@@ -38,7 +38,6 @@ import GHC.Hs.Binds
 -- others:
 import GHC.Tc.Types.Evidence
 import GHC.Core
-import GHC.Types.Id( Id )
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Basic
@@ -252,8 +251,10 @@ data HsExpr p
                              -- Turned from HsVar to HsUnboundVar by the
                              --   renamer, when it finds an out-of-scope
                              --   variable or hole.
-                             -- The (XUnboundVar p) field becomes Id
-                             --   after typechecking
+                             -- The (XUnboundVar p) field becomes an HoleExprRef
+                             --   after typechecking; this is where the
+                             --   erroring expression will be written after
+                             --   solving. See Note [Holes] in GHC.Tc.Types.Constraint.
 
   | HsConLikeOut (XConLikeOut p)
                  ConLike     -- ^ After typechecker only; must be different
@@ -608,7 +609,11 @@ type instance XApp           (GhcPass _) = NoExtField
 
 type instance XUnboundVar    GhcPs = NoExtField
 type instance XUnboundVar    GhcRn = NoExtField
-type instance XUnboundVar    GhcTc = Id
+type instance XUnboundVar    GhcTc = HoleExprRef
+  -- We really don't need the whole HoleExprRef; just the IORef EvTerm
+  -- would be enough. But then deriving a Data instance becomes impossible.
+  -- Much, much easier just to define HoleExprRef with a Data instance and
+  -- store the whole structure.
 
 type instance XAppTypeE      GhcPs = NoExtField
 type instance XAppTypeE      GhcRn = NoExtField

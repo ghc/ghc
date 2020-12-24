@@ -1,12 +1,12 @@
 
 holes3.hs:3:5: error:
-    • Found hole: _ :: t
-      Where: ‘t’ is a rigid type variable bound by
-               the inferred type of f :: t
+    • Found hole: _ :: p
+      Where: ‘p’ is a rigid type variable bound by
+               the inferred type of f :: p
                at holes3.hs:3:1-5
     • In an equation for ‘f’: f = _
-    • Relevant bindings include f :: t (bound at holes3.hs:3:1)
-      Valid hole fits include f :: forall {t}. t
+    • Relevant bindings include f :: p (bound at holes3.hs:3:1)
+      Valid hole fits include f :: forall {p}. p
 
 holes3.hs:6:7: error:
     • Found hole: _gr :: Char
@@ -16,7 +16,7 @@ holes3.hs:6:7: error:
         x :: Int (bound at holes3.hs:6:3)
         g :: Int -> Char (bound at holes3.hs:6:1)
       Valid hole fits include
-        f :: forall {t}. t
+        f :: forall {p}. p
         maxBound :: forall a. Bounded a => a
         minBound :: forall a. Bounded a => a
 
@@ -29,7 +29,7 @@ holes3.hs:8:5: error:
     • Relevant bindings include h :: [Char] (bound at holes3.hs:8:1)
       Valid hole fits include
         h :: [Char]
-        f :: forall {t}. t
+        f :: forall {p}. p
         [] :: forall a. [a]
         mempty :: forall a. Monoid a => a
 
@@ -48,7 +48,7 @@ holes3.hs:11:15: error:
         z :: [a] -> [a]
         g :: Int -> Char
         h :: [Char]
-        f :: forall {t}. t
+        f :: forall {p}. p
         otherwise :: Bool
         False :: Bool
         True :: Bool

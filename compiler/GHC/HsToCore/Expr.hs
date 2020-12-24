@@ -268,7 +268,8 @@ dsExpr :: HsExpr GhcTc -> DsM CoreExpr
 dsExpr (HsVar    _ (L _ id))           = dsHsVar id
 dsExpr (HsRecFld _ (Unambiguous id _)) = dsHsVar id
 dsExpr (HsRecFld _ (Ambiguous   id _)) = dsHsVar id
-dsExpr (HsUnboundVar id _)             = dsHsVar id
+dsExpr (HsUnboundVar (HER ref _ _) _)  = dsEvTerm =<< readMutVar ref
+        -- See Note [Holes] in GHC.Tc.Types.Constraint
 
 dsExpr (HsPar _ e)            = dsLExpr e
 dsExpr (ExprWithTySig _ e _)  = dsLExpr e
