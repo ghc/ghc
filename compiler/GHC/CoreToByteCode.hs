@@ -604,8 +604,8 @@ returnUnboxedReps d s szb reps = do
              []    -> return (unitOL $ RETURN_UBX V)
              [rep] -> return (unitOL $ RETURN_UBX (toArgRep platform rep))
              -- otherwise use RETURN_T with a tuple descriptor
-             _     -> do
-               let (tuple_info, args_offsets) = layoutTuple profile 0 (primRepCmmType platform) reps
+             nv_reps -> do
+               let (tuple_info, args_offsets) = layoutTuple profile 0 (primRepCmmType platform) nv_reps
                    args_ptrs = map (\(rep, off) -> (isFollowableArg (toArgRep platform rep), off)) args_offsets
                tuple_bco <- emitBc (tupleBCO platform tuple_info args_ptrs)
                return $ PUSH_UBX (mkTupleInfoLit platform tuple_info) 1 `consOL`
@@ -1053,8 +1053,9 @@ doCase d s p scrut bndr alts
         (bndr_size, tuple_info, args_offsets)
            | isUnboxedTupleType bndr_ty =
                let bndr_ty = primRepCmmType platform
+                   bndr_reps = filter (not.isVoidRep) (bcIdPrimReps bndr)
                    (tuple_info, args_offsets) =
-                       layoutTuple profile 0 bndr_ty (bcIdPrimReps bndr)
+                       layoutTuple profile 0 bndr_ty bndr_reps
                in ( wordsToBytes platform (tupleSize tuple_info)
                   , tuple_info
                   , args_offsets
