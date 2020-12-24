@@ -12,3 +12,6 @@
 :doc func1
 :doc func2
 :doc func3
+:doc PatSyn
+:doc TyCl
+:doc TyFam
