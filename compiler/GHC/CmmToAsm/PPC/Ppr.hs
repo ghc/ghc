@@ -66,8 +66,9 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
             _ -> pprLabel platform lbl) $$ -- blocks guaranteed not null,
                                            -- so label needed
          vcat (map (pprBasicBlock config top_info) blocks) $$
-         (if ncgDwarfEnabled config
-          then pdoc platform (mkAsmTempEndLabel lbl) <> char ':' else empty) $$
+         ppWhen (ncgDwarfEnabled config) (pdoc platform (mkAsmTempEndLabel lbl)
+                                          <> char ':' $$
+                                          pprProcEndLabel platform lbl) $$
          pprSizeDecl platform lbl
 
     Just (CmmStaticsRaw info_lbl _) ->
@@ -127,15 +128,20 @@ pprFunctionPrologue platform lab =  pprGloblDecl platform lab
                         $$ text "\t.localentry\t" <> pdoc platform lab
                         <> text ",.-" <> pdoc platform lab
 
+pprProcEndLabel :: Platform -> CLabel -- ^ Procedure name
+                -> SDoc
+pprProcEndLabel platform lbl =
+    pdoc platform (mkAsmTempProcEndLabel lbl) <> char ':'
+
 pprBasicBlock :: NCGConfig -> LabelMap RawCmmStatics -> NatBasicBlock Instr
               -> SDoc
 pprBasicBlock config info_env (BasicBlock blockid instrs)
   = maybe_infotable $$
     pprLabel platform asmLbl $$
     vcat (map (pprInstr platform) instrs) $$
-    (if  ncgDwarfEnabled config
-      then pdoc platform (mkAsmTempEndLabel asmLbl) <> char ':'
-      else empty
+    ppWhen (ncgDwarfEnabled config) (
+      pdoc platform (mkAsmTempEndLabel asmLbl) <> char ':'
+      <> pprProcEndLabel platform asmLbl
     )
   where
     asmLbl = blockLbl blockid
