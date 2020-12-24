@@ -51,7 +51,8 @@ tt = testOneFile "/home/alanz/mysrc/git.haskell.org/worktree/exactprint/_build/s
  -- "cases/AddDecl2.hs" changeAddDecl2
  -- "cases/AddDecl3.hs" changeAddDecl3
  -- "cases/LocalDecls.hs" changeLocalDecls
- "cases/LocalDecls2.hs" changeLocalDecls2
+ -- "cases/LocalDecls2.hs" changeLocalDecls2
+ "cases/WhereIn3a.hs" changeWhereIn3a
 
 
 
@@ -314,8 +315,8 @@ changeLocalDecls libdir ans (L l p) = do
 -- prior local decl. So it adds a "where" annotation.
 changeLocalDecls2 :: Changer
 changeLocalDecls2 libdir ans (L l p) = do
-  Right (declAnns, d@(L ld (ValD _ decl))) <- withDynFlags libdir (\df -> parseDecl df "decl" "nn = 2")
-  Right (sigAnns, s@(L ls (SigD _ sig)))   <- withDynFlags libdir (\df -> parseDecl df "sig"  "nn :: Int")
+  Right (_, d@(L ld (ValD _ decl))) <- withDynFlags libdir (\df -> parseDecl df "decl" "nn = 2")
+  Right (_, s@(L ls (SigD _ sig)))  <- withDynFlags libdir (\df -> parseDecl df "sig"  "nn :: Int")
   let decl' = setEntryDP' (L ld decl) (DP (1, 0))
   let  sig' = setEntryDP' (L ls  sig) (DP (1, 5))
   let (p',(ans',_),_w) = runTransform mempty doAddLocal
@@ -324,41 +325,41 @@ changeLocalDecls2 libdir ans (L l p) = do
                         -> Transform (LMatch GhcPs (LHsExpr GhcPs))
       replaceLocalBinds m@(L lm (Match ma mln pats (GRHSs _ rhs EmptyLocalBinds{}))) = do
         newSpan <- uniqueSrcSpanT
-        -- let
-        --   newAnnKey = AnnKey (rs newSpan) (CN "HsValBinds")
-        --   addWhere mkds =
-        --     case Map.lookup (mkAnnKey m) mkds of
-        --       Nothing -> error "wtf"
-        --       Just ann -> Map.insert newAnnKey ann2 mkds2
-        --         where
-        --           ann1 = ann { annsDP = annsDP ann ++ [(G AnnWhere,DP (1,2))]
-        --                      , annCapturedSpan = Just newAnnKey
-        --                      , annSortKey = Just [rs ls, rs ld]
-        --                      }
-        --           mkds2 = Map.insert (mkAnnKey m) ann1 mkds
-        --           ann2 = annNone
-        --                      { annEntryDelta     = DP (1,0) }
-        -- modifyAnnsT addWhere
         let an = ApiAnn (Anchor (rs newSpan) (MovedAnchor (DP (1,3))))
                         (AnnList Nothing Nothing [(undeltaSpan (rs newSpan) AnnWhere (DP (0,0)))] [])
-                        []
+                        noCom
         let decls = [s,d]
-        -- logTr $ "(m,decls)=" ++ show (mkAnnKey m,map mkAnnKey decls)
         let sortKey = captureOrder' decls
         let binds = (HsValBinds an (ValBinds sortKey (listToBag $ [decl'])
                                     [sig']))
         return (L lm (Match ma mln pats (GRHSs noExtField rhs binds)))
       replaceLocalBinds x = return x
-  -- putStrLn $ "log:" ++ intercalate "\n" w
   return (ans,L l p')
 
+-- ---------------------------------------------------------------------
+
+changeWhereIn3a :: Changer
+changeWhereIn3a libdir ans (GHC.L l p) = do
+  let decls0 = GHC.hsmodDecls p
+      (decls,(ans',_),w) = runTransform mempty (balanceCommentsList decls0)
+      d0 = head $ drop 0 decls
+      d1 = head $ drop 2 decls
+      d2 = head $ drop 3 decls
+      d0' = setEntryDP' d0 (DP (2, 0))
+      d1' = setEntryDP' d1 (DP (2, 0))
+      d2' = setEntryDP' d2 (DP (2, 0))
+      decls' = d2':d1':d0':(tail decls)
+  debugM $ unlines w
+  debugM $ "changeWhereIn3a:d0':" ++ showAst d0'
+  let p2 = p { GHC.hsmodDecls = decls'}
+  return (ans,GHC.L l p2)
 
 -- ---------------------------------------------------------------------
 -- Next section to be moved to the appropriate library
 
 remove :: (Monoid t) => LocatedAn t a -> LocatedAn u b -> LocatedAn t a
 remove (L (SrcSpanAnn ApiAnnNotUsed l) v) lb
-  = L (SrcSpanAnn (ApiAnn (Anchor (realSrcSpan l) (DeletedAnchor $ locatedAnAnchor lb)) mempty []) l) v
+  = L (SrcSpanAnn (ApiAnn (Anchor (realSrcSpan l) (DeletedAnchor $ locatedAnAnchor lb)) mempty noCom) l) v
 remove (L (SrcSpanAnn (ApiAnn a an cs) l) v) lb
   = L (SrcSpanAnn (ApiAnn (Anchor (anchor a) (DeletedAnchor $ locatedAnAnchor lb)) an cs) l) v
 

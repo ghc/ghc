@@ -209,7 +209,7 @@ import qualified GHC.Data.Stream as Stream
 import GHC.Data.Stream (Stream)
 
 import Data.Data hiding (Fixity, TyCon)
-import Data.Maybe       ( fromJust )
+import Data.Maybe       ( fromJust, fromMaybe )
 import Data.List        ( nub, isPrefixOf, partition )
 import Control.Monad
 import Data.IORef
@@ -443,7 +443,7 @@ hscParse' mod_summary
 
             let api_anns = ApiAnns {
                       apiAnnEofPos = eof_pos pst,
-                      apiAnnRogueComments = comment_q pst
+                      apiAnnRogueComments = (fromMaybe [] (header_comments pst)) ++ comment_q pst
                    }
                 res = HsParsedModule {
                       hpm_module    = rdr_module,

@@ -944,7 +944,7 @@ data Sig pass
   -- | PatSynSig (XPatSynSig pass) [LocatedN (IdP pass)] (LHsSigType pass) -- AZ: old one
       -- P :: forall a b. Req => Prov => ty
 
-      -- | A signature for a class method
+      -- - | A signature for a class method
       --   False: ordinary class-method signature
       --   True:  generic-default class method signature
       -- e.g.   class C a where
@@ -957,7 +957,7 @@ data Sig pass
   | ClassOpSig (XClassOpSig pass) Bool [LIdP pass] (LHsSigType pass)
   -- | ClassOpSig (XClassOpSig pass) Bool [LocatedN (IdP pass)] (LHsSigType pass) -- AZ: old one
 
-        -- | A type signature in generated code, notably the code
+        -- - | A type signature in generated code, notably the code
         -- generated for record selectors.  We simply record
         -- the desired Id itself, replete with its name, type
         -- and IdDetails.  Otherwise it's just like a type

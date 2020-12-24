@@ -20,6 +20,7 @@ module Utils
 import Control.Monad.State
 -- import qualified Data.ByteString as B
 -- import GHC.Generics hiding (Fixity)
+import Data.Function
 import Data.Ord (comparing)
 
 import GHC.Hs.Dump
@@ -261,7 +262,7 @@ isExactName = False `mkQ` isExact
 
 -- ---------------------------------------------------------------------
 
-ghcCommentText :: RealLocated AnnotationComment -> String
+ghcCommentText :: LAnnotationComment -> String
 ghcCommentText (L _ (AnnDocCommentNext s))  = s
 ghcCommentText (L _ (AnnDocCommentPrev s))  = s
 ghcCommentText (L _ (AnnDocCommentNamed s)) = s
@@ -270,15 +271,15 @@ ghcCommentText (L _ (AnnDocOptions s))      = s
 ghcCommentText (L _ (AnnLineComment s))     = s
 ghcCommentText (L _ (AnnBlockComment s))    = s
 
-tokComment :: RealLocated AnnotationComment -> Comment
+tokComment :: LAnnotationComment -> Comment
 tokComment t@(L lt _) = mkComment (ghcCommentText t) lt
 
-mkComment :: String -> RealSrcSpan -> Comment
-mkComment c ss = Comment c ss Nothing
+mkComment :: String -> Anchor -> Comment
+mkComment c anc = Comment c anc Nothing
 
 -- | Makes a comment which originates from a specific keyword.
 mkKWComment :: AnnKeywordId -> RealSrcSpan -> Comment
-mkKWComment kw ss = Comment (keywordToString $ G kw) ss (Just kw)
+mkKWComment kw ss = Comment (keywordToString $ G kw) (Anchor ss UnchangedAnchor) (Just kw)
 
 comment2dp :: (Comment,  DeltaPos) -> (KeywordId, DeltaPos)
 comment2dp = first AnnComment
@@ -292,14 +293,17 @@ rogueComments as = extractRogueComments as
 
 -- extractComments :: ApiAnns -> [Comment]
 -- extractComments anns
---   -- cm has type :: Map RealSrcSpan [RealLocated AnnotationComment]
+--   -- cm has type :: Map RealSrcSpan [LAnnotationComment]
 --   -- = map tokComment . sortRealLocated . concat $ Map.elems (apiAnnComments anns)
 --   = []
 
 extractRogueComments :: ApiAnns -> [Comment]
 extractRogueComments anns
-  -- cm has type :: Map RealSrcSpan [RealLocated AnnotationComment]
-  = map tokComment $ sortRealLocated  (apiAnnRogueComments anns)
+  -- cm has type :: Map RealSrcSpan [LAnnotationComment]
+  = map tokComment $ sortAnchorLocated  (apiAnnRogueComments anns)
+
+sortAnchorLocated :: [GenLocated Anchor a] -> [GenLocated Anchor a]
+sortAnchorLocated = sortBy (compare `on` (anchor . getLoc))
 
 
 getAnnotationEP :: (Data a) =>  Located a  -> Anns -> Maybe Annotation

@@ -77,14 +77,14 @@ checkLine line s
            size   = length pragma
            mSrcLoc = mkSrcLoc (mkFastString "LINE")
            ss     = mkSrcSpan (mSrcLoc line 1) (mSrcLoc line (size+1))
-       in (res, Just $ mkComment pragma (rs ss))
+       in (res, Just $ mkComment pragma (GHC.spanAsAnchor ss))
   -- Deal with shebang/cpp directives too
   -- x |  "#" `isPrefixOf` s = ("",Just $ Comment ((line, 1), (line, length s)) s)
   |  "#!" `isPrefixOf` s =
     let mSrcLoc = mkSrcLoc (mkFastString "SHEBANG")
         ss = mkSrcSpan (mSrcLoc line 1) (mSrcLoc line (length s))
     in
-    ("",Just $ mkComment s (rs ss))
+    ("",Just $ mkComment s (GHC.spanAsAnchor ss))
   | otherwise = (s, Nothing)
 
 getPragma :: String -> (String, String)

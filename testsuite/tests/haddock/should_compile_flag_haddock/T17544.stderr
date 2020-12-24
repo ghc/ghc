@@ -5,7 +5,9 @@
  { T17544.hs:1:1 }
  (HsModule
   (ApiAnn
-   { T17544.hs:1:1 }
+   (Anchor
+    { T17544.hs:1:1 }
+    (UnchangedAnchor))
    (AnnsModule
     [(AddApiAnn AnnModule { T17544.hs:3:1-6 })
     ,(AddApiAnn AnnWhere { T17544.hs:3:15-19 })]
@@ -14,7 +16,8 @@
      (Nothing)
      []
      []))
-   [])
+   (AnnComments
+    []))
   (VirtualBraces
    (1))
   (Just
@@ -24,16 +27,26 @@
   (Nothing)
   []
   [(L
-    (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:(5,1)-(6,16) })
+    (SrcSpanAnn (ApiAnn
+                 (Anchor
+                  { T17544.hs:(5,1)-(6,16) }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (AnnComments
+                  [])) { T17544.hs:(5,1)-(6,16) })
     (TyClD
      (NoExtField)
      (ClassDecl
       ((,)
        (ApiAnn
-        { T17544.hs:(5,1)-(6,16) }
+        (Anchor
+         { T17544.hs:(5,1)-(6,16) }
+         (UnchangedAnchor))
         [(AddApiAnn AnnClass { T17544.hs:5:1-5 })
         ,(AddApiAnn AnnWhere { T17544.hs:5:12-16 })]
-        [])
+        (AnnComments
+         []))
        (VirtualBraces
         (3)))
       (Nothing)
@@ -47,9 +60,12 @@
          (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:5:10 })
          (UserTyVar
           (ApiAnn
-           { T17544.hs:5:10 }
+           (Anchor
+            { T17544.hs:5:10 }
+            (UnchangedAnchor))
            []
-           [])
+           (AnnComments
+            []))
           (())
           (L
            (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:5:10 })
@@ -61,9 +77,12 @@
         (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:6:3-16 })
         (ClassOpSig
          (ApiAnn
-          { T17544.hs:6:3-4 }
+          (Anchor
+           { T17544.hs:6:3-4 }
+           (UnchangedAnchor))
           [(AddApiAnn AnnDcolon { T17544.hs:6:6-7 })]
-          [])
+          (AnnComments
+           []))
          (False)
          [(L
            (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:6:3-4 })
@@ -75,47 +94,56 @@
            (NoExtField)
            (HsOuterImplicit
             (NoExtField))
-          (L
-           (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:6:9-16 })
-           (HsFunTy
-            (ApiAnn
-             { T17544.hs:6:9 }
-             (AddRarrowAnn
-              { T17544.hs:6:11-12 })
-             [])
-            (HsUnrestrictedArrow
-             (NormalSyntax))
-            (L
-             (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:6:9 })
-             (HsTyVar
-              (ApiAnn
+           (L
+            (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:6:9-16 })
+            (HsFunTy
+             (ApiAnn
+              (Anchor
                { T17544.hs:6:9 }
-               []
-               [])
-              (NotPromoted)
-              (L
-               (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:6:9 })
-               (Unqual
-                {OccName: a}))))
-            (L
-             (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:6:14-16 })
-             (HsDocTy
-              (ApiAnnNotUsed)
-              (L
-               (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:6:14-16 })
-               (HsTyVar
-                (ApiAnn
-                 { T17544.hs:6:14-16 }
-                 []
-                 [])
-                (NotPromoted)
-                (L
-                 (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:6:14-16 })
-                 (Unqual
-                  {OccName: Int}))))
-              (L
-               { T17544.hs:7:5-23 }
-               (HsDocString
+               (UnchangedAnchor))
+              (AddRarrowAnn
+               { T17544.hs:6:11-12 })
+              (AnnComments
+               []))
+             (HsUnrestrictedArrow
+              (NormalSyntax))
+             (L
+              (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:6:9 })
+              (HsTyVar
+               (ApiAnn
+                (Anchor
+                 { T17544.hs:6:9 }
+                 (UnchangedAnchor))
+                []
+                (AnnComments
+                 []))
+               (NotPromoted)
+               (L
+                (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:6:9 })
+                (Unqual
+                 {OccName: a}))))
+             (L
+              (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:6:14-16 })
+              (HsDocTy
+               (ApiAnnNotUsed)
+               (L
+                (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:6:14-16 })
+                (HsTyVar
+                 (ApiAnn
+                  (Anchor
+                   { T17544.hs:6:14-16 }
+                   (UnchangedAnchor))
+                  []
+                  (AnnComments
+                   []))
+                 (NotPromoted)
+                 (L
+                  (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:6:14-16 })
+                  (Unqual
+                   {OccName: Int}))))
+               (L
+                { T17544.hs:7:5-23 }
+                (HsDocString
                  " comment on Int"))))))))))]
       {Bag(LocatedA (HsBind GhcPs)):
        []}
@@ -123,16 +151,26 @@
       []
       [])))
   ,(L
-    (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:(9,1)-(10,16) })
+    (SrcSpanAnn (ApiAnn
+                 (Anchor
+                  { T17544.hs:(9,1)-(10,16) }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (AnnComments
+                  [])) { T17544.hs:(9,1)-(10,16) })
     (TyClD
      (NoExtField)
      (ClassDecl
       ((,)
        (ApiAnn
-        { T17544.hs:(9,1)-(10,16) }
+        (Anchor
+         { T17544.hs:(9,1)-(10,16) }
+         (UnchangedAnchor))
         [(AddApiAnn AnnClass { T17544.hs:9:1-5 })
         ,(AddApiAnn AnnWhere { T17544.hs:9:12-16 })]
-        [])
+        (AnnComments
+         []))
        (VirtualBraces
         (3)))
       (Nothing)
@@ -146,9 +184,12 @@
          (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:9:10 })
          (UserTyVar
           (ApiAnn
-           { T17544.hs:9:10 }
+           (Anchor
+            { T17544.hs:9:10 }
+            (UnchangedAnchor))
            []
-           [])
+           (AnnComments
+            []))
           (())
           (L
            (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:9:10 })
@@ -160,9 +201,12 @@
         (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:10:3-16 })
         (ClassOpSig
          (ApiAnn
-          { T17544.hs:10:3-4 }
+          (Anchor
+           { T17544.hs:10:3-4 }
+           (UnchangedAnchor))
           [(AddApiAnn AnnDcolon { T17544.hs:10:6-7 })]
-          [])
+          (AnnComments
+           []))
          (False)
          [(L
            (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:10:3-4 })
@@ -174,39 +218,48 @@
            (NoExtField)
            (HsOuterImplicit
             (NoExtField))
-          (L
-           (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:10:9-16 })
-           (HsFunTy
-            (ApiAnn
-             { T17544.hs:10:9 }
-             (AddRarrowAnn
-              { T17544.hs:10:11-12 })
-             [])
-            (HsUnrestrictedArrow
-             (NormalSyntax))
-            (L
-             (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:10:9 })
-             (HsTyVar
-              (ApiAnn
+           (L
+            (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:10:9-16 })
+            (HsFunTy
+             (ApiAnn
+              (Anchor
                { T17544.hs:10:9 }
-               []
-               [])
-              (NotPromoted)
-              (L
-               (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:10:9 })
-               (Unqual
-                {OccName: a}))))
-            (L
-             (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:10:14-16 })
-             (HsTyVar
-              (ApiAnn
-               { T17544.hs:10:14-16 }
-               []
-               [])
-              (NotPromoted)
-              (L
-               (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:10:14-16 })
-               (Unqual
+               (UnchangedAnchor))
+              (AddRarrowAnn
+               { T17544.hs:10:11-12 })
+              (AnnComments
+               []))
+             (HsUnrestrictedArrow
+              (NormalSyntax))
+             (L
+              (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:10:9 })
+              (HsTyVar
+               (ApiAnn
+                (Anchor
+                 { T17544.hs:10:9 }
+                 (UnchangedAnchor))
+                []
+                (AnnComments
+                 []))
+               (NotPromoted)
+               (L
+                (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:10:9 })
+                (Unqual
+                 {OccName: a}))))
+             (L
+              (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:10:14-16 })
+              (HsTyVar
+               (ApiAnn
+                (Anchor
+                 { T17544.hs:10:14-16 }
+                 (UnchangedAnchor))
+                []
+                (AnnComments
+                 []))
+               (NotPromoted)
+               (L
+                (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:10:14-16 })
+                (Unqual
                  {OccName: Int}))))))))))]
       {Bag(LocatedA (HsBind GhcPs)):
        []}
@@ -218,16 +271,26 @@
          (HsDocString
           " comment on f2")))])))
   ,(L
-    (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:(13,1)-(14,16) })
+    (SrcSpanAnn (ApiAnn
+                 (Anchor
+                  { T17544.hs:(13,1)-(14,16) }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (AnnComments
+                  [])) { T17544.hs:(13,1)-(14,16) })
     (TyClD
      (NoExtField)
      (ClassDecl
       ((,)
        (ApiAnn
-        { T17544.hs:(13,1)-(14,16) }
+        (Anchor
+         { T17544.hs:(13,1)-(14,16) }
+         (UnchangedAnchor))
         [(AddApiAnn AnnClass { T17544.hs:13:1-5 })
         ,(AddApiAnn AnnWhere { T17544.hs:13:12-16 })]
-        [])
+        (AnnComments
+         []))
        (VirtualBraces
         (3)))
       (Nothing)
@@ -241,9 +304,12 @@
          (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:13:10 })
          (UserTyVar
           (ApiAnn
-           { T17544.hs:13:10 }
+           (Anchor
+            { T17544.hs:13:10 }
+            (UnchangedAnchor))
            []
-           [])
+           (AnnComments
+            []))
           (())
           (L
            (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:13:10 })
@@ -255,9 +321,12 @@
         (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:14:3-16 })
         (ClassOpSig
          (ApiAnn
-          { T17544.hs:14:3-4 }
+          (Anchor
+           { T17544.hs:14:3-4 }
+           (UnchangedAnchor))
           [(AddApiAnn AnnDcolon { T17544.hs:14:6-7 })]
-          [])
+          (AnnComments
+           []))
          (False)
          [(L
            (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:14:3-4 })
@@ -269,39 +338,48 @@
            (NoExtField)
            (HsOuterImplicit
             (NoExtField))
-          (L
-           (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:14:9-16 })
-           (HsFunTy
-            (ApiAnn
-             { T17544.hs:14:9 }
-             (AddRarrowAnn
-              { T17544.hs:14:11-12 })
-             [])
-            (HsUnrestrictedArrow
-             (NormalSyntax))
-            (L
-             (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:14:9 })
-             (HsTyVar
-              (ApiAnn
+           (L
+            (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:14:9-16 })
+            (HsFunTy
+             (ApiAnn
+              (Anchor
                { T17544.hs:14:9 }
-               []
-               [])
-              (NotPromoted)
-              (L
-               (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:14:9 })
-               (Unqual
-                {OccName: a}))))
-            (L
-             (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:14:14-16 })
-             (HsTyVar
-              (ApiAnn
-               { T17544.hs:14:14-16 }
-               []
-               [])
-              (NotPromoted)
-              (L
-               (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:14:14-16 })
-               (Unqual
+               (UnchangedAnchor))
+              (AddRarrowAnn
+               { T17544.hs:14:11-12 })
+              (AnnComments
+               []))
+             (HsUnrestrictedArrow
+              (NormalSyntax))
+             (L
+              (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:14:9 })
+              (HsTyVar
+               (ApiAnn
+                (Anchor
+                 { T17544.hs:14:9 }
+                 (UnchangedAnchor))
+                []
+                (AnnComments
+                 []))
+               (NotPromoted)
+               (L
+                (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:14:9 })
+                (Unqual
+                 {OccName: a}))))
+             (L
+              (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:14:14-16 })
+              (HsTyVar
+               (ApiAnn
+                (Anchor
+                 { T17544.hs:14:14-16 }
+                 (UnchangedAnchor))
+                []
+                (AnnComments
+                 []))
+               (NotPromoted)
+               (L
+                (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:14:14-16 })
+                (Unqual
                  {OccName: Int}))))))))))]
       {Bag(LocatedA (HsBind GhcPs)):
        []}
@@ -316,16 +394,26 @@
       (HsDocString
        " comment on C3"))))
   ,(L
-    (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:(17,1)-(20,16) })
+    (SrcSpanAnn (ApiAnn
+                 (Anchor
+                  { T17544.hs:(17,1)-(20,16) }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (AnnComments
+                  [])) { T17544.hs:(17,1)-(20,16) })
     (TyClD
      (NoExtField)
      (ClassDecl
       ((,)
        (ApiAnn
-        { T17544.hs:(17,1)-(20,16) }
+        (Anchor
+         { T17544.hs:(17,1)-(20,16) }
+         (UnchangedAnchor))
         [(AddApiAnn AnnClass { T17544.hs:17:1-5 })
         ,(AddApiAnn AnnWhere { T17544.hs:17:12-16 })]
-        [])
+        (AnnComments
+         []))
        (VirtualBraces
         (3)))
       (Nothing)
@@ -339,9 +427,12 @@
          (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:17:10 })
          (UserTyVar
           (ApiAnn
-           { T17544.hs:17:10 }
+           (Anchor
+            { T17544.hs:17:10 }
+            (UnchangedAnchor))
            []
-           [])
+           (AnnComments
+            []))
           (())
           (L
            (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:17:10 })
@@ -353,9 +444,12 @@
         (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:18:3-16 })
         (ClassOpSig
          (ApiAnn
-          { T17544.hs:18:3-4 }
+          (Anchor
+           { T17544.hs:18:3-4 }
+           (UnchangedAnchor))
           [(AddApiAnn AnnDcolon { T17544.hs:18:6-7 })]
-          [])
+          (AnnComments
+           []))
          (False)
          [(L
            (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:18:3-4 })
@@ -367,47 +461,59 @@
            (NoExtField)
            (HsOuterImplicit
             (NoExtField))
-          (L
-           (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:18:9-16 })
-           (HsFunTy
-            (ApiAnn
-             { T17544.hs:18:9 }
-             (AddRarrowAnn
-              { T17544.hs:18:11-12 })
-             [])
-            (HsUnrestrictedArrow
-             (NormalSyntax))
-            (L
-             (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:18:9 })
-             (HsTyVar
-              (ApiAnn
+           (L
+            (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:18:9-16 })
+            (HsFunTy
+             (ApiAnn
+              (Anchor
                { T17544.hs:18:9 }
-               []
-               [])
-              (NotPromoted)
-              (L
-               (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:18:9 })
-               (Unqual
-                {OccName: a}))))
-            (L
-             (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:18:14-16 })
-             (HsTyVar
-              (ApiAnn
-               { T17544.hs:18:14-16 }
-               []
-               [])
-              (NotPromoted)
-              (L
-               (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:18:14-16 })
-               (Unqual
+               (UnchangedAnchor))
+              (AddRarrowAnn
+               { T17544.hs:18:11-12 })
+              (AnnComments
+               []))
+             (HsUnrestrictedArrow
+              (NormalSyntax))
+             (L
+              (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:18:9 })
+              (HsTyVar
+               (ApiAnn
+                (Anchor
+                 { T17544.hs:18:9 }
+                 (UnchangedAnchor))
+                []
+                (AnnComments
+                 []))
+               (NotPromoted)
+               (L
+                (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:18:9 })
+                (Unqual
+                 {OccName: a}))))
+             (L
+              (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:18:14-16 })
+              (HsTyVar
+               (ApiAnn
+                (Anchor
+                 { T17544.hs:18:14-16 }
+                 (UnchangedAnchor))
+                []
+                (AnnComments
+                 []))
+               (NotPromoted)
+               (L
+                (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:18:14-16 })
+                (Unqual
                  {OccName: Int}))))))))))
       ,(L
         (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:20:3-16 })
         (ClassOpSig
          (ApiAnn
-          { T17544.hs:20:3-4 }
+          (Anchor
+           { T17544.hs:20:3-4 }
+           (UnchangedAnchor))
           [(AddApiAnn AnnDcolon { T17544.hs:20:6-7 })]
-          [])
+          (AnnComments
+           []))
          (False)
          [(L
            (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:20:3-4 })
@@ -419,39 +525,48 @@
            (NoExtField)
            (HsOuterImplicit
             (NoExtField))
-          (L
-           (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:20:9-16 })
-           (HsFunTy
-            (ApiAnn
-             { T17544.hs:20:9 }
-             (AddRarrowAnn
-              { T17544.hs:20:11-12 })
-             [])
-            (HsUnrestrictedArrow
-             (NormalSyntax))
-            (L
-             (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:20:9 })
-             (HsTyVar
-              (ApiAnn
+           (L
+            (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:20:9-16 })
+            (HsFunTy
+             (ApiAnn
+              (Anchor
                { T17544.hs:20:9 }
-               []
-               [])
-              (NotPromoted)
-              (L
-               (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:20:9 })
-               (Unqual
-                {OccName: a}))))
-            (L
-             (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:20:14-16 })
-             (HsTyVar
-              (ApiAnn
-               { T17544.hs:20:14-16 }
-               []
-               [])
-              (NotPromoted)
-              (L
-               (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:20:14-16 })
-               (Unqual
+               (UnchangedAnchor))
+              (AddRarrowAnn
+               { T17544.hs:20:11-12 })
+              (AnnComments
+               []))
+             (HsUnrestrictedArrow
+              (NormalSyntax))
+             (L
+              (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:20:9 })
+              (HsTyVar
+               (ApiAnn
+                (Anchor
+                 { T17544.hs:20:9 }
+                 (UnchangedAnchor))
+                []
+                (AnnComments
+                 []))
+               (NotPromoted)
+               (L
+                (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:20:9 })
+                (Unqual
+                 {OccName: a}))))
+             (L
+              (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:20:14-16 })
+              (HsTyVar
+               (ApiAnn
+                (Anchor
+                 { T17544.hs:20:14-16 }
+                 (UnchangedAnchor))
+                []
+                (AnnComments
+                 []))
+               (NotPromoted)
+               (L
+                (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:20:14-16 })
+                (Unqual
                  {OccName: Int}))))))))))]
       {Bag(LocatedA (HsBind GhcPs)):
        []}
@@ -459,18 +574,28 @@
       []
       [])))
   ,(L
-    (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:22:1-30 })
+    (SrcSpanAnn (ApiAnn
+                 (Anchor
+                  { T17544.hs:22:1-30 }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (AnnComments
+                  [])) { T17544.hs:22:1-30 })
     (TyClD
      (NoExtField)
      (ClassDecl
       ((,)
        (ApiAnn
-        { T17544.hs:22:1-30 }
+        (Anchor
+         { T17544.hs:22:1-30 }
+         (UnchangedAnchor))
         [(AddApiAnn AnnClass { T17544.hs:22:1-5 })
         ,(AddApiAnn AnnWhere { T17544.hs:22:12-16 })
         ,(AddApiAnn AnnOpenC { T17544.hs:22:18 })
         ,(AddApiAnn AnnCloseC { T17544.hs:22:30 })]
-        [])
+        (AnnComments
+         []))
        (ExplicitBraces))
       (Nothing)
       (L
@@ -483,9 +608,12 @@
          (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:22:10 })
          (UserTyVar
           (ApiAnn
-           { T17544.hs:22:10 }
+           (Anchor
+            { T17544.hs:22:10 }
+            (UnchangedAnchor))
            []
-           [])
+           (AnnComments
+            []))
           (())
           (L
            (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:22:10 })
@@ -500,9 +628,12 @@
         (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:22:20-28 })
         (FamilyDecl
          (ApiAnn
-          { T17544.hs:22:20-28 }
+          (Anchor
+           { T17544.hs:22:20-28 }
+           (UnchangedAnchor))
           [(AddApiAnn AnnData { T17544.hs:22:20-23 })]
-          [])
+          (AnnComments
+           []))
          (DataFamily)
          (NotTopLevel)
          (L
@@ -515,9 +646,12 @@
             (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:22:28 })
             (UserTyVar
              (ApiAnn
-              { T17544.hs:22:28 }
+              (Anchor
+               { T17544.hs:22:28 }
+               (UnchangedAnchor))
               []
-              [])
+              (AnnComments
+               []))
              (())
              (L
               (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:22:28 })
@@ -532,50 +666,66 @@
       []
       [])))
   ,(L
-    (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:(23,1)-(25,18) })
+    (SrcSpanAnn (ApiAnn
+                 (Anchor
+                  { T17544.hs:(23,1)-(25,18) }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (AnnComments
+                  [])) { T17544.hs:(23,1)-(25,18) })
     (InstD
      (NoExtField)
      (ClsInstD
       (NoExtField)
       (ClsInstDecl
        (ApiAnn
-        { T17544.hs:23:1-8 }
+        (Anchor
+         { T17544.hs:23:1-8 }
+         (UnchangedAnchor))
         [(AddApiAnn AnnInstance { T17544.hs:23:1-8 })
         ,(AddApiAnn AnnWhere { T17544.hs:23:17-21 })]
-        [])
+        (AnnComments
+         []))
        (L
         (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:23:10-15 })
         (HsSig
          (NoExtField)
          (HsOuterImplicit
           (NoExtField))
-        (L
-         (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:23:10-15 })
-         (HsAppTy
-          (NoExtField)
-          (L
-           (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:23:10-11 })
-           (HsTyVar
-            (ApiAnn
-             { T17544.hs:23:10-11 }
-             []
-             [])
-            (NotPromoted)
-            (L
-             (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:23:10-11 })
-             (Unqual
-              {OccName: C5}))))
-          (L
-           (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:23:13-15 })
-           (HsTyVar
-            (ApiAnn
-             { T17544.hs:23:13-15 }
-             []
-             [])
-            (NotPromoted)
-            (L
-             (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:23:13-15 })
-             (Unqual
+         (L
+          (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:23:10-15 })
+          (HsAppTy
+           (NoExtField)
+           (L
+            (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:23:10-11 })
+            (HsTyVar
+             (ApiAnn
+              (Anchor
+               { T17544.hs:23:10-11 }
+               (UnchangedAnchor))
+              []
+              (AnnComments
+               []))
+             (NotPromoted)
+             (L
+              (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:23:10-11 })
+              (Unqual
+               {OccName: C5}))))
+           (L
+            (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:23:13-15 })
+            (HsTyVar
+             (ApiAnn
+              (Anchor
+               { T17544.hs:23:13-15 }
+               (UnchangedAnchor))
+              []
+              (AnnComments
+               []))
+             (NotPromoted)
+             (L
+              (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:23:13-15 })
+              (Unqual
                {OccName: Int}))))))))
        {Bag(LocatedA (HsBind GhcPs)):
         []}
@@ -584,100 +734,125 @@
        [(L
          (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:(24,3)-(25,18) })
          (DataFamInstDecl
-           (FamEqn
-            (ApiAnnNotUsed)
-            (L
-             (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:24:8-9 })
-             (Unqual
-              {OccName: D5}))
-        (HsOuterImplicit
+          (FamEqn
+           (ApiAnnNotUsed)
+           (L
+            (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:24:8-9 })
+            (Unqual
+             {OccName: D5}))
+           (HsOuterImplicit
             (NoExtField))
-            [(HsValArg
-              (L
-               (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:24:11-13 })
-               (HsTyVar
-                (ApiAnn
+           [(HsValArg
+             (L
+              (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:24:11-13 })
+              (HsTyVar
+               (ApiAnn
+                (Anchor
                  { T17544.hs:24:11-13 }
-                 []
-                 [])
-                (NotPromoted)
-                (L
-                 (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:24:11-13 })
-                 (Unqual
-                  {OccName: Int})))))]
-            (Prefix)
-            (HsDataDefn
-             (ApiAnn
+                 (UnchangedAnchor))
+                []
+                (AnnComments
+                 []))
+               (NotPromoted)
+               (L
+                (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:24:11-13 })
+                (Unqual
+                 {OccName: Int})))))]
+           (Prefix)
+           (HsDataDefn
+            (ApiAnn
+             (Anchor
               { T17544.hs:(24,3)-(25,18) }
-              [(AddApiAnn AnnData { T17544.hs:24:3-6 })
-              ,(AddApiAnn AnnWhere { T17544.hs:24:15-19 })]
-              [])
-             (DataType)
-             (Nothing)
-             (Nothing)
-             (Nothing)
-             [(L
-               (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:25:5-18 })
-               (ConDeclGADT
-                (ApiAnn
+              (UnchangedAnchor))
+             [(AddApiAnn AnnData { T17544.hs:24:3-6 })
+             ,(AddApiAnn AnnWhere { T17544.hs:24:15-19 })]
+             (AnnComments
+              []))
+            (DataType)
+            (Nothing)
+            (Nothing)
+            (Nothing)
+            [(L
+              (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:25:5-18 })
+              (ConDeclGADT
+               (ApiAnn
+                (Anchor
                  { T17544.hs:25:5-18 }
-                 [(AddApiAnn AnnDcolon { T17544.hs:25:10-11 })]
-                 [])
-                [(L
-                  (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:25:5-8 })
-                  (Unqual
-                   {OccName: MkD5}))]
+                 (UnchangedAnchor))
+                [(AddApiAnn AnnDcolon { T17544.hs:25:10-11 })]
+                (AnnComments
+                 []))
+               [(L
+                 (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:25:5-8 })
+                 (Unqual
+                  {OccName: MkD5}))]
                (L
                 (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:25:13-18 })
                 (HsOuterImplicit
                  (NoExtField)))
-                (Nothing)
-                (PrefixConGADT
-                 [])
-                (L
-                 (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:25:13-18 })
-                 (HsAppTy
-                  (NoExtField)
-                  (L
-                   (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:25:13-14 })
-                   (HsTyVar
-                    (ApiAnn
+               (Nothing)
+               (PrefixConGADT
+                [])
+               (L
+                (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:25:13-18 })
+                (HsAppTy
+                 (NoExtField)
+                 (L
+                  (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:25:13-14 })
+                  (HsTyVar
+                   (ApiAnn
+                    (Anchor
                      { T17544.hs:25:13-14 }
-                     []
-                     [])
-                    (NotPromoted)
-                    (L
-                     (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:25:13-14 })
-                     (Unqual
-                      {OccName: D5}))))
-                  (L
-                   (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:25:16-18 })
-                   (HsTyVar
-                    (ApiAnn
+                     (UnchangedAnchor))
+                    []
+                    (AnnComments
+                     []))
+                   (NotPromoted)
+                   (L
+                    (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:25:13-14 })
+                    (Unqual
+                     {OccName: D5}))))
+                 (L
+                  (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:25:16-18 })
+                  (HsTyVar
+                   (ApiAnn
+                    (Anchor
                      { T17544.hs:25:16-18 }
-                     []
-                     [])
-                    (NotPromoted)
-                    (L
-                     (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:25:16-18 })
-                     (Unqual
-                      {OccName: Int}))))))
-                (Nothing)))]
+                     (UnchangedAnchor))
+                    []
+                    (AnnComments
+                     []))
+                   (NotPromoted)
+                   (L
+                    (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:25:16-18 })
+                    (Unqual
+                     {OccName: Int}))))))
+               (Nothing)))]
             []))))]
        (Nothing)))))
   ,(L
-    (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:28:1-30 })
+    (SrcSpanAnn (ApiAnn
+                 (Anchor
+                  { T17544.hs:28:1-30 }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (AnnComments
+                  [])) { T17544.hs:28:1-30 })
     (TyClD
      (NoExtField)
      (ClassDecl
       ((,)
        (ApiAnn
-        { T17544.hs:28:1-30 }
+        (Anchor
+         { T17544.hs:28:1-30 }
+         (UnchangedAnchor))
         [(AddApiAnn AnnClass { T17544.hs:28:1-5 })
         ,(AddApiAnn AnnWhere { T17544.hs:28:12-16 })
         ,(AddApiAnn AnnOpenC { T17544.hs:28:18 })
         ,(AddApiAnn AnnCloseC { T17544.hs:28:30 })]
-        [])
+        (AnnComments
+         []))
        (ExplicitBraces))
       (Nothing)
       (L
@@ -690,9 +865,12 @@
          (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:28:10 })
          (UserTyVar
           (ApiAnn
-           { T17544.hs:28:10 }
+           (Anchor
+            { T17544.hs:28:10 }
+            (UnchangedAnchor))
            []
-           [])
+           (AnnComments
+            []))
           (())
           (L
            (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:28:10 })
@@ -707,9 +885,12 @@
         (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:28:20-28 })
         (FamilyDecl
          (ApiAnn
-          { T17544.hs:28:20-28 }
+          (Anchor
+           { T17544.hs:28:20-28 }
+           (UnchangedAnchor))
           [(AddApiAnn AnnData { T17544.hs:28:20-23 })]
-          [])
+          (AnnComments
+           []))
          (DataFamily)
          (NotTopLevel)
          (L
@@ -722,9 +903,12 @@
             (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:28:28 })
             (UserTyVar
              (ApiAnn
-              { T17544.hs:28:28 }
+              (Anchor
+               { T17544.hs:28:28 }
+               (UnchangedAnchor))
               []
-              [])
+              (AnnComments
+               []))
              (())
              (L
               (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:28:28 })
@@ -739,50 +923,66 @@
       []
       [])))
   ,(L
-    (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:(29,1)-(31,18) })
+    (SrcSpanAnn (ApiAnn
+                 (Anchor
+                  { T17544.hs:(29,1)-(31,18) }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (AnnComments
+                  [])) { T17544.hs:(29,1)-(31,18) })
     (InstD
      (NoExtField)
      (ClsInstD
       (NoExtField)
       (ClsInstDecl
        (ApiAnn
-        { T17544.hs:29:1-8 }
+        (Anchor
+         { T17544.hs:29:1-8 }
+         (UnchangedAnchor))
         [(AddApiAnn AnnInstance { T17544.hs:29:1-8 })
         ,(AddApiAnn AnnWhere { T17544.hs:29:17-21 })]
-        [])
+        (AnnComments
+         []))
        (L
         (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:29:10-15 })
         (HsSig
          (NoExtField)
          (HsOuterImplicit
           (NoExtField))
-        (L
-         (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:29:10-15 })
-         (HsAppTy
-          (NoExtField)
-          (L
-           (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:29:10-11 })
-           (HsTyVar
-            (ApiAnn
-             { T17544.hs:29:10-11 }
-             []
-             [])
-            (NotPromoted)
-            (L
-             (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:29:10-11 })
-             (Unqual
-              {OccName: C6}))))
-          (L
-           (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:29:13-15 })
-           (HsTyVar
-            (ApiAnn
-             { T17544.hs:29:13-15 }
-             []
-             [])
-            (NotPromoted)
-            (L
-             (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:29:13-15 })
-             (Unqual
+         (L
+          (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:29:10-15 })
+          (HsAppTy
+           (NoExtField)
+           (L
+            (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:29:10-11 })
+            (HsTyVar
+             (ApiAnn
+              (Anchor
+               { T17544.hs:29:10-11 }
+               (UnchangedAnchor))
+              []
+              (AnnComments
+               []))
+             (NotPromoted)
+             (L
+              (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:29:10-11 })
+              (Unqual
+               {OccName: C6}))))
+           (L
+            (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:29:13-15 })
+            (HsTyVar
+             (ApiAnn
+              (Anchor
+               { T17544.hs:29:13-15 }
+               (UnchangedAnchor))
+              []
+              (AnnComments
+               []))
+             (NotPromoted)
+             (L
+              (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:29:13-15 })
+              (Unqual
                {OccName: Int}))))))))
        {Bag(LocatedA (HsBind GhcPs)):
         []}
@@ -791,100 +991,125 @@
        [(L
          (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:(30,3)-(31,18) })
          (DataFamInstDecl
-           (FamEqn
-            (ApiAnnNotUsed)
-            (L
-             (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:30:8-9 })
-             (Unqual
-              {OccName: D6}))
+          (FamEqn
+           (ApiAnnNotUsed)
+           (L
+            (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:30:8-9 })
+            (Unqual
+             {OccName: D6}))
            (HsOuterImplicit
             (NoExtField))
-            [(HsValArg
-              (L
-               (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:30:11-13 })
-               (HsTyVar
-                (ApiAnn
+           [(HsValArg
+             (L
+              (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:30:11-13 })
+              (HsTyVar
+               (ApiAnn
+                (Anchor
                  { T17544.hs:30:11-13 }
-                 []
-                 [])
-                (NotPromoted)
-                (L
-                 (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:30:11-13 })
-                 (Unqual
-                  {OccName: Int})))))]
-            (Prefix)
-            (HsDataDefn
-             (ApiAnn
+                 (UnchangedAnchor))
+                []
+                (AnnComments
+                 []))
+               (NotPromoted)
+               (L
+                (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:30:11-13 })
+                (Unqual
+                 {OccName: Int})))))]
+           (Prefix)
+           (HsDataDefn
+            (ApiAnn
+             (Anchor
               { T17544.hs:(30,3)-(31,18) }
-              [(AddApiAnn AnnData { T17544.hs:30:3-6 })
-              ,(AddApiAnn AnnWhere { T17544.hs:30:15-19 })]
-              [])
-             (DataType)
-             (Nothing)
-             (Nothing)
-             (Nothing)
-             [(L
-               (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:31:5-18 })
-               (ConDeclGADT
-                (ApiAnn
+              (UnchangedAnchor))
+             [(AddApiAnn AnnData { T17544.hs:30:3-6 })
+             ,(AddApiAnn AnnWhere { T17544.hs:30:15-19 })]
+             (AnnComments
+              []))
+            (DataType)
+            (Nothing)
+            (Nothing)
+            (Nothing)
+            [(L
+              (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:31:5-18 })
+              (ConDeclGADT
+               (ApiAnn
+                (Anchor
                  { T17544.hs:31:5-18 }
-                 [(AddApiAnn AnnDcolon { T17544.hs:31:10-11 })]
-                 [])
-                [(L
-                  (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:31:5-8 })
-                  (Unqual
-                   {OccName: MkD6}))]
+                 (UnchangedAnchor))
+                [(AddApiAnn AnnDcolon { T17544.hs:31:10-11 })]
+                (AnnComments
+                 []))
+               [(L
+                 (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:31:5-8 })
+                 (Unqual
+                  {OccName: MkD6}))]
                (L
                 (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:31:13-18 })
                 (HsOuterImplicit
                  (NoExtField)))
-                (Nothing)
-                (PrefixConGADT
-                 [])
-                (L
-                 (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:31:13-18 })
-                 (HsAppTy
-                  (NoExtField)
-                  (L
-                   (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:31:13-14 })
-                   (HsTyVar
-                    (ApiAnn
+               (Nothing)
+               (PrefixConGADT
+                [])
+               (L
+                (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:31:13-18 })
+                (HsAppTy
+                 (NoExtField)
+                 (L
+                  (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:31:13-14 })
+                  (HsTyVar
+                   (ApiAnn
+                    (Anchor
                      { T17544.hs:31:13-14 }
-                     []
-                     [])
-                    (NotPromoted)
-                    (L
-                     (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:31:13-14 })
-                     (Unqual
-                      {OccName: D6}))))
-                  (L
-                   (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:31:16-18 })
-                   (HsTyVar
-                    (ApiAnn
+                     (UnchangedAnchor))
+                    []
+                    (AnnComments
+                     []))
+                   (NotPromoted)
+                   (L
+                    (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:31:13-14 })
+                    (Unqual
+                     {OccName: D6}))))
+                 (L
+                  (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:31:16-18 })
+                  (HsTyVar
+                   (ApiAnn
+                    (Anchor
                      { T17544.hs:31:16-18 }
-                     []
-                     [])
-                    (NotPromoted)
-                    (L
-                     (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:31:16-18 })
-                     (Unqual
-                      {OccName: Int}))))))
-                (Nothing)))]
+                     (UnchangedAnchor))
+                    []
+                    (AnnComments
+                     []))
+                   (NotPromoted)
+                   (L
+                    (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:31:16-18 })
+                    (Unqual
+                     {OccName: Int}))))))
+               (Nothing)))]
             []))))]
        (Nothing)))))
   ,(L
-    (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:34:1-30 })
+    (SrcSpanAnn (ApiAnn
+                 (Anchor
+                  { T17544.hs:34:1-30 }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (AnnComments
+                  [])) { T17544.hs:34:1-30 })
     (TyClD
      (NoExtField)
      (ClassDecl
       ((,)
        (ApiAnn
-        { T17544.hs:34:1-30 }
+        (Anchor
+         { T17544.hs:34:1-30 }
+         (UnchangedAnchor))
         [(AddApiAnn AnnClass { T17544.hs:34:1-5 })
         ,(AddApiAnn AnnWhere { T17544.hs:34:12-16 })
         ,(AddApiAnn AnnOpenC { T17544.hs:34:18 })
         ,(AddApiAnn AnnCloseC { T17544.hs:34:30 })]
-        [])
+        (AnnComments
+         []))
        (ExplicitBraces))
       (Nothing)
       (L
@@ -897,9 +1122,12 @@
          (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:34:10 })
          (UserTyVar
           (ApiAnn
-           { T17544.hs:34:10 }
+           (Anchor
+            { T17544.hs:34:10 }
+            (UnchangedAnchor))
            []
-           [])
+           (AnnComments
+            []))
           (())
           (L
            (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:34:10 })
@@ -914,9 +1142,12 @@
         (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:34:20-28 })
         (FamilyDecl
          (ApiAnn
-          { T17544.hs:34:20-28 }
+          (Anchor
+           { T17544.hs:34:20-28 }
+           (UnchangedAnchor))
           [(AddApiAnn AnnData { T17544.hs:34:20-23 })]
-          [])
+          (AnnComments
+           []))
          (DataFamily)
          (NotTopLevel)
          (L
@@ -929,9 +1160,12 @@
             (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:34:28 })
             (UserTyVar
              (ApiAnn
-              { T17544.hs:34:28 }
+              (Anchor
+               { T17544.hs:34:28 }
+               (UnchangedAnchor))
               []
-              [])
+              (AnnComments
+               []))
              (())
              (L
               (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:34:28 })
@@ -946,50 +1180,66 @@
       []
       [])))
   ,(L
-    (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:(35,1)-(37,18) })
+    (SrcSpanAnn (ApiAnn
+                 (Anchor
+                  { T17544.hs:(35,1)-(37,18) }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (AnnComments
+                  [])) { T17544.hs:(35,1)-(37,18) })
     (InstD
      (NoExtField)
      (ClsInstD
       (NoExtField)
       (ClsInstDecl
        (ApiAnn
-        { T17544.hs:35:1-8 }
+        (Anchor
+         { T17544.hs:35:1-8 }
+         (UnchangedAnchor))
         [(AddApiAnn AnnInstance { T17544.hs:35:1-8 })
         ,(AddApiAnn AnnWhere { T17544.hs:35:17-21 })]
-        [])
+        (AnnComments
+         []))
        (L
         (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:35:10-15 })
         (HsSig
          (NoExtField)
          (HsOuterImplicit
           (NoExtField))
-        (L
-         (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:35:10-15 })
-         (HsAppTy
-          (NoExtField)
-          (L
-           (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:35:10-11 })
-           (HsTyVar
-            (ApiAnn
-             { T17544.hs:35:10-11 }
-             []
-             [])
-            (NotPromoted)
-            (L
-             (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:35:10-11 })
-             (Unqual
-              {OccName: C7}))))
-          (L
-           (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:35:13-15 })
-           (HsTyVar
-            (ApiAnn
-             { T17544.hs:35:13-15 }
-             []
-             [])
-            (NotPromoted)
-            (L
-             (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:35:13-15 })
-             (Unqual
+         (L
+          (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:35:10-15 })
+          (HsAppTy
+           (NoExtField)
+           (L
+            (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:35:10-11 })
+            (HsTyVar
+             (ApiAnn
+              (Anchor
+               { T17544.hs:35:10-11 }
+               (UnchangedAnchor))
+              []
+              (AnnComments
+               []))
+             (NotPromoted)
+             (L
+              (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:35:10-11 })
+              (Unqual
+               {OccName: C7}))))
+           (L
+            (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:35:13-15 })
+            (HsTyVar
+             (ApiAnn
+              (Anchor
+               { T17544.hs:35:13-15 }
+               (UnchangedAnchor))
+              []
+              (AnnComments
+               []))
+             (NotPromoted)
+             (L
+              (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:35:13-15 })
+              (Unqual
                {OccName: Int}))))))))
        {Bag(LocatedA (HsBind GhcPs)):
         []}
@@ -998,100 +1248,125 @@
        [(L
          (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:(36,3)-(37,18) })
          (DataFamInstDecl
-           (FamEqn
-            (ApiAnnNotUsed)
-            (L
-             (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:36:8-9 })
-             (Unqual
-              {OccName: D7}))
+          (FamEqn
+           (ApiAnnNotUsed)
+           (L
+            (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:36:8-9 })
+            (Unqual
+             {OccName: D7}))
            (HsOuterImplicit
             (NoExtField))
-            [(HsValArg
-              (L
-               (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:36:11-13 })
-               (HsTyVar
-                (ApiAnn
+           [(HsValArg
+             (L
+              (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:36:11-13 })
+              (HsTyVar
+               (ApiAnn
+                (Anchor
                  { T17544.hs:36:11-13 }
-                 []
-                 [])
-                (NotPromoted)
-                (L
-                 (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:36:11-13 })
-                 (Unqual
-                  {OccName: Int})))))]
-            (Prefix)
-            (HsDataDefn
-             (ApiAnn
+                 (UnchangedAnchor))
+                []
+                (AnnComments
+                 []))
+               (NotPromoted)
+               (L
+                (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:36:11-13 })
+                (Unqual
+                 {OccName: Int})))))]
+           (Prefix)
+           (HsDataDefn
+            (ApiAnn
+             (Anchor
               { T17544.hs:(36,3)-(37,18) }
-              [(AddApiAnn AnnData { T17544.hs:36:3-6 })
-              ,(AddApiAnn AnnWhere { T17544.hs:36:15-19 })]
-              [])
-             (DataType)
-             (Nothing)
-             (Nothing)
-             (Nothing)
-             [(L
-               (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:37:5-18 })
-               (ConDeclGADT
-                (ApiAnn
+              (UnchangedAnchor))
+             [(AddApiAnn AnnData { T17544.hs:36:3-6 })
+             ,(AddApiAnn AnnWhere { T17544.hs:36:15-19 })]
+             (AnnComments
+              []))
+            (DataType)
+            (Nothing)
+            (Nothing)
+            (Nothing)
+            [(L
+              (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:37:5-18 })
+              (ConDeclGADT
+               (ApiAnn
+                (Anchor
                  { T17544.hs:37:5-18 }
-                 [(AddApiAnn AnnDcolon { T17544.hs:37:10-11 })]
-                 [])
-                [(L
-                  (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:37:5-8 })
-                  (Unqual
-                   {OccName: MkD7}))]
+                 (UnchangedAnchor))
+                [(AddApiAnn AnnDcolon { T17544.hs:37:10-11 })]
+                (AnnComments
+                 []))
+               [(L
+                 (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:37:5-8 })
+                 (Unqual
+                  {OccName: MkD7}))]
                (L
                 (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:37:13-18 })
                 (HsOuterImplicit
                  (NoExtField)))
-                (Nothing)
-                (PrefixConGADT
-                 [])
-                (L
-                 (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:37:13-18 })
-                 (HsAppTy
-                  (NoExtField)
-                  (L
-                   (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:37:13-14 })
-                   (HsTyVar
-                    (ApiAnn
+               (Nothing)
+               (PrefixConGADT
+                [])
+               (L
+                (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:37:13-18 })
+                (HsAppTy
+                 (NoExtField)
+                 (L
+                  (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:37:13-14 })
+                  (HsTyVar
+                   (ApiAnn
+                    (Anchor
                      { T17544.hs:37:13-14 }
-                     []
-                     [])
-                    (NotPromoted)
-                    (L
-                     (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:37:13-14 })
-                     (Unqual
-                      {OccName: D7}))))
-                  (L
-                   (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:37:16-18 })
-                   (HsTyVar
-                    (ApiAnn
+                     (UnchangedAnchor))
+                    []
+                    (AnnComments
+                     []))
+                   (NotPromoted)
+                   (L
+                    (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:37:13-14 })
+                    (Unqual
+                     {OccName: D7}))))
+                 (L
+                  (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:37:16-18 })
+                  (HsTyVar
+                   (ApiAnn
+                    (Anchor
                      { T17544.hs:37:16-18 }
-                     []
-                     [])
-                    (NotPromoted)
-                    (L
-                     (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:37:16-18 })
-                     (Unqual
-                      {OccName: Int}))))))
-                (Nothing)))]
+                     (UnchangedAnchor))
+                    []
+                    (AnnComments
+                     []))
+                   (NotPromoted)
+                   (L
+                    (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:37:16-18 })
+                    (Unqual
+                     {OccName: Int}))))))
+               (Nothing)))]
             []))))]
        (Nothing)))))
   ,(L
-    (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:40:1-30 })
+    (SrcSpanAnn (ApiAnn
+                 (Anchor
+                  { T17544.hs:40:1-30 }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (AnnComments
+                  [])) { T17544.hs:40:1-30 })
     (TyClD
      (NoExtField)
      (ClassDecl
       ((,)
        (ApiAnn
-        { T17544.hs:40:1-30 }
+        (Anchor
+         { T17544.hs:40:1-30 }
+         (UnchangedAnchor))
         [(AddApiAnn AnnClass { T17544.hs:40:1-5 })
         ,(AddApiAnn AnnWhere { T17544.hs:40:12-16 })
         ,(AddApiAnn AnnOpenC { T17544.hs:40:18 })
         ,(AddApiAnn AnnCloseC { T17544.hs:40:30 })]
-        [])
+        (AnnComments
+         []))
        (ExplicitBraces))
       (Nothing)
       (L
@@ -1104,9 +1379,12 @@
          (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:40:10 })
          (UserTyVar
           (ApiAnn
-           { T17544.hs:40:10 }
+           (Anchor
+            { T17544.hs:40:10 }
+            (UnchangedAnchor))
            []
-           [])
+           (AnnComments
+            []))
           (())
           (L
            (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:40:10 })
@@ -1121,9 +1399,12 @@
         (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:40:20-28 })
         (FamilyDecl
          (ApiAnn
-          { T17544.hs:40:20-28 }
+          (Anchor
+           { T17544.hs:40:20-28 }
+           (UnchangedAnchor))
           [(AddApiAnn AnnData { T17544.hs:40:20-23 })]
-          [])
+          (AnnComments
+           []))
          (DataFamily)
          (NotTopLevel)
          (L
@@ -1136,9 +1417,12 @@
             (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:40:28 })
             (UserTyVar
              (ApiAnn
-              { T17544.hs:40:28 }
+              (Anchor
+               { T17544.hs:40:28 }
+               (UnchangedAnchor))
               []
-              [])
+              (AnnComments
+               []))
              (())
              (L
               (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:40:28 })
@@ -1153,50 +1437,66 @@
       []
       [])))
   ,(L
-    (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:(41,1)-(43,18) })
+    (SrcSpanAnn (ApiAnn
+                 (Anchor
+                  { T17544.hs:(41,1)-(43,18) }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (AnnComments
+                  [])) { T17544.hs:(41,1)-(43,18) })
     (InstD
      (NoExtField)
      (ClsInstD
       (NoExtField)
       (ClsInstDecl
        (ApiAnn
-        { T17544.hs:41:1-8 }
+        (Anchor
+         { T17544.hs:41:1-8 }
+         (UnchangedAnchor))
         [(AddApiAnn AnnInstance { T17544.hs:41:1-8 })
         ,(AddApiAnn AnnWhere { T17544.hs:41:17-21 })]
-        [])
+        (AnnComments
+         []))
        (L
         (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:41:10-15 })
         (HsSig
          (NoExtField)
          (HsOuterImplicit
           (NoExtField))
-        (L
-         (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:41:10-15 })
-         (HsAppTy
-          (NoExtField)
-          (L
-           (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:41:10-11 })
-           (HsTyVar
-            (ApiAnn
-             { T17544.hs:41:10-11 }
-             []
-             [])
-            (NotPromoted)
-            (L
-             (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:41:10-11 })
-             (Unqual
-              {OccName: C8}))))
-          (L
-           (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:41:13-15 })
-           (HsTyVar
-            (ApiAnn
-             { T17544.hs:41:13-15 }
-             []
-             [])
-            (NotPromoted)
-            (L
-             (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:41:13-15 })
-             (Unqual
+         (L
+          (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:41:10-15 })
+          (HsAppTy
+           (NoExtField)
+           (L
+            (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:41:10-11 })
+            (HsTyVar
+             (ApiAnn
+              (Anchor
+               { T17544.hs:41:10-11 }
+               (UnchangedAnchor))
+              []
+              (AnnComments
+               []))
+             (NotPromoted)
+             (L
+              (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:41:10-11 })
+              (Unqual
+               {OccName: C8}))))
+           (L
+            (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:41:13-15 })
+            (HsTyVar
+             (ApiAnn
+              (Anchor
+               { T17544.hs:41:13-15 }
+               (UnchangedAnchor))
+              []
+              (AnnComments
+               []))
+             (NotPromoted)
+             (L
+              (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:41:13-15 })
+              (Unqual
                {OccName: Int}))))))))
        {Bag(LocatedA (HsBind GhcPs)):
         []}
@@ -1205,100 +1505,125 @@
        [(L
          (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:(42,3)-(43,18) })
          (DataFamInstDecl
-           (FamEqn
-            (ApiAnnNotUsed)
-            (L
-             (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:42:8-9 })
-             (Unqual
-              {OccName: D8}))
+          (FamEqn
+           (ApiAnnNotUsed)
+           (L
+            (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:42:8-9 })
+            (Unqual
+             {OccName: D8}))
            (HsOuterImplicit
             (NoExtField))
-            [(HsValArg
-              (L
-               (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:42:11-13 })
-               (HsTyVar
-                (ApiAnn
+           [(HsValArg
+             (L
+              (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:42:11-13 })
+              (HsTyVar
+               (ApiAnn
+                (Anchor
                  { T17544.hs:42:11-13 }
-                 []
-                 [])
-                (NotPromoted)
-                (L
-                 (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:42:11-13 })
-                 (Unqual
-                  {OccName: Int})))))]
-            (Prefix)
-            (HsDataDefn
-             (ApiAnn
+                 (UnchangedAnchor))
+                []
+                (AnnComments
+                 []))
+               (NotPromoted)
+               (L
+                (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:42:11-13 })
+                (Unqual
+                 {OccName: Int})))))]
+           (Prefix)
+           (HsDataDefn
+            (ApiAnn
+             (Anchor
               { T17544.hs:(42,3)-(43,18) }
-              [(AddApiAnn AnnData { T17544.hs:42:3-6 })
-              ,(AddApiAnn AnnWhere { T17544.hs:42:15-19 })]
-              [])
-             (DataType)
-             (Nothing)
-             (Nothing)
-             (Nothing)
-             [(L
-               (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:43:5-18 })
-               (ConDeclGADT
-                (ApiAnn
+              (UnchangedAnchor))
+             [(AddApiAnn AnnData { T17544.hs:42:3-6 })
+             ,(AddApiAnn AnnWhere { T17544.hs:42:15-19 })]
+             (AnnComments
+              []))
+            (DataType)
+            (Nothing)
+            (Nothing)
+            (Nothing)
+            [(L
+              (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:43:5-18 })
+              (ConDeclGADT
+               (ApiAnn
+                (Anchor
                  { T17544.hs:43:5-18 }
-                 [(AddApiAnn AnnDcolon { T17544.hs:43:10-11 })]
-                 [])
-                [(L
-                  (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:43:5-8 })
-                  (Unqual
-                   {OccName: MkD8}))]
+                 (UnchangedAnchor))
+                [(AddApiAnn AnnDcolon { T17544.hs:43:10-11 })]
+                (AnnComments
+                 []))
+               [(L
+                 (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:43:5-8 })
+                 (Unqual
+                  {OccName: MkD8}))]
                (L
                 (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:43:13-18 })
                 (HsOuterImplicit
                  (NoExtField)))
-                (Nothing)
-                (PrefixConGADT
-                 [])
-                (L
-                 (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:43:13-18 })
-                 (HsAppTy
-                  (NoExtField)
-                  (L
-                   (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:43:13-14 })
-                   (HsTyVar
-                    (ApiAnn
+               (Nothing)
+               (PrefixConGADT
+                [])
+               (L
+                (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:43:13-18 })
+                (HsAppTy
+                 (NoExtField)
+                 (L
+                  (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:43:13-14 })
+                  (HsTyVar
+                   (ApiAnn
+                    (Anchor
                      { T17544.hs:43:13-14 }
-                     []
-                     [])
-                    (NotPromoted)
-                    (L
-                     (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:43:13-14 })
-                     (Unqual
-                      {OccName: D8}))))
-                  (L
-                   (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:43:16-18 })
-                   (HsTyVar
-                    (ApiAnn
+                     (UnchangedAnchor))
+                    []
+                    (AnnComments
+                     []))
+                   (NotPromoted)
+                   (L
+                    (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:43:13-14 })
+                    (Unqual
+                     {OccName: D8}))))
+                 (L
+                  (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:43:16-18 })
+                  (HsTyVar
+                   (ApiAnn
+                    (Anchor
                      { T17544.hs:43:16-18 }
-                     []
-                     [])
-                    (NotPromoted)
-                    (L
-                     (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:43:16-18 })
-                     (Unqual
-                      {OccName: Int}))))))
-                (Nothing)))]
+                     (UnchangedAnchor))
+                    []
+                    (AnnComments
+                     []))
+                   (NotPromoted)
+                   (L
+                    (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:43:16-18 })
+                    (Unqual
+                     {OccName: Int}))))))
+               (Nothing)))]
             []))))]
        (Nothing)))))
   ,(L
-    (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:46:1-30 })
+    (SrcSpanAnn (ApiAnn
+                 (Anchor
+                  { T17544.hs:46:1-30 }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (AnnComments
+                  [])) { T17544.hs:46:1-30 })
     (TyClD
      (NoExtField)
      (ClassDecl
       ((,)
        (ApiAnn
-        { T17544.hs:46:1-30 }
+        (Anchor
+         { T17544.hs:46:1-30 }
+         (UnchangedAnchor))
         [(AddApiAnn AnnClass { T17544.hs:46:1-5 })
         ,(AddApiAnn AnnWhere { T17544.hs:46:12-16 })
         ,(AddApiAnn AnnOpenC { T17544.hs:46:18 })
         ,(AddApiAnn AnnCloseC { T17544.hs:46:30 })]
-        [])
+        (AnnComments
+         []))
        (ExplicitBraces))
       (Nothing)
       (L
@@ -1311,9 +1636,12 @@
          (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:46:10 })
          (UserTyVar
           (ApiAnn
-           { T17544.hs:46:10 }
+           (Anchor
+            { T17544.hs:46:10 }
+            (UnchangedAnchor))
            []
-           [])
+           (AnnComments
+            []))
           (())
           (L
            (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:46:10 })
@@ -1328,9 +1656,12 @@
         (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:46:20-28 })
         (FamilyDecl
          (ApiAnn
-          { T17544.hs:46:20-28 }
+          (Anchor
+           { T17544.hs:46:20-28 }
+           (UnchangedAnchor))
           [(AddApiAnn AnnData { T17544.hs:46:20-23 })]
-          [])
+          (AnnComments
+           []))
          (DataFamily)
          (NotTopLevel)
          (L
@@ -1343,9 +1674,12 @@
             (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:46:28 })
             (UserTyVar
              (ApiAnn
-              { T17544.hs:46:28 }
+              (Anchor
+               { T17544.hs:46:28 }
+               (UnchangedAnchor))
               []
-              [])
+              (AnnComments
+               []))
              (())
              (L
               (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:46:28 })
@@ -1360,50 +1694,66 @@
       []
       [])))
   ,(L
-    (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:(47,1)-(49,18) })
+    (SrcSpanAnn (ApiAnn
+                 (Anchor
+                  { T17544.hs:(47,1)-(49,18) }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (AnnComments
+                  [])) { T17544.hs:(47,1)-(49,18) })
     (InstD
      (NoExtField)
      (ClsInstD
       (NoExtField)
       (ClsInstDecl
        (ApiAnn
-        { T17544.hs:47:1-8 }
+        (Anchor
+         { T17544.hs:47:1-8 }
+         (UnchangedAnchor))
         [(AddApiAnn AnnInstance { T17544.hs:47:1-8 })
         ,(AddApiAnn AnnWhere { T17544.hs:47:17-21 })]
-        [])
+        (AnnComments
+         []))
        (L
         (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:47:10-15 })
         (HsSig
          (NoExtField)
          (HsOuterImplicit
           (NoExtField))
-        (L
-         (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:47:10-15 })
-         (HsAppTy
-          (NoExtField)
-          (L
-           (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:47:10-11 })
-           (HsTyVar
-            (ApiAnn
-             { T17544.hs:47:10-11 }
-             []
-             [])
-            (NotPromoted)
-            (L
-             (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:47:10-11 })
-             (Unqual
-              {OccName: C9}))))
-          (L
-           (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:47:13-15 })
-           (HsTyVar
-            (ApiAnn
-             { T17544.hs:47:13-15 }
-             []
-             [])
-            (NotPromoted)
-            (L
-             (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:47:13-15 })
-             (Unqual
+         (L
+          (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:47:10-15 })
+          (HsAppTy
+           (NoExtField)
+           (L
+            (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:47:10-11 })
+            (HsTyVar
+             (ApiAnn
+              (Anchor
+               { T17544.hs:47:10-11 }
+               (UnchangedAnchor))
+              []
+              (AnnComments
+               []))
+             (NotPromoted)
+             (L
+              (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:47:10-11 })
+              (Unqual
+               {OccName: C9}))))
+           (L
+            (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:47:13-15 })
+            (HsTyVar
+             (ApiAnn
+              (Anchor
+               { T17544.hs:47:13-15 }
+               (UnchangedAnchor))
+              []
+              (AnnComments
+               []))
+             (NotPromoted)
+             (L
+              (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:47:13-15 })
+              (Unqual
                {OccName: Int}))))))))
        {Bag(LocatedA (HsBind GhcPs)):
         []}
@@ -1412,100 +1762,125 @@
        [(L
          (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:(48,3)-(49,18) })
          (DataFamInstDecl
-           (FamEqn
-            (ApiAnnNotUsed)
-            (L
-             (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:48:8-9 })
-             (Unqual
-              {OccName: D9}))
+          (FamEqn
+           (ApiAnnNotUsed)
+           (L
+            (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:48:8-9 })
+            (Unqual
+             {OccName: D9}))
            (HsOuterImplicit
             (NoExtField))
-            [(HsValArg
-              (L
-               (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:48:11-13 })
-               (HsTyVar
-                (ApiAnn
+           [(HsValArg
+             (L
+              (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:48:11-13 })
+              (HsTyVar
+               (ApiAnn
+                (Anchor
                  { T17544.hs:48:11-13 }
-                 []
-                 [])
-                (NotPromoted)
-                (L
-                 (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:48:11-13 })
-                 (Unqual
-                  {OccName: Int})))))]
-            (Prefix)
-            (HsDataDefn
-             (ApiAnn
+                 (UnchangedAnchor))
+                []
+                (AnnComments
+                 []))
+               (NotPromoted)
+               (L
+                (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:48:11-13 })
+                (Unqual
+                 {OccName: Int})))))]
+           (Prefix)
+           (HsDataDefn
+            (ApiAnn
+             (Anchor
               { T17544.hs:(48,3)-(49,18) }
-              [(AddApiAnn AnnData { T17544.hs:48:3-6 })
-              ,(AddApiAnn AnnWhere { T17544.hs:48:15-19 })]
-              [])
-             (DataType)
-             (Nothing)
-             (Nothing)
-             (Nothing)
-             [(L
-               (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:49:5-18 })
-               (ConDeclGADT
-                (ApiAnn
+              (UnchangedAnchor))
+             [(AddApiAnn AnnData { T17544.hs:48:3-6 })
+             ,(AddApiAnn AnnWhere { T17544.hs:48:15-19 })]
+             (AnnComments
+              []))
+            (DataType)
+            (Nothing)
+            (Nothing)
+            (Nothing)
+            [(L
+              (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:49:5-18 })
+              (ConDeclGADT
+               (ApiAnn
+                (Anchor
                  { T17544.hs:49:5-18 }
-                 [(AddApiAnn AnnDcolon { T17544.hs:49:10-11 })]
-                 [])
-                [(L
-                  (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:49:5-8 })
-                  (Unqual
-                   {OccName: MkD9}))]
+                 (UnchangedAnchor))
+                [(AddApiAnn AnnDcolon { T17544.hs:49:10-11 })]
+                (AnnComments
+                 []))
+               [(L
+                 (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:49:5-8 })
+                 (Unqual
+                  {OccName: MkD9}))]
                (L
                 (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:49:13-18 })
                 (HsOuterImplicit
                  (NoExtField)))
-                (Nothing)
-                (PrefixConGADT
-                 [])
-                (L
-                 (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:49:13-18 })
-                 (HsAppTy
-                  (NoExtField)
-                  (L
-                   (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:49:13-14 })
-                   (HsTyVar
-                    (ApiAnn
+               (Nothing)
+               (PrefixConGADT
+                [])
+               (L
+                (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:49:13-18 })
+                (HsAppTy
+                 (NoExtField)
+                 (L
+                  (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:49:13-14 })
+                  (HsTyVar
+                   (ApiAnn
+                    (Anchor
                      { T17544.hs:49:13-14 }
-                     []
-                     [])
-                    (NotPromoted)
-                    (L
-                     (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:49:13-14 })
-                     (Unqual
-                      {OccName: D9}))))
-                  (L
-                   (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:49:16-18 })
-                   (HsTyVar
-                    (ApiAnn
+                     (UnchangedAnchor))
+                    []
+                    (AnnComments
+                     []))
+                   (NotPromoted)
+                   (L
+                    (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:49:13-14 })
+                    (Unqual
+                     {OccName: D9}))))
+                 (L
+                  (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:49:16-18 })
+                  (HsTyVar
+                   (ApiAnn
+                    (Anchor
                      { T17544.hs:49:16-18 }
-                     []
-                     [])
-                    (NotPromoted)
-                    (L
-                     (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:49:16-18 })
-                     (Unqual
-                      {OccName: Int}))))))
-                (Nothing)))]
+                     (UnchangedAnchor))
+                    []
+                    (AnnComments
+                     []))
+                   (NotPromoted)
+                   (L
+                    (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:49:16-18 })
+                    (Unqual
+                     {OccName: Int}))))))
+               (Nothing)))]
             []))))]
        (Nothing)))))
   ,(L
-    (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:52:1-32 })
+    (SrcSpanAnn (ApiAnn
+                 (Anchor
+                  { T17544.hs:52:1-32 }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (AnnComments
+                  [])) { T17544.hs:52:1-32 })
     (TyClD
      (NoExtField)
      (ClassDecl
       ((,)
        (ApiAnn
-        { T17544.hs:52:1-32 }
+        (Anchor
+         { T17544.hs:52:1-32 }
+         (UnchangedAnchor))
         [(AddApiAnn AnnClass { T17544.hs:52:1-5 })
         ,(AddApiAnn AnnWhere { T17544.hs:52:13-17 })
         ,(AddApiAnn AnnOpenC { T17544.hs:52:19 })
         ,(AddApiAnn AnnCloseC { T17544.hs:52:32 })]
-        [])
+        (AnnComments
+         []))
        (ExplicitBraces))
       (Nothing)
       (L
@@ -1518,9 +1893,12 @@
          (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:52:11 })
          (UserTyVar
           (ApiAnn
-           { T17544.hs:52:11 }
+           (Anchor
+            { T17544.hs:52:11 }
+            (UnchangedAnchor))
            []
-           [])
+           (AnnComments
+            []))
           (())
           (L
            (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:52:11 })
@@ -1535,9 +1913,12 @@
         (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:52:21-30 })
         (FamilyDecl
          (ApiAnn
-          { T17544.hs:52:21-30 }
+          (Anchor
+           { T17544.hs:52:21-30 }
+           (UnchangedAnchor))
           [(AddApiAnn AnnData { T17544.hs:52:21-24 })]
-          [])
+          (AnnComments
+           []))
          (DataFamily)
          (NotTopLevel)
          (L
@@ -1550,9 +1931,12 @@
             (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:52:30 })
             (UserTyVar
              (ApiAnn
-              { T17544.hs:52:30 }
+              (Anchor
+               { T17544.hs:52:30 }
+               (UnchangedAnchor))
               []
-              [])
+              (AnnComments
+               []))
              (())
              (L
               (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:52:30 })
@@ -1567,50 +1951,66 @@
       []
       [])))
   ,(L
-    (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:(53,1)-(55,20) })
+    (SrcSpanAnn (ApiAnn
+                 (Anchor
+                  { T17544.hs:(53,1)-(55,20) }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (AnnComments
+                  [])) { T17544.hs:(53,1)-(55,20) })
     (InstD
      (NoExtField)
      (ClsInstD
       (NoExtField)
       (ClsInstDecl
        (ApiAnn
-        { T17544.hs:53:1-8 }
+        (Anchor
+         { T17544.hs:53:1-8 }
+         (UnchangedAnchor))
         [(AddApiAnn AnnInstance { T17544.hs:53:1-8 })
         ,(AddApiAnn AnnWhere { T17544.hs:53:18-22 })]
-        [])
+        (AnnComments
+         []))
        (L
         (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:53:10-16 })
         (HsSig
          (NoExtField)
          (HsOuterImplicit
           (NoExtField))
-        (L
-         (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:53:10-16 })
-         (HsAppTy
-          (NoExtField)
-          (L
-           (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:53:10-12 })
-           (HsTyVar
-            (ApiAnn
-             { T17544.hs:53:10-12 }
-             []
-             [])
-            (NotPromoted)
-            (L
-             (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:53:10-12 })
-             (Unqual
-              {OccName: C10}))))
-          (L
-           (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:53:14-16 })
-           (HsTyVar
-            (ApiAnn
-             { T17544.hs:53:14-16 }
-             []
-             [])
-            (NotPromoted)
-            (L
-             (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:53:14-16 })
-             (Unqual
+         (L
+          (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:53:10-16 })
+          (HsAppTy
+           (NoExtField)
+           (L
+            (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:53:10-12 })
+            (HsTyVar
+             (ApiAnn
+              (Anchor
+               { T17544.hs:53:10-12 }
+               (UnchangedAnchor))
+              []
+              (AnnComments
+               []))
+             (NotPromoted)
+             (L
+              (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:53:10-12 })
+              (Unqual
+               {OccName: C10}))))
+           (L
+            (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:53:14-16 })
+            (HsTyVar
+             (ApiAnn
+              (Anchor
+               { T17544.hs:53:14-16 }
+               (UnchangedAnchor))
+              []
+              (AnnComments
+               []))
+             (NotPromoted)
+             (L
+              (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:53:14-16 })
+              (Unqual
                {OccName: Int}))))))))
        {Bag(LocatedA (HsBind GhcPs)):
         []}
@@ -1619,85 +2019,100 @@
        [(L
          (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:(54,3)-(55,20) })
          (DataFamInstDecl
-           (FamEqn
-            (ApiAnnNotUsed)
-            (L
-             (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:54:8-10 })
-             (Unqual
-              {OccName: D10}))
+          (FamEqn
+           (ApiAnnNotUsed)
+           (L
+            (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:54:8-10 })
+            (Unqual
+             {OccName: D10}))
            (HsOuterImplicit
             (NoExtField))
-            [(HsValArg
-              (L
-               (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:54:12-14 })
-               (HsTyVar
-                (ApiAnn
+           [(HsValArg
+             (L
+              (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:54:12-14 })
+              (HsTyVar
+               (ApiAnn
+                (Anchor
                  { T17544.hs:54:12-14 }
-                 []
-                 [])
-                (NotPromoted)
-                (L
-                 (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:54:12-14 })
-                 (Unqual
-                  {OccName: Int})))))]
-            (Prefix)
-            (HsDataDefn
-             (ApiAnn
+                 (UnchangedAnchor))
+                []
+                (AnnComments
+                 []))
+               (NotPromoted)
+               (L
+                (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:54:12-14 })
+                (Unqual
+                 {OccName: Int})))))]
+           (Prefix)
+           (HsDataDefn
+            (ApiAnn
+             (Anchor
               { T17544.hs:(54,3)-(55,20) }
-              [(AddApiAnn AnnData { T17544.hs:54:3-6 })
-              ,(AddApiAnn AnnWhere { T17544.hs:54:16-20 })]
-              [])
-             (DataType)
-             (Nothing)
-             (Nothing)
-             (Nothing)
-             [(L
-               (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:55:5-20 })
-               (ConDeclGADT
-                (ApiAnn
+              (UnchangedAnchor))
+             [(AddApiAnn AnnData { T17544.hs:54:3-6 })
+             ,(AddApiAnn AnnWhere { T17544.hs:54:16-20 })]
+             (AnnComments
+              []))
+            (DataType)
+            (Nothing)
+            (Nothing)
+            (Nothing)
+            [(L
+              (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:55:5-20 })
+              (ConDeclGADT
+               (ApiAnn
+                (Anchor
                  { T17544.hs:55:5-20 }
-                 [(AddApiAnn AnnDcolon { T17544.hs:55:11-12 })]
-                 [])
-                [(L
-                  (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:55:5-9 })
-                  (Unqual
-                   {OccName: MkD10}))]
+                 (UnchangedAnchor))
+                [(AddApiAnn AnnDcolon { T17544.hs:55:11-12 })]
+                (AnnComments
+                 []))
+               [(L
+                 (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:55:5-9 })
+                 (Unqual
+                  {OccName: MkD10}))]
                (L
                 (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:55:14-20 })
                 (HsOuterImplicit
                  (NoExtField)))
-                (Nothing)
-                (PrefixConGADT
-                 [])
-                (L
-                 (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:55:14-20 })
-                 (HsAppTy
-                  (NoExtField)
-                  (L
-                   (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:55:14-16 })
-                   (HsTyVar
-                    (ApiAnn
+               (Nothing)
+               (PrefixConGADT
+                [])
+               (L
+                (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:55:14-20 })
+                (HsAppTy
+                 (NoExtField)
+                 (L
+                  (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:55:14-16 })
+                  (HsTyVar
+                   (ApiAnn
+                    (Anchor
                      { T17544.hs:55:14-16 }
-                     []
-                     [])
-                    (NotPromoted)
-                    (L
-                     (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:55:14-16 })
-                     (Unqual
-                      {OccName: D10}))))
-                  (L
-                   (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:55:18-20 })
-                   (HsTyVar
-                    (ApiAnn
+                     (UnchangedAnchor))
+                    []
+                    (AnnComments
+                     []))
+                   (NotPromoted)
+                   (L
+                    (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:55:14-16 })
+                    (Unqual
+                     {OccName: D10}))))
+                 (L
+                  (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:55:18-20 })
+                  (HsTyVar
+                   (ApiAnn
+                    (Anchor
                      { T17544.hs:55:18-20 }
-                     []
-                     [])
-                    (NotPromoted)
-                    (L
-                     (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:55:18-20 })
-                     (Unqual
-                      {OccName: Int}))))))
-                (Nothing)))]
+                     (UnchangedAnchor))
+                    []
+                    (AnnComments
+                     []))
+                   (NotPromoted)
+                   (L
+                    (SrcSpanAnn (ApiAnnNotUsed) { T17544.hs:55:18-20 })
+                    (Unqual
+                     {OccName: Int}))))))
+               (Nothing)))]
             []))))]
        (Nothing)))))
   ,(L

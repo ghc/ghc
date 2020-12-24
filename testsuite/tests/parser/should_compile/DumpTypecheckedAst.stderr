@@ -12,49 +12,61 @@
      (HsApp
       (ApiAnn
        (Anchor
-        { placeholder:-1:-1 })
+        { placeholder:-1:-1 }
+        (UnchangedAnchor))
        (NoApiAnns)
-       [])
+       (AnnComments
+        []))
       (L
        (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
        (HsApp
         (ApiAnn
          (Anchor
-          { placeholder:-1:-1 })
+          { placeholder:-1:-1 }
+          (UnchangedAnchor))
          (NoApiAnns)
-         [])
+         (AnnComments
+          []))
         (L
          (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
          (HsApp
           (ApiAnn
            (Anchor
-            { placeholder:-1:-1 })
+            { placeholder:-1:-1 }
+            (UnchangedAnchor))
            (NoApiAnns)
-           [])
+           (AnnComments
+            []))
           (L
            (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
            (HsApp
             (ApiAnn
              (Anchor
-              { placeholder:-1:-1 })
+              { placeholder:-1:-1 }
+              (UnchangedAnchor))
              (NoApiAnns)
-             [])
+             (AnnComments
+              []))
             (L
              (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
              (HsApp
               (ApiAnn
                (Anchor
-                { placeholder:-1:-1 })
+                { placeholder:-1:-1 }
+                (UnchangedAnchor))
                (NoApiAnns)
-               [])
+               (AnnComments
+                []))
               (L
                (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
                (HsApp
                 (ApiAnn
                  (Anchor
-                  { placeholder:-1:-1 })
+                  { placeholder:-1:-1 }
+                  (UnchangedAnchor))
                  (NoApiAnns)
-                 [])
+                 (AnnComments
+                  []))
                 (L
                  (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
                  (HsConLikeOut
@@ -65,18 +77,22 @@
                  (HsLit
                   (ApiAnn
                    (Anchor
-                    { placeholder:-1:-1 })
+                    { placeholder:-1:-1 }
+                    (UnchangedAnchor))
                    (NoApiAnns)
-                   [])
+                   (AnnComments
+                    []))
                   {HsWord{64}Prim (1374752024144278257) (NoSourceText)}))))
               (L
                (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
                (HsLit
                 (ApiAnn
                  (Anchor
-                  { placeholder:-1:-1 })
+                  { placeholder:-1:-1 }
+                  (UnchangedAnchor))
                  (NoApiAnns)
-                 [])
+                 (AnnComments
+                  []))
                 {HsWord{64}Prim (13654949607623281177) (NoSourceText)}))))
             (L
              (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
@@ -94,9 +110,11 @@
              (HsApp
               (ApiAnn
                (Anchor
-                { placeholder:-1:-1 })
+                { placeholder:-1:-1 }
+                (UnchangedAnchor))
                (NoApiAnns)
-               [])
+               (AnnComments
+                []))
               (L
                (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
                (HsConLikeOut
@@ -107,9 +125,11 @@
                (HsLit
                 (ApiAnn
                  (Anchor
-                  { placeholder:-1:-1 })
+                  { placeholder:-1:-1 }
+                  (UnchangedAnchor))
                  (NoApiAnns)
-                 [])
+                 (AnnComments
+                  []))
                 (HsStringPrim
                  (NoSourceText)
                  "T")))))))))
@@ -118,9 +138,11 @@
          (HsLit
           (ApiAnn
            (Anchor
-            { placeholder:-1:-1 })
+            { placeholder:-1:-1 }
+            (UnchangedAnchor))
            (NoApiAnns)
-           [])
+           (AnnComments
+            []))
           {HsInt{64}Prim (1) (SourceText
                               "1")}))))
       (L
@@ -140,49 +162,61 @@
      (HsApp
       (ApiAnn
        (Anchor
-        { placeholder:-1:-1 })
+        { placeholder:-1:-1 }
+        (UnchangedAnchor))
        (NoApiAnns)
-       [])
+       (AnnComments
+        []))
       (L
        (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
        (HsApp
         (ApiAnn
          (Anchor
-          { placeholder:-1:-1 })
+          { placeholder:-1:-1 }
+          (UnchangedAnchor))
          (NoApiAnns)
-         [])
+         (AnnComments
+          []))
         (L
          (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
          (HsApp
           (ApiAnn
            (Anchor
-            { placeholder:-1:-1 })
+            { placeholder:-1:-1 }
+            (UnchangedAnchor))
            (NoApiAnns)
-           [])
+           (AnnComments
+            []))
           (L
            (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
            (HsApp
             (ApiAnn
              (Anchor
-              { placeholder:-1:-1 })
+              { placeholder:-1:-1 }
+              (UnchangedAnchor))
              (NoApiAnns)
-             [])
+             (AnnComments
+              []))
             (L
              (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
              (HsApp
               (ApiAnn
                (Anchor
-                { placeholder:-1:-1 })
+                { placeholder:-1:-1 }
+                (UnchangedAnchor))
                (NoApiAnns)
-               [])
+               (AnnComments
+                []))
               (L
                (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
                (HsApp
                 (ApiAnn
                  (Anchor
-                  { placeholder:-1:-1 })
+                  { placeholder:-1:-1 }
+                  (UnchangedAnchor))
                  (NoApiAnns)
-                 [])
+                 (AnnComments
+                  []))
                 (L
                  (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
                  (HsConLikeOut
@@ -193,18 +227,22 @@
                  (HsLit
                   (ApiAnn
                    (Anchor
-                    { placeholder:-1:-1 })
+                    { placeholder:-1:-1 }
+                    (UnchangedAnchor))
                    (NoApiAnns)
-                   [])
+                   (AnnComments
+                    []))
                   {HsWord{64}Prim (10715337633704422415) (NoSourceText)}))))
               (L
                (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
                (HsLit
                 (ApiAnn
                  (Anchor
-                  { placeholder:-1:-1 })
+                  { placeholder:-1:-1 }
+                  (UnchangedAnchor))
                  (NoApiAnns)
-                 [])
+                 (AnnComments
+                  []))
                 {HsWord{64}Prim (12411373583424111944) (NoSourceText)}))))
             (L
              (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
@@ -222,9 +260,11 @@
              (HsApp
               (ApiAnn
                (Anchor
-                { placeholder:-1:-1 })
+                { placeholder:-1:-1 }
+                (UnchangedAnchor))
                (NoApiAnns)
-               [])
+               (AnnComments
+                []))
               (L
                (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
                (HsConLikeOut
@@ -235,9 +275,11 @@
                (HsLit
                 (ApiAnn
                  (Anchor
-                  { placeholder:-1:-1 })
+                  { placeholder:-1:-1 }
+                  (UnchangedAnchor))
                  (NoApiAnns)
-                 [])
+                 (AnnComments
+                  []))
                 (HsStringPrim
                  (NoSourceText)
                  "'MkT")))))))))
@@ -246,9 +288,11 @@
          (HsLit
           (ApiAnn
            (Anchor
-            { placeholder:-1:-1 })
+            { placeholder:-1:-1 }
+            (UnchangedAnchor))
            (NoApiAnns)
-           [])
+           (AnnComments
+            []))
           {HsInt{64}Prim (3) (SourceText
                               "3")}))))
       (L
@@ -268,49 +312,61 @@
      (HsApp
       (ApiAnn
        (Anchor
-        { placeholder:-1:-1 })
+        { placeholder:-1:-1 }
+        (UnchangedAnchor))
        (NoApiAnns)
-       [])
+       (AnnComments
+        []))
       (L
        (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
        (HsApp
         (ApiAnn
          (Anchor
-          { placeholder:-1:-1 })
+          { placeholder:-1:-1 }
+          (UnchangedAnchor))
          (NoApiAnns)
-         [])
+         (AnnComments
+          []))
         (L
          (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
          (HsApp
           (ApiAnn
            (Anchor
-            { placeholder:-1:-1 })
+            { placeholder:-1:-1 }
+            (UnchangedAnchor))
            (NoApiAnns)
-           [])
+           (AnnComments
+            []))
           (L
            (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
            (HsApp
             (ApiAnn
              (Anchor
-              { placeholder:-1:-1 })
+              { placeholder:-1:-1 }
+              (UnchangedAnchor))
              (NoApiAnns)
-             [])
+             (AnnComments
+              []))
             (L
              (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
              (HsApp
               (ApiAnn
                (Anchor
-                { placeholder:-1:-1 })
+                { placeholder:-1:-1 }
+                (UnchangedAnchor))
                (NoApiAnns)
-               [])
+               (AnnComments
+                []))
               (L
                (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
                (HsApp
                 (ApiAnn
                  (Anchor
-                  { placeholder:-1:-1 })
+                  { placeholder:-1:-1 }
+                  (UnchangedAnchor))
                  (NoApiAnns)
-                 [])
+                 (AnnComments
+                  []))
                 (L
                  (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
                  (HsConLikeOut
@@ -321,18 +377,22 @@
                  (HsLit
                   (ApiAnn
                    (Anchor
-                    { placeholder:-1:-1 })
+                    { placeholder:-1:-1 }
+                    (UnchangedAnchor))
                    (NoApiAnns)
-                   [])
+                   (AnnComments
+                    []))
                   {HsWord{64}Prim (14073232900889011755) (NoSourceText)}))))
               (L
                (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
                (HsLit
                 (ApiAnn
                  (Anchor
-                  { placeholder:-1:-1 })
+                  { placeholder:-1:-1 }
+                  (UnchangedAnchor))
                  (NoApiAnns)
-                 [])
+                 (AnnComments
+                  []))
                 {HsWord{64}Prim (2739668351064589274) (NoSourceText)}))))
             (L
              (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
@@ -350,9 +410,11 @@
              (HsApp
               (ApiAnn
                (Anchor
-                { placeholder:-1:-1 })
+                { placeholder:-1:-1 }
+                (UnchangedAnchor))
                (NoApiAnns)
-               [])
+               (AnnComments
+                []))
               (L
                (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
                (HsConLikeOut
@@ -363,9 +425,11 @@
                (HsLit
                 (ApiAnn
                  (Anchor
-                  { placeholder:-1:-1 })
+                  { placeholder:-1:-1 }
+                  (UnchangedAnchor))
                  (NoApiAnns)
-                 [])
+                 (AnnComments
+                  []))
                 (HsStringPrim
                  (NoSourceText)
                  "Peano")))))))))
@@ -374,9 +438,11 @@
          (HsLit
           (ApiAnn
            (Anchor
-            { placeholder:-1:-1 })
+            { placeholder:-1:-1 }
+            (UnchangedAnchor))
            (NoApiAnns)
-           [])
+           (AnnComments
+            []))
           {HsInt{64}Prim (0) (SourceText
                               "0")}))))
       (L
@@ -396,49 +462,61 @@
      (HsApp
       (ApiAnn
        (Anchor
-        { placeholder:-1:-1 })
+        { placeholder:-1:-1 }
+        (UnchangedAnchor))
        (NoApiAnns)
-       [])
+       (AnnComments
+        []))
       (L
        (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
        (HsApp
         (ApiAnn
          (Anchor
-          { placeholder:-1:-1 })
+          { placeholder:-1:-1 }
+          (UnchangedAnchor))
          (NoApiAnns)
-         [])
+         (AnnComments
+          []))
         (L
          (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
          (HsApp
           (ApiAnn
            (Anchor
-            { placeholder:-1:-1 })
+            { placeholder:-1:-1 }
+            (UnchangedAnchor))
            (NoApiAnns)
-           [])
+           (AnnComments
+            []))
           (L
            (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
            (HsApp
             (ApiAnn
              (Anchor
-              { placeholder:-1:-1 })
+              { placeholder:-1:-1 }
+              (UnchangedAnchor))
              (NoApiAnns)
-             [])
+             (AnnComments
+              []))
             (L
              (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
              (HsApp
               (ApiAnn
                (Anchor
-                { placeholder:-1:-1 })
+                { placeholder:-1:-1 }
+                (UnchangedAnchor))
                (NoApiAnns)
-               [])
+               (AnnComments
+                []))
               (L
                (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
                (HsApp
                 (ApiAnn
                  (Anchor
-                  { placeholder:-1:-1 })
+                  { placeholder:-1:-1 }
+                  (UnchangedAnchor))
                  (NoApiAnns)
-                 [])
+                 (AnnComments
+                  []))
                 (L
                  (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
                  (HsConLikeOut
@@ -449,18 +527,22 @@
                  (HsLit
                   (ApiAnn
                    (Anchor
-                    { placeholder:-1:-1 })
+                    { placeholder:-1:-1 }
+                    (UnchangedAnchor))
                    (NoApiAnns)
-                   [])
+                   (AnnComments
+                    []))
                   {HsWord{64}Prim (13760111476013868540) (NoSourceText)}))))
               (L
                (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
                (HsLit
                 (ApiAnn
                  (Anchor
-                  { placeholder:-1:-1 })
+                  { placeholder:-1:-1 }
+                  (UnchangedAnchor))
                  (NoApiAnns)
-                 [])
+                 (AnnComments
+                  []))
                 {HsWord{64}Prim (12314848029315386153) (NoSourceText)}))))
             (L
              (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
@@ -478,9 +560,11 @@
              (HsApp
               (ApiAnn
                (Anchor
-                { placeholder:-1:-1 })
+                { placeholder:-1:-1 }
+                (UnchangedAnchor))
                (NoApiAnns)
-               [])
+               (AnnComments
+                []))
               (L
                (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
                (HsConLikeOut
@@ -491,9 +575,11 @@
                (HsLit
                 (ApiAnn
                  (Anchor
-                  { placeholder:-1:-1 })
+                  { placeholder:-1:-1 }
+                  (UnchangedAnchor))
                  (NoApiAnns)
-                 [])
+                 (AnnComments
+                  []))
                 (HsStringPrim
                  (NoSourceText)
                  "'Zero")))))))))
@@ -502,9 +588,11 @@
          (HsLit
           (ApiAnn
            (Anchor
-            { placeholder:-1:-1 })
+            { placeholder:-1:-1 }
+            (UnchangedAnchor))
            (NoApiAnns)
-           [])
+           (AnnComments
+            []))
           {HsInt{64}Prim (0) (SourceText
                               "0")}))))
       (L
@@ -524,49 +612,61 @@
      (HsApp
       (ApiAnn
        (Anchor
-        { placeholder:-1:-1 })
+        { placeholder:-1:-1 }
+        (UnchangedAnchor))
        (NoApiAnns)
-       [])
+       (AnnComments
+        []))
       (L
        (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
        (HsApp
         (ApiAnn
          (Anchor
-          { placeholder:-1:-1 })
+          { placeholder:-1:-1 }
+          (UnchangedAnchor))
          (NoApiAnns)
-         [])
+         (AnnComments
+          []))
         (L
          (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
          (HsApp
           (ApiAnn
            (Anchor
-            { placeholder:-1:-1 })
+            { placeholder:-1:-1 }
+            (UnchangedAnchor))
            (NoApiAnns)
-           [])
+           (AnnComments
+            []))
           (L
            (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
            (HsApp
             (ApiAnn
              (Anchor
-              { placeholder:-1:-1 })
+              { placeholder:-1:-1 }
+              (UnchangedAnchor))
              (NoApiAnns)
-             [])
+             (AnnComments
+              []))
             (L
              (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
              (HsApp
               (ApiAnn
                (Anchor
-                { placeholder:-1:-1 })
+                { placeholder:-1:-1 }
+                (UnchangedAnchor))
                (NoApiAnns)
-               [])
+               (AnnComments
+                []))
               (L
                (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
                (HsApp
                 (ApiAnn
                  (Anchor
-                  { placeholder:-1:-1 })
+                  { placeholder:-1:-1 }
+                  (UnchangedAnchor))
                  (NoApiAnns)
-                 [])
+                 (AnnComments
+                  []))
                 (L
                  (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
                  (HsConLikeOut
@@ -577,18 +677,22 @@
                  (HsLit
                   (ApiAnn
                    (Anchor
-                    { placeholder:-1:-1 })
+                    { placeholder:-1:-1 }
+                    (UnchangedAnchor))
                    (NoApiAnns)
-                   [])
+                   (AnnComments
+                    []))
                   {HsWord{64}Prim (1143980031331647856) (NoSourceText)}))))
               (L
                (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
                (HsLit
                 (ApiAnn
                  (Anchor
-                  { placeholder:-1:-1 })
+                  { placeholder:-1:-1 }
+                  (UnchangedAnchor))
                  (NoApiAnns)
-                 [])
+                 (AnnComments
+                  []))
                 {HsWord{64}Prim (14802086722010293686) (NoSourceText)}))))
             (L
              (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
@@ -606,9 +710,11 @@
              (HsApp
               (ApiAnn
                (Anchor
-                { placeholder:-1:-1 })
+                { placeholder:-1:-1 }
+                (UnchangedAnchor))
                (NoApiAnns)
-               [])
+               (AnnComments
+                []))
               (L
                (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
                (HsConLikeOut
@@ -619,9 +725,11 @@
                (HsLit
                 (ApiAnn
                  (Anchor
-                  { placeholder:-1:-1 })
+                  { placeholder:-1:-1 }
+                  (UnchangedAnchor))
                  (NoApiAnns)
-                 [])
+                 (AnnComments
+                  []))
                 (HsStringPrim
                  (NoSourceText)
                  "'Succ")))))))))
@@ -630,9 +738,11 @@
          (HsLit
           (ApiAnn
            (Anchor
-            { placeholder:-1:-1 })
+            { placeholder:-1:-1 }
+            (UnchangedAnchor))
            (NoApiAnns)
-           [])
+           (AnnComments
+            []))
           {HsInt{64}Prim (0) (SourceText
                               "0")}))))
       (L
@@ -652,9 +762,11 @@
      (HsApp
       (ApiAnn
        (Anchor
-        { placeholder:-1:-1 })
+        { placeholder:-1:-1 }
+        (UnchangedAnchor))
        (NoApiAnns)
-       [])
+       (AnnComments
+        []))
       (L
        (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
        (HsConLikeOut
@@ -665,9 +777,11 @@
        (HsLit
         (ApiAnn
          (Anchor
-          { placeholder:-1:-1 })
+          { placeholder:-1:-1 }
+          (UnchangedAnchor))
          (NoApiAnns)
-         [])
+         (AnnComments
+          []))
         (HsInt
          (NoExtField)
          (IL
@@ -684,9 +798,11 @@
      (HsApp
       (ApiAnn
        (Anchor
-        { placeholder:-1:-1 })
+        { placeholder:-1:-1 }
+        (UnchangedAnchor))
        (NoApiAnns)
-       [])
+       (AnnComments
+        []))
       (L
        (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
        (HsConLikeOut
@@ -697,9 +813,11 @@
        (HsLit
         (ApiAnn
          (Anchor
-          { placeholder:-1:-1 })
+          { placeholder:-1:-1 }
+          (UnchangedAnchor))
          (NoApiAnns)
-         [])
+         (AnnComments
+          []))
         (HsInt
          (NoExtField)
          (IL
@@ -716,9 +834,11 @@
      (HsApp
       (ApiAnn
        (Anchor
-        { placeholder:-1:-1 })
+        { placeholder:-1:-1 }
+        (UnchangedAnchor))
        (NoApiAnns)
-       [])
+       (AnnComments
+        []))
       (L
        (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
        (HsConLikeOut
@@ -729,9 +849,11 @@
        (HsLit
         (ApiAnn
          (Anchor
-          { placeholder:-1:-1 })
+          { placeholder:-1:-1 }
+          (UnchangedAnchor))
          (NoApiAnns)
-         [])
+         (AnnComments
+          []))
         (HsInt
          (NoExtField)
          (IL
@@ -748,17 +870,21 @@
      (HsApp
       (ApiAnn
        (Anchor
-        { placeholder:-1:-1 })
+        { placeholder:-1:-1 }
+        (UnchangedAnchor))
        (NoApiAnns)
-       [])
+       (AnnComments
+        []))
       (L
        (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
        (HsApp
         (ApiAnn
          (Anchor
-          { placeholder:-1:-1 })
+          { placeholder:-1:-1 }
+          (UnchangedAnchor))
          (NoApiAnns)
-         [])
+         (AnnComments
+          []))
         (L
          (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
          (HsConLikeOut
@@ -788,17 +914,21 @@
      (HsApp
       (ApiAnn
        (Anchor
-        { placeholder:-1:-1 })
+        { placeholder:-1:-1 }
+        (UnchangedAnchor))
        (NoApiAnns)
-       [])
+       (AnnComments
+        []))
       (L
        (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
        (HsApp
         (ApiAnn
          (Anchor
-          { placeholder:-1:-1 })
+          { placeholder:-1:-1 }
+          (UnchangedAnchor))
          (NoApiAnns)
-         [])
+         (AnnComments
+          []))
         (L
          (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
          (HsConLikeOut
@@ -828,17 +958,21 @@
      (HsApp
       (ApiAnn
        (Anchor
-        { placeholder:-1:-1 })
+        { placeholder:-1:-1 }
+        (UnchangedAnchor))
        (NoApiAnns)
-       [])
+       (AnnComments
+        []))
       (L
        (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
        (HsApp
         (ApiAnn
          (Anchor
-          { placeholder:-1:-1 })
+          { placeholder:-1:-1 }
+          (UnchangedAnchor))
          (NoApiAnns)
-         [])
+         (AnnComments
+          []))
         (L
          (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
          (HsConLikeOut
@@ -868,17 +1002,21 @@
      (HsApp
       (ApiAnn
        (Anchor
-        { placeholder:-1:-1 })
+        { placeholder:-1:-1 }
+        (UnchangedAnchor))
        (NoApiAnns)
-       [])
+       (AnnComments
+        []))
       (L
        (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
        (HsApp
         (ApiAnn
          (Anchor
-          { placeholder:-1:-1 })
+          { placeholder:-1:-1 }
+          (UnchangedAnchor))
          (NoApiAnns)
-         [])
+         (AnnComments
+          []))
         (L
          (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
          (HsConLikeOut
@@ -908,17 +1046,21 @@
      (HsApp
       (ApiAnn
        (Anchor
-        { placeholder:-1:-1 })
+        { placeholder:-1:-1 }
+        (UnchangedAnchor))
        (NoApiAnns)
-       [])
+       (AnnComments
+        []))
       (L
        (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
        (HsApp
         (ApiAnn
          (Anchor
-          { placeholder:-1:-1 })
+          { placeholder:-1:-1 }
+          (UnchangedAnchor))
          (NoApiAnns)
-         [])
+         (AnnComments
+          []))
         (L
          (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
          (HsConLikeOut
@@ -948,17 +1090,21 @@
      (HsApp
       (ApiAnn
        (Anchor
-        { placeholder:-1:-1 })
+        { placeholder:-1:-1 }
+        (UnchangedAnchor))
        (NoApiAnns)
-       [])
+       (AnnComments
+        []))
       (L
        (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
        (HsApp
         (ApiAnn
          (Anchor
-          { placeholder:-1:-1 })
+          { placeholder:-1:-1 }
+          (UnchangedAnchor))
          (NoApiAnns)
-         [])
+         (AnnComments
+          []))
         (L
          (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
          (HsConLikeOut
@@ -980,17 +1126,21 @@
          (HsApp
           (ApiAnn
            (Anchor
-            { placeholder:-1:-1 })
+            { placeholder:-1:-1 }
+            (UnchangedAnchor))
            (NoApiAnns)
-           [])
+           (AnnComments
+            []))
           (L
            (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
            (HsApp
             (ApiAnn
              (Anchor
-              { placeholder:-1:-1 })
+              { placeholder:-1:-1 }
+              (UnchangedAnchor))
              (NoApiAnns)
-             [])
+             (AnnComments
+              []))
             (L
              (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
              (XExpr
@@ -1019,17 +1169,21 @@
              (HsApp
               (ApiAnn
                (Anchor
-                { placeholder:-1:-1 })
+                { placeholder:-1:-1 }
+                (UnchangedAnchor))
                (NoApiAnns)
-               [])
+               (AnnComments
+                []))
               (L
                (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
                (HsApp
                 (ApiAnn
                  (Anchor
-                  { placeholder:-1:-1 })
+                  { placeholder:-1:-1 }
+                  (UnchangedAnchor))
                  (NoApiAnns)
-                 [])
+                 (AnnComments
+                  []))
                 (L
                  (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
                  (XExpr
@@ -1058,17 +1212,21 @@
                  (HsApp
                   (ApiAnn
                    (Anchor
-                    { placeholder:-1:-1 })
+                    { placeholder:-1:-1 }
+                    (UnchangedAnchor))
                    (NoApiAnns)
-                   [])
+                   (AnnComments
+                    []))
                   (L
                    (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
                    (HsApp
                     (ApiAnn
                      (Anchor
-                      { placeholder:-1:-1 })
+                      { placeholder:-1:-1 }
+                      (UnchangedAnchor))
                      (NoApiAnns)
-                     [])
+                     (AnnComments
+                      []))
                     (L
                      (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
                      (XExpr
@@ -1110,17 +1268,21 @@
      (HsApp
       (ApiAnn
        (Anchor
-        { placeholder:-1:-1 })
+        { placeholder:-1:-1 }
+        (UnchangedAnchor))
        (NoApiAnns)
-       [])
+       (AnnComments
+        []))
       (L
        (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
        (HsApp
         (ApiAnn
          (Anchor
-          { placeholder:-1:-1 })
+          { placeholder:-1:-1 }
+          (UnchangedAnchor))
          (NoApiAnns)
-         [])
+         (AnnComments
+          []))
         (L
          (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
          (HsConLikeOut
@@ -1155,17 +1317,21 @@
      (HsApp
       (ApiAnn
        (Anchor
-        { placeholder:-1:-1 })
+        { placeholder:-1:-1 }
+        (UnchangedAnchor))
        (NoApiAnns)
-       [])
+       (AnnComments
+        []))
       (L
        (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
        (HsApp
         (ApiAnn
          (Anchor
-          { placeholder:-1:-1 })
+          { placeholder:-1:-1 }
+          (UnchangedAnchor))
          (NoApiAnns)
-         [])
+         (AnnComments
+          []))
         (L
          (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
          (HsConLikeOut
@@ -1180,9 +1346,11 @@
            (HsApp
             (ApiAnn
              (Anchor
-              { placeholder:-1:-1 })
+              { placeholder:-1:-1 }
+              (UnchangedAnchor))
              (NoApiAnns)
-             [])
+             (AnnComments
+              []))
             (L
              (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
              (HsConLikeOut
@@ -1193,9 +1361,11 @@
              (HsLit
               (ApiAnn
                (Anchor
-                { placeholder:-1:-1 })
+                { placeholder:-1:-1 }
+                (UnchangedAnchor))
                (NoApiAnns)
-               [])
+               (AnnComments
+                []))
               (HsStringPrim
                (NoSourceText)
                "main")))))))))
@@ -1208,9 +1378,11 @@
          (HsApp
           (ApiAnn
            (Anchor
-            { placeholder:-1:-1 })
+            { placeholder:-1:-1 }
+            (UnchangedAnchor))
            (NoApiAnns)
-           [])
+           (AnnComments
+            []))
           (L
            (SrcSpanAnn (ApiAnnNotUsed) { <no location info> })
            (HsConLikeOut
@@ -1221,9 +1393,11 @@
            (HsLit
             (ApiAnn
              (Anchor
-              { placeholder:-1:-1 })
+              { placeholder:-1:-1 }
+              (UnchangedAnchor))
              (NoApiAnns)
-             [])
+             (AnnComments
+              []))
             (HsStringPrim
              (NoSourceText)
              "DumpTypecheckedAst")))))))))))
@@ -1243,7 +1417,14 @@
     [({abstract:TcEvBinds})]
     {Bag(LocatedA (HsBind Var)):
      [(L
-       (SrcSpanAnn (ApiAnnNotUsed) { DumpTypecheckedAst.hs:18:1-23 })
+       (SrcSpanAnn (ApiAnn
+                    (Anchor
+                     { DumpTypecheckedAst.hs:18:1-23 }
+                     (UnchangedAnchor))
+                    (AnnListItem
+                     [])
+                    (AnnComments
+                     [])) { DumpTypecheckedAst.hs:18:1-23 })
        (FunBind
         (WpHole)
         (L
@@ -1293,9 +1474,11 @@
                     (HsLit
                      (ApiAnn
                       (Anchor
-                       { DumpTypecheckedAst.hs:18:17-23 })
+                       { DumpTypecheckedAst.hs:18:17-23 }
+                       (UnchangedAnchor))
                       (NoApiAnns)
-                      [])
+                      (AnnComments
+                       []))
                      (HsString
                       (SourceText "hello")
                       {FastString: "hello"})))))))]

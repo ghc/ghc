@@ -1,5 +1,6 @@
 test('Ppr001', ignore_stderr, makefile_test, ['ppr001'])
 test('Ppr002', ignore_stderr, makefile_test, ['ppr002'])
+test('Ppr002a', ignore_stderr, makefile_test, ['ppr002a'])
 test('Ppr003', ignore_stderr, makefile_test, ['ppr003'])
 test('Ppr004', ignore_stderr, makefile_test, ['ppr004'])
 test('Ppr005', ignore_stderr, makefile_test, ['ppr005'])

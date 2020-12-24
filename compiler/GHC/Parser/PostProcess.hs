@@ -187,7 +187,7 @@ mkClassDecl loc' (L _ (mcxt, tycl_hdr)) fds where_cls layoutInfo annsIn
        ; (cls, tparams, fixity, ann) <- checkTyClHdr True tycl_hdr
        ; (tyvars,annst) <- checkTyVars (text "class") whereDots cls tparams
        ; cs <- getCommentsFor (locA loc) -- Get any remaining comments
-       ; let anns' = addAnns (ApiAnn (spanAsAnchor $ locA loc) annsIn []) (ann++annst) cs
+       ; let anns' = addAnns (ApiAnn (spanAsAnchor $ locA loc) annsIn noCom) (ann++annst) cs
        ; return (L loc (ClassDecl { tcdCExt = (anns', layoutInfo)
                                   , tcdCtxt = mcxt
                                   , tcdLName = cls, tcdTyVars = tyvars
@@ -213,7 +213,7 @@ mkTyData loc' new_or_data cType (L _ (mcxt, tycl_hdr))
        ; (tc, tparams, fixity, ann) <- checkTyClHdr False tycl_hdr
        ; (tyvars, anns) <- checkTyVars (ppr new_or_data) equalsDots tc tparams
        ; cs <- getCommentsFor (locA loc) -- Get any remaining comments
-       ; let anns' = addAnns (ApiAnn (spanAsAnchor $ locA loc) annsIn []) (ann ++ anns) cs
+       ; let anns' = addAnns (ApiAnn (spanAsAnchor $ locA loc) annsIn noCom) (ann ++ anns) cs
        ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv anns'
        ; return (L loc (DataDecl { tcdDExt = anns', -- AZ: do we need these?
                                    tcdLName = tc, tcdTyVars = tyvars,
@@ -248,7 +248,7 @@ mkTySynonym loc lhs rhs annsIn
        ; cs1 <- getCommentsFor loc -- Add any API Annotations to the top SrcSpan [temp]
        ; (tyvars, anns) <- checkTyVars (text "type") equalsDots tc tparams
        ; cs2 <- getCommentsFor loc -- Add any API Annotations to the top SrcSpan [temp]
-       ; let anns' = addAnns (ApiAnn (spanAsAnchor loc) annsIn []) (ann ++ anns) (cs1 ++ cs2)
+       ; let anns' = addAnns (ApiAnn (spanAsAnchor loc) annsIn noCom) (ann ++ anns) (cs1 Semi.<> cs2)
        ; return (L (noAnnSrcSpan loc) (SynDecl
                                 { tcdSExt = anns'
                                 , tcdLName = tc, tcdTyVars = tyvars
@@ -310,7 +310,7 @@ mkDataFamInst loc new_or_data cType (mcxt, bndrs, tycl_hdr)
   = do { (tc, tparams, fixity, ann) <- checkTyClHdr False tycl_hdr
        ; -- AZ:TODO: deal with these comments
        ; cs <- getCommentsFor loc -- Add any API Annotations to the top SrcSpan [temp]
-       ; let anns' = addAnns (ApiAnn (spanAsAnchor loc) ann cs) anns []
+       ; let anns' = addAnns (ApiAnn (spanAsAnchor loc) ann cs) anns noCom
        ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv anns'
        ; return (L (noAnnSrcSpan loc) (DataFamInstD anns' (DataFamInstDecl
                   (FamEqn { feqn_ext    = noAnn -- AZ: get anns
@@ -342,7 +342,7 @@ mkFamDecl loc info topLevel lhs ksig injAnn annsIn
        ; cs1 <- getCommentsFor loc -- Add any API Annotations to the top SrcSpan [temp]
        ; (tyvars, anns) <- checkTyVars (ppr info) equals_or_where tc tparams
        ; cs2 <- getCommentsFor loc -- Add any API Annotations to the top SrcSpan [temp]
-       ; let anns' = addAnns (ApiAnn (spanAsAnchor loc) annsIn []) (ann++anns) (cs1 ++ cs2)
+       ; let anns' = addAnns (ApiAnn (spanAsAnchor loc) annsIn noCom) (ann++anns) (cs1 Semi.<> cs2)
        ; return (L (noAnnSrcSpan loc) (FamDecl noExtField
                                          (FamilyDecl
                                            { fdExt       = anns'
@@ -370,16 +370,22 @@ mkSpliceDecl :: LHsExpr GhcPs -> P (LHsDecl GhcPs)
 -- as spliced declaration.  See #10945
 mkSpliceDecl lexpr@(L loc expr)
   | HsSpliceE _ splice@(HsUntypedSplice {}) <- expr = do
-    cs <- getPriorCommentsFor (locA loc)
+    -- cs <- getPriorCommentsFor (locA loc)
+    cs <- getCommentsFor (locA loc)
     return $ L (addCommentsToSSA loc cs) $ SpliceD noExtField (SpliceDecl noExtField (L loc splice) ExplicitSplice)
+    -- return $ L loc $ SpliceD noExtField (SpliceDecl noExtField (L loc splice) ExplicitSplice)
 
   | HsSpliceE _ splice@(HsQuasiQuote {}) <- expr = do
-    cs <- getPriorCommentsFor (locA loc)
+    -- cs <- getPriorCommentsFor (locA loc)
+    cs <- getCommentsFor (locA loc)
     return $ L (addCommentsToSSA loc cs) $ SpliceD noExtField (SpliceDecl noExtField (L loc splice) ExplicitSplice)
+    -- return $ L loc $ SpliceD noExtField (SpliceDecl noExtField (L loc splice) ExplicitSplice)
 
   | otherwise = do
-    cs <- getPriorCommentsFor (locA loc)
+    -- cs <- getPriorCommentsFor (locA loc)
+    cs <- getCommentsFor (locA loc)
     return $ L (addCommentsToSSA loc cs) $ SpliceD noExtField (SpliceDecl noExtField
+    -- return $ L loc $ SpliceD noExtField (SpliceDecl noExtField
                                  (L loc (mkUntypedSplice noAnn BareSplice lexpr))
                                        ImplicitSplice)
 
@@ -438,7 +444,7 @@ add_where :: AddApiAnn -> ApiAnn' AnnList -> ApiAnn' AnnList
 add_where an (ApiAnn a (AnnList o c r t) cs)
   = ApiAnn (widenAnchor a [an]) (AnnList o c (an:r) t) cs
 add_where an@(AddApiAnn _ rs) ApiAnnNotUsed
-  = ApiAnn (Anchor rs UnchangedAnchor) (AnnList Nothing Nothing [an] []) []
+  = ApiAnn (Anchor rs UnchangedAnchor) (AnnList Nothing Nothing [an] []) noCom
 
 {- **********************************************************************
 
@@ -526,10 +532,12 @@ getMonoBind (L loc1 (FunBind { fun_id = fun_id1@(L _ f1)
     go mtchs loc
        ((L loc2 (ValD _ (FunBind { fun_id = (L _ f2)
                                  , fun_matches =
-                                    MG { mg_alts = (L _ mtchs2) } })))
+                                    MG { mg_alts = (L _ [L lm2 mtchs2]) } })))
          : binds) _
-        | f1 == f2 = go (mtchs2 ++ mtchs)
-                        (combineSrcSpansA loc loc2) binds []
+        | f1 == f2 =
+          let (loc2', lm2') = transferComments loc2 lm2
+          in go (L lm2' mtchs2 : mtchs)
+                        (combineSrcSpansA loc loc2') binds []
     go mtchs loc (doc_decl@(L loc2 (DocD {})) : binds) doc_decls
         = let doc_decls' = doc_decl : doc_decls
           in go mtchs (combineSrcSpansA loc loc2) binds doc_decls'
@@ -700,7 +708,7 @@ mkGadtDecl loc names ty annsIn = do
           in (PrefixConGADT arg_types, res_type, anns, cs)
 
       an = case outer_bndrs of
-        _                -> ApiAnn (spanAsAnchor loc) (annsIn ++ annsa) (cs ++ csa)
+        _                -> ApiAnn (spanAsAnchor loc) (annsIn ++ annsa) (cs Semi.<> csa)
         -- Was Maybe (ApiAnnForAllTy, STUFF)
         -- Nothing                -> ApiAnn (realSrcSpan loc) (annsIn ++ annsa) (cs ++ csa)
         -- Just (ApiAnnNotUsed,_) -> ApiAnn (realSrcSpan loc) (annsIn ++ annsa) (cs ++ csa)
@@ -819,13 +827,13 @@ checkTyVars pp_what equals_or_where tc tparms
   where
     check :: HsArg (LHsType GhcPs) (LHsType GhcPs) -> P (LHsTyVarBndr () GhcPs, [AddApiAnn]) -- AZ
     check (HsTypeArg _ ki@(L loc _)) = addFatalError $ Error (ErrUnexpectedTypeAppInDecl ki pp_what (unLoc tc)) [] (locA loc)
-    check (HsValArg ty) = chkParens [] [] ty
+    check (HsValArg ty) = chkParens [] noCom ty
     check (HsArgPar sp) = addFatalError $ Error (ErrMalformedDecl pp_what (unLoc tc)) [] sp
         -- Keep around an action for adjusting the annotations of extra parens
     chkParens :: [AddApiAnn] -> ApiAnnComments -> LHsType GhcPs
               -> P (LHsTyVarBndr () GhcPs, [AddApiAnn])
     chkParens acc cs (L l (HsParTy an ty))
-      = chkParens (mkParensApiAnn (locA l) ++ acc) (cs ++ apiAnnComments an) ty
+      = chkParens (mkParensApiAnn (locA l) ++ acc) (cs Semi.<> apiAnnComments an) ty
     chkParens acc cs ty = do
       tv <- chk acc cs ty
       return (tv, reverse acc)
@@ -970,7 +978,7 @@ checkTyClHdr is_cls ty
     newAnns (SrcSpanAnn (ApiAnn ap (AnnListItem ta) csp) l) (ApiAnn as (AnnParen _ o c) cs) =
       let
         lr = combineRealSrcSpans (anchor ap) (anchor as)
-        an = (ApiAnn (Anchor lr UnchangedAnchor) (NameAnn NameParens o (realSrcSpan l) c ta) (csp ++ cs))
+        an = (ApiAnn (Anchor lr UnchangedAnchor) (NameAnn NameParens o (realSrcSpan l) c ta) (csp Semi.<> cs))
       in SrcSpanAnn an (RealSrcSpan lr Nothing)
 
 -- | Yield a parse error if we have a function applied directly to a do block
@@ -1016,7 +1024,7 @@ checkCmdBlockArguments :: LHsCmd GhcPs -> PV ()
 -- @
 checkContext :: LHsType GhcPs -> P (LHsContext GhcPs)
 checkContext orig_t@(L (SrcSpanAnn _ l) _orig_t) =
-  check ([],[],[]) orig_t
+  check ([],[],noCom) orig_t
  where
   check :: ([RealSrcSpan],[RealSrcSpan],ApiAnnComments)
         -> LHsType GhcPs -> P (LHsContext GhcPs)
@@ -1026,22 +1034,22 @@ checkContext orig_t@(L (SrcSpanAnn _ l) _orig_t) =
     -- Ditto ()
     = do
         let (op,cp,cs') = case ann' of
-              ApiAnnNotUsed -> ([],[],[])
+              ApiAnnNotUsed -> ([],[],noCom)
               ApiAnn _ (AnnParen _ o c) cs -> ([o],[c],cs)
         return (L (SrcSpanAnn (ApiAnn (spanAsAnchor l)
-                               (AnnContext Nothing (op++oparens) (cp++cparens)) (cs++cs')) l) ts)
+                               (AnnContext Nothing (op++oparens) (cp++cparens)) (cs Semi.<> cs')) l) ts)
 
   check (opi,cpi,csi) (L _lp1 (HsParTy ann' ty))
                                   -- to be sure HsParTy doesn't get into the way
     = do
         let (op,cp,cs') = case ann' of
-                    ApiAnnNotUsed -> ([],[],[])
+                    ApiAnnNotUsed -> ([],[],noCom)
                     ApiAnn _ (AnnParen _ open close ) cs -> ([open],[close],cs)
-        check (op++opi,cp++cpi,cs'++csi) ty
+        check (op++opi,cp++cpi,cs' Semi.<> csi) ty
 
   -- No need for anns, returning original
   check (_opi,_cpi,_csi) _t =
-                 return (L (SrcSpanAnn (ApiAnn (spanAsAnchor l) (AnnContext Nothing [] []) []) l) [orig_t])
+                 return (L (SrcSpanAnn (ApiAnn (spanAsAnchor l) (AnnContext Nothing [] []) noCom) l) [orig_t])
 
 checkImportDecl :: Maybe RealSrcSpan
                 -> Maybe RealSrcSpan
@@ -1143,7 +1151,7 @@ checkAPat loc e0 = do
      (L l p) <- checkLPat e
      let aa = [AddApiAnn ai o, AddApiAnn ac c]
          (ai,ac) = parenTypeKws pt
-     return (ParPat (ApiAnn (spanAsAnchor $ (widenSpan (locA l) aa)) an []) (L l p))
+     return (ParPat (ApiAnn (spanAsAnchor $ (widenSpan (locA l) aa)) an noCom) (L l p))
    _           -> patFail (locA loc) (ppr e0)
 
 placeHolderPunRhs :: DisambECP b => PV (LocatedA b)
@@ -1207,8 +1215,6 @@ checkFunBind :: SrcStrictness
 checkFunBind strictness locF ann lhs_loc fun is_infix pats (L rhs_span grhss)
   = do  ps <- runPV_hints param_hints (mapM checkLPat pats)
         let match_span = noAnnSrcSpan $ combineSrcSpans lhs_loc rhs_span
-        -- Add back the annotations stripped from any HsPar values in the lhs
-        -- mapM_ (\a -> a match_span) ann
         cs <- getCommentsFor locF
         return (makeFunBind fun (L (noAnnSrcSpan $ locA match_span)
                  [L match_span (Match { m_ext = ApiAnn (spanAsAnchor locF) ann cs
@@ -1840,8 +1846,7 @@ class DisambTD b where
 instance DisambTD (HsType GhcPs) where
   mkHsAppTyHeadPV = return
   mkHsAppTyPV t1 t2 = return (mkHsAppTy t1 t2)
-  mkHsAppKindTyPV t l_at ki = return (mkHsAppKindTy l' t ki)
-    where l' = combineSrcSpans l_at (getLocA ki)
+  mkHsAppKindTyPV t l_at ki = return (mkHsAppKindTy l_at t ki)
   mkHsOpTyPV t1 op t2 = return (mkLHsOpTy t1 op t2)
   mkUnpackednessPV = addUnpackednessP
 
@@ -2665,9 +2670,10 @@ data PV_Context =
 
 data PV_Accum =
   PV_Accum
-    { pv_warnings :: Bag Warning
-    , pv_errors   :: Bag Error
-    , pv_comment_q :: [RealLocated AnnotationComment]
+    { pv_warnings        :: Bag Warning
+    , pv_errors          :: Bag Error
+    , pv_header_comments :: Maybe [LAnnotationComment]
+    , pv_comment_q       :: [LAnnotationComment]
     }
 
 data PV_Result a = PV_Ok PV_Accum a | PV_Failed PV_Accum
@@ -2719,6 +2725,7 @@ runPV_hints hints m =
       pv_acc = PV_Accum
         { pv_warnings = warnings s
         , pv_errors   = errors s
+        , pv_header_comments = header_comments s
         , pv_comment_q = comment_q s }
       mkPState acc' =
         s { warnings = pv_warnings acc'
@@ -2755,12 +2762,14 @@ instance MonadP PV where
     let (comment_q', newAnns) = allocateComments ss (pv_comment_q s) in
       PV_Ok s {
          pv_comment_q = comment_q'
-       } newAnns
+       } (AnnComments newAnns)
   allocatePriorCommentsP ss = PV $ \_ s ->
-    let (comment_q', newAnns) = allocatePriorComments ss (pv_comment_q s) in
+    let (header_comments', comment_q', newAnns)
+          = allocatePriorComments ss (pv_comment_q s) (pv_header_comments s) in
       PV_Ok s {
+         pv_header_comments = header_comments',
          pv_comment_q = comment_q'
-       } newAnns
+       } (AnnComments newAnns)
 
 {- Note [Parser-Validator Hint]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

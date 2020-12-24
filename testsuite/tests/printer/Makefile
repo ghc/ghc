@@ -16,6 +16,11 @@ ppr002:
 	$(CHECK_PPR)   "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" Ppr002.hs
 	$(CHECK_EXACT) "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" Ppr002.hs
 
+.PHONY: ppr002a
+ppr002a:
+	$(CHECK_PPR)   "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" Ppr002a.hs
+	$(CHECK_EXACT) "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" Ppr002a.hs
+
 .PHONY: ppr003
 ppr003:
 	$(CHECK_PPR)   "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" Ppr003.hs

@@ -179,11 +179,11 @@ type Annotated a = EP String Identity a
 markAnnotated :: ExactPrint a => a -> Annotated ()
 markAnnotated a = enterAnn (getAnnotationEntry a) a
 
-data Entry = Entry Anchor [RealLocated AnnotationComment]
+data Entry = Entry Anchor ApiAnnComments
            | NoEntryVal
 
 instance (HasEntry (ApiAnn' an)) =>  HasEntry (SrcSpanAnn' (ApiAnn' an)) where
-  fromAnn (SrcSpanAnn ApiAnnNotUsed ss) = Entry (spanAsAnchor ss) []
+  fromAnn (SrcSpanAnn ApiAnnNotUsed ss) = Entry (spanAsAnchor ss) noCom
   fromAnn (SrcSpanAnn an _) = fromAnn an
 
 instance HasEntry (ApiAnn' a) where
@@ -213,13 +213,18 @@ enterAnn (Entry anchor' cs) a = do
   p <- getPosP
   debugM $ "enterAnn:(p,a) =" ++ show (p, astId a) ++ " starting"
   let curAnchor = anchor anchor' -- As a base for the current AST element
-  addCommentsA cs
   case anchor_op anchor' of
     MovedAnchor dp -> do
       debugM $ "enterAnn: MovedAnchor:" ++ show dp
-      printComments curAnchor
+      case (priorComments cs) of
+        (L loc _:_) -> do
+            addCommentsA (priorComments cs)
+            printComments curAnchor
+        _ -> return ()
       setPriorEndNoLayoutD (ss2pos curAnchor)
-    _ -> printComments curAnchor
+    _ -> do
+      addCommentsA (priorComments cs)
+      printComments curAnchor
   setAnchorU curAnchor
   -- -------------------------------------------------------------------
   -- The first part corresponds to the delta phase, so should only use
@@ -255,6 +260,11 @@ enterAnn (Entry anchor' cs) a = do
     st = annNone { annEntryDelta = edp }
   withOffset st (advance edp >> exact a)
 
+  when ((getFollowingComments cs) /= []) $ do
+    debugM $ "starting trailing comments:" ++ showAst (getFollowingComments cs)
+    mapM_ printOneComment (map tokComment $ getFollowingComments cs)
+    debugM $ "ending trailing comments"
+
   case anchor_op anchor' of
     DeletedAnchor a -> setPriorEndASTD False a
     MovedAnchor _ -> setPriorMovedD (Just (DP (2,0)))
@@ -262,7 +272,7 @@ enterAnn (Entry anchor' cs) a = do
 
 -- ---------------------------------------------------------------------
 
-addCommentsA :: [RealLocated AnnotationComment] -> EPP ()
+addCommentsA :: [LAnnotationComment] -> EPP ()
 addCommentsA csNew = addComments (map tokComment csNew)
   -- cs <- getUnallocatedComments
   -- -- AZ:TODO: sortedlist?
@@ -272,7 +282,7 @@ addComments :: [Comment] -> EPP ()
 addComments csNew = do
   debugM $ "addComments:" ++ show csNew
   cs <- getUnallocatedComments
-  let cmp (Comment _ l1 _) (Comment _ l2 _) = compare l1 l2
+  let cmp (Comment _ l1 _) (Comment _ l2 _) = compare (anchor l1) (anchor l2)
   -- AZ:TODO: sortedlist?
   putUnallocatedComments (sortBy cmp $ csNew ++ cs)
 
@@ -327,7 +337,7 @@ class (Typeable a) => ExactPrint a where
 -- | Bare Located elements are simply stripped off without further
 -- processing.
 instance (ExactPrint a) => ExactPrint (Located a) where
-  getAnnotationEntry (L l _) = Entry (spanAsAnchor l) []
+  getAnnotationEntry (L l _) = Entry (spanAsAnchor l) noCom
   exact (L _ a) = markAnnotated a
 
 instance (ExactPrint a) => ExactPrint (LocatedA a) where
@@ -625,7 +635,7 @@ markAnnList an@(ApiAnn _ ann _) action = do
 printComments :: RealSrcSpan -> EPP ()
 printComments ss = do
   cs <- commentAllocation ss
-  debugM $ "printComments: (ss,comment locations): " ++ showPprUnsafe (rs2range ss,map commentIdentifier cs)
+  debugM $ "printComments: (ss,comment locations): " ++ showPprUnsafe (rs2range ss,map commentAnchor cs)
   mapM_ printOneComment cs
 
 -- ---------------------------------------------------------------------
@@ -635,15 +645,19 @@ printOneComment c@(Comment _str loc _mo) = do
   mpm <- getPriorMovedD
   dp <- case mpm of
     Nothing -> do
-      pe <- getPriorEndD
-      let dp = ss2delta pe loc
-      return dp
+      case anchor_op loc of
+        MovedAnchor dp -> return dp
+        _ -> do
+          pe <- getPriorEndD
+          let dp = ss2delta pe (anchor loc)
+          return dp
     Just dp -> do
       setPriorMovedD Nothing
       return dp
   dp' <- adjustDeltaForOffsetM dp
-  setPriorEndD (ss2posEnd loc)
-  printQueuedComment loc c dp'
+  debugM $ "printOneComment:(dp,dp')=" ++ showGhc (dp,dp')
+  setPriorEndD (ss2posEnd (anchor loc))
+  printQueuedComment (anchor loc) c dp'
 
 {-
 -- Delta function
@@ -663,8 +677,8 @@ makeDeltaComment c = do
 printOneComment' :: Comment -> EPP ()
 printOneComment' c@(Comment _str loc _mo) = do
   p <- getPosP
-  let dp = ss2delta p loc
-  printQueuedComment loc c dp
+  let dp = ss2delta p (anchor loc)
+  printQueuedComment (anchor loc) c dp
 
 
 -- ---------------------------------------------------------------------
@@ -672,7 +686,7 @@ printOneComment' c@(Comment _str loc _mo) = do
 commentAllocation :: RealSrcSpan -> EPP [Comment]
 commentAllocation ss = do
   cs <- getUnallocatedComments
-  let (earlier,later) = partition (\(Comment _str loc _mo) -> loc <= ss) cs
+  let (earlier,later) = partition (\(Comment _str loc _mo) -> anchor loc <= ss) cs
   putUnallocatedComments later
   -- debugM $ "commentAllocation:(ss,earlier,later)" ++ show (rs2range ss,earlier,later)
   return earlier
@@ -1079,13 +1093,6 @@ instance ExactPrint (RuleDecls GhcPs) where
     markLocatedAALS an id AnnClose (Just "#-}")
     -- markTrailingSemi
 
--- instance Annotate (RuleDecls GhcPs) where
---   markAST _ (HsRules _ src rules) = do
---     markAnnOpen src "{-# RULES"
---     setLayoutFlag $ markListIntercalateWithFunLevel markLocated 2 rules
---     markWithString AnnClose "#-}"
---     markTrailingSemi
-
 -- ---------------------------------------------------------------------
 
 instance ExactPrint (RuleDecl GhcPs) where
@@ -1215,7 +1222,7 @@ instance ExactPrint (RuleBndr GhcPs) where
 --     markAnnotated rhs
 
 instance (ExactPrint body) => ExactPrint (FamEqn GhcPs body) where
-  getAnnotationEntry = const NoEntryVal
+  getAnnotationEntry (FamEqn { feqn_ext = an}) = fromAnn an
   exact (FamEqn { feqn_ext = an
                 , feqn_tycon  = tycon
                 , feqn_bndrs  = bndrs
@@ -1261,7 +1268,7 @@ exactHsFamInstLHS an thing bndrs typats fixity mb_ctxt = do
 
     exact_pats pats = do
       markAnnotated thing
-      mapM_ markAnnotated pats
+      markAnnotated pats
 
 -- ---------------------------------------------------------------------
 

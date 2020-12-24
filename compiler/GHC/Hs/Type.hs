@@ -113,6 +113,8 @@ import GHC.Utils.Misc ( count )
 import Data.Data hiding ( Fixity, Prefix, Infix )
 import Data.Maybe
 
+import qualified Data.Semigroup as S
+
 {-
 ************************************************************************
 *                                                                      *
@@ -1616,18 +1618,18 @@ splitHsFunType ty = go ty
       = let
           (anns, cs, args, res) = splitHsFunType ty
           anns' = anns ++ annParen2AddApiAnn an
-          cs' = cs ++ apiAnnComments (ann l) ++ apiAnnComments an
+          cs' = cs S.<> apiAnnComments (ann l) S.<> apiAnnComments an
         in (anns', cs', args, res)
 
     go (L ll (HsFunTy (ApiAnn _ an cs) mult x y))
       | (anns, csy, args, res) <- splitHsFunType y
-      = (anns, csy ++ apiAnnComments (ann ll), HsScaled mult x':args, res)
+      = (anns, csy S.<> apiAnnComments (ann ll), HsScaled mult x':args, res)
       where
         (L (SrcSpanAnn a l) t) = x
         an' = addTrailingAnnToA l an cs a
         x' = L (SrcSpanAnn an' l) t
 
-    go other = ([], [], [], other)
+    go other = ([], noCom, [], other)
 
 -- | Retrieve the name of the \"head\" of a nested type application.
 -- This is somewhat like @GHC.Tc.Gen.HsType.splitHsAppTys@, but a little more

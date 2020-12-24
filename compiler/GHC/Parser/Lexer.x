@@ -2285,7 +2285,8 @@ data PState = PState {
         -- the GHC API can do source to source conversions.
         -- See note [Api annotations] in GHC.Parser.Annotation
         eof_pos :: Maybe RealSrcSpan,
-        comment_q :: [RealLocated AnnotationComment],
+        header_comments :: Maybe [LAnnotationComment],
+        comment_q :: [LAnnotationComment],
 
         -- Haddock comments accumulated in ascending order of their location
         -- (BufPos). We use OrdList to get O(1) snoc.
@@ -2758,6 +2759,7 @@ initParserState options buf loc =
       alr_justClosedExplicitLetBlock = False,
       -- AZ annotations = [],
       eof_pos = Nothing,
+      header_comments = Nothing,
       comment_q = [],
       hdk_comments = nilOL
     }
@@ -2799,10 +2801,10 @@ class Monad m => MonadP m where
   getBit :: ExtBits -> m Bool
   -- | Go through the @comment_q@ in @PState@ and remove all comments
   -- that belong within the given span
-  allocateCommentsP :: RealSrcSpan -> m [RealLocated AnnotationComment]
+  allocateCommentsP :: RealSrcSpan -> m ApiAnnComments
   -- | Go through the @comment_q@ in @PState@ and remove all comments
   -- that come before or within the given span
-  allocatePriorCommentsP :: RealSrcSpan -> m [RealLocated AnnotationComment]
+  allocatePriorCommentsP :: RealSrcSpan -> m ApiAnnComments
 
 instance MonadP P where
   addError err
@@ -2822,20 +2824,22 @@ instance MonadP P where
     let (comment_q', newAnns) = allocateComments ss (comment_q s) in
       POk s {
          comment_q = comment_q'
-       } newAnns
+       } (AnnComments newAnns)
   allocatePriorCommentsP ss = P $ \s ->
-    let (comment_q', newAnns) = allocatePriorComments ss (comment_q s) in
+    let (header_comments', comment_q', newAnns)
+             = allocatePriorComments ss (comment_q s) (header_comments s) in
       POk s {
+         header_comments = header_comments',
          comment_q = comment_q'
-       } newAnns
+       } (AnnComments newAnns)
 
-getCommentsFor :: (MonadP m) => SrcSpan -> m [RealLocated AnnotationComment]
+getCommentsFor :: (MonadP m) => SrcSpan -> m ApiAnnComments
 getCommentsFor (RealSrcSpan l _) = allocateCommentsP l
-getCommentsFor _ = return []
+getCommentsFor _ = return noCom
 
-getPriorCommentsFor :: (MonadP m) => SrcSpan -> m [RealLocated AnnotationComment]
+getPriorCommentsFor :: (MonadP m) => SrcSpan -> m ApiAnnComments
 getPriorCommentsFor (RealSrcSpan l _) = allocatePriorCommentsP l
-getPriorCommentsFor _ = return []
+getPriorCommentsFor _ = return noCom
 
 addTabWarning :: RealSrcSpan -> P ()
 addTabWarning srcspan
@@ -3343,12 +3347,12 @@ queueComment c = P $ \s -> POk s {
 
 allocateComments
   :: RealSrcSpan
-  -> [RealLocated AnnotationComment]
-  -> ([RealLocated AnnotationComment], [RealLocated AnnotationComment])
+  -> [LAnnotationComment]
+  -> ([LAnnotationComment], [LAnnotationComment])
 allocateComments ss comment_q =
   let
-    (before,rest)  = break (\(L l _) -> isRealSubspanOf l ss) comment_q
-    (middle,after) = break (\(L l _) -> not (isRealSubspanOf l ss)) rest
+    (before,rest)  = break (\(L l _) -> isRealSubspanOf (anchor l) ss) comment_q
+    (middle,after) = break (\(L l _) -> not (isRealSubspanOf (anchor l) ss)) rest
     comment_q' = before ++ after
     newAnns = middle
   in
@@ -3356,25 +3360,28 @@ allocateComments ss comment_q =
 
 allocatePriorComments
   :: RealSrcSpan
-  -> [RealLocated AnnotationComment]
-  -> ([RealLocated AnnotationComment], [RealLocated AnnotationComment])
-allocatePriorComments ss comment_q =
+  -> [LAnnotationComment]
+  -> Maybe [LAnnotationComment]
+  -> (Maybe [LAnnotationComment], [LAnnotationComment], [LAnnotationComment])
+allocatePriorComments ss comment_q mheader_comments =
   let
-    cmp (L l _) = l <= ss
+    cmp (L l _) = anchor l <= ss
     (before,after) = partition cmp comment_q
     newAnns = before
     comment_q'= after
   in
-    (comment_q', newAnns)
+    case mheader_comments of
+      Nothing -> (Just newAnns, comment_q', [])
+      Just _ -> (mheader_comments, comment_q', newAnns)
 
-commentToAnnotation :: RealLocated Token -> RealLocated AnnotationComment
-commentToAnnotation (L l (ITdocCommentNext s))  = L l (AnnDocCommentNext s)
-commentToAnnotation (L l (ITdocCommentPrev s))  = L l (AnnDocCommentPrev s)
-commentToAnnotation (L l (ITdocCommentNamed s)) = L l (AnnDocCommentNamed s)
-commentToAnnotation (L l (ITdocSection n s))    = L l (AnnDocSection n s)
-commentToAnnotation (L l (ITdocOptions s))      = L l (AnnDocOptions s)
-commentToAnnotation (L l (ITlineComment s))     = L l (AnnLineComment s)
-commentToAnnotation (L l (ITblockComment s))    = L l (AnnBlockComment s)
+commentToAnnotation :: RealLocated Token -> LAnnotationComment
+commentToAnnotation (L l (ITdocCommentNext s))  = L (realSpanAsAnchor l) (AnnDocCommentNext s)
+commentToAnnotation (L l (ITdocCommentPrev s))  = L (realSpanAsAnchor l) (AnnDocCommentPrev s)
+commentToAnnotation (L l (ITdocCommentNamed s)) = L (realSpanAsAnchor l) (AnnDocCommentNamed s)
+commentToAnnotation (L l (ITdocSection n s))    = L (realSpanAsAnchor l) (AnnDocSection n s)
+commentToAnnotation (L l (ITdocOptions s))      = L (realSpanAsAnchor l) (AnnDocOptions s)
+commentToAnnotation (L l (ITlineComment s))     = L (realSpanAsAnchor l) (AnnLineComment s)
+commentToAnnotation (L l (ITblockComment s))    = L (realSpanAsAnchor l) (AnnBlockComment s)
 commentToAnnotation _                           = panic "commentToAnnotation"
 
 -- ---------------------------------------------------------------------

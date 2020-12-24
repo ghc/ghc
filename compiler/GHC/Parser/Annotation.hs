@@ -21,8 +21,10 @@ module GHC.Parser.Annotation (
   SrcSpanAnnA, SrcSpanAnnL, SrcSpanAnnP, SrcSpanAnnC, SrcSpanAnnName, SrcSpanAnn'(..),
   AddApiAnn(..),
   ApiAnn, ApiAnn'(..), Anchor(..), AnchorOperation(..), DeltaPos(..),
-  spanAsAnchor,
-  ApiAnnCO, ApiAnnComments,
+  ApiAnnComments(..), LAnnotationComment, com, noCom,
+  getFollowingComments, setFollowingComments, setPriorComments,
+  spanAsAnchor, realSpanAsAnchor,
+  ApiAnnCO,
   noAnn,
 
   AnnsModule(..),
@@ -38,7 +40,8 @@ module GHC.Parser.Annotation (
   noLocA, getLocA, getLocAnn,
   noSrcSpanA,
   mapLocA, reAnn,
-  noAnnSrcSpan, noComments, comment, addCommentsToSSA,
+  noAnnSrcSpan, noComments, comment, addCommentsToSSA, setCommentsSSA,
+  transferComments,
   addAnns, addAnnsA, widenSpan, widenAnchor, widenAnchorR, widenLocatedAn,
   apiAnnAnns, apiAnnAnnsL, apiAnnComments,
   annParen2AddApiAnn, parenTypeKws,
@@ -89,8 +92,8 @@ The full ApiAnns type is
 >  ApiAnns
 >    { apiAnnItems :: Map.Map ApiAnnKey [RealSrcSpan],
 >      apiAnnEofPos :: Maybe RealSrcSpan,
->      apiAnnComments :: Map.Map RealSrcSpan [RealLocated AnnotationComment],
->      apiAnnRogueComments :: [RealLocated AnnotationComment]
+>      apiAnnComments :: Map.Map RealSrcSpan [LAnnotationComment],
+>      apiAnnRogueComments :: [LAnnotationComment]
 >    }
 
 NON-COMMENT ELEMENTS
@@ -136,14 +139,14 @@ Every comment is associated with a *located* AnnotationComment.
 We associate comments with the lowest (most specific) AST element
 enclosing them:
 
-> Map.Map RealSrcSpan [RealLocated AnnotationComment]
+> Map.Map RealSrcSpan [LAnnotationComment]
 
 PARSER STATE
 
 There is one field in PState (the parser state) which play a role
 with annotations.
 
->  comment_q :: [RealLocated AnnotationComment],
+>  comment_q :: [LAnnotationComment],
 
 The 'comment_q' field captures comments as they are seen in the token stream,
 so that when they are ready to be allocated via the parser they are
@@ -176,7 +179,7 @@ https://gitlab.haskell.org/ghc/ghc/wikis/api-annotations
 data ApiAnns =
   ApiAnns
     { apiAnnEofPos :: Maybe RealSrcSpan,
-      apiAnnRogueComments :: [RealLocated AnnotationComment]
+      apiAnnRogueComments :: [LAnnotationComment]
     }
 
 -- If you update this, update the Note [Api annotations] above
@@ -201,7 +204,7 @@ type ApiAnnKey = (RealSrcSpan,AnnKeywordId)
 --
 -- --  Note: A given 'SrcSpan' may appear in multiple AST elements,
 -- --  beware of duplicates
--- getAnnotationComments :: ApiAnns -> RealSrcSpan -> [RealLocated AnnotationComment]
+-- getAnnotationComments :: ApiAnns -> RealSrcSpan -> [LAnnotationComment]
 -- getAnnotationComments anns span =
 --   case Map.lookup span (apiAnnComments anns) of
 --     Just cs -> cs
@@ -210,7 +213,7 @@ type ApiAnnKey = (RealSrcSpan,AnnKeywordId)
 -- -- |Retrieve the comments allocated to the current 'SrcSpan', and
 -- -- remove them from the annotations
 -- getAndRemoveAnnotationComments :: ApiAnns -> RealSrcSpan
---                                -> ([RealLocated AnnotationComment],ApiAnns)
+--                                -> ([LAnnotationComment],ApiAnns)
 -- getAndRemoveAnnotationComments anns span =
 --   case Map.lookup span ann_comments of
 --     Just cs -> (cs, anns{ apiAnnComments = Map.delete span ann_comments })
@@ -499,11 +502,10 @@ defined.
 -- ones, and have them still printed out in a reasonable way.
 data ApiAnn' ann
   = ApiAnn { entry   :: Anchor
-           -- ^ Base location for the start of
-                                     -- the syntactic element holding the
-                                     -- annotations.
+           -- ^ Base location for the start of the syntactic element
+           -- holding the annotations.
            , anns     :: ann -- ^ Annotations added by the Parser
-           , comments :: [RealLocated AnnotationComment]
+           , comments :: ApiAnnComments
               -- ^ Comments enclosed in the SrcSpan of the element
               -- this `ApiAnn'` is attached to
            }
@@ -530,11 +532,40 @@ data AnchorOperation = UnchangedAnchor
                      | DeletedAnchor RealSrcSpan
         deriving (Data, Eq, Show)
 
+data ApiAnnComments = AnnComments
+                        { priorComments :: ![LAnnotationComment] }
+                    | AnnCommentsBalanced
+                        { priorComments :: ![LAnnotationComment]
+                        , followingComments :: ![LAnnotationComment] }
+        deriving (Data, Eq)
+
+type LAnnotationComment = GenLocated Anchor AnnotationComment
+
+noCom :: ApiAnnComments
+noCom = AnnComments []
+
+com :: [LAnnotationComment] -> ApiAnnComments
+com cs = AnnComments cs
+
+getFollowingComments :: ApiAnnComments -> [LAnnotationComment]
+getFollowingComments (AnnComments _) = []
+getFollowingComments (AnnCommentsBalanced _ cs) = cs
+
+setFollowingComments :: ApiAnnComments -> [LAnnotationComment] -> ApiAnnComments
+setFollowingComments (AnnComments ls) cs            = AnnCommentsBalanced ls cs
+setFollowingComments (AnnCommentsBalanced ls _) cs = AnnCommentsBalanced ls cs
+
+setPriorComments :: ApiAnnComments -> [LAnnotationComment] -> ApiAnnComments
+setPriorComments (AnnComments _) cs            = AnnComments cs
+setPriorComments (AnnCommentsBalanced _ ts) cs = AnnCommentsBalanced cs ts
+
 spanAsAnchor :: SrcSpan -> Anchor
 spanAsAnchor s  = Anchor (realSrcSpan s) UnchangedAnchor
 
+realSpanAsAnchor :: RealSrcSpan -> Anchor
+realSpanAsAnchor s  = Anchor s UnchangedAnchor
+
 type ApiAnn = ApiAnn' [AddApiAnn]
-type ApiAnnComments = [RealLocated AnnotationComment]
 
 -- | Relative position, row then column
 newtype DeltaPos = DP (Int,Int) deriving (Show,Eq,Ord,Data)
@@ -546,7 +577,7 @@ data NoApiAnns = NoApiAnns
 type ApiAnnCO = ApiAnn' NoApiAnns -- ^ Api Annotations for comments only
 
 noComments ::ApiAnnCO
-noComments = ApiAnn (Anchor placeholderRealSpan UnchangedAnchor) NoApiAnns []
+noComments = ApiAnn (Anchor placeholderRealSpan UnchangedAnchor) NoApiAnns noCom
 
 -- TODO:AZ get rid of this
 placeholderRealSpan :: RealSrcSpan
@@ -559,7 +590,20 @@ addCommentsToSSA :: (Monoid ann) => SrcSpanAnn' (ApiAnn' ann) -> ApiAnnComments 
 addCommentsToSSA (SrcSpanAnn ApiAnnNotUsed loc) cs
   = SrcSpanAnn (ApiAnn (Anchor (realSrcSpan loc) UnchangedAnchor) mempty cs) loc
 addCommentsToSSA (SrcSpanAnn (ApiAnn a an cs) loc) cs'
-  = SrcSpanAnn (ApiAnn a an (cs++cs')) loc
+  = SrcSpanAnn (ApiAnn a an (cs <> cs')) loc
+
+setCommentsSSA :: (Monoid ann) => SrcSpanAnn' (ApiAnn' ann) -> ApiAnnComments -> SrcSpanAnn' (ApiAnn' ann)
+setCommentsSSA (SrcSpanAnn ApiAnnNotUsed loc) cs
+  = SrcSpanAnn (ApiAnn (Anchor (realSrcSpan loc) UnchangedAnchor) mempty cs) loc
+setCommentsSSA (SrcSpanAnn (ApiAnn a an _) loc) cs
+  = SrcSpanAnn (ApiAnn a an cs) loc
+
+transferComments :: (Monoid ann)
+  => SrcSpanAnn' (ApiAnn' ann) -> SrcSpanAnn' (ApiAnn' ann)
+  -> (SrcSpanAnn' (ApiAnn' ann),  SrcSpanAnn' (ApiAnn' ann))
+transferComments from@(SrcSpanAnn ApiAnnNotUsed _) to = (from, to)
+transferComments (SrcSpanAnn (ApiAnn a an cs) l) to
+  = ((SrcSpanAnn (ApiAnn a an noCom) l), addCommentsToSSA to cs)
 
 type LocatedA = GenLocated SrcSpanAnnA
 type LocatedL = GenLocated SrcSpanAnnL
@@ -781,19 +825,19 @@ data AnnPragma
 addTrailingAnnToL :: SrcSpan -> TrailingAnn -> ApiAnnComments -> ApiAnn' AnnList -> ApiAnn' AnnList
 addTrailingAnnToL s t cs ApiAnnNotUsed = ApiAnn (spanAsAnchor s) (AnnList Nothing Nothing [] [t]) cs
 addTrailingAnnToL _ t cs n = n { anns = addTrailing (anns n)
-                               , comments = comments n ++ cs }
+                               , comments = comments n <> cs }
   where
     addTrailing n = n { al_trailing = t : al_trailing n }
 
 addTrailingAnnToA :: SrcSpan -> TrailingAnn -> ApiAnnComments -> ApiAnn' AnnListItem -> ApiAnn' AnnListItem
 addTrailingAnnToA s t cs ApiAnnNotUsed = ApiAnn (spanAsAnchor s) (AnnListItem [t]) cs
 addTrailingAnnToA _ t cs n = n { anns = addTrailing (anns n)
-                               , comments = comments n ++ cs }
+                               , comments = comments n <> cs }
   where
     addTrailing n = n { lann_trailing = t : lann_trailing n }
 
 addTrailingCommaToN :: SrcSpan -> ApiAnn' NameAnn -> RealSrcSpan -> ApiAnn' NameAnn
-addTrailingCommaToN s ApiAnnNotUsed l = ApiAnn (spanAsAnchor s) (NameAnnTrailing [AddCommaAnn l]) []
+addTrailingCommaToN s ApiAnnNotUsed l = ApiAnn (spanAsAnchor s) (NameAnnTrailing [AddCommaAnn l]) noCom
 addTrailingCommaToN _ n l = n { anns = addTrailing (anns n) l }
   where
     addTrailing :: NameAnn -> RealSrcSpan -> NameAnn
@@ -892,15 +936,18 @@ noAnn = ApiAnnNotUsed
 -- this function discarded.
 addAnns :: ApiAnn -> [AddApiAnn] -> ApiAnnComments -> ApiAnn
 addAnns (ApiAnn l as1 cs) as2 cs2
-  = ApiAnn (widenAnchor l (as1 ++ as2)) (as1 ++ as2) (cs ++ cs2)
-addAnns ApiAnnNotUsed [] [] = ApiAnnNotUsed
+  = ApiAnn (widenAnchor l (as1 ++ as2)) (as1 ++ as2) (cs <> cs2)
+addAnns ApiAnnNotUsed [] (AnnComments []) = ApiAnnNotUsed
+addAnns ApiAnnNotUsed [] (AnnCommentsBalanced [] []) = ApiAnnNotUsed
 addAnns ApiAnnNotUsed as cs = ApiAnn (Anchor placeholderRealSpan UnchangedAnchor) as cs
 
 -- AZ:TODO use widenSpan here too
 addAnnsA :: SrcSpanAnnA -> [TrailingAnn] -> ApiAnnComments -> SrcSpanAnnA
 addAnnsA (SrcSpanAnn (ApiAnn l as1 cs) loc) as2 cs2
-  = SrcSpanAnn (ApiAnn l (AnnListItem (lann_trailing as1 ++ as2)) (cs ++ cs2)) loc
-addAnnsA (SrcSpanAnn ApiAnnNotUsed loc) [] []
+  = SrcSpanAnn (ApiAnn l (AnnListItem (lann_trailing as1 ++ as2)) (cs <> cs2)) loc
+addAnnsA (SrcSpanAnn ApiAnnNotUsed loc) [] (AnnComments [])
+  = SrcSpanAnn ApiAnnNotUsed loc
+addAnnsA (SrcSpanAnn ApiAnnNotUsed loc) [] (AnnCommentsBalanced [] [])
   = SrcSpanAnn ApiAnnNotUsed loc
 addAnnsA (SrcSpanAnn ApiAnnNotUsed loc) as cs
   = SrcSpanAnn (ApiAnn (spanAsAnchor loc) (AnnListItem as) cs) loc
@@ -950,7 +997,7 @@ parenTypeKws AnnParensSquare = (AnnOpenS, AnnCloseS)
 
 
 apiAnnComments :: ApiAnn' an -> ApiAnnComments
-apiAnnComments ApiAnnNotUsed = []
+apiAnnComments ApiAnnNotUsed = AnnComments []
 apiAnnComments (ApiAnn _ _ cs) = cs
 
 instance (Semigroup an) => Semigroup (SrcSpanAnn' an) where
@@ -967,8 +1014,18 @@ instance (Semigroup a) => Semigroup (ApiAnn' a) where
    -- annotations must follow it. So we combine them which yields the
    -- largest span
 
+instance Ord Anchor where
+  compare (Anchor s1 _) (Anchor s2 _) = compare s1 s2
+
 instance Semigroup Anchor where
   Anchor r1 o1 <> Anchor r2 _ = Anchor (combineRealSrcSpans r1 r2) o1
+
+instance Semigroup ApiAnnComments where
+  AnnComments cs1 <> AnnComments cs2 = AnnComments (cs1 ++ cs2)
+  AnnComments cs1 <> AnnCommentsBalanced cs2 as2 = AnnCommentsBalanced (cs1 ++ cs2) as2
+  AnnCommentsBalanced cs1 as1 <> AnnComments cs2 = AnnCommentsBalanced (cs1 ++ cs2) as1
+  AnnCommentsBalanced cs1 as1 <> AnnCommentsBalanced cs2 as2 = AnnCommentsBalanced (cs1 ++ cs2) (as1++as2)
+
 
 instance (Monoid a) => Monoid (ApiAnn' a) where
   mempty = ApiAnnNotUsed
@@ -993,6 +1050,13 @@ instance Outputable AnchorOperation where
 
 instance Outputable DeltaPos where
   ppr (DP l) = text "DP" <+> ppr l
+
+instance Outputable (GenLocated Anchor AnnotationComment) where
+  ppr (L l c) = text "L" <+> ppr l <+> ppr c
+
+instance Outputable ApiAnnComments where
+  ppr (AnnComments cs) = text "AnnComments" <+> ppr cs
+  ppr (AnnCommentsBalanced cs ts) = text "AnnCommentsBalanced" <+> ppr cs <+> ppr ts
 
 instance (NamedThing (Located a)) => NamedThing (LocatedAn an a) where
   getName (L l a) = getName (L (locA l) a)

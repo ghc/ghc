@@ -5,7 +5,9 @@
  { T15323.hs:1:1 }
  (HsModule
   (ApiAnn
-   { T15323.hs:1:1 }
+   (Anchor
+    { T15323.hs:1:1 }
+    (UnchangedAnchor))
    (AnnsModule
     [(AddApiAnn AnnModule { T15323.hs:3:1-6 })
     ,(AddApiAnn AnnWhere { T15323.hs:3:15-19 })]
@@ -14,7 +16,8 @@
      (Nothing)
      []
      []))
-   [])
+   (AnnComments
+    []))
   (VirtualBraces
    (1))
   (Just
@@ -24,15 +27,25 @@
   (Nothing)
   []
   [(L
-    (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:(5,1)-(6,54) })
+    (SrcSpanAnn (ApiAnn
+                 (Anchor
+                  { T15323.hs:(5,1)-(6,54) }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (AnnComments
+                  [])) { T15323.hs:(5,1)-(6,54) })
     (TyClD
      (NoExtField)
      (DataDecl
       (ApiAnn
-       { T15323.hs:(5,1)-(6,54) }
+       (Anchor
+        { T15323.hs:(5,1)-(6,54) }
+        (UnchangedAnchor))
        [(AddApiAnn AnnData { T15323.hs:5:1-4 })
        ,(AddApiAnn AnnWhere { T15323.hs:5:21-25 })]
-       [])
+       (AnnComments
+        []))
       (L
        (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:5:6-17 })
        (Unqual
@@ -43,9 +56,12 @@
          (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:5:19 })
          (UserTyVar
           (ApiAnn
-           { T15323.hs:5:19 }
+           (Anchor
+            { T15323.hs:5:19 }
+            (UnchangedAnchor))
            []
-           [])
+           (AnnComments
+            []))
           (())
           (L
            (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:5:19 })
@@ -54,10 +70,13 @@
       (Prefix)
       (HsDataDefn
        (ApiAnn
-        { T15323.hs:(5,1)-(6,54) }
+        (Anchor
+         { T15323.hs:(5,1)-(6,54) }
+         (UnchangedAnchor))
         [(AddApiAnn AnnData { T15323.hs:5:1-4 })
         ,(AddApiAnn AnnWhere { T15323.hs:5:21-25 })]
-        [])
+        (AnnComments
+         []))
        (DataType)
        (Nothing)
        (Nothing)
@@ -66,9 +85,12 @@
          (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:6:5-54 })
          (ConDeclGADT
           (ApiAnn
-           { T15323.hs:6:5-54 }
+           (Anchor
+            { T15323.hs:6:5-54 }
+            (UnchangedAnchor))
            [(AddApiAnn AnnDcolon { T15323.hs:6:17-18 })]
-           [])
+           (AnnComments
+            []))
           [(L
             (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:6:5-14 })
             (Unqual
@@ -77,45 +99,57 @@
            (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:6:20-54 })
            (HsOuterExplicit
             (ApiAnn
-             { T15323.hs:6:20-25 }
+             (Anchor
+              { T15323.hs:6:20-25 }
+              (UnchangedAnchor))
              ((,)
               (AddApiAnn AnnForall { T15323.hs:6:20-25 })
               (AddApiAnn AnnDot { T15323.hs:6:29 }))
-             [])
-          [(L
-            (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:6:27 })
-            (UserTyVar
-             (ApiAnn
-              { T15323.hs:6:27 }
-              []
-              [])
-             (SpecifiedSpec)
-             (L
+             (AnnComments
+              []))
+            [(L
               (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:6:27 })
-              (Unqual
+              (UserTyVar
+               (ApiAnn
+                (Anchor
+                 { T15323.hs:6:27 }
+                 (UnchangedAnchor))
+                []
+                (AnnComments
+                 []))
+               (SpecifiedSpec)
+               (L
+                (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:6:27 })
+                (Unqual
                  {OccName: v}))))]))
           (Just
            (L
             (SrcSpanAnn (ApiAnn
-                         { T15323.hs:6:31-36 }
+                         (Anchor
+                          { T15323.hs:6:31-36 }
+                          (UnchangedAnchor))
                          (AnnContext
                           (Just
                            ((,)
                             (NormalSyntax)
                             { T15323.hs:6:38-39 }))
-                          [{ T15323.hs:6:31 }]
-                          [{ T15323.hs:6:36 }])
-                         []) { T15323.hs:6:31-36 })
+                          []
+                          [])
+                         (AnnComments
+                          [])) { T15323.hs:6:31-36 })
             [(L
               (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:6:31-36 })
               (HsParTy
                (ApiAnn
-                { T15323.hs:6:31 }
+                (Anchor
+                 { T15323.hs:6:31 }
+                 (UnchangedAnchor))
                 (AnnParen
                  (AnnParens)
                  { T15323.hs:6:31 }
                  { T15323.hs:6:36 })
-                [])
+                (AnnComments
+                 []))
                (L
                 (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:6:32-35 })
                 (HsAppTy
@@ -124,9 +158,12 @@
                   (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:6:32-33 })
                   (HsTyVar
                    (ApiAnn
-                    { T15323.hs:6:32-33 }
+                    (Anchor
+                     { T15323.hs:6:32-33 }
+                     (UnchangedAnchor))
                     []
-                    [])
+                    (AnnComments
+                     []))
                    (NotPromoted)
                    (L
                     (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:6:32-33 })
@@ -136,9 +173,12 @@
                   (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:6:35 })
                   (HsTyVar
                    (ApiAnn
-                    { T15323.hs:6:35 }
+                    (Anchor
+                     { T15323.hs:6:35 }
+                     (UnchangedAnchor))
                     []
-                    [])
+                    (AnnComments
+                     []))
                    (NotPromoted)
                    (L
                     (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:6:35 })
@@ -154,9 +194,12 @@
              (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:6:41-52 })
              (HsTyVar
               (ApiAnn
-               { T15323.hs:6:41-52 }
+               (Anchor
+                { T15323.hs:6:41-52 }
+                (UnchangedAnchor))
                []
-               [])
+               (AnnComments
+                []))
               (NotPromoted)
               (L
                (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:6:41-52 })
@@ -166,9 +209,12 @@
              (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:6:54 })
              (HsTyVar
               (ApiAnn
-               { T15323.hs:6:54 }
+               (Anchor
+                { T15323.hs:6:54 }
+                (UnchangedAnchor))
                []
-               [])
+               (AnnComments
+                []))
               (NotPromoted)
               (L
                (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:6:54 })
@@ -178,5 +224,3 @@
        []))))]
   (Nothing)
   (Nothing)))
-
-

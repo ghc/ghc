@@ -13,7 +13,14 @@
    [(TyClGroup
      (NoExtField)
      [(L
-       (SrcSpanAnn (ApiAnnNotUsed) { T14189.hs:6:1-42 })
+       (SrcSpanAnn (ApiAnn
+                    (Anchor
+                     { T14189.hs:6:1-42 }
+                     (UnchangedAnchor))
+                    (AnnListItem
+                     [])
+                    (AnnComments
+                     [])) { T14189.hs:6:1-42 })
        (DataDecl
         (DataDeclRn
          (True)
@@ -34,11 +41,14 @@
          (Nothing)
          [(L
            (SrcSpanAnn (ApiAnn
-                        { T14189.hs:6:15-20 }
+                        (Anchor
+                         { T14189.hs:6:15-20 }
+                         (UnchangedAnchor))
                         (AnnListItem
                          [(AddVbarAnn
                            { T14189.hs:6:22 })])
-                        []) { T14189.hs:6:15-20 })
+                        (AnnComments
+                         [])) { T14189.hs:6:15-20 })
            (ConDeclH98
             (ApiAnnNotUsed)
             (L
@@ -63,11 +73,14 @@
             (Nothing)))
          ,(L
            (SrcSpanAnn (ApiAnn
-                        { T14189.hs:6:24-25 }
+                        (Anchor
+                         { T14189.hs:6:24-25 }
+                         (UnchangedAnchor))
                         (AnnListItem
                          [(AddVbarAnn
                            { T14189.hs:6:27 })])
-                        []) { T14189.hs:6:24-25 })
+                        (AnnComments
+                         [])) { T14189.hs:6:24-25 })
            (ConDeclH98
             (ApiAnnNotUsed)
             (L
@@ -92,7 +105,9 @@
             (RecCon
              (L
               (SrcSpanAnn (ApiAnn
-                           { T14189.hs:6:31 }
+                           (Anchor
+                            { T14189.hs:6:31 }
+                            (UnchangedAnchor))
                            (AnnList
                             (Just
                              (AddApiAnn AnnOpenC { T14189.hs:6:31 }))
@@ -100,7 +115,8 @@
                              (AddApiAnn AnnCloseC { T14189.hs:6:42 }))
                             []
                             [])
-                           []) { T14189.hs:6:31-42 })
+                           (AnnComments
+                            [])) { T14189.hs:6:31-42 })
               [(L
                 (SrcSpanAnn (ApiAnnNotUsed) { T14189.hs:6:33-40 })
                 (ConDeclField
@@ -184,5 +200,3 @@
          (False)
          {Name: T14189.f})])])])
   (Nothing)))
-
-

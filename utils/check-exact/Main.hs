@@ -6,6 +6,7 @@ import GHC hiding (moduleName)
 import GHC.Driver.Ppr
 import GHC.Driver.Session
 import GHC.Hs.Dump
+-- import qualified Control.Monad.IO.Class as GHC
 -- import GHC.Types.SourceText
 -- import GHC.Hs.Exact hiding (ExactPrint())
 -- import GHC.Utils.Outputable hiding (space)
@@ -23,6 +24,7 @@ tt :: IO ()
 tt = testOneFile "/home/alanz/mysrc/git.haskell.org/worktree/exactprint/_build/stage1/lib"
  -- "../../testsuite/tests/printer/Ppr001.hs"
  -- "../../testsuite/tests/printer/Ppr002.hs"
+ -- "../../testsuite/tests/printer/Ppr002a.hs"
  -- "../../testsuite/tests/printer/Ppr003.hs"
  -- "../../testsuite/tests/printer/Ppr004.hs"
  -- "../../testsuite/tests/printer/Ppr005.hs"
@@ -83,6 +85,7 @@ tt = testOneFile "/home/alanz/mysrc/git.haskell.org/worktree/exactprint/_build/s
  -- "../../testsuite/tests/printer/T14343b.hs"
  -- "../../testsuite/tests/printer/T14343.hs"
  -- "../../testsuite/tests/printer/T15761.hs"
+ -- "../../testsuite/tests/printer/Test17519.hs"
  -- "../../testsuite/tests/printer/T18052a.hs"
  -- "../../testsuite/tests/printer/T18247a.hs"
  -- "../../testsuite/tests/printer/Ppr050.hs"
@@ -104,6 +107,7 @@ tt = testOneFile "/home/alanz/mysrc/git.haskell.org/worktree/exactprint/_build/s
  -- "../../testsuite/tests/printer/Test11018.hs"
  -- "../../testsuite/tests/printer/Test11332.hs"
  -- "../../testsuite/tests/printer/Test16230.hs"
+ "../../testsuite/tests/printer/Test16236.hs"
  -- "../../testsuite/tests/printer/AnnotationLet.hs"
  -- "../../testsuite/tests/printer/AnnotationTuple.hs"
  -- "../../testsuite/tests/ghc-api/annotations/CommentsTest.hs"
@@ -113,7 +117,8 @@ tt = testOneFile "/home/alanz/mysrc/git.haskell.org/worktree/exactprint/_build/s
  -- "../../testsuite/tests/printer/Ppr055.hs"
  -- "../../testsuite/tests/hiefile/should_run/PatTypes.hs"
  -- "./cases/AddDecl.hs"
- "./cases/LocalDecls2.expected.hs"
+ -- "./cases/LocalDecls2.expected.hs"
+ -- "./cases/WhereIn3a.hs"
 
 -- exact = ppr
 
@@ -201,6 +206,9 @@ parseOneFile libdir fileName = do
                      [x] -> x
                      xs -> error $ "Can't find module, got:"
                               ++ show (map (ml_hs_file . ms_location) xs)
+         -- toks <- getRichTokenStream (ms_mod modSum)
+         -- toks <- getTokenStream (ms_mod modSum)
+         -- GHC.liftIO $ putStrLn $ "toks=" ++ showPprUnsafe toks
          parseModule modSum
 
 -- getPragmas :: ApiAnns -> String

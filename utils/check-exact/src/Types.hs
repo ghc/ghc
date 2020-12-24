@@ -286,14 +286,16 @@ data Comment = Comment
     -- AZ:TODO: commentIdentifier is a misnomer, should be commentSrcSpan, it is
     -- the thing we use to decide where in the output stream the comment should
     -- go.
-    , commentIdentifier :: !RealSrcSpan -- ^ Needed to uniquely identify two comments with the same contents
-    , commentOrigin     :: !(Maybe AnnKeywordId) -- ^ We sometimes turn syntax into comments in order to process them properly.
+    , commentAnchor :: !Anchor
+    , commentOrigin :: !(Maybe AnnKeywordId) -- ^ We sometimes turn syntax into comments in order to process them properly.
     }
   deriving (Eq)
+
 instance Show Comment where
   show (Comment cs ss o) = "(Comment " ++ show cs ++ " " ++ showPprUnsafe ss ++ " " ++ show o ++ ")"
+
 instance Ord Comment where
-  compare (Comment _ ss1 _) (Comment _ ss2 _) = compare ss1 ss2
+  compare (Comment _ ss1 _) (Comment _ ss2 _) = compare (anchor ss1) (anchor ss2)
 
 instance Outputable Comment where
   ppr x = text (show x)

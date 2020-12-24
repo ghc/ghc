@@ -274,7 +274,7 @@ postParseTransform
   -> Either a (GHC.ApiAnns, GHC.ParsedSource)
 postParseTransform parseRes = fmap mkAnns parseRes
   where
-    mkAnns (apianns, cs, _, m) = (apianns, m)
+    mkAnns (apianns, _cs, _, m) = (apianns, m)
       -- (relativiseApiAnnsWithOptions opts cs m apianns, m)
 
 -- | Internal function. Initializes DynFlags value for parsing.

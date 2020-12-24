@@ -87,6 +87,8 @@ import GHC.Parser.Errors
 import GHC.Builtin.Types ( unitTyCon, unitDataCon, tupleTyCon, tupleDataCon, nilDataCon,
                            unboxedUnitTyCon, unboxedUnitDataCon,
                            listTyCon_RDR, consDataCon_RDR, eqTyCon_RDR)
+
+import qualified Data.Semigroup as Semi
 }
 
 %expect 0 -- shift/reduce conflicts
@@ -909,7 +911,7 @@ body2   :: { (AnnList
              ,LayoutInfo) }
         :  '{' top '}'                          { (AnnList (Just $ moc $1) (Just $ mcc $3) [] (fst $2)
                                                   , snd $2, ExplicitBraces) }
-        |  missing_module_keyword top close     { (AnnList Nothing Nothing [] [],snd $2, VirtualBraces leftmostColumn) }
+        |  missing_module_keyword top close     { (AnnList Nothing Nothing [] [], snd $2, VirtualBraces leftmostColumn) }
 
 
 top     :: { ([TrailingAnn]
@@ -917,9 +919,9 @@ top     :: { ([TrailingAnn]
         : semis top1                            { ($1, $2) }
 
 top1    :: { ([LImportDecl GhcPs], [LHsDecl GhcPs]) }
-        : importdecls_semi topdecls_semi        { (reverse $1, cvTopDecls $2) }
-        | importdecls_semi topdecls             { (reverse $1, cvTopDecls $2) }
-        | importdecls                           { (reverse $1, []) }
+        : importdecls_semi topdecls_cs_semi        { (reverse $1, cvTopDecls $2) }
+        | importdecls_semi topdecls_cs             { (reverse $1, cvTopDecls $2) }
+        | importdecls                              { (reverse $1, []) }
 
 -----------------------------------------------------------------------------
 -- Module declaration & imports only
@@ -1171,6 +1173,22 @@ topdecls_semi :: { OrdList (LHsDecl GhcPs) }
                                              ; return ($1 `snocOL` t) }}
         | {- empty -}                  { nilOL }
 
+
+-----------------------------------------------------------------------------
+-- Each topdecl accumulates prior comments
+-- No trailing semicolons, non-empty
+topdecls_cs :: { OrdList (LHsDecl GhcPs) }
+        : topdecls_cs_semi topdecl_cs        { $1 `snocOL` $2 }
+
+-- May have trailing semicolons, can be empty
+topdecls_cs_semi :: { OrdList (LHsDecl GhcPs) }
+        : topdecls_cs_semi topdecl_cs semis1 {% do { t <- amsA $2 $3
+                                                   ; return ($1 `snocOL` t) }}
+        | {- empty -}                  { nilOL }
+topdecl_cs :: { LHsDecl GhcPs }
+topdecl_cs : topdecl {% commentsPA $1 }
+
+-----------------------------------------------------------------------------
 topdecl :: { LHsDecl GhcPs }
         : cl_decl                               { sL1 $1 (TyClD noExtField (unLoc $1)) }
         | ty_decl                               { sL1 $1 (TyClD noExtField (unLoc $1)) }
@@ -1180,7 +1198,7 @@ topdecl :: { LHsDecl GhcPs }
         | role_annot                            { sL1 $1 (RoleAnnotD noExtField (unLoc $1)) }
         | 'default' '(' comma_types0 ')'        {% acsA (\cs -> sLL $1 $>
                                                     (DefD noExtField (DefaultDecl (ApiAnn (glR $1) [mj AnnDefault $1,mop $2,mcp $4] cs) $3))) }
-        | 'foreign' fdecl          {% acsA (\cs -> sLL $1 $> ((snd $ unLoc $2) (ApiAnn (glR $1) (mj AnnForeign $1:(fst $ unLoc $2)) cs))) }
+        | 'foreign' fdecl                       {% acsA (\cs -> sLL $1 $> ((snd $ unLoc $2) (ApiAnn (glR $1) (mj AnnForeign $1:(fst $ unLoc $2)) cs))) }
         | '{-# DEPRECATED' deprecations '#-}'   {% acsA (\cs -> sLL $1 $> $ WarningD noExtField (Warnings (ApiAnn (glR $1) [mo $1,mc $3] cs) (getDEPRECATED_PRAGs $1) (fromOL $2))) }
         | '{-# WARNING' warnings '#-}'          {% acsA (\cs -> sLL $1 $> $ WarningD noExtField (Warnings (ApiAnn (glR $1) [mo $1,mc $3] cs) (getWARNING_PRAGs $1) (fromOL $2))) }
         | '{-# RULES' rules '#-}'               {% acsA (\cs -> sLL $1 $> $ RuleD noExtField (HsRules (ApiAnn (glR $1) [mo $1,mc $3] cs) (getRULES_PRAGs $1) (reverse $2))) }
@@ -1192,7 +1210,8 @@ topdecl :: { LHsDecl GhcPs }
         -- but we treat an arbitrary expression just as if
         -- it had a $(..) wrapped around it
         | infixexp                              {% runPV (unECP $1) >>= \ $1 ->
-                                                   mkSpliceDecl $1 }
+                                                    do { d <- mkSpliceDecl $1
+                                                       ; commentsPA d }}
 
 -- Type classes
 --
@@ -1384,7 +1403,9 @@ ty_fam_inst_eqn :: { LTyFamInstEqn GhcPs }
         : 'forall' tv_bndrs '.' type '=' ktype
               {% do { hintExplicitForall $1
                     ; tvbs <- fromSpecTyVarBndrs $2
-                    ; mkTyFamInstEqn (comb2A $1 $>) (mkHsOuterExplicit (ApiAnn (glR $1) (mu AnnForall $1, mj AnnDot $3) []) tvbs) $4 $6 [mj AnnEqual $5] }}
+                    ; let loc = comb2A $1 $>
+                    ; cs <- getCommentsFor loc
+                    ; mkTyFamInstEqn loc (mkHsOuterExplicit (ApiAnn (glR $1) (mu AnnForall $1, mj AnnDot $3) cs) tvbs) $4 $6 [mj AnnEqual $5] }}
                     -- ; (eqn,ann) <- mkTyFamInstEqn (mkHsOuterExplicit tvbs) $4 $6
                     -- ; return (sLL $1 $>
                     --            (mu AnnForall $1:mj AnnDot $3:mj AnnEqual $5:ann,eqn)) } }
@@ -1516,12 +1537,13 @@ datafam_inst_hdr :: { Located (Maybe (LHsContext GhcPs), HsOuterFamEqnTyVarBndrs
                                                          >>= \tvbs ->
                                                              (acs (\cs -> (sLL $1 (reLoc $>)
                                                                                   (Just ( addTrailingDarrowC $4 $5 cs)
-                                                                                        , mkHsOuterExplicit (ApiAnn (glR $1) (mu AnnForall $1, mj AnnDot $3) []) tvbs, $6))))
+                                                                                        , mkHsOuterExplicit (ApiAnn (glR $1) (mu AnnForall $1, mj AnnDot $3) noCom) tvbs, $6))))
                                                     }
         | 'forall' tv_bndrs '.' type   {% do { hintExplicitForall $1
                                              ; tvbs <- fromSpecTyVarBndrs $2
-                                             ; return (sLL $1 (reLoc $>)
-                                                                 (Nothing, mkHsOuterExplicit (ApiAnn (glR $1) (mu AnnForall $1, mj AnnDot $3) []) tvbs, $4))
+                                             ; let loc = comb2 $1 (reLoc $>)
+                                             ; cs <- getCommentsFor loc
+                                             ; return (sL loc (Nothing, mkHsOuterExplicit (ApiAnn (glR $1) (mu AnnForall $1, mj AnnDot $3) cs) tvbs, $4))
                                        } }
         | context '=>' type         {% acs (\cs -> (sLLAA $1 $>(Just (addTrailingDarrowC $1 $2 cs), mkHsOuterImplicit, $3))) }
         | type                      { sL1A $1 (Nothing, mkHsOuterImplicit, $1) }
@@ -2476,7 +2498,7 @@ decl_no_th :: { LHsDecl GhcPs }
                                         -- Depending upon what the pattern looks like we might get either
                                         -- a FunBind or PatBind back from checkValDef. See Note
                                         -- [FunBind vs PatBind]
-                                          ; cs <- getPriorCommentsFor l
+                                          ; cs <- getCommentsFor l
                                           ; return $! (sL (commentsA l cs) $ ValD noExtField r) } }
         | pattern_synonym_decl  { $1 }
 
@@ -2761,7 +2783,7 @@ aexp    :: { ECP }
                                          $ Match { m_ext = ApiAnn (glR $1) [mj AnnLam $1] cs
                                                  , m_ctxt = LambdaExpr
                                                  , m_pats = $2:$3
-                                                 , m_grhss = unguardedGRHSs (comb2 $4 (reLoc $5)) $5 (ApiAnn (glR $4) (GrhsAnn Nothing (mu AnnRarrow $4)) []) }])) }
+                                                 , m_grhss = unguardedGRHSs (comb2 $4 (reLoc $5)) $5 (ApiAnn (glR $4) (GrhsAnn Nothing (mu AnnRarrow $4)) noCom) }])) }
         | 'let' binds 'in' exp          {  ECP $
                                            unECP $4 >>= \ $4 ->
                                            mkHsLetPV (comb2A $1 $>) (unLoc $2) $4
@@ -2974,7 +2996,7 @@ tup_exprs :: { forall b. DisambECP b => PV (SumOrTuple b) }
                                 ; return (Tuple (Right t : snd $2)) } }
            | commas tup_tail
                  { $2 >>= \ $2 ->
-                   do { let {cos = map (\ll -> (Left (ApiAnn (anc $ rs ll) (rs ll) []))) (fst $1) }
+                   do { let {cos = map (\ll -> (Left (ApiAnn (anc $ rs ll) (rs ll) noCom))) (fst $1) }
                       ; return (Tuple (cos ++ $2)) } }
 
            | texp bars   { unECP $1 >>= \ $1 -> return $
@@ -2988,7 +3010,7 @@ tup_exprs :: { forall b. DisambECP b => PV (SumOrTuple b) }
 commas_tup_tail :: { forall b. DisambECP b => PV (SrcSpan,[Either (ApiAnn' RealSrcSpan) (LocatedA b)]) }
 commas_tup_tail : commas tup_tail
         { $2 >>= \ $2 ->
-          do { let {cos = map (\l -> (Left (ApiAnn (anc $ rs l) (rs l) []))) (tail $ fst $1) }
+          do { let {cos = map (\l -> (Left (ApiAnn (anc $ rs l) (rs l) noCom))) (tail $ fst $1) }
              ; return ((head $ fst $1, cos ++ $2)) } }
 
 -- Always follows a comma
@@ -4114,13 +4136,13 @@ anc r = Anchor r UnchangedAnchor
 
 acs :: MonadP m => (ApiAnnComments -> Located a) -> m (Located a)
 acs a = do
-  let (L l _) = a []
+  let (L l _) = a noCom
   cs <- getCommentsFor l
   return (a cs)
 
 acsa :: MonadP m => (ApiAnnComments -> LocatedAn t a) -> m (LocatedAn t a)
 acsa a = do
-  let (L l _) = a []
+  let (L l _) = a noCom
   cs <- getCommentsFor (locA l)
   return (a cs)
 
@@ -4205,6 +4227,16 @@ parseModule = parseModuleNoHaddock >>= addHaddockToModule
 commentsA :: (Monoid ann) => SrcSpan -> ApiAnnComments -> SrcSpanAnn' (ApiAnn' ann)
 commentsA loc cs = SrcSpanAnn (ApiAnn (Anchor (rs loc) UnchangedAnchor) mempty cs) loc
 
+commentsPA :: (Monoid ann) => LocatedAn ann a -> P (LocatedAn ann a)
+commentsPA la@(L l a) = do
+  cs <- getPriorCommentsFor (getLocA la)
+  return (L (addCommentsToSSA l cs) a)
+
+acsP :: (MonadP m, Monoid t) => (Located a) -> m (LocatedAn t a)
+acsP (L l a) = do
+  cs <- getPriorCommentsFor l
+  return (L (addCommentsToSSA (noAnnSrcSpan l) cs) a)
+
 rs :: SrcSpan -> RealSrcSpan
 rs (RealSrcSpan l _) = l
 rs _ = panic "Parser should only have RealSrcSpan"
@@ -4226,7 +4258,7 @@ addTrailingCommaA  la span = addTrailingAnnA la span AddCommaAnn
 addTrailingAnnA :: MonadP m => LocatedA a -> SrcSpan -> (RealSrcSpan -> TrailingAnn) -> m (LocatedA a)
 addTrailingAnnA (L (SrcSpanAnn anns l) a) ss ta = do
   -- cs <- getCommentsFor l
-  let cs = []
+  let cs = noCom
   -- AZ:TODO: generalise updating comments into an annotation
   let
     anns' = if isZeroWidthSpan ss
@@ -4254,7 +4286,7 @@ addTrailingAnnL (L (SrcSpanAnn anns l) a) ta = do
 addTrailingCommaN :: MonadP m => LocatedN a -> SrcSpan -> m (LocatedN a)
 addTrailingCommaN (L (SrcSpanAnn anns l) a) span = do
   -- cs <- getCommentsFor l
-  let cs = []
+  let cs = noCom
   -- AZ:TODO: generalise updating comments into an annotation
   let anns' = if isZeroWidthSpan span
                 then anns
@@ -4274,7 +4306,7 @@ addTrailingDarrowC (L (SrcSpanAnn ApiAnnNotUsed l) a) lt cs =
 addTrailingDarrowC (L (SrcSpanAnn (ApiAnn lr (AnnContext _ o c) csc) l) a) lt cs =
   let
     u = if (isUnicode lt) then UnicodeSyntax else NormalSyntax
-  in L (SrcSpanAnn (ApiAnn lr (AnnContext (Just (u,glRR lt)) o c) (cs++csc)) l) a
+  in L (SrcSpanAnn (ApiAnn lr (AnnContext (Just (u,glRR lt)) o c) (cs Semi.<> csc)) l) a
 
 -- -------------------------------------
 
