@@ -20,7 +20,7 @@
 -- that lets you combine any two values of type @a@ into one. Where being
 -- associative means that the following must always hold:
 --
--- >>> (a <> b) <> c == a <> (b <> c)
+-- prop> (a <> b) <> c == a <> (b <> c)
 --
 -- ==== __Examples__
 --
@@ -36,9 +36,10 @@
 -- can never be empty:
 --
 -- >>> (1 :| [])
--- 1 :| []               -- equivalent to [1] but guaranteed to be non-empty
+-- 1 :| []               -- equivalent to [1] but guaranteed to be non-empty.
+--
 -- >>> (1 :| [2, 3, 4])
--- 1 :| [2,3,4]          -- equivalent to [1,2,3,4] but guaranteed to be non-empty
+-- 1 :| [2,3,4]          -- equivalent to [1,2,3,4] but guaranteed to be non-empty.
 --
 -- Equipped with this guaranteed to be non-empty data structure, we can combine
 -- values using 'sconcat' and a 'Semigroup' of our choosing. We can try the 'Min'
@@ -115,6 +116,10 @@ import           Data.Bitraversable
 import           Data.Coerce
 import           Data.Data
 import           GHC.Generics
+
+-- $setup
+-- >>> import Prelude
+-- >>> import Data.List.NonEmpty (NonEmpty (..))
 
 -- | A generalization of 'Data.List.cycle' to an arbitrary 'Semigroup'.
 -- May fail to terminate for some values in some semigroups.

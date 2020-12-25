@@ -30,6 +30,9 @@ import Data.Ix
 import GHC.Generics
 import Data.Semigroup (Semigroup(..), stimesIdempotent)
 
+-- $setup
+-- >>> import Prelude
+
 -- | Uninhabited data type
 --
 -- @since 4.8.0.0

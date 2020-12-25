@@ -38,7 +38,7 @@ import GHC.Read
 
 -- $setup
 -- Allow the use of some Prelude functions in doctests.
--- >>> import Prelude ( (+), (*), length, putStrLn )
+-- >>> import Prelude
 
 {-
 -- just for testing
