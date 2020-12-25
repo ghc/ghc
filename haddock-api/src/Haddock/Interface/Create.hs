@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, TupleSections, BangPatterns, LambdaCase #-}
+{-# LANGUAGE CPP, TupleSections, BangPatterns, LambdaCase, NamedFieldPuns #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wwarn #-}
@@ -18,7 +18,7 @@
 -- which creates a Haddock 'Interface' from the typechecking
 -- results 'TypecheckedModule' from GHC.
 -----------------------------------------------------------------------------
-module Haddock.Interface.Create (createInterface) where
+module Haddock.Interface.Create (createInterface, createInterface1) where
 
 import Documentation.Haddock.Doc (metaDocAppend)
 import Haddock.Types
@@ -37,6 +37,7 @@ import Data.Maybe
 import Control.Monad
 import Data.Traversable
 
+import GHC.Tc.Utils.Monad (finalSafeMode)
 import GHC.Types.Avail hiding (avail)
 import qualified GHC.Types.Avail  as Avail
 import qualified GHC.Unit.Module as Module
@@ -62,6 +63,191 @@ import GHC.Utils.Panic
 import GHC.HsToCore.Docs hiding (mkMaps)
 import GHC.Parser.Annotation (IsUnicodeSyntax(..))
 import GHC.Unit.Module.Warnings
+
+
+createInterface1
+  :: [Flag]
+  -> UnitState
+  -> ModSummary
+  -> TcGblEnv
+  -> IfaceMap
+  -> InstIfaceMap
+  -> ErrMsgGhc Interface
+createInterface1 flags unit_state mod_sum tc_gbl_env ifaces inst_ifaces = do
+
+  let
+    ModSummary
+      {
+        -- Cached flags from OPTIONS, INCLUDE and LANGUAGE
+        -- pragmas in the modules source code. Used to infer
+        -- safety of module.
+        ms_hspp_opts
+      , ms_location = ModLocation
+        {
+          ml_hie_file
+        }
+      } = mod_sum
+
+    TcGblEnv
+      {
+        tcg_mod
+      , tcg_src
+      , tcg_semantic_mod
+      , tcg_rdr_env
+      , tcg_exports
+      , tcg_insts
+      , tcg_fam_insts
+      , tcg_warns
+
+      -- Renamed source
+      , tcg_rn_imports
+      , tcg_rn_exports
+      , tcg_rn_decls
+
+      , tcg_doc_hdr
+      } = tc_gbl_env
+
+    dflags = ms_hspp_opts
+
+    is_sig = tcg_src == HsigFile
+
+    (pkg_name_fs, _) =
+      modulePackageInfo unit_state flags (Just tcg_mod)
+
+    pkg_name :: Maybe Package
+    pkg_name =
+      let
+        unpack (PackageName name) = unpackFS name
+      in
+        fmap unpack pkg_name_fs
+
+    fixities :: FixMap
+    fixities = case tcg_rn_decls of
+      Nothing -> mempty
+      Just dx -> mkFixMap dx
+
+    -- Locations of all the TH splices
+    loc_splices :: [SrcSpan]
+    loc_splices = case tcg_rn_decls of
+      Nothing -> []
+      Just HsGroup { hs_splcds } -> [ loc | L loc _ <- hs_splcds ]
+
+  decls <- case tcg_rn_decls of
+    Nothing -> do
+      liftErrMsg $ tell [ "Warning: Renamed source is not available" ]
+      pure []
+    Just dx ->
+      pure (topDecls dx)
+
+  -- Derive final options to use for haddocking this module
+  doc_opts <- liftErrMsg $ mkDocOpts (haddockOptions ms_hspp_opts) flags tcg_mod
+
+  let
+    -- All elements of an explicit export list, if present
+    export_list :: Maybe [(IE GhcRn, Avails)]
+    export_list
+      | OptIgnoreExports `elem` doc_opts  =
+          Nothing
+      | Just rn_exports <- tcg_rn_exports =
+          Just [ (ie, avail) | (L _ ie, avail) <- rn_exports ]
+      | otherwise =
+          Nothing
+
+    -- All the exported Names of this module.
+    exported_names :: [Name]
+    exported_names =
+      concatMap availNamesWithSelectors tcg_exports
+
+    -- Module imports of the form `import X`. Note that there is
+    -- a) no qualification and
+    -- b) no import list
+    imported_modules :: Map ModuleName [ModuleName]
+    imported_modules
+      | Just{} <- export_list =
+          unrestrictedModuleImports (map unLoc tcg_rn_imports)
+      | otherwise =
+          M.empty
+
+    -- TyThings that have instances defined in this module
+    local_instances :: [Name]
+    local_instances =
+      [ name
+      | name <- map getName tcg_insts ++ map getName tcg_fam_insts
+      , nameIsLocalOrFrom tcg_semantic_mod name
+      ]
+
+  -- Infer module safety
+  safety   <- liftIO (finalSafeMode ms_hspp_opts tc_gbl_env)
+
+  -- Process the top-level module header documentation.
+  (!info, header_doc) <- liftErrMsg $ processModuleHeader dflags pkg_name
+    tcg_rdr_env safety tcg_doc_hdr
+
+  -- Warnings on declarations in this module
+  decl_warnings <- liftErrMsg (mkWarningMap dflags tcg_warns tcg_rdr_env exported_names)
+
+  -- Warning on the module header
+  mod_warning <- liftErrMsg (moduleWarning dflags tcg_rdr_env tcg_warns)
+
+  let
+    -- Warnings in this module and transitive warnings from dependend modules
+    warnings :: Map Name (Doc Name)
+    warnings = M.unions (decl_warnings : map ifaceWarningMap (M.elems ifaces))
+
+  maps@(!docs, !arg_docs, !decl_map, _) <-
+    liftErrMsg (mkMaps dflags pkg_name tcg_rdr_env local_instances decls)
+
+  export_items <- mkExportItems is_sig ifaces pkg_name tcg_mod tcg_semantic_mod
+    warnings tcg_rdr_env exported_names (map fst decls) maps fixities
+    imported_modules loc_splices export_list tcg_exports inst_ifaces dflags
+
+  let
+    visible_names :: [Name]
+    visible_names = mkVisibleNames maps export_items doc_opts
+
+    -- Measure haddock documentation coverage.
+    pruned_export_items :: [ExportItem GhcRn]
+    pruned_export_items = pruneExportItems export_items
+
+    !haddockable = 1 + length export_items -- module + exports
+    !haddocked = (if isJust tcg_doc_hdr then 1 else 0) + length pruned_export_items
+
+    coverage :: (Int, Int)
+    !coverage = (haddockable, haddocked)
+
+    aliases :: Map Module ModuleName
+    aliases = mkAliasMap unit_state tcg_rn_imports
+
+  return $! Interface
+    {
+      ifaceMod               = tcg_mod
+    , ifaceIsSig             = is_sig
+    , ifaceOrigFilename      = msHsFilePath mod_sum
+    , ifaceHieFile           = Just ml_hie_file
+    , ifaceInfo              = info
+    , ifaceDoc               = Documentation header_doc mod_warning
+    , ifaceRnDoc             = Documentation Nothing Nothing
+    , ifaceOptions           = doc_opts
+    , ifaceDocMap            = docs
+    , ifaceArgMap            = arg_docs
+    , ifaceRnDocMap          = M.empty
+    , ifaceRnArgMap          = M.empty
+    , ifaceExportItems       = if OptPrune `elem` doc_opts then
+                                 pruned_export_items else export_items
+    , ifaceRnExportItems     = []
+    , ifaceExports           = exported_names
+    , ifaceVisibleExports    = visible_names
+    , ifaceDeclMap           = decl_map
+    , ifaceFixMap            = fixities
+    , ifaceModuleAliases     = aliases
+    , ifaceInstances         = tcg_insts
+    , ifaceFamInstances      = tcg_fam_insts
+    , ifaceOrphanInstances   = [] -- Filled in attachInstances
+    , ifaceRnOrphanInstances = [] -- Filled in attachInstances
+    , ifaceHaddockCoverage   = coverage
+    , ifaceWarningMap        = warnings
+    , ifaceDynFlags          = dflags
+    }
 
 
 -- | Use a 'TypecheckedModule' to produce an 'Interface'.
@@ -166,7 +352,7 @@ createInterface tm unit_state flags modMap instIfaceMap = do
         | otherwise = exportItems
       !prunedExportItems = seqList prunedExportItems' `seq` prunedExportItems'
 
-  let !aliases = mkAliasMap unit_state $ tm_renamed_source tm
+  let !aliases = mkAliasMap unit_state imports
 
   modWarn <- liftErrMsg (moduleWarning dflags gre warnings)
 
@@ -204,35 +390,32 @@ createInterface tm unit_state flags modMap instIfaceMap = do
 -- create a mapping from the module identity of M, to an alias N
 -- (if there are multiple aliases, we pick the last one.)  This
 -- will go in 'ifaceModuleAliases'.
-mkAliasMap :: UnitState -> Maybe RenamedSource -> M.Map Module ModuleName
-mkAliasMap state mRenamedSource =
-  case mRenamedSource of
-    Nothing -> M.empty
-    Just (_,impDecls,_,_) ->
-      M.fromList $
-      mapMaybe (\(SrcLoc.L _ impDecl) -> do
-        SrcLoc.L _ alias <- ideclAs impDecl
-        return $
-          (lookupModuleDyn state
-             -- TODO: This is supremely dodgy, because in general the
-             -- UnitId isn't going to look anything like the package
-             -- qualifier (even with old versions of GHC, the
-             -- IPID would be p-0.1, but a package qualifier never
-             -- has a version number it.  (Is it possible that in
-             -- Haddock-land, the UnitIds never have version numbers?
-             -- I, ezyang, have not quite understand Haddock's package
-             -- identifier model.)
-             --
-             -- Additionally, this is simulating some logic GHC already
-             -- has for deciding how to qualify names when it outputs
-             -- them to the user.  We should reuse that information;
-             -- or at least reuse the renamed imports, which know what
-             -- they import!
-             (fmap Module.fsToUnit $
-              fmap sl_fs $ ideclPkgQual impDecl)
-             (case ideclName impDecl of SrcLoc.L _ name -> name),
-           alias))
-        impDecls
+mkAliasMap :: UnitState -> [LImportDecl GhcRn] -> M.Map Module ModuleName
+mkAliasMap state impDecls =
+  M.fromList $
+  mapMaybe (\(SrcLoc.L _ impDecl) -> do
+    SrcLoc.L _ alias <- ideclAs impDecl
+    return $
+      (lookupModuleDyn state
+         -- TODO: This is supremely dodgy, because in general the
+         -- UnitId isn't going to look anything like the package
+         -- qualifier (even with old versions of GHC, the
+         -- IPID would be p-0.1, but a package qualifier never
+         -- has a version number it.  (Is it possible that in
+         -- Haddock-land, the UnitIds never have version numbers?
+         -- I, ezyang, have not quite understand Haddock's package
+         -- identifier model.)
+         --
+         -- Additionally, this is simulating some logic GHC already
+         -- has for deciding how to qualify names when it outputs
+         -- them to the user.  We should reuse that information;
+         -- or at least reuse the renamed imports, which know what
+         -- they import!
+         (fmap Module.fsToUnit $
+          fmap sl_fs $ ideclPkgQual impDecl)
+         (case ideclName impDecl of SrcLoc.L _ name -> name),
+       alias))
+    impDecls
 
 -- We want to know which modules are imported without any qualification. This
 -- way we can display module reexports more compactly. This mapping also looks
