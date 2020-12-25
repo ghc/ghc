@@ -139,4 +139,7 @@ Compiler
 
   The ``Numeric`` module recieves ``showBin`` and ``readBin`` to show and
   read integer numbers in binary.
+  
+- ``System.IO.openFile`` can no longer leak a file descriptor if it
+  is interrupted by an asynchronous exception (#19114, #19115).
 
