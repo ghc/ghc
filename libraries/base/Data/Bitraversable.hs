@@ -34,6 +34,11 @@ import Data.Functor.Identity (Identity(..))
 import Data.Functor.Utils (StateL(..), StateR(..))
 import GHC.Generics (K1(..))
 
+-- $setup
+-- >>> import Prelude
+-- >>> import Data.Maybe
+-- >>> import Data.List (find)
+
 -- | 'Bitraversable' identifies bifunctorial data structures whose elements can
 -- be traversed in order, performing 'Applicative' or 'Monad' actions at each
 -- element, and collecting a result structure with the same shape.
