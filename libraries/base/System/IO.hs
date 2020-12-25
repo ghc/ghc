@@ -347,7 +347,9 @@ readFile name   =  openFile name ReadMode >>= hGetContents
 -- @since 4.15.0.0
 
 readFile'       :: FilePath -> IO String
-readFile' name  =  openFile name ReadMode >>= hGetContents'
+-- There's a bit of overkill here—both withFile and
+-- hGetContents' will close the file in the end.
+readFile' name  =  withFile name ReadMode hGetContents'
 
 -- | The computation 'writeFile' @file str@ function writes the string @str@,
 -- to the file @file@.
@@ -413,21 +415,6 @@ hReady h        =  hWaitForInput h 0
 hPrint          :: Show a => Handle -> a -> IO ()
 hPrint hdl      =  hPutStrLn hdl . show
 
--- | @'withFile' name mode act@ opens a file using 'openFile' and passes
--- the resulting handle to the computation @act@.  The handle will be
--- closed on exit from 'withFile', whether by normal termination or by
--- raising an exception.  If closing the handle raises an exception, then
--- this exception will be raised by 'withFile' rather than any exception
--- raised by @act@.
-withFile :: FilePath -> IOMode -> (Handle -> IO r) -> IO r
-withFile name mode = bracket (openFile name mode) hClose
-
--- | @'withBinaryFile' name mode act@ opens a file using 'openBinaryFile'
--- and passes the resulting handle to the computation @act@.  The handle
--- will be closed on exit from 'withBinaryFile', whether by normal
--- termination or by raising an exception.
-withBinaryFile :: FilePath -> IOMode -> (Handle -> IO r) -> IO r
-withBinaryFile name mode = bracket (openBinaryFile name mode) hClose
 
 -- ---------------------------------------------------------------------------
 -- fixIO
