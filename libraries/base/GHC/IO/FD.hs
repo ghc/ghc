@@ -22,7 +22,7 @@
 
 module GHC.IO.FD (
         FD(..),
-        openFile, mkFD, release,
+        openFileWith, openFile, mkFD, release,
         setNonBlockingMode,
         readRawBufferPtr, readRawBufferPtrNoBlock, writeRawBufferPtr,
         stdin, stdout, stderr
