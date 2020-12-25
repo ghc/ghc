@@ -199,8 +199,9 @@ withFD filepath iomode non_blocking act =
       -- NB. always use a safe open(), because we don't know whether open()
       -- will be fast or not.  It can be slow on NFS and FUSE filesystems,
       -- for example.
-       bracketOnError (throwErrnoIfMinus1Retry "openFile" $ c_safe_open f oflags 0o666)
-                      c_close act
+       mask $ \restore -> do
+         fd <- throwErrnoIfMinus1Retry "openFile" $ c_safe_open f oflags 0o666
+         restore (act fd) `onException` c_close fd
 
 -- | Open a file and make an 'FD' for it. Truncates the file to zero
 -- size when the `IOMode` is `WriteMode`. @openFileWith@
