@@ -30,6 +30,7 @@ module GHC.MVar (
         , tryReadMVar
         , isEmptyMVar
         , addMVarFinalizer
+        , touchMVar
     ) where
 
 import GHC.Base
@@ -179,4 +180,8 @@ isEmptyMVar (MVar mv#) = IO $ \ s# ->
 addMVarFinalizer :: MVar a -> IO () -> IO ()
 addMVarFinalizer (MVar m) (IO finalizer) =
     IO $ \s -> case mkWeak# m () finalizer s of { (# s1, _ #) -> (# s1, () #) }
+
+-- | Ensure that an 'MVar' is still alive.
+touchMVar :: MVar a -> IO ()
+touchMVar (MVar m) = IO $ \s -> (# touch# m s, () #)
 
