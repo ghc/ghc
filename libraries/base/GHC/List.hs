@@ -41,6 +41,9 @@ import GHC.Num.Integer (Integer)
 infixl 9  !!
 infix  4 `elem`, `notElem`
 
+-- $setup
+-- >>> import Prelude (Num (..), Ord (..), Int, Double, odd, not, undefined)
+
 --------------------------------------------------------------
 -- List-manipulation functions
 --------------------------------------------------------------
@@ -52,7 +55,7 @@ infix  4 `elem`, `notElem`
 -- >>> head [1..]
 -- 1
 -- >>> head []
--- Exception: Prelude.head: empty list
+-- *** Exception: Prelude.head: empty list
 head                    :: [a] -> a
 head (x:_)              =  x
 head []                 =  badHead
@@ -96,7 +99,7 @@ uncons (x:xs)           = Just (x, xs)
 -- >>> tail [1]
 -- []
 -- >>> tail []
--- Exception: Prelude.tail: empty list
+-- *** Exception: Prelude.tail: empty list
 tail                    :: [a] -> [a]
 tail (_:xs)             =  xs
 tail []                 =  errorEmptyList "tail"
@@ -109,7 +112,7 @@ tail []                 =  errorEmptyList "tail"
 -- >>> last [1..]
 -- * Hangs forever *
 -- >>> last []
--- Exception: Prelude.last: empty list
+-- *** Exception: Prelude.last: empty list
 last                    :: [a] -> a
 #if defined(USE_REPORT_PRELUDE)
 last [x]                =  x
@@ -135,7 +138,7 @@ lastError = errorEmptyList "last"
 -- >>> init [1]
 -- []
 -- >>> init []
--- Exception: Prelude.init: empty list
+-- *** Exception: Prelude.init: empty list
 init                    :: [a] -> [a]
 #if defined(USE_REPORT_PRELUDE)
 init [x]                =  []
@@ -305,7 +308,7 @@ foldl' k z0 xs =
 -- >>> foldl1 (+) [1..4]
 -- 10
 -- >>> foldl1 (+) []
--- Exception: Prelude.foldl1: empty list
+-- *** Exception: Prelude.foldl1: empty list
 -- >>> foldl1 (-) [1..4]
 -- -8
 -- >>> foldl1 (&&) [True, False, True, True]
@@ -496,7 +499,7 @@ match on everything past the :, which is just the tail of scanl.
 -- >>> foldr1 (+) [1..4]
 -- 10
 -- >>> foldr1 (+) []
--- Exception: Prelude.foldr1: empty list
+-- *** Exception: Prelude.foldr1: empty list
 -- >>> foldr1 (-) [1..4]
 -- -2
 -- >>> foldr1 (&&) [True, False, True, True]
@@ -604,7 +607,7 @@ scanr1 f (x:xs)         =  f x q : qs
 -- programmer to supply their own comparison function.
 --
 -- >>> maximum []
--- Exception: Prelude.maximum: empty list
+-- *** Exception: Prelude.maximum: empty list
 -- >>> maximum [42]
 -- 42
 -- >>> maximum [55, -12, 7, 0, -89]
@@ -628,7 +631,7 @@ maximum xs              =  foldl1' max xs
 -- programmer to supply their own comparison function.
 --
 -- >>> minimum []
--- Exception: Prelude.minimum: empty list
+-- *** Exception: Prelude.minimum: empty list
 -- >>> minimum [42]
 -- 42
 -- >>> minimum [55, -12, 7, 0, -89]
@@ -735,7 +738,7 @@ replicate n x           =  take n (repeat x)
 -- on infinite lists.
 --
 -- >>> cycle []
--- Exception: Prelude.cycle: empty list
+-- *** Exception: Prelude.cycle: empty list
 -- >>> cycle [42]
 -- [42,42,42,42,42,42,42,42,42,42...
 -- >>> cycle [2, 5, 7]
@@ -1242,9 +1245,9 @@ concat = foldr (++) []
 -- >>> ['a', 'b', 'c'] !! 2
 -- 'c'
 -- >>> ['a', 'b', 'c'] !! 3
--- Exception: Prelude.!!: index too large
+-- *** Exception: Prelude.!!: index too large
 -- >>> ['a', 'b', 'c'] !! (-1)
--- Exception: Prelude.!!: negative index
+-- *** Exception: Prelude.!!: negative index
 (!!)                    :: [a] -> Int -> a
 #if defined(USE_REPORT_PRELUDE)
 xs     !! n | n < 0 =  errorWithoutStackTrace "Prelude.!!: negative index"
@@ -1372,15 +1375,15 @@ NB: Zips for larger tuples are in the List module.
 -- corresponding pairs.
 --
 -- >>> zip [1, 2] ['a', 'b']
--- [(1, 'a'), (2, 'b')]
+-- [(1,'a'),(2,'b')]
 --
 -- If one input list is shorter than the other, excess elements of the longer
 -- list are discarded, even if one of the lists is infinite:
 --
 -- >>> zip [1] ['a', 'b']
--- [(1, 'a')]
+-- [(1,'a')]
 -- >>> zip [1, 2] ['a']
--- [(1, 'a')]
+-- [(1,'a')]
 -- >>> zip [] [1..]
 -- []
 -- >>> zip [1..] []
@@ -1388,10 +1391,11 @@ NB: Zips for larger tuples are in the List module.
 --
 -- 'zip' is right-lazy:
 --
--- >>> zip [] _|_
+-- >>> zip [] undefined
 -- []
--- >>> zip _|_ []
--- _|_
+-- >>> zip undefined []
+-- *** Exception: Prelude.undefined
+-- ...
 --
 -- 'zip' is capable of list fusion, but it is restricted to its
 -- first list argument and its resulting list.
@@ -1449,7 +1453,8 @@ zip3FB cons = \a b c r -> (a,b,c) `cons` r
 --
 -- 'zipWith' is right-lazy:
 --
--- >>> zipWith f [] _|_
+-- >>> let f = undefined
+-- >>> zipWith f [] undefined
 -- []
 --
 -- 'zipWith' is capable of list fusion, but it is restricted to its

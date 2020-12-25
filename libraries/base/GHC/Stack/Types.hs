@@ -53,6 +53,10 @@ import GHC.Types (Char, Int)
 import GHC.Tuple ()       -- See Note [Depend on GHC.Tuple] in GHC.Base
 import GHC.Num.Integer () -- See Note [Depend on GHC.Num.Integer] in GHC.Base
 
+-- $setup
+-- >>> import Prelude
+-- >>> import GHC.Stack (prettyCallStack, callStack)
+
 ----------------------------------------------------------------------
 -- Explicit call-stacks built via ImplicitParams
 ----------------------------------------------------------------------
@@ -81,12 +85,12 @@ type HasCallStack = (?callStack :: CallStack)
 -- along with the string given as argument. We can access the
 -- call-stack inside @putStrLnWithCallStack@ with 'GHC.Stack.callStack'.
 --
--- @
+-- >>> :{
 -- putStrLnWithCallStack :: HasCallStack => String -> IO ()
 -- putStrLnWithCallStack msg = do
 --   putStrLn msg
 --   putStrLn (prettyCallStack callStack)
--- @
+-- :}
 --
 -- Thus, if we call @putStrLnWithCallStack@ we will get a formatted call-stack
 -- alongside our string.
@@ -95,7 +99,7 @@ type HasCallStack = (?callStack :: CallStack)
 -- >>> putStrLnWithCallStack "hello"
 -- hello
 -- CallStack (from HasCallStack):
---   putStrLnWithCallStack, called at <interactive>:2:1 in interactive:Ghci1
+--   putStrLnWithCallStack, called at <interactive>:... in interactive:Ghci...
 --
 --
 -- GHC solves 'HasCallStack' constraints in three steps:

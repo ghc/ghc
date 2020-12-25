@@ -35,6 +35,9 @@ import GHC.Read
 import GHC.Real (Fractional, Real, RealFrac)
 import GHC.Show
 
+-- $setup
+-- >>> import Prelude
+
 -- |
 -- > comparing p x y = compare (p x) (p y)
 --

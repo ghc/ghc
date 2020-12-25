@@ -30,6 +30,10 @@ import Control.Exception   (Exception(..), handleJust, bracket,
                             asyncExceptionFromException)
 import Data.Unique         (Unique, newUnique)
 
+-- $setup
+-- >>> import Prelude
+-- >>> import Control.Concurrent (threadDelay)
+
 -- An internal type that is thrown as a dynamic exception to
 -- interrupt the running IO computation when the timeout has
 -- expired.
