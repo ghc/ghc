@@ -32,7 +32,9 @@ module GHC.IO.Handle.Internals (
   wantWritableHandle, wantReadableHandle, wantReadableHandle_,
   wantSeekableHandle,
 
-  mkHandle, mkFileHandle, mkDuplexHandle,
+  mkHandle,
+  mkFileHandle, mkFileHandleNoFinalizer, mkDuplexHandle, mkDuplexHandleNoFinalizer,
+  addHandleFinalizer,
   openTextEncoding, closeTextCodecs, initBufferState,
   dEFAULT_CHAR_BUFFER_SIZE,
 
@@ -47,7 +49,7 @@ module GHC.IO.Handle.Internals (
   ioe_EOF, ioe_notReadable, ioe_notWritable,
   ioe_finalizedHandle, ioe_bufsiz,
 
-  hClose_help, hLookAhead_,
+  hClose_impl, hClose_help, hLookAhead_,
 
   HandleFinalizer, handleFinalizer,
 
@@ -90,15 +92,18 @@ c_DEBUG_DUMP = False
 
 type HandleFinalizer = FilePath -> MVar Handle__ -> IO ()
 
-newFileHandle :: FilePath -> Maybe HandleFinalizer -> Handle__ -> IO Handle
-newFileHandle filepath mb_finalizer hc = do
-  m <- newMVar hc
-  case mb_finalizer of
-    Just finalizer -> do debugIO $ "Registering finalizer: " ++ show filepath
-                         addMVarFinalizer m (finalizer filepath m)
-    Nothing        -> do debugIO $ "No finalizer: " ++ show filepath
-                         return ()
-  return (FileHandle filepath m)
+-- | Add a finalizer to a 'Handle'. Specifically, the finalizer
+-- will be added to the 'MVar' of a file handle or the write-side
+-- 'MVar' of a duplex handle. See Handle Finalizers for details.
+addHandleFinalizer :: Handle -> HandleFinalizer -> IO ()
+addHandleFinalizer handle finalizer = do
+  debugIO $ "Registering finalizer: " ++ show filepath
+  addMVarFinalizer mv (finalizer filepath mv)
+  where
+    !(filepath, !mv) = case handle of
+      FileHandle fp m -> (fp, m)
+      DuplexHandle fp _ write_m -> (fp, write_m)
+
 
 -- ---------------------------------------------------------------------------
 -- Working with Handles
@@ -649,16 +654,17 @@ flushByteReadBuffer h_@Handle__{..} = do
   the offset accordingly. This is only required for WINIO.
 -}
 
-mkHandle :: (RawIO dev, IODevice dev, BufferedIO dev, Typeable dev) => dev
+-- | Make an @'MVar' 'Handle__'@ for use in a 'Handle'. This function
+-- does not install a finalizer; that must be done by the caller.
+mkHandleMVar :: (RawIO dev, IODevice dev, BufferedIO dev, Typeable dev) => dev
          -> FilePath
          -> HandleType
          -> Bool                     -- buffered?
          -> Maybe TextEncoding
          -> NewlineMode
-         -> Maybe HandleFinalizer
          -> Maybe (MVar Handle__)
-         -> IO Handle
-mkHandle dev filepath ha_type buffered mb_codec nl finalizer other_side =
+         -> IO (MVar Handle__)
+mkHandleMVar dev filepath ha_type buffered mb_codec nl other_side =
    openTextEncoding mb_codec ha_type $ \ mb_encoder mb_decoder -> do
 
    let !buf_state = initBufferState ha_type
@@ -675,8 +681,7 @@ mkHandle dev filepath ha_type buffered mb_codec nl finalizer other_side =
 
    spares <- newIORef BufferListNil
    debugIO $ "making handle for " ++ filepath
-   newFileHandle filepath finalizer
-            (Handle__ { haDevice = dev,
+   newMVar $ Handle__ { haDevice = dev,
                         haType = ha_type,
                         haBufferMode = bmode,
                         haByteBuffer = bbufref,
@@ -689,7 +694,7 @@ mkHandle dev filepath ha_type buffered mb_codec nl finalizer other_side =
                         haInputNL = inputNL nl,
                         haOutputNL = outputNL nl,
                         haOtherSide = other_side
-                      })
+                      }
   where
     -- See Note [Making offsets for append]
     initHandleOffset
@@ -698,6 +703,45 @@ mkHandle dev filepath ha_type buffered mb_codec nl finalizer other_side =
           size <- IODevice.getSize dev
           return (fromIntegral size :: Word64)
       | otherwise = return 0
+
+mkHandle :: (RawIO dev, IODevice dev, BufferedIO dev, Typeable dev) => dev
+         -> FilePath
+         -> HandleType
+         -> Bool                     -- buffered?
+         -> Maybe TextEncoding
+         -> NewlineMode
+         -> Maybe HandleFinalizer
+         -> Maybe (MVar Handle__)
+         -> IO Handle
+mkHandle dev filepath ha_type buffered mb_codec nl mb_finalizer other_side = do
+  mv <- mkHandleMVar dev filepath ha_type buffered mb_codec nl other_side
+  let handle = FileHandle filepath mv
+  case mb_finalizer of
+    Nothing -> pure ()
+    Just finalizer -> addHandleFinalizer handle finalizer
+  pure handle
+
+-- | makes a new 'Handle' without a finalizer.
+mkFileHandleNoFinalizer
+             :: (RawIO dev, IODevice dev, BufferedIO dev, Typeable dev)
+             => dev -- ^ the underlying IO device, which must support
+                    -- 'IODevice', 'BufferedIO' and 'Typeable'
+             -> FilePath
+                    -- ^ a string describing the 'Handle', e.g. the file
+                    -- path for a file.  Used in error messages.
+             -> IOMode
+                    -- The mode in which the 'Handle' is to be used
+             -> Maybe TextEncoding
+                    -- Create the 'Handle' with no text encoding?
+             -> NewlineMode
+                    -- Translate newlines?
+             -> IO Handle
+mkFileHandleNoFinalizer dev filepath iomode mb_codec tr_newlines = do
+   mv <- mkHandleMVar dev filepath (ioModeToHandleType iomode) True{-buffered-}
+                      mb_codec
+                      tr_newlines
+                      Nothing{-other_side-}
+   pure (FileHandle filepath mv)
 
 -- | makes a new 'Handle'
 mkFileHandle :: (RawIO dev, IODevice dev, BufferedIO dev, Typeable dev)
@@ -713,10 +757,31 @@ mkFileHandle :: (RawIO dev, IODevice dev, BufferedIO dev, Typeable dev)
              -> NewlineMode
                     -- Translate newlines?
              -> IO Handle
-mkFileHandle dev filepath iomode mb_codec tr_newlines =
-   mkHandle dev filepath (ioModeToHandleType iomode) True{-buffered-} mb_codec
-            tr_newlines
-            (Just handleFinalizer) Nothing{-other_side-}
+
+mkFileHandle dev filepath iomode mb_codec tr_newlines = do
+   h <- mkFileHandleNoFinalizer dev filepath iomode mb_codec tr_newlines
+   addHandleFinalizer h handleFinalizer
+   pure h
+
+-- | like 'mkFileHandle', except that a 'Handle' is created with two
+-- independent buffers, one for reading and one for writing.  Used for
+-- full-duplex streams, such as network sockets.
+mkDuplexHandleNoFinalizer ::
+  (RawIO dev, IODevice dev, BufferedIO dev, Typeable dev)
+     => dev -> FilePath -> Maybe TextEncoding -> NewlineMode -> IO Handle
+mkDuplexHandleNoFinalizer dev filepath mb_codec tr_newlines = do
+
+  write_m <-
+       mkHandleMVar dev filepath WriteHandle True mb_codec
+                        tr_newlines
+                        Nothing -- no other side
+
+  read_m <-
+      mkHandleMVar dev filepath ReadHandle True mb_codec
+                        tr_newlines
+                        (Just write_m)
+
+  return (DuplexHandle filepath read_m write_m)
 
 -- | like 'mkFileHandle', except that a 'Handle' is created with two
 -- independent buffers, one for reading and one for writing.  Used for
@@ -724,20 +789,9 @@ mkFileHandle dev filepath iomode mb_codec tr_newlines =
 mkDuplexHandle :: (RawIO dev, IODevice dev, BufferedIO dev, Typeable dev) => dev
                -> FilePath -> Maybe TextEncoding -> NewlineMode -> IO Handle
 mkDuplexHandle dev filepath mb_codec tr_newlines = do
-
-  write_side@(FileHandle _ write_m) <-
-       mkHandle dev filepath WriteHandle True mb_codec
-                        tr_newlines
-                        (Just handleFinalizer)
-                        Nothing -- no othersie
-
-  read_side@(FileHandle _ read_m) <-
-      mkHandle dev filepath ReadHandle True mb_codec
-                        tr_newlines
-                        Nothing -- no finalizer
-                        (Just write_m)
-
-  return (DuplexHandle filepath read_m write_m)
+  handle <- mkDuplexHandleNoFinalizer dev filepath mb_codec tr_newlines
+  addHandleFinalizer handle handleFinalizer
+  pure handle
 
 ioModeToHandleType :: IOMode -> HandleType
 ioModeToHandleType ReadMode      = ReadHandle
@@ -775,7 +829,30 @@ closeTextCodecs Handle__{..} = do
   case haEncoder of Nothing -> return (); Just d -> Encoding.close d
 
 -- ---------------------------------------------------------------------------
--- closing Handles
+-- Closing a handle
+
+-- | This function exists temporarily to avoid an unused import warning in
+-- `bytestring`.
+hClose_impl :: Handle -> IO ()
+hClose_impl h@(FileHandle _ m)     = do
+  mb_exc <- hClose' h m
+  hClose_maybethrow mb_exc h
+hClose_impl h@(DuplexHandle _ r w) = do
+  excs <- mapM (hClose' h) [r,w]
+  hClose_maybethrow (listToMaybe (catMaybes excs)) h
+
+hClose_maybethrow :: Maybe SomeException -> Handle -> IO ()
+hClose_maybethrow Nothing  h = return ()
+hClose_maybethrow (Just e) h = hClose_rethrow e h
+
+hClose_rethrow :: SomeException -> Handle -> IO ()
+hClose_rethrow e h =
+  case fromException e of
+    Just ioe -> ioError (augmentIOError ioe "hClose" h)
+    Nothing  -> throwIO e
+
+hClose' :: Handle -> MVar Handle__ -> IO (Maybe SomeException)
+hClose' h m = withHandle' "hClose" h m $ hClose_help
 
 -- hClose_help is also called by lazyRead (in GHC.IO.Handle.Text) when
 -- EOF is read or an IO error occurs on a lazy stream.  The
