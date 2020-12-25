@@ -36,7 +36,7 @@ import GHC.Stack.Types ( HasCallStack )
 
 -- $setup
 -- Allow the use of some Prelude functions in doctests.
--- >>> import Prelude ( (*), odd, show, sum )
+-- >>> import Prelude
 
 -- ---------------------------------------------------------------------------
 -- Functions over Maybe
@@ -143,6 +143,7 @@ isNothing _       = False
 --
 -- >>> 2 * (fromJust Nothing)
 -- *** Exception: Maybe.fromJust: Nothing
+-- ...
 --
 fromJust          :: HasCallStack => Maybe a -> a
 fromJust Nothing  = error "Maybe.fromJust: Nothing" -- yuck

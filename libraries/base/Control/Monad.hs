@@ -85,6 +85,10 @@ import GHC.Base hiding ( mapM, sequence )
 import GHC.List ( zipWith, unzip )
 import GHC.Num  ( (-) )
 
+-- $setup
+-- >>> import Prelude
+-- >>> let safeDiv x y = guard (y /= 0) >> Just (x `div` y :: Int)
+
 -- -----------------------------------------------------------------------------
 -- Functions mandated by the Prelude
 
@@ -106,12 +110,11 @@ import GHC.Num  ( (-) )
 -- 'Nothing' when the denominator @y@ is zero and @'Just' (x \`div\`
 -- y)@ otherwise. For example:
 --
--- @
 -- >>> safeDiv 4 0
 -- Nothing
+--
 -- >>> safeDiv 4 2
 -- Just 2
--- @
 --
 -- A definition of @safeDiv@ using guards, but not 'guard':
 --
@@ -360,12 +363,11 @@ f <$!> m = do
 --
 -- An example using 'mfilter' with the 'Maybe' monad:
 --
--- @
 -- >>> mfilter odd (Just 1)
 -- Just 1
 -- >>> mfilter odd (Just 2)
 -- Nothing
--- @
+--
 mfilter :: (MonadPlus m) => (a -> Bool) -> m a -> m a
 {-# INLINABLE mfilter #-}
 mfilter p ma = do

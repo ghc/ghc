@@ -106,12 +106,13 @@ putTraceMsg = traceIO
 The 'trace' function outputs the trace message given as its first argument,
 before returning the second argument as its result.
 
-For example, this returns the value of @f x@ but first outputs the message.
+For example, this returns the value of @f x@ and outputs the message to stderr.
+Depending on your terminal (settings), they may or may not be mixed.
 
 >>> let x = 123; f = show
 >>> trace ("calling f with x = " ++ show x) (f x)
-"calling f with x = 123
-123"
+calling f with x = 123
+"123"
 
 The 'trace' function should /only/ be used for debugging, or for monitoring
 execution. The function is not referentially transparent: its type indicates
@@ -127,8 +128,8 @@ trace string expr = unsafePerformIO $ do
 Like 'trace' but returns the message instead of a third value.
 
 >>> traceId "hello"
-"hello
-hello"
+hello
+"hello"
 
 @since 4.7.0.0
 -}
