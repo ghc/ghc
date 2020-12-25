@@ -138,6 +138,9 @@ addFilePathToIOError fun fp ioe
 --  * 'System.IO.Error.isPermissionError' if the user does not have permission
 --     to open the file.
 --
+-- On POSIX systems, 'openFile' is an /interruptible operation/ as
+-- described in "Control.Exception".
+--
 -- Note: if you will be working with files containing binary data, you'll want to
 -- be using 'openBinaryFile'.
 openFile :: FilePath -> IOMode -> IO Handle
@@ -156,6 +159,9 @@ openFile fp im =
 -- it wants to unblock itself. By corollary, a non-threaded runtime
 -- will need a process-external trigger in order to become unblocked.
 --
+-- On POSIX systems, 'openFileBlocking' is an /interruptible operation/ as
+-- described in "Control.Exception".
+--
 -- @since 4.4.0.0
 openFileBlocking :: FilePath -> IOMode -> IO Handle
 openFileBlocking fp im =
@@ -172,6 +178,8 @@ openFileBlocking fp im =
 -- treatment of end-of-line and end-of-file characters.
 -- (See also 'System.IO.hSetBinaryMode'.)
 
+-- On POSIX systems, 'openBinaryFile' is an /interruptible operation/ as
+-- described in "Control.Exception".
 openBinaryFile :: FilePath -> IOMode -> IO Handle
 openBinaryFile fp m =
   catchException
@@ -181,21 +189,31 @@ openBinaryFile fp m =
 openFile' :: String -> IOMode -> Bool -> Bool -> IO Handle
 openFile' filepath iomode binary non_blocking = do
   -- first open the file to get an FD
-  (fd, fd_type) <- FD.openFile filepath iomode non_blocking
+  hndl <- FD.openFileWith filepath iomode non_blocking $ \fd fd_type -> do
 
-  mb_codec <- if binary then return Nothing else fmap Just getLocaleEncoding
+    mb_codec <- if binary then return Nothing else fmap Just getLocaleEncoding
 
-  -- then use it to make a Handle
-  mkHandleFromFD fd fd_type filepath iomode
-                   False {- do not *set* non-blocking mode -}
-                   mb_codec
-            `onException` IODevice.close fd
-        -- NB. don't forget to close the FD if mkHandleFromFD fails, otherwise
-        -- this FD leaks.
+    -- then use it to make a Handle
+    mkHandleFromFD fd fd_type filepath iomode
+                     False {- do not *set* non-blocking mode -}
+                     mb_codec
+        -- Note: openFileWith takes care of closing the FD if making the handle
+        -- fails.
+
         -- ASSERT: if we just created the file, then fdToHandle' won't fail
         -- (so we don't need to worry about removing the newly created file
         --  in the event of an error).
 
+  -- Suppose the handle is never actually used. Further suppose that, before
+  -- openFileWith returns from `onException`, the garbage collector runs
+  -- (running the finalizer and closing the file) and then an exception is
+  -- received. Then the file will be closed a second time, which is no good. So
+  -- we use `touchHandle` to make sure the handle finalizers aren't called until
+  -- we're out of the catch block. Yuras, at least, thinks this situation
+  -- is possible, albeit extremely unlikely in practice, and it would be quite
+  -- difficult to debug.
+  touchHandle hndl
+  pure hndl
 
 -- ---------------------------------------------------------------------------
 -- Converting file descriptors from/to Handles
