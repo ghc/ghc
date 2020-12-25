@@ -50,6 +50,9 @@
   * Correct `Bounded` instance and remove `Enum` and `Integral` instances for
     `Data.Ord.Down`.
 
+  * `System.IO.openFile` will no longer leak a file descriptor if it
+    is interrupted by an asynchronous exception (#19114, #19115).
+
 ## 4.14.0.0 *TBA*
   * Bundled with GHC 8.10.1
 

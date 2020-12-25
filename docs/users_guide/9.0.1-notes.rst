@@ -403,6 +403,9 @@ Haddock
   in an upcoming ``bytestring`` release to improve the performance of
   ``ByteString`` literals created with ``OverloadedStrings``.
 
+- ``System.IO.openFile`` can no longer leak a file descriptor if it
+  is interrupted by an asynchronous exception (#19114, #19115).
+
 Build system
 ~~~~~~~~~~~~
 
