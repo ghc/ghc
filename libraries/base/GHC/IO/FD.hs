@@ -166,21 +166,22 @@ writeBuf' fd buf = do
 -- -----------------------------------------------------------------------------
 -- opening files
 
--- | Open a file and make an 'FD' for it.  Truncates the file to zero
--- size when the `IOMode` is `WriteMode`.
-openFile
+-- | Open a file and produce a raw file descriptor for it. Truncates the
+-- the file if `WriteMode` is specified. @withFD@
+-- guarantees that if an exception occurs in the passed action, then the file
+-- will be closed.
+withFD
   :: FilePath -- ^ file to open
   -> IOMode   -- ^ mode in which to open the file
   -> Bool     -- ^ open the file in non-blocking mode?
-  -> IO (FD,IODeviceType)
-
-openFile filepath iomode non_blocking =
+  -> (CInt -> IO r) -- ^ An action to perform with the file descriptor
+  -> IO r
+withFD filepath iomode non_blocking act =
   withFilePath filepath $ \ f ->
-
     let
       oflags1 = case iomode of
                   ReadMode      -> read_flags
-                  WriteMode     -> write_flags
+                  WriteMode     -> truncate_flags
                   ReadWriteMode -> rw_flags
                   AppendMode    -> append_flags
 
@@ -194,35 +195,53 @@ openFile filepath iomode non_blocking =
 
       oflags | non_blocking = oflags2 .|. nonblock_flags
              | otherwise    = oflags2
-    in do
+    in
+      -- NB. always use a safe open(), because we don't know whether open()
+      -- will be fast or not.  It can be slow on NFS and FUSE filesystems,
+      -- for example.
+       bracketOnError (throwErrnoIfMinus1Retry "openFile" $ c_safe_open f oflags 0o666)
+                      c_close act
 
-    -- NB. always use a safe open(), because we don't know whether open()
-    -- will be fast or not.  It can be slow on NFS and FUSE filesystems,
-    -- for example.
-    fd <- throwErrnoIfMinus1Retry "openFile" $ c_safe_open f oflags 0o666
-
+-- | Open a file and make an 'FD' for it. Truncates the file to zero
+-- size when the `IOMode` is `WriteMode`. @openFileWith@
+-- guarantees that if an exception occurs in the passed action, then the file
+-- will be closed.
+openFileWith
+  :: FilePath -- ^ file to open
+  -> IOMode   -- ^ mode in which to open the file
+  -> Bool     -- ^ open the file in non-blocking mode?
+  -> (FD -> IODeviceType -> IO r)
+  -> IO r
+openFileWith filepath iomode non_blocking act =
+  withFD filepath iomode non_blocking $ \ fd -> do
     (fD,fd_type) <- mkFD fd iomode Nothing{-no stat-}
                             False{-not a socket-}
                             non_blocking
-            `catchAny` \e -> do _ <- c_close fd
-                                throwIO e
+    act fD fd_type
 
-    -- we want to truncate() if this is an open in WriteMode, but only
-    -- if the target is a RegularFile.  ftruncate() fails on special files
-    -- like /dev/null.
-    when (iomode == WriteMode && fd_type == RegularFile) $
-      setSize fD 0
-
-    return (fD,fd_type)
+-- | Open a file and make an 'FD' for it.  Truncates the file to zero
+-- size when the `IOMode` is `WriteMode`. This function is difficult
+-- to use without potentially leaking the file descriptor on exception.
+-- Use 'openFileWith' instead.
+openFile
+  :: FilePath -- ^ file to open
+  -> IOMode   -- ^ mode in which to open the file
+  -> Bool     -- ^ open the file in non-blocking mode?
+  -> IO (FD,IODeviceType)
+{-# DEPRECATED openFile "Risk of file descriptor leak" #-}
+openFile filepath iomode non_blocking =
+  openFileWith filepath iomode non_blocking $
+    \ fd fd_type -> pure (fd, fd_type)
 
 std_flags, output_flags, read_flags, write_flags, rw_flags,
-    append_flags, nonblock_flags :: CInt
+    append_flags, nonblock_flags, truncate_flags :: CInt
 std_flags    = o_NOCTTY
 output_flags = std_flags    .|. o_CREAT
 read_flags   = std_flags    .|. o_RDONLY
 write_flags  = output_flags .|. o_WRONLY
 rw_flags     = output_flags .|. o_RDWR
 append_flags = write_flags  .|. o_APPEND
+truncate_flags = write_flags .|. o_TRUNC
 nonblock_flags = o_NONBLOCK
 
 
