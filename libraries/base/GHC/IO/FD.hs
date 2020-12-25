@@ -22,7 +22,7 @@
 
 module GHC.IO.FD (
         FD(..),
-        openFile, mkFD, release,
+        openFileWith, openFile, mkFD, release,
         setNonBlockingMode,
         readRawBufferPtr, readRawBufferPtrNoBlock, writeRawBufferPtr,
         stdin, stdout, stderr
@@ -166,17 +166,63 @@ writeBuf' fd buf = do
 -- -----------------------------------------------------------------------------
 -- opening files
 
--- | Open a file and make an 'FD' for it.  Truncates the file to zero
--- size when the `IOMode` is `WriteMode`.
-openFile
+-- | A wrapper for 'System.Posix.Internals.c_safe_open' that takes
+-- an action to perform with the file descriptor. This function
+-- guarantees that if an exception occurs in the passed action,
+-- then the file will be closed. On successful return, the file remains
+-- *open*; it should generally be closed by a finalizer. Caution: the
+-- passed action *must not* close the file descriptor. If it does so and
+-- then receives an exception, then the exception handler will attempt to
+-- close it again, which is impermissible.
+c_safe_open_with
+  :: System.Posix.Internals.CFilePath  -- ^ The file to open
+  -> CInt -- ^ The flags to pass to open
+  -> CMode -- ^ The permission mode to use for file creation
+  -> (CInt -> IO r) -- ^ An action to perform with the file descriptor
+  -> IO r
+c_safe_open_with path oflags mode act =
+  mask $ \restore -> do
+    fd <- throwErrnoIfMinus1Retry "openFile" $ do
+      open_res <- c_safe_open path oflags mode
+      -- c_safe_open is an interruptible foreign call. If the call is
+      -- interrupted by an exception *before* the system call has
+      -- returned (so the file is not yet open), we want to deliver
+      -- that exception instead of retrying.
+      when (open_res == -1) $
+        -- Control.Exception.allowInterrupt, inlined to avoid messing
+        -- with Haddock links.
+        interruptible (pure ())
+      pure open_res
+    restore (act fd) `onException` c_close fd
+
+-- | Open a file and make an 'FD' for it. Truncates the file to zero
+-- size when the `IOMode` is `WriteMode`. @openFileWith@
+-- guarantees that if an exception occurs in the passed action, then the file
+-- will be closed. On successful return, the file remains /open/.
+--
+-- 'openFileWith' is an /interruptible operation/ as described in
+-- "Control.Exception".
+--
+-- Caution: the passed action /must not/ close the file descriptor. If it does
+-- so and then receives an exception, then the exception handler will attempt
+-- to close it again, which is impermissible. The code calling `openFileWith`
+-- is responsible for ensuring that the file is eventually closed after
+-- `openFileWith` returns. This may be done, for example, by using
+-- 'Control.Exception.bracket'. See 'GHC.IO.Handle.FD.openFile'' to see
+-- how to do this using a finalizer.
+openFileWith
   :: FilePath -- ^ file to open
   -> IOMode   -- ^ mode in which to open the file
   -> Bool     -- ^ open the file in non-blocking mode?
-  -> IO (FD,IODeviceType)
-
-openFile filepath iomode non_blocking =
+  -> (FD -> IODeviceType -> IO r)
+  -> IO r
+openFileWith filepath iomode non_blocking act =
+  -- TODO: withFilePath is not interruptible, so if someone calls
+  -- openFileWith when exceptions are masked and passes it an
+  -- infinitely long or otherwise expensive FilePath, then the thread
+  -- will not respond to ^C. Yuck. I (David Feuer) believe the solution
+  -- is to add an interruptible version of `withFilePath`.
   withFilePath filepath $ \ f ->
-
     let
       oflags1 = case iomode of
                   ReadMode      -> read_flags
@@ -194,26 +240,36 @@ openFile filepath iomode non_blocking =
 
       oflags | non_blocking = oflags2 .|. nonblock_flags
              | otherwise    = oflags2
-    in do
+    in
+      -- NB. always use a safe open(), because we don't know whether open()
+      -- will be fast or not.  It can be slow on NFS and FUSE filesystems,
+      -- for example.
+      c_safe_open_with f oflags 0o666 $ \ fd -> do
+        (fD,fd_type) <- mkFD fd iomode Nothing{-no stat-}
+                                False{-not a socket-}
+                                non_blocking
+        -- we want to truncate() if this is an open in WriteMode, but only
+        -- if the target is a RegularFile.  ftruncate() fails on special files
+        -- like /dev/null.
+        when (iomode == WriteMode && fd_type == RegularFile) $
+          setSize fD 0
+        act fD fd_type
 
-    -- NB. always use a safe open(), because we don't know whether open()
-    -- will be fast or not.  It can be slow on NFS and FUSE filesystems,
-    -- for example.
-    fd <- throwErrnoIfMinus1Retry "openFile" $ c_safe_open f oflags 0o666
-
-    (fD,fd_type) <- mkFD fd iomode Nothing{-no stat-}
-                            False{-not a socket-}
-                            non_blocking
-            `catchAny` \e -> do _ <- c_close fd
-                                throwIO e
-
-    -- we want to truncate() if this is an open in WriteMode, but only
-    -- if the target is a RegularFile.  ftruncate() fails on special files
-    -- like /dev/null.
-    when (iomode == WriteMode && fd_type == RegularFile) $
-      setSize fD 0
-
-    return (fD,fd_type)
+-- | Open a file and make an 'FD' for it.  Truncates the file to zero
+-- size when the `IOMode` is `WriteMode`. This function is difficult
+-- to use without potentially leaking the file descriptor on exception.
+-- In particular, it must be used with exceptions masked, which is a
+-- bit rude because the thread will be uninterruptible while the file
+-- path is being encoded. Use 'openFileWith' instead.
+openFile
+  :: FilePath -- ^ file to open
+  -> IOMode   -- ^ mode in which to open the file
+  -> Bool     -- ^ open the file in non-blocking mode?
+  -> IO (FD,IODeviceType)
+{-# DEPRECATED openFile "Use openFileWith instead" #-}
+openFile filepath iomode non_blocking =
+  openFileWith filepath iomode non_blocking $
+    \ fd fd_type -> pure (fd, fd_type)
 
 std_flags, output_flags, read_flags, write_flags, rw_flags,
     append_flags, nonblock_flags :: CInt

@@ -347,7 +347,13 @@ readFile name   =  openFile name ReadMode >>= hGetContents
 -- @since 4.15.0.0
 
 readFile'       :: FilePath -> IO String
-readFile' name  =  openFile name ReadMode >>= hGetContents'
+-- This is not really an *ideal* implementation. The Handle machinery
+-- is basically all overkill. Most notably, we have no real need to create
+-- a finalizer to close the file if we change this bracketOnError to bracket! But
+-- we also don't need almost any of the rest of the Handle stuff; we know a priori what
+-- sort of Handle we're making. Is it worth trying to clean this up?
+-- Unclear.
+readFile' name  =  bracketOnError (openFile name ReadMode) hClose hGetContents'
 
 -- | The computation 'writeFile' @file str@ function writes the string @str@,
 -- to the file @file@.
