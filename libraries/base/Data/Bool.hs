@@ -28,6 +28,9 @@ module Data.Bool (
 
 import GHC.Base
 
+-- $setup
+-- >>> import Prelude
+
 -- | Case analysis for the 'Bool' type. @'bool' x y p@ evaluates to @x@
 -- when @p@ is 'False', and evaluates to @y@ when @p@ is 'True'.
 --

@@ -27,6 +27,10 @@ module Data.STRef (
 import GHC.ST
 import GHC.STRef
 
+-- $setup
+-- >>> import Prelude
+-- >>> import Control.Monad.ST
+
 -- | Mutate the contents of an 'STRef'.
 --
 -- >>> :{

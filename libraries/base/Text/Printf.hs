@@ -100,6 +100,9 @@ import Numeric
 import Numeric.Natural
 import System.IO
 
+-- $setup
+-- >>> import Prelude
+
 -------------------
 
 -- | Format a variable number of arguments with the C-style formatting string.

@@ -20,6 +20,9 @@ module Data.Bifunctor
 import Control.Applicative  ( Const(..) )
 import GHC.Generics ( K1(..) )
 
+-- $setup
+-- >>> import Prelude
+
 -- | A bifunctor is a type constructor that takes
 -- two type arguments and is a functor in /both/ arguments. That
 -- is, unlike with 'Functor', a type constructor such as 'Either'

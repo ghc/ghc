@@ -26,6 +26,9 @@ import System.IO.Unsafe (unsafePerformIO)
 import GHC.Num
 import Data.IORef
 
+-- $setup
+-- >>> import Prelude
+
 -- | An abstract unique object.  Objects of type 'Unique' may be
 -- compared for equality and ordering and hashed into 'Int'.
 --

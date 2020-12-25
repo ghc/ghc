@@ -79,6 +79,9 @@ import GHC.Base ( Applicative(..), Monad(..), Monoid, Maybe(..), NonEmpty(..),
 import GHC.Generics
 import qualified GHC.List as List ( foldr )
 
+-- $setup
+-- >>> import Prelude
+
 -- | Functors representing data structures that can be traversed from
 -- left to right.
 --
