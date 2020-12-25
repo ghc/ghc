@@ -196,7 +196,6 @@ openFile' filepath iomode binary non_blocking =
         --  in the event of an error).
 
 
-
 -- ---------------------------------------------------------------------------
 -- Converting file descriptors from/to Handles
 
