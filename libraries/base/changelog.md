@@ -11,6 +11,9 @@
   * Add `Semigroup` and `Monoid` instances for `Data.Functor.Product` and
     `Data.Functor.Compose`.
 
+  * `System.IO.openFile` will no longer leak a file descriptor if it
+    is interrupted by an asynchronous exception (#19114, #19115).
+
 ## 4.15.0.0 *TBA*
 
   * `openFile` now calls the `open` system call with an `interruptible` FFI
