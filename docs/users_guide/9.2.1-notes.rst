@@ -182,6 +182,9 @@ Runtime system
 
 - ``Char`` gets type-level support by analogy with strings and natural numbers.
   We extend the ``GHC.TypeLits`` module with these built-in type-families: ::
+  
+- On POSIX, ``System.IO.openFile`` can no longer leak a file descriptor if it
+  is interrupted by an asynchronous exception (#19114, #19115).
 
     type family CmpChar (a :: Char) (b :: Char) :: Ordering
     type family ConsSymbol (a :: Char) (b :: Symbol) :: Symbol
