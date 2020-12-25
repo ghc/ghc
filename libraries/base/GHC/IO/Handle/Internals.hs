@@ -49,7 +49,7 @@ module GHC.IO.Handle.Internals (
 
   hClose_help, hLookAhead_,
 
-  HandleFinalizer, handleFinalizer,
+  HandleFinalizer, handleFinalizer, touchHandle,
 
   debugIO, traceIO
  ) where
@@ -738,6 +738,14 @@ mkDuplexHandle dev filepath mb_codec tr_newlines = do
                         (Just write_m)
 
   return (DuplexHandle filepath read_m write_m)
+
+-- | Ensure that the 'MVar' to which finalizers are attached
+-- (the write side for a duplex handle) is still alive. We use
+-- this to prevent a potential file descriptor double close in
+-- @GHC.IO.Handle.FD.openFile'@.
+touchHandle :: Handle -> IO ()
+touchHandle (FileHandle _ m) = touchMVar m
+touchHandle (DuplexHandle _ _ write_m) = touchMVar write_m
 
 ioModeToHandleType :: IOMode -> HandleType
 ioModeToHandleType ReadMode      = ReadHandle
