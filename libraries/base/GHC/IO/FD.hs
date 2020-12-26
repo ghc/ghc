@@ -169,7 +169,10 @@ writeBuf' fd buf = do
 -- | A wrapper for 'System.Posix.Internals.c_safe_open' that takes
 -- an action to perform with the file descriptor. This function
 -- guarantees that if an exception occurs in the passed action,
--- then the file will be closed.
+-- then the file will be closed. Caution: the passed action *must not*
+-- close the file descriptor. If it does so and then receives an
+-- exception, then the exception handler will attempt to close it
+-- again, which is impermissible.
 c_safe_open_with
   :: System.Posix.Internals.CFilePath  -- ^ The file to open
   -> CInt -- ^ The flags to pass to open
@@ -181,10 +184,31 @@ c_safe_open_with path oflags mode act =
     fd <- throwErrnoIfMinus1Retry "openFile" $ c_safe_open path oflags mode
     restore (act fd) `onException` c_close fd
 
+{- Note: We could write a version of c_safe_open_with (and a
+corresponding version of openFileWith) that allow the file to
+be closed without a failure. This would look like
+
+    c_safe_open_with_recover
+      :: Exception e
+      -> CFilePath
+      -> CInt
+      -> CMode
+      -> (e -> IO r)
+      -> (CInt -> IO r)
+      -> IO r
+
+  If the action threw an exception of type `e`, then we'd
+  close the file descriptor and then proceed with the
+  recovery action. I haven't implemented this because we
+  don't need it yet. -}
+
 -- | Open a file and make an 'FD' for it. Truncates the file to zero
 -- size when the `IOMode` is `WriteMode`. @openFileWith@
 -- guarantees that if an exception occurs in the passed action, then the file
--- will be closed.
+-- will be closed. Caution: the passed action *must not*
+-- close the file descriptor. If it does so and then receives an
+-- exception, then the exception handler will attempt to close it
+-- again, which is impermissible.
 openFileWith
   :: FilePath -- ^ file to open
   -> IOMode   -- ^ mode in which to open the file
@@ -222,20 +246,21 @@ openFileWith filepath iomode non_blocking act =
         -- if the target is a RegularFile.  ftruncate() fails on special files
         -- like /dev/null.
         when (iomode == WriteMode && fd_type == RegularFile) $
-            throwErrnoIf_ (/=0) "GHC.IO.FD.openFileWith" $
-              setSize fD 0
+          setSize fD 0
         act fD fd_type
 
 -- | Open a file and make an 'FD' for it.  Truncates the file to zero
 -- size when the `IOMode` is `WriteMode`. This function is difficult
 -- to use without potentially leaking the file descriptor on exception.
--- Use 'openFileWith' instead.
+-- In particular, it must be used with exceptions masked, which is a
+-- bit rude because the thread will be uninterruptible while the file
+-- path is being encoded. Use 'openFileWith' instead.
 openFile
   :: FilePath -- ^ file to open
   -> IOMode   -- ^ mode in which to open the file
   -> Bool     -- ^ open the file in non-blocking mode?
   -> IO (FD,IODeviceType)
-{-# DEPRECATED openFile "Risk of file descriptor leak" #-}
+{-# DEPRECATED openFile "Use openFileWith instead" #-}
 openFile filepath iomode non_blocking =
   openFileWith filepath iomode non_blocking $
     \ fd fd_type -> pure (fd, fd_type)
