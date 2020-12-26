@@ -206,7 +206,9 @@ withFD filepath iomode non_blocking act =
            -- if the target is a RegularFile.  ftruncate() fails on special files
            -- like /dev/null.
            when (iomode == WriteMode && fd_type == RegularFile) $
-             setSize fD 0
+               throwErrnoIf_ (/=0) "GHC.IO.FD.withFD" $
+                 c_ftruncate fd 0
+
            act fd) `onException` c_close fd
 
 -- | Open a file and make an 'FD' for it. Truncates the file to zero
