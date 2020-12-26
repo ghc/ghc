@@ -33,6 +33,10 @@
 
         infix 4 ~, ~~
 
+- Introduce `keepAlive#` to replace `touch#` in controlling object lifetime without
+  the soundness issues of the latter (see
+  [#17760](https://gitlab.haskell.org/ghc/ghc/-/issues/17760)).
+
 ## 0.6.1 (edit as necessary)
 
 - Shipped with GHC 8.10.1
