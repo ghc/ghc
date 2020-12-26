@@ -181,7 +181,7 @@ withFD filepath iomode non_blocking act =
     let
       oflags1 = case iomode of
                   ReadMode      -> read_flags
-                  WriteMode     -> truncate_flags
+                  WriteMode     -> write_flags
                   ReadWriteMode -> rw_flags
                   AppendMode    -> append_flags
 
@@ -201,7 +201,13 @@ withFD filepath iomode non_blocking act =
       -- for example.
        mask $ \restore -> do
          fd <- throwErrnoIfMinus1Retry "openFile" $ c_safe_open f oflags 0o666
-         restore (act fd) `onException` c_close fd
+         restore (do
+           -- we want to truncate() if this is an open in WriteMode, but only
+           -- if the target is a RegularFile.  ftruncate() fails on special files
+           -- like /dev/null.
+           when (iomode == WriteMode && fd_type == RegularFile) $
+             setSize fD 0
+           act fd) `onException` c_close fd
 
 -- | Open a file and make an 'FD' for it. Truncates the file to zero
 -- size when the `IOMode` is `WriteMode`. @openFileWith@
@@ -242,7 +248,6 @@ read_flags   = std_flags    .|. o_RDONLY
 write_flags  = output_flags .|. o_WRONLY
 rw_flags     = output_flags .|. o_RDWR
 append_flags = write_flags  .|. o_APPEND
-truncate_flags = write_flags .|. o_TRUNC
 nonblock_flags = o_NONBLOCK
 
 
