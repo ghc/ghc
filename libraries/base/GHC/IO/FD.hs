@@ -166,17 +166,32 @@ writeBuf' fd buf = do
 -- -----------------------------------------------------------------------------
 -- opening files
 
--- | Open a file and produce a raw file descriptor for it. Truncates the
--- the file if `WriteMode` is specified. @withFD@
+-- | A wrapper for 'System.Posix.Internals.c_safe_open' that takes
+-- an action to perform with the file descriptor. This function
+-- guarantees that if an exception occurs in the passed action,
+-- then the file will be closed.
+c_safe_open_with
+  :: System.Posix.Internals.CFilePath  -- ^ The file to open
+  -> CInt -- ^ The flags to pass to open
+  -> CMode -- ^ The permission mode to use for file creation
+  -> (CInt -> IO r) -- ^ An action to perform with the file descriptor
+  -> IO r
+c_safe_open_with path oflags mode act =
+  mask $ \restore -> do
+    fd <- throwErrnoIfMinus1Retry "openFile" $ c_safe_open path oflags mode
+    restore (act fd) `onException` c_close fd
+
+-- | Open a file and make an 'FD' for it. Truncates the file to zero
+-- size when the `IOMode` is `WriteMode`. @openFileWith@
 -- guarantees that if an exception occurs in the passed action, then the file
 -- will be closed.
-withFD
+openFileWith
   :: FilePath -- ^ file to open
   -> IOMode   -- ^ mode in which to open the file
   -> Bool     -- ^ open the file in non-blocking mode?
-  -> (CInt -> IO r) -- ^ An action to perform with the file descriptor
+  -> (FD -> IODeviceType -> IO r)
   -> IO r
-withFD filepath iomode non_blocking act =
+openFileWith filepath iomode non_blocking act =
   withFilePath filepath $ \ f ->
     let
       oflags1 = case iomode of
@@ -199,34 +214,17 @@ withFD filepath iomode non_blocking act =
       -- NB. always use a safe open(), because we don't know whether open()
       -- will be fast or not.  It can be slow on NFS and FUSE filesystems,
       -- for example.
-       mask $ \restore -> do
-         fd <- throwErrnoIfMinus1Retry "openFile" $ c_safe_open f oflags 0o666
-         restore (do
-           -- we want to truncate() if this is an open in WriteMode, but only
-           -- if the target is a RegularFile.  ftruncate() fails on special files
-           -- like /dev/null.
-           when (iomode == WriteMode && fd_type == RegularFile) $
-               throwErrnoIf_ (/=0) "GHC.IO.FD.withFD" $
-                 c_ftruncate fd 0
-
-           act fd) `onException` c_close fd
-
--- | Open a file and make an 'FD' for it. Truncates the file to zero
--- size when the `IOMode` is `WriteMode`. @openFileWith@
--- guarantees that if an exception occurs in the passed action, then the file
--- will be closed.
-openFileWith
-  :: FilePath -- ^ file to open
-  -> IOMode   -- ^ mode in which to open the file
-  -> Bool     -- ^ open the file in non-blocking mode?
-  -> (FD -> IODeviceType -> IO r)
-  -> IO r
-openFileWith filepath iomode non_blocking act =
-  withFD filepath iomode non_blocking $ \ fd -> do
-    (fD,fd_type) <- mkFD fd iomode Nothing{-no stat-}
-                            False{-not a socket-}
-                            non_blocking
-    act fD fd_type
+      c_safe_open_with f oflags 0o666 $ \ fd -> do
+        (fD,fd_type) <- mkFD fd iomode Nothing{-no stat-}
+                                False{-not a socket-}
+                                non_blocking
+        -- we want to truncate() if this is an open in WriteMode, but only
+        -- if the target is a RegularFile.  ftruncate() fails on special files
+        -- like /dev/null.
+        when (iomode == WriteMode && fd_type == RegularFile) $
+            throwErrnoIf_ (/=0) "GHC.IO.FD.openFileWith" $
+              setSize fD 0
+        act fD fd_type
 
 -- | Open a file and make an 'FD' for it.  Truncates the file to zero
 -- size when the `IOMode` is `WriteMode`. This function is difficult
