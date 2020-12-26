@@ -351,11 +351,28 @@ Haddock
     -- | This comment used to trigger a parse error
     main = putStrLn "Hello"
 
+``base`` library
+~~~~~~~~~~~~~~~~
+
+- ``Foreign.ForeignPtr.withForeignPtr`` is now less aggressively optimised,
+  avoiding the unsoundness issue reported in
+  :ghc-ticket:`17760` in exchange for a small amount of additional allocation.
+
+  If your application is impacted significantly by this change and the
+  continuation given to ``withForeignPtr`` will not *provably* diverge (via
+  throwing of an exception or looping) then the previous optimisation behavior
+  can be recovered by instead using ``GHC.ForeignPtr.unsafeWithForeignPtr``.
+
+
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 
 - Add a known-key ``cstringLength#`` to ``GHC.CString`` that is eligible
   for constant folding by a built-in rule.
+
+- A new primop, ``keepAlive#``, has been introduced to replace ``touch#`` in
+  controlling object lifetime without the soundness issues affecting the latter
+  (see :ghc-ticket:`17760`)
 
 ``ghc`` library
 ~~~~~~~~~~~~~~~
