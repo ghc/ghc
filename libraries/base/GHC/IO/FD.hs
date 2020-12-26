@@ -241,7 +241,7 @@ openFile filepath iomode non_blocking =
     \ fd fd_type -> pure (fd, fd_type)
 
 std_flags, output_flags, read_flags, write_flags, rw_flags,
-    append_flags, nonblock_flags, truncate_flags :: CInt
+    append_flags, nonblock_flags :: CInt
 std_flags    = o_NOCTTY
 output_flags = std_flags    .|. o_CREAT
 read_flags   = std_flags    .|. o_RDONLY
