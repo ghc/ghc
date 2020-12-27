@@ -743,7 +743,7 @@ mkDuplexHandle dev filepath mb_codec tr_newlines = do
 -- handle finalizers for why we only touch the read side
 -- of a duplex handle.
 touchHandle :: Handle -> IO ()
-touchHandle (FileHandle _ m) = touchMVar write_m
+touchHandle (FileHandle _ m) = touchMVar m
 touchHandle (DuplexHandle _ read_m _) = touchMVar read_m
 
 ioModeToHandleType :: IOMode -> HandleType
