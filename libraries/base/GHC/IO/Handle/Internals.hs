@@ -49,7 +49,7 @@ module GHC.IO.Handle.Internals (
 
   hClose_help, hLookAhead_,
 
-  HandleFinalizer, handleFinalizer,
+  HandleFinalizer, handleFinalizer, touchHandle,
 
   debugIO, traceIO
  ) where
@@ -738,6 +738,13 @@ mkDuplexHandle dev filepath mb_codec tr_newlines = do
                         (Just write_m)
 
   return (DuplexHandle filepath read_m write_m)
+
+-- | Ensure that a handle is still alive. See the note on
+-- handle finalizers for why we only touch the read side
+-- of a duplex handle.
+touchHandle :: Handle -> IO ()
+touchHandle (FileHandle _ m) = touchMVar m
+touchHandle (DuplexHandle _ read_m _) = touchMVar read_m
 
 ioModeToHandleType :: IOMode -> HandleType
 ioModeToHandleType ReadMode      = ReadHandle

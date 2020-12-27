@@ -181,21 +181,27 @@ openBinaryFile fp m =
 openFile' :: String -> IOMode -> Bool -> Bool -> IO Handle
 openFile' filepath iomode binary non_blocking = do
   -- first open the file to get an FD
-  (fd, fd_type) <- FD.openFile filepath iomode non_blocking
+  hndl <- FD.openFileWith filepath iomode non_blocking $ \fd fd_type -> do
 
-  mb_codec <- if binary then return Nothing else fmap Just getLocaleEncoding
+    mb_codec <- if binary then return Nothing else fmap Just getLocaleEncoding
 
-  -- then use it to make a Handle
-  mkHandleFromFD fd fd_type filepath iomode
-                   False {- do not *set* non-blocking mode -}
-                   mb_codec
-            `onException` IODevice.close fd
-        -- NB. don't forget to close the FD if mkHandleFromFD fails, otherwise
-        -- this FD leaks.
+    -- then use it to make a Handle
+    mkHandleFromFD fd fd_type filepath iomode
+                     False {- do not *set* non-blocking mode -}
+                     mb_codec
+        -- Note: openFileWith takes care of closing the FD if making the handle
+        -- fails.
+
         -- ASSERT: if we just created the file, then fdToHandle' won't fail
         -- (so we don't need to worry about removing the newly created file
         --  in the event of an error).
-
+  -- Do we actually need touchHandle? I'm not sure.
+  -- Suppose the handle is never actually used. Further suppose that, before openFileWith
+  -- returns from `onException`, the garbage collector runs (running the
+  -- finalizer and closing the file) and then an exception is received. Then
+  -- the file will be closed a second time, which is no good.
+  touchHandle hndl
+  pure hndl
 
 -- ---------------------------------------------------------------------------
 -- Converting file descriptors from/to Handles
