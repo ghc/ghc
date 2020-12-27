@@ -317,17 +317,17 @@ module GHC.Generics  (
 --
 -- |
 --
--- The instance for 'V1' is slightly awkward (but also rarely used):
+-- To deal with the 'V1' case, we use the following code (which requires the pragma @EmptyCase@):
 --
 -- @
 -- instance Encode' 'V1' where
---   encode' x = undefined
+--   encode' x = case x of { }
 -- @
 --
--- There are no values of type @V1 p@ to pass (except undefined), so this is
--- actually impossible. One can ask why it is useful to define an instance for
--- 'V1' at all in this case? Well, an empty type can be used as an argument to
--- a non-empty type, and you might still want to encode the resulting type.
+-- There are no values of type @V1 p@ to pass, so it is impossible for this
+-- function to be invoked. One can ask why it is useful to define an instance
+-- for 'V1' at all in this case? Well, an empty type can be used as an argument
+-- to a non-empty type, and you might still want to encode the resulting type.
 -- As a somewhat contrived example, consider @[Empty]@, which is not an empty
 -- type, but contains just the empty list. The 'V1' instance ensures that we
 -- can call the generic function on such types.
