@@ -36,6 +36,15 @@
   * Correct `Bounded` instance and remove `Enum` and `Integral` instances for
     `Data.Ord.Down`.
 
+  * `Foreign.ForeignPtr.withForeignPtr` is now less aggressively optimised,
+    avoiding the soundness issue reported in
+    [#17760](https://gitlab.haskell.org/ghc/ghc/-/issues/17760) in exchange for
+    a small amount more allocation. If your application regresses significantly
+    *and* the continuation given to `withForeignPtr` will *not* provably
+    diverge then the previous optimisation behavior can be recovered by instead
+    using `GHC.ForeignPtr.unsafeWithForeignPtr`.
+
+
 ## 4.14.0.0 *Jan 2020*
   * Bundled with GHC 8.10.1
 

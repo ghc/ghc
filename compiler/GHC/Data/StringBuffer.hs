@@ -64,6 +64,12 @@ import GHC.IO.Encoding.Failure  ( CodingFailureMode(IgnoreCodingFailure) )
 import GHC.Exts
 
 import Foreign
+#if MIN_VERSION_base(4,15,0)
+import GHC.ForeignPtr (unsafeWithForeignPtr)
+#else
+unsafeWithForeignPtr :: ForeignPtr a -> (Ptr a -> IO b) -> IO b
+unsafeWithForeignPtr = withForeignPtr
+#endif
 
 -- -----------------------------------------------------------------------------
 -- The StringBuffer type
@@ -103,7 +109,7 @@ hGetStringBuffer fname = do
    offset_i <- skipBOM h size_i 0  -- offset is 0 initially
    let size = fromIntegral $ size_i - offset_i
    buf <- mallocForeignPtrArray (size+3)
-   withForeignPtr buf $ \ptr -> do
+   unsafeWithForeignPtr buf $ \ptr -> do
      r <- if size == 0 then return 0 else hGetBuf h ptr size
      hClose h
      if (r /= size)
@@ -116,7 +122,7 @@ hGetStringBufferBlock handle wanted
          offset_i <- hTell handle >>= skipBOM handle size_i
          let size = min wanted (fromIntegral $ size_i-offset_i)
          buf <- mallocForeignPtrArray (size+3)
-         withForeignPtr buf $ \ptr ->
+         unsafeWithForeignPtr buf $ \ptr ->
              do r <- if size == 0 then return 0 else hGetBuf handle ptr size
                 if r /= size
                    then ioError (userError $ "short read of file: "++show(r,size,size_i,handle))
@@ -124,8 +130,8 @@ hGetStringBufferBlock handle wanted
 
 hPutStringBuffer :: Handle -> StringBuffer -> IO ()
 hPutStringBuffer hdl (StringBuffer buf len cur)
-    = do withForeignPtr (plusForeignPtr buf cur) $ \ptr ->
-             hPutBuf hdl ptr len
+    = unsafeWithForeignPtr (plusForeignPtr buf cur) $ \ptr ->
+          hPutBuf hdl ptr len
 
 -- | Skip the byte-order mark if there is one (see #1744 and #6016),
 -- and return the new position of the handle in bytes.
@@ -161,9 +167,9 @@ newUTF8StringBuffer buf ptr size = do
 appendStringBuffers :: StringBuffer -> StringBuffer -> IO StringBuffer
 appendStringBuffers sb1 sb2
     = do newBuf <- mallocForeignPtrArray (size+3)
-         withForeignPtr newBuf $ \ptr ->
-          withForeignPtr (buf sb1) $ \sb1Ptr ->
-           withForeignPtr (buf sb2) $ \sb2Ptr ->
+         unsafeWithForeignPtr newBuf $ \ptr ->
+          unsafeWithForeignPtr (buf sb1) $ \sb1Ptr ->
+           unsafeWithForeignPtr (buf sb2) $ \sb2Ptr ->
              do copyArray ptr (sb1Ptr `advancePtr` cur sb1) sb1_len
                 copyArray (ptr `advancePtr` sb1_len) (sb2Ptr `advancePtr` cur sb2) sb2_len
                 pokeArray (ptr `advancePtr` size) [0,0,0]
@@ -180,7 +186,7 @@ stringToStringBuffer str =
  unsafePerformIO $ do
   let size = utf8EncodedLength str
   buf <- mallocForeignPtrArray (size+3)
-  withForeignPtr buf $ \ptr -> do
+  unsafeWithForeignPtr buf $ \ptr -> do
     utf8EncodeString ptr str
     pokeArray (ptr `plusPtr` size :: Ptr Word8) [0,0,0]
     -- sentinels for UTF-8 decoding
@@ -198,8 +204,8 @@ stringToStringBuffer str =
 nextChar :: StringBuffer -> (Char,StringBuffer)
 nextChar (StringBuffer buf len (I# cur#)) =
   -- Getting our fingers dirty a little here, but this is performance-critical
-  inlinePerformIO $ do
-    withForeignPtr buf $ \(Ptr a#) -> do
+  inlinePerformIO $
+    unsafeWithForeignPtr buf $ \(Ptr a#) ->
         case utf8DecodeCharAddr# (a# `plusAddr#` cur#) 0# of
           (# c#, nBytes# #) ->
              let cur' = I# (cur# +# nBytes#) in
@@ -215,8 +221,8 @@ currentChar = fst . nextChar
 prevChar :: StringBuffer -> Char -> Char
 prevChar (StringBuffer _   _   0)   deflt = deflt
 prevChar (StringBuffer buf _   cur) _     =
-  inlinePerformIO $ do
-    withForeignPtr buf $ \p -> do
+  inlinePerformIO $
+    unsafeWithForeignPtr buf $ \p -> do
       p' <- utf8PrevChar (p `plusPtr` cur)
       return (fst (utf8DecodeChar p'))
 
@@ -254,7 +260,7 @@ atEnd (StringBuffer _ l c) = l == c
 atLine :: Int -> StringBuffer -> Maybe StringBuffer
 atLine line sb@(StringBuffer buf len _) =
   inlinePerformIO $
-    withForeignPtr buf $ \p -> do
+    unsafeWithForeignPtr buf $ \p -> do
       p' <- skipToLine line len p
       if p' == nullPtr
         then return Nothing
@@ -305,14 +311,14 @@ lexemeToFastString :: StringBuffer
 lexemeToFastString _ 0 = nilFS
 lexemeToFastString (StringBuffer buf _ cur) len =
    inlinePerformIO $
-     withForeignPtr buf $ \ptr ->
+     unsafeWithForeignPtr buf $ \ptr ->
        return $! mkFastStringBytes (ptr `plusPtr` cur) len
 
 -- | Return the previous @n@ characters (or fewer if we are less than @n@
 -- characters into the buffer.
 decodePrevNChars :: Int -> StringBuffer -> String
 decodePrevNChars n (StringBuffer buf _ cur) =
-    inlinePerformIO $ withForeignPtr buf $ \p0 ->
+    inlinePerformIO $ unsafeWithForeignPtr buf $ \p0 ->
       go p0 n "" (p0 `plusPtr` (cur - 1))
   where
     go :: Ptr Word8 -> Int -> String -> Ptr Word8 -> IO String

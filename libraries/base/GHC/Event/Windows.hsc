@@ -668,7 +668,7 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
                         -- the pointer.
                         debugIO $ "## Waiting for cancellation record... "
                         _ <- FFI.getOverlappedResult h lpol True
-                        oldDataPtr <- exchangePtr ptr_lpol nullReq
+                        oldDataPtr <- I.exchangePtr ptr_lpol nullReq
                         when (oldDataPtr == cdData) $
                           do reqs1 <- removeRequest
                              debugIO $ "-1.. " ++ show reqs1 ++ " requests queued after error."
