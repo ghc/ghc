@@ -183,5 +183,5 @@ addMVarFinalizer (MVar m) (IO finalizer) =
 
 -- | Ensure that an 'MVar' is still alive.
 touchMVar :: MVar a -> IO ()
-touchMVar (MVar m) = IO $ touch# m
+touchMVar (MVar m) = IO $ \s -> (# touch# m s, () #)
 
