@@ -179,7 +179,7 @@ openBinaryFile fp m =
     (\e -> ioError (addFilePathToIOError "openBinaryFile" fp e))
 
 openFile' :: String -> IOMode -> Bool -> Bool -> IO Handle
-openFile' filepath iomode binary non_blocking =
+openFile' filepath iomode binary non_blocking = do
   -- first open the file to get an FD
   hndl <- FD.openFileWith filepath iomode non_blocking $ \fd fd_type -> do
 
