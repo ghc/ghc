@@ -1030,16 +1030,7 @@ dataConSrcToImplBang dflags fam_envs arg_ty
                      -- Unwrap type families and newtypes
         arg_ty' = case mb_co of { Just (_,ty) -> scaledSet arg_ty ty; Nothing -> arg_ty }
   , isUnpackableType dflags fam_envs (scaledThing arg_ty')
-  , (rep_tys, _) <- dataConArgUnpack arg_ty'
-  , case unpk_prag of
-      NoSrcUnpack -- No explicit unpack pragma, so use heuristics
-        | Just (_:_:_) <- unpackable_type_datacons (scaledThing arg_ty')
-        -> False -- don't unpack sum types automatically, but they can be unpacked with an explicit source UNPACK.
-        | otherwise
-        -> gopt Opt_UnboxStrictFields dflags
-           || (gopt Opt_UnboxSmallStrictFields dflags
-               && rep_tys `lengthAtMost` 1)  -- See Note [Unpack one-wide fields]
-      srcUnpack -> isSrcUnpacked srcUnpack
+  , doUnpacking dflags unpk_prag arg_ty'
   = case mb_co of
       Nothing     -> HsUnpack Nothing
       Just (co,_) -> HsUnpack (Just co)
@@ -1047,6 +1038,20 @@ dataConSrcToImplBang dflags fam_envs arg_ty
   | otherwise -- Record the strict-but-no-unpack decision
   = HsStrict
 
+-- | Determine whether we ought to unpack a field based on user annotations if present and heuristics if not.
+doUnpacking :: DynFlags -> SrcUnpackedness -> Scaled Type -> Bool
+doUnpacking dflags prag arg_ty =
+  case prag of
+    SrcNoUnpack -> False -- {-# NOUNPACK #-}
+    SrcUnpack   -> True  -- {-# UNPACK #-}
+    NoSrcUnpack -- No explicit unpack pragma, so use heuristics
+      | Just (_:_:_) <- unpackable_type_datacons (scaledThing arg_ty)
+      -> False -- don't unpack sum types automatically, but they can be unpacked with an explicit source UNPACK.
+      | otherwise
+      -> gopt Opt_UnboxStrictFields dflags
+         || (gopt Opt_UnboxSmallStrictFields dflags
+             && rep_tys `lengthAtMost` 1)  -- See Note [Unpack one-wide fields]
+  where (rep_tys, _) = dataConArgUnpack arg_ty
 
 -- | Wrappers/Workers and representation following Unpack/Strictness
 -- decisions
@@ -1100,239 +1105,218 @@ unitBoxer :: Boxer
 unitBoxer = UnitBox
 
 -------------------------
-{-
-Note [UNPACK for sum types]
 
-Given a data type D, for example:
-
-    data D = D1 T1 ... Tn
+{- Note [UNPACK for sum types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have a data type D, for example:
+    data D = D1 [Int] [Bool]
            | D2
-           | ...
 
 and another data type which unpacks a field of type D:
+    data U a = MkU {-# UNPACK #-} !D
+                   {-# UNPACK #-} !(a,a)
+                   {-# UNPACK #-} !D
 
-    data U = MkU {-# UNPACK #-} !D
+Then the wrapper and worker for MkU have these types
 
-when constructing a value of type U with an expression such as:
+  -- Wrapper
+  $WMkU :: D -> (a,a) -> D -> U a
 
-    MkU x
+  -- Worker
+  MkU :: (# (# [Int],[Bool] #) | (# #) #)
+      -> a
+      -> a
+      -> (# (# [Int],[Bool] #) | (# #) #)
+      -> U a
 
-we will need to apply a function to the argument x to convert it
-to an unboxed sum.
+For each unpacked /sum/-type argument, the worker gets one argument.
+But for each unpacked /product/-type argument, the worker gets N
+arguments (here two).
 
-This 'Unboxer' function for a sum argument 'x' then looks like this:
+Why treat them differently?  See Note [Why sums and products are treated differently].
 
-    case (case x of
-            D1 x1 ... xn -> (# (# x1, ..., xn #) | ... #)
-            D2 -> (# | (# #) | ... #)
-            ...) of
-      x_ubx -> <rhs uses x_ubx>
+The wrapper $WMkU looks like this:
 
-This is different than the unboxer expressions for tuples to avoid code explosion.
-To demonstrate why we need this, suppose we have these data types
+  $WMkU :: D -> (a,a) -> D -> U a
+  $WMkU x1 y x2
+    = case (case x1 of {
+              D1 a b -> (# (# a,b #) | #)
+              D2     -> (# | (# #) #) }) of { x1_ubx ->
+      case y of { (y1, y2) ->
+      case (case x2 of {
+              D1 a b -> (# (# a,b #) | #)
+              D2     -> (# | (# #) #) }) of { x2_ubx ->
+      MkU x1_ubx y1 y2 x2_ubx
 
-    data D = D {-# UNPACK #-} !S
-               {-# UNPACK #-} !S
+Notice the nested case needed for sums.
 
-    data S = S1 Int | S2 Bool
+This different treatment for sums and product is implemented in
+dataConArgUnpackSum and dataConArgUnpackProduct respectively.
 
-If we generate code similar to code we generate for tuples, when desugaring the expression:
+Note [Why sums and products are treated differently]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Can we handle sums like products, with each wrapper argument
+occupying multiple argument slots in the worker?  No: for a sum
+type the number of argument slots varies, and that's exactly what
+unboxed sums are designed for.
 
-    D arg1 arg2
+Can we handle products like sums, with each wrapper argument occupying
+exactly one argument slot (and unboxed tuple) in the worker?  Yes,
+we could.  For example
+   data P = MkP {-# UNPACK #-} !Q
+   data Q = MkQ {-# NOUNPACK #-} !Int
+                {-# NOUNPACK #-} Int
 
-we generate this:
+Currently could unpack P thus, taking two slots in the worker
+   $WMkP :: Q -> P
+   $WMkP x = case x of { MkQ a b -> MkP a b }
+   MkP :: Int -> Int -> P  -- Worker
 
-    case arg1 of
-      S1 i1 -> case arg2 of
-                 S1 i2 -> D (# i1 | #) (# i2 | #)
-                 S2 b2 -> D (# i1 | #) (# | b2 #)
-      S2 b1 -> case arg2 of
-                 S1 i2 -> D (# | b1 #) (# i2 | #)
-                 S2 b2 -> D (# | b1 #) (# | b2 #)
+We could instead do this (uniformly with sums)
 
-This grows like a tree with
+   $WMkP1 :: Q -> P
+   $WMkP1 x = case (case x of { MkQ a b -> (# a, b #) }) of ubx_x
+              MkP1 ubx_x
+   MkP1 :: (# Int, Int #) -> P  -- Worker
 
-    height = number of unpacked sum fields
-    branching factor of a level = number of alternatives in that level
+The representation of MkP and MkP1 would be identical (a constructor
+with two fields).
 
-To avoid this, we use nested `case` expressions and generate code like this:
+BUT, with MkP (as with every data constructor) we record its argument
+strictness as a bit-vector, actually [StrictnessMark]
+   MkP strictness:  SL
+This information is used in Core to record which fields are sure to
+be evaluated.  (Look for calls to dataConRepStrictness.)  E.g. in Core
+    case v of MkP x y -> ....<here x is known to be evald>....
 
-    case (case arg1 of
-            S1 i1 -> (# i1 | #)
-            S2 b1 -> (# | b1 #)) of
-      s1 -> case (case arg2 of
-                    S1 i2 -> (# i2 | #)
-                    S2 b2 -> (# | b2 #)) of
-              s2 -> D s1 s2
--}
+Alas, with MkP1 this information is hidden by the unboxed pair,
+In Core there will be an auxiliary case expression to take apart the pair:
+    case v of MkP1 xy -> case xy of (# x,y #) -> ...
+And now we have no easy way to know that x is evaluated in the "...".
 
-{- Note [Why sums and products are treated differently by the unpacker]
-
-We could in principle handle products in dataConArgUnpack in the same way
-we handle sums, by producing a single representation type which was an
-unboxed product rather than an unboxed sum. However, the strictness
-analyser currently is able to make use of the information about the
-strictness of each of the components of a product (which are passed back
-here in the list of StrictnessMarks), whereas it is unable to consume or
-make use of information about potential strictness of the fields of sum
-constructors (which would require some new sort of representation for the
-strictness information).
-
-Presently, if we have a situation like:
-
-  data T = MkT {-# UNPACK #-} S Char
-  data S = MkS !Int Bool !Int
-
-The worker for MkT has four arguments, and the strictness information
-might be rendered as:
-
-  mkT :: Int -> Bool -> Int -> Char -> T
-  mkT :str: SLSL -> .
-
-The strictness of the arguments of mkT is essentially a bit-vector,
-represented by the type [StrictnessMark] here.
-
-When the strictness analyser is faced with a case expression on the
-unpacked representation data constructor for MkT:
-
-  case x of MkTRep a b c d -> expr
-
-it can know from the strictness marks associated with MkTRep that a is
-evaluated.
-
-If we were to change it so that there was a single representation type
-for the unpacked field, the worker would then have a type something like:
-
-  mkT :: (# Int, Bool, Int #) -> Char -> T
-  mkT :str: S(SLS)L -> .
-
-and in the new story, we would need a way with something like:
-
-  case x of MkTRep abc d ->
-    case abc of (# a, b, c #) -> expr
-
-for the strictness analyser to know that a is evaluated in expr.
-
-This would require the information about strictness of worker
-arguments (or perhaps variables in general) to become more detailed,
-such that we could drill down into the parts of the unboxed product
-to determine if they are evaluated or not. This may eventually be
-something to consider, but it's a larger project.
-
+Fixing this might be possible, but it'd be tricky.  So we avoid the
+problem entirely by treating sums and products differently here.
 -}
 
 dataConArgUnpack
    :: Scaled Type
    ->  ( [(Scaled Type, StrictnessMark)]   -- Rep types
        , (Unboxer, Boxer) )
-
-dataConArgUnpack (Scaled arg_mult arg_ty)
+dataConArgUnpack scaledTy@(Scaled _ arg_ty)
   | Just (tc, tc_args) <- splitTyConApp_maybe arg_ty
-  , Just con <- tyConSingleAlgDataCon_maybe tc
-      -- NB: check for an *algebraic* data type
-      -- A recursive newtype might mean that
-      -- 'arg_ty' is a newtype
-  , let rep_tys = map (scaleScaled arg_mult) $ dataConInstArgTys con tc_args
-  = -- unpack a product type
-    ASSERT( null (dataConExTyCoVars con) )
-      -- Note [Unpacking GADTs and existentials]
-    ( rep_tys `zip` dataConRepStrictness con
-    ,( \ arg_id ->
-       do { rep_ids <- mapM newLocal rep_tys
-          ; let r_mult = idMult arg_id
-          ; let rep_ids' = map (scaleIdBy r_mult) rep_ids
-          ; let unbox_fn body
-                  = mkSingleAltCase (Var arg_id) arg_id
-                             (DataAlt con) rep_ids' body
-          ; return (rep_ids, unbox_fn) }
-     , Boxer $ \ subst ->
-       do { rep_ids <- mapM (newLocal . TcType.substScaledTyUnchecked subst) rep_tys
-          ; return (rep_ids, Var (dataConWorkId con)
-                             `mkTyApps` (substTysUnchecked subst tc_args)
-                             `mkVarApps` rep_ids ) } ) )
-  | Just (tc, tc_args) <- splitTyConApp_maybe arg_ty
-  = -- unpack a sum type
-    let
-      cons = tyConDataCons tc
-      ubx_sum_arity = length cons
-      src_tys = map (\con -> map scaledThing $ dataConInstArgTys con tc_args) cons
-      sum_alt_tys = map mkUbxSumAltTy src_tys
-      sum_ty_unscaled = mkSumTy sum_alt_tys
-      sum_ty = Scaled arg_mult sum_ty_unscaled
-      newLocal' = newLocal . Scaled arg_mult
-
-      -- See Note [UNPACK for sum types]
-      unboxer :: Unboxer
-      unboxer arg_id = do
-        con_arg_binders <- mapM (mapM newLocal') src_tys
-        ubx_sum_bndr <- newLocal sum_ty
-
-        let
-          mk_ubx_sum_alt :: Int -> DataCon -> [Var] -> CoreAlt
-          mk_ubx_sum_alt alt con [] =
-            ( DataAlt con, [],
-              mkCoreUbxSum sum_alt_tys alt (Var (dataConWorkId (tupleDataCon Unboxed 0))) )
-
-          mk_ubx_sum_alt alt con [bndr] =
-            ( DataAlt con, [bndr], mkCoreUbxSum sum_alt_tys alt (Var bndr) )
-
-          mk_ubx_sum_alt alt con bndrs =
-            let tuple = mkCoreUbxTup (map idType bndrs) (map Var bndrs)
-             in ( DataAlt con, bndrs, mkCoreUbxSum sum_alt_tys alt tuple )
-
-          ubx_sum :: CoreExpr
-          ubx_sum =
-            let alts = zipWith3 mk_ubx_sum_alt [ 1 .. ] cons con_arg_binders
-             in Case (Var arg_id) arg_id (coreAltsType alts) alts
-
-          unbox_fn :: CoreExpr -> CoreExpr
-          unbox_fn body =
-            mkSingleAltCase ubx_sum ubx_sum_bndr DEFAULT [] body
-
-        return ([ubx_sum_bndr], unbox_fn)
-
-      boxer :: Boxer
-      boxer = Boxer $ \ subst -> do
-                unboxed_field_id <- newLocal' (TcType.substTy subst sum_ty_unscaled)
-                tuple_bndrs <- mapM (newLocal' . TcType.substTy subst) sum_alt_tys
-
-                let tc_args' = substTys subst tc_args
-                    arg_ty' = substTy subst arg_ty
-
-                con_arg_binders <-
-                  mapM (mapM newLocal' . map (TcType.substTy subst)) src_tys
-
-                let mk_sum_alt :: Int -> DataCon -> Var -> [Var] -> CoreAlt
-                    mk_sum_alt alt con tuple_bndr [] =
-                      ( DataAlt (sumDataCon alt ubx_sum_arity), [tuple_bndr],
-                        Var (dataConWorkId con) `mkTyApps` tc_args' )
-
-                    mk_sum_alt alt con _ [datacon_bndr] =
-                      ( DataAlt (sumDataCon alt ubx_sum_arity), [datacon_bndr],
-                        Var (dataConWorkId con) `mkTyApps`  tc_args'
-                                                `mkVarApps` [datacon_bndr] )
-
-                    mk_sum_alt alt con tuple_bndr datacon_bndrs =
-                      ( DataAlt (sumDataCon alt ubx_sum_arity), [tuple_bndr],
-                        Case (Var tuple_bndr) tuple_bndr arg_ty'
-                          [ ( DataAlt (tupleDataCon Unboxed (length datacon_bndrs)), datacon_bndrs,
-                              Var (dataConWorkId con) `mkTyApps`  tc_args'
-                                                      `mkVarApps` datacon_bndrs ) ] )
-
-                return ( [unboxed_field_id],
-                         Case (Var unboxed_field_id) unboxed_field_id arg_ty'
-                              (zipWith4 mk_sum_alt [ 1 .. ] cons tuple_bndrs con_arg_binders) )
-    in
-      ( [ (sum_ty, MarkedStrict) ] -- NOTE(osa): I don't completely understand
-                                   -- this part. The idea: Unpacked variant will
-                                   -- be one field only, and the type of the
-                                   -- field will be an unboxed sum. It's strict,
-                                   -- because it's a hash type.
-      , ( unboxer, boxer ) )
-
+  = case tyConSingleAlgDataCon_maybe tc of
+      Nothing -> dataConArgUnpackSum scaledTy tc tc_args
+      Just con -> dataConArgUnpackProduct scaledTy tc_args con
   | otherwise
   = pprPanic "dataConArgUnpack" (ppr arg_ty)
     -- An interface file specified Unpacked, but we couldn't unpack it
+
+dataConArgUnpackProduct
+  :: Scaled Type
+  -> [Type]
+  -> DataCon
+  -> ( [(Scaled Type, StrictnessMark)]   -- Rep types
+     , (Unboxer, Boxer) )
+dataConArgUnpackProduct (Scaled arg_mult _) tc_args con =
+  ASSERT( null (dataConExTyCoVars con) )
+    -- Note [Unpacking GADTs and existentials]
+  let rep_tys = map (scaleScaled arg_mult) $ dataConInstArgTys con tc_args
+  in ( rep_tys `zip` dataConRepStrictness con
+     , ( \ arg_id ->
+         do { rep_ids <- mapM newLocal rep_tys
+            ; let r_mult = idMult arg_id
+            ; let rep_ids' = map (scaleIdBy r_mult) rep_ids
+            ; let unbox_fn body
+                    = mkSingleAltCase (Var arg_id) arg_id
+                               (DataAlt con) rep_ids' body
+            ; return (rep_ids, unbox_fn) }
+       , Boxer $ \ subst ->
+         do { rep_ids <- mapM (newLocal . TcType.substScaledTyUnchecked subst) rep_tys
+            ; return (rep_ids, Var (dataConWorkId con)
+                               `mkTyApps` (substTysUnchecked subst tc_args)
+                               `mkVarApps` rep_ids ) } ) )
+
+dataConArgUnpackSum
+  :: Scaled Type
+  -> TyCon
+  -> [Type]
+  -> ( [(Scaled Type, StrictnessMark)]   -- Rep types
+     , (Unboxer, Boxer) )
+dataConArgUnpackSum (Scaled arg_mult arg_ty) tc tc_args =
+  ( [ (sum_ty, MarkedStrict) ] -- The idea: Unpacked variant will
+                               -- be one field only, and the type of the
+                               -- field will be an unboxed sum.
+  , ( unboxer, boxer ) )
+  where
+    cons = tyConDataCons tc
+    ubx_sum_arity = length cons
+    src_tys = map (\con -> map scaledThing $ dataConInstArgTys con tc_args) cons
+    sum_alt_tys = map mkUbxSumAltTy src_tys
+    sum_ty_unscaled = mkSumTy sum_alt_tys
+    sum_ty = Scaled arg_mult sum_ty_unscaled
+    newLocal' = newLocal . Scaled arg_mult
+
+    -- See Note [UNPACK for sum types]
+    unboxer :: Unboxer
+    unboxer arg_id = do
+      con_arg_binders <- mapM (mapM newLocal') src_tys
+      ubx_sum_bndr <- newLocal sum_ty
+
+      let
+        mk_ubx_sum_alt :: Int -> DataCon -> [Var] -> CoreAlt
+        mk_ubx_sum_alt alt con [] =
+          ( DataAlt con, [],
+            mkCoreUbxSum sum_alt_tys alt (Var (dataConWorkId (tupleDataCon Unboxed 0))) )
+
+        mk_ubx_sum_alt alt con [bndr] =
+          ( DataAlt con, [bndr], mkCoreUbxSum sum_alt_tys alt (Var bndr) )
+
+        mk_ubx_sum_alt alt con bndrs =
+          let tuple = mkCoreUbxTup (map idType bndrs) (map Var bndrs)
+           in ( DataAlt con, bndrs, mkCoreUbxSum sum_alt_tys alt tuple )
+
+        ubx_sum :: CoreExpr
+        ubx_sum =
+          let alts = zipWith3 mk_ubx_sum_alt [ 1 .. ] cons con_arg_binders
+           in Case (Var arg_id) arg_id (coreAltsType alts) alts
+
+        unbox_fn :: CoreExpr -> CoreExpr
+        unbox_fn body =
+          mkSingleAltCase ubx_sum ubx_sum_bndr DEFAULT [] body
+
+      return ([ubx_sum_bndr], unbox_fn)
+
+    boxer :: Boxer
+    boxer = Boxer $ \ subst -> do
+              unboxed_field_id <- newLocal' (TcType.substTy subst sum_ty_unscaled)
+              tuple_bndrs <- mapM (newLocal' . TcType.substTy subst) sum_alt_tys
+
+              let tc_args' = substTys subst tc_args
+                  arg_ty' = substTy subst arg_ty
+
+              con_arg_binders <-
+                mapM (mapM newLocal' . map (TcType.substTy subst)) src_tys
+
+              let mk_sum_alt :: Int -> DataCon -> Var -> [Var] -> CoreAlt
+                  mk_sum_alt alt con tuple_bndr [] =
+                    ( DataAlt (sumDataCon alt ubx_sum_arity), [tuple_bndr],
+                      Var (dataConWorkId con) `mkTyApps` tc_args' )
+
+                  mk_sum_alt alt con _ [datacon_bndr] =
+                    ( DataAlt (sumDataCon alt ubx_sum_arity), [datacon_bndr],
+                      Var (dataConWorkId con) `mkTyApps`  tc_args'
+                                              `mkVarApps` [datacon_bndr] )
+
+                  mk_sum_alt alt con tuple_bndr datacon_bndrs =
+                    ( DataAlt (sumDataCon alt ubx_sum_arity), [tuple_bndr],
+                      Case (Var tuple_bndr) tuple_bndr arg_ty'
+                        [ ( DataAlt (tupleDataCon Unboxed (length datacon_bndrs)), datacon_bndrs,
+                            Var (dataConWorkId con) `mkTyApps`  tc_args'
+                                                    `mkVarApps` datacon_bndrs ) ] )
+
+              return ( [unboxed_field_id],
+                       Case (Var unboxed_field_id) unboxed_field_id arg_ty'
+                            (zipWith4 mk_sum_alt [ 1 .. ] cons tuple_bndrs con_arg_binders) )
 
 isUnpackableType :: DynFlags -> FamInstEnvs -> Type -> Bool
 -- True if we can unpack the UNPACK the argument type
@@ -1383,18 +1367,21 @@ isUnpackableType dflags fam_envs ty
       = xopt LangExt.StrictData dflags -- Be conservative
     attempt_unpack _ = False
 
--- Works just on a single level to determine if a type looks unpackable, and obtains its list of data constructors.
+-- Given a type already assumed to have been normalized by topNormaliseType,
+-- unpackable_type_datacons ty = Just datacons
+-- iff ty is of the form
+--     T ty1 .. tyn
+-- and T is an algebraic data type (not newtype), in which no data
+-- constructors have existentials, and datacons is the list of data
+-- constructors of T.
 unpackable_type_datacons :: Type -> Maybe [DataCon]
 unpackable_type_datacons ty
   | Just (tc, _) <- splitTyConApp_maybe ty
   , let cons = tyConDataCons tc
-  , -- either a single non-newtype constructor, or more than one constructor
-    case cons of
-      []  -> False
-      [_] -> not (isNewTyCon tc)
-      _   -> True
+  , not (null cons)
   , all (null . dataConExTyCoVars) cons
-  = Just cons -- See Note [Unpacking GADTs and existentials]
+  = ASSERT(not (isNewTyCon tc))
+    Just cons -- See Note [Unpacking GADTs and existentials]
   | otherwise
   = Nothing
 
