@@ -49,7 +49,7 @@
  */
 int64_t signExtend(uint64_t val, uint8_t bits);
 /* Helper functions to check some instruction properties */
-bool isVectorPp(uint32_t *p);
+bool isVectorOp(uint32_t *p);
 bool isLoadStore(uint32_t *p);
 
 /* aarch64 relocations may contain an addend alreay in the position
@@ -272,12 +272,12 @@ signExtend(uint64_t val, uint8_t bits) {
     return (int64_t)(val << (64-bits)) >> (64-bits);
 }
 
-bool
+inline bool
 isVectorOp(uint32_t *p) {
     return (*p & 0x04800000) == 0x04800000;
 }
 
-bool
+inline bool
 isLoadStore(uint32_t *p) {
     return (*p & 0x3B000000) == 0x39000000;
 }
@@ -345,7 +345,7 @@ decodeAddend(ObjectCode * oc, Section * section, MachORelocationInfo * ri) {
 inline bool
 fitsBits(size_t bits, int64_t value) {
     if(bits == 64) return true;
-    if(bits > 64) barf("fits_bits with %d bits and an 64bit integer!", bits);
+    if(bits > 64) barf("fits_bits with %zu bits and an 64bit integer!", bits);
     return  0 == (value >> bits)   // All bits off: 0
         || -1 == (value >> bits);  // All bits on: -1
 }
