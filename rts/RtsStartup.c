@@ -383,21 +383,11 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     }
 #endif
 
-#if defined(mingw32_HOST_OS) && !defined(THREADED_RTS)
-   if (is_io_mng_native_p())
-      startupAsyncWinIO();
-    else
-      startupAsyncIO();
-#endif
+    initIOManager();
 
     x86_init_fpu();
 
     startupHpc();
-
-    // ditto.
-#if defined(THREADED_RTS)
-    ioManagerStart();
-#endif
 
     /* Record initialization times */
     stat_endInit();
@@ -455,9 +445,7 @@ hs_exit_(bool wait_foreign)
     checkFPUStack();
 #endif
 
-#if defined(THREADED_RTS)
-    ioManagerDie();
-#endif
+    stopIOManager();
 
     /* stop all running tasks. This is also where we stop concurrent non-moving
      * collection if it's running */
@@ -577,12 +565,7 @@ hs_exit_(bool wait_foreign)
     if (tf != NULL) fclose(tf);
 #endif
 
-#if defined(mingw32_HOST_OS) && !defined(THREADED_RTS)
-    if (is_io_mng_native_p())
-      shutdownAsyncWinIO(wait_foreign);
-    else
-      shutdownAsyncIO(wait_foreign);
-#endif
+    exitIOManager(wait_foreign);
 
     /* Restore the console Codepage.  */
 #if defined(mingw32_HOST_OS)
