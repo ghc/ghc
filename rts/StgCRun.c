@@ -899,7 +899,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 
         ".globl " STG_RETURN "\n\t"
         THUMB_FUNC
-#if !defined(ios_HOST_OS)
+#if !(defined(ios_HOST_OS) || defined(darwin_HOST_OS))
         ".type " STG_RETURN ", %%function\n"
 #endif
         STG_RETURN ":\n\t"
@@ -982,7 +982,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
         "br %1\n\t"
 
         ".globl " STG_RETURN "\n\t"
-#if !defined(ios_HOST_OS)
+#if !(defined(ios_HOST_OS) || defined(darwin_HOST_OS))
         ".type " STG_RETURN ", %%function\n"
 #endif
         STG_RETURN ":\n\t"
