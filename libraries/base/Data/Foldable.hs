@@ -1309,8 +1309,8 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 -- not to use lists).
 --
 -- The more general methods of the @Foldable@ class are now exported by the
--- "Prelude" in place of the original List-specific methods (see
--- [FTP](https://wiki.haskell.org/Foldable_Traversable_In_Prelude)).
+-- "Prelude" in place of the original List-specific methods (see the
+-- [FTP Proposal](https://wiki.haskell.org/Foldable_Traversable_In_Prelude)).
 -- The List-specific variants are for now still available in "GHC.OldList", but
 -- that module is intended only as a transitional aid, and may be removed in
 -- the future.
@@ -1340,6 +1340,15 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 
 --------------
 
+-- In order to avoid having actual Unicode glyphs in the module source, some
+-- HTML entities are used for Greek letters and ellipsis below.  These are:
+--
+-- * alpha = &#x03b1;
+-- * beta  = &#x03b2;
+-- * tau   = &#x03c4;
+-- * ellipsis = &#x2026;
+
+
 -- $leftright
 -- #leftright#
 --
@@ -1353,9 +1362,9 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 -- `foldr`  :: Foldable &#x03c4; => (&#x03b1; -> &#x03b2; -> &#x03b2;) -> &#x03b2; -> &#x03c4; &#x03b1; -> &#x03b2;
 -- @
 --
--- The second argument of both is an initial accumulator value @z@ of some type
--- @&#x03b2;@, and the third is a @Foldable@ structure with elements
--- @(a, b, c, &#x2026;)@ of some type @&#x03b1;@.
+-- The second argument of both is an initial accumulator value @z@ of type
+-- @&#x03b2;@, and the third is a @Foldable@ structure containing elements
+-- @(a, b, c, &#x2026;)@ of type @&#x03b1;@.
 --
 -- * __`foldl'`__ takes an update function of the form:
 --
@@ -1369,13 +1378,13 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 --
 --     @
 --     g y . &#x2026; . g c . g b . g a $ z
---       where g e !acc = f acc e
+--       where g element !acc = f acc element
 --     @
 --
---     (just @z@ if the structure is empty).  This is a [strict](#strict)
---     reduction with no opportunity for early return or intermediate results.
---     The structure must be finite, since no result is returned until the last
---     element is processed.
+--     If the initial structure is empty, then the result is the value of @z@.
+--     This is a [strict](#strict) reduction with no opportunity for early
+--     return or intermediate results.  The structure must be finite, since no
+--     result is returned until the last element is processed.
 --
 -- * __`foldr`__ takes an update function of the form:
 --
@@ -1391,11 +1400,12 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 --     f a . f b . f c . &#x2026; $ z
 --     @
 --
---     (just @z@ for empty structures). If each @(f e)@ returns a structure in
---     which its second argument is captured in a lazily-evaluated component,
---     then the fold of the remaining elements is available to the caller of
---     `foldr` as a pending computation (thunk) that is computed only when that
---     component is evaluated.
+--     If the initial structure is empty, then the result is the value of @z@.
+--     If each call of @f@ on the current element @e@, (referenced as @(f e)@
+--     below) returns a structure in which its second argument is captured in a
+--     lazily-evaluated component, then the fold of the remaining elements is
+--     available to the caller of `foldr` as a pending computation (thunk) that
+--     is computed only when that component is evaluated.
 --
 --     Alternatively, if any of the @(f e)@ ignore their second argument, the
 --     fold stops there, with the remaining elements unused.  As a result,
