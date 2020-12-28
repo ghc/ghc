@@ -16,7 +16,6 @@
 module Data.Bitraversable
   ( Bitraversable(..)
   , bisequenceA
-  , bisequence
   , bimapM
   , bifor
   , biforM
