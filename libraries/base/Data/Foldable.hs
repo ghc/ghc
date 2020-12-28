@@ -54,9 +54,6 @@ module Data.Foldable (
     -- * Overview
     -- $overview
 
-    -- ** Left and right folds
-    -- $leftright
-
     -- ** Recursive and corecursive reduction
     -- $reduction
 
@@ -93,6 +90,9 @@ module Data.Foldable (
     -- * Laws
     -- $laws
 
+    -- * Notes
+    -- $notes
+
     -- * See also
     -- $also
     ) where
@@ -117,7 +117,11 @@ import GHC.Num  ( Num(..) )
 
 infix  4 `elem`, `notElem`
 
--- | Data structures that can be folded.
+-- | The @Foldable@ class represents data structures that can be reduced to a
+-- summary value one element at a time.  Strict left-associative folds are a
+-- good fit for space-efficient reduction, while lazy right-associative folds
+-- are good fit for corecursive iteration or for folds that short-circuit after
+-- processing an initial subsequence of the structure's elements.
 --
 class Foldable t where
     {-# MINIMAL foldMap | foldr #-}
@@ -1293,69 +1297,71 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 
 --------------
 
+-- In order to avoid having actual Unicode glyphs in the module source, some
+-- HTML entities are used for Greek letters and ellipsis below.  These are:
+--
+-- * alpha = &#x03b1;
+-- * beta  = &#x03b2;
+-- * tau   = &#x03c4;
+-- * ellipsis = &#x2026;
+
 -- $overview
 --
 -- #overview#
 -- The @Foldable@ class represents structures that can be reduced to a summary
--- value one element at a time.  The absence of a 'Functor' superclass allows
--- @Foldable@ structures to impose constraints on their element types.  Thus,
--- Sets are @Foldable@, even though @Set@ imposes an 'Ord' constraint on its
--- elements (this precludes defining a @Functor@ instance for @Set@).
+-- value one element at a time.
 --
--- The @Foldable@ class makes it possible to use idioms familiar from the List
--- type with container structures that are better suited to the task at hand.
--- This allows a user to substitute more appropriate @Foldable@ data types
--- for Lists without requiring new idioms (see [[1\]](#uselistsnot) for when
--- not to use lists).
+-- == Left and right folds
 --
--- The more general methods of the @Foldable@ class are now exported by the
--- "Prelude" in place of the original List-specific methods (see
--- [FTP](https://wiki.haskell.org/Foldable_Traversable_In_Prelude)).
--- The List-specific variants are for now still available in "GHC.OldList", but
--- that module is intended only as a transitional aid, and may be removed in
--- the future.
---
--- This change is not entirely without controversy (see [[2\]](#wats)).  In
--- particular, surprises can arise from the @Foldable@ instance of the 2-tuple
--- @(a,)@ which now behaves as a 1-element @Foldable@ container in its second
--- slot.  In contexts where a specific monomorphic type is expected, and you
--- want to be able to rely on type errors to guide refactoring, it may make
--- sense to define and use less-polymorphic variants of some of the @Foldable@
--- methods.
---
--- Below are two examples showing a definition of a reusable less-polymorphic
--- 'sum' and a one-off in-line specialisation of 'length':
---
--- > {-# LANGUAGE TypeApplications #-}
--- >
--- > mySum :: Num a => [a] -> a
--- > mySum = sum
--- >
--- > myFieldLength :: MyRecord -> Int
--- > myFieldLength myrec = length @[] $ someField myrec
---
--- In both cases, if the data type to which the function is applied changes
--- to something other than a list, the call-site will no longer compile until
--- appropriate changes are made.
-
---------------
-
--- $leftright
 -- #leftright#
+-- Merging the contribution of the current element with an accumulator value
+-- from a partial result is performed by an /update function/, either
+-- explicitly provided by the caller as in `foldr`, implicit as in `length`, or
+-- partly implicit as in `foldMap` (where each element is mapped into a monoid,
+-- and the Monoid's `mappend` performs the merge).
 --
--- Two key methods of @Foldable@ are the strict `foldl'` and the lazy `foldr`:
--- The first argument of both is a function that updates the result of the fold
--- given an element of the structure and a partial fold of, respectively, either
--- the preceding or following elements of the structure.
+-- A key distinction is between left-associative and right-associative
+-- folds:
+--
+-- * In left-associative folds the accumulator is a partial fold over the
+--   elements that __precede__ the current element, and is passed to the update
+--   function as its first (left) argument.  The outer-most application of the
+--   update function merges the contribution of the last element of the
+--   structure with the contributions of all its predecessors.
+--
+-- * In right-associative folds the accumulator is a partial fold over the
+--   elements that __follow__ the current element, and is passed to the update
+--   function as its second (right) argument.  The outer-most application of
+--   the update function merges the contribution of the first element of the
+--   structure with the contributions of all its successors.
+--
+-- These two types of folds are typified by the left-associative strict
+-- `foldl'` and the right-associative lazy `foldr`.
 --
 -- @
 -- `foldl'` :: Foldable &#x03c4; => (&#x03b2; -> &#x03b1; -> &#x03b2;) -> &#x03b2; -> &#x03c4; &#x03b1; -> &#x03b2;
 -- `foldr`  :: Foldable &#x03c4; => (&#x03b1; -> &#x03b2; -> &#x03b2;) -> &#x03b2; -> &#x03c4; &#x03b1; -> &#x03b2;
 -- @
 --
--- The second argument of both is an initial accumulator value @z@ of some type
--- @&#x03b2;@, and the third is a @Foldable@ structure with elements
--- @(a, b, c, &#x2026;)@ of some type @&#x03b1;@.
+-- Example usage:
+--
+-- >>> foldl' (+) 0 [1..100]
+-- 5050
+-- >>> foldr (&&) True (repeat False)
+-- False
+--
+-- The first argument of both is an explicit /update function/ that merges the
+-- contribution of an element of the structure with a partial fold over,
+-- respectively, either the preceding or following elements of the structure.
+--
+-- The second argument of both is an initial accumulator value @z@ of type
+-- @&#x03b2;@.  This is the result of the fold when the structure is empty.
+-- When the structure is non-empty, this is the accumulator value merged with
+-- the first element in left-associative folds, or with the last element in
+-- right associative folds.
+--
+-- The third and final argument is a @Foldable@ structure containing elements
+-- @(a, b, c, &#x2026;)@ of type @&#x03b1;@.
 --
 -- * __`foldl'`__ takes an update function of the form:
 --
@@ -1369,13 +1375,15 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 --
 --     @
 --     g y . &#x2026; . g c . g b . g a $ z
---       where g e !acc = f acc e
+--       where g element !acc = f acc element
 --     @
 --
---     (just @z@ if the structure is empty).  This is a [strict](#strict)
---     reduction with no opportunity for early return or intermediate results.
---     The structure must be finite, since no result is returned until the last
---     element is processed.
+--     Since `foldl'` is strict in the accumulator, this is always a
+--     [strict](#strict) reduction with no opportunity for early return or
+--     intermediate results.  The structure must be finite, since no result is
+--     returned until the last element is processed.  The advantage of
+--     strictness is space efficiency: the final result can be computed without
+--     storing a potentially deep stack of lazy intermediate results.
 --
 -- * __`foldr`__ takes an update function of the form:
 --
@@ -1391,11 +1399,11 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 --     f a . f b . f c . &#x2026; $ z
 --     @
 --
---     (just @z@ for empty structures). If each @(f e)@ returns a structure in
---     which its second argument is captured in a lazily-evaluated component,
---     then the fold of the remaining elements is available to the caller of
---     `foldr` as a pending computation (thunk) that is computed only when that
---     component is evaluated.
+--     If each call of @f@ on the current element @e@, (referenced as @(f e)@
+--     below) returns a structure in which its second argument is captured in a
+--     lazily-evaluated component, then the fold of the remaining elements is
+--     available to the caller of `foldr` as a pending computation (thunk) that
+--     is computed only when that component is evaluated.
 --
 --     Alternatively, if any of the @(f e)@ ignore their second argument, the
 --     fold stops there, with the remaining elements unused.  As a result,
@@ -1407,12 +1415,19 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 --     called with a strict update function, evaluation cannot begin until the
 --     last element is reached, by which point a deep stack of pending function
 --     applications may have been built up in memory.
+--
+-- In finite structures for which right-to-left sequencing no less efficient as
+-- left-to-right sequencing, there is no inherent performance distinction
+-- between left-associative and right-associative folds.  If the structure's
+-- @Foldable@ instance takes advantage of this symmetry to also make strict
+-- right folds space-efficient and lazy left folds corecursive, one need only
+-- take care to choose either a strict or lazy method for the task at hand.
 
 --------------
 
 -- $reduction
 --
--- As observed in the above [description](#leftright) of left and right folds,
+-- As observed in the [above description](#leftright) of left and right folds,
 -- there are three general ways in which a structure can be reduced to a
 -- summary value:
 --
@@ -1879,6 +1894,51 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 
 --------------
 
+-- $notes
+--
+-- #notes#
+-- The absence of a 'Functor' superclass allows
+-- @Foldable@ structures to impose constraints on their element types.  Thus,
+-- Sets are @Foldable@, even though @Set@ imposes an 'Ord' constraint on its
+-- elements (this precludes defining a @Functor@ instance for @Set@).
+--
+-- The @Foldable@ class makes it possible to use idioms familiar from the List
+-- type with container structures that are better suited to the task at hand.
+-- This allows a user to substitute more appropriate @Foldable@ data types
+-- for Lists without requiring new idioms (see [[1\]](#uselistsnot) for when
+-- not to use lists).
+--
+-- The more general methods of the @Foldable@ class are now exported by the
+-- "Prelude" in place of the original List-specific methods (see the
+-- [FTP Proposal](https://wiki.haskell.org/Foldable_Traversable_In_Prelude)).
+-- The List-specific variants are for now still available in "GHC.OldList", but
+-- that module is intended only as a transitional aid, and may be removed in
+-- the future.
+--
+-- Surprises can arise from the @Foldable@ instance of the 2-tuple @(a,)@ which
+-- now behaves as a 1-element @Foldable@ container in its second slot.  In
+-- contexts where a specific monomorphic type is expected, and you want to be
+-- able to rely on type errors to guide refactoring, it may make sense to
+-- define and use less-polymorphic variants of some of the @Foldable@ methods.
+--
+-- Below are two examples showing a definition of a reusable less-polymorphic
+-- 'sum' and a one-off in-line specialisation of 'length':
+--
+-- > {-# LANGUAGE TypeApplications #-}
+-- >
+-- > mySum :: Num a => [a] -> a
+-- > mySum = sum
+-- >
+-- > type SlowVector a = [a]
+-- > slowLength :: SlowVector -> Int
+-- > slowLength v = length @[] v
+--
+-- In both cases, if the data type to which the function is applied changes
+-- to something other than a list, the call-site will no longer compile until
+-- appropriate changes are made.
+
+--------------
+
 -- $also
 --
 --  * [1] #uselistsnot# \"When You Should Use Lists in Haskell (Mostly, You Should Not)\",
@@ -1886,12 +1946,7 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 --    in arxiv.org, Programming Languages (cs.PL), at
 --    <https://arxiv.org/abs/1808.08329>.
 --
---  * #wats# [2] \"Haskell Foldable Wats\"
---    by Henning Thielemann,
---    Haskell libraries mailing list, 2016, at
---    <https://mail.haskell.org/pipermail/libraries/2016-February/026678.html>.
---
---  * [3] \"The Essence of the Iterator Pattern\",
+--  * [2] \"The Essence of the Iterator Pattern\",
 --    by Jeremy Gibbons and Bruno Oliveira,
 --    in /Mathematically-Structured Functional Programming/, 2006, online at
 --    <http://www.cs.ox.ac.uk/people/jeremy.gibbons/publications/#iterator>.
