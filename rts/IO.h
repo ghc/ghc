@@ -31,5 +31,27 @@ RTS_PRIVATE void initIOManager(void);
 RTS_PRIVATE void stopIOManager(void);
 RTS_PRIVATE void exitIOManager(bool wait_threads);
 
+/* The per-capability data structures belonging to the I/O manager.
+ *
+ * It can be accessed as cap->iomgr.
+ *
+ * The content of the structure is defined conditionally so it is different for
+ * each I/O manager implementation.
+ */
+typedef struct {
+
+#if defined(THREADED_RTS)
+#if !defined(mingw32_HOST_OS)
+    /* Control FD for the MIO manager for this capability */
+    int control_fd;
+#endif
+#endif
+
+} CapIOManager;
+
+/* Per-capability init hook: called from initCapability().
+ */
+RTS_PRIVATE void initCapabilityIOManager(CapIOManager *iomgr);
+
 #include "EndPrivate.h"
 

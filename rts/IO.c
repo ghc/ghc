@@ -79,6 +79,12 @@ stopIOManager(void)
 #define USED_IF_NOT_THREADS_AND_MINGW32 STG_UNUSED
 #endif
 
+#if defined(THREADED_RTS) && !defined(mingw32_HOST_OS)
+#define USED_IF_THREADS_AND_NOT_MINGW32
+#else
+#define USED_IF_THREADS_AND_NOT_MINGW32 STG_UNUSED
+#endif
+
 /* Called in the RTS shutdown after the scheduler exits
  */
 void
@@ -91,6 +97,15 @@ exitIOManager(bool wait_threads USED_IF_NOT_THREADS_AND_MINGW32)
     } else {
         shutdownAsyncIO(wait_threads);
     }
+#endif
+
+}
+
+void initCapabilityIOManager(CapIOManager *iomgr USED_IF_THREADS_AND_NOT_MINGW32)
+{
+
+#if defined(THREADED_RTS) && !defined(mingw32_HOST_OS)
+    iomgr->control_fd = -1;
 #endif
 
 }

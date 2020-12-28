@@ -280,11 +280,10 @@ initCapability (Capability *cap, uint32_t i)
     cap->spark_stats.converted  = 0;
     cap->spark_stats.gcd        = 0;
     cap->spark_stats.fizzled    = 0;
-#if !defined(mingw32_HOST_OS)
-    cap->io_manager_control_wr_fd = -1;
-#endif
 #endif
     cap->total_allocated        = 0;
+
+    initCapabilityIOManager(&cap->iomgr);
 
     cap->f.stgEagerBlackholeInfo = (W_)&__stg_EAGER_BLACKHOLE_info;
     cap->f.stgGCEnter1     = (StgFunPtr)__stg_gc_enter_1;
@@ -1368,7 +1367,7 @@ void
 setIOManagerControlFd(uint32_t cap_no USED_IF_THREADS, int fd USED_IF_THREADS) {
 #if defined(THREADED_RTS)
     if (cap_no < n_capabilities) {
-        RELAXED_STORE(&capabilities[cap_no]->io_manager_control_wr_fd, fd);
+        RELAXED_STORE(&capabilities[cap_no]->iomgr.control_fd, fd);
     } else {
         errorBelch("warning: setIOManagerControlFd called with illegal capability number.");
     }
