@@ -32,3 +32,15 @@ test('UnusedPackages', normal, multimod_compile,
     ['UnusedPackages.hs', '-package=bytestring -package=base -package=process -package=ghc -Wunused-packages'])
 
 test('T18402', normal, compile, [''])
+
+test('DeferIncompleteGuards', normal, compile, [''])
+test('DeferIncompletePatterns', normal, compile, [''])
+test('DeferIncompleteRecordUpdates', normal, compile, [''])
+test('DeferIncompleteUniPatterns', normal, compile, [''])
+test('DeferMissingFields', normal, compile, [''])
+test('DeferMissingMethods', normal, compile, [''])
+test('DeferPartialFields', normal, compile, [''])
+test('Incomplete', normal, compile, [''])
+test('NoIncomplete', normal, compile, [''])
+
+

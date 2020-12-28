@@ -70,6 +70,7 @@ import GHC.Data.Bag
 import GHC.Data.IOEnv (updEnv, unsafeInterleaveM)
 import GHC.Data.OrdList
 import GHC.Utils.Monad (mapMaybeM)
+import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad (when, forM_)
 import qualified Data.Semigroup as Semi
@@ -362,13 +363,15 @@ reportWarnings dflags ctx@(DsMatchContext kind loc) vars
         putSrcSpanDs l (warnDs (Reason Opt_WarnOverlappingPatterns)
                                (pprEqn q "has inaccessible right hand side"))
 
-      when exists_u $ putSrcSpanDs loc $ warnDs flag_u_reason $
-        pprEqns vars unc_examples
+      when exists_u $ putSrcSpanDs loc $ case xopt LangExt.Incomplete dflags of
+        False -> errDs $ pprEqns vars unc_examples
+        True -> warnDs flag_u_reason $
+          pprEqns vars unc_examples
   where
     flag_i = overlapping dflags kind
     flag_u = exhaustive dflags kind
     flag_b = redundantBang dflags
-    flag_u_reason = maybe NoReason Reason (exhaustiveWarningFlag kind)
+    flag_u_reason = maybe NoReason Reason (fst <$> exhaustiveWarningFlag kind)
 
     maxPatterns = maxUncoveredPatterns dflags
 

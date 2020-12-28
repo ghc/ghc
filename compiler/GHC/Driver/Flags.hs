@@ -354,6 +354,13 @@ data GeneralFlag
 
    | Opt_G_NoStateHack
    | Opt_G_NoOptCoercion
+
+   | Opt_DeferIncompletePatterns
+   | Opt_DeferIncompleteUniPatterns
+   | Opt_DeferIncompleteRecordUpdates
+   | Opt_DeferMissingFields
+   | Opt_DeferMissingMethods
+
    deriving (Eq, Show, Enum)
 
 -- Check whether a flag should be considered an "optimisation flag"
