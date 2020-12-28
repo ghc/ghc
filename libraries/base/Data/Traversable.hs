@@ -82,8 +82,17 @@ import qualified GHC.List as List ( foldr )
 -- $setup
 -- >>> import Prelude
 
+-- XXX: Missing haddock feature.  Links to anchors in other modules
+-- don't have a sensible way to name the link within the module itself.
+-- Thus, the below "Data.Traversable#overview" works well when shown as
+-- @Data.Traversable@ from other modules, but in the home module it should
+-- be possible to specify alternative link text. :-(
+
 -- | Functors representing data structures that can be traversed from
--- left to right.
+-- left to right, performing an action on each element.
+--
+-- A more detailed description can be found in the overview section of
+-- "Data.Traversable#overview".
 --
 class (Functor t, Foldable t) => Traversable t where
     {-# MINIMAL traverse | sequenceA #-}
@@ -461,7 +470,9 @@ foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
 ------------------
 
 -- $overview
--- @Traversable@ functors can be thought of as polymorphic containers that
+--
+-- #overview#
+-- Traversable functors can be thought of as polymorphic containers that
 -- support mapping of applicative (or monadic) effects over the container
 -- (element-wise) to create a new container of __the same shape__, with the
 -- effects sequenced in a natural order for the container type in question.
@@ -549,6 +560,8 @@ foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
 ------------------
 
 -- $validation
+--
+-- #validation#
 -- A hypothetical application of the above is to validate a structure:
 --
 -- >>> validate :: Int -> Either (String, Int) Int
@@ -581,9 +594,9 @@ foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
 -- The @Foldable@ instance should be defined in a manner that avoids
 -- construction of an unnecesary copy of the container.
 --
--- Perhaps the most widely used @Foldable@ methods are 'mapM_' and its flipped
--- version 'forM_'.  Often, to sequence IO actions (that return no useful
--- results) over all the elements of a @Traversable@ container.  One special
+-- The @Foldable@ method 'mapM_' and its flipped version 'forM_' can be used
+-- to sequence IO actions over all the elements of a @Traversable@ container
+-- (just for their side-effects, ignoring any results) .  One special
 -- case is a 'Maybe' container that optionally holds a value. Given:
 --
 -- > action :: a -> IO ()
@@ -838,7 +851,7 @@ foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
 --  * [1] \"The Essence of the Iterator Pattern\",
 --    by Jeremy Gibbons and Bruno Oliveira,
 --    in /Mathematically-Structured Functional Programming/, 2006, online at
---    <http://web.comlab.ox.ac.uk/oucl/work/jeremy.gibbons/publications/#iterator>.
+--    <http://www.cs.ox.ac.uk/people/jeremy.gibbons/publications/#iterator>.
 --
 --  * \"Applicative Programming with Effects\",
 --    by Conor McBride and Ross Paterson,
