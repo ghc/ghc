@@ -695,6 +695,13 @@ INFO_TABLE( stg_COMPACT_NFDATA_DIRTY, 0, 9, COMPACT_NFDATA, "COMPACT_NFDATA", "C
 { foreign "C" barf("COMPACT_NFDATA_DIRTY object (%p) entered!", R1) never returns; }
 
 /* ----------------------------------------------------------------------------
+   I/O manager data structures
+   ------------------------------------------------------------------------- */
+
+INFO_TABLE_CONSTR(stg_TIMEOUT_QUEUE,2,1,0,MUT_PRIM,"TIMEOUT_QUEUE","TIMEOUT_QUEUE")
+{ foreign "C" barf("TIMEOUT_QUEUE object (%p) entered!", R1) never returns; }
+
+/* ----------------------------------------------------------------------------
    Note [CHARLIKE and INTLIKE closures.]
 
    These are static representations of Chars and small Ints, so that

@@ -721,7 +721,6 @@ removeFromQueues(Capability *cap, StgTSO *tso)
       goto done;
 
   case BlockedOnDelay:
-        removeThreadFromQueue(cap, &cap->iomgr->sleeping_queue, tso);
         goto done;
 #endif
 
