@@ -161,7 +161,6 @@ static char *thread_stop_reasons[] = {
     [6 + BlockedOnBlackHole]    = "blocked on a black hole",
     [6 + BlockedOnRead]         = "blocked on a read operation",
     [6 + BlockedOnWrite]        = "blocked on a write operation",
-    [6 + BlockedOnDelay]        = "blocked on a delay operation",
     [6 + BlockedOnSTM]          = "blocked on STM",
     [6 + BlockedOnDoProc]       = "blocked on asyncDoProc",
     [6 + BlockedOnCCall]        = "blocked on a foreign call",

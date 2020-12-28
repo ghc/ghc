@@ -462,7 +462,6 @@ check_target:
 #if !defined(THREADED_RTS)
     case BlockedOnRead:
     case BlockedOnWrite:
-    case BlockedOnDelay:
 #if defined(mingw32_HOST_OS)
     case BlockedOnDoProc:
 #endif
@@ -719,9 +718,6 @@ removeFromQueues(Capability *cap, StgTSO *tso)
       abandonWorkRequest(tso->block_info.async_result->reqID);
 #endif
       goto done;
-
-  case BlockedOnDelay:
-        goto done;
 #endif
 
   default:
