@@ -505,7 +505,7 @@ data WarningFlag =
    | Opt_WarnInvalidHaddock               -- Since 8.12
    | Opt_WarnOperatorWhitespaceExtConflict  -- Since 9.2
    | Opt_WarnOperatorWhitespace             -- Since 9.2
-   deriving (Eq, Show, Enum)
+   deriving (Eq, Ord, Show, Enum)
 
 -- | Used when outputting warnings: if a reason is given, it is
 -- displayed. If a warning isn't controlled by a flag, this is made

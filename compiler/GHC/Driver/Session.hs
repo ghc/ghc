@@ -53,6 +53,7 @@ module GHC.Driver.Session (
         Option(..), showOpt,
         DynLibLoader(..),
         fFlags, fLangFlags, xFlags,
+        flagSpecOf,
         wWarningFlags,
         dynFlagDependencies,
         makeDynFlagsConsistent,
@@ -279,7 +280,7 @@ import Control.Monad.Trans.Except
 import Data.Ord
 import Data.Char
 import Data.List
-import Data.Map (Map)
+import Data.Map (Map, (!?))
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -3173,9 +3174,10 @@ nop _ = return ()
 
 -- | Find the 'FlagSpec' for a 'WarningFlag'.
 flagSpecOf :: WarningFlag -> Maybe (FlagSpec WarningFlag)
-flagSpecOf flag = listToMaybe $ filter check wWarningFlags
-  where
-    check fs = flagSpecFlag fs == flag
+flagSpecOf flag = wWarningFlagMap !? flag
+
+wWarningFlagMap :: Map WarningFlag (FlagSpec WarningFlag)
+wWarningFlagMap = Map.fromList $ map (flagSpecFlag &&& id) wWarningFlags
 
 -- | These @-W\<blah\>@ flags can all be reversed with @-Wno-\<blah\>@
 wWarningFlags :: [FlagSpec WarningFlag]
