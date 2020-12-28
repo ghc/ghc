@@ -21,6 +21,16 @@
 
 #include "BeginPrivate.h"
 
+/* Init hook: called from hs_init_ghc.
+ */
+void initIOManager(void);
+
+
+/* Shutdown hooks: called from hs_exit_ before and after the scheduler exits.
+ */
+void stopIOManager(void);
+void exitIOManager(bool wait_threads);
+
 /*
  * Communicating with the IO manager thread (see GHC.Conc).
  * Posix implementation in posix/Signals.c
@@ -32,6 +42,14 @@ void ioManagerWakeup (void);
 #if defined(THREADED_RTS) || defined(mingw32_HOST_OS)
 void ioManagerDie (void);
 void ioManagerStart (void);
+#endif
+
+/* Pedantic warning cleanliness
+ */
+#if !defined(THREADED_RTS) && defined(mingw32_HOST_OS)
+#define USED_IF_NOT_THREADS_AND_MINGW32
+#else
+#define USED_IF_NOT_THREADS_AND_MINGW32 STG_UNUSED
 #endif
 
 #include "EndPrivate.h"
