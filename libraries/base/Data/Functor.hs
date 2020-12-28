@@ -25,7 +25,7 @@
 --  Nothing                 --  (Int -> String) -> Maybe Int -> Maybe String
 --
 --  >>> fmap show [1,2,3]   --  (a   -> b)      -> f a       -> f b
---  ["1", "2", "3"]         --  (Int -> String) -> [Int]     -> [String]
+--  ["1","2","3"]           --  (Int -> String) -> [Int]     -> [String]
 --
 --  >>> fmap show []        --  (a   -> b)      -> f a       -> f b
 --  []                      --  (Int -> String) -> [Int]     -> [String]
