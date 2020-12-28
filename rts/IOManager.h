@@ -21,7 +21,38 @@
 
 #include "BeginPrivate.h"
 
-/* Init hook: called from hs_init_ghc.
+/* The per-capability data structures belonging to the I/O manager.
+ *
+ * It can be accessed as cap->iomgr.
+ *
+ * The content of the structure is defined conditionally so it is different for
+ * each I/O manager implementation.
+ *
+ * TODO: once the content of this struct is genuinely private, and not shared
+ * with other parts of the RTS, then it can be made opaque, so the content is
+ * known only to the I/O manager and not the rest of the RTS.
+ */
+typedef struct {
+
+#if defined(THREADED_RTS)
+#if !defined(mingw32_HOST_OS)
+    /* Control FD for the MIO manager for this capability */
+    int control_fd;
+#endif
+#endif
+
+} CapIOManager;
+
+
+/* Allocate and initialise the per-capability CapIOManager that lives in each
+ * Capability. It is called from initCapability, via initScheduler,
+ * via hs_init_ghc.
+ */
+void initCapabilityIOManager(CapIOManager **iomgr);
+
+
+/* Init hook: called from hs_init_ghc, very late in the startup after almost
+ * everything else is done.
  */
 void initIOManager(void);
 
