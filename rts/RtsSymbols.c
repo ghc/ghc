@@ -625,6 +625,7 @@
       SymI_HasProto(stg_decodeDoublezuInt64zh)                          \
       SymI_HasProto(stg_decodeFloatzuIntzh)                             \
       SymI_HasProto(stg_delayzh)                                        \
+      SymI_HasProto(stg_registerDelayzh)                                \
       SymI_HasProto(stg_deRefWeakzh)                                    \
       SymI_HasProto(stg_deRefStablePtrzh)                               \
       SymI_HasProto(dirty_MUT_VAR)                                      \

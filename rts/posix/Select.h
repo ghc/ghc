@@ -11,4 +11,4 @@
 // An absolute time value in units of 10ms.
 typedef StgWord LowResTime;
 
-RTS_PRIVATE LowResTime getDelayTarget (HsInt us);
+RTS_PRIVATE void registerDelay(Capability *cap, StgMVar *mvar, HsInt usecs);

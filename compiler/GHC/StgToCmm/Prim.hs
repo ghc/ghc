@@ -1507,6 +1507,7 @@ emitPrimOp dflags primop = case primop of
   ReadIOPortOp -> alwaysExternal
   WriteIOPortOp -> alwaysExternal
   DelayOp -> alwaysExternal
+  RegisterDelayOp -> alwaysExternal
   WaitReadOp -> alwaysExternal
   WaitWriteOp -> alwaysExternal
   ForkOp -> alwaysExternal

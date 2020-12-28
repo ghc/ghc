@@ -252,7 +252,8 @@ truncateRunQueue(Capability *cap)
 
 #if !defined(THREADED_RTS)
 #define EMPTY_BLOCKED_QUEUE()  (emptyQueue(blocked_queue_hd))
-#define EMPTY_SLEEPING_QUEUE() (emptyQueue(sleeping_queue))
+#define EMPTY_SLEEPING_QUEUE(cap) \
+          (cap->timeout_queue == (StgTimeoutQueue *)END_TSO_QUEUE)
 #endif
 
 INLINE_HEADER bool
@@ -260,7 +261,7 @@ emptyThreadQueues(Capability *cap)
 {
     return emptyRunQueue(cap)
 #if !defined(THREADED_RTS)
-        && EMPTY_BLOCKED_QUEUE() && EMPTY_SLEEPING_QUEUE()
+        && EMPTY_BLOCKED_QUEUE() && EMPTY_SLEEPING_QUEUE(cap)
 #endif
     ;
 }

@@ -284,6 +284,9 @@ initCapability (Capability *cap, uint32_t i)
     cap->io_manager_control_wr_fd = -1;
 #endif
 #endif
+#if !defined(THREADED_RTS)
+    cap->timeout_queue          = (StgTimeoutQueue*)END_TSO_QUEUE;
+#endif
     cap->total_allocated        = 0;
 
     cap->f.stgEagerBlackholeInfo = (W_)&__stg_EAGER_BLACKHOLE_info;
@@ -1317,6 +1320,9 @@ markCapability (evac_fn evac, void *user, Capability *cap,
     if (!no_mark_sparks) {
         traverseSparkQueue (evac, user, cap);
     }
+#endif
+#if !defined(THREADED_RTS)
+    evac(user, (StgClosure **)(void *)&cap->timeout_queue);
 #endif
 
     // Free STM structures for this Capability

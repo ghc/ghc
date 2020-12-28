@@ -74,7 +74,6 @@
 // Blocked/sleeping threads
 StgTSO *blocked_queue_hd = NULL;
 StgTSO *blocked_queue_tl = NULL;
-StgTSO *sleeping_queue = NULL;    // perhaps replace with a hash table?
 #endif
 
 // Bytes allocated since the last time a HeapOverflow exception was thrown by
@@ -909,7 +908,7 @@ scheduleCheckBlockedThreads(Capability *cap USED_IF_NOT_THREADS)
     // run queue is empty, and there are no other tasks running, we
     // can wait indefinitely for something to happen.
     //
-    if ( !emptyQueue(blocked_queue_hd) || !emptyQueue(sleeping_queue) )
+    if ( !EMPTY_BLOCKED_QUEUE() || !EMPTY_SLEEPING_QUEUE(cap) )
     {
         awaitEvent (emptyRunQueue(cap));
     }
@@ -2390,7 +2389,6 @@ deleteAllThreads ()
 
 #if !defined(THREADED_RTS)
     ASSERT(blocked_queue_hd == END_TSO_QUEUE);
-    ASSERT(sleeping_queue == END_TSO_QUEUE);
 #endif
 }
 
@@ -2723,7 +2721,6 @@ initScheduler(void)
 #if !defined(THREADED_RTS)
   blocked_queue_hd  = END_TSO_QUEUE;
   blocked_queue_tl  = END_TSO_QUEUE;
-  sleeping_queue    = END_TSO_QUEUE;
 #endif
 
   sched_state    = SCHED_RUNNING;
@@ -2816,7 +2813,6 @@ void markScheduler (evac_fn evac USED_IF_NOT_THREADS,
 #if !defined(THREADED_RTS)
     evac(user, (StgClosure **)(void *)&blocked_queue_hd);
     evac(user, (StgClosure **)(void *)&blocked_queue_tl);
-    evac(user, (StgClosure **)(void *)&sleeping_queue);
 #endif
 }
 
