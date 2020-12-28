@@ -54,6 +54,7 @@ module GHC.Driver.Session (
         DynLibLoader(..),
         fFlags, fLangFlags, xFlags,
         wWarningFlags,
+        wWarningFlagMap,
         dynFlagDependencies,
         makeDynFlagsConsistent,
         positionIndependent,
@@ -279,7 +280,7 @@ import Control.Monad.Trans.Except
 import Data.Ord
 import Data.Char
 import Data.List
-import Data.Map (Map)
+import Data.Map (Map, (!?))
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -1391,12 +1392,12 @@ defaultLogAction dflags reason severity srcSpan msg
         case reason of
           NoReason -> Nothing
           Reason wflag -> do
-            spec <- flagSpecOf wflag
+            spec <- wWarningFlagMap !? wflag
             return ("-W" ++ flagSpecName spec ++ warnFlagGrp wflag)
           ErrReason Nothing ->
             return "-Werror"
           ErrReason (Just wflag) -> do
-            spec <- flagSpecOf wflag
+            spec <- wWarningFlagMap !? wflag
             return $
               "-W" ++ flagSpecName spec ++ warnFlagGrp wflag ++
               ", -Werror=" ++ flagSpecName spec
@@ -3172,10 +3173,8 @@ nop :: TurnOnFlag -> DynP ()
 nop _ = return ()
 
 -- | Find the 'FlagSpec' for a 'WarningFlag'.
-flagSpecOf :: WarningFlag -> Maybe (FlagSpec WarningFlag)
-flagSpecOf flag = listToMaybe $ filter check wWarningFlags
-  where
-    check fs = flagSpecFlag fs == flag
+wWarningFlagMap :: Map WarningFlag (FlagSpec WarningFlag)
+wWarningFlagMap = Map.fromListWith (\_ x -> x) $ map (flagSpecFlag &&& id) wWarningFlags
 
 -- | These @-W\<blah\>@ flags can all be reversed with @-Wno-\<blah\>@
 wWarningFlags :: [FlagSpec WarningFlag]
