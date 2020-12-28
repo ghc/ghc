@@ -20,6 +20,7 @@
 #include "IOManager.h"       // RTS internal
 #include "Capability.h"
 #include "RtsFlags.h"
+#include "RtsUtils.h"
 
 #if !defined(mingw32_HOST_OS) && defined(HAVE_SIGNAL_H)
 #include "posix/Signals.h"
@@ -32,7 +33,24 @@
 #endif
 
 
-/* Called in the RTS initialisation
+/* Allocate and initialise the per-capability CapIOManager that lives in each
+ * Capability. Called early in the RTS initialisation.
+ */
+void initCapabilityIOManager(CapIOManager **piomgr)
+{
+    CapIOManager *iomgr =
+      (CapIOManager *) stgMallocBytes(sizeof(CapIOManager),
+                                      "initCapabilityIOManager");
+
+#if defined(THREADED_RTS) && !defined(mingw32_HOST_OS)
+    iomgr->control_fd = -1;
+#endif
+
+    *piomgr = iomgr;
+}
+
+
+/* Called late in the RTS initialisation
  */
 void
 initIOManager(void)
@@ -140,7 +158,7 @@ void
 setIOManagerControlFd(uint32_t cap_no USED_IF_THREADS, int fd USED_IF_THREADS) {
 #if defined(THREADED_RTS)
     if (cap_no < n_capabilities) {
-        RELAXED_STORE(&capabilities[cap_no]->io_manager_control_wr_fd, fd);
+        RELAXED_STORE(&capabilities[cap_no]->iomgr->control_fd, fd);
     } else {
         errorBelch("warning: setIOManagerControlFd called with illegal capability number.");
     }
