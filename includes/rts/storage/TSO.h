@@ -309,7 +309,6 @@ void dirty_STACK (Capability *cap, StgStack *stack);
 
         BlockedOnRead          NULL                 blocked_queue
         BlockedOnWrite         NULL                 blocked_queue
-        BlockedOnDelay         NULL                 blocked_queue
 
       tso->link == END_TSO_QUEUE, if the thread is currently running.
 

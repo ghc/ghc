@@ -238,7 +238,7 @@
 #define BlockedOnBlackHole  2
 #define BlockedOnRead       3
 #define BlockedOnWrite      4
-#define BlockedOnDelay      5
+     /* BlockedOnDelay      5 is no longer used */
 #define BlockedOnSTM        6
 
 /* Win32 only: */
