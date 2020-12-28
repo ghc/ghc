@@ -835,7 +835,7 @@ foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
 --  * [1] \"The Essence of the Iterator Pattern\",
 --    by Jeremy Gibbons and Bruno Oliveira,
 --    in /Mathematically-Structured Functional Programming/, 2006, online at
---    <http://web.comlab.ox.ac.uk/oucl/work/jeremy.gibbons/publications/#iterator>.
+--    <http://www.cs.ox.ac.uk/people/jeremy.gibbons/publications/#iterator>.
 --
 --  * \"Applicative Programming with Effects\",
 --    by Conor McBride and Ross Paterson,
