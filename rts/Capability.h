@@ -163,6 +163,10 @@ struct Capability_ {
 #if !defined(THREADED_RTS)
     // Timeouts used by select() I/O manager
     StgTimeoutQueue *timeout_queue;
+    // TODO: this timeout_queue is not used on Windows but the scheduler still
+    // depends on it. This should be fixed by having the scheduler not know
+    // about the exact details of the I/O managers' data structures for tracking
+    // outstanding I/O and timers.
 #endif
 
     // Per-capability STM-related data
