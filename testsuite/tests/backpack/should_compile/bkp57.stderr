@@ -16,4 +16,5 @@
     [1 of 1] Including common
     [1 of 2] Compiling Instance[sig]    ( consumer-abs/Instance.hsig, bkp57.out/consumer-abs/consumer-abs-EtqPCpl4Hcf9otzJUe9fPM/Instance.o )
     [2 of 2] Compiling Downstream       ( consumer-abs/Downstream.hs, bkp57.out/consumer-abs/consumer-abs-EtqPCpl4Hcf9otzJUe9fPM/Downstream.o )
-  [1 of 1] Compiling Tie             ( tie/Tie.hs, bkp57.out/tie/Tie.o )
+  [1 of 2] Compiling Tie              ( tie/Tie.hs, bkp57.out/tie/Tie.o )
+  [2 of 2] Instantiating consumer-abs

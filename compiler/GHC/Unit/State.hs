@@ -35,6 +35,7 @@ module GHC.Unit.State (
         lookupModuleInAllUnits,
         lookupModuleWithSuggestions,
         lookupPluginModuleWithSuggestions,
+        requirementMerges,
         LookupResult(..),
         ModuleSuggestion(..),
         ModuleOrigin(..),
@@ -1962,6 +1963,19 @@ instance Outputable UnitErr where
 
         ppr_reason (p, reason) =
             pprReason (ppr (unitId p) <+> text "is") reason
+
+-- | Return this list of requirement interfaces that need to be merged
+-- to form @mod_name@, or @[]@ if this is not a requirement.
+requirementMerges :: UnitState -> ModuleName -> [InstantiatedModule]
+requirementMerges pkgstate mod_name =
+    fmap fixupModule $ fromMaybe [] (Map.lookup mod_name (requirementContext pkgstate))
+    where
+      -- update IndefUnitId ppr info as they may have changed since the
+      -- time the IndefUnitId was created
+      fixupModule (Module iud name) = Module iud' name
+         where
+            iud' = iud { instUnitInstanceOf = cid' }
+            cid' = instUnitInstanceOf iud
 
 -- -----------------------------------------------------------------------------
 

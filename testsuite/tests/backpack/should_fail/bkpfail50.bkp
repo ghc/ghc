@@ -1,0 +1,8 @@
+unit p where
+    signature H where
+        data T = T Int
+unit q where
+    dependency p[H=<A>]
+    signature A where
+        data T = T Bool
+-- signatures don't merge

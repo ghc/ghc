@@ -5,7 +5,9 @@
   [2 of 3] Compiling H                ( h/H.hs, nothing )
   [3 of 3] Compiling A[sig]           ( h/A.hsig, nothing )
 [3 of 3] Processing q
-  [1 of 1] Compiling A[sig]           ( q/A.hsig, nothing )
+  [1 of 3] Compiling A[sig]           ( q/A.hsig, nothing )
+  [2 of 3] Instantiating h
+  [3 of 3] Instantiating p
 
 bkpfail07.bkp:6:9: error:
     • Type constructor ‘T’ has conflicting definitions in the module

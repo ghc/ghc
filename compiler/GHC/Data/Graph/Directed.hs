@@ -1,7 +1,10 @@
 -- (c) The University of Glasgow 2006
 
-{-# LANGUAGE CPP, ScopedTypeVariables, ViewPatterns #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module GHC.Data.Graph.Directed (
         Graph, graphFromEdgedVerticesOrd, graphFromEdgedVerticesUniq,

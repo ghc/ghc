@@ -11,3 +11,4 @@
     Instantiating sig[B=impl:B]
     [1 of 2] Compiling B[sig]           ( sig/B.hsig, bkp41.out/sig/sig-HVnmSw44WZeBfwnUur4wzl/B.o )
     [2 of 2] Compiling App              ( sig/App.hs, bkp41.out/sig/sig-HVnmSw44WZeBfwnUur4wzl/App.o )
+  [1 of 1] Instantiating sig

@@ -8,6 +8,8 @@
   [2 of 3] Compiling Q                ( q/Q.hs, bkpfail14.out/q/Q.o )
   [3 of 3] Compiling Q2               ( q/Q2.hs, bkpfail14.out/q/Q2.o )
 [3 of 3] Processing r
+  [1 of 3] Compiling H[sig]           ( r/H.hsig, nothing )
+  [2 of 3] Instantiating p
 
 bkpfail14.bkp:9:9: error:
     • Identifier ‘f’ has conflicting definitions in the module
