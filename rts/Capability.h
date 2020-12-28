@@ -160,6 +160,10 @@ struct Capability_ {
     int io_manager_control_wr_fd;
 #endif
 #endif
+#if !defined(THREADED_RTS)
+    // Timeouts used by select() I/O manager
+    StgTimeoutQueue *timeout_queue;
+#endif
 
     // Per-capability STM-related data
     StgTVarWatchQueue *free_tvar_watch_queues;

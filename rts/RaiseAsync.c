@@ -720,7 +720,6 @@ removeFromQueues(Capability *cap, StgTSO *tso)
       goto done;
 
   case BlockedOnDelay:
-        removeThreadFromQueue(cap, &sleeping_queue, tso);
         goto done;
 #endif
 

@@ -22,6 +22,7 @@
 #include "AwaitEvent.h"
 #include "Stats.h"
 #include "GetTime.h"
+#include "Threads.h"
 
 # if defined(HAVE_SYS_SELECT_H)
 #  include <sys/select.h>
@@ -37,6 +38,8 @@
 #include "Clock.h"
 
 #if !defined(THREADED_RTS)
+
+#define END_TIMEOUT_QUEUE ((StgTimeoutQueue *)END_TSO_QUEUE)
 
 // The target time for a threadDelay is stored in a one-word quantity
 // in the TSO (tso->block_info.target).  On a 32-bit machine we
@@ -66,7 +69,7 @@ static LowResTime getLowResTimeOfDay(void)
 /*
  * For a given microsecond delay, return the target time in LowResTime.
  */
-LowResTime getDelayTarget (HsInt us)
+static LowResTime getDelayTarget (HsInt us)
 {
     Time elapsed;
     elapsed = getProcessElapsedTime();
@@ -79,6 +82,38 @@ LowResTime getDelayTarget (HsInt us)
         // round up the target time, because we never want to sleep *less*
         // than the desired amount.
         return TimeToLowResTimeRoundUp(elapsed + USToTime(us));
+    }
+}
+
+void registerDelay(Capability *cap, StgMVar *mvar, HsInt usecs)
+{
+    LowResTime target = getDelayTarget(usecs);
+
+    IF_DEBUG(scheduler,
+             debugBelch("scheduler: timer for delay of %llu usec installed at %llu\n",
+                       (unsigned long long)usecs, (unsigned long long)target));
+
+    /* Allocate and fill in a new sleep list entry */
+    StgTimeoutQueue *p = (StgTimeoutQueue *)allocate(cap, sizeofW(StgTimeoutQueue));
+    SET_HDR(p, &stg_TIMEOUT_QUEUE_info, CCS_SYSTEM);
+    p->mvar     = mvar;
+    p->waketime = target;
+
+    /* Insert the request into the right place in the sorted list.
+     * This is not efficient of course, being linear in the worst case.
+     * TODO: replace this data structure with a heap or timer wheel.
+     */
+    StgTimeoutQueue *prev = NULL;
+    StgTimeoutQueue *q = cap->timeout_queue;
+    while (q != END_TIMEOUT_QUEUE && q->waketime < target) {
+        prev = q;
+        q = q->next;
+    }
+    p->next = q;
+    if (prev == NULL) {
+        cap->timeout_queue = p;
+    } else {
+        prev->next = p;
     }
 }
 
@@ -95,21 +130,21 @@ LowResTime getDelayTarget (HsInt us)
  */
 static bool wakeUpSleepingThreads (LowResTime now)
 {
-    StgTSO *tso;
     bool flag = false;
 
-    while (sleeping_queue != END_TSO_QUEUE) {
-        tso = sleeping_queue;
-        if (((long)now - (long)tso->block_info.target) < 0) {
+    /* Pop entries from the front of the sleeping queue that are past their
+     * wake time, and unblock the corresponding MVars.
+     */
+    while (MainCapability.timeout_queue != END_TIMEOUT_QUEUE) {
+        StgTimeoutQueue *q = MainCapability.timeout_queue;
+        if (((long)now - (long)q->waketime) < 0) {
             break;
         }
-        sleeping_queue = tso->_link;
-        tso->why_blocked = NotBlocked;
-        tso->_link = END_TSO_QUEUE;
-        IF_DEBUG(scheduler, debugBelch("Waking up sleeping thread %lu\n",
-                                       (unsigned long)tso->id));
-        // MainCapability: this code is !THREADED_RTS
-        pushOnRunQueue(&MainCapability,tso);
+        MainCapability.timeout_queue = q->next;
+        IF_DEBUG(scheduler,
+                 debugBelch("scheduler: timer expired at %llu, writing to MVar\n",
+                           (unsigned long long)q->waketime));
+        performTryPutMVar(&MainCapability, q->mvar, Unit_closure);
         flag = true;
     }
     return flag;
@@ -298,7 +333,7 @@ awaitEvent(bool wait)
           tv.tv_sec  = 0;
           tv.tv_usec = 0;
           ptv = &tv;
-      } else if (sleeping_queue != END_TSO_QUEUE) {
+      } else if (MainCapability.timeout_queue != END_TIMEOUT_QUEUE) {
           /* SUSv2 allows implementations to have an implementation defined
            * maximum timeout for select(2). The standard requires
            * implementations to silently truncate values exceeding this maximum
@@ -317,7 +352,7 @@ awaitEvent(bool wait)
            */
           const time_t max_seconds = 2678400; // 31 * 24 * 60 * 60
 
-          Time min = LowResTimeToTime(sleeping_queue->block_info.target - now);
+          Time min = LowResTimeToTime(MainCapability.timeout_queue->waketime - now);
           tv.tv_sec  = TimeToSeconds(min);
           if (tv.tv_sec < max_seconds) {
               tv.tv_usec = TimeToUS(min) % 1000000;

@@ -2484,21 +2484,16 @@ stg_waitWritezh ( W_ fd )
 
 stg_delayzh ( W_ us_delay )
 {
-#if defined(mingw32_HOST_OS)
-    W_ ares;
-    CInt reqID;
-#else
-    W_ t, prev, target;
-#endif
-
 #if defined(THREADED_RTS)
     ccall barf("delay# on threaded RTS") never returns;
+#elif !defined(mingw32_HOST_OS)
+    ccall barf("delay# on non-windows") never returns;
 #else
+    W_ ares;
+    CInt reqID;
 
     ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I16);
     StgTSO_why_blocked(CurrentTSO) = BlockedOnDelay::I16;
-
-#if defined(mingw32_HOST_OS)
 
     /* could probably allocate this on the heap instead */
     ("ptr" ares) = ccall stgMallocBytes(SIZEOF_StgAsyncIOResult,
@@ -2516,33 +2511,19 @@ stg_delayzh ( W_ us_delay )
     StgTSO_why_blocked(CurrentTSO) = BlockedOnDoProc::I16;
     APPEND_TO_BLOCKED_QUEUE(CurrentTSO);
     jump stg_block_async_void();
-
-#else
-
-
-    (target) = ccall getDelayTarget(us_delay);
-
-    StgTSO_block_info(CurrentTSO) = target;
-
-    /* Insert the new thread in the sleeping queue. */
-    prev = NULL;
-    t = W_[sleeping_queue];
-while:
-    if (t != END_TSO_QUEUE && StgTSO_block_info(t) < target) {
-        prev = t;
-        t = StgTSO__link(t);
-        goto while;
-    }
-
-    StgTSO__link(CurrentTSO) = t;
-    if (prev == NULL) {
-        W_[sleeping_queue] = CurrentTSO;
-    } else {
-        ccall setTSOLink(MyCapability() "ptr", prev "ptr", CurrentTSO);
-    }
-    jump stg_block_noregs();
 #endif
-#endif /* !THREADED_RTS */
+}
+
+stg_registerDelayzh ( P_ mvar, W_ us_delay )
+{
+#if defined(THREADED_RTS)
+    ccall barf("registerDelay# on threaded RTS") never returns;
+#elif defined(mingw32_HOST_OS)
+    ccall barf("registerDelay# on windows") never returns;
+#else
+    ccall registerDelay(MyCapability() "ptr", mvar "ptr", us_delay);
+    return ();
+#endif
 }
 
 

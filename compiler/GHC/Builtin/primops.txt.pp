@@ -2610,6 +2610,16 @@ primop  WaitWriteOp "waitWrite#" GenPrimOp
    has_side_effects = True
    out_of_line      = True
 
+primop  RegisterDelayOp "registerDelay#" GenPrimOp
+   MVar# s () -> Int# -> State# s -> State# s
+   {Register for a delay of the specified number of microseconds. The
+   given {\tt MVar} will be written to after the time expires. Use
+   with {\tt newMVar#} followed by {\tt takeMVar#} to block until
+   the expiry time.}
+   with
+   has_side_effects = True
+   out_of_line      = True
+
 ------------------------------------------------------------------------
 section "Concurrency primitives"
 ------------------------------------------------------------------------
