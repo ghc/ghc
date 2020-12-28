@@ -116,6 +116,10 @@ import GHC.Base hiding ( foldr )
 import GHC.Generics
 import GHC.Num  ( Num(..) )
 
+-- $setup
+-- >>> import Prelude
+-- >>> import Data.Monoid (Product (..), Sum (..))
+
 infix  4 `elem`, `notElem`
 
 -- XXX: Missing haddock feature.  Links to anchors in other modules

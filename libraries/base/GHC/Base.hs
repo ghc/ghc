@@ -129,6 +129,9 @@ import {-# SOURCE #-} Data.Semigroup.Internal ( stimesDefault
                                               , stimesIdempotentMonoid
                                               )
 
+-- $setup
+-- >>> import GHC.Num
+
 infixr 9  .
 infixr 5  ++
 infixl 4  <$
@@ -216,7 +219,7 @@ class Semigroup a where
         -- The default definition should be sufficient, but this can be
         -- overridden for efficiency.
         --
-        -- >>> import Data.List.NonEmpty
+        -- >>> import Data.List.NonEmpty (NonEmpty (..))
         -- >>> sconcat $ "Hello" :| [" ", "Haskell", "!"]
         -- "Hello Haskell!"
         sconcat :: NonEmpty a -> a

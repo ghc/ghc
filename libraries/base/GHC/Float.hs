@@ -71,7 +71,7 @@ import GHC.Num.BigNat
 infixr 8  **
 
 -- $setup
--- >>> import GHC.Num
+-- >>> import Prelude
 
 ------------------------------------------------------------------------
 -- Standard numeric classes

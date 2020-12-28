@@ -167,15 +167,9 @@ class (Functor t, Foldable t) => Traversable t where
     --
     -- ==== __Examples__
     --
-    -- 'mapM' is 'traverse' for 'Monad', and the following example shows
-    -- how 'mapM' can apply an 'IO' action to a 'List' to produce a
-    -- structured result.
-    --
-    -- Basic usage:
-    --
-    -- >>> import System.IO
-    -- >>> mapM (openTempFile ".") ["t1", "t2"]
-    -- [("./t169980-3",{handle: ./t169980-3}),("./t269980-4",{handle: ./t269980-4})]
+    -- 'mapM' is literally a 'traverse' with a type signature restricted
+    -- to 'Monad'. Its implementation may be more efficient due to additional
+    -- power of 'Monad'.
     --
     mapM :: Monad m => (a -> m b) -> t a -> m (t b)
     {-# INLINE mapM #-}  -- See Note [Inline default methods]
