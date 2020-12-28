@@ -42,7 +42,15 @@ infixl 9  !!
 infix  4 `elem`, `notElem`
 
 -- $setup
+-- >>> import GHC.Base
 -- >>> import Prelude (Num (..), Ord (..), Int, Double, odd, not, undefined)
+-- >>> import Control.DeepSeq (force)
+--
+-- -- compiled versions are uninterruptible.
+-- https://gitlab.haskell.org/ghc/ghc/-/issues/367
+--
+-- >>> let or  = foldr (||) False
+-- >>> let and = foldr (&&) True
 
 --------------------------------------------------------------
 -- List-manipulation functions
@@ -506,8 +514,8 @@ match on everything past the :, which is just the tail of scanl.
 -- False
 -- >>> foldr1 (||) [False, False, True, True]
 -- True
--- >>> foldr1 (+) [1..]
--- * Hangs forever *
+-- >>> force $ foldr1 (+) [1..]
+-- *** Exception: stack overflow
 foldr1                  :: (a -> a -> a) -> [a] -> a
 foldr1 f = go
   where go [x]            =  x
@@ -593,7 +601,7 @@ remove the cause for the chain of evaluations, and all is well.
 -- [False,False,True,True]
 -- >>> scanr1 (||) [True, True, False, False]
 -- [True,True,False,False]
--- >>> scanr1 (+) [1..]
+-- >>> force $ scanr1 (+) [1..]
 -- * Hangs forever *
 scanr1                  :: (a -> a -> a) -> [a] -> [a]
 scanr1 _ []             =  []
@@ -656,9 +664,9 @@ minimum xs              =  foldl1' min xs
 -- the consumer doesn't force each iterate. See 'iterate'' for a strict
 -- variant of this function.
 --
--- >>> iterate not True
+-- >>> take 10 $ iterate not True
 -- [True,False,True,False...
--- >>> iterate (+3) 42
+-- >>> take 10 $ iterate (+3) 42
 -- [42,45,48,51,54,57,60,63...
 {-# NOINLINE [1] iterate #-}
 iterate :: (a -> a) -> a -> [a]
@@ -701,7 +709,7 @@ iterate'FB c f x0 = go x0
 
 -- | 'repeat' @x@ is an infinite list, with @x@ the value of every element.
 --
--- >>> repeat 17
+-- >>> take 20 $ repeat 17
 --[17,17,17,17,17,17,17,17,17...
 repeat :: a -> [a]
 {-# INLINE [0] repeat #-}
@@ -739,9 +747,9 @@ replicate n x           =  take n (repeat x)
 --
 -- >>> cycle []
 -- *** Exception: Prelude.cycle: empty list
--- >>> cycle [42]
+-- >>> take 20 $ cycle [42]
 -- [42,42,42,42,42,42,42,42,42,42...
--- >>> cycle [2, 5, 7]
+-- >>> take 20 $ cycle [2, 5, 7]
 -- [2,5,7,2,5,7,2,5,7,2,5,7...
 cycle                   :: [a] -> [a]
 cycle []                = errorEmptyList "cycle"

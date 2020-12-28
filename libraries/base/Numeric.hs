@@ -72,6 +72,8 @@ import GHC.Show
 import Text.ParserCombinators.ReadP( ReadP, readP_to_S, pfail )
 import qualified Text.Read.Lex as L
 
+-- $setup
+-- >>> import Prelude
 
 -- -----------------------------------------------------------------------------
 -- Reading

@@ -58,6 +58,7 @@ import GHC.Generics (K1(..))
 -- $setup
 -- >>> import Prelude
 -- >>> import Data.Char
+-- >>> import Data.Monoid (Product (..), Sum (..))
 -- >>> data BiList a b = BiList [a] [b]
 -- >>> instance Bifoldable BiList where bifoldr f g z (BiList as bs) = foldr f (foldr g z bs) as
 

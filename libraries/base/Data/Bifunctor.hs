@@ -22,6 +22,7 @@ import GHC.Generics ( K1(..) )
 
 -- $setup
 -- >>> import Prelude
+-- >>> import Data.Char (toUpper)
 
 -- | A bifunctor is a type constructor that takes
 -- two type arguments and is a functor in /both/ arguments. That
