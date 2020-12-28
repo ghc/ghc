@@ -385,7 +385,6 @@ data WhyBlocked
   | BlockedOnBlackHole
   | BlockedOnRead
   | BlockedOnWrite
-  | BlockedOnDelay
   | BlockedOnSTM
   | BlockedOnDoProc
   | BlockedOnCCall
