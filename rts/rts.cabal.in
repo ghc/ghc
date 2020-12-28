@@ -433,6 +433,7 @@ library
                HsFFI.c
                Inlines.c
                Interpreter.c
+               IO.c
                LdvProfile.c
                Libdw.c
                LibdwPool.c
