@@ -271,13 +271,23 @@ ppCtor dflags dat subdocs con@ConDeclH98 { con_args = con_args' }
                         (HsTyVar noExtField NotPromoted (reL (tcdName dat))) :
                         map (tyVarArg . unLoc) (hsQTvExplicit $ tyClDeclTyVars dat)
 
-ppCtor dflags _dat subdocs con@(ConDeclGADT { })
-   = concatMap (lookupCon dflags subdocs) (getConNames con) ++ f
+ppCtor dflags _dat subdocs (ConDeclGADT { con_names = names
+                                        , con_bndrs = L _ outer_bndrs
+                                        , con_mb_cxt = mcxt
+                                        , con_g_args = args
+                                        , con_res_ty = res_ty })
+   = concatMap (lookupCon dflags subdocs) names ++ [typeSig]
     where
-        f = [typeSig name (getGADTConTypeG con)]
-
-        typeSig nm ty = operator nm ++ " :: " ++ outHsSigType dflags (unL ty)
-        name = out dflags $ map unL $ getConNames con
+        typeSig = operator name ++ " :: " ++ outHsSigType dflags con_sig_ty
+        name = out dflags $ map unL names
+        con_sig_ty = HsSig noExtField outer_bndrs theta_ty where
+          theta_ty = case mcxt of
+            Just theta -> noLoc (HsQualTy { hst_xqual = noExtField, hst_ctxt = theta, hst_body = tau_ty })
+            Nothing -> tau_ty
+          tau_ty = foldr mkFunTy res_ty $
+            case args of PrefixConGADT pos_args -> map hsScaledThing pos_args
+                         RecConGADT (L _ flds) -> map (cd_fld_type . unL) flds
+          mkFunTy a b = noLoc (HsFunTy noExtField (HsUnrestrictedArrow NormalSyntax) a b)
 
 ppFixity :: DynFlags -> (Name, Fixity) -> [String]
 ppFixity dflags (name, fixity) = [out dflags ((FixitySig noExtField [noLoc name] fixity) :: FixitySig GhcRn)]

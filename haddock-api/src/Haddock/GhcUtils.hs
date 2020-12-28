@@ -185,36 +185,6 @@ tyClDeclLNameI (ClassDecl { tcdLName = ln }) = ln
 tcdNameI :: TyClDecl DocNameI -> DocName
 tcdNameI = unLoc . tyClDeclLNameI
 
--- -------------------------------------
-
-getGADTConTypeG :: ConDecl GhcRn -> LHsSigType GhcRn
--- The full type of a GADT data constructor We really only get this in
--- order to pretty-print it, and currently only in Haddock's code.  So
--- we are cavalier about locations and extensions, hence the
--- 'undefined's
-getGADTConTypeG (ConDeclGADT { con_bndrs = L _ outer_bndrs
-                            , con_mb_cxt = mcxt, con_g_args = args
-                            , con_res_ty = res_ty })
- = noLoc (HsSig { sig_ext   = noExtField
-                , sig_bndrs = outer_bndrs
-                , sig_body  = theta_ty })
- where
-   theta_ty | Just theta <- mcxt
-            = noLoc (HsQualTy { hst_xqual = noExtField, hst_ctxt = theta, hst_body = tau_ty })
-            | otherwise
-            = tau_ty
-
---   tau_ty :: LHsType DocNameI
-   tau_ty = case args of
-              RecConGADT flds -> mkFunTy (noLoc (HsRecTy noExtField (unLoc flds))) res_ty
-              PrefixConGADT pos_args -> foldr mkFunTy res_ty (map hsScaledThing pos_args)
-
-   -- mkFunTy :: LHsType DocNameI -> LHsType DocNameI -> LHsType DocNameI
-   mkFunTy a b = noLoc (HsFunTy noExtField (HsUnrestrictedArrow NormalSyntax) a b)
-
-getGADTConTypeG (ConDeclH98 {}) = panic "getGADTConTypeG"
-  -- Should only be called on ConDeclGADT
-
 
 -------------------------------------------------------------------------------
 -- * Parenthesization
