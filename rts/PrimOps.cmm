@@ -2472,21 +2472,16 @@ stg_waitWritezh ( W_ fd )
 
 stg_delayzh ( W_ us_delay )
 {
-#if defined(mingw32_HOST_OS)
-    W_ ares;
-    CInt reqID;
-#else
-    W_ t, prev, target;
-#endif
-
 #if defined(THREADED_RTS)
     ccall barf("delay# on threaded RTS") never returns;
+#elif !defined(mingw32_HOST_OS)
+    ccall barf("delay# on non-windows") never returns;
 #else
+    W_ ares;
+    CInt reqID;
 
     ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I16);
     StgTSO_why_blocked(CurrentTSO) = BlockedOnDelay::I16;
-
-#if defined(mingw32_HOST_OS)
 
     /* could probably allocate this on the heap instead */
     ("ptr" ares) = ccall stgMallocBytes(SIZEOF_StgAsyncIOResult,
@@ -2504,17 +2499,19 @@ stg_delayzh ( W_ us_delay )
     StgTSO_why_blocked(CurrentTSO) = BlockedOnDoProc::I16;
     ccall appendToIOBlockedQueue(MyCapability() "ptr", CurrentTSO "ptr");
     jump stg_block_async_void();
-
-#else
-
-    (target) = ccall getDelayTarget(us_delay);
-
-    StgTSO_block_info(CurrentTSO) = target;
-
-    ccall insertIntoSleepingQueue(MyCapability() "ptr", CurrentTSO "ptr", target);
-    jump stg_block_noregs();
 #endif
-#endif /* !THREADED_RTS */
+}
+
+stg_registerDelayzh ( P_ mvar, W_ us_delay )
+{
+#if defined(THREADED_RTS)
+    ccall barf("registerDelay# on threaded RTS") never returns;
+#elif defined(mingw32_HOST_OS)
+    ccall barf("registerDelay# on windows") never returns;
+#else
+    ccall registerDelay(MyCapability() "ptr", mvar "ptr", us_delay);
+    return ();
+#endif
 }
 
 

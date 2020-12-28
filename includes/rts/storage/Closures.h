@@ -495,3 +495,14 @@ typedef struct StgCompactNFData_ {
       // Used by compacting GC for linking CNFs with threaded hash tables. See
       // Note [CNFs in compacting GC] in Compact.c for details.
 } StgCompactNFData;
+
+/* ----------------------------------------------------------------------------
+   Timeout queue data structure used by the non-threaded unix I/O manager
+   ------------------------------------------------------------------------- */
+
+typedef struct StgTimeoutQueue_ {
+  StgHeader                header;
+  StgMVar                 *mvar;
+  struct StgTimeoutQueue_ *next;
+  StgWord                  waketime;  /* LowResTime */
+} StgTimeoutQueue;

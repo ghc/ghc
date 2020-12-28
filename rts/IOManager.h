@@ -22,7 +22,6 @@
 #include "BeginPrivate.h"
 
 #include "sm/GC.h" // for evac_fn
-#include "posix/Select.h" // for LowResTime TODO: switch to normal Time
 
 
 /* The per-capability data structures belonging to the I/O manager.
@@ -51,14 +50,13 @@ typedef struct {
     StgTSO *blocked_queue_hd;
     StgTSO *blocked_queue_tl;
 
-    /* Thread queue for threads blocked on timeouts.
+#if !defined(mingw32_HOST_OS)
+    /* Timeout queue, used for threads blocked on timeouts.
      * Used by the select() I/O manager only. It is grossly inefficient, like
      * everything else to do with the select() I/O manager.
-     *
-     * TODO@ It is not used by any of the Windows I/O managers, though it
-     * remains defined for them. This is an oddity that should be resolved.
      */
-    StgTSO *sleeping_queue;
+    StgTimeoutQueue *timeout_queue;
+#endif
 #endif
 
 } CapIOManager;
@@ -130,14 +128,14 @@ void markCapabilityIOManager(evac_fn evac, void *user, CapIOManager *iomgr);
  */
 void appendToIOBlockedQueue(Capability *cap, StgTSO *tso);
 
-/* Insert a thread into the queue of threads blocked on timers.
+/* Register a timout, to write to an MVar once the time expires.
  *
- * This is used by the select() I/O manager implementation only.
+ * This is currently only supported by the select() I/O manager implementation.
+ * TODO: add support for the Windows non-threaded I/O manager(s).
  *
- * The sleeping queue is defined for other non-threaded I/O managers but not
- * used. This is a wart that should be excised.
+ * Defined in posix/Select.c
  */
-void insertIntoSleepingQueue(Capability *cap, StgTSO *tso, LowResTime target);
+void registerDelay(Capability *cap, StgMVar *mvar, HsInt usecs);
 #endif
 
 
@@ -236,11 +234,14 @@ INLINE_HEADER bool emptyPendingTimeouts(CapIOManager *iomgr
     return true;
 #else
 #if defined(mingw32_HOST_OS)
-    /* None of the Windows I/O managers use the sleeping_queue
+    /* The Windows I/O managers track timeouts either via the blocked_queue
+     * (in the MIO case) or totally separately for WinIO. Timers/timeouts in
+     * the WinIO non-threaded case are not properly tracked here, which is
+     * almost certainly wrong.
      */
     return true;
 #else
-    return (iomgr->sleeping_queue == END_TSO_QUEUE);
+    return (iomgr->timeout_queue == (StgTimeoutQueue *)END_TSO_QUEUE);
 #endif
 #endif
 }

@@ -50,7 +50,9 @@ void initCapabilityIOManager(CapIOManager **piomgr)
 #else // !defined(THREADED_RTS)
     iomgr->blocked_queue_hd = END_TSO_QUEUE;
     iomgr->blocked_queue_tl = END_TSO_QUEUE;
-    iomgr->sleeping_queue   = END_TSO_QUEUE;
+#if !defined(mingw32_HOST_OS)
+    iomgr->timeout_queue    = (StgTimeoutQueue*)END_TSO_QUEUE;
+#endif
 #endif
 
     *piomgr = iomgr;
@@ -164,7 +166,9 @@ void markCapabilityIOManager(evac_fn       evac  USED_IF_NOT_THREADS,
 #if !defined(THREADED_RTS)
     evac(user, (StgClosure **)(void *)&iomgr->blocked_queue_hd);
     evac(user, (StgClosure **)(void *)&iomgr->blocked_queue_tl);
-    evac(user, (StgClosure **)(void *)&iomgr->sleeping_queue);
+#if !defined(mingw32_HOST_OS)
+    evac(user, (StgClosure **)(void *)&iomgr->timeout_queue);
+#endif
 #endif
 
 }
@@ -197,23 +201,5 @@ void appendToIOBlockedQueue(Capability *cap, StgTSO *tso)
         setTSOLink(cap, iomgr->blocked_queue_tl, tso);
     }
     iomgr->blocked_queue_tl = tso;
-}
-
-void insertIntoSleepingQueue(Capability *cap, StgTSO *tso, LowResTime target)
-{
-    CapIOManager *iomgr = cap->iomgr;
-    StgTSO *prev = NULL;
-    StgTSO *t = iomgr->sleeping_queue;
-    while (t != END_TSO_QUEUE && t->block_info.target < target) {
-        prev = t;
-        t = t->_link;
-    }
-
-    tso->_link = t;
-    if (prev == NULL) {
-        iomgr->sleeping_queue = tso;
-    } else {
-        setTSOLink(cap, prev, tso);
-    }
 }
 #endif
