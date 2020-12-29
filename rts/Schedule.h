@@ -105,14 +105,6 @@ extern volatile StgWord sched_state;
  */
 extern volatile StgWord recent_activity;
 
-/* Thread queues.
- * Locks required  : sched_mutex
- */
-#if !defined(THREADED_RTS)
-extern  StgTSO *blocked_queue_hd, *blocked_queue_tl;
-extern  StgTSO *sleeping_queue;
-#endif
-
 extern bool heap_overflow;
 
 #if defined(THREADED_RTS)
@@ -184,8 +176,8 @@ truncateRunQueue(Capability *cap)
 }
 
 #if !defined(THREADED_RTS)
-#define EMPTY_BLOCKED_QUEUE()  (emptyQueue(blocked_queue_hd))
-#define EMPTY_SLEEPING_QUEUE() (emptyQueue(sleeping_queue))
+#define EMPTY_BLOCKED_QUEUE(cap)  (emptyQueue(cap->iomgr->blocked_queue_hd))
+#define EMPTY_SLEEPING_QUEUE(cap) (emptyQueue(cap->iomgr->sleeping_queue))
 #endif
 
 INLINE_HEADER bool
@@ -193,7 +185,8 @@ emptyThreadQueues(Capability *cap)
 {
     return emptyRunQueue(cap)
 #if !defined(THREADED_RTS)
-        && EMPTY_BLOCKED_QUEUE() && EMPTY_SLEEPING_QUEUE()
+        // TODO replace this by a test that deferrs to the active I/O manager
+        && EMPTY_BLOCKED_QUEUE(cap) && EMPTY_SLEEPING_QUEUE(cap)
 #endif
     ;
 }

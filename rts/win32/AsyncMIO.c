@@ -224,6 +224,8 @@ awaitRequests(bool wait)
 #if !defined(THREADED_RTS)
   // none of this is actually used in the threaded RTS
 
+    CapIOManager *iomgr = MainCapability.iomgr;
+
 start:
 #if 0
     fprintf(stderr, "awaitRequests(): %d %d %d\n",
@@ -289,7 +291,7 @@ start:
             unsigned int rID = completedTable[i].reqID;
 
             prev = NULL;
-            for(tso = blocked_queue_hd; tso != END_TSO_QUEUE;
+            for(tso = iomgr->blocked_queue_hd; tso != END_TSO_QUEUE;
                   tso = tso->_link) {
 
                 switch(tso->why_blocked) {
@@ -309,10 +311,11 @@ start:
                         if (prev) {
                             setTSOLink(&MainCapability, prev, tso->_link);
                         } else {
-                            blocked_queue_hd = tso->_link;
+                            iomgr->blocked_queue_hd = tso->_link;
                         }
-                        if (blocked_queue_tl == tso) {
-                            blocked_queue_tl = prev ? prev : END_TSO_QUEUE;
+                        if (iomgr->blocked_queue_tl == tso) {
+                            iomgr->blocked_queue_tl = prev ? prev
+                                                           : END_TSO_QUEUE;
                         }
 
                         // Terminates the run queue + this inner for-loop.

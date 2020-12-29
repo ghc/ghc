@@ -70,13 +70,6 @@
  * Global variables
  * -------------------------------------------------------------------------- */
 
-#if !defined(THREADED_RTS)
-// Blocked/sleeping threads
-StgTSO *blocked_queue_hd = NULL;
-StgTSO *blocked_queue_tl = NULL;
-StgTSO *sleeping_queue = NULL;    // perhaps replace with a hash table?
-#endif
-
 // Bytes allocated since the last time a HeapOverflow exception was thrown by
 // the RTS
 uint64_t allocated_bytes_at_heapoverflow = 0;
@@ -910,7 +903,13 @@ scheduleCheckBlockedThreads(Capability *cap USED_IF_NOT_THREADS)
     // run queue is empty, and there are no other tasks running, we
     // can wait indefinitely for something to happen.
     //
-    if ( !emptyQueue(blocked_queue_hd) || !emptyQueue(sleeping_queue) )
+    // TODO: this empty-queue test is highly dubious because it only makes
+    // sense for some I/O managers. The sleeping_queue is _only_ used by the
+    // select() I/O manager. The WinIO I/O manager does not use either the
+    // sleeping_queue or the blocked_queue, so both queues will _always_ be
+    // empty and so awaitEvent will _never_ be called here for WinIO. This may
+    // explain why there is a second call to awaitEvent below for mingw32.
+    if ( !EMPTY_BLOCKED_QUEUE(cap) || !EMPTY_SLEEPING_QUEUE(cap) )
     {
         awaitEvent (emptyRunQueue(cap));
     }
@@ -2365,11 +2364,6 @@ deleteAllThreads ()
     // somewhere, and the main scheduler loop has to deal with it.
     // Also, the run queue is the only thing keeping these threads from
     // being GC'd, and we don't want the "main thread has been GC'd" panic.
-
-#if !defined(THREADED_RTS)
-    ASSERT(blocked_queue_hd == END_TSO_QUEUE);
-    ASSERT(sleeping_queue == END_TSO_QUEUE);
-#endif
 }
 
 /* -----------------------------------------------------------------------------
@@ -2703,12 +2697,6 @@ startWorkerTasks (uint32_t from USED_IF_THREADS, uint32_t to USED_IF_THREADS)
 void
 initScheduler(void)
 {
-#if !defined(THREADED_RTS)
-  blocked_queue_hd  = END_TSO_QUEUE;
-  blocked_queue_tl  = END_TSO_QUEUE;
-  sleeping_queue    = END_TSO_QUEUE;
-#endif
-
   sched_state    = SCHED_RUNNING;
   SEQ_CST_STORE(&recent_activity, ACTIVITY_YES);
 
@@ -2793,14 +2781,9 @@ freeScheduler( void )
 #endif
 }
 
-void markScheduler (evac_fn evac USED_IF_NOT_THREADS,
-                    void *user USED_IF_NOT_THREADS)
+void markScheduler (evac_fn evac STG_UNUSED,
+                    void *user STG_UNUSED)
 {
-#if !defined(THREADED_RTS)
-    evac(user, (StgClosure **)(void *)&blocked_queue_hd);
-    evac(user, (StgClosure **)(void *)&blocked_queue_tl);
-    evac(user, (StgClosure **)(void *)&sleeping_queue);
-#endif
 }
 
 /* -----------------------------------------------------------------------------

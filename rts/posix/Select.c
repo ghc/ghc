@@ -98,12 +98,12 @@ static bool wakeUpSleepingThreads (LowResTime now)
     StgTSO *tso;
     bool flag = false;
 
-    while (sleeping_queue != END_TSO_QUEUE) {
-        tso = sleeping_queue;
+    while (MainCapability.iomgr->sleeping_queue != END_TSO_QUEUE) {
+        tso = MainCapability.iomgr->sleeping_queue;
         if (((long)now - (long)tso->block_info.target) < 0) {
             break;
         }
-        sleeping_queue = tso->_link;
+        MainCapability.iomgr->sleeping_queue = tso->_link;
         tso->why_blocked = NotBlocked;
         tso->_link = END_TSO_QUEUE;
         IF_DEBUG(scheduler, debugBelch("Waking up sleeping thread %"
@@ -253,7 +253,9 @@ awaitEvent(bool wait)
       FD_ZERO(&rfd);
       FD_ZERO(&wfd);
 
-      for(tso = blocked_queue_hd; tso != END_TSO_QUEUE; tso = next) {
+      for(tso = MainCapability.iomgr->blocked_queue_hd;
+          tso != END_TSO_QUEUE;
+          tso = next) {
         next = tso->_link;
 
       /* On older FreeBSDs, FD_SETSIZE is unsigned. Cast it to signed int
@@ -298,7 +300,7 @@ awaitEvent(bool wait)
           tv.tv_sec  = 0;
           tv.tv_usec = 0;
           ptv = &tv;
-      } else if (sleeping_queue != END_TSO_QUEUE) {
+      } else if (MainCapability.iomgr->sleeping_queue != END_TSO_QUEUE) {
           /* SUSv2 allows implementations to have an implementation defined
            * maximum timeout for select(2). The standard requires
            * implementations to silently truncate values exceeding this maximum
@@ -317,7 +319,10 @@ awaitEvent(bool wait)
            */
           const time_t max_seconds = 2678400; // 31 * 24 * 60 * 60
 
-          Time min = LowResTimeToTime(sleeping_queue->block_info.target - now);
+          Time min = LowResTimeToTime(
+                       MainCapability.iomgr->sleeping_queue->block_info.target
+                       - now
+                     );
           tv.tv_sec  = TimeToSeconds(min);
           if (tv.tv_sec < max_seconds) {
               tv.tv_usec = TimeToUS(min) % 1000000;
@@ -385,7 +390,9 @@ awaitEvent(bool wait)
            * traversed blocked TSOs. As a result you
            * can't use functions accessing 'blocked_queue_hd'.
            */
-          for(tso = blocked_queue_hd; tso != END_TSO_QUEUE; tso = next) {
+          for(tso = MainCapability.iomgr->blocked_queue_hd;
+              tso != END_TSO_QUEUE;
+              tso = next) {
               next = tso->_link;
               int fd;
               enum FdState fd_state = RTS_FD_IS_BLOCKING;
@@ -435,7 +442,7 @@ awaitEvent(bool wait)
                   break;
               case RTS_FD_IS_BLOCKING:
                   if (prev == NULL)
-                      blocked_queue_hd = tso;
+                      MainCapability.iomgr->blocked_queue_hd = tso;
                   else
                       setTSOLink(&MainCapability, prev, tso);
                   prev = tso;
@@ -444,10 +451,11 @@ awaitEvent(bool wait)
           }
 
           if (prev == NULL)
-              blocked_queue_hd = blocked_queue_tl = END_TSO_QUEUE;
+              MainCapability.iomgr->blocked_queue_hd =
+                MainCapability.iomgr->blocked_queue_tl = END_TSO_QUEUE;
           else {
               prev->_link = END_TSO_QUEUE;
-              blocked_queue_tl = prev;
+              MainCapability.iomgr->blocked_queue_tl = prev;
           }
       }
 

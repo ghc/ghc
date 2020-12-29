@@ -43,6 +43,22 @@ typedef struct {
     /* Control FD for the MIO manager for this capability */
     int control_fd;
 #endif
+#else // !defined(THREADED_RTS)
+    /* Thread queue for threads blocked on I/O completion.
+     * Used by the select() and Win32 MIO I/O managers. It is not used by
+     * the WinIO I/O manager, though it remains defined in this case.
+     */
+    StgTSO *blocked_queue_hd;
+    StgTSO *blocked_queue_tl;
+
+    /* Thread queue for threads blocked on timeouts.
+     * Used by the select() I/O manager only. It is grossly inefficient, like
+     * everything else to do with the select() I/O manager.
+     *
+     * TODO: It is not used by any of the Windows I/O managers, though it
+     * remains defined for them. This is an oddity that should be resolved.
+     */
+    StgTSO *sleeping_queue;
 #endif
 
 } CapIOManager;
