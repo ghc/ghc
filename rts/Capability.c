@@ -30,10 +30,6 @@
 #include "sm/OSMem.h"
 #include "sm/BlockAlloc.h" // for countBlocks()
 
-#if !defined(mingw32_HOST_OS)
-#include "rts/IOInterface.h" // for setIOManagerControlFd()
-#endif
-
 #include <string.h>
 
 // one global capability, this is the Capability for non-threaded
@@ -1361,18 +1357,5 @@ bool checkSparkCountInvariant (void)
     return (sparks.created ==
               sparks.converted + remaining + sparks.gcd + sparks.fizzled);
 
-}
-#endif
-
-#if !defined(mingw32_HOST_OS)
-void
-setIOManagerControlFd(uint32_t cap_no USED_IF_THREADS, int fd USED_IF_THREADS) {
-#if defined(THREADED_RTS)
-    if (cap_no < n_capabilities) {
-        RELAXED_STORE(&capabilities[cap_no]->io_manager_control_wr_fd, fd);
-    } else {
-        errorBelch("warning: setIOManagerControlFd called with illegal capability number.");
-    }
-#endif
 }
 #endif
