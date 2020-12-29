@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP, ForeignFunctionInterface #-}
 
--- | Socket functions using System.Event instead of GHC's I/O manager.
+-- | Socket functions using GHC.Event instead of GHC's I/O manager.
 module EventSocket
     (
       accept
@@ -12,14 +12,13 @@ module EventSocket
     , c_send
     ) where
 
-import Control.Concurrent (modifyMVar_, newMVar)
-import Control.Monad (liftM, when)
+import Control.Monad (when)
 import Data.ByteString (ByteString)
 import Data.Word (Word8)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Internal as B
 import Data.ByteString.Unsafe (unsafeUseAsCStringLen)
-import Foreign.C.Types (CChar, CInt, CSize)
+import Foreign.C.Types (CChar(..), CInt(..), CSize(..))
 import Foreign.Marshal.Alloc (allocaBytes)
 import Foreign.Marshal.Utils (with)
 import Foreign.ForeignPtr (withForeignPtr)
@@ -31,48 +30,46 @@ import GHC.IOBase (IOErrorType(..))
 #else
 import GHC.IO.Exception (IOErrorType(..))
 #endif
-import Network.Socket hiding (accept, connect, recv, send)
+import Network.Socket hiding (accept, connect, bind)
+import qualified Network.Socket as NS (connect)
+import Network.Socket.Address (pokeSocketAddress, sizeOfSocketAddress, peekSocketAddress)
 import Network.Socket.Internal
 import Prelude hiding (repeat)
-import System.Event.Thread
+import qualified GHC.Event as T
 import System.IO.Error (ioeSetErrorString, mkIOError)
 import EventUtil
 
 connect :: Socket    -- Unconnected Socket
         -> SockAddr  -- Socket address stuff
         -> IO ()
-connect sock@(MkSocket s _family _stype _protocol socketStatus) addr = do
-  modifyMVar_ socketStatus $ \currentStatus -> do
-  if currentStatus /= NotConnected && currentStatus /= Bound
-    then
-      ioError (userError ("connect: can't peform connect on socket in status " ++
-                          show currentStatus))
-    else do
-      withSockAddr addr $ \p_addr sz -> do
+connect sock addr = do
+  let sz = sizeOfSocketAddress addr in
+        allocaBytes sz $ \p_sock_addr  -> do
+          pokeSocketAddress p_sock_addr addr
+          withFdSocket sock $ \s -> do
+             let connectLoop = do
+                   r <- c_connect s (castPtr p_sock_addr) (CInt (fromIntegral sz))
+                   if r == -1
+                       then do
+                         err <- getErrno
+                         case () of
+                           _ | err == eINTR       -> connectLoop
+                           _ | err == eINPROGRESS -> connectBlocked s sock
+                           _                      -> throwSocketError "connect"
+                       else return r
 
-        let connectLoop = do
-              r <- c_connect s p_addr (fromIntegral sz)
-              if r == -1
-                  then do
-                    err <- getErrno
-                    case () of
-                      _ | err == eINTR       -> connectLoop
-                      _ | err == eINPROGRESS -> connectBlocked
-                      _                      -> throwSocketError "connect"
-                  else return r
-
-        connectLoop
-        return Connected
+             _ <- connectLoop
+             return ()
 
   where
-    connectBlocked = do
-      threadWaitWrite (fromIntegral s)
-      err <- getSocketOption sock SoError
-      if (err == 0)
-        then return 0
-        else ioError (errnoToIOError "connect"
-                      (Errno (fromIntegral err))
-                      Nothing Nothing)
+    connectBlocked s sk = do
+        T.threadWaitWrite (fromIntegral s)
+        err <- getSocketOption sk SoError
+        if err == 0
+          then return 0
+          else ioError (errnoToIOError "connect"
+                        (Errno (fromIntegral err))
+                        Nothing Nothing)
 
 foreign import ccall unsafe "connect"
   c_connect :: CInt -> Ptr SockAddr -> CInt{-CSockLen?? -} -> IO CInt
@@ -81,9 +78,9 @@ foreign import ccall unsafe "connect"
 -- Receiving
 
 recv :: Socket -> Int -> IO ByteString
-recv (MkSocket s _ _ _ _) nbytes
+recv sock nbytes
     | nbytes <= 0 = ioError (mkInvalidRecvArgError "Network.Socket.ByteString.recv")
-    | otherwise   = do
+    | otherwise   = withFdSocket sock $ \s -> do
   fp <- B.mallocByteString nbytes
   n <- withForeignPtr fp $ recvInner s nbytes
   if n <= 0
@@ -93,7 +90,7 @@ recv (MkSocket s _ _ _ _) nbytes
 recvInner :: CInt -> Int -> Ptr Word8 -> IO Int
 recvInner s nbytes ptr = do
     len <- throwErrnoIfMinus1Retry_repeatOnBlock "recv"
-           (threadWaitRead (fromIntegral s)) $
+           (T.threadWaitRead (fromIntegral s)) $
            c_recv s (castPtr ptr) (fromIntegral nbytes) 0{-flags-}
     case fromIntegral len of
          (-1) -> do errno <- getErrno
@@ -111,12 +108,13 @@ recvInner s nbytes ptr = do
 send :: Socket      -- ^ Connected socket
      -> ByteString  -- ^ Data to send
      -> IO Int      -- ^ Number of bytes sent
-send (MkSocket s _ _ _ _) xs =
-    unsafeUseAsCStringLen xs $ \(str, len) ->
-    liftM fromIntegral $
-        throwSocketErrorIfMinus1RetryMayBlock "send"
-        (threadWaitWrite (fromIntegral s)) $
-        c_send s str (fromIntegral len) 0
+send sock xs =
+    unsafeUseAsCStringLen xs $ \(str, len) -> do
+      withFdSocket sock $ \s -> do
+        fmap fromIntegral $
+            throwSocketErrorIfMinus1RetryMayBlock "send"
+            (T.threadWaitWrite (fromIntegral s)) $
+            c_send s str (fromIntegral len) 0
 
 -- | Send data to the socket.  The socket must be connected to a
 -- remote socket.  Unlike 'send', this function continues to send data
@@ -134,17 +132,20 @@ sendAll sock bs = do
 -- Accepting
 
 accept :: Socket -> IO (Socket, SockAddr)
-accept (MkSocket s family stype protocol _status) = do
-    let sz = sizeOfSockAddrByFamily family
-    allocaBytes sz $ \ sockaddr -> do
-        with (fromIntegral sz) $ \ ptr_len -> do
-        new_sock <- throwSocketErrorIfMinus1RetryMayBlock "accept"
-                    (threadWaitRead (fromIntegral s)) $
-                    c_accept s sockaddr ptr_len
-        setNonBlocking (fromIntegral new_sock)
-        addr <- peekSockAddr sockaddr
-        new_status <- newMVar Connected
-        return (MkSocket new_sock family stype protocol new_status, addr)
+accept sock =
+  withFdSocket sock $ \s -> do
+    sockaddr <- getSocketName sock
+    let sz = sizeOfSocketAddress sockaddr
+    allocaBytes sz $ \ sock_addr_ptr -> do
+      with sz $ \ ptr_len -> do
+        new_sock_fd <- throwSocketErrorIfMinus1RetryMayBlock "accept"
+                    (T.threadWaitRead (fromIntegral s)) $
+                    c_accept s sock_addr_ptr (castPtr ptr_len)
+        setNonBlocking (fromIntegral new_sock_fd)
+        addr <- peekSocketAddress sock_addr_ptr
+        new_sock <- mkSocket (fromIntegral new_sock_fd)
+        NS.connect new_sock addr
+        return (new_sock, addr)
 
 mkInvalidRecvArgError :: String -> IOError
 mkInvalidRecvArgError loc = ioeSetErrorString (mkIOError InvalidArgument
