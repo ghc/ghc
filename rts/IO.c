@@ -20,6 +20,10 @@
 #include "HsFFI.h"
 
 #include "IO.h"
+#include "Capability.h"
+
+/* Some things declared in rts/IOManager.h are defined here */
+#include "rts/IOManager.h"
 
 #if defined(mingw32_HOST_OS) && !defined(THREADED_RTS)
 #include "win32/AsyncMIO.h"
@@ -110,3 +114,18 @@ void initCapabilityIOManager(CapIOManager *iomgr USED_IF_THREADS_AND_NOT_MINGW32
 
 }
 
+/* Declared in rts/IOManager.h. Used only by the MIO threaded I/O manager on
+ * Unix platforms.
+ */
+#if !defined(mingw32_HOST_OS)
+void
+setIOManagerControlFd(uint32_t cap_no USED_IF_THREADS, int fd USED_IF_THREADS) {
+#if defined(THREADED_RTS)
+    if (cap_no < n_capabilities) {
+        RELAXED_STORE(&capabilities[cap_no]->iomgr.control_fd, fd);
+    } else {
+        errorBelch("warning: setIOManagerControlFd called with illegal capability number.");
+    }
+#endif
+}
+#endif
