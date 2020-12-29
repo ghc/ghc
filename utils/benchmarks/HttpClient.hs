@@ -1,16 +1,14 @@
 {-# LANGUAGE BangPatterns, FlexibleContexts, OverloadedStrings #-}
 
 import Text.Printf
-import System.Event.Clock
-import qualified Data.Attoparsec as A (parseWith)
-import qualified Data.Attoparsec.Char8 as A
+import qualified Data.Attoparsec.ByteString as A (feed, parseWith, IResult(..), parse)
+import qualified Data.Attoparsec.ByteString.Char8 as C
 import RFC2616
 import Control.Exception
 import Control.Concurrent.QSemN
 import Control.Monad
-import Network.Socket hiding (connect, recv)
+import Network.Socket hiding (connect)
 import System.Console.GetOpt
-import Data.Function
 import Data.Monoid
 import GHC.Conc (numCapabilities)
 import Args (ljust, parseArgs, positive, theLast)
@@ -19,10 +17,11 @@ import System.Environment (getArgs)
 import qualified Data.ByteString.Char8 as B
 import Text.Parsec
 import Text.Parsec.String
-import Control.Applicative hiding (many, (<|>))
 import Data.Char (isSpace)
-import System.Event.Thread
-import EventSocket
+import GHC.Event (ensureIOManagerIsRunning)
+import EventSocket (connect, recv, sendAll)
+import Data.Time.Clock (diffUTCTime, getCurrentTime, nominalDiffTimeToSeconds)
+import qualified Data.Semigroup as S
 
 type URL = (String, String, String)
 
@@ -56,27 +55,28 @@ client ctors reqs = do
                   A.parseWith refill RFC2616.response
           case resp of
             err@(A.Partial _) -> print err
-            err@(A.Fail bs _ msg) -> print (msg, B.take 10 bs)
-            A.Done bs (st, chdrs) -> do
+            A.Fail bs _ msg -> print (msg, B.take 10 bs)
+            A.Done bs (_, chdrs) -> do
               let hdrs  = map lowerHeader chdrs
-                  close = Header "connection" ["close"]
-                  contentLength = case A.parse A.decimal (B.concat (lookupHeader "content-length" hdrs)) `A.feed` "" of
+                  closeHeader = Header "connection" ["close"]
+                  contentLength = case A.parse C.decimal (B.concat
+                           (lookupHeader "content-length" hdrs)) `A.feed` "" of
                                     A.Done _ n -> n
-                                    err -> error (show chdrs)
+                                    _ -> error (show chdrs)
               let slurp !n s = do
                     let len = B.length s
                     if len == 0 || len >= n
                       then return $! B.drop n s
                       else slurp (n-len) =<< recv sock 65536
               if B.length bs >= contentLength
-                then if reqno >= reqs || close `elem` hdrs
+                then if reqno >= reqs || closeHeader `elem` hdrs
                      then return ()
                      else loop (B.drop contentLength bs) (reqno+1) sock reqStart
                 else slurp contentLength bs >>= \s ->
-                     if reqno >= reqs || close `elem` hdrs
+                     if reqno >= reqs || closeHeader `elem` hdrs
                      then return ()
                      else loop s (reqno+1) sock reqStart
-    bracket connector (sClose . fst) . uncurry $ loop "" 1
+    bracket connector (close . fst) . uncurry $ loop "" 1
 
 
 main = do
@@ -92,12 +92,12 @@ main = do
   sem <- newQSemN 0
   start <- getCurrentTime
   replicateM_ clients $ do
-    forkIO $ (client (take conns (cycle ctors)) requests `finally` signalQSemN sem 1)
+    _ <- forkIO $ client (take conns (cycle ctors)) requests `finally` signalQSemN sem 1
     return ()
   waitQSemN sem clients
   end <- getCurrentTime
-  let elapsed = end - start
-      rate = fromIntegral total / elapsed
+  let elapsed = realToFrac (nominalDiffTimeToSeconds $ diffUTCTime end start) :: Double
+      rate = realToFrac (fromIntegral total / elapsed) :: Double
   printf "%.6g reqs/sec in %.6g secs\n" rate elapsed
 
 ------------------------------------------------------------------------
@@ -123,13 +123,20 @@ instance Monoid Config where
         , cfgRequests    = mempty
         }
 
-    mappend a b = Config {
-          cfgClients     = app cfgClients a b
-        , cfgConnections = app cfgConnections a b
-        , cfgRequests    = app cfgRequests a b
-        }
-      where app :: (Monoid b) => (a -> b) -> a -> a -> b
-            app = on mappend
+    mappend = (<>)
+
+instance S.Semigroup Config where
+  Config {
+      cfgClients     = a
+    , cfgConnections = b
+    , cfgRequests    = c
+    } <> Config { cfgClients     = d
+                , cfgConnections = e
+                , cfgRequests    = f
+                } =
+    Config { cfgClients     = a <> d
+           , cfgConnections = b <> e
+           , cfgRequests    = c <> f }
 
 defaultOptions :: [OptDescr (IO Config)]
 defaultOptions = [
