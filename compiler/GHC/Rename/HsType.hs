@@ -2,7 +2,6 @@
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies        #-}
-{-# LANGUAGE ViewPatterns        #-}
 
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
