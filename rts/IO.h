@@ -119,7 +119,7 @@ INLINE_HEADER bool emptyPendingTimeouts(CapIOManager *iomgr);
  * Defined in posix/Select.c
  *         or win32/AwaitEvent.c
  */
-RTS_PRIVATE void awaitEvent(bool wait);
+RTS_PRIVATE void awaitEvent(Capability *cap, bool wait);
 #endif
 
 /* Pedantic warning cleanliness
