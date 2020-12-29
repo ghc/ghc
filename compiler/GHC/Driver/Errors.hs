@@ -1,5 +1,3 @@
-{-# LANGUAGE ViewPatterns #-}
-
 module GHC.Driver.Errors (
     warningsToMessages
   , printOrThrowWarnings
