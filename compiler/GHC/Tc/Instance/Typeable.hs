@@ -4,10 +4,9 @@
 -}
 
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE MultiWayIf #-}
 
 module GHC.Tc.Instance.Typeable(mkTypeableBinds, tyConIsTypeable) where
 
