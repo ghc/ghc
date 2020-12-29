@@ -8,8 +8,9 @@ module Args
     , printUsage
     ) where
 
-import Data.Monoid (Monoid(..), Last(..))
-import System.Console.GetOpt (OptDescr, ArgOrder(Permute), getOpt, usageInfo)
+import Data.Monoid (Last(..))
+import System.Console.GetOpt (OptDescr, ArgOrder(Permute),
+                               getOpt, usageInfo)
 import System.Environment (getProgName)
 import System.Exit (ExitCode(..), exitWith)
 import System.IO (hPutStrLn, stderr)
@@ -19,15 +20,15 @@ theLast :: (cfg -> Last a)    -- ^ Field to access.
         -> cfg
         -> a
 theLast f cfg = case f cfg of
-                  Last Nothing  -> error "some horrible config sin has occurred"
-                  Last (Just a) -> a
+  Last Nothing  -> error "some horrible config sin has occurred"
+  Last (Just a) -> a
 
 -- | Parse command line options.
 parseArgs :: Monoid cfg => cfg -> [OptDescr (IO cfg)] -> [String]
           -> IO (cfg, [String])
 parseArgs defCfg options args =
   case getOpt Permute options args of
-    (_, _, (err:_)) -> parseError err
+    (_, _, err:_) -> parseError err
     (opts, rest, _) -> do
       cfg <- (mappend defCfg . mconcat) `fmap` sequence opts
       return (cfg, rest)
@@ -69,6 +70,5 @@ printUsage options exitCode = do
   putStr (usageInfo ("Usage: " ++ p ++ " [OPTIONS] [ARGS]") options)
   mapM_ putStrLn [
        ""
-     , "hi mom!"
     ]
   exitWith exitCode
