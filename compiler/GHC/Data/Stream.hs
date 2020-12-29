@@ -1,6 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE TupleSections #-}
 -- -----------------------------------------------------------------------------
 --
 -- (c) The University of Glasgow 2012
