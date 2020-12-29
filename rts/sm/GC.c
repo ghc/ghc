@@ -537,8 +537,6 @@ GarbageCollect (uint32_t collect_gen,
       markCapability(mark_root, gct, cap, true/*don't mark sparks*/);
   }
 
-  markScheduler(mark_root, gct);
-
   // Mark the weak pointer list, and prepare to detect dead weak pointers.
   markWeakPtrList();
   initWeakForGC();

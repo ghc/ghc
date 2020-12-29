@@ -25,7 +25,6 @@
 #include "NonMovingSweep.h"
 #include "NonMovingCensus.h"
 #include "StablePtr.h" // markStablePtrTable
-#include "Schedule.h" // markScheduler
 #include "Weak.h" // dead_weak_ptr_list
 
 struct NonmovingHeap nonmovingHeap;
@@ -949,7 +948,6 @@ void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
         markCapability((evac_fn)markQueueAddRoot, mark_queue,
                 capabilities[n], true/*don't mark sparks*/);
     }
-    markScheduler((evac_fn)markQueueAddRoot, mark_queue);
     nonmovingMarkWeakPtrList(mark_queue, *dead_weaks);
     markStablePtrTable((evac_fn)markQueueAddRoot, mark_queue);
 
