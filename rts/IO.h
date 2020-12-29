@@ -22,6 +22,7 @@
 #include "BeginPrivate.h"
 
 #include "sm/GC.h" // for evac_fn
+#include "posix/Select.h" // for LowResTime TODO: switch to normal Time
 
 /* Init hook: called from hs_init_ghc.
  */
@@ -59,6 +60,24 @@ RTS_PRIVATE void initCapabilityIOManager(CapIOManager *iomgr);
  */
 RTS_PRIVATE void markCapabilityIOManager(evac_fn evac, void *user,
                                          CapIOManager *iomgr);
+
+#if !defined(THREADED_RTS)
+/* Add a thread to the end of the queue of threads blocked on I/O.
+ *
+ * This is used by the select() and the Windows MIO non-threaded I/O manager
+ * implementation.
+ */
+RTS_PRIVATE void appendToIOBlockedQueue(StgTSO *tso);
+
+/* Insert a thread into the queue of threads blocked on timers.
+ *
+ * This is used by the select() I/O manager implementation only.
+ *
+ * The sleeping queue is defined for other non-threaded I/O managers but not
+ * used. This is a wart that should be excised.
+ */
+RTS_PRIVATE void insertIntoSleepingQueue(StgTSO *tso, LowResTime target);
+#endif
 
 #include "EndPrivate.h"
 
