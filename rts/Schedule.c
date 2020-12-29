@@ -2797,11 +2797,6 @@ freeScheduler( void )
 #endif
 }
 
-void markScheduler (evac_fn evac STG_UNUSED,
-                    void *user STG_UNUSED)
-{
-}
-
 /* -----------------------------------------------------------------------------
    performGC
 
