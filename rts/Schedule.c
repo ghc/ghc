@@ -397,8 +397,10 @@ schedule (Capability *initialCapability, Task *task)
      * the user specified "context switch as often as possible", with
      * +RTS -C0
      */
-    if (RtsFlags.ConcFlags.ctxtSwitchTicks == 0
-        && !emptyThreadQueues(cap)) {
+    if (RtsFlags.ConcFlags.ctxtSwitchTicks == 0 &&
+        (!emptyRunQueue(cap) ||
+         !emptyPendingIO(cap->iomgr) ||
+         !emptyPendingTimeouts(cap->iomgr))) {
         RELAXED_STORE(&cap->context_switch, 1);
     }
 
@@ -909,7 +911,7 @@ scheduleCheckBlockedThreads(Capability *cap USED_IF_NOT_THREADS)
     // sleeping_queue or the blocked_queue, so both queues will _always_ be
     // empty and so awaitEvent will _never_ be called here for WinIO. This may
     // explain why there is a second call to awaitEvent below for mingw32.
-    if ( !EMPTY_BLOCKED_QUEUE(cap) || !EMPTY_SLEEPING_QUEUE(cap) )
+    if ( !emptyPendingIO(cap->iomgr) || !emptyPendingTimeouts(cap->iomgr) )
     {
         awaitEvent (emptyRunQueue(cap));
     }
@@ -930,7 +932,13 @@ scheduleDetectDeadlock (Capability **pcap, Task *task)
      * other tasks are waiting for work, we must have a deadlock of
      * some description.
      */
-    if ( emptyThreadQueues(cap) )
+    if ( emptyRunQueue(cap) &&
+         /* TODO: this test is highly dubious for the WinIO case since the
+            emptyPendingIO test is always true, even when there is I/O pending.
+            Is this why we need the special BlockedOnIOCompletion case below?
+          */
+         emptyPendingIO(cap->iomgr) &&
+         emptyPendingTimeouts(cap->iomgr) )
     {
 #if defined(THREADED_RTS)
         /*
