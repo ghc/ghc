@@ -2143,7 +2143,6 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
            home_unit       = hsc_home_unit hsc_env
        map1 <- case backend dflags of
          NoBackend   -> enableCodeGenForTH home_unit default_backend map0
-         Interpreter -> enableCodeGenForUnboxedSums default_backend map0
          _           -> return map0
        if null errs
          then pure $ concat $ nodeMapElts map1
@@ -2240,28 +2239,8 @@ enableCodeGenForTH home_unit =
       -- can't compile anything anyway! See #16219.
       isHomeUnitDefinite home_unit
 
--- | Update the every ModSummary that is depended on
--- by a module that needs unboxed tuples. We enable codegen to
--- the specified target, disable optimization and change the .hi
--- and .o file locations to be temporary files.
---
--- This is used in order to load code that uses unboxed tuples
--- or sums into GHCi while still allowing some code to be interpreted.
-enableCodeGenForUnboxedSums :: Backend
-  -> NodeMap [Either ErrorMessages ModSummary]
-  -> IO (NodeMap [Either ErrorMessages ModSummary])
-enableCodeGenForUnboxedSums =
-  enableCodeGenWhen condition should_modify TFL_GhcSession TFL_CurrentModule
-  where
-    condition ms =
-      xopt LangExt.UnboxedSums (ms_hspp_opts ms) &&
-      not (gopt Opt_ByteCode (ms_hspp_opts ms)) &&
-      (isBootSummary ms == NotBoot)
-    should_modify (ModSummary { ms_hspp_opts = dflags }) =
-      backend dflags == Interpreter
-
--- | Helper used to implement 'enableCodeGenForTH' and
--- 'enableCodeGenForUnboxedSums'. In particular, this enables
+-- | Helper used to implement 'enableCodeGenForTH'.
+-- In particular, this enables
 -- unoptimized code generation for all modules that meet some
 -- condition (first parameter), or are dependencies of those
 -- modules. The second parameter is a condition to check before
