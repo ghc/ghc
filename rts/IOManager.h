@@ -22,6 +22,7 @@
 #include "BeginPrivate.h"
 
 #include "sm/GC.h" // for evac_fn
+#include "posix/Select.h" // for LowResTime TODO: switch to normal Time
 
 
 /* The per-capability data structures belonging to the I/O manager.
@@ -103,6 +104,25 @@ void wakeupIOManager(void);
 /* GC hook: mark any per-capability GC roots the I/O manager uses.
  */
 void markCapabilityIOManager(evac_fn evac, void *user, CapIOManager *iomgr);
+
+
+#if !defined(THREADED_RTS)
+/* Add a thread to the end of the queue of threads blocked on I/O.
+ *
+ * This is used by the select() and the Windows MIO non-threaded I/O manager
+ * implementation.
+ */
+void appendToIOBlockedQueue(StgTSO *tso);
+
+/* Insert a thread into the queue of threads blocked on timers.
+ *
+ * This is used by the select() I/O manager implementation only.
+ *
+ * The sleeping queue is defined for other non-threaded I/O managers but not
+ * used. This is a wart that should be excised.
+ */
+void insertIntoSleepingQueue(StgTSO *tso, LowResTime target);
+#endif
 
 
 /* Pedantic warning cleanliness

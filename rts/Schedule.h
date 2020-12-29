@@ -155,22 +155,6 @@ peekRunQueue (Capability *cap)
 
 void promoteInRunQueue (Capability *cap, StgTSO *tso);
 
-/* Add a thread to the end of the blocked queue.
- */
-#if !defined(THREADED_RTS)
-INLINE_HEADER void
-appendToBlockedQueue(StgTSO *tso)
-{
-    ASSERT(tso->_link == END_TSO_QUEUE);
-    if (blocked_queue_hd == END_TSO_QUEUE) {
-        blocked_queue_hd = tso;
-    } else {
-        setTSOLink(&MainCapability, blocked_queue_tl, tso);
-    }
-    blocked_queue_tl = tso;
-}
-#endif
-
 /* Check whether various thread queues are empty
  */
 INLINE_HEADER bool

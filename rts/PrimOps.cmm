@@ -2571,18 +2571,6 @@ stg_whereFromzh (P_ clos)
    Thread I/O blocking primitives
    -------------------------------------------------------------------------- */
 
-/* Add a thread to the end of the blocked queue. (C-- version of the C
- * macro in Schedule.h).
- */
-#define APPEND_TO_BLOCKED_QUEUE(tso)                    \
-    ASSERT(StgTSO__link(tso) == END_TSO_QUEUE);         \
-    if (W_[blocked_queue_hd] == END_TSO_QUEUE) {        \
-        W_[blocked_queue_hd] = tso;                     \
-    } else {                                            \
-        ccall setTSOLink(MyCapability() "ptr", W_[blocked_queue_tl] "ptr", tso); \
-    }                                                   \
-    W_[blocked_queue_tl] = tso;
-
 stg_waitReadzh ( W_ fd )
 {
 #if defined(THREADED_RTS)
@@ -2594,7 +2582,7 @@ stg_waitReadzh ( W_ fd )
     StgTSO_block_info(CurrentTSO) = fd;
     // No locking - we're not going to use this interface in the
     // threaded RTS anyway.
-    APPEND_TO_BLOCKED_QUEUE(CurrentTSO);
+    ccall appendToIOBlockedQueue(CurrentTSO "ptr");
     jump stg_block_noregs();
 #endif
 }
@@ -2610,7 +2598,7 @@ stg_waitWritezh ( W_ fd )
     StgTSO_block_info(CurrentTSO) = fd;
     // No locking - we're not going to use this interface in the
     // threaded RTS anyway.
-    APPEND_TO_BLOCKED_QUEUE(CurrentTSO);
+    ccall appendToIOBlockedQueue(CurrentTSO "ptr");
     jump stg_block_noregs();
 #endif
 }
@@ -2647,32 +2635,16 @@ stg_delayzh ( W_ us_delay )
      * delayed thread on the blocked_queue.
      */
     StgTSO_why_blocked(CurrentTSO) = BlockedOnDoProc::I16;
-    APPEND_TO_BLOCKED_QUEUE(CurrentTSO);
+    ccall appendToIOBlockedQueue(CurrentTSO "ptr");
     jump stg_block_async_void();
 
 #else
-
 
     (target) = ccall getDelayTarget(us_delay);
 
     StgTSO_block_info(CurrentTSO) = target;
 
-    /* Insert the new thread in the sleeping queue. */
-    prev = NULL;
-    t = W_[sleeping_queue];
-while:
-    if (t != END_TSO_QUEUE && StgTSO_block_info(t) < target) {
-        prev = t;
-        t = StgTSO__link(t);
-        goto while;
-    }
-
-    StgTSO__link(CurrentTSO) = t;
-    if (prev == NULL) {
-        W_[sleeping_queue] = CurrentTSO;
-    } else {
-        ccall setTSOLink(MyCapability() "ptr", prev "ptr", CurrentTSO);
-    }
+    ccall insertIntoSleepingQueue(CurrentTSO "ptr", target);
     jump stg_block_noregs();
 #endif
 #endif /* !THREADED_RTS */
@@ -2700,7 +2672,7 @@ stg_asyncReadzh ( W_ fd, W_ is_sock, W_ len, W_ buf )
     StgAsyncIOResult_len(ares)     = 0;
     StgAsyncIOResult_errCode(ares) = 0;
     StgTSO_block_info(CurrentTSO)  = ares;
-    APPEND_TO_BLOCKED_QUEUE(CurrentTSO);
+    ccall appendToIOBlockedQueue(CurrentTSO "ptr");
     jump stg_block_async();
 #endif
 }
@@ -2725,7 +2697,7 @@ stg_asyncWritezh ( W_ fd, W_ is_sock, W_ len, W_ buf )
     StgAsyncIOResult_len(ares)     = 0;
     StgAsyncIOResult_errCode(ares) = 0;
     StgTSO_block_info(CurrentTSO)  = ares;
-    APPEND_TO_BLOCKED_QUEUE(CurrentTSO);
+    ccall appendToIOBlockedQueue(CurrentTSO "ptr");
     jump stg_block_async();
 #endif
 }
@@ -2750,7 +2722,7 @@ stg_asyncDoProczh ( W_ proc, W_ param )
     StgAsyncIOResult_len(ares)     = 0;
     StgAsyncIOResult_errCode(ares) = 0;
     StgTSO_block_info(CurrentTSO) = ares;
-    APPEND_TO_BLOCKED_QUEUE(CurrentTSO);
+    ccall appendToIOBlockedQueue(CurrentTSO "ptr");
     jump stg_block_async();
 #endif
 }
