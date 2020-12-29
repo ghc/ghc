@@ -30,7 +30,6 @@
 #include "Sparks.h"
 #include "Capability.h"
 #include "Task.h"
-#include "AwaitEvent.h"
 #include "IOManager.h"
 #if defined(mingw32_HOST_OS)
 #include "win32/MIOManager.h"
@@ -317,6 +316,9 @@ schedule (Capability *initialCapability, Task *task)
         /* Notify the I/O manager that we have nothing to do.  If there are
            any outstanding I/O requests we'll block here.  If there are not
            then this is a user error and we will abort soon.  */
+        /* TODO: see if we can rationalise these two awaitEvent calls before
+         *       and after scheduleDetectDeadlock().
+         */
         awaitEvent (emptyRunQueue(cap));
 #else
         ASSERT(sched_state >= SCHED_INTERRUPTING);
@@ -900,17 +902,23 @@ static void
 scheduleCheckBlockedThreads(Capability *cap USED_IF_NOT_THREADS)
 {
 #if !defined(THREADED_RTS)
-    //
-    // Check whether any waiting threads need to be woken up.  If the
-    // run queue is empty, and there are no other tasks running, we
-    // can wait indefinitely for something to happen.
-    //
-    // TODO: this empty-queue test is highly dubious because it only makes
-    // sense for some I/O managers. The sleeping_queue is _only_ used by the
-    // select() I/O manager. The WinIO I/O manager does not use either the
-    // sleeping_queue or the blocked_queue, so both queues will _always_ be
-    // empty and so awaitEvent will _never_ be called here for WinIO. This may
-    // explain why there is a second call to awaitEvent below for mingw32.
+    /* Check whether there is any completed I/O or expired timers. If so,
+     * process the competions as appropriate, which will typically cause some
+     * waiting threads to be woken up.
+     *
+     * If the run queue is empty, and there are no other threads running, we
+     * can wait indefinitely for something to happen.
+     *
+     * TODO: see if we can rationalise these two awaitEvent calls before
+     * and after scheduleDetectDeadlock()
+     *
+     * TODO: these empty-queue tests are highly dubious because they only make
+     * sense for some I/O managers. The sleeping_queue is _only_ used by the
+     * select() I/O manager. The WinIO I/O manager does not use either the
+     * sleeping_queue or the blocked_queue, so both queues will _always_ be
+     * empty and so awaitEvent will _never_ be called here for WinIO. This may
+     * explain why there is a second call to awaitEvent below for mingw32.
+     */
     if (anyPendingTimeoutsOrIO(cap->iomgr))
     {
         awaitEvent (emptyRunQueue(cap));
