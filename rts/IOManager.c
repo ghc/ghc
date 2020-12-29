@@ -150,6 +150,13 @@ void wakeupIOManager(void)
 }
 
 
+void markCapabilityIOManager(evac_fn evac STG_UNUSED,
+                             void *user STG_UNUSED,
+                             CapIOManager *iomgr STG_UNUSED)
+{
+}
+
+
 /* Declared in rts/IOInterface.h. Used only by the MIO threaded I/O manager on
  * Unix platforms.
  */

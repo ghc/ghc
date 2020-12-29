@@ -21,6 +21,9 @@
 
 #include "BeginPrivate.h"
 
+#include "sm/GC.h" // for evac_fn
+
+
 /* The per-capability data structures belonging to the I/O manager.
  *
  * It can be accessed as cap->iomgr.
@@ -95,6 +98,11 @@ void exitIOManager(bool wait_threads);
  * manager if it waa blocked waiting.
  */
 void wakeupIOManager(void);
+
+
+/* GC hook: mark any per-capability GC roots the I/O manager uses.
+ */
+void markCapabilityIOManager(evac_fn evac, void *user, CapIOManager *iomgr);
 
 
 /* Pedantic warning cleanliness

@@ -1323,6 +1323,8 @@ markCapability (evac_fn evac, void *user, Capability *cap,
     }
 #endif
 
+    markCapabilityIOManager(evac, user, cap->iomgr);
+
     // Free STM structures for this Capability
     stmPreGCHook(cap);
 }
