@@ -95,5 +95,95 @@ RTS_PRIVATE void appendToIOBlockedQueue(StgTSO *tso);
 RTS_PRIVATE void insertIntoSleepingQueue(StgTSO *tso, LowResTime target);
 #endif
 
+/* Test to see if there are any in-flight I/O operations with the I/O manager.
+ *
+ * This is used by the scheduler as part of deadlock-detection, and the
+ * "context switch as often as possible" test.
+ */
+INLINE_HEADER bool emptyPendingIO(CapIOManager *iomgr);
+
+/* Test to see if there are any pending timeouts with the I/O manager.
+ *
+ * This is used by the scheduler as part of deadlock-detection, and the
+ * "context switch as often as possible" test.
+ */
+INLINE_HEADER bool emptyPendingTimeouts(CapIOManager *iomgr);
+
+
+/* Pedantic warning cleanliness
+ */
+#if !defined(THREADED_RTS) && defined(mingw32_HOST_OS)
+#define USED_IF_NOT_THREADS_AND_MINGW32
+#else
+#define USED_IF_NOT_THREADS_AND_MINGW32 STG_UNUSED
+#endif
+
+#if defined(THREADED_RTS) && !defined(mingw32_HOST_OS)
+#define USED_IF_THREADS_AND_NOT_MINGW32
+#else
+#define USED_IF_THREADS_AND_NOT_MINGW32 STG_UNUSED
+#endif
+
+#if !defined(THREADED_RTS) && !defined(mingw32_HOST_OS)
+#define USED_IF_NOT_THREADS_AND_NOT_MINGW32
+#else
+#define USED_IF_NOT_THREADS_AND_NOT_MINGW32 STG_UNUSED
+#endif
+
+
+/* -----------------------------------------------------------------------------
+ * INLINE functions... private from here on down.
+ *
+ * Some of these hooks are performance sensitive so parts of them are
+ * implemented here so they can be inlined.
+ * -----------------------------------------------------------------------------
+ */
+
+INLINE_HEADER bool emptyPendingIO(CapIOManager *iomgr USED_IF_NOT_THREADS)
+{
+#if defined(THREADED_RTS)
+    /* For the purpose of the scheduler, the threaded I/O managers never have
+       pending I/O. Of course in reality they do, but they're managed via other
+       primitives that the scheduler can see into (threads, MVars and foreign
+       blocking calls).
+     */
+    return true;
+#else
+#if defined(mingw32_HOST_OS)
+    /* The MIO I/O manager uses the blocked_queue, while the WinIO does not.
+       Note: the latter fact makes this test useless for the WinIO I/O manager,
+       and is the probable cause of the complication in the scheduler with
+       having to call awaitEvent in multiple places.
+     */
+    return (iomgr->blocked_queue_hd == END_TSO_QUEUE);
+#else
+    /* The select() I/O manager uses the blocked_queue.
+     */
+    return (iomgr->blocked_queue_hd == END_TSO_QUEUE);
+#endif
+#endif
+}
+
+INLINE_HEADER bool emptyPendingTimeouts(CapIOManager *iomgr
+                                          USED_IF_NOT_THREADS_AND_NOT_MINGW32)
+{
+#if defined(THREADED_RTS)
+    /* For the purpose of the scheduler, the threaded I/O managers never have
+       pending timers. Of course in reality they do, but they're managed via
+       other primitives that the scheduler can see into (threads, MVars and
+       foreign blocking calls).
+     */
+    return true;
+#else
+#if defined(mingw32_HOST_OS)
+    /* None of the Windows I/O managers use the sleeping_queue
+     */
+    return true;
+#else
+    return (iomgr->sleeping_queue == END_TSO_QUEUE);
+#endif
+#endif
+}
+
 #include "EndPrivate.h"
 
