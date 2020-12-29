@@ -1,6 +1,4 @@
-{-# LANGUAGE CPP            #-}
-{-# LANGUAGE DeriveFunctor  #-}
-{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE TypeApplications #-}
 

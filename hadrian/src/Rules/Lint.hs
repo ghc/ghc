@@ -24,19 +24,17 @@ lint lintAction = do
 
 base :: Action ()
 base = do
-  topDir   <- topDirectory
   buildDir <- buildRoot
-  let stage1Lib    = topDir </> buildDir </> "stage1/lib"
-  let machDeps     = topDir </> "includes/MachDeps.h"
-  let hsBaseConfig = topDir </> buildDir </> "stage1/libraries/base/build/include/HsBaseConfig.h"
+  let stage1Lib    = buildDir </> "stage1/lib"
+  let machDeps     = "includes/MachDeps.h"
   let ghcautoconf  = stage1Lib </> "ghcautoconf.h"
   let ghcplatform  = stage1Lib </> "ghcplatform.h"
-  need [ghcautoconf, ghcplatform, machDeps, hsBaseConfig]
-  let include0  = topDir </> "includes"
-  let include1  = topDir </> "libraries/base/include"
+  need ["stage1:lib:base", ghcautoconf, ghcplatform, machDeps]
+  let include0  = "includes"
+  let include1  = "libraries/base/include"
   let include2  = stage1Lib
-  let include3  = topDir </> buildDir </> "stage1/libraries/base/build/include"
-  let hlintYaml = topDir </> "libraries/base/.hlint.yaml"
+  let include3  = buildDir </> "stage1/libraries/base/build/include"
+  let hlintYaml = "libraries/base/.hlint.yaml"
   hostArch <- (<> "_HOST_ARCH") <$> setting HostArch
   let cmdLine = "hlint -j --cpp-define " <> hostArch <> " --cpp-include=" <> include0 <>
                 " --cpp-include=" <> include1 <>
@@ -48,20 +46,18 @@ base = do
 
 compiler :: Action ()
 compiler = do
-  topDir   <- topDirectory
   buildDir <- buildRoot
-  let stage1Lib      = topDir </> buildDir </> "stage1/lib"
-  let stage1Compiler = topDir </> buildDir </> "stage1/compiler/build"
-  let machDeps       = topDir </> "includes/MachDeps.h"
-  let hsVersions     = topDir </> "compiler/HsVersions.h"
-  let compilerDir    = topDir </> "compiler"
+  let stage1Lib      = buildDir </> "stage1/lib"
+  let stage1Compiler = buildDir </> "stage1/compiler/build"
+  let machDeps       = "includes/MachDeps.h"
+  let hsVersions     = "compiler/HsVersions.h"
+  let compilerDir    = "compiler"
   let ghcautoconf    = stage1Lib </> "ghcautoconf.h"
   let ghcplatform    = stage1Lib </> "ghcplatform.h"
-  let pmv            = stage1Compiler </> "primop-vector-uniques.hs-incl"
-  need [ghcautoconf, ghcplatform, machDeps, hsVersions, pmv]
-  let include0  = topDir </> "includes"
+  need $ mconcat [[ghcautoconf, ghcplatform], hsIncls stage1Compiler, [machDeps, hsVersions]]
+  let include0  = "includes"
   let include1  = stage1Lib
-  let hlintYaml = topDir </> "compiler/.hlint.yaml"
+  let hlintYaml = "compiler/.hlint.yaml"
   hostArch <- (<> "_HOST_ARCH") <$> setting HostArch
   let cmdLine = "hlint -j --cpp-define " <> hostArch <>
                 " --cpp-include=" <> include0 <>
@@ -73,3 +69,21 @@ compiler = do
   putBuild $ "| " <> cmdLine
   cmd_ cmdLine
 
+hsIncls :: FilePath -> [FilePath]
+hsIncls path = [ path </> "primop-vector-tycons.hs-incl"
+               , path </> "primop-vector-tys.hs-incl"
+               , path </> "primop-vector-tys-exports.hs-incl"
+               , path </> "primop-code-size.hs-incl"
+               , path </> "primop-vector-uniques.hs-incl"
+               , path </> "primop-data-decl.hs-incl"
+               , path </> "primop-tag.hs-incl"
+               , path </> "primop-list.hs-incl"
+               , path </> "primop-strictness.hs-incl"
+               , path </> "primop-fixity.hs-incl"
+               , path </> "primop-docs.hs-incl"
+               , path </> "primop-primop-info.hs-incl"
+               , path </> "primop-out-of-line.hs-incl"
+               , path </> "primop-has-side-effects.hs-incl"
+               , path </> "primop-can-fail.hs-incl"
+               , path </> "primop-commutable.hs-incl"
+               ]

@@ -36,7 +36,7 @@ import GHC.Core.DataCon
 import GHC.Core.Coercion hiding( substCo )
 import GHC.Core.Rules
 import GHC.Core.Type     hiding ( substTy )
-import GHC.Core.TyCon   ( tyConUnique, tyConName )
+import GHC.Core.TyCon   (TyCon, tyConUnique, tyConName )
 import GHC.Core.Multiplicity
 import GHC.Types.Id
 import GHC.Core.Ppr     ( pprParendExpr )
@@ -65,7 +65,6 @@ import Control.Monad    ( zipWithM )
 import Data.List (nubBy, sortBy, partition)
 import GHC.Builtin.Names ( specTyConKey )
 import GHC.Unit.Module
-import GHC.Core.TyCon ( TyCon )
 import GHC.Exts( SpecConstrAnnotation(..) )
 import Data.Ord( comparing )
 

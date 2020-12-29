@@ -1,6 +1,5 @@
 {-# LANGUAGE CPP                #-}
 {-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE MultiWayIf         #-}
 
 {-# OPTIONS_HADDOCK not-home #-}
 

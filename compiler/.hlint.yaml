@@ -7,7 +7,6 @@
 - warn: {name: Use fewer LANGUAGE pragmas}
 - warn: {name: Redundant return}
 - warn: {name: Redundant True guards}
-- warn: {name: Redundant do}
 - warn: {name: Redundant variable capture}
 - warn: {name: Redundant void}
 - warn: {name: Redundant as}
