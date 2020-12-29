@@ -521,7 +521,7 @@ withTiming' dflags what force_result prtimings action
 
     where whenPrintTimings = liftIO . when (prtimings == PrintTimings)
 
-          recordAllocs alloc = do
+          recordAllocs alloc =
             liftIO $ traceMarkerIO $ "GHC:allocs:" ++ show alloc
 
           eventBegins ctx w = do

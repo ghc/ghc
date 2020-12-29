@@ -1,7 +1,6 @@
 {-# LANGUAGE CPP                      #-}
 {-# LANGUAGE BangPatterns             #-}
 {-# LANGUAGE NondecreasingIndentation #-}
-{-# LANGUAGE LambdaCase               #-}
 {-# OPTIONS_GHC -fprof-auto-top #-}
 
 -------------------------------------------------------------------------------
@@ -1211,8 +1210,7 @@ checkSafeImports tcg_env
     cond' :: ImportedModsVal -> ImportedModsVal -> Hsc ImportedModsVal
     cond' v1 v2
         | imv_is_safe v1 /= imv_is_safe v2
-        = do
-            throwOneError $ mkPlainErrMsg (imv_span v1)
+        = throwOneError $ mkPlainErrMsg (imv_span v1)
               (text "Module" <+> ppr (imv_name v1) <+>
               (text $ "is imported both as a safe and unsafe import!"))
         | otherwise
