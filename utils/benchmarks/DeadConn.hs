@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, ForeignFunctionInterface, OverloadedStrings #-}
+{-# LANGUAGE CPP, OverloadedStrings #-}
 
 -- A simple tool that creates a number of "dead" connections to a
 -- server.  A dead connection is a connection that doesn't transmit
@@ -10,15 +10,17 @@ import EventSocket (connect, recv, sendAll)
 import Control.Concurrent (forkIO)
 import Control.Monad (forM_, forever)
 import qualified Data.ByteString.Char8 as S
-import Data.Function (on)
-import Data.Monoid (Monoid(..), Last(..))
-import Network.Socket (AddrInfo(..), SocketType(..), defaultHints, getAddrInfo,
-                       socket, sClose, withSocketsDo)
+import Data.Monoid (Last(..))
+import Network.Socket (AddrInfo(..), SocketType(..),
+                        defaultHints, getAddrInfo,
+                        socket, close, withSocketsDo)
 import System.Console.GetOpt (ArgDescr(ReqArg), OptDescr(..))
 import System.Environment (getArgs)
-import System.Event.Thread (ensureIOManagerIsRunning, threadDelay)
-import System.Posix.Resource (ResourceLimit(..), ResourceLimits(..),
+import GHC.Event (ensureIOManagerIsRunning, threadDelay)
+import System.Posix.Resource (ResourceLimit(..),
+                              ResourceLimits(..),
                               Resource(..), setResourceLimit)
+import qualified Data.Semigroup as Sem
 
 main = withSocketsDo $ do
     (cfg, _) <- parseArgs defaultConfig defaultOptions =<< getArgs
@@ -55,7 +57,7 @@ main = withSocketsDo $ do
                      threadDelay myDelay
                      s <- recv sock 256
                      if S.null s
-                       then sClose sock
+                       then close sock
                        else recvLoop
         sendLoop request
     putStrLn $ show numConns ++ " threads looping"
@@ -83,6 +85,24 @@ defaultConfig = Config
     , cfgPort     = ljust 3000
     }
 
+instance Sem.Semigroup Config where
+  Config {
+    cfgNumConns = a
+    , cfgDelay  = b
+    , cfgHost   = c
+    , cfgPort   = d
+    }
+    <> Config { cfgNumConns = e
+              , cfgDelay  = f
+              , cfgHost   = g
+              , cfgPort   = h
+              } =
+    Config { cfgNumConns = a <> e
+           , cfgDelay  = b <> f
+           , cfgHost   = c <> g
+           , cfgPort   = d <> h
+           }
+
 instance Monoid Config where
     mempty = Config
         { cfgNumConns = mempty
@@ -91,15 +111,7 @@ instance Monoid Config where
         , cfgPort     = mempty
         }
 
-    mappend a b = Config
-        { cfgNumConns = app cfgNumConns a b
-        , cfgDelay    = app cfgDelay a b
-        , cfgHost     = app cfgHost a b
-        , cfgPort     = app cfgPort a b
-        }
-      where
-        app :: (Monoid b) => (a -> b) -> a -> a -> b
-        app = on mappend
+    mappend = (<>)
 
 defaultOptions :: [OptDescr (IO Config)]
 defaultOptions = [
