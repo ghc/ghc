@@ -28,7 +28,7 @@
 static bool workerWaitingForRequests = false;
 
 void
-awaitEvent(bool wait)
+awaitEvent(Capability *cap, bool wait)
 {
   do {
     /* Try to de-queue completed IO requests
@@ -45,7 +45,7 @@ awaitEvent(bool wait)
     // startSignalHandlers(), but this is the way that posix/Select.c
     // does it and I'm feeling too paranoid to refactor it today --SDM
     if (stg_pending_events != 0) {
-        startSignalHandlers(&MainCapability);
+        startSignalHandlers(cap);
         return;
     }
 
@@ -57,7 +57,7 @@ awaitEvent(bool wait)
 
   } while (wait
            && sched_state == SCHED_RUNNING
-           && emptyRunQueue(&MainCapability)
+           && emptyRunQueue(cap)
       );
 }
 #endif

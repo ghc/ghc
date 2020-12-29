@@ -319,7 +319,7 @@ schedule (Capability *initialCapability, Task *task)
         /* TODO: see if we can rationalise these two awaitEvent calls before
          *       and after scheduleDetectDeadlock().
          */
-        awaitEvent (emptyRunQueue(cap));
+        awaitEvent (cap, emptyRunQueue(cap));
 #else
         ASSERT(sched_state >= SCHED_INTERRUPTING);
 #endif
@@ -921,7 +921,7 @@ scheduleCheckBlockedThreads(Capability *cap USED_IF_NOT_THREADS)
      */
     if (anyPendingTimeoutsOrIO(cap->iomgr))
     {
-        awaitEvent (emptyRunQueue(cap));
+        awaitEvent (cap, emptyRunQueue(cap));
     }
 #endif
 }

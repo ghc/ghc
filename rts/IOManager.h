@@ -159,7 +159,7 @@ INLINE_HEADER bool anyPendingTimeoutsOrIO(CapIOManager *iomgr);
  * Defined in posix/Select.c
  *         or win32/AwaitEvent.c
  */
-void awaitEvent(bool wait);
+void awaitEvent(Capability *cap, bool wait);
 #endif
 
 

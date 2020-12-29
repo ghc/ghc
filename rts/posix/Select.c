@@ -93,23 +93,23 @@ LowResTime getDelayTarget (HsInt us)
  * if this is true, then our time has expired.
  * (idea due to Andy Gill).
  */
-static bool wakeUpSleepingThreads (LowResTime now)
+static bool wakeUpSleepingThreads (Capability *cap, LowResTime now)
 {
+    CapIOManager *iomgr = cap->iomgr;
     StgTSO *tso;
     bool flag = false;
 
-    while (MainCapability.iomgr->sleeping_queue != END_TSO_QUEUE) {
-        tso = MainCapability.iomgr->sleeping_queue;
+    while (iomgr->sleeping_queue != END_TSO_QUEUE) {
+        tso = iomgr->sleeping_queue;
         if (((long)now - (long)tso->block_info.target) < 0) {
             break;
         }
-        MainCapability.iomgr->sleeping_queue = tso->_link;
+        iomgr->sleeping_queue = tso->_link;
         tso->why_blocked = NotBlocked;
         tso->_link = END_TSO_QUEUE;
         IF_DEBUG(scheduler, debugBelch("Waking up sleeping thread %"
                                        FMT_StgThreadID "\n", tso->id));
-        // MainCapability: this code is !THREADED_RTS
-        pushOnRunQueue(&MainCapability,tso);
+        pushOnRunQueue(cap,tso);
         flag = true;
     }
     return flag;
@@ -217,8 +217,9 @@ static enum FdState fdPollWriteState (int fd)
  *
  */
 void
-awaitEvent(bool wait)
+awaitEvent(Capability *cap, bool wait)
 {
+    CapIOManager *iomgr = cap->iomgr;
     StgTSO *tso, *prev, *next;
     fd_set rfd,wfd;
     int numFound;
@@ -243,7 +244,7 @@ awaitEvent(bool wait)
     do {
 
       now = getLowResTimeOfDay();
-      if (wakeUpSleepingThreads(now)) {
+      if (wakeUpSleepingThreads(cap, now)) {
           return;
       }
 
@@ -253,7 +254,7 @@ awaitEvent(bool wait)
       FD_ZERO(&rfd);
       FD_ZERO(&wfd);
 
-      for(tso = MainCapability.iomgr->blocked_queue_hd;
+      for(tso = iomgr->blocked_queue_hd;
           tso != END_TSO_QUEUE;
           tso = next) {
         next = tso->_link;
@@ -300,7 +301,7 @@ awaitEvent(bool wait)
           tv.tv_sec  = 0;
           tv.tv_usec = 0;
           ptv = &tv;
-      } else if (MainCapability.iomgr->sleeping_queue != END_TSO_QUEUE) {
+      } else if (iomgr->sleeping_queue != END_TSO_QUEUE) {
           /* SUSv2 allows implementations to have an implementation defined
            * maximum timeout for select(2). The standard requires
            * implementations to silently truncate values exceeding this maximum
@@ -320,8 +321,7 @@ awaitEvent(bool wait)
           const time_t max_seconds = 2678400; // 31 * 24 * 60 * 60
 
           Time min = LowResTimeToTime(
-                       MainCapability.iomgr->sleeping_queue->block_info.target
-                       - now
+                       iomgr->sleeping_queue->block_info.target - now
                      );
           tv.tv_sec  = TimeToSeconds(min);
           if (tv.tv_sec < max_seconds) {
@@ -355,7 +355,7 @@ awaitEvent(bool wait)
            */
 #if defined(RTS_USER_SIGNALS)
           if (RtsFlags.MiscFlags.install_signal_handlers && signals_pending()) {
-              startSignalHandlers(&MainCapability);
+              startSignalHandlers(cap);
               return; /* still hold the lock */
           }
 #endif
@@ -368,12 +368,12 @@ awaitEvent(bool wait)
 
           /* check for threads that need waking up
            */
-          wakeUpSleepingThreads(getLowResTimeOfDay());
+          wakeUpSleepingThreads(cap, getLowResTimeOfDay());
 
           /* If new runnable threads have arrived, stop waiting for
            * I/O and run them.
            */
-          if (!emptyRunQueue(&MainCapability)) {
+          if (!emptyRunQueue(cap)) {
               return; /* still hold the lock */
           }
       }
@@ -390,7 +390,7 @@ awaitEvent(bool wait)
            * traversed blocked TSOs. As a result you
            * can't use functions accessing 'blocked_queue_hd'.
            */
-          for(tso = MainCapability.iomgr->blocked_queue_hd;
+          for(tso = iomgr->blocked_queue_hd;
               tso != END_TSO_QUEUE;
               tso = next) {
               next = tso->_link;
@@ -429,7 +429,7 @@ awaitEvent(bool wait)
                   IF_DEBUG(scheduler,
                       debugBelch("Killing blocked thread %" FMT_StgThreadID
                                  " on bad fd=%i\n", tso->id, fd));
-                  raiseAsync(&MainCapability, tso,
+                  raiseAsync(cap, tso,
                       (StgClosure *)blockedOnBadFD_closure, false, NULL);
                   break;
               case RTS_FD_IS_READY:
@@ -438,29 +438,29 @@ awaitEvent(bool wait)
                                  tso->id));
                   tso->why_blocked = NotBlocked;
                   tso->_link = END_TSO_QUEUE;
-                  pushOnRunQueue(&MainCapability,tso);
+                  pushOnRunQueue(cap,tso);
                   break;
               case RTS_FD_IS_BLOCKING:
                   if (prev == NULL)
-                      MainCapability.iomgr->blocked_queue_hd = tso;
+                      iomgr->blocked_queue_hd = tso;
                   else
-                      setTSOLink(&MainCapability, prev, tso);
+                      setTSOLink(cap, prev, tso);
                   prev = tso;
                   break;
               }
           }
 
           if (prev == NULL)
-              MainCapability.iomgr->blocked_queue_hd =
-                MainCapability.iomgr->blocked_queue_tl = END_TSO_QUEUE;
+              iomgr->blocked_queue_hd =
+                iomgr->blocked_queue_tl = END_TSO_QUEUE;
           else {
               prev->_link = END_TSO_QUEUE;
-              MainCapability.iomgr->blocked_queue_tl = prev;
+              iomgr->blocked_queue_tl = prev;
           }
       }
 
     } while (wait && sched_state == SCHED_RUNNING
-             && emptyRunQueue(&MainCapability));
+                  && emptyRunQueue(cap));
 }
 
 #endif /* THREADED_RTS */
