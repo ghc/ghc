@@ -114,6 +114,12 @@ void initCapabilityIOManager(CapIOManager *iomgr USED_IF_THREADS_AND_NOT_MINGW32
 
 }
 
+void markCapabilityIOManager(evac_fn evac STG_UNUSED,
+                             void *user STG_UNUSED,
+                             CapIOManager *iomgr STG_UNUSED)
+{
+}
+
 /* Declared in rts/IOManager.h. Used only by the MIO threaded I/O manager on
  * Unix platforms.
  */

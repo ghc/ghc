@@ -21,6 +21,8 @@
 
 #include "BeginPrivate.h"
 
+#include "sm/GC.h" // for evac_fn
+
 /* Init hook: called from hs_init_ghc.
  */
 RTS_PRIVATE void initIOManager(void);
@@ -52,6 +54,11 @@ typedef struct {
 /* Per-capability init hook: called from initCapability().
  */
 RTS_PRIVATE void initCapabilityIOManager(CapIOManager *iomgr);
+
+/* GC hook: mark any per-capability GC roots the I/O manager uses.
+ */
+RTS_PRIVATE void markCapabilityIOManager(evac_fn evac, void *user,
+                                         CapIOManager *iomgr);
 
 #include "EndPrivate.h"
 
