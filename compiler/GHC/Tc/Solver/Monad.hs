@@ -1,5 +1,10 @@
-{-# LANGUAGE CPP, DeriveFunctor, TypeFamilies, ScopedTypeVariables, TypeApplications,
-             DerivingStrategies, GeneralizedNewtypeDeriving, ScopedTypeVariables #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates -Wno-incomplete-uni-patterns #-}
 

@@ -1,13 +1,11 @@
-{-# LANGUAGE CPP                  #-}
-{-# LANGUAGE ConstraintKinds      #-}
-{-# LANGUAGE DeriveDataTypeable   #-}
-{-# LANGUAGE FlexibleContexts     #-}
-{-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE ScopedTypeVariables  #-}
-{-# LANGUAGE StandaloneDeriving   #-}
-{-# LANGUAGE TypeApplications     #-}
-{-# LANGUAGE TypeFamilies         #-}
-{-# LANGUAGE ViewPatterns         #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
                                       -- in module Language.Haskell.Syntax.Extension
 {-

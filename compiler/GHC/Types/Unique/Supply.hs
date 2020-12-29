@@ -3,11 +3,10 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 -}
 
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE MagicHash #-}
-{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE UnboxedTuples #-}
 
 module GHC.Types.Unique.Supply (
