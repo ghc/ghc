@@ -1,9 +1,15 @@
+swap :: (# a, b #) -> (# b, a #)
+swap (# x, y #) = (# y, x #)
+
 type T1 a = a -> (# a #)
 tuple1 :: T1 a
 tuple1 x = (# x #)
 
-tuple1a :: a -> T1 a -> a
-tuple1a x f = case f x of (# y #) -> y
+tuple1_a :: T1 a -> a -> a
+tuple1_a f x = case f x of (# y #) -> y
+
+tuple1_b :: T1 a -> a -> String -> IO ()
+tuple1_b f x msg = case f x of (# _ #) -> putStrLn msg
 
 -- can still be returned in registers, pointers
 type T2p a = a -> a -> a -> a -> (# a, a, a, a #)
@@ -46,7 +52,7 @@ tuple3_a :: T3 a
            , a, a, a, a
            , a, a, a, a
            )
-tuple3_a f x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 = 
+tuple3_a f x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 =
     case f x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 of
             (# y1, y2, y3, y4, y5, y6, y7, y8, y9, y10, y11, y12 #) ->
                 (y1, y2, y3, y4, y5, y6, y7, y8, y9, y10, y11, y12)
@@ -176,7 +182,7 @@ type T5 = Int -> Word64 -> Int -> Word64
        -> (# Int, WW#, Int, WW#
            , Int, WW#, Int, WW#
            , Int, WW#, Int, WW#
-           , Int, WW#, Int, WW# 
+           , Int, WW#, Int, WW#
            #)
 
 tuple5 :: T5
@@ -217,3 +223,116 @@ tuple5_a f i1 w1 i2 w2
        , (j5, W64# x5, j6, W64# x6)
        , (j7, W64# x7, j8, W64# x8)
        )
+
+type T6 = Int ->
+        (# Int#, (# Int, (# Int#, (# #) #) #) #)
+tuple6 :: T6
+tuple6 x@(I# x#) = (# x#, (# x, (# x#, (# #) #) #) #)
+
+tuple6_a :: T6 -> Int -> String
+tuple6_a f x =
+  case f x of
+    (# x1, (# x2, (# x3, (# #) #) #) #) -> show (I# x1, (x2, (I# x3, ())))
+
+-- empty tuples and tuples with void
+
+type TV1 = Bool -> (# #)
+tuple_v1 :: TV1
+tuple_v1 _ = (# #)
+
+tuple_v1_a :: TV1 -> Bool -> Bool
+tuple_v1_a f x = case f x of (# #) -> True
+
+
+type TV2 = Bool -> (# (# #) #)
+tuple_v2 :: TV2
+tuple_v2 _ = (# (# #) #)
+
+tuple_v2_a :: TV2 -> Bool -> Bool
+tuple_v2_a f x = case f x of (# _ #) -> True
+
+
+type TV3 a = a -> (# (# #), a #)
+tuple_v3 :: TV3 a
+tuple_v3 x = (# (# #), x #)
+
+tuple_v3_a :: TV3 a -> a -> a
+tuple_v3_a f x = case f x of (# _, y #) -> y
+
+
+type TV4 a = a -> (# a, (# #) #)
+tuple_v4 :: TV4 a
+tuple_v4 x = (# x, (# #) #)
+
+tuple_v4_a :: TV4 a -> a -> a
+tuple_v4_a f x = case f x of (# y, _ #) -> y
+
+type TV5 a = a -> (# (# #), a, (# #) #)
+tuple_v5 :: TV5 a
+tuple_v5 x = (# (# #), x, (# #) #)
+
+tuple_v5_a :: TV5 a -> a -> a
+tuple_v5_a f x = case f x of (# _, x, _ #) -> x
+
+type TV6 = Int -> Double -> Int -> Double
+         -> (# Int#, (# #), Double#, (# #)
+            ,  Int#, (# #), Double#, (# #) #)
+tuple_v6 :: TV6
+tuple_v6 (I# x) (D# y) (I# z) (D# w) = (# x, (# #), y, (# #), z, (# #), w, (# #) #)
+
+tuple_v6_a :: TV6 -> Int -> Double -> Int -> Double
+           -> (Int, Double, Int, Double)
+tuple_v6_a f x y z w = case f x y z w of (# x', _, y', _, z', _, w', _ #) ->
+                                           (I# x', D# y', I# z', D# w')
+
+-- some levity polymorphic things
+lev_poly :: forall r a (b :: TYPE r).
+            (a -> a -> a -> a ->
+             a -> a -> a -> a ->
+             a -> a -> a -> a -> b) -> a -> b
+lev_poly f x = f x x x x x x x x x x x x
+
+lev_poly_a :: (t1
+                -> t2 -> (# a, b, c, d, e, f, g, h, i, j, k, l #))
+            -> t1 -> t2 -> (a, b, c, d, e, f, g, h, i, j, k, l)
+lev_poly_a lp t x =
+  case lp t x of (# x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12 #) ->
+                   (x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12)
+
+lev_poly_boxed x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12
+  = (x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12)
+
+lev_poly_b lp t x =
+  case lp t x of (x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12)
+                   -> (x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12)
+
+-- some unboxed sums
+type S1 = (# (# Int#, String #) | Bool #)
+sum1 :: Int -> Int -> String -> Bool -> S1
+sum1 0 (I# x) y _ = (# (# x, y #) | #)
+sum1 _ _      _ b = (# | b #)
+
+sum1_a :: (Int -> Int -> String -> Bool -> S1) -> Int -> Int -> String -> Bool -> Either (Int, String) Bool
+sum1_a f n x y b =
+  case f n x y b of
+    (# (# x, y #) | #) -> Left (I# x, y)
+    (# | b #)          -> Right b
+
+
+type S2 a = (# (# a, a, a, a #) | (# a, a #) | (# #) | Int# | Int #)
+sum2 :: Int -> a -> S2 a
+sum2 0 x = (# (# x, x, x, x #) | | | | #)
+sum2 1 x = (# | (# x, x #) | | | #)
+sum2 2 _ = (# | | (# #) | | #)
+sum2 n@(I# n#) _
+  | even n = (# | | | n# | #)
+  | otherwise = (# | | | | n #)
+
+sum2_a :: Show a => (Int -> a -> S2 a) -> Int -> a -> String
+sum2_a f n x =
+  case f n x of
+    (# (# x1, x2, x3, x4 #) | | | | #) -> show (x1, x2, x3, x4)
+    (# | (# x1, x2 #) | | | #)         -> show (x1, x2)
+    (# | | (# #) | | #)                -> "(# #)"
+    (# | | | x# | #)                   -> show (I# x#) ++ "#"
+    (# | | | | x #)                    -> show x

@@ -874,7 +874,7 @@ schemeT _d _s _p (StgOpApp (StgPrimCallOp {}) _args _ty)
    -- Case 2: Unboxed tuple
    -- XXX do unboxed non-tuples still work?
 schemeT d s p (StgConApp con args _tys)
-   | isUnboxedTupleDataCon con
+   | isUnboxedTupleDataCon con || isUnboxedSumDataCon con
    = returnUnboxedTuple d s p args
 
    -- Case 3: Ordinary data constructor
@@ -1021,7 +1021,7 @@ doCase d s p scrut bndr alts
         -- like (# Word# #) or (# Int#, State# RealWorld# #) do not have a
         -- tuple return frame
         ubx_tuple_frame =
-          isUnboxedTupleType bndr_ty &&
+          (isUnboxedTupleType bndr_ty || isUnboxedSumType bndr_ty) &&
           length non_void_arg_reps > 1
 
         non_void_arg_reps = non_void (typeArgReps platform bndr_ty)
@@ -1051,7 +1051,7 @@ doCase d s p scrut bndr alts
                              | otherwise       = wordSize platform
 
         (bndr_size, tuple_info, args_offsets)
-           | isUnboxedTupleType bndr_ty =
+           | ubx_tuple_frame =
                let bndr_ty = primRepCmmType platform
                    bndr_reps = filter (not.isVoidRep) (bcIdPrimReps bndr)
                    (tuple_info, args_offsets) =
@@ -1091,7 +1091,7 @@ doCase d s p scrut bndr alts
            | null real_bndrs = do
                 rhs_code <- schemeE d_alts s p_alts rhs
                 return (my_discr alt, rhs_code)
-           | isUnboxedTupleType bndr_ty =
+           | isUnboxedTupleType bndr_ty || isUnboxedSumType bndr_ty =
              let bndr_ty = primRepCmmType platform . bcIdPrimRep
                  tuple_start = d_bndr
                  (tuple_info, args_offsets) =
@@ -1189,7 +1189,8 @@ doCase d s p scrut bndr alts
           -- NB: unboxed tuple cases bind the scrut binder to the same offset
           -- as one of the alt binders, so we have to remove any duplicates here:
           rel_slots = nub $ map fromIntegral $ concatMap spread binds
-          spread (id, offset) | isUnboxedTupleType (idType id) = []
+          spread (id, offset) | isUnboxedTupleType (idType id) ||
+                                isUnboxedSumType (idType id) = []
                               | isFollowableArg (bcIdArgRep platform id) = [ rel_offset ]
                               | otherwise                      = []
                 where rel_offset = trunc16W $ bytesToWords platform (d - offset)
@@ -1978,9 +1979,11 @@ idSizeW :: Platform -> Id -> WordOff
 idSizeW platform = WordOff . argRepSizeW platform . bcIdArgRep platform
 
 -- XXX check void args
+-- XXX can't we just use the tuple case for everything?
 idSizeCon :: Platform -> Id -> ByteOff
 idSizeCon platform var
-  | isUnboxedTupleType (idType var) =
+  | isUnboxedTupleType (idType var) ||
+    isUnboxedSumType (idType var) =
     wordsToBytes platform .
     WordOff . sum . map (argRepSizeW platform . toArgRep platform) .
     bcIdPrimReps $ var

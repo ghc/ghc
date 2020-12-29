@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP, UnboxedTuples, MagicHash, ScopedTypeVariables, PolyKinds #-}
-{-# OPTIONS_GHC -fobject-code #-}
+{-# OPTIONS_GHC -fbyte-code #-}
 
 #include "MachDeps.h"
 
@@ -9,7 +9,7 @@
 #define WW Word
 #endif
 
-module Obj where
+module ByteCode where
 
 import GHC.Exts
 import GHC.Word
