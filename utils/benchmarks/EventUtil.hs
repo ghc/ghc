@@ -16,7 +16,8 @@ import System.Posix.Types (Fd)
 {-# SPECIALISE
     throwErrnoIfMinus1Retry_mayBlock
          :: String -> IO CInt -> IO CInt -> IO CInt #-}
-throwErrnoIfMinus1Retry_mayBlock :: Num a => String -> IO a -> IO a -> IO a
+throwErrnoIfMinus1Retry_mayBlock :: (Eq a, Num a) => String ->
+                                    IO a -> IO a -> IO a
 throwErrnoIfMinus1Retry_mayBlock name on_block act = do
     res <- act
     if res == -1
@@ -29,8 +30,9 @@ throwErrnoIfMinus1Retry_mayBlock name on_block act = do
                         else throwErrno name
         else return res
 
-throwErrnoIfMinus1Retry_repeatOnBlock :: Num a => String -> IO b -> IO a -> IO a
-throwErrnoIfMinus1Retry_repeatOnBlock name on_block act = do
+throwErrnoIfMinus1Retry_repeatOnBlock :: (Eq a, Num a) => String ->
+                                         IO b -> IO a -> IO a
+throwErrnoIfMinus1Retry_repeatOnBlock name on_block act =
   throwErrnoIfMinus1Retry_mayBlock name (on_block >> repeat) act
   where repeat = throwErrnoIfMinus1Retry_repeatOnBlock name on_block act
 
