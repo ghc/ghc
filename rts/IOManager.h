@@ -156,6 +156,20 @@ INLINE_HEADER bool emptyPendingIO(CapIOManager *iomgr);
 INLINE_HEADER bool emptyPendingTimeouts(CapIOManager *iomgr);
 
 
+#if !defined(THREADED_RTS)
+/* Check whether there is any completed I/O or expired timers. If so,
+ * process the competions as appropriate, which will typically cause some
+ * waiting threads to be woken up.
+ *
+ * Called from schedule() both *before* and *after* scheduleDetectDeadlock().
+ *
+ * Defined in posix/Select.c
+ *         or win32/AwaitEvent.c
+ */
+void awaitEvent(bool wait);
+#endif
+
+
 /* Pedantic warning cleanliness
  */
 #if !defined(THREADED_RTS) && defined(mingw32_HOST_OS)
