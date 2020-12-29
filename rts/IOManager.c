@@ -43,8 +43,14 @@ void initCapabilityIOManager(CapIOManager **piomgr)
       (CapIOManager *) stgMallocBytes(sizeof(CapIOManager),
                                       "initCapabilityIOManager");
 
-#if defined(THREADED_RTS) && !defined(mingw32_HOST_OS)
+#if defined(THREADED_RTS)
+#if !defined(mingw32_HOST_OS)
     iomgr->control_fd = -1;
+#endif
+#else // !defined(THREADED_RTS)
+    iomgr->blocked_queue_hd = END_TSO_QUEUE;
+    iomgr->blocked_queue_tl = END_TSO_QUEUE;
+    iomgr->sleeping_queue   = END_TSO_QUEUE;
 #endif
 
     *piomgr = iomgr;
@@ -150,11 +156,17 @@ void wakeupIOManager(void)
 #endif
 }
 
-
-void markCapabilityIOManager(evac_fn evac STG_UNUSED,
-                             void *user STG_UNUSED,
-                             CapIOManager *iomgr STG_UNUSED)
+void markCapabilityIOManager(evac_fn       evac  USED_IF_NOT_THREADS,
+                             void         *user  USED_IF_NOT_THREADS,
+                             CapIOManager *iomgr USED_IF_NOT_THREADS)
 {
+
+#if !defined(THREADED_RTS)
+    evac(user, (StgClosure **)(void *)&iomgr->blocked_queue_hd);
+    evac(user, (StgClosure **)(void *)&iomgr->blocked_queue_tl);
+    evac(user, (StgClosure **)(void *)&iomgr->sleeping_queue);
+#endif
+
 }
 
 
@@ -178,18 +190,18 @@ setIOManagerControlFd(uint32_t cap_no USED_IF_THREADS, int fd USED_IF_THREADS) {
 void appendToIOBlockedQueue(StgTSO *tso)
 {
     ASSERT(tso->_link == END_TSO_QUEUE);
-    if (blocked_queue_hd == END_TSO_QUEUE) {
-        blocked_queue_hd = tso;
+    if (MainCapability.iomgr->blocked_queue_hd == END_TSO_QUEUE) {
+        MainCapability.iomgr->blocked_queue_hd = tso;
     } else {
-        setTSOLink(&MainCapability, blocked_queue_tl, tso);
+        setTSOLink(&MainCapability, MainCapability.iomgr->blocked_queue_tl, tso);
     }
-    blocked_queue_tl = tso;
+    MainCapability.iomgr->blocked_queue_tl = tso;
 }
 
 void insertIntoSleepingQueue(StgTSO *tso, LowResTime target)
 {
     StgTSO *prev = NULL;
-    StgTSO *t = sleeping_queue;
+    StgTSO *t = MainCapability.iomgr->sleeping_queue;
     while (t != END_TSO_QUEUE && t->block_info.target < target) {
         prev = t;
         t = t->_link;
@@ -197,7 +209,7 @@ void insertIntoSleepingQueue(StgTSO *tso, LowResTime target)
 
     tso->_link = t;
     if (prev == NULL) {
-        sleeping_queue = tso;
+        MainCapability.iomgr->sleeping_queue = tso;
     } else {
         setTSOLink(&MainCapability, prev, tso);
     }
