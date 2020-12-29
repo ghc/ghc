@@ -15,3 +15,10 @@ test('CaretDiagnostics1',
      compile_fail,
      ['-fdiagnostics-show-caret -ferror-spans'])
 test('CaretDiagnostics2', normal, compile_fail, ['-fdiagnostics-show-caret'])
+
+test('IncompleteGuards', normal, compile_fail, [''])
+test('IncompletePatterns', normal, compile_fail, [''])
+test('IncompleteRecordUpdates', normal, compile_fail, [''])
+test('IncompleteUniPatterns', normal, compile_fail, [''])
+test('MissingFields', normal, compile_fail, [''])
+test('MissingMethods', normal, compile_fail, [''])
