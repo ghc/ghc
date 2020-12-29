@@ -1210,7 +1210,7 @@ sdist-ghc-prep-tree :
 	cd $(SRC_DIST_GHC_DIR) && $(MAKE) distclean
 	$(call removeTrees,$(SRC_DIST_GHC_DIR)/libraries/tarballs/)
 	$(call removeTrees,$(SRC_DIST_GHC_DIR)/libraries/stamp/)
-	$(call removeTrees,$(SRC_DIST_GHC_DIR)/hadrian/_build/ (SRC_DIST_GHC_DIR)/hadrian/dist-newstyle/)
+	$(call removeTrees,$(SRC_DIST_GHC_DIR)/hadrian/_build/ $(SRC_DIST_GHC_DIR)/hadrian/dist-newstyle/)
 	$(call removeTrees,$(SRC_DIST_GHC_DIR)/compiler/stage[123])
 	$(call removeFiles,$(SRC_DIST_GHC_DIR)/mk/build.mk)
 	$(call removeFiles,$(SRC_DIST_GHC_DIR)/rts/rts.cabal)
