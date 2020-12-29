@@ -16,7 +16,7 @@
 #include "Rts.h"
 #include "RtsFlags.h"
 #include "Schedule.h"
-#include "AwaitEvent.h"
+#include "IOManager.h"
 #include <windows.h>
 #include "win32/AsyncMIO.h"
 #include "win32/AsyncWinIO.h"
