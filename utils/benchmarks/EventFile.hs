@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, ForeignFunctionInterface #-}
+{-# LANGUAGE CPP #-}
 
 -- | File functions using System.Event instead of GHC's I/O manager.
 module EventFile
@@ -9,7 +9,6 @@ module EventFile
 import Data.ByteString (ByteString)
 import Data.ByteString.Internal (createAndTrim)
 import Data.Word (Word8)
-import qualified Data.ByteString as B
 import Foreign.Ptr (Ptr, castPtr)
 import Foreign.C.Error (eINTR, getErrno, throwErrno)
 #if __GLASGOW_HASKELL__ < 612
@@ -20,7 +19,7 @@ import GHC.IO.Exception (IOErrorType(..))
 #if defined(USE_GHC_IO_MANAGER)
 import GHC.Conc (threadWaitRead)
 #else
-import System.Event.Thread (threadWaitRead)
+import GHC.Event (threadWaitRead)
 #endif
 import System.IO.Error (ioeSetErrorString, mkIOError)
 import System.Posix.Internals (c_read)
@@ -46,6 +45,5 @@ readInner fd nbytes ptr = do
          n -> return n
 
 mkInvalidReadArgError :: String -> IOError
-mkInvalidReadArgError loc = ioeSetErrorString (mkIOError InvalidArgument
-                                               loc Nothing Nothing)
-                            "non-positive length"
+mkInvalidReadArgError loc = ioeSetErrorString
+  (mkIOError InvalidArgument loc Nothing Nothing) "non-positive length"
