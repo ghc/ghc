@@ -63,6 +63,11 @@ class (Monad m) => MonadFix m where
 
 -- Instances of MonadFix for Prelude monads
 
+-- | @since 4.16
+instance MonadFix Solo where
+    mfix f = let a = f (unSolo a) in a
+             where unSolo (Solo x) = x
+
 -- | @since 2.01
 instance MonadFix Maybe where
     mfix f = let a = f (unJust a) in a

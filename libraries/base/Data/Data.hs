@@ -127,6 +127,7 @@ import GHC.List
 import GHC.Num
 import GHC.Read
 import GHC.Show
+import GHC.Tuple (Solo (..))
 import Text.Read( reads )
 
 -- Imports for the instances
@@ -1183,6 +1184,9 @@ deriving instance (Data a, Data b) => Data (Either a b)
 
 -- | @since 4.0.0.0
 deriving instance Data ()
+
+-- | @since 4.16
+deriving instance Data a => Data (Solo a)
 
 -- | @since 4.0.0.0
 deriving instance (Data a, Data b) => Data (a,b)
