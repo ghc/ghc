@@ -26,7 +26,7 @@ module GHC.Types.Demand (
     multCard, multDmd, multSubDmd,
     -- ** Predicates on @Card@inalities and @Demand@s
     isAbs, isUsedOnce, isStrict,
-    isAbsDmd, isUsedOnceDmd, isStrUsedDmd,
+    isAbsDmd, isUsedOnceDmd, isStrUsedDmd, isStrictDmd,
     isTopDmd, isSeqDmd, isWeakDmd,
     -- ** Special demands
     evalDmd,
@@ -435,6 +435,10 @@ isTopDmd dmd = dmd == topDmd
 isAbsDmd :: Demand -> Bool
 isAbsDmd (n :* _) = isAbs n
 
+-- | Contrast with isStrictUsedDmd. See Note [Strict demands]
+isStrictDmd :: Demand -> Bool
+isStrictDmd (n :* _) = isStrict n
+
 -- | Not absent and used strictly. See Note [Strict demands]
 isStrUsedDmd :: Demand -> Bool
 isStrUsedDmd (n :* _) = isStrict n && not (isAbs n)
@@ -601,8 +605,9 @@ saturatedByOneShots n (_ :* sd) = isUsedOnce (peelManyCalls n sd)
 'isStrUsedDmd' returns true only of demands that are
    both strict
    and  used
-In particular, it is False for <B>, which can and does
-arise in, say (#7319)
+
+In particular, it is False for <B> (i.e. strict and not used,
+cardinality C_10), which can and does arise in, say (#7319)
    f x = raise# <some exception>
 Then 'x' is not used, so f gets strictness <B> -> .
 Now the w/w generates

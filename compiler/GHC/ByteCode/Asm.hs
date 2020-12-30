@@ -473,10 +473,11 @@ assembleI platform i = case i of
       LitNumWord64  -> int64 (fromIntegral i)
       LitNumInteger -> panic "GHC.ByteCode.Asm.literal: LitNumInteger"
       LitNumNatural -> panic "GHC.ByteCode.Asm.literal: LitNumNatural"
+
     -- We can lower 'LitRubbish' to an arbitrary constant, but @NULL@ is most
     -- likely to elicit a crash (rather than corrupt memory) in case absence
     -- analysis messed up.
-    literal LitRubbish         = int 0
+    literal (LitRubbish {}) = int 0
 
     litlabel fs = lit [BCONPtrLbl fs]
     addr (RemotePtr a) = words [fromIntegral a]
