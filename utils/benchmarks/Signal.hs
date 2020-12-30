@@ -1,18 +1,27 @@
+{-# LANGUAGE FlexibleContexts #-}
+
 import Control.Concurrent
-import System.Event.Signal
-import System.Posix.Signals
+import System.Posix.Signals (Handler(Catch), sigINT,
+                              sigUSR1, sigUSR2,
+                              blockSignals,
+                              fullSignalSet, installHandler)
+import GHC.Event (loop, EventManager)
+import qualified GHC.Event.Manager as EM (new, emState)
+import GHC.IORef (readIORef)
 
-handler sk = do
-  print (skSignal sk)
+handler :: EventManager -> Handler
+handler em = do
+  Catch (readIORef (EM.emState em) >>= print)
 
+main :: IO ()
 main = do
-  mgr <- new
-  blockAllSignals
-  registerHandler_ mgr sigINT handler
+  mgr <- EM.new
+  blockSignals fullSignalSet
+  _ <- installHandler sigINT (handler mgr) (Just fullSignalSet)
   putStrLn "INT handler installed"
-  forkIO $ do
-    threadDelay 1000000
-    registerHandler mgr sigUSR1 handler
-    registerHandler mgr sigUSR2 handler
-    putStrLn "USR1 and USR2 handlers installed"
+  _ <- forkIO $ do
+         threadDelay 1000000
+         _ <- installHandler sigUSR1 (handler mgr) (Just fullSignalSet)
+         _ <- installHandler sigUSR2 (handler mgr) (Just fullSignalSet)
+         putStrLn "USR1 and USR2 handlers installed"
   loop mgr
