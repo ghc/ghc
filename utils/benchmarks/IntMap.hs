@@ -20,5 +20,5 @@ ascFrom max = go 0 IM.empty
     go :: Int -> IntMap Int -> IntMap Int
     go n !mp
         | n >= max  = mp
-        | otherwise = let (_, !mp') = IM.insertWith const n n mp
+        | otherwise = let !mp' = IM.insertWith const n n mp
                       in go (n + 1) mp'
