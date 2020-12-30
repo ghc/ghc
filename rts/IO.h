@@ -83,7 +83,7 @@ RTS_PRIVATE void markCapabilityIOManager(evac_fn evac, void *user,
  * This is used by the select() and the Windows MIO non-threaded I/O manager
  * implementation.
  */
-RTS_PRIVATE void appendToIOBlockedQueue(StgTSO *tso);
+RTS_PRIVATE void appendToIOBlockedQueue(Capability *cap, StgTSO *tso);
 
 /* Insert a thread into the queue of threads blocked on timers.
  *
@@ -92,7 +92,8 @@ RTS_PRIVATE void appendToIOBlockedQueue(StgTSO *tso);
  * The sleeping queue is defined for other non-threaded I/O managers but not
  * used. This is a wart that should be excised.
  */
-RTS_PRIVATE void insertIntoSleepingQueue(StgTSO *tso, LowResTime target);
+RTS_PRIVATE void insertIntoSleepingQueue(Capability *cap, StgTSO *tso,
+                                         LowResTime target);
 #endif
 
 /* Test to see if there are any in-flight I/O operations with the I/O manager.
