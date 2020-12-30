@@ -1,22 +1,21 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, BangPatterns #-}
 
 -- Benchmark 'threadDelay' by forking N threads which sleep for a
 -- number of milliseconds and wait for them all to finish.
 
 import Args (ljust, parseArgs, positive, theLast)
 import Control.Concurrent (forkIO, runInUnboundThread)
-import Control.Monad (when)
-import Data.Function (on)
-import Data.Monoid (Monoid(..), Last(..))
+import Control.Monad (unless, when)
+import qualified Data.Semigroup as Sem
+import Data.Monoid (Last(..))
 import System.Console.GetOpt (ArgDescr(ReqArg), OptDescr(..))
 import System.Environment (getArgs)
-import System.Event.Thread (ensureIOManagerIsRunning)
+import GHC.Event (ensureIOManagerIsRunning)
 import Control.Concurrent.STM
-
-#ifdef USE_GHC_IO_MANAGER
+#if defined(USE_GHC_IO_MANAGER)
 import Control.Concurrent (threadDelay)
 #else
-import System.Event.Thread (threadDelay)
+import GHC.Event (threadDelay)
 #endif
 
 main = do
@@ -41,7 +40,7 @@ main = do
       loop 0
       atomically $ do
         b <- readTVar done
-        when (not b) retry
+        unless b retry
 
 ------------------------------------------------------------------------
 -- Configuration
@@ -51,19 +50,19 @@ data Config = Config {
     }
 
 defaultConfig :: Config
-defaultConfig = Config
-    { cfgNumThreads    = ljust 1000
-    }
+defaultConfig = Config {
+  cfgNumThreads = ljust 1000
+  }
+
+instance Sem.Semigroup Config where
+  Config a <> Config b =
+    Config (a <> b)
 
 instance Monoid Config where
-    mempty = Config
-        { cfgNumThreads    = mempty
-        }
-
-    mappend a b = Config
-        { cfgNumThreads = app cfgNumThreads a b
-        }
-      where app = on mappend
+    mempty = Config {
+      cfgNumThreads = mempty
+      }
+    mappend = (<>)
 
 defaultOptions :: [OptDescr (IO Config)]
 defaultOptions = [
