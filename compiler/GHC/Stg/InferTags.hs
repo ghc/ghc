@@ -26,8 +26,11 @@
 {-# OPTIONS_GHC -dsuppress-coercions -dno-suppress-type-signatures -dno-suppress-module-prefixes #-}
 -- {-# OPTIONS_GHC -fprof-auto #-}
 {-# OPTIONS_GHC -ticky -ticky-allocd -ticky-dyn-thunk #-}
+{-# OPTIONS_GHC -dsuppress-ticks #-}
 
-module GHC.Stg.InferTags (findTags, EnterLattice) where
+module GHC.Stg.InferTags
+    (findTags, EnterLattice)
+where
 
 #include "HsVersions.h"
 
@@ -102,222 +105,289 @@ import GHC.Utils.Panic
 import GHC.Driver.Ppr (pprTraceM)
 {-
 
-    Note [Debugging Taggedness]
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Debugging Taggedness]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In practice bugs happen. So I added a few ways to make issues with this code easier to debug.
 
-    In practice bugs happen. So I added a few ways to make issues with this code easier to debug.
-
-    * There is a flag to dump the result of this analysis (ddump-stg-tag-nodes).
+* There is a flag to dump the result of this analysis (ddump-stg-tag-nodes).
     I found this immensely helpful during developement.
-    * There is a flag to emit runtime checks to confirm the results of taggedness (dtag-inference-checks).
-      If we case on a value we expect to be tagged it adds a runtime check for the tag. If there is no tag
-      your program will terminate immediately which makes it a lot easier to find the root cause.
-    * The data flow graph can be extended with a description making it easier to work with.
-      This is disabled by default, enabled by -DDEBUG, and easily changed by defining (or not)
-      WITH_NODE_DESC. This has a significant performance impact hence is disabled by default.
+* There is a flag to emit runtime checks to confirm the results of taggedness (dtag-inference-checks).
+    If we case on a value we expect to be tagged it adds a runtime check for the tag. If there is no tag
+    your program will terminate immediately which makes it a lot easier to find the root cause.
+    This is done in GHC.StgToCmm.Expr.cgIdApp.
+* Defining WITH_NODE_DESC extends the data flow graph with a more detailed description of the nodes,
+    making it easier understand when dumping all the nodes of the graph with ddump-stg-tag-nodes.
+
+    This is disabled by default, enabled by -DDEBUG, but can also be enabled manually by defining
+    WITH_NODE_DESC. Since this has a significant performance impact it is disabled by default.
+
+    When WITH_NODE_DESC is defined the FlowNode type will have an additional field _node_desc which
+    should help map dataflow nodes to constructs in the Stg AST.
 
 
-    Note [Tag Inferrence - The basic idea]
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    This code has two goals:
+Note [Tag Inferrence - The basic idea]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This code has two goals:
 
-    * Ensure constructors with strict fields are only
-        allocated with tagged pointers in the strict fields.
-    * Infer if a given evaluation site of an id is guaranteed to
-        refer to a tagged pointer.
+a) Ensure constructors with strict fields are only
+    allocated with tagged pointers in the strict fields.
+b) Infer if a given case scrutinizing an id (case x of ...) is guaranteed to
+    refer to a tagged pointer.
 
-    Id's refered to by a tagged pointer do not have to be entered
-    when used in an case expression which has massive performance
-    benefits. If we can *infer* that the pointer is tagged without
-    a runtime check we can improve performance further. In particular
-    for traversals of strict data structures where repeated checks for
-    the presence can carry a high cost.
+You might think that, because the wrapper of a constructor evaluates the
+field before allocating the Constructor the strict fields would always be tagged.
 
-    This Module contains the code for the actual inference and upholding
-    the strict field invariant. See Note [The strict field invariant]
-    Once computed the infered tag information is stored in the extension
-    point of StgApp. This is then used in StgCmmExpr to determine if we
-    need to enter an expression.
+However #16831 shows one example where this is not the case. The basic issue
+is that the simplifier can and will discard a case like
+    case x of x'
+        _ -> rhs
+if x is a binding with a unfolding of `OtherCon []`. Rightfully so since this
+indicates that a value is *evaluated*. But while all *tagged* values are
+evaluated not all evaluated vales are tagged. So we sometimes have to enter evaluated
+values in order to get a properly tagged pointer. See also #15155, #14677 and slightly
+related #17004.
 
-    This is essentially a form of 0CFA analysis. The correspondence is as follows:
+Id's refered to by a tagged pointer do not have to be entered
+when used in an case expression which has massive performance
+benefits. See for example the results presented in the
+"Faster Laziness Using Dynamic Pointer Tagging" paper.
+If we can *infer* that a pointer is tagged without a runtime check
+we can improve performance further. We can remove a conditional
+jump in the generated code which means we have to execute fewer code
+for one, but also free up prediction resources in the CPU for other
+branches.
+This is especially true for the traversals of strict data structures
+where repeated checks for the presence can carry a high cost.
 
-    * Labeling expressions:
-        Is done by creating a data flow node for the expression. Nodes are labeled
-        by their id's. While labeling we also set up the initial dataflow state which
-        is implicit encoded in the `node_result` field for each dataflow node.
+This Module contains the code for the actual inference and upholding
+the strict field invariant. See Note [The strict field invariant]
+Once computed the infered tag information is stored in the extension
+point of StgApp. This is then used in StgCmmExpr to determine if we
+need to enter an expression.
 
-        The data flow graph is created initially by nodesTopBinds.
+This is essentially a form of 0CFA analysis. The correspondence is as follows:
 
-    * Inference rules:
-        Inference rules are encoded in the `node_update` field of nodes.
-        These functions when executed update the dataflow state based on the existing
-        dataflow state. The functions themselves are created in the various `node*`
-        functions eg. `nodeLiteral`
+* Labeling expressions:
+    Is done by creating a data flow node for the expression. Nodes are labeled
+    by their id's. While labeling we also set up the initial dataflow state which
+    is implicit encoded in the `node_result` field for each dataflow node.
 
-        The simpler ones just return a constant result (and hence are only run once).
-        More complicated ones might reference current values of other nodes to
-        determine their result and can be iterated often.
+    The data flow graph is created initially by nodesTopBinds.
 
-        All node* functions have explicit documentation describing both how
-        data flows between their inputs and outputs, as well as how new
-        constraints are generated. But it's fairly informal.
+* Inference rules:
+    Inference rules are encoded in the `node_update` field of nodes.
+    These functions when executed update the dataflow state based on the existing
+    dataflow state. The functions themselves are created in the various `node*`
+    functions eg. `nodeLiteral`
 
-    *  Solving of the constraints:
-        Constraints are solved by iterating node_update functions until we reach
-        a fixpoint or an iteration limit.
+    The simpler ones just return a constant result (and hence are only run once).
+    More complicated ones might reference current values of other nodes to
+    determine their result and can be iterated often.
 
-    All inference rules have been crafted such that intermediate results are safe to use.
-    This means even if we fail to reach a fixpoint we can use the results gathered up to
-    that point safely.
+    All node* functions have explicit documentation describing both how
+    data flows between their inputs and outputs, as well as how new
+    constraints are generated. But it's fairly informal.
 
-    The kind of information we track has it's own Note [Lattice for tag analysis].
+*  Solving of the constraints:
+    Constraints are solved by iterating node_update functions until we reach
+    a fixpoint or an iteration limit.
 
-    Once the dataflow analysis has run we extract relevant information from the constraints in
-    the rewrite* (e.g. rewriteRhs) functions. This:
-    + Updates the extension points where appropriate.
-    + Inserts seq where required to uphold the strict field invariant.
-      See Note [The strict field invariant].
+All inference rules have been crafted such that intermediate results are safe to use.
+This means even if we fail to reach a fixpoint we can use the results gathered up to
+that point safely.
 
-    I found that commonly 0CFA is represented as having distinct maps
-    for variables and labels. Implementation wise we instead
-    assign all occurences refering to a local variable the same label.
-    Which is done by keeping a mapping of variables to labels. This has
-    the advantage that it works even in the presence of shadowing.
-    This is beneficial for running the analysis. But does impose some
-    overhead during creation of the data flow graph (but overall improves perf).
-    Imported ids are simply referenced by their unique instead.
+The kind of information we track has it's own Note [Lattice for tag analysis].
+
+Once the dataflow analysis has run we extract relevant information from the constraints in
+the rewrite* (e.g. rewriteRhs) functions. This:
++ Updates the extension points where appropriate.
++ Inserts seq where required to uphold the strict field invariant.
+    See Note [The strict field invariant].
+
+I found that commonly 0CFA is represented as having distinct maps
+for variables and labels. Implementation wise we instead
+assign all occurences refering to a local variable the same label.
+Which is done by keeping a mapping of variables to labels. This has
+the advantage that it works even in the presence of shadowing.
+This is beneficial for running the analysis. But does impose some
+overhead during creation of the data flow graph (but overall improves perf).
+Imported ids are simply referenced by their unique instead.
+
+Note [The strict field invariant]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The purpose of this invariant is that it allows us to eliminate
+the tag check when casing on values coming out of strict fields.
+
+To achieve this the code in this module transforms the STG AST such
+that all strict fields of allocated constructors will only contain
+tagged values.
+
+We do allow two exceptions to this invariant.
+* Functions.
+* Values representing an absentError. See [Taggedness of absentError]
+
+See also Note [Taggedness of absentError] for more information on
+the later.
+
+We uphold this invariant by inserting code for evaluation around
+constructor allocation where needed. In practice this means sometimes
+we will turn this RHS:
+
+    StrictTuple foo bar
+
+into this:
+
+    case foo of taggedFoo ->
+    case bar of taggedBar ->
+        StrictTuple taggedFoo taggedBar
+
+This is sometimes needed to ensure arguments used as strict
+constructor fields are tagged. If we were to blindly rewrite
+constructor allocations in this fashion we wouldn't get much
+benefit out of the invariant.
+
+Luckily *most* bindings which will be put into strict fields are already
+represented by tagged pointers. So we run the tag inference analysis first.
+This tries to infer if bindings like "foo" and "bar in the example above are
+already tagged. If they are we can avoid inserting additional cases.
+
+Having established the invariant we can then rely on it to eliminate tag checks
+when scrutinizing bindings coming out of strict fields.
+
+In particular when traversing the strict spine of a data structure
+this eliminates a significant amount of code being executed. Leading
+to significant speedups. (10% and up for some traversals!)
+
+For a full example consider:
+
+case x of
+  StrictTuple a b -> case a of
+                        True -> ...
+                        False -> ...
+
+Assuming x was inferred to be a thunk we can't optimize anything about
+the outer case. Looking at the inner case we can omit the tag-check part
+of the case. (Since a comes out of a strict field.)
+
+That is to say usually we would generate code like this for the inner
+case above without the strict field invariant:
+
+    //Start of the tag-check
+    c14F:
+        I64[Sp - 8] = c14w;
+        R1 = R2;
+        Sp = Sp - 8;
+        if (R1 & 7 != 0) goto c14w; else goto c14x;
+    c14x:
+        call (I64[R1])(R1) returns to c14w, args: 8, res: 8, upd: 8;
+    //End of the tag-check
+    c14w:
+    //Branch on the values tag.
+        if (R1 & 7 != 1) goto <True rhs>; else goto <False rhs>;
+
+But since we know that a is tagged (coming out of a strict field and having the invariant) we
+can omit the whole tag-check and are left only with the branching on the tag:
+
+    //Branch on the tag
+    c14w:
+        if (R2 & 7 != 1) goto <True rhs>; else goto <False rhs>;
+
+Note [Taggedness of absentError]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+WorkerWrapper -  under certain circumstances - will determine
+that a strict field in a constructor is not used and put a bottom
+expression in there as placeholder which is not supposed to be
+evaluated. See Note [Absent errors] in the WW code for why we do this.
+
+We have to take great care to avoid evaluating these absentError
+expresions when upholding the strict field invariant. Because
+evaluating them would trigger a panic in the runtime.
+
+For this purpose we treat bindings representing an absentError value
+as being tagged. We do this with the help of strictness analysis which
+will assign a special kind of divergence value (Absent) to such bindings.
+
+This is similar to the simplifier treating absentError as a constructor.
+See Note [aBSENT_ERROR_ID] for a description of the simplifier case.
+
+This is alright, because in the absence of bugs in the rest of GHC any such value
+should never be evaluated, and therefore can be treated as already
+evaluated without affecting correctness.
+
+This means we might end up with code like this:
+
+    data T a b c = MkT a b !c
+
+    $wf :: a -> b -> Result
+    $wf a b = let c = absentError "ww_absent"
+                in  g (MkT a b c)
+
+Where we know g will not use the strict field c.
+
+We catch this kind of situation in two ways:
+* Checking the RHS for absentError applications in the current module.
+* Inspecting the strictness of imported ids.
+
+We check for absentError applications in the current module because:
+    * It works with -O0 in which case the demand analyser isn't run.
+    * It is more performant to inspect the functions unique than to
+        compare the strictness.
+
+We have to rely on the strictness analysis for imported id's since not
+all ids provide us with an unfolding to inspect.
+
+If we come across a let binding of absentError we simply treat the binding as
+if it's represented by a tagged pointer.
+
+Checking the strictness properties for imported ids is important.
+What if we inline $wf into a module B, but don't do so for `c` which might
+get floated out? We have to ensure that c is still treated as tagged.
+
+Checking the RHS of local functions, and strictness of imported ones is sufficient
+to make this work.
+* Consider c (binding absentError) to be defined in module A
+* $wf to be inlined into module B from module A.
+
+This gives us four cases to consider:
+
+A & B not optimized:
+    Since ww will not run on either, c will never be generated by the compiler.
+A & B optimized:
+    A will be analyzed, the demand analyzer will recognise c as an absent error
+    which allows us to treat `c` as tagged inside module B.
+A optimized, B not optimized:
+    If B is not optimized then the body of $wf can't end up in B, so this works out.
+A not optimized, B not optimized:
+    Since A is not optimised GHC won't expose any unfoldings, so again $wf and c can't
+    end up in different modules and things work out.
 
 
-    Note [Useless Bangs]
-    ~~~~~~~~~~~~~~~~~~~~
+Note [nesting Limit]
+~~~~~~~~~~~~~~~~~~~~
+When analysing a function like `f x = x : f x` we need to widen the result to
+ensure termination. We achieve this by analysing results only up to a depth of
+set by the nestingLimit variable.
 
-    Ghcs state monad is lazy. So to avoid space leaks I've added bangs
-    very liberally in this module. Some are bound to be useless, but this
-    still beats having space leaks.
+Analysing results nested past a few levels does not convey a real performance
+improvement, but it does affect compile times significantly for certain code.
 
-    The only place in this module where we explicitly depend on lazyness is the
-    (unused) ty for case alternatives. So there is no harm in excessive bang
-    annotations, at least not compared to space leaks.
+When viewing the lattice elments as tree, the nesting level is the depth of the
+tree. That is a simple lattice of the form "NeverEnter <noFields>" has a nesting
+level of 1. NeverEnter <NeverEnter> would have two, and so on.
 
+Note [Useless Bangs]
+~~~~~~~~~~~~~~~~~~~~
+Ghcs state monad is lazy. So to avoid space leaks I've added bangs
+very liberally in this module. Some are bound to be useless, but this
+still beats having space leaks.
 
-    Note [The strict field invariant]
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    The code in this module transforms the STG AST such
-    that all strict fields will only contain tagged values.
-
-    We do allow two exceptions to this invariant.
-    * Functions.
-    * Values representing an absentError.
-
-    See also Note [Taggedness of absentError] for more information on
-    the later.
-
-    We uphold this invariant by inserting code for evaluation around
-    constructor allocation where needed. In practice this means sometimes
-    we will turn this RHS:
-
-        StrictTuple foo bar
-
-    into something like:
-
-        case foo of taggedFoo ->
-        case bar of taggedBar ->
-            StrictTuple taggedFoo taggedBar
-
-    The purpose of this invariant is that it allows us to eliminate
-    the tag check when casing on values coming out of strict fields.
-
-    In particular when traversing the strict spine of a data structure
-    this eliminates a significant amount of code being executed leading
-    to significant speedups. (10% and up for the traversal!)
-
-    This, on it's own, would *not* be a performance improvement.
-    However since for most strict constructor arguments we can infer
-    if a tag is present or not in practice we do not add a lot of evaluation
-    so the overhead is far lower than the payoff.
-
-    Note [Taggedness of absentError]
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    WorkerWrapper -  under certain circumstances - will determine
-    that a strict field in a constructor is not used and put a bottom
-    expression in there as placeholder which is not supposed to be
-    evaluated. See Note [Absent errors] in the WW code for why we do this.
-
-    We have to take great care to avoid evaluating these absentError
-    expresions when upholding the strict field invariant. Because
-    evaluating them would trigger a panic in the runtime.
-
-    For this purpose we treat bindings representing an absentError value
-    as being tagged. We do this with the help of strictness analysis which
-    will assign a special kind of divergence value (Absent) to such bindings.
-
-    This is similar to the simplifier treating absentError as a constructor.
-    See Note [aBSENT_ERROR_ID] for a description of the simplifier case.
-
-    This is alright, because in the absence of bugs in the rest of GHC any such value
-    should never be evaluated, and therefore can be treated as already
-    evaluated without affecting correctness.
-
-    This means we might end up with code like this:
-
-        data T a b c = MkT a b !c
-
-        $wf :: a -> b -> Result
-        $wf a b = let c = absentError "ww_absent"
-                  in  g (MkT a b c)
-
-    Where we know g will not use the strict field c.
-
-    We catch this kind of situation in two ways:
-    * Checking the RHS for absentError applications in the current module.
-    * Inspecting the strictness of imported ids.
-
-    We check for absentError applications in the current module because:
-        * It works with -O0 in which case the demand analyser isn't run.
-        * It's more performant to inspect the functions unique than to
-          compare the strictness.
-
-    We have to rely on the strictness analysis for imported id's since not
-    all ids provide us with an unfolding to inspect.
-
-    If we come across a let binding of absentError we simply treat the binding as
-    if it's represented by a tagged pointer.
-
-    Checking the strictness properties for imported ids is important.
-    What if we inline $wf into a module B, but don't do so for `c` which might
-    get floated out? We have to ensure that c is still treated as tagged.
-
-    Checking the RHS of local functions, and strictness of imported ones is sufficient
-    to make this work.
-    * Consider c (binding absentError) to be defined in module A
-    * $wf to be inlined into module B from module A.
-
-    This gives us four cases to consider:
-
-    A & B not optimized:
-        Since ww will not run on either, c will never be generated by the compiler.
-    A & B optimized:
-        A will be analyzed, the demand analyzer will recognise c as an absent error
-        which allows us to treat `c` as tagged inside module B.
-    A optimized, B not optimized:
-        If B is not optimized then the body of $wf can't end up in B, so this works out.
-    A not optimized, B not optimized:
-        Since A is not optimised GHC won't expose any unfoldings, so again $wf and c can't
-        end up in different modules and things work out.
-
-
-    Note [nesting Limit]
-    ~~~~~~~~~~~~~~~~~~~~
-
-    When analysing a function like `f x = x : f x` we need to widen the result to
-    ensure termination. We achieve this by analysing results only up to a depth of
-    set by the nestingLimit variable.
-
-    Analysing results nested past a few levels does not convey a real performance
-    improvement, but it does affect compile times significantly for certain code.
+The only place in this module where we explicitly depend on lazyness is the
+(unused) ty for case alternatives. (See the calls to mkSeqs). There we pass
+a panic value which (eventually) get's used as an argument for StgConApp's
+[Type] argument. The argument is only relevant for unarise and unused after
+making this alright to do.
+So there is no harm in excessive bang annotations, at least not compared to space leaks.
 
 -}
 
@@ -366,9 +436,8 @@ data RecursionKind
 
 
 {-
-    Note [Lattice for tag analysis]
-   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+Note [Lattice for tag analysis]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # The EnterInfo Lattice
 
 We use a lattice for the tag analysis.
@@ -450,7 +519,7 @@ This is a mouthful so here is an example:
     This means if we bind the second field of 'x' (here bound to 'a')
     then 'a' will have the information (NeverEnter,fi1) associated with it.
 
-    This is independent of weither or not x needs to be entered, or even it's
+    This is independent of weither or not x needs to be entered, or even its
     termination. As this information can only be used if x terminates.
 
 If we have "foo = Just bar" then this lattice will
@@ -498,9 +567,8 @@ With the enterInfo of 'x' being:
 When documenting this analysis we often omit the Fields* constructors for clarity.
 We would then write x's enterInfo as NeverEnter < NeverEnter >.
 
-    Note [The lattice element combinators]
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+Note [The lattice element combinators]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We do use lub to combine multiple branches and this behaves as expected.
 
 For field infos we combine field information pointwise.
@@ -518,13 +586,12 @@ it's more obvious when multiple branches are combined when looking at the
 data flow graph.
 
 
-    Note [Combining Branches]
-    ~~~~~~~~~~~~~~~~~~~~~~~~~
-
+Note [Combining Branches]
+~~~~~~~~~~~~~~~~~~~~~~~~~
 We use lub to combine the branches:
 
 The enterInfo of a case expression is the combination
-of all it's branches. Let's look at an easy case first:
+of all its branches. Let's look at an easy case first:
 
     case exp of
         A1 -> alt1@(True,thunk)
@@ -640,9 +707,8 @@ entered in correct code, and further can never be bound to a variable at runtime
 
 Hopefully sheds some light on why it is safe to use this approach.
 
-    Note [Recursive Functions]
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+Note [Recursive Functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this function:
 
     f x
@@ -664,7 +730,7 @@ For any of these tail calls we assign a enter info of NoValue.
 When combining NoValue with other branches NoValue
 always "gives way" to the result of the non-recursive branch(es).
 
-This is correct as *when the function returns* it's result must be
+This is correct as *when the function returns* its result must be
 from one of the non-tailcalled branches.
 
 It even works our for silly things like f x = f x, we infer a value
@@ -692,9 +758,8 @@ TODO:
     logic applies.
     But it's rare enough that it doesn't impact performance in a major way.
 
-    Note [Functions producing infinite values]
-    ------------------------------------------
-
+Note [Functions producing infinite values]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We have to deal with functions without a fixpoint in our lattice.
 These are primarily functions producing infinite values like (f x = x : f x)
 
@@ -732,9 +797,8 @@ therefore can use the result from the solved constraints, even if not all
 have been resolved.
 
 
-    Note [Infering recursive tail calls]
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+Note [Infering recursive tail calls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When creating the data flow graph we also keep track of
 the context in which an expression occurs.
 This is required to deal with shadowing of ids but also allows
@@ -788,28 +852,28 @@ instance Outputable EnterInfo where
     ppr MaybeEnter      = char 'm'
     ppr NeverEnter      = char 't'
 
-{-  Note [Comparing Sums and Products]
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{-
+Note [Comparing Sums and Products]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+At a glance it makes sense that we would never compare sum and product results.
+However consider this case:
 
-    At a glance it makes sense that we would never compare sum and product results.
-    However consider this case:
+case v of
+    True -> case x of prod -> Left prod
+    False -> case y of sum -> Right sum
 
-    case v of
-        True -> case x of prod -> Left prod
-        False -> case y of sum -> Right sum
+Then we will infer taggedness of tagged<tagged>, which is a tagged
+result with the first field also being tagged.
 
-    Then we will infer taggedness of tagged<tagged>, which is a tagged
-    result with the first field also being tagged.
+However the first field will be a prod type in one and
+a sum type in the other case. But this does not concern
+us as taggedness is value-level property so their types
+don't have to match.
 
-    However the first field will be a prod type in one and
-    a sum type in the other case. But this does not concern
-    us as taggedness is value-level property so their types
-    don't have to match.
+We could go even further still and compare the fields of
+`prod` and `sum` against each other. And we do!
 
-    We could go even further still and compare the fields of
-    `prod` and `sum` against each other. And we do!
-
-    See Note [The lattice element combinators] for details.
+See Note [The lattice element combinators] for details.
 
 -}
 
@@ -886,8 +950,10 @@ instance Outputable FieldInfo where
     ppr FieldsNone              = text "none"
     ppr FieldsUndet             = text "undet"
 
-{-  Note [FieldInfo Binary instance]
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{-
+Note [FieldInfo Binary instance]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+TODO: Either put this info into interface files, or remove the instances.
 
 Putting a data con into a interface file can cause non-trivial overhead
 as it involves type checking at load time among other things.
@@ -1049,14 +1115,18 @@ isFinalValue :: EnterLattice -> Bool
 isFinalValue lat = enterInfo lat == MaybeEnter && hasFinalFields lat
 
 nestingLevelOver :: EnterLattice -> Int -> Bool
-nestingLevelOver _ 0 = True
-nestingLevelOver (EnterLattice _ (FieldsProd fields)) n
-    = any (`nestingLevelOver` (n-1)) fields
-nestingLevelOver (EnterLattice _  (FieldsSum  _ fields)) n
-    = any (`nestingLevelOver` (n-1)) fields
-nestingLevelOver (EnterLattice _  (FieldsUntyped fields)) n
-    = any (`nestingLevelOver` (n-1)) fields
-nestingLevelOver _ _ = False
+nestingLevelOver lat depth
+    | depth <= 0 = True
+    | otherwise = case lat of
+        EnterLattice _ fieldLattice ->
+            case fieldLattice of
+                FieldsProd    fields -> any (`nestingLevelOver` (depth-1)) fields
+                FieldsSum   _ fields -> any (`nestingLevelOver` (depth-1)) fields
+                FieldsUntyped fields -> any (`nestingLevelOver` (depth-1)) fields
+                FieldsNone           -> False
+                FieldsUndet          -> False
+                FieldsUnknown        -> False
+
 
 widenToNestingLevel :: Int -> EnterLattice -> EnterLattice
 widenToNestingLevel n l
@@ -1226,9 +1296,8 @@ lookupNodeResult node_id = do
         Just n  -> return $! node_result n
 
 {-
-    Note [Field information of function ids]
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+Note [Field information of function ids]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this code:
 
 f x :: a -> (Maybe Int,a)
@@ -1446,7 +1515,7 @@ isSingleMapOf v env =
 mkJoinNode :: [NodeId] -> AM NodeId
 mkJoinNode []     = return unknownNodeId
 mkJoinNode [node] = return node
-mkJoinNode inputs = do
+mkJoinNode inputs = {-# SCC joinNode #-} do
     node_id <- mkUniqueId
     let updater = do
             input_results <- mapM lookupNodeResult inputs
@@ -1550,9 +1619,9 @@ litNode         = mkConstNode litNodeId     (nullaryLattice NeverEnter) (text "l
 addrNode        = mkConstNode addrNodeId    (nullaryLattice NeverEnter) (text "c_str")
 nullaryConNode  = mkConstNode nullaryConNodeId (nullaryLattice NeverEnter) (text "nullCon")
 
-{-  Note [Imported Ids]
-    ~~~~~~~~~~~~~~~~~~~
-
+{-
+Note [Imported Ids]
+~~~~~~~~~~~~~~~~~~~
 # Assigning data flow nodes to imported ids.
 
 We want to keep our Ids a simple newtype around Unique.
@@ -1588,9 +1657,8 @@ The rules are simply:
     * AlwaysEnter for Thunks - Technically the RTS might evaluate them so *always* is a lie here.
     * MaybeEnter otherwise.
 
-    Note [Shadowing and NodeIds]
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+Note [Shadowing and NodeIds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Shadowing makes things more complex.
 
 While constructing the data flow graph we have to be able to relate
@@ -1775,9 +1843,9 @@ nodesBind this_mod ctxt bot lne (StgRec binds) = do
     return $! (StgRec $ zip ids rhss', (CLetRecBody boundIds lne) `extendCtxt` ctxt)
 
 
-{-  Note [RhsCon data flow]
-    ~~~~~~~~~~~~~~~~~~~~~~~
-
+{-
+Note [RhsCon data flow]
+~~~~~~~~~~~~~~~~~~~~~~~
 Describes rules for lets like this:
 
     let x = Con args@[a1 .. an]
@@ -2135,8 +2203,8 @@ TODO: Partial applications
   But it's not a big win so I haven't spent the time.
 
 
-    Note [RhsClosure data flow]
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [RhsClosure data flow]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     +---------+
     | rhsNode |  = <body>
@@ -2254,9 +2322,9 @@ nodeExpr _ _ctxt  (StgLit lit)              = return $! (StgLit lit, litNodeId)
 nodeExpr _ _ctxt  (StgOpApp op args res_ty) = return $! (StgOpApp op args res_ty, unknownNodeId)
 nodeExpr _ _ctxt  (StgLam {})               = error "Invariant violated: No lambdas in STG representation."
 
-{-  Note [Case Data Flow Nodes]
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+{-
+Note [Case Data Flow Nodes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Case expressions result in a few control flow nodes and constraints.
 
 Information between the different nodes for a case expression
@@ -2478,9 +2546,9 @@ nodeAlt this_mod ctxt scrutNodeId (altCon, bndrs, rhs)
 -- call branches and regular references to an id.
 -- See Note [Recursive Functions] for the details.
 
-{-  Note [Let/ Data Flow]
-    ~~~~~~~~~~~~~~~~~~~~
-
+{-
+Note [Let/ Data Flow]
+~~~~~~~~~~~~~~~~~~~~~
 This is rather simple. For a construct like:
 
     expr@(let x = rhs in body)
@@ -2521,9 +2589,9 @@ nodeLetNoEscape this_mod ctxt (StgLetNoEscape ext bind expr) = do
     return $! (StgLetNoEscape ext bind' expr', node)
 nodeLetNoEscape _ _ _ = panic "Impossible"
 
-{-  Note [ConApp Data Flow]
-    ~~~~~~~~~~~~~~~~~~~~~~~
-
+{-
+Note [ConApp Data Flow]
+~~~~~~~~~~~~~~~~~~~~~~~
 Information from the constructor (strict fields)
 and arguments is used to determine the result.
 
@@ -2608,9 +2676,9 @@ nodeConApp this_mod ctxt (StgConApp _ext con args tys) = do
     return $! (StgConApp node_id con args tys, node_id)
 nodeConApp _ _ _ = panic "Impossible"
 
-{-  Note [App Data Flow]
-    ~~~~~~~~~~~~~~~~~~~~
-
+{-
+Note [App Data Flow]
+~~~~~~~~~~~~~~~~~~~~
 This is one of the more involved data flow constructs.
 The actual flow if information is rather simple:
 
@@ -2847,7 +2915,7 @@ solveConstraints dflags = do
         -- let dep_sorted_nodes = nonDetEltsUFM todos
         let !dep_sorted_nodes = {-# SCC "nodeSorting" #-}
                                 (depSortNodes todos) :: [FlowNode]
-        iterate dep_sorted_nodes (undefined,undefined) 1
+        iterate dep_sorted_nodes 5
 
         uqList <- map snd . nonDetUFMToList . fs_uqNodeMap <$> get
         doneList <- map snd . nonDetUFMToList . fs_doneNodes <$> get
@@ -2858,8 +2926,8 @@ solveConstraints dflags = do
         -- mapM_ (pprTraceM "node:" . ppr) resultNodes
         return ()
   where
-    iterate :: [FlowNode] -> (NodeArray,FlagArray) -> Int -> AM ()
-    iterate xs (arr, doneFlags) n = do
+    iterate :: [FlowNode] -> Int -> AM ()
+    iterate xs n = do
         pprTraceM "Pass:" $ (ppr (length xs)) <+> text "nodes remaining."
         !change <- liftIO $ newIORef False
         !xs' <- runUpdates change False xs
@@ -2871,37 +2939,39 @@ solveConstraints dflags = do
             else if (n > 5)
                 then -- pprTraceM "Warning:" (text "Aborting at" <+> ppr n <+> text "iterations") >>
                      return ()
-                else iterate xs' (arr,doneFlags) (n+1)
+                else iterate xs' (n+1)
 
-runUpdates :: IORef Bool -> Bool -> [FlowNode] -> AM [FlowNode]
-runUpdates !_change _some_change [] = return []
-runUpdates change some_change (node:nodes) = do
-    -- !_ <- get
-    !node_changed <- update node
-    -- Avoid a write if we can
-    when (not some_change && node_changed) $ do
-        liftIO $ writeIORef change True
+    runUpdates :: IORef Bool -> Bool -> [FlowNode] -> AM [FlowNode]
+    runUpdates !change_ref some_change [] = do
+        -- Sadly it's hard to make using the stack to both return
+        -- the list of nodes, as well as the Bool efficient.
+        -- So I use this horrible hack of writing an IORef.
+        liftIO $ writeIORef change_ref some_change
+        return []
+    runUpdates change_ref some_change (node:nodes) = do
+        -- We keep track if anything changed, if not we can terminate the
+        -- analysis early.
+        !node_changed <- runNodeUpdate node
+        let !some_change' = some_change || node_changed
 
-    node_done <- isMarkedDone (node_id node)
-    if node_done
-        then runUpdates change (some_change || node_changed) nodes
+        node_done <- isMarkedDone (node_id node)
+        if node_done
+            then runUpdates change_ref some_change' nodes
+            else do
+                pure (node:) <*> runUpdates change_ref some_change' nodes
+
+runNodeUpdate :: FlowNode -> AM Bool
+runNodeUpdate node = do
+    let old_result = node_result node
+    result <- node_update node
+    let !node' = node { node_result = result }
+    done <- GHC.Utils.Monad.allM isMarkedDone (node_inputs node)
+    when done (markDone node')
+    if (result == old_result)
+        -- Nothing to do this round
+        then return False
         else do
-            pure (node:) <*> runUpdates change (some_change || node_changed) nodes
-
-    where
-        -- True <=> something changed.
-        update :: FlowNode -> AM Bool
-        update node = do
-            let old_result = node_result node
-            result <- node_update node
-            done <- and <$> (mapM isMarkedDone (node_inputs node))
-            let node' = node { node_result = result }
-            when (done || result `nestingLevelOver` 12) (markDone node')
-            if (result == old_result)
-                -- Nothing to do this round
-                then return False
-                else do
-                    return True
+            return True
 
 
 
@@ -2935,8 +3005,10 @@ rewriteBinds (StgRec binds) =do
 -- | When dealing with a let bound rhs passing the id in allows us the shortcut the
 --  the rule for the rhs tag to flow to the id
 rewriteRhs :: Id -> InferStgRhs -> AM (TgStgRhs, TgStgExpr -> TgStgExpr)
-rewriteRhs _binding (StgRhsCon (node_id,rewriteFlag) ccs con args) = do
+rewriteRhs _binding (StgRhsCon (node_id,rewriteFlag) ccs con args) = {-# SCC rewriteRhs_ #-} do
     node <- getNode node_id
+
+    -- Look up the nodes, representing the constructor arguments.
     fieldInfos <- mapM lookupNodeResult (node_inputs node)
     -- tagInfo <- lookupNodeResult node_id
     -- pprTraceM "rewriteRhsCon" $ ppr _binding <+> ppr tagInfo
@@ -2958,7 +3030,6 @@ rewriteRhs _binding (StgRhsCon (node_id,rewriteFlag) ccs con args) = do
     if (null evalArgs)
         then return $! (StgRhsCon noExtFieldSilent ccs con args, id)
         else do
-            -- tagInfo <- lookupNodeResult node_id
             -- pprTraceM "Creating seqs (wrapped) for " $ ppr _binding <+> ppr node_id
 
             evaldArgs <- mapM mkLocalArgId evalArgs -- Create case binders
