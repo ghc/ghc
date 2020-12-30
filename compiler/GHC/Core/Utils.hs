@@ -1892,11 +1892,7 @@ exprIsConLike = exprIsHNFlike isConLikeId isConLikeUnfolding
 -- or PAPs.
 --
 exprIsHNFlike :: (Var -> Bool) -> (Unfolding -> Bool) -> CoreExpr -> Bool
-exprIsHNFlike is_con is_con_unf expr =
-    let res = is_hnf_like expr
-    in
-    -- pprTrace "exprIsHNFlike:" (text "expr:" <+> ppr expr $$ text "res:" <+> ppr res)
-      res
+exprIsHNFlike is_con is_con_unf = is_hnf_like
   where
     is_hnf_like (Var v) -- NB: There are no value args at this point
       =  id_app_is_value v 0 -- Catches nullary constructors,

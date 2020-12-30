@@ -133,7 +133,7 @@ This code has two goals:
 a) Ensure constructors with strict fields are only
     allocated with tagged pointers in the strict fields.
 b) Infer if a given case scrutinizing an id (case x of ...) is guaranteed to
-    refer to a tagged pointer.
+    refer to a tagged pointer. See also Note [Optimizing function closures]
 
 You might think that, because the wrapper of a constructor evaluates the
 field before allocating the Constructor the strict fields would always be tagged.
@@ -174,6 +174,9 @@ This is essentially a form of 0CFA analysis. The correspondence is as follows:
     is implicit encoded in the `node_result` field for each dataflow node.
 
     The data flow graph is created initially by nodesTopBinds.
+
+    It's nodes are represented by the FlowNode type. Which incoming edges to
+    each node being recorded in the nodes themselves.
 
 * Inference rules:
     Inference rules are encoded in the `node_update` field of nodes.
@@ -223,9 +226,9 @@ To achieve this the code in this module transforms the STG AST such
 that all strict fields of allocated constructors will only contain
 tagged values.
 
-We do allow two exceptions to this invariant.
-* Functions.
+We do allow one exceptions to this invariant.
 * Values representing an absentError. See [Taggedness of absentError]
+TODO: Make sure functions are forced as expected!
 
 See also Note [Taggedness of absentError] for more information on
 the later.
@@ -292,6 +295,28 @@ can omit the whole tag-check and are left only with the branching on the tag:
     //Branch on the tag
     c14w:
         if (R2 & 7 != 1) goto <True rhs>; else goto <False rhs>;
+
+Note [Optimizing function closures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A binding two ways:
+
+* By applying it to arguments and forcing the result:
+    case (f x y) of ...
+* By scrutinizing it as a value, potentially also branchon on the result:
+    case x of ...
+
+We optimize for the second case for a number of reasons:
+* It's the case that inspired this analysis
+* Scrutinizing of tagged value bindings happens more often
+  than application of unknown function bindings.
+* To fully optimize function bindings we would want to keep
+  track of their arity as well.
+
+Most of all it's a matter of not having been worked on much. There is no
+theoretical reason why this shouldn't "just" work for function bindings.
+But there might be a few details about partial applications and other cases
+that need to be worked out.
 
 Note [Taggedness of absentError]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1388,6 +1413,8 @@ instance NFData FlowNode where
 #endif
                 })  = deepseq (node_inputs,node_result) ()
 
+-- TODO: It would be nice to use .dot syntax here to allow graphviz renderings
+-- of the data flow graph.
 instance Outputable FlowNode where
     ppr node =
         hang

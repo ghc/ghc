@@ -794,7 +794,6 @@ completeBind env top_lvl mb_cont old_bndr new_bndr new_rhs
 
 addLetBndrInfo :: OutId -> ArityType -> Unfolding -> OutId
 addLetBndrInfo new_bndr new_arity_type new_unf
-  | otherwise
   = new_bndr `setIdInfo` info5
   where
     AT oss div = new_arity_type
