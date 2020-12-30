@@ -4,21 +4,20 @@ import Control.Concurrent (forkIO, runInUnboundThread)
 import Control.Exception (bracket, finally)
 import Control.Monad (unless, when)
 import Control.Monad.Fix (fix)
-import qualified Data.Attoparsec as A
+import qualified Data.Attoparsec.ByteString as A
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy as L
-import Network.Socket hiding (accept, recv)
-#ifdef USE_GHC_IO_MANAGER
+import Network.Socket hiding (accept)
+#if defined(USE_GHC_IO_MANAGER)
 import Network.Socket (accept)
 import Network.Socket.ByteString (recv, sendAll)
 #else
 import EventSocket (accept, recv, sendAll)
-import System.Event.Thread (ensureIOManagerIsRunning)
+import GHC.Event (ensureIOManagerIsRunning)
 #endif
 import qualified EventFile as F
 import System.Posix.Files
 import System.Posix.IO
-import qualified Text.Show.ByteString as S
 import NoPush
 import RFC2616
 
@@ -30,12 +29,12 @@ main = do
       myHints = defaultHints { addrFlags = [AI_PASSIVE]
                              , addrSocketType = Stream }
   (ai:_) <- getAddrInfo (Just myHints) Nothing (Just port)
-#ifndef USE_GHC_IO_MANAGER
+#if !defined(USE_GHC_IO_MANAGER)
   ensureIOManagerIsRunning
 #endif
   sock <- socket (addrFamily ai) (addrSocketType ai) (addrProtocol ai)
   setSocketOption sock ReuseAddr 1
-  bindSocket sock (addrAddress ai)
+  bind sock (addrAddress ai)
   listen sock 1024
   runInUnboundThread $ acceptConnections sock
 
@@ -44,10 +43,10 @@ acceptConnections sock = loop
   where
     loop = do
       (c,_) <- accept sock
-      forkIO $ client c
+      _ <- forkIO $ client c
       loop
 
-parseM :: Monad m => (m B.ByteString) -> A.Parser a -> m (B.ByteString, Either String a)
+parseM :: Monad m => m B.ByteString -> A.Parser a -> m (B.ByteString, Either String a)
 parseM refill p = (step . A.parse p) =<< refill
   where step (A.Fail bs _stk msg) = return (bs, Left msg)
         step (A.Partial k) = (step . k) =<< refill
@@ -60,7 +59,7 @@ withNoPush :: Socket -> IO a -> IO a
 withNoPush sock act = setNoPush sock True >> act `finally` setNoPush sock False
 
 client :: Socket -> IO ()
-client sock = (`finally` sClose sock) loop
+client sock = (`finally` close sock) loop
  where
   loop = do
     (bs, ereq) <- parseM (recv sock 4096) request
@@ -88,7 +87,7 @@ client sock = (`finally` sClose sock) loop
           withNoPush sock $ do
             sendAll sock $! (`B.append` "\r\n\r\n") $ B.intercalate "\r\n" [
                 fixedHeaders
-              , B.append "Content-length: " . strict . S.show . asInt . fileSize $ st
+              , B.append "Content-length: " . strict . L.singleton . toEnum . asInt . fileSize $ st
               ]
             fix $ \sendLoop -> do
               s <- F.read fd 16384
