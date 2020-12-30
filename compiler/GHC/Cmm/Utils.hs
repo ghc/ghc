@@ -4,7 +4,6 @@
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
-
 -----------------------------------------------------------------------------
 --
 -- Cmm utilities.
