@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 -- Flow:
 --
 -- 1. Create N pipes.
@@ -7,18 +8,19 @@
 
 import Args (ljust, parseArgs, positive, theLast)
 import Control.Concurrent (MVar, forkIO, takeMVar, newEmptyMVar, putMVar)
-import Control.Monad (forM_, replicateM, when)
-import Data.Function (on)
+import Control.Monad (forM_, replicateM, when, void)
 import Data.IORef (IORef, atomicModifyIORef, newIORef)
-import Data.Monoid (Monoid(..), Last(..))
+import Data.Monoid (Last(..))
 import Foreign.C.Error (throwErrnoIfMinus1Retry, throwErrnoIfMinus1Retry_)
 import Foreign.Marshal.Alloc (alloca)
 import System.Console.GetOpt (ArgDescr(ReqArg), OptDescr(..))
 import System.Environment (getArgs)
-import System.Event (Event, EventManager, FdKey(..), evtRead, evtWrite, loop,
-                     new, registerFd, registerTimeout)
-import System.Event.Manager (newDefaultBackend, newWith)
-import qualified System.Event.Poll as Poll
+import GHC.Event (Event, Lifetime(OneShot))
+import qualified GHC.Event as ET (TimerManager, newWith, newDefaultBackend,
+                                    registerTimeout)
+import qualified GHC.Event as EM (FdKey, loop, keyFd, new, registerFd,
+                                            evtRead, evtWrite)
+import Data.Semigroup as Sem hiding (Last, Option)
 import System.Posix.IO (createPipe)
 import System.Posix.Resource (ResourceLimit(..), ResourceLimits(..),
                               Resource(..), setResourceLimit)
@@ -38,18 +40,17 @@ defaultConfig = Config {
                 , cfgNumMessages = ljust 1024
                 }
 
+instance Sem.Semigroup Config where
+    (Config a b c) <>
+      (Config d e f) =
+      Config
+      (a <> d)
+      (b <> e)
+      (c <> f)
+
 instance Monoid Config where
-    mempty  = Config {
-                cfgDelay = mempty
-              , cfgNumPipes = mempty
-              , cfgNumMessages = mempty
-              }
-    mappend a b = Config {
-                    cfgDelay = app cfgDelay a b
-                  , cfgNumPipes = app cfgNumPipes a b
-                  , cfgNumMessages = app cfgNumMessages a b
-                  }
-        where app = on mappend
+    mempty  = Config mempty mempty mempty
+    mappend = (<>)
 
 defaultOptions :: [OptDescr (IO Config)]
 defaultOptions = [
@@ -64,22 +65,22 @@ defaultOptions = [
           "number of messages to send"
  ]
 
-readCallback :: Config -> EventManager -> MVar () -> IORef Int
-             -> FdKey -> Event -> IO ()
+readCallback :: Config -> ET.TimerManager -> MVar () -> IORef Int
+             -> EM.FdKey -> Event -> IO ()
 readCallback cfg mgr done ref reg _ = do
   let numMessages = theLast cfgNumMessages cfg
       delay       = theLast cfgDelay cfg
-      fd          = keyFd reg
+      fd          = EM.keyFd reg
   a <- atomicModifyIORef ref (\a -> let !b = a+1 in (b,b))
   case undefined of
     _ | a > numMessages -> close fd >> putMVar done ()
       | delay == 0      -> readByte fd
-      | otherwise       -> registerTimeout mgr delay (readByte fd) >> return ()
+      | otherwise       -> void (ET.registerTimeout mgr delay (readByte fd))
 
-writeCallback :: Config -> IORef Int -> FdKey -> Event -> IO ()
+writeCallback :: Config -> IORef Int -> EM.FdKey -> Event -> IO ()
 writeCallback cfg ref reg _ = do
   let numMessages = theLast cfgNumMessages cfg
-      fd = keyFd reg
+      fd = EM.keyFd reg
   a <- atomicModifyIORef ref (\a -> let !b = a+1 in (b,b))
   if a > numMessages
     then close fd
@@ -96,18 +97,18 @@ main = do
     putStrLn "creating pipes"
     pipePairs <- replicateM numPipes createPipe
 
-    mgr <- newWith =<< newDefaultBackend
-    -- mgr <- newWith =<< Poll.new
-    _ <- forkIO $ loop mgr
+    mgr <- EM.new
+    mgr_timer <- ET.newWith =<< ET.newDefaultBackend
+    _ <- forkIO $ EM.loop mgr
     rref <- newIORef 0
     wref <- newIORef 0
     done <- newEmptyMVar
     putStrLn "registering readers"
     forM_ pipePairs $ \(r,_) ->
-      registerFd mgr (readCallback cfg mgr done rref) r evtRead
+      EM.registerFd mgr (readCallback cfg mgr_timer done rref) r EM.evtRead OneShot
     putStrLn "registering writers"
     forM_ pipePairs $ \(_,w) ->
-      registerFd mgr (writeCallback cfg wref) w evtWrite
+      EM.registerFd mgr (writeCallback cfg wref) w EM.evtWrite OneShot
     putStrLn "waiting until done"
     takeMVar done
 
@@ -122,4 +123,4 @@ writeByte (Fd fd) =
       when (n /= 1) . error $ "writeByte returned " ++ show n
 
 close :: Fd -> IO ()
-close (Fd fd) = c_close fd >> return ()
+close (Fd fd) = void (c_close fd)
