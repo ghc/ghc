@@ -17,8 +17,6 @@
 -- Portability :  portable
 --
 -- Class of data structures that can be folded to a summary value.
--- See the [Overview](#overview) and subsequent sections for a more
--- detailed description.
 --
 -----------------------------------------------------------------------------
 
@@ -117,11 +115,20 @@ import GHC.Num  ( Num(..) )
 
 infix  4 `elem`, `notElem`
 
--- | The @Foldable@ class represents data structures that can be reduced to a
+-- XXX: Missing haddock feature.  Links to anchors in other modules
+-- don't have a sensible way to name the link within the module itself.
+-- Thus, the below "Data.Foldable#overview" works well when shown as
+-- @Data.Foldable@ from other modules, but in the home module it should
+-- be possible to specify an alternative name. :-(
+
+-- | The Foldable class represents data structures that can be reduced to a
 -- summary value one element at a time.  Strict left-associative folds are a
 -- good fit for space-efficient reduction, while lazy right-associative folds
 -- are good fit for corecursive iteration or for folds that short-circuit after
 -- processing an initial subsequence of the structure's elements.
+--
+-- A more detailed description can be found in the overview section of
+-- "Data.Foldable#overview".
 --
 class Foldable t where
     {-# MINIMAL foldMap | foldr #-}
@@ -1308,8 +1315,8 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 -- $overview
 --
 -- #overview#
--- The @Foldable@ class represents structures that can be reduced to a summary
--- value one element at a time.
+-- Foldable structures are reduced to a summary value by accumulating
+-- contributions to the result one element at a time.
 --
 -- == Left and right folds
 --
