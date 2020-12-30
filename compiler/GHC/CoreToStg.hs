@@ -374,9 +374,10 @@ coreToStgExpr
 coreToStgExpr (Lit (LitNumber LitNumInteger _)) = panic "coreToStgExpr: LitInteger"
 coreToStgExpr (Lit (LitNumber LitNumNatural _)) = panic "coreToStgExpr: LitNatural"
 coreToStgExpr (Lit l)      = return (StgLit l)
-coreToStgExpr (App (Lit LitRubbish) _some_unlifted_type)
+coreToStgExpr (App (Lit lit) _some_boxed_type)
+  | isRubbishLit lit
   -- We lower 'LitRubbish' to @()@ here, which is much easier than doing it in
-  -- a STG to Cmm pass.
+  -- a STG to Cmm pass. Doesn't matter whether it is lifted or unlifted
   = coreToStgExpr (Var unitDataConId)
 coreToStgExpr (Var v) = coreToStgApp v [] []
 coreToStgExpr (Coercion _)

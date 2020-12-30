@@ -55,7 +55,8 @@ module GHC.Types.Literal
         , word8Lit, word16Lit, word32Lit
         , charToIntLit, intToCharLit
         , floatToIntLit, intToFloatLit, doubleToIntLit, intToDoubleLit
-        , nullAddrLit, rubbishLit, floatToDoubleLit, doubleToFloatLit
+        , nullAddrLit, floatToDoubleLit, doubleToFloatLit
+        , rubbishLit, isRubbishLit
         ) where
 
 #include "HsVersions.h"
@@ -132,11 +133,10 @@ data Literal
                                 -- that can be represented as a Literal. Create
                                 -- with 'nullAddrLit'
 
-  | LitRubbish                  -- ^ A nonsense value, used when an unlifted
-                                -- binding is absent and has type
-                                -- @forall (a :: 'TYPE' 'UnliftedRep'). a@.
-                                -- May be lowered by code-gen to any possible
-                                -- value. Also see Note [Rubbish literals]
+  | LitRubbish Bool             -- ^ A nonsense value; always boxed, but
+                                --      True <=> lifted, False <=> unlifted
+                                -- Used when a binding is absent.
+                                -- See Note [Rubbish literals]
 
   | LitFloat   Rational         -- ^ @Float#@. Create with 'mkLitFloat'
   | LitDouble  Rational         -- ^ @Double#@. Create with 'mkLitDouble'
@@ -241,7 +241,7 @@ instance Binary Literal where
         = do putByte bh 6
              put_ bh nt
              put_ bh i
-    put_ bh (LitRubbish) = putByte bh 7
+    put_ bh (LitRubbish b) = do putByte bh 7; put_ bh b
     get bh = do
             h <- getByte bh
             case h of
@@ -267,7 +267,9 @@ instance Binary Literal where
                     nt <- get bh
                     i  <- get bh
                     return (LitNumber nt i)
-              _ -> return (LitRubbish)
+              _ -> do
+                    b <- get bh
+                    return (LitRubbish b)
 
 instance Outputable Literal where
     ppr = pprLiteral id
@@ -680,9 +682,13 @@ doubleToFloatLit l             = pprPanic "doubleToFloatLit" (ppr l)
 nullAddrLit :: Literal
 nullAddrLit = LitNullAddr
 
--- | A nonsense literal of type @forall (a :: 'TYPE' 'UnliftedRep'). a@.
-rubbishLit :: Literal
-rubbishLit = LitRubbish
+-- | A rubbish literal; see Note [Rubbish literals]
+rubbishLit :: Bool -> Literal
+rubbishLit is_lifted = LitRubbish is_lifted
+
+isRubbishLit :: Literal -> Bool
+isRubbishLit (LitRubbish {}) = True
+isRubbishLit _               = False
 
 {-
         Predicates
@@ -807,9 +813,11 @@ literalType (LitNumber lt _)  = case lt of
    LitNumWord16  -> word16PrimTy
    LitNumWord32  -> word32PrimTy
    LitNumWord64  -> word64PrimTy
-literalType (LitRubbish)      = mkForAllTy a Inferred (mkTyVarTy a)
+literalType (LitRubbish is_lifted) = mkForAllTy a Inferred (mkTyVarTy a)
   where
-    a = alphaTyVarUnliftedRep
+    -- See Note [Rubbish literals]
+    a | is_lifted = alphaTyVar
+      | otherwise = alphaTyVarUnliftedRep
 
 absentLiteralOf :: TyCon -> Maybe Literal
 -- Return a literal of the appropriate primitive
@@ -849,7 +857,7 @@ cmpLit (LitLabel     a _ _) (LitLabel      b _ _) = a `uniqCompareFS` b
 cmpLit (LitNumber nt1 a)    (LitNumber nt2  b)
   | nt1 == nt2 = a   `compare` b
   | otherwise  = nt1 `compare` nt2
-cmpLit (LitRubbish)         (LitRubbish)          = EQ
+cmpLit (LitRubbish b1)      (LitRubbish b2)       = b1 `compare` b2
 cmpLit lit1 lit2
   | litTag lit1 < litTag lit2 = LT
   | otherwise                 = GT
@@ -862,7 +870,7 @@ litTag (LitFloat     _)   = 4
 litTag (LitDouble    _)   = 5
 litTag (LitLabel _ _ _)   = 6
 litTag (LitNumber  {})    = 7
-litTag (LitRubbish)       = 8
+litTag (LitRubbish {})    = 8
 
 {-
         Printing
@@ -895,7 +903,9 @@ pprLiteral add_par (LitLabel l mb fod) =
     where b = case mb of
               Nothing -> pprHsString l
               Just x  -> doubleQuotes (text (unpackFS l ++ '@':show x))
-pprLiteral _       (LitRubbish)     = text "__RUBBISH"
+pprLiteral _       (LitRubbish is_lifted)
+  = text "__RUBBISH"
+    <> parens (if is_lifted then text "lifted" else text "unlifted")
 
 pprIntegerVal :: (SDoc -> SDoc) -> Integer -> SDoc
 -- See Note [Printing of literals in Core].
@@ -960,37 +970,38 @@ What is <absent value>?
 * For primitive types like Int# or Word# we can use any random
   value of that type.
 * But what about /unlifted/ but /boxed/ types like MutVar# or
-  Array#?   We need a literal value of that type.
+  Array#?  Or /lifted/ but /strict/ values, such as a field of
+  a strict data constructor.  For these we use LitRubbish.
+  See Note [Absent errors] in GHC.Core.Opt.WorkWrap.Utils.hs
 
-That is 'LitRubbish'.  Since we need a rubbish literal for
-many boxed, unlifted types, we say that LitRubbish has type
-  LitRubbish :: forall (a :: TYPE UnliftedRep). a
+The literal (LitRubbish is_lifted)
+has type
+  LitRubbish :: forall (a :: TYPE LiftedRep). a     if is_lifted
+  LitRubbish :: forall (a :: TYPE UnliftedRep). a   otherwise
 
 So we might see a w/w split like
-  $wf x z = let y :: Array# Int = LitRubbish @(Array# Int)
+  $wf x z = let y :: Array# Int = (LitRubbish False) @(Array# Int)
             in e
 
-Recall that (TYPE UnliftedRep) is the kind of boxed, unlifted
-heap pointers.
-
-Here are the moving parts:
+Here are the moving parts, but see also Note [Absent errors] in
+GHC.Core.Opt.WorkWrap.Utils
 
 * We define LitRubbish as a constructor in GHC.Types.Literal.Literal
 
 * It is given its polymorphic type by Literal.literalType
 
 * GHC.Core.Opt.WorkWrap.Utils.mk_absent_let introduces a LitRubbish for absent
-  arguments of boxed, unlifted type.
+  arguments of boxed, unlifted type; or boxed, lifted arguments of strict data
+  constructors.
 
-* In CoreToSTG we convert (RubishLit @t) to just ().  STG is
-  untyped, so it doesn't matter that it points to a lifted
-  value. The important thing is that it is a heap pointer,
-  which the garbage collector can follow if it encounters it.
+* In CoreToSTG we convert (RubishLit @t) to just ().  STG is untyped, so this
+  will work OK for both lifted and unlifted (but boxed) values. The important
+  thing is that it is a heap pointer, which the garbage collector can follow if
+  it encounters it.
 
-  We considered maintaining LitRubbish in STG, and lowering
-  it in the code generators, but it seems simpler to do it
-  once and for all in CoreToSTG.
+  We considered maintaining LitRubbish in STG, and lowering it in the code
+  generators, but it seems simpler to do it once and for all in CoreToSTG.
 
-  In GHC.ByteCode.Asm we just lower it as a 0 literal, because
-  it's all boxed and lifted to the host GC anyway.
+  In GHC.ByteCode.Asm we just lower it as a 0 literal, because it's all boxed to
+  the host GC anyway.
 -}

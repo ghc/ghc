@@ -26,7 +26,7 @@ module GHC.Types.Demand (
     multCard, multDmd, multSubDmd,
     -- ** Predicates on @Card@inalities and @Demand@s
     isAbs, isUsedOnce, isStrict,
-    isAbsDmd, isUsedOnceDmd, isStrUsedDmd,
+    isAbsDmd, isUsedOnceDmd, isStrUsedDmd, isStrictDmd,
     isTopDmd, isSeqDmd, isWeakDmd,
     -- ** Special demands
     evalDmd,
@@ -106,12 +106,32 @@ import GHC.Utils.Panic
 ************************************************************************
 -}
 
+{- Note [Evaluation cardinalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The demand analyser uses an /evaluation cardinality/ of type Card,
+to specify how many times a term is evaluated.  A cardinality C_lu
+represents an /interval/ [l..u], meaning
+    C_lu means evaluated /at least/ 'l' times and
+                         /at most/  'u' times
+
+* The lower bound corresponds to /strictness/
+  Hence 'l' is either 0 (lazy)
+                   or 1 (strict)
+
+* The upper bound corresponds to /usage/
+  Hence 'u' is either 0 (not used at all),
+                   or 1 (used at most once)
+                   or n (no information)
+
+Intervals describe sets, so the underlying lattice is the powerset lattice.
+
+Usually l<=u, but we also have C_10, the interval [1,0], the empty interval,
+denoting the empty set.   This is the bottom element of the lattice.
+-}
+
+
 -- | Describes an interval of /evaluation cardinalities/.
--- @C_lu@ means "evaluated /at least/ @l@ and /at most/ @u@ times".
--- The lower bound corresponds to /strictness/ (hence @l@ is either @0@ or @1@),
--- the upper bound corresponds to /usage/      (@u@ is one of @0@, @1@, @n@).
---
--- Intervals describe sets, so the underlying lattice is the powerset lattice.
+-- See Note [Evaluation cardinalities]
 data Card
   = C_00 -- ^ {0}     Absent.
   | C_01 -- ^ {0,1}   Used at most once.
@@ -435,6 +455,10 @@ isTopDmd dmd = dmd == topDmd
 isAbsDmd :: Demand -> Bool
 isAbsDmd (n :* _) = isAbs n
 
+-- | Contrast with isStrictUsedDmd. See Note [Strict demands]
+isStrictDmd :: Demand -> Bool
+isStrictDmd (n :* _) = isStrict n
+
 -- | Not absent and used strictly. See Note [Strict demands]
 isStrUsedDmd :: Demand -> Bool
 isStrUsedDmd (n :* _) = isStrict n && not (isAbs n)
@@ -601,8 +625,9 @@ saturatedByOneShots n (_ :* sd) = isUsedOnce (peelManyCalls n sd)
 'isStrUsedDmd' returns true only of demands that are
    both strict
    and  used
-In particular, it is False for <B>, which can and does
-arise in, say (#7319)
+
+In particular, it is False for <B> (i.e. strict and not used,
+cardinality C_10), which can and does arise in, say (#7319)
    f x = raise# <some exception>
 Then 'x' is not used, so f gets strictness <B> -> .
 Now the w/w generates

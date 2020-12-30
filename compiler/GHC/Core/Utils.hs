@@ -1611,7 +1611,7 @@ expr_ok primop_ok other_expr
         Var f   -> app_ok primop_ok f args
         -- 'LitRubbish' is the only literal that can occur in the head of an
         -- application and will not be matched by the above case (Var /= Lit).
-        Lit lit -> ASSERT( lit == rubbishLit ) True
+        Lit lit -> ASSERT( isRubbishLit lit ) True
         _       -> False
 
 -----------------------------
