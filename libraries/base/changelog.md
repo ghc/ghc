@@ -11,6 +11,10 @@
   * Add `Semigroup` and `Monoid` instances for `Data.Functor.Product` and
     `Data.Functor.Compose`.
 
+  * Add `Functor`, `Applicative`, `Monad`, `MonadFix`, `Foldable`, `Traversable`,
+    `Eq`, `Ord`, `Show`, `Read`, `Eq1`, `Ord1`, `Show1`, `Read1`, `Generic`,
+    `Generic1`, and `Data` instances for `GHC.Tuple.Solo`.
+
 ## 4.15.0.0 *TBA*
 
   * `openFile` now calls the `open` system call with an `interruptible` FFI

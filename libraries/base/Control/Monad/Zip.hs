@@ -25,6 +25,7 @@ import Data.Ord ( Down(..) )
 import Data.Proxy
 import qualified Data.List.NonEmpty as NE
 import GHC.Generics
+import GHC.Tuple (Solo (..))
 
 -- | Instances should satisfy the laws:
 --
@@ -70,6 +71,11 @@ instance MonadZip NE.NonEmpty where
 instance MonadZip Identity where
     mzipWith                 = liftM2
     munzip (Identity (a, b)) = (Identity a, Identity b)
+
+-- | @since 4.15.0.0
+instance MonadZip Solo where
+    mzipWith = liftM2
+    munzip (Solo (a, b)) = (Solo a, Solo b)
 
 -- | @since 4.8.0.0
 instance MonadZip Dual where
