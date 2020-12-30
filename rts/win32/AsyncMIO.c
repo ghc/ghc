@@ -289,7 +289,7 @@ start:
             unsigned int rID = completedTable[i].reqID;
 
             prev = NULL;
-            for(tso = blocked_queue_hd; tso != END_TSO_QUEUE;
+            for(tso = MainCapability.iomgr.blocked_queue_hd; tso != END_TSO_QUEUE;
                   tso = tso->_link) {
 
                 switch(tso->why_blocked) {
@@ -309,10 +309,10 @@ start:
                         if (prev) {
                             setTSOLink(&MainCapability, prev, tso->_link);
                         } else {
-                            blocked_queue_hd = tso->_link;
+                            MainCapability.iomgr.blocked_queue_hd = tso->_link;
                         }
-                        if (blocked_queue_tl == tso) {
-                            blocked_queue_tl = prev ? prev : END_TSO_QUEUE;
+                        if (MainCapability.iomgr.blocked_queue_tl == tso) {
+                            MainCapability.iomgr.blocked_queue_tl = prev ? prev : END_TSO_QUEUE;
                         }
 
                         // Terminates the run queue + this inner for-loop.
