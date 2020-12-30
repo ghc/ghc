@@ -45,6 +45,7 @@ import GHC.Runtime.Interpreter.Types
 import GHCi.RemoteTypes
 import GHCi.BreakArray
 import GHC.ByteCode.Types
+import GHC.Core.DataCon
 import GHC.Core.ConLike
 import GHC.Core.PatSyn
 import GHC.Driver.Phases
@@ -1815,7 +1816,7 @@ data DocComponents =
 buildDocComponents :: GHC.GhcMonad m => String -> Name -> m DocComponents
 buildDocComponents str name = do
   mbThing <- GHC.lookupName name
-  sigAndLoc <- traverse (sigAndLocDoc str) mbThing
+  let sigAndLoc = sigAndLocDoc str <$> mbThing
   (docs, argDocs)
     <- either handleGetDocsFailure pure
          =<< GHC.getDocs name
@@ -1824,25 +1825,25 @@ buildDocComponents str name = do
 
 -- | Produce output containing the type/kind signature, category, and definiton
 -- location of a TyThing.
-sigAndLocDoc :: GHC.GhcMonad m => String -> TyThing -> m SDoc
+sigAndLocDoc :: String -> TyThing -> SDoc
 sigAndLocDoc str tyThing = do
-  tyDoc <- tyThingTyDoc tyThing
-  let sigDoc = text str <+> nest 2 (dcolon <+> tyDoc)
+  let tyDoc = tyThingTyDoc tyThing
+      sigDoc = text str <+> nest 2 (dcolon <+> tyDoc)
       comment =
         hsep [ char '\t' <> text "--"
              , pprTyThingCategory tyThing
              , text "defined" <+> pprNameDefnLoc (getName tyThing)
              ]
-  pure $ hang sigDoc 2 comment
+   in hang sigDoc 2 comment
 
   where
-    tyThingTyDoc :: GHC.GhcMonad m => TyThing -> m SDoc
+    tyThingTyDoc :: TyThing -> SDoc
     tyThingTyDoc = \case
-      AnId id                     -> pure . pprTypeForUser $ varType id
-      AConLike (RealDataCon _)    -> pprTypeForUser <$> GHC.exprType GHC.TM_Inst str
-      AConLike (PatSynCon patSyn) -> pure $ pprPatSynType patSyn
-      ATyCon tyCon                -> pure . pprTypeForUser $ GHC.tyConKind tyCon
-      ACoAxiom _                  -> pure empty
+      AnId i                      -> pprTypeForUser $ varType i
+      AConLike (RealDataCon dc)   -> pprTypeForUser $ dataConDisplayType False dc
+      AConLike (PatSynCon patSyn) -> pprPatSynType patSyn
+      ATyCon tyCon                -> pprTypeForUser $ GHC.tyConKind tyCon
+      ACoAxiom _                  -> empty
 
 pprDocs :: [DocComponents] -> [SDoc]
 pprDocs docs
