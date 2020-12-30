@@ -15,10 +15,9 @@ module RFC2616
     , lookupHeader
     ) where
 
-import Control.Applicative hiding (many)
-import Data.Attoparsec as P
-import qualified Data.Attoparsec.Char8 as P8
-import Data.Attoparsec.Char8 (char8, endOfLine, isDigit_w8)
+import Data.Attoparsec.ByteString as P
+import qualified Data.Attoparsec.ByteString.Char8 as P8
+import Data.Attoparsec.ByteString.Char8 (char8, endOfLine, isDigit_w8)
 import Data.Word (Word8)
 import qualified Data.ByteString.Char8 as B hiding (map)
 import qualified Data.ByteString as B (map)
@@ -52,13 +51,13 @@ data Header = Header {
 
 messageHeader :: Parser Header
 messageHeader = do
-  header <- P.takeWhile isToken <* char8 ':' <* skipWhile P8.isHorizontalSpace
-  body <- takeTill P8.isEndOfLine <* endOfLine
-  bodies <- many $ skipSpaces *> takeTill P8.isEndOfLine <* endOfLine
+  header <- P.takeWhile isToken <* char8 ':' <* P.skipWhile P8.isHorizontalSpace
+  body <- P.takeTill P8.isEndOfLine <* endOfLine
+  bodies <- P.many' $ skipSpaces *> P.takeTill P8.isEndOfLine <* endOfLine
   return $! Header header (body:bodies)
 
 request :: Parser (Request, [Header])
-request = (,) <$> requestLine <*> many messageHeader <* endOfLine
+request = (,) <$> requestLine <*> P.many' messageHeader <* endOfLine
 
 data Response = Response {
       responseVersion :: !B.ByteString
@@ -74,7 +73,7 @@ responseLine = do
   return $! Response version code msg
 
 response :: Parser (Response, [Header])
-response = (,) <$> responseLine <*> many messageHeader <* endOfLine
+response = (,) <$> responseLine <*> P.many' messageHeader <* endOfLine
 
 lowerHeader :: Header -> Header
 lowerHeader (Header n v) = Header (B.map toLower n) (map (B.map toLower) v)
