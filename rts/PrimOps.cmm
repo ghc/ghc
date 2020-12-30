@@ -2582,7 +2582,7 @@ stg_waitReadzh ( W_ fd )
     StgTSO_block_info(CurrentTSO) = fd;
     // No locking - we're not going to use this interface in the
     // threaded RTS anyway.
-    ccall appendToIOBlockedQueue(CurrentTSO "ptr");
+    ccall appendToIOBlockedQueue(MyCapability() "ptr", CurrentTSO "ptr");
     jump stg_block_noregs();
 #endif
 }
@@ -2598,7 +2598,7 @@ stg_waitWritezh ( W_ fd )
     StgTSO_block_info(CurrentTSO) = fd;
     // No locking - we're not going to use this interface in the
     // threaded RTS anyway.
-    ccall appendToIOBlockedQueue(CurrentTSO "ptr");
+    ccall appendToIOBlockedQueue(MyCapability() "ptr", CurrentTSO "ptr");
     jump stg_block_noregs();
 #endif
 }
@@ -2635,7 +2635,7 @@ stg_delayzh ( W_ us_delay )
      * delayed thread on the blocked_queue.
      */
     StgTSO_why_blocked(CurrentTSO) = BlockedOnDoProc::I16;
-    ccall appendToIOBlockedQueue(CurrentTSO "ptr");
+    ccall appendToIOBlockedQueue(MyCapability() "ptr", CurrentTSO "ptr");
     jump stg_block_async_void();
 
 #else
@@ -2644,7 +2644,7 @@ stg_delayzh ( W_ us_delay )
 
     StgTSO_block_info(CurrentTSO) = target;
 
-    ccall insertIntoSleepingQueue(CurrentTSO "ptr", target);
+    ccall insertIntoSleepingQueue(MyCapability() "ptr", CurrentTSO "ptr", target);
     jump stg_block_noregs();
 #endif
 #endif /* !THREADED_RTS */
@@ -2672,7 +2672,7 @@ stg_asyncReadzh ( W_ fd, W_ is_sock, W_ len, W_ buf )
     StgAsyncIOResult_len(ares)     = 0;
     StgAsyncIOResult_errCode(ares) = 0;
     StgTSO_block_info(CurrentTSO)  = ares;
-    ccall appendToIOBlockedQueue(CurrentTSO "ptr");
+    ccall appendToIOBlockedQueue(MyCapability() "ptr", CurrentTSO "ptr");
     jump stg_block_async();
 #endif
 }
@@ -2697,7 +2697,7 @@ stg_asyncWritezh ( W_ fd, W_ is_sock, W_ len, W_ buf )
     StgAsyncIOResult_len(ares)     = 0;
     StgAsyncIOResult_errCode(ares) = 0;
     StgTSO_block_info(CurrentTSO)  = ares;
-    ccall appendToIOBlockedQueue(CurrentTSO "ptr");
+    ccall appendToIOBlockedQueue(MyCapability() "ptr", CurrentTSO "ptr");
     jump stg_block_async();
 #endif
 }
@@ -2722,7 +2722,7 @@ stg_asyncDoProczh ( W_ proc, W_ param )
     StgAsyncIOResult_len(ares)     = 0;
     StgAsyncIOResult_errCode(ares) = 0;
     StgTSO_block_info(CurrentTSO) = ares;
-    ccall appendToIOBlockedQueue(CurrentTSO "ptr");
+    ccall appendToIOBlockedQueue(MyCapability() "ptr", CurrentTSO "ptr");
     jump stg_block_async();
 #endif
 }

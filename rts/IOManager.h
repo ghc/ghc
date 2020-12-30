@@ -128,7 +128,7 @@ void markCapabilityIOManager(evac_fn evac, void *user, CapIOManager *iomgr);
  * This is used by the select() and the Windows MIO non-threaded I/O manager
  * implementation.
  */
-void appendToIOBlockedQueue(StgTSO *tso);
+void appendToIOBlockedQueue(Capability *cap, StgTSO *tso);
 
 /* Insert a thread into the queue of threads blocked on timers.
  *
@@ -137,7 +137,7 @@ void appendToIOBlockedQueue(StgTSO *tso);
  * The sleeping queue is defined for other non-threaded I/O managers but not
  * used. This is a wart that should be excised.
  */
-void insertIntoSleepingQueue(StgTSO *tso, LowResTime target);
+void insertIntoSleepingQueue(Capability *cap, StgTSO *tso, LowResTime target);
 #endif
 
 /* Check to see if there are any pending timeouts or I/O operations
