@@ -145,6 +145,9 @@ valid_hole_fits.hs:34:11: warning: [-Wtyped-holes (in -Wdefault)]
           with Just @Bool
           (imported from ‘Data.Maybe’ at valid_hole_fits.hs:5:1-17
            (and originally defined in ‘GHC.Maybe’))
+        Solo :: forall a. a -> Solo a
+          with Solo @Bool
+          (bound at <wired into compiler>)
         id :: forall a. a -> a
           with id @Bool
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40

@@ -7,7 +7,7 @@ overloadedlistsfail01.hs:5:8: error:
         instance Show Ordering -- Defined in ‘GHC.Show’
         instance Show a => Show (Maybe a) -- Defined in ‘GHC.Show’
         instance Show Integer -- Defined in ‘GHC.Show’
-        ...plus 22 others
+        ...plus 23 others
         ...plus 14 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the expression: print [1]

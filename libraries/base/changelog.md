@@ -1,7 +1,14 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
 ## 4.15.0.0 *TBA*
-  * TODO
+
+  * Add `Functor`, `Applicative`, `Monad`, `MonadFix`, `Foldable`, `Traversable`,
+    `Eq`, `Ord`, `Show`, `Read`, `Eq1`, `Ord1`, `Show1`, `Read1`, `Generic`,
+    `Generic1`, and `Data` instances for `GHC.Tuple.Solo`.
+
+  * `openFile` now calls the `open` system call with an `interruptible` FFI
+    call, ensuring that the call can be interrupted with `SIGINT` on POSIX
+    systems.
 
   * Add `hGetContents'`, `getContents'`, and `readFile'` in `System.IO`:
     Strict IO variants of `hGetContents`, `getContents`, and `readFile`.
