@@ -57,8 +57,8 @@ compiler = do
   let compilerDir    = topDir </> "compiler"
   let ghcautoconf    = stage1Lib </> "ghcautoconf.h"
   let ghcplatform    = stage1Lib </> "ghcplatform.h"
-  let pmv            = stage1Compiler </> "primop-vector-uniques.hs-incl"
-  need [ghcautoconf, ghcplatform, machDeps, hsVersions, pmv]
+  produces $ hsIncls stage1Compiler
+  need $ mconcat [[ghcautoconf, ghcplatform], hsIncls stage1Compiler, [machDeps, hsVersions]]
   let include0  = topDir </> "includes"
   let include1  = stage1Lib
   let hlintYaml = topDir </> "compiler/.hlint.yaml"
@@ -73,3 +73,21 @@ compiler = do
   putBuild $ "| " <> cmdLine
   cmd_ cmdLine
 
+hsIncls :: FilePath -> [FilePath]
+hsIncls path = [ path </> "primop-vector-tycons.hs-incl"
+               , path </> "primop-vector-tys.hs-incl"
+               , path </> "primop-vector-tys-exports.hs-incl"
+               , path </> "primop-code-size.hs-incl"
+               , path </> "primop-vector-uniques.hs-incl"
+               , path </> "primop-data-decl.hs-incl"
+               , path </> "primop-tag.hs-incl"
+               , path </> "primop-list.hs-incl"
+               , path </> "primop-strictness.hs-incl"
+               , path </> "primop-fixity.hs-incl"
+               , path </> "primop-docs.hs-incl"
+               , path </> "primop-primop-info.hs-incl"
+               , path </> "primop-out-of-line.hs-incl"
+               , path </> "primop-has-side-effects.hs-incl"
+               , path </> "primop-can-fail.hs-incl"
+               , path </> "primop-commutable.hs-incl"
+               ]

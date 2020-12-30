@@ -375,6 +375,35 @@ lint-base:
     - .gitlab/ci.sh run_hadrian stage1:lib:base
     - .gitlab/ci.sh run_hadrian lint:base
 
+lint-compiler:
+  extends: .lint-params
+  variables:
+    BUILD_FLAVOUR: default
+  script:
+    - .gitlab/ci.sh setup
+    - .gitlab/ci.sh configure
+    - .gitlab/ci.sh run_hadrian _build/stage1/lib/ghcautoconf.h
+    - .gitlab/ci.sh run_hadrian _build/stage1/lib/ghcplatform.h
+    - .gitlab/ci.sh run_hadrian _build/stage1/compiler/build/primop-vector-tycons.hs-incl
+    - .gitlab/ci.sh run_hadrian _build/stage1/compiler/build/primop-vector-tys.hs-incl
+    - .gitlab/ci.sh run_hadrian _build/stage1/compiler/build/primop-vector-tys-exports.hs-incl
+    - .gitlab/ci.sh run_hadrian _build/stage1/compiler/build/primop-code-size.hs-incl
+    - .gitlab/ci.sh run_hadrian _build/stage1/compiler/build/primop-vector-uniques.hs-incl
+    - .gitlab/ci.sh run_hadrian _build/stage1/compiler/build/primop-data-decl.hs-incl
+    - .gitlab/ci.sh run_hadrian _build/stage1/compiler/build/primop-tag.hs-incl
+    - .gitlab/ci.sh run_hadrian _build/stage1/compiler/build/primop-list.hs-incl
+    - .gitlab/ci.sh run_hadrian _build/stage1/compiler/build/primop-strictness.hs-incl
+    - .gitlab/ci.sh run_hadrian _build/stage1/compiler/build/primop-fixity.hs-incl
+    - .gitlab/ci.sh run_hadrian _build/stage1/compiler/build/primop-docs.hs-incl
+    - .gitlab/ci.sh run_hadrian _build/stage1/compiler/build/primop-primop-info.hs-incl
+    - .gitlab/ci.sh run_hadrian _build/stage1/compiler/build/primop-out-of-line.hs-incl
+    - .gitlab/ci.sh run_hadrian _build/stage1/compiler/build/primop-has-side-effects.hs-incl
+    - .gitlab/ci.sh run_hadrian _build/stage1/compiler/build/primop-can-fail.hs-incl
+    - .gitlab/ci.sh run_hadrian _build/stage1/compiler/build/primop-commutable.hs-incl
+    - .gitlab/ci.sh run_hadrian lint:compiler
+
+
+
 ############################################################
 # Validation via Pipelines (make)
 ############################################################
