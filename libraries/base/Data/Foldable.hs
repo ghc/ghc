@@ -119,7 +119,7 @@ infix  4 `elem`, `notElem`
 -- don't have a sensible way to name the link within the module itself.
 -- Thus, the below "Data.Foldable#overview" works well when shown as
 -- @Data.Foldable@ from other modules, but in the home module it should
--- be possible to specify an alternative name. :-(
+-- be possible to specify alternative link text. :-(
 
 -- | The Foldable class represents data structures that can be reduced to a
 -- summary value one element at a time.  Strict left-associative folds are a
@@ -1667,7 +1667,8 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 --   in some monads are conditionally lazy and can /short-circuit/ a chain of
 --   computations.  The below folds will terminate as early as possible, but
 --   even infinite loops can be productive here, when evaluated solely for
---   their stream of IO side-effects.
+--   their stream of IO side-effects.  See "Data.Traversable#validation"
+--   for some additional discussion.
 --
 --     @
 --     `traverse_`  :: (Foldable t, Applicative f) => (a -> f b) -> t a -> f ()
