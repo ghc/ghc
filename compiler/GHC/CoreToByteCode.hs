@@ -1655,13 +1655,13 @@ pushAtom _ _ (AnnLit lit) = do
                 _  -> PUSH_UBX lit (trunc16W $ bytesToWords platform size_bytes)
 
      case lit of
-        LitLabel _ _ _  -> code AddrRep
-        LitFloat _      -> code FloatRep
-        LitDouble _     -> code DoubleRep
-        LitChar _       -> code WordRep
+        LitLabel {}     -> code AddrRep
+        LitFloat {}     -> code FloatRep
+        LitDouble {}    -> code DoubleRep
+        LitChar {}      -> code WordRep
         LitNullAddr     -> code AddrRep
-        LitString _     -> code AddrRep
-        LitRubbish      -> code WordRep
+        LitString {}    -> code AddrRep
+        LitRubbish {}   -> code WordRep
         LitNumber nt _  -> case nt of
           LitNumInt     -> code IntRep
           LitNumWord    -> code WordRep
