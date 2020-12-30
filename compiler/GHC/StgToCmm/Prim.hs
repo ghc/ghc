@@ -1081,13 +1081,6 @@ emitPrimOp cfg primop =
   ChrOp           -> \args -> opNop args  -- Int# and Char# are rep'd the same
   OrdOp           -> \args -> opNop args
 
-  Narrow8IntOp   -> \args -> opNarrow args (MO_SS_Conv, W8)
-  Narrow16IntOp  -> \args -> opNarrow args (MO_SS_Conv, W16)
-  Narrow32IntOp  -> \args -> opNarrow args (MO_SS_Conv, W32)
-  Narrow8WordOp  -> \args -> opNarrow args (MO_UU_Conv, W8)
-  Narrow16WordOp -> \args -> opNarrow args (MO_UU_Conv, W16)
-  Narrow32WordOp -> \args -> opNarrow args (MO_UU_Conv, W32)
-
   DoublePowerOp  -> \args -> opCallish args MO_F64_Pwr
   DoubleSinOp    -> \args -> opCallish args MO_F64_Sin
   DoubleCosOp    -> \args -> opCallish args MO_F64_Cos
@@ -1662,14 +1655,6 @@ emitPrimOp cfg primop =
 
   opNop :: [CmmExpr] -> PrimopCmmEmit
   opNop args = opIntoRegs $ \[res] -> emitAssign (CmmLocal res) arg
-    where [arg] = args
-
-  opNarrow
-    :: [CmmExpr]
-    -> (Width -> Width -> MachOp, Width)
-    -> PrimopCmmEmit
-  opNarrow args (mop, rep) = opIntoRegs $ \[res] -> emitAssign (CmmLocal res) $
-    CmmMachOp (mop rep (wordWidth platform)) [CmmMachOp (mop (wordWidth platform) rep) [arg]]
     where [arg] = args
 
   -- These primops are implemented by CallishMachOps, because they sometimes

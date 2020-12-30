@@ -57,11 +57,11 @@ narrowGmpSize# x = x
 -- On IL32P64 (i.e. Win64), we have to be careful with CLong not being
 -- 64bit.  This is mostly an issue on values returned from C functions
 -- due to sign-extension.
-narrowGmpSize# = narrow32Int#
+narrowGmpSize# i = int32ToInt# (intToInt32# i)
 #endif
 
 narrowCInt# :: Int# -> Int#
-narrowCInt# = narrow32Int#
+narrowCInt# i = int32ToInt# (intToInt32# i)
 
 bignat_compare :: WordArray# -> WordArray# -> Int#
 bignat_compare x y = narrowCInt# (c_mpn_cmp x y (wordArraySize# x))

@@ -719,6 +719,6 @@ own to enable constant folding; for example 'shift':
 -- > i16_to_w16 = \x -> case eta of _
 -- >   { I16# b1 -> case tagToEnum# (<=# 0 b1) of _
 -- >       { False -> Nothing
--- >       ; True -> Just (W16# (narrow16Word# (int2Word# b1)))
+-- >       ; True -> Just (W16# (WordToWord16# (int2Word# b1)))
 -- >       }
 -- >   }

@@ -624,39 +624,6 @@ primOpRules nm = \case
    WordToIntOp    -> mkPrimOpRule nm 1 [ liftLitPlatform (litNumCoerce LitNumInt) ]
    IntToWordOp    -> mkPrimOpRule nm 1 [ liftLitPlatform (litNumCoerce LitNumWord) ]
 
-   Narrow8IntOp   -> mkPrimOpRule nm 1 [ liftLitPlatform (litNumNarrow LitNumInt8)
-                                       , subsumedByPrimOp Narrow8IntOp
-                                       , Narrow8IntOp `subsumesPrimOp` Narrow16IntOp
-                                       , Narrow8IntOp `subsumesPrimOp` Narrow32IntOp
-                                       , narrowSubsumesAnd IntAndOp Narrow8IntOp 8 ]
-   Narrow16IntOp  -> mkPrimOpRule nm 1 [ liftLitPlatform (litNumNarrow LitNumInt16)
-                                       , subsumedByPrimOp Narrow8IntOp
-                                       , subsumedByPrimOp Narrow16IntOp
-                                       , Narrow16IntOp `subsumesPrimOp` Narrow32IntOp
-                                       , narrowSubsumesAnd IntAndOp Narrow16IntOp 16 ]
-   Narrow32IntOp  -> mkPrimOpRule nm 1 [ liftLitPlatform (litNumNarrow LitNumInt32)
-                                       , subsumedByPrimOp Narrow8IntOp
-                                       , subsumedByPrimOp Narrow16IntOp
-                                       , subsumedByPrimOp Narrow32IntOp
-                                       , removeOp32
-                                       , narrowSubsumesAnd IntAndOp Narrow32IntOp 32 ]
-   Narrow8WordOp  -> mkPrimOpRule nm 1 [ liftLitPlatform (litNumNarrow LitNumWord8)
-                                       , subsumedByPrimOp Narrow8WordOp
-                                       , Narrow8WordOp `subsumesPrimOp` Narrow16WordOp
-                                       , Narrow8WordOp `subsumesPrimOp` Narrow32WordOp
-                                       , narrowSubsumesAnd WordAndOp Narrow8WordOp 8 ]
-   Narrow16WordOp -> mkPrimOpRule nm 1 [ liftLitPlatform (litNumNarrow LitNumWord16)
-                                       , subsumedByPrimOp Narrow8WordOp
-                                       , subsumedByPrimOp Narrow16WordOp
-                                       , Narrow16WordOp `subsumesPrimOp` Narrow32WordOp
-                                       , narrowSubsumesAnd WordAndOp Narrow16WordOp 16 ]
-   Narrow32WordOp -> mkPrimOpRule nm 1 [ liftLitPlatform (litNumNarrow LitNumWord32)
-                                       , subsumedByPrimOp Narrow8WordOp
-                                       , subsumedByPrimOp Narrow16WordOp
-                                       , subsumedByPrimOp Narrow32WordOp
-                                       , removeOp32
-                                       , narrowSubsumesAnd WordAndOp Narrow32WordOp 32 ]
-
    OrdOp          -> mkPrimOpRule nm 1 [ liftLit charToIntLit
                                        , semiInversePrimOp ChrOp ]
    ChrOp          -> mkPrimOpRule nm 1 [ do [Lit lit] <- getArgs
@@ -1460,18 +1427,6 @@ semiInversePrimOp primop = do
   matchPrimOpId primop primop_id
   return e
 
-subsumesPrimOp :: PrimOp -> PrimOp -> RuleM CoreExpr
-this `subsumesPrimOp` that = do
-  [Var primop_id `App` e] <- getArgs
-  matchPrimOpId that primop_id
-  return (Var (primOpId this) `App` e)
-
-subsumedByPrimOp :: PrimOp -> RuleM CoreExpr
-subsumedByPrimOp primop = do
-  [e@(Var primop_id `App` _)] <- getArgs
-  matchPrimOpId primop primop_id
-  return e
-
 -- | Transform `extendWordN (narrowWordN x)` into `x .&. 0xFF..FF`
 extendNarrowPassthrough :: PrimOp -> Integer -> RuleM CoreExpr
 extendNarrowPassthrough narrow_primop n = do
@@ -1531,7 +1486,7 @@ Consider this code:
   chunkToBitmap :: [Bool] -> Word32
   chunkToBitmap chunk = foldr (.|.) 0 [ 1 `shiftL` n | (True,n) <- zip chunk [0..] ]
 
-This optimises to:
+This optimised to:
 Shift.$wgo = \ (w_sCS :: GHC.Prim.Int#) (w1_sCT :: [GHC.Types.Bool]) ->
     case w1_sCT of _ {
       [] -> 0##;
@@ -1668,16 +1623,6 @@ liftLitPlatform f = do
   platform <- getPlatform
   [Lit lit] <- getArgs
   return $ Lit (f platform lit)
-
-removeOp32 :: RuleM CoreExpr
-removeOp32 = do
-  platform <- getPlatform
-  case platformWordSize platform of
-    PW4 -> do
-      [e] <- getArgs
-      return e
-    PW8 ->
-      mzero
 
 getArgs :: RuleM [CoreExpr]
 getArgs = RuleM $ \_ _ _ args -> Just args

@@ -445,15 +445,6 @@ genPrim prof bound ty op = case op of
                                                         , rh |= app "h$reverseWord" [l]
                                                         ]
 
------------------------------- Narrow -------------------------------------------
-
-  Narrow8IntOp    -> \[r] [x] -> PrimInline $ r |= signExtend8  x
-  Narrow16IntOp   -> \[r] [x] -> PrimInline $ r |= signExtend16 x
-  Narrow32IntOp   -> \[r] [x] -> PrimInline $ r |= toI32  x
-  Narrow8WordOp   -> \[r] [x] -> PrimInline $ r |= mask8  x
-  Narrow16WordOp  -> \[r] [x] -> PrimInline $ r |= mask16 x
-  Narrow32WordOp  -> \[r] [x] -> PrimInline $ r |= toU32  x
-
 ------------------------------ Double -------------------------------------------
 
   DoubleGtOp        -> \[r] [x,y] -> PrimInline $ r |= if10 (x .>.   y)

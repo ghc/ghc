@@ -38,6 +38,7 @@ module GHC.Exts
 
         module GHC.Prim,
         module GHC.Prim.Ext,
+        module GHC.Prim.Deprecated,
 
         -- ** Running 'RealWorld' state thread
         runRW#,
@@ -138,6 +139,7 @@ import GHC.Types
            -- GHC's internal representation of 'TyCon's, for 'Typeable'
          , Module, TrName, TyCon, TypeLitSort, KindRep, KindBndr )
 import qualified GHC.Prim.Ext
+import qualified GHC.Prim.Deprecated
 import GHC.ArrayArray
 import GHC.Base hiding ( coerce )
 import GHC.Ptr

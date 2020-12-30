@@ -1054,18 +1054,6 @@ primop   BRevOp     "bitReverse#"     GenPrimOp   Word# -> Word#
     {Reverse the order of the bits in a word.}
 
 ------------------------------------------------------------------------
-section "Narrowings"
-        {Explicit narrowing of native-sized ints or words.}
-------------------------------------------------------------------------
-
-primop   Narrow8IntOp      "narrow8Int#"      GenPrimOp   Int# -> Int#
-primop   Narrow16IntOp     "narrow16Int#"     GenPrimOp   Int# -> Int#
-primop   Narrow32IntOp     "narrow32Int#"     GenPrimOp   Int# -> Int#
-primop   Narrow8WordOp     "narrow8Word#"     GenPrimOp   Word# -> Word#
-primop   Narrow16WordOp    "narrow16Word#"    GenPrimOp   Word# -> Word#
-primop   Narrow32WordOp    "narrow32Word#"    GenPrimOp   Word# -> Word#
-
-------------------------------------------------------------------------
 section "Double#"
         {Operations on double-precision (64 bit) floating-point numbers.}
 ------------------------------------------------------------------------
