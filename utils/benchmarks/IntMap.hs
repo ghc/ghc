@@ -2,8 +2,8 @@
 module Main where
 
 import Criterion.Main
-import System.Event.IntMap (IntMap)
-import qualified System.Event.IntMap as IM
+import Data.IntMap.Strict (IntMap)
+import qualified Data.IntMap.Strict as IM
 
 main = defaultMain
     [ bench "insert10k" $ whnf ascFrom n
