@@ -1486,7 +1486,13 @@ checkMissingFields con_like rbinds
            (addErrTc (missingStrictFields con_like missing_s_fields))
 
     warn <- woptM Opt_WarnMissingFields
-    when (warn && notNull missing_ns_fields)
+    defer <- goptM Opt_DeferMissingFields
+    lang <- xoptM LangExt.Incomplete
+    let shouldFail = not lang && not defer
+    when (shouldFail && notNull missing_ns_fields)
+         (failIfTc True
+             (missingFields con_like missing_ns_fields))
+    when (not shouldFail && warn && notNull missing_ns_fields)
          (warnTc (Reason Opt_WarnMissingFields) True
              (missingFields con_like missing_ns_fields))
 

@@ -1,5 +1,7 @@
 {-# LANGUAGE NoIncomplete #-}
-{-# OPTIONS_GHC -Wmissing-methods #-}
+{-# OPTIONS_GHC -fdefer-missing-methods #-}
+-- we'll switch this warning off because it's on in Wdefault
+{-# OPTIONS_GHC -Wno-missing-methods #-}
 
 module A where
 

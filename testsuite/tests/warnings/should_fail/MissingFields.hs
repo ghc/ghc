@@ -1,6 +1,4 @@
 {-# LANGUAGE NoIncomplete #-}
-{-# OPTIONS_GHC -Wno-missing-fields #-} -- This warning is on from -Wdefault
-{-# OPTIONS_GHC -fdefer-missing-fields #-}
 
 module A where
 
