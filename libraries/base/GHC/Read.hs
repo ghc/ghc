@@ -73,6 +73,7 @@ import GHC.Base
 import GHC.Arr
 import GHC.Word
 import GHC.List (filter)
+import GHC.Tuple (Solo (..))
 
 
 -- | @'readParen' 'True' p@ parses what @p@ parses, but surrounded with
@@ -666,6 +667,9 @@ instance Read () where
 
   readListPrec = readListPrecDefault
   readList     = readListDefault
+
+-- | @since 4.15
+deriving instance Read a => Read (Solo a)
 
 -- | @since 2.01
 instance (Read a, Read b) => Read (a,b) where
