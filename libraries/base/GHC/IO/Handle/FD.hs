@@ -187,38 +187,32 @@ openBinaryFile fp m =
     (\e -> ioError (addFilePathToIOError "openBinaryFile" fp e))
 
 openFile' :: String -> IOMode -> Bool -> Bool -> IO Handle
-openFile' filepath iomode binary non_blocking = do
+openFile' filepath iomode binary non_blocking =
   -- first open the file to get an FD
-  hndl <- FD.openFileWith filepath iomode non_blocking $ \fd fd_type -> do
+  FD.openFileWith filepath iomode non_blocking (\fd fd_type -> do
 
-    mb_codec <- if binary then return Nothing else fmap Just getLocaleEncoding
+      mb_codec <- if binary then return Nothing else fmap Just getLocaleEncoding
 
-    -- then use it to make a Handle
-    mkHandleFromFD fd fd_type filepath iomode
-                     False {- do not *set* non-blocking mode -}
-                     mb_codec
-        -- Note: openFileWith takes care of closing the FD if making the handle
-        -- fails.
+      -- Then use it to make a Handle. If this fails, openFileWith
+      -- will take care of closing the file.
+      mkHandleFromFDNoFinalizer fd fd_type filepath iomode
+                       False {- do not *set* non-blocking mode -}
+                       mb_codec)
+
+    -- Add a finalizer to the handle. This is done under a mask,
+    -- so there are no asynchronous exceptions, and (satisfying
+    -- the conditions of openFileWith), addHandleFinalizer
+    -- cannot throw a synchronous exception.
+    (\hndl -> hndl <$ addHandleFinalizer hndl handleFinalizer)
 
         -- ASSERT: if we just created the file, then fdToHandle' won't fail
         -- (so we don't need to worry about removing the newly created file
         --  in the event of an error).
 
-  -- Suppose the handle is never actually used. Further suppose that, before
-  -- openFileWith returns from `onException`, the garbage collector runs
-  -- (running the finalizer and closing the file) and then an exception is
-  -- received. Then the file will be closed a second time, which is no good. So
-  -- we use `touchHandle` to make sure the handle finalizers aren't called until
-  -- we're out of the catch block. Yuras, at least, thinks this situation
-  -- is possible, albeit extremely unlikely in practice, and it would be quite
-  -- difficult to debug.
-  touchHandle hndl
-  pure hndl
-
 -- ---------------------------------------------------------------------------
 -- Converting file descriptors from/to Handles
 
-mkHandleFromFD
+mkHandleFromFDNoFinalizer
    :: FD.FD
    -> IODeviceType
    -> FilePath  -- a string describing this file descriptor (e.g. the filename)
@@ -227,7 +221,7 @@ mkHandleFromFD
    -> Maybe TextEncoding
    -> IO Handle
 
-mkHandleFromFD fd0 fd_type filepath iomode set_non_blocking mb_codec
+mkHandleFromFDNoFinalizer fd0 fd_type filepath iomode set_non_blocking mb_codec
   = do
 #if !defined(mingw32_HOST_OS)
     -- turn on non-blocking mode
@@ -251,11 +245,24 @@ mkHandleFromFD fd0 fd_type filepath iomode set_non_blocking mb_codec
            -- only *Streams* can be DuplexHandles.  Other read/write
            -- Handles must share a buffer.
            | ReadWriteMode <- iomode -> 
-                mkDuplexHandle fd filepath mb_codec nl
+                mkDuplexHandleNoFinalizer fd filepath mb_codec nl
                    
 
         _other -> 
-           mkFileHandle fd filepath iomode mb_codec nl
+           mkFileHandleNoFinalizer fd filepath iomode mb_codec nl
+
+mkHandleFromFD
+   :: FD.FD
+   -> IODeviceType
+   -> FilePath  -- a string describing this file descriptor (e.g. the filename)
+   -> IOMode
+   -> Bool      --  *set* non-blocking mode on the FD
+   -> Maybe TextEncoding
+   -> IO Handle
+mkHandleFromFD fd0 fd_type filepath iomode set_non_blocking mb_codec = do
+  h <- mkHandleFromFDNoFinalizer fd0 fd_type filepath iomode
+                                 set_non_blocking mb_codec
+  addHandleFinalizer h handleFinalizer
 
 -- | Old API kept to avoid breaking clients
 fdToHandle' :: CInt
