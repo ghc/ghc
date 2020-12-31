@@ -1427,6 +1427,67 @@ by saying ``-fno-wombat``.
     determines if a function definition will be kept around at all for
     potential inlining.
 
+.. ghc-flag:: -funfolding-case-threshold=⟨n⟩
+    :shortdesc: *default: 1.* Reduce inlining for cases nested deeper than n.
+    :type: dynamic
+    :category:
+
+    :default: 1
+
+    .. index::
+       single: inlining, controlling
+       single: unfolding, controlling
+
+    GHC is in general quite eager to inline small functions. However sometimes
+    these functions will be expanded by more inlining after inlining. Since
+    they are now applied to "interesting" arguments. Even worse, their expanded
+    form might reference again a small function, which will be inlined and expanded
+    afterwards. This can repeat often and lead to explosive growth of programs.
+
+    As it happened in #18730.
+
+    Starting with GHC 9.0 we will be less eager to inline deep into nested cases.
+    We achieve this by applying a inlining penalty that increases as the nesting
+    gets deeper. However sometimes a specific (maybe quite high!) threshold of nesting
+    is to be expected.
+
+    In such cases this flag can be used to ignore the first ⟨n⟩ levels of nesting
+    when computing the penalty.
+
+
+    :ghc-flag:`-funfolding-case-scaling=⟨n⟩` controls how fast the penalty
+    grows with the depth of the nesting.
+
+  .. ghc-flag:: -funfolding-case-scaling=⟨n⟩
+    :shortdesc: *default: 25.* Apply a penalty of (inlining_cost * `1/n`) for each level of case nesting.
+    :type: dynamic
+    :category:
+
+    :default: 1
+
+    .. index::
+       single: inlining, controlling
+       single: unfolding, controlling
+
+    GHC is in general quite eager to inline small functions. However sometimes
+    these functions will be expanded by more inlining after inlining. Since
+    they are now applied to "interesting" arguments. Even worse, their expanded
+    form might reference again a small function, which will be inlined and expanded
+    afterwards. This can repeat often and lead to explosive growth of programs.
+
+    As it happened in #18730.
+
+    Starting with GHC 9.0 we will be less eager to inline deep into nested cases.
+    We achieve this by applying a inlining penalty that increases as the nesting
+    gets deeper. However sometimes we are ok with inlining a lot in the name of
+    performance.
+
+    In such cases this flag can be used to tune how hard we penalize inlining into
+    deeply nested cases beyond the threshold set by :ghc-flag:`-funfolding-case-threshold=⟨n⟩`.
+    Cases are only counted against the nesting level if they have more than one alternative.
+
+    We use 1/n to scale the penalty. That is a higher value gives a lower penalty.
+
 .. ghc-flag:: -fworker-wrapper
     :shortdesc: Enable the worker/wrapper transformation.
     :type: dynamic
