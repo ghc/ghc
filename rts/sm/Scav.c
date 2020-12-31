@@ -441,6 +441,14 @@ scavenge_block (bdescr *bd)
 
   p = bd->u.scan;
 
+  // Sanity check: See Note [Deadlock detection under nonmoving collector].
+#if defined(DEBUG)
+  if (RtsFlags.GcFlags.useNonmoving && deadlock_detect_gc) {
+      ASSERT(bd->gen == oldest_gen);
+  }
+#endif
+
+
   // we might be evacuating into the very object that we're
   // scavenging, so we have to check the real bd->free pointer each
   // time around the loop.
