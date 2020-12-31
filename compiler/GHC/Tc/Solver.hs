@@ -218,7 +218,13 @@ simplifyAndEmitFlatConstraints wanted
        ; traceTc "emitFlatConstraints {" (ppr wanted)
        ; case floatKindEqualities wanted of
            Nothing -> do { traceTc "emitFlatConstraints } failing" (ppr wanted)
-                         ; emitConstraints wanted -- So they get reported!
+                         -- Emit the bad constraints, wrapped in an implication
+                         -- See Note [Wrapping failing kind equalities]
+                         ; tclvl  <- TcM.getTcLevel
+                         ; implic <- buildTvImplication UnkSkol [] tclvl wanted
+                                     -- UnkSkol: doesn't matter, because
+                                     -- we bind no skolem varaibles here
+                         ; emitImplication implic
                          ; failM }
            Just (simples, holes)
               -> do { _ <- promoteTyVarSet (tyCoVarsOfCts simples)
@@ -375,6 +381,40 @@ All this is done:
   reporting errors, we avoid that happening.
 
 See also #18062, #11506
+
+Note [Wrapping failing kind equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In simplifyAndEmitFlatConstraints, if we fail to get down to simple
+flat constraints we will
+* re-emit the constraints so that they are reported
+* fail in the monad
+But there is a Terrible Danger that, if -fdefer-type-errors is on, and
+we just re-emit an insoluble constraint like (* ~ (*->*)), that we'll
+report only a warning and proceed with compilation.  But if we ever fail
+in the monad it should be fatal; we should report an error and stop after
+the type checker.  If not, chaos results: #19142.
+
+Our solution is this:
+* Even with -fdefer-type-errors, inside an implication with no place for
+  value bindings (ic_binds = CoEvBindsVar), report failing equalities as
+  errors.  We have to do this anyway; see GHC.Tc.Errors
+  Note [Failing equalities with no evidence bindings].
+
+* Right here in simplifyAndEmitFlatConstraints, use buildTvImplication
+  to wrap the failing constraint in a degenerate implication (no
+  skolems, no theta, no bumped TcLevel), with ic_binds = CoEvBindsVar.
+  That way any failing equalities will lead to an error not a warning,
+  irrespective of -fdefer-type-errors.
+
+  This is a slight hack, because the implication doesn't have a bumped
+  TcLevel, but that doesn't matter.
+
+We re-emit the implication rather than reporting the errors right now,
+so that the error mesages are improved by other solving and defaulting.
+e.g. we prefer
+    Cannot match 'Type->Type' with 'Type'
+to  Cannot match 'Type->Type' with 'TYPE r0'
+
 
 Note [floatKindEqualities vs approximateWC]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
