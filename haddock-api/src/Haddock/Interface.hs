@@ -52,6 +52,7 @@ import Text.Printf
 
 import GHC.Unit.Module.Env (mkModuleSet, emptyModuleSet, unionModuleSet, ModuleSet)
 import GHC.Unit.Module.ModSummary
+import GHC.Unit.Module.Graph
 import GHC.Unit.Types
 import GHC.Data.Graph.Directed
 import GHC.Driver.Session hiding (verbosity)
@@ -137,10 +138,11 @@ createIfaces verbosity modules flags instIfaceMap = do
   (ifaces, _, !ms) <- foldM f ([], Map.empty, emptyModuleSet) sortedMods
   return (reverse ifaces, ms)
   where
-    f (ifaces, ifaceMap, !ms) modSummary = do
+    f state (InstantiationNode _) = pure state
+    f (ifaces, ifaceMap, !ms) (ModuleNode ems) = do
       x <- {-# SCC processModule #-}
            withTimingD "processModule" (const ()) $ do
-             processModule verbosity modSummary flags ifaceMap instIfaceMap
+             processModule verbosity (emsModSummary ems) flags ifaceMap instIfaceMap
       return $ case x of
         Just (iface, ms') -> ( iface:ifaces
                              , Map.insert (ifaceMod iface) iface ifaceMap
