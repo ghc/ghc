@@ -326,7 +326,6 @@ packSocketType' stype = case Just stype of
 #ifdef SOCK_SEQPACKET
     Just SeqPacket -> Just #const SOCK_SEQPACKET
 #endif
-    _ -> Nothing
 
 packSocketType :: SocketType -> CInt
 packSocketType stype = fromMaybe (error errMsg) (packSocketType' stype)
