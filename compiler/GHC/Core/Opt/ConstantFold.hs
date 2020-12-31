@@ -198,43 +198,43 @@ primOpRules nm = \case
 
    -- coercions
 
-   Int8ExtendOp   -> mkPrimOpRule nm 1 [ liftLitPlatform extendIntLit ]
-   Int16ExtendOp  -> mkPrimOpRule nm 1 [ liftLitPlatform extendIntLit ]
-   Int32ExtendOp  -> mkPrimOpRule nm 1 [ liftLitPlatform extendIntLit ]
-   Int8NarrowOp   -> mkPrimOpRule nm 1 [ liftLit narrowInt8Lit
-                                       , subsumedByPrimOp Int8NarrowOp
-                                       , narrowSubsumesAnd IntAndOp Int8NarrowOp 8 ]
-   Int16NarrowOp  -> mkPrimOpRule nm 1 [ liftLit narrowInt16Lit
-                                       , subsumedByPrimOp Int8NarrowOp
-                                       , subsumedByPrimOp Int16NarrowOp
-                                       , narrowSubsumesAnd IntAndOp Int16NarrowOp 16 ]
-   Int32NarrowOp  -> mkPrimOpRule nm 1 [ liftLit narrowInt32Lit
-                                       , subsumedByPrimOp Int8NarrowOp
-                                       , subsumedByPrimOp Int16NarrowOp
-                                       , subsumedByPrimOp Int32NarrowOp
-                                       , narrowSubsumesAnd IntAndOp Int32NarrowOp 32 ]
+   Int8ToIntOp    -> mkPrimOpRule nm 1 [ liftLitPlatform extendIntLit ]
+   Int16ToIntOp   -> mkPrimOpRule nm 1 [ liftLitPlatform extendIntLit ]
+   Int32ToIntOp   -> mkPrimOpRule nm 1 [ liftLitPlatform extendIntLit ]
+   IntToInt8Op    -> mkPrimOpRule nm 1 [ liftLit narrowInt8Lit
+                                       , subsumedByPrimOp IntToInt8Op
+                                       , narrowSubsumesAnd IntAndOp IntToInt8Op 8 ]
+   IntToInt16Op   -> mkPrimOpRule nm 1 [ liftLit narrowInt16Lit
+                                       , subsumedByPrimOp IntToInt8Op
+                                       , subsumedByPrimOp IntToInt16Op
+                                       , narrowSubsumesAnd IntAndOp IntToInt16Op 16 ]
+   IntToInt32Op   -> mkPrimOpRule nm 1 [ liftLit narrowInt32Lit
+                                       , subsumedByPrimOp IntToInt8Op
+                                       , subsumedByPrimOp IntToInt16Op
+                                       , subsumedByPrimOp IntToInt32Op
+                                       , narrowSubsumesAnd IntAndOp IntToInt32Op 32 ]
 
-   Word8ExtendOp  -> mkPrimOpRule nm 1 [ liftLitPlatform extendWordLit
-                                       , extendNarrowPassthrough Word8NarrowOp 0xFF
+   Word8ToWordOp  -> mkPrimOpRule nm 1 [ liftLitPlatform extendWordLit
+                                       , extendNarrowPassthrough WordToWord8Op 0xFF
                                        ]
-   Word16ExtendOp -> mkPrimOpRule nm 1 [ liftLitPlatform extendWordLit
-                                       , extendNarrowPassthrough Word16NarrowOp 0xFFFF
+   Word16ToWordOp -> mkPrimOpRule nm 1 [ liftLitPlatform extendWordLit
+                                       , extendNarrowPassthrough WordToWord16Op 0xFFFF
                                        ]
-   Word32ExtendOp -> mkPrimOpRule nm 1 [ liftLitPlatform extendWordLit
-                                       , extendNarrowPassthrough Word32NarrowOp 0xFFFFFFFF
+   Word32ToWordOp -> mkPrimOpRule nm 1 [ liftLitPlatform extendWordLit
+                                       , extendNarrowPassthrough WordToWord32Op 0xFFFFFFFF
                                        ]
-   Word8NarrowOp  -> mkPrimOpRule nm 1 [ liftLit narrowWord8Lit
-                                       , subsumedByPrimOp Word8NarrowOp
-                                       , narrowSubsumesAnd WordAndOp Word8NarrowOp 8 ]
-   Word16NarrowOp -> mkPrimOpRule nm 1 [ liftLit narrowWord16Lit
-                                       , subsumedByPrimOp Word8NarrowOp
-                                       , subsumedByPrimOp Word16NarrowOp
-                                       , narrowSubsumesAnd WordAndOp Word16NarrowOp 16 ]
-   Word32NarrowOp -> mkPrimOpRule nm 1 [ liftLit narrowWord32Lit
-                                       , subsumedByPrimOp Word8NarrowOp
-                                       , subsumedByPrimOp Word16NarrowOp
-                                       , subsumedByPrimOp Word32NarrowOp
-                                       , narrowSubsumesAnd WordAndOp Word32NarrowOp 32 ]
+   WordToWord8Op  -> mkPrimOpRule nm 1 [ liftLit narrowWord8Lit
+                                       , subsumedByPrimOp WordToWord8Op
+                                       , narrowSubsumesAnd WordAndOp WordToWord8Op 8 ]
+   WordToWord16Op -> mkPrimOpRule nm 1 [ liftLit narrowWord16Lit
+                                       , subsumedByPrimOp WordToWord8Op
+                                       , subsumedByPrimOp WordToWord16Op
+                                       , narrowSubsumesAnd WordAndOp WordToWord16Op 16 ]
+   WordToWord32Op -> mkPrimOpRule nm 1 [ liftLit narrowWord32Lit
+                                       , subsumedByPrimOp WordToWord8Op
+                                       , subsumedByPrimOp WordToWord16Op
+                                       , subsumedByPrimOp WordToWord32Op
+                                       , narrowSubsumesAnd WordAndOp WordToWord32Op 32 ]
 
 
    WordToIntOp    -> mkPrimOpRule nm 1 [ liftLitPlatform (litNumCoerce LitNumInt)
