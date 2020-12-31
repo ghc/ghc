@@ -55,8 +55,6 @@ module Network.Socket.Types (
     , peekSockAddr
     , pokeSockAddr
     , withSockAddr
-    , sizeOfSocketAddress
-    , peekSocketAddress
     -- * Unsorted
     , ProtocolNumber
     , defaultProtocol
