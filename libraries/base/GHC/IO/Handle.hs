@@ -74,39 +74,6 @@ import GHC.Real
 import Data.Maybe
 import Data.Typeable
 
--- ---------------------------------------------------------------------------
--- Closing a handle
-
--- | Computation 'hClose' @hdl@ makes handle @hdl@ closed.  Before the
--- computation finishes, if @hdl@ is writable its buffer is flushed as
--- for 'hFlush'.
--- Performing 'hClose' on a handle that has already been closed has no effect;
--- doing so is not an error.  All other operations on a closed handle will fail.
--- If 'hClose' fails for any reason, any further operations (apart from
--- 'hClose') on the handle will still fail as if @hdl@ had been successfully
--- closed.
-
-hClose :: Handle -> IO ()
-hClose h@(FileHandle _ m)     = do
-  mb_exc <- hClose' h m
-  hClose_maybethrow mb_exc h
-hClose h@(DuplexHandle _ r w) = do
-  excs <- mapM (hClose' h) [r,w]
-  hClose_maybethrow (listToMaybe (catMaybes excs)) h
-
-hClose_maybethrow :: Maybe SomeException -> Handle -> IO ()
-hClose_maybethrow Nothing  h = return ()
-hClose_maybethrow (Just e) h = hClose_rethrow e h
-
-hClose_rethrow :: SomeException -> Handle -> IO ()
-hClose_rethrow e h =
-  case fromException e of
-    Just ioe -> ioError (augmentIOError ioe "hClose" h)
-    Nothing  -> throwIO e
-
-hClose' :: Handle -> MVar Handle__ -> IO (Maybe SomeException)
-hClose' h m = withHandle' "hClose" h m $ hClose_help
-
 -----------------------------------------------------------------------------
 -- Detecting and changing the size of a file
 
