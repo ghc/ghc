@@ -347,13 +347,9 @@ readFile name   =  openFile name ReadMode >>= hGetContents
 -- @since 4.15.0.0
 
 readFile'       :: FilePath -> IO String
--- This is not really an *ideal* implementation. The Handle machinery
--- is basically all overkill. Most notably, we have no real need to create
--- a finalizer to close the file if we change this bracketOnError to bracket! But
--- we also don't need almost any of the rest of the Handle stuff; we know a priori what
--- sort of Handle we're making. Is it worth trying to clean this up?
--- Unclear.
-readFile' name  =  bracketOnError (openFile name ReadMode) hClose hGetContents'
+-- We use withOpenFile because hGetContents' closes the
+-- file itself; withFile is just *slightly* overkill.
+readFile' name  =  withOpenFile name ReadMode hGetContents'
 
 -- | The computation 'writeFile' @file str@ function writes the string @str@,
 -- to the file @file@.
@@ -426,14 +422,20 @@ hPrint hdl      =  hPutStrLn hdl . show
 -- this exception will be raised by 'withFile' rather than any exception
 -- raised by @act@.
 withFile :: FilePath -> IOMode -> (Handle -> IO r) -> IO r
-withFile name mode = bracket (openFile name mode) hClose
+-- Using withOpenFile instead of bracketing openFile lets us avoid
+-- encoding the file path under a mask and becoming unresponsive if
+-- that encoding takes a long time.
+withFile name mode act = withOpenFile name mode (\h -> act h *> hClose h)
 
 -- | @'withBinaryFile' name mode act@ opens a file using 'openBinaryFile'
 -- and passes the resulting handle to the computation @act@.  The handle
 -- will be closed on exit from 'withBinaryFile', whether by normal
 -- termination or by raising an exception.
 withBinaryFile :: FilePath -> IOMode -> (Handle -> IO r) -> IO r
-withBinaryFile name mode = bracket (openBinaryFile name mode) hClose
+-- Using withOpenBinaryFile instead of bracketing openFile lets us avoid
+-- encoding the file path under a mask and becoming unresponsive if
+-- that encoding takes a long time.
+withBinaryFile name mode act = withOpenBinaryFile name mode (\h -> act h *> hClose h)
 
 -- ---------------------------------------------------------------------------
 -- fixIO
