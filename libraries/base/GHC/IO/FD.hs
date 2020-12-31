@@ -2,6 +2,7 @@
 {-# LANGUAGE CPP
            , NoImplicitPrelude
            , BangPatterns
+           , RankNTypes
   #-}
 {-# OPTIONS_GHC -Wno-identities #-}
 -- Whether there are identities depends on the platform
@@ -167,20 +168,39 @@ writeBuf' fd buf = do
 -- opening files
 
 -- | A wrapper for 'System.Posix.Internals.c_safe_open' that takes
--- an action to perform with the file descriptor. This function
--- guarantees that if an exception occurs in the passed action,
--- then the file will be closed. On successful return, the file remains
--- *open*; it should generally be closed by a finalizer. Caution: the
--- passed action *must not* close the file descriptor. If it does so and
--- then receives an exception, then the exception handler will attempt to
--- close it again, which is impermissible.
+-- two actions, @act1@ and @act2@, to perform after opening the file.
+--
+-- @act1@ is passed a file descriptor for the newly opened file. If
+-- an exception occurs in @act1@, then the file will be closed.
+-- @act1@ /must not/ close the file itself. If it does so and then
+-- receives an exception, then the exception handler will attempt to
+-- close it again, which is impermissable.
+--
+-- @act2@ is performed with asynchronous exceptions masked. It is passed a
+-- function to restore the masking state and the result of @act1@.
+-- It /must not/ throw an exception (or deliver one via an interruptible
+-- operation) without first closing the file or arranging for it to be
+-- closed. @act2@ /may/ close the file, but is not required to do so.
+-- If @act2@ leaves the file open, then the file will remain open on
+-- return from `c_safe_open_with`.
+--
+-- Code calling `c_safe_open_with` that wishes to install a finalizer
+-- to close the file should do so in @act2@. Doing so in @act1@ could
+-- potentially close the file in the finalizer first and then in the
+-- exception handler.
+
 c_safe_open_with
   :: System.Posix.Internals.CFilePath  -- ^ The file to open
   -> CInt -- ^ The flags to pass to open
   -> CMode -- ^ The permission mode to use for file creation
-  -> (CInt -> IO r) -- ^ An action to perform with the file descriptor
-  -> IO r
-c_safe_open_with path oflags mode act =
+  -> (CInt -> IO r) -- ^ @act1@: An action to perform on the file descriptor
+                    -- with the masking state restored and an exception
+                    -- handler that closes the file on exception.
+  -> ((forall x. IO x -> IO x) -> r -> IO s)
+                    -- ^ @act2@: An action to perform with async exceptions
+                    -- masked and no exception handler.
+  -> IO s
+c_safe_open_with path oflags mode act1 act2 =
   mask $ \restore -> do
     fd <- throwErrnoIfMinus1Retry "openFile" $ do
       open_res <- c_safe_open path oflags mode
@@ -193,30 +213,48 @@ c_safe_open_with path oflags mode act =
         -- with Haddock links.
         interruptible (pure ())
       pure open_res
-    restore (act fd) `onException` c_close fd
+    r <- restore (act1 fd) `onException` c_close fd
+    act2 restore r
 
--- | Open a file and make an 'FD' for it. Truncates the file to zero
--- size when the `IOMode` is `WriteMode`. @openFileWith@
--- guarantees that if an exception occurs in the passed action, then the file
--- will be closed. On successful return, the file remains /open/.
+-- | Open a file and make an 'FD' for it. Truncates the file to zero size when
+-- the `IOMode` is `WriteMode`.
 --
--- 'openFileWith' is an /interruptible operation/ as described in
--- "Control.Exception".
+-- `openFileWith` takes two actions, @act1@ and @act2@, to perform after
+-- opening the file.
 --
--- Caution: the passed action /must not/ close the file descriptor. If it does
--- so and then receives an exception, then the exception handler will attempt
--- to close it again, which is impermissible. The code calling `openFileWith`
--- is responsible for ensuring that the file is eventually closed after
--- `openFileWith` returns. This may be done, for example, by using
--- 'Control.Exception.bracket'. See 'GHC.IO.Handle.FD.openFile'' to see
--- how to do this using a finalizer.
+-- @act1@ is passed a file descriptor and I/O device type for the newly opened
+-- file. If an exception occurs in @act1@, then the file will be closed.
+-- @act1@ /must not/ close the file itself. If it does so and then receives an
+-- exception, then the exception handler will attempt to close it again, which
+-- is impermissable.
+--
+-- @act2@ is performed with asynchronous exceptions masked. It is passed a
+-- function to restore the masking state and the result of @act1@.  It /must
+-- not/ throw an exception (or deliver one via an interruptible operation)
+-- without first closing the file or arranging for it to be closed. @act2@
+-- /may/ close the file, but is not required to do so.  If @act2@ leaves the
+-- file open, then the file will remain open on return from `openFileWith`.
+--
+-- Code calling `openFileWith` that wishes to install a finalizer to close
+-- the file should do so in @act2@. Doing so in @act1@ could potentially close
+-- the file in the finalizer first and then in the exception handler. See
+-- 'GHC.IO.Handle.FD.openFile'' for an example of this use. Regardless, the
+-- caller is responsible for ensuring that the file is eventually closed,
+-- perhaps using 'Control.Exception.bracket'.
+
 openFileWith
   :: FilePath -- ^ file to open
   -> IOMode   -- ^ mode in which to open the file
   -> Bool     -- ^ open the file in non-blocking mode?
-  -> (FD -> IODeviceType -> IO r)
-  -> IO r
-openFileWith filepath iomode non_blocking act =
+  -> (FD -> IODeviceType -> IO r) -- ^ @act1@: An action to perform
+                    -- on the file descriptor with the masking state
+                    -- restored and an exception handler that closes
+                    -- the file on exception.
+  -> ((forall x. IO x -> IO x) -> r -> IO s)
+                    -- ^ @act2@: An action to perform with async exceptions
+                    -- masked and no exception handler.
+  -> IO s
+openFileWith filepath iomode non_blocking act1 act2 =
   -- TODO: withFilePath is not interruptible, so if someone calls
   -- openFileWith when exceptions are masked and passes it an
   -- infinitely long or otherwise expensive FilePath, then the thread
@@ -244,7 +282,7 @@ openFileWith filepath iomode non_blocking act =
       -- NB. always use a safe open(), because we don't know whether open()
       -- will be fast or not.  It can be slow on NFS and FUSE filesystems,
       -- for example.
-      c_safe_open_with f oflags 0o666 $ \ fd -> do
+      c_safe_open_with f oflags 0o666 ( \ fd -> do
         (fD,fd_type) <- mkFD fd iomode Nothing{-no stat-}
                                 False{-not a socket-}
                                 non_blocking
@@ -253,7 +291,7 @@ openFileWith filepath iomode non_blocking act =
         -- like /dev/null.
         when (iomode == WriteMode && fd_type == RegularFile) $
           setSize fD 0
-        act fD fd_type
+        act fD fd_type ) act2
 
 -- | Open a file and make an 'FD' for it.  Truncates the file to zero
 -- size when the `IOMode` is `WriteMode`. This function is difficult
@@ -268,8 +306,8 @@ openFile
   -> IO (FD,IODeviceType)
 {-# DEPRECATED openFile "Use openFileWith instead" #-}
 openFile filepath iomode non_blocking =
-  openFileWith filepath iomode non_blocking $
-    \ fd fd_type -> pure (fd, fd_type)
+  openFileWith filepath iomode non_blocking
+    (\ fd fd_type -> pure (fd, fd_type)) (\_ r -> pure r)
 
 std_flags, output_flags, read_flags, write_flags, rw_flags,
     append_flags, nonblock_flags :: CInt
