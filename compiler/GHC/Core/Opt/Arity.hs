@@ -19,7 +19,7 @@ module GHC.Core.Opt.Arity
 
    -- ** ArityType
    , ArityType(..), mkBotArityType, mkTopArityType, expandableArityType
-   , arityTypeArity, maxWithArity, idArityType
+   , arityTypeArity, maxWithOneShots, idArityType
 
    -- ** Join points
    , etaExpandToJoinPoint, etaExpandToJoinPointRule
@@ -598,11 +598,14 @@ isDeadEndArityType :: ArityType -> Bool
 isDeadEndArityType (AT _ div) = isDeadEndDiv div
 
 -- | Expand a non-bottoming arity type so that it has at least the given arity.
-maxWithArity :: ArityType -> Arity -> ArityType
-maxWithArity at@(AT oss div) !ar
-  | isDeadEndArityType at    = at
-  | oss `lengthAtLeast` ar   = at
-  | otherwise                = AT (take ar $ oss ++ repeat NoOneShotInfo) div
+maxWithOneShots :: ArityType -> [OneShotInfo] -> ArityType
+maxWithOneShots at@(AT oss1 div) oss2
+  | isDeadEndDiv div = at
+  | otherwise        = AT (zip_oss oss1 oss2) div
+  where
+    zip_oss (os1:oss1) (os2:oss2) = (os1 `bestOneShot` os2) : zip_oss oss1 oss2
+    zip_oss []         oss2       = oss2
+    zip_oss oss1       []         = oss1
 
 -- | Trim an arity type so that it has at most the given arity.
 -- Any excess 'OneShotInfo's are truncated to 'topDiv', even if they end in
@@ -661,10 +664,9 @@ findRhsArity dflags bndr rhs old_arity
         next_at = step cur_at
 
     step :: ArityType -> ArityType
-    step at = -- pprTrace "step" (ppr bndr <+> ppr at <+> ppr (arityType env rhs)) $
-              arityType env rhs
+    step cur_at = arityType env rhs
       where
-        env = extendSigEnv (findRhsArityEnv dflags) bndr at
+        env = extendSigEnv (findRhsArityEnv dflags) bndr cur_at
 
 {-
 Note [Arity analysis]

@@ -8,7 +8,8 @@ The simplifier utilities
 
 module GHC.Core.Opt.Simplify.Utils (
         -- Rebuilding
-        mkLam, mkCase, prepareAlts, tryEtaExpandRhs,
+        mkLam, mkCase, prepareAlts,
+        tryEtaExpandRhs, wantEtaExpansion,
 
         -- Inlining,
         preInlineUnconditionally, postInlineUnconditionally,
@@ -1672,7 +1673,7 @@ tryEtaExpandRhs mode bndr rhs
 
   | sm_eta_expand mode      -- Provided eta-expansion is on
   , new_arity > old_arity   -- And the current manifest arity isn't enough
-  , want_eta rhs
+  , wantEtaExpansion rhs
   = do { tick (EtaExpansion bndr)
        ; return (arity_type, etaExpandAT arity_type rhs) }
 
@@ -1684,23 +1685,37 @@ tryEtaExpandRhs mode bndr rhs
     old_arity = exprArity rhs
 
     arity_type = findRhsArity dflags bndr rhs old_arity
-                 `maxWithArity` idCallArity bndr
+                 `maxWithOneShots` idDemandOneShots bndr
+       -- maxWithOneShots: take account of the demand on the
+       -- binder.  Perhaps it is always called with 2 args
+       --   let f = \x. blah in (f 3 4, f 1 9)
+       -- f's demand-info says how many args it is called with
+
     new_arity = arityTypeArity arity_type
 
-    -- See Note [Which RHSs do we eta-expand?]
-    want_eta (Cast e _)                  = want_eta e
-    want_eta (Tick _ e)                  = want_eta e
-    want_eta (Lam b e) | isTyVar b       = want_eta e
-    want_eta (App e a) | exprIsTrivial a = want_eta e
-    want_eta (Var {})                    = False
-    want_eta (Lit {})                    = False
-    want_eta _ = True
-{-
-    want_eta _ = case arity_type of
-                   ATop (os:_) -> isOneShotInfo os
-                   ATop []     -> False
-                   ABot {}     -> True
--}
+wantEtaExpansion :: CoreExpr -> Bool
+-- Mostly True; but False of PAPs which will immediately eta-reduce again
+-- See
+-- See Note [Which RHSs do we eta-expand?]
+wantEtaExpansion (Cast e _)             = wantEtaExpansion e
+wantEtaExpansion (Tick _ e)             = wantEtaExpansion e
+wantEtaExpansion (Lam b e) | isTyVar b  = wantEtaExpansion e
+wantEtaExpansion (App e _)              = wantEtaExpansion e
+wantEtaExpansion (Var {})               = False
+wantEtaExpansion (Lit {})               = False
+wantEtaExpansion _                      = True
+
+idDemandOneShots :: Id -> [OneShotInfo]
+idDemandOneShots bndr
+  = combine (argOneShots (idDemandInfo bndr))
+            (idCallArity bndr)
+  where
+    combine :: [OneShotInfo]    -- From the Demand on the Id
+            -> Arity            -- From the Call Arity on the Id
+            -> [OneShotInfo]
+    combine oss ca
+      | oss `lengthAtLeast` ca = oss
+      | otherwise              = take ca (oss ++ repeat NoOneShotInfo)
 
 {-
 Note [Eta-expanding at let bindings]

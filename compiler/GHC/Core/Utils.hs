@@ -2374,13 +2374,14 @@ There are some particularly delicate points here:
   However for GlobalIds we can look at the arity; and for primops we
   must, since they have no unfolding.
 
-* Regardless of whether 'f' is a value, we always want to
-  reduce (/\a -> f a) to f
+* Type and dictionary abstraction.
+  Regardless of whether 'f' is a value, we always want to reduce
+        (/\a -> f a)  -->   f
   This came up in a RULE: foldr (build (/\a -> g a))
   did not match           foldr (build (/\b -> ...something complex...))
   The type checker can insert these eta-expanded versions,
   with both type and dictionary lambdas; hence the slightly
-  ad-hoc isDictId
+  ad-hoc (all ok_lam bndrs)
 
 * Never *reduce* arity. For example
       f = \xy. g x y
@@ -2431,7 +2432,7 @@ tryEtaReduce bndrs body
     -- See Note [Eta reduction with casted arguments]
     -- for why we have an accumulating coercion
     go [] fun co
-      | ok_fun fun
+      | ok_fun incoming_arity fun
       , let used_vars = exprFreeVars fun `unionVarSet` tyCoVarsOfCo co
       , not (any (`elemVarSet` used_vars) bndrs)
       = Just (mkCast fun co)   -- Check for any of the binders free in the result
@@ -2451,14 +2452,17 @@ tryEtaReduce bndrs body
 
     ---------------
     -- Note [Eta reduction conditions]
-    ok_fun (App fun (Type {})) = ok_fun fun
-    ok_fun (Cast fun _)        = ok_fun fun
-    ok_fun (Tick _ expr)       = ok_fun expr
-    ok_fun (Var fun_id)        = ok_fun_id fun_id || all ok_lam bndrs
-    ok_fun _fun                = False
+    ok_fun :: Arity -> CoreExpr -> Bool
+    ok_fun n (App fun arg)
+      | isTypeArg arg      = ok_fun n fun
+      | otherwise          = ok_fun (n+1) fun
+    ok_fun n (Cast fun _)  = ok_fun n fun
+    ok_fun n (Tick _ expr) = ok_fun n expr
+    ok_fun n (Var fun_id)  = ok_fun_id n fun_id || all ok_lam bndrs
+    ok_fun _ _fun          = False
 
     ---------------
-    ok_fun_id fun = fun_arity fun >= incoming_arity
+    ok_fun_id n fun = fun_arity fun >= n
 
     ---------------
     fun_arity fun             -- See Note [Arity care]
@@ -2473,6 +2477,8 @@ tryEtaReduce bndrs body
 
     ---------------
     ok_lam v = isTyVar v || isEvVar v
+    -- See Note [Eta reduction conditions]:
+    -- bullet on Type and dictionary abstractions
 
     ---------------
     ok_arg :: Var              -- Of type bndr_t
