@@ -606,3 +606,5 @@ test('TyAppPat_PatternBindingExistential', normal, compile_fail, [''])
 test('TyAppPat_ScopedTyVarConflict', normal, compile_fail, [''])
 test('TyAppPat_TooMany', normal, compile_fail, [''])
 test('T12178a', normal, compile_fail, [''])
+test('T19142', normal, compile_fail, [''])
+

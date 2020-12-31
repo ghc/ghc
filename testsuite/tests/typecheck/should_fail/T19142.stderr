@@ -1,0 +1,13 @@
+
+T19142.hs:14:15: error:
+    • Expecting one more argument to ‘Maybe’
+      Expected a type, but ‘Maybe’ has kind ‘* -> *’
+    • In the first argument of ‘Maybe’, namely ‘Maybe’
+      In the type ‘Maybe Maybe’
+      In a pattern type signature: Maybe Maybe
+
+T19142.hs:20:12: error:
+    • Expected kind ‘* -> *’, but ‘Int’ has kind ‘*’
+    • In the type ‘Int’
+      In the expression: foo @Int
+      In an equation for ‘g’: g x = foo @Int
