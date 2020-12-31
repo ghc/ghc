@@ -99,7 +99,7 @@ Limitations of deferred type errors
 The errors that can be deferred are:
 
 - Out of scope term variables
-- Equality constraints; e.g. `ord True` gives rise to an insoluble equality constraint `Char ~ Bool`, which can be deferred.
+- Equality constraints; e.g. ``ord True`` gives rise to an insoluble equality constraint ``Char ~ Bool``, which can be deferred.
 - Type-class and implicit-parameter constraints
 
 All other type errors are reported immediately, and cannot be deferred; for
@@ -107,15 +107,22 @@ example, an ill-kinded type signature, an instance declaration that is
 non-terminating or ill-formed, a type-family instance that does not
 obey the declared injectivity constraints, etc etc.
 
-In a few cases, even equality constraints cannot be deferred.  Specifically:
+In a few cases, equality constraints cannot be deferred.  Specifically:
 
-- Kind-equalities cannot be deferred, e.g. ::
+- Kind errors in a type or kind signature, partial type signatures, or pattern signature.
+  e.g. ::
 
     f :: Int Bool -> Char
 
   This type signature contains a kind error which cannot be deferred.
 
-- Type equalities under a forall cannot be deferred (c.f. `#14605
+- Type equalities under a forall (c.f. `#14605
   <https://gitlab.haskell.org/ghc/ghc/issues/14605>`_).
 
+- Kind errors in a visible type application. e.g. ::
 
+    reverse @Maybe xs
+
+- Kind errors in a ``default`` declaration.  e.g. ::
+
+    default( Double, Int Int )
