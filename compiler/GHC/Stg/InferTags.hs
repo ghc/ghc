@@ -420,6 +420,7 @@ So there is no harm in excessive bang annotations, at least not compared to spac
 #if defined(DEBUG)
 #define WITH_NODE_DESC
 #endif
+#define WITH_NODE_DESC
 
 -- See Note [nesting Limit]
 nestingLimit :: Int
@@ -1427,6 +1428,17 @@ instance Outputable FlowNode where
                 NodeId uq -> ppr uq
         pprDone _node = empty
             -- if node_done node then text "done" else empty
+
+dumpNodes :: [FlowNode] -> SDoc
+dumpNodes nodes =
+    text "digraph tag-flow-nodes {" <> char '\n' <>
+    vcat (map ppr_node_deps nodes) <>
+    text "}"
+    where
+        ppr_node_deps node =
+            ppr (node_id node) <> text "[label=\"" <> ppr node <> text "\"];" <> char '\n' <>
+                vcat ( map (mk_dep (node_id node)) (node_inputs node))
+        mk_dep node_id in_id = ppr in_id <> text " -> " <> ppr node_id <> char ';';
 
 data IsLNE = LNE | NotLNE deriving (Eq)
 
@@ -2947,9 +2959,10 @@ solveConstraints dflags = do
         uqList <- map snd . nonDetUFMToList . fs_uqNodeMap <$> get
         doneList <- map snd . nonDetUFMToList . fs_doneNodes <$> get
         let resultNodes =  (uqList ++ doneList)
+
         seq (unsafePerformIO $ GHC.Utils.Error.dumpIfSet_dyn dflags
                 Opt_D_dump_stg_tag_nodes "STG Infered tags" FormatText
-                (vcat $ map ppr resultNodes)) (return ())
+                (dumpNodes resultNodes)) (return ())
         -- mapM_ (pprTraceM "node:" . ppr) resultNodes
         return ()
   where
