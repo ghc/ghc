@@ -36,7 +36,7 @@ import GHC.Builtin.Types
 
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity
-import GHC.Core.FVs
+-- import GHC.Core.FVs
 import GHC.Core.Opt.Monad ( CoreToDo(..) )
 import GHC.Core.Lint    ( endPassIO )
 import GHC.Core
@@ -59,7 +59,7 @@ import GHC.Utils.Monad  ( mapAccumLM )
 
 import GHC.Types.Demand
 import GHC.Types.Var
-import GHC.Types.Var.Set
+-- import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Id
 import GHC.Types.Id.Info
@@ -586,7 +586,7 @@ cpeRhsE env expr@(Lit (LitNumber nt i))
       Just e  -> cpeRhsE env e
 cpeRhsE _env expr@(Lit {}) = return (emptyFloats, expr)
 cpeRhsE env expr@(Var {})  = cpeApp env expr
-cpeRhsE env expr@(App {}) = cpeApp env expr
+cpeRhsE env expr@(App {})  = cpeApp env expr
 
 cpeRhsE env (Let bind body)
   = do { (env', bind_floats, maybe_bind') <- cpeBind NotTopLevel env bind
@@ -787,6 +787,7 @@ cpeApp top_env expr
         -- rather than the far superior "f x y".  Test case is par01.
         = let (terminal, args', depth') = collect_args arg
           in cpe_app env terminal (args' ++ args) (depth + depth' - 1)
+
     cpe_app env (Var f) (CpeApp _runtimeRep@Type{} : CpeApp _type@Type{} : CpeApp arg : rest) n
         | f `hasKey` runRWKey
         -- N.B. While it may appear that n == 1 in the case of runRW#
@@ -842,7 +843,7 @@ cpeApp top_env expr
        case head of
          Just fn_id -> do { sat_app <- maybeSaturate fn_id app depth
                           ; return (floats, sat_app) }
-         _other              -> return (floats, app)
+         _other     -> return (floats, app)
 
     -- Deconstruct and rebuild the application, floating any non-atomic
     -- arguments to the outside.  We collect the type of the expression,
@@ -1263,6 +1264,8 @@ get to a partial application:
 -- When updating this function, make sure it lines up with
 -- GHC.Core.Utils.tryEtaReduce!
 tryEtaReducePrep :: [CoreBndr] -> CoreExpr -> Maybe CoreExpr
+tryEtaReducePrep = tryEtaReduce False
+{-
 tryEtaReducePrep bndrs expr@(App _ _)
   | ok_to_eta_reduce f
   , n_remaining >= 0
@@ -1291,6 +1294,7 @@ tryEtaReducePrep bndrs (Tick tickish e)
   = fmap (mkTick tickish) $ tryEtaReducePrep bndrs e
 
 tryEtaReducePrep _ _ = Nothing
+-}
 
 {-
 ************************************************************************

@@ -49,7 +49,7 @@ import GHC.Types.Unique ( hasKey )
 import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
 import GHC.Core.Utils
-import GHC.Core.Opt.Arity ( ArityType(..)
+import GHC.Core.Opt.Arity ( ArityType, arityTypeArityDiv
                           , pushCoTyArg, pushCoValArg
                           , idArityType, etaExpandAT )
 import GHC.Core.SimpleOpt ( exprIsConApp_maybe, joinPointBinding_maybe, joinPointBindings_maybe )
@@ -796,8 +796,7 @@ addLetBndrInfo :: OutId -> ArityType -> Unfolding -> OutId
 addLetBndrInfo new_bndr new_arity_type new_unf
   = new_bndr `setIdInfo` info5
   where
-    AT oss div = new_arity_type
-    new_arity  = length oss
+    (new_arity, div) = arityTypeArityDiv new_arity_type
 
     info1 = idInfo new_bndr `setArityInfo` new_arity
 
