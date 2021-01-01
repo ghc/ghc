@@ -1395,7 +1395,7 @@ stat_exitReport (void)
                          * BLOCKS_PER_MBLOCK
                          * BLOCK_SIZE_W
                          - hw_alloc_blocks * BLOCK_SIZE_W)
-                / (uint64_t)sizeof(W_);
+                * (uint64_t)sizeof(W_);
 
             sum.average_bytes_used = stats.major_gcs == 0 ? 0 :
                  stats.cumulative_live_bytes/stats.major_gcs,
