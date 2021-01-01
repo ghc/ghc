@@ -715,7 +715,7 @@ mkHandle :: (RawIO dev, IODevice dev, BufferedIO dev, Typeable dev) => dev
          -> IO Handle
 mkHandle dev filepath ha_type buffered mb_codec nl mb_finalizer other_side = do
   mv <- mkHandleMVar dev filepath ha_type buffered mb_codec nl other_side
-  let handle = Handle filepath mv
+  let handle = FileHandle filepath mv
   case mb_finalizer of
     Nothing -> pure ()
     Just finalizer -> addHandleFinalizer handle finalizer
