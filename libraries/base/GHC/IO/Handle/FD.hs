@@ -247,8 +247,8 @@ withOpenFile' filepath iomode binary non_blocking act close_finally =
     -- cannot throw a synchronous exception.
     (\restore hndl -> do
         addHandleFinalizer hndl handleFinalizer
-        r <- restore (act hndl) `onException` hClose hndl
-        when close_finally $ hClose hndl
+        r <- restore (act hndl) `onException` hClose_impl hndl
+        when close_finally $ hClose_impl hndl
         pure r
         )
 

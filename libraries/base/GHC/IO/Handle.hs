@@ -74,6 +74,25 @@ import GHC.Real
 import Data.Maybe
 import Data.Typeable
 
+-- ---------------------------------------------------------------------------
+-- Closing a handle
+
+-- | Computation 'hClose' @hdl@ makes handle @hdl@ closed.  Before the
+-- computation finishes, if @hdl@ is writable its buffer is flushed as
+-- for 'hFlush'.
+-- Performing 'hClose' on a handle that has already been closed has no effect;
+-- doing so is not an error.  All other operations on a closed handle will fail.
+-- If 'hClose' fails for any reason, any further operations (apart from
+-- 'hClose') on the handle will still fail as if @hdl@ had been successfully
+-- closed.
+--
+-- 'hClose' is an /interruptible operation/ in the sense described in
+-- "Control.Exception". If 'hClose' is interrupted by an asynchronous
+-- exception in the process of flushing its buffers, then the I/O device
+-- (e.g., file) will be closed anyway.
+hClose :: Handle -> IO ()
+hClose = hClose_impl
+
 -----------------------------------------------------------------------------
 -- Detecting and changing the size of a file
 
