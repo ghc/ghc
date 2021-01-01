@@ -136,8 +136,22 @@ StgWord8 the_gc_thread[sizeof(gc_thread) + 64 * sizeof(gen_workspace)]
     ATTRIBUTE_ALIGNED(64);
 #endif
 
-// Number of threads running in *this* GC.  Affects how many
-// step->todos[] lists we have to look in to find work.
+/* Note [n_gc_threads]
+This is a global variable that originally tracked the number of threads
+participating in the current gc. It's meaing has diverged from this somewhate.
+In practise, it now takes one of the values {1, n_capabilities}. Don't be
+tricked into thinking this means garbage collections must have 1 or
+n_capabilities participating: idle capabilities (idle_cap[cap->no]) are included
+in the n_gc_thread count.
+
+Clearly this is in need of some tidying up, but for now we tread carefully. We
+check n_gc_threads > 1 to see whether we are in a parallel or sequential. We
+ensure n_gc_threads > 1 before iterating over gc_threads a la:
+
+for(i=0;i<n_gc_threads;++i) { foo(gc_thread[i]; )}
+
+Omitting this check has led to issues such as #19147.
+*/
 uint32_t n_gc_threads;
 
 // For stats:
@@ -552,12 +566,13 @@ GarbageCollect (uint32_t collect_gen,
       uint64_t par_balanced_copied_acc = 0;
       const gc_thread* thread;
 
-      for (i=0; i < n_gc_threads; i++) {
-          copied += RELAXED_LOAD(&gc_threads[i]->copied);
-      }
-      for (i=0; i < n_gc_threads; i++) {
-          thread = gc_threads[i];
-          if (n_gc_threads > 1) {
+      // see Note [n_gc_threads]
+      if (n_gc_threads > 1) {
+          for (i=0; i < n_gc_threads; i++) {
+              copied += RELAXED_LOAD(&gc_threads[i]->copied);
+          }
+          for (i=0; i < n_gc_threads; i++) {
+              thread = gc_threads[i];
               debugTrace(DEBUG_gc,"thread %d:", i);
               debugTrace(DEBUG_gc,"   copied           %ld",
                          RELAXED_LOAD(&thread->copied) * sizeof(W_));
@@ -585,12 +600,12 @@ GarbageCollect (uint32_t collect_gen,
               par_balanced_copied_acc +=
                   stg_min(n_gc_threads * RELAXED_LOAD(&thread->copied), copied);
           }
-      }
-      if (n_gc_threads > 1) {
           // See Note [Work Balance] for an explanation of this computation
           par_balanced_copied =
               (par_balanced_copied_acc - copied + (n_gc_threads - 1) / 2) /
               (n_gc_threads - 1);
+      } else {
+          copied += gct->copied;
       }
   }
 
