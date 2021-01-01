@@ -347,9 +347,9 @@ readFile name   =  openFile name ReadMode >>= hGetContents
 -- @since 4.15.0.0
 
 readFile'       :: FilePath -> IO String
--- We use withOpenFile because hGetContents' closes the
--- file itself; withFile is just *slightly* overkill.
-readFile' name  =  withOpenFile name ReadMode hGetContents'
+-- There's a bit of overkill here—both withFile and
+-- hGetContents' will close the file in the end.
+readFile' name  =  withFile name ReadMode hGetContents'
 
 -- | The computation 'writeFile' @file str@ function writes the string @str@,
 -- to the file @file@.
@@ -415,27 +415,6 @@ hReady h        =  hWaitForInput h 0
 hPrint          :: Show a => Handle -> a -> IO ()
 hPrint hdl      =  hPutStrLn hdl . show
 
--- | @'withFile' name mode act@ opens a file using 'openFile' and passes
--- the resulting handle to the computation @act@.  The handle will be
--- closed on exit from 'withFile', whether by normal termination or by
--- raising an exception.  If closing the handle raises an exception, then
--- this exception will be raised by 'withFile' rather than any exception
--- raised by @act@.
-withFile :: FilePath -> IOMode -> (Handle -> IO r) -> IO r
--- Using withOpenFile instead of bracketing openFile lets us avoid
--- encoding the file path under a mask and becoming unresponsive if
--- that encoding takes a long time.
-withFile name mode act = withOpenFile name mode (\h -> act h *> hClose h)
-
--- | @'withBinaryFile' name mode act@ opens a file using 'openBinaryFile'
--- and passes the resulting handle to the computation @act@.  The handle
--- will be closed on exit from 'withBinaryFile', whether by normal
--- termination or by raising an exception.
-withBinaryFile :: FilePath -> IOMode -> (Handle -> IO r) -> IO r
--- Using withOpenBinaryFile instead of bracketing openFile lets us avoid
--- encoding the file path under a mask and becoming unresponsive if
--- that encoding takes a long time.
-withBinaryFile name mode act = withOpenBinaryFile name mode (\h -> act h *> hClose h)
 
 -- ---------------------------------------------------------------------------
 -- fixIO
