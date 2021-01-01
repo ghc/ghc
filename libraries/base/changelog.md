@@ -50,6 +50,9 @@
   * Correct `Bounded` instance and remove `Enum` and `Integral` instances for
     `Data.Ord.Down`.
 
+  * `Data.Foldable` methods `maximum{,By}`, `minimum{,By}`, `product` and `sum`
+    are now stricter by default, as well as in the class implementation for List.
+
 ## 4.14.0.0 *TBA*
   * Bundled with GHC 8.10.1
 
