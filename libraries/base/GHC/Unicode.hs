@@ -45,6 +45,9 @@ import {-# SOURCE #-} Data.Version
 -- for GeneralCategory
 import GHC.Show ( Show )
 
+-- $setup
+-- >>> import Prelude
+
 #include "HsBaseConfig.h"
 #include "UnicodeVersion.h"
 

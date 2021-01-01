@@ -30,7 +30,7 @@
 -- The 'Sum' monoid is defined by the numerical addition operator and `0` as neutral element:
 --
 -- >>> mempty :: Sum Int
--- Sum 0
+-- Sum {getSum = 0}
 -- >>> Sum 1 <> Sum 2 <> Sum 3 <> Sum 4 :: Sum Int
 -- Sum {getSum = 10}
 --

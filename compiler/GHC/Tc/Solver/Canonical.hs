@@ -2378,8 +2378,9 @@ Now, clearly we don't want to unify alpha:=Int!  Yet at the moment we
 process [G] alpha[1] ~ Int, we don't have any given-equalities in the
 inert set, and hence there are no given equalities to make alpha untouchable.
 
-(NB: if it were alpha[2] ~ Int, this argument wouldn't hold.  But that
-almost never happens, and will never happen at all if we cure #18929.)
+NB: if it were alpha[2] ~ Int, this argument wouldn't hold.  But that
+never happens: invariant (GivenInv) in Note [TcLevel invariants]
+in GHC.Tc.Utils.TcType.
 
 Simple solution: never unify in Givens!
 -}

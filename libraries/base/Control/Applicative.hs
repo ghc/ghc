@@ -63,6 +63,9 @@ import GHC.List (repeat, zipWith, drop)
 import GHC.Read (Read)
 import GHC.Show (Show)
 
+-- $setup
+-- >>> import Prelude
+
 newtype WrappedMonad m a = WrapMonad { unwrapMonad :: m a }
                          deriving ( Generic  -- ^ @since 4.7.0.0
                                   , Generic1 -- ^ @since 4.7.0.0
@@ -146,7 +149,9 @@ instance Alternative ZipList where
 --
 -- ==== __Examples__
 --
--- Using the 'Alternative' instance of `Control.Monad.Except`, the following functions:
+-- Using the 'Alternative' instance of "Control.Monad.Except", the following functions:
+--
+-- >>> import Control.Monad.Except
 --
 -- >>> canFail = throwError "it failed" :: Except String Int
 -- >>> final = return 42                :: Except String Int

@@ -2032,6 +2032,18 @@ new equality, to maintain the inert-set invariants.
     inert_solved_funeqs optimistically. But when we lookup we have to
     take the substitution into account
 
+NB: we could in principle avoid kick-out:
+  a) When unifying a meta-tyvar from an outer level, because
+     then the entire implication will be iterated; see
+     Note [The Unification Level Flag]
+
+  b) For Givens, after a unification.  By (GivenInv) in GHC.Tc.Utils.TcType
+     Note [TcLevel invariants], a Given can't include a meta-tyvar from
+     its own level, so it falls under (a).  Of course, we must still
+     kick out Givens when adding a new non-unificaiton Given.
+
+But kicking out more vigorously may lead to earlier unification and fewer
+iterations, so we don't take advantage of these possibilities.
 
 Note [Rewrite insolubles]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2296,11 +2308,13 @@ isOuterTyVar :: TcLevel -> TyCoVar -> Bool
 -- True of a type variable that comes from a
 -- shallower level than the ambient level (tclvl)
 isOuterTyVar tclvl tv
-  | isTyVar tv = tclvl `strictlyDeeperThan` tcTyVarLevel tv
-                 || isPromotableMetaTyVar tv
-    -- isPromotable: a meta-tv alpha[3] may end up unifying with skolem b[2],
-    -- so treat it as an "outer" var, even at level 3.
-    -- This will become redundant after fixing #18929.
+  | isTyVar tv = ASSERT2( not (isTouchableMetaTyVar tclvl tv), ppr tv <+> ppr tclvl  )
+                 tclvl `strictlyDeeperThan` tcTyVarLevel tv
+    -- ASSERT: we are dealing with Givens here, and invariant (GivenInv) from
+    -- Note Note [TcLevel invariants] in GHC.Tc.Utils.TcType ensures that there can't
+    -- be a touchable meta tyvar.   If this wasn't true, you might worry that,
+    -- at level 3, a meta-tv alpha[3] gets unified with skolem b[2], and thereby
+    -- becomes "outer" even though its level numbers says it isn't.
   | otherwise  = False  -- Coercion variables; doesn't much matter
 
 -- | Returns Given constraints that might,
@@ -2424,8 +2438,8 @@ Examples:
     [G] C (F alpha)
     [W] C a
   This also might match later. Again, we will need to flatten to
-  find this out. (Surprised about a metavariable in a Given? See
-  #18929.)
+  find this out. (Surprised about a metavariable in a Given? That
+  can easily happen -- See Note [GivenInv] in GHC.Tc.Utils.TcType.)
 
     [G] C (F a)
     [W] C a
@@ -2434,7 +2448,6 @@ Examples:
 
 This treatment fixes #18910 and is tested in
 typecheck/should_compile/InstanceGivenOverlap{,2}
-
 -}
 
 removeInertCts :: [Ct] -> InertCans -> InertCans

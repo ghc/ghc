@@ -25,7 +25,8 @@ import GHC.ST
 import GHC.Base
 
 -- $setup
--- import Prelude
+-- >>> import Prelude
+-- >>> import Control.Monad.ST
 
 data STRef s a = STRef (MutVar# s a)
 -- ^ a value of type @STRef s a@ is a mutable variable in state thread @s@,

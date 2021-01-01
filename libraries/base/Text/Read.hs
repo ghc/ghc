@@ -51,6 +51,9 @@ import Text.ParserCombinators.ReadP as P
 import Text.ParserCombinators.ReadPrec
 import qualified Text.Read.Lex as L
 
+-- $setup
+-- >>> import Prelude
+
 ------------------------------------------------------------------------
 -- utility functions
 
