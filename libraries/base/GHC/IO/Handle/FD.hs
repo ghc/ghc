@@ -319,6 +319,7 @@ mkHandleFromFD fd0 fd_type filepath iomode set_non_blocking mb_codec = do
   h <- mkHandleFromFDNoFinalizer fd0 fd_type filepath iomode
                                  set_non_blocking mb_codec
   addHandleFinalizer h handleFinalizer
+  pure h
 
 -- | Old API kept to avoid breaking clients
 fdToHandle' :: CInt
