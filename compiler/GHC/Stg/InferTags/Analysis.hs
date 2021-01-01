@@ -408,16 +408,7 @@ mkJoinNode inputs = {-# SCC joinNode #-} do
 -- | Compute the taggedness result of applying a constructor to the given arguments
 --   *and* applying the strict field invariant. Marking all strict fields as tagged.
 mkOutConLattice :: DataCon -> EnterInfo -> [EnterLattice] -> EnterLattice
-mkOutConLattice con outer fields
-    | null fields   = EnterLattice outer $ FieldsNone
-    | conCount == 1 = EnterLattice outer $ FieldsProd out_fields
-    | conCount > 1  = EnterLattice outer $ FieldsSum (Just con) out_fields
-    | otherwise = panic "mkOutConLattice"
-  where
-    out_fields = mapStrictConArgs con (`setEnterInfo` NeverEnter) fields
-    conCount = length (tyConDataCons $ dataConTyCon con)
-
-
+mkOutConLattice con outer fields = EnterLattice outer
 
 type NodeArray = IOArray Int FlowNode
 type FlagArray = IOUArray Int Bool
@@ -1039,7 +1030,7 @@ nodeRhs :: HasDebugCallStack => Module -> ContextStack -> TopLevelFlag
 nodeRhs this_mod ctxt topFlag binding (StgRhsCon _ ccs con args)
   | null args = do
         -- pprTraceM "RhsConNullary" (ppr con <+> ppr node_id <+> ppr ctxt)
-        let node = mkConstNode node_id (EnterLattice NeverEnter FieldsNone)
+        let node = mkConstNode node_id (EnterLattice NeverEnter)
                                        (ppr binding <-> text "rhsConNullary")
         markDone $ node
         return $! (StgRhsCon (node_id,RhsCon) ccs con args)
@@ -1190,7 +1181,7 @@ nodeRhs this_mod ctxt _topFlag binding (StgRhsClosure _ext _ccs _flag args body)
                         , node_inputs = [body_id]
                         -- ^ We might infer things about nested fields once evaluated.
                         -- , node_done   = False
-                        , node_result = EnterLattice enterInfo FieldsUndet
+                        , node_result = EnterLattice enterInfo
                         , node_update = node_update node_id body_id
                         }
     addNode notDone node
