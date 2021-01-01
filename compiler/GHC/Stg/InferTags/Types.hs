@@ -505,10 +505,10 @@ undetLat        :: EnterLattice
 maybeLat        :: EnterLattice
 noValue         :: EnterLattice
 neverEnterLat   :: EnterLattice
-undetLat      = EnterLattice UndetEnterInfo FieldsUndet
-maybeLat      = EnterLattice MaybeEnter FieldsUnknown
-noValue       = EnterLattice NoValue FieldsNone
-neverEnterLat = EnterLattice NeverEnter FieldsUndet
+undetLat      = EnterLattice UndetEnterInfo
+maybeLat      = EnterLattice MaybeEnter
+noValue       = EnterLattice NoValue
+neverEnterLat = EnterLattice NeverEnter
 
 -- | Encode if a node needs to be entered or is already evaluated.
 data EnterInfo
@@ -557,110 +557,17 @@ See Note [The lattice element combinators] for details.
 
 data EnterLattice = EnterLattice
     { enterInfo :: !EnterInfo
-    , fieldInfo :: !FieldInfo
     }
     deriving (Eq, Generic, NFData)
 
 instance Binary EnterLattice where
-    put_ bh (EnterLattice enterInfo fieldInfo) = put_ bh enterInfo >> put_ bh fieldInfo
-    get h = pure EnterLattice <*> B.get h <*> B.get h
-
--- Side note: Nullary constructors are assigned FieldsNone.
-
-data FieldInfo
-    -- | Direct tail recursion, "phantom" fields.
-    = FieldsNone
-
-    -- | The associated value has up to (length fields) fields we know something
-    -- about. But the actual value at runtime can have less fields! Or more fields!
-    -- See Note [Lattice for tag analysis].
-    | FieldsUntyped [EnterLattice]
-
-    -- Product result with up to (length fields) fields we know something about.
-    | FieldsProd [EnterLattice]
-
-    -- Sum with constructor the fields came out of
-    | FieldsSum  !(Maybe DataCon) [EnterLattice]
-
-    -- | At most we can say something about the tag of the value.
-    --   The fields are impossible to known.
-    | FieldsUnknown
-
-    -- | We might find out more about the fields
-    | FieldsUndet
-    deriving (Generic)
-
-instance Eq FieldInfo where
-    -- x == y
-    --     | maybeEq x y == True
-    FieldsNone == FieldsNone = True
-    FieldsUnknown == FieldsUnknown = True
-    FieldsUndet == FieldsUndet = True
-    (FieldsSum mb_con1 flds1) == (FieldsSum mb_con2 flds2)
-        = mb_con1 == mb_con2 && eqEnterLattices flds1 flds2
-    (FieldsUntyped flds1) == (FieldsUntyped flds2)
-        = eqEnterLattices flds1 flds2
-    (FieldsProd flds1) == (FieldsProd flds2)
-        = eqEnterLattices flds1 flds2
-    _ == _ = False
-
--- Relying on Eq [a] ends up not specializing which is quite
--- bad for performance :( So I handwrote this after the obvious
--- attempts failed.
-eqEnterLattices :: [EnterLattice] -> [EnterLattice] -> Bool
-eqEnterLattices [] [] = True
-eqEnterLattices (x:xs) (y:ys) =
-    x == y && eqEnterLattices xs ys
-eqEnterLattices _ _ = False
-
-instance NFData FieldInfo where
-    rnf x = seq x ()
+    put_ bh (EnterLattice enterInfo) = put_ bh enterInfo
+    get h = pure EnterLattice <*> B.get h
 
 instance Outputable EnterLattice where
-    ppr (EnterLattice enterInfo fieldInfo)
-        = ppr enterInfo <> text " x " <> ppr fieldInfo
+    ppr (EnterLattice enterInfo)
+        = ppr enterInfo
 
-instance Outputable FieldInfo where
-    ppr FieldsUnknown           = text "bot"
-    ppr (FieldsUntyped fields)  = text "any" <> ppr fields
-    ppr (FieldsProd fields)     = text "prod" <> ppr fields
-    ppr (FieldsSum con fields)  = text "sum" <> char '<' <> ppr con <> char '>' <> ppr fields
-    ppr FieldsNone              = text "none"
-    ppr FieldsUndet             = text "undet"
-
-{-
-Note [FieldInfo Binary instance]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-TODO: Either put this info into interface files, or remove the instances.
-
-Putting a data con into a interface file can cause non-trivial overhead
-as it involves type checking at load time among other things.
-
-So we convert all Sum field infos to untyped ones when serializing.
-We currently do not take advantage of the con info so this does not
-weaken the strength of the analysis.
-
--}
-instance Binary FieldInfo where
-    put_ bh FieldsNone              = putByte bh 0
-    put_ bh (FieldsUntyped fields)  = putByte bh 1 >> put_ bh fields
-    put_ bh (FieldsProd fields)     = putByte bh 2 >> put_ bh fields
-    -- We turn FieldSum into FieldsUntyped here,
-    -- While losing precision it means we don't have to save the con
-    put_ bh (FieldsSum _con fields) = putByte bh 1 >> put_ bh fields
-    put_ bh FieldsUnknown           = putByte bh 4
-    put_ bh FieldsUndet             = putByte bh 5
-
-    get bh = do
-        con <- getByte bh
-        case con of
-            0 -> pure FieldsNone
-            1 -> pure FieldsUntyped <*> B.get bh
-            2 -> pure FieldsProd <*> B.get bh
-            3 -> panic "get:FieldInfo - invalid byte"
-            4 -> pure FieldsUnknown
-            5 -> pure FieldsUndet
-            _ -> panic "get:FieldInfo - invalid byte"
 
 -- lub
 combineEnterInfo :: EnterInfo -> EnterInfo -> EnterInfo
@@ -675,103 +582,30 @@ combineEnterInfo NeverEnter NeverEnter  = NeverEnter
 combineEnterInfo NoValue x              = x
 combineEnterInfo x NoValue              = x
 
-combineFieldsUntyped :: [EnterLattice] -> [EnterLattice] -> [EnterLattice]
-combineFieldsUntyped fields1 fields2 =
-    go fields1 fields2
-  where
-    go (x:xs) (y:ys) = combineLattices x y : go xs ys
-    go []     ys     = ys
-    go xs     []      = xs
 
 combineLattices :: EnterLattice -> EnterLattice -> EnterLattice
 combineLattices x1 x2 | maybeEq x1 x2 || x1 == x2 = x1
-combineLattices (EnterLattice ei1 fi1) (EnterLattice ei2 fi2)
-    = EnterLattice (combineEnterInfo ei1 ei2) (combineFieldInfos fi1 fi2)
-
-combineFieldInfos :: FieldInfo -> FieldInfo -> FieldInfo
-combineFieldInfos FieldsUndet _ = FieldsUndet
-combineFieldInfos _ FieldsUndet = FieldsUndet
-combineFieldInfos (FieldsUnknown) _ = FieldsUnknown
-combineFieldInfos _ (FieldsUnknown) = FieldsUnknown
-combineFieldInfos FieldsNone x = x
-combineFieldInfos x FieldsNone = x
--- Combine results of different constructors
--- See Note [Combining Branches]
-combineFieldInfos (FieldsProd fs1) (FieldsSum _ fs2) =
-    FieldsUntyped $ combineFieldsUntyped fs1 fs2
-combineFieldInfos (FieldsSum _ fs1) (FieldsProd fs2) =
-    FieldsUntyped $ combineFieldsUntyped fs1 fs2
-
-combineFieldInfos (FieldsSum c1 fs1)  (FieldsSum c2 fs2)
-    | c1 /= c2  = FieldsUntyped $ combineFieldsUntyped fs1 fs2
-    | otherwise = FieldsSum c1 $
-                  zipWithEqual "SumInfo:combine" combineLattices fs1 fs2
-combineFieldInfos (FieldsProd fs1) (FieldsProd fs2)
-    | l1 == l2 = FieldsProd $ combined
-    -- We might combine different types. See Note [Combining Branches]
-    | otherwise = FieldsProd $ combined ++ tail
-    where
-        combined = zipWith combineLattices fs1 fs2
-        tail
-          | l1 < l2 = drop l1 fs2
-          | l1 > l2 = drop l2 fs1
-          | otherwise = panic "combineFieldInfos: impossible"
-        !l1 = length fs1
-        !l2 = length fs2
-
-
--- untyped v untyped
-combineFieldInfos (FieldsUntyped fs1) (FieldsUntyped fs2) =
-    FieldsUntyped $ combineFieldsUntyped fs1 fs2
--- untyped v sum
-combineFieldInfos (FieldsSum _ fs1) (FieldsUntyped fs2) =
-    FieldsUntyped $ combineFieldsUntyped fs1 fs2
-combineFieldInfos (FieldsUntyped fs1) (FieldsSum _ fs2) =
-    FieldsUntyped $ combineFieldsUntyped fs1 fs2
--- untyped v prod
-combineFieldInfos (FieldsProd fs1) (FieldsUntyped fs2) =
-    FieldsUntyped $ combineFieldsUntyped fs1 fs2
-combineFieldInfos (FieldsUntyped fs1) (FieldsProd fs2) =
-    FieldsUntyped $ combineFieldsUntyped fs1 fs2
+combineLattices (EnterLattice ei1) (EnterLattice ei2)
+    = EnterLattice (combineEnterInfo ei1 ei2)
 
 ------------------------------------------------------------
 --      Utility functions to deal with lattices           --
 ------------------------------------------------------------
 
-
 -- Lattice of which we know, and can only know, the outer layer.
 flatLattice :: EnterInfo -> EnterLattice
-flatLattice x = EnterLattice x FieldsUnknown
+flatLattice x = EnterLattice x
 
 -- Lattice where we know there are no inner values.
 nullaryLattice :: EnterInfo -> EnterLattice
-nullaryLattice enterInfo = EnterLattice enterInfo FieldsNone
+nullaryLattice enterInfo = EnterLattice enterInfo
 
 -- Set (outermost) enterInfo
 setEnterInfo :: HasDebugCallStack => EnterLattice -> EnterInfo -> EnterLattice
-setEnterInfo lat@(EnterLattice enter fields) newEnter
+setEnterInfo lat@(EnterLattice enter ) newEnter
     | enter == newEnter
     = lat
-    | otherwise = EnterLattice newEnter fields
-
--- Lookup nth-field of the returned valued.
--- Defaulting towards undetLat
--- Zero indexed
-indexField :: EnterLattice -> Int -> EnterLattice
-indexField lat n =
-    case fieldInfo lat of
-        FieldsUndet -> undetLat
-        FieldsUnknown -> maybeLat
-        FieldsNone -> noValue
-        FieldsSum  _ fields -> getField fields
-        FieldsProd fields   -> getField fields
-        FieldsUntyped fields -> getField fields
-  where
-    getField fields =
-        case drop n fields of
-            -- We treat [] equal to [undetLat, undetLat, undetLat, ...]
-            [] -> undetLat
-            (x:_xs) -> x
+    | otherwise = EnterLattice newEnter
 
 -- Returns true if the lattice element represents a known-tagged value.
 hasOuterTag :: EnterLattice -> Bool
@@ -780,50 +614,16 @@ hasOuterTag lat = enterInfo lat == NeverEnter
 -- We use these to stop iterating on nodes which are already at the bot of the lattice.
 
 hasFinalFields :: EnterLattice -> Bool
-hasFinalFields lat =
-    case (fieldInfo lat) of
-        (FieldsUnknown )        -> True
-        (FieldsNone  )          -> False
-        (FieldsUndet)           -> False
-        (FieldsProd fields)     -> all isFinalValue fields
-        (FieldsSum  _ fields)   -> all isFinalValue fields
-        (FieldsUntyped fields)  -> all isFinalValue fields
+hasFinalFields lat = True
 
 isFinalValue :: EnterLattice -> Bool
 isFinalValue lat = enterInfo lat == MaybeEnter && hasFinalFields lat
 
 nestingLevelOver :: EnterLattice -> Int -> Bool
-nestingLevelOver lat depth
-    | depth <= 0 = True
-    | otherwise = case lat of
-        EnterLattice _ fieldLattice ->
-            case fieldLattice of
-                FieldsProd    fields -> any (`nestingLevelOver` (depth-1)) fields
-                FieldsSum   _ fields -> any (`nestingLevelOver` (depth-1)) fields
-                FieldsUntyped fields -> any (`nestingLevelOver` (depth-1)) fields
-                FieldsNone           -> False
-                FieldsUndet          -> False
-                FieldsUnknown        -> False
-
+nestingLevelOver lat depth = False
 
 widenToNestingLevel :: Int -> EnterLattice -> EnterLattice
-widenToNestingLevel n l
-    | nestingLevelOver l n = -- pprTrace "capping" (ppr l) $
-                             widenToNestingLevel' n l
-    | otherwise = l
-
-widenToNestingLevel' :: Int -> EnterLattice -> EnterLattice
-widenToNestingLevel' _ l@(EnterLattice _ FieldsUnknown )  = l
-widenToNestingLevel' _ l@(EnterLattice _ FieldsNone     ) = l
-widenToNestingLevel' _ l@(EnterLattice _ FieldsUndet   )  = l
-widenToNestingLevel' 0 _ = maybeLat
-widenToNestingLevel' n (EnterLattice e (FieldsProd fields)) =
-    EnterLattice e (FieldsProd $! (map (widenToNestingLevel' (n-1)) fields))
-widenToNestingLevel' n (EnterLattice e (FieldsSum c fields)) =
-    EnterLattice e (FieldsSum c $! map (widenToNestingLevel' (n-1)) fields)
-widenToNestingLevel' n (EnterLattice e (FieldsUntyped fields)) =
-    EnterLattice e (FieldsUntyped $! map (widenToNestingLevel' (n-1)) fields)
-
+widenToNestingLevel n l = l
 
 -- Node IDs are generally *just* uniques created during the creation
 -- of the data flow graph.
