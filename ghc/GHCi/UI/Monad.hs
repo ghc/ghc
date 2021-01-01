@@ -31,6 +31,7 @@ module GHCi.UI.Monad (
         initInterpBuffering,
         turnOffBuffering, turnOffBuffering_,
         flushInterpBuffers,
+        runInternal,
         mkEvalWrapper
     ) where
 
@@ -74,6 +75,7 @@ import Control.Monad.Trans.Reader
 import Control.Monad.IO.Class
 import Data.Map.Strict (Map)
 import qualified Data.IntMap.Strict as IntMap
+import qualified GHC.Data.EnumSet as EnumSet
 import qualified GHC.LanguageExtensions as LangExt
 
 -----------------------------------------------------------------------------
@@ -519,7 +521,10 @@ runInternal =
         -- Running GHCi's internal expression is incompatible with -XSafe.
           -- We temporarily disable any Safe Haskell settings while running
           -- GHCi internal expressions. (see #12509)
-        safeHaskell = Sf_None
+        safeHaskell = Sf_None,
+          -- Disable dumping of any data during evaluation of GHCi's internal
+          -- expressions. (#17500)
+        dumpFlags = EnumSet.empty
       }
         -- RebindableSyntax can wreak havoc with GHCi in several ways
           -- (see #13385 and #14342 for examples), so we temporarily

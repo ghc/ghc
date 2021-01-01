@@ -612,7 +612,7 @@ rOOT_MAIN :: Module
 rOOT_MAIN       = mkMainModule (fsLit ":Main") -- Root module for initialisation
 
 mkInteractiveModule :: Int -> Module
--- (mkInteractiveMoudule 9) makes module 'interactive:M9'
+-- (mkInteractiveMoudule 9) makes module 'interactive:Ghci9'
 mkInteractiveModule n = mkModule interactiveUnit (mkModuleName ("Ghci" ++ show n))
 
 pRELUDE_NAME, mAIN_NAME :: ModuleName
