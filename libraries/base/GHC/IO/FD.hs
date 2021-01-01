@@ -167,7 +167,7 @@ writeBuf' fd buf = do
 -- -----------------------------------------------------------------------------
 -- opening files
 
--- | A wrapper for 'System.Posix.Internals.c_safe_open' that takes
+-- | A wrapper for 'System.Posix.Internals.c_interruptible_open' that takes
 -- two actions, @act1@ and @act2@, to perform after opening the file.
 --
 -- @act1@ is passed a file descriptor for the newly opened file. If
@@ -182,14 +182,14 @@ writeBuf' fd buf = do
 -- operation) without first closing the file or arranging for it to be
 -- closed. @act2@ /may/ close the file, but is not required to do so.
 -- If @act2@ leaves the file open, then the file will remain open on
--- return from `c_safe_open_with`.
+-- return from `c_interruptible_open_with`.
 --
--- Code calling `c_safe_open_with` that wishes to install a finalizer
+-- Code calling `c_interruptible_open_with` that wishes to install a finalizer
 -- to close the file should do so in @act2@. Doing so in @act1@ could
 -- potentially close the file in the finalizer first and then in the
 -- exception handler.
 
-c_safe_open_with
+c_interruptible_open_with
   :: System.Posix.Internals.CFilePath  -- ^ The file to open
   -> CInt -- ^ The flags to pass to open
   -> CMode -- ^ The permission mode to use for file creation
@@ -200,19 +200,10 @@ c_safe_open_with
                     -- ^ @act2@: An action to perform with async exceptions
                     -- masked and no exception handler.
   -> IO s
-c_safe_open_with path oflags mode act1 act2 =
+c_interruptible_open_with path oflags mode act1 act2 =
   mask $ \restore -> do
-    fd <- throwErrnoIfMinus1Retry "openFile" $ do
-      open_res <- c_safe_open path oflags mode
-      -- c_safe_open is an interruptible foreign call. If the call is
-      -- interrupted by an exception *before* the system call has
-      -- returned (so the file is not yet open), we want to deliver
-      -- that exception instead of retrying.
-      when (open_res == -1) $
-        -- Control.Exception.allowInterrupt, inlined to avoid messing
-        -- with Haddock links.
-        interruptible (pure ())
-      pure open_res
+    fd <- throwErrnoIfMinus1Retry "openFile" $
+             c_interruptible_open path oflags mode
     r <- restore (act1 fd) `onException` c_close fd
     act2 restore r
 
@@ -277,7 +268,7 @@ openFileWith filepath iomode non_blocking act1 act2 =
       -- NB. always use a safe open(), because we don't know whether open()
       -- will be fast or not.  It can be slow on NFS and FUSE filesystems,
       -- for example.
-      c_safe_open_with f oflags 0o666 ( \ fd -> do
+      c_interruptible_open_with f oflags 0o666 ( \ fd -> do
         (fD,fd_type) <- mkFD fd iomode Nothing{-no stat-}
                                 False{-not a socket-}
                                 non_blocking
@@ -286,7 +277,7 @@ openFileWith filepath iomode non_blocking act1 act2 =
         -- like /dev/null.
         when (iomode == WriteMode && fd_type == RegularFile) $
           setSize fD 0
-        act fD fd_type ) act2
+        act1 fD fd_type ) act2
 
 -- | Open a file and make an 'FD' for it.  Truncates the file to zero
 -- size when the `IOMode` is `WriteMode`. This function is difficult
