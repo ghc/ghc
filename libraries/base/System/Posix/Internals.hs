@@ -356,8 +356,30 @@ type CFilePath = CWString
 foreign import ccall unsafe "HsBase.h __hscore_open"
    c_open :: CFilePath -> CInt -> CMode -> IO CInt
 
--- e.g. use `interruptible` rather than `safe` due to #17912.
+-- We want to be able to interrupt an openFile call if
+-- it's expensive (NFS, FUSE, etc.), and we especially
+-- need to be able to interrupt a blocking open call.
+-- See #17912.
+c_interruptible_open :: CFilePath -> CInt -> CMode -> IO CInt
+c_interruptible_open filepath oflags mode = do
+  open_res <- c_interruptible_open_ path oflags mode
+  -- c_interruptible_open_ is an interruptible foreign call.
+  -- If the call is interrupted by an exception handler
+  -- before the system call has returned (so the file is
+  -- not yet open), we want to deliver the exception.
+  -- In point of fact, we deliver any pending exception
+  -- here regardless of the *reason* the system call
+  -- fails.
+  when (open_res == -1) $
+    -- Control.Exception.allowInterrupt, inlined to avoid
+    -- messing with any Haddock links.
+    interruptible (pure ())
+  pure (open_res)
+
 foreign import ccall interruptible "HsBase.h __hscore_open"
+   c_interruptible_open_ :: CFilePath -> CInt -> CMode -> IO CInt
+
+foreign import ccall safe "HsBase.h __hscore_open"
    c_safe_open :: CFilePath -> CInt -> CMode -> IO CInt
 
 foreign import ccall unsafe "HsBase.h __hscore_fstat"
