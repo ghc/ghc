@@ -501,12 +501,14 @@ It is a tail call if it's none of the above and in a tail call position in
 ---------------------------------
 
 
-undetLat :: EnterLattice
-undetLat = EnterLattice UndetEnterInfo FieldsUndet
-maybeLat :: EnterLattice
-maybeLat = EnterLattice MaybeEnter FieldsUnknown
-noValue :: EnterLattice
-noValue = EnterLattice NoValue FieldsNone
+undetLat        :: EnterLattice
+maybeLat        :: EnterLattice
+noValue         :: EnterLattice
+neverEnterLat   :: EnterLattice
+undetLat      = EnterLattice UndetEnterInfo FieldsUndet
+maybeLat      = EnterLattice MaybeEnter FieldsUnknown
+noValue       = EnterLattice NoValue FieldsNone
+neverEnterLat = EnterLattice NeverEnter FieldsUndet
 
 -- | Encode if a node needs to be entered or is already evaluated.
 data EnterInfo
