@@ -528,7 +528,6 @@ Library
         GHC.Stg.InferTags.Rewrite
         GHC.Stg.InferTags.Types
         GHC.Stg.InferTags.Analysis
-        GHC.Stg.InferTags.Monad
         GHC.Stg.Pipeline
         GHC.Stg.Stats
         GHC.Stg.Subst
