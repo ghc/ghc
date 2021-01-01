@@ -49,7 +49,7 @@ module GHC.IO.Handle.Internals (
   ioe_EOF, ioe_notReadable, ioe_notWritable,
   ioe_finalizedHandle, ioe_bufsiz,
 
-  hClose, hClose_help, hLookAhead_,
+  hClose_impl, hClose_help, hLookAhead_,
 
   HandleFinalizer, handleFinalizer,
 
@@ -831,20 +831,13 @@ closeTextCodecs Handle__{..} = do
 -- ---------------------------------------------------------------------------
 -- Closing a handle
 
--- | Computation 'hClose' @hdl@ makes handle @hdl@ closed.  Before the
--- computation finishes, if @hdl@ is writable its buffer is flushed as
--- for 'hFlush'.
--- Performing 'hClose' on a handle that has already been closed has no effect;
--- doing so is not an error.  All other operations on a closed handle will fail.
--- If 'hClose' fails for any reason, any further operations (apart from
--- 'hClose') on the handle will still fail as if @hdl@ had been successfully
--- closed.
-
-hClose :: Handle -> IO ()
-hClose h@(FileHandle _ m)     = do
+-- | This function exists temporarily to avoid an unused import warning in
+-- `bytestring`.
+hClose_impl :: Handle -> IO ()
+hClose_impl h@(FileHandle _ m)     = do
   mb_exc <- hClose' h m
   hClose_maybethrow mb_exc h
-hClose h@(DuplexHandle _ r w) = do
+hClose_impl h@(DuplexHandle _ r w) = do
   excs <- mapM (hClose' h) [r,w]
   hClose_maybethrow (listToMaybe (catMaybes excs)) h
 
