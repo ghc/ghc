@@ -20,7 +20,8 @@
 module GHC.IO.StdHandles
   ( -- std handles
     stdin, stdout, stderr,
-    openFile, openBinaryFile, openFileBlocking
+    openFile, openBinaryFile, openFileBlocking,
+    withFile, withBinaryFile, withFileBlocking
   ) where
 
 import GHC.IO
@@ -64,10 +65,19 @@ stderr = POSIX.stderr
 openFile :: FilePath -> IOMode -> IO Handle
 openFile = POSIX.openFile
 
+withFile :: FilePath -> IOMode -> (Handle -> IO r) -> IO r
+withFile = POSIX.withFile
+
 openBinaryFile :: FilePath -> IOMode -> IO Handle
 openBinaryFile = POSIX.openBinaryFile
 
+withBinaryFile :: FilePath -> IOMode -> (Handle -> IO r) -> IO r
+withBinaryFile = POSIX.withBinaryFile
+
 openFileBlocking :: FilePath -> IOMode -> IO Handle
 openFileBlocking = POSIX.openFileBlocking
+
+withFileBlocking :: FilePath -> IOMode -> (Handle -> IO r) -> IO r
+withFileBlocking = POSIX.withFileBlocking
 
 #endif
