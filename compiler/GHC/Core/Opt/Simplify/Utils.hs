@@ -1574,15 +1574,16 @@ mkLam env bndrs body cont
 
     mkLam' dflags bndrs body
       | gopt Opt_DoEtaReduction dflags
-      , Just etad_lam <- tryEtaReduce bndrs body
+      , Just etad_lam <- tryEtaReduce True bndrs body
       = do { tick (EtaReduction (head bndrs))
            ; return etad_lam }
 
       | not (contIsRhs cont)   -- See Note [Eta-expanding lambdas]
       , sm_eta_expand (getMode env)
-      , any isRuntimeVar bndrs
+      , any isRuntimeVar bndrs  -- Only when there is at least one value lambda already
       , let body_arity = exprEtaExpandArity dflags body
-      , expandableArityType body_arity
+      , expandableArityType body_arity  -- This guard is only so that we only do
+                                        -- a tick if there so something to do
       = do { tick (EtaExpansion (head bndrs))
            ; let res = mkLams bndrs (etaExpandAT body_arity body)
            ; traceSmpl "eta expand" (vcat [text "before" <+> ppr (mkLams bndrs body)
@@ -1684,8 +1685,8 @@ tryEtaExpandRhs mode bndr rhs
     dflags    = sm_dflags mode
     old_arity = exprArity rhs
 
-    arity_type = findRhsArity dflags bndr rhs old_arity
-                 `maxWithOneShots` idDemandOneShots bndr
+    rhs_arity_type = findRhsArity dflags bndr rhs old_arity
+    arity_type = rhs_arity_type `maxWithOneShots` idDemandOneShots bndr
        -- maxWithOneShots: take account of the demand on the
        -- binder.  Perhaps it is always called with 2 args
        --   let f = \x. blah in (f 3 4, f 1 9)
@@ -1707,15 +1708,25 @@ wantEtaExpansion _                      = True
 
 idDemandOneShots :: Id -> [OneShotInfo]
 idDemandOneShots bndr
-  = combine (argOneShots (idDemandInfo bndr))
-            (idCallArity bndr)
+  = call_arity_one_shots `zip_oss` dmd_one_shots
   where
-    combine :: [OneShotInfo]    -- From the Demand on the Id
-            -> Arity            -- From the Call Arity on the Id
-            -> [OneShotInfo]
-    combine oss ca
-      | oss `lengthAtLeast` ca = oss
-      | otherwise              = take ca (oss ++ repeat NoOneShotInfo)
+    call_arity_one_shots :: [OneShotInfo]
+    call_arity_one_shots
+      | call_arity == 0 = []
+      | otherwise       = NoOneShotInfo : replicate (call_arity-1) OneShotLam
+    -- Call Arity analysis says the function is always called
+    -- applied to this many arguments
+    call_arity = idCallArity bndr
+
+    dmd_one_shots :: [OneShotInfo]
+    -- If the demand info is Cx(C1(C1(.))) then we know that an
+    -- application to one arg is also an application to three
+    dmd_one_shots = argOneShots (idDemandInfo bndr)
+
+    -- Take the *longer* list
+    zip_oss (os1:oss1) (os2:oss2) = (os1 `bestOneShot` os2) : zip_oss oss1 oss2
+    zip_oss []         oss2       = oss2
+    zip_oss oss1       []         = oss1
 
 {-
 Note [Eta-expanding at let bindings]

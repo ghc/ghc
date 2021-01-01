@@ -20,5 +20,6 @@ baz' n = if p n then baz n else baz (n+1)
 
 main = do
   n <- length `fmap` getArgs
-  print $ summap (foo' n) n + summap (bar' n) n + summap (baz' n) n
+--   print $ summap (foo' n) n + summap (bar' n) n + summap (baz' n) n
+  print $ summap (bar' n) n
 
