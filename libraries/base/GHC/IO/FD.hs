@@ -255,11 +255,6 @@ openFileWith
                     -- masked and no exception handler.
   -> IO s
 openFileWith filepath iomode non_blocking act1 act2 =
-  -- TODO: withFilePath is not interruptible, so if someone calls
-  -- openFileWith when exceptions are masked and passes it an
-  -- infinitely long or otherwise expensive FilePath, then the thread
-  -- will not respond to ^C. Yuck. I (David Feuer) believe the solution
-  -- is to add an interruptible version of `withFilePath`.
   withFilePath filepath $ \ f ->
     let
       oflags1 = case iomode of
@@ -304,7 +299,6 @@ openFile
   -> IOMode   -- ^ mode in which to open the file
   -> Bool     -- ^ open the file in non-blocking mode?
   -> IO (FD,IODeviceType)
-{-# DEPRECATED openFile "Use openFileWith instead" #-}
 openFile filepath iomode non_blocking =
   openFileWith filepath iomode non_blocking
     (\ fd fd_type -> pure (fd, fd_type)) (\_ r -> pure r)
