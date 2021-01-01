@@ -507,10 +507,16 @@ stat_endGC (Capability *cap, gc_thread *initiating_gct, W_ live, W_ copied, W_ s
             initiating_gct->gc_start_elapsed - initiating_gct->gc_sync_start_elapsed;
         stats.gc.elapsed_ns = current_elapsed - initiating_gct->gc_start_elapsed;
         stats.gc.cpu_ns = 0;
-        for (unsigned int i=0; i < par_n_threads; i++) {
-            gc_thread *gct = gc_threads[i];
-            ASSERT(gct->gc_end_cpu >= gct->gc_start_cpu);
-            stats.gc.cpu_ns += gct->gc_end_cpu - gct->gc_start_cpu;
+        if (par_n_threads == 1) {
+            ASSERT(initiating_gct->gc_end_cpu >= initiating_gct->gc_start_cpu);
+            stats.gc.cpu_ns += initiating_gct->gc_end_cpu - initiating_gct->gc_start_cpu;
+
+        } else {
+            for (unsigned int i=0; i < par_n_threads; i++) {
+                gc_thread *gct = gc_threads[i];
+                ASSERT(gct->gc_end_cpu >= gct->gc_start_cpu);
+                stats.gc.cpu_ns += gct->gc_end_cpu - gct->gc_start_cpu;
+            }
         }
     }
     // -------------------------------------------------
