@@ -2012,19 +2012,22 @@ addSection (Section *s, SectionKind kind, SectionAlloc alloc,
 
 #define UNUSED(x) (void)(x)
 
+#if defined(OBJFORMAT_ELF)
 void * loadNativeObj (pathchar *path, char **errmsg)
 {
-#if defined(OBJFORMAT_ELF)
    ACQUIRE_LOCK(&linker_mutex);
    void *r = loadNativeObj_ELF(path, errmsg);
    RELEASE_LOCK(&linker_mutex);
    return r;
+}
 #else
+void * loadNativeObj (pathchar *path, char **errmsg) GNU_ATTRIBUTE(__noreturn__)
+{
    UNUSED(path);
    UNUSED(errmsg);
    barf("loadNativeObj: not implemented on this platform");
-#endif
 }
+#endif
 
 HsInt unloadNativeObj (void *handle)
 {
