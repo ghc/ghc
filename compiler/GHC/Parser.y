@@ -42,7 +42,7 @@ where
 -- base
 import Control.Monad    ( unless, liftM, when, (<=<) )
 import GHC.Exts
-import Data.Maybe       ( maybeToList )
+import Data.Maybe       ( maybeToList, fromMaybe, fromJust )
 import qualified Prelude -- for happy-generated code
 
 import GHC.Prelude
@@ -87,7 +87,7 @@ import GHC.Builtin.Types ( unitTyCon, unitDataCon, tupleTyCon, tupleDataCon, nil
                            listTyCon_RDR, consDataCon_RDR, eqTyCon_RDR)
 }
 
-%expect 0 -- shift/reduce conflicts
+%expect 1 -- shift/reduce conflicts
 
 {- Note [shift/reduce conflicts]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2767,7 +2767,7 @@ aexp    :: { ECP }
         | 'let' binds inExp(exp)          {% do
             let (tokenIn, tokenEcpM, worked) = $3
 
-            hintParsingErrorWithContext worked tokenIn "let/in clause without body. Please add a body."
+            hintParsingErrorWithContext worked (fromMaybe $1 tokenIn) "let/in clause without body. Please add a body."
 
             case tokenEcpM of
                                -- Todo. Here we replaced "let x in" by _. But
@@ -2777,7 +2777,7 @@ aexp    :: { ECP }
                                Just tokenEcp -> return $ ECP $
                                            unECP tokenEcp >>= \ tokenEcp ->
                                            amms (mkHsLetPV (comb2 $1 tokenEcp) (snd (unLoc $2)) tokenEcp)
-                                               (mj AnnLet $1:mj AnnIn tokenIn
+                                               (mj AnnLet $1:mj AnnIn (fromJust tokenIn)
                                                  :(fst $ unLoc $2)) }
         | '\\' 'lcase' altslist
             {  ECP $ $3 >>= \ $3 ->
@@ -3778,10 +3778,10 @@ closeContext(c) :: { (Located Token, Bool) }
         : c { ($1, True) }
         | error { ($1, False) }
 
-inExp(c) :: { (Located Token, Maybe ECP, Bool) }
-        : 'in' c { ($1, Just $2, True) }
-        | 'in' error { ($1, Nothing, False) }
---         | error { ($1, $1, False) }
+inExp(c) :: { (Maybe (Located Token), Maybe ECP, Bool) }
+        : 'in' c %shift { (Just $1, Just $2, True) }
+        | 'in' error %shift { (Just $1, Nothing, False) }
+        | error { (Nothing, Nothing, False) }
 
 -----------------------------------------------------------------------------
 -- Miscellaneous (mostly renamings)
