@@ -1,2 +1,4 @@
 
-readFail012.hs:7:9: parse error (possibly incorrect indentation or mismatched brackets)
+readFail012.hs:6:13: error: opening brace is here
+
+readFail012.hs:7:9: error: missing closing tuple brace ')'

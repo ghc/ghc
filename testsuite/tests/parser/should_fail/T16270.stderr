@@ -67,5 +67,10 @@ T16270.hs:35:5: error:
 T16270.hs:37:5: error:
     primitive string literal must contain only characters <= '\xFF'
 
-T16270.hs:43:1: error:
-    parse error (possibly incorrect indentation or mismatched brackets)
+T16270.hs:40:5: error: 'let' is here
+
+T16270.hs:43:1: error: missing 'in' in 'let/in' clause
+
+T16270.hs:43:5: error: 'let' is here
+
+T16270.hs:44:1: error: missing 'in' in 'let/in' clause
