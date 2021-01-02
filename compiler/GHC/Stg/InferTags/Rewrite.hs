@@ -63,6 +63,9 @@ import Control.Monad
 
 import GHC.Stg.InferTags.Types
 
+import GHC.Driver.Ppr
+import GHC.Utils.Outputable
+
 ------------------------------------------------------------
 -- Add cases around strict fields where required.
 ------------------------------------------------------------
@@ -130,7 +133,7 @@ rewriteRhs _binding (StgRhsCon (node_id,rewriteFlag) ccs con args) = {-# SCC rew
     if (null evalArgs)
         then return $! (StgRhsCon noExtFieldSilent ccs con args, id)
         else do
-            -- pprTraceM "Creating seqs for " $ ppr _binding <+> ppr node_id
+            pprTraceM "CreatingSeqs for " $ ppr _binding <+> ppr node_id
 
             evaldArgs <- mapM mkLocalArgId evalArgs -- Create case binders
             let varMap = zip evalArgs evaldArgs -- Match them up with original ids
