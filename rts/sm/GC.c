@@ -1040,7 +1040,7 @@ new_gc_thread (uint32_t n, gc_thread *t)
     initSpinLock(&t->mut_spin);
     ACQUIRE_SPIN_LOCK(&t->gc_spin);
     ACQUIRE_SPIN_LOCK(&t->mut_spin);
-    t->wakeup = GC_THREAD_INACTIVE;  // starts true, so we can wait for the
+    SEQ_CST_STORE(&t->wakeup, GC_THREAD_INACTIVE);  // starts true, so we can wait for the
                           // thread to start up, see wakeup_gc_threads
 #endif
 
@@ -1285,7 +1285,7 @@ gcWorkerThread (Capability *cap)
     //    measurements more accurate on Linux, perhaps because it syncs
     //    the CPU time across the multiple cores.  Without this, CPU time
     //    is heavily skewed towards GC rather than MUT.
-    gct->wakeup = GC_THREAD_STANDING_BY;
+    SEQ_CST_STORE(&gct->wakeup, GC_THREAD_STANDING_BY);
     debugTrace(DEBUG_gc, "GC thread %d standing by...", gct->thread_index);
     ACQUIRE_SPIN_LOCK(&gct->gc_spin);
 
