@@ -1,2 +1,3 @@
 
-readFail024.hs:5:2: parse error on input ‘h’
+readFail024.hs:5:2: error:
+    parse error on input ‘h’ (possibly incorrect indentation or mismatched brackets)

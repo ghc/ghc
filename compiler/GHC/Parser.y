@@ -64,7 +64,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Misc          ( looksLikePackageName, fstOf3, sndOf3, thdOf3 )
 
 import GHC.Types.Name.Reader
-import GHC.Types.Name.Occurrence ( varName, dataName, tcClsName, tvName, occNameFS )
+import GHC.Types.Name.Occurrence ( varName, dataName, tcClsName, tvName, occNameFS, mkVarOcc )
 import GHC.Types.SrcLoc
 import GHC.Types.Basic
 import GHC.Types.Fixity
@@ -2769,6 +2769,8 @@ aexp    :: { ECP }
                                            amms (mkHsLetPV (comb2 $1 $>) (snd (unLoc $2)) $4)
                                                (mj AnnLet $1:mj AnnIn $3
                                                  :(fst $ unLoc $2)) }
+        | 'let' binds 'in' error         {% hintParsingErrorWithContext $3 "insert a valid expression" "'in' is here" "while looking for a body" "missingLetBody"}
+        | 'let' binds error        {% hintParsingErrorWithContext $1 "insert a valid 'in expression'" "'let' is here" "while looking for 'in'" "missingIn"}
         | '\\' 'lcase' altslist
             {  ECP $ $3 >>= \ $3 ->
                amms (mkHsLamCasePV (comb2 $1 $>)
@@ -2784,6 +2786,11 @@ aexp    :: { ECP }
                                      :mj AnnElse $7
                                      :(map (\l -> mj AnnSemi l) (fst $3))
                                     ++(map (\l -> mj AnnSemi l) (fst $6))) }
+        | 'if' exp optSemi 'then' exp optSemi 'else' error        {% hintParsingErrorWithContext $7 "insert a valid expression" "'else' is here" "while looking for an expression after 'else'" "parseError"}
+        | 'if' exp optSemi 'then' exp optSemi error        {% hintParsingErrorWithContext $4 "insert an 'else expression'" "'then' is here" "while looking for an 'else' expression" "missingElse"}
+        | 'if' exp optSemi 'then' error        {% hintParsingErrorWithContext $4 "insert a valid expression in the 'then' branch" "'then' is here" "while looking for an expression in the 'then' branch" "parseError"}
+        | 'if' exp optSemi error        {% hintParsingErrorWithContext $1 "insert a valid 'then' expression" "if is here" "while looking for a 'then' token" "missingThen"}
+        | 'if' error        {% hintParsingErrorWithContext $1 "insert a valid boolean expression in 'if bool then expr else expr'" "if is here" "while looking for a boolean expression" "parseError"}
         | 'if' ifgdpats                 {% hintMultiWayIf (getLoc $1) >>= \_ ->
                                            fmap ecpFromExp $
                                            ams (sLL $1 $> $ HsMultiIf noExtField
@@ -2796,6 +2803,10 @@ aexp    :: { ECP }
                                                    FromSource (snd $ unLoc $4)))
                                                (mj AnnCase $1:mj AnnOf $3
                                                   :(fst $ unLoc $4)) }
+        | 'case' exp error  {% do
+            hintParsingErrorWithContext $1 "insert 'of' followed by patterns" "'case' is here" "while looking for 'of' in 'case'" "missingOf"
+        }
+
         -- QualifiedDo.
         | DO  stmtlist               {% do
                                       hintQualifiedDo $1
@@ -2851,21 +2862,26 @@ aexp2   :: { ECP }
         | '(' texp ')'                  { ECP $
                                            unECP $2 >>= \ $2 ->
                                            amms (mkHsParPV (comb2 $1 $>) $2) [mop $1,mcp $3] }
+        | '(' texp error                  {% hintParsingErrorWithContext $1 "insert a closing brace here ')'" "opening brace is here" "while looking for a closing ')'" "unclosedBracedExpression"}
         | '(' tup_exprs ')'             { ECP $
                                            $2 >>= \ $2 ->
                                            amms (mkSumOrTuplePV (comb2 $1 $>) Boxed (snd $2))
                                                 ((mop $1:fst $2) ++ [mcp $3]) }
 
+        | '(' tup_exprs error {% hintParsingErrorWithContext $1 "insert a closing brace here ')'" "opening brace is here" "while looking for a closing ')'" "unclosedTuple"}
         | '(#' texp '#)'                { ECP $
                                            unECP $2 >>= \ $2 ->
                                            amms (mkSumOrTuplePV (comb2 $1 $>) Unboxed (Tuple [L (gl $2) (Just $2)]))
                                                 [mo $1,mc $3] }
+        | '(#' texp error {% hintParsingErrorWithContext $1 "insert a closing '#)' here" "opening brace is here" "while looking for a closing '#)'" "unclosedUnboxedTupleSum"}
         | '(#' tup_exprs '#)'           { ECP $
                                            $2 >>= \ $2 ->
                                            amms (mkSumOrTuplePV (comb2 $1 $>) Unboxed (snd $2))
                                                 ((mo $1:fst $2) ++ [mc $3]) }
 
+        | '(#' tup_exprs error {% hintParsingErrorWithContext $1 "insert a closing '#)" "opening brace is here" "while looking for a closing '#)'" "unclosedUnboxedTuple"}
         | '[' list ']'      { ECP $ $2 (comb2 $1 $>) >>= \a -> ams a [mos $1,mcs $3] }
+        | '[' list  error   {% hintParsingErrorWithContext $1 "insert a closing ']'" "opening bracket is here" "while looking for a closing list ']'" "unclosedList"}
         | '_'               { ECP $ mkHsWildCardPV (getLoc $1) }
 
         -- Template Haskell Extension
@@ -2883,19 +2899,24 @@ aexp2   :: { ECP }
                                  ams (sLL $1 $> $ HsBracket noExtField (ExpBr noExtField $2))
                                       (if (hasE $1) then [mj AnnOpenE $1, mu AnnCloseQ $3]
                                                     else [mu AnnOpenEQ $1,mu AnnCloseQ $3]) }
+        | '[|' exp error {% hintParsingErrorWithContext $1 "insert a closing TH quote '|]'" "opening quote is here" "while looking for a closing TH quote '|]'" "unclosedTHQuote" }
         | '[||' exp '||]'     {% runPV (unECP $2) >>= \ $2 ->
                                  fmap ecpFromExp $
                                  ams (sLL $1 $> $ HsBracket noExtField (TExpBr noExtField $2))
                                       (if (hasE $1) then [mj AnnOpenE $1,mc $3] else [mo $1,mc $3]) }
+        | '[||' exp error {% hintParsingErrorWithContext $1 "insert a typed TH quote '|]]'" "opening quote is here" "while looking for a closing type TH quote '||]'" "unclosedTTHQuote"}
         | '[t|' ktype '|]'    {% fmap ecpFromExp $
                                  ams (sLL $1 $> $ HsBracket noExtField (TypBr noExtField $2)) [mo $1,mu AnnCloseQ $3] }
+        | '[t|' ktype error {% hintParsingErrorWithContext $1 "insert a closing TH type quote '|]'" "opening quote is here" "while looking for a closing TH type quote '|]'" "unclosedTHTypeQuote"}
         | '[p|' infixexp '|]' {% (checkPattern <=< runPV) (unECP $2) >>= \p ->
                                       fmap ecpFromExp $
                                       ams (sLL $1 $> $ HsBracket noExtField (PatBr noExtField p))
                                           [mo $1,mu AnnCloseQ $3] }
+        | '[p|' infixexp error {% hintParsingErrorWithContext $1 "insert a closing TH pattern quote '|]'" "opening quote is here" "while looking for a closing TH pattern quote '|]" "unclosedTHPatternQuote"}
         | '[d|' cvtopbody '|]' {% fmap ecpFromExp $
                                   ams (sLL $1 $> $ HsBracket noExtField (DecBrL noExtField (snd $2)))
                                       (mo $1:mu AnnCloseQ $3:fst $2) }
+        | '[d|' cvtopbody error {% hintParsingErrorWithContext $1 "insert a closing TH definition quote '|]'" "opening quote is here" "while looking for a closing TH definition quote '|]" "unclosedTHDefinitionQuote"}
         | quasiquote          { ECP $ mkHsSplicePV $1 }
 
         -- arrow notation extension
@@ -2904,6 +2925,7 @@ aexp2   :: { ECP }
                                      ams (sLL $1 $> $ HsCmdArrForm noExtField $2 Prefix
                                                           Nothing (reverse $3))
                                          [mu AnnOpenB $1,mu AnnCloseB $4] }
+        | '(|' aexp cmdargs error {% hintParsingErrorWithContext $1 "insert a closing arrow notation '|)'" "opening arrow notation is here" "while looking for a closirg arrow notation '|)'" "unclosedArrowNotation"}
 
 splice_exp :: { LHsExpr GhcPs }
         : splice_untyped { mapLoc (HsSpliceE noExtField) $1 }
@@ -3315,7 +3337,7 @@ qual  :: { forall b. DisambECP b => PV (LStmt GhcPs (Located b)) }
                                                [mu AnnLarrow $2] }
     | exp                                { unECP $1 >>= \ $1 ->
                                            return $ sL1 $1 $ mkBodyStmt $1 }
-    | 'let' binds                        { ams (sLL $1 $> $ LetStmt noExtField (snd $ unLoc $2))
+    | 'let' binds %shift                       { ams (sLL $1 $> $ LetStmt noExtField (snd $ unLoc $2))
                                                (mj AnnLet $1:(fst $ unLoc $2)) }
 
 -----------------------------------------------------------------------------
@@ -3986,6 +4008,24 @@ hintExplicitForall tok = do
     forall   <- getBit ExplicitForallBit
     rulePrag <- getBit InRulePragBit
     unless (forall || rulePrag) $ addError $ PsError (PsErrExplicitForall (isUnicode tok)) [] (getLoc tok)
+
+-- Hint about parsing error
+hintParsingErrorWithContext :: Located Token -> String -> String -> String -> String -> P ECP
+hintParsingErrorWithContext tokOpen messageError messageHint contextMessage varName = do
+    pErr <- srcParseWarn
+
+    let pErr' = pErr { errHints = (SuggestSyntax (text messageError)):(errHints pErr) }
+
+    let pErr'' = case pErr' of
+          PsError (PsErrParse token context) suggets loc -> PsError (PsErrParse token contextMessage) suggets loc
+          _ -> pErr'
+
+
+    addError pErr''
+    addError $ PsError (PsErrParseErrorWithContext (text messageHint)) [] (getLoc tokOpen)
+
+    -- Generate a dumb expression (i.e. a variable usage) to replace the failing expression
+    pure $ ECP $ mkHsVarPV (L (getLoc tokOpen) (mkRdrUnqual (mkVarOcc ("_" ++ varName))))
 
 -- Hint about qualified-do
 hintQualifiedDo :: Located Token -> P ()

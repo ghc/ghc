@@ -1,4 +1,4 @@
 
 mdofail005.hs:11:14: error:
-    parse error on input ‘<-’
+    parse error on input ‘<-’ (possibly incorrect indentation or mismatched brackets)
     Perhaps you intended to use RecursiveDo

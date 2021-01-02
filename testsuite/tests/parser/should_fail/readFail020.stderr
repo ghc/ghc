@@ -1,2 +1,9 @@
 
-readFail020.hs:3:16: error: parse error on input ‘}’
+readFail020.hs:3:5: error: 'let' is here
+
+readFail020.hs:3:16: error:
+    parse error on input ‘}’ (possibly incorrect indentation or mismatched brackets)
+
+readFail020.hs:3:16: error:
+    parse error on input ‘}’ while looking for 'in'
+    hint: insert a valid 'in expression'

@@ -1,2 +1,9 @@
 
-T10498a.hs:12:15: error: parse error on input ‘->’
+T10498a.hs:11:5: error: 'then' is here
+
+T10498a.hs:12:15: error:
+    parse error on input ‘->’ (possibly incorrect indentation or mismatched brackets)
+
+T10498a.hs:12:15: error:
+    parse error on input ‘->’ while looking for an 'else' expression
+    hint: insert an 'else expression'

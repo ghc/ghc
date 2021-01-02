@@ -1,2 +1,6 @@
 
-readFail047.hs:6:5: parse error (possibly incorrect indentation or mismatched brackets)
+readFail047.hs:5:9: error: opening brace is here
+
+readFail047.hs:6:5: error:
+    parse error while looking for a closing ')'
+    hint: insert a closing brace here ')'

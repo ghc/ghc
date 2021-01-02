@@ -2,10 +2,6 @@
 T16270.hs:2:12: warning:
     -Werror=missing-space-after-bang is deprecated: bang patterns can no longer be written with a space
 
-T16270.hs:7:1: warning: [-Wtabs (in -Wdefault)]
-    Tab character found here, and in five further locations.
-    Please use spaces instead.
-
 T16270.hs:7:12: error:
     Unexpected semi-colons in conditional:
         if c then False; else True
@@ -67,5 +63,14 @@ T16270.hs:35:5: error:
 T16270.hs:37:5: error:
     primitive string literal must contain only characters <= '\xFF'
 
+T16270.hs:40:5: error: 'let' is here
+
 T16270.hs:43:1: error:
-    parse error (possibly incorrect indentation or mismatched brackets)
+    parse error while looking for 'in'
+    hint: insert a valid 'in expression'
+
+T16270.hs:43:5: error: 'let' is here
+
+T16270.hs:44:1: error:
+    parse error while looking for 'in'
+    hint: insert a valid 'in expression'

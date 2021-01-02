@@ -1,2 +1,3 @@
 
-readFail014.hs:3:12: parse error on input ‘}’
+readFail014.hs:3:12: error:
+    parse error on input ‘}’ (possibly incorrect indentation or mismatched brackets)

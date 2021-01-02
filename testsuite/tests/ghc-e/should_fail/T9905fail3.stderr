@@ -1,2 +1,3 @@
 
-<interactive>:0:17: error: parse error on input ‘+’
+<interactive>:0:17: error:
+    parse error on input ‘+’ (possibly incorrect indentation or mismatched brackets)

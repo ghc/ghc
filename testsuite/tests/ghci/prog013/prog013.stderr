@@ -1,17 +1,18 @@
 
 Bad.hs:3:8: error:
-    lexical error in string/character literal at character '\n'
+    lexical error in string/character literal at character '\n'(possibly missing end of string)
 
 Bad.hs:3:8: error:
-    lexical error in string/character literal at character '\n'
+    lexical error in string/character literal at character '\n'(possibly missing end of string)
 
 Bad.hs:3:8: error:
-    lexical error in string/character literal at character '\n'
+    lexical error in string/character literal at character '\n'(possibly missing end of string)
 
-<interactive>:9:1: error: parse error on input ‘+’
-
-Bad.hs:3:8: error:
-    lexical error in string/character literal at character '\n'
+<interactive>:9:1: error:
+    parse error on input ‘+’ (possibly incorrect indentation or mismatched brackets)
 
 Bad.hs:3:8: error:
-    lexical error in string/character literal at character '\n'
+    lexical error in string/character literal at character '\n'(possibly missing end of string)
+
+Bad.hs:3:8: error:
+    lexical error in string/character literal at character '\n'(possibly missing end of string)

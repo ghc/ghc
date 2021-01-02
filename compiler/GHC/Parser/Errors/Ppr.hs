@@ -167,18 +167,24 @@ pp_err = \case
          , text $ case kind of
             LexErrKind_EOF    -> " at end of input"
             LexErrKind_UTF8   -> " (UTF-8 decoding error)"
-            LexErrKind_Char c -> " at character " ++ show c
+            LexErrKind_Char c -> " at character " ++ show c ++ case c of
+              '\n' -> "(possibly missing end of string)"
+              _ -> ""
          ]
 
    PsErrSuffixAT
       -> text "Suffix occurrence of @. For an as-pattern, remove the leading whitespace."
 
-   PsErrParse token
+   PsErrParse token context
       | null token
-      -> text "parse error (possibly incorrect indentation or mismatched brackets)"
-
+      -> text "parse error" <+> contextMessage
       | otherwise
-      -> text "parse error on input" <+> quotes (text token)
+      -> text "parse error on input" <+> quotes (text token) <+> contextMessage
+
+      where
+        contextMessage
+          | null context = text "(possibly incorrect indentation or mismatched brackets)"
+          | otherwise = text context
 
    PsErrCmmLexer
       -> text "Cmm lexical error"
@@ -327,6 +333,8 @@ pp_err = \case
    PsErrParseErrorInPat s
       -> text "Parse error in pattern:" <+> s
 
+   PsErrParseErrorWithContext s
+      -> s
 
    PsErrInvalidInfixHole
       -> text "Invalid infix hole, expected an infix operator"
@@ -606,6 +614,7 @@ pp_hint = \case
                else empty
    TypeApplicationsInPatternsOnlyDataCons ->
      text "Type applications in patterns are only allowed on data constructors."
+   SuggestSyntax doc -> text "hint:" <+> doc
 
 perhaps_as_pat :: SDoc
 perhaps_as_pat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"

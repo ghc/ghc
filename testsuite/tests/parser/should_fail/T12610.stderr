@@ -3,4 +3,11 @@ T12610.hs:5:1: warning: [-Wtabs (in -Wdefault)]
     Tab character found here.
     Please use spaces instead.
 
-T12610.hs:5:9: parse error on input ‘y’
+T12610.hs:4:5: error: 'let' is here
+
+T12610.hs:5:9: error:
+    parse error on input ‘y’ while looking for 'in'
+    hint: insert a valid 'in expression'
+
+T12610.hs:5:11: error:
+    parse error on input ‘=’ (possibly incorrect indentation or mismatched brackets)

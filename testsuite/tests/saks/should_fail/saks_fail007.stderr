@@ -1,2 +1,3 @@
 
-saks_fail007.hs:7:12: error: parse error on input ‘::’
+saks_fail007.hs:7:12: error:
+    parse error on input ‘::’ (possibly incorrect indentation or mismatched brackets)

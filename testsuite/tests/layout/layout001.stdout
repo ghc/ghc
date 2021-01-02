@@ -1,7 +1,8 @@
 Running with -XNoAlternativeLayoutRule
 Running with -XAlternativeLayoutRule
 
-layout001.hs:6:3: error: parse error on input ‘where’
+layout001.hs:6:3: error:
+    parse error on input ‘where’ (possibly incorrect indentation or mismatched brackets)
 Running with -XAlternativeLayoutRule -XAlternativeLayoutRuleTransitional
 
 layout001.hs:6:3: warning: [-Walternative-layout-rule-transitional (in -Wdefault)]

@@ -1,7 +1,9 @@
 Running with -XNoAlternativeLayoutRule
 Running with -XAlternativeLayoutRule
 
-layout004.hs:7:14: parse error on input ‘,’
+layout004.hs:7:14: error:
+    parse error on input ‘,’ (possibly incorrect indentation or mismatched brackets)
 Running with -XAlternativeLayoutRule -XAlternativeLayoutRuleTransitional
 
-layout004.hs:7:14: parse error on input ‘,’
+layout004.hs:7:14: error:
+    parse error on input ‘,’ (possibly incorrect indentation or mismatched brackets)

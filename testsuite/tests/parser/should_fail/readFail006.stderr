@@ -1,2 +1,3 @@
 
-readFail006.hs:8:12: parse error on input ‘@’
+readFail006.hs:8:12: error:
+    parse error on input ‘@’ (possibly incorrect indentation or mismatched brackets)

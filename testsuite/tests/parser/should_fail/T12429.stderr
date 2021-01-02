@@ -1,4 +1,4 @@
 
 T12429.hs:2:29: error:
-    parse error on input ‘Y’
+    parse error on input ‘Y’ (possibly incorrect indentation or mismatched brackets)
     Perhaps you intended to use PatternSynonyms

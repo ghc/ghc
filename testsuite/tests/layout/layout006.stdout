@@ -5,7 +5,8 @@ layout006.hs:12:4: warning: [-Woverlapping-patterns (in -Wdefault)]
     In an equation for ‘f’: f | True = ...
 Running with -XAlternativeLayoutRule
 
-layout006.hs:12:2: error: parse error on input ‘|’
+layout006.hs:12:2: error:
+    parse error on input ‘|’ (possibly incorrect indentation or mismatched brackets)
 Running with -XAlternativeLayoutRule -XAlternativeLayoutRuleTransitional
 
 layout006.hs:12:2: warning: [-Walternative-layout-rule-transitional (in -Wdefault)]

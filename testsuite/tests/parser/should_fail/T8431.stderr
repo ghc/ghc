@@ -1,2 +1,3 @@
 
-T8431.hs:1:1: parse error on input ‘)’
+T8431.hs:1:1: error:
+    parse error on input ‘)’ (possibly incorrect indentation or mismatched brackets)

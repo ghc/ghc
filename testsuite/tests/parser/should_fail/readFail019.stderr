@@ -1,2 +1,3 @@
 
-readFail019.hs:3:18: parse error on input ‘in’
+readFail019.hs:3:18: error:
+    parse error on input ‘in’ (possibly incorrect indentation or mismatched brackets)

@@ -56,7 +56,7 @@ module GHC.Parser.Lexer (
    allocateComments,
    MonadP(..),
    getRealSrcLoc, getPState,
-   failMsgP, failLocMsgP, srcParseFail,
+   failMsgP, failLocMsgP, srcParseFail, srcParseWarn,
    getErrorMessages, getMessages,
    popContext, pushModuleContext, setLastToken, setSrcLoc,
    activeContext, nextIsEOF,
@@ -2901,7 +2901,7 @@ srcParseErr
   -> Int                -- length of the previous token
   -> SrcSpan
   -> PsError
-srcParseErr options buf len loc = PsError (PsErrParse token) suggests loc
+srcParseErr options buf len loc = PsError (PsErrParse token "") suggests loc
   where
    token = lexemeToString (offsetBytes (-len) buf) len
    pattern = decodePrevNChars 8 buf
@@ -2928,6 +2928,11 @@ srcParseFail :: P a
 srcParseFail = P $ \s@PState{ buffer = buf, options = o, last_len = len,
                             last_loc = last_loc } ->
     unP (addFatalError $ srcParseErr o buf len (mkSrcSpanPs last_loc)) s
+
+srcParseWarn :: P PsError
+srcParseWarn = P $ \s@PState{ buffer = buf, options = o, last_len = len,
+                            last_loc = last_loc } ->
+    POk s (srcParseErr o buf len (mkSrcSpanPs last_loc))
 
 -- A lexical error is reported at a particular position in the source file,
 -- not over a token range.

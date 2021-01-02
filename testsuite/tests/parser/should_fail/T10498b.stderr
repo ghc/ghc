@@ -1,2 +1,9 @@
 
-T10498b.hs:7:8: error: parse error on input ‘module’
+T10498b.hs:7:5: error: if is here
+
+T10498b.hs:7:8: error:
+    parse error on input ‘module’ (possibly incorrect indentation or mismatched brackets)
+
+T10498b.hs:7:8: error:
+    parse error on input ‘module’ while looking for a boolean expression
+    hint: insert a valid boolean expression in 'if bool then expr else expr'
