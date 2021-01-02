@@ -136,7 +136,7 @@ numbering GHC versions:
 
     We may make snapshot releases of the current stable branch
     `available for
-    download <http://www.haskell.org/ghc/dist/stable/dist/>`__, and the
+    download <http://www.haskell.org/ghc/dist/latest/>`__, and the
     latest sources are available from
     :ghc-wiki:`the git repositories <repositories>`.
 
@@ -145,11 +145,6 @@ numbering GHC versions:
     built, and ``x.y.z+1`` is the next release to be made on that
     branch. For example, ``6.8.1.20040225`` would be a snapshot of the
     ``6.8`` branch during the development of ``6.8.2``.
-
-    We may make snapshot releases of the HEAD `available for
-    download <http://www.haskell.org/ghc/dist/current/dist/>`__, and the
-    latest sources are available from
-    :ghc-wiki:`the git repositories <repositories>`.
 
     Unstable snapshot releases are named ``x.y.YYYYMMDD``. where
     ``YYYYMMDD`` is the date of the sources from which the snapshot was
