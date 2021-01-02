@@ -2767,7 +2767,7 @@ aexp    :: { ECP }
         | 'let' binds inExp(exp)          {% do
             let (tokenIn, tokenEcpM, worked) = $3
 
-            hintParsingErrorWithContext worked tokenIn $1
+            hintParsingErrorWithContext worked tokenIn "let/in clause without body. Please add a body."
 
             case tokenEcpM of
                                -- Todo. Here we replaced "let x in" by _. But
@@ -2859,12 +2859,12 @@ aexp2   :: { ECP }
         -- correct Haskell (you'd have to write '((+ 3), (4 -))')
         -- but the less cluttered version fell out of having texps.
         | '(' texp closeContext(')')                  {% do
-            hintParsingErrorWithContext (snd $3) $1 (fst $3)
+            hintParsingErrorWithContext (snd $3) $1 "please close this brace."
             return $ ECP $
                                            unECP $2 >>= \ $2 ->
                                            amms (mkHsParPV (comb2 $1 (fst $>)) $2) [mop $1,mcp (fst $3)] }
         | '(' tup_exprs closeContext(')') {% do
-                                          hintParsingErrorWithContext (snd $3) $1 (fst $3)
+                                          hintParsingErrorWithContext (snd $3) $1 "please close this tuple brace."
                                           return $ ECP $
                                            $2 >>= \ $2 ->
                                            amms (mkSumOrTuplePV (comb2 $1 (fst $>)) Boxed (snd $2))
@@ -2880,7 +2880,7 @@ aexp2   :: { ECP }
                                                 ((mo $1:fst $2) ++ [mc $3]) }
 
         | '[' list closeContext(']')      {% do
-            hintParsingErrorWithContext (snd $3) $1 (fst $3)
+            hintParsingErrorWithContext (snd $3) $1 "please close this list."
             return $ ECP $ $2 (comb2 $1 (fst $>)) >>= \a -> ams a [mos $1,mcs (fst $3)] }
         | '_'               { ECP $ mkHsWildCardPV (getLoc $1) }
 
@@ -4013,8 +4013,8 @@ hintExplicitForall tok = do
     unless (forall || rulePrag) $ addError $ PsError (PsErrExplicitForall (isUnicode tok)) [] (getLoc tok)
 
 -- Hint about parsing error
-hintParsingErrorWithContext :: Bool -> Located Token -> Located Token -> P ()
-hintParsingErrorWithContext False tokOpen tokClose = addError $ PsError (PsErrParseErrorWithContext (text "Parsing error: Location shows the opening context")) [] (getLoc tokOpen)
+hintParsingErrorWithContext :: Bool -> Located Token -> String -> P ()
+hintParsingErrorWithContext False tokOpen message = addError $ PsError (PsErrParseErrorWithContext (text message)) [] (getLoc tokOpen)
 hintParsingErrorWithContext True _ _ = return ()
 
 -- Hint about qualified-do
