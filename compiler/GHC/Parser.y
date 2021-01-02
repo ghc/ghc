@@ -2764,10 +2764,20 @@ aexp    :: { ECP }
                                                , m_pats = $2:$3
                                                , m_grhss = unguardedGRHSs $5 }]))
                           [mj AnnLam $1, mu AnnRarrow $4] }
-        | 'let' binds 'in' exp          {  ECP $
-                                           unECP $4 >>= \ $4 ->
-                                           amms (mkHsLetPV (comb2 $1 $>) (snd (unLoc $2)) $4)
-                                               (mj AnnLet $1:mj AnnIn $3
+        | 'let' binds inExp(exp)          {% do
+            let (tokenIn, tokenEcpM, worked) = $3
+
+            hintParsingErrorWithContext worked tokenIn $1
+
+            case tokenEcpM of
+                               -- Todo. Here we replaced "let x in" by _. But
+                               -- something better may be to replace it by "let
+                               -- x in _".
+                               Nothing -> return $ ECP $ mkHsWildCardPV (getLoc $1)
+                               Just tokenEcp -> return $ ECP $
+                                           unECP tokenEcp >>= \ tokenEcp ->
+                                           amms (mkHsLetPV (comb2 $1 tokenEcp) (snd (unLoc $2)) tokenEcp)
+                                               (mj AnnLet $1:mj AnnIn tokenIn
                                                  :(fst $ unLoc $2)) }
         | '\\' 'lcase' altslist
             {  ECP $ $3 >>= \ $3 ->
@@ -2848,13 +2858,17 @@ aexp2   :: { ECP }
         -- This allows you to write, e.g., '(+ 3, 4 -)', which isn't
         -- correct Haskell (you'd have to write '((+ 3), (4 -))')
         -- but the less cluttered version fell out of having texps.
-        | '(' texp ')'                  { ECP $
+        | '(' texp closeContext(')')                  {% do
+            hintParsingErrorWithContext (snd $3) $1 (fst $3)
+            return $ ECP $
                                            unECP $2 >>= \ $2 ->
-                                           amms (mkHsParPV (comb2 $1 $>) $2) [mop $1,mcp $3] }
-        | '(' tup_exprs ')'             { ECP $
+                                           amms (mkHsParPV (comb2 $1 (fst $>)) $2) [mop $1,mcp (fst $3)] }
+        | '(' tup_exprs closeContext(')') {% do
+                                          hintParsingErrorWithContext (snd $3) $1 (fst $3)
+                                          return $ ECP $
                                            $2 >>= \ $2 ->
-                                           amms (mkSumOrTuplePV (comb2 $1 $>) Boxed (snd $2))
-                                                ((mop $1:fst $2) ++ [mcp $3]) }
+                                           amms (mkSumOrTuplePV (comb2 $1 (fst $>)) Boxed (snd $2))
+                                                ((mop $1:fst $2) ++ [mcp (fst $3)]) }
 
         | '(#' texp '#)'                { ECP $
                                            unECP $2 >>= \ $2 ->
@@ -2865,7 +2879,9 @@ aexp2   :: { ECP }
                                            amms (mkSumOrTuplePV (comb2 $1 $>) Unboxed (snd $2))
                                                 ((mo $1:fst $2) ++ [mc $3]) }
 
-        | '[' list ']'      { ECP $ $2 (comb2 $1 $>) >>= \a -> ams a [mos $1,mcs $3] }
+        | '[' list closeContext(']')      {% do
+            hintParsingErrorWithContext (snd $3) $1 (fst $3)
+            return $ ECP $ $2 (comb2 $1 (fst $>)) >>= \a -> ams a [mos $1,mcs (fst $3)] }
         | '_'               { ECP $ mkHsWildCardPV (getLoc $1) }
 
         -- Template Haskell Extension
@@ -3758,6 +3774,15 @@ close :: { () }
         : vccurly               { () } -- context popped in lexer.
         | error                 {% popContext }
 
+closeContext(c) :: { (Located Token, Bool) }
+        : c { ($1, True) }
+        | error { ($1, False) }
+
+inExp(c) :: { (Located Token, Maybe ECP, Bool) }
+        : 'in' c { ($1, Just $2, True) }
+        | 'in' error { ($1, Nothing, False) }
+--         | error { ($1, $1, False) }
+
 -----------------------------------------------------------------------------
 -- Miscellaneous (mostly renamings)
 
@@ -3986,6 +4011,11 @@ hintExplicitForall tok = do
     forall   <- getBit ExplicitForallBit
     rulePrag <- getBit InRulePragBit
     unless (forall || rulePrag) $ addError $ PsError (PsErrExplicitForall (isUnicode tok)) [] (getLoc tok)
+
+-- Hint about parsing error
+hintParsingErrorWithContext :: Bool -> Located Token -> Located Token -> P ()
+hintParsingErrorWithContext False tokOpen tokClose = addError $ PsError (PsErrParseErrorWithContext (text "Parsing error: Location shows the opening context")) [] (getLoc tokOpen)
+hintParsingErrorWithContext True _ _ = return ()
 
 -- Hint about qualified-do
 hintQualifiedDo :: Located Token -> P ()
