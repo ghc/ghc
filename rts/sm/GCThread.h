@@ -127,7 +127,7 @@ typedef struct gc_thread_ {
     OSThreadId id;                 // The OS thread that this struct belongs to
     SpinLock   gc_spin;
     SpinLock   mut_spin;
-    volatile StgWord wakeup;       // NB not StgWord8; only StgWord is guaranteed atomic
+    StgWord wakeup;                // This should only be accessed via atomic accesses
 #endif
     uint32_t thread_index;         // a zero based index identifying the thread
 
