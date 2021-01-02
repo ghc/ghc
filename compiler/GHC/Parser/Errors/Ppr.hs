@@ -328,7 +328,7 @@ pp_err = \case
       -> text "Parse error in pattern:" <+> s
 
    PsErrParseErrorWithContext s
-      -> text "Parse error: " <+> s
+      -> text "Parse error:" <+> s
 
    PsErrInvalidInfixHole
       -> text "Invalid infix hole, expected an infix operator"
