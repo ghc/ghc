@@ -99,7 +99,8 @@ findSpark (Capability *cap)
   bool retry;
   uint32_t i = 0;
 
-  if (!emptyRunQueue(cap) || cap->n_returning_tasks != 0) {
+  // This is an approximate check so relaxed load is acceptable here.
+  if (!emptyRunQueue(cap) || RELAXED_LOAD(&cap->n_returning_tasks) != 0) {
       // If there are other threads, don't try to run any new
       // sparks: sparks might be speculative, we don't want to take
       // resources away from the main computation.
