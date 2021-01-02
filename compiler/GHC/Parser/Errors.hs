@@ -374,7 +374,8 @@ data PsErrorDesc
       -- ^ Parse error in pattern
       --
       -- TODO: distinguish errors without using SDoc
-
+   | PsErrParseErrorWithContext !SDoc
+      -- ^ Parse error with context (e.g. missing closing brace)
 
 newtype StarIsType = StarIsType Bool
 
