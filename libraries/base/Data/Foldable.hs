@@ -145,10 +145,12 @@ class Foldable t where
     -- >>> fold [Sum 1, Sum 3, Sum 5]
     -- Sum {getSum = 9}
     --
-    -- Infinite structures never terminate:
+    -- Folds of infinite structures do not terminate when the Monoid's
+    -- `mappend` is strict:
     --
     -- >>> fold (repeat Nothing)
     -- * Hangs forever *
+    --
     fold :: Monoid m => t m -> m
     fold = foldMap id
 
@@ -168,10 +170,16 @@ class Foldable t where
     -- >>> foldMap (replicate 3) [1, 2, 3]
     -- [1,1,1,2,2,2,3,3,3]
     --
-    -- Infinite structures never terminate:
+    -- When a Monoid's `mappend` is lazy, 'foldMap' can produce a (possibly
+    -- unbounded) result even from an unbounded structure:
     --
-    -- >>> foldMap Sum [1..]
-    -- * Hangs forever *
+    -- >>> import qualified Data.ByteString.Lazy as L
+    -- >>> import qualified Data.ByteString.Builder as B
+    -- >>> let bld :: Int -> B.Builder; bld i = B.intDec i <> B.word8 0x20
+    -- >>> let lbs = B.toLazyByteString $ foldMap bld [0..]
+    -- >>> L.take 64 lbs
+    -- "0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24"
+    --
     foldMap :: Monoid m => (a -> m) -> t a -> m
     {-# INLINE foldMap #-}
     -- This INLINE allows more list functions to fuse. See #9848.
@@ -1304,11 +1312,6 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 
 --------------
 
--- In order to avoid having actual Unicode glyphs in the module source,
--- the below numeric HTML entity codes are used:
---
--- * ellipsis = &#x2026;
-
 -- $overview
 --
 -- #overview#
@@ -1420,8 +1423,8 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 --     last element is reached, by which point a deep stack of pending function
 --     applications may have been built up in memory.
 --
--- In finite structures for which right-to-left sequencing no less efficient as
--- left-to-right sequencing, there is no inherent performance distinction
+-- In finite structures for which right-to-left sequencing no less efficient
+-- than left-to-right sequencing, there is no inherent performance distinction
 -- between left-associative and right-associative folds.  If the structure's
 -- @Foldable@ instance takes advantage of this symmetry to also make strict
 -- right folds space-efficient and lazy left folds corecursive, one need only
