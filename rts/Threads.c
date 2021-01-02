@@ -810,6 +810,7 @@ loop:
         if (info == &stg_MVAR_CLEAN_info) {
             // Resolve #18919.
             dirty_MVAR(&cap->r, (StgClosure*)mvar, mvar->value);
+            info = &stg_MVAR_DIRTY_info;
         }
     }
 
