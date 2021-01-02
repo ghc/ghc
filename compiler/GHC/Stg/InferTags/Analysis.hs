@@ -332,6 +332,7 @@ TODO:
 getConArgNodeId :: HasDebugCallStack => ContextStack -> StgArg -> AM NodeId
 getConArgNodeId _    (StgLitArg _ ) = return litNodeId
 getConArgNodeId ctxt (StgVarArg v )
+    -- TODO: I think a function type doesn't rule out a thunk here. (E.g. a thunk returning a function)
     | isFunTy (unwrapType $ idType v)
     = return neverNodeId
     | otherwise
