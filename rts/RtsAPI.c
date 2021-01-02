@@ -720,7 +720,10 @@ PauseToken *rts_pause (void)
     // other capabilities. Doing this check is justified because rts_pause is a
     // user facing function and we want good error reporting. We also don't
     // expect rts_pause to be performance critical.
-    if (task->cap && task->cap->running_task == task)
+    //
+    // N.B. we use a relaxed load since there is no easy way to synchronize
+    // here and this check is ultimately just a convenience for the user..
+    if (task->cap && RELAXED_LOAD(&task->cap->running_task) == task)
     {
         // This task owns a capability (and it can't be taken by other capabilities).
         errorBelch(task->cap->in_haskell
