@@ -786,9 +786,15 @@ loop:
 
     // There are takeMVar(s) waiting: wake up the first one
     tso = q->tso;
-    mvar->head = q->link;
-    if (mvar->head == (StgMVarTSOQueue*)&stg_END_TSO_QUEUE_closure) {
+    mvar->head = q = q->link;
+    if (q == (StgMVarTSOQueue*)&stg_END_TSO_QUEUE_closure) {
         mvar->tail = (StgMVarTSOQueue*)&stg_END_TSO_QUEUE_closure;
+    } else {
+        if (info == &stg_MVAR_CLEAN_info) {
+            // Resolve #18919.
+            dirty_MVAR(&cap->r, (StgClosure*)mvar);
+            info = &stg_MVAR_DIRTY_info;
+        }
     }
 
     ASSERT(tso->block_info.closure == (StgClosure*)mvar);
@@ -812,10 +818,8 @@ loop:
 
     // If it was a readMVar, then we can still do work,
     // so loop back. (XXX: This could take a while)
-    if (why_blocked == BlockedOnMVarRead) {
-        q = ((StgMVarTSOQueue*)q)->link;
+    if (why_blocked == BlockedOnMVarRead)
         goto loop;
-    }
 
     ASSERT(why_blocked == BlockedOnMVar);
 
