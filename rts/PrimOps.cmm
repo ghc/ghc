@@ -1834,6 +1834,7 @@ loop:
             // Resolve #18919.
             ccall dirty_MVAR(BaseReg "ptr", mvar "ptr",
                              StgMVar_value(mvar) "ptr");
+            info = stg_MVAR_DIRTY_info;
         }
     }
 
@@ -1924,6 +1925,7 @@ loop:
             // Resolve #18919.
             ccall dirty_MVAR(BaseReg "ptr", mvar "ptr",
                              StgMVar_value(mvar) "ptr");
+            info = stg_MVAR_DIRTY_info;
         }
     }
 
