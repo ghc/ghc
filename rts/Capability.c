@@ -31,7 +31,7 @@
 #include "sm/BlockAlloc.h" // for countBlocks()
 
 #if !defined(mingw32_HOST_OS)
-#include "rts/IOManager.h" // for setIOManagerControlFd()
+#include "rts/IOInterface.h" // for setIOManagerControlFd()
 #endif
 
 #include <string.h>
