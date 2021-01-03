@@ -264,12 +264,16 @@ openFileWith filepath iomode non_blocking act1 act2 =
 
       oflags | non_blocking = oflags2 .|. nonblock_flags
              | otherwise    = oflags2
-    in
+    in do
+      -- We want to be sure all the arguments to c_interruptible_open_with
+      -- are fully evaluated *before* it slips under a mask (assuming we're
+      -- not already under a user-imposed mask).
+      oflags' <- evaluate oflags
       -- NB. always use a safe open(), because we don't know whether open()
       -- will be fast or not.  It can be slow on NFS and FUSE filesystems,
       -- for example.
-      c_interruptible_open_with f oflags 0o666 ( \ fd -> do
-        (fD,fd_type) <- mkFD fd iomode Nothing{-no stat-}
+      c_interruptible_open_with f oflags' 0o666 ( \ fileno -> do
+        (fD,fd_type) <- mkFD fileno iomode Nothing{-no stat-}
                                 False{-not a socket-}
                                 non_blocking
         -- we want to truncate() if this is an open in WriteMode, but only
