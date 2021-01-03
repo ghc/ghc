@@ -43,6 +43,7 @@ import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Instance.Family ( tcGetFamInstEnvs, tcLookupDataFamInst )
 import GHC.Core.FamInstEnv    ( FamInstEnvs )
 import GHC.Core.UsageEnv      ( unitUE )
+import GHC.Core.TyCo.Subst    (substTyWithInScope)
 import GHC.Rename.Env         ( addUsedGRE )
 import GHC.Rename.Utils       ( addNameClashErrRn, unknownSubordinateErr )
 import GHC.Tc.Solver          ( InferMode(..), simplifyInfer )
@@ -53,6 +54,7 @@ import GHC.Tc.Utils.TcType as TcType
 import GHC.Hs
 import GHC.Types.Id
 import GHC.Types.Id.Info
+import GHC.Types.Var.Env  ( mkInScopeSet )
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Types.Name
@@ -61,7 +63,7 @@ import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type
 import GHC.Tc.Types.Evidence
-import GHC.Builtin.Types( multiplicityTy )
+import GHC.Builtin.Types( multiplicityTy, typeSymbolKind )
 import GHC.Builtin.Names
 import GHC.Builtin.Names.TH( liftStringName, liftName )
 import GHC.Driver.Session
@@ -70,6 +72,7 @@ import GHC.Utils.Misc
 import GHC.Data.Maybe
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
+import GHC.Data.FastString( FastString )
 import Control.Monad
 
 import Data.Function
@@ -366,6 +369,7 @@ tcInferAppHead_maybe fun args mb_res_ty
       HsRecFld _ f              -> Just <$> tcInferRecSelId f args mb_res_ty
       ExprWithTySig _ e hs_ty   -> add_head_ctxt fun args $
                                    Just <$> tcExprWithSig e hs_ty
+      HsOverLabel _ mb_fl lbl   -> Just <$> tcInferOverLabel mb_fl lbl
       _                         -> return Nothing
 
 add_head_ctxt :: HsExpr GhcRn -> [HsExprArg 'TcpRn] -> TcM a -> TcM a
@@ -710,6 +714,85 @@ no constraints so we'll complain about not being able to solve
 Storable w.  Instead, don't generalise; then _ gets instantiated to
 CLong, as it should.
 -}
+
+
+{- *********************************************************************
+*                                                                      *
+                 Overloaded labels
+*                                                                      *
+********************************************************************* -}
+
+{- Note [Type-checking overloaded labels]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Recall that we have
+
+  module GHC.OverloadedLabels where
+    class IsLabel (x :: Symbol) a where
+      fromLabel :: a
+so
+  fromLabel :: forall x a. IsLabel x a => a
+
+We translate `#foo` to `fromLabel @"foo"`, where we use
+
+ * the in-scope `fromLabel` if `RebindableSyntax` is enabled; or if not
+ * `GHC.OverloadedLabels.fromLabel`.
+
+In the `RebindableSyntax` case, the renamer will have filled in the
+first field of `HsOverLabel` with the `fromLabel` function to use, and
+we simply apply it to the appropriate visible type argument.
+
+Notice that we /only/ apply to the Symbol argument, so the resulting
+expression has type
+    fromLabel @"foo" :: forall a. IsLabel "foo" a => a
+Now ordinary Visible Type Application can be used to instantiate the 'a':
+the user may have written (#foo @Int).
+
+We need to be a bit careful in case we have a RebindableSyntax fromLabel
+like this (#19194):
+    fromLabel :: forall {k1} {k2} (a:k1). blah
+Then we want to instantiate those inferred quantifiers k1,k2, before
+type-applying to "foo", so we get
+    fromLabel @Symbol @blah @"foo" ...
+
+That first non-inferred quantifier, here (a:k1) might have any kind; but
+it should be equal to Symbol.  So unify with Symbol and cast.
+
+-}
+
+tcInferOverLabel :: Maybe Name -> FastString -> TcM (HsExpr GhcTc, TcSigmaType)
+tcInferOverLabel mb_fromLabel lbl
+  = do { -- See Note [Type-checking overloaded labels]
+         loc <- getSrcSpanM
+       ; from_label_id <- tcLookupId (mb_fromLabel `orElse` fromLabelClassOpName)
+       ; (wrap, from_label_ty) <- instantiateInferred fun_orig (idType from_label_id)
+       ; let from_label_expr = mkHsWrap wrap $
+                               HsVar noExtField (L loc from_label_id)
+
+       -- The type of fromLabel should be
+       --    fromLabel :: forall (x::Symbol). blah
+       -- We simply desugar to
+       --    fromLabel @lbl
+       ; case tcSplitForAllTyVarBinder_maybe from_label_ty of
+            Just (tvb, body_ty)
+              | let tv = binderVar tvb
+              -> do { co <- unifyKind Nothing typeSymbolKind (tyVarKind tv)
+                    ; let str_lit_ty = mkCastTy (mkStrLitTy lbl) co
+                          in_scope   = mkInScopeSet (tyCoVarsOfTypes [str_lit_ty,body_ty])
+                          inst_ty    = substTyWithInScope in_scope [tv] [str_lit_ty] body_ty
+                          app_expr   = mkHsWrap (mkWpTyApps [str_lit_ty]) from_label_expr
+                    ; return ( app_expr, inst_ty ) }
+            _ -> failWithTc (text "Bad overloaded label type" <+> ppr (idType from_label_id))
+    }
+  where
+    fun_orig = exprCtOrigin (HsOverLabel noExtField mb_fromLabel lbl)
+
+instantiateInferred :: CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcSigmaType)
+-- Instantiate just the /inferred/ quantifiers
+instantiateInferred fun_orig fun_sigma
+   | (tvs,  body1) <- tcSplitSomeForAllTyVars (== Inferred) fun_sigma
+   , (theta, body2) <- tcSplitPhiTy body1
+   = do { (_inst_tvs, wrap, fun_rho) <- instantiateSigma fun_orig tvs theta body2
+        ; return (wrap, fun_rho) }
 
 
 {- *********************************************************************

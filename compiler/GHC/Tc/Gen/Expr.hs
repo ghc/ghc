@@ -37,7 +37,6 @@ import GHC.Tc.Utils.Zonk
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Unify
 import GHC.Types.Basic
-import GHC.Types.SourceText
 import GHC.Core.Multiplicity
 import GHC.Core.UsageEnv
 import GHC.Tc.Utils.Instantiate
@@ -180,11 +179,13 @@ tcExpr :: HsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
 
 -- Use tcApp to typecheck appplications, which are treated specially
 -- by Quick Look.  Specifically:
---   - HsApp:     value applications
---   - HsTypeApp: type applications
---   - HsVar:     lone variables, to ensure that they can get an
---                impredicative instantiation (via Quick Look
---                driven by res_ty (in checking mode).
+--   - HsApp:       value applications
+--   - HsTypeApp:   type applications
+--   - HsOverLabel: overloaded labels
+--   - HsRecFld:    overloaded record fields
+--   - HsVar:       lone variables, to ensure that they can get an
+--                  impredicative instantiation (via Quick Look
+--                  driven by res_ty (in checking mode)).
 --   - ExprWithTySig: (e :: type)
 -- See Note [Application chains and heads] in GHC.Tc.Gen.App
 tcExpr e@(HsVar {})         res_ty = tcApp e res_ty
@@ -192,6 +193,7 @@ tcExpr e@(HsApp {})         res_ty = tcApp e res_ty
 tcExpr e@(HsAppType {})     res_ty = tcApp e res_ty
 tcExpr e@(ExprWithTySig {}) res_ty = tcApp e res_ty
 tcExpr e@(HsRecFld {})      res_ty = tcApp e res_ty
+tcExpr e@(HsOverLabel {})   res_ty = tcApp e res_ty
 
 -- Typecheck an occurrence of an unbound Id
 --
@@ -245,31 +247,6 @@ tcExpr e@(HsIPVar _ x) res_ty
                           unwrapIP $ mkClassPred ipClass [x,ty]
   origin = IPOccOrigin x
 
-tcExpr e@(HsOverLabel _ mb_fromLabel l) res_ty
-  = do { -- See Note [Type-checking overloaded labels]
-         loc <- getSrcSpanM
-       ; case mb_fromLabel of
-           Just fromLabel -> tcExpr (applyFromLabel loc fromLabel) res_ty
-           Nothing -> do { isLabelClass <- tcLookupClass isLabelClassName
-                         ; alpha <- newFlexiTyVarTy liftedTypeKind
-                         ; let pred = mkClassPred isLabelClass [lbl, alpha]
-                         ; loc <- getSrcSpanM
-                         ; var <- emitWantedEvVar origin pred
-                         ; tcWrapResult e
-                                       (fromDict pred (HsVar noExtField (L loc var)))
-                                        alpha res_ty } }
-  where
-  -- Coerces a dictionary for `IsLabel "x" t` into `t`,
-  -- or `HasField "x" r a into `r -> a`.
-  fromDict pred = mkHsWrap $ mkWpCastR $ unwrapIP pred
-  origin = OverLabelOrigin l
-  lbl = mkStrLitTy l
-
-  applyFromLabel loc fromLabel =
-    HsAppType noExtField
-         (L loc (HsVar noExtField (L loc fromLabel)))
-         (mkEmptyWildCardBndrs (L loc (HsTyLit noExtField (HsStrTy NoSourceText l))))
-
 tcExpr (HsLam x match) res_ty
   = do  { (wrap, match') <- tcMatchLambda herald match_ctxt match res_ty
         ; return (mkHsWrap wrap (HsLam x match')) }
@@ -292,31 +269,6 @@ tcExpr e@(HsLamCase x matches) res_ty
               , text "requires"]
     match_ctxt = MC { mc_what = CaseAlt, mc_body = tcBody }
 
-{-
-Note [Type-checking overloaded labels]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Recall that we have
-
-  module GHC.OverloadedLabels where
-    class IsLabel (x :: Symbol) a where
-      fromLabel :: a
-
-We translate `#foo` to `fromLabel @"foo"`, where we use
-
- * the in-scope `fromLabel` if `RebindableSyntax` is enabled; or if not
- * `GHC.OverloadedLabels.fromLabel`.
-
-In the `RebindableSyntax` case, the renamer will have filled in the
-first field of `HsOverLabel` with the `fromLabel` function to use, and
-we simply apply it to the appropriate visible type argument.
-
-In the `OverloadedLabels` case, when we see an overloaded label like
-`#foo`, we generate a fresh variable `alpha` for the type and emit an
-`IsLabel "foo" alpha` constraint.  Because the `IsLabel` class has a
-single method, it is represented by a newtype, so we can coerce
-`IsLabel "foo" alpha` to `alpha` (just like for implicit parameters).
-
--}
 
 
 {-

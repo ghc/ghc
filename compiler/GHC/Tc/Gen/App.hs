@@ -167,6 +167,7 @@ app :: head
 
 head ::= f             -- HsVar:    variables
       |  fld           -- HsRecFld: record field selectors
+      |  #lbl          -- HsOverLabel: overloaded label
       |  (expr :: ty)  -- ExprWithTySig: expr with user type sig
       |  other_expr    -- Other expressions
 
