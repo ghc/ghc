@@ -29,6 +29,7 @@
 #include "RtsUtils.h"
 #include "sm/OSMem.h"
 #include "sm/BlockAlloc.h" // for countBlocks()
+#include "IOManager.h"
 
 #include <string.h>
 
