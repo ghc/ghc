@@ -534,7 +534,7 @@ library
                   win32/ConsoleHandler.c
                   win32/GetEnv.c
                   win32/GetTime.c
-                  win32/IOManager.c
+                  win32/MIOManager.c
                   win32/OSMem.c
                   win32/OSThreads.c
                   win32/ThrIOManager.c
