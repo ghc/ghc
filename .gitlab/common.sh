@@ -1,5 +1,9 @@
+#!/usr/bin/env bash
+
 # Common bash utilities
 # ----------------------
+
+# shellcheck disable=SC2034
 
 # Colors
 BLACK="0;30"

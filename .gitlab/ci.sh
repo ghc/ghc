@@ -18,6 +18,7 @@ fi
 
 CABAL_CACHE="$TOP/${CABAL_CACHE:-cabal-cache}"
 
+# shellcheck source=.gitlab/common.sh
 source "$TOP/.gitlab/common.sh"
 
 function time_it() {
@@ -597,11 +598,11 @@ function run_hadrian() {
 
 # A convenience function to allow debugging in the CI environment.
 function shell() {
-  local cmd="*@"
-  if [ -z "$cmd" ]; then
-    cmd="bash -i"
+  local cmd=( "$@" )
+  if [ -z "${cmd[*]}" ]; then
+    cmd=( "bash" "-i" )
   fi
-  run "$cmd"
+  run "${cmd[@]}"
 }
 
 setup_locale
