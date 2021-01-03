@@ -19,12 +19,14 @@
 #include "rts/IOInterface.h" // exported
 #include "IOManager.h"       // RTS internal
 #include "Capability.h"
+#include "RtsFlags.h"
 
-#if !defined(mingw32_HOST_OS) && defined(THREADED_RTS)
+#if !defined(mingw32_HOST_OS)
 #include "posix/Signals.h"
 #endif
 
-#if defined(mingw32_HOST_OS) && !defined(THREADED_RTS)
+#if defined(mingw32_HOST_OS)
+#include "win32/ThrIOManager.h"
 #include "win32/AsyncMIO.h"
 #include "win32/AsyncWinIO.h"
 #endif

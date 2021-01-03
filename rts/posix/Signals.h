@@ -27,7 +27,17 @@ void startSignalHandlers(Capability *cap);
 
 void install_vtalrm_handler(int sig, TickProc handle_tick);
 
+/* Communicating with the IO manager thread (see GHC.Conc).
+ *
+ * TODO: these I/O manager things are not related to signals and ought to live
+ * elsewhere, e.g. in a module specifically for the I/O manager.
+ */
+void ioManagerWakeup (void);
+#if defined(THREADED_RTS)
+void ioManagerDie (void);
+void ioManagerStart (void);
 void ioManagerStartCap (/* inout */ Capability **cap);
+#endif
 
 extern StgInt *signal_handlers;
 
