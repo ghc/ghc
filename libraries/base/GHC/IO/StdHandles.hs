@@ -27,6 +27,7 @@ module GHC.IO.StdHandles
 import GHC.IO
 import GHC.IO.IOMode
 import GHC.IO.Handle.Types
+import GHC.IO.Handle.Internals (hClose_impl)
 
 import qualified GHC.IO.Handle.FD as POSIX
 #if defined(mingw32_HOST_OS)
@@ -45,11 +46,27 @@ stderr = POSIX.stderr <!> Win.stderr
 openFile :: FilePath -> IOMode -> IO Handle
 openFile = POSIX.openFile <!> Win.openFile
 
+-- TODO: implement as for POSIX
+withFile :: FilePath -> IOMode -> (Handle -> IO r) -> IO r
+withFile = POSIX.withFile <!> wf
+  where
+    wf path mode act = bracket (openFile path mode) hClose_impl act
+
 openBinaryFile :: FilePath -> IOMode -> IO Handle
 openBinaryFile = POSIX.openBinaryFile <!> Win.openBinaryFile
 
+withBinaryFile :: FilePath -> IOMode -> (Handle -> IO r) -> IO r
+withBinaryFile = POSIX.withBinaryFile <!> wf
+  where
+    wf path mode act = bracket (openBinaryFile path mode) hClose_impl act
+
 openFileBlocking :: FilePath -> IOMode -> IO Handle
 openFileBlocking = POSIX.openFileBlocking <!> Win.openFileBlocking
+
+withFileBlocking :: FilePath -> IOMode -> (Handle -> IO r) -> IO r
+withFileBlocking = POSIX.withFileBlocking <!> wf
+  where
+    wf path mode act = bracket (openFileBlocking path mode) hClose_impl act
 
 #else
 
