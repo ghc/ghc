@@ -127,13 +127,21 @@ infix  4 `elem`, `notElem`
 -- are good fit for corecursive iteration or for folds that short-circuit after
 -- processing an initial subsequence of the structure's elements.
 --
+-- Instances can be derived automatically by enabling the @DeriveFoldable@
+-- extension.  For example, a derived instance for a binary tree might be:
+--
+-- > data Tree a = Empty | Leaf a | Node (Tree a) a (Tree a) deriving Foldable
+--
 -- A more detailed description can be found in the overview section of
 -- "Data.Foldable#overview".
 --
 class Foldable t where
     {-# MINIMAL foldMap | foldr #-}
 
-    -- | Combine the elements of a structure using a monoid.
+    -- | Combine the elements of a structure using `mappend`.
+    -- Right-associative and lazy in the accumulator.  For
+    -- strict left-associative folds, use `foldMap'` instead,
+    -- with 'id' as the map.
     --
     -- ==== __Examples__
     --
@@ -145,17 +153,25 @@ class Foldable t where
     -- >>> fold [Sum 1, Sum 3, Sum 5]
     -- Sum {getSum = 9}
     --
-    -- Folds of infinite structures do not terminate when the Monoid's
+    -- Folds of unbounded structures do not terminate when the Monoid's
     -- `mappend` is strict:
     --
     -- >>> fold (repeat Nothing)
     -- * Hangs forever *
     --
+    -- Lazy folds of unbounded structures are fine:
+    --
+    -- >>> take 12 $ fold $ map (\i -> [i..i+2]) [0..]
+    -- [0,1,2,1,2,3,2,3,4,3,4,5]
+    -- >>> sum $ take 4000000 $ fold $ map (\i -> [i..i+2]) [0..]
+    -- 2666668666666
+    --
     fold :: Monoid m => t m -> m
     fold = foldMap id
 
-    -- | Map each element of the structure to a monoid,
-    -- and combine the results.
+    -- | Map each element of the structure to a monoid, and combine the
+    -- results.  Right-associative and lazy in the accumulator.
+    -- For strict left-associative folds consider `foldMap'` instead.
     --
     -- ==== __Examples__
     --
@@ -170,8 +186,9 @@ class Foldable t where
     -- >>> foldMap (replicate 3) [1, 2, 3]
     -- [1,1,1,2,2,2,3,3,3]
     --
-    -- When a Monoid's `mappend` is lazy, 'foldMap' can produce a (possibly
-    -- unbounded) result even from an unbounded structure:
+    -- When a Monoid's `mappend` is lazy in its second argument, 'foldMap' can
+    -- return a possibly unbounded result even from a structure that is
+    -- unbounded on the right:
     --
     -- >>> import qualified Data.ByteString.Lazy as L
     -- >>> import qualified Data.ByteString.Builder as B
@@ -185,13 +202,15 @@ class Foldable t where
     -- This INLINE allows more list functions to fuse. See #9848.
     foldMap f = foldr (mappend . f) mempty
 
-    -- | A variant of 'foldMap' that is strict in the accumulator.
+    -- | A left-associative variant of 'foldMap' that is strict in the
+    -- accumulator.  Best method for strict reduction when partial
+    -- results are merged via `mappend`.
     --
     -- @since 4.13.0.0
     foldMap' :: Monoid m => (a -> m) -> t a -> m
     foldMap' f = foldl' (\ acc a -> acc <> f a) mempty
 
-    -- | Right-associative fold of a structure.
+    -- | Right-associative fold of a structure, lazy in the accumulator.
     --
     -- In the case of lists, 'foldr', when applied to a binary operator, a
     -- starting value (typically the right-identity of the operator), and a
@@ -199,9 +218,10 @@ class Foldable t where
     --
     -- > foldr f z [x1, x2, ..., xn] == x1 `f` (x2 `f` ... (xn `f` z)...)
     --
-    -- Note that, since the head of the resulting expression is produced by
-    -- an application of the operator to the first element of the list,
-    -- 'foldr' can produce a terminating expression from an infinite list.
+    -- Note that since the head of the resulting expression is produced by an
+    -- application of the operator to the first element of the list, given an
+    -- operator lazy in its right argument, 'foldr' can produce a terminating
+    -- expression from an unbounded list.
     --
     -- For a general 'Foldable' structure this should be semantically identical
     -- to,
@@ -218,21 +238,22 @@ class Foldable t where
     -- >>> foldr (||) False []
     -- False
     --
-    -- >>> foldr (\nextChar reversedString -> reversedString ++ [nextChar]) "foo" ['a', 'b', 'c', 'd']
+    -- >>> foldr (\c acc -> acc ++ [c]) "foo" ['a', 'b', 'c', 'd']
     -- "foodcba"
     --
     -- ===== Infinite structures
     --
     -- ⚠️ Applying 'foldr' to infinite structures usually doesn't terminate.
     --
-    -- It may still terminate in one of the following conditions:
+    -- It may still terminate under one of the following conditions:
     --
     -- * the folding function is short-circuiting
     -- * the folding function is lazy on its second argument
     --
     -- ====== Short-circuiting
     --
-    -- '(||)' short-circuits on 'True' values, so the following terminates because there is a 'True' value finitely far from the left side:
+    -- '(||)' short-circuits on 'True' values, so the following terminates
+    -- because there is a 'True' value finitely far from the left side:
     --
     -- >>> foldr (||) False (True : repeat False)
     -- True
@@ -244,71 +265,71 @@ class Foldable t where
     --
     -- ====== Laziness in the second argument
     --
-    -- Applying 'foldr' to infinite structures terminates when the folding function is lazy on its second argument:
+    -- Applying 'foldr' to infinite structures terminates when the operator is
+    -- lazy in its second argument:
     --
-    -- >>> foldr (\nextElement accumulator -> nextElement : fmap (+3) accumulator) [42] (repeat 1)
-    -- [1,4,7,10,13,16,19,22,25,28,31,34,37,40,43...
-    --
-    -- >>> take 5 $ foldr (\nextElement accumulator -> nextElement : fmap (+3) accumulator) [42] (repeat 1)
+    -- >>> take 5 $ foldr (\i acc -> i : fmap (+3) acc) [42] (repeat 1)
     -- [1,4,7,10,13]
     foldr :: (a -> b -> b) -> b -> t a -> b
     foldr f z t = appEndo (foldMap (Endo #. f) t) z
 
-    -- | Right-associative fold of a structure, but with strict application of
-    -- the operator.
+    -- | Right-associative fold of a structure, strict in the accumulator.
+    -- This is rarely what you want.
     --
     -- @since 4.6.0.0
     foldr' :: (a -> b -> b) -> b -> t a -> b
     foldr' f z0 xs = foldl f' id xs z0
       where f' k x z = k $! f x z
 
-    -- | Left-associative fold of a structure.
+    -- | Left-associative fold of a structure, lazy in the accumulator.  This
+    -- is rarely what you want, but can work well for structures with efficient
+    -- right-to-left sequencing and an operator that is lazy in its left
+    -- argument.
     --
-    -- In the case of lists, 'foldl', when applied to a binary
-    -- operator, a starting value (typically the left-identity of the operator),
-    -- and a list, reduces the list using the binary operator, from left to
-    -- right:
+    -- In the case of lists, 'foldl', when applied to a binary operator, a
+    -- starting value (typically the left-identity of the operator), and a
+    -- list, reduces the list using the binary operator, from left to right:
     --
     -- > foldl f z [x1, x2, ..., xn] == (...((z `f` x1) `f` x2) `f`...) `f` xn
     --
     -- Note that to produce the outermost application of the operator the
-    -- entire input list must be traversed. This means that 'foldl' will
-    -- diverge if given an infinite list.
+    -- entire input list must be traversed. Like all left-associative folds,
+    -- 'foldl' will diverge if given an infinite list.
     --
-    -- Also note that if you want an efficient left-fold, you probably want to
-    -- use `foldl'` instead of 'foldl'. The reason for this is that latter does
-    -- not force the "inner" results (e.g. @z \`f\` x1@ in the above example)
-    -- before applying them to the operator (e.g. to @(\`f\` x2)@). This results
-    -- in a thunk chain \(\mathcal{O}(n)\) elements long, which then must be
-    -- evaluated from the outside-in.
+    -- If you want an efficient strict left-fold, you probably want to use
+    -- `foldl'` instead of 'foldl'. The reason for this is that the latter does
+    -- not force the /inner/ results (e.g. @z \`f\` x1@ in the above example)
+    -- before applying them to the operator (e.g. to @(\`f\` x2)@). This
+    -- results in a thunk chain \(\mathcal{O}(n)\) elements long, which then
+    -- must be evaluated from the outside-in.
     --
     -- For a general 'Foldable' structure this should be semantically identical
-    -- to,
+    -- to:
     --
     -- @foldl f z = 'List.foldl' f z . 'toList'@
     --
     -- ==== __Examples__
     --
-    -- Basic usage:
+    -- The first example is a strict fold, which in practice is best performed
+    -- with `foldl'`.
     --
-    -- >>> foldl (+) 42 (Node (Leaf 1) 3 (Node Empty 4 (Leaf 2)))
+    -- >>> foldl (+) 42 [1,2,3,4]
     -- 52
     --
-    -- >>> foldl (+) 42 Empty
-    -- 42
+    -- Though the result below is lazy, the input is reversed before prepending
+    -- it to the initial accumulator, so corecursion begins only after traversing
+    -- the entire input string.
     --
-    -- >>> foldl (\string nextElement -> nextElement : string) "abcd" (Node (Leaf 'd') 'e' (Node Empty 'f' (Leaf 'g')))
-    -- "gfedabcd"
+    -- >>> foldl (\acc c -> c : acc) "abcd" "efgh"
+    -- "hgfeabcd"
     --
-    -- Left-folding infinite structures never terminates:
+    -- A left fold of a structure that is infinite on the right cannot
+    -- terminate, even when for any finite input the fold just returns the
+    -- initial accumulator:
     --
-    -- >>> let infiniteNode = Node Empty 1 infiniteNode in foldl (+) 42 infiniteNode
+    -- >>> foldl (\a _ -> a) 0 $ repeat 1
     -- * Hangs forever *
     --
-    -- Evaluating the head of the result (when applicable) does not terminate, unlike 'foldr':
-    --
-    -- >>> let infiniteNode = Node Empty 'd' infiniteNode in take 5 (foldl (\string nextElement -> nextElement : string) "abc" infiniteNode)
-    -- * Hangs forever *
     foldl :: (b -> a -> b) -> b -> t a -> b
     foldl f z t = appEndo (getDual (foldMap (Dual . Endo . flip f) t)) z
     -- There's no point mucking around with coercions here,
@@ -320,7 +341,7 @@ class Foldable t where
     -- This ensures that each step of the fold is forced to weak head normal
     -- form before being applied, avoiding the collection of thunks that would
     -- otherwise occur. This is often what you want to strictly reduce a finite
-    -- list to a single, monolithic result (e.g. 'length').
+    -- structure to a single strict result (e.g. 'sum').
     --
     -- For a general 'Foldable' structure this should be semantically identical
     -- to,
@@ -335,7 +356,8 @@ class Foldable t where
     -- | A variant of 'foldr' that has no base case,
     -- and thus may only be applied to non-empty structures.
     --
-    -- ⚠️ This function is non-total and will raise a runtime exception if the structure happens to be empty.
+    -- This function is non-total and will raise a runtime exception if the
+    -- structure happens to be empty.
     --
     -- ==== __Examples__
     --
@@ -372,7 +394,8 @@ class Foldable t where
     -- | A variant of 'foldl' that has no base case,
     -- and thus may only be applied to non-empty structures.
     --
-    -- ⚠️ This function is non-total and will raise a runtime exception if the structure happens to be empty.
+    -- This function is non-total and will raise a runtime exception if the
+    -- structure happens to be empty.
     --
     -- @'foldl1' f = 'List.foldl1' f . 'toList'@
     --
@@ -408,7 +431,9 @@ class Foldable t where
                          Nothing -> y
                          Just x  -> f x y)
 
-    -- | List of elements of a structure, from left to right.
+    -- | List of elements of a structure, from left to right.  If the entire
+    -- list is intended to be reduced via a fold, just fold the structure
+    -- directly bypassing the list.
     --
     -- ==== __Examples__
     --
@@ -436,9 +461,11 @@ class Foldable t where
     {-# INLINE toList #-}
     toList t = build (\ c n -> foldr c n t)
 
-    -- | Test whether the structure is empty. The default implementation is
-    -- optimized for structures that are similar to cons-lists, because there
-    -- is no general way to do better.
+    -- | Test whether the structure is empty.  The default implementation is
+    -- Left-associative, lazy in both the initial element and the accumulator.
+    -- Thus optimised for structures where the first element can be accessed in
+    -- constant time.  Structures where this is not the case should have a
+    -- non-default implementation.
     --
     -- ==== __Examples__
     --
@@ -450,7 +477,9 @@ class Foldable t where
     -- >>> null [1]
     -- False
     --
-    -- 'null' terminates even for infinite structures:
+    -- 'null' is expected to terminate even for infinite structures.
+    -- The default implementation terminates provided the structure
+    -- is bounded on the left (there is a left-most element).
     --
     -- >>> null [1..]
     -- False
@@ -460,8 +489,10 @@ class Foldable t where
     null = foldr (\_ _ -> False) True
 
     -- | Returns the size/length of a finite structure as an 'Int'.  The
-    -- default implementation is optimized for structures that are similar to
-    -- cons-lists, because there is no general way to do better.
+    -- default implementation just counts elements starting with the left-most.
+    -- Instances for structures that can compute the element count faster
+    -- than via element-by-element counting, should provide a specialised
+    -- implementation.
     --
     -- ==== __Examples__
     --
@@ -496,8 +527,9 @@ class Foldable t where
     -- >>> 3 `elem` [1,2,3,4,5]
     -- True
     --
-    -- For infinite structures, 'elem' terminates if the value exists at a
-    -- finite distance from the left side of the structure:
+    -- For infinite structures, the default implementation of 'elem'
+    -- terminates if the sought-after value exists at a finite distance
+    -- from the left side of the structure:
     --
     -- >>> 3 `elem` [1..]
     -- True
@@ -511,7 +543,8 @@ class Foldable t where
 
     -- | The largest element of a non-empty structure.
     --
-    -- ⚠️ This function is non-total and will raise a runtime exception if the structure happens to be empty.
+    --  This function is non-total and will raise a runtime exception if the
+    --  structure happens to be empty.
     --
     -- ==== __Examples__
     --
@@ -534,7 +567,8 @@ class Foldable t where
 
     -- | The least element of a non-empty structure.
     --
-    -- ⚠️ This function is non-total and will raise a runtime exception if the structure happens to be empty
+    -- This function is non-total and will raise a runtime exception if the
+    -- structure happens to be empty
     --
     -- ==== __Examples__
     --
@@ -851,45 +885,94 @@ deriving instance Foldable UWord
 -- | @since 4.12.0.0
 deriving instance Foldable Down
 
--- | Monadic fold over the elements of a structure,
--- associating to the right, i.e. from right to left.
+-- | Monadic fold over the elements of a structure.  This type of fold is
+-- left-associative in the monadic effects, and right-associative in the output
+-- value.
+--
+-- Given a structure @t@ with elements @(a, b, c, ..., x, y)@, the result of
+-- a fold with an operator function @f@ is equivalent to:
+--
+-- > foldrM f z t = do { yy <- f y z; xx <- f x yy; ... ; bb <- f b cc; f a bb }
+--
+-- If in a 'MonadPlus' the bind short-circuits, the evaluated effects will be
+-- from a tail of the sequence.  If you want to evaluate the monadic effects in
+-- left-to-right order, or perhaps be able to short-circuit after an initial
+-- sequence of elements, you'll need to use `foldlM` instead.
+--
+-- If the monadic effects don't short-circuit, the outer-most application of
+-- @f@ is to left-most element @a@, so that, ignoring effects, the result looks
+-- like a right fold:
+--
+-- > a `f` (b `f` (c `f` (... (x `f` (y `f` z))))).
+--
+-- and yet, left-associative monadic binds, rather than right-associative
+-- applications of @f@, sequence the computation.
 --
 -- ==== __Examples__
 --
 -- Basic usage:
 --
--- >>> foldrM (\string acc -> print string >> pure (acc + length string)) 42 ["Hello", "world", "!"]
--- "!"
--- "world"
--- "Hello"
--- 53
+-- >>> let f i acc = do { print i ; return $ i : acc }
+-- >>> foldrM f [] [0..3]
+-- 3
+-- 2
+-- 1
+-- 0
+-- [0,1,2,3]
+--
 foldrM :: (Foldable t, Monad m) => (a -> b -> m b) -> b -> t a -> m b
 foldrM f z0 xs = foldl c return xs z0
   -- See Note [List fusion and continuations in 'c']
   where c k x z = f x z >>= k
         {-# INLINE c #-}
 
--- | Monadic fold over the elements of a structure,
--- associating to the left, i.e. from left to right.
+-- | Monadic fold over the elements of a structure.  This type of fold is
+-- right-associative in the monadic effects, and left-associative in the output
+-- value.
+--
+-- Given a structure @t@ with elements @(a, b, ..., w, x, y)@, the result of
+-- a fold with an operator function @f@ is equivalent to:
+--
+-- > foldlM f z t = do { aa <- f z a; bb <- f aa b; ... ; xx <- f ww x; f xx y }
+--
+-- If in a 'MonadPlus' the bind short-circuits, the evaluated effects will be
+-- from an initial portion of the sequence.  If you want to evaluate the
+-- monadic effects in right-to-left order, or perhaps be able to short-circuit
+-- after processing a tail of the sequence of elements, you'll need to use
+-- `foldrM` instead.
+--
+-- If the monadic effects don't short-circuit, the outer-most application of
+-- @f@ is to the right-most element @y@, so that, ignoring effects, the result
+-- looks like a left fold:
+--
+-- > ((((z `f` a) `f` b) ... `f` w) `f` x) `f` y
+--
+-- and yet, right-associative monadic binds, rather than left-associative
+-- applications of @f@, sequence the computation.
 --
 -- ==== __Examples__
 --
 -- Basic usage:
 --
--- >>> foldlM (\acc string -> print string >> pure (acc + length string)) 42 ["Hello", "world", "!"]
--- "Hello"
--- "world"
--- "!"
--- 53
+-- >>> let f a e = do { print e ; return $ e : a }
+-- >>> foldlM f [] [0..3]
+-- 0
+-- 1
+-- 2
+-- 3
+-- [3,2,1,0]
+--
 foldlM :: (Foldable t, Monad m) => (b -> a -> m b) -> b -> t a -> m b
 foldlM f z0 xs = foldr c return xs z0
   -- See Note [List fusion and continuations in 'c']
   where c x k z = f z x >>= k
         {-# INLINE c #-}
 
--- | Map each element of a structure to an action, evaluate these
--- actions from left to right, and ignore the results. For a version
--- that doesn't ignore the results see 'Data.Traversable.traverse'.
+-- | Map each element of a structure to an 'Applicative' action, evaluate these
+-- actions from left to right, and ignore the results. For a version that
+-- doesn't ignore the results see 'Data.Traversable.traverse'.
+--
+-- 'traverse_' is just like 'mapM_', but generalised to 'Applicative' actions.
 --
 -- ==== __Examples__
 --
@@ -906,7 +989,10 @@ traverse_ f = foldr c (pure ())
         {-# INLINE c #-}
 
 -- | 'for_' is 'traverse_' with its arguments flipped. For a version
--- that doesn't ignore the results see 'Data.Traversable.for'.
+-- that doesn't ignore the results see 'Data.Traversable.for'.  This
+-- is 'forM_' generalised to 'Applicative' actions.
+--
+-- 'for_' is just like 'forM_', but generalised to 'Applicative' actions.
 --
 -- ==== __Examples__
 --
@@ -926,8 +1012,8 @@ for_ = flip traverse_
 -- version that doesn't ignore the results see
 -- 'Data.Traversable.mapM'.
 --
--- As of base 4.8.0.0, 'mapM_' is just 'traverse_', specialized to
--- 'Monad'.
+-- 'mapM_' is just like 'traverse_', but specialised to monadic actions.
+--
 mapM_ :: (Foldable t, Monad m) => (a -> m b) -> t a -> m ()
 mapM_ f = foldr c (return ())
   -- See Note [List fusion and continuations in 'c']
@@ -937,7 +1023,8 @@ mapM_ f = foldr c (return ())
 -- | 'forM_' is 'mapM_' with its arguments flipped. For a version that
 -- doesn't ignore the results see 'Data.Traversable.forM'.
 --
--- As of base 4.8.0.0, 'forM_' is just 'for_', specialized to 'Monad'.
+-- 'forM_' is just like 'for_', but specialised to monadic actions.
+--
 forM_ :: (Foldable t, Monad m) => t a -> (a -> m b) -> m ()
 {-# INLINE forM_ #-}
 forM_ = flip mapM_
@@ -945,6 +1032,9 @@ forM_ = flip mapM_
 -- | Evaluate each action in the structure from left to right, and
 -- ignore the results. For a version that doesn't ignore the results
 -- see 'Data.Traversable.sequenceA'.
+--
+-- 'sequenceA_' is just like 'sequence_', but generalised to 'Applicative'
+-- actions.
 --
 -- ==== __Examples__
 --
@@ -964,8 +1054,9 @@ sequenceA_ = foldr c (pure ())
 -- and ignore the results. For a version that doesn't ignore the
 -- results see 'Data.Traversable.sequence'.
 --
--- As of base 4.8.0.0, 'sequence_' is just 'sequenceA_', specialized
--- to 'Monad'.
+-- 'sequence_' is just like 'sequenceA_', but specialised to monadic
+-- actions.
+--
 sequence_ :: (Foldable t, Monad m) => t (m a) -> m ()
 sequence_ = foldr c (return ())
   -- See Note [List fusion and continuations in 'c']
@@ -973,6 +1064,8 @@ sequence_ = foldr c (return ())
         {-# INLINE c #-}
 
 -- | The sum of a collection of actions, generalizing 'concat'.
+--
+-- 'asum' is just like 'msum', but generalised to 'Alternative'.
 --
 -- ==== __Examples__
 --
@@ -985,7 +1078,9 @@ asum :: (Foldable t, Alternative f) => t (f a) -> f a
 asum = foldr (<|>) empty
 
 -- | The sum of a collection of actions, generalizing 'concat'.
--- As of base 4.8.0.0, 'msum' is just 'asum', specialized to 'MonadPlus'.
+--
+-- 'msum' is just like 'asum', but specialised to 'MonadPlus'.
+--
 msum :: (Foldable t, MonadPlus m) => t (m a) -> m a
 {-# INLINE msum #-}
 msum = asum
@@ -999,8 +1094,12 @@ msum = asum
 -- >>> concat (Just [1, 2, 3])
 -- [1,2,3]
 --
--- >>> concat (Node (Leaf [1, 2, 3]) [4, 5] (Node Empty [6] (Leaf [])))
+-- >>> concat (Left 42)
+-- []
+--
+-- >>> concat [[1, 2, 3], [4, 5], [6], []]
 -- [1,2,3,4,5,6]
+--
 concat :: Foldable t => t [a] -> [a]
 concat xs = build (\c n -> foldr (\x y -> foldr c y x) n xs)
 {-# INLINE concat #-}
@@ -1015,8 +1114,8 @@ concat xs = build (\c n -> foldr (\x y -> foldr c y x) n xs)
 -- >>> concatMap (take 3) [[1..], [10..], [100..], [1000..]]
 -- [1,2,3,10,11,12,100,101,102,1000,1001,1002]
 --
--- >>> concatMap (take 3) (Node (Leaf [1..]) [10..] Empty)
--- [1,2,3,10,11,12]
+-- >>> concatMap (take 3) (Just [1..])
+-- [1,2,3]
 concatMap :: Foldable t => (a -> [b]) -> t a -> [b]
 concatMap f xs = build (\c n -> foldr (\x b -> foldr c b (f x)) n xs)
 {-# INLINE concatMap #-}
@@ -1043,7 +1142,7 @@ concatMap f xs = build (\c n -> foldr (\x b -> foldr c b (f x)) n xs)
 -- >>> and [True, True, False]
 -- False
 --
--- >>> and (False : repeat True) -- Infinite list [False,True,True,True,True,True,True...
+-- >>> and (False : repeat True) -- Infinite list [False,True,True,True,...
 -- False
 --
 -- >>> and (repeat True)
@@ -1071,7 +1170,7 @@ and = getAll #. foldMap All
 -- >>> or [True, True, False]
 -- True
 --
--- >>> or (True : repeat False) -- Infinite list [True,False,False,False,False,False,False...
+-- >>> or (True : repeat False) -- Infinite list [True,False,False,False,...
 -- True
 --
 -- >>> or (repeat False)
@@ -1206,9 +1305,6 @@ notElem x = not . elem x
 -- >>> find (> 42) [0, 5..]
 -- Just 45
 --
--- >>> find (> 4) (Node (Leaf 3) 17 (Node Empty 12 (Leaf 8)))
--- Just 17
---
 -- >>> find (> 12) [1..7]
 -- Nothing
 find :: Foldable t => (a -> Bool) -> t a -> Maybe a
@@ -1322,25 +1418,25 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 --
 -- #leftright#
 -- Merging the contribution of the current element with an accumulator value
--- from a partial result is performed by an /update function/, either
+-- from a partial result is performed by an /operator/ function, either
 -- explicitly provided by the caller as in `foldr`, implicit as in `length`, or
--- partly implicit as in `foldMap` (where each element is mapped into a monoid,
--- and the Monoid's `mappend` performs the merge).
+-- partly implicit as in `foldMap` (where each element is mapped into a
+-- 'Monoid', and the monoid's `mappend` operator performs the merge).
 --
 -- A key distinction is between left-associative and right-associative
 -- folds:
 --
 -- * In left-associative folds the accumulator is a partial fold over the
---   elements that __precede__ the current element, and is passed to the update
---   function as its first (left) argument.  The outer-most application of the
---   update function merges the contribution of the last element of the
---   structure with the contributions of all its predecessors.
+--   elements that __precede__ the current element, and is passed to the
+--   operator as its first (left) argument.  The outer-most application of the
+--   operator merges the contribution of the last element of the structure with
+--   the contributions of all its predecessors.
 --
 -- * In right-associative folds the accumulator is a partial fold over the
---   elements that __follow__ the current element, and is passed to the update
---   function as its second (right) argument.  The outer-most application of
---   the update function merges the contribution of the first element of the
---   structure with the contributions of all its successors.
+--   elements that __follow__ the current element, and is passed to the
+--   operator as its second (right) argument.  The outer-most application of
+--   the operator merges the contribution of the first element of the structure
+--   with the contributions of all its successors.
 --
 -- These two types of folds are typified by the left-associative strict
 -- `foldl'` and the right-associative lazy `foldr`.
@@ -1357,7 +1453,7 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 -- >>> foldr (&&) True (repeat False)
 -- False
 --
--- The first argument of both is an explicit /update function/ that merges the
+-- The first argument of both is an explicit /operator/ that merges the
 -- contribution of an element of the structure with a partial fold over,
 -- respectively, either the preceding or following elements of the structure.
 --
@@ -1370,7 +1466,7 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 -- The third and final argument is a @Foldable@ structure containing elements
 -- @(a, b, c, &#x2026;)@.
 --
--- * __`foldl'`__ takes an update function of the form:
+-- * __`foldl'`__ takes an operator function of the form:
 --
 --     @
 --     f :: b -- accumulated fold of the initial elements
@@ -1392,7 +1488,7 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 --     strictness is space efficiency: the final result can be computed without
 --     storing a potentially deep stack of lazy intermediate results.
 --
--- * __`foldr`__ takes an update function of the form:
+-- * __`foldr`__ takes an operator function of the form:
 --
 --     @
 --     f :: a -- current element
@@ -1402,9 +1498,7 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 --
 --     the result of the fold is:
 --
---     @
---     f a . f b . f c . &#x2026; $ z
---     @
+--     @f a . f b . f c . &#x2026; $ z@
 --
 --     If each call of @f@ on the current element @e@, (referenced as @(f e)@
 --     below) returns a structure in which its second argument is captured in a
@@ -1417,11 +1511,11 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 --     `foldr` is well suited to define both [corecursive](#corec)
 --     and [short-circuit](#short) reductions.
 --
---     When the update function is always strict in the second argument,
---     `foldl'` is generally a better choice than `foldr`.  When `foldr` is
---     called with a strict update function, evaluation cannot begin until the
---     last element is reached, by which point a deep stack of pending function
---     applications may have been built up in memory.
+--     When the operator is always strict in the second argument, `foldl'` is
+--     generally a better choice than `foldr`.  When `foldr` is called with a
+--     strict operator, evaluation cannot begin until the last element is
+--     reached, by which point a deep stack of pending function applications
+--     may have been built up in memory.
 --
 -- In finite structures for which right-to-left sequencing no less efficient
 -- than left-to-right sequencing, there is no inherent performance distinction
@@ -1455,17 +1549,17 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 --   finite, because the termination condition might otherwise never be met.
 --
 -- Whether a fold is recursive, corecursive or short-circuiting can depend on
--- both the method chosen to perform the fold and on the update function passed
--- to that method (which may be implicit, as with the `mappend` method of a
--- monoid instance).
+-- both the method chosen to perform the fold and on the operator passed to
+-- that method (which may be implicit, as with the `mappend` method of a monoid
+-- instance).
 --
--- There are also hybrid cases, where the method and/or the update function are
--- not well suited to the task at hand, resulting in a fold that fails to yield
+-- There are also hybrid cases, where the method and/or operator are not well
+-- suited to the task at hand, resulting in a fold that fails to yield
 -- incremental results until the entire input is processed, or fails to
 -- strictly evaluate results as it goes, deferring all the work to the
 -- evaluation of a large final thunk. Such cases should be avoided, either by
--- selecting a more appropriate @Foldable@ method, or by tailoring the update
--- function to the chosen method.
+-- selecting a more appropriate @Foldable@ method, or by tailoring the operator
+-- to the chosen method.
 --
 -- The distinction between these types of folds is critical, both in deciding
 -- which @Foldable@ method to use to perform the reduction efficiently, and in
@@ -1490,11 +1584,11 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 -- ensure that `foldl'` actually performs a strict left-associative reduction.
 --
 -- The `foldMap'` method is a special case of `foldl'`, in which the initial
--- accumulator is `mempty` and the update function is @mappend . f@, where
--- @f@ maps each input element into the 'Monoid' in question.  Therefore,
--- `foldMap'` is an appropriate choice under essentially the same conditions
--- as `foldl'`, and its implementation for a given @Foldable@ structure should
--- also be a strict left-associative reduction.
+-- accumulator is `mempty` and the operator is @mappend . f@, where @f@ maps
+-- each input element into the 'Monoid' in question.  Therefore, `foldMap'` is
+-- an appropriate choice under essentially the same conditions as `foldl'`, and
+-- its implementation for a given @Foldable@ structure should also be a strict
+-- left-associative reduction.
 --
 -- While the examples below are not necessarily the most optimal definitions of
 -- the intended functions, they are all cases in which `foldMap'` is far more
@@ -1513,17 +1607,13 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 --
 -- The full list of strict recursive functions in this module is:
 --
--- * Provided the update function is strict in its left argument:
+-- * Provided the operator is strict in its left argument:
 --
---     @
---     `foldl'` :: Foldable t => (b -> a -> b) -> b -> t a -> b
---     @
+--     @`foldl'` :: Foldable t => (b -> a -> b) -> b -> t a -> b@
 --
 -- * Provided `mappend` is strict in its left argument:
 --
---     @
---     `foldMap'` :: (Foldable t, Monoid m) => (a -> m) -> t a -> m
---     @
+--     @`foldMap'` :: (Foldable t, Monoid m) => (a -> m) -> t a -> m@
 --
 -- * Provided the instance is correctly defined:
 --
@@ -1551,9 +1641,9 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 --
 -- Conversely, an implementation of `foldr` for a structure that can
 -- accommodate a large (and possibly unbounded) number of elements is expected
--- to be lazy in the tail of the input, allowing update functions that are lazy
--- in the accumulator to yield intermediate results incrementally.  Such folds
--- are right-associative, with the tail of the stream returned as a lazily
+-- to be lazy in the tail of the input, allowing operators that are lazy in the
+-- accumulator to yield intermediate results incrementally.  Such folds are
+-- right-associative, with the tail of the stream returned as a lazily
 -- evaluated component of the result (an element of a tuple or some other
 -- non-strict constructor, e.g. the @(:)@ constructor for lists).
 --
@@ -1601,13 +1691,13 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 -- $shortcircuit
 --
 -- #short#
--- Examples of short-cicuit reduction include various boolean predicates
--- that test whether some or all the elements of a structure satisfy a
--- given condition.  Because these don't necessarily consume the entire
--- list, they typically employ `foldr` with an update function that
--- is conditionally strict in its second argument.  Once the termination
--- condition is met the second argument (tail of the input structure) is
--- ignored.  No result is returned until that happens.
+-- Examples of short-cicuit reduction include various boolean predicates that
+-- test whether some or all the elements of a structure satisfy a given
+-- condition.  Because these don't necessarily consume the entire list, they
+-- typically employ `foldr` with an operator that is conditionally strict in
+-- its second argument.  Once the termination condition is met the second
+-- argument (tail of the input structure) is ignored.  No result is returned
+-- until that happens.
 --
 -- The key distinguishing feature of these folds is /conditional/ strictness
 -- in the second argument, it is sometimes evaluated and sometimes not.
@@ -1679,33 +1769,25 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 --     `sequence_`  :: (Foldable t, Monad m) => t (m a) -> m ()
 --     @
 --
--- * Finally, there's one more special case, which can short-circuit when the
---   monad @m@ is a 'MonadPlus', and the update function conditionally calls
---   'mzero'.  The monadic result is a strict left fold of the inputs when the
---   monad's bind operator is strict in its first argument.  And yet the
---   monadic actions of this ostensibly left fold are sequenced via the lazy
---   `foldr`, which allows it to short-circuit early.  The monadic side-effects
---   are evaluated in left-to-right order.
+-- * Finally, there's one more special case, `foldlM`, which can short-circuit
+--   when the monad @m@ is a 'MonadPlus', and the operator invokes 'mzero'.
 --
---     @
---     `foldlM` :: (Foldable t, Monad m) => (b -> a -> m b) -> b -> t a -> m b
---     @
+--     @`foldlM` :: (Foldable t, Monad m) => (b -> a -> m b) -> b -> t a -> m b@
 --
---     For a structure @xs@ with elements @(a, b, c, &#x2026;)@, the default
---     definition of @(foldlM f xs z)@ expands (via `foldr`) to:
+--     This type of fold is right-associative in the monadic effects, and
+--     left-associative in the output value.
 --
---     @
---     return z >>= (g a >>= (g b >>= (g c >>= ...)))
---       where g element acc = f acc element -- i.e. g = flip f
---     @
+--     Given a structure @t@ with elements @(a, b, ..., x, y)@, the result
+--     of a fold with operator @f@ is equivalent to:
 --
---     The fold is not strict in the accumulator, unless @f@ is.  But even when
---     @f@ is strict, if the Monad's bind operator is not strict in its right
---     argument the chain of monadic actions can short-circuit:
+--     > foldlM f z t = do { aa <- f z a; bb <- f aa b; ... ; f xx y }
+--
+--     If in a 'MonadPlus' the bind short-circuits, the evaluated effects will
+--     be from an initial portion of the sequence.
 --
 --     >>> :set -XBangPatterns
 --     >>> import Control.Monad
---     >>> import Control.Monad.Trans
+--     >>> import Control.Monad.Trans.Class
 --     >>> import Control.Monad.Trans.Maybe
 --     >>> import Data.Foldable
 --     >>> let f !_ e = when (e > 3) mzero >> lift (print e)
@@ -1724,9 +1806,9 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 --     >>> runMaybeT $ foldrM f () [0..]
 --     ...hangs...
 --
---     If the update function is changed to short-circuit on the initial
---     elements and the structure is finite, `foldrM` will run effects and
---     produce results in reverse order:
+--     If instead the operator short-circuits on the initial elements and the
+--     structure is finite, `foldrM` will perform the monadic effects in reverse
+--     order:
 --
 --     >>> let f e _ = when (e < 3) mzero >> lift (print e)
 --     >>> runMaybeT $ foldrM f () [0..5]
@@ -1744,16 +1826,25 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 -- They do have specialised uses, but are best avoided when in doubt.
 --
 -- @
---   `foldr'` :: (a -> b -> b) -> b -> t a -> b
---   `foldl` :: (b -> a -> b) -> b -> t a -> b
---   `foldl1` :: (a -> a -> a) -> t a -> a
---   `foldrM` :: (Foldable t, Monad m) => (a -> b -> m b) -> b -> t a -> m b
+-- `foldr'` :: (a -> b -> b) -> b -> t a -> b
+-- `foldl` :: (b -> a -> b) -> b -> t a -> b
+-- `foldl1` :: (a -> a -> a) -> t a -> a
+-- `foldrM` :: (Foldable t, Monad m) => (a -> b -> m b) -> b -> t a -> m b
 -- @
+--
+-- The lazy left-folds (used corecursively) and 'foldrM' (used to sequence
+-- actions right-to-left) can be efficient in structures whose @Foldable@
+-- instances take advantage of efficient right-to-left iteration to perform
+-- lazy left folds outside-in from the right-most element.
+--
+-- The strict `foldr'` is the least likely to be useful, structures that
+-- support efficient sequencing /only/ right-to-left are not at all common.
 
 --------------
 
 -- $instances
 --
+-- #instances#
 -- For many structures reasonably efficient @Foldable@ instances can be derived
 -- automatically, by enabling the @DeriveFoldable@ GHC extension.  When this
 -- works, it is generally not necessary to define a custom instance by hand.
@@ -1761,7 +1852,7 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 -- care is required to avoid producing slower code, or code that is not
 -- sufficiently lazy, strict or /lawful/.
 --
--- The hand-crafted intances can get away with only defining one of 'foldr' or
+-- The hand-crafted instances can get away with only defining one of 'foldr' or
 -- 'foldMap'.  All the other methods have default definitions in terms of one
 -- of these.  The default definitions have the expected strictness and the
 -- expected asymptotic runtime and space costs, modulo small constant factors.
@@ -1769,7 +1860,8 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 -- doing better than the default derived implementations, plus careful tests to
 -- ensure that the custom methods are correct.
 --
--- For example, given a data type
+-- Below we construct a @Foldable@ instance for a data type representing a
+-- (finite) binary tree with depth-first traversal.
 --
 -- > data Tree a = Empty | Leaf a | Node (Tree a) a (Tree a)
 --
@@ -1783,11 +1875,10 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 -- The 'Node' case is a right fold of the left subtree whose initial
 -- value is a right fold of the rest of the tree.
 --
--- For example, when `f` is '(:)', all three cases return an immediate
--- value, respectively @z@ or a /cons cell/ holding @x@ or @l@, with the
--- remainder the structure, if any, encapsulated in a lazy thunk.
--- This meets the expected efficient [corecursive](#corec) behaviour
--- of 'foldr'.
+-- For example, when `f` is '(:)', all three cases return an immediate value,
+-- respectively @z@ or a /cons cell/ holding @x@ or @l@, with the remainder the
+-- structure, if any, encapsulated in a lazy thunk.  This meets the expected
+-- efficient [corecursive](#corec) behaviour of 'foldr'.
 --
 -- Alternatively, one could define @foldMap@:
 --
@@ -1801,9 +1892,57 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 -- one in terms of the other.  If you implement just one, likely 'foldr'
 -- is the better choice.
 --
--- The fact that `foldl'` can be reasonably efficiently defined in terms
--- of 'foldr' is one of the more surprising features of @Foldable@.  It
--- may be instructive to take a look at how this works.
+-- A binary tree typically (when balanced, or randomly biased) provides equally
+-- efficient access to its left and right subtrees.  This makes it possible to
+-- define a `foldl` optimised for [corecursive](#corec) folds with operators
+-- that are lazy in their first (left) argument.
+--
+-- > instance Foldable Tree where
+-- >    foldr f z Empty = z
+-- >    foldr f z (Leaf x) = f x z
+-- >    foldr f z (Node l k r) = foldr f (f k (foldr f z r)) l
+-- >    --
+-- >    foldMap f Empty = mempty
+-- >    foldMap f (Leaf x) = f x
+-- >    foldMap f (Node l k r) = foldMap f l <> f k <> foldMap f r
+-- >    --
+-- >    foldl f z Empty = z
+-- >    foldl f z (Leaf x) = f z x
+-- >    foldl f z (Node l k r) = foldl f (f (foldl f z l) k) r
+--
+-- Now left-to-right and right-to-left iteration over the structure
+-- elements are equally efficient (note the mirror-order output when
+-- using `foldl`):
+--
+-- >>> foldr (\e acc -> e : acc) [] (Node (Leaf 1) 2 (Leaf 3))
+-- [1,2,3]
+-- >>> foldl (\acc e -> e : acc) [] (Node (Leaf 1) 2 (Leaf 3))
+-- [3,2,1]
+--
+-- We can carry this further, and define more non-default methods...
+--
+-- The structure definition actually admits trees that are unbounded on either
+-- or both sides.  The only fold that can plausibly terminate for a tree
+-- unbounded on both left and right is `null`, when defined as shown below.
+-- The default definition in terms of `foldr` diverges if the tree is unbounded
+-- on the left.  Here we define a variant that avoids travelling down the tree
+-- to find the left-most element and just examines the root node.
+--
+-- >    null Empty = True
+-- >    null _     = False
+--
+-- This is a sound choice also for finite trees.
+--
+-- In practice, unbounded trees are quite uncommon, and can barely be said to
+-- be @Foldable@.  They would typically employ breadth first traversal, and
+-- would support only corecursive and short-circuit folds (diverge under strict
+-- reduction).
+--
+-- Returning to more mininal instances defined in terms of just `foldr`, it is
+-- somewhat surprising that a fairly efficient /default/ implementation of the
+-- strict `foldl'` is defined in terms of lazy `foldr` when only the latter is
+-- explicitly provided by the instance.  It may be instructive to take a look
+-- at how this works.
 
 --------------
 
@@ -1813,15 +1952,13 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 --
 -- The left fold:
 --
--- @
--- foldl' f z [a, b, &#x2026;, x, y]
--- @
+-- @foldl' f z [a, b, &#x2026;, x, y]@
 --
 -- can be expanded as:
 --
 -- @
 -- id . g y . g x . &#x2026; . g b . g a $ z
--- \ \ where g = flip f
+--    where g = flip f
 -- @
 --
 -- In which to maintain the expected strictness we need to perform function
@@ -1833,7 +1970,7 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 -- > f' x k z = k $! (g x) z = k $! f z x
 --
 -- We see that a lazy 'foldr' of the @g e@ endomorphisms, with @f'@ as as the
--- update function, in fact yields a strict left fold, that avoids building a
+-- operator, in fact yields a strict left fold, that avoids building a
 -- deep chain of intermediate thunks:
 --
 -- > foldl' f z0 xs = foldr f' id xs z0
