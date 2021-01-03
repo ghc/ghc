@@ -20,6 +20,10 @@
 #include "IOManager.h"       // RTS internal
 #include "Capability.h"
 
+#if !defined(mingw32_HOST_OS) && defined(THREADED_RTS)
+#include "posix/Signals.h"
+#endif
+
 #if defined(mingw32_HOST_OS) && !defined(THREADED_RTS)
 #include "win32/AsyncMIO.h"
 #include "win32/AsyncWinIO.h"
@@ -53,6 +57,30 @@ initIOManager(void)
      */
 #endif
 
+}
+
+/* Called from forkProcess in the child process on the surviving capability.
+ */
+void
+initIOManagerAfterFork(Capability **pcap USED_IF_THREADS_AND_NOT_MINGW32)
+{
+#if defined(THREADED_RTS) && !defined(mingw32_HOST_OS)
+    /* Posix implementation in posix/Signals.c
+     *
+     * No non-threaded impl because the non-threaded Posix select() I/O manager
+     * does not need any initialisation.
+     *
+     * No Windows impl since no forking.
+     *
+     * TODO: figure out if it is necessary for the threaded MIO case for the
+     * starting of the IO managager threads to be synchronous. It would be
+     * simpler if it could start them asynchronously and thus not have to
+     * have the pcap as an inout param, that could be modified. In practice it
+     * cannot be modified anyway since in the contexts where it is called
+     * (forkProcess), there is only a single cap available.
+     */
+    ioManagerStartCap(pcap);
+#endif
 }
 
 

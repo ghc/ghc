@@ -25,6 +25,18 @@
  */
 void initIOManager(void);
 
+/* Init hook: called from forkProcess in the child process on the surviving
+ * capability.
+ *
+ * Note that this is synchronous and can run Haskell code, so can change the
+ * given cap.
+ */
+void initIOManagerAfterFork(/* inout */ Capability **pcap);
+
+/* TODO: rationalise initIOManager and initIOManagerAfterFork into a single
+         per-capability init function.
+ */
+
 
 /* Shutdown hooks: called from hs_exit_ before and after the scheduler exits.
  */
@@ -51,5 +63,12 @@ void ioManagerStart (void);
 #else
 #define USED_IF_NOT_THREADS_AND_MINGW32 STG_UNUSED
 #endif
+
+#if defined(THREADED_RTS) && !defined(mingw32_HOST_OS)
+#define USED_IF_THREADS_AND_NOT_MINGW32
+#else
+#define USED_IF_THREADS_AND_NOT_MINGW32 STG_UNUSED
+#endif
+
 
 #include "EndPrivate.h"
