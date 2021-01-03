@@ -330,7 +330,7 @@ checkGenWeakPtrList( uint32_t g )
 {
   for (StgWeak *w = generations[g].weak_ptr_list; w != NULL; w = w->link) {
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(w));
-    ASSERT(w->header.info == &stg_WEAK_info);
+    ASSERT(w->header.info == &stg_WEAK_info || w->header.info == &stg_DEAD_WEAK_info);
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(w->key));
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(w->value));
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(w->finalizer));
