@@ -32,6 +32,7 @@
 #include "Capability.h"
 #include "Task.h"
 #include "AwaitEvent.h"
+#include "IOManager.h"
 #if defined(mingw32_HOST_OS)
 #include "win32/MIOManager.h"
 #include "win32/AsyncWinIO.h"
