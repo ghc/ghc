@@ -17,7 +17,8 @@ if [ ! -d "$TOP/.gitlab" ]; then
   echo "This script expects to be run from the root of a ghc checkout"
 fi
 
-source $TOP/.gitlab/common.sh
+# shellcheck source=.gitlab/common.sh
+source "$TOP/.gitlab/common.sh"
 
 function usage() {
   cat <<EOF
@@ -386,7 +387,7 @@ function configure() {
   run ./configure \
     --enable-tarballs-autodownload \
     $target_args \
-    $CONFIGURE_ARGS \
+    "${CONFIGURE_ARGS[@]}" \
     GHC="$GHC" \
     HAPPY="$HAPPY" \
     ALEX="$ALEX" \
@@ -407,7 +408,7 @@ function build_make() {
 
   echo "include mk/flavours/${BUILD_FLAVOUR}.mk" > mk/build.mk
   echo 'GhcLibHcOpts+=-haddock' >> mk/build.mk
-  run "$MAKE" -j"$cores" $MAKE_ARGS
+  run "$MAKE" -j"$cores" "${MAKE_ARGS[@]}"
   run "$MAKE" -j"$cores" binary-dist-prep TAR_COMP_OPTS=-1
   ls -lh "$BIN_DIST_PREP_TAR_COMP"
 }
@@ -430,7 +431,8 @@ function push_perf_notes() {
 # Figure out which commit should be used by the testsuite driver as a
 # performance baseline. See Note [The CI Story].
 function determine_metric_baseline() {
-  export PERF_BASELINE_COMMIT="$(git merge-base $CI_MERGE_REQUEST_TARGET_BRANCH_NAME HEAD)"
+  export PERF_BASELINE_COMMIT
+  PERF_BASELINE_COMMIT="$(git merge-base "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" HEAD)"
   info "Using $PERF_BASELINE_COMMIT for performance metric baseline..."
 }
 
@@ -462,7 +464,7 @@ function build_hadrian() {
 
   run_hadrian binary-dist
 
-  mv _build/bindist/ghc*.tar.xz $BIN_DIST_NAME.tar.xz
+  mv _build/bindist/ghc*.tar.xz "$BIN_DIST_NAME.tar.xz"
 }
 
 function test_hadrian() {
@@ -495,7 +497,7 @@ function cabal_test() {
     -ddump-to-file -dumpdir "$OUT/dumps" -ddump-timings \
     +RTS --machine-readable "-t$OUT/rts.log" -RTS \
     -package mtl -ilibraries/Cabal/Cabal libraries/Cabal/Cabal/Setup.hs \
-    $@
+    "$@"
   rm -Rf tmp
   end_section "Cabal test: $OUT"
 }
@@ -528,17 +530,17 @@ function run_hadrian() {
     -j"$cores" \
     --broken-test="$BROKEN_TESTS" \
     --bignum=$BIGNUM_BACKEND \
-    $HADRIAN_ARGS \
-    $@
+    "${HADRIAN_ARGS[@]}" \
+    "$@"
 }
 
 # A convenience function to allow debugging in the CI environment.
 function shell() {
-  local cmd=$@
-  if [ -z "$cmd" ]; then
-    cmd="bash -i"
+  local cmd=( "$@" )
+  if [ -z "${cmd[*]}" ]; then
+    cmd=( "bash" "-i" )
   fi
-  run $cmd
+  run "${cmd[@]}"
 }
 
 setup_locale
@@ -599,9 +601,9 @@ case $1 in
     test_hadrian || res=$?
     push_perf_notes
     exit $res ;;
-  run_hadrian) shift; run_hadrian $@ ;;
+  run_hadrian) shift; run_hadrian "$@" ;;
   perf_test) run_perf_test ;;
   clean) clean ;;
-  shell) shell $@ ;;
+  shell) shell "$@" ;;
   *) fail "unknown mode $1" ;;
 esac
