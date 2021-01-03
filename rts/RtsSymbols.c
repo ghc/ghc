@@ -341,7 +341,6 @@
    SymI_HasProto(setIOManagerControlFd) \
    SymI_HasProto(setTimerManagerControlFd) \
    SymI_HasProto(setIOManagerWakeupFd)  \
-   SymI_HasProto(ioManagerWakeup)       \
    SymI_HasProto(blockUserSignals)      \
    SymI_HasProto(unblockUserSignals)
 #else
@@ -350,7 +349,6 @@
    SymI_HasProto(getOverlappedEntries)       \
    SymI_HasProto(completeSynchronousRequest) \
    SymI_HasProto(registerAlertableWait)      \
-   SymI_HasProto(ioManagerWakeup)            \
    SymI_HasProto(sendIOManagerEvent)         \
    SymI_HasProto(readIOManagerEvent)         \
    SymI_HasProto(getIOManagerEvent)          \
