@@ -39,6 +39,11 @@ void initIOManagerAfterFork(/* inout */ Capability **pcap);
 
 
 /* Shutdown hooks: called from hs_exit_ before and after the scheduler exits.
+ *
+ * The stopIOManager is also called many times (once per-capability) within the
+ * scheduler shutdown (but only in threaded mode). This is despite the fact that
+ * stopIOManager shuts down the I/O manager for all capabilities.
+ * FIXME: this is accidentally quadratic and confusing.
  */
 void stopIOManager(void);
 void exitIOManager(bool wait_threads);
