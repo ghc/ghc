@@ -33,7 +33,7 @@
 #include "Task.h"
 #include "AwaitEvent.h"
 #if defined(mingw32_HOST_OS)
-#include "win32/IOManager.h"
+#include "win32/MIOManager.h"
 #include "win32/AsyncWinIO.h"
 #endif
 #include "Trace.h"

@@ -9,7 +9,7 @@
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
-#include "IOManager.h"
+#include "MIOManager.h"
 #include "rts\OSThreads.h"
 #include "Prelude.h"
 #include <windows.h>
