@@ -1,4 +1,4 @@
-/* IOManager.c
+/* MIOManager.c
  *
  * Non-blocking / asynchronous I/O for Win32.
  *
@@ -12,7 +12,7 @@
 
 #include "Rts.h"
 #include "RtsUtils.h"
-#include "IOManager.h"
+#include "MIOManager.h"
 #include "WorkQueue.h"
 #include "ConsoleHandler.h"
 #include <stdio.h>
