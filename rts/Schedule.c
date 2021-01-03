@@ -2200,9 +2200,7 @@ forkProcess(HsStablePtr *entry
         // like startup event, capabilities, process info etc
         traceTaskCreate(task, cap);
 
-#if defined(THREADED_RTS)
-        ioManagerStartCap(&cap);
-#endif
+        initIOManagerAfterFork(&cap);
 
         // Install toplevel exception handlers, so interruption
         // signal will be sent to the main thread.
