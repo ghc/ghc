@@ -21,5 +21,17 @@
 
 #include "BeginPrivate.h"
 
+/*
+ * Communicating with the IO manager thread (see GHC.Conc).
+ * Posix implementation in posix/Signals.c
+ * Win32 implementation in win32/ThrIOManager.c, Windows's WINIO has the same
+ * interfaces for Threaded and Non-threaded I/O, so these methods are always
+ * available for WINIO.
+*/
+void ioManagerWakeup (void);
+#if defined(THREADED_RTS) || defined(mingw32_HOST_OS)
+void ioManagerDie (void);
+void ioManagerStart (void);
+#endif
 
 #include "EndPrivate.h"

@@ -46,6 +46,7 @@
 # include "RetainerProfile.h"
 #endif
 
+#include "IOManager.h"
 #if defined(mingw32_HOST_OS) && !defined(THREADED_RTS)
 #include "win32/AsyncMIO.h"
 #include "win32/AsyncWinIO.h"
