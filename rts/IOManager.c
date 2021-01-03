@@ -116,6 +116,20 @@ exitIOManager(bool wait_threads USED_IF_NOT_THREADS_AND_MINGW32)
 
 }
 
+/* Wakeup hook: called from the scheduler's wakeUpRts (currently only in
+ * threaded mode).
+ */
+void wakeupIOManager(void)
+{
+#if defined(THREADED_RTS)
+    /* Posix implementation in posix/Signals.c
+     * Win32 implementation in win32/ThrIOManager.c
+     */
+    ioManagerWakeup();
+#endif
+}
+
+
 /* Declared in rts/IOInterface.h. Used only by the MIO threaded I/O manager on
  * Unix platforms.
  */
