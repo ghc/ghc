@@ -1221,7 +1221,15 @@ shutdownCapability (Capability *cap USED_IF_THREADS,
             //
             // To reproduce this deadlock: run ffi002(threaded1)
             // repeatedly on a loaded machine.
-            ioManagerDie();
+            //
+            // FIXME: stopIOManager is not a per-capability action. It shuts
+            // down the I/O subsystem for all capabilities, but here we call
+            // it once per cap, so this is accidentally quadratic, but mainly
+            // it is confusing. Replace this with a per-capability stop, and
+            // perhaps make it synchronous so it works the first time and we
+            // don't have to come back and try again here.
+            //
+            stopIOManager();
             yieldThread();
             continue;
         }
