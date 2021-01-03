@@ -2893,7 +2893,7 @@ void wakeUpRts(void)
     // This forces the IO Manager thread to wakeup, which will
     // in turn ensure that some OS thread wakes up and runs the
     // scheduler loop, which will cause a GC and deadlock check.
-    ioManagerWakeup();
+    wakeupIOManager();
 }
 #endif
 
