@@ -89,6 +89,7 @@ typedef struct _GC_FLAGS {
 
     bool numa;                   /* Use NUMA */
     StgWord numaMask;
+    bool refill_wsdeques;
 } GC_FLAGS;
 
 /* See Note [Synchronization of flags and base APIs] */

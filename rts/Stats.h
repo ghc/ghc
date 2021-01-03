@@ -38,7 +38,7 @@ void      stat_endGC  (Capability *cap, struct gc_thread_ *initiating_gct, W_ li
                        W_ par_max_copied, W_ par_balanced_copied,
                        W_ gc_spin_spin, W_ gc_spin_yield, W_ mut_spin_spin,
                        W_ mut_spin_yield, W_ any_work, W_ no_work,
-                       W_ scav_find_work);
+                       W_ scav_find_work, W_ max_n_todo_overflow);
 
 void      stat_startNonmovingGcSync(void);
 void      stat_endNonmovingGcSync(void);
