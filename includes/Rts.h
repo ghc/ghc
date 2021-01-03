@@ -230,7 +230,7 @@ void _assertFail(const char *filename, unsigned int linenum)
 #include "rts/FileLock.h"
 #include "rts/GetTime.h"
 #include "rts/Globals.h"
-#include "rts/IOManager.h"
+#include "rts/IOInterface.h"
 #include "rts/Linker.h"
 #include "rts/Ticky.h"
 #include "rts/Timer.h"
