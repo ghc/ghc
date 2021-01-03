@@ -9,7 +9,7 @@
  */
 
 #include "Rts.h"
-#include <rts/IOManager.h>
+#include <rts/IOInterface.h>
 #include "AsyncWinIO.h"
 #include "Prelude.h"
 #include "Capability.h"

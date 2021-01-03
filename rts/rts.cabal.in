@@ -155,7 +155,7 @@ library
                       rts/GetTime.h
                       rts/Globals.h
                       rts/Hpc.h
-                      rts/IOManager.h
+                      rts/IOInterface.h
                       rts/Libdw.h
                       rts/LibdwPool.h
                       rts/Linker.h
