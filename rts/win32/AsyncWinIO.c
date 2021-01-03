@@ -10,6 +10,7 @@
 
 #include "Rts.h"
 #include <rts/IOInterface.h>
+#include "ThrIOManager.h"
 #include "AsyncWinIO.h"
 #include "Prelude.h"
 #include "Capability.h"
