@@ -20,7 +20,7 @@
 #include "Profiling.h"
 #include "Messages.h"
 #if defined(mingw32_HOST_OS)
-#include "win32/IOManager.h"
+#include "win32/MIOManager.h"
 #endif
 
 static void blockedThrowTo (Capability *cap,
