@@ -51,7 +51,7 @@ import GHC.Core.PatSyn
 import GHC.HsToCore.Match.Constructor
 import GHC.HsToCore.Match.Literal
 import GHC.Core.Type
-import GHC.Core.Coercion ( eqCoercion )
+import GHC.Core.Coercion ( coercionType )
 import GHC.Core.TyCon    ( isNewTyCon )
 import GHC.Core.Multiplicity
 import GHC.Builtin.Types
@@ -1063,7 +1063,6 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     -- the instance for IPName derives using the id, so this works if the
     -- above does
     exp (HsIPVar _ i) (HsIPVar _ i') = i == i'
-    exp (HsOverLabel _ l x) (HsOverLabel _ l' x') = l == l' && x == x'
     exp (HsOverLit _ l) (HsOverLit _ l') =
         -- Overloaded lits are equal if they have the same type
         -- and the data is the same.
@@ -1124,7 +1123,7 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     wrap WpHole WpHole = True
     wrap (WpCompose w1 w2) (WpCompose w1' w2') = wrap w1 w1' && wrap w2 w2'
     wrap (WpFun w1 w2 _ _) (WpFun w1' w2' _ _) = wrap w1 w1' && wrap w2 w2'
-    wrap (WpCast co)       (WpCast co')        = co `eqCoercion` co'
+    wrap (WpCast co)       (WpCast co')        = eq_co co co'
     wrap (WpEvApp et1)     (WpEvApp et2)       = et1 `ev_term` et2
     wrap (WpTyApp t)       (WpTyApp t')        = eqType t t'
     -- Enhancement: could implement equality for more wrappers
@@ -1133,9 +1132,13 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
 
     ---------
     ev_term :: EvTerm -> EvTerm -> Bool
-    ev_term (EvExpr (Var a)) (EvExpr  (Var b)) = a==b
-    ev_term (EvExpr (Coercion a)) (EvExpr (Coercion b)) = a `eqCoercion` b
+    ev_term (EvExpr (Var a)) (EvExpr  (Var b))
+      = idType a `eqType` idType b
+    ev_term (EvExpr (Coercion a)) (EvExpr (Coercion b))
+      = a `eq_co` b
     ev_term _ _ = False
+
+    eq_co co1 co2 = coercionType co1 `eqType` coercionType co2
 
     ---------
     eq_list :: (a->a->Bool) -> [a] -> [a] -> Bool

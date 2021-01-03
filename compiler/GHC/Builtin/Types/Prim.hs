@@ -23,8 +23,11 @@ module GHC.Builtin.Types.Prim(
         alphaTys, alphaTy, betaTy, gammaTy, deltaTy,
         alphaTyVarsUnliftedRep, alphaTyVarUnliftedRep,
         alphaTysUnliftedRep, alphaTyUnliftedRep,
-        runtimeRep1TyVar, runtimeRep2TyVar, runtimeRep1Ty, runtimeRep2Ty,
-        openAlphaTy, openBetaTy, openAlphaTyVar, openBetaTyVar,
+        runtimeRep1TyVar, runtimeRep2TyVar, runtimeRep3TyVar,
+        runtimeRep1Ty, runtimeRep2Ty, runtimeRep3Ty,
+
+        openAlphaTyVar, openBetaTyVar, openGammaTyVar,
+        openAlphaTy, openBetaTy, openGammaTy,
 
         multiplicityTyVar,
 
@@ -374,23 +377,26 @@ alphaTysUnliftedRep = mkTyVarTys alphaTyVarsUnliftedRep
 alphaTyUnliftedRep :: Type
 (alphaTyUnliftedRep:_) = alphaTysUnliftedRep
 
-runtimeRep1TyVar, runtimeRep2TyVar :: TyVar
-(runtimeRep1TyVar : runtimeRep2TyVar : _)
+runtimeRep1TyVar, runtimeRep2TyVar, runtimeRep3TyVar :: TyVar
+(runtimeRep1TyVar : runtimeRep2TyVar : runtimeRep3TyVar : _)
   = drop 16 (mkTemplateTyVars (repeat runtimeRepTy))  -- selects 'q','r'
 
-runtimeRep1Ty, runtimeRep2Ty :: Type
+runtimeRep1Ty, runtimeRep2Ty, runtimeRep3Ty :: Type
 runtimeRep1Ty = mkTyVarTy runtimeRep1TyVar
 runtimeRep2Ty = mkTyVarTy runtimeRep2TyVar
+runtimeRep3Ty = mkTyVarTy runtimeRep3TyVar
 
-openAlphaTyVar, openBetaTyVar :: TyVar
+openAlphaTyVar, openBetaTyVar, openGammaTyVar :: TyVar
 -- alpha :: TYPE r1
 -- beta  :: TYPE r2
-[openAlphaTyVar,openBetaTyVar]
-  = mkTemplateTyVars [tYPE runtimeRep1Ty, tYPE runtimeRep2Ty]
+-- gamma :: TYPE r3
+[openAlphaTyVar,openBetaTyVar,openGammaTyVar]
+  = mkTemplateTyVars [tYPE runtimeRep1Ty, tYPE runtimeRep2Ty, tYPE runtimeRep3Ty]
 
-openAlphaTy, openBetaTy :: Type
+openAlphaTy, openBetaTy, openGammaTy :: Type
 openAlphaTy = mkTyVarTy openAlphaTyVar
 openBetaTy  = mkTyVarTy openBetaTyVar
+openGammaTy = mkTyVarTy openGammaTyVar
 
 multiplicityTyVar :: TyVar
 multiplicityTyVar = mkTemplateTyVars (repeat multiplicityTy) !! 13  -- selects 'n'

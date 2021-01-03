@@ -541,7 +541,7 @@ nlHsIf cond true false = noLoc (HsIf noExtField cond true false)
 
 nlHsCase expr matches
   = noLoc (HsCase noExtField expr (mkMatchGroup Generated matches))
-nlList exprs          = noLoc (ExplicitList noExtField Nothing exprs)
+nlList exprs          = noLoc (ExplicitList noExtField exprs)
 
 nlHsAppTy :: LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
 nlHsTyVar :: IdP (GhcPass p)                            -> LHsType (GhcPass p)

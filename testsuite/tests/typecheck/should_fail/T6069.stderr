@@ -23,5 +23,5 @@ T6069.hs:15:16: error:
       Expected: ST s2 Int -> b2
         Actual: (forall s. ST s b2) -> b2
     • In the second argument of ‘(.)’, namely ‘runST’
-      In the first argument of ‘($)’, namely ‘(print . runST)’
-      In the expression: (print . runST) $
+      In the expression: print . runST
+      In the expression: ((print . runST) $) fourty_two

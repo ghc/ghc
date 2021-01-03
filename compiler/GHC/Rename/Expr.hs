@@ -48,6 +48,8 @@ import GHC.Driver.Session
 import GHC.Builtin.Names
 
 import GHC.Types.Fixity
+-- import GHC.Types.Id.Make ( ifThenElseName, leftSectionName, rightSectionName )
+import GHC.Types.Id.Make
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
@@ -70,6 +72,129 @@ import Control.Arrow (first)
 import Data.Ord
 import Data.Array
 import qualified Data.List.NonEmpty as NE
+
+{- Note [Renaming and typechecking overloaded and rebindable constructs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For overloaded constructs (overloaded literals, lists, strings), and
+rebindable constructs (e.g. if-then-else), our general plan is this,
+using overloaded labels #foo as an example:
+
+* In the RENAMER: transform
+      HsOverLabel "foo"
+      ==> XExpr (HsExpansion (HsOverLabel #foo)
+                             (fromLabel `HsAppType` "foo"))
+  We write this more compactly in concrete-syntax form like this
+      #foo  ==>  fromLabel @"foo"
+
+  Recall that (HsExpansion orig expanded), 'orig' is the original term
+  the user wrote, and 'expanded' is the expanded or desugared version
+  to be typechecked.
+
+* In the TYPECHECKER: typecheck the expansion, in this case
+      fromLabel @"foo"
+  The typechecker (and desugarer) will never see HsOverLabel
+
+In effect, the renamer does a bit of desugaring. Recall GHC.Hs.Expr
+Note [Rebindable syntax and HsExpansion], which describes the use of HsExpansion.
+
+RebindableSyntax:
+  If RebindableSyntax is off we use the built-in 'fromLabel', defined in
+     GHC.Builtin.Names.fromLabelClassOpName
+  If RebindableSyntax if ON, we look up "fromLabel" in the environment
+     to get whichever one is in scope.
+This is accomplished by lookupSyntaxName, and it applies to all the
+constructs below.
+
+Here are the constructs that we transform in this way. Some are uniform,
+but several have a little bit of special treatment:
+
+* HsIf (if-the-else)
+     if b then e1 else e2  ==>  ifThenElse b e1 e2
+  We do this /only/ if rebindable syntax is on, because the coverage
+  checker looks for HsIf (see GHC.HsToCore.Coverage.addTickHsExpr)
+  That means the typechecker and desugarer need to understand HsIf
+  for the non-rebindable-syntax case.
+
+* OverLabel (overloaded labels, #lbl)
+     #lbl  ==>  fromLabel @"lbl"
+  As ever, we use lookupSyntaxName to look up 'fromLabel'
+
+* ExplicitList (explicit lists [a,b,c])
+     When (and only when) OverloadedLists is on
+     [e1,e2]  ==>  fromListN 2 [e1,e2]
+  NB: the type checker and desugarer still see ExplicitList,
+      but to them it always means the built-in lists.
+
+* SectionL and SectionR (left and right sections)
+     (`op` e) ==> rightSection op e
+     (e `op`) ==> leftSection  (op e)
+  where `leftSection` and `rightSection` are levity-polymorphic
+  wired-in Ids (see Note [Wired-in Ids for rebindable syntax] in
+  GHC.Types.Id.Make.
+
+  Using an auxiliary function in this way avoids the awkwardness of
+  generating a lambda, esp if `e` is a redex, so we *don't* want
+  to generate `(\x -> op x e)`. See Historical
+  Note [Desugaring operator sections]
+
+* It's a bit painful to transform `OpApp e1 op e2` to a
+  `HsTransformed` form, because the renamer does precedence
+  rearrangement.  So the renamer leaves an OpApp as an OpApp.
+
+  The typechecker turns `OpApp` into a use of `HsTranformed`
+  on the fly, in GHC.Tc.Gen.Head.splitHsApps.
+
+
+Historical Note [Desugaring operator sections]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This Note explains some historical trickiness in desugaring left and
+right sections.  That trickiness has completely disappeareds now that
+we desugar to calls to 'leftSection` and `rightSection`, but I'm
+leaving it here to remind us how nice the new story is.
+
+Desugaring left sections with -XPostfixOperators is straightforward: convert
+(expr `op`) to (op expr).
+
+Without -XPostfixOperators it's a bit more tricky. At first it looks as if we
+can convert
+
+    (expr `op`)
+
+naively to
+
+    \x -> op expr x
+
+But no!  expr might be a redex, and we can lose laziness badly this
+way.  Consider
+
+    map (expr `op`) xs
+
+for example. If expr were a redex then eta-expanding naively would
+result in multiple evaluations where the user might only have expected one.
+
+So we convert instead to
+
+    let y = expr in \x -> op y x
+
+Also, note that we must do this for both right and (perhaps surprisingly) left
+sections. Why are left sections necessary? Consider the program (found in #18151),
+
+    seq (True `undefined`) ()
+
+according to the Haskell Report this should reduce to () (as it specifies
+desugaring via eta expansion). However, if we fail to eta expand we will rather
+bottom. Consequently, we must eta expand even in the case of a left section.
+
+If `expr` is actually just a variable, say, then the simplifier
+will inline `y`, eliminating the redundant `let`.
+
+Note that this works even in the case that `expr` is unlifted. In this case
+bindNonRec will automatically do the right thing, giving us:
+
+    case expr of y -> (\x -> op y x)
+
+See #18151.
+-}
 
 {-
 ************************************************************************
@@ -130,7 +255,7 @@ rnExpr (HsVar _ (L l v))
                                        -- OverloadedLists works correctly
                                        -- Note [Empty lists] in GHC.Hs.Expr
               , xopt LangExt.OverloadedLists dflags
-              -> rnExpr (ExplicitList noExtField Nothing [])
+              -> rnExpr (ExplicitList noExtField [])
 
               | otherwise
               -> finishHsVar (L l name) ;
@@ -147,12 +272,14 @@ rnExpr (HsIPVar x v)
 rnExpr (HsUnboundVar x v)
   = return (HsUnboundVar x v, emptyFVs)
 
-rnExpr (HsOverLabel x _ v)
-  = do { rebindable_on <- xoptM LangExt.RebindableSyntax
-       ; if rebindable_on
-         then do { fromLabel <- lookupOccRn (mkVarUnqual (fsLit "fromLabel"))
-                 ; return (HsOverLabel x (Just fromLabel) v, unitFV fromLabel) }
-         else return (HsOverLabel x Nothing v, emptyFVs) }
+rnExpr (HsOverLabel _ v)
+  = do { (from_label, fvs) <- lookupSyntaxName fromLabelClassOpName
+       ; return ( mkExpandedExpr (HsOverLabel noExtField v) $
+                  HsAppType noExtField (genLHsVar from_label) hs_ty_arg
+                , fvs ) }
+  where
+    hs_ty_arg = mkEmptyWildCardBndrs $ wrapGenSpan $
+                HsTyLit noExtField (HsStrTy NoSourceText v)
 
 rnExpr (HsLit x lit@(HsString src s))
   = do { opt_OverloadedStrings <- xoptM LangExt.OverloadedStrings
@@ -269,16 +396,19 @@ rnExpr (HsDo x do_or_lc (L l stmts))
              (\ _ -> return ((), emptyFVs))
         ; return ( HsDo x do_or_lc (L l stmts'), fvs ) }
 
-rnExpr (ExplicitList x _  exps)
-  = do  { opt_OverloadedLists <- xoptM LangExt.OverloadedLists
-        ; (exps', fvs) <- rnExprs exps
-        ; if opt_OverloadedLists
-           then do {
-            ; (from_list_n_name, fvs') <- lookupSyntax fromListNName
-            ; return (ExplicitList x (Just from_list_n_name) exps'
-                     , fvs `plusFV` fvs') }
-           else
-            return  (ExplicitList x Nothing exps', fvs) }
+rnExpr (ExplicitList x exps)
+  = do  { (exps', fvs) <- rnExprs exps
+        ; opt_OverloadedLists <- xoptM LangExt.OverloadedLists
+        ; if not opt_OverloadedLists
+          then return  (ExplicitList x exps', fvs)
+          else
+    do { (from_list_n_name, fvs') <- lookupSyntaxName fromListNName
+       ; let rn_list  = ExplicitList x exps'
+             lit_n    = mkIntegralLit (length exps)
+             hs_lit   = wrapGenSpan (HsLit noExtField (HsInt noExtField lit_n))
+             exp_list = genHsApps from_list_n_name [hs_lit, wrapGenSpan rn_list]
+       ; return ( mkExpandedExpr rn_list exp_list
+                , fvs `plusFV` fvs') } }
 
 rnExpr (ExplicitTuple x tup_args boxity)
   = do { checkTupleSection tup_args
@@ -320,24 +450,44 @@ rnExpr (ExprWithTySig _ expr pty)
         ; (expr', fvExpr) <- bindSigTyVarsFV (hsWcScopedTvs pty') $
                              rnLExpr expr
         ; return (ExprWithTySig noExtField expr' pty', fvExpr `plusFV` fvTy) }
+
+{-
 rnExpr (HsIf _ p b1 b2)
-  = do { (p', fvP) <- rnLExpr p
+  = do { (p',  fvP)  <- rnLExpr p
        ; (b1', fvB1) <- rnLExpr b1
        ; (b2', fvB2) <- rnLExpr b2
-       ; mifteName <- lookupReboundIf
-       ; let subFVs = plusFVs [fvP, fvB1, fvB2]
-       ; return $ case mifteName of
-           -- RS is off, we keep an 'HsIf' node around
-           Nothing ->
-             (HsIf noExtField  p' b1' b2', subFVs)
-           -- See Note [Rebindable syntax and HsExpansion].
-           Just ifteName ->
-             let ifteExpr = rebindIf ifteName p' b1' b2'
-             in (ifteExpr, plusFVs [unitFV (unLoc ifteName), subFVs])
+
+       ; (ite_name, ite_fvs) <- lookupSyntaxName ifThenElseName
+       ; let rn_if = HsIf noExtField p' b1' b2'
+             ds_if = genHsApps ite_name [p', b1', b2']
+             fvs   = plusFVs [fvP, fvB1, fvB2, ite_fvs]
+       ; return (mkExpandedExpr rn_if ds_if, fvs) }
+-}
+
+rnExpr (HsIf _ p b1 b2)
+  = do { (p',  fvP)  <- rnLExpr p
+       ; (b1', fvB1) <- rnLExpr b1
+       ; (b2', fvB2) <- rnLExpr b2
+       ; let fvs_if = plusFVs [fvP, fvB1, fvB2]
+             rn_if  = HsIf noExtField  p' b1' b2'
+
+       -- Deal with rebindable syntax
+       -- See Note [Renaming and typechecking overloaded and rebindable constructs]
+       ; rebind <- xoptM LangExt.RebindableSyntax
+
+         -- Non rebindable-syntax case
+         ; if not rebind
+           then return (rn_if, fvs_if)
+
+         -- Rebindable-syntax case
+           else do { (ite_name, fvs_ite) <- lookupSyntaxName ifThenElseName
+                   ; let ds_if = genHsApps ite_name [p', b1', b2']
+                         fvs   = plusFVs [fvs_if, fvs_ite]
+                   ; return (mkExpandedExpr rn_if ds_if, fvs) }
        }
+
 rnExpr (HsMultiIf x alts)
   = do { (alts', fvs) <- mapFvRn (rnGRHS IfAlt rnLExpr) alts
-       -- ; return (HsMultiIf ty alts', fvs) }
        ; return (HsMultiIf x alts', fvs) }
 
 rnExpr (ArithSeq x _ seq)
@@ -406,19 +556,54 @@ rnExpr other = pprPanic "rnExpr: unexpected expression" (ppr other)
 ----------------------
 -- See Note [Parsing sections] in GHC.Parser
 rnSection :: HsExpr GhcPs -> RnM (HsExpr GhcRn, FreeVars)
+
 rnSection section@(SectionR x op expr)
   = do  { (op', fvs_op)     <- rnLExpr op
         ; (expr', fvs_expr) <- rnLExpr expr
         ; checkSectionPrec InfixR section op' expr'
-        ; return (SectionR x op' expr', fvs_op `plusFV` fvs_expr) }
+        ; let rn_section = SectionR x op' expr'
+              ds_section = genHsApps rightSectionName [op',expr']
+        ; return ( mkExpandedExpr rn_section ds_section
+                 , fvs_op `plusFV` fvs_expr) }
 
 rnSection section@(SectionL x expr op)
+  -- Note [Left sections]
   = do  { (expr', fvs_expr) <- rnLExpr expr
         ; (op', fvs_op)     <- rnLExpr op
         ; checkSectionPrec InfixL section op' expr'
-        ; return (SectionL x expr' op', fvs_op `plusFV` fvs_expr) }
+        ; postfix_ops <- xoptM LangExt.PostfixOperators
+                        -- Note [Left sections]
+        ; let rn_section = SectionL x expr' op'
+              ds_section
+                | postfix_ops = HsApp noExtField op' expr'
+                | otherwise   = genHsApps leftSectionName
+                                   [wrapGenSpan $ HsApp noExtField op' expr']
+        ; return ( mkExpandedExpr rn_section ds_section
+                 , fvs_op `plusFV` fvs_expr) }
 
 rnSection other = pprPanic "rnSection" (ppr other)
+
+{- Note [Left sections]
+~~~~~~~~~~~~~~~~~~~~~~~
+If Postfix operators is ON we desguar
+   (e `op`)  ==>   op e
+
+If Postfix operators is OFF we desguar
+   (e `op`)   ==>  leftSection (op x)
+   where
+     leftSection :: (a->b)-> a -> b
+     -- Just forces the function type
+     leftSection f x = f x
+
+The defn of leftSection is important because:
+* Types: (x `ord`) should be rejected
+ because ord does not take two arguments; and because
+
+* Semantics: seq (True `undefined`) ()
+  should return (), whereas
+     seq (undefined True) ()
+  would evaluate `undefined`.
+-}
 
 {-
 ************************************************************************
@@ -2231,25 +2416,20 @@ getMonadFailOp ctxt
         return (failAfterFromStringSynExpr, failFvs `plusFV` fromStringFvs)
       | otherwise = lookupQualifiedDo ctxt failMName
 
--- Rebinding 'if's to 'ifThenElse' applications.
---
+
+genHsApps :: Name -> [LHsExpr GhcRn] -> HsExpr GhcRn
+genHsApps fun args = foldl genHsApp (genHsVar fun) args
+
+genHsApp :: HsExpr GhcRn -> LHsExpr GhcRn -> HsExpr GhcRn
+genHsApp fun arg = HsApp noExtField (wrapGenSpan fun) arg
+
+genLHsVar :: Name -> LHsExpr GhcRn
+genLHsVar nm = wrapGenSpan $ genHsVar nm
+
+genHsVar :: Name -> HsExpr GhcRn
+genHsVar nm = HsVar noExtField $ wrapGenSpan nm
+
+wrapGenSpan :: a -> Located a
+-- Wrap something in a "GeneratedSrcSpan"
 -- See Note [Rebindable syntax and HsExpansion]
-rebindIf
-  :: Located Name  -- 'Name' for the 'ifThenElse' function we will rebind to
-  -> LHsExpr GhcRn -- renamed condition
-  -> LHsExpr GhcRn -- renamed true branch
-  -> LHsExpr GhcRn -- renamed false branch
-  -> HsExpr GhcRn  -- rebound if expression
-rebindIf ifteName p b1 b2 =
-  let ifteOrig = HsIf noExtField p b1 b2
-      ifteFun  = L generatedSrcSpan (HsVar noExtField ifteName)
-                 -- ifThenElse var
-      ifteApp  = mkHsAppsWith (\_ _ e -> L generatedSrcSpan e)
-                              ifteFun
-                              [p, b1, b2]
-                 -- desugared_if_expr =
-                 --   ifThenElse desugared_predicate
-                 --              desugared_true_branch
-                 --              desugared_false_branch
-  in mkExpanded XExpr ifteOrig (unLoc ifteApp)
-     -- (source_if_expr, desugared_if_expr)
+wrapGenSpan x = L generatedSrcSpan x

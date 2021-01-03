@@ -32,7 +32,7 @@ module GHC.Types.Id.Make (
         nullAddrId, seqId, lazyId, lazyIdKey,
         coercionTokenId, magicDictId, coerceId,
         proxyHashId, noinlineId, noinlineIdName,
-        coerceName,
+        coerceName, ifThenElseName, leftSectionName, rightSectionName,
 
         -- Re-export error Ids
         module GHC.Core.Opt.ConstantFold
@@ -53,7 +53,7 @@ import GHC.Core.Coercion
 import GHC.Tc.Utils.TcType as TcType
 import GHC.Core.Make
 import GHC.Core.FVs     ( mkRuleInfo )
-import GHC.Core.Utils   ( mkCast, mkDefaultCase )
+import GHC.Core.Utils   ( exprType, mkCast, mkDefaultCase )
 import GHC.Core.Unfold.Make
 import GHC.Core.SimpleOpt
 import GHC.Types.Literal
@@ -176,6 +176,9 @@ ghcPrimIds
     , magicDictId
     , coerceId
     , proxyHashId
+    , ifThenElseId
+    , leftSectionId
+    , rightSectionId
     ]
 
 {-
@@ -1427,7 +1430,8 @@ failure when trying.)
 
 nullAddrName, seqName,
    realWorldName, voidPrimIdName, coercionTokenName,
-   magicDictName, coerceName, proxyName :: Name
+   magicDictName, coerceName, proxyName,
+   leftSectionName, rightSectionName, ifThenElseName :: Name
 nullAddrName      = mkWiredInIdName gHC_PRIM  (fsLit "nullAddr#")      nullAddrIdKey      nullAddrId
 seqName           = mkWiredInIdName gHC_PRIM  (fsLit "seq")            seqIdKey           seqId
 realWorldName     = mkWiredInIdName gHC_PRIM  (fsLit "realWorld#")     realWorldPrimIdKey realWorldPrimId
@@ -1436,6 +1440,9 @@ coercionTokenName = mkWiredInIdName gHC_PRIM  (fsLit "coercionToken#") coercionT
 magicDictName     = mkWiredInIdName gHC_PRIM  (fsLit "magicDict")      magicDictKey       magicDictId
 coerceName        = mkWiredInIdName gHC_PRIM  (fsLit "coerce")         coerceKey          coerceId
 proxyName         = mkWiredInIdName gHC_PRIM  (fsLit "proxy#")         proxyHashKey       proxyHashId
+leftSectionName   = mkWiredInIdName gHC_PRIM  (fsLit "leftSection")    leftSectionKey     leftSectionId
+rightSectionName  = mkWiredInIdName gHC_PRIM  (fsLit "rightSection")   rightSectionKey    rightSectionId
+ifThenElseName    = mkWiredInIdName gHC_PRIM  (fsLit "ifThenElse")     ifThenElseKey      ifThenElseId
 
 -- Names listed in magicIds; see Note [magicIds]
 lazyIdName, oneShotName, noinlineIdName :: Name
@@ -1513,16 +1520,84 @@ oneShotId = pcMiscPrelId oneShotName ty info
   where
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
                        `setUnfoldingInfo`  mkCompulsoryUnfolding defaultSimpleOpts rhs
-    ty  = mkSpecForAllTys [ runtimeRep1TyVar, runtimeRep2TyVar
-                          , openAlphaTyVar, openBetaTyVar ]
-                          (mkVisFunTyMany fun_ty fun_ty)
+    ty  = mkInfForAllTys  [ runtimeRep1TyVar, runtimeRep2TyVar ] $
+          mkSpecForAllTys [ openAlphaTyVar, openBetaTyVar ]      $
+          mkVisFunTyMany fun_ty fun_ty
     fun_ty = mkVisFunTyMany openAlphaTy openBetaTy
     [body, x] = mkTemplateLocals [fun_ty, openAlphaTy]
     x' = setOneShotLambda x  -- Here is the magic bit!
     rhs = mkLams [ runtimeRep1TyVar, runtimeRep2TyVar
                  , openAlphaTyVar, openBetaTyVar
                  , body, x'] $
-          Var body `App` Var x
+          Var body `App` Var x'
+
+----------------------------------------------------------------------
+{- Note [Wired-in Ids for rebindable syntax]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The functions ifThenElseId, leftSectionId, rightSectionId are
+wired in here ONLY because they are use in a levity-polymorphic way
+by the rebindable syntax mechanism. See GHC.Rename.Expr
+
+Note [Renaming and typechecking overloaded and rebindable constructs]
+
+They have Compulsory unfoldings to so that the levity polymorphism
+does not linger for long.
+-}
+
+-- See Note [Wired-in Ids for rebindable syntax]
+-- forall r (a::TYPE r). Bool -> a -> a
+-- ifThenElse c e1 e2 = case c of { True -> e1; False -> e2 }
+ifThenElseId :: Id
+ifThenElseId = pcMiscPrelId ifThenElseName ty info
+  where
+    info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
+                       `setUnfoldingInfo`  mkCompulsoryUnfolding defaultSimpleOpts rhs
+    ty  = mkInfForAllTy runtimeRep1TyVar $
+          mkSpecForAllTy openAlphaTyVar  $
+          exprType body
+    [c,e1,e2] = mkTemplateLocals [boolTy, openAlphaTy, openAlphaTy]
+    rhs  = mkLams [ runtimeRep1TyVar, openAlphaTyVar ] body
+    body = mkLams [c, e1, e2 ] $
+           Case (Var c) c openAlphaTy [ Alt (DataAlt falseDataCon) [] (Var e2)
+                                      , Alt (DataAlt trueDataCon)  [] (Var e1) ]
+
+-- See Note [Wired-in Ids for rebindable syntax]
+--   leftSection :: forall r1 r2 (a:Type r1) (b:TYPE r2).
+--                  (a->b) -> a -> b
+--   leftSection f x = f x
+-- Important that it is eta-expanded, that
+--     (leftSection undefined `seq` ())
+-- is () and not undefined
+leftSectionId :: Id
+leftSectionId = pcMiscPrelId leftSectionName ty info
+  where
+    info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
+                       `setUnfoldingInfo`  mkCompulsoryUnfolding defaultSimpleOpts rhs
+    ty  = mkInfForAllTys  [runtimeRep1TyVar,runtimeRep2TyVar] $
+          mkSpecForAllTys [openAlphaTyVar,  openBetaTyVar]    $
+          exprType body
+    [f,x] = mkTemplateLocals [mkVisFunTyMany openAlphaTy openBetaTy, openAlphaTy]
+    rhs  = mkLams [ runtimeRep1TyVar, runtimeRep2TyVar
+                  , openAlphaTyVar,   openBetaTyVar   ] body
+    body = mkLams [f,x] $ App (Var f) (Var x)
+
+-- See Note [Wired-in Ids for rebindable syntax]
+--   rightSection :: forall r1 r2 r3 (a:Type r1) (b:TYPE r2) (c:TYPE r3).
+--                   (a->b->c) -> b -> a -> c
+--   rightSection f y x = f x y
+rightSectionId :: Id
+rightSectionId = pcMiscPrelId rightSectionName ty info
+  where
+    info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
+                       `setUnfoldingInfo`  mkCompulsoryUnfolding defaultSimpleOpts rhs
+    ty  = mkInfForAllTys  [runtimeRep1TyVar,runtimeRep2TyVar,runtimeRep3TyVar] $
+          mkSpecForAllTys [openAlphaTyVar,  openBetaTyVar,   openGammaTyVar ]  $
+          exprType body
+    [f,x,y] = mkTemplateLocals [ mkVisFunTysMany [openAlphaTy, openBetaTy] openGammaTy
+                               , openAlphaTy, openBetaTy ]
+    rhs  = mkLams [ runtimeRep1TyVar, runtimeRep2TyVar, runtimeRep3TyVar
+                  , openAlphaTyVar,   openBetaTyVar,    openGammaTyVar ] body
+    body = mkLams [f,y,x] $ mkVarApps (Var f) [x,y]
 
 --------------------------------------------------------------------------------
 magicDictId :: Id  -- See Note [magicDictId magic]

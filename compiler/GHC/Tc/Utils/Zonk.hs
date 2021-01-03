@@ -20,7 +20,7 @@ module GHC.Tc.Utils.Zonk (
         -- * Other HsSyn functions
         mkHsDictLet, mkHsApp,
         mkHsAppTy, mkHsCaseAlt,
-        shortCutLit, hsOverLitName,
+        tcShortCutLit, shortCutLit, hsOverLitName,
         conLikeResTy,
 
         -- * re-exported from TcMonad
@@ -90,6 +90,7 @@ import GHC.Types.Basic
 import GHC.Types.SrcLoc
 import GHC.Types.Unique.FM
 import GHC.Types.TyThing
+import GHC.Driver.Session( getDynFlags, targetPlatform )
 
 import GHC.Data.Maybe
 import GHC.Data.Bag
@@ -153,26 +154,50 @@ hsLitType (HsDoublePrim _ _) = doublePrimTy
 
 -- Overloaded literals. Here mainly because it uses isIntTy etc
 
+tcShortCutLit :: HsOverLit GhcRn -> ExpRhoType -> TcM (Maybe (HsOverLit GhcTc))
+tcShortCutLit lit@(OverLit { ol_val = val, ol_ext = rebindable }) exp_res_ty
+  | not rebindable
+  , Just res_ty <- checkingExpType_maybe exp_res_ty
+  = do { dflags <- getDynFlags
+       ; let platform = targetPlatform dflags
+       ; case shortCutLit platform val res_ty of
+            Just expr -> return $ Just $
+                         lit { ol_witness = expr
+                             , ol_ext = OverLitTc False res_ty }
+            Nothing   -> return Nothing }
+  | otherwise
+  = return Nothing
+
 shortCutLit :: Platform -> OverLitVal -> TcType -> Maybe (HsExpr GhcTc)
-shortCutLit platform (HsIntegral int@(IL src neg i)) ty
-  | isIntTy ty  && platformInIntRange  platform i = Just (HsLit noExtField (HsInt noExtField int))
-  | isWordTy ty && platformInWordRange platform i = Just (mkLit wordDataCon (HsWordPrim src i))
-  | isIntegerTy ty = Just (HsLit noExtField (HsInteger src i ty))
-  | otherwise = shortCutLit platform (HsFractional (integralFractionalLit neg i)) ty
+shortCutLit platform val res_ty
+  = case val of
+      HsIntegral int_lit    -> go_integral int_lit
+      HsFractional frac_lit -> go_fractional frac_lit
+      HsIsString s src      -> go_string   s src
+  where
+    go_integral int@(IL src neg i)
+      | isIntTy res_ty  && platformInIntRange  platform i
+      = Just (HsLit noExtField (HsInt noExtField int))
+      | isWordTy res_ty && platformInWordRange platform i
+      = Just (mkLit wordDataCon (HsWordPrim src i))
+      | isIntegerTy res_ty
+      = Just (HsLit noExtField (HsInteger src i res_ty))
+      | otherwise
+      = go_fractional (integralFractionalLit neg i)
         -- The 'otherwise' case is important
         -- Consider (3 :: Float).  Syntactically it looks like an IntLit,
         -- so we'll call shortCutIntLit, but of course it's a float
         -- This can make a big difference for programs with a lot of
         -- literals, compiled without -O
 
-shortCutLit _ (HsFractional f) ty
-  | isFloatTy ty  = Just (mkLit floatDataCon  (HsFloatPrim noExtField f))
-  | isDoubleTy ty = Just (mkLit doubleDataCon (HsDoublePrim noExtField f))
-  | otherwise     = Nothing
+    go_fractional f
+      | isFloatTy res_ty  = Just (mkLit floatDataCon  (HsFloatPrim noExtField f))
+      | isDoubleTy res_ty = Just (mkLit doubleDataCon (HsDoublePrim noExtField f))
+      | otherwise         = Nothing
 
-shortCutLit _ (HsIsString src s) ty
-  | isStringTy ty = Just (HsLit noExtField (HsString src s))
-  | otherwise     = Nothing
+    go_string src s
+      | isStringTy res_ty = Just (HsLit noExtField (HsString src s))
+      | otherwise         = Nothing
 
 mkLit :: DataCon -> HsLit GhcTc -> HsExpr GhcTc
 mkLit con lit = HsApp noExtField (nlHsDataCon con) (nlHsLit lit)
@@ -881,13 +906,10 @@ zonkExpr env (HsDo ty do_or_lc (L l stmts))
        new_ty <- zonkTcTypeToTypeX env ty
        return (HsDo new_ty do_or_lc (L l new_stmts))
 
-zonkExpr env (ExplicitList ty wit exprs)
-  = do (env1, new_wit) <- zonkWit env wit
-       new_ty <- zonkTcTypeToTypeX env1 ty
-       new_exprs <- zonkLExprs env1 exprs
-       return (ExplicitList new_ty new_wit new_exprs)
-   where zonkWit env Nothing    = return (env, Nothing)
-         zonkWit env (Just fln) = second Just <$> zonkSyntaxExpr env fln
+zonkExpr env (ExplicitList ty exprs)
+  = do new_ty <- zonkTcTypeToTypeX env ty
+       new_exprs <- zonkLExprs env exprs
+       return (ExplicitList new_ty new_exprs)
 
 zonkExpr env expr@(RecordCon { rcon_ext = ext, rcon_flds = rbinds })
   = do  { new_con_expr <- zonkExpr env (rcon_con_expr ext)

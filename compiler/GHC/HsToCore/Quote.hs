@@ -1476,7 +1476,7 @@ repE (HsVar _ (L _ x)) =
         Just (DsSplice e)  -> do { e' <- lift $ dsExpr e
                                  ; return (MkC e') } }
 repE (HsIPVar _ n) = rep_implicit_param_name n >>= repImplicitParamVar
-repE (HsOverLabel _ _ s) = repOverLabel s
+repE (HsOverLabel _ s) = repOverLabel s
 
 repE e@(HsRecFld _ f) = case f of
   Unambiguous x _ -> repE (HsVar noExtField (noLoc x))
@@ -1548,7 +1548,7 @@ repE e@(HsDo _ ctxt (L _ sts))
   | otherwise
   = notHandled "monad comprehension and [: :]" (ppr e)
 
-repE (ExplicitList _ _ es) = do { xs <- repLEs es; repListExp xs }
+repE (ExplicitList _ es) = do { xs <- repLEs es; repListExp xs }
 repE (ExplicitTuple _ es boxity) =
   let tupArgToCoreExp :: LHsTupArg GhcRn -> MetaM (Core (Maybe (M TH.Exp)))
       tupArgToCoreExp (L _ a)
@@ -1608,7 +1608,7 @@ repE (HsUnboundVar _ uv)   = do
                                occ   <- occNameLit uv
                                sname <- repNameS occ
                                repUnboundVar sname
-repE (XExpr (HsExpanded _ b))        = repE b
+repE (XExpr (HsExpanded a _))        = repE a
 repE e@(HsPragE _ HsPragSCC  {} _)   = notHandled "Cost centres" (ppr e)
 repE e                     = notHandled "Expression form" (ppr e)
 

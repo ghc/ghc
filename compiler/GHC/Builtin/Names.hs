@@ -442,7 +442,7 @@ basicKnownKeyNames
         knownNatClassName, knownSymbolClassName,
 
         -- Overloaded labels
-        isLabelClassName,
+        fromLabelClassOpName,
 
         -- Implicit Parameters
         ipClassName,
@@ -1619,9 +1619,9 @@ knownSymbolClassName :: Name
 knownSymbolClassName  = clsQual gHC_TYPELITS (fsLit "KnownSymbol") knownSymbolClassNameKey
 
 -- Overloaded labels
-isLabelClassName :: Name
-isLabelClassName
- = clsQual gHC_OVER_LABELS (fsLit "IsLabel") isLabelClassNameKey
+fromLabelClassOpName :: Name
+fromLabelClassOpName
+ = varQual gHC_OVER_LABELS (fsLit "fromLabel") fromLabelClassOpKey
 
 -- Implicit Parameters
 ipClassName :: Name
@@ -1775,9 +1775,6 @@ knownSymbolClassNameKey = mkPreludeClassUnique 43
 
 ghciIoClassKey :: Unique
 ghciIoClassKey = mkPreludeClassUnique 44
-
-isLabelClassNameKey :: Unique
-isLabelClassNameKey = mkPreludeClassUnique 45
 
 semigroupClassKey, monoidClassKey :: Unique
 semigroupClassKey = mkPreludeClassUnique 46
@@ -2314,6 +2311,10 @@ sndIdKey                      = mkPreludeMiscIdUnique 42
 otherwiseIdKey                = mkPreludeMiscIdUnique 43
 assertIdKey                   = mkPreludeMiscIdUnique 44
 
+leftSectionKey, rightSectionKey, ifThenElseKey :: Unique
+leftSectionKey                = mkPreludeMiscIdUnique 45
+rightSectionKey               = mkPreludeMiscIdUnique 46
+ifThenElseKey                 = mkPreludeMiscIdUnique 47
 
 rootMainKey, runMainKey :: Unique
 rootMainKey                   = mkPreludeMiscIdUnique 101
@@ -2394,6 +2395,10 @@ mfixIdKey       = mkPreludeMiscIdUnique 175
 -- MonadFail operations
 failMClassOpKey :: Unique
 failMClassOpKey = mkPreludeMiscIdUnique 176
+
+-- fromLabel
+fromLabelClassOpKey :: Unique
+fromLabelClassOpKey = mkPreludeMiscIdUnique 177
 
 -- Arrow notation
 arrAIdKey, composeAIdKey, firstAIdKey, appAIdKey, choiceAIdKey,

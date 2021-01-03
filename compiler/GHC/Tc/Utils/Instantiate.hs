@@ -12,7 +12,8 @@
 
 module GHC.Tc.Utils.Instantiate (
      topSkolemise,
-     topInstantiate, instantiateSigma,
+     topInstantiate, topInstantiateInferred,
+     instantiateSigma,
      instCall, instDFunType, instStupidTheta, instTyVarsWith,
      newWanted, newWanteds,
 
@@ -189,25 +190,33 @@ topSkolemise ty
       = return (wrap, tv_prs, ev_vars, substTy subst ty)
         -- substTy is a quick no-op on an empty substitution
 
--- | Instantiate all outer type variables
+-- | Instantiate outer type variables
 -- and any context. Never looks through arrows.
-topInstantiate :: CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
--- if    topInstantiate ty = (wrap, rho)
--- and   e :: ty
--- then  wrap e :: rho  (that is, wrap :: ty "->" rho)
--- NB: always returns a rho-type, with no top-level forall or (=>)
-topInstantiate orig ty
-  | (tvs, theta, body) <- tcSplitSigmaTy ty
+topInstantiate, topInstantiateInferred
+   :: CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
+topInstantiate         = topInstantiateSome isInvisibleArgFlag
+topInstantiateInferred = topInstantiateSome isInferredArgFlag
+
+topInstantiateSome :: (ArgFlag -> Bool) -> CtOrigin
+                   -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
+-- Instantiate the binders that satisfy the predicate
+-- If    top_instantiate ty = (wrap, inner_ty)
+-- then  wrap :: inner_ty "->" ty
+-- NB: returns a type with no (=>),
+--     and no forall satisfying arg_flag_pred
+topInstantiateSome arg_flag_pred orig sigma
+  | (tvs,   body1) <- tcSplitSomeForAllTyVars arg_flag_pred sigma
+  , (theta, body2) <- tcSplitPhiTy body1
   , not (null tvs && null theta)
-  = do { (_, wrap1, body1) <- instantiateSigma orig tvs theta body
+  = do { (_, wrap1, body3) <- instantiateSigma orig tvs theta body2
 
        -- Loop, to account for types like
        --       forall a. Num a => forall b. Ord b => ...
-       ; (wrap2, rho) <- topInstantiate orig body1
+       ; (wrap2, body4) <- topInstantiateSome arg_flag_pred orig body3
 
-       ; return (wrap2 <.> wrap1, rho) }
+       ; return (wrap2 <.> wrap1, body4) }
 
-  | otherwise = return (idHsWrapper, ty)
+  | otherwise = return (idHsWrapper, sigma)
 
 instantiateSigma :: CtOrigin -> [TyVar] -> TcThetaType -> TcSigmaType
                  -> TcM ([TcTyVar], HsWrapper, TcSigmaType)
@@ -658,34 +667,18 @@ cases (the rest are caught in lookupInst).
 newOverloadedLit :: HsOverLit GhcRn
                  -> ExpRhoType
                  -> TcM (HsOverLit GhcTc)
-newOverloadedLit
-  lit@(OverLit { ol_val = val, ol_ext = rebindable }) res_ty
-  | not rebindable
-  = do { res_ty <- expTypeToType res_ty
-       ; dflags <- getDynFlags
-       ; let platform = targetPlatform dflags
-       ; case shortCutLit platform val res_ty of
-        -- Do not generate a LitInst for rebindable syntax.
-        -- Reason: If we do, tcSimplify will call lookupInst, which
-        --         will call tcSyntaxName, which does unification,
-        --         which tcSimplify doesn't like
-           Just expr -> return (lit { ol_witness = expr
-                                    , ol_ext = OverLitTc False res_ty })
-           Nothing   -> newNonTrivialOverloadedLit orig lit
-                                                   (mkCheckExpType res_ty) }
-
-  | otherwise
-  = newNonTrivialOverloadedLit orig lit res_ty
-  where
-    orig = LiteralOrigin lit
+newOverloadedLit lit res_ty
+  = do { mb_lit' <- tcShortCutLit lit res_ty
+       ; case mb_lit' of
+            Just lit' -> return lit'
+            Nothing   -> newNonTrivialOverloadedLit lit res_ty }
 
 -- Does not handle things that 'shortCutLit' can handle. See also
 -- newOverloadedLit in GHC.Tc.Utils.Unify
-newNonTrivialOverloadedLit :: CtOrigin
-                           -> HsOverLit GhcRn
+newNonTrivialOverloadedLit :: HsOverLit GhcRn
                            -> ExpRhoType
                            -> TcM (HsOverLit GhcTc)
-newNonTrivialOverloadedLit orig
+newNonTrivialOverloadedLit
   lit@(OverLit { ol_val = val, ol_witness = HsVar _ (L _ meth_name)
                , ol_ext = rebindable }) res_ty
   = do  { hs_lit <- mkOverLit val
@@ -697,7 +690,10 @@ newNonTrivialOverloadedLit orig
         ; res_ty <- readExpType res_ty
         ; return (lit { ol_witness = witness
                       , ol_ext = OverLitTc rebindable res_ty }) }
-newNonTrivialOverloadedLit _ lit _
+  where
+    orig = LiteralOrigin lit
+
+newNonTrivialOverloadedLit lit _
   = pprPanic "newNonTrivialOverloadedLit" (ppr lit)
 
 ------------

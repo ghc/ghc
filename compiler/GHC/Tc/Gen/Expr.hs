@@ -17,9 +17,10 @@
 
 module GHC.Tc.Gen.Expr
        ( tcCheckPolyExpr, tcCheckPolyExprNC,
-         tcCheckMonoExpr, tcCheckMonoExprNC, tcMonoExpr, tcMonoExprNC,
+         tcCheckMonoExpr, tcCheckMonoExprNC,
+         tcMonoExpr, tcMonoExprNC,
          tcInferRho, tcInferRhoNC,
-         tcExpr,
+         tcPolyExpr, tcExpr,
          tcSyntaxOp, tcSyntaxOpGen, SyntaxOpType(..), synKnownType,
          tcCheckId,
          addAmbiguousNameErr,
@@ -37,7 +38,6 @@ import GHC.Tc.Utils.Zonk
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Unify
 import GHC.Types.Basic
-import GHC.Types.SourceText
 import GHC.Core.Multiplicity
 import GHC.Core.UsageEnv
 import GHC.Tc.Utils.Instantiate
@@ -81,7 +81,7 @@ import GHC.Data.FastString
 import Control.Monad
 import GHC.Core.Class(classTyCon)
 import GHC.Types.Unique.Set ( UniqSet, mkUniqSet, elementOfUniqSet, nonDetEltsUniqSet )
-import qualified GHC.LanguageExtensions as LangExt
+-- import qualified GHC.LanguageExtensions as LangExt
 
 import Data.Function
 import Data.List (partition, sortBy, groupBy, intersect)
@@ -105,34 +105,23 @@ tcCheckPolyExpr, tcCheckPolyExprNC
 -- The NC version does not do so, usually because the caller wants
 -- to do so themselves.
 
-tcCheckPolyExpr   expr res_ty = tcPolyExpr   expr (mkCheckExpType res_ty)
-tcCheckPolyExprNC expr res_ty = tcPolyExprNC expr (mkCheckExpType res_ty)
+tcCheckPolyExpr   expr res_ty = tcPolyLExpr   expr (mkCheckExpType res_ty)
+tcCheckPolyExprNC expr res_ty = tcPolyLExprNC expr (mkCheckExpType res_ty)
 
 -- These versions take an ExpType
-tcPolyExpr, tcPolyExprNC
-  :: LHsExpr GhcRn -> ExpSigmaType
-  -> TcM (LHsExpr GhcTc)
+tcPolyLExpr, tcPolyLExprNC :: LHsExpr GhcRn -> ExpSigmaType
+                           -> TcM (LHsExpr GhcTc)
 
-tcPolyExpr expr res_ty
-  = addLExprCtxt expr $
-    do { traceTc "tcPolyExpr" (ppr res_ty)
-       ; tcPolyExprNC expr res_ty }
+tcPolyLExpr (L loc expr) res_ty
+  = setSrcSpan loc   $
+    addExprCtxt expr $
+    do { expr' <- tcPolyExpr expr res_ty
+       ; return (L loc expr') }
 
-tcPolyExprNC (L loc expr) res_ty
-  = set_loc_and_ctxt loc expr $
-    do { traceTc "tcPolyExprNC" (ppr res_ty)
-       ; (wrap, expr') <- tcSkolemiseET GenSigCtxt res_ty $ \ res_ty ->
-                          tcExpr expr res_ty
-       ; return $ L loc (mkHsWrap wrap expr') }
-
-  where -- See Note [Rebindable syntax and HsExpansion), which describes
-        -- the logic behind this location/context tweaking.
-        set_loc_and_ctxt l e m = do
-          inGenCode <- inGeneratedCode
-          if inGenCode && not (isGeneratedSrcSpan l)
-            then setSrcSpan l $
-                 addExprCtxt e m
-            else setSrcSpan l m
+tcPolyLExprNC (L loc expr) res_ty
+  = setSrcSpan loc    $
+    do { expr' <- tcPolyExpr expr res_ty
+       ; return (L loc expr') }
 
 ---------------
 tcCheckMonoExpr, tcCheckMonoExprNC
@@ -149,9 +138,11 @@ tcMonoExpr, tcMonoExprNC
                          -- Definitely no foralls at the top
     -> TcM (LHsExpr GhcTc)
 
-tcMonoExpr expr res_ty
-  = addLExprCtxt expr $
-    tcMonoExprNC expr res_ty
+tcMonoExpr (L loc expr) res_ty
+  = setSrcSpan loc   $
+    addExprCtxt expr $
+    do  { expr' <- tcExpr expr res_ty
+        ; return (L loc expr') }
 
 tcMonoExprNC (L loc expr) res_ty
   = setSrcSpan loc $
@@ -161,8 +152,11 @@ tcMonoExprNC (L loc expr) res_ty
 ---------------
 tcInferRho, tcInferRhoNC :: LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcRhoType)
 -- Infer a *rho*-type. The return type is always instantiated.
-tcInferRho le = addLExprCtxt le $
-                tcInferRhoNC le
+tcInferRho (L loc expr)
+  = setSrcSpan loc   $   -- Set location /first/; see
+    addExprCtxt expr $
+    do { (expr', rho) <- tcInfer (tcExpr expr)
+       ; return (L loc expr', rho) }
 
 tcInferRhoNC (L loc expr)
   = setSrcSpan loc $
@@ -176,22 +170,39 @@ tcInferRhoNC (L loc expr)
 *                                                                      *
 ********************************************************************* -}
 
+tcPolyExpr :: HsExpr GhcRn -> ExpSigmaType -> TcM (HsExpr GhcTc)
+tcPolyExpr expr res_ty
+  = do { traceTc "tcPolyExpr" (ppr res_ty)
+       ; (wrap, expr') <- tcSkolemiseET GenSigCtxt res_ty $ \ res_ty ->
+                          tcExpr expr res_ty
+       ; return $ mkHsWrap wrap expr' }
+
 tcExpr :: HsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
 
 -- Use tcApp to typecheck appplications, which are treated specially
 -- by Quick Look.  Specifically:
---   - HsApp:     value applications
---   - HsTypeApp: type applications
---   - HsVar:     lone variables, to ensure that they can get an
---                impredicative instantiation (via Quick Look
---                driven by res_ty (in checking mode).
+--   - HsApp:       value applications
+--   - HsAppType:   type applications
+--   - HsOverLabel: overloaded labels
+--   - HsRecFld:    overloaded record fields
+--   - HsVar:       lone variables, to ensure that they can get an
+--                  impredicative instantiation (via Quick Look
+--                  driven by res_ty (in checking mode)).
 --   - ExprWithTySig: (e :: type)
 -- See Note [Application chains and heads] in GHC.Tc.Gen.App
-tcExpr e@(HsVar {})         res_ty = tcApp e res_ty
-tcExpr e@(HsApp {})         res_ty = tcApp e res_ty
-tcExpr e@(HsAppType {})     res_ty = tcApp e res_ty
-tcExpr e@(ExprWithTySig {}) res_ty = tcApp e res_ty
-tcExpr e@(HsRecFld {})      res_ty = tcApp e res_ty
+tcExpr e@(HsVar {})              res_ty = tcApp e res_ty
+tcExpr e@(HsApp {})              res_ty = tcApp e res_ty
+tcExpr e@(HsAppType {})          res_ty = tcApp e res_ty
+tcExpr e@(ExprWithTySig {})      res_ty = tcApp e res_ty
+tcExpr e@(HsRecFld {})           res_ty = tcApp e res_ty
+tcExpr e@(XExpr (HsExpanded {})) res_ty = tcApp e res_ty
+tcExpr e@(OpApp {})              res_ty = tcApp e res_ty
+
+
+tcExpr e@(HsOverLit _ lit)  res_ty = do { mb_res <- tcShortCutLit lit res_ty
+                                        ; case mb_res of
+                                             Just lit' -> return (HsOverLit noExtField lit')
+                                             Nothing   -> tcApp e res_ty }
 
 -- Typecheck an occurrence of an unbound Id
 --
@@ -215,10 +226,6 @@ tcExpr (HsPar x expr) res_ty
 tcExpr (HsPragE x prag expr) res_ty
   = do { expr' <- tcMonoExpr expr res_ty
        ; return (HsPragE x (tcExprPrag prag) expr') }
-
-tcExpr (HsOverLit x lit) res_ty
-  = do  { lit' <- newOverloadedLit lit res_ty
-        ; return (HsOverLit x lit') }
 
 tcExpr (NegApp x expr neg_expr) res_ty
   = do  { (expr', neg_expr')
@@ -245,31 +252,6 @@ tcExpr e@(HsIPVar _ x) res_ty
                           unwrapIP $ mkClassPred ipClass [x,ty]
   origin = IPOccOrigin x
 
-tcExpr e@(HsOverLabel _ mb_fromLabel l) res_ty
-  = do { -- See Note [Type-checking overloaded labels]
-         loc <- getSrcSpanM
-       ; case mb_fromLabel of
-           Just fromLabel -> tcExpr (applyFromLabel loc fromLabel) res_ty
-           Nothing -> do { isLabelClass <- tcLookupClass isLabelClassName
-                         ; alpha <- newFlexiTyVarTy liftedTypeKind
-                         ; let pred = mkClassPred isLabelClass [lbl, alpha]
-                         ; loc <- getSrcSpanM
-                         ; var <- emitWantedEvVar origin pred
-                         ; tcWrapResult e
-                                       (fromDict pred (HsVar noExtField (L loc var)))
-                                        alpha res_ty } }
-  where
-  -- Coerces a dictionary for `IsLabel "x" t` into `t`,
-  -- or `HasField "x" r a into `r -> a`.
-  fromDict pred = mkHsWrap $ mkWpCastR $ unwrapIP pred
-  origin = OverLabelOrigin l
-  lbl = mkStrLitTy l
-
-  applyFromLabel loc fromLabel =
-    HsAppType noExtField
-         (L loc (HsVar noExtField (L loc fromLabel)))
-         (mkEmptyWildCardBndrs (L loc (HsTyLit noExtField (HsStrTy NoSourceText l))))
-
 tcExpr (HsLam x match) res_ty
   = do  { (wrap, match') <- tcMatchLambda herald match_ctxt match res_ty
         ; return (mkHsWrap wrap (HsLam x match')) }
@@ -292,92 +274,22 @@ tcExpr e@(HsLamCase x matches) res_ty
               , text "requires"]
     match_ctxt = MC { mc_what = CaseAlt, mc_body = tcBody }
 
-{-
-Note [Type-checking overloaded labels]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Recall that we have
-
-  module GHC.OverloadedLabels where
-    class IsLabel (x :: Symbol) a where
-      fromLabel :: a
-
-We translate `#foo` to `fromLabel @"foo"`, where we use
-
- * the in-scope `fromLabel` if `RebindableSyntax` is enabled; or if not
- * `GHC.OverloadedLabels.fromLabel`.
-
-In the `RebindableSyntax` case, the renamer will have filled in the
-first field of `HsOverLabel` with the `fromLabel` function to use, and
-we simply apply it to the appropriate visible type argument.
-
-In the `OverloadedLabels` case, when we see an overloaded label like
-`#foo`, we generate a fresh variable `alpha` for the type and emit an
-`IsLabel "foo" alpha` constraint.  Because the `IsLabel` class has a
-single method, it is represented by a newtype, so we can coerce
-`IsLabel "foo" alpha` to `alpha` (just like for implicit parameters).
-
--}
 
 
 {-
 ************************************************************************
 *                                                                      *
-                Infix operators and sections
+                Explicit lists
 *                                                                      *
 ************************************************************************
-
-Note [Left sections]
-~~~~~~~~~~~~~~~~~~~~
-Left sections, like (4 *), are equivalent to
-        \ x -> (*) 4 x,
-or, if PostfixOperators is enabled, just
-        (*) 4
-With PostfixOperators we don't actually require the function to take
-two arguments at all.  For example, (x `not`) means (not x); you get
-postfix operators!  Not Haskell 98, but it's less work and kind of
-useful.
 -}
 
-tcExpr expr@(OpApp {}) res_ty
-  = tcApp expr res_ty
-
--- Right sections, equivalent to \ x -> x `op` expr, or
---      \ x -> op x expr
-
-tcExpr expr@(SectionR x op arg2) res_ty
-  = do { (op', op_ty) <- tcInferRhoNC op
-       ; (wrap_fun, [Scaled arg1_mult arg1_ty, arg2_ty], op_res_ty)
-                  <- matchActualFunTysRho (mk_op_msg op) fn_orig
-                                          (Just (ppr op)) 2 op_ty
-       ; arg2' <- tcValArg (unLoc op) arg2 arg2_ty 2
-       ; let expr'      = SectionR x (mkLHsWrap wrap_fun op') arg2'
-             act_res_ty = mkVisFunTy arg1_mult arg1_ty op_res_ty
-       ; tcWrapResultMono expr expr' act_res_ty res_ty }
-
-  where
-    fn_orig = lexprCtOrigin op
-    -- It's important to use the origin of 'op', so that call-stacks
-    -- come out right; they are driven by the OccurrenceOf CtOrigin
-    -- See #13285
-
-tcExpr expr@(SectionL x arg1 op) res_ty
-  = do { (op', op_ty) <- tcInferRhoNC op
-       ; dflags <- getDynFlags      -- Note [Left sections]
-       ; let n_reqd_args | xopt LangExt.PostfixOperators dflags = 1
-                         | otherwise                            = 2
-
-       ; (wrap_fn, (arg1_ty:arg_tys), op_res_ty)
-           <- matchActualFunTysRho (mk_op_msg op) fn_orig
-                                   (Just (ppr op)) n_reqd_args op_ty
-       ; arg1' <- tcValArg (unLoc op) arg1 arg1_ty 1
-       ; let expr'      = SectionL x arg1' (mkLHsWrap wrap_fn op')
-             act_res_ty = mkVisFunTys arg_tys op_res_ty
-       ; tcWrapResultMono expr expr' act_res_ty res_ty }
-  where
-    fn_orig = lexprCtOrigin op
-    -- It's important to use the origin of 'op', so that call-stacks
-    -- come out right; they are driven by the OccurrenceOf CtOrigin
-    -- See #13285
+tcExpr (ExplicitList _ exprs) res_ty
+  = do  { res_ty <- expTypeToType res_ty
+        ; (coi, elt_ty) <- matchExpectedListTy res_ty
+        ; let tc_elt expr = tcCheckPolyExpr expr elt_ty
+        ; exprs' <- mapM tc_elt exprs
+        ; return $ mkHsWrapCo coi $ ExplicitList elt_ty exprs' }
 
 tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
   | all tupArgPresent tup_args
@@ -427,32 +339,6 @@ tcExpr (ExplicitSum _ alt arity expr) res_ty
        ; expr' <- tcCheckPolyExpr expr (arg_tys' `getNth` (alt - 1))
        ; return $ mkHsWrapCo coi (ExplicitSum arg_tys' alt arity expr' ) }
 
--- This will see the empty list only when -XOverloadedLists.
--- See Note [Empty lists] in GHC.Hs.Expr.
-tcExpr (ExplicitList _ witness exprs) res_ty
-  = case witness of
-      Nothing   -> do  { res_ty <- expTypeToType res_ty
-                       ; (coi, elt_ty) <- matchExpectedListTy res_ty
-                       ; exprs' <- mapM (tc_elt elt_ty) exprs
-                       ; return $
-                         mkHsWrapCo coi $ ExplicitList elt_ty Nothing exprs' }
-
-      Just fln -> do { ((exprs', elt_ty), fln')
-                         <- tcSyntaxOp ListOrigin fln
-                                       [synKnownType intTy, SynList] res_ty $
-                            \ [elt_ty] [_int_mul, list_mul] ->
-                              -- We ignore _int_mul because the integer (first
-                              -- argument of fromListN) is statically known: it
-                              -- is desugared to a literal. Therefore there is
-                              -- no variable of which to scale the usage in that
-                              -- first argument, and `_int_mul` is completely
-                              -- free in this expression.
-                            do { exprs' <-
-                                    mapM (tcScalingUsage list_mul . tc_elt elt_ty) exprs
-                               ; return (exprs', elt_ty) }
-
-                     ; return $ ExplicitList elt_ty (Just fln') exprs' }
-     where tc_elt elt_ty expr = tcCheckPolyExpr expr elt_ty
 
 {-
 ************************************************************************
@@ -502,6 +388,7 @@ tcExpr (HsIf x pred b1 b2) res_ty
        ; (u2,b2') <- tcCollectingUsage $ tcMonoExpr b2 res_ty
        ; tcEmitBindingUsage (supUE u1 u2)
        ; return (HsIf x pred' b1' b2') }
+
 
 tcExpr (HsMultiIf _ alts) res_ty
   = do { alts' <- mapM (wrapLocM $ tcGRHS match_ctxt res_ty) alts
@@ -958,19 +845,6 @@ tcExpr e@(HsRnBracketOut _ brack ps) res_ty = tcUntypedBracket e brack ps res_ty
 {-
 ************************************************************************
 *                                                                      *
-                Rebindable syntax
-*                                                                      *
-************************************************************************
--}
-
--- See Note [Rebindable syntax and HsExpansion].
-tcExpr (XExpr (HsExpanded a b)) t
-  = fmap (XExpr . ExpansionExpr . HsExpanded a) $
-      setSrcSpan generatedSrcSpan (tcExpr b t)
-
-{-
-************************************************************************
-*                                                                      *
                 Catch-all
 *                                                                      *
 ************************************************************************
@@ -978,7 +852,7 @@ tcExpr (XExpr (HsExpanded a b)) t
 
 tcExpr other _ = pprPanic "tcExpr" (ppr other)
   -- Include ArrForm, ArrApp, which shouldn't appear at all
-  -- Also HsTcBracketOut, HsQuasiQuoteE
+  -- Also HsTcBracketOut, HsQuasiQuoteE, HsIf, SectionL, SectionR
 
 
 {-
@@ -1395,8 +1269,8 @@ For each binding field = value
 3. Instantiate the field type (from the field label) using the type
    envt from step 2.
 
-4  Type check the value using tcValArg, passing the field type as
-   the expected argument type.
+4  Type check the value using tcCheckPolyExprNC (in tcRecordField),
+   passing the field type as the expected argument type.
 
 This extends OK when the field types are universally quantified.
 -}
@@ -1543,9 +1417,6 @@ Boring and alphabetical:
 fieldCtxt :: FieldLabelString -> SDoc
 fieldCtxt field_name
   = text "In the" <+> quotes (ppr field_name) <+> ptext (sLit "field of a record")
-
-mk_op_msg :: LHsExpr GhcRn -> SDoc
-mk_op_msg op = text "The operator" <+> quotes (ppr op) <+> text "takes"
 
 badFieldTypes :: [(FieldLabelString,TcType)] -> SDoc
 badFieldTypes prs
@@ -1840,3 +1711,4 @@ checkClosedInStaticForm name = do
 -- When @n@ is not closed, we traverse the graph reachable from @n@ to build
 -- the reason.
 --
+

@@ -387,7 +387,7 @@ simplNonRecX env bndr new_rhs
 
   | otherwise
   = do  { (env', bndr') <- simplBinder env bndr
-        ; completeNonRecX NotTopLevel env' (isStrictId bndr) bndr bndr' new_rhs }
+        ; completeNonRecX NotTopLevel env' (isStrictId bndr') bndr bndr' new_rhs }
                 -- simplNonRecX is only used for NotTopLevel things
 
 --------------------------
@@ -1573,21 +1573,22 @@ simplNonRecE env bndr (rhs, rhs_se) (bndrs, body) cont
        ; -- pprTrace "preInlineUncond" (ppr bndr <+> ppr rhs) $
          simplLam env' bndrs body cont }
 
-  -- Deal with strict bindings
-  | isStrictId bndr          -- Includes coercions, and unlifted types
-  , sm_case_case (getMode env)
-  = simplExprF (rhs_se `setInScopeFromE` env) rhs
-               (StrictBind { sc_bndr = bndr, sc_bndrs = bndrs, sc_body = body
-                           , sc_env = env, sc_cont = cont, sc_dup = NoDup })
-
-  -- Deal with lazy bindings
   | otherwise
-  = ASSERT( not (isTyVar bndr) )
-    do { (env1, bndr1) <- simplNonRecBndr env bndr
-       ; (env2, bndr2) <- addBndrRules env1 bndr bndr1 Nothing
+  = do { (env1, bndr1) <- simplNonRecBndr env bndr
+
+       -- Deal with strict bindings
+       -- See Note [Dark corner with levity polymorphism]
+       ; if isStrictId bndr1 && sm_case_case (getMode env)
+         then simplExprF (rhs_se `setInScopeFromE` env) rhs
+                   (StrictBind { sc_bndr = bndr, sc_bndrs = bndrs, sc_body = body
+                               , sc_env = env, sc_cont = cont, sc_dup = NoDup })
+
+       -- Deal with lazy bindings
+         else do
+       { (env2, bndr2) <- addBndrRules env1 bndr bndr1 Nothing
        ; (floats1, env3) <- simplLazyBind env2 NotTopLevel NonRecursive bndr bndr2 rhs rhs_se
        ; (floats2, expr') <- simplLam env3 bndrs body cont
-       ; return (floats1 `addFloats` floats2, expr') }
+       ; return (floats1 `addFloats` floats2, expr') } }
 
 ------------------
 simplRecE :: SimplEnv
@@ -1608,7 +1609,19 @@ simplRecE env pairs body cont
         ; (floats2, expr') <- simplExprF env2 body cont
         ; return (floats1 `addFloats` floats2, expr') }
 
-{- Note [Avoiding exponential behaviour]
+{- Note [Dark corner with levity polymorphism]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In `simplNonRecE`, the call to `isStrictId` will fail if the binder
+has a levity-polymorphic type, of kind (TYPE r).  So we are careful to
+call `isStrictId` on the OutId, not the InId, in case we have
+     ((\(r::RuntimeRep) \(x::Type r). blah) Lifted arg)
+That will lead to `simplNonRecE env (x::Type r) arg`, and we can't tell
+if x is lifted or unlifted from that.
+
+We only get such redexes from the compulsory inlining of a wired-in,
+levity-polymorphic function like `rightSection` (see GHC.Types.Id.Make).
+
+Note [Avoiding exponential behaviour]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 One way in which we can get exponential behaviour is if we simplify a
 big expression, and the re-simplify it -- and then this happens in a

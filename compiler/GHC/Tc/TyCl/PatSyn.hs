@@ -1019,7 +1019,7 @@ tcPatToExpr name args pat = go pat
     go1 (ParPat _ pat)          = fmap (HsPar noExtField) $ go pat
     go1 p@(ListPat reb pats)
       | Nothing <- reb = do { exprs <- mapM go pats
-                            ; return $ ExplicitList noExtField Nothing exprs }
+                            ; return $ ExplicitList noExtField exprs }
       | otherwise                   = notInvertibleListPat p
     go1 (TuplePat _ pats box)       = do { exprs <- mapM go pats
                                          ; return $ ExplicitTuple noExtField

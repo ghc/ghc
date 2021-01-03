@@ -483,6 +483,8 @@ isGoodBreakExpr :: HsExpr GhcTc -> Bool
 isGoodBreakExpr (HsApp {})     = True
 isGoodBreakExpr (HsAppType {}) = True
 isGoodBreakExpr (OpApp {})     = True
+isGoodBreakExpr (XExpr (ExpansionExpr (HsExpanded _ e)))
+                               = isGoodBreakExpr e
 isGoodBreakExpr _other         = False
 
 isCallSite :: HsExpr GhcTc -> Bool
@@ -529,7 +531,6 @@ addTickHsExpr (HsApp x e1 e2)    = liftM2 (HsApp x) (addTickLHsExprNever e1)
 addTickHsExpr (HsAppType x e ty) = liftM3 HsAppType (return x)
                                                     (addTickLHsExprNever e)
                                                     (return ty)
-
 addTickHsExpr (OpApp fix e1 e2 e3) =
         liftM4 OpApp
                 (return fix)
@@ -583,15 +584,8 @@ addTickHsExpr (HsDo srcloc cxt (L l stmts))
         forQual = case cxt of
                     ListComp -> Just $ BinBox QualBinBox
                     _        -> Nothing
-addTickHsExpr (ExplicitList ty wit es) =
-        liftM3 ExplicitList
-                (return ty)
-                (addTickWit wit)
-                (mapM (addTickLHsExpr) es)
-             where addTickWit Nothing = return Nothing
-                   addTickWit (Just fln)
-                     = do fln' <- addTickSyntaxExpr hpcSrcSpan fln
-                          return (Just fln')
+addTickHsExpr (ExplicitList ty es)
+  = liftM2 ExplicitList (return ty) (mapM (addTickLHsExpr) es)
 
 addTickHsExpr (HsStatic fvs e) = HsStatic fvs <$> addTickLHsExpr e
 
