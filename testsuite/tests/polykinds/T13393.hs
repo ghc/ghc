@@ -28,7 +28,7 @@ newtype AacEncSt (rate :: Rate) channels (codec :: AacCodec) = MkAacEncSt
 
 -- makeLenses ''AacEncSt
 
-type Iso s t a b = forall p f. (Functor f) => (a -> f b) -> s -> (f t)
+type Iso s t a b = forall f. (Functor f) => (a -> f b) -> s -> (f t)
 instance (Monad m, Monoid w) => MonadState s (RWST r w s m) where
 
 iso :: (s -> a) -> (b -> t) -> Iso s t a b

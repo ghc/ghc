@@ -440,7 +440,7 @@ emptyLHsQTvs = HsQTvs { hsq_ext = [], hsq_explicit = [] }
 -- we use use HsOuterImplicit, wrapped around a HsForAllTy
 -- for the visible quantification
 --
--- See Note [forall-or-nothing] rule
+-- See Note [forall-or-nothing rule]
 
 -- | The outermost type variables in a type that obeys the @forall@-or-nothing
 -- rule. See @Note [forall-or-nothing rule]@.
