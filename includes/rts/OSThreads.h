@@ -175,6 +175,7 @@ extern void closeCondition        ( Condition* pCond );
 extern bool broadcastCondition    ( Condition* pCond );
 extern bool signalCondition       ( Condition* pCond );
 extern bool waitCondition         ( Condition* pCond, Mutex* pMut );
+extern bool timedWaitCondition    ( Condition* pCond, Mutex* pMut, Time timeout);
 
 //
 // Mutexes
