@@ -1,6 +1,7 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE InterruptibleFFI #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, CApiFFI #-}
+{-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
@@ -356,31 +357,56 @@ type CFilePath = CWString
 foreign import ccall unsafe "HsBase.h __hscore_open"
    c_open :: CFilePath -> CInt -> CMode -> IO CInt
 
+-- | The same as 'c_safe_open', but an /interruptible operation/
+-- as described in "Control.Exception"—it respects `uninterruptibleMask`
+-- but not `mask`.
+--
 -- We want to be able to interrupt an openFile call if
 -- it's expensive (NFS, FUSE, etc.), and we especially
 -- need to be able to interrupt a blocking open call.
 -- See #17912.
 c_interruptible_open :: CFilePath -> CInt -> CMode -> IO CInt
-c_interruptible_open filepath oflags mode = do
-  open_res <- c_interruptible_open_ filepath oflags mode
-  -- c_interruptible_open_ is an interruptible foreign call.
-  -- If the call is interrupted by an exception handler
-  -- before the system call has returned (so the file is
-  -- not yet open), we want to deliver the exception.
-  -- In point of fact, we deliver any pending exception
-  -- here regardless of the *reason* the system call
-  -- fails.
-  when (open_res == -1) $
-    -- Control.Exception.allowInterrupt, inlined to avoid
-    -- messing with any Haddock links.
-    interruptible (pure ())
-  pure (open_res)
+c_interruptible_open filepath oflags mode =
+  getMaskingState >>= \case
+    -- If we're in an uninterruptible mask, there's basically
+    -- no point in using an interruptible FFI call. The open system call
+    -- will be interrupted, but the exception won't be delivered
+    -- unless the caller manually futzes with the masking state. So
+    -- then the caller (assuming they're following the usual conventions)
+    -- will retry the call (in response to EINTR), and we've just
+    -- wasted everyone's time.
+    MaskedUninterruptible -> c_safe_open_ filepath oflags mode
+    _ -> do
+      open_res <- c_interruptible_open_ filepath oflags mode
+      -- c_interruptible_open_ is an interruptible foreign call.
+      -- If the call is interrupted by an exception handler
+      -- before the system call has returned (so the file is
+      -- not yet open), we want to deliver the exception.
+      -- In point of fact, we deliver any pending exception
+      -- here regardless of the *reason* the system call
+      -- fails.
+      when (open_res == -1) $
+        -- Control.Exception.allowInterrupt, inlined to avoid
+        -- messing with any Haddock links.
+        interruptible (pure ())
+      pure open_res
 
 foreign import ccall interruptible "HsBase.h __hscore_open"
    c_interruptible_open_ :: CFilePath -> CInt -> CMode -> IO CInt
 
+c_safe_open :: CFilePath -> CInt -> CMode -> IO CInt
+c_safe_open filepath oflags mode =
+  getMaskingState >>= \case
+    -- When exceptions are unmasked, we use an interruptible
+    -- open call. If the system call is successfully
+    -- interrupted, the situation will be the same as if
+    -- the exception had arrived before this function was
+    -- called.
+    Unmasked -> c_interruptible_open_ filepath oflags mode
+    _ -> c_safe_open_ filepath oflags mode
+
 foreign import ccall safe "HsBase.h __hscore_open"
-   c_safe_open :: CFilePath -> CInt -> CMode -> IO CInt
+   c_safe_open_ :: CFilePath -> CInt -> CMode -> IO CInt
 
 foreign import ccall unsafe "HsBase.h __hscore_fstat"
    c_fstat :: CInt -> Ptr CStat -> IO CInt
