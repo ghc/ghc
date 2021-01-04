@@ -1523,8 +1523,8 @@ preloadObjectFile (pathchar *path)
       return NULL;
    }
 
-   /* iOS does not permit to mmap with r+w+x, however while the comment for
-    * this function says this is not the final resting place, for some
+   /* iOS and AArch64 Darwin do not permit to mmap with r+w+x, however while the
+    * comment for this function says this is not the final resting place, for some
     * architectures / hosts (at least mach-o non-iOS -- see ocGetNames_MachO)
     * the image mmaped here in fact ends up being the final resting place for
     * the sections. And hence we need to leave r+w+x here for other hosts
@@ -1532,7 +1532,7 @@ preloadObjectFile (pathchar *path)
     *
     * See also the misalignment logic for darwin below.
     */
-#if defined(ios_HOST_OS)
+#if defined(ios_HOST_OS) || (defined(aarch64_HOST_ARCH) && defined(darwin_HOST_OS))
    image = mmapForLinker(fileSize, PROT_READ|PROT_WRITE, MAP_PRIVATE, fd, 0);
 #else
    image = mmapForLinker(fileSize, PROT_READ|PROT_WRITE|PROT_EXEC,
