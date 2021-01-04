@@ -29,7 +29,7 @@ module GHC.Utils.Error (
 
         -- ** Construction
         emptyMessages, mkLocMessage, mkLocMessageAnn, makeIntoWarning,
-        mkErrMsg, mkPlainErrMsg, mkErrDoc, mkLongErrMsg, mkWarnMsg,
+        mkErrMsg, mkPlainErrMsg, mkErr, mkLongErrMsg, mkWarnMsg,
         mkPlainWarnMsg,
         mkLongWarnMsg,
 
@@ -121,15 +121,6 @@ orValid _       v = v
 -- Collecting up messages for later ordering and printing.
 
 ----------------
-emptyMessages :: Messages
-emptyMessages = (emptyBag, emptyBag)
-
-isEmptyMessages :: Messages -> Bool
-isEmptyMessages (warns, errs) = isEmptyBag warns && isEmptyBag errs
-
-errorsFound :: DynFlags -> Messages -> Bool
-errorsFound _dflags (_warns, errs) = not (isEmptyBag errs)
-
 formatErrDoc :: SDocContext -> ErrDoc -> SDoc
 formatErrDoc ctx (ErrDoc important context supplementary)
   = case msgs of
@@ -140,18 +131,18 @@ formatErrDoc ctx (ErrDoc important context supplementary)
         [important, context, supplementary]
     starred = (bullet<+>) . vcat
 
-pprErrMsgBagWithLoc :: Bag ErrMsg -> [SDoc]
+pprErrMsgBagWithLoc :: Bag (ErrMsg ErrDoc) -> [SDoc]
 pprErrMsgBagWithLoc bag = [ pprLocErrMsg item | item <- sortMsgBag Nothing bag ]
 
-pprLocErrMsg :: ErrMsg -> SDoc
+pprLocErrMsg :: RenderableDiagnostic e => ErrMsg e -> SDoc
 pprLocErrMsg (ErrMsg { errMsgSpan      = s
-                     , errMsgDoc       = doc
+                     , errMsgDiagnostic = e
                      , errMsgSeverity  = sev
                      , errMsgContext   = unqual })
   = sdocWithContext $ \ctx ->
-    withErrStyle unqual $ mkLocMessage sev s (formatErrDoc ctx doc)
+    withErrStyle unqual $ mkLocMessage sev s (formatErrDoc ctx $ renderDiagnostic e)
 
-sortMsgBag :: Maybe DynFlags -> Bag ErrMsg -> [ErrMsg]
+sortMsgBag :: Maybe DynFlags -> Bag (ErrMsg e) -> [ErrMsg e]
 sortMsgBag dflags = maybeLimit . sortBy (cmp `on` errMsgSpan) . bagToList
   where cmp
           | fromMaybe False (fmap reverseErrors dflags) = SrcLoc.rightmost_smallest
