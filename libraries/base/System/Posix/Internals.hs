@@ -2,6 +2,8 @@
 {-# LANGUAGE InterruptibleFFI #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, CApiFFI #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE MagicHash #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
@@ -386,13 +388,27 @@ c_interruptible_open filepath oflags mode =
       -- here regardless of the *reason* the system call
       -- fails.
       when (open_res == -1) $
-        -- Control.Exception.allowInterrupt, inlined to avoid
-        -- messing with any Haddock links.
-        interruptible (pure ())
+        if hostIsThreaded
+          then
+            -- Control.Exception.allowInterrupt, inlined to avoid
+            -- messing with any Haddock links.
+            interruptible (pure ())
+          else
+            -- Try to make this work somewhat better on the non-threaded
+            -- RTS. See #8684. This inlines the definition of `yield`; module
+            -- dependencies look pretty hairy here and I don't want to make
+            -- things worse for one little wrapper.
+            interruptible (IO $ \s -> (# yield# s, () #))
       pure open_res
 
 foreign import ccall interruptible "HsBase.h __hscore_open"
    c_interruptible_open_ :: CFilePath -> CInt -> CMode -> IO CInt
+
+-- | Consult the RTS to find whether it is threaded.
+hostIsThreaded :: Bool
+hostIsThreaded = rtsIsThreaded_ /= 0
+
+foreign import ccall unsafe "rts_isThreaded" rtsIsThreaded_ :: Int
 
 c_safe_open :: CFilePath -> CInt -> CMode -> IO CInt
 c_safe_open filepath oflags mode =
