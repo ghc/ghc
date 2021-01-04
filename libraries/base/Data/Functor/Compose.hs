@@ -5,6 +5,7 @@
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -32,7 +33,7 @@ import Data.Coerce (coerce)
 import Data.Data (Data)
 import Data.Type.Equality (TestEquality(..), (:~:)(..))
 import GHC.Generics (Generic, Generic1)
-import Text.Read (Read(..), readListDefault, readListPrecDefault)
+import Text.Read ()
 
 infixr 9 `Compose`
 
@@ -46,6 +47,17 @@ newtype Compose f g a = Compose { getCompose :: f (g a) }
            , Semigroup -- ^ @since 4.16.0.0
            , Monoid    -- ^ @since 4.16.0.0
            )
+
+-- Instances of Prelude classes
+
+-- | @since 4.16.0.0
+deriving instance Eq (f (g a)) => Eq (Compose f g a)
+-- | @since 4.16.0.0
+deriving instance Ord (f (g a)) => Ord (Compose f g a)
+-- | @since 4.16.0.0
+deriving instance Read (f (g a)) => Read (Compose f g a)
+-- | @since 4.16.0.0
+deriving instance Show (f (g a)) => Show (Compose f g a)
 
 -- Instances of lifted Prelude classes
 
@@ -76,27 +88,6 @@ instance (Show1 f, Show1 g) => Show1 (Compose f g) where
       where
         sp' = liftShowsPrec sp sl
         sl' = liftShowList sp sl
-
--- Instances of Prelude classes
-
--- | @since 4.9.0.0
-instance (Eq1 f, Eq1 g, Eq a) => Eq (Compose f g a) where
-    (==) = eq1
-
--- | @since 4.9.0.0
-instance (Ord1 f, Ord1 g, Ord a) => Ord (Compose f g a) where
-    compare = compare1
-
--- | @since 4.9.0.0
-instance (Read1 f, Read1 g, Read a) => Read (Compose f g a) where
-    readPrec = readPrec1
-
-    readListPrec = readListPrecDefault
-    readList     = readListDefault
-
--- | @since 4.9.0.0
-instance (Show1 f, Show1 g, Show a) => Show (Compose f g a) where
-    showsPrec = showsPrec1
 
 -- Functor instances
 

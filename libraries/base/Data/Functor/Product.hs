@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE Safe #-}
+{-# LANGUAGE StandaloneDeriving #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Functor.Product
@@ -28,7 +29,7 @@ import Control.Monad.Zip (MonadZip(mzipWith))
 import Data.Data (Data)
 import Data.Functor.Classes
 import GHC.Generics (Generic, Generic1)
-import Text.Read (Read(..), readListDefault, readListPrecDefault)
+import Text.Read ()
 
 -- | Lifted product of functors.
 data Product f g a = Pair (f a) (g a)
@@ -36,6 +37,15 @@ data Product f g a = Pair (f a) (g a)
            , Generic  -- ^ @since 4.9.0.0
            , Generic1 -- ^ @since 4.9.0.0
            )
+
+-- | @since 4.16.0.0
+deriving instance (Eq (f a), Eq (g a)) => Eq (Product f g a)
+-- | @since 4.16.0.0
+deriving instance (Ord (f a), Ord (g a)) => Ord (Product f g a)
+-- | @since 4.16.0.0
+deriving instance (Read (f a), Read (g a)) => Read (Product f g a)
+-- | @since 4.16.0.0
+deriving instance (Show (f a), Show (g a)) => Show (Product f g a)
 
 -- | @since 4.9.0.0
 instance (Eq1 f, Eq1 g) => Eq1 (Product f g) where
@@ -58,25 +68,6 @@ instance (Read1 f, Read1 g) => Read1 (Product f g) where
 instance (Show1 f, Show1 g) => Show1 (Product f g) where
     liftShowsPrec sp sl d (Pair x y) =
         showsBinaryWith (liftShowsPrec sp sl) (liftShowsPrec sp sl) "Pair" d x y
-
--- | @since 4.9.0.0
-instance (Eq1 f, Eq1 g, Eq a) => Eq (Product f g a)
-    where (==) = eq1
-
--- | @since 4.9.0.0
-instance (Ord1 f, Ord1 g, Ord a) => Ord (Product f g a) where
-    compare = compare1
-
--- | @since 4.9.0.0
-instance (Read1 f, Read1 g, Read a) => Read (Product f g a) where
-    readPrec = readPrec1
-
-    readListPrec = readListPrecDefault
-    readList     = readListDefault
-
--- | @since 4.9.0.0
-instance (Show1 f, Show1 g, Show a) => Show (Product f g a) where
-    showsPrec = showsPrec1
 
 -- | @since 4.9.0.0
 instance (Functor f, Functor g) => Functor (Product f g) where
