@@ -37,6 +37,10 @@ cd haddock
 
 and then proceed using your favourite build tool.
 
+Note: before building `haddock`, you need to build the subprojects
+`haddock-library` and `haddock-api`, in this order!
+The `cabal v2-build` takes care of this automatically.
+
 #### Using [`cabal v2-build`][cabal v2]
 
 ```bash
