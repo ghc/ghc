@@ -32,10 +32,10 @@ module GHC.Tc.Utils.Zonk (
         zonkTopDecls, zonkTopExpr, zonkTopLExpr,
         zonkTopBndrs,
         ZonkEnv, ZonkFlexi(..), emptyZonkEnv, mkEmptyZonkEnv, initZonkEnv,
-        zonkTyVarBinders, zonkTyVarBindersX, zonkTyVarBinderX,
+        zonkTyVarBindersX, zonkTyVarBinderX,
         zonkTyBndrs, zonkTyBndrsX,
         zonkTcTypeToType,  zonkTcTypeToTypeX,
-        zonkTcTypesToTypes, zonkTcTypesToTypesX, zonkScaledTcTypesToTypesX,
+        zonkTcTypesToTypesX, zonkScaledTcTypesToTypesX,
         zonkTyVarOcc,
         zonkCoToCo,
         zonkEvBinds, zonkTcEvBinds,
@@ -283,6 +283,10 @@ There are three possibilities:
   It's a way to have a variable that is not a mutable
   unification variable, but doesn't have a binding site
   either.
+
+* NoFlexi: See Note [Error on unconstrained meta-variables]
+  in GHC.Tc.Utils.TcMType. This mode will panic on unfilled
+  meta-variables.
 -}
 
 data ZonkFlexi   -- See Note [Un-unified unification variables]
@@ -290,6 +294,9 @@ data ZonkFlexi   -- See Note [Un-unified unification variables]
   | SkolemiseFlexi  -- Skolemise unbound unification variables
                     -- See Note [Zonking the LHS of a RULE]
   | RuntimeUnkFlexi -- Used in the GHCi debugger
+  | NoFlexi         -- Panic on unfilled meta-variables
+                    -- See Note [Error on unconstrained meta-variables]
+                    -- in GHC.Tc.Utils.TcMType
 
 instance Outputable ZonkEnv where
   ppr (ZonkEnv { ze_tv_env = tv_env
@@ -450,10 +457,6 @@ zonkTyBndrX env tv
                -- Internal names tidy up better, for iface files.
        ; let tv' = mkTyVar (tyVarName tv) ki
        ; return (extendTyZonkEnv env tv', tv') }
-
-zonkTyVarBinders ::  [VarBndr TcTyVar vis]
-                 -> TcM (ZonkEnv, [VarBndr TyVar vis])
-zonkTyVarBinders tvbs = initZonkEnv $ \ ze -> zonkTyVarBindersX ze tvbs
 
 zonkTyVarBindersX :: ZonkEnv -> [VarBndr TcTyVar vis]
                              -> TcM (ZonkEnv, [VarBndr TyVar vis])
@@ -1835,6 +1838,9 @@ commitFlexi flexi tv zonked_kind
                         -- otherwise-unconstrained unification variables are
                         -- turned into RuntimeUnks as they leave the
                         -- typechecker's monad
+
+      NoFlexi -> pprPanic "NoFlexi" (ppr tv <+> dcolon <+> ppr zonked_kind)
+
   where
      name = tyVarName tv
 
@@ -1886,9 +1892,6 @@ zonkTcTyConToTyCon tc
 -- Confused by zonking? See Note [What is zonking?] in GHC.Tc.Utils.TcMType.
 zonkTcTypeToType :: TcType -> TcM Type
 zonkTcTypeToType ty = initZonkEnv $ \ ze -> zonkTcTypeToTypeX ze ty
-
-zonkTcTypesToTypes :: [TcType] -> TcM [Type]
-zonkTcTypesToTypes tys = initZonkEnv $ \ ze -> zonkTcTypesToTypesX ze tys
 
 zonkScaledTcTypeToTypeX :: ZonkEnv -> Scaled TcType -> TcM (Scaled TcType)
 zonkScaledTcTypeToTypeX env (Scaled m ty) = Scaled <$> zonkTcTypeToTypeX env m
