@@ -146,7 +146,7 @@ endef
 define addCFileDeps
 
 	$(CPP) $($1_$2_MKDEPENDC_OPTS) $($1_$2_$(firstword $($1_$2_WAYS))_ALL_CC_OPTS) $($(basename $4)_CC_OPTS) -MM -x c $4 -MF $3.bit
-	$(foreach w,$5,sed -e 's|\\|/|g' -e 's| /$$| \\|' -e "1s|\.o|\.$($w_osuf)|" -e "1s|^|$(dir $4)|" -e "1s|$1/|$1/$2/build/|" -e "1s|$2/build/$2/build|$2/build|g" -e "s|^$(TOP)/||g$(CASE_INSENSITIVE_SED)" $3.bit >> $3.tmp &&) true
+	$(QUIET)$(foreach w,$5,sed -e 's|\\|/|g' -e 's| /$$| \\|' -e "1s|\.o|\.$($w_osuf)|" -e "1s|^|$(dir $4)|" -e "1s|$1/|$1/$2/build/|" -e "1s|$2/build/$2/build|$2/build|g" -e "s|^$(TOP)/||g$(CASE_INSENSITIVE_SED)" $3.bit >> $3.tmp &&) true
 endef
 
 ifeq "$(Windows_Host)" "YES"

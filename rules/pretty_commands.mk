@@ -1,7 +1,9 @@
 ifneq ($(V),1)
 cmd = @echo '  $(if $(label_$1),$(label_$1),$1) $@'; "$($1)"
+QUIET = @
 else
 cmd = "$($1)"
+QUIET =
 endif
 
 label_ALEX=ALEX
