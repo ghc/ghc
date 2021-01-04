@@ -4,6 +4,7 @@
 # ----------------------
 
 # shellcheck disable=SC2034
+# shellcheck disable=SC1117
 
 # Colors
 BLACK="0;30"
