@@ -34,13 +34,13 @@ import GHC.Unit.Module.Deps
 import GHC.Types.SrcLoc
 import GHC.Types.Unique.FM
 import GHC.Types.Avail
+import GHC.Types.Error
 import GHC.Types.FieldLabel
 import GHC.Types.Var
 import GHC.Types.Basic
 import GHC.Types.Name
 import GHC.Types.Name.Shape
 
-import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Fingerprint
@@ -57,7 +57,7 @@ tcRnMsgMaybe do_this = do
     r <- liftIO $ do_this
     case r of
         Left errs -> do
-            addMessages (emptyBag, errs)
+            addMessages (mkMessages errs)
             failM
         Right x -> return x
 
