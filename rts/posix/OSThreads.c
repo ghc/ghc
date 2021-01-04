@@ -78,6 +78,9 @@
 #include <numa.h>
 #endif
 
+// TODO does this need configure magic?
+#include <time.h>
+
 /*
  * This (allegedly) OS threads independent layer was initially
  * abstracted away from code that used Pthreads, so the functions
@@ -115,6 +118,19 @@ bool
 waitCondition ( Condition* pCond, Mutex* pMut )
 {
   return (pthread_cond_wait(pCond,pMut) == 0);
+}
+
+bool
+timedWaitCondition ( Condition* pCond, Mutex* pMut, Time timeout) {
+    timeout += getMonotonicNSec();
+    uint64_t secs = TimeToSeconds(timeout);
+
+    const struct timespec t = (struct timespec) {
+        .tv_sec = secs,
+        .tv_nsec = TimeToNS(timeout - SecondsToTime(secs))
+    };
+
+    return pthread_cond_timedwait(pCond,pMut, &t) == 0;
 }
 
 void
