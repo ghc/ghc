@@ -1103,32 +1103,197 @@ heapCensusCompactList(Census *census, bdescr *bd)
     }
 }
 
+/*
+ * Take a census of the contents of a "normal" (e.g. not large, not compact)
+ * heap block. This can, however, handle PINNED blocks.
+ */
+static void
+heapCensusBlock(Census *census, bdescr *bd)
+{
+    StgPtr p = bd->start;
+
+    // In the case of PINNED blocks there can be (zeroed) slop at the beginning
+    // due to object alignment.
+    if (bd->flags & BF_PINNED) {
+        while (p < bd->free && !*p) p++;
+    }
+
+    while (p < bd->free) {
+        const StgInfoTable *info = get_itbl((const StgClosure *)p);
+        bool prim = false;
+        size_t size;
+
+        switch (info->type) {
+
+        case THUNK:
+            size = thunk_sizeW_fromITBL(info);
+            break;
+
+        case THUNK_1_1:
+        case THUNK_0_2:
+        case THUNK_2_0:
+            size = sizeofW(StgThunkHeader) + 2;
+            break;
+
+        case THUNK_1_0:
+        case THUNK_0_1:
+        case THUNK_SELECTOR:
+            size = sizeofW(StgThunkHeader) + 1;
+            break;
+
+        case FUN:
+        case BLACKHOLE:
+        case BLOCKING_QUEUE:
+        case FUN_1_0:
+        case FUN_0_1:
+        case FUN_1_1:
+        case FUN_0_2:
+        case FUN_2_0:
+        case CONSTR:
+        case CONSTR_NOCAF:
+        case CONSTR_1_0:
+        case CONSTR_0_1:
+        case CONSTR_1_1:
+        case CONSTR_0_2:
+        case CONSTR_2_0:
+            size = sizeW_fromITBL(info);
+            break;
+
+        case IND:
+            // Special case/Delicate Hack: INDs don't normally
+            // appear, since we're doing this heap census right
+            // after GC.  However, GarbageCollect() also does
+            // resurrectThreads(), which can update some
+            // blackholes when it calls raiseAsync() on the
+            // resurrected threads.  So we know that any IND will
+            // be the size of a BLACKHOLE.
+            size = BLACKHOLE_sizeW();
+            break;
+
+        case BCO:
+            prim = true;
+            size = bco_sizeW((StgBCO *)p);
+            break;
+
+        case MVAR_CLEAN:
+        case MVAR_DIRTY:
+        case TVAR:
+        case WEAK:
+        case PRIM:
+        case MUT_PRIM:
+        case MUT_VAR_CLEAN:
+        case MUT_VAR_DIRTY:
+            prim = true;
+            size = sizeW_fromITBL(info);
+            break;
+
+        case AP:
+            size = ap_sizeW((StgAP *)p);
+            break;
+
+        case PAP:
+            size = pap_sizeW((StgPAP *)p);
+            break;
+
+        case AP_STACK:
+            size = ap_stack_sizeW((StgAP_STACK *)p);
+            break;
+
+        case ARR_WORDS:
+            prim = true;
+            size = arr_words_sizeW((StgArrBytes*)p);
+            break;
+
+        case MUT_ARR_PTRS_CLEAN:
+        case MUT_ARR_PTRS_DIRTY:
+        case MUT_ARR_PTRS_FROZEN_CLEAN:
+        case MUT_ARR_PTRS_FROZEN_DIRTY:
+            prim = true;
+            size = mut_arr_ptrs_sizeW((StgMutArrPtrs *)p);
+            break;
+
+        case SMALL_MUT_ARR_PTRS_CLEAN:
+        case SMALL_MUT_ARR_PTRS_DIRTY:
+        case SMALL_MUT_ARR_PTRS_FROZEN_CLEAN:
+        case SMALL_MUT_ARR_PTRS_FROZEN_DIRTY:
+            prim = true;
+            size = small_mut_arr_ptrs_sizeW((StgSmallMutArrPtrs *)p);
+            break;
+
+        case TSO:
+            prim = true;
+#if defined(PROFILING)
+            if (RtsFlags.ProfFlags.includeTSOs) {
+                size = sizeofW(StgTSO);
+                break;
+            } else {
+                // Skip this TSO and move on to the next object
+                p += sizeofW(StgTSO);
+                continue;
+            }
+#else
+            size = sizeofW(StgTSO);
+            break;
+#endif
+
+        case STACK:
+            prim = true;
+#if defined(PROFILING)
+            if (RtsFlags.ProfFlags.includeTSOs) {
+                size = stack_sizeW((StgStack*)p);
+                break;
+            } else {
+                // Skip this TSO and move on to the next object
+                p += stack_sizeW((StgStack*)p);
+                continue;
+            }
+#else
+            size = stack_sizeW((StgStack*)p);
+            break;
+#endif
+
+        case TREC_CHUNK:
+            prim = true;
+            size = sizeofW(StgTRecChunk);
+            break;
+
+        case COMPACT_NFDATA:
+            barf("heapCensus, found compact object in the wrong list");
+            break;
+
+        default:
+            barf("heapCensus, unknown object: %d", info->type);
+        }
+
+        heapProfObject(census,(StgClosure*)p,size,prim);
+
+        p += size;
+
+        /* skip over slop, see Note [slop on the heap] */
+        while (p < bd->free && !*p) p++;
+        /* Note [skipping slop in the heap profiler]
+         * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+         *
+         * We make sure to zero slop that can remain after a major GC so
+         * here we can assume any slop words we see until the block's free
+         * pointer are zero. Since info pointers are always nonzero we can
+         * use this to scan for the next valid heap closure.
+         *
+         * Note that not all types of slop are relevant here, only the ones
+         * that can reman after major GC. So essentially just large objects
+         * and pinned objects. All other closures will have been packed nice
+         * and thight into fresh blocks.
+         */
+    }
+}
+
 /* -----------------------------------------------------------------------------
  * Code to perform a heap census.
  * -------------------------------------------------------------------------- */
 static void
 heapCensusChain( Census *census, bdescr *bd )
 {
-    StgPtr p;
-    const StgInfoTable *info;
-    size_t size;
-    bool prim;
-
     for (; bd != NULL; bd = bd->link) {
-
-        // HACK: pretend a pinned block is just one big ARR_WORDS
-        // owned by CCS_PINNED.  These blocks can be full of holes due
-        // to alignment constraints so we can't traverse the memory
-        // and do a proper census.
-        if (bd->flags & BF_PINNED) {
-            StgClosure arr;
-            SET_HDR(&arr, &stg_ARR_WORDS_info, CCS_PINNED);
-            heapProfObject(census, &arr, bd->blocks * BLOCK_SIZE_W, true);
-            continue;
-        }
-
-        p = bd->start;
-
         // When we shrink a large ARR_WORDS, we do not adjust the free pointer
         // of the associated block descriptor, thus introducing slop at the end
         // of the object.  This slop remains after GC, violating the assumption
@@ -1136,181 +1301,19 @@ heapCensusChain( Census *census, bdescr *bd )
         // The slop isn't always zeroed (e.g. in non-profiling mode, cf
         // OVERWRITING_CLOSURE_OFS).
         // Consequently, we handle large ARR_WORDS objects as a special case.
-        if (bd->flags & BF_LARGE
-            && get_itbl((StgClosure *)p)->type == ARR_WORDS) {
-            size = arr_words_sizeW((StgArrBytes *)p);
-            prim = true;
-            heapProfObject(census, (StgClosure *)p, size, prim);
-            continue;
-        }
-
-
-        while (p < bd->free) {
-            info = get_itbl((const StgClosure *)p);
-            prim = false;
-
-            switch (info->type) {
-
-            case THUNK:
-                size = thunk_sizeW_fromITBL(info);
-                break;
-
-            case THUNK_1_1:
-            case THUNK_0_2:
-            case THUNK_2_0:
-                size = sizeofW(StgThunkHeader) + 2;
-                break;
-
-            case THUNK_1_0:
-            case THUNK_0_1:
-            case THUNK_SELECTOR:
-                size = sizeofW(StgThunkHeader) + 1;
-                break;
-
-            case FUN:
-            case BLACKHOLE:
-            case BLOCKING_QUEUE:
-            case FUN_1_0:
-            case FUN_0_1:
-            case FUN_1_1:
-            case FUN_0_2:
-            case FUN_2_0:
-            case CONSTR:
-            case CONSTR_NOCAF:
-            case CONSTR_1_0:
-            case CONSTR_0_1:
-            case CONSTR_1_1:
-            case CONSTR_0_2:
-            case CONSTR_2_0:
-                size = sizeW_fromITBL(info);
-                break;
-
-            case IND:
-                // Special case/Delicate Hack: INDs don't normally
-                // appear, since we're doing this heap census right
-                // after GC.  However, GarbageCollect() also does
-                // resurrectThreads(), which can update some
-                // blackholes when it calls raiseAsync() on the
-                // resurrected threads.  So we know that any IND will
-                // be the size of a BLACKHOLE.
-                size = BLACKHOLE_sizeW();
-                break;
-
-            case BCO:
-                prim = true;
-                size = bco_sizeW((StgBCO *)p);
-                break;
-
-            case MVAR_CLEAN:
-            case MVAR_DIRTY:
-            case TVAR:
-            case WEAK:
-            case PRIM:
-            case MUT_PRIM:
-            case MUT_VAR_CLEAN:
-            case MUT_VAR_DIRTY:
-                prim = true;
-                size = sizeW_fromITBL(info);
-                break;
-
-            case AP:
-                size = ap_sizeW((StgAP *)p);
-                break;
-
-            case PAP:
-                size = pap_sizeW((StgPAP *)p);
-                break;
-
-            case AP_STACK:
-                size = ap_stack_sizeW((StgAP_STACK *)p);
-                break;
-
-            case ARR_WORDS:
-                prim = true;
-                size = arr_words_sizeW((StgArrBytes*)p);
-                break;
-
-            case MUT_ARR_PTRS_CLEAN:
-            case MUT_ARR_PTRS_DIRTY:
-            case MUT_ARR_PTRS_FROZEN_CLEAN:
-            case MUT_ARR_PTRS_FROZEN_DIRTY:
-                prim = true;
-                size = mut_arr_ptrs_sizeW((StgMutArrPtrs *)p);
-                break;
-
-            case SMALL_MUT_ARR_PTRS_CLEAN:
-            case SMALL_MUT_ARR_PTRS_DIRTY:
-            case SMALL_MUT_ARR_PTRS_FROZEN_CLEAN:
-            case SMALL_MUT_ARR_PTRS_FROZEN_DIRTY:
-                prim = true;
-                size = small_mut_arr_ptrs_sizeW((StgSmallMutArrPtrs *)p);
-                break;
-
-            case TSO:
-                prim = true;
-#if defined(PROFILING)
-                if (RtsFlags.ProfFlags.includeTSOs) {
-                    size = sizeofW(StgTSO);
-                    break;
-                } else {
-                    // Skip this TSO and move on to the next object
-                    p += sizeofW(StgTSO);
-                    continue;
-                }
-#else
-                size = sizeofW(StgTSO);
-                break;
-#endif
-
-            case STACK:
-                prim = true;
-#if defined(PROFILING)
-                if (RtsFlags.ProfFlags.includeTSOs) {
-                    size = stack_sizeW((StgStack*)p);
-                    break;
-                } else {
-                    // Skip this TSO and move on to the next object
-                    p += stack_sizeW((StgStack*)p);
-                    continue;
-                }
-#else
-                size = stack_sizeW((StgStack*)p);
-                break;
-#endif
-
-            case TREC_CHUNK:
-                prim = true;
-                size = sizeofW(StgTRecChunk);
-                break;
-
-            case COMPACT_NFDATA:
-                barf("heapCensus, found compact object in the wrong list");
-                break;
-
-            default:
-                barf("heapCensus, unknown object: %d", info->type);
-            }
-
-            heapProfObject(census,(StgClosure*)p,size,prim);
-
-            p += size;
-
-            /* skip over slop, see Note [slop on the heap] */
+        if (bd->flags & BF_LARGE) {
+            StgPtr p = bd->start;
+            // There may be some initial zeros due to object alignment.
             while (p < bd->free && !*p) p++;
-            /* Note [skipping slop in the heap profiler]
-             * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-             *
-             * We make sure to zero slop that can remain after a major GC so
-             * here we can assume any slop words we see until the block's free
-             * pointer are zero. Since info pointers are always nonzero we can
-             * use this to scan for the next valid heap closure.
-             *
-             * Note that not all types of slop are relevant here, only the ones
-             * that can reman after major GC. So essentially just large objects
-             * and pinned objects. All other closures will have been packed nice
-             * and thight into fresh blocks.
-             */
+            if (get_itbl((StgClosure *)p)->type == ARR_WORDS) {
+                size_t size = arr_words_sizeW((StgArrBytes *)p);
+                bool prim = true;
+                heapProfObject(census, (StgClosure *)p, size, prim);
+                continue;
+            }
         }
+
+        heapCensusBlock(census, bd);
     }
 }
 
