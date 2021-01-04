@@ -270,7 +270,7 @@ GarbageCollect (uint32_t collect_gen,
   generation *gen;
   StgWord live_blocks, live_words, par_max_copied, par_balanced_copied,
       gc_spin_spin, gc_spin_yield, mut_spin_spin, mut_spin_yield,
-      any_work, no_work, scav_find_work;
+      any_work, scav_find_work;
 #if defined(THREADED_RTS)
   gc_thread *saved_gct;
 #endif
@@ -593,7 +593,6 @@ GarbageCollect (uint32_t collect_gen,
   mut_spin_spin = 0;
   mut_spin_yield = 0;
   any_work = 0;
-  no_work = 0;
   scav_find_work = 0;
   {
       uint32_t i;
@@ -614,8 +613,6 @@ GarbageCollect (uint32_t collect_gen,
                          RELAXED_LOAD(&thread->scanned) * sizeof(W_));
               debugTrace(DEBUG_gc,"   any_work         %ld",
                          RELAXED_LOAD(&thread->any_work));
-              debugTrace(DEBUG_gc,"   no_work          %ld",
-                         RELAXED_LOAD(&thread->no_work));
               debugTrace(DEBUG_gc,"   scav_find_work %ld",
                          RELAXED_LOAD(&thread->scav_find_work));
 
@@ -627,7 +624,6 @@ GarbageCollect (uint32_t collect_gen,
 #endif
 
               any_work += RELAXED_LOAD(&thread->any_work);
-              no_work += RELAXED_LOAD(&thread->no_work);
               scav_find_work += RELAXED_LOAD(&thread->scav_find_work);
 
               par_max_copied = stg_max(RELAXED_LOAD(&thread->copied), par_max_copied);
@@ -1047,7 +1043,7 @@ GarbageCollect (uint32_t collect_gen,
              N, n_gc_threads, gc_threads,
              par_max_copied, par_balanced_copied,
              gc_spin_spin, gc_spin_yield, mut_spin_spin, mut_spin_yield,
-             any_work, no_work, scav_find_work);
+             any_work, scav_find_work);
 
 #if defined(RTS_USER_SIGNALS)
   if (RtsFlags.MiscFlags.install_signal_handlers) {
@@ -1188,7 +1184,6 @@ freeGcThreads (void)
         closeCondition(&gc_running_cv);
         closeMutex(&gc_running_mutex);
         stgFree (gc_threads);
-
 #else
         for (g = 0; g < RtsFlags.GcFlags.generations; g++)
         {
@@ -1320,7 +1315,6 @@ scavenge_until_all_done (void)
                 traceEventGcWork(gct->cap);
                 continue; // for(;;) loop
             }
-            NONATOMIC_ADD(&gct->no_work, 1);
         }
 #endif
         break; // for(;;) loop
@@ -1808,7 +1802,6 @@ init_gc_thread (gc_thread *t)
     t->copied = 0;
     t->scanned = 0;
     t->any_work = 0;
-    t->no_work = 0;
     t->scav_find_work = 0;
 }
 

@@ -159,7 +159,6 @@ initStats0(void)
         .mut_spin_spin = 0,
         .mut_spin_yield = 0,
         .any_work = 0,
-        .no_work = 0,
         .scav_find_work = 0,
         .init_cpu_ns = 0,
         .init_elapsed_ns = 0,
@@ -461,8 +460,7 @@ void
 stat_endGC (Capability *cap, gc_thread *initiating_gct, W_ live, W_ copied, W_ slop,
             uint32_t gen, uint32_t par_n_threads, gc_thread **gc_threads,
             W_ par_max_copied, W_ par_balanced_copied, W_ gc_spin_spin, W_ gc_spin_yield,
-            W_ mut_spin_spin, W_ mut_spin_yield, W_ any_work, W_ no_work,
-            W_ scav_find_work)
+            W_ mut_spin_spin, W_ mut_spin_yield, W_ any_work, W_ scav_find_work)
 {
     ACQUIRE_LOCK(&stats_mutex);
 
@@ -542,7 +540,6 @@ stat_endGC (Capability *cap, gc_thread *initiating_gct, W_ live, W_ copied, W_ s
         stats.cumulative_par_balanced_copied_bytes +=
             stats.gc.par_balanced_copied_bytes;
         stats.any_work += any_work;
-        stats.no_work += no_work;
         stats.scav_find_work += scav_find_work;
         stats.gc_spin_spin += gc_spin_spin;
         stats.gc_spin_yield += gc_spin_yield;
@@ -1027,10 +1024,6 @@ static void report_summary(const RTSSummaryStats* sum)
                     , col_width[2], stats.any_work);
         statsPrintf("%*s" "%*s" "%*" FMT_Word64 "\n"
                     , col_width[0], ""
-                    , col_width[1], "no_work"
-                    , col_width[2], stats.no_work);
-        statsPrintf("%*s" "%*s" "%*" FMT_Word64 "\n"
-                    , col_width[0], ""
                     , col_width[1], "scav_find_work"
                     , col_width[2], stats.scav_find_work);
 #elif defined(THREADED_RTS) // THREADED_RTS && PROF_SPIN
@@ -1172,8 +1165,6 @@ static void report_machine_readable (const RTSSummaryStats * sum)
             whitehole_threadPaused_spin);
     MR_STAT("any_work", FMT_Word64,
             stats.any_work);
-    MR_STAT("no_work", FMT_Word64,
-            stats.no_work);
     MR_STAT("scav_find_work", FMT_Word64,
             stats.scav_find_work);
 #endif // PROF_SPIN
@@ -1619,10 +1610,7 @@ collector.
 
 Parallel garbage collector counters:
 * any_work:
-    A cheap function called whenever a gc_thread is ready for work. Does
-    not do any work.
-* no_work:
-    Incremented whenever any_work finds no work.
+    Incremented whenever a parallel GC looks for work to steal.
 * scav_find_work:
     Called to do work when any_work return true.
 

@@ -266,9 +266,6 @@ typedef struct _RTSStats {
     // The number of times a GC thread has checked for work across all parallel
     // GCs
   uint64_t any_work;
-    // The number of times a GC thread has checked for work and found none
-    // across all parallel GCs
-  uint64_t no_work;
     // The number of times a GC thread has iterated it's outer loop across all
     // parallel GCs
   uint64_t scav_find_work;
