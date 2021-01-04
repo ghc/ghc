@@ -48,6 +48,11 @@
     diverge then the previous optimisation behavior can be recovered by instead
     using `GHC.ForeignPtr.unsafeWithForeignPtr`.
 
+## 4.14.1.0 *Jul 2020*
+
+  * Bundled with GHC 8.10.2
+
+  * Fix a precision issue in `log1mexp` (#17125)
 
 ## 4.14.0.0 *Jan 2020*
   * Bundled with GHC 8.10.1
