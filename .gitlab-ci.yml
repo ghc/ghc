@@ -683,6 +683,9 @@ validate-x86_64-linux-deb9-debug:
     ValidateSpeed: SLOW
     # Override validate flavour default; see #16890.
     BUILD_SPHINX_PDF: "YES"
+    # Reduce verbosity otherwise the logs exceed the maximum log size
+    # (16MBytes).
+    TEST_VERBOSE: 0
     TEST_SPEED: slow
     TEST_ENV: "x86_64-linux-deb9-debug"
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-deb9-linux-debug.tar.xz"
