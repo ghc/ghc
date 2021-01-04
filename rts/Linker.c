@@ -1374,7 +1374,6 @@ mkOc( ObjectType type, pathchar *path, char *image, int imageSize,
    oc->rx_m32 = m32_allocator_new(true);
 #endif
 
-   oc->l_addr = NULL;
    oc->nc_ranges = NULL;
    oc->dlopen_handle = NULL;
 

@@ -314,9 +314,6 @@ struct _ObjectCode {
     /* handle returned from dlopen */
     void *dlopen_handle;
 
-    /* base virtual address of the loaded code */
-    void *l_addr;
-
     /* virtual memory ranges of loaded code */
     NativeCodeRange *nc_ranges;
 };
