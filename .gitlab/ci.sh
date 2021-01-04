@@ -418,6 +418,11 @@ function fetch_perf_notes() {
 }
 
 function push_perf_notes() {
+  if [ -n "$CROSS_TARGET" ]; then
+    info "Can't test cross-compiled build."
+    return
+  fi
+
   info "Pushing perf notes..."
   "$TOP/.gitlab/test-metrics.sh" push
 }
