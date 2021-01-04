@@ -537,7 +537,8 @@ tc_top_lhs_type tyki ctxt (L loc sig_ty@(HsSig { sig_bndrs = hs_outer_bndrs
        ; kvs <- kindGeneralizeAll ty1  -- "All" because it's a top-level type
        ; reportUnsolvedEqualities skol_info kvs tclvl wanted
 
-       ; final_ty <- zonkTcTypeToType (mkInfForAllTys kvs ty1)
+       ; ze       <- mkEmptyZonkEnv NoFlexi
+       ; final_ty <- zonkTcTypeToTypeX ze (mkInfForAllTys kvs ty1)
        ; traceTc "tc_top_lhs_type }" (vcat [ppr sig_ty, ppr final_ty])
        ; return final_ty }
   where
