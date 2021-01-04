@@ -104,6 +104,7 @@ import GHC.Types.Unique
 import GHC.Types.Var.Set
 import GHC.Types.Meta
 import GHC.Types.Basic hiding( SuccessFlag(..) )
+import GHC.Types.Error
 import GHC.Types.Fixity as Hs
 import GHC.Types.Annotations
 import GHC.Types.Name
@@ -114,7 +115,6 @@ import GHC.Unit.Module
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.Deps
 
-import GHC.Utils.Error
 import GHC.Utils.Misc
 import GHC.Utils.Panic as Panic
 import GHC.Utils.Lexeme
@@ -122,7 +122,6 @@ import GHC.Utils.Outputable
 
 import GHC.SysTools.FileCleanup ( newTempName, TempFileLifetime(..) )
 
-import GHC.Data.Bag
 import GHC.Data.FastString
 import GHC.Data.Maybe( MaybeErr(..) )
 import qualified GHC.Data.EnumSet as EnumSet
@@ -1286,7 +1285,7 @@ runTH ty fhv = do
 -- See Note [Remote Template Haskell] in libraries/ghci/GHCi/TH.hs.
 runRemoteTH
   :: IServInstance
-  -> [Messages]   --  saved from nested calls to qRecover
+  -> [Messages ErrDoc]   --  saved from nested calls to qRecover
   -> TcM ()
 runRemoteTH iserv recovers = do
   THMsg msg <- liftIO $ readIServ iserv getTHMessage
@@ -1298,15 +1297,15 @@ runRemoteTH iserv recovers = do
       writeTcRef v emptyMessages
       runRemoteTH iserv (msgs : recovers)
     EndRecover caught_error -> do
-      let (prev_msgs@(prev_warns,prev_errs), rest) = case recovers of
+      let (prev_msgs, rest) = case recovers of
              [] -> panic "EndRecover"
              a : b -> (a,b)
       v <- getErrsVar
-      (warn_msgs,_) <- readTcRef v
+      warn_msgs <- getWarningMessages <$> readTcRef v
       -- keep the warnings only if there were no errors
       writeTcRef v $ if caught_error
         then prev_msgs
-        else (prev_warns `unionBags` warn_msgs, prev_errs)
+        else mkMessages warn_msgs `unionMessages` prev_msgs
       runRemoteTH iserv rest
     _other -> do
       r <- handleTHMessage msg

@@ -60,7 +60,7 @@ import GHC.Utils.Panic
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Basic    ( IntWithInf, intGtLimit )
-import GHC.Utils.Error    ( emptyMessages )
+import GHC.Types.Error
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
@@ -149,7 +149,7 @@ simplifyTop wanteds
 
            ; warnAllUnsolved $ emptyWC { wc_simple = unsafe_ol }
 
-           ; whyUnsafe <- fst <$> TcM.readTcRef errs_var
+           ; whyUnsafe <- getWarningMessages <$> TcM.readTcRef errs_var
            ; TcM.writeTcRef errs_var saved_msg
            ; recordUnsafeInfer whyUnsafe
            }
