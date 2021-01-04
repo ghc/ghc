@@ -454,6 +454,7 @@ function test_make() {
   run "$MAKE" V=0 \
     "$test_target" \
     THREADS="$cores" \
+    VERBOSE="$TEST_VERBOSE" \
     JUNIT_FILE=../../junit.xml
 }
 
