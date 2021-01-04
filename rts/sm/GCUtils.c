@@ -129,8 +129,7 @@ steal_todo_block (uint32_t g)
     // look for work to steal
     for (n = 0; n < n_gc_threads; n++) {
         if (n == gct->thread_index) continue;
-        q = gc_threads[n]->gens[g].todo_q;
-        bd = stealWSDeque(q);
+        bd = stealWSDeque(gc_threads[n]->gens[g].todo_q);
         if (bd) {
             return bd;
         }

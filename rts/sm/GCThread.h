@@ -182,7 +182,6 @@ typedef struct gc_thread_ {
     W_ copied;
     W_ scanned;
     W_ any_work;
-    W_ no_work;
     W_ scav_find_work;
 
     Time gc_start_cpu;             // thread CPU time
