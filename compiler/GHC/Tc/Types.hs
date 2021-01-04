@@ -748,7 +748,7 @@ data TcLclEnv           -- Changes as we move inside an expression
                                       -- and for tidying types
 
         tcl_lie  :: TcRef WantedConstraints,    -- Place to accumulate type constraints
-        tcl_errs :: TcRef Messages              -- Place to accumulate errors
+        tcl_errs :: TcRef (Messages ErrDoc)     -- Place to accumulate errors
     }
 
 setLclEnvTcLevel :: TcLclEnv -> TcLevel -> TcLclEnv
