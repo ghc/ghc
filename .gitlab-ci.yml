@@ -2,7 +2,7 @@ variables:
   GIT_SSL_NO_VERIFY: "1"
 
   # Commit of ghc/ci-images repository from which to pull Docker images
-  DOCKER_REV: 0da9c4be73f2d73868f610d20352af856e8f2727
+  DOCKER_REV: b91c5bcfdb1092979c467a3f2d7be7574f840739
 
   # Sequential version number capturing the versions of all tools fetched by
   # .gitlab/ci.sh. Used for invalidation of GitLab CI cache.
@@ -99,6 +99,7 @@ ghc-linters:
     - .gitlab/linters/check-cpp.py commits $base $CI_COMMIT_SHA
     - .gitlab/linters/check-version-number.sh
     - python3 utils/checkUniques/check-uniques.py .
+    - shellcheck .gitlab/ci.sh .gitlab/common.sh
   dependencies: []
   tags:
     - lint
