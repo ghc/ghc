@@ -1953,9 +1953,15 @@ int ocRunInit_ELF( ObjectCode *oc )
  * Shared object loading
  */
 
+#if defined(HAVE_DLINFO)
+struct piterate_cb_info {
+  ObjectCode *nc;
+  void *l_addr;   /* base virtual address of the loaded code */
+};
+
 static int loadNativeObjCb_(struct dl_phdr_info *info,
     size_t _size GNUC3_ATTRIBUTE(__unused__), void *data) {
-  ObjectCode* nc = (ObjectCode*) data;
+  struct piterate_cb_info *s = (struct piterate_cb_info *) data;
 
   // This logic mimicks _dl_addr_inside_object from glibc
   // For reference:
@@ -1974,22 +1980,23 @@ static int loadNativeObjCb_(struct dl_phdr_info *info,
   //   return 0;
   // }
 
-  if ((void*) info->dlpi_addr == nc->l_addr) {
+  if ((void*) info->dlpi_addr == s->l_addr) {
     int n = info->dlpi_phnum;
     while (--n >= 0) {
       if (info->dlpi_phdr[n].p_type == PT_LOAD) {
         NativeCodeRange* ncr =
           stgMallocBytes(sizeof(NativeCodeRange), "loadNativeObjCb_");
-        ncr->start = (void*) ((char*) nc->l_addr + info->dlpi_phdr[n].p_vaddr);
+        ncr->start = (void*) ((char*) s->l_addr + info->dlpi_phdr[n].p_vaddr);
         ncr->end = (void*) ((char*) ncr->start + info->dlpi_phdr[n].p_memsz);
 
-        ncr->next = nc->nc_ranges;
-        nc->nc_ranges = ncr;
+        ncr->next = s->nc->nc_ranges;
+        s->nc->nc_ranges = ncr;
       }
     }
   }
   return 0;
 }
+#endif /* defined(HAVE_DLINFO) */
 
 static void copyErrmsg(char** errmsg_dest, char* errmsg) {
   if (errmsg == NULL) errmsg = "loadNativeObj_ELF: unknown error";
@@ -2032,6 +2039,7 @@ void * loadNativeObj_ELF (pathchar *path, char **errmsg)
 
    foreignExportsLoadingObject(nc);
    hdl = dlopen(path, RTLD_NOW|RTLD_LOCAL);
+   nc->dlopen_handle = hdl;
    foreignExportsFinishedLoadingObject();
    if (hdl == NULL) {
      /* dlopen failed; save the message in errmsg */
@@ -2039,6 +2047,7 @@ void * loadNativeObj_ELF (pathchar *path, char **errmsg)
      goto dlopen_fail;
    }
 
+#if defined(HAVE_DLINFO)
    struct link_map *map;
    if (dlinfo(hdl, RTLD_DI_LINKMAP, &map) == -1) {
      /* dlinfo failed; save the message in errmsg */
@@ -2046,15 +2055,18 @@ void * loadNativeObj_ELF (pathchar *path, char **errmsg)
      goto dlinfo_fail;
    }
 
-   nc->l_addr = (void*) map->l_addr;
-   nc->dlopen_handle = hdl;
    hdl = NULL; // pass handle ownership to nc
 
-   dl_iterate_phdr(loadNativeObjCb_, nc);
+   struct piterate_cb_info piterate_info = {
+     .nc = nc,
+     .l_addr = (void *) map->l_addr
+   };
+   dl_iterate_phdr(loadNativeObjCb_, &piterate_info);
    if (!nc->nc_ranges) {
      copyErrmsg(errmsg, "dl_iterate_phdr failed to find obj");
      goto dl_iterate_phdr_fail;
    }
+#endif /* defined (HAVE_DLINFO) */
 
    insertOCSectionIndices(nc);
 
