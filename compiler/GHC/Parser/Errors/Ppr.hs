@@ -24,25 +24,25 @@ import GHC.Hs.Type (pprLHsContext)
 import GHC.Builtin.Names (allNameStrings)
 import GHC.Builtin.Types (filterCTuple)
 
-mkParserErr :: SrcSpan -> SDoc -> ErrMsg
+mkParserErr :: SrcSpan -> SDoc -> ErrMsg ErrDoc
 mkParserErr span doc = ErrMsg
    { errMsgSpan        = span
    , errMsgContext     = alwaysQualify
-   , errMsgDoc         = ErrDoc [doc] [] []
+   , errMsgDiagnostic  = ErrDoc [doc] [] []
    , errMsgSeverity    = SevError
    , errMsgReason      = NoReason
    }
 
-mkParserWarn :: WarningFlag -> SrcSpan -> SDoc -> ErrMsg
+mkParserWarn :: WarningFlag -> SrcSpan -> SDoc -> ErrMsg ErrDoc
 mkParserWarn flag span doc = ErrMsg
    { errMsgSpan        = span
    , errMsgContext     = alwaysQualify
-   , errMsgDoc         = ErrDoc [doc] [] []
+   , errMsgDiagnostic  = ErrDoc [doc] [] []
    , errMsgSeverity    = SevWarning
    , errMsgReason      = Reason flag
    }
 
-pprWarning :: PsWarning -> ErrMsg
+pprWarning :: PsWarning -> ErrMsg ErrDoc
 pprWarning = \case
    PsWarnTab loc tc
       -> mkParserWarn Opt_WarnTabs loc $
@@ -128,7 +128,7 @@ pprWarning = \case
            OperatorWhitespaceOccurrence_Suffix -> mk_msg "suffix"
            OperatorWhitespaceOccurrence_TightInfix -> mk_msg "tight infix"
 
-pprError :: PsError -> ErrMsg
+pprError :: PsError -> ErrMsg ErrDoc
 pprError err = mkParserErr (errLoc err) $ vcat
    (pp_err (errDesc err) : map pp_hint (errHints err))
 

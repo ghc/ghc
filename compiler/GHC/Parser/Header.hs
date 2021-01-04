@@ -39,7 +39,7 @@ import GHC.Hs
 import GHC.Unit.Module
 import GHC.Builtin.Names
 
-import GHC.Types.Error
+import GHC.Types.Error hiding ( getErrorMessages, getWarningMessages )
 import GHC.Types.SrcLoc
 import GHC.Types.SourceError
 import GHC.Types.SourceText
@@ -52,7 +52,7 @@ import GHC.Utils.Exception as Exception
 
 import GHC.Data.StringBuffer
 import GHC.Data.Maybe
-import GHC.Data.Bag         ( Bag, emptyBag, listToBag, unitBag, isEmptyBag )
+import GHC.Data.Bag         ( Bag, listToBag, unitBag, isEmptyBag )
 import GHC.Data.FastString
 
 import Control.Monad
@@ -348,9 +348,9 @@ unsupportedExtnError dflags loc unsup =
      suggestions = fuzzyMatch unsup supported
 
 
-optionsErrorMsgs :: [String] -> [Located String] -> FilePath -> Messages
+optionsErrorMsgs :: [String] -> [Located String] -> FilePath -> Messages ErrDoc
 optionsErrorMsgs unhandled_flags flags_lines _filename
-  = (emptyBag, listToBag (map mkMsg unhandled_flags_lines))
+  = mkMessages $ listToBag (map mkMsg unhandled_flags_lines)
   where unhandled_flags_lines :: [Located String]
         unhandled_flags_lines = [ L l f
                                 | f <- unhandled_flags
