@@ -261,8 +261,8 @@ optDescrs =
       "Freeze Stage2 GHC."
     , Option [] ["skip-depends"] (NoArg readSkipDepends)
       "Skip rebuilding dependency information."
-    , Option [] ["bignum"] (OptArg readBignum "BIGNUM")
-      "Select GHC BigNum backend: native, gmp, ffi."
+    , Option [] ["bignum"] (OptArg readBignum "BACKEND")
+      "Select ghc-bignum backend: native, gmp (default), check-gmp, ffi."
     , Option [] ["progress-info"] (OptArg readProgressInfo "STYLE")
       "Progress info style (None, Brief, Normal or Unicorn)."
     , Option [] ["docs"] (OptArg readDocsArg "TARGET")
