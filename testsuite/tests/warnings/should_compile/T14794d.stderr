@@ -1,0 +1,6 @@
+
+T14794d.hs:8:1: warning: [-Wmissing-exported-signatures]
+    Top-level binding with no type signature: test3 :: Bool
+
+T14794d.hs:10:1: warning: [-Wmissing-exported-signatures]
+    Pattern synonym with no type signature: pattern Test4 :: Bool
