@@ -7,7 +7,7 @@ module Haddock.Backends.Hyperlinker
 
 
 import Haddock.Types
-import Haddock.Utils (writeUtf8File)
+import Haddock.Utils (writeUtf8File, out, verbose, Verbosity)
 import Haddock.Backends.Hyperlinker.Renderer
 import Haddock.Backends.Hyperlinker.Parser
 import Haddock.Backends.Hyperlinker.Types
@@ -18,8 +18,9 @@ import Data.Maybe
 import System.Directory
 import System.FilePath
 
-import GHC.Iface.Ext.Types  ( HieFile(..), HieASTs(..) )
+import GHC.Iface.Ext.Types  ( HieFile(..), HieASTs(..), HieAST(..), NodeInfo(..), SourcedNodeInfo(..) )
 import GHC.Iface.Ext.Binary ( readHieFile, hie_file_result, NameCacheUpdater(..))
+import GHC.Types.SrcLoc     ( realSrcLocSpan, mkRealSrcLoc )
 import Data.Map as M
 import GHC.Data.FastString     ( mkFastString )
 import GHC.Unit.Module         ( Module, moduleName )
@@ -32,27 +33,28 @@ import GHC.Types.Unique.Supply ( mkSplitUniqSupply )
 -- Note that list of interfaces should also contain interfaces normally hidden
 -- when generating documentation. Otherwise this could lead to dead links in
 -- produced source.
-ppHyperlinkedSource :: FilePath -- ^ Output directory
+ppHyperlinkedSource :: Verbosity
+                    -> FilePath -- ^ Output directory
                     -> FilePath -- ^ Resource directory
                     -> Maybe FilePath -- ^ Custom CSS file path
                     -> Bool -- ^ Flag indicating whether to pretty-print HTML
                     -> M.Map Module SrcPath -- ^ Paths to sources
                     -> [Interface] -- ^ Interfaces for which we create source
                     -> IO ()
-ppHyperlinkedSource outdir libdir mstyle pretty srcs' ifaces = do
+ppHyperlinkedSource verbosity outdir libdir mstyle pretty srcs' ifaces = do
     createDirectoryIfMissing True srcdir
     let cssFile = fromMaybe (defaultCssFile libdir) mstyle
     copyFile cssFile $ srcdir </> srcCssFile
     copyFile (libdir </> "html" </> highlightScript) $
         srcdir </> highlightScript
-    mapM_ (ppHyperlinkedModuleSource srcdir pretty srcs) ifaces
+    mapM_ (ppHyperlinkedModuleSource verbosity srcdir pretty srcs) ifaces
   where
     srcdir = outdir </> hypSrcDir
     srcs = (srcs', M.mapKeys moduleName srcs')
 
 -- | Generate hyperlinked source for particular interface.
-ppHyperlinkedModuleSource :: FilePath -> Bool -> SrcMaps -> Interface -> IO ()
-ppHyperlinkedModuleSource srcdir pretty srcs iface = case ifaceHieFile iface of
+ppHyperlinkedModuleSource :: Verbosity -> FilePath -> Bool -> SrcMaps -> Interface -> IO ()
+ppHyperlinkedModuleSource verbosity srcdir pretty srcs iface = case ifaceHieFile iface of
     Just hfp -> do
         -- Parse the GHC-produced HIE file
         u <- mkSplitUniqSupply 'a'
@@ -66,24 +68,32 @@ ppHyperlinkedModuleSource srcdir pretty srcs iface = case ifaceHieFile iface of
                  <$> (readHieFile ncu hfp)
 
         -- Get the AST and tokens corresponding to the source file we want
-        let mast | M.size asts == 1 = snd <$> M.lookupMin asts
-                 | otherwise        = M.lookup (mkFastString file) asts
+        let fileFs = mkFastString file
+            mast | M.size asts == 1 = snd <$> M.lookupMin asts
+                 | otherwise        = M.lookup fileFs asts
+            ast = fromMaybe (emptyHieAst fileFs) mast
+            fullAst = recoverFullIfaceTypes df types ast
             tokens = parse df file rawSrc
 
+        -- Warn if we didn't find an AST, but there were still ASTs
+        if M.null asts
+          then pure ()
+          else out verbosity verbose $ unwords [ "couldn't find ast for"
+                                               , file, show (M.keys asts) ]
+
         -- Produce and write out the hyperlinked sources
-        case mast of
-          Just ast ->
-              let fullAst = recoverFullIfaceTypes df types ast
-              in writeUtf8File path . renderToString pretty . render' fullAst $ tokens
-          Nothing
-            | M.size asts == 0 -> return ()
-            | otherwise -> error $ unwords [ "couldn't find ast for"
-                                           , file, show (M.keys asts) ]
+        writeUtf8File path . renderToString pretty . render' fullAst $ tokens
     Nothing -> return ()
   where
     df = ifaceDynFlags iface
     render' = render (Just srcCssFile) (Just highlightScript) srcs
     path = srcdir </> hypSrcModuleFile (ifaceMod iface)
+
+    emptyHieAst fileFs = Node
+      { nodeSpan = realSrcLocSpan (mkRealSrcLoc fileFs 1 0)
+      , nodeChildren = []
+      , sourcedNodeInfo = SourcedNodeInfo mempty
+      }
 
 -- | Name of CSS file in output directory.
 srcCssFile :: FilePath

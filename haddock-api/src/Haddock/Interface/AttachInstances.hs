@@ -1,5 +1,7 @@
 {-# LANGUAGE MagicHash, BangPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Interface.AttachInstances
@@ -17,11 +19,10 @@ module Haddock.Interface.AttachInstances (attachInstances) where
 
 import Haddock.Types
 import Haddock.Convert
-import Haddock.GhcUtils
 
 import Control.Applicative ((<|>))
 import Control.Arrow hiding ((<+>))
-import Data.List
+import Data.List (sortBy)
 import Data.Ord (comparing)
 import Data.Maybe ( maybeToList, mapMaybe, fromMaybe )
 import qualified Data.Map as Map

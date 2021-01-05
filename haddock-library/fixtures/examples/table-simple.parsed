@@ -3,50 +3,40 @@ DocTable
     {tableBodyRows = [TableRow
                         [TableCell
                            {tableCellColspan = 1,
-                            tableCellContents = DocString " 200  ",
+                            tableCellContents = DocString "200",
                             tableCellRowspan = 1},
                          TableCell
                            {tableCellColspan = 1,
-                            tableCellContents = DocAppend
-                                                  (DocString "   ")
-                                                  (DocAppend
-                                                     (DocMonospaced (DocString "OK"))
-                                                     (DocString "       ")),
+                            tableCellContents = DocMonospaced (DocString "OK"),
                             tableCellRowspan = 1},
                          TableCell
                            {tableCellColspan = 1,
-                            tableCellContents = DocString
-                                                  " operation successful                     ",
+                            tableCellContents = DocString "operation successful",
                             tableCellRowspan = 1}],
                       TableRow
                         [TableCell
                            {tableCellColspan = 1,
-                            tableCellContents = DocString " 204  ",
+                            tableCellContents = DocString "204",
                             tableCellRowspan = 1},
                          TableCell
                            {tableCellColspan = 1,
-                            tableCellContents = DocAppend
-                                                  (DocString " ")
-                                                  (DocAppend
-                                                     (DocMonospaced (DocString "No Content"))
-                                                     (DocString " ")),
+                            tableCellContents = DocMonospaced (DocString "No Content"),
                             tableCellRowspan = 1},
                          TableCell
                            {tableCellColspan = 1,
                             tableCellContents = DocString
-                                                  " operation successful, no body returned   ",
+                                                  "operation successful, no body returned",
                             tableCellRowspan = 1}]],
      tableHeaderRows = [TableRow
                           [TableCell
                              {tableCellColspan = 1,
-                              tableCellContents = DocString " code ",
+                              tableCellContents = DocString "code",
                               tableCellRowspan = 1},
                            TableCell
                              {tableCellColspan = 1,
-                              tableCellContents = DocString " message      ",
+                              tableCellContents = DocString "message",
                               tableCellRowspan = 1},
                            TableCell
                              {tableCellColspan = 1,
-                              tableCellContents = DocString
-                                                    " description                              ",
+                              tableCellContents = DocString "description",
                               tableCellRowspan = 1}]]}

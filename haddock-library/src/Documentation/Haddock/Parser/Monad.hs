@@ -4,6 +4,18 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TypeSynonymInstances #-}
+-- |
+-- Module      :  Documentation.Haddock.Parser.Monad
+-- Copyright   :  (c) Alec Theriault 2018-2019,
+-- License     :  BSD-like
+--
+-- Maintainer  :  haddock@projects.haskell.org
+-- Stability   :  experimental
+-- Portability :  portable
+--
+-- Defines the Parsec monad over which all parsing is done and also provides
+-- more efficient versions of the usual parsec combinator functions (but
+-- specialized to 'Text').
 
 module Documentation.Haddock.Parser.Monad where
 
@@ -17,7 +29,6 @@ import qualified Data.Text as T
 import           Data.Text                   ( Text )
 
 import           Control.Monad               ( mfilter )
-import           Data.Functor                ( ($>) )
 import           Data.String                 ( IsString(..) )
 import           Data.Bits                   ( Bits(..) )
 import           Data.Char                   ( ord )
@@ -25,7 +36,9 @@ import           Data.List                   ( foldl' )
 import           Control.Applicative as App
 
 import           Documentation.Haddock.Types ( Version )
+
 import           Prelude hiding (takeWhile)
+import           CompatPrelude
 
 -- | The only bit of information we really care about truding along with us
 -- through parsing is the version attached to a @\@since@ annotation - if
@@ -95,7 +108,6 @@ takeWhile f = do
       pos' = T.foldl updatePosChar pos t
       s' = s{ stateInput = inp', statePos = pos' }
   setParserState s' $> t
-
 
 -- | Like 'takeWhile', but fails if no characters matched.
 --

@@ -3,19 +3,20 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 module Haddock.Interface.Specialize
     ( specializeInstHead
     ) where
 
 
+import Haddock.GhcUtils ( hsTyVarBndrName )
 import Haddock.Syb
 import Haddock.Types
 
 import GHC
 import GHC.Types.Name
 import GHC.Data.FastString
-import GHC.Builtin.Types.Prim ( funTyConName )
 import GHC.Builtin.Types ( listTyConName, unrestrictedFunTyConName )
 import GHC.Parser.Annotation (IsUnicodeSyntax(..))
 
@@ -57,13 +58,9 @@ specialize specs = go spec_map0
 -- Again, it is just a convenience function around 'specialize'. Note that
 -- length of type list should be the same as the number of binders.
 specializeTyVarBndrs :: LHsQTyVars GhcRn -> [HsType GhcRn] -> HsType GhcRn -> HsType GhcRn
-specializeTyVarBndrs bndrs typs =
-    specialize $ zip bndrs' typs
+specializeTyVarBndrs bndrs typs = specialize $ zip bndrs' typs
   where
-    bndrs' = map (bname . unLoc) . hsq_explicit $ bndrs
-    bname (UserTyVar _ _ (L _ name)) = name
-    bname (KindedTyVar _ _ (L _ name) _) = name
-    bname (XTyVarBndr _) = error "haddock:specializeTyVarBndrs"
+    bndrs' = map (hsTyVarBndrName . unLoc) . hsq_explicit $ bndrs
 
 
 
@@ -217,7 +214,7 @@ freeVariables =
     teleNames (HsForAllVis   _ bndrs) = bndrsNames bndrs
     teleNames (HsForAllInvis _ bndrs) = bndrsNames bndrs
 
-    bndrsNames = Set.fromList . map (getName . tyVarName . unLoc)
+    bndrsNames = Set.fromList . map (getName . hsTyVarBndrName . unLoc)
 
 
 -- | Make given type visually unambiguous.
@@ -365,9 +362,3 @@ alternativeNames name =
 
 located :: Functor f => (a -> f b) -> Located a -> f (Located b)
 located f (L loc e) = L loc <$> f e
-
-
-tyVarName :: HsTyVarBndr flag name -> IdP name
-tyVarName (UserTyVar _ _ name) = unLoc name
-tyVarName (KindedTyVar _ _ (L _ name) _) = name
-tyVarName (XTyVarBndr _ ) = error "haddock:tyVarName"

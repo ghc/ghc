@@ -1,6 +1,6 @@
-cabal-version:        2.0
+cabal-version:        2.4
 name:                 haddock
-version:              2.22.0
+version:              2.24.0
 synopsis:             A documentation-generation tool for Haskell libraries
 description:
   This is Haddock, a tool for automatically generating documentation
@@ -23,8 +23,8 @@ description:
   without any documentation annotations, Haddock can generate useful documentation
   from your source code.
   .
-  <<https://cdn.rawgit.com/haskell/haddock/ghc-8.6/doc/cheatsheet/haddocks.svg>>
-license:              BSD2
+  <<https://cdn.rawgit.com/haskell/haddock/ghc-8.10/doc/cheatsheet/haddocks.svg>>
+license:              BSD-3-Clause
 license-file:         LICENSE
 author:               Simon Marlow, David Waern
 maintainer:           Alec Theriault <alec.theriault@gmail.com>, Alex Biehl <alexbiehl@gmail.com>, Simon Hengel <sol@typeful.net>, Mateusz Kowalczyk <fuuzetsu@fuuzetsu.co.uk>
@@ -33,7 +33,7 @@ bug-reports:          https://github.com/haskell/haddock/issues
 copyright:            (c) Simon Marlow, David Waern
 category:             Documentation
 build-type:           Simple
-tested-with:          GHC==9.0.*, GHC==8.10.*
+tested-with:          GHC==9.0.*
 
 extra-source-files:
   CHANGES.md
@@ -46,10 +46,12 @@ extra-source-files:
   html-test/src/*.hs
   html-test/ref/*.html
   hypsrc-test/src/*.hs
+  hypsrc-test/src/*.h
   hypsrc-test/ref/src/*.html
-  latex-test/src/Simple/*.hs
-  latex-test/ref/Simple/*.tex
-  latex-test/ref/Simple/*.sty
+  latex-test/src/**/*.hs
+  latex-test/ref/**/*.tex
+  hoogle-test/src/**/*.hs
+  hoogle-test/ref/**/*.txt
 
 flag in-ghc-tree
   description: Are we in a GHC tree?
@@ -60,11 +62,11 @@ executable haddock
   default-language:     Haskell2010
   main-is:              Main.hs
   hs-source-dirs:       driver
-  ghc-options:          -funbox-strict-fields -Wall -fwarn-tabs -O2 -threaded
+  ghc-options:          -funbox-strict-fields -Wall -Wincomplete-uni-patterns -Wincomplete-record-updates -O2 -threaded
 
   -- haddock typically only supports a single GHC major version
   build-depends:
-    base ^>= 4.13.0.0 || ^>= 4.14.0.0 || ^>= 4.15.0.0
+    base ^>= 4.13.0.0 || ^>= 4.14.0.0 || ^>= 4.15.0.0 || ^>= 4.16.0.0
 
   if flag(in-ghc-tree)
     hs-source-dirs: haddock-api/src,  haddock-library/src
@@ -77,7 +79,6 @@ executable haddock
       exceptions,
       array,
       xhtml >= 3000.2 && < 3000.3,
-      Cabal >= 1.10,
       ghc-boot,
       ghc-boot-th,
       ghc == 9.0.*,
@@ -87,8 +88,10 @@ executable haddock
       transformers
 
     other-modules:
+      CompatPrelude
       Documentation.Haddock.Parser
       Documentation.Haddock.Parser.Monad
+      Documentation.Haddock.Parser.Identifier
       Documentation.Haddock.Types
       Documentation.Haddock.Doc
       Documentation.Haddock.Parser.Util
@@ -142,7 +145,7 @@ executable haddock
   else
     -- in order for haddock's advertised version number to have proper meaning,
     -- we pin down to a single haddock-api version.
-    build-depends:  haddock-api == 2.22.0
+    build-depends:  haddock-api == 2.24.0
 
 test-suite html-test
   type:             exitcode-stdio-1.0

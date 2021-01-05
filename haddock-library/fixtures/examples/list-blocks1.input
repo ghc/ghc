@@ -1,0 +1,15 @@
+* Something about foo
+
+    @
+    foo :: a -> b -> c
+    foo a b = bar c b
+    @
+
+* Something about bar
+
+    @
+    bar :: a -> b -> c
+    bar a b = foo b a
+    @
+
+* And then we continue
