@@ -46,7 +46,6 @@ module GHC.Word (
     eqWord64, neWord64, gtWord64, geWord64, ltWord64, leWord64
     ) where
 
-import Data.Bits
 import Data.Maybe
 
 #if WORD_SIZE_IN_BITS < 64
@@ -54,6 +53,7 @@ import GHC.IntWord64
 #endif
 
 import GHC.Base
+import GHC.Bits
 import GHC.Enum
 import GHC.Num
 import GHC.Real
