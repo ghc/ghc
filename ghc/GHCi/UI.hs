@@ -458,7 +458,7 @@ interactiveUI config srcs maybe_exprs = do
    _ <- liftIO $ newStablePtr stderr
 
     -- Initialise buffering for the *interpreted* I/O system
-   (nobuffering, flush) <- initInterpBuffering
+   (nobuffering, flush) <- runInternal initInterpBuffering
 
    -- The initial set of DynFlags used for interactive evaluation is the same
    -- as the global DynFlags, plus -XExtendedDefaultRules and
@@ -1215,6 +1215,10 @@ runStmt input step = do
      -- and should therefore not be used here.
      | otherwise -> do
          hsc_env <- GHC.getSession
+         let !ic = hsc_IC hsc_env  -- Bang-pattern to avoid space leaks
+         setDumpFilePrefix ic
+           -- `-ddump-to-file` must work for normal GHCi compilations /
+           --     evaluations. (#17500)
          decls <- liftIO (hscParseDeclsWithLocation hsc_env source line input)
          run_decls decls
   where
@@ -1269,6 +1273,13 @@ runStmt input step = do
         l :: a -> Located a
         l = L loc
       in l (LetStmt noExtField (l (HsValBinds noExtField (ValBinds noExtField (unitBag (l bind)) []))))
+
+    setDumpFilePrefix :: GHC.GhcMonad m => InteractiveContext -> m () -- #17500
+    setDumpFilePrefix ic = do
+        dflags <- GHC.getInteractiveDynFlags
+        GHC.setInteractiveDynFlags dflags { dumpPrefix = Just (modStr ++ ".") }
+      where
+        modStr = moduleNameString $ moduleName $ icInteractiveModule $ ic
 
 -- | Clean up the GHCi environment after a statement has run
 afterRunStmt :: GhciMonad m
