@@ -1,5 +1,5 @@
-# -fwarn-missing-exported-signatures should take precedence over -fwarn-missing-signatures
-test('T2526', normal, compile, ['-fwarn-missing-signatures -fwarn-missing-exported-signatures'])
+# -fwarn-missing-signatures should take precedence over -fwarn-missing-exported-signatures
+test('T2526', normal, compile, ['-fwarn-missing-exported-signatures -fwarn-missing-signatures'])
 test('T9178', [], multimod_compile, ['T9178', '-Wall'])
 
 # T9230.hs contains a tab character. Test that -Wtabs is enabled by default.

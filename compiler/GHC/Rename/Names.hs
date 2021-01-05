@@ -1442,8 +1442,8 @@ warnMissingSignatures gbl_env
        ; warn_pat_syns      <- woptM Opt_WarnMissingPatternSynonymSignatures
 
        ; let add_sig_warns
-               | warn_only_exported = add_warns Opt_WarnMissingExportedSignatures
                | warn_missing_sigs  = add_warns Opt_WarnMissingSignatures
+               | warn_only_exported = add_warns Opt_WarnMissingExportedSignatures
                | warn_pat_syns      = add_warns Opt_WarnMissingPatternSynonymSignatures
                | otherwise          = return ()
 
