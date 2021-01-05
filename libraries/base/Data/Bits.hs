@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, BangPatterns, MagicHash #-}
+{-# LANGUAGE CPP, DerivingStrategies, GeneralizedNewtypeDeriving, NoImplicitPrelude, BangPatterns, MagicHash #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -48,7 +48,10 @@ module Data.Bits (
   bitDefault,
   testBitDefault,
   popCountDefault,
-  toIntegralSized
+  toIntegralSized,
+  oneBits,
+
+  Conj(..), Disj(..), Xor(..), Iff(..)
  ) where
 
 -- Defines the @Bits@ class containing bit-based operations.
@@ -59,6 +62,7 @@ module Data.Bits (
 
 import Data.Maybe
 import GHC.Num
+import GHC.Enum (Bounded, Enum)
 import GHC.Base
 import GHC.Real
 
@@ -397,6 +401,11 @@ popCountDefault = go 0
    go c w = go (c+1) (w .&. (w - 1)) -- clear the least significant
 {-# INLINABLE popCountDefault #-}
 
+-- | A more concise version of 'complement zeroBits'.
+-- @since 9.2
+oneBits :: (Bits a) => a
+oneBits = complement zeroBits
+{-# INLINE oneBits #-}
 
 -- | Interpret 'Bool' as 1-bit bit-field
 --
@@ -715,3 +724,58 @@ own to enable constant folding; for example 'shift':
 -- >       ; True -> Just (W16# (narrow16Word# (int2Word# b1)))
 -- >       }
 -- >   }
+
+-- | Monoid under bitwise AND.
+-- @since 9.2
+newtype Conj a = Conj { getConj :: a }
+  deriving newtype (Bounded, Enum, Bits, FiniteBits, Eq)
+
+-- | @since 9.2
+instance (Bits a) => Semigroup (Conj a) where
+  Conj x <> Conj y = Conj (x .&. y)
+
+-- | @since 9.2
+instance (Bits a) => Monoid (Conj a) where
+  mempty = Conj . complement $ zeroBits
+
+-- | Monoid under bitwise OR.
+-- @since 9.2
+newtype Disj a = Disj { getDisj :: a }
+  deriving newtype (Bounded, Enum, Bits, FiniteBits, Eq)
+
+-- | @since 9.2
+instance (Bits a) => Semigroup (Disj a) where
+  Disj x <> Disj y = Disj (x .|. y)
+
+-- | @since 9.2
+instance (Bits a) => Monoid (Disj a) where
+  mempty = Disj zeroBits
+
+-- | Monoid under bitwise XOR.
+-- @since 9.2
+newtype Xor a = Xor { getXor :: a }
+  deriving newtype (Bounded, Enum, Bits, FiniteBits, Eq)
+
+-- | @since 9.2
+instance (Bits a) => Semigroup (Xor a) where
+  Xor x <> Xor y = Xor (x `xor` y)
+
+-- | @since 9.2
+instance (Bits a) => Monoid (Xor a) where
+  mempty = Xor zeroBits
+
+-- | Monoid under bitwise \'equality\'; defined as '1' if the corresponding 
+-- bits match, and '0' otherwise.
+-- @since 9.2
+newtype Iff a = Iff { getIff :: a }
+  deriving newtype (Bounded, Enum, Bits, FiniteBits, Eq)
+
+-- | @since 9.2
+instance (Bits a) => Semigroup (Iff a) where
+  {-# INLINEABLE (<>) #-}
+  Iff x <> Iff y = Iff . complement $ (x `xor` y)
+
+-- | @since 9.2
+instance (Bits a) => Monoid (Iff a) where
+  {-# INLINEABLE mempty #-}  
+  mempty = Iff . complement $ zeroBits
