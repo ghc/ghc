@@ -911,6 +911,7 @@ GMP_PREFER_FRAMEWORK = @GMP_PREFER_FRAMEWORK@
 GMP_FORCE_INTREE = @GMP_FORCE_INTREE@
 
 CURSES_LIB_DIRS = @CURSES_LIB_DIRS@
+CURSES_LIB_DIRS_STAGE0 = @CURSES_LIB_DIRS_STAGE0@
 
 # See Note [Disable -O2 in unregisterised mode]
 # Be careful: 'GhcUnregisterised' should be defined earlier in this file.
