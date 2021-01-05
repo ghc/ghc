@@ -55,8 +55,8 @@ module GHC.Float
 
 import Data.Maybe
 
-import Data.Bits
 import GHC.Base
+import GHC.Bits
 import GHC.List
 import GHC.Enum
 import GHC.Show
