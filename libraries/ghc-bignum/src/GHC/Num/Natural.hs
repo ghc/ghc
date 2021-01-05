@@ -239,7 +239,8 @@ naturalShiftR x (W# n) = naturalShiftR# x n
 
 -- | Left shift
 naturalShiftL# :: Natural -> Word# -> Natural
-naturalShiftL# (NS x) n
+naturalShiftL# v@(NS x) n
+   | 0## <- x                     = v
    | isTrue# (clz# x `geWord#` n) = NS (x `uncheckedShiftL#` word2Int# n)
    | True                         = NB (bigNatFromWord# x `bigNatShiftL#` n)
 naturalShiftL# (NB x) n = NB (x `bigNatShiftL#` n)
