@@ -405,6 +405,7 @@ Library
             GHC.Event.Arr
             GHC.Event.Array
             GHC.Event.IntTable
+            GHC.Event.IntVar
             GHC.Event.PSQ
             GHC.Event.Unique
             System.CPUTime.Windows
