@@ -1,10 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 module Haddock.Backends.Hyperlinker.Parser (parse) where
 
+import Control.Monad.Trans.Maybe
+import Control.Monad.Trans.Class
 import Control.Applicative ( Alternative(..) )
-import Control.Monad.Trans.Maybe ( MaybeT(..) )
-import Control.Monad.Trans.Class ( MonadTrans(lift) )
 import Data.List           ( isPrefixOf, isSuffixOf )
 
 import qualified Data.ByteString as BS

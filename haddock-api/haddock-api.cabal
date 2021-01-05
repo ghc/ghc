@@ -1,6 +1,6 @@
 cabal-version:        2.0
 name:                 haddock-api
-version:              2.22.0
+version:              2.24.0
 synopsis:             A documentation-generation tool for Haskell libraries
 description:          Haddock is a documentation-generation tool for Haskell
                       libraries
@@ -13,7 +13,7 @@ bug-reports:          https://github.com/haskell/haddock/issues
 copyright:            (c) Simon Marlow, David Waern
 category:             Documentation
 build-type:           Simple
-tested-with:          GHC==8.12.*, GHC==8.10.*, GHC==8.8.1
+tested-with:          GHC==9.0.*
 
 extra-source-files:
   CHANGES.md
@@ -35,8 +35,8 @@ data-files:
   html/Ocean.theme/ocean.css
   html/Ocean.theme/plus.gif
   html/Ocean.theme/synopsis.png
-  html/NewOcean.std-theme/new-ocean.css
-  html/NewOcean.std-theme/synopsis.png
+  html/Linuwial.std-theme/linuwial.css
+  html/Linuwial.std-theme/synopsis.png
   latex/haddock.sty
 
 library
@@ -44,10 +44,9 @@ library
 
   -- this package typically supports only single major versions
   build-depends: base            ^>= 4.15.0
-               , Cabal           ^>= 2.4.0
                , ghc             ^>= 9.0
                , ghc-paths       ^>= 0.1.0.9
-               , haddock-library ^>= 1.8.0
+               , haddock-library ^>= 1.9.0
                , xhtml           ^>= 3000.2.2
 
   -- Versions for the dependencies below are transitively pinned by
@@ -65,10 +64,16 @@ library
 
   hs-source-dirs: src
 
-  ghc-options: -funbox-strict-fields -Wall -fwarn-tabs -O2
-  ghc-options: -Wall
-  if impl(ghc >= 8.0)
-    ghc-options: -Wcompat -Wnoncanonical-monad-instances -Wnoncanonical-monadfail-instances
+  ghc-options: -funbox-strict-fields -O2
+               -Wall
+               -Wcompat
+               -Widentities
+               -Wredundant-constraints
+               -Wnoncanonical-monad-instances
+               -Wmissing-home-modules
+               -Wincomplete-uni-patterns
+               -Wincomplete-record-updates
+
 
   exposed-modules:
     Documentation.Haddock
@@ -168,13 +173,12 @@ test-suite spec
     Haddock.Backends.Hyperlinker.Parser
     Haddock.Backends.Hyperlinker.Types
 
-  build-depends: Cabal           ^>= 2.4
-               , ghc             ^>= 8.9
-               , ghc-paths       ^>= 0.1.0.9
-               , haddock-library ^>= 1.8.0
+  build-depends: ghc             ^>= 9.0
+               , ghc-paths       ^>= 0.1.0.12
+               , haddock-library ^>= 1.9.0
                , xhtml           ^>= 3000.2.2
-               , hspec           >= 2.4.4 && < 2.6
-               , QuickCheck      ^>= 2.11
+               , hspec           >= 2.4.4 && < 2.8
+               , QuickCheck      >= 2.11  && ^>= 2.14
 
   -- Versions for the dependencies below are transitively pinned by
   -- the non-reinstallable `ghc` package and hence need no version
@@ -190,7 +194,7 @@ test-suite spec
                , transformers
 
   build-tool-depends:
-    hspec-discover:hspec-discover >= 2.4.4 && < 2.6
+    hspec-discover:hspec-discover >= 2.4.4 && < 2.8
 
 source-repository head
   type:     git

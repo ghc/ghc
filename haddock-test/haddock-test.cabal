@@ -1,4 +1,3 @@
-cabal-version:        >= 1.10
 name:                 haddock-test
 version:              0.0.1
 synopsis:             Test utilities for Haddock
@@ -10,14 +9,15 @@ bug-reports:          https://github.com/haskell/haddock/issues
 copyright:            (c) Simon Marlow, David Waern
 category:             Documentation
 build-type:           Simple
+tested-with:          GHC==9.0.*
+cabal-version:        >= 1.10
 stability:            experimental
-tested-with:          GHC==8.10.*, GHC==8.8.1, GHC==8.6.5
 
 library
   default-language: Haskell2010
   ghc-options: -Wall
   hs-source-dirs:   src
-  build-depends:    base >= 4.3 && < 4.13, bytestring, directory, process, filepath, Cabal
+  build-depends:    base >= 4.3 && < 4.16, bytestring, directory, process, filepath, Cabal
 
   exposed-modules:
     Test.Haddock

@@ -1,5 +1,8 @@
 {-# OPTIONS_HADDOCK ignore-exports #-}
-module IgnoreExports (foo) where
+module IgnoreExports (Foo, foo) where
+
+-- | documentation for Foo
+data Foo = Bar -- ^ Documentation for Bar
 
 -- | documentation for foo
 foo :: Int

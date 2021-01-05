@@ -36,14 +36,14 @@ module Haddock.Options (
   readIfaceArgs,
   optPackageName,
   optPackageVersion,
-  modulePackageInfo
+  modulePackageInfo,
+  ignoredSymbols
 ) where
 
 
 import qualified Data.Char as Char
 import           Data.Version
 import           Control.Applicative
-import           Distribution.Verbosity
 import           GHC.Data.FastString
 import           GHC ( DynFlags, Module, moduleUnit, unitState )
 import           Haddock.Types
@@ -109,6 +109,7 @@ data Flag
   | Flag_PackageVersion String
   | Flag_Reexport String
   | Flag_SinceQualification String
+  | Flag_IgnoreLinkSymbol String
   deriving (Eq, Show)
 
 
@@ -220,7 +221,9 @@ options backwardsCompat =
     Option [] ["package-version"] (ReqArg Flag_PackageVersion "VERSION")
       "version of the package being documented in usual x.y.z.w format",
     Option []  ["since-qual"] (ReqArg Flag_SinceQualification "QUAL")
-      "package qualification of @since, one of\n'always' (default) or 'only-external'"
+      "package qualification of @since, one of\n'always' (default) or 'only-external'",
+    Option [] ["ignore-link-symbol"] (ReqArg Flag_IgnoreLinkSymbol "SYMBOL")
+      "name of a symbol which does not trigger a warning in case of link issue"
   ]
 
 
@@ -332,11 +335,13 @@ sinceQualification flags =
 verbosity :: [Flag] -> Verbosity
 verbosity flags =
   case [ str | Flag_Verbosity str <- flags ] of
-    []  -> normal
+    []  -> Normal
     x:_ -> case parseVerbosity x of
       Left e -> throwE e
       Right v -> v
 
+ignoredSymbols :: [Flag] -> [String]
+ignoredSymbols flags = [ symbol | Flag_IgnoreLinkSymbol symbol <- flags ]
 
 ghcFlags :: [Flag] -> [String]
 ghcFlags flags = [ option | Flag_OptGhc option <- flags ]

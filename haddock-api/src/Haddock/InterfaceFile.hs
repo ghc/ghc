@@ -22,12 +22,12 @@ module Haddock.InterfaceFile (
 
 
 import Haddock.Types
-import Haddock.Utils hiding (out)
 
 import Control.Monad
+import Control.Monad.IO.Class ( MonadIO(..) )
 import Data.Array
 import Data.IORef
-import Data.List
+import Data.List (mapAccumR)
 import qualified Data.Map as Map
 import Data.Map (Map)
 import Data.Word
@@ -84,7 +84,7 @@ binaryInterfaceMagic = 0xD0Cface
 --
 binaryInterfaceVersion :: Word16
 #if MIN_VERSION_ghc(9,0,0) && !MIN_VERSION_ghc(9,1,0)
-binaryInterfaceVersion = 34
+binaryInterfaceVersion = 37
 
 binaryInterfaceVersionCompatibility :: [Word16]
 binaryInterfaceVersionCompatibility = [binaryInterfaceVersion]
@@ -702,3 +702,28 @@ instance Binary DocName where
         name <- get bh
         return (Undocumented name)
       _ -> error "get DocName: Bad h"
+
+instance Binary n => Binary (Wrap n) where
+  put_ bh (Unadorned n) = do
+    putByte bh 0
+    put_ bh n
+  put_ bh (Parenthesized n) = do
+    putByte bh 1
+    put_ bh n
+  put_ bh (Backticked n) = do
+    putByte bh 2
+    put_ bh n
+
+  get bh = do
+    h <- getByte bh
+    case h of
+      0 -> do
+        name <- get bh
+        return (Unadorned name)
+      1 -> do
+        name <- get bh
+        return (Parenthesized name)
+      2 -> do
+        name <- get bh
+        return (Backticked name)
+      _ -> error "get Wrap: Bad h"
