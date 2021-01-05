@@ -786,8 +786,6 @@ see Note [Use one-shot information] in "GHC.Core.Opt.OccurAnal".
 --            ExnOrDiv (nip)
 --                  |
 --            Diverges (ni)
---                  |
---             Absent (i)
 -- @
 --
 -- As you can see, we don't distinguish __n__ and __i__.
@@ -798,14 +796,10 @@ data Divergence
   | ExnOrDiv -- ^ Definitely throws a *precise* exception, an imprecise
              --   exception or diverges. Never converges, hence 'isDeadEndDiv'!
              --   See scenario 1 in Note [Precise exceptions and strictness analysis].
-  | Absent   -- ^ Will diverge upon entry, but will not be evaluated in absence of
-             --   compiler bugs.
   | Dunno    -- ^ Might diverge, throw any kind of exception or converge.
   deriving Eq
 
 lubDivergence :: Divergence -> Divergence -> Divergence
-lubDivergence Absent   div      = div
-lubDivergence div      Absent   = div
 lubDivergence Diverges div      = div
 lubDivergence div      Diverges = div
 lubDivergence ExnOrDiv ExnOrDiv = ExnOrDiv
