@@ -188,6 +188,7 @@ Library
         Foreign.Storable
         GHC.Arr
         GHC.Base
+        GHC.Bits
         GHC.ByteOrder
         GHC.Char
         GHC.Clock
