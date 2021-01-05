@@ -77,6 +77,7 @@ data OptKind m                             -- Suppose the flag is -f
     | OptPrefix (String -> EwM m ())       -- -f or -farg (i.e. the arg is optional)
     | OptIntSuffix (Maybe Int -> EwM m ()) -- -f or -f=n; pass n to fn
     | IntSuffix (Int -> EwM m ())          -- -f or -f=n; pass n to fn
+    | WordSuffix (Word -> EwM m ())        -- -f or -f=n; pass n to fn
     | FloatSuffix (Float -> EwM m ())      -- -f or -f=n; pass n to fn
     | PassFlag  (String -> EwM m ())       -- -f; pass "-f" fn
     | AnySuffix (String -> EwM m ())       -- -f or -farg; pass entire "-farg" to fn
@@ -253,6 +254,9 @@ processOneArg opt_kind rest arg args
         IntSuffix f | Just n <- parseInt rest_no_eq -> Right (f n, args)
                     | otherwise -> Left ("malformed integer argument in " ++ dash_arg)
 
+        WordSuffix f | Just n <- parseWord rest_no_eq -> Right (f n, args)
+                     | otherwise -> Left ("malformed natural argument in " ++ dash_arg)
+
         FloatSuffix f | Just n <- parseFloat rest_no_eq -> Right (f n, args)
                       | otherwise -> Left ("malformed float argument in " ++ dash_arg)
 
@@ -279,6 +283,7 @@ arg_ok (Prefix          _)  _    _   = True -- Missing argument checked for in p
                                             -- to improve error message (#12625)
 arg_ok (OptIntSuffix    _)  _    _   = True
 arg_ok (IntSuffix       _)  _    _   = True
+arg_ok (WordSuffix      _)  _    _   = True
 arg_ok (FloatSuffix     _)  _    _   = True
 arg_ok (OptPrefix       _)  _    _   = True
 arg_ok (PassFlag        _)  rest _   = null rest
@@ -291,6 +296,11 @@ arg_ok (AnySuffix       _)  _    _   = True
 --   * gibberish    => Nothing
 parseInt :: String -> Maybe Int
 parseInt s = case reads s of
+                 ((n,""):_) -> Just n
+                 _          -> Nothing
+
+parseWord :: String -> Maybe Word
+parseWord s = case reads s of
                  ((n,""):_) -> Just n
                  _          -> Nothing
 

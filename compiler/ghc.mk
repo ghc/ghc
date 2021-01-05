@@ -190,18 +190,6 @@ compiler_stage1_CONFIGURE_OPTS += --flags=stage1
 compiler_stage2_CONFIGURE_OPTS += --flags=stage2
 compiler_stage3_CONFIGURE_OPTS += --flags=stage3
 
-ifeq "$(GhcThreaded)" "YES"
-# We pass THREADED_RTS to the stage2 C files so that cbits/genSym.c will bring
-# the threaded version of atomic_inc() into scope.
-compiler_stage2_CONFIGURE_OPTS += --ghc-option=-optc-DTHREADED_RTS
-endif
-
-# If the bootstrapping GHC supplies the threaded RTS, then we can have a
-# threaded stage 1 too.
-ifeq "$(GhcThreadedRts)" "YES"
-compiler_stage1_CONFIGURE_OPTS += --ghc-option=-optc-DTHREADED_RTS
-endif
-
 ifeq "$(GhcWithInterpreter)" "YES"
 compiler_stage2_CONFIGURE_OPTS += --flags=internal-interpreter
 
