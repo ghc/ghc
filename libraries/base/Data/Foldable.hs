@@ -76,7 +76,10 @@ module Data.Foldable (
     -- *** Hybrid folds
     -- $hybrid
 
-    -- ** Avoiding multi-pass algorithms
+    -- ** Generative Recursion
+    -- $generative
+
+    -- ** Avoiding multi-pass folds
     -- $multipass
 
     -- * Defining instances
@@ -124,13 +127,17 @@ infix  4 `elem`, `notElem`
 -- | The Foldable class represents data structures that can be reduced to a
 -- summary value one element at a time.  Strict left-associative folds are a
 -- good fit for space-efficient reduction, while lazy right-associative folds
--- are good fit for corecursive iteration or for folds that short-circuit after
--- processing an initial subsequence of the structure's elements.
+-- are a good fit for corecursive iteration, or for folds that short-circuit
+-- after processing an initial subsequence of the structure's elements.
 --
 -- Instances can be derived automatically by enabling the @DeriveFoldable@
 -- extension.  For example, a derived instance for a binary tree might be:
 --
--- > data Tree a = Empty | Leaf a | Node (Tree a) a (Tree a) deriving Foldable
+-- > {-# LANGUAGE DeriveFoldable #-}
+-- > data Tree a = Empty
+-- >             | Leaf a
+-- >             | Node (Tree a) a (Tree a)
+-- >     deriving Foldable
 --
 -- A more detailed description can be found in the overview section of
 -- "Data.Foldable#overview".
@@ -138,10 +145,10 @@ infix  4 `elem`, `notElem`
 class Foldable t where
     {-# MINIMAL foldMap | foldr #-}
 
-    -- | Combine the elements of a structure using `mappend`.
-    -- Right-associative and lazy in the accumulator.  For
-    -- strict left-associative folds, use `foldMap'` instead,
-    -- with 'id' as the map.
+    -- | Given a structure with elements whose type is a 'Monoid', combine them
+    -- via the monoid's @('<>')@ operator.  This fold is right-associative and
+    -- lazy in the accumulator.  When you need a strict left-associative fold,
+    -- use `foldMap'` instead, with 'id' as the map.
     --
     -- ==== __Examples__
     --
@@ -150,16 +157,16 @@ class Foldable t where
     -- >>> fold [[1, 2, 3], [4, 5], [6], []]
     -- [1,2,3,4,5,6]
     --
-    -- >>> fold [Sum 1, Sum 3, Sum 5]
+    -- >>> fold $ Node (Leaf (Sum 1)) (Sum 3) (Leaf (Sum 5))
     -- Sum {getSum = 9}
     --
-    -- Folds of unbounded structures do not terminate when the Monoid's
-    -- `mappend` is strict:
+    -- Folds of unbounded structures do not terminate when the monoid's
+    -- @('<>')@ operator is strict:
     --
     -- >>> fold (repeat Nothing)
     -- * Hangs forever *
     --
-    -- Lazy folds of unbounded structures are fine:
+    -- Lazy corecursive folds of unbounded structures are fine:
     --
     -- >>> take 12 $ fold $ map (\i -> [i..i+2]) [0..]
     -- [0,1,2,1,2,3,2,3,4,3,4,5]
@@ -169,9 +176,10 @@ class Foldable t where
     fold :: Monoid m => t m -> m
     fold = foldMap id
 
-    -- | Map each element of the structure to a monoid, and combine the
-    -- results.  Right-associative and lazy in the accumulator.
-    -- For strict left-associative folds consider `foldMap'` instead.
+    -- | Map each element of the structure into a monoid, and combine the
+    -- results with @('<>')@.  This fold is right-associative and lazy in the
+    -- accumulator.  For strict left-associative folds consider `foldMap'`
+    -- instead.
     --
     -- ==== __Examples__
     --
@@ -186,9 +194,10 @@ class Foldable t where
     -- >>> foldMap (replicate 3) [1, 2, 3]
     -- [1,1,1,2,2,2,3,3,3]
     --
-    -- When a Monoid's `mappend` is lazy in its second argument, 'foldMap' can
-    -- return a possibly unbounded result even from a structure that is
-    -- unbounded on the right:
+    -- When a Monoid's @('<>')@ is lazy in its second argument, 'foldMap' can
+    -- return a result even from an unbounded structure.  For example, lazy
+    -- accumulation enables "Data.ByteString.Builder" to efficiently serialise
+    -- large data structures and produce the output incrementally:
     --
     -- >>> import qualified Data.ByteString.Lazy as L
     -- >>> import qualified Data.ByteString.Builder as B
@@ -199,12 +208,30 @@ class Foldable t where
     --
     foldMap :: Monoid m => (a -> m) -> t a -> m
     {-# INLINE foldMap #-}
-    -- This INLINE allows more list functions to fuse. See #9848.
+    -- This INLINE allows more list functions to fuse.  See #9848.
     foldMap f = foldr (mappend . f) mempty
 
     -- | A left-associative variant of 'foldMap' that is strict in the
-    -- accumulator.  Best method for strict reduction when partial
-    -- results are merged via `mappend`.
+    -- accumulator.  Use this method for strict reduction when partial
+    -- results are merged via @('<>')@.
+    --
+    -- ==== __Examples__
+    --
+    -- Define a 'Monoid' over finite bit strings under 'xor'.  Use it to
+    -- strictly compute the `xor` of a list of 'Int' values.
+    --
+    -- >>> :set -XGeneralizedNewtypeDeriving
+    -- >>> import Data.Bits (Bits, FiniteBits, xor, zeroBits)
+    -- >>> import Data.Foldable (foldMap')
+    -- >>> import Numeric (showHex)
+    -- >>>
+    -- >>> newtype X a = X a deriving (Eq, Bounded, Enum, Bits, FiniteBits)
+    -- >>> instance Bits a => Semigroup (X a) where X a <> X b = X (a `xor` b)
+    -- >>> instance Bits a => Monoid    (X a) where mempty     = X zeroBits
+    -- >>>
+    -- >>> let bits :: [Int]; bits = [0xcafe, 0xfeed, 0xdeaf, 0xbeef, 0x5411]
+    -- >>> (\ (X a) -> showString "0x" . showHex a $ "") $ foldMap' X bits
+    -- "0x42"
     --
     -- @since 4.13.0.0
     foldMap' :: Monoid m => (a -> m) -> t a -> m
@@ -252,7 +279,7 @@ class Foldable t where
     --
     -- ====== Short-circuiting
     --
-    -- '(||)' short-circuits on 'True' values, so the following terminates
+    -- @('||')@ short-circuits on 'True' values, so the following terminates
     -- because there is a 'True' value finitely far from the left side:
     --
     -- >>> foldr (||) False (True : repeat False)
@@ -266,9 +293,10 @@ class Foldable t where
     -- ====== Laziness in the second argument
     --
     -- Applying 'foldr' to infinite structures terminates when the operator is
-    -- lazy in its second argument:
+    -- lazy in its second argument (the initial accumulator is never used in
+    -- this case, and so could be left 'undefined', but @[]@ is more clear):
     --
-    -- >>> take 5 $ foldr (\i acc -> i : fmap (+3) acc) [42] (repeat 1)
+    -- >>> take 5 $ foldr (\i acc -> i : fmap (+3) acc) [] (repeat 1)
     -- [1,4,7,10,13]
     foldr :: (a -> b -> b) -> b -> t a -> b
     foldr f z t = appEndo (foldMap (Endo #. f) t) z
@@ -293,15 +321,15 @@ class Foldable t where
     -- > foldl f z [x1, x2, ..., xn] == (...((z `f` x1) `f` x2) `f`...) `f` xn
     --
     -- Note that to produce the outermost application of the operator the
-    -- entire input list must be traversed. Like all left-associative folds,
+    -- entire input list must be traversed.  Like all left-associative folds,
     -- 'foldl' will diverge if given an infinite list.
     --
     -- If you want an efficient strict left-fold, you probably want to use
-    -- `foldl'` instead of 'foldl'. The reason for this is that the latter does
-    -- not force the /inner/ results (e.g. @z \`f\` x1@ in the above example)
-    -- before applying them to the operator (e.g. to @(\`f\` x2)@). This
-    -- results in a thunk chain \(\mathcal{O}(n)\) elements long, which then
-    -- must be evaluated from the outside-in.
+    -- `foldl'` instead of 'foldl'.  The reason for this is that the latter
+    -- does not force the /inner/ results (e.g. @z \`f\` x1@ in the above
+    -- example) before applying them to the operator (e.g. to @(\`f\` x2)@).
+    -- This results in a thunk chain \(\mathcal{O}(n)\) elements long, which
+    -- then must be evaluated from the outside-in.
     --
     -- For a general 'Foldable' structure this should be semantically identical
     -- to:
@@ -338,10 +366,10 @@ class Foldable t where
     -- | Left-associative fold of a structure but with strict application of
     -- the operator.
     --
-    -- This ensures that each step of the fold is forced to weak head normal
-    -- form before being applied, avoiding the collection of thunks that would
-    -- otherwise occur. This is often what you want to strictly reduce a finite
-    -- structure to a single strict result (e.g. 'sum').
+    -- This ensures that each step of the fold is forced to Weak Head Normal
+    -- Form before being applied, avoiding the collection of thunks that would
+    -- otherwise occur.  This is often what you want to strictly reduce a
+    -- finite structure to a single strict result (e.g. 'sum').
     --
     -- For a general 'Foldable' structure this should be semantically identical
     -- to,
@@ -462,10 +490,10 @@ class Foldable t where
     toList t = build (\ c n -> foldr c n t)
 
     -- | Test whether the structure is empty.  The default implementation is
-    -- Left-associative, lazy in both the initial element and the accumulator.
-    -- Thus optimised for structures where the first element can be accessed in
-    -- constant time.  Structures where this is not the case should have a
-    -- non-default implementation.
+    -- Left-associative and lazy in both the initial element and the
+    -- accumulator.  Thus optimised for structures where the first element can
+    -- be accessed in constant time.  Structures where this is not the case
+    -- should have a non-default implementation.
     --
     -- ==== __Examples__
     --
@@ -543,8 +571,10 @@ class Foldable t where
 
     -- | The largest element of a non-empty structure.
     --
-    --  This function is non-total and will raise a runtime exception if the
-    --  structure happens to be empty.
+    -- This function is non-total and will raise a runtime exception if the
+    -- structure happens to be empty.  A structure that supports random access
+    -- and maintains its elements in order should provide a specialised
+    -- implementation to return the maximum in faster than linear time.
     --
     -- ==== __Examples__
     --
@@ -568,7 +598,9 @@ class Foldable t where
     -- | The least element of a non-empty structure.
     --
     -- This function is non-total and will raise a runtime exception if the
-    -- structure happens to be empty
+    -- structure happens to be empty A structure that supports random access
+    -- and maintains its elements in order should provide a specialised
+    -- implementation to return the minimum in faster than linear time.
     --
     -- ==== __Examples__
     --
@@ -969,7 +1001,7 @@ foldlM f z0 xs = foldr c return xs z0
         {-# INLINE c #-}
 
 -- | Map each element of a structure to an 'Applicative' action, evaluate these
--- actions from left to right, and ignore the results. For a version that
+-- actions from left to right, and ignore the results.  For a version that
 -- doesn't ignore the results see 'Data.Traversable.traverse'.
 --
 -- 'traverse_' is just like 'mapM_', but generalised to 'Applicative' actions.
@@ -988,7 +1020,7 @@ traverse_ f = foldr c (pure ())
   where c x k = f x *> k
         {-# INLINE c #-}
 
--- | 'for_' is 'traverse_' with its arguments flipped. For a version
+-- | 'for_' is 'traverse_' with its arguments flipped.  For a version
 -- that doesn't ignore the results see 'Data.Traversable.for'.  This
 -- is 'forM_' generalised to 'Applicative' actions.
 --
@@ -1008,7 +1040,7 @@ for_ :: (Foldable t, Applicative f) => t a -> (a -> f b) -> f ()
 for_ = flip traverse_
 
 -- | Map each element of a structure to a monadic action, evaluate
--- these actions from left to right, and ignore the results. For a
+-- these actions from left to right, and ignore the results.  For a
 -- version that doesn't ignore the results see
 -- 'Data.Traversable.mapM'.
 --
@@ -1020,7 +1052,7 @@ mapM_ f = foldr c (return ())
   where c x k = f x >> k
         {-# INLINE c #-}
 
--- | 'forM_' is 'mapM_' with its arguments flipped. For a version that
+-- | 'forM_' is 'mapM_' with its arguments flipped.  For a version that
 -- doesn't ignore the results see 'Data.Traversable.forM'.
 --
 -- 'forM_' is just like 'for_', but specialised to monadic actions.
@@ -1030,7 +1062,7 @@ forM_ :: (Foldable t, Monad m) => t a -> (a -> m b) -> m ()
 forM_ = flip mapM_
 
 -- | Evaluate each action in the structure from left to right, and
--- ignore the results. For a version that doesn't ignore the results
+-- ignore the results.  For a version that doesn't ignore the results
 -- see 'Data.Traversable.sequenceA'.
 --
 -- 'sequenceA_' is just like 'sequence_', but generalised to 'Applicative'
@@ -1051,7 +1083,7 @@ sequenceA_ = foldr c (pure ())
         {-# INLINE c #-}
 
 -- | Evaluate each monadic action in the structure from left to right,
--- and ignore the results. For a version that doesn't ignore the
+-- and ignore the results.  For a version that doesn't ignore the
 -- results see 'Data.Traversable.sequence'.
 --
 -- 'sequence_' is just like 'sequenceA_', but specialised to monadic
@@ -1393,16 +1425,16 @@ Note [maximumBy/minimumBy space usage]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When the type signatures of maximumBy and minimumBy were generalized to work
 over any Foldable instance (instead of just lists), they were defined using
-foldr1. This was problematic for space usage, as the semantics of maximumBy
+foldr1.  This was problematic for space usage, as the semantics of maximumBy
 and minimumBy essentially require that they examine every element of the
-data structure. Using foldr1 to examine every element results in space usage
-proportional to the size of the data structure. For the common case of lists,
+data structure.  Using foldr1 to examine every element results in space usage
+proportional to the size of the data structure.  For the common case of lists,
 this could be particularly bad (see #10830).
 
 For the common case of lists, switching the implementations of maximumBy and
 minimumBy to foldl1 solves the issue, assuming GHC's strictness analysis can then
-make these functions only use O(1) stack space. As of base 4.16, we have
-switched to employing foldl' over foldl1, not relying on GHC's optimiser. See
+make these functions only use O(1) stack space.  As of base 4.16, we have
+switched to employing foldl' over foldl1, not relying on GHC's optimiser.  See
 https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 -}
 
@@ -1537,7 +1569,7 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 --   entire input structure, and so the input must be finite.
 --
 -- * __Corecursion__, which yields intermediate results as it encounters
---   additional input elements. Lazy processing of the remaining elements
+--   additional input elements.  Lazy processing of the remaining elements
 --   makes the intermediate results available even before the rest of the
 --   input is processed.  The input may be unbounded, and the caller can
 --   stop processing intermediate results early.
@@ -1557,7 +1589,7 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 -- suited to the task at hand, resulting in a fold that fails to yield
 -- incremental results until the entire input is processed, or fails to
 -- strictly evaluate results as it goes, deferring all the work to the
--- evaluation of a large final thunk. Such cases should be avoided, either by
+-- evaluation of a large final thunk.  Such cases should be avoided, either by
 -- selecting a more appropriate @Foldable@ method, or by tailoring the operator
 -- to the chosen method.
 --
@@ -1634,7 +1666,7 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 -- #corec#
 -- Common examples of lazy corecursive reduction are functions that map and
 -- flatten a structure to a lazy stream of result values, i.e.  an iterator
--- over the transformed input elements. In such cases, it is important to
+-- over the transformed input elements.  In such cases, it is important to
 -- choose a @Foldable@ method that is lazy in the tail of the structure, such
 -- as `foldr` (or `foldMap`, if the result @Monoid@ has a lazy `mappend` as
 -- with e.g. ByteString Builders).
@@ -1875,7 +1907,7 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 -- The 'Node' case is a right fold of the left subtree whose initial
 -- value is a right fold of the rest of the tree.
 --
--- For example, when `f` is '(:)', all three cases return an immediate value,
+-- For example, when @f@ is @(':')@, all three cases return an immediate value,
 -- respectively @z@ or a /cons cell/ holding @x@ or @l@, with the remainder the
 -- structure, if any, encapsulated in a lazy thunk.  This meets the expected
 -- efficient [corecursive](#corec) behaviour of 'foldr'.
@@ -1938,7 +1970,7 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 -- would support only corecursive and short-circuit folds (diverge under strict
 -- reduction).
 --
--- Returning to more mininal instances defined in terms of just `foldr`, it is
+-- Returning to simpler instances, defined just in terms of `foldr`, it is
 -- somewhat surprising that a fairly efficient /default/ implementation of the
 -- strict `foldl'` is defined in terms of lazy `foldr` when only the latter is
 -- explicitly provided by the instance.  It may be instructive to take a look
@@ -1983,8 +2015,167 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 
 --------------
 
+-- $generative
+--
+-- #generative#
+-- So far, we have not discussed /generative recursion/.  Unlike recursive
+-- reduction or corecursion, instead of processing a sequence of elements
+-- already in memory, generative recursion involves producing a possibly
+-- unbounded sequence of values from an initial seed value.  The canonical
+-- example of this is 'Data.List.unfoldr' for Lists, with variants available
+-- for Vectors and various other structures.
+--
+-- A key issue with lists, when used generatively as /iterators/, rather than as
+-- poor-man's containers (see [[1\]](#uselistsnot)), is that such iterators
+-- tend to consume memory when used more than once.  A single traversal of a
+-- list-as-iterator will run in constant space, but as soon as the list is
+-- retained for reuse, its entire element sequence is stored in memory, and the
+-- second traversal reads the copy, rather than regenerates the elements.  It
+-- is sometimes better to recompute the elements rather than memoise the list.
+--
+-- Memoisation happens because the built-in Haskell list __@[]@__ is
+-- represented as __data__, either empty or a /cons-cell/ holding the first
+-- element and the tail of the list.  The @Foldable@ class enables a variant
+-- representation of iterators as /functions/, which take an operator and a
+-- starting accumulator and output a summary result.
+--
+-- The [@fmlist@](https://hackage.haskell.org/package/fmlist) package takes
+-- this approach, by representing a list via its `foldMap` action.
+--
+-- Below we implement an analogous data structure using a representation
+-- based on `foldr`.  This is an example of /Church encoding/
+-- (named after Alonzo Church, inventor of the lambda calculus).
+--
+-- > {-# LANGUAGE RankNTypes #-}
+-- > newtype FRList a = FR { unFR :: forall b. (a -> b -> b) -> b -> b }
+--
+-- The __@unFR@__ field of this type is essentially its `foldr` method
+-- with the list as its first rather than last argument.  Thus we
+-- immediately get a @Foldable@ instance (and a 'toList' function
+-- mapping an __@FRList@__ to a regular list).
+--
+-- > instance Foldable FRList where
+-- >     foldr f z l = unFR l f z
+-- >     -- With older versions of @base@, also define sum, product, ...
+-- >     -- to ensure use of the strict `foldl'`.
+-- >     -- sum = foldl' (+) 0
+-- >     -- ...
+--
+-- We can convert a regular list to an __@FRList@__ with:
+--
+-- > fromList :: [a] -> FRList a
+-- > fromList as = FRList $ \ f z -> foldr f z as
+--
+-- However, reuse of an __@FRList@__ obtained in this way will typically
+-- memoise the underlying element sequence.  Instead, we can define
+-- __@FRList@__ terms directly:
+--
+-- > -- | Immediately return the initial accumulator
+-- > nil :: FRList a
+-- > nil = FRList $ \ _ z -> z
+-- > {-# INLINE nil #-}
+--
+-- > -- | Fold the tail to use as an accumulator with the new initial element
+-- > cons :: a -> FRList a -> FRList a
+-- > cons a l = FRList $ \ f z -> f a (unFR l f z)
+-- > {-# INLINE cons #-}
+--
+-- More crucially, we can also directly define the key building block for
+-- generative recursion:
+--
+-- > -- | Generative recursion, dual to `foldr`.
+-- > unfoldr :: (s -> Maybe (a, s)) -> s -> FRList a
+-- > unfoldr g s0 = FR generate
+-- >   where generate f z = loop s0
+-- >           where loop s | Just (a, t) <- g s = f a (loop t)
+-- >                        | otherwise = z
+-- > {-# INLINE unfoldr #-}
+--
+-- Which can, for example, be specialised to number ranges:
+--
+-- > -- | Generate a range of consecutive integral values.
+-- > range :: (Ord a, Integral a) => a -> a -> FRList a
+-- > range lo hi =
+-- >     unfoldr (\s -> if s > hi then Nothing else Just (s, s+1)) lo
+-- > {-# INLINE range #-}
+--
+-- The program below, when compiled with optimisation:
+--
+-- > main :: IO ()
+-- > main = do
+-- >     let r :: FRList Int
+-- >         r = range 1 10000000
+-- >      in print (sum r, length r)
+--
+-- produces the expected output with no noticeable garbage-collection, despite
+-- reuse of the __@FRList@__ term __@r@__.
+--
+-- > (50000005000000,10000000)
+-- >     52,120 bytes allocated in the heap
+-- >      3,320 bytes copied during GC
+-- >     44,376 bytes maximum residency (1 sample(s))
+-- >     25,256 bytes maximum slop
+-- >          3 MiB total memory in use (0 MB lost due to fragmentation)
+--
+-- The Weak Head Normal Form of an __@FRList@__ is a lambda abstraction not a
+-- data value, and reuse does not lead to memoisation.  Reuse of the iterator
+-- above is somewhat contrived, when computing multiple folds over a common
+-- list, you should generally traverse a  list only [once](#multipass).  The
+-- goal is to demonstrate that the separate computations of the 'sum' and
+-- 'length' run efficiently in constant space, despite reuse.  This would not
+-- be the case with the list @[1..10000000]@.
+--
+-- This is, however, an artificially simple reduction.  More typically, there
+-- are likely to be some allocations in the inner loop, but the temporary
+-- storage used will be garbage-collected as needed, and overall memory
+-- utilisation will remain modest and will not scale with the size of the list.
+--
+-- If we go back to built-in lists (i.e. __@[]@__), but avoid reuse by
+-- performing reduction in a single pass, as below:
+--
+-- > data PairS a b = P !a !b -- We define a strict pair datatype
+-- >
+-- > main :: IO ()
+-- > main = do
+-- >     let l :: [Int]
+-- >         l = [1..10000000]
+-- >      in print $ average l
+-- >   where
+-- >     sumlen :: PairS Int Int -> Int -> PairS Int Int
+-- >     sumlen (P s l) a = P (s + a) (l + 1)
+-- >
+-- >     average is =
+-- >         let (P s l) = foldl' sumlen (P 0 0) is
+-- >          in (fromIntegral s :: Double) / fromIntegral l
+--
+-- the result is again obtained in constant space:
+--
+-- > 5000000.5
+-- >          102,176 bytes allocated in the heap
+-- >            3,320 bytes copied during GC
+-- >           44,376 bytes maximum residency (1 sample(s))
+-- >           25,256 bytes maximum slop
+-- >                3 MiB total memory in use (0 MB lost due to fragmentation)
+--
+-- (and, in fact, faster than with __@FRList@__ by a small factor).
+--
+-- The __@[]@__ list structure works as an efficient iterator when used
+-- just once.  When space-leaks via list reuse are not a concern, and/or
+-- memoisation is actually desirable, the regular list implementation is
+-- likely to be faster.  This is not a suggestion to replace all your uses of
+-- __@[]@__ with a generative alternative.
+--
+-- The __@FRList@__ type could be further extended with instances of 'Functor',
+-- 'Applicative', 'Monad', 'Alternative', etc., and could then provide a
+-- fully-featured list type, optimised for reuse without space-leaks.  If,
+-- however, all that's required is space-efficient, re-use friendly iteration,
+-- less is perhaps more, and just @Foldable@ may be sufficient.
+
+--------------
+
 -- $multipass
 --
+-- #multipass#
 -- In applications where you want to compute a composite function of a
 -- structure, which requires more than one aggregate as an input, it is
 -- generally best to compute all the aggregates in a single pass, rather
@@ -2001,21 +2192,21 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 --
 -- > import Data.Foldable (foldl')
 -- >
--- > data PairS a b = P !a !b -- strict pair
+-- > data PairS a b = P !a !b -- We define a strict pair datatype
 -- >
 -- > -- | Compute sum and length in a single pass, then reduce to the average.
 -- > average :: (Foldable f, Fractional a) => f a -> a
--- > average = pairToFrac . foldl' f z
--- >   where
--- >     z = P 0 (0 :: Int)
--- >     f (P s l) a = P (s+a) (l+1)
--- >     pairToFrac (P s l) = s / fromIntegral l
+-- > average xs =
+-- >     let sumlen (P s l) a = P (s + a) (l + 1 :: Int)
+-- >         (P s l) = foldl' sumlen (P 0 0) xs
+-- >      in s / fromIntegral l
 --
--- The above example is somewhat contrived, some structures keep track of
--- their length internally, and can return it in @O(1)@ time, so this
--- particular recipe for averages is not always the most efficient.
--- In general, composite aggregate functions of large structures benefit
--- from single-pass reduction.
+-- The above example is somewhat contrived, some structures keep track of their
+-- length internally, and can return it in \(\mathcal{O}(1)\) time, so this
+-- particular recipe for averages is not always the most efficient.  In
+-- general, composite aggregate functions of large structures benefit from
+-- single-pass reduction.  This is especially the case when reuse of a list and
+-- memoisation of its elements is thereby avoided,
 
 --------------
 
