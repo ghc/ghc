@@ -1104,7 +1104,7 @@ of ``-W(no-)*``.
 
 .. ghc-flag:: -Wmissing-exported-signatures
     :shortdesc: warn about top-level functions without signatures, only if they
-        are exported. takes precedence over -Wmissing-signatures
+        are exported
     :type: dynamic
     :reverse: -Wno-missing-exported-signatures
     :category:
@@ -1115,8 +1115,9 @@ of ``-W(no-)*``.
     If you would like GHC to check that every exported top-level
     function/value has a type signature, but not check unexported
     values, use the :ghc-flag:`-Wmissing-exported-signatures`
-    option. This option takes precedence over
-    :ghc-flag:`-Wmissing-signatures`. As part of the warning GHC also
+    option. If this option is used in conjunction with
+    :ghc-flag:`-Wmissing-signatures` then every top-level function/value
+    must have a type signature. As part of the warning GHC also
     reports the inferred type. The option is off by default.
 
 .. ghc-flag:: -Wmissing-local-sigs

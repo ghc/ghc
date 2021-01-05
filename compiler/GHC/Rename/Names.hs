@@ -1480,16 +1480,16 @@ warnMissingSignatures gbl_env
        ; warn_pat_syns      <- woptM Opt_WarnMissingPatternSynonymSignatures
 
        ; let add_sig_warns
-               | warn_only_exported = add_warns Opt_WarnMissingExportedSignatures
                | warn_missing_sigs  = add_warns Opt_WarnMissingSignatures
+               | warn_only_exported = add_warns Opt_WarnMissingExportedSignatures
                | warn_pat_syns      = add_warns Opt_WarnMissingPatternSynonymSignatures
                | otherwise          = return ()
 
              add_warns flag
-                = when warn_pat_syns
-                       (mapM_ add_pat_syn_warn pat_syns) >>
-                  when (warn_missing_sigs || warn_only_exported)
-                       (mapM_ add_bind_warn binds)
+                = when (warn_missing_sigs || warn_only_exported)
+                       (mapM_ add_bind_warn binds) >>
+                  when (warn_missing_sigs || warn_pat_syns)
+                       (mapM_ add_pat_syn_warn pat_syns)
                 where
                   add_pat_syn_warn p
                     = add_warn name $
@@ -1514,7 +1514,7 @@ warnMissingSignatures gbl_env
                            (addWarnAt (Reason flag) (getSrcSpan name) msg)
 
                   export_check name
-                    = not warn_only_exported || name `elemNameSet` exports
+                    = warn_missing_sigs || not warn_only_exported || name `elemNameSet` exports
 
        ; add_sig_warns }
 
