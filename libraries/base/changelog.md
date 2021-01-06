@@ -11,6 +11,9 @@
   * Add `Semigroup` and `Monoid` instances for `Data.Functor.Product` and
     `Data.Functor.Compose`.
 
+  * Add `Eq1`, `Read1` and `Show1` instance for `Complex`;
+    add `Eq1`, `Ord1`, `Show1` and `Read1` instances for 3 and 4-tuples.
+
 ## 4.15.0.0 *TBA*
 
   * `openFile` now calls the `open` system call with an `interruptible` FFI
