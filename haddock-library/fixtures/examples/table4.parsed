@@ -8,10 +8,10 @@ DocAppend
                                  {tableCellColspan = 1,
                                   tableCellContents = DocString
                                                         (concat
-                                                           ["   outer     \n",
-                                                            "             \n",
-                                                            "-------+     \n",
-                                                            " inner |     "]),
+                                                           ["outer\n",
+                                                            "\n",
+                                                            "-------+\n",
+                                                            "inner |"]),
                                   tableCellRowspan = 1}]],
            tableHeaderRows = []})
      (DocAppend
@@ -21,6 +21,6 @@ DocAppend
              {tableBodyRows = [TableRow
                                  [TableCell
                                     {tableCellColspan = 1,
-                                     tableCellContents = DocString " inner ",
+                                     tableCellContents = DocString "inner",
                                      tableCellRowspan = 1}]],
               tableHeaderRows = []})))

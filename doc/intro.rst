@@ -62,11 +62,9 @@ Obtaining Haddock
 Distributions (source & binary) of Haddock can be obtained from its `web
 site <http://www.haskell.org/haddock/>`__.
 
-Up-to-date sources can also be obtained from our public darcs
+Up-to-date sources can also be obtained from our public GitHub
 repository. The Haddock sources are at
-``http://code.haskell.org/haddock``. See
-`darcs.net <http://www.darcs.net/>`__ for more information on the darcs
-version control utility.
+``https://github.com/haskell/haddock``.
 
 License
 -------

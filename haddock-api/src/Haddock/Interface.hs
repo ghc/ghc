@@ -43,11 +43,11 @@ import Haddock.Types
 import Haddock.Utils
 
 import Control.Monad
+import Control.Monad.IO.Class ( liftIO )
 import Control.Exception (evaluate)
-import Data.List
+import Data.List (foldl', isPrefixOf, nub)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import Distribution.Verbosity
 import Text.Printf
 
 import GHC.Unit.Module.Env (mkModuleSet, emptyModuleSet, unionModuleSet, ModuleSet)
@@ -65,6 +65,7 @@ import GHC.Types.Name.Occurrence (isTcOcc)
 import GHC.Types.Name.Reader (unQualOK, greMangledName, globalRdrEnvElts)
 import GHC.Utils.Error (withTimingD)
 import GHC.HsToCore.Docs
+import GHC.Runtime.Loader (initializePlugins)
 
 #if defined(mingw32_HOST_OS)
 import System.IO
@@ -114,7 +115,7 @@ processModules verbosity modules flags extIfaces = do
   let warnings = Flag_NoWarnings `notElem` flags
   dflags <- getDynFlags
   let (interfaces'', msgs) =
-         runWriter $ mapM (renameInterface dflags links warnings) interfaces'
+         runWriter $ mapM (renameInterface dflags (ignoredSymbols flags) links warnings) interfaces'
   liftIO $ mapM_ putStrLn msgs
 
   return (interfaces'', homeLinks)
@@ -155,7 +156,14 @@ createIfaces verbosity modules flags instIfaceMap = do
 processModule :: Verbosity -> ModSummary -> [Flag] -> IfaceMap -> InstIfaceMap -> Ghc (Maybe (Interface, ModuleSet))
 processModule verbosity modsum flags modMap instIfaceMap = do
   out verbosity verbose $ "Checking module " ++ moduleString (ms_mod modsum) ++ "..."
-  tm <- {-# SCC "parse/typecheck/load" #-} loadModule =<< typecheckModule =<< parseModule modsum
+
+  -- Since GHC 8.6, plugins are initialized on a per module basis
+  hsc_env' <- getSession
+  hsc_env'' <- liftIO $ initializePlugins (hsc_env' { hsc_dflags = ms_hspp_opts modsum })
+  setSession hsc_env''
+  let modsum' = modsum { ms_hspp_opts = (hsc_dflags hsc_env'') }
+
+  tm <- {-# SCC "parse/typecheck/load" #-} loadModule =<< typecheckModule =<< parseModule modsum'
 
   case isBootSummary modsum of
     IsBoot ->

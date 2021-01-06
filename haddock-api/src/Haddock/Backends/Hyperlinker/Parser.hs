@@ -3,9 +3,9 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 module Haddock.Backends.Hyperlinker.Parser (parse) where
 
+import Control.Monad.Trans.Maybe
+import Control.Monad.Trans.Class
 import Control.Applicative ( Alternative(..) )
-import Control.Monad.Trans.Maybe ( MaybeT(..) )
-import Control.Monad.Trans.Class ( MonadTrans(lift) )
 import Data.List           ( isPrefixOf, isSuffixOf )
 
 import qualified Data.ByteString as BS
@@ -24,7 +24,6 @@ import GHC.Utils.Panic      ( panic )
 import GHC.Driver.Ppr       ( showSDoc )
 import GHC.Types.SrcLoc
 import GHC.Data.StringBuffer ( StringBuffer, atEnd )
-import GHC.Unit              ( homeUnitId )
 
 import Haddock.Backends.Hyperlinker.Types as T
 import Haddock.GhcUtils

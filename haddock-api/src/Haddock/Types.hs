@@ -27,14 +27,16 @@ module Haddock.Types (
   , module Documentation.Haddock.Types
  ) where
 
-import Control.Exception
 import Control.Arrow hiding ((<+>))
 import Control.DeepSeq
+import Control.Exception (throw)
 import Control.Monad (ap)
+import Control.Monad.Catch
 import Control.Monad.IO.Class (MonadIO(..))
 import Data.Typeable (Typeable)
 import Data.Map (Map)
 import Data.Data (Data)
+import Data.Void (Void)
 import Documentation.Haddock.Types
 import GHC.Types.Basic (PromotionFlag(..))
 import GHC.Types.Fixity (Fixity(..))
@@ -285,6 +287,12 @@ noDocForDecl = (Documentation Nothing Nothing, mempty)
 -- | Type of environment used to cross-reference identifiers in the syntax.
 type LinkEnv = Map Name Module
 
+-- | An 'RdrName' tagged with some type/value namespace information.
+data NsRdrName = NsRdrName
+  { namespace :: !Namespace
+  , rdrName :: !RdrName
+  }
+
 -- | Extends 'Name' with cross-reference information.
 data DocName
   = Documented Name Module
@@ -331,7 +339,30 @@ instance SetName DocName where
     setName name' (Documented _ mdl) = Documented name' mdl
     setName name' (Undocumented _) = Undocumented name'
 
+-- | Adds extra "wrapper" information to a name.
+--
+-- This is to work around the fact that most name types in GHC ('Name', 'RdrName',
+-- 'OccName', ...) don't include backticks or parens.
+data Wrap n
+  = Unadorned { unwrap :: n  }     -- ^ don't do anything to the name
+  | Parenthesized { unwrap :: n }  -- ^ add parentheses around the name
+  | Backticked { unwrap :: n }     -- ^ add backticks around the name
+  deriving (Show, Functor, Foldable, Traversable)
 
+-- | Useful for debugging
+instance Outputable n => Outputable (Wrap n) where
+  ppr (Unadorned n)     = ppr n
+  ppr (Parenthesized n) = hcat [ char '(', ppr n, char ')' ]
+  ppr (Backticked n)    = hcat [ char '`', ppr n, char '`' ]
+
+showWrapped :: (a -> String) -> Wrap a -> String
+showWrapped f (Unadorned n) = f n
+showWrapped f (Parenthesized n) = "(" ++ f n ++ ")"
+showWrapped f (Backticked n) = "`" ++ f n ++ "`"
+
+instance HasOccName DocName where
+
+    occName = occName . getName
 
 -----------------------------------------------------------------------------
 -- * Instances
@@ -425,10 +456,10 @@ instance NamedThing name => NamedThing (InstOrigin name) where
 
 type LDoc id = Located (Doc id)
 
-type Doc id = DocH (ModuleName, OccName) id
-type MDoc id = MetaDoc (ModuleName, OccName) id
+type Doc id = DocH (Wrap (ModuleName, OccName)) (Wrap id)
+type MDoc id = MetaDoc (Wrap (ModuleName, OccName)) (Wrap id)
 
-type DocMarkup id a = DocMarkupH (ModuleName, OccName) id a
+type DocMarkup id a = DocMarkupH (Wrap (ModuleName, OccName)) id a
 
 instance (NFData a, NFData mod)
          => NFData (DocH mod a) where
@@ -621,17 +652,28 @@ tell w = Writer ((), w)
 
 
 -- | Haddock's own exception type.
-data HaddockException = HaddockException String deriving Typeable
+data HaddockException
+  = HaddockException String
+  | WithContext [String] SomeException
+  deriving Typeable
 
 
 instance Show HaddockException where
   show (HaddockException str) = str
-
+  show (WithContext ctxts se)  = unlines $ ["While " ++ ctxt ++ ":\n" | ctxt <- reverse ctxts] ++ [show se]
 
 throwE :: String -> a
 instance Exception HaddockException
 throwE str = throw (HaddockException str)
 
+withExceptionContext :: MonadCatch m => String -> m a -> m a
+withExceptionContext ctxt =
+  handle (\ex ->
+      case ex of
+        HaddockException _ -> throwM $ WithContext [ctxt] (toException ex)
+        WithContext ctxts se -> throwM $ WithContext (ctxt:ctxts) se
+          ) .
+  handle (throwM . WithContext [ctxt])
 
 -- In "Haddock.Interface.Create", we need to gather
 -- @Haddock.Types.ErrMsg@s a lot, like @ErrMsgM@ does,
@@ -666,6 +708,12 @@ instance Monad ErrMsgGhc where
 instance MonadIO ErrMsgGhc where
   liftIO m = WriterGhc (fmap (\x -> (x, [])) (liftIO m))
 
+instance MonadThrow ErrMsgGhc where
+  throwM e = WriterGhc (throwM e)
+
+instance MonadCatch ErrMsgGhc where
+  catch (WriterGhc m) f = WriterGhc (catch m (runWriterGhc . f))
+
 -----------------------------------------------------------------------------
 -- * Pass sensitive types
 -----------------------------------------------------------------------------
@@ -692,7 +740,7 @@ type instance XOpTy            DocNameI = NoExtField
 type instance XParTy           DocNameI = NoExtField
 type instance XIParamTy        DocNameI = NoExtField
 type instance XKindSig         DocNameI = NoExtField
-type instance XSpliceTy        DocNameI = NoExtField
+type instance XSpliceTy        DocNameI = Void       -- see `renameHsSpliceTy`
 type instance XDocTy           DocNameI = NoExtField
 type instance XBangTy          DocNameI = NoExtField
 type instance XRecTy           DocNameI = NoExtField

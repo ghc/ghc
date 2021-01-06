@@ -29,13 +29,22 @@ import GHC.Builtin.Types (eqTyCon_RDR)
 import Control.Applicative
 import Control.Arrow ( first )
 import Control.Monad hiding (mapM)
-import Data.List
+import Data.List (intercalate)
 import qualified Data.Map as Map hiding ( Map )
+import qualified Data.Set as Set
 import Prelude hiding (mapM)
 import GHC.HsToCore.Docs
 
-renameInterface :: DynFlags -> LinkEnv -> Bool -> Interface -> ErrMsgM Interface
-renameInterface dflags renamingEnv warnings iface =
+-- | Traverse docstrings and ASTs in the Haddock interface, renaming 'Name' to
+-- 'DocName'.
+--
+-- What this really boils down to is: for each 'Name', figure out which of the
+-- modules that export the name is the preferred place to link to.
+--
+-- The renamed output gets written into fields in the Haddock interface record
+-- that were previously left empty.
+renameInterface :: DynFlags -> [String] -> LinkEnv -> Bool -> Interface -> ErrMsgM Interface
+renameInterface _dflags ignoredSymbols renamingEnv warnings iface =
 
   -- first create the local env, where every name exported by this module
   -- is mapped to itself, and everything else comes from the global renaming
@@ -70,8 +79,15 @@ renameInterface dflags renamingEnv warnings iface =
       -- Note that since the renamed AST represents equality constraints as
       -- @HasOpTy t1 eqTyCon_RDR t2@ (and _not_ as @HsEqTy t1 t2@), we need to
       -- manually filter out 'eqTyCon_RDR' (aka @~@).
-      strings = [ pretty dflags n
+
+      qualifiedName n = (moduleNameString $ moduleName $ nameModule n) <> "." <> getOccString n
+
+      ignoreSet = Set.fromList ignoredSymbols
+
+      strings = [ qualifiedName n
+
                 | n <- missingNames
+                , not (qualifiedName n `Set.member` ignoreSet)
                 , not (isSystemName n)
                 , not (isBuiltInSyntax n)
                 , Exact n /= eqTyCon_RDR
@@ -83,7 +99,7 @@ renameInterface dflags renamingEnv warnings iface =
     unless (OptHide `elem` ifaceOptions iface || null strings || not warnings) $
       tell ["Warning: " ++ moduleString (ifaceMod iface) ++
             ": could not find link destinations for:\n"++
-            unwords ("   " : strings) ]
+            intercalate "\n\t- "  ("" : strings) ]
 
     return $ iface { ifaceRnDoc         = finalModuleDoc,
                      ifaceRnDocMap      = rnDocMap,
@@ -131,6 +147,11 @@ lookupRn name = RnM $ \lkp ->
     (False,maps_to) -> (maps_to, (name :))
     (True, maps_to) -> (maps_to, id)
 
+-- | Look up a 'Name' in the renaming environment, but don't warn if you don't
+-- find the name. Prefer to use 'lookupRn' whenever possible.
+lookupRnNoWarn :: Name -> RnM DocName
+lookupRnNoWarn name = RnM $ \lkp -> (snd (lkp name), id)
+
 -- | Run the renamer action using lookup in a 'LinkEnv' as the lookup function.
 -- Returns the renamed value along with a list of `Name`'s that could not be
 -- renamed because they weren't in the environment.
@@ -174,8 +195,8 @@ renameLDocHsSyn :: LHsDocString -> RnM LHsDocString
 renameLDocHsSyn = return
 
 
-renameDoc :: Traversable t => t Name -> RnM (t DocName)
-renameDoc = traverse rename
+renameDoc :: Traversable t => t (Wrap Name) -> RnM (t (Wrap DocName))
+renameDoc = traverse (traverse rename)
 
 renameFnArgsDoc :: FnArgsDoc Name -> RnM (FnArgsDoc DocName)
 renameFnArgsDoc = mapM renameDoc
@@ -560,7 +581,7 @@ renameSig sig = case sig of
     lnames' <- mapM renameL lnames
     return $ FixSig noExtField (FixitySig noExtField lnames' fixity)
   MinimalSig _ src (L l s) -> do
-    s' <- traverse renameL s
+    s' <- traverse (traverse lookupRnNoWarn) s
     return $ MinimalSig noExtField src (L l s')
   -- we have filtered out all other kinds of signatures in Interface.Create
   _ -> error "expected TypeSig"

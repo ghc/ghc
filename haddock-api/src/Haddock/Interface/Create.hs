@@ -31,11 +31,13 @@ import Haddock.Interface.LexParseRn
 import Data.Bifunctor
 import Data.Bitraversable
 import qualified Data.Map as M
+import qualified Data.Set as S
 import Data.Map (Map)
-import Data.List
+import Data.List (find, foldl')
 import Data.Maybe
 import Control.Monad
 import Data.Traversable
+import GHC.Stack (HasCallStack)
 
 import GHC.Types.Avail hiding (avail)
 import qualified GHC.Types.Avail  as Avail
@@ -47,7 +49,6 @@ import GHC.Types.SourceFile
 import GHC.Core.ConLike (ConLike(..))
 import GHC
 import GHC.Driver.Ppr
-import GHC.Driver.Env
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
@@ -63,17 +64,22 @@ import GHC.HsToCore.Docs hiding (mkMaps)
 import GHC.Parser.Annotation (IsUnicodeSyntax(..))
 import GHC.Unit.Module.Warnings
 
+mkExceptionContext :: TypecheckedModule -> String
+mkExceptionContext =
+  ("creating Haddock interface for " ++) . moduleNameString . ms_mod_name . pm_mod_summary . tm_parsed_module
 
 -- | Use a 'TypecheckedModule' to produce an 'Interface'.
 -- To do this, we need access to already processed modules in the topological
 -- sort. That's what's in the 'IfaceMap'.
-createInterface :: TypecheckedModule
+createInterface :: HasCallStack
+                => TypecheckedModule
                 -> UnitState
                 -> [Flag]       -- Boolean flags
                 -> IfaceMap     -- Locally processed modules
                 -> InstIfaceMap -- External, already installed interfaces
                 -> ErrMsgGhc Interface
-createInterface tm unit_state flags modMap instIfaceMap = do
+createInterface tm unit_state flags modMap instIfaceMap =
+ withExceptionContext (mkExceptionContext tm) $ do
 
   let ms             = pm_mod_summary . tm_parsed_module $ tm
       mi             = moduleInfo tm
@@ -91,8 +97,9 @@ createInterface tm unit_state flags modMap instIfaceMap = do
 
       (TcGblEnv { tcg_rdr_env = gre
                 , tcg_warns   = warnings
-                , tcg_exports = all_exports
+                , tcg_exports = all_exports0
                 }, md) = tm_internals_ tm
+      all_local_avails = gresToAvailInfo . filter isLocalGRE . globalRdrEnvElts $ gre
 
   -- The 'pkgName' is necessary to decide what package to mention in "@since"
   -- annotations. Not having it is not fatal though.
@@ -119,9 +126,9 @@ createInterface tm unit_state flags modMap instIfaceMap = do
   let declsWithDocs = topDecls group_
 
       exports0 = fmap (map (first unLoc)) mayExports
-      exports
-        | OptIgnoreExports `elem` opts = Nothing
-        | otherwise = exports0
+      (all_exports, exports)
+        | OptIgnoreExports `elem` opts = (all_local_avails, Nothing)
+        | otherwise = (all_exports0, exports0)
 
       unrestrictedImportedMods
         -- module re-exports are only possible with
@@ -133,8 +140,8 @@ createInterface tm unit_state flags modMap instIfaceMap = do
       fixMap = mkFixMap group_
       (decls, _) = unzip declsWithDocs
       localInsts = filter (nameIsLocalOrFrom sem_mdl)
-                        $  map getName instances
-                        ++ map getName fam_instances
+                        $  map getName fam_instances
+                        ++ map getName instances
       -- Locations of all TH splices
       splices = [ l | L l (SpliceD _ _) <- hsmodDecls hsm ]
 
@@ -170,6 +177,18 @@ createInterface tm unit_state flags modMap instIfaceMap = do
 
   modWarn <- liftErrMsg (moduleWarning dflags gre warnings)
 
+  -- Prune the docstring 'Map's to keep only docstrings that are not private.
+  --
+  -- Besides all the names that GHC has told us this module exports, we also
+  -- keep the docs for locally defined class instances. This is more names than
+  -- we need, but figuring out which instances are fully private is tricky.
+  --
+  -- We do this pruning to avoid having to rename, emit warnings, and save
+  -- docstrings which will anyways never be rendered.
+  let !localVisibleNames = S.fromList (localInsts ++ exportedNames)
+      !prunedDocMap = M.restrictKeys docMap localVisibleNames
+      !prunedArgMap = M.restrictKeys argMap localVisibleNames
+
   return $! Interface {
     ifaceMod               = mdl
   , ifaceIsSig             = is_sig
@@ -178,12 +197,12 @@ createInterface tm unit_state flags modMap instIfaceMap = do
   , ifaceDoc               = Documentation mbDoc modWarn
   , ifaceRnDoc             = Documentation Nothing Nothing
   , ifaceOptions           = opts
-  , ifaceDocMap            = docMap
-  , ifaceArgMap            = argMap
-  , ifaceRnDocMap          = M.empty
-  , ifaceRnArgMap          = M.empty
+  , ifaceDocMap            = prunedDocMap
+  , ifaceArgMap            = prunedArgMap
+  , ifaceRnDocMap          = M.empty -- Filled in `renameInterface`
+  , ifaceRnArgMap          = M.empty -- Filled in `renameInterface`
   , ifaceExportItems       = prunedExportItems
-  , ifaceRnExportItems     = []
+  , ifaceRnExportItems     = [] -- Filled in `renameInterface`
   , ifaceExports           = exportedNames
   , ifaceVisibleExports    = visibleNames
   , ifaceDeclMap           = declMap
@@ -457,7 +476,8 @@ mkFixMap group_ =
 -- We create the export items even if the module is hidden, since they
 -- might be useful when creating the export items for other modules.
 mkExportItems
-  :: Bool               -- is it a signature
+  :: HasCallStack
+  => Bool               -- is it a signature
   -> IfaceMap
   -> Maybe Package      -- this package
   -> Module             -- this module
@@ -495,7 +515,7 @@ mkExportItems
       return [ExportDoc doc]
 
     lookupExport (IEDocNamed _ str, _)      = liftErrMsg $
-      findNamedDoc str [ unL d | d <- decls ] >>= \case
+      findNamedDoc str [ unLoc d | d <- decls ] >>= \case
         Nothing -> return  []
         Just docStr -> do
           doc <- processDocStringParas dflags pkgName gre docStr
@@ -516,7 +536,8 @@ mkExportItems
       availExportItem is_sig modMap thisMod semMod warnings exportedNames
         maps fixMap splices instIfaceMap dflags avail
 
-availExportItem :: Bool               -- is it a signature
+availExportItem :: HasCallStack
+                => Bool               -- is it a signature
                 -> IfaceMap
                 -> Module             -- this module
                 -> Module             -- semantic module
@@ -543,13 +564,13 @@ availExportItem is_sig modMap thisMod semMod warnings exportedNames
           export <- hiValExportItem dflags t l doc (l `elem` splices) $ M.lookup t fixMap
           return [export]
         (ds, docs_) | decl : _ <- filter (not . isValD . unLoc) ds ->
-          let declNames = getMainDeclBinder (unL decl)
+          let declNames = getMainDeclBinder (unLoc decl)
           in case () of
             _
               -- We should not show a subordinate by itself if any of its
               -- parents is also exported. See note [1].
               | t `notElem` declNames,
-                Just p <- find isExported (parents t $ unL decl) ->
+                Just p <- find isExported (parents t $ unLoc decl) ->
                 do liftErrMsg $ tell [
                      "Warning: " ++ moduleString thisMod ++ ": " ++
                      pretty dflags (nameOccName t) ++ " is exported separately but " ++
@@ -598,11 +619,24 @@ availExportItem is_sig modMap thisMod semMod warnings exportedNames
 
         _ -> return []
 
-    availExportDecl :: AvailInfo -> LHsDecl GhcRn
+    -- Tries 'extractDecl' first then falls back to 'hiDecl' if that fails
+    availDecl :: Name -> LHsDecl GhcRn -> ErrMsgGhc (LHsDecl GhcRn)
+    availDecl declName parentDecl =
+      case extractDecl declMap declName parentDecl of
+        Right d -> pure d
+        Left err -> do
+          synifiedDeclOpt <- hiDecl dflags declName
+          case synifiedDeclOpt of
+            Just synifiedDecl -> pure synifiedDecl
+            Nothing -> pprPanic "availExportItem" (O.text err)
+
+    availExportDecl :: HasCallStack => AvailInfo -> LHsDecl GhcRn
                     -> (DocForDecl Name, [(Name, DocForDecl Name)])
                     -> ErrMsgGhc [ ExportItem GhcRn ]
     availExportDecl avail decl (doc, subs)
       | availExportsDecl avail = do
+          extractedDecl <- availDecl (availName avail) decl
+
           -- bundled pattern synonyms only make sense if the declaration is
           -- exported (otherwise there would be nothing to bundle to)
           bundledPatSyns <- findBundledPatterns avail
@@ -618,8 +652,7 @@ availExportItem is_sig modMap thisMod semMod warnings exportedNames
                 ]
 
           return [ ExportDecl {
-                       expItemDecl      = restrictTo (fmap fst subs)
-                                            (extractDecl declMap (availName avail) decl)
+                       expItemDecl      = restrictTo (fmap fst subs) extractedDecl
                      , expItemPats      = bundledPatSyns
                      , expItemMbDoc     = doc
                      , expItemSubDocs   = subs
@@ -629,18 +662,18 @@ availExportItem is_sig modMap thisMod semMod warnings exportedNames
                      }
                  ]
 
-      | otherwise =
-          return [ ExportDecl {
-                       expItemDecl      = extractDecl declMap sub decl
+      | otherwise = for subs $ \(sub, sub_doc) -> do
+          extractedDecl <- availDecl sub decl
+
+          return ( ExportDecl {
+                       expItemDecl      = extractedDecl
                      , expItemPats      = []
                      , expItemMbDoc     = sub_doc
                      , expItemSubDocs   = []
                      , expItemInstances = []
                      , expItemFixities  = [ (sub, f) | Just f <- [M.lookup sub fixMap] ]
                      , expItemSpliced   = False
-                     }
-                 | (sub, sub_doc) <- subs
-                 ]
+                     } )
 
     exportedNameSet = mkNameSet exportedNames
     isExported n = elemNameSet n exportedNameSet
@@ -707,6 +740,7 @@ semToIdMod this_uid m
     | Module.isHoleModule m = mkModule this_uid (moduleName m)
     | otherwise             = m
 
+-- | Reify a declaration from the GHC internal 'TyThing' representation.
 hiDecl :: DynFlags -> Name -> ErrMsgGhc (Maybe (LHsDecl GhcRn))
 hiDecl dflags t = do
   mayTyThing <- liftGhcToErrMsgGhc $ lookupName t
@@ -853,16 +887,26 @@ fullModuleContents is_sig modMap pkgName thisMod semMod warnings gre exportedNam
 -- it might be an individual record selector or a class method.  In these
 -- cases we have to extract the required declaration (and somehow cobble
 -- together a type signature for it...).
-extractDecl :: DeclMap -> Name -> LHsDecl GhcRn -> LHsDecl GhcRn
+--
+-- This function looks through the declarations in this module to try to find
+-- the one with the right name.
+extractDecl
+  :: HasCallStack
+  => DeclMap                   -- ^ all declarations in the file
+  -> Name                      -- ^ name of the declaration to extract
+  -> LHsDecl GhcRn             -- ^ parent declaration
+  -> Either ErrMsg (LHsDecl GhcRn)
 extractDecl declMap name decl
-  | name `elem` getMainDeclBinder (unLoc decl) = decl
+  | name `elem` getMainDeclBinder (unLoc decl) = pure decl
   | otherwise  =
     case unLoc decl of
-      TyClD _ d@ClassDecl {} ->
+      TyClD _ d@ClassDecl { tcdLName = L _ clsNm
+                          , tcdSigs = clsSigs
+                          , tcdATs = clsATs } ->
         let
           matchesMethod =
             [ lsig
-            | lsig <- tcdSigs d
+            | lsig <- clsSigs
             , ClassOpSig _ False _ _ <- pure $ unLoc lsig
               -- Note: exclude `default` declarations (see #505)
             , name `elem` sigName lsig
@@ -870,29 +914,31 @@ extractDecl declMap name decl
 
           matchesAssociatedType =
             [ lfam_decl
-            | lfam_decl <- tcdATs d
+            | lfam_decl <- clsATs
             , name == unLoc (fdLName (unLoc lfam_decl))
             ]
 
             -- TODO: document fixity
         in case (matchesMethod, matchesAssociatedType)  of
-          ([s0], _) -> let (n, tyvar_names) = (tcdName d, tyClDeclTyVars d)
-                           L pos sig = addClassContext n tyvar_names s0
-                       in L pos (SigD noExtField sig)
-          (_, [L pos fam_decl]) -> L pos (TyClD noExtField (FamDecl noExtField fam_decl))
+          ([s0], _) -> let tyvar_names = tyClDeclTyVars d
+                           L pos sig = addClassContext clsNm tyvar_names s0
+                       in pure (L pos (SigD noExtField sig))
+          (_, [L pos fam_decl]) -> pure (L pos (TyClD noExtField (FamDecl noExtField fam_decl)))
 
           ([], [])
             | Just (famInstDecl:_) <- M.lookup name declMap
             -> extractDecl declMap name famInstDecl
-          _ -> pprPanic "extractDecl" (O.text "Ambiguous decl for" O.<+> O.ppr name O.<+> O.text "in class:"
-                                         O.$$ O.nest 4 (O.ppr d)
-                                         O.$$ O.text "Matches:"
-                                         O.$$ O.nest 4 (O.ppr matchesMethod O.<+> O.ppr matchesAssociatedType))
-      TyClD _ d@DataDecl {} ->
-        let (n, tyvar_tys) = (tcdName d, lHsQTyVarsToTypes (tyClDeclTyVars d))
-        in if isDataConName name
-           then SigD noExtField <$> extractPatternSyn name n tyvar_tys (dd_cons (tcdDataDefn d))
-           else SigD noExtField <$> extractRecSel name n tyvar_tys (dd_cons (tcdDataDefn d))
+          _ -> Left (concat [ "Ambiguous decl for ", getOccString name
+                            , " in class ", getOccString clsNm ])
+
+      TyClD _ d@DataDecl { tcdLName = L _ dataNm
+                         , tcdDataDefn = HsDataDefn { dd_cons = dataCons } } -> do
+        let ty_args = lHsQTyVarsToTypes (tyClDeclTyVars d)
+        lsig <- if isDataConName name
+                  then extractPatternSyn name dataNm ty_args dataCons
+                  else extractRecSel name dataNm ty_args dataCons
+        pure (SigD noExtField <$> lsig)
+
       TyClD _ FamDecl {}
         | isValName name
         , Just (famInst:_) <- M.lookup name declMap
@@ -902,8 +948,8 @@ extractDecl declMap name decl
                                     , feqn_pats  = tys
                                     , feqn_rhs   = defn }))) ->
         if isDataConName name
-        then SigD noExtField <$> extractPatternSyn name n tys (dd_cons defn)
-        else SigD noExtField <$> extractRecSel name n tys (dd_cons defn)
+        then fmap (SigD noExtField) <$> extractPatternSyn name n tys (dd_cons defn)
+        else fmap (SigD noExtField) <$> extractRecSel name n tys (dd_cons defn)
       InstD _ (ClsInstD _ ClsInstDecl { cid_datafam_insts = insts })
         | isDataConName name ->
             let matches = [ d' | L _ d'@(DataFamInstDecl (FamEqn { feqn_rhs = dd })) <- insts
@@ -911,9 +957,9 @@ extractDecl declMap name decl
                                ]
             in case matches of
                 [d0] -> extractDecl declMap name (noLoc (InstD noExtField (DataFamInstD noExtField d0)))
-                _    -> error "internal: extractDecl (ClsInstD)"
+                _    -> Left "internal: extractDecl (ClsInstD)"
         | otherwise ->
-            let matches = [ d' | L _ d'@(DataFamInstDecl d)
+            let matches = [ d' | L _ d'@(DataFamInstDecl d )
                                    <- insts
                                  -- , L _ ConDecl { con_details = RecCon rec } <- dd_cons (feqn_rhs d)
                                , Just rec <- map (getRecConArgs_maybe . unLoc) (dd_cons (feqn_rhs d))
@@ -923,16 +969,18 @@ extractDecl declMap name decl
                           ]
             in case matches of
               [d0] -> extractDecl declMap name (noLoc . InstD noExtField $ DataFamInstD noExtField d0)
-              _ -> error "internal: extractDecl (ClsInstD)"
-      _ -> pprPanic "extractDecl" $
-        O.text "Unhandled decl for" O.<+> O.ppr name O.<> O.text ":"
-        O.$$ O.nest 4 (O.ppr decl)
+              _ -> Left "internal: extractDecl (ClsInstD)"
+      _ -> Left ("extractDecl: Unhandled decl for " ++ getOccString name)
 
-extractPatternSyn :: Name -> Name -> [LHsTypeArg GhcRn] -> [LConDecl GhcRn] -> LSig GhcRn
+extractPatternSyn :: HasCallStack
+                  => Name -> Name
+                  -> [LHsTypeArg GhcRn] -> [LConDecl GhcRn]
+                  -> Either ErrMsg (LSig GhcRn)
 extractPatternSyn nm t tvs cons =
   case filter matches cons of
-    [] -> error "extractPatternSyn: constructor pattern not found"
-    con:_ -> extract <$> con
+    [] -> Left . O.showSDocOneLine O.defaultSDocContext $
+          O.text "constructor pattern " O.<+> O.ppr nm O.<+> O.text "not found in type" O.<+> O.ppr t
+    con:_ -> pure (extract <$> con)
  where
   matches :: LConDecl GhcRn -> Bool
   matches (L _ con) = nm `elem` (unLoc <$> getConNames con)
@@ -967,13 +1015,13 @@ extractPatternSyn nm t tvs cons =
                           mkAppTyArg f (HsArgPar _) = HsParTy noExtField f
 
 extractRecSel :: Name -> Name -> [LHsTypeArg GhcRn] -> [LConDecl GhcRn]
-              -> LSig GhcRn
-extractRecSel _ _ _ [] = error "extractRecSel: selector not found"
+              -> Either ErrMsg (LSig GhcRn)
+extractRecSel _ _ _ [] = Left "extractRecSel: selector not found"
 
 extractRecSel nm t tvs (L _ con : rest) =
   case getRecConArgs_maybe con of
     Just (L _ fields) | ((l,L _ (ConDeclField _ _nn ty _)) : _) <- matching_fields fields ->
-      L l (TypeSig noExtField [noLoc nm] (mkEmptySigWcType (noLoc (HsFunTy noExtField (HsUnrestrictedArrow NormalSyntax) data_ty (getBangType ty)))))
+      pure (L l (TypeSig noExtField [noLoc nm] (mkEmptyWildCardBndrs $ mkEmptySigType (noLoc (HsFunTy noExtField (HsUnrestrictedArrow NormalSyntax) data_ty (getBangType ty))))))
     _ -> extractRecSel nm t tvs rest
  where
   matching_fields :: [LConDeclField GhcRn] -> [(SrcSpan, LConDeclField GhcRn)]
