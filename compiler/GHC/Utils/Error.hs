@@ -15,9 +15,8 @@ module GHC.Utils.Error (
 
         -- * Messages
         ErrMsg(..),
-        ErrDoc(..), errDoc,
-        mapErrDoc,
-        WarnMsg, MsgDoc,
+        WarnMsg,
+        SDoc,
         Messages, ErrorMessages, WarningMessages,
         unionMessages,
         errorsFound, isEmptyMessages,
@@ -91,11 +90,10 @@ import System.IO
 import GHC.Conc         ( getAllocationCounter )
 import System.CPUTime
 
-
 -------------------------
 data Validity
   = IsValid            -- ^ Everything is fine
-  | NotValid MsgDoc    -- ^ A problem, and some indication of why
+  | NotValid SDoc    -- ^ A problem, and some indication of why
 
 isValid :: Validity -> Bool
 isValid IsValid       = True
@@ -110,7 +108,7 @@ allValid :: [Validity] -> Validity
 allValid []       = IsValid
 allValid (v : vs) = v `andValid` allValid vs
 
-getInvalids :: [Validity] -> [MsgDoc]
+getInvalids :: [Validity] -> [SDoc]
 getInvalids vs = [d | NotValid d <- vs]
 
 orValid :: Validity -> Validity -> Validity
@@ -121,17 +119,18 @@ orValid _       v = v
 -- Collecting up messages for later ordering and printing.
 
 ----------------
-formatErrDoc :: SDocContext -> ErrDoc -> SDoc
-formatErrDoc ctx (ErrDoc important context supplementary)
+-- | Formats the input list of structured document, where each element of the list gets a bullet.
+formatErrDoc :: SDocContext -> [SDoc] -> SDoc
+formatErrDoc ctx docs
   = case msgs of
-        [msg] -> vcat msg
-        _ -> vcat $ map starred msgs
+        []    -> Outputable.empty
+        [msg] -> msg
+        _     -> vcat $ map starred msgs
     where
-    msgs = filter (not . null) $ map (filter (not . Outputable.isEmpty ctx))
-        [important, context, supplementary]
-    starred = (bullet<+>) . vcat
+    msgs    = filter (not . Outputable.isEmpty ctx) docs
+    starred = (bullet<+>)
 
-pprErrMsgBagWithLoc :: Bag (ErrMsg ErrDoc) -> [SDoc]
+pprErrMsgBagWithLoc :: Bag (ErrMsg [SDoc]) -> [SDoc]
 pprErrMsgBagWithLoc bag = [ pprLocErrMsg item | item <- sortMsgBag Nothing bag ]
 
 pprLocErrMsg :: RenderableDiagnostic e => ErrMsg e -> SDoc
@@ -353,15 +352,15 @@ ifVerbose dflags val act
   | otherwise               = return ()
 {-# INLINE ifVerbose #-}  -- see Note [INLINE conditional tracing utilities]
 
-errorMsg :: DynFlags -> MsgDoc -> IO ()
+errorMsg :: DynFlags -> SDoc -> IO ()
 errorMsg dflags msg
    = putLogMsg dflags NoReason SevError noSrcSpan $ withPprStyle defaultErrStyle msg
 
-warningMsg :: DynFlags -> MsgDoc -> IO ()
+warningMsg :: DynFlags -> SDoc -> IO ()
 warningMsg dflags msg
    = putLogMsg dflags NoReason SevWarning noSrcSpan $ withPprStyle defaultErrStyle msg
 
-fatalErrorMsg :: DynFlags -> MsgDoc -> IO ()
+fatalErrorMsg :: DynFlags -> SDoc -> IO ()
 fatalErrorMsg dflags msg =
     putLogMsg dflags NoReason SevFatal noSrcSpan $ withPprStyle defaultErrStyle msg
 
@@ -528,29 +527,29 @@ withTiming' dflags what force_result prtimings action
           eventBeginsDoc ctx w = showSDocOneLine ctx $ text "GHC:started:" <+> w
           eventEndsDoc   ctx w = showSDocOneLine ctx $ text "GHC:finished:" <+> w
 
-debugTraceMsg :: DynFlags -> Int -> MsgDoc -> IO ()
+debugTraceMsg :: DynFlags -> Int -> SDoc -> IO ()
 debugTraceMsg dflags val msg =
    ifVerbose dflags val $
       logInfo dflags (withPprStyle defaultDumpStyle msg)
 {-# INLINE debugTraceMsg #-}  -- see Note [INLINE conditional tracing utilities]
 
-putMsg :: DynFlags -> MsgDoc -> IO ()
+putMsg :: DynFlags -> SDoc -> IO ()
 putMsg dflags msg = logInfo dflags (withPprStyle defaultUserStyle msg)
 
-printInfoForUser :: DynFlags -> PrintUnqualified -> MsgDoc -> IO ()
+printInfoForUser :: DynFlags -> PrintUnqualified -> SDoc -> IO ()
 printInfoForUser dflags print_unqual msg
   = logInfo dflags (withUserStyle print_unqual AllTheWay msg)
 
-printOutputForUser :: DynFlags -> PrintUnqualified -> MsgDoc -> IO ()
+printOutputForUser :: DynFlags -> PrintUnqualified -> SDoc -> IO ()
 printOutputForUser dflags print_unqual msg
   = logOutput dflags (withUserStyle print_unqual AllTheWay msg)
 
-logInfo :: DynFlags -> MsgDoc -> IO ()
+logInfo :: DynFlags -> SDoc -> IO ()
 logInfo dflags msg
   = putLogMsg dflags NoReason SevInfo noSrcSpan msg
 
 -- | Like 'logInfo' but with 'SevOutput' rather then 'SevInfo'
-logOutput :: DynFlags -> MsgDoc -> IO ()
+logOutput :: DynFlags -> SDoc -> IO ()
 logOutput dflags msg
   = putLogMsg dflags NoReason SevOutput noSrcSpan msg
 

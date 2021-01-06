@@ -542,7 +542,7 @@ checkCConv JavaScriptCallConv = do dflags <- getDynFlags
 
 -- Warnings
 
-check :: Validity -> (MsgDoc -> MsgDoc) -> TcM ()
+check :: Validity -> (SDoc -> SDoc) -> TcM ()
 check IsValid _             = return ()
 check (NotValid doc) err_fn = addErrTc (err_fn doc)
 
@@ -558,7 +558,7 @@ argument, result :: SDoc
 argument = text "argument"
 result   = text "result"
 
-badCName :: CLabelString -> MsgDoc
+badCName :: CLabelString -> SDoc
 badCName target
   = sep [quotes (ppr target) <+> text "is not a valid C identifier"]
 

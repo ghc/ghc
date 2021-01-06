@@ -231,7 +231,7 @@ initTc :: HscEnv
        -> Module
        -> RealSrcSpan
        -> TcM r
-       -> IO (Messages ErrDoc, Maybe r)
+       -> IO (Messages [SDoc], Maybe r)
                 -- Nothing => error thrown by the thing inside
                 -- (error messages should have been printed already)
 
@@ -353,7 +353,7 @@ initTcWithGbl :: HscEnv
               -> TcGblEnv
               -> RealSrcSpan
               -> TcM r
-              -> IO (Messages ErrDoc, Maybe r)
+              -> IO (Messages [SDoc], Maybe r)
 initTcWithGbl hsc_env gbl_env loc do_this
  = do { lie_var      <- newIORef emptyWC
       ; errs_var     <- newIORef emptyMessages
@@ -399,7 +399,7 @@ initTcWithGbl hsc_env gbl_env loc do_this
       ; return (msgs, final_res)
       }
 
-initTcInteractive :: HscEnv -> TcM a -> IO (Messages ErrDoc, Maybe a)
+initTcInteractive :: HscEnv -> TcM a -> IO (Messages [SDoc], Maybe a)
 -- Initialise the type checker monad for use in GHCi
 initTcInteractive hsc_env thing_inside
   = initTc hsc_env HsSrcFile False
@@ -588,9 +588,9 @@ getEpsAndHpt :: TcRnIf gbl lcl (ExternalPackageState, HomePackageTable)
 getEpsAndHpt = do { env <- getTopEnv; eps <- readMutVar (hsc_EPS env)
                   ; return (eps, hsc_HPT env) }
 
--- | A convenient wrapper for taking a @MaybeErr MsgDoc a@ and throwing
+-- | A convenient wrapper for taking a @MaybeErr SDoc a@ and throwing
 -- an exception if it is an error.
-withException :: TcRnIf gbl lcl (MaybeErr MsgDoc a) -> TcRnIf gbl lcl a
+withException :: TcRnIf gbl lcl (MaybeErr SDoc a) -> TcRnIf gbl lcl a
 withException do_this = do
     r <- do_this
     dflags <- getDynFlags
@@ -930,22 +930,22 @@ wrapLocM_ fn (L loc a) = setSrcSpan loc (fn a)
 
 -- Reporting errors
 
-getErrsVar :: TcRn (TcRef (Messages ErrDoc))
+getErrsVar :: TcRn (TcRef (Messages [SDoc]))
 getErrsVar = do { env <- getLclEnv; return (tcl_errs env) }
 
-setErrsVar :: TcRef (Messages ErrDoc) -> TcRn a -> TcRn a
+setErrsVar :: TcRef (Messages [SDoc]) -> TcRn a -> TcRn a
 setErrsVar v = updLclEnv (\ env -> env { tcl_errs =  v })
 
-addErr :: MsgDoc -> TcRn ()
+addErr :: SDoc -> TcRn ()
 addErr msg = do { loc <- getSrcSpanM; addErrAt loc msg }
 
-failWith :: MsgDoc -> TcRn a
+failWith :: SDoc -> TcRn a
 failWith msg = addErr msg >> failM
 
-failAt :: SrcSpan -> MsgDoc -> TcRn a
+failAt :: SrcSpan -> SDoc -> TcRn a
 failAt loc msg = addErrAt loc msg >> failM
 
-addErrAt :: SrcSpan -> MsgDoc -> TcRn ()
+addErrAt :: SrcSpan -> SDoc -> TcRn ()
 -- addErrAt is mainly (exclusively?) used by the renamer, where
 -- tidying is not an issue, but it's all lazy so the extra
 -- work doesn't matter
@@ -954,16 +954,16 @@ addErrAt loc msg = do { ctxt <- getErrCtxt
                       ; err_info <- mkErrInfo tidy_env ctxt
                       ; addLongErrAt loc msg err_info }
 
-addErrs :: [(SrcSpan,MsgDoc)] -> TcRn ()
+addErrs :: [(SrcSpan,SDoc)] -> TcRn ()
 addErrs msgs = mapM_ add msgs
              where
                add (loc,msg) = addErrAt loc msg
 
-checkErr :: Bool -> MsgDoc -> TcRn ()
+checkErr :: Bool -> SDoc -> TcRn ()
 -- Add the error if the bool is False
 checkErr ok msg = unless ok (addErr msg)
 
-addMessages :: Messages ErrDoc -> TcRn ()
+addMessages :: Messages [SDoc] -> TcRn ()
 addMessages msgs1
   = do { errs_var <- getErrsVar ;
          msgs0 <- readTcRef errs_var ;
@@ -992,36 +992,36 @@ discardWarnings thing_inside
 ************************************************************************
 -}
 
-mkLongErrAt :: SrcSpan -> MsgDoc -> MsgDoc -> TcRn (ErrMsg ErrDoc)
+mkLongErrAt :: SrcSpan -> SDoc -> SDoc -> TcRn (ErrMsg [SDoc])
 mkLongErrAt loc msg extra
   = do { printer <- getPrintUnqualified ;
          unit_state <- hsc_units <$> getTopEnv ;
          let msg' = pprWithUnitState unit_state msg in
          return $ mkLongErrMsg loc printer msg' extra }
 
-mkErrDocAt :: SrcSpan -> ErrDoc -> TcRn (ErrMsg ErrDoc)
+mkErrDocAt :: SrcSpan -> [SDoc] -> TcRn (ErrMsg [SDoc])
 mkErrDocAt loc errDoc
   = do { printer <- getPrintUnqualified ;
          unit_state <- hsc_units <$> getTopEnv ;
          let f = pprWithUnitState unit_state
-             errDoc' = mapErrDoc f errDoc
+             errDoc' = map f errDoc
          in
          return $ mkErr loc printer errDoc' }
 
-addLongErrAt :: SrcSpan -> MsgDoc -> MsgDoc -> TcRn ()
+addLongErrAt :: SrcSpan -> SDoc -> SDoc -> TcRn ()
 addLongErrAt loc msg extra = mkLongErrAt loc msg extra >>= reportError
 
-reportErrors :: [ErrMsg ErrDoc] -> TcM ()
+reportErrors :: [ErrMsg [SDoc]] -> TcM ()
 reportErrors = mapM_ reportError
 
-reportError :: ErrMsg ErrDoc -> TcRn ()
+reportError :: ErrMsg [SDoc] -> TcRn ()
 reportError err
   = do { traceTc "Adding error:" (pprLocErrMsg err) ;
          errs_var <- getErrsVar ;
          msgs     <- readTcRef errs_var ;
          writeTcRef errs_var (err `addMessage` msgs) }
 
-reportWarning :: WarnReason -> ErrMsg ErrDoc -> TcRn ()
+reportWarning :: WarnReason -> ErrMsg [SDoc] -> TcRn ()
 reportWarning reason err
   = do { let warn = makeIntoWarning reason err
                     -- 'err' was built by mkLongErrMsg or something like that,
@@ -1100,12 +1100,12 @@ setErrCtxt ctxt = updLclEnv (\ env -> env { tcl_ctxt = ctxt })
 
 -- | Add a fixed message to the error context. This message should not
 -- do any tidying.
-addErrCtxt :: MsgDoc -> TcM a -> TcM a
+addErrCtxt :: SDoc -> TcM a -> TcM a
 {-# INLINE addErrCtxt #-}   -- Note [Inlining addErrCtxt]
 addErrCtxt msg = addErrCtxtM (\env -> return (env, msg))
 
 -- | Add a message to the error context. This message may do tidying.
-addErrCtxtM :: (TidyEnv -> TcM (TidyEnv, MsgDoc)) -> TcM a -> TcM a
+addErrCtxtM :: (TidyEnv -> TcM (TidyEnv, SDoc)) -> TcM a -> TcM a
 {-# INLINE addErrCtxtM #-}  -- Note [Inlining addErrCtxt]
 addErrCtxtM ctxt m = updCtxt (push_ctxt (False, ctxt)) m
 
@@ -1113,17 +1113,17 @@ addErrCtxtM ctxt m = updCtxt (push_ctxt (False, ctxt)) m
 -- message is always sure to be reported, even if there is a lot of
 -- context. It also doesn't count toward the maximum number of contexts
 -- reported.
-addLandmarkErrCtxt :: MsgDoc -> TcM a -> TcM a
+addLandmarkErrCtxt :: SDoc -> TcM a -> TcM a
 {-# INLINE addLandmarkErrCtxt #-}  -- Note [Inlining addErrCtxt]
 addLandmarkErrCtxt msg = addLandmarkErrCtxtM (\env -> return (env, msg))
 
 -- | Variant of 'addLandmarkErrCtxt' that allows for monadic operations
 -- and tidying.
-addLandmarkErrCtxtM :: (TidyEnv -> TcM (TidyEnv, MsgDoc)) -> TcM a -> TcM a
+addLandmarkErrCtxtM :: (TidyEnv -> TcM (TidyEnv, SDoc)) -> TcM a -> TcM a
 {-# INLINE addLandmarkErrCtxtM #-}  -- Note [Inlining addErrCtxt]
 addLandmarkErrCtxtM ctxt m = updCtxt (push_ctxt (True, ctxt)) m
 
-push_ctxt :: (Bool, TidyEnv -> TcM (TidyEnv, MsgDoc))
+push_ctxt :: (Bool, TidyEnv -> TcM (TidyEnv, SDoc))
           -> Bool -> [ErrCtxt] -> [ErrCtxt]
 push_ctxt ctxt in_gen ctxts
   | in_gen    = ctxts
@@ -1191,7 +1191,7 @@ capture_constraints thing_inside
        ; lie <- readTcRef lie_var
        ; return (res, lie) }
 
-capture_messages :: TcM r -> TcM (r, Messages ErrDoc)
+capture_messages :: TcM r -> TcM (r, Messages [SDoc])
 -- capture_messages simply captures and returns the
 --                  errors arnd warnings generated by thing_inside
 -- Precondition: thing_inside must not throw an exception!
@@ -1361,7 +1361,7 @@ foldAndRecoverM f acc (x:xs) =
                                 Just acc' -> foldAndRecoverM f acc' xs  }
 
 -----------------------
-tryTc :: TcRn a -> TcRn (Maybe a, Messages ErrDoc)
+tryTc :: TcRn a -> TcRn (Maybe a, Messages [SDoc])
 -- (tryTc m) executes m, and returns
 --      Just r,  if m succeeds (returning r)
 --      Nothing, if m fails
@@ -1414,11 +1414,11 @@ tryTcDiscardingErrs recover thing_inside
     tidy up the message; we then use it to tidy the context messages
 -}
 
-addErrTc :: MsgDoc -> TcM ()
+addErrTc :: SDoc -> TcM ()
 addErrTc err_msg = do { env0 <- tcInitTidyEnv
                       ; addErrTcM (env0, err_msg) }
 
-addErrTcM :: (TidyEnv, MsgDoc) -> TcM ()
+addErrTcM :: (TidyEnv, SDoc) -> TcM ()
 addErrTcM (tidy_env, err_msg)
   = do { ctxt <- getErrCtxt ;
          loc  <- getSrcSpanM ;
@@ -1426,27 +1426,27 @@ addErrTcM (tidy_env, err_msg)
 
 -- The failWith functions add an error message and cause failure
 
-failWithTc :: MsgDoc -> TcM a               -- Add an error message and fail
+failWithTc :: SDoc -> TcM a               -- Add an error message and fail
 failWithTc err_msg
   = addErrTc err_msg >> failM
 
-failWithTcM :: (TidyEnv, MsgDoc) -> TcM a   -- Add an error message and fail
+failWithTcM :: (TidyEnv, SDoc) -> TcM a   -- Add an error message and fail
 failWithTcM local_and_msg
   = addErrTcM local_and_msg >> failM
 
-checkTc :: Bool -> MsgDoc -> TcM ()         -- Check that the boolean is true
+checkTc :: Bool -> SDoc -> TcM ()         -- Check that the boolean is true
 checkTc True  _   = return ()
 checkTc False err = failWithTc err
 
-checkTcM :: Bool -> (TidyEnv, MsgDoc) -> TcM ()
+checkTcM :: Bool -> (TidyEnv, SDoc) -> TcM ()
 checkTcM True  _   = return ()
 checkTcM False err = failWithTcM err
 
-failIfTc :: Bool -> MsgDoc -> TcM ()         -- Check that the boolean is false
+failIfTc :: Bool -> SDoc -> TcM ()         -- Check that the boolean is false
 failIfTc False _   = return ()
 failIfTc True  err = failWithTc err
 
-failIfTcM :: Bool -> (TidyEnv, MsgDoc) -> TcM ()
+failIfTcM :: Bool -> (TidyEnv, SDoc) -> TcM ()
    -- Check that the boolean is false
 failIfTcM False _   = return ()
 failIfTcM True  err = failWithTcM err
@@ -1456,59 +1456,59 @@ failIfTcM True  err = failWithTcM err
 
 -- | Display a warning if a condition is met,
 --   and the warning is enabled
-warnIfFlag :: WarningFlag -> Bool -> MsgDoc -> TcRn ()
+warnIfFlag :: WarningFlag -> Bool -> SDoc -> TcRn ()
 warnIfFlag warn_flag is_bad msg
   = do { warn_on <- woptM warn_flag
        ; when (warn_on && is_bad) $
          addWarn (Reason warn_flag) msg }
 
 -- | Display a warning if a condition is met.
-warnIf :: Bool -> MsgDoc -> TcRn ()
+warnIf :: Bool -> SDoc -> TcRn ()
 warnIf is_bad msg
   = when is_bad (addWarn NoReason msg)
 
 -- | Display a warning if a condition is met.
-warnTc :: WarnReason -> Bool -> MsgDoc -> TcM ()
+warnTc :: WarnReason -> Bool -> SDoc -> TcM ()
 warnTc reason warn_if_true warn_msg
   | warn_if_true = addWarnTc reason warn_msg
   | otherwise    = return ()
 
 -- | Display a warning if a condition is met.
-warnTcM :: WarnReason -> Bool -> (TidyEnv, MsgDoc) -> TcM ()
+warnTcM :: WarnReason -> Bool -> (TidyEnv, SDoc) -> TcM ()
 warnTcM reason warn_if_true warn_msg
   | warn_if_true = addWarnTcM reason warn_msg
   | otherwise    = return ()
 
 -- | Display a warning in the current context.
-addWarnTc :: WarnReason -> MsgDoc -> TcM ()
+addWarnTc :: WarnReason -> SDoc -> TcM ()
 addWarnTc reason msg
  = do { env0 <- tcInitTidyEnv ;
       addWarnTcM reason (env0, msg) }
 
 -- | Display a warning in a given context.
-addWarnTcM :: WarnReason -> (TidyEnv, MsgDoc) -> TcM ()
+addWarnTcM :: WarnReason -> (TidyEnv, SDoc) -> TcM ()
 addWarnTcM reason (env0, msg)
  = do { ctxt <- getErrCtxt ;
         err_info <- mkErrInfo env0 ctxt ;
         add_warn reason msg err_info }
 
 -- | Display a warning for the current source location.
-addWarn :: WarnReason -> MsgDoc -> TcRn ()
+addWarn :: WarnReason -> SDoc -> TcRn ()
 addWarn reason msg = add_warn reason msg Outputable.empty
 
 -- | Display a warning for a given source location.
-addWarnAt :: WarnReason -> SrcSpan -> MsgDoc -> TcRn ()
+addWarnAt :: WarnReason -> SrcSpan -> SDoc -> TcRn ()
 addWarnAt reason loc msg = add_warn_at reason loc msg Outputable.empty
 
 -- | Display a warning, with an optional flag, for the current source
 -- location.
-add_warn :: WarnReason -> MsgDoc -> MsgDoc -> TcRn ()
+add_warn :: WarnReason -> SDoc -> SDoc -> TcRn ()
 add_warn reason msg extra_info
   = do { loc <- getSrcSpanM
        ; add_warn_at reason loc msg extra_info }
 
 -- | Display a warning, with an optional flag, for a given location.
-add_warn_at :: WarnReason -> SrcSpan -> MsgDoc -> MsgDoc -> TcRn ()
+add_warn_at :: WarnReason -> SrcSpan -> SDoc -> SDoc -> TcRn ()
 add_warn_at reason loc msg extra_info
   = do { printer <- getPrintUnqualified ;
          let { warn = mkLongWarnMsg loc printer
@@ -1521,7 +1521,7 @@ add_warn_at reason loc msg extra_info
         Other helper functions
 -}
 
-add_err_tcm :: TidyEnv -> MsgDoc -> SrcSpan
+add_err_tcm :: TidyEnv -> SDoc -> SrcSpan
             -> [ErrCtxt]
             -> TcM ()
 add_err_tcm tidy_env err_msg loc ctxt
@@ -2046,7 +2046,7 @@ getIfModule :: IfL Module
 getIfModule = do { env <- getLclEnv; return (if_mod env) }
 
 --------------------
-failIfM :: MsgDoc -> IfL a
+failIfM :: SDoc -> IfL a
 -- The Iface monad doesn't have a place to accumulate errors, so we
 -- just fall over fast if one happens; it "shouldn't happen".
 -- We use IfL here so that we can get context info out of the local env
