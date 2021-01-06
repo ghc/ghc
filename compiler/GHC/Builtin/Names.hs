@@ -1875,7 +1875,7 @@ uWordTyConKey   = mkPreludeTyConUnique 163
 -- Type-level naturals
 typeSymbolKindConNameKey,
   typeNatAddTyFamNameKey, typeNatMulTyFamNameKey, typeNatExpTyFamNameKey,
-  typeNatLeqTyFamNameKey, typeNatSubTyFamNameKey
+  typeNatSubTyFamNameKey
   , typeSymbolCmpTyFamNameKey, typeNatCmpTyFamNameKey
   , typeNatDivTyFamNameKey
   , typeNatModTyFamNameKey
@@ -1885,7 +1885,7 @@ typeSymbolKindConNameKey  = mkPreludeTyConUnique 165
 typeNatAddTyFamNameKey    = mkPreludeTyConUnique 166
 typeNatMulTyFamNameKey    = mkPreludeTyConUnique 167
 typeNatExpTyFamNameKey    = mkPreludeTyConUnique 168
-typeNatLeqTyFamNameKey    = mkPreludeTyConUnique 169
+-- typeNatLeqTyFamNameKey    = mkPreludeTyConUnique 169
 typeNatSubTyFamNameKey    = mkPreludeTyConUnique 170
 typeSymbolCmpTyFamNameKey = mkPreludeTyConUnique 171
 typeNatCmpTyFamNameKey    = mkPreludeTyConUnique 172

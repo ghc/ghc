@@ -159,6 +159,7 @@ Library
         Data.Type.Bool
         Data.Type.Coercion
         Data.Type.Equality
+        Data.Type.Ord
         Data.Typeable
         Data.Unique
         Data.Version
