@@ -645,7 +645,7 @@ data DynFlags = DynFlags {
 
   ghciHistSize          :: Int,
 
-  -- | MsgDoc output action: use "GHC.Utils.Error" instead of this if you can
+  -- | SDoc output action: use "GHC.Utils.Error" instead of this if you can
   log_action            :: LogAction,
   dump_action           :: DumpAction,
   trace_action          :: TraceAction,
@@ -1334,7 +1334,7 @@ type LogAction = DynFlags
               -> WarnReason
               -> Severity
               -> SrcSpan
-              -> MsgDoc
+              -> SDoc
               -> IO ()
 
 defaultFatalMessager :: FatalMessager
@@ -1980,7 +1980,7 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
   return (dflags4, leftover, warns' ++ warns)
 
 -- | Write an error or warning to the 'LogOutput'.
-putLogMsg :: DynFlags -> WarnReason -> Severity -> SrcSpan -> MsgDoc -> IO ()
+putLogMsg :: DynFlags -> WarnReason -> Severity -> SrcSpan -> SDoc -> IO ()
 putLogMsg dflags = log_action dflags dflags
 
 -- | Check (and potentially disable) any extensions that aren't allowed
