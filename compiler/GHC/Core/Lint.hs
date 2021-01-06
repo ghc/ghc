@@ -2472,7 +2472,7 @@ compatible_branches (CoAxBranch { cab_tvs = tvs1
         lhs2'          = substTys subst lhs2
         rhs2'          = substTy  subst rhs2
     in
-    case tcUnifyTys (const BindMe) lhs1 lhs2' of
+    case tcUnifyTys alwaysBindFun lhs1 lhs2' of
       Just unifying_subst -> substTy unifying_subst rhs1  `eqType`
                              substTy unifying_subst rhs2'
       Nothing             -> True
