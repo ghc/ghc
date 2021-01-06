@@ -17,7 +17,7 @@ module GHC.Core.Unify (
         -- Side-effect free unification
         tcUnifyTy, tcUnifyTyKi, tcUnifyTys, tcUnifyTyKis,
         tcUnifyTysFG, tcUnifyTyWithTFs,
-        BindFlag(..),
+        BindFun, BindFlag(..), matchBindFun, alwaysBindFun,
         UnifyResult, UnifyResultM(..), MaybeApartReason(..),
 
         -- Matching a type against a lifted type (coercion)
@@ -109,6 +109,16 @@ How do you choose between them?
    equals the kind of the target, then use the TyKi version.
 -}
 
+-- | Some unification functions are parameterised by a 'BindFun', which
+-- says whether or not to allow a certain unification to take place.
+-- A 'BindFun' takes the 'TyVar' involved along with the 'Type' it will
+-- potentially be bound to.
+--
+-- It is possible for the variable to actually be a coercion variable
+-- (Note [Matching coercion variables]), but only when one-way matching.
+-- In this case, the 'Type' will be a 'CoercionTy'.
+type BindFun = TyCoVar -> Type -> BindFlag
+
 -- | @tcMatchTy t1 t2@ produces a substitution (over fvs(t1))
 -- @s@ such that @s(t1)@ equals @t2@.
 -- The returned substitution might bind coercion variables,
@@ -124,7 +134,7 @@ How do you choose between them?
 tcMatchTy :: Type -> Type -> Maybe TCvSubst
 tcMatchTy ty1 ty2 = tcMatchTys [ty1] [ty2]
 
-tcMatchTyX_BM :: (TyVar -> BindFlag) -> TCvSubst
+tcMatchTyX_BM :: BindFun -> TCvSubst
               -> Type -> Type -> Maybe TCvSubst
 tcMatchTyX_BM bind_me subst ty1 ty2
   = tc_match_tys_x bind_me False subst [ty1] [ty2]
@@ -134,7 +144,7 @@ tcMatchTyX_BM bind_me subst ty1 ty2
 -- See also Note [tcMatchTy vs tcMatchTyKi]
 tcMatchTyKi :: Type -> Type -> Maybe TCvSubst
 tcMatchTyKi ty1 ty2
-  = tc_match_tys (const BindMe) True [ty1] [ty2]
+  = tc_match_tys alwaysBindFun True [ty1] [ty2]
 
 -- | This is similar to 'tcMatchTy', but extends a substitution
 -- See also Note [tcMatchTy vs tcMatchTyKi]
@@ -143,7 +153,7 @@ tcMatchTyX :: TCvSubst            -- ^ Substitution to extend
            -> Type                -- ^ Target
            -> Maybe TCvSubst
 tcMatchTyX subst ty1 ty2
-  = tc_match_tys_x (const BindMe) False subst [ty1] [ty2]
+  = tc_match_tys_x alwaysBindFun False subst [ty1] [ty2]
 
 -- | Like 'tcMatchTy' but over a list of types.
 -- See also Note [tcMatchTy vs tcMatchTyKi]
@@ -152,7 +162,7 @@ tcMatchTys :: [Type]         -- ^ Template
            -> Maybe TCvSubst -- ^ One-shot; in principle the template
                              -- variables could be free in the target
 tcMatchTys tys1 tys2
-  = tc_match_tys (const BindMe) False tys1 tys2
+  = tc_match_tys alwaysBindFun False tys1 tys2
 
 -- | Like 'tcMatchTyKi' but over a list of types.
 -- See also Note [tcMatchTy vs tcMatchTyKi]
@@ -160,7 +170,7 @@ tcMatchTyKis :: [Type]         -- ^ Template
              -> [Type]         -- ^ Target
              -> Maybe TCvSubst -- ^ One-shot substitution
 tcMatchTyKis tys1 tys2
-  = tc_match_tys (const BindMe) True tys1 tys2
+  = tc_match_tys alwaysBindFun True tys1 tys2
 
 -- | Like 'tcMatchTys', but extending a substitution
 -- See also Note [tcMatchTy vs tcMatchTyKi]
@@ -169,7 +179,7 @@ tcMatchTysX :: TCvSubst       -- ^ Substitution to extend
             -> [Type]         -- ^ Target
             -> Maybe TCvSubst -- ^ One-shot substitution
 tcMatchTysX subst tys1 tys2
-  = tc_match_tys_x (const BindMe) False subst tys1 tys2
+  = tc_match_tys_x alwaysBindFun False subst tys1 tys2
 
 -- | Like 'tcMatchTyKis', but extending a substitution
 -- See also Note [tcMatchTy vs tcMatchTyKi]
@@ -178,21 +188,21 @@ tcMatchTyKisX :: TCvSubst        -- ^ Substitution to extend
               -> [Type]          -- ^ Target
               -> Maybe TCvSubst  -- ^ One-shot substitution
 tcMatchTyKisX subst tys1 tys2
-  = tc_match_tys_x (const BindMe) True subst tys1 tys2
+  = tc_match_tys_x alwaysBindFun True subst tys1 tys2
 
 -- | Same as tc_match_tys_x, but starts with an empty substitution
-tc_match_tys :: (TyVar -> BindFlag)
-               -> Bool          -- ^ match kinds?
-               -> [Type]
-               -> [Type]
-               -> Maybe TCvSubst
+tc_match_tys :: BindFun
+             -> Bool          -- ^ match kinds?
+             -> [Type]
+             -> [Type]
+             -> Maybe TCvSubst
 tc_match_tys bind_me match_kis tys1 tys2
   = tc_match_tys_x bind_me match_kis (mkEmptyTCvSubst in_scope) tys1 tys2
   where
     in_scope = mkInScopeSet (tyCoVarsOfTypes tys1 `unionVarSet` tyCoVarsOfTypes tys2)
 
 -- | Worker for 'tcMatchTysX' and 'tcMatchTyKisX'
-tc_match_tys_x :: (TyVar -> BindFlag)
+tc_match_tys_x :: BindFun
                -> Bool          -- ^ match kinds?
                -> TCvSubst
                -> [Type]
@@ -225,9 +235,22 @@ ruleMatchTyKiX tmpl_tvs rn_env tenv tmpl target
       Unifiable (tenv', _) -> Just tenv'
       _                    -> Nothing
 
-matchBindFun :: TyCoVarSet -> TyVar -> BindFlag
-matchBindFun tvs tv = if tv `elemVarSet` tvs then BindMe else Skolem
+-- | Allow binding only for any variable in the set. Variables may
+-- be bound to any type.
+-- Used when doing simple matching; e.g. can we find a substitution
+--
+-- @
+-- S = [a :-> t1, b :-> t2] such that
+--     S( Maybe (a, b->Int )  =   Maybe (Bool, Char -> Int)
+-- @
+matchBindFun :: TyCoVarSet -> BindFun
+matchBindFun tvs tv _ty
+  | tv `elemVarSet` tvs = BindMe
+  | otherwise           = Apart
 
+-- | Allow the binding of any variable to any type
+alwaysBindFun :: BindFun
+alwaysBindFun _tv _ty = BindMe
 
 {- *********************************************************************
 *                                                                      *
@@ -301,7 +324,7 @@ typesCantMatch :: [(Type,Type)] -> Bool
 typesCantMatch prs = any (uncurry cant_match) prs
   where
     cant_match :: Type -> Type -> Bool
-    cant_match t1 t2 = case tcUnifyTysFG (const BindMe) [t1] [t2] of
+    cant_match t1 t2 = case tcUnifyTysFG alwaysBindFun [t1] [t2] of
       SurelyApart -> True
       _           -> False
 
@@ -409,11 +432,11 @@ indexed-types/should_compile/Overlap14.
 tcUnifyTy :: Type -> Type       -- All tyvars are bindable
           -> Maybe TCvSubst
                        -- A regular one-shot (idempotent) substitution
-tcUnifyTy t1 t2 = tcUnifyTys (const BindMe) [t1] [t2]
+tcUnifyTy t1 t2 = tcUnifyTys alwaysBindFun [t1] [t2]
 
 -- | Like 'tcUnifyTy', but also unifies the kinds
 tcUnifyTyKi :: Type -> Type -> Maybe TCvSubst
-tcUnifyTyKi t1 t2 = tcUnifyTyKis (const BindMe) [t1] [t2]
+tcUnifyTyKi t1 t2 = tcUnifyTyKis alwaysBindFun [t1] [t2]
 
 -- | Unify two types, treating type family applications as possibly unifying
 -- with anything and looking through injective type family applications.
@@ -427,7 +450,7 @@ tcUnifyTyWithTFs :: Bool  -- ^ True <=> do two-way unification;
 -- The code is incorporated with the standard unifier for convenience, but
 -- its operation should match the specification in the paper.
 tcUnifyTyWithTFs twoWay t1 t2
-  = case tc_unify_tys (const BindMe) twoWay True False
+  = case tc_unify_tys alwaysBindFun twoWay True False
                        rn_env emptyTvSubstEnv emptyCvSubstEnv
                        [t1] [t2] of
       Unifiable          (subst, _) -> Just $ maybe_fix subst
@@ -444,7 +467,7 @@ tcUnifyTyWithTFs twoWay t1 t2
                                                -- domain with range
 
 -----------------
-tcUnifyTys :: (TyCoVar -> BindFlag)
+tcUnifyTys :: BindFun
            -> [Type] -> [Type]
            -> Maybe TCvSubst
                                 -- ^ A regular one-shot (idempotent) substitution
@@ -459,7 +482,7 @@ tcUnifyTys bind_fn tys1 tys2
       _                -> Nothing
 
 -- | Like 'tcUnifyTys' but also unifies the kinds
-tcUnifyTyKis :: (TyCoVar -> BindFlag)
+tcUnifyTyKis :: BindFun
              -> [Type] -> [Type]
              -> Maybe TCvSubst
 tcUnifyTyKis bind_fn tys1 tys2
@@ -511,20 +534,20 @@ instance Monad UnifyResultM where
 -- @s(tys1)@ and that of @s(tys2)@ are equal, as witnessed by the returned
 -- Coercions. This version requires that the kinds of the types are the same,
 -- if you unify left-to-right.
-tcUnifyTysFG :: (TyVar -> BindFlag)
+tcUnifyTysFG :: BindFun
              -> [Type] -> [Type]
              -> UnifyResult
 tcUnifyTysFG bind_fn tys1 tys2
   = tc_unify_tys_fg False bind_fn tys1 tys2
 
-tcUnifyTyKisFG :: (TyVar -> BindFlag)
+tcUnifyTyKisFG :: BindFun
                -> [Type] -> [Type]
                -> UnifyResult
 tcUnifyTyKisFG bind_fn tys1 tys2
   = tc_unify_tys_fg True bind_fn tys1 tys2
 
 tc_unify_tys_fg :: Bool
-                -> (TyVar -> BindFlag)
+                -> BindFun
                 -> [Type] -> [Type]
                 -> UnifyResult
 tc_unify_tys_fg match_kis bind_fn tys1 tys2
@@ -538,7 +561,7 @@ tc_unify_tys_fg match_kis bind_fn tys1 tys2
 
 -- | This function is actually the one to call the unifier -- a little
 -- too general for outside clients, though.
-tc_unify_tys :: (TyVar -> BindFlag)
+tc_unify_tys :: BindFun
              -> AmIUnifying -- ^ True <=> unify; False <=> match
              -> Bool        -- ^ True <=> doing an injectivity check
              -> Bool        -- ^ True <=> treat the kinds as well
@@ -1102,18 +1125,17 @@ unify_ty env (CoercionTy co1) (CoercionTy co2) kco
            CoVarCo cv
              | not (um_unif env)
              , not (cv `elemVarEnv` c_subst)
-             , BindMe <- tvBindFlag env cv
-             -> do { checkRnEnv env (tyCoVarsOfCo co2)
-                   ; let (_, co_l, co_r) = decomposeFunCo Nominal kco
-                     -- Because the coercion is nominal, it should be safe to
+             , let (_, co_l, co_r) = decomposeFunCo Nominal kco
+                     -- Because the coercion is used in a type, it should be safe to
                      -- ignore the multiplicity coercion.
                       -- cv :: t1 ~ t2
                       -- co2 :: s1 ~ s2
                       -- co_l :: t1 ~ s1
                       -- co_r :: t2 ~ s2
-                   ; extendCvEnv cv (co_l `mkTransCo`
-                                     co2 `mkTransCo`
-                                     mkSymCo co_r) }
+                   rhs_co = co_l `mkTransCo` co2 `mkTransCo` mkSymCo co_r
+             , BindMe <- tvBindFlag env cv (CoercionTy rhs_co)
+             -> do { checkRnEnv env (tyCoVarsOfCo co2)
+                   ; extendCvEnv cv rhs_co }
            _ -> return () }
 
 unify_ty _ _ _ _ = surelyApart
@@ -1206,13 +1228,15 @@ uUnrefined env tv1' ty2 ty2' kco
 
     do {   -- So both are unrefined
            -- Bind one or the other, depending on which is bindable
-       ; let b1  = tvBindFlag env tv1'
-             b2  = tvBindFlag env tv2'
+       ; let rhs1 = ty2 `mkCastTy` mkSymCo kco
+             rhs2 = ty1 `mkCastTy` kco
+             b1  = tvBindFlag env tv1' rhs1
+             b2  = tvBindFlag env tv2' rhs2
              ty1 = mkTyVarTy tv1'
        ; case (b1, b2) of
-           (BindMe, _) -> bindTv env tv1' (ty2 `mkCastTy` mkSymCo kco)
+           (BindMe, _) -> bindTv env tv1' rhs1
            (_, BindMe) | um_unif env
-                       -> bindTv (umSwapRn env) tv2 (ty1 `mkCastTy` kco)
+                       -> bindTv (umSwapRn env) tv2 rhs2
 
            _ | tv1' == tv2' -> return ()
              -- How could this happen? If we're only matching and if
@@ -1222,9 +1246,11 @@ uUnrefined env tv1' ty2 ty2' kco
   }}}}
 
 uUnrefined env tv1' ty2 _ kco -- ty2 is not a type variable
-  = case tvBindFlag env tv1' of
-      Skolem -> surelyApart
-      BindMe -> bindTv env tv1' (ty2 `mkCastTy` mkSymCo kco)
+  = case tvBindFlag env tv1' rhs of
+      Apart  -> surelyApart
+      BindMe -> bindTv env tv1' rhs
+  where
+    rhs = ty2 `mkCastTy` mkSymCo kco
 
 bindTv :: UMEnv -> OutTyVar -> Type -> UM ()
 -- OK, so we want to extend the substitution with tv := ty
@@ -1262,14 +1288,16 @@ occursCheck env tv free_tvs
 -}
 
 data BindFlag
-  = BindMe      -- A regular type variable
+  = BindMe      -- ^ A regular type variable
 
-  | Skolem      -- This type variable is a skolem constant
-                -- Don't bind it; it only matches itself
-                -- These variables are SurelyApart from other types
-                -- See Note [Binding when looking up instances] in GHC.Core.InstEnv
-                -- for why it must be SurelyApart.
+  | Apart       -- ^ Declare that this type variable is /apart/ from the
+                -- type provided. That is, the type variable will never
+                -- be instantiated to that type.
+                -- See also Note [Binding when looking up instances]
+                -- in GHC.Core.InstEnv.
   deriving Eq
+-- NB: It would be conceivable to have an analogue to MaybeApart here,
+-- but there is not yet a need.
 
 {-
 ************************************************************************
@@ -1296,7 +1324,7 @@ data UMEnv
             -- Do not bind these in the substitution!
             -- See the function tvBindFlag
 
-          , um_bind_fun :: TyVar -> BindFlag
+          , um_bind_fun :: BindFun
             -- User-supplied BindFlag function,
             -- for variables not in um_skols
           }
@@ -1340,10 +1368,10 @@ initUM subst_env cv_subst_env um
     state = UMState { um_tv_env = subst_env
                     , um_cv_env = cv_subst_env }
 
-tvBindFlag :: UMEnv -> OutTyVar -> BindFlag
-tvBindFlag env tv
-  | tv `elemVarSet` um_skols env = Skolem
-  | otherwise                    = um_bind_fun env tv
+tvBindFlag :: UMEnv -> OutTyVar -> Type -> BindFlag
+tvBindFlag env tv rhs
+  | tv `elemVarSet` um_skols env = Apart
+  | otherwise                    = um_bind_fun env tv rhs
 
 getTvSubstEnv :: UM TvSubstEnv
 getTvSubstEnv = UM $ \state -> Unifiable (state, um_tv_env state)
@@ -1843,7 +1871,7 @@ flattenTysX :: InScopeSet -> [Type] -> ([Type], TyVarEnv (TyCon, [Type]))
 --     can't really sensibly refer to that b. So it may include a locally-
 --     bound tyvar in its range. Currently, the only usage of this env't
 --     checks whether there are any meta-variables in it
---     (in GHC.Tc.Solver.Monad.mightMatchLater), so this is all OK.
+--     (in GHC.Tc.Solver.Monad.mightEqualLater), so this is all OK.
 flattenTysX in_scope tys
   = let (env, result) = coreFlattenTys emptyTvSubstEnv (emptyFlattenEnv in_scope) tys in
     (result, build_env (fe_type_map env))

@@ -1005,7 +1005,7 @@ checkAxInstCo (AxiomInstCo ax ind cos)
     check_no_conflict _    [] = Nothing
     check_no_conflict flat (b@CoAxBranch { cab_lhs = lhs_incomp } : rest)
          -- See Note [Apartness] in GHC.Core.FamInstEnv
-      | SurelyApart <- tcUnifyTysFG (const BindMe) flat lhs_incomp
+      | SurelyApart <- tcUnifyTysFG alwaysBindFun flat lhs_incomp
       = check_no_conflict flat rest
       | otherwise
       = Just b

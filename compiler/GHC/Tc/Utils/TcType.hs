@@ -457,26 +457,6 @@ checking.  It's attached to mutable type variables only.
 It's knot-tied back to "GHC.Types.Var".  There is no reason in principle
 why "GHC.Types.Var" shouldn't actually have the definition, but it "belongs" here.
 
-Note [Signature skolems]
-~~~~~~~~~~~~~~~~~~~~~~~~
-A TyVarTv is a specialised variant of TauTv, with the following invariants:
-
-    * A TyVarTv can be unified only with a TyVar,
-      not with any other type
-
-    * Its MetaDetails, if filled in, will always be another TyVarTv
-      or a SkolemTv
-
-TyVarTvs are only distinguished to improve error messages.
-Consider this
-
-  data T (a:k1) = MkT (S a)
-  data S (b:k2) = MkS (T b)
-
-When doing kind inference on {S,T} we don't want *skolems* for k1,k2,
-because they end up unifying; we want those TyVarTvs again.
-
-
 Note [TyVars and TcTyVars during type checking]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The Var type has constructors TyVar and TcTyVar.  They are used
@@ -547,7 +527,7 @@ data MetaInfo
 
    | TyVarTv       -- A variant of TauTv, except that it should not be
                    --   unified with a type, only with a type variable
-                   -- See Note [Signature skolems]
+                   -- See Note [TyVarTv] in GHC.Tc.Utils.TcMType
 
    | RuntimeUnkTv  -- A unification variable used in the GHCi debugger.
                    -- It /is/ allowed to unify with a polytype, unlike TauTv
