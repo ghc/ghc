@@ -322,7 +322,7 @@ handleWarningsThrowErrors (warnings, errors) = do
 --  2. If there are no error messages, but the second result indicates failure
 --     there should be warnings in the first result. That is, if the action
 --     failed, it must have been due to the warnings (i.e., @-Werror@).
-ioMsgMaybe :: IO (Messages ErrDoc, Maybe a) -> Hsc a
+ioMsgMaybe :: IO (Messages [SDoc], Maybe a) -> Hsc a
 ioMsgMaybe ioA = do
     (msgs, mb_r) <- liftIO ioA
     let (warns, errs) = partitionMessages msgs
@@ -333,7 +333,7 @@ ioMsgMaybe ioA = do
 
 -- | like ioMsgMaybe, except that we ignore error messages and return
 -- 'Nothing' instead.
-ioMsgMaybe' :: IO (Messages ErrDoc, Maybe a) -> Hsc (Maybe a)
+ioMsgMaybe' :: IO (Messages [SDoc], Maybe a) -> Hsc (Maybe a)
 ioMsgMaybe' ioA = do
     (msgs, mb_r) <- liftIO $ ioA
     logWarnings (getWarningMessages msgs)
@@ -1135,7 +1135,7 @@ hscCheckSafeImports tcg_env = do
 
     warns rules = listToBag $ map warnRules rules
 
-    warnRules :: GenLocated SrcSpan (RuleDecl GhcTc) -> ErrMsg ErrDoc
+    warnRules :: GenLocated SrcSpan (RuleDecl GhcTc) -> ErrMsg [SDoc]
     warnRules (L loc (HsRule { rd_name = n })) =
         mkPlainWarnMsg loc $
             text "Rule \"" <> ftext (snd $ unLoc n) <> text "\" ignored" $+$
