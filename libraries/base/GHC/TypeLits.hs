@@ -11,6 +11,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE GADTs #-}
 
 {-|
 GHC's @DataKinds@ language extension lifts data constructors, natural
@@ -39,6 +40,8 @@ module GHC.TypeLits
   , N.SomeNat(..), SomeSymbol(..)
   , someNatVal, someSymbolVal
   , N.sameNat, sameSymbol
+  , TypeOrdering(..)
+  , N.cmpNat, cmpSymbol
 
 
     -- * Functions on type literals
@@ -63,6 +66,7 @@ import GHC.Prim(magicDict, Proxy#)
 import Data.Maybe(Maybe(..))
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality((:~:)(Refl))
+import Data.Type.Ord(Compare, TypeOrdering(..))
 import Unsafe.Coerce(unsafeCoerce)
 
 import GHC.TypeNats (Natural, Nat, KnownNat)
@@ -204,6 +208,20 @@ sameSymbol :: (KnownSymbol a, KnownSymbol b) =>
 sameSymbol x y
   | symbolVal x == symbolVal y  = Just (unsafeCoerce Refl)
   | otherwise                   = Nothing
+
+
+type instance Compare (a :: Symbol) b = CmpSymbol a b
+
+-- | Like 'sameSymbol', but if the symbols aren't equal, this additionally
+-- provides proof of LT or GT.
+cmpSymbol :: forall a b proxy1 proxy2. (KnownSymbol a, KnownSymbol b)
+          => proxy1 a -> proxy2 b -> TypeOrdering a b
+cmpSymbol x y = case compare (symbolVal x) (symbolVal y) of
+  EQ -> unsafeCoerce TypeEq
+  LT -> case unsafeCoerce Refl :: (CmpSymbol a b :~: 'LT) of
+    Refl -> TypeLt
+  GT -> case unsafeCoerce Refl :: (CmpSymbol a b :~: 'GT) of
+    Refl -> TypeGt
 
 --------------------------------------------------------------------------------
 -- PRIVATE:
