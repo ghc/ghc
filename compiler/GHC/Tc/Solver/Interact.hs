@@ -2151,7 +2151,7 @@ Other notes:
      - natural numbers
      - Typeable
 
-* See also Note [What might match later?] in GHC.Tc.Solver.Monad.
+* See also Note [What might equal later?] in GHC.Tc.Solver.Monad.
 
 * The given-overlap problem is arguably not easy to appear in practice
   due to our aggressive prioritization of equality solving over other
@@ -2303,5 +2303,5 @@ matchLocalInst pred loc
         (matches, unif || this_unif)
       where
         qtv_set = mkVarSet qtvs
-        this_unif = mightMatchLater qpred (ctEvLoc ev) pred loc
+        this_unif = mightEqualLater qpred (ctEvLoc ev) pred loc
         (matches, unif) = match_local_inst qcis

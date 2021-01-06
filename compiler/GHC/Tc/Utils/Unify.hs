@@ -1583,7 +1583,7 @@ Needless to say, all three have wrinkles:
   up a fresh gamma[n], and unify beta[k] := gamma[n].
 
 * (TYVAR-TV) Unification variables.  Suppose alpha[tyv,n] is a level-n
-  TyVarTv (see Note [Signature skolems] in GHC.Tc.Types.TcType)? Now
+  TyVarTv (see Note [TyVarTv] in GHC.Tc.Types.TcMType)? Now
   consider alpha[tyv,n] ~ Bool.  We don't want to unify because that
   would break the TyVarTv invariant.
 

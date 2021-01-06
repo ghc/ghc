@@ -63,7 +63,7 @@ module GHC.Tc.Solver.Monad (
     getInertEqs, getInertCans, getInertGivens,
     getInertInsols, getInnermostGivenEqLevel,
     getTcSInerts, setTcSInerts,
-    matchableGivens, prohibitedSuperClassSolve, mightMatchLater,
+    matchableGivens, prohibitedSuperClassSolve, mightEqualLater,
     getUnsolvedInerts,
     removeInertCts, getPendingGivenScs,
     addInertCan, insertFunEq, addInertForAll,
@@ -2326,50 +2326,65 @@ matchableGivens loc_w pred_w (IS { inert_cans = inert_cans })
     matchable_given :: Ct -> Bool
     matchable_given ct
       | CtGiven { ctev_loc = loc_g, ctev_pred = pred_g } <- ctEvidence ct
-      = mightMatchLater pred_g loc_g pred_w loc_w
+      = mightEqualLater pred_g loc_g pred_w loc_w
 
       | otherwise
       = False
 
-mightMatchLater :: TcPredType -> CtLoc -> TcPredType -> CtLoc -> Bool
--- See Note [What might match later?]
-mightMatchLater given_pred given_loc wanted_pred wanted_loc
+mightEqualLater :: TcPredType -> CtLoc -> TcPredType -> CtLoc -> Bool
+-- See Note [What might equal later?]
+-- Used to implement logic in Note [Instance and Given overlap] in GHC.Tc.Solver.Interact
+mightEqualLater given_pred given_loc wanted_pred wanted_loc
   | prohibitedSuperClassSolve given_loc wanted_loc
   = False
 
-  | SurelyApart <- tcUnifyTysFG bind_meta_tv [flattened_given] [flattened_wanted]
-  = False
-
   | otherwise
-  = True   -- safe answer
+  = case tcUnifyTysFG bind_fun [flattened_given] [flattened_wanted] of
+      SurelyApart              -> False  -- types that are surely apart do not equal later
+      MaybeApart MARInfinite _ -> False  -- see Example 7 in the Note.
+      _                        -> True
+
   where
     in_scope  = mkInScopeSet $ tyCoVarsOfTypes [given_pred, wanted_pred]
 
     -- NB: flatten both at the same time, so that we can share mappings
     -- from type family applications to variables, and also to guarantee
     -- that the fresh variables are really fresh between the given and
-    -- the wanted.
+    -- the wanted. Flattening both at the same time is needed to get
+    -- Example 9 from the Note.
     ([flattened_given, flattened_wanted], var_mapping)
       = flattenTysX in_scope [given_pred, wanted_pred]
 
-    bind_meta_tv :: TcTyVar -> BindFlag
-    -- Any meta tyvar may be unified later, so we treat it as
-    -- bindable when unifying with givens. That ensures that we
-    -- conservatively assume that a meta tyvar might get unified with
-    -- something that matches the 'given', until demonstrated
-    -- otherwise.  More info in Note [Instance and Given overlap]
-    -- in GHC.Tc.Solver.Interact
-    bind_meta_tv tv | is_meta_tv tv = BindMe
+    bind_fun :: BindFun
+    bind_fun tv rhs_ty
+      | isMetaTyVar tv
+      , can_unify (metaTyVarInfo tv) rhs_ty
+         -- this checks for CycleBreakerTvs and TyVarTvs; forgetting
+         -- the latter was #19106.
+      = BindMe
 
-                    | Just (_fam_tc, fam_args) <- lookupVarEnv var_mapping tv
-                    , anyFreeVarsOfTypes is_meta_tv fam_args
-                    = BindMe
+         -- See Examples 4, 5, and 6 from the Note
+      | Just (_fam_tc, fam_args) <- lookupVarEnv var_mapping tv
+      , anyFreeVarsOfTypes isMetaTyVar fam_args
+      = BindMe
 
-                    | otherwise     = Skolem
+      | otherwise
+      = Apart
 
-     -- CycleBreakerTvs really stands for a type family application in
-     -- a given; these won't contain touchable meta-variables
-    is_meta_tv = isMetaTyVar <&&> not . isCycleBreakerTyVar
+    -- like canSolveByUnification, but allows cbv variables to unify
+    can_unify :: MetaInfo -> Type -> Bool
+    can_unify TyVarTv rhs_ty  -- see Example 3 from the Note
+      | Just rhs_tv <- tcGetTyVar_maybe rhs_ty
+      = case tcTyVarDetails rhs_tv of
+          MetaTv { mtv_info = TyVarTv } -> True
+          MetaTv {}                     -> False  -- could unify with anything
+          SkolemTv {}                   -> True
+          RuntimeUnk                    -> True
+      | otherwise  -- not a var on the RHS
+      = False
+    can_unify _other _rhs_ty
+      = True
+
 
 prohibitedSuperClassSolve :: CtLoc -> CtLoc -> Bool
 -- See Note [Solving superclass constraints] in GHC.Tc.TyCl.Instance
@@ -2387,50 +2402,82 @@ because it is a candidate for floating out of this implication.  We
 only float equalities with a meta-tyvar on the left, so we only pull
 those out here.
 
-Note [What might match later?]
+Note [What might equal later?]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We must determine whether a Given might later match a Wanted. We
+We must determine whether a Given might later equal a Wanted. We
 definitely need to account for the possibility that any metavariable
-in the Wanted might be arbitrarily instantiated. We do *not* want
-to allow skolems in the Given to be instantiated. But what about
-type family applications? (Examples are below the explanation.)
+might be arbitrarily instantiated. Yet we do *not* want
+to allow skolems in to be instantiated, as we've already rewritten
+with respect to any Givens. (We're solving a Wanted here, and so
+all Givens have already been processed.)
 
-To allow flexibility in how type family applications unify we use
-the Core flattener. See
+This is best understood by example.
+
+1. C alpha  ~?  C Int
+
+   That given certainly might match later.
+
+2. C a  ~?  C Int
+
+   No. No new givens are going to arise that will get the `a` to rewrite
+   to Int.
+
+3. C alpha[tv]   ~?  C Int
+
+   That alpha[tv] is a TyVarTv, unifiable only with other type variables.
+   It cannot equal later.
+
+4. C (F alpha)   ~?   C Int
+
+   Sure -- that can equal later, if we learn something useful about alpha.
+
+5. C (F alpha[tv])  ~?  C Int
+
+   This, too, might equal later. Perhaps we have [G] F b ~ Int elsewhere.
+   Or maybe we have C (F alpha[tv] beta[tv]), these unify with each other,
+   and F x x = Int. Remember: returning True doesn't commit ourselves to
+   anything.
+
+6. C (F a)  ~?  C a
+
+   No, this won't match later. If we could rewrite (F a) or a, we would
+   have by now.
+
+7. C (Maybe alpha)  ~?  C alpha
+
+   We say this cannot equal later, because it would require
+   alpha := Maybe (Maybe (Maybe ...)). While such a type can be contrived,
+   we choose not to worry about it. See Note [Infinitary substitution in lookup]
+   in GHC.Core.InstEnv. Getting this wrong let to #19107, tested in
+   typecheck/should_compile/T19107.
+
+8. C cbv   ~?  C Int
+
+   We say this can equal later. The cbv is a cycle-breaker var. See
+   Note [Type variable cycles in Givens] in GHC.Tc.Solver.Canonical.
+   A cycle-breaker var stands for an arbitrary type family application --
+   and that application may mention a metavariable. We could look to
+   see whether it does (the information is in the inert_cycle_breakers
+   variable in the InertSet), but it seems too obscure to worry about.
+
+9. C (F alpha, Int)  ~?  C (Bool, F alpha)
+
+   This cannot equal later, because F a would have to equal both Bool and
+   Int.
+
+To deal with type family applications, we use the Core flattener. See
 Note [Flattening type-family applications when matching instances] in GHC.Core.Unify.
 The Core flattener replaces all type family applications with
 fresh variables. The next question: should we allow these fresh
 variables in the domain of a unifying substitution?
 
-A type family application that mentions only skolems is settled: any
-skolems would have been rewritten w.r.t. Givens by now. These type
-family applications match only themselves. A type family application
-that mentions metavariables, on the other hand, can match anything.
-So, if the original type family application contains a metavariable,
-we use BindMe to tell the unifier to allow it in the substitution.
-On the other hand, a type family application with only skolems is
-considered rigid.
-
-Examples:
-    [G] C a
-    [W] C alpha
-  This easily might match later.
-
-    [G] C a
-    [W] C (F alpha)
-  This might match later, too, but we need to flatten the (F alpha)
-  to a fresh variable so that the unifier can connect the two.
-
-    [G] C (F alpha)
-    [W] C a
-  This also might match later. Again, we will need to flatten to
-  find this out. (Surprised about a metavariable in a Given? See
-  #18929.)
-
-    [G] C (F a)
-    [W] C a
-  This won't match later. We're not going to get new Givens that
-  can inform the F a, and so this is a no-go.
+A type family application that mentions only skolems (example 6) is settled:
+any skolems would have been rewritten w.r.t. Givens by now. These type family
+applications match only themselves. A type family application that mentions
+metavariables, on the other hand, can match anything. So, if the original type
+family application contains a metavariable, we use BindMe to tell the unifier
+to allow it in the substitution. On the other hand, a type family application
+with only skolems is considered rigid.
 
 This treatment fixes #18910 and is tested in
 typecheck/should_compile/InstanceGivenOverlap{,2}

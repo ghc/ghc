@@ -1060,9 +1060,9 @@ incoherent instances as long as there are others.
 ************************************************************************
 -}
 
-instanceBindFun :: TyCoVar -> BindFlag
-instanceBindFun tv | isOverlappableTyVar tv = Skolem
-                   | otherwise              = BindMe
+instanceBindFun :: BindFun
+instanceBindFun tv _rhs_ty | isOverlappableTyVar tv = Apart
+                           | otherwise              = BindMe
    -- Note [Binding when looking up instances]
 
 {-
@@ -1085,7 +1085,7 @@ them in the unification test. These are called "super skolems". Example:
 The op [x,x] means we need (Foo [a]). This `a` will never be instantiated, and
 so it is a super skolem. (See the use of tcInstSuperSkolTyVarsX in
 GHC.Tc.Gen.Pat.tcDataConPat.) Super skolems respond True to
-isOverlappableTyVar, and the use of Skolem in instanceBindFun, above, means
+isOverlappableTyVar, and the use of Apart in instanceBindFun, above, means
 that these will be treated as fresh constants in the unification algorithm
 during instance lookup. Without this treatment, GHC would complain, saying
 that the choice of instance depended on the instantiation of 'a'; but of
