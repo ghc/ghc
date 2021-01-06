@@ -576,7 +576,7 @@ loadExpr hsc_env span root_ul_bco
         -- All wired-in names are in the base package, which we link
         -- by default, so we can safely ignore them here.
 
-dieWith :: DynFlags -> SrcSpan -> MsgDoc -> IO a
+dieWith :: DynFlags -> SrcSpan -> SDoc -> IO a
 dieWith dflags span msg = throwGhcExceptionIO (ProgramError (showSDoc dflags (mkLocMessage SevFatal span msg)))
 
 

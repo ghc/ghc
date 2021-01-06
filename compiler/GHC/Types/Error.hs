@@ -7,14 +7,10 @@ module GHC.Types.Error
    , WarningMessages
    , ErrorMessages
    , ErrMsg (..)
-   , WarnMsg
-   , ErrDoc (..)
-   , MsgDoc
+   , SDoc
    , Severity (..)
    , RenderableDiagnostic (..)
    , unionMessages
-   , errDoc
-   , mapErrDoc
    , pprMessageBag
    , mkLocMessage
    , mkLocMessageAnn
@@ -84,15 +80,12 @@ in future iterations these can be either parameterised over an 'e' message type 
 a bit more declarative) or removed altogether.
 -}
 
-type WarningMessages = Bag (ErrMsg ErrDoc)
-type ErrorMessages   = Bag (ErrMsg ErrDoc)
+type WarningMessages = Bag (ErrMsg [SDoc])
+type ErrorMessages   = Bag (ErrMsg [SDoc])
 
-type MsgDoc          = SDoc
-type WarnMsg         = ErrMsg ErrDoc
-
--- | A class for types (typically errors and warnings) which can be \"rendered\" into an opaque 'ErrDoc'.
+-- | A class for types (typically errors and warnings) which can be \"rendered\" into an opaque list of 'SDoc's.
 class RenderableDiagnostic a where
-  renderDiagnostic :: a -> ErrDoc
+  renderDiagnostic :: a -> [SDoc]
 
 -- | The main 'GHC' error type, parameterised over the /domain-specific/ message.
 data ErrMsg e = ErrMsg
@@ -104,19 +97,7 @@ data ErrMsg e = ErrMsg
    , errMsgReason      :: WarnReason
    } deriving Functor
 
--- | Categorise error msgs by their importance.  This is so each section can
--- be rendered visually distinct.  See Note [Error report] for where these come
--- from.
-data ErrDoc = ErrDoc {
-        -- | Primary error msg.
-        errDocImportant     :: [MsgDoc],
-        -- | Context e.g. \"In the second argument of ...\".
-        errDocContext       :: [MsgDoc],
-        -- | Supplementary information, e.g. \"Relevant bindings include ...\".
-        errDocSupplementary :: [MsgDoc]
-        }
-
-instance RenderableDiagnostic ErrDoc where
+instance RenderableDiagnostic [SDoc] where
   renderDiagnostic = id
 
 -- | Joins two collections of messages together.
@@ -130,12 +111,6 @@ consMessage e (Messages msgs) = Messages (e `consBag` msgs)
 -- | Appends a message at the end.
 snocMessage :: Messages e -> ErrMsg e -> Messages e
 snocMessage (Messages msgs) e = Messages (msgs `snocBag` e)
-
-errDoc :: [MsgDoc] -> [MsgDoc] -> [MsgDoc] -> ErrDoc
-errDoc = ErrDoc
-
-mapErrDoc :: (MsgDoc -> MsgDoc) -> ErrDoc -> ErrDoc
-mapErrDoc f (ErrDoc a b c) = ErrDoc (map f a) (map f b) (map f c)
 
 data Severity
   = SevOutput
@@ -163,19 +138,19 @@ data Severity
 instance ToJson Severity where
   json s = JSString (show s)
 
-instance Show (ErrMsg ErrDoc) where
+instance Show (ErrMsg [SDoc]) where
     show = showErrMsg
 
 -- | Shows an 'ErrMsg'.
 showErrMsg :: RenderableDiagnostic a => ErrMsg a -> String
 showErrMsg err =
-  renderWithContext defaultSDocContext (vcat (errDocImportant $ renderDiagnostic $ errMsgDiagnostic err))
+  renderWithContext defaultSDocContext (vcat (renderDiagnostic $ errMsgDiagnostic err))
 
-pprMessageBag :: Bag MsgDoc -> SDoc
+pprMessageBag :: Bag SDoc -> SDoc
 pprMessageBag msgs = vcat (punctuate blankLine (bagToList msgs))
 
 -- | Make an unannotated error message with location info.
-mkLocMessage :: Severity -> SrcSpan -> MsgDoc -> MsgDoc
+mkLocMessage :: Severity -> SrcSpan -> SDoc -> SDoc
 mkLocMessage = mkLocMessageAnn Nothing
 
 -- | Make a possibly annotated error message with location info.
@@ -183,8 +158,8 @@ mkLocMessageAnn
   :: Maybe String                       -- ^ optional annotation
   -> Severity                           -- ^ severity
   -> SrcSpan                            -- ^ location
-  -> MsgDoc                             -- ^ message
-  -> MsgDoc
+  -> SDoc                             -- ^ message
+  -> SDoc
   -- Always print the location, even if it is unhelpful.  Error messages
   -- are supposed to be in a standard format, and one without a location
   -- would look strange.  Better to say explicitly "<no location info>".
@@ -224,7 +199,7 @@ getSeverityColour SevError   = Col.sError
 getSeverityColour SevFatal   = Col.sFatal
 getSeverityColour _          = const mempty
 
-getCaretDiagnostic :: Severity -> SrcSpan -> IO MsgDoc
+getCaretDiagnostic :: Severity -> SrcSpan -> IO SDoc
 getCaretDiagnostic _ (UnhelpfulSpan _) = pure empty
 getCaretDiagnostic severity (RealSrcSpan span _) =
   caretDiagnostic <$> getSrcLine (srcSpanFile span) row
@@ -321,19 +296,19 @@ mk_err_msg sev locn print_unqual err
 mkErr :: SrcSpan -> PrintUnqualified -> e -> ErrMsg e
 mkErr = mk_err_msg SevError
 
-mkLongErrMsg, mkLongWarnMsg   :: SrcSpan -> PrintUnqualified -> MsgDoc -> MsgDoc -> ErrMsg ErrDoc
+mkLongErrMsg, mkLongWarnMsg   :: SrcSpan -> PrintUnqualified -> SDoc -> SDoc -> ErrMsg [SDoc]
 -- ^ A long (multi-line) error message
-mkErrMsg, mkWarnMsg           :: SrcSpan -> PrintUnqualified -> MsgDoc            -> ErrMsg ErrDoc
+mkErrMsg, mkWarnMsg           :: SrcSpan -> PrintUnqualified -> SDoc            -> ErrMsg [SDoc]
 -- ^ A short (one-line) error message
-mkPlainErrMsg, mkPlainWarnMsg :: SrcSpan ->                     MsgDoc            -> ErrMsg ErrDoc
+mkPlainErrMsg, mkPlainWarnMsg :: SrcSpan ->                     SDoc            -> ErrMsg [SDoc]
 -- ^ Variant that doesn't care about qualified/unqualified names
 
-mkLongErrMsg   locn unqual msg extra = mk_err_msg SevError   locn unqual        (ErrDoc [msg] [] [extra])
-mkErrMsg       locn unqual msg       = mk_err_msg SevError   locn unqual        (ErrDoc [msg] [] [])
-mkPlainErrMsg  locn        msg       = mk_err_msg SevError   locn alwaysQualify (ErrDoc [msg] [] [])
-mkLongWarnMsg  locn unqual msg extra = mk_err_msg SevWarning locn unqual        (ErrDoc [msg] [] [extra])
-mkWarnMsg      locn unqual msg       = mk_err_msg SevWarning locn unqual        (ErrDoc [msg] [] [])
-mkPlainWarnMsg locn        msg       = mk_err_msg SevWarning locn alwaysQualify (ErrDoc [msg] [] [])
+mkLongErrMsg   locn unqual msg extra = mk_err_msg SevError   locn unqual        [msg,extra]
+mkErrMsg       locn unqual msg       = mk_err_msg SevError   locn unqual        [msg]
+mkPlainErrMsg  locn        msg       = mk_err_msg SevError   locn alwaysQualify [msg]
+mkLongWarnMsg  locn unqual msg extra = mk_err_msg SevWarning locn unqual        [msg,extra]
+mkWarnMsg      locn unqual msg       = mk_err_msg SevWarning locn unqual        [msg]
+mkPlainWarnMsg locn        msg       = mk_err_msg SevWarning locn alwaysQualify [msg]
 
 emptyMessages :: Messages e
 emptyMessages = Messages emptyBag
