@@ -1,6 +1,8 @@
 module T7944 where
 
-import GHC.Types
+import GHC.Exts
+
+-- Force specialisation of "go"
 
 -- This is more or less just an ordinary fold
 go :: SPEC -> [a] -> IntMap a -> IntMap a

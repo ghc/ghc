@@ -497,7 +497,7 @@ data DynFlags = DynFlags {
   specConstrThreshold   :: Maybe Int,   -- ^ Threshold for SpecConstr
   specConstrCount       :: Maybe Int,   -- ^ Max number of specialisations for any one function
   specConstrRecursive   :: Int,         -- ^ Max number of specialisations for recursive types
-                                        --   Not optional; otherwise SPEC can diverge.
+                                        --   Not optional; otherwise ForceSpecConstr can diverge.
   binBlobThreshold      :: Word,        -- ^ Binary literals (e.g. strings) whose size is above
                                         --   this threshold will be dumped in a binary file
                                         --   by the assembler code generator (0 to disable)

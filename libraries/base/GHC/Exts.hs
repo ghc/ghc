@@ -94,6 +94,9 @@ module GHC.Exts
         -- * Event logging
         traceEvent,
 
+        -- * SpecConstr annotations
+        SpecConstrAnnotation(..),
+
         -- * The call stack
         currentCallStack,
 
@@ -119,6 +122,7 @@ import GHC.Stack
 import qualified Data.Coerce
 import Data.String
 import Data.OldList
+import Data.Data
 import Data.Ord
 import Data.Version ( Version(..), makeVersion )
 import qualified Debug.Trace
@@ -164,6 +168,25 @@ groupByFB c n eq xs0 = groupByFBCore xs0
 traceEvent :: String -> IO ()
 traceEvent = Debug.Trace.traceEventIO
 {-# DEPRECATED traceEvent "Use 'Debug.Trace.traceEvent' or 'Debug.Trace.traceEventIO'" #-} -- deprecated in 7.4
+
+
+{- **********************************************************************
+*                                                                       *
+*              SpecConstr annotation                                    *
+*                                                                       *
+********************************************************************** -}
+
+-- Annotating a type with NoSpecConstr will make SpecConstr
+-- not specialise for arguments of that type.
+
+-- This data type is defined here, rather than in the SpecConstr module
+-- itself, so that importing it doesn't force stupidly linking the
+-- entire ghc package at runtime
+
+data SpecConstrAnnotation = NoSpecConstr | ForceSpecConstr
+                deriving ( Data -- ^ @since 4.3.0.0
+                         , Eq   -- ^ @since 4.3.0.0
+                         )
 
 
 {- **********************************************************************
