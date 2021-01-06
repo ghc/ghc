@@ -504,5 +504,5 @@ typedef struct StgTimeoutQueue_ {
   StgHeader                header;
   StgMVar                 *mvar;
   struct StgTimeoutQueue_ *next;
-  StgWord                  waketime;  /* LowResTime */
+  Time                     waketime;
 } StgTimeoutQueue;

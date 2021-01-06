@@ -40,57 +40,20 @@
 
 #define END_TIMEOUT_QUEUE ((StgTimeoutQueue *)END_TSO_QUEUE)
 
-// The target time for a threadDelay is stored in a one-word quantity
-// in the TSO (tso->block_info.target).  On a 32-bit machine we
-// therefore can't afford to use nanosecond resolution because it
-// would overflow too quickly, so instead we use millisecond
-// resolution.
-
-// An absolute time value in units of 10ms.
-typedef StgWord LowResTime;
-
-#if SIZEOF_VOID_P == 4
-#define LowResTimeToTime(t)          (USToTime((t) * 1000))
-#define TimeToLowResTimeRoundDown(t) ((LowResTime)(TimeToUS(t) / 1000))
-#define TimeToLowResTimeRoundUp(t)   ((TimeToUS(t) + 1000-1) / 1000)
-#else
-#define LowResTimeToTime(t) (t)
-#define TimeToLowResTimeRoundDown(t) (t)
-#define TimeToLowResTimeRoundUp(t)   (t)
-#endif
-
-/*
- * Return the time since the program started, in LowResTime,
- * rounded down.
- */
-static LowResTime getLowResTimeOfDay(void)
-{
-    return TimeToLowResTimeRoundDown(getProcessElapsedTime());
-}
-
-/*
- * For a given microsecond delay, return the target time in LowResTime.
- */
-static LowResTime getDelayTarget (HsInt us)
-{
-    Time elapsed;
-    elapsed = getProcessElapsedTime();
-
-    // If the desired target would be larger than the maximum Time,
-    // default to the maximum Time. (#7087)
-    if (us > TimeToUS(TIME_MAX - elapsed)) {
-        return TimeToLowResTimeRoundDown(TIME_MAX);
-    } else {
-        // round up the target time, because we never want to sleep *less*
-        // than the desired amount.
-        return TimeToLowResTimeRoundUp(elapsed + USToTime(us));
-    }
-}
-
 void registerDelay(Capability *cap, StgMVar *mvar, HsInt usecs)
 {
     CapIOManager *iomgr = cap->iomgr;
-    LowResTime target = getDelayTarget(usecs);
+
+    Time elapsed = getProcessElapsedTime();
+    Time target;
+
+    // If the desired target would be larger than the maximum Time,
+    // default to the maximum Time. (#7087)
+    if (usecs > TimeToUS(TIME_MAX - elapsed)) {
+        target = TIME_MAX;
+    } else {
+        target = elapsed + USToTime(usecs);
+    }
 
     IF_DEBUG(scheduler,
              debugBelch("scheduler: timer for delay of %llu usec installed at %llu\n",
@@ -120,18 +83,16 @@ void registerDelay(Capability *cap, StgMVar *mvar, HsInt usecs)
     }
 }
 
-/* There's a clever trick here to avoid problems when the time wraps
- * around.  Since our maximum delay is smaller than 31 bits of ticks
- * (it's actually 31 bits of microseconds), we can safely check
- * whether a timer has expired even if our timer will wrap around
- * before the target is reached, using the following formula:
+/* We use the 64bit Time type from rts/Time.h so our max time (in nanosecond
+ * precision) is over 290 years from the epoch of the monotonic clock.
  *
- *        (int)((uint)current_time - (uint)target_time) < 0
- *
- * if this is true, then our time has expired.
- * (idea due to Andy Gill).
+ * Previous limitations forced us to use 31 bits with millisecond precision
+ * which meant we would get clock wrap around. There was a cunning formula to
+ * determine if the timer had expired, even if the clock had wrapped around.
+ * With 64bit Time we do not need to worry about clock wraparound and can just
+ * use the simple formula.
  */
-static bool wakeUpSleepingThreads (Capability *cap, LowResTime now)
+static bool wakeUpSleepingThreads (Capability *cap, Time now)
 {
     CapIOManager *iomgr = cap->iomgr;
 
@@ -140,7 +101,7 @@ static bool wakeUpSleepingThreads (Capability *cap, LowResTime now)
      */
     while (iomgr->timeout_queue != END_TIMEOUT_QUEUE) {
         StgTimeoutQueue *q = iomgr->timeout_queue;
-        if (((long)now - (long)q->waketime) < 0) {
+        if (now < q->waketime) {
             break;
         }
         iomgr->timeout_queue = q->next;
@@ -268,7 +229,7 @@ awaitEvent(Capability *cap, bool wait)
     int maxfd = -1;
     bool seen_bad_fd = false;
     struct timeval tv, *ptv;
-    LowResTime now;
+    Time now;
 
     IF_DEBUG(scheduler,
              debugBelch("scheduler: checking for threads blocked on I/O");
@@ -285,7 +246,7 @@ awaitEvent(Capability *cap, bool wait)
      */
     do {
 
-      now = getLowResTimeOfDay();
+      now = getProcessElapsedTime();
       if (wakeUpSleepingThreads(cap, now)) {
           /* If we woke any sleeping threads,
            * return to the scheduler to run them */
@@ -364,7 +325,7 @@ awaitEvent(Capability *cap, bool wait)
            */
           const time_t max_seconds = 2678400; // 31 * 24 * 60 * 60
 
-          Time min = LowResTimeToTime(iomgr->timeout_queue->waketime - now);
+          Time min = iomgr->timeout_queue->waketime - now;
           tv.tv_sec  = TimeToSeconds(min);
           if (tv.tv_sec < max_seconds) {
               tv.tv_usec = TimeToUS(min) % 1000000;
@@ -411,7 +372,7 @@ awaitEvent(Capability *cap, bool wait)
           /* Check for threads that need waking up. If new runnable threads
            * have arrived, stop waiting for I/O and run them.
            */
-          if (wakeUpSleepingThreads(cap, getLowResTimeOfDay())) {
+          if (wakeUpSleepingThreads(cap, getProcessElapsedTime())) {
               return; /* still hold the lock */
           }
       }
