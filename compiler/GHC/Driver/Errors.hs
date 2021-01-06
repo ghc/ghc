@@ -53,7 +53,7 @@ handleFlagWarnings dflags warns = do
   printOrThrowWarnings dflags bag
 
 -- | Checks if given 'WarnMsg' is a fatal warning.
-isWarnMsgFatal :: DynFlags -> WarnMsg -> Maybe (Maybe WarningFlag)
+isWarnMsgFatal :: DynFlags -> ErrMsg [SDoc] -> Maybe (Maybe WarningFlag)
 isWarnMsgFatal dflags ErrMsg{errMsgReason = Reason wflag}
   = if wopt_fatal wflag dflags
       then Just (Just wflag)
@@ -74,7 +74,7 @@ shouldPrintWarning _ _
 
 -- | Given a bag of warnings, turn them into an exception if
 -- -Werror is enabled, or print them out otherwise.
-printOrThrowWarnings :: DynFlags -> Bag WarnMsg -> IO ()
+printOrThrowWarnings :: DynFlags -> Bag (ErrMsg [SDoc]) -> IO ()
 printOrThrowWarnings dflags warns = do
   let (make_error, warns') =
         mapAccumBagL
