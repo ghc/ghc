@@ -12,7 +12,7 @@
     `Data.Functor.Compose`.
 
   * Add `Eq1`, `Read1` and `Show1` instance for `Complex`;
-    add `Eq1`, `Ord1`, `Show1` and `Read1` instances for 3 and 4-tuples.
+    add `Eq1/2`, `Ord1/2`, `Show1/2` and `Read1/2` instances for 3 and 4-tuples.
 
 ## 4.15.0.0 *TBA*
 
