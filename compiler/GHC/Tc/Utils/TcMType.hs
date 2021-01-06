@@ -760,21 +760,27 @@ the thinking.
 {- Note [TyVarTv]
 ~~~~~~~~~~~~~~~~~
 A TyVarTv can unify with type *variables* only, including other TyVarTvs and
-skolems. Sometimes, they can unify with type variables that the user would
-rather keep distinct; see #11203 for an example.  So, any client of this
-function needs to either allow the TyVarTvs to unify with each other or check
-that they don't (say, with a call to findDubTyVarTvs).
+skolems.  They are used in two places:
 
-Before #15050 this (under the name SigTv) was used for ScopedTypeVariables in
-patterns, to make sure these type variables only refer to other type variables,
-but this restriction was dropped, and ScopedTypeVariables can now refer to full
-types (GHC Proposal 29).
+1. In kind signatures, see GHC.Tc.TyCl
+      Note [Inferring kinds for type declarations]
+   and Note [Kind checking for GADTs]
 
-The remaining uses of newTyVarTyVars are
-* In kind signatures, see
-  GHC.Tc.TyCl Note [Inferring kinds for type declarations]
-          and Note [Kind checking for GADTs]
-* In partial type signatures, see Note [Quantified variables in partial type signatures]
+2. In partial type signatures.  See GHC.Tc.Types
+   Note [Quantified variables in partial type signatures]
+
+Sometimes, they can unify with type variables that the user would
+rather keep distinct; see #11203 for an example.  So, any client of
+this function needs to either allow the TyVarTvs to unify with each
+other or check that they don't. In the case of (1) the check is done
+in GHC.Tc.TyCl.swizzleTcTyConBndrs.  In case of (2) it's done by
+findDupTyVarTvs in GHC.Tc.Gen.Bind.chooseInferredQuantifiers.
+
+Historical note: Before #15050 this (under the name SigTv) was also
+used for ScopedTypeVariables in patterns, to make sure these type
+variables only refer to other type variables, but this restriction was
+dropped, and ScopedTypeVariables can now refer to full types (GHC
+Proposal 29).
 -}
 
 newMetaTyVarName :: FastString -> TcM Name
@@ -1764,7 +1770,7 @@ defaultTyVar default_kind tv
 
   | isTyVarTyVar tv
     -- Do not default TyVarTvs. Doing so would violate the invariants
-    -- on TyVarTvs; see Note [Signature skolems] in GHC.Tc.Utils.TcType.
+    -- on TyVarTvs; see Note [TyVarTv] in GHC.Tc.Utils.TcMType.
     -- #13343 is an example; #14555 is another
     -- See Note [Inferring kinds for type declarations] in GHC.Tc.TyCl
   = return False

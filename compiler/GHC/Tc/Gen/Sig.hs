@@ -511,7 +511,7 @@ So we instantiate f and g's signature with TyVarTv skolems
 unification takes place, we'll find out when we do the final
 impedance-matching check in GHC.Tc.Gen.Bind.mkExport
 
-See Note [Signature skolems] in GHC.Tc.Utils.TcType
+See Note [TyVarTv] in GHC.Tc.Utils.TcMType
 
 None of this applies to a function binding with a complete
 signature, which doesn't use tcInstSig.  See GHC.Tc.Gen.Bind.tcPolyCheck.
