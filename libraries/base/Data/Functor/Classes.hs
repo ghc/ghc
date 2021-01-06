@@ -70,6 +70,7 @@ import Data.Functor.Identity (Identity(Identity))
 import Data.Proxy (Proxy(Proxy))
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Ord (Down(Down))
+import Data.Complex (Complex((:+)))
 
 import GHC.Read (expectP, list, paren)
 
@@ -661,6 +662,25 @@ instance Read1 Down where
 instance Show1 Down where
     liftShowsPrec sp _ d (Down x) = showsUnaryWith sp "Down" d x
 
+-- | @since 4.16.0.0
+instance Eq1 Complex where
+    liftEq eq (x :+ y) (u :+ v) = eq x u && eq y v
+
+-- | @since 4.16.0.0
+instance Read1 Complex where
+    liftReadPrec rp _  = parens $ prec 9 $ do
+        x <- step rp
+        expectP (Symbol ":+")
+        y <- step rp
+        return (x :+ y)
+
+    liftReadListPrec = liftReadListPrecDefault
+    liftReadList     = liftReadListDefault
+
+-- | @since 4.16.0.0
+instance Show1 Complex where
+    liftShowsPrec sp _ d (x :+ y) = showParen (d >= 10) $
+        sp 10 x . showString " :+ " . sp 10 y
 
 -- Building blocks
 
