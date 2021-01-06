@@ -1,3 +1,4 @@
+{-# LANGUAGE CApiFFI #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE InterruptibleFFI #-}
 {-# LANGUAGE MultiWayIf #-}
@@ -40,7 +41,7 @@ import System.Posix.Types (COff, CPid)
 -- use ordinary POSIX file locking due to its peculiar semantics under
 -- multi-threaded environments.
 
-foreign import ccall interruptible "fcntl"
+foreign import capi interruptible "fcntl.h fcntl"
   c_fcntl :: CInt -> CInt -> Ptr FLock -> IO CInt
 
 data FLock  = FLock { l_type   :: CShort
