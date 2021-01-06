@@ -140,7 +140,7 @@ where the code that e1 expands to might import some defns that
 also turn out to be needed by the code that e2 expands to.
 -}
 
-tcLookupImported_maybe :: Name -> TcM (MaybeErr MsgDoc TyThing)
+tcLookupImported_maybe :: Name -> TcM (MaybeErr SDoc TyThing)
 -- Returns (Failed err) if we can't find the interface file for the thing
 tcLookupImported_maybe name
   = do  { hsc_env <- getTopEnv
@@ -149,7 +149,7 @@ tcLookupImported_maybe name
             Just thing -> return (Succeeded thing)
             Nothing    -> tcImportDecl_maybe name }
 
-tcImportDecl_maybe :: Name -> TcM (MaybeErr MsgDoc TyThing)
+tcImportDecl_maybe :: Name -> TcM (MaybeErr SDoc TyThing)
 -- Entry point for *source-code* uses of importDecl
 tcImportDecl_maybe name
   | Just thing <- wiredInNameTyThing_maybe name
@@ -160,7 +160,7 @@ tcImportDecl_maybe name
   | otherwise
   = initIfaceTcRn (importDecl name)
 
-importDecl :: Name -> IfM lcl (MaybeErr MsgDoc TyThing)
+importDecl :: Name -> IfM lcl (MaybeErr SDoc TyThing)
 -- Get the TyThing for this Name from an interface file
 -- It's not a wired-in thing -- the caller caught that
 importDecl name
@@ -302,7 +302,7 @@ loadSrcInterface_maybe :: SDoc
                        -> ModuleName
                        -> IsBootInterface     -- {-# SOURCE #-} ?
                        -> Maybe FastString    -- "package", if any
-                       -> RnM (MaybeErr MsgDoc ModIface)
+                       -> RnM (MaybeErr SDoc ModIface)
 
 loadSrcInterface_maybe doc mod want_boot maybe_pkg
   -- We must first find which Module this import refers to.  This involves
@@ -408,7 +408,7 @@ loadInterfaceWithException doc mod_name where_from
 
 ------------------
 loadInterface :: SDoc -> Module -> WhereFrom
-              -> IfM lcl (MaybeErr MsgDoc ModIface)
+              -> IfM lcl (MaybeErr SDoc ModIface)
 
 -- loadInterface looks in both the HPT and PIT for the required interface
 -- If not found, it loads it, and puts it in the PIT (always).
@@ -663,7 +663,7 @@ is_external_sig home_unit iface =
 -- we are actually typechecking p.)
 computeInterface ::
        SDoc -> IsBootInterface -> Module
-    -> TcRnIf gbl lcl (MaybeErr MsgDoc (ModIface, FilePath))
+    -> TcRnIf gbl lcl (MaybeErr SDoc (ModIface, FilePath))
 computeInterface doc_str hi_boot_file mod0 = do
     MASSERT( not (isHoleModule mod0) )
     hsc_env <- getTopEnv
@@ -695,7 +695,7 @@ computeInterface doc_str hi_boot_file mod0 = do
 -- @p[A=\<A>,B=\<B>]:B@ never includes B.
 moduleFreeHolesPrecise
     :: SDoc -> Module
-    -> TcRnIf gbl lcl (MaybeErr MsgDoc (UniqDSet ModuleName))
+    -> TcRnIf gbl lcl (MaybeErr SDoc (UniqDSet ModuleName))
 moduleFreeHolesPrecise doc_str mod
  | moduleIsDefinite mod = return (Succeeded emptyUniqDSet)
  | otherwise =
@@ -728,7 +728,7 @@ moduleFreeHolesPrecise doc_str mod
             Failed err -> return (Failed err)
 
 wantHiBootFile :: HomeUnit -> ExternalPackageState -> Module -> WhereFrom
-               -> MaybeErr MsgDoc IsBootInterface
+               -> MaybeErr SDoc IsBootInterface
 -- Figure out whether we want Foo.hi or Foo.hi-boot
 wantHiBootFile home_unit eps mod from
   = case from of
@@ -816,7 +816,7 @@ findAndReadIface :: SDoc
                  -> Module
                  -> IsBootInterface     -- True  <=> Look for a .hi-boot file
                                         -- False <=> Look for .hi file
-                 -> TcRnIf gbl lcl (MaybeErr MsgDoc (ModIface, FilePath))
+                 -> TcRnIf gbl lcl (MaybeErr SDoc (ModIface, FilePath))
         -- Nothing <=> file not found, or unreadable, or illegible
         -- Just x  <=> successfully found and parsed
 
@@ -926,7 +926,7 @@ writeIface dflags hi_file_path new_iface
 
 -- @readIface@ tries just the one file.
 readIface :: Module -> FilePath
-          -> TcRnIf gbl lcl (MaybeErr MsgDoc ModIface)
+          -> TcRnIf gbl lcl (MaybeErr SDoc ModIface)
         -- Failed err    <=> file not found, or unreadable, or illegible
         -- Succeeded iface <=> successfully found and parsed
 
@@ -1229,7 +1229,7 @@ badIfaceFile file err
   = vcat [text "Bad interface file:" <+> text file,
           nest 4 err]
 
-hiModuleNameMismatchWarn :: Module -> Module -> MsgDoc
+hiModuleNameMismatchWarn :: Module -> Module -> SDoc
 hiModuleNameMismatchWarn requested_mod read_mod
  | moduleUnit requested_mod == moduleUnit read_mod =
     sep [text "Interface file contains module" <+> quotes (ppr read_mod) <> comma,

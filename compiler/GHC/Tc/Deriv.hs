@@ -2219,10 +2219,10 @@ gndNonNewtypeErr :: SDoc
 gndNonNewtypeErr =
   text "GeneralizedNewtypeDeriving cannot be used on non-newtypes"
 
-derivingNullaryErr :: MsgDoc
+derivingNullaryErr :: SDoc
 derivingNullaryErr = text "Cannot derive instances for nullary classes"
 
-derivingKindErr :: TyCon -> Class -> [Type] -> Kind -> Bool -> MsgDoc
+derivingKindErr :: TyCon -> Class -> [Type] -> Kind -> Bool -> SDoc
 derivingKindErr tc cls cls_tys cls_kind enough_args
   = sep [ hang (text "Cannot derive well-kinded instance of form"
                       <+> quotes (pprClassPred cls cls_tys
@@ -2237,7 +2237,7 @@ derivingKindErr tc cls cls_tys cls_kind enough_args
                     = text "(Perhaps you intended to use PolyKinds)"
                     | otherwise = Outputable.empty
 
-derivingViaKindErr :: Class -> Kind -> Type -> Kind -> MsgDoc
+derivingViaKindErr :: Class -> Kind -> Type -> Kind -> SDoc
 derivingViaKindErr cls cls_kind via_ty via_kind
   = hang (text "Cannot derive instance via" <+> quotes (pprType via_ty))
        2 (text "Class" <+> quotes (ppr cls)
@@ -2246,26 +2246,26 @@ derivingViaKindErr cls cls_kind via_ty via_kind
       $+$ text "but" <+> quotes (pprType via_ty)
                <+> text "has kind" <+> quotes (pprKind via_kind))
 
-derivingEtaErr :: Class -> [Type] -> Type -> MsgDoc
+derivingEtaErr :: Class -> [Type] -> Type -> SDoc
 derivingEtaErr cls cls_tys inst_ty
   = sep [text "Cannot eta-reduce to an instance of form",
          nest 2 (text "instance (...) =>"
                 <+> pprClassPred cls (cls_tys ++ [inst_ty]))]
 
 derivingThingErr :: Bool -> Class -> [Type]
-                 -> Maybe (DerivStrategy GhcTc) -> MsgDoc -> MsgDoc
+                 -> Maybe (DerivStrategy GhcTc) -> SDoc -> SDoc
 derivingThingErr newtype_deriving cls cls_args mb_strat why
   = derivingThingErr' newtype_deriving cls cls_args mb_strat
                       (maybe empty derivStrategyName mb_strat) why
 
-derivingThingErrM :: Bool -> MsgDoc -> DerivM MsgDoc
+derivingThingErrM :: Bool -> SDoc -> DerivM SDoc
 derivingThingErrM newtype_deriving why
   = do DerivEnv { denv_cls      = cls
                 , denv_inst_tys = cls_args
                 , denv_strat    = mb_strat } <- ask
        pure $ derivingThingErr newtype_deriving cls cls_args mb_strat why
 
-derivingThingErrMechanism :: DerivSpecMechanism -> MsgDoc -> DerivM MsgDoc
+derivingThingErrMechanism :: DerivSpecMechanism -> SDoc -> DerivM SDoc
 derivingThingErrMechanism mechanism why
   = do DerivEnv { denv_cls      = cls
                 , denv_inst_tys = cls_args
@@ -2274,7 +2274,7 @@ derivingThingErrMechanism mechanism why
                 (derivStrategyName $ derivSpecMechanismToStrategy mechanism) why
 
 derivingThingErr' :: Bool -> Class -> [Type]
-                  -> Maybe (DerivStrategy GhcTc) -> MsgDoc -> MsgDoc -> MsgDoc
+                  -> Maybe (DerivStrategy GhcTc) -> SDoc -> SDoc -> SDoc
 derivingThingErr' newtype_deriving cls cls_args mb_strat strat_msg why
   = sep [(hang (text "Can't make a derived instance of")
              2 (quotes (ppr pred) <+> via_mechanism)

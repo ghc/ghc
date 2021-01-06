@@ -112,7 +112,6 @@ import GHC.Unit.External
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Encoding
-import GHC.Utils.Error
 import GHC.Utils.Misc ( HasDebugCallStack )
 
 import GHC.Data.FastString
@@ -155,7 +154,7 @@ lookupGlobal hsc_env name
             Failed msg      -> pprPanic "lookupGlobal" msg
         }
 
-lookupGlobal_maybe :: HscEnv -> Name -> IO (MaybeErr MsgDoc TyThing)
+lookupGlobal_maybe :: HscEnv -> Name -> IO (MaybeErr SDoc TyThing)
 -- This may look up an Id that one has previously looked up.
 -- If so, we are going to read its interface file, and add its bindings
 -- to the ExternalPackageTable.
@@ -174,7 +173,7 @@ lookupGlobal_maybe hsc_env name
           lookupImported_maybe hsc_env name
         }
 
-lookupImported_maybe :: HscEnv -> Name -> IO (MaybeErr MsgDoc TyThing)
+lookupImported_maybe :: HscEnv -> Name -> IO (MaybeErr SDoc TyThing)
 -- Returns (Failed err) if we can't find the interface file for the thing
 lookupImported_maybe hsc_env name
   = do  { mb_thing <- lookupType hsc_env name
@@ -183,7 +182,7 @@ lookupImported_maybe hsc_env name
             Nothing    -> importDecl_maybe hsc_env name
             }
 
-importDecl_maybe :: HscEnv -> Name -> IO (MaybeErr MsgDoc TyThing)
+importDecl_maybe :: HscEnv -> Name -> IO (MaybeErr SDoc TyThing)
 importDecl_maybe hsc_env name
   | Just thing <- wiredInNameTyThing_maybe name
   = do  { when (needWiredInHomeIface thing)
@@ -200,7 +199,7 @@ ioLookupDataCon hsc_env name = do
     Succeeded thing -> return thing
     Failed msg      -> pprPanic "lookupDataConIO" msg
 
-ioLookupDataCon_maybe :: HscEnv -> Name -> IO (MaybeErr MsgDoc DataCon)
+ioLookupDataCon_maybe :: HscEnv -> Name -> IO (MaybeErr SDoc DataCon)
 ioLookupDataCon_maybe hsc_env name = do
     thing <- lookupGlobal hsc_env name
     return $ case thing of

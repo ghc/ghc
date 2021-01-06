@@ -230,7 +230,7 @@ import GHC.Data.List.SetOps ( getNth, findDupsEq )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Data.FastString
-import GHC.Utils.Error( Validity(..), MsgDoc, isValid )
+import GHC.Utils.Error( Validity(..), isValid )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.List  ( mapAccumL )
@@ -2432,7 +2432,7 @@ legalFIPrimResultTyCon dflags tc
   | otherwise
   = NotValid unlifted_only
 
-unlifted_only :: MsgDoc
+unlifted_only :: SDoc
 unlifted_only = text "foreign import prim only accepts simple unlifted types"
 
 validIfUnliftedFFITypes :: DynFlags -> Validity

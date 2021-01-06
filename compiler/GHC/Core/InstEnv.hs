@@ -53,7 +53,6 @@ import Data.Maybe       ( isJust, isNothing )
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
-import GHC.Utils.Error
 import GHC.Utils.Panic
 
 {-
@@ -810,7 +809,7 @@ anyone noticing, so it's manifestly not ruining anyone's day.)
 -- yield 'Left errorMessage'.
 lookupUniqueInstEnv :: InstEnvs
                     -> Class -> [Type]
-                    -> Either MsgDoc (ClsInst, [Type])
+                    -> Either SDoc (ClsInst, [Type])
 lookupUniqueInstEnv instEnv cls tys
   = case lookupInstEnv False instEnv cls tys of
       ([(inst, inst_tys)], _, _)

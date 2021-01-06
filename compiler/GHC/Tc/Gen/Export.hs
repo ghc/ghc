@@ -814,7 +814,7 @@ failWithDcErr parent child parents = do
 exportClashErr :: GlobalRdrEnv
                -> GreName -> GreName
                -> IE GhcPs -> IE GhcPs
-               -> MsgDoc
+               -> SDoc
 exportClashErr global_env child1 child2 ie1 ie2
   = vcat [ text "Conflicting exports for" <+> quotes (ppr occ) <> colon
          , ppr_export child1' gre1' ie1'

@@ -71,7 +71,7 @@ import GHC.Unit.Module.Warnings  ( WarningTxt, pprWarningTxtForMsg )
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.TyCon
-import GHC.Utils.Error  ( MsgDoc )
+import GHC.Utils.Error
 import GHC.Builtin.Names( rOOT_MAIN )
 import GHC.Types.Basic  ( TopLevelFlag(..), TupleSort(..) )
 import GHC.Types.SrcLoc as SrcLoc
@@ -279,7 +279,7 @@ lookupLocatedTopBndrRn = wrapLocM lookupTopBndrRn
 -- | Lookup an @Exact@ @RdrName@. See Note [Looking up Exact RdrNames].
 -- This never adds an error, but it may return one, see
 -- Note [Errors in lookup functions]
-lookupExactOcc_either :: Name -> RnM (Either MsgDoc Name)
+lookupExactOcc_either :: Name -> RnM (Either SDoc Name)
 lookupExactOcc_either name
   | Just thing <- wiredInNameTyThing_maybe name
   , Just tycon <- case thing of
@@ -326,7 +326,7 @@ lookupExactOcc_either name
            gres -> return (Left (sameNameErr gres))   -- Ugh!  See Note [Template Haskell ambiguity]
        }
 
-sameNameErr :: [GlobalRdrElt] -> MsgDoc
+sameNameErr :: [GlobalRdrElt] -> SDoc
 sameNameErr [] = panic "addSameNameErr: empty list"
 sameNameErr gres@(_ : _)
   = hang (text "Same exact name in multiple name-spaces:")
@@ -435,7 +435,7 @@ lookupExactOrOrig_maybe rdr_name res k
            NotExactOrOrig     -> k }
 
 data ExactOrOrigResult = FoundExactOrOrig Name -- ^ Found an Exact Or Orig Name
-                       | ExactOrOrigError MsgDoc -- ^ The RdrName was an Exact
+                       | ExactOrOrigError SDoc -- ^ The RdrName was an Exact
                                                  -- or Orig, but there was an
                                                  -- error looking up the Name
                        | NotExactOrOrig -- ^ The RdrName is neither an Exact nor
@@ -753,7 +753,7 @@ lookupSubBndrOcc :: Bool
                  -> Name     -- Parent
                  -> SDoc
                  -> RdrName
-                 -> RnM (Either MsgDoc Name)
+                 -> RnM (Either SDoc Name)
 -- Find all the things the rdr-name maps to
 -- and pick the one with the right parent namep
 lookupSubBndrOcc warn_if_deprec the_parent doc rdr_name = do
@@ -1516,7 +1516,7 @@ lookupSigCtxtOccRn ctxt what
 
 lookupBindGroupOcc :: HsSigCtxt
                    -> SDoc
-                   -> RdrName -> RnM (Either MsgDoc Name)
+                   -> RdrName -> RnM (Either SDoc Name)
 -- Looks up the RdrName, expecting it to resolve to one of the
 -- bound names passed in.  If not, return an appropriate error message
 --
@@ -1587,7 +1587,7 @@ lookupBindGroupOcc ctxt what rdr_name
                            <+> quotes (ppr rdr_name) <+> text "is declared"
 
     -- Identify all similar names and produce a message listing them
-    candidates :: [Name] -> MsgDoc
+    candidates :: [Name] -> SDoc
     candidates names_in_scope
       = case similar_names of
           []  -> Outputable.empty

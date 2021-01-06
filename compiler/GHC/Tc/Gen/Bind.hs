@@ -230,7 +230,7 @@ tcHsBootSigs binds sigs
         -- Notice that we make GlobalIds, not LocalIds
     tc_boot_sig s = pprPanic "tcHsBootSigs/tc_boot_sig" (ppr s)
 
-badBootDeclErr :: MsgDoc
+badBootDeclErr :: SDoc
 badBootDeclErr = text "Illegal declarations in an hs-boot file"
 
 ------------------------

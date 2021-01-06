@@ -60,7 +60,6 @@ import GHC.Types.FieldLabel
 import GHC.Rename.Env
 import GHC.Data.Bag
 import GHC.Utils.Misc
-import GHC.Utils.Error
 import GHC.Driver.Session ( getDynFlags )
 import Data.Maybe( mapMaybe )
 import Control.Monad ( zipWithM )
@@ -974,7 +973,7 @@ add_void need_dummy_arg ty
   | otherwise      = ty
 
 tcPatToExpr :: Name -> [Located Name] -> LPat GhcRn
-            -> Either MsgDoc (LHsExpr GhcRn)
+            -> Either SDoc (LHsExpr GhcRn)
 -- Given a /pattern/, return an /expression/ that builds a value
 -- that matches the pattern.  E.g. if the pattern is (Just [x]),
 -- the expression is (Just [x]).  They look the same, but the
@@ -989,7 +988,7 @@ tcPatToExpr name args pat = go pat
 
     -- Make a prefix con for prefix and infix patterns for simplicity
     mkPrefixConExpr :: Located Name -> [LPat GhcRn]
-                    -> Either MsgDoc (HsExpr GhcRn)
+                    -> Either SDoc (HsExpr GhcRn)
     mkPrefixConExpr lcon@(L loc _) pats
       = do { exprs <- mapM go pats
            ; let con = L loc (HsVar noExtField lcon)
@@ -997,15 +996,15 @@ tcPatToExpr name args pat = go pat
            }
 
     mkRecordConExpr :: Located Name -> HsRecFields GhcRn (LPat GhcRn)
-                    -> Either MsgDoc (HsExpr GhcRn)
+                    -> Either SDoc (HsExpr GhcRn)
     mkRecordConExpr con fields
       = do { exprFields <- mapM go fields
            ; return (RecordCon noExtField con exprFields) }
 
-    go :: LPat GhcRn -> Either MsgDoc (LHsExpr GhcRn)
+    go :: LPat GhcRn -> Either SDoc (LHsExpr GhcRn)
     go (L loc p) = L loc <$> go1 p
 
-    go1 :: Pat GhcRn -> Either MsgDoc (HsExpr GhcRn)
+    go1 :: Pat GhcRn -> Either SDoc (HsExpr GhcRn)
     go1 (ConPat NoExtField con info)
       = case info of
           PrefixCon _ ps -> mkPrefixConExpr con ps

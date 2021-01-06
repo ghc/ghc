@@ -68,25 +68,25 @@ import System.IO.Unsafe
 -------------------------------------------------------------------
 --              The external interface
 
-convertToHsDecls :: Origin -> SrcSpan -> [TH.Dec] -> Either MsgDoc [LHsDecl GhcPs]
+convertToHsDecls :: Origin -> SrcSpan -> [TH.Dec] -> Either SDoc [LHsDecl GhcPs]
 convertToHsDecls origin loc ds = initCvt origin loc (fmap catMaybes (mapM cvt_dec ds))
   where
     cvt_dec d = wrapMsg "declaration" d (cvtDec d)
 
-convertToHsExpr :: Origin -> SrcSpan -> TH.Exp -> Either MsgDoc (LHsExpr GhcPs)
+convertToHsExpr :: Origin -> SrcSpan -> TH.Exp -> Either SDoc (LHsExpr GhcPs)
 convertToHsExpr origin loc e
   = initCvt origin loc $ wrapMsg "expression" e $ cvtl e
 
-convertToPat :: Origin -> SrcSpan -> TH.Pat -> Either MsgDoc (LPat GhcPs)
+convertToPat :: Origin -> SrcSpan -> TH.Pat -> Either SDoc (LPat GhcPs)
 convertToPat origin loc p
   = initCvt origin loc $ wrapMsg "pattern" p $ cvtPat p
 
-convertToHsType :: Origin -> SrcSpan -> TH.Type -> Either MsgDoc (LHsType GhcPs)
+convertToHsType :: Origin -> SrcSpan -> TH.Type -> Either SDoc (LHsType GhcPs)
 convertToHsType origin loc t
   = initCvt origin loc $ wrapMsg "type" t $ cvtType t
 
 -------------------------------------------------------------------
-newtype CvtM a = CvtM { unCvtM :: Origin -> SrcSpan -> Either MsgDoc (SrcSpan, a) }
+newtype CvtM a = CvtM { unCvtM :: Origin -> SrcSpan -> Either SDoc (SrcSpan, a) }
     deriving (Functor)
         -- Push down the Origin (that is configurable by
         -- -fenable-th-splice-warnings) and source location;
@@ -110,13 +110,13 @@ instance Monad CvtM where
     Left err -> Left err
     Right (loc',v) -> unCvtM (k v) origin loc'
 
-initCvt :: Origin -> SrcSpan -> CvtM a -> Either MsgDoc a
+initCvt :: Origin -> SrcSpan -> CvtM a -> Either SDoc a
 initCvt origin loc (CvtM m) = fmap snd (m origin loc)
 
 force :: a -> CvtM ()
 force a = a `seq` return ()
 
-failWith :: MsgDoc -> CvtM a
+failWith :: SDoc -> CvtM a
 failWith m = CvtM (\_ _ -> Left m)
 
 getOrigin :: CvtM Origin
@@ -467,7 +467,7 @@ cvtTySynEqn (TySynEqn mb_bndrs lhs rhs)
         }
 
 ----------------
-cvt_ci_decs :: MsgDoc -> [TH.Dec]
+cvt_ci_decs :: SDoc -> [TH.Dec]
             -> CvtM (LHsBinds GhcPs,
                      [LSig GhcPs],
                      [LFamilyDecl GhcPs],
@@ -564,7 +564,7 @@ is_ip_bind :: TH.Dec -> Either (String, TH.Exp) TH.Dec
 is_ip_bind (TH.ImplicitParamBindD n e) = Left (n, e)
 is_ip_bind decl             = Right decl
 
-mkBadDecMsg :: Outputable a => MsgDoc -> [a] -> MsgDoc
+mkBadDecMsg :: Outputable a => SDoc -> [a] -> SDoc
 mkBadDecMsg doc bads
   = sep [ text "Illegal declaration(s) in" <+> doc <> colon
         , nest 2 (vcat (map Outputable.ppr bads)) ]
@@ -862,7 +862,7 @@ cvtRuleBndr (TypedRuleVar n ty)
 --              Declarations
 ---------------------------------------------------
 
-cvtLocalDecs :: MsgDoc -> [TH.Dec] -> CvtM (HsLocalBinds GhcPs)
+cvtLocalDecs :: SDoc -> [TH.Dec] -> CvtM (HsLocalBinds GhcPs)
 cvtLocalDecs doc ds
   = case partitionWith is_ip_bind ds of
       ([], []) -> return (EmptyLocalBinds noExtField)

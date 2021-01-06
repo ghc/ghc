@@ -982,7 +982,7 @@ checkStability hpt sccs all_home_mods =
 -- | Each module is given a unique 'LogQueue' to redirect compilation messages
 -- to. A 'Nothing' value contains the result of compilation, and denotes the
 -- end of the message queue.
-data LogQueue = LogQueue !(IORef [Maybe (WarnReason, Severity, SrcSpan, MsgDoc)])
+data LogQueue = LogQueue !(IORef [Maybe (WarnReason, Severity, SrcSpan, SDoc)])
                          !(MVar ())
 
 -- | The graph of modules to compile and their corresponding result 'MVar' and
@@ -1236,7 +1236,7 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods cleanup sccs = do
             return (success_flag,ok_results)
 
   where
-    writeLogQueue :: LogQueue -> Maybe (WarnReason,Severity,SrcSpan,MsgDoc) -> IO ()
+    writeLogQueue :: LogQueue -> Maybe (WarnReason,Severity,SrcSpan,SDoc) -> IO ()
     writeLogQueue (LogQueue ref sem) msg = do
         atomicModifyIORef' ref $ \msgs -> (msg:msgs,())
         _ <- tryPutMVar sem ()
@@ -2886,7 +2886,7 @@ withDeferredDiagnostics f = do
       (\_ -> setLogAction (log_action dflags) >> printDeferredDiagnostics)
       (\_ -> f)
 
-noModError :: HscEnv -> SrcSpan -> ModuleName -> FindResult -> ErrMsg ErrDoc
+noModError :: HscEnv -> SrcSpan -> ModuleName -> FindResult -> ErrMsg [SDoc]
 -- ToDo: we don't have a proper line number for this error
 noModError hsc_env loc wanted_mod err
   = mkPlainErrMsg loc $ cannotFindModule hsc_env wanted_mod err
