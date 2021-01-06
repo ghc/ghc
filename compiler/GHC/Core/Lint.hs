@@ -541,7 +541,7 @@ lintUnfolding :: Bool               -- True <=> is a compulsory unfolding
               -> SrcLoc
               -> VarSet             -- Treat these as in scope
               -> CoreExpr
-              -> Maybe (Bag MsgDoc) -- Nothing => OK
+              -> Maybe (Bag SDoc) -- Nothing => OK
 
 lintUnfolding is_compulsory dflags locn var_set expr
   | isEmptyBag errs = Nothing
@@ -559,7 +559,7 @@ lintUnfolding is_compulsory dflags locn var_set expr
 lintExpr :: DynFlags
          -> [Var]               -- Treat these as in scope
          -> CoreExpr
-         -> Maybe (Bag MsgDoc)  -- Nothing => OK
+         -> Maybe (Bag SDoc)  -- Nothing => OK
 
 lintExpr dflags vars expr
   | isEmptyBag errs = Nothing
@@ -2551,7 +2551,7 @@ newtype LintM a =
             (Maybe a, WarnsAndErrs) } -- Result and messages (if any)
    deriving (Functor)
 
-type WarnsAndErrs = (Bag MsgDoc, Bag MsgDoc)
+type WarnsAndErrs = (Bag SDoc, Bag SDoc)
 
 {- Note [Checking for global Ids]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2710,31 +2710,31 @@ noLPChecks thing_inside
 getLintFlags :: LintM LintFlags
 getLintFlags = LintM $ \ env errs -> (Just (le_flags env), errs)
 
-checkL :: Bool -> MsgDoc -> LintM ()
+checkL :: Bool -> SDoc -> LintM ()
 checkL True  _   = return ()
 checkL False msg = failWithL msg
 
 -- like checkL, but relevant to type checking
-lintL :: Bool -> MsgDoc -> LintM ()
+lintL :: Bool -> SDoc -> LintM ()
 lintL = checkL
 
-checkWarnL :: Bool -> MsgDoc -> LintM ()
+checkWarnL :: Bool -> SDoc -> LintM ()
 checkWarnL True   _  = return ()
 checkWarnL False msg = addWarnL msg
 
-failWithL :: MsgDoc -> LintM a
+failWithL :: SDoc -> LintM a
 failWithL msg = LintM $ \ env (warns,errs) ->
                 (Nothing, (warns, addMsg True env errs msg))
 
-addErrL :: MsgDoc -> LintM ()
+addErrL :: SDoc -> LintM ()
 addErrL msg = LintM $ \ env (warns,errs) ->
               (Just (), (warns, addMsg True env errs msg))
 
-addWarnL :: MsgDoc -> LintM ()
+addWarnL :: SDoc -> LintM ()
 addWarnL msg = LintM $ \ env (warns,errs) ->
               (Just (), (addMsg False env warns msg, errs))
 
-addMsg :: Bool -> LintEnv ->  Bag MsgDoc -> MsgDoc -> Bag MsgDoc
+addMsg :: Bool -> LintEnv ->  Bag SDoc -> SDoc -> Bag SDoc
 addMsg is_error env msgs msg
   = ASSERT2( notNull loc_msgs, msg )
     msgs `snocBag` mk_msg msg
@@ -2862,7 +2862,7 @@ varCallSiteUsage id =
          Nothing -> unitUE id One
          Just id_ue -> id_ue
 
-ensureEqTys :: LintedType -> LintedType -> MsgDoc -> LintM ()
+ensureEqTys :: LintedType -> LintedType -> SDoc -> LintM ()
 -- check ty2 is subtype of ty1 (ie, has same structure but usage
 -- annotations need only be consistent, not equal)
 -- Assumes ty1,ty2 are have already had the substitution applied
@@ -2996,36 +2996,36 @@ pp_binder b | isId b    = hsep [ppr b, dcolon, ppr (idType b)]
 ------------------------------------------------------
 --      Messages for case expressions
 
-mkDefaultArgsMsg :: [Var] -> MsgDoc
+mkDefaultArgsMsg :: [Var] -> SDoc
 mkDefaultArgsMsg args
   = hang (text "DEFAULT case with binders")
          4 (ppr args)
 
-mkCaseAltMsg :: CoreExpr -> Type -> Type -> MsgDoc
+mkCaseAltMsg :: CoreExpr -> Type -> Type -> SDoc
 mkCaseAltMsg e ty1 ty2
   = hang (text "Type of case alternatives not the same as the annotation on case:")
          4 (vcat [ text "Actual type:" <+> ppr ty1,
                    text "Annotation on case:" <+> ppr ty2,
                    text "Alt Rhs:" <+> ppr e ])
 
-mkScrutMsg :: Id -> Type -> Type -> TCvSubst -> MsgDoc
+mkScrutMsg :: Id -> Type -> Type -> TCvSubst -> SDoc
 mkScrutMsg var var_ty scrut_ty subst
   = vcat [text "Result binder in case doesn't match scrutinee:" <+> ppr var,
           text "Result binder type:" <+> ppr var_ty,--(idType var),
           text "Scrutinee type:" <+> ppr scrut_ty,
      hsep [text "Current TCv subst", ppr subst]]
 
-mkNonDefltMsg, mkNonIncreasingAltsMsg :: CoreExpr -> MsgDoc
+mkNonDefltMsg, mkNonIncreasingAltsMsg :: CoreExpr -> SDoc
 mkNonDefltMsg e
   = hang (text "Case expression with DEFAULT not at the beginning") 4 (ppr e)
 mkNonIncreasingAltsMsg e
   = hang (text "Case expression with badly-ordered alternatives") 4 (ppr e)
 
-nonExhaustiveAltsMsg :: CoreExpr -> MsgDoc
+nonExhaustiveAltsMsg :: CoreExpr -> SDoc
 nonExhaustiveAltsMsg e
   = hang (text "Case expression with non-exhaustive alternatives") 4 (ppr e)
 
-mkBadConMsg :: TyCon -> DataCon -> MsgDoc
+mkBadConMsg :: TyCon -> DataCon -> SDoc
 mkBadConMsg tycon datacon
   = vcat [
         text "In a case alternative, data constructor isn't in scrutinee type:",
@@ -3033,7 +3033,7 @@ mkBadConMsg tycon datacon
         text "Data con:" <+> ppr datacon
     ]
 
-mkBadPatMsg :: Type -> Type -> MsgDoc
+mkBadPatMsg :: Type -> Type -> SDoc
 mkBadPatMsg con_result_ty scrut_ty
   = vcat [
         text "In a case alternative, pattern result type doesn't match scrutinee type:",
@@ -3041,17 +3041,17 @@ mkBadPatMsg con_result_ty scrut_ty
         text "Scrutinee type:" <+> ppr scrut_ty
     ]
 
-integerScrutinisedMsg :: MsgDoc
+integerScrutinisedMsg :: SDoc
 integerScrutinisedMsg
   = text "In a LitAlt, the literal is lifted (probably Integer)"
 
-mkBadAltMsg :: Type -> CoreAlt -> MsgDoc
+mkBadAltMsg :: Type -> CoreAlt -> SDoc
 mkBadAltMsg scrut_ty alt
   = vcat [ text "Data alternative when scrutinee is not a tycon application",
            text "Scrutinee type:" <+> ppr scrut_ty,
            text "Alternative:" <+> pprCoreAlt alt ]
 
-mkNewTyDataConAltMsg :: Type -> CoreAlt -> MsgDoc
+mkNewTyDataConAltMsg :: Type -> CoreAlt -> SDoc
 mkNewTyDataConAltMsg scrut_ty alt
   = vcat [ text "Data alternative for newtype datacon",
            text "Scrutinee type:" <+> ppr scrut_ty,
@@ -3061,21 +3061,21 @@ mkNewTyDataConAltMsg scrut_ty alt
 ------------------------------------------------------
 --      Other error messages
 
-mkAppMsg :: Type -> Type -> CoreExpr -> MsgDoc
+mkAppMsg :: Type -> Type -> CoreExpr -> SDoc
 mkAppMsg fun_ty arg_ty arg
   = vcat [text "Argument value doesn't match argument type:",
               hang (text "Fun type:") 4 (ppr fun_ty),
               hang (text "Arg type:") 4 (ppr arg_ty),
               hang (text "Arg:") 4 (ppr arg)]
 
-mkNonFunAppMsg :: Type -> Type -> CoreExpr -> MsgDoc
+mkNonFunAppMsg :: Type -> Type -> CoreExpr -> SDoc
 mkNonFunAppMsg fun_ty arg_ty arg
   = vcat [text "Non-function type in function position",
               hang (text "Fun type:") 4 (ppr fun_ty),
               hang (text "Arg type:") 4 (ppr arg_ty),
               hang (text "Arg:") 4 (ppr arg)]
 
-mkLetErr :: TyVar -> CoreExpr -> MsgDoc
+mkLetErr :: TyVar -> CoreExpr -> SDoc
 mkLetErr bndr rhs
   = vcat [text "Bad `let' binding:",
           hang (text "Variable:")
@@ -3083,7 +3083,7 @@ mkLetErr bndr rhs
           hang (text "Rhs:")
                  4 (ppr rhs)]
 
-mkTyAppMsg :: Type -> Type -> MsgDoc
+mkTyAppMsg :: Type -> Type -> SDoc
 mkTyAppMsg ty arg_ty
   = vcat [text "Illegal type application:",
               hang (text "Exp type:")
@@ -3091,10 +3091,10 @@ mkTyAppMsg ty arg_ty
               hang (text "Arg type:")
                  4 (ppr arg_ty <+> dcolon <+> ppr (typeKind arg_ty))]
 
-emptyRec :: CoreExpr -> MsgDoc
+emptyRec :: CoreExpr -> SDoc
 emptyRec e = hang (text "Empty Rec binding:") 2 (ppr e)
 
-mkRhsMsg :: Id -> SDoc -> Type -> MsgDoc
+mkRhsMsg :: Id -> SDoc -> Type -> SDoc
 mkRhsMsg binder what ty
   = vcat
     [hsep [text "The type of this binder doesn't match the type of its" <+> what <> colon,
@@ -3102,29 +3102,29 @@ mkRhsMsg binder what ty
      hsep [text "Binder's type:", ppr (idType binder)],
      hsep [text "Rhs type:", ppr ty]]
 
-mkLetAppMsg :: CoreExpr -> MsgDoc
+mkLetAppMsg :: CoreExpr -> SDoc
 mkLetAppMsg e
   = hang (text "This argument does not satisfy the let/app invariant:")
        2 (ppr e)
 
-badBndrTyMsg :: Id -> SDoc -> MsgDoc
+badBndrTyMsg :: Id -> SDoc -> SDoc
 badBndrTyMsg binder what
   = vcat [ text "The type of this binder is" <+> what <> colon <+> ppr binder
          , text "Binder's type:" <+> ppr (idType binder) ]
 
-mkNonTopExportedMsg :: Id -> MsgDoc
+mkNonTopExportedMsg :: Id -> SDoc
 mkNonTopExportedMsg binder
   = hsep [text "Non-top-level binder is marked as exported:", ppr binder]
 
-mkNonTopExternalNameMsg :: Id -> MsgDoc
+mkNonTopExternalNameMsg :: Id -> SDoc
 mkNonTopExternalNameMsg binder
   = hsep [text "Non-top-level binder has an external name:", ppr binder]
 
-mkTopNonLitStrMsg :: Id -> MsgDoc
+mkTopNonLitStrMsg :: Id -> SDoc
 mkTopNonLitStrMsg binder
   = hsep [text "Top-level Addr# binder has a non-literal rhs:", ppr binder]
 
-mkKindErrMsg :: TyVar -> Type -> MsgDoc
+mkKindErrMsg :: TyVar -> Type -> SDoc
 mkKindErrMsg tyvar arg_ty
   = vcat [text "Kinds don't match in type application:",
           hang (text "Type variable:")
@@ -3132,10 +3132,10 @@ mkKindErrMsg tyvar arg_ty
           hang (text "Arg type:")
                  4 (ppr arg_ty <+> dcolon <+> ppr (typeKind arg_ty))]
 
-mkCastErr :: CoreExpr -> Coercion -> Type -> Type -> MsgDoc
+mkCastErr :: CoreExpr -> Coercion -> Type -> Type -> SDoc
 mkCastErr expr = mk_cast_err "expression" "type" (ppr expr)
 
-mkCastTyErr :: Type -> Coercion -> Kind -> Kind -> MsgDoc
+mkCastTyErr :: Type -> Coercion -> Kind -> Kind -> SDoc
 mkCastTyErr ty = mk_cast_err "type" "kind" (ppr ty)
 
 mk_cast_err :: String -- ^ What sort of casted thing this is
@@ -3143,7 +3143,7 @@ mk_cast_err :: String -- ^ What sort of casted thing this is
             -> String -- ^ What sort of coercion is being used
                       --   (\"type\" or \"kind\").
             -> SDoc   -- ^ The thing being casted.
-            -> Coercion -> Type -> Type -> MsgDoc
+            -> Coercion -> Type -> Type -> SDoc
 mk_cast_err thing_str co_str pp_thing co from_ty thing_ty
   = vcat [from_msg <+> text "of Cast differs from" <+> co_msg
             <+> text "of" <+> enclosed_msg,
@@ -3234,16 +3234,16 @@ mkBadJoinPointRuleMsg bndr join_arity rule
          , text "Join arity:" <+> ppr join_arity
          , text "Rule:" <+> ppr rule ]
 
-pprLeftOrRight :: LeftOrRight -> MsgDoc
+pprLeftOrRight :: LeftOrRight -> SDoc
 pprLeftOrRight CLeft  = text "left"
 pprLeftOrRight CRight = text "right"
 
-dupVars :: [NonEmpty Var] -> MsgDoc
+dupVars :: [NonEmpty Var] -> SDoc
 dupVars vars
   = hang (text "Duplicate variables brought into scope")
        2 (ppr (map toList vars))
 
-dupExtVars :: [NonEmpty Name] -> MsgDoc
+dupExtVars :: [NonEmpty Name] -> SDoc
 dupExtVars vars
   = hang (text "Duplicate top-level variables with the same qualified name")
        2 (ppr (map toList vars))
