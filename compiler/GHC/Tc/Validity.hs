@@ -2205,7 +2205,7 @@ checkValidAssocTyFamDeflt fam_tc pats =
 --
 checkFamInstRhs :: TyCon -> [Type]         -- LHS
                 -> [(TyCon, [Type])]       -- type family calls in RHS
-                -> [MsgDoc]
+                -> [SDoc]
 checkFamInstRhs lhs_tc lhs_tys famInsts
   = mapMaybe check famInsts
   where
