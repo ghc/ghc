@@ -65,8 +65,10 @@ import GHC.Core.TyCon as TyCon
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Unify
 import GHC.Types.Basic
-import GHC.Utils.Error hiding ( dumpIfSet )
+import GHC.Utils.Error
 import qualified GHC.Utils.Error as Err
+import GHC.Utils.Logger (Logger, putLogMsg, putDumpMsg, DumpFormat (..), getLogger)
+import qualified GHC.Utils.Logger as Logger
 import GHC.Data.List.SetOps
 import GHC.Builtin.Names
 import GHC.Utils.Outputable as Outputable
@@ -288,21 +290,23 @@ endPassIO :: HscEnv -> PrintUnqualified
           -> CoreToDo -> CoreProgram -> [CoreRule] -> IO ()
 -- Used by the IO-is CorePrep too
 endPassIO hsc_env print_unqual pass binds rules
-  = do { dumpPassResult dflags print_unqual mb_flag
+  = do { dumpPassResult logger dflags print_unqual mb_flag
                         (ppr pass) (pprPassDetails pass) binds rules
        ; lintPassResult hsc_env pass binds }
   where
+    logger  = hsc_logger hsc_env
     dflags  = hsc_dflags hsc_env
     mb_flag = case coreDumpFlag pass of
                 Just flag | dopt flag dflags                    -> Just flag
                           | dopt Opt_D_verbose_core2core dflags -> Just flag
                 _ -> Nothing
 
-dumpIfSet :: DynFlags -> Bool -> CoreToDo -> SDoc -> SDoc -> IO ()
-dumpIfSet dflags dump_me pass extra_info doc
-  = Err.dumpIfSet dflags dump_me (showSDoc dflags (ppr pass <+> extra_info)) doc
+dumpIfSet :: Logger -> DynFlags -> Bool -> CoreToDo -> SDoc -> SDoc -> IO ()
+dumpIfSet logger dflags dump_me pass extra_info doc
+  = Logger.dumpIfSet logger dflags dump_me (showSDoc dflags (ppr pass <+> extra_info)) doc
 
-dumpPassResult :: DynFlags
+dumpPassResult :: Logger
+               -> DynFlags
                -> PrintUnqualified
                -> Maybe DumpFlag        -- Just df => show details in a file whose
                                         --            name is specified by df
@@ -310,16 +314,16 @@ dumpPassResult :: DynFlags
                -> SDoc                  -- Extra info to appear after header
                -> CoreProgram -> [CoreRule]
                -> IO ()
-dumpPassResult dflags unqual mb_flag hdr extra_info binds rules
+dumpPassResult logger dflags unqual mb_flag hdr extra_info binds rules
   = do { forM_ mb_flag $ \flag -> do
            let sty = mkDumpStyle unqual
-           dumpAction dflags sty (dumpOptionsFromFlag flag)
+           putDumpMsg logger dflags sty flag
               (showSDoc dflags hdr) FormatCore dump_doc
 
          -- Report result size
          -- This has the side effect of forcing the intermediate to be evaluated
          -- if it's not already forced by a -ddump flag.
-       ; Err.debugTraceMsg dflags 2 size_doc
+       ; Err.debugTraceMsg logger dflags 2 size_doc
        }
 
   where
@@ -375,35 +379,37 @@ lintPassResult hsc_env pass binds
   = return ()
   | otherwise
   = do { let warns_and_errs = lintCoreBindings dflags pass (interactiveInScope hsc_env) binds
-       ; Err.showPass dflags ("Core Linted result of " ++ showPpr dflags pass)
-       ; displayLintResults dflags (showLintWarnings pass) (ppr pass)
+       ; Err.showPass logger dflags ("Core Linted result of " ++ showPpr dflags pass)
+       ; displayLintResults logger dflags (showLintWarnings pass) (ppr pass)
                             (pprCoreBindings binds) warns_and_errs }
   where
     dflags = hsc_dflags hsc_env
+    logger = hsc_logger hsc_env
 
-displayLintResults :: DynFlags
+displayLintResults :: Logger
+                   -> DynFlags
                    -> Bool -- ^ If 'True', display linter warnings.
                            --   If 'False', ignore linter warnings.
                    -> SDoc -- ^ The source of the linted program
                    -> SDoc -- ^ The linted program, pretty-printed
                    -> WarnsAndErrs
                    -> IO ()
-displayLintResults dflags display_warnings pp_what pp_pgm (warns, errs)
+displayLintResults logger dflags display_warnings pp_what pp_pgm (warns, errs)
   | not (isEmptyBag errs)
-  = do { putLogMsg dflags NoReason Err.SevDump noSrcSpan
+  = do { putLogMsg logger dflags NoReason Err.SevDump noSrcSpan
            $ withPprStyle defaultDumpStyle
            (vcat [ lint_banner "errors" pp_what, Err.pprMessageBag errs
                  , text "*** Offending Program ***"
                  , pp_pgm
                  , text "*** End of Offense ***" ])
-       ; Err.ghcExit dflags 1 }
+       ; Err.ghcExit logger dflags 1 }
 
   | not (isEmptyBag warns)
   , not (hasNoDebugOutput dflags)
   , display_warnings
   -- If the Core linter encounters an error, output to stderr instead of
   -- stdout (#13342)
-  = putLogMsg dflags NoReason Err.SevInfo noSrcSpan
+  = putLogMsg logger dflags NoReason Err.SevInfo noSrcSpan
       $ withPprStyle defaultDumpStyle
         (lint_banner "warnings" pp_what $$ Err.pprMessageBag (mapBag ($$ blankLine) warns))
 
@@ -426,11 +432,12 @@ lintInteractiveExpr what hsc_env expr
   | not (gopt Opt_DoCoreLinting dflags)
   = return ()
   | Just err <- lintExpr dflags (interactiveInScope hsc_env) expr
-  = displayLintResults dflags False what (pprCoreExpr expr) (emptyBag, err)
+  = displayLintResults logger dflags False what (pprCoreExpr expr) (emptyBag, err)
   | otherwise
   = return ()
   where
     dflags = hsc_dflags hsc_env
+    logger = hsc_logger hsc_env
 
 interactiveInScope :: HscEnv -> [Var]
 -- In GHCi we may lint expressions, or bindings arising from 'deriving'
@@ -2314,12 +2321,13 @@ lintCoercion (HoleCo h)
 ************************************************************************
 -}
 
-lintAxioms :: DynFlags
+lintAxioms :: Logger
+           -> DynFlags
            -> SDoc -- ^ The source of the linted axioms
            -> [CoAxiom Branched]
            -> IO ()
-lintAxioms dflags what axioms =
-  displayLintResults dflags True what (vcat $ map pprCoAxiom axioms) $
+lintAxioms logger dflags what axioms =
+  displayLintResults logger dflags True what (vcat $ map pprCoAxiom axioms) $
   initL dflags (defaultLintFlags dflags) [] $
   do { mapM_ lint_axiom axioms
      ; let axiom_groups = groupWith coAxiomTyCon axioms
@@ -3265,16 +3273,17 @@ lintAnnots :: SDoc -> (ModGuts -> CoreM ModGuts) -> ModGuts -> CoreM ModGuts
 lintAnnots pname pass guts = do
   -- Run the pass as we normally would
   dflags <- getDynFlags
+  logger <- getLogger
   when (gopt Opt_DoAnnotationLinting dflags) $
-    liftIO $ Err.showPass dflags "Annotation linting - first run"
+    liftIO $ Err.showPass logger dflags "Annotation linting - first run"
   nguts <- pass guts
   -- If appropriate re-run it without debug annotations to make sure
   -- that they made no difference.
   when (gopt Opt_DoAnnotationLinting dflags) $ do
-    liftIO $ Err.showPass dflags "Annotation linting - second run"
+    liftIO $ Err.showPass logger dflags "Annotation linting - second run"
     nguts' <- withoutAnnots pass guts
     -- Finally compare the resulting bindings
-    liftIO $ Err.showPass dflags "Annotation linting - comparison"
+    liftIO $ Err.showPass logger dflags "Annotation linting - comparison"
     let binds = flattenBinds $ mg_binds nguts
         binds' = flattenBinds $ mg_binds nguts'
         (diffs,_) = diffBinds True (mkRnEnv2 emptyInScopeSet) binds binds'

@@ -20,6 +20,7 @@ import GHC.Unit.Types
 import GHC.Unit.Info
 import GHC.Unit.State
 
+import GHC.Utils.Logger
 import GHC.Utils.Monad
 import GHC.Utils.Misc
 
@@ -62,11 +63,11 @@ it is supported by both gcc and clang. Anecdotally nvcc supports
 -Xlinker, but not -Wl.
 -}
 
-linkBinary :: DynFlags -> UnitEnv -> [FilePath] -> [UnitId] -> IO ()
+linkBinary :: Logger -> DynFlags -> UnitEnv -> [FilePath] -> [UnitId] -> IO ()
 linkBinary = linkBinary' False
 
-linkBinary' :: Bool -> DynFlags -> UnitEnv -> [FilePath] -> [UnitId] -> IO ()
-linkBinary' staticLink dflags unit_env o_files dep_units = do
+linkBinary' :: Bool -> Logger -> DynFlags -> UnitEnv -> [FilePath] -> [UnitId] -> IO ()
+linkBinary' staticLink logger dflags unit_env o_files dep_units = do
     let platform   = ue_platform unit_env
         unit_state = ue_units unit_env
         toolSettings' = toolSettings dflags
@@ -121,7 +122,7 @@ linkBinary' staticLink dflags unit_env o_files dep_units = do
       if gopt Opt_SingleLibFolder dflags
       then do
         libs <- getLibs dflags unit_env dep_units
-        tmpDir <- newTempDir dflags
+        tmpDir <- newTempDir logger dflags
         sequence_ [ copyFile lib (tmpDir </> basename)
                   | (lib, basename) <- libs]
         return [ "-L" ++ tmpDir ]
@@ -136,8 +137,8 @@ linkBinary' staticLink dflags unit_env o_files dep_units = do
     let lib_paths = libraryPaths dflags
     let lib_path_opts = map ("-L"++) lib_paths
 
-    extraLinkObj <- mkExtraObjToLinkIntoBinary dflags unit_state
-    noteLinkObjs <- mkNoteObjsToLinkIntoBinary dflags unit_env dep_units
+    extraLinkObj <- mkExtraObjToLinkIntoBinary logger dflags unit_state
+    noteLinkObjs <- mkNoteObjsToLinkIntoBinary logger dflags unit_env dep_units
 
     let
       (pre_hs_libs, post_hs_libs)
@@ -179,16 +180,16 @@ linkBinary' staticLink dflags unit_env o_files dep_units = do
     let extra_ld_inputs = ldInputs dflags
 
     rc_objs <- case platformOS platform of
-      OSMinGW32 | gopt Opt_GenManifest dflags -> maybeCreateManifest dflags output_fn
+      OSMinGW32 | gopt Opt_GenManifest dflags -> maybeCreateManifest logger dflags output_fn
       _                                       -> return []
 
-    let link dflags args | staticLink = GHC.SysTools.runLibtool dflags args
+    let link dflags args | staticLink = GHC.SysTools.runLibtool logger dflags args
                          | platformOS platform == OSDarwin
                             = do
-                                 GHC.SysTools.runLink dflags args
-                                 GHC.Linker.MacOS.runInjectRPaths dflags pkg_lib_paths output_fn
+                                 GHC.SysTools.runLink logger dflags args
+                                 GHC.Linker.MacOS.runInjectRPaths logger dflags pkg_lib_paths output_fn
                          | otherwise
-                            = GHC.SysTools.runLink dflags args
+                            = GHC.SysTools.runLink logger dflags args
 
     link dflags (
                        map GHC.SysTools.Option verbFlags
@@ -269,8 +270,8 @@ linkBinary' staticLink dflags unit_env o_files dep_units = do
 -- | Linking a static lib will not really link anything. It will merely produce
 -- a static archive of all dependent static libraries. The resulting library
 -- will still need to be linked with any remaining link flags.
-linkStaticLib :: DynFlags -> UnitEnv -> [String] -> [UnitId] -> IO ()
-linkStaticLib dflags unit_env o_files dep_units = do
+linkStaticLib :: Logger -> DynFlags -> UnitEnv -> [String] -> [UnitId] -> IO ()
+linkStaticLib logger dflags unit_env o_files dep_units = do
   let platform  = ue_platform unit_env
       extra_ld_inputs = [ f | FileOption _ f <- ldInputs dflags ]
       modules = o_files ++ extra_ld_inputs
@@ -302,7 +303,7 @@ linkStaticLib dflags unit_env o_files dep_units = do
     else writeBSDAr output_fn $ afilter (not . isBSDSymdef) ar
 
   -- run ranlib over the archive. write*Ar does *not* create the symbol index.
-  runRanlib dflags [GHC.SysTools.FileOption "" output_fn]
+  runRanlib logger dflags [GHC.SysTools.FileOption "" output_fn]
 
 
 
