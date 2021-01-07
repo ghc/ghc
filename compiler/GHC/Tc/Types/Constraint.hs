@@ -289,7 +289,7 @@ instance Outputable Hole where
 instance Outputable HoleSort where
   ppr (ExprHole ref) = text "ExprHole:" <+> ppr ref
   ppr TypeHole       = text "TypeHole"
-  ppr ConstraintHole = text "CosntraintHole"
+  ppr ConstraintHole = text "ConstraintHole"
 
 ------------
 -- | Used to indicate extra information about why a CIrredCan is irreducible
