@@ -22,12 +22,13 @@ import GHC.Unit.State
 import GHC.Linker.MacOS
 import GHC.Linker.Unit
 import GHC.SysTools.Tasks
+import GHC.Utils.Logger
 
 import qualified Data.Set as Set
 import System.FilePath
 
-linkDynLib :: DynFlags -> UnitEnv -> [String] -> [UnitId] -> IO ()
-linkDynLib dflags0 unit_env o_files dep_packages
+linkDynLib :: Logger -> DynFlags -> UnitEnv -> [String] -> [UnitId] -> IO ()
+linkDynLib logger dflags0 unit_env o_files dep_packages
  = do
     let platform   = ue_platform unit_env
         os         = platformOS platform
@@ -103,7 +104,7 @@ linkDynLib dflags0 unit_env o_files dep_packages
                             Just s -> s
                             Nothing -> "HSdll.dll"
 
-            runLink dflags (
+            runLink logger dflags (
                     map Option verbFlags
                  ++ [ Option "-o"
                     , FileOption "" output_fn
@@ -163,7 +164,7 @@ linkDynLib dflags0 unit_env o_files dep_packages
             instName <- case dylibInstallName dflags of
                 Just n -> return n
                 Nothing -> return $ "@rpath" `combine` (takeFileName output_fn)
-            runLink dflags (
+            runLink logger dflags (
                     map Option verbFlags
                  ++ [ Option "-dynamiclib"
                     , Option "-o"
@@ -191,7 +192,7 @@ linkDynLib dflags0 unit_env o_files dep_packages
                  -- See Note [Dynamic linking on macOS]
                  ++ [ Option "-Wl,-dead_strip_dylibs", Option "-Wl,-headerpad,8000" ]
               )
-            runInjectRPaths dflags pkg_lib_paths output_fn
+            runInjectRPaths logger dflags pkg_lib_paths output_fn
         _ -> do
             -------------------------------------------------------------------
             -- Making a DSO
@@ -205,7 +206,7 @@ linkDynLib dflags0 unit_env o_files dep_packages
                                 -- See Note [-Bsymbolic assumptions by GHC]
                                 ["-Wl,-Bsymbolic" | not unregisterised]
 
-            runLink dflags (
+            runLink logger dflags (
                     map Option verbFlags
                  ++ libmLinkOpts
                  ++ [ Option "-o"

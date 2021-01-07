@@ -24,6 +24,7 @@ import GHC.Utils.Error
 import GHC.Data.Maybe       (MaybeT(..),runMaybeT)
 import GHC.Utils.Misc       (charToC)
 import GHC.Utils.Outputable (text,hcat)
+import GHC.Utils.Logger
 
 import Control.Monad (when)
 import Data.Binary.Get
@@ -141,9 +142,9 @@ data ElfHeader = ElfHeader
 
 
 -- | Read the ELF header
-readElfHeader :: DynFlags -> ByteString -> IO (Maybe ElfHeader)
-readElfHeader dflags bs = runGetOrThrow getHeader bs `catchIO` \_ -> do
-    debugTraceMsg dflags 3 $
+readElfHeader :: Logger -> DynFlags -> ByteString -> IO (Maybe ElfHeader)
+readElfHeader logger dflags bs = runGetOrThrow getHeader bs `catchIO` \_ -> do
+    debugTraceMsg logger dflags 3 $
       text ("Unable to read ELF header")
     return Nothing
   where
@@ -194,13 +195,14 @@ data SectionTable = SectionTable
   }
 
 -- | Read the ELF section table
-readElfSectionTable :: DynFlags
+readElfSectionTable :: Logger
+                    -> DynFlags
                     -> ElfHeader
                     -> ByteString
                     -> IO (Maybe SectionTable)
 
-readElfSectionTable dflags hdr bs = action `catchIO` \_ -> do
-    debugTraceMsg dflags 3 $
+readElfSectionTable logger dflags hdr bs = action `catchIO` \_ -> do
+    debugTraceMsg logger dflags 3 $
       text ("Unable to read ELF section table")
     return Nothing
   where
@@ -245,15 +247,16 @@ data Section = Section
   }
 
 -- | Read a ELF section
-readElfSectionByIndex :: DynFlags
+readElfSectionByIndex :: Logger
+                      -> DynFlags
                       -> ElfHeader
                       -> SectionTable
                       -> Word64
                       -> ByteString
                       -> IO (Maybe Section)
 
-readElfSectionByIndex dflags hdr secTable i bs = action `catchIO` \_ -> do
-    debugTraceMsg dflags 3 $
+readElfSectionByIndex logger dflags hdr secTable i bs = action `catchIO` \_ -> do
+    debugTraceMsg logger dflags 3 $
       text ("Unable to read ELF section")
     return Nothing
   where
@@ -289,13 +292,14 @@ readElfSectionByIndex dflags hdr secTable i bs = action `catchIO` \_ -> do
 -- | Find a section from its name. Return the section contents.
 --
 -- We do not perform any check on the section type.
-findSectionFromName :: DynFlags
+findSectionFromName :: Logger
+                    -> DynFlags
                     -> ElfHeader
                     -> SectionTable
                     -> String
                     -> ByteString
                     -> IO (Maybe ByteString)
-findSectionFromName dflags hdr secTable name bs =
+findSectionFromName logger dflags hdr secTable name bs =
     rec [0..sectionEntryCount secTable - 1]
   where
     -- convert the required section name into a ByteString to perform
@@ -306,7 +310,7 @@ findSectionFromName dflags hdr secTable name bs =
     -- the matching one, if any
     rec []     = return Nothing
     rec (x:xs) = do
-      me <- readElfSectionByIndex dflags hdr secTable x bs
+      me <- readElfSectionByIndex logger dflags hdr secTable x bs
       case me of
         Just e | entryName e == name' -> return (Just (entryBS e))
         _                             -> rec xs
@@ -316,20 +320,21 @@ findSectionFromName dflags hdr secTable name bs =
 --
 -- If the section isn't found or if there is any parsing error, we return
 -- Nothing
-readElfSectionByName :: DynFlags
+readElfSectionByName :: Logger
+                     -> DynFlags
                      -> ByteString
                      -> String
                      -> IO (Maybe LBS.ByteString)
 
-readElfSectionByName dflags bs name = action `catchIO` \_ -> do
-    debugTraceMsg dflags 3 $
+readElfSectionByName logger dflags bs name = action `catchIO` \_ -> do
+    debugTraceMsg logger dflags 3 $
       text ("Unable to read ELF section \"" ++ name ++ "\"")
     return Nothing
   where
     action = runMaybeT $ do
-      hdr      <- MaybeT $ readElfHeader dflags bs
-      secTable <- MaybeT $ readElfSectionTable dflags hdr bs
-      MaybeT $ findSectionFromName dflags hdr secTable name bs
+      hdr      <- MaybeT $ readElfHeader logger dflags bs
+      secTable <- MaybeT $ readElfSectionTable logger dflags hdr bs
+      MaybeT $ findSectionFromName logger dflags hdr secTable name bs
 
 ------------------
 -- NOTE SECTIONS
@@ -339,14 +344,15 @@ readElfSectionByName dflags bs name = action `catchIO` \_ -> do
 --
 -- If you try to read a note from a section which does not support the Note
 -- format, the parsing is likely to fail and Nothing will be returned
-readElfNoteBS :: DynFlags
+readElfNoteBS :: Logger
+              -> DynFlags
               -> ByteString
               -> String
               -> String
               -> IO (Maybe LBS.ByteString)
 
-readElfNoteBS dflags bs sectionName noteId = action `catchIO`  \_ -> do
-    debugTraceMsg dflags 3 $
+readElfNoteBS logger dflags bs sectionName noteId = action `catchIO`  \_ -> do
+    debugTraceMsg logger dflags 3 $
          text ("Unable to read ELF note \"" ++ noteId ++
                "\" in section \"" ++ sectionName ++ "\"")
     return Nothing
@@ -380,29 +386,30 @@ readElfNoteBS dflags bs sectionName noteId = action `catchIO`  \_ -> do
 
 
     action = runMaybeT $ do
-      hdr  <- MaybeT $ readElfHeader dflags bs
-      sec  <- MaybeT $ readElfSectionByName dflags bs sectionName
+      hdr  <- MaybeT $ readElfHeader logger dflags bs
+      sec  <- MaybeT $ readElfSectionByName logger dflags bs sectionName
       MaybeT $ runGetOrThrow (findNote hdr) sec
 
 -- | read a Note as a String
 --
 -- If you try to read a note from a section which does not support the Note
 -- format, the parsing is likely to fail and Nothing will be returned
-readElfNoteAsString :: DynFlags
+readElfNoteAsString :: Logger
+                    -> DynFlags
                     -> FilePath
                     -> String
                     -> String
                     -> IO (Maybe String)
 
-readElfNoteAsString dflags path sectionName noteId = action `catchIO`  \_ -> do
-    debugTraceMsg dflags 3 $
+readElfNoteAsString logger dflags path sectionName noteId = action `catchIO`  \_ -> do
+    debugTraceMsg logger dflags 3 $
          text ("Unable to read ELF note \"" ++ noteId ++
                "\" in section \"" ++ sectionName ++ "\"")
     return Nothing
   where
     action = do
       bs   <- LBS.readFile path
-      note <- readElfNoteBS dflags bs sectionName noteId
+      note <- readElfNoteBS logger dflags bs sectionName noteId
       return (fmap B8.unpack note)
 
 

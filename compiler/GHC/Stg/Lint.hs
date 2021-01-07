@@ -54,6 +54,7 @@ import GHC.Utils.Error      ( Severity(..), mkLocMessage )
 import GHC.Core.Type
 import GHC.Types.RepType
 import GHC.Types.SrcLoc
+import GHC.Utils.Logger
 import GHC.Utils.Outputable
 import GHC.Unit.Module            ( Module )
 import qualified GHC.Utils.Error as Err
@@ -61,20 +62,21 @@ import Control.Applicative ((<|>))
 import Control.Monad
 
 lintStgTopBindings :: forall a . (OutputablePass a, BinderP a ~ Id)
-                   => DynFlags
+                   => Logger
+                   -> DynFlags
                    -> Module -- ^ module being compiled
                    -> Bool   -- ^ have we run Unarise yet?
                    -> String -- ^ who produced the STG?
                    -> [GenStgTopBinding a]
                    -> IO ()
 
-lintStgTopBindings dflags this_mod unarised whodunnit binds
+lintStgTopBindings logger dflags this_mod unarised whodunnit binds
   = {-# SCC "StgLint" #-}
     case initL this_mod unarised opts top_level_binds (lint_binds binds) of
       Nothing  ->
         return ()
       Just msg -> do
-        putLogMsg dflags NoReason Err.SevDump noSrcSpan
+        putLogMsg logger dflags NoReason Err.SevDump noSrcSpan
           $ withPprStyle defaultDumpStyle
           (vcat [ text "*** Stg Lint ErrMsgs: in" <+>
                         text whodunnit <+> text "***",
@@ -82,7 +84,7 @@ lintStgTopBindings dflags this_mod unarised whodunnit binds
                   text "*** Offending Program ***",
                   pprGenStgTopBindings opts binds,
                   text "*** End of Offense ***"])
-        Err.ghcExit dflags 1
+        Err.ghcExit logger dflags 1
   where
     opts = initStgPprOpts dflags
     -- Bring all top-level binds into scope because CoreToStg does not generate

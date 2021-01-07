@@ -41,7 +41,7 @@ import GHC.Tc.Utils.Env     ( checkWellStaged, tcMetaTy )
 
 import GHC.Driver.Session
 import GHC.Data.FastString
-import GHC.Utils.Error  ( dumpIfSet_dyn_printer, DumpFormat (..) )
+import GHC.Utils.Logger  ( dumpIfSet_dyn_printer, DumpFormat (..), getLogger )
 import GHC.Utils.Panic
 import GHC.Driver.Hooks
 import GHC.Builtin.Names.TH ( decsQTyConName, expQTyConName, liftName
@@ -808,15 +808,16 @@ data SpliceInfo
 traceSplice :: SpliceInfo -> TcM ()
 traceSplice (SpliceInfo { spliceDescription = sd, spliceSource = mb_src
                         , spliceGenerated = gen, spliceIsDecl = is_decl })
-  = do { loc <- case mb_src of
-                   Nothing        -> getSrcSpanM
-                   Just (L loc _) -> return loc
-       ; traceOptTcRn Opt_D_dump_splices (spliceDebugDoc loc)
+  = do loc <- case mb_src of
+                 Nothing        -> getSrcSpanM
+                 Just (L loc _) -> return loc
+       traceOptTcRn Opt_D_dump_splices (spliceDebugDoc loc)
 
-       ; when is_decl $  -- Raw material for -dth-dec-file
-         do { dflags <- getDynFlags
-            ; liftIO $ dumpIfSet_dyn_printer alwaysQualify dflags Opt_D_th_dec_file
-                                             "" FormatHaskell (spliceCodeDoc loc) } }
+       when is_decl $ do -- Raw material for -dth-dec-file
+        dflags <- getDynFlags
+        logger <- getLogger
+        liftIO $ dumpIfSet_dyn_printer alwaysQualify logger dflags Opt_D_th_dec_file
+                                       "" FormatHaskell (spliceCodeDoc loc)
   where
     -- `-ddump-splices`
     spliceDebugDoc :: SrcSpan -> SDoc
