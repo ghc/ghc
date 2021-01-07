@@ -14,7 +14,6 @@ Syntax
     parallel_list_comprehensions
     generalised_list_comprehensions
     monad_comprehensions
-    monadfail_desugaring
     overloaded_lists
     rebindable_syntax
     tuple_sections
