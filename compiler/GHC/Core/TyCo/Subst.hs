@@ -57,7 +57,7 @@ module GHC.Core.TyCo.Subst
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Core.Type
-   ( mkCastTy, mkAppTy, isCoercionTy )
+   ( mkCastTy, mkAppTy, isCoercionTy, mkTyConApp )
 import {-# SOURCE #-} GHC.Core.Coercion
    ( mkCoVarCo, mkKindCo, mkNthCo, mkTransCo
    , mkNomReflCo, mkSubCo, mkSymCo
