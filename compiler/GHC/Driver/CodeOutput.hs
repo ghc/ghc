@@ -40,6 +40,7 @@ import GHC.SysTools.FileCleanup
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Logger
 
 import GHC.Unit
 import GHC.Unit.State
@@ -63,7 +64,8 @@ import System.IO
 ************************************************************************
 -}
 
-codeOutput :: DynFlags
+codeOutput :: Logger
+           -> DynFlags
            -> UnitState
            -> Module
            -> FilePath
@@ -78,7 +80,7 @@ codeOutput :: DynFlags
                   [(ForeignSrcLang, FilePath)]{-foreign_fps-},
                   a)
 
-codeOutput dflags unit_state this_mod filenm location foreign_stubs foreign_fps pkg_deps
+codeOutput logger dflags unit_state this_mod filenm location foreign_stubs foreign_fps pkg_deps
   cmm_stream
   =
     do  {
@@ -88,29 +90,29 @@ codeOutput dflags unit_state this_mod filenm location foreign_stubs foreign_fps 
                     then Stream.mapM do_lint cmm_stream
                     else cmm_stream
 
-              do_lint cmm = withTimingSilent
+              do_lint cmm = withTimingSilent logger
                   dflags
                   (text "CmmLint"<+>brackets (ppr this_mod))
                   (const ()) $ do
                 { case cmmLint (targetPlatform dflags) cmm of
-                        Just err -> do { log_action dflags
+                        Just err -> do { putLogMsg logger
                                                    dflags
                                                    NoReason
                                                    SevDump
                                                    noSrcSpan
                                                    $ withPprStyle defaultDumpStyle err
-                                       ; ghcExit dflags 1
+                                       ; ghcExit logger dflags 1
                                        }
                         Nothing  -> return ()
                 ; return cmm
                 }
 
-        ; stubs_exist <- outputForeignStubs dflags unit_state this_mod location foreign_stubs
+        ; stubs_exist <- outputForeignStubs logger dflags unit_state this_mod location foreign_stubs
         ; a <- case backend dflags of
-                 NCG         -> outputAsm dflags this_mod location filenm
+                 NCG         -> outputAsm logger dflags this_mod location filenm
                                           linted_cmm_stream
-                 ViaC        -> outputC dflags filenm linted_cmm_stream pkg_deps
-                 LLVM        -> outputLlvm dflags filenm linted_cmm_stream
+                 ViaC        -> outputC logger dflags filenm linted_cmm_stream pkg_deps
+                 LLVM        -> outputLlvm logger dflags filenm linted_cmm_stream
                  Interpreter -> panic "codeOutput: Interpreter"
                  NoBackend   -> panic "codeOutput: NoBackend"
         ; return (filenm, stubs_exist, foreign_fps, a)
@@ -127,13 +129,14 @@ doOutput filenm io_action = bracket (openFile filenm WriteMode) hClose io_action
 ************************************************************************
 -}
 
-outputC :: DynFlags
+outputC :: Logger
+        -> DynFlags
         -> FilePath
         -> Stream IO RawCmmGroup a
         -> [UnitId]
         -> IO a
-outputC dflags filenm cmm_stream packages =
-  withTiming dflags (text "C codegen") (\a -> seq a () {- FIXME -}) $ do
+outputC logger dflags filenm cmm_stream packages =
+  withTiming logger dflags (text "C codegen") (\a -> seq a () {- FIXME -}) $ do
     let pkg_names = map unitIdString packages
     doOutput filenm $ \ h -> do
       hPutStr h ("/* GHC_PACKAGES " ++ unwords pkg_names ++ "\n*/\n")
@@ -141,7 +144,7 @@ outputC dflags filenm cmm_stream packages =
       let platform = targetPlatform dflags
           writeC cmm = do
             let doc = cmmToC platform cmm
-            dumpIfSet_dyn dflags Opt_D_dump_c_backend
+            dumpIfSet_dyn logger dflags Opt_D_dump_c_backend
                           "C backend output"
                           FormatC
                           doc
@@ -156,18 +159,19 @@ outputC dflags filenm cmm_stream packages =
 ************************************************************************
 -}
 
-outputAsm :: DynFlags
+outputAsm :: Logger
+          -> DynFlags
           -> Module
           -> ModLocation
           -> FilePath
           -> Stream IO RawCmmGroup a
           -> IO a
-outputAsm dflags this_mod location filenm cmm_stream = do
+outputAsm logger dflags this_mod location filenm cmm_stream = do
   ncg_uniqs <- mkSplitUniqSupply 'n'
-  debugTraceMsg dflags 4 (text "Outputing asm to" <+> text filenm)
+  debugTraceMsg logger dflags 4 (text "Outputing asm to" <+> text filenm)
   {-# SCC "OutputAsm" #-} doOutput filenm $
     \h -> {-# SCC "NativeCodeGen" #-}
-      nativeCodeGen dflags this_mod location h ncg_uniqs cmm_stream
+      nativeCodeGen logger dflags this_mod location h ncg_uniqs cmm_stream
 
 {-
 ************************************************************************
@@ -177,11 +181,11 @@ outputAsm dflags this_mod location filenm cmm_stream = do
 ************************************************************************
 -}
 
-outputLlvm :: DynFlags -> FilePath -> Stream IO RawCmmGroup a -> IO a
-outputLlvm dflags filenm cmm_stream =
+outputLlvm :: Logger -> DynFlags -> FilePath -> Stream IO RawCmmGroup a -> IO a
+outputLlvm logger dflags filenm cmm_stream =
   {-# SCC "llvm_output" #-} doOutput filenm $
     \f -> {-# SCC "llvm_CodeGen" #-}
-      llvmCodeGen dflags f cmm_stream
+      llvmCodeGen logger dflags f cmm_stream
 
 {-
 ************************************************************************
@@ -191,13 +195,13 @@ outputLlvm dflags filenm cmm_stream =
 ************************************************************************
 -}
 
-outputForeignStubs :: DynFlags -> UnitState -> Module -> ModLocation -> ForeignStubs
+outputForeignStubs :: Logger -> DynFlags -> UnitState -> Module -> ModLocation -> ForeignStubs
                    -> IO (Bool,         -- Header file created
                           Maybe FilePath) -- C file created
-outputForeignStubs dflags unit_state mod location stubs
+outputForeignStubs logger dflags unit_state mod location stubs
  = do
    let stub_h = mkStubPaths dflags (moduleName mod) location
-   stub_c <- newTempName dflags TFL_CurrentModule "c"
+   stub_c <- newTempName logger dflags TFL_CurrentModule "c"
 
    case stubs of
      NoStubs ->
@@ -214,7 +218,7 @@ outputForeignStubs dflags unit_state mod location stubs
 
         createDirectoryIfMissing True (takeDirectory stub_h)
 
-        dumpIfSet_dyn dflags Opt_D_dump_foreign
+        dumpIfSet_dyn logger dflags Opt_D_dump_foreign
                       "Foreign export header file"
                       FormatC
                       stub_h_output_d
@@ -234,7 +238,7 @@ outputForeignStubs dflags unit_state mod location stubs
            <- outputForeignStubs_help stub_h stub_h_output_w
                 ("#include <HsFFI.h>\n" ++ cplusplus_hdr) cplusplus_ftr
 
-        dumpIfSet_dyn dflags Opt_D_dump_foreign
+        dumpIfSet_dyn logger dflags Opt_D_dump_foreign
                       "Foreign export stubs" FormatC stub_c_output_d
 
         stub_c_file_exists

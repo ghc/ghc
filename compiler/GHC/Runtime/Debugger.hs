@@ -35,6 +35,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Error
 import GHC.Utils.Monad
 import GHC.Utils.Exception
+import GHC.Utils.Logger
 
 import GHC.Types.Id
 import GHC.Types.Name
@@ -72,7 +73,8 @@ pprintClosureCommand bindThings force str = do
   unqual  <- GHC.getPrintUnqual
   docterms <- mapM showTerm terms
   dflags <- getDynFlags
-  liftIO $ (printOutputForUser dflags unqual . vcat)
+  logger <- getLogger
+  liftIO $ (printOutputForUser logger dflags unqual . vcat)
            (zipWith (\id docterm -> ppr id <+> char '=' <+> docterm)
                     ids
                     docterms)
@@ -95,8 +97,9 @@ pprintClosureCommand bindThings force str = do
        case (improveRTTIType hsc_env id_ty' reconstructed_type) of
          Nothing     -> return (subst, term')
          Just subst' -> do { dflags <- GHC.getSessionDynFlags
+                           ; logger <- getLogger
                            ; liftIO $
-                               dumpIfSet_dyn dflags Opt_D_dump_rtti "RTTI"
+                               dumpIfSet_dyn logger dflags Opt_D_dump_rtti "RTTI"
                                  FormatText
                                  (fsep $ [text "RTTI Improvement for", ppr id,
                                   text "old substitution:" , ppr subst,
@@ -175,20 +178,26 @@ showTerm term = do
     if not (isFullyEvaluatedTerm t)
      then return Nothing
      else do
-        hsc_env <- getSession
-        dflags  <- GHC.getSessionDynFlags
-        do
-           (new_env, bname) <- bindToFreshName hsc_env ty "showme"
-           setSession new_env
-                      -- XXX: this tries to disable logging of errors
-                      -- does this still do what it is intended to do
-                      -- with the changed error handling and logging?
-           let noop_log _ _ _ _ _ = return ()
-               expr = "Prelude.return (Prelude.show " ++
+        let set_session = do
+                hsc_env <- getSession
+                (new_env, bname) <- bindToFreshName hsc_env ty "showme"
+                setSession new_env
+
+                -- this disables logging of errors
+                let noop_log _ _ _ _ _ = return ()
+                pushLogHookM (const noop_log)
+
+                return (hsc_env, bname)
+
+            reset_session (old_env,_) = setSession old_env
+
+        MC.bracket set_session reset_session $ \(_,bname) -> do
+           hsc_env <- getSession
+           dflags  <- GHC.getSessionDynFlags
+           let expr = "Prelude.return (Prelude.show " ++
                          showPpr dflags bname ++
                       ") :: Prelude.IO Prelude.String"
                dl   = hsc_loader hsc_env
-           GHC.setSessionDynFlags dflags{log_action=noop_log}
            txt_ <- withExtendedLoadedEnv dl
                                        [(bname, fhv)]
                                        (GHC.compileExprRemote expr)
@@ -198,9 +207,7 @@ showTerm term = do
              return $ Just $ cparen (prec >= myprec && needsParens txt)
                                     (text txt)
             else return Nothing
-         `MC.finally` do
-           setSession hsc_env
-           GHC.setSessionDynFlags dflags
+
   cPprShowable prec NewtypeWrap{ty=new_ty,wrapped_term=t} =
       cPprShowable prec t{ty=new_ty}
   cPprShowable _ _ = return Nothing

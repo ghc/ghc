@@ -61,6 +61,7 @@ import GHC.Types.SrcLoc
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Logger
 import GHC.Data.FastString
 import GHC.Data.Bag
 import GHC.Utils.FV as FV (fvVarList, unionFV, mkFVs)
@@ -199,6 +200,7 @@ tcDeriving deriv_infos deriv_decls
         ; insts2 <- mapM genInst infer_specs
 
         ; dflags <- getDynFlags
+        ; logger <- getLogger
 
         ; let (_, deriv_stuff, fvs) = unzip3 (insts1 ++ insts2)
         ; loc <- getSrcSpanM
@@ -233,7 +235,7 @@ tcDeriving deriv_infos deriv_decls
         ; (inst_info, rn_binds, rn_dus) <- renameDeriv inst_infos binds
 
         ; unless (isEmptyBag inst_info) $
-             liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances"
+             liftIO (dumpIfSet_dyn logger dflags Opt_D_dump_deriv "Derived instances"
                         FormatHaskell
                         (ddump_deriving inst_info rn_binds famInsts))
 
