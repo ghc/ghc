@@ -17,15 +17,16 @@ import GHC.Driver.Session ( DynFlags, targetPlatform )
 import GHC.Platform ( platformArch, Arch(..) )
 import GHC.Utils.Error ( withTiming )
 import GHC.Utils.Outputable ( text )
+import GHC.Utils.Logger
 
 import Control.Exception
 import qualified Data.ByteString.Char8 as B
 import System.IO
 
 -- | Read in assembly file and process
-llvmFixupAsm :: DynFlags -> FilePath -> FilePath -> IO ()
-llvmFixupAsm dflags f1 f2 = {-# SCC "llvm_mangler" #-}
-    withTiming dflags (text "LLVM Mangler") id $
+llvmFixupAsm :: Logger -> DynFlags -> FilePath -> FilePath -> IO ()
+llvmFixupAsm logger dflags f1 f2 = {-# SCC "llvm_mangler" #-}
+    withTiming logger dflags (text "LLVM Mangler") id $
     withBinaryFile f1 ReadMode $ \r -> withBinaryFile f2 WriteMode $ \w -> do
         go r w
         hClose r

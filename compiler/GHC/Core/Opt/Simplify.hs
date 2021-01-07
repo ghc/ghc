@@ -57,6 +57,7 @@ import GHC.Core.FVs     ( mkRuleInfo )
 import GHC.Core.Rules   ( lookupRule, getRules, initRuleOpts )
 import GHC.Types.Basic
 import GHC.Utils.Monad  ( mapAccumLM, liftIO )
+import GHC.Utils.Logger
 import GHC.Types.Var    ( isTyCoVar )
 import GHC.Data.Maybe   ( orElse )
 import Control.Monad
@@ -64,7 +65,6 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Data.FastString
 import GHC.Utils.Misc
-import GHC.Utils.Error
 import GHC.Unit.Module ( moduleName, pprModuleName )
 import GHC.Core.Multiplicity
 import GHC.Builtin.PrimOps ( PrimOp (SeqOp) )
@@ -267,6 +267,7 @@ simplRecOrTopPair env top_lvl is_rec mb_cont old_bndr new_bndr rhs
 
   where
     dflags = seDynFlags env
+    logger = seLogger env
 
     -- trace_bind emits a trace for each top-level binding, which
     -- helps to locate the tracing for inlining and rule firing
@@ -274,7 +275,7 @@ simplRecOrTopPair env top_lvl is_rec mb_cont old_bndr new_bndr rhs
       | not (dopt Opt_D_verbose_core2core dflags)
       = thing_inside
       | otherwise
-      = traceAction dflags ("SimplBind " ++ what)
+      = putTraceMsg logger dflags ("SimplBind " ++ what)
          (ppr old_bndr) thing_inside
 
 --------------------------
@@ -1882,7 +1883,7 @@ simplIdF env var cont
 
 completeCall :: SimplEnv -> OutId -> SimplCont -> SimplM (SimplFloats, OutExpr)
 completeCall env var cont
-  | Just expr <- callSiteInline dflags case_depth var active_unf
+  | Just expr <- callSiteInline logger dflags case_depth var active_unf
                                 lone_variable arg_infos interesting_cont
   -- Inline the variable's RHS
   = do { checkedTick (UnfoldingDone var)
@@ -1899,15 +1900,16 @@ completeCall env var cont
   where
     dflags     = seDynFlags env
     case_depth = seCaseDepth env
+    logger     = seLogger env
     (lone_variable, arg_infos, call_cont) = contArgs cont
     n_val_args       = length arg_infos
     interesting_cont = interestingCallContext env call_cont
     active_unf       = activeUnfolding (getMode env) var
 
     log_inlining doc
-      = liftIO $ dumpAction dflags
+      = liftIO $ putDumpMsg logger dflags
            (mkDumpStyle alwaysQualify)
-           (dumpOptionsFromFlag Opt_D_dump_inlinings)
+           Opt_D_dump_inlinings
            "" FormatText doc
 
     dump_inline unfolding cont
@@ -2170,6 +2172,7 @@ tryRules env rules fn args call_cont
   where
     ropts      = initRuleOpts dflags
     dflags     = seDynFlags env
+    logger     = seLogger env
     zapped_env = zapSubstEnv env  -- See Note [zapSubstEnv]
 
     printRuleModule rule
@@ -2198,11 +2201,11 @@ tryRules env rules fn args call_cont
     nodump
       | dopt Opt_D_dump_rule_rewrites dflags
       = liftIO $
-          touchDumpFile dflags (dumpOptionsFromFlag Opt_D_dump_rule_rewrites)
+          touchDumpFile logger dflags Opt_D_dump_rule_rewrites
 
       | dopt Opt_D_dump_rule_firings dflags
       = liftIO $
-          touchDumpFile dflags (dumpOptionsFromFlag Opt_D_dump_rule_firings)
+          touchDumpFile logger dflags Opt_D_dump_rule_firings
 
       | otherwise
       = return ()
@@ -2210,7 +2213,7 @@ tryRules env rules fn args call_cont
     log_rule dflags flag hdr details
       = liftIO $ do
           let sty = mkDumpStyle alwaysQualify
-          dumpAction dflags sty (dumpOptionsFromFlag flag) "" FormatText $
+          putDumpMsg logger dflags sty flag "" FormatText $
               sep [text hdr, nest 4 details]
 
 trySeqRules :: SimplEnv
