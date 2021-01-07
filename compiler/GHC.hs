@@ -275,7 +275,7 @@ module GHC (
         parser,
 
         -- * API Annotations
-        ApiAnns(..),AnnKeywordId(..),AnnotationComment(..), ApiAnnKey,
+        ApiAnns(..),AnnKeywordId(..),AnnotationComment(..), ApiAnnKey(..),
         getAnnotation, getAndRemoveAnnotation,
         getAnnotationComments, getAndRemoveAnnotationComments,
         unicodeAnn,
