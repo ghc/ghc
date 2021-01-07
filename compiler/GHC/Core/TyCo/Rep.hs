@@ -1000,7 +1000,11 @@ mkPiTys tbs ty = foldr mkPiTy ty tbs
 
 -- | Create the plain type constructor type which has been applied to no type arguments at all.
 mkTyConTy :: TyCon -> Type
-mkTyConTy tycon = TyConApp tycon []
+mkTyConTy tycon
+  | tycon `hasKey` liftedTypeKindTyConKey
+  = liftedTypeKindTyConApp -- See Note [Prefer Type over TYPE 'LiftedRep].
+  | otherwise
+  = TyConApp tycon []
 
 -- | A key function: builds a 'TyConApp' or 'FunTy' as appropriate to
 -- its arguments.  Applies its arguments to the constructor from left to right.
