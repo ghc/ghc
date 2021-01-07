@@ -573,15 +573,13 @@ tcExpr expr@(RecordCon { rcon_con_name = L loc con_name
                        , rcon_flds = rbinds }) res_ty
   = do  { con_like <- tcLookupConLike con_name
 
-        -- Check for missing fields
-        ; checkMissingFields con_like rbinds
-
         ; (con_expr, con_sigma) <- tcInferId con_name
         ; (con_wrap, con_tau)   <- topInstantiate orig con_sigma
               -- a shallow instantiation should really be enough for
               -- a data constructor.
         ; let arity = conLikeArity con_like
               Right (arg_tys, actual_res_ty) = tcSplitFunTysN arity con_tau
+
         ; case conLikeWrapId_maybe con_like of {
                Nothing -> nonBidirectionalErr (conLikeName con_like) ;
                Just con_id ->
@@ -592,6 +590,7 @@ tcExpr expr@(RecordCon { rcon_con_name = L loc con_name
                    -- scaled types instead. Meanwhile, it's safe to take
                    -- `scaledThing` above, as we know all the multiplicities are
                    -- Many.
+
         ; let rcon_tc = RecordConTc
                            { rcon_con_like = con_like
                            , rcon_con_expr = mkHsWrap con_wrap con_expr }
@@ -599,7 +598,13 @@ tcExpr expr@(RecordCon { rcon_con_name = L loc con_name
                                 , rcon_con_name = L loc con_id
                                 , rcon_flds = rbinds' }
 
-        ; tcWrapResultMono expr expr' actual_res_ty res_ty } } }
+        ; ret <- tcWrapResultMono expr expr' actual_res_ty res_ty
+
+        -- Check for missing fields.  We do this after type-checking to get
+        -- better types in error messages (cf #18869).
+        ; checkMissingFields con_like rbinds arg_tys
+
+        ; return ret } } }
   where
     orig = OccurrenceOf con_name
 
@@ -1465,8 +1470,8 @@ tcRecordField con_like flds_w_tys (L loc (FieldOcc sel_name lbl)) rhs
         field_lbl = occNameFS $ rdrNameOcc (unLoc lbl)
 
 
-checkMissingFields ::  ConLike -> HsRecordBinds GhcRn -> TcM ()
-checkMissingFields con_like rbinds
+checkMissingFields ::  ConLike -> HsRecordBinds GhcRn -> [Scaled TcType] -> TcM ()
+checkMissingFields con_like rbinds arg_tys
   | null field_labels   -- Not declared as a record;
                         -- But C{} is still valid if no strict fields
   = if any isBanged field_strs then
@@ -1479,22 +1484,28 @@ checkMissingFields con_like rbinds
                  (missingFields con_like []))
 
   | otherwise = do              -- A record
-    unless (null missing_s_fields)
-           (addErrTc (missingStrictFields con_like missing_s_fields))
+    unless (null missing_s_fields) $ do
+        fs <- zonk_fields missing_s_fields
+        addErrTc (missingStrictFields con_like fs)
 
     warn <- woptM Opt_WarnMissingFields
-    when (warn && notNull missing_ns_fields)
-         (warnTc (Reason Opt_WarnMissingFields) True
-             (missingFields con_like missing_ns_fields))
+    when (warn && notNull missing_ns_fields) $ do
+        fs <- zonk_fields missing_ns_fields
+        warnTc (Reason Opt_WarnMissingFields) True
+             (missingFields con_like fs)
 
   where
+    -- we zonk the fields to get better types in error messages (#18869)
+    zonk_fields fs = forM fs $ \(str,ty) -> do
+        ty' <- zonkTcType ty
+        return (str,ty')
     missing_s_fields
-        = [ flLabel fl | (fl, str) <- field_info,
+        = [ (flLabel fl, scaledThing ty) | ((fl, str),ty) <- field_info_tys,
                  isBanged str,
                  not (fl `elemField` field_names_used)
           ]
     missing_ns_fields
-        = [ flLabel fl | (fl, str) <- field_info,
+        = [ (flLabel fl, scaledThing ty) | ((fl, str),ty) <- field_info_tys,
                  not (isBanged str),
                  not (fl `elemField` field_names_used)
           ]
@@ -1505,6 +1516,8 @@ checkMissingFields con_like rbinds
     field_info = zipEqual "missingFields"
                           field_labels
                           field_strs
+
+    field_info_tys = zip field_info arg_tys
 
     field_strs = conLikeImplBangs con_like
 
@@ -1627,11 +1640,11 @@ mixedSelectors data_sels@(dc_rep_id:_) pat_syn_sels@(ps_rep_id:_)
 mixedSelectors _ _ = panic "GHC.Tc.Gen.Expr: mixedSelectors emptylists"
 
 
-missingStrictFields :: ConLike -> [FieldLabelString] -> SDoc
+missingStrictFields :: ConLike -> [(FieldLabelString, TcType)] -> SDoc
 missingStrictFields con fields
   = vcat [header, nest 2 rest]
   where
-    pprField f = ppr f <+> text "::" <+> ppr (conLikeFieldType con f)
+    pprField (f,ty) = ppr f <+> dcolon <+> ppr ty
     rest | null fields = Outputable.empty  -- Happens for non-record constructors
                                            -- with strict fields
          | otherwise   = vcat (fmap pprField fields)
@@ -1640,11 +1653,11 @@ missingStrictFields con fields
              text "does not have the required strict field(s)" <>
              if null fields then Outputable.empty else colon
 
-missingFields :: ConLike -> [FieldLabelString] -> SDoc
+missingFields :: ConLike -> [(FieldLabelString, TcType)] -> SDoc
 missingFields con fields
   = vcat [header, nest 2 rest]
   where
-    pprField f = ppr f <+> text "::" <+> ppr (conLikeFieldType con f)
+    pprField (f,ty) = ppr f <+> text "::" <+> ppr ty
     rest | null fields = Outputable.empty
          | otherwise   = vcat (fmap pprField fields)
     header = text "Fields of" <+> quotes (ppr con) <+>
