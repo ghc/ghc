@@ -6,6 +6,6 @@ T13870.hs:8:9: warning: [-Wmissing-fields (in -Wdefault)]
 
 T13870.hs:14:9: warning: [-Wmissing-fields (in -Wdefault)]
     • Fields of ‘Identity’ not initialised:
-        runIdentity :: a
+        runIdentity :: Int
     • In the expression: Identity {}
       In an equation for ‘test3’: test3 = Identity {}
