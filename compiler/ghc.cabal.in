@@ -713,6 +713,7 @@ Library
         GHC.Utils.Panic.Plain
         GHC.Utils.Ppr
         GHC.Utils.Ppr.Colour
+        GHC.Utils.Strict
 
     reexported-modules:
           GHC.Platform.ArchOS
