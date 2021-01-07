@@ -71,9 +71,11 @@ module GHC.Parser.Lexer (
   ) where
 
 import GHC.Prelude
+import qualified GHC.Data.Strict as Strict
 
 -- base
 import Control.Monad
+import Control.Applicative
 import Data.Bits
 import Data.Char
 import Data.List
@@ -1537,7 +1539,7 @@ varid span buf len =
     Just (ITcase, _) -> do
       lastTk <- getLastTk
       keyword <- case lastTk of
-        Just ITlam -> do
+        Strict.Just ITlam -> do
           lambdaCase <- getBit LambdaCaseBit
           unless lambdaCase $ do
             pState <- getPState
@@ -2190,7 +2192,7 @@ warnTab srcspan _buf _len = do
 
 warnThen :: WarningFlag -> (SrcSpan -> PsWarning) -> Action -> Action
 warnThen flag warning action srcspan buf len = do
-    addWarning flag (warning (RealSrcSpan (psRealSpan srcspan) Nothing))
+    addWarning flag (warning (RealSrcSpan (psRealSpan srcspan) Strict.Nothing))
     action srcspan buf len
 
 -- -----------------------------------------------------------------------------
@@ -2250,12 +2252,13 @@ data PState = PState {
         options    :: ParserOpts,
         warnings   :: Bag PsWarning,
         errors     :: Bag PsError,
-        tab_first  :: Maybe RealSrcSpan, -- pos of first tab warning in the file
+        tab_first  :: !(Strict.Maybe RealSrcSpan),
+                                         -- pos of first tab warning in the file
         tab_count  :: !Word,             -- number of tab warnings in the file
-        last_tk    :: Maybe Token,
-        last_loc   :: PsSpan,      -- pos of previous token
+        last_tk    :: !(Strict.Maybe Token),
+        last_loc   :: !PsSpan,     -- pos of previous token
         last_len   :: !Int,        -- len of previous token
-        loc        :: PsLoc,       -- current loc (end of prev token + 1)
+        loc        :: !PsLoc,      -- current loc (end of prev token + 1)
         context    :: [LayoutContext],
         lex_state  :: [Int],
         srcfiles   :: [FastString],
@@ -2283,7 +2286,7 @@ data PState = PState {
         -- the GHC API can do source to source conversions.
         -- See note [Api annotations] in GHC.Parser.Annotation
         annotations :: [(ApiAnnKey,[RealSrcSpan])],
-        eof_pos :: Maybe RealSrcSpan,
+        eof_pos :: !(Strict.Maybe RealSrcSpan),
         comment_q :: [RealLocated AnnotationComment],
         annotations_comments :: [(RealSrcSpan,[RealLocated AnnotationComment])],
 
@@ -2336,7 +2339,7 @@ failMsgP f = do
 
 failLocMsgP :: RealSrcLoc -> RealSrcLoc -> (SrcSpan -> PsError) -> P a
 failLocMsgP loc1 loc2 f =
-  addFatalError (f (RealSrcSpan (mkRealSrcSpan loc1 loc2) Nothing))
+  addFatalError (f (RealSrcSpan (mkRealSrcSpan loc1 loc2) Strict.Nothing))
 
 getPState :: P PState
 getPState = P $ \s -> POk s s
@@ -2366,7 +2369,7 @@ addSrcFile :: FastString -> P ()
 addSrcFile f = P $ \s -> POk s{ srcfiles = f : srcfiles s } ()
 
 setEofPos :: RealSrcSpan -> P ()
-setEofPos span = P $ \s -> POk s{ eof_pos = Just span } ()
+setEofPos span = P $ \s -> POk s{ eof_pos = Strict.Just span } ()
 
 setLastToken :: PsSpan -> Int -> P ()
 setLastToken loc len = P $ \s -> POk s {
@@ -2375,9 +2378,9 @@ setLastToken loc len = P $ \s -> POk s {
   } ()
 
 setLastTk :: Token -> P ()
-setLastTk tk = P $ \s -> POk s { last_tk = Just tk } ()
+setLastTk tk = P $ \s -> POk s { last_tk = Strict.Just tk } ()
 
-getLastTk :: P (Maybe Token)
+getLastTk :: P (Strict.Maybe Token)
 getLastTk = P $ \s@(PState { last_tk = last_tk }) -> POk s last_tk
 
 data AlexInput = AI !PsLoc !StringBuffer
@@ -2741,9 +2744,9 @@ initParserState options buf loc =
       options       = options,
       errors        = emptyBag,
       warnings      = emptyBag,
-      tab_first     = Nothing,
+      tab_first     = Strict.Nothing,
       tab_count     = 0,
-      last_tk       = Nothing,
+      last_tk       = Strict.Nothing,
       last_loc      = mkPsSpan init_loc init_loc,
       last_len      = 0,
       loc           = init_loc,
@@ -2757,7 +2760,7 @@ initParserState options buf loc =
       alr_expecting_ocurly = Nothing,
       alr_justClosedExplicitLetBlock = False,
       annotations = [],
-      eof_pos = Nothing,
+      eof_pos = Strict.Nothing,
       comment_q = [],
       annotations_comments = [],
       hdk_comments = nilOL
@@ -2831,7 +2834,7 @@ addAnnsAt l = mapM_ (\(AddAnn a v) -> addAnnotation l a v)
 addTabWarning :: RealSrcSpan -> P ()
 addTabWarning srcspan
  = P $ \s@PState{tab_first=tf, tab_count=tc, options=o} ->
-       let tf' = if isJust tf then tf else Just srcspan
+       let tf' = tf <|> Strict.Just srcspan
            tc' = tc + 1
            s' = if warnopt Opt_WarnTabs o
                 then s{tab_first = tf', tab_count = tc'}
@@ -2851,8 +2854,9 @@ getMessages p =
       -- we add the tabulation warning on the fly because
       -- we count the number of occurences of tab characters
       ws' = case tab_first p of
-               Nothing -> ws
-               Just tf -> PsWarnTab (RealSrcSpan tf Nothing) (tab_count p)
+        Strict.Nothing -> ws
+        Strict.Just tf ->
+          PsWarnTab (RealSrcSpan tf Strict.Nothing) (tab_count p)
                            `consBag` ws
   in (ws', errors p)
 
@@ -3314,7 +3318,7 @@ clean_pragma prag = canon_ws (map toLower (unprefix prag))
 
 addAnnotationOnly :: RealSrcSpan -> AnnKeywordId -> RealSrcSpan -> P ()
 addAnnotationOnly l a v = P $ \s -> POk s {
-  annotations = ((l,a), [v]) : annotations s
+  annotations = (ApiAnnKey l a, [v]) : annotations s
   } ()
 
 

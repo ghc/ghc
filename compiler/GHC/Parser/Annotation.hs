@@ -4,7 +4,7 @@ module GHC.Parser.Annotation (
   getAnnotation, getAndRemoveAnnotation,
   getAnnotationComments,getAndRemoveAnnotationComments,
   ApiAnns(..),
-  ApiAnnKey,
+  ApiAnnKey(..),
   AnnKeywordId(..),
   AddAnn(..),mkParensApiAnn,
   AnnotationComment(..),
@@ -18,6 +18,7 @@ import GHC.Prelude
 
 import GHC.Types.Name.Reader
 import GHC.Utils.Outputable
+import qualified GHC.Data.Strict as Strict
 import GHC.Types.SrcLoc
 import qualified Data.Map as Map
 import Data.Data
@@ -62,7 +63,7 @@ a two level map, from the RealSrcSpan of the AST element containing it, to
 a map from keywords ('AnnKeyWord') to all locations of the keyword directly
 in the AST element:
 
-> type ApiAnnKey = (RealSrcSpan,AnnKeywordId)
+> data ApiAnnKey = ApiAnnKey RealSrcSpan AnnKeywordId
 >
 > Map.Map ApiAnnKey [RealSrcSpan]
 
@@ -140,13 +141,14 @@ https://gitlab.haskell.org/ghc/ghc/wikis/api-annotations
 data ApiAnns =
   ApiAnns
     { apiAnnItems :: Map.Map ApiAnnKey [RealSrcSpan],
-      apiAnnEofPos :: Maybe RealSrcSpan,
+      apiAnnEofPos :: !(Strict.Maybe RealSrcSpan),
       apiAnnComments :: Map.Map RealSrcSpan [RealLocated AnnotationComment],
       apiAnnRogueComments :: [RealLocated AnnotationComment]
     }
 
 -- If you update this, update the Note [Api annotations] above
-type ApiAnnKey = (RealSrcSpan,AnnKeywordId)
+data ApiAnnKey = ApiAnnKey !RealSrcSpan !AnnKeywordId
+  deriving (Eq, Ord, Show)
 
 
 -- ---------------------------------------------------------------------
@@ -183,8 +185,8 @@ mkParensApiAnn (RealSrcSpan ss _) = [AddAnn AnnOpenP lo,AddAnn AnnCloseP lc]
     sc = srcSpanStartCol ss
     el = srcSpanEndLine ss
     ec = srcSpanEndCol ss
-    lo = RealSrcSpan (mkRealSrcSpan (realSrcSpanStart ss)        (mkRealSrcLoc f sl (sc+1))) Nothing
-    lc = RealSrcSpan (mkRealSrcSpan (mkRealSrcLoc f el (ec - 1)) (realSrcSpanEnd ss))        Nothing
+    lo = RealSrcSpan (mkRealSrcSpan (realSrcSpanStart ss)        (mkRealSrcLoc f sl (sc+1))) Strict.Nothing
+    lc = RealSrcSpan (mkRealSrcSpan (mkRealSrcLoc f el (ec - 1)) (realSrcSpanEnd ss))        Strict.Nothing
 
 -- ---------------------------------------------------------------------
 -- | Retrieve a list of annotation 'SrcSpan's based on the 'SrcSpan'
@@ -195,7 +197,7 @@ getAnnotation anns span ann =
     Nothing -> []
     Just ss -> ss
   where ann_items = apiAnnItems anns
-        ann_key = (span,ann)
+        ann_key = ApiAnnKey span ann
 
 -- | Retrieve a list of annotation 'SrcSpan's based on the 'SrcSpan'
 -- of the annotated AST element, and the known type of the annotation.
@@ -207,7 +209,7 @@ getAndRemoveAnnotation anns span ann =
     Nothing -> ([],anns)
     Just ss -> (ss,anns{ apiAnnItems = Map.delete ann_key ann_items })
   where ann_items = apiAnnItems anns
-        ann_key = (span,ann)
+        ann_key = ApiAnnKey span ann
 
 -- |Retrieve the comments allocated to the current 'SrcSpan'
 --

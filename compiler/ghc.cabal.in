@@ -375,6 +375,7 @@ Library
         GHC.Data.OrdList
         GHC.Data.Pair
         GHC.Data.Stream
+        GHC.Data.Strict
         GHC.Data.StringBuffer
         GHC.Data.TrieMap
         GHC.Driver.Backend

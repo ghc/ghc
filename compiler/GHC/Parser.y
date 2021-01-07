@@ -62,6 +62,7 @@ import GHC.Data.Maybe          ( orElse )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc          ( looksLikePackageName, fstOf3, sndOf3, thdOf3 )
+import qualified GHC.Data.Strict as Strict
 
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Occurrence ( varName, dataName, tcClsName, tvName, occNameFS )
@@ -3966,9 +3967,9 @@ looksLikeMult :: LHsType GhcPs -> Located RdrName -> LHsType GhcPs -> Bool
 looksLikeMult ty1 l_op ty2
   | Unqual op_name <- unLoc l_op
   , occNameFS op_name == fsLit "%"
-  , Just ty1_pos <- getBufSpan (getLoc ty1)
-  , Just pct_pos <- getBufSpan (getLoc l_op)
-  , Just ty2_pos <- getBufSpan (getLoc ty2)
+  , Strict.Just ty1_pos <- getBufSpan (getLoc ty1)
+  , Strict.Just pct_pos <- getBufSpan (getLoc l_op)
+  , Strict.Just ty2_pos <- getBufSpan (getLoc ty2)
   , bufSpanEnd ty1_pos /= bufSpanStart pct_pos
   , bufSpanEnd pct_pos == bufSpanStart ty2_pos
   = True

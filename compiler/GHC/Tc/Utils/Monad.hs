@@ -187,6 +187,7 @@ import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Error
 import GHC.Utils.Panic
 import GHC.Utils.Misc
+import qualified GHC.Data.Strict as Strict
 
 import GHC.Types.Fixity.Env
 import GHC.Types.Name.Reader
@@ -890,7 +891,7 @@ addDependentFiles fs = do
 
 getSrcSpanM :: TcRn SrcSpan
         -- Avoid clash with Name.getSrcLoc
-getSrcSpanM = do { env <- getLclEnv; return (RealSrcSpan (tcl_loc env) Nothing) }
+getSrcSpanM = do { env <- getLclEnv; return (RealSrcSpan (tcl_loc env) Strict.Nothing) }
 
 -- See Note [Rebindable syntax and HsExpansion].
 inGeneratedCode :: TcRn Bool
