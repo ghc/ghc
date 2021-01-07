@@ -37,7 +37,8 @@ parserDeps libdir =
   defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
     runGhc (Just libdir) $ do
         df <- getSessionDynFlags
-        (df, _, _) <- parseDynamicFlags df [noLoc "-package=ghc"]
+        logger <- getLogger
+        (df, _, _) <- parseDynamicFlags logger df [noLoc "-package=ghc"]
         setSessionDynFlags df
         env <- getSession
         loop env emptyUniqSet [mkModuleName "GHC.Parser"]
