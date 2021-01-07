@@ -65,6 +65,7 @@ import GHC.Data.List.SetOps ( equivClasses )
 import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Utils.FV ( fvVarList, unionFV )
+import qualified GHC.Data.Strict as Strict
 
 import Control.Monad    ( when )
 import Data.Foldable    ( toList )
@@ -1055,7 +1056,7 @@ mkErrorMsgFromCt ctxt ct report
 mkErrorReport :: ReportErrCtxt -> TcLclEnv -> Report -> TcM (MsgEnvelope DecoratedSDoc)
 mkErrorReport ctxt tcl_env (Report important relevant_bindings valid_subs)
   = do { context <- mkErrInfo (cec_tidy ctxt) (tcl_ctxt tcl_env)
-       ; mkDecoratedSDocAt (RealSrcSpan (tcl_loc tcl_env) Nothing)
+       ; mkDecoratedSDocAt (RealSrcSpan (tcl_loc tcl_env) Strict.Nothing)
                            (vcat important)
                            context
                            (vcat $ relevant_bindings ++ valid_subs)
@@ -1176,7 +1177,7 @@ mkHoleError _tidy_simples _ctxt hole@(Hole { hole_occ = occ
        ; imp_info <- getImports
        ; curr_mod <- getModule
        ; hpt <- getHpt
-       ; mkDecoratedSDocAt (RealSrcSpan (tcl_loc lcl_env) Nothing)
+       ; mkDecoratedSDocAt (RealSrcSpan (tcl_loc lcl_env) Strict.Nothing)
                            out_of_scope_msg O.empty
                            (unknownNameSuggestions dflags hpt curr_mod rdr_env
                             (tcl_rdr lcl_env) imp_info (mkRdrUnqual occ)) }
