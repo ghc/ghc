@@ -64,3 +64,5 @@ test('T18894',  [ grep_errmsg(r'Dmd=\S+C\S+') ], compile, ['-ddump-stranal -dsup
 test('T18894b',  [ grep_errmsg(r'Arity=2') ], compile, ['-ddump-stranal -dsuppress-uniques -fno-call-arity -dppr-cols=200'])
 # We care about the workers of f,g,h,i:
 test('T18982',  [ grep_errmsg(r'\$w. .*Int#$') ], compile, ['-dppr-cols=1000 -ddump-simpl -dsuppress-idinfo -dsuppress-uniques'])
+
+test('T19180', normal, compile, [''])
