@@ -42,7 +42,7 @@ module GHC.Core.TyCo.Rep (
         MCoercion(..), MCoercionR, MCoercionN,
 
         -- * Functions over types
-        mkTyConTy, mkTyVarTy, mkTyVarTys,
+        mkTyConTy_, mkTyVarTy, mkTyVarTys,
         mkTyCoVarTy, mkTyCoVarTys,
         mkFunTy, mkVisFunTy, mkInvisFunTy, mkVisFunTys,
         mkForAllTy, mkForAllTys, mkInvisForAllTys,
@@ -51,7 +51,6 @@ module GHC.Core.TyCo.Rep (
         mkScaledFunTy,
         mkVisFunTyMany, mkVisFunTysMany,
         mkInvisFunTyMany, mkInvisFunTysMany,
-        mkTyConApp,
         tYPE,
 
         -- * Functions over binders
@@ -91,8 +90,8 @@ import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 
 -- others
-import GHC.Builtin.Names ( liftedTypeKindTyConKey, liftedRepDataConKey, manyDataConKey, tYPETyConKey )
-import {-# SOURCE #-} GHC.Builtin.Types ( liftedTypeKindTyCon, liftedTypeKind, manyDataConTy )
+import GHC.Builtin.Names ( liftedRepDataConKey )
+import {-# SOURCE #-} GHC.Builtin.Types ( liftedTypeKind, manyDataConTy )
 import {-# SOURCE #-} GHC.Builtin.Types.Prim ( tYPETyCon )
 import GHC.Types.Basic ( LeftOrRight(..), pickLR )
 import GHC.Types.Unique ( hasKey, Uniquable(..) )
@@ -1004,35 +1003,11 @@ mkPiTy (Named (Bndr tv vis)) ty = mkForAllTy tv vis ty
 mkPiTys :: [TyCoBinder] -> Type -> Type
 mkPiTys tbs ty = foldr mkPiTy ty tbs
 
--- | Create the plain type constructor type which has been applied to no type arguments at all.
-mkTyConTy :: TyCon -> Type
-mkTyConTy tycon = TyConApp tycon []
-
--- | A key function: builds a 'TyConApp' or 'FunTy' as appropriate to
--- its arguments.  Applies its arguments to the constructor from left to right.
-mkTyConApp :: TyCon -> [Type] -> Type
-mkTyConApp tycon tys
-  | isFunTyCon tycon
-  , [w, _rep1,_rep2,ty1,ty2] <- tys
-  -- The FunTyCon (->) is always a visible one
-  = FunTy { ft_af = VisArg, ft_mult = w, ft_arg = ty1, ft_res = ty2 }
-
-  -- See Note [Prefer Type over TYPE 'LiftedRep]
-  | tycon `hasKey` liftedTypeKindTyConKey
-  = ASSERT2( null tys, ppr tycon $$ ppr tys )
-    liftedTypeKindTyConApp
-  | tycon `hasKey` manyDataConKey
-  -- There are a lot of occurrences of 'Many' so it's a small optimisation to
-  -- avoid reboxing every time `mkTyConApp` is called.
-  = ASSERT2( null tys, ppr tycon $$ ppr tys )
-    manyDataConTy
-  -- See Note [Prefer Type over TYPE 'LiftedRep].
-  | tycon `hasKey` tYPETyConKey
-  , [rep] <- tys
-  = tYPE rep
-  -- The catch-all case
-  | otherwise
-  = TyConApp tycon tys
+-- | Create a nullary 'TyConApp'. In general you should rather use
+-- 'GHC.Core.Type.mkTyConTy'. This merely exists to break the import cycle
+-- between 'GHC.Core.TyCon' and this module.
+mkTyConTy_ :: TyCon -> Type
+mkTyConTy_ tycon = TyConApp tycon []
 
 {-
 Note [Prefer Type over TYPE 'LiftedRep]
@@ -1079,16 +1054,9 @@ To accomplish these we use a number of tricks:
     (namely 'GHC.Builtin.Types.Prim.liftedTypeKind'), ensuring that we
     don't need to allocate such types (goal (a)).
 
- 3. To avoid allocating 'TyConApp' constructors the
-    'GHC.Builtin.Types.Prim.tYPE' function catches the lifted case and returns
-    `liftedTypeKind` instead of building an application (goal (a)).
-
- 4. Similarly, 'Type.mkTyConApp' catches applications of `TYPE` and
-    handles them using 'GHC.Builtin.Types.Prim.tYPE', ensuring
-    that it benefits from the optimisation described above (goal (a)).
-
-Note that it's quite important that we do not define 'liftedTypeKind' in terms
-of 'mkTyConApp' since this tricks (1) and (4) would then result in a loop.
+ 3. We use the sharing mechanism described in Note [Sharing nullary TyConApps]
+    in GHC.Core.TyCon to ensure that we never need to allocate such
+    nullary applications (goal (a)).
 
 See #17958.
 -}
@@ -1100,12 +1068,6 @@ tYPE (TyConApp tc [])
   -- See Note [Prefer Type of TYPE 'LiftedRep]
   | tc `hasKey` liftedRepDataConKey = liftedTypeKind  -- TYPE 'LiftedRep
 tYPE rr = TyConApp tYPETyCon [rr]
-
--- This is a single, global definition of the type `Type`
--- Defined here so it is only allocated once.
--- See Note [Prefer Type over TYPE 'LiftedRep] in this module.
-liftedTypeKindTyConApp :: Type
-liftedTypeKindTyConApp = TyConApp liftedTypeKindTyCon []
 
 {-
 %************************************************************************
