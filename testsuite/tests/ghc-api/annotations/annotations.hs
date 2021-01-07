@@ -46,7 +46,7 @@ testOneFile libdir fileName = do
         let anns = p
             ann_items = apiAnnItems anns
             ann_eof = apiAnnEofPos anns
-            (l,_) = fst $ head $ Map.toList ann_items
+            ApiAnnKey l _ = fst $ head $ Map.toList ann_items
             annModule = getAnnotation anns l AnnModule
             annLet    = getAnnotation anns l AnnLet
 
@@ -54,7 +54,7 @@ testOneFile libdir fileName = do
                                     "EOF: " ++ show ann_eof])
 
 showAnns anns = "[\n" ++ (intercalate "\n"
-   $ map (\((s,k),v)
+   $ map (\(ApiAnnKey s k, v)
               -> ("(AK " ++ pp s ++ " " ++ show k ++" = " ++ pp v ++ ")\n"))
    $ Map.toList anns)
     ++ "]\n"

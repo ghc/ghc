@@ -101,6 +101,7 @@ import GHC.Utils.Panic hiding ( showException, try )
 import GHC.Utils.Misc
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Data.Bag (unitBag)
+import qualified GHC.Data.Strict as Strict
 
 -- Haskell Libraries
 import System.Console.Haskeline as Haskeline
@@ -3693,7 +3694,7 @@ stepLocalCmd arg = withSandboxOnly ":steplocal" $ step arg
         Just loc -> do
            md <- fromMaybe (panic "stepLocalCmd") <$> getCurrentBreakModule
            current_toplevel_decl <- enclosingTickSpan md loc
-           doContinue (`isSubspanOf` RealSrcSpan current_toplevel_decl Nothing) GHC.SingleStep
+           doContinue (`isSubspanOf` RealSrcSpan current_toplevel_decl Strict.Nothing) GHC.SingleStep
 
 stepModuleCmd :: GhciMonad m => String -> m ()
 stepModuleCmd arg = withSandboxOnly ":stepmodule" $ step arg
@@ -3992,7 +3993,7 @@ findBreakAndSet md lookupTickTree = do
          (alreadySet, nm) <-
                recordBreak $ BreakLocation
                        { breakModule = md
-                       , breakLoc = RealSrcSpan pan Nothing
+                       , breakLoc = RealSrcSpan pan Strict.Nothing
                        , breakTick = tick
                        , onBreakCmd = ""
                        , breakEnabled = True
@@ -4054,7 +4055,7 @@ findBreakByCoord mb_file (line, col) arr
         ticks = arr ! line
 
         -- the ticks that span this coordinate
-        contains = [ tick | tick@(_,pan) <- ticks, RealSrcSpan pan Nothing `spans` (line,col),
+        contains = [ tick | tick@(_,pan) <- ticks, RealSrcSpan pan Strict.Nothing `spans` (line,col),
                             is_correct_file pan ]
 
         is_correct_file pan
