@@ -288,9 +288,8 @@ findDependency hsc_env srcloc pkg imp is_boot include_pkg_deps
                 -> return Nothing
 
             fail ->
-                let dflags = hsc_dflags hsc_env
-                in throwOneError $ mkPlainErrMsg dflags srcloc $
-                        cannotFindModule hsc_env imp fail
+                throwOneError $ mkPlainErrMsg srcloc $
+                     cannotFindModule hsc_env imp fail
         }
 
 -----------------------------

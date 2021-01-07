@@ -88,6 +88,7 @@ import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State.Strict
 import Data.Either   (partitionEithers)
 import Data.Foldable (foldlM, minimumBy, toList)
+import Data.Monoid   (Any(..))
 import Data.List     (sortBy, find)
 import qualified Data.List.NonEmpty as NE
 import Data.Ord      (comparing)
@@ -120,9 +121,18 @@ isInhabited (MkNablas ds) = pure (not (null ds))
 
 -- See Note [Implementation of COMPLETE pragmas]
 
--- | Update the COMPLETE sets of 'ResidualCompleteMatches'.
-updRcm :: (CompleteMatch -> CompleteMatch) -> ResidualCompleteMatches -> ResidualCompleteMatches
-updRcm f (RCM vanilla pragmas) = RCM (f <$> vanilla) (fmap f <$> pragmas)
+-- | Update the COMPLETE sets of 'ResidualCompleteMatches', or 'Nothing'
+-- if there was no change as per the update function.
+updRcm :: (CompleteMatch          -> (Bool, CompleteMatch))
+       -> ResidualCompleteMatches -> (Maybe ResidualCompleteMatches)
+updRcm f (RCM vanilla pragmas)
+  | not any_change = Nothing
+  | otherwise      = Just (RCM vanilla' pragmas')
+  where
+    f' cm = case f cm of (b, cm') -> (Any b, cm')
+    (chgd, vanilla')  = traverse f' vanilla
+    (chgds, pragmas') = traverse (traverse f') pragmas
+    any_change        = getAny $ chgd `mappend` chgds
 
 -- | A pseudo-'CompleteMatch' for the vanilla complete set of the given data
 -- 'TyCon'.
@@ -160,10 +170,15 @@ addTyConMatches tc rcm = add_tc_match <$> addCompleteMatches rcm
     add_tc_match rcm
       = rcm{rcm_vanilla = rcm_vanilla rcm <|> vanillaCompleteMatchTC tc}
 
-markMatched :: ConLike -> ResidualCompleteMatches -> DsM ResidualCompleteMatches
-markMatched cl rcm = do
+markMatched :: PmAltCon -> ResidualCompleteMatches -> DsM (Maybe ResidualCompleteMatches)
+-- Nothing means the PmAltCon didn't occur in any COMPLETE set
+markMatched (PmAltLit _)      _   = pure Nothing -- lits are never part of a COMPLETE set
+markMatched (PmAltConLike cl) rcm = do
   rcm' <- addConLikeMatches cl rcm
-  pure $ updRcm (flip delOneFromUniqDSet cl) rcm'
+  let go cm = case lookupUniqDSet cm cl of
+        Nothing -> (False, cm)
+        Just _  -> (True,  delOneFromUniqDSet cm cl)
+  pure $ updRcm go rcm'
 
 {-
 Note [Implementation of COMPLETE pragmas]
@@ -762,13 +777,14 @@ addNotConCt nabla x nalt = do
       MASSERT( isPmAltConMatchStrict nalt )
       let vi' = vi{ vi_neg = neg', vi_bot = IsNotBot }
       -- 3. Make sure there's at least one other possible constructor
-      case nalt of
-        PmAltConLike cl -> do
-          -- Mark dirty to force a delayed inhabitation test
-          rcm' <- lift (markMatched cl rcm)
-          pure (Just x', vi'{ vi_rcm = rcm' })
-        _ ->
-          pure (Nothing, vi')
+      mb_rcm' <- lift (markMatched nalt rcm)
+      pure $ case mb_rcm' of
+        -- If nalt could be removed from a COMPLETE set, we'll get back Just and
+        -- have to mark x' dirty to force a delayed inhabitation test.
+        Just rcm' -> (Just x', vi'{ vi_rcm = rcm' })
+        -- Otherwise, nalt didn't occur in any residual COMPLETE set and there's
+        -- nothing more to check.
+        Nothing   -> (Nothing, vi')
 
 hasRequiredTheta :: PmAltCon -> Bool
 hasRequiredTheta (PmAltConLike cl) = notNull req_theta
@@ -1226,7 +1242,7 @@ inhabitationTest fuel  old_ty_st nabla@MkNabla{ nabla_tm_st = ts } = do
     test_one vi =
       lift (varNeedsTesting old_ty_st nabla vi) >>= \case
         True -> do
-          -- tracPm "test_one" (ppr vi)
+          -- lift $ tracePm "test_one" (ppr vi)
           -- No solution yet and needs testing
           -- We have to test with a Nabla where all dirty bits are cleared
           instantiate (fuel-1) nabla_not_dirty vi
@@ -1234,17 +1250,17 @@ inhabitationTest fuel  old_ty_st nabla@MkNabla{ nabla_tm_st = ts } = do
 
 -- | Checks whether the given 'VarInfo' needs to be tested for inhabitants.
 --
---     1. If it already has a solution, we don't have to test.
---     2. If it's marked dirty because of new negative term constraints, we have
+--     1. If it's marked dirty because of new negative term constraints, we have
 --        to test.
---     3. Otherwise, if the type state didn't change, we don't need to test.
+--     2. If it already has a solution, we don't have to test.
+--     3. If the type state didn't change, we don't need to test.
 --     4. If the type state changed, we compare normalised source types. No need
 --        to test if unchanged.
 varNeedsTesting :: TyState -> Nabla -> VarInfo -> DsM Bool
-varNeedsTesting _         _                              vi
-  | notNull (vi_pos vi)                     = pure False
 varNeedsTesting _         MkNabla{nabla_tm_st=tm_st}     vi
   | elemDVarSet (vi_id vi) (ts_dirty tm_st) = pure True
+varNeedsTesting _         _                              vi
+  | notNull (vi_pos vi)                     = pure False
 varNeedsTesting old_ty_st MkNabla{nabla_ty_st=new_ty_st} _
   -- Same type state => still inhabited
   | not (tyStateRefined old_ty_st new_ty_st) = pure False

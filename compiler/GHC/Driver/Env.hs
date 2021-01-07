@@ -29,6 +29,7 @@ import GHC.Prelude
 
 import GHC.Driver.Ppr
 import GHC.Driver.Session
+import GHC.Driver.Errors ( printOrThrowWarnings )
 
 import GHC.Runtime.Context
 import GHC.Driver.Env.Types ( Hsc(..), HscEnv(..) )
@@ -59,7 +60,6 @@ import GHC.Data.Bag
 
 import GHC.Utils.Outputable
 import GHC.Utils.Monad
-import GHC.Utils.Error
 import GHC.Utils.Panic
 import GHC.Utils.Misc
 
