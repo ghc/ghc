@@ -138,7 +138,6 @@ data Extension
    | TypeApplications
    | Strict
    | StrictData
-   | MonadFailDesugaring
    | EmptyDataDeriving
    | NumericUnderscores
    | QuantifiedConstraints

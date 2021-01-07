@@ -53,4 +53,6 @@ expectedCabalOnlyExtensions = ["Generics",
                                "SafeImports",
                                "Safe",
                                "Unsafe",
-                               "Trustworthy"]
+                               "Trustworthy",
+                               "MonadFailDesugaring"
+                              ]
