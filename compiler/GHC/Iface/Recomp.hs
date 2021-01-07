@@ -139,7 +139,8 @@ checkOldIface
 
 checkOldIface hsc_env mod_summary source_modified maybe_iface
   = do  let dflags = hsc_dflags hsc_env
-        showPass dflags $
+        let logger = hsc_logger hsc_env
+        showPass logger dflags $
             "Checking old interface for " ++
               (showPpr dflags $ ms_mod mod_summary) ++
               " (use -ddump-hi-diffs for more details)"

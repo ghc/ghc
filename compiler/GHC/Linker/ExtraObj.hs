@@ -31,11 +31,11 @@ import GHC.Utils.Asm
 import GHC.Utils.Error
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Logger
 
 import GHC.Driver.Session
 import GHC.Driver.Ppr
 
-import GHC.Types.SrcLoc ( noSrcSpan )
 import qualified GHC.Data.ShortText as ST
 
 import GHC.SysTools.Elf
@@ -48,13 +48,13 @@ import Control.Monad.IO.Class
 import Control.Monad
 import Data.Maybe
 
-mkExtraObj :: DynFlags -> UnitState -> Suffix -> String -> IO FilePath
-mkExtraObj dflags unit_state extn xs
- = do cFile <- newTempName dflags TFL_CurrentModule extn
-      oFile <- newTempName dflags TFL_GhcSession "o"
+mkExtraObj :: Logger -> DynFlags -> UnitState -> Suffix -> String -> IO FilePath
+mkExtraObj logger dflags unit_state extn xs
+ = do cFile <- newTempName logger dflags TFL_CurrentModule extn
+      oFile <- newTempName logger dflags TFL_GhcSession "o"
       writeFile cFile xs
-      ccInfo <- liftIO $ getCompilerInfo dflags
-      runCc Nothing dflags
+      ccInfo <- liftIO $ getCompilerInfo logger dflags
+      runCc Nothing logger dflags
             ([Option        "-c",
               FileOption "" cFile,
               Option        "-o",
@@ -87,15 +87,14 @@ mkExtraObj dflags unit_state extn xs
 --
 -- On Windows, when making a shared library we also may need a DllMain.
 --
-mkExtraObjToLinkIntoBinary :: DynFlags -> UnitState -> IO FilePath
-mkExtraObjToLinkIntoBinary dflags unit_state = do
+mkExtraObjToLinkIntoBinary :: Logger -> DynFlags -> UnitState -> IO FilePath
+mkExtraObjToLinkIntoBinary logger dflags unit_state = do
   when (gopt Opt_NoHsMain dflags && haveRtsOptsFlags dflags) $
-     putLogMsg dflags NoReason SevInfo noSrcSpan
-         $ withPprStyle defaultUserStyle
+     logInfo logger dflags $ withPprStyle defaultUserStyle
          (text "Warning: -rtsopts and -with-rtsopts have no effect with -no-hs-main." $$
           text "    Call hs_init_ghc() from your main() function to set these options.")
 
-  mkExtraObj dflags unit_state "c" (showSDoc dflags main)
+  mkExtraObj logger dflags unit_state "c" (showSDoc dflags main)
   where
     main
       | gopt Opt_NoHsMain dflags = Outputable.empty
@@ -153,12 +152,12 @@ mkExtraObjToLinkIntoBinary dflags unit_state = do
 -- this was included as inline assembly in the main.c file but this
 -- is pretty fragile. gas gets upset trying to calculate relative offsets
 -- that span the .note section (notably .text) when debug info is present
-mkNoteObjsToLinkIntoBinary :: DynFlags -> UnitEnv -> [UnitId] -> IO [FilePath]
-mkNoteObjsToLinkIntoBinary dflags unit_env dep_packages = do
+mkNoteObjsToLinkIntoBinary :: Logger -> DynFlags -> UnitEnv -> [UnitId] -> IO [FilePath]
+mkNoteObjsToLinkIntoBinary logger dflags unit_env dep_packages = do
    link_info <- getLinkInfo dflags unit_env dep_packages
 
    if (platformSupportsSavingLinkOpts (platformOS platform ))
-     then fmap (:[]) $ mkExtraObj dflags unit_state "s" (showSDoc dflags (link_opts link_info))
+     then fmap (:[]) $ mkExtraObj logger dflags unit_state "s" (showSDoc dflags (link_opts link_info))
      else return []
 
   where
@@ -216,8 +215,8 @@ ghcLinkInfoNoteName = "GHC link info"
 
 -- Returns 'False' if it was, and we can avoid linking, because the
 -- previous binary was linked with "the same options".
-checkLinkInfo :: DynFlags -> UnitEnv -> [UnitId] -> FilePath -> IO Bool
-checkLinkInfo dflags unit_env pkg_deps exe_file
+checkLinkInfo :: Logger -> DynFlags -> UnitEnv -> [UnitId] -> FilePath -> IO Bool
+checkLinkInfo logger dflags unit_env pkg_deps exe_file
  | not (platformSupportsSavingLinkOpts (platformOS (ue_platform unit_env)))
  -- ToDo: Windows and OS X do not use the ELF binary format, so
  -- readelf does not work there.  We need to find another way to do
@@ -228,11 +227,11 @@ checkLinkInfo dflags unit_env pkg_deps exe_file
  | otherwise
  = do
    link_info <- getLinkInfo dflags unit_env pkg_deps
-   debugTraceMsg dflags 3 $ text ("Link info: " ++ link_info)
-   m_exe_link_info <- readElfNoteAsString dflags exe_file
+   debugTraceMsg logger dflags 3 $ text ("Link info: " ++ link_info)
+   m_exe_link_info <- readElfNoteAsString logger dflags exe_file
                           ghcLinkInfoSectionName ghcLinkInfoNoteName
    let sameLinkInfo = (Just link_info == m_exe_link_info)
-   debugTraceMsg dflags 3 $ case m_exe_link_info of
+   debugTraceMsg logger dflags 3 $ case m_exe_link_info of
      Nothing -> text "Exe link info: Not found"
      Just s
        | sameLinkInfo -> text ("Exe link info is the same")
