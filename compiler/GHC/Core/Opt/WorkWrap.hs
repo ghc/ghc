@@ -781,27 +781,59 @@ then the splitting will go deeper too.
 NB: For recursive thunks, the Simplifier is unable to float `x-rhs` out of
 `x*`'s RHS, because `x*` occurs freely in `x-rhs`, and will just change it
 back to the original definition, so we just split non-recursive thunks.
+
+Note [Thunk splitting for top-level binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Top-level bindings are never strict. Yet they can be absent, as T14270 shows:
+
+  module T14270 (mkTrApp) where
+  mkTrApp x y
+    | Just ... <- ... typeRepKind x ...
+    = undefined
+    | otherwise
+    = undefined
+  typeRepKind = Tick scc undefined
+
+(T19180 is a profiling-free test case for this)
+Note that `typeRepKind` is not exported and its only use site in
+`mkTrApp` guards a bottoming expression. Thus, demand analysis
+figures out that `typeRepKind` is absent and splits the thunk to
+
+  typeRepKind =
+    let typeRepKind = Tick scc undefined in
+    let typeRepKind = absentError in
+    typeRepKind
+
+But now we have a local binding with an External Name
+(See Note [About the NameSorts]). That will trigger a CoreLint error, which we
+get around by localising the Id for the auxiliary bindings in 'splitThunk'.
 -}
 
--- See Note [Thunk splitting]
+-- | See Note [Thunk splitting].
+--
 -- splitThunk converts the *non-recursive* binding
 --      x = e
 -- into
---      x = let x = e
---          in case x of
---               I# y -> let x = I# y in x }
+--      x = let x' = e in
+--          case x' of I# y -> let x' = I# y in x'
 -- See comments above. Is it not beautifully short?
 -- Moreover, it works just as well when there are
 -- several binders, and if the binders are lifted
 -- E.g.     x = e
---     -->  x = let x = e in
---              case x of (a,b) -> let x = (a,b)  in x
-
+--     -->  x = let x' = e in
+--              case x' of (a,b) -> let x' = (a,b)  in x'
+-- Here, x' is a localised version of x, in case x is a
+-- top-level Id with an External Name, because Lint rejects local binders with
+-- External Names; see Note [About the NameSorts] in GHC.Types.Name.
+--
+-- How can we do thunk-splitting on a top-level binder?  See
+-- Note [Thunk splitting for top-level binders].
 splitThunk :: DynFlags -> FamInstEnvs -> RecFlag -> Var -> Expr Var -> UniqSM [(Var, Expr Var)]
-splitThunk dflags fam_envs is_rec fn_id rhs
-  = ASSERT(not (isJoinId fn_id))
-    do { (useful,_, wrap_fn, work_fn) <- mkWWstr dflags fam_envs False [fn_id]
-       ; let res = [ (fn_id, Let (NonRec fn_id rhs) (wrap_fn (work_fn (Var fn_id)))) ]
-       ; if useful then ASSERT2( isNonRec is_rec, ppr fn_id ) -- The thunk must be non-recursive
+splitThunk dflags fam_envs is_rec x rhs
+  = ASSERT(not (isJoinId x))
+    do { let x' = localiseId x -- See comment above
+       ; (useful,_, wrap_fn, work_fn) <- mkWWstr dflags fam_envs False [x']
+       ; let res = [ (x, Let (NonRec x' rhs) (wrap_fn (work_fn (Var x')))) ]
+       ; if useful then ASSERT2( isNonRec is_rec, ppr x ) -- The thunk must be non-recursive
                    return res
-                   else return [(fn_id, rhs)] }
+                   else return [(x, rhs)] }
