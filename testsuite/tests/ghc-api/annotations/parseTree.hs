@@ -60,7 +60,7 @@ testOneFile libdir fileName = do
 
 
 showAnns anns = "[\n" ++ (intercalate "\n"
-   $ map (\((s,k),v)
+   $ map (\(ApiAnnKey s k, v)
               -> ("(AK " ++ pp s ++ " " ++ show k ++" = " ++ pp v ++ ")\n"))
    $ Map.toList anns)
     ++ "]\n"

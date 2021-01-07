@@ -25,6 +25,7 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.Type
 import GHC.Types.Var
 import GHC.Types.Var.Env
+import qualified GHC.Data.Strict as Strict
 
 import GHC.Iface.Ext.Types
 
@@ -536,7 +537,7 @@ combineScopes _ ModuleScope = ModuleScope
 combineScopes NoScope x = x
 combineScopes x NoScope = x
 combineScopes (LocalScope a) (LocalScope b) =
-  mkScope $ combineSrcSpans (RealSrcSpan a Nothing) (RealSrcSpan b Nothing)
+  mkScope $ combineSrcSpans (RealSrcSpan a Strict.Nothing) (RealSrcSpan b Strict.Nothing)
 
 mkSourcedNodeInfo :: NodeOrigin -> NodeInfo a -> SourcedNodeInfo a
 mkSourcedNodeInfo org ni = SourcedNodeInfo $ M.singleton org ni

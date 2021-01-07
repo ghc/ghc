@@ -55,6 +55,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Error
+import qualified GHC.Data.Strict as Strict
 
 import GHC.Unit
 import GHC.Unit.Env
@@ -762,7 +763,7 @@ summariseRequirement pn mod_name = do
                         hsmodHaddockModHeader = Nothing
                     }),
                 hpm_src_files = [],
-                hpm_annotations = ApiAnns Map.empty Nothing Map.empty []
+                hpm_annotations = ApiAnns Map.empty Strict.Nothing Map.empty []
             }),
         ms_hspp_file = "", -- none, it came inline
         ms_hspp_opts = dflags,
@@ -873,7 +874,7 @@ hsModuleToModSummary pn hsc_src modname
             ms_parsed_mod = Just (HsParsedModule {
                     hpm_module = hsmod,
                     hpm_src_files = [], -- TODO if we preprocessed it
-                    hpm_annotations = ApiAnns Map.empty Nothing Map.empty [] -- BOGUS
+                    hpm_annotations = ApiAnns Map.empty Strict.Nothing Map.empty [] -- BOGUS
                 }),
             ms_hs_date = time,
             ms_obj_date = Nothing, -- TODO do this, but problem: hi_timestamp is BOGUS

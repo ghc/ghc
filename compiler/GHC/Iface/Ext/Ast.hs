@@ -60,6 +60,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Data.Maybe
 import GHC.Data.FastString
+import qualified GHC.Data.Strict as Strict
 
 import GHC.Iface.Ext.Types
 import GHC.Iface.Ext.Utils
@@ -350,7 +351,7 @@ enrichHie ts (hsGrp, imports, exports, _) ev_bs insts tcs =
 
           top_ev_asts <-
             toHie $ EvBindContext ModuleScope Nothing
-                  $ L (RealSrcSpan (realSrcLocSpan $ mkRealSrcLoc file 1 1) Nothing)
+                  $ L (RealSrcSpan (realSrcLocSpan $ mkRealSrcLoc file 1 1) Strict.Nothing)
                   $ EvBinds ev_bs
 
           (uloc_evs,more_ev_asts) <- getUnlocatedEvBinds file
