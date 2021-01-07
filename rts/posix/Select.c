@@ -95,7 +95,6 @@ void registerDelay(Capability *cap, StgMVar *mvar, HsInt usecs)
 static bool wakeUpSleepingThreads (Capability *cap, Time now)
 {
     CapIOManager *iomgr = cap->iomgr;
-    bool flag = false;
 
     /* Pop entries from the front of the sleeping queue that are past their
      * wake time, and unblock the corresponding MVars.
@@ -110,9 +109,13 @@ static bool wakeUpSleepingThreads (Capability *cap, Time now)
                  debugBelch("scheduler: timer expired at %llu, writing to MVar\n",
                            (unsigned long long)q->waketime));
         performTryPutMVar(cap, q->mvar, Unit_closure);
-        flag = true;
     }
-    return flag;
+    /* Filling any of these MVars is not guaranteed to wake any threads, since
+     * threads many not be still waiting on the MVars. We don't actually need
+     * to know if we woke any threads. We need to know if there are now any
+     * runnable threads. We can find out simply by checking the run queue.
+     */
+    return (!emptyRunQueue(cap));
 }
 
 static void GNUC3_ATTRIBUTE(__noreturn__)
@@ -245,6 +248,8 @@ awaitEvent(Capability *cap, bool wait)
 
       now = getProcessElapsedTime();
       if (wakeUpSleepingThreads(cap, now)) {
+          /* If we woke any sleeping threads,
+           * return to the scheduler to run them */
           return;
       }
 
@@ -364,14 +369,10 @@ awaitEvent(Capability *cap, bool wait)
               return; /* still hold the lock */
           }
 
-          /* check for threads that need waking up
+          /* Check for threads that need waking up. If new runnable threads
+           * have arrived, stop waiting for I/O and run them.
            */
-          wakeUpSleepingThreads(cap, getProcessElapsedTime());
-
-          /* If new runnable threads have arrived, stop waiting for
-           * I/O and run them.
-           */
-          if (!emptyRunQueue(cap)) {
+          if (wakeUpSleepingThreads(cap, getProcessElapsedTime())) {
               return; /* still hold the lock */
           }
       }
