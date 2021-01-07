@@ -55,6 +55,7 @@ import GHC.Unit.Module   ( Module, ModuleName )
 import GHC.Unit.Module.ModIface
 
 import GHC.Utils.Panic
+import GHC.Utils.Logger
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Exception
@@ -191,10 +192,11 @@ getValueSafely hsc_env val_name expected_type = do
   case mb_hval of
     Nothing   -> return Nothing
     Just hval -> do
-      value <- lessUnsafeCoerce dflags "getValueSafely" hval
+      value <- lessUnsafeCoerce logger dflags "getValueSafely" hval
       return (Just value)
   where
     dflags = hsc_dflags hsc_env
+    logger = hsc_logger hsc_env
 
 getHValueSafely :: HscEnv -> Name -> Type -> IO (Maybe HValue)
 getHValueSafely hsc_env val_name expected_type = do
@@ -226,12 +228,12 @@ getHValueSafely hsc_env val_name expected_type = do
 --
 -- 2) Wrap it in some debug messages at verbosity 3 or higher so we can see what happened
 --    if it /does/ segfault
-lessUnsafeCoerce :: DynFlags -> String -> a -> IO b
-lessUnsafeCoerce dflags context what = do
-    debugTraceMsg dflags 3 $ (text "Coercing a value in") <+> (text context) <>
-                             (text "...")
+lessUnsafeCoerce :: Logger -> DynFlags -> String -> a -> IO b
+lessUnsafeCoerce logger dflags context what = do
+    debugTraceMsg logger dflags 3 $
+        (text "Coercing a value in") <+> (text context) <> (text "...")
     output <- evaluate (unsafeCoerce what)
-    debugTraceMsg dflags 3 (text "Successfully evaluated coercion")
+    debugTraceMsg logger dflags 3 (text "Successfully evaluated coercion")
     return output
 
 

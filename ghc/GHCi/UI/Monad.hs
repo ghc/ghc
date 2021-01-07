@@ -57,6 +57,7 @@ import GHCi.RemoteTypes
 import GHC.Hs (ImportDecl, GhcPs, GhciLStmt, LHsDecl)
 import GHC.Hs.Utils
 import GHC.Utils.Misc
+import GHC.Utils.Logger
 
 import GHC.Utils.Exception hiding (uninterruptibleMask, mask, catch)
 import Numeric
@@ -307,12 +308,19 @@ instance MonadIO GHCi where
 instance HasDynFlags GHCi where
   getDynFlags = getSessionDynFlags
 
+instance HasLogger GHCi where
+  getLogger = hsc_logger <$> getSession
+
 instance GhcMonad GHCi where
   setSession s' = liftGhc $ setSession s'
   getSession    = liftGhc $ getSession
 
+
 instance HasDynFlags (InputT GHCi) where
   getDynFlags = lift getDynFlags
+
+instance HasLogger (InputT GHCi) where
+  getLogger = lift getLogger
 
 instance GhcMonad (InputT GHCi) where
   setSession = lift . setSession

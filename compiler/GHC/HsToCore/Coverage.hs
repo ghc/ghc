@@ -35,10 +35,10 @@ import GHC.Data.FastString
 import GHC.Data.Bag
 
 import GHC.Utils.Misc
-import GHC.Utils.Error
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Monad
+import GHC.Utils.Logger
 
 import GHC.Types.SrcLoc
 import GHC.Types.Basic
@@ -84,8 +84,9 @@ addTicksToBinds
 
 addTicksToBinds hsc_env mod mod_loc exports tyCons binds
   | let dflags = hsc_dflags hsc_env
-        passes = coveragePasses dflags, not (null passes),
-    Just orig_file <- ml_hs_file mod_loc = do
+        passes = coveragePasses dflags
+  , not (null passes)
+  , Just orig_file <- ml_hs_file mod_loc = do
 
      let  orig_file2 = guessSourceFile binds orig_file
 
@@ -121,7 +122,8 @@ addTicksToBinds hsc_env mod mod_loc exports tyCons binds
      hashNo <- writeMixEntries dflags mod tickCount entries orig_file2
      modBreaks <- mkModBreaks hsc_env mod tickCount entries
 
-     dumpIfSet_dyn dflags Opt_D_dump_ticked "HPC" FormatHaskell
+     let logger = hsc_logger hsc_env
+     dumpIfSet_dyn logger dflags Opt_D_dump_ticked "HPC" FormatHaskell
        (pprLHsBinds binds1)
 
      return (binds1, HpcInfo tickCount hashNo, modBreaks)
