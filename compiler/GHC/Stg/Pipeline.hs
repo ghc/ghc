@@ -30,6 +30,7 @@ import GHC.Utils.Error
 import GHC.Types.Unique.Supply
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Logger
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Trans.State.Strict
@@ -46,14 +47,15 @@ instance MonadUnique StgM where
 runStgM :: Char -> StgM a -> IO a
 runStgM mask (StgM m) = evalStateT m mask
 
-stg2stg :: DynFlags                  -- includes spec of what stg-to-stg passes to do
+stg2stg :: Logger
+        -> DynFlags                  -- includes spec of what stg-to-stg passes to do
         -> Module                    -- module being compiled
         -> [StgTopBinding]           -- input program
         -> IO [StgTopBinding]        -- output program
 
-stg2stg dflags this_mod binds
+stg2stg logger dflags this_mod binds
   = do  { dump_when Opt_D_dump_stg_from_core "Initial STG:" binds
-        ; showPass dflags "Stg2Stg"
+        ; showPass logger dflags "Stg2Stg"
         -- Do the main business!
         ; binds' <- runStgM 'g' $
             foldM do_stg_pass binds (getStgToDo dflags)
@@ -73,7 +75,7 @@ stg2stg dflags this_mod binds
   where
     stg_linter unarised
       | gopt Opt_DoStgLinting dflags
-      = lintStgTopBindings dflags this_mod unarised
+      = lintStgTopBindings logger dflags this_mod unarised
       | otherwise
       = \ _whodunnit _binds -> return ()
 
@@ -106,11 +108,11 @@ stg2stg dflags this_mod binds
 
     opts = initStgPprOpts dflags
     dump_when flag header binds
-      = dumpIfSet_dyn dflags flag header FormatSTG (pprStgTopBindings opts binds)
+      = dumpIfSet_dyn logger dflags flag header FormatSTG (pprStgTopBindings opts binds)
 
     end_pass what binds2
       = liftIO $ do -- report verbosely, if required
-          dumpIfSet_dyn dflags Opt_D_verbose_stg2stg what
+          dumpIfSet_dyn logger dflags Opt_D_verbose_stg2stg what
             FormatSTG (vcat (map (pprStgTopBinding opts) binds2))
           stg_linter False what binds2
           return binds2

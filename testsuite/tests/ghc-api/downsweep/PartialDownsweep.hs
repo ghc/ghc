@@ -47,7 +47,8 @@ main = do
 
   runGhc (Just libdir) $ do
     dflags0 <- getSessionDynFlags
-    (dflags1, _, _) <- parseDynamicFlags dflags0 $ map noLoc $
+    logger <- getLogger
+    (dflags1, _, _) <- parseDynamicFlags logger dflags0 $ map noLoc $
         [ "-fno-diagnostics-show-caret"
         -- , "-v3"
         ] ++ args
