@@ -152,7 +152,6 @@ import qualified GHC.Core.TyCo.Rep as Rep  -- this needs to be used only very lo
 import GHC.Core.Coercion
 import GHC.Core.Unify
 
-import GHC.Utils.Error
 import GHC.Tc.Types.Evidence
 import GHC.Core.Class
 import GHC.Core.TyCon
@@ -168,6 +167,7 @@ import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Logger
 import GHC.Data.Bag as Bag
 import GHC.Types.Unique.Supply
 import GHC.Utils.Misc
@@ -2986,7 +2986,7 @@ csTraceTcM mk_doc
                   || dopt Opt_D_dump_tc_trace dflags )
               ( do { msg <- mk_doc
                    ; TcM.dumpTcRn False
-                       (dumpOptionsFromFlag Opt_D_dump_cs_trace)
+                       Opt_D_dump_cs_trace
                        "" FormatText
                        msg }) }
 {-# INLINE csTraceTcM #-}  -- see Note [INLINE conditional tracing utilities]
