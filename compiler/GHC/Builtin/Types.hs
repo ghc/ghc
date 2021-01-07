@@ -692,9 +692,9 @@ constraintKindTyCon = pcTyCon constraintKindTyConName Nothing [] []
 
 -- See Note [Prefer Type over TYPE 'LiftedRep] in GHC.Core.TyCo.Rep.
 liftedTypeKind, typeToTypeKind, constraintKind :: Kind
-liftedTypeKind   = TyCoRep.TyConApp liftedTypeKindTyCon []
+liftedTypeKind   = mkTyConTy liftedTypeKindTyCon
 typeToTypeKind   = liftedTypeKind `mkVisFunTyMany` liftedTypeKind
-constraintKind   = mkTyConApp constraintKindTyCon []
+constraintKind   = mkTyConTy constraintKindTyCon
 
 {-
 ************************************************************************
