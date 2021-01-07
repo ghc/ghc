@@ -15,6 +15,7 @@ import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
 import GHC.Core.Utils  ( exprType, exprIsHNF )
 import GHC.Core.FVs    ( exprFreeVars )
+import GHC.Types.Name ( getOccFS )
 import GHC.Types.Var
 import GHC.Types.Id
 import GHC.Types.Id.Info
@@ -781,6 +782,32 @@ then the splitting will go deeper too.
 NB: For recursive thunks, the Simplifier is unable to float `x-rhs` out of
 `x*`'s RHS, because `x*` occurs freely in `x-rhs`, and will just change it
 back to the original definition, so we just split non-recursive thunks.
+
+Note [Splitting absent, top-level thunks]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider (T14270+profiling build, similarly T19180+non-profiled build)
+
+  module T14270 (mkTrApp) where
+  mkTrApp x y
+    | Just ... <- ... typeRepKind x ...
+    = undefined
+    | otherwise
+    = undefined
+  typeRepKind = Tick scc undefined
+
+Note that `typeRepKind` is not exported and its only use site in
+`mkTrApp` guards a bottoming expression. Thus, demand analysis
+figures out that `typeRepKind` is absent and transforms to (as
+per Note [Thunk splitting])
+
+  typeRepKind =
+    let typeRepKind = Tick scc undefined in
+    let typeRepKind = absentError in
+    typeRepKind
+
+But now we have a local binding with an External Name
+(See Note [About the NameSorts]). That will trigger a CoreLint error, which we
+get around by marking the newly introduced binders as SysLocal in 'splitThunk'.
 -}
 
 -- See Note [Thunk splitting]
@@ -800,8 +827,14 @@ back to the original definition, so we just split non-recursive thunks.
 splitThunk :: DynFlags -> FamInstEnvs -> RecFlag -> Var -> Expr Var -> UniqSM [(Var, Expr Var)]
 splitThunk dflags fam_envs is_rec fn_id rhs
   = ASSERT(not (isJoinId fn_id))
-    do { (useful,_, wrap_fn, work_fn) <- mkWWstr dflags fam_envs False [fn_id]
-       ; let res = [ (fn_id, Let (NonRec fn_id rhs) (wrap_fn (work_fn (Var fn_id)))) ]
+    do { (useful,_, wrap_fn, work_fn) <- mkWWstr dflags fam_envs False [fn_id']
+       ; let res = [ (fn_id, Let (NonRec fn_id' rhs) (wrap_fn (work_fn (Var fn_id')))) ]
        ; if useful then ASSERT2( isNonRec is_rec, ppr fn_id ) -- The thunk must be non-recursive
                    return res
                    else return [(fn_id, rhs)] }
+  where
+    -- See Note [Splitting absent, top-level thunks]
+    fn_id' = mkSysLocalOrCoVar (getOccFS fn_id)
+                               (idUnique fn_id)
+                               (idMult fn_id)
+                               (idType fn_id)
