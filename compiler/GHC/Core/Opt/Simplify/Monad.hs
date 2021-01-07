@@ -39,7 +39,7 @@ import GHC.Core.Opt.Monad
 import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Utils.Monad
-import GHC.Utils.Error as Err
+import GHC.Utils.Logger as Logger
 import GHC.Utils.Misc      ( count )
 import GHC.Utils.Panic     (throwGhcExceptionIO, GhcException (..))
 import GHC.Types.Basic     ( IntWithInf, treatZeroAsInf, mkIntWithInf )
@@ -80,6 +80,7 @@ pattern SM m <- SM' m
 
 data SimplTopEnv
   = STE { st_flags     :: DynFlags
+        , st_logger    :: !Logger
         , st_max_ticks :: IntWithInf  -- ^ Max #ticks in this simplifier run
         , st_rules     :: RuleEnv
         , st_fams      :: (FamInstEnv, FamInstEnv)
@@ -88,18 +89,19 @@ data SimplTopEnv
             -- ^ Coercion optimiser options
         }
 
-initSmpl :: DynFlags -> RuleEnv -> (FamInstEnv, FamInstEnv)
+initSmpl :: Logger -> DynFlags -> RuleEnv -> (FamInstEnv, FamInstEnv)
          -> UniqSupply          -- No init count; set to 0
          -> Int                 -- Size of the bindings, used to limit
                                 -- the number of ticks we allow
          -> SimplM a
          -> IO (a, SimplCount)
 
-initSmpl dflags rules fam_envs us size m
+initSmpl logger dflags rules fam_envs us size m
   = do (result, _, count) <- unSM m env us (zeroSimplCount dflags)
        return (result, count)
   where
     env = STE { st_flags = dflags
+              , st_logger = logger
               , st_rules = rules
               , st_max_ticks = computeMaxTicks dflags size
               , st_fams = fam_envs
@@ -163,10 +165,11 @@ thenSmpl_ m k
 
 traceSmpl :: String -> SDoc -> SimplM ()
 traceSmpl herald doc
-  = do { dflags <- getDynFlags
-       ; liftIO $ Err.dumpIfSet_dyn dflags Opt_D_dump_simpl_trace "Simpl Trace"
-           FormatText
-           (hang (text herald) 2 doc) }
+  = do dflags <- getDynFlags
+       logger <- getLogger
+       liftIO $ Logger.dumpIfSet_dyn logger dflags Opt_D_dump_simpl_trace "Simpl Trace"
+         FormatText
+         (hang (text herald) 2 doc)
 {-# INLINE traceSmpl #-}  -- see Note [INLINE conditional tracing utilities]
 
 {-
@@ -192,6 +195,9 @@ instance MonadUnique SimplM where
 
 instance HasDynFlags SimplM where
     getDynFlags = SM (\st_env us sc -> return (st_flags st_env, us, sc))
+
+instance HasLogger SimplM where
+    getLogger = SM (\st_env us sc -> return (st_logger st_env, us, sc))
 
 instance MonadIO SimplM where
     liftIO m = SM $ \_ us sc -> do

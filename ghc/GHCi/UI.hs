@@ -54,7 +54,7 @@ import GHC.Driver.Config
 import qualified GHC
 import GHC ( LoadHowMuch(..), Target(..),  TargetId(..),
              Resume, SingleStep, Ghc,
-             GetDocsFailure(..),
+             GetDocsFailure(..), putLogMsgM, pushLogHookM,
              getModuleGraph, handleSourceError, ms_mod )
 import GHC.Driver.Main (hscParseDeclsWithLocation, hscParseStmtWithLocation)
 import GHC.Hs.ImpExp
@@ -81,6 +81,7 @@ import GHC.Unit.Module.ModSummary
 
 import GHC.Data.StringBuffer
 import GHC.Utils.Outputable
+import GHC.Utils.Logger
 
 -- Other random utilities
 import GHC.Types.Basic hiding ( isTopLevel )
@@ -472,13 +473,10 @@ interactiveUI config srcs maybe_exprs = do
                $ dflags
    GHC.setInteractiveDynFlags dflags'
 
+   -- Update the LogAction. Ensure we don't override the user's log action lest
+   -- we break -ddump-json (#14078)
    lastErrLocationsRef <- liftIO $ newIORef []
-   progDynFlags <- GHC.getProgramDynFlags
-   _ <- GHC.setProgramDynFlags $
-      -- Ensure we don't override the user's log action lest we break
-      -- -ddump-json (#14078)
-      progDynFlags { log_action = ghciLogAction (log_action progDynFlags)
-                                                lastErrLocationsRef }
+   pushLogHookM (ghciLogAction lastErrLocationsRef)
 
    when (isNothing maybe_exprs) $ do
         -- Only for GHCi (not runghc and ghc -e):
@@ -570,8 +568,8 @@ resetLastErrorLocations = do
     st <- getGHCiState
     liftIO $ writeIORef (lastErrorLocations st) []
 
-ghciLogAction :: LogAction -> IORef [(FastString, Int)] ->  LogAction
-ghciLogAction old_log_action lastErrLocations
+ghciLogAction :: IORef [(FastString, Int)] -> LogAction -> LogAction
+ghciLogAction lastErrLocations old_log_action
               dflags flag severity srcSpan msg = do
     old_log_action dflags flag severity srcSpan msg
     case severity of
@@ -2952,10 +2950,11 @@ newDynFlags :: GhciMonad m => Bool -> [String] -> m ()
 newDynFlags interactive_only minus_opts = do
       let lopts = map noLoc minus_opts
 
+      logger <- getLogger
       idflags0 <- GHC.getInteractiveDynFlags
-      (idflags1, leftovers, warns) <- GHC.parseDynamicFlags idflags0 lopts
+      (idflags1, leftovers, warns) <- GHC.parseDynamicFlags logger idflags0 lopts
 
-      liftIO $ handleFlagWarnings idflags1 warns
+      liftIO $ handleFlagWarnings logger idflags1 warns
       when (not $ null leftovers)
            (throwGhcException . CmdLineError
             $ "Some flags have not been recognized: "
@@ -2969,7 +2968,7 @@ newDynFlags interactive_only minus_opts = do
       dflags0 <- getDynFlags
 
       when (not interactive_only) $ do
-        (dflags1, _, _) <- liftIO $ GHC.parseDynamicFlags dflags0 lopts
+        (dflags1, _, _) <- liftIO $ GHC.parseDynamicFlags logger dflags0 lopts
         must_reload <- GHC.setProgramDynFlags dflags1
 
         -- if the package flags changed, reset the context and link
@@ -3106,8 +3105,7 @@ showCmd str = do
             , action "bindings"   $ showBindings
             , action "linker"     $ do
                msg <- liftIO $ Loader.showLoaderState (hsc_loader hsc_env)
-               dflags <- getDynFlags
-               liftIO $ putLogMsg dflags NoReason SevDump noSrcSpan msg
+               putLogMsgM NoReason SevDump noSrcSpan msg
             , action "breaks"     $ showBkptTable
             , action "context"    $ showContext
             , action "packages"   $ showUnits
