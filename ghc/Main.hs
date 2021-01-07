@@ -57,6 +57,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Monad       ( liftIO )
 import GHC.Utils.Binary        ( openBinMem, put_ )
+import GHC.Utils.Logger
 
 import GHC.Settings.Config
 import GHC.Settings.Constants
@@ -151,6 +152,8 @@ main = do
 main' :: PostLoadMode -> DynFlags -> [Located String] -> [Warn]
       -> Ghc ()
 main' postLoadMode dflags0 args flagWarnings = do
+  logger <- getLogger
+
   -- set the default GhcMode, backend and GhcLink.  The backend
   -- can be further adjusted on a module by module basis, using only
   -- the -fllvm and -fasm flags.  If the default backend is not
@@ -192,7 +195,7 @@ main' postLoadMode dflags0 args flagWarnings = do
         -- The rest of the arguments are "dynamic"
         -- Leftover ones are presumably files
   (dflags3, fileish_args, dynamicFlagWarnings) <-
-      GHC.parseDynamicFlags dflags2 args
+      GHC.parseDynamicFlags logger dflags2 args
 
   let dflags4 = case bcknd of
                 Interpreter | not (gopt Opt_ExternalInterpreter dflags3) ->
@@ -215,7 +218,7 @@ main' postLoadMode dflags0 args flagWarnings = do
   handleSourceError (\e -> do
        GHC.printException e
        liftIO $ exitWith (ExitFailure 1)) $ do
-         liftIO $ handleFlagWarnings dflags4 flagWarnings'
+         liftIO $ handleFlagWarnings logger dflags4 flagWarnings'
 
   liftIO $ showBanner postLoadMode dflags4
 
@@ -252,7 +255,7 @@ main' postLoadMode dflags0 args flagWarnings = do
        DoFrontend f           -> doFrontend f srcs
        DoBackpack             -> doBackpack (map fst srcs)
 
-  liftIO $ dumpFinalStats dflags6
+  liftIO $ dumpFinalStats logger dflags6
 
 ghciUI :: [(FilePath, Maybe Phase)] -> Maybe [String] -> Ghc ()
 #if !defined(HAVE_INTERNAL_INTERPRETER)
@@ -753,12 +756,12 @@ showUsage ghci dflags = do
      dump ('$':'$':s) = putStr progName >> dump s
      dump (c:s)       = putChar c >> dump s
 
-dumpFinalStats :: DynFlags -> IO ()
-dumpFinalStats dflags =
-  when (gopt Opt_D_faststring_stats dflags) $ dumpFastStringStats dflags
+dumpFinalStats :: Logger -> DynFlags -> IO ()
+dumpFinalStats logger dflags =
+  when (gopt Opt_D_faststring_stats dflags) $ dumpFastStringStats logger dflags
 
-dumpFastStringStats :: DynFlags -> IO ()
-dumpFastStringStats dflags = do
+dumpFastStringStats :: Logger -> DynFlags -> IO ()
+dumpFastStringStats logger dflags = do
   segments <- getFastStringTable
   hasZ <- getFastStringZEncCounter
   let buckets = concat segments
@@ -779,14 +782,14 @@ dumpFastStringStats dflags = do
         -- which is not counted as "z-encoded".  Only strings whose
         -- Z-encoding is different from the original string are counted in
         -- the "z-encoded" total.
-  putMsg dflags msg
+  putMsg logger dflags msg
   where
    x `pcntOf` y = int ((x * 100) `quot` y) Outputable.<> char '%'
 
 showUnits, dumpUnits, dumpUnitsSimple :: HscEnv -> IO ()
 showUnits       hsc_env = putStrLn (showSDoc (hsc_dflags hsc_env) (pprUnits (hsc_units hsc_env)))
-dumpUnits       hsc_env = putMsg (hsc_dflags hsc_env) (pprUnits (hsc_units hsc_env))
-dumpUnitsSimple hsc_env = putMsg (hsc_dflags hsc_env) (pprUnitsSimple (hsc_units hsc_env))
+dumpUnits       hsc_env = putMsg (hsc_logger hsc_env) (hsc_dflags hsc_env) (pprUnits (hsc_units hsc_env))
+dumpUnitsSimple hsc_env = putMsg (hsc_logger hsc_env) (hsc_dflags hsc_env) (pprUnitsSimple (hsc_units hsc_env))
 
 -- -----------------------------------------------------------------------------
 -- Frontend plugin support

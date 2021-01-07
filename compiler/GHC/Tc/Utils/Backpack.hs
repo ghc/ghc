@@ -363,7 +363,7 @@ tcRnCheckUnit ::
     HscEnv -> Unit ->
     IO (Messages DecoratedSDoc, Maybe ())
 tcRnCheckUnit hsc_env uid =
-   withTiming dflags
+   withTiming logger dflags
               (text "Check unit id" <+> ppr uid)
               (const ()) $
    initTc hsc_env
@@ -374,6 +374,7 @@ tcRnCheckUnit hsc_env uid =
     $ checkUnit uid
   where
    dflags = hsc_dflags hsc_env
+   logger = hsc_logger hsc_env
    loc_str = "Command line argument: -unit-id " ++ showSDoc dflags (ppr uid)
 
 -- TODO: Maybe lcl_iface0 should be pre-renamed to the right thing? Unclear...
@@ -383,13 +384,14 @@ tcRnCheckUnit hsc_env uid =
 tcRnMergeSignatures :: HscEnv -> HsParsedModule -> TcGblEnv {- from local sig -} -> ModIface
                     -> IO (Messages DecoratedSDoc, Maybe TcGblEnv)
 tcRnMergeSignatures hsc_env hpm orig_tcg_env iface =
-  withTiming dflags
+  withTiming logger dflags
              (text "Signature merging" <+> brackets (ppr this_mod))
              (const ()) $
   initTc hsc_env HsigFile False this_mod real_loc $
     mergeSignatures hpm orig_tcg_env iface
  where
   dflags   = hsc_dflags hsc_env
+  logger   = hsc_logger hsc_env
   this_mod = mi_module iface
   real_loc = tcg_top_loc orig_tcg_env
 
@@ -914,12 +916,13 @@ tcRnInstantiateSignature ::
     HscEnv -> Module -> RealSrcSpan ->
     IO (Messages DecoratedSDoc, Maybe TcGblEnv)
 tcRnInstantiateSignature hsc_env this_mod real_loc =
-   withTiming dflags
+   withTiming logger dflags
               (text "Signature instantiation"<+>brackets (ppr this_mod))
               (const ()) $
    initTc hsc_env HsigFile False this_mod real_loc $ instantiateSignature
   where
    dflags = hsc_dflags hsc_env
+   logger = hsc_logger hsc_env
 
 exportOccs :: [AvailInfo] -> [OccName]
 exportOccs = concatMap (map occName . availNames)
