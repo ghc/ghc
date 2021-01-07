@@ -2524,7 +2524,7 @@ instance MonadP PV where
       let
         (comment_q', new_ann_comments) = allocateComments l (pv_comment_q acc)
         annotations_comments' = new_ann_comments ++ pv_annotations_comments acc
-        annotations' = ((l,a), [v]) : pv_annotations acc
+        annotations' = (ApiAnnKey l a, [v]) : pv_annotations acc
         acc' = acc
           { pv_annotations = annotations'
           , pv_comment_q = comment_q'
