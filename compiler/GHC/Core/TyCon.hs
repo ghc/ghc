@@ -88,6 +88,7 @@ module GHC.Core.TyCon(
         tyConFamilySize,
         tyConStupidTheta,
         tyConArity,
+        tyConNullaryTy,
         tyConRoles,
         tyConFlavour,
         tyConTuple_maybe, tyConClass_maybe, tyConATs,
@@ -135,7 +136,7 @@ import GHC.Prelude
 import GHC.Platform
 
 import {-# SOURCE #-} GHC.Core.TyCo.Rep
-   ( Kind, Type, PredType, mkForAllTy, mkFunTyMany )
+   ( Kind, Type, PredType, mkForAllTy, mkFunTyMany, mkTyConTy_ )
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr
    ( pprType )
 import {-# SOURCE #-} GHC.Builtin.Types
@@ -416,6 +417,20 @@ See also:
  * [Renaming injectivity annotation] in GHC.Rename.Module
  * [Verifying injectivity annotation] in GHC.Core.FamInstEnv
  * [Type inference for type families with injectivity] in GHC.Tc.Solver.Interact
+
+Note [Sharing nullary TyConApps]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Nullary type constructor applications are extremely common. For this reason
+each TyCon carries with it a @TyConApp tycon []@. This ensures that
+'mkTyConTy' does not need to allocate and eliminates quite a bit of heap
+residency. Furthermore, we use 'mkTyConTy' in the nullary case of 'mkTyConApp',
+ensuring that this function also benefits from sharing.
+
+This optimisation improves allocations in the Cabal test by around 0.3% and
+decreased cache misses measurably.
+
+See #19367.
+
 
 ************************************************************************
 *                                                                      *
@@ -718,6 +733,7 @@ data TyCon
         tyConResKind :: Kind,             -- ^ Result kind
         tyConKind    :: Kind,             -- ^ Kind of this TyCon
         tyConArity   :: Arity,            -- ^ Arity
+        tyConNullaryTy :: Type,
 
         tcRepName :: TyConRepName
     }
@@ -748,6 +764,7 @@ data TyCon
         tyConResKind :: Kind,             -- ^ Result kind
         tyConKind    :: Kind,             -- ^ Kind of this TyCon
         tyConArity   :: Arity,            -- ^ Arity
+        tyConNullaryTy :: Type,           -- ^ A pre-allocated @TyConApp tycon []@
 
               -- The tyConTyVars scope over:
               --
@@ -805,6 +822,7 @@ data TyCon
         tyConResKind :: Kind,             -- ^ Result kind
         tyConKind    :: Kind,             -- ^ Kind of this TyCon
         tyConArity   :: Arity,            -- ^ Arity
+        tyConNullaryTy :: Type,           -- ^ A pre-allocated @TyConApp tycon []@
              -- tyConTyVars scope over: synTcRhs
 
         tcRoles      :: [Role],  -- ^ The role for each type variable
@@ -843,6 +861,7 @@ data TyCon
         tyConResKind :: Kind,             -- ^ Result kind
         tyConKind    :: Kind,             -- ^ Kind of this TyCon
         tyConArity   :: Arity,            -- ^ Arity
+        tyConNullaryTy :: Type,           -- ^ A pre-allocated @TyConApp tycon []@
             -- tyConTyVars connect an associated family TyCon
             -- with its parent class; see GHC.Tc.Validity.checkConsistentFamInst
 
@@ -879,6 +898,7 @@ data TyCon
         tyConResKind :: Kind,             -- ^ Result kind
         tyConKind    :: Kind,             -- ^ Kind of this TyCon
         tyConArity   :: Arity,            -- ^ Arity
+        tyConNullaryTy :: Type,           -- ^ A pre-allocated @TyConApp tycon []@
 
         tcRoles       :: [Role], -- ^ The role for each type variable
                                  -- This list has length = tyConArity
@@ -904,6 +924,7 @@ data TyCon
         tyConResKind :: Kind,             -- ^ Result kind
         tyConKind    :: Kind,             -- ^ Kind of this TyCon
         tyConArity   :: Arity,            -- ^ Arity
+        tyConNullaryTy :: Type,           -- ^ A pre-allocated @TyConApp tycon []@
 
         tcRoles       :: [Role],    -- ^ Roles: N for kind vars, R for type vars
         dataCon       :: DataCon,   -- ^ Corresponding data constructor
@@ -923,6 +944,7 @@ data TyCon
         tyConResKind :: Kind,          -- ^ Result kind
         tyConKind    :: Kind,          -- ^ Kind of this TyCon
         tyConArity   :: Arity,         -- ^ Arity
+        tyConNullaryTy :: Type,           -- ^ A pre-allocated @TyConApp tycon []@
 
           -- NB: the TyConArity of a TcTyCon must match
           -- the number of Required (positional, user-specified)
@@ -1602,15 +1624,18 @@ So we compromise, and move their Kind calculation to the call site.
 -- this functionality
 mkFunTyCon :: Name -> [TyConBinder] -> Name -> TyCon
 mkFunTyCon name binders rep_nm
-  = FunTyCon {
-        tyConUnique  = nameUnique name,
-        tyConName    = name,
-        tyConBinders = binders,
-        tyConResKind = liftedTypeKind,
-        tyConKind    = mkTyConKind binders liftedTypeKind,
-        tyConArity   = length binders,
-        tcRepName    = rep_nm
-    }
+  = let tc =
+          FunTyCon {
+              tyConUnique  = nameUnique name,
+              tyConName    = name,
+              tyConBinders = binders,
+              tyConResKind = liftedTypeKind,
+              tyConKind    = mkTyConKind binders liftedTypeKind,
+              tyConArity   = length binders,
+              tyConNullaryTy = mkTyConTy_ tc,
+              tcRepName    = rep_nm
+          }
+    in tc
 
 -- | This is the making of an algebraic 'TyCon'.
 mkAlgTyCon :: Name
@@ -1626,22 +1651,25 @@ mkAlgTyCon :: Name
            -> Bool              -- ^ Was the 'TyCon' declared with GADT syntax?
            -> TyCon
 mkAlgTyCon name binders res_kind roles cType stupid rhs parent gadt_syn
-  = AlgTyCon {
-        tyConName        = name,
-        tyConUnique      = nameUnique name,
-        tyConBinders     = binders,
-        tyConResKind     = res_kind,
-        tyConKind        = mkTyConKind binders res_kind,
-        tyConArity       = length binders,
-        tyConTyVars      = binderVars binders,
-        tcRoles          = roles,
-        tyConCType       = cType,
-        algTcStupidTheta = stupid,
-        algTcRhs         = rhs,
-        algTcFields      = fieldsOfAlgTcRhs rhs,
-        algTcParent      = ASSERT2( okParent name parent, ppr name $$ ppr parent ) parent,
-        algTcGadtSyntax  = gadt_syn
-    }
+  = let tc =
+          AlgTyCon {
+              tyConName        = name,
+              tyConUnique      = nameUnique name,
+              tyConBinders     = binders,
+              tyConResKind     = res_kind,
+              tyConKind        = mkTyConKind binders res_kind,
+              tyConArity       = length binders,
+              tyConNullaryTy   = mkTyConTy_ tc,
+              tyConTyVars      = binderVars binders,
+              tcRoles          = roles,
+              tyConCType       = cType,
+              algTcStupidTheta = stupid,
+              algTcRhs         = rhs,
+              algTcFields      = fieldsOfAlgTcRhs rhs,
+              algTcParent      = ASSERT2( okParent name parent, ppr name $$ ppr parent ) parent,
+              algTcGadtSyntax  = gadt_syn
+          }
+    in tc
 
 -- | Simpler specialization of 'mkAlgTyCon' for classes
 mkClassTyCon :: Name -> [TyConBinder]
@@ -1661,23 +1689,26 @@ mkTupleTyCon :: Name
              -> AlgTyConFlav
              -> TyCon
 mkTupleTyCon name binders res_kind arity con sort parent
-  = AlgTyCon {
-        tyConUnique      = nameUnique name,
-        tyConName        = name,
-        tyConBinders     = binders,
-        tyConTyVars      = binderVars binders,
-        tyConResKind     = res_kind,
-        tyConKind        = mkTyConKind binders res_kind,
-        tyConArity       = arity,
-        tcRoles          = replicate arity Representational,
-        tyConCType       = Nothing,
-        algTcGadtSyntax  = False,
-        algTcStupidTheta = [],
-        algTcRhs         = TupleTyCon { data_con = con,
-                                        tup_sort = sort },
-        algTcFields      = emptyDFsEnv,
-        algTcParent      = parent
-    }
+  = let tc =
+          AlgTyCon {
+              tyConUnique      = nameUnique name,
+              tyConName        = name,
+              tyConBinders     = binders,
+              tyConTyVars      = binderVars binders,
+              tyConResKind     = res_kind,
+              tyConKind        = mkTyConKind binders res_kind,
+              tyConArity       = arity,
+              tyConNullaryTy   = mkTyConTy_ tc,
+              tcRoles          = replicate arity Representational,
+              tyConCType       = Nothing,
+              algTcGadtSyntax  = False,
+              algTcStupidTheta = [],
+              algTcRhs         = TupleTyCon { data_con = con,
+                                              tup_sort = sort },
+              algTcFields      = emptyDFsEnv,
+              algTcParent      = parent
+          }
+    in tc
 
 mkSumTyCon :: Name
              -> [TyConBinder]
@@ -1688,22 +1719,25 @@ mkSumTyCon :: Name
              -> AlgTyConFlav
              -> TyCon
 mkSumTyCon name binders res_kind arity tyvars cons parent
-  = AlgTyCon {
-        tyConUnique      = nameUnique name,
-        tyConName        = name,
-        tyConBinders     = binders,
-        tyConTyVars      = tyvars,
-        tyConResKind     = res_kind,
-        tyConKind        = mkTyConKind binders res_kind,
-        tyConArity       = arity,
-        tcRoles          = replicate arity Representational,
-        tyConCType       = Nothing,
-        algTcGadtSyntax  = False,
-        algTcStupidTheta = [],
-        algTcRhs         = mkSumTyConRhs cons,
-        algTcFields      = emptyDFsEnv,
-        algTcParent      = parent
-    }
+  = let tc =
+          AlgTyCon {
+              tyConUnique      = nameUnique name,
+              tyConName        = name,
+              tyConBinders     = binders,
+              tyConTyVars      = tyvars,
+              tyConResKind     = res_kind,
+              tyConKind        = mkTyConKind binders res_kind,
+              tyConArity       = arity,
+              tyConNullaryTy   = mkTyConTy_ tc,
+              tcRoles          = replicate arity Representational,
+              tyConCType       = Nothing,
+              algTcGadtSyntax  = False,
+              algTcStupidTheta = [],
+              algTcRhs         = mkSumTyConRhs cons,
+              algTcFields      = emptyDFsEnv,
+              algTcParent      = parent
+          }
+    in tc
 
 -- | Makes a tycon suitable for use during type-checking. It stores
 -- a variety of details about the definition of the TyCon, but no
@@ -1721,16 +1755,19 @@ mkTcTyCon :: Name
           -> TyConFlavour        -- ^ What sort of 'TyCon' this represents
           -> TyCon
 mkTcTyCon name binders res_kind scoped_tvs poly flav
-  = TcTyCon { tyConUnique  = getUnique name
-            , tyConName    = name
-            , tyConTyVars  = binderVars binders
-            , tyConBinders = binders
-            , tyConResKind = res_kind
-            , tyConKind    = mkTyConKind binders res_kind
-            , tyConArity   = length binders
-            , tcTyConScopedTyVars = scoped_tvs
-            , tcTyConIsPoly       = poly
-            , tcTyConFlavour      = flav }
+  = let tc =
+          TcTyCon { tyConUnique  = getUnique name
+                  , tyConName    = name
+                  , tyConTyVars  = binderVars binders
+                  , tyConBinders = binders
+                  , tyConResKind = res_kind
+                  , tyConKind    = mkTyConKind binders res_kind
+                  , tyConArity   = length binders
+                  , tyConNullaryTy = mkTyConTy_ tc
+                  , tcTyConScopedTyVars = scoped_tvs
+                  , tcTyConIsPoly       = poly
+                  , tcTyConFlavour      = flav }
+    in tc
 
 -- | No scoped type variables (to be used with mkTcTyCon).
 noTcTyConScopedTyVars :: [(Name, TcTyVar)]
@@ -1767,55 +1804,64 @@ mkPrimTyCon' :: Name -> [TyConBinder]
              -> [Role]
              -> Bool -> Maybe TyConRepName -> TyCon
 mkPrimTyCon' name binders res_kind roles is_unlifted rep_nm
-  = PrimTyCon {
-        tyConName    = name,
-        tyConUnique  = nameUnique name,
-        tyConBinders = binders,
-        tyConResKind = res_kind,
-        tyConKind    = mkTyConKind binders res_kind,
-        tyConArity   = length roles,
-        tcRoles      = roles,
-        isUnlifted   = is_unlifted,
-        primRepName  = rep_nm
-    }
+  = let tc =
+          PrimTyCon {
+              tyConName    = name,
+              tyConUnique  = nameUnique name,
+              tyConBinders = binders,
+              tyConResKind = res_kind,
+              tyConKind    = mkTyConKind binders res_kind,
+              tyConArity   = length roles,
+              tyConNullaryTy = mkTyConTy_ tc,
+              tcRoles      = roles,
+              isUnlifted   = is_unlifted,
+              primRepName  = rep_nm
+          }
+    in tc
 
 -- | Create a type synonym 'TyCon'
 mkSynonymTyCon :: Name -> [TyConBinder] -> Kind   -- ^ /result/ kind
                -> [Role] -> Type -> Bool -> Bool -> Bool -> TyCon
 mkSynonymTyCon name binders res_kind roles rhs is_tau is_fam_free is_forgetful
-  = SynonymTyCon {
-        tyConName      = name,
-        tyConUnique    = nameUnique name,
-        tyConBinders   = binders,
-        tyConResKind   = res_kind,
-        tyConKind      = mkTyConKind binders res_kind,
-        tyConArity     = length binders,
-        tyConTyVars    = binderVars binders,
-        tcRoles        = roles,
-        synTcRhs       = rhs,
-        synIsTau       = is_tau,
-        synIsFamFree   = is_fam_free,
-        synIsForgetful = is_forgetful
-    }
+  = let tc =
+          SynonymTyCon {
+              tyConName      = name,
+              tyConUnique    = nameUnique name,
+              tyConBinders   = binders,
+              tyConResKind   = res_kind,
+              tyConKind      = mkTyConKind binders res_kind,
+              tyConArity     = length binders,
+              tyConNullaryTy = mkTyConTy_ tc,
+              tyConTyVars    = binderVars binders,
+              tcRoles        = roles,
+              synTcRhs       = rhs,
+              synIsTau       = is_tau,
+              synIsFamFree   = is_fam_free,
+              synIsForgetful = is_forgetful
+          }
+    in tc
 
 -- | Create a type family 'TyCon'
 mkFamilyTyCon :: Name -> [TyConBinder] -> Kind  -- ^ /result/ kind
               -> Maybe Name -> FamTyConFlav
               -> Maybe Class -> Injectivity -> TyCon
 mkFamilyTyCon name binders res_kind resVar flav parent inj
-  = FamilyTyCon
-      { tyConUnique  = nameUnique name
-      , tyConName    = name
-      , tyConBinders = binders
-      , tyConResKind = res_kind
-      , tyConKind    = mkTyConKind binders res_kind
-      , tyConArity   = length binders
-      , tyConTyVars  = binderVars binders
-      , famTcResVar  = resVar
-      , famTcFlav    = flav
-      , famTcParent  = classTyCon <$> parent
-      , famTcInj     = inj
-      }
+  = let tc =
+          FamilyTyCon
+            { tyConUnique  = nameUnique name
+            , tyConName    = name
+            , tyConBinders = binders
+            , tyConResKind = res_kind
+            , tyConKind    = mkTyConKind binders res_kind
+            , tyConArity   = length binders
+            , tyConNullaryTy = mkTyConTy_ tc
+            , tyConTyVars  = binderVars binders
+            , famTcResVar  = resVar
+            , famTcFlav    = flav
+            , famTcParent  = classTyCon <$> parent
+            , famTcInj     = inj
+            }
+    in tc
 
 
 -- | Create a promoted data constructor 'TyCon'
@@ -1826,18 +1872,21 @@ mkPromotedDataCon :: DataCon -> Name -> TyConRepName
                   -> [TyConTyCoBinder] -> Kind -> [Role]
                   -> RuntimeRepInfo -> TyCon
 mkPromotedDataCon con name rep_name binders res_kind roles rep_info
-  = PromotedDataCon {
-        tyConUnique   = nameUnique name,
-        tyConName     = name,
-        tyConArity    = length roles,
-        tcRoles       = roles,
-        tyConBinders  = binders,
-        tyConResKind  = res_kind,
-        tyConKind     = mkTyConKind binders res_kind,
-        dataCon       = con,
-        tcRepName     = rep_name,
-        promDcRepInfo = rep_info
-  }
+  = let tc =
+          PromotedDataCon {
+            tyConUnique   = nameUnique name,
+            tyConName     = name,
+            tyConArity    = length roles,
+            tyConNullaryTy = mkTyConTy_ tc,
+            tcRoles       = roles,
+            tyConBinders  = binders,
+            tyConResKind  = res_kind,
+            tyConKind     = mkTyConKind binders res_kind,
+            dataCon       = con,
+            tcRepName     = rep_name,
+            promDcRepInfo = rep_info
+          }
+    in tc
 
 isFunTyCon :: TyCon -> Bool
 isFunTyCon (FunTyCon {}) = True
@@ -2217,7 +2266,11 @@ setTcTyConKind :: TyCon -> Kind -> TyCon
 -- The new kind is always a zonked version of its previous
 -- kind, so we don't need to update any other fields.
 -- See Note [The Purely Kinded Invariant] in GHC.Tc.Gen.HsType
-setTcTyConKind tc@(TcTyCon {}) kind = tc { tyConKind = kind }
+setTcTyConKind tc@(TcTyCon {}) kind = let tc' = tc { tyConKind = kind
+                                                   , tyConNullaryTy = mkTyConTy_ tc'
+                                                       -- see Note [Sharing nullary TyCons]
+                                                   }
+                                      in tc'
 setTcTyConKind tc              _    = pprPanic "setTcTyConKind" (ppr tc)
 
 -- | Could this TyCon ever be levity-polymorphic when fully applied?

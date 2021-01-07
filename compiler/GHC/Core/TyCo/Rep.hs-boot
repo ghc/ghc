@@ -3,6 +3,7 @@ module GHC.Core.TyCo.Rep where
 import GHC.Utils.Outputable ( Outputable )
 import Data.Data  ( Data )
 import {-# SOURCE #-} GHC.Types.Var( Var, ArgFlag, AnonArgFlag )
+import {-# SOURCE #-} GHC.Core.TyCon ( TyCon )
 
 data Type
 data Coercion
@@ -22,6 +23,7 @@ type MCoercionN = MCoercion
 
 mkFunTyMany :: AnonArgFlag -> Type -> Type -> Type
 mkForAllTy :: Var -> ArgFlag -> Type -> Type
+mkTyConTy_ :: TyCon -> Type
 
 instance Data Type  -- To support Data instances in GHC.Core.Coercion.Axiom
 instance Outputable Type

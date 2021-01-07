@@ -1490,6 +1490,31 @@ tyConBindersTyCoBinders = map to_tyb
     to_tyb (Bndr tv (NamedTCB vis)) = Named (Bndr tv vis)
     to_tyb (Bndr tv (AnonTCB af))   = Anon af (tymult (varType tv))
 
+-- | Create the plain type constructor type which has been applied to no type arguments at all.
+mkTyConTy :: TyCon -> Type
+mkTyConTy tycon = tyConNullaryTy tycon
+  -- see Note [Sharing nullary TyConApps] in GHC.Core.TyCon
+
+-- | A key function: builds a 'TyConApp' or 'FunTy' as appropriate to
+-- its arguments.  Applies its arguments to the constructor from left to right.
+mkTyConApp :: TyCon -> [Type] -> Type
+mkTyConApp tycon tys
+  | [] <- tys
+  = mkTyConTy tycon
+
+  | isFunTyCon tycon
+  , [w, _rep1,_rep2,ty1,ty2] <- tys
+  -- The FunTyCon (->) is always a visible one
+  = FunTy { ft_af = VisArg, ft_mult = w, ft_arg = ty1, ft_res = ty2 }
+
+  -- See Note [Prefer Type over TYPE 'LiftedRep].
+  | tycon `hasKey` tYPETyConKey
+  , [rep] <- tys
+  = tYPE rep
+  -- The catch-all case
+  | otherwise
+  = TyConApp tycon tys
+
 
 {-
 --------------------------------------------------------------------
@@ -2254,7 +2279,6 @@ But the left is an AppTy while the right is a TyConApp. The solution is
 to use repSplitAppTy_maybe to break up the TyConApp into its pieces and
 then continue. Easy to do, but also easy to forget to do.
 
-
 Note [Comparing nullary type synonyms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider the task of testing equality between two 'Type's of the form
@@ -2281,7 +2305,7 @@ We perform this optimisation in a number of places:
 
 This optimisation is especially helpful for the ubiquitous GHC.Types.Type,
 since GHC prefers to use the type synonym over @TYPE 'LiftedRep@ applications
-whenever possible. See [Prefer Type over TYPE 'LiftedRep] in
+whenever possible. See Note [Prefer Type over TYPE 'LiftedRep] in
 GHC.Core.TyCo.Rep for details.
 
 -}
