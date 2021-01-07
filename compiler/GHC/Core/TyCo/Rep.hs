@@ -1081,6 +1081,10 @@ To accomplish these we use a number of tricks:
     handles them using 'GHC.Builtin.Types.Prim.tYPE', ensuring
     that it benefits from the optimisation described above (goal (a)).
 
+ 5. Finally, to ensure that 'liftedTypeKindTyCon' is just plain static data
+    (and not a CAF which will incur a tag check) we takes pains to ensure that
+    its RHS (defined in terms of GHC.Core.Type.buildSynTyCon) inlines.
+
 Note that it's quite important that we do not define 'liftedTypeKind' in terms
 of 'mkTyConApp' since this tricks (1) and (4) would then result in a loop.
 

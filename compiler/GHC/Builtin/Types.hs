@@ -1413,10 +1413,12 @@ runtimeRepTy = mkTyConTy runtimeRepTyCon
 
 -- Type synonyms; see Note [TYPE and RuntimeRep] in GHC.Builtin.Types.Prim
 -- and Note [Prefer Type over TYPE 'LiftedRep] in GHC.Core.TyCo.Rep.
+-- We take cares to ensure that buildSynTyCon is inlined, ensuring that
+-- this binding is a static data constructor application.
 -- type Type = tYPE 'LiftedRep
 liftedTypeKindTyCon :: TyCon
 liftedTypeKindTyCon   = buildSynTyCon liftedTypeKindTyConName
-                                       [] liftedTypeKind [] rhs
+                                      [] liftedTypeKind [] rhs
   where rhs = TyCoRep.TyConApp tYPETyCon [liftedRepTy]
 
 runtimeRepTyCon :: TyCon

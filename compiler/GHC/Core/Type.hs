@@ -2014,14 +2014,25 @@ buildSynTyCon :: Name -> [KnotTied TyConBinder] -> Kind   -- ^ /result/ kind
 -- This function is here because here is where we have
 --   isFamFree and isTauTy
 buildSynTyCon name binders res_kind roles rhs
-  = mkSynonymTyCon name binders res_kind roles rhs is_tau is_fam_free is_forgetful
+  = mkSynonymTyCon name binders res_kind roles rhs is_tau is_fam_free (is_forgetful binders rhs)
   where
     is_tau       = isTauTy rhs
     is_fam_free  = isFamFreeTy rhs
-    is_forgetful = any (not . (`elemVarSet` tyCoVarsOfType rhs) . binderVar) binders ||
-                   uniqSetAny isForgetfulSynTyCon (tyConsOfType rhs)
          -- NB: This is allowed to be conservative, returning True more often
          -- than it should. See comments on GHC.Core.TyCon.isForgetfulSynTyCon
+{-# INLINE buildSynTyCon #-}
+-- This function ultimately just produces a data constructor
+-- application. Good things happen when this is obvious to
+-- GHC. In particular see Note [Prefer Type over TYPE
+-- 'LiftedRep] in GHC.Core.TyCo.Rep (point 5 in particular).
+
+-- A helper for buildSynTyCon.
+is_forgetful :: [KnotTied TyConBinder] -> KnotTied Type -> Bool
+is_forgetful binders rhs
+  = any (not . (`elemVarSet` fvs) . binderVar) binders ||
+    uniqSetAny isForgetfulSynTyCon (tyConsOfType rhs)
+  where
+    fvs = tyCoVarsOfType rhs
 
 {-
 ************************************************************************
