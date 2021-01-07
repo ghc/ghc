@@ -780,10 +780,9 @@ exhaustive list). How we deal with pattern match failure is context-dependent.
    entirely. So, for list comprehensions, the fail function is set to 'Nothing'
    for clarity.
 
- * In the case of monadic contexts (e.g. monad comprehensions, do, and mdo
-   expressions) we want pattern match failure to be desugared to the appropriate
-   'fail' function (either that of Monad or MonadFail, depending on whether
-   -XMonadFailDesugaring is enabled.)
+* In the case of monadic contexts (e.g. monad comprehensions, do, and mdo
+   expressions) we want pattern match failure to be desugared to the
+   'fail' function (from MonadFail type class).
 
 At one point we failed to make this distinction, leading to #11216.
 -}
