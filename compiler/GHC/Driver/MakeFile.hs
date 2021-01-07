@@ -42,6 +42,7 @@ import GHC.Unit.Finder
 
 import GHC.Utils.Exception
 import GHC.Utils.Error
+import GHC.Utils.Logger
 
 import System.Directory
 import System.FilePath
@@ -60,6 +61,8 @@ import qualified Data.Set as Set
 
 doMkDependHS :: GhcMonad m => [FilePath] -> m ()
 doMkDependHS srcs = do
+    logger <- getLogger
+
     -- Initialisation
     dflags0 <- GHC.getSessionDynFlags
 
@@ -79,7 +82,7 @@ doMkDependHS srcs = do
     when (null (depSuffixes dflags)) $ liftIO $
         throwGhcExceptionIO (ProgramError "You must specify at least one -dep-suffix")
 
-    files <- liftIO $ beginMkDependHS dflags
+    files <- liftIO $ beginMkDependHS logger dflags
 
     -- Do the downsweep to find all the modules
     targets <- mapM (\s -> GHC.guessTarget s Nothing) srcs
@@ -92,7 +95,7 @@ doMkDependHS srcs = do
     let sorted = GHC.topSortModuleGraph False module_graph Nothing
 
     -- Print out the dependencies if wanted
-    liftIO $ debugTraceMsg dflags 2 (text "Module dependencies" $$ ppr sorted)
+    liftIO $ debugTraceMsg logger dflags 2 (text "Module dependencies" $$ ppr sorted)
 
     -- Process them one by one, dumping results into makefile
     -- and complaining about cycles
@@ -101,10 +104,10 @@ doMkDependHS srcs = do
     mapM_ (liftIO . processDeps dflags hsc_env excl_mods root (mkd_tmp_hdl files)) sorted
 
     -- If -ddump-mod-cycles, show cycles in the module graph
-    liftIO $ dumpModCycles dflags module_graph
+    liftIO $ dumpModCycles logger dflags module_graph
 
     -- Tidy up
-    liftIO $ endMkDependHS dflags files
+    liftIO $ endMkDependHS logger dflags files
 
     -- Unconditional exiting is a bad idea.  If an error occurs we'll get an
     --exception; if that is not caught it's fine, but at least we have a
@@ -128,11 +131,11 @@ data MkDepFiles
             mkd_tmp_file  :: FilePath,          -- Name of the temporary file
             mkd_tmp_hdl   :: Handle }           -- Handle of the open temporary file
 
-beginMkDependHS :: DynFlags -> IO MkDepFiles
-beginMkDependHS dflags = do
+beginMkDependHS :: Logger -> DynFlags -> IO MkDepFiles
+beginMkDependHS logger dflags = do
         -- open a new temp file in which to stuff the dependency info
         -- as we go along.
-  tmp_file <- newTempName dflags TFL_CurrentModule "dep"
+  tmp_file <- newTempName logger dflags TFL_CurrentModule "dep"
   tmp_hdl <- openFile tmp_file WriteMode
 
         -- open the makefile
@@ -338,9 +341,9 @@ insertSuffixes file_name extras
 --
 -----------------------------------------------------------------
 
-endMkDependHS :: DynFlags -> MkDepFiles -> IO ()
+endMkDependHS :: Logger -> DynFlags -> MkDepFiles -> IO ()
 
-endMkDependHS dflags
+endMkDependHS logger dflags
    (MkDep { mkd_make_file = makefile, mkd_make_hdl =  makefile_hdl,
             mkd_tmp_file  = tmp_file, mkd_tmp_hdl  =  tmp_hdl })
   = do
@@ -366,27 +369,27 @@ endMkDependHS dflags
 
         -- Create a backup of the original makefile
   when (isJust makefile_hdl)
-       (SysTools.copy dflags ("Backing up " ++ makefile)
+       (SysTools.copy logger dflags ("Backing up " ++ makefile)
           makefile (makefile++".bak"))
 
         -- Copy the new makefile in place
-  SysTools.copy dflags "Installing new makefile" tmp_file makefile
+  SysTools.copy logger dflags "Installing new makefile" tmp_file makefile
 
 
 -----------------------------------------------------------------
 --              Module cycles
 -----------------------------------------------------------------
 
-dumpModCycles :: DynFlags -> ModuleGraph -> IO ()
-dumpModCycles dflags module_graph
+dumpModCycles :: Logger -> DynFlags -> ModuleGraph -> IO ()
+dumpModCycles logger dflags module_graph
   | not (dopt Opt_D_dump_mod_cycles dflags)
   = return ()
 
   | null cycles
-  = putMsg dflags (text "No module cycles")
+  = putMsg logger dflags (text "No module cycles")
 
   | otherwise
-  = putMsg dflags (hang (text "Module cycles found:") 2 pp_cycles)
+  = putMsg logger dflags (hang (text "Module cycles found:") 2 pp_cycles)
   where
     topoSort = filterToposortToModules $
       GHC.topSortModuleGraph True module_graph Nothing
