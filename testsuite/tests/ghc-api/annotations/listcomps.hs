@@ -56,7 +56,7 @@ testOneFile libdir fileName = do
 
     where
       getAnnSrcSpans :: ApiAnns -> [(RealSrcSpan,(ApiAnnKey,[RealSrcSpan]))]
-      getAnnSrcSpans anns = map (\a@((ss,_),_) -> (ss,a)) $ Map.toList (apiAnnItems anns)
+      getAnnSrcSpans anns = map (\a@(ApiAnnKey ss _, _) -> (ss,a)) $ Map.toList (apiAnnItems anns)
 
       getAllSrcSpans :: (Data t) => t -> [RealSrcSpan]
       getAllSrcSpans ast = everything (++) ([] `mkQ` getSrcSpan) ast
@@ -66,7 +66,7 @@ testOneFile libdir fileName = do
           getSrcSpan (UnhelpfulSpan _) = []
 
 showAnns anns = "[\n" ++ (intercalate "\n"
-   $ map (\((s,k),v)
+   $ map (\(ApiAnnKey s k, v)
               -> ("(AK " ++ pp s ++ " " ++ show k ++" = " ++ pp v ++ ")\n"))
    $ Map.toList anns)
     ++ "]\n"

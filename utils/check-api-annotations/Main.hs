@@ -10,7 +10,6 @@ import System.Environment( getArgs )
 import System.Exit
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import Data.Maybe( isJust )
 
 main::IO()
 main = do
@@ -46,7 +45,7 @@ testOneFile libdir fileName = do
            ann_items = apiAnnItems anns
 
            exploded = [((kw,ss),[anchor])
-                      | ((anchor,kw),sss) <- Map.toList ann_items,ss <- sss]
+                      | (ApiAnnKey anchor kw,sss) <- Map.toList ann_items,ss <- sss]
 
            exploded' = Map.toList $ Map.fromListWith (++) exploded
 
@@ -56,7 +55,7 @@ testOneFile libdir fileName = do
 
            -- Check that every annotation location in 'vs' appears after
            -- the start of the enclosing span 's'
-           comesBefore ((s,_),vs) = not $ all ok vs
+           comesBefore (ApiAnnKey s _,vs) = not $ all ok vs
              where ok v = realSrcSpanStart s <= realSrcSpanStart v
 
            precedingProblems = filter comesBefore $ Map.toList ann_items
@@ -72,7 +71,7 @@ testOneFile libdir fileName = do
        putStrLn (showAnns ann_items)
        putStrLn "---Eof Position (should be Just)-----"
        putStrLn (show (apiAnnEofPos anns))
-       if null problems' && null precedingProblems && isJust (apiAnnEofPos anns)
+       if null problems' && null precedingProblems && not (null (apiAnnEofPos anns))
           then exitSuccess
           else exitFailure
 
@@ -90,7 +89,7 @@ showAnns anns = showAnnsList $ Map.toList anns
 
 showAnnsList :: [(ApiAnnKey, [RealSrcSpan])] -> String
 showAnnsList annsList = "[\n" ++ (intercalate ",\n"
-   $ map (\((s,k),v)
+   $ map (\(ApiAnnKey s k,v)
               -> ("((" ++ pp s ++ "," ++ show k ++"), " ++ pp v ++ ")"))
    annsList)
     ++ "\n]\n"
