@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wwarn #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ViewPatterns #-}
   -----------------------------------------------------------------------------
 -- |
@@ -22,7 +23,7 @@ module Haddock.Interface.LexParseRn
 import GHC.Types.Avail
 import Control.Arrow
 import Control.Monad
-import Data.List
+import Data.List ((\\), maximumBy)
 import Data.Ord
 import Documentation.Haddock.Doc (metaDocConcat)
 import GHC.Driver.Session (languageExtensions)

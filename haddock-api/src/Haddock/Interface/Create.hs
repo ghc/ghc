@@ -1,6 +1,8 @@
-{-# LANGUAGE CPP, TupleSections, BangPatterns, LambdaCase, NamedFieldPuns #-}
+{-# LANGUAGE StandaloneDeriving, FlexibleInstances, MultiParamTypeClasses, CPP, TupleSections, BangPatterns, LambdaCase, NamedFieldPuns, ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# OPTIONS_GHC -Wwarn #-}
 -----------------------------------------------------------------------------
 -- |
@@ -18,43 +20,42 @@
 -- which creates a Haddock 'Interface' from the typechecking
 -- results 'TypecheckedModule' from GHC.
 -----------------------------------------------------------------------------
-module Haddock.Interface.Create (createInterface, createInterface1) where
+module Haddock.Interface.Create (IfM, runIfM, createInterface1) where
 
 import Documentation.Haddock.Doc (metaDocAppend)
-import Haddock.Types
+import Haddock.Types hiding (liftErrMsg)
 import Haddock.Options
 import Haddock.GhcUtils
 import Haddock.Utils
 import Haddock.Convert
 import Haddock.Interface.LexParseRn
 
-import Data.Bifunctor
+import Control.Monad.Reader
+import Control.Monad.Writer.Strict hiding (tell)
 import Data.Bitraversable
 import qualified Data.Map as M
 import Data.Map (Map)
 import Data.List
 import Data.Maybe
-import Control.Monad
 import Data.Traversable
 
 import GHC.Tc.Utils.Monad (finalSafeMode)
 import GHC.Types.Avail hiding (avail)
 import qualified GHC.Types.Avail  as Avail
 import qualified GHC.Unit.Module as Module
-import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.ModSummary
 import qualified GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.SourceFile
+import GHC.Core.Class
 import GHC.Core.ConLike (ConLike(..))
-import GHC
+import GHC hiding (lookupName)
 import GHC.Driver.Ppr
-import GHC.Driver.Env
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Unit.State
 import GHC.Types.Name.Reader
-import GHC.Tc.Types
+import GHC.Tc.Types hiding (IfM)
 import GHC.Data.FastString ( unpackFS, bytesFS )
 import GHC.Types.Basic ( PromotionFlag(..) )
 import GHC.Types.SourceText
@@ -65,14 +66,68 @@ import GHC.Parser.Annotation (IsUnicodeSyntax(..))
 import GHC.Unit.Module.Warnings
 
 
+newtype IfEnv m = IfEnv
+  {
+    -- | Lookup names in the enviroment.
+    ife_lookup_name :: Name -> m (Maybe TyThing)
+  }
+
+
+-- | A monad in which we create Haddock interfaces. Not to be confused with
+-- `GHC.Tc.Types.IfM` which is used to write GHC interfaces.
+--
+-- In the past `createInterface` was running in the `Ghc` monad but proved hard
+-- to sustain as soon as we moved over for Haddock to be a plugin. Also abstracting
+-- over the Ghc specific clarifies where side effects happen.
+newtype IfM m a = IfM { unIfM :: ReaderT (IfEnv m) (WriterT [ErrMsg] m) a }
+
+
+deriving newtype instance Functor m => Functor (IfM m)
+deriving newtype instance Applicative m => Applicative (IfM m)
+deriving newtype instance Monad m => Monad (IfM m)
+deriving newtype instance MonadIO m => MonadIO (IfM m)
+deriving newtype instance Monad m => MonadReader (IfEnv m) (IfM m)
+deriving newtype instance Monad m => MonadWriter [ErrMsg] (IfM m)
+
+
+-- | Run an `IfM` action.
+runIfM
+  -- | Lookup a global name in the current session. Used in cases
+  -- where declarations don't
+  :: (Name -> m (Maybe TyThing))
+  -- | The action to run.
+  -> IfM m a
+  -- | Result and accumulated error/warning messages.
+  -> m (a, [ErrMsg])
+runIfM lookup_name action = do
+  let
+    if_env = IfEnv
+      {
+        ife_lookup_name = lookup_name
+      }
+  runWriterT (runReaderT (unIfM action) if_env)
+
+
+liftErrMsg :: Monad m => ErrMsgM a -> IfM m a
+liftErrMsg action = do
+  writer (runWriter action)
+
+
+lookupName :: Monad m => Name -> IfM m (Maybe TyThing)
+lookupName name = IfM $ do
+  lookup_name <- asks ife_lookup_name
+  lift $ lift (lookup_name name)
+
+
 createInterface1
-  :: [Flag]
+  :: MonadIO m
+  => [Flag]
   -> UnitState
   -> ModSummary
   -> TcGblEnv
   -> IfaceMap
   -> InstIfaceMap
-  -> ErrMsgGhc Interface
+  -> IfM m Interface
 createInterface1 flags unit_state mod_sum tc_gbl_env ifaces inst_ifaces = do
 
   let
@@ -134,7 +189,7 @@ createInterface1 flags unit_state mod_sum tc_gbl_env ifaces inst_ifaces = do
 
   decls <- case tcg_rn_decls of
     Nothing -> do
-      liftErrMsg $ tell [ "Warning: Renamed source is not available" ]
+      tell [ "Warning: Renamed source is not available" ]
       pure []
     Just dx ->
       pure (topDecls dx)
@@ -248,142 +303,6 @@ createInterface1 flags unit_state mod_sum tc_gbl_env ifaces inst_ifaces = do
     , ifaceWarningMap        = warnings
     , ifaceDynFlags          = dflags
     }
-
-
--- | Use a 'TypecheckedModule' to produce an 'Interface'.
--- To do this, we need access to already processed modules in the topological
--- sort. That's what's in the 'IfaceMap'.
-createInterface :: TypecheckedModule
-                -> UnitState
-                -> [Flag]       -- Boolean flags
-                -> IfaceMap     -- Locally processed modules
-                -> InstIfaceMap -- External, already installed interfaces
-                -> ErrMsgGhc Interface
-createInterface tm unit_state flags modMap instIfaceMap = do
-
-  let ms             = pm_mod_summary . tm_parsed_module $ tm
-      mi             = moduleInfo tm
-      L _ hsm        = parsedSource tm
-      !safety        = modInfoSafe mi
-      mdl            = ms_mod ms
-      sem_mdl        = tcg_semantic_mod (fst (tm_internals_ tm))
-      is_sig         = ms_hsc_src ms == HsigFile
-      dflags         = ms_hspp_opts ms
-      !instances     = modInfoInstances mi
-      !fam_instances = md_fam_insts md
-      !exportedNames = modInfoExportsWithSelectors mi
-      (pkgNameFS, _) = modulePackageInfo unit_state flags (Just mdl)
-      pkgName        = fmap (unpackFS . (\(PackageName n) -> n)) pkgNameFS
-
-      (TcGblEnv { tcg_rdr_env = gre
-                , tcg_warns   = warnings
-                , tcg_exports = all_exports
-                }, md) = tm_internals_ tm
-
-  -- The 'pkgName' is necessary to decide what package to mention in "@since"
-  -- annotations. Not having it is not fatal though.
-  --
-  -- Cabal can be trusted to pass the right flags, so this warning should be
-  -- mostly encountered when running Haddock outside of Cabal.
-  when (isNothing pkgName) $
-    liftErrMsg $ tell [ "Warning: Package name is not available." ]
-
-  -- The renamed source should always be available to us, but it's best
-  -- to be on the safe side.
-  (group_, imports, mayExports, mayDocHeader) <-
-    case renamedSource tm of
-      Nothing -> do
-        liftErrMsg $ tell [ "Warning: Renamed source is not available." ]
-        return (emptyRnGroup, [], Nothing, Nothing)
-      Just x -> return x
-
-  opts <- liftErrMsg $ mkDocOpts (haddockOptions dflags) flags mdl
-
-  -- Process the top-level module header documentation.
-  (!info, mbDoc) <- liftErrMsg $ processModuleHeader dflags pkgName gre safety mayDocHeader
-
-  let declsWithDocs = topDecls group_
-
-      exports0 = fmap (map (first unLoc)) mayExports
-      exports
-        | OptIgnoreExports `elem` opts = Nothing
-        | otherwise = exports0
-
-      unrestrictedImportedMods
-        -- module re-exports are only possible with
-        -- explicit export list
-        | Just{} <- exports
-        = unrestrictedModuleImports (map unLoc imports)
-        | otherwise = M.empty
-
-      fixMap = mkFixMap group_
-      (decls, _) = unzip declsWithDocs
-      localInsts = filter (nameIsLocalOrFrom sem_mdl)
-                        $  map getName instances
-                        ++ map getName fam_instances
-      -- Locations of all TH splices
-      splices = [ l | L l (SpliceD _ _) <- hsmodDecls hsm ]
-
-  warningMap <- liftErrMsg (mkWarningMap dflags warnings gre exportedNames)
-
-  maps@(!docMap, !argMap, !declMap, _) <-
-    liftErrMsg (mkMaps dflags pkgName gre localInsts declsWithDocs)
-
-  let allWarnings = M.unions (warningMap : map ifaceWarningMap (M.elems modMap))
-
-  -- The MAIN functionality: compute the export items which will
-  -- each be the actual documentation of this module.
-  exportItems <- mkExportItems is_sig modMap pkgName mdl sem_mdl allWarnings gre
-                   exportedNames decls maps fixMap unrestrictedImportedMods
-                   splices exports all_exports instIfaceMap dflags
-
-  let !visibleNames = mkVisibleNames maps exportItems opts
-
-  -- Measure haddock documentation coverage.
-  let prunedExportItems0 = pruneExportItems exportItems
-      !haddockable = 1 + length exportItems -- module + exports
-      !haddocked = (if isJust mbDoc then 1 else 0) + length prunedExportItems0
-      !coverage = (haddockable, haddocked)
-
-  -- Prune the export list to just those declarations that have
-  -- documentation, if the 'prune' option is on.
-  let prunedExportItems'
-        | OptPrune `elem` opts = prunedExportItems0
-        | otherwise = exportItems
-      !prunedExportItems = seqList prunedExportItems' `seq` prunedExportItems'
-
-  let !aliases = mkAliasMap unit_state imports
-
-  modWarn <- liftErrMsg (moduleWarning dflags gre warnings)
-
-  return $! Interface {
-    ifaceMod               = mdl
-  , ifaceIsSig             = is_sig
-  , ifaceOrigFilename      = msHsFilePath ms
-  , ifaceInfo              = info
-  , ifaceDoc               = Documentation mbDoc modWarn
-  , ifaceRnDoc             = Documentation Nothing Nothing
-  , ifaceOptions           = opts
-  , ifaceDocMap            = docMap
-  , ifaceArgMap            = argMap
-  , ifaceRnDocMap          = M.empty
-  , ifaceRnArgMap          = M.empty
-  , ifaceExportItems       = prunedExportItems
-  , ifaceRnExportItems     = []
-  , ifaceExports           = exportedNames
-  , ifaceVisibleExports    = visibleNames
-  , ifaceDeclMap           = declMap
-  , ifaceFixMap            = fixMap
-  , ifaceModuleAliases     = aliases
-  , ifaceInstances         = instances
-  , ifaceFamInstances      = fam_instances
-  , ifaceOrphanInstances   = [] -- Filled in `attachInstances`
-  , ifaceRnOrphanInstances = [] -- Filled in `renameInterface`
-  , ifaceHaddockCoverage   = coverage
-  , ifaceWarningMap        = warningMap
-  , ifaceHieFile           = Just $ ml_hie_file $ ms_location ms
-  , ifaceDynFlags          = dflags
-  }
 
 
 -- | Given all of the @import M as N@ declarations in a package,
@@ -640,7 +559,8 @@ mkFixMap group_ =
 -- We create the export items even if the module is hidden, since they
 -- might be useful when creating the export items for other modules.
 mkExportItems
-  :: Bool               -- is it a signature
+  :: Monad m
+  => Bool               -- is it a signature
   -> IfaceMap
   -> Maybe Package      -- this package
   -> Module             -- this module
@@ -657,7 +577,7 @@ mkExportItems
   -> Avails             -- exported stuff from this module
   -> InstIfaceMap
   -> DynFlags
-  -> ErrMsgGhc [ExportItem GhcRn]
+  -> IfM m [ExportItem GhcRn]
 mkExportItems
   is_sig modMap pkgName thisMod semMod warnings gre exportedNames decls
   maps fixMap unrestricted_imp_mods splices exportList allExports
@@ -699,24 +619,39 @@ mkExportItems
       availExportItem is_sig modMap thisMod semMod warnings exportedNames
         maps fixMap splices instIfaceMap dflags avail
 
-availExportItem :: Bool               -- is it a signature
-                -> IfaceMap
-                -> Module             -- this module
-                -> Module             -- semantic module
-                -> WarningMap
-                -> [Name]             -- exported names (orig)
-                -> Maps
-                -> FixMap
-                -> [SrcSpan]          -- splice locations
-                -> InstIfaceMap
-                -> DynFlags
-                -> AvailInfo
-                -> ErrMsgGhc [ExportItem GhcRn]
+
+-- Extract the minimal complete definition of a Name, if one exists
+minimalDef :: Monad m => Name -> IfM m (Maybe ClassMinimalDef)
+minimalDef n = do
+  mty <- lookupName n
+  case mty of
+    Just (ATyCon (tyConClass_maybe -> Just c)) ->
+      return . Just $ classMinimalDef c
+    _ ->
+      return Nothing
+
+
+availExportItem
+  :: forall m
+  .  Monad m
+  => Bool               -- is it a signature
+  -> IfaceMap
+  -> Module             -- this module
+  -> Module             -- semantic module
+  -> WarningMap
+  -> [Name]             -- exported names (orig)
+  -> Maps
+  -> FixMap
+  -> [SrcSpan]          -- splice locations
+  -> InstIfaceMap
+  -> DynFlags
+  -> AvailInfo
+  -> IfM m [ExportItem GhcRn]
 availExportItem is_sig modMap thisMod semMod warnings exportedNames
   (docMap, argMap, declMap, _) fixMap splices instIfaceMap
   dflags availInfo = declWith availInfo
   where
-    declWith :: AvailInfo -> ErrMsgGhc [ ExportItem GhcRn ]
+    declWith :: AvailInfo -> IfM m [ ExportItem GhcRn ]
     declWith avail = do
       let t = availName avail
       r    <- findDecl avail
@@ -753,7 +688,7 @@ availExportItem is_sig modMap thisMod semMod warnings exportedNames
                     in availExportDecl avail newDecl docs_
 
                   L loc (TyClD _ cl@ClassDecl{}) -> do
-                    mdef <- liftGhcToErrMsgGhc $ minimalDef t
+                    mdef <- minimalDef t
                     let sig = maybeToList $ fmap (noLoc . MinimalSig noExtField NoSourceText . noLoc . fmap noLoc) mdef
                     availExportDecl avail
                       (L loc $ TyClD noExtField cl { tcdSigs = sig ++ tcdSigs cl }) docs_
@@ -783,7 +718,7 @@ availExportItem is_sig modMap thisMod semMod warnings exportedNames
 
     availExportDecl :: AvailInfo -> LHsDecl GhcRn
                     -> (DocForDecl Name, [(Name, DocForDecl Name)])
-                    -> ErrMsgGhc [ ExportItem GhcRn ]
+                    -> IfM m [ ExportItem GhcRn ]
     availExportDecl avail decl (doc, subs)
       | availExportsDecl avail = do
           -- bundled pattern synonyms only make sense if the declaration is
@@ -828,7 +763,7 @@ availExportItem is_sig modMap thisMod semMod warnings exportedNames
     exportedNameSet = mkNameSet exportedNames
     isExported n = elemNameSet n exportedNameSet
 
-    findDecl :: AvailInfo -> ErrMsgGhc ([LHsDecl GhcRn], (DocForDecl Name, [(Name, DocForDecl Name)]))
+    findDecl :: AvailInfo -> IfM m ([LHsDecl GhcRn], (DocForDecl Name, [(Name, DocForDecl Name)]))
     findDecl avail
       | m == semMod =
           case M.lookup n declMap of
@@ -857,10 +792,10 @@ availExportItem is_sig modMap thisMod semMod warnings exportedNames
         n = availName avail
         m = nameModule n
 
-    findBundledPatterns :: AvailInfo -> ErrMsgGhc [(HsDecl GhcRn, DocForDecl Name)]
+    findBundledPatterns :: AvailInfo -> IfM m [(HsDecl GhcRn, DocForDecl Name)]
     findBundledPatterns avail = do
       patsyns <- for constructor_names $ \name -> do
-        mtyThing <- liftGhcToErrMsgGhc (lookupName name)
+        mtyThing <- lookupName name
         case mtyThing of
           Just (AConLike PatSynCon{}) -> do
             export_items <- declWith (Avail.avail name)
@@ -890,9 +825,9 @@ semToIdMod this_uid m
     | Module.isHoleModule m = mkModule this_uid (moduleName m)
     | otherwise             = m
 
-hiDecl :: DynFlags -> Name -> ErrMsgGhc (Maybe (LHsDecl GhcRn))
+hiDecl :: Monad m => DynFlags -> Name -> IfM m (Maybe (LHsDecl GhcRn))
 hiDecl dflags t = do
-  mayTyThing <- liftGhcToErrMsgGhc $ lookupName t
+  mayTyThing <- lookupName t
   case mayTyThing of
     Nothing -> do
       liftErrMsg $ tell ["Warning: Not found in environment: " ++ pretty dflags t]
@@ -911,8 +846,9 @@ hiDecl dflags t = do
 -- It gets the type signature from GHC and that means it's not going to
 -- have a meaningful 'SrcSpan'. So we pass down 'SrcSpan' for the
 -- declaration and use it instead - 'nLoc' here.
-hiValExportItem :: DynFlags -> Name -> SrcSpan -> DocForDecl Name -> Bool
-                -> Maybe Fixity -> ErrMsgGhc (ExportItem GhcRn)
+hiValExportItem
+  :: Monad m => DynFlags -> Name -> SrcSpan -> DocForDecl Name -> Bool
+  -> Maybe Fixity -> IfM m (ExportItem GhcRn)
 hiValExportItem dflags name nLoc doc splice fixity = do
   mayDecl <- hiDecl dflags name
   case mayDecl of
@@ -942,12 +878,14 @@ lookupDocs avail warnings docMap argMap =
 
 -- | Export the given module as `ExportModule`. We are not concerned with the
 -- single export items of the given module.
-moduleExport :: Module           -- ^ Module A (identity, NOT semantic)
-             -> DynFlags         -- ^ The flags used when typechecking A
-             -> IfaceMap         -- ^ Already created interfaces
-             -> InstIfaceMap     -- ^ Interfaces in other packages
-             -> ModuleName       -- ^ The exported module
-             -> ErrMsgGhc [ExportItem GhcRn] -- ^ Resulting export items
+moduleExport
+  :: Monad m
+  => Module           -- ^ Module A (identity, NOT semantic)
+  -> DynFlags         -- ^ The flags used when typechecking A
+  -> IfaceMap         -- ^ Already created interfaces
+  -> InstIfaceMap     -- ^ Interfaces in other packages
+  -> ModuleName       -- ^ The exported module
+  -> IfM m [ExportItem GhcRn] -- ^ Resulting export items
 moduleExport thisMod dflags ifaceMap instIfaceMap expMod =
     -- NB: we constructed the identity module when looking up in
     -- the IfaceMap.
@@ -961,9 +899,8 @@ moduleExport thisMod dflags ifaceMap instIfaceMap expMod =
         case M.lookup expMod (M.mapKeys moduleName instIfaceMap) of
           Just iface -> return [ ExportModule (instMod iface) ]
           Nothing -> do
-            liftErrMsg $
-              tell ["Warning: " ++ pretty dflags thisMod ++ ": Could not find " ++
-                    "documentation for exported module: " ++ pretty dflags expMod]
+            liftErrMsg $ tell ["Warning: " ++ pretty dflags thisMod ++ ": Could not find " ++
+                               "documentation for exported module: " ++ pretty dflags expMod]
             return []
   where
     m = mkModule (moduleUnit thisMod) expMod -- Identity module!
@@ -989,22 +926,24 @@ moduleExport thisMod dflags ifaceMap instIfaceMap expMod =
 -- every locally defined declaration is exported; thus, we just
 -- zip through the renamed declarations.
 
-fullModuleContents :: Bool               -- is it a signature
-                   -> IfaceMap
-                   -> Maybe Package      -- this package
-                   -> Module             -- this module
-                   -> Module             -- semantic module
-                   -> WarningMap
-                   -> GlobalRdrEnv      -- ^ The renaming environment
-                   -> [Name]             -- exported names (orig)
-                   -> [LHsDecl GhcRn]    -- renamed source declarations
-                   -> Maps
-                   -> FixMap
-                   -> [SrcSpan]          -- splice locations
-                   -> InstIfaceMap
-                   -> DynFlags
-                   -> Avails
-                   -> ErrMsgGhc [ExportItem GhcRn]
+fullModuleContents
+  :: Monad m
+  => Bool               -- is it a signature
+  -> IfaceMap
+  -> Maybe Package      -- this package
+  -> Module             -- this module
+  -> Module             -- semantic module
+  -> WarningMap
+  -> GlobalRdrEnv      -- ^ The renaming environment
+  -> [Name]             -- exported names (orig)
+  -> [LHsDecl GhcRn]    -- renamed source declarations
+  -> Maps
+  -> FixMap
+  -> [SrcSpan]          -- splice locations
+  -> InstIfaceMap
+  -> DynFlags
+  -> Avails
+  -> IfM m [ExportItem GhcRn]
 fullModuleContents is_sig modMap pkgName thisMod semMod warnings gre exportedNames
   decls maps@(_, _, declMap, _) fixMap splices instIfaceMap dflags avails = do
   let availEnv = availsToNameEnv (nubAvails avails)

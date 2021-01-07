@@ -61,6 +61,7 @@ library
                , exceptions
                , filepath
                , ghc-boot
+               , mtl
                , transformers
 
   hs-source-dirs: src

@@ -39,7 +39,7 @@ import System.FilePath
 import Data.Char
 import Control.Monad
 import Data.Maybe
-import Data.List
+import Data.List (sort)
 import Prelude hiding ((<>))
 
 import Haddock.Doc (combineDocumentation)

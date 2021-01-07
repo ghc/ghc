@@ -27,7 +27,7 @@ import Haddock.Utils hiding (out)
 import Control.Monad
 import Data.Array
 import Data.IORef
-import Data.List
+import Data.List (mapAccumR)
 import qualified Data.Map as Map
 import Data.Map (Map)
 import Data.Word

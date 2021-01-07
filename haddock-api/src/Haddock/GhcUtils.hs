@@ -34,7 +34,6 @@ import GHC.Driver.Ppr (showPpr )
 import GHC.Types.Name
 import GHC.Unit.Module
 import GHC
-import GHC.Core.Class
 import GHC.Driver.Session
 import GHC.Types.SrcLoc  ( advanceSrcLoc )
 import GHC.Types.Var     ( Specificity, VarBndr(..), TyVarBinder
@@ -402,14 +401,6 @@ modifySessionDynFlags f = do
   _ <- setSessionDynFlags (f dflags)
   return ()
 
-
--- Extract the minimal complete definition of a Name, if one exists
-minimalDef :: GhcMonad m => Name -> m (Maybe ClassMinimalDef)
-minimalDef n = do
-  mty <- lookupGlobalName n
-  case mty of
-    Just (ATyCon (tyConClass_maybe -> Just c)) -> return . Just $ classMinimalDef c
-    _ -> return Nothing
 
 -------------------------------------------------------------------------------
 -- * DynFlags

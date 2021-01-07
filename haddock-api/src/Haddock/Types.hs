@@ -3,6 +3,9 @@
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -----------------------------------------------------------------------------
@@ -25,13 +28,16 @@ module Haddock.Types (
   , HsDocString, LHsDocString
   , Fixity(..)
   , module Documentation.Haddock.Types
+
+  -- $ Reexports
+  , runWriter
+  , tell
  ) where
 
 import Control.Exception
-import Control.Arrow hiding ((<+>))
 import Control.DeepSeq
-import Control.Monad (ap)
 import Control.Monad.IO.Class (MonadIO(..))
+import Control.Monad.Writer.Strict (Writer, WriterT, MonadWriter(..), lift, runWriter, runWriterT)
 import Data.Typeable (Typeable)
 import Data.Map (Map)
 import Data.Data (Data)
@@ -595,26 +601,7 @@ data SinceQual
 
 
 type ErrMsg = String
-newtype ErrMsgM a = Writer { runWriter :: (a, [ErrMsg]) }
-
-
-instance Functor ErrMsgM where
-        fmap f (Writer (a, msgs)) = Writer (f a, msgs)
-
-instance Applicative ErrMsgM where
-    pure a = Writer (a, [])
-    (<*>)  = ap
-
-instance Monad ErrMsgM where
-        return   = pure
-        m >>= k  = Writer $ let
-                (a, w)  = runWriter m
-                (b, w') = runWriter (k a)
-                in (b, w ++ w')
-
-
-tell :: [ErrMsg] -> ErrMsgM ()
-tell w = Writer ((), w)
+type ErrMsgM = Writer [ErrMsg]
 
 
 -- Exceptions
@@ -637,34 +624,24 @@ throwE str = throw (HaddockException str)
 -- @Haddock.Types.ErrMsg@s a lot, like @ErrMsgM@ does,
 -- but we can't just use @GhcT ErrMsgM@ because GhcT requires the
 -- transformed monad to be MonadIO.
-newtype ErrMsgGhc a = WriterGhc { runWriterGhc :: Ghc (a, [ErrMsg]) }
---instance MonadIO ErrMsgGhc where
---  liftIO = WriterGhc . fmap (\a->(a,[])) liftIO
---er, implementing GhcMonad involves annoying ExceptionMonad and
---WarnLogMonad classes, so don't bother.
+newtype ErrMsgGhc a = ErrMsgGhc { unErrMsgGhc :: WriterT [ErrMsg] Ghc a }
+
+
+deriving newtype instance Functor ErrMsgGhc
+deriving newtype instance Applicative ErrMsgGhc
+deriving newtype instance Monad ErrMsgGhc
+deriving newtype instance (MonadWriter [ErrMsg]) ErrMsgGhc
+deriving newtype instance MonadIO ErrMsgGhc
+
+
+runWriterGhc :: ErrMsgGhc a -> Ghc (a, [ErrMsg])
+runWriterGhc = runWriterT . unErrMsgGhc
+
 liftGhcToErrMsgGhc :: Ghc a -> ErrMsgGhc a
-liftGhcToErrMsgGhc = WriterGhc . fmap (\a->(a,[]))
+liftGhcToErrMsgGhc = ErrMsgGhc . lift
+
 liftErrMsg :: ErrMsgM a -> ErrMsgGhc a
-liftErrMsg = WriterGhc . return . runWriter
---  for now, use (liftErrMsg . tell) for this
---tell :: [ErrMsg] -> ErrMsgGhc ()
---tell msgs = WriterGhc $ return ( (), msgs )
-
-
-instance Functor ErrMsgGhc where
-  fmap f (WriterGhc x) = WriterGhc (fmap (first f) x)
-
-instance Applicative ErrMsgGhc where
-    pure a = WriterGhc (return (a, []))
-    (<*>) = ap
-
-instance Monad ErrMsgGhc where
-  return = pure
-  m >>= k = WriterGhc $ runWriterGhc m >>= \ (a, msgs1) ->
-               fmap (second (msgs1 ++)) (runWriterGhc (k a))
-
-instance MonadIO ErrMsgGhc where
-  liftIO m = WriterGhc (fmap (\x -> (x, [])) (liftIO m))
+liftErrMsg = writer . runWriter
 
 -----------------------------------------------------------------------------
 -- * Pass sensitive types

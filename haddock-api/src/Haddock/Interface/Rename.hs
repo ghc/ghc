@@ -29,7 +29,6 @@ import GHC.Builtin.Types (eqTyCon_RDR)
 import Control.Applicative
 import Control.Arrow ( first )
 import Control.Monad hiding (mapM)
-import Data.List
 import qualified Data.Map as Map hiding ( Map )
 import Prelude hiding (mapM)
 import GHC.HsToCore.Docs
