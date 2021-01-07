@@ -8,7 +8,7 @@
 
 module GHC.Core.Opt.Simplify.Env (
         -- * The simplifier mode
-        setMode, getMode, updMode, seDynFlags, seUnfoldingOpts,
+        setMode, getMode, updMode, seDynFlags, seUnfoldingOpts, seLogger,
 
         -- * Environments
         SimplEnv(..), pprSimplEnv,   -- Temp not abstract
@@ -71,6 +71,7 @@ import GHC.Utils.Monad
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
+import GHC.Utils.Logger
 import GHC.Types.Unique.FM      ( pprUniqFM )
 
 import Data.List (mapAccumL)
@@ -311,6 +312,10 @@ getMode env = seMode env
 
 seDynFlags :: SimplEnv -> DynFlags
 seDynFlags env = sm_dflags (seMode env)
+
+seLogger :: SimplEnv -> Logger
+seLogger env = sm_logger (seMode env)
+
 
 seUnfoldingOpts :: SimplEnv -> UnfoldingOpts
 seUnfoldingOpts env = sm_uf_opts (seMode env)

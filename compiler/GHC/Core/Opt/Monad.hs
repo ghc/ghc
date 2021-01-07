@@ -64,7 +64,8 @@ import GHC.Types.Name.Env
 import GHC.Types.SrcLoc
 
 import GHC.Utils.Outputable as Outputable
-import GHC.Utils.Error ( Severity(..), DumpFormat (..), dumpAction, dumpOptionsFromFlag )
+import GHC.Utils.Logger ( HasLogger (..), DumpFormat (..), putLogMsg, putDumpMsg, Logger )
+import GHC.Utils.Error ( Severity(..) )
 import GHC.Utils.Monad
 
 import GHC.Data.FastString
@@ -172,6 +173,7 @@ data SimplMode             -- See comments in GHC.Core.Opt.Simplify.Monad
         , sm_case_case  :: !Bool          -- ^ Whether case-of-case is enabled
         , sm_eta_expand :: !Bool          -- ^ Whether eta-expansion is enabled
         , sm_pre_inline :: !Bool          -- ^ Whether pre-inlining is enabled
+        , sm_logger     :: !Logger
         , sm_dflags     :: DynFlags
             -- Just for convenient non-monadic access; we don't override these.
             --
@@ -180,9 +182,7 @@ data SimplMode             -- See comments in GHC.Core.Opt.Simplify.Monad
             --    - Opt_DictsCheap and Opt_PedanticBottoms general flags
             --    - rules options (initRuleOpts)
             --    - verbose_core2core, dump_inlinings, dump_rule_rewrites/firings
-            --    - traceAction, dumpAction
             --    - inlineCheck
-            --    - touchDumpFile (generatedDumps, etc.)
         }
 
 instance Outputable SimplMode where
@@ -723,6 +723,9 @@ getUniqMask = read cr_uniq_mask
 instance HasDynFlags CoreM where
     getDynFlags = fmap hsc_dflags getHscEnv
 
+instance HasLogger CoreM where
+    getLogger = fmap hsc_logger getHscEnv
+
 instance HasModule CoreM where
     getModule = read cr_module
 
@@ -789,19 +792,20 @@ we aren't using annotations heavily.
 -}
 
 msg :: Severity -> WarnReason -> SDoc -> CoreM ()
-msg sev reason doc
-  = do { dflags <- getDynFlags
-       ; loc    <- getSrcSpanM
-       ; unqual <- getPrintUnqualified
-       ; let sty = case sev of
-                     SevError   -> err_sty
-                     SevWarning -> err_sty
-                     SevDump    -> dump_sty
-                     _          -> user_sty
-             err_sty  = mkErrStyle unqual
-             user_sty = mkUserStyle unqual AllTheWay
-             dump_sty = mkDumpStyle unqual
-       ; liftIO $ putLogMsg dflags reason sev loc (withPprStyle sty doc) }
+msg sev reason doc = do
+    dflags <- getDynFlags
+    logger <- getLogger
+    loc    <- getSrcSpanM
+    unqual <- getPrintUnqualified
+    let sty = case sev of
+                SevError   -> err_sty
+                SevWarning -> err_sty
+                SevDump    -> dump_sty
+                _          -> user_sty
+        err_sty  = mkErrStyle unqual
+        user_sty = mkUserStyle unqual AllTheWay
+        dump_sty = mkDumpStyle unqual
+    liftIO $ putLogMsg logger dflags reason sev loc (withPprStyle sty doc)
 
 -- | Output a String message to the screen
 putMsgS :: String -> CoreM ()
@@ -840,9 +844,10 @@ debugTraceMsg = msg SevDump NoReason
 
 -- | Show some labelled 'SDoc' if a particular flag is set or at a verbosity level of @-v -ddump-most@ or higher
 dumpIfSet_dyn :: DumpFlag -> String -> DumpFormat -> SDoc -> CoreM ()
-dumpIfSet_dyn flag str fmt doc
-  = do { dflags <- getDynFlags
-       ; unqual <- getPrintUnqualified
-       ; when (dopt flag dflags) $ liftIO $ do
-         let sty = mkDumpStyle unqual
-         dumpAction dflags sty (dumpOptionsFromFlag flag) str fmt doc }
+dumpIfSet_dyn flag str fmt doc = do
+    dflags <- getDynFlags
+    logger <- getLogger
+    unqual <- getPrintUnqualified
+    when (dopt flag dflags) $ liftIO $ do
+        let sty = mkDumpStyle unqual
+        putDumpMsg logger dflags sty flag str fmt doc

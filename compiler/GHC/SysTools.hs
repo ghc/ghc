@@ -36,6 +36,7 @@ import GHC.Settings.Utils
 
 import GHC.Utils.Error
 import GHC.Utils.Panic
+import GHC.Utils.Logger
 import GHC.Driver.Session
 
 import Control.Monad.Trans.Except (runExceptT)
@@ -185,13 +186,13 @@ for more information.
 
 -}
 
-copy :: DynFlags -> String -> FilePath -> FilePath -> IO ()
-copy dflags purpose from to = copyWithHeader dflags purpose Nothing from to
+copy :: Logger -> DynFlags -> String -> FilePath -> FilePath -> IO ()
+copy logger dflags purpose from to = copyWithHeader logger dflags purpose Nothing from to
 
-copyWithHeader :: DynFlags -> String -> Maybe String -> FilePath -> FilePath
+copyWithHeader :: Logger -> DynFlags -> String -> Maybe String -> FilePath -> FilePath
                -> IO ()
-copyWithHeader dflags purpose maybe_header from to = do
-  showPass dflags purpose
+copyWithHeader logger dflags purpose maybe_header from to = do
+  showPass logger dflags purpose
 
   hout <- openBinaryFile to   WriteMode
   hin  <- openBinaryFile from ReadMode

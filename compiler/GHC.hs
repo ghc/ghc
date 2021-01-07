@@ -31,9 +31,16 @@ module GHC (
         GhcMode(..), GhcLink(..),
         parseDynamicFlags, parseTargetFiles,
         getSessionDynFlags, setSessionDynFlags,
-        getProgramDynFlags, setProgramDynFlags, setLogAction,
+        getProgramDynFlags, setProgramDynFlags,
         getInteractiveDynFlags, setInteractiveDynFlags,
         interpretPackageEnv,
+
+        -- * Logging
+        Logger, getLogger,
+        pushLogHook, popLogHook,
+        pushLogHookM, popLogHookM, modifyLogger,
+        putMsgM, putLogMsgM,
+
 
         -- * Targets
         Target(..), TargetId(..), Phase,
@@ -353,6 +360,7 @@ import GHC.Utils.Monad
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Logger
 
 import GHC.Core.Predicate
 import GHC.Core.Type  hiding( typeKind )
@@ -524,9 +532,10 @@ withCleanupSession ghc = ghc `MC.finally` cleanup
    cleanup = do
       hsc_env <- getSession
       let dflags = hsc_dflags hsc_env
+      let logger = hsc_logger hsc_env
       liftIO $ do
-          cleanTempFiles dflags
-          cleanTempDirs dflags
+          cleanTempFiles logger dflags
+          cleanTempDirs logger dflags
           stopInterp hsc_env -- shut down the IServ
           --  exceptions will be blocked while we clean the temporary files,
           -- so there shouldn't be any difficulty if we receive further
@@ -551,11 +560,12 @@ initGhcMonad mb_top_dir
                    ; mySettings <- initSysTools top_dir
                    ; myLlvmConfig <- lazyInitLlvmConfig top_dir
                    ; dflags <- initDynFlags (defaultDynFlags mySettings myLlvmConfig)
-                   ; checkBrokenTablesNextToCode dflags
+                   ; hsc_env <- newHscEnv dflags
+                   ; checkBrokenTablesNextToCode (hsc_logger hsc_env) dflags
                    ; setUnsafeGlobalDynFlags dflags
                       -- c.f. DynFlags.parseDynamicFlagsFull, which
                       -- creates DynFlags and sets the UnsafeGlobalDynFlags
-                   ; newHscEnv dflags }
+                   ; return hsc_env }
        ; setSession env }
 
 -- | The binutils linker on ARM emits unnecessary R_ARM_COPY relocations which
@@ -564,9 +574,9 @@ initGhcMonad mb_top_dir
 -- version where this bug is fixed.
 -- See https://sourceware.org/bugzilla/show_bug.cgi?id=16177 and
 -- https://gitlab.haskell.org/ghc/ghc/issues/4210#note_78333
-checkBrokenTablesNextToCode :: MonadIO m => DynFlags -> m ()
-checkBrokenTablesNextToCode dflags
-  = do { broken <- checkBrokenTablesNextToCode' dflags
+checkBrokenTablesNextToCode :: MonadIO m => Logger -> DynFlags -> m ()
+checkBrokenTablesNextToCode logger dflags
+  = do { broken <- checkBrokenTablesNextToCode' logger dflags
        ; when broken
          $ do { _ <- liftIO $ throwIO $ mkApiErr dflags invalidLdErr
               ; liftIO $ fail "unsupported linker"
@@ -577,13 +587,13 @@ checkBrokenTablesNextToCode dflags
                    text "when using binutils ld (please see:" <+>
                    text "https://sourceware.org/bugzilla/show_bug.cgi?id=16177)"
 
-checkBrokenTablesNextToCode' :: MonadIO m => DynFlags -> m Bool
-checkBrokenTablesNextToCode' dflags
+checkBrokenTablesNextToCode' :: MonadIO m => Logger -> DynFlags -> m Bool
+checkBrokenTablesNextToCode' logger dflags
   | not (isARM arch)                 = return False
   | WayDyn `S.notMember` ways dflags = return False
   | not tablesNextToCode             = return False
   | otherwise                        = do
-    linkerInfo <- liftIO $ getLinkerInfo dflags
+    linkerInfo <- liftIO $ getLinkerInfo logger dflags
     case linkerInfo of
       GnuLD _  -> return True
       _        -> return False
@@ -627,9 +637,10 @@ checkBrokenTablesNextToCode' dflags
 -- (packageFlags dflags).
 setSessionDynFlags :: GhcMonad m => DynFlags -> m ()
 setSessionDynFlags dflags0 = do
-  dflags <- checkNewDynFlags dflags0
+  logger <- getLogger
+  dflags <- checkNewDynFlags logger dflags0
   hsc_env <- getSession
-  (dbs,unit_state,home_unit) <- liftIO $ initUnits dflags (hsc_unit_dbs hsc_env)
+  (dbs,unit_state,home_unit) <- liftIO $ initUnits logger dflags (hsc_unit_dbs hsc_env)
 
   -- Interpreter
   interp  <- if gopt Opt_ExternalInterpreter dflags
@@ -644,7 +655,7 @@ setSessionDynFlags dflags0 = do
              | otherwise = ""
            msg = text "Starting " <> text prog
          tr <- if verbosity dflags >= 3
-                then return (logInfo dflags $ withPprStyle defaultDumpStyle msg)
+                then return (logInfo logger dflags $ withPprStyle defaultDumpStyle msg)
                 else return (pure ())
          let
           conf = IServConfig
@@ -689,24 +700,16 @@ setSessionDynFlags dflags0 = do
 setProgramDynFlags :: GhcMonad m => DynFlags -> m Bool
 setProgramDynFlags dflags = setProgramDynFlags_ True dflags
 
--- | Set the action taken when the compiler produces a message.  This
--- can also be accomplished using 'setProgramDynFlags', but using
--- 'setLogAction' avoids invalidating the cached module graph.
-setLogAction :: GhcMonad m => LogAction -> m ()
-setLogAction action = do
-  dflags' <- getProgramDynFlags
-  void $ setProgramDynFlags_ False $
-    dflags' { log_action = action }
-
 setProgramDynFlags_ :: GhcMonad m => Bool -> DynFlags -> m Bool
 setProgramDynFlags_ invalidate_needed dflags = do
-  dflags' <- checkNewDynFlags dflags
+  logger <- getLogger
+  dflags' <- checkNewDynFlags logger dflags
   dflags_prev <- getProgramDynFlags
   let changed = packageFlagsChanged dflags_prev dflags'
   if changed
     then do
         hsc_env <- getSession
-        (dbs,unit_state,home_unit) <- liftIO $ initUnits dflags' (hsc_unit_dbs hsc_env)
+        (dbs,unit_state,home_unit) <- liftIO $ initUnits logger dflags' (hsc_unit_dbs hsc_env)
         let unit_env = UnitEnv
               { ue_platform  = targetPlatform dflags'
               , ue_namever   = ghcNameVersion dflags'
@@ -759,8 +762,9 @@ getProgramDynFlags = getSessionDynFlags
 -- 'unitState' into the interactive @DynFlags@.
 setInteractiveDynFlags :: GhcMonad m => DynFlags -> m ()
 setInteractiveDynFlags dflags = do
-  dflags' <- checkNewDynFlags dflags
-  dflags'' <- checkNewInteractiveDynFlags dflags'
+  logger <- getLogger
+  dflags' <- checkNewDynFlags logger dflags
+  dflags'' <- checkNewInteractiveDynFlags logger dflags'
   modifySessionM $ \hsc_env0 -> do
     let ic0 = hsc_IC hsc_env0
 
@@ -783,12 +787,15 @@ getInteractiveDynFlags :: GhcMonad m => m DynFlags
 getInteractiveDynFlags = withSession $ \h -> return (ic_dflags (hsc_IC h))
 
 
-parseDynamicFlags :: MonadIO m =>
-                     DynFlags -> [Located String]
-                  -> m (DynFlags, [Located String], [Warn])
-parseDynamicFlags dflags cmdline = do
+parseDynamicFlags
+    :: MonadIO m
+    => Logger
+    -> DynFlags
+    -> [Located String]
+    -> m (DynFlags, [Located String], [Warn])
+parseDynamicFlags logger dflags cmdline = do
   (dflags1, leftovers, warns) <- parseDynamicFlagsCmdLine dflags cmdline
-  dflags2 <- liftIO $ interpretPackageEnv dflags1
+  dflags2 <- liftIO $ interpretPackageEnv logger dflags1
   return (dflags2, leftovers, warns)
 
 -- | Parse command line arguments that look like files.
@@ -877,19 +884,19 @@ normalise_hyp fp
 -- | Checks the set of new DynFlags for possibly erroneous option
 -- combinations when invoking 'setSessionDynFlags' and friends, and if
 -- found, returns a fixed copy (if possible).
-checkNewDynFlags :: MonadIO m => DynFlags -> m DynFlags
-checkNewDynFlags dflags = do
+checkNewDynFlags :: MonadIO m => Logger -> DynFlags -> m DynFlags
+checkNewDynFlags logger dflags = do
   -- See Note [DynFlags consistency]
   let (dflags', warnings) = makeDynFlagsConsistent dflags
-  liftIO $ handleFlagWarnings dflags (map (Warn NoReason) warnings)
+  liftIO $ handleFlagWarnings logger dflags (map (Warn NoReason) warnings)
   return dflags'
 
-checkNewInteractiveDynFlags :: MonadIO m => DynFlags -> m DynFlags
-checkNewInteractiveDynFlags dflags0 = do
+checkNewInteractiveDynFlags :: MonadIO m => Logger -> DynFlags -> m DynFlags
+checkNewInteractiveDynFlags logger dflags0 = do
   -- We currently don't support use of StaticPointers in expressions entered on
   -- the REPL. See #12356.
   if xopt LangExt.StaticPointers dflags0
-  then do liftIO $ printOrThrowWarnings dflags0 $ listToBag
+  then do liftIO $ printOrThrowWarnings logger dflags0 $ listToBag
             [mkPlainWarnMsg interactiveSrcSpan
              $ text "StaticPointers is not supported in GHCi interactive expressions."]
           return $ xopt_unset dflags0 LangExt.StaticPointers
@@ -1799,8 +1806,8 @@ parser str dflags filename =
 -- > id1
 -- > id2
 --
-interpretPackageEnv :: DynFlags -> IO DynFlags
-interpretPackageEnv dflags = do
+interpretPackageEnv :: Logger -> DynFlags -> IO DynFlags
+interpretPackageEnv logger dflags = do
     mPkgEnv <- runMaybeT $ msum $ [
                    getCmdLineArg >>= \env -> msum [
                        probeNullEnv env
@@ -1828,7 +1835,7 @@ interpretPackageEnv dflags = do
         return dflags
       Just envfile -> do
         content <- readFile envfile
-        compilationProgressMsg dflags (text "Loaded package environment from " <> text envfile)
+        compilationProgressMsg logger dflags (text "Loaded package environment from " <> text envfile)
         let (_, dflags') = runCmdLine (runEwM (setFlagsFromEnvFile envfile content)) dflags
 
         return dflags'

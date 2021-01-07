@@ -15,6 +15,7 @@ import GHC.Prelude
 import GHC.Types.SrcLoc
 import GHC.Types.Error
 import GHC.Utils.Outputable ( text, withPprStyle, mkErrStyle )
+import GHC.Utils.Logger
 import qualified GHC.Driver.CmdLine as CmdLine
 
 -- | Converts a list of 'WarningMessages' into a tuple where the second element contains only
@@ -28,11 +29,11 @@ warningsToMessages dflags =
         Right warn{ errMsgSeverity = SevError
                   , errMsgReason = ErrReason err_reason }
 
-printBagOfErrors :: RenderableDiagnostic a => DynFlags -> Bag (MsgEnvelope a) -> IO ()
-printBagOfErrors dflags bag_of_errors
+printBagOfErrors :: RenderableDiagnostic a => Logger -> DynFlags -> Bag (MsgEnvelope a) -> IO ()
+printBagOfErrors logger dflags bag_of_errors
   = sequence_ [ let style = mkErrStyle unqual
                     ctx   = initSDocContext dflags style
-                in putLogMsg dflags reason sev s $
+                in putLogMsg logger dflags reason sev s $
                    withPprStyle style (formatBulleted ctx (renderDiagnostic doc))
               | MsgEnvelope { errMsgSpan      = s,
                               errMsgDiagnostic = doc,
@@ -41,8 +42,8 @@ printBagOfErrors dflags bag_of_errors
                               errMsgContext   = unqual } <- sortMsgBag (Just dflags)
                                                                        bag_of_errors ]
 
-handleFlagWarnings :: DynFlags -> [CmdLine.Warn] -> IO ()
-handleFlagWarnings dflags warns = do
+handleFlagWarnings :: Logger -> DynFlags -> [CmdLine.Warn] -> IO ()
+handleFlagWarnings logger dflags warns = do
   let warns' = filter (shouldPrintWarning dflags . CmdLine.warnReason)  warns
 
       -- It would be nicer if warns :: [Located SDoc], but that
@@ -50,7 +51,7 @@ handleFlagWarnings dflags warns = do
       bag = listToBag [ mkPlainWarnMsg loc (text warn)
                       | CmdLine.Warn _ (L loc warn) <- warns' ]
 
-  printOrThrowWarnings dflags bag
+  printOrThrowWarnings logger dflags bag
 
 -- | Checks if given 'WarnMsg' is a fatal warning.
 isWarnMsgFatal :: DynFlags -> WarnMsg -> Maybe (Maybe WarningFlag)
@@ -74,8 +75,8 @@ shouldPrintWarning _ _
 
 -- | Given a bag of warnings, turn them into an exception if
 -- -Werror is enabled, or print them out otherwise.
-printOrThrowWarnings :: DynFlags -> Bag WarnMsg -> IO ()
-printOrThrowWarnings dflags warns = do
+printOrThrowWarnings :: Logger -> DynFlags -> Bag WarnMsg -> IO ()
+printOrThrowWarnings logger dflags warns = do
   let (make_error, warns') =
         mapAccumBagL
           (\make_err warn ->
@@ -89,4 +90,4 @@ printOrThrowWarnings dflags warns = do
           False warns
   if make_error
     then throwIO (mkSrcErr warns')
-    else printBagOfErrors dflags warns
+    else printBagOfErrors logger dflags warns

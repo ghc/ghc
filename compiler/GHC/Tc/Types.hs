@@ -142,6 +142,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Fingerprint
 import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Utils.Logger
 
 import GHC.Builtin.Names ( isUnboundName )
 
@@ -235,6 +236,9 @@ data Env gbl lcl
 
 instance ContainsDynFlags (Env gbl lcl) where
     extractDynFlags env = hsc_dflags (env_top env)
+
+instance ContainsLogger (Env gbl lcl) where
+    extractLogger env = hsc_logger (env_top env)
 
 instance ContainsModule gbl => ContainsModule (Env gbl lcl) where
     extractModule env = extractModule (env_gbl env)
@@ -1712,8 +1716,8 @@ getRoleAnnots bndrs role_env
 
 -- | Check the 'TcGblEnv' for consistency. Currently, only checks
 -- axioms, but should check other aspects, too.
-lintGblEnv :: DynFlags -> TcGblEnv -> TcM ()
-lintGblEnv dflags tcg_env =
-  liftIO $ lintAxioms dflags (text "TcGblEnv axioms") axioms
+lintGblEnv :: Logger -> DynFlags -> TcGblEnv -> TcM ()
+lintGblEnv logger dflags tcg_env =
+  liftIO $ lintAxioms logger dflags (text "TcGblEnv axioms") axioms
   where
     axioms = typeEnvCoAxioms (tcg_type_env tcg_env)

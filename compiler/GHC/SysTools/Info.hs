@@ -13,6 +13,7 @@ import GHC.Utils.Error
 import GHC.Driver.Session
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
+import GHC.Utils.Logger
 
 import Data.List ( isInfixOf, isPrefixOf )
 import Data.IORef
@@ -103,19 +104,19 @@ neededLinkArgs (AixLD o)     = o
 neededLinkArgs UnknownLD     = []
 
 -- Grab linker info and cache it in DynFlags.
-getLinkerInfo :: DynFlags -> IO LinkerInfo
-getLinkerInfo dflags = do
+getLinkerInfo :: Logger -> DynFlags -> IO LinkerInfo
+getLinkerInfo logger dflags = do
   info <- readIORef (rtldInfo dflags)
   case info of
     Just v  -> return v
     Nothing -> do
-      v <- getLinkerInfo' dflags
+      v <- getLinkerInfo' logger dflags
       writeIORef (rtldInfo dflags) (Just v)
       return v
 
 -- See Note [Run-time linker info].
-getLinkerInfo' :: DynFlags -> IO LinkerInfo
-getLinkerInfo' dflags = do
+getLinkerInfo' :: Logger -> DynFlags -> IO LinkerInfo
+getLinkerInfo' logger dflags = do
   let platform = targetPlatform dflags
       os = platformOS platform
       (pgm,args0) = pgm_l dflags
@@ -194,10 +195,10 @@ getLinkerInfo' dflags = do
         parseLinkerInfo (lines stdo) (lines stde) exitc
     )
     (\err -> do
-        debugTraceMsg dflags 2
+        debugTraceMsg logger dflags 2
             (text "Error (figuring out linker information):" <+>
              text (show err))
-        errorMsg dflags $ hang (text "Warning:") 9 $
+        errorMsg logger dflags $ hang (text "Warning:") 9 $
           text "Couldn't figure out linker information!" $$
           text "Make sure you're using GNU ld, GNU gold" <+>
           text "or the built in OS X linker, etc."
@@ -205,19 +206,19 @@ getLinkerInfo' dflags = do
     )
 
 -- Grab compiler info and cache it in DynFlags.
-getCompilerInfo :: DynFlags -> IO CompilerInfo
-getCompilerInfo dflags = do
+getCompilerInfo :: Logger -> DynFlags -> IO CompilerInfo
+getCompilerInfo logger dflags = do
   info <- readIORef (rtccInfo dflags)
   case info of
     Just v  -> return v
     Nothing -> do
-      v <- getCompilerInfo' dflags
+      v <- getCompilerInfo' logger dflags
       writeIORef (rtccInfo dflags) (Just v)
       return v
 
 -- See Note [Run-time linker info].
-getCompilerInfo' :: DynFlags -> IO CompilerInfo
-getCompilerInfo' dflags = do
+getCompilerInfo' :: Logger -> DynFlags -> IO CompilerInfo
+getCompilerInfo' logger dflags = do
   let pgm = pgm_c dflags
       -- Try to grab the info from the process output.
       parseCompilerInfo _stdo stde _exitc
@@ -251,10 +252,10 @@ getCompilerInfo' dflags = do
       parseCompilerInfo (lines stdo) (lines stde) exitc
       )
       (\err -> do
-          debugTraceMsg dflags 2
+          debugTraceMsg logger dflags 2
               (text "Error (figuring out C compiler information):" <+>
                text (show err))
-          errorMsg dflags $ hang (text "Warning:") 9 $
+          errorMsg logger dflags $ hang (text "Warning:") 9 $
             text "Couldn't figure out C compiler information!" $$
             text "Make sure you're using GNU gcc, or clang"
           return UnknownCC

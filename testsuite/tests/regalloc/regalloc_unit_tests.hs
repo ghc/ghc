@@ -64,9 +64,10 @@ main = do
     --get a GHC context and run the tests
     runGhc (Just libdir) $ do
         dflags <- fmap setOptions getDynFlags
+        logger <- getLogger
         reifyGhc $ \_ -> do
             us <- unitTestUniqSupply
-            runTests dflags us
+            runTests logger dflags us
 
     return ()
 
@@ -100,6 +101,7 @@ assertIO = assertOr $ \msg -> void (throwIO . RegAllocTestException $ msg)
 -- ***NOTE*** This function sets Opt_D_dump_asm_stats in the passed
 -- DynFlags because it won't work without it.  Handle stderr appropriately.
 compileCmmForRegAllocStats ::
+    Logger ->
     DynFlags ->
     FilePath ->
     (NCGConfig ->
@@ -107,7 +109,7 @@ compileCmmForRegAllocStats ::
     UniqSupply ->
     IO [( Maybe [Color.RegAllocStats (Alignment, RawCmmStatics) X86.Instr.Instr]
         , Maybe [Linear.RegAllocStats])]
-compileCmmForRegAllocStats dflags' cmmFile ncgImplF us = do
+compileCmmForRegAllocStats logger dflags' cmmFile ncgImplF us = do
     let ncgImpl = ncgImplF (initNCGConfig dflags thisMod)
     hscEnv <- newHscEnv dflags
 
@@ -117,18 +119,18 @@ compileCmmForRegAllocStats dflags' cmmFile ncgImplF us = do
         errorMsgs   = fmap pprError errors
 
     -- print parser errors or warnings
-    mapM_ (printBagOfErrors dflags) [warningMsgs, errorMsgs]
+    mapM_ (printBagOfErrors logger dflags) [warningMsgs, errorMsgs]
 
     let initTopSRT = emptySRT thisMod
     cmmGroup <- fmap snd $ cmmPipeline hscEnv initTopSRT $ fromJust parsedCmm
 
-    rawCmms <- cmmToRawCmm dflags (Stream.yield cmmGroup)
+    rawCmms <- cmmToRawCmm logger dflags (Stream.yield cmmGroup)
 
     collectedCmms <- mconcat <$> Stream.collect rawCmms
 
     -- compile and discard the generated code, returning regalloc stats
     mapM (\ (count, thisCmm) ->
-        cmmNativeGen dflags thisModLoc ncgImpl
+        cmmNativeGen logger dflags thisModLoc ncgImpl
             usb dwarfFileIds dbgMap thisCmm count >>=
                 (\(_, _, _, _, colorStats, linearStats, _) ->
                 -- scrub unneeded output from cmmNativeGen
@@ -160,8 +162,8 @@ noSpillsCmmFile = "no_spills.cmm"
 
 -- | Run each unit test in this file and notify the user of success or
 -- failure.
-runTests :: DynFlags -> UniqSupply -> IO ()
-runTests dflags us = testGraphNoSpills dflags noSpillsCmmFile us >>= \res ->
+runTests :: Logger -> DynFlags -> UniqSupply -> IO ()
+runTests logger dflags us = testGraphNoSpills logger dflags noSpillsCmmFile us >>= \res ->
                         if res then putStrLn "All tests passed."
                                else hPutStr stderr "testGraphNoSpills failed!"
 
@@ -177,10 +179,10 @@ runTests dflags us = testGraphNoSpills dflags noSpillsCmmFile us >>= \res ->
 -- the register allocator should be able to do everything
 -- (on x86) in the passed file without any spills or reloads.
 --
-testGraphNoSpills :: DynFlags -> FilePath -> UniqSupply -> IO Bool
-testGraphNoSpills dflags' path us = do
+testGraphNoSpills :: Logger -> DynFlags -> FilePath -> UniqSupply -> IO Bool
+testGraphNoSpills logger dflags' path us = do
         colorStats <- fst . concatTupledMaybes <$>
-                        compileCmmForRegAllocStats dflags path X86.ncgX86 us
+                        compileCmmForRegAllocStats logger dflags path X86.ncgX86 us
 
         assertIO "testGraphNoSpills: color stats should not be empty"
                         $ not (null colorStats)

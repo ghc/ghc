@@ -24,7 +24,7 @@ module GHC.Driver.Session (
         WarningFlag(..), WarnReason(..),
         Language(..),
         PlatformConstants(..),
-        FatalMessager, LogAction, FlushOut(..), FlushErr(..),
+        FatalMessager, FlushOut(..), FlushErr(..),
         ProfAuto(..),
         glasgowExtsFlags,
         warningGroups, warningHierarchies,
@@ -60,11 +60,10 @@ module GHC.Driver.Session (
         optimisationFlags,
         setFlagsFromEnvFile,
         pprDynFlagsDiff,
+        flagSpecOf,
+        smallestGroups,
 
         targetProfile,
-
-        -- ** Log output
-        putLogMsg,
 
         -- ** Safe Haskell
         safeHaskellOn, safeHaskellModeEnabled,
@@ -150,9 +149,6 @@ module GHC.Driver.Session (
         defaultWays,
         initDynFlags,                   -- DynFlags -> IO DynFlags
         defaultFatalMessager,
-        defaultLogAction,
-        defaultLogActionHPrintDoc,
-        defaultLogActionHPutStrDoc,
         defaultFlushOut,
         defaultFlushErr,
 
@@ -249,7 +245,6 @@ import GHC.Utils.Misc
 import GHC.Utils.GlobalVars
 import GHC.Data.Maybe
 import GHC.Utils.Monad
-import qualified GHC.Utils.Ppr as Pretty
 import GHC.Types.SrcLoc
 import GHC.Types.SafeHaskell
 import GHC.Types.Basic ( Alignment, alignmentOf, IntWithInf, treatZeroAsInf )
@@ -260,11 +255,6 @@ import GHC.Settings
 import GHC.CmmToAsm.CFG.Weight
 import {-# SOURCE #-} GHC.Core.Opt.CallerCC
 
-import GHC.Types.Error
-import {-# SOURCE #-} GHC.Utils.Error
-                               ( DumpAction, TraceAction
-                               , defaultDumpAction, defaultTraceAction )
-import GHC.Utils.Json
 import GHC.SysTools.Terminal ( stderrSupportsAnsiColors )
 import GHC.SysTools.BaseDir ( expandToolDir, expandTopDir )
 
@@ -599,11 +589,6 @@ data DynFlags = DynFlags {
   -- The next available suffix to uniquely name a temp file, updated atomically
   nextTempSuffix        :: IORef Int,
 
-  -- Names of files which were generated from -ddump-to-file; used to
-  -- track which ones we need to truncate because it's our first run
-  -- through
-  generatedDumps        :: IORef (Set FilePath),
-
   -- hsc dynamic flags
   dumpFlags             :: EnumSet DumpFlag,
   generalFlags          :: EnumSet GeneralFlag,
@@ -645,10 +630,6 @@ data DynFlags = DynFlags {
 
   ghciHistSize          :: Int,
 
-  -- | SDoc output action: use "GHC.Utils.Error" instead of this if you can
-  log_action            :: LogAction,
-  dump_action           :: DumpAction,
-  trace_action          :: TraceAction,
   flushOut              :: FlushOut,
   flushErr              :: FlushErr,
 
@@ -1084,7 +1065,6 @@ initDynFlags dflags = do
  refNextTempSuffix <- newIORef 0
  refFilesToClean <- newIORef emptyFilesToClean
  refDirsToClean <- newIORef Map.empty
- refGeneratedDumps <- newIORef Set.empty
  refRtldInfo <- newIORef Nothing
  refRtccInfo <- newIORef Nothing
  wrapperNum <- newIORef emptyModuleEnv
@@ -1108,7 +1088,6 @@ initDynFlags dflags = do
         nextTempSuffix = refNextTempSuffix,
         filesToClean   = refFilesToClean,
         dirsToClean    = refDirsToClean,
-        generatedDumps = refGeneratedDumps,
         nextWrapperNum = wrapperNum,
         useUnicode    = useUnicode',
         useColor      = useColor',
@@ -1238,7 +1217,6 @@ defaultDynFlags mySettings llvmConfig =
         nextTempSuffix = panic "defaultDynFlags: No nextTempSuffix",
         filesToClean   = panic "defaultDynFlags: No filesToClean",
         dirsToClean    = panic "defaultDynFlags: No dirsToClean",
-        generatedDumps = panic "defaultDynFlags: No generatedDumps",
         ghcVersionFile = Nothing,
         haddockOptions = Nothing,
         dumpFlags = EnumSet.empty,
@@ -1265,12 +1243,6 @@ defaultDynFlags mySettings llvmConfig =
         maxWorkerArgs = 10,
 
         ghciHistSize = 50, -- keep a log of length 50 by default
-
-        -- Logging
-
-        log_action   = defaultLogAction,
-        dump_action  = defaultDumpAction,
-        trace_action = defaultTraceAction,
 
         flushOut = defaultFlushOut,
         flushErr = defaultFlushErr,
@@ -1312,118 +1284,12 @@ defaultWays settings = if pc_DYNAMIC_BY_DEFAULT (sPlatformConstants settings)
                        then Set.singleton WayDyn
                        else Set.empty
 
---------------------------------------------------------------------------
---
--- Note [JSON Error Messages]
---
--- When the user requests the compiler output to be dumped as json
--- we used to collect them all in an IORef and then print them at the end.
--- This doesn't work very well with GHCi. (See #14078) So instead we now
--- use the simpler method of just outputting a JSON document inplace to
--- stdout.
---
--- Before the compiler calls log_action, it has already turned the `ErrMsg`
--- into a formatted message. This means that we lose some possible
--- information to provide to the user but refactoring log_action is quite
--- invasive as it is called in many places. So, for now I left it alone
--- and we can refine its behaviour as users request different output.
 
 type FatalMessager = String -> IO ()
-
-type LogAction = DynFlags
-              -> WarnReason
-              -> Severity
-              -> SrcSpan
-              -> SDoc
-              -> IO ()
 
 defaultFatalMessager :: FatalMessager
 defaultFatalMessager = hPutStrLn stderr
 
-
--- See Note [JSON Error Messages]
---
-jsonLogAction :: LogAction
-jsonLogAction dflags reason severity srcSpan msg
-  =
-    defaultLogActionHPutStrDoc dflags True stdout
-      (withPprStyle (PprCode CStyle) (doc $$ text ""))
-    where
-      str = renderWithContext (initSDocContext dflags defaultUserStyle) msg
-      doc = renderJSON $
-              JSObject [ ( "span", json srcSpan )
-                       , ( "doc" , JSString str )
-                       , ( "severity", json severity )
-                       , ( "reason" ,   json reason )
-                       ]
-
-
-defaultLogAction :: LogAction
-defaultLogAction dflags reason severity srcSpan msg
-    = case severity of
-      SevOutput      -> printOut msg
-      SevDump        -> printOut (msg $$ blankLine)
-      SevInteractive -> putStrSDoc msg
-      SevInfo        -> printErrs msg
-      SevFatal       -> printErrs msg
-      SevWarning     -> printWarns
-      SevError       -> printWarns
-    where
-      printOut   = defaultLogActionHPrintDoc  dflags False stdout
-      printErrs  = defaultLogActionHPrintDoc  dflags False stderr
-      putStrSDoc = defaultLogActionHPutStrDoc dflags False stdout
-      -- Pretty print the warning flag, if any (#10752)
-      message = mkLocMessageAnn flagMsg severity srcSpan msg
-
-      printWarns = do
-        hPutChar stderr '\n'
-        caretDiagnostic <-
-            if gopt Opt_DiagnosticsShowCaret dflags
-            then getCaretDiagnostic severity srcSpan
-            else pure empty
-        printErrs $ getPprStyle $ \style ->
-          withPprStyle (setStyleColoured True style)
-            (message $+$ caretDiagnostic)
-        -- careful (#2302): printErrs prints in UTF-8,
-        -- whereas converting to string first and using
-        -- hPutStr would just emit the low 8 bits of
-        -- each unicode char.
-
-      flagMsg =
-        case reason of
-          NoReason -> Nothing
-          Reason wflag -> do
-            spec <- flagSpecOf wflag
-            return ("-W" ++ flagSpecName spec ++ warnFlagGrp wflag)
-          ErrReason Nothing ->
-            return "-Werror"
-          ErrReason (Just wflag) -> do
-            spec <- flagSpecOf wflag
-            return $
-              "-W" ++ flagSpecName spec ++ warnFlagGrp wflag ++
-              ", -Werror=" ++ flagSpecName spec
-
-      warnFlagGrp flag
-          | gopt Opt_ShowWarnGroups dflags =
-                case smallestGroups flag of
-                    [] -> ""
-                    groups -> " (in " ++ intercalate ", " (map ("-W"++) groups) ++ ")"
-          | otherwise = ""
-
--- | Like 'defaultLogActionHPutStrDoc' but appends an extra newline.
-defaultLogActionHPrintDoc :: DynFlags -> Bool -> Handle -> SDoc -> IO ()
-defaultLogActionHPrintDoc dflags asciiSpace h d
- = defaultLogActionHPutStrDoc dflags asciiSpace h (d $$ text "")
-
--- | The boolean arguments let's the pretty printer know if it can optimize indent
--- by writing ascii ' ' characters without going through decoding.
-defaultLogActionHPutStrDoc :: DynFlags -> Bool -> Handle -> SDoc -> IO ()
-defaultLogActionHPutStrDoc dflags asciiSpace h d
-  -- Don't add a newline at the end, so that successive
-  -- calls to this log-action can output all on the same line
-  = printSDoc ctx (Pretty.PageMode asciiSpace) h d
-    where
-      ctx = initSDocContext dflags defaultUserStyle
 
 newtype FlushOut = FlushOut (IO ())
 
@@ -1793,9 +1659,6 @@ setOutputFile    f d = d { outputFile_    = f}
 setDynOutputFile f d = d { dynOutputFile_ = f}
 setOutputHi      f d = d { outputHi       = f}
 
-setJsonLogAction :: DynFlags -> DynFlags
-setJsonLogAction d = d { log_action = jsonLogAction }
-
 parseUnitInsts :: String -> Instantiations
 parseUnitInsts str = case filter ((=="").snd) (readP_to_S parse str) of
     [(r, "")] -> r
@@ -1978,10 +1841,6 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
   let warns' = map (Warn Cmd.NoReason) (consistency_warnings ++ sh_warns)
 
   return (dflags4, leftover, warns' ++ warns)
-
--- | Write an error or warning to the 'LogOutput'.
-putLogMsg :: DynFlags -> WarnReason -> Severity -> SrcSpan -> SDoc -> IO ()
-putLogMsg dflags = log_action dflags dflags
 
 -- | Check (and potentially disable) any extensions that aren't allowed
 -- in safe mode.
@@ -2648,7 +2507,7 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "ddump-debug"
         (setDumpFlag Opt_D_dump_debug)
   , make_ord_flag defGhcFlag "ddump-json"
-        (noArg (flip dopt_set Opt_D_dump_json . setJsonLogAction ) )
+        (setDumpFlag Opt_D_dump_json )
   , make_ord_flag defGhcFlag "dppr-debug"
         (setDumpFlag Opt_D_ppr_debug)
   , make_ord_flag defGhcFlag "ddebug-output"

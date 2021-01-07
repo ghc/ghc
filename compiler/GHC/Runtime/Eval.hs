@@ -93,6 +93,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
+import GHC.Utils.Logger
 
 import GHC.Types.RepType
 import GHC.Types.Fixity.Env
@@ -552,7 +553,7 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv (Just BreakInfo{..}) = do
    mb_hValues <-
       mapM (getBreakpointVar hsc_env apStack_fhv . fromIntegral) offsets
    when (any isNothing mb_hValues) $
-      debugTraceMsg (hsc_dflags hsc_env) 1 $
+      debugTraceMsg (hsc_logger hsc_env) (hsc_dflags hsc_env) 1 $
           text "Warning: _result has been evaluated, some bindings have been lost"
 
    us <- mkSplitUniqSupply 'I'   -- Dodgy; will give the same uniques every time
@@ -644,7 +645,8 @@ rttiEnvironment hsc_env@HscEnv{hsc_IC=ic} = do
                                            ++ "improvement for a type")) hsc_env
                Just subst -> do
                  let dflags = hsc_dflags hsc_env
-                 dumpIfSet_dyn dflags Opt_D_dump_rtti "RTTI"
+                 let logger = hsc_logger hsc_env
+                 dumpIfSet_dyn logger dflags Opt_D_dump_rtti "RTTI"
                    FormatText
                    (fsep [text "RTTI Improvement for", ppr id, equals,
                           ppr subst])

@@ -61,7 +61,7 @@ import GHC.Types.Unique
 import GHC.Utils.BufHandle   ( BufHandle )
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.Supply
-import GHC.Utils.Error
+import GHC.Utils.Logger
 import qualified GHC.Data.Stream as Stream
 
 import Data.Maybe (fromJust)
@@ -302,6 +302,7 @@ data LlvmEnv = LlvmEnv
   { envVersion :: LlvmVersion      -- ^ LLVM version
   , envOpts    :: LlvmOpts         -- ^ LLVM backend options
   , envDynFlags :: DynFlags        -- ^ Dynamic flags
+  , envLogger :: !Logger           -- ^ Logger
   , envOutput :: BufHandle         -- ^ Output buffer
   , envMask :: !Char               -- ^ Mask for creating unique values
   , envFreshMeta :: MetaId         -- ^ Supply of fresh metadata IDs
@@ -332,6 +333,10 @@ instance Monad LlvmM where
 instance HasDynFlags LlvmM where
     getDynFlags = LlvmM $ \env -> return (envDynFlags env, env)
 
+instance HasLogger LlvmM where
+    getLogger = LlvmM $ \env -> return (envLogger env, env)
+
+
 -- | Get target platform
 getPlatform :: LlvmM Platform
 getPlatform = llvmOptsPlatform <$> getLlvmOpts
@@ -355,8 +360,8 @@ liftIO m = LlvmM $ \env -> do x <- m
                               return (x, env)
 
 -- | Get initial Llvm environment.
-runLlvm :: DynFlags -> LlvmVersion -> BufHandle -> LlvmM a -> IO a
-runLlvm dflags ver out m = do
+runLlvm :: Logger -> DynFlags -> LlvmVersion -> BufHandle -> LlvmM a -> IO a
+runLlvm logger dflags ver out m = do
     (a, _) <- runLlvmM m env
     return a
   where env = LlvmEnv { envFunMap = emptyUFM
@@ -367,6 +372,7 @@ runLlvm dflags ver out m = do
                       , envVersion = ver
                       , envOpts = initLlvmOpts dflags
                       , envDynFlags = dflags
+                      , envLogger = logger
                       , envOutput = out
                       , envMask = 'n'
                       , envFreshMeta = MetaId 0
@@ -426,7 +432,8 @@ getLlvmVer = getEnv envVersion
 dumpIfSetLlvm :: DumpFlag -> String -> DumpFormat -> Outp.SDoc -> LlvmM ()
 dumpIfSetLlvm flag hdr fmt doc = do
   dflags <- getDynFlags
-  liftIO $ dumpIfSet_dyn dflags flag hdr fmt doc
+  logger <- getLogger
+  liftIO $ dumpIfSet_dyn logger dflags flag hdr fmt doc
 
 -- | Prints the given contents to the output handle
 renderLlvm :: Outp.SDoc -> LlvmM ()

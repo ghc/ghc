@@ -128,6 +128,7 @@ import GHC.Utils.Error
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
+import GHC.Utils.Logger
 
 import GHC.Types.Error
 import GHC.Types.Name.Reader
@@ -193,7 +194,7 @@ tcRnModule :: HscEnv
 tcRnModule hsc_env mod_sum save_rn_syntax
    parsedModule@HsParsedModule {hpm_module= L loc this_module}
  | RealSrcSpan real_loc _ <- loc
- = withTiming dflags
+ = withTiming logger dflags
               (text "Renamer/typechecker"<+>brackets (ppr this_mod))
               (const ()) $
    initTc hsc_env hsc_src save_rn_syntax this_mod real_loc $
@@ -206,7 +207,8 @@ tcRnModule hsc_env mod_sum save_rn_syntax
 
   where
     hsc_src = ms_hsc_src mod_sum
-    dflags = hsc_dflags hsc_env
+    dflags  = hsc_dflags hsc_env
+    logger  = hsc_logger hsc_env
     home_unit = hsc_home_unit hsc_env
     err_msg = mkPlainMsgEnvelope loc $
               text "Module does not have a RealSrcSpan:" <+> ppr this_mod
@@ -296,7 +298,7 @@ tcRnModuleTcRnM hsc_env mod_sum
                                  tcRnSrcDecls explicit_mod_hdr local_decls export_ies
 
                ; whenM (goptM Opt_DoCoreLinting) $
-                 lintGblEnv (hsc_dflags hsc_env) tcg_env
+                 lintGblEnv (hsc_logger hsc_env) (hsc_dflags hsc_env) tcg_env
 
                ; setGblEnv tcg_env
                  $ do { -- Process the export list
@@ -2889,7 +2891,7 @@ tcDump env
 
         -- Dump short output if -ddump-types or -ddump-tc
         when (dopt Opt_D_dump_types dflags || dopt Opt_D_dump_tc dflags)
-          (dumpTcRn True (dumpOptionsFromFlag Opt_D_dump_types)
+          (dumpTcRn True Opt_D_dump_types
             "" FormatText (pprWithUnitState unit_state short_dump)) ;
 
         -- Dump bindings if -ddump-tc

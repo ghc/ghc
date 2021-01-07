@@ -50,6 +50,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Utils.Outputable
 import GHC.Utils.Misc( filterOut )
 import GHC.Utils.Panic
+import GHC.Utils.Logger as Logger
 import qualified GHC.Utils.Error as Err
 
 import GHC.Types.ForeignStubs
@@ -161,7 +162,7 @@ mkBootModDetailsTc hsc_env
                 }
   = -- This timing isn't terribly useful since the result isn't forced, but
     -- the message is useful to locating oneself in the compilation process.
-    Err.withTiming dflags
+    Err.withTiming logger dflags
                    (text "CoreTidy"<+>brackets (ppr this_mod))
                    (const ()) $
     return (ModDetails { md_types            = type_env'
@@ -174,6 +175,7 @@ mkBootModDetailsTc hsc_env
                        })
   where
     dflags = hsc_dflags hsc_env
+    logger = hsc_logger hsc_env
 
     -- Find the LocalIds in the type env that are exported
     -- Make them into GlobalIds, and tidy their types
@@ -368,7 +370,7 @@ tidyProgram hsc_env  (ModGuts { mg_module           = mod
                               , mg_modBreaks        = modBreaks
                               })
 
-  = Err.withTiming dflags
+  = Err.withTiming logger dflags
                    (text "CoreTidy"<+>brackets (ppr mod))
                    (const ()) $
     do  { let { omit_prags = gopt Opt_OmitInterfacePragmas dflags
@@ -442,15 +444,15 @@ tidyProgram hsc_env  (ModGuts { mg_module           = mod
           -- If the endPass didn't print the rules, but ddump-rules is
           -- on, print now
         ; unless (dopt Opt_D_dump_simpl dflags) $
-            Err.dumpIfSet_dyn dflags Opt_D_dump_rules
+            Logger.dumpIfSet_dyn logger dflags Opt_D_dump_rules
               (showSDoc dflags (ppr CoreTidy <+> text "rules"))
-              Err.FormatText
+              FormatText
               (pprRulesForUser tidy_rules)
 
           -- Print one-line size info
         ; let cs = coreBindsStats tidy_binds
-        ; Err.dumpIfSet_dyn dflags Opt_D_dump_core_stats "Core Stats"
-            Err.FormatText
+        ; Logger.dumpIfSet_dyn logger dflags Opt_D_dump_core_stats "Core Stats"
+            FormatText
             (text "Tidy size (terms,types,coercions)"
              <+> ppr (moduleName mod) <> colon
              <+> int (cs_tm cs)
@@ -478,6 +480,7 @@ tidyProgram hsc_env  (ModGuts { mg_module           = mod
         }
   where
     dflags = hsc_dflags hsc_env
+    logger = hsc_logger hsc_env
 
 --------------------------
 trimId :: Bool -> Id -> Id

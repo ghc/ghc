@@ -1,4 +1,4 @@
-Found 238 Language.Haskell.Syntax module dependencies
+Found 239 Language.Haskell.Syntax module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.Types
@@ -222,6 +222,7 @@ GHC.Utils.GlobalVars
 GHC.Utils.IO.Unsafe
 GHC.Utils.Json
 GHC.Utils.Lexeme
+GHC.Utils.Logger
 GHC.Utils.Misc
 GHC.Utils.Monad
 GHC.Utils.Outputable

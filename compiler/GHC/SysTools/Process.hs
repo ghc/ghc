@@ -18,7 +18,8 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Prelude
 import GHC.Utils.Misc
-import GHC.Types.SrcLoc ( SrcLoc, mkSrcLoc, noSrcSpan, mkSrcSpan )
+import GHC.Utils.Logger
+import GHC.Types.SrcLoc ( SrcLoc, mkSrcLoc, mkSrcSpan )
 
 import Control.Concurrent
 import Data.Char
@@ -132,7 +133,8 @@ getGccEnv opts =
 -----------------------------------------------------------------------------
 -- Running an external program
 
-runSomething :: DynFlags
+runSomething :: Logger
+             -> DynFlags
              -> String          -- For -v message
              -> String          -- Command name (possibly a full path)
                                 --      assumed already dos-ified
@@ -140,8 +142,8 @@ runSomething :: DynFlags
                                 --      runSomething will dos-ify them
              -> IO ()
 
-runSomething dflags phase_name pgm args =
-  runSomethingFiltered dflags id phase_name pgm args Nothing Nothing
+runSomething logger dflags phase_name pgm args =
+  runSomethingFiltered logger dflags id phase_name pgm args Nothing Nothing
 
 -- | Run a command, placing the arguments in an external response file.
 --
@@ -153,18 +155,18 @@ runSomething dflags phase_name pgm args =
 --     https://gcc.gnu.org/wiki/Response_Files
 --     https://gitlab.haskell.org/ghc/ghc/issues/10777
 runSomethingResponseFile
-  :: DynFlags -> (String->String) -> String -> String -> [Option]
+  :: Logger -> DynFlags -> (String->String) -> String -> String -> [Option]
   -> Maybe [(String,String)] -> IO ()
 
-runSomethingResponseFile dflags filter_fn phase_name pgm args mb_env =
-    runSomethingWith dflags phase_name pgm args $ \real_args -> do
+runSomethingResponseFile logger dflags filter_fn phase_name pgm args mb_env =
+    runSomethingWith logger dflags phase_name pgm args $ \real_args -> do
         fp <- getResponseFile real_args
         let args = ['@':fp]
-        r <- builderMainLoop dflags filter_fn pgm args Nothing mb_env
+        r <- builderMainLoop logger dflags filter_fn pgm args Nothing mb_env
         return (r,())
   where
     getResponseFile args = do
-      fp <- newTempName dflags TFL_CurrentModule "rsp"
+      fp <- newTempName logger dflags TFL_CurrentModule "rsp"
       withFile fp WriteMode $ \h -> do
 #if defined(mingw32_HOST_OS)
           hSetEncoding h latin1
@@ -200,23 +202,23 @@ runSomethingResponseFile dflags filter_fn phase_name pgm args mb_env =
         ]
 
 runSomethingFiltered
-  :: DynFlags -> (String->String) -> String -> String -> [Option]
+  :: Logger -> DynFlags -> (String->String) -> String -> String -> [Option]
   -> Maybe FilePath -> Maybe [(String,String)] -> IO ()
 
-runSomethingFiltered dflags filter_fn phase_name pgm args mb_cwd mb_env =
-    runSomethingWith dflags phase_name pgm args $ \real_args -> do
-        r <- builderMainLoop dflags filter_fn pgm real_args mb_cwd mb_env
+runSomethingFiltered logger dflags filter_fn phase_name pgm args mb_cwd mb_env =
+    runSomethingWith logger dflags phase_name pgm args $ \real_args -> do
+        r <- builderMainLoop logger dflags filter_fn pgm real_args mb_cwd mb_env
         return (r,())
 
 runSomethingWith
-  :: DynFlags -> String -> String -> [Option]
+  :: Logger -> DynFlags -> String -> String -> [Option]
   -> ([String] -> IO (ExitCode, a))
   -> IO a
 
-runSomethingWith dflags phase_name pgm args io = do
+runSomethingWith logger dflags phase_name pgm args io = do
   let real_args = filter notNull (map showOpt args)
       cmdLine = showCommandForUser pgm real_args
-  traceCmd dflags phase_name cmdLine $ handleProc pgm phase_name $ io real_args
+  traceCmd logger dflags phase_name cmdLine $ handleProc pgm phase_name $ io real_args
 
 handleProc :: String -> String -> IO (ExitCode, r) -> IO r
 handleProc pgm phase_name proc = do
@@ -236,10 +238,10 @@ handleProc pgm phase_name proc = do
     does_not_exist = throwGhcExceptionIO (InstallationError ("could not execute: " ++ pgm))
 
 
-builderMainLoop :: DynFlags -> (String -> String) -> FilePath
+builderMainLoop :: Logger -> DynFlags -> (String -> String) -> FilePath
                 -> [String] -> Maybe FilePath -> Maybe [(String, String)]
                 -> IO ExitCode
-builderMainLoop dflags filter_fn pgm real_args mb_cwd mb_env = do
+builderMainLoop logger dflags filter_fn pgm real_args mb_cwd mb_env = do
   chan <- newChan
 
   -- We use a mask here rather than a bracket because we want
@@ -300,11 +302,10 @@ builderMainLoop dflags filter_fn pgm real_args mb_cwd mb_env = do
       msg <- readChan chan
       case msg of
         BuildMsg msg -> do
-          putLogMsg dflags NoReason SevInfo noSrcSpan
-              $ withPprStyle defaultUserStyle msg
+          logInfo logger dflags $ withPprStyle defaultUserStyle msg
           log_loop chan t
         BuildError loc msg -> do
-          putLogMsg dflags NoReason SevError (mkSrcSpan loc loc)
+          putLogMsg logger dflags NoReason SevError (mkSrcSpan loc loc)
               $ withPprStyle defaultUserStyle msg
           log_loop chan t
         EOF ->

@@ -187,6 +187,7 @@ import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Error
 import GHC.Utils.Panic
 import GHC.Utils.Misc
+import GHC.Utils.Logger
 
 import GHC.Types.Error
 import GHC.Types.Fixity.Env
@@ -752,14 +753,14 @@ formatTraceMsg herald doc = hang (text herald) 2 doc
 traceOptTcRn :: DumpFlag -> SDoc -> TcRn ()
 traceOptTcRn flag doc =
   whenDOptM flag $
-    dumpTcRn False (dumpOptionsFromFlag flag) "" FormatText doc
+    dumpTcRn False flag "" FormatText doc
 {-# INLINE traceOptTcRn #-} -- see Note [INLINE conditional tracing utilities]
 
 -- | Dump if the given 'DumpFlag' is set.
 dumpOptTcRn :: DumpFlag -> String -> DumpFormat -> SDoc -> TcRn ()
 dumpOptTcRn flag title fmt doc =
   whenDOptM flag $
-    dumpTcRn False (dumpOptionsFromFlag flag) title fmt doc
+    dumpTcRn False flag title fmt doc
 {-# INLINE dumpOptTcRn #-} -- see Note [INLINE conditional tracing utilities]
 
 -- | Unconditionally dump some trace output
@@ -769,15 +770,16 @@ dumpOptTcRn flag title fmt doc =
 -- generally we want all other debugging output to use 'PprDump'
 -- style. We 'PprUser' style if 'useUserStyle' is True.
 --
-dumpTcRn :: Bool -> DumpOptions -> String -> DumpFormat -> SDoc -> TcRn ()
-dumpTcRn useUserStyle dumpOpt title fmt doc = do
+dumpTcRn :: Bool -> DumpFlag -> String -> DumpFormat -> SDoc -> TcRn ()
+dumpTcRn useUserStyle flag title fmt doc = do
   dflags <- getDynFlags
+  logger <- getLogger
   printer <- getPrintUnqualified
   real_doc <- wrapDocLoc doc
   let sty = if useUserStyle
               then mkUserStyle printer AllTheWay
               else mkDumpStyle printer
-  liftIO $ dumpAction dflags sty dumpOpt title fmt real_doc
+  liftIO $ putDumpMsg logger dflags sty flag title fmt real_doc
 
 -- | Add current location if -dppr-debug
 -- (otherwise the full location is usually way too much)
@@ -799,10 +801,11 @@ getPrintUnqualified
 
 -- | Like logInfoTcRn, but for user consumption
 printForUserTcRn :: SDoc -> TcRn ()
-printForUserTcRn doc
-  = do { dflags <- getDynFlags
-       ; printer <- getPrintUnqualified
-       ; liftIO (printOutputForUser dflags printer doc) }
+printForUserTcRn doc = do
+    dflags <- getDynFlags
+    logger <- getLogger
+    printer <- getPrintUnqualified
+    liftIO (printOutputForUser logger dflags printer doc)
 
 {-
 traceIf and traceHiDiffs work in the TcRnIf monad, where no RdrEnv is
@@ -819,9 +822,10 @@ traceHiDiffs = traceOptIf Opt_D_dump_hi_diffs
 
 traceOptIf :: DumpFlag -> SDoc -> TcRnIf m n ()
 traceOptIf flag doc
-  = whenDOptM flag $    -- No RdrEnv available, so qualify everything
-    do { dflags <- getDynFlags
-       ; liftIO (putMsg dflags doc) }
+  = whenDOptM flag $ do   -- No RdrEnv available, so qualify everything
+        dflags <- getDynFlags
+        logger <- getLogger
+        liftIO (putMsg logger dflags doc)
 {-# INLINE traceOptIf #-}  -- see Note [INLINE conditional tracing utilities]
 
 {-
@@ -2058,13 +2062,14 @@ failIfM :: SDoc -> IfL a
 -- The Iface monad doesn't have a place to accumulate errors, so we
 -- just fall over fast if one happens; it "shouldn't happen".
 -- We use IfL here so that we can get context info out of the local env
-failIfM msg
-  = do  { env <- getLclEnv
-        ; let full_msg = (if_loc env <> colon) $$ nest 2 msg
-        ; dflags <- getDynFlags
-        ; liftIO (putLogMsg dflags NoReason SevFatal
-                   noSrcSpan $ withPprStyle defaultErrStyle full_msg)
-        ; failM }
+failIfM msg = do
+    env <- getLclEnv
+    let full_msg = (if_loc env <> colon) $$ nest 2 msg
+    dflags <- getDynFlags
+    logger <- getLogger
+    liftIO (putLogMsg logger dflags NoReason SevFatal
+             noSrcSpan $ withPprStyle defaultErrStyle full_msg)
+    failM
 
 --------------------
 
@@ -2093,9 +2098,10 @@ forkM_maybe doc thing_inside
                 -- happen when compiling interface signatures (see tcInterfaceSigs)
                   whenDOptM Opt_D_dump_if_trace $ do
                       dflags <- getDynFlags
+                      logger <- getLogger
                       let msg = hang (text "forkM failed:" <+> doc)
                                    2 (text (show exn))
-                      liftIO $ putLogMsg dflags
+                      liftIO $ putLogMsg logger dflags
                                          NoReason
                                          SevFatal
                                          noSrcSpan

@@ -22,7 +22,8 @@ main = do
     defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
 
     dflags0 <- getSessionDynFlags
-    (dflags1, _, _) <- parseDynamicFlags dflags0 $ map noLoc $
+    logger <- getLogger
+    (dflags1, _, _) <- parseDynamicFlags logger dflags0 $ map noLoc $
         [ "-i", "-i.", "-imydir"
         -- , "-v3"
         ] ++ args

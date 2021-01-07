@@ -56,6 +56,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Outputable
 import GHC.Utils.Monad  ( mapAccumLM )
+import GHC.Utils.Logger
 
 import GHC.Types.Demand
 import GHC.Types.Var
@@ -186,7 +187,7 @@ type CpeRhs  = CoreExpr    -- Non-terminal 'rhs'
 corePrepPgm :: HscEnv -> Module -> ModLocation -> CoreProgram -> [TyCon]
             -> IO (CoreProgram, S.Set CostCentre)
 corePrepPgm hsc_env this_mod mod_loc binds data_tycons =
-    withTiming dflags
+    withTiming logger dflags
                (text "CorePrep"<+>brackets (ppr this_mod))
                (const ()) $ do
     us <- mkSplitUniqSupply 's'
@@ -211,15 +212,17 @@ corePrepPgm hsc_env this_mod mod_loc binds data_tycons =
     return (binds_out, cost_centres)
   where
     dflags = hsc_dflags hsc_env
+    logger = hsc_logger hsc_env
 
 corePrepExpr :: HscEnv -> CoreExpr -> IO CoreExpr
 corePrepExpr hsc_env expr = do
     let dflags = hsc_dflags hsc_env
-    withTiming dflags (text "CorePrep [expr]") (const ()) $ do
+    let logger = hsc_logger hsc_env
+    withTiming logger dflags (text "CorePrep [expr]") (const ()) $ do
       us <- mkSplitUniqSupply 's'
       initialCorePrepEnv <- mkInitialCorePrepEnv hsc_env
       let new_expr = initUs_ us (cpeBodyNF initialCorePrepEnv expr)
-      dumpIfSet_dyn dflags Opt_D_dump_prep "CorePrep" FormatCore (ppr new_expr)
+      dumpIfSet_dyn logger dflags Opt_D_dump_prep "CorePrep" FormatCore (ppr new_expr)
       return new_expr
 
 corePrepTopBinds :: CorePrepEnv -> [CoreBind] -> UniqSM Floats

@@ -57,6 +57,7 @@ import GHC.Unit.Module
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Logger
 
 import GHC.SysTools.FileCleanup
 
@@ -69,7 +70,8 @@ import GHC.Utils.Misc
 import System.IO.Unsafe
 import qualified Data.ByteString as BS
 
-codeGen :: DynFlags
+codeGen :: Logger
+        -> DynFlags
         -> Module
         -> [TyCon]
         -> CollectedCCs                -- (Local/global) cost-centres needing declaring/registering.
@@ -79,7 +81,7 @@ codeGen :: DynFlags
                                        -- Output as a stream, so codegen can
                                        -- be interleaved with output
 
-codeGen dflags this_mod data_tycons
+codeGen logger dflags this_mod data_tycons
         cost_centre_info stg_binds hpc_info
   = do  {     -- cg: run the code generator, and yield the resulting CmmGroup
               -- Using an IORef to store the state is a bit crude, but otherwise
@@ -87,7 +89,7 @@ codeGen dflags this_mod data_tycons
         ; cgref <- liftIO $ newIORef =<< initC
         ; let cg :: FCode () -> Stream IO CmmGroup ()
               cg fcode = do
-                cmm <- liftIO . withTimingSilent dflags (text "STG -> Cmm") (`seq` ()) $ do
+                cmm <- liftIO . withTimingSilent logger dflags (text "STG -> Cmm") (`seq` ()) $ do
                          st <- readIORef cgref
                          let (a,st') = runC dflags this_mod st (getCmm fcode)
 
@@ -104,7 +106,7 @@ codeGen dflags this_mod data_tycons
                -- Note [pipeline-split-init].
         ; cg (mkModuleInit cost_centre_info this_mod hpc_info)
 
-        ; mapM_ (cg . cgTopBinding dflags) stg_binds
+        ; mapM_ (cg . cgTopBinding logger dflags) stg_binds
 
                 -- Put datatype_stuff after code_stuff, because the
                 -- datatype closure table (for enumeration types) to
@@ -151,14 +153,14 @@ This is so that we can write the top level processing in a compositional
 style, with the increasing static environment being plumbed as a state
 variable. -}
 
-cgTopBinding :: DynFlags -> CgStgTopBinding -> FCode ()
-cgTopBinding dflags (StgTopLifted (StgNonRec id rhs))
+cgTopBinding :: Logger -> DynFlags -> CgStgTopBinding -> FCode ()
+cgTopBinding _logger dflags (StgTopLifted (StgNonRec id rhs))
   = do  { let (info, fcode) = cgTopRhs dflags NonRecursive id rhs
         ; fcode
         ; addBindC info
         }
 
-cgTopBinding dflags (StgTopLifted (StgRec pairs))
+cgTopBinding _logger dflags (StgTopLifted (StgRec pairs))
   = do  { let (bndrs, rhss) = unzip pairs
         ; let pairs' = zip bndrs rhss
               r = unzipWith (cgTopRhs dflags Recursive) pairs'
@@ -167,7 +169,7 @@ cgTopBinding dflags (StgTopLifted (StgRec pairs))
         ; sequence_ fcodes
         }
 
-cgTopBinding dflags (StgTopStringLit id str) = do
+cgTopBinding logger dflags (StgTopStringLit id str) = do
   let label = mkBytesLabel (idName id)
   -- emit either a CmmString literal or dump the string in a file and emit a
   -- CmmFileEmbed literal.
@@ -179,7 +181,7 @@ cgTopBinding dflags (StgTopStringLit id str) = do
       (lit,decl) = if not isNCG || asString
         then mkByteStringCLit label str
         else mkFileEmbedLit label $ unsafePerformIO $ do
-               bFile <- newTempName dflags TFL_CurrentModule ".dat"
+               bFile <- newTempName logger dflags TFL_CurrentModule ".dat"
                BS.writeFile bFile str
                return bFile
   emitDecl decl

@@ -52,6 +52,7 @@ import GHC.Driver.Session
 import GHC.Utils.Error (withTimingSilent)
 import GHC.Utils.Panic
 import GHC.Types.Unique.Supply
+import GHC.Utils.Logger
 import GHC.Utils.Monad
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -68,14 +69,14 @@ mkEmptyContInfoTable info_lbl
                  , cit_srt  = Nothing
                  , cit_clo  = Nothing }
 
-cmmToRawCmm :: DynFlags -> Stream IO CmmGroupSRTs a
+cmmToRawCmm :: Logger -> DynFlags -> Stream IO CmmGroupSRTs a
             -> IO (Stream IO RawCmmGroup a)
-cmmToRawCmm dflags cmms
+cmmToRawCmm logger dflags cmms
   = do { uniqs <- mkSplitUniqSupply 'i'
        ; let do_one :: UniqSupply -> [CmmDeclSRTs] -> IO (UniqSupply, [RawCmmDecl])
              do_one uniqs cmm =
                -- NB. strictness fixes a space leak.  DO NOT REMOVE.
-               withTimingSilent dflags (text "Cmm -> Raw Cmm")
+               withTimingSilent logger dflags (text "Cmm -> Raw Cmm")
                                 forceRes $
                  case initUs uniqs $ concatMapM (mkInfoTable dflags) cmm of
                    (b,uniqs') -> return (uniqs',b)

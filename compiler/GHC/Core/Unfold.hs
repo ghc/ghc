@@ -56,11 +56,11 @@ import GHC.Core.Type
 import GHC.Builtin.Names
 import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
 import GHC.Data.Bag
+import GHC.Utils.Logger
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Types.ForeignCall
 import GHC.Types.Name
-import GHC.Utils.Error
 
 import qualified Data.ByteString as BS
 import Data.List (isPrefixOf)
@@ -1052,7 +1052,8 @@ them inlining is to give them a NOINLINE pragma, which we do in
 StrictAnal.addStrictnessInfoToTopId
 -}
 
-callSiteInline :: DynFlags
+callSiteInline :: Logger
+               -> DynFlags
                -> Int                   -- Case depth
                -> Id                    -- The Id
                -> Bool                  -- True <=> unfolding is active
@@ -1096,7 +1097,7 @@ instance Outputable CallCtxt where
   ppr DiscArgCtxt = text "DiscArgCtxt"
   ppr RuleArgCtxt = text "RuleArgCtxt"
 
-callSiteInline dflags !case_depth id active_unfolding lone_variable arg_infos cont_info
+callSiteInline logger dflags !case_depth id active_unfolding lone_variable arg_infos cont_info
   = case idUnfolding id of
       -- idUnfolding checks for loop-breakers, returning NoUnfolding
       -- Things with an INLINE pragma may have an unfolding *and*
@@ -1104,22 +1105,22 @@ callSiteInline dflags !case_depth id active_unfolding lone_variable arg_infos co
         CoreUnfolding { uf_tmpl = unf_template
                       , uf_is_work_free = is_wf
                       , uf_guidance = guidance, uf_expandable = is_exp }
-          | active_unfolding -> tryUnfolding dflags case_depth id lone_variable
+          | active_unfolding -> tryUnfolding logger dflags case_depth id lone_variable
                                     arg_infos cont_info unf_template
                                     is_wf is_exp guidance
-          | otherwise -> traceInline dflags id "Inactive unfolding:" (ppr id) Nothing
+          | otherwise -> traceInline logger dflags id "Inactive unfolding:" (ppr id) Nothing
         NoUnfolding      -> Nothing
         BootUnfolding    -> Nothing
         OtherCon {}      -> Nothing
         DFunUnfolding {} -> Nothing     -- Never unfold a DFun
 
 -- | Report the inlining of an identifier's RHS to the user, if requested.
-traceInline :: DynFlags -> Id -> String -> SDoc -> a -> a
-traceInline dflags inline_id str doc result
+traceInline :: Logger -> DynFlags -> Id -> String -> SDoc -> a -> a
+traceInline logger dflags inline_id str doc result
   -- We take care to ensure that doc is used in only one branch, ensuring that
   -- the simplifier can push its allocation into the branch. See Note [INLINE
   -- conditional tracing utilities].
-  | enable    = traceAction dflags str doc result
+  | enable    = putTraceMsg logger dflags str doc result
   | otherwise = result
   where
     enable
@@ -1227,32 +1228,32 @@ needed on a per-module basis.
 
 -}
 
-tryUnfolding :: DynFlags -> Int -> Id -> Bool -> [ArgSummary] -> CallCtxt
+tryUnfolding :: Logger -> DynFlags -> Int -> Id -> Bool -> [ArgSummary] -> CallCtxt
              -> CoreExpr -> Bool -> Bool -> UnfoldingGuidance
              -> Maybe CoreExpr
-tryUnfolding dflags !case_depth id lone_variable
+tryUnfolding logger dflags !case_depth id lone_variable
              arg_infos cont_info unf_template
              is_wf is_exp guidance
  = case guidance of
-     UnfNever -> traceInline dflags id str (text "UnfNever") Nothing
+     UnfNever -> traceInline logger dflags id str (text "UnfNever") Nothing
 
      UnfWhen { ug_arity = uf_arity, ug_unsat_ok = unsat_ok, ug_boring_ok = boring_ok }
         | enough_args && (boring_ok || some_benefit || unfoldingVeryAggressive uf_opts)
                 -- See Note [INLINE for small functions (3)]
-        -> traceInline dflags id str (mk_doc some_benefit empty True) (Just unf_template)
+        -> traceInline logger dflags id str (mk_doc some_benefit empty True) (Just unf_template)
         | otherwise
-        -> traceInline dflags id str (mk_doc some_benefit empty False) Nothing
+        -> traceInline logger dflags id str (mk_doc some_benefit empty False) Nothing
         where
           some_benefit = calc_some_benefit uf_arity
           enough_args = (n_val_args >= uf_arity) || (unsat_ok && n_val_args > 0)
 
      UnfIfGoodArgs { ug_args = arg_discounts, ug_res = res_discount, ug_size = size }
         | unfoldingVeryAggressive uf_opts
-        -> traceInline dflags id str (mk_doc some_benefit extra_doc True) (Just unf_template)
+        -> traceInline logger dflags id str (mk_doc some_benefit extra_doc True) (Just unf_template)
         | is_wf && some_benefit && small_enough
-        -> traceInline dflags id str (mk_doc some_benefit extra_doc True) (Just unf_template)
+        -> traceInline logger dflags id str (mk_doc some_benefit extra_doc True) (Just unf_template)
         | otherwise
-        -> traceInline dflags id str (mk_doc some_benefit extra_doc False) Nothing
+        -> traceInline logger dflags id str (mk_doc some_benefit extra_doc False) Nothing
         where
           some_benefit = calc_some_benefit (length arg_discounts)
           extra_doc = vcat [ text "case depth =" <+> int case_depth

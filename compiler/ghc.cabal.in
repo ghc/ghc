@@ -705,6 +705,7 @@ Library
         GHC.Utils.IO.Unsafe
         GHC.Utils.Json
         GHC.Utils.Lexeme
+        GHC.Utils.Logger
         GHC.Utils.Misc
         GHC.Utils.Monad
         GHC.Utils.Monad.State

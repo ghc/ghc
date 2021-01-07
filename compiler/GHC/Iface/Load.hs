@@ -65,6 +65,7 @@ import GHC.Utils.Error
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
+import GHC.Utils.Logger
 
 import GHC.Settings.Constants
 
@@ -430,8 +431,11 @@ loadInterface doc_str mod from
        -- Redo search for our local hole module
        loadInterface doc_str (mkHomeModule home_unit (moduleName mod)) from
   | otherwise
-  = withTimingSilentD (text "loading interface") (pure ()) $
-    do  {       -- Read the state
+  = do
+    logger <- getLogger
+    dflags <- getDynFlags
+    withTimingSilent logger dflags (text "loading interface") (pure ()) $ do
+        {       -- Read the state
           (eps,hpt) <- getEpsAndHpt
         ; gbl_env <- getGblEnv
 
@@ -917,10 +921,10 @@ findAndReadIface doc_str mod wanted_mod_with_insts hi_boot_file
           checkBuildDynamicToo _ = return ()
 
 -- | Write interface file
-writeIface :: DynFlags -> FilePath -> ModIface -> IO ()
-writeIface dflags hi_file_path new_iface
+writeIface :: Logger -> DynFlags -> FilePath -> ModIface -> IO ()
+writeIface logger dflags hi_file_path new_iface
     = do createDirectoryIfMissing True (takeDirectory hi_file_path)
-         let printer = TraceBinIFace (debugTraceMsg dflags 3)
+         let printer = TraceBinIFace (debugTraceMsg logger dflags 3)
              profile = targetProfile dflags
          writeBinIface profile printer hi_file_path new_iface
 
@@ -1052,8 +1056,9 @@ For some background on this choice see trac #15269.
 showIface :: HscEnv -> FilePath -> IO ()
 showIface hsc_env filename = do
    let dflags  = hsc_dflags hsc_env
+   let logger  = hsc_logger hsc_env
        unit_state = hsc_units hsc_env
-       printer = putLogMsg dflags NoReason SevOutput noSrcSpan . withPprStyle defaultDumpStyle
+       printer = putLogMsg logger dflags NoReason SevOutput noSrcSpan . withPprStyle defaultDumpStyle
 
    -- skip the hi way check; we don't want to worry about profiled vs.
    -- non-profiled interfaces, for example.
@@ -1067,7 +1072,7 @@ showIface hsc_env filename = do
        print_unqual = QueryQualify qualifyImportedNames
                                    neverQualifyModules
                                    neverQualifyPackages
-   putLogMsg dflags NoReason SevDump noSrcSpan
+   putLogMsg logger dflags NoReason SevDump noSrcSpan
       $ withPprStyle (mkDumpStyle print_unqual)
       $ pprModIface unit_state iface
 

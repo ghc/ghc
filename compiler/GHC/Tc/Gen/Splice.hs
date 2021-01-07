@@ -119,6 +119,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Panic as Panic
 import GHC.Utils.Lexeme
 import GHC.Utils.Outputable
+import GHC.Utils.Logger
 
 import GHC.SysTools.FileCleanup ( newTempName, TempFileLifetime(..) )
 
@@ -1135,7 +1136,8 @@ instance TH.Quasi TcM where
 
   qAddTempFile suffix = do
     dflags <- getDynFlags
-    liftIO $ newTempName dflags TFL_GhcSession suffix
+    logger <- getLogger
+    liftIO $ newTempName logger dflags TFL_GhcSession suffix
 
   qAddTopDecls thds = do
       l <- getSrcSpanM
