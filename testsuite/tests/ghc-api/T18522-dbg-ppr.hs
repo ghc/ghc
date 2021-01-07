@@ -37,6 +37,7 @@ main = do
       `xopt_set` LangExt.RankNTypes
     hsc_env <- getSession
     let dflags = hsc_dflags hsc_env
+    let logger = hsc_logger hsc_env
     liftIO $ do
       th_t <- runQ [t| forall k {j}.
                        forall (a :: k) (b :: j) ->
@@ -48,7 +49,7 @@ main = do
       let (warnings, errors) = partitionMessages messages
       case mres of
         Nothing -> do
-          printBagOfErrors dflags warnings
-          printBagOfErrors dflags errors
+          printBagOfErrors logger dflags warnings
+          printBagOfErrors logger dflags errors
         Just (t, _) -> do
           putStrLn $ showSDoc dflags (debugPprType t)

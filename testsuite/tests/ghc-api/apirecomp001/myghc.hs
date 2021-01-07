@@ -23,7 +23,8 @@ main = do
   libdir : args <- getArgs
   runGhc (Just libdir) $ do
     dflags0 <- getSessionDynFlags
-    (dflags, _, _) <- parseDynamicFlags dflags0
+    logger <- getLogger
+    (dflags, _, _) <- parseDynamicFlags logger dflags0
       (map (mkGeneralLocated "on the commandline") args)
     setSessionDynFlags $ dflags { backend   = NoBackend
                                 , ghcLink   = LinkInMemory
