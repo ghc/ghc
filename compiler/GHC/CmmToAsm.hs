@@ -582,9 +582,10 @@ cmmNativeGen logger dflags modLoc ncgImpl us fileIds dbgMap cmm count
           else do
                 -- do linear register allocation
                 let reg_alloc proc = do
-                       (alloced, maybe_more_stack, ra_stats) <-
-                               Linear.regAlloc config proc
-                       case maybe_more_stack of
+                        let regAlloc = (linearRegAlloc ncgImpl)
+                        (alloced, maybe_more_stack, ra_stats) <-
+                                regAlloc config proc
+                        case maybe_more_stack of
                          Nothing -> return ( alloced, ra_stats, [] )
                          Just amount -> do
                            (alloced',stack_updt_blks) <-

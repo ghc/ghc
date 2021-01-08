@@ -14,6 +14,11 @@ import GHC.CmmToAsm.Config
 import GHC.CmmToAsm.Types
 import GHC.CmmToAsm.Instr
 
+import qualified GHC.CmmToAsm.Reg.Linear as Linear
+import qualified GHC.CmmToAsm.Reg.Linear.FreeRegs as FR
+
+import qualified GHC.CmmToAsm.Reg.Linear.SPARC as SPARC
+
 import qualified GHC.CmmToAsm.SPARC.Instr          as SPARC
 import qualified GHC.CmmToAsm.SPARC.Ppr            as SPARC
 import qualified GHC.CmmToAsm.SPARC.CodeGen        as SPARC
@@ -41,6 +46,7 @@ ncgSPARC config = NcgImpl
    -- Allocating more stack space for spilling isn't currently supported for the
    -- linear register allocator on SPARC, hence the panic below.
    , ncgAllocMoreStack         = noAllocMoreStack
+   , linearRegAlloc            = Linear.regAlloc (FR.frInitFreeRegs platform :: SPARC.FreeRegs)
    }
     where
       platform = ncgPlatform config
