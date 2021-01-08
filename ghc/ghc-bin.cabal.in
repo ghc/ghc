@@ -24,6 +24,11 @@ Flag internal-interpreter
     Default: False
     Manual: True
 
+Flag ghc-debug
+    Description: Build with support for ghc-debug.
+    Default: False
+    Manual: True
+
 Flag threaded
     Description: Link the ghc executable against the threaded RTS
     Default: True
@@ -43,6 +48,10 @@ Executable ghc
                    transformers == 0.5.*,
                    ghc-boot   == @ProjectVersionMunged@,
                    ghc        == @ProjectVersionMunged@
+
+    if flag(ghc-debug)
+        build-depends: ghc-debug-stub
+        CPP-OPTIONS: -DGHC_DEBUG
 
     if os(windows)
         Build-Depends: Win32  >= 2.3 && < 2.11
