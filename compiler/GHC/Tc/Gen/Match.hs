@@ -383,7 +383,8 @@ tcStmtsAndThen ctxt stmt_chk (L loc stmt : stmts) res_ty thing_inside
 
 tcGuardStmt :: TcExprStmtChecker
 tcGuardStmt _ (BodyStmt _ guard _ _) res_ty thing_inside
-  = do  { guard' <- tcCheckMonoExpr guard boolTy
+  = do  { guard' <- tcScalingUsage Many $ tcCheckMonoExpr guard boolTy
+          -- Scale the guard to Many (see #19120 and #19193)
         ; thing  <- thing_inside res_ty
         ; return (BodyStmt boolTy guard' noSyntaxExpr noSyntaxExpr, thing) }
 
