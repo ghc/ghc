@@ -4,3 +4,8 @@
 overloadedrecfldsfail11.hs:5:15: error: [-Wdeprecations (in -Wdefault), -Werror=deprecations]
     In the use of ‘foo’ (imported from OverloadedRecFldsFail11_A):
     "Warning on a record field"
+
+overloadedrecfldsfail11.hs:5:15: error: [-Wambiguous-fields (in -Wdefault), -Werror=ambiguous-fields]
+    The field ‘foo’ belonging to type S is ambiguous.
+    This will not be supported by -XDuplicateRecordFields in future releases of GHC.
+    You can use a qualified import or explicit case analysis to resolve the ambiguity.
