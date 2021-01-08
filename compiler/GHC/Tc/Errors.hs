@@ -378,15 +378,30 @@ deferringAnyBindings (CEC { cec_defer_type_errors  = TypeError
                           , cec_out_of_scope_holes = HoleError }) = False
 deferringAnyBindings _                                            = True
 
--- | Transforms a 'ReportErrCtxt' into one that does not defer any bindings
--- at all.
-noDeferredBindings :: ReportErrCtxt -> ReportErrCtxt
-noDeferredBindings ctxt = ctxt { cec_defer_type_errors  = TypeError
-                               , cec_expr_holes         = HoleError
-                               , cec_out_of_scope_holes = HoleError }
+maybeSwitchOffDefer :: EvBindsVar -> ReportErrCtxt -> ReportErrCtxt
+-- Switch off defer-type-errors inside CoEvBindsVar
+-- See Note [Failing equalities with no evidence bindings]
+maybeSwitchOffDefer evb ctxt
+ | CoEvBindsVar{} <- evb
+ = ctxt { cec_defer_type_errors  = TypeError
+        , cec_expr_holes         = HoleError
+        , cec_out_of_scope_holes = HoleError }
+ | otherwise
+ = ctxt
 
-{- Note [Suppressing error messages]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Failing equalities with no evidence bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we go inside an implication that has no term evidence
+(e.g. unifying under a forall), we can't defer type errors.  You could
+imagine using the /enclosing/ bindings (in cec_binds), but that may
+not have enough stuff in scope for the bindings to be well typed.  So
+we just switch off deferred type errors altogether.  See #14605.
+
+This is done by maybeSwitchOffDefer.  It's also useful in one other
+place: see Note [Wrapping failing kind equalities] in GHC.Tc.Solver.
+
+Note [Suppressing error messages]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The cec_suppress flag says "don't report any errors".  Instead, just create
 evidence bindings (as usual).  It's used when more important errors have occurred.
 
@@ -445,15 +460,8 @@ reportImplic ctxt implic@(Implic { ic_skols = tvs
     implic' = implic { ic_skols = tvs'
                      , ic_given = map (tidyEvVar env1) given
                      , ic_info  = info' }
-    ctxt1 | CoEvBindsVar{} <- evb    = noDeferredBindings ctxt
-          | otherwise                = ctxt
-          -- If we go inside an implication that has no term
-          -- evidence (e.g. unifying under a forall), we can't defer
-          -- type errors.  You could imagine using the /enclosing/
-          -- bindings (in cec_binds), but that may not have enough stuff
-          -- in scope for the bindings to be well typed.  So we just
-          -- switch off deferred type errors altogether.  See #14605.
 
+    ctxt1 = maybeSwitchOffDefer evb ctxt
     ctxt' = ctxt1 { cec_tidy     = env1
                   , cec_encl     = implic' : cec_encl ctxt
 
