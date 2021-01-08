@@ -36,7 +36,6 @@ import GHC.Types.Id
 import GHC.Types.RepType
 import GHC.Unit.Types (Module)
 
-import GHC.Types.Demand ( Divergence ( Absent ), splitStrictSig )
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 
@@ -647,10 +646,6 @@ addImportedNode this_mod id
                     , isNullaryRepDataCon con
                     = set_if_desc nullaryConNode new_node_id (text "ext_nullCon" <-> ppr id)
 
-                    -- Imported binding of absentError
-                    | (_, Absent) <- splitStrictSig (idStrictness id)
-                    = set_if_desc neverEnterNode new_node_id (text "ext_absent_error" <-> ppr id)
-
                     | Just lf_info <- idLFInfo_maybe id
                     =   case lf_info of
                             -- Function, applied not entered.
@@ -1083,7 +1078,7 @@ nodeRhs this_mod ctxt topFlag binding (StgRhsCon _ ccs con args)
                 | remainsConRhs == RhsCon =
                     NeverEnter
 
-                -- b) nothing to force
+                -- b) only lazy fields
                 | not $ any isMarkedStrict $ dataConRepStrictness con
                 =   NeverEnter
 
@@ -1799,8 +1794,4 @@ isAbsentExpr :: GenStgExpr p -> Bool
 isAbsentExpr (StgTick _t e) = isAbsentExpr e
 isAbsentExpr (StgApp _ f _)
   | idUnique f == absentErrorIdKey = True
-  -- I'm not convinced that this via strictness is required for module-internal functions.
-  -- But it's hard to proof otherwise so we just accept this overhead.
-  | (_, Absent) <- splitStrictSig (idStrictness f)
-  = True
 isAbsentExpr _ = False
