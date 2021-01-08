@@ -1130,7 +1130,7 @@ nodeRhs this_mod ctxt _topFlag binding (StgRhsClosure _ext _ccs _flag args body)
                         , node_result = result
                         , node_update = return result
                         }
-    addNode notDone node
+    addNode isDone node
     return $! (StgRhsClosure _ext _ccs _flag args body')
 
   where
@@ -1460,22 +1460,13 @@ Example:
 nodeConApp :: HasDebugCallStack => Module -> ContextStack -> StgExpr -> AM (InferStgExpr, NodeId)
 nodeConApp this_mod ctxt (StgConApp _ext con args tys) = do
     node_id <- mkUniqueId
-    mapM_ (addImportedNode this_mod) [v | StgVarArg v <- args]
-    inputs <- mapM (getConArgNodeId ctxt) args :: AM [NodeId]
-    let updater = do
-            --SIMPLE
-            -- fieldResults <- mapM lookupNodeResult inputs :: AM [EnterLattice]
-            -- let result = mkOutConLattice con MaybeEnter fieldResults
-            -- pprTraceM "UpdateConApp:" $ ppr (node_id,result) <+> text "inputs:" <> ppr inputs
-            let result = neverEnterLat
-            updateNodeResult node_id result
-            return $! result
+    let result = maybeLat
 
-    addNode notDone $ setNodeDesc (text "conApp") $ FlowNode
+    addNode isDone $ setNodeDesc (text "conApp") $ FlowNode
         { node_id = node_id
-        , node_result = undetLat
-        , node_inputs = inputs
-        , node_update = updater
+        , node_result = result
+        , node_inputs = []
+        , node_update = return result
         }
 
     return $! (StgConApp node_id con args tys, node_id)
