@@ -33,6 +33,7 @@ import GHC.Types.Unique.Set
 -- | For a jump instruction at the end of a block, generate fixup code so its
 --      vregs are in the correct regs for its destination.
 --
+{-# INLINEABLE joinToTargets #-}
 joinToTargets
         :: (FR freeRegs, Instruction instr)
         => BlockMap RegSet              -- ^ maps the unique of the blockid to the set of vregs
@@ -57,6 +58,7 @@ joinToTargets block_live id instr
         = joinToTargets' block_live [] id instr (jumpDestsOfInstr instr)
 
 -----
+{-# INLINEABLE joinToTargets' #-}
 joinToTargets'
         :: (FR freeRegs, Instruction instr)
         => BlockMap RegSet              -- ^ maps the unique of the blockid to the set of vregs
@@ -112,6 +114,7 @@ joinToTargets' block_live new_blocks block_id instr (dest:dests)
 
 
 -- this is the first time we jumped to this block.
+{-# INLINEABLE joinToTargets_first #-}
 joinToTargets_first :: (FR freeRegs, Instruction instr)
                     => BlockMap RegSet
                     -> [NatBasicBlock instr]
@@ -141,6 +144,7 @@ joinToTargets_first block_live new_blocks block_id instr dest dests
 
 
 -- we've jumped to this block before
+{-# INLINEABLE joinToTargets_again #-}
 joinToTargets_again :: (Instruction instr, FR freeRegs)
                     => BlockMap RegSet
                     -> [NatBasicBlock instr]
@@ -296,6 +300,7 @@ expandNode vreg src dst
 --      destinations. We have eliminated any possibility of single-node
 --      cycles in expandNode above.
 --
+{-# INLINEABLE handleComponent #-}
 handleComponent
         :: Instruction instr
         => Int -> instr -> SCC (Node Loc Unique)
@@ -348,6 +353,7 @@ handleComponent _ _ (CyclicSCC _)
 
 -- | Move a vreg between these two locations.
 --
+{-# INLINEABLE makeMove #-}
 makeMove
     :: Instruction instr
     => Int      -- ^ current C stack delta.
@@ -363,13 +369,13 @@ makeMove delta vreg src dst
       case (src, dst) of
           (InReg s, InReg d) ->
               do recordSpill (SpillJoinRR vreg)
-                 return $ mkRegRegMoveInstr platform (RegReal s) (RegReal d)
+                 return $! mkRegRegMoveInstr platform (RegReal s) (RegReal d)
           (InMem s, InReg d) ->
               do recordSpill (SpillJoinRM vreg)
-                 return $ mkLoadInstr config (RegReal d) delta s
+                 return $! mkLoadInstr config (RegReal d) delta s
           (InReg s, InMem d) ->
               do recordSpill (SpillJoinRM vreg)
-                 return $ mkSpillInstr config (RegReal s) delta d
+                 return $! mkSpillInstr config (RegReal s) delta d
           _ ->
               -- we don't handle memory to memory moves.
               -- they shouldn't happen because we don't share

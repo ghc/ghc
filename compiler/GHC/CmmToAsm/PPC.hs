@@ -12,12 +12,16 @@ import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.Monad
 import GHC.CmmToAsm.Config
 import GHC.CmmToAsm.Types
+import qualified GHC.CmmToAsm.Reg.Linear as Linear
+import qualified GHC.CmmToAsm.Reg.Linear.FreeRegs as FR
 
+import qualified GHC.CmmToAsm.Reg.Linear.PPC as PPC
 import qualified GHC.CmmToAsm.PPC.Instr   as PPC
 import qualified GHC.CmmToAsm.PPC.Ppr     as PPC
 import qualified GHC.CmmToAsm.PPC.CodeGen as PPC
 import qualified GHC.CmmToAsm.PPC.Regs    as PPC
 import qualified GHC.CmmToAsm.PPC.RegInfo as PPC
+
 
 ncgPPC :: NCGConfig -> NcgImpl RawCmmStatics PPC.Instr PPC.JumpDest
 ncgPPC config = NcgImpl
@@ -36,6 +40,8 @@ ncgPPC config = NcgImpl
    , ncgMakeFarBranches        = PPC.makeFarBranches
    , extractUnwindPoints       = const []
    , invertCondBranches        = \_ _ -> id
+   , linearRegAlloc            = Linear.regAlloc (FR.frInitFreeRegs platform :: PPC.FreeRegs)
+
    }
     where
       platform = ncgPlatform config

@@ -71,6 +71,8 @@ import GHC.Utils.Outputable (SDoc, ppr)
 import GHC.Utils.Panic      (pprPanic)
 import GHC.CmmToAsm.CFG
 import GHC.CmmToAsm.CFG.Weight
+import GHC.CmmToAsm.Reg.Linear.Base
+import GHC.CmmToAsm.Reg.Liveness
 
 data NcgImpl statics instr jumpDest = NcgImpl {
     ncgConfig                 :: !NCGConfig,
@@ -97,9 +99,17 @@ data NcgImpl statics instr jumpDest = NcgImpl {
     -- See Note [What is this unwinding business?] in "GHC.Cmm.DebugBlock"
     -- and Note [Unwinding information in the NCG] in this module.
     invertCondBranches        :: Maybe CFG -> LabelMap RawCmmStatics -> [NatBasicBlock instr]
-                              -> [NatBasicBlock instr]
+                              -> [NatBasicBlock instr],
     -- ^ Turn the sequence of @jcc l1; jmp l2@ into @jncc l2; \<block_l1>@
     -- when possible.
+    linearRegAlloc            :: NCGConfig
+                                -> LiveCmmDecl statics instr
+                                -> UniqSM ( NatCmmDecl statics instr
+                                        , Maybe Int  -- number of extra stack slots required,
+                                                -- beyond maxSpillSlots
+                                        , Maybe RegAllocStats
+                                        )
+    -- ^ Specialized version of the linear register allocator.
     }
 
 data NatM_State
