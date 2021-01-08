@@ -153,11 +153,11 @@ unfoldr f a = case f a of
 
 -- | Extract the first element of the stream.
 head :: NonEmpty a -> a
-head ~(a :| _) = a
+head (a :| _) = a
 
 -- | Extract the possibly-empty tail of the stream.
 tail :: NonEmpty a -> [a]
-tail ~(_ :| as) = as
+tail (_ :| as) = as
 
 -- | Extract the last element of the stream.
 last :: NonEmpty a -> a
