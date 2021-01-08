@@ -1130,7 +1130,7 @@ nodeRhs this_mod ctxt _topFlag binding (StgRhsClosure _ext _ccs _flag args body)
                         , node_result = result
                         , node_update = return result
                         }
-    addNode notDone node
+    addNode isDone node
     return $! (StgRhsClosure _ext _ccs _flag args body')
 
   where
@@ -1460,22 +1460,13 @@ Example:
 nodeConApp :: HasDebugCallStack => Module -> ContextStack -> StgExpr -> AM (InferStgExpr, NodeId)
 nodeConApp this_mod ctxt (StgConApp _ext con args tys) = do
     node_id <- mkUniqueId
-    mapM_ (addImportedNode this_mod) [v | StgVarArg v <- args]
-    inputs <- mapM (getConArgNodeId ctxt) args :: AM [NodeId]
-    let updater = do
-            --SIMPLE
-            -- fieldResults <- mapM lookupNodeResult inputs :: AM [EnterLattice]
-            -- let result = mkOutConLattice con MaybeEnter fieldResults
-            -- pprTraceM "UpdateConApp:" $ ppr (node_id,result) <+> text "inputs:" <> ppr inputs
-            let result = neverEnterLat
-            updateNodeResult node_id result
-            return $! result
+    let result = maybeLat
 
-    addNode notDone $ setNodeDesc (text "conApp") $ FlowNode
+    addNode isDone $ setNodeDesc (text "conApp") $ FlowNode
         { node_id = node_id
-        , node_result = undetLat
-        , node_inputs = inputs
-        , node_update = updater
+        , node_result = result
+        , node_inputs = []
+        , node_update = return result
         }
 
     return $! (StgConApp node_id con args tys, node_id)
@@ -1600,7 +1591,7 @@ nodeApp this_mod ctxt expr@(StgApp _ f args) = do
             | otherwise -> do
                 node_id <- mkUniqueId
                 let updater = do
-                        !result <- mkResult
+                        let result = maybeLat
 
                         -- pprTraceM "Updating " (ppr node_id)
                         -- Try to peek into the function being applied
@@ -1610,88 +1601,21 @@ nodeApp this_mod ctxt expr@(StgApp _ f args) = do
                         --     text "inputs:" <+> ppr inputs $$
                         --     ppr input_nodes
                         --     )
-                        if (null inputs || isFinalValue result )
-                            -- We have collected the final result
-                            then do
-                                -- pprTraceM "Limiting nesting for " (ppr node_id)
-                                node <- getNode node_id
-                                markDone $ node { node_result = result }
-                                return $! result
-                            else do
-                                updateNodeResult node_id result
-                                return $! result
+                        node <- getNode node_id
+                        markDone $ node { node_result = result }
+                        return $! result
 
                 addNode notDone $ setNodeDesc (text "app" <-> ppr f <> ppr args) $
                     FlowNode
                         { node_id = node_id
-                        , node_result = undetLat
-                        , node_inputs = inputs
-                        , node_update = updater
+                        , node_result = maybeLat
+                        , node_inputs = []
+                        , node_update = return $ maybeLat
                         }
 
                 return $! (StgApp node_id f args, node_id)
   where
-    inputs
-        | isAbsentExpr expr = []
-        | isFun && (not isSat) = []
-        | recTail = []
-        | isFun && isSat = [f_node_id]
-        | otherwise = [f_node_id]
 
-    -- See Note [App Data Flow]
-    mkResult :: AM EnterLattice
-    mkResult
-        | isAbsent =
-            -- pprTrace "Absent:" (ppr f) $
-            return $! neverEnterLat
-
-        | isFun && (not isSat) = return $! maybeLat
-
-        -- App in a direct self-recursive tail call context, returns nothing
-        | recTail = return $! EnterLattice NoValue
-
-        | OtherRecursion <- recursionKind
-        =   lookupNodeResult f_node_id
-
-        | NoMutRecursion <- recursionKind =
-            -- pprTrace "simpleRec" (ppr f) $
-            lookupNodeResult f_node_id
-
-        | isFun && isSat = return maybeLat
-
-
-        {- TODO: If we build a pap, but keep track of the field values we should
-            be able to use these if it's fully applied later in the body. eg:
-
-            case f x of pap ->
-                let res = pap y in (resulting in tagged fields)
-                if cond then Just <taggedThing> else res
-
-            But we currently don't do so.
-        -}
-        | not isFun
-        , null args
-        = lookupNodeResult f_node_id
-
-        | otherwise
-        = return $! maybeLat
-
-    recTail = recursionKind == NoMutRecursion && isRecTail f ctxt
-    isFun = isFunTy (unwrapType $ idType f)
-    arity = idFunRepArity f
-    isSat = arity > 0 && (length args == arity)
-    isAbsent = isAbsentExpr expr
-
-    -- We check if f is imported using importedFuncNode_Maybe so this
-    -- is guarantedd to be not imported when demanded.
-    f_node_id = getKnownIdNodeId ctxt f
-
-    recursionKind = getRecursionKind ctxt
-
-    getRecursionKind [] = NoRecursion
-    getRecursionKind ((CLetRec ids _) : _) | f `elemVarEnv` ids =
-                if sizeUFM ids == 1 then NoMutRecursion else OtherRecursion
-    getRecursionKind (_ : todo) = getRecursionKind todo
 nodeApp _ _ _ = panic "Impossible"
 
 -- These are inserted by the WW transformation and we treat them semantically as tagged.
