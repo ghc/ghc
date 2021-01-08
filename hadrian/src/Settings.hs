@@ -280,6 +280,7 @@ builderSetting = (,,)
 
   where ghcBuilder =
           [ ("c", CompileCWithGhc)
+          , ("cpp", CompileCppWithGhc)
           , ("deps", FindHsDependencies)
           , ("hs", CompileHs)
           , ("link", LinkHs)

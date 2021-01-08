@@ -52,6 +52,7 @@ instance NFData   CcMode
 -- * Link object files & static libraries into an executable.
 data GhcMode = CompileHs
              | CompileCWithGhc
+             | CompileCppWithGhc
              | FindHsDependencies
              | LinkHs
              | ToolArgs
