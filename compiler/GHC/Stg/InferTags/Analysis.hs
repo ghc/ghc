@@ -36,13 +36,11 @@ import GHC.Types.Id
 import GHC.Types.RepType
 import GHC.Unit.Types (Module)
 
-import GHC.Types.Demand ( Divergence ( Absent ), splitStrictSig )
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 
 import GHC.Core.DataCon
 import GHC.Core (AltCon(..))
-import GHC.Core.TyCon (tyConDataCons)
 import GHC.Core.Type
 
 import GHC.Utils.Outputable
@@ -284,48 +282,6 @@ nestingLimit :: Int
 nestingLimit = 10
 
 
-
-{-
-Note [Field information of function ids]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider this code:
-
-f x :: a -> (Maybe Int,a)
-f x = (Just 1, a)
-
-We can infer the taggedness of all but the second field of the tuple.
-
-However if we have code like this:
-
-f x :: a -> (Maybe Int,a)
-f x = (Just 1, a)
-
-g _ =
-    let v = Just f
-        ...
-    in
-    case v of
-        Just f' -> f' True
-        Nothing -> f False
-
-If we keep the field information of f when stored inside a constructor then
-we can eventually figure out that f' == f, so all branches have the same return taggedness info
-which is the same as the one of f. So we could infer as the taggedness of g's result:
-
-    enterInfo(g) = NeverEnter < NeverEnter < NeverEnter >, MaybeEnter>
-                    ^ func        ^ Just       ^ 1           ^ "a"
-
-However currently when when we bind a function to a variable we throw away any field information
-of the functions result. We do not *have* to strip this information, it's merely done for performance.
-
-TODO:
-    This could be done, at the expense of compile time. We should benchmark this as future work
-    to figure out of it's worth and do it if useful.
-
-    Same thing for keeping track of the original function. Potentially removing some unknown calls.
-
--}
-
 -- | If we use a *function* as an unapplied argument to a constructor we throw
 -- away nested information and make do with NeverEnter Top for now.
 -- See Note [Field information of function ids]
@@ -406,10 +362,6 @@ mkJoinNode inputs = {-# SCC joinNode #-} do
                        }
     return $! node_id
 
--- | Compute the taggedness result of applying a constructor to the given arguments
---   *and* applying the strict field invariant. Marking all strict fields as tagged.
-mkOutConLattice :: DataCon -> EnterInfo -> [EnterLattice] -> EnterLattice
-mkOutConLattice con outer fields = EnterLattice outer
 
 type NodeArray = IOArray Int FlowNode
 type FlagArray = IOUArray Int Bool
@@ -637,10 +589,6 @@ addImportedNode this_mod id
                     | Just con <- (isDataConWorkId_maybe id)
                     , isNullaryRepDataCon con
                     = set_if_desc nullaryConNode new_node_id (text "ext_nullCon" <-> ppr id)
-
-                    -- Imported binding of absentError
-                    | (_, Absent) <- splitStrictSig (idStrictness id)
-                    = set_if_desc neverEnterNode new_node_id (text "ext_absent_error" <-> ppr id)
 
                     | Just lf_info <- idLFInfo_maybe id
                     =   case lf_info of
@@ -1043,7 +991,6 @@ nodeRhs this_mod ctxt topFlag binding (StgRhsCon _ ccs con args)
                     FlowNode
                         { node_id = node_id
                         , node_inputs = node_inputs
-                        --, node_done   = False
                         , node_result = undetLat
                         , node_update = node_update node_id node_inputs
                         }
@@ -1093,10 +1040,9 @@ nodeRhs this_mod ctxt topFlag binding (StgRhsCon _ ccs con args)
         -- Strict fields need to marked as neverEnter here, even if their inputs are not.
         -- This is because at the time we scrutinise the result of this rhs they will have
         -- been tagged.
-        let result = mkOutConLattice con outerTag fieldResults
-        let cappedResult = widenToNestingLevel nestingLimit result
-        updateNodeResult this_id cappedResult
-        return $! cappedResult
+        let result = EnterLattice outerTag
+        updateNodeResult this_id result
+        return $! result
 
 
 
@@ -1176,14 +1122,13 @@ Rule 3: NeverEnter:
 -}
 
 nodeRhs this_mod ctxt _topFlag binding (StgRhsClosure _ext _ccs _flag args body) = do
-    (body', body_id) <- nodeExpr this_mod ctxt' body
+    (body', _) <- nodeExpr this_mod ctxt' body
     let node = setNodeDesc node_desc $
                FlowNode { node_id = node_id
-                        , node_inputs = [body_id]
+                        , node_inputs = []
                         -- ^ We might infer things about nested fields once evaluated.
-                        -- , node_done   = False
-                        , node_result = EnterLattice enterInfo
-                        , node_update = node_update node_id body_id
+                        , node_result = result
+                        , node_update = return result
                         }
     addNode notDone node
     return $! (StgRhsClosure _ext _ccs _flag args body')
@@ -1197,23 +1142,11 @@ nodeRhs this_mod ctxt _topFlag binding (StgRhsClosure _ext _ccs _flag args body)
     varMap = mkVarEnv (zip args (replicate arity unknownNodeId))
     ctxt' = (CClosureBody varMap `extendCtxt` ctxt)
     arity = length args
-    enterInfo
-        | isAbsentExpr body = NeverEnter
-        | null args = AlwaysEnter
-        | otherwise = NeverEnter      -- Thunks with arity > 0
-                                    -- are only entered when applied.
-    node_update this_id body_id = do
-        -- SIMPLE: We ignore results from within the body.
-        -- bodyInfo <- lookupNodeResult body_id
-        let bodyInfo = undetLat
-        let result = setEnterInfo bodyInfo enterInfo
-        let cappedResult = widenToNestingLevel nestingLimit result
-        if hasFinalFields cappedResult
-            then do
-                node <- getNode this_id
-                markDone $ node { node_result = cappedResult }
-            else updateNodeResult this_id cappedResult
-        return $! cappedResult
+    result
+        | isAbsentExpr body = (flatLattice NeverEnter)
+        | null args = (flatLattice AlwaysEnter)
+        | otherwise = (flatLattice NeverEnter )      -- A lambda of some form, will be tagged with arity.
+
 
 -- Constraints for possible STG expressions. Most are delegated to helper functions.
 nodeExpr :: Module -> ContextStack -> StgExpr -> AM (InferStgExpr, NodeId)
@@ -1339,10 +1272,10 @@ Examples:
 -- See Note [Case Data Flow Node]
 nodeCase :: Module -> ContextStack -> StgExpr -> AM (InferStgExpr, NodeId)
 nodeCase this_mod ctxt (StgCase scrut bndr alt_type alts) = do
-    (scrut',scrutNodeId) <- nodeExpr this_mod (CCaseScrut `extendCtxt` ctxt) scrut
-    bndrNodeId <- nodeCaseBndr scrutNodeId bndr
+    (scrut',_scrutNodeId) <- nodeExpr this_mod (CCaseScrut `extendCtxt` ctxt) scrut
+    bndrNodeId <- nodeCaseBndr bndr
     let ctxt' = CCaseBndr (unitVarEnv bndr bndrNodeId) `extendCtxt` ctxt
-    (alts', altNodeIds) <- unzip <$> mapM (nodeAlt this_mod ctxt' scrutNodeId) alts
+    (alts', altNodeIds) <- unzip <$> mapM (nodeAlt this_mod ctxt') alts
     !caseNodeId <- mkJoinNode altNodeIds
     -- pprTraceM "Scrut, alts, rhss" $ ppr (scrut, scrutNodeId, altNodeIds, altsId)
     return $! (StgCase scrut' bndr alt_type alts' , caseNodeId)
@@ -1350,37 +1283,20 @@ nodeCase _ _ _ = panic "Impossible: nodeCase"
 
 
 -- Take the result of the scrutinee and mark it as tagged.
-nodeCaseBndr :: NodeId -> Id -> AM NodeId
-nodeCaseBndr scrutNodeId _bndr = do
+nodeCaseBndr :: Id -> AM NodeId
+nodeCaseBndr _bndr = do
     !bndrNodeId <- mkUniqueId
-    addNode notDone $ setNodeDesc (text "caseBndr" <-> parens (ppr scrutNodeId) <-> ppr _bndr) $
+    addNode isDone $ setNodeDesc (text "caseBndr" <-> ppr _bndr) $
                       FlowNode
                         { node_id = bndrNodeId
-                        , node_inputs = [scrutNodeId] --, node_done = False
-                        , node_result = undetLat
-                        , node_update = updater bndrNodeId
+                        , node_inputs = []
+                        , node_result = neverEnterLat
+                        , node_update = return neverEnterLat
                         }
     return bndrNodeId
-      where
-        -- updater bndrNodeId = do
-        --     scrutResult <- lookupNodeResult scrutNodeId
-        --     let result = setEnterInfo scrutResult NeverEnter
-        --     if hasFinalFields result
-        --         then do
-        --             node <- getNode bndrNodeId
-        --             markDone $ node { node_result = result }
-        --         else
-        --             updateNodeResult bndrNodeId result
-        --     return $! result
-        -- SIMPLE: Just mark it tagged.
-        updater bndrNodeId = do
-            let result = neverEnterLat
-            node <- getNode bndrNodeId
-            markDone $ node { node_result = result }
-            return $! result
 
-nodeAlt :: HasDebugCallStack => Module -> ContextStack -> NodeId -> StgAlt -> AM (InferStgAlt, NodeId)
-nodeAlt this_mod ctxt scrutNodeId (altCon, bndrs, rhs)
+nodeAlt :: HasDebugCallStack => Module -> ContextStack -> StgAlt -> AM (InferStgAlt, NodeId)
+nodeAlt this_mod ctxt (altCon, bndrs, rhs)
   | otherwise = do
     bndrMappings <- mkVarEnv <$> zipWithM mkAltBndrNode [0..] bndrs
     let ctxt' = (CAlt bndrMappings) `extendCtxt` ctxt
@@ -1406,54 +1322,20 @@ nodeAlt this_mod ctxt scrutNodeId (altCon, bndrs, rhs)
                 addNode isDone litNode { node_id = node_id }
                 return $! (bndr,node_id)
           | otherwise = do
-                node_id <- mkUniqueId --New ID since we might shadow existing binds
-                let updater = do
-                        -- Fancy code:
-                        -- so just hard code bndr_res
-                        -- scrut_res <- lookupNodeResult scrutNodeId :: AM EnterLattice
-                        -- let bndr_res = (indexField scrut_res n) :: EnterLattice
-                        -- let is_strict_field = elem bndr strictBnds
-                        -- let result
-                        --         | is_strict_field
-                        --         -- Tag things coming out of strict binds
-                        --         = setEnterInfo bndr_res NeverEnter
-                        --         | otherwise = bndr_res
-
-                        -- pprTraceM "Updating altBndr:" (ppr (node_id, result) $$
-                        --         text "Input:" <+> ppr scrutNodeId $$
-                        --         text "scrut_res" <+> ppr scrut_res $$
-                        --         text "bndr_res" <+> ppr bndr_res )
-                        -- let finalFields = hasFinalFields result
-                        -- if (is_strict_field && finalFields) || (finalFields && enterInfo result == MaybeEnter)
-                        --     then do
-                        --         node <- getNode node_id
-                        --         markDone $ node {  node_result = result }
-                        --     else
-                        --         updateNodeResult node_id result
-                        -- return $! result
-
-                        -- Simple code: Just set tag for strict fields,
-                        -- set non-tagged otherwise.
-                        let is_strict_field = elem bndr strictBnds
-                        let result
-                                | is_strict_field = neverEnterLat
-                                | otherwise = undetLat
-
-                        node <- getNode node_id
-                        markDone $ node {  node_result = result }
-                        return $! result
-
-
-                addNode notDone $ setNodeDesc (text "altBndr" <-> ppr altCon <-> ppr bndr) $
+                node_id <- mkUniqueId
+                addNode isDone $ setNodeDesc (text "altBndr" <-> ppr altCon <-> ppr bndr) $
                     FlowNode
                         { node_id = node_id
-                        , node_result = undetLat
-                        -- , node_done = False
-                        , node_inputs = [scrutNodeId]
-                        , node_update = updater
+                        , node_result = result
+                        , node_inputs = []
+                        , node_update = return result
                         }
                 return $! (bndr,node_id)
             where
+                is_strict_field = elem bndr strictBnds
+                result
+                    | is_strict_field = neverEnterLat
+                    | otherwise = maybeLat
                 bndrTy = idType bndr
 
 -- Note [Let bindings and their context]
@@ -1706,136 +1588,110 @@ Examples:
 
 -}
 
+
 nodeApp :: HasDebugCallStack => Module -> ContextStack -> StgExpr -> AM (InferStgExpr, NodeId)
--- SIMPLE
-nodeApp _this_mod ctxt expr@(StgApp _ f args) = do
-    node_id <- mkUniqueId
-    let updater = do
-            !result <- mkResult
-            node <- getNode node_id
-            markDone $ node { node_result = result }
-            return $! result
+nodeApp this_mod ctxt expr@(StgApp _ f args) = do
+    addImportedNode this_mod f
+    maybeImportedFunc <- importedFuncNode_Maybe this_mod f
+    case () of
+        _
+            | Just node_id <- maybeImportedFunc
+            ->  return $! (StgApp node_id f args, node_id)
+            | otherwise -> do
+                node_id <- mkUniqueId
+                let updater = do
+                        !result <- mkResult
 
-    addNode notDone $ setNodeDesc (text "app" <-> ppr f <> ppr args) $
-        FlowNode
-            { node_id = node_id
-            , node_result = undetLat
-            , node_inputs = inputs
-            , node_update = updater
-            }
+                        -- pprTraceM "Updating " (ppr node_id)
+                        -- Try to peek into the function being applied
+                        -- node <- getNode node_id
+                        -- !input_nodes <- mapM getNode inputs
+                        -- pprTraceM "AppFields" (ppr (f, result) <+> ppr node $$
+                        --     text "inputs:" <+> ppr inputs $$
+                        --     ppr input_nodes
+                        --     )
+                        if (null inputs || isFinalValue result )
+                            -- We have collected the final result
+                            then do
+                                -- pprTraceM "Limiting nesting for " (ppr node_id)
+                                node <- getNode node_id
+                                markDone $ node { node_result = result }
+                                return $! result
+                            else do
+                                updateNodeResult node_id result
+                                return $! result
 
-    return $! (StgApp node_id f args, node_id)
+                addNode notDone $ setNodeDesc (text "app" <-> ppr f <> ppr args) $
+                    FlowNode
+                        { node_id = node_id
+                        , node_result = undetLat
+                        , node_inputs = inputs
+                        , node_update = updater
+                        }
+
+                return $! (StgApp node_id f args, node_id)
   where
-    inputs = []
+    inputs
+        | isAbsentExpr expr = []
+        | isFun && (not isSat) = []
+        | recTail = []
+        | isFun && isSat = [f_node_id]
+        | otherwise = [f_node_id]
 
     -- See Note [App Data Flow]
     mkResult :: AM EnterLattice
     mkResult
-        | isAbsentExpr expr = return $! nullaryLattice NeverEnter
-        | otherwise         = return maybeLat
+        | isAbsent =
+            -- pprTrace "Absent:" (ppr f) $
+            return $! neverEnterLat
 
--- FANCY
--- nodeApp this_mod ctxt expr@(StgApp _ f args) = do
---     mapM_ (addImportedNode this_mod) (f:[v | StgVarArg v <- args])
---     maybeImportedFunc <- importedFuncNode_Maybe this_mod f
---     case () of
---         _
---             | Just node_id <- maybeImportedFunc
---             ->  return $! (StgApp node_id f args, node_id)
---             | otherwise -> do
---                 node_id <- mkUniqueId
---                 let updater = do
---                         !result <- mkResult
+        | isFun && (not isSat) = return $! maybeLat
 
---                         -- pprTraceM "Updating " (ppr node_id)
---                         -- Try to peek into the function being applied
---                         -- node <- getNode node_id
---                         -- !input_nodes <- mapM getNode inputs
---                         -- pprTraceM "AppFields" (ppr (f, result) <+> ppr node $$
---                         --     text "inputs:" <+> ppr inputs $$
---                         --     ppr input_nodes
---                         --     )
---                         if (null inputs || isFinalValue result )
---                             -- We have collected the final result
---                             then do
---                                 -- pprTraceM "Limiting nesting for " (ppr node_id)
---                                 node <- getNode node_id
---                                 markDone $ node { node_result = result }
---                                 return $! result
---                             else do
---                                 updateNodeResult node_id result
---                                 return $! result
+        -- App in a direct self-recursive tail call context, returns nothing
+        | recTail = return $! EnterLattice NoValue
 
---                 addNode notDone $ setNodeDesc (text "app" <-> ppr f <> ppr args) $
---                     FlowNode
---                         { node_id = node_id, node_result = undetLat
---                         , node_inputs = inputs
---                         , node_update = updater
---                         }
+        | OtherRecursion <- recursionKind
+        =   lookupNodeResult f_node_id
 
---                 return $! (StgApp node_id f args, node_id)
---   where
---     inputs
---         | isAbsentExpr expr = []
---         | isFun && (not isSat) = []
---         | recTail = []
---         | isFun && isSat = [f_node_id]
---         | otherwise = [f_node_id]
+        | NoMutRecursion <- recursionKind =
+            -- pprTrace "simpleRec" (ppr f) $
+            lookupNodeResult f_node_id
 
---     -- See Note [App Data Flow]
---     mkResult :: AM EnterLattice
---     mkResult
---         | isAbsent =
---             -- pprTrace "Absent:" (ppr f) $
---             return $! nullaryLattice NeverEnter
-
---         | isFun && (not isSat) = return $! maybeLat
-
---         -- App in a direct self-recursive tail call context, returns nothing
---         | recTail = return $! nullaryLattice NoValue
-
---         | OtherRecursion <- recursionKind
---         =   lookupNodeResult f_node_id
-
---         | NoMutRecursion <- recursionKind =
---             -- pprTrace "simpleRec" (ppr f) $
---             lookupNodeResult f_node_id
-
---         | isFun && isSat = (`setEnterInfo` MaybeEnter) <$!> lookupNodeResult f_node_id
+        | isFun && isSat = return maybeLat
 
 
---         {- TODO: If we build a pap, but keep track of the field values we should
---             be able to use these if it's fully applied later in the body. eg:
+        {- TODO: If we build a pap, but keep track of the field values we should
+            be able to use these if it's fully applied later in the body. eg:
 
---             case f x of pap ->
---                 let res = pap y in (resulting in tagged fields)
---                 if cond then Just <taggedThing> else res
+            case f x of pap ->
+                let res = pap y in (resulting in tagged fields)
+                if cond then Just <taggedThing> else res
 
---             But we currently don't do so.
---         -}
---         | not isFun
---         , null args
---         = lookupNodeResult f_node_id
+            But we currently don't do so.
+        -}
+        | not isFun
+        , null args
+        = lookupNodeResult f_node_id
 
---         | otherwise
---         = return $! maybeLat
+        | otherwise
+        = return $! maybeLat
 
---     recTail = recursionKind == NoMutRecursion && isRecTail f ctxt
---     isFun = isFunTy (unwrapType $ idType f)
---     arity = idFunRepArity f
---     isSat = arity > 0 && (length args == arity)
---     isAbsent = isAbsentExpr expr
+    recTail = recursionKind == NoMutRecursion && isRecTail f ctxt
+    isFun = isFunTy (unwrapType $ idType f)
+    arity = idFunRepArity f
+    isSat = arity > 0 && (length args == arity)
+    isAbsent = isAbsentExpr expr
 
---     -- We check if f is imported using importedFuncNode_Maybe so this
---     -- is guarantedd to be not imported when demanded.
---     f_node_id = getKnownIdNodeId ctxt f
+    -- We check if f is imported using importedFuncNode_Maybe so this
+    -- is guarantedd to be not imported when demanded.
+    f_node_id = getKnownIdNodeId ctxt f
 
---     recursionKind = getRecursionKind ctxt
+    recursionKind = getRecursionKind ctxt
 
---     getRecursionKind [] = NoRecursion
---     getRecursionKind ((CLetRec ids _) : _) | f `elemVarEnv` ids =
---                 if sizeUFM ids == 1 then NoMutRecursion else OtherRecursion
---     getRecursionKind (_ : todo) = getRecursionKind todo
+    getRecursionKind [] = NoRecursion
+    getRecursionKind ((CLetRec ids _) : _) | f `elemVarEnv` ids =
+                if sizeUFM ids == 1 then NoMutRecursion else OtherRecursion
+    getRecursionKind (_ : todo) = getRecursionKind todo
 nodeApp _ _ _ = panic "Impossible"
 
 -- These are inserted by the WW transformation and we treat them semantically as tagged.
@@ -1847,6 +1703,4 @@ isAbsentExpr (StgApp _ f _)
   | idUnique f == absentErrorIdKey = True
   -- I'm not convinced that this via strictness is required for module-internal functions.
   -- But it's hard to proof otherwise so we just accept this overhead.
-  | (_, Absent) <- splitStrictSig (idStrictness f)
-  = True
 isAbsentExpr _ = False
