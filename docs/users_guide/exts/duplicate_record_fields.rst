@@ -41,6 +41,11 @@ is still not allowed if both ``S(x)`` and ``T(x)`` are in scope: ::
 
     bad r = x r
 
+**Warning**: the type-based disambiguation rules described in the remainder of
+this section are being removed. The :ghc-flag:`-Wambiguous-fields` option will
+warn about code that relies on these rules. In a future GHC release, such code
+will produce ambiguity errors.
+
 An ambiguous selector may be disambiguated by the type being "pushed down" to
 the occurrence of the selector (see :ref:`higher-rank-type-inference` for more
 details on what "pushed down" means). For example, the following are permitted: ::
@@ -82,14 +87,19 @@ definitions: ::
 
 Without :extension:`DuplicateRecordFields`, an update mentioning ``foo`` will always be
 ambiguous if all these definitions were in scope. When the extension is enabled,
-there are several options for disambiguating updates:
-
-- Check for types that have all the fields being updated. For example: ::
+and there is exactly one type that has all the fields being updated, that type will be used.
+For example: ::
 
       f x = x { foo = 3, bar = 2 }
 
-  Here ``f`` must be updating ``T`` because neither ``S`` nor ``U`` have both
-  fields.
+Here ``f`` must be updating ``T`` because neither ``S`` nor ``U`` have both
+fields.
+
+If there are multiple types with all the fields, type information may be used to
+disambiguate which record type is meant. **Warning**: the following rules are
+being removed. The :ghc-flag:`-Wambiguous-fields` option will warn about code
+that relies on these rules. In a future GHC release, such code will produce
+ambiguity errors.
 
 - Use the type being pushed in to the record update, as in the following: ::
 

@@ -52,6 +52,7 @@ To reverse ``-Werror``, which makes all warnings into errors, use ``-Wwarn``.
         * :ghc-flag:`-Winaccessible-code`
         * :ghc-flag:`-Wstar-binder`
         * :ghc-flag:`-Woperator-whitespace-ext-conflict`
+        * :ghc-flag:`-Wambiguous-fields`
 
 The following flags are simple ways to select standard "packages" of warnings:
 
@@ -1944,6 +1945,22 @@ of ``-W(no-)*``.
 
     Since GHC 7.10, ``Typeable`` is automatically derived for all types.
     Thus, deriving ``Typeable`` yourself is redundant.
+
+.. ghc-flag:: -Wambiguous-fields
+    :shortdesc: warn about ambiguous field selectors or updates
+    :type: dynamic
+    :category:
+
+    :since: 9.2
+
+    When :extension:`DuplicateRecordFields` is enabled, the option
+    :ghc-flag:`-Wambiguous-fields` warns about occurrences of fields in
+    selectors or updates that depend on the deprecated mechanism for
+    type-directed disambiguation.  This mechanism will be removed in a future
+    GHC release, at which point these occurrences will be rejected as ambiguous.
+
+    This warning has no effect when :extension:`DuplicateRecordFields` is
+    disabled.
 
 If you're feeling really paranoid, the :ghc-flag:`-dcore-lint` option is a good choice.
 It turns on heavyweight intra-pass sanity-checking within GHC. (It checks GHC's

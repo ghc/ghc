@@ -1324,13 +1324,16 @@ disambiguateRecordBinds record_expr record_rho rbnds res_ty
 
         -- Multiple possible parents: try harder to disambiguate
         -- Can we get a parent TyCon from the pushed-in type?
-        _:_ | Just p <- tyConOfET fam_inst_envs res_ty -> return (RecSelData p)
+        _:_ | Just p <- tyConOfET fam_inst_envs res_ty ->
+              do { reportAmbiguousField p
+                 ; return (RecSelData p) }
 
         -- Does the expression being updated have a type signature?
         -- If so, try to extract a parent TyCon from it
             | Just {} <- obviousSig (unLoc record_expr)
             , Just tc <- tyConOf fam_inst_envs record_rho
-            -> return (RecSelData tc)
+            -> do { reportAmbiguousField tc
+                  ; return (RecSelData tc) }
 
         -- Nothing else we can try...
         _ -> failWithTc badOverloadedUpdate
@@ -1371,6 +1374,18 @@ disambiguateRecordBinds record_expr record_rho rbnds res_ty
            ; return $ L l upd { hsRecFieldLbl
                                   = L loc (Unambiguous i (L loc lbl)) } }
 
+    -- See Note [Deprecating ambiguous fields] in GHC.Tc.Gen.Head
+    reportAmbiguousField :: TyCon -> TcM ()
+    reportAmbiguousField parent_type =
+        whenWOptM Opt_WarnAmbiguousFields $
+          addWarnAt (Reason Opt_WarnAmbiguousFields) (getLoc (head rbnds)) $
+          vcat [ text "The record update" <+> ppr rupd
+                   <+> text "with type" <+> ppr parent_type
+                   <+> text "is ambiguous."
+               , text "This will not be supported by -XDuplicateRecordFields in future releases of GHC."
+               ]
+      where
+        rupd = RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds, rupd_ext = noExtField }
 
 {-
 Game plan for record bindings
