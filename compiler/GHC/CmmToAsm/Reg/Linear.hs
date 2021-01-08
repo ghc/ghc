@@ -125,6 +125,7 @@ import GHC.CmmToAsm.Reg.Utils
 import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.Config
 import GHC.CmmToAsm.Types
+import Unsafe.Coerce (unsafeCoerce)
 import GHC.Platform.Reg
 
 import GHC.Cmm.BlockId
@@ -236,7 +237,8 @@ linearRegAlloc config entry_ids block_live sccs
  where
   go :: (FR regs, Outputable regs)
      => regs -> UniqSM ([NatBasicBlock instr], RegAllocStats, Int)
-  go f = linearRegAlloc' config f entry_ids block_live sccs
+  go f = unsafeCoerce linearRegAlloc_X86_64 config f entry_ids block_live sccs
+         --linearRegAlloc' config f entry_ids block_live sccs
   platform = ncgPlatform config
 
 linearRegAlloc_X86_64
