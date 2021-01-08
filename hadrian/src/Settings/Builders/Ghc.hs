@@ -14,7 +14,7 @@ import Rules.Libffi (libffiName)
 import System.Directory
 
 ghcBuilderArgs :: Args
-ghcBuilderArgs = mconcat [ compileAndLinkHs, compileC, findHsDependencies
+ghcBuilderArgs = mconcat [ compileAndLinkHs, compileC, compileCxx, findHsDependencies
                          , toolArgs]
 
 toolArgs :: Args
@@ -60,6 +60,23 @@ compileC = builder (Ghc CompileCWithGhc) ? do
             , ghcLinkArgs
             , commonGhcArgs
             , mconcat (map (map ("-optc" ++) <$>) ccArgs)
+            , defaultGhcWarningsArgs
+            , arg "-c"
+            , getInputs
+            , arg "-o"
+            , arg =<< getOutput ]
+
+compileCxx :: Args
+compileCxx = builder (Ghc CompileCppWithGhc) ? do
+    way <- getWay
+    let ccArgs = [ getContextData cxxOpts
+                 , getStagedSettingList ConfCcArgs
+                 , cIncludeArgs
+                 , Dynamic `wayUnit` way ? pure [ "-fPIC", "-DDYNAMIC" ] ]
+    mconcat [ arg "-Wall"
+            , ghcLinkArgs
+            , commonGhcArgs
+            , mconcat (map (map ("-optcxx" ++) <$>) ccArgs)
             , defaultGhcWarningsArgs
             , arg "-c"
             , getInputs
