@@ -382,8 +382,25 @@ add_head_ctxt fun args thing_inside
 *                                                                      *
 ********************************************************************* -}
 
-{- Note [Disambiguating record fields]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{-
+Note [Deprecating ambiguous fields]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In the future, the -XDuplicateRecordFields extension will no longer support
+disambiguating record fields during type-checking (as described in Note
+[Disambiguating record fields]).  For now, the -Wambiguous-fields option will
+emit a warning whenever an ambiguous field is resolved using type information.
+In a subsequent GHC release, this functionality will be removed and the warning
+will turn into an ambiguity error in the renamer.
+
+For background information, see GHC proposal #366
+(https://github.com/ghc-proposals/ghc-proposals/pull/366).
+
+
+Note [Disambiguating record fields]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+NB. The following is going to be removed: see
+Note [Deprecating ambiguous fields].
+
 When the -XDuplicateRecordFields extension is used, and the renamer
 encounters a record selector or update that it cannot immediately
 disambiguate (because it involves fields that belong to multiple
@@ -533,7 +550,7 @@ tcInferAmbiguousRecSelId lbl args mb_res_ty
   = ambiguousSelector lbl
 
 finish_ambiguous_selector :: Located RdrName -> Type -> TcM Name
-finish_ambiguous_selector lr@(L _ rdr) parent_type
+finish_ambiguous_selector lr@(L loc rdr) parent_type
  = do { fam_inst_envs <- tcGetFamInstEnvs
       ; case tyConOf fam_inst_envs parent_type of {
           Nothing -> ambiguousSelector lr ;
@@ -546,6 +563,17 @@ finish_ambiguous_selector lr@(L _ rdr) parent_type
            Just gre ->
 
     do { addUsedGRE True gre
+         -- See Note [Deprecating ambiguous fields]
+       ; whenWOptM Opt_WarnAmbiguousFields $
+          addWarnAt (Reason Opt_WarnAmbiguousFields) loc $
+          vcat [ text "The field" <+> quotes (ppr rdr)
+                   <+> text "belonging to type" <+> ppr parent_type
+                   <+> text "is ambiguous."
+               , text "This will not be supported by -XDuplicateRecordFields in future releases of GHC."
+               , if isLocalGRE gre
+                 then text "You can use explicit case analysis to resolve the ambiguity."
+                 else text "You can use a qualified import or explicit case analysis to resolve the ambiguity."
+               ]
        ; return (greMangledName gre) } } } } }
 
 -- This field name really is ambiguous, so add a suitable "ambiguous
