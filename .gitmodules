@@ -123,3 +123,6 @@
 [submodule "libraries/libffi-clib"]
 	path = libraries/libffi-clib
 	url = https://gitlab.haskell.org/ghc/libffi-clib.git
+[submodule "ghc-debug"]
+	path = ghc-debug
+	url = git@gitlab.haskell.org:ghc/ghc-debug.git
