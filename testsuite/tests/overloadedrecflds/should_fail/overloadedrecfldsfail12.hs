@@ -12,4 +12,7 @@ f e = e { foo = 3, bar = 3 }
 s :: T -> Int
 s = foo
 
+t :: S -> Bool
+t = foo
+
 main = return ()
