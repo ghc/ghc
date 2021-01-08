@@ -117,10 +117,17 @@ nonHsObjects context = do
     asmSrcs <- interpretInContext context (getContextData asmSrcs)
     asmObjs <- mapM (objectPath context) asmSrcs
     cObjs   <- cObjects context
+    cxxObjs <- cxxObjects context
     cmmSrcs <- interpretInContext context (getContextData cmmSrcs)
     cmmObjs <- mapM (objectPath context) cmmSrcs
     eObjs   <- extraObjects context
-    return $ asmObjs ++ cObjs ++ cmmObjs ++ eObjs
+    return $ asmObjs ++ cObjs ++ cxxObjs ++ cmmObjs ++ eObjs
+
+-- | Return all the Cxx object files needed to build the given library context.
+cxxObjects :: Context -> Action [FilePath]
+cxxObjects context = do
+    srcs <- interpretInContext context (getContextData cxxSrcs)
+    mapM (objectPath context) srcs
 
 -- | Return all the C object files needed to build the given library context.
 cObjects :: Context -> Action [FilePath]
