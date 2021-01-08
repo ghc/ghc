@@ -757,13 +757,12 @@ simplifyInteractive wanteds
 
 ------------------
 simplifyDefault :: ThetaType    -- Wanted; has no type variables in it
-                -> TcM ()       -- Succeeds if the constraint is soluble
+                -> TcM Bool     -- Return if the constraint is soluble
 simplifyDefault theta
   = do { traceTc "simplifyDefault" empty
        ; wanteds  <- newWanteds DefaultOrigin theta
        ; unsolved <- runTcSDeriveds (solveWantedsAndDrop (mkSimpleWC wanteds))
-       ; reportAllUnsolved unsolved
-       ; return () }
+       ; return (isEmptyWC unsolved) }
 
 ------------------
 tcCheckSatisfiability :: InertSet -> Bag EvVar -> TcM (Maybe InertSet)

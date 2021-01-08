@@ -12,6 +12,7 @@ import GHC.Prelude
 
 import GHC.Hs
 import GHC.Core.Class
+import GHC.Core.Type (typeKind)
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.HsType
@@ -85,10 +86,10 @@ check_instance :: Type -> Class -> TcM Bool
   -- Check that ty is an instance of cls
   -- We only care about whether it worked or not; return a boolean
 check_instance ty cls
-  = do  { (_, success) <- discardErrs $
-                          askNoErrs $
-                          simplifyDefault [mkClassPred cls [ty]]
-        ; return success }
+  | eqType (typeKind $ mkTyConTy $ classTyCon cls)
+           (mkVisFunTyMany (typeKind ty) constraintKind)
+     = simplifyDefault [mkClassPred cls [ty]]
+  | otherwise = return False
 
 defaultDeclCtxt :: SDoc
 defaultDeclCtxt = text "When checking the types in a default declaration"
