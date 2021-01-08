@@ -55,6 +55,11 @@ packageArgs = do
         , package cabal ?
           stage0 ? builder Ghc ? arg "-O0"
 
+        , package ghc_debug_stub ?
+            builder (Cabal Flags) ? mconcat
+              [ arg "+eras"
+              ]
+
         ------------------------------- compiler -------------------------------
         , package compiler ? mconcat
           [ builder Alex ? arg "--latin1"
@@ -116,6 +121,7 @@ packageArgs = do
 
           , builder (Cabal Flags) ? mconcat
             [ (expr (ghcWithInterpreter stage)) `cabalFlag` "internal-interpreter"
+            , notStage0 `cabalFlag` "ghc-debug"
             , ifM stage0
                   -- We build a threaded stage 1 if the bootstrapping compiler
                   -- supports it.
