@@ -81,6 +81,9 @@ import qualified GHC.List as List ( foldr )
 
 -- $setup
 -- >>> import Prelude
+-- >>> import Data.Maybe (catMaybes, mapMaybe)
+-- >>> import Data.Either (rights)
+-- >>> import Data.Foldable (traverse_)
 
 -- XXX: Missing haddock feature.  Links to anchors in other modules
 -- don't have a sensible way to name the link within the module itself.
@@ -497,10 +500,17 @@ foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
 -- over a list of file names produces an IO action that evaluates to a list
 -- of __@(fileName, lineCount)@__ pairs:
 --
--- >>> nameAndLineCount :: FilePath -> IO (FilePath, Int)
--- >>> nameAndLineCount fn = ...
--- >>> traverse nameAndLineCount ["/etc/passwd","/etc/hosts"]
+-- @
+-- nameAndLineCount :: FilePath -> IO (FilePath, Int)
+-- nameAndLineCount fn = ...
+-- @
+--
+-- Then @traverse nameAndLineCount ["/etc/passwd","/etc/hosts"]@
+-- could return
+--
+-- @
 -- [("/etc/passwd",56),("/etc/hosts",32)]
+-- @
 --
 -- The specialisation of 'traverse' to the case when __@f@__ is a monad is
 -- called 'mapM'.  The two are otherwise generally identical:
@@ -522,7 +532,7 @@ foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
 -- replaced by each element of __@f a@__ in turn:
 --
 -- >>> mapM (\n -> [0..n]) $ Just 2
--- [Just 0, Just 1, Just 2]
+-- [Just 0,Just 1,Just 2]
 -- >>> mapM (\n -> [0..n]) [0..2]
 -- [[0,0,0],[0,0,1],[0,0,2],[0,1,0],[0,1,1],[0,1,2]]
 --
@@ -558,14 +568,18 @@ foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
 -- #validation#
 -- A hypothetical application of the above is to validate a structure:
 --
--- >>> validate :: Int -> Either (String, Int) Int
--- >>> validate i = if odd i then Left ("That's odd", i) else Right i
+-- >>> :{
+-- validate :: Int -> Either (String, Int) Int
+-- validate i = if odd i then Left ("That's odd", i) else Right i
+-- :}
+--
 -- >>> traverse validate [2,4,6,8,10]
 -- Right [2,4,6,8,10]
 -- >>> traverse validate [2,4,6,8,9]
 -- Left ("That's odd",9)
 --
--- >>> -- Since 'Nothing' is an empty structure, none of its elements are odd.
+-- Since 'Nothing' is an empty structure, none of its elements are odd.
+--
 -- >>> traverse validate Nothing
 -- Right Nothing
 -- >>> traverse validate (Just 42)
@@ -585,7 +599,7 @@ foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
 -- >>> traverse_ validate [2,4,6,8,9]
 -- Left ("That's odd",9)
 --
--- The @Foldable@ instance should be defined in a manner that avoids
+-- The 'Foldable' instance should be defined in a manner that avoids
 -- construction of an unnecesary copy of the container.
 --
 -- The @Foldable@ method 'mapM_' and its flipped version 'forM_' can be used

@@ -536,8 +536,8 @@ foldr1 f = go
 -- [98,-97,99,-96,100]
 -- >>> scanr (\nextChar reversedString -> nextChar : reversedString) "foo" ['a', 'b', 'c', 'd']
 -- ["abcdfoo","bcdfoo","cdfoo","dfoo","foo"]
--- >>> scanr (+) 0 [1..]
--- * Hangs forever *
+-- >>> force $ scanr (+) 0 [1..]
+-- *** Exception: stack overflow
 {-# NOINLINE [1] scanr #-}
 scanr                   :: (a -> b -> b) -> b -> [a] -> [b]
 scanr _ q0 []           =  [q0]
@@ -602,7 +602,7 @@ remove the cause for the chain of evaluations, and all is well.
 -- >>> scanr1 (||) [True, True, False, False]
 -- [True,True,False,False]
 -- >>> force $ scanr1 (+) [1..]
--- * Hangs forever *
+-- *** Exception: stack overflow
 scanr1                  :: (a -> a -> a) -> [a] -> [a]
 scanr1 _ []             =  []
 scanr1 _ [x]            =  [x]
