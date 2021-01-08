@@ -167,7 +167,6 @@ reportUnsolved wanted
 -- See Note [Deferring coercion errors to runtime]
 -- Used by solveEqualities for kind equalities
 --      (see Note [Fail fast on kind errors] in "GHC.Tc.Solver")
--- and for simplifyDefault.
 reportAllUnsolved :: WantedConstraints -> TcM ()
 reportAllUnsolved wanted
   = do { ev_binds <- newNoTcEvBinds
