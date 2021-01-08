@@ -348,7 +348,7 @@ processBlock block_live (BasicBlock id instrs)
         initBlock id block_live
 
         (instrs', fixups)
-                <- linearRA block_live [] [] id instrs
+                <- linearRA block_live id instrs
         -- pprTraceM "blockResult" $ ppr (instrs', fixups)
         return  $ BasicBlock id instrs' : fixups
 
@@ -385,30 +385,28 @@ initBlock id block_live
 
 -- | Do allocation for a sequence of instructions.
 linearRA
-        :: OutputableRegConstraint freeRegs instr
+        :: forall freeRegs instr. (OutputableRegConstraint freeRegs instr)
         => BlockMap RegSet                      -- ^ map of what vregs are live on entry to each block.
-        -> [instr]                              -- ^ accumulator for instructions already processed.
-        -> [NatBasicBlock instr]                -- ^ accumulator for blocks of fixup code.
         -> BlockId                              -- ^ id of the current block, for debugging.
         -> [LiveInstr instr]                    -- ^ liveness annotated instructions in this block.
-
         -> RegM freeRegs
                 ( [instr]                       --   instructions after register allocation
                 , [NatBasicBlock instr])        --   fresh blocks of fixup code.
+linearRA block_live block_id = go [] []
+  where
+    go :: [instr]                              -- ^ accumulator for instructions already processed.
+       -> [NatBasicBlock instr]                -- ^ accumulator for blocks of fixup code.
+       -> [LiveInstr instr]                    -- ^ liveness annotated instructions in this block.
+       -> RegM freeRegs
+               ( [instr]                       --   instructions after register allocation
+               , [NatBasicBlock instr] )       --   fresh blocks of fixup code.
+    go !accInstr !accFixups [] = do
+        return ( reverse accInstr               -- instrs need to be returned in the correct order.
+               , accFixups )                    -- it doesn't matter what order the fixup blocks are returned in.
 
-
-linearRA _          accInstr accFixup _ []
-        = return
-                ( reverse accInstr              -- instrs need to be returned in the correct order.
-                , accFixup)                     -- it doesn't matter what order the fixup blocks are returned in.
-
-
-linearRA block_live accInstr accFixups id (instr:instrs)
- = do
-        (accInstr', new_fixups) <- raInsn block_live accInstr id instr
-
-        linearRA block_live accInstr' (new_fixups ++ accFixups) id instrs
-
+    go accInstr accFixups (instr:instrs) = do
+        (accInstr', new_fixups) <- raInsn block_live accInstr block_id instr
+        go accInstr' (new_fixups ++ accFixups) instrs
 
 -- | Do allocation for a single instruction.
 raInsn
