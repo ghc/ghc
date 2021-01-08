@@ -118,3 +118,6 @@
 [submodule "libraries/file-io"]
 	path = libraries/file-io
 	url = https://gitlab.haskell.org/ghc/packages/file-io.git
+[submodule "ghc-debug"]
+	path = ghc-debug
+	url = git@gitlab.haskell.org:ghc/ghc-debug.git
