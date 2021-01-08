@@ -253,7 +253,7 @@ linearRegAlloc'
 
 linearRegAlloc' config initFreeRegs entry_ids block_live sccs
  = do   us      <- getUniqueSupplyM
-        let (_, stack, stats, blocks) =
+        let !(_, !stack, !stats, !blocks) =
                 runR config mapEmpty initFreeRegs emptyRegMap emptyStackMap us
                     $ linearRA_SCCs entry_ids block_live [] sccs
         return  (blocks, stats, getStackUse stack)
