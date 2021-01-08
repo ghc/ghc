@@ -505,6 +505,7 @@ data WarningFlag =
    | Opt_WarnInvalidHaddock               -- Since 8.12
    | Opt_WarnOperatorWhitespaceExtConflict  -- Since 9.2
    | Opt_WarnOperatorWhitespace             -- Since 9.2
+   | Opt_WarnAmbiguousFields                -- Since 9.2
    deriving (Eq, Show, Enum)
 
 -- | Used when outputting warnings: if a reason is given, it is

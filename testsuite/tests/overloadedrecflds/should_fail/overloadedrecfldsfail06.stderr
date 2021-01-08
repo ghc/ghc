@@ -26,3 +26,11 @@ overloadedrecfldsfail06.hs:9:1: error: [-Wunused-imports (in -Wextra), -Werror=u
 overloadedrecfldsfail06.hs:10:1: error: [-Wunused-imports (in -Wextra), -Werror=unused-imports]
     The qualified import of ‘U(x), U’
     from module ‘OverloadedRecFldsFail06_A’ is redundant
+
+overloadedrecfldsfail06.hs:15:22: error: [-Wambiguous-fields (in -Wdefault), -Werror=ambiguous-fields]
+    The record update u {x = True} with type U is ambiguous.
+    This will not be supported by -XDuplicateRecordFields in future releases of GHC.
+
+overloadedrecfldsfail06.hs:18:28: error: [-Wambiguous-fields (in -Wdefault), -Werror=ambiguous-fields]
+    The record update v {P.x = 3} with type V is ambiguous.
+    This will not be supported by -XDuplicateRecordFields in future releases of GHC.
