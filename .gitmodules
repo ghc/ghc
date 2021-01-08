@@ -110,3 +110,6 @@
 [submodule "libraries/exceptions"]
 	path = libraries/exceptions
 	url = https://gitlab.haskell.org/ghc/packages/exceptions.git
+[submodule "ghc-debug"]
+	path = ghc-debug
+	url = git@gitlab.haskell.org:ghc/ghc-debug.git

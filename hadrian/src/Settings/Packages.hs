@@ -77,6 +77,7 @@ packageArgs = do
 
           , builder (Cabal Flags) ? mconcat
             [ ghcWithInterpreter ? notStage0 ? arg "internal-interpreter"
+            , notStage0? arg "ghc-debug"
             , cross ? arg "-terminfo"
             , ifM stage0
                   -- We build a threaded stage 1 if the bootstrapping compiler
