@@ -168,6 +168,8 @@ stage1Packages = do
         , unlit
         , xhtml
         , if winTarget then win32 else unix
+        , ghc_debug_convention
+        , ghc_debug_stub
         ]
       , when (not cross)
         [ haddock

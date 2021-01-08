@@ -115,3 +115,6 @@
 [submodule "libraries/os-string"]
 	path = libraries/os-string
 	url = https://gitlab.haskell.org/ghc/packages/os-string
+[submodule "ghc-debug"]
+	path = ghc-debug
+	url = git@gitlab.haskell.org:ghc/ghc-debug.git
