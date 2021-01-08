@@ -23,6 +23,8 @@ description:
   without any documentation annotations, Haddock can generate useful documentation
   from your source code.
   .
+  Documentation for the haddock binary is available at [readthedocs](https://haskell-haddock.readthedocs.io/en/latest/).
+  .
   <<https://cdn.rawgit.com/haskell/haddock/ghc-8.10/doc/cheatsheet/haddocks.svg>>
 license:              BSD-3-Clause
 license-file:         LICENSE
