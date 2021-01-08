@@ -291,6 +291,7 @@ resolveContextData context@Context {..} = do
           , extraLibDirs    = C.extraLibDirs    buildInfo
           , asmSrcs         = C.asmSources      buildInfo
           , cSrcs           = C.cSources        buildInfo
+          , cxxSrcs      = C.cxxSources      buildInfo
           , cmmSrcs         = C.cmmSources      buildInfo
           , hcOpts          = C.programDefaultArgs ghcProg
               ++ C.hcOptions C.GHC buildInfo
@@ -299,6 +300,7 @@ resolveContextData context@Context {..} = do
               ++ C.programOverrideArgs ghcProg
           , asmOpts            = C.asmOptions buildInfo
           , ccOpts             = C.ccOptions  buildInfo
+          , cxxOpts         = C.cxxOptions buildInfo
           , cmmOpts            = C.cmmOptions buildInfo
           , cppOpts            = C.cppOptions buildInfo
           , ldOpts             = C.ldOptions  buildInfo
