@@ -137,6 +137,8 @@ stage1Packages = do
         , stm
         , unlit
         , xhtml
+        , ghc_debug_convention
+        , ghc_debug_stub
         ]
       , when (not cross)
         [ haddock
