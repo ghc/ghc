@@ -117,6 +117,8 @@ stage1Packages = do
              , time
              , unlit
              , xhtml
+             , ghc_debug_convention
+             , ghc_debug_stub
              ]
           ++ [ haddock  | not cross                  ]
           ++ [ hpcBin   | not cross                  ]
