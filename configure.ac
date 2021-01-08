@@ -93,21 +93,21 @@ AC_ARG_WITH([ghc],
 AC_SUBST(WithGhc,$GHC)
 
 AC_ARG_ENABLE(bootstrap-with-devel-snapshot,
-[AC_HELP_STRING([--enable-bootstrap-with-devel-snapshot],
+[AS_HELP_STRING([--enable-bootstrap-with-devel-snapshot],
                 [Allow bootstrapping using a development snapshot of GHC.  This is not guaranteed to work.])],
         EnableBootstrapWithDevelSnaphost=YES,
         EnableBootstrapWithDevelSnaphost=NO
 )
 
 AC_ARG_ENABLE(tarballs-autodownload,
-[AC_HELP_STRING([--enable-tarballs-autodownload],
+[AS_HELP_STRING([--enable-tarballs-autodownload],
                 [Automatically download Windows distribution binaries if needed.])],
         TarballsAutodownload=YES,
         TarballsAutodownload=NO
 )
 
 AC_ARG_ENABLE(distro-toolchain,
-[AC_HELP_STRING([--enable-distro-toolchain],
+[AS_HELP_STRING([--enable-distro-toolchain],
                 [Do not use bundled Windows toolchain binaries.])],
         EnableDistroToolchain=YES,
         EnableDistroToolchain=NO
@@ -118,7 +118,7 @@ if test "$EnableDistroToolchain" = "YES"; then
 fi
 
 AC_ARG_ENABLE(native-io-manager,
-[AC_HELP_STRING([--enable-native-io-manager],
+[AS_HELP_STRING([--enable-native-io-manager],
                 [Enable the native I/O manager by default.])],
         EnableNativeIOManager=YES,
         EnableNativeIOManager=NO
@@ -875,7 +875,7 @@ AC_PATH_PROG(AutoreconfCmd, autoreconf, autoreconf)
 
 dnl ** check for dtrace (currently only implemented for Mac OS X)
 AC_ARG_ENABLE(dtrace,
-    [AC_HELP_STRING([--enable-dtrace],
+    [AS_HELP_STRING([--enable-dtrace],
         [Enable DTrace])],
     EnableDtrace=$enableval,
     EnableDtrace=yes
@@ -1066,7 +1066,7 @@ dnl ################################################################
 # system libffi
 
 AC_ARG_WITH([system-libffi],
-[AC_HELP_STRING([--with-system-libffi],
+[AS_HELP_STRING([--with-system-libffi],
   [Use system provided libffi for RTS [default=no]])
 ])
 
@@ -1077,7 +1077,7 @@ AS_IF([test "x$with_system_libffi" = "xyes"],
 AC_SUBST(UseSystemLibFFI)
 
 AC_ARG_WITH([ffi-includes],
-[AC_HELP_STRING([--with-ffi-includes=ARG],
+[AS_HELP_STRING([--with-ffi-includes=ARG],
   [Find includes for libffi in ARG [default=system default]])
 ],
 [
@@ -1092,7 +1092,7 @@ AC_ARG_WITH([ffi-includes],
 AC_SUBST(FFIIncludeDir)
 
 AC_ARG_WITH([ffi-libraries],
-[AC_HELP_STRING([--with-ffi-libraries=ARG],
+[AS_HELP_STRING([--with-ffi-libraries=ARG],
   [Find libffi in ARG [default=system default]])
 ],
 [
@@ -1165,7 +1165,7 @@ FP_CHECK_TIMER_CREATE
 
 dnl ** check for Apple's "interesting" long double compatibility scheme
 AC_MSG_CHECKING(for printf\$LDBLStub)
-AC_TRY_LINK_FUNC(printf\$LDBLStub,
+AC_LINK_IFELSE([AC_LANG_CALL([], [printf\$LDBLStub])],
     [
         AC_MSG_RESULT(yes)
         AC_DEFINE([HAVE_PRINTF_LDBLSTUB],[1],
@@ -1209,12 +1209,12 @@ dnl ** pthread_setname_np is a recent addition to glibc, and OS X has
 dnl    a different single-argument version.
 AC_CHECK_LIB(pthread, pthread_setname_np)
 AC_MSG_CHECKING(for pthread_setname_np)
-AC_TRY_LINK(
-[
+AC_LINK_IFELSE([AC_LANG_PROGRAM(
+[[
 #define _GNU_SOURCE
 #include <pthread.h>
-],
-[pthread_setname_np(pthread_self(), "name");],
+]],
+[[pthread_setname_np(pthread_self(), "name");]])],
     AC_MSG_RESULT(yes)
     AC_DEFINE([HAVE_PTHREAD_SETNAME_NP], [1],
       [Define to 1 if you have the glibc version of pthread_setname_np]),
@@ -1253,7 +1253,7 @@ dnl    VirtualAlloc MEM_RESERVE 1099512676352 bytes failed: The paging file is t
 dnl
 
 AC_ARG_ENABLE(large-address-space,
-    [AC_HELP_STRING([--enable-large-address-space],
+    [AS_HELP_STRING([--enable-large-address-space],
         [Use a single large address space on 64 bit systems (enabled by default on 64 bit platforms)])],
     EnableLargeAddressSpace=$enableval,
     EnableLargeAddressSpace=yes
@@ -1315,7 +1315,7 @@ AC_DEFINE_UNQUOTED([RTS_LINKER_USE_MMAP], [$RtsLinkerUseMmap],
 dnl ** Have libdw?
 dnl --------------------------------------------------------------
 AC_ARG_WITH([libdw-libraries],
-  [AC_HELP_STRING([--with-libdw-libraries=ARG],
+  [AS_HELP_STRING([--with-libdw-libraries=ARG],
     [Find libraries for libdw in ARG [default=system default]])
   ],
   [
@@ -1326,7 +1326,7 @@ AC_ARG_WITH([libdw-libraries],
 AC_SUBST(LibdwLibDir)
 
 AC_ARG_WITH([libdw-includes],
-  [AC_HELP_STRING([--with-libdw-includes=ARG],
+  [AS_HELP_STRING([--with-libdw-includes=ARG],
     [Find includes for libdw in ARG [default=system default]])
   ],
   [
@@ -1339,7 +1339,7 @@ AC_SUBST(LibdwIncludeDir)
 UseLibdw=NO
 USE_LIBDW=0
 AC_ARG_ENABLE(dwarf-unwind,
-    [AC_HELP_STRING([--enable-dwarf-unwind],
+    [AS_HELP_STRING([--enable-dwarf-unwind],
         [Enable DWARF unwinding support in the runtime system via elfutils' libdw [default=no]])])
 if test "$enable_dwarf_unwind" = "yes" ; then
   CFLAGS2="$CFLAGS"
@@ -1368,7 +1368,7 @@ AC_DEFINE_UNQUOTED([USE_LIBDW], [$USE_LIBDW], [Set to 1 to use libdw])
 dnl ** Have libnuma?
 dnl --------------------------------------------------------------
 AC_ARG_WITH([libnuma-libraries],
-  [AC_HELP_STRING([--with-libnuma-libraries=ARG],
+  [AS_HELP_STRING([--with-libnuma-libraries=ARG],
     [Find libraries for libnuma in ARG [default=system default]])
   ],
   [
@@ -1379,7 +1379,7 @@ AC_ARG_WITH([libnuma-libraries],
 AC_SUBST(LibNumaLibDir)
 
 AC_ARG_WITH([libnuma-includes],
-  [AC_HELP_STRING([--with-libnuma-includes=ARG],
+  [AS_HELP_STRING([--with-libnuma-includes=ARG],
     [Find includes for libnuma in ARG [default=system default]])
   ],
   [
@@ -1391,7 +1391,7 @@ AC_SUBST(LibNumaIncludeDir)
 
 HaveLibNuma=0
 AC_ARG_ENABLE(numa,
-    [AC_HELP_STRING([--enable-numa],
+    [AS_HELP_STRING([--enable-numa],
         [Enable NUMA memory policy and thread affinity support in the
          runtime system via numactl's libnuma [default=auto]])])
 
