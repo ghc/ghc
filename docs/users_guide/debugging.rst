@@ -881,6 +881,13 @@ Checking for consistency
 
     Ditto for C-\\- level.
 
+.. ghc-flag:: -dasm-lint
+    :shortdesc: ASM pass sanity checking
+    :type: dynamic
+
+    Turn on intra-pass sanity-checking within GHC, at the
+    code generator level.
+
 .. ghc-flag:: -fllvm-fill-undef-with-garbage
     :shortdesc: Intruct LLVM to fill dead STG registers with garbage
     :type: dynamic
