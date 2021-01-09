@@ -816,8 +816,9 @@ matchEquations ctxt vars eqns_info rhs_ty
 
         ; match_result <- match vars rhs_ty eqns_info
 
-        ; fail_expr <- mkErrorAppDs pAT_ERROR_ID rhs_ty error_doc
-        ; extractMatchResult match_result fail_expr }
+        ; fail_expr <- mkErrorAppDs pAT_ERROR_ID unitTy error_doc
+        ; let fail_expr' = mkWildCase fail_expr (unrestricted unitTy) rhs_ty []
+        ; extractMatchResult match_result fail_expr' }
 
 -- | @matchSimply@ is a wrapper for 'match' which deals with the
 -- situation where we want to match a single expression against a single
