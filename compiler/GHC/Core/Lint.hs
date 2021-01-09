@@ -481,7 +481,8 @@ lintCoreBindings dflags pass local_in_scope binds
     flags = (defaultLintFlags dflags)
                { lf_check_global_ids = check_globals
                , lf_check_inline_loop_breakers = check_lbs
-               , lf_check_static_ptrs = check_static_ptrs }
+               , lf_check_static_ptrs = check_static_ptrs
+               , lf_check_linearity = check_linearity }
 
     -- See Note [Checking for global Ids]
     check_globals = case pass of
@@ -502,6 +503,11 @@ lintCoreBindings dflags pass local_in_scope binds
                           CoreTidy              -> RejectEverywhere
                           CorePrep              -> AllowAtTopLevel
                           _                     -> AllowAnywhere
+
+    check_linearity = gopt Opt_DoLinearCoreLinting dflags || (
+                        case pass of
+                          CoreDesugar -> True
+                          _ -> False)
 
     (_, dups) = removeDups compare binders
 
