@@ -24,7 +24,6 @@
 -XTraditionalRecordSyntax
 -copy-libs-when-linking
 -dannot-lint
--dasm-lint
 -ddump-asm-conflicts
 -ddump-call-arity
 -ddump-cs-trace
