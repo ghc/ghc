@@ -611,7 +611,7 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
   | otherwise
   = WARN( not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr cpr) )
           -- The arity should match the signature
-    do { mb_stuff <- mkWwBodies dflags fam_envs rhs_fvs fn_id wrap_dmds use_cpr_info
+    do { mb_stuff <- mkWwBodies (initWwOpts dflags fam_envs) rhs_fvs fn_id wrap_dmds use_cpr_info
        ; case mb_stuff of
             Nothing -> return [(fn_id, rhs)]
 
@@ -870,7 +870,8 @@ splitThunk :: DynFlags -> FamInstEnvs -> RecFlag -> Var -> Expr Var -> UniqSM [(
 splitThunk dflags fam_envs is_rec x rhs
   = ASSERT(not (isJoinId x))
     do { let x' = localiseId x -- See comment above
-       ; (useful,_, wrap_fn, work_fn) <- mkWWstr dflags fam_envs False [x']
+       ; (useful,_, wrap_fn, work_fn)
+           <- mkWWstr (initWwOpts dflags fam_envs) NotArgOfInlineableFun [x']
        ; let res = [ (x, Let (NonRec x' rhs) (wrap_fn (work_fn (Var x')))) ]
        ; if useful then ASSERT2( isNonRec is_rec, ppr x ) -- The thunk must be non-recursive
                    return res

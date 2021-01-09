@@ -483,7 +483,7 @@ argCprType env arg_ty dmd = CprType 0 (go arg_ty dmd)
   where
     go ty dmd
       | Unbox (DataConPatContext { dcpc_dc = dc, dcpc_tc_args = tc_args }) ds
-          <- wantToUnbox (ae_fam_envs env) no_inlineable_prag ty dmd
+          <- wantToUnbox (ae_fam_envs env) MaybeArgOfInlineableFun ty dmd
       -- No existentials; see Note [Which types are unboxed?])
       -- Otherwise we'd need to call dataConRepInstPat here and thread a
       -- UniqSupply. So argCprType is a bit less aggressive than it could
@@ -493,11 +493,6 @@ argCprType env arg_ty dmd = CprType 0 (go arg_ty dmd)
       = ConCpr (dataConTag dc) (zipWith go arg_tys ds)
       | otherwise
       = topCpr
-    -- Rather than maintaining in AnalEnv whether we are in an INLINEABLE
-    -- function, we just assume that we aren't. That flag is only relevant
-    -- to Note [Do not unpack class dictionaries], the few unboxing
-    -- opportunities on dicts it prohibits are probably irrelevant to CPR.
-    no_inlineable_prag = False
 
 {- Note [Safe abortion in the fixed-point iteration]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

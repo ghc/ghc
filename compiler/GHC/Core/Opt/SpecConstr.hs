@@ -1720,7 +1720,7 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
                 -- And build the results
         ; let spec_body_ty   = exprType spec_body
               spec_lam_args1 = qvars ++ extra_bndrs
-              (spec_lam_args, spec_call_args) = mkWorkerArgs (sc_dflags env)
+              (spec_lam_args, spec_call_args) = mkWorkerArgs False
                                                              spec_lam_args1 spec_body_ty
                 -- mkWorkerArgs: usual w/w hack to avoid generating
                 -- a spec_rhs of unlifted type and no args
@@ -2031,8 +2031,9 @@ callsToNewPats env fn spec_info@(SI { si_specs = done_specs }) bndr_occs calls
 
               -- Remove ones that have too many worker variables
               small_pats = filterOut too_big non_dups
+              max_args = maxWorkerArgs (sc_dflags env)
               too_big (CP { cp_qvars = vars, cp_args = args })
-                = not (isWorkerSmallEnough (sc_dflags env) (valArgCount args) vars)
+                = not (isWorkerSmallEnough max_args (valArgCount args) vars)
                   -- We are about to construct w/w pair in 'spec_one'.
                   -- Omit specialisation leading to high arity workers.
                   -- See Note [Limit w/w arity] in GHC.Core.Opt.WorkWrap.Utils

@@ -7,8 +7,9 @@ A library for the ``worker\/wrapper'' back-end to the strictness analyser
 {-# LANGUAGE CPP #-}
 
 module GHC.Core.Opt.WorkWrap.Utils
-   ( mkWwBodies, mkWWstr, mkWorkerArgs
-   , DataConPatContext(..), UnboxingDecision(..), splitArgType_maybe, wantToUnbox
+   ( WwOpts(..), initWwOpts, mkWwBodies, mkWWstr, mkWorkerArgs
+   , DataConPatContext(..), splitArgType_maybe
+   , UnboxingDecision(..), ArgOfInlineableFun(..), wantToUnbox
    , findTypeShape
    , isWorkerSmallEnough
    )
@@ -20,7 +21,8 @@ import GHC.Prelude
 
 import GHC.Core
 import GHC.Core.Utils   ( exprType, mkCast, mkDefaultCase, mkSingleAltCase
-                        , bindNonRec, dataConRepFSInstPat )
+                        , bindNonRec, dataConRepFSInstPat
+                        , normSplitTyConApp_maybe )
 import GHC.Types.Id
 import GHC.Types.Id.Info ( JoinArity )
 import GHC.Core.DataCon
@@ -45,7 +47,6 @@ import GHC.Core.TyCon.RecWalk
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique
 import GHC.Types.Name ( getOccFS )
-import GHC.Data.Maybe
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -123,14 +124,31 @@ the unusable strictness-info into the interfaces.
 @mkWwBodies@ is called when doing the worker\/wrapper split inside a module.
 -}
 
+data WwOpts
+  = MkWwOpts
+  { wo_fam_envs          :: !FamInstEnvs
+  , wo_cpr_anal          :: !Bool
+  , wo_fun_to_thunk      :: !Bool
+  , wo_max_worker_args   :: !Int
+  , wo_output_file       :: Maybe String
+  }
+
+initWwOpts :: DynFlags -> FamInstEnvs -> WwOpts
+initWwOpts dflags fam_envs = MkWwOpts
+  { wo_fam_envs          = fam_envs
+  , wo_cpr_anal          = gopt Opt_CprAnal dflags
+  , wo_fun_to_thunk      = gopt Opt_FunToThunk dflags
+  , wo_max_worker_args   = maxWorkerArgs dflags
+  , wo_output_file       = outputFile dflags
+  }
+
 type WwResult
   = ([Demand],              -- Demands for worker (value) args
      JoinArity,             -- Number of worker (type OR value) args
      Id -> CoreExpr,        -- Wrapper body, lacking only the worker Id
      CoreExpr -> CoreExpr)  -- Worker body, lacking the original function rhs
 
-mkWwBodies :: DynFlags
-           -> FamInstEnvs
+mkWwBodies :: WwOpts
            -> VarSet         -- Free vars of RHS
                              -- See Note [Freshen WW arguments]
            -> Id             -- The original function
@@ -149,25 +167,25 @@ mkWwBodies :: DynFlags
 --                        let x = (a,b) in
 --                        E
 
-mkWwBodies dflags fam_envs rhs_fvs fun_id demands cpr_info
+mkWwBodies opts rhs_fvs fun_id demands cpr_info
   = do  { let empty_subst = mkEmptyTCvSubst (mkInScopeSet rhs_fvs)
                 -- See Note [Freshen WW arguments]
 
         ; (wrap_args, wrap_fn_args, work_fn_args, res_ty)
              <- mkWWargs empty_subst fun_ty demands
         ; (useful1, work_args, wrap_fn_str, work_fn_str)
-             <- mkWWstr dflags fam_envs has_inlineable_prag wrap_args
+             <- mkWWstr opts inlineable_flag wrap_args
 
         -- Do CPR w/w.  See Note [Always do CPR w/w]
         ; (useful2, wrap_fn_cpr, work_fn_cpr, cpr_res_ty)
-              <- mkWWcpr (gopt Opt_CprAnal dflags) fam_envs res_ty cpr_info
+              <- mkWWcpr opts res_ty cpr_info
 
-        ; let (work_lam_args, work_call_args) = mkWorkerArgs dflags work_args cpr_res_ty
+        ; let (work_lam_args, work_call_args) = mkWorkerArgs (wo_fun_to_thunk opts) work_args cpr_res_ty
               worker_args_dmds = [idDemandInfo v | v <- work_call_args, isId v]
               wrapper_body = wrap_fn_args . wrap_fn_cpr . wrap_fn_str . applyToVars work_call_args . Var
               worker_body = mkLams work_lam_args. work_fn_str . work_fn_cpr . work_fn_args
 
-        ; if isWorkerSmallEnough dflags (length demands) work_args
+        ; if isWorkerSmallEnough (wo_max_worker_args opts) (length demands) work_args
              && not (too_many_args_for_join_point wrap_args)
              && ((useful1 && not only_one_void_argument) || useful2)
           then return (Just (worker_args_dmds, length work_call_args,
@@ -184,8 +202,9 @@ mkWwBodies dflags fam_envs rhs_fvs fun_id demands cpr_info
   where
     fun_ty        = idType fun_id
     mb_join_arity = isJoinId_maybe fun_id
-    has_inlineable_prag = isStableUnfolding (realIdUnfolding fun_id)
-                          -- See Note [Do not unpack class dictionaries]
+    inlineable_flag -- See Note [Do not unpack class dictionaries]
+      | isStableUnfolding (realIdUnfolding fun_id) = MaybeArgOfInlineableFun
+      | otherwise                                  = NotArgOfInlineableFun
 
     -- Note [Do not split void functions]
     only_one_void_argument
@@ -208,9 +227,9 @@ mkWwBodies dflags fam_envs rhs_fvs fun_id demands cpr_info
       = False
 
 -- See Note [Limit w/w arity]
-isWorkerSmallEnough :: DynFlags -> Int -> [Var] -> Bool
-isWorkerSmallEnough dflags old_n_args vars
-  = count isId vars <= max old_n_args (maxWorkerArgs dflags)
+isWorkerSmallEnough :: Int -> Int -> [Var] -> Bool
+isWorkerSmallEnough max_worker_args old_n_args vars
+  = count isId vars <= max old_n_args max_worker_args
     -- We count only Free variables (isId) to skip Type, Kind
     -- variables which have no runtime representation.
     -- Also if the function took 82 arguments before (old_n_args), it's fine if
@@ -274,11 +293,12 @@ add a void argument.  E.g.
 We use the state-token type which generates no code.
 -}
 
-mkWorkerArgs :: DynFlags -> [Var]
+mkWorkerArgs :: Bool
+             -> [Var]
              -> Type    -- Type of body
              -> ([Var], -- Lambda bound args
                  [Var]) -- Args at call site
-mkWorkerArgs dflags args res_ty
+mkWorkerArgs fun_to_thunk args res_ty
     | any isId args || not needsAValueLambda
     = (args, args)
     | otherwise
@@ -290,7 +310,7 @@ mkWorkerArgs dflags args res_ty
         -- We may encounter a levity-polymorphic result, in which case we
         -- conservatively assume that we have laziness that needs preservation.
         -- See #15186.
-        || not (gopt Opt_FunToThunk dflags)
+        || not fun_to_thunk
            -- see Note [Protecting the last value argument]
 
       -- Might the result be lifted?
@@ -546,9 +566,7 @@ data DataConPatContext
 -- See Note [Which types are unboxed?].
 splitArgType_maybe :: FamInstEnvs -> Type -> Maybe DataConPatContext
 splitArgType_maybe fam_envs ty
-  | let (co, ty1) = topNormaliseType_maybe fam_envs ty
-                    `orElse` (mkRepReflCo ty, ty)
-  , Just (tc, tc_args) <- splitTyConApp_maybe ty1
+  | Just (tc, tc_args, co) <- normSplitTyConApp_maybe fam_envs ty
   , Just con <- tyConSingleAlgDataCon_maybe tc
   = Just DataConPatContext { dcpc_dc      = con
                            , dcpc_tc_args = tc_args
@@ -564,9 +582,7 @@ splitArgType_maybe _ _ = Nothing
 -- See Note [Which types are unboxed?].
 splitResultType_maybe :: FamInstEnvs -> ConTag -> Type -> Maybe DataConPatContext
 splitResultType_maybe fam_envs con_tag ty
-  | let (co, ty1) = topNormaliseType_maybe fam_envs ty
-                    `orElse` (mkRepReflCo ty, ty)
-  , Just (tc, tc_args) <- splitTyConApp_maybe ty1
+  | Just (tc, tc_args, co) <- normSplitTyConApp_maybe fam_envs ty
   , isDataTyCon tc -- NB: rules out unboxed sums and pairs!
   , let cons = tyConDataCons tc
   , cons `lengthAtLeast` con_tag -- This might not be true if we import the
@@ -596,6 +612,8 @@ isLinear (Scaled w _ ) =
 data UnboxingDecision s
   = StopUnboxing
   -- ^ We ran out of strictness info. Leave untouched.
+  | DropAbsent
+  -- ^ The argument/field was absent. Drop it.
   | Unbox !DataConPatContext [s]
   -- ^ The argument is used strictly or the returned product was constructed, so
   -- unbox it.
@@ -604,23 +622,36 @@ data UnboxingDecision s
   -- The @[s]@ carries the bits of information with which we can continue
   -- unboxing, e.g. @s@ will be 'Demand'.
 
-wantToUnbox :: FamInstEnvs -> Bool -> Type -> Demand -> UnboxingDecision Demand
+-- | A specialised Bool for an argument to 'wantToUnbox'.
+-- See Note [Do not unpack class dictionaries].
+data ArgOfInlineableFun
+  = NotArgOfInlineableFun   -- ^ Definitely not in an inlineable fun.
+  | MaybeArgOfInlineableFun -- ^ We might be in an inlineable fun, so we won't
+                            -- unbox dictionary args.
+  deriving Eq
+
+wantToUnbox :: FamInstEnvs -> ArgOfInlineableFun -> Type -> Demand -> UnboxingDecision Demand
 -- See Note [Which types are unboxed?]
-wantToUnbox fam_envs has_inlineable_prag ty dmd =
-  case splitArgType_maybe fam_envs ty of
-    Just dcpc@DataConPatContext{ dcpc_dc = dc }
-      | isStrUsedDmd dmd
-      , let arity = dataConRepArity dc
-      -- See Note [Unpacking arguments with product and polymorphic demands]
-      , Just cs <- split_prod_dmd_arity dmd arity
-      -- See Note [Do not unpack class dictionaries]
-      , not (has_inlineable_prag && isClassPred ty)
-      -- See Note [mkWWstr and unsafeCoerce]
-      , cs `lengthIs` arity
-      -- See Note [Add demands for strict constructors]
-      , let cs' = addDataConStrictness dc cs
-      -> Unbox dcpc cs'
-    _ -> StopUnboxing
+wantToUnbox fam_envs inlineable_flag ty dmd
+  | isAbsDmd dmd
+  = DropAbsent
+
+  | isStrUsedDmd dmd
+  , Just dcpc@DataConPatContext{ dcpc_dc = dc } <- splitArgType_maybe fam_envs ty
+  , let arity = dataConRepArity dc
+  -- See Note [Unpacking arguments with product and polymorphic demands]
+  , Just cs <- split_prod_dmd_arity dmd arity
+  -- See Note [Do not unpack class dictionaries]
+  , inlineable_flag == NotArgOfInlineableFun || not (isClassPred ty)
+  -- See Note [mkWWstr and unsafeCoerce]
+  , cs `lengthIs` arity
+  -- See Note [Add demands for strict constructors]
+  , let cs' = addDataConStrictness dc cs
+  = Unbox dcpc cs'
+
+  | otherwise
+  = StopUnboxing
+
   where
     split_prod_dmd_arity dmd arity
       -- For seqDmd, it should behave like <S(AAAA)>, for some
@@ -850,25 +881,23 @@ the case on `x` up through the case on `burble`.
 ************************************************************************
 -}
 
-mkWWstr :: DynFlags
-        -> FamInstEnvs
-        -> Bool    -- True <=> INLINEABLE pragma on this function defn
-                   -- See Note [Do not unpack class dictionaries]
-        -> [Var]                                -- Wrapper args; have their demand info on them
-                                                --  *Includes type variables*
-        -> UniqSM (Bool,                        -- Is this useful
-                   [Var],                       -- Worker args
-                   CoreExpr -> CoreExpr,        -- Wrapper body, lacking the worker call
-                                                -- and without its lambdas
-                                                -- This fn adds the unboxing
+mkWWstr :: WwOpts
+        -> ArgOfInlineableFun            -- See Note [Do not unpack class dictionaries]
+        -> [Var]                         -- Wrapper args; have their demand info on them
+                                         --  *Includes type variables*
+        -> UniqSM (Bool,                 -- Is this useful
+                   [Var],                -- Worker args
+                   CoreExpr -> CoreExpr, -- Wrapper body, lacking the worker call
+                                         -- and without its lambdas
+                                         -- This fn adds the unboxing
 
-                   CoreExpr -> CoreExpr)        -- Worker body, lacking the original body of the function,
-                                                -- and lacking its lambdas.
-                                                -- This fn does the reboxing
-mkWWstr dflags fam_envs has_inlineable_prag args
+                   CoreExpr -> CoreExpr) -- Worker body, lacking the original body of the function,
+                                         -- and lacking its lambdas.
+                                         -- This fn does the reboxing
+mkWWstr opts inlineable_flag args
   = go args
   where
-    go_one arg = mkWWstr_one dflags fam_envs has_inlineable_prag arg
+    go_one arg = mkWWstr_one opts inlineable_flag arg
 
     go []           = return (False, [], nop_fn, nop_fn)
     go (arg : args) = do { (useful1, args1, wrap_fn1, work_fn1) <- go_one arg
@@ -885,37 +914,37 @@ mkWWstr dflags fam_envs has_inlineable_prag args
 --   * work_fn assumes work_args are in scope, a
 --        brings into scope wrap_arg (via lets)
 -- See Note [How to do the worker/wrapper split]
-mkWWstr_one :: DynFlags -> FamInstEnvs
-            -> Bool    -- True <=> INLINEABLE pragma on this function defn
-                       -- See Note [Do not unpack class dictionaries]
+mkWWstr_one :: WwOpts
+            -> ArgOfInlineableFun -- See Note [Do not unpack class dictionaries]
             -> Var
             -> UniqSM (Bool, [Var], CoreExpr -> CoreExpr, CoreExpr -> CoreExpr)
-mkWWstr_one dflags fam_envs has_inlineable_prag arg
-  | isTyVar arg
-  = return (False, [arg],  nop_fn, nop_fn)
+mkWWstr_one opts inlineable_flag arg =
+  case wantToUnbox fam_envs inlineable_flag arg_ty arg_dmd of
+    _ | isTyVar arg -> do_nothing
 
-  | isAbsDmd dmd
-  , Just work_fn <- mk_absent_let dflags arg dmd
-     -- Absent case.  We can't always handle absence for rep-polymorphic
-     -- types, so we need to choose just the cases we can
-     -- (that's what mk_absent_let does)
-  = return (True, [], nop_fn, work_fn)
+    DropAbsent
+      | Just work_fn <- mk_absent_let opts arg
+         -- Absent case.  We can't always handle absence for arbitrary
+         -- unlifted types, so we need to choose just the cases we can
+         -- (that's what mk_absent_let does)
+      -> return (True, [], nop_fn, work_fn)
 
-  | Unbox dcpc cs <- wantToUnbox fam_envs has_inlineable_prag arg_ty dmd
-  = unbox_one dflags fam_envs arg cs dcpc
+    Unbox dcpc cs -> unbox_one opts arg cs dcpc
 
-  | otherwise   -- Other cases
-  = return (False, [arg], nop_fn, nop_fn)
+    _ -> do_nothing -- Other cases, like StopUnboxing
 
   where
-    arg_ty = idType arg
-    dmd    = idDemandInfo arg
+    fam_envs   = wo_fam_envs opts
+    arg_ty     = idType arg
+    arg_dmd    = idDemandInfo arg
+    do_nothing = return (False, [arg], nop_fn, nop_fn)
 
-unbox_one :: DynFlags -> FamInstEnvs -> Var
+unbox_one :: WwOpts
+          -> Var
           -> [Demand]
           -> DataConPatContext
           -> UniqSM (Bool, [Var], CoreExpr -> CoreExpr, CoreExpr -> CoreExpr)
-unbox_one dflags fam_envs arg cs
+unbox_one opts arg cs
           DataConPatContext { dcpc_dc = dc, dcpc_tc_args = tc_args
                             , dcpc_co = co }
   = do { (case_bndr_uniq:pat_bndrs_uniqs) <- getUniquesM
@@ -930,7 +959,7 @@ unbox_one dflags fam_envs arg cs
                           -- in GHC.Core.Opt.Simplify; and see #13890
              rebox_fn   = Let (NonRec arg_no_unf con_app)
              con_app    = mkConApp2 dc tc_args (ex_tvs' ++ arg_ids') `mkCast` mkSymCo co
-       ; (_, worker_args, wrap_fn, work_fn) <- mkWWstr dflags fam_envs False (ex_tvs' ++ arg_ids')
+       ; (_, worker_args, wrap_fn, work_fn) <- mkWWstr opts NotArgOfInlineableFun (ex_tvs' ++ arg_ids')
        ; return (True, worker_args, unbox_fn . wrap_fn, work_fn . rebox_fn) }
                           -- Don't pass the arg, rebox instead
 
@@ -1142,8 +1171,7 @@ The non-CPR results appear ordered in the unboxed tuple as if by a
 left-to-right traversal of the result structure.
 -}
 
-mkWWcpr :: Bool
-        -> FamInstEnvs
+mkWWcpr :: WwOpts
         -> Type                              -- function body type
         -> Cpr                               -- CPR analysis results
         -> UniqSM (Bool,                     -- Is w/w'ing useful?
@@ -1151,15 +1179,15 @@ mkWWcpr :: Bool
                    CoreExpr -> CoreExpr,     -- New worker
                    Type)                     -- Type of worker's body
 
-mkWWcpr opt_CprAnal fam_envs body_ty cpr
+mkWWcpr opts body_ty cpr
     -- CPR explicitly turned off (or in -O0)
-  | not opt_CprAnal = return (False, id, id, body_ty)
+  | not (wo_cpr_anal opts) = return (False, id, id, body_ty)
     -- CPR is turned on by default for -O and O2
   | otherwise
   = case asConCpr cpr of
        Nothing      -> return (False, id, id, body_ty)  -- No CPR info
        Just (con_tag, _cprs)
-         | Just dcpc <- splitResultType_maybe fam_envs con_tag body_ty
+         | Just dcpc <- splitResultType_maybe (wo_fam_envs opts) con_tag body_ty
          -> mkWWcpr_help dcpc
          |  otherwise
          -- See Note [non-algebraic or open body type warning]
@@ -1373,12 +1401,12 @@ fragile
 -- If @mk_absent_let _ id == Just wrap@, then @wrap e@ will wrap a let binding
 -- for @id@ with that RHS around @e@. Otherwise, there could no suitable RHS be
 -- found.
-mk_absent_let :: DynFlags -> Id -> Demand -> Maybe (CoreExpr -> CoreExpr)
-mk_absent_let dflags arg dmd
+mk_absent_let :: WwOpts -> Id -> Maybe (CoreExpr -> CoreExpr)
+mk_absent_let opts arg
   -- The lifted case: Bind 'absentError' for a nice panic message if we are
   -- wrong (like we were in #11126). See (1) in Note [Absent fillers]
   | Just [LiftedRep] <- mb_mono_prim_reps
-  , not (isStrictDmd dmd) -- See (2) in Note [Absent fillers]
+  , not (isStrictDmd (idDemandInfo arg)) -- See (2) in Note [Absent fillers]
   = Just (Let (NonRec arg panic_rhs))
 
   -- The default case for mono rep: Bind @RUBBISH[prim_reps] \@arg_ty@
@@ -1392,26 +1420,26 @@ mk_absent_let dflags arg dmd
   = WARN( True, text "No absent value for" <+> ppr arg_ty )
     Nothing
   where
-    arg_ty            = idType arg
+    arg_ty = idType arg
     mb_mono_prim_reps = typeMonoPrimRep_maybe arg_ty
 
     panic_rhs = mkAbsentErrorApp arg_ty msg
 
-    msg       = showSDoc (gopt_set dflags Opt_SuppressUniques)
-                         (vcat
-                           [ text "Arg:" <+> ppr arg
-                           , text "Type:" <+> ppr arg_ty
-                           , file_msg
-                           ])
+    msg = renderWithContext
+            (defaultSDocContext { sdocSuppressUniques = True })
+            (vcat
+              [ text "Arg:" <+> ppr arg
+              , text "Type:" <+> ppr arg_ty
+              , file_msg ])
               -- We need to suppress uniques here because otherwise they'd
               -- end up in the generated code as strings. This is bad for
               -- determinism, because with different uniques the strings
               -- will have different lengths and hence different costs for
               -- the inliner leading to different inlining.
               -- See also Note [Unique Determinism] in GHC.Types.Unique
-    file_msg  = case outputFile dflags of
-                  Nothing -> empty
-                  Just f  -> text "In output file " <+> quotes (text f)
+    file_msg = case wo_output_file opts of
+                 Nothing -> empty
+                 Just f  -> text "In output file " <+> quotes (text f)
 
 ww_prefix :: FastString
 ww_prefix = fsLit "ww"
