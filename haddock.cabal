@@ -84,7 +84,8 @@ executable haddock
       bytestring,
       parsec,
       text,
-      transformers
+      transformers,
+      mtl
 
     other-modules:
       Documentation.Haddock.Parser
