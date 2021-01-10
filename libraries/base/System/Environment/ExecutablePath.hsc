@@ -16,28 +16,36 @@
 -- @since 4.6.0.0
 -----------------------------------------------------------------------------
 
-module System.Environment.ExecutablePath ( getExecutablePath ) where
+module System.Environment.ExecutablePath
+  ( getExecutablePath
+  , executablePath
+  ) where
 
 -- The imports are purposely kept completely disjoint to prevent edits
 -- to one OS implementation from breaking another.
 
 #if defined(darwin_HOST_OS)
+import Control.Exception (catch, throw)
 import Data.Word
 import Foreign.C
 import Foreign.Marshal.Alloc
 import Foreign.Ptr
 import Foreign.Storable
+import System.IO.Error (isDoesNotExistError)
 import System.Posix.Internals
 #elif defined(linux_HOST_OS)
+import Data.List (isSuffixOf)
 import Foreign.C
 import Foreign.Marshal.Array
 import System.Posix.Internals
 #elif defined(freebsd_HOST_OS)
+import Control.Exception (catch, throw)
 import Foreign.C
 import Foreign.Marshal.Alloc
 import Foreign.Marshal.Array
 import Foreign.Ptr
 import Foreign.Storable
+import System.IO.Error (isDoesNotExistError)
 import System.Posix.Internals
 #include <sys/types.h>
 #include <sys/sysctl.h>
@@ -72,6 +80,24 @@ import System.Posix.Internals
 --
 -- @since 4.6.0.0
 getExecutablePath :: IO FilePath
+
+-- | Get an action to query the absolute pathname of the current executable.
+--
+-- If the operating systems provides a reliable way to determine the current
+-- executable, returns a query action, otherwise return @Nothing@.  The action
+-- is defined on FreeBSD, Linux, MacOS and Windows.
+--
+-- Even where the query action is defined, there may be situations where no
+-- result is available, e.g. if the executable file was deleted while the
+-- program is running.  Therefore the result of the query action is a @Maybe
+-- FilePath@.
+--
+-- Note that for scripts and interactive sessions, the result is the path to
+-- the interpreter (e.g. ghci.)
+--
+-- @since ???
+executablePath :: Maybe (IO (Maybe FilePath))
+
 
 --------------------------------------------------------------------------------
 -- Mac OS X
@@ -118,6 +144,12 @@ realpath path =
 
 getExecutablePath = _NSGetExecutablePath >>= realpath
 
+-- realpath(3) fails with ENOENT when file does not exist (was deleted)
+executablePath = Just (getExecutablePath `catch` f) where
+  where
+  f e | isDoesNotExistError e = pure Nothing
+      | otherwise             = throw e
+
 --------------------------------------------------------------------------------
 -- Linux
 
@@ -139,6 +171,14 @@ readSymbolicLink file =
             peekFilePathLen (buf,fromIntegral len)
 
 getExecutablePath = readSymbolicLink $ "/proc/self/exe"
+
+executablePath = Just (check <$> getExecutablePath) where
+  -- procfs(5): If the pathname has been unlinked, the symbolic link will
+  -- contain the string '(deleted)' appended to the original pathname.
+  --
+  -- See also https://gitlab.haskell.org/ghc/ghc/-/issues/10957
+  check s | "(deleted)" `isSuffixOf` s = Nothing
+          | otherwise = Just s
 
 --------------------------------------------------------------------------------
 -- FreeBSD
@@ -178,6 +218,16 @@ getExecutablePath = do
       , -1   -- current process
       ]
 
+executablePath = Just (getExecutablePath `catch` f) where
+  where
+  -- The sysctl fails with errno ENOENT when executable has been deleted;
+  -- see https://gitlab.haskell.org/ghc/ghc/-/issues/12377#note_321346.
+  f e | isDoesNotExistError e = pure Nothing
+
+  -- As far as I know, ENOENT is the only kind of failure that should be
+  -- expected and handled.  Re-throw other errors.
+      | otherwise             = throw e
+
 
 --------------------------------------------------------------------------------
 -- Windows
@@ -206,6 +256,10 @@ getExecutablePath = go 2048  -- plenty, PATH_MAX is 512 under Win32
                     then return real
                     else fail path
               | otherwise  -> go (size * 2)
+
+-- Windows prevents deletion of executable file while program is running.
+-- Therefore return @Just@ of the result.
+executablePath = Just (Just <$> getExecutablePath)
 
 -- | Returns the final path of the given path. If the given
 --   path is a symbolic link, the returned value is the
@@ -293,6 +347,8 @@ getExecutablePath =
             else errorWithoutStackTrace $ "getExecutablePath: " ++ msg
   where msg = "no OS specific implementation and program name couldn't be " ++
               "found in argv"
+
+executablePath = Nothing
 
 --------------------------------------------------------------------------------
 
