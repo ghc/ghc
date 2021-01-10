@@ -832,7 +832,8 @@ splitThunk :: DynFlags -> FamInstEnvs -> RecFlag -> Var -> Expr Var -> UniqSM [(
 splitThunk dflags fam_envs is_rec x rhs
   = ASSERT(not (isJoinId x))
     do { let x' = localiseId x -- See comment above
-       ; (useful,_, wrap_fn, work_fn) <- mkWWstr (initWwOpts dflags fam_envs) False [x']
+       ; let opts = initWwOpts dflags fam_envs
+       ; (useful,_, wrap_fn, work_fn) <- mkWWstr opts (wantToUnboxArg fam_envs False) [x']
        ; let res = [ (x, Let (NonRec x' rhs) (wrap_fn (work_fn (Var x')))) ]
        ; if useful then ASSERT2( isNonRec is_rec, ppr x ) -- The thunk must be non-recursive
                    return res

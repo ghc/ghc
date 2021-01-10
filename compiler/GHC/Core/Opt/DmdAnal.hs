@@ -527,10 +527,9 @@ forcesRealWorld :: FamInstEnvs -> Type -> Bool
 forcesRealWorld fam_envs ty
   | ty `eqType` realWorldStatePrimTy
   = True
-  | Just DataConPatContext{ dcpc_dc = dc, dcpc_tc_args = tc_args }
-      <- splitArgType_maybe fam_envs ty
-  , isUnboxedTupleDataCon dc
-  , let field_tys = dataConInstArgTys dc tc_args
+  | Just (tc, tc_args, _co) <- normSplitTyConApp_maybe fam_envs ty
+  , isUnboxedTupleTyCon tc
+  , let field_tys = dataConInstArgTys (tyConSingleDataCon tc) tc_args
   = any (eqType realWorldStatePrimTy . scaledThing) field_tys
   | otherwise
   = False

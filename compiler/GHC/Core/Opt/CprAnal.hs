@@ -16,6 +16,7 @@ import GHC.Prelude
 import GHC.Driver.Session
 import GHC.Types.Demand
 import GHC.Types.Cpr
+import GHC.Types.Unbox
 import GHC.Core
 import GHC.Core.Seq
 import GHC.Utils.Outputable
@@ -24,14 +25,14 @@ import GHC.Types.Basic
 import GHC.Core.DataCon
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import GHC.Core.Utils   ( exprIsHNF, dumpIdInfoOfProgram )
+import GHC.Core.Utils   ( exprIsHNF, dumpIdInfoOfProgram, normSplitTyConApp_maybe )
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.FamInstEnv
 import GHC.Core.Opt.WorkWrap.Utils
 import GHC.Utils.Misc
 import GHC.Utils.Error  ( dumpIfSet_dyn, DumpFormat (..) )
-import GHC.Data.Maybe   ( isJust, isNothing )
+import GHC.Data.Maybe   ( isJust )
 
 import Control.Monad ( guard )
 import Data.List
@@ -322,8 +323,13 @@ cprAnalBind top_lvl env id rhs
     not_strict  = not (isStrUsedDmd (idDemandInfo id))
     -- See Note [CPR for sum types]
     (_, ret_ty) = splitPiTys (idType id)
-    not_a_prod  = isNothing (splitArgType_maybe (ae_fam_envs env) ret_ty)
-    returns_sum = not (isTopLevel top_lvl) && not_a_prod
+    returns_prod
+      | Just (tc, _, _) <- normSplitTyConApp_maybe (ae_fam_envs env) ret_ty
+      , Just _prod_dc <- tyConSingleAlgDataCon_maybe tc
+      = True
+      | otherwise
+      = False
+    returns_sum = not (isTopLevel top_lvl) && not returns_prod
 
 isDataStructure :: Id -> CoreExpr -> Bool
 -- See Note [CPR for data structures]
@@ -425,8 +431,8 @@ nonVirgin env = env { ae_virgin = False }
 extendSigEnvForDemand :: AnalEnv -> Id -> Demand -> AnalEnv
 extendSigEnvForDemand env id dmd
   | isId id
-  , Just (_, DataConPatContext { dcpc_dc = dc })
-      <- wantToUnbox (ae_fam_envs env) has_inlineable_prag (idType id) dmd
+  , Unbox (DataConPatContext { dcpc_dc = dc }) _
+      <- wantToUnboxArg (ae_fam_envs env) has_inlineable_prag (idType id) dmd
   = extendSigEnv env id (CprSig (conCprType (dataConTag dc)))
   | otherwise
   = env
