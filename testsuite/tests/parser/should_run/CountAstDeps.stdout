@@ -1,4 +1,4 @@
-Found 245 GHC.Parser module dependencies
+Found 237 GHC.Hs.Expr.Types module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.Types
@@ -77,7 +77,6 @@ GHC.Data.Stream
 GHC.Data.StringBuffer
 GHC.Data.TrieMap
 GHC.Driver.Backend
-GHC.Driver.Backpack.Syntax
 GHC.Driver.CmdLine
 GHC.Driver.Env
 GHC.Driver.Env.Types
@@ -114,14 +113,7 @@ GHC.Iface.Recomp.Binary
 GHC.Iface.Syntax
 GHC.Iface.Type
 GHC.Linker.Types
-GHC.Parser
 GHC.Parser.Annotation
-GHC.Parser.CharClass
-GHC.Parser.Errors
-GHC.Parser.Lexer
-GHC.Parser.PostProcess
-GHC.Parser.PostProcess.Haddock
-GHC.Parser.Types
 GHC.Platform
 GHC.Platform.AArch64
 GHC.Platform.ARM
