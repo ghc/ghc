@@ -19,6 +19,7 @@ module System.Environment
     (
       getArgs,
       getProgName,
+      executablePath,
       getExecutablePath,
       getEnv,
       lookupEnv,

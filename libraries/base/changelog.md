@@ -4,6 +4,9 @@
 
   * Add explicitly bidirectional `pattern TypeRep` to `Type.Reflection`.
 
+  * Introduce `GHC.ExecutablePath.executablePath`, which is more robust than
+    `getExecutablePath` in cases when the executable has been deleted.
+
 ## 4.16.0.0 *TBA*
 
   * Make it possible to promote `Natural`s and remove the separate `Nat` kind.
