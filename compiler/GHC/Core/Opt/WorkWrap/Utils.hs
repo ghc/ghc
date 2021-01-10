@@ -8,7 +8,7 @@ A library for the ``worker\/wrapper'' back-end to the strictness analyser
 
 module GHC.Core.Opt.WorkWrap.Utils
    ( WwOpts(..), initWwOpts, mkWwBodies, mkWWstr, mkWorkerArgs
-   , DataConPatContext(..), splitArgType_maybe, wantToUnbox
+   , DataConPatContext(..), wantToUnboxArg
    , findTypeShape
    , isWorkerSmallEnough
    )
@@ -20,12 +20,13 @@ import GHC.Prelude
 
 import GHC.Core
 import GHC.Core.Utils   ( exprType, mkCast, mkDefaultCase, mkSingleAltCase
-                        , dataConRepFSInstPat )
+                        , dataConRepFSInstPat, normSplitTyConApp_maybe )
 import GHC.Types.Id
 import GHC.Types.Id.Info ( JoinArity )
 import GHC.Core.DataCon
 import GHC.Types.Demand
 import GHC.Types.Cpr
+import GHC.Types.Unbox
 import GHC.Core.Make    ( mkAbsentErrorApp, mkCoreUbxTup
                         , mkCoreApp, mkCoreLet )
 import GHC.Types.Id.Make ( voidArgId, voidPrimId )
@@ -53,6 +54,8 @@ import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Data.FastString
 import GHC.Data.List.SetOps
+
+import Control.Applicative ( (<|>) )
 
 {-
 ************************************************************************
@@ -173,11 +176,11 @@ mkWwBodies opts rhs_fvs fun_id demands cpr_info
         ; (wrap_args, wrap_fn_args, work_fn_args, res_ty)
              <- mkWWargs empty_subst fun_ty demands
         ; (useful1, work_args, wrap_fn_str, work_fn_str)
-             <- mkWWstr opts has_inlineable_prag wrap_args
+             <- mkWWstr opts arg_ubx_strat wrap_args
 
         -- Do CPR w/w.  See Note [Always do CPR w/w]
         ; (useful2, wrap_fn_cpr, work_fn_cpr, cpr_res_ty)
-              <- mkWWcpr opts res_ty cpr_info
+              <- mkWWcpr opts ret_ubx_strat res_ty cpr_info
 
         ; let (work_lam_args, work_call_args) = mkWorkerArgs (wo_fun_to_thunk opts) work_args cpr_res_ty
               worker_args_dmds = [idDemandInfo v | v <- work_call_args, isId v]
@@ -201,8 +204,14 @@ mkWwBodies opts rhs_fvs fun_id demands cpr_info
   where
     fun_ty        = idType fun_id
     mb_join_arity = isJoinId_maybe fun_id
+
+    arg_ubx_strat :: UnboxingStrategy Demand
+    arg_ubx_strat = wantToUnboxArg (wo_fam_envs opts) has_inlineable_prag
     has_inlineable_prag = isStableUnfolding (realIdUnfolding fun_id)
                           -- See Note [Do not unpack class dictionaries]
+
+    ret_ubx_strat :: UnboxingStrategy CprResult
+    ret_ubx_strat = wantToUnboxResult (wo_fam_envs opts)
 
     -- Note [Do not split void functions]
     only_one_void_argument
@@ -529,7 +538,82 @@ To avoid this:
 
     Another tricky case was when f :: forall a. a -> forall a. a->a
     (i.e. with shadowing), and then the worker used the same 'a' twice.
+-}
 
+{-
+************************************************************************
+*                                                                      *
+\subsection{Unboxing Strategies for Strictness and CPR}
+*                                                                      *
+************************************************************************
+-}
+
+-- | 'UnboxingStrategy' for strict arguments
+wantToUnboxArg :: FamInstEnvs -> Bool -> UnboxingStrategy Demand
+-- See Note [Which types are unboxed?]
+wantToUnboxArg fam_envs has_inlineable_prag ty dmd
+  | isAbsDmd dmd
+  = DropAbsent
+
+  | isStrUsedDmd dmd
+  , Just (tc, tc_args, co) <- normSplitTyConApp_maybe fam_envs ty
+   -- See Note [Which types are unboxed?]
+  , Just dc <- tyConSingleAlgDataCon_maybe tc
+  , let arity = dataConRepArity dc
+  -- See Note [Unpacking arguments with product and polymorphic demands]
+  , Just cs <- split_prod_dmd_arity dmd arity
+  -- See Note [Do not unpack class dictionaries]
+  , not (has_inlineable_prag && isClassPred ty)
+  -- See Note [mkWWstr and unsafeCoerce]
+  , cs `lengthIs` arity
+  = Unbox (DataConPatContext dc tc_args co) cs
+
+  | otherwise
+  = StopUnboxing
+
+  where
+    split_prod_dmd_arity dmd arity
+      -- For seqDmd, it should behave like <S(AAAA)>, for some
+      -- suitable arity
+      | isSeqDmd dmd        = Just (replicate arity absDmd)
+      | _ :* Prod ds <- dmd = Just ds
+      | otherwise           = Nothing
+
+
+-- | 'UnboxingStrategy' for constructed results
+wantToUnboxResult :: FamInstEnvs -> UnboxingStrategy CprResult
+-- See Note [Which types are unboxed?]
+wantToUnboxResult fam_envs ty cpr
+  | Just con_tag <- asConCpr cpr
+  , Just (tc, tc_args, co) <- normSplitTyConApp_maybe fam_envs ty
+  , isDataTyCon tc -- NB: No unboxed sums or tuples
+  , Just dcs <- tyConAlgDataCons_maybe tc <|> open_body_ty_warning
+  , dcs `lengthAtLeast` con_tag -- This might not be true if we import the
+                                -- type constructor via a .hs-boot file (#8743)
+  , let dc = dcs `getNth` (con_tag - fIRST_TAG)
+  , null (dataConExTyCoVars dc) -- no existentials;
+                                -- See Note [Which types are unboxed?]
+                                -- and GHC.Core.Opt.CprAnal.extendEnvForDataAlt
+                                -- where we also check this.
+  , all isLinear (dataConInstArgTys dc tc_args)
+  -- Deactivates CPR worker/wrapper splits on constructors with non-linear
+  -- arguments, for the moment, because they require unboxed tuple with variable
+  -- multiplicity fields.
+  = Unbox (DataConPatContext dc tc_args co) []
+
+  | otherwise
+  = StopUnboxing
+
+  where
+    open_body_ty_warning = WARN( True, text "wantToUnboxResult: non-algebraic or open body type" <+> ppr ty ) Nothing
+
+isLinear :: Scaled a -> Bool
+isLinear (Scaled w _ ) =
+  case w of
+    One -> True
+    _ -> False
+
+{-
 ************************************************************************
 *                                                                      *
 \subsection{Strictness stuff}
@@ -538,8 +622,7 @@ To avoid this:
 -}
 
 mkWWstr :: WwOpts
-        -> Bool    -- True <=> INLINEABLE pragma on this function defn
-                   -- See Note [Do not unpack class dictionaries]
+        -> UnboxingStrategy Demand
         -> [Var]                                -- Wrapper args; have their demand info on them
                                                 --  *Includes type variables*
         -> UniqSM (Bool,                        -- Is this useful
@@ -551,10 +634,10 @@ mkWWstr :: WwOpts
                    CoreExpr -> CoreExpr)        -- Worker body, lacking the original body of the function,
                                                 -- and lacking its lambdas.
                                                 -- This fn does the reboxing
-mkWWstr opts has_inlineable_prag args
+mkWWstr opts want_to_unbox args
   = go args
   where
-    go_one arg = mkWWstr_one opts ubx_strat arg
+    go_one arg = mkWWstr_one opts want_to_unbox arg
 
     go []           = return (False, [], nop_fn, nop_fn)
     go (arg : args) = do { (useful1, args1, wrap_fn1, work_fn1) <- go_one arg
@@ -601,60 +684,34 @@ as-yet-un-filled-in unitState files.
 --        brings into scope wrap_arg (via lets)
 -- See Note [How to do the worker/wrapper split]
 mkWWstr_one :: WwOpts
-            -> Bool    -- True <=> INLINEABLE pragma on this function defn
-                       -- See Note [Do not unpack class dictionaries]
+            -> UnboxingStrategy Demand
             -> Var
             -> UniqSM (Bool, [Var], CoreExpr -> CoreExpr, CoreExpr -> CoreExpr)
-  | isTyVar arg
-  = return (False, [arg],  nop_fn, nop_fn)
-mkWWstr_one opts has_inlineable_prag arg =
+mkWWstr_one opts want_to_unbox arg =
+  case want_to_unbox (idType arg) (idDemandInfo arg) of
+     _ | isTyVar arg -> do_nothing
 
-  | isAbsDmd dmd
-  , Just work_fn <- mk_absent_let dflags fam_envs arg dmd
-     -- Absent case.  We can't always handle absence for arbitrary
-     -- unlifted types, so we need to choose just the cases we can
-     -- (that's what mk_absent_let does)
-  = return (True, [], nop_fn, work_fn)
+     DropAbsent
+       | Just work_fn <- mk_absent_let opts arg (idDemandInfo arg)
+         -- Absent case.  We can't always handle absence for arbitrary
+         -- unlifted types, so we need to choose just the cases we can
+         -- (that's what mk_absent_let does)
+       -> return (True, [], nop_fn, work_fn)
 
-  | Just (cs, acdc) <- wantToUnbox fam_envs has_inlineable_prag arg_ty dmd
-  = unbox_one dflags fam_envs arg cs acdc
+     Unbox dcpc cs -> unbox_one opts want_to_unbox arg cs dcpc
 
-  | otherwise   -- Other cases
-  = return (False, [arg], nop_fn, nop_fn)
+     _ -> do_nothing -- Other cases, like StopUnboxing
 
   where
-    arg_ty = idType arg
-    dmd    = idDemandInfo arg
-
-wantToUnbox :: FamInstEnvs -> Bool -> Type -> Demand -> Maybe ([Demand], DataConPatContext)
--- See Note [Which types are unboxed?]
-wantToUnbox fam_envs has_inlineable_prag ty dmd =
-  case splitArgType_maybe fam_envs ty of
-    Just dcpc@DataConPatContext{ dcpc_dc = dc }
-      | isStrUsedDmd dmd
-      , let arity = dataConRepArity dc
-      -- See Note [Unpacking arguments with product and polymorphic demands]
-      , Just cs <- split_prod_dmd_arity dmd arity
-      -- See Note [Do not unpack class dictionaries]
-      , not (has_inlineable_prag && isClassPred ty)
-      -- See Note [mkWWstr and unsafeCoerce]
-      , cs `lengthIs` arity
-      -> Just (cs, dcpc)
-    _ -> Nothing
-  where
-    split_prod_dmd_arity dmd arity
-      -- For seqDmd, it should behave like <S(AAAA)>, for some
-      -- suitable arity
-      | isSeqDmd dmd        = Just (replicate arity absDmd)
-      | _ :* Prod ds <- dmd = Just ds
-      | otherwise           = Nothing
+    do_nothing = return (False, [arg], nop_fn, nop_fn)
 
 unbox_one :: WwOpts
+          -> UnboxingStrategy Demand
           -> Var
           -> [Demand]
           -> DataConPatContext
           -> UniqSM (Bool, [Var], CoreExpr -> CoreExpr, CoreExpr -> CoreExpr)
-unbox_one opts arg cs
+unbox_one opts want_to_unbox arg cs
           DataConPatContext { dcpc_dc = dc, dcpc_tc_args = tc_args
                             , dcpc_co = co }
   = do { (case_bndr_uniq:pat_bndrs_uniqs) <- getUniquesM
@@ -671,7 +728,7 @@ unbox_one opts arg cs
                           -- in GHC.Core.Opt.Simplify; and see #13890
              rebox_fn   = Let (NonRec arg_no_unf con_app)
              con_app    = mkConApp2 dc tc_args (ex_tvs' ++ arg_ids') `mkCast` mkSymCo co
-       ; (_, worker_args, wrap_fn, work_fn) <- mkWWstr opts False (ex_tvs' ++ arg_ids')
+       ; (_, worker_args, wrap_fn, work_fn) <- mkWWstr opts want_to_unbox (ex_tvs' ++ arg_ids')
        ; return (True, worker_args, unbox_fn . wrap_fn, work_fn . rebox_fn) }
                           -- Don't pass the arg, rebox instead
 
@@ -953,75 +1010,6 @@ off the unpacking in mkWWstr_one (see the isClassPred test).
 Historical note: #14955 describes how I got this fix wrong the first time.
 -}
 
--- | The result of 'splitArgType_maybe' and 'splitResultType_maybe'.
---
--- Both splits
---   * Take a type `ty`
---   * Succeed with (DataConPatContext dc tys co)
---     iff co :: T tys ~ ty
---     and `dc` is the appropriate DataCon of `T`
---     and `T` is suitable for the kind of split
---     (differs for strictness and CPR, see Note [Which types are unboxed?])
-data DataConPatContext
-  = DataConPatContext
-  { dcpc_dc        :: !DataCon
-  , dcpc_tc_args   :: ![Type]
-  , dcpc_co        :: !Coercion
-  }
-
--- | If @splitArgType_maybe ty = Just (dc, tys, co)@
--- then @dc \@tys \@_ex_tys (_args::_arg_tys) :: tc tys@
--- and  @co :: ty ~ tc tys@
--- where underscore prefixes are holes, e.g. yet unspecified.
---
--- See Note [Which types are unboxed?].
-splitArgType_maybe :: FamInstEnvs -> Type -> Maybe DataConPatContext
-splitArgType_maybe fam_envs ty
-  | let (co, ty1) = topNormaliseType_maybe fam_envs ty
-                    `orElse` (mkRepReflCo ty, ty)
-  , Just (tc, tc_args) <- splitTyConApp_maybe ty1
-  , Just con <- tyConSingleAlgDataCon_maybe tc
-  = Just DataConPatContext { dcpc_dc      = con
-                           , dcpc_tc_args = tc_args
-                           , dcpc_co      = co }
-splitArgType_maybe _ _ = Nothing
-
--- | If @splitResultType_maybe n ty = Just (dc, tys, co)@
--- then @dc \@tys \@_ex_tys (_args::_arg_tys) :: tc tys@
--- and  @co :: ty ~ tc tys@
--- where underscore prefixes are holes, e.g. yet unspecified.
--- @dc@ is the @n@th data constructor of @tc@.
---
--- See Note [Which types are unboxed?].
-splitResultType_maybe :: FamInstEnvs -> ConTag -> Type -> Maybe DataConPatContext
-splitResultType_maybe fam_envs con_tag ty
-  | let (co, ty1) = topNormaliseType_maybe fam_envs ty
-                    `orElse` (mkRepReflCo ty, ty)
-  , Just (tc, tc_args) <- splitTyConApp_maybe ty1
-  , isDataTyCon tc -- NB: rules out unboxed sums and pairs!
-  , let cons = tyConDataCons tc
-  , cons `lengthAtLeast` con_tag -- This might not be true if we import the
-                                 -- type constructor via a .hs-boot file (#8743)
-  , let con = cons `getNth` (con_tag - fIRST_TAG)
-  , null (dataConExTyCoVars con) -- no existentials;
-                                 -- See Note [Which types are unboxed?]
-                                 -- and GHC.Core.Opt.CprAnal.extendEnvForDataAlt
-                                 -- where we also check this.
-  , all isLinear (dataConInstArgTys con tc_args)
-  -- Deactivates CPR worker/wrapper splits on constructors with non-linear
-  -- arguments, for the moment, because they require unboxed tuple with variable
-  -- multiplicity fields.
-  = Just DataConPatContext { dcpc_dc = con
-                           , dcpc_tc_args = tc_args
-                           , dcpc_co = co }
-splitResultType_maybe _ _ _ = Nothing
-
-isLinear :: Scaled a -> Bool
-isLinear (Scaled w _ ) =
-  case w of
-    One -> True
-    _ -> False
-
 findTypeShape :: FamInstEnvs -> Type -> TypeShape
 -- Uncover the arrow and product shape of a type
 -- The data type TypeShape is defined in GHC.Types.Demand
@@ -1134,6 +1122,7 @@ left-to-right traversal of the result structure.
 -}
 
 mkWWcpr :: WwOpts
+        -> UnboxingStrategy CprResult
         -> Type                              -- function body type
         -> CprResult                         -- CPR analysis results
         -> UniqSM (Bool,                     -- Is w/w'ing useful?
@@ -1141,26 +1130,19 @@ mkWWcpr :: WwOpts
                    CoreExpr -> CoreExpr,     -- New worker
                    Type)                     -- Type of worker's body
 
-mkWWcpr opts body_ty cpr
-    -- CPR explicitly turned off (or in -O0)
-  | not (wo_cpr_anal opts) = return (False, id, id, body_ty)
-    -- CPR is turned on by default for -O and O2
-  | otherwise
-  = case asConCpr cpr of
-       Nothing      -> return (False, id, id, body_ty)  -- No CPR info
-       Just con_tag | Just dcpc <- splitResultType_maybe (wo_fam_envs opts) con_tag body_ty
-                    -> mkWWcpr_help dcpc
-                    |  otherwise
-                       -- See Note [non-algebraic or open body type warning]
-                    -> WARN( True, text "mkWWcpr: non-algebraic or open body type" <+> ppr body_ty )
-                       return (False, id, id, body_ty)
+mkWWcpr opts want_to_unbox body_ty cpr = case want_to_unbox body_ty cpr of
+   Unbox dcpc _arg_cprs -- not nestedly (yet)
+     | wo_cpr_anal opts -> mkWWcpr_help dcpc
+   _                    -> return (False, id, id, body_ty)  -- No CPR info
 
 mkWWcpr_help :: DataConPatContext
              -> UniqSM (Bool, CoreExpr -> CoreExpr, CoreExpr -> CoreExpr, Type)
 
 mkWWcpr_help (DataConPatContext { dcpc_dc = dc, dcpc_tc_args = tc_args
                                 , dcpc_co = co })
-  | [arg_ty]   <- dataConInstArgTys dc tc_args -- NB: No existentials!
+  | ASSERT2( null (dataConExTyCoVars dc), ppr dc ) True
+      -- No existentials! Should have been caught in 'wantToUnboxResult'
+  , [arg_ty]   <- dataConInstArgTys dc tc_args
   , [str_mark] <- dataConRepStrictness dc
   , isUnliftedType (scaledThing arg_ty)
   , isLinear arg_ty
@@ -1199,7 +1181,7 @@ mkWWcpr_help (DataConPatContext { dcpc_dc = dc, dcpc_tc_args = tc_args
              con_app         = mkConApp2 dc tc_args arg_ids `mkCast` mkSymCo co
              tup_con         = tupleDataCon Unboxed (length arg_ids)
 
-       ; MASSERT( null _exs ) -- Should have been caught by splitResultType_maybe
+       ; MASSERT( null _exs ) -- Should have been caught by wantToUnboxResult
 
        ; return (True
                 , \ wkr_call -> mkSingleAltCase wkr_call wrap_wild
