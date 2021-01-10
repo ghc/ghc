@@ -13,12 +13,13 @@ therefore, is almost nothing but re-exporting.
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
-                                      -- in module GHC.Hs.Extension
+                                      -- in module Language.Haskell.Syntax.Extension
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleInstances #-} -- For deriving instance Data
 
 module GHC.Hs (
+        module Language.Haskell.Syntax,
         module GHC.Hs.Binds,
         module GHC.Hs.Decls,
         module GHC.Hs.Expr,
@@ -28,7 +29,7 @@ module GHC.Hs (
         module GHC.Hs.Type,
         module GHC.Hs.Utils,
         module GHC.Hs.Doc,
-        module GHC.Hs.Extension,
+        module GHC.Hs.Extension.GhcPass,
         Fixity,
 
         HsModule(..),
@@ -43,7 +44,8 @@ import GHC.Hs.Binds
 import GHC.Hs.Expr
 import GHC.Hs.ImpExp
 import GHC.Hs.Lit
-import GHC.Hs.Extension
+import Language.Haskell.Syntax
+import GHC.Hs.Extension.GhcPass
 import GHC.Hs.Pat
 import GHC.Hs.Type
 import GHC.Hs.Utils

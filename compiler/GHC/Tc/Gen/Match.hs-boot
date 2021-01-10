@@ -5,7 +5,7 @@ import GHC.Types.Name   ( Name )
 import GHC.Tc.Utils.TcType( ExpSigmaType, ExpRhoType )
 import GHC.Tc.Types     ( TcM )
 import GHC.Types.SrcLoc ( Located )
-import GHC.Hs.Extension ( GhcRn, GhcTc )
+import GHC.Hs.Extension.GhcPass ( GhcRn, GhcTc )
 
 tcGRHSsPat    :: GRHSs GhcRn (LHsExpr GhcRn)
               -> ExpRhoType

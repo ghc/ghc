@@ -1,4 +1,4 @@
-Found 238 parser module dependencies
+Found 246 parser module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.Types
@@ -95,7 +95,7 @@ GHC.Hs.Binds
 GHC.Hs.Decls
 GHC.Hs.Doc
 GHC.Hs.Expr
-GHC.Hs.Extension
+GHC.Hs.Extension.GhcPass
 GHC.Hs.ImpExp
 GHC.Hs.Instances
 GHC.Hs.Lit
@@ -237,3 +237,11 @@ GHC.Utils.Panic
 GHC.Utils.Panic.Plain
 GHC.Utils.Ppr
 GHC.Utils.Ppr.Colour
+Language.Haskell.Syntax
+Language.Haskell.Syntax.Binds
+Language.Haskell.Syntax.Decls
+Language.Haskell.Syntax.Expr
+Language.Haskell.Syntax.Extension
+Language.Haskell.Syntax.Lit
+Language.Haskell.Syntax.Pat
+Language.Haskell.Syntax.Type

@@ -796,7 +796,7 @@ displayed.
     import GHC.Driver.Plugins
     import GHC.Driver.Types
     import GHC.Tc.Types
-    import GHC.Hs.Extension
+    import Language.Haskell.Syntax.Extension
     import GHC.Hs.Decls
     import GHC.Hs.Expr
     import GHC.Hs.ImpExp
@@ -1335,7 +1335,7 @@ this idea can be seen below:
     import BasicTypes
     import GHC.Plugins
     import GHC.Hs.Expr
-    import GHC.Hs.Extension
+    import Language.Haskell.Syntax.Extension
     import GHC.Hs.Lit
     import Hooks
     import GHC.Tc.Utils.Monad

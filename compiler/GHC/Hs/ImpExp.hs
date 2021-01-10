@@ -5,7 +5,7 @@
 {-# LANGUAGE TypeApplications     #-}
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
-                                      -- in module GHC.Hs.Extension
+                                      -- in module Language.Haskell.Syntax.Extension
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
@@ -28,7 +28,8 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Data.FastString
 import GHC.Types.SrcLoc
-import GHC.Hs.Extension
+import Language.Haskell.Syntax.Extension
+import GHC.Hs.Extension.GhcPass
 
 import Data.Data
 import Data.Maybe

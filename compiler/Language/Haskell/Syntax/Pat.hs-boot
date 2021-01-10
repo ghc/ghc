@@ -7,13 +7,11 @@
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE TypeFamilies #-}
 
-{-# OPTIONS_GHC -Wno-orphans #-}
+module Language.Haskell.Syntax.Pat where
 
-module GHC.Hs.Pat where
+import Language.Haskell.Syntax.Extension ( XRec )
+import Data.Kind
 
-import GHC.Utils.Outputable
-import GHC.Hs.Extension.GhcPass ( OutputableBndrId, GhcPass )
-
-import Language.Haskell.Syntax.Pat
-
-instance OutputableBndrId p => Outputable (Pat (GhcPass p))
+type role Pat nominal
+data Pat (i :: Type)
+type LPat i = XRec i (Pat i)
