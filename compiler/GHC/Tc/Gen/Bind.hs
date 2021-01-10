@@ -427,7 +427,7 @@ tc_group top_lvl sig_fn prag_fn (Recursive, binds) closed thing_inside
       tcPolyBinds sig_fn prag_fn Recursive rec_tc closed binds
 
 recursivePatSynErr ::
-     (OutputableBndrId p, CollectPass (GhcPass p))
+     (OutputableBndrId p, CollectPassPat (GhcPass p))
   => SrcSpan -- ^ The location of the first pattern synonym binding
              --   (for error reporting)
   -> LHsBinds (GhcPass p)
@@ -656,7 +656,7 @@ tcPolyCheck prag_fn
                           , abe_mono  = poly_id2
                           , abe_prags = SpecPrags spec_prags }
 
-             abs_bind = L bind_loc $
+             abs_bind = L bind_loc $ XHsBindsLR $
                         AbsBinds { abs_ext      = noExtField
                                  , abs_tvs      = []
                                  , abs_ev_vars  = []
@@ -738,7 +738,7 @@ tcPolyInfer rec_tc prag_fn tc_sig_fn mono bind_list
 
        ; loc <- getSrcSpanM
        ; let poly_ids = map abe_poly exports
-             abs_bind = L loc $
+             abs_bind = L loc $ XHsBindsLR $
                         AbsBinds { abs_ext = noExtField
                                  , abs_tvs = qtvs
                                  , abs_ev_vars = givens, abs_ev_binds = [ev_binds]
