@@ -44,11 +44,15 @@ Note [Language.Haskell.Syntax.* Hierarchy]
 Why are these modules not 'GHC.Hs.*', or some other 'GHC.*'? The answer
 is that they are to be separated from GHC and put into another package,
 in accordance with the final goals of Trees that Grow. (See Note [Trees
-that grow] in 'Language.Haskell.Syntax.Extension'.)
+that grow] in 'Language.Haskell.Syntax.Extension'.) In short, the
+'Language.Haskell.Syntax.*' tree should be entirely GHC-independent.
+GHC-specific stuff related to source-language syntax should be in
+'GHC.Hs.*'.
 
-We cannot separate them yet, but by giving them names like so, we hope
-to remind others that the goal is to factor them out, and therefore
-dependencies on the rest of GHC should never be added, only removed.
+We cannot move them to the separate package yet, but by giving them
+names like so, we hope to remind others that the goal is to factor them
+out, and therefore dependencies on the rest of GHC should never be
+added, only removed.
 
 For more details, see
 https://gitlab.haskell.org/ghc/ghc/-/wikis/implementing-trees-that-grow

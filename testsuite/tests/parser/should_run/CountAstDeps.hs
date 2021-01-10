@@ -13,4 +13,4 @@ module Main(main) where
 import CountDeps
 
 main :: IO ()
-main = printDeps "GHC.Parser"
+main = printDeps "Language.Haskell.Syntax"
