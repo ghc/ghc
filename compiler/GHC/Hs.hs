@@ -29,6 +29,7 @@ module GHC.Hs (
         module GHC.Hs.Utils,
         module GHC.Hs.Doc,
         module GHC.Hs.Extension,
+        module GHC.Hs.Extension.GhcPass,
         Fixity,
 
         HsModule(..),
@@ -44,6 +45,7 @@ import GHC.Hs.Expr
 import GHC.Hs.ImpExp
 import GHC.Hs.Lit
 import GHC.Hs.Extension
+import GHC.Hs.Extension.GhcPass
 import GHC.Hs.Pat
 import GHC.Hs.Type
 import GHC.Hs.Utils

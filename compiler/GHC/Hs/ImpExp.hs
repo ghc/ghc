@@ -29,6 +29,7 @@ import GHC.Utils.Panic
 import GHC.Data.FastString
 import GHC.Types.SrcLoc
 import GHC.Hs.Extension
+import GHC.Hs.Extension.GhcPass
 
 import Data.Data
 import Data.Maybe

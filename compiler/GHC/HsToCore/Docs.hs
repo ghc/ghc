@@ -18,6 +18,7 @@ import GHC.Hs.Binds
 import GHC.Hs.Doc
 import GHC.Hs.Decls
 import GHC.Hs.Extension
+import GHC.Hs.Extension.GhcPass
 import GHC.Hs.Type
 import GHC.Hs.Utils
 import GHC.Types.Name

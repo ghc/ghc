@@ -5,7 +5,7 @@ import GHC.Tc.Utils.TcType ( TcRhoType, TcSigmaType, SyntaxOpType, ExpType, ExpR
 import GHC.Tc.Types        ( TcM )
 import GHC.Tc.Types.Origin ( CtOrigin )
 import GHC.Core.Type ( Mult )
-import GHC.Hs.Extension    ( GhcRn, GhcTc )
+import GHC.Hs.Extension.GhcPass ( GhcRn, GhcTc )
 
 tcCheckPolyExpr, tcCheckPolyExprNC ::
           LHsExpr GhcRn
