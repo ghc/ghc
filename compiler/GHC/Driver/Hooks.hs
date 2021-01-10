@@ -38,7 +38,7 @@ import GHC.Driver.Pipeline.Monad
 import GHC.Hs.Decls
 import GHC.Hs.Binds
 import GHC.Hs.Expr
-import GHC.Hs.Extension
+import GHC.Hs.Extension.GhcPass
 
 import GHC.Types.Name.Reader
 import GHC.Types.Name

@@ -7,13 +7,11 @@
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE TypeFamilies #-}
 
-{-# OPTIONS_GHC -Wno-orphans #-}
+module GHC.Hs.Pat.Types where
 
-module GHC.Hs.Pat where
+import GHC.Hs.Extension ( XRec )
+import Data.Kind
 
-import GHC.Utils.Outputable
-import GHC.Hs.Extension.GhcPass ( OutputableBndrId, GhcPass )
-
-import GHC.Hs.Pat.Types
-
-instance OutputableBndrId p => Outputable (Pat (GhcPass p))
+type role Pat nominal
+data Pat (i :: Type)
+type LPat i = XRec i (Pat i)

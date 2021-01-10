@@ -3,7 +3,7 @@ module GHC.Tc.TyCl.PatSyn where
 import GHC.Hs    ( PatSynBind, LHsBinds )
 import GHC.Tc.Types ( TcM, TcSigInfo )
 import GHC.Tc.Utils.Monad ( TcGblEnv)
-import GHC.Hs.Extension ( GhcRn, GhcTc )
+import GHC.Hs.Extension.GhcPass ( GhcRn, GhcTc )
 import Data.Maybe  ( Maybe )
 import GHC.Tc.Gen.Sig ( TcPragEnv )
 
