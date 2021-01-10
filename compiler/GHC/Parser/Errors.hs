@@ -20,6 +20,7 @@ import GHC.Types.Name.Reader (RdrName)
 import GHC.Types.Name.Occurrence (OccName)
 import GHC.Parser.Types
 import GHC.Hs.Extension
+import GHC.Hs.Extension.GhcPass
 import GHC.Hs.Expr
 import GHC.Hs.Pat
 import GHC.Hs.Type

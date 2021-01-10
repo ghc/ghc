@@ -1,4 +1,4 @@
-Found 238 parser module dependencies
+Found 245 parser module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.Types
@@ -92,15 +92,22 @@ GHC.Driver.Ppr
 GHC.Driver.Session
 GHC.Hs
 GHC.Hs.Binds
+GHC.Hs.Binds.Types
 GHC.Hs.Decls
+GHC.Hs.Decls.Types
 GHC.Hs.Doc
 GHC.Hs.Expr
+GHC.Hs.Expr.Types
 GHC.Hs.Extension
+GHC.Hs.Extension.GhcPass
 GHC.Hs.ImpExp
 GHC.Hs.Instances
 GHC.Hs.Lit
+GHC.Hs.Lit.Types
 GHC.Hs.Pat
+GHC.Hs.Pat.Types
 GHC.Hs.Type
+GHC.Hs.Type.Types
 GHC.Hs.Utils
 GHC.Iface.Ext.Fields
 GHC.Iface.Recomp.Binary

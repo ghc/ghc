@@ -114,6 +114,7 @@ import GHC.Hs.Pat
 import GHC.Hs.Type
 import GHC.Hs.Lit
 import GHC.Hs.Extension
+import GHC.Hs.Extension.GhcPass
 
 import GHC.Tc.Types.Evidence
 import GHC.Core.TyCo.Rep

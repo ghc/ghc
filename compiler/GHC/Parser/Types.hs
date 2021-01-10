@@ -13,7 +13,7 @@ import GHC.Prelude
 import GHC.Types.Basic
 import GHC.Types.SrcLoc
 import GHC.Types.Name.Reader
-import GHC.Hs.Extension
+import GHC.Hs.Extension.GhcPass
 import GHC.Hs.Lit
 import GHC.Hs.Pat
 import GHC.Hs.Type

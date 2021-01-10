@@ -8,30 +8,25 @@
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE TypeFamilies #-}
 
+{-# OPTIONS_GHC -Wno-orphans #-}
+
 module GHC.Hs.Expr where
 
 import GHC.Utils.Outputable ( SDoc, Outputable )
-import {-# SOURCE #-} GHC.Hs.Pat  ( LPat )
-import GHC.Types.Basic  ( SpliceExplicitFlag(..))
-import GHC.Hs.Extension ( OutputableBndrId, GhcPass, XRec )
-import Data.Kind  ( Type )
-
-type role HsExpr nominal
-type role HsCmd nominal
-type role MatchGroup nominal nominal
-type role GRHSs nominal nominal
-type role HsSplice nominal
-data HsExpr (i :: Type)
-data HsCmd  (i :: Type)
-data HsSplice (i :: Type)
-data MatchGroup (a :: Type) (body :: Type)
-data GRHSs (a :: Type) (body :: Type)
-type family SyntaxExpr (i :: Type)
+import GHC.Hs.Pat.Types ( LPat )
+import {-# SOURCE #-} GHC.Hs.Pat () -- for Outputable
+import GHC.Types.Basic ( SpliceExplicitFlag(..))
+import GHC.Hs.Expr.Types
+  ( HsExpr, LHsExpr
+  , HsCmd
+  , MatchGroup
+  , GRHSs
+  , HsSplice
+  )
+import GHC.Hs.Extension.GhcPass ( OutputableBndrId, GhcPass )
 
 instance OutputableBndrId p => Outputable (HsExpr (GhcPass p))
 instance OutputableBndrId p => Outputable (HsCmd (GhcPass p))
-
-type LHsExpr a = XRec a (HsExpr a)
 
 pprLExpr :: (OutputableBndrId p) => LHsExpr (GhcPass p) -> SDoc
 
