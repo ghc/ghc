@@ -5,7 +5,7 @@
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
-                                      -- in module GHC.Hs.Extension
+                                      -- in module Language.Haskell.Syntax.Extension
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 
 {-

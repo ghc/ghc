@@ -714,6 +714,15 @@ Library
         GHC.Utils.Ppr
         GHC.Utils.Ppr.Colour
 
+        Language.Haskell.Syntax
+        Language.Haskell.Syntax.Binds
+        Language.Haskell.Syntax.Decls
+        Language.Haskell.Syntax.Expr
+        Language.Haskell.Syntax.Extension
+        Language.Haskell.Syntax.Lit
+        Language.Haskell.Syntax.Pat
+        Language.Haskell.Syntax.Type
+
     reexported-modules:
           GHC.Platform.ArchOS
         , GHC.Platform.Host

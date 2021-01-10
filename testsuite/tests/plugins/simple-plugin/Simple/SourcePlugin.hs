@@ -7,7 +7,7 @@ import GHC.Driver.Plugins
 import GHC.Driver.Session
 import GHC.Plugins
 import GHC.Tc.Types
-import GHC.Hs.Extension
+import Language.Haskell.Syntax.Extension
 import GHC.Types.Avail
 import GHC.Hs
 import GHC.Hs.Expr
