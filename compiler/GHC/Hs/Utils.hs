@@ -113,6 +113,7 @@ import GHC.Hs.Expr
 import GHC.Hs.Pat
 import GHC.Hs.Type
 import GHC.Hs.Lit
+import Language.Haskell.Syntax.Extension
 import GHC.Hs.Extension
 
 import GHC.Tc.Types.Evidence

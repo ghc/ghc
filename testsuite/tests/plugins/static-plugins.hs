@@ -13,7 +13,7 @@ import GHC.Fingerprint.Type
 import GHC.Hs.Decls
 import GHC.Hs.Doc
 import GHC.Hs.Expr
-import GHC.Hs.Extension
+import Language.Haskell.Syntax.Extension
 import GHC.Hs.ImpExp
 import GHC.Utils.Outputable
 import System.Environment
