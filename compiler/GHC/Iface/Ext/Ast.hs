@@ -825,21 +825,29 @@ instance HiePass p => ToHie (BindContext (Located (HsBind (GhcPass p)))) where
       VarBind{var_rhs = expr} ->
         [ toHie expr
         ]
-      AbsBinds{ abs_exports = xs, abs_binds = binds
-              , abs_ev_binds = ev_binds
-              , abs_ev_vars = ev_vars } ->
-        [  lift (modify (modifyState xs)) >> -- Note [Name Remapping]
-                (toHie $ fmap (BC context scope) binds)
-        , toHie $ map (L span . abe_wrap) xs
-        , toHie $
-            map (EvBindContext (mkScope span) (getRealSpan span)
-                . L span) ev_binds
-        , toHie $
-            map (C (EvidenceVarBind EvSigBind
-                                    (mkScope span)
-                                    (getRealSpan span))
-                . L span) ev_vars
-        ]
+      XHsBindsLR ext -> case ghcPass @p of
+#if __GLASGOW_HASKELL__ < 811
+        GhcPs -> noExtCon ext
+        GhcRn -> noExtCon ext
+#endif
+        GhcTc ->
+          let
+            AbsBinds{ abs_exports = xs, abs_binds = binds
+                    , abs_ev_binds = ev_binds
+                    , abs_ev_vars = ev_vars } = ext
+          in
+            [  lift (modify (modifyState xs)) >> -- Note [Name Remapping]
+                    (toHie $ fmap (BC context scope) binds)
+            , toHie $ map (L span . abe_wrap) xs
+            , toHie $
+                map (EvBindContext (mkScope span) (getRealSpan span)
+                    . L span) ev_binds
+            , toHie $
+                map (C (EvidenceVarBind EvSigBind
+                                        (mkScope span)
+                                        (getRealSpan span))
+                    . L span) ev_vars
+            ]
       PatSynBind _ psb ->
         [ toHie $ L span psb -- PatSynBinds only occur at the top level
         ]
@@ -1157,17 +1165,22 @@ instance HiePass p => ToHie (Located (HsExpr (GhcPass p))) where
       HsBinTick _ _ _ expr ->
         [ toHie expr
         ]
-      HsBracket _ b ->
-        [ toHie b
-        ]
-      HsRnBracketOut _ b p ->
-        [ toHie b
-        , toHie p
-        ]
-      HsTcBracketOut _ _wrap b p ->
-        [ toHie b
-        , toHie p
-        ]
+      HsBracket b -> case ghcPass @p of
+        GhcPs ->
+          [ toHie b
+          ]
+        GhcRn -> case b of
+          HsBracketRnTyped b' ->
+            [ toHie b'
+            ]
+          HsBracketRnUntyped b p ->
+            [ toHie b
+            , toHie p
+            ]
+        GhcTc | HsBracketTc _wrap b p <- b ->
+          [ toHie b
+          , toHie p
+          ]
       HsSpliceE _ x ->
         [ toHie $ L mspan x
         ]

@@ -1273,7 +1273,8 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                           , abe_mono = self_dict
                           , abe_prags = dfun_spec_prags }
                           -- NB: see Note [SPECIALISE instance pragmas]
-             main_bind = AbsBinds { abs_ext = noExtField
+             main_bind = XHsBindsLR $
+                         AbsBinds { abs_ext = noExtField
                                   , abs_tvs = inst_tyvars
                                   , abs_ev_vars = dfun_ev_vars
                                   , abs_exports = [export]
@@ -1425,7 +1426,8 @@ tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds sc_theta
                               , abe_mono = sc_ev_id
                               , abe_prags = noSpecPrags }
                  local_ev_binds = TcEvBinds ev_binds_var
-                 bind = AbsBinds { abs_ext      = noExtField
+                 bind = XHsBindsLR $
+                        AbsBinds { abs_ext      = noExtField
                                  , abs_tvs      = tyvars
                                  , abs_ev_vars  = dfun_evs
                                  , abs_exports  = [export]
@@ -1856,7 +1858,8 @@ tcMethodBody clas tyvars dfun_ev_vars inst_tys
                            , abe_prags = specs }
 
               local_ev_binds = TcEvBinds ev_binds_var
-              full_bind = AbsBinds { abs_ext      = noExtField
+              full_bind = XHsBindsLR $
+                          AbsBinds { abs_ext      = noExtField
                                    , abs_tvs      = tyvars
                                    , abs_ev_vars  = dfun_ev_vars
                                    , abs_exports  = [export]
@@ -1912,7 +1915,7 @@ tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
                           , abe_wrap  = hs_wrap
                           , abe_prags = noSpecPrags }
 
-       ; return (unitBag $ L (getLoc meth_bind) $
+       ; return (unitBag $ L (getLoc meth_bind) $ XHsBindsLR $
                  AbsBinds { abs_ext = noExtField, abs_tvs = [], abs_ev_vars = []
                           , abs_exports = [export]
                           , abs_binds = tc_bind, abs_ev_binds = []

@@ -1638,7 +1638,7 @@ gen_Lift_binds loc tycon tycon_args = (listToBag [lift_bind, liftTyped_bind], em
             data_con_RDR = getRdrName data_con
             con_arity    = dataConSourceArity data_con
             as_needed    = take con_arity as_RDRs
-            lift_Expr    = noLoc (HsBracket noExtField (mk_bracket br_body))
+            lift_Expr    = noLoc $ HsBracket $ mk_bracket br_body
             br_body      = nlHsApps (Exact (dataConName data_con))
                                     (map nlHsVar as_needed)
 
