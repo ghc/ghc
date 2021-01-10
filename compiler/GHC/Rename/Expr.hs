@@ -212,7 +212,7 @@ rnExpr (NegApp _ e _)
 
 ------------------------------------------
 -- Template Haskell extensions
-rnExpr e@(HsBracket _ br_body) = rnBracket e br_body
+rnExpr e@(HsBracket br_body) = rnBracket e br_body
 
 rnExpr (HsSpliceE _ splice) = rnSpliceExpr splice
 

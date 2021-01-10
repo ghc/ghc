@@ -427,7 +427,7 @@ tc_group top_lvl sig_fn prag_fn (Recursive, binds) closed thing_inside
       tcPolyBinds sig_fn prag_fn Recursive rec_tc closed binds
 
 recursivePatSynErr ::
-     (OutputableBndrId p, CollectPass (GhcPass p))
+     (OutputableBndrId p, CollectPassPat (GhcPass p))
   => SrcSpan -- ^ The location of the first pattern synonym binding
              --   (for error reporting)
   -> LHsBinds (GhcPass p)
@@ -650,15 +650,13 @@ tcPolyCheck prag_fn
                              , fun_ext     = wrap_gen <.> wrap_res
                              , fun_tick    = tick }
 
-             export = ABE { abe_ext   = noExtField
-                          , abe_wrap  = idHsWrapper
+             export = ABE { abe_wrap  = idHsWrapper
                           , abe_poly  = poly_id
                           , abe_mono  = poly_id2
                           , abe_prags = SpecPrags spec_prags }
 
-             abs_bind = L bind_loc $
-                        AbsBinds { abs_ext      = noExtField
-                                 , abs_tvs      = []
+             abs_bind = L bind_loc $ XHsBindsLR $
+                        AbsBinds { abs_tvs      = []
                                  , abs_ev_vars  = []
                                  , abs_ev_binds = []
                                  , abs_exports  = [export]
@@ -738,9 +736,8 @@ tcPolyInfer rec_tc prag_fn tc_sig_fn mono bind_list
 
        ; loc <- getSrcSpanM
        ; let poly_ids = map abe_poly exports
-             abs_bind = L loc $
-                        AbsBinds { abs_ext = noExtField
-                                 , abs_tvs = qtvs
+             abs_bind = L loc $ XHsBindsLR $
+                        AbsBinds { abs_tvs = qtvs
                                  , abs_ev_vars = givens, abs_ev_binds = [ev_binds]
                                  , abs_exports = exports, abs_binds = binds'
                                  , abs_sig = False }
@@ -755,7 +752,7 @@ mkExport :: TcPragEnv
                                         --          when typechecking the bindings
          -> [TyVar] -> TcThetaType      -- Both already zonked
          -> MonoBindInfo
-         -> TcM (ABExport GhcTc)
+         -> TcM ABExport
 -- Only called for generalisation plan InferGen, not by CheckGen or NoGen
 --
 -- mkExport generates exports with
@@ -800,8 +797,7 @@ mkExport prag_fn insoluble qtvs theta
         ; when warn_missing_sigs $
               localSigWarn Opt_WarnMissingLocalSignatures poly_id mb_sig
 
-        ; return (ABE { abe_ext = noExtField
-                      , abe_wrap = wrap
+        ; return (ABE { abe_wrap = wrap
                         -- abe_wrap :: idType poly_id ~ (forall qtvs. theta => mono_ty)
                       , abe_poly  = poly_id
                       , abe_mono  = mono_id

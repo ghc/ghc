@@ -569,11 +569,11 @@ zonk_bind env bind@(FunBind { fun_id = L loc var
                       , fun_matches = new_ms
                       , fun_ext = new_co_fn }) }
 
-zonk_bind env (AbsBinds { abs_tvs = tyvars, abs_ev_vars = evs
-                        , abs_ev_binds = ev_binds
-                        , abs_exports = exports
-                        , abs_binds = val_binds
-                        , abs_sig = has_sig })
+zonk_bind env (XHsBindsLR (AbsBinds { abs_tvs = tyvars, abs_ev_vars = evs
+                                    , abs_ev_binds = ev_binds
+                                    , abs_exports = exports
+                                    , abs_binds = val_binds
+                                    , abs_sig = has_sig }))
   = ASSERT( all isImmutableTyVar tyvars )
     do { (env0, new_tyvars) <- zonkTyBndrsX env tyvars
        ; (env1, new_evs) <- zonkEvBndrsX env0 evs
@@ -584,11 +584,11 @@ zonk_bind env (AbsBinds { abs_tvs = tyvars, abs_ev_vars = evs
             ; new_val_binds <- mapBagM (zonk_val_bind env3) val_binds
             ; new_exports   <- mapM (zonk_export env3) exports
             ; return (new_val_binds, new_exports) }
-       ; return (AbsBinds { abs_ext = noExtField
-                          , abs_tvs = new_tyvars, abs_ev_vars = new_evs
+       ; return $ XHsBindsLR $
+                 AbsBinds { abs_tvs = new_tyvars, abs_ev_vars = new_evs
                           , abs_ev_binds = new_ev_binds
                           , abs_exports = new_exports, abs_binds = new_val_bind
-                          , abs_sig = has_sig }) }
+                          , abs_sig = has_sig } }
   where
     zonk_val_bind env lbind
       | has_sig
@@ -607,17 +607,15 @@ zonk_bind env (AbsBinds { abs_tvs = tyvars, abs_ev_vars = evs
       | otherwise
       = zonk_lbind env lbind   -- The normal case
 
-    zonk_export :: ZonkEnv -> ABExport GhcTc -> TcM (ABExport GhcTc)
-    zonk_export env (ABE{ abe_ext = x
-                        , abe_wrap = wrap
+    zonk_export :: ZonkEnv -> ABExport -> TcM ABExport
+    zonk_export env (ABE{ abe_wrap = wrap
                         , abe_poly = poly_id
                         , abe_mono = mono_id
                         , abe_prags = prags })
         = do new_poly_id <- zonkIdBndr env poly_id
              (_, new_wrap) <- zonkCoFn env wrap
              new_prags <- zonkSpecPrags env prags
-             return (ABE{ abe_ext = x
-                        , abe_wrap = new_wrap
+             return (ABE{ abe_wrap = new_wrap
                         , abe_poly = new_poly_id
                         , abe_mono = zonkIdOcc env mono_id
                         , abe_prags = new_prags })
@@ -790,13 +788,10 @@ zonkExpr env (HsAppType ty e t)
        return (HsAppType new_ty new_e t)
        -- NB: the type is an HsType; can't zonk that!
 
-zonkExpr _ e@(HsRnBracketOut _ _ _)
-  = pprPanic "zonkExpr: HsRnBracketOut" (ppr e)
-
-zonkExpr env (HsTcBracketOut x wrap body bs)
+zonkExpr env (HsBracket (HsBracketTc wrap body bs))
   = do wrap' <- traverse zonkQuoteWrap wrap
        bs' <- mapM (zonk_b env) bs
-       return (HsTcBracketOut x wrap' body bs')
+       return $ HsBracket $ HsBracketTc wrap' body bs'
   where
     zonkQuoteWrap (QuoteWrapper ev ty) = do
         let ev' = zonkIdOcc env ev

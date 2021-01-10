@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -41,6 +42,7 @@ import GHC.Types.Name.Set
 import GHC.Types.Basic
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc as SrcLoc
+import GHC.Types.Var
 import GHC.Data.Bag
 import GHC.Data.FastString
 import GHC.Data.BooleanFormula (LBooleanFormula)
@@ -48,6 +50,7 @@ import GHC.Data.BooleanFormula (LBooleanFormula)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
+import Data.Data hiding ( Fixity )
 import Data.List hiding ( foldr )
 import Data.Function
 
@@ -93,18 +96,62 @@ type instance XPatBind    GhcRn (GhcPass pR) = NameSet -- Free variables
 type instance XPatBind    GhcTc (GhcPass pR) = Type    -- Type of the GRHSs
 
 type instance XVarBind    (GhcPass pL) (GhcPass pR) = NoExtField
-type instance XAbsBinds   (GhcPass pL) (GhcPass pR) = NoExtField
 type instance XPatSynBind (GhcPass pL) (GhcPass pR) = NoExtField
-type instance XXHsBindsLR (GhcPass pL) (GhcPass pR) = NoExtCon
 
-type instance XABE       (GhcPass p) = NoExtField
-type instance XXABExport (GhcPass p) = NoExtCon
+type instance XXHsBindsLR GhcPs (GhcPass pR) = NoExtCon
+type instance XXHsBindsLR GhcRn (GhcPass pR) = NoExtCon
+type instance XXHsBindsLR GhcTc (GhcPass pR) = AbsBinds
 
 type instance XPSB         (GhcPass idL) GhcPs = NoExtField
 type instance XPSB         (GhcPass idL) GhcRn = NameSet
 type instance XPSB         (GhcPass idL) GhcTc = NameSet
 
 type instance XXPatSynBind (GhcPass idL) (GhcPass idR) = NoExtCon
+
+-- ---------------------------------------------------------------------
+
+-- | Abstraction Bindings
+data AbsBinds = AbsBinds {
+      abs_tvs     :: [TyVar],
+      abs_ev_vars :: [EvVar],  -- ^ Includes equality constraints
+
+     -- | AbsBinds only gets used when idL = idR after renaming,
+     -- but these need to be idL's for the collect... code in HsUtil
+     -- to have the right type
+      abs_exports :: [ABExport],
+
+      -- | Evidence bindings
+      -- Why a list? See "GHC.Tc.TyCl.Instance"
+      -- Note [Typechecking plan for instance declarations]
+      abs_ev_binds :: [TcEvBinds],
+
+      -- | Typechecked user bindings
+      abs_binds    :: LHsBinds GhcTc,
+
+      abs_sig :: Bool  -- See Note [The abs_sig field of AbsBinds]
+  }
+
+
+        -- Consider (AbsBinds tvs ds [(ftvs, poly_f, mono_f) binds]
+        --
+        -- Creates bindings for (polymorphic, overloaded) poly_f
+        -- in terms of monomorphic, non-overloaded mono_f
+        --
+        -- Invariants:
+        --      1. 'binds' binds mono_f
+        --      2. ftvs is a subset of tvs
+        --      3. ftvs includes all tyvars free in ds
+        --
+        -- See Note [AbsBinds]
+
+-- | Abstraction Bindings Export
+data ABExport
+  = ABE { abe_poly      :: Id           -- ^ Any INLINE pragma is attached to this Id
+        , abe_mono      :: Id
+        , abe_wrap      :: HsWrapper    -- ^ See Note [ABExport wrapper]
+             -- Shape: (forall abs_tvs. abs_ev_vars => abe_mono) ~ abe_poly
+        , abe_prags     :: TcSpecPrags  -- ^ SPECIALISE pragmas
+        }
 
 {-
 Note [AbsBinds]
@@ -315,8 +362,8 @@ variables.  The action happens in GHC.Tc.Gen.Bind.mkExport.
 
 Note [Bind free vars]
 ~~~~~~~~~~~~~~~~~~~~~
-The bind_fvs field of FunBind and PatBind records the free variables
-of the definition.  It is used for the following purposes
+The extension fields of FunBind and PatBind at GhcRn records the free
+variables of the definition.  It is used for the following purposes:
 
 a) Dependency analysis prior to type checking
     (see GHC.Tc.Gen.Bind.tc_group)
@@ -330,10 +377,10 @@ c) Deciding whether the binding can be used in static forms
 
 Specifically,
 
-  * bind_fvs includes all free vars that are defined in this module
+  * it includes all free vars that are defined in this module
     (including top-level things and lexically scoped type variables)
 
-  * bind_fvs excludes imported vars; this is just to keep the set smaller
+  * it excludes imported vars; this is just to keep the set smaller
 
   * Before renaming, and after typechecking, the field is unused;
     it's just an error thunk
@@ -453,10 +500,13 @@ ppr_monobind (FunBind { fun_id = fun,
     $$  whenPprDebug (pprIfTc @idR $ ppr wrap)
 
 ppr_monobind (PatSynBind _ psb) = ppr psb
-ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars
-                       , abs_exports = exports, abs_binds = val_binds
-                       , abs_ev_binds = ev_binds })
-  = sdocOption sdocPrintTypecheckerElaboration $ \case
+ppr_monobind (XHsBindsLR b) = case ghcPass @idL of
+#if __GLASGOW_HASKELL__ <= 900
+  GhcPs -> noExtCon b
+  GhcRn -> noExtCon b
+#endif
+  GhcTc ->
+    sdocOption sdocPrintTypecheckerElaboration $ \case
       False -> pprLHsBinds val_binds
       True  -> -- Show extra information (bug number: #10662)
                hang (text "AbsBinds"
@@ -470,12 +520,16 @@ ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars
                , text "Binds:" <+> pprLHsBinds val_binds
                , pprIfTc @idR (text "Evidence:" <+> ppr ev_binds)
                ]
+    where
+      AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars
+               , abs_exports = exports, abs_binds = val_binds
+               , abs_ev_binds = ev_binds } = b
 
-instance OutputableBndrId p => Outputable (ABExport (GhcPass p)) where
+instance Outputable ABExport where
   ppr (ABE { abe_wrap = wrap, abe_poly = gbl, abe_mono = lcl, abe_prags = prags })
     = vcat [ sep [ ppr gbl, nest 2 (text "<=" <+> ppr lcl) ]
            , nest 2 (pprTcSpecPrags prags)
-           , pprIfTc @p $ nest 2 (text "wrap:" <+> ppr wrap) ]
+           , ppr $ nest 2 (text "wrap:" <+> ppr wrap) ]
 
 instance (OutputableBndrId l, OutputableBndrId r,
          Outputable (XXPatSynBind (GhcPass l) (GhcPass r)))
@@ -570,6 +624,39 @@ type instance XXSig             (GhcPass p) = NoExtCon
 
 type instance XFixitySig  (GhcPass p) = NoExtField
 type instance XXFixitySig (GhcPass p) = NoExtCon
+
+-- | Type checker Specialisation Pragmas
+--
+-- 'TcSpecPrags' conveys @SPECIALISE@ pragmas from the type checker to the desugarer
+data TcSpecPrags
+  = IsDefaultMethod     -- ^ Super-specialised: a default method should
+                        -- be macro-expanded at every call site
+  | SpecPrags [LTcSpecPrag]
+  deriving Data
+
+-- | Located Type checker Specification Pragmas
+type LTcSpecPrag = Located TcSpecPrag
+
+-- | Type checker Specification Pragma
+data TcSpecPrag
+  = SpecPrag
+        Id
+        HsWrapper
+        InlinePragma
+  -- ^ The Id to be specialised, a wrapper that specialises the
+  -- polymorphic function, and inlining spec for the specialised function
+  deriving Data
+
+noSpecPrags :: TcSpecPrags
+noSpecPrags = SpecPrags []
+
+hasSpecPrags :: TcSpecPrags -> Bool
+hasSpecPrags (SpecPrags ps) = not (null ps)
+hasSpecPrags IsDefaultMethod = False
+
+isDefaultMethod :: TcSpecPrags -> Bool
+isDefaultMethod IsDefaultMethod = True
+isDefaultMethod (SpecPrags {})  = False
 
 instance OutputableBndrId p => Outputable (Sig (GhcPass p)) where
     ppr sig = ppr_sig sig
