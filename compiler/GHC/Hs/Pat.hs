@@ -397,7 +397,7 @@ isBangedPat (ParPat _ p) = isBangedLPat p
 isBangedPat (BangPat {}) = True
 isBangedPat _            = False
 
-looksLazyPatBind :: HsBind (GhcPass p) -> Bool
+looksLazyPatBind :: forall p. IsPass p => HsBind (GhcPass p) -> Bool
 -- Returns True of anything *except*
 --     a StrictHsBind (as above) or
 --     a VarPat
@@ -405,7 +405,9 @@ looksLazyPatBind :: HsBind (GhcPass p) -> Bool
 -- Looks through AbsBinds
 looksLazyPatBind (PatBind { pat_lhs = p })
   = looksLazyLPat p
-looksLazyPatBind (AbsBinds { abs_binds = binds })
+looksLazyPatBind (XHsBindsLR b)
+  | GhcTc <- ghcPass @p
+  , AbsBinds { abs_binds = binds } <- b
   = anyBag (looksLazyPatBind . unLoc) binds
 looksLazyPatBind _
   = False

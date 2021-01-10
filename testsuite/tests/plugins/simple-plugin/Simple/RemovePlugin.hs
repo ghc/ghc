@@ -48,7 +48,7 @@ typecheckPlugin [name, "typecheck"] _ tc
                 }
   where notNamedAs name (L _ FunBind { fun_id = L _ fid })
           = occNameString (getOccName fid) /= name
-        notNamedAs name (L _ AbsBinds { abs_binds = bnds })
+        notNamedAs name (L _ (XHsBindsLR (AbsBinds { abs_binds = bnds })))
           = all (notNamedAs name) bnds
         notNamedAs _ (L _ b) = True
 typecheckPlugin _ _ tc = return tc

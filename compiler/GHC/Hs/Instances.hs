@@ -64,6 +64,12 @@ deriving instance Data (HsBindLR GhcPs GhcRn)
 deriving instance Data (HsBindLR GhcRn GhcRn)
 deriving instance Data (HsBindLR GhcTc GhcTc)
 
+-- deriving instance (DataIdLR pL pR) => Data (AbsBinds pL pR)
+deriving instance Data (AbsBinds GhcPs GhcPs)
+deriving instance Data (AbsBinds GhcPs GhcRn)
+deriving instance Data (AbsBinds GhcRn GhcRn)
+deriving instance Data (AbsBinds GhcTc GhcTc)
+
 -- deriving instance (DataId p)       => Data (ABExport p)
 deriving instance Data (ABExport GhcPs)
 deriving instance Data (ABExport GhcRn)
@@ -352,6 +358,10 @@ deriving instance Data (HsSplicedThing GhcTc)
 deriving instance Data (HsBracket GhcPs)
 deriving instance Data (HsBracket GhcRn)
 deriving instance Data (HsBracket GhcTc)
+
+deriving instance Data (HsBracketRn GhcRn)
+
+deriving instance Data (HsBracketTc GhcTc)
 
 -- deriving instance (DataIdLR p p) => Data (ArithSeqInfo p)
 deriving instance Data (ArithSeqInfo GhcPs)

@@ -195,11 +195,12 @@ dsHsBind dflags (PatBind { pat_lhs = pat, pat_rhs = grhss
                            else []
         ; return (force_var', sel_binds) }
 
-dsHsBind dflags (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
-                          , abs_exports = exports
-                          , abs_ev_binds = ev_binds
-                          , abs_binds = binds, abs_sig = has_sig })
-  = do { ds_binds <- addTyCs FromSource (listToBag dicts) $
+dsHsBind dflags (XHsBindsLR ext)
+  = do { let AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
+                      , abs_exports = exports
+                      , abs_ev_binds = ev_binds
+                      , abs_binds = binds, abs_sig = has_sig } = ext
+       ; ds_binds <- addTyCs FromSource (listToBag dicts) $
                      dsLHsBinds binds
              -- addTyCs: push type constraints deeper
              --            for inner pattern match check

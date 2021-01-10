@@ -2872,29 +2872,29 @@ aexp2   :: { ECP }
         | splice_untyped { ECP $ mkHsSplicePV $1 }
         | splice_typed   { ecpFromExp $ mapLoc (HsSpliceE noExtField) $1 }
 
-        | SIMPLEQUOTE  qvar     {% fmap ecpFromExp $ ams (sLL $1 $> $ HsBracket noExtField (VarBr noExtField True  (unLoc $2))) [mj AnnSimpleQuote $1,mj AnnName $2] }
-        | SIMPLEQUOTE  qcon     {% fmap ecpFromExp $ ams (sLL $1 $> $ HsBracket noExtField (VarBr noExtField True  (unLoc $2))) [mj AnnSimpleQuote $1,mj AnnName $2] }
-        | TH_TY_QUOTE tyvar     {% fmap ecpFromExp $ ams (sLL $1 $> $ HsBracket noExtField (VarBr noExtField False (unLoc $2))) [mj AnnThTyQuote $1,mj AnnName $2] }
-        | TH_TY_QUOTE gtycon    {% fmap ecpFromExp $ ams (sLL $1 $> $ HsBracket noExtField (VarBr noExtField False (unLoc $2))) [mj AnnThTyQuote $1,mj AnnName $2] }
+        | SIMPLEQUOTE  qvar     {% fmap ecpFromExp $ ams (sLL $1 $> $ HsBracket (VarBr noExtField True  (unLoc $2))) [mj AnnSimpleQuote $1,mj AnnName $2] }
+        | SIMPLEQUOTE  qcon     {% fmap ecpFromExp $ ams (sLL $1 $> $ HsBracket (VarBr noExtField True  (unLoc $2))) [mj AnnSimpleQuote $1,mj AnnName $2] }
+        | TH_TY_QUOTE tyvar     {% fmap ecpFromExp $ ams (sLL $1 $> $ HsBracket (VarBr noExtField False (unLoc $2))) [mj AnnThTyQuote $1,mj AnnName $2] }
+        | TH_TY_QUOTE gtycon    {% fmap ecpFromExp $ ams (sLL $1 $> $ HsBracket (VarBr noExtField False (unLoc $2))) [mj AnnThTyQuote $1,mj AnnName $2] }
         -- See Note [%shift: aexp2 -> TH_TY_QUOTE]
         | TH_TY_QUOTE %shift    {% reportEmptyDoubleQuotes (getLoc $1) }
         | '[|' exp '|]'       {% runPV (unECP $2) >>= \ $2 ->
                                  fmap ecpFromExp $
-                                 ams (sLL $1 $> $ HsBracket noExtField (ExpBr noExtField $2))
+                                 ams (sLL $1 $> $ HsBracket (ExpBr noExtField $2))
                                       (if (hasE $1) then [mj AnnOpenE $1, mu AnnCloseQ $3]
                                                     else [mu AnnOpenEQ $1,mu AnnCloseQ $3]) }
         | '[||' exp '||]'     {% runPV (unECP $2) >>= \ $2 ->
                                  fmap ecpFromExp $
-                                 ams (sLL $1 $> $ HsBracket noExtField (TExpBr noExtField $2))
+                                 ams (sLL $1 $> $ HsBracket (TExpBr noExtField $2))
                                       (if (hasE $1) then [mj AnnOpenE $1,mc $3] else [mo $1,mc $3]) }
         | '[t|' ktype '|]'    {% fmap ecpFromExp $
-                                 ams (sLL $1 $> $ HsBracket noExtField (TypBr noExtField $2)) [mo $1,mu AnnCloseQ $3] }
+                                 ams (sLL $1 $> $ HsBracket (TypBr noExtField $2)) [mo $1,mu AnnCloseQ $3] }
         | '[p|' infixexp '|]' {% (checkPattern <=< runPV) (unECP $2) >>= \p ->
                                       fmap ecpFromExp $
-                                      ams (sLL $1 $> $ HsBracket noExtField (PatBr noExtField p))
+                                      ams (sLL $1 $> $ HsBracket (PatBr noExtField p))
                                           [mo $1,mu AnnCloseQ $3] }
         | '[d|' cvtopbody '|]' {% fmap ecpFromExp $
-                                  ams (sLL $1 $> $ HsBracket noExtField (DecBrL noExtField (snd $2)))
+                                  ams (sLL $1 $> $ HsBracket (DecBrL noExtField (snd $2)))
                                       (mo $1:mu AnnCloseQ $3:fst $2) }
         | quasiquote          { ECP $ mkHsSplicePV $1 }
 

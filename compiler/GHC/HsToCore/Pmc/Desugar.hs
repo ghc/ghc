@@ -373,8 +373,9 @@ desugarLocalBinds (L _ (HsValBinds _ (XValBindsLR (NValBinds binds _)))) =
       , GRHSs{grhssGRHSs = [L _ (GRHS _ _grds rhs)]} <- grhss = do
           core_rhs <- dsLExpr rhs
           return [PmLet x core_rhs]
-    go (L _ AbsBinds{ abs_tvs = [], abs_ev_vars = []
-                    , abs_exports=exports, abs_binds = binds }) = do
+    go (L _ (XHsBindsLR (AbsBinds
+                          { abs_tvs = [], abs_ev_vars = []
+                          , abs_exports=exports, abs_binds = binds }))) = do
       -- Typechecked HsLocalBinds are wrapped in AbsBinds, which carry
       -- renamings. See Note [Long-distance information for HsLocalBinds]
       -- for the details.

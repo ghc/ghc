@@ -692,68 +692,69 @@
              (NoSourceText)
              "DumpTypecheckedAst")))))))))))
  ,({ DumpTypecheckedAst.hs:18:1-23 }
-   (AbsBinds
-    (NoExtField)
-    []
-    []
-    [(ABE
-      (NoExtField)
-      {Var: main}
-      {Var: main}
-      (WpHole)
-      (SpecPrags
-       []))]
-    [({abstract:TcEvBinds})]
-    {Bag(Located (HsBind Var)):
-     [({ DumpTypecheckedAst.hs:18:1-23 }
-       (FunBind
-        (WpHole)
-        ({ DumpTypecheckedAst.hs:18:1-4 }
-         {Var: main})
-        (MG
-         (MatchGroupTc
-          []
-          (TyConApp
-           ({abstract:TyCon})
-           [(TyConApp
-             ({abstract:TyCon})
-             [])]))
-         ({ DumpTypecheckedAst.hs:18:1-23 }
-          [({ DumpTypecheckedAst.hs:18:1-23 }
-            (Match
-             (NoExtField)
-             (FunRhs
-              ({ DumpTypecheckedAst.hs:18:1-4 }
-               {Name: main})
-              (Prefix)
-              (NoSrcStrict))
-             []
-             (GRHSs
+   (XHsBindsLR
+    (AbsBinds
+     (NoExtField)
+     []
+     []
+     [(ABE
+       (NoExtField)
+       {Var: main}
+       {Var: main}
+       (WpHole)
+       (SpecPrags
+        []))]
+     [({abstract:TcEvBinds})]
+     {Bag(Located (HsBind Var)):
+      [({ DumpTypecheckedAst.hs:18:1-23 }
+        (FunBind
+         (WpHole)
+         ({ DumpTypecheckedAst.hs:18:1-4 }
+          {Var: main})
+         (MG
+          (MatchGroupTc
+           []
+           (TyConApp
+            ({abstract:TyCon})
+            [(TyConApp
+              ({abstract:TyCon})
+              [])]))
+          ({ DumpTypecheckedAst.hs:18:1-23 }
+           [({ DumpTypecheckedAst.hs:18:1-23 }
+             (Match
               (NoExtField)
-              [({ DumpTypecheckedAst.hs:18:6-23 }
-                (GRHS
-                 (NoExtField)
-                 []
-                 ({ DumpTypecheckedAst.hs:18:8-23 }
-                  (HsApp
-                   (NoExtField)
-                   ({ DumpTypecheckedAst.hs:18:8-15 }
-                    (HsVar
-                     (NoExtField)
-                     ({ <no location info> }
-                      {Var: putStrLn})))
-                   ({ DumpTypecheckedAst.hs:18:17-23 }
-                    (HsLit
-                     (NoExtField)
-                     (HsString
-                      (SourceText
-                       "\"hello\"")
-                      {FastString: "hello"})))))))]
-              ({ <no location info> }
-               (EmptyLocalBinds
-                (NoExtField))))))])
-         (FromSource))
-        []))]}
-    (False)))]}
+              (FunRhs
+               ({ DumpTypecheckedAst.hs:18:1-4 }
+                {Name: main})
+               (Prefix)
+               (NoSrcStrict))
+              []
+              (GRHSs
+               (NoExtField)
+               [({ DumpTypecheckedAst.hs:18:6-23 }
+                 (GRHS
+                  (NoExtField)
+                  []
+                  ({ DumpTypecheckedAst.hs:18:8-23 }
+                   (HsApp
+                    (NoExtField)
+                    ({ DumpTypecheckedAst.hs:18:8-15 }
+                     (HsVar
+                      (NoExtField)
+                      ({ <no location info> }
+                       {Var: putStrLn})))
+                    ({ DumpTypecheckedAst.hs:18:17-23 }
+                     (HsLit
+                      (NoExtField)
+                      (HsString
+                       (SourceText
+                        "\"hello\"")
+                       {FastString: "hello"})))))))]
+               ({ <no location info> }
+                (EmptyLocalBinds
+                 (NoExtField))))))])
+          (FromSource))
+         []))]}
+     (False))))]}
 
 
