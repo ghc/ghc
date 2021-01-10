@@ -9,7 +9,7 @@ import GHC.Hs.Expr ( PendingRnSplice, DelayedSplice )
 import GHC.Tc.Types( TcM , SpliceType )
 import GHC.Tc.Utils.TcType   ( ExpRhoType )
 import GHC.Types.Annotations ( Annotation, CoreAnnTarget )
-import GHC.Hs.Extension      ( GhcRn, GhcPs, GhcTc )
+import GHC.Hs.Extension.GhcPass ( GhcRn, GhcPs, GhcTc )
 
 import GHC.Hs     ( HsSplice, HsBracket, HsExpr, LHsExpr, LHsType, LPat,
                     LHsDecl, ThModFinalizers )
