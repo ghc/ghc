@@ -47,7 +47,7 @@ module GHC.Core.Utils (
         exprToType, exprToCoercion_maybe,
         applyTypeToArgs, applyTypeToArg,
         dataConRepInstPat, dataConRepFSInstPat,
-        isEmptyTy,
+        isEmptyTy, normSplitTyConApp_maybe,
 
         -- * Working with ticks
         stripTicksTop, stripTicksTopE, stripTicksTopT,
@@ -87,6 +87,7 @@ import GHC.Core.DataCon
 import GHC.Builtin.PrimOps
 import GHC.Types.Id
 import GHC.Types.Id.Info
+import GHC.Core.FamInstEnv
 import GHC.Core.Type as Type
 import GHC.Core.Predicate
 import GHC.Core.TyCo.Rep( TyCoBinder(..), TyBinder )
@@ -2562,6 +2563,17 @@ isEmptyTy ty
     = True
     | otherwise
     = False
+
+-- | If `normSplitTyConApp_maybe _ ty = Just (tc, tys, co)`
+-- then `ty |> co = tc tys`. It's 'splitArgType_maybe', but looks through
+-- coercions via 'topNormaliseType_maybe'. Hence the \"norm\" prefix.
+normSplitTyConApp_maybe :: FamInstEnvs -> Type -> Maybe (TyCon, [Type], Coercion)
+normSplitTyConApp_maybe fam_envs ty
+  | let (co, ty1) = topNormaliseType_maybe fam_envs ty
+                    `orElse` (mkRepReflCo ty, ty)
+  , Just (tc, tc_args) <- splitTyConApp_maybe ty1
+  = Just (tc, tc_args, co)
+normSplitTyConApp_maybe _ _ = Nothing
 
 {-
 *****************************************************
