@@ -11,7 +11,7 @@
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
                                       -- in module Language.Haskell.Syntax.Extension
 
-{-# OPTIONS_GHC -Wno-orphans     #-}
+{-# OPTIONS_GHC -Wno-orphans     #-} -- Outputable
 
 {-
 (c) The University of Glasgow 2006
