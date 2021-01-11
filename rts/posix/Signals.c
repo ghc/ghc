@@ -561,7 +561,8 @@ backtrace_handler(int sig STG_UNUSED)
         RELEASE_STORE(&propa_record.tv_nsec, curr_time.tv_nsec);
 
         OSThreadId currThId = osThreadId();
-        for (uint32_t i=0; i < n_capabilities; i++) {
+        uint32_t n_caps = RELAXED_LOAD(&n_capabilities);
+        for (uint32_t i=0; i < n_caps; i++) {
             Task *cap_task = ACQUIRE_LOAD(&capabilities[i]->running_task);
             if (!cap_task) { continue; }
             OSThreadId tid = ACQUIRE_LOAD(&cap_task->id);
@@ -582,7 +583,7 @@ backtrace_handler(int sig STG_UNUSED)
     /* more specific value more meaningful on Linux
      * gettid() is not linkable atm, let's use just the syscall
      */
-#    include <sys/syscall.h>
+#   include <sys/syscall.h>
     pid_t tid = syscall(SYS_gettid);
     fprintf(stderr, "\nCaught SIGQUIT; Backtrace of thread %ld :\n", tid);
 #  else
