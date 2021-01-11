@@ -2,6 +2,8 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE FlexibleContexts #-}
 
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 module GHC.Parser.Errors.Ppr
    ( mkParserWarn
    , mkParserErr
@@ -11,6 +13,7 @@ where
 import GHC.Prelude
 import GHC.Driver.Flags
 import GHC.Parser.Errors
+import GHC.Parser.Errors.Types
 import GHC.Parser.Types
 import GHC.Types.Basic
 import GHC.Types.Error
@@ -27,8 +30,16 @@ import GHC.Builtin.Types (filterCTuple)
 import GHC.Driver.Session (DynFlags)
 import GHC.Utils.Error (diagReasonSeverity)
 
+-- This is a totally uninteresting instance will will be populated in the context of #18516.
+instance Diagnostic PsMessage where
+  diagnosticMessage _ = mkDecorated []
+  diagnosticReason  _ = ErrorWithoutFlag
+
 mk_parser_err :: SrcSpan -> SDoc -> MsgEnvelope DiagnosticMessage
 mk_parser_err span doc = MsgEnvelope
+
+mkParserErr :: SrcSpan -> SDoc -> MsgEnvelope DecoratedSDoc
+mkParserErr span doc = MsgEnvelope
    { errMsgSpan        = span
    , errMsgContext     = alwaysQualify
    , errMsgDiagnostic  = DiagnosticMessage (mkDecorated [doc]) ErrorWithoutFlag
