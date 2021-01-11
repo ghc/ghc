@@ -214,6 +214,14 @@ onException io what = io `catch` \e -> do _ <- what
 --
 -- > withFile name mode = bracket (openFile name mode) hClose
 --
+-- Implementation of bracket is using 'mask', which means that the release
+-- handler should be uninterruptible to run to completion in presence of
+-- asynchronous exceptions. 'hClose' is uninterruptible if used
+-- non-concurrently, closing a socket (from \"network\" package) is
+-- uninterruptible as well, an example of interruptible close handler is
+-- 'killThread' which should be wrapped using 'uninterruptibleMask_' when used
+-- with 'bracket'. Comments in 'uninterruptibleMask' still aply.
+--
 bracket
         :: IO a         -- ^ computation to run first (\"acquire resource\")
         -> (a -> IO b)  -- ^ computation to run last (\"release resource\")
