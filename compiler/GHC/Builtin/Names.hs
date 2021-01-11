@@ -348,6 +348,7 @@ basicKnownKeyNames
         -- ghc-bignum
         integerFromNaturalName,
         integerToNaturalClampName,
+        integerToNaturalThrowName,
         integerToWordName,
         integerToIntName,
         integerToWord64Name,
@@ -1122,6 +1123,7 @@ negateName        = varQual gHC_NUM (fsLit "negate")      negateClassOpKey
 ---------------------------------
 integerFromNaturalName
    , integerToNaturalClampName
+   , integerToNaturalThrowName
    , integerToWordName
    , integerToIntName
    , integerToWord64Name
@@ -1189,6 +1191,7 @@ naturalQuotRemName        = bnnVarQual "naturalQuotRem"            naturalQuotRe
 
 integerFromNaturalName    = bniVarQual "integerFromNatural"        integerFromNaturalIdKey
 integerToNaturalClampName = bniVarQual "integerToNaturalClamp"     integerToNaturalClampIdKey
+integerToNaturalThrowName = bniVarQual "integerToNaturalThrow"     integerToNaturalThrowIdKey
 integerToWordName         = bniVarQual "integerToWord#"            integerToWordIdKey
 integerToIntName          = bniVarQual "integerToInt#"             integerToIntIdKey
 integerToWord64Name       = bniVarQual "integerToWord64#"          integerToWord64IdKey
@@ -2423,6 +2426,7 @@ unsafeCoercePrimIdKey    = mkPreludeMiscIdUnique 571
 
 integerFromNaturalIdKey
    , integerToNaturalClampIdKey
+   , integerToNaturalThrowIdKey
    , integerToWordIdKey
    , integerToIntIdKey
    , integerToWord64IdKey
@@ -2474,45 +2478,46 @@ integerFromNaturalIdKey
 
 integerFromNaturalIdKey    = mkPreludeMiscIdUnique 600
 integerToNaturalClampIdKey = mkPreludeMiscIdUnique 601
-integerToWordIdKey         = mkPreludeMiscIdUnique 602
-integerToIntIdKey          = mkPreludeMiscIdUnique 603
-integerToWord64IdKey       = mkPreludeMiscIdUnique 604
-integerToInt64IdKey        = mkPreludeMiscIdUnique 605
-integerAddIdKey            = mkPreludeMiscIdUnique 606
-integerMulIdKey            = mkPreludeMiscIdUnique 607
-integerSubIdKey            = mkPreludeMiscIdUnique 608
-integerNegateIdKey         = mkPreludeMiscIdUnique 609
-integerEqPrimIdKey         = mkPreludeMiscIdUnique 610
-integerNePrimIdKey         = mkPreludeMiscIdUnique 611
-integerLePrimIdKey         = mkPreludeMiscIdUnique 612
-integerGtPrimIdKey         = mkPreludeMiscIdUnique 613
-integerLtPrimIdKey         = mkPreludeMiscIdUnique 614
-integerGePrimIdKey         = mkPreludeMiscIdUnique 615
-integerAbsIdKey            = mkPreludeMiscIdUnique 616
-integerSignumIdKey         = mkPreludeMiscIdUnique 617
-integerCompareIdKey        = mkPreludeMiscIdUnique 618
-integerQuotIdKey           = mkPreludeMiscIdUnique 619
-integerRemIdKey            = mkPreludeMiscIdUnique 620
-integerDivIdKey            = mkPreludeMiscIdUnique 621
-integerModIdKey            = mkPreludeMiscIdUnique 622
-integerDivModIdKey         = mkPreludeMiscIdUnique 623
-integerQuotRemIdKey        = mkPreludeMiscIdUnique 624
-integerToFloatIdKey        = mkPreludeMiscIdUnique 625
-integerToDoubleIdKey       = mkPreludeMiscIdUnique 626
-integerEncodeFloatIdKey    = mkPreludeMiscIdUnique 627
-integerEncodeDoubleIdKey   = mkPreludeMiscIdUnique 628
-integerGcdIdKey            = mkPreludeMiscIdUnique 629
-integerLcmIdKey            = mkPreludeMiscIdUnique 630
-integerAndIdKey            = mkPreludeMiscIdUnique 631
-integerOrIdKey             = mkPreludeMiscIdUnique 632
-integerXorIdKey            = mkPreludeMiscIdUnique 633
-integerComplementIdKey     = mkPreludeMiscIdUnique 634
-integerBitIdKey            = mkPreludeMiscIdUnique 635
-integerShiftLIdKey         = mkPreludeMiscIdUnique 636
-integerShiftRIdKey         = mkPreludeMiscIdUnique 637
-integerFromWordIdKey       = mkPreludeMiscIdUnique 638
-integerFromWord64IdKey     = mkPreludeMiscIdUnique 639
-integerFromInt64IdKey      = mkPreludeMiscIdUnique 640
+integerToNaturalThrowIdKey = mkPreludeMiscIdUnique 602
+integerToWordIdKey         = mkPreludeMiscIdUnique 603
+integerToIntIdKey          = mkPreludeMiscIdUnique 604
+integerToWord64IdKey       = mkPreludeMiscIdUnique 605
+integerToInt64IdKey        = mkPreludeMiscIdUnique 606
+integerAddIdKey            = mkPreludeMiscIdUnique 607
+integerMulIdKey            = mkPreludeMiscIdUnique 608
+integerSubIdKey            = mkPreludeMiscIdUnique 609
+integerNegateIdKey         = mkPreludeMiscIdUnique 610
+integerEqPrimIdKey         = mkPreludeMiscIdUnique 611
+integerNePrimIdKey         = mkPreludeMiscIdUnique 612
+integerLePrimIdKey         = mkPreludeMiscIdUnique 613
+integerGtPrimIdKey         = mkPreludeMiscIdUnique 614
+integerLtPrimIdKey         = mkPreludeMiscIdUnique 615
+integerGePrimIdKey         = mkPreludeMiscIdUnique 616
+integerAbsIdKey            = mkPreludeMiscIdUnique 617
+integerSignumIdKey         = mkPreludeMiscIdUnique 618
+integerCompareIdKey        = mkPreludeMiscIdUnique 619
+integerQuotIdKey           = mkPreludeMiscIdUnique 620
+integerRemIdKey            = mkPreludeMiscIdUnique 621
+integerDivIdKey            = mkPreludeMiscIdUnique 622
+integerModIdKey            = mkPreludeMiscIdUnique 623
+integerDivModIdKey         = mkPreludeMiscIdUnique 624
+integerQuotRemIdKey        = mkPreludeMiscIdUnique 625
+integerToFloatIdKey        = mkPreludeMiscIdUnique 626
+integerToDoubleIdKey       = mkPreludeMiscIdUnique 627
+integerEncodeFloatIdKey    = mkPreludeMiscIdUnique 628
+integerEncodeDoubleIdKey   = mkPreludeMiscIdUnique 629
+integerGcdIdKey            = mkPreludeMiscIdUnique 630
+integerLcmIdKey            = mkPreludeMiscIdUnique 631
+integerAndIdKey            = mkPreludeMiscIdUnique 632
+integerOrIdKey             = mkPreludeMiscIdUnique 633
+integerXorIdKey            = mkPreludeMiscIdUnique 634
+integerComplementIdKey     = mkPreludeMiscIdUnique 635
+integerBitIdKey            = mkPreludeMiscIdUnique 636
+integerShiftLIdKey         = mkPreludeMiscIdUnique 637
+integerShiftRIdKey         = mkPreludeMiscIdUnique 638
+integerFromWordIdKey       = mkPreludeMiscIdUnique 639
+integerFromWord64IdKey     = mkPreludeMiscIdUnique 640
+integerFromInt64IdKey      = mkPreludeMiscIdUnique 641
 
 naturalToWordIdKey         = mkPreludeMiscIdUnique 650
 naturalAddIdKey            = mkPreludeMiscIdUnique 651

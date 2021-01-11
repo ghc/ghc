@@ -1,7 +1,7 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 40, types: 17, coercions: 0, joins: 0/0}
+  = {terms: 35, types: 14, coercions: 0, joins: 0/0}
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 ten :: Natural
@@ -52,19 +52,15 @@ M.minusOne1 :: Natural
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
 M.minusOne1 = 1
 
--- RHS size: {terms: 11, types: 4, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 6, types: 1, coercions: 0, joins: 0/0}
 minusOne :: Natural
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
-         WorkFree=True, Expandable=False, Guidance=IF_ARGS [] 40 0}]
+         WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 40 10}]
 minusOne
-  = case M.minusOne1 of wild {
-      NS ds1 ->
-        case ds1 of {
-          __DEFAULT -> GHC.Num.$fNumNatural1;
-          0## -> wild
-        };
-      NB ipv -> GHC.Num.$fNumNatural1
+  = case GHC.Num.Natural.$wnaturalNegate M.minusOne1 of ww
+    { __DEFAULT ->
+    GHC.Num.Natural.NS ww
     }
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
