@@ -709,7 +709,10 @@ foreignExportsInitialiser mod hs_fns =
    -- See Note [Tracking foreign exports] in rts/ForeignExports.c
    vcat
     [ text "static struct ForeignExportsList" <+> list_symbol <+> equals
-         <+> braces (text ".exports = " <+> export_list) <> semi
+         <+> braces (
+           text ".exports = " <+> export_list <> comma <+>
+           text ".n_entries = " <+> ppr (length hs_fns))
+         <> semi
     , text "static void " <> ctor_symbol <> text "(void)"
          <+> text " __attribute__((constructor));"
     , text "static void " <> ctor_symbol <> text "()"

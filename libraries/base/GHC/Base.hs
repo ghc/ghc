@@ -120,7 +120,7 @@ import GHC.Err
 import GHC.Maybe
 import {-# SOURCE #-} GHC.IO (mkUserError, mplusIO)
 
-import GHC.Tuple ()              -- Note [Depend on GHC.Tuple]
+import GHC.Tuple (Solo (..))     -- Note [Depend on GHC.Tuple]
 import GHC.Num.Integer ()        -- Note [Depend on GHC.Num.Integer]
 
 -- for 'class Semigroup'
@@ -348,6 +348,15 @@ instance Monoid () where
         mempty        = ()
         mconcat _     = ()
 
+-- | @since 4.15
+instance Semigroup a => Semigroup (Solo a) where
+  Solo a <> Solo b = Solo (a <> b)
+  stimes n (Solo a) = Solo (stimes n a)
+
+-- | @since 4.15
+instance Monoid a => Monoid (Solo a) where
+  mempty = Solo mempty
+
 -- | @since 4.9.0.0
 instance (Semigroup a, Semigroup b) => Semigroup (a, b) where
         (a,b) <> (a',b') = (a<>a',b<>b')
@@ -422,6 +431,20 @@ instance Semigroup a => Semigroup (Maybe a) where
 instance Semigroup a => Monoid (Maybe a) where
     mempty = Nothing
 
+-- | @since 4.15
+instance Applicative Solo where
+  pure = Solo
+
+  -- Note: we really want to match strictly here. This lets us write,
+  -- for example,
+  --
+  -- forceSpine :: Foldable f => f a -> ()
+  -- forceSpine xs
+  --   | Solo r <- traverse_ Solo xs
+  --   = r
+  Solo f <*> Solo x = Solo (f x)
+  liftA2 f (Solo x) (Solo y) = Solo (f x y)
+
 -- | For tuples, the 'Monoid' constraint on @a@ determines
 -- how the first values merge.
 -- For example, 'String's concatenate:
@@ -434,6 +457,10 @@ instance Monoid a => Applicative ((,) a) where
     pure x = (mempty, x)
     (u, f) <*> (v, x) = (u <> v, f x)
     liftA2 f (u, x) (v, y) = (u <> v, f x y)
+
+-- | @since 4.15
+instance Monad Solo where
+  Solo x >>= f = f x
 
 -- | @since 4.9.0.0
 instance Monoid a => Monad ((,) a) where
@@ -965,6 +992,15 @@ instance Applicative ((->) r) where
 -- | @since 2.01
 instance Monad ((->) r) where
     f >>= k = \ r -> k (f r) r
+
+-- | @since 4.15
+instance Functor Solo where
+  fmap f (Solo a) = Solo (f a)
+
+  -- Being strict in the `Solo` argument here seems most consistent
+  -- with the concept behind `Solo`: always strict in the wrapper and lazy
+  -- in the contents.
+  x <$ Solo _ = Solo x
 
 -- | @since 2.01
 instance Functor ((,) a) where

@@ -66,6 +66,7 @@ import GHC.Arr  ( Array(..), elems, numElements,
                   foldl1Elems, foldr1Elems)
 import GHC.Base hiding ( foldr )
 import GHC.Generics
+import GHC.Tuple (Solo (..))
 import GHC.Num  ( Num(..) )
 
 infix  4 `elem`, `notElem`
@@ -648,6 +649,9 @@ instance Foldable (Either a) where
     length (Right _) = 1
 
     null             = isLeft
+
+-- | @since 4.15
+deriving instance Foldable Solo
 
 -- | @since 4.7.0.0
 instance Foldable ((,) a) where

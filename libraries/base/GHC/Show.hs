@@ -53,6 +53,7 @@ import GHC.Base
 import GHC.List ((!!), foldr1, break)
 import GHC.Num
 import GHC.Stack.Types
+import GHC.Tuple (Solo (..))
 
 
 -- | The @shows@ functions return a function that prepends the
@@ -166,6 +167,9 @@ appPrec1 = I# 11#       -- appPrec + 1
 
 -- | @since 2.01
 deriving instance Show ()
+
+-- | @since 4.15
+deriving instance Show a => Show (Solo a)
 
 -- | @since 2.01
 instance Show a => Show [a]  where

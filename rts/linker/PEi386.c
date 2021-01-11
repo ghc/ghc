@@ -2078,7 +2078,7 @@ SymbolAddr *lookupSymbol_PEi386(SymbolName *lbl)
         else if (pinfo && pinfo->owner && isSymbolImport (pinfo->owner, lbl))
         {
             /* See Note [BFD import library].  */
-            HINSTANCE dllInstance = (HINSTANCE)lookupSymbol(pinfo->value);
+            HINSTANCE dllInstance = (HINSTANCE)lookupDependentSymbol(pinfo->value, NULL);
             if (!dllInstance && pinfo->value)
                return pinfo->value;
 
