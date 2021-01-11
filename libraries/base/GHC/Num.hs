@@ -140,20 +140,10 @@ instance  Num Integer  where
 -- @since 4.8.0.0
 instance  Num Natural  where
     (+) = naturalAdd
-    (-) x y = case compare x y of
-      EQ -> naturalZero
-      GT -> naturalSubUnsafe x y
-      LT -> raise# underflowException
-
+    (-) = naturalSubThrow
     (*) = naturalMul
-    negate x
-      | naturalIsZero x = x
-      | otherwise       = raise# underflowException
-
-    fromInteger x
-      | x < 0     = raise# underflowException
-      | otherwise = integerToNaturalClamp x
-
+    negate = naturalNegate
+    fromInteger = integerToNaturalThrow
     abs    = id
     signum = naturalSignum
 
