@@ -98,8 +98,6 @@ cgExpr (StgLetNoEscape _ binds expr) =
 cgExpr (StgCase expr bndr alt_type alts) =
   cgCase expr bndr alt_type alts
 
-cgExpr (StgLam {}) = panic "cgExpr: StgLam"
-
 ------------------------------------------------------------------------
 --              Let no escape
 ------------------------------------------------------------------------
