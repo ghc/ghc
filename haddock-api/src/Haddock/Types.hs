@@ -319,7 +319,8 @@ type instance NoGhcTc DocNameI = DocNameI
 type instance IdP DocNameI = DocName
 
 instance CollectPass DocNameI where
-  collectXXPat _ _ ext = dataConCantHappen ext
+  collectXXPat _ ext = dataConCantHappen ext
+  collectXXHsBindsLR ext = dataConCantHappen ext
 
 instance NamedThing DocName where
   getName (Documented name _) = name
@@ -828,6 +829,7 @@ type instance XConDeclField  DocNameI = NoExtField
 type instance XXConDeclField DocNameI = DataConCantHappen
 
 type instance XXPat DocNameI = DataConCantHappen
+type instance XXHsBindsLR DocNameI a = DataConCantHappen
 
 type instance XCInjectivityAnn DocNameI = NoExtField
 
