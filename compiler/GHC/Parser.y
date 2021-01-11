@@ -2769,8 +2769,8 @@ aexp    :: { ECP }
                                            amms (mkHsLetPV (comb2 $1 $>) (snd (unLoc $2)) $4)
                                                (mj AnnLet $1:mj AnnIn $3
                                                  :(fst $ unLoc $2)) }
-        | 'let' binds 'in' error          {% hintParsingErrorWithContext $3 "let/in clause without body. Please add a body." }
-        | 'let' binds error        {% hintParsingErrorWithContext $1 "let/in clause without in. Please add a body." }
+        | 'let' binds 'in' error         {% hintParsingErrorWithContext $3 "let/in clause without body. Please add a body." }
+        | 'let' binds error        {% hintParsingErrorWithContext $1 "let/in clause without in. Please add a (in body)." }
         | '\\' 'lcase' altslist
             {  ECP $ $3 >>= \ $3 ->
                amms (mkHsLamCasePV (comb2 $1 $>)
@@ -2867,11 +2867,13 @@ aexp2   :: { ECP }
                                            unECP $2 >>= \ $2 ->
                                            amms (mkSumOrTuplePV (comb2 $1 $>) Unboxed (Tuple [L (gl $2) (Just $2)]))
                                                 [mo $1,mc $3] }
+        | '(#' texp error {% hintParsingErrorWithContext $1 "please close this expression." }
         | '(#' tup_exprs '#)'           { ECP $
                                            $2 >>= \ $2 ->
                                            amms (mkSumOrTuplePV (comb2 $1 $>) Unboxed (snd $2))
                                                 ((mo $1:fst $2) ++ [mc $3]) }
 
+        | '(#' tup_exprs error {% hintParsingErrorWithContext $1 "please close this strict tuple brace." }
         | '[' list ']'  { ECP $ $2 (comb2 $1 $>) >>= \a -> ams a [mos $1,mcs $3] }
         | '[' list  error   {% hintParsingErrorWithContext $1 "please close this list." }
         | '_'               { ECP $ mkHsWildCardPV (getLoc $1) }
@@ -2891,19 +2893,24 @@ aexp2   :: { ECP }
                                  ams (sLL $1 $> $ HsBracket noExtField (ExpBr noExtField $2))
                                       (if (hasE $1) then [mj AnnOpenE $1, mu AnnCloseQ $3]
                                                     else [mu AnnOpenEQ $1,mu AnnCloseQ $3]) }
+        | '[|' exp error {% hintParsingErrorWithContext $1 "please close this TH quote" }
         | '[||' exp '||]'     {% runPV (unECP $2) >>= \ $2 ->
                                  fmap ecpFromExp $
                                  ams (sLL $1 $> $ HsBracket noExtField (TExpBr noExtField $2))
                                       (if (hasE $1) then [mj AnnOpenE $1,mc $3] else [mo $1,mc $3]) }
+        | '[||' exp error {% hintParsingErrorWithContext $1 "please close this TTH quote" }
         | '[t|' ktype '|]'    {% fmap ecpFromExp $
                                  ams (sLL $1 $> $ HsBracket noExtField (TypBr noExtField $2)) [mo $1,mu AnnCloseQ $3] }
+        | '[t|' ktype error {% hintParsingErrorWithContext $1 "please close this TH type QQ" }
         | '[p|' infixexp '|]' {% (checkPattern <=< runPV) (unECP $2) >>= \p ->
                                       fmap ecpFromExp $
                                       ams (sLL $1 $> $ HsBracket noExtField (PatBr noExtField p))
                                           [mo $1,mu AnnCloseQ $3] }
+        | '[p|' infixexp error {% hintParsingErrorWithContext $1 "please close this TH pattern QQ" }
         | '[d|' cvtopbody '|]' {% fmap ecpFromExp $
                                   ams (sLL $1 $> $ HsBracket noExtField (DecBrL noExtField (snd $2)))
                                       (mo $1:mu AnnCloseQ $3:fst $2) }
+        | '[d|' cvtopbody error {% hintParsingErrorWithContext $1 "please close this TH definition QQ" }
         | quasiquote          { ECP $ mkHsSplicePV $1 }
 
         -- arrow notation extension
@@ -2912,6 +2919,7 @@ aexp2   :: { ECP }
                                      ams (sLL $1 $> $ HsCmdArrForm noExtField $2 Prefix
                                                           Nothing (reverse $3))
                                          [mu AnnOpenB $1,mu AnnCloseB $4] }
+        | '(|' aexp cmdargs error {% hintParsingErrorWithContext $1 "please close this arrow notation" }
 
 splice_exp :: { LHsExpr GhcPs }
         : splice_untyped { mapLoc (HsSpliceE noExtField) $1 }
