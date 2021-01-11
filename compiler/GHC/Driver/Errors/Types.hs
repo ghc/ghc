@@ -1,0 +1,36 @@
+{-# LANGUAGE GADTs #-}
+
+module GHC.Driver.Errors.Types (
+    GhcMessage(..)
+  , DriverMessage
+  , ghcUnknownMessage
+  ) where
+
+import Data.Typeable
+import GHC.Types.Error
+
+-- | The umbrella type that encompasses all the different messages that GHC might output during the
+-- different compilation stages.
+data GhcMessage where
+  -- | A message from the parsing phase.
+  GhcPsMessage      :: GhcMessage
+  -- | A message from typecheck/renaming phase.
+  GhcTcRnMessage    :: GhcMessage
+  -- | A message from the desugaring phase.
+  GhcDsMessage      :: GhcMessage
+  -- | A message from the driver.
+  GhcDriverMessage  :: DriverMessage -> GhcMessage
+  -- | An \"escape\" hatch which can be used when we don't know the source of the message or
+  -- if the message is not one of the typed ones. The 'RenderableDiagnostic' and 'Typeable' constrains
+  -- ensure that if we /know/, at pattern-matching time, the originating type, we can attempt a cast and
+  -- access the fully-structured error. This would be the case for a GHC plugin that offers a domain-specific
+  -- type but that doesn't want to place the burden on IDEs/application code to \"know\" the precise error
+  -- type. The 'RenderableDiagnostic' constraints ensures that worst case scenario we can still render this
+  -- into something which can be eventually converted into an 'SDoc'.
+  GhcUnknownMessage :: forall a. (RenderableDiagnostic a, Typeable a) => a -> GhcMessage
+
+ghcUnknownMessage :: ErrDoc -> GhcMessage
+ghcUnknownMessage = GhcUnknownMessage
+
+-- | A message from the driver.
+data DriverMessage

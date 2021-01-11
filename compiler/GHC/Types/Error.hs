@@ -78,10 +78,6 @@ or -XPartialTypeSignatures). For now we rely on the 'Severity' to distinguish be
 error, although the 'Severity' can be /more/ than just 'SevWarn' and 'SevError', and as such it probably
 shouldn't belong to an 'ErrMsg' to begin with, as it might potentially lead to the construction of
 \"impossible states\" (e.g. a waning with 'SevInfo', for example).
-
-'WarningMessages' and 'ErrorMessages' are for now simple type aliases to retain backward compatibility, but
-in future iterations these can be either parameterised over an 'e' message type (to make type signatures
-a bit more declarative) or removed altogether.
 -}
 
 type WarningMessages = Bag (ErrMsg ErrDoc)
