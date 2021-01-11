@@ -8,16 +8,19 @@ module GHC.Driver.Errors.Types (
 
 import Data.Typeable
 import GHC.Types.Error
+import GHC.Parser.Errors.Types ( PsMessage )
+import GHC.Tc.Errors.Types ( TcRnMessage )
+import GHC.HsToCore.Errors.Types ( DsMessage )
 
 -- | The umbrella type that encompasses all the different messages that GHC might output during the
 -- different compilation stages.
 data GhcMessage where
   -- | A message from the parsing phase.
-  GhcPsMessage      :: GhcMessage
+  GhcPsMessage      :: PsMessage -> GhcMessage
   -- | A message from typecheck/renaming phase.
-  GhcTcRnMessage    :: GhcMessage
-  -- | A message from the desugaring phase.
-  GhcDsMessage      :: GhcMessage
+  GhcTcRnMessage    :: TcRnMessage -> GhcMessage
+  -- | A message from the desugaring (HsToCore) phase.
+  GhcDsMessage      :: DsMessage -> GhcMessage
   -- | A message from the driver.
   GhcDriverMessage  :: DriverMessage -> GhcMessage
   -- | An \"escape\" hatch which can be used when we don't know the source of the message or
