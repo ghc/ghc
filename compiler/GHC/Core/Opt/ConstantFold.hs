@@ -1392,6 +1392,7 @@ builtinBignumRules _ =
       , rule_passthrough      "Word# -> Natural -> Word#"       naturalToWordName   naturalNSDataConName
 
       , rule_IntegerToNaturalClamp "Integer -> Natural (clamp)" integerToNaturalClampName
+      , rule_IntegerToNaturalThrow "Integer -> Natural (throw)" integerToNaturalThrowName
       , rule_binopn             "naturalAdd"          naturalAddName       (+)
       , rule_partial_binopn     "naturalSub"          naturalSubName       (\a b -> if a >= b then Just (a - b) else Nothing)
       , rule_binopn             "naturalMul"          naturalMulName       (*)
@@ -1445,6 +1446,9 @@ builtinBignumRules _ =
           rule_IntegerToNaturalClamp str name
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
                            ru_try = match_IntegerToNaturalClamp }
+          rule_IntegerToNaturalThrow str name
+           = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
+                           ru_try = match_IntegerToNaturalThrow }
           rule_binopn str name op
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
                            ru_try = match_Natural_binop op }
@@ -1616,6 +1620,14 @@ match_IntegerToNaturalClamp _ id_unf _ [xl]
       then Just (Lit (mkLitNatural x))
       else Just (Lit (mkLitNatural 0))
 match_IntegerToNaturalClamp _ _ _ _ = Nothing
+
+match_IntegerToNaturalThrow :: RuleFun
+match_IntegerToNaturalThrow _ id_unf _ [xl]
+  | Just (LitNumber LitNumInteger x) <- exprIsLiteral_maybe id_unf xl
+  = if x >= 0
+      then Just (Lit (mkLitNatural x))
+      else Nothing
+match_IntegerToNaturalThrow _ _ _ _ = Nothing
 
 -------------------------------------------------
 {- Note [Rewriting integerBit]
