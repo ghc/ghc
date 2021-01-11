@@ -87,7 +87,7 @@ import GHC.Builtin.Types ( unitTyCon, unitDataCon, tupleTyCon, tupleDataCon, nil
                            listTyCon_RDR, consDataCon_RDR, eqTyCon_RDR)
 }
 
-%expect 1 -- shift/reduce conflicts
+%expect 0 -- shift/reduce conflicts
 
 {- Note [shift/reduce conflicts]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2764,21 +2764,13 @@ aexp    :: { ECP }
                                                , m_pats = $2:$3
                                                , m_grhss = unguardedGRHSs $5 }]))
                           [mj AnnLam $1, mu AnnRarrow $4] }
-        | 'let' binds inExp(exp)          {% do
-            let (tokenIn, tokenEcpM, worked) = $3
-
-            hintParsingErrorWithContext worked (fromMaybe $1 tokenIn) "let/in clause without body. Please add a body."
-
-            case tokenEcpM of
-                               -- Todo. Here we replaced "let x in" by _. But
-                               -- something better may be to replace it by "let
-                               -- x in _".
-                               Nothing -> return $ ECP $ mkHsWildCardPV (getLoc $1)
-                               Just tokenEcp -> return $ ECP $
-                                           unECP tokenEcp >>= \ tokenEcp ->
-                                           amms (mkHsLetPV (comb2 $1 tokenEcp) (snd (unLoc $2)) tokenEcp)
-                                               (mj AnnLet $1:mj AnnIn (fromJust tokenIn)
+        | 'let' binds 'in' exp          {  ECP $
+                                           unECP $4 >>= \ $4 ->
+                                           amms (mkHsLetPV (comb2 $1 $>) (snd (unLoc $2)) $4)
+                                               (mj AnnLet $1:mj AnnIn $3
                                                  :(fst $ unLoc $2)) }
+        | 'let' binds 'in' error          {% hintParsingErrorWithContext $3 "let/in clause without body. Please add a body." }
+        | 'let' binds error        {% hintParsingErrorWithContext $1 "let/in clause without in. Please add a body." }
         | '\\' 'lcase' altslist
             {  ECP $ $3 >>= \ $3 ->
                amms (mkHsLamCasePV (comb2 $1 $>)
@@ -2806,9 +2798,8 @@ aexp    :: { ECP }
                                                    FromSource (snd $ unLoc $4)))
                                                (mj AnnCase $1:mj AnnOf $3
                                                   :(fst $ unLoc $4)) }
-        | 'case' exp error    {% do
-            hintParsingErrorWithContext False $1 "case of without the of. Please add the of."
-            return $ ECP $ mkHsWildCardPV (getLoc $1)
+        | 'case' exp error  {% do
+            hintParsingErrorWithContext $1 "case of without the of. Please add the of."
         }
 
         -- QualifiedDo.
@@ -2863,18 +2854,15 @@ aexp2   :: { ECP }
         -- This allows you to write, e.g., '(+ 3, 4 -)', which isn't
         -- correct Haskell (you'd have to write '((+ 3), (4 -))')
         -- but the less cluttered version fell out of having texps.
-        | '(' texp closeContext(')')                  {% do
-            hintParsingErrorWithContext (snd $3) $1 "please close this brace."
-            return $ ECP $
+        | '(' texp ')'              { ECP $
                                            unECP $2 >>= \ $2 ->
-                                           amms (mkHsParPV (comb2 $1 (fst $>)) $2) [mop $1,mcp (fst $3)] }
-        | '(' tup_exprs closeContext(')') {% do
-                                          hintParsingErrorWithContext (snd $3) $1 "please close this tuple brace."
-                                          return $ ECP $
+                                           amms (mkHsParPV (comb2 $1 $>) $2) [mop $1,mcp $3] }
+        | '(' texp error                  {% hintParsingErrorWithContext $1 "please close this brace." }
+        | '(' tup_exprs ')' { ECP $
                                            $2 >>= \ $2 ->
-                                           amms (mkSumOrTuplePV (comb2 $1 (fst $>)) Boxed (snd $2))
-                                                ((mop $1:fst $2) ++ [mcp (fst $3)]) }
-
+                                           amms (mkSumOrTuplePV (comb2 $1 $>) Boxed (snd $2))
+                                                ((mop $1:fst $2) ++ [mcp $3]) }
+        | '(' tup_exprs error {% hintParsingErrorWithContext $1 "please close this tuple brace." }
         | '(#' texp '#)'                { ECP $
                                            unECP $2 >>= \ $2 ->
                                            amms (mkSumOrTuplePV (comb2 $1 $>) Unboxed (Tuple [L (gl $2) (Just $2)]))
@@ -2884,9 +2872,8 @@ aexp2   :: { ECP }
                                            amms (mkSumOrTuplePV (comb2 $1 $>) Unboxed (snd $2))
                                                 ((mo $1:fst $2) ++ [mc $3]) }
 
-        | '[' list closeContext(']')      {% do
-            hintParsingErrorWithContext (snd $3) $1 "please close this list."
-            return $ ECP $ $2 (comb2 $1 (fst $>)) >>= \a -> ams a [mos $1,mcs (fst $3)] }
+        | '[' list ']'  { ECP $ $2 (comb2 $1 $>) >>= \a -> ams a [mos $1,mcs $3] }
+        | '[' list  error   {% hintParsingErrorWithContext $1 "please close this list." }
         | '_'               { ECP $ mkHsWildCardPV (getLoc $1) }
 
         -- Template Haskell Extension
@@ -3336,7 +3323,7 @@ qual  :: { forall b. DisambECP b => PV (LStmt GhcPs (Located b)) }
                                                [mu AnnLarrow $2] }
     | exp                                { unECP $1 >>= \ $1 ->
                                            return $ sL1 $1 $ mkBodyStmt $1 }
-    | 'let' binds                        { ams (sLL $1 $> $ LetStmt noExtField (snd $ unLoc $2))
+    | 'let' binds %shift                       { ams (sLL $1 $> $ LetStmt noExtField (snd $ unLoc $2))
                                                (mj AnnLet $1:(fst $ unLoc $2)) }
 
 -----------------------------------------------------------------------------
@@ -3779,15 +3766,6 @@ close :: { () }
         : vccurly               { () } -- context popped in lexer.
         | error                 {% popContext }
 
-closeContext(c) :: { (Located Token, Bool) }
-        : c { ($1, True) }
-        | error { ($1, False) }
-
-inExp(c) :: { (Maybe (Located Token), Maybe ECP, Bool) }
-        : 'in' c %shift { (Just $1, Just $2, True) }
-        | 'in' error %shift { (Just $1, Nothing, False) }
-        | error { (Nothing, Nothing, False) }
-
 -----------------------------------------------------------------------------
 -- Miscellaneous (mostly renamings)
 
@@ -4018,9 +3996,10 @@ hintExplicitForall tok = do
     unless (forall || rulePrag) $ addError $ PsError (PsErrExplicitForall (isUnicode tok)) [] (getLoc tok)
 
 -- Hint about parsing error
-hintParsingErrorWithContext :: Bool -> Located Token -> String -> P ()
-hintParsingErrorWithContext False tokOpen message = addError $ PsError (PsErrParseErrorWithContext (text message)) [] (getLoc tokOpen)
-hintParsingErrorWithContext True _ _ = return ()
+hintParsingErrorWithContext :: Located Token -> String -> P ECP
+hintParsingErrorWithContext tokOpen message = do
+    addError $ PsError (PsErrParseErrorWithContext (text message)) [] (getLoc tokOpen)
+    pure $ ECP $ mkHsWildCardPV (getLoc tokOpen)
 
 -- Hint about qualified-do
 hintQualifiedDo :: Located Token -> P ()
