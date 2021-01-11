@@ -127,7 +127,6 @@ primOpRules nm = \case
                                     , do l <- getLiteral 1
                                          guard $ l == oneI8
                                          pure $ Lit zeroI8
-                                    , equalArgs $> Lit zeroI8
                                     , equalArgs $> Lit zeroI8 ]
    Int8NegOp   -> mkPrimOpRule nm 1 [ unaryLit negOp
                                     , semiInversePrimOp Int8NegOp ]
@@ -199,7 +198,6 @@ primOpRules nm = \case
                                     , do l <- getLiteral 1
                                          guard $ l == oneI16
                                          pure $ Lit zeroI16
-                                    , equalArgs $> Lit zeroI16
                                     , equalArgs $> Lit zeroI16 ]
    Int16NegOp  -> mkPrimOpRule nm 1 [ unaryLit negOp
                                     , semiInversePrimOp Int16NegOp ]
@@ -271,7 +269,6 @@ primOpRules nm = \case
                                     , do l <- getLiteral 1
                                          guard $ l == oneI32
                                          pure $ Lit zeroI32
-                                    , equalArgs $> Lit zeroI32
                                     , equalArgs $> Lit zeroI32 ]
    Int32NegOp  -> mkPrimOpRule nm 1 [ unaryLit negOp
                                     , semiInversePrimOp Int32NegOp ]
@@ -349,7 +346,6 @@ primOpRules nm = \case
                                          platform <- getPlatform
                                          guard (l == onei platform)
                                          retLit zeroi
-                                    , equalArgs >> retLit zeroi
                                     , equalArgs >> retLit zeroi ]
    IntAndOp    -> mkPrimOpRule nm 2 [ binaryLit (intOp2 (.&.))
                                     , idempotent
@@ -706,7 +702,7 @@ int8Op2
   -> RuleOpts -> Literal -> Literal -> Maybe CoreExpr
 int8Op2 op _ (LitNumber LitNumInt8 i1) (LitNumber LitNumInt8 i2) =
   int8Result (fromInteger i1 `op` fromInteger i2)
-int8Op2 _ _ _ _ = Nothing  -- Could find LitLit
+int8Op2 _ _ _ _ = Nothing
 
 int16Op2
   :: (Integral a, Integral b)
@@ -714,7 +710,7 @@ int16Op2
   -> RuleOpts -> Literal -> Literal -> Maybe CoreExpr
 int16Op2 op _ (LitNumber LitNumInt16 i1) (LitNumber LitNumInt16 i2) =
   int16Result (fromInteger i1 `op` fromInteger i2)
-int16Op2 _ _ _ _ = Nothing  -- Could find LitLit
+int16Op2 _ _ _ _ = Nothing
 
 int32Op2
   :: (Integral a, Integral b)
@@ -722,7 +718,7 @@ int32Op2
   -> RuleOpts -> Literal -> Literal -> Maybe CoreExpr
 int32Op2 op _ (LitNumber LitNumInt32 i1) (LitNumber LitNumInt32 i2) =
   int32Result (fromInteger i1 `op` fromInteger i2)
-int32Op2 _ _ _ _ = Nothing  -- Could find LitLit
+int32Op2 _ _ _ _ = Nothing
 
 intOp2 :: (Integral a, Integral b)
        => (a -> b -> Integer)
@@ -1314,18 +1310,18 @@ identityCPlatform :: (Platform -> Literal) -> RuleM CoreExpr
 identityCPlatform lit =
   leftIdentityCPlatform lit `mplus` rightIdentityCPlatform lit
 
-leftZero :: (Platform -> Literal) -> RuleM CoreExpr
-leftZero zero = do
+leftZero :: RuleM CoreExpr
+leftZero = do
   platform <- getPlatform
   [Lit l1, _] <- getArgs
-  guard $ l1 == zero platform
+  guard $ isZeroLit l1
   return $ Lit l1
 
-rightZero :: (Platform -> Literal) -> RuleM CoreExpr
-rightZero zero = do
+rightZero :: RuleM CoreExpr
+rightZero = do
   platform <- getPlatform
   [_, Lit l2] <- getArgs
-  guard $ l2 == zero platform
+  guard $ isZeroLit l1
   return $ Lit l2
 
 zeroElem :: (Platform -> Literal) -> RuleM CoreExpr
