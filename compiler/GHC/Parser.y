@@ -2806,6 +2806,11 @@ aexp    :: { ECP }
                                                    FromSource (snd $ unLoc $4)))
                                                (mj AnnCase $1:mj AnnOf $3
                                                   :(fst $ unLoc $4)) }
+        | 'case' exp error    {% do
+            hintParsingErrorWithContext False $1 "case of without the of. Please add the of."
+            return $ ECP $ mkHsWildCardPV (getLoc $1)
+        }
+
         -- QualifiedDo.
         | DO  stmtlist               {% do
                                       hintQualifiedDo $1
