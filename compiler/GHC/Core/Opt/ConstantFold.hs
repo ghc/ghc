@@ -118,25 +118,21 @@ primOpRules nm = \case
                                     , rightIdentityCPlatform zeroi
                                     , equalArgs >> retLitNoC zeroi ]
    IntMulOp    -> mkPrimOpRule nm 2 [ binaryLit (intOp2 (*))
-                                    , zeroElem zeroi
+                                    , zeroElem
                                     , identityPlatform onei
                                     , mulFoldingRules IntMulOp intOps
                                     ]
    IntQuotOp   -> mkPrimOpRule nm 2 [ nonZeroLit 1 >> binaryLit (intOp2 quot)
-                                    , leftZero zeroi
+                                    , leftZero
                                     , rightIdentityPlatform onei
                                     , equalArgs >> retLit onei ]
    IntRemOp    -> mkPrimOpRule nm 2 [ nonZeroLit 1 >> binaryLit (intOp2 rem)
-                                    , leftZero zeroi
-                                    , do l <- getLiteral 1
-                                         platform <- getPlatform
-                                         guard (l == onei platform)
-                                         retLit zeroi
-                                    , equalArgs >> retLit zeroi
+                                    , leftZero
+                                    , oneLit 1 >> retLit zeroi
                                     , equalArgs >> retLit zeroi ]
    IntAndOp    -> mkPrimOpRule nm 2 [ binaryLit (intOp2 (.&.))
                                     , idempotent
-                                    , zeroElem zeroi ]
+                                    , zeroElem ]
    IntOrOp     -> mkPrimOpRule nm 2 [ binaryLit (intOp2 (.|.))
                                     , idempotent
                                     , identityPlatform zeroi ]
@@ -176,15 +172,12 @@ primOpRules nm = \case
    WordQuotOp  -> mkPrimOpRule nm 2 [ nonZeroLit 1 >> binaryLit (wordOp2 quot)
                                     , rightIdentityPlatform onew ]
    WordRemOp   -> mkPrimOpRule nm 2 [ nonZeroLit 1 >> binaryLit (wordOp2 rem)
-                                    , leftZero zerow
-                                    , do l <- getLiteral 1
-                                         platform <- getPlatform
-                                         guard (l == onew platform)
-                                         retLit zerow
+                                    , leftZero
+                                    , oneLit 1 >> retLit zerow
                                     , equalArgs >> retLit zerow ]
    WordAndOp   -> mkPrimOpRule nm 2 [ binaryLit (wordOp2 (.&.))
                                     , idempotent
-                                    , zeroElem zerow ]
+                                    , zeroElem ]
    WordOrOp    -> mkPrimOpRule nm 2 [ binaryLit (wordOp2 (.|.))
                                     , idempotent
                                     , identityPlatform zerow ]
@@ -989,22 +982,20 @@ identityCPlatform :: (Platform -> Literal) -> RuleM CoreExpr
 identityCPlatform lit =
   leftIdentityCPlatform lit `mplus` rightIdentityCPlatform lit
 
-leftZero :: (Platform -> Literal) -> RuleM CoreExpr
-leftZero zero = do
-  platform <- getPlatform
+leftZero :: RuleM CoreExpr
+leftZero = do
   [Lit l1, _] <- getArgs
-  guard $ l1 == zero platform
+  guard $ isZeroLit l1
   return $ Lit l1
 
-rightZero :: (Platform -> Literal) -> RuleM CoreExpr
-rightZero zero = do
-  platform <- getPlatform
+rightZero :: RuleM CoreExpr
+rightZero = do
   [_, Lit l2] <- getArgs
-  guard $ l2 == zero platform
+  guard $ isZeroLit l2
   return $ Lit l2
 
-zeroElem :: (Platform -> Literal) -> RuleM CoreExpr
-zeroElem lit = leftZero lit `mplus` rightZero lit
+zeroElem :: RuleM CoreExpr
+zeroElem = leftZero `mplus` rightZero
 
 equalArgs :: RuleM ()
 equalArgs = do
@@ -1013,6 +1004,9 @@ equalArgs = do
 
 nonZeroLit :: Int -> RuleM ()
 nonZeroLit n = getLiteral n >>= guard . not . isZeroLit
+
+oneLit :: Int -> RuleM ()
+oneLit n = getLiteral n >>= guard . isOneLit
 
 -- When excess precision is not requested, cut down the precision of the
 -- Rational value to that of Float/Double. We confuse host architecture
@@ -1342,7 +1336,7 @@ builtinRules enableBignumRules
 
      mkBasicRule divIntName 2 $ msum
         [ nonZeroLit 1 >> binaryLit (intOp2 div)
-        , leftZero zeroi
+        , leftZero
         , do
           [arg, Lit (LitNumber LitNumInt d)] <- getArgs
           Just n <- return $ exactLog2 d
@@ -1352,7 +1346,7 @@ builtinRules enableBignumRules
 
      mkBasicRule modIntName 2 $ msum
         [ nonZeroLit 1 >> binaryLit (intOp2 mod)
-        , leftZero zeroi
+        , leftZero
         , do
           [arg, Lit (LitNumber LitNumInt d)] <- getArgs
           Just _ <- return $ exactLog2 d
