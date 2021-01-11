@@ -537,9 +537,63 @@ static void
 backtrace_handler(int sig STG_UNUSED)
 {
 #if USE_LIBDW
+
+/* propagate SIGQUIT to all threads running as a capability */
+#if defined(THREADED_RTS)
+    /* there is no good portable way to distinguish os sent SIGQUIT and ones
+     * propagated by us here, posix states that a signal can be delivered to
+     * any thread not blocking it, though Linux always delivers to main thread
+     * unless the main thread blocks it, we should not rely on that as to be
+     * too Linux specific
+     *
+     * instead we track the monotic time the signal reaches us, and only
+     * propagate with a minimum 1 second interval
+     */
+    static struct timespec propa_record;
+    struct timespec curr_time, propa_time;
+    clock_gettime(CLOCK_MONOTONIC, &curr_time);
+    propa_time.tv_sec = ACQUIRE_LOAD(&propa_record.tv_sec);
+    propa_time.tv_nsec = ACQUIRE_LOAD(&propa_record.tv_nsec);
+    long int diff_sec = curr_time.tv_sec - propa_time.tv_sec;
+    if ( diff_sec > 1 ||
+        (diff_sec > 0 && curr_time.tv_nsec >= propa_time.tv_nsec) ) {
+        RELEASE_STORE(&propa_record.tv_sec, curr_time.tv_sec);
+        RELEASE_STORE(&propa_record.tv_nsec, curr_time.tv_nsec);
+
+        OSThreadId currThId = osThreadId();
+        uint32_t n_caps = RELAXED_LOAD(&n_capabilities);
+        for (uint32_t i=0; i < n_caps; i++) {
+            Task *cap_task = ACQUIRE_LOAD(&capabilities[i]->running_task);
+            if (!cap_task) { continue; }
+            OSThreadId tid = ACQUIRE_LOAD(&cap_task->id);
+            if (tid != currThId) {
+                /* TODO need separate impls regarding availability of pthread */
+                pthread_kill(tid, SIGQUIT);
+            }
+        }
+    }
+#endif /* THREADED_RTS */
+
     LibdwSession *session = libdwInit();
     Backtrace *bt = libdwGetBacktrace(session);
+
+/* TODO fprintf is not safe to call from a signal handler */
+#if defined(THREADED_RTS)
+#  if defined(linux_HOST_OS)
+    /* more specific value more meaningful on Linux
+     * gettid() is not linkable atm, let's use just the syscall
+     */
+#   include <sys/syscall.h>
+    pid_t tid = syscall(SYS_gettid);
+    fprintf(stderr, "\nCaught SIGQUIT; Backtrace of thread %ld :\n", tid);
+#  else
+    OSThreadId currThId = osThreadId();
+    fprintf(stderr, "\nCaught SIGQUIT; Backtrace of thread %lu :\n", currThId);
+#  endif
+#else
     fprintf(stderr, "\nCaught SIGQUIT; Backtrace:\n");
+#endif
+
     libdwPrintBacktrace(session, stderr, bt);
     backtraceFree(bt);
     libdwFree(session);

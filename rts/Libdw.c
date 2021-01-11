@@ -259,8 +259,8 @@ Backtrace *libdwGetBacktrace(LibdwSession *session) {
     session->cur_bt = bt;
     session->max_depth = max_backtrace_depth;
 
-    int pid = getpid();
-    int ret = dwfl_getthread_frames(session->dwfl, pid,
+    pid_t curr_tid = pthread_self();
+    int ret = dwfl_getthread_frames(session->dwfl, curr_tid,
                                     getBacktraceFrameCb, session);
     if (ret == -1)
         sysErrorBelch("Failed to get stack frames of current process: %s",
@@ -270,13 +270,13 @@ Backtrace *libdwGetBacktrace(LibdwSession *session) {
     return bt;
 }
 
-static pid_t next_thread(Dwfl *dwfl, void *arg, void **thread_argp) {
+static pid_t next_thread(Dwfl *dwfl STG_UNUSED, void *arg, void **thread_argp) {
     /* there is only the current thread */
     if (*thread_argp != NULL)
         return 0;
 
     *thread_argp = arg;
-    return dwfl_pid(dwfl);
+    return pthread_self();
 }
 
 static bool memory_read(Dwfl *dwfl STG_UNUSED, Dwarf_Addr addr,
