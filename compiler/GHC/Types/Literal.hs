@@ -48,7 +48,7 @@ module GHC.Types.Literal
         -- ** Predicates on Literals and their contents
         , litIsDupable, litIsTrivial, litIsLifted
         , inCharRange
-        , isZeroLit
+        , isZeroLit, isOneLit
         , litFitsInChar
         , litValue, mapLitValue
 
@@ -602,6 +602,13 @@ isZeroLit (LitNumber _ 0) = True
 isZeroLit (LitFloat  0)   = True
 isZeroLit (LitDouble 0)   = True
 isZeroLit _               = False
+
+-- | Tests whether the literal represents a one of whatever type it is
+isOneLit :: Literal -> Bool
+isOneLit (LitNumber _ 1) = True
+isOneLit (LitFloat  1)   = True
+isOneLit (LitDouble 1)   = True
+isOneLit _               = False
 
 -- | Returns the 'Integer' contained in the 'Literal', for when that makes
 -- sense, i.e. for 'Char', 'Int', 'Word', 'LitInteger' and 'LitNatural'.
