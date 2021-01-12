@@ -11,6 +11,7 @@ import qualified CommandLine
 import qualified Environment
 import qualified Rules
 import qualified Rules.Clean
+import qualified Rules.Docspec
 import qualified Rules.Documentation
 import qualified Rules.Lint
 import qualified Rules.Nofib
@@ -83,6 +84,7 @@ main = do
         rules :: Rules ()
         rules = do
             Rules.buildRules
+            Rules.Docspec.docspecRules
             Rules.Documentation.documentationRules
             Rules.Clean.cleanRules
             Rules.Lint.lintRules
