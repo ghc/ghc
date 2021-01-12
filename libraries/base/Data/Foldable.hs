@@ -117,8 +117,10 @@ import GHC.Generics
 import GHC.Num  ( Num(..) )
 
 -- $setup
+-- >>> :set -XDeriveFoldable
 -- >>> import Prelude
 -- >>> import Data.Monoid (Product (..), Sum (..))
+-- >>> data Tree a = Empty | Leaf a | Node (Tree a) a (Tree a) deriving (Show, Foldable)
 
 infix  4 `elem`, `notElem`
 
