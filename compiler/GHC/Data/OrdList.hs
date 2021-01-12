@@ -17,13 +17,14 @@ module GHC.Data.OrdList (
         OrdList, pattern NilOL, pattern ConsOL, pattern SnocOL,
         nilOL, isNilOL, unitOL, appOL, consOL, snocOL, concatOL, lastOL,
         headOL,
-        mapOL, fromOL, toOL, foldrOL, foldlOL, reverseOL, fromOLReverse,
+        mapOL, mapOL', fromOL, toOL, foldrOL, foldlOL, reverseOL, fromOLReverse,
         strictlyEqOL, strictlyOrdOL
 ) where
 
 import GHC.Prelude
 import Data.Foldable
 
+import GHC.Utils.Misc (strictMap)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
@@ -178,6 +179,20 @@ fromOLReverse a = go a []
 
 mapOL :: (a -> b) -> OrdList a -> OrdList b
 mapOL = fmap
+
+mapOL' :: (a->b) -> OrdList a -> OrdList b
+mapOL' _ None        = None
+mapOL' f (One x)     = One $! f x
+mapOL' f (Cons x xs) = let !x1 = f x
+                           !xs1 = mapOL' f xs
+                       in Cons x1 xs1
+mapOL' f (Snoc xs x) = let !x1 = f x
+                           !xs1 = mapOL' f xs
+                       in Snoc xs1 x1
+mapOL' f (Two b1 b2) = let !b1' = mapOL' f b1
+                           !b2' = mapOL' f b2
+                       in Two b1' b2'
+mapOL' f (Many xs)   = Many $! strictMap f xs
 
 foldrOL :: (a->b->b) -> b -> OrdList a -> b
 foldrOL _ z None        = z
