@@ -972,7 +972,7 @@ simplExprF :: SimplEnv
            -> SimplCont
            -> SimplM (SimplFloats, OutExpr)
 
-simplExprF !env e cont
+simplExprF !env e !cont
   = {- pprTrace "simplExprF" (vcat
       [ ppr e
       , text "cont =" <+> ppr cont
