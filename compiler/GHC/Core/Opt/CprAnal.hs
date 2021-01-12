@@ -147,7 +147,7 @@ cprAnal' _ _ (Lit lit)     = (whnfTermCprType, Lit lit)
 cprAnal' _ _ (Type ty)     = (whnfTermCprType, Type ty)      -- Doesn't happen, in fact
 cprAnal' _ _ (Coercion co) = (whnfTermCprType, Coercion co)
 
-cprAnal' env args (Var var)   = (cprTransform env args var, Var var)
+cprAnal' env args (Var var) = (cprTransform env args var, Var var)
 
 cprAnal' env args (Cast e co)
   = (cpr_ty, Cast e' co)

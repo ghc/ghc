@@ -12,7 +12,7 @@
 module GHC.Types.Cpr (
     TerminationFlag (Terminates),
     Cpr, topCpr, conCpr, whnfTermCpr, divergeCpr, lubCpr, asConCpr,
-    CprType (..), topCprType, whnfTermCprType, conCprType, lubCprType, lubCprTypes,
+    CprType (..), topCprType, whnfTermCprType, lubCprType, lubCprTypes,
     pruneDeepCpr, markOptimisticConCprType, splitConCprTy, applyCprTy, abstractCprTy,
     abstractCprTyNTimes, ensureCprTyArity, trimCprTy,
     forceCprTy, forceCpr, bothCprType,
@@ -312,12 +312,22 @@ extractArgCprAndTermination = map go
   where
     go (CprType 0 cpr) = cpr
     -- we didn't give it enough arguments, so terminates rapidly
-    go _               = topCpr
+    go _               = whnfTermCpr
 
-conCprType :: ConTag -> [CprType] -> CprType
-conCprType con_tag args = CprType 0 (conCpr con_tag cprs)
+conCprType :: DataCon -> [CprType] -> CprType
+conCprType dc args = CprType 0 (conCpr con_tag cprs)
   where
-    cprs = extractArgCprAndTermination args
+    con_tag = dataConTag dc
+    cprs = addDataConTermination dc $ extractArgCprAndTermination args
+
+addDataConTermination :: DataCon -> [Cpr] -> [Cpr]
+-- See Note [No unboxed tuple for single, unlifted transit var]
+addDataConTermination con cprs
+  = zipWithEqual "addDataConTermination" add cprs strs
+  where
+    strs = dataConRepStrictness con
+    add cpr str | isMarkedStrict str = snd $ forceCpr topSubDmd cpr -- like seq
+                | otherwise          = cpr
 
 markOptimisticConCprType :: DataCon -> CprType -> CprType
 markOptimisticConCprType dc _ty@(CprType n cpr)
@@ -530,7 +540,7 @@ cprTransformDataConSig con args
   , wkr_arity <= mAX_CPR_SIZE
   , args `lengthIs` wkr_arity
   -- , pprTrace "cprTransformDataConSig" (ppr con <+> ppr wkr_arity <+> ppr args) True
-  = abstractCprTyNTimes wkr_arity $ conCprType (dataConTag con) args
+  = abstractCprTyNTimes wkr_arity $ conCprType con args
   | otherwise -- TODO: Refl binds a coercion. What about these? can we CPR them? I don't see why we couldn't.
   = topCprType
   where
@@ -589,7 +599,7 @@ argCprTypesFromStrictSig want_to_unbox arg_tys sig
       -- Otherwise we'd need to call dataConRepInstPat here and thread a UniqSupply
       , null (dataConExTyCoVars dc)
       , let arg_tys = map scaledThing (dataConInstArgTys dc tc_args)
-      = conCprType (dataConTag dc) (zipWith go arg_tys dmds)
+      = conCprType dc (zipWith go arg_tys dmds)
       | otherwise
       = snd $ forceCprTy dmd topCprType
 
