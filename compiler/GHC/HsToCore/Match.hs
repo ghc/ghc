@@ -259,7 +259,7 @@ matchEmpty var res_ty
   = return [MR_Fallible mk_seq]
   where
     mk_seq fail = return $ mkWildCase (Var var) (idScaledType var) res_ty
-                                      [(DEFAULT, [], fail)]
+                                      [Alt DEFAULT [] fail]
 
 matchVariables :: NonEmpty MatchId -> Type -> NonEmpty EquationInfo -> DsM (MatchResult CoreExpr)
 -- Real true variables, just like in matchVar, SLPJ p 94

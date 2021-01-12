@@ -37,7 +37,6 @@ import GHC.HsToCore.Utils
 import GHC.Tc.Utils.TcType
 import GHC.Core.Type
 import GHC.Core.Multiplicity
-import GHC.Types.Id   ( Id )
 import GHC.Core.Coercion
 import GHC.Builtin.Types.Prim
 import GHC.Core.TyCon
@@ -159,7 +158,7 @@ unboxArg arg
               \ body -> Case (mkIfThenElse arg (mkIntLit platform 1) (mkIntLit platform 0))
                              prim_arg
                              (exprType body)
-                             [(DEFAULT,[],body)])
+                             [Alt DEFAULT [] body])
 
   -- Data types with a single constructor, which has a single, primitive-typed arg
   -- This deals with Int, Float etc; also Ptr, ForeignPtr
@@ -169,7 +168,7 @@ unboxArg arg
     do case_bndr <- newSysLocalDs Many arg_ty
        prim_arg <- newSysLocalDs Many data_con_arg_ty1
        return (Var prim_arg,
-               \ body -> Case arg case_bndr (exprType body) [(DataAlt data_con,[prim_arg],body)]
+               \ body -> Case arg case_bndr (exprType body) [Alt (DataAlt data_con) [prim_arg] body]
               )
 
   -- Byte-arrays, both mutable and otherwise; hack warning
@@ -184,7 +183,7 @@ unboxArg arg
   = do case_bndr <- newSysLocalDs Many arg_ty
        vars@[_l_var, _r_var, arr_cts_var] <- newSysLocalsDs (map unrestricted data_con_arg_tys)
        return (Var arr_cts_var,
-               \ body -> Case arg case_bndr (exprType body) [(DataAlt data_con,vars,body)]
+               \ body -> Case arg case_bndr (exprType body) [Alt (DataAlt data_con) vars body]
               )
 
   | otherwise
@@ -275,7 +274,7 @@ boxResult result_ty
 
 mk_alt :: (Expr Var -> [Expr Var] -> Expr Var)
        -> (Maybe Type, Expr Var -> Expr Var)
-       -> DsM (Type, (AltCon, [Id], Expr Var))
+       -> DsM (Type, CoreAlt)
 mk_alt return_result (Nothing, wrap_result)
   = do -- The ccall returns ()
        state_id <- newSysLocalDs Many realWorldStatePrimTy
@@ -284,7 +283,7 @@ mk_alt return_result (Nothing, wrap_result)
                                      [wrap_result (panic "boxResult")]
 
              ccall_res_ty = mkTupleTy Unboxed [realWorldStatePrimTy]
-             the_alt      = (DataAlt (tupleDataCon Unboxed 1), [state_id], the_rhs)
+             the_alt      = Alt (DataAlt (tupleDataCon Unboxed 1)) [state_id] the_rhs
 
        return (ccall_res_ty, the_alt)
 
@@ -297,7 +296,7 @@ mk_alt return_result (Just prim_res_ty, wrap_result)
        ; let the_rhs = return_result (Var state_id)
                                 [wrap_result (Var result_id)]
              ccall_res_ty = mkTupleTy Unboxed [realWorldStatePrimTy, prim_res_ty]
-             the_alt      = (DataAlt (tupleDataCon Unboxed 2), [state_id, result_id], the_rhs)
+             the_alt      = Alt (DataAlt (tupleDataCon Unboxed 2)) [state_id, result_id] the_rhs
        ; return (ccall_res_ty, the_alt) }
 
 
@@ -332,8 +331,8 @@ resultWrapper result_ty
        ; let platform = targetPlatform dflags
        ; let marshal_bool e
                = mkWildCase e (unrestricted intPrimTy) boolTy
-                   [ (DEFAULT                     ,[],Var trueDataConId )
-                   , (LitAlt (mkLitInt platform 0),[],Var falseDataConId)]
+                   [ Alt DEFAULT                        [] (Var trueDataConId )
+                   , Alt (LitAlt (mkLitInt platform 0)) [] (Var falseDataConId)]
        ; return (Just intPrimTy, marshal_bool) }
 
   -- Newtypes

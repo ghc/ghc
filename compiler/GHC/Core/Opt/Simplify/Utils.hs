@@ -2242,15 +2242,15 @@ mkCase, mkCase1, mkCase2, mkCase3
 --      1. Merge Nested Cases
 --------------------------------------------------
 
-mkCase dflags scrut outer_bndr alts_ty ((DEFAULT, _, deflt_rhs) : outer_alts)
+mkCase dflags scrut outer_bndr alts_ty (Alt DEFAULT _ deflt_rhs : outer_alts)
   | gopt Opt_CaseMerge dflags
   , (ticks, Case (Var inner_scrut_var) inner_bndr _ inner_alts)
        <- stripTicksTop tickishFloatable deflt_rhs
   , inner_scrut_var == outer_bndr
   = do  { tick (CaseMerge outer_bndr)
 
-        ; let wrap_alt (con, args, rhs) = ASSERT( outer_bndr `notElem` args )
-                                          (con, args, wrap_rhs rhs)
+        ; let wrap_alt (Alt con args rhs) = ASSERT( outer_bndr `notElem` args )
+                                            (Alt con args (wrap_rhs rhs))
                 -- Simplifier's no-shadowing invariant should ensure
                 -- that outer_bndr is not shadowed by the inner patterns
               wrap_rhs rhs = Let (NonRec inner_bndr (Var outer_bndr)) rhs
@@ -2284,13 +2284,13 @@ mkCase dflags scrut bndr alts_ty alts = mkCase1 dflags scrut bndr alts_ty alts
 --      2. Eliminate Identity Case
 --------------------------------------------------
 
-mkCase1 _dflags scrut case_bndr _ alts@((_,_,rhs1) : _)      -- Identity case
+mkCase1 _dflags scrut case_bndr _ alts@(Alt _ _ rhs1 : _)      -- Identity case
   | all identity_alt alts
   = do { tick (CaseIdentity case_bndr)
        ; return (mkTicks ticks $ re_cast scrut rhs1) }
   where
-    ticks = concatMap (stripTicksT tickishFloatable . thdOf3) (tail alts)
-    identity_alt (con, args, rhs) = check_eq rhs con args
+    ticks = concatMap (\(Alt _ _ rhs) -> stripTicksT tickishFloatable rhs) (tail alts)
+    identity_alt (Alt con args rhs) = check_eq rhs con args
 
     check_eq (Cast rhs co) con args        -- See Note [RHS casts]
       = not (any (`elemVarSet` tyCoVarsOfCo co) args) && check_eq rhs con args
@@ -2332,8 +2332,8 @@ mkCase1 dflags scrut bndr alts_ty alts = mkCase2 dflags scrut bndr alts_ty alts
 mkCase2 dflags scrut bndr alts_ty alts
   | -- See Note [Scrutinee Constant Folding]
     case alts of  -- Not if there is just a DEFAULT alternative
-      [(DEFAULT,_,_)] -> False
-      _               -> True
+      [Alt DEFAULT _ _] -> False
+      _                 -> True
   , gopt Opt_CaseFolding dflags
   , Just (scrut', tx_con, mk_orig) <- caseRules (targetPlatform dflags) scrut
   = do { bndr' <- newId (fsLit "lwild") Many (exprType scrut')
@@ -2368,11 +2368,11 @@ mkCase2 dflags scrut bndr alts_ty alts
 
     tx_alt :: (AltCon -> Maybe AltCon) -> (Id -> CoreExpr) -> Id
            -> CoreAlt -> SimplM (Maybe CoreAlt)
-    tx_alt tx_con mk_orig new_bndr (con, bs, rhs)
+    tx_alt tx_con mk_orig new_bndr (Alt con bs rhs)
       = case tx_con con of
           Nothing   -> return Nothing
           Just con' -> do { bs' <- mk_new_bndrs new_bndr con'
-                          ; return (Just (con', bs', rhs')) }
+                          ; return (Just (Alt con' bs' rhs')) }
       where
         rhs' | isDeadBinder bndr = rhs
              | otherwise         = bindNonRec bndr orig_val rhs
@@ -2399,8 +2399,8 @@ mkCase2 dflags scrut bndr alts_ty alts
 
     add_default :: [CoreAlt] -> [CoreAlt]
     -- See Note [Literal cases]
-    add_default ((LitAlt {}, bs, rhs) : alts) = (DEFAULT, bs, rhs) : alts
-    add_default alts                          = alts
+    add_default (Alt (LitAlt {}) bs rhs : alts) = Alt DEFAULT bs rhs : alts
+    add_default alts                            = alts
 
 {- Note [Literal cases]
 ~~~~~~~~~~~~~~~~~~~~~~~
