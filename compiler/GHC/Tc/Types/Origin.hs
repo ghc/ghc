@@ -1,5 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
@@ -11,7 +13,7 @@ module GHC.Tc.Types.Origin (
   UserTypeCtxt(..), pprUserTypeCtxt, isSigMaybe,
 
   -- SkolemInfo
-  SkolemInfo(..), pprSigSkolInfo, pprSkolInfo,
+  SkolemInfo(..), pprSigSkolInfo, pprSkolInfo, RenderableTyVarBndr(..),
 
   -- CtOrigin
   CtOrigin(..), exprCtOrigin, lexprCtOrigin, matchesCtOrigin, grhssCtOrigin,
@@ -165,6 +167,16 @@ isSigMaybe _                = Nothing
 *                                                                      *
 ************************************************************************
 -}
+
+-- | This type can be used in any place where we need a witness that we can
+-- pretty-print a particular 'LHsTyVarBndr'.
+data RenderableTyVarBndr where
+  RenderableTyVarBndr :: forall flag pass.
+                      ( OutputableBndrFlag flag
+                      , Outputable (LHsTyVarBndr flag pass)
+                      )
+                      => LHsTyVarBndr flag pass
+                      -> RenderableTyVarBndr
 
 -- SkolemInfo gives the origin of *given* constraints
 --   a) type variables are skolemised
