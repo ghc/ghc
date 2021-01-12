@@ -840,9 +840,11 @@ findAndReadIface doc_str mod wanted_mod_with_insts hi_boot_file
        -- TODO: make this check a function
        if mod `installedModuleEq` gHC_PRIM
            then do
-               iface <- getHooked ghcPrimIfaceHook ghcPrimIface
-               return (Succeeded (iface,
-                                   "<built in interface for GHC.Prim>"))
+               hooks <- getHooks
+               let iface = case ghcPrimIfaceHook hooks of
+                            Nothing -> ghcPrimIface
+                            Just h  -> h
+               return (Succeeded (iface, "<built in interface for GHC.Prim>"))
            else do
                dflags <- getDynFlags
                -- Look for the file

@@ -89,6 +89,7 @@ import GHC.Platform
 
 import GHC.Driver.Env
 import GHC.Driver.Session
+import {-# SOURCE #-} GHC.Driver.Hooks
 
 import GHC.Hs
 
@@ -236,6 +237,9 @@ data Env gbl lcl
 
 instance ContainsDynFlags (Env gbl lcl) where
     extractDynFlags env = hsc_dflags (env_top env)
+
+instance ContainsHooks (Env gbl lcl) where
+    extractHooks env = hsc_hooks (env_top env)
 
 instance ContainsLogger (Env gbl lcl) where
     extractLogger env = hsc_logger (env_top env)

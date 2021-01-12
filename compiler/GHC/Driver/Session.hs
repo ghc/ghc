@@ -229,7 +229,6 @@ import GHC.Unit.Types
 import GHC.Unit.Parser
 import GHC.Unit.Module
 import GHC.Builtin.Names ( mAIN_NAME )
-import {-# SOURCE #-} GHC.Driver.Hooks
 import GHC.Driver.Phases ( Phase(..), phaseInputExt )
 import GHC.Driver.Flags
 import GHC.Driver.Backend
@@ -547,9 +546,6 @@ data DynFlags = DynFlags {
   frontendPluginOpts    :: [String],
     -- ^ the @-ffrontend-opt@ flags given on the command line, in *reverse*
     -- order that they're specified on the command line.
-
-  -- GHC API hooks
-  hooks                 :: Hooks,
 
   --  For ghc -M
   depMakefile           :: FilePath,
@@ -1169,7 +1165,6 @@ defaultDynFlags mySettings llvmConfig =
         pluginModNames          = [],
         pluginModNameOpts       = [],
         frontendPluginOpts      = [],
-        hooks                   = emptyHooks,
 
         outputFile_             = Nothing,
         dynOutputFile_          = Nothing,
