@@ -438,3 +438,7 @@ test ('T18923',
       [ collect_compiler_stats('bytes allocated',2) ],
       compile,
       ['-v0 -O'])
+test ('T16577',
+      [ collect_compiler_stats('bytes allocated',2) ],
+      compile,
+      ['-v0 -O'])
