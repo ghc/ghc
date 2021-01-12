@@ -215,6 +215,10 @@ The supported transformers are listed below:
             default to loading static rather than dynamic library when,
             e.g., loading libraries during TemplateHaskell evaluations.</td>
     </tr>
+    <tr>
+        <td><code>no_profiled_libs</code></td>
+        <td>Disables building of libraries in profiled build ways.</td>
+    </tr>
 </table>
 
 ## Ways
