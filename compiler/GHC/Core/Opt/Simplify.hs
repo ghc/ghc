@@ -165,6 +165,38 @@ It's quite convenient. This way we don't need to manipulate the substitution all
 the time: every update to a binder is automatically reflected to its bound
 occurrences.
 
+Note [Bangs in the Simplifier]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Both SimplFloats and SimplEnv do *not* generally benefit from making
+their fields strict. I don't know if this is because of good use of
+laziness or unintended side effects like closures capturing more variables
+after WW has run.
+
+But the end result is that we keep these lazy, but force them in some places
+where we know it's beneficial to the compiler.
+
+Similarly environments returned from functions aren't *always* beneficial to
+force. In some places they would never be demanded so forcing them early
+increases allocation. In other places they almost always get demanded so
+it's worthwhile to force them early.
+
+Would it be better to through every allocation of e.g. SimplEnv and decide
+wether or not to make this one strict? Absolutely! Would be a good use of
+someones time? Absolutely not! I made these strict that showed up during
+a profiled build or which I noticed while looking at core for one reason
+or another.
+
+The result sadly is that we end up with "random" bangs in the simplifier
+where we sometimes force e.g. the returned environment from a function and
+sometimes we don't for the same function. Depending on the context around
+the call. The treatment is also not very consistent. I only added bangs
+where I saw it making a difference either in the core or benchmarks. Some
+patterns where it would be beneficial aren't convered as a consequence as
+I neither have the time to go through all of the core and some cases are
+too small to show up in benchmarks.
+
+
+
 ************************************************************************
 *                                                                      *
 \subsection{Bindings}
@@ -180,7 +212,8 @@ simplTopBinds env0 binds0
                 -- anything into scope, then we don't get a complaint about that.
                 -- It's rather as if the top-level binders were imported.
                 -- See note [Glomming] in "GHC.Core.Opt.OccurAnal".
-        ; env1 <- {-#SCC "simplTopBinds-simplRecBndrs" #-} simplRecBndrs env0 (bindersOfBinds binds0)
+        -- See Note [Bangs in the Simplifier]
+        ; !env1 <- {-#SCC "simplTopBinds-simplRecBndrs" #-} simplRecBndrs env0 (bindersOfBinds binds0)
         ; (floats, env2) <- {-#SCC "simplTopBinds-simpl_binds" #-} simpl_binds env1 binds0
         ; freeTick SimplifierDone
         ; return (floats, env2) }
@@ -193,7 +226,9 @@ simplTopBinds env0 binds0
     simpl_binds env []           = return (emptyFloats env, env)
     simpl_binds env (bind:binds) = do { (float,  env1) <- simpl_bind env bind
                                       ; (floats, env2) <- simpl_binds env1 binds
-                                      ; return (float `addFloats` floats, env2) }
+                                      -- See Note [Bangs in the Simplifier]
+                                      ; let !floats1 = float `addFloats` floats
+                                      ; return (floats1, env2) }
 
     simpl_bind env (Rec pairs)
       = simplRecBind env TopLevel Nothing pairs
@@ -294,7 +329,7 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
   = ASSERT( isId bndr )
     ASSERT2( not (isJoinId bndr), ppr bndr )
     -- pprTrace "simplLazyBind" ((ppr bndr <+> ppr bndr1) $$ ppr rhs $$ ppr (seIdSubst rhs_se)) $
-    do  { let   rhs_env     = rhs_se `setInScopeFromE` env
+    do  { let   !rhs_env     = rhs_se `setInScopeFromE` env -- See Note [Bangs in the Simplifier]
                 (tvs, body) = case collectTyAndValBinders rhs of
                                 (tvs, [], body)
                                   | surely_not_lam body -> (tvs, body)
@@ -940,7 +975,7 @@ might do the same again.
 -}
 
 simplExpr :: SimplEnv -> CoreExpr -> SimplM CoreExpr
-simplExpr env (Type ty)
+simplExpr !env (Type ty) -- See Note [Bangs in the Simplifier]
   = do { ty' <- simplType env ty  -- See Note [Avoiding space leaks in OutType]
        ; return (Type ty') }
 
@@ -971,7 +1006,7 @@ simplExprF :: SimplEnv
            -> SimplCont
            -> SimplM (SimplFloats, OutExpr)
 
-simplExprF env e cont
+simplExprF !env e !cont -- See Note [Bangs in the Simplifier]
   = {- pprTrace "simplExprF" (vcat
       [ ppr e
       , text "cont =" <+> ppr cont
@@ -1868,24 +1903,33 @@ outside.  Surprisingly tricky!
 simplVar :: SimplEnv -> InVar -> SimplM OutExpr
 -- Look up an InVar in the environment
 simplVar env var
-  | isTyVar var = return (Type (substTyVar env var))
-  | isCoVar var = return (Coercion (substCoVar env var))
+  -- Why $! ? See Note [Bangs in the Simplifier]
+  | isTyVar var = return $! Type $! (substTyVar env var)
+  | isCoVar var = return $! Coercion $! (substCoVar env var)
   | otherwise
   = case substId env var of
-        ContEx tvs cvs ids e -> simplExpr (setSubstEnv env tvs cvs ids) e
+        ContEx tvs cvs ids e -> let env' = setSubstEnv env tvs cvs ids
+                                in simplExpr env' e
         DoneId var1          -> return (Var var1)
         DoneEx e _           -> return e
 
 simplIdF :: SimplEnv -> InId -> SimplCont -> SimplM (SimplFloats, OutExpr)
 simplIdF env var cont
   = case substId env var of
-      ContEx tvs cvs ids e -> simplExprF (setSubstEnv env tvs cvs ids) e cont
-                                -- Don't trim; haven't already simplified e,
-                                -- so the cont is not embodied in e
+      ContEx tvs cvs ids e ->
+          let env' = setSubstEnv env tvs cvs ids
+          in simplExprF env' e cont
+          -- Don't trim; haven't already simplified e,
+          -- so the cont is not embodied in e
 
-      DoneId var1 -> completeCall env var1 (trimJoinCont var (isJoinId_maybe var1) cont)
+      DoneId var1 ->
+          let cont' = trimJoinCont var (isJoinId_maybe var1) cont
+          in completeCall env var1 cont'
 
-      DoneEx e mb_join -> simplExprF (zapSubstEnv env) e (trimJoinCont var mb_join cont)
+      DoneEx e mb_join ->
+          let env' = zapSubstEnv env
+              cont' = trimJoinCont var mb_join cont
+          in simplExprF env' e cont'
               -- Note [zapSubstEnv]
               -- The template is already simplified, so don't re-substitute.
               -- This is VITAL.  Consider
@@ -1906,12 +1950,14 @@ completeCall env var cont
   -- Inline the variable's RHS
   = do { checkedTick (UnfoldingDone var)
        ; dump_inline expr cont
-       ; simplExprF (zapSubstEnv env) expr cont }
+       ; let env1 = zapSubstEnv env
+       ; simplExprF env1 expr cont }
 
   | otherwise
   -- Don't inline; instead rebuild the call
   = do { rule_base <- getSimplRules
-       ; let info = mkArgInfo env var (getRules rule_base var)
+       ; let rules = getRules rule_base var
+             info = mkArgInfo env var rules
                               n_val_args call_cont
        ; rebuildCall env info cont }
 
