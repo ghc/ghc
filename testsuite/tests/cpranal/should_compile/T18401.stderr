@@ -1,0 +1,39 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core = {terms: 53, types: 82, coercions: 0, joins: 0/0}
+
+Rec {
+-- RHS size: {terms: 13, types: 12, coercions: 0, joins: 0/0}
+T18401.$w$spoly_$wgo1 :: forall {a}. a -> [a] -> [a]
+T18401.$w$spoly_$wgo1
+  = \ (@a_s1bS) (w_s1bT :: a_s1bS) (w1_s1bU :: [a_s1bS]) ->
+      case w1_s1bU of {
+        [] -> GHC.Types.[] @a_s1bS;
+        : y_a157 ys_a158 -> GHC.Types.: @a_s1bS w_s1bT (T18401.$w$spoly_$wgo1 @a_s1bS y_a157 ys_a158)
+      }
+end Rec }
+
+-- RHS size: {terms: 11, types: 12, coercions: 0, joins: 0/0}
+T18401.safeInit_$spoly_$wgo1 :: forall {a}. a -> [a] -> (# Bool, [a] #)
+T18401.safeInit_$spoly_$wgo1 = \ (@a_s1bS) (w_s1bT :: a_s1bS) (w1_s1bU :: [a_s1bS]) -> case T18401.$w$spoly_$wgo1 @a_s1bS w_s1bT w1_s1bU of ww_s1bZ { __DEFAULT -> (# GHC.Types.True, ww_s1bZ #) }
+
+-- RHS size: {terms: 14, types: 16, coercions: 0, joins: 0/0}
+si :: forall a. [a] -> (Bool, [a])
+si
+  = \ (@a_s18A) (w_s18B :: [a_s18A]) ->
+      case w_s18B of {
+        [] -> (GHC.Types.False, GHC.Types.[] @a_s18A);
+        : y_a157 ys_a158 -> (GHC.Types.True, T18401.$w$spoly_$wgo1 @a_s18A y_a157 ys_a158)
+      }
+
+-- RHS size: {terms: 11, types: 13, coercions: 0, joins: 0/0}
+safeInit :: forall a. [a] -> Maybe [a]
+safeInit
+  = \ (@a_aNq) (xs_au6 :: [a_aNq]) ->
+      case xs_au6 of {
+        [] -> GHC.Maybe.Nothing @[a_aNq];
+        : y_a157 ys_a158 -> GHC.Maybe.Just @[a_aNq] (T18401.$w$spoly_$wgo1 @a_aNq y_a157 ys_a158)
+      }
+
+
+

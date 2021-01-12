@@ -40,6 +40,8 @@ import qualified Data.Semigroup as Semigroup
 import Control.Monad.Trans.Writer.CPS
 import Control.Monad (zipWithM, zipWithM_)
 
+import GHC.Driver.Ppr
+
 --------------
 -- * Levitated
 
@@ -536,10 +538,9 @@ seqCprSig (CprSig sig) = seqCprType sig `seq` ()
 cprTransformDataConSig :: DataCon -> [CprType] -> CprType
 cprTransformDataConSig con args
   | null (dataConExTyCoVars con)  -- No existentials
-  , wkr_arity > 0
   , wkr_arity <= mAX_CPR_SIZE
   , args `lengthIs` wkr_arity
-  -- , pprTrace "cprTransformDataConSig" (ppr con <+> ppr wkr_arity <+> ppr args) True
+  , pprTrace "cprTransformDataConSig" (ppr con <+> ppr wkr_arity <+> ppr args) True
   = abstractCprTyNTimes wkr_arity $ conCprType con args
   | otherwise -- TODO: Refl binds a coercion. What about these? can we CPR them? I don't see why we couldn't.
   = topCprType
