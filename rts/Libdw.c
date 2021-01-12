@@ -237,9 +237,9 @@ static int getBacktraceFrameCb(Dwfl_Frame *frame, void *arg) {
         // failed to find PC
         backtracePush(session->cur_bt, 0x0);
     } else {
-        if (is_activation)
-            pc -= 1; // TODO: is this right?
-        backtracePush(session->cur_bt, (StgPtr) (uintptr_t) pc);
+        // see https://sourceware.org/git/?p=elfutils.git;a=blob;f=src/stack.c;h=534aa93c433551896b67b65845ab4891fd175066;hb=HEAD#l376
+        Dwarf_Addr pc_adjusted = pc - (is_activation ? 0 : 1);
+        backtracePush(session->cur_bt, (StgPtr) (uintptr_t) pc_adjusted);
     }
     session->max_depth--;
     if (session->max_depth == 0) {
