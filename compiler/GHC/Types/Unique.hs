@@ -68,8 +68,20 @@ import Data.Bits
 *                                                                      *
 ************************************************************************
 
-The @Chars@ are ``tag letters'' that identify the @UniqueSupply@.
-Fast comparison is everything on @Uniques@:
+Note [Uniques and masks]
+~~~~~~~~~~~~~~~~~~~~~~~~
+A `Unique` in GHC is a Word-sized value composed of two pieces:
+* A "mask", of width `UNIQUE_TAG_BITS`, in the high order bits
+* A number, of width `uNIQUE_BITS`, which fills up the remainder of the Word
+
+The mask is typically an ASCII character.  It is typically used to make it easier
+to distinguish uniques constructed by different parts of the compiler.
+There is a (potentially incomplete) list of unique masks used given in
+GHC.Builtin.Uniques. See Note [Uniques-prelude - Uniques for wired-in Prelude things]
+
+`mkUnique` constructs a `Unique` from its pieces
+  mkUnique :: Char -> Int -> Unique
+
 -}
 
 -- | Unique identifier.
