@@ -41,7 +41,8 @@ import Data.List
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The goal of Constructed Product Result analysis is to identify functions that
 surely return heap-allocated records on every code path, so that we can
-eliminate said heap allocation by performing a worker/wrapper split.
+eliminate said heap allocation by performing a worker/wrapper split
+(via 'GHC.Core.Opt.WorkWrap.Utils.mkWWcpr_start').
 
 @swap@ below is such a function:
 
@@ -132,8 +133,8 @@ cprAnalTopBind env (Rec pairs)
 -- * Analysing expressions
 --
 
--- | Analoguous to the abstract semantic function ⟦_⟧ : Expr -> Env -> A from
--- "Constructed Product Result Analysis for Haskell"
+-- | Analoguous to the abstract semantic function \(⟦_⟧ : Expr -> Env -> A\)
+-- from "Constructed Product Result Analysis for Haskell"
 cprAnal, cprAnal'
   :: AnalEnv
   -> [CprType]           -- ^ info about incoming arguments
@@ -167,15 +168,11 @@ cprAnal' env args (App fun (Type ty))
 cprAnal' env args (App fun arg)
   = (app_ty, App fun' arg')
   where
-    -- TODO: Make incoming info a proper lattice, so that it's clear that we
-    --       can always cough up another topCprType
-    (arg_ty, arg')      = cprAnal env [] arg
-    -- TODO: forgetCPR on arg_ty! We assume CPR according to what WW makes of
-    -- the StrictSig and in all other cases, we won't actually get a CPR.
-    -- So the CPR of the argument is actually irrelevant. Its termination info
-    -- is useful, though. BUT, what about data con apps? There we definietely
-    -- want CPR!
-    (fun_ty, fun')      = cprAnal env (arg_ty:args) fun
+    (arg_ty, arg') = cprAnal env [] arg
+    -- NB: arg_ty may have the CPR property. That is indeed important for data
+    -- constructors.
+    (fun_ty, fun') = cprAnal env (arg_ty:args) fun
+    -- TODO: Move the following comment into a Note. But first determine if we need it.
     -- We force arg_ty when entering a lambda or when applying a transformer.
     -- There's no need to force arg_ty after the application, because the
     -- potential divergence from forcing was already unleashed.
@@ -185,7 +182,7 @@ cprAnal' env args (App fun arg)
     -- of the binder (somewhat anticipating how the function will look after
     -- WWing for strictness). We don't have that available here before having
     -- analysed the fun.
-    app_ty              = applyCprTy fun_ty
+    app_ty         = applyCprTy fun_ty
 cprAnal' env args (Lam var body)
   | isTyVar var
   , (body_ty, body') <- cprAnal env args body
@@ -194,16 +191,16 @@ cprAnal' env args (Lam var body)
   = (lam_ty, Lam var body')
   where
     (arg_ty, body_args)
-      | ty:args' <- args = (ty, args')      -- We know things about the argument, for example from a StrictSig or an incoming argument. NB: This can never be an anonymous (non-let-bound) lambda! The simplifier would have eliminated the necessary (App (Lam{} |> co) _) construct.
-      | otherwise        = (topCprType, []) -- An anonymous lambda or no info on its argument
-    env'                 = extendSigEnv env var (CprSig arg_ty) -- TODO: I think we also need to store assumed argument strictness (which would be all lazy here) in the env
+      | ty:args' <- args = (ty, args')      -- Can only be info from a StrictSig
+      | otherwise        = (topCprType, []) -- An anonymous lambda
+    env'                 = extendSigEnv env var (CprSig arg_ty)
     (body_ty, body')     = cprAnal env' body_args body
     lam_ty               = abstractCprTy body_ty
 
 cprAnal' env args (Case scrut case_bndr ty alts)
   = (res_ty, Case scrut' case_bndr ty alts')
   where
-    -- Analyse the scrutinee and additional force the resulting CPR type with
+    -- Analyse the scrutinee and additionally force the resulting CPR type with
     -- head strictness.
     (scrut_ty, scrut')        = cprAnal env [] scrut
     (whnf_flag, case_bndr_ty) = forceCprTy seqDmd scrut_ty
@@ -229,17 +226,14 @@ cprAnalAlt
   -> CprType        -- ^ info about the case binder
   -> Alt Var        -- ^ current alternative
   -> (CprType, Alt Var)
-cprAnalAlt env args case_bndr case_bndr_ty (Alt con@(DataAlt dc) bndrs rhs)
-  -- See 'extendEnvForDataAlt' and Note [CPR in a DataAlt case alternative]
-  = (rhs_ty, Alt con bndrs rhs')
-  where
-    env_alt        = extendEnvForDataAlt env case_bndr case_bndr_ty dc bndrs
-    (rhs_ty, rhs') = cprAnal env_alt args rhs
 cprAnalAlt env args case_bndr case_bndr_ty (Alt con bndrs rhs)
   = (rhs_ty, Alt con bndrs rhs')
   where
-    env' = extendSigEnv env case_bndr (CprSig case_bndr_ty)
-    (rhs_ty, rhs') = cprAnal env' args rhs
+    env_alt
+      -- See 'extendEnvForDataAlt' and Note [CPR in a DataAlt case alternative]
+      | DataAlt dc <- con = extendEnvForDataAlt env case_bndr case_bndr_ty dc bndrs
+      | otherwise         = extendSigEnv env case_bndr (CprSig case_bndr_ty)
+    (rhs_ty, rhs') = cprAnal env_alt args rhs
 
 --
 -- * CPR transformer
@@ -255,7 +249,7 @@ cprTransform env args id
     sig
   where
     sig
-      -- Top-level binding, local let-binding or case binder
+      -- Top-level binding, local let-binding, lambda arg or case binder
       | Just sig <- lookupSigEnv env id
       = cprTransformSig (idStrictness id) sig args
       -- See Note [CPR for data structures]
@@ -271,7 +265,7 @@ cprTransform env args id
       = topCprType
 
 --
--- * Bindings
+-- * Analysing Bindings
 --
 
 --
@@ -487,7 +481,7 @@ data AnalEnv
   -- ^ Needed when expanding type families and synonyms of product types.
   }
 
-type SigEnv = VarEnv CprSig
+type SigEnv = IdEnv CprSig
 
 instance Outputable AnalEnv where
   ppr (AE { ae_sigs = env, ae_virgin = virgin })
