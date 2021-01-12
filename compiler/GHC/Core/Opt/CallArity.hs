@@ -325,7 +325,9 @@ every time we would be lookup up `x` in the analysis result of `e2`.
     with it.
   * In the recursive case, when calclulating the `cross_calls`, if there is
     any boring variable in the recursive group, we ignore all co-call-results
-    and directly go to a very conservative assumption.
+    and directly go to a very conservative assumption. We make a similar
+    assumption when a group contains a self-recursive binding as this implies
+    that the variable is called more than once (see #18789).
 
 The last point has the nice side effect that the relatively expensive
 integration of co-call results in a recursive groups is often skipped. This
@@ -670,6 +672,7 @@ callArityRecEnv any_boring ae_rhss ae_body
   where
     vars = map fst ae_rhss
 
+    ae_combined :: CallArityRes
     ae_combined = lubRess (map snd ae_rhss) `lubRes` ae_body
 
     cross_calls
@@ -678,7 +681,15 @@ callArityRecEnv any_boring ae_rhss ae_body
         -- Also, calculating cross_calls is expensive. Simply be conservative
         -- if the mutually recursive group becomes too large.
         | lengthExceeds ae_rhss 25 = completeGraph (domRes ae_combined)
+        -- Also avoid cross-call computation when a binding contains a
+        -- self-recursive call since this implies that the binding was called
+        -- more than once. See #18789.
+        | any_self_call            = completeGraph (domRes ae_combined)
         | otherwise                = unionUnVarGraphs $ map cross_call ae_rhss
+
+    any_self_call = any is_self_call ae_rhss
+      where is_self_call (v, ae_rhs) = v `elemUnVarSet` domRes ae_rhs
+
     cross_call (v, ae_rhs) = completeBipartiteGraph called_by_v called_with_v
       where
         is_thunk = idCallArity v == 0
@@ -689,6 +700,7 @@ callArityRecEnv any_boring ae_rhss ae_body
                     | otherwise = ae_combined
         -- What do we want to know from these?
         -- Which calls can happen next to any recursive call.
+        called_with_v, called_by_v :: UnVarSet
         called_with_v
             = unionUnVarSets $ map (calledWith ae_before_v) vars
         called_by_v = domRes ae_rhs
