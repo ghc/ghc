@@ -1539,9 +1539,7 @@ pprInfo (thing, fixity, cls_insts, fam_insts, docs)
   $$ vcat (map GHC.pprInstance cls_insts)
   $$ vcat (map GHC.pprFamInst  fam_insts)
   where
-    show_fixity
-        | fixity == GHC.defaultFixity = empty
-        | otherwise                   = ppr fixity <+> pprInfixName (GHC.getName thing)
+    show_fixity = ppr fixity <+> pprInfixName (GHC.getName thing)
 
 -----------------------------------------------------------------------------
 -- :main
