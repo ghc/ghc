@@ -140,7 +140,7 @@ updateGlobalIds env e = go env e
     go env (Case e b ty alts) =
         assertNotInNameEnv env [b] (Case (go env e) b ty (map go_alt alts))
       where
-         go_alt (k,bs,e) = assertNotInNameEnv env bs (k, bs, go env e)
+         go_alt (Alt k bs e) = assertNotInNameEnv env bs (Alt k bs (go env e))
     go env (Cast e c) = Cast (go env e) c
     go env (Tick t e) = Tick t (go env e)
     go _ e@Type{} = e

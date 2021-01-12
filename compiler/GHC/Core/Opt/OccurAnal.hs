@@ -2196,12 +2196,12 @@ occAnalLamOrRhs env binders body
 
 occAnalAlt :: OccEnv
            -> CoreAlt -> (UsageDetails, Alt IdWithOccInfo)
-occAnalAlt env (con, bndrs, rhs)
+occAnalAlt env (Alt con bndrs rhs)
   = case occAnal (env `addInScope` bndrs) rhs of { (rhs_usage1, rhs1) ->
     let
       (alt_usg, tagged_bndrs) = tagLamBinders rhs_usage1 bndrs
     in                          -- See Note [Binders in case alternatives]
-    (alt_usg, (con, tagged_bndrs, rhs1)) }
+    (alt_usg, Alt con tagged_bndrs rhs1) }
 
 {-
 ************************************************************************
