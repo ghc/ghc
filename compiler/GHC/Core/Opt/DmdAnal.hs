@@ -424,7 +424,7 @@ dmdAnal' env dmd (Lam var body)
     in
     (multDmdType n lam_ty, Lam var' body')
 
-dmdAnal' env dmd (Case scrut case_bndr ty [(alt, bndrs, rhs)])
+dmdAnal' env dmd (Case scrut case_bndr ty [Alt alt bndrs rhs])
   -- Only one alternative.
   -- If it's a DataAlt, it should be the only constructor of the type.
   | is_single_data_alt alt
@@ -464,7 +464,7 @@ dmdAnal' env dmd (Case scrut case_bndr ty [(alt, bndrs, rhs)])
 --                                   , text "scrut_ty" <+> ppr scrut_ty
 --                                   , text "alt_ty" <+> ppr alt_ty2
 --                                   , text "res_ty" <+> ppr res_ty ]) $
-    (res_ty, Case scrut' case_bndr' ty [(alt, bndrs', rhs')])
+    (res_ty, Case scrut' case_bndr' ty [Alt alt bndrs' rhs'])
     where
       is_single_data_alt (DataAlt dc) = isJust $ tyConSingleAlgDataCon_maybe $ dataConTyCon dc
       is_single_data_alt _            = True
@@ -536,13 +536,13 @@ forcesRealWorld fam_envs ty
   = False
 
 dmdAnalSumAlt :: AnalEnv -> SubDemand -> Id -> Alt Var -> (DmdType, Alt Var)
-dmdAnalSumAlt env dmd case_bndr (con,bndrs,rhs)
+dmdAnalSumAlt env dmd case_bndr (Alt con bndrs rhs)
   | (rhs_ty, rhs') <- dmdAnal env dmd rhs
   , (alt_ty, dmds) <- findBndrsDmds env rhs_ty bndrs
   , let (_ :* case_bndr_sd) = findIdDemand alt_ty case_bndr
         -- See Note [Demand on scrutinee of a product case]
         id_dmds             = addCaseBndrDmd case_bndr_sd dmds
-  = (alt_ty, (con, setBndrsDemandInfo bndrs id_dmds, rhs'))
+  = (alt_ty, Alt con (setBndrsDemandInfo bndrs id_dmds) rhs')
 
 {-
 Note [Analysing with absent demand]
