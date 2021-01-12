@@ -7,6 +7,7 @@
 {-# LANGUAGE CPP #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates -Wno-incomplete-uni-patterns #-}
+-- {-# OPTIONS_GHC -ddump-simpl -ddump-to-file -ddump-stg-final #-}
 module GHC.Core.Opt.Simplify ( simplTopBinds, simplExpr, simplRules ) where
 
 #include "HsVersions.h"
@@ -971,7 +972,7 @@ simplExprF :: SimplEnv
            -> SimplCont
            -> SimplM (SimplFloats, OutExpr)
 
-simplExprF env e cont
+simplExprF !env e cont
   = {- pprTrace "simplExprF" (vcat
       [ ppr e
       , text "cont =" <+> ppr cont
@@ -1868,24 +1869,32 @@ outside.  Surprisingly tricky!
 simplVar :: SimplEnv -> InVar -> SimplM OutExpr
 -- Look up an InVar in the environment
 simplVar env var
-  | isTyVar var = return (Type (substTyVar env var))
-  | isCoVar var = return (Coercion (substCoVar env var))
+  | isTyVar var = return $! Type $! (substTyVar env var)
+  | isCoVar var = return $! Coercion $! (substCoVar env var)
   | otherwise
   = case substId env var of
-        ContEx tvs cvs ids e -> simplExpr (setSubstEnv env tvs cvs ids) e
+        ContEx tvs cvs ids e -> let !env' = setSubstEnv env tvs cvs ids
+                                in simplExpr env' e
         DoneId var1          -> return (Var var1)
         DoneEx e _           -> return e
 
 simplIdF :: SimplEnv -> InId -> SimplCont -> SimplM (SimplFloats, OutExpr)
 simplIdF env var cont
   = case substId env var of
-      ContEx tvs cvs ids e -> simplExprF (setSubstEnv env tvs cvs ids) e cont
-                                -- Don't trim; haven't already simplified e,
-                                -- so the cont is not embodied in e
+      ContEx tvs cvs ids e ->
+          let !env' = setSubstEnv env tvs cvs ids
+          in simplExprF env' e cont
+          -- Don't trim; haven't already simplified e,
+          -- so the cont is not embodied in e
 
-      DoneId var1 -> completeCall env var1 (trimJoinCont var (isJoinId_maybe var1) cont)
+      DoneId var1 ->
+          let cont' = trimJoinCont var (isJoinId_maybe var1) cont
+          in completeCall env var1 cont'
 
-      DoneEx e mb_join -> simplExprF (zapSubstEnv env) e (trimJoinCont var mb_join cont)
+      DoneEx e mb_join ->
+          let !env' = zapSubstEnv env
+              !cont' = trimJoinCont var mb_join cont
+          in simplExprF env' e cont'
               -- Note [zapSubstEnv]
               -- The template is already simplified, so don't re-substitute.
               -- This is VITAL.  Consider
