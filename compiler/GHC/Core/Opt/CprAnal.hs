@@ -173,16 +173,6 @@ cprAnal' env args (App fun arg)
     -- NB: arg_ty may have the CPR property. That is indeed important for data
     -- constructors.
     (fun_ty, fun') = cprAnal env (arg_ty:args) fun
-    -- TODO: Move the following comment into a Note. But first determine if we need it.
-    -- We force arg_ty when entering a lambda or when applying a transformer.
-    -- There's no need to force arg_ty after the application, because the
-    -- potential divergence from forcing was already unleashed.
-    -- Hence arg_str below is unused.
-    -- Why unleash in lambda and tranformer rather than here?
-    -- We need to unleash in lambda anyway, because there we see the strictness
-    -- of the binder (somewhat anticipating how the function will look after
-    -- WWing for strictness). We don't have that available here before having
-    -- analysed the fun.
     app_ty         = applyCprTy fun_ty
 cprAnal' env args (Lam var body)
   | isTyVar var
@@ -281,21 +271,14 @@ noWidening = id
 -- | A widening operator on 'CprSig' to ensure termination of fixed-point
 -- iteration. See Note [Ensuring termination of fixed-point iteration]
 depthWidening :: Widening
-depthWidening = pruneSig mAX_DEPTH . markDiverging
+depthWidening (CprSig ty) = CprSig . prune . mark_diverging $ ty
+  where
+    mark_diverging ty = ty { ct_cpr = ct_cpr ty `lubCpr` divergeCpr }
+    prune ty = ty { ct_cpr = pruneDeepCpr mAX_DEPTH (ct_cpr ty) }
 
+-- This constant is quite arbitrary. We might well make it a CLI flag if needed
 mAX_DEPTH :: Int
 mAX_DEPTH = 4
-
-pruneSig :: Int -> CprSig -> CprSig
-pruneSig d (CprSig cpr_ty)
-  = CprSig $ cpr_ty { ct_cpr = pruneDeepCpr d (ct_cpr cpr_ty) }
-
--- TODO: We need the lubCpr with the initial CPR because
---       of functions like iterate, which we would CPR
---       multiple levels deep, thereby changing termination
---       behavior.
-markDiverging :: CprSig -> CprSig
-markDiverging (CprSig cpr_ty) = CprSig $ cpr_ty { ct_cpr = ct_cpr cpr_ty `lubCpr` divergeCpr }
 
 --
 -- ** Analysing a binding (one-round, the non-recursive case)
