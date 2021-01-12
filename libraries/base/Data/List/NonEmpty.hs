@@ -113,6 +113,9 @@ import           GHC.Base            (NonEmpty(..))
 
 infixr 5 <|
 
+-- $setup
+-- >>> import Prelude (negate)
+
 -- | Number of elements in 'NonEmpty' list.
 length :: NonEmpty a -> Int
 length (_ :| xs) = 1 + Prelude.length xs
