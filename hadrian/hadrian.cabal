@@ -68,6 +68,7 @@ executable hadrian
                        , Rules.Compile
                        , Rules.Configure
                        , Rules.Dependencies
+                       , Rules.Docspec
                        , Rules.Documentation
                        , Rules.Generate
                        , Rules.Gmp
