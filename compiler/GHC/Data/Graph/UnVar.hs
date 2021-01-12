@@ -74,7 +74,7 @@ unionUnVarSet :: UnVarSet -> UnVarSet -> UnVarSet
 unionUnVarSet (UnVarSet set1) (UnVarSet set2) = UnVarSet (set1 `S.union` set2)
 
 unionUnVarSets :: [UnVarSet] -> UnVarSet
-unionUnVarSets = foldr unionUnVarSet emptyUnVarSet
+unionUnVarSets = foldl' (flip unionUnVarSet) emptyUnVarSet
 
 instance Outputable UnVarSet where
     ppr (UnVarSet s) = braces $
