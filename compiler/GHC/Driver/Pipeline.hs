@@ -484,6 +484,7 @@ compileEmptyStub dflags hsc_env basename location mod_name = do
 -- libraries.
 link :: GhcLink                 -- ^ interactive or batch
      -> Logger                  -- ^ Logger
+     -> Hooks
      -> DynFlags                -- ^ dynamic flags
      -> UnitEnv                 -- ^ unit environment
      -> Bool                    -- ^ attempt linking in batch mode?
@@ -497,20 +498,20 @@ link :: GhcLink                 -- ^ interactive or batch
 -- exports main, i.e., we have good reason to believe that linking
 -- will succeed.
 
-link ghcLink logger dflags unit_env
-  = lookupHook linkHook l dflags ghcLink dflags
-  where
-    l k dflags batch_attempt_linking hpt = case k of
-        NoLink        -> return Succeeded
-        LinkBinary    -> link' logger dflags unit_env batch_attempt_linking hpt
-        LinkStaticLib -> link' logger dflags unit_env batch_attempt_linking hpt
-        LinkDynLib    -> link' logger dflags unit_env batch_attempt_linking hpt
-        LinkInMemory
-            | platformMisc_ghcWithInterpreter $ platformMisc dflags
-            -> -- Not Linking...(demand linker will do the job)
-               return Succeeded
-            | otherwise
-            -> panicBadLink LinkInMemory
+link ghcLink logger hooks dflags unit_env batch_attempt_linking hpt =
+  case linkHook hooks of
+      Nothing -> case ghcLink of
+          NoLink        -> return Succeeded
+          LinkBinary    -> link' logger dflags unit_env batch_attempt_linking hpt
+          LinkStaticLib -> link' logger dflags unit_env batch_attempt_linking hpt
+          LinkDynLib    -> link' logger dflags unit_env batch_attempt_linking hpt
+          LinkInMemory
+              | platformMisc_ghcWithInterpreter $ platformMisc dflags
+              -> -- Not Linking...(demand linker will do the job)
+                 return Succeeded
+              | otherwise
+              -> panicBadLink LinkInMemory
+      Just h  -> h ghcLink dflags batch_attempt_linking hpt
 
 
 panicBadLink :: GhcLink -> a
@@ -937,8 +938,10 @@ pipeLoop phase input_fn = do
 
 runHookedPhase :: PhasePlus -> FilePath -> CompPipeline (PhasePlus, FilePath)
 runHookedPhase pp input = do
-  dflags <- hsc_dflags <$> getPipeSession
-  lookupHook runPhaseHook runPhase dflags pp input
+  hooks <- hsc_hooks <$> getPipeSession
+  case runPhaseHook hooks of
+    Nothing -> runPhase pp input
+    Just h  -> h pp input
 
 -- -----------------------------------------------------------------------------
 -- In each phase, we need to know into what filename to generate the
