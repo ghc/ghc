@@ -86,6 +86,32 @@ lazily-evaluated infinite tree.
      * The fresh node
      * A thunk for each sub-tree
 
+Note [How unique supplies are used]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The general design (used throughout GHC) is to:
+
+* Different parts of the compiler use uniques with different masks. The mask is either
+  encoded when we create a UniqueSupply at the beginning of a pass, or in the
+  MonadUnique instance for the pass.
+  There is a (potentially incomplete) list of unique masks used given in
+  GHC.Builtin.Uniques. See Note [Uniques-prelude - Uniques for wired-in Prelude things]
+* Either the supply, or the MonadUnique instance is then used throughout
+  the pass(es), allowing us the generate new uniques when needed.
+
+If different code shares the same mask then care has to be taken that all uniques
+still get distinct numbers. Usually this is done by relying on genSym which
+has *one* counter per GHC invocation that is relied on by all calls to it.
+But using something like the address for pinned objects works as well and in fact is done
+for fast strings.
+
+This is important for example in the simplifier. Most passes of the simplifier use
+the same mask 's'. However in some places we create a unique supply using `mkSplitUniqSupply`
+and thread it through the code, while in others we use `uniqFromMask`
+Ultimately both boil down to the new unique consisting of the mask and the result from
+a call to `genSym`. The later producing a distinct number for each invocation ensuring
+uniques are distinct as well.
+
 Note [Optimising the unique supply]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -116,6 +142,46 @@ and to rely on -fno-state-hack, full laziness and inlining to get the same
 result. It was very brittle and required enabling -fno-state-hack globally. So
 it has been rewritten using lower level constructs to explicitly state what we
 want.
+
+Note [Optimising use of unique supplies]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When it comes to having a way to generate new Uniques
+there are generally three ways to deal with this:
+
+For pure code the only good approach is to take an UniqSupply
+as argument. Then  thread it through the code splitting it
+for sub-passes or when creating uniques.
+The code for this is about as optimized as it gets, but we can't
+get around the need to allocate one `UniqSupply` for each Unique
+we need.
+
+For code in IO we can improve on this by threading only the *mask*
+we are going to use for Uniques. Using `uniqFromMask` to
+generate uniques as needed. This gets rid of the overhead of
+allocating a new UniqSupply for each unique generated. It also avoids
+frequent state updates when the Unique/Mask is part of the state in a
+state monad.
+
+For monadic code in IO which always uses the same mask we can go further
+and hardcode the mask into the MonadUnique instance. On top of all the
+benefits of threading the mask this *also* has the benefit of avoiding
+the mask getting captured in thunks, or being passed around at runtime.
+It does however come at the cost of having to use a fixed Mask for all
+code run in this Monad.
+
+NB: It's *not* an optimization to pass around the UniqSupply inside an
+IORef instead of the mask. While this would avoid frequent state updates
+it still requires allocating one UniqSupply per Unique. On top of some
+overhead for reading/writing to/from the IORef.
+
+All of this hinges on the assumption that UniqSupply and
+uniqFromMask use the same source of distinct numbers (`genSym`) which
+allows both to be used at the same time, with the same mask, while still
+ensuring distinct uniques.
+One might consider this fact to be an "accident". But GHC worked like this
+as far back as source control history goes. It also allows the later two
+optimizations to be used. So it seems safe to depend on this fact.
 
 -}
 
@@ -187,7 +253,7 @@ initUniqSupply counter inc = do
     poke ghc_unique_inc     inc
 
 uniqFromMask :: Char -> IO Unique
-uniqFromMask mask
+uniqFromMask !mask
   = do { uqNum <- genSym
        ; return $! mkUnique mask uqNum }
 

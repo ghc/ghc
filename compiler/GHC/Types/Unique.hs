@@ -19,6 +19,7 @@ Haskell).
 
 {-# LANGUAGE CPP, BangPatterns, MagicHash #-}
 
+{-# OPTIONS_GHC -ddump-stg-final -ddump-simpl -ddump-to-file -O2 #-}
 module GHC.Types.Unique (
         -- * Main data types
         Unique, Uniquable(..),
