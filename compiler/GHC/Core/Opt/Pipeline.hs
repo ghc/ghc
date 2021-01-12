@@ -69,7 +69,7 @@ import GHC.Types.Basic
 import GHC.Types.Demand ( zapDmdEnvSig )
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
-import GHC.Types.Unique.Supply ( UniqSupply, mkSplitUniqSupply, splitUniqSupply )
+import GHC.Types.Unique.Supply ( UniqSupply )
 import GHC.Types.Unique.FM
 import GHC.Types.Name.Ppr
 
@@ -634,10 +634,9 @@ simplifyExpr hsc_env expr
                             snd $ ic_instances $ hsc_IC hsc_env )
               simpl_env = simplEnvForGHCi dflags
 
-        ; us <-  mkSplitUniqSupply 's'
         ; let sz = exprSize expr
 
-        ; (expr', counts) <- initSmpl dflags rule_env fi_env us sz $
+        ; (expr', counts) <- initSmpl dflags rule_env fi_env sz $
                              simplExprGently simpl_env expr
 
         ; Err.dumpIfSet dflags (dopt Opt_D_dump_simpl_stats dflags)
@@ -685,27 +684,25 @@ simplExprGently env expr = do
 simplifyPgm :: CoreToDo -> ModGuts -> CoreM ModGuts
 simplifyPgm pass guts
   = do { hsc_env <- getHscEnv
-       ; us <- getUniqueSupplyM
        ; rb <- getRuleBase
        ; liftIOWithCount $
-         simplifyPgmIO pass hsc_env us rb guts }
+         simplifyPgmIO pass hsc_env rb guts }
 
 simplifyPgmIO :: CoreToDo
               -> HscEnv
-              -> UniqSupply
               -> RuleBase
               -> ModGuts
               -> IO (SimplCount, ModGuts)  -- New bindings
 
 simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
-              hsc_env us hpt_rule_base
+              hsc_env hpt_rule_base
               guts@(ModGuts { mg_module = this_mod
                             , mg_rdr_env = rdr_env
                             , mg_deps = deps
                             , mg_binds = binds, mg_rules = rules
                             , mg_fam_inst_env = fam_inst_env })
   = do { (termination_msg, it_count, counts_out, guts')
-           <- do_iteration us 1 [] binds rules
+           <- do_iteration 1 [] binds rules
 
         ; Err.dumpIfSet dflags (dopt Opt_D_verbose_core2core dflags &&
                                 dopt Opt_D_dump_simpl_stats  dflags)
@@ -724,14 +721,14 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
     active_rule  = activeRule mode
     active_unf   = activeUnfolding mode
 
-    do_iteration :: UniqSupply
-                 -> Int          -- Counts iterations
+    do_iteration :: Int --UniqSupply
+                --  -> Int          -- Counts iterations
                  -> [SimplCount] -- Counts from earlier iterations, reversed
                  -> CoreProgram  -- Bindings in
                  -> [CoreRule]   -- and orphan rules
                  -> IO (String, Int, SimplCount, ModGuts)
 
-    do_iteration us iteration_no counts_so_far binds rules
+    do_iteration iteration_no counts_so_far binds rules
         -- iteration_no is the number of the iteration we are
         -- about to begin, with '1' for the first
       | iteration_no > max_iterations   -- Stop if we've run out of iterations
@@ -776,7 +773,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
 
                 -- Simplify the program
            ((binds1, rules1), counts1) <-
-             initSmpl dflags (mkRuleEnv rule_base2 vis_orphs) fam_envs us1 sz $
+             initSmpl dflags (mkRuleEnv rule_base2 vis_orphs) fam_envs sz $
                do { (floats, env1) <- {-# SCC "SimplTopBinds" #-}
                                       simplTopBinds simpl_env tagged_binds
 
@@ -810,20 +807,18 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
            lintPassResult hsc_env pass binds2 ;
 
                 -- Loop
-           do_iteration us2 (iteration_no + 1) (counts1:counts_so_far) binds2 rules1
+           do_iteration (iteration_no + 1) (counts1:counts_so_far) binds2 rules1
            } }
 #if __GLASGOW_HASKELL__ <= 810
       | otherwise = panic "do_iteration"
 #endif
       where
-        (us1, us2) = splitUniqSupply us
-
         -- Remember the counts_so_far are reversed
         totalise :: [SimplCount] -> SimplCount
         totalise = foldr (\c acc -> acc `plusSimplCount` c)
                          (zeroSimplCount dflags)
 
-simplifyPgmIO _ _ _ _ _ = panic "simplifyPgmIO"
+simplifyPgmIO _ _ _ _ = panic "simplifyPgmIO"
 
 -------------------
 dump_end_iteration :: DynFlags -> PrintUnqualified -> Int
