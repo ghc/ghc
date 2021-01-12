@@ -115,7 +115,7 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcInteger conflicts excl
                             ArchSPARC64   -> panic "trivColorable ArchSPARC64"
                             ArchPPC_64 _  -> 15
                             ArchARM _ _ _ -> panic "trivColorable ArchARM"
-                            ArchARM64     -> panic "trivColorable ArchARM64"
+                            ArchAArch64     -> panic "trivColorable ArchAArch64"
                             ArchAlpha     -> panic "trivColorable ArchAlpha"
                             ArchMipseb    -> panic "trivColorable ArchMipseb"
                             ArchMipsel    -> panic "trivColorable ArchMipsel"
@@ -146,7 +146,7 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcFloat conflicts exclus
                             ArchSPARC64   -> panic "trivColorable ArchSPARC64"
                             ArchPPC_64 _  -> 0
                             ArchARM _ _ _ -> panic "trivColorable ArchARM"
-                            ArchARM64     -> panic "trivColorable ArchARM64"
+                            ArchAArch64     -> panic "trivColorable ArchAArch64"
                             ArchAlpha     -> panic "trivColorable ArchAlpha"
                             ArchMipseb    -> panic "trivColorable ArchMipseb"
                             ArchMipsel    -> panic "trivColorable ArchMipsel"
@@ -179,7 +179,7 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcDouble conflicts exclu
                             ArchSPARC64   -> panic "trivColorable ArchSPARC64"
                             ArchPPC_64 _  -> 20
                             ArchARM _ _ _ -> panic "trivColorable ArchARM"
-                            ArchARM64     -> panic "trivColorable ArchARM64"
+                            ArchAArch64     -> panic "trivColorable ArchAArch64"
                             ArchAlpha     -> panic "trivColorable ArchAlpha"
                             ArchMipseb    -> panic "trivColorable ArchMipseb"
                             ArchMipsel    -> panic "trivColorable ArchMipsel"
