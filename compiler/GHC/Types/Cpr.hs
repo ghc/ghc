@@ -16,7 +16,7 @@ module GHC.Types.Cpr (
     pruneDeepCpr, markOptimisticConCprType, splitConCprTy, applyCprTy, abstractCprTy,
     abstractCprTyNTimes, ensureCprTyArity, trimCprTy,
     forceCprTy, forceCpr, bothCprType,
-    cprTransformDataConSig, UnboxingStrategy, cprTransformSig, argCprTypesFromStrictSig,
+    cprTransformDataConSig, cprTransformSig, argCprTypesFromStrictSig,
     CprSig (..), mkCprSig, mkCprSigForArity,
     topCprSig, seqCprSig
   ) where
@@ -565,9 +565,9 @@ cprTransformSig str_sig (CprSig sig_ty) arg_tys
   | dmds <- argDmdsFromStrictSig str_sig
   , dmds `leLength` arg_tys
   , arg_tys `lengthIs` ct_arty sig_ty
-  -- Maybe we should use resTypeArgDmd instead of strTop here. On the other
+  -- Maybe we should use defaultArgDmd instead of topDmd here. On the other
   -- hand, I don't think it makes much of a difference; We basically only need
-  -- to pad with strTop when str_sig was topSig to begin with.
+  -- to pad with topDmd when str_sig was topSig to begin with.
   , (tf, _) <- runTerminationM $ zipWithM_ (idIfLazy forceCprTyM) (dmds ++ repeat topDmd) arg_tys
   = sig_ty `bothCprType` tf
   | otherwise
