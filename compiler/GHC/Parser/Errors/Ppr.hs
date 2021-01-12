@@ -1,6 +1,8 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE GADTs #-}
 
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 module GHC.Parser.Errors.Ppr
    ( pprWarning
    , pprError
@@ -10,12 +12,13 @@ where
 import GHC.Prelude
 import GHC.Driver.Flags
 import GHC.Parser.Errors
+import GHC.Parser.Errors.Types
 import GHC.Parser.Types
 import GHC.Types.Basic
+import GHC.Types.Error
 import GHC.Types.SrcLoc
 import GHC.Types.Name.Reader (starInfo, rdrNameOcc, opIsAt, mkUnqual)
 import GHC.Types.Name.Occurrence (isSymOcc, occNameFS, varName)
-import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Data.FastString
@@ -23,6 +26,10 @@ import GHC.Hs.Expr (prependQualified,HsExpr(..))
 import GHC.Hs.Type (pprLHsContext)
 import GHC.Builtin.Names (allNameStrings)
 import GHC.Builtin.Types (filterCTuple)
+
+-- This is a totally uninteresting instance will will be populated in the context of #18516.
+instance RenderableDiagnostic PsMessage where
+  renderDiagnostic _ = ErrDoc [] [] []
 
 mkParserErr :: SrcSpan -> SDoc -> ErrMsg ErrDoc
 mkParserErr span doc = ErrMsg
