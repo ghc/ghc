@@ -1915,12 +1915,14 @@ completeCall env var cont
   -- Inline the variable's RHS
   = do { checkedTick (UnfoldingDone var)
        ; dump_inline expr cont
-       ; simplExprF (zapSubstEnv env) expr cont }
+       ; let !env1 = (zapSubstEnv env)
+       ; simplExprF env1 expr cont }
 
   | otherwise
   -- Don't inline; instead rebuild the call
   = do { rule_base <- getSimplRules
-       ; let info = mkArgInfo env var (getRules rule_base var)
+       ; let rules = getRules rule_base var
+       ; let info = mkArgInfo env var rules
                               n_val_args call_cont
        ; rebuildCall env info cont }
 
