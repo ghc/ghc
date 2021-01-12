@@ -16,6 +16,7 @@ import GHC.Prelude
 import GHC.Driver.Session
 import GHC.Types.Demand
 import GHC.Types.Cpr
+import GHC.Types.Unbox
 import GHC.Core
 import GHC.Core.Opt.Arity ( splitFunNewTys )
 import GHC.Core.Seq
@@ -351,8 +352,7 @@ cprAnalBind top_lvl env widening id rhs
     (_, ret_ty) = splitPiTys (idType id)
     returns_prod
       | Just (tc, _, _) <- normSplitTyConApp_maybe (ae_fam_envs env) ret_ty
-      , Just _prod_dc <- tyConSingleAlgDataCon_maybe tc
-      = True
+      = isJust (tyConSingleAlgDataCon_maybe tc)
       | otherwise
       = False
     returns_sum = not (isTopLevel top_lvl) && not returns_prod
@@ -514,13 +514,15 @@ extendEnvForDataAlt :: AnalEnv -> Id -> CprType -> DataCon -> [Var] -> AnalEnv
 extendEnvForDataAlt env case_bndr case_bndr_ty dc bndrs
   = extendSigEnv env' case_bndr (CprSig case_bndr_ty')
   where
-    is_algebraic = isJust (tyConAlgDataCons_maybe (dataConTyCon dc))
-    no_exs       = null (dataConExTyCoVars dc)
     case_bndr_ty'
-      | is_algebraic, no_exs = markOptimisticConCprType dc case_bndr_ty
-      -- The tycon wasn't algebraic or the datacon had existentials.
-      -- See Note [Which types are unboxed?] for why no existentials.
-      | otherwise            = case_bndr_ty
+      -- Only give the case binder the CPR property if it would be unboxed.
+      -- See Note [Which types are unboxed?]
+      | CprType 0 cpr <- case_bndr_ty
+      , Unbox{} <- wantToUnboxResult (ae_fam_envs env) (idType case_bndr) cpr
+      = markOptimisticConCprType dc case_bndr_ty
+      -- Will not be unboxed, so giving it the CPR property introduces reboxing.
+      | otherwise
+      = case_bndr_ty
     env'
       | Just fields <- splitConCprTy dc case_bndr_ty'
       , let ids     = filter isId bndrs
