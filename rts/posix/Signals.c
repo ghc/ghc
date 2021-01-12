@@ -546,15 +546,15 @@ backtrace_handler(int sig STG_UNUSED)
      * unless the main thread blocks it, we should not rely on that as to be
      * too Linux specific
      *
-     * instead we track the monotic time the signal reaches us, and only
+     * instead we track the monotonic time the signal reaches us, and only
      * propagate with a minimum 1 second interval
      */
     static StgWord64 propa_record;
     StgWord64 curr_time, propa_time;
     curr_time = getMonotonicNSec();
-    propa_time = ACQUIRE_LOAD(&propa_record);
+    propa_time = SEQ_CST_LOAD(&propa_record);
     if ( curr_time - propa_time >= 1000000000 ) {
-        RELEASE_STORE(&propa_record, curr_time);
+        SEQ_CST_STORE(&propa_record, curr_time);
 
         OSThreadId currThId = osThreadId();
         uint32_t n_caps = RELAXED_LOAD(&n_capabilities);
