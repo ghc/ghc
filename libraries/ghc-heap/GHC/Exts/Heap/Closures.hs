@@ -368,7 +368,7 @@ data PrimType
   | PAddr
   | PFloat
   | PDouble
-  deriving (Eq, Show, Generic)
+  deriving (Eq, Show, Generic, Ord)
 
 data WhatNext
   = ThreadRunGHC
@@ -376,7 +376,7 @@ data WhatNext
   | ThreadKilled
   | ThreadComplete
   | WhatNextUnknownValue Word16 -- ^ Please report this as a bug
-  deriving (Eq, Show, Generic)
+  deriving (Eq, Show, Generic, Ord)
 
 data WhyBlocked
   = NotBlocked
@@ -394,7 +394,7 @@ data WhyBlocked
   | ThreadMigrating
   | BlockedOnIOCompletion
   | WhyBlockedUnknownValue Word16 -- ^ Please report this as a bug
-  deriving (Eq, Show, Generic)
+  deriving (Eq, Show, Generic, Ord)
 
 data TsoFlags
   = TsoLocked
@@ -405,7 +405,7 @@ data TsoFlags
   | TsoSqueezed
   | TsoAllocLimit
   | TsoFlagsUnknownValue Word32 -- ^ Please report this as a bug
-  deriving (Eq, Show, Generic)
+  deriving (Eq, Show, Generic, Ord)
 
 -- | For generic code, this function returns all referenced closures.
 allClosures :: GenClosure b -> [b]
