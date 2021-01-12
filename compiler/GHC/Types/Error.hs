@@ -12,6 +12,7 @@ module GHC.Types.Error
    , MsgDoc
    , Severity (..)
    , RenderableDiagnostic (..)
+   , getMessages
    , unionMessages
    , errDoc
    , mapErrDoc
@@ -61,7 +62,7 @@ import System.IO.Error  ( catchIOError )
 
 -- | A collection of messages emitted by GHC during error reporting. A diagnostic message is typically
 -- a warning or an error. See Note [Messages].
-newtype Messages e = Messages (Bag (ErrMsg e))
+newtype Messages e = Messages { getMessages :: Bag (ErrMsg e) }
 
 instance Functor Messages where
   fmap f (Messages xs) = Messages (mapBag (fmap f) xs)

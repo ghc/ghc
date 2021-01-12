@@ -11,7 +11,7 @@ module GHC.Driver.Errors.Types (
 import Data.Typeable
 
 import GHC.Core.InstEnv ( ClsInst )
-import GHC.Data.Bag
+import GHC.Driver.Env.Types
 import GHC.Driver.Flags
 import GHC.Driver.Session ( DynFlags )
 import GHC.Prelude ( String )
@@ -19,6 +19,7 @@ import GHC.Types.Error
 import GHC.Types.SrcLoc
 import GHC.Unit.Finder.Types ( FindResult )
 import GHC.Unit.Module.Name ( ModuleName )
+import GHC.Unit.State
 import GHC.Unit.Types ( UnitId, Module )
 import GHC.Utils.Outputable
 
@@ -50,7 +51,7 @@ ghcUnknownMessage :: ErrDoc -> GhcMessage
 ghcUnknownMessage = GhcUnknownMessage
 
 
-type Reasons = Bag (ErrMsg TcRnMessage)
+type Reasons = Messages TcRnMessage
 
 -- | A message from the driver.
 data DriverMessage
@@ -59,10 +60,10 @@ data DriverMessage
   | DriverWarnInferredSafeImports  !ModuleName
 
     -- Errors
-  | DriverCannotFindModule !DynFlags !ModuleName !FindResult
+  | DriverCannotFindModule !HscEnv !ModuleName !FindResult
   | DriverNotAnExpression !String
   | DriverParseErrorImport
-  | DriverPkgRequiredTrusted !DynFlags !UnitId
+  | DriverPkgRequiredTrusted !UnitState !UnitId
   | DriverCantLoadIfaceForSafe !Module
   | DriverUnknownMessage !ErrDoc
 
