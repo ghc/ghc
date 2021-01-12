@@ -1255,15 +1255,15 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
   | isExitJoinId bndr                        = Nothing -- Note [Do not inline exit join points]
                                                        -- in module Exitify
   | not (one_occ (idOccInfo bndr))           = Nothing
-  | not (isStableUnfolding unf)              = Just (extend_subst_with rhs)
+  | not (isStableUnfolding unf)              = Just $! (extend_subst_with rhs)
 
   -- Note [Stable unfoldings and preInlineUnconditionally]
   | not (isInlinePragma inline_prag)
-  , Just inl <- maybeUnfoldingTemplate unf   = Just (extend_subst_with inl)
+  , Just inl <- maybeUnfoldingTemplate unf   = Just $! (extend_subst_with inl)
   | otherwise                                = Nothing
   where
     unf = idUnfolding bndr
-    extend_subst_with inl_rhs = extendIdSubst env bndr (mkContEx rhs_env inl_rhs)
+    extend_subst_with inl_rhs = extendIdSubst env bndr $! (mkContEx rhs_env inl_rhs)
 
     one_occ IAmDead = True -- Happens in ((\x.1) v)
     one_occ OneOcc{ occ_n_br   = 1
@@ -1942,7 +1942,7 @@ abstractFloats uf_opts top_lvl main_tvs floats body
     abstract subst (NonRec id rhs)
       = do { (poly_id1, poly_app) <- mk_poly1 tvs_here id
            ; let (poly_id2, poly_rhs) = mk_poly2 poly_id1 tvs_here rhs'
-                 subst' = GHC.Core.Subst.extendIdSubst subst id poly_app
+                 !subst' = GHC.Core.Subst.extendIdSubst subst id poly_app
            ; return (subst', NonRec poly_id2 poly_rhs) }
       where
         rhs' = GHC.Core.Subst.substExpr subst rhs
