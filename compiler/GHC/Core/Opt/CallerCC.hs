@@ -93,7 +93,7 @@ doExpr env (Let b rhs)      = Let <$> doBind env b <*> doExpr env rhs
 doExpr env (Case scrut b ty alts) =
     Case <$> doExpr env scrut <*> pure b <*> pure ty <*> mapM doAlt alts
   where
-    doAlt (con, bs, rhs) = (con, bs,) <$> doExpr env rhs
+    doAlt (Alt con bs rhs)  = Alt con bs <$> doExpr env rhs
 doExpr env (Cast expr co)   = Cast <$> doExpr env expr <*> pure co
 doExpr env (Tick t e)       = Tick t <$> doExpr env e
 doExpr _env e@(Type _)      = pure e

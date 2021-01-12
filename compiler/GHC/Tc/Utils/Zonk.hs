@@ -1615,10 +1615,10 @@ zonkCoreExpr env (Case scrut b ty alts)
          return $ Case scrut' b' ty' alts'
 
 zonkCoreAlt :: ZonkEnv -> CoreAlt -> TcM CoreAlt
-zonkCoreAlt env (dc, bndrs, rhs)
+zonkCoreAlt env (Alt dc bndrs rhs)
     = do (env1, bndrs') <- zonkCoreBndrsX env bndrs
          rhs' <- zonkCoreExpr env1 rhs
-         return $ (dc, bndrs', rhs')
+         return $ Alt dc bndrs' rhs'
 
 zonkCoreBind :: ZonkEnv -> CoreBind -> TcM (ZonkEnv, CoreBind)
 zonkCoreBind env (NonRec v e)

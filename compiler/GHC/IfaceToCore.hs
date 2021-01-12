@@ -1532,30 +1532,30 @@ tcIfaceLit lit = return lit
 
 -------------------------
 tcIfaceAlt :: CoreExpr -> Mult -> (TyCon, [Type])
-           -> (IfaceConAlt, [FastString], IfaceExpr)
-           -> IfL (AltCon, [TyVar], CoreExpr)
-tcIfaceAlt _ _ _ (IfaceDefault, names, rhs)
+           -> IfaceAlt
+           -> IfL CoreAlt
+tcIfaceAlt _ _ _ (IfaceAlt IfaceDefault names rhs)
   = ASSERT( null names ) do
     rhs' <- tcIfaceExpr rhs
-    return (DEFAULT, [], rhs')
+    return (Alt DEFAULT [] rhs')
 
-tcIfaceAlt _ _ _ (IfaceLitAlt lit, names, rhs)
+tcIfaceAlt _ _ _ (IfaceAlt (IfaceLitAlt lit) names rhs)
   = ASSERT( null names ) do
     lit' <- tcIfaceLit lit
     rhs' <- tcIfaceExpr rhs
-    return (LitAlt lit', [], rhs')
+    return (Alt (LitAlt lit') [] rhs')
 
 -- A case alternative is made quite a bit more complicated
 -- by the fact that we omit type annotations because we can
 -- work them out.  True enough, but its not that easy!
-tcIfaceAlt scrut mult (tycon, inst_tys) (IfaceDataAlt data_occ, arg_strs, rhs)
+tcIfaceAlt scrut mult (tycon, inst_tys) (IfaceAlt (IfaceDataAlt data_occ) arg_strs rhs)
   = do  { con <- tcIfaceDataCon data_occ
         ; when (debugIsOn && not (con `elem` tyConDataCons tycon))
                (failIfM (ppr scrut $$ ppr con $$ ppr tycon $$ ppr (tyConDataCons tycon)))
         ; tcIfaceDataAlt mult con inst_tys arg_strs rhs }
 
 tcIfaceDataAlt :: Mult -> DataCon -> [Type] -> [FastString] -> IfaceExpr
-               -> IfL (AltCon, [TyVar], CoreExpr)
+               -> IfL CoreAlt
 tcIfaceDataAlt mult con inst_tys arg_strs rhs
   = do  { us <- newUniqueSupply
         ; let uniqs = uniqsFromSupply us
@@ -1565,7 +1565,7 @@ tcIfaceDataAlt mult con inst_tys arg_strs rhs
         ; rhs' <- extendIfaceEnvs  ex_tvs       $
                   extendIfaceIdEnv arg_ids      $
                   tcIfaceExpr rhs
-        ; return (DataAlt con, ex_tvs ++ arg_ids, rhs') }
+        ; return (Alt (DataAlt con) (ex_tvs ++ arg_ids) rhs') }
 
 {-
 ************************************************************************
