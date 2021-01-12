@@ -60,6 +60,9 @@ void backtraceFree(Backtrace *bt) {
 struct LibdwSession_ {
     Dwfl *dwfl;
 
+    // the very thread on which this session is instantiated
+    pid_t tid;
+
     // The current backtrace we are collecting (if any)
     Backtrace *cur_bt;
     int max_depth;
@@ -98,6 +101,16 @@ LibdwSession *libdwInit() {
         free(session);
         return NULL;
     }
+
+#if defined(linux_HOST_OS)
+    /* more specific value more meaningful on Linux
+     * gettid() is not linkable atm, let's use just the syscall
+     */
+#   include <sys/syscall.h>
+    session->tid = syscall(SYS_gettid);
+#else
+    session->tid = osThreadId();
+#endif
 
     // Report the loaded modules
     int ret = dwfl_linux_proc_report(session->dwfl, getpid());
@@ -208,8 +221,8 @@ static int printFrame(StgPtr pc, void *cbdata)
     struct PrintData *pd = (struct PrintData *) cbdata;
     Location loc;
     libdwLookupLocation(pd->session, &loc, pc);
-    fprintf(pd->file, "  %24p    %s ",
-            (void*) pc, loc.function);
+    fprintf(pd->file, "  %10ld %016p  %s ",
+            pd->session->tid, (void*) pc, loc.function);
     if (loc.source_file)
         fprintf(pd->file, "(%s:%d.%d)\n",
                 loc.source_file, loc.lineno, loc.colno);
