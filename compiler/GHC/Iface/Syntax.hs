@@ -11,7 +11,7 @@ module GHC.Iface.Syntax (
 
         IfaceDecl(..), IfaceFamTyConFlav(..), IfaceClassOp(..), IfaceAT(..),
         IfaceConDecl(..), IfaceConDecls(..), IfaceEqSpec,
-        IfaceExpr(..), IfaceAlt, IfaceLetBndr(..), IfaceJoinInfo(..),
+        IfaceExpr(..), IfaceAlt(..), IfaceLetBndr(..), IfaceJoinInfo(..),
         IfaceBinding(..), IfaceConAlt(..),
         IfaceIdInfo, IfaceIdDetails(..), IfaceUnfolding(..),
         IfaceInfoItem(..), IfaceRule(..), IfaceAnnotation(..), IfaceAnnTarget,
@@ -569,7 +569,7 @@ data IfaceTickish
   | IfaceSource  RealSrcSpan String        -- from SourceNote
   -- no breakpoints: we never export these into interface files
 
-type IfaceAlt = (IfaceConAlt, [IfLclName], IfaceExpr)
+data IfaceAlt = IfaceAlt IfaceConAlt [IfLclName] IfaceExpr
         -- Note: IfLclName, not IfaceBndr (and same with the case binder)
         -- We reconstruct the kind/type of the thing from the context
         -- thus saving bulk in interface files
@@ -1385,7 +1385,7 @@ pprIfaceExpr add_par (IfaceECase scrut ty)
                  , text "ret_ty" <+> pprParendIfaceType ty
                  , text "of {}" ])
 
-pprIfaceExpr add_par (IfaceCase scrut bndr [(con, bs, rhs)])
+pprIfaceExpr add_par (IfaceCase scrut bndr [IfaceAlt con bs rhs])
   = add_par (sep [text "case"
                         <+> pprIfaceExpr noParens scrut <+> text "of"
                         <+> ppr bndr <+> char '{' <+> ppr_con_bs con bs <+> arrow,
@@ -1395,7 +1395,7 @@ pprIfaceExpr add_par (IfaceCase scrut bndr alts)
   = add_par (sep [text "case"
                         <+> pprIfaceExpr noParens scrut <+> text "of"
                         <+> ppr bndr <+> char '{',
-                  nest 2 (sep (map ppr_alt alts)) <+> char '}'])
+                  nest 2 (sep (map pprIfaceAlt alts)) <+> char '}'])
 
 pprIfaceExpr _       (IfaceCast expr co)
   = sep [pprParendIfaceExpr expr,
@@ -1417,9 +1417,9 @@ pprIfaceExpr add_par (IfaceLet (IfaceRec pairs) body)
 pprIfaceExpr add_par (IfaceTick tickish e)
   = add_par (pprIfaceTickish tickish <+> pprIfaceExpr noParens e)
 
-ppr_alt :: (IfaceConAlt, [IfLclName], IfaceExpr) -> SDoc
-ppr_alt (con, bs, rhs) = sep [ppr_con_bs con bs,
-                         arrow <+> pprIfaceExpr noParens rhs]
+pprIfaceAlt :: IfaceAlt -> SDoc
+pprIfaceAlt (IfaceAlt con bs rhs)
+  = sep [ppr_con_bs con bs, arrow <+> pprIfaceExpr noParens rhs]
 
 ppr_con_bs :: IfaceConAlt -> [IfLclName] -> SDoc
 ppr_con_bs con bs = ppr con <+> hsep (map ppr bs)
@@ -1748,14 +1748,14 @@ freeNamesIfExpr (IfaceECase e ty)     = freeNamesIfExpr e &&& freeNamesIfType ty
 freeNamesIfExpr (IfaceCase s _ alts)
   = freeNamesIfExpr s &&& fnList fn_alt alts &&& fn_cons alts
   where
-    fn_alt (_con,_bs,r) = freeNamesIfExpr r
+    fn_alt (IfaceAlt _con _bs r) = freeNamesIfExpr r
 
     -- Depend on the data constructors.  Just one will do!
     -- Note [Tracking data constructors]
-    fn_cons []                            = emptyNameSet
-    fn_cons ((IfaceDefault    ,_,_) : xs) = fn_cons xs
-    fn_cons ((IfaceDataAlt con,_,_) : _ ) = unitNameSet con
-    fn_cons (_                      : _ ) = emptyNameSet
+    fn_cons []                                     = emptyNameSet
+    fn_cons (IfaceAlt IfaceDefault _ _       : xs) = fn_cons xs
+    fn_cons (IfaceAlt (IfaceDataAlt con) _ _ : _ ) = unitNameSet con
+    fn_cons (_                               : _ ) = emptyNameSet
 
 freeNamesIfExpr (IfaceLet (IfaceNonRec bndr rhs) body)
   = freeNamesIfLetBndr bndr &&& freeNamesIfExpr rhs &&& freeNamesIfExpr body
@@ -2283,6 +2283,16 @@ instance Binary IfaceUnfolding where
             _ -> do e <- get bh
                     return (IfCompulsory e)
 
+instance Binary IfaceAlt where
+    put_ bh (IfaceAlt a b c) = do
+        put_ bh a
+        put_ bh b
+        put_ bh c
+    get bh = do
+        a <- get bh
+        b <- get bh
+        c <- get bh
+        return (IfaceAlt a b c)
 
 instance Binary IfaceExpr where
     put_ bh (IfaceLcl aa) = do
@@ -2606,6 +2616,9 @@ instance NFData IfaceExpr where
     IfaceLit l -> l `seq` () -- FIXME
     IfaceFCall fc ty -> fc `seq` rnf ty
     IfaceTick tick e -> rnf tick `seq` rnf e
+
+instance NFData IfaceAlt where
+  rnf (IfaceAlt con bndrs rhs) = rnf con `seq` rnf bndrs `seq` rnf rhs
 
 instance NFData IfaceBinding where
   rnf = \case

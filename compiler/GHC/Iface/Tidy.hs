@@ -836,8 +836,8 @@ dffvExpr (Let (Rec prs) e)    = extendScopeList (map fst prs) $
 dffvExpr (Case e b _ as)      = dffvExpr e >> extendScope b (mapM_ dffvAlt as)
 dffvExpr _other               = return ()
 
-dffvAlt :: (t, [Var], CoreExpr) -> DFFV ()
-dffvAlt (_,xs,r) = extendScopeList xs (dffvExpr r)
+dffvAlt :: CoreAlt -> DFFV ()
+dffvAlt (Alt _ xs r) = extendScopeList xs (dffvExpr r)
 
 dffvBind :: (Id, CoreExpr) -> DFFV ()
 dffvBind(x,r)

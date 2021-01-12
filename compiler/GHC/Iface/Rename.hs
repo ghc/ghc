@@ -662,8 +662,8 @@ rnIfaceTyConBinder :: Rename IfaceTyConBinder
 rnIfaceTyConBinder (Bndr tv vis) = Bndr <$> rnIfaceBndr tv <*> pure vis
 
 rnIfaceAlt :: Rename IfaceAlt
-rnIfaceAlt (conalt, names, rhs)
-     = (,,) <$> rnIfaceConAlt conalt <*> pure names <*> rnIfaceExpr rhs
+rnIfaceAlt (IfaceAlt conalt names rhs)
+     = IfaceAlt <$> rnIfaceConAlt conalt <*> pure names <*> rnIfaceExpr rhs
 
 rnIfaceConAlt :: Rename IfaceConAlt
 rnIfaceConAlt (IfaceDataAlt data_occ) = IfaceDataAlt <$> rnIfaceGlobal data_occ

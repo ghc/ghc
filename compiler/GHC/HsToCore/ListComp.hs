@@ -295,8 +295,8 @@ deBindComp pat core_list1 quals core_list2 = do
     let
         rhs = Lam u1 $
               Case (Var u1) u1 res_ty
-                   [(DataAlt nilDataCon,  [],       core_list2),
-                    (DataAlt consDataCon, [u2, u3], core_match)]
+                   [Alt (DataAlt nilDataCon)  []       core_list2
+                   ,Alt (DataAlt consDataCon) [u2, u3] core_match]
                         -- Increasing order of tag
 
     return (Let (Rec [(h, rhs)]) letrec_body)
@@ -423,8 +423,8 @@ mkZipBind elt_tys = do
 
     mk_case (as, a', as') rest
           = Case (Var as) as elt_tuple_list_ty
-                  [(DataAlt nilDataCon,  [],        mkNilExpr elt_tuple_ty),
-                   (DataAlt consDataCon, [a', as'], rest)]
+                  [ Alt (DataAlt nilDataCon)  []        (mkNilExpr elt_tuple_ty)
+                  , Alt (DataAlt consDataCon) [a', as'] rest]
                         -- Increasing order of tag
 
 

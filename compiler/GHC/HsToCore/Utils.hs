@@ -261,7 +261,7 @@ mkViewMatchResult var' viewExpr = fmap $ mkCoreLet $ NonRec var' viewExpr
 
 mkEvalMatchResult :: Id -> Type -> MatchResult CoreExpr -> MatchResult CoreExpr
 mkEvalMatchResult var ty = fmap $ \e ->
-  Case (Var var) var ty [(DEFAULT, [], e)]
+  Case (Var var) var ty [Alt DEFAULT [] e]
 
 mkGuardedMatchResult :: CoreExpr -> MatchResult CoreExpr -> MatchResult CoreExpr
 mkGuardedMatchResult pred_expr mr = MR_Fallible $ \fail -> do
@@ -277,13 +277,13 @@ mkCoPrimCaseMatchResult var ty match_alts
   where
     mk_case fail = do
         alts <- mapM (mk_alt fail) sorted_alts
-        return (Case (Var var) var ty ((DEFAULT, [], fail) : alts))
+        return (Case (Var var) var ty (Alt DEFAULT [] fail : alts))
 
     sorted_alts = sortWith fst match_alts       -- Right order for a Case
     mk_alt fail (lit, mr)
        = ASSERT( not (litIsLifted lit) )
          do body <- runMatchResult fail mr
-            return (LitAlt lit, [], body)
+            return (Alt (LitAlt lit) [] body)
 
 data CaseAlt a = MkCaseAlt{ alt_pat :: a,
                             alt_bndrs :: [Var],
@@ -367,7 +367,7 @@ mkDataConCase var ty alts@(alt1 :| _)
                      , alt_result = match_result } =
       flip adjustMatchResultDs match_result $ \body -> do
         case dataConBoxer con of
-          Nothing -> return (DataAlt con, args, body)
+          Nothing -> return (Alt (DataAlt con) args body)
           Just (DCB boxer) -> do
             us <- newUniqueSupply
             let (rep_ids, binds) = initUs_ us (boxer ty_args args)
@@ -375,12 +375,12 @@ mkDataConCase var ty alts@(alt1 :| _)
               -- Upholds the invariant that the binders of a case expression
               -- must be scaled by the case multiplicity. See Note [Case
               -- expression invariants] in CoreSyn.
-            return (DataAlt con, rep_ids', mkLets binds body)
+            return (Alt (DataAlt con) rep_ids' (mkLets binds body))
 
     mk_default :: MatchResult (Maybe CoreAlt)
     mk_default
       | exhaustive_case = MR_Infallible $ return Nothing
-      | otherwise       = MR_Fallible $ \fail -> return $ Just (DEFAULT, [], fail)
+      | otherwise       = MR_Fallible $ \fail -> return $ Just (Alt DEFAULT [] fail)
 
     mentioned_constructors = mkUniqSet $ map alt_pat sorted_alts
     un_mentioned_constructors
@@ -487,7 +487,7 @@ There are a few subtleties in the desugaring of `seq`:
 mkCoreAppDs  :: SDoc -> CoreExpr -> CoreExpr -> CoreExpr
 mkCoreAppDs _ (Var f `App` Type _r `App` Type ty1 `App` Type ty2 `App` arg1) arg2
   | f `hasKey` seqIdKey            -- Note [Desugaring seq], points (1) and (2)
-  = Case arg1 case_bndr ty2 [(DEFAULT,[],arg2)]
+  = Case arg1 case_bndr ty2 [Alt DEFAULT [] arg2]
   where
     case_bndr = case arg1 of
                    Var v1 | isInternalName (idName v1)
@@ -952,8 +952,8 @@ mkBinaryTickBox ixT ixF e = do
            trueBox  = Tick (HpcTick this_mod ixT) (Var trueDataConId)
        --
        return $ Case e bndr1 boolTy
-                       [ (DataAlt falseDataCon, [], falseBox)
-                       , (DataAlt trueDataCon,  [], trueBox)
+                       [ Alt (DataAlt falseDataCon) [] falseBox
+                       , Alt (DataAlt trueDataCon)  [] trueBox
                        ]
 
 
