@@ -346,10 +346,10 @@ cmmMachOpFoldM platform mop [x, (CmmLit (CmmInt n _))]
   = case mop of
         MO_Mul rep
            | Just p <- exactLog2 n ->
-                 Just $! (cmmMachOpFold platform (MO_Shl rep) [x, CmmLit (CmmInt p rep)])
+                 Just $! (cmmMachOpFold platform (MO_Shl rep) [x, CmmLit (CmmInt p $ wordWidth platform)])
         MO_U_Quot rep
            | Just p <- exactLog2 n ->
-                 Just $! (cmmMachOpFold platform (MO_U_Shr rep) [x, CmmLit (CmmInt p rep)])
+                 Just $! (cmmMachOpFold platform (MO_U_Shr rep) [x, CmmLit (CmmInt p $ wordWidth platform)])
         MO_U_Rem rep
            | Just _ <- exactLog2 n ->
                  Just $! (cmmMachOpFold platform (MO_And rep) [x, CmmLit (CmmInt (n - 1) rep)])
