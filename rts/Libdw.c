@@ -289,7 +289,17 @@ static pid_t next_thread(Dwfl *dwfl STG_UNUSED, void *arg, void **thread_argp) {
         return 0;
 
     *thread_argp = arg;
-    return pthread_self();
+    pid_t tid = pthread_self();
+    /* it is unfortunate pthread_t is unsigned, and the opaque value returned
+     * by pthread_self() can appear negative at times after re-interpreted as
+     * signed int. then libdw will reject a negative value:
+     * see https://sourceware.org/git?p=elfutils.git;a=blob;f=libdwfl/dwfl_frame.c;h=5bbf850e8e38a58ba06a1f9895f3de552e47693e;hb=HEAD#l276
+     * so let's workaround it.
+     *
+     * TODO or should we use gettid() on Linux? does a negative pid_t for a
+     * thread on Linux implies some error? given libdw assuming so.
+     */
+    return abs(tid);
 }
 
 static bool memory_read(Dwfl *dwfl STG_UNUSED, Dwarf_Addr addr,
