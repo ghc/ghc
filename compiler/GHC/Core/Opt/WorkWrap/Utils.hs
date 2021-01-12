@@ -9,7 +9,7 @@ A library for the ``worker\/wrapper'' back-end to the strictness analyser
 
 module GHC.Core.Opt.WorkWrap.Utils
    ( WwOpts(..), initWwOpts, mkWwBodies, mkWWstr, mkWorkerArgs
-   , DataConPatContext(..), wantToUnboxArg
+   , DataConPatContext(..), wantToUnboxArg, wantToUnboxResult
    , findTypeShape
    , isWorkerSmallEnough
    )
