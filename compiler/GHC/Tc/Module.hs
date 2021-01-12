@@ -60,7 +60,6 @@ import GHC.Tc.Gen.Match
 import GHC.Tc.Utils.Unify( checkConstraints )
 import GHC.Tc.Utils.Zonk
 import GHC.Tc.Gen.Expr
-import GHC.Tc.Errors( reportAllUnsolved )
 import GHC.Tc.Gen.App( tcInferSigma )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Gen.Export
@@ -2610,13 +2609,16 @@ tcRnType hsc_env flexi normalise rdr_type
         -- It can have any rank or kind
         -- First bring into scope any wildcards
        ; traceTc "tcRnType" (vcat [ppr wcs, ppr rn_type])
-       ; (_tclvl, wanted, (ty, kind))
-               <- pushLevelAndSolveEqualitiesX "tcRnType"  $
+       ; ((ty, kind), wanted)
+               <- captureTopConstraints $
+                  pushTcLevelM_         $
                   bindNamedWildCardBinders wcs $ \ wcs' ->
                   do { mapM_ emitNamedTypeHole wcs'
                      ; tcInferLHsTypeUnsaturated rn_type }
 
-       ; checkNoErrs (reportAllUnsolved wanted)
+       -- Since all the wanteds are equalities, the returned bindings will be empty
+       ; empty_binds <- simplifyTop wanted
+       ; MASSERT2( isEmptyBag empty_binds, ppr empty_binds )
 
        -- Do kind generalisation; see Note [Kind-generalise in tcRnType]
        ; kvs <- kindGeneralizeAll kind
