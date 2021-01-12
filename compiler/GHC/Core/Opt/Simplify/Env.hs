@@ -90,7 +90,7 @@ data SimplEnv
      -- Static in the sense of lexically scoped,
      -- wrt the original expression
 
-        seMode      :: SimplMode
+        seMode      :: !SimplMode
 
         -- The current substitution
       , seTvSubst   :: TvSubstEnv      -- InTyVar |--> OutType
@@ -103,7 +103,7 @@ data SimplEnv
 
         -- The current set of in-scope variables
         -- They are all OutVars, and all bound in this module
-      , seInScope   :: InScopeSet       -- OutVars only
+      , seInScope   :: !InScopeSet       -- OutVars only
 
       , seCaseDepth :: !Int  -- Depth of multi-branch case alternatives
     }
@@ -325,7 +325,10 @@ setMode :: SimplMode -> SimplEnv -> SimplEnv
 setMode mode env = env { seMode = mode }
 
 updMode :: (SimplMode -> SimplMode) -> SimplEnv -> SimplEnv
-updMode upd env = env { seMode = upd (seMode env) }
+updMode upd env
+  = -- Avoid keeping env alive in case inlining fails.
+    let mode = upd $! (seMode env)
+    in env { seMode = mode }
 
 bumpCaseDepth :: SimplEnv -> SimplEnv
 bumpCaseDepth env = env { seCaseDepth = seCaseDepth env + 1 }
@@ -363,8 +366,12 @@ setInScopeFromF env floats = env { seInScope = sfInScope floats }
 addNewInScopeIds :: SimplEnv -> [CoreBndr] -> SimplEnv
         -- The new Ids are guaranteed to be freshly allocated
 addNewInScopeIds env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst }) vs
-  = env { seInScope = in_scope `extendInScopeSetList` vs,
-          seIdSubst = id_subst `delVarEnvList` vs }
+-- See Note [Bangs in the Simplifier]
+  = let !in_scope1 = in_scope `extendInScopeSetList` vs
+        !id_subst1 = id_subst `delVarEnvList` vs
+    in
+    env { seInScope = in_scope1,
+          seIdSubst = id_subst1 }
         -- Why delete?  Consider
         --      let x = a*b in (x, \x -> x+3)
         -- We add [x |-> a*b] to the substitution, but we must
@@ -544,8 +551,8 @@ mkFloatBind env bind
       = SimplFloats { sfLetFloats  = unitLetFloat bind
                     , sfJoinFloats = emptyJoinFloats
                     , sfInScope    = in_scope' }
-
-    in_scope' = seInScope env `extendInScopeSetBind` bind
+    -- See Note [Bangs in the Simplifier]
+    !in_scope' = seInScope env `extendInScopeSetBind` bind
 
 extendFloats :: SimplFloats -> OutBind -> SimplFloats
 -- Add this binding to the floats, and extend the in-scope env too
@@ -616,10 +623,11 @@ mkRecFloats floats@(SimplFloats { sfLetFloats  = LetFloats bs _ff
                 , sfJoinFloats = jfloats'
                 , sfInScope    = in_scope }
   where
-    floats'  | isNilOL bs  = emptyLetFloats
-             | otherwise   = unitLetFloat (Rec (flattenBinds (fromOL bs)))
-    jfloats' | isNilOL jbs = emptyJoinFloats
-             | otherwise   = unitJoinFloat (Rec (flattenBinds (fromOL jbs)))
+    -- See Note [Bangs in the Simplifier]
+    !floats'  | isNilOL bs  = emptyLetFloats
+              | otherwise   = unitLetFloat (Rec (flattenBinds (fromOL bs)))
+    !jfloats' | isNilOL jbs = emptyJoinFloats
+              | otherwise   = unitJoinFloat (Rec (flattenBinds (fromOL jbs)))
 
 wrapFloats :: SimplFloats -> OutExpr -> OutExpr
 -- Wrap the floats around the expression; they should all
@@ -649,12 +657,14 @@ getTopFloatBinds (SimplFloats { sfLetFloats  = lbs
   = ASSERT( isNilOL jbs )  -- Can't be any top-level join bindings
     letFloatBinds lbs
 
+{-# INLINE mapLetFloats #-}
 mapLetFloats :: LetFloats -> ((Id,CoreExpr) -> (Id,CoreExpr)) -> LetFloats
 mapLetFloats (LetFloats fs ff) fun
-   = LetFloats (mapOL app fs) ff
+   = LetFloats fs1 ff
    where
     app (NonRec b e) = case fun (b,e) of (b',e') -> NonRec b' e'
-    app (Rec bs)     = Rec (map fun bs)
+    app (Rec bs)     = Rec (strictMap fun bs)
+    !fs1 = (mapOL' app fs) -- See Note [Bangs in the Simplifier]
 
 {-
 ************************************************************************
@@ -748,7 +758,7 @@ See also Note [Scaling join point arguments].
 -}
 
 simplBinders :: SimplEnv -> [InBndr] -> SimplM (SimplEnv, [OutBndr])
-simplBinders  env bndrs = mapAccumLM simplBinder  env bndrs
+simplBinders  !env bndrs = mapAccumLM simplBinder  env bndrs
 
 -------------
 simplBinder :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
@@ -757,7 +767,7 @@ simplBinder :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
 -- Return with IdInfo already substituted, but (fragile) occurrence info zapped
 -- The substitution is extended only if the variable is cloned, because
 -- we *don't* need to use it to track occurrence info.
-simplBinder env bndr
+simplBinder !env bndr
   | isTyVar bndr  = do  { let (env', tv) = substTyVarBndr env bndr
                         ; seqTyVar tv `seq` return (env', tv) }
   | otherwise     = do  { let (env', id) = substIdBndr env bndr
@@ -766,16 +776,18 @@ simplBinder env bndr
 ---------------
 simplNonRecBndr :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
 -- A non-recursive let binder
-simplNonRecBndr env id
-  = do  { let (env1, id1) = substIdBndr env id
+simplNonRecBndr !env id
+  -- See Note [Bangs in the Simplifier]
+  = do  { let (!env1, id1) = substIdBndr env id
         ; seqId id1 `seq` return (env1, id1) }
 
 ---------------
 simplRecBndrs :: SimplEnv -> [InBndr] -> SimplM SimplEnv
 -- Recursive let binders
 simplRecBndrs env@(SimplEnv {}) ids
+  -- See Note [Bangs in the Simplifier]
   = ASSERT(all (not . isJoinId) ids)
-    do  { let (env1, ids1) = mapAccumL substIdBndr env ids
+    do  { let (!env1, ids1) = mapAccumL substIdBndr env ids
         ; seqIds ids1 `seq` return env1 }
 
 
@@ -810,6 +822,10 @@ substNonCoVarIdBndr
 --      all fragile info is zapped
 substNonCoVarIdBndr env id = subst_id_bndr env id (\x -> x)
 
+-- Inline to make the (OutId -> OutId) function a known call.
+-- This is especially important for `substNonCoVarIdBndr` which
+-- passes an identity lambda.
+{-# INLINE subst_id_bndr #-}
 subst_id_bndr :: SimplEnv
               -> InBndr    -- Env and binder to transform
               -> (OutId -> OutId)  -- Adjust the type
@@ -817,7 +833,7 @@ subst_id_bndr :: SimplEnv
 subst_id_bndr env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst })
               old_id adjust_type
   = ASSERT2( not (isCoVar old_id), ppr old_id )
-    (env { seInScope = in_scope `extendInScopeSet` new_id,
+    (env { seInScope = new_in_scope,
            seIdSubst = new_subst }, new_id)
     -- It's important that both seInScope and seIdSubst are updated with
     -- the new_id, /after/ applying adjust_type. That's why adjust_type
@@ -825,19 +841,22 @@ subst_id_bndr env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst })
     -- place that gives a non-identity adjust_type) we'd have to fiddle
     -- afresh with both seInScope and seIdSubst
   where
-    id1  = uniqAway in_scope old_id
-    id2  = substIdType env id1
-    id3  = zapFragileIdInfo id2       -- Zaps rules, worker-info, unfolding
+    -- See Note [Bangs in the Simplifier]
+    !id1  = uniqAway in_scope old_id
+    !id2  = substIdType env id1
+    !id3  = zapFragileIdInfo id2       -- Zaps rules, worker-info, unfolding
                                       -- and fragile OccInfo
-    new_id = adjust_type id3
+    !new_id = adjust_type id3
 
         -- Extend the substitution if the unique has changed,
         -- or there's some useful occurrence information
         -- See the notes with substTyVarBndr for the delSubstEnv
-    new_subst | new_id /= old_id
+    !new_subst | new_id /= old_id
               = extendVarEnv id_subst old_id (DoneId new_id)
               | otherwise
               = delVarEnv id_subst old_id
+
+    !new_in_scope = in_scope `extendInScopeSet` new_id
 
 ------------------------------------
 seqTyVar :: TyVar -> ()
@@ -947,7 +966,7 @@ adjustJoinPointType mult new_res_ty join_id
     orig_ar = idJoinArity join_id
     orig_ty = idType join_id
 
-    new_join_ty = go orig_ar orig_ty
+    new_join_ty = go orig_ar orig_ty :: Type
 
     go 0 _  = new_res_ty
     go n ty | Just (arg_bndr, res_ty) <- splitPiTy_maybe ty
@@ -956,7 +975,8 @@ adjustJoinPointType mult new_res_ty join_id
             | otherwise
             = pprPanic "adjustJoinPointType" (ppr orig_ar <+> ppr orig_ty)
 
-    scale_bndr (Anon af t) = Anon af (scaleScaled mult t)
+    -- See Note [Bangs in the Simplifier]
+    scale_bndr (Anon af t) = Anon af $! (scaleScaled mult t)
     scale_bndr b@(Named _) = b
 
 {- Note [Scaling join point arguments]
