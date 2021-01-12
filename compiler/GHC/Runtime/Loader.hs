@@ -188,7 +188,9 @@ forceLoadTyCon hsc_env con_name = do
 
 getValueSafely :: HscEnv -> Name -> Type -> IO (Maybe a)
 getValueSafely hsc_env val_name expected_type = do
-  mb_hval <- lookupHook getValueSafelyHook getHValueSafely dflags hsc_env val_name expected_type
+  mb_hval <- case getValueSafelyHook hooks of
+    Nothing -> getHValueSafely hsc_env val_name expected_type
+    Just h  -> h               hsc_env val_name expected_type
   case mb_hval of
     Nothing   -> return Nothing
     Just hval -> do
@@ -197,6 +199,7 @@ getValueSafely hsc_env val_name expected_type = do
   where
     dflags = hsc_dflags hsc_env
     logger = hsc_logger hsc_env
+    hooks  = hsc_hooks hsc_env
 
 getHValueSafely :: HscEnv -> Name -> Type -> IO (Maybe HValue)
 getHValueSafely hsc_env val_name expected_type = do
