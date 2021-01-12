@@ -122,12 +122,12 @@ cprAnalTopBind :: AnalEnv
 cprAnalTopBind env (NonRec id rhs)
   = (env', NonRec id' rhs')
   where
-    (id', rhs', env') = cprAnalBind TopLevel env noWidening [] id rhs
+    (id', rhs', env') = cprAnalBind TopLevel env noWidening id rhs
 
 cprAnalTopBind env (Rec pairs)
   = (env', Rec pairs')
   where
-    (env', pairs') = cprFix TopLevel env [] pairs
+    (env', pairs') = cprFix TopLevel env pairs
 
 --
 -- * Analysing expressions
@@ -210,13 +210,13 @@ cprAnal' env args (Case scrut case_bndr ty alts)
 cprAnal' env args (Let (NonRec id rhs) body)
   = (body_ty, Let (NonRec id' rhs') body')
   where
-    (id', rhs', env') = cprAnalBind NotTopLevel env noWidening args id rhs
+    (id', rhs', env') = cprAnalBind NotTopLevel env noWidening id rhs
     (body_ty, body')  = cprAnal env' args body
 
 cprAnal' env args (Let (Rec pairs) body)
   = body_ty `seq` (body_ty, Let (Rec pairs') body')
   where
-    (env', pairs')   = cprFix NotTopLevel env args pairs
+    (env', pairs')   = cprFix NotTopLevel env pairs
     (body_ty, body') = cprAnal env' args body
 
 cprAnalAlt
@@ -306,11 +306,10 @@ cprAnalBind
   :: TopLevelFlag
   -> AnalEnv
   -> Widening -- ^ We want to specify 'depthWidening' in fixed-point iteration
-  -> [CprType]
   -> Id
   -> CoreExpr
   -> (Id, CoreExpr, AnalEnv)
-cprAnalBind top_lvl env widening args id rhs
+cprAnalBind top_lvl env widening id rhs
   -- See Note [CPR for data structures]
   | isDataStructure id rhs
   = (id,  rhs,  env) -- Data structure => no code => no need to analyse rhs
@@ -327,13 +326,7 @@ cprAnalBind top_lvl env widening args id rhs
                                                    arg_tys
                                                    (idStrictness id)
 
-    -- TODO: Not sure if that special handling of join points is really
-    -- necessary. It might even be harmful if the excess 'args' aren't unboxed
-    -- and we blindly assume that they have the CPR property! So we should
-    -- try out getting rid of this special case and 'args'.
-    (rhs_ty, rhs')
-      | isJoinId id = cprAnal env (assumed_arg_cpr_tys ++ args) rhs
-      | otherwise   = cprAnal env assumed_arg_cpr_tys rhs
+    (rhs_ty, rhs')      = cprAnal env assumed_arg_cpr_tys rhs
 
     -- possibly trim thunk CPR info
     rhs_ty'
@@ -397,10 +390,9 @@ unboxingStrategy env = wantToUnboxArg (ae_fam_envs env) has_inlineable_prag
 cprFix
   :: TopLevelFlag
   -> AnalEnv                    -- Does not include bindings for this binding
-  -> [CprType]
   -> [(Id,CoreExpr)]
   -> (AnalEnv, [(Id,CoreExpr)]) -- Binders annotated with CPR info
-cprFix top_lvl orig_env str orig_pairs
+cprFix top_lvl orig_env orig_pairs
   = loop 1 init_env init_pairs
   where
     init_sig id rhs
@@ -434,7 +426,7 @@ cprFix top_lvl orig_env str orig_pairs
       where
         go env (id, rhs) = (env', (id', rhs'))
           where
-            (id', rhs', env') = cprAnalBind top_lvl env depthWidening str id rhs
+            (id', rhs', env') = cprAnalBind top_lvl env depthWidening id rhs
 
 {- Note [Arity trimming for CPR signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
