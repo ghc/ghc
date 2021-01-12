@@ -20,6 +20,7 @@ import GHC.Types.Name.Set
 import GHC.Hs
 import GHC.Types.Name.Reader
 import GHC.Tc.Utils.Monad
+import GHC.Driver.Env.Types
 
 import GHC.Rename.Env
 import GHC.Rename.Utils   ( HsDocContext(..), newLocalBndrRn )
@@ -314,7 +315,10 @@ runRnSplice :: UntypedSpliceFlavour
             -> HsSplice GhcRn   -- Always untyped
             -> TcRn (res, [ForeignRef (TH.Q ())])
 runRnSplice flavour run_meta ppr_res splice
-  = do { splice' <- getHooked runRnSpliceHook return >>= ($ splice)
+  = do { hooks <- hsc_hooks <$> getTopEnv
+       ; splice' <- case runRnSpliceHook hooks of
+            Nothing -> return splice
+            Just h  -> h splice
 
        ; let the_expr = case splice' of
                 HsUntypedSplice _ _ _ e   ->  e

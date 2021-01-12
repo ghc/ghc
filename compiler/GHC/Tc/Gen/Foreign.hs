@@ -216,8 +216,11 @@ to the module's usages.
 
 tcForeignImports :: [LForeignDecl GhcRn]
                  -> TcM ([Id], [LForeignDecl GhcTc], Bag GlobalRdrElt)
-tcForeignImports decls
-  = getHooked tcForeignImportsHook tcForeignImports' >>= ($ decls)
+tcForeignImports decls = do
+    hooks <- getHooks
+    case tcForeignImportsHook hooks of
+        Nothing -> tcForeignImports' decls
+        Just h  -> h decls
 
 tcForeignImports' :: [LForeignDecl GhcRn]
                   -> TcM ([Id], [LForeignDecl GhcTc], Bag GlobalRdrElt)
@@ -359,8 +362,11 @@ checkMissingAmpersand dflags arg_tys res_ty
 
 tcForeignExports :: [LForeignDecl GhcRn]
              -> TcM (LHsBinds GhcTc, [LForeignDecl GhcTc], Bag GlobalRdrElt)
-tcForeignExports decls =
-  getHooked tcForeignExportsHook tcForeignExports' >>= ($ decls)
+tcForeignExports decls = do
+    hooks <- getHooks
+    case tcForeignExportsHook hooks of
+        Nothing -> tcForeignExports' decls
+        Just h  -> h decls
 
 tcForeignExports' :: [LForeignDecl GhcRn]
              -> TcM (LHsBinds GhcTc, [LForeignDecl GhcTc], Bag GlobalRdrElt)

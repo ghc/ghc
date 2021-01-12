@@ -7,9 +7,9 @@
 
 module GHC.Driver.Hooks
    ( Hooks
+   , HasHooks (..)
+   , ContainsHooks (..)
    , emptyHooks
-   , lookupHook
-   , getHooked
      -- the hooks:
    , DsForeignsHook
    , dsForeignsHook
@@ -68,7 +68,6 @@ import GHCi.RemoteTypes
 import GHC.Data.Stream
 import GHC.Data.Bag
 
-import Data.Maybe
 import qualified Data.Kind
 import System.Process
 
@@ -125,33 +124,33 @@ virtually no difference for plugin authors that want to write a foreign hook.
 type family DsForeignsHook :: Data.Kind.Type
 
 data Hooks = Hooks
-  { dsForeignsHook         :: Maybe DsForeignsHook
+  { dsForeignsHook         :: !(Maybe DsForeignsHook)
   -- ^ Actual type:
   -- @Maybe ([LForeignDecl GhcTc] -> DsM (ForeignStubs, OrdList (Id, CoreExpr)))@
-  , tcForeignImportsHook   :: Maybe ([LForeignDecl GhcRn]
-                          -> TcM ([Id], [LForeignDecl GhcTc], Bag GlobalRdrElt))
-  , tcForeignExportsHook   :: Maybe ([LForeignDecl GhcRn]
-            -> TcM (LHsBinds GhcTc, [LForeignDecl GhcTc], Bag GlobalRdrElt))
-  , hscFrontendHook        :: Maybe (ModSummary -> Hsc FrontendResult)
+  , tcForeignImportsHook   :: !(Maybe ([LForeignDecl GhcRn]
+                          -> TcM ([Id], [LForeignDecl GhcTc], Bag GlobalRdrElt)))
+  , tcForeignExportsHook   :: !(Maybe ([LForeignDecl GhcRn]
+            -> TcM (LHsBinds GhcTc, [LForeignDecl GhcTc], Bag GlobalRdrElt)))
+  , hscFrontendHook        :: !(Maybe (ModSummary -> Hsc FrontendResult))
   , hscCompileCoreExprHook ::
-               Maybe (HscEnv -> SrcSpan -> CoreExpr -> IO ForeignHValue)
-  , ghcPrimIfaceHook       :: Maybe ModIface
-  , runPhaseHook           :: Maybe (PhasePlus -> FilePath -> CompPipeline (PhasePlus, FilePath))
-  , runMetaHook            :: Maybe (MetaHook TcM)
-  , linkHook               :: Maybe (GhcLink -> DynFlags -> Bool
-                                         -> HomePackageTable -> IO SuccessFlag)
-  , runRnSpliceHook        :: Maybe (HsSplice GhcRn -> RnM (HsSplice GhcRn))
-  , getValueSafelyHook     :: Maybe (HscEnv -> Name -> Type
-                                                          -> IO (Maybe HValue))
-  , createIservProcessHook :: Maybe (CreateProcess -> IO ProcessHandle)
-  , stgToCmmHook           :: Maybe (DynFlags -> Module -> [TyCon] -> CollectedCCs
-                                 -> [CgStgTopBinding] -> HpcInfo -> Stream IO CmmGroup ModuleLFInfos)
-  , cmmToRawCmmHook        :: forall a . Maybe (DynFlags -> Maybe Module -> Stream IO CmmGroupSRTs a
-                                 -> IO (Stream IO RawCmmGroup a))
+               !(Maybe (HscEnv -> SrcSpan -> CoreExpr -> IO ForeignHValue))
+  , ghcPrimIfaceHook       :: !(Maybe ModIface)
+  , runPhaseHook           :: !(Maybe (PhasePlus -> FilePath -> CompPipeline (PhasePlus, FilePath)))
+  , runMetaHook            :: !(Maybe (MetaHook TcM))
+  , linkHook               :: !(Maybe (GhcLink -> DynFlags -> Bool
+                                         -> HomePackageTable -> IO SuccessFlag))
+  , runRnSpliceHook        :: !(Maybe (HsSplice GhcRn -> RnM (HsSplice GhcRn)))
+  , getValueSafelyHook     :: !(Maybe (HscEnv -> Name -> Type
+                                                          -> IO (Maybe HValue)))
+  , createIservProcessHook :: !(Maybe (CreateProcess -> IO ProcessHandle))
+  , stgToCmmHook           :: !(Maybe (DynFlags -> Module -> [TyCon] -> CollectedCCs
+                                 -> [CgStgTopBinding] -> HpcInfo -> Stream IO CmmGroup ModuleLFInfos))
+  , cmmToRawCmmHook        :: !(forall a . Maybe (DynFlags -> Maybe Module -> Stream IO CmmGroupSRTs a
+                                 -> IO (Stream IO RawCmmGroup a)))
   }
 
-getHooked :: (Functor f, HasDynFlags f) => (Hooks -> Maybe a) -> a -> f a
-getHooked hook def = fmap (lookupHook hook def) getDynFlags
+class HasHooks m where
+    getHooks :: m Hooks
 
-lookupHook :: (Hooks -> Maybe a) -> a -> DynFlags -> a
-lookupHook hook def = fromMaybe def . hook . hooks
+class ContainsHooks a where
+    extractHooks :: a -> Hooks
