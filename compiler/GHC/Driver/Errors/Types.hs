@@ -2,12 +2,26 @@
 
 module GHC.Driver.Errors.Types (
     GhcMessage(..)
-  , DriverMessage
+  , DriverMessage(..)
+  -- * Constructors
   , ghcUnknownMessage
+  , mkDriverWarn
   ) where
 
 import Data.Typeable
+
+import GHC.Core.InstEnv ( ClsInst )
+import GHC.Data.Bag
+import GHC.Driver.Flags
+import GHC.Driver.Session ( DynFlags )
+import GHC.Prelude ( String )
 import GHC.Types.Error
+import GHC.Types.SrcLoc
+import GHC.Unit.Finder.Types ( FindResult )
+import GHC.Unit.Module.Name ( ModuleName )
+import GHC.Unit.Types ( UnitId, Module )
+import GHC.Utils.Outputable
+
 import GHC.Parser.Errors.Types ( PsMessage )
 import GHC.Tc.Errors.Types ( TcRnMessage )
 import GHC.HsToCore.Errors.Types ( DsMessage )
@@ -35,5 +49,25 @@ data GhcMessage where
 ghcUnknownMessage :: ErrDoc -> GhcMessage
 ghcUnknownMessage = GhcUnknownMessage
 
+
+type Reasons = Bag (ErrMsg TcRnMessage)
+
 -- | A message from the driver.
 data DriverMessage
+  = -- Warnings
+    DriverWarnModuleInferredUnsafe !DynFlags !ModuleName [ClsInst] Reasons
+  | DriverWarnInferredSafeImports  !ModuleName
+
+    -- Errors
+  | DriverCannotFindModule !DynFlags !ModuleName !FindResult
+  | DriverNotAnExpression !String
+  | DriverParseErrorImport
+  | DriverPkgRequiredTrusted !DynFlags !UnitId
+  | DriverCantLoadIfaceForSafe !Module
+  | DriverUnknownMessage !ErrDoc
+
+
+-- | Construct an structured error out of the input driver message.
+mkDriverWarn :: WarnReason -> SrcSpan -> PrintUnqualified -> DriverMessage -> ErrMsg DriverMessage
+mkDriverWarn reason loc qual warn =
+  makeIntoWarning reason (mkErr loc qual warn)
