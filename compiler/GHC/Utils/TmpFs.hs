@@ -1,11 +1,26 @@
 {-# LANGUAGE CPP #-}
-module GHC.SysTools.FileCleanup
-  ( TempFileLifetime(..)
-  , cleanTempDirs, cleanTempFiles, cleanCurrentModuleTempFiles
-  , addFilesToClean, changeTempFilesLifetime
-  , newTempName, newTempLibName, newTempDir
-  , withSystemTempDirectory, withTempDirectory
-  ) where
+
+-- | Temporary file-system management
+module GHC.Utils.TmpFs
+    ( TmpFs
+    , initTmpFs
+    , forkTmpFsFrom
+    , mergeTmpFsInto
+    , FilesToClean(..)
+    , emptyFilesToClean
+    , TempFileLifetime(..)
+    , cleanTempDirs
+    , cleanTempFiles
+    , cleanCurrentModuleTempFiles
+    , addFilesToClean
+    , changeTempFilesLifetime
+    , newTempName
+    , newTempLibName
+    , newTempDir
+    , withSystemTempDirectory
+    , withTempDirectory
+    )
+where
 
 import GHC.Prelude
 
@@ -20,7 +35,9 @@ import GHC.Driver.Phases
 import Control.Monad
 import Data.List (partition)
 import qualified Data.Set as Set
+import Data.Set (Set)
 import qualified Data.Map as Map
+import Data.Map (Map)
 import Data.IORef
 import System.Directory
 import System.FilePath
@@ -29,6 +46,40 @@ import System.IO.Error
 #if !defined(mingw32_HOST_OS)
 import qualified System.Posix.Internals
 #endif
+
+-- | Temporary file-system
+data TmpFs = TmpFs
+  { tmp_dirs_to_clean :: IORef (Map FilePath FilePath)
+      -- ^ Maps system temporary directory (passed via settings or DynFlags) to
+      -- an actual temporary directory for this process.
+      --
+      -- It's a Map probably to support changing the system temporary directory
+      -- over time.
+      --
+      -- Shared with forked TmpFs.
+
+  , tmp_next_suffix :: IORef Int
+      -- ^ The next available suffix to uniquely name a temp file, updated
+      -- atomically.
+      --
+      -- Shared with forked TmpFs.
+
+  , tmp_files_to_clean :: IORef FilesToClean
+      -- ^ Files to clean (per session or per module)
+      --
+      -- Not shared with forked TmpFs.
+  }
+
+-- | A collection of files that must be deleted before ghc exits.
+data FilesToClean = FilesToClean
+    { ftcGhcSession :: !(Set FilePath)
+        -- ^ Files that will be deleted at the end of runGhc(T)
+
+    , ftcCurrentModule :: !(Set FilePath)
+        -- ^ Files that will be deleted the next time
+        -- 'cleanCurrentModuleTempFiles' is called, or otherwise at the end of
+        -- the session.
+    }
 
 -- | Used when a temp file is created. This determines which component Set of
 -- FilesToClean will get the temp file
@@ -41,20 +92,63 @@ data TempFileLifetime
   -- runGhc(T)
   deriving (Show)
 
-cleanTempDirs :: Logger -> DynFlags -> IO ()
-cleanTempDirs logger dflags
+
+-- | An empty FilesToClean
+emptyFilesToClean :: FilesToClean
+emptyFilesToClean = FilesToClean Set.empty Set.empty
+
+-- | Merge two FilesToClean
+mergeFilesToClean :: FilesToClean -> FilesToClean -> FilesToClean
+mergeFilesToClean x y = FilesToClean
+    { ftcGhcSession    = Set.union (ftcGhcSession x) (ftcGhcSession y)
+    , ftcCurrentModule = Set.union (ftcCurrentModule x) (ftcCurrentModule y)
+    }
+
+-- | Initialise an empty TmpFs
+initTmpFs :: IO TmpFs
+initTmpFs = do
+    files <- newIORef emptyFilesToClean
+    dirs  <- newIORef Map.empty
+    next  <- newIORef 0
+    return $ TmpFs
+        { tmp_files_to_clean = files
+        , tmp_dirs_to_clean  = dirs
+        , tmp_next_suffix    = next
+        }
+
+-- | Initialise an empty TmpFs sharing unique numbers and per-process temporary
+-- directories with the given TmpFs
+forkTmpFsFrom :: TmpFs -> IO TmpFs
+forkTmpFsFrom old = do
+    files <- newIORef emptyFilesToClean
+    return $ TmpFs
+        { tmp_files_to_clean = files
+        , tmp_dirs_to_clean  = tmp_dirs_to_clean old
+        , tmp_next_suffix    = tmp_next_suffix old
+        }
+
+-- | Merge the first TmpFs into the second.
+--
+-- The first TmpFs is returned emptied.
+mergeTmpFsInto :: TmpFs -> TmpFs -> IO ()
+mergeTmpFsInto src dst = do
+    src_files <- atomicModifyIORef' (tmp_files_to_clean src) (\s -> (emptyFilesToClean, s))
+    atomicModifyIORef' (tmp_files_to_clean dst) (\s -> (mergeFilesToClean src_files s, ()))
+
+cleanTempDirs :: Logger -> TmpFs -> DynFlags -> IO ()
+cleanTempDirs logger tmpfs dflags
    = unless (gopt Opt_KeepTmpFiles dflags)
    $ mask_
-   $ do let ref = dirsToClean dflags
+   $ do let ref = tmp_dirs_to_clean tmpfs
         ds <- atomicModifyIORef' ref $ \ds -> (Map.empty, ds)
         removeTmpDirs logger dflags (Map.elems ds)
 
--- | Delete all files in @filesToClean dflags@.
-cleanTempFiles :: Logger -> DynFlags -> IO ()
-cleanTempFiles logger dflags
+-- | Delete all files in @tmp_files_to_clean@.
+cleanTempFiles :: Logger -> TmpFs -> DynFlags -> IO ()
+cleanTempFiles logger tmpfs dflags
    = unless (gopt Opt_KeepTmpFiles dflags)
    $ mask_
-   $ do let ref = filesToClean dflags
+   $ do let ref = tmp_files_to_clean tmpfs
         to_delete <- atomicModifyIORef' ref $
             \FilesToClean
                 { ftcCurrentModule = cm_files
@@ -63,15 +157,15 @@ cleanTempFiles logger dflags
                      , Set.toList cm_files ++ Set.toList gs_files)
         removeTmpFiles logger dflags to_delete
 
--- | Delete all files in @filesToClean dflags@. That have lifetime
+-- | Delete all files in @tmp_files_to_clean@. That have lifetime
 -- TFL_CurrentModule.
 -- If a file must be cleaned eventually, but must survive a
 -- cleanCurrentModuleTempFiles, ensure it has lifetime TFL_GhcSession.
-cleanCurrentModuleTempFiles :: Logger -> DynFlags -> IO ()
-cleanCurrentModuleTempFiles logger dflags
+cleanCurrentModuleTempFiles :: Logger -> TmpFs -> DynFlags -> IO ()
+cleanCurrentModuleTempFiles logger tmpfs dflags
    = unless (gopt Opt_KeepTmpFiles dflags)
    $ mask_
-   $ do let ref = filesToClean dflags
+   $ do let ref = tmp_files_to_clean tmpfs
         to_delete <- atomicModifyIORef' ref $
             \ftc@FilesToClean{ftcCurrentModule = cm_files} ->
                 (ftc {ftcCurrentModule = Set.empty}, Set.toList cm_files)
@@ -81,8 +175,8 @@ cleanCurrentModuleTempFiles logger dflags
 -- 'cleanTempFiles' or 'cleanCurrentModuleTempFiles', depending on lifetime.
 -- If any of new_files are already tracked, they will have their lifetime
 -- updated.
-addFilesToClean :: DynFlags -> TempFileLifetime -> [FilePath] -> IO ()
-addFilesToClean dflags lifetime new_files = modifyIORef' (filesToClean dflags) $
+addFilesToClean :: TmpFs -> TempFileLifetime -> [FilePath] -> IO ()
+addFilesToClean tmpfs lifetime new_files = modifyIORef' (tmp_files_to_clean tmpfs) $
   \FilesToClean
     { ftcCurrentModule = cm_files
     , ftcGhcSession = gs_files
@@ -100,76 +194,76 @@ addFilesToClean dflags lifetime new_files = modifyIORef' (filesToClean dflags) $
 
 -- | Update the lifetime of files already being tracked. If any files are
 -- not being tracked they will be discarded.
-changeTempFilesLifetime :: DynFlags -> TempFileLifetime -> [FilePath] -> IO ()
-changeTempFilesLifetime dflags lifetime files = do
+changeTempFilesLifetime :: TmpFs -> TempFileLifetime -> [FilePath] -> IO ()
+changeTempFilesLifetime tmpfs lifetime files = do
   FilesToClean
     { ftcCurrentModule = cm_files
     , ftcGhcSession = gs_files
-    } <- readIORef (filesToClean dflags)
+    } <- readIORef (tmp_files_to_clean tmpfs)
   let old_set = case lifetime of
         TFL_CurrentModule -> gs_files
         TFL_GhcSession -> cm_files
       existing_files = [f | f <- files, f `Set.member` old_set]
-  addFilesToClean dflags lifetime existing_files
+  addFilesToClean tmpfs lifetime existing_files
 
 -- Return a unique numeric temp file suffix
-newTempSuffix :: DynFlags -> IO Int
-newTempSuffix dflags =
-  atomicModifyIORef' (nextTempSuffix dflags) $ \n -> (n+1,n)
+newTempSuffix :: TmpFs -> IO Int
+newTempSuffix tmpfs =
+  atomicModifyIORef' (tmp_next_suffix tmpfs) $ \n -> (n+1,n)
 
 -- Find a temporary name that doesn't already exist.
-newTempName :: Logger -> DynFlags -> TempFileLifetime -> Suffix -> IO FilePath
-newTempName logger dflags lifetime extn
-  = do d <- getTempDir logger dflags
+newTempName :: Logger -> TmpFs -> DynFlags -> TempFileLifetime -> Suffix -> IO FilePath
+newTempName logger tmpfs dflags lifetime extn
+  = do d <- getTempDir logger tmpfs dflags
        findTempName (d </> "ghc_") -- See Note [Deterministic base name]
   where
     findTempName :: FilePath -> IO FilePath
     findTempName prefix
-      = do n <- newTempSuffix dflags
+      = do n <- newTempSuffix tmpfs
            let filename = prefix ++ show n <.> extn
            b <- doesFileExist filename
            if b then findTempName prefix
                 else do -- clean it up later
-                        addFilesToClean dflags lifetime [filename]
+                        addFilesToClean tmpfs lifetime [filename]
                         return filename
 
-newTempDir :: Logger -> DynFlags -> IO FilePath
-newTempDir logger dflags
-  = do d <- getTempDir logger dflags
+newTempDir :: Logger -> TmpFs -> DynFlags -> IO FilePath
+newTempDir logger tmpfs dflags
+  = do d <- getTempDir logger tmpfs dflags
        findTempDir (d </> "ghc_")
   where
     findTempDir :: FilePath -> IO FilePath
     findTempDir prefix
-      = do n <- newTempSuffix dflags
+      = do n <- newTempSuffix tmpfs
            let filename = prefix ++ show n
            b <- doesDirectoryExist filename
            if b then findTempDir prefix
                 else do createDirectory filename
-                        -- see mkTempDir below; this is wrong: -> consIORef (dirsToClean dflags) filename
+                        -- see mkTempDir below; this is wrong: -> consIORef (tmp_dirs_to_clean tmpfs) filename
                         return filename
 
-newTempLibName :: Logger -> DynFlags -> TempFileLifetime -> Suffix
+newTempLibName :: Logger -> TmpFs -> DynFlags -> TempFileLifetime -> Suffix
   -> IO (FilePath, FilePath, String)
-newTempLibName logger dflags lifetime extn
-  = do d <- getTempDir logger dflags
+newTempLibName logger tmpfs dflags lifetime extn
+  = do d <- getTempDir logger tmpfs dflags
        findTempName d ("ghc_")
   where
     findTempName :: FilePath -> String -> IO (FilePath, FilePath, String)
     findTempName dir prefix
-      = do n <- newTempSuffix dflags -- See Note [Deterministic base name]
+      = do n <- newTempSuffix tmpfs -- See Note [Deterministic base name]
            let libname = prefix ++ show n
                filename = dir </> "lib" ++ libname <.> extn
            b <- doesFileExist filename
            if b then findTempName dir prefix
                 else do -- clean it up later
-                        addFilesToClean dflags lifetime [filename]
+                        addFilesToClean tmpfs lifetime [filename]
                         return (filename, dir, libname)
 
 
 -- Return our temporary directory within tmp_dir, creating one if we
 -- don't have one yet.
-getTempDir :: Logger -> DynFlags -> IO FilePath
-getTempDir logger dflags = do
+getTempDir :: Logger -> TmpFs -> DynFlags -> IO FilePath
+getTempDir logger tmpfs dflags = do
     mapping <- readIORef dir_ref
     case Map.lookup tmp_dir mapping of
         Nothing -> do
@@ -179,17 +273,17 @@ getTempDir logger dflags = do
         Just dir -> return dir
   where
     tmp_dir = tmpDir dflags
-    dir_ref = dirsToClean dflags
+    dir_ref = tmp_dirs_to_clean tmpfs
 
     mkTempDir :: FilePath -> IO FilePath
     mkTempDir prefix = do
-        n <- newTempSuffix dflags
+        n <- newTempSuffix tmpfs
         let our_dir = prefix ++ show n
 
         -- 1. Speculatively create our new directory.
         createDirectory our_dir
 
-        -- 2. Update the dirsToClean mapping unless an entry already exists
+        -- 2. Update the tmp_dirs_to_clean mapping unless an entry already exists
         -- (i.e. unless another thread beat us to it).
         their_dir <- atomicModifyIORef' dir_ref $ \mapping ->
             case Map.lookup tmp_dir mapping of

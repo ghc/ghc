@@ -58,7 +58,6 @@ import GHC.ByteCode.Asm
 import GHC.ByteCode.Types
 
 import GHC.SysTools
-import GHC.SysTools.FileCleanup
 
 import GHC.Types.Basic
 import GHC.Types.Name
@@ -71,6 +70,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Utils.Error
 import GHC.Utils.Logger
+import GHC.Utils.TmpFs
 
 import GHC.Unit.Env
 import GHC.Unit.Finder
@@ -919,11 +919,12 @@ dynLoadObjs hsc_env pls@LoaderState{..} objs = do
     let unit_env = hsc_unit_env hsc_env
     let dflags   = hsc_dflags hsc_env
     let logger   = hsc_logger hsc_env
+    let tmpfs    = hsc_tmpfs hsc_env
     let platform = ue_platform unit_env
     let minus_ls = [ lib | Option ('-':'l':lib) <- ldInputs dflags ]
     let minus_big_ls = [ lib | Option ('-':'L':lib) <- ldInputs dflags ]
     (soFile, libPath , libName) <-
-      newTempLibName logger dflags TFL_CurrentModule (platformSOExt platform)
+      newTempLibName logger tmpfs dflags TFL_CurrentModule (platformSOExt platform)
     let
         dflags2 = dflags {
                       -- We don't want the original ldInputs in
@@ -969,10 +970,10 @@ dynLoadObjs hsc_env pls@LoaderState{..} objs = do
     -- link all "loaded packages" so symbols in those can be resolved
     -- Note: We are loading packages with local scope, so to see the
     -- symbols in this link we must link all loaded packages again.
-    linkDynLib logger dflags2 unit_env objs pkgs_loaded
+    linkDynLib logger tmpfs dflags2 unit_env objs pkgs_loaded
 
     -- if we got this far, extend the lifetime of the library file
-    changeTempFilesLifetime dflags TFL_GhcSession [soFile]
+    changeTempFilesLifetime tmpfs TFL_GhcSession [soFile]
     m <- loadDLL hsc_env soFile
     case m of
         Nothing -> return $! pls { temp_sos = (libPath, libName) : temp_sos }
