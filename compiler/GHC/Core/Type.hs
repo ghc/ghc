@@ -6,6 +6,7 @@
 {-# LANGUAGE CPP, FlexibleContexts, PatternSynonyms, ViewPatterns #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+{-# OPTIONS_GHC -ddump-simpl -ddump-to-file -ddump-stg-final -dsuppress-coercions #-}
 
 -- | Main functions for manipulating types and type-related things
 module GHC.Core.Type (

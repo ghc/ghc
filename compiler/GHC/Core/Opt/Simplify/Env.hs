@@ -654,12 +654,14 @@ getTopFloatBinds (SimplFloats { sfLetFloats  = lbs
   = ASSERT( isNilOL jbs )  -- Can't be any top-level join bindings
     letFloatBinds lbs
 
+{-# INLINE mapLetFloats #-}
 mapLetFloats :: LetFloats -> ((Id,CoreExpr) -> (Id,CoreExpr)) -> LetFloats
 mapLetFloats (LetFloats fs ff) fun
-   = LetFloats (mapOL app fs) ff
+   = LetFloats fs1 ff
    where
     app (NonRec b e) = case fun (b,e) of (b',e') -> NonRec b' e'
-    app (Rec bs)     = Rec (map fun bs)
+    app (Rec bs)     = Rec (strictMap fun bs)
+    !fs1 = (mapOL' app fs)
 
 {-
 ************************************************************************
@@ -956,7 +958,7 @@ adjustJoinPointType mult new_res_ty join_id
     orig_ar = idJoinArity join_id
     orig_ty = idType join_id
 
-    new_join_ty = go orig_ar orig_ty
+    new_join_ty = go orig_ar orig_ty :: Type
 
     go 0 _  = new_res_ty
     go n ty | Just (arg_bndr, res_ty) <- splitPiTy_maybe ty
