@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE LambdaCase #-}
 
 -----------------------------------------------------------------------------
 --
@@ -59,7 +60,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Logger
 
-import GHC.SysTools.FileCleanup
+import GHC.Utils.TmpFs
 
 import GHC.Data.Stream
 import GHC.Data.OrdList
@@ -71,6 +72,7 @@ import System.IO.Unsafe
 import qualified Data.ByteString as BS
 
 codeGen :: Logger
+        -> TmpFs
         -> DynFlags
         -> Module
         -> [TyCon]
@@ -81,7 +83,7 @@ codeGen :: Logger
                                        -- Output as a stream, so codegen can
                                        -- be interleaved with output
 
-codeGen logger dflags this_mod data_tycons
+codeGen logger tmpfs dflags this_mod data_tycons
         cost_centre_info stg_binds hpc_info
   = do  {     -- cg: run the code generator, and yield the resulting CmmGroup
               -- Using an IORef to store the state is a bit crude, but otherwise
@@ -106,7 +108,7 @@ codeGen logger dflags this_mod data_tycons
                -- Note [pipeline-split-init].
         ; cg (mkModuleInit cost_centre_info this_mod hpc_info)
 
-        ; mapM_ (cg . cgTopBinding logger dflags) stg_binds
+        ; mapM_ (cg . cgTopBinding logger tmpfs dflags) stg_binds
 
                 -- Put datatype_stuff after code_stuff, because the
                 -- datatype closure table (for enumeration types) to
@@ -153,39 +155,38 @@ This is so that we can write the top level processing in a compositional
 style, with the increasing static environment being plumbed as a state
 variable. -}
 
-cgTopBinding :: Logger -> DynFlags -> CgStgTopBinding -> FCode ()
-cgTopBinding _logger dflags (StgTopLifted (StgNonRec id rhs))
-  = do  { let (info, fcode) = cgTopRhs dflags NonRecursive id rhs
-        ; fcode
-        ; addBindC info
-        }
+cgTopBinding :: Logger -> TmpFs -> DynFlags -> CgStgTopBinding -> FCode ()
+cgTopBinding logger tmpfs dflags = \case
+    StgTopLifted (StgNonRec id rhs) -> do
+        let (info, fcode) = cgTopRhs dflags NonRecursive id rhs
+        fcode
+        addBindC info
 
-cgTopBinding _logger dflags (StgTopLifted (StgRec pairs))
-  = do  { let (bndrs, rhss) = unzip pairs
-        ; let pairs' = zip bndrs rhss
-              r = unzipWith (cgTopRhs dflags Recursive) pairs'
-              (infos, fcodes) = unzip r
-        ; addBindsC infos
-        ; sequence_ fcodes
-        }
+    StgTopLifted (StgRec pairs) -> do
+        let (bndrs, rhss) = unzip pairs
+        let pairs' = zip bndrs rhss
+            r = unzipWith (cgTopRhs dflags Recursive) pairs'
+            (infos, fcodes) = unzip r
+        addBindsC infos
+        sequence_ fcodes
 
-cgTopBinding logger dflags (StgTopStringLit id str) = do
-  let label = mkBytesLabel (idName id)
-  -- emit either a CmmString literal or dump the string in a file and emit a
-  -- CmmFileEmbed literal.
-  -- See Note [Embedding large binary blobs] in GHC.CmmToAsm.Ppr
-  let isNCG    = backend dflags == NCG
-      isSmall  = fromIntegral (BS.length str) <= binBlobThreshold dflags
-      asString = binBlobThreshold dflags == 0 || isSmall
+    StgTopStringLit id str -> do
+        let label = mkBytesLabel (idName id)
+        -- emit either a CmmString literal or dump the string in a file and emit a
+        -- CmmFileEmbed literal.
+        -- See Note [Embedding large binary blobs] in GHC.CmmToAsm.Ppr
+        let isNCG    = backend dflags == NCG
+            isSmall  = fromIntegral (BS.length str) <= binBlobThreshold dflags
+            asString = binBlobThreshold dflags == 0 || isSmall
 
-      (lit,decl) = if not isNCG || asString
-        then mkByteStringCLit label str
-        else mkFileEmbedLit label $ unsafePerformIO $ do
-               bFile <- newTempName logger dflags TFL_CurrentModule ".dat"
-               BS.writeFile bFile str
-               return bFile
-  emitDecl decl
-  addBindC (litIdInfo (targetPlatform dflags) id mkLFStringLit lit)
+            (lit,decl) = if not isNCG || asString
+              then mkByteStringCLit label str
+              else mkFileEmbedLit label $ unsafePerformIO $ do
+                     bFile <- newTempName logger tmpfs dflags TFL_CurrentModule ".dat"
+                     BS.writeFile bFile str
+                     return bFile
+        emitDecl decl
+        addBindC (litIdInfo (targetPlatform dflags) id mkLFStringLit lit)
 
 
 cgTopRhs :: DynFlags -> RecFlag -> Id -> CgStgRhs -> (CgIdInfo, FCode ())
