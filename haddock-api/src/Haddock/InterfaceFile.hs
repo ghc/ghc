@@ -123,14 +123,12 @@ writeInterfaceFile filename iface = do
   put_ bh0 symtab_p_p
 
   -- Make some intial state
-  symtab_next <- newFastMutInt
-  writeFastMutInt symtab_next 0
+  symtab_next <- newFastMutInt 0
   symtab_map <- newIORef emptyUFM
   let bin_symtab = BinSymbolTable {
                       bin_symtab_next = symtab_next,
                       bin_symtab_map  = symtab_map }
-  dict_next_ref <- newFastMutInt
-  writeFastMutInt dict_next_ref 0
+  dict_next_ref <- newFastMutInt 0
   dict_map_ref <- newIORef emptyUFM
   let bin_dict = BinDictionary {
                       bin_dict_next = dict_next_ref,
