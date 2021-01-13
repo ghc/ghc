@@ -46,8 +46,7 @@ data BufHandle = BufHandle {-#UNPACK#-}!(Ptr Word8)
 newBufHandle :: Handle -> IO BufHandle
 newBufHandle hdl = do
   ptr <- mallocBytes buf_size
-  r <- newFastMutInt
-  writeFastMutInt r 0
+  r <- newFastMutInt 0
   return (BufHandle ptr r hdl)
 
 buf_size :: Int
