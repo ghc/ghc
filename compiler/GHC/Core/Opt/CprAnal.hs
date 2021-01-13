@@ -38,6 +38,8 @@ import GHC.Data.Maybe   ( isJust )
 import Control.Monad ( guard )
 import Data.List
 
+-- import GHC.Driver.Ppr
+
 {- Note [Constructed Product Result]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The goal of Constructed Product Result analysis is to identify functions that
@@ -189,7 +191,8 @@ cprAnal' env args (Lam var body)
     lam_ty               = abstractCprTy body_ty
 
 cprAnal' env args (Case scrut case_bndr ty alts)
-  = (res_ty, Case scrut' case_bndr ty alts')
+  = -- pprTrace "cprAnal:Case" (ppr scrut <+> ppr alt_tys <+> ppr res_ty) $
+    (res_ty, Case scrut' case_bndr ty alts')
   where
     -- Analyse the scrutinee and additionally force the resulting CPR type with
     -- head strictness.
@@ -301,6 +304,7 @@ cprAnalBind top_lvl env widening id rhs
   = (id', rhs', env')
   where
     arg_tys             = fst (splitFunNewTys (idType id))
+    -- TODO: Note
     -- We compute the Termination and CPR transformer based on the strictness
     -- signature. There is no point in pretending that an arg we are strict in
     -- could lead to non-termination, as the signature then trivially
@@ -323,7 +327,7 @@ cprAnalBind top_lvl env widening id rhs
     -- See Note [Arity trimming for CPR signatures]
     -- See Note [Ensuring termination of fixed-point iteration]
     sig    = widening $ mkCprSigForArity (ae_dflags env) (idArity id) rhs_ty'
-    id'    = -- pprTrace "cprAnalBind" (ppr id $$ ppr sig) $
+    id'    = -- pprTrace "cprAnalBind" (ppr id $$ ppr rhs_ty' $$ ppr sig) $
              setIdCprInfo id sig
     env'   = extendSigEnv env id sig
 
@@ -394,7 +398,7 @@ cprFix top_lvl orig_env orig_pairs
     loop :: Int -> AnalEnv -> [(Id,CoreExpr)] -> (AnalEnv, [(Id,CoreExpr)])
     loop n env pairs
       | found_fixpoint = (reset_env', pairs')
-      | otherwise      = -- pprTrace "cprFix:loop" (ppr n <+> ppr (map fst pairs)) $
+      | otherwise      = -- pprTrace "cprFix:loop" (ppr n <+> ppr (map _prj pairs) <+> ppr (map _prj pairs')) $
                          loop (n+1) env' pairs'
       where
         -- In all but the first iteration, delete the virgin flag
@@ -403,6 +407,7 @@ cprFix top_lvl orig_env orig_pairs
         -- Make sure we reset the virgin flag to what it was when we are stable
         reset_env'     = env'{ ae_virgin = orig_virgin }
         found_fixpoint = map (idCprInfo . fst) pairs' == map (idCprInfo . fst) pairs
+        _prj (id,_)    = (id, idCprInfo id) -- a helper fun for the trace call
 
     step :: AnalEnv -> [(Id, CoreExpr)] -> (AnalEnv, [(Id, CoreExpr)])
     step env pairs = mapAccumL go env pairs
