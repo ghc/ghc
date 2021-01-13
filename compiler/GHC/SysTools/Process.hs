@@ -10,16 +10,19 @@ module GHC.SysTools.Process where
 
 #include "HsVersions.h"
 
+import GHC.Prelude
+
+import GHC.Driver.Session
+
 import GHC.Utils.Exception
 import GHC.Utils.Error
-import GHC.Driver.Session
-import GHC.Data.FastString
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Prelude
 import GHC.Utils.Misc
 import GHC.Utils.Logger
+
 import GHC.Types.SrcLoc ( SrcLoc, mkSrcLoc, mkSrcSpan )
+import GHC.Data.FastString
 
 import Control.Concurrent
 import Data.Char
@@ -31,7 +34,7 @@ import System.IO
 import System.IO.Error as IO
 import System.Process
 
-import GHC.SysTools.FileCleanup
+import GHC.Utils.TmpFs
 
 -- | Enable process jobs support on Windows if it can be expected to work (e.g.
 -- @process >= 1.6.9.0@).
@@ -155,10 +158,16 @@ runSomething logger dflags phase_name pgm args =
 --     https://gcc.gnu.org/wiki/Response_Files
 --     https://gitlab.haskell.org/ghc/ghc/issues/10777
 runSomethingResponseFile
-  :: Logger -> DynFlags -> (String->String) -> String -> String -> [Option]
-  -> Maybe [(String,String)] -> IO ()
-
-runSomethingResponseFile logger dflags filter_fn phase_name pgm args mb_env =
+  :: Logger
+  -> TmpFs
+  -> DynFlags
+  -> (String->String)
+  -> String
+  -> String
+  -> [Option]
+  -> Maybe [(String,String)]
+  -> IO ()
+runSomethingResponseFile logger tmpfs dflags filter_fn phase_name pgm args mb_env =
     runSomethingWith logger dflags phase_name pgm args $ \real_args -> do
         fp <- getResponseFile real_args
         let args = ['@':fp]
@@ -166,7 +175,7 @@ runSomethingResponseFile logger dflags filter_fn phase_name pgm args mb_env =
         return (r,())
   where
     getResponseFile args = do
-      fp <- newTempName logger dflags TFL_CurrentModule "rsp"
+      fp <- newTempName logger tmpfs dflags TFL_CurrentModule "rsp"
       withFile fp WriteMode $ \h -> do
 #if defined(mingw32_HOST_OS)
           hSetEncoding h latin1

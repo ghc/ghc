@@ -22,7 +22,7 @@ import GHC.Driver.Phases
 import GHC.Driver.Env
 import GHC.Driver.Plugins
 
-import GHC.SysTools.FileCleanup (TempFileLifetime)
+import GHC.Utils.TmpFs (TempFileLifetime)
 
 import GHC.Types.SourceFile
 

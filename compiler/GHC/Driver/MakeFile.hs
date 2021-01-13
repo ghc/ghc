@@ -31,7 +31,7 @@ import GHC.Types.SourceError
 import GHC.Types.SrcLoc
 import Data.List (partition)
 import GHC.Data.FastString
-import GHC.SysTools.FileCleanup
+import GHC.Utils.TmpFs
 
 import GHC.Iface.Load (cannotFindModule)
 
@@ -82,7 +82,8 @@ doMkDependHS srcs = do
     when (null (depSuffixes dflags)) $ liftIO $
         throwGhcExceptionIO (ProgramError "You must specify at least one -dep-suffix")
 
-    files <- liftIO $ beginMkDependHS logger dflags
+    tmpfs <- hsc_tmpfs <$> getSession
+    files <- liftIO $ beginMkDependHS logger tmpfs dflags
 
     -- Do the downsweep to find all the modules
     targets <- mapM (\s -> GHC.guessTarget s Nothing) srcs
@@ -131,11 +132,11 @@ data MkDepFiles
             mkd_tmp_file  :: FilePath,          -- Name of the temporary file
             mkd_tmp_hdl   :: Handle }           -- Handle of the open temporary file
 
-beginMkDependHS :: Logger -> DynFlags -> IO MkDepFiles
-beginMkDependHS logger dflags = do
+beginMkDependHS :: Logger -> TmpFs -> DynFlags -> IO MkDepFiles
+beginMkDependHS logger tmpfs dflags = do
         -- open a new temp file in which to stuff the dependency info
         -- as we go along.
-  tmp_file <- newTempName logger dflags TFL_CurrentModule "dep"
+  tmp_file <- newTempName logger tmpfs dflags TFL_CurrentModule "dep"
   tmp_hdl <- openFile tmp_file WriteMode
 
         -- open the makefile

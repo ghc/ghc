@@ -204,6 +204,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Exception
 import GHC.Utils.Misc
 import GHC.Utils.Logger
+import GHC.Utils.TmpFs
 
 import GHC.Data.FastString
 import GHC.Data.Bag
@@ -245,6 +246,7 @@ newHscEnv dflags = do
     fc_var  <- newIORef emptyInstalledModuleEnv
     emptyLoader <- uninitializedLoader
     logger  <- initLogger
+    tmpfs   <- initTmpFs
     -- FIXME: it's sad that we have so many "unitialized" fields filled with
     -- empty stuff or lazy panics. We should have two kinds of HscEnv
     -- (initialized or not) instead and less fields that are mutable over time.
@@ -265,6 +267,7 @@ newHscEnv dflags = do
                   ,  hsc_static_plugins = []
                   ,  hsc_unit_dbs       = Nothing
                   ,  hsc_hooks          = emptyHooks
+                  ,  hsc_tmpfs          = tmpfs
                   }
 
 -- -----------------------------------------------------------------------------
@@ -1525,6 +1528,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
             dflags = hsc_dflags hsc_env
             logger = hsc_logger hsc_env
             hooks  = hsc_hooks hsc_env
+            tmpfs  = hsc_tmpfs hsc_env
             data_tycons = filter isDataTyCon tycons
             -- cg_tycons includes newtypes, for the benefit of External Core,
             -- but we don't generate any code for newtypes
@@ -1576,7 +1580,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
 
             (output_filename, (_stub_h_exists, stub_c_exists), foreign_fps, cg_infos)
                 <- {-# SCC "codeOutput" #-}
-                  codeOutput logger dflags (hsc_units hsc_env) this_mod output_filename location
+                  codeOutput logger tmpfs dflags (hsc_units hsc_env) this_mod output_filename location
                   foreign_stubs foreign_files dependencies rawcmms1
             return (output_filename, stub_c_exists, foreign_fps, cg_infos)
 
@@ -1588,6 +1592,7 @@ hscInteractive :: HscEnv
 hscInteractive hsc_env cgguts location = do
     let dflags = hsc_dflags hsc_env
     let logger = hsc_logger hsc_env
+    let tmpfs  = hsc_tmpfs hsc_env
     let CgGuts{ -- This is the last use of the ModGuts in a compilation.
                 -- From now on, we just use the bits we need.
                cg_module   = this_mod,
@@ -1610,7 +1615,7 @@ hscInteractive hsc_env cgguts location = do
     comp_bc <- byteCodeGen hsc_env this_mod prepd_binds data_tycons mod_breaks
     ------------------ Create f-x-dynamic C-side stuff -----
     (_istub_h_exists, istub_c_exists)
-        <- outputForeignStubs logger dflags (hsc_units hsc_env) this_mod location foreign_stubs
+        <- outputForeignStubs logger tmpfs dflags (hsc_units hsc_env) this_mod location foreign_stubs
     return (istub_c_exists, comp_bc, spt_entries)
 
 ------------------------------
@@ -1620,6 +1625,7 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
     let dflags   = hsc_dflags hsc_env
     let logger   = hsc_logger hsc_env
     let hooks    = hsc_hooks hsc_env
+    let tmpfs    = hsc_tmpfs hsc_env
         home_unit = hsc_home_unit hsc_env
         platform  = targetPlatform dflags
     cmm <- ioMsgMaybe
@@ -1651,7 +1657,7 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
           Nothing -> cmmToRawCmm logger dflags         (Stream.yield cmmgroup)
           Just h  -> h                  dflags Nothing (Stream.yield cmmgroup)
 
-        _ <- codeOutput logger dflags (hsc_units hsc_env) cmm_mod output_filename no_loc NoStubs [] []
+        _ <- codeOutput logger tmpfs dflags (hsc_units hsc_env) cmm_mod output_filename no_loc NoStubs [] []
              rawCmms
         return ()
   where
@@ -1693,14 +1699,15 @@ doCodeGen hsc_env this_mod data_tycons
     let dflags = hsc_dflags hsc_env
     let logger = hsc_logger hsc_env
     let hooks  = hsc_hooks hsc_env
-        platform = targetPlatform dflags
+    let tmpfs  = hsc_tmpfs hsc_env
+    let platform = targetPlatform dflags
 
     let stg_binds_w_fvs = annTopBindingsFreeVars stg_binds
 
     dumpIfSet_dyn logger dflags Opt_D_dump_stg_final "Final STG:" FormatSTG (pprGenStgTopBindings (initStgPprOpts dflags) stg_binds_w_fvs)
 
     let stg_to_cmm = case stgToCmmHook hooks of
-                        Nothing -> StgToCmm.codeGen logger
+                        Nothing -> StgToCmm.codeGen logger tmpfs
                         Just h  -> h
 
     let cmm_stream :: Stream IO CmmGroup ModuleLFInfos
