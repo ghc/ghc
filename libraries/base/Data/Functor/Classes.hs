@@ -79,6 +79,11 @@ import Text.Read (Read(..), parens, prec, step)
 import Text.Read.Lex (Lexeme(..))
 import Text.Show (showListWith)
 
+-- $setup
+-- >>> import Prelude
+-- >>> import Data.Complex (Complex (..))
+-- >>> import Text.ParserCombinators.ReadPrec
+
 -- | Lifting of the 'Eq' class to unary type constructors.
 --
 -- @since 4.9.0.0
@@ -522,18 +527,29 @@ instance (Show a) => Show1 ((,) a) where
 
 
 -- | @since 4.16.0.0
+--
+-- >>> eq2 ('x', True, "str") ('x', True, "str")
+-- True
+--
 instance Eq a => Eq2 ((,,) a) where
     liftEq2 e1 e2 (u1, x1, y1) (v1, x2, y2) =
         u1 == v1 &&
         e1 x1 x2 && e2 y1 y2
 
 -- | @since 4.16.0.0
+--
+-- >>> compare2 ('x', True, "aaa") ('x', True, "zzz")
+-- LT
 instance Ord a => Ord2 ((,,) a) where
     liftCompare2 comp1 comp2 (u1, x1, y1) (v1, x2, y2) =
         compare u1 v1 `mappend`
         comp1 x1 x2 `mappend` comp2 y1 y2
 
 -- | @since 4.16.0.0
+--
+-- >>> readPrec_to_S readPrec2 0 "('x', True, 2)" :: [((Char, Bool, Int), String)]
+-- [(('x',True,2),"")]
+--
 instance Read a => Read2 ((,,) a) where
     liftReadPrec2 rp1 _ rp2 _ = parens $ paren $ do
         x1 <- readPrec
@@ -547,6 +563,10 @@ instance Read a => Read2 ((,,) a) where
     liftReadList2     = liftReadList2Default
 
 -- | @since 4.16.0.0
+--
+-- >>> showsPrec2 0 ('x', True, 2 :: Int) ""
+-- "('x',True,2)"
+--
 instance Show a => Show2 ((,,) a) where
     liftShowsPrec2 sp1 _ sp2 _ _ (x1,y1,y2)
         = showChar '(' . showsPrec 0 x1
@@ -575,6 +595,10 @@ instance (Show a, Show b) => Show1 ((,,) a b) where
 
 
 -- | @since 4.16.0.0
+--
+-- >>> eq2 ('x', True, "str", 2) ('x', True, "str", 2 :: Int)
+-- True
+--
 instance (Eq a, Eq b) => Eq2 ((,,,) a b) where
     liftEq2 e1 e2 (u1, u2, x1, y1) (v1, v2, x2, y2) =
         u1 == v1 &&
@@ -582,6 +606,10 @@ instance (Eq a, Eq b) => Eq2 ((,,,) a b) where
         e1 x1 x2 && e2 y1 y2
 
 -- | @since 4.16.0.0
+--
+-- >>> compare2 ('x', True, "str", 2) ('x', True, "str", 3 :: Int)
+-- LT
+--
 instance (Ord a, Ord b) => Ord2 ((,,,) a b) where
     liftCompare2 comp1 comp2 (u1, u2, x1, y1) (v1, v2, x2, y2) =
         compare u1 v1 `mappend`
@@ -589,6 +617,10 @@ instance (Ord a, Ord b) => Ord2 ((,,,) a b) where
         comp1 x1 x2 `mappend` comp2 y1 y2
 
 -- | @since 4.16.0.0
+--
+-- >>> readPrec_to_S readPrec2 0 "('x', True, 2, 4.5)" :: [((Char, Bool, Int, Double), String)]
+-- [(('x',True,2,4.5),"")]
+--
 instance (Read a, Read b) => Read2 ((,,,) a b) where
     liftReadPrec2 rp1 _ rp2 _ = parens $ paren $ do
         x1 <- readPrec
@@ -604,6 +636,10 @@ instance (Read a, Read b) => Read2 ((,,,) a b) where
     liftReadList2     = liftReadList2Default
 
 -- | @since 4.16.0.0
+--
+-- >>> showsPrec2 0 ('x', True, 2 :: Int, 4.5 :: Double) ""
+-- "('x',True,2,4.5)"
+--
 instance (Show a, Show b) => Show2 ((,,,) a b) where
     liftShowsPrec2 sp1 _ sp2 _ _ (x1,x2,y1,y2)
         = showChar '(' . showsPrec 0 x1
@@ -776,10 +812,21 @@ instance Show1 Down where
     liftShowsPrec sp _ d (Down x) = showsUnaryWith sp "Down" d x
 
 -- | @since 4.16.0.0
+--
+-- >>> eq1 (1 :+ 2) (1 :+ 2)
+-- True
+--
+-- >>> eq1 (1 :+ 2) (1 :+ 3)
+-- False
+--
 instance Eq1 Complex where
     liftEq eq (x :+ y) (u :+ v) = eq x u && eq y v
 
 -- | @since 4.16.0.0
+--
+-- >>> readPrec_to_S readPrec1 0 "(2 % 3) :+ (3 % 4)" :: [(Complex Rational, String)]
+-- [(2 % 3 :+ 3 % 4,"")]
+--
 instance Read1 Complex where
     liftReadPrec rp _  = parens $ prec 9 $ do
         x <- step rp
@@ -791,6 +838,10 @@ instance Read1 Complex where
     liftReadList     = liftReadListDefault
 
 -- | @since 4.16.0.0
+--
+-- >>> showsPrec1 0 (2 :+ 3) ""
+-- "2 :+ 3"
+--
 instance Show1 Complex where
     liftShowsPrec sp _ d (x :+ y) = showParen (d >= 10) $
         sp 10 x . showString " :+ " . sp 10 y
