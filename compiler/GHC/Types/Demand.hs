@@ -1,5 +1,6 @@
-{-# LANGUAGE CPP          #-}
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE CPP             #-}
+{-# LANGUAGE ViewPatterns    #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -47,7 +48,7 @@ module GHC.Types.Demand (
     Divergence(..), topDiv, botDiv, exnDiv, lubDivergence, isDeadEndDiv,
 
     -- * Demand types
-    DmdType(..), dmdTypeDepth,
+    DmdType(DmdType), dmdTypeDepth,
     -- ** Algebra
     nopDmdType, botDmdType,
     lubDmdType, plusDmdType, multDmdType,
@@ -283,20 +284,7 @@ data Demand
 -- See Note [Call demands are relative]
 -- and Note [Demand notation].
 data SubDemand
-  = Poly !Card
-  -- ^ Polymorphic demand, the denoted thing is evaluated arbitrarily deep,
-  -- with the specified cardinality at every level.
-  -- Expands to 'Call' via 'viewCall' and to 'Prod' via 'viewProd'.
-  --
-  -- @Poly n@ is semantically equivalent to @Prod [n :* Poly n, ...]@ or
-  -- @Call n (Poly n)@. 'mkCall' and 'mkProd' do these rewrites.
-  --
-  -- In Note [Demand notation]: @U === P(U,U,...)@ and @U === CU(U)@,
-  --                            @S === P(S,S,...)@ and @S === CS(S)@, and so on.
-  --
-  -- We only really use 'Poly' with 'C_10' (bottom), 'C_00' (absent),
-  -- 'C_0N' (top) and sometimes 'C_1N', but it's simpler to treat it uniformly
-  -- than to have a special constructor for each of the three cases.
+  = Poly_ !Card -- ^ Use 'Poly' instead. See Note [Interning Demand types]
   | Call !Card !SubDemand
   -- ^ @Call n sd@ describes the evaluation context of @n@ function
   -- applications, where every individual result is evaluated according to @sd@.
@@ -309,25 +297,47 @@ data SubDemand
   -- evaluated according to @ds@.
   deriving Eq
 
-poly00, poly01, poly0N, poly11, poly1N, poly10 :: SubDemand
+pattern Poly :: Card -> SubDemand
+-- ^ Polymorphic demand, the denoted thing is evaluated arbitrarily deep,
+-- with the specified cardinality at every level.
+-- Expands to 'Call' via 'viewCall' and to 'Prod' via 'viewProd'.
+--
+-- @Poly n@ is semantically equivalent to @Prod [n :* Poly n, ...]@ or
+-- @Call n (Poly n)@. 'mkCall' and 'mkProd' do these rewrites.
+--
+-- In Note [Demand notation]: @U === P(U,U,...)@ and @U === CU(U)@,
+--                            @S === P(S,S,...)@ and @S === CS(S)@, and so on.
+--
+-- We only really use 'Poly' with 'C_10' (bottom), 'C_00' (absent),
+-- 'C_0N' (top) and sometimes 'C_1N', but it's simpler to treat it uniformly
+-- than to have a special constructor for each of the three cases.
+--
+-- The 6 different combinations of 'Poly' are interned.
+-- See Note [Interning Demand types]
+pattern Poly c <- Poly_ c where
+  Poly C_00 = poly00
+  Poly C_01 = poly01
+  Poly C_0N = poly0N
+  Poly C_11 = poly11
+  Poly C_1N = poly1N
+  Poly C_10 = poly10
+{-# COMPLETE Poly, Prod, Call #-}
+
+poly00, poly01, poly0N, poly10, poly11, poly1N :: SubDemand
+poly00 = Poly_ C_00
+poly01 = Poly_ C_01
+poly0N = Poly_ C_0N
+poly10 = Poly_ C_10
+poly11 = Poly_ C_11
+poly1N = Poly_ C_1N
+
 topSubDmd, botSubDmd, seqSubDmd :: SubDemand
-poly00 = Poly C_00
-poly01 = Poly C_01
-poly0N = Poly C_0N
-poly11 = Poly C_11
-poly1N = Poly C_1N
-poly10 = Poly C_10
-topSubDmd = poly0N
-botSubDmd = poly10
-seqSubDmd = poly00
+topSubDmd = Poly C_0N
+botSubDmd = Poly C_10
+seqSubDmd = Poly C_00
 
 polyDmd :: Card -> Demand
-polyDmd C_00 = C_00 :* poly00
-polyDmd C_01 = C_01 :* poly01
-polyDmd C_0N = C_0N :* poly0N
-polyDmd C_11 = C_11 :* poly11
-polyDmd C_1N = C_1N :* poly1N
-polyDmd C_10 = C_10 :* poly10
+polyDmd c = c :* Poly c
 
 -- | A smart constructor for 'Prod', applying rewrite rules along the semantic
 -- equality @Prod [polyDmd n, ...] === polyDmd n@, simplifying to 'Poly'
@@ -1090,12 +1100,27 @@ keepAliveDmdEnv env vs
 --    * Evaluates its arguments ('dt_args')
 --    * Diverges on every code path or not ('dt_div')
 data DmdType
-  = DmdType
-  { dt_env  :: DmdEnv     -- ^ Demand on explicitly-mentioned free variables
-  , dt_args :: [Demand]   -- ^ Demand on arguments
-  , dt_div  :: Divergence -- ^ Whether evaluation diverges.
-                          -- See Note [Demand type Divergence]
-  }
+  = DmdType_ DmdEnv [Demand] Divergence
+  -- ^ Use 'DmdType' instead! See Note [Interning Demand types].
+
+-- | The demand type of doing nothing (lazy, absent, no Divergence
+-- information). Note that it is ''not'' the top of the lattice (which would be
+-- "may use everything"), so it is (no longer) called topDmdType.
+nopDmdType :: DmdType
+nopDmdType = DmdType_ emptyDmdEnv [] topDiv
+
+pattern DmdType :: DmdEnv -> [Demand] -> Divergence -> DmdType
+-- ^ Pattern synonym that interns 'nopDmdType'.
+-- See Note [Interning Demand types]
+pattern DmdType
+  { _dt_env  -- Demand on explicitly-mentioned free variables
+  , dt_args  -- Demand on arguments
+  , dt_div   -- Whether evaluation diverges. See Note [Demand type Divergence]
+  } <- DmdType_ _dt_env dt_args dt_div where
+  DmdType env args div
+    | div == topDiv && null args && isEmptyVarEnv env = nopDmdType
+    | otherwise                                       = DmdType_ env args div
+{-# COMPLETE DmdType #-}
 
 instance Eq DmdType where
   (==) (DmdType fv1 ds1 div1)
@@ -1119,6 +1144,20 @@ lubDmdType d1 d2
     lub_ds  = zipWithEqual "lubDmdType" lubDmd ds1 ds2
     lub_div = lubDivergence r1 r2
 
+botDmdType :: DmdType
+botDmdType = DmdType emptyDmdEnv [] botDiv
+
+-- | The demand type of an unspecified expression that is guaranteed to
+-- throw a (precise or imprecise) exception or diverge.
+exnDmdType :: DmdType
+exnDmdType = DmdType emptyDmdEnv [] exnDiv
+
+isTopDmdType :: DmdType -> Bool
+isTopDmdType ty = ty == nopDmdType
+
+dmdTypeDepth :: DmdType -> Arity
+dmdTypeDepth = length . dt_args
+
 type PlusDmdArg = (DmdEnv, Divergence)
 
 mkPlusDmdArg :: DmdEnv -> PlusDmdArg
@@ -1135,27 +1174,6 @@ plusDmdType (DmdType fv1 ds1 r1) (fv2, t2)
   = DmdType (plusVarEnv_CD plusDmd fv1 (defaultFvDmd r1) fv2 (defaultFvDmd t2))
             ds1
             (r1 `plusDivergence` t2)
-
-botDmdType :: DmdType
-botDmdType = DmdType emptyDmdEnv [] botDiv
-
--- | The demand type of doing nothing (lazy, absent, no Divergence
--- information). Note that it is ''not'' the top of the lattice (which would be
--- "may use everything"), so it is (no longer) called topDmdType.
-nopDmdType :: DmdType
-nopDmdType = DmdType emptyDmdEnv [] topDiv
-
-isTopDmdType :: DmdType -> Bool
-isTopDmdType (DmdType env args div)
-  = div == topDiv && null args && isEmptyVarEnv env
-
--- | The demand type of an unspecified expression that is guaranteed to
--- throw a (precise or imprecise) exception or diverge.
-exnDmdType :: DmdType
-exnDmdType = DmdType emptyDmdEnv [] exnDiv
-
-dmdTypeDepth :: DmdType -> Arity
-dmdTypeDepth = length . dt_args
 
 -- | This makes sure we can use the demand type with n arguments after eta
 -- expansion, where n must not be lower than the demand types depth.
@@ -1871,3 +1889,42 @@ instance Binary Divergence where
       1 -> return ExnOrDiv
       2 -> return Diverges
       _ -> pprPanic "Binary:Divergence" (ppr (fromIntegral h :: Int))
+
+{- Note [Interning Demand types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We make sure to *intern* frequently allocated values, like 'topSubDmd' and
+'nopDmdType', by making sure we always return those exact binders whenever
+we'd otherwise construct an identical heap copy of them.
+
+How frequent are we allocating 'topSubDmd' and 'nopDmdType' that it justifies
+the additional complexity? #19190 measured how often we allocate them while
+compiling Cabal:
+  * 'topSubDmd' was allocated 150k times
+  * 'nopDmdType' was allocated 320k times
+
+The interning is implemented by Pattern Synonyms ('Poly', 'DmdType'). The
+original data constructors ('Poly_', 'DmdType_') should no longer called.
+Why not smart constructors? See Note [Smart Constructors vs. Pattern Synonyms].
+
+Note [Smart Constructors vs. Pattern Synonyms]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Apart from syntactic overhead at definition sites, a Pattern Synonym `C` is
+preferrable to a smart constructor `mkC`, because
+
+  * `C` can simply be the name of the now deprecated data constructor, which can
+    be renamed to `C_`. This makes sure that all *previous* use sites
+    automatically call the correct `C`. Not so easy to achieve with `mkC`.
+  * This also works for *old* call sites that used record field updates. By
+    contrast, even if we replaced all *old* use sites of `C` by `mkC`, we won't
+    catch record field updates. See 'DmdType', for example.
+  * We can be sure that all *new* call sites will use the pattern synonym,
+    because it's just the natural thing to use. Just pretend it's still the same
+    old data constructor and everything is well. By constrast, it's easy to
+    forget that there's `mkC` after half a year of not having touched the code,
+    fall into old habits and directly use the data constructor again.
+  * Same thing with record field updates: if there are record selectors, someone
+    eventually will use update syntax in *new* code, which bypasses `mkC`
+    entirely.
+  * This is exactly what Pattern Synonym builders are for
+
+-}
