@@ -8,12 +8,11 @@ A library for the ``worker\/wrapper'' back-end to the strictness analyser
 {-# LANGUAGE ViewPatterns #-}
 
 module GHC.Core.Opt.WorkWrap.Utils
-   ( WwOpts(..), initWwOpts, mkWwBodies, mkWWstr, mkWorkerArgs
-   , DataConPatContext(..), wantToUnboxArg, wantToUnboxResult
-   , findTypeShape
-   , isWorkerSmallEnough
-   )
-where
+  ( WwOpts(..), initWwOpts, mkWwBodies, mkWWstr, mkWorkerArgs
+  , DataConPatContext(..), wantToUnboxArg, wantToUnboxResult
+  , findTypeShape
+  , isWorkerSmallEnough
+  ) where
 
 #include "HsVersions.h"
 
@@ -28,10 +27,10 @@ import GHC.Core.DataCon
 import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Types.Unbox
-import GHC.Core.Make    ( mkAbsentErrorApp, mkCoreUbxTup
-                        , mkCoreApp, mkWildValBinder, mkCoreLet )
+import GHC.Core.Make     ( mkAbsentErrorApp, mkCoreUbxTup, unitExpr
+                         , mkCoreApp, mkWildValBinder, mkCoreLet )
 import GHC.Types.Id.Make ( voidArgId, voidPrimId )
-import GHC.Builtin.Types      ( tupleDataCon, unboxedUnitTy )
+import GHC.Builtin.Types ( tupleDataCon, unboxedUnitTy, unitTy )
 import GHC.Types.Literal ( absentLiteralOf, rubbishLit )
 import GHC.Types.Var.Env ( mkInScopeSet )
 import GHC.Types.Var.Set ( VarSet )
@@ -1209,11 +1208,19 @@ unbox_one_result opts want_to_unbox res_bndr arg_cprs
 --       to the wrapper
 --     * `unbox scrut alt = (case <scrut> of (# a, b #) -> <alt>)`
 --     * `tup = (# a, b #)`
--- Special case: If there's only a single var `a` which is known
--- to be cheap to evaluate, then there's no need for a `(# a #)`
--- singleton tuple and we can just pass `a` around.
+-- There are two special cases for when there's 0 or 1 transit var,
+-- respectively. See Note [Lifted, empty tuple when no transit vars]
+-- and Note [No unboxed tuple for single, unlifted transit var]
 move_transit_vars :: [Id] -> (CoreExpr -> CoreExpr -> CoreExpr, CoreExpr)
 move_transit_vars vars
+  | [] <- vars
+  , let case_bndr = mkWildValBinder cprCaseBndrMult unitTy
+  -- See Note [Lifted, empty tuple when no transit vars]
+  --   * Wrapper: `unbox scrut alt = (case <scrut> of _ -> <alt>)`
+  --   * Worker:  `tup = ()`
+  = ( \build_res wkr_call -> mkDefaultCase wkr_call case_bndr build_res
+    , unitExpr )
+
   | [var] <- vars
   , let var_ty = idType var
   , isUnliftedType var_ty || whnf_term var == Terminates
@@ -1284,11 +1291,29 @@ To achieve said transformation, 'mkWWcpr_start'
      responsible for tupling them up in the worker and taking the tuple apart
      in the wrapper. This is implemented in 'move_transit_vars'.
 
+Note [Lifted, empty tuple when no transit vars]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the case when there are no transit vars, e.g.:
+```
+  trueAllAlong xs = case xs of
+    [] -> True
+    x:xs -> x `seq` force xs
+  ==> { CPR+WW }
+  trueAllAlong xs = case $wtrueAllAlong xs of (# #) -> True
+  $wtrueAllAlong xs = case xs of
+    [] -> (# #)
+    x:xs -> x `seq` force xs
+```
+Here, instead of passing around the *unboxed* empty unit tuple `(# #)`, we
+simply return the *boxed* empty unit tuple `()`, simply because it's easier
+on the eye. There's no difference because we end up evaluating it anyway in
+the case expression of the wrapper `trueAllAlong`.
+
 Note [No unboxed tuple for single, unlifted transit var]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If there's only a single, unlifted transit var (Note [Worker/wrapper for CPR]),
-we don't need to allocate an unboxed singleton tuple for that and can return
-the unlifted thing directly. E.g.
+When there's only a single, unlifted transit var (Note [Worker/wrapper for CPR]),
+we don't wrap an unboxed singleton tuple around it (which otherwise would be
+needed to suspend evaluation) and return the unlifted thing directly. E.g.
 ```
   f :: Int -> Int
   f x = x+1
