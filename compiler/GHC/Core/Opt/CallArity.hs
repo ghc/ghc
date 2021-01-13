@@ -2,6 +2,8 @@
 -- Copyright (c) 2014 Joachim Breitner
 --
 
+{-# LANGUAGE BangPatterns #-}
+
 module GHC.Core.Opt.CallArity
     ( callArityAnalProgram
     , callArityRHS -- for testing
@@ -722,10 +724,10 @@ unitArityRes :: Var -> Arity -> CallArityRes
 unitArityRes v arity = (emptyUnVarGraph, unitVarEnv v arity)
 
 resDelList :: [Var] -> CallArityRes -> CallArityRes
-resDelList vs ae = foldr resDel ae vs
+resDelList vs ae = foldl' (flip resDel) ae vs
 
 resDel :: Var -> CallArityRes -> CallArityRes
-resDel v (g, ae) = (g `delNode` v, ae `delVarEnv` v)
+resDel v (!g, !ae) = (g `delNode` v, ae `delVarEnv` v)
 
 domRes :: CallArityRes -> UnVarSet
 domRes (_, ae) = varEnvDom ae
