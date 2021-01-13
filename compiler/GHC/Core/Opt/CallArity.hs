@@ -674,6 +674,12 @@ callArityRecEnv any_boring ae_rhss ae_body
 
     ae_combined = lubRess (map snd ae_rhss) `lubRes` ae_body
 
+    mk_called_with_set :: CallArityRes -> UnVarSet
+    mk_called_with_set ae_before = unionUnVarSets $ map (calledWith ae_before) vars
+
+    -- called_with set used for non-thunks, when all RHS's are in play
+    called_with_everything = mk_called_with_set ae_combined
+
     cross_calls
         -- See Note [Taking boring variables into account]
         | any_boring               = completeGraph (domRes ae_combined)
@@ -684,15 +690,19 @@ callArityRecEnv any_boring ae_rhss ae_body
     cross_call (v, ae_rhs) = completeBipartiteGraph called_by_v called_with_v
       where
         is_thunk = idCallArity v == 0
-        -- What rhs are relevant as happening before (or after) calling v?
-        --    If v is a thunk, everything from all the _other_ variables
-        --    If v is not a thunk, everything can happen.
-        ae_before_v | is_thunk  = lubRess (map snd $ filter ((/= v) . fst) ae_rhss) `lubRes` ae_body
-                    | otherwise = ae_combined
         -- What do we want to know from these?
         -- Which calls can happen next to any recursive call.
+        called_with_v :: UnVarSet
         called_with_v
-            = unionUnVarSets $ map (calledWith ae_before_v) vars
+            -- What rhs are relevant as happening before (or after) calling v?
+            --    If v is a thunk, everything from all the _other_ variables
+            --    If v is not a thunk, everything can happen.
+            | is_thunk =
+              let ae_before_v :: CallArityRes
+                  ae_before_v = lubRess (map snd $ filter ((/= v) . fst) ae_rhss) `lubRes` ae_body
+              in mk_called_with_set ae_before_v
+            | otherwise = called_with_everything
+
         called_by_v = domRes ae_rhs
 
     ae_new = first (cross_calls `unionUnVarGraph`) ae_combined
