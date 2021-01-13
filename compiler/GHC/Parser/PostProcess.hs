@@ -982,7 +982,7 @@ checkPat loc (L l e@(PatBuilderVar (L _ c))) tyargs args
   | not (null args) && patIsRec c =
       add_hint SuggestRecursiveDo $
       patFail l (ppr e)
-checkPat loc (L _ (PatBuilderAppType f t)) tyargs args = do
+checkPat loc (L _ (PatBuilderAppType f t)) tyargs args =
   checkPat loc f (t : tyargs) args
 checkPat loc (L _ (PatBuilderApp f e)) [] args = do
   p <- checkLPat e

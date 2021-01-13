@@ -1,7 +1,6 @@
 {-# LANGUAGE CPP                      #-}
 {-# LANGUAGE BangPatterns             #-}
 {-# LANGUAGE NondecreasingIndentation #-}
-{-# LANGUAGE LambdaCase               #-}
 {-# OPTIONS_GHC -fprof-auto-top #-}
 
 -------------------------------------------------------------------------------
