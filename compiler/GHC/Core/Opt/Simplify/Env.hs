@@ -364,8 +364,8 @@ setInScopeFromF env floats = env { seInScope = sfInScope floats }
 addNewInScopeIds :: SimplEnv -> [CoreBndr] -> SimplEnv
         -- The new Ids are guaranteed to be freshly allocated
 addNewInScopeIds env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst }) vs
-  = let in_scope1 = in_scope `extendInScopeSetList` vs
-        id_subst1 = id_subst `delVarEnvList` vs
+  = let !in_scope1 = in_scope `extendInScopeSetList` vs
+        !id_subst1 = id_subst `delVarEnvList` vs
     in
     env { seInScope = in_scope1,
           seIdSubst = id_subst1 }
