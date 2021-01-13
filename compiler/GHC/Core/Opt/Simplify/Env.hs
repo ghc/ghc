@@ -967,7 +967,7 @@ adjustJoinPointType mult new_res_ty join_id
             | otherwise
             = pprPanic "adjustJoinPointType" (ppr orig_ar <+> ppr orig_ty)
 
-    scale_bndr (Anon af t) = Anon af (scaleScaled mult t)
+    scale_bndr (Anon af t) = Anon af $! (scaleScaled mult t)
     scale_bndr b@(Named _) = b
 
 {- Note [Scaling join point arguments]
