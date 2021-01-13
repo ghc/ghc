@@ -301,6 +301,7 @@ cprAnalBind top_lvl env widening id rhs
   = (id', rhs', env')
   where
     arg_tys             = fst (splitFunNewTys (idType id))
+    -- TODO: Note
     -- We compute the Termination and CPR transformer based on the strictness
     -- signature. There is no point in pretending that an arg we are strict in
     -- could lead to non-termination, as the signature then trivially
