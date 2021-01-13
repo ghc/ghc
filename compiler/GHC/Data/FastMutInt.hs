@@ -9,7 +9,8 @@
 
 module GHC.Data.FastMutInt(
         FastMutInt, newFastMutInt,
-        readFastMutInt, writeFastMutInt
+        readFastMutInt, writeFastMutInt,
+        atomicFetchAddFastMut
   ) where
 
 import GHC.Prelude
@@ -27,15 +28,20 @@ newFastMutInt n = do
   where
     !(I# size) = finiteBitSize (0 :: Int)
     create = IO $ \s ->
-      case newByteArray# size s of { (# s, arr #) ->
-        (# s, FastMutInt arr #) }
+      case newByteArray# size s of
+        (# s, arr #) -> (# s, FastMutInt arr #)
 
 readFastMutInt :: FastMutInt -> IO Int
 readFastMutInt (FastMutInt arr) = IO $ \s ->
-  case readIntArray# arr 0# s of { (# s, i #) ->
-  (# s, I# i #) }
+  case readIntArray# arr 0# s of
+    (# s, i #) -> (# s, I# i #)
 
 writeFastMutInt :: FastMutInt -> Int -> IO ()
 writeFastMutInt (FastMutInt arr) (I# i) = IO $ \s ->
-  case writeIntArray# arr 0# i s of { s ->
-  (# s, () #) }
+  case writeIntArray# arr 0# i s of
+    s -> (# s, () #)
+
+atomicFetchAddFastMut :: FastMutInt -> Int -> IO Int
+atomicFetchAddFastMut (FastMutInt arr) (I# i) = IO $ \s ->
+  case fetchAddIntArray# arr 0# i s of
+    (# s, n #) -> (# s, I# n #)
