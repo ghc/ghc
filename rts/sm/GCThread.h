@@ -125,9 +125,7 @@ typedef struct gc_thread_ {
 
 #if defined(THREADED_RTS)
     OSThreadId id;                 // The OS thread that this struct belongs to
-    SpinLock   gc_spin;
-    SpinLock   mut_spin;
-    StgWord wakeup;                // This should only be accessed via atomic accesses
+    volatile StgWord wakeup;       // NB not StgWord8; only StgWord is guaranteed atomic
 #endif
     uint32_t thread_index;         // a zero based index identifying the thread
 
@@ -182,8 +180,8 @@ typedef struct gc_thread_ {
     W_ copied;
     W_ scanned;
     W_ any_work;
-    W_ no_work;
     W_ scav_find_work;
+    W_ max_n_todo_overflow;
 
     Time gc_start_cpu;             // thread CPU time
     Time gc_end_cpu;               // thread CPU time

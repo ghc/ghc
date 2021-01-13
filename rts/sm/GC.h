@@ -76,6 +76,7 @@ void freeGcThreads (void);
 void resizeGenerations (void);
 
 #if defined(THREADED_RTS)
+void notifyTodoBlock (void);
 void waitForGcThreads (Capability *cap, bool idle_cap[]);
 void releaseGCThreads (Capability *cap, bool idle_cap[]);
 #endif
