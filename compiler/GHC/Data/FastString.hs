@@ -298,13 +298,13 @@ and updates to multiple buckets with low synchronization overhead.
 See Note [Updating the FastString table] on how it's updated.
 -}
 data FastStringTable = FastStringTable
-  {-# UNPACK #-} !(IORef Int) -- the unique ID counter shared with all buckets
-  {-# UNPACK #-} !(IORef Int) -- number of computed z-encodings for all buckets
+  {-# UNPACK #-} !FastMutInt -- the unique ID counter shared with all buckets
+  {-# UNPACK #-} !FastMutInt -- number of computed z-encodings for all buckets
   (Array# (IORef FastStringTableSegment)) -- concurrent segments
 
 data FastStringTableSegment = FastStringTableSegment
-  {-# UNPACK #-} !(MVar ()) -- the lock for write in each segment
-  {-# UNPACK #-} !(IORef Int) -- the number of elements
+  {-# UNPACK #-} !(MVar ())  -- the lock for write in each segment
+  {-# UNPACK #-} !FastMutInt -- the number of elements
   (MutableArray# RealWorld [FastString]) -- buckets in this segment
 
 {-
@@ -365,7 +365,7 @@ stringTable = unsafePerformIO $ do
       loop a# i# s1#
         | isTrue# (i# ==# numSegments#) = s1#
         | otherwise = case newMVar () `unIO` s1# of
-            (# s2#, lock #) -> case newIORef 0 `unIO` s2# of
+            (# s2#, lock #) -> case newFastMutInt 0 `unIO` s2# of
               (# s3#, counter #) -> case newArray# initialNumBuckets# [] s3# of
                 (# s4#, buckets# #) -> case newIORef
                     (FastStringTableSegment lock counter buckets#) `unIO` s4# of
