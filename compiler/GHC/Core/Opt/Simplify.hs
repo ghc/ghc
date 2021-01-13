@@ -295,7 +295,7 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
   = ASSERT( isId bndr )
     ASSERT2( not (isJoinId bndr), ppr bndr )
     -- pprTrace "simplLazyBind" ((ppr bndr <+> ppr bndr1) $$ ppr rhs $$ ppr (seIdSubst rhs_se)) $
-    do  { let   rhs_env     = rhs_se `setInScopeFromE` env
+    do  { let   !rhs_env     = rhs_se `setInScopeFromE` env
                 (tvs, body) = case collectTyAndValBinders rhs of
                                 (tvs, [], body)
                                   | surely_not_lam body -> (tvs, body)
