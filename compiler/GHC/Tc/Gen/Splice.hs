@@ -122,7 +122,7 @@ import GHC.Utils.Lexeme
 import GHC.Utils.Outputable
 import GHC.Utils.Logger
 
-import GHC.SysTools.FileCleanup ( newTempName, TempFileLifetime(..) )
+import GHC.Utils.TmpFs ( newTempName, TempFileLifetime(..) )
 
 import GHC.Data.FastString
 import GHC.Data.Maybe( MaybeErr(..) )
@@ -1140,7 +1140,8 @@ instance TH.Quasi TcM where
   qAddTempFile suffix = do
     dflags <- getDynFlags
     logger <- getLogger
-    liftIO $ newTempName logger dflags TFL_GhcSession suffix
+    tmpfs  <- hsc_tmpfs <$> getTopEnv
+    liftIO $ newTempName logger tmpfs dflags TFL_GhcSession suffix
 
   qAddTopDecls thds = do
       l <- getSrcSpanM
