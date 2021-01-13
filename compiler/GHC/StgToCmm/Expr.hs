@@ -76,11 +76,11 @@ cgExpr (StgOpApp (StgPrimOp DataToTagOp) [StgVarArg a] _res_ty) = do
   emitComment (mkFastString "dataToTag#")
   info <- getCgIdInfo a
   let amode = idInfoToAmode info
-  tag_reg <- assignTemp $ cmmConstrTag1 dflags amode
+  tag_reg <- assignTemp $ cmmConstrTag1 platform amode
   result_reg <- newTemp (bWord platform)
   let tag = CmmReg $ CmmLocal tag_reg
       is_tagged = cmmNeWord platform tag (zeroExpr platform)
-      is_too_big_tag = cmmEqWord platform tag (cmmTagMask dflags)
+      is_too_big_tag = cmmEqWord platform tag (cmmTagMask platform)
   -- Here we will first check the tag bits of the pointer we were given;
   -- if this doesn't work then enter the closure and use the info table
   -- to determine the constructor. Note that all tag bits set means that
@@ -90,8 +90,9 @@ cgExpr (StgOpApp (StgPrimOp DataToTagOp) [StgVarArg a] _res_ty) = do
   slow_path <- getCode $ do
       tmp <- newTemp (bWord platform)
       _ <- withSequel (AssignTo [tmp] False) (cgIdApp a [])
+      ptr_opts <- getPtrOpts
       emitAssign (CmmLocal result_reg)
-        $ getConstrTag dflags (cmmUntag platform (CmmReg (CmmLocal tmp)))
+        $ getConstrTag ptr_opts (cmmUntag platform (CmmReg (CmmLocal tmp)))
 
   fast_path <- getCode $ do
       -- Return the constructor index from the pointer tag
@@ -100,8 +101,9 @@ cgExpr (StgOpApp (StgPrimOp DataToTagOp) [StgVarArg a] _res_ty) = do
             $ cmmSubWord platform tag (CmmLit $ mkWordCLit platform 1)
       -- Return the constructor index recorded in the info table
       return_info_tag <- getCode $ do
+          ptr_opts <- getPtrOpts
           emitAssign (CmmLocal result_reg)
-            $ getConstrTag platform (cmmUntag dflags amode)
+            $ getConstrTag ptr_opts (cmmUntag platform amode)
 
       emit =<< mkCmmIfThenElse' is_too_big_tag return_info_tag return_ptr_tag (Just False)
 
