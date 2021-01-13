@@ -36,7 +36,7 @@ import qualified GHC.Data.ShortText as ST
 import GHC.Data.Stream           ( Stream )
 import qualified GHC.Data.Stream as Stream
 
-import GHC.SysTools.FileCleanup
+import GHC.Utils.TmpFs
 
 
 import GHC.Utils.Error
@@ -66,23 +66,24 @@ import System.IO
 ************************************************************************
 -}
 
-codeOutput :: Logger
-           -> DynFlags
-           -> UnitState
-           -> Module
-           -> FilePath
-           -> ModLocation
-           -> (a -> ForeignStubs)
-           -> [(ForeignSrcLang, FilePath)]
-           -- ^ additional files to be compiled with the C compiler
-           -> [UnitId]
-           -> Stream IO RawCmmGroup a                       -- Compiled C--
-           -> IO (FilePath,
-                  (Bool{-stub_h_exists-}, Maybe FilePath{-stub_c_exists-}),
-                  [(ForeignSrcLang, FilePath)]{-foreign_fps-},
-                  a)
-
-codeOutput logger dflags unit_state this_mod filenm location genForeignStubs foreign_fps pkg_deps
+codeOutput
+    :: Logger
+    -> TmpFs
+    -> DynFlags
+    -> UnitState
+    -> Module
+    -> FilePath
+    -> ModLocation
+    -> (a -> ForeignStubs)
+    -> [(ForeignSrcLang, FilePath)]
+    -- ^ additional files to be compiled with the C compiler
+    -> [UnitId]
+    -> Stream IO RawCmmGroup a                       -- Compiled C--
+    -> IO (FilePath,
+           (Bool{-stub_h_exists-}, Maybe FilePath{-stub_c_exists-}),
+           [(ForeignSrcLang, FilePath)]{-foreign_fps-},
+           a)
+codeOutput logger tmpfs dflags unit_state this_mod filenm location genForeignStubs foreign_fps pkg_deps
   cmm_stream
   =
     do  {
@@ -117,7 +118,7 @@ codeOutput logger dflags unit_state this_mod filenm location genForeignStubs for
                  Interpreter -> panic "codeOutput: Interpreter"
                  NoBackend   -> panic "codeOutput: NoBackend"
         ; let stubs = genForeignStubs a
-        ; stubs_exist <- outputForeignStubs logger dflags unit_state this_mod location stubs
+        ; stubs_exist <- outputForeignStubs logger tmpfs dflags unit_state this_mod location stubs
         ; return (filenm, stubs_exist, foreign_fps, a)
         }
 
@@ -198,13 +199,20 @@ outputLlvm logger dflags filenm cmm_stream =
 ************************************************************************
 -}
 
-outputForeignStubs :: Logger -> DynFlags -> UnitState -> Module -> ModLocation -> ForeignStubs
-                   -> IO (Bool,         -- Header file created
-                          Maybe FilePath) -- C file created
-outputForeignStubs logger dflags unit_state mod location stubs
+outputForeignStubs
+    :: Logger
+    -> TmpFs
+    -> DynFlags
+    -> UnitState
+    -> Module
+    -> ModLocation
+    -> ForeignStubs
+    -> IO (Bool,         -- Header file created
+           Maybe FilePath) -- C file created
+outputForeignStubs logger tmpfs dflags unit_state mod location stubs
  = do
    let stub_h = mkStubPaths dflags (moduleName mod) location
-   stub_c <- newTempName logger dflags TFL_CurrentModule "c"
+   stub_c <- newTempName logger tmpfs dflags TFL_CurrentModule "c"
 
    case stubs of
      NoStubs ->

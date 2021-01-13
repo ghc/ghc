@@ -134,7 +134,6 @@ GHC.Settings.Constants
 GHC.Stg.Syntax
 GHC.StgToCmm.Types
 GHC.SysTools.BaseDir
-GHC.SysTools.FileCleanup
 GHC.SysTools.Terminal
 GHC.Tc.Errors.Hole.FitTypes
 GHC.Tc.Types
@@ -233,6 +232,7 @@ GHC.Utils.Panic
 GHC.Utils.Panic.Plain
 GHC.Utils.Ppr
 GHC.Utils.Ppr.Colour
+GHC.Utils.TmpFs
 Language.Haskell.Syntax
 Language.Haskell.Syntax.Binds
 Language.Haskell.Syntax.Decls
