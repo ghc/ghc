@@ -130,7 +130,6 @@ data AuxBindSpec
 -- | Retrieve the 'RdrName' of the binding that the supplied 'AuxBindSpec'
 -- describes.
 auxBindSpecRdrName :: AuxBindSpec -> RdrName
-auxBindSpecRdrName (DerivCon2Tag      _ con2tag_RDR) = con2tag_RDR
 auxBindSpecRdrName (DerivTag2Con      _ tag2con_RDR) = tag2con_RDR
 auxBindSpecRdrName (DerivMaxTag       _ maxtag_RDR)  = maxtag_RDR
 auxBindSpecRdrName (DerivDataDataType _ dataT_RDR _) = dataT_RDR
@@ -641,10 +640,10 @@ gen_Enum_binds loc tycon _ = do
     tag2con_RDR <- new_tag2con_rdr_name loc tycon
     maxtag_RDR  <- new_maxtag_rdr_name  loc tycon
 
-    return ( method_binds con2tag_RDR tag2con_RDR maxtag_RDR
-           , aux_binds    con2tag_RDR tag2con_RDR maxtag_RDR )
+    return ( method_binds tag2con_RDR maxtag_RDR
+           , aux_binds    tag2con_RDR maxtag_RDR )
   where
-    method_binds con2tag_RDR tag2con_RDR maxtag_RDR = listToBag
+    method_binds tag2con_RDR maxtag_RDR = listToBag
       [ succ_enum      tag2con_RDR maxtag_RDR
       , pred_enum      tag2con_RDR
       , to_enum        tag2con_RDR maxtag_RDR
@@ -822,7 +821,7 @@ gen_Ix_binds loc tycon _ = do
       then (enum_ixes tag2con_RDR, listToBag $ map DerivAuxBind
                    [ DerivTag2Con tycon tag2con_RDR
                    ])
-      else (single_con_ixes))
+      else (single_con_ixes, emptyBag)
   where
     --------------------------------------------------------------
     enum_ixes tag2con_RDR = listToBag
@@ -2080,14 +2079,13 @@ mkCoerceClassMethEqn cls inst_tvs inst_tys rhs_ty id
 {-
 ************************************************************************
 *                                                                      *
-\subsection{Generating extra binds (@con2tag@, @tag2con@, etc.)}
+\subsection{Generating extra binds (@tag2con@, etc.)}
 *                                                                      *
 ************************************************************************
 
 \begin{verbatim}
 data Foo ... = ...
 
-con2tag_Foo :: Foo ... -> Int#
 tag2con_Foo :: Int -> Foo ...   -- easier if Int, not Int#
 maxtag_Foo  :: Int              -- ditto (NB: not unlifted)
 \end{verbatim}
@@ -2461,7 +2459,7 @@ eq_Expr ty a b
  where
    (_, _, prim_eq, _, _) = primOrdOps "Eq" ty
 
-untag_Expr :: (RdrName, RdrName)]
+untag_Expr :: [(RdrName, RdrName)]
            -> LHsExpr GhcPs -> LHsExpr GhcPs
 untag_Expr [] expr = expr
 untag_Expr ((untag_this, put_tag_here) : more) expr
