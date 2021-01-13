@@ -13,7 +13,6 @@ import GHC.Settings
 
 import GHC.SysTools
 import GHC.SysTools.Ar
-import GHC.SysTools.FileCleanup
 
 import GHC.Unit.Env
 import GHC.Unit.Types
@@ -23,6 +22,7 @@ import GHC.Unit.State
 import GHC.Utils.Logger
 import GHC.Utils.Monad
 import GHC.Utils.Misc
+import GHC.Utils.TmpFs
 
 import GHC.Linker.MacOS
 import GHC.Linker.Unit
@@ -64,11 +64,11 @@ it is supported by both gcc and clang. Anecdotally nvcc supports
 -Xlinker, but not -Wl.
 -}
 
-linkBinary :: Logger -> DynFlags -> UnitEnv -> [FilePath] -> [UnitId] -> IO ()
+linkBinary :: Logger -> TmpFs -> DynFlags -> UnitEnv -> [FilePath] -> [UnitId] -> IO ()
 linkBinary = linkBinary' False
 
-linkBinary' :: Bool -> Logger -> DynFlags -> UnitEnv -> [FilePath] -> [UnitId] -> IO ()
-linkBinary' staticLink logger dflags unit_env o_files dep_units = do
+linkBinary' :: Bool -> Logger -> TmpFs -> DynFlags -> UnitEnv -> [FilePath] -> [UnitId] -> IO ()
+linkBinary' staticLink logger tmpfs dflags unit_env o_files dep_units = do
     let platform   = ue_platform unit_env
         unit_state = ue_units unit_env
         toolSettings' = toolSettings dflags
@@ -123,7 +123,7 @@ linkBinary' staticLink logger dflags unit_env o_files dep_units = do
       if gopt Opt_SingleLibFolder dflags
       then do
         libs <- getLibs dflags unit_env dep_units
-        tmpDir <- newTempDir logger dflags
+        tmpDir <- newTempDir logger tmpfs dflags
         sequence_ [ copyFile lib (tmpDir </> basename)
                   | (lib, basename) <- libs]
         return [ "-L" ++ tmpDir ]
@@ -138,8 +138,8 @@ linkBinary' staticLink logger dflags unit_env o_files dep_units = do
     let lib_paths = libraryPaths dflags
     let lib_path_opts = map ("-L"++) lib_paths
 
-    extraLinkObj <- maybeToList <$> mkExtraObjToLinkIntoBinary logger dflags unit_state
-    noteLinkObjs <- mkNoteObjsToLinkIntoBinary logger dflags unit_env dep_units
+    extraLinkObj <- maybeToList <$> mkExtraObjToLinkIntoBinary logger tmpfs dflags unit_state
+    noteLinkObjs <- mkNoteObjsToLinkIntoBinary logger tmpfs dflags unit_env dep_units
 
     let
       (pre_hs_libs, post_hs_libs)
@@ -181,16 +181,16 @@ linkBinary' staticLink logger dflags unit_env o_files dep_units = do
     let extra_ld_inputs = ldInputs dflags
 
     rc_objs <- case platformOS platform of
-      OSMinGW32 | gopt Opt_GenManifest dflags -> maybeCreateManifest logger dflags output_fn
+      OSMinGW32 | gopt Opt_GenManifest dflags -> maybeCreateManifest logger tmpfs dflags output_fn
       _                                       -> return []
 
     let link dflags args | staticLink = GHC.SysTools.runLibtool logger dflags args
                          | platformOS platform == OSDarwin
                             = do
-                                 GHC.SysTools.runLink logger dflags args
+                                 GHC.SysTools.runLink logger tmpfs dflags args
                                  GHC.Linker.MacOS.runInjectRPaths logger dflags pkg_lib_paths output_fn
                          | otherwise
-                            = GHC.SysTools.runLink logger dflags args
+                            = GHC.SysTools.runLink logger tmpfs dflags args
 
     link dflags (
                        map GHC.SysTools.Option verbFlags

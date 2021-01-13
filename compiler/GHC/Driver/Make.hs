@@ -83,7 +83,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Utils.Error
 import GHC.Utils.Logger
-import GHC.SysTools.FileCleanup
+import GHC.Utils.TmpFs
 
 import GHC.Types.Basic
 import GHC.Types.Target
@@ -568,8 +568,6 @@ load' how_much mHscMessage mod_graph = do
         -- an unstable module (#7231).
         mg = fmap (fmap ModuleNode) stable_mg ++ unstable_mg
 
-    -- clean up between compilations
-    let cleanup hsc_env = cleanCurrentModuleTempFiles (hsc_logger hsc_env) (hsc_dflags hsc_env)
     liftIO $ debugTraceMsg logger dflags 2 (hang (text "Ready for upsweep")
                                2 (ppr mg))
 
@@ -581,7 +579,7 @@ load' how_much mHscMessage mod_graph = do
 
     setSession hsc_env{ hsc_HPT = emptyHomePackageTable }
     (upsweep_ok, modsUpswept) <- withDeferredDiagnostics $
-      upsweep_fn mHscMessage pruned_hpt stable_mods cleanup mg
+      upsweep_fn mHscMessage pruned_hpt stable_mods mg
 
     -- Make modsDone be the summaries for each home module now
     -- available; this should equal the domain of hpt3.
@@ -601,7 +599,7 @@ load' how_much mHscMessage mod_graph = do
 
           -- Clean up after ourselves
           hsc_env1 <- getSession
-          liftIO $ cleanCurrentModuleTempFiles logger dflags
+          liftIO $ cleanCurrentModuleTempFiles logger (hsc_tmpfs hsc_env1) dflags
 
           -- Issue a warning for the confusing case where the user
           -- said '-o foo' but we're not going to do any linking.
@@ -620,6 +618,7 @@ load' how_much mHscMessage mod_graph = do
           hsc_env <- getSession
           linkresult <- liftIO $ link (ghcLink dflags)
                                       logger
+                                      (hsc_tmpfs hsc_env)
                                       (hsc_hooks hsc_env)
                                       dflags
                                       (hsc_unit_env hsc_env)
@@ -665,9 +664,9 @@ load' how_much mHscMessage mod_graph = do
                         lookupHpt hpt4 (moduleName ms_mod)
                         >>= hm_linkable
                 ]
-          liftIO $
-            changeTempFilesLifetime dflags TFL_CurrentModule unneeded_temps
-          liftIO $ cleanCurrentModuleTempFiles logger dflags
+          tmpfs <- hsc_tmpfs <$> getSession
+          liftIO $ changeTempFilesLifetime tmpfs TFL_CurrentModule unneeded_temps
+          liftIO $ cleanCurrentModuleTempFiles logger tmpfs dflags
 
           let hpt5 = retainInTopLevelEnvs (map ms_mod_name mods_to_keep)
                                           hpt4
@@ -686,6 +685,7 @@ load' how_much mHscMessage mod_graph = do
           hsc_env <- getSession
           linkresult <- liftIO $ link (ghcLink dflags)
                                       logger
+                                      (hsc_tmpfs hsc_env)
                                       (hsc_hooks hsc_env)
                                       dflags
                                       (hsc_unit_env hsc_env)
@@ -1067,14 +1067,14 @@ parUpsweep
     -> Maybe Messager
     -> HomePackageTable
     -> StableModules
-    -> (HscEnv -> IO ())
     -> [SCC ModuleGraphNode]
     -> m (SuccessFlag,
           [ModuleGraphNode])
-parUpsweep n_jobs mHscMessage old_hpt stable_mods cleanup sccs = do
+parUpsweep n_jobs mHscMessage old_hpt stable_mods sccs = do
     hsc_env <- getSession
     let dflags = hsc_dflags hsc_env
     let logger = hsc_logger hsc_env
+    let tmpfs  = hsc_tmpfs hsc_env
 
     -- The bits of shared state we'll be using:
 
@@ -1176,18 +1176,15 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods cleanup sccs = do
                 -- deal with synchronously printing these messages.
                 let lcl_logger = pushLogHook (const (parLogAction log_queue)) thread_safe_logger
 
-                --
-                -- Use a local filesToClean var so that we can clean up
-                -- intermediate files in a timely fashion (as soon as
-                -- compilation for that module is finished) without having to
-                -- worry about accidentally deleting a simultaneous compile's
-                -- important files.
-                lcl_files_to_clean <- newIORef emptyFilesToClean
-                let lcl_dflags = dflags { filesToClean = lcl_files_to_clean }
+                -- Use a local TmpFs so that we can clean up intermediate files
+                -- in a timely fashion (as soon as compilation for that module
+                -- is finished) without having to worry about accidentally
+                -- deleting a simultaneous compile's important files.
+                lcl_tmpfs <- forkTmpFsFrom tmpfs
 
                 -- Unmask asynchronous exceptions and perform the thread-local
                 -- work to compile the module (see parUpsweep_one).
-                m_res <- MC.try $ unmask $ prettyPrintGhcErrors lcl_dflags $
+                m_res <- MC.try $ unmask $ prettyPrintGhcErrors dflags $
                   case mod of
                     InstantiationNode iuid -> do
                       hsc_env <- readMVar hsc_env_var
@@ -1195,8 +1192,8 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods cleanup sccs = do
                       pure Succeeded
                     ModuleNode ems ->
                       parUpsweep_one (emsModSummary ems) home_mod_map comp_graph_loops
-                                     lcl_logger lcl_dflags (hsc_home_unit hsc_env)
-                                     mHscMessage cleanup
+                                     lcl_logger lcl_tmpfs dflags (hsc_home_unit hsc_env)
+                                     mHscMessage
                                      par_sem hsc_env_var old_hpt_var
                                      stable_mods mod_idx (length sccs)
 
@@ -1208,7 +1205,7 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods cleanup sccs = do
                         -- interrupt, and the user doesn't have to be informed
                         -- about that.
                         when (fromException exc /= Just ThreadKilled)
-                             (errorMsg lcl_logger lcl_dflags (text (show exc)))
+                             (errorMsg lcl_logger dflags (text (show exc)))
                         return Failed
 
                 -- Populate the result MVar.
@@ -1220,13 +1217,8 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods cleanup sccs = do
                 writeLogQueue log_queue Nothing
 
                 -- Add the remaining files that weren't cleaned up to the
-                -- global filesToClean ref, for cleanup later.
-                FilesToClean
-                  { ftcCurrentModule = cm_files
-                  , ftcGhcSession = gs_files
-                  } <- readIORef (filesToClean lcl_dflags)
-                addFilesToClean dflags TFL_CurrentModule $ Set.toList cm_files
-                addFilesToClean dflags TFL_GhcSession $ Set.toList gs_files
+                -- global TmpFs, for cleanup later.
+                mergeTmpFsInto lcl_tmpfs tmpfs
 
         -- Kill all the workers, masking interrupts (since killThread is
         -- interruptible). XXX: This is not ideal.
@@ -1298,14 +1290,14 @@ parUpsweep_one
     -- ^ The list of all module loops within the compilation graph.
     -> Logger
     -- ^ The thread-local Logger
+    -> TmpFs
+    -- ^ The thread-local TmpFs
     -> DynFlags
     -- ^ The thread-local DynFlags
     -> HomeUnit
     -- ^ The home-unit
     -> Maybe Messager
     -- ^ The messager
-    -> (HscEnv -> IO ())
-    -- ^ The callback for cleaning up intermediate files
     -> QSem
     -- ^ The semaphore for limiting the number of simultaneous compiles
     -> MVar HscEnv
@@ -1320,7 +1312,7 @@ parUpsweep_one
     -- ^ The total number of modules
     -> IO SuccessFlag
     -- ^ The result of this compile
-parUpsweep_one mod home_mod_map comp_graph_loops lcl_logger lcl_dflags home_unit mHscMessage cleanup par_sem
+parUpsweep_one mod home_mod_map comp_graph_loops lcl_logger lcl_tmpfs lcl_dflags home_unit mHscMessage par_sem
                hsc_env_var old_hpt_var stable_mods mod_index num_mods = do
 
     let this_build_mod = mkBuildModule0 mod
@@ -1430,9 +1422,7 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_logger lcl_dflags home_unit
         let withSem sem = MC.bracket_ (waitQSem sem) (signalQSem sem)
         mb_mod_info <- withSem par_sem $
             handleSourceError (\err -> do logg err; return Nothing) $ do
-                -- Have the ModSummary and HscEnv point to our local log_action
-                -- and filesToClean var.
-                let lcl_mod = localize_mod mod
+                -- Have the HscEnv point to our local logger and tmpfs.
                 let lcl_hsc_env = localize_hsc_env hsc_env
 
                 -- Re-typecheck the loop
@@ -1440,7 +1430,7 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_logger lcl_dflags home_unit
                 -- we close a recursive module loop, see bug #12035.
                 type_env_var <- liftIO $ newIORef emptyNameEnv
                 let lcl_hsc_env' = lcl_hsc_env { hsc_type_env_var =
-                                    Just (ms_mod lcl_mod, type_env_var) }
+                                    Just (ms_mod mod, type_env_var) }
                 lcl_hsc_env'' <- case finish_loop of
                     Nothing   -> return lcl_hsc_env'
                     -- In the non-parallel case, the retypecheck prior to
@@ -1454,7 +1444,7 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_logger lcl_dflags home_unit
 
                 -- Compile the module.
                 mod_info <- upsweep_mod lcl_hsc_env'' mHscMessage old_hpt stable_mods
-                                        lcl_mod mod_index num_mods
+                                        mod mod_index num_mods
                 return (Just mod_info)
 
         case mb_mod_info of
@@ -1483,18 +1473,16 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_logger lcl_dflags home_unit
                     return (hsc_env'', localize_hsc_env hsc_env'')
 
                 -- Clean up any intermediate files.
-                cleanup lcl_hsc_env'
+                cleanCurrentModuleTempFiles (hsc_logger lcl_hsc_env')
+                                            (hsc_tmpfs  lcl_hsc_env')
+                                            (hsc_dflags lcl_hsc_env')
                 return Succeeded
 
   where
-    localize_mod mod
-        = mod { ms_hspp_opts = (ms_hspp_opts mod)
-                 { filesToClean = filesToClean lcl_dflags } }
-
     localize_hsc_env hsc_env
         = hsc_env { hsc_logger = lcl_logger
-                  , hsc_dflags = (hsc_dflags hsc_env)
-                     { filesToClean = filesToClean lcl_dflags } }
+                  , hsc_tmpfs  = lcl_tmpfs
+                  }
 
 -- -----------------------------------------------------------------------------
 --
@@ -1510,7 +1498,6 @@ upsweep
     => Maybe Messager
     -> HomePackageTable            -- ^ HPT from last time round (pruned)
     -> StableModules               -- ^ stable modules (see checkStability)
-    -> (HscEnv -> IO ())           -- ^ How to clean up unwanted tmp files
     -> [SCC ModuleGraphNode]       -- ^ Mods to do (the worklist)
     -> m (SuccessFlag,
           [ModuleGraphNode])
@@ -1520,7 +1507,7 @@ upsweep
        --  2. The 'HscEnv' in the monad has an updated HPT
        --  3. A list of modules which succeeded loading.
 
-upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
+upsweep mHscMessage old_hpt stable_mods sccs = do
    (res, done) <- upsweep' old_hpt emptyMG sccs 1 (length sccs)
    return (res, reverse $ mgModSummaries' done)
  where
@@ -1588,7 +1575,9 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
         hsc_env <- getSession
 
         -- Remove unwanted tmp files between compilations
-        liftIO (cleanup hsc_env)
+        liftIO $ cleanCurrentModuleTempFiles (hsc_logger hsc_env)
+                                             (hsc_tmpfs  hsc_env)
+                                             (hsc_dflags hsc_env)
 
         -- Get ready to tie the knot
         type_env_var <- liftIO $ newIORef emptyNameEnv
@@ -2274,10 +2263,11 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
        -- otherwise those modules will fail to compile.
        -- See Note [-fno-code mode] #8025
        let default_backend = platformDefaultBackend (targetPlatform dflags)
-           home_unit       = hsc_home_unit hsc_env
+       let home_unit       = hsc_home_unit hsc_env
+       let tmpfs           = hsc_tmpfs     hsc_env
        map1 <- case backend dflags of
-         NoBackend   -> enableCodeGenForTH logger home_unit default_backend map0
-         Interpreter -> enableCodeGenForUnboxedTuplesOrSums logger default_backend map0
+         NoBackend   -> enableCodeGenForTH logger tmpfs home_unit default_backend map0
+         Interpreter -> enableCodeGenForUnboxedTuplesOrSums logger tmpfs default_backend map0
          _           -> return map0
        if null errs
          then pure $ concat $ modNodeMapElems map1
@@ -2372,12 +2362,13 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
 -- See Note [-fno-code mode]
 enableCodeGenForTH
   :: Logger
+  -> TmpFs
   -> HomeUnit
   -> Backend
   -> ModNodeMap [Either ErrorMessages ExtendedModSummary]
   -> IO (ModNodeMap [Either ErrorMessages ExtendedModSummary])
-enableCodeGenForTH logger home_unit =
-  enableCodeGenWhen logger condition should_modify TFL_CurrentModule TFL_GhcSession
+enableCodeGenForTH logger tmpfs home_unit =
+  enableCodeGenWhen logger tmpfs condition should_modify TFL_CurrentModule TFL_GhcSession
   where
     condition = isTemplateHaskellOrQQNonBoot
     should_modify (ModSummary { ms_hspp_opts = dflags }) =
@@ -2395,11 +2386,12 @@ enableCodeGenForTH logger home_unit =
 -- or sums into GHCi while still allowing some code to be interpreted.
 enableCodeGenForUnboxedTuplesOrSums
   :: Logger
+  -> TmpFs
   -> Backend
   -> ModNodeMap [Either ErrorMessages ExtendedModSummary]
   -> IO (ModNodeMap [Either ErrorMessages ExtendedModSummary])
-enableCodeGenForUnboxedTuplesOrSums logger =
-  enableCodeGenWhen logger condition should_modify TFL_GhcSession TFL_CurrentModule
+enableCodeGenForUnboxedTuplesOrSums logger tmpfs =
+  enableCodeGenWhen logger tmpfs condition should_modify TFL_GhcSession TFL_CurrentModule
   where
     condition ms =
       unboxed_tuples_or_sums (ms_hspp_opts ms) &&
@@ -2418,6 +2410,7 @@ enableCodeGenForUnboxedTuplesOrSums logger =
 -- marking modules for code generation.
 enableCodeGenWhen
   :: Logger
+  -> TmpFs
   -> (ModSummary -> Bool)
   -> (ModSummary -> Bool)
   -> TempFileLifetime
@@ -2425,7 +2418,7 @@ enableCodeGenWhen
   -> Backend
   -> ModNodeMap [Either ErrorMessages ExtendedModSummary]
   -> IO (ModNodeMap [Either ErrorMessages ExtendedModSummary])
-enableCodeGenWhen logger condition should_modify staticLife dynLife bcknd nodemap =
+enableCodeGenWhen logger tmpfs condition should_modify staticLife dynLife bcknd nodemap =
   traverse (traverse (traverse enable_code_gen)) nodemap
   where
     enable_code_gen :: ExtendedModSummary -> IO ExtendedModSummary
@@ -2440,9 +2433,9 @@ enableCodeGenWhen logger condition should_modify staticLife dynLife bcknd nodema
       , ms_mod `Set.member` needs_codegen_set
       = do
         let new_temp_file suf dynsuf = do
-              tn <- newTempName logger dflags staticLife suf
+              tn <- newTempName logger tmpfs dflags staticLife suf
               let dyn_tn = tn -<.> dynsuf
-              addFilesToClean dflags dynLife [dyn_tn]
+              addFilesToClean tmpfs dynLife [dyn_tn]
               return tn
           -- We don't want to create .o or .hi files unless we have been asked
           -- to by the user. But we need them, so we patch their locations in

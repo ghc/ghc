@@ -25,6 +25,7 @@ import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Logger
+import GHC.Utils.TmpFs
 
 import Data.List (tails, isPrefixOf)
 import System.IO
@@ -62,15 +63,15 @@ runPp logger dflags args = traceToolCommand logger dflags "pp" $ do
   runSomething logger dflags "Haskell pre-processor" prog (args ++ opts)
 
 -- | Run compiler of C-like languages and raw objects (such as gcc or clang).
-runCc :: Maybe ForeignSrcLang -> Logger -> DynFlags -> [Option] -> IO ()
-runCc mLanguage logger dflags args = traceToolCommand logger dflags "cc" $ do
+runCc :: Maybe ForeignSrcLang -> Logger -> TmpFs -> DynFlags -> [Option] -> IO ()
+runCc mLanguage logger tmpfs dflags args = traceToolCommand logger dflags "cc" $ do
   let p = pgm_c dflags
       args1 = map Option userOpts
       args2 = languageOptions ++ args ++ args1
       -- We take care to pass -optc flags in args1 last to ensure that the
       -- user can override flags passed by GHC. See #14452.
   mb_env <- getGccEnv args2
-  runSomethingResponseFile logger dflags cc_filter "C Compiler" p args2 mb_env
+  runSomethingResponseFile logger tmpfs dflags cc_filter "C Compiler" p args2 mb_env
  where
   -- discard some harmless warnings from gcc that we can't turn off
   cc_filter = unlines . doFilter . lines
@@ -239,8 +240,8 @@ figureLlvmVersion logger dflags = traceToolCommand logger dflags "llc" $ do
 
 
 
-runLink :: Logger -> DynFlags -> [Option] -> IO ()
-runLink logger dflags args = traceToolCommand logger dflags "linker" $ do
+runLink :: Logger -> TmpFs -> DynFlags -> [Option] -> IO ()
+runLink logger tmpfs dflags args = traceToolCommand logger dflags "linker" $ do
   -- See Note [Run-time linker info]
   --
   -- `-optl` args come at the end, so that later `-l` options
@@ -251,7 +252,7 @@ runLink logger dflags args = traceToolCommand logger dflags "linker" $ do
       optl_args = map Option (getOpts dflags opt_l)
       args2     = args0 ++ linkargs ++ args ++ optl_args
   mb_env <- getGccEnv args2
-  runSomethingResponseFile logger dflags ld_filter "Linker" p args2 mb_env
+  runSomethingResponseFile logger tmpfs dflags ld_filter "Linker" p args2 mb_env
   where
     ld_filter = case (platformOS (targetPlatform dflags)) of
                   OSSolaris2 -> sunos_ld_filter
@@ -303,18 +304,23 @@ ld: warning: symbol referencing errors
     ld_warning_found = not . null . snd . ld_warn_break
 
 -- See Note [Merging object files for GHCi] in GHC.Driver.Pipeline.
-runMergeObjects :: Logger -> DynFlags -> [Option] -> IO ()
-runMergeObjects logger dflags args = traceToolCommand logger dflags "merge-objects" $ do
-  let (p,args0) = pgm_lm dflags
-      optl_args = map Option (getOpts dflags opt_lm)
-      args2     = args0 ++ args ++ optl_args
-  -- N.B. Darwin's ld64 doesn't support response files. Consequently we only
-  -- use them on Windows where they are truly necessary.
+runMergeObjects :: Logger -> TmpFs -> DynFlags -> [Option] -> IO ()
 #if defined(mingw32_HOST_OS)
-  mb_env <- getGccEnv args2
-  runSomethingResponseFile logger dflags id "Merge objects" p args2 mb_env
+runMergeObjects logger tmpfs  dflags args =
 #else
-  runSomething logger dflags "Merge objects" p args2
+runMergeObjects logger _tmpfs dflags args =
+#endif
+  traceToolCommand logger dflags "merge-objects" $ do
+    let (p,args0) = pgm_lm dflags
+        optl_args = map Option (getOpts dflags opt_lm)
+        args2     = args0 ++ args ++ optl_args
+    -- N.B. Darwin's ld64 doesn't support response files. Consequently we only
+    -- use them on Windows where they are truly necessary.
+#if defined(mingw32_HOST_OS)
+    mb_env <- getGccEnv args2
+    runSomethingResponseFile logger tmpfs dflags id "Merge objects" p args2 mb_env
+#else
+    runSomething logger dflags "Merge objects" p args2
 #endif
 
 runLibtool :: Logger -> DynFlags -> [Option] -> IO ()

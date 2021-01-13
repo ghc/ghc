@@ -32,6 +32,7 @@ import GHC.Utils.Error
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Logger
+import GHC.Utils.TmpFs
 
 import GHC.Driver.Session
 import GHC.Driver.Ppr
@@ -39,7 +40,6 @@ import GHC.Driver.Ppr
 import qualified GHC.Data.ShortText as ST
 
 import GHC.SysTools.Elf
-import GHC.SysTools.FileCleanup
 import GHC.SysTools.Tasks
 import GHC.SysTools.Info
 import GHC.Linker.Unit
@@ -48,13 +48,13 @@ import Control.Monad.IO.Class
 import Control.Monad
 import Data.Maybe
 
-mkExtraObj :: Logger -> DynFlags -> UnitState -> Suffix -> String -> IO FilePath
-mkExtraObj logger dflags unit_state extn xs
- = do cFile <- newTempName logger dflags TFL_CurrentModule extn
-      oFile <- newTempName logger dflags TFL_GhcSession "o"
+mkExtraObj :: Logger -> TmpFs -> DynFlags -> UnitState -> Suffix -> String -> IO FilePath
+mkExtraObj logger tmpfs dflags unit_state extn xs
+ = do cFile <- newTempName logger tmpfs dflags TFL_CurrentModule extn
+      oFile <- newTempName logger tmpfs dflags TFL_GhcSession "o"
       writeFile cFile xs
       ccInfo <- liftIO $ getCompilerInfo logger dflags
-      runCc Nothing logger dflags
+      runCc Nothing logger tmpfs dflags
             ([Option        "-c",
               FileOption "" cFile,
               Option        "-o",
@@ -87,8 +87,8 @@ mkExtraObj logger dflags unit_state extn xs
 --
 -- On Windows, when making a shared library we also may need a DllMain.
 --
-mkExtraObjToLinkIntoBinary :: Logger -> DynFlags -> UnitState -> IO (Maybe FilePath)
-mkExtraObjToLinkIntoBinary logger dflags unit_state = do
+mkExtraObjToLinkIntoBinary :: Logger -> TmpFs -> DynFlags -> UnitState -> IO (Maybe FilePath)
+mkExtraObjToLinkIntoBinary logger tmpfs dflags unit_state = do
   when (gopt Opt_NoHsMain dflags && haveRtsOptsFlags dflags) $
      logInfo logger dflags $ withPprStyle defaultUserStyle
          (text "Warning: -rtsopts and -with-rtsopts have no effect with -no-hs-main." $$
@@ -114,7 +114,7 @@ mkExtraObjToLinkIntoBinary logger dflags unit_state = do
     _ -> mk_extra_obj exeMain
 
   where
-    mk_extra_obj = fmap Just . mkExtraObj logger dflags unit_state "c" . showSDoc dflags
+    mk_extra_obj = fmap Just . mkExtraObj logger tmpfs dflags unit_state "c" . showSDoc dflags
 
     exeMain = vcat [
         text "#include <Rts.h>",
@@ -163,12 +163,12 @@ mkExtraObjToLinkIntoBinary logger dflags unit_state = do
 -- this was included as inline assembly in the main.c file but this
 -- is pretty fragile. gas gets upset trying to calculate relative offsets
 -- that span the .note section (notably .text) when debug info is present
-mkNoteObjsToLinkIntoBinary :: Logger -> DynFlags -> UnitEnv -> [UnitId] -> IO [FilePath]
-mkNoteObjsToLinkIntoBinary logger dflags unit_env dep_packages = do
+mkNoteObjsToLinkIntoBinary :: Logger -> TmpFs -> DynFlags -> UnitEnv -> [UnitId] -> IO [FilePath]
+mkNoteObjsToLinkIntoBinary logger tmpfs dflags unit_env dep_packages = do
    link_info <- getLinkInfo dflags unit_env dep_packages
 
    if (platformSupportsSavingLinkOpts (platformOS platform ))
-     then fmap (:[]) $ mkExtraObj logger dflags unit_state "s" (showSDoc dflags (link_opts link_info))
+     then fmap (:[]) $ mkExtraObj logger tmpfs dflags unit_state "s" (showSDoc dflags (link_opts link_info))
      else return []
 
   where

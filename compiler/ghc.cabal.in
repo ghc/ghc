@@ -560,7 +560,6 @@ Library
         GHC.SysTools.Ar
         GHC.SysTools.BaseDir
         GHC.SysTools.Elf
-        GHC.SysTools.FileCleanup
         GHC.SysTools.Info
         GHC.SysTools.Process
         GHC.SysTools.Tasks
@@ -717,6 +716,7 @@ Library
         GHC.Utils.Panic.Plain
         GHC.Utils.Ppr
         GHC.Utils.Ppr.Colour
+        GHC.Utils.TmpFs
 
         Language.Haskell.Syntax
         Language.Haskell.Syntax.Binds

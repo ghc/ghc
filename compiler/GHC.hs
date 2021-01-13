@@ -351,7 +351,7 @@ import GHC.Tc.Module
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Instance.Family
 
-import GHC.SysTools.FileCleanup
+import GHC.Utils.TmpFs
 import GHC.SysTools
 import GHC.SysTools.BaseDir
 
@@ -533,9 +533,10 @@ withCleanupSession ghc = ghc `MC.finally` cleanup
       hsc_env <- getSession
       let dflags = hsc_dflags hsc_env
       let logger = hsc_logger hsc_env
+      let tmpfs  = hsc_tmpfs hsc_env
       liftIO $ do
-          cleanTempFiles logger dflags
-          cleanTempDirs logger dflags
+          cleanTempFiles logger tmpfs dflags
+          cleanTempDirs logger tmpfs dflags
           stopInterp hsc_env -- shut down the IServ
           --  exceptions will be blocked while we clean the temporary files,
           -- so there shouldn't be any difficulty if we receive further
