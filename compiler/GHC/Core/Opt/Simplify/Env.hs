@@ -5,7 +5,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
-{-# OPTIONS_GHC -ddump-simpl -ddump-to-file -ddump-stg-final #-}
+{-# OPTIONS_GHC -ddump-simpl -ddump-to-file -ddump-stg-final -dsuppress-coercions #-}
 
 module GHC.Core.Opt.Simplify.Env (
         -- * The simplifier mode
@@ -326,7 +326,8 @@ setMode :: SimplMode -> SimplEnv -> SimplEnv
 setMode mode env = env { seMode = mode }
 
 updMode :: (SimplMode -> SimplMode) -> SimplEnv -> SimplEnv
-updMode upd env = env { seMode = upd (seMode env) }
+updMode upd env = let !mode = upd (seMode env)
+                  in env { seMode = mode }
 
 bumpCaseDepth :: SimplEnv -> SimplEnv
 bumpCaseDepth env = env { seCaseDepth = seCaseDepth env + 1 }
@@ -549,7 +550,7 @@ mkFloatBind env bind
                     , sfJoinFloats = emptyJoinFloats
                     , sfInScope    = in_scope' }
 
-    in_scope' = seInScope env `extendInScopeSetBind` bind
+    !in_scope' = seInScope env `extendInScopeSetBind` bind
 
 extendFloats :: SimplFloats -> OutBind -> SimplFloats
 -- Add this binding to the floats, and extend the in-scope env too
@@ -566,9 +567,9 @@ extendFloats (SimplFloats { sfLetFloats  = floats
                 , sfLetFloats  = floats'
                 , sfJoinFloats = jfloats }
   where
-    in_scope' = in_scope `extendInScopeSetBind` bind
-    floats'   = floats  `addLetFlts`  unitLetFloat bind
-    jfloats'  = jfloats `addJoinFlts` unitJoinFloat bind
+    !in_scope' = in_scope `extendInScopeSetBind` bind
+    !floats'   = floats  `addLetFlts`  unitLetFloat bind
+    !jfloats'  = jfloats `addJoinFlts` unitJoinFloat bind
 
 addLetFloats :: SimplFloats -> LetFloats -> SimplFloats
 -- Add the let-floats for env2 to env1;
@@ -814,6 +815,8 @@ substNonCoVarIdBndr
 --      all fragile info is zapped
 substNonCoVarIdBndr env id = subst_id_bndr env id (\x -> x)
 
+-- Inline to make the (OutId -> OutId) function a known call.
+{-# INLINE subst_id_bndr #-}
 subst_id_bndr :: SimplEnv
               -> InBndr    -- Env and binder to transform
               -> (OutId -> OutId)  -- Adjust the type
@@ -821,7 +824,7 @@ subst_id_bndr :: SimplEnv
 subst_id_bndr env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst })
               old_id adjust_type
   = ASSERT2( not (isCoVar old_id), ppr old_id )
-    (env { seInScope = in_scope `extendInScopeSet` new_id,
+    (env { seInScope = new_in_scope,
            seIdSubst = new_subst }, new_id)
     -- It's important that both seInScope and seIdSubst are updated with
     -- the new_id, /after/ applying adjust_type. That's why adjust_type
@@ -829,19 +832,21 @@ subst_id_bndr env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst })
     -- place that gives a non-identity adjust_type) we'd have to fiddle
     -- afresh with both seInScope and seIdSubst
   where
-    id1  = uniqAway in_scope old_id
-    id2  = substIdType env id1
-    id3  = zapFragileIdInfo id2       -- Zaps rules, worker-info, unfolding
+    !id1  = uniqAway in_scope old_id
+    !id2  = substIdType env id1
+    !id3  = zapFragileIdInfo id2       -- Zaps rules, worker-info, unfolding
                                       -- and fragile OccInfo
-    new_id = adjust_type id3
+    !new_id = adjust_type id3
 
         -- Extend the substitution if the unique has changed,
         -- or there's some useful occurrence information
         -- See the notes with substTyVarBndr for the delSubstEnv
-    new_subst | new_id /= old_id
+    !new_subst | new_id /= old_id
               = extendVarEnv id_subst old_id (DoneId new_id)
               | otherwise
               = delVarEnv id_subst old_id
+
+    !new_in_scope = in_scope `extendInScopeSet` new_id
 
 ------------------------------------
 seqTyVar :: TyVar -> ()
