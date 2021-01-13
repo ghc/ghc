@@ -252,7 +252,7 @@ import GHC.Types.Id
 import GHC.Types.Literal
 import GHC.Core.Make (aBSENT_SUM_FIELD_ERROR_ID)
 import GHC.Types.Id.Make (voidPrimId, voidArgId)
-import GHC.Utils.Monad (mapAccumLM)
+import GHC.Utils.Monad (mapAccumLM')
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
@@ -776,7 +776,7 @@ unariseFunArgs :: UnariseEnv -> [StgArg] -> [StgArg]
 unariseFunArgs = concatMap . unariseFunArg
 
 unariseFunArgBinders :: UnariseEnv -> [Id] -> UniqSM (UnariseEnv, [Id])
-unariseFunArgBinders rho xs = second concat <$> mapAccumLM unariseFunArgBinder rho xs
+unariseFunArgBinders rho xs = second concat <$> mapAccumLM' unariseFunArgBinder rho xs
 
 -- Result list of binders is never empty
 unariseFunArgBinder :: UnariseEnv -> Id -> UniqSM (UnariseEnv, [Id])
@@ -806,7 +806,7 @@ unariseConArgs :: UnariseEnv -> [InStgArg] -> [OutStgArg]
 unariseConArgs = concatMap . unariseConArg
 
 unariseConArgBinders :: UnariseEnv -> [Id] -> UniqSM (UnariseEnv, [Id])
-unariseConArgBinders rho xs = second concat <$> mapAccumLM unariseConArgBinder rho xs
+unariseConArgBinders rho xs = second concat <$> mapAccumLM' unariseConArgBinder rho xs
 
 -- Different from `unariseFunArgBinder`: result list of binders may be empty.
 -- See DataCon applications case in Note [Post-unarisation invariants].

@@ -67,7 +67,7 @@ pprintClosureCommand bindThings force str = do
 
   -- Obtain the terms and the recovered type information
   let ids = [id | AnId id <- pprintables]
-  (subst, terms) <- mapAccumLM go emptyTCvSubst ids
+  (subst, terms) <- mapAccumLM' go emptyTCvSubst ids
 
   -- Apply the substitutions obtained after recovering the types
   modifySession $ \hsc_env ->

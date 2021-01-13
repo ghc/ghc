@@ -398,7 +398,7 @@ zonkFieldOcc env (FieldOcc sel lbl)
   = fmap ((flip FieldOcc) lbl) $ zonkIdBndr env sel
 
 zonkEvBndrsX :: ZonkEnv -> [EvVar] -> TcM (ZonkEnv, [Var])
-zonkEvBndrsX = mapAccumLM zonkEvBndrX
+zonkEvBndrsX = mapAccumLM' zonkEvBndrX
 
 zonkEvBndrX :: ZonkEnv -> EvVar -> TcM (ZonkEnv, EvVar)
 -- Works for dictionaries and coercions
@@ -428,13 +428,13 @@ zonkCoreBndrX env v
   | otherwise = zonkTyBndrX env v
 
 zonkCoreBndrsX :: ZonkEnv -> [Var] -> TcM (ZonkEnv, [Var])
-zonkCoreBndrsX = mapAccumLM zonkCoreBndrX
+zonkCoreBndrsX = mapAccumLM' zonkCoreBndrX
 
 zonkTyBndrs :: [TcTyVar] -> TcM (ZonkEnv, [TyVar])
 zonkTyBndrs tvs = initZonkEnv $ \ze -> zonkTyBndrsX ze tvs
 
 zonkTyBndrsX :: ZonkEnv -> [TcTyVar] -> TcM (ZonkEnv, [TyVar])
-zonkTyBndrsX = mapAccumLM zonkTyBndrX
+zonkTyBndrsX = mapAccumLM' zonkTyBndrX
 
 zonkTyBndrX :: ZonkEnv -> TcTyVar -> TcM (ZonkEnv, TyVar)
 -- This guarantees to return a TyVar (not a TcTyVar)
@@ -452,7 +452,7 @@ zonkTyBndrX env tv
 
 zonkTyVarBindersX :: ZonkEnv -> [VarBndr TcTyVar vis]
                              -> TcM (ZonkEnv, [VarBndr TyVar vis])
-zonkTyVarBindersX = mapAccumLM zonkTyVarBinderX
+zonkTyVarBindersX = mapAccumLM' zonkTyVarBinderX
 
 zonkTyVarBinderX :: ZonkEnv -> VarBndr TcTyVar vis
                             -> TcM (ZonkEnv, VarBndr TyVar vis)
@@ -970,7 +970,7 @@ zonkSyntaxExpr env (SyntaxExprTc { syn_expr      = expr
                                , syn_res_wrap  = res_wrap })
   = do { (env0, res_wrap')  <- zonkCoFn env res_wrap
        ; expr'              <- zonkExpr env0 expr
-       ; (env1, arg_wraps') <- mapAccumLM zonkCoFn env0 arg_wraps
+       ; (env1, arg_wraps') <- mapAccumLM' zonkCoFn env0 arg_wraps
        ; return (env1, SyntaxExprTc { syn_expr      = expr'
                                     , syn_arg_wraps = arg_wraps'
                                     , syn_res_wrap  = res_wrap' }) }
@@ -1505,7 +1505,7 @@ zonkRule :: ZonkEnv -> RuleDecl GhcTc -> TcM (RuleDecl GhcTc)
 zonkRule env rule@(HsRule { rd_tmvs = tm_bndrs{-::[RuleBndr TcId]-}
                           , rd_lhs = lhs
                           , rd_rhs = rhs })
-  = do { (env_inside, new_tm_bndrs) <- mapAccumLM zonk_tm_bndr env tm_bndrs
+  = do { (env_inside, new_tm_bndrs) <- mapAccumLM' zonk_tm_bndr env tm_bndrs
 
        ; let env_lhs = setZonkType env_inside SkolemiseFlexi
               -- See Note [Zonking the LHS of a RULE]
@@ -1630,7 +1630,7 @@ zonkEvTypeable env (EvTypeableTyLit t1)
        ; return (EvTypeableTyLit t1') }
 
 zonkTcEvBinds_s :: ZonkEnv -> [TcEvBinds] -> TcM (ZonkEnv, [TcEvBinds])
-zonkTcEvBinds_s env bs = do { (env, bs') <- mapAccumLM zonk_tc_ev_binds env bs
+zonkTcEvBinds_s env bs = do { (env, bs') <- mapAccumLM' zonk_tc_ev_binds env bs
                             ; return (env, [EvBinds (unionManyBags bs')]) }
 
 zonkTcEvBinds :: ZonkEnv -> TcEvBinds -> TcM (ZonkEnv, TcEvBinds)

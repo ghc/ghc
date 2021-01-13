@@ -223,7 +223,7 @@ instantiateSigma :: CtOrigin -> [TyVar] -> TcThetaType -> TcSigmaType
 -- instantiates the the type variables tvs, emits the (instantiated)
 -- constraints theta, and returns the (instantiated) type ty
 instantiateSigma orig tvs theta body_ty
-  = do { (subst, inst_tvs) <- mapAccumLM newMetaTyVarX empty_subst tvs
+  = do { (subst, inst_tvs) <- mapAccumLM' newMetaTyVarX empty_subst tvs
        ; let inst_theta  = substTheta subst theta
              inst_body   = substTy subst body_ty
              inst_tv_tys = mkTyVarTys inst_tvs
@@ -484,7 +484,7 @@ tcInstTypeBndrs id
                   --      (?x :: Int) => Int -> Int
   = return ([], theta, tau)
   | otherwise
-  = do { (subst, tyvars') <- mapAccumLM inst_invis_bndr emptyTCvSubst tyvars
+  = do { (subst, tyvars') <- mapAccumLM' inst_invis_bndr emptyTCvSubst tyvars
        ; let tv_prs  = map (tyVarName . binderVar) tyvars `zip` tyvars'
              subst'  = extendTCvInScopeSet subst (tyCoVarsOfType rho)
        ; return (tv_prs, substTheta subst' theta, substTy subst' tau) }

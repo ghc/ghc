@@ -10,7 +10,7 @@ module GHC.Utils.Monad
 
         , zipWith3M, zipWith3M_, zipWith4M, zipWithAndUnzipM
         , mapAndUnzipM, mapAndUnzip3M, mapAndUnzip4M, mapAndUnzip5M
-        , mapAccumLM
+        , mapAccumLM'
         , liftFstM, liftSndM
         , mapSndM
         , concatMapM
@@ -137,21 +137,17 @@ mapAndUnzip5M :: Monad m => (a -> m (b,c,d,e,f)) -> [a] -> m ([b],[c],[d],[e],[f
 -- See Note [Inline @mapAndUnzipNM@ functions] above.
 mapAndUnzip5M f xs =  unzip5 <$> traverse f xs
 
--- TODO: mapAccumLM is used in many places. Surely most of
--- these don't actually want to be lazy. We should add a strict
--- variant and use it where appropriate.
-
--- | Monadic version of mapAccumL
-mapAccumLM :: Monad m
+-- | Monadic version of mapAccumL, but strict both in state and elements.
+mapAccumLM' :: Monad m
             => (acc -> x -> m (acc, y)) -- ^ combining function
             -> acc                      -- ^ initial state
             -> [x]                      -- ^ inputs
             -> m (acc, [y])             -- ^ final state, outputs
-mapAccumLM f s xs =
+mapAccumLM' f s xs =
   go s xs
   where
     go s (x:xs) = do
-      (s1, x')  <- f s x
+      (!s1, !x')  <- f s x
       (s2, xs') <- go s1 xs
       return    (s2, x' : xs')
     go s [] = return (s, [])

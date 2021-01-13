@@ -1991,7 +1991,7 @@ abstractFloats :: UnfoldingOpts -> TopLevelFlag -> [OutTyVar] -> SimplFloats
 abstractFloats uf_opts top_lvl main_tvs floats body
   = assert (notNull body_floats) $
     assert (isNilOL (sfJoinFloats floats)) $
-    do  { (subst, float_binds) <- mapAccumLM abstract empty_subst body_floats
+    do  { (subst, float_binds) <- mapAccumLM' abstract empty_subst body_floats
         ; return (float_binds, GHC.Core.Subst.substExpr subst body) }
   where
     is_top_lvl  = isTopLevel top_lvl

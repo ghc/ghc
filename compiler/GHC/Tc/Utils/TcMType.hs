@@ -1144,7 +1144,7 @@ newMetaTyVars = newMetaTyVarsX emptyTCvSubst
 
 newMetaTyVarsX :: TCvSubst -> [TyVar] -> TcM (TCvSubst, [TcTyVar])
 -- Just like newMetaTyVars, but start with an existing substitution.
-newMetaTyVarsX subst = mapAccumLM newMetaTyVarX subst
+newMetaTyVarsX subst = mapAccumLM' newMetaTyVarX subst
 
 newMetaTyVarX :: TCvSubst -> TyVar -> TcM (TCvSubst, TcTyVar)
 -- Make a new unification variable tyvar whose Name and Kind come from
@@ -2665,7 +2665,7 @@ zonkTidyOrigin env (CycleBreakerOrigin orig)
   = do { (env1, orig') <- zonkTidyOrigin env orig
        ; return (env1, CycleBreakerOrigin orig') }
 zonkTidyOrigin env (InstProvidedOrigin mod cls_inst)
-  = do { (env1, is_tys') <- mapAccumLM zonkTidyTcType env (is_tys cls_inst)
+  = do { (env1, is_tys') <- mapAccumLM' zonkTidyTcType env (is_tys cls_inst)
        ; return (env1, InstProvidedOrigin mod (cls_inst {is_tys = is_tys'})) }
 zonkTidyOrigin env (FixedRuntimeRepOrigin ty frr_orig)
   = do { (env1, ty') <- zonkTidyTcType env ty
@@ -2677,7 +2677,7 @@ zonkTidyOrigin env (WantedSuperclassOrigin pty orig)
 zonkTidyOrigin env orig = return (env, orig)
 
 zonkTidyOrigins :: TidyEnv -> [CtOrigin] -> TcM (TidyEnv, [CtOrigin])
-zonkTidyOrigins = mapAccumLM zonkTidyOrigin
+zonkTidyOrigins = mapAccumLM' zonkTidyOrigin
 
 ----------------
 tidyCt :: TidyEnv -> Ct -> Ct

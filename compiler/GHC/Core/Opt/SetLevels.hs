@@ -120,7 +120,7 @@ import GHC.Builtin.Names      ( runRWKey )
 import GHC.Data.FastString
 
 import GHC.Utils.FV
-import GHC.Utils.Monad  ( mapAccumLM )
+import GHC.Utils.Monad  ( mapAccumLM' )
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -440,7 +440,7 @@ lvlApp env orig_expr ((_,AnnVar fn), args)
         ; return (foldl' App lapp' rargs') }
 
   | otherwise
-  = do { (_, args') <- mapAccumLM lvl_arg stricts args
+  = do { (_, args') <- mapAccumLM' lvl_arg stricts args
             -- Take account of argument strictness; see
             -- Note [Floating to the top]
        ; return (foldl' App (lookupVar env fn) args') }

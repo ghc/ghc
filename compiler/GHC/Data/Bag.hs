@@ -293,7 +293,7 @@ mapAccumBagLM f s (UnitBag x)     = do { (s1, x1) <- f s x; return (s1, UnitBag 
 mapAccumBagLM f s (TwoBags b1 b2) = do { (s1, b1') <- mapAccumBagLM f s  b1
                                        ; (s2, b2') <- mapAccumBagLM f s1 b2
                                        ; return (s2, TwoBags b1' b2') }
-mapAccumBagLM f s (ListBag xs)    = do { (s', xs') <- mapAccumLM f s xs
+mapAccumBagLM f s (ListBag xs)    = do { (s', xs') <- mapAccumLM' f s xs
                                        ; return (s', ListBag xs') }
 
 listToBag :: [a] -> Bag a

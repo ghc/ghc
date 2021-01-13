@@ -774,7 +774,7 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = Left rbnds }) res_
         ; let result_inst_tys = mkTyVarTys con1_tvs'
               init_subst = mkEmptyTCvSubst (getTCvInScope result_subst)
 
-        ; (scrut_subst, scrut_inst_tys) <- mapAccumLM mk_inst_ty init_subst
+        ; (scrut_subst, scrut_inst_tys) <- mapAccumLM' mk_inst_ty init_subst
                                                       (con1_tvs `zip` result_inst_tys)
 
         ; let rec_res_ty    = TcType.substTy result_subst con1_res_ty

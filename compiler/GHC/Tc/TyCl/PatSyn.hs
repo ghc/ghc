@@ -425,7 +425,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
            tcCheckPat PatSyn lpat (unrestricted skol_pat_ty)   $
            do { let in_scope    = mkInScopeSet (mkVarSet skol_univ_tvs)
                     empty_subst = mkEmptyTCvSubst in_scope
-              ; (inst_subst, ex_tvs') <- mapAccumLM newMetaTyVarX empty_subst skol_ex_tvs
+              ; (inst_subst, ex_tvs') <- mapAccumLM' newMetaTyVarX empty_subst skol_ex_tvs
                     -- newMetaTyVarX: see the "Existential type variables"
                     -- part of Note [Checking against a pattern signature]
               ; traceTc "tcpatsyn1" (vcat [ ppr v <+> dcolon <+> ppr (tyVarKind v) | v <- ex_tvs])

@@ -69,7 +69,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Trace
-import GHC.Utils.Monad  ( mapAccumLM, liftIO )
+import GHC.Utils.Monad  ( mapAccumLM', liftIO )
 import GHC.Utils.Logger
 
 import Control.Monad
@@ -256,7 +256,7 @@ simplRecBind :: SimplEnv -> TopLevelFlag -> MaybeJoinCont
              -> [(InId, InExpr)]
              -> SimplM (SimplFloats, SimplEnv)
 simplRecBind env0 top_lvl mb_cont pairs0
-  = do  { (env_with_info, triples) <- mapAccumLM add_rules env0 pairs0
+  = do  { (env_with_info, triples) <- mapAccumLM' add_rules env0 pairs0
         ; (rec_floats, env1) <- go env_with_info triples
         ; return (mkRecFloats rec_floats, env1) }
   where
@@ -1650,7 +1650,7 @@ simplLamBndr :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
 simplLamBndr env bndr = simplBinder env bndr
 
 simplLamBndrs :: SimplEnv -> [InBndr] -> SimplM (SimplEnv, [OutBndr])
-simplLamBndrs env bndrs = mapAccumLM simplLamBndr env bndrs
+simplLamBndrs env bndrs = mapAccumLM' simplLamBndr env bndrs
 
 ------------------
 simplNonRecE :: SimplEnv
@@ -3547,7 +3547,7 @@ mkDupableContWithDmds env _
         -- NB: we don't use alt_env further; it has the substEnv for
         --     the alternatives, and we don't want that
 
-        ; (join_floats, alts'') <- mapAccumLM (mkDupableAlt (targetPlatform (seDynFlags env)) case_bndr')
+        ; (join_floats, alts'') <- mapAccumLM' (mkDupableAlt (targetPlatform (seDynFlags env)) case_bndr')
                                               emptyJoinFloats alts'
 
         ; let all_floats = floats `addJoinFloats` join_floats

@@ -760,7 +760,7 @@ See also Note [Scaling join point arguments].
 -}
 
 simplBinders :: SimplEnv -> [InBndr] -> SimplM (SimplEnv, [OutBndr])
-simplBinders  !env bndrs = mapAccumLM simplBinder  env bndrs
+simplBinders  !env bndrs = mapAccumLM' simplBinder  env bndrs
 
 -------------
 simplBinder :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)

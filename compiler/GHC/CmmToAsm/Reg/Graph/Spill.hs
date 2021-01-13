@@ -203,9 +203,9 @@ regSpill_instr platform regSlotMap (LiveInstr instr (Just _)) = do
   let rsSpillModify       = filter (\r -> elemUFM r regSlotMap) rsModify
 
   -- rewrite the instr and work out spill code.
-  (instr1, prepost1)      <- mapAccumLM (spillRead   regSlotMap) instr  rsSpillRead
-  (instr2, prepost2)      <- mapAccumLM (spillWrite  regSlotMap) instr1 rsSpillWritten
-  (instr3, prepost3)      <- mapAccumLM (spillModify regSlotMap) instr2 rsSpillModify
+  (instr1, prepost1)      <- mapAccumLM' (spillRead   regSlotMap) instr  rsSpillRead
+  (instr2, prepost2)      <- mapAccumLM' (spillWrite  regSlotMap) instr1 rsSpillWritten
+  (instr3, prepost3)      <- mapAccumLM' (spillModify regSlotMap) instr2 rsSpillModify
 
   let (mPrefixes, mPostfixes) = unzip (prepost1 ++ prepost2 ++ prepost3)
   let prefixes                = concat mPrefixes

@@ -327,7 +327,7 @@ coreTopBindToStg dflags this_mod env ccs (Rec pairs)
         -- generate StgTopBindings and CAF cost centres created for CAFs
         (ccs', stg_rhss)
           = initCts dflags env' $
-              mapAccumLM (\ccs rhs -> swap <$> coreToTopStgRhs dflags ccs this_mod rhs)
+              mapAccumLM' (\ccs rhs -> swap <$> coreToTopStgRhs dflags ccs this_mod rhs)
                          ccs
                          pairs
         bind = StgTopLifted $ StgRec (zip binders stg_rhss)

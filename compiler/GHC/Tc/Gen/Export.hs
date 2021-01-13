@@ -139,7 +139,7 @@ emptyExportAccum = ExportAccum emptyOccEnv emptyUniqSet
 accumExports :: (ExportAccum -> x -> TcRn (Maybe (ExportAccum, y)))
              -> [x]
              -> TcRn [y]
-accumExports f = fmap (catMaybes . snd) . mapAccumLM f' emptyExportAccum
+accumExports f = fmap (catMaybes . snd) . mapAccumLM' f' emptyExportAccum
   where f' acc x = do
           m <- attemptM (f acc x)
           pure $ case m of

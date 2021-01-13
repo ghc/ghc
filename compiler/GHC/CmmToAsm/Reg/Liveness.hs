@@ -446,7 +446,7 @@ slurpReloadCoalesce live
                                         then getSlotMap blockId
                                         else return emptyUFM
 
-                (_, mMoves)     <- mapAccumLM slurpLI slotMap instrs
+                (_, mMoves)     <- mapAccumLM' slurpLI slotMap instrs
                 return $ listToBag $ catMaybes mMoves
 
         slurpLI :: SlotMap Reg                           -- current slotMap

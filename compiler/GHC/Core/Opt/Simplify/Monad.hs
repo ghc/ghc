@@ -170,7 +170,7 @@ thenSmpl_ m k
 -- TODO: this specializing is not allowed
 -- {-# SPECIALIZE mapM         :: (a -> SimplM b) -> [a] -> SimplM [b] #-}
 -- {-# SPECIALIZE mapAndUnzipM :: (a -> SimplM (b, c)) -> [a] -> SimplM ([b],[c]) #-}
--- {-# SPECIALIZE mapAccumLM   :: (acc -> b -> SimplM (acc,c)) -> acc -> [b] -> SimplM (acc, [c]) #-}
+-- {-# SPECIALIZE mapAccumLM'   :: (acc -> b -> SimplM (acc,c)) -> acc -> [b] -> SimplM (acc, [c]) #-}
 
 traceSmpl :: String -> SDoc -> SimplM ()
 traceSmpl herald doc

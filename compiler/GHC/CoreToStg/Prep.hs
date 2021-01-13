@@ -58,7 +58,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Outputable
-import GHC.Utils.Monad  ( mapAccumLM )
+import GHC.Utils.Monad  ( mapAccumLM' )
 import GHC.Utils.Logger
 import GHC.Utils.Trace
 
@@ -2107,7 +2107,7 @@ subst_cv_bndr tce cv
 -- ---------------------------------------------------------------------------
 
 cpCloneBndrs :: CorePrepEnv -> [InVar] -> UniqSM (CorePrepEnv, [OutVar])
-cpCloneBndrs env bs = mapAccumLM cpCloneBndr env bs
+cpCloneBndrs env bs = mapAccumLM' cpCloneBndr env bs
 
 cpCloneBndr  :: CorePrepEnv -> InVar -> UniqSM (CorePrepEnv, OutVar)
 cpCloneBndr env bndr
