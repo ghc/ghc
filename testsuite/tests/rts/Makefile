@@ -104,10 +104,16 @@ T13617:
 T14695:
 	echo ":quit" | LD_LIBRARY_PATH="foo:" "$(TEST_HC)" $(filter-out -rtsopts, $(TEST_HC_OPTS_INTERACTIVE))
 
+define run_InternalCounters
+$(RM) InternalCounters.run.$(1)
+'$(TEST_HC)' -debug -threaded InternalCounters.hs -o InternalCounters.run.$(1) 2>&1 > /dev/null
+./InternalCounters.run.$(1) +RTS -s $(2) -RTS 2>&1  | grep "Internal Counters"
+endef
+
 .PHONY: InternalCounters
 InternalCounters:
-	"$(TEST_HC)" +RTS -s --internal-counters -RTS 2>&1 | grep "Internal Counters"
-	-"$(TEST_HC)" +RTS -s -RTS 2>&1 | grep "Internal Counters"
+	$(call run_InternalCounters,with,--internal-counters)
+	-$(call run_InternalCounters,without,)
 
 .PHONY: KeepCafsFail
 KeepCafsFail:
