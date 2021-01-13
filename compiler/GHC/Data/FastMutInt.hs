@@ -9,10 +9,7 @@
 
 module GHC.Data.FastMutInt(
         FastMutInt, newFastMutInt,
-        readFastMutInt, writeFastMutInt,
-
-        FastMutPtr, newFastMutPtr,
-        readFastMutPtr, writeFastMutPtr
+        readFastMutInt, writeFastMutInt
   ) where
 
 import GHC.Prelude
@@ -24,10 +21,6 @@ import GHC.Ptr
 newFastMutInt :: IO FastMutInt
 readFastMutInt :: FastMutInt -> IO Int
 writeFastMutInt :: FastMutInt -> Int -> IO ()
-
-newFastMutPtr :: IO FastMutPtr
-readFastMutPtr :: FastMutPtr -> IO (Ptr a)
-writeFastMutPtr :: FastMutPtr -> Ptr a -> IO ()
 
 data FastMutInt = FastMutInt (MutableByteArray# RealWorld)
 
@@ -42,20 +35,4 @@ readFastMutInt (FastMutInt arr) = IO $ \s ->
 
 writeFastMutInt (FastMutInt arr) (I# i) = IO $ \s ->
   case writeIntArray# arr 0# i s of { s ->
-  (# s, () #) }
-
-data FastMutPtr = FastMutPtr (MutableByteArray# RealWorld)
-
-newFastMutPtr = IO $ \s ->
-  case newByteArray# size s of { (# s, arr #) ->
-  (# s, FastMutPtr arr #) }
-  -- GHC assumes 'sizeof (Int) == sizeof (Ptr a)'
-  where !(I# size) = finiteBitSize (0 :: Int)
-
-readFastMutPtr (FastMutPtr arr) = IO $ \s ->
-  case readAddrArray# arr 0# s of { (# s, i #) ->
-  (# s, Ptr i #) }
-
-writeFastMutPtr (FastMutPtr arr) (Ptr i) = IO $ \s ->
-  case writeAddrArray# arr 0# i s of { s ->
   (# s, () #) }
