@@ -95,3 +95,25 @@ int libdwLookupLocation(LibdwSession *session, Location *loc, StgPtr pc);
 
 /* Pretty-print a backtrace to the given FILE */
 void libdwPrintBacktrace(LibdwSession *session, FILE *file, Backtrace *bt);
+
+
+/* Start a dedicated thread running in the background, to print out backtraces
+ * as captured by each thread on SIGQUIT.
+ */
+void initBacktracePrinting(void);
+
+/* Obtain the thread-local libdw session.
+ *
+ * allocAsNeeded requires one to be allocated as necessary, so should be false
+ * when calling from a signal handler.
+ */
+LibdwSession *libdwThreadSession(bool allocAsNeeded STG_UNUSED);
+
+/* Capture backtrace of current thread and schedule the dump of it.
+ *
+ * This is designed to be async-signal-safe.
+ *
+ * TODO the implementation uses dwfl_getthread_frames() which still does
+ *      allocation, need a safe alternative.
+ */
+void libdwDumpBacktrace(void);

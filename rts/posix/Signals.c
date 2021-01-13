@@ -527,6 +527,8 @@ shutdown_handler(int sig STG_UNUSED)
     }
 }
 
+#define LOG_TO_STDERR(msg) write(STDERR_FILENO, msg, strlen(msg))
+
 /* -----------------------------------------------------------------------------
  * SIGQUIT handler.
  *
@@ -536,18 +538,20 @@ shutdown_handler(int sig STG_UNUSED)
 static void
 backtrace_handler(int sig STG_UNUSED)
 {
-#if USE_LIBDW
-
-/* propagate SIGQUIT to all threads running as a capability */
-#if defined(THREADED_RTS)
-    /* there is no good portable way to distinguish os sent SIGQUIT and ones
+#if USE_LIBDW && defined(THREADED_RTS) && (CC_SUPPORTS_TLS == 1) && \
+    ( defined(HAVE_PTHREAD_H) || defined(freebsd_HOST_OS) )
+    /**
+     * propagate SIGQUIT to all threads running as a capability
+     *
+     * there is no good portable way to distinguish os sent SIGQUIT and ones
      * propagated by us here, posix states that a signal can be delivered to
      * any thread not blocking it, though Linux always delivers to main thread
      * unless the main thread blocks it, we should not rely on that as to be
      * too Linux specific
      *
      * instead we track the monotonic time the signal reaches us, and only
-     * propagate with a minimum 1 second interval
+     * propagate with a minimum 1 second interval, effectively limiting the
+     * propagation rate at 1 Hz at maximum, thus to avoid a storm of echos
      */
     static StgWord64 propa_record;
     StgWord64 curr_time, propa_time;
@@ -563,38 +567,15 @@ backtrace_handler(int sig STG_UNUSED)
             if (!cap_task) { continue; }
             OSThreadId tid = ACQUIRE_LOAD(&cap_task->id);
             if (tid != currThId) {
-                /* TODO need separate impls regarding availability of pthread */
                 pthread_kill(tid, SIGQUIT);
             }
         }
     }
-#endif /* THREADED_RTS */
 
-    LibdwSession *session = libdwInit();
-    Backtrace *bt = libdwGetBacktrace(session);
-
-/* TODO fprintf is not safe to call from a signal handler */
-#if defined(THREADED_RTS)
-#  if defined(linux_HOST_OS)
-    /* more specific value more meaningful on Linux
-     * gettid() is not linkable atm, let's use just the syscall
-     */
-#   include <sys/syscall.h>
-    pid_t tid = syscall(SYS_gettid);
-    fprintf(stderr, "\nCaught SIGQUIT; Backtrace of thread %ld :\n", tid);
-#  else
-    OSThreadId currThId = osThreadId();
-    fprintf(stderr, "\nCaught SIGQUIT; Backtrace of thread %lu :\n", currThId);
-#  endif
+    /* capture backtrace of current thread and schedule the dump of it */
+    libdwDumpBacktrace();
 #else
-    fprintf(stderr, "\nCaught SIGQUIT; Backtrace:\n");
-#endif
-
-    libdwPrintBacktrace(session, stderr, bt);
-    backtraceFree(bt);
-    libdwFree(session);
-#else
-    fprintf(stderr, "This build does not support backtraces.\n");
+    LOG_TO_STDERR("This build does not support backtraces.\n");
 #endif
 }
 
@@ -768,7 +749,7 @@ initDefaultHandlers(void)
         sysErrorBelch("warning: failed to install SIGPIPE handler");
     }
 
-    // Print a backtrace on SIGQUIT
+    initBacktracePrinting();
     action.sa_handler = backtrace_handler;
     sigemptyset(&action.sa_mask);
     action.sa_flags = 0;
