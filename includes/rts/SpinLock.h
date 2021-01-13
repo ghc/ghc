@@ -79,9 +79,13 @@ INLINE_HEADER void ACQUIRE_SPIN_LOCK(SpinLock * p)
     StgWord32 r = 0;
     uint32_t i;
     do {
+        r = cas((StgVolatilePtr)p, 1, 0);
+        if (r != 0) return;
         for (i = 0; i < SPIN_COUNT; i++) {
-            r = cas((StgVolatilePtr)p, 1, 0);
-            if (r != 0) return;
+            if (VOLATILE_LOAD(p) != 0) {
+              r = cas((StgVolatilePtr)p, 1, 0);
+              if (r != 0) return;
+            }
             busy_wait_nop();
         }
         yieldThread();
