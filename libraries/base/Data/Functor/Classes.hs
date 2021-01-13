@@ -79,6 +79,9 @@ import Text.Read (Read(..), parens, prec, step)
 import Text.Read.Lex (Lexeme(..))
 import Text.Show (showListWith)
 
+-- $setup
+-- >>> import Prelude
+
 -- | Lifting of the 'Eq' class to unary type constructors.
 --
 -- @since 4.9.0.0
@@ -522,6 +525,10 @@ instance (Show a) => Show1 ((,) a) where
 
 
 -- | @since 4.16.0.0
+--
+-- >>> eq2 ('x', True, "str") ('x', True, "str")
+-- True
+--
 instance Eq a => Eq2 ((,,) a) where
     liftEq2 e1 e2 (u1, x1, y1) (v1, x2, y2) =
         u1 == v1 &&
