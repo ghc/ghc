@@ -181,7 +181,7 @@ simplTopBinds env0 binds0
                 -- anything into scope, then we don't get a complaint about that.
                 -- It's rather as if the top-level binders were imported.
                 -- See note [Glomming] in "GHC.Core.Opt.OccurAnal".
-        ; env1 <- {-#SCC "simplTopBinds-simplRecBndrs" #-} simplRecBndrs env0 (bindersOfBinds binds0)
+        ; !env1 <- {-#SCC "simplTopBinds-simplRecBndrs" #-} simplRecBndrs env0 (bindersOfBinds binds0)
         ; (floats, env2) <- {-#SCC "simplTopBinds-simpl_binds" #-} simpl_binds env1 binds0
         ; freeTick SimplifierDone
         ; return (floats, env2) }
@@ -194,12 +194,14 @@ simplTopBinds env0 binds0
     simpl_binds env []           = return (emptyFloats env, env)
     simpl_binds env (bind:binds) = do { (float,  env1) <- simpl_bind env bind
                                       ; (floats, env2) <- simpl_binds env1 binds
-                                      ; return (float `addFloats` floats, env2) }
+                                      ; let !floats1 = float `addFloats` floats
+                                      ; return (floats1, env2) }
 
     simpl_bind env (Rec pairs)
       = simplRecBind env TopLevel Nothing pairs
     simpl_bind env (NonRec b r)
-      = do { (env', b') <- addBndrRules env b (lookupRecBndr env b) Nothing
+      = do { let out_bndr = (lookupRecBndr env b)
+           ; (env', b') <- addBndrRules env b out_bndr Nothing
            ; simplRecOrTopPair env' TopLevel NonRecursive Nothing b b' r }
 
 {-
@@ -224,7 +226,8 @@ simplRecBind env0 top_lvl mb_cont pairs0
     add_rules :: SimplEnv -> (InBndr,InExpr) -> SimplM (SimplEnv, (InBndr, OutBndr, InExpr))
         -- Add the (substituted) rules to the binder
     add_rules env (bndr, rhs)
-        = do { (env', bndr') <- addBndrRules env bndr (lookupRecBndr env bndr) mb_cont
+        = do { let out_bndr = (lookupRecBndr env bndr)
+             ; (env', bndr') <- addBndrRules env bndr out_bndr mb_cont
              ; return (env', (bndr, bndr', rhs)) }
 
     go env [] = return (emptyFloats env, env)

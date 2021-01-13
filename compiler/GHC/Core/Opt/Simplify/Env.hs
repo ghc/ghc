@@ -567,9 +567,9 @@ extendFloats (SimplFloats { sfLetFloats  = floats
                 , sfLetFloats  = floats'
                 , sfJoinFloats = jfloats }
   where
-    !in_scope' = in_scope `extendInScopeSetBind` bind
-    !floats'   = floats  `addLetFlts`  unitLetFloat bind
-    !jfloats'  = jfloats `addJoinFlts` unitJoinFloat bind
+    in_scope' = in_scope `extendInScopeSetBind` bind
+    floats'   = floats  `addLetFlts`  unitLetFloat bind
+    jfloats'  = jfloats `addJoinFlts` unitJoinFloat bind
 
 addLetFloats :: SimplFloats -> LetFloats -> SimplFloats
 -- Add the let-floats for env2 to env1;
@@ -621,10 +621,10 @@ mkRecFloats floats@(SimplFloats { sfLetFloats  = LetFloats bs _ff
                 , sfJoinFloats = jfloats'
                 , sfInScope    = in_scope }
   where
-    floats'  | isNilOL bs  = emptyLetFloats
-             | otherwise   = unitLetFloat (Rec (flattenBinds (fromOL bs)))
-    jfloats' | isNilOL jbs = emptyJoinFloats
-             | otherwise   = unitJoinFloat (Rec (flattenBinds (fromOL jbs)))
+    !floats'  | isNilOL bs  = emptyLetFloats
+              | otherwise   = unitLetFloat (Rec (flattenBinds (fromOL bs)))
+    !jfloats' | isNilOL jbs = emptyJoinFloats
+              | otherwise   = unitJoinFloat (Rec (flattenBinds (fromOL jbs)))
 
 wrapFloats :: SimplFloats -> OutExpr -> OutExpr
 -- Wrap the floats around the expression; they should all
