@@ -34,7 +34,6 @@ import GHC.Types.Id
 import GHC.Types.Var.Env
 import GHC.Types.Unique.FM
 import GHC.Utils.Outputable
-import GHC.Data.Bag
 import GHC.Types.Unique
 
 import qualified Data.IntSet as S
@@ -64,11 +63,20 @@ isEmptyUnVarSet (UnVarSet s) = S.null s
 delUnVarSet :: UnVarSet -> Var -> UnVarSet
 delUnVarSet (UnVarSet s) v = UnVarSet $ k v `S.delete` s
 
+minusUnVarSet :: UnVarSet -> UnVarSet -> UnVarSet
+minusUnVarSet (UnVarSet s) (UnVarSet s') = UnVarSet $ s `S.difference` s'
+
+sizeUnVarSet :: UnVarSet -> Int
+sizeUnVarSet (UnVarSet s) = S.size s
+
 mkUnVarSet :: [Var] -> UnVarSet
 mkUnVarSet vs = UnVarSet $ S.fromList $ map k vs
 
 varEnvDom :: VarEnv a -> UnVarSet
 varEnvDom ae = UnVarSet $ ufmToSet_Directly ae
+
+extendUnVarSet :: Var -> UnVarSet -> UnVarSet
+extendUnVarSet v (UnVarSet s) = UnVarSet $ S.insert (k v) s
 
 unionUnVarSet :: UnVarSet -> UnVarSet -> UnVarSet
 unionUnVarSet (UnVarSet set1) (UnVarSet set2) = UnVarSet (set1 `S.union` set2)
@@ -80,14 +88,13 @@ instance Outputable UnVarSet where
     ppr (UnVarSet s) = braces $
         hcat $ punctuate comma [ ppr (getUnique i) | i <- S.toList s]
 
-
--- The graph type. A list of complete bipartite graphs
-data Gen = CBPG UnVarSet UnVarSet -- complete bipartite
-         | CG   UnVarSet          -- complete
-newtype UnVarGraph = UnVarGraph (Bag Gen)
+data UnVarGraph = CBPG  !UnVarSet !UnVarSet -- ^ complete bipartite graph
+                | CG    !UnVarSet           -- ^ complete graph
+                | Union UnVarGraph UnVarGraph
+                | Del   !UnVarSet UnVarGraph
 
 emptyUnVarGraph :: UnVarGraph
-emptyUnVarGraph = UnVarGraph emptyBag
+emptyUnVarGraph = CG emptyUnVarSet
 
 unionUnVarGraph :: UnVarGraph -> UnVarGraph -> UnVarGraph
 {-
@@ -101,45 +108,74 @@ unionUnVarGraph (UnVarGraph [CBPG s1 s2]) (UnVarGraph [CG s3, CG s4])
     = pprTrace "unionUnVarGraph fired2" empty $
       completeGraph (s1 `unionUnVarSet` s2)
 -}
-unionUnVarGraph (UnVarGraph g1) (UnVarGraph g2)
-    = -- pprTrace "unionUnVarGraph" (ppr (length g1, length g2)) $
-      UnVarGraph (g1 `unionBags` g2)
+unionUnVarGraph a b
+  | is_null a = b
+  | is_null b = a
+  | otherwise = Union a b
 
 unionUnVarGraphs :: [UnVarGraph] -> UnVarGraph
 unionUnVarGraphs = foldl' unionUnVarGraph emptyUnVarGraph
 
 -- completeBipartiteGraph A B = { {a,b} | a ∈ A, b ∈ B }
 completeBipartiteGraph :: UnVarSet -> UnVarSet -> UnVarGraph
-completeBipartiteGraph s1 s2 = prune $ UnVarGraph $ unitBag $ CBPG s1 s2
+completeBipartiteGraph s1 s2 = prune $ CBPG s1 s2
 
 completeGraph :: UnVarSet -> UnVarGraph
-completeGraph s = prune $ UnVarGraph $ unitBag $ CG s
+completeGraph s = prune $ CG s
 
+-- (v' ∈ neighbors G v) <=> v--v' ∈ G
 neighbors :: UnVarGraph -> Var -> UnVarSet
-neighbors (UnVarGraph g) v = unionUnVarSets $ concatMap go $ bagToList g
-  where go (CG s)       = (if v `elemUnVarSet` s then [s] else [])
-        go (CBPG s1 s2) = (if v `elemUnVarSet` s1 then [s2] else []) ++
-                          (if v `elemUnVarSet` s2 then [s1] else [])
+neighbors = go
+  where
+    go (Del d g) v
+      | v `elemUnVarSet` d = emptyUnVarSet
+      | otherwise          = go g v `minusUnVarSet` d
+    go (Union g1 g2) v     = go g1 v `unionUnVarSet` go g2 v
+    go (CG s) v            = if v `elemUnVarSet` s then s else emptyUnVarSet
+    go (CBPG s1 s2) v      = (if v `elemUnVarSet` s1 then s2 else emptyUnVarSet) `unionUnVarSet`
+                             (if v `elemUnVarSet` s2 then s1 else emptyUnVarSet)
 
 -- hasLoopAt G v <=> v--v ∈ G
 hasLoopAt :: UnVarGraph -> Var -> Bool
-hasLoopAt (UnVarGraph g) v = any go $ bagToList g
-  where go (CG s)       = v `elemUnVarSet` s
-        go (CBPG s1 s2) = v `elemUnVarSet` s1 && v `elemUnVarSet` s2
-
+hasLoopAt = go
+  where
+    go (Del d g) v
+      | v `elemUnVarSet` d  = False
+      | otherwise           = go g v
+    go (Union g1 g2) v      = go g1 v || go g2 v
+    go (CG s) v             = v `elemUnVarSet` s
+    go (CBPG s1 s2) v       = v `elemUnVarSet` s1 && v `elemUnVarSet` s2
 
 delNode :: UnVarGraph -> Var -> UnVarGraph
-delNode (UnVarGraph g) v = prune $ UnVarGraph $ mapBag go g
-  where go (CG s)       = CG (s `delUnVarSet` v)
-        go (CBPG s1 s2) = CBPG (s1 `delUnVarSet` v) (s2 `delUnVarSet` v)
+delNode (Del d g) v = Del (extendUnVarSet v d) g
+delNode g         v
+  | is_null g       = emptyUnVarGraph
+  | otherwise       = Del (mkUnVarSet [v]) g
 
+-- | Resolves all `Del`, by pushing them in, and simplifies `∅ ∪ … = …`
 prune :: UnVarGraph -> UnVarGraph
-prune (UnVarGraph g) = UnVarGraph $ filterBag go g
-  where go (CG s)       = not (isEmptyUnVarSet s)
-        go (CBPG s1 s2) = not (isEmptyUnVarSet s1) && not (isEmptyUnVarSet s2)
+prune = go emptyUnVarSet
+  where
+    go :: UnVarSet -> UnVarGraph -> UnVarGraph
+    go dels (Del dels' g) = go (dels `unionUnVarSet` dels') g
+    go dels (Union g1 g2)
+      | is_null g1' = g2'
+      | is_null g2' = g1'
+      | otherwise   = Union g1' g2'
+      where
+        g1' = go dels g1
+        g2' = go dels g2
+    go dels (CG s)        = CG (s `minusUnVarSet` dels)
+    go dels (CBPG s1 s2)  = CBPG (s1 `minusUnVarSet` dels) (s2 `minusUnVarSet` dels)
 
-instance Outputable Gen where
-    ppr (CG s)       = ppr s  <> char '²'
-    ppr (CBPG s1 s2) = ppr s1 <+> char 'x' <+> ppr s2
+-- | Shallow empty check.
+is_null :: UnVarGraph -> Bool
+is_null (CBPG s1 s2)  = isEmptyUnVarSet s1 || isEmptyUnVarSet s2
+is_null (CG   s)      = isEmptyUnVarSet s
+is_null _             = False
+
 instance Outputable UnVarGraph where
-    ppr (UnVarGraph g) = ppr g
+    ppr (Del d g) = text "Del" <+> ppr (sizeUnVarSet d) <+> parens (ppr g)
+    ppr (Union a b) = text "Union" <+> parens (ppr a) <+> parens (ppr b)
+    ppr (CG s) = text "CG" <+> ppr (sizeUnVarSet s)
+    ppr (CBPG a b) = text "CBPG" <+> ppr (sizeUnVarSet a) <+> ppr (sizeUnVarSet b)
