@@ -9,6 +9,7 @@ The code for *top-level* bindings is in GHC.Iface.Tidy.
 
 {-# LANGUAGE CPP #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+{-# OPTIONS_GHC -ddump-to-file -ddump-simpl -dumpdir out-dumps #-}
 module GHC.Core.Tidy (
         tidyExpr, tidyRules, tidyUnfolding
     ) where
@@ -31,6 +32,7 @@ import GHC.Types.Unique.FM
 import GHC.Types.Name hiding (tidyNameOcc)
 import GHC.Types.SrcLoc
 import GHC.Data.Maybe
+import GHC.Utils.Misc (strictMap)
 import Data.List
 
 {-
@@ -43,49 +45,52 @@ import Data.List
 
 tidyBind :: TidyEnv
          -> CoreBind
-         ->  (TidyEnv, CoreBind)
+         -> (TidyEnv, CoreBind)
 
 tidyBind env (NonRec bndr rhs)
   = tidyLetBndr env env bndr =: \ (env', bndr') ->
-    (env', NonRec bndr' (tidyExpr env' rhs))
+    (env', NonRec bndr' $! tidyExpr env' rhs)
 
 tidyBind env (Rec prs)
-  = let
-       (bndrs, rhss)  = unzip prs
-       (env', bndrs') = mapAccumL (tidyLetBndr env') env bndrs
+  = let (env', bndrs') = mapAccumL (\env'' (bndr, _rhs) -> tidyLetBndr env' env'' bndr) env prs
     in
-    map (tidyExpr env') rhss =: \ rhss' ->
+    map (tidyExpr env' . snd) prs =: \ rhss' ->
     (env', Rec (zip bndrs' rhss'))
 
 
 ------------  Expressions  --------------
 tidyExpr :: TidyEnv -> CoreExpr -> CoreExpr
-tidyExpr env (Var v)       = Var (tidyVarOcc env v)
-tidyExpr env (Type ty)     = Type (tidyType env ty)
-tidyExpr env (Coercion co) = Coercion (tidyCo env co)
+tidyExpr env (Var v)       = Var $! tidyVarOcc env v
+tidyExpr env (Type ty)     = Type $! tidyType env ty
+tidyExpr env (Coercion co) = Coercion $! tidyCo env co
 tidyExpr _   (Lit lit)     = Lit lit
-tidyExpr env (App f a)     = App (tidyExpr env f) (tidyExpr env a)
-tidyExpr env (Tick t e)    = Tick (tidyTickish env t) (tidyExpr env e)
-tidyExpr env (Cast e co)   = Cast (tidyExpr env e) (tidyCo env co)
+tidyExpr env (App f a)     = (App $! tidyExpr env f) $! tidyExpr env a
+tidyExpr env (Tick t e)    = (Tick $! tidyTickish env t) $! tidyExpr env e
+tidyExpr env (Cast e co)   = (Cast $! tidyExpr env e) $! tidyCo env co
 
 tidyExpr env (Let b e)
   = tidyBind env b      =: \ (env', b') ->
-    Let b' (tidyExpr env' e)
+    tidyExpr env' e     =: \ e' ->
+    Let b' e'
 
 tidyExpr env (Case e b ty alts)
-  = tidyBndr env b  =: \ (env', b) ->
-    Case (tidyExpr env e) b (tidyType env ty)
-         (map (tidyAlt env') alts)
+  = tidyExpr env e                =: \ e' ->
+    tidyType env ty               =: \ ty' ->
+    tidyBndr env b                =: \ (env', b) ->
+    strictMap (tidyAlt env') alts =: \ alts' ->
+    Case e' b ty' alts'
 
 tidyExpr env (Lam b e)
   = tidyBndr env b      =: \ (env', b) ->
-    Lam b (tidyExpr env' e)
+    tidyExpr env' e     =: \ e' ->
+    Lam b e'
 
 ------------  Case alternatives  --------------
 tidyAlt :: TidyEnv -> CoreAlt -> CoreAlt
 tidyAlt env (con, vs, rhs)
   = tidyBndrs env vs    =: \ (env', vs) ->
-    (con, vs, tidyExpr env' rhs)
+    tidyExpr env' rhs   =: \ rhs' ->
+    (con, vs, rhs')
 
 ------------  Tickish  --------------
 tidyTickish :: TidyEnv -> Tickish Id -> Tickish Id
@@ -104,8 +109,8 @@ tidyRule :: TidyEnv -> CoreRule -> CoreRule
 tidyRule _   rule@(BuiltinRule {}) = rule
 tidyRule env rule@(Rule { ru_bndrs = bndrs, ru_args = args, ru_rhs = rhs,
                           ru_fn = fn, ru_rough = mb_ns })
-  = tidyBndrs env bndrs         =: \ (env', bndrs) ->
-    map (tidyExpr env') args    =: \ args ->
+  = tidyBndrs env bndrs            =: \ (env', bndrs) ->
+    strictMap (tidyExpr env') args =: \ args ->
     rule { ru_bndrs = bndrs, ru_args = args,
            ru_rhs   = tidyExpr env' rhs,
            ru_fn    = tidyNameOcc env fn,
@@ -152,7 +157,7 @@ tidyIdBndr env@(tidy_env, var_env) id
         ty'      = tidyType env (idType id)
         mult'    = tidyType env (idMult id)
         name'    = mkInternalName (idUnique id) occ' noSrcSpan
-        id'      = mkLocalIdWithInfo name' mult' ty' new_info
+        !id'     = mkLocalIdWithInfo name' mult' ty' new_info
         var_env' = extendVarEnv var_env id id'
 
         -- Note [Tidy IdInfo]
@@ -179,7 +184,7 @@ tidyLetBndr rec_tidy_env env@(tidy_env, var_env) id
         mult'    = tidyType env (idMult id)
         name'    = mkInternalName (idUnique id) occ' noSrcSpan
         details  = idDetails id
-        id'      = mkLocalVar details name' mult' ty' new_info
+        !id'     = mkLocalVar details name' mult' ty' new_info
         var_env' = extendVarEnv var_env id id'
 
         -- Note [Tidy IdInfo]
