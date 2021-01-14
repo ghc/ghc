@@ -868,6 +868,13 @@ entry counters to the eventlog.
 
    Defines a ticky counter.
 
+.. event-type:: TICKY_COUNTER_BEGIN_SAMPLE
+
+   :tag: 212
+   :length: fixed
+
+   Denotes the beginning of an atomic set of ticky-ticky profiler counter samples.
+
 .. event-type:: TICKY_COUNTER_SAMPLE
 
    :tag: 211
@@ -878,4 +885,4 @@ entry counters to the eventlog.
    :field Word64: number of times this has been allocated (words). Only
      produced for modules compiled with :ghc-flag:`-ticky-allocd`.
 
-   Records the counter statistics at a moment in time.
+   Records the number of "ticks" recorded by a ticky-ticky counter single the last sample.

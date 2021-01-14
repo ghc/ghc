@@ -86,8 +86,10 @@ import Control.Applicative ((<|>))
 import Control.Monad (foldM, forM, guard, mzero, when)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State.Strict
+import Data.Coerce
 import Data.Either   (partitionEithers)
 import Data.Foldable (foldlM, minimumBy, toList)
+import Data.Monoid   (Any(..))
 import Data.List     (sortBy, find)
 import qualified Data.List.NonEmpty as NE
 import Data.Ord      (comparing)
@@ -120,9 +122,19 @@ isInhabited (MkNablas ds) = pure (not (null ds))
 
 -- See Note [Implementation of COMPLETE pragmas]
 
--- | Update the COMPLETE sets of 'ResidualCompleteMatches'.
-updRcm :: (CompleteMatch -> CompleteMatch) -> ResidualCompleteMatches -> ResidualCompleteMatches
-updRcm f (RCM vanilla pragmas) = RCM (f <$> vanilla) (fmap f <$> pragmas)
+-- | Update the COMPLETE sets of 'ResidualCompleteMatches', or 'Nothing'
+-- if there was no change as per the update function.
+updRcm :: (CompleteMatch          -> (Bool, CompleteMatch))
+       -> ResidualCompleteMatches -> (Maybe ResidualCompleteMatches)
+updRcm f (RCM vanilla pragmas)
+  | not any_change = Nothing
+  | otherwise      = Just (RCM vanilla' pragmas')
+  where
+    f' ::  CompleteMatch          -> (Any,  CompleteMatch)
+    f' = coerce f
+    (chgd, vanilla')  = traverse f' vanilla
+    (chgds, pragmas') = traverse (traverse f') pragmas
+    any_change        = getAny $ chgd `mappend` chgds
 
 -- | A pseudo-'CompleteMatch' for the vanilla complete set of the given data
 -- 'TyCon'.
@@ -160,10 +172,17 @@ addTyConMatches tc rcm = add_tc_match <$> addCompleteMatches rcm
     add_tc_match rcm
       = rcm{rcm_vanilla = rcm_vanilla rcm <|> vanillaCompleteMatchTC tc}
 
-markMatched :: ConLike -> ResidualCompleteMatches -> DsM ResidualCompleteMatches
-markMatched cl rcm = do
+markMatched :: PmAltCon -> ResidualCompleteMatches -> DsM (Maybe ResidualCompleteMatches)
+-- Nothing means the PmAltCon didn't occur in any COMPLETE set.
+-- See Note [Shortcutting the inhabitation test] for how this is useful for
+-- performance on T17836.
+markMatched (PmAltLit _)      _   = pure Nothing -- lits are never part of a COMPLETE set
+markMatched (PmAltConLike cl) rcm = do
   rcm' <- addConLikeMatches cl rcm
-  pure $ updRcm (flip delOneFromUniqDSet cl) rcm'
+  let go cm = case lookupUniqDSet cm cl of
+        Nothing -> (False, cm)
+        Just _  -> (True,  delOneFromUniqDSet cm cl)
+  pure $ updRcm go rcm'
 
 {-
 Note [Implementation of COMPLETE pragmas]
@@ -747,6 +766,10 @@ addNotConCt nabla x nalt = do
     Just x  -> markDirty x nabla'
     Nothing -> nabla'
   where
+    -- | Update `x`'s 'VarInfo' entry. Fail ('MaybeT') if contradiction,
+    -- otherwise return updated entry and `Just x'` if `x` should be marked dirty,
+    -- where `x'` is the representative of `x`.
+    go :: VarInfo -> MaybeT DsM (Maybe Id, VarInfo)
     go vi@(VI x' pos neg _ rcm) = do
       -- 1. Bail out quickly when nalt contradicts a solution
       let contradicts nalt sol = eqPmAltCon (paca_con sol) nalt == Equal
@@ -762,13 +785,16 @@ addNotConCt nabla x nalt = do
       MASSERT( isPmAltConMatchStrict nalt )
       let vi' = vi{ vi_neg = neg', vi_bot = IsNotBot }
       -- 3. Make sure there's at least one other possible constructor
-      case nalt of
-        PmAltConLike cl -> do
-          -- Mark dirty to force a delayed inhabitation test
-          rcm' <- lift (markMatched cl rcm)
-          pure (Just x', vi'{ vi_rcm = rcm' })
-        _ ->
-          pure (Nothing, vi')
+      mb_rcm' <- lift (markMatched nalt rcm)
+      pure $ case mb_rcm' of
+        -- If nalt could be removed from a COMPLETE set, we'll get back Just and
+        -- have to mark x dirty, by returning Just x'.
+        Just rcm' -> (Just x',  vi'{ vi_rcm = rcm' })
+        -- Otherwise, nalt didn't occur in any residual COMPLETE set and we
+        -- don't have to mark it dirty. So we return Nothing, which in the case
+        -- above would have compromised precision.
+        -- See Note [Shortcutting the inhabitation test], grep for T17836.
+        Nothing   -> (Nothing, vi')
 
 hasRequiredTheta :: PmAltCon -> Bool
 hasRequiredTheta (PmAltConLike cl) = notNull req_theta
@@ -1226,25 +1252,20 @@ inhabitationTest fuel  old_ty_st nabla@MkNabla{ nabla_tm_st = ts } = do
     test_one vi =
       lift (varNeedsTesting old_ty_st nabla vi) >>= \case
         True -> do
-          -- tracPm "test_one" (ppr vi)
+          -- lift $ tracePm "test_one" (ppr vi)
           -- No solution yet and needs testing
           -- We have to test with a Nabla where all dirty bits are cleared
           instantiate (fuel-1) nabla_not_dirty vi
         _ -> pure vi
 
 -- | Checks whether the given 'VarInfo' needs to be tested for inhabitants.
---
---     1. If it already has a solution, we don't have to test.
---     2. If it's marked dirty because of new negative term constraints, we have
---        to test.
---     3. Otherwise, if the type state didn't change, we don't need to test.
---     4. If the type state changed, we compare normalised source types. No need
---        to test if unchanged.
+-- Returns `False` when we can skip the inhabitation test, presuming it would
+-- say "yes" anyway. See Note [Shortcutting the inhabitation test].
 varNeedsTesting :: TyState -> Nabla -> VarInfo -> DsM Bool
-varNeedsTesting _         _                              vi
-  | notNull (vi_pos vi)                     = pure False
 varNeedsTesting _         MkNabla{nabla_tm_st=tm_st}     vi
   | elemDVarSet (vi_id vi) (ts_dirty tm_st) = pure True
+varNeedsTesting _         _                              vi
+  | notNull (vi_pos vi)                     = pure False
 varNeedsTesting old_ty_st MkNabla{nabla_ty_st=new_ty_st} _
   -- Same type state => still inhabited
   | not (tyStateRefined old_ty_st new_ty_st) = pure False
@@ -1517,11 +1538,114 @@ guessConLikeUnivTyArgsFromResTy _   norm_res_ty (PatSynCon ps)  = do
   subst <- tcMatchTy con_res_ty norm_res_ty
   traverse (lookupTyVar subst) univ_tvs
 
-{- Note [Fuel for the inhabitation test]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Whether or not a type is inhabited is undecidable in general. As a result, we
-can run into infinite loops in `inhabitationTest`. Therefore, we adopt a
-fuel-based approach to prevent that.
+{- Note [Soundness and completeness]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Soundness and completeness of the pattern-match checker depends entirely on the
+soundness and completeness of the inhabitation test.
+
+Achieving both soundness and completeness at the same time is undecidable.
+See also T17977 and Note [Fuel for the inhabitation test].
+Losing soundness would make the algorithm pointless; hence we give up on
+completeness, but try to get as close as possible (how close is called
+the 'precision' of the algorithm).
+
+Soundness means that you
+  1. Can remove clauses flagged as redundant without changing program semantics
+     (no false positives).
+  2. Can be sure that your program is free of incomplete pattern matches
+     when the checker doesn't flag any inexhaustive definitions
+     (no false negatives).
+
+A complete algorithm would mean that
+  1. When a clause can be deleted without changing program semantics, it will
+     be flagged as redundant (no false negatives).
+  2. A program that is free of incomplete pattern matches will never have a
+     definition be flagged as inexhaustive (no false positives).
+
+Via the LYG algorithm, we reduce both these properties to a property on
+the inhabitation test of refinementment types:
+  *Soundness*:    If the inhabitation test says "no" for a given refinement type
+                  Nabla, then it provably has no inhabitant.
+  *Completeness*: If the inhabitation test says "yes" for a given refinement type
+                  Nabla, then it provably has an inhabitant.
+Our test is sound, but incomplete, so there are instances where we say
+"yes" but in fact the Nabla is empty. Which entails false positive exhaustivity
+and false negative redundancy warnings, as above.
+
+In summary, we have the following correspondence:
+
+Property     | Exhaustiveness warnings | Redundancy warnings | Inhabitation test |
+-------------|-------------------------|---------------------|-------------------|
+Soundness    | No false negatives      | No false positives  | Only says "no"    |
+             |                         |                     | if there is no    |
+             |                         |                     | inhabitant        |
+Completeness | No false positives      | No false negatives  | Only says "yes"   |
+             |                         |                     | if there is an    |
+             |                         |                     | inhabitant        |
+
+Note [Shortcutting the inhabitation test]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Generally, we have to re-test a refinement type for inhabitants whenever we
+add a new constraint. Often, we can say "no" early, upon trying to add a
+contradicting constraint, see Note [The Pos/Neg invariant]. Still, COMPLETE
+sets and type evidence are best handled in a delayed fashion, because of
+the recursive nature of the test and our fuel-based approach.
+But even then there are some cases in which we can skip the full test,
+because we are sure that the refinement type is still inhabited. These
+conditions are monitored by 'varNeedsTesting'. It returns
+
+- `True` whenever a full inhabitation test is needed
+- `False` whenever the test can be skipped, amounting to an inhabitation test
+  that says "yes".
+
+According to Note [Soundness and Completeness], this test will never compromise
+soundness: The `True` case just forwards to the actual inhabitation test and the
+`False` case amounts to an inhabitation test that is trivially sound, because it
+never says "no".
+
+Of course, if the returns says `False`, Completeness (and thus Precision) of the
+algorithm is affected, but we get to skip costly inhabitation tests. We try to
+trade as little Precision as possible against as much Performance as possible.
+Here are the tests, in order:
+
+  1. If a variable is dirty (because of a newly added negative term constraint),
+     we have to test.
+  2. If a variable has positive information, we don't have to test: The
+     positive information acts as constructive proof for inhabitation.
+  3. If the type state didn't change, there is no need to test.
+  4. If the variable's normalised type didn't change, there is no need to test.
+  5. Otherwise, we have to test.
+
+Why (1) before (2)?
+-------------------
+Consider the reverse for (T18960):
+  pattern P x = x
+  {-# COMPLETE P :: () #-}
+  foo = case () of x@(P _) -> ()
+This should be exhaustive. But if we say "We know `x` has solution `()`, so it's
+inhabited", then we'll get a warning saying that `()` wasn't matched.
+But the match on `P` added the new negative information to the uncovered set,
+in the process of which we marked `x` as dirty. By giving the dirty flag a
+higher priority than positive info, we get to test again and see that `x` is
+uninhabited and the match is exhaustive.
+
+But suppose that `P` wasn't mentioned in any COMPLETE set. Then we simply
+don't mark `x` as dirty and will emit a warning again (which we would anyway),
+without running a superfluous inhabitation test. That speeds up T17836
+considerably.
+
+Why (2) before (3) and (4)?
+---------------------------
+Simply because (2) is more efficient to test than (3) (not by a lot), which
+is more efficient to test than (4), which is still more efficient than running
+the full inhabitation test (5).
+
+Note [Fuel for the inhabitation test]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Whether or not a type is inhabited is undecidable in general, see also
+Note [Soundness and Completeness]. As a result, we can run into infinite
+loops in `inhabitationTest`. Therefore, we adopt a fuel-based approach to
+prevent that.
 
 Consider the following example:
 

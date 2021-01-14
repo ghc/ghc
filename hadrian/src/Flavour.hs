@@ -11,6 +11,7 @@ module Flavour
   , viaLlvmBackend
   , enableProfiledGhc
   , disableDynamicGhcPrograms
+  , disableProfiledLibs
   ) where
 
 import Expression
@@ -90,6 +91,7 @@ flavourTransformers = M.fromList
     , "llvm" =: viaLlvmBackend
     , "profiled_ghc" =: enableProfiledGhc
     , "no_dynamic_ghc" =: disableDynamicGhcPrograms
+    , "no_profiled_libs" =: disableProfiledLibs
     ]
   where (=:) = (,)
 
@@ -117,13 +119,14 @@ parseFlavour baseFlavours transformers str =
     parser = do
       base <- baseFlavour
       transs <- P.many flavourTrans
+      P.eof
       return $ foldr ($) base transs
 
     baseFlavour :: Parser Flavour
     baseFlavour =
         P.choice [ f <$ P.try (P.string (name f))
-                 | f <- baseFlavours
-                 ]
+                 | f <- reverse (sortOn name baseFlavours)
+                 ]      -- needed to parse e.g. "quick-debug" before "quick"
 
     flavourTrans :: Parser (Flavour -> Flavour)
     flavourTrans = do
@@ -211,3 +214,8 @@ enableProfiledGhc flavour = flavour { ghcProfiled = True }
 -- | Disable 'dynamicGhcPrograms'.
 disableDynamicGhcPrograms :: Flavour -> Flavour
 disableDynamicGhcPrograms flavour = flavour { dynamicGhcPrograms = pure False }
+
+-- | Don't build libraries in profiled 'Way's.
+disableProfiledLibs :: Flavour -> Flavour
+disableProfiledLibs flavour =
+    flavour { libraryWays = filter (not . wayUnit Profiling) <$> libraryWays flavour }
