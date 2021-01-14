@@ -94,6 +94,7 @@ import GHC.Core.TyCo.Rep( TyCoBinder(..), TyBinder )
 import GHC.Core.Coercion
 import GHC.Core.TyCon
 import GHC.Core.Multiplicity
+import {-# SOURCE #-} GHC.Core.Opt.CprAnal ( exprTerminates )
 import GHC.Types.Unique
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -1650,11 +1651,13 @@ app_ok primop_ok fun args
 
       _other -> isUnliftedType (idType fun)          -- c.f. the Var case of exprIsHNF
              || idArity fun > n_val_args             -- Partial apps
+             || pprTrace "cpr_term" (ppr fun $$ ppr n_val_args $$ ppr cpr_term) cpr_term
              -- NB: even in the nullary case, do /not/ check
              --     for evaluated-ness of the fun;
              --     see Note [exprOkForSpeculation and evaluated variables]
              where
                n_val_args = valArgCount args
+               cpr_term = exprTerminates (mkApps (varToCoreExpr fun) args)
   where
     (arg_tys, _) = splitPiTys (idType fun)
 

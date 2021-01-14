@@ -7,7 +7,7 @@
 -- See https://www.microsoft.com/en-us/research/publication/constructed-product-result-analysis-haskell/.
 -- CPR analysis should happen after strictness analysis.
 -- See Note [Phase ordering].
-module GHC.Core.Opt.CprAnal ( cprAnalProgram ) where
+module GHC.Core.Opt.CprAnal ( cprAnalProgram, exprTerminates ) where
 
 #include "HsVersions.h"
 
@@ -326,7 +326,7 @@ cprAnalBind top_lvl env widening id rhs
 
     -- See Note [Arity trimming for CPR signatures]
     -- See Note [Ensuring termination of fixed-point iteration]
-    sig    = widening $ mkCprSigForArity (ae_dflags env) (idArity id) rhs_ty'
+    sig    = widening $ mkCprSigForArity (maybe 0 caseBinderCprDepth (ae_dflags env)) (idArity id) rhs_ty'
     id'    = -- pprTrace "cprAnalBind" (ppr id $$ ppr rhs_ty' $$ ppr sig) $
              setIdCprInfo id sig
     env'   = extendSigEnv env id sig
@@ -337,11 +337,14 @@ cprAnalBind top_lvl env widening id rhs
     not_strict  = not (isStrUsedDmd (idDemandInfo id))
     -- See Note [CPR for sum types]
     (_, ret_ty) = splitPiTys (idType id)
-    returns_prod
-      | Just (tc, _, _) <- normSplitTyConApp_maybe (ae_fam_envs env) ret_ty
-      = isJust (tyConSingleAlgDataCon_maybe tc)
-      | otherwise
-      = False
+    returns_prod = case ae_fam_envs env of
+      Just fam_envs
+        | Just (tc, _, _) <- normSplitTyConApp_maybe fam_envs ret_ty
+        -> isJust (tyConSingleAlgDataCon_maybe tc)
+      Nothing
+        | Just (tc, _) <- splitTyConApp_maybe ret_ty
+        -> isJust (tyConSingleAlgDataCon_maybe tc)
+      _ -> False
     returns_sum = not (isTopLevel top_lvl) && not returns_prod
 
 isDataStructure :: Id -> CoreExpr -> Bool
@@ -361,7 +364,9 @@ cprDataStructureUnfolding_maybe id = do
   return unf
 
 unboxingStrategy :: AnalEnv -> UnboxingStrategy Demand
-unboxingStrategy env = wantToUnboxArg (ae_fam_envs env) has_inlineable_prag
+unboxingStrategy env
+  | Just fam_envs <- ae_fam_envs env = wantToUnboxArg fam_envs has_inlineable_prag
+  | otherwise                        = \_ _ -> StopUnboxing
   where
     -- Rather than maintaining in AnalEnv whether we are in an INLINEABLE
     -- function, we just assume that we are. That flag is only relevant
@@ -450,14 +455,14 @@ Hence we always trim the CPR signature of a binding to idArity.
 
 data AnalEnv
   = AE
-  { ae_sigs   :: SigEnv
+  { ae_sigs   :: !SigEnv
   -- ^ Current approximation of signatures for local ids
-  , ae_virgin :: Bool
+  , ae_virgin :: !Bool
   -- ^ True only on every first iteration in a fixed-point
   -- iteration. See Note [Initialising strictness] in "GHC.Core.Opt.DmdAnal"
-  , ae_dflags :: DynFlags
+  , ae_dflags :: !(Maybe DynFlags)
   -- ^ For 'caseBinderCprDepth'.
-  , ae_fam_envs :: FamInstEnvs
+  , ae_fam_envs :: !(Maybe FamInstEnvs)
   -- ^ Needed when expanding type families and synonyms of product types.
   }
 
@@ -474,8 +479,8 @@ emptyAnalEnv dflags fam_envs
   = AE
   { ae_sigs = emptyVarEnv
   , ae_virgin = True
-  , ae_dflags = dflags
-  , ae_fam_envs = fam_envs
+  , ae_dflags = Just dflags
+  , ae_fam_envs = Just fam_envs
   }
 
 lookupSigEnv :: AnalEnv -> Id -> Maybe CprSig
@@ -505,8 +510,9 @@ extendEnvForDataAlt env case_bndr case_bndr_ty dc bndrs
     case_bndr_ty'
       -- Only give the case binder the CPR property if it would be unboxed.
       -- See Note [Which types are unboxed?]
-      | ty'@(CprType 0 cpr) <- markOptimisticConCprType dc case_bndr_ty
-      , Unbox{} <- wantToUnboxResult (ae_fam_envs env) (idType case_bndr) cpr
+      | Just fam_envs <- ae_fam_envs env
+      , ty'@(CprType 0 cpr) <- markOptimisticConCprType dc case_bndr_ty
+      , Unbox{} <- wantToUnboxResult fam_envs (idType case_bndr) cpr
       = ty'
       -- Will not be unboxed, so giving it the CPR property introduces reboxing.
       | otherwise
@@ -797,3 +803,19 @@ point: all of these functions can have the CPR property.
     f1 (MkT3 x y) | h x y     = f3 (MkT3 x (y-1))
                   | otherwise = x
 -}
+
+---------------------------------
+-- * 'exprTerminates'
+--   Entry-point for 'exprOkForSpeculation'
+--
+
+exprTerminates :: CoreExpr -> Bool
+exprTerminates e = ct_arty ty > 0 || fst (forceCpr topSubDmd (ct_cpr ty)) == Terminates
+  where
+    env = AE
+        { ae_sigs = emptyVarEnv
+        , ae_virgin = True
+        , ae_dflags = Nothing
+        , ae_fam_envs = Nothing
+        }
+    (ty, _) = cprAnal env [] e

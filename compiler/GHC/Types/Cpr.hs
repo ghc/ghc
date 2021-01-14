@@ -31,7 +31,6 @@ import GHC.Types.Unbox
 import GHC.Core.DataCon
 import GHC.Core.Type
 import GHC.Core.Multiplicity
-import GHC.Driver.Session
 import GHC.Utils.Binary
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -51,10 +50,6 @@ data KnownShape r
   | TopSh
   deriving Eq
 
-seqKnownShape :: (r -> ()) -> KnownShape r -> ()
-seqKnownShape seq_r (ConSh _ args) = foldr (seq . seq_r) () args
-seqKnownShape _     _              = ()
-
 lubKnownShape :: (r -> r -> r) -> KnownShape r -> KnownShape r -> KnownShape r
 lubKnownShape _     BotSh            sh               = sh
 lubKnownShape _     sh               BotSh            = sh
@@ -70,6 +65,10 @@ pruneKnownShape :: (Int -> r -> r) -> Int -> KnownShape r -> KnownShape r
 pruneKnownShape _       0     _              = TopSh
 pruneKnownShape prune_r depth (ConSh t args) = ConSh t (map (prune_r (depth - 1)) args)
 pruneKnownShape _       _     sh             = sh
+
+seqKnownShape :: (r -> ()) -> KnownShape r -> ()
+seqKnownShape seq_r (ConSh _ args) = foldr (seq . seq_r) () args
+seqKnownShape _     _              = ()
 
 ---------------
 -- * Optimism
@@ -155,31 +154,9 @@ seqTerm (Term _ l) = seqKnownShape seqTerm l
 --  * Cpr is different from Termination in that we give up once one result
 --    isn't constructed
 --  * These are the key values to support, in case of a redesign. Write them down first:
---      topTerm, botTerm, whnfTerm, topCpr, botCpr, conCpr
---  * That is: For Termination we might or might not have nested info,
---    independent of termination of the current level. This is why Maybe
---    So, i.e. when we return a function (or newtype there-of) we'd have
---    something like @Termination Terminates Nothing@. We know evaluation
---    terminates, but we don't have any information on shape.
---    In fact, it's the same as
---  * Factoring Termination this way (i.e., TerminationFlag x shape) means less
---    duplication
--- Alternative: Interleave everything. Looks like this:
--- data Blub (b::Bool)
---   = NoCpr (Blub 'False)
---   | Cpr  ConTag TerminationFlag (Blub b)
---   | Term ConTag TerminationFlag (Blub b)
---   | TopBlub
---   | BotBlub
---  + More compact
---  + No Maybe (well, not here, still in Termination)
---  + Easier to handle in WW: Termination and Cpr encode compatible shape info
---    by construction
---  - Harder to understand: NoCpr means we can still have Termination info
---  - Spreads Termination stuff between two lattices
--- ... Probably not such a good idea, after all.
+--      topTerm, botTerm, topCpr, botCpr, whnfTermCpr, conCpr
 --
--- We keep TerminationFlag in Cpr if we can't transform beyond a MightDiverge anyway?
+-- Why keep TerminationFlag in Cpr if we can't transform beyond a MightDiverge anyway?
 -- Because a seq might make a constructed product available again. WW makes sure to
 -- split only as long as termination allows it, so we should be safe.
 
@@ -543,11 +520,11 @@ newtype CprSig = CprSig { getCprSig :: CprType }
 -- | Turns a 'CprType' computed for the particular 'Arity' into a 'CprSig'
 -- unleashable at that arity. See Note [Understanding DmdType and StrictSig] in
 -- "GHC.Types.Demand"
-mkCprSigForArity :: DynFlags -> Arity -> CprType -> CprSig
-mkCprSigForArity dflags arty
+mkCprSigForArity :: Int -> Arity -> CprType -> CprSig
+mkCprSigForArity case_bndr_cpr_depth arty
   = CprSig
   . ensureCprTyArity arty
-  . zonkOptimisticCprTy (caseBinderCprDepth dflags)
+  . zonkOptimisticCprTy case_bndr_cpr_depth
 
 topCprSig :: CprSig
 topCprSig = CprSig topCprType
