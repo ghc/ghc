@@ -1084,22 +1084,11 @@ integerEncodeDouble# (IN b) e  = negateDouble# (bigNatEncodeDouble# b e)
 integerEncodeDouble :: Integer -> Int -> Double
 integerEncodeDouble !m (I# e)  = D# (integerEncodeDouble# m e)
 
--- | Encode an Integer (mantissa) into a Double#
-integerToDouble# :: Integer -> Double#
-{-# NOINLINE integerToDouble# #-}
-integerToDouble# !i = integerEncodeDouble# i 0#
-
--- | Encode an Integer (mantissa) into a Float#
-integerToFloat# :: Integer -> Float#
-{-# NOINLINE integerToFloat# #-}
-integerToFloat# !i = integerEncodeFloat# i 0#
-
 -- | Encode (# Integer mantissa, Int# exponent #) into a Float#
 --
 -- TODO: Not sure if it's worth to write 'Float' optimized versions here
 integerEncodeFloat# :: Integer -> Int# -> Float#
 {-# NOINLINE integerEncodeFloat# #-}
-integerEncodeFloat# !m 0# = double2Float# (integerToDouble# m)
 integerEncodeFloat# !m e  = double2Float# (integerEncodeDouble# m e)
 
 -- | Compute the number of digits of the Integer (without the sign) in the given base.
