@@ -62,6 +62,7 @@ import GHC.Num.Integer (Integer)
 import qualified GHC.Num.Integer as I
 import GHC.Prim
 import GHC.Types
+import {-# SOURCE #-} GHC.Float (integerToFloat#, integerToDouble#)
 
 smallInteger :: Int# -> Integer
 smallInteger = I.integerFromInt#
@@ -96,13 +97,13 @@ encodeFloatInteger :: Integer -> Int# -> Float#
 encodeFloatInteger = I.integerEncodeFloat#
 
 floatFromInteger :: Integer -> Float#
-floatFromInteger = I.integerToFloat#
+floatFromInteger = integerToFloat#
 
 encodeDoubleInteger :: Integer -> Int# -> Double#
 encodeDoubleInteger = I.integerEncodeDouble#
 
 doubleFromInteger :: Integer -> Double#
-doubleFromInteger = I.integerToDouble#
+doubleFromInteger = integerToDouble#
 
 decodeDoubleInteger :: Double# -> (# Integer, Int# #)
 decodeDoubleInteger = I.integerDecodeDouble#
