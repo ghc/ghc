@@ -407,7 +407,14 @@ popCountDefault = go 0
 {-# INLINABLE popCountDefault #-}
 
 -- | A more concise version of 'complement zeroBits'.
--- @since 9.2
+-- 
+-- >>> complement zeroBits :: Word == oneBits :: Word
+-- True
+--
+-- >>> complement oneBits :: Word == zeroBits :: Word
+-- True
+--
+-- @since 4.16
 oneBits :: (Bits a) => a
 oneBits = complement zeroBits
 {-# INLINE oneBits #-}
@@ -731,56 +738,72 @@ own to enable constant folding; for example 'shift':
 -- >   }
 
 -- | Monoid under bitwise AND.
--- @since 9.2
+--
+-- >>> getConj (Conj 0xab <> Conj 0x12) :: Word8
+-- 2
+--
+-- @since 4.16
 newtype Conj a = Conj { getConj :: a }
   deriving newtype (Bounded, Enum, Bits, FiniteBits, Eq)
 
--- | @since 9.2
+-- | @since 4.16
 instance (Bits a) => Semigroup (Conj a) where
   Conj x <> Conj y = Conj (x .&. y)
 
--- | @since 9.2
+-- | @since 4.16
 instance (Bits a) => Monoid (Conj a) where
   mempty = Conj . complement $ zeroBits
 
 -- | Monoid under bitwise OR.
--- @since 9.2
+--
+-- >>> getDisj (Disj 0xab <> Disj 0x12) :: Word8
+-- 187
+--
+-- @since 4.16
 newtype Disj a = Disj { getDisj :: a }
   deriving newtype (Bounded, Enum, Bits, FiniteBits, Eq)
 
--- | @since 9.2
+-- | @since 4.16
 instance (Bits a) => Semigroup (Disj a) where
   Disj x <> Disj y = Disj (x .|. y)
 
--- | @since 9.2
+-- | @since 4.16
 instance (Bits a) => Monoid (Disj a) where
   mempty = Disj zeroBits
 
 -- | Monoid under bitwise XOR.
--- @since 9.2
+--
+-- >>> getXor (Xor 0xab <> 0x12) :: Word8
+-- 185
+--
+-- @since 4.16
 newtype Xor a = Xor { getXor :: a }
   deriving newtype (Bounded, Enum, Bits, FiniteBits, Eq)
 
--- | @since 9.2
+-- | @since 4.16
 instance (Bits a) => Semigroup (Xor a) where
   Xor x <> Xor y = Xor (x `xor` y)
 
--- | @since 9.2
+-- | @since 4.16
 instance (Bits a) => Monoid (Xor a) where
   mempty = Xor zeroBits
 
--- | Monoid under bitwise \'equality\'; defined as '1' if the corresponding 
--- bits match, and '0' otherwise.
--- @since 9.2
+-- | Monoid under bitwise \'equality\'; defined as @1@ if the corresponding 
+-- bits match, and @0@ otherwise.
+--
+-- >>> getIff (Iff 0xab <> Iff 0x12) :: Word8
+-- 70
+--
+-- @since 4.16
 newtype Iff a = Iff { getIff :: a }
   deriving newtype (Bounded, Enum, Bits, FiniteBits, Eq)
 
--- | @since 9.2
+-- | @since 4.16
 instance (Bits a) => Semigroup (Iff a) where
   {-# INLINEABLE (<>) #-}
   Iff x <> Iff y = Iff . complement $ (x `xor` y)
 
--- | @since 9.2
+-- | @since 4.16
 instance (Bits a) => Monoid (Iff a) where
   {-# INLINEABLE mempty #-}  
   mempty = Iff . complement $ zeroBits
