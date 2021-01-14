@@ -164,7 +164,7 @@ getGADTConType (ConDeclH98 {}) = panic "getGADTConType"
 getMainDeclBinderI :: HsDecl DocNameI -> [IdP DocNameI]
 getMainDeclBinderI (TyClD _ d) = [tcdNameI d]
 getMainDeclBinderI (ValD _ d) =
-  case collectHsBindBinders d of
+  case collectHsBindBinders CollNoDictBinders d of
     []       -> []
     (name:_) -> [name]
 getMainDeclBinderI (SigD _ d) = sigNameNoLoc d

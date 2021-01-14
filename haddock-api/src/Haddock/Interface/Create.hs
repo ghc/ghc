@@ -956,7 +956,7 @@ fullModuleContents is_sig modMap pkgName thisMod semMod warnings gre exportedNam
         doc <- liftErrMsg (processDocStringParas dflags pkgName gre docStr)
         return [[ExportDoc doc]]
       (L _ (ValD _ valDecl))
-        | name:_ <- collectHsBindBinders valDecl
+        | name:_ <- collectHsBindBinders CollNoDictBinders valDecl
         , Just (L _ SigD{}:_) <- filter isSigD <$> M.lookup name declMap
         -> return []
       _ ->
