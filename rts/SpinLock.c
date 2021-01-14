@@ -24,13 +24,35 @@
 
 #if defined(THREADED_RTS)
 
+#if defined(PROF_SPIN)
+
+static ATTR_ALWAYS_INLINE StgWord try_acquire_spin_slow_path(SpinLock * p)
+{
+    StgWord r;
+    r = cas((StgVolatilePtr)&(p->lock), 1, 0);
+    if (r == 0) RELAXED_ADD(&p->spin, 1);
+    return r;
+}
+
+#else /* !PROF_SPIN */
+
+static ATTR_ALWAYS_INLINE StgWord try_acquire_spin_slow_path(SpinLock * p)
+{
+    StgWord r;
+    r = RELAXED_LOAD(&p->lock);
+    if (r != 0) {
+        r = cas((StgVolatilePtr)&(p->lock), 1, 0);
+    }
+    return r;
+}
+
+#endif
+
 void acquire_spin_lock_slow_path(SpinLock * p)
 {
     do {
         for (uint32_t i = 0; i < SPIN_COUNT; i++) {
-            StgWord32 r = cas((StgVolatilePtr)&(p->lock), 1, 0);
-            if (r != 0) return;
-            IF_PROF_SPIN(RELAXED_ADD(&p->spin, 1));
+            if (try_acquire_spin_slow_path(p) != 0) return;
             busy_wait_nop();
         }
         IF_PROF_SPIN(RELAXED_ADD(&p->yield, 1));
