@@ -662,7 +662,7 @@ rewrite_vector ki roles tys
                                   tys
        }
   where
-    (bndrs, inner_ki, any_named_bndrs) = split_pi_tys' ki  -- "RAE" fix
+    (bndrs, inner_ki, any_named_bndrs) = split_pi_tys' ki
     fvs                                = tyCoVarsOfType ki
 {-# INLINE rewrite_vector #-}
 

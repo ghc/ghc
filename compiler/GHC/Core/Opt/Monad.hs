@@ -59,7 +59,6 @@ import GHC.Core.Unfold
 import GHC.Types.Basic  ( CompilerPhase(..) )
 import GHC.Types.Annotations
 import GHC.Types.Var
-import GHC.Types.Unique (uniqFromMask)
 import GHC.Types.Unique.Supply
 import GHC.Types.Name.Env
 import GHC.Types.SrcLoc

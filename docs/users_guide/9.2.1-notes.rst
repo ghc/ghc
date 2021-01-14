@@ -50,7 +50,7 @@ Language
 Compiler
 ~~~~~~~~
 
-- New ``-Wredundant-bang-patterns`` flag that enables checks for "dead" bangs.
+- New :ghc-flag:`-Wredundant-bang-patterns` flag that enables checks for "dead" bangs.
   For instance, given this program: ::
 
       f :: Bool -> Bool
@@ -61,14 +61,12 @@ Compiler
   since the argument was already forced in the first equation. For more
   details see :ghc-flag:`-Wredundant-bang-patterns`.
 
-- New ``-finline-generics`` and ``-finline-generics-aggressively`` flags for
-  improving performance of generics-based algorithms.
+- New :ghc-flag:`-finline-generics` and
+  :ghc-flag:`-finline-generics-aggressively` flags for improving performance of
+  generics-based algorithms.
 
   For more details see :ghc-flag:`-finline-generics` and
   :ghc-flag:`-finline-generics-aggressively`.
-
-- Type checker plugins which work with the natural numbers now
-  should use ``naturalTy`` kind instead of ``typeNatKind``, which has been removed.
 
 - GHCi's ``:kind!`` command now expands through type synonyms in addition to type
   families. See :ghci-cmd:`:kind`.
@@ -77,9 +75,15 @@ Compiler
   that the compiler automatically insert cost-centres on all call-sites of
   the named function.
 
-- There is a significant refactoring in the solver; any type-checker plugins
-  will have to be updated, as GHC no longer uses flattening skolems or
-  flattening metavariables.
+Runtime system
+~~~~~~~~~~~~~~
+
+- The heap profiler now has proper treatment of pinned ``ByteArray#``\ s. Such
+  heap objects will now be correctly attributed to their appropriate cost
+  centre instead of merely being lumped into the ``PINNED`` category.
+  Moreover, we now correctly account for the size of the array, meaning that
+  space lost to fragmentation is no longer counted as live data.
+
 
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
@@ -89,6 +93,13 @@ Compiler
 
 ``ghc`` library
 ~~~~~~~~~~~~~~~
+
+- There is a significant refactoring in the solver; any type-checker plugins
+  will have to be updated, as GHC no longer uses flattening skolems or
+  flattening metavariables.
+
+- Type checker plugins which work with the natural numbers now
+  should use ``naturalTy`` kind instead of ``typeNatKind``, which has been removed.
 
 - The ``con_args`` field of ``ConDeclGADT`` has been renamed to ``con_g_args``.
   This is because the type of ``con_g_args`` is now different from the type of

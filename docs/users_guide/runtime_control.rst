@@ -411,6 +411,17 @@ performance.
     Note that :rts-flag:`--nonmoving-gc` cannot be used with ``-G1``,
     :rts-flag:`profiling <-hc>` nor :rts-flag:`-c`.
 
+.. rts-flag:: -w
+
+    :default: off
+    :since: a long time ago
+    :reverse: none
+
+    Uses a mark-region garbage collection strategy for the oldest-generation heap.
+    Note that this cannot be used in conjunction with heap profiling
+    (:rts-flag:`-hT`) unless linked against the profiling runtime system with
+    :ghc-flag:`-prof`.
+
 .. rts-flag:: -xn
 
     :default: off
@@ -1237,9 +1248,9 @@ When the program is linked with the :ghc-flag:`-eventlog` option
     nanoseconds since the start of executation of the running program.
     This is the elapsed time, not the CPU time.
 
-.. rts-flag:: -ol ⟨filename⟩
+.. rts-flag:: -ol⟨filename⟩
 
-    :default: :file:`<program>.eventlog`
+    :default: :file:`⟨program⟩.eventlog`
     :since: 8.8
 
     Sets the destination for the eventlog produced with the

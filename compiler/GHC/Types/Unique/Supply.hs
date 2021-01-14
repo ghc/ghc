@@ -3,11 +3,8 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 -}
 
-{-# OPTIONS_GHC -fno-state-hack #-}
-    -- This -fno-state-hack is important
-    -- See Note [Optimising the unique supply]
-
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE BangPatterns #-}
@@ -22,7 +19,7 @@ module GHC.Types.Unique.Supply (
 
         -- ** Operations on supplies
         uniqFromSupply, uniqsFromSupply, -- basic ops
-        takeUniqFromSupply,
+        takeUniqFromSupply, uniqFromMask,
 
         mkSplitUniqSupply,
         splitUniqSupply, listSplitUniqSupply,
@@ -40,7 +37,7 @@ module GHC.Types.Unique.Supply (
 import GHC.Prelude
 
 import GHC.Types.Unique
-import GHC.Utils.Panic.Plain (panic)
+import GHC.Utils.Panic.Plain
 
 import GHC.IO
 
@@ -48,9 +45,17 @@ import GHC.Utils.Monad
 import Control.Monad
 import Data.Bits
 import Data.Char
-import GHC.Exts( inline )
+import GHC.Exts( Ptr(..), noDuplicate# )
+#if MIN_VERSION_GLASGOW_HASKELL(9,1,0,0)
+import GHC.Exts( Int(..), word2Int#, fetchAddWordAddr#, plusWord#, readWordOffAddr# )
+#if defined(DEBUG)
+import GHC.Utils.Misc
+#endif
+#endif
+import Foreign.Storable
 
 #include "Unique.h"
+#include "HsVersions.h"
 
 {-
 ************************************************************************
@@ -83,7 +88,22 @@ lazily-evaluated infinite tree.
 
 Note [Optimising the unique supply]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 The inner loop of mkSplitUniqSupply is a function closure
+
+     mk_supply s0 =
+        case noDuplicate# s0 of { s1 ->
+        case unIO genSym s1 of { (# s2, u #) ->
+        case unIO (unsafeDupableInterleaveIO (IO mk_supply)) s2 of { (# s3, x #) ->
+        case unIO (unsafeDupableInterleaveIO (IO mk_supply)) s3 of { (# s4, y #) ->
+        (# s4, MkSplitUniqSupply (mask .|. u) x y #)
+        }}}}
+
+It's a classic example of an IO action that is captured and then called
+repeatedly (see #18238 for some discussion). It mustn't allocate!  The test
+perf/should_run/UniqLoop keeps track of this loop.  Watch it carefully.
+
+We used to write it as:
 
      mk_supply :: IO UniqSupply
      mk_supply = unsafeInterleaveIO $
@@ -92,100 +112,11 @@ The inner loop of mkSplitUniqSupply is a function closure
                  mk_supply   >>= \ s2 ->
                  return (MkSplitUniqSupply (mask .|. u) s1 s2)
 
-It's a classic example of an IO action that is captured
-and the called repeatedly (see #18238 for some discussion).
-It turns out that we can get something like
+and to rely on -fno-state-hack, full laziness and inlining to get the same
+result. It was very brittle and required enabling -fno-state-hack globally. So
+it has been rewritten using lower level constructs to explicitly state what we
+want.
 
-  $wmkSplitUniqSupply c# s
-    = letrec
-        mk_supply
-          = \s -> unsafeDupableInterleaveIO1
-                    (\s2 -> case noDuplicate# s2 of s3 ->
-                            ...
-                            case mk_supply s4 of (# s5, t1 #) ->
-                            ...
-                            (# s6, MkSplitUniqSupply ... #)
-      in mk_supply s
-
-This is bad becuase we allocate that inner (\s2...) every time.
-Why doesn't full laziness float out the (\s2...)?  Because of
-the state hack (#18238).
-
-So for this module we switch the state hack off -- it's an example
-of when it makes things worse rather than better.  And we use
-multiShotIO (see Note [multiShotIO]) thus:
-
-     mk_supply = multiShotIO $
-                 unsafeInterleaveIO $
-                 genSym      >>= \ u ->
-                 ...
-
-Now full laziness can float that lambda out, and we get
-
-  $wmkSplitUniqSupply c# s
-    = letrec
-        lvl = \s2 -> case noDuplicate# s2 of s3 ->
-                     ...
-                     case unsafeDupableInterleaveIO
-                              lvl s4 of (# s5, t1 #) ->
-                     ...
-                     (# s6, MkSplitUniqSupply ... #)
-      in unsafeDupableInterleaveIO1 lvl s
-
-This is all terribly delicate.  It just so happened that before I
-fixed #18078, and even with the state-hack still enabled, we were
-getting this:
-
-  $wmkSplitUniqSupply c# s
-    = letrec
-        mk_supply = \s2 -> case noDuplicate# s2 of s3 ->
-                           ...
-                           case mks_help s3 of (# s5,t1 #) ->
-                           ...
-                           (# s6, MkSplitUniqSupply ... #)
-        mks_help = unsafeDupableInterleaveIO mk_supply
-           -- mks_help marked as loop breaker
-      in mks_help s
-
-The fact that we didn't need full laziness was somewhat fortuitious.
-We got the right number of allocations. But the partial application of
-the arity-2 unsafeDupableInterleaveIO in mks_help makes it quite a
-bit slower.  (Test perf/should_run/UniqLoop had a 20% perf change.)
-
-Sigh.  The test perf/should_run/UniqLoop keeps track of this loop.
-Watch it carefully.
-
-Note [multiShotIO]
-~~~~~~~~~~~~~~~~~~
-The function multiShotIO :: IO a -> IO a
-says that the argument IO action may be invoked repeatedly (is
-multi-shot), and so there should be a multi-shot lambda around it.
-It's quite easy to define, in any module with `-fno-state-hack`:
-    multiShotIO :: IO a -> IO a
-    {-# INLINE multiShotIO #-}
-    multiShotIO (IO m) = IO (\s -> inline m s)
-
-Because of -fno-state-hack, that '\s' will be multi-shot. Now,
-ignoring the casts from IO:
-    multiShotIO (\ss{one-shot}. blah)
-    ==> let m = \ss{one-shot}. blah
-        in \s. inline m s
-    ==> \s. (\ss{one-shot}.blah) s
-    ==> \s. blah[s/ss]
-
-The magic `inline` function does two things
-* It prevents eta reduction.  If we wrote just
-      multiShotIO (IO m) = IO (\s -> m s)
-  the lamda would eta-reduce to 'm' and all would be lost.
-
-* It helps ensure that 'm' really does inline.
-
-Note that 'inline' evaporates in phase 0.  See Note [inlineId magic]
-in GHC.Core.Opt.ConstantFold.match_inline.
-
-The INLINE pragma on multiShotIO is very important, else the
-'inline' call will evaporate when compiling the module that
-defines 'multiShotIO', before it is ever exported.
 -}
 
 
@@ -208,28 +139,58 @@ mkSplitUniqSupply :: Char -> IO UniqSupply
 -- See Note [How the unique supply works]
 -- See Note [Optimising the unique supply]
 mkSplitUniqSupply c
-  = mk_supply
+  = unsafeDupableInterleaveIO (IO mk_supply)
+
   where
-     !mask = ord c `shiftL` uNIQUE_BITS
+     !mask = ord c `unsafeShiftL` uNIQUE_BITS
 
         -- Here comes THE MAGIC: see Note [How the unique supply works]
         -- This is one of the most hammered bits in the whole compiler
         -- See Note [Optimising the unique supply]
-        -- NB: Use unsafeInterleaveIO for thread-safety.
-     mk_supply = multiShotIO $
-                 unsafeInterleaveIO $
-                 genSym      >>= \ u ->
-                 mk_supply   >>= \ s1 ->
-                 mk_supply   >>= \ s2 ->
-                 return (MkSplitUniqSupply (mask .|. u) s1 s2)
+        -- NB: Use noDuplicate# for thread-safety.
+     mk_supply s0 =
+        case noDuplicate# s0 of { s1 ->
+        case unIO genSym s1 of { (# s2, u #) ->
+        -- deferred IO computations
+        case unIO (unsafeDupableInterleaveIO (IO mk_supply)) s2 of { (# s3, x #) ->
+        case unIO (unsafeDupableInterleaveIO (IO mk_supply)) s3 of { (# s4, y #) ->
+        (# s4, MkSplitUniqSupply (mask .|. u) x y #)
+        }}}}
 
-multiShotIO :: IO a -> IO a
-{-# INLINE multiShotIO #-}
--- See Note [multiShotIO]
-multiShotIO (IO m) = IO (\s -> inline m s)
-
+#if !MIN_VERSION_GLASGOW_HASKELL(9,1,0,0)
 foreign import ccall unsafe "genSym" genSym :: IO Int
-foreign import ccall unsafe "initGenSym" initUniqSupply :: Int -> Int -> IO ()
+#else
+genSym :: IO Int
+genSym = do
+    let !mask = (1 `unsafeShiftL` uNIQUE_BITS) - 1
+    let !(Ptr counter) = ghc_unique_counter
+    let !(Ptr inc_ptr) = ghc_unique_inc
+    u <- IO $ \s0 -> case readWordOffAddr# inc_ptr 0# s0 of
+        (# s1, inc #) -> case fetchAddWordAddr# counter inc s1 of
+            (# s2, val #) ->
+                let !u = I# (word2Int# (val `plusWord#` inc)) .&. mask
+                in (# s2, u #)
+#if defined(DEBUG)
+    -- Uh oh! We will overflow next time a unique is requested.
+    -- (Note that if the increment isn't 1 we may miss this check)
+    MASSERT(u /= mask)
+#endif
+    return u
+#endif
+
+foreign import ccall unsafe "&ghc_unique_counter" ghc_unique_counter :: Ptr Word
+foreign import ccall unsafe "&ghc_unique_inc"     ghc_unique_inc     :: Ptr Int
+
+initUniqSupply :: Word -> Int -> IO ()
+initUniqSupply counter inc = do
+    poke ghc_unique_counter counter
+    poke ghc_unique_inc     inc
+
+uniqFromMask :: Char -> IO Unique
+uniqFromMask mask
+  = do { uqNum <- genSym
+       ; return $! mkUnique mask uqNum }
+
 
 splitUniqSupply :: UniqSupply -> (UniqSupply, UniqSupply)
 -- ^ Build two 'UniqSupply' from a single one, each of which
