@@ -20,3 +20,4 @@ bool needStubForRelAarch64(MachORelocationInfo * rel);
 bool makeStubAarch64(Stub * s);
 
 #endif
+

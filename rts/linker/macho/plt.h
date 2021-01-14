@@ -32,3 +32,4 @@ void freeStubs(Section * section);
 #endif // OBJECTFORMAT_MACHO
 
 #endif // aarch64_HOST_ARCH
+

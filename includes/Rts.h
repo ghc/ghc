@@ -34,7 +34,7 @@ extern "C" {
  * because of some specific defines like MMAP_ANON, MMAP_ANONYMOUS. */
 #define _DARWIN_C_SOURCE 1
 #endif
-  
+
 #if !defined(IN_STG_CODE)
 #define IN_STG_CODE 0
 #endif
