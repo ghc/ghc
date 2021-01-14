@@ -4646,14 +4646,27 @@ validHoleFitsImpliedGFlags
 default_PIC :: Platform -> [GeneralFlag]
 default_PIC platform =
   case (platformOS platform, platformArch platform) of
-    (OSDarwin, ArchX86_64) -> [Opt_PIC]
-    (OSOpenBSD, ArchX86_64) -> [Opt_PIC] -- Due to PIE support in
-                                         -- OpenBSD since 5.3 release
-                                         -- (1 May 2013) we need to
-                                         -- always generate PIC. See
-                                         -- #10597 for more
-                                         -- information.
-    _                      -> []
+    -- Darwin always requires PIC.  Especially on more recent macOS releases
+    -- there will be a 4GB __ZEROPAGE that prevents us from using 32bit addresses
+    -- while we could work around this on x86_64 (like WINE does), we won't be
+    -- able on aarch64, where this is enforced.    
+    (OSDarwin,  ArchX86_64) -> [Opt_PIC]
+    -- For AArch64, we need to always have PIC enabled.  The relocation model
+    -- on AArch64 does not permit arbitrary relocations.  Under ASLR, we can't
+    -- control much how far apart symbols are in memory for our in-memory static
+    -- linker;  and thus need to ensure we get sufficiently capable relocations.
+    -- This requires PIC on AArch64, and ExternalDynamicRefs on Linux as on top
+    -- of that.  Subsequently we expect all code on aarch64/linux (and macOS) to
+    -- be built with -fPIC.
+    (OSDarwin,  ArchAArch64) -> [Opt_PIC]
+    (OSLinux,   ArchAArch64) -> [Opt_PIC, Opt_ExternalDynamicRefs]    
+    (OSOpenBSD, ArchX86_64)  -> [Opt_PIC] -- Due to PIE support in
+                                          -- OpenBSD since 5.3 release
+                                          -- (1 May 2013) we need to
+                                          -- always generate PIC. See
+                                          -- #10597 for more
+                                          -- information.
+    _                        -> []
 
 
 -- We usually want to use RPath, except on macOS (OSDarwin).  On recent macOS
