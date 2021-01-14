@@ -1,5 +1,10 @@
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DerivingStrategies #-} 
+{-# LANGUAGE GeneralizedNewtypeDeriving #-} 
+{-# LANGUAGE NoImplicitPrelude #-}  
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, DerivingStrategies, GeneralizedNewtypeDeriving, NoImplicitPrelude, BangPatterns, MagicHash #-}
 
 -----------------------------------------------------------------------------
 -- |
