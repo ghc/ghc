@@ -191,8 +191,8 @@ tidyOpenTypes env tys
 
 ---------------
 tidyOpenType :: TidyEnv -> Type -> (TidyEnv, Type)
-tidyOpenType env ty = let (env', [ty']) = tidyOpenTypes env [ty] in
-                      (env', ty')
+tidyOpenType env ty = let !(!env', ![ty']) = tidyOpenTypes env [ty]
+                      in (env', ty')
 
 ---------------
 -- | Calls 'tidyType' on a top-level type (i.e. with an empty tidying environment)
@@ -212,15 +212,15 @@ tidyCo env@(_, subst) co
   = go co
   where
     go_mco MRefl    = MRefl
-    go_mco (MCo co) = MCo (go co)
+    go_mco (MCo co) = MCo $! (go co)
 
-    go (Refl ty)             = Refl (tidyType env ty)
-    go (GRefl r ty mco)      = GRefl r (tidyType env ty) $! go_mco mco
+    go (Refl ty)             = Refl $! tidyType env ty
+    go (GRefl r ty mco)      = (GRefl r $! tidyType env ty) $! go_mco mco
     go (TyConAppCo r tc cos) = let args = strictMap go cos
                                    -- See Note [Strict mapping during tidying]
                                in args `seq` TyConAppCo r tc args
     go (AppCo co1 co2)       = (AppCo $! go co1) $! go co2
-    go (ForAllCo tv h co)    = ((ForAllCo $! tvp) $! (go h)) $! (tidyCo envp co)
+    go (ForAllCo tv h co)    = ((ForAllCo $! tvp) $! go h) $! (tidyCo envp co)
                                where (envp, tvp) = tidyVarBndr env tv
             -- the case above duplicates a bit of work in tidying h and the kind
             -- of tv. But the alternative is to use coercionKind, which seems worse.
@@ -232,7 +232,7 @@ tidyCo env@(_, subst) co
     go (AxiomInstCo con ind cos) = let args = strictMap go cos
                                        -- See Note [Strict mapping during tidying]
                                    in  args `seq` AxiomInstCo con ind args
-    go (UnivCo p r t1 t2)    = (((UnivCo $! (go_prov p)) $! r) $!
+    go (UnivCo p r t1 t2)    = (((UnivCo $! go_prov p) $! r) $!
                                 tidyType env t1) $! tidyType env t2
     go (SymCo co)            = SymCo $! go co
     go (TransCo co1 co2)     = (TransCo $! go co1) $! go co2
@@ -245,6 +245,6 @@ tidyCo env@(_, subst) co
                                    -- See Note [Strict mapping during tidying]
                                in cos1 `seq` AxiomRuleCo ax cos1
 
-    go_prov (PhantomProv co)    = PhantomProv (go co)
-    go_prov (ProofIrrelProv co) = ProofIrrelProv (go co)
+    go_prov (PhantomProv co)    = PhantomProv $! (go co)
+    go_prov (ProofIrrelProv co) = ProofIrrelProv $! (go co)
     go_prov p@(PluginProv _)    = p
