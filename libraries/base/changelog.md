@@ -25,6 +25,9 @@
     `newAlignedPinnedByteArray#` actually always assumed this but we didn't
     document this fact in the user facing API until now.
 
+  * `fromInteger :: Integer -> Float/Double` now consistently round to the
+    nearest value, with ties to even.
+
 ## 4.15.0.0 *TBA*
 
   * `openFile` now calls the `open` system call with an `interruptible` FFI
