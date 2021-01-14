@@ -1,5 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP
+{-# LANGUAGE BangPatterns
+           , CPP
            , GHCForeignImportPrim
            , NoImplicitPrelude
            , MagicHash
@@ -299,6 +300,15 @@ instance Num Float where
     {-# INLINE fromInteger #-}
     fromInteger i = F# (integerToFloat# i)
 
+-- | Convert an Integer to a Float#
+integerToFloat# :: Integer -> Float#
+{-# NOINLINE integerToFloat# #-}
+integerToFloat# (IS i)   = int2Float# i
+integerToFloat# i@(IP _) = case integerToBinaryFloat' i of
+                             F# x -> x
+integerToFloat# (IN bn)  = case integerToBinaryFloat' (IP bn) of
+                             F# x -> negateFloat# x
+
 -- | @since 2.01
 instance  Real Float  where
     toRational (F# x#)  =
@@ -494,6 +504,14 @@ instance  Num Double  where
     {-# INLINE fromInteger #-}
     fromInteger i = D# (integerToDouble# i)
 
+-- | Convert an Integer to a Double#
+integerToDouble# :: Integer -> Double#
+{-# NOINLINE integerToDouble# #-}
+integerToDouble# (IS i)   = int2Double# i
+integerToDouble# i@(IP _) = case integerToBinaryFloat' i of
+                              D# x -> x
+integerToDouble# (IN bn)  = case integerToBinaryFloat' (IP bn) of
+                              D# x -> negateDouble# x
 
 -- | @since 2.01
 instance  Real Double  where
@@ -920,7 +938,39 @@ floatToDigits base x =
  (map fromIntegral (reverse rds), k)
 
 ------------------------------------------------------------------------
--- Converting from a Rational to a RealFloa
+-- Converting from an Integer to a RealFloat
+------------------------------------------------------------------------
+
+{-# SPECIALISE integerToBinaryFloat' :: Integer -> Float,
+                                        Integer -> Double #-}
+-- | Converts a positive integer to a floating-point value.
+--
+-- The value nearest to the argument will be returned.
+-- If there are two such values, the one with an even significand will
+-- be returned (i.e. IEEE roundTiesToEven).
+--
+-- The argument must be strictly positive, and @floatRadix (undefined :: a)@ must be 2.
+integerToBinaryFloat' :: RealFloat a => Integer -> a
+integerToBinaryFloat' n = result
+  where
+    mantDigs = floatDigits result
+    k = I# (word2Int# (integerLog2# n))
+    result = if k < mantDigs then
+               encodeFloat n 0
+             else
+               let !e@(I# e#) = k - mantDigs + 1
+                   q = n `unsafeShiftR` e
+                   n' = case roundingMode# n (e# -# 1#) of
+                          0# -> q
+                          1# -> if integerToInt q .&. 1 == 0 then
+                                  q
+                                else
+                                  q + 1
+                          _ {- 2# -} -> q + 1
+               in encodeFloat n' e
+
+------------------------------------------------------------------------
+-- Converting from a Rational to a RealFloat
 ------------------------------------------------------------------------
 
 {-
