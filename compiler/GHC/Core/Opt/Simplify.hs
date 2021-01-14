@@ -979,12 +979,6 @@ simplExprF env e cont
 simplExprF1 :: SimplEnv -> InExpr -> SimplCont
             -> SimplM (SimplFloats, OutExpr)
 
-simplExprF1 _ (Type ty) cont
-  = pprPanic "simplExprF: type" (ppr ty <+> text"cont: " <+> ppr cont)
-    -- simplExprF does only with term-valued expressions
-    -- The (Type ty) case is handled separately by simplExpr
-    -- and by the other callers of simplExprF
-
 simplExprF1 env (Var v)        cont = {-#SCC "simplIdF" #-} simplIdF env v cont
 simplExprF1 env (Lit lit)      cont = {-#SCC "rebuild" #-} rebuild env (Lit lit) cont
 simplExprF1 env (Tick t expr)  cont = {-#SCC "simplTick" #-} simplTick env t expr cont
@@ -1069,6 +1063,12 @@ simplExprF1 env (Let (NonRec bndr rhs) body) cont
 
   | otherwise
   = {-#SCC "simplNonRecE" #-} simplNonRecE env bndr (rhs, env) ([], body) cont
+
+simplExprF1 _ (Type ty) cont
+  = pprPanic "simplExprF: type" (ppr ty <+> text"cont: " <+> ppr cont)
+    -- simplExprF does only with term-valued expressions
+    -- The (Type ty) case is handled separately by simplExpr
+    -- and by the other callers of simplExprF
 
 {- Note [Avoiding space leaks in OutType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
