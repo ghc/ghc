@@ -322,6 +322,17 @@ The trick is very similar to the built-in "state hack"
 (see Note [The state-transformer hack] in "GHC.Core.Opt.Arity") but is
 applicable on a monad-by-monad basis under programmer control.
 
+Do note, however, that each 'oneShot' only applies to a single lambda.
+Consequently, it may be necessary to apply it more than once. For instance, in
+the case of a monad that takes multiple arguments, e.g.
+
+    newtype M a =  M (Env -> UniqSupply -> IO (a, UniqSupply))
+
+we have would have the following smart constructor,
+
+    mkM :: Env -> UniqSupply -> IO (a, UniqSupply)
+    mkM env us = M $ oneShot $ \env -> oneShot $ \us -> f env us
+
 Using pattern synonyms
 ~~~~~~~~~~~~~~~~~~~~~~
 Using a smart constructor is fine, but there is no way to check that we
