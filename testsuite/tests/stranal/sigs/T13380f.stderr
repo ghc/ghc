@@ -15,9 +15,9 @@ T13380f.$trModule: *
 T13380f.f: *c1(*, #c1(#))
 T13380f.g: *c1(*, #c1(#))
 T13380f.h: *c1(*, #c1(#))
-T13380f.interruptibleCall: *c1(*, *)
-T13380f.safeCall: *c1(*, *)
-T13380f.unsafeCall: *c1(*, *)
+T13380f.interruptibleCall: *c1(*, #c1())
+T13380f.safeCall: *c1(*, #c1())
+T13380f.unsafeCall: *c1(*, #c1())
 
 
 
