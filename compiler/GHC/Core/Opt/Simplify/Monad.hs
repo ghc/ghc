@@ -76,7 +76,7 @@ pattern SM :: (SimplTopEnv -> UniqSupply -> SimplCount
 -- See Note [The one-shot state monad trick] in GHC.Utils.Monad
 pattern SM m <- SM' m
   where
-    SM m = SM' (oneShot m)
+    SM m = SM' $ oneShot $ \env -> oneShot $ \us -> oneShot $ \count -> m env us count
 
 data SimplTopEnv
   = STE { st_flags     :: DynFlags
