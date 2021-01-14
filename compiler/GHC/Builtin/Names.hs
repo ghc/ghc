@@ -375,8 +375,6 @@ basicKnownKeyNames
         integerModName,
         integerDivModName,
         integerQuotRemName,
-        integerToFloatName,
-        integerToDoubleName,
         integerEncodeFloatName,
         integerEncodeDoubleName,
         integerGcdName,
@@ -397,6 +395,8 @@ basicKnownKeyNames
         naturalQuotRemName,
         bignatFromWordListName,
         -- Float/Double
+        integerToFloatName,
+        integerToDoubleName,
         rationalToFloatName,
         rationalToDoubleName,
 
@@ -1148,8 +1148,6 @@ integerFromNaturalName
    , integerModName
    , integerDivModName
    , integerQuotRemName
-   , integerToFloatName
-   , integerToDoubleName
    , integerEncodeFloatName
    , integerEncodeDoubleName
    , integerGcdName
@@ -1215,8 +1213,6 @@ integerDivName            = bniVarQual "integerDiv"                integerDivIdK
 integerModName            = bniVarQual "integerMod"                integerModIdKey
 integerDivModName         = bniVarQual "integerDivMod#"            integerDivModIdKey
 integerQuotRemName        = bniVarQual "integerQuotRem#"           integerQuotRemIdKey
-integerToFloatName        = bniVarQual "integerToFloat#"           integerToFloatIdKey
-integerToDoubleName       = bniVarQual "integerToDouble#"          integerToDoubleIdKey
 integerEncodeFloatName    = bniVarQual "integerEncodeFloat#"       integerEncodeFloatIdKey
 integerEncodeDoubleName   = bniVarQual "integerEncodeDouble#"      integerEncodeDoubleIdKey
 integerGcdName            = bniVarQual "integerGcd"                integerGcdIdKey
@@ -1259,7 +1255,9 @@ floatingClassName  = clsQual gHC_FLOAT (fsLit "Floating")  floatingClassKey
 realFloatClassName = clsQual gHC_FLOAT (fsLit "RealFloat") realFloatClassKey
 
 -- other GHC.Float functions
-rationalToFloatName, rationalToDoubleName :: Name
+integerToFloatName, integerToDoubleName, rationalToFloatName, rationalToDoubleName :: Name
+integerToFloatName   = varQual gHC_FLOAT (fsLit "integerToFloat#") integerToFloatIdKey
+integerToDoubleName  = varQual gHC_FLOAT (fsLit "integerToDouble#") integerToDoubleIdKey
 rationalToFloatName  = varQual gHC_FLOAT (fsLit "rationalToFloat") rationalToFloatIdKey
 rationalToDoubleName = varQual gHC_FLOAT (fsLit "rationalToDouble") rationalToDoubleIdKey
 
@@ -2247,6 +2245,10 @@ coercionTokenIdKey    = mkPreludeMiscIdUnique 124
 
 noinlineIdKey                 = mkPreludeMiscIdUnique 125
 
+integerToFloatIdKey, integerToDoubleIdKey :: Unique
+integerToFloatIdKey    = mkPreludeMiscIdUnique 128
+integerToDoubleIdKey   = mkPreludeMiscIdUnique 129
+
 rationalToFloatIdKey, rationalToDoubleIdKey :: Unique
 rationalToFloatIdKey   = mkPreludeMiscIdUnique 130
 rationalToDoubleIdKey  = mkPreludeMiscIdUnique 131
@@ -2445,8 +2447,6 @@ integerFromNaturalIdKey
    , integerModIdKey
    , integerDivModIdKey
    , integerQuotRemIdKey
-   , integerToFloatIdKey
-   , integerToDoubleIdKey
    , integerEncodeFloatIdKey
    , integerEncodeDoubleIdKey
    , integerGcdIdKey
@@ -2496,8 +2496,6 @@ integerDivIdKey            = mkPreludeMiscIdUnique 621
 integerModIdKey            = mkPreludeMiscIdUnique 622
 integerDivModIdKey         = mkPreludeMiscIdUnique 623
 integerQuotRemIdKey        = mkPreludeMiscIdUnique 624
-integerToFloatIdKey        = mkPreludeMiscIdUnique 625
-integerToDoubleIdKey       = mkPreludeMiscIdUnique 626
 integerEncodeFloatIdKey    = mkPreludeMiscIdUnique 627
 integerEncodeDoubleIdKey   = mkPreludeMiscIdUnique 628
 integerGcdIdKey            = mkPreludeMiscIdUnique 629
