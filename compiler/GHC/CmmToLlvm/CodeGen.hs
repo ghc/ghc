@@ -1509,9 +1509,9 @@ genMachOp_slow opt op [x, y] = case op of
     MO_And _   -> genBinMach LM_MO_And
     MO_Or  _   -> genBinMach LM_MO_Or
     MO_Xor _   -> genBinMach LM_MO_Xor
-    MO_Shl _   -> genBinMach LM_MO_Shl
-    MO_U_Shr _ -> genBinMach LM_MO_LShr
-    MO_S_Shr _ -> genBinMach LM_MO_AShr
+    MO_Shl _   -> genBinCastYMach LM_MO_Shl
+    MO_U_Shr _ -> genBinCastYMach LM_MO_LShr
+    MO_S_Shr _ -> genBinCastYMach LM_MO_AShr
 
     MO_V_Add l w   -> genCastBinMach (LMVector l (widthToLlvmInt w)) LM_MO_Add
     MO_V_Sub l w   -> genCastBinMach (LMVector l (widthToLlvmInt w)) LM_MO_Sub
@@ -1555,15 +1555,23 @@ genMachOp_slow opt op [x, y] = case op of
 #endif
 
     where
-        binLlvmOp ty binOp = do
+        binLlvmOp ty binOp allow_y_cast = do
           platform <- getPlatform
           runExprData $ do
             vx <- exprToVarW x
             vy <- exprToVarW y
-            if getVarType vx == getVarType vy
-                then
-                    doExprW (ty vx) $ binOp vx vy
-                else do
+
+            if | getVarType vx == getVarType vy
+               -> doExprW (ty vx) $ binOp vx vy
+
+               | allow_y_cast
+               -> do
+                    vy' <- singletonPanic "binLlvmOp cast"<$>
+                            castVarsW Signed [(vy, (ty vx))]
+                    doExprW (ty vx) $ binOp vx vy'
+
+               | otherwise
+               -> do
                     -- Error. Continue anyway so we can debug the generated ll file.
                     dflags <- getDynFlags
                     let style = PprCode CStyle
@@ -1585,7 +1593,7 @@ genMachOp_slow opt op [x, y] = case op of
         -- comparisons while LLVM return i1. Need to extend to llvmWord type
         -- if expected. See Note [Literals and branch conditions].
         genBinComp opt cmp = do
-            ed@(v1, stmts, top) <- binLlvmOp (\_ -> i1) (Compare cmp)
+            ed@(v1, stmts, top) <- binLlvmOp (\_ -> i1) (Compare cmp) False
             dflags <- getDynFlags
             platform <- getPlatform
             if getVarType v1 == i1
@@ -1599,7 +1607,9 @@ genMachOp_slow opt op [x, y] = case op of
                     panic $ "genBinComp: Compare returned type other then i1! "
                         ++ (showSDoc dflags $ ppr $ getVarType v1)
 
-        genBinMach op = binLlvmOp getVarType (LlvmOp op)
+        genBinMach op = binLlvmOp getVarType (LlvmOp op) False
+
+        genBinCastYMach op = binLlvmOp getVarType (LlvmOp op) True
 
         genCastBinMach ty op = binCastLlvmOp ty (LlvmOp op)
 
