@@ -38,6 +38,9 @@
   * Under POSIX, `System.IO.openFile` will no longer leak a file descriptor if it
     is interrupted by an asynchronous exception (#19114, #19115).
 
+  * `fromInteger :: Integer -> Float/Double` now consistently round to the
+    nearest value, with ties to even.
+
 ## 4.15.0.0 *TBA*
 
   * `openFile` now calls the `open` system call with an `interruptible` FFI
