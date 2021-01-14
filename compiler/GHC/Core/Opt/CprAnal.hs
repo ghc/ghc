@@ -505,9 +505,9 @@ extendEnvForDataAlt env case_bndr case_bndr_ty dc bndrs
     case_bndr_ty'
       -- Only give the case binder the CPR property if it would be unboxed.
       -- See Note [Which types are unboxed?]
-      | CprType 0 cpr <- case_bndr_ty
+      | ty'@(CprType 0 cpr) <- markOptimisticConCprType dc case_bndr_ty
       , Unbox{} <- wantToUnboxResult (ae_fam_envs env) (idType case_bndr) cpr
-      = markOptimisticConCprType dc case_bndr_ty
+      = ty'
       -- Will not be unboxed, so giving it the CPR property introduces reboxing.
       | otherwise
       = case_bndr_ty

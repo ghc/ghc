@@ -103,22 +103,27 @@ data Termination
   -- is broken.
   deriving Eq
 
+-- | Normalises the nested termination info according to
+-- > TopSh === ConSh t [topTerm..]
+-- > BotSh === ConSh t [botTerm..]
+-- (Note that this identity doesn't hold for CPR!):
+normTermShape :: KnownShape Termination -> KnownShape Termination
+normTermShape (ConSh _ fields)
+  | all (== topTerm) fields = TopSh
+  | all (== botTerm) fields = BotSh
+normTermShape sh            = sh
+
 pattern Term :: TerminationFlag -> KnownShape Termination -> Termination
 pattern Term tf s <- (Term_ tf s)
   where
-    -- The first 4 are only for interning purposes
-    Term Terminates   BotSh = botTerm
-    Term Terminates   TopSh = whnfTerm
-    Term MightDiverge BotSh = divergeTerm
-    Term MightDiverge TopSh = topTerm
-    -- The final one normalises the nested termination info according to
-    -- > TopTerm === Term MightDiverge (ConSh t [topTerm..])
-    -- > BotTerm === Term Terminates (ConSh t [botTerm..])
-    -- (Note that this identity doesn't hold for CPR!):
-    Term tf           sh@(ConSh _ fields)
-      | MightDiverge <- tf, all (== topTerm) fields = topTerm
-      | Terminates   <- tf, all (== botTerm) fields = botTerm
-      | otherwise                                   = Term_ tf sh
+    -- 'normTermShape' is main point of this synonym. The first 4 case alts
+    -- are only for interning purposes.
+    Term tf (normTermShape -> sh) = case (tf, sh) of
+      (Terminates,   BotSh) -> botTerm
+      (Terminates,   TopSh) -> whnfTerm
+      (MightDiverge, BotSh) -> divergeTerm
+      (MightDiverge, TopSh) -> topTerm
+      (tf,           sh   ) -> Term_ tf sh
 {-# COMPLETE Term #-}
 
 topTerm :: Termination
@@ -338,22 +343,6 @@ addDataConTermination con cprs
     add cpr str | isMarkedStrict str = snd $ forceCpr topSubDmd cpr -- like seq
                 | otherwise          = cpr
 
-markOptimisticConCprType :: DataCon -> CprType -> CprType
-markOptimisticConCprType dc _ty@(CprType n cpr)
-  = -- pprTraceWith "markOptimisticConCpr" (\ty' -> ppr _ty $$ ppr ty') $
-    ASSERT2( n == 0, ppr _ty ) CprType 0 (optimisticConCpr con_tag fields)
-  where
-    con_tag   = dataConTag dc
-    wkr_arity = dataConRepArity dc
-    fields    = case cpr of
-      NoMoreCpr (Term _ (ConSh t terms))
-        | con_tag == t       -> map NoMoreCpr terms
-      NoMoreCpr (Term _ BotSh) -> replicate wkr_arity (NoMoreCpr botTerm)
-      Cpr _ _ (ConSh t cprs)
-        | con_tag == t       -> cprs
-      Cpr _ _ BotSh       -> replicate wkr_arity botCpr
-      _                      -> replicate wkr_arity topCpr
-
 splitConCprTy :: DataCon -> CprType -> Maybe [Cpr]
 splitConCprTy dc (CprType 0 (Cpr _ _ l))
   | BotSh <- l
@@ -407,15 +396,33 @@ the pattern. That led to a deliberate panic when calling @zipEqual@ in
 panic on T16893.
 -}
 
----------------------------
--- * Zonking optimistic CPR
+-------------------------------
+-- * Optimistic Case Binder CPR
 --
+
+markOptimisticConCprType :: DataCon -> CprType -> CprType
+markOptimisticConCprType dc _ty@(CprType n cpr)
+  = -- pprTrace "markOptimisticConCpr" (ppr _ty $$ ppr ty') $
+    ASSERT2( n == 0, ppr _ty ) ty'
+  where
+    ty' = CprType 0 (optimisticConCpr con_tag fields)
+    con_tag   = dataConTag dc
+    wkr_arity = dataConRepArity dc
+    fields    = case cpr of
+      NoMoreCpr (Term _ (ConSh t terms))
+        | con_tag == t         -> map NoMoreCpr terms
+      NoMoreCpr (Term _ BotSh) -> replicate wkr_arity (NoMoreCpr botTerm)
+      Cpr _ _ (ConSh t cprs)
+        | con_tag == t         -> cprs
+      Cpr _ _ BotSh            -> replicate wkr_arity botCpr
+      _                        -> replicate wkr_arity topCpr
 
 zonkOptimisticCprTy :: Int -> CprType -> CprType
 zonkOptimisticCprTy max_depth _ty@(CprType arty cpr)
-  = -- pprTraceWith "zonkOptimisticCprTy" (\ty' -> ppr max_depth <+> ppr _ty <+> ppr ty') $
-    CprType arty (zonk max_depth cpr)
+  = -- pprTrace "zonkOptimisticCprTy" (ppr max_depth <+> ppr _ty <+> ppr ty') $
+    ty'
   where
+    ty' = CprType arty (zonk max_depth cpr)
     -- | The Int is the amount of "fuel" left; when it reaches 0, we no longer
     -- turn OptimisticCpr into Cpr, but into NoMoreCpr.
     zonk :: Int -> Cpr -> Cpr
