@@ -32,22 +32,25 @@ base = do
   let hsBaseConfig = topDir </> buildDir </> "stage1/libraries/base/build/include/HsBaseConfig.h"
   let ghcautoconf  = stage1Lib </> "ghcautoconf.h"
   let ghcplatform  = stage1Lib </> "ghcplatform.h"
-  need [ghcautoconf, ghcplatform, machDeps, hsBaseConfig]
+  need [stage1GHC, ghcautoconf, ghcplatform, machDeps, hsBaseConfig]
   let include0  = topDir </> "includes"
   let include1  = topDir </> "libraries/base/include"
   let include2  = stage1Lib
   let include3  = topDir </> buildDir </> "stage1/libraries/base/build/include"
-  let cmdLine = "cabal-docspec -w " <> stage1GHC <>
-                " --no-cabal-plan" <>
-                " --strip-comments" <>
-                " --timeout 2" <>
-                " --ghci-rtsopts=-K500K" <>
-                " --extra-package=mtl --extra-package=deepseq --extra-package=bytestring" <>
-                " -XNoImplicitPrelude" <>
-                " -I " <> include0 <>
-                " -I " <> include1 <>
-                " -I " <> include2 <>
-                " -I " <> include3 <> " " <>
-                cabalFile
-  putBuild $ "| " <> cmdLine
-  cmd_ cmdLine
+  let options = [ " -w ", stage1GHC
+                , " --no-cabal-plan"
+                , " --strip-comments"
+                , " --timeout 2"
+                , " --ghci-rtsopts=-K500K"
+                , " --extra-package=mtl"
+                , " --extra-package=deepseq"
+                , " --extra-package=bytestring"
+                , " -XNoImplicitPrelude"
+                , " -I ", include0
+                , " -I ", include1
+                , " -I ", include2
+                , " -I ", include3
+                , " ", cabalFile
+                ]
+  putBuild $ "| " <> "cabal-docspec" <> mconcat options
+  command_ [] "cabal-docspec" options
