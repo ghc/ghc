@@ -50,6 +50,7 @@ import GHC.Data.Maybe
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Tc.Utils.TcType ( isUnitTy )
 import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Data.FastString
@@ -1121,7 +1122,10 @@ mkWWcpr_start opts want_to_unbox body_ty body_cpr
     let wrap_fn = unbox_transit_tup (wrap_build_res deref_res_bndr)     -- 3 2 1
         work_fn body = bind_res_bndr body (work_unpack_res transit_tup) -- 1 2 3
         work_body_ty = exprType transit_tup
-    return $ if not useful
+        -- It wasn't useful if both worker and wrapper return () anyway
+        -- See Note [Lifted, empty tuple when no transit vars]
+        useful' = useful && not (isUnitTy body_ty && isUnitTy work_body_ty)
+    return $ if not useful'
                 then (False, nop_fn, nop_fn, body_ty)
                 else (True, wrap_fn, work_fn, work_body_ty)
   where
