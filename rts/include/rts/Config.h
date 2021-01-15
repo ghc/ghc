@@ -49,4 +49,6 @@
 
 /* Profile spin locks */
 
+#if defined(DEBUG)
 #define PROF_SPIN
+#endif
