@@ -1,8 +1,8 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE DerivingStrategies #-} 
-{-# LANGUAGE GeneralizedNewtypeDeriving #-} 
-{-# LANGUAGE NoImplicitPrelude #-}  
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE Trustworthy #-}
 
@@ -407,7 +407,7 @@ popCountDefault = go 0
 {-# INLINABLE popCountDefault #-}
 
 -- | A more concise version of 'complement zeroBits'.
--- 
+--
 -- >>> complement zeroBits :: Word == oneBits :: Word
 -- True
 --
@@ -788,7 +788,7 @@ instance (Bits a) => Semigroup (Xor a) where
 instance (Bits a) => Monoid (Xor a) where
   mempty = Xor zeroBits
 
--- | Monoid under bitwise \'equality\'; defined as @1@ if the corresponding 
+-- | Monoid under bitwise \'equality\'; defined as @1@ if the corresponding
 -- bits match, and @0@ otherwise.
 --
 -- >>> getIff (Iff 0xab <> Iff 0x12) :: Word8
