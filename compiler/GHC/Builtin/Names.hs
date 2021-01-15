@@ -349,6 +349,7 @@ basicKnownKeyNames
         integerFromNaturalName,
         integerToNaturalClampName,
         integerToNaturalThrowName,
+        integerToNaturalName,
         integerToWordName,
         integerToIntName,
         integerToWord64Name,
@@ -360,15 +361,16 @@ basicKnownKeyNames
         integerMulName,
         integerSubName,
         integerNegateName,
-        integerEqPrimName,
-        integerNePrimName,
-        integerLePrimName,
-        integerGtPrimName,
-        integerLtPrimName,
-        integerGePrimName,
+        integerEqName,
+        integerNeName,
+        integerLeName,
+        integerGtName,
+        integerLtName,
+        integerGeName,
         integerAbsName,
         integerSignumName,
         integerCompareName,
+        integerPopCountName,
         integerQuotName,
         integerRemName,
         integerDivName,
@@ -386,16 +388,48 @@ basicKnownKeyNames
         integerXorName,
         integerComplementName,
         integerBitName,
+        integerTestBitName,
         integerShiftLName,
         integerShiftRName,
+
         naturalToWordName,
+        naturalToWordClampName,
+        naturalEqName,
+        naturalNeName,
+        naturalGeName,
+        naturalLeName,
+        naturalGtName,
+        naturalLtName,
+        naturalCompareName,
+        naturalPopCountName,
+        naturalShiftRName,
+        naturalShiftLName,
         naturalAddName,
         naturalSubName,
+        naturalSubThrowName,
+        naturalSubUnsafeName,
         naturalMulName,
+        naturalSignumName,
+        naturalNegateName,
+        naturalQuotRemName,
         naturalQuotName,
         naturalRemName,
-        naturalQuotRemName,
+        naturalAndName,
+        naturalAndNotName,
+        naturalOrName,
+        naturalXorName,
+        naturalTestBitName,
+        naturalBitName,
+        naturalGcdName,
+        naturalLcmName,
+        naturalLog2Name,
+        naturalLogBaseWordName,
+        naturalLogBaseName,
+        naturalPowModName,
+        naturalSizeInBaseName,
+
         bignatFromWordListName,
+
         -- Float/Double
         rationalToFloatName,
         rationalToDoubleName,
@@ -1124,6 +1158,7 @@ negateName        = varQual gHC_NUM (fsLit "negate")      negateClassOpKey
 integerFromNaturalName
    , integerToNaturalClampName
    , integerToNaturalThrowName
+   , integerToNaturalName
    , integerToWordName
    , integerToIntName
    , integerToWord64Name
@@ -1135,15 +1170,16 @@ integerFromNaturalName
    , integerMulName
    , integerSubName
    , integerNegateName
-   , integerEqPrimName
-   , integerNePrimName
-   , integerLePrimName
-   , integerGtPrimName
-   , integerLtPrimName
-   , integerGePrimName
+   , integerEqName
+   , integerNeName
+   , integerLeName
+   , integerGtName
+   , integerLtName
+   , integerGeName
    , integerAbsName
    , integerSignumName
    , integerCompareName
+   , integerPopCountName
    , integerQuotName
    , integerRemName
    , integerDivName
@@ -1161,15 +1197,44 @@ integerFromNaturalName
    , integerXorName
    , integerComplementName
    , integerBitName
+   , integerTestBitName
    , integerShiftLName
    , integerShiftRName
    , naturalToWordName
+   , naturalToWordClampName
+   , naturalEqName
+   , naturalNeName
+   , naturalGeName
+   , naturalLeName
+   , naturalGtName
+   , naturalLtName
+   , naturalCompareName
+   , naturalPopCountName
+   , naturalShiftRName
+   , naturalShiftLName
    , naturalAddName
    , naturalSubName
+   , naturalSubThrowName
+   , naturalSubUnsafeName
    , naturalMulName
+   , naturalSignumName
+   , naturalNegateName
+   , naturalQuotRemName
    , naturalQuotName
    , naturalRemName
-   , naturalQuotRemName
+   , naturalAndName
+   , naturalAndNotName
+   , naturalOrName
+   , naturalXorName
+   , naturalTestBitName
+   , naturalBitName
+   , naturalGcdName
+   , naturalLcmName
+   , naturalLog2Name
+   , naturalLogBaseWordName
+   , naturalLogBaseName
+   , naturalPowModName
+   , naturalSizeInBaseName
    , bignatFromWordListName
    :: Name
 
@@ -1182,16 +1247,45 @@ bniVarQual str key = varQual gHC_NUM_INTEGER (fsLit str) key
 bignatFromWordListName    = bnbVarQual "bigNatFromWordList#"       bignatFromWordListIdKey
 
 naturalToWordName         = bnnVarQual "naturalToWord#"            naturalToWordIdKey
+naturalToWordClampName    = bnnVarQual "naturalToWordClamp#"       naturalToWordClampIdKey
+naturalEqName             = bnnVarQual "naturalEq#"                naturalEqIdKey
+naturalNeName             = bnnVarQual "naturalNe#"                naturalNeIdKey
+naturalGeName             = bnnVarQual "naturalGe#"                naturalGeIdKey
+naturalLeName             = bnnVarQual "naturalLe#"                naturalLeIdKey
+naturalGtName             = bnnVarQual "naturalGt#"                naturalGtIdKey
+naturalLtName             = bnnVarQual "naturalLt#"                naturalLtIdKey
+naturalCompareName        = bnnVarQual "naturalCompare"            naturalCompareIdKey
+naturalPopCountName       = bnnVarQual "naturalPopCount#"          naturalPopCountIdKey
+naturalShiftRName         = bnnVarQual "naturalShiftR#"            naturalShiftRIdKey
+naturalShiftLName         = bnnVarQual "naturalShiftL#"            naturalShiftLIdKey
 naturalAddName            = bnnVarQual "naturalAdd"                naturalAddIdKey
-naturalSubName            = bnnVarQual "naturalSubUnsafe"          naturalSubIdKey
+naturalSubName            = bnnVarQual "naturalSub"                naturalSubIdKey
+naturalSubThrowName       = bnnVarQual "naturalSubThrow"           naturalSubThrowIdKey
+naturalSubUnsafeName      = bnnVarQual "naturalSubUnsafe"          naturalSubUnsafeIdKey
 naturalMulName            = bnnVarQual "naturalMul"                naturalMulIdKey
+naturalSignumName         = bnnVarQual "naturalSignum"             naturalSignumIdKey
+naturalNegateName         = bnnVarQual "naturalNegate"             naturalNegateIdKey
+naturalQuotRemName        = bnnVarQual "naturalQuotRem#"           naturalQuotRemIdKey
 naturalQuotName           = bnnVarQual "naturalQuot"               naturalQuotIdKey
 naturalRemName            = bnnVarQual "naturalRem"                naturalRemIdKey
-naturalQuotRemName        = bnnVarQual "naturalQuotRem"            naturalQuotRemIdKey
+naturalAndName            = bnnVarQual "naturalAnd"                naturalAndIdKey
+naturalAndNotName         = bnnVarQual "naturalAndNot"             naturalAndNotIdKey
+naturalOrName             = bnnVarQual "naturalOr"                 naturalOrIdKey
+naturalXorName            = bnnVarQual "naturalXor"                naturalXorIdKey
+naturalTestBitName        = bnnVarQual "naturalTestBit#"           naturalTestBitIdKey
+naturalBitName            = bnnVarQual "naturalBit#"               naturalBitIdKey
+naturalGcdName            = bnnVarQual "naturalGcd"                naturalGcdIdKey
+naturalLcmName            = bnnVarQual "naturalLcm"                naturalLcmIdKey
+naturalLog2Name           = bnnVarQual "naturalLog2#"              naturalLog2IdKey
+naturalLogBaseWordName    = bnnVarQual "naturalLogBaseWord#"       naturalLogBaseWordIdKey
+naturalLogBaseName        = bnnVarQual "naturalLogBase#"           naturalLogBaseIdKey
+naturalPowModName         = bnnVarQual "naturalPowMod"             naturalPowModIdKey
+naturalSizeInBaseName     = bnnVarQual "naturalSizeInBase#"        naturalSizeInBaseIdKey
 
 integerFromNaturalName    = bniVarQual "integerFromNatural"        integerFromNaturalIdKey
 integerToNaturalClampName = bniVarQual "integerToNaturalClamp"     integerToNaturalClampIdKey
 integerToNaturalThrowName = bniVarQual "integerToNaturalThrow"     integerToNaturalThrowIdKey
+integerToNaturalName      = bniVarQual "integerToNatural"          integerToNaturalIdKey
 integerToWordName         = bniVarQual "integerToWord#"            integerToWordIdKey
 integerToIntName          = bniVarQual "integerToInt#"             integerToIntIdKey
 integerToWord64Name       = bniVarQual "integerToWord64#"          integerToWord64IdKey
@@ -1203,15 +1297,16 @@ integerAddName            = bniVarQual "integerAdd"                integerAddIdK
 integerMulName            = bniVarQual "integerMul"                integerMulIdKey
 integerSubName            = bniVarQual "integerSub"                integerSubIdKey
 integerNegateName         = bniVarQual "integerNegate"             integerNegateIdKey
-integerEqPrimName         = bniVarQual "integerEq#"                integerEqPrimIdKey
-integerNePrimName         = bniVarQual "integerNe#"                integerNePrimIdKey
-integerLePrimName         = bniVarQual "integerLe#"                integerLePrimIdKey
-integerGtPrimName         = bniVarQual "integerGt#"                integerGtPrimIdKey
-integerLtPrimName         = bniVarQual "integerLt#"                integerLtPrimIdKey
-integerGePrimName         = bniVarQual "integerGe#"                integerGePrimIdKey
+integerEqName             = bniVarQual "integerEq#"                integerEqIdKey
+integerNeName             = bniVarQual "integerNe#"                integerNeIdKey
+integerLeName             = bniVarQual "integerLe#"                integerLeIdKey
+integerGtName             = bniVarQual "integerGt#"                integerGtIdKey
+integerLtName             = bniVarQual "integerLt#"                integerLtIdKey
+integerGeName             = bniVarQual "integerGe#"                integerGeIdKey
 integerAbsName            = bniVarQual "integerAbs"                integerAbsIdKey
 integerSignumName         = bniVarQual "integerSignum"             integerSignumIdKey
 integerCompareName        = bniVarQual "integerCompare"            integerCompareIdKey
+integerPopCountName       = bniVarQual "integerPopCount#"          integerPopCountIdKey
 integerQuotName           = bniVarQual "integerQuot"               integerQuotIdKey
 integerRemName            = bniVarQual "integerRem"                integerRemIdKey
 integerDivName            = bniVarQual "integerDiv"                integerDivIdKey
@@ -1229,6 +1324,7 @@ integerOrName             = bniVarQual "integerOr"                 integerOrIdKe
 integerXorName            = bniVarQual "integerXor"                integerXorIdKey
 integerComplementName     = bniVarQual "integerComplement"         integerComplementIdKey
 integerBitName            = bniVarQual "integerBit#"               integerBitIdKey
+integerTestBitName        = bniVarQual "integerTestBit#"           integerTestBitIdKey
 integerShiftLName         = bniVarQual "integerShiftL#"            integerShiftLIdKey
 integerShiftRName         = bniVarQual "integerShiftR#"            integerShiftRIdKey
 
@@ -2427,6 +2523,7 @@ unsafeCoercePrimIdKey    = mkPreludeMiscIdUnique 571
 integerFromNaturalIdKey
    , integerToNaturalClampIdKey
    , integerToNaturalThrowIdKey
+   , integerToNaturalIdKey
    , integerToWordIdKey
    , integerToIntIdKey
    , integerToWord64IdKey
@@ -2435,15 +2532,16 @@ integerFromNaturalIdKey
    , integerMulIdKey
    , integerSubIdKey
    , integerNegateIdKey
-   , integerEqPrimIdKey
-   , integerNePrimIdKey
-   , integerLePrimIdKey
-   , integerGtPrimIdKey
-   , integerLtPrimIdKey
-   , integerGePrimIdKey
+   , integerEqIdKey
+   , integerNeIdKey
+   , integerLeIdKey
+   , integerGtIdKey
+   , integerLtIdKey
+   , integerGeIdKey
    , integerAbsIdKey
    , integerSignumIdKey
    , integerCompareIdKey
+   , integerPopCountIdKey
    , integerQuotIdKey
    , integerRemIdKey
    , integerDivIdKey
@@ -2461,73 +2559,133 @@ integerFromNaturalIdKey
    , integerXorIdKey
    , integerComplementIdKey
    , integerBitIdKey
+   , integerTestBitIdKey
    , integerShiftLIdKey
    , integerShiftRIdKey
    , integerFromWordIdKey
    , integerFromWord64IdKey
    , integerFromInt64IdKey
    , naturalToWordIdKey
+   , naturalToWordClampIdKey
+   , naturalEqIdKey
+   , naturalNeIdKey
+   , naturalGeIdKey
+   , naturalLeIdKey
+   , naturalGtIdKey
+   , naturalLtIdKey
+   , naturalCompareIdKey
+   , naturalPopCountIdKey
+   , naturalShiftRIdKey
+   , naturalShiftLIdKey
    , naturalAddIdKey
    , naturalSubIdKey
+   , naturalSubThrowIdKey
+   , naturalSubUnsafeIdKey
    , naturalMulIdKey
+   , naturalSignumIdKey
+   , naturalNegateIdKey
+   , naturalQuotRemIdKey
    , naturalQuotIdKey
    , naturalRemIdKey
-   , naturalQuotRemIdKey
+   , naturalAndIdKey
+   , naturalAndNotIdKey
+   , naturalOrIdKey
+   , naturalXorIdKey
+   , naturalTestBitIdKey
+   , naturalBitIdKey
+   , naturalGcdIdKey
+   , naturalLcmIdKey
+   , naturalLog2IdKey
+   , naturalLogBaseWordIdKey
+   , naturalLogBaseIdKey
+   , naturalPowModIdKey
+   , naturalSizeInBaseIdKey
    , bignatFromWordListIdKey
    :: Unique
 
 integerFromNaturalIdKey    = mkPreludeMiscIdUnique 600
 integerToNaturalClampIdKey = mkPreludeMiscIdUnique 601
 integerToNaturalThrowIdKey = mkPreludeMiscIdUnique 602
-integerToWordIdKey         = mkPreludeMiscIdUnique 603
-integerToIntIdKey          = mkPreludeMiscIdUnique 604
-integerToWord64IdKey       = mkPreludeMiscIdUnique 605
-integerToInt64IdKey        = mkPreludeMiscIdUnique 606
-integerAddIdKey            = mkPreludeMiscIdUnique 607
-integerMulIdKey            = mkPreludeMiscIdUnique 608
-integerSubIdKey            = mkPreludeMiscIdUnique 609
-integerNegateIdKey         = mkPreludeMiscIdUnique 610
-integerEqPrimIdKey         = mkPreludeMiscIdUnique 611
-integerNePrimIdKey         = mkPreludeMiscIdUnique 612
-integerLePrimIdKey         = mkPreludeMiscIdUnique 613
-integerGtPrimIdKey         = mkPreludeMiscIdUnique 614
-integerLtPrimIdKey         = mkPreludeMiscIdUnique 615
-integerGePrimIdKey         = mkPreludeMiscIdUnique 616
-integerAbsIdKey            = mkPreludeMiscIdUnique 617
-integerSignumIdKey         = mkPreludeMiscIdUnique 618
-integerCompareIdKey        = mkPreludeMiscIdUnique 619
-integerQuotIdKey           = mkPreludeMiscIdUnique 620
-integerRemIdKey            = mkPreludeMiscIdUnique 621
-integerDivIdKey            = mkPreludeMiscIdUnique 622
-integerModIdKey            = mkPreludeMiscIdUnique 623
-integerDivModIdKey         = mkPreludeMiscIdUnique 624
-integerQuotRemIdKey        = mkPreludeMiscIdUnique 625
-integerToFloatIdKey        = mkPreludeMiscIdUnique 626
-integerToDoubleIdKey       = mkPreludeMiscIdUnique 627
-integerEncodeFloatIdKey    = mkPreludeMiscIdUnique 628
-integerEncodeDoubleIdKey   = mkPreludeMiscIdUnique 629
-integerGcdIdKey            = mkPreludeMiscIdUnique 630
-integerLcmIdKey            = mkPreludeMiscIdUnique 631
-integerAndIdKey            = mkPreludeMiscIdUnique 632
-integerOrIdKey             = mkPreludeMiscIdUnique 633
-integerXorIdKey            = mkPreludeMiscIdUnique 634
-integerComplementIdKey     = mkPreludeMiscIdUnique 635
-integerBitIdKey            = mkPreludeMiscIdUnique 636
-integerShiftLIdKey         = mkPreludeMiscIdUnique 637
-integerShiftRIdKey         = mkPreludeMiscIdUnique 638
-integerFromWordIdKey       = mkPreludeMiscIdUnique 639
-integerFromWord64IdKey     = mkPreludeMiscIdUnique 640
-integerFromInt64IdKey      = mkPreludeMiscIdUnique 641
+integerToNaturalIdKey      = mkPreludeMiscIdUnique 603
+integerToWordIdKey         = mkPreludeMiscIdUnique 604
+integerToIntIdKey          = mkPreludeMiscIdUnique 605
+integerToWord64IdKey       = mkPreludeMiscIdUnique 606
+integerToInt64IdKey        = mkPreludeMiscIdUnique 607
+integerAddIdKey            = mkPreludeMiscIdUnique 608
+integerMulIdKey            = mkPreludeMiscIdUnique 609
+integerSubIdKey            = mkPreludeMiscIdUnique 610
+integerNegateIdKey         = mkPreludeMiscIdUnique 611
+integerEqIdKey             = mkPreludeMiscIdUnique 612
+integerNeIdKey             = mkPreludeMiscIdUnique 613
+integerLeIdKey             = mkPreludeMiscIdUnique 614
+integerGtIdKey             = mkPreludeMiscIdUnique 615
+integerLtIdKey             = mkPreludeMiscIdUnique 616
+integerGeIdKey             = mkPreludeMiscIdUnique 617
+integerAbsIdKey            = mkPreludeMiscIdUnique 618
+integerSignumIdKey         = mkPreludeMiscIdUnique 619
+integerCompareIdKey        = mkPreludeMiscIdUnique 620
+integerPopCountIdKey       = mkPreludeMiscIdUnique 621
+integerQuotIdKey           = mkPreludeMiscIdUnique 622
+integerRemIdKey            = mkPreludeMiscIdUnique 623
+integerDivIdKey            = mkPreludeMiscIdUnique 624
+integerModIdKey            = mkPreludeMiscIdUnique 625
+integerDivModIdKey         = mkPreludeMiscIdUnique 626
+integerQuotRemIdKey        = mkPreludeMiscIdUnique 627
+integerToFloatIdKey        = mkPreludeMiscIdUnique 628
+integerToDoubleIdKey       = mkPreludeMiscIdUnique 629
+integerEncodeFloatIdKey    = mkPreludeMiscIdUnique 630
+integerEncodeDoubleIdKey   = mkPreludeMiscIdUnique 631
+integerGcdIdKey            = mkPreludeMiscIdUnique 632
+integerLcmIdKey            = mkPreludeMiscIdUnique 633
+integerAndIdKey            = mkPreludeMiscIdUnique 634
+integerOrIdKey             = mkPreludeMiscIdUnique 635
+integerXorIdKey            = mkPreludeMiscIdUnique 636
+integerComplementIdKey     = mkPreludeMiscIdUnique 637
+integerBitIdKey            = mkPreludeMiscIdUnique 638
+integerTestBitIdKey        = mkPreludeMiscIdUnique 639
+integerShiftLIdKey         = mkPreludeMiscIdUnique 640
+integerShiftRIdKey         = mkPreludeMiscIdUnique 641
+integerFromWordIdKey       = mkPreludeMiscIdUnique 642
+integerFromWord64IdKey     = mkPreludeMiscIdUnique 643
+integerFromInt64IdKey      = mkPreludeMiscIdUnique 644
 
 naturalToWordIdKey         = mkPreludeMiscIdUnique 650
-naturalAddIdKey            = mkPreludeMiscIdUnique 651
-naturalSubIdKey            = mkPreludeMiscIdUnique 652
-naturalMulIdKey            = mkPreludeMiscIdUnique 653
-naturalQuotIdKey           = mkPreludeMiscIdUnique 654
-naturalRemIdKey            = mkPreludeMiscIdUnique 655
-naturalQuotRemIdKey        = mkPreludeMiscIdUnique 656
+naturalToWordClampIdKey    = mkPreludeMiscIdUnique 651
+naturalEqIdKey             = mkPreludeMiscIdUnique 652
+naturalNeIdKey             = mkPreludeMiscIdUnique 653
+naturalGeIdKey             = mkPreludeMiscIdUnique 654
+naturalLeIdKey             = mkPreludeMiscIdUnique 655
+naturalGtIdKey             = mkPreludeMiscIdUnique 656
+naturalLtIdKey             = mkPreludeMiscIdUnique 657
+naturalCompareIdKey        = mkPreludeMiscIdUnique 658
+naturalPopCountIdKey       = mkPreludeMiscIdUnique 659
+naturalShiftRIdKey         = mkPreludeMiscIdUnique 660
+naturalShiftLIdKey         = mkPreludeMiscIdUnique 661
+naturalAddIdKey            = mkPreludeMiscIdUnique 662
+naturalSubIdKey            = mkPreludeMiscIdUnique 663
+naturalSubThrowIdKey       = mkPreludeMiscIdUnique 664
+naturalSubUnsafeIdKey      = mkPreludeMiscIdUnique 665
+naturalMulIdKey            = mkPreludeMiscIdUnique 666
+naturalSignumIdKey         = mkPreludeMiscIdUnique 667
+naturalNegateIdKey         = mkPreludeMiscIdUnique 668
+naturalQuotRemIdKey        = mkPreludeMiscIdUnique 669
+naturalQuotIdKey           = mkPreludeMiscIdUnique 670
+naturalRemIdKey            = mkPreludeMiscIdUnique 671
+naturalAndIdKey            = mkPreludeMiscIdUnique 672
+naturalAndNotIdKey         = mkPreludeMiscIdUnique 673
+naturalOrIdKey             = mkPreludeMiscIdUnique 674
+naturalXorIdKey            = mkPreludeMiscIdUnique 675
+naturalTestBitIdKey        = mkPreludeMiscIdUnique 676
+naturalBitIdKey            = mkPreludeMiscIdUnique 677
+naturalGcdIdKey            = mkPreludeMiscIdUnique 678
+naturalLcmIdKey            = mkPreludeMiscIdUnique 679
+naturalLog2IdKey           = mkPreludeMiscIdUnique 680
+naturalLogBaseWordIdKey    = mkPreludeMiscIdUnique 681
+naturalLogBaseIdKey        = mkPreludeMiscIdUnique 682
+naturalPowModIdKey         = mkPreludeMiscIdUnique 683
+naturalSizeInBaseIdKey     = mkPreludeMiscIdUnique 684
 
-bignatFromWordListIdKey    = mkPreludeMiscIdUnique 670
+bignatFromWordListIdKey    = mkPreludeMiscIdUnique 690
 
 {-
 ************************************************************************
