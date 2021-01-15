@@ -1228,26 +1228,13 @@ check_irred_pred :: Bool -> TidyEnv -> DynFlags -> UserTypeCtxt -> PredType -> T
 check_irred_pred under_syn env dflags ctxt pred
     -- The predicate looks like (X t1 t2) or (x t1 t2) :: Constraint
     -- where X is a type function
-  = do { -- If it looks like (x t1 t2), require ConstraintKinds
+  =      -- If it looks like (x t1 t2), require ConstraintKinds
          --   see Note [ConstraintKinds in predicates]
          -- But (X t1 t2) is always ok because we just require ConstraintKinds
          -- at the definition site (#9838)
-        failIfTcM (not under_syn && not (xopt LangExt.ConstraintKinds dflags)
-                                && hasTyVarHead pred)
-                  (predIrredErr env pred)
-
-         -- Make sure it is OK to have an irred pred in this context
-         -- See Note [Irreducible predicates in superclasses]
-       ; failIfTcM (is_superclass ctxt
-                    && not (xopt LangExt.UndecidableInstances dflags)
-                    && has_tyfun_head pred)
-                   (predSuperClassErr env pred) }
-  where
-    is_superclass ctxt = case ctxt of { ClassSCCtxt _ -> True; _ -> False }
-    has_tyfun_head ty
-      = case tcSplitTyConApp_maybe ty of
-          Just (tc, _) -> isTypeFamilyTyCon tc
-          Nothing      -> False
+    failIfTcM (not under_syn && not (xopt LangExt.ConstraintKinds dflags)
+                            && hasTyVarHead pred)
+              (predIrredErr env pred)
 
 {- Note [ConstraintKinds in predicates]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1258,19 +1245,7 @@ e.g.   module A where
        module B where
           import A
           f :: C a => a -> a        -- Does *not* need -XConstraintKinds
-
-Note [Irreducible predicates in superclasses]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Allowing type-family calls in class superclasses is somewhat dangerous
-because we can write:
-
- type family Fooish x :: * -> Constraint
- type instance Fooish () = Foo
- class Fooish () a => Foo a where
-
-This will cause the constraint simplifier to loop because every time we canonicalise a
-(Foo a) class constraint we add a (Fooish () a) constraint which will be immediately
-solved to add+canonicalise another (Foo a) constraint.  -}
+-}
 
 -------------------------
 check_class_pred :: TidyEnv -> DynFlags -> UserTypeCtxt
