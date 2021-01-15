@@ -122,6 +122,7 @@ char *EventDesc[] = {
   [EVENT_CONC_UPD_REM_SET_FLUSH] = "Update remembered set flushed",
   [EVENT_NONMOVING_HEAP_CENSUS]  = "Nonmoving heap census",
   [EVENT_TICKY_COUNTER_DEF]    = "Ticky-ticky entry counter definition",
+  [EVENT_TICKY_COUNTER_BEGIN_SAMPLE] = "Ticky-ticky entry counter begin sample",
   [EVENT_TICKY_COUNTER_SAMPLE] = "Ticky-ticky entry counter sample",
 };
 
@@ -492,6 +493,10 @@ init_event_types(void)
 
         case EVENT_TICKY_COUNTER_DEF: // (counter_id, arity, arg_kinds, name)
             eventTypes[t].size = EVENT_SIZE_DYNAMIC;
+            break;
+
+        case EVENT_TICKY_COUNTER_BEGIN_SAMPLE:
+            eventTypes[t].size = 0;
             break;
 
         case EVENT_TICKY_COUNTER_SAMPLE: // (counter_id, entry_count, allocs, allocd)
@@ -1519,11 +1524,17 @@ static void postTickyCounterSample(EventsBuf *eb, StgEntCounter *p)
     postWord64(eb, p->entry_count);
     postWord64(eb, p->allocs);
     postWord64(eb, p->allocd);
+
+    p->entry_count = 0;
+    p->allocs = 0;
+    p->allocd = 0;
 }
 
 void postTickyCounterSamples(StgEntCounter *counters)
 {
     ACQUIRE_LOCK(&eventBufMutex);
+    ensureRoomForEvent(&eventBuf, EVENT_TICKY_COUNTER_SAMPLE);
+    postEventHeader(&eventBuf, EVENT_TICKY_COUNTER_BEGIN_SAMPLE);
     for (StgEntCounter *p = counters; p != NULL; p = p->link) {
         postTickyCounterSample(&eventBuf, p);
     }

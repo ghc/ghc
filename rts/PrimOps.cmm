@@ -408,6 +408,9 @@ stg_newArrayArrayzh ( W_ n /* words */ )
     StgMutArrPtrs_ptrs(arr) = n;
     StgMutArrPtrs_size(arr) = size;
 
+    // Initialize card table to all-clean.
+    setCardsValue(arr, 0, n, 0);
+
     // Initialise all elements of the array with a pointer to the new array
     p = arr + SIZEOF_StgMutArrPtrs;
   for:
