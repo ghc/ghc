@@ -23,7 +23,7 @@ module GHC.Core.Make (
         FloatBind(..), wrapFloat, wrapFloats, floatBindings,
 
         -- * Constructing small tuples
-        mkCoreVarTupTy, mkCoreTup, mkCoreUbxTup,
+        mkCoreVarTupTy, mkCoreTup, mkCoreUbxTup, mkCoreUbxSum,
         mkCoreTupBoxity, unitExpr,
 
         -- * Constructing big tuples
@@ -401,6 +401,18 @@ mkCoreUbxTup tys exps
 mkCoreTupBoxity :: Boxity -> [CoreExpr] -> CoreExpr
 mkCoreTupBoxity Boxed   exps = mkCoreTup1 exps
 mkCoreTupBoxity Unboxed exps = mkCoreUbxTup (map exprType exps) exps
+
+-- | Build an unboxed sum.
+--
+-- Alternative number ("alt") starts from 1.
+mkCoreUbxSum :: Int -> Int -> [Type] -> CoreExpr -> CoreExpr
+mkCoreUbxSum arity alt tys exp
+  = ASSERT( length tys == arity )
+    ASSERT( alt <= arity )
+    mkCoreConApps (sumDataCon alt arity)
+                  (map (Type . getRuntimeRep) tys
+                   ++ map Type tys
+                   ++ [exp])
 
 -- | Build a big tuple holding the specified variables
 -- One-tuples are flattened; see Note [Flattening one-tuples]
