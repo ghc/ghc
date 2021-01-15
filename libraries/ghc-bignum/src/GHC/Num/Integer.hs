@@ -225,6 +225,15 @@ integerToNatural (IS x) = naturalFromWord# (wordFromAbsInt# x)
 integerToNatural (IP x) = naturalFromBigNat# x
 integerToNatural (IN x) = naturalFromBigNat# x
 
+-- | Convert a Integer into a Natural
+--
+-- Throw an exception if input is negative.
+integerToNaturalThrow :: Integer -> Natural
+{-# NOINLINE integerToNaturalThrow #-}
+integerToNaturalThrow (IS x) = naturalFromWord# (wordFromAbsInt# x)
+integerToNaturalThrow (IP x) = naturalFromBigNat# x
+integerToNaturalThrow (IN _) = raiseUnderflow
+
 ---------------------------------------------------------------------
 -- Predicates
 ---------------------------------------------------------------------
@@ -988,11 +997,11 @@ integerLogBase :: Integer -> Integer -> Word
 integerLogBase !base !i = W# (integerLogBase# base i)
 
 -- | Indicate if the value is a power of two and which one
-integerIsPowerOf2# :: Integer -> (# () | Word# #)
+integerIsPowerOf2# :: Integer -> (# (# #) | Word# #)
 integerIsPowerOf2# (IS i)
-   | isTrue# (i <=# 0#) = (# () | #)
+   | isTrue# (i <=# 0#) = (# (# #) | #)
    | True               = wordIsPowerOf2# (int2Word# i)
-integerIsPowerOf2# (IN _) = (# () | #)
+integerIsPowerOf2# (IN _) = (# (# #) | #)
 integerIsPowerOf2# (IP w) = bigNatIsPowerOf2# w
 
 #if WORD_SIZE_IN_BITS == 32

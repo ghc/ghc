@@ -1124,29 +1124,29 @@ instance Ix Int64 where
 
 {-# RULES
 "fromIntegral/Natural->Int8"
-    fromIntegral = (fromIntegral :: Int -> Int8)    . naturalToInt
+    fromIntegral = (fromIntegral :: Int -> Int8)  . fromIntegral . naturalToWord
 "fromIntegral/Natural->Int16"
-    fromIntegral = (fromIntegral :: Int -> Int16)   . naturalToInt
+    fromIntegral = (fromIntegral :: Int -> Int16) . fromIntegral . naturalToWord
 "fromIntegral/Natural->Int32"
-    fromIntegral = (fromIntegral :: Int -> Int32)   . naturalToInt
+    fromIntegral = (fromIntegral :: Int -> Int32) . fromIntegral . naturalToWord
   #-}
 
 {-# RULES
 "fromIntegral/Int8->Natural"
-    fromIntegral = naturalFromIntUnsafe  . (fromIntegral :: Int8  -> Int)
+    fromIntegral = naturalFromWord  . fromIntegral . (fromIntegral :: Int8  -> Int)
 "fromIntegral/Int16->Natural"
-    fromIntegral = naturalFromIntUnsafe  . (fromIntegral :: Int16 -> Int)
+    fromIntegral = naturalFromWord  . fromIntegral . (fromIntegral :: Int16 -> Int)
 "fromIntegral/Int32->Natural"
-    fromIntegral = naturalFromIntUnsafe  . (fromIntegral :: Int32 -> Int)
+    fromIntegral = naturalFromWord  . fromIntegral . (fromIntegral :: Int32 -> Int)
   #-}
 
 #if WORD_SIZE_IN_BITS == 64
 -- these RULES are valid for Word==Word64 & Int==Int64
 {-# RULES
 "fromIntegral/Natural->Int64"
-    fromIntegral = (fromIntegral :: Int -> Int64) . naturalToInt
+    fromIntegral = (fromIntegral :: Int -> Int64) . fromIntegral . naturalToWord
 "fromIntegral/Int64->Natural"
-    fromIntegral = naturalFromIntUnsafe . (fromIntegral :: Int64 -> Int)
+    fromIntegral = naturalFromWord . fromIntegral . (fromIntegral :: Int64 -> Int)
   #-}
 #endif
 
