@@ -5,7 +5,8 @@
 module GHC.Types.Name.Cache
     ( lookupOrigNameCache
     , extendOrigNameCache
-    , extendNameCache
+    , allocNameInCache
+    , addNameToCache
     , initNameCache
     , NameCache(..), OrigNameCache
     ) where
@@ -18,9 +19,12 @@ import GHC.Types.Unique.Supply
 import GHC.Builtin.Types
 import GHC.Builtin.Names
 
+import GHC.Types.SrcLoc
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+
+import GHC.Exts (inline)
 
 #include "HsVersions.h"
 
@@ -102,6 +106,26 @@ extendNameCache nc mod occ !name
   = extendModuleEnvWith combine nc mod (unitOccEnv occ name)
   where
     combine _ occ_env = extendOccEnv occ_env occ name
+
+-- | Allocate a fresh 'Unique' from the 'NameCache' and extend it with a new
+-- 'OccName', returning the finished 'Name'.
+allocNameInCache :: Module -> OccName -> SrcSpan
+                 -> NameCache -> (NameCache, Name)
+allocNameInCache mod occ loc nc
+  = inline addNameToCache uniq mod occ loc $
+    nc { nsUniqs = us' }
+  where
+    !(uniq, us') = takeUniqFromSupply (nsUniqs nc)
+
+-- | Extend the 'NameCache' with a new 'OccName' with the given 'Unique',
+-- returning the finished 'Name'
+addNameToCache :: Unique -> Module -> OccName -> SrcSpan
+               -> NameCache -> (NameCache, Name)
+addNameToCache uniq mod occ loc nc
+  = (nc { nsNames = extendNameCache (nsNames nc) mod occ name }, name)
+  where
+    !name = mkExternalName uniq mod occ loc
+
 
 -- | The NameCache makes sure that there is just one Unique assigned for
 -- each original name; i.e. (module-name, occ-name) pair and provides

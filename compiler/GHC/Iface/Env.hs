@@ -6,7 +6,7 @@ module GHC.Iface.Env (
         newGlobalBinder, newInteractiveBinder,
         externaliseName,
         lookupIfaceTop,
-        lookupOrig, lookupOrigIO, lookupOrigNameCache, extendNameCache,
+        lookupOrig, lookupOrigIO, lookupOrigNameCache,
         newIfaceName, newIfaceNames,
         extendIfaceIdEnv, extendIfaceTyVarEnv,
         tcIfaceLclId, tcIfaceTyVar, lookupIfaceVar,
@@ -108,22 +108,13 @@ allocateGlobalBinder name_supply mod occ loc
         Just name | isWiredInName name
                   -> (name_supply, name)
                   | otherwise
-                  -> (new_name_supply, name')
+                  -> addNameToCache uniq mod occ loc name_supply
                   where
-                    uniq             = nameUnique name
-                    name'            = mkExternalName uniq mod occ loc
-                                       -- name' is like name, but with the right SrcSpan
-                    new_cache        = extendNameCache (nsNames name_supply) mod occ name'
-                    !new_name_supply = name_supply {nsNames = new_cache}
+                    uniq = nameUnique name
 
         -- Miss in the cache!
         -- Build a completely new Name, and put it in the cache
-        _ -> (new_name_supply, name)
-                  where
-                    (uniq, us')      = takeUniqFromSupply (nsUniqs name_supply)
-                    name             = mkExternalName uniq mod occ loc
-                    new_cache        = extendNameCache (nsNames name_supply) mod occ name
-                    !new_name_supply = name_supply {nsUniqs = us', nsNames = new_cache}
+        _ -> allocNameInCache mod occ loc name_supply
 
 ifaceExportNames :: [IfaceExport] -> TcRnIf gbl lcl [AvailInfo]
 ifaceExportNames exports = return exports
@@ -193,13 +184,7 @@ lookupNameCache :: Module -> OccName -> NameCache -> (NameCache, Name)
 lookupNameCache mod occ name_cache =
   case lookupOrigNameCache (nsNames name_cache) mod occ of {
     Just name -> (name_cache, name);
-    Nothing   ->
-        case takeUniqFromSupply (nsUniqs name_cache) of {
-          (uniq, us) ->
-              let
-                name      = mkExternalName uniq mod occ noSrcSpan
-                new_cache = extendNameCache (nsNames name_cache) mod occ name
-              in (name_cache{ nsUniqs = us, nsNames = new_cache }, name) }}
+    Nothing   -> allocNameInCache mod occ noSrcSpan name_cache }
 
 externaliseName :: Module -> Name -> TcRnIf m n Name
 -- Take an Internal Name and make it an External one,
@@ -209,10 +194,8 @@ externaliseName mod name
              loc = nameSrcSpan name
              uniq = nameUnique name
        ; occ `seq` return ()  -- c.f. seq in newGlobalBinder
-       ; updNameCacheTc mod occ $ \ ns ->
-         let name' = mkExternalName uniq mod occ loc
-             ns'   = ns { nsNames = extendNameCache (nsNames ns) mod occ name' }
-         in (ns', name') }
+       ; updNameCacheTc mod occ $ \ns -> addNameToCache uniq mod occ loc ns
+       }
 
 -- | Set the 'Module' of a 'Name'.
 setNameModule :: Maybe Module -> Name -> TcRnIf m n Name

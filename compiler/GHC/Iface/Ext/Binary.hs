@@ -319,11 +319,7 @@ fromHieName nc (ExternalName mod occ span) =
     let cache = nsNames nc
     in case lookupOrigNameCache cache mod occ of
          Just name -> (nc, name)
-         Nothing ->
-           let (uniq, us) = takeUniqFromSupply (nsUniqs nc)
-               name       = mkExternalName uniq mod occ span
-               new_cache  = extendNameCache cache mod occ name
-           in ( nc{ nsUniqs = us, nsNames = new_cache }, name )
+         Nothing   -> allocNameInCache mod occ span nc
 fromHieName nc (LocalName occ span) =
     let (uniq, us) = takeUniqFromSupply (nsUniqs nc)
         name       = mkInternalName uniq occ span
