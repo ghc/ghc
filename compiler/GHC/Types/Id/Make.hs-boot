@@ -11,5 +11,6 @@ mkDataConWorkId :: Name -> DataCon -> Id
 mkDictSelId     :: Name -> Class   -> Id
 
 mkPrimOpId      :: PrimOp -> Id
+voidPrimId      :: Id
 
 magicDictId :: Id
