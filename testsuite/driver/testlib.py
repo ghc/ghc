@@ -1698,7 +1698,8 @@ def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: str) -> 
             print('Wrong exit code for ' + name + '(' + way + ')' + '(expected', opts.exit_code, ', actual', exit_code, ')')
             dump_stdout(name)
             dump_stderr(name)
-        return failBecause('bad exit code (%d)' % exit_code)
+        message = format_bad_exit_code_message(exit_code)
+        return failBecause(message)
 
     if not (opts.ignore_stderr or stderr_ok(name, way) or opts.combined_output):
         return failBecause('bad stderr',
@@ -1797,7 +1798,8 @@ def interpreter_run(name: TestName,
         print('Wrong exit code for ' + name + '(' + way + ') (expected', getTestOpts().exit_code, ', actual', exit_code, ')')
         dump_stdout(name)
         dump_stderr(name)
-        return failBecause('bad exit code (%d)' % exit_code,
+        message = format_bad_exit_code_message(exit_code)
+        return failBecause(message,
                            stderr=read_stderr(name),
                            stdout=read_stdout(name))
 
@@ -2393,6 +2395,18 @@ def runCmd(cmd: str,
         # Only print a message when timeout killed the process unexpectedly.
         if_verbose(1, 'Timeout happened...killed process "{0}"...\n'.format(cmd))
     return r.returncode
+
+# Each message should be kept lowercase
+def exit_code_specific_message(exit_code: int) -> str:
+    messages = {99: "test timeout"}
+    return messages.get(exit_code, "")
+
+def format_bad_exit_code_message(exit_code: int) -> str:
+    ex_msg = exit_code_specific_message(exit_code)
+    if ex_msg == "":
+        return 'bad exit code (%d)' % exit_code
+    else:
+        return ': '.join(['bad exit code (%d)' % exit_code, ex_msg])
 
 # -----------------------------------------------------------------------------
 # checking if ghostscript is available for checking the output of hp2ps
