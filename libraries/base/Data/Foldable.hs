@@ -1000,8 +1000,8 @@ foldrM f z0 xs = foldl c return xs z0
 --
 foldlM :: (Foldable t, Monad m) => (b -> a -> m b) -> b -> t a -> m b
 foldlM f z0 xs = foldr c return xs z0
-  -- See Note [List fusion and continuations in 'c']
-  where c x k z = f z x >>= k
+  -- See Note [List fusion and continuations in 'c' (foldlM)]
+  where c x k = \z -> f z x >>= k
         {-# INLINE c #-}
 
 -- | Map each element of a structure to an 'Applicative' action, evaluate these
