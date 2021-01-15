@@ -37,12 +37,10 @@ module GHC.Natural
      -- * Conversions
    , naturalToInteger
    , naturalToWord
-   , naturalToInt
-   , naturalFromInteger
-   , wordToNatural
-   , intToNatural
    , naturalToWordMaybe
+   , wordToNatural
    , wordToNatural#
+   , naturalFromInteger
      -- * Modular arithmetic
    , powModNatural
    )
@@ -100,8 +98,8 @@ minusNatural = N.naturalSubThrow
 -- @since 4.8.0.0
 minusNaturalMaybe :: Natural -> Natural -> Maybe Natural
 minusNaturalMaybe x y = case N.naturalSub x y of
-   (# () | #) -> Nothing
-   (# | n #)  -> Just n
+   (# (# #) |   #) -> Nothing
+   (#       | n #) -> Just n
 
 -- | 'Natural' multiplication
 timesNatural :: Natural -> Natural -> Natural
@@ -161,9 +159,6 @@ naturalToInteger = I.integerFromNatural
 naturalToWord :: Natural -> Word
 naturalToWord = N.naturalToWord
 
-naturalToInt :: Natural -> Int
-naturalToInt = N.naturalToInt
-
 -- | @since 4.10.0.0
 naturalFromInteger :: Integer -> Natural
 naturalFromInteger = I.integerToNatural
@@ -174,17 +169,14 @@ naturalFromInteger = I.integerToNatural
 wordToNatural :: Word -> Natural
 wordToNatural = N.naturalFromWord
 
-intToNatural :: Int -> Natural
-intToNatural = N.naturalFromIntThrow
-
 -- | Try downcasting 'Natural' to 'Word' value.
 -- Returns 'Nothing' if value doesn't fit in 'Word'.
 --
 -- @since 4.8.0.0
 naturalToWordMaybe :: Natural -> Maybe Word
 naturalToWordMaybe n = case N.naturalToWordMaybe# n of
-   (# w | #)  -> Just (W# w)
-   (# | () #) -> Nothing
+   (#       | w #) -> Just (W# w)
+   (# (# #) |   #) -> Nothing
 
 wordToNatural# :: Word -> Natural
 wordToNatural# = N.naturalFromWord
