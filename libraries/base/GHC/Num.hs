@@ -35,7 +35,6 @@ import qualified GHC.Integer
 import GHC.Base
 import GHC.Num.Integer
 import GHC.Num.Natural
-import {-# SOURCE #-} GHC.Exception.Type
 
 infixl 7  *
 infixl 6  +, -
@@ -139,23 +138,13 @@ instance  Num Integer  where
 --
 -- @since 4.8.0.0
 instance  Num Natural  where
-    (+) = naturalAdd
-    (-) x y = case compare x y of
-      EQ -> naturalZero
-      GT -> naturalSubUnsafe x y
-      LT -> raise# underflowException
-
-    (*) = naturalMul
-    negate x
-      | naturalIsZero x = x
-      | otherwise       = raise# underflowException
-
-    fromInteger x
-      | x < 0     = raise# underflowException
-      | otherwise = integerToNaturalClamp x
-
-    abs    = id
-    signum = naturalSignum
+    (+)         = naturalAdd
+    (-)         = naturalSubThrow
+    (*)         = naturalMul
+    negate      = naturalNegate
+    fromInteger = integerToNaturalThrow
+    abs         = id
+    signum      = naturalSignum
 
 {-# DEPRECATED quotRemInteger "Use integerQuotRem# instead" #-}
 quotRemInteger :: Integer -> Integer -> (# Integer, Integer #)
