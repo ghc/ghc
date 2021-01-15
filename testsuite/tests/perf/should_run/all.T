@@ -178,6 +178,7 @@ test('T5536',
 test('T7257',
      [collect_stats('bytes allocated',10),
       collect_runtime_residency(5),
+      run_timeout_multiplier(2),
       only_ways(['normal'])
      ],
     compile_and_run, ['-O'])
