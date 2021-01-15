@@ -1,4 +1,4 @@
-{-# LANGUAGE UndecidableInstances,
+{-# LANGUAGE UndecidableInstances, FlexibleContexts,
              MultiParamTypeClasses, FunctionalDependencies #-}
 
 -- The Show instance for S would have form
@@ -17,4 +17,3 @@ instance X T c => Show T where
     show _ = ""
 
 data S = S T deriving Show
-

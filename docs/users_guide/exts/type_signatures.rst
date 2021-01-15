@@ -7,7 +7,6 @@ Type signatures
     :maxdepth: 1
 
     explicit_forall
-    flexible_contexts_signature
     ambiguous_types
     kind_signatures
     scoped_type_variables

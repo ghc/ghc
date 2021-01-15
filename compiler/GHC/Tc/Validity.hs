@@ -1182,7 +1182,7 @@ check_pred_help under_syn env dflags ctxt pred
               -- in Note [Lift equality constraints when quantifying] in GHC.Tc.Utils.TcType
 
       ForAllPred _ theta head -> check_quant_pred env dflags ctxt pred theta head
-      IrredPred {}            -> check_irred_pred under_syn env dflags ctxt pred
+      IrredPred {}            -> check_irred_pred under_syn env dflags pred
 
 check_eq_pred :: TidyEnv -> DynFlags -> PredType -> TcM ()
 check_eq_pred env dflags pred
@@ -1224,30 +1224,17 @@ check_tuple_pred under_syn env dflags ctxt pred ts
     -- This case will not normally be executed because without
     -- -XConstraintKinds tuple types are only kind-checked as *
 
-check_irred_pred :: Bool -> TidyEnv -> DynFlags -> UserTypeCtxt -> PredType -> TcM ()
-check_irred_pred under_syn env dflags ctxt pred
+check_irred_pred :: Bool -> TidyEnv -> DynFlags -> PredType -> TcM ()
+check_irred_pred under_syn env dflags pred
     -- The predicate looks like (X t1 t2) or (x t1 t2) :: Constraint
     -- where X is a type function
-  = do { -- If it looks like (x t1 t2), require ConstraintKinds
+  =      -- If it looks like (x t1 t2), require ConstraintKinds
          --   see Note [ConstraintKinds in predicates]
          -- But (X t1 t2) is always ok because we just require ConstraintKinds
          -- at the definition site (#9838)
-        failIfTcM (not under_syn && not (xopt LangExt.ConstraintKinds dflags)
-                                && hasTyVarHead pred)
-                  (predIrredErr env pred)
-
-         -- Make sure it is OK to have an irred pred in this context
-         -- See Note [Irreducible predicates in superclasses]
-       ; failIfTcM (is_superclass ctxt
-                    && not (xopt LangExt.UndecidableInstances dflags)
-                    && has_tyfun_head pred)
-                   (predSuperClassErr env pred) }
-  where
-    is_superclass ctxt = case ctxt of { ClassSCCtxt _ -> True; _ -> False }
-    has_tyfun_head ty
-      = case tcSplitTyConApp_maybe ty of
-          Just (tc, _) -> isTypeFamilyTyCon tc
-          Nothing      -> False
+    failIfTcM (not under_syn && not (xopt LangExt.ConstraintKinds dflags)
+                            && hasTyVarHead pred)
+              (predIrredErr env pred)
 
 {- Note [ConstraintKinds in predicates]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1258,19 +1245,7 @@ e.g.   module A where
        module B where
           import A
           f :: C a => a -> a        -- Does *not* need -XConstraintKinds
-
-Note [Irreducible predicates in superclasses]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Allowing type-family calls in class superclasses is somewhat dangerous
-because we can write:
-
- type family Fooish x :: * -> Constraint
- type instance Fooish () = Foo
- class Fooish () a => Foo a where
-
-This will cause the constraint simplifier to loop because every time we canonicalise a
-(Foo a) class constraint we add a (Fooish () a) constraint which will be immediately
-solved to add+canonicalise another (Foo a) constraint.  -}
+-}
 
 -------------------------
 check_class_pred :: TidyEnv -> DynFlags -> UserTypeCtxt
@@ -1294,10 +1269,9 @@ check_class_pred env dflags ctxt pred cls tys
 
     -- Check the arguments of a class constraint
     flexible_contexts = xopt LangExt.FlexibleContexts     dflags
-    undecidable_ok    = xopt LangExt.UndecidableInstances dflags
     arg_tys_ok = case ctxt of
         SpecInstCtxt -> True    -- {-# SPECIALISE instance Eq (T Int) #-} is fine
-        InstDeclCtxt {} -> checkValidClsArgs (flexible_contexts || undecidable_ok) cls tys
+        InstDeclCtxt {} -> checkValidClsArgs flexible_contexts cls tys
                                 -- Further checks on head and theta
                                 -- in checkInstTermination
         _               -> checkValidClsArgs flexible_contexts cls tys
@@ -1431,7 +1405,7 @@ checkThetaCtxt ctxt theta env
                   , text "While checking" <+> pprUserTypeCtxt ctxt ] )
 
 eqPredTyErr, predTupleErr, predIrredErr,
-   predSuperClassErr, badQuantHeadErr :: TidyEnv -> PredType -> (TidyEnv, SDoc)
+   badQuantHeadErr :: TidyEnv -> PredType -> (TidyEnv, SDoc)
 badQuantHeadErr env pred
   = ( env
     , hang (text "Quantified predicate must have a class or type variable head:")
@@ -1448,11 +1422,6 @@ predIrredErr env pred
   = ( env
     , hang (text "Illegal constraint:" <+> ppr_tidy env pred)
          2 (parens constraintKindsMsg) )
-predSuperClassErr env pred
-  = ( env
-    , hang (text "Illegal constraint" <+> quotes (ppr_tidy env pred)
-            <+> text "in a superclass context")
-         2 (parens undecidableMsg) )
 
 predTyVarErr :: TidyEnv -> PredType -> (TidyEnv, SDoc)
 predTyVarErr env pred
