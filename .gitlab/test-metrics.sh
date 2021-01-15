@@ -34,7 +34,7 @@ function setup_ssh() {
   echo "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDJPR1vrZgeGTXmgJw2PsJfMjf22LcDnVVwt3l0rwTZ+8Q2J0bHaYxMRKBco1sON6LGcZepw0Hy76RQ87v057pTz18SXvnfE7U/B6v9qBk0ILJz+4BOX9sEhxu2XmScp/wMxkG9IoyruMlsxXzd1sz09o+rzzx24U2Rp27PRm08vG0oipve6BWLbYEqYrE4/nCufqOJmGd56fju7OTU0lTpEkGDEDWGMxutaX2CbTbDju7qy07Ld8BjSc9aHfvuQaslUbj3ex3EF8EXahURzGpHQn/UFFzVGMokFumiJCAagHQb7cj6jOkKseZLaysbA/mTBQsOzjWiRmkN23bQf1wF ben+ghc-ci@smart-cactus.org" > ~/.ssh/perf_rsa.pub
   touch ~/.ssh/perf_rsa
   chmod 0600 ~/.ssh/perf_rsa
-  echo "$PERF_NOTE_KEY" >> ~/.ssh/perf_rsa
+  echo "$PERF_NOTE_KEY" > ~/.ssh/perf_rsa
   ssh-add ~/.ssh/perf_rsa
 }
 
