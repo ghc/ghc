@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
-{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, UndecidableInstances #-}
+{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, UndecidableInstances,
+             FlexibleContexts #-}
 
 -- Compiles fine.
 -- Instance selection works fine.

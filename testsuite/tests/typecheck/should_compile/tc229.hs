@@ -3,7 +3,7 @@
 -- trac #1406: Constraint doesn't reduce in the presence of quantified
 --             type variables
 
-{-# LANGUAGE FlexibleInstances, UndecidableInstances, RankNTypes,
+{-# LANGUAGE FlexibleInstances, UndecidableInstances, RankNTypes, FlexibleContexts,
              MultiParamTypeClasses, FunctionalDependencies #-}
 
 module Problem where
@@ -35,4 +35,3 @@ thP4' = thr' t_hPrefix
 thr :: (forall r. r -> a) -> a
 thr f = f undefined
 thP4 = thr t_hPrefix
-

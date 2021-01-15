@@ -3,7 +3,8 @@
     FunctionalDependencies,
     UndecidableInstances,
     FlexibleInstances,
-    EmptyDataDecls #-}
+    EmptyDataDecls,
+    FlexibleContexts #-}
 
 -- #1797
 

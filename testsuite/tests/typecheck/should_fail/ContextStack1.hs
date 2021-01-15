@@ -1,4 +1,4 @@
-{-# LANGUAGE UndecidableInstances, FlexibleInstances #-}
+{-# LANGUAGE UndecidableInstances, FlexibleInstances, FlexibleContexts #-}
 
 module ContextStack1 where
 
@@ -8,4 +8,3 @@ instance Cls [a] => Cls a
 
 t :: ()
 t = meth
-
