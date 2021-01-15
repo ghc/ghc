@@ -1302,6 +1302,22 @@ tryEtaReducePrep _ _ = Nothing
 Note [Pin demand info on floats]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We pin demand info on floated lets, so that we can see the one-shot thunks.
+
+Note [Speculative evaluation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Since call-by-value is much cheaper than call-by-need, we case-bind arguments
+that are either
+
+  1. Strictly evaluated anyway, according to the StrictSig of the callee, or
+  2. ok-for-spec, according to 'exprOkForSpeculation'
+
+While (1) is a no-brainer and always beneficial, (2) is a bit
+more subtle, as the careful haddock for 'exprOkForSpeculation'
+points out. Still, by case-binding the argument we don't need
+to allocate a thunk for it, whose closure must be retained as
+long as the callee might evaluate it. And if it is evaluated on
+most code paths anyway, we get to turn the unknown eval in the
+callee into a known call at the call site.
 -}
 
 data FloatingBind
@@ -1350,19 +1366,20 @@ data OkToSpec
 
 mkFloat :: Demand -> Bool -> Id -> CpeRhs -> FloatingBind
 mkFloat dmd is_unlifted bndr rhs
-  | is_strict
-  , not is_hnf  = FloatCase rhs bndr DEFAULT [] (exprOkForSpeculation rhs)
+  | is_strict || ok_for_spec -- See Note [Speculative evaluation]
+  , not is_hnf  = FloatCase rhs bndr DEFAULT [] ok_for_spec
     -- Don't make a case for a HNF binding, even if it's strict
     -- Otherwise we get  case (\x -> e) of ...!
 
-  | is_unlifted = ASSERT2( exprOkForSpeculation rhs, ppr rhs )
+  | is_unlifted = ASSERT2( ok_for_spec, ppr rhs )
                   FloatCase rhs bndr DEFAULT [] True
-  | is_hnf    = FloatLet (NonRec bndr                       rhs)
-  | otherwise = FloatLet (NonRec (setIdDemandInfo bndr dmd) rhs)
+  | is_hnf      = FloatLet (NonRec bndr                       rhs)
+  | otherwise   = FloatLet (NonRec (setIdDemandInfo bndr dmd) rhs)
                    -- See Note [Pin demand info on floats]
   where
-    is_hnf    = exprIsHNF rhs
-    is_strict = isStrUsedDmd dmd
+    is_hnf      = exprIsHNF rhs
+    is_strict   = isStrUsedDmd dmd
+    ok_for_spec = exprOkForSpeculation rhs
 
 emptyFloats :: Floats
 emptyFloats = Floats OkToSpec nilOL
