@@ -1,0 +1,6 @@
+
+T19187a.hs:7:10: error:
+    • The constraint ‘Eq Int’
+        is no smaller than the instance head ‘Eq T’
+      (Use UndecidableInstances to permit this)
+    • In the instance declaration for ‘Eq T’
