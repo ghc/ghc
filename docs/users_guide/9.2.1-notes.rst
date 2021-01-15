@@ -47,6 +47,10 @@ Language
         -- Alternatively,
         -- type Codomain ('KProxy :: KProxy o) = NatTr (Proxy :: o -> Type)
 
+* Previously, ``-XUndecidableInstances`` accidentally implied ``-XFlexibleContexts``.
+  This is now fixed, but it means that some program will newly require
+  ``-XFlexibleContexts``.
+        
 Compiler
 ~~~~~~~~
 

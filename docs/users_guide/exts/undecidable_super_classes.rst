@@ -1,3 +1,5 @@
+.. _superclass-rules:
+
 Undecidable (or recursive) superclasses
 ---------------------------------------
 

@@ -173,27 +173,8 @@ syntactically allowed. Some further various observations about this grammar:
   instance, ``instance (C a)`` is accepted, as is ``instance forall a. (C a)``.
 
 .. _instance-rules:
-
-Relaxed rules for instance contexts
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-In Haskell 98, the class constraints in the context of the instance
-declaration must be of the form ``C a`` where ``a`` is a type variable
-that occurs in the head.
-
-The :extension:`FlexibleContexts` extension relaxes this rule, as well as relaxing
-the corresponding rule for type signatures (see
-:ref:`flexible-contexts`). Specifically, :extension:`FlexibleContexts`, allows
-(well-kinded) class constraints of form ``(C t1 ... tn)`` in the context
-of an instance declaration.
-
-Notice that the extension does not affect equality constraints in an instance
-context; they are permitted by :extension:`TypeFamilies` or :extension:`GADTs`.
-
-However, the instance declaration must still conform to the rules for
-instance termination: see :ref:`instance-termination`.
-
 .. _instance-termination:
+.. _undecidable-instances:
 
 Instance termination rules
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -283,60 +264,6 @@ because the derived instance
       instance (Show a, Show (h a)) => Show (MinHeap h a)
 
 conforms to the above rules.
-
-A useful idiom permitted by the above rules is as follows. If one allows
-overlapping instance declarations then it's quite convenient to have a
-"default instance" declaration that applies if something more specific
-does not:
-
-::
-
-      instance C a where
-        op = ... -- Default
-
-.. _undecidable-instances:
-
-Undecidable instances
-~~~~~~~~~~~~~~~~~~~~~
-
-.. index::
-   single: -XUndecidableInstances
-
-Sometimes even the termination rules of :ref:`instance-termination` are
-too onerous. So GHC allows you to experiment with more liberal rules: if
-you use the experimental extension :extension:`UndecidableInstances`, both the Paterson
-Conditions and the Coverage
-Condition (described in :ref:`instance-termination`) are lifted.
-Termination is still ensured by having a fixed-depth recursion stack. If
-you exceed the stack depth you get a sort of backtrace, and the
-opportunity to increase the stack depth with
-``-freduction-depth=⟨n⟩``. However, if you should exceed the default
-reduction depth limit, it is probably best just to disable depth
-checking, with ``-freduction-depth=0``. The exact depth your program
-requires depends on minutiae of your code, and it may change between
-minor GHC releases. The safest bet for released code -- if you're sure
-that it should compile in finite time -- is just to disable the check.
-
-For example, sometimes you might want to use the following to get the
-effect of a "class synonym":
-
-::
-
-      class (C1 a, C2 a, C3 a) => C a where { }
-
-      instance (C1 a, C2 a, C3 a) => C a where { }
-
-This allows you to write shorter signatures:
-
-::
-
-      f :: C a => ...
-
-instead of
-
-::
-
-      f :: (C1 a, C2 a, C3 a) => ...
 
 The restrictions on functional dependencies
 (:ref:`functional-dependencies`) are particularly troublesome. It is

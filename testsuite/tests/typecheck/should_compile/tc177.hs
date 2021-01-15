@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances, UndecidableInstances,
+{-# LANGUAGE FlexibleInstances, UndecidableInstances, FlexibleContexts,
              MultiParamTypeClasses, FunctionalDependencies #-}
 
 -- This is a rather complicated program that uses functional
@@ -105,4 +105,3 @@ instance EqR (Succ n) Zero F where
 
 instance (EqR n1 n2 b) => EqR (Succ n1) (Succ n2) b where
     eqR (Succ n1) (Succ n2) = eqR n1 n2
-
