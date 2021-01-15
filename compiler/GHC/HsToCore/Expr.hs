@@ -458,11 +458,7 @@ dsExpr (ExplicitTuple _ tup_args boxity)
                         -- See Note [Don't flatten tuples from HsSyn] in GHC.Core.Make
 
 dsExpr (ExplicitSum types alt arity expr)
-  = do { dsWhenNoErrs (dsLExprNoLP expr)
-                      (\core_expr -> mkCoreConApps (sumDataCon alt arity)
-                                     (map (Type . getRuntimeRep) types ++
-                                      map Type types ++
-                                      [core_expr]) ) }
+  = dsWhenNoErrs (dsLExprNoLP expr) (mkCoreUbxSum arity alt types)
 
 dsExpr (HsPragE _ prag expr) =
   ds_prag_expr prag expr

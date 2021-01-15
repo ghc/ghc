@@ -136,13 +136,13 @@ bigNatIsTwo# ba =
    &&# indexWordArray# ba 0# `eqWord#` 2##
 
 -- | Indicate if the value is a power of two and which one
-bigNatIsPowerOf2# :: BigNat# -> (# () | Word# #)
+bigNatIsPowerOf2# :: BigNat# -> (# (# #) | Word# #)
 bigNatIsPowerOf2# a
-   | bigNatIsZero a                      = (# () | #)
+   | bigNatIsZero a                      = (# (# #) | #)
    | True = case wordIsPowerOf2# msw of
-               (# () | #) -> (# () | #)
+               (# (# #) | #) -> (# (# #) | #)
                (# | c  #) -> case checkAllZeroes (imax -# 1#) of
-                  0# -> (# () | #)
+                  0# -> (# (# #) | #)
                   _  -> (# | c `plusWord#`
                               (int2Word# imax `uncheckedShiftL#` WORD_SIZE_BITS_SHIFT#) #)
    where
@@ -227,11 +227,11 @@ bigNatToWord# a
    | True           = bigNatIndex# a 0#
 
 -- | Convert a BigNat into a Word# if it fits
-bigNatToWordMaybe# :: BigNat# -> (# Word# | () #)
+bigNatToWordMaybe# :: BigNat# -> (# (# #) | Word# #)
 bigNatToWordMaybe# a
-   | bigNatIsZero a                = (# 0## | #)
-   | isTrue# (bigNatSize# a ># 1#) = (# | () #)
-   | True                          = (# bigNatIndex# a 0# | #)
+   | bigNatIsZero a                = (#       | 0## #)
+   | isTrue# (bigNatSize# a ># 1#) = (# (# #) |     #)
+   | True                          = (#       | bigNatIndex# a 0# #)
 
 -- | Convert a BigNat into a Word
 bigNatToWord :: BigNat# -> Word
@@ -359,8 +359,44 @@ bigNatCompare a b =
 
 
 -- | Predicate: a < b
+bigNatLt# :: BigNat# -> BigNat# -> Bool#
+bigNatLt# a b
+  | LT <- bigNatCompare a b = 1#
+  | True                    = 0#
+
+-- | Predicate: a < b
 bigNatLt :: BigNat# -> BigNat# -> Bool
-bigNatLt a b = bigNatCompare a b == LT
+bigNatLt a b = isTrue# (bigNatLt# a b)
+
+-- | Predicate: a <= b
+bigNatLe# :: BigNat# -> BigNat# -> Bool#
+bigNatLe# a b
+  | GT <- bigNatCompare a b = 0#
+  | True                    = 1#
+
+-- | Predicate: a <= b
+bigNatLe :: BigNat# -> BigNat# -> Bool
+bigNatLe a b = isTrue# (bigNatLe# a b)
+
+-- | Predicate: a > b
+bigNatGt# :: BigNat# -> BigNat# -> Bool#
+bigNatGt# a b
+  | GT <- bigNatCompare a b = 1#
+  | True                    = 0#
+
+-- | Predicate: a > b
+bigNatGt :: BigNat# -> BigNat# -> Bool
+bigNatGt a b = isTrue# (bigNatGt# a b)
+
+-- | Predicate: a >= b
+bigNatGe# :: BigNat# -> BigNat# -> Bool#
+bigNatGe# a b
+  | LT <- bigNatCompare a b = 0#
+  | True                    = 1#
+
+-- | Predicate: a >= b
+bigNatGe :: BigNat# -> BigNat# -> Bool
+bigNatGe a b = isTrue# (bigNatGe# a b)
 
 -------------------------------------------------
 -- Addition
@@ -474,10 +510,10 @@ bigNatSubWordUnsafe :: BigNat# -> Word -> BigNat#
 bigNatSubWordUnsafe x (W# y) = bigNatSubWordUnsafe# x y
 
 -- | Subtract a Word# from a BigNat
-bigNatSubWord# :: BigNat# -> Word# -> (# () | BigNat# #)
+bigNatSubWord# :: BigNat# -> Word# -> (# (# #) | BigNat# #)
 bigNatSubWord# a b
    | 0## <- b          = (# | a #)
-   | bigNatIsZero a    = (# () | #)
+   | bigNatIsZero a    = (# (# #) | #)
    | True
    = withNewWordArrayTrimedMaybe# (bigNatSize# a) \mwa s ->
             inline bignat_sub_word mwa a b s
@@ -498,11 +534,11 @@ bigNatSubUnsafe a b
                                  -- GHC.Num.Primitives
 
 -- | Subtract two BigNat
-bigNatSub :: BigNat# -> BigNat# -> (# () | BigNat# #)
+bigNatSub :: BigNat# -> BigNat# -> (# (# #) | BigNat# #)
 bigNatSub a b
    | bigNatIsZero b = (# | a #)
    | isTrue# (bigNatSize# a <# bigNatSize# b)
-   = (# () | #)
+   = (# (# #) | #)
 
    | True
    = withNewWordArrayTrimedMaybe# (bigNatSize# a) \mwa s ->
@@ -1136,7 +1172,7 @@ bigNatPowModWord# b  e  m
 -- exponent @/e/@ modulo @/m/@.
 bigNatPowMod :: BigNat# -> BigNat# -> BigNat# -> BigNat#
 bigNatPowMod !b !e !m
-   | (# m' | #) <- bigNatToWordMaybe# m
+   | (# | m' #) <- bigNatToWordMaybe# m
    = bigNatFromWord# (bigNatPowModWord# b e m')
    | bigNatIsZero m = raiseDivZero_BigNat void#
    | bigNatIsOne  m = bigNatFromWord# 0##

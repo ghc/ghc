@@ -138,13 +138,13 @@ instance  Num Integer  where
 --
 -- @since 4.8.0.0
 instance  Num Natural  where
-    (+) = naturalAdd
-    (-) = naturalSubThrow
-    (*) = naturalMul
-    negate = naturalNegate
+    (+)         = naturalAdd
+    (-)         = naturalSubThrow
+    (*)         = naturalMul
+    negate      = naturalNegate
     fromInteger = integerToNaturalThrow
-    abs    = id
-    signum = naturalSignum
+    abs         = id
+    signum      = naturalSignum
 
 {-# DEPRECATED quotRemInteger "Use integerQuotRem# instead" #-}
 quotRemInteger :: Integer -> Integer -> (# Integer, Integer #)

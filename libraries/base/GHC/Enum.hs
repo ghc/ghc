@@ -963,8 +963,8 @@ dn_list x0 delta lim = go (x0 :: Integer)
 instance Enum Natural where
     succ n = n + 1
     pred n = n - 1
-    toEnum i
-      | i >= 0    = naturalFromIntUnsafe i
+    toEnum i@(I# i#)
+      | i >= 0    = naturalFromWord# (int2Word# i#)
       | otherwise = errorWithoutStackTrace "toEnum: unexpected negative Int"
 
     fromEnum (NS w)

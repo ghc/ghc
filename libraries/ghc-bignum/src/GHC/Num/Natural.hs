@@ -32,6 +32,10 @@ instance Eq Natural where
 
 instance Ord Natural where
    compare = naturalCompare
+   (>)     = naturalGt
+   (>=)    = naturalGe
+   (<)     = naturalLt
+   (<=)    = naturalLe
 
 
 -- | Check Natural invariants
@@ -62,7 +66,7 @@ naturalIsOne (NS 1##) = True
 naturalIsOne _        = False
 
 -- | Indicate if the value is a power of two and which one
-naturalIsPowerOf2# :: Natural -> (# () | Word# #)
+naturalIsPowerOf2# :: Natural -> (# (# #) | Word# #)
 naturalIsPowerOf2# (NS w) = wordIsPowerOf2# w
 naturalIsPowerOf2# (NB w) = bigNatIsPowerOf2# w
 
@@ -80,7 +84,6 @@ naturalToBigNat# (NB bn) = bn
 
 -- | Create a Natural from a Word#
 naturalFromWord# :: Word# -> Natural
-{-# NOINLINE naturalFromWord# #-}
 naturalFromWord# x = NS x
 
 -- | Convert two Word# (most-significant first) into a Natural
@@ -109,6 +112,7 @@ naturalToWord !n = W# (naturalToWord# n)
 
 -- | Convert a Natural into a Word# clamping to (maxBound :: Word#).
 naturalToWordClamp# :: Natural -> Word#
+{-# NOINLINE naturalToWordClamp #-}
 naturalToWordClamp# (NS x) = x
 naturalToWordClamp# (NB _) = WORD_MAXBOUND##
 
@@ -117,58 +121,10 @@ naturalToWordClamp :: Natural -> Word
 naturalToWordClamp !n = W# (naturalToWordClamp# n)
 
 -- | Try downcasting 'Natural' to 'Word' value.
--- Returns '()' if value doesn't fit in 'Word'.
-naturalToWordMaybe# :: Natural -> (# Word# | () #)
-naturalToWordMaybe# (NS w) = (# w |    #)
-naturalToWordMaybe# _      = (#   | () #)
-
--- | Create a Natural from an Int# (unsafe: silently converts negative values
--- into positive ones)
-naturalFromIntUnsafe# :: Int# -> Natural
-naturalFromIntUnsafe# !i = NS (int2Word# i)
-
--- | Create a Natural from an Int (unsafe: silently converts negative values
--- into positive ones)
-naturalFromIntUnsafe :: Int -> Natural
-naturalFromIntUnsafe (I# i) = naturalFromIntUnsafe# i
-
--- | Create a Natural from an Int#
---
--- Throws 'Control.Exception.Underflow' when passed a negative 'Int'.
-naturalFromIntThrow# :: Int# -> Natural
-naturalFromIntThrow# i
-   | isTrue# (i <# 0#) = raiseUnderflow
-   | True              = naturalFromIntUnsafe# i
-
--- | Create a Natural from an Int
---
--- Throws 'Control.Exception.Underflow' when passed a negative 'Int'.
-naturalFromIntThrow :: Int -> Natural
-naturalFromIntThrow (I# i) = naturalFromIntThrow# i
-
--- | Create an Int# from a Natural (can overflow the int and give a negative
--- number)
-naturalToInt# :: Natural -> Int#
-naturalToInt# !n = word2Int# (naturalToWord# n)
-
--- | Create an Int# from a Natural (can overflow the int and give a negative
--- number)
-naturalToInt :: Natural -> Int
-naturalToInt !n = I# (naturalToInt# n)
-
--- | Create a Natural from an Int#
---
--- Underflow exception if Int# is negative
-naturalFromInt# :: Int# -> Natural
-naturalFromInt# !i
-   | isTrue# (i >=# 0#) = NS (int2Word# i)
-   | True               = raiseUnderflow
-
--- | Create a Natural from an Int
---
--- Underflow exception if Int# is negative
-naturalFromInt :: Int -> Natural
-naturalFromInt (I# i) = naturalFromInt# i
+-- Returns '(##)' if value doesn't fit in 'Word'.
+naturalToWordMaybe# :: Natural -> (# (# #) | Word# #)
+naturalToWordMaybe# (NS w) = (#       | w #)
+naturalToWordMaybe# _      = (# (# #) |   #)
 
 -- | Encode (# Natural mantissa, Int# exponent #) into a Double#
 naturalEncodeDouble# :: Natural -> Int# -> Double#
@@ -180,7 +136,7 @@ naturalEncodeDouble# (NB b) e  = bigNatEncodeDouble# b e
 naturalToDouble# :: Natural -> Double#
 naturalToDouble# !n = naturalEncodeDouble# n 0#
 
--- | Encode an Natural (mantissa) into a Float#
+-- | Encode a Natural (mantissa) into a Float#
 naturalToFloat# :: Natural -> Float#
 naturalToFloat# !i = naturalEncodeFloat# i 0#
 
@@ -193,6 +149,7 @@ naturalEncodeFloat# !m e  = double2Float# (naturalEncodeDouble# m e)
 
 -- | Equality test for Natural
 naturalEq# :: Natural -> Natural -> Bool#
+{-# NOINLINE naturalEq# #-}
 naturalEq# (NS x) (NS y) = x `eqWord#` y
 naturalEq# (NB x) (NB y) = bigNatEq# x y
 naturalEq# _      _      = 0#
@@ -203,6 +160,7 @@ naturalEq !x !y = isTrue# (naturalEq# x y)
 
 -- | Inequality test for Natural
 naturalNe# :: Natural -> Natural -> Bool#
+{-# NOINLINE naturalNe# #-}
 naturalNe# (NS x) (NS y) = x `neWord#` y
 naturalNe# (NB x) (NB y) = bigNatNe# x y
 naturalNe# _      _      = 1#
@@ -211,15 +169,66 @@ naturalNe# _      _      = 1#
 naturalNe :: Natural -> Natural -> Bool
 naturalNe !x !y = isTrue# (naturalNe# x y)
 
+-- | Greater or equal test for Natural
+naturalGe# :: Natural -> Natural -> Bool#
+{-# NOINLINE naturalGe# #-}
+naturalGe# (NS x) (NS y) = x `geWord#` y
+naturalGe# (NS _) (NB _) = 0#
+naturalGe# (NB _) (NS _) = 1#
+naturalGe# (NB x) (NB y) = bigNatGe# x y
+
+-- | Greater or equal test for Natural
+naturalGe :: Natural -> Natural -> Bool
+naturalGe !x !y = isTrue# (naturalGe# x y)
+
+-- | Lower or equal test for Natural
+naturalLe# :: Natural -> Natural -> Bool#
+{-# NOINLINE naturalLe# #-}
+naturalLe# (NS x) (NS y) = x `leWord#` y
+naturalLe# (NS _) (NB _) = 1#
+naturalLe# (NB _) (NS _) = 0#
+naturalLe# (NB x) (NB y) = bigNatLe# x y
+
+-- | Lower or equal test for Natural
+naturalLe :: Natural -> Natural -> Bool
+naturalLe !x !y = isTrue# (naturalLe# x y)
+
+
+-- | Greater test for Natural
+naturalGt# :: Natural -> Natural -> Bool#
+{-# NOINLINE naturalGt# #-}
+naturalGt# (NS x) (NS y) = x `gtWord#` y
+naturalGt# (NS _) (NB _) = 0#
+naturalGt# (NB _) (NS _) = 1#
+naturalGt# (NB x) (NB y) = bigNatGt# x y
+
+-- | Greater test for Natural
+naturalGt :: Natural -> Natural -> Bool
+naturalGt !x !y = isTrue# (naturalGt# x y)
+
+-- | Lower test for Natural
+naturalLt# :: Natural -> Natural -> Bool#
+{-# NOINLINE naturalLt# #-}
+naturalLt# (NS x) (NS y) = x `ltWord#` y
+naturalLt# (NS _) (NB _) = 1#
+naturalLt# (NB _) (NS _) = 0#
+naturalLt# (NB x) (NB y) = bigNatLt# x y
+
+-- | Lower test for Natural
+naturalLt :: Natural -> Natural -> Bool
+naturalLt !x !y = isTrue# (naturalLt# x y)
+
 -- | Compare two Natural
 naturalCompare :: Natural -> Natural -> Ordering
-naturalCompare (NS x) (NS y) = compare (W# x) (W# y)
+{-# NOINLINE naturalCompare #-}
+naturalCompare (NS x) (NS y) = cmpW# x y
 naturalCompare (NB x) (NB y) = bigNatCompare x y
 naturalCompare (NS _) (NB _) = LT
 naturalCompare (NB _) (NS _) = GT
 
 -- | PopCount for Natural
 naturalPopCount# :: Natural -> Word#
+{-# NOINLINE naturalPopCount# #-}
 naturalPopCount# (NS x) = popCnt# x
 naturalPopCount# (NB x) = bigNatPopCount# x
 
@@ -230,6 +239,7 @@ naturalPopCount (NB x) = bigNatPopCount x
 
 -- | Right shift for Natural
 naturalShiftR# :: Natural -> Word# -> Natural
+{-# NOINLINE naturalShiftR# #-}
 naturalShiftR# (NS x) n = NS (x `shiftRW#` n)
 naturalShiftR# (NB x) n = naturalFromBigNat# (x `bigNatShiftR#` n)
 
@@ -239,6 +249,7 @@ naturalShiftR x (W# n) = naturalShiftR# x n
 
 -- | Left shift
 naturalShiftL# :: Natural -> Word# -> Natural
+{-# NOINLINE naturalShiftL# #-}
 naturalShiftL# v@(NS x) n
    | 0## <- x                     = v
    | isTrue# (clz# x `geWord#` n) = NS (x `uncheckedShiftL#` word2Int# n)
@@ -261,23 +272,24 @@ naturalAdd (NS x) (NS y) =
       (# l,c  #) -> NB (bigNatFromWord2# (int2Word# c) l)
 
 -- | Sub two naturals
-naturalSub :: Natural -> Natural -> (# () | Natural #)
+naturalSub :: Natural -> Natural -> (# Void# | Natural #)
 {-# NOINLINE naturalSub #-}
-naturalSub (NS _) (NB _) = (# () | #)
+naturalSub (NS _) (NB _) = (# void# | #)
 naturalSub (NB x) (NS y) = (# | naturalFromBigNat# (bigNatSubWordUnsafe# x y) #)
 naturalSub (NS x) (NS y) =
    case subWordC# x y of
-      (# l,0# #) -> (# | NS l #)
-      (# _,_  #) -> (# () | #)
+      (# l,0# #) -> (#       | NS l #)
+      (# _,_  #) -> (# void# |      #)
 naturalSub (NB x) (NB y) =
    case bigNatSub x y of
-      (# () | #) -> (# () | #)
-      (# | z  #) -> (# | naturalFromBigNat# z #)
+      (# (# #) |    #) -> (# void# | #)
+      (#       | z  #) -> (#       | naturalFromBigNat# z #)
 
 -- | Sub two naturals
 --
 -- Throw an Underflow exception if x < y
 naturalSubThrow :: Natural -> Natural -> Natural
+{-# NOINLINE naturalSubThrow #-}
 naturalSubThrow (NS _) (NB _) = raiseUnderflow
 naturalSubThrow (NB x) (NS y) = naturalFromBigNat# (bigNatSubWordUnsafe# x y)
 naturalSubThrow (NS x) (NS y) =
@@ -286,8 +298,8 @@ naturalSubThrow (NS x) (NS y) =
       (# _,_  #) -> raiseUnderflow
 naturalSubThrow (NB x) (NB y) =
    case bigNatSub x y of
-      (# () | #) -> raiseUnderflow
-      (# | z  #) -> naturalFromBigNat# z
+      (# (# #) |   #) -> raiseUnderflow
+      (#       | z #) -> naturalFromBigNat# z
 
 -- | Sub two naturals
 --
@@ -300,8 +312,8 @@ naturalSubUnsafe (NS _) (NB _) = naturalZero
 naturalSubUnsafe (NB x) (NS y) = naturalFromBigNat# (bigNatSubWordUnsafe# x y)
 naturalSubUnsafe (NB x) (NB y) =
    case bigNatSub x y of
-      (# () | #) -> naturalZero
-      (# | z  #) -> naturalFromBigNat# z
+      (# (# #) |   #) -> naturalZero
+      (#       | z #) -> naturalFromBigNat# z
 
 -- | Multiplication
 naturalMul :: Natural -> Natural -> Natural
@@ -327,6 +339,7 @@ naturalSqr !a = naturalMul a a
 
 -- | Signum for Natural
 naturalSignum :: Natural -> Natural
+{-# NOINLINE naturalSignum #-}
 naturalSignum (NS 0##) = NS 0##
 naturalSignum _        = NS 1##
 
@@ -380,30 +393,35 @@ naturalRem (NB n) (NB d) = case bigNatRem n d of
                              r -> naturalFromBigNat# r
 
 naturalAnd :: Natural -> Natural -> Natural
+{-# NOINLINE naturalAnd #-}
 naturalAnd (NS n) (NS m) = NS (n `and#` m)
 naturalAnd (NS n) (NB m) = NS (n `and#` bigNatToWord# m)
 naturalAnd (NB n) (NS m) = NS (bigNatToWord# n `and#` m)
 naturalAnd (NB n) (NB m) = naturalFromBigNat# (bigNatAnd n m)
 
 naturalAndNot :: Natural -> Natural -> Natural
+{-# NOINLINE naturalAndNot #-}
 naturalAndNot (NS n) (NS m) = NS (n `and#` not# m)
 naturalAndNot (NS n) (NB m) = NS (n `and#` not# (bigNatToWord# m))
 naturalAndNot (NB n) (NS m) = NS (bigNatToWord# n `and#` not# m)
 naturalAndNot (NB n) (NB m) = naturalFromBigNat# (bigNatAndNot n m)
 
 naturalOr :: Natural -> Natural -> Natural
+{-# NOINLINE naturalOr #-}
 naturalOr (NS n) (NS m) = NS (n `or#` m)
 naturalOr (NS n) (NB m) = NB (bigNatOrWord# m n)
 naturalOr (NB n) (NS m) = NB (bigNatOrWord# n m)
 naturalOr (NB n) (NB m) = NB (bigNatOr n m)
 
 naturalXor :: Natural -> Natural -> Natural
+{-# NOINLINE naturalXor #-}
 naturalXor (NS n) (NS m) = NS (n `xor#` m)
 naturalXor (NS n) (NB m) = NB (bigNatXorWord# m n)
 naturalXor (NB n) (NS m) = NB (bigNatXorWord# n m)
 naturalXor (NB n) (NB m) = naturalFromBigNat# (bigNatXor n m)
 
 naturalTestBit# :: Natural -> Word# -> Bool#
+{-# NOINLINE naturalTestBit# #-}
 naturalTestBit# (NS w) i  = (i `ltWord#` WORD_SIZE_IN_BITS##) &&#
                             ((w `and#` (1## `uncheckedShiftL#` word2Int# i)) `neWord#` 0##)
 naturalTestBit# (NB bn) i = bigNatTestBit# bn i
@@ -412,6 +430,7 @@ naturalTestBit :: Natural -> Word -> Bool
 naturalTestBit !n (W# i) = isTrue# (naturalTestBit# n i)
 
 naturalBit# :: Word# -> Natural
+{-# NOINLINE naturalBit# #-}
 naturalBit# i
   | isTrue# (i `ltWord#` WORD_SIZE_IN_BITS##) = NS (1## `uncheckedShiftL#` word2Int# i)
   | True                                      = NB (bigNatBit# i)
@@ -421,6 +440,7 @@ naturalBit (W# i) = naturalBit# i
 
 -- | Compute greatest common divisor.
 naturalGcd :: Natural -> Natural -> Natural
+{-# NOINLINE naturalGcd #-}
 naturalGcd (NS 0##) !y       = y
 naturalGcd x        (NS 0##) = x
 naturalGcd (NS 1##) _        = NS 1##
@@ -432,6 +452,7 @@ naturalGcd (NS x)   (NS y)   = NS (gcdWord# x y)
 
 -- | Compute least common multiple.
 naturalLcm :: Natural -> Natural -> Natural
+{-# NOINLINE naturalLcm #-}
 naturalLcm (NS 0##) !_       = NS 0##
 naturalLcm _        (NS 0##) = NS 0##
 naturalLcm (NS 1##) y        = y
@@ -443,6 +464,7 @@ naturalLcm (NB a  ) (NB b  ) = naturalFromBigNat# (bigNatLcm a b)
 
 -- | Base 2 logarithm
 naturalLog2# :: Natural -> Word#
+{-# NOINLINE naturalLog2# #-}
 naturalLog2# (NS w) = wordLog2# w
 naturalLog2# (NB b) = bigNatLog2# b
 
@@ -452,6 +474,7 @@ naturalLog2 !n = W# (naturalLog2# n)
 
 -- | Logarithm for an arbitrary base
 naturalLogBaseWord# :: Word# -> Natural -> Word#
+{-# NOINLINE naturalLogBaseWord# #-}
 naturalLogBaseWord# base (NS a) = wordLogBase# base a
 naturalLogBaseWord# base (NB a) = bigNatLogBaseWord# base a
 
@@ -461,6 +484,7 @@ naturalLogBaseWord (W# base) !a = W# (naturalLogBaseWord# base a)
 
 -- | Logarithm for an arbitrary base
 naturalLogBase# :: Natural -> Natural -> Word#
+{-# NOINLINE naturalLogBase# #-}
 naturalLogBase# (NS base) !a     = naturalLogBaseWord# base a
 naturalLogBase# (NB _   ) (NS _) = 0##
 naturalLogBase# (NB base) (NB a) = bigNatLogBase# base a
@@ -472,6 +496,7 @@ naturalLogBase !base !a = W# (naturalLogBase# base a)
 -- | \"@'naturalPowMod' /b/ /e/ /m/@\" computes base @/b/@ raised to
 -- exponent @/e/@ modulo @/m/@.
 naturalPowMod :: Natural -> Natural -> Natural -> Natural
+{-# NOINLINE naturalPowMod #-}
 naturalPowMod !_         !_       (NS 0##) = raiseDivZero
 naturalPowMod _          _        (NS 1##) = NS 0##
 naturalPowMod _          (NS 0##) _        = NS 1##
@@ -491,6 +516,7 @@ naturalPowMod b         e        (NB m)    = naturalFromBigNat#
 --
 -- `base` must be > 1
 naturalSizeInBase# :: Word# -> Natural -> Word#
+{-# NOINLINE naturalSizeInBase# #-}
 naturalSizeInBase# base (NS w) = wordSizeInBase# base w
 naturalSizeInBase# base (NB n) = bigNatSizeInBase# base n
 
@@ -501,6 +527,7 @@ naturalSizeInBase# base (NB n) = bigNatSizeInBase# base n
 -- byte first (big-endian) if @1#@ or least significant byte first
 -- (little-endian) if @0#@.
 naturalToAddr# :: Natural -> Addr# -> Bool# -> State# s -> (# State# s, Word# #)
+{-# NOINLINE naturalToAddr# #-}
 naturalToAddr# (NS i) = wordToAddr# i
 naturalToAddr# (NB n) = bigNatToAddr# n
 
@@ -525,6 +552,7 @@ naturalToAddr a addr e = IO \s -> case naturalToAddr# a addr e s of
 --
 -- Null higher limbs are automatically trimed.
 naturalFromAddr# :: Word# -> Addr# -> Bool# -> State# s -> (# State# s, Natural #)
+{-# NOINLINE naturalFromAddr# #-}
 naturalFromAddr# sz addr e s =
    case bigNatFromAddr# sz addr e s of
       (# s', n #) -> (# s', naturalFromBigNat# n #)
@@ -549,6 +577,7 @@ naturalFromAddr sz addr e = IO (naturalFromAddr# sz addr e)
 -- byte first (big-endian) if @1#@ or least significant byte first
 -- (little-endian) if @0#@.
 naturalToMutableByteArray# :: Natural -> MutableByteArray# s -> Word# -> Bool# -> State# s -> (# State# s, Word# #)
+{-# NOINLINE naturalToMutableByteArray# #-}
 naturalToMutableByteArray# (NS w) = wordToMutableByteArray# w
 naturalToMutableByteArray# (NB a) = bigNatToMutableByteArray# a
 
@@ -562,5 +591,6 @@ naturalToMutableByteArray# (NB a) = bigNatToMutableByteArray# a
 --
 -- Null higher limbs are automatically trimed.
 naturalFromByteArray# :: Word# -> ByteArray# -> Word# -> Bool# -> State# s -> (# State# s, Natural #)
+{-# NOINLINE naturalFromByteArray# #-}
 naturalFromByteArray# sz ba off e s = case bigNatFromByteArray# sz ba off e s of
    (# s', a #) -> (# s', naturalFromBigNat# a #)
