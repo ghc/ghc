@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
-{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, UndecidableInstances #-}
+{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, UndecidableInstances,
+             FlexibleContexts #-}
 
 -- Compilation loops in GHC 6.2!
 -- While LoopOfTheDay1.hs did compile and work,

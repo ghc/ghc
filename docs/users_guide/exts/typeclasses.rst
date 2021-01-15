@@ -13,7 +13,6 @@ space <http://research.microsoft.com/~simonpj/Papers/type-class-design-space/>`_
     :maxdepth: 1
 
     multi_param_type_classes
-    flexible_contexts
     undecidable_super_classes
     constrained_class_methods
     default_signatures

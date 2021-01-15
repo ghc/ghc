@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies, FlexibleContexts,
              UndecidableInstances, ExistentialQuantification,
              ScopedTypeVariables #-}
 
@@ -86,4 +86,3 @@ instance (ValToType a) => ValToType [a] where
                      case valToType xs of {Wrapper xs' ->
                      case xs' of {(_::xst) ->
                      Wrapper (undefined::CONS xt xst)}}}}
-

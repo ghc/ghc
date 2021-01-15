@@ -1,13 +1,13 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 {-# LANGUAGE MultiParamTypeClasses, FlexibleInstances,
-             UndecidableInstances #-}
+             UndecidableInstances, FlexibleContexts #-}
 
 -- Instances compile fine but instance selection loops in GHC 6.2.
 -- try: :t foo (T1a 1)
 -- This is essentially the same as LoopOfTheDay2.hs
 -- but with the innocent (?) use of overlapping instances.
 
-module ShouldCompile where 
+module ShouldCompile where
 
 data T1 = T1a Int | T1b T1
 

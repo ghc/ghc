@@ -1,54 +1,26 @@
-.. _superclass-rules:
+.. _flexible-contexts:
 
-Flexible contexts
------------------
+Loosening restrictions on class contexts
+----------------------------------------
 
 .. extension:: FlexibleContexts
-    :shortdesc: Enable flexible contexts.
+    :shortdesc: Remove some restrictions on class contexts
 
     :since: 6.8.1
 
-    Allow the use of complex constraints in class declaration contexts.
+    Remove the type-variable restriction on class contexts.
 
-In Haskell 98 the context of a class declaration (which introduces
-superclasses) must be simple; that is, each predicate must consist of a
-class applied to type variables. The extension :extension:`FlexibleContexts`
-(:ref:`flexible-contexts`) lifts this restriction, so that the only
-restriction on the context in a class declaration is that the class
-hierarchy must be acyclic. So these class declarations are OK: ::
+The :extension:`FlexibleContexts` extension lifts the Haskell 98 restriction that
+the type-class constraints (anywhere they appear) must have the form *(class
+type-variable)* or *(class (type-variable type1 type2 ... typen))*. With
+:extension:`FlexibleContexts` these type signatures are perfectly okay::
 
-      class Functor (m k) => FiniteMap m k where
-        ...
+      g :: Eq [a] => ...
+      g :: Ord (T a ()) => ...
 
-      class (Monad m, Monad (t m)) => Transform t m where
-        lift :: m a -> (t m) a
-
-As in Haskell 98, the class hierarchy must be acyclic. However, the
-definition of "acyclic" involves only the superclass relationships. For
-example, this is okay: ::
-
-      class C a where
-        op :: D b => a -> b -> b
-
-      class C a => D a where ...
-
-Here, ``C`` is a superclass of ``D``, but it's OK for a class operation
-``op`` of ``C`` to mention ``D``. (It would not be OK for ``D`` to be a
-superclass of ``C``.)
-
-With the extension that adds a :ref:`kind of
-constraints <constraint-kind>`, you can write more exotic superclass
-definitions. The superclass cycle check is even more liberal in these
-cases. For example, this is OK: ::
-
-      class A cls c where
-        meth :: cls c => c -> c
-
-      class A B c => B c where
-
-A superclass context for a class ``C`` is allowed if, after expanding
-type synonyms to their right-hand-sides, and uses of classes (other than
-``C``) to their superclasses, ``C`` does not occur syntactically in the
-context.
-
-
+This extension does not affect equality constraints in an instance
+context; they are permitted by :extension:`TypeFamilies` or :extension:`GADTs`.
+      
+Note that :extension:`FlexibleContexts` affects usages of class constraints,
+in type signatures and other contexts. In contrast, :extension:`FlexibleInstances`
+loosens a similar restriction in place when declaring a new instance.
