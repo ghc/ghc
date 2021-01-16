@@ -50,7 +50,7 @@ Language
 * Previously, ``-XUndecidableInstances`` accidentally implied ``-XFlexibleContexts``.
   This is now fixed, but it means that some programs will newly require
   ``-XFlexibleContexts``.
-        
+
 Compiler
 ~~~~~~~~
 
@@ -72,9 +72,6 @@ Compiler
   For more details see :ghc-flag:`-finline-generics` and
   :ghc-flag:`-finline-generics-aggressively`.
 
-- GHCi's ``:kind!`` command now expands through type synonyms in addition to type
-  families. See :ghci-cmd:`:kind`.
-
 - GHC now supports a flag, :ghc-flag:`-fprof-callers=⟨name⟩`, for requesting
   that the compiler automatically insert cost-centres on all call-sites of
   the named function.
@@ -82,10 +79,20 @@ Compiler
 GHCi
 ~~~~
 
+- GHCi's ``:kind!`` command now expands through type synonyms in addition to
+  type families. See :ghci-cmd:`:kind`.
+
 - GHCi's :ghci-cmd:`:edit` command now looks for an editor in
   the :envvar:`VISUAL` environment variable before
   :envvar:`EDITOR`, following UNIX convention.
   (:ghc-ticket:`19030`)
+
+- New debugger command :ghci-cmd:`:ignore` to set an ``ignore count`` for a
+  specified breakpoint.  The next ``ignore count`` times the program hits this
+  breakpoint, the breakpoint is ignored, and the program doesn't stop.
+
+- New optional parameter added to the command :ghci-cmd:`:continue` to set the
+  ``ignore count`` for the current breakpoint.
 
 Runtime system
 ~~~~~~~~~~~~~~
