@@ -20,6 +20,7 @@ module GHC.Runtime.Interpreter
   , costCentreStackInfo
   , newBreakArray
   , enableBreakpoint
+  , storeIgnoreCount
   , breakpointStatus
   , getBreakpointVar
   , getClosure
@@ -383,6 +384,11 @@ enableBreakpoint :: HscEnv -> ForeignRef BreakArray -> Int -> Bool -> IO ()
 enableBreakpoint hsc_env ref ix b =
   withForeignRef ref $ \breakarray ->
     iservCmd hsc_env (EnableBreakpoint breakarray ix b)
+
+storeIgnoreCount :: HscEnv -> ForeignRef BreakArray -> Int -> Int -> IO ()
+storeIgnoreCount hsc_env ref ix cnt = do                         -- #19157
+  withForeignRef ref $ \breakarray ->
+    iservCmd hsc_env (SetIgnoreCount breakarray ix cnt)
 
 breakpointStatus :: HscEnv -> ForeignRef BreakArray -> Int -> IO Bool
 breakpointStatus hsc_env ref ix =

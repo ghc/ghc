@@ -211,6 +211,7 @@ ghciCommands = map mkCmd [
   ("info",      keepGoing' (info False),        completeIdentifier),
   ("info!",     keepGoing' (info True),         completeIdentifier),
   ("issafe",    keepGoing' isSafeCmd,           completeModule),
+  ("ignore",    keepGoing ignoreCmd,            noCompletion),
   ("kind",      keepGoing' (kindOfType False),  completeIdentifier),
   ("kind!",     keepGoing' (kindOfType True),   completeIdentifier),
   ("load",      keepGoingPaths loadModule_,     completeHomeModuleOrFile),
@@ -347,7 +348,7 @@ defFullHelpText =
   "   :back [<n>]                 go back in the history N steps (after :trace)\n" ++
   "   :break [<mod>] <l> [<col>]  set a breakpoint at the specified location\n" ++
   "   :break <name>               set a breakpoint on the specified function\n" ++
-  "   :continue                   resume after a breakpoint\n" ++
+  "   :continue [<count>]         resume after a breakpoint [and set break ignore count]\n" ++
   "   :delete <number> ...        delete the specified breakpoints\n" ++
   "   :delete *                   delete all breakpoints\n" ++
   "   :disable <number> ...       disable the specified breakpoints\n" ++
@@ -357,6 +358,7 @@ defFullHelpText =
   "   :force <expr>               print <expr>, forcing unevaluated parts\n" ++
   "   :forward [<n>]              go forward in the history N step s(after :back)\n" ++
   "   :history [<n>]              after :trace, show the execution history\n" ++
+  "   :ignore <breaknum> <count>  for break <breaknum> set break ignore <count>\n" ++
   "   :list                       show the source code around current breakpoint\n" ++
   "   :list <identifier>          show the source code for <identifier>\n" ++
   "   :list [<module>] <line>     show the source code around line number <line>\n" ++
@@ -1306,7 +1308,7 @@ afterRunStmt step_here run_result = do
                st <- getGHCiState
                enqueueCommands [stop st]
                return ()
-         | otherwise -> resume step_here GHC.SingleStep >>=
+         | otherwise -> resume step_here GHC.SingleStep Nothing >>=
                         afterRunStmt step_here >> return ()
 
   flushInterpBuffers
@@ -3676,12 +3678,25 @@ traceCmd arg
   tr []         = doContinue (const True) GHC.RunAndLogSteps
   tr expression = runStmt expression GHC.RunAndLogSteps >> return ()
 
-continueCmd :: GhciMonad m => String -> m ()
-continueCmd = noArgs $ withSandboxOnly ":continue" $ doContinue (const True) GHC.RunToCompletion
+continueCmd :: GhciMonad m => String -> m ()                  -- #19157
+continueCmd argLine = withSandboxOnly ":continue" $
+  case contSwitch (words argLine) of
+    Left sdoc   -> printForUser sdoc
+    Right mbCnt -> doContinue' (const True) GHC.RunToCompletion mbCnt
+    where
+      contSwitch :: [String] -> Either SDoc (Maybe Int)
+      contSwitch [ ] = Right Nothing
+      contSwitch [x] = getIgnoreCount x
+      contSwitch  _  = Left $
+          text "After ':continue' only one ignore count is allowed"
+
 
 doContinue :: GhciMonad m => (SrcSpan -> Bool) -> SingleStep -> m ()
-doContinue pre step = do
-  runResult <- resume pre step
+doContinue pre step = doContinue' pre step Nothing
+
+doContinue' :: GhciMonad m => (SrcSpan -> Bool) -> SingleStep -> Maybe Int -> m ()
+doContinue' pre step mbCnt= do
+  runResult <- resume pre step mbCnt
   _ <- afterRunStmt pre runResult
   return ()
 
@@ -3727,23 +3742,30 @@ enaDisaSwitch enaDisa idents = do
   where
     enaDisaOneBreak :: GhciMonad m => Bool -> String -> m ()
     enaDisaOneBreak enaDisa strId = do
-      sdoc_loc <- getBreakLoc enaDisa strId
+      sdoc_loc <- checkEnaDisa enaDisa strId
       case sdoc_loc of
         Left sdoc -> printForUser sdoc
         Right loc -> enaDisaAssoc enaDisa (read strId, loc)
 
-getBreakLoc :: GhciMonad m => Bool -> String -> m (Either SDoc BreakLocation)
-getBreakLoc enaDisa strId = do
+checkEnaDisa :: GhciMonad m => Bool -> String -> m (Either SDoc BreakLocation)
+checkEnaDisa enaDisa strId = do
+    sdoc_loc <- getBreakLoc strId
+    pure $ sdoc_loc >>= checkEnaDisaState enaDisa strId
+
+getBreakLoc :: GhciMonad m => String -> m (Either SDoc BreakLocation)
+getBreakLoc strId = do
     st <- getGHCiState
     case readMaybe strId >>= flip IntMap.lookup (breaks st) of
       Nothing -> return $ Left (text "Breakpoint" <+> text strId <+>
                                 text "not found")
-      Just loc ->
-        if breakEnabled loc == enaDisa
-           then return $ Left
-               (text "Breakpoint" <+> text strId <+>
-                text "already in desired state")
-           else return $ Right loc
+      Just loc -> return $ Right loc
+
+checkEnaDisaState :: Bool -> String -> BreakLocation -> Either SDoc BreakLocation
+checkEnaDisaState enaDisa strId loc = do
+    if breakEnabled loc == enaDisa
+    then Left $
+        text "Breakpoint" <+> text strId <+> text "already in desired state"
+    else Right loc
 
 enaDisaAssoc :: GhciMonad m => Bool -> (Int, BreakLocation) -> m ()
 enaDisaAssoc enaDisa (intId, loc) = do
@@ -3787,6 +3809,38 @@ historyCmd arg
 bold :: SDoc -> SDoc
 bold c | do_bold   = text start_bold <> c <> text end_bold
        | otherwise = c
+
+ignoreCmd  :: GhciMonad m => String -> m ()                     -- #19157
+ignoreCmd argLine = withSandboxOnly ":ignore" $ do
+    result <- ignoreSwitch (words argLine)
+    case result of
+      Left sdoc -> printForUser sdoc
+      Right (loc, mbCount)   -> do
+        let breakInfo = GHC.BreakInfo { breakInfo_module = breakModule loc
+                                      , breakInfo_number = breakTick loc }
+            count = fromMaybe 0 mbCount
+        hsc_env <- GHC.getSession
+        GHC.setIgnoreCount hsc_env breakInfo count
+
+ignoreSwitch :: GhciMonad m => [String] -> m (Either SDoc (BreakLocation, Maybe Int))
+ignoreSwitch [break, count] = do
+    sdoc_loc <- getBreakLoc break
+    pure $ (,) <$> sdoc_loc <*> getIgnoreCount count
+ignoreSwitch _ = pure $ Left $ text "Syntax:  :ignore <breaknum> <count>"
+
+getIgnoreCount :: String -> Either SDoc (Maybe Int)
+getIgnoreCount str =
+    let checkJust :: Maybe Int -> Either SDoc (Maybe Int)
+        checkJust mbCnt
+          | (isJust mbCnt) = Right mbCnt
+          | otherwise    = Left $ sdocIgnore <+> text "is not numeric"
+        checkPositive :: Maybe Int -> Either SDoc (Maybe Int)
+        checkPositive mbCnt
+          | isJust mbCnt && fromJust mbCnt >= 0 = Right mbCnt
+          | otherwise = Left $  sdocIgnore <+> text "must be >= 0"
+        mbCnt :: Maybe Int = readMaybe str
+        sdocIgnore = (text "Ignore count") <+> quotes (text str)
+    in  Right mbCnt >>= checkJust >>= checkPositive
 
 backCmd :: GhciMonad m => String -> m ()
 backCmd arg
