@@ -23,6 +23,7 @@ module GHC.Runtime.Eval (
         getHistorySpan,
         getModBreaks,
         getHistoryModule,
+        setupBreakpoint,
         back, forward,
         setContext, getContext,
         getNamesInScope,
@@ -397,8 +398,9 @@ handleRunStatus step expr bindings final_ids status history
 #endif
 
 
-resumeExec :: GhcMonad m => (SrcSpan->Bool) -> SingleStep -> m ExecResult
-resumeExec canLogSpan step
+resumeExec :: GhcMonad m => (SrcSpan->Bool) -> SingleStep -> Maybe Int
+           -> m ExecResult
+resumeExec canLogSpan step mbCnt
  = do
    hsc_env <- getSession
    let ic = hsc_IC hsc_env
@@ -433,6 +435,10 @@ resumeExec canLogSpan step
                  , resumeSpan = span
                  , resumeHistory = hist } ->
                withVirtualCWD $ do
+                when (isJust mb_brkpt && isJust mbCnt) $ do
+                  setupBreakpoint hsc_env (fromJust mb_brkpt) (fromJust mbCnt)
+                    -- When the user specified a break ignore count, set it
+                    -- in the interpreter
                 status <- liftIO $ GHCi.resumeStmt hsc_env (isStep step) fhv
                 let prevHistoryLst = fromListBL 50 hist
                     hist' = case mb_brkpt of
@@ -442,6 +448,17 @@ resumeExec canLogSpan step
                          | otherwise -> mkHistory hsc_env apStack bi `consBL`
                                                         fromListBL 50 hist
                 handleRunStatus step expr bindings final_ids status hist'
+
+setupBreakpoint :: GhcMonad m => HscEnv -> BreakInfo -> Int -> m ()   -- #19157
+setupBreakpoint hsc_env brkInfo cnt = do
+  let modl :: Module = breakInfo_module brkInfo
+      breaks hsc_env modl = getModBreaks $ expectJust "setupBreakpoint" $
+         lookupHpt (hsc_HPT hsc_env) (moduleName modl)
+      ix = breakInfo_number brkInfo
+      modBreaks  = breaks hsc_env modl
+      breakarray = modBreaks_flags modBreaks
+  _ <- liftIO $ GHCi.storeBreakpoint hsc_env breakarray ix cnt
+  pure ()
 
 back :: GhcMonad m => Int -> m ([Name], Int, SrcSpan, String)
 back n = moveHist (+n)
