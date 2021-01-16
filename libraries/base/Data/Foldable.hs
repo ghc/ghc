@@ -117,8 +117,10 @@ import GHC.Generics
 import GHC.Num  ( Num(..) )
 
 -- $setup
+-- >>> :set -XDeriveFoldable
 -- >>> import Prelude
 -- >>> import Data.Monoid (Product (..), Sum (..))
+-- >>> data Tree a = Empty | Leaf a | Node (Tree a) a (Tree a) deriving (Show, Foldable)
 
 infix  4 `elem`, `notElem`
 
@@ -602,7 +604,7 @@ class Foldable t where
     -- | The least element of a non-empty structure.
     --
     -- This function is non-total and will raise a runtime exception if the
-    -- structure happens to be empty A structure that supports random access
+    -- structure happens to be empty.  A structure that supports random access
     -- and maintains its elements in order should provide a specialised
     -- implementation to return the minimum in faster than linear time.
     --

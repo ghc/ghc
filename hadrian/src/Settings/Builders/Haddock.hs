@@ -43,8 +43,10 @@ haddockBuilderArgs = mconcat
         hVersion <- expr $ pkgVersion haddock
         statsDir <- expr $ haddockStatsFilesDir
         ghcOpts  <- haddockGhcArgs
+        threads  <- shakeThreads <$> expr getShakeOptions
         mconcat
-            [ arg "--verbosity=0"
+            [ arg $ "-j" ++ (show threads)
+            , arg "--verbosity=0"
             , arg $ "-B" ++ root -/- stageString Stage1 -/- "lib"
             , arg $ "--lib=" ++ root -/- stageString Stage1 -/- "lib"
             , arg $ "--odir=" ++ takeDirectory output

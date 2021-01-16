@@ -2955,7 +2955,7 @@ doAtomicAddrRMW
             -> CmmType       -- ^ Pointed value type
             -> CmmExpr       -- ^ Op argument (e.g. amount to add)
             -> FCode ()
-doAtomicAddrRMW res amop addr ty n = do
+doAtomicAddrRMW res amop addr ty n =
     emitPrimCall
         [ res ]
         (MO_AtomicRMW (typeWidth ty) amop)
@@ -2982,7 +2982,7 @@ doAtomicReadAddr
     -> CmmExpr   -- ^ Addr#
     -> CmmType   -- ^ Type of element by which we are indexing
     -> FCode ()
-doAtomicReadAddr res addr ty = do
+doAtomicReadAddr res addr ty =
     emitPrimCall
         [ res ]
         (MO_AtomicRead (typeWidth ty))
@@ -3009,7 +3009,7 @@ doAtomicWriteAddr
     -> CmmType   -- ^ Type of element by which we are indexing
     -> CmmExpr   -- ^ Value to write
     -> FCode ()
-doAtomicWriteAddr addr ty val = do
+doAtomicWriteAddr addr ty val =
     emitPrimCall
         [ {- no results -} ]
         (MO_AtomicWrite (typeWidth ty))

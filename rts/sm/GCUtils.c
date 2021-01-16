@@ -30,6 +30,8 @@
 SpinLock gc_alloc_block_sync;
 #endif
 
+static void push_todo_block(bdescr *bd, gen_workspace *ws);
+
 bdescr* allocGroup_sync(uint32_t n)
 {
     bdescr *bd;
@@ -168,6 +170,38 @@ push_scanned_block (bdescr *bd, gen_workspace *ws)
     }
 }
 
+void
+push_todo_block(bdescr *bd, gen_workspace *ws)
+{
+    debugTrace(DEBUG_gc, "push todo block %p (%ld words), step %d, todo_q: %ld",
+            bd->start, (unsigned long)(bd->free - bd->u.scan),
+            ws->gen->no, dequeElements(ws->todo_q));
+
+    ASSERT(bd->link == NULL);
+
+    if(!pushWSDeque(ws->todo_q, bd)) {
+        bd->link = ws->todo_overflow;
+        ws->todo_overflow = bd;
+        ws->n_todo_overflow++;
+
+        // In theory, if a gc thread pushes more blocks to it's todo_q than it
+        // pops, the todo_overflow list will continue to grow. Other gc threads
+        // can't steal from the todo_overflwo list, so they may be idle as the
+        // first gc thread works diligently on it's todo_overflow list. In
+        // practice this has not been observed to occur.
+        //
+        // The max_n_todo_overflow counter will allow us to observe large
+        // todo_overflow lists if they ever arise. As of now I've not observed
+        // any nonzero max_n_todo_overflow samples.
+        gct->max_n_todo_overflow =
+            stg_max(gct->max_n_todo_overflow, ws->n_todo_overflow);
+    }
+
+#if defined(THREADED_RTS)
+    notifyTodoBlock();
+#endif
+}
+
 /* Note [big objects]
 
    We can get an ordinary object (CONSTR, FUN, THUNK etc.) that is
@@ -277,17 +311,7 @@ todo_block_full (uint32_t size, gen_workspace *ws)
         // Otherwise, push this block out to the global list.
         else
         {
-            DEBUG_ONLY( generation *gen );
-            DEBUG_ONLY( gen = ws->gen );
-            debugTrace(DEBUG_gc, "push todo block %p (%ld words), step %d, todo_q: %ld",
-                  bd->start, (unsigned long)(bd->free - bd->u.scan),
-                  gen->no, dequeElements(ws->todo_q));
-
-            if (!pushWSDeque(ws->todo_q, bd)) {
-                bd->link = ws->todo_overflow;
-                ws->todo_overflow = bd;
-                ws->n_todo_overflow++;
-            }
+            push_todo_block(bd, ws);
         }
     }
 
