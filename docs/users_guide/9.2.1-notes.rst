@@ -125,9 +125,6 @@ Compiler
   For more details see :ghc-flag:`-finline-generics` and
   :ghc-flag:`-finline-generics-aggressively`.
 
-- GHCi's ``:kind!`` command now expands through type synonyms in addition to type
-  families. See :ghci-cmd:`:kind`.
-
 - GHC now supports a flag, :ghc-flag:`-fprof-callers=⟨name⟩`, for requesting
   that the compiler automatically insert cost-centres on all call-sites of
   the named function.
@@ -147,6 +144,9 @@ Compiler
 GHCi
 ~~~~
 
+- GHCi's ``:kind!`` command now expands through type synonyms in addition to
+  type families. See :ghci-cmd:`:kind`.
+
 - GHCi's :ghci-cmd:`:edit` command now looks for an editor in
   the :envvar:`VISUAL` environment variable before
   :envvar:`EDITOR`, following UNIX convention.
@@ -155,6 +155,13 @@ GHCi
 - GHC now follows by default the XDG Base Directory Specification. If
   ``$HOME/.ghc`` is found it will fallback to the old paths to give you
   time to migrate. This fallback will be removed in three releases.
+
+- New debugger command :ghci-cmd:`:ignore` to set an ``ignore count`` for a
+  specified breakpoint.  The next ``ignore count`` times the program hits this
+  breakpoint, the breakpoint is ignored, and the program doesn't stop.
+
+- New optional parameter added to the command :ghci-cmd:`:continue` to set the
+  ``ignore count`` for the current breakpoint.
 
 Runtime system
 ~~~~~~~~~~~~~~

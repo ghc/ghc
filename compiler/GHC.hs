@@ -159,9 +159,10 @@ module GHC (
         GHC.obtainTermFromId, GHC.obtainTermFromVal, reconstructType,
         modInfoModBreaks,
         ModBreaks(..), BreakIndex,
-        BreakInfo(breakInfo_number, breakInfo_module),
+        BreakInfo(..),
         GHC.Runtime.Eval.back,
         GHC.Runtime.Eval.forward,
+        GHC.Runtime.Eval.setupBreakpoint,
 
         -- * Abstract syntax elements
 
