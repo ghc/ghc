@@ -68,12 +68,22 @@ Compiler
   For more details see :ghc-flag:`-finline-generics` and
   :ghc-flag:`-finline-generics-aggressively`.
 
-- GHCi's ``:kind!`` command now expands through type synonyms in addition to type
-  families. See :ghci-cmd:`:kind`.
-
 - GHC now supports a flag, :ghc-flag:`-fprof-callers=⟨name⟩`, for requesting
   that the compiler automatically insert cost-centres on all call-sites of
   the named function.
+
+GHCi
+~~~~
+
+- GHCi's ``:kind!`` command now expands through type synonyms in addition to
+  type families. See :ghci-cmd:`:kind`.
+
+- New debugger command :ghci-cmd:`:ignore` to set an ``ignore count`` for a
+  specified breakpoint.  The next ``ignore count`` times the program hits this
+  breakpoint, the breakpoint is ignored, and the program doesn't stop.
+
+- New optional parameter added to the command :ghci-cmd:`:continue` to set the
+  ``ignore count`` for the current breakpoint..
 
 Runtime system
 ~~~~~~~~~~~~~~
