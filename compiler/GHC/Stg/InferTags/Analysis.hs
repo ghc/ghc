@@ -1472,149 +1472,51 @@ nodeConApp this_mod ctxt (StgConApp _ext con args tys) = do
     return $! (StgConApp node_id con args tys, node_id)
 nodeConApp _ _ _ = panic "Impossible"
 
-{-
-Note [App Data Flow]
-~~~~~~~~~~~~~~~~~~~~
-This is one of the more involved data flow constructs.
-The actual flow if information is rather simple:
-
-    `StgApp f arg`
-
-Induces this data flow
-
-+---+     +------+
-| f |     | args |
-+-+-+     +--+---+
-  |          |
-  v          v
-  +----------+
-  | app node |
-  +----------+
-
-However there are a lot of rules which go into how the "app node"
-actually uses the information give. We check these conditions in order:
-
-1) If f is imported:
-->  We compute it's enterInfo as described by Note [Imported Ids]
-
-2) If f is an absent expression:
-->  We treat it as NeverEnter.
-
-3) If f is a simple recursive tail call:
-->  We mark the result as such: NoValue x RecFields
-    See [Recursive Functions] for details.
-
-4) If f is part of mutual recursive binds.
-or is a unsaturated function call:
-->  We throw up our hands and determine we know nothing.
-
-5) If f is a unsaturated function call:
--> we also give up and infer no information.
-
-6) If f is a saturated function:
-->  We determine setOuter(MaybeEnter, enterInfo(f))
-
-7) If f is not a function, and has no args:
-->  We reuse the information of f
-
-8)
-In any other case:
-->  We throw up our hands and determine we know nothing.
-
-Examples:
-
-1) Imported ids:
-
-    e@(head xs)
-    => enterInfo(e) = importedInfo(head)
-    => NeverEnter
-
-    Where importedInfo is implemented by `addImportedNode`
-
-2) Absent error:
-
-    e@(absentError foo)
-    => enterInfo(e) = NeverEnter
-
-4) Self-recursive calls:
-
-    letrec {
-        f x = ...
-        g x = ...
-        h x = ... expr@(g foo) ...
-        }
-
-    Here g is part of the recursive group so rule 7 triggers and given the context we derive:
-        enterInfo(g foo) = MaybeEnter
-
-5) Unsaturated functions:
-
-    e@(f x), arity(f) > 1:
-
-    enterInfo(f x) = MaybeEnter
-
-    We don't retain field information of f. Since there is likely
-    little gain for too much complexity. But we could revisit this.
-
-6) Saturated function call:
-
-    Given:
-
-    f x = case x of _ -> (True,False)
-    enterInfo(f) = NeverEnter < NeverEnter, NeverEnter >
-
-    If we have an expression `e@(f x)` we derive:
-
-    enterInfo(e)
-    => setOuter(MaybeEnter, enterInfo(f))
-    => setOuter(MaybeEnter, NeverEnter < NeverEnter, NeverEnter >)
-    => MaybeEnter < NeverEnter, NeverEnter >
-
-7) Variable expressions:
-
-    For any variable expressions (e.g. expr@v) we derive enterInfo(expr) = enterInfo(v).
-
-8) Other cases: We derive no information, that is for any other application we derive
-    enterInfo(expr) = MaybeEnter
-
--}
-
-
+-- In the simple approach variable applications don't provide useful information.
 nodeApp :: HasDebugCallStack => Module -> ContextStack -> StgExpr -> AM (InferStgExpr, NodeId)
-nodeApp this_mod ctxt expr@(StgApp _ f args) = do
+nodeApp this_mod ctxt expr@(StgApp _ f args@[]) = do
     addImportedNode this_mod f
     maybeImportedFunc <- importedFuncNode_Maybe this_mod f
     case () of
-        _
-            | Just node_id <- maybeImportedFunc
-            ->  return $! (StgApp node_id f args, node_id)
-            | otherwise -> do
-                node_id <- mkUniqueId
-                let updater = do
-                        let result = maybeLat
+      _
+        | Just node_id <- maybeImportedFunc
+        ->  return $! (StgApp node_id f args, node_id)
+        | otherwise -> do
+            node_id <- mkUniqueId
+            let updater = do
+                    result <- if isFun  then return maybeLat
+                                        else lookupNodeResult f_node_id
 
-                        -- pprTraceM "Updating " (ppr node_id)
-                        -- Try to peek into the function being applied
-                        -- node <- getNode node_id
-                        -- !input_nodes <- mapM getNode inputs
-                        -- pprTraceM "AppFields" (ppr (f, result) <+> ppr node $$
-                        --     text "inputs:" <+> ppr inputs $$
-                        --     ppr input_nodes
-                        --     )
-                        node <- getNode node_id
-                        markDone $ node { node_result = result }
-                        return $! result
+                    if (isFinalValue result )
+                        -- We have reached the top of the lattice.
+                        then do
+                            node <- getNode node_id
+                            markDone $ node { node_result = result }
+                            return $! result
+                        else do
+                            updateNodeResult node_id result
+                            return $! result
 
-                addNode notDone $ setNodeDesc (text "app" <-> ppr f <> ppr args) $
-                    FlowNode
-                        { node_id = node_id
-                        , node_result = maybeLat
-                        , node_inputs = []
-                        , node_update = return $ maybeLat
-                        }
+            addNode notDone $ setNodeDesc (text "app" <-> ppr f <> ppr args) $
+                FlowNode
+                    { node_id = node_id, node_result = undetLat
+                    , node_inputs = inputs
+                    , node_update = updater
+                    }
 
-                return $! (StgApp node_id f args, node_id)
+            return (StgApp node_id f args, node_id)
   where
+    inputs
+        | isFun = []
+        | otherwise = [f_node_id]
+    isFun = isFunTy (unwrapType $ idType f)
+
+    -- We check if f is imported using importedFuncNode_Maybe so this
+    -- is guaranted to be known when demanded.
+    f_node_id = getKnownIdNodeId ctxt f
+
+nodeApp this_mod ctxt expr@(StgApp _ f args) = do
+    return (StgApp maybeNodeId f args, maybeNodeId)
 
 nodeApp _ _ _ = panic "Impossible"
 
