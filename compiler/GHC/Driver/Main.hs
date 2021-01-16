@@ -2044,7 +2044,9 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr
 
            {- Convert to BCOs -}
          ; bcos <- coreExprToBCOs hsc_env
-                     (icInteractiveModule (hsc_IC hsc_env)) stg_expr
+                     (icInteractiveModule (hsc_IC hsc_env))
+                     bco_tmp_id
+                     stg_expr
 
            {- load it -}
          ; loadExpr hsc_env srcspan bcos }

@@ -51,7 +51,7 @@ import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Utils.Misc
 import GHC.Types.Var.Set
-import GHC.Builtin.Types ( unitDataConId, unboxedUnitTy )
+import GHC.Builtin.Types ( unboxedUnitTy )
 import GHC.Builtin.Types.Prim
 import GHC.Core.TyCo.Ppr ( pprType )
 import GHC.Utils.Error
@@ -178,15 +178,13 @@ literals:
 -- Returns: the root BCO for this expression
 coreExprToBCOs :: HscEnv
                -> Module
+               -> Id
                -> StgRhs
                -> IO UnlinkedBCO
-coreExprToBCOs hsc_env this_mod expr
+coreExprToBCOs hsc_env this_mod bndr expr
  = withTiming dflags
               (text "GHC.CoreToByteCode"<+>brackets (ppr this_mod))
               (const ()) $ do
-      -- create a totally bogus name for the top-level BCO; this
-      -- should be harmless, since it's never used for anything
-      let invented_name  = mkSystemVarName (mkPseudoUniqueE 0) (fsLit "ExprTopLevel")
 
       -- the uniques are needed to generate fresh variables when we introduce new
       -- let bindings for ticked expressions
@@ -194,10 +192,11 @@ coreExprToBCOs hsc_env this_mod expr
       (BcM_State _dflags _us _this_mod _final_ctr mallocd _ _ _, proto_bco)
          <- runBc hsc_env us this_mod Nothing emptyVarEnv $ do
               prepd_expr <- annBindingFreeVars <$>
-                                       bcPrepBind (StgNonRec unitDataConId expr) -- XXX hack
+                                       bcPrepBind (StgNonRec bndr expr)
               case prepd_expr of
-                (StgNonRec _ cg_expr) -> schemeR [] (invented_name, cg_expr)
-                _                     -> panic "yuck"
+                (StgNonRec _ cg_expr) -> schemeR [] (idName bndr, cg_expr)
+                _                     ->
+                  panic "GHC.CoreToByteCode.coreExprToBCOs"
 
       when (notNull mallocd)
            (panic "GHC.CoreToByteCode.coreExprToBCOs: missing final emitBc?")
@@ -448,18 +447,8 @@ schemeR :: [Id]                 -- Free vars of the RHS, ordered as they
                                 -- top-level things, which have no free vars.
         -> (Name, CgStgRhs)
         -> BcM (ProtoBCO Name)
-{-
-   XXX remove or update for STG syntax
-   | trace (showSDoc (
-              (char ' '
-               $$ (ppr.filter (not.isTyVar).dVarSetElems.fst) rhs
-               $$ pprCoreExpr (deAnnotate rhs)
-               $$ char ' '
-              ))) False
-   = undefined
-   | otherwise
--}
-schemeR fvs (nm, rhs) = schemeR_wrk fvs nm rhs (collect rhs)
+schemeR fvs (nm, rhs)
+   = schemeR_wrk fvs nm rhs (collect rhs)
 
 -- If an expression is a lambda (after apply bcView), return the
 -- list of arguments to the lambda (in R-to-L order) and the
@@ -565,8 +554,7 @@ fvsToEnv :: BCEnv -> CgStgRhs -> [Id]
 
 fvsToEnv p (StgRhsClosure fvs _ _ _ _) =
             [v | v <- dVarSetElems fvs,
-                      -- isId v,           -- Could be a type variable (XXX still in STG?)
-                      v `Map.member` p]
+                 v `Map.member` p]
 fvsToEnv _ _ = []
 
 -- -----------------------------------------------------------------------------
@@ -873,7 +861,6 @@ schemeT _d _s _p (StgOpApp (StgPrimCallOp {}) _args _ty)
    = unsupportedCConvException
 
    -- Case 2: Unboxed tuple
-   -- XXX do unboxed non-tuples still work?
 schemeT d s p (StgConApp con args _tys)
    | isUnboxedTupleDataCon con || isUnboxedSumDataCon con
    = returnUnboxedTuple d s p args
@@ -1986,10 +1973,9 @@ lookupBCEnv_maybe = Map.lookup
 idSizeW :: Platform -> Id -> WordOff
 idSizeW platform = WordOff . argRepSizeW platform . bcIdArgRep platform
 
--- XXX check void args
--- XXX can't we just use the tuple case for everything?
 idSizeCon :: Platform -> Id -> ByteOff
 idSizeCon platform var
+  -- unboxed tuple components are padded to word size
   | isUnboxedTupleType (idType var) ||
     isUnboxedSumType (idType var) =
     wordsToBytes platform .
