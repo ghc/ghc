@@ -1939,7 +1939,6 @@ This is unusual: it's a LocalId whose Name has a Module from another
 module. Tiresomely, we must filter it out again in GHC.Iface.Make, less we
 get two defns for 'main' in the interface file!
 
-
 Note [Main module without a main function in the export spec]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Giving accurate error messages for a Main module that does not export a main

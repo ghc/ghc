@@ -73,15 +73,15 @@ run m = case m of
   MkCostCentres mod ccs -> mkCostCentres mod ccs
   CostCentreStackInfo ptr -> ccsToStrings (fromRemotePtr ptr)
   NewBreakArray sz -> mkRemoteRef =<< newBreakArray sz
-  EnableBreakpoint ref ix b -> do
-    arr <- localRef ref
-    _ <- if b then setBreakOn arr ix else setBreakOff arr ix
+  SetupBreakpoint ref ix cnt -> do
+    arr <- localRef ref;
+    _ <- setupBreakpoint arr ix cnt
     return ()
   BreakpointStatus ref ix -> do
     arr <- localRef ref; r <- getBreak arr ix
     case r of
       Nothing -> return False
-      Just w -> return (w /= 0)
+      Just w -> return (w == 0)
   GetBreakpointVar ref ix -> do
     aps <- localRef ref
     mapM mkRemoteRef =<< getIdValFromApStack aps ix

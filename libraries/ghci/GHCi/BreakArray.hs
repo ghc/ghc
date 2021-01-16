@@ -7,12 +7,17 @@
 --
 -- | Break Arrays
 --
--- An array of bytes, indexed by a breakpoint number (breakpointId in Tickish)
+-- An array of words, indexed by a breakpoint number (breakpointId in Tickish)
+-- containing the ignore count for every breakpopint.
 -- There is one of these arrays per module.
 --
--- Each byte is
---   1 if the corresponding breakpoint is enabled
---   0 otherwise
+-- For each word with value n:
+--   n > 1  : the corresponding breakpoint is enabled. Next time the bp is hit,
+--            GHCi will decrement the ignore count and continue processing.
+--   n == 0 : The breakpoint is enabled, GHCi will stop next time it hits
+--            this breakpoint.
+--   n == -1: This breakpoint is disabled.
+--   n < -1 : Not used.
 --
 -------------------------------------------------------------------------------
 
@@ -22,25 +27,26 @@ module GHCi.BreakArray
           (BA) -- constructor is exported only for GHC.CoreToByteCode
     , newBreakArray
     , getBreak
-    , setBreakOn
-    , setBreakOff
+    , setupBreakpoint
+    , breakOn
+    , breakOff
     , showBreakArray
     ) where
 
 import Prelude -- See note [Why do we import Prelude here?]
 import Control.Monad
-import Data.Word
-import GHC.Word
 
 import GHC.Exts
 import GHC.IO ( IO(..) )
 import System.IO.Unsafe ( unsafeDupablePerformIO )
 
+#include "MachDeps.h"
+
 data BreakArray = BA (MutableByteArray# RealWorld)
 
-breakOff, breakOn :: Word8
-breakOn  = 1
-breakOff = 0
+breakOff, breakOn :: Int
+breakOn  = 0
+breakOff = -1
 
 showBreakArray :: BreakArray -> IO ()
 showBreakArray array = do
@@ -49,21 +55,14 @@ showBreakArray array = do
         putStr $ ' ' : show val
     putStr "\n"
 
-setBreakOn :: BreakArray -> Int -> IO Bool
-setBreakOn array index
-    | safeIndex array index = do
-          writeBreakArray array index breakOn
-          return True
+setupBreakpoint :: BreakArray -> Int -> Int -> IO Bool
+setupBreakpoint breakArray ind val
+    | safeIndex breakArray ind = do
+        writeBreakArray breakArray ind val
+        return True
     | otherwise = return False
 
-setBreakOff :: BreakArray -> Int -> IO Bool
-setBreakOff array index
-    | safeIndex array index = do
-          writeBreakArray array index breakOff
-          return True
-    | otherwise = return False
-
-getBreak :: BreakArray -> Int -> IO (Maybe Word8)
+getBreak :: BreakArray -> Int -> IO (Maybe Int)
 getBreak array index
     | safeIndex array index = do
           val <- readBreakArray array index
@@ -74,7 +73,7 @@ safeIndex :: BreakArray -> Int -> Bool
 safeIndex array index = index < size array && index >= 0
 
 size :: BreakArray -> Int
-size (BA array) = size
+size (BA array) = size `div` SIZEOF_HSWORD
   where
     -- We want to keep this operation pure. The mutable byte array
     -- is never resized so this is safe.
@@ -85,31 +84,31 @@ size (BA array) = size
         IO $ \s -> case getSizeofMutableByteArray# arr s of
                        (# s', n# #) -> (# s', I# n# #)
 
-allocBA :: Int -> IO BreakArray
-allocBA (I# sz) = IO $ \s1 ->
-    case newByteArray# sz s1 of { (# s2, array #) -> (# s2, BA array #) }
+allocBA :: Int# -> IO BreakArray
+allocBA sz# = IO $ \s1 ->
+    case newByteArray# sz# s1 of { (# s2, array #) -> (# s2, BA array #) }
 
--- create a new break array and initialise elements to zero
+-- create a new break array and initialise all elements to breakOff.
 newBreakArray :: Int -> IO BreakArray
-newBreakArray entries@(I# sz) = do
-    BA array <- allocBA entries
+newBreakArray (I# sz#) = do
+    BA array <- allocBA (sz# *# SIZEOF_HSWORD#)
     case breakOff of
-        off -> do
-           let loop n | isTrue# (n ==# sz) = return ()
+        I# off -> do
+           let loop n | isTrue# (n >=# sz#) = return ()
                       | otherwise = do writeBA# array n off; loop (n +# 1#)
            loop 0#
     return $ BA array
 
-writeBA# :: MutableByteArray# RealWorld -> Int# -> Word8 -> IO ()
-writeBA# array i (W8# w) = IO $ \s ->
-    case writeWord8Array# array i w s of { s -> (# s, () #) }
+writeBA# :: MutableByteArray# RealWorld -> Int# -> Int# -> IO ()
+writeBA# array ind val = IO $ \s ->
+    case writeIntArray# array ind val s of { s -> (# s, () #) }
 
-writeBreakArray :: BreakArray -> Int -> Word8 -> IO ()
-writeBreakArray (BA array) (I# i) word = writeBA# array i word
+writeBreakArray :: BreakArray -> Int -> Int -> IO ()
+writeBreakArray (BA array) (I# i) (I# val) = writeBA# array i val
 
-readBA# :: MutableByteArray# RealWorld -> Int# -> IO Word8
+readBA# :: MutableByteArray# RealWorld -> Int# -> IO Int
 readBA# array i = IO $ \s ->
-    case readWord8Array# array i s of { (# s, c #) -> (# s, W8# c #) }
+    case readIntArray# array i s of { (# s, c #) -> (# s, I# c #) }
 
-readBreakArray :: BreakArray -> Int -> IO Word8
-readBreakArray (BA array) (I# i) = readBA# array i
+readBreakArray :: BreakArray -> Int -> IO Int
+readBreakArray (BA array) (I# ind# ) = readBA# array ind#
