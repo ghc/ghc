@@ -43,7 +43,7 @@ import GHC.Runtime.Debugger
 import GHC.Runtime.Interpreter
 import GHC.Runtime.Interpreter.Types
 import GHCi.RemoteTypes
-import GHCi.BreakArray
+import GHCi.BreakArray( breakOn, breakOff )
 import GHC.ByteCode.Types
 import GHC.Core.DataCon
 import GHC.Core.ConLike
@@ -215,6 +215,7 @@ ghciCommands = map mkCmd [
   ("info",      keepGoing' (info False),        completeIdentifier),
   ("info!",     keepGoing' (info True),         completeIdentifier),
   ("issafe",    keepGoing' isSafeCmd,           completeModule),
+  ("ignore",    keepGoing ignoreCmd,            noCompletion),
   ("kind",      keepGoing' (kindOfType False),  completeIdentifier),
   ("kind!",     keepGoing' (kindOfType True),   completeIdentifier),
   ("load",      keepGoingPaths loadModule_,     completeHomeModuleOrFile),
@@ -351,7 +352,7 @@ defFullHelpText =
   "   :back [<n>]                 go back in the history N steps (after :trace)\n" ++
   "   :break [<mod>] <l> [<col>]  set a breakpoint at the specified location\n" ++
   "   :break <name>               set a breakpoint on the specified function\n" ++
-  "   :continue                   resume after a breakpoint\n" ++
+  "   :continue [<count>]         resume after a breakpoint [and set break ignore count]\n" ++
   "   :delete <number> ...        delete the specified breakpoints\n" ++
   "   :delete *                   delete all breakpoints\n" ++
   "   :disable <number> ...       disable the specified breakpoints\n" ++
@@ -361,6 +362,7 @@ defFullHelpText =
   "   :force <expr>               print <expr>, forcing unevaluated parts\n" ++
   "   :forward [<n>]              go forward in the history N step s(after :back)\n" ++
   "   :history [<n>]              after :trace, show the execution history\n" ++
+  "   :ignore <breaknum> <count>  for break <breaknum> set break ignore <count>\n" ++
   "   :list                       show the source code around current breakpoint\n" ++
   "   :list <identifier>          show the source code for <identifier>\n" ++
   "   :list [<module>] <line>     show the source code around line number <line>\n" ++
@@ -1311,7 +1313,7 @@ afterRunStmt step_here run_result = do
                st <- getGHCiState
                enqueueCommands [stop st]
                return ()
-         | otherwise -> resume step_here GHC.SingleStep >>=
+         | otherwise -> resume step_here GHC.SingleStep Nothing >>=
                         afterRunStmt step_here >> return ()
 
   flushInterpBuffers
@@ -3513,7 +3515,7 @@ completeBreakpoint = wrapCompleter spaces $ \w -> do          -- #3000
     -- Return all possible bids for a given Module
     bidsByModule :: GhciMonad m => [ModuleName] -> Module -> m [String]
     bidsByModule nonquals mod = do
-      (_, _, decls) <- getModBreak mod
+      (_, decls) <- getModBreak mod
       let bids = nub $ declPath <$> elems decls
       pure $ case (moduleName mod) `elem` nonquals of
               True  -> bids
@@ -3540,7 +3542,7 @@ completeBreakpoint = wrapCompleter spaces $ \w -> do          -- #3000
     -- declarations. See Note [ModBreaks.decls] in GHC.ByteCode.Types
     addNestedDecls :: GhciMonad m => (String, Module) -> m [String]
     addNestedDecls (ident, mod) = do
-        (_, _, decls) <- getModBreak mod
+        (_, decls) <- getModBreak mod
         let (mod_str, topLvl, _) = splitIdent ident
             ident_decls = filter ((topLvl ==) . head) $ elems decls
             bids = nub $ declPath <$> ident_decls
@@ -3726,12 +3728,24 @@ traceCmd arg
   tr []         = doContinue (const True) GHC.RunAndLogSteps
   tr expression = runStmt expression GHC.RunAndLogSteps >> return ()
 
-continueCmd :: GhciMonad m => String -> m ()
-continueCmd = noArgs $ withSandboxOnly ":continue" $ doContinue (const True) GHC.RunToCompletion
+continueCmd :: GhciMonad m => String -> m ()                  -- #19157
+continueCmd argLine = withSandboxOnly ":continue" $
+  case contSwitch (words argLine) of
+    Left sdoc   -> printForUser sdoc
+    Right mbCnt -> doContinue' (const True) GHC.RunToCompletion mbCnt
+    where
+      contSwitch :: [String] -> Either SDoc (Maybe Int)
+      contSwitch [ ] = Right Nothing
+      contSwitch [x] = getIgnoreCount x
+      contSwitch  _  = Left $
+          text "After ':continue' only one ignore count is allowed"
 
 doContinue :: GhciMonad m => (SrcSpan -> Bool) -> SingleStep -> m ()
-doContinue pre step = do
-  runResult <- resume pre step
+doContinue pre step = doContinue' pre step Nothing
+
+doContinue' :: GhciMonad m => (SrcSpan -> Bool) -> SingleStep -> Maybe Int -> m ()
+doContinue' pre step mbCnt= do
+  runResult <- resume pre step mbCnt
   _ <- afterRunStmt pre runResult
   return ()
 
@@ -3777,23 +3791,30 @@ enaDisaSwitch enaDisa idents = do
   where
     enaDisaOneBreak :: GhciMonad m => Bool -> String -> m ()
     enaDisaOneBreak enaDisa strId = do
-      sdoc_loc <- getBreakLoc enaDisa strId
+      sdoc_loc <- checkEnaDisa enaDisa strId
       case sdoc_loc of
         Left sdoc -> printForUser sdoc
         Right loc -> enaDisaAssoc enaDisa (read strId, loc)
 
-getBreakLoc :: GhciMonad m => Bool -> String -> m (Either SDoc BreakLocation)
-getBreakLoc enaDisa strId = do
+checkEnaDisa :: GhciMonad m => Bool -> String -> m (Either SDoc BreakLocation)
+checkEnaDisa enaDisa strId = do
+    sdoc_loc <- getBreakLoc strId
+    pure $ sdoc_loc >>= checkEnaDisaState enaDisa strId
+
+getBreakLoc :: GhciMonad m => String -> m (Either SDoc BreakLocation)
+getBreakLoc strId = do
     st <- getGHCiState
     case readMaybe strId >>= flip IntMap.lookup (breaks st) of
       Nothing -> return $ Left (text "Breakpoint" <+> text strId <+>
                                 text "not found")
-      Just loc ->
-        if breakEnabled loc == enaDisa
-           then return $ Left
-               (text "Breakpoint" <+> text strId <+>
-                text "already in desired state")
-           else return $ Right loc
+      Just loc -> return $ Right loc
+
+checkEnaDisaState :: Bool -> String -> BreakLocation -> Either SDoc BreakLocation
+checkEnaDisaState enaDisa strId loc = do
+    if breakEnabled loc == enaDisa
+    then Left $
+        text "Breakpoint" <+> text strId <+> text "already in desired state"
+    else Right loc
 
 enaDisaAssoc :: GhciMonad m => Bool -> (Int, BreakLocation) -> m ()
 enaDisaAssoc enaDisa (intId, loc) = do
@@ -3837,6 +3858,41 @@ historyCmd arg
 bold :: SDoc -> SDoc
 bold c | do_bold   = text start_bold <> c <> text end_bold
        | otherwise = c
+
+ignoreCmd  :: GhciMonad m => String -> m ()                     -- #19157
+ignoreCmd argLine = withSandboxOnly ":ignore" $ do
+    result <- ignoreSwitch (words argLine)
+    case result of
+      Left sdoc -> printForUser sdoc
+      Right (loc, mbCount)   -> do
+        let breakInfo = GHC.BreakInfo (breakModule loc) (breakTick loc)
+            count = fromMaybe 0 mbCount
+        setIgnoreCount breakInfo count
+
+ignoreSwitch :: GhciMonad m => [String] -> m (Either SDoc (BreakLocation, Maybe Int))
+ignoreSwitch [break, count] = do
+    sdoc_loc <- getBreakLoc break
+    pure $ (,) <$> sdoc_loc <*> getIgnoreCount count
+ignoreSwitch _ = pure $ Left $ text "Syntax:  :ignore <breaknum> <count>"
+
+getIgnoreCount :: String -> Either SDoc (Maybe Int)
+getIgnoreCount str =
+    let checkJust :: Maybe Int -> Either SDoc (Maybe Int)
+        checkJust mbCnt
+          | (isJust mbCnt) = Right mbCnt
+          | otherwise    = Left $ sdocIgnore <+> text "is not numeric"
+        checkPositive :: Maybe Int -> Either SDoc (Maybe Int)
+        checkPositive mbCnt
+          | isJust mbCnt && fromJust mbCnt >= 0 = Right mbCnt
+          | otherwise = Left $  sdocIgnore <+> text "must be >= 0"
+        mbCnt :: Maybe Int = readMaybe str
+        sdocIgnore = (text "Ignore count") <+> quotes (text str)
+    in  Right mbCnt >>= checkJust >>= checkPositive
+
+setIgnoreCount :: GhciMonad m => GHC.BreakInfo -> Int -> m()
+setIgnoreCount loc count = do
+    hsc_env <- GHC.getSession
+    GHC.setIgnoreCount hsc_env loc count
 
 backCmd :: GhciMonad m => String -> m ()
 backCmd arg
@@ -3956,7 +4012,7 @@ breakById inp = do
     validateBP _ "" (Just _) = pure $ Just $ text "Function name is missing"
     validateBP _ fun_str (Just modl) = do
         isInterpr <- GHC.moduleIsInterpreted modl
-        (_, _, decls) <- getModBreak modl
+        (_, decls) <- getModBreak modl
         mb_err_msg <- case isInterpr of
           False -> pure $ Just $ text "Module" <+> quotes (ppr modl)
                         <+> text "is not interpreted"
@@ -3975,13 +4031,12 @@ findBreakAndSet :: GhciMonad m
                 => Module -> (TickArray -> [(Int, RealSrcSpan)]) -> m ()
 findBreakAndSet md lookupTickTree = do
    tickArray <- getTickArray md
-   (breakArray, _, _) <- getModBreak md
    case lookupTickTree tickArray of
       []  -> liftIO $ putStrLn $ "No breakpoints found at that location."
-      some -> mapM_ (breakAt breakArray) some
+      some -> mapM_ breakAt some
  where
-   breakAt breakArray (tick, pan) = do
-         setBreakFlag True breakArray tick
+   breakAt (tick, pan) = do
+         setBreakFlag md tick True
          (alreadySet, nm) <-
                recordBreak $ BreakLocation
                        { breakModule = md
@@ -4250,7 +4305,7 @@ getTickArray modl = do
    case lookupModuleEnv arrmap modl of
       Just arr -> return arr
       Nothing  -> do
-        (_breakArray, ticks, _) <- getModBreak modl
+        (ticks, _) <- getModBreak modl
         let arr = mkTickArray (assocs ticks)
         setGHCiState st{tickarrays = extendModuleEnv arrmap modl arr}
         return arr
@@ -4285,29 +4340,27 @@ deleteBreak identity = do
            let rest = IntMap.delete identity oldLocations
            setGHCiState $ st { breaks = rest }
 
-turnBreakOnOff :: GHC.GhcMonad m => Bool -> BreakLocation -> m BreakLocation
+turnBreakOnOff :: GhciMonad m => Bool -> BreakLocation -> m BreakLocation
 turnBreakOnOff onOff loc
   | onOff == breakEnabled loc = return loc
   | otherwise = do
-      (arr, _, _) <- getModBreak (breakModule loc)
-      hsc_env <- GHC.getSession
-      liftIO $ enableBreakpoint hsc_env arr (breakTick loc) onOff
+      setBreakFlag (breakModule loc) (breakTick loc)  onOff
       return loc { breakEnabled = onOff }
 
 getModBreak :: GHC.GhcMonad m
-            => Module -> m (ForeignRef BreakArray, Array Int SrcSpan, Array Int [String])
+            => Module -> m (Array Int SrcSpan, Array Int [String])
 getModBreak m = do
    mod_info      <- fromMaybe (panic "getModBreak") <$> GHC.getModuleInfo m
    let modBreaks  = GHC.modInfoModBreaks mod_info
-   let arr        = GHC.modBreaks_flags modBreaks
    let ticks      = GHC.modBreaks_locs  modBreaks
    let decls      = GHC.modBreaks_decls modBreaks
-   return (arr, ticks, decls)
+   return (ticks, decls)
 
-setBreakFlag :: GHC.GhcMonad m => Bool -> ForeignRef BreakArray -> Int -> m ()
-setBreakFlag toggle arr i = do
-  hsc_env <- GHC.getSession
-  liftIO $ enableBreakpoint hsc_env arr i toggle
+setBreakFlag :: GhciMonad m => Module -> Int -> Bool ->m ()
+setBreakFlag  md ix enaDisa = do
+  let enaDisaToCount True = breakOn
+      enaDisaToCount False = breakOff
+  setIgnoreCount (GHC.BreakInfo md ix) $ enaDisaToCount enaDisa
 
 -- ---------------------------------------------------------------------------
 -- User code exception handling
