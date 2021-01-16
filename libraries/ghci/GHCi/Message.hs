@@ -224,6 +224,13 @@ data Message a where
     :: RemoteRef (ResumeContext ())
     -> Message (EvalStatus ())
 
+  -- | Set how many times a breakpoint should be ignored
+  SetBpIgnoreCount
+   :: RemoteRef BreakArray
+   -> Int                               -- index
+   -> Int                               -- count
+   -> Message ()
+
 deriving instance Show (Message a)
 
 
@@ -510,6 +517,7 @@ getMessage = do
       36 -> Msg <$> (Seq <$> get)
       37 -> Msg <$> return RtsRevertCAFs
       38 -> Msg <$> (ResumeSeq <$> get)
+      39 -> Msg <$> (SetBpIgnoreCount <$> get <*> get <*> get)
       _  -> error $ "Unknown Message code " ++ (show b)
 
 putMessage :: Message a -> Put
@@ -553,6 +561,7 @@ putMessage m = case m of
   Seq a                       -> putWord8 36 >> put a
   RtsRevertCAFs               -> putWord8 37
   ResumeSeq a                 -> putWord8 38 >> put a
+  SetBpIgnoreCount arr ix cnt -> putWord8 39 >> put arr >> put ix >> put cnt
 
 -- -----------------------------------------------------------------------------
 -- Reading/writing messages

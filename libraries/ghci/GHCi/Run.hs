@@ -77,11 +77,15 @@ run m = case m of
     arr <- localRef ref
     _ <- if b then setBreakOn arr ix else setBreakOff arr ix
     return ()
+  SetBpIgnoreCount ref ix cnt -> do
+    arr <- localRef ref;
+    _ <- setBreakCount arr ix cnt
+    return ()
   BreakpointStatus ref ix -> do
     arr <- localRef ref; r <- getBreak arr ix
     case r of
       Nothing -> return False
-      Just w -> return (w /= 0)
+      Just w -> return (w == 0)
   GetBreakpointVar ref ix -> do
     aps <- localRef ref
     mapM mkRemoteRef =<< getIdValFromApStack aps ix

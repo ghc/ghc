@@ -1066,14 +1066,23 @@ run_BCO:
             {
                breakPoints = (StgArrBytes *) BCO_PTR(arg1_brk_array);
 
-               // stop the current thread if either the
+               // stop the current thread if either the                        -- RSX fix comment !!
                // "rts_stop_next_breakpoint" flag is true OR if the
                // breakpoint flag for this particular expression is
                // true
-               if (rts_stop_next_breakpoint == true ||
-                   ((StgWord8*)breakPoints->payload)[arg2_array_index]
-                     == true)
+               StgInt bpIgnoreCount = ((StgInt*)breakPoints->payload)[arg2_array_index];
+               bool doBreak = false;
+               if (rts_stop_next_breakpoint == false)
                {
+                   if (bpIgnoreCount > 0) {           // decrement and write back
+                       ((StgInt*)breakPoints->payload)[arg2_array_index] = --bpIgnoreCount;
+                   }
+                   else if (bpIgnoreCount == 0) {
+                       doBreak = true;
+                   }
+               }
+               if (rts_stop_next_breakpoint == true || doBreak)
+                {
                   // make sure we don't automatically stop at the
                   // next breakpoint
                   rts_stop_next_breakpoint = false;

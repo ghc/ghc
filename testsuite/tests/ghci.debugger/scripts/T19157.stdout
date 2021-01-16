@@ -1,0 +1,13 @@
+Breakpoint 0 activated at T19157.hs:8:23-37
+Stopped in T19157.mySum.go, T19157.hs:8:23-37
+_result :: Int = _
+go :: Int -> [Int] -> Int = _
+s :: Int = 1
+ss :: [Int] = [2,3,4,5]
+sum :: Int = 0
+Stopped in T19157.mySum.go, T19157.hs:8:23-37
+_result :: Int = _
+go :: Int -> [Int] -> Int = _
+s :: Int = 4
+ss :: [Int] = [5]
+sum :: Int = _

@@ -347,7 +347,7 @@ defFullHelpText =
   "   :back [<n>]                 go back in the history N steps (after :trace)\n" ++
   "   :break [<mod>] <l> [<col>]  set a breakpoint at the specified location\n" ++
   "   :break <name>               set a breakpoint on the specified function\n" ++
-  "   :continue                   resume after a breakpoint\n" ++
+  "   :continue [<count>]         resume after a breakpoint [and set break ignore count]\n" ++
   "   :delete <number> ...        delete the specified breakpoints\n" ++
   "   :delete *                   delete all breakpoints\n" ++
   "   :disable <number> ...       disable the specified breakpoints\n" ++
@@ -1306,7 +1306,7 @@ afterRunStmt step_here run_result = do
                st <- getGHCiState
                enqueueCommands [stop st]
                return ()
-         | otherwise -> resume step_here GHC.SingleStep >>=
+         | otherwise -> resume step_here GHC.SingleStep Nothing >>=
                         afterRunStmt step_here >> return ()
 
   flushInterpBuffers
@@ -3676,12 +3676,36 @@ traceCmd arg
   tr []         = doContinue (const True) GHC.RunAndLogSteps
   tr expression = runStmt expression GHC.RunAndLogSteps >> return ()
 
-continueCmd :: GhciMonad m => String -> m ()
-continueCmd = noArgs $ withSandboxOnly ":continue" $ doContinue (const True) GHC.RunToCompletion
+continueCmd :: GhciMonad m => String -> m ()                  -- #19157
+continueCmd argLine = withSandboxOnly ":continue" $ do
+  contSwitch $ words argLine
+    where
+      contSwitch :: GhciMonad m => [String] -> m ()
+      contSwitch [] = doCont Nothing
+      contSwitch [x] = do
+        mbCnt <- getBpIgnoreCount x
+        doCont mbCnt
+      contSwitch _ = throwGhcException $
+        CmdLineError "After :continue only one positive number is allowed"
+
+      doCont :: GhciMonad m => Maybe Int -> m ()
+      doCont mbCnt = doContinue' (const True) GHC.RunToCompletion mbCnt
+
+getBpIgnoreCount :: GhciMonad m => String -> m (Maybe Int)
+getBpIgnoreCount str = do
+    let mbCnt :: Maybe Int = readMaybe str
+    when (isNothing mbCnt) $ throwGhcException $
+            CmdLineError ("'" ++ str ++ "' is not numeric")
+    when (fromJust mbCnt < 0) $ throwGhcException $
+            CmdLineError ("'" ++ str ++ "' must be >= 0")
+    pure mbCnt
 
 doContinue :: GhciMonad m => (SrcSpan -> Bool) -> SingleStep -> m ()
-doContinue pre step = do
-  runResult <- resume pre step
+doContinue pre step = doContinue' pre step Nothing
+
+doContinue' :: GhciMonad m => (SrcSpan -> Bool) -> SingleStep -> Maybe Int -> m ()
+doContinue' pre step mbCnt= do
+  runResult <- resume pre step mbCnt
   _ <- afterRunStmt pre runResult
   return ()
 
