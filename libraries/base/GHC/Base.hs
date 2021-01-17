@@ -493,6 +493,7 @@ class Functor f where
     --
     -- Some type constructors with two parameters or more have a @'Data.Bifunctor'@ instance that allows
     -- both the last and the penultimate parameters to be mapped over.
+    --
     -- ==== __Examples__
     --
     -- Convert from a @'Data.Maybe.Maybe' Int@ to a @Maybe String@
@@ -524,11 +525,11 @@ class Functor f where
     -- It may seem surprising that the function is only applied to the last element of the tuple
     -- compared to the list example above which applies it to every element in the list.
     -- To understand, remember that tuples are type constructors with multiple type parameters:
-    -- a tuple of 3 elements `(a,b,c)` can also be written `(,,) a b c` and its `Functor` instance
-    -- is defined for `Functor ((,,) a b)` (i.e., only the third parameter is free to be mapped over
-    -- with `fmap`).
+    -- a tuple of 3 elements @(a,b,c)@ can also be written @(,,) a b c@ and its @Functor@ instance
+    -- is defined for @Functor ((,,) a b)@ (i.e., only the third parameter is free to be mapped over
+    -- with @fmap@).
     --
-    -- It explains why `fmap` can be used with tuples containing values of different types as in the
+    -- It explains why @fmap@ can be used with tuples containing values of different types as in the
     -- following example:
     --
     -- >>> fmap even ("hello", 1.0, 4)
