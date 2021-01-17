@@ -1460,13 +1460,22 @@ Example:
 nodeConApp :: HasDebugCallStack => Module -> ContextStack -> StgExpr -> AM (InferStgExpr, NodeId)
 nodeConApp this_mod ctxt (StgConApp _ext con args tys) = do
     node_id <- mkUniqueId
-    let result = maybeLat
+    mapM_ (addImportedNode this_mod) [v | StgVarArg v <- args]
+    -- The input fields are *important*. We use them to decide if
+    -- we need to evaluate any of the strict fields of the constructor
+    -- in the rewrite steps.
+    inputs <- mapM (getConArgNodeId ctxt) args :: AM [NodeId]
+    let updater = do
+            let result = maybeLat
+            -- pprTraceM "UpdateConApp:" $ ppr (node_id,result) <+> text "inputs:" <> ppr inputs
+            updateNodeResult node_id result
+            return $! result
 
-    addNode isDone $ setNodeDesc (text "conApp") $ FlowNode
+    addNode notDone $ setNodeDesc (text "conApp") $ FlowNode
         { node_id = node_id
-        , node_result = result
-        , node_inputs = []
-        , node_update = return result
+        , node_result = undetLat
+        , node_inputs = inputs
+        , node_update = updater
         }
 
     return $! (StgConApp node_id con args tys, node_id)
