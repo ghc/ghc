@@ -126,6 +126,12 @@ _darcs/
 /driver/ghci/ghc-pkg-inplace
 /driver/ghci/ghci-inplace
 /driver/ghci/ghci.res
+/driver/ghci/cwrapper.c
+/driver/ghci/cwrapper.h
+/driver/ghci/getLocation.c
+/driver/ghci/getLocation.h
+/driver/ghci/isMinTTY.c
+/driver/ghci/isMinTTY.h
 /driver/package.conf
 /driver/package.conf.inplace.old
 /settings
