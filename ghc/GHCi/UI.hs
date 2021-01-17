@@ -1552,13 +1552,9 @@ pprInfo :: (TyThing, Fixity, [GHC.ClsInst], [GHC.FamInst], SDoc) -> SDoc
 pprInfo (thing, fixity, cls_insts, fam_insts, docs)
   =  docs
   $$ pprTyThingInContextLoc thing
-  $$ show_fixity
+  $$ showFixity thing fixity
   $$ vcat (map GHC.pprInstance cls_insts)
   $$ vcat (map GHC.pprFamInst  fam_insts)
-  where
-    show_fixity
-        | fixity == GHC.defaultFixity = empty
-        | otherwise                   = ppr fixity <+> pprInfixName (GHC.getName thing)
 
 -----------------------------------------------------------------------------
 -- :main
@@ -3264,11 +3260,7 @@ showBindings = do
     pprTT :: (TyThing, Fixity, [GHC.ClsInst], [GHC.FamInst], SDoc) -> SDoc
     pprTT (thing, fixity, _cls_insts, _fam_insts, _docs)
       = pprTyThing showToHeader thing
-        $$ show_fixity
-      where
-        show_fixity
-            | fixity == GHC.defaultFixity  = empty
-            | otherwise                    = ppr fixity <+> ppr (GHC.getName thing)
+        $$ showFixity thing fixity
 
 
 printTyThing :: GHC.GhcMonad m => TyThing -> m ()
@@ -4406,6 +4398,24 @@ showModule = moduleNameString . moduleName
 -- See Note [Field modBreaks_decls] in GHC.ByteCode.Types
 declPath :: [String] -> String
 declPath = intercalate "."
+
+-- | Optionally show a fixity declaration like @infixr 4 #@
+--
+-- We always display the fixity of terms with symbolic names (like <$>).
+-- For other terms we only display the fixity if it has been set to a
+-- value other than the default infixl 9.
+--
+-- We have no way of distinguishing between a fixity that has been
+-- manually set to infixl 9 and a fixity that has assumed infixl 9 as
+-- the default, so we choose to not display the fixity in both cases
+-- (for terms with non-symbolic names).
+--
+-- See #19200.
+showFixity :: TyThing -> Fixity -> SDoc
+showFixity thing fixity
+    | fixity /= GHC.defaultFixity || isSymOcc (getOccName thing)
+        = ppr fixity <+> pprInfixName (GHC.getName thing)
+    | otherwise = empty
 
 -- TODO: won't work if home dir is encoded.
 -- (changeDirectory may not work either in that case.)
