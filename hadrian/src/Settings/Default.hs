@@ -124,6 +124,7 @@ stage1Packages = do
           ++ [ libiserv | not cross ]
           ++ [ runGhc   | not cross                  ]
           ++ [ touchy   | windowsHost                ]
+          ++ [ ghciWrapper | windowsHost             ]
           ++ [ unix     | not windowsHost            ]
           ++ [ win32    | windowsHost                ]
 

@@ -1496,6 +1496,7 @@ AC_CONFIG_FILES(
   compiler/ghc.cabal
   ghc/ghc-bin.cabal
   utils/runghc/runghc.cabal
+  driver/ghci/ghci-wrapper.cabal
   utils/iserv/iserv.cabal
   utils/iserv-proxy/iserv-proxy.cabal
   utils/remote-iserv/remote-iserv.cabal
