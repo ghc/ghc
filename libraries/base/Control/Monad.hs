@@ -284,10 +284,11 @@ Core: https://gitlab.haskell.org/ghc/ghc/issues/11795#note_118976
 -- and then returns the list of results:
 --
 -- ==== __Examples__
--- >>> replicateM 3 (putStrLn "a")
--- a
--- a
--- a
+--
+-- >>> import Control.Monad.State
+-- >>> runState (replicateM 3 $ state $ \s -> (s, s + 1)) 1
+-- ([1,2,3],4)
+--
 replicateM        :: (Applicative m) => Int -> m a -> m [a]
 {-# INLINABLE replicateM #-}
 {-# SPECIALISE replicateM :: Int -> IO a -> IO [a] #-}
@@ -300,6 +301,14 @@ replicateM cnt0 f =
         | otherwise = liftA2 (:) f (loop (cnt - 1))
 
 -- | Like 'replicateM', but discards the result.
+--
+-- ==== __Examples__
+--
+-- >>> replicateM_ 3 (putStrLn "a")
+-- a
+-- a
+-- a
+--
 replicateM_       :: (Applicative m) => Int -> m a -> m ()
 {-# INLINABLE replicateM_ #-}
 {-# SPECIALISE replicateM_ :: Int -> IO a -> IO () #-}
