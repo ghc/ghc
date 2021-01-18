@@ -1467,16 +1467,8 @@ flattenExtensionFlags ml = foldr f defaultExtensionFlags
 -- @docs/users_guide/exts@.
 languageExtensions :: Maybe Language -> [LangExt.Extension]
 
-languageExtensions Nothing
-    -- Nothing => the default case
-    = LangExt.NondecreasingIndentation -- This has been on by default for some time
-    : delete LangExt.DatatypeContexts  -- The Haskell' committee decided to
-                                       -- remove datatype contexts from the
-                                       -- language:
-   -- http://www.haskell.org/pipermail/haskell-prime/2011-January/003335.html
-      (languageExtensions (Just Haskell2010))
-
-   -- NB: MonoPatBinds is no longer the default
+-- Nothing: the default case
+languageExtensions Nothing = languageExtensions (Just GHC2021)
 
 languageExtensions (Just Haskell98)
     = [LangExt.ImplicitPrelude,
@@ -1508,6 +1500,55 @@ languageExtensions (Just Haskell2010)
        LangExt.PatternGuards,
        LangExt.DoAndIfThenElse,
        LangExt.RelaxedPolyRec]
+
+languageExtensions (Just GHC2021)
+    = [LangExt.ImplicitPrelude,
+       -- See Note [When is StarIsType enabled]
+       LangExt.StarIsType,
+       LangExt.MonomorphismRestriction,
+       LangExt.TraditionalRecordSyntax,
+       LangExt.EmptyDataDecls,
+       LangExt.ForeignFunctionInterface,
+       LangExt.PatternGuards,
+       LangExt.DoAndIfThenElse,
+       LangExt.RelaxedPolyRec,
+       -- Now the new extensions (not in Haskell2010)
+       LangExt.BangPatterns,
+       LangExt.BinaryLiterals,
+       LangExt.ConstrainedClassMethods,
+       LangExt.ConstraintKinds,
+       LangExt.DeriveDataTypeable,
+       LangExt.DeriveFoldable,
+       LangExt.DeriveFunctor,
+       LangExt.DeriveGeneric,
+       LangExt.DeriveLift,
+       LangExt.DeriveTraversable,
+       LangExt.EmptyCase,
+       LangExt.EmptyDataDeriving,
+       LangExt.ExistentialQuantification,
+       LangExt.ExplicitForAll,
+       LangExt.FlexibleContexts,
+       LangExt.FlexibleInstances,
+       LangExt.GADTSyntax,
+       LangExt.GeneralisedNewtypeDeriving,
+       LangExt.HexFloatLiterals,
+       LangExt.ImportQualifiedPost,
+       LangExt.InstanceSigs,
+       LangExt.KindSignatures,
+       LangExt.MultiParamTypeClasses,
+       LangExt.NamedFieldPuns,
+       LangExt.NamedWildCards,
+       LangExt.NumericUnderscores,
+       LangExt.PolyKinds,
+       LangExt.PostfixOperators,
+       LangExt.RankNTypes,
+       LangExt.ScopedTypeVariables,
+       LangExt.StandaloneDeriving,
+       LangExt.StandaloneKindSignatures,
+       LangExt.TupleSections,
+       LangExt.TypeApplications,
+       LangExt.TypeOperators,
+       LangExt.TypeSynonymInstances]
 
 hasPprDebug :: DynFlags -> Bool
 hasPprDebug = dopt Opt_D_ppr_debug
@@ -3554,7 +3595,8 @@ supportedLanguagesAndExtensions arch_os =
 languageFlagsDeps :: [(Deprecation, FlagSpec Language)]
 languageFlagsDeps = [
   flagSpec "Haskell98"   Haskell98,
-  flagSpec "Haskell2010" Haskell2010
+  flagSpec "Haskell2010" Haskell2010,
+  flagSpec "GHC2021"     GHC2021
   ]
 
 -- | These -X<blah> flags cannot be reversed with -XNo<blah>

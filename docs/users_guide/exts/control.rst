@@ -17,6 +17,70 @@ Language extensions can be controlled (i.e. allowed or not) in two ways:
 -  Language extensions can also be enabled using the ``LANGUAGE`` pragma, thus
    ``{-# LANGUAGE TemplateHaskell #-}`` (see :ref:`language-pragma`).
 
+.. extension:: GHC2021
+    :shortdesc: Use GHC’s set of default languages from 2021
+
+    GHC blesses a number of extensions, beyond Haskell 2010, to be suitable to
+    turned on by default. These extensions are considered to be stable and
+    conservative.
+
+    ``GHC2021`` is used by GHC if neither ``Haskell98`` nor``Haskell2010`` is
+    turned on explicitly. Since later versions of GHC may use a later
+    ``GHC20xx`` by default, users are advised to declare the language set
+    explicitly with ``-XGHC2021``.
+
+
+    The ``GHC2021`` language set comprises of the following extensions:
+
+    .. hlist::
+
+     * :extension:`ImplicitPrelude`
+     * :extension:`StarIsType`
+     * :extension:`MonomorphismRestriction`
+     * :extension:`TraditionalRecordSyntax`
+     * :extension:`EmptyDataDecls`
+     * :extension:`ForeignFunctionInterface`
+     * :extension:`PatternGuards`
+     * :extension:`DoAndIfThenElse`
+     * :extension:`RelaxedPolyRec`
+     * :extension:`BangPatterns`
+     * :extension:`BinaryLiterals`
+     * :extension:`ConstrainedClassMethods`
+     * :extension:`ConstraintKinds`
+     * :extension:`DeriveDataTypeable`
+     * :extension:`DeriveFoldable`
+     * :extension:`DeriveFunctor`
+     * :extension:`DeriveGeneric`
+     * :extension:`DeriveLift`
+     * :extension:`DeriveTraversable`
+     * :extension:`EmptyCase`
+     * :extension:`EmptyDataDeriving`
+     * :extension:`ExistentialQuantification`
+     * :extension:`ExplicitForAll`
+     * :extension:`FlexibleContexts`
+     * :extension:`FlexibleInstances`
+     * :extension:`GADTSyntax`
+     * :extension:`GeneralisedNewtypeDeriving`
+     * :extension:`HexFloatLiterals`
+     * :extension:`ImportQualifiedPost`
+     * :extension:`InstanceSigs`
+     * :extension:`KindSignatures`
+     * :extension:`MultiParamTypeClasses`
+     * :extension:`NamedFieldPuns`
+     * :extension:`NamedWildCards`
+     * :extension:`NumericUnderscores`
+     * :extension:`PolyKinds`
+     * :extension:`PostfixOperators`
+     * :extension:`RankNTypes`
+     * :extension:`ScopedTypeVariables`
+     * :extension:`StandaloneDeriving`
+     * :extension:`StandaloneKindSignatures`
+     * :extension:`TupleSections`
+     * :extension:`TypeApplications`
+     * :extension:`TypeOperators`
+     * :extension:`TypeSynonymInstances`
+
+
 .. extension:: Haskell2010
     :shortdesc: Use the Haskell 2010 language variant.
 
