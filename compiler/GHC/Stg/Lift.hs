@@ -229,7 +229,6 @@ liftExpr (StgApp f args) = do
   pure (StgApp f' top_lvl_args)
 liftExpr (StgConApp con args tys) = StgConApp con <$> traverse liftArgs args <*> pure tys
 liftExpr (StgOpApp op args ty) = StgOpApp op <$> traverse liftArgs args <*> pure ty
-liftExpr (StgLam _ _) = pprPanic "stgLiftLams" (text "StgLam")
 liftExpr (StgCase scrut info ty alts) = do
   scrut' <- liftExpr scrut
   withSubstBndr (binderInfoBndr info) $ \bndr' -> do

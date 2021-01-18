@@ -336,9 +336,6 @@ unariseExpr rho (StgConApp dc args ty_args)
 unariseExpr rho (StgOpApp op args ty)
   = return (StgOpApp op (unariseFunArgs rho args) ty)
 
-unariseExpr _ e@StgLam{}
-  = pprPanic "unariseExpr: found lambda" (pprStgExpr panicStgPprOpts e)
-
 unariseExpr rho (StgCase scrut bndr alt_ty alts)
   -- tuple/sum binders in the scrutinee can always be eliminated
   | StgApp v [] <- scrut

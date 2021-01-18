@@ -33,13 +33,17 @@ basic properties listed above.
 -}
 
 {-# LANGUAGE ScopedTypeVariables, FlexibleContexts, TypeFamilies,
-  DeriveFunctor #-}
+  DeriveFunctor, TypeApplications, CPP #-}
 
 module GHC.Stg.Lint ( lintStgTopBindings ) where
 
 import GHC.Prelude
 
 import GHC.Stg.Syntax
+import GHC.Hs.Extension ( NoExtCon )
+#if __GLASGOW_HASKELL__ < 811
+import GHC.Hs.Extension ( noExtCon )
+#endif
 
 import GHC.Driver.Session
 import GHC.Data.Bag         ( Bag, emptyBag, isEmptyBag, snocBag, bagToList )
@@ -60,7 +64,7 @@ import qualified GHC.Utils.Error as Err
 import Control.Applicative ((<|>))
 import Control.Monad
 
-lintStgTopBindings :: forall a . (OutputablePass a, BinderP a ~ Id)
+lintStgTopBindings :: forall a . (OutputablePass a, BinderP a ~ Id, XXStgExpr a ~ NoExtCon)
                    => DynFlags
                    -> Module -- ^ module being compiled
                    -> Bool   -- ^ have we run Unarise yet?
@@ -108,7 +112,7 @@ lintStgVar :: Id -> LintM ()
 lintStgVar id = checkInScope id
 
 lintStgBinds
-    :: (OutputablePass a, BinderP a ~ Id)
+    :: (OutputablePass a, BinderP a ~ Id, XXStgExpr a ~ NoExtCon)
     => TopLevelFlag -> GenStgBinding a -> LintM [Id] -- Returns the binders
 lintStgBinds top_lvl (StgNonRec binder rhs) = do
     lint_binds_help top_lvl (binder,rhs)
@@ -122,7 +126,7 @@ lintStgBinds top_lvl (StgRec pairs)
     binders = [b | (b,_) <- pairs]
 
 lint_binds_help
-    :: (OutputablePass a, BinderP a ~ Id)
+    :: (OutputablePass a, BinderP a ~ Id, XXStgExpr a ~ NoExtCon)
     => TopLevelFlag
     -> (Id, GenStgRhs a)
     -> LintM ()
@@ -153,7 +157,7 @@ checkNoCurrentCCS rhs = do
          -> addErrL (text "Top-level StgRhsCon with CurrentCCS" $$ rhs')
       _ -> return ()
 
-lintStgRhs :: (OutputablePass a, BinderP a ~ Id) => GenStgRhs a -> LintM ()
+lintStgRhs :: (OutputablePass a, BinderP a ~ Id, XXStgExpr a ~ NoExtCon) => GenStgRhs a -> LintM ()
 
 lintStgRhs (StgRhsClosure _ _ _ [] expr)
   = lintStgExpr expr
@@ -171,7 +175,7 @@ lintStgRhs rhs@(StgRhsCon _ con args) = do
     mapM_ lintStgArg args
     mapM_ checkPostUnariseConArg args
 
-lintStgExpr :: (OutputablePass a, BinderP a ~ Id) => GenStgExpr a -> LintM ()
+lintStgExpr :: (OutputablePass a, BinderP a ~ Id, XXStgExpr a ~ NoExtCon) => GenStgExpr a -> LintM ()
 
 lintStgExpr (StgLit _) = return ()
 
@@ -191,10 +195,6 @@ lintStgExpr app@(StgConApp con args _arg_tys) = do
 
 lintStgExpr (StgOpApp _ args _) =
     mapM_ lintStgArg args
-
-lintStgExpr lam@(StgLam _ _) = do
-    opts <- getStgPprOpts
-    addErrL (text "Unexpected StgLam" <+> pprStgExpr opts lam)
 
 lintStgExpr (StgLet _ binds body) = do
     binders <- lintStgBinds NotTopLevel binds
@@ -218,8 +218,12 @@ lintStgExpr (StgCase scrut bndr alts_type alts) = do
 
     addInScopeVars [bndr | in_scope] (mapM_ lintAlt alts)
 
+#if __GLASGOW_HASKELL__ < 811
+lintStgExpr (XStgExpr xStgExpr) = noExtCon xStgExpr
+#endif
+
 lintAlt
-    :: (OutputablePass a, BinderP a ~ Id)
+    :: (OutputablePass a, BinderP a ~ Id, XXStgExpr a ~ NoExtCon)
     => (AltCon, [Id], GenStgExpr a) -> LintM ()
 
 lintAlt (DEFAULT, _, rhs) =
