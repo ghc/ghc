@@ -1563,8 +1563,8 @@ void postIPE(StgWord64 info,
     StgWord module_len = strlen(module);
     StgWord srcloc_len = strlen(srcloc);
     // 8 for the info word
-    // 5 for the number of strings in the payload as postString adds 1 to the length
-    StgWord len = 8+table_name_len+closure_desc_len+ty_desc_len+label_len+module_len+srcloc_len+5;
+    // 6 for the number of strings in the payload as postString adds 1 to the length
+    StgWord len = 8+table_name_len+closure_desc_len+ty_desc_len+label_len+module_len+srcloc_len+6;
     ensureRoomForVariableEvent(&eventBuf, len);
     postEventHeader(&eventBuf, EVENT_IPE);
     postPayloadSize(&eventBuf, len);
