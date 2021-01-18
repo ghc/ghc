@@ -316,7 +316,7 @@ warnMissingHomeModules hsc_env mod_graph =
           (sep (map ppr missing))
     warn = makeIntoWarning
       (Reason Opt_WarnMissingHomeModules)
-      (mkPlainErrMsg noSrcSpan msg)
+      (mkPlainMsgEnvelope noSrcSpan msg)
 
 -- | Describes which modules of the module graph need to be loaded.
 data LoadHowMuch
@@ -383,7 +383,7 @@ warnUnusedPackages = do
 
     let warn = makeIntoWarning
           (Reason Opt_WarnUnusedPackages)
-          (mkPlainErrMsg noSrcSpan msg)
+          (mkPlainMsgEnvelope noSrcSpan msg)
         msg = vcat [ text "The following packages were specified" <+>
                      text "via -package or -package-id flags,"
                    , text "but were not needed for compilation:"
@@ -2209,7 +2209,7 @@ warnUnnecessarySourceImports sccs = do
 
         warn :: Located ModuleName -> WarnMsg
         warn (L loc mod) =
-           mkPlainErrMsg loc
+           mkPlainMsgEnvelope loc
                 (text "Warning: {-# SOURCE #-} unnecessary in import of "
                  <+> quotes (ppr mod))
 
@@ -2278,7 +2278,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
                 if exists || isJust maybe_buf
                     then summariseFile hsc_env old_summaries file mb_phase
                                        obj_allowed maybe_buf
-                    else return $ Left $ unitBag $ mkPlainErrMsg noSrcSpan $
+                    else return $ Left $ unitBag $ mkPlainMsgEnvelope noSrcSpan $
                            text "can't find file:" <+> text file
         getRootSummary (Target (TargetModule modl) obj_allowed maybe_buf)
            = do maybe_summary <- summariseModule hsc_env old_summary_map NotBoot
@@ -2718,7 +2718,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
               | otherwise = HsSrcFile
 
         when (pi_mod_name /= wanted_mod) $
-                throwE $ unitBag $ mkPlainErrMsg pi_mod_name_loc $
+                throwE $ unitBag $ mkPlainMsgEnvelope pi_mod_name_loc $
                               text "File name does not match module name:"
                               $$ text "Saw:" <+> quotes (ppr pi_mod_name)
                               $$ text "Expected:" <+> quotes (ppr wanted_mod)
@@ -2730,7 +2730,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
                         | (k,v) <- ((pi_mod_name, mkHoleModule pi_mod_name)
                                 : homeUnitInstantiations home_unit)
                         ])
-            in throwE $ unitBag $ mkPlainErrMsg pi_mod_name_loc $
+            in throwE $ unitBag $ mkPlainMsgEnvelope pi_mod_name_loc $
                 text "Unexpected signature:" <+> quotes (ppr pi_mod_name)
                 $$ if gopt Opt_BuildingCabalPackage dflags
                     then parens (text "Try adding" <+> quotes (ppr pi_mod_name)
@@ -2886,24 +2886,24 @@ withDeferredDiagnostics f = do
       (\_ -> setLogAction (log_action dflags) >> printDeferredDiagnostics)
       (\_ -> f)
 
-noModError :: HscEnv -> SrcSpan -> ModuleName -> FindResult -> ErrMsg [SDoc]
+noModError :: HscEnv -> SrcSpan -> ModuleName -> FindResult -> MsgEnvelope [SDoc]
 -- ToDo: we don't have a proper line number for this error
 noModError hsc_env loc wanted_mod err
-  = mkPlainErrMsg loc $ cannotFindModule hsc_env wanted_mod err
+  = mkPlainMsgEnvelope loc $ cannotFindModule hsc_env wanted_mod err
 
 noHsFileErr :: SrcSpan -> String -> ErrorMessages
 noHsFileErr loc path
-  = unitBag $ mkPlainErrMsg loc $ text "Can't find" <+> text path
+  = unitBag $ mkPlainMsgEnvelope loc $ text "Can't find" <+> text path
 
 moduleNotFoundErr :: ModuleName -> ErrorMessages
 moduleNotFoundErr mod
-  = unitBag $ mkPlainErrMsg noSrcSpan $
+  = unitBag $ mkPlainMsgEnvelope noSrcSpan $
         text "module" <+> quotes (ppr mod) <+> text "cannot be found locally"
 
 multiRootsErr :: [ModSummary] -> IO ()
 multiRootsErr [] = panic "multiRootsErr"
 multiRootsErr summs@(summ1:_)
-  = throwOneError $ mkPlainErrMsg noSrcSpan $
+  = throwOneError $ mkPlainMsgEnvelope noSrcSpan $
         text "module" <+> quotes (ppr mod) <+>
         text "is defined in multiple files:" <+>
         sep (map text files)

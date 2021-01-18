@@ -297,7 +297,7 @@ findDependency hsc_env srcloc pkg imp is_boot include_pkg_deps
                 -> return Nothing
 
             fail ->
-                throwOneError $ mkPlainErrMsg srcloc $
+                throwOneError $ mkPlainMsgEnvelope srcloc $
                      cannotFindModule hsc_env imp fail
         }
 
