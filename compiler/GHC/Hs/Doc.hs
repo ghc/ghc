@@ -27,7 +27,6 @@ import GHC.Prelude
 
 import GHC.Utils.Binary
 import GHC.Utils.Encoding
-import GHC.Utils.IO.Unsafe
 import GHC.Types.Name
 import GHC.Utils.Outputable as Outputable
 import GHC.Types.SrcLoc
@@ -35,12 +34,10 @@ import GHC.Types.SrcLoc
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as C8
-import qualified Data.ByteString.Internal as BS
 import Data.Data
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Maybe
-import Foreign
 
 -- | Haskell Documentation String
 --
@@ -68,13 +65,7 @@ isEmptyDocString :: HsDocString -> Bool
 isEmptyDocString (HsDocString bs) = BS.null bs
 
 mkHsDocString :: String -> HsDocString
-mkHsDocString s =
-  inlinePerformIO $ do
-    let len = utf8EncodedLength s
-    buf <- mallocForeignPtrBytes len
-    withForeignPtr buf $ \ptr -> do
-      utf8EncodeString ptr s
-      pure (HsDocString (BS.fromForeignPtr buf 0 len))
+mkHsDocString s = HsDocString (utf8EncodeString s)
 
 -- | Create a 'HsDocString' from a UTF8-encoded 'ByteString'.
 mkHsDocStringUtf8ByteString :: ByteString -> HsDocString
