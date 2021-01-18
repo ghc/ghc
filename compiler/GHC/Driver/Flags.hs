@@ -528,7 +528,7 @@ instance ToJson WarnReason where
   json (ErrReason (Just wf)) = JSString (show wf)
 
 
-data Language = Haskell98 | Haskell2010
+data Language = Haskell98 | Haskell2010 | GHC2021
    deriving (Eq, Enum, Show, Bounded)
 
 instance Outputable Language where
