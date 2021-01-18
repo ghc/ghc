@@ -14,21 +14,21 @@ module GHC.Utils.Error (
         Severity(..),
 
         -- * Messages
-        ErrMsg(..),
         WarnMsg,
+        MsgEnvelope(..),
         SDoc,
         Messages, ErrorMessages, WarningMessages,
         unionMessages,
         errorsFound, isEmptyMessages,
 
         -- ** Formatting
-        pprMessageBag, pprErrMsgBagWithLoc,
-        pprLocErrMsg,
+        pprMessageBag, pprMsgEnvelopeBagWithLoc,
+        pprLocMsgEnvelope,
         formatErrDoc,
 
         -- ** Construction
         emptyMessages, mkLocMessage, mkLocMessageAnn, makeIntoWarning,
-        mkErrMsg, mkPlainErrMsg, mkErr, mkLongErrMsg, mkWarnMsg,
+        mkMsgEnvelope, mkPlainMsgEnvelope, mkErr, mkLongMsgEnvelope, mkWarnMsg,
         mkPlainWarnMsg,
         mkLongWarnMsg,
 
@@ -130,18 +130,18 @@ formatErrDoc ctx docs
     msgs    = filter (not . Outputable.isEmpty ctx) docs
     starred = (bullet<+>)
 
-pprErrMsgBagWithLoc :: Bag (ErrMsg [SDoc]) -> [SDoc]
-pprErrMsgBagWithLoc bag = [ pprLocErrMsg item | item <- sortMsgBag Nothing bag ]
+pprMsgEnvelopeBagWithLoc :: Bag (MsgEnvelope [SDoc]) -> [SDoc]
+pprMsgEnvelopeBagWithLoc bag = [ pprLocMsgEnvelope item | item <- sortMsgBag Nothing bag ]
 
-pprLocErrMsg :: RenderableDiagnostic e => ErrMsg e -> SDoc
-pprLocErrMsg (ErrMsg { errMsgSpan      = s
-                     , errMsgDiagnostic = e
-                     , errMsgSeverity  = sev
-                     , errMsgContext   = unqual })
+pprLocMsgEnvelope :: RenderableDiagnostic e => MsgEnvelope e -> SDoc
+pprLocMsgEnvelope (MsgEnvelope { errMsgSpan      = s
+                               , errMsgDiagnostic = e
+                               , errMsgSeverity  = sev
+                               , errMsgContext   = unqual })
   = sdocWithContext $ \ctx ->
     withErrStyle unqual $ mkLocMessage sev s (formatErrDoc ctx $ renderDiagnostic e)
 
-sortMsgBag :: Maybe DynFlags -> Bag (ErrMsg e) -> [ErrMsg e]
+sortMsgBag :: Maybe DynFlags -> Bag (MsgEnvelope e) -> [MsgEnvelope e]
 sortMsgBag dflags = maybeLimit . sortBy (cmp `on` errMsgSpan) . bagToList
   where cmp
           | fromMaybe False (fmap reverseErrors dflags) = SrcLoc.rightmost_smallest
