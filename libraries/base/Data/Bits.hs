@@ -62,7 +62,7 @@ import GHC.Enum
 import GHC.Read
 import GHC.Show
 
--- | A more concise version of 'complement zeroBits'.
+-- | A more concise version of @complement zeroBits@.
 --
 -- >>> complement zeroBits :: Word == oneBits :: Word
 -- True
@@ -82,8 +82,17 @@ oneBits = complement zeroBits
 --
 -- @since 4.16
 newtype And a = And { getAnd :: a }
-  deriving newtype (Bounded, Enum, Bits, FiniteBits, Eq)
-  deriving stock (Show, Read)
+  deriving newtype (
+                    Bounded, -- ^ @since 4.16
+                    Enum, -- ^ @since 4.16
+                    Bits, -- ^ @since 4.16
+                    FiniteBits, -- ^ @since 4.16
+                    Eq -- ^ @since 4.16
+                    )
+  deriving stock (
+                  Show, -- ^ @since 4.16
+                  Read -- ^ @since 4.16
+                 )
 
 -- | @since 4.16
 instance (Bits a) => Semigroup (And a) where
@@ -100,8 +109,17 @@ instance (Bits a) => Monoid (And a) where
 --
 -- @since 4.16
 newtype Ior a = Ior { getIor :: a }
-  deriving newtype (Bounded, Enum, Bits, FiniteBits, Eq)
-  deriving stock (Show, Read)
+  deriving newtype (
+                    Bounded, -- ^ @since 4.16
+                    Enum, -- ^ @since 4.16
+                    Bits, -- ^ @since 4.16
+                    FiniteBits, -- ^ @since 4.16
+                    Eq -- ^ @since 4.16
+                    )
+  deriving stock (
+                  Show, -- ^ @since 4.16
+                  Read -- ^ @since 4.16
+                 )
 
 -- | @since 4.16
 instance (Bits a) => Semigroup (Ior a) where
@@ -118,8 +136,17 @@ instance (Bits a) => Monoid (Ior a) where
 --
 -- @since 4.16
 newtype Xor a = Xor { getXor :: a }
-  deriving newtype (Bounded, Enum, Bits, FiniteBits, Eq)
-  deriving stock (Show, Read)
+  deriving newtype (
+                    Bounded, -- ^ @since 4.16
+                    Enum, -- ^ @since 4.16
+                    Bits, -- ^ @since 4.16
+                    FiniteBits, -- ^ @since 4.16
+                    Eq -- ^ @since 4.16
+                    )
+  deriving stock (
+                  Show, -- ^ @since 4.16
+                  Read -- ^ @since 4.16
+                 )
 
 -- | @since 4.16
 instance (Bits a) => Semigroup (Xor a) where
@@ -137,8 +164,17 @@ instance (Bits a) => Monoid (Xor a) where
 --
 -- @since 4.16
 newtype Iff a = Iff { getIff :: a }
-  deriving newtype (Bounded, Enum, Bits, FiniteBits, Eq)
-  deriving stock (Show, Read)
+  deriving newtype (
+                    Bounded, -- ^ @since 4.16
+                    Enum, -- ^ @since 4.16
+                    Bits, -- ^ @since 4.16
+                    FiniteBits, -- ^ @since 4.16
+                    Eq -- ^ @since 4.16
+                    )
+  deriving stock (
+                  Show, -- ^ @since 4.16
+                  Read -- ^ @since 4.16
+                 )
 
 -- | @since 4.16
 instance (Bits a) => Semigroup (Iff a) where
