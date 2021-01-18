@@ -191,7 +191,7 @@ stringToStringBuffer str =
   let size = utf8EncodedLength str
   buf <- mallocForeignPtrArray (size+3)
   unsafeWithForeignPtr buf $ \ptr -> do
-    utf8EncodeString ptr str
+    utf8EncodeStringPtr ptr str
     pokeArray (ptr `plusPtr` size :: Ptr Word8) [0,0,0]
     -- sentinels for UTF-8 decoding
   return (StringBuffer buf size 0)
