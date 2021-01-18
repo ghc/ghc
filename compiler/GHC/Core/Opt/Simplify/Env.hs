@@ -60,7 +60,6 @@ import GHC.Data.OrdList
 import GHC.Types.Id as Id
 import GHC.Core.Make            ( mkWildValBinder )
 import GHC.Driver.Session       ( DynFlags )
-import GHC.Driver.Ppr
 import GHC.Builtin.Types
 import GHC.Core.TyCo.Rep        ( TyCoBinder(..) )
 import qualified GHC.Core.Type as Type
@@ -683,7 +682,7 @@ refineFromInScope :: InScopeSet -> Var -> Var
 refineFromInScope in_scope v
   | isLocalId v = case lookupInScope in_scope v of
                   Just v' -> v'
-                  Nothing -> WARN( True, ppr v ) v  -- This is an error!
+                  Nothing -> pprPanic "refineFromInScope" (ppr in_scope $$ ppr v)
   | otherwise = v
 
 lookupRecBndr :: SimplEnv -> InId -> OutId
