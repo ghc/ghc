@@ -94,6 +94,7 @@ import GHC.Types.Unique.FM
 import GHC.Core.DataCon
 import GHC.Driver.Ppr
 import GHC.Data.Maybe
+import qualified Data.List.NonEmpty as NE
 
 -------------------------------------------------------------------------
 --
@@ -659,7 +660,8 @@ convertInfoProvMap dflags defns this_mod (InfoTableProvMap (UniqMap dcenv) denv)
             UsageSite _ n <- hasIdLabelInfo cl >>= getConInfoTableLocation
             -- This is a bit grimy, relies on the DataCon and Name having the same Unique, which they do
             (dc, ns) <- (hasHaskellName cl >>= lookupUFM_Directly dcenv . getUnique)
-            (ss, l) <- lookup n ns
+            -- Lookup is linear but lists will be small (< 100)
+            (ss, l) <- lookup n (NE.toList ns)
             return $ InfoProvEnt cl cn (tyString (dataConTyCon dc)) (this_mod, ss, l)
 
     in lookupClosureMap `firstJust` lookupDataConMap) defns
