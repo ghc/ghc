@@ -3,16 +3,21 @@
 {-# LANGUAGE LambdaCase #-}
 
 module GHC.Types.Error
-   ( Messages
+   ( -- * Messages
+     Messages
    , WarningMessages
    , ErrorMessages
+   , mkMessages
+   , emptyMessages
+   , isEmptyMessages
+   , addMessage
+   , unionMessages
    , ErrMsg (..)
    , WarnMsg
    , ErrDoc (..)
    , MsgDoc
    , Severity (..)
    , RenderableDiagnostic (..)
-   , unionMessages
    , errDoc
    , mapErrDoc
    , pprMessageBag
@@ -21,11 +26,7 @@ module GHC.Types.Error
    , getSeverityColour
    , getCaretDiagnostic
    , makeIntoWarning
-   -- * Manipulating 'Messages'
-   , consMessage
-   , snocMessage
    -- * Constructing individual errors
-   , mkMessages
    , mkErrMsg
    , mkPlainErrMsg
    , mkErr
@@ -33,9 +34,7 @@ module GHC.Types.Error
    , mkWarnMsg
    , mkPlainWarnMsg
    , mkLongWarnMsg
-   , emptyMessages
    -- * Queries
-   , isEmptyMessages
    , isErrorMessage
    , isWarningMessage
    , getErrorMessages
@@ -59,13 +58,6 @@ import GHC.Utils.Json
 
 import System.IO.Error  ( catchIOError )
 
--- | A collection of messages emitted by GHC during error reporting. A diagnostic message is typically
--- a warning or an error. See Note [Messages].
-newtype Messages e = Messages (Bag (ErrMsg e))
-
-instance Functor Messages where
-  fmap f (Messages xs) = Messages (mapBag (fmap f) xs)
-
 {-
 Note [Messages]
 ~~~~~~~~~~~~~~~
@@ -77,12 +69,35 @@ be able to promote or demote errors and warnings based on certain flags (e.g. -W
 or -XPartialTypeSignatures). For now we rely on the 'Severity' to distinguish between a warning and an
 error, although the 'Severity' can be /more/ than just 'SevWarn' and 'SevError', and as such it probably
 shouldn't belong to an 'ErrMsg' to begin with, as it might potentially lead to the construction of
-\"impossible states\" (e.g. a waning with 'SevInfo', for example).
+"impossible states" (e.g. a waning with 'SevInfo', for example).
 
 'WarningMessages' and 'ErrorMessages' are for now simple type aliases to retain backward compatibility, but
 in future iterations these can be either parameterised over an 'e' message type (to make type signatures
 a bit more declarative) or removed altogether.
 -}
+
+-- | A collection of messages emitted by GHC during error reporting. A diagnostic message is typically
+-- a warning or an error. See Note [Messages].
+newtype Messages e = Messages (Bag (ErrMsg e))
+
+instance Functor Messages where
+  fmap f (Messages xs) = Messages (mapBag (fmap f) xs)
+
+emptyMessages :: Messages e
+emptyMessages = Messages emptyBag
+
+mkMessages :: Bag (ErrMsg e) -> Messages e
+mkMessages = Messages
+
+isEmptyMessages :: Messages e -> Bool
+isEmptyMessages (Messages msgs) = isEmptyBag msgs
+
+addMessage :: ErrMsg e -> Messages e -> Messages e
+addMessage x (Messages xs) = Messages (x `consBag` xs)
+
+-- | Joins two collections of messages together.
+unionMessages :: Messages e -> Messages e -> Messages e
+unionMessages (Messages msgs1) (Messages msgs2) = Messages (msgs1 `unionBags` msgs2)
 
 type WarningMessages = Bag (ErrMsg ErrDoc)
 type ErrorMessages   = Bag (ErrMsg ErrDoc)
@@ -90,7 +105,35 @@ type ErrorMessages   = Bag (ErrMsg ErrDoc)
 type MsgDoc          = SDoc
 type WarnMsg         = ErrMsg ErrDoc
 
+{-
+Note [Rendering Messages]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Turning 'Messages' into something that renders nicely for the user is one of the last steps, and it
+happens typically at the application boundaries (i.e. from the 'Driver' upwards).
+
+For now (see #18516) this class is very boring as it has only one instance, but the idea is that as
+the more domain-specific types are defined, the more instances we would get. For example, given something like:
+
+data TcRnMessage
+  = TcRnOutOfScope ..
+  | ..
+
+We could then define how a 'TcRnMessage' is displayed to the user. Rather than scattering pieces of
+'SDoc' around the codebase, we would write once for all:
+
+instance RenderableDiagnostic TcRnMessage where
+  renderDiagnostic = \case
+    TcRnOutOfScope .. -> ErrDoc [text "Out of scope error ..."] [] []
+    ...
+
+This way, we can easily write generic rendering functions for errors that all they care about is the
+knowledge that a given type 'e' has a 'RenderableDiagnostic' constraint.
+
+-}
+
 -- | A class for types (typically errors and warnings) which can be \"rendered\" into an opaque 'ErrDoc'.
+-- For more information, see Note [Rendering Messages].
 class RenderableDiagnostic a where
   renderDiagnostic :: a -> ErrDoc
 
@@ -118,18 +161,6 @@ data ErrDoc = ErrDoc {
 
 instance RenderableDiagnostic ErrDoc where
   renderDiagnostic = id
-
--- | Joins two collections of messages together.
-unionMessages :: Messages e -> Messages e -> Messages e
-unionMessages (Messages msgs1) (Messages msgs2) = Messages (msgs1 `unionBags` msgs2)
-
--- | Prepends a message at the beginning.
-consMessage :: ErrMsg e -> Messages e -> Messages e
-consMessage e (Messages msgs) = Messages (e `consBag` msgs)
-
--- | Appends a message at the end.
-snocMessage :: Messages e -> ErrMsg e -> Messages e
-snocMessage (Messages msgs) e = Messages (msgs `snocBag` e)
 
 errDoc :: [MsgDoc] -> [MsgDoc] -> [MsgDoc] -> ErrDoc
 errDoc = ErrDoc
@@ -335,18 +366,9 @@ mkLongWarnMsg  locn unqual msg extra = mk_err_msg SevWarning locn unqual        
 mkWarnMsg      locn unqual msg       = mk_err_msg SevWarning locn unqual        (ErrDoc [msg] [] [])
 mkPlainWarnMsg locn        msg       = mk_err_msg SevWarning locn alwaysQualify (ErrDoc [msg] [] [])
 
-emptyMessages :: Messages e
-emptyMessages = Messages emptyBag
-
-mkMessages :: Bag (ErrMsg e) -> Messages e
-mkMessages = Messages
-
 --
 -- Queries
 --
-
-isEmptyMessages :: Messages e -> Bool
-isEmptyMessages (Messages msgs) = isEmptyBag msgs
 
 isErrorMessage :: ErrMsg e -> Bool
 isErrorMessage = (== SevError) . errMsgSeverity

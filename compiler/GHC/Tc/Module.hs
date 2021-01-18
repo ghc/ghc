@@ -202,7 +202,7 @@ tcRnModule hsc_env mod_sum save_rn_syntax
           tcRnModuleTcRnM hsc_env mod_sum parsedModule pair
 
   | otherwise
-  = return (err_msg `consMessage` emptyMessages, Nothing)
+  = return (err_msg `addMessage` emptyMessages, Nothing)
 
   where
     hsc_src = ms_hsc_src mod_sum
