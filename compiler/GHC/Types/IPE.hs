@@ -8,11 +8,12 @@ import GHC.Types.SrcLoc
 import GHC.Core.DataCon
 
 import GHC.Types.Unique.Map
+import GHC.Core.Type
 
 -- | A map from a 'Name' to the best approximate source position that
 -- name arose from.
 type ClosureMap = UniqMap Name  -- The binding
-                          (String, RealSrcSpan, String)
+                          (Type, RealSrcSpan, String)
                           -- The best approximate source position.
                           -- (rendered type, source position, source note
                           -- label)
@@ -24,7 +25,7 @@ type ClosureMap = UniqMap Name  -- The binding
 -- the constructor was used at, if possible and a string which names
 -- the source location. This is the same information as is the payload
 -- for the 'GHC.Core.SourceNote' constructor.
-type DCMap = UniqMap DataCon [(Int, Maybe (RealSrcSpan, String))]
+type DCMap = UniqMap DataCon [(Int, (RealSrcSpan, String))]
 
 data InfoTableProvMap = InfoTableProvMap
                           { provDC :: DCMap
