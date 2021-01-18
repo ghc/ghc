@@ -28,18 +28,18 @@ warningsToMessages dflags =
         Right warn{ errMsgSeverity = SevError
                   , errMsgReason = ErrReason err_reason }
 
-printBagOfErrors :: RenderableDiagnostic a => DynFlags -> Bag (ErrMsg a) -> IO ()
+printBagOfErrors :: RenderableDiagnostic a => DynFlags -> Bag (MsgEnvelope a) -> IO ()
 printBagOfErrors dflags bag_of_errors
   = sequence_ [ let style = mkErrStyle unqual
                     ctx   = initSDocContext dflags style
-                in putLogMsg dflags reason sev s
-                $ withPprStyle style (formatErrDoc ctx (renderDiagnostic doc))
-              | ErrMsg { errMsgSpan      = s,
-                         errMsgDiagnostic = doc,
-                         errMsgSeverity  = sev,
-                         errMsgReason    = reason,
-                         errMsgContext   = unqual } <- sortMsgBag (Just dflags)
-                                                                  bag_of_errors ]
+                in putLogMsg dflags reason sev s $
+                   withPprStyle style (formatErrDoc ctx (renderDiagnostic doc))
+              | MsgEnvelope { errMsgSpan      = s,
+                              errMsgDiagnostic = doc,
+                              errMsgSeverity  = sev,
+                              errMsgReason    = reason,
+                              errMsgContext   = unqual } <- sortMsgBag (Just dflags)
+                                                                       bag_of_errors ]
 
 handleFlagWarnings :: DynFlags -> [CmdLine.Warn] -> IO ()
 handleFlagWarnings dflags warns = do
@@ -53,8 +53,8 @@ handleFlagWarnings dflags warns = do
   printOrThrowWarnings dflags bag
 
 -- | Checks if given 'WarnMsg' is a fatal warning.
-isWarnMsgFatal :: DynFlags -> ErrMsg [SDoc] -> Maybe (Maybe WarningFlag)
-isWarnMsgFatal dflags ErrMsg{errMsgReason = Reason wflag}
+isWarnMsgFatal :: DynFlags -> MsgEnvelope [SDoc] -> Maybe (Maybe WarningFlag)
+isWarnMsgFatal dflags MsgEnvelope{errMsgReason = Reason wflag}
   = if wopt_fatal wflag dflags
       then Just (Just wflag)
       else Nothing
@@ -74,7 +74,7 @@ shouldPrintWarning _ _
 
 -- | Given a bag of warnings, turn them into an exception if
 -- -Werror is enabled, or print them out otherwise.
-printOrThrowWarnings :: DynFlags -> Bag (ErrMsg [SDoc]) -> IO ()
+printOrThrowWarnings :: DynFlags -> Bag (MsgEnvelope [SDoc]) -> IO ()
 printOrThrowWarnings dflags warns = do
   let (make_error, warns') =
         mapAccumBagL
