@@ -1491,18 +1491,18 @@ data Unfolding
                                 -- (For NOINLINE, the phase, if any, is in the
                                 -- InlinePragInfo for this Id.)
         uf_tmpl       :: CoreExpr,        -- Template; occurrence info is correct
-        uf_src        :: UnfoldingSource, -- Where the unfolding came from
-        uf_is_top     :: Bool,          -- True <=> top level binding
-        uf_is_value   :: Bool,          -- exprIsHNF template (cached); it is ok to discard
+        uf_src        :: !UnfoldingSource, -- Where the unfolding came from
+        uf_is_top     :: !Bool,          -- True <=> top level binding
+        uf_is_value   :: !Bool,          -- exprIsHNF template (cached); it is ok to discard
                                         --      a `seq` on this variable
-        uf_is_conlike :: Bool,          -- True <=> applicn of constructor or CONLIKE function
+        uf_is_conlike :: !Bool,          -- True <=> applicn of constructor or CONLIKE function
                                         --      Cached version of exprIsConLike
-        uf_is_work_free :: Bool,                -- True <=> doesn't waste (much) work to expand
+        uf_is_work_free :: !Bool,                -- True <=> doesn't waste (much) work to expand
                                         --          inside an inlining
                                         --      Cached version of exprIsCheap
-        uf_expandable :: Bool,          -- True <=> can expand in RULE matching
+        uf_expandable :: !Bool,          -- True <=> can expand in RULE matching
                                         --      Cached version of exprIsExpandable
-        uf_guidance   :: UnfoldingGuidance      -- Tells about the *size* of the template.
+        uf_guidance   :: !UnfoldingGuidance      -- Tells about the *size* of the template.
     }
   -- ^ An unfolding with redundant cached information. Parameters:
   --
