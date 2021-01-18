@@ -33,7 +33,6 @@ import GHC.Types.Id.Make
 import GHC.Core.Class
 import GHC.Core.TyCon
 import GHC.Core.Type
-import GHC.Types.Id
 import GHC.Types.SourceText
 import GHC.Tc.Utils.TcType
 import GHC.Core.Multiplicity
@@ -171,7 +170,7 @@ mkDataConStupidTheta tycon arg_tys univ_tvs
 
 ------------------------------------------------------
 buildPatSyn :: Name -> Bool
-            -> (Id,Bool) -> Maybe (Id, Bool)
+            -> PatSynMatcher -> PatSynBuilder
             -> ([InvisTVBinder], ThetaType) -- ^ Univ and req
             -> ([InvisTVBinder], ThetaType) -- ^ Ex and prov
             -> [Type]                       -- ^ Argument types
@@ -179,7 +178,7 @@ buildPatSyn :: Name -> Bool
             -> [FieldLabel]                 -- ^ Field labels for
                                             --   a record pattern synonym
             -> PatSyn
-buildPatSyn src_name declared_infix matcher@(matcher_id,_) builder
+buildPatSyn src_name declared_infix matcher@(_, matcher_ty,_) builder
             (univ_tvs, req_theta) (ex_tvs, prov_theta) arg_tys
             pat_ty field_labels
   = -- The assertion checks that the matcher is
@@ -202,7 +201,7 @@ buildPatSyn src_name declared_infix matcher@(matcher_id,_) builder
              arg_tys pat_ty
              matcher builder field_labels
   where
-    ((_:_:univ_tvs1), req_theta1, tau) = tcSplitSigmaTy $ idType matcher_id
+    ((_:_:univ_tvs1), req_theta1, tau) = tcSplitSigmaTy $ matcher_ty
     ([pat_ty1, cont_sigma, _], _)      = tcSplitFunTys tau
     (ex_tvs1, prov_theta1, cont_tau)   = tcSplitSigmaTy (scaledThing cont_sigma)
     (arg_tys1, _) = (tcSplitFunTys cont_tau)
