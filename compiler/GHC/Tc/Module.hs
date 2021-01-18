@@ -208,7 +208,7 @@ tcRnModule hsc_env mod_sum save_rn_syntax
     hsc_src = ms_hsc_src mod_sum
     dflags = hsc_dflags hsc_env
     home_unit = hsc_home_unit hsc_env
-    err_msg = mkPlainErrMsg loc $
+    err_msg = mkPlainMsgEnvelope loc $
               text "Module does not have a RealSrcSpan:" <+> ppr this_mod
 
     pair :: (Module, SrcSpan)

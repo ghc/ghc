@@ -28,24 +28,24 @@ warningsToMessages dflags =
         Right warn{ errMsgSeverity = SevError
                   , errMsgReason = ErrReason err_reason }
 
-printBagOfErrors :: RenderableDiagnostic a => DynFlags -> Bag (ErrMsg a) -> IO ()
+printBagOfErrors :: RenderableDiagnostic a => DynFlags -> Bag (MsgEnvelope a) -> IO ()
 printBagOfErrors dflags bag_of_errors
   = sequence_ [ let style = mkErrStyle unqual
                     ctx   = initSDocContext dflags style
-                in putLogMsg dflags reason sev s
-                $ withPprStyle style (formatErrDoc ctx (renderDiagnostic doc))
-              | ErrMsg { errMsgSpan      = s,
-                         errMsgDiagnostic = doc,
-                         errMsgSeverity  = sev,
-                         errMsgReason    = reason,
-                         errMsgContext   = unqual } <- sortMsgBag (Just dflags)
-                                                                  bag_of_errors ]
+                in putLogMsg dflags reason sev s $
+                   withPprStyle style (formatErrDoc ctx (renderDiagnostic doc))
+              | MsgEnvelope { errMsgSpan      = s,
+                              errMsgDiagnostic = doc,
+                              errMsgSeverity  = sev,
+                              errMsgReason    = reason,
+                              errMsgContext   = unqual } <- sortMsgBag (Just dflags)
+                                                                       bag_of_errors ]
 
 handleFlagWarnings :: DynFlags -> [CmdLine.Warn] -> IO ()
 handleFlagWarnings dflags warns = do
   let warns' = filter (shouldPrintWarning dflags . CmdLine.warnReason)  warns
 
-      -- It would be nicer if warns :: [Located MsgDoc], but that
+      -- It would be nicer if warns :: [Located SDoc], but that
       -- has circular import problems.
       bag = listToBag [ mkPlainWarnMsg loc (text warn)
                       | CmdLine.Warn _ (L loc warn) <- warns' ]
@@ -54,7 +54,7 @@ handleFlagWarnings dflags warns = do
 
 -- | Checks if given 'WarnMsg' is a fatal warning.
 isWarnMsgFatal :: DynFlags -> WarnMsg -> Maybe (Maybe WarningFlag)
-isWarnMsgFatal dflags ErrMsg{errMsgReason = Reason wflag}
+isWarnMsgFatal dflags MsgEnvelope{errMsgReason = Reason wflag}
   = if wopt_fatal wflag dflags
       then Just (Just wflag)
       else Nothing
