@@ -63,6 +63,8 @@ PRELUDE_CLOSURE(base_GHCziEventziWindows_processRemoteCompletion_closure);
 PRELUDE_CLOSURE(base_GHCziTopHandler_flushStdHandles_closure);
 PRELUDE_CLOSURE(base_GHCziTopHandler_runMainIO_closure);
 
+PRELUDE_INFO(ghczmprim_GHCziTypes_False_con_info);
+PRELUDE_INFO(ghczmprim_GHCziTypes_True_con_info);
 PRELUDE_INFO(ghczmprim_GHCziTypes_Czh_con_info);
 PRELUDE_INFO(ghczmprim_GHCziTypes_Izh_con_info);
 PRELUDE_INFO(ghczmprim_GHCziTypes_Fzh_con_info);
@@ -114,6 +116,8 @@ PRELUDE_INFO(base_GHCziStable_StablePtr_con_info);
 
 #define blockedOnBadFD_closure    DLL_IMPORT_DATA_REF(base_GHCziEventziThread_blockedOnBadFD_closure)
 
+#define False_con_info            DLL_IMPORT_DATA_REF(ghczmprim_GHCziTypes_False_con_info)
+#define True_con_info             DLL_IMPORT_DATA_REF(ghczmprim_GHCziTypes_True_con_info)
 #define Czh_con_info              DLL_IMPORT_DATA_REF(ghczmprim_GHCziTypes_Czh_con_info)
 #define Izh_con_info              DLL_IMPORT_DATA_REF(ghczmprim_GHCziTypes_Izh_con_info)
 #define Fzh_con_info              DLL_IMPORT_DATA_REF(ghczmprim_GHCziTypes_Fzh_con_info)
