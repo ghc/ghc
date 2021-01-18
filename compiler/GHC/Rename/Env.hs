@@ -71,7 +71,6 @@ import GHC.Unit.Module.Warnings  ( WarningTxt, pprWarningTxtForMsg )
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.TyCon
-import GHC.Utils.Error
 import GHC.Builtin.Names( rOOT_MAIN )
 import GHC.Types.Basic  ( TopLevelFlag(..), TupleSort(..) )
 import GHC.Types.SrcLoc as SrcLoc

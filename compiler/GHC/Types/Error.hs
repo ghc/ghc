@@ -12,7 +12,7 @@ module GHC.Types.Error
    , isEmptyMessages
    , addMessage
    , unionMessages
-   , ErrMsg (..)
+   , MsgEnvelope (..)
    , SDoc
    , Severity (..)
    , RenderableDiagnostic (..)
@@ -23,10 +23,10 @@ module GHC.Types.Error
    , getCaretDiagnostic
    , makeIntoWarning
    -- * Constructing individual errors
-   , mkErrMsg
-   , mkPlainErrMsg
+   , mkMsgEnvelope
+   , mkPlainMsgEnvelope
    , mkErr
-   , mkLongErrMsg
+   , mkLongMsgEnvelope
    , mkWarnMsg
    , mkPlainWarnMsg
    , mkLongWarnMsg
@@ -64,7 +64,7 @@ The reason behind that is that there is a fluid relationship between errors and 
 be able to promote or demote errors and warnings based on certain flags (e.g. -Werror, -fdefer-type-errors
 or -XPartialTypeSignatures). For now we rely on the 'Severity' to distinguish between a warning and an
 error, although the 'Severity' can be /more/ than just 'SevWarn' and 'SevError', and as such it probably
-shouldn't belong to an 'ErrMsg' to begin with, as it might potentially lead to the construction of
+shouldn't belong to an 'MsgEnvelope' to begin with, as it might potentially lead to the construction of
 "impossible states" (e.g. a waning with 'SevInfo', for example).
 
 'WarningMessages' and 'ErrorMessages' are for now simple type aliases to retain backward compatibility, but
@@ -74,7 +74,7 @@ a bit more declarative) or removed altogether.
 
 -- | A collection of messages emitted by GHC during error reporting. A diagnostic message is typically
 -- a warning or an error. See Note [Messages].
-newtype Messages e = Messages (Bag (ErrMsg e))
+newtype Messages e = Messages (Bag (MsgEnvelope e))
 
 instance Functor Messages where
   fmap f (Messages xs) = Messages (mapBag (fmap f) xs)
@@ -82,21 +82,21 @@ instance Functor Messages where
 emptyMessages :: Messages e
 emptyMessages = Messages emptyBag
 
-mkMessages :: Bag (ErrMsg e) -> Messages e
+mkMessages :: Bag (MsgEnvelope e) -> Messages e
 mkMessages = Messages
 
 isEmptyMessages :: Messages e -> Bool
 isEmptyMessages (Messages msgs) = isEmptyBag msgs
 
-addMessage :: ErrMsg e -> Messages e -> Messages e
+addMessage :: MsgEnvelope e -> Messages e -> Messages e
 addMessage x (Messages xs) = Messages (x `consBag` xs)
 
 -- | Joins two collections of messages together.
 unionMessages :: Messages e -> Messages e -> Messages e
 unionMessages (Messages msgs1) (Messages msgs2) = Messages (msgs1 `unionBags` msgs2)
 
-type WarningMessages = Bag (ErrMsg [SDoc])
-type ErrorMessages   = Bag (ErrMsg [SDoc])
+type WarningMessages = Bag (MsgEnvelope [SDoc])
+type ErrorMessages   = Bag (MsgEnvelope [SDoc])
 
 {-
 Note [Rendering Messages]
@@ -130,8 +130,13 @@ knowledge that a given type 'e' has a 'RenderableDiagnostic' constraint.
 class RenderableDiagnostic a where
   renderDiagnostic :: a -> [SDoc]
 
--- | The main 'GHC' error type, parameterised over the /domain-specific/ message.
-data ErrMsg e = ErrMsg
+-- | An \"envelope\" for GHC's \"facts\" about a running program, parameterised over the
+-- /domain-specific/ (i.e. parsing, typecheck-renaming, etc) diagnostics.
+--
+-- To say things differently, GHC emits /diagnostics/ about the running program, each of which is wrapped
+-- into a 'MsgEnvelope' that carries specific information like where the error happened, its severity, etc.
+-- Finally, multiple 'MsgEnvelope's are aggregated into 'Messages' that are returned to the user.
+data MsgEnvelope e = MsgEnvelope
    { errMsgSpan        :: SrcSpan
       -- ^ The SrcSpan is used for sorting errors into line-number order
    , errMsgContext     :: PrintUnqualified
@@ -169,12 +174,12 @@ data Severity
 instance ToJson Severity where
   json s = JSString (show s)
 
-instance Show (ErrMsg [SDoc]) where
-    show = showErrMsg
+instance Show (MsgEnvelope [SDoc]) where
+    show = showMsgEnvelope
 
--- | Shows an 'ErrMsg'.
-showErrMsg :: RenderableDiagnostic a => ErrMsg a -> String
-showErrMsg err =
+-- | Shows an 'MsgEnvelope'.
+showMsgEnvelope :: RenderableDiagnostic a => MsgEnvelope a -> String
+showMsgEnvelope err =
   renderWithContext defaultSDocContext (vcat (renderDiagnostic $ errMsgDiagnostic err))
 
 pprMessageBag :: Bag SDoc -> SDoc
@@ -306,37 +311,37 @@ getCaretDiagnostic severity (RealSrcSpan span _) =
                       | otherwise = ""
         caretLine = replicate start ' ' ++ replicate width '^' ++ caretEllipsis
 
-makeIntoWarning :: WarnReason -> ErrMsg e -> ErrMsg e
+makeIntoWarning :: WarnReason -> MsgEnvelope e -> MsgEnvelope e
 makeIntoWarning reason err = err
     { errMsgSeverity = SevWarning
     , errMsgReason = reason }
 
 --
--- Creating ErrMsg(s)
+-- Creating MsgEnvelope(s)
 --
 
 mk_err_msg
-  :: Severity -> SrcSpan -> PrintUnqualified -> e -> ErrMsg e
+  :: Severity -> SrcSpan -> PrintUnqualified -> e -> MsgEnvelope e
 mk_err_msg sev locn print_unqual err
- = ErrMsg { errMsgSpan = locn
+ = MsgEnvelope { errMsgSpan = locn
           , errMsgContext = print_unqual
           , errMsgDiagnostic = err
           , errMsgSeverity = sev
           , errMsgReason = NoReason }
 
-mkErr :: SrcSpan -> PrintUnqualified -> e -> ErrMsg e
+mkErr :: SrcSpan -> PrintUnqualified -> e -> MsgEnvelope e
 mkErr = mk_err_msg SevError
 
-mkLongErrMsg, mkLongWarnMsg   :: SrcSpan -> PrintUnqualified -> SDoc -> SDoc -> ErrMsg [SDoc]
+mkLongMsgEnvelope, mkLongWarnMsg   :: SrcSpan -> PrintUnqualified -> SDoc -> SDoc -> MsgEnvelope [SDoc]
 -- ^ A long (multi-line) error message
-mkErrMsg, mkWarnMsg           :: SrcSpan -> PrintUnqualified -> SDoc            -> ErrMsg [SDoc]
+mkMsgEnvelope, mkWarnMsg           :: SrcSpan -> PrintUnqualified -> SDoc            -> MsgEnvelope [SDoc]
 -- ^ A short (one-line) error message
-mkPlainErrMsg, mkPlainWarnMsg :: SrcSpan ->                     SDoc            -> ErrMsg [SDoc]
+mkPlainMsgEnvelope, mkPlainWarnMsg :: SrcSpan ->                     SDoc            -> MsgEnvelope [SDoc]
 -- ^ Variant that doesn't care about qualified/unqualified names
 
-mkLongErrMsg   locn unqual msg extra = mk_err_msg SevError   locn unqual        [msg,extra]
-mkErrMsg       locn unqual msg       = mk_err_msg SevError   locn unqual        [msg]
-mkPlainErrMsg  locn        msg       = mk_err_msg SevError   locn alwaysQualify [msg]
+mkLongMsgEnvelope   locn unqual msg extra = mk_err_msg SevError   locn unqual        [msg,extra]
+mkMsgEnvelope       locn unqual msg       = mk_err_msg SevError   locn unqual        [msg]
+mkPlainMsgEnvelope  locn        msg       = mk_err_msg SevError   locn alwaysQualify [msg]
 mkLongWarnMsg  locn unqual msg extra = mk_err_msg SevWarning locn unqual        [msg,extra]
 mkWarnMsg      locn unqual msg       = mk_err_msg SevWarning locn unqual        [msg]
 mkPlainWarnMsg locn        msg       = mk_err_msg SevWarning locn alwaysQualify [msg]
@@ -345,22 +350,22 @@ mkPlainWarnMsg locn        msg       = mk_err_msg SevWarning locn alwaysQualify 
 -- Queries
 --
 
-isErrorMessage :: ErrMsg e -> Bool
+isErrorMessage :: MsgEnvelope e -> Bool
 isErrorMessage = (== SevError) . errMsgSeverity
 
-isWarningMessage :: ErrMsg e -> Bool
+isWarningMessage :: MsgEnvelope e -> Bool
 isWarningMessage = not . isErrorMessage
 
 errorsFound :: Messages e -> Bool
 errorsFound (Messages msgs) = any isErrorMessage msgs
 
-getWarningMessages :: Messages e -> Bag (ErrMsg e)
+getWarningMessages :: Messages e -> Bag (MsgEnvelope e)
 getWarningMessages (Messages xs) = fst $ partitionBag isWarningMessage xs
 
-getErrorMessages :: Messages e -> Bag (ErrMsg e)
+getErrorMessages :: Messages e -> Bag (MsgEnvelope e)
 getErrorMessages (Messages xs) = fst $ partitionBag isErrorMessage xs
 
 -- | Partitions the 'Messages' and returns a tuple which first element are the warnings, and the
 -- second the errors.
-partitionMessages :: Messages e -> (Bag (ErrMsg e), Bag (ErrMsg e))
+partitionMessages :: Messages e -> (Bag (MsgEnvelope e), Bag (MsgEnvelope e))
 partitionMessages (Messages xs) = partitionBag isWarningMessage xs
