@@ -51,6 +51,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Driver.CodeOutput ( ipInitCode )
 
+import GHC.Utils.Encoding
 
 import Control.Monad
 import Data.Char (ord)
@@ -230,9 +231,8 @@ emitCostCentreDecl cc = do
   ; modl  <- newByteStringCLit (bytesFS $ moduleNameFS
                                         $ moduleName
                                         $ cc_mod cc)
-  ; loc <- newByteStringCLit $ bytesFS $ mkFastString $
+  ; loc <- newByteStringCLit $ utf8EncodeString $
                    showPpr dflags (costCentreSrcSpan cc)
-           -- XXX going via FastString to get UTF-8 encoding is silly
   ; let
      lits = [ zero platform,  -- StgInt ccID,
               label,          -- char *label,
@@ -296,20 +296,17 @@ emitInfoTableProv ip = do
   ; let mod = infoProvModule ip
   ; let (src, label) = maybe ("", "") (\(s, l) -> (showPpr dflags s, l)) (infoTableProv ip)
   ; platform <- getPlatform
-                        -- NB. bytesFS: we want the UTF-8 bytes here (#5559)
-  ; label <- newByteStringCLit (bytesFS $ mkFastString label)
+  ; let mk_string = newByteStringCLit . utf8EncodeString
+  ; label <- mk_string label
   ; modl  <- newByteStringCLit (bytesFS $ moduleNameFS
                                         $ moduleName
                                         $ mod)
 
-  ; ty_string  <- newByteStringCLit (bytesFS (mkFastString (infoTableType ip)))
-  ; loc <- newByteStringCLit $ bytesFS $ mkFastString $ src
-           -- XXX going via FastString to get UTF-8 encoding is silly
-  ; table_name <- newByteStringCLit $ bytesFS $ mkFastString $
-                    showPpr dflags (pprCLabel platform CStyle (infoTablePtr ip))
-
-  ; closure_type <- newByteStringCLit $ bytesFS $ mkFastString $
-                    showPpr dflags (text $ show $ infoProvEntClosureType ip)
+  ; ty_string  <- mk_string (infoTableType ip)
+  ; loc <- mk_string src
+  ; table_name <- mk_string (showPpr dflags (pprCLabel platform CStyle (infoTablePtr ip)))
+  ; closure_type <- mk_string
+                      (showPpr dflags (text $ show $ infoProvEntClosureType ip))
   ; let
      lits = [ CmmLabel (infoTablePtr ip), -- Info table pointer
               table_name,     -- char *table_name
