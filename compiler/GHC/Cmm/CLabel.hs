@@ -19,6 +19,7 @@ module GHC.Cmm.CLabel (
         ForeignLabelSource(..),
         DynamicLinkerLabelInfo(..),
         ConInfoTableLocation(..),
+        getConInfoTableLocation,
 
         -- * Constructors
         mkClosureLabel,
@@ -108,6 +109,7 @@ module GHC.Cmm.CLabel (
         isIdLabel,
         isTickyLabel,
         hasHaskellName,
+        hasIdLabelInfo,
         isBytesLabel,
         isForeignLabel,
         isSomeRODataLabel,
@@ -482,6 +484,11 @@ data ConInfoTableLocation = UsageSite Module Int
 instance Outputable ConInfoTableLocation where
   ppr (UsageSite m n) = text "Loc(" <> ppr n <> text "):" <+> ppr m
   ppr DefinitionSite = empty
+
+getConInfoTableLocation :: IdLabelInfo -> Maybe ConInfoTableLocation
+getConInfoTableLocation (ConInfoTable ci) = Just ci
+getConInfoTableLocation (ConEntry ci) = Just ci
+getConInfoTableLocation _ = Nothing
 
 instance Outputable IdLabelInfo where
   ppr Closure    = text "Closure"
@@ -867,6 +874,10 @@ toInfoLbl platform lbl = case lbl of
 hasHaskellName :: CLabel -> Maybe Name
 hasHaskellName (IdLabel n _ _) = Just n
 hasHaskellName _               = Nothing
+
+hasIdLabelInfo :: CLabel -> Maybe IdLabelInfo
+hasIdLabelInfo (IdLabel _ _ l) = Just l
+hasIdLabelInfo _ = Nothing
 
 -- -----------------------------------------------------------------------------
 -- Does a CLabel's referent itself refer to a CAF?

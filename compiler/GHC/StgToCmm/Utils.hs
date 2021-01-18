@@ -45,7 +45,7 @@ module GHC.StgToCmm.Utils (
         emitUpdRemSetPush,
         emitUpdRemSetPushThunk,
 
-        convertClosureMap, convertDCMap
+        convertInfoProvMap
   ) where
 
 #include "HsVersions.h"
@@ -91,8 +91,9 @@ import Data.List
 import Data.Ord
 import GHC.Types.Unique.Map
 import GHC.Types.Unique.FM
-import Data.Maybe
 import GHC.Core.DataCon
+import GHC.Driver.Ppr
+import GHC.Data.Maybe
 
 -------------------------------------------------------------------------
 --
@@ -640,22 +641,25 @@ emitUpdRemSetPushThunk ptr =
 
 -- | Convert source information collected about identifiers in 'GHC.STG.Debug'
 -- to entries suitable for placing into the info table provenenance table.
-convertClosureMap :: [CmmInfoTable] -> Module -> ClosureMap -> [InfoProvEnt]
-convertClosureMap defns this_mod denv =
-  mapMaybe (\cmit -> do
+convertInfoProvMap :: DynFlags -> [CmmInfoTable] -> Module -> InfoTableProvMap -> [InfoProvEnt]
+convertInfoProvMap dflags defns this_mod (InfoTableProvMap (UniqMap dcenv) denv) =
+  mapMaybe (\cmit ->
     let cl = cit_lbl cmit
         cn  = rtsClosureType (cit_rep cmit)
-    n <- hasHaskellName cl
-    (ty, ss, l) <- lookupUniqMap denv n
-    return (InfoProvEnt cl cn ty (this_mod, ss, l))) defns
 
--- | Convert source information about data constructors into entries suitable
--- for placing into the info table provenance table.
-convertDCMap :: Module -> DCMap -> [InfoProvEnt]
-convertDCMap this_mod (UniqMap denv) =
-  concatMap (\(dc, ns) -> mapMaybe (\(k, mss) ->
-      case mss of
-        Nothing -> Nothing
-        Just (ss, l) -> Just $
-          InfoProvEnt (mkConInfoTableLabel (dataConName dc) (UsageSite this_mod k))
-                       0 "" (this_mod, ss, l)) ns) (nonDetEltsUFM denv)
+        tyString :: Outputable a => a -> String
+        tyString t = showPpr dflags t
+
+        lookupClosureMap, lookupDataConMap :: Maybe InfoProvEnt
+        lookupClosureMap = case hasHaskellName cl >>= lookupUniqMap denv of
+                                Just (ty, ss, l) -> Just (InfoProvEnt cl cn (tyString ty) (this_mod, ss, l))
+                                Nothing -> Nothing
+
+        lookupDataConMap = do
+            UsageSite _ n <- hasIdLabelInfo cl >>= getConInfoTableLocation
+            -- This is a bit grimy, relies on the DataCon and Name having the same Unique, which they do
+            (dc, ns) <- (hasHaskellName cl >>= lookupUFM_Directly dcenv . getUnique)
+            (ss, l) <- lookup n ns
+            return $ InfoProvEnt cl cn (tyString (dataConTyCon dc)) (this_mod, ss, l)
+
+    in lookupClosureMap `firstJust` lookupDataConMap) defns

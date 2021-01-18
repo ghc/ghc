@@ -16,7 +16,6 @@ import GHC.Unit.Module
 import GHC.Types.Name   ( getName, getOccName, occNameString, nameSrcSpan)
 import GHC.Data.FastString
 import GHC.Driver.Session
-import GHC.Driver.Ppr
 
 import Control.Monad (when)
 import Control.Monad.Trans.RWS
@@ -125,13 +124,12 @@ recordStgIdPosition :: Id -> Maybe (RealSrcSpan, String) -> Maybe (RealSrcSpan, 
 recordStgIdPosition id best_span ss = do
   dflags <- asks rDynFlags
   when (gopt Opt_InfoTableMap dflags) $ do
-    let tyString = showPpr dflags (idType id)
     cc <- asks rSpan
     --Useful for debugging why a certain Id gets given a certain span
     --pprTraceM "recordStgIdPosition" (ppr id $$ ppr cc $$ ppr best_span $$ ppr ss)
     case best_span <|> cc <|> ss of
       Nothing -> return ()
-      Just (rss, d) -> modify (\env -> env { provClosure = addToUniqMap (provClosure env) (idName id) (tyString, rss, d)})
+      Just (rss, d) -> modify (\env -> env { provClosure = addToUniqMap (provClosure env) (idName id) (idType id, rss, d)})
 
 numberDataCon :: DataCon -> [Tickish Id] -> M ConstructorNumber
 -- Unboxed tuples and sums do not allocate so they
@@ -143,8 +141,12 @@ numberDataCon dc ts = do
   if not (gopt Opt_DistinctConstructorTables dflags) then return NoNumber else do
           env <- get
           mcc <- asks rSpan
-          let best_span = selectTick ts <|> mcc
-          let dcMap' = alterUniqMap (maybe (Just [(0, best_span)]) (\xs@((k, _):_) -> Just ((k + 1, best_span) : xs))) (provDC env) dc
+          let mbest_span = selectTick ts <|> mcc
+          let dcMap' =
+                case mbest_span of
+                  Nothing -> (provDC env)
+                  Just best_span ->
+                    alterUniqMap (maybe (Just [(0, best_span)]) (\xs@((k, _):_) -> Just ((k + 1, best_span) : xs))) (provDC env) dc
           put (env { provDC = dcMap' })
           let r = lookupUniqMap dcMap' dc
           return $ case r of
@@ -191,7 +193,7 @@ a StgRhsClosure or an StgConApp. The current source position is recorded
 depending on the location indicated by the surrounding SourceNote.
 
 The functions which add information to the map are `recordStgIdPosition` and
-`incDc`.
+`numberDataCon`.
 
 When the -fdistinct-constructor-tables` flag is turned on then every
 usage of a data constructor gets its own distinct info table. This is orchestrated

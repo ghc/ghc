@@ -319,7 +319,7 @@ profilingInitCode platform this_mod (local_CCs, singleton_CCSs)
 -- | Generate code to initialise info pointer origin
 -- See note [Mapping Info Tables to Source Positions]
 ipInitCode :: [CmmInfoTable] -> DynFlags -> Module -> InfoTableProvMap -> SDoc
-ipInitCode used_info dflags this_mod (InfoTableProvMap dcmap closure_map)
+ipInitCode used_info dflags this_mod itmap
  = if not (gopt Opt_InfoTableMap dflags)
     then empty
     else withPprStyle (PprCode CStyle) $ vcat
@@ -333,10 +333,8 @@ ipInitCode used_info dflags this_mod (InfoTableProvMap dcmap closure_map)
                  ])
        ]
  where
-   dc_ents = convertDCMap this_mod dcmap
-   closure_ents = convertClosureMap used_info this_mod closure_map
+   ents = convertInfoProvMap dflags used_info this_mod itmap
    platform = targetPlatform dflags
-   ents = closure_ents ++ dc_ents
    emit_ipe_decl ipe =
        text "extern InfoProvEnt" <+> ipe_lbl <> text "[];"
      where ipe_lbl = pprCLabel platform CStyle (mkIPELabel ipe)
