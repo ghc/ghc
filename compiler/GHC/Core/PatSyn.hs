@@ -9,10 +9,10 @@
 
 module GHC.Core.PatSyn (
         -- * Main data types
-        PatSyn, mkPatSyn,
+        PatSyn, PatSynMatcher, PatSynBuilder, mkPatSyn,
 
         -- ** Type deconstruction
-        patSynName, patSynArity, patSynIsInfix,
+        patSynName, patSynArity, patSynIsInfix, patSynResultType,
         patSynArgs,
         patSynMatcher, patSynBuilder,
         patSynUnivTyVarBinders, patSynExTyVars, patSynExTyVarBinders,
@@ -20,7 +20,7 @@ module GHC.Core.PatSyn (
         patSynInstArgTys, patSynInstResTy, patSynFieldLabels,
         patSynFieldType,
 
-        updatePatSynIds, pprPatSynType
+        pprPatSynType
     ) where
 
 #include "HsVersions.h"
@@ -86,33 +86,37 @@ data PatSyn
                                -- See Note [Pattern synonym result type]
 
         -- See Note [Matchers and builders for pattern synonyms]
-        psMatcher     :: (Id, Bool),
-             -- Matcher function.
-             -- If Bool is True then prov_theta and arg_tys are empty
-             -- and type is
-             --   forall (p :: RuntimeRep) (r :: TYPE p) univ_tvs.
-             --                          req_theta
-             --                       => res_ty
-             --                       -> (forall ex_tvs. Void# -> r)
-             --                       -> (Void# -> r)
-             --                       -> r
-             --
-             -- Otherwise type is
-             --   forall (p :: RuntimeRep) (r :: TYPE r) univ_tvs.
-             --                          req_theta
-             --                       => res_ty
-             --                       -> (forall ex_tvs. prov_theta => arg_tys -> r)
-             --                       -> (Void# -> r)
-             --                       -> r
-
-        psBuilder     :: Maybe (Id, Bool)
-             -- Nothing  => uni-directional pattern synonym
-             -- Just (builder, is_unlifted) => bi-directional
-             -- Builder function, of type
-             --  forall univ_tvs, ex_tvs. (req_theta, prov_theta)
-             --                       =>  arg_tys -> res_ty
-             -- See Note [Builder for pattern synonyms with unboxed type]
+        -- See Note [Keep Ids out of PatSyn]
+        psMatcher     :: PatSynMatcher,
+        psBuilder     :: PatSynBuilder
   }
+
+type PatSynMatcher = (Name, Type, Bool)
+     -- Matcher function.
+     -- If Bool is True then prov_theta and arg_tys are empty
+     -- and type is
+     --   forall (p :: RuntimeRep) (r :: TYPE p) univ_tvs.
+     --                          req_theta
+     --                       => res_ty
+     --                       -> (forall ex_tvs. Void# -> r)
+     --                       -> (Void# -> r)
+     --                       -> r
+     --
+     -- Otherwise type is
+     --   forall (p :: RuntimeRep) (r :: TYPE r) univ_tvs.
+     --                          req_theta
+     --                       => res_ty
+     --                       -> (forall ex_tvs. prov_theta => arg_tys -> r)
+     --                       -> (Void# -> r)
+     --                       -> r
+
+type PatSynBuilder = Maybe (Name, Type, Bool)
+     -- Nothing  => uni-directional pattern synonym
+     -- Just (builder, is_unlifted) => bi-directional
+     -- Builder function, of type
+     --  forall univ_tvs, ex_tvs. (req_theta, prov_theta)
+     --                       =>  arg_tys -> res_ty
+     -- See Note [Builder for pattern synonyms with unboxed type]
 
 {- Note [Pattern synonym signature contexts]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -202,6 +206,22 @@ declarations to have identical semantics:
 The latter generates the proper required constraint, the former does not.
 Also rather different to GADTs is the fact that Just42 doesn't have any
 universally quantified type variables, whereas Just'42 or MkS above has.
+
+Note [Keep Ids out of PatSyn]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We carefully arrange that PatSyn does not contain the Ids for the matcher
+and builder.  We want PatSyn, like TyCon and DataCon, to be completely
+immutable. But, the matcher and builder are relatively sophisticated
+functions, and we want to get their final IdInfo in the same way as
+any other Id, so we'd have to update the Ids in the PatSyn too.
+
+Rather than try to tidy PatSyns (which is easy to forget and is a bit
+tricky, see #19074), it seems cleaner to make them entirely immutable,
+like TyCons and Classes.  To that end PatSynBuilder and PatSynMatcher
+contain Names not Ids. Which, it turns out, is absolutely fine.
+
+c.f. DefMethInfo in Class, which contains the Name, but not the Id,
+of the default method.
 
 Note [Pattern synonym representation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -363,8 +383,8 @@ mkPatSyn :: Name
                                          -- variables and provided dicts
          -> [Type]               -- ^ Original arguments
          -> Type                 -- ^ Original result type
-         -> (Id, Bool)           -- ^ Name of matcher
-         -> Maybe (Id, Bool)     -- ^ Name of builder
+         -> PatSynMatcher        -- ^ Matcher
+         -> PatSynBuilder        -- ^ Builder
          -> [FieldLabel]         -- ^ Names of fields for
                                  --   a record pattern synonym
          -> PatSyn
@@ -433,17 +453,14 @@ patSynSig :: PatSyn -> ([TyVar], ThetaType, [TyVar], ThetaType, [Scaled Type], T
 patSynSig ps = let (u_tvs, req, e_tvs, prov, arg_tys, res_ty) = patSynSigBndr ps
                in (binderVars u_tvs, req, binderVars e_tvs, prov, arg_tys, res_ty)
 
-patSynMatcher :: PatSyn -> (Id,Bool)
+patSynMatcher :: PatSyn -> PatSynMatcher
 patSynMatcher = psMatcher
 
-patSynBuilder :: PatSyn -> Maybe (Id, Bool)
+patSynBuilder :: PatSyn -> PatSynBuilder
 patSynBuilder = psBuilder
 
-updatePatSynIds :: (Id -> Id) -> PatSyn -> PatSyn
-updatePatSynIds tidy_fn ps@(MkPatSyn { psMatcher = matcher, psBuilder = builder })
-  = ps { psMatcher = tidy_pr matcher, psBuilder = fmap tidy_pr builder }
-  where
-    tidy_pr (id, dummy) = (tidy_fn id, dummy)
+patSynResultType :: PatSyn -> Type
+patSynResultType = psResultTy
 
 patSynInstArgTys :: PatSyn -> [Type] -> [Type]
 -- Return the types of the argument patterns

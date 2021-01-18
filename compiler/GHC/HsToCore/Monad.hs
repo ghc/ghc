@@ -255,22 +255,24 @@ runDs hsc_env (ds_gbl, ds_lcl) thing_inside
 
 -- | Run a 'DsM' action in the context of an existing 'ModGuts'
 initDsWithModGuts :: HscEnv -> ModGuts -> DsM a -> IO (Messages, Maybe a)
-initDsWithModGuts hsc_env guts thing_inside
+initDsWithModGuts hsc_env (ModGuts { mg_module = this_mod, mg_binds = binds
+                                   , mg_tcs = tycons, mg_fam_insts = fam_insts
+                                   , mg_patsyns = patsyns, mg_rdr_env = rdr_env
+                                   , mg_fam_inst_env = fam_inst_env
+                                   , mg_complete_matches = local_complete_matches
+                          }) thing_inside
   = do { cc_st_var   <- newIORef newCostCentreState
        ; msg_var <- newIORef emptyMessages
        ; eps <- liftIO $ hscEPS hsc_env
        ; let unit_env = hsc_unit_env hsc_env
-             type_env = typeEnvFromEntities ids (mg_tcs guts) (mg_fam_insts guts)
-             rdr_env  = mg_rdr_env guts
-             fam_inst_env = mg_fam_inst_env guts
-             this_mod = mg_module guts
+             type_env = typeEnvFromEntities ids tycons patsyns fam_insts
              complete_matches = hptCompleteSigs hsc_env     -- from the home package
-                                ++ mg_complete_matches guts -- from the current module
+                                ++ local_complete_matches  -- from the current module
                                 ++ eps_complete_matches eps -- from imports
 
              bindsToIds (NonRec v _)   = [v]
              bindsToIds (Rec    binds) = map fst binds
-             ids = concatMap bindsToIds (mg_binds guts)
+             ids = concatMap bindsToIds binds
 
              envs  = mkDsEnvs unit_env this_mod rdr_env type_env
                               fam_inst_env msg_var cc_st_var
