@@ -957,9 +957,15 @@ cgIdApp strict fun_id args = do
             where
               trace = do
                 tickyTagged
+                use_id <- newUnique
+                -- TODO: We could avoid entering the same id more than once, so we should pass some identifier here.
+                _lbl <- emitTickyCounterTag use_id (NonVoid fun_id)
+                tickyTagSkip use_id fun_id
+
                 -- pprTraceM "WHNF:" (ppr fun_id <+> ppr args )
               assertTag =
                 -- TODO: Move into platform
+                -- enabled by -dtag-inference-checks
                 when (gopt Opt_DoTagInferenceChecks dflags) $
                   emitTagAssertion (showPprUnsafe (ppr fun_id <+> pprExpr platform fun)) fun
 
