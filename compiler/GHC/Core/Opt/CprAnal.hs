@@ -95,8 +95,8 @@ Ideally, we would want the following pipeline:
 4. worker/wrapper (for CPR)
 
 Currently, we omit 2. and anticipate the results of worker/wrapper.
-See Note [CPR in a DataAlt case alternative]
-and Note [CPR for binders that will be unboxed].
+See Note [CPR for binders that will be unboxed]
+and Note [CPR in a DataAlt case alternative].
 An additional w/w pass would simplify things, but probably add slight overhead.
 So currently we have
 
@@ -536,61 +536,10 @@ number of iterations, defaulting to Top after a certain limit
 In case of CprAnal, we simply prune Cpr and Termination info after each
 iteration to a constant depth of mAX_DEPTH.
 
-Note [CPR in a DataAlt case alternative]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In a case alternative, we want to give some of the binders the CPR property.
-Specifically
-
- * The case binder; inside the alternative, the case binder always has
-   the CPR property, meaning that a case on it will successfully cancel.
-   Example:
-        f True  x = case x of y { I# x' -> if x' ==# 3
-                                           then y
-                                           else I# 8 }
-        f False x = I# 3
-
-   By giving 'y' the CPR property, we ensure that 'f' does too, so we get
-        f b x = case fw b x of { r -> I# r }
-        fw True  x = case x of y { I# x' -> if x' ==# 3 then x' else 8 }
-        fw False x = 3
-
-   Of course there is the usual risk of re-boxing: we have 'x' available
-   boxed and unboxed, but we return the unboxed version for the wrapper to
-   box.  If the wrapper doesn't cancel with its caller, we'll end up
-   re-boxing something that we did have available in boxed form.
-
- * Any strict binders with product type, can use
-   Note [CPR for binders that will be unboxed]
-   to anticipate worker/wrappering for strictness info.
-   But we can go a little further. Consider
-
-      data T = MkT !Int Int
-
-      f2 (MkT x y) | y>0       = f2 (MkT x (y-1))
-                   | otherwise = x
-
-   For $wf2 we are going to unbox the MkT *and*, since it is strict, the
-   first argument of the MkT; see Note [Add demands for strict constructors].
-   But then we don't want box it up again when returning it!  We want
-   'f2' to have the CPR property, so we give 'x' the CPR property.
-
- * It's a bit delicate because we're brittly anticipating worker/wrapper here.
-   If the case above is scrutinising something other than an argument the
-   original function, we really don't have the unboxed version available.  E.g
-      g v = case foo v of
-              MkT x y | y>0       -> ...
-                      | otherwise -> x
-   Here we don't have the unboxed 'x' available.  Hence the
-   is_var_scrut test when making use of the strictness annotation.
-   Slightly ad-hoc, because even if the scrutinee *is* a variable it
-   might not be a onre of the arguments to the original function, or a
-   sub-component thereof.  But it's simple, and nothing terrible
-   happens if we get it wrong.  e.g. Trac #10694.
-
 Note [CPR for binders that will be unboxed]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If a lambda-bound variable will be unboxed by worker/wrapper (so it must be
-demanded strictly), then give it a CPR signature. Here's a concrete example
+demanded strictly), then give it the CPR property. Here's a concrete example
 ('f1' in test T10482a), assuming h is strict:
 
   f1 :: Int -> Int
@@ -607,21 +556,61 @@ of 'h' in the example).
 
 Moreover, if f itself is strict in x, then we'll pass x unboxed to
 f1, and so the boxed version *won't* be available; in that case it's
-very helpful to give 'x' the CPR property.
+very helpful to give 'x' the CPR property. Otherwise, the worker would
+*rebox* 'x' before returning it.
 
-Note that
+Note that we only want to do this for something that we want to unbox
+('wantToUnboxArg'), else we may get over-optimistic CPR results
+(e.g. from \x -> x!).
 
-  * We only want to do this for something that definitely
-    has product type, else we may get over-optimistic CPR results
-    (e.g. from \x -> x!).
+Note [CPR in a DataAlt case alternative]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In a case alternative, we want to give some of the binders the CPR property.
+Specifically
 
-  * This also (approximately) applies to DataAlt field binders;
-    See Note [CPR in a DataAlt case alternative].
+ * The case binder. Inside the alternative, the case binder always has
+   the CPR property if the scrutinee has it, meaning that a case on it will
+   successfully cancel. Example:
+     f x = case x of y { I# x' -> if x' ==# 3
+                                     then y
+                                     else I# 8 }
 
-  * See Note [CPR examples]
+   Since 'x' is used strictly, it will be unboxed and given the CPR property
+   (See Note [CPR for binders that will be unboxed]).
+   By giving 'y' the CPR property, we ensure that 'f' does too, so we get
+        f (I# x) = I# (fw x)
+        fw x = case x of y { I# x' -> if x' ==# 3 then x' else 8 }
+
+   If the scrutinee has the CPR property, giving it to the case binder will
+   never introduce reboxing. But there are also compelling cases where we
+   want to optimistically give the case binder the CPR property even if the
+   scrutinee did not have it: See Note [Optimistic case binder CPR]. That may
+   very well introduce reboxing and we try to minimise the risk of doing so.
+
+ * The field binders. If the scrutinee had nested CPR information, the field
+   binders inherit that information.
+   Example (adapted from T10482a):
+        f2 t = case t of (x, y)
+                 | x<0 -> f2 (MkT2 x (y-1))
+                 | y>1 -> 1
+                 | otherwise -> x
+   Since 'f2' is strict in 't' and even 'x', they will be available unboxed-only.
+   Note [CPR for binders that will be unboxed] gives 't' an appropriately nested
+   CPR property from which the field binder 'x' inherits its CPR property in turn,
+   so that we give 'f2' the CPR property.
+
+Note [Optimistic case binder CPR]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+TODO, CaseBinderCPR
+   Example:
+        f True  x = case x of y { I# x' -> if x' ==# 3
+                                           then y
+                                           else I# 8 }
+        f False x = I# 3
 
 Note [CPR for sum types]
 ~~~~~~~~~~~~~~~~~~~~~~~~
+TODO: This is out of date since we have join points. See #16570
 At the moment we do not do CPR for let-bindings that
    * non-top level
    * bind a sum type
@@ -771,29 +760,4 @@ we still give every function an every deepening CPR signature. But it's very
 uncommon to find code like this, whereas the long static data structures from
 the beginning of this Note are very common because of GHC's strategy of ANF'ing
 data structure RHSs.
-
-Note [CPR examples]
-~~~~~~~~~~~~~~~~~~~~
-Here are some examples (stranal/should_compile/T10482a) of the
-usefulness of Note [CPR in a DataAlt case alternative].  The main
-point: all of these functions can have the CPR property.
-
-    ------- f1 -----------
-    -- x is used strictly by h, so it'll be available
-    -- unboxed before it is returned in the True branch
-
-    f1 :: Int -> Int
-    f1 x = case h x x of
-            True  -> x
-            False -> f1 (x-1)
-
-    ------- f3 -----------
-    -- h is strict in x, so x will be unboxed before it
-    -- is rerturned in the otherwise case.
-
-    data T3 = MkT3 Int Int
-
-    f1 :: T3 -> Int
-    f1 (MkT3 x y) | h x y     = f3 (MkT3 x (y-1))
-                  | otherwise = x
 -}
