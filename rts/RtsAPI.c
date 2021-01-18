@@ -31,6 +31,7 @@ HaskellObj
 rts_mkChar (Capability *cap, HsChar c)
 {
   StgClosure *p;
+  // See Note [Precomputed static closures]
   if (c <= MAX_CHARLIKE) {
     p = (StgClosure *)CHARLIKE_CLOSURE(c);
   } else {
@@ -45,6 +46,7 @@ HaskellObj
 rts_mkInt (Capability *cap, HsInt i)
 {
   StgClosure *p;
+  // See Note [Precomputed static closures]
   if (i >= MIN_INTLIKE && i <= MAX_INTLIKE) {
     p = (StgClosure *)INTLIKE_CLOSURE(i);
   } else {
