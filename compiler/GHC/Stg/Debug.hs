@@ -22,6 +22,8 @@ import Control.Monad.Trans.RWS
 import GHC.Types.Unique.Map
 import GHC.Types.SrcLoc
 import Control.Applicative
+import qualified Data.List.NonEmpty as NE
+import Data.List.NonEmpty (NonEmpty(..))
 
 data R = R { rDynFlags :: DynFlags, rModLocation :: ModLocation, rSpan :: Maybe (RealSrcSpan, String) }
 
@@ -146,12 +148,13 @@ numberDataCon dc ts = do
                 case mbest_span of
                   Nothing -> (provDC env)
                   Just best_span ->
-                    alterUniqMap (maybe (Just [(0, best_span)]) (\xs@((k, _):_) -> Just ((k + 1, best_span) : xs))) (provDC env) dc
+                    alterUniqMap (maybe (Just ((0, best_span) :| [] ))
+                                        (\xs@((k, _):|_) -> Just ((k + 1, best_span) `NE.cons` xs))) (provDC env) dc
           put (env { provDC = dcMap' })
           let r = lookupUniqMap dcMap' dc
           return $ case r of
             Nothing -> NoNumber
-            Just res -> Numbered (fst (head res))
+            Just res -> Numbered (fst (NE.head res))
 
 selectTick :: [Tickish Id] -> Maybe (RealSrcSpan, String)
 selectTick [] = Nothing
