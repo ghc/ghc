@@ -3295,6 +3295,7 @@ showLanguages' show_all dflags =
            Nothing          -> text "Haskell2010"
            Just Haskell98   -> text "Haskell98"
            Just Haskell2010 -> text "Haskell2010"
+           Just GH2021      -> text "GHC2021"
      , (if show_all then text "all active language options:"
                     else text "with the following modifiers:") $$
           nest 2 (vcat (map (setting xopt) DynFlags.xFlags))
