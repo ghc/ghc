@@ -1018,8 +1018,8 @@ reportError :: ErrMsg ErrDoc -> TcRn ()
 reportError err
   = do { traceTc "Adding error:" (pprLocErrMsg err) ;
          errs_var <- getErrsVar ;
-         (warns, errs) <- partitionMessages <$> readTcRef errs_var ;
-         writeTcRef errs_var (mkMessages $ warns `unionBags` (errs `snocBag` err)) }
+         msgs     <- readTcRef errs_var ;
+         writeTcRef errs_var (err `addMessage` msgs) }
 
 reportWarning :: WarnReason -> ErrMsg ErrDoc -> TcRn ()
 reportWarning reason err
