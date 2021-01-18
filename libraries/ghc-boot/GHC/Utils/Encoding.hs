@@ -26,6 +26,7 @@ module GHC.Utils.Encoding (
         utf8DecodeStringLazy,
         utf8EncodeChar,
         utf8EncodeString,
+        utf8EncodeStringPtr,
         utf8EncodeShortByteString,
         utf8EncodedLength,
         countUTF8Chars,
@@ -249,8 +250,17 @@ utf8EncodeChar write# c =
       case write# off# (int2Word# c#) s of
         s -> (# s, () #)
 
-utf8EncodeString :: Ptr Word8 -> String -> IO ()
-utf8EncodeString (Ptr a#) str = go a# str
+utf8EncodeString :: String -> ByteString
+utf8EncodeString s =
+  unsafePerformIO $ do
+    let len = utf8EncodedLength s
+    buf <- mallocForeignPtrBytes len
+    withForeignPtr buf $ \ptr -> do
+      utf8EncodeStringPtr ptr s
+      pure (BS.fromForeignPtr buf 0 len)
+
+utf8EncodeStringPtr :: Ptr Word8 -> String -> IO ()
+utf8EncodeStringPtr (Ptr a#) str = go a# str
   where go !_   []   = return ()
         go a# (c:cs) = do
           I# off# <- stToIO $ utf8EncodeChar (writeWord8OffAddr# a#) c
