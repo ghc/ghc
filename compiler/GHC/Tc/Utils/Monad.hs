@@ -992,14 +992,14 @@ discardWarnings thing_inside
 ************************************************************************
 -}
 
-mkLongErrAt :: SrcSpan -> SDoc -> SDoc -> TcRn (ErrMsg [SDoc])
+mkLongErrAt :: SrcSpan -> SDoc -> SDoc -> TcRn (MsgEnvelope [SDoc])
 mkLongErrAt loc msg extra
   = do { printer <- getPrintUnqualified ;
          unit_state <- hsc_units <$> getTopEnv ;
          let msg' = pprWithUnitState unit_state msg in
-         return $ mkLongErrMsg loc printer msg' extra }
+         return $ mkLongMsgEnvelope loc printer msg' extra }
 
-mkErrDocAt :: SrcSpan -> [SDoc] -> TcRn (ErrMsg [SDoc])
+mkErrDocAt :: SrcSpan -> [SDoc] -> TcRn (MsgEnvelope [SDoc])
 mkErrDocAt loc errDoc
   = do { printer <- getPrintUnqualified ;
          unit_state <- hsc_units <$> getTopEnv ;
@@ -1011,24 +1011,24 @@ mkErrDocAt loc errDoc
 addLongErrAt :: SrcSpan -> SDoc -> SDoc -> TcRn ()
 addLongErrAt loc msg extra = mkLongErrAt loc msg extra >>= reportError
 
-reportErrors :: [ErrMsg [SDoc]] -> TcM ()
+reportErrors :: [MsgEnvelope [SDoc]] -> TcM ()
 reportErrors = mapM_ reportError
 
-reportError :: ErrMsg [SDoc] -> TcRn ()
+reportError :: MsgEnvelope [SDoc] -> TcRn ()
 reportError err
-  = do { traceTc "Adding error:" (pprLocErrMsg err) ;
+  = do { traceTc "Adding error:" (pprLocMsgEnvelope err) ;
          errs_var <- getErrsVar ;
          msgs     <- readTcRef errs_var ;
          writeTcRef errs_var (err `addMessage` msgs) }
 
-reportWarning :: WarnReason -> ErrMsg [SDoc] -> TcRn ()
+reportWarning :: WarnReason -> MsgEnvelope [SDoc] -> TcRn ()
 reportWarning reason err
   = do { let warn = makeIntoWarning reason err
-                    -- 'err' was built by mkLongErrMsg or something like that,
+                    -- 'err' was built by mkLongMsgEnvelope or something like that,
                     -- so it's of error severity.  For a warning we downgrade
                     -- its severity to SevWarning
 
-       ; traceTc "Adding warning:" (pprLocErrMsg warn)
+       ; traceTc "Adding warning:" (pprLocMsgEnvelope warn)
        ; errs_var <- getErrsVar
        ; (warns, errs) <- partitionMessages <$> readTcRef errs_var
        ; writeTcRef errs_var (mkMessages $ (warns `snocBag` warn) `unionBags` errs) }
