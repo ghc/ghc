@@ -70,6 +70,7 @@ import GHC.Tc.Types.Evidence
 import GHC.Types.Var.Set
 import GHC.Builtin.Types
 import GHC.Builtin.Names
+import GHC.Builtin.Uniques
 import GHC.Driver.Session
 import GHC.Types.SrcLoc
 import GHC.Utils.Misc
@@ -944,7 +945,14 @@ tcExpr (GetField _ arg field mb_getField) res_ty
           Just getField -> tcExpr (mkGet loc getField arg field) res_ty
           Nothing -> panic "tcExpr: GetField: Not implemented"
       }
-tcExpr (Projection _ _ _ (L _ p)) res_ty = tcExpr p res_ty
+tcExpr (Projection _ fields mb_getField mb_circ) res_ty
+  = do { -- See Note [Type-checking record dot syntax] (not written yet)
+        loc <- getSrcSpanM
+      ; case (mb_getField, mb_circ) of
+          (Just getField, Just circ) -> tcExpr (mkProj loc getField circ fields) res_ty
+          (Nothing, _) -> panic "tcExpr: Projection: Not implemented"
+          (Just _, Nothing) -> panic "tcExpr: The impossible has happened"
+       }
 tcExpr (RecordDotUpd _ _ _ _ (L _ s)) res_ty = tcExpr s res_ty
 
 {-
@@ -1849,8 +1857,8 @@ mkParen loc = L loc . HsPar noExtField
 mkApp :: SrcSpan -> LHsExpr GhcRn -> LHsExpr GhcRn -> LHsExpr GhcRn
 mkApp loc x = L loc . HsApp noExtField x
 
-_mkOpApp :: LHsExpr GhcRn -> LHsExpr GhcRn -> LHsExpr GhcRn -> LHsExpr GhcRn
-_mkOpApp x op = noLoc . OpApp (Fixity NoSourceText minPrecedence InfixL) x op
+mkOpApp :: SrcSpan -> LHsExpr GhcRn -> LHsExpr GhcRn -> LHsExpr GhcRn -> LHsExpr GhcRn
+mkOpApp loc x op = L loc . OpApp (Fixity NoSourceText minPrecedence InfixL) x op
 
 mkAppType :: SrcSpan -> LHsExpr GhcRn -> GenLocated SrcSpan (HsType (NoGhcTc GhcRn)) -> LHsExpr GhcRn
 mkAppType loc expr = L loc . HsAppType noExtField expr . mkEmptyWildCardBndrs
@@ -1868,5 +1876,30 @@ mkGet' loc get_field l@(r : _) (L _ field) =
   mkApp loc (mkAppType loc (L loc (HsVar noExtField (L loc get_field)))
                (mkSelector loc field)) (mkParen loc r)
   : l
-
 mkGet' _ _ [] _ = panic "mkGet' : The impossible has happened!"
+
+-- mkProj fieldS calculates a projection.
+-- e.g. .x = mkProj x = \z -> z.x = \z -> (getField @field x)
+--      .x.y = mkProj [.x, .y] = (.y) . (.x) = (\z -> z.y) . (\z -> z.x)
+mkProj :: SrcSpan -> Name -> Name -> [Located FastString] -> HsExpr GhcRn
+mkProj loc getFieldName circName (field : fieldS) =
+  unLoc (foldl' f (proj field) fieldS)
+  where
+    f :: LHsExpr GhcRn -> Located FastString -> LHsExpr GhcRn
+    f acc field = (mkParen loc . mkOpApp loc (proj field) (circ loc)) acc
+
+    proj :: Located FastString -> LHsExpr GhcRn
+    proj f =
+      let body = L loc $ mkGet loc getFieldName (zVar loc) f
+          grhs = L loc $ GRHS noExtField [] body
+          ghrss = GRHSs noExtField [grhs] (L loc (EmptyLocalBinds noExtField))
+          m = L loc $ Match {m_ext=noExtField, m_ctxt=LambdaExpr, m_pats=[zPat loc], m_grhss=ghrss} in
+      mkParen loc (L loc $ HsLam noExtField MG {mg_ext=noExtField, mg_alts=L loc [m], mg_origin=Generated})
+
+    zPat :: SrcSpan -> LPat GhcRn
+    zVar, circ :: SrcSpan -> LHsExpr GhcRn
+    zPat loc = L loc $ VarPat noExtField (L loc $ mkSystemVarName (mkVarOccUnique (fsLit "z")) (fsLit "z")) --  (L loc $ mkRdrUnqual (mkVarOcc "z"))
+    zVar loc = L loc $ HsVar noExtField (L loc $ mkSystemVarName (mkVarOccUnique (fsLit "z")) (fsLit "z"))
+    circ loc = L loc $ HsVar noExtField (L loc $ circName)
+
+mkProj _ _ _ [] = panic "mkProj': The impossible happened"

@@ -532,7 +532,7 @@ data HsExpr p
         proj_ext :: XProjection p
       , proj_flds :: [Located FastString]
       , proj_get_field :: Maybe (IdP p)
-      , proj_proj :: LHsExpr p -- Desugared equivalent 'getField' term.
+      , proj_circ :: Maybe (IdP p)
       }
   -- ^ @Just id@ means @RebindableSyntax@ is in use and gives the id
   --   of the in-scope 'getField'.

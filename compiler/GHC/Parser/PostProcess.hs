@@ -2708,9 +2708,6 @@ mkVar = noLoc . HsVar noExtField . noLoc . mkRdrUnqual . mkVarOcc
 mkApp :: LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs
 mkApp x = noLoc . HsApp noExtField x
 
-mkOpApp :: LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs
-mkOpApp x op = noLoc . OpApp noExtField x op
-
 mkAppType :: LHsExpr GhcPs -> GenLocated SrcSpan (HsType (NoGhcTc GhcPs)) -> LHsExpr GhcPs
 mkAppType expr = noLoc . HsAppType noExtField expr . HsWC noExtField
 
@@ -2726,32 +2723,6 @@ isGetField :: LHsExpr GhcPs -> Bool
 isGetField (L _ GetField{}) = True
 isGetField _ = False
 
-zPat :: LPat GhcPs
-zVar, circ :: LHsExpr GhcPs
-zPat = noLoc $ VarPat noExtField (noLoc $ mkRdrUnqual (mkVarOcc "z"))
-zVar = noLoc $ HsVar  noExtField (noLoc $ mkRdrUnqual (mkVarOcc "z"))
-circ = noLoc $ HsVar  noExtField (noLoc $ mkRdrUnqual (mkVarOcc "."))
-
--- mkProj' fieldS calculates a projection.
--- e.g. .x = mkProj' x = \z -> z.x = \z -> (getField @field x)
---      .x.y = mkProj' [.x, .y] = (.y) . (.x) = (\z -> z.y) . (\z -> z.x)
-mkProj :: [Located FastString] -> LHsExpr GhcPs
-mkProj (field : fieldS) = foldl' f (proj field) fieldS
-  where
-    f acc field = (mkParen . mkOpApp (proj field) circ) acc
-
-    proj f =
-      let body = mkGet zVar f
-          grhs = noLoc $ GRHS noExtField [] body
-          ghrss = GRHSs noExtField [grhs] (noLoc (EmptyLocalBinds noExtField))
-          m = noLoc $ Match {m_ext=noExtField, m_ctxt=LambdaExpr, m_pats=[zPat], m_grhss=ghrss} in
-      mkParen (noLoc $ HsLam noExtField MG {mg_ext=noExtField, mg_alts=noLoc [m], mg_origin=Generated})
-mkProj [] = panic "mkProj': The impossible happened"
-
--- mkGet arg field calcuates a get_field @field arg expression.
--- e.g. z.x = mkGet z x = get_field @x z
-mkGet :: LHsExpr GhcPs -> Located FastString -> LHsExpr GhcPs
-mkGet arg field = head $ mkGet' [arg] field
 mkGet' :: [LHsExpr GhcPs] -> Located FastString -> [LHsExpr GhcPs]
 mkGet' l@(r : _) (L _ field) = get_field `mkAppType` mkSelector field `mkApp` mkParen r : l
 mkGet' [] _ = panic "mkGet' : The impossible has happened!"
@@ -2772,7 +2743,7 @@ mkProjection loc flds =
       proj_ext = noExtField
     , proj_flds = flds
     , proj_get_field = Nothing
-    , proj_proj = mkProj flds
+    , proj_circ = Nothing
     }
 
 -- e.g. foo.bar.baz.quux = 1

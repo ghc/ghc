@@ -215,24 +215,24 @@ rnExpr (NegApp _ e _)
 
 rnExpr (GetField x e f _)
   = do { rebindable_on <- xoptM LangExt.RebindableSyntax
-       ; (e', fvs) <- rnLExpr e
+       ; (e, fvs) <- rnLExpr e
        ; if rebindable_on
          then do {
            getField <- lookupOccRn (mkVarUnqual (fsLit "getField"))
-         ; return (GetField x e' f (Just getField), fvs `plusFV` unitFV getField)
+         ; return (GetField x e f (Just getField), fvs `plusFV` unitFV getField)
          }
-         else return (GetField x e' f Nothing, fvs)
+         else return (GetField x e f Nothing, fvs)
        }
 
-rnExpr (Projection x fs _ p)
-  = do { rebindable_on <- xoptM LangExt.RebindableSyntax
-       ; (p', fv) <- rnLExpr p
+rnExpr (Projection x fs _ _)
+  = do { circ <- lookupOccRn compose_RDR
+       ; rebindable_on <- xoptM LangExt.RebindableSyntax
        ; if rebindable_on
          then do {
            getField <- lookupOccRn (mkVarUnqual (fsLit "getField"))
-         ; return (Projection x fs (Just getField) p', fv)
+         ; return (Projection x fs (Just getField) (Just circ), mkFVs [getField, circ])
          }
-         else return (Projection x fs Nothing p', fv)
+         else return (Projection x fs Nothing (Just circ), unitFV circ)
        }
 
 rnExpr (RecordDotUpd x e us _ f)
