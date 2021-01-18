@@ -77,7 +77,7 @@ makeStub(Section * section,
 
 void
 freeStubs(Section * section) {
-    if(section->info->nstubs == 0)
+    if(NULL == section || section->info->nstubs == 0)
         return;
     Stub * last = section->info->stubs;
     while(last->next != NULL) {
