@@ -23,8 +23,7 @@ module GHC.Integer (
 #endif
 
     -- * Helpers for 'RealFloat' type-class operations
-    encodeFloatInteger, floatFromInteger,
-    encodeDoubleInteger, decodeDoubleInteger, doubleFromInteger,
+    encodeFloatInteger, encodeDoubleInteger, decodeDoubleInteger,
 
     -- * Arithmetic operations
     plusInteger, minusInteger, timesInteger, negateInteger,
@@ -62,7 +61,6 @@ import GHC.Num.Integer (Integer)
 import qualified GHC.Num.Integer as I
 import GHC.Prim
 import GHC.Types
-import {-# SOURCE #-} GHC.Float (integerToFloat#, integerToDouble#)
 
 smallInteger :: Int# -> Integer
 smallInteger = I.integerFromInt#
@@ -96,14 +94,8 @@ integerToInt64 = I.integerToInt64#
 encodeFloatInteger :: Integer -> Int# -> Float#
 encodeFloatInteger = I.integerEncodeFloat#
 
-floatFromInteger :: Integer -> Float#
-floatFromInteger = integerToFloat#
-
 encodeDoubleInteger :: Integer -> Int# -> Double#
 encodeDoubleInteger = I.integerEncodeDouble#
-
-doubleFromInteger :: Integer -> Double#
-doubleFromInteger = integerToDouble#
 
 decodeDoubleInteger :: Double# -> (# Integer, Int# #)
 decodeDoubleInteger = I.integerDecodeDouble#
