@@ -51,6 +51,7 @@ stage0
 stage1
 stage2
 _build
+_validatebuild
 */generated/
 */ghc-stage1
 .shake.*
