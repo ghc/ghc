@@ -255,6 +255,10 @@ Compiler
 GHCi
 ~~~~
 
+- GHCi prompt no longer lists loaded modules.
+  The previous behavior can be restored with ``:set prompt "%s> "``
+  and ``:set prompt-cont "%s| "``.
+
 - The ``:script`` command now allows for file names that contain spaces to
   passed as arguments: either by enclosing the file names in double quotes or by
   escaping spaces in file names with a backslash. (:ghc-ticket:`18027`)
