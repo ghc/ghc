@@ -2156,7 +2156,7 @@ mkRdrRecordUpd exp flds
 
 mkRdrRecordCon :: Located RdrName -> HsRecordBinds GhcPs -> HsExpr GhcPs
 mkRdrRecordCon con flds
-  = RecordCon { rcon_ext = noExtField, rcon_con_name = con, rcon_flds = flds }
+  = RecordCon { rcon_ext = noExtField, rcon_con = con, rcon_flds = flds }
 
 mk_rec_fields :: [Located (HsRecField (GhcPass p) arg)] -> Maybe SrcSpan -> HsRecFields (GhcPass p) arg
 mk_rec_fields fs Nothing = HsRecFields { rec_flds = fs, rec_dotdot = Nothing }

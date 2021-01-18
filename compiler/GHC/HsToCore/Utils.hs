@@ -322,8 +322,9 @@ mkCoSynCaseMatchResult var ty alt = MR_Fallible $ mkPatSynCase var ty alt
 
 mkPatSynCase :: Id -> Type -> CaseAlt PatSyn -> CoreExpr -> DsM CoreExpr
 mkPatSynCase var ty alt fail = do
+    matcher_id <- dsLookupGlobalId matcher_name
     matcher <- dsLExpr $ mkLHsWrap wrapper $
-                         nlHsTyApp matcher [getRuntimeRep ty, ty]
+                         nlHsTyApp matcher_id [getRuntimeRep ty, ty]
     cont <- mkCoreLams bndrs <$> runMatchResult fail match_result
     return $ mkCoreAppsDs (text "patsyn" <+> ppr var) matcher [Var var, ensure_unstrict cont, Lam voidArgId fail]
   where
@@ -331,7 +332,7 @@ mkPatSynCase var ty alt fail = do
                alt_bndrs = bndrs,
                alt_wrapper = wrapper,
                alt_result = match_result} = alt
-    (matcher, needs_void_lam) = patSynMatcher psyn
+    (matcher_name, _, needs_void_lam) = patSynMatcher psyn
 
     -- See Note [Matchers and builders for pattern synonyms] in GHC.Core.PatSyn
     -- on these extra Void# arguments
