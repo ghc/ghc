@@ -34,8 +34,6 @@ import GHC.Core.Stats   (coreBindsStats, CoreStats(..))
 import GHC.Core.Seq     (seqBinds)
 import GHC.Core.Lint
 import GHC.Core.Rules
-import GHC.Core.PatSyn
-import GHC.Core.ConLike
 import GHC.Core.Opt.Arity   ( exprArity, exprBotStrictness_maybe )
 import GHC.Core.InstEnv
 import GHC.Core.Type     ( tidyTopType )
@@ -194,10 +192,8 @@ mkBootModDetailsTc hsc_env
 
     final_tcs  = filterOut isWiredIn tcs
                  -- See Note [Drop wired-in things]
-    type_env1  = typeEnvFromEntities final_ids final_tcs fam_insts
-    insts'     = mkFinalClsInsts type_env1 insts
-    pat_syns'  = mkFinalPatSyns  type_env1 pat_syns
-    type_env'  = extendTypeEnvWithPatSyns pat_syns' type_env1
+    type_env'  = typeEnvFromEntities final_ids final_tcs pat_syns fam_insts
+    insts'     = mkFinalClsInsts type_env' insts
 
     -- Default methods have their export flag set (isExportedId),
     -- but everything else doesn't (yet), because this is
@@ -220,13 +216,6 @@ lookupFinalId type_env id
 
 mkFinalClsInsts :: TypeEnv -> [ClsInst] -> [ClsInst]
 mkFinalClsInsts env = map (updateClsInstDFun (lookupFinalId env))
-
-mkFinalPatSyns :: TypeEnv -> [PatSyn] -> [PatSyn]
-mkFinalPatSyns env = map (updatePatSynIds (lookupFinalId env))
-
-extendTypeEnvWithPatSyns :: [PatSyn] -> TypeEnv -> TypeEnv
-extendTypeEnvWithPatSyns tidy_patsyns type_env
-  = extendTypeEnvList type_env [AConLike (PatSynCon ps) | ps <- tidy_patsyns ]
 
 globaliseAndTidyBootId :: Id -> Id
 -- For a LocalId with an External Name,
@@ -430,10 +419,8 @@ tidyProgram hsc_env  (ModGuts { mg_module           = mod
 
               ; final_tcs      = filterOut isWiredIn tcs
                                  -- See Note [Drop wired-in things]
-              ; type_env       = typeEnvFromEntities final_ids final_tcs fam_insts
-              ; tidy_cls_insts = mkFinalClsInsts type_env cls_insts
-              ; tidy_patsyns   = mkFinalPatSyns  type_env patsyns
-              ; tidy_type_env  = extendTypeEnvWithPatSyns tidy_patsyns type_env
+              ; tidy_type_env  = typeEnvFromEntities final_ids final_tcs patsyns fam_insts
+              ; tidy_cls_insts = mkFinalClsInsts tidy_type_env cls_insts
               ; tidy_rules     = tidyRules tidy_env trimmed_rules
 
               ; -- See Note [Injecting implicit bindings]

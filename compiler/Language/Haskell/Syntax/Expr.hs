@@ -354,10 +354,9 @@ data HsExpr p
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | RecordCon
-      { rcon_ext      :: XRecordCon p
-      , rcon_con_name :: LIdP p             -- The constructor name;
-                                            --  not used after type checking
-      , rcon_flds     :: HsRecordBinds p }  -- The fields
+      { rcon_ext  :: XRecordCon p
+      , rcon_con  :: XRec p (ConLikeP p)  -- The constructor
+      , rcon_flds :: HsRecordBinds p }    -- The fields
 
   -- | Record update
   --

@@ -320,7 +320,7 @@ tcValBinds top_lvl binds sigs thing_inside
                  do { thing <- thing_inside
                        -- See Note [Pattern synonym builders don't yield dependencies]
                        --     in GHC.Rename.Bind
-                    ; patsyn_builders <- mapM tcPatSynBuilderBind patsyns
+                    ; patsyn_builders <- mapM (tcPatSynBuilderBind prag_fn) patsyns
                     ; let extra_binds = [ (NonRecursive, builder)
                                         | builder <- patsyn_builders ]
                     ; return (extra_binds, thing) }

@@ -1568,7 +1568,7 @@ repE (ExplicitSum _ alt arity e)
  = do { e1 <- repLE e
       ; repUnboxedSum e1 alt arity }
 
-repE (RecordCon { rcon_con_name = c, rcon_flds = flds })
+repE (RecordCon { rcon_con = c, rcon_flds = flds })
  = do { x <- lookupLOcc c;
         fs <- repFields flds;
         repRecCon x fs }
