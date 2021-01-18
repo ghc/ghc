@@ -30,19 +30,29 @@
 HaskellObj
 rts_mkChar (Capability *cap, HsChar c)
 {
-  StgClosure *p = (StgClosure *)allocate(cap, CONSTR_sizeW(0,1));
-  SET_HDR(p, Czh_con_info, CCS_SYSTEM);
-  p->payload[0]  = (StgClosure *)(StgWord)(StgChar)c;
-  return p;
+  StgClosure *p;
+  if (c <= MAX_CHARLIKE) {
+    p = (StgClosure *)CHARLIKE_CLOSURE(c);
+  } else {
+    p = (StgClosure *)allocate(cap, CONSTR_sizeW(0,1));
+    SET_HDR(p, Czh_con_info, CCS_SYSTEM);
+    p->payload[0]  = (StgClosure *)(StgWord)(StgChar)c;
+  }
+  return TAG_CLOSURE(1, p);
 }
 
 HaskellObj
 rts_mkInt (Capability *cap, HsInt i)
 {
-  StgClosure *p = (StgClosure *)allocate(cap,CONSTR_sizeW(0,1));
-  SET_HDR(p, Izh_con_info, CCS_SYSTEM);
-  p->payload[0]  = (StgClosure *)(StgInt)i;
-  return p;
+  StgClosure *p;
+  if (i >= MIN_INTLIKE && i <= MAX_INTLIKE) {
+    p = (StgClosure *)INTLIKE_CLOSURE(i);
+  } else {
+    p = (StgClosure *)allocate(cap,CONSTR_sizeW(0,1));
+    SET_HDR(p, Izh_con_info, CCS_SYSTEM);
+    p->payload[0]  = (StgClosure *)(StgInt)i;
+  }
+  return TAG_CLOSURE(1, p);
 }
 
 HaskellObj
@@ -52,7 +62,7 @@ rts_mkInt8 (Capability *cap, HsInt8 i)
   SET_HDR(p, I8zh_con_info, CCS_SYSTEM);
   /* Make sure we mask out the bits above the lowest 8 */
   p->payload[0]  = (StgClosure *)(StgInt)i;
-  return p;
+  return TAG_CLOSURE(1, p);
 }
 
 HaskellObj
@@ -62,7 +72,7 @@ rts_mkInt16 (Capability *cap, HsInt16 i)
   SET_HDR(p, I16zh_con_info, CCS_SYSTEM);
   /* Make sure we mask out the relevant bits */
   p->payload[0]  = (StgClosure *)(StgInt)i;
-  return p;
+  return TAG_CLOSURE(1, p);
 }
 
 HaskellObj
@@ -71,16 +81,16 @@ rts_mkInt32 (Capability *cap, HsInt32 i)
   StgClosure *p = (StgClosure *)allocate(cap,CONSTR_sizeW(0,1));
   SET_HDR(p, I32zh_con_info, CCS_SYSTEM);
   p->payload[0]  = (StgClosure *)(StgInt)i;
-  return p;
+  return TAG_CLOSURE(1, p);
 }
 
 HaskellObj
 rts_mkInt64 (Capability *cap, HsInt64 i)
 {
-  StgClosure *p = (StgClosure *)allocate(cap,CONSTR_sizeW(0,2));
+  StgClosure *p = (StgClosure *)allocate(cap,CONSTR_sizeW(0,sizeofW(StgInt64)));
   SET_HDR(p, I64zh_con_info, CCS_SYSTEM);
   ASSIGN_Int64((P_)&(p->payload[0]), i);
-  return p;
+  return TAG_CLOSURE(1, p);
 }
 
 HaskellObj
@@ -89,7 +99,7 @@ rts_mkWord (Capability *cap, HsWord i)
   StgClosure *p = (StgClosure *)allocate(cap,CONSTR_sizeW(0,1));
   SET_HDR(p, Wzh_con_info, CCS_SYSTEM);
   p->payload[0]  = (StgClosure *)(StgWord)i;
-  return p;
+  return TAG_CLOSURE(1, p);
 }
 
 HaskellObj
@@ -99,7 +109,7 @@ rts_mkWord8 (Capability *cap, HsWord8 w)
   StgClosure *p = (StgClosure *)allocate(cap,CONSTR_sizeW(0,1));
   SET_HDR(p, W8zh_con_info, CCS_SYSTEM);
   p->payload[0]  = (StgClosure *)(StgWord)(w & 0xff);
-  return p;
+  return TAG_CLOSURE(1, p);
 }
 
 HaskellObj
@@ -109,7 +119,7 @@ rts_mkWord16 (Capability *cap, HsWord16 w)
   StgClosure *p = (StgClosure *)allocate(cap,CONSTR_sizeW(0,1));
   SET_HDR(p, W16zh_con_info, CCS_SYSTEM);
   p->payload[0]  = (StgClosure *)(StgWord)(w & 0xffff);
-  return p;
+  return TAG_CLOSURE(1, p);
 }
 
 HaskellObj
@@ -119,17 +129,17 @@ rts_mkWord32 (Capability *cap, HsWord32 w)
   StgClosure *p = (StgClosure *)allocate(cap,CONSTR_sizeW(0,1));
   SET_HDR(p, W32zh_con_info, CCS_SYSTEM);
   p->payload[0]  = (StgClosure *)(StgWord)(w & 0xffffffff);
-  return p;
+  return TAG_CLOSURE(1, p);
 }
 
 HaskellObj
 rts_mkWord64 (Capability *cap, HsWord64 w)
 {
-  StgClosure *p = (StgClosure *)allocate(cap,CONSTR_sizeW(0,2));
+  StgClosure *p = (StgClosure *)allocate(cap,CONSTR_sizeW(0,sizeofW(StgWord64)));
   /* see mk_Int8 comment */
   SET_HDR(p, W64zh_con_info, CCS_SYSTEM);
   ASSIGN_Word64((P_)&(p->payload[0]), w);
-  return p;
+  return TAG_CLOSURE(1, p);
 }
 
 
@@ -139,7 +149,7 @@ rts_mkFloat (Capability *cap, HsFloat f)
   StgClosure *p = (StgClosure *)allocate(cap,CONSTR_sizeW(0,1));
   SET_HDR(p, Fzh_con_info, CCS_SYSTEM);
   ASSIGN_FLT((P_)p->payload, (StgFloat)f);
-  return p;
+  return TAG_CLOSURE(1, p);
 }
 
 HaskellObj
@@ -148,7 +158,7 @@ rts_mkDouble (Capability *cap, HsDouble d)
   StgClosure *p = (StgClosure *)allocate(cap,CONSTR_sizeW(0,sizeofW(StgDouble)));
   SET_HDR(p, Dzh_con_info, CCS_SYSTEM);
   ASSIGN_DBL((P_)p->payload, (StgDouble)d);
-  return p;
+  return TAG_CLOSURE(1, p);
 }
 
 HaskellObj
@@ -157,7 +167,7 @@ rts_mkStablePtr (Capability *cap, HsStablePtr s)
   StgClosure *p = (StgClosure *)allocate(cap,sizeofW(StgHeader)+1);
   SET_HDR(p, StablePtr_con_info, CCS_SYSTEM);
   p->payload[0]  = (StgClosure *)s;
-  return p;
+  return TAG_CLOSURE(1, p);
 }
 
 HaskellObj
@@ -166,7 +176,7 @@ rts_mkPtr (Capability *cap, HsPtr a)
   StgClosure *p = (StgClosure *)allocate(cap,sizeofW(StgHeader)+1);
   SET_HDR(p, Ptr_con_info, CCS_SYSTEM);
   p->payload[0]  = (StgClosure *)a;
-  return p;
+  return TAG_CLOSURE(1, p);
 }
 
 HaskellObj
@@ -175,16 +185,16 @@ rts_mkFunPtr (Capability *cap, HsFunPtr a)
   StgClosure *p = (StgClosure *)allocate(cap,sizeofW(StgHeader)+1);
   SET_HDR(p, FunPtr_con_info, CCS_SYSTEM);
   p->payload[0]  = (StgClosure *)a;
-  return p;
+  return TAG_CLOSURE(1, p);
 }
 
 HaskellObj
 rts_mkBool (Capability *cap STG_UNUSED, HsBool b)
 {
   if (b) {
-    return (StgClosure *)True_closure;
+    return TAG_CLOSURE(2, (StgClosure *)True_closure);
   } else {
-    return (StgClosure *)False_closure;
+    return TAG_CLOSURE(1, (StgClosure *)False_closure);
   }
 }
 
@@ -365,14 +375,7 @@ rts_getFunPtr (HaskellObj p)
 HsBool
 rts_getBool (HaskellObj p)
 {
-    const StgInfoTable *info;
-
-    info = get_itbl((const StgClosure *)UNTAG_CONST_CLOSURE(p));
-    if (info->srt == 0) { // srt is the constructor tag
-        return 0;
-    } else {
-        return 1;
-    }
+    return UNTAG_CONST_CLOSURE(p) == True_closure;
 }
 
 /* -----------------------------------------------------------------------------
