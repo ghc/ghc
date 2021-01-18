@@ -300,7 +300,7 @@ instance Num Float where
     {-# INLINE fromInteger #-}
     fromInteger i = F# (integerToFloat# i)
 
--- | Encode an Integer (mantissa) into a Float#
+-- | Convert an Integer to a Float#
 integerToFloat# :: Integer -> Float#
 {-# NOINLINE integerToFloat# #-}
 integerToFloat# (IS i)   = int2Float# i
@@ -504,7 +504,7 @@ instance  Num Double  where
     {-# INLINE fromInteger #-}
     fromInteger i = D# (integerToDouble# i)
 
--- | Encode an Integer (mantissa) into a Double#
+-- | Convert an Integer to a Double#
 integerToDouble# :: Integer -> Double#
 {-# NOINLINE integerToDouble# #-}
 integerToDouble# (IS i)   = int2Double# i
@@ -943,11 +943,10 @@ floatToDigits base x =
 
 {-# SPECIALISE integerToBinaryFloat' :: Integer -> Float,
                                         Integer -> Double #-}
--- The argument must be strictly positive
+-- The argument must be strictly positive, and @floatRadix (undefined :: a)@ must be 2
 integerToBinaryFloat' :: RealFloat a => Integer -> a
 integerToBinaryFloat' n = result
   where
-    -- @floatRadix result@ must be 2
     mantDigs = floatDigits result
     k = I# (word2Int# (integerLog2# n))
     result = if k < mantDigs then
