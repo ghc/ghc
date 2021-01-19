@@ -13,7 +13,7 @@
 
 #pragma once
 
-EXTERN_INLINE StgPtr deRefStablePtr (StgStablePtr stable_ptr);
+ATTR_ALWAYS_INLINE EXTERN_INLINE StgPtr deRefStablePtr (StgStablePtr stable_ptr);
 StgStablePtr getStablePtr  (StgPtr p);
 
 /* -----------------------------------------------------------------------------
@@ -28,7 +28,7 @@ typedef struct {
 
 extern DLL_IMPORT_RTS spEntry *stable_ptr_table;
 
-EXTERN_INLINE
+ATTR_ALWAYS_INLINE EXTERN_INLINE
 StgPtr deRefStablePtr(StgStablePtr sp)
 {
     // acquire load to ensure that we see the new SPT if it has been recently
