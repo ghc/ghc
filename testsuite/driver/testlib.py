@@ -1084,7 +1084,8 @@ def do_test(name: TestName,
         [len(t.unexpected_passes),
          len(t.unexpected_failures),
          len(t.framework_failures)]]
-    if_verbose(2, "=====> {0} {1} of {2} {3}".format(*progress_args))
+    if t.total_tests % 100 == 0: if_verbose(2, "=====> {1} of {2} {3}".format(*progress_args))
+    if_verbose(3, "=====> {0} {1} of {2} {3}".format(*progress_args))
 
     # Update terminal title
     # useful progress indicator even when make test VERBOSE=1
