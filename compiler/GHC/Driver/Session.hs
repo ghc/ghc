@@ -467,8 +467,6 @@ data DynFlags = DynFlags {
   specConstrCount       :: Maybe Int,   -- ^ Max number of specialisations for any one function
   specConstrRecursive   :: Int,         -- ^ Max number of specialisations for recursive types
                                         --   Not optional; otherwise ForceSpecConstr can diverge.
-  caseBinderCprDepth    :: Int,         -- ^ How many levels deep a case binder
-                                        --   should optimistically get the CPR property.
   binBlobThreshold      :: Word,        -- ^ Binary literals (e.g. strings) whose size is above
                                         --   this threshold will be dumped in a binary file
                                         --   by the assembler code generator (0 to disable)
@@ -1148,7 +1146,6 @@ defaultDynFlags mySettings llvmConfig =
         specConstrCount         = Just 3,
         specConstrRecursive     = 3,
         liberateCaseThreshold   = Just 2000,
-        caseBinderCprDepth      = 1, -- The default prior to Nested CPR
         floatLamArgs            = Just 0, -- Default: float only if no fvs
         liftLamsRecArgs         = Just 5, -- Default: the number of available argument hardware registers on x86_64
         liftLamsNonRecArgs      = Just 5, -- Default: the number of available argument hardware registers on x86_64
@@ -2796,8 +2793,6 @@ dynamic_flags_deps = [
       (intSuffix (\n d -> d { liberateCaseThreshold = Just n }))
   , make_ord_flag defFlag "fno-liberate-case-threshold"
       (noArg (\d -> d { liberateCaseThreshold = Nothing }))
-  , make_ord_flag defFlag "fcase-binder-cpr-depth"
-      (intSuffix (\n d -> d { caseBinderCprDepth = n }))
   , make_ord_flag defFlag "drule-check"
       (sepArg (\s d -> d { ruleCheck = Just s }))
   , make_ord_flag defFlag "dinline-check"
