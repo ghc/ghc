@@ -30,7 +30,7 @@ Language extensions can be controlled (i.e. allowed or not) in two ways:
     explicitly with ``-XGHC2021``.
 
 
-    The ``GHC2021`` language set comprises of the following extensions:
+    The ``GHC2021`` language set comprises the following extensions:
 
     .. hlist::
 
