@@ -48,7 +48,7 @@ import GHC.Data.BooleanFormula (LBooleanFormula)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
-import Data.List hiding ( foldr )
+import Data.List (sortBy)
 import Data.Function
 
 {-

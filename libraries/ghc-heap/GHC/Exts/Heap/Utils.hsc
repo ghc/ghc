@@ -11,7 +11,7 @@ import GHC.Exts.Heap.Constants
 import GHC.Exts.Heap.InfoTable
 
 import Data.Char
-import Data.List
+import Data.List (intercalate)
 import Foreign
 import GHC.CString
 import GHC.Exts

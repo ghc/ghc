@@ -34,7 +34,7 @@ import GHC.Utils.Error  ( dumpIfSet_dyn, DumpFormat (..) )
 import GHC.Data.Maybe   ( isJust, isNothing )
 
 import Control.Monad ( guard )
-import Data.List
+import Data.List ( mapAccumL )
 
 {- Note [Constructed Product Result]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

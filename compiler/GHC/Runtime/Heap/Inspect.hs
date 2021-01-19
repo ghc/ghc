@@ -67,7 +67,7 @@ import GHC.IO (throwIO)
 
 import Control.Monad
 import Data.Maybe
-import Data.List
+import Data.List ((\\))
 import GHC.Exts
 import qualified Data.Sequence as Seq
 import Data.Sequence (viewl, ViewL(..))

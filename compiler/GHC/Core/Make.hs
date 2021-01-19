@@ -87,7 +87,7 @@ import GHC.Utils.Panic
 
 import GHC.Data.FastString
 
-import Data.List
+import Data.List        ( partition )
 import Data.Char        ( ord )
 
 infixl 4 `mkCoreApp`, `mkCoreApps`

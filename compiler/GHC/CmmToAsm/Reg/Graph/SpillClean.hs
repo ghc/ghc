@@ -51,7 +51,7 @@ import GHC.Utils.Panic
 import GHC.Platform
 import GHC.Cmm.Dataflow.Collections
 
-import Data.List
+import Data.List (nub, foldl1', find)
 import Data.Maybe
 import Data.IntSet              (IntSet)
 import qualified Data.IntSet    as IntSet
