@@ -299,6 +299,7 @@ library
          "-Wl,-u,_hs_atomicwrite8"
          "-Wl,-u,_hs_atomicwrite16"
          "-Wl,-u,_hs_atomicwrite32"
+         "-Wl,-u,stopHeapProfTimer"
 
       if flag(find-ptr)
         -- This symbol is useful in gdb, but not referred to anywhere,
