@@ -23,7 +23,6 @@ import GHC.Core.Seq
 import GHC.Utils.Outputable
 import GHC.Types.Var.Env
 import GHC.Types.Basic
-import GHC.Core.DataCon
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Core.Utils   ( exprIsHNF, dumpIdInfoOfProgram, normSplitTyConApp_maybe )
@@ -111,7 +110,7 @@ So currently we have
 
 cprAnalProgram :: DynFlags -> FamInstEnvs -> CoreProgram -> IO CoreProgram
 cprAnalProgram dflags fam_envs binds = do
-  let env            = emptyAnalEnv dflags fam_envs
+  let env            = emptyAnalEnv fam_envs
   let binds_plus_cpr = snd $ mapAccumL cprAnalTopBind env binds
   dumpIfSet_dyn dflags Opt_D_dump_cpr_signatures "Cpr signatures" FormatText $
     dumpIdInfoOfProgram (ppr . cprInfo) binds_plus_cpr
@@ -223,10 +222,16 @@ cprAnalAlt
 cprAnalAlt env args case_bndr case_bndr_ty (con,bndrs,rhs)
   = (rhs_ty, (con, bndrs, rhs'))
   where
+    env_case_bndr = extendSigEnv env case_bndr (CprSig case_bndr_ty)
     env_alt
-      -- See 'extendEnvForDataAlt' and Note [CPR in a DataAlt case alternative]
-      | DataAlt dc <- con = extendEnvForDataAlt env case_bndr case_bndr_ty dc bndrs
-      | otherwise         = extendSigEnv env case_bndr (CprSig case_bndr_ty)
+      -- See Note [CPR in a DataAlt case alternative]
+      | DataAlt dc  <- con
+      , Just fields <- splitConCprTy dc case_bndr_ty
+      , let ids     = filter isId bndrs
+      , let cpr_tys = map (CprSig . CprType 0) fields
+      = extendSigEnvList env_case_bndr (zipEqual "cprAnalAlt" ids cpr_tys)
+      | otherwise
+      = env_case_bndr
     (rhs_ty, rhs') = cprAnal env_alt args rhs
 
 --
@@ -239,7 +244,7 @@ cprTransform
   -> Id              -- ^ The function
   -> CprType         -- ^ The demand type of the function
 cprTransform env args id
-  = -- pprTrace "cprTransform" (vcat [ppr id, ppr sig])
+  = -- pprTrace "cprTransform" (vcat [ppr id, ppr sig, ppr args])
     sig
   where
     sig
@@ -326,7 +331,7 @@ cprAnalBind top_lvl env widening id rhs
 
     -- See Note [Arity trimming for CPR signatures]
     -- See Note [Ensuring termination of fixed-point iteration]
-    sig    = widening $ mkCprSigForArity (ae_dflags env) (idArity id) rhs_ty'
+    sig    = widening $ mkCprSigForArity (idArity id) rhs_ty'
     id'    = -- pprTrace "cprAnalBind" (ppr id $$ ppr rhs_ty' $$ ppr sig) $
              setIdCprInfo id sig
     env'   = extendSigEnv env id sig
@@ -455,8 +460,6 @@ data AnalEnv
   , ae_virgin :: Bool
   -- ^ True only on every first iteration in a fixed-point
   -- iteration. See Note [Initialising strictness] in "GHC.Core.Opt.DmdAnal"
-  , ae_dflags :: DynFlags
-  -- ^ For 'caseBinderCprDepth'.
   , ae_fam_envs :: FamInstEnvs
   -- ^ Needed when expanding type families and synonyms of product types.
   }
@@ -469,12 +472,11 @@ instance Outputable AnalEnv where
          [ text "ae_virgin =" <+> ppr virgin
          , text "ae_sigs =" <+> ppr env ])
 
-emptyAnalEnv :: DynFlags -> FamInstEnvs -> AnalEnv
-emptyAnalEnv dflags fam_envs
+emptyAnalEnv :: FamInstEnvs -> AnalEnv
+emptyAnalEnv fam_envs
   = AE
   { ae_sigs = emptyVarEnv
   , ae_virgin = True
-  , ae_dflags = dflags
   , ae_fam_envs = fam_envs
   }
 
@@ -496,28 +498,6 @@ extendSigEnvFromIds env ids
 
 nonVirgin :: AnalEnv -> AnalEnv
 nonVirgin env = env { ae_virgin = False }
-
-extendEnvForDataAlt :: AnalEnv -> Id -> CprType -> DataCon -> [Var] -> AnalEnv
--- See Note [CPR in a DataAlt case alternative]
-extendEnvForDataAlt env case_bndr case_bndr_ty dc bndrs
-  = extendSigEnv env' case_bndr (CprSig case_bndr_ty')
-  where
-    case_bndr_ty'
-      -- Only give the case binder the CPR property if it would be unboxed.
-      -- See Note [Which types are unboxed?]
-      | ty'@(CprType 0 cpr) <- markOptimisticConCprType dc case_bndr_ty
-      , Unbox{} <- wantToUnboxResult (ae_fam_envs env) (idType case_bndr) cpr
-      = ty'
-      -- Will not be unboxed, so giving it the CPR property introduces reboxing.
-      | otherwise
-      = case_bndr_ty
-    env'
-      | Just fields <- splitConCprTy dc case_bndr_ty'
-      , let ids     = filter isId bndrs
-      , let cpr_tys = map (CprSig . CprType 0) fields
-      = extendSigEnvList env (zipEqual "extendEnvForDataAlt" ids cpr_tys)
-      | otherwise
-      = env
 
 {- Note [Ensuring termination of fixed-point iteration]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -582,10 +562,8 @@ Specifically
         fw x = case x of y { I# x' -> if x' ==# 3 then x' else 8 }
 
    If the scrutinee has the CPR property, giving it to the case binder will
-   never introduce reboxing. But there are also compelling cases where we
-   want to optimistically give the case binder the CPR property even if the
-   scrutinee did not have it: See Note [Optimistic case binder CPR]. That may
-   very well introduce reboxing and we try to minimise the risk of doing so.
+   never introduce reboxing. We used to be more optimistic before Nested CPR;
+   see #19232.
 
  * The field binders. If the scrutinee had nested CPR information, the field
    binders inherit that information.
@@ -597,16 +575,7 @@ Specifically
    Since 'f2' is strict in 't' and even 'x', they will be available unboxed-only.
    Note [CPR for binders that will be unboxed] gives 't' an appropriately nested
    CPR property from which the field binder 'x' inherits its CPR property in turn,
-   so that we give 'f2' the CPR property.
-
-Note [Optimistic case binder CPR]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-TODO, CaseBinderCPR
-   Example:
-        f True  x = case x of y { I# x' -> if x' ==# 3
-                                           then y
-                                           else I# 8 }
-        f False x = I# 3
+   so that we give 'f2' the CPR property. Implementation in 'extendEnvForDataAlt'.
 
 Note [CPR for sum types]
 ~~~~~~~~~~~~~~~~~~~~~~~~
