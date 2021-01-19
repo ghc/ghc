@@ -2886,7 +2886,7 @@ withDeferredDiagnostics f = do
       (\_ -> setLogAction (log_action dflags) >> printDeferredDiagnostics)
       (\_ -> f)
 
-noModError :: HscEnv -> SrcSpan -> ModuleName -> FindResult -> MsgEnvelope [SDoc]
+noModError :: HscEnv -> SrcSpan -> ModuleName -> FindResult -> MsgEnvelope DecoratedSDoc
 -- ToDo: we don't have a proper line number for this error
 noModError hsc_env loc wanted_mod err
   = mkPlainMsgEnvelope loc $ cannotFindModule hsc_env wanted_mod err

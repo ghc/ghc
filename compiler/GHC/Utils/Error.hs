@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns    #-}
 {-# LANGUAGE CPP             #-}
 {-# LANGUAGE RankNTypes      #-}
+{-# LANGUAGE ViewPatterns    #-}
 
 {-
 (c) The AQUA Project, Glasgow University, 1994-1998
@@ -17,6 +18,7 @@ module GHC.Utils.Error (
         WarnMsg,
         MsgEnvelope(..),
         SDoc,
+        DecoratedSDoc(unDecorated),
         Messages, ErrorMessages, WarningMessages,
         unionMessages,
         errorsFound, isEmptyMessages,
@@ -24,10 +26,10 @@ module GHC.Utils.Error (
         -- ** Formatting
         pprMessageBag, pprMsgEnvelopeBagWithLoc,
         pprLocMsgEnvelope,
-        formatErrDoc,
+        formatBulleted,
 
         -- ** Construction
-        emptyMessages, mkLocMessage, mkLocMessageAnn, makeIntoWarning,
+        emptyMessages, mkDecorated, mkLocMessage, mkLocMessageAnn, makeIntoWarning,
         mkMsgEnvelope, mkPlainMsgEnvelope, mkErr, mkLongMsgEnvelope, mkWarnMsg,
         mkPlainWarnMsg,
         mkLongWarnMsg,
@@ -120,8 +122,8 @@ orValid _       v = v
 
 ----------------
 -- | Formats the input list of structured document, where each element of the list gets a bullet.
-formatErrDoc :: SDocContext -> [SDoc] -> SDoc
-formatErrDoc ctx docs
+formatBulleted :: SDocContext -> DecoratedSDoc -> SDoc
+formatBulleted ctx (unDecorated -> docs)
   = case msgs of
         []    -> Outputable.empty
         [msg] -> msg
@@ -130,7 +132,7 @@ formatErrDoc ctx docs
     msgs    = filter (not . Outputable.isEmpty ctx) docs
     starred = (bullet<+>)
 
-pprMsgEnvelopeBagWithLoc :: Bag (MsgEnvelope [SDoc]) -> [SDoc]
+pprMsgEnvelopeBagWithLoc :: Bag (MsgEnvelope DecoratedSDoc) -> [SDoc]
 pprMsgEnvelopeBagWithLoc bag = [ pprLocMsgEnvelope item | item <- sortMsgBag Nothing bag ]
 
 pprLocMsgEnvelope :: RenderableDiagnostic e => MsgEnvelope e -> SDoc
@@ -139,7 +141,7 @@ pprLocMsgEnvelope (MsgEnvelope { errMsgSpan      = s
                                , errMsgSeverity  = sev
                                , errMsgContext   = unqual })
   = sdocWithContext $ \ctx ->
-    withErrStyle unqual $ mkLocMessage sev s (formatErrDoc ctx $ renderDiagnostic e)
+    withErrStyle unqual $ mkLocMessage sev s (formatBulleted ctx $ renderDiagnostic e)
 
 sortMsgBag :: Maybe DynFlags -> Bag (MsgEnvelope e) -> [MsgEnvelope e]
 sortMsgBag dflags = maybeLimit . sortBy (cmp `on` errMsgSpan) . bagToList
