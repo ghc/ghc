@@ -236,8 +236,10 @@ lubCpr (Cpr tf1 sh1) (Cpr tf2 sh2)
 lubCpr cpr1            cpr2
   = NoMoreCpr (lubTerm (forgetCpr cpr1) (forgetCpr cpr2))
 
+-- | Trims CPR information (but keeps termination information) for e.g. thunks
 trimCpr :: Cpr -> Cpr
-trimCpr cpr@(Cpr _ BotSh) = cpr -- don't trim away bottom (we didn't do so before Nested CPR) TODO: Explain; CPR'ing for the error case
+trimCpr cpr@(Cpr _ BotSh) = cpr -- Don't trim away bottom, we still want to
+                                -- unbox e.g. error thunks
 trimCpr cpr               = NoMoreCpr (forgetCpr cpr)
 
 pruneDeepCpr :: Int -> Cpr -> Cpr
@@ -255,12 +257,6 @@ seqCpr (NoMoreCpr t) = seqTerm t
 
 ------------
 -- * CprType
-
--- TODO: Maybe formulate CprType like this?
--- data CprType' = TerminatingCall CprType | Ret Cpr Termination
---   deriving Eq
--- data CprType = CT (Levitated CprType')
---   deriving Eq
 
 -- | The abstract domain \(A_t\) from the original 'CPR for Haskell' paper.
 data CprType
@@ -402,7 +398,6 @@ noteTermFlag Terminates   = TerminationM (tell (Semigroup.Any False))
 -- return that.
 -- See Note [Rapid termination for strict binders]
 forceCprTy :: Demand -> CprType -> (TerminationFlag, CprType)
--- TODO: This doesn't consider strict fields yet, I think
 forceCprTy dmd ty = runTerminationM (idIfLazy forceCprTyM dmd ty)
 
 -- | Lifts a 'TerminaionM' action from 'SubDemand's to 'Demand's by returning
@@ -536,7 +531,9 @@ cprTransformSig str_sig (CprSig sig_ty) arg_tys
   , dmds `leLength` arg_tys
   , arg_tys `lengthIs` ct_arty sig_ty
   -- See Note [Rapid termination for strict binders]
-  -- TODO: I think dmds doesn't account for strict fields. Should we?
+  -- NB: 'dmds' doesn't account for strict fields, see
+  -- Note [Add demands for strict constructors]. We don't have to, either: All
+  -- forcing will be done by the call to the DataCon wrapper.
   , (tf, _) <- runTerminationM $ zipWithM_ (idIfLazy forceCprTyM) (dmds ++ repeat topDmd) arg_tys
   = -- pprTrace "cprTransformSig:ok" (ppr str_sig <+> ppr sig_ty <+> ppr arg_tys <+> ppr tf)
     sig_ty `bothCprType` tf
@@ -553,14 +550,11 @@ argDmdsFromStrictSig = fst . splitStrictSig
 -- | Produces 'CprType's the termination info of which match the given
 -- strictness signature. Examples:
 --
---   - A head-strict demand @S@ would translate to @#@, a
---   - A tuple demand @S(S,L)@ would translate to @#(#,*)@
---   - A call demand @C(S)@ would translate to @strTop -> #(#,*)@
+--   - A head-strict demand `S` would translate to `#`
+--   - A tuple demand `S(S,L)` would translate to `#(#,*)`
+--   - A call demand `C(S)` would translate to `. -> #(#,*)`
 argCprTypesFromStrictSig :: UnboxingStrategy Demand -> [Type] -> StrictSig -> [CprType]
 argCprTypesFromStrictSig want_to_unbox arg_tys sig
-  -- TODO: Maybe look at unliftedness from the unboxing strategy, just in case
-  -- we e.g. fail to mark an Int# argument as Terminates, which should always be
-  -- the case as per the let/app invariant.
   = zipWith go arg_tys (argDmdsFromStrictSig sig)
   where
     go ty dmd
