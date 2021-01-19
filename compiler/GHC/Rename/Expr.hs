@@ -838,7 +838,7 @@ rnStmt ctxt rnBody (L loc (BindStmt _ pat body)) thing_inside
         ; (fail_op, fvs2) <- monadFailOp pat ctxt
 
         ; rnPat (StmtCtxt ctxt) pat $ \ pat' -> do
-        { (thing, fvs3) <- thing_inside (collectPatBinders pat')
+        { (thing, fvs3) <- thing_inside (collectPatBinders CollNoDictBinders pat')
         ; let xbsrn = XBindStmtRn { xbsrn_bindOp = bind_op, xbsrn_failOp = fail_op }
         ; return (( [( L loc (BindStmt xbsrn pat' body'), fv_expr )]
                   , thing),
@@ -848,7 +848,7 @@ rnStmt ctxt rnBody (L loc (BindStmt _ pat body)) thing_inside
 
 rnStmt _ _ (L loc (LetStmt _ (L l binds))) thing_inside
   =     rnLocalBindsAndThen binds $ \binds' bind_fvs -> do
-        { (thing, fvs) <- thing_inside (collectLocalBinders binds')
+        { (thing, fvs) <- thing_inside (collectLocalBinders CollNoDictBinders binds')
         ; return ( ([(L loc (LetStmt noExtField (L l binds')), bind_fvs)], thing)
                  , fvs) }
 
@@ -1064,7 +1064,7 @@ rnRecStmtsAndThen ctxt rnBody s cont
         ; new_lhs_and_fv <- rn_rec_stmts_lhs fix_env s
 
           --    ...bring them and their fixities into scope
-        ; let bound_names = collectLStmtsBinders (map fst new_lhs_and_fv)
+        ; let bound_names = collectLStmtsBinders CollNoDictBinders (map fst new_lhs_and_fv)
               -- Fake uses of variables introduced implicitly (warning suppression, see #4404)
               rec_uses = lStmtsImplicits (map fst new_lhs_and_fv)
               implicit_uses = mkNameSet $ concatMap snd $ rec_uses
@@ -1141,7 +1141,7 @@ rn_rec_stmts_lhs :: Outputable body => MiniFixityEnv
                  -> RnM [(LStmtLR GhcRn GhcPs body, FreeVars)]
 rn_rec_stmts_lhs fix_env stmts
   = do { ls <- concatMapM (rn_rec_stmt_lhs fix_env) stmts
-       ; let boundNames = collectLStmtsBinders (map fst ls)
+       ; let boundNames = collectLStmtsBinders CollNoDictBinders (map fst ls)
             -- First do error checking: we need to check for dups here because we
             -- don't bind all of the variables from the Stmt at once
             -- with bindLocatedLocals.
@@ -1178,7 +1178,7 @@ rn_rec_stmt ctxt rnBody _ (L loc (BindStmt _ pat' body), fv_pat)
 
        ; (fail_op, fvs2) <- getMonadFailOp ctxt
 
-       ; let bndrs = mkNameSet (collectPatBinders pat')
+       ; let bndrs = mkNameSet (collectPatBinders CollNoDictBinders pat')
              fvs   = fv_expr `plusFV` fv_pat `plusFV` fvs1 `plusFV` fvs2
        ; let xbsrn = XBindStmtRn { xbsrn_bindOp = bind_op, xbsrn_failOp = fail_op }
        ; return [(bndrs, fvs, bndrs `intersectNameSet` fvs,
@@ -1734,7 +1734,7 @@ stmtTreeToStmts monad_names ctxt (StmtTreeApplicative trees) tail tail_fvs = do
              }, emptyFVs)
    stmtTreeArg ctxt tail_fvs tree = do
      let stmts = flattenStmtTree tree
-         pvarset = mkNameSet (concatMap (collectStmtBinders.unLoc.fst) stmts)
+         pvarset = mkNameSet (concatMap (collectStmtBinders CollNoDictBinders . unLoc . fst) stmts)
                      `intersectNameSet` tail_fvs
          pvars = nameSetElemsStable pvarset
            -- See Note [Deterministic ApplicativeDo and RecursiveDo desugaring]
@@ -1765,7 +1765,7 @@ segments
   -> [[(ExprLStmt GhcRn, FreeVars)]]
 segments stmts = map fst $ merge $ reverse $ map reverse $ walk (reverse stmts)
   where
-    allvars = mkNameSet (concatMap (collectStmtBinders.unLoc.fst) stmts)
+    allvars = mkNameSet (concatMap (collectStmtBinders CollNoDictBinders . unLoc . fst) stmts)
 
     -- We would rather not have a segment that just has LetStmts in
     -- it, so combine those with an adjacent segment where possible.
@@ -1805,7 +1805,7 @@ segments stmts = map fst $ merge $ reverse $ map reverse $ walk (reverse stmts)
       | isLetStmt stmt = (pvars, fvs' `minusNameSet` pvars)
       | otherwise      = (pvars, fvs')
       where fvs' = fvs `intersectNameSet` allvars
-            pvars = mkNameSet (collectStmtBinders (unLoc stmt))
+            pvars = mkNameSet (collectStmtBinders CollNoDictBinders (unLoc stmt))
 
     isStrictPatternBind :: ExprLStmt GhcRn -> Bool
     isStrictPatternBind (L _ (BindStmt _ pat _)) = isStrictPattern pat
@@ -1912,7 +1912,7 @@ slurpIndependentStmts stmts = go [] [] emptyNameSet stmts
     | disjointNameSet bndrs fvs && not (isStrictPattern pat)
     = go lets ((L loc (BindStmt xbs pat body), fvs) : indep)
          bndrs' rest
-    where bndrs' = bndrs `unionNameSet` mkNameSet (collectPatBinders pat)
+    where bndrs' = bndrs `unionNameSet` mkNameSet (collectPatBinders CollNoDictBinders pat)
   -- If we encounter a LetStmt that doesn't depend on a BindStmt in this
   -- group, then move it to the beginning, so that it doesn't interfere with
   -- grouping more BindStmts.

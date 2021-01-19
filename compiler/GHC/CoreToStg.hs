@@ -448,8 +448,8 @@ coreToStgExpr e0@(Case scrut bndr _ alts) = do
               text "STG:" $$ pprStgExpr panicStgPprOpts stg
       _ -> return stg
   where
-    vars_alt :: (AltCon, [Var], CoreExpr) -> CtsM (AltCon, [Var], StgExpr)
-    vars_alt (con, binders, rhs)
+    vars_alt :: CoreAlt -> CtsM (AltCon, [Var], StgExpr)
+    vars_alt (Alt con binders rhs)
       | DataAlt c <- con, c == unboxedUnitDataCon
       = -- This case is a bit smelly.
         -- See Note [Nullary unboxed tuple] in GHC.Core.Type
@@ -500,7 +500,7 @@ mkStgAltType bndr alts
    -- grabbing the one from a constructor alternative
    -- if one exists.
    look_for_better_tycon
-        | ((DataAlt con, _, _) : _) <- data_alts =
+        | ((Alt (DataAlt con) _ _) : _) <- data_alts =
                 AlgAlt (dataConTyCon con)
         | otherwise =
                 ASSERT(null data_alts)

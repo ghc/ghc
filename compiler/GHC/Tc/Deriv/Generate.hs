@@ -1503,7 +1503,7 @@ kind1, kind2 :: Kind
 kind1 = typeToTypeKind
 kind2 = liftedTypeKind `mkVisFunTyMany` kind1
 
-gfoldl_RDR, gunfold_RDR, toConstr_RDR, dataTypeOf_RDR, mkConstr_RDR,
+gfoldl_RDR, gunfold_RDR, toConstr_RDR, dataTypeOf_RDR, mkConstrTag_RDR,
     mkDataType_RDR, conIndex_RDR, prefix_RDR, infix_RDR,
     dataCast1_RDR, dataCast2_RDR, gcast1_RDR, gcast2_RDR,
     constr_RDR, dataType_RDR,
@@ -1531,7 +1531,7 @@ dataCast1_RDR  = varQual_RDR  gENERICS (fsLit "dataCast1")
 dataCast2_RDR  = varQual_RDR  gENERICS (fsLit "dataCast2")
 gcast1_RDR     = varQual_RDR  tYPEABLE (fsLit "gcast1")
 gcast2_RDR     = varQual_RDR  tYPEABLE (fsLit "gcast2")
-mkConstr_RDR   = varQual_RDR  gENERICS (fsLit "mkConstr")
+mkConstrTag_RDR = varQual_RDR gENERICS (fsLit "mkConstrTag")
 constr_RDR     = tcQual_RDR   gENERICS (fsLit "Constr")
 mkDataType_RDR = varQual_RDR  gENERICS (fsLit "mkDataType")
 dataType_RDR   = tcQual_RDR   gENERICS (fsLit "DataType")
@@ -2169,12 +2169,12 @@ genAuxBindSpecOriginal dflags loc spec
     gen_bind (DerivDataConstr dc dataC_RDR dataT_RDR)
       = mkHsVarBind loc dataC_RDR rhs
       where
-        rhs = nlHsApps mkConstr_RDR constr_args
+        rhs = nlHsApps mkConstrTag_RDR constr_args
 
         constr_args
-           = [ -- nlHsIntLit (toInteger (dataConTag dc)),   -- Tag
-               nlHsVar dataT_RDR                            -- DataType
-             , nlHsLit (mkHsString (occNameString dc_occ))  -- String name
+           = [ nlHsVar dataT_RDR                            -- DataType
+             , nlHsLit (mkHsString (occNameString dc_occ))  -- Constructor name
+             , nlHsIntLit (toInteger (dataConTag dc))       -- Constructor tag
              , nlList  labels                               -- Field labels
              , nlHsVar fixity ]                             -- Fixity
 

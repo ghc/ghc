@@ -525,13 +525,15 @@ staticLitsToWords platform = go . foldMap decomposeMultiWord
     goSubWord rem_bytes accum (lit : rest)
       | Just (bytes, w) <- isSubWordLit lit
       , rem_bytes >= widthInBytes w
-      = let accum' =
-              case platformByteOrder platform of
-                BigEndian    -> (accum `shiftL` widthInBits w) .|. bytes
-                LittleEndian -> (accum `shiftL` widthInBits w) .|. byteSwap w bytes
+      = let accum' = (accum `shiftL` widthInBits w) .|. fixEndian w bytes
         in goSubWord (rem_bytes - widthInBytes w) accum' rest
     goSubWord rem_bytes accum rest
-      = pprWord (byteSwap (wordWidth platform) $ accum `shiftL` (8*rem_bytes)) : go rest
+      = pprWord (fixEndian (wordWidth platform) $ accum `shiftL` (8*rem_bytes)) : go rest
+
+    fixEndian :: Width -> Integer -> Integer
+    fixEndian w = case platformByteOrder platform of
+      BigEndian    -> id
+      LittleEndian -> byteSwap w
 
     -- Decompose multi-word or floating-point literals into multiple
     -- single-word (or smaller) literals.
