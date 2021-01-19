@@ -9,7 +9,7 @@ module GHC.Driver.Errors (
 import GHC.Driver.Session
 import GHC.Data.Bag
 import GHC.Utils.Exception
-import GHC.Utils.Error ( formatErrDoc, sortMsgBag )
+import GHC.Utils.Error ( formatBulleted, sortMsgBag )
 import GHC.Types.SourceError ( mkSrcErr )
 import GHC.Prelude
 import GHC.Types.SrcLoc
@@ -33,7 +33,7 @@ printBagOfErrors dflags bag_of_errors
   = sequence_ [ let style = mkErrStyle unqual
                     ctx   = initSDocContext dflags style
                 in putLogMsg dflags reason sev s $
-                   withPprStyle style (formatErrDoc ctx (renderDiagnostic doc))
+                   withPprStyle style (formatBulleted ctx (renderDiagnostic doc))
               | MsgEnvelope { errMsgSpan      = s,
                               errMsgDiagnostic = doc,
                               errMsgSeverity  = sev,
