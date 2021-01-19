@@ -95,6 +95,8 @@ import GHC.Core.DataCon
 import GHC.Driver.Ppr
 import GHC.Data.Maybe
 import qualified Data.List.NonEmpty as NE
+import Control.Monad ( when )
+
 
 -------------------------------------------------------------------------
 --
@@ -297,7 +299,18 @@ emitRODataLits :: CLabel -> [CmmLit] -> FCode ()
 emitRODataLits lbl lits = emitDecl (mkRODataLits lbl lits)
 
 emitDataCon :: CLabel -> CmmInfoTable -> CostCentreStack -> [CmmLit] -> FCode ()
-emitDataCon lbl itbl ccs payload = emitDecl (CmmData (Section Data lbl) (CmmStatics lbl itbl ccs payload))
+emitDataCon lbl itbl ccs payload = do
+  addUsedInfo itbl
+  emitDecl (CmmData (Section Data lbl) (CmmStatics lbl itbl ccs payload))
+
+addUsedInfo :: CmmInfoTable -> FCode ()
+addUsedInfo cmm_itbl
+  = do  { dflags <- getDynFlags
+        ; when (gopt Opt_InfoTableMap dflags) $ do {
+          ; state <- getState
+          ; setState $ state { cgs_used_info = cmm_itbl : cgs_used_info state } } }
+
+
 
 newStringCLit :: String -> FCode CmmLit
 -- Make a global definition for the string,
@@ -664,4 +677,4 @@ convertInfoProvMap dflags defns this_mod (InfoTableProvMap (UniqMap dcenv) denv)
             (ss, l) <- lookup n (NE.toList ns)
             return $ InfoProvEnt cl cn (tyString (dataConTyCon dc)) (this_mod, ss, l)
 
-    in lookupClosureMap `firstJust` lookupDataConMap) defns
+    in lookupDataConMap `firstJust` lookupClosureMap) defns

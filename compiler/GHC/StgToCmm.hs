@@ -108,7 +108,6 @@ codeGen dflags this_mod ip_map@(InfoTableProvMap (UniqMap denv) _) data_tycons
         ; cg (mkModuleInit cost_centre_info this_mod hpc_info)
 
         ; mapM_ (cg . cgTopBinding dflags) stg_binds
-        ; cgs <- liftIO (readIORef  cgref)
         ; cg (initInfoTableProv ip_map this_mod)
                 -- Put datatype_stuff after code_stuff, because the
                 -- datatype closure table (for enumeration types) to
@@ -143,6 +142,7 @@ codeGen dflags this_mod ip_map@(InfoTableProvMap (UniqMap denv) _) data_tycons
                 | otherwise
                 = mkNameEnv (Prelude.map extractInfo (eltsUFM cg_id_infos))
 
+        ; cgs <- liftIO (readIORef  cgref)
         ; return (cgs_used_info cgs, generatedInfo)
         }
 

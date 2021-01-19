@@ -487,7 +487,6 @@ instance Outputable ConInfoTableLocation where
 
 getConInfoTableLocation :: IdLabelInfo -> Maybe ConInfoTableLocation
 getConInfoTableLocation (ConInfoTable ci) = Just ci
-getConInfoTableLocation (ConEntry ci) = Just ci
 getConInfoTableLocation _ = Nothing
 
 instance Outputable IdLabelInfo where

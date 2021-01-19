@@ -144,17 +144,16 @@ numberDataCon dc ts = do
           env <- get
           mcc <- asks rSpan
           let mbest_span = selectTick ts <|> mcc
-          let dcMap' =
-                case mbest_span of
-                  Nothing -> (provDC env)
-                  Just best_span ->
-                    alterUniqMap (maybe (Just ((0, best_span) :| [] ))
-                                        (\xs@((k, _):|_) -> Just ((k + 1, best_span) `NE.cons` xs))) (provDC env) dc
-          put (env { provDC = dcMap' })
-          let r = lookupUniqMap dcMap' dc
-          return $ case r of
-            Nothing -> NoNumber
-            Just res -> Numbered (fst (NE.head res))
+          case mbest_span of
+            Nothing -> return NoNumber
+            Just best_span -> do
+              let dcMap' = alterUniqMap (maybe (Just ((0, best_span) :| [] ))
+                                  (\xs@((k, _):|_) -> Just ((k + 1, best_span) `NE.cons` xs))) (provDC env) dc
+              put (env { provDC = dcMap' })
+              let r = lookupUniqMap dcMap' dc
+              return $ case r of
+                Nothing -> NoNumber
+                Just res -> Numbered (fst (NE.head res))
 
 selectTick :: [Tickish Id] -> Maybe (RealSrcSpan, String)
 selectTick [] = Nothing
