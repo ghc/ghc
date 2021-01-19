@@ -377,7 +377,9 @@ rts_getFunPtr (HaskellObj p)
 HsBool
 rts_getBool (HaskellObj p)
 {
-    return UNTAG_CONST_CLOSURE(p) == True_closure;
+    p = UNTAG_CLOSURE(p);
+    ASSERT(p == False_closure || p == True_closure);
+    return p == True_closure;
 }
 
 /* -----------------------------------------------------------------------------
