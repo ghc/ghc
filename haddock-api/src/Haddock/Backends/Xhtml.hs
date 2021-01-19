@@ -223,10 +223,7 @@ moduleInfo iface =
           ("Language", lg)
           ] ++ extsForm
         where
-          lg inf = case hmi_language inf of
-            Nothing -> Nothing
-            Just Haskell98 -> Just "Haskell98"
-            Just Haskell2010 -> Just "Haskell2010"
+          lg inf = fmap show (hmi_language inf)
 
           multilineRow :: String -> [String] -> HtmlTable
           multilineRow title xs = (th ! [valign "top"]) << title <-> td << (toLines xs)
