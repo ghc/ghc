@@ -432,6 +432,10 @@ btPrintThread(void *_ STG_UNUSED)
                 break;
             }
         }
+        if(!last) {
+            continue;
+        }
+        fprintf(stderr, "\nCaught SIGQUIT:\n");
         // we are printing backtraces from the list in LIFO fashion,
         // intuitively it is better FIFO, but it does not matter that much
         for(struct BtQue *curr=last; curr; curr = curr->next) {
@@ -449,11 +453,10 @@ btPrintThread(void *_ STG_UNUSED)
             }
             // print out, this is on a normal thread, so async-signal-safety
             // is no longer a concern
-            fprintf(stderr, "\nCaught SIGQUIT;"
-                    " Backtrace of thread %d with %d frame(s):\n",
+            fprintf(stderr, "\n * Backtrace of thread %d with %d frame(s):\n",
                     curr->tid, curr->nFrames);
             if(curr->dwflerr) {
-                fprintf(stderr, " * with dwfl error (%d): %s\n",
+                fprintf(stderr, " *-* with dwfl error (%d): %s\n",
                         curr->dwflerr, dwfl_errmsg(curr->dwflerr));
             }
             for(int i = curr->nFrames - 1; i >= 0; i--) {
