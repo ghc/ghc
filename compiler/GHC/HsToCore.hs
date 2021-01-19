@@ -86,7 +86,7 @@ import GHC.Unit
 import GHC.Unit.Module.ModGuts
 import GHC.Unit.Module.ModIface
 
-import Data.List
+import Data.List (partition)
 import Data.IORef
 import Control.Monad( when )
 import GHC.Driver.Plugins ( LoadedPlugin(..) )

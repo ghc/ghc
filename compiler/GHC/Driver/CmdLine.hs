@@ -36,7 +36,7 @@ import GHC.Types.SrcLoc
 import GHC.Utils.Json
 
 import Data.Function
-import Data.List
+import Data.List (sortBy, intercalate, stripPrefix)
 
 import Control.Monad (liftM, ap)
 

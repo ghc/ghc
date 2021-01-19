@@ -278,7 +278,7 @@ import Control.Monad.Trans.Except
 
 import Data.Ord
 import Data.Char
-import Data.List
+import Data.List (intercalate, delete, sortBy)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)

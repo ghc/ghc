@@ -96,7 +96,7 @@ import GHC.Utils.Misc
 import Control.Monad
 import Data.Function ( on )
 import Data.Functor.Identity
-import Data.List
+import Data.List (nubBy, partition)
 import Data.List.NonEmpty ( NonEmpty(..) )
 import qualified Data.Set as Set
 import Data.Tuple( swap )

@@ -68,7 +68,7 @@ import GHC.Data.FastString
 import GHC.Data.Maybe
 import GHC.Data.Bag
 import GHC.Utils.Misc as Utils
-import Data.List
+import Data.List (sortBy, mapAccumL, isPrefixOf)
 import Data.Function    ( on )
 import Control.Monad    ( guard )
 

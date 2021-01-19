@@ -26,7 +26,7 @@ import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.Maybe
 import           Data.Data
 import           Data.Function
-import           Data.List
+import           Data.List (find, sortBy)
 import           Data.Map.Strict   (Map)
 import qualified Data.Map.Strict   as M
 import           Data.Maybe
