@@ -636,8 +636,8 @@ litEq is_eq = msum
     do_lit_eq platform lit expr = do
       guard (not (litIsLifted lit))
       return (mkWildCase expr (unrestricted $ literalType lit) intPrimTy
-                    [(DEFAULT,    [], val_if_neq),
-                     (LitAlt lit, [], val_if_eq)])
+                    [ Alt DEFAULT      [] val_if_neq
+                    , Alt (LitAlt lit) [] val_if_eq])
       where
         val_if_eq  | is_eq     = trueValInt  platform
                    | otherwise = falseValInt platform

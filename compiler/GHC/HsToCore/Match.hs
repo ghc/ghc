@@ -259,7 +259,7 @@ matchEmpty var res_ty
   = return [MR_Fallible mk_seq]
   where
     mk_seq fail = return $ mkWildCase (Var var) (idScaledType var) res_ty
-                                      [(DEFAULT, [], fail)]
+                                      [Alt DEFAULT [] fail]
 
 matchVariables :: NonEmpty MatchId -> Type -> NonEmpty EquationInfo -> DsM (MatchResult CoreExpr)
 -- Real true variables, just like in matchVar, SLPJ p 94
@@ -453,7 +453,7 @@ tidy1 v _ (LazyPat _ pat)
     -- This is a convenient place to check for unlifted types under a lazy pattern.
     -- Doing this check during type-checking is unsatisfactory because we may
     -- not fully know the zonked types yet. We sure do here.
-  = do  { let unlifted_bndrs = filter (isUnliftedType . idType) (collectPatBinders pat)
+  = do  { let unlifted_bndrs = filter (isUnliftedType . idType) (collectPatBinders CollNoDictBinders pat)
         ; unless (null unlifted_bndrs) $
           putSrcSpanDs (getLoc pat) $
           errDs (hang (text "A lazy (~) pattern cannot bind variables of unlifted type." $$
