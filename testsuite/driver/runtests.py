@@ -402,7 +402,7 @@ def tabulate_metrics(metrics: List[PerfMetric]) -> None:
 # First collect all the tests to be run
 t_files_ok = True
 for file in t_files:
-    if_verbose(2, '====> Scanning %s' % file)
+    if_verbose(3, '====> Scanning %s' % file)
     newTestDir(tempdir, os.path.dirname(file))
     try:
         with io.open(file, encoding='utf8') as f:
