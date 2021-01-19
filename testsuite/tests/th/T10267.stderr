@@ -1,17 +1,5 @@
 
 T10267.hs:8:1: error:
-    • Found hole: _ :: a
-      Where: ‘a’ is a rigid type variable bound by
-               the type signature for:
-                 j :: forall a. a -> a
-               at T10267.hs:(8,1)-(12,14)
-    • In an equation for ‘j’: j x = _
-    • Relevant bindings include
-        x :: a (bound at T10267.hs:8:1)
-        j :: a -> a (bound at T10267.hs:8:1)
-      Valid hole fits include x :: a (bound at T10267.hs:8:1)
-
-T10267.hs:8:1: error:
     • Found hole: _foo :: a -> a
       Where: ‘a’ is a rigid type variable bound by
                the type signature for:
@@ -29,3 +17,15 @@ T10267.hs:8:1: error:
           with id @a
           (imported from ‘Prelude’ at T10267.hs:3:8-13
            (and originally defined in ‘GHC.Base’))
+
+T10267.hs:8:1: error:
+    • Found hole: _ :: a
+      Where: ‘a’ is a rigid type variable bound by
+               the type signature for:
+                 j :: forall a. a -> a
+               at T10267.hs:(8,1)-(12,14)
+    • In an equation for ‘j’: j x = _
+    • Relevant bindings include
+        x :: a (bound at T10267.hs:8:1)
+        j :: a -> a (bound at T10267.hs:8:1)
+      Valid hole fits include x :: a (bound at T10267.hs:8:1)
