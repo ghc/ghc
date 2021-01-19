@@ -637,7 +637,7 @@ Specifically
 
 Note [CPR for sum types]
 ~~~~~~~~~~~~~~~~~~~~~~~~
-TODO: This is out of date since we have join points. See #16570
+This is out of date since we have join points. See #16570
 At the moment we do not do CPR for let-bindings that
    * non-top level
    * bind a sum type
