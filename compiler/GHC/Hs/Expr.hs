@@ -494,11 +494,7 @@ data HsExpr p
         gf_ext :: XGetField p
       , gf_expr :: LHsExpr p
       , gf_field :: Located FastString
-      , gf_get_field :: Maybe (IdP p)
       }
-  -- ^ @Just id@ means @RebindableSyntax@ is in use and gives the id
-  --   of the in-scope 'getField'.
-  --   NB: Not in use after typechecking.
 
   -- Record dot update e.g. @a{foo.bar.baz=1, quux}@.
   --
@@ -532,12 +528,7 @@ data HsExpr p
   | Projection {
         proj_ext :: XProjection p
       , proj_flds :: [Located FastString]
-      , proj_get_field :: Maybe (IdP p)
-      , proj_circ :: Maybe (IdP p)
       }
-  -- ^ @Just id@ means @RebindableSyntax@ is in use and gives the id
-  --   of the in-scope 'getField'.
-  --   NB: Not in use after typechecking.
 
   -- | Expression with an explicit type signature. @e :: type@
   --

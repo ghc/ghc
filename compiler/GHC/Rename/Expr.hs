@@ -46,7 +46,9 @@ import GHC.Rename.HsType
 import GHC.Rename.Pat
 import GHC.Driver.Session
 import GHC.Builtin.Names
+import GHC.Builtin.Uniques
 
+import GHC.Types.Basic
 import GHC.Types.Fixity
 import GHC.Types.Name
 import GHC.Types.Name.Set
@@ -213,27 +215,21 @@ rnExpr (NegApp _ e _)
 ------------------------------------------
 -- Record dot syntax
 
-rnExpr (GetField x e f _)
-  = do { rebindable_on <- xoptM LangExt.RebindableSyntax
-       ; (e, fvs) <- rnLExpr e
-       ; if rebindable_on
-         then do {
-           getField <- lookupOccRn (mkVarUnqual (fsLit "getField"))
-         ; return (GetField x e f (Just getField), fvs `plusFV` unitFV getField)
-         }
-         else return (GetField x e f Nothing, fvs)
-       }
+rnExpr (GetField _ e f)
+ = do { getField <- lookupOccRn (mkVarUnqual (fsLit "getField"))
+      ; (e, fv_e) <- rnLExpr e
+      ; return ( mkExpanded XExpr
+                   (GetField noExtField e f)
+                   (mkGet generatedSrcSpan getField e f)
+               , fv_e `plusFV` unitFV getField ) }
 
-rnExpr (Projection x fs _ _)
-  = do { circ <- lookupOccRn compose_RDR -- Desugaring uses '.' (function composition).
-       ; rebindable_on <- xoptM LangExt.RebindableSyntax
-       ; if rebindable_on
-         then do {
-           getField <- lookupOccRn (mkVarUnqual (fsLit "getField"))
-         ; return (Projection x fs (Just getField) (Just circ), mkFVs [getField, circ])
-         }
-         else return (Projection x fs Nothing (Just circ), unitFV circ)
-       }
+rnExpr (Projection _ fs)
+  = do { circ <- lookupOccRn compose_RDR
+       ; getField <- lookupOccRn (mkVarUnqual (fsLit "getField"))
+       ; return ( mkExpanded XExpr
+                    (Projection noExtField fs)
+                    (mkProj generatedSrcSpan getField circ fs)
+                , mkFVs [getField, circ] ) }
 
 rnExpr (RecordDotUpd x e us _ _ f)
   = do { rebindable_on <- xoptM LangExt.RebindableSyntax
@@ -2299,3 +2295,59 @@ rebindIf ifteName p b1 b2 =
                  --              desugared_false_branch
   in mkExpanded XExpr ifteOrig (unLoc ifteApp)
      -- (source_if_expr, desugared_if_expr)
+
+-----------------------------------------
+-- Bits and pieces for RecordDotSyntax.
+--
+-- See Note [Rebindable syntax and HsExpansion]
+
+mkParen :: SrcSpan -> LHsExpr GhcRn -> LHsExpr GhcRn
+mkParen loc = L loc . HsPar noExtField
+
+mkApp :: SrcSpan -> LHsExpr GhcRn -> LHsExpr GhcRn -> LHsExpr GhcRn
+mkApp loc x = L loc . HsApp noExtField x
+
+mkOpApp :: SrcSpan -> LHsExpr GhcRn -> LHsExpr GhcRn -> LHsExpr GhcRn -> LHsExpr GhcRn
+mkOpApp loc x op = L loc . OpApp (Fixity NoSourceText minPrecedence InfixL) x op
+
+mkAppType :: SrcSpan -> LHsExpr GhcRn -> GenLocated SrcSpan (HsType (NoGhcTc GhcRn)) -> LHsExpr GhcRn
+mkAppType loc expr = L loc . HsAppType noExtField expr . mkEmptyWildCardBndrs
+
+mkSelector :: SrcSpan -> FastString -> LHsType GhcRn
+mkSelector loc = L loc . HsTyLit noExtField . HsStrTy NoSourceText
+
+-- mkGet arg field calcuates a get_field @field arg expression.
+-- e.g. z.x = mkGet z x = get_field @x z
+mkGet :: SrcSpan -> Name -> LHsExpr GhcRn -> Located FastString -> HsExpr GhcRn
+mkGet loc get_field arg field = unLoc (head $ mkGet' loc get_field [arg] field)
+
+mkGet' :: SrcSpan -> Name -> [LHsExpr GhcRn] -> Located FastString -> [LHsExpr GhcRn]
+mkGet' loc get_field l@(r : _) (L _ field) =
+  mkApp loc (mkAppType loc (L loc (HsVar noExtField (L loc get_field)))
+               (mkSelector loc field)) (mkParen loc r)
+  : l
+mkGet' _ _ [] _ = panic "mkGet' : The impossible has happened!"
+
+-- mkProj fields calculates a projection.
+-- e.g. .x = mkProj x = \z -> z.x = \z -> (getField @field x)
+--      .x.y = mkProj [.x, .y] = (.y) . (.x) = (\z -> z.y) . (\z -> z.x)
+mkProj :: SrcSpan -> Name -> Name -> [Located FastString] -> HsExpr GhcRn
+mkProj loc getFieldName circName (field : fields) = unLoc (foldl' f (proj field) fields)
+  where
+    f :: LHsExpr GhcRn -> Located FastString -> LHsExpr GhcRn
+    f acc field = (mkParen loc . mkOpApp loc (proj field) (circ loc)) acc
+
+    proj :: Located FastString -> LHsExpr GhcRn
+    proj f =
+      let body = L loc $ mkGet loc getFieldName (zVar loc) f
+          grhs = L loc $ GRHS noExtField [] body
+          ghrss = GRHSs noExtField [grhs] (L loc (EmptyLocalBinds noExtField))
+          m = L loc $ Match {m_ext=noExtField, m_ctxt=LambdaExpr, m_pats=[zPat loc], m_grhss=ghrss} in
+      mkParen loc (L loc $ HsLam noExtField MG {mg_ext=noExtField, mg_alts=L loc [m], mg_origin=Generated})
+
+    zPat :: SrcSpan -> LPat GhcRn
+    zVar, circ :: SrcSpan -> LHsExpr GhcRn
+    zPat loc = L loc $ VarPat noExtField (L loc $ mkSystemVarName (mkVarOccUnique (fsLit "z")) (fsLit "z")) --  (L loc $ mkRdrUnqual (mkVarOcc "z"))
+    zVar loc = L loc $ HsVar noExtField (L loc $ mkSystemVarName (mkVarOccUnique (fsLit "z")) (fsLit "z"))
+    circ loc = L loc $ HsVar noExtField (L loc $ circName)
+mkProj _ _ _ [] = panic "mkProj': The impossible happened"

@@ -938,20 +938,13 @@ tcExpr (ArithSeq _ witness seq) res_ty
 ************************************************************************
 -}
 
-tcExpr (GetField _ arg field mb_getField) res_ty
+tcExpr (GetField _ _ _) _res_ty
  = do { -- See Note [Type-checking record dot syntax] (not written yet)
-        loc <- getSrcSpanM
-      ; case mb_getField of
-          Just getField -> tcExpr (mkGet loc getField arg field) res_ty
-          Nothing -> panic "tcExpr: GetField: Not implemented"
+         panic "tcExpr: GetField: Not implemented"
       }
-tcExpr (Projection _ fields mb_getField mb_circ) res_ty
+tcExpr (Projection _ _) res_ty
   = do { -- See Note [Type-checking record dot syntax] (not written yet)
-        loc <- getSrcSpanM
-      ; case (mb_getField, mb_circ) of
-          (Just getField, Just circ) -> tcExpr (mkProj loc getField circ fields) res_ty
-          (_, Nothing) -> panic "tcExpr: The impossible has happened"
-          (Nothing, Just _) -> panic "tcExpr: Projection: Not implemented"
+         panic "tcExpr: Projection: Not implemented"
        }
 tcExpr (RecordDotUpd _ _ _ _ _ (L _ s)) res_ty = tcExpr s res_ty
 
@@ -1847,57 +1840,3 @@ checkClosedInStaticForm name = do
 -- When @n@ is not closed, we traverse the graph reachable from @n@ to build
 -- the reason.
 --
-
------------------------------------------
--- Bits and pieces for RecordDotSyntax.
-
-mkParen :: SrcSpan -> LHsExpr GhcRn -> LHsExpr GhcRn
-mkParen loc = L loc . HsPar noExtField
-
-mkApp :: SrcSpan -> LHsExpr GhcRn -> LHsExpr GhcRn -> LHsExpr GhcRn
-mkApp loc x = L loc . HsApp noExtField x
-
-mkOpApp :: SrcSpan -> LHsExpr GhcRn -> LHsExpr GhcRn -> LHsExpr GhcRn -> LHsExpr GhcRn
-mkOpApp loc x op = L loc . OpApp (Fixity NoSourceText minPrecedence InfixL) x op
-
-mkAppType :: SrcSpan -> LHsExpr GhcRn -> GenLocated SrcSpan (HsType (NoGhcTc GhcRn)) -> LHsExpr GhcRn
-mkAppType loc expr = L loc . HsAppType noExtField expr . mkEmptyWildCardBndrs
-
-mkSelector :: SrcSpan -> FastString -> LHsType GhcRn
-mkSelector loc = L loc . HsTyLit noExtField . HsStrTy NoSourceText
-
--- mkGet arg field calcuates a get_field @field arg expression.
--- e.g. z.x = mkGet z x = get_field @x z
-mkGet :: SrcSpan -> Name -> LHsExpr GhcRn -> Located FastString -> HsExpr GhcRn
-mkGet loc get_field arg field = unLoc (head $ mkGet' loc get_field [arg] field)
-
-mkGet' :: SrcSpan -> Name -> [LHsExpr GhcRn] -> Located FastString -> [LHsExpr GhcRn]
-mkGet' loc get_field l@(r : _) (L _ field) =
-  mkApp loc (mkAppType loc (L loc (HsVar noExtField (L loc get_field)))
-               (mkSelector loc field)) (mkParen loc r)
-  : l
-mkGet' _ _ [] _ = panic "mkGet' : The impossible has happened!"
-
--- mkProj fields calculates a projection.
--- e.g. .x = mkProj x = \z -> z.x = \z -> (getField @field x)
---      .x.y = mkProj [.x, .y] = (.y) . (.x) = (\z -> z.y) . (\z -> z.x)
-mkProj :: SrcSpan -> Name -> Name -> [Located FastString] -> HsExpr GhcRn
-mkProj loc getFieldName circName (field : fields) = unLoc (foldl' f (proj field) fields)
-  where
-    f :: LHsExpr GhcRn -> Located FastString -> LHsExpr GhcRn
-    f acc field = (mkParen loc . mkOpApp loc (proj field) (circ loc)) acc
-
-    proj :: Located FastString -> LHsExpr GhcRn
-    proj f =
-      let body = L loc $ mkGet loc getFieldName (zVar loc) f
-          grhs = L loc $ GRHS noExtField [] body
-          ghrss = GRHSs noExtField [grhs] (L loc (EmptyLocalBinds noExtField))
-          m = L loc $ Match {m_ext=noExtField, m_ctxt=LambdaExpr, m_pats=[zPat loc], m_grhss=ghrss} in
-      mkParen loc (L loc $ HsLam noExtField MG {mg_ext=noExtField, mg_alts=L loc [m], mg_origin=Generated})
-
-    zPat :: SrcSpan -> LPat GhcRn
-    zVar, circ :: SrcSpan -> LHsExpr GhcRn
-    zPat loc = L loc $ VarPat noExtField (L loc $ mkSystemVarName (mkVarOccUnique (fsLit "z")) (fsLit "z")) --  (L loc $ mkRdrUnqual (mkVarOcc "z"))
-    zVar loc = L loc $ HsVar noExtField (L loc $ mkSystemVarName (mkVarOccUnique (fsLit "z")) (fsLit "z"))
-    circ loc = L loc $ HsVar noExtField (L loc $ circName)
-mkProj _ _ _ [] = panic "mkProj': The impossible happened"

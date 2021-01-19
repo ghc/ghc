@@ -2734,7 +2734,6 @@ mkGetField loc arg field =
       gf_ext = noExtField
     , gf_expr = arg
     , gf_field = field
-    , gf_get_field = Nothing
     }
 
 mkProjection :: SrcSpan -> [Located FastString] -> LHsExpr GhcPs
@@ -2743,8 +2742,6 @@ mkProjection loc flds =
   L loc Projection {
       proj_ext = noExtField
     , proj_flds = flds
-    , proj_get_field = Nothing
-    , proj_circ = Nothing
     }
 
 -- e.g. foo.bar.baz.quux = 1
