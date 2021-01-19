@@ -512,6 +512,10 @@ static int cbGetBacktraceFramePC(Dwfl_Frame *frame, void *arg) {
 
 static pthread_t btPrintThId;
 
+// Note this is designed to be safe to call from signal handlers, it should be
+// async-singal-safe as described in:
+//   https://man7.org/linux/man-pages/man7/signal-safety.7.html
+// but currently still contains allocation code, i.e. dwfl_getthread_frames()
 void libdwDumpBacktrace(void) {
     if( btp_init_err ) {
         LOG_TO_STDERR( "Backtrace printing initialization has failed." );
@@ -549,7 +553,8 @@ void libdwDumpBacktrace(void) {
     btq->tid = kernelThreadId();
     btq->nFrames = 0;
     // TODO dwfl_getthread_frames() does allocation, need to find an
-    //      async-signal-safe alternative
+    //      async-signal-safe alternative, or fast repeating SIGQUIT can
+    //      hang the process, which shows the unsafety
     btq->dwflerr = dwfl_getthread_frames(session->dwfl, dwfl_pid(session->dwfl),
                                        cbGetBacktraceFramePC, btq);
     // see: https://sourceware.org/git?p=elfutils.git;a=blob;f=src/stack.c;h=534aa93c433551896b67b65845ab4891fd175066;hb=HEAD#l717
