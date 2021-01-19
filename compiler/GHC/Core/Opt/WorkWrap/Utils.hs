@@ -1348,7 +1348,7 @@ For `f`, rapid termination analysis should see that `(+n)` terminates rapidly
 and thus omit the singleton tuple.
 For `h`, we also have to consider the strictness of the field, but in contrast
 to Note [Add demands for strict constructors], that may already happen in
-'cprTransformDataConSig', so the CPR info should reflect that.
+'cprTransformDataConWorkSig', so the CPR info should reflect that.
 
 ************************************************************************
 *                                                                      *

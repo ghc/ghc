@@ -183,7 +183,7 @@ cprAnal' env args (Lam var body)
   = (lam_ty, Lam var body')
   where
     (arg_ty, body_args)
-      | ty:args' <- args = (ty, args')      -- Can only be info from a StrictSig
+      | ty:args' <- args = (ty, args')      -- Info from e.g. a StrictSig or DataCon wrapper args
       | otherwise        = (topCprType, []) -- An anonymous lambda
     env'                 = extendSigEnv env var (CprSig arg_ty)
     (body_ty, body')     = cprAnal env' body_args body
@@ -254,9 +254,12 @@ cprTransform env args id
       -- See Note [CPR for data structures]
       | Just rhs <- cprDataStructureUnfolding_maybe id
       = fst $ cprAnal env args rhs
+      -- See Note [CPR for DataCon wrappers]
+      | isDataConWrapId id, let rhs = uf_tmpl (realIdUnfolding id)
+      = fst $ cprAnal env args rhs
       -- Data constructor
       | Just con <- isDataConWorkId_maybe id
-      = cprTransformDataConSig con args
+      = cprTransformDataConWorkSig con args
       -- Imported function or data con worker
       | isGlobalId id
       = cprTransformSig (idStrictness id) (idCprInfo id) args
@@ -784,4 +787,17 @@ we still give every function an every deepening CPR signature. But it's very
 uncommon to find code like this, whereas the long static data structures from
 the beginning of this Note are very common because of GHC's strategy of ANF'ing
 data structure RHSs.
+
+Note [CPR for DataCon wrappers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We treat DataCon wrappers simply by analysing their unfolding. Why not analyse
+the unfolding once, upfront? Two reasons:
+
+  1. It's simpler to analyse the unfolding anew at every call site, and the
+     unfolding will be pretty cheap to analyse.
+  2. The CPR sig we would give the wrapper in 'GHC.Types.Id.Make.mkDataConRep'
+     would not take into account whether the arguments to the wrapper had the
+     CPR property itself! That would make the CPR transformers derived from
+     CPR sigs for DataCon wrappers much less precise than the transformer for
+     DataCon workers ('cprTransformDataConWorkSig').
 -}
