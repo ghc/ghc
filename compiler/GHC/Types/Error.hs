@@ -15,9 +15,11 @@ module GHC.Types.Error
    , MsgEnvelope (..)
    , WarnMsg
    , SDoc
+   , DecoratedSDoc (unDecorated)
    , Severity (..)
    , RenderableDiagnostic (..)
    , pprMessageBag
+   , mkDecorated
    , mkLocMessage
    , mkLocMessageAnn
    , getSeverityColour
@@ -131,7 +133,7 @@ We could then define how a 'TcRnMessage' is displayed to the user. Rather than s
 
 instance RenderableDiagnostic TcRnMessage where
   renderDiagnostic = \case
-    TcRnOutOfScope .. -> ErrDoc [text "Out of scope error ..."] [] []
+    TcRnOutOfScope .. -> Decorated [text "Out of scope error ..."]
     ...
 
 This way, we can easily write generic rendering functions for errors that all they care about is the
@@ -139,10 +141,10 @@ knowledge that a given type 'e' has a 'RenderableDiagnostic' constraint.
 
 -}
 
--- | A class for types (typically errors and warnings) which can be \"rendered\" into an opaque 'ErrDoc'.
+-- | A class for types (typically errors and warnings) which can be \"rendered\" into an opaque 'DecoratedSDoc'.
 -- For more information, see Note [Rendering Messages].
 class RenderableDiagnostic a where
-  renderDiagnostic :: a -> [SDoc]
+  renderDiagnostic :: a -> DecoratedSDoc
 
 -- | An envelope for GHC's facts about a running program, parameterised over the
 -- /domain-specific/ (i.e. parsing, typecheck-renaming, etc) diagnostics.
@@ -159,7 +161,7 @@ data MsgEnvelope e = MsgEnvelope
    , errMsgReason      :: WarnReason
    } deriving Functor
 
-instance RenderableDiagnostic [SDoc] where
+instance RenderableDiagnostic DecoratedSDoc where
   renderDiagnostic = id
 
 data Severity
@@ -188,13 +190,13 @@ data Severity
 instance ToJson Severity where
   json s = JSString (show s)
 
-instance Show (MsgEnvelope [SDoc]) where
+instance Show (MsgEnvelope DecoratedSDoc) where
     show = showMsgEnvelope
 
 -- | Shows an 'MsgEnvelope'.
 showMsgEnvelope :: RenderableDiagnostic a => MsgEnvelope a -> String
 showMsgEnvelope err =
-  renderWithContext defaultSDocContext (vcat (renderDiagnostic $ errMsgDiagnostic err))
+  renderWithContext defaultSDocContext (vcat (unDecorated . renderDiagnostic $ errMsgDiagnostic err))
 
 pprMessageBag :: Bag SDoc -> SDoc
 pprMessageBag msgs = vcat (punctuate blankLine (bagToList msgs))
@@ -338,27 +340,27 @@ mk_err_msg
   :: Severity -> SrcSpan -> PrintUnqualified -> e -> MsgEnvelope e
 mk_err_msg sev locn print_unqual err
  = MsgEnvelope { errMsgSpan = locn
-          , errMsgContext = print_unqual
-          , errMsgDiagnostic = err
-          , errMsgSeverity = sev
-          , errMsgReason = NoReason }
+               , errMsgContext = print_unqual
+               , errMsgDiagnostic = err
+               , errMsgSeverity = sev
+               , errMsgReason = NoReason }
 
 mkErr :: SrcSpan -> PrintUnqualified -> e -> MsgEnvelope e
 mkErr = mk_err_msg SevError
 
-mkLongMsgEnvelope, mkLongWarnMsg   :: SrcSpan -> PrintUnqualified -> SDoc -> SDoc -> MsgEnvelope [SDoc]
+mkLongMsgEnvelope, mkLongWarnMsg   :: SrcSpan -> PrintUnqualified -> SDoc -> SDoc -> MsgEnvelope DecoratedSDoc
 -- ^ A long (multi-line) error message
-mkMsgEnvelope, mkWarnMsg           :: SrcSpan -> PrintUnqualified -> SDoc            -> MsgEnvelope [SDoc]
+mkMsgEnvelope, mkWarnMsg           :: SrcSpan -> PrintUnqualified -> SDoc         -> MsgEnvelope DecoratedSDoc
 -- ^ A short (one-line) error message
-mkPlainMsgEnvelope, mkPlainWarnMsg :: SrcSpan ->                     SDoc            -> MsgEnvelope [SDoc]
+mkPlainMsgEnvelope, mkPlainWarnMsg :: SrcSpan ->                     SDoc         -> MsgEnvelope DecoratedSDoc
 -- ^ Variant that doesn't care about qualified/unqualified names
 
-mkLongMsgEnvelope   locn unqual msg extra = mk_err_msg SevError   locn unqual        [msg,extra]
-mkMsgEnvelope       locn unqual msg       = mk_err_msg SevError   locn unqual        [msg]
-mkPlainMsgEnvelope  locn        msg       = mk_err_msg SevError   locn alwaysQualify [msg]
-mkLongWarnMsg  locn unqual msg extra = mk_err_msg SevWarning locn unqual        [msg,extra]
-mkWarnMsg      locn unqual msg       = mk_err_msg SevWarning locn unqual        [msg]
-mkPlainWarnMsg locn        msg       = mk_err_msg SevWarning locn alwaysQualify [msg]
+mkLongMsgEnvelope   locn unqual msg extra = mk_err_msg SevError   locn unqual        (mkDecorated [msg,extra])
+mkMsgEnvelope       locn unqual msg       = mk_err_msg SevError   locn unqual        (mkDecorated [msg])
+mkPlainMsgEnvelope  locn        msg       = mk_err_msg SevError   locn alwaysQualify (mkDecorated [msg])
+mkLongWarnMsg       locn unqual msg extra = mk_err_msg SevWarning locn unqual        (mkDecorated [msg,extra])
+mkWarnMsg           locn unqual msg       = mk_err_msg SevWarning locn unqual        (mkDecorated [msg])
+mkPlainWarnMsg      locn        msg       = mk_err_msg SevWarning locn alwaysQualify (mkDecorated [msg])
 
 --
 -- Queries

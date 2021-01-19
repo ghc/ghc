@@ -348,7 +348,7 @@ unsupportedExtnError dflags loc unsup =
      suggestions = fuzzyMatch unsup supported
 
 
-optionsErrorMsgs :: [String] -> [Located String] -> FilePath -> Messages [SDoc]
+optionsErrorMsgs :: [String] -> [Located String] -> FilePath -> Messages DecoratedSDoc
 optionsErrorMsgs unhandled_flags flags_lines _filename
   = mkMessages $ listToBag (map mkMsg unhandled_flags_lines)
   where unhandled_flags_lines :: [Located String]
