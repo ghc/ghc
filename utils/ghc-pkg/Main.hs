@@ -79,7 +79,9 @@ import System.Environment ( getArgs, getProgName, getEnv )
 import System.IO
 import System.IO.Error
 import GHC.IO.Exception (IOErrorType(InappropriateType))
-import Data.List
+import Data.List ( group, sort, sortBy, nub, partition, find
+                 , intercalate, intersperse, foldl', unfoldr
+                 , isInfixOf, isSuffixOf, isPrefixOf, stripPrefix )
 import Control.Concurrent
 import qualified Data.Foldable as F
 import qualified Data.Traversable as F

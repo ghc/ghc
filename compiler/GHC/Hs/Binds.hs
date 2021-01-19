@@ -48,7 +48,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 import Data.Data hiding ( Fixity )
-import Data.List hiding ( foldr )
+import Data.List (sortBy)
 import Data.Function
 import Data.Void
 

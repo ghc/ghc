@@ -140,7 +140,7 @@ import GHC.Utils.Exception
 import GHC.Utils.Panic.Plain
 
 import Data.Data
-import Data.List        hiding (group)
+import Data.List        ( foldl1', zipWith4, sortBy )
 import Data.List.NonEmpty  ( NonEmpty(..) )
 
 import GHC.Exts

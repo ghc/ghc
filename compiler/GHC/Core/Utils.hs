@@ -104,7 +104,7 @@ import GHC.Utils.Misc
 import GHC.Data.Pair
 import Data.ByteString     ( ByteString )
 import Data.Function       ( on )
-import Data.List
+import Data.List           ( sort, sortBy, partition, zipWith4, mapAccumL )
 import Data.Ord            ( comparing )
 import GHC.Data.OrdList
 import qualified Data.Set as Set

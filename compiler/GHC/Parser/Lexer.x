@@ -76,7 +76,7 @@ import GHC.Prelude
 import Control.Monad
 import Data.Bits
 import Data.Char
-import Data.List
+import Data.List (stripPrefix, isInfixOf)
 import Data.Maybe
 import Data.Word
 

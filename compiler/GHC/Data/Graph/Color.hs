@@ -28,7 +28,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 import Data.Maybe
-import Data.List
+import Data.List (mapAccumL)
 
 
 -- | Try to color a graph with this set of colors.

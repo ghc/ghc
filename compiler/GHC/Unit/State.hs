@@ -107,7 +107,7 @@ import System.FilePath as FilePath
 import Control.Monad
 import Data.Graph (stronglyConnComp, SCC(..))
 import Data.Char ( toUpper )
-import Data.List as List
+import Data.List ( intersperse, partition, sortBy, isSuffixOf )
 import Data.Map (Map)
 import Data.Set (Set)
 import Data.Monoid (First(..))

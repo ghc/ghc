@@ -62,7 +62,7 @@ import GHC.Driver.Hooks
 import GHC.Utils.Encoding
 
 import Data.Maybe
-import Data.List
+import Data.List (unzip4, nub)
 
 {-
 Desugaring of @foreign@ declarations is naturally split up into
