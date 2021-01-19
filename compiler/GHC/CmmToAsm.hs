@@ -140,7 +140,7 @@ import GHC.Unit
 import GHC.Data.Stream (Stream)
 import qualified GHC.Data.Stream as Stream
 
-import Data.List
+import Data.List (sortBy, groupBy)
 import Data.Maybe
 import Data.Ord         ( comparing )
 import Control.Exception

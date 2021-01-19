@@ -11,7 +11,7 @@ module GHC.Data.SizedSeq
 import Prelude -- See note [Why do we import Prelude here?]
 import Control.DeepSeq
 import Data.Binary
-import Data.List
+import Data.List (genericLength)
 import GHC.Generics
 
 data SizedSeq a = SizedSeq {-# UNPACK #-} !Word [a]

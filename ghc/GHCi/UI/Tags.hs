@@ -29,7 +29,7 @@ import GHC.Driver.Env
 
 import Control.Monad
 import Data.Function
-import Data.List
+import Data.List (sort, sortBy, groupBy)
 import Data.Maybe
 import Data.Ord
 import GHC.Driver.Phases

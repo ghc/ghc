@@ -56,7 +56,7 @@ import GHC.Data.Maybe ( whenIsJust )
 import GHC.Driver.Session
 import GHC.Data.FastString
 import Control.Monad
-import Data.List
+import Data.List (find, sortBy)
 import GHC.Settings.Constants ( mAX_TUPLE_SIZE, mAX_CTUPLE_SIZE )
 import qualified Data.List.NonEmpty as NE
 import qualified GHC.LanguageExtensions as LangExt

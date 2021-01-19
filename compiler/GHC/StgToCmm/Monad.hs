@@ -89,7 +89,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc
 
 import Control.Monad
-import Data.List
+import Data.List (mapAccumL)
 
 
 

@@ -40,7 +40,7 @@ import GHC.Unit.Module
 import GHC.Unit.Module.Imported
 import GHC.Unit.Home.ModInfo
 
-import Data.List
+import Data.List (sortBy, partition, nub)
 import Data.Function ( on )
 
 {-

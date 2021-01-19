@@ -53,7 +53,7 @@ import GHC.Cmm
 import GHC.Utils.Outputable
 import GHC.Data.FastString
 
-import Data.List
+import Data.List (intersperse)
 
 import qualified Data.ByteString as BS
 

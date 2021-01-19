@@ -54,7 +54,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Data.Maybe       ( orElse )
 import GHC.Data.FastString
-import Data.List
+import Data.List (mapAccumL)
 import qualified Data.ByteString as BS
 
 {-

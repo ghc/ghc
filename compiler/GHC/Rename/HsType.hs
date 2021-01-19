@@ -70,7 +70,7 @@ import GHC.Data.FastString
 import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
 
-import Data.List
+import Data.List (sortBy, nubBy, partition)
 import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty (NonEmpty(..))
 import Control.Monad

@@ -54,7 +54,7 @@ import GHC.Data.Maybe ( expectJust )
 -- std interfaces
 import Data.Maybe
 import Data.Array
-import Data.List hiding (transpose)
+import Data.List ( sort )
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 

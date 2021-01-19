@@ -89,7 +89,7 @@ import Data.Kind (Constraint)
 
 import Data.ByteString ( unpack )
 import Control.Monad
-import Data.List
+import Data.List (sort, sortBy)
 import Data.Function
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class

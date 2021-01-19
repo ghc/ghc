@@ -52,7 +52,7 @@ import GHC.Utils.Panic
 import GHC.Types.Var.Set
 import GHC.Types.SrcLoc
 import GHC.Data.List.SetOps( assocMaybe )
-import Data.List
+import Data.List (mapAccumL)
 import GHC.Utils.Misc
 import GHC.Types.Unique.DSet
 

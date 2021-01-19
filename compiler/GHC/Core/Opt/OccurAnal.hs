@@ -52,7 +52,7 @@ import GHC.Utils.Misc
 import GHC.Data.Maybe( orElse, isJust )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import Data.List
+import Data.List (mapAccumL, mapAccumR)
 
 {-
 ************************************************************************

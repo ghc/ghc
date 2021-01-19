@@ -44,7 +44,7 @@ import GHC.Data.Maybe
 import GHC.Data.List.SetOps (removeDups)
 
 import GHC.Data.OrdList
-import Data.List
+import Data.List (sortOn, sortBy)
 import Data.Foldable (toList)
 
 import qualified Data.Set as Set

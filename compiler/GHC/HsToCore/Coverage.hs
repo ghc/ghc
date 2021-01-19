@@ -52,7 +52,7 @@ import GHC.Types.CostCentre
 import GHC.Types.CostCentre.State
 
 import Control.Monad
-import Data.List
+import Data.List (isSuffixOf, intersperse)
 import Data.Array
 import Data.Time
 import System.Directory

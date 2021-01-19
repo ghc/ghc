@@ -27,7 +27,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Platform
 
-import Data.List
+import Data.List (nub, (\\), intersect)
 import Data.Maybe
 import Data.IntSet              (IntSet)
 import qualified Data.IntSet    as IntSet

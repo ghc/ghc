@@ -77,7 +77,7 @@ import GHC.Types.SrcLoc as SrcLoc
 import System.Directory
 import System.Exit      ( ExitCode(..), exitWith )
 import System.FilePath  ( takeDirectory, (</>) )
-import Data.List
+import Data.List        ( sortBy, stripPrefix )
 import qualified Data.Set as Set
 import Data.IORef
 import Data.Maybe       ( fromMaybe )

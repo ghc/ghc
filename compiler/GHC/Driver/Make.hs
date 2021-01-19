@@ -120,7 +120,7 @@ import Control.Monad
 import Control.Monad.Trans.Except ( ExceptT(..), runExceptT, throwE )
 import qualified Control.Monad.Catch as MC
 import Data.IORef
-import Data.List
+import Data.List (nub, sort, sortBy, partition)
 import qualified Data.List as List
 import Data.Foldable (toList)
 import Data.Maybe
