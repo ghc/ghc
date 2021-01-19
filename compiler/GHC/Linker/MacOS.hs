@@ -22,7 +22,7 @@ import GHC.Runtime.Interpreter (loadDLL)
 
 import GHC.Utils.Exception
 
-import Data.List
+import Data.List (isPrefixOf, nub, sort, intersperse, intercalate)
 import Control.Monad (join, forM, filterM)
 import System.Directory (doesFileExist, getHomeDirectory)
 import System.FilePath ((</>), (<.>))

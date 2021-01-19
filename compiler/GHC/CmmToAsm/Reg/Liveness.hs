@@ -67,7 +67,7 @@ import GHC.Types.Unique.Supply
 import GHC.Data.Bag
 import GHC.Utils.Monad.State
 
-import Data.List
+import Data.List (mapAccumL, groupBy, partition)
 import Data.Maybe
 import Data.IntSet              (IntSet)
 

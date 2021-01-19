@@ -151,7 +151,7 @@ import GHC.Types.TyThing
 
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State
-import Data.List
+import Data.List (intercalate)
 import Data.Maybe
 import GHC.Fingerprint
 import qualified GHC.LanguageExtensions as LangExt

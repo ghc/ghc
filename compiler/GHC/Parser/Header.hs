@@ -58,7 +58,7 @@ import GHC.Data.FastString
 import Control.Monad
 import System.IO
 import System.IO.Unsafe
-import Data.List
+import Data.List (partition)
 
 ------------------------------------------------------------------------------
 

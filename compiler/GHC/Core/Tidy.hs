@@ -31,7 +31,7 @@ import GHC.Types.Unique.FM
 import GHC.Types.Name hiding (tidyNameOcc)
 import GHC.Types.SrcLoc
 import GHC.Data.Maybe
-import Data.List
+import Data.List (mapAccumL)
 
 {-
 ************************************************************************
