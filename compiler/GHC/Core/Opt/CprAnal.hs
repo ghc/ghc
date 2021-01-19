@@ -309,12 +309,8 @@ cprAnalBind top_lvl env widening id rhs
   = (id', rhs', env')
   where
     arg_tys             = fst (splitFunNewTys (idType id))
-    -- TODO: Note
-    -- We compute the Termination and CPR transformer based on the strictness
-    -- signature. There is no point in pretending that an arg we are strict in
-    -- could lead to non-termination, as the signature then trivially
-    -- MightDiverge. Instead we assume that call sites make sure to force the
-    -- arguments appropriately and unleash the TerminationFlag there.
+    -- See Note [CPR for binders that will be unboxed]
+    -- See Note [Rapid termination for strict binders]
     assumed_arg_cpr_tys = argCprTypesFromStrictSig (unboxingStrategy env)
                                                    arg_tys
                                                    (idStrictness id)
@@ -542,6 +538,65 @@ very helpful to give 'x' the CPR property. Otherwise, the worker would
 Note that we only want to do this for something that we want to unbox
 ('wantToUnboxArg'), else we may get over-optimistic CPR results
 (e.g. from \x -> x!).
+
+In practice, we derive CPR information directly from the strictness signature
+and the argument type in 'cprAnalBind' via 'argCprTypesFromStrictSig'.
+
+Note [Rapid termination for strict binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Evaluation of any strict binder will rapidly terminate once strictness
+worker/wrapper has happened. Here's an example:
+
+  g :: Int -> Int -> (Int, Int)
+  g x | x > 0     = (x, x)
+      | otherwise = (0, 0)
+
+We want to nestedly unbox the components of the constructed pair, but we
+may only do so if we can prove that 'x' terminates rapidly. And indeed it
+does! As strictness analysis will tell, 'g' would eval 'x' anyway, so it
+is OK to regard 'x' as if it terminates rapidly, because any additional
+evaluation beyond the first one will. We get
+
+  g (I# x) = case $wg x of (# a, b #) -> (I# a, I# b)
+  $wg x | x ># 0#   = (# x, x #)
+        | otherwise = (# 0#, 0# #)
+
+Like for Note [CPR for binders that will be unboxed], we derive
+termination information directly from the strictness signature
+in 'cprAnalBind' via 'argCprTypesFromStrictSig'.
+
+But in contrast to CPR information, we also have to account for termination of
+strict arguments at *call sites* of 'g'! For example
+
+  h :: Int -> ((Int, Int), (Int, Int))
+  h z = (g z, g 42)
+
+We saw that 'g' can be unboxed nestedly. And we'd even say that calls to 'g'
+itself terminate rapidly, provided its argument 'x' terminates.
+Now, can we unbox the pair returned by 'h' nestedly? No! Evaluating
+`h (error "boom")` will terminate just fine, but not if we decide to
+unbox the first component of 'h'. The key is that we have to uphold
+the "provided its argument terminates" precondition at call sites of 'g'.
+That clearly is not the case for 'z', which is a lazy binder.
+
+The solution is to "force" 'z' according to the strictness
+signature of 'g', which is what 'cprTransformSig' does. It
+accounts the TerminationFlag resulting from the forcing to
+the termination recorded in the signature, as if there was
+a case expression forcing the argument before the call. In
+case of 'g', we get that it MightDiverge because forcing of
+the argument 'z' MightDiverge.
+
+Why not simply say that 'g' MightDiverge, so that we don't have to be smart at
+call sites? Because then we don't get to see that *any* function that uses its
+arguments terminates rapidly! In particular, we'd miss to unbox `g 42` above,
+which is perfectly within limits; evaluation of `42` terminates rapidly and then
+so does the call `g 42`, which allows to unbox the second component of 'h', thus
+
+  h z = case $wh z of
+    (# p, a, b #) -> (p, (I# a, I# b))
+  $wh z = case $wg 42 of
+    (# a, b #) -> (# g z, a, b #)
 
 Note [CPR in a DataAlt case alternative]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
