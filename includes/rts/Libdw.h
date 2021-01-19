@@ -109,7 +109,7 @@ void initBacktracePrinting(void);
  * allocAsNeeded requires one to be allocated as necessary, so should be false
  * when calling from a signal handler.
  */
-LibdwSession *libdwThreadSession(bool allocAsNeeded STG_UNUSED);
+LibdwSession *libdwThreadSession(bool allocAsNeeded);
 
 /* Capture backtrace of current thread and schedule the dump of it.
  *
