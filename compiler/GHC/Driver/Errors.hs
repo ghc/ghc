@@ -9,7 +9,7 @@ module GHC.Driver.Errors (
 import GHC.Driver.Session
 import GHC.Data.Bag
 import GHC.Utils.Exception
-import GHC.Utils.Error ( formatErrDoc, sortMsgBag )
+import GHC.Utils.Error ( formatBulleted, sortMsgBag )
 import GHC.Types.SourceError ( mkSrcErr )
 import GHC.Prelude
 import GHC.Types.SrcLoc
@@ -33,7 +33,7 @@ printBagOfErrors dflags bag_of_errors
   = sequence_ [ let style = mkErrStyle unqual
                     ctx   = initSDocContext dflags style
                 in putLogMsg dflags reason sev s
-                $ withPprStyle style (formatErrDoc ctx (renderDiagnostic doc))
+                $ withPprStyle style (formatBulleted ctx (renderDiagnostic doc))
               | MsgEnvelope { errMsgSpan      = s,
                          errMsgDiagnostic = doc,
                          errMsgSeverity  = sev,
@@ -53,7 +53,7 @@ handleFlagWarnings dflags warns = do
   printOrThrowWarnings dflags bag
 
 -- | Checks if given 'WarnMsg' is a fatal warning.
-isWarnMsgFatal :: DynFlags -> MsgEnvelope [SDoc] -> Maybe (Maybe WarningFlag)
+isWarnMsgFatal :: DynFlags -> MsgEnvelope DecoratedSDoc -> Maybe (Maybe WarningFlag)
 isWarnMsgFatal dflags MsgEnvelope{errMsgReason = Reason wflag}
   = if wopt_fatal wflag dflags
       then Just (Just wflag)
@@ -74,7 +74,7 @@ shouldPrintWarning _ _
 
 -- | Given a bag of warnings, turn them into an exception if
 -- -Werror is enabled, or print them out otherwise.
-printOrThrowWarnings :: DynFlags -> Bag (MsgEnvelope [SDoc]) -> IO ()
+printOrThrowWarnings :: DynFlags -> Bag (MsgEnvelope DecoratedSDoc) -> IO ()
 printOrThrowWarnings dflags warns = do
   let (make_error, warns') =
         mapAccumBagL

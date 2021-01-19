@@ -743,7 +743,7 @@ mkUserTypeErrorReporter ctxt
                       ; maybeReportError ctxt err
                       ; addDeferredBinding ctxt err ct }
 
-mkUserTypeError :: ReportErrCtxt -> Ct -> TcM (MsgEnvelope [SDoc])
+mkUserTypeError :: ReportErrCtxt -> Ct -> TcM (MsgEnvelope DecoratedSDoc)
 mkUserTypeError ctxt ct = mkErrorMsgFromCt ctxt ct
                         $ important
                         $ pprUserTypeErrorTy
@@ -819,7 +819,7 @@ pattern match which binds some equality constraints.  If we
 find one, we report the insoluble Given.
 -}
 
-mkGroupReporter :: (ReportErrCtxt -> [Ct] -> TcM (MsgEnvelope [SDoc]))
+mkGroupReporter :: (ReportErrCtxt -> [Ct] -> TcM (MsgEnvelope DecoratedSDoc))
                              -- Make error message for a group
                 -> Reporter  -- Deal with lots of constraints
 -- Group together errors from same location,
@@ -828,7 +828,7 @@ mkGroupReporter mk_err ctxt cts
   = mapM_ (reportGroup mk_err ctxt . toList) (equivClasses cmp_loc cts)
 
 -- Like mkGroupReporter, but doesn't actually print error messages
-mkSuppressReporter :: (ReportErrCtxt -> [Ct] -> TcM (MsgEnvelope [SDoc])) -> Reporter
+mkSuppressReporter :: (ReportErrCtxt -> [Ct] -> TcM (MsgEnvelope DecoratedSDoc)) -> Reporter
 mkSuppressReporter mk_err ctxt cts
   = mapM_ (suppressGroup mk_err ctxt . toList) (equivClasses cmp_loc cts)
 
@@ -846,7 +846,7 @@ cmp_loc ct1 ct2 = get ct1 `compare` get ct2
              -- Reduce duplication by reporting only one error from each
              -- /starting/ location even if the end location differs
 
-reportGroup :: (ReportErrCtxt -> [Ct] -> TcM (MsgEnvelope [SDoc])) -> Reporter
+reportGroup :: (ReportErrCtxt -> [Ct] -> TcM (MsgEnvelope DecoratedSDoc)) -> Reporter
 reportGroup mk_err ctxt cts =
   ASSERT( not (null cts))
   do { err <- mk_err ctxt cts
@@ -865,13 +865,13 @@ reportGroup mk_err ctxt cts =
 
 -- like reportGroup, but does not actually report messages. It still adds
 -- -fdefer-type-errors bindings, though.
-suppressGroup :: (ReportErrCtxt -> [Ct] -> TcM (MsgEnvelope [SDoc])) -> Reporter
+suppressGroup :: (ReportErrCtxt -> [Ct] -> TcM (MsgEnvelope DecoratedSDoc)) -> Reporter
 suppressGroup mk_err ctxt cts
  = do { err <- mk_err ctxt cts
       ; traceTc "Suppressing errors for" (ppr cts)
       ; mapM_ (addDeferredBinding ctxt err) cts }
 
-maybeReportHoleError :: ReportErrCtxt -> Hole -> MsgEnvelope [SDoc] -> TcM ()
+maybeReportHoleError :: ReportErrCtxt -> Hole -> MsgEnvelope DecoratedSDoc -> TcM ()
 maybeReportHoleError ctxt hole err
   | isOutOfScopeHole hole
   -- Always report an error for out-of-scope variables
@@ -913,7 +913,7 @@ maybeReportHoleError ctxt hole err
        HoleWarn  -> reportWarning (Reason Opt_WarnTypedHoles) err
        HoleDefer -> return ()
 
-maybeReportError :: ReportErrCtxt -> MsgEnvelope [SDoc] -> TcM ()
+maybeReportError :: ReportErrCtxt -> MsgEnvelope DecoratedSDoc -> TcM ()
 -- Report the error and/or make a deferred binding for it
 maybeReportError ctxt err
   | cec_suppress ctxt    -- Some worse error has occurred;
@@ -925,7 +925,7 @@ maybeReportError ctxt err
       TypeWarn reason -> reportWarning reason err
       TypeError       -> reportError err
 
-addDeferredBinding :: ReportErrCtxt -> MsgEnvelope [SDoc] -> Ct -> TcM ()
+addDeferredBinding :: ReportErrCtxt -> MsgEnvelope DecoratedSDoc -> Ct -> TcM ()
 -- See Note [Deferring coercion errors to runtime]
 addDeferredBinding ctxt err ct
   | deferringAnyBindings ctxt
@@ -948,14 +948,14 @@ addDeferredBinding ctxt err ct
   = return ()
 
 mkErrorTerm :: DynFlags -> Type  -- of the error term
-            -> MsgEnvelope [SDoc] -> EvTerm
+            -> MsgEnvelope DecoratedSDoc -> EvTerm
 mkErrorTerm dflags ty err = evDelayedError ty err_fs
   where
     err_msg = pprLocMsgEnvelope err
     err_fs  = mkFastString $ showSDoc dflags $
               err_msg $$ text "(deferred type error)"
 
-maybeAddDeferredHoleBinding :: ReportErrCtxt -> MsgEnvelope [SDoc] -> Hole -> TcM ()
+maybeAddDeferredHoleBinding :: ReportErrCtxt -> MsgEnvelope DecoratedSDoc -> Hole -> TcM ()
 maybeAddDeferredHoleBinding ctxt err (Hole { hole_sort = ExprHole (HER ref ref_ty _) })
 -- Only add bindings for holes in expressions
 -- not for holes in partial type signatures
@@ -1041,15 +1041,17 @@ pprWithArising (ct:cts)
     ppr_one ct' = hang (parens (pprType (ctPred ct')))
                      2 (pprCtLoc (ctLoc ct'))
 
-mkErrorMsgFromCt :: ReportErrCtxt -> Ct -> Report -> TcM (MsgEnvelope [SDoc])
+mkErrorMsgFromCt :: ReportErrCtxt -> Ct -> Report -> TcM (MsgEnvelope DecoratedSDoc)
 mkErrorMsgFromCt ctxt ct report
   = mkErrorReport ctxt (ctLocEnv (ctLoc ct)) report
 
-mkErrorReport :: ReportErrCtxt -> TcLclEnv -> Report -> TcM (MsgEnvelope [SDoc])
+mkErrorReport :: ReportErrCtxt -> TcLclEnv -> Report -> TcM (MsgEnvelope DecoratedSDoc)
 mkErrorReport ctxt tcl_env (Report important relevant_bindings valid_subs)
   = do { context <- mkErrInfo (cec_tidy ctxt) (tcl_ctxt tcl_env)
-       ; mkErrDocAt (RealSrcSpan (tcl_loc tcl_env) Nothing)
-            [vcat important, context, vcat (relevant_bindings ++ valid_subs)]
+       ; mkDecoratedSDocAt (RealSrcSpan (tcl_loc tcl_env) Nothing)
+                           important
+                           [context]
+                           (relevant_bindings ++ valid_subs)
        }
 
 type UserGiven = Implication
@@ -1146,7 +1148,7 @@ solve it.
 ************************************************************************
 -}
 
-mkIrredErr :: ReportErrCtxt -> [Ct] -> TcM (MsgEnvelope [SDoc])
+mkIrredErr :: ReportErrCtxt -> [Ct] -> TcM (MsgEnvelope DecoratedSDoc)
 mkIrredErr ctxt cts
   = do { (ctxt, binds_msg, ct1) <- relevantBindings True ctxt ct1
        ; let orig = ctOrigin ct1
@@ -1157,7 +1159,7 @@ mkIrredErr ctxt cts
     (ct1:_) = cts
 
 ----------------
-mkHoleError :: [Ct] -> ReportErrCtxt -> Hole -> TcM (MsgEnvelope [SDoc])
+mkHoleError :: [Ct] -> ReportErrCtxt -> Hole -> TcM (MsgEnvelope DecoratedSDoc)
 mkHoleError _tidy_simples _ctxt hole@(Hole { hole_occ = occ
                                            , hole_ty = hole_ty
                                            , hole_loc = ct_loc })
@@ -1167,10 +1169,10 @@ mkHoleError _tidy_simples _ctxt hole@(Hole { hole_occ = occ
        ; imp_info <- getImports
        ; curr_mod <- getModule
        ; hpt <- getHpt
-       ; mkErrDocAt (RealSrcSpan (tcl_loc lcl_env) Nothing) $
-                    [out_of_scope_msg,
-                    (unknownNameSuggestions dflags hpt curr_mod rdr_env
-                     (tcl_rdr lcl_env) imp_info (mkRdrUnqual occ))] }
+       ; mkDecoratedSDocAt (RealSrcSpan (tcl_loc lcl_env) Nothing)
+                           [out_of_scope_msg] []
+                           [unknownNameSuggestions dflags hpt curr_mod rdr_env
+                            (tcl_rdr lcl_env) imp_info (mkRdrUnqual occ)] }
   where
     herald | isDataOcc occ = text "Data constructor not in scope:"
            | otherwise     = text "Variable not in scope:"
@@ -1298,7 +1300,7 @@ givenConstraintsMsg ctxt =
             2 (vcat $ map pprConstraint constraints)
 
 ----------------
-mkIPErr :: ReportErrCtxt -> [Ct] -> TcM (MsgEnvelope [SDoc])
+mkIPErr :: ReportErrCtxt -> [Ct] -> TcM (MsgEnvelope DecoratedSDoc)
 mkIPErr ctxt cts
   = do { (ctxt, binds_msg, ct1) <- relevantBindings True ctxt ct1
        ; let orig    = ctOrigin ct1
@@ -1375,11 +1377,11 @@ any more.  So we don't assert that it is.
 
 -- Don't have multiple equality errors from the same location
 -- E.g.   (Int,Bool) ~ (Bool,Int)   one error will do!
-mkEqErr :: ReportErrCtxt -> [Ct] -> TcM (MsgEnvelope [SDoc])
+mkEqErr :: ReportErrCtxt -> [Ct] -> TcM (MsgEnvelope DecoratedSDoc)
 mkEqErr ctxt (ct:_) = mkEqErr1 ctxt ct
 mkEqErr _ [] = panic "mkEqErr"
 
-mkEqErr1 :: ReportErrCtxt -> Ct -> TcM (MsgEnvelope [SDoc])
+mkEqErr1 :: ReportErrCtxt -> Ct -> TcM (MsgEnvelope DecoratedSDoc)
 mkEqErr1 ctxt ct   -- Wanted or derived;
                    -- givens handled in mkGivenErrorReporter
   = do { (ctxt, binds_msg, ct) <- relevantBindings True ctxt ct
@@ -1445,7 +1447,7 @@ mkCoercibleExplanation rdr_env fam_envs ty1 ty2
 
 mkEqErr_help :: DynFlags -> ReportErrCtxt -> Report
              -> Ct
-             -> TcType -> TcType -> TcM (MsgEnvelope [SDoc])
+             -> TcType -> TcType -> TcM (MsgEnvelope DecoratedSDoc)
 mkEqErr_help dflags ctxt report ct ty1 ty2
   | Just (tv1, _) <- tcGetCastedTyVar_maybe ty1
   = mkTyVarEqErr dflags ctxt report ct tv1 ty2
@@ -1456,7 +1458,7 @@ mkEqErr_help dflags ctxt report ct ty1 ty2
 
 reportEqErr :: ReportErrCtxt -> Report
             -> Ct
-            -> TcType -> TcType -> TcM (MsgEnvelope [SDoc])
+            -> TcType -> TcType -> TcM (MsgEnvelope DecoratedSDoc)
 reportEqErr ctxt report ct ty1 ty2
   = mkErrorMsgFromCt ctxt ct (mconcat [misMatch, report, eqInfo])
   where
@@ -1465,7 +1467,7 @@ reportEqErr ctxt report ct ty1 ty2
 
 mkTyVarEqErr, mkTyVarEqErr'
   :: DynFlags -> ReportErrCtxt -> Report -> Ct
-             -> TcTyVar -> TcType -> TcM (MsgEnvelope [SDoc])
+             -> TcTyVar -> TcType -> TcM (MsgEnvelope DecoratedSDoc)
 -- tv1 and ty2 are already tidied
 mkTyVarEqErr dflags ctxt report ct tv1 ty2
   = do { traceTc "mkTyVarEqErr" (ppr ct $$ ppr tv1 $$ ppr ty2)
@@ -1665,7 +1667,7 @@ pp_givens givens
 -- always be another unsolved wanted around, which will ordinarily suppress
 -- this message. But this can still be printed out with -fdefer-type-errors
 -- (sigh), so we must produce a message.
-mkBlockedEqErr :: ReportErrCtxt -> [Ct] -> TcM (MsgEnvelope [SDoc])
+mkBlockedEqErr :: ReportErrCtxt -> [Ct] -> TcM (MsgEnvelope DecoratedSDoc)
 mkBlockedEqErr ctxt (ct:_) = mkErrorMsgFromCt ctxt ct report
   where
     report = important msg
@@ -2272,7 +2274,7 @@ Warn of loopy local equalities that were dropped.
 ************************************************************************
 -}
 
-mkDictErr :: ReportErrCtxt -> [Ct] -> TcM (MsgEnvelope [SDoc])
+mkDictErr :: ReportErrCtxt -> [Ct] -> TcM (MsgEnvelope DecoratedSDoc)
 mkDictErr ctxt cts
   = ASSERT( not (null cts) )
     do { inst_envs <- tcGetInstEnvs
