@@ -16,7 +16,7 @@ module GHC.Types.Cpr (
     pruneDeepCpr, splitConCprTy, applyCprTy, abstractCprTy,
     abstractCprTyNTimes, ensureCprTyArity, trimCprTy,
     forceCprTy, forceCpr, bothCprType,
-    cprTransformDataConSig, cprTransformSig, argCprTypesFromStrictSig,
+    cprTransformDataConWorkSig, cprTransformSig, argCprTypesFromStrictSig,
     CprSig (..), mkCprSig, mkCprSigForArity,
     topCprSig, seqCprSig
   ) where
@@ -499,12 +499,13 @@ seqCprSig :: CprSig -> ()
 seqCprSig (CprSig sig) = seqCprType sig `seq` ()
 
 -- | Get a 'CprType' for a 'DataCon', given 'CprType's for its fields.
-cprTransformDataConSig :: DataCon -> [CprType] -> CprType
-cprTransformDataConSig con args
+cprTransformDataConWorkSig :: DataCon -> [CprType] -> CprType
+-- What about DataCon *wrappers*? See Note [CPR for DataCon wrappers]
+cprTransformDataConWorkSig con args
   | null (dataConExTyCoVars con)  -- No existentials
   , wkr_arity <= mAX_CPR_SIZE
   , args `lengthIs` wkr_arity
-  -- , pprTrace "cprTransformDataConSig" (ppr con <+> ppr wkr_arity <+> ppr args) True
+  -- , pprTrace "cprTransformDataConWorkSig" (ppr con <+> ppr wkr_arity <+> ppr args) True
   = abstractCprTyNTimes wkr_arity $ conCprType con args
   | otherwise
   = topCprType
@@ -517,7 +518,6 @@ cprTransformDataConSig con args
     --     that each argument 'Terminates' anyway.
     --   * Data constructor workers are in fact lazy! Evaluation is done by the
     --     (now inlined) wrapper.
-    -- TODO: What about data con wrappers? Do we handle them? If so, where?
 
     mAX_CPR_SIZE :: Arity
     mAX_CPR_SIZE = 10
