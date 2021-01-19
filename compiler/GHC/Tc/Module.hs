@@ -188,7 +188,7 @@ tcRnModule :: HscEnv
            -> ModSummary
            -> Bool              -- True <=> save renamed syntax
            -> HsParsedModule
-           -> IO (Messages [SDoc], Maybe TcGblEnv)
+           -> IO (Messages DecoratedSDoc, Maybe TcGblEnv)
 
 tcRnModule hsc_env mod_sum save_rn_syntax
    parsedModule@HsParsedModule {hpm_module= L loc this_module}
@@ -1986,7 +1986,7 @@ this Note.
 *********************************************************
 -}
 
-runTcInteractive :: HscEnv -> TcRn a -> IO (Messages [SDoc], Maybe a)
+runTcInteractive :: HscEnv -> TcRn a -> IO (Messages DecoratedSDoc, Maybe a)
 -- Initialise the tcg_inst_env with instances from all home modules.
 -- This mimics the more selective call to hptInstances in tcRnImports
 runTcInteractive hsc_env thing_inside
@@ -2102,7 +2102,7 @@ We don't bother with the tcl_th_bndrs environment either.
 -- The returned TypecheckedHsExpr is of type IO [ () ], a list of the bound
 -- values, coerced to ().
 tcRnStmt :: HscEnv -> GhciLStmt GhcPs
-         -> IO (Messages [SDoc], Maybe ([Id], LHsExpr GhcTc, FixityEnv))
+         -> IO (Messages DecoratedSDoc, Maybe ([Id], LHsExpr GhcTc, FixityEnv))
 tcRnStmt hsc_env rdr_stmt
   = runTcInteractive hsc_env $ do {
 
@@ -2482,7 +2482,7 @@ getGhciStepIO = do
 
     return (noLoc $ ExprWithTySig noExtField (nlHsVar ghciStepIoMName) stepTy)
 
-isGHCiMonad :: HscEnv -> String -> IO (Messages [SDoc], Maybe Name)
+isGHCiMonad :: HscEnv -> String -> IO (Messages DecoratedSDoc, Maybe Name)
 isGHCiMonad hsc_env ty
   = runTcInteractive hsc_env $ do
         rdrEnv <- getGlobalRdrEnv
@@ -2509,7 +2509,7 @@ data TcRnExprMode = TM_Inst     -- ^ Instantiate inferred quantifiers only (:typ
 tcRnExpr :: HscEnv
          -> TcRnExprMode
          -> LHsExpr GhcPs
-         -> IO (Messages [SDoc], Maybe Type)
+         -> IO (Messages DecoratedSDoc, Maybe Type)
 tcRnExpr hsc_env mode rdr_expr
   = runTcInteractive hsc_env $
     do {
@@ -2578,7 +2578,7 @@ has a special case for application chains.
 --------------------------
 tcRnImportDecls :: HscEnv
                 -> [LImportDecl GhcPs]
-                -> IO (Messages [SDoc], Maybe GlobalRdrEnv)
+                -> IO (Messages DecoratedSDoc, Maybe GlobalRdrEnv)
 -- Find the new chunk of GlobalRdrEnv created by this list of import
 -- decls.  In contract tcRnImports *extends* the TcGblEnv.
 tcRnImportDecls hsc_env import_decls
@@ -2594,7 +2594,7 @@ tcRnType :: HscEnv
          -> ZonkFlexi
          -> Bool        -- Normalise the returned type
          -> LHsType GhcPs
-         -> IO (Messages [SDoc], Maybe (Type, Kind))
+         -> IO (Messages DecoratedSDoc, Maybe (Type, Kind))
 tcRnType hsc_env flexi normalise rdr_type
   = runTcInteractive hsc_env $
     setXOptM LangExt.PolyKinds $   -- See Note [Kind-generalise in tcRnType]
@@ -2728,7 +2728,7 @@ tcRnDeclsi exists to allow class, data, and other declarations in GHCi.
 
 tcRnDeclsi :: HscEnv
            -> [LHsDecl GhcPs]
-           -> IO (Messages [SDoc], Maybe TcGblEnv)
+           -> IO (Messages DecoratedSDoc, Maybe TcGblEnv)
 tcRnDeclsi hsc_env local_decls
   = runTcInteractive hsc_env $
     tcRnSrcDecls False local_decls Nothing
@@ -2753,13 +2753,13 @@ externaliseAndTidyId this_mod id
 -- a package module with an interface on disk.  If neither of these is
 -- true, then the result will be an error indicating the interface
 -- could not be found.
-getModuleInterface :: HscEnv -> Module -> IO (Messages [SDoc], Maybe ModIface)
+getModuleInterface :: HscEnv -> Module -> IO (Messages DecoratedSDoc, Maybe ModIface)
 getModuleInterface hsc_env mod
   = runTcInteractive hsc_env $
     loadModuleInterface (text "getModuleInterface") mod
 
 tcRnLookupRdrName :: HscEnv -> Located RdrName
-                  -> IO (Messages [SDoc], Maybe [Name])
+                  -> IO (Messages DecoratedSDoc, Maybe [Name])
 -- ^ Find all the Names that this RdrName could mean, in GHCi
 tcRnLookupRdrName hsc_env (L loc rdr_name)
   = runTcInteractive hsc_env $
@@ -2773,7 +2773,7 @@ tcRnLookupRdrName hsc_env (L loc rdr_name)
        ; when (null names) (addErrTc (text "Not in scope:" <+> quotes (ppr rdr_name)))
        ; return names }
 
-tcRnLookupName :: HscEnv -> Name -> IO (Messages [SDoc], Maybe TyThing)
+tcRnLookupName :: HscEnv -> Name -> IO (Messages DecoratedSDoc, Maybe TyThing)
 tcRnLookupName hsc_env name
   = runTcInteractive hsc_env $
     tcRnLookupName' name
@@ -2792,7 +2792,7 @@ tcRnLookupName' name = do
 
 tcRnGetInfo :: HscEnv
             -> Name
-            -> IO ( Messages [SDoc]
+            -> IO ( Messages DecoratedSDoc
                   , Maybe (TyThing, Fixity, [ClsInst], [FamInst], SDoc))
 
 -- Used to implement :info in GHCi
