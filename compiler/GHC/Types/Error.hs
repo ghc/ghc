@@ -18,6 +18,7 @@ module GHC.Types.Error
    , DecoratedSDoc (unDecorated)
    , Severity (..)
    , RenderableDiagnostic (..)
+   , mapDecorated
    , pprMessageBag
    , mkDecorated
    , mkLocMessage
@@ -197,6 +198,9 @@ instance Show (MsgEnvelope DecoratedSDoc) where
 showMsgEnvelope :: RenderableDiagnostic a => MsgEnvelope a -> String
 showMsgEnvelope err =
   renderWithContext defaultSDocContext (vcat (unDecorated . renderDiagnostic $ errMsgDiagnostic err))
+
+mapDecorated :: (SDoc -> SDoc) -> DecoratedSDoc -> DecoratedSDoc
+mapDecorated f (Decorated xs) = Decorated (map f xs)
 
 pprMessageBag :: Bag SDoc -> SDoc
 pprMessageBag msgs = vcat (punctuate blankLine (bagToList msgs))
