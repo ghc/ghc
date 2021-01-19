@@ -556,7 +556,7 @@ void libdwDumpBacktrace(void) {
     //      async-signal-safe alternative, or fast repeating SIGQUIT can
     //      hang the process, which shows the unsafety
     btq->dwflerr = dwfl_getthread_frames(session->dwfl, dwfl_pid(session->dwfl),
-                                       cbGetBacktraceFramePC, btq);
+                                         cbGetBacktraceFramePC, btq);
     // see: https://sourceware.org/git?p=elfutils.git;a=blob;f=src/stack.c;h=534aa93c433551896b67b65845ab4891fd175066;hb=HEAD#l717
     switch (btq->dwflerr) {
         case DWARF_CB_OK:
