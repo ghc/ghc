@@ -24,7 +24,7 @@ Language extensions can be controlled (i.e. allowed or not) in two ways:
     turned on by default. These extensions are considered to be stable and
     conservative.
 
-    ``GHC2021`` is used by GHC if neither ``Haskell98`` nor``Haskell2010`` is
+    ``GHC2021`` is used by GHC if neither ``Haskell98`` nor ``Haskell2010`` is
     turned on explicitly. Since later versions of GHC may use a later
     ``GHC20xx`` by default, users are advised to declare the language set
     explicitly with ``-XGHC2021``.
