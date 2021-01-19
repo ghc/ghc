@@ -180,8 +180,15 @@ getTestArgs = do
                            Just filepath -> Just $ "--metrics-file=" ++ filepath
                            Nothing -> Nothing
         configArgs   = concat [["-e", configArg] | configArg <- testConfigs args]
+        globalTestVerbosity = case globalVerbosity of
+                                Silent -> "0"
+                                Error -> "1"
+                                Warn -> "1"
+                                Info -> "2"
+                                Verbose -> "4"
+                                Diagnostic -> "5"
         verbosityArg = case testVerbosity args of
-                           Nothing -> Just $ "--verbose=" ++ show (fromEnum globalVerbosity)
+                           Nothing -> Just $ "--verbose=" ++ globalTestVerbosity
                            Just verbosity -> Just $ "--verbose=" ++ verbosity
         wayArgs      = map ("--way=" ++) (testWays args)
         compilerArg  = ["--config", "compiler=" ++ show (compiler)]
