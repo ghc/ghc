@@ -36,7 +36,7 @@ import GHC.Data.Maybe
 
 import GHC.Rename.Unbound
 
-import Data.List
+import Data.List (groupBy)
 import Data.Function    ( on )
 
 {-

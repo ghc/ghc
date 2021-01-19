@@ -40,7 +40,7 @@ import GHC.Unit.Module.Deps
 import GHC.Data.Maybe
 
 import Control.Monad (filterM)
-import Data.List
+import Data.List (sort, sortBy, nub)
 import Data.IORef
 import Data.Map (Map)
 import qualified Data.Map as Map

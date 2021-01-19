@@ -60,7 +60,7 @@ import GHC.Platform.Profile
 import GHC.Unit
 
 import GHC.Utils.Misc
-import Data.List
+import Data.List (mapAccumL, partition)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Data.FastString

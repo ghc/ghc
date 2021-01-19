@@ -16,7 +16,7 @@ module GHC.BaseDir where
 
 import Prelude -- See Note [Why do we import Prelude here?]
 
-import Data.List
+import Data.List (stripPrefix)
 import System.FilePath
 
 -- Windows

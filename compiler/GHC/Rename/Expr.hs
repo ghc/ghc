@@ -53,7 +53,7 @@ import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
 import GHC.Types.Unique.Set
 import GHC.Types.SourceText
-import Data.List
+import Data.List (unzip4, minimumBy)
 import Data.Maybe (isJust, isNothing)
 import GHC.Utils.Misc
 import GHC.Data.List.SetOps ( removeDups )

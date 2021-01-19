@@ -13,7 +13,7 @@ import HpcFlags
 import HpcUtils
 
 import System.FilePath
-import Data.List
+import Data.List (sortBy, find)
 import Data.Maybe(fromJust)
 import Data.Semigroup as Semi
 import Data.Array

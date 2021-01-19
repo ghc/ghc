@@ -147,7 +147,7 @@ import GHC.Utils.Panic
 
 import Data.Either
 import Data.Function
-import Data.List
+import Data.List ( partition, deleteBy )
 import Data.Proxy
 
 {-

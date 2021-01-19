@@ -46,7 +46,7 @@ import GHC.Types.Unique
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.FM
 
-import Data.List        hiding (union)
+import Data.List (mapAccumL, sortBy)
 import Data.Maybe
 
 -- | Lookup a node from the graph.
