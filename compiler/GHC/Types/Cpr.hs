@@ -400,6 +400,7 @@ noteTermFlag Terminates   = TerminationM (tell (Semigroup.Any False))
 -- | Forces possibly deep 'Termination' info of a 'CprType' according to
 -- incoming 'ArgStr'. If there's any possibility that this 'MightDiverge',
 -- return that.
+-- See Note [Rapid termination for strict binders]
 forceCprTy :: Demand -> CprType -> (TerminationFlag, CprType)
 -- TODO: This doesn't consider strict fields yet, I think
 forceCprTy dmd ty = runTerminationM (idIfLazy forceCprTyM dmd ty)
@@ -530,13 +531,13 @@ cprTransformDataConSig con args
     --         things worse.
 
 cprTransformSig :: StrictSig -> CprSig -> [CprType] -> CprType
+-- See Note [Rapid termination for strict binders] in CprAnal
 cprTransformSig str_sig (CprSig sig_ty) arg_tys
   | dmds <- argDmdsFromStrictSig str_sig
   , dmds `leLength` arg_tys
   , arg_tys `lengthIs` ct_arty sig_ty
-  -- Maybe we should use defaultArgDmd instead of topDmd here. On the other
-  -- hand, I don't think it makes much of a difference; We basically only need
-  -- to pad with topDmd when str_sig was topSig to begin with.
+  -- See Note [Rapid termination for strict binders]
+  -- TODO: I think dmds doesn't account for strict fields. Should we?
   , (tf, _) <- runTerminationM $ zipWithM_ (idIfLazy forceCprTyM) (dmds ++ repeat topDmd) arg_tys
   = -- pprTrace "cprTransformSig:ok" (ppr str_sig <+> ppr sig_ty <+> ppr arg_tys <+> ppr tf)
     sig_ty `bothCprType` tf
