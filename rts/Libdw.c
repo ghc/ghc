@@ -388,9 +388,10 @@ static const Dwfl_Thread_Callbacks thread_cbs = {
  */
 struct BtQue {
     pid_t tid;
+    int dwflerr;
     int nFrames;
     Dwarf_Addr framePCs[BTQ_MAX_DEPTH];
-    struct BtQue *next;
+    struct BtQue *next; // to form a list as the print queue
     int btPrintNum; // to avoid duplicated printing
 };
 
@@ -409,11 +410,17 @@ btPrintThread(void *_ STG_UNUSED)
         return NULL;
     }
 
-    for(;;) {
+    for(int printCntr=1; ; printCntr++) { // it is okay printCntr to overflow
         sem_wait(&btqSema); // go idle when there's no backtrace to print
+        for(int i=0; i<32; i++) { // TODO tune this number or improve the algo
+            // move out of the way for propagated SIGQUIT signals to have their
+            // respective threads capture their bts then enlist to btqPending,
+            // in a short burst
+            sched_yield();
+        }
         struct BtQue *last = NULL;
-        // take the whole list concurrently with many threads adding their
-        // respective backtrace in responding to SIGQUIT
+        // take the whole list concurrently with many threads (hopefully done)
+        // adding their respective backtrace in responding to SIGQUIT
         for(;;) {
             last = SEQ_CST_LOAD(&btqPending);
             if(!last) {
@@ -428,11 +435,27 @@ btPrintThread(void *_ STG_UNUSED)
         // we are printing backtraces from the list in LIFO fashion,
         // intuitively it is better FIFO, but it does not matter that much
         for(struct BtQue *curr=last; curr; curr = curr->next) {
+            // avoid duplicate printing of a same bt record. each thread has
+            // its local storage, will be overwritten from time to time, then
+            // if we are so slow to have not printed a previous snapshot in
+            // time, we'll print out the latest content at first sight of a
+            // thread's bt record, then it's meaningless to print it for
+            // subsequent occurrences of the record struct in btqPending list
+            // TODO need memory barriers for btPrintNum field access?
+            if( curr->btPrintNum == printCntr ) {
+                continue;
+            } else {
+                curr->btPrintNum = printCntr;
+            }
             // print out, this is on a normal thread, so async-signal-safety
             // is no longer a concern
             fprintf(stderr, "\nCaught SIGQUIT;"
-                " Backtrace of thread %d with %d frame(s):\n",
-                curr->tid, curr->nFrames);
+                    " Backtrace of thread %d with %d frame(s):\n",
+                    curr->tid, curr->nFrames);
+            if(curr->dwflerr) {
+                fprintf(stderr, " * with dwfl error (%d): %s\n",
+                        curr->dwflerr, dwfl_errmsg(curr->dwflerr));
+            }
             for(int i = curr->nFrames - 1; i >= 0; i--) {
                 Dwarf_Addr pc = curr->framePCs[i];
                 Location loc;
@@ -473,7 +496,7 @@ static int cbGetBacktraceFramePC(Dwfl_Frame *frame, void *arg) {
     }
     Dwarf_Addr pc;
     bool is_activation;
-    if (! dwfl_frame_pc(frame, &pc, &is_activation)) {
+    if (! dwfl_frame_pc(frame, &pc, &is_activation) ) {
         // failed to find PC
         btq->framePCs[ btq->nFrames ] = 0x0;
     } else {
@@ -510,7 +533,7 @@ void libdwDumpBacktrace(void) {
         return;
     }
 
-    // Note: 
+    // Note:
     //   It's not safe from a singal handler as in here, to allocate the
     //   struct. Otherwise we'll have to alloc and pass the ptr to
     //   pthread_setspecific() at thread initialization, then
@@ -527,11 +550,19 @@ void libdwDumpBacktrace(void) {
     btq->nFrames = 0;
     // TODO dwfl_getthread_frames() does allocation, need to find an
     //      async-signal-safe alternative
-    int ret = dwfl_getthread_frames(session->dwfl, dwfl_pid(session->dwfl),
-                                    cbGetBacktraceFramePC, btq);
-    if (ret == -1) {
-        LOG_TO_STDERR("Failed to get stack frames for backtrace.\n");
-        return;
+    btq->dwflerr = dwfl_getthread_frames(session->dwfl, dwfl_pid(session->dwfl),
+                                       cbGetBacktraceFramePC, btq);
+    // see: https://sourceware.org/git?p=elfutils.git;a=blob;f=src/stack.c;h=534aa93c433551896b67b65845ab4891fd175066;hb=HEAD#l717
+    switch (btq->dwflerr) {
+        case DWARF_CB_OK:
+        case DWARF_CB_ABORT:
+            btq->dwflerr = 0;
+            break;
+        case -1:
+            btq->dwflerr = dwfl_errno();
+            break;
+        default:
+            break;
     }
     RELEASE_FENCE(); // TODO this redundant given the following cas()?
     // schedule the captured bt to be printed out by the print thread
@@ -578,6 +609,7 @@ void initBacktracePrinting(void) {
              strerror(btp_init_err));
         return;
     }
+    // TODO use a portable way to make it low priority?
 }
 
 #else /* !USE_LIBDW */

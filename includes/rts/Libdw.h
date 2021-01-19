@@ -11,6 +11,8 @@
 // for FILE
 #include <stdio.h>
 
+#include <stdbool.h>
+
 // Chunk capacity
 // This is rather arbitrary
 #define BACKTRACE_CHUNK_SZ 256
