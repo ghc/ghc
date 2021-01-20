@@ -192,10 +192,6 @@ lintStgExpr app@(StgConApp con args _arg_tys) = do
 lintStgExpr (StgOpApp _ args _) =
     mapM_ lintStgArg args
 
-lintStgExpr lam@(StgLam _ _) = do
-    opts <- getStgPprOpts
-    addErrL (text "Unexpected StgLam" <+> pprStgExpr opts lam)
-
 lintStgExpr (StgLet _ binds body) = do
     binders <- lintStgBinds NotTopLevel binds
     addLoc (BodyOfLetRec binders) $

@@ -91,8 +91,6 @@ annTopBindingsDeps this_mod bs = zip bs (map top_bind bs)
       args bounds as
     expr bounds (StgOpApp _ as _) =
       args bounds as
-    expr _ lam@StgLam{} =
-      pprPanic "annTopBindingsDeps" (text "Found lambda:" $$ pprStgExpr panicStgPprOpts lam)
     expr bounds (StgCase scrut scrut_bndr _ as) =
       expr bounds scrut `unionVarSet`
         alts (extendVarSet bounds scrut_bndr) as
