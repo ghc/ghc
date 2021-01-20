@@ -4,7 +4,6 @@ test('T14794c', normal, compile, [''])
 test('T14794d', normal, compile, [''])
 test('T14794e', normal, compile, [''])
 test('T14794f', normal, compile, [''])
-test('T14794g', normal, compile, [''])
 
 test('T9178', [], multimod_compile, ['T9178', '-Wall'])
 
