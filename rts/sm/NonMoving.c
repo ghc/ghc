@@ -733,7 +733,7 @@ static void free_nonmoving_allocator(struct NonmovingAllocator *alloc)
 
 void nonmovingInit(void)
 {
-    if (! RtsFlags.GcFlags.useNonmoving) return;
+    if (! USE_NONMOVING) return;
 #if defined(THREADED_RTS)
     initMutex(&nonmoving_collection_mutex);
     initCondition(&concurrent_coll_finished);
@@ -748,7 +748,7 @@ void nonmovingInit(void)
 // Stop any nonmoving collection in preparation for RTS shutdown.
 void nonmovingStop(void)
 {
-    if (! RtsFlags.GcFlags.useNonmoving) return;
+    if (! USE_NONMOVING) return;
 #if defined(THREADED_RTS)
     if (mark_thread) {
         debugTrace(DEBUG_nonmoving_gc,
@@ -761,7 +761,7 @@ void nonmovingStop(void)
 
 void nonmovingExit(void)
 {
-    if (! RtsFlags.GcFlags.useNonmoving) return;
+    if (! USE_NONMOVING) return;
 
     // First make sure collector is stopped before we tear things down.
     nonmovingStop();
@@ -819,11 +819,6 @@ void nonmovingClearBitmap(struct NonmovingSegment *seg)
 /* Prepare the heap bitmaps and snapshot metadata for a mark */
 static void nonmovingPrepareMark(void)
 {
-    // See Note [Static objects under the nonmoving collector].
-    prev_static_flag = static_flag;
-    static_flag =
-        static_flag == STATIC_FLAG_A ? STATIC_FLAG_B : STATIC_FLAG_A;
-
     // Should have been cleared by the last sweep
     ASSERT(nonmovingHeap.sweep_list == NULL);
 
@@ -851,6 +846,15 @@ static void nonmovingPrepareMark(void)
     for (bdescr *bd = nonmoving_large_objects; bd; bd = bd->link) {
         bd->flags &= ~BF_MARKED;
     }
+
+    if (!RtsFlags.GcFlags.concurrentNonmoving)
+        return;
+
+    // See Note [Static objects under the nonmoving collector].
+    prev_static_flag = static_flag;
+    static_flag =
+        static_flag == STATIC_FLAG_A ? STATIC_FLAG_B : STATIC_FLAG_A;
+
 
     // Add newly promoted large objects and clear mark bits
     bdescr *next;
@@ -932,6 +936,17 @@ void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
         return;
     }
 #endif
+
+    if (!RtsFlags.GcFlags.concurrentNonmoving) {
+        nonmovingPrepareMark();
+        MarkQueue *mark_queue = stgMallocBytes(sizeof(MarkQueue), "mark queue");
+        initMarkQueue(mark_queue);
+        nonmovingMark(mark_queue);
+        freeMarkQueue(mark_queue);
+        stgFree(mark_queue);
+        nonmovingSweep();
+        return;
+    }
 
     trace(TRACE_nonmoving_gc, "Starting nonmoving GC preparation");
     resizeGenerations();

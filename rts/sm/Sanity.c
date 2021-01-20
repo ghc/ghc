@@ -922,7 +922,7 @@ static void checkGeneration (generation *gen,
     if (!after_major_gc) return;
 #endif
 
-    if (RtsFlags.GcFlags.useNonmoving && gen == oldest_gen) {
+    if (RtsFlags.GcFlags.concurrentNonmoving && gen == oldest_gen) {
         ASSERT(countNonMovingSegments(nonmovingHeap.free) == (W_) nonmovingHeap.n_free * NONMOVING_SEGMENT_BLOCKS);
         ASSERT(countBlocks(nonmoving_large_objects) == n_nonmoving_large_blocks);
         ASSERT(countBlocks(nonmoving_marked_large_objects) == n_nonmoving_marked_large_blocks);
@@ -1041,7 +1041,7 @@ findMemoryLeak (void)
         markBlocks(capabilities[i]->upd_rem_set.queue.blocks);
     }
 
-    if (RtsFlags.GcFlags.useNonmoving) {
+    if (RtsFlags.GcFlags.useNonmovingPinned || RtsFlags.GcFlags.concurrentNonmoving) {
         markBlocks(upd_rem_set_block_list);
         markBlocks(nonmoving_large_objects);
         markBlocks(nonmoving_marked_large_objects);
@@ -1120,7 +1120,7 @@ static W_
 genBlocks (generation *gen)
 {
     W_ ret = 0;
-    if (RtsFlags.GcFlags.useNonmoving && gen == oldest_gen) {
+    if (USE_NONMOVING && gen == oldest_gen) {
         // See Note [Live data accounting in nonmoving collector].
         ASSERT(countNonMovingHeap(&nonmovingHeap) == gen->n_blocks);
         ret += countAllocdBlocks(nonmoving_large_objects);
@@ -1130,12 +1130,11 @@ genBlocks (generation *gen)
         ret += countNonMovingHeap(&nonmovingHeap);
         if (current_mark_queue)
             ret += countBlocks(current_mark_queue->blocks);
-    } else {
-        ASSERT(countBlocks(gen->blocks) == gen->n_blocks);
-        ASSERT(countCompactBlocks(gen->compact_objects) == gen->n_compact_blocks);
-        ASSERT(countCompactBlocks(gen->compact_blocks_in_import) == gen->n_compact_blocks_in_import);
-        ret += gen->n_blocks;
     }
+    ASSERT(countBlocks(gen->blocks) == gen->n_blocks);
+    ASSERT(countCompactBlocks(gen->compact_objects) == gen->n_compact_blocks);
+    ASSERT(countCompactBlocks(gen->compact_blocks_in_import) == gen->n_compact_blocks_in_import);
+    ret += gen->n_blocks;
 
     ASSERT(countBlocks(gen->large_objects) == gen->n_large_blocks);
 
@@ -1195,7 +1194,7 @@ memInventory (bool show)
   // Can't easily do a memory inventory: We might race with the nonmoving
   // collector. In principle we could try to take nonmoving_collection_mutex
   // and do an inventory if we have it but we don't currently implement this.
-  if (RtsFlags.GcFlags.useNonmoving)
+  if (RtsFlags.GcFlags.concurrentNonmoving)
     return;
 #endif
 

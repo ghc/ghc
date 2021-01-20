@@ -147,7 +147,7 @@ alloc_for_copy (uint32_t size, uint32_t gen_no)
 {
     ASSERT(gen_no < RtsFlags.GcFlags.generations);
 
-    if (RTS_UNLIKELY(RtsFlags.GcFlags.useNonmoving)) {
+    if (RTS_UNLIKELY(RtsFlags.GcFlags.concurrentNonmoving)) {
         return alloc_for_copy_nonmoving(size, gen_no);
     }
 
@@ -437,7 +437,7 @@ evacuate_large(StgPtr p)
   new_gen = &generations[new_gen_no];
 
   __atomic_fetch_or(&bd->flags, BF_EVACUATED, __ATOMIC_ACQ_REL);
-  if (RTS_UNLIKELY(RtsFlags.GcFlags.useNonmoving && new_gen == oldest_gen)) {
+  if (RTS_UNLIKELY(RtsFlags.GcFlags.concurrentNonmoving && new_gen == oldest_gen)) {
       __atomic_fetch_or(&bd->flags, BF_NONMOVING, __ATOMIC_ACQ_REL);
 
       // See Note [Non-moving GC: Marking evacuated objects].
@@ -479,7 +479,7 @@ evacuate_large(StgPtr p)
 STATIC_INLINE void
 evacuate_static_object (StgClosure **link_field, StgClosure *q)
 {
-    if (RTS_UNLIKELY(RtsFlags.GcFlags.useNonmoving)) {
+    if (RTS_UNLIKELY(RtsFlags.GcFlags.concurrentNonmoving)) {
         // See Note [Static objects under the nonmoving collector] in Storage.c.
         if (major_gc && !deadlock_detect_gc)
             markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, q);
@@ -596,7 +596,7 @@ evacuate_compact (StgPtr p)
     // for that - the only code touching the generation of the block is
     // in the GC, and that should never see blocks other than the first)
     bd->flags |= BF_EVACUATED;
-    if (RTS_UNLIKELY(RtsFlags.GcFlags.useNonmoving && new_gen == oldest_gen)) {
+    if (RTS_UNLIKELY(RtsFlags.GcFlags.concurrentNonmoving && new_gen == oldest_gen)) {
       __atomic_fetch_or(&bd->flags, BF_NONMOVING, __ATOMIC_RELAXED);
 
       // See Note [Non-moving GC: Marking evacuated objects].
