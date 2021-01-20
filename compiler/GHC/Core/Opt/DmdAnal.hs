@@ -56,8 +56,8 @@ import GHC.Types.Unique.Set
 -}
 
 -- | Options for the demand analysis
-data DmdAnalOpts = DmdAnalOpts
-   { dmd_strict_dicts :: !Bool -- ^ Use strict dictionaries
+newtype DmdAnalOpts = DmdAnalOpts
+   { dmd_strict_dicts :: Bool -- ^ Use strict dictionaries
    }
 
 -- | Outputs a new copy of the Core program in which binders have been annotated
