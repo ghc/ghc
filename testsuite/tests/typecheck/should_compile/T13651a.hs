@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE TypeFamilies, TypeFamilyDependencies #-}
 module T13651 where
 

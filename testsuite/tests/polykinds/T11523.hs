@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# language KindSignatures #-}
 {-# language PolyKinds #-}
 {-# language DataKinds #-}

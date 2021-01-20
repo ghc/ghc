@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 module TcFail209a where
 
 g :: ((Show a, Num a), Eq a) => a -> a

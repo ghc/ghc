@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE TypeFamilies, PolyKinds, DataKinds, TypeOperators #-}
 module T7939 where
 import Data.Kind (Type)

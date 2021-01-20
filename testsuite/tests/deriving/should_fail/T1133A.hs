@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 
 module T1133A where
 

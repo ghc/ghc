@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 module T11663 where
 
 -- All of these should fail as type signatures are not allowed

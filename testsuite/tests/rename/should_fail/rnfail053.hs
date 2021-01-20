@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 -- Test #2114 (error message)
 
 module ShouldFail where

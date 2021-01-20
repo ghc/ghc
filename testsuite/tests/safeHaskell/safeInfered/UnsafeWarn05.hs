@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE Unsafe #-}
 {-# OPTIONS_GHC -fwarn-trustworthy-safe #-}
 {-# OPTIONS_GHC -fwarn-safe #-}

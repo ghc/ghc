@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 module ShouldFail where
 
 -- Without any extensions enabled both of these should fail

@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# Language ViewPatterns, TypeOperators, KindSignatures, PolyKinds,
              StandaloneDeriving, GADTs, RebindableSyntax,
              RankNTypes, LambdaCase, PatternSynonyms, TypeApplications #-}

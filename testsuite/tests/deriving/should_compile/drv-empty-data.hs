@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE DeriveTraversable, DeriveGeneric, EmptyCase,
     DeriveDataTypeable, StandaloneDeriving, DeriveLift #-}

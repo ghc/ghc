@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE TypeFamilies, DataKinds, PolyKinds, ExplicitForAll, GADTs,
              UndecidableInstances, RankNTypes, ScopedTypeVariables #-}
 

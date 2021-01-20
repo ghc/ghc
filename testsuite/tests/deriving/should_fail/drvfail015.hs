@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# OPTIONS_GHC -XStandaloneDeriving #-}
 
 module ShouldFail where

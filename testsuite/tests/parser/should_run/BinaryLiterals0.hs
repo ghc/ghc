@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 -- | Anti-Test for GHC 7.10+'s @BinaryLiterals@ extensions (see GHC #9224)
 --
 -- NB: This code won't compile with -XBinaryLiterals enabled

@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE TemplateHaskell, TypeFamilies #-}
 
 module Bug where

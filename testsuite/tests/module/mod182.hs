@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 
 -- If 'ImportQualifiedPost' is not enabled 'qualified' can not appear in
 -- postpositive position.

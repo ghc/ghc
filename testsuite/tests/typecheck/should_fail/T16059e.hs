@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 module T16059e where
 
 import T16059b

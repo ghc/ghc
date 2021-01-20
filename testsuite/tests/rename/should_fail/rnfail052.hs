@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 -- Error messages when you use 'forall' *without* the RankN flags
 -- Test cases similar to #2114
 

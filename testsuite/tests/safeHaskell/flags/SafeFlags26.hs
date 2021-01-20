@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# OPTIONS_GHC -fwarn-safe -Werror #-}
 -- | Basic test to see if Safe warning flags compile
 -- Warn if module is inferred safe

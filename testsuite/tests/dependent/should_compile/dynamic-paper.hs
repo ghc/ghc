@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {- This is the code extracted from "A reflection on types", by Simon PJ,
 Stephanie Weirich, Richard Eisenberg, and Dimitrios Vytiniotis, 2016. -}
 

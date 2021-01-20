@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE Safe #-}
 -- | Basic test to see if no safe infer flag works
 module UnsafeInfered11 where

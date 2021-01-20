@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE TypeFamilies, RankNTypes #-}
 
 -- This test made the type checker produce an

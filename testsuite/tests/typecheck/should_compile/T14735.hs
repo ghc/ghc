@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# Language QuantifiedConstraints #-}
 {-# Language StandaloneDeriving #-}
 {-# Language DataKinds #-}

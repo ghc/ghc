@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 -- TupleSections not enabled
 {-# LANGUAGE UnboxedTuples #-}
 

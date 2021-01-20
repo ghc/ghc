@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 -- No ScopedTypeVariables, so (v::a) means (v:: forall a.a)
 
 module ShouldCompile where

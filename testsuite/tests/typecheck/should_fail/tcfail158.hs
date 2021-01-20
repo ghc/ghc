@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE ExplicitForAll #-}
 
 -- This one actually crashed in 6.4.1

@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE GADTs, TypeOperators, PolyKinds, DataKinds,
              TypeFamilyDependencies, RankNTypes, LambdaCase, EmptyCase,
              UndecidableInstances #-}

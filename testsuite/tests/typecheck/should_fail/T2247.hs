@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE FunctionalDependencies, MultiParamTypeClasses, UndecidableInstances, FlexibleInstances #-}
 
 module T2247 where

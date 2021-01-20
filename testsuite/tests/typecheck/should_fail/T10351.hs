@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 module T10351 where
 
 class C a where

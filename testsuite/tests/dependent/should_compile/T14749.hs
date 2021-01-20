@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE GADTs, TypeOperators, DataKinds, TypeFamilies, PolyKinds, TypeFamilyDependencies #-}
 
 module T14749 where

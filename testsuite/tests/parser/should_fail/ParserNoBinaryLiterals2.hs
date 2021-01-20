@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE MagicHash #-}
 
 module ParserNoBinaryLiterals2 where

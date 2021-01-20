@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 import Control.Monad.ST
 import Data.STRef
 

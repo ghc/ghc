@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE CPP, MagicHash, BlockArguments, UnboxedTuples #-}
 {-# LANGUAGE CPP, MagicHash, BlockArguments, ScopedTypeVariables #-}
 

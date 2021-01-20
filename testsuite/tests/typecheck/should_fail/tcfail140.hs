@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 -- GHC 6.4 gave pretty horrible error messages
 -- for some of these examples
 -- c.f. SourceForge [ ghc-Bugs-1231273 ] confusing error

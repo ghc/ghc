@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 module T14172 where
 
 import Data.Functor.Compose

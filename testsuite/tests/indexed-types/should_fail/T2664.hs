@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE EmptyDataDecls, TypeFamilies, TypeOperators, ScopedTypeVariables #-}
 module Overflow where
 import Control.Concurrent

@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 module T8743 where
 
 -- Without the following import, it does not fail

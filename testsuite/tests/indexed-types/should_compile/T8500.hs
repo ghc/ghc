@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
  {-# LANGUAGE TypeFamilies #-}
 
 module T8500 where

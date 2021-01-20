@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE FunctionalDependencies, MultiParamTypeClasses #-}
 module T5300 where
 

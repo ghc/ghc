@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 -- Without -XScopedTypeVariables, this should fail
 
 module ShouldFail where

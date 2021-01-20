@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 -- {-# LANGUAGE NoBangPatterns #-}
 
 module T17162 where

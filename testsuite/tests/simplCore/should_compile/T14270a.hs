@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE TypeApplications, ScopedTypeVariables, GADTs, RankNTypes,
              PolyKinds, KindSignatures #-}
 {-# OPTIONS_GHC -O2 #-} -- We are provoking a bug in GHC.Core.Opt.SpecConstr

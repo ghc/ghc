@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 module ShouldFail where

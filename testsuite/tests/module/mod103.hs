@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 -- !!! Layout rule extension (restricting empty do's).
 module Foo where
 

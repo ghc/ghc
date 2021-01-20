@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE FlexibleInstances, TypeFamilies #-}
 import Data.Kind (Type)
 

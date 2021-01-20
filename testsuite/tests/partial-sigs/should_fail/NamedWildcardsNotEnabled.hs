@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 module NamedWildcardsNotEnabled where
 
 foo :: _a -> _b

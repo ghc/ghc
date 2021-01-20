@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# OPTIONS_GHC -fwarn-name-shadowing -fwarn-unused-binds #-}
 
 -- #1972
