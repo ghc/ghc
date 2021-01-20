@@ -425,7 +425,7 @@ INFO_TABLE_RET( stg_ret_t, RET_BCO )
     if((tuple_regs_L & 1) != 0) { L1 = L_[Sp]; Sp = Sp + 8; }
 
     /* Sp points to the topmost argument now */
-    jump Sp(tuple_stack) [*]; // NB. all registers live!
+    jump %ENTRY_CODE(Sp(tuple_stack)) [*]; // NB. all registers live!
 }
 
 
