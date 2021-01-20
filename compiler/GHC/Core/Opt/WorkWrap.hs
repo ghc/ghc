@@ -482,7 +482,7 @@ tryWW dflags fam_envs is_rec fn_id rhs
         -- See Note [Don't w/w inline small non-loop-breaker things]
 
   | is_fun && is_eta_exp
-  = splitFun dflags fam_envs new_fn_id fn_info wrap_arg_dmds div wrap_body_sd cpr rhs
+  = splitFun dflags fam_envs new_fn_id fn_info wrap_arg_dmds div cat rhs
 
   | isNonRec is_rec, is_thunk                        -- See Note [Thunk splitting]
   = splitThunk dflags fam_envs is_rec new_fn_id rhs
@@ -498,15 +498,9 @@ tryWW dflags fam_envs is_rec fn_id rhs
     cpr_ty       = getCprSig (cprInfo fn_info)
     -- Arity of the CPR sig should match idArity when it's not a join point.
     -- See Note [Arity trimming for CPR signatures] in GHC.Core.Opt.CprAnal
-    cpr          = ASSERT2( isJoinId fn_id || cpr_ty == topCprType || ct_arty cpr_ty == arityInfo fn_info
+    cat          = ASSERT2( isJoinId fn_id || cpr_ty == topCprType || ct_arty cpr_ty == arityInfo fn_info
                           , ppr fn_id <> colon <+> text "ct_arty:" <+> ppr (ct_arty cpr_ty) <+> text "arityInfo:" <+> ppr (arityInfo fn_info))
-                   ct_cpr cpr_ty
-
-    -- Figure out the *least sub-demand* put on the function body by all call sites.
-    -- Sub-demand, because we can assume at least seq demand.
-    -- splitFun uses this to improve CPR info.
-    (_card1 :* fn_sd)      = demandInfo fn_info -- how the function was called
-    (_card2, wrap_body_sd) = peelManyCalls (length wrap_arg_dmds) fn_sd
+                   ct_cat cpr_ty
 
     new_fn_id = zapIdUsedOnceInfo (zapIdUsageEnvInfo fn_id)
         -- See Note [Zapping DmdEnv after Demand Analyzer] and
@@ -590,12 +584,12 @@ See https://gitlab.haskell.org/ghc/ghc/merge_requests/312#note_192064.
 
 
 ---------------------
-splitFun :: DynFlags -> FamInstEnvs -> Id -> IdInfo -> [Demand] -> Divergence -> SubDemand -> Cpr -> CoreExpr
+splitFun :: DynFlags -> FamInstEnvs -> Id -> IdInfo -> [Demand] -> Divergence -> CAT -> CoreExpr
          -> UniqSM [(Id, CoreExpr)]
-splitFun dflags fam_envs fn_id fn_info wrap_arg_dmds div wrap_body_sd cpr rhs
-  = WARN( not (wrap_arg_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_arg_dmds $$ ppr cpr) ) do
+splitFun dflags fam_envs fn_id fn_info wrap_arg_dmds div cat rhs
+  = WARN( not (wrap_arg_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_arg_dmds $$ ppr cat) ) do
     -- The arity should match the signature
-    stuff <- mkWwBodies (initWwOpts dflags fam_envs) rhs_fvs fn_id wrap_arg_dmds body_cpr
+    stuff <- mkWwBodies (initWwOpts dflags fam_envs) rhs_fvs fn_id wrap_arg_dmds body_cat
     case stuff of
       Just (work_demands, join_arity, wrap_fn, work_fn) -> do
         work_uniq <- getUniqueM
@@ -676,21 +670,17 @@ splitFun dflags fam_envs fn_id fn_info wrap_arg_dmds div wrap_body_sd cpr rhs
                     -- The arity is set by the simplifier using exprEtaExpandArity
                     -- So it may be more than the number of top-level-visible lambdas
 
-    -- body_cpr is the CPR we w/w the body for. Note that we kill it for join points,
+    -- body_cat is the CPR we w/w the body for. Note that we kill it for join points,
     -- see Note [Don't w/w join points for CPR].
-    -- Also force the body CPR (and Termination information!) according to how
-    -- the function is used. The sub-demand on the body is in wrap_body_sd.
-    body_cpr
-      | isJoinId fn_id = topCpr
-      | otherwise      = snd $ forceCpr wrap_body_sd cpr
+    body_cat
+      | isJoinId fn_id = topCAT
+      | otherwise      = cat
     -- Even if we don't w/w join points for CPR, we might still do so for
     -- strictness. In which case a join point worker keeps its original CPR
     -- property; see Note [Don't w/w join points for CPR]. Otherwise, the worker
     -- doesn't have the CPR property anymore.
-    -- No forcing here, because work_cpr_sig concerns *the signature*, not the
-    -- CPR of the body expression.
     work_cpr_sig arity
-      | isJoinId fn_id = mkCprSig arity cpr
+      | isJoinId fn_id = mkCprSig arity cat
       | otherwise      = topCprSig
 
 mkStrWrapperInlinePrag :: InlinePragma -> InlinePragma

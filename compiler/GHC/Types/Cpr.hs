@@ -11,14 +11,11 @@
 -- and "GHC.Core.Opt.WorkWrap.Utils" are its primary customers via 'GHC.Types.Id.idCprInfo'.
 module GHC.Types.Cpr (
     TerminationFlag (Terminates),
-    Cpr, topCpr, conCpr, whnfTermCpr, divergeCpr, lubCpr, asConCpr,
+    CAT, topCAT, whnfTermCAT, divergeCAT, lubCAT, pruneDeepCAT, asConCAT,
     CprType (..), topCprType, whnfTermCprType, lubCprType, lubCprTypes,
-    pruneDeepCpr, splitConCprTy, applyCprTy, abstractCprTy,
-    abstractCprTyNTimes, ensureCprTyArity, trimCprTy,
-    forceCprTy, forceCpr, bothCprType,
+    splitConCprTy, applyCprTy, abstractCprTy, trimCprTy, forceCprTy, bothCprType,
     cprTransformDataConWorkSig, cprTransformSig, argCprTypesFromStrictSig,
-    CprSig (..), mkCprSig, mkCprSigForArity,
-    topCprSig, seqCprSig
+    CprSig (..), topCprSig, mkCprSig, mkCprSigForFunRHS, seqCprSig
   ) where
 
 #include "HsVersions.h"
@@ -35,6 +32,8 @@ import GHC.Utils.Binary
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+
+import Data.Coerce
 import qualified Data.Semigroup as Semigroup
 import Control.Monad.Trans.Writer.CPS
 import Control.Monad (zipWithM, zipWithM_)
@@ -69,6 +68,31 @@ pruneKnownShape :: (Int -> r -> r) -> Int -> KnownShape r -> KnownShape r
 pruneKnownShape _       0     _              = TopSh
 pruneKnownShape prune_r depth (ConSh t args) = ConSh t (map (prune_r (depth - 1)) args)
 pruneKnownShape _       _     sh             = sh
+
+splitConSh :: r -> r -> ConTag -> Int -> KnownShape r -> [r]
+splitConSh bot _top _   arty BotSh = replicate arty bot
+splitConSh _   _    tag arty (ConSh t fields)
+  | tag == t
+  , length fields == arty -- See Note [CPR types and unsafeCoerce]
+  = fields
+splitConSh _   top  _   arty  _    = replicate arty top
+
+{- Note [CPR types and unsafeCoerce]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Unsafe coercions may lead to looking into a CPR type analysed for a different
+type than the type of the expression a case scrutinises. Example (like T16893):
+
+  data T = T Int
+  data U = U Int Int
+  ... (case unsafeCoerce (U 1 2 :: U) of
+        T i -> ...) ...
+
+Although we can only derive bogus in these situations, we shouldn't try to
+unpack the 2 field CPR type from the scrutinee into a 1 field type matching
+the pattern. That led to a deliberate panic when calling @zipEqual@ in
+'CprAnal.cprAnalAlt'. Nothing bad was happening, just a precautionary
+panic on T16893.
+-}
 
 ----------------
 -- * Termination
@@ -133,6 +157,9 @@ pruneDeepTerm :: Int -> Termination -> Termination
 pruneDeepTerm depth (Term tf sh) =
   Term tf (pruneKnownShape pruneDeepTerm depth sh)
 
+splitConTerm :: ConTag -> Int -> KnownShape Termination -> [Termination]
+splitConTerm = splitConSh botTerm topTerm
+
 seqTerm :: Termination -> ()
 seqTerm (Term _ l) = seqKnownShape seqTerm l
 
@@ -159,40 +186,51 @@ seqTerm (Term _ l) = seqKnownShape seqTerm l
 --------
 -- * Cpr
 
-data Cpr
-  = Cpr_ !TerminationFlag !(KnownShape Cpr)
-  | NoMoreCpr_ !Termination
+newtype Cpr
+  = Cpr (KnownShape Cpr)
   deriving Eq
 
-pattern Cpr :: TerminationFlag -> KnownShape Cpr -> Cpr
-pattern Cpr tf sh <- (Cpr_ tf sh)
-  where
-    Cpr Terminates   BotSh = botCpr
-    Cpr Terminates   TopSh = whnfTermCpr
-    Cpr MightDiverge BotSh = divergeCpr
-    Cpr MightDiverge TopSh = topCpr
-    Cpr tf           sh    = Cpr_ tf sh
-
-pattern NoMoreCpr :: Termination -> Cpr
-pattern NoMoreCpr t <- (NoMoreCpr_ t)
-  where
-    NoMoreCpr t
-      | t == topTerm  = topCpr
-      | t == whnfTerm = whnfTermCpr
-      -- The following two would change CPR information:
-      --- | t == botTerm  = botCpr
-      --- | t == divergeTerm = divergeCpr
-      | otherwise     = NoMoreCpr_ t
-{-# COMPLETE Cpr, NoMoreCpr #-}
-
 botCpr :: Cpr
-botCpr = Cpr_ Terminates BotSh
+botCpr = Cpr BotSh
 
 topCpr :: Cpr
-topCpr = Cpr_ MightDiverge TopSh
+topCpr = Cpr TopSh
 
-whnfTermCpr :: Cpr
-whnfTermCpr = Cpr_ Terminates TopSh
+lubCpr :: Cpr -> Cpr -> Cpr
+lubCpr (Cpr sh1) (Cpr sh2) = Cpr (lubKnownShape lubCpr sh1 sh2)
+
+pruneDeepCpr :: Int -> Cpr -> Cpr
+pruneDeepCpr depth = coerce (pruneKnownShape pruneDeepCpr depth)
+
+splitConCpr :: ConTag -> Int -> KnownShape Cpr -> [Cpr]
+splitConCpr = splitConSh botCpr topCpr
+
+seqCpr :: Cpr -> ()
+seqCpr = coerce (seqKnownShape seqCpr)
+
+--------
+-- * CAT
+
+-- | Joint lattice of 'Termination' and 'Cpr'.
+-- (C)pr (A)nd (T)ermination, hence \"CAT\".
+data CAT = CAT !Termination !Cpr
+  deriving Eq
+
+unzipCAT :: [CAT] -> ([Termination], [Cpr])
+unzipCAT = unzip . map (\(CAT t c) -> (t, c))
+
+-- | Like 'Control.Arrow.(***)' for 'CAT'.
+liftCAT :: (Termination -> Termination) -> (Cpr -> Cpr) -> CAT -> CAT
+liftCAT ft fc (CAT t c) = CAT (ft t) (fc c)
+
+topCAT :: CAT
+topCAT = CAT topTerm topCpr
+
+botCAT :: CAT
+botCAT = CAT botTerm botCpr
+
+whnfTermCAT :: CAT
+whnfTermCAT = CAT whnfTerm topCpr
 
 -- | Used as
 --
@@ -203,44 +241,51 @@ whnfTermCpr = Cpr_ Terminates TopSh
 -- are optimistic about all CPR and nested termination information. I.e., we
 -- assume that returned tuple components terminate rapidly and construct a
 -- product.
-divergeCpr :: Cpr
-divergeCpr = Cpr_ MightDiverge BotSh
+divergeCAT :: CAT
+divergeCAT = CAT divergeTerm botCpr
 
-conCpr :: ConTag -> [Cpr] -> Cpr
-conCpr t fs = Cpr Terminates (ConSh t fs)
+conCAT :: ConTag -> [CAT] -> CAT
+conCAT t fs = CAT (Term Terminates (ConSh t terms)) (Cpr (ConSh t cprs))
+  where
+    (terms, cprs) = unzipCAT fs
 
--- | Forget encoded CPR info, but keep termination info.
-forgetCpr :: Cpr -> Termination
-forgetCpr (NoMoreCpr t)         = t
-forgetCpr (Cpr tf (ConSh t fs)) = Term tf (ConSh t (map forgetCpr fs))
-forgetCpr (Cpr tf TopSh)        = Term tf TopSh
-forgetCpr (Cpr tf BotSh)        = Term tf BotSh
+asConCAT :: CAT -> Maybe (ConTag, [CAT])
+-- This is the key function consulted by WW
+-- Note that it completely ignores the termination flag. CPR is assumed to be
+-- correct. TODO Write Note about it
+asConCAT (CAT (Term _ tsh) (Cpr (ConSh t cprs)))
+  | let terms = splitConTerm t (length cprs) tsh
+  , let !cats = zipWith CAT terms cprs
+  = Just (t, cats)
+asConCAT _
+  = Nothing
 
-lubCpr :: Cpr -> Cpr -> Cpr
-lubCpr (Cpr tf1 sh1) (Cpr tf2 sh2)
-  = Cpr (lubTermFlag tf1 tf2)
-        (lubKnownShape lubCpr sh1 sh2)
-lubCpr cpr1            cpr2
-  = NoMoreCpr (lubTerm (forgetCpr cpr1) (forgetCpr cpr2))
+lubCAT :: CAT -> CAT -> CAT
+lubCAT (CAT t1 c1) (CAT t2 c2) = CAT (lubTerm t1 t2) (lubCpr c1 c2)
+
+-- | Trims deep CPR information as soon as there is a single 'MightDiverge' in
+-- the way.
+takeCprWhileTerminates :: Termination -> Cpr -> Cpr
+-- See Note [Trimming CPR signatures according to Termination]
+takeCprWhileTerminates term cpr
+  | term == botTerm || cpr == botCpr = cpr -- Don't trim away bottom, we still
+                                           -- want to unbox e.g. error thunks
+  | Term Terminates (ConSh t terms) <- term
+  , Cpr csh <- cpr
+  , let cprs = splitConCpr t (length terms) csh
+  = Cpr (ConSh t (zipWith takeCprWhileTerminates terms cprs))
+  | otherwise
+  = topCpr
 
 -- | Trims CPR information (but keeps termination information) for e.g. thunks
-trimCpr :: Cpr -> Cpr
-trimCpr cpr@(Cpr _ BotSh) = cpr -- Don't trim away bottom, we still want to
-                                -- unbox e.g. error thunks
-trimCpr cpr               = NoMoreCpr (forgetCpr cpr)
+trimCpr :: CAT -> CAT
+trimCpr (CAT term cpr) = CAT term (takeCprWhileTerminates topTerm cpr)
 
-pruneDeepCpr :: Int -> Cpr -> Cpr
-pruneDeepCpr depth (Cpr tf sh)   = Cpr tf (pruneKnownShape pruneDeepCpr depth sh)
-pruneDeepCpr depth (NoMoreCpr t) = NoMoreCpr (pruneDeepTerm depth t)
+pruneDeepCAT :: Int -> CAT -> CAT
+pruneDeepCAT depth = liftCAT (pruneDeepTerm depth) (pruneDeepCpr depth)
 
-asConCpr :: Cpr -> Maybe (ConTag, [Cpr])
--- This is the key function consulted by WW
-asConCpr (Cpr Terminates (ConSh t fields)) = Just (t, fields)
-asConCpr _                                 = Nothing
-
-seqCpr :: Cpr -> ()
-seqCpr (Cpr _ l)     = seqKnownShape seqCpr l
-seqCpr (NoMoreCpr t) = seqTerm t
+seqCAT :: CAT -> ()
+seqCAT (CAT t c) = seqTerm t `seq` seqCpr c
 
 ------------
 -- * CprType
@@ -250,116 +295,91 @@ data CprType
   = CprType
   { ct_arty :: !Arity
   -- ^ Number of value arguments the denoted expression eats before returning
-  -- the 'ct_cpr'
-  , ct_cpr  :: !Cpr
-  -- ^ 'Cpr' eventually unleashed when applied to 'ct_arty' arguments
+  -- the 'ct_cat'
+  , ct_cat  :: !CAT
+  -- ^ 'CAT' eventually unleashed when applied to 'ct_arty' arguments
   }
 
 instance Eq CprType where
-  a == b =  ct_cpr a  == ct_cpr b
+  a == b =  ct_cat a  == ct_cat b
          && (ct_arty a == ct_arty b || isTopCprType a)
 
 isTopCprType :: CprType -> Bool
-isTopCprType (CprType _ cpr) = cpr == topCpr
+isTopCprType (CprType _ cpr) = cpr == topCAT
 
 topCprType :: CprType
-topCprType = CprType 0 topCpr
+topCprType = CprType 0 topCAT
 
 botCprType :: CprType
-botCprType = CprType 0 botCpr
+botCprType = CprType 0 botCAT
 
 whnfTermCprType :: CprType
-whnfTermCprType = CprType 0 whnfTermCpr
+whnfTermCprType = CprType 0 whnfTermCAT
 
 lubCprType :: CprType -> CprType -> CprType
-lubCprType ty1@(CprType n1 cpr1) ty2@(CprType n2 cpr2)
-  | ct_cpr ty1 == botCpr && n1 <= n2 = ty2
-  | ct_cpr ty2 == botCpr && n2 <= n1 = ty1
+lubCprType ty1@(CprType n1 cat1) ty2@(CprType n2 cat2)
+  | ct_cat ty1 == botCAT && n1 <= n2 = ty2
+  | ct_cat ty2 == botCAT && n2 <= n1 = ty1
   -- There might be non-bottom CPR types with mismatching arities.
   -- Consider test DmdAnalGADTs. We want to return topCpr in these cases.
   -- Returning topCprType is a safe default.
   | n1 == n2
-  = CprType n1 (lubCpr cpr1 cpr2)
+  = CprType n1 (lubCAT cat1 cat2)
   | otherwise
   = topCprType
 
 lubCprTypes :: [CprType] -> CprType
 lubCprTypes = foldl' lubCprType botCprType
 
-extractArgCprAndTermination :: [CprType] -> [Cpr]
+extractArgCprAndTermination :: [CprType] -> [CAT]
 extractArgCprAndTermination = map go
   where
-    go (CprType 0 cpr) = cpr
+    go (CprType 0 cat) = cat
     -- we didn't give it enough arguments, so terminates rapidly
-    go _               = whnfTermCpr
+    go _               = whnfTermCAT
 
 conCprType :: DataCon -> [CprType] -> CprType
-conCprType dc args = CprType 0 (conCpr con_tag cprs)
+conCprType dc args = CprType 0 (conCAT con_tag cats)
   where
     con_tag = dataConTag dc
-    cprs = addDataConTermination dc $ extractArgCprAndTermination args
+    cats = addDataConTermination dc $ extractArgCprAndTermination args
 
-addDataConTermination :: DataCon -> [Cpr] -> [Cpr]
+addDataConTermination :: DataCon -> [CAT] -> [CAT]
 -- See Note [No unboxed tuple for single, unlifted transit var]
-addDataConTermination con cprs
-  = zipWithEqual "addDataConTermination" add cprs strs
+addDataConTermination con cats
+  = zipWithEqual "addDataConTermination" add cats strs
   where
     strs = dataConRepStrictness con
-    add cpr str | isMarkedStrict str = snd $ forceCpr topSubDmd cpr -- like seq
-                | otherwise          = cpr
+    add cat str | isMarkedStrict str = snd $ forceCAT topSubDmd cat -- like seq
+                | otherwise          = cat
 
-splitConCprTy :: DataCon -> CprType -> Maybe [Cpr]
-splitConCprTy dc (CprType 0 (Cpr _ l))
-  | BotSh <- l
-  = Just (replicate (dataConRepArity dc) botCpr)
-  | (ConSh t fields) <- l
-  , dataConTag dc == t
-  , length fields == dataConRepArity dc -- See Note [CPR types and unsafeCoerce]
-  = Just fields
-splitConCprTy _  _
-  = Nothing
+splitConCprTy :: DataCon -> CprType -> Maybe [CAT]
+splitConCprTy dc (CprType 0 (CAT (Term Terminates tsh) (Cpr csh)))
+  | let tag = dataConTag dc
+  , let arty = dataConRepArity dc
+  = Just $! zipWith CAT (splitConTerm tag arty tsh) (splitConCpr tag arty csh)
+splitConCprTy _  _                                                =
+  Nothing
 
 applyCprTy :: CprType -> CprType
 applyCprTy = applyCprTyNTimes 1
 
 applyCprTyNTimes :: Arity -> CprType -> CprType
-applyCprTyNTimes n (CprType m cpr)
-  | m >= n        = CprType (m-n) cpr
-  | cpr == botCpr = botCprType
+applyCprTyNTimes n (CprType m cat)
+  | m >= n        = CprType (m-n) cat
+  | cat == botCAT = botCprType
   | otherwise     = topCprType
 
 abstractCprTy :: CprType -> CprType
 abstractCprTy = abstractCprTyNTimes 1
 
 abstractCprTyNTimes :: Arity -> CprType -> CprType
-abstractCprTyNTimes n ty@(CprType m cpr)
+abstractCprTyNTimes n ty@(CprType m cat)
   | isTopCprType ty = topCprType
-  | otherwise       = CprType (n+m) cpr
-
-ensureCprTyArity :: Arity -> CprType -> CprType
-ensureCprTyArity n ty@(CprType m _)
-  | m == n    = ty
-  | otherwise = topCprType
+  | otherwise       = CprType (n+m) cat
 
 trimCprTy :: CprType -> CprType
-trimCprTy (CprType arty cpr) = CprType arty (trimCpr cpr)
-
-{- Note [CPR types and unsafeCoerce]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Unsafe coercions may lead to looking into a CPR type analysed for a different
-type than the type of the expression a case scrutinises. Example (like T16893):
-
-  data T = T Int
-  data U = U Int Int
-  ... (case unsafeCoerce (U 1 2 :: U) of
-        T i -> ...) ...
-
-Although we can only derive bogus in these situations, we shouldn't try to
-unpack the 2 field CPR type from the scrutinee into a 1 field type matching
-the pattern. That led to a deliberate panic when calling @zipEqual@ in
-'CprAnal.extendEnvForDataAlt'. Nothing bad was happening, just a precautionary
-panic on T16893.
--}
+trimCprTy (CprType arty cat) = CprType arty (trimCpr cat)
 
 ----------------------------------------
 -- * Forcing 'Termination' with 'Demand'
@@ -395,32 +415,21 @@ idIfLazy k (n :* sd) cpr
   | isStrict n = k sd cpr
   | otherwise  = return cpr
 
+forceTerm :: SubDemand -> Termination -> (TerminationFlag, Termination)
+forceTerm sd term = runTerminationM (forceTermM sd term)
+
 forceCprTyM :: SubDemand -> CprType -> TerminationM CprType
 forceCprTyM sd ty
   | let arity = ct_arty ty
   , (m, body_sd) <- peelManyCalls arity sd
   , isStrict m
-  , CprType body_arty body_cpr  <- applyCprTyNTimes arity ty
-  = abstractCprTyNTimes arity . CprType body_arty <$> forceCprM body_sd body_cpr
+  , CprType body_arty body_cat  <- applyCprTyNTimes arity ty
+  = abstractCprTyNTimes arity . CprType body_arty <$> forceCATM body_sd body_cat
   | otherwise
   = return ty
 
-forceCprM :: SubDemand -> Cpr -> TerminationM Cpr
-forceCprM sd (NoMoreCpr t)    = NoMoreCpr <$> forceTermM sd t
-forceCprM sd (Cpr tf sh) = do
-  -- 1. discharge head strictness by noting the term flag
-  noteTermFlag tf
-  -- 2. discharge *nested* strictness on available nested info
-  sh' <- case (sh, sd) of
-    (BotSh, _) -> return BotSh
-    (ConSh t fields, viewProd (length fields) -> Just ds) | t == fIRST_TAG -> do
-      fields' <- zipWithM (idIfLazy forceCprM) ds fields
-      return (ConSh fIRST_TAG fields')
-    (TopSh, Prod ds) -> do
-      fields' <- mapM (flip (idIfLazy forceCprM) topCpr) ds
-      return (ConSh fIRST_TAG fields')
-    _ -> return sh -- just don't force anything
-  return (Cpr Terminates sh')
+forceCATM :: SubDemand -> CAT -> TerminationM CAT
+forceCATM sd (CAT term cpr) = flip CAT cpr <$> forceTermM sd term
 
 forceTermM :: SubDemand -> Termination -> TerminationM Termination
 forceTermM sd (Term tf sh) = do
@@ -438,8 +447,8 @@ forceTermM sd (Term tf sh) = do
     _ -> return sh -- just don't force anything
   return (Term Terminates sh')
 
-forceCpr :: SubDemand -> Cpr -> (TerminationFlag, Cpr)
-forceCpr sd cpr = runTerminationM (forceCprM sd cpr)
+forceCAT :: SubDemand -> CAT -> (TerminationFlag, CAT)
+forceCAT sd cpr = runTerminationM (forceCATM sd cpr)
 
 -- | 'lubTerm's the given outer @TerminationFlag@ on the @CprType@s 'ct_term'.
 bothCprType :: CprType -> TerminationFlag -> CprType
@@ -447,14 +456,13 @@ bothCprType :: CprType -> TerminationFlag -> CprType
 -- If tf = MightDiverge, it will only set the WHNF layer to MightDiverge,
 -- leaving nested termination info (e.g. on product components) intact.
 bothCprType ct Terminates   = ct
-bothCprType ct MightDiverge = ct { ct_cpr = shallowDivCpr (ct_cpr ct) }
+bothCprType ct MightDiverge = ct { ct_cat = liftCAT shallowDivTerm id (ct_cat ct) }
 
-shallowDivCpr :: Cpr -> Cpr
-shallowDivCpr (NoMoreCpr (Term _ sh)) = NoMoreCpr (Term MightDiverge sh)
-shallowDivCpr (Cpr _ sh)              = Cpr MightDiverge sh
+shallowDivTerm :: Termination -> Termination
+shallowDivTerm (Term _ sh) = Term MightDiverge sh
 
 seqCprType :: CprType -> ()
-seqCprType (CprType _ cpr) = seqCpr cpr
+seqCprType (CprType _ cat) = seqCAT cat
 
 --------------
 -- * CprSig
@@ -464,17 +472,33 @@ seqCprType (CprType _ cpr) = seqCpr cpr
 newtype CprSig = CprSig { getCprSig :: CprType }
   deriving (Eq, Binary)
 
--- | Turns a 'CprType' computed for the particular 'Arity' into a 'CprSig'
--- unleashable at that arity. See Note [Understanding DmdType and StrictSig] in
--- "GHC.Types.Demand"
-mkCprSigForArity :: Arity -> CprType -> CprSig
-mkCprSigForArity arty = CprSig . ensureCprTyArity arty
+-- | Turns a 'CprType' of a function body into a signature that is unleashable
+-- at call sites of the particular 'Arity' and minimum call 'Demand'.
+--
+-- See Note [Trimming CPR signatures according to Termination]
+-- and Note [Improving CPR by considering strictness demand from call sites],
+-- as well as Note [Arity trimming for CPR signatures],
+-- all in "GHC.Core.Opt.CprAnal".
+mkCprSigForFunRHS :: Arity -> Demand -> CprType -> CprSig
+mkCprSigForFunRHS arty fun_demand ty
+  | ct_arty ty /= arty = topCprSig -- See Note [Arity trimming for CPR signatures]
+  | otherwise          = CprSig ty{ ct_cat = CAT whnf_term final_cpr }
+  where
+    CAT whnf_term whnf_cpr = ct_cat ty
+    -- See Note [Improving CPR by considering strictness demand from call sites]
+    -- Figure out the *least sub-demand* put on the function body by all call sites.
+    -- Sub-demand, because we can assume at least seq demand on the body.
+    (_card1 :* fn_sd) = fun_demand -- how the function was called
+    (_card2, body_sd) = peelManyCalls arty fn_sd
+    (_, demanded_term) = forceTerm body_sd whnf_term
+    -- See Note [Trimming CPR signatures according to Termination]
+    final_cpr = takeCprWhileTerminates demanded_term whnf_cpr
 
 topCprSig :: CprSig
 topCprSig = CprSig topCprType
 
-mkCprSig :: Arity -> Cpr -> CprSig
-mkCprSig arty cpr = CprSig (CprType arty cpr)
+mkCprSig :: Arity -> CAT -> CprSig
+mkCprSig arty cat = CprSig (CprType arty cat)
 
 seqCprSig :: CprSig -> ()
 seqCprSig (CprSig sig) = seqCprType sig `seq` ()
@@ -572,21 +596,22 @@ instance Outputable Termination where
     ConSh t fs -> ppr t <> pprFields fs
 
 instance Outputable Cpr where
-  ppr (NoMoreCpr t)          = ppr t
   -- I like it better without the special case
-  -- ppr (Cpr MightDiverge Top) = empty
-  -- ppr (Cpr Terminates   Bot) = char 'b'
-  ppr (Cpr tf l)          = ppr tf <> case l of
+  ppr (Cpr l) = case l of
     TopSh -> empty
     BotSh -> char 'b' -- Maybe just 'c'?
     ConSh t fs -> char 'c' <> ppr t <> pprFields fs
 
+instance Outputable CAT where
+  ppr (CAT t c) = parens (ppr t <> comma <> ppr c)
+
 instance Outputable CprType where
-  ppr (CprType arty cpr) = ppr arty <+> ppr cpr
+  ppr (CprType arty cat) =
+    ppr arty <> text "->" <> ppr cat
 
 -- | Only print the CPR result
 instance Outputable CprSig where
-  ppr (CprSig ty) = ppr (ct_cpr ty)
+  ppr (CprSig ty) = ppr (ct_cat ty)
 
 -----------
 -- * Binary
@@ -617,16 +642,13 @@ instance Binary Termination where
   get  bh = Term <$> get bh <*> get bh
 
 instance Binary Cpr where
-  put_ bh (Cpr tf l) = put_ bh True >> put_ bh tf >> put_ bh l
-  put_ bh (NoMoreCpr t) = put_ bh False >> put_ bh t
-  get  bh = do
-    b <- get bh
-    if b
-      then Cpr <$> get bh <*> get bh
-      else NoMoreCpr <$> get bh
+  put_ bh (Cpr sh) = put_ bh sh
+  get  bh = Cpr <$> get bh
+
+instance Binary CAT where
+  put_ bh (CAT t c) = put_ bh t *> put_ bh c
+  get  bh = CAT <$> get bh <*> get bh
 
 instance Binary CprType where
-  put_ bh (CprType args cpr) = do
-    put_ bh args
-    put_ bh cpr
+  put_ bh (CprType args cat) = put_ bh args *> put_ bh cat
   get  bh = CprType <$> get bh <*> get bh
