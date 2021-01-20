@@ -15,8 +15,13 @@ module GHC.Types.SourceText
    , negateIntegralLit
    , negateFractionalLit
    , mkIntegralLit
-   , mkFractionalLit
-   , integralFractionalLit
+   , mkTHFractionalLit, rationalFromFractionalLit
+   , integralFractionalLit, mkSourceFractionalLit
+   , FractionalExponentBase(..)
+
+   -- Used by the pm checker.
+   , fractionalLitFromRational
+
    )
 where
 
@@ -30,6 +35,7 @@ import GHC.Utils.Panic
 
 import Data.Function (on)
 import Data.Data
+import GHC.Real ( Ratio(..) )
 
 {-
 Note [Pragma source text]
@@ -155,37 +161,75 @@ negateIntegralLit (IL text neg value)
 -- encountered in the user's source program. This allows us to pretty-print exactly what
 -- the user wrote, which is important e.g. for floating point numbers that can't represented
 -- as Doubles (we used to via Double for pretty-printing). See also #2245.
+-- Note [FractionalLit representation] in GHC.HsToCore.Match.Literal
 data FractionalLit = FL
-   { fl_text :: SourceText     -- ^ How the value was written in the source
-   , fl_neg :: Bool            -- ^ See Note [Negative zero] in GHC.Rename.Pat
-   , fl_value :: Rational      -- ^ Numeric value of the literal
-   }
-   deriving (Data, Show)
+    { fl_text :: SourceText     -- ^ How the value was written in the source
+    , fl_neg :: Bool                        -- See Note [Negative zero]
+    , fl_signi :: Rational                  -- The significand component of the literal
+    , fl_exp :: Integer                     -- The exponent component of the literal
+    , fl_exp_base :: FractionalExponentBase -- See Note [Fractional exponent bases]
+    }
+    deriving (Data, Show)
   -- The Show instance is required for the derived GHC.Parser.Lexer.Token instance when DEBUG is on
 
-mkFractionalLit :: Real a => a -> FractionalLit
-mkFractionalLit r = FL { fl_text = SourceText (show (realToFrac r::Double))
-                           -- Converting to a Double here may technically lose
-                           -- precision (see #15502). We could alternatively
-                           -- convert to a Rational for the most accuracy, but
-                           -- it would cause Floats and Doubles to be displayed
-                           -- strangely, so we opt not to do this. (In contrast
-                           -- to mkIntegralLit, where we always convert to an
-                           -- Integer for the highest accuracy.)
-                       , fl_neg = r < 0
-                       , fl_value = toRational r }
+-- See Note [FractionalLit representation] in GHC.HsToCore.Match.Literal
+data FractionalExponentBase
+  = Base2 -- Used in hex fractional literals
+  | Base10
+  deriving (Eq, Ord, Data, Show)
+
+mkRationalWithExponentBase :: Rational -> Integer -> FractionalExponentBase -> Rational
+mkRationalWithExponentBase i e feb = i * (eb ^^ e)
+  where eb = case feb of Base2 -> 2 ; Base10 -> 10
+
+fractionalLitFromRational :: Rational -> FractionalLit
+fractionalLitFromRational r =  FL { fl_text = NoSourceText
+                           , fl_neg = r < 0
+                           , fl_signi = r
+                           , fl_exp = 0
+                           , fl_exp_base = Base10 }
+
+rationalFromFractionalLit :: FractionalLit -> Rational
+rationalFromFractionalLit (FL _ _ i e expBase) =
+  mkRationalWithExponentBase i e expBase
+
+mkTHFractionalLit :: Rational -> FractionalLit
+mkTHFractionalLit r =  FL { fl_text = SourceText (show (realToFrac r::Double))
+                             -- Converting to a Double here may technically lose
+                             -- precision (see #15502). We could alternatively
+                             -- convert to a Rational for the most accuracy, but
+                             -- it would cause Floats and Doubles to be displayed
+                             -- strangely, so we opt not to do this. (In contrast
+                             -- to mkIntegralLit, where we always convert to an
+                             -- Integer for the highest accuracy.)
+                           , fl_neg = r < 0
+                           , fl_signi = r
+                           , fl_exp = 0
+                           , fl_exp_base = Base10 }
 
 negateFractionalLit :: FractionalLit -> FractionalLit
-negateFractionalLit (FL text neg value)
+negateFractionalLit (FL text neg i e eb)
   = case text of
-      SourceText ('-':src) -> FL (SourceText src)     False value
-      SourceText      src  -> FL (SourceText ('-':src)) True  value
-      NoSourceText         -> FL NoSourceText (not neg) (negate value)
+      SourceText ('-':src) -> FL (SourceText src)       False i e eb
+      SourceText      src  -> FL (SourceText ('-':src)) True  i e eb
+      NoSourceText         -> FL NoSourceText (not neg) (negate i) e eb
 
 integralFractionalLit :: Bool -> Integer -> FractionalLit
-integralFractionalLit neg i = FL { fl_text = SourceText (show i),
-                                   fl_neg = neg,
-                                   fl_value = fromInteger i }
+integralFractionalLit neg i = FL { fl_text = SourceText (show i)
+                                 , fl_neg = neg
+                                 , fl_signi = i :% 1
+                                 , fl_exp = 0
+                                 , fl_exp_base = Base10 }
+
+mkSourceFractionalLit :: String -> Bool -> Integer -> Integer
+                      -> FractionalExponentBase
+                      -> FractionalLit
+mkSourceFractionalLit !str !b !r !i !ff = FL (SourceText str) b (r :% 1) i ff
+
+-- Note [fractional exponent bases] For hexadecimal rationals of
+-- the form 0x0.3p10 the exponent is given on base 2 rather than
+-- base 10. These are the only options, hence the sum type. See also #15646.
+
 
 -- Comparison operations are needed when grouping literals
 -- for compiling pattern-matching (module GHC.HsToCore.Match.Literal)
@@ -200,14 +244,26 @@ instance Outputable IntegralLit where
   ppr (IL (SourceText src) _ _) = text src
   ppr (IL NoSourceText _ value) = text (show value)
 
-instance Eq FractionalLit where
-  (==) = (==) `on` fl_value
 
+-- | Compare fractional lits with small exponents for value equality but
+--   large values for syntactic equality.
+compareFractionalLit :: FractionalLit -> FractionalLit -> Ordering
+compareFractionalLit fl1 fl2
+  | fl_exp fl1 < 100 && fl_exp fl2 < 100 && fl_exp fl1 >= -100 && fl_exp fl2 >= -100
+    = rationalFromFractionalLit fl1 `compare` rationalFromFractionalLit fl2
+  | otherwise = (compare `on` (\x -> (fl_signi x, fl_exp x, fl_exp_base x))) fl1 fl2
+
+instance Eq FractionalLit where
+  (==) fl1 fl2 = case compare fl1 fl2 of
+          EQ -> True
+          _  -> False
 instance Ord FractionalLit where
-  compare = compare `on` fl_value
+  compare = compareFractionalLit
 
 instance Outputable FractionalLit where
-  ppr f = pprWithSourceText (fl_text f) (rational (fl_value f))
+  ppr (fl@(FL {})) =
+    pprWithSourceText (fl_text fl) $
+      rational $ mkRationalWithExponentBase (fl_signi fl) (fl_exp fl) (fl_exp_base fl)
 
 -- | A String Literal in the source, including its original raw format for use by
 -- source to source manipulation tools.

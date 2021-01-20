@@ -902,7 +902,7 @@ data PatGroup
   | PgCon DataCon       -- Constructor patterns (incl list, tuple)
   | PgSyn PatSyn [Type] -- See Note [Pattern synonym groups]
   | PgLit Literal       -- Literal patterns
-  | PgN   Rational      -- Overloaded numeric literals;
+  | PgN   FractionalLit -- Overloaded numeric literals;
                         -- see Note [Don't use Literal for PgN]
   | PgOverS FastString  -- Overloaded string literals
   | PgNpK Integer       -- n+k patterns
@@ -930,7 +930,7 @@ the invariant that value in a LitInt must be in the range of the target
 machine's Int# type, and an overloaded literal could meaningfully be larger.
 
 Solution: For pattern grouping purposes, just store the literal directly in
-the PgN constructor as a Rational if numeric, and add a PgOverStr constructor
+the PgN constructor as a FractionalLit if numeric, and add a PgOverStr constructor
 for overloaded strings.
 -}
 
@@ -1016,6 +1016,10 @@ sameGroup (PgSyn p1 t1) (PgSyn p2 t2) = p1==p2 && eqTypes t1 t2
                                                 -- eqTypes: See Note [Pattern synonym groups]
 sameGroup (PgLit _)     (PgLit _)     = True    -- One case expression
 sameGroup (PgN l1)      (PgN l2)      = l1==l2  -- Order is significant
+        -- Order is significant, match PgN after PgLit
+        -- If the exponents are small check for value equality rather than syntactic equality
+        -- This is implemented in the Eq instance for FractionalLit, we do this to avoid
+        -- computing the value of excessivly large rationals.
 sameGroup (PgOverS s1)  (PgOverS s2)  = s1==s2
 sameGroup (PgNpK l1)    (PgNpK l2)    = l1==l2  -- See Note [Grouping overloaded literal patterns]
 sameGroup (PgCo t1)     (PgCo t2)     = t1 `eqType` t2
@@ -1154,12 +1158,10 @@ patGroup _ (WildPat {})                 = PgAny
 patGroup _ (BangPat {})                 = PgBang
 patGroup _ (NPat _ (L _ (OverLit {ol_val=oval})) mb_neg _) =
   case (oval, isJust mb_neg) of
-   (HsIntegral   i, False) -> PgN (fromInteger (il_value i))
-   (HsIntegral   i, True ) -> PgN (-fromInteger (il_value i))
-   (HsFractional r, False) -> PgN (fl_value r)
-   (HsFractional r, True ) -> PgN (-fl_value r)
-   (HsIsString _ s, _) -> ASSERT(isNothing mb_neg)
-                          PgOverS s
+    (HsIntegral   i, is_neg) -> PgN (integralFractionalLit is_neg (il_value i))
+    (HsFractional f, _)      -> PgN f
+    (HsIsString _ s, _) -> ASSERT(isNothing mb_neg)
+                            PgOverS s
 patGroup _ (NPlusKPat _ _ (L _ (OverLit {ol_val=oval})) _ _ _) =
   case oval of
    HsIntegral i -> PgNpK (il_value i)
