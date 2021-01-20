@@ -55,7 +55,6 @@ import GHC.Core.Unify    ( tcMatchTyKi )
 import GHC.Utils.Misc
 import GHC.Types.Var
 import GHC.Types.Var.Set
-import GHC.Types.Unique.Set
 import GHC.Types.Basic    ( IntWithInf, intGtLimit )
 import GHC.Utils.Error    ( emptyMessages )
 import qualified GHC.LanguageExtensions as LangExt
@@ -2175,29 +2174,6 @@ some unification in solveSimpleWanteds; because that's the only way
 we'll get more Givens (a unification is like adding a Given) to
 allow the implication to make progress.
 -}
-
-promoteTyVar :: TcTyVar -> TcM Bool
--- When we float a constraint out of an implication we must restore
--- invariant (WantedInv) in Note [TcLevel and untouchable type variables] in GHC.Tc.Utils.TcType
--- Return True <=> we did some promotion
--- Also returns either the original tyvar (no promotion) or the new one
--- See Note [Promoting unification variables]
-promoteTyVar tv
-  = do { tclvl <- TcM.getTcLevel
-       ; if (isFloatedTouchableMetaTyVar tclvl tv)
-         then do { cloned_tv <- TcM.cloneMetaTyVar tv
-                 ; let rhs_tv = setMetaTyVarTcLevel cloned_tv tclvl
-                 ; TcM.writeMetaTyVar tv (mkTyVarTy rhs_tv)
-                 ; return True }
-         else return False }
-
--- Returns whether or not *any* tyvar is defaulted
-promoteTyVarSet :: TcTyVarSet -> TcM Bool
-promoteTyVarSet tvs
-  = do { bools <- mapM promoteTyVar (nonDetEltsUniqSet tvs)
-         -- Non-determinism is OK because order of promotion doesn't matter
-
-       ; return (or bools) }
 
 promoteTyVarTcS :: TcTyVar  -> TcS ()
 -- When we float a constraint out of an implication we must restore
