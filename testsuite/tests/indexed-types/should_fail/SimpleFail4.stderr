@@ -1,5 +1,5 @@
 
-SimpleFail4.hs:10:3: error:
+SimpleFail4.hs:11:3: error:
     • Illegal argument ‘Int’ in:
         ‘type S2 Int = ...’
         The arguments to ‘S2’ must all be distinct type variables

@@ -1,4 +1,4 @@
 
-BadImport08.hs:5:1:
+BadImport08.hs:6:1: error:
     Control.Monad.ST.Unsafe: Can't be safely imported!
     The module itself isn't safe.

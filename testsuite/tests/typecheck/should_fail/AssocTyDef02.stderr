@@ -1,5 +1,5 @@
 
-AssocTyDef02.hs:6:5: error:
+AssocTyDef02.hs:7:5: error:
     • Illegal argument ‘[b]’ in:
         ‘type Typ [b] = ...’
         The arguments to ‘Typ’ must all be distinct type variables

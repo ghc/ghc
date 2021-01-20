@@ -1,5 +1,5 @@
 
-SafeLang12.hs:2:14: warning:
+SafeLang12.hs:3:14: warning:
     -XTemplateHaskell is not allowed in Safe Haskell; ignoring -XTemplateHaskell
 
 SafeLang12_B.hs:2:14: warning:
