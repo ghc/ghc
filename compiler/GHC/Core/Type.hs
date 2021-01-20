@@ -766,8 +766,7 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
                      , tcm_hole = cohole })
   = (go_ty, go_tys, go_co, go_cos)
   where
-    go_tys _   []       = return []
-    go_tys env (ty:tys) = (:) <$> go_ty env ty <*> go_tys env tys
+    go_tys env tys       = mapM (go_ty env) tys
 
     go_ty env (TyVarTy tv)    = tyvar env tv
     go_ty env (AppTy t1 t2)   = mkAppTy <$> go_ty env t1 <*> go_ty env t2
@@ -796,8 +795,7 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
            ; inner' <- go_ty env' inner
            ; return $ ForAllTy (Bndr tv' vis) inner' }
 
-    go_cos _   []       = return []
-    go_cos env (co:cos) = (:) <$> go_co env co <*> go_cos env cos
+    go_cos env cos      = mapM (go_co env) cos
 
     go_mco _   MRefl    = return MRefl
     go_mco env (MCo co) = MCo <$> (go_co env co)

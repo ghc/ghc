@@ -26,7 +26,7 @@ import GHC.Core.TyCo.FVs (tyCoVarsOfTypesWellScoped, tyCoVarsOfTypeList)
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Var
 import GHC.Types.Var.Env
-import GHC.Utils.Misc (seqList)
+import GHC.Utils.Misc (seqList,strictMap)
 
 import Data.List (mapAccumL)
 
@@ -124,25 +124,26 @@ tidyTyCoVarOcc env@(_, subst) tv
 
 ---------------
 tidyTypes :: TidyEnv -> [Type] -> [Type]
-tidyTypes env tys = map (tidyType env) tys
+tidyTypes env tys = strictMap (tidyType env) tys
 
 ---------------
 tidyType :: TidyEnv -> Type -> Type
-tidyType _   (LitTy n)             = LitTy n
-tidyType env (TyVarTy tv)          = TyVarTy (tidyTyCoVarOcc env tv)
-tidyType env (TyConApp tycon tys)  = let args = tidyTypes env tys
-                                     in args `seqList` TyConApp tycon args
-tidyType env (AppTy fun arg)       = (AppTy $! (tidyType env fun)) $! (tidyType env arg)
-tidyType env ty@(FunTy _ w arg res)  = let { !w'   = tidyType env w
-                                           ; !arg' = tidyType env arg
-                                           ; !res' = tidyType env res }
-                                       in ty { ft_mult = w', ft_arg = arg', ft_res = res' }
-tidyType env (ty@(ForAllTy{}))     = mkForAllTys' (zip tvs' vis) $! tidyType env' body_ty
-  where
-    (tvs, vis, body_ty) = splitForAllTyCoVars' ty
-    (env', tvs') = tidyVarBndrs env tvs
-tidyType env (CastTy ty co)       = (CastTy $! tidyType env ty) $! (tidyCo env co)
-tidyType env (CoercionTy co)      = CoercionTy $! (tidyCo env co)
+tidyType env ty = go ty
+    where
+        go (LitTy n)             = LitTy n
+        go (TyVarTy tv)          = TyVarTy $! tidyTyCoVarOcc env tv
+        go (TyConApp tycon tys)  = TyConApp tycon $! strictMap go tys
+        go (AppTy fun arg)       = (AppTy $! go fun) $! go arg
+        go (FunTy k w arg res)   = let !w'   = go w
+                                       !arg' = go arg
+                                       !res' = go res
+                                   in FunTy k w' arg' res'
+        go (ty@(ForAllTy{}))     = mkForAllTys' (zip tvs' vis) $! tidyType env' body_ty
+            where
+            (tvs, vis, body_ty) = splitForAllTyCoVars' ty
+            (env', tvs') = tidyVarBndrs env tvs
+        go (CastTy ty co)         = (CastTy $! go ty) $! (tidyCo env co)
+        go (CoercionTy co)        = CoercionTy $! (tidyCo env co)
 
 
 -- The following two functions differ from mkForAllTys and splitForAllTyCoVars in that
@@ -201,8 +202,7 @@ tidyCo env@(_, subst) co
 
     go (Refl ty)             = Refl (tidyType env ty)
     go (GRefl r ty mco)      = GRefl r (tidyType env ty) $! go_mco mco
-    go (TyConAppCo r tc cos) = let args = map go cos
-                               in args `seqList` TyConAppCo r tc args
+    go (TyConAppCo r tc cos) = TyConAppCo r tc $! strictMap go cos
     go (AppCo co1 co2)       = (AppCo $! go co1) $! go co2
     go (ForAllCo tv h co)    = ((ForAllCo $! tvp) $! (go h)) $! (tidyCo envp co)
                                where (envp, tvp) = tidyVarBndr env tv
@@ -224,12 +224,11 @@ tidyCo env@(_, subst) co
     go (InstCo co ty)        = (InstCo $! go co) $! go ty
     go (KindCo co)           = KindCo $! go co
     go (SubCo co)            = SubCo $! go co
-    go (AxiomRuleCo ax cos)  = let cos1 = tidyCos env cos
-                               in cos1 `seqList` AxiomRuleCo ax cos1
+    go (AxiomRuleCo ax cos)  = AxiomRuleCo ax $! strictMap go cos
 
     go_prov (PhantomProv co)    = PhantomProv (go co)
     go_prov (ProofIrrelProv co) = ProofIrrelProv (go co)
     go_prov p@(PluginProv _)    = p
 
 tidyCos :: TidyEnv -> [Coercion] -> [Coercion]
-tidyCos env = map (tidyCo env)
+tidyCos env cos = strictMap (tidyCo env) cos
