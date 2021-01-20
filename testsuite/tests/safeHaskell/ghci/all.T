@@ -19,4 +19,5 @@ test('p17', normalise_version("bytestring"), ghci_script, ['p17.script'])
 # 7172
 test('p18', normalise_version("bytestring"), ghci_script, ['p18.script'])
 test('T12509', [extra_hc_opts('-XSafe')], ghci_script, ['T12509.script'])
+test('T19243', normal, ghci_script, ['T19243.script'])
 
