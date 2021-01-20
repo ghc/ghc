@@ -62,11 +62,16 @@ import GHC.Builtin.Types.Prim
 import GHC.Tc.Solver.Monad (InertSet, emptyInert)
 import GHC.Tc.Utils.TcType (isStringTy)
 import GHC.Types.CompleteMatch (CompleteMatch)
+import GHC.Types.SourceText (mkFractionalLit, FractionalLit, fractionalLitFromRational,
+  FractionalExponentBase(..), SourceText(..))
 
 import Numeric (fromRat)
 import Data.Foldable (find)
 import Data.Ratio
+import GHC.Real (Ratio(..))
 import qualified Data.Semigroup as Semi
+
+-- import GHC.Driver.Ppr
 
 --
 -- * Normalised refinement types
@@ -293,7 +298,7 @@ data PmLitValue
   -- lists
   | PmLitString FastString
   | PmLitOverInt Int {- How often Negated? -} Integer
-  | PmLitOverRat Int {- How often Negated? -} Rational
+  | PmLitOverRat Int {- How often Negated? -} FractionalLit
   | PmLitOverString FastString
 
 -- | Undecidable semantic equality result.
@@ -523,10 +528,11 @@ overloadPmLit :: Type -> PmLit -> Maybe PmLit
 overloadPmLit ty (PmLit _ v) = PmLit ty <$> go v
   where
     go (PmLitInt i)          = Just (PmLitOverInt 0 i)
-    go (PmLitRat r)          = Just (PmLitOverRat 0 r)
+    go (PmLitRat r)          = Just $! PmLitOverRat 0 $! fractionalLitFromRational r
     go (PmLitString s)
       | ty `eqType` stringTy = Just v
       | otherwise            = Just (PmLitOverString s)
+    go ovRat@PmLitOverRat{}  = Just ovRat
     go _               = Nothing
 
 pmLitAsStringLit :: PmLit -> Maybe FastString
@@ -555,9 +561,30 @@ coreExprAsPmLit e = case collectArgs e of
     -> literalToPmLit (literalType l) l >>= overloadPmLit (exprType e)
   (Var x, args)
     -- See Note [Detecting overloaded literals with -XRebindableSyntax]
+    -- fromRational <expr>
     | is_rebound_name x fromRationalName
     , [r] <- dropWhile (not . is_ratio) args
     -> coreExprAsPmLit r >>= overloadPmLit (exprType e)
+
+  --Rationals with large exponents
+  (Var x, args)
+    -- See Note [Detecting overloaded literals with -XRebindableSyntax]
+    -- See Note [Dealing with rationals with large exponents]
+    -- mkRationalBase* <rational> <exponent>
+    | Just exp_base <- is_larg_exp_ratio x
+    , [r, Lit exp] <- dropWhile (not . is_ratio) args
+    , (Var x, [_ty, Lit n, Lit d]) <- collectArgs r
+    , Just dc <- isDataConWorkId_maybe x
+    , dataConName dc == ratioDataConName
+    -> do
+      n' <- isLitValue_maybe n
+      d' <- isLitValue_maybe d
+      exp' <- isLitValue_maybe exp
+      let rational = (abs n') :% d'
+      let neg = if n' < 0 then 1 else 0
+      let frac = mkFractionalLit NoSourceText False rational exp' exp_base
+      Just $ PmLit (exprType e) (PmLitOverRat neg frac)
+
   (Var x, args)
     | is_rebound_name x fromStringName
     -- See Note [Detecting overloaded literals with -XRebindableSyntax]
@@ -573,6 +600,7 @@ coreExprAsPmLit e = case collectArgs e of
   (Var x, [Lit l])
     | idName x `elem` [unpackCStringName, unpackCStringUtf8Name]
     -> literalToPmLit stringTy l
+
   _ -> Nothing
   where
     is_lit Lit{} = True
@@ -583,6 +611,14 @@ coreExprAsPmLit e = case collectArgs e of
       = tyConName tc == ratioTyConName
       | otherwise
       = False
+    is_larg_exp_ratio x
+      | is_rebound_name x mkRationalBase10Name
+      = Just Base10
+      | is_rebound_name x mkRationalBase2Name
+      = Just Base2
+      | otherwise
+      = Nothing
+
 
     -- See Note [Detecting overloaded literals with -XRebindableSyntax]
     is_rebound_name :: Id -> Name -> Bool
@@ -601,6 +637,36 @@ type `String`).
 
 The same applies to other overloaded literals, such as overloaded rationals
 (`fromRational`)and overloaded integer literals (`fromInteger`).
+
+Note [Dealing with rationals with large exponents]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Rationals with large exponents are *not* desugared to
+a simple rational. As that would require us to compute
+their value which can be expensive. Rather they desugar
+to an expression. For example 1e1000 will desugar to an
+expression of the form: `mkRationalWithExponentBase10 (1 :% 1) 1000`
+
+Only overloaded literals desugar to this form however, so we
+we can just return a overloaded rational literal.
+
+The most complex case is if we have RebindableSyntax enabled.
+By example if we have a pattern like this: `f 3.3 = True`
+
+It will desugar to:
+  fromRational
+    [TYPE: Rational, mkRationalBase10 (:% @Integer 10 1) (-1)]
+
+The fromRational is properly detected as an overloaded Rational by
+coreExprAsPmLit and it's general code for detecting overloaded rationals.
+See Note [Detecting overloaded literals with -XRebindableSyntax].
+
+This case then recurses into coreExprAsPmLit passing only the expression
+`mkRationalBase10 (:% @Integer 10 1) (-1)`. Which is caught by rationals
+with large exponents case. This will return a `PmLitOverRat` literal.
+
+Which is then passed to overloadPmLit which simply returns it as-is since
+it's already overloaded.
+
 -}
 
 instance Outputable PmLitValue where
@@ -609,7 +675,7 @@ instance Outputable PmLitValue where
   ppr (PmLitChar c)       = pprHsChar c
   ppr (PmLitString s)     = pprHsString s
   ppr (PmLitOverInt n i)  = minuses n (ppr i)
-  ppr (PmLitOverRat n r)  = minuses n (ppr (double (fromRat r)))
+  ppr (PmLitOverRat n r)  = minuses n (ppr r)
   ppr (PmLitOverString s) = pprHsString s
 
 -- Take care of negated literals

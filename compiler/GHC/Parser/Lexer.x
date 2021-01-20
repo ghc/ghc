@@ -101,7 +101,7 @@ import GHC.Data.FastString
 import GHC.Types.Unique.FM
 import GHC.Data.Maybe
 import GHC.Data.OrdList
-import GHC.Utils.Misc ( readRational, readHexRational )
+import GHC.Utils.Misc ( readSignificandExponentPair, readHexSignificandExponentPair )
 
 import GHC.Types.SrcLoc
 import GHC.Types.SourceText
@@ -1700,7 +1700,7 @@ binary = (2,octDecDigit)
 octal = (8,octDecDigit)
 hexadecimal = (16,hexDigit)
 
--- readRational can understand negative rationals, exponents, everything.
+-- readSignificandExponentPair can understand negative rationals, exponents, everything.
 tok_frac :: Int -> (String -> Token) -> Action
 tok_frac drop f span buf len = do
   numericUnderscores <- getBit NumericUnderscoresBit  -- #14473
@@ -1716,18 +1716,20 @@ tok_hex_float    str = ITrational   $! readHexFractionalLit str
 tok_primfloat    str = ITprimfloat  $! readFractionalLit str
 tok_primdouble   str = ITprimdouble $! readFractionalLit str
 
-readFractionalLit :: String -> FractionalLit
-readFractionalLit str = ((FL $! (SourceText str)) $! is_neg) $! readRational str
-                        where is_neg = case str of ('-':_) -> True
-                                                   _       -> False
-readHexFractionalLit :: String -> FractionalLit
-readHexFractionalLit str =
-  FL { fl_text  = SourceText str
-     , fl_neg   = case str of
+readFractionalLit, readHexFractionalLit :: String -> FractionalLit
+readHexFractionalLit = readFractionalLitX readHexSignificandExponentPair Base2
+readFractionalLit = readFractionalLitX readSignificandExponentPair Base10
+
+readFractionalLitX :: (String -> (Integer, Integer))
+                   -> FractionalExponentBase
+                   -> String -> FractionalLit
+readFractionalLitX readStr b str =
+  mkSourceFractionalLit str is_neg i e b
+  where
+    is_neg = case str of
                     '-' : _ -> True
-                    _       -> False
-     , fl_value = readHexRational str
-     }
+                    _      -> False
+    (i, e) = readStr str
 
 -- -----------------------------------------------------------------------------
 -- Layout processing

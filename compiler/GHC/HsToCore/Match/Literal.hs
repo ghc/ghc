@@ -52,7 +52,6 @@ import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
 import GHC.Types.Literal
 import GHC.Types.SrcLoc
-import Data.Ratio
 import GHC.Utils.Outputable as Outputable
 import GHC.Driver.Session
 import GHC.Utils.Misc
@@ -66,6 +65,7 @@ import Data.Int
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NEL
 import Data.Word
+import GHC.Real ( Ratio(..), numerator, denominator )
 
 {-
 ************************************************************************
@@ -101,22 +101,131 @@ dsLit l = do
     HsWordPrim   _ w -> return (Lit (mkLitWordWrap platform w))
     HsInt64Prim  _ i -> return (Lit (mkLitInt64Wrap i))
     HsWord64Prim _ w -> return (Lit (mkLitWord64Wrap w))
-    HsFloatPrim  _ f -> return (Lit (LitFloat (fl_value f)))
-    HsDoublePrim _ d -> return (Lit (LitDouble (fl_value d)))
+
+    -- This can be slow for very large literals. See Note [FractionalLit representation]
+    -- and #15646
+    HsFloatPrim  _ fl -> return (Lit (LitFloat (rationalFromFractionalLit fl)))
+    HsDoublePrim _ fl -> return (Lit (LitDouble (rationalFromFractionalLit fl)))
     HsChar _ c       -> return (mkCharExpr c)
     HsString _ str   -> mkStringExprFS str
     HsInteger _ i _  -> return (mkIntegerExpr i)
     HsInt _ i        -> return (mkIntExpr platform (il_value i))
-    HsRat _ (FL _ _ val) ty ->
-      return (mkCoreConApps ratio_data_con [Type integer_ty, num, denom])
-      where
-        num   = mkIntegerExpr (numerator val)
-        denom = mkIntegerExpr (denominator val)
+    HsRat _ fl ty    -> dsFractionalLitToRational fl ty
+
+{-
+Note [FractionalLit representation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There is a fun wrinkle to this, we used to simply compute the value
+for these literals and store it as `Rational`. While this might seem
+reasonable it meant typechecking literals of extremely large numbers
+wasn't possible. This happend for example in #15646.
+
+There a user would write in GHCi e.g. `:t 1e1234111111111111111111111`
+which would trip up the compiler. The reason being we would parse it as
+<Literal of value n>. Try to compute n, which would run out of memory
+for truly large numbers, or take far too long for merely large ones.
+
+To fix this we instead now store the significand and exponent of the
+literal instead. Depending on the size of the exponent we then defer
+the computation of the Rational value, potentially up to runtime of the
+program! There are still cases left were we might compute large rationals
+but it's a lot rarer then.
+
+The current state of affairs for large literals is:
+* Typechecking: Will produce a FractionalLit
+* Desugaring a large overloaded literal to Float/Double *is* done
+  at compile time. So can still fail. But this only matters for values too large
+  to be represented as float anyway.
+* Converting overloaded literals to a value of *Rational* is done at *runtime*.
+  If such a value is then demanded at runtime the program might hang or run out of
+  memory. But that is perhaps expected and acceptable.
+* TH might also evaluate the literal even when overloaded.
+  But there a user should be able to work around #15646 by
+  generating a call to `mkRationalBase10/2` for large literals instead.
+
+
+Note [FractionalLit representation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For fractional literals, like 1.3 or 0.79e22, we do /not/ represent
+them within the compiler as a Rational.  Doing so would force the
+compiler to compute a huge Rational for 2.3e300000000000, at compile
+time (#15646)!
+
+So instead we represent fractional literals as a FractionalLit,
+in which we record the significand and exponent separately.  Then
+we can compute the huge Rational at /runtime/, by emitting code
+for
+       mkRationalBase10 2.3 300000000000
+
+where mkRationalBase10 is defined in the library GHC.Real
+
+The moving parts are here:
+
+* Parsing, renaming, typechecking: use FractionalLit, in which the
+  significand and exponent are represented separately.
+
+* Desugaring.  Remember that a fractional literal like 54.4e20 has type
+     Fractional a => a
+
+  - For fractional literals whose type turns out to be Float/Double,
+    we desugar to a Float/Double literal at /compile time/.
+    This conversion can still fail. But this only matters for values
+    too large to be represented as float anyway.  See dsLit in
+    GHC.HsToCore.Match.Literal
+
+  - For fractional literals whose type turns out to be Rational, we
+    desugar the literal to a call of `mkRationalBase10` (etc for hex
+    literals), so that we only compute the Rational at /run time/.  If
+    this value is then demanded at runtime the program might hang or
+    run out of memory. But that is perhaps expected and acceptable.
+    See dsFractionalLitToRational in GHC.HsToCore.Match.Literal
+
+  - For fractional literals whose type isn't one of the above, we just
+    call the typeclass method `fromRational`.  But to do that we need
+    the rational to give to it, and we compute that at runtime, as
+    above.
+
+* Template Haskell definitions are also problematic. While the TH code
+  works as expected once it's spliced into a program it will compute the
+  value of the large literal.
+  But there a user should be able to work around #15646
+  by having their TH code generating a call to `mkRationalBase[10/2]` for
+  large literals  instead.
+
+-}
+
+-- | See Note [FractionalLit representation]
+dsFractionalLitToRational :: FractionalLit -> Type -> DsM CoreExpr
+dsFractionalLitToRational fl@FL{ fl_signi = signi, fl_exp = exp, fl_exp_base = base } ty
+  -- We compute "small" rationals here and now
+  | abs exp <= 100
+  = let !val   = rationalFromFractionalLit fl
+        !num   = mkIntegerExpr (numerator val)
+        !denom = mkIntegerExpr (denominator val)
         (ratio_data_con, integer_ty)
             = case tcSplitTyConApp ty of
                     (tycon, [i_ty]) -> ASSERT(isIntegerTy i_ty && tycon `hasKey` ratioTyConKey)
                                        (head (tyConDataCons tycon), i_ty)
                     x -> pprPanic "dsLit" (ppr x)
+    in return $! (mkCoreConApps ratio_data_con [Type integer_ty, num, denom])
+  -- Large rationals will be computed at runtime.
+  | otherwise
+  = do
+      let mkRationalName = case base of
+                             Base2 -> mkRationalBase2Name
+                             Base10 -> mkRationalBase10Name
+      mkRational <- dsLookupGlobalId mkRationalName
+      litR <- dsRational signi
+      let litE = mkIntegerExpr exp
+      return (mkCoreApps (Var mkRational) [litR, litE])
+
+dsRational :: Rational -> DsM CoreExpr
+dsRational (n :% d) = do
+  dcn <- dsLookupDataCon ratioDataConName
+  let cn = mkIntegerExpr n
+  let dn = mkIntegerExpr d
+  return $ mkCoreConApps dcn [Type integerTy, cn, dn]
+
 
 dsOverLit :: HsOverLit GhcTc -> DsM CoreExpr
 -- ^ Post-typechecker, the 'HsExpr' field of an 'OverLit' contains
@@ -128,6 +237,7 @@ dsOverLit (OverLit { ol_val = val, ol_ext = OverLitTc rebindable ty
   case shortCutLit platform val ty of
     Just expr | not rebindable -> dsExpr expr        -- Note [Literal short cut]
     _                          -> dsExpr witness
+
 {-
 Note [Literal short cut]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -540,15 +650,17 @@ hsLitKey :: Platform -> HsLit GhcTc -> Literal
 -- In the case of the fixed-width numeric types, we need to wrap here
 -- because Literal has an invariant that the literal is in range, while
 -- HsLit does not.
-hsLitKey platform (HsIntPrim    _ i) = mkLitIntWrap  platform i
-hsLitKey platform (HsWordPrim   _ w) = mkLitWordWrap platform w
-hsLitKey _        (HsInt64Prim  _ i) = mkLitInt64Wrap  i
-hsLitKey _        (HsWord64Prim _ w) = mkLitWord64Wrap w
-hsLitKey _        (HsCharPrim   _ c) = mkLitChar            c
-hsLitKey _        (HsFloatPrim  _ f) = mkLitFloat           (fl_value f)
-hsLitKey _        (HsDoublePrim _ d) = mkLitDouble          (fl_value d)
-hsLitKey _        (HsString _ s)     = LitString (bytesFS s)
-hsLitKey _        l                  = pprPanic "hsLitKey" (ppr l)
+hsLitKey platform (HsIntPrim    _ i)  = mkLitIntWrap  platform i
+hsLitKey platform (HsWordPrim   _ w)  = mkLitWordWrap platform w
+hsLitKey _        (HsInt64Prim  _ i)  = mkLitInt64Wrap  i
+hsLitKey _        (HsWord64Prim _ w)  = mkLitWord64Wrap w
+hsLitKey _        (HsCharPrim   _ c)  = mkLitChar            c
+-- This following two can be slow. See Note [FractionalLit representation]
+hsLitKey _        (HsFloatPrim  _ fl) = mkLitFloat (rationalFromFractionalLit fl)
+hsLitKey _        (HsDoublePrim _ fl) = mkLitDouble (rationalFromFractionalLit fl)
+
+hsLitKey _        (HsString _ s)      = LitString (bytesFS s)
+hsLitKey _        l                   = pprPanic "hsLitKey" (ppr l)
 
 {-
 ************************************************************************

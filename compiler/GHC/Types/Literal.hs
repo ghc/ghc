@@ -51,6 +51,7 @@ module GHC.Types.Literal
         , isZeroLit, isOneLit
         , litFitsInChar
         , litValue, mapLitValue
+        , isLitValue_maybe
 
         -- ** Coercions
         , narrowInt8Lit, narrowInt16Lit, narrowInt32Lit
