@@ -12,6 +12,8 @@ import GHC.Prelude
 
 import GHC.Hs
 import GHC.Core.Class
+import GHC.Core.Type ( typeKind )
+import GHC.Types.Var( tyVarKind )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.HsType
@@ -82,13 +84,20 @@ tc_default_ty deflt_clss hs_ty
         ; return ty }
 
 check_instance :: Type -> Class -> TcM Bool
-  -- Check that ty is an instance of cls
-  -- We only care about whether it worked or not; return a boolean
+-- Check that ty is an instance of cls
+-- We only care about whether it worked or not; return a boolean
+-- This checks that  cls :: k -> Constraint
+-- with just one argument and no polymorphism; if we need to add
+-- polymorphism we can make it more complicated.  For now we are
+-- concerned with classes like
+--    Num      :: Type -> Constraint
+--    Foldable :: (Type->Type) -> Constraint
 check_instance ty cls
-  = do  { (_, success) <- discardErrs $
-                          askNoErrs $
-                          simplifyDefault [mkClassPred cls [ty]]
-        ; return success }
+  | [cls_tv] <- classTyVars cls
+  , tyVarKind cls_tv `tcEqType` typeKind ty
+  = simplifyDefault [mkClassPred cls [ty]]
+  | otherwise
+  = return False
 
 defaultDeclCtxt :: SDoc
 defaultDeclCtxt = text "When checking the types in a default declaration"

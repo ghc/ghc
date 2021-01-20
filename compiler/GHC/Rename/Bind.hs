@@ -266,7 +266,7 @@ rnLocalValBindsLHS fix_env binds
          --   import A(f)
          --   g = let f = ... in f
          -- should.
-       ; let bound_names = collectHsValBinders binds'
+       ; let bound_names = collectHsValBinders CollNoDictBinders binds'
              -- There should be only Ids, but if there are any bogus
              -- pattern synonyms, we'll collect them anyway, so that
              -- we don't generate subsequent out-of-scope messages
@@ -285,7 +285,7 @@ rnValBindsLHS topP (ValBinds x mbinds sigs)
   = do { mbinds' <- mapBagM (wrapLocM (rnBindLHS topP doc)) mbinds
        ; return $ ValBinds x mbinds' sigs }
   where
-    bndrs = collectHsBindsBinders mbinds
+    bndrs = collectHsBindsBinders CollNoDictBinders mbinds
     doc   = text "In the binding group for:" <+> pprWithCommas ppr bndrs
 
 rnValBindsLHS _ b = pprPanic "rnValBindsLHSFromDoc" (ppr b)
@@ -472,7 +472,7 @@ rnBind _ bind@(PatBind { pat_lhs = pat
                 -- Keep locally-defined Names
                 -- As well as dependency analysis, we need these for the
                 -- MonoLocalBinds test in GHC.Tc.Gen.Bind.decideGeneralisationPlan
-              bndrs = collectPatBinders pat
+              bndrs = collectPatBinders CollNoDictBinders pat
               bind' = bind { pat_rhs  = grhss'
                            , pat_ext = fvs' }
 
@@ -864,7 +864,7 @@ rnMethodBinds is_cls_decl cls ktv_names binds sigs
        --       (==) :: a -> a -> a
        --       {-# SPECIALISE instance Eq a => Eq (T [a]) #-}
        ; let (spec_inst_prags, other_sigs) = partition isSpecInstLSig sigs
-             bound_nms = mkNameSet (collectHsBindsBinders binds')
+             bound_nms = mkNameSet (collectHsBindsBinders CollNoDictBinders binds')
              sig_ctxt | is_cls_decl = ClsDeclCtxt cls
                       | otherwise   = InstDeclCtxt bound_nms
        ; (spec_inst_prags', sip_fvs) <- renameSigs sig_ctxt spec_inst_prags

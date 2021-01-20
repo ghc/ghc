@@ -1462,7 +1462,7 @@ wakeup_gc_threads (uint32_t me USED_IF_THREADS,
     if (n_gc_threads == 1) return;
 
 #if defined(DEBUG)
-    StgInt num_idle = 0;
+    StgWord num_idle = 0;
     for(i=0; i < n_gc_threads; ++i) {
         ASSERT(!(i==me && idle_cap[i]));
         if (idle_cap[i]) { ++num_idle;}

@@ -48,7 +48,7 @@ module GHC.Types.Literal
         -- ** Predicates on Literals and their contents
         , litIsDupable, litIsTrivial, litIsLifted
         , inCharRange
-        , isZeroLit
+        , isZeroLit, isOneLit
         , litFitsInChar
         , litValue, mapLitValue
 
@@ -603,6 +603,13 @@ isZeroLit (LitFloat  0)   = True
 isZeroLit (LitDouble 0)   = True
 isZeroLit _               = False
 
+-- | Tests whether the literal represents a one of whatever type it is
+isOneLit :: Literal -> Bool
+isOneLit (LitNumber _ 1) = True
+isOneLit (LitFloat  1)   = True
+isOneLit (LitDouble 1)   = True
+isOneLit _               = False
+
 -- | Returns the 'Integer' contained in the 'Literal', for when that makes
 -- sense, i.e. for 'Char', 'Int', 'Word', 'LitInteger' and 'LitNatural'.
 litValue  :: Literal -> Integer
@@ -837,8 +844,14 @@ absent_lits = listToUFM_Directly
                         [ (addrPrimTyConKey,    LitNullAddr)
                         , (charPrimTyConKey,    LitChar 'x')
                         , (intPrimTyConKey,     mkLitIntUnchecked 0)
+                        , (int8PrimTyConKey,    mkLitInt8Unchecked 0)
+                        , (int16PrimTyConKey,   mkLitInt16Unchecked 0)
+                        , (int32PrimTyConKey,   mkLitInt32Unchecked 0)
                         , (int64PrimTyConKey,   mkLitInt64Unchecked 0)
                         , (wordPrimTyConKey,    mkLitWordUnchecked 0)
+                        , (word8PrimTyConKey,   mkLitWord8Unchecked 0)
+                        , (word16PrimTyConKey,  mkLitWord16Unchecked 0)
+                        , (word32PrimTyConKey,  mkLitWord32Unchecked 0)
                         , (word64PrimTyConKey,  mkLitWord64Unchecked 0)
                         , (floatPrimTyConKey,   LitFloat 0)
                         , (doublePrimTyConKey,  LitDouble 0)

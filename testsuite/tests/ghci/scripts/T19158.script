@@ -1,0 +1,3 @@
+:set -fdefer-type-errors
+:set -XTypeApplications
+:t id @Maybe
