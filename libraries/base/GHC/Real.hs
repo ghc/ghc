@@ -806,3 +806,25 @@ integralEnumFromTo n m = map fromInteger [toInteger n .. toInteger m]
 integralEnumFromThenTo :: Integral a => a -> a -> a -> [a]
 integralEnumFromThenTo n1 n2 m
   = map fromInteger [toInteger n1, toInteger n2 .. toInteger m]
+
+-- mkRational related code
+
+data FractionalExponentBase
+  = Base2
+  | Base10
+  deriving (Show)
+
+mkRationalBase2 :: Rational -> Integer -> Rational
+mkRationalBase2 r e = mkRationalWithExponentBase r e Base2
+
+mkRationalBase10 :: Rational -> Integer -> Rational
+mkRationalBase10 r e = mkRationalWithExponentBase r e Base10
+
+mkRationalWithExponentBase :: Rational -> Integer
+                           -> FractionalExponentBase -> Rational
+mkRationalWithExponentBase r e feb = r * (eb ^^ e)
+  where eb = case feb of Base2 -> 2 ; Base10 -> 10
+
+-- Note [fractional exponent bases] For hexadecimal rationals of
+-- the form 0x0.3p10 the exponent is given on base 2 rather than
+-- base 10. These are the only options, hence the sum type. See also #15646.

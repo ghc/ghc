@@ -62,11 +62,14 @@ import GHC.Builtin.Types.Prim
 import GHC.Tc.Solver.Monad (InertSet, emptyInert)
 import GHC.Tc.Utils.TcType (isStringTy)
 import GHC.Types.CompleteMatch (CompleteMatch)
+import GHC.Types.SourceText (FractionalLit, fractionalLitFromRational, rationalFromFractionalLit)
 
 import Numeric (fromRat)
 import Data.Foldable (find)
 import Data.Ratio
 import qualified Data.Semigroup as Semi
+
+-- import GHC.Driver.Ppr
 
 --
 -- * Normalised refinement types
@@ -293,7 +296,7 @@ data PmLitValue
   -- lists
   | PmLitString FastString
   | PmLitOverInt Int {- How often Negated? -} Integer
-  | PmLitOverRat Int {- How often Negated? -} Rational
+  | PmLitOverRat Int {- How often Negated? -} FractionalLit
   | PmLitOverString FastString
 
 -- | Undecidable semantic equality result.
@@ -523,7 +526,7 @@ overloadPmLit :: Type -> PmLit -> Maybe PmLit
 overloadPmLit ty (PmLit _ v) = PmLit ty <$> go v
   where
     go (PmLitInt i)          = Just (PmLitOverInt 0 i)
-    go (PmLitRat r)          = Just (PmLitOverRat 0 r)
+    go (PmLitRat r)          = Just $! PmLitOverRat 0 $! fractionalLitFromRational r
     go (PmLitString s)
       | ty `eqType` stringTy = Just v
       | otherwise            = Just (PmLitOverString s)
@@ -573,7 +576,12 @@ coreExprAsPmLit e = case collectArgs e of
   (Var x, [Lit l])
     | idName x `elem` [unpackCStringName, unpackCStringUtf8Name]
     -> literalToPmLit stringTy l
-  _ -> Nothing
+  (Var x, [Lit l])
+    | idName x `elem` [mkRationalBase10Name, mkRationalBase2Name]
+    -> literalToPmLit stringTy l
+
+  _ -> -- pprTrace "coreExprAsPmLit:" (ppr e)
+       Nothing
   where
     is_lit Lit{} = True
     is_lit _     = False
@@ -609,7 +617,8 @@ instance Outputable PmLitValue where
   ppr (PmLitChar c)       = pprHsChar c
   ppr (PmLitString s)     = pprHsString s
   ppr (PmLitOverInt n i)  = minuses n (ppr i)
-  ppr (PmLitOverRat n r)  = minuses n (ppr (double (fromRat r)))
+  -- TODO: Large rationals probably shouldn't go through fromRat
+  ppr (PmLitOverRat n r)  = minuses n (ppr (double (fromRat $ rationalFromFractionalLit r)))
   ppr (PmLitOverString s) = pprHsString s
 
 -- Take care of negated literals

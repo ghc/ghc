@@ -265,6 +265,7 @@ basicKnownKeyNames
 
         -- Numeric stuff
         negateName, minusName, geName, eqName,
+        mkRationalBase2Name, mkRationalBase10Name,
 
         -- Conversion functions
         rationalTyConName,
@@ -1252,7 +1253,8 @@ toIntegerName       = varQual gHC_REAL (fsLit "toInteger")    toIntegerClassOpKe
 toRationalName      = varQual gHC_REAL (fsLit "toRational")   toRationalClassOpKey
 fromIntegralName    = varQual  gHC_REAL (fsLit "fromIntegral")fromIntegralIdKey
 realToFracName      = varQual  gHC_REAL (fsLit "realToFrac")  realToFracIdKey
-
+mkRationalBase2Name  = varQual  gHC_REAL  (fsLit "mkRationalBase2")  mkRationalBase2IdKey
+mkRationalBase10Name = varQual  gHC_REAL  (fsLit "mkRationalBase10") mkRationalBase10IdKey
 -- PrelFloat classes
 floatingClassName, realFloatClassName :: Name
 floatingClassName  = clsQual gHC_FLOAT (fsLit "Floating")  floatingClassKey
@@ -2522,6 +2524,15 @@ naturalRemIdKey            = mkPreludeMiscIdUnique 655
 naturalQuotRemIdKey        = mkPreludeMiscIdUnique 656
 
 bignatFromWordListIdKey    = mkPreludeMiscIdUnique 670
+
+------------------------------------------------------
+-- ghci optimization for big rationals 700-749 uniques
+------------------------------------------------------
+
+-- Creating rationals at runtime.
+mkRationalBase2IdKey, mkRationalBase10IdKey :: Unique
+mkRationalBase2IdKey  = mkPreludeMiscIdUnique 700
+mkRationalBase10IdKey = mkPreludeMiscIdUnique 701 :: Unique
 
 {-
 ************************************************************************
