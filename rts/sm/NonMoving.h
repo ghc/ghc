@@ -27,6 +27,8 @@
 // In blocks
 #define NONMOVING_SEGMENT_BLOCKS (NONMOVING_SEGMENT_SIZE / BLOCK_SIZE)
 
+#define USE_NONMOVING (RtsFlags.GcFlags.useNonmovingPinned || RtsFlags.GcFlags.concurrentNonmoving)
+
 _Static_assert(NONMOVING_SEGMENT_SIZE % BLOCK_SIZE == 0,
                "non-moving segment size must be multiple of block size");
 

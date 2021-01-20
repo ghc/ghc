@@ -52,7 +52,21 @@ typedef struct _GC_FLAGS {
     double  oldGenFactor;
     double  pcFreeHeap;
 
-    bool         useNonmoving; // default = false
+    // The non-moving collector has a few modes:
+    //
+    //   * if !THREADED_RTS: non-moving oldest generation, non-concurrent collection
+    //
+    //   * if THREADED_RTS && useNonmovingPinned: moving oldest generation,
+    //     non-moving allocation of pinned objects, non-concurrent collection
+    //
+    //   * if THREADED_RTS && concurrentNonmoving: non-moving oldest generation,
+    //     non-moving allocation of pinned objects, concurrent collection
+    //
+    //   * if THREADED_RTS && useNonmovingPinned && concurrentNonmoving:
+    //     moving oldest generation, non-moving allocation of pinned objects,
+    //     non-concurrent collection
+    bool         useNonmovingPinned; // Allocate pinned objects directly into non-moving heap; default = false
+    bool         concurrentNonmoving; // Use non-moving heap and concurrent collection for oldest generation; default = false
     bool         nonmovingSelectorOpt; // Do selector optimization in the
                                        // non-moving heap, default = false
     uint32_t     generations;
