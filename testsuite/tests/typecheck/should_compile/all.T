@@ -664,6 +664,11 @@ test('T15499', normal, compile, [''])
 test('T15586', normal, compile, [''])
 test('T15368', normal, compile, ['-fdefer-type-errors'])
 test('T15645', normal, compile, ['-Wwarn=missing-monadfail-instances'])
+test('T15646',
+     compile_timeout_multiplier(0.01),
+     # 0.01 may seem tiny (1 is timeout after 300s, so this is 3 seconds),
+     # but if this test regresses, it will take about 10 seconds to finish.
+     compile, [''])
 test('T15778', normal, compile, [''])
 test('T14761c', expect_broken_for(16540, ['hpc', 'profasm', 'optasm']), compile, [''])
 test('T16008', normal, compile, [''])
