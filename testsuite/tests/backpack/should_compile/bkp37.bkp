@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE FlexibleInstances #-}
 unit p where
     signature A where
