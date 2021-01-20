@@ -22,6 +22,7 @@
 -----------------------------------------------------------------------------
 
 module Data.Bits (
+  -- * Type classes
   Bits(
     (.&.), (.|.), xor,
     complement,
@@ -46,13 +47,13 @@ module Data.Bits (
     countLeadingZeros,
     countTrailingZeros
   ),
-
+  -- * Extra functions
   bitDefault,
   testBitDefault,
   popCountDefault,
   toIntegralSized,
   oneBits,
-
+  -- * Newtypes
   And(..), Ior(..), Xor(..), Iff(..)
  ) where
 
