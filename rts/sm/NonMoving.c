@@ -720,9 +720,11 @@ static void free_nonmoving_allocator(struct NonmovingAllocator *alloc)
     stgFree(alloc);
 }
 
+#define USE_NONMOVING (RtsFlags.GcFlags.useNonmovingPinned || RtsFlags.GcFlags.concurrentNonmoving)
+
 void nonmovingInit(void)
 {
-    if (! RtsFlags.GcFlags.useNonmoving) return;
+    if (! USE_NONMOVING) return;
 #if defined(THREADED_RTS)
     initMutex(&nonmoving_collection_mutex);
     initCondition(&concurrent_coll_finished);
@@ -737,7 +739,7 @@ void nonmovingInit(void)
 // Stop any nonmoving collection in preparation for RTS shutdown.
 void nonmovingStop(void)
 {
-    if (! RtsFlags.GcFlags.useNonmoving) return;
+    if (! USE_NONMOVING) return;
 #if defined(THREADED_RTS)
     if (mark_thread) {
         debugTrace(DEBUG_nonmoving_gc,
@@ -751,7 +753,7 @@ void nonmovingStop(void)
 
 void nonmovingExit(void)
 {
-    if (! RtsFlags.GcFlags.useNonmoving) return;
+    if (! USE_NONMOVING) return;
 
     // First make sure collector is stopped before we tear things down.
     nonmovingStop();
@@ -992,7 +994,7 @@ void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
     // again for the sync if we let it go, because it'll immediately start doing
     // a major GC, because that's what we do when exiting scheduler (see
     // exitScheduler()).
-    if (sched_state == SCHED_RUNNING) {
+    if (sched_state == SCHED_RUNNING && RtsFlags.GcFlags.concurrentNonmoving) {
         concurrent_coll_running = true;
         nonmoving_write_barrier_enabled = true;
         debugTrace(DEBUG_nonmoving_gc, "Starting concurrent mark thread");
