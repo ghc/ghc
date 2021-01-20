@@ -1,5 +1,5 @@
 
-tcfail150.hs:6:3: error:
+tcfail150.hs:7:3: error:
     • Constraint ‘Eq a’ in the type of ‘op’
         constrains only the class type variables
       Enable ConstrainedClassMethods to allow it

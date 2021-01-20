@@ -1,5 +1,5 @@
 
-T6022.hs:3:1: error:
+T6022.hs:4:1: error:
     • Non type-variable argument in the constraint: Eq ([a] -> a)
       (Use FlexibleContexts to permit this)
     • When checking the inferred type

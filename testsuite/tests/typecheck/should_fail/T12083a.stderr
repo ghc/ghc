@@ -1,10 +1,10 @@
 
-T12083a.hs:5:1: error:
+T12083a.hs:6:1: error:
     • Illegal qualified type: Num a => a
       Perhaps you intended to use RankNTypes
     • In the type synonym declaration for ‘Constrd’
 
-T12083a.hs:9:26: error:
+T12083a.hs:10:26: error:
     • Data constructor ‘ExistentiallyLost’ has existential type variables, a context, or a specialised result type
         ExistentiallyLost :: forall u. TC u => u -> ExistentiallyLost
         (Enable ExistentialQuantification or GADTs to allow this)

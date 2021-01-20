@@ -1,5 +1,5 @@
 
-T12563.hs:7:15: error:
+T12563.hs:8:15: error:
     • Couldn't match expected type ‘(forall a. f0 a) -> f0 r0’
                   with actual type ‘p0’
       Cannot instantiate unification variable ‘p0’
@@ -8,5 +8,5 @@ T12563.hs:7:15: error:
       In the expression: foo g
       In the expression: \ g -> foo g
     • Relevant bindings include
-        g :: p0 (bound at T12563.hs:7:6)
-        x :: p0 -> f0 r0 (bound at T12563.hs:7:1)
+        g :: p0 (bound at T12563.hs:8:6)
+        x :: p0 -> f0 r0 (bound at T12563.hs:8:1)

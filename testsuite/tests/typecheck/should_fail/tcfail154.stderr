@@ -1,5 +1,5 @@
 
-tcfail154.hs:12:10: error:
+tcfail154.hs:13:10: error:
     • Variable ‘a’ occurs more often
         in the constraint ‘C a a’ than in the instance head ‘Eq (T a)’
       (Use UndecidableInstances to permit this)

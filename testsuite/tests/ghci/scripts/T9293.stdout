@@ -1,8 +1,49 @@
 options currently set: none.
 base language is: Haskell2010
 with the following modifiers:
+  -XBangPatterns
+  -XBinaryLiterals
+  -XNoCUSKs
+  -XConstrainedClassMethods
+  -XConstraintKinds
   -XNoDatatypeContexts
-  -XNondecreasingIndentation
+  -XDeriveDataTypeable
+  -XDeriveFoldable
+  -XDeriveFunctor
+  -XDeriveGeneric
+  -XDeriveLift
+  -XDeriveTraversable
+  -XEmptyCase
+  -XEmptyDataDeriving
+  -XExistentialQuantification
+  -XExplicitForAll
+  -XFlexibleContexts
+  -XFlexibleInstances
+  -XGADTSyntax
+  -XGeneralizedNewtypeDeriving
+  -XGeneralisedNewtypeDeriving
+  -XImportQualifiedPost
+  -XInstanceSigs
+  -XKindSignatures
+  -XMultiParamTypeClasses
+  -XNumericUnderscores
+  -XNamedFieldPuns
+  -XNamedWildCards
+  -XHexFloatLiterals
+  -XPatternSignatures
+  -XPolyKinds
+  -XPolymorphicComponents
+  -XPostfixOperators
+  -XRank2Types
+  -XRankNTypes
+  -XRecordPuns
+  -XScopedTypeVariables
+  -XStandaloneDeriving
+  -XStandaloneKindSignatures
+  -XTupleSections
+  -XTypeApplications
+  -XTypeOperators
+  -XTypeSynonymInstances
 GHCi-specific dynamic flag settings:
 other dynamic, non-language, flag settings:
   -fno-diagnostics-show-caret
@@ -20,11 +61,51 @@ Should fail, GADTs is not enabled
 options currently set: none.
 base language is: Haskell2010
 with the following modifiers:
+  -XBangPatterns
+  -XBinaryLiterals
+  -XNoCUSKs
+  -XConstrainedClassMethods
+  -XConstraintKinds
   -XNoDatatypeContexts
+  -XDeriveDataTypeable
+  -XDeriveFoldable
+  -XDeriveFunctor
+  -XDeriveGeneric
+  -XDeriveLift
+  -XDeriveTraversable
+  -XEmptyCase
+  -XEmptyDataDeriving
+  -XExistentialQuantification
+  -XExplicitForAll
+  -XFlexibleContexts
+  -XFlexibleInstances
   -XGADTSyntax
   -XGADTs
+  -XGeneralizedNewtypeDeriving
+  -XGeneralisedNewtypeDeriving
+  -XImportQualifiedPost
+  -XInstanceSigs
+  -XKindSignatures
   -XMonoLocalBinds
-  -XNondecreasingIndentation
+  -XMultiParamTypeClasses
+  -XNumericUnderscores
+  -XNamedFieldPuns
+  -XNamedWildCards
+  -XHexFloatLiterals
+  -XPatternSignatures
+  -XPolyKinds
+  -XPolymorphicComponents
+  -XPostfixOperators
+  -XRank2Types
+  -XRankNTypes
+  -XRecordPuns
+  -XScopedTypeVariables
+  -XStandaloneDeriving
+  -XStandaloneKindSignatures
+  -XTupleSections
+  -XTypeApplications
+  -XTypeOperators
+  -XTypeSynonymInstances
 GHCi-specific dynamic flag settings:
 other dynamic, non-language, flag settings:
   -fno-diagnostics-show-caret
@@ -42,10 +123,50 @@ Should work, GADTs is in force from :set
 options currently set: none.
 base language is: Haskell2010
 with the following modifiers:
+  -XBangPatterns
+  -XBinaryLiterals
+  -XNoCUSKs
+  -XConstrainedClassMethods
+  -XConstraintKinds
   -XNoDatatypeContexts
+  -XDeriveDataTypeable
+  -XDeriveFoldable
+  -XDeriveFunctor
+  -XDeriveGeneric
+  -XDeriveLift
+  -XDeriveTraversable
+  -XEmptyCase
+  -XEmptyDataDeriving
+  -XExistentialQuantification
+  -XExplicitForAll
+  -XFlexibleContexts
+  -XFlexibleInstances
   -XGADTSyntax
+  -XGeneralizedNewtypeDeriving
+  -XGeneralisedNewtypeDeriving
+  -XImportQualifiedPost
+  -XInstanceSigs
+  -XKindSignatures
   -XMonoLocalBinds
-  -XNondecreasingIndentation
+  -XMultiParamTypeClasses
+  -XNumericUnderscores
+  -XNamedFieldPuns
+  -XNamedWildCards
+  -XHexFloatLiterals
+  -XPatternSignatures
+  -XPolyKinds
+  -XPolymorphicComponents
+  -XPostfixOperators
+  -XRank2Types
+  -XRankNTypes
+  -XRecordPuns
+  -XScopedTypeVariables
+  -XStandaloneDeriving
+  -XStandaloneKindSignatures
+  -XTupleSections
+  -XTypeApplications
+  -XTypeOperators
+  -XTypeSynonymInstances
 GHCi-specific dynamic flag settings:
 other dynamic, non-language, flag settings:
   -fno-diagnostics-show-caret
