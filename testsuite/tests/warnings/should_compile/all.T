@@ -32,3 +32,6 @@ test('UnusedPackages', normal, multimod_compile,
     ['UnusedPackages.hs', '-package=bytestring -package=base -package=process -package=ghc -Wunused-packages'])
 
 test('T18402', normal, compile, [''])
+
+test('MissingSignatures', normal, compile, [''])
+test('MissingExportedSignatures', normal, compile, [''])
