@@ -140,34 +140,21 @@ seqTerm (Term _ l) = seqKnownShape seqTerm l
 --  * We want to share between Cpr and Termination, so KnownShape
 --  * Cpr is different from Termination in that we give up once one result
 --    isn't constructed
+--  * It is useful to keep non-terminating CPR, because strictness analysis
+--    might have found out that we are strict in the non-terminating component
+--    anyway, or there's a later seq on it.
+--    But that also means we are too optimistic in the following example:
+--      h1 :: Int -> Maybe Int
+--      h1 n = Just (sum [0..n])
+--      {-# NOINLINE h1 #-}
+--
+--      h2 :: Int -> Int
+--      h2 n | n < 0     = n
+--           | otherwise = case h1 n of Just blah -> blah
+--      {-# NOINLINE h2 #-}
+--    We'd wrongfully give h2 the CPR property here. The case on h1 won't cancel away.
 --  * These are the key values to support, in case of a redesign. Write them down first:
 --      topTerm, botTerm, whnfTerm, topCpr, botCpr, conCpr
---  * That is: For Termination we might or might not have nested info,
---    independent of termination of the current level. This is why Maybe
---    So, i.e. when we return a function (or newtype there-of) we'd have
---    something like @Termination Terminates Nothing@. We know evaluation
---    terminates, but we don't have any information on shape.
---    In fact, it's the same as
---  * Factoring Termination this way (i.e., TerminationFlag x shape) means less
---    duplication
--- Alternative: Interleave everything. Looks like this:
--- data Blub (b::Bool)
---   = NoCpr (Blub 'False)
---   | Cpr  ConTag TerminationFlag (Blub b)
---   | Term ConTag TerminationFlag (Blub b)
---   | TopBlub
---   | BotBlub
---  + More compact
---  + No Maybe (well, not here, still in Termination)
---  + Easier to handle in WW: Termination and Cpr encode compatible shape info
---    by construction
---  - Harder to understand: NoCpr means we can still have Termination info
---  - Spreads Termination stuff between two lattices
--- ... Probably not such a good idea, after all.
---
--- We keep TerminationFlag in Cpr if we can't transform beyond a MightDiverge anyway?
--- Because a seq might make a constructed product available again. WW makes sure to
--- split only as long as termination allows it, so we should be safe.
 
 --------
 -- * Cpr
