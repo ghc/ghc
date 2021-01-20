@@ -166,9 +166,15 @@ shortCutLit platform (HsIntegral int@(IL src neg i)) ty
         -- literals, compiled without -O
 
 shortCutLit _ (HsFractional f) ty
-  | isFloatTy ty  = Just (mkLit floatDataCon  (HsFloatPrim noExtField f))
-  | isDoubleTy ty = Just (mkLit doubleDataCon (HsDoublePrim noExtField f))
+  | isFloatTy ty && valueInRange  = Just (mkLit floatDataCon  (HsFloatPrim noExtField f))
+  | isDoubleTy ty && valueInRange = Just (mkLit doubleDataCon (HsDoublePrim noExtField f))
   | otherwise     = Nothing
+  where
+    valueInRange =
+      case f of
+        FL { fl_exp = e } -> (-100) <= e && e <= 100
+        -- We limit short-cutting Fractional Literals to when their power of 10
+        -- is less than 100, which ensures desugaring isn't slow.
 
 shortCutLit _ (HsIsString src s) ty
   | isStringTy ty = Just (HsLit noExtField (HsString src s))
