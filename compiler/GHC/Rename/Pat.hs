@@ -863,21 +863,26 @@ rnLit :: HsLit p -> RnM ()
 rnLit (HsChar _ c) = checkErr (inCharRange c) (bogusCharError c)
 rnLit _ = return ()
 
--- Turn a Fractional-looking literal which happens to be an integer into an
+-- | Turn a Fractional-looking literal which happens to be an integer into an
 -- Integer-looking literal.
+-- We only convert numbers where the exponent is between 0 and 100 to avoid
+-- converting huge numbers and incurring long compilation times. See #15646.
 generalizeOverLitVal :: OverLitVal -> OverLitVal
-generalizeOverLitVal (HsFractional (FL {fl_text=src,fl_neg=neg,fl_value=val}))
-    | denominator val == 1 = HsIntegral (IL { il_text=src
-                                            , il_neg=neg
-                                            , il_value=numerator val})
+generalizeOverLitVal (HsFractional fl@(FL {fl_text=src,fl_neg=neg,fl_exp=e}))
+    | e >= -100 && e <= 100
+    , let val = rationalFromFractionalLit fl
+    , denominator val == 1 = HsIntegral (IL {il_text=src,il_neg=neg,il_value=numerator val})
 generalizeOverLitVal lit = lit
 
 isNegativeZeroOverLit :: HsOverLit t -> Bool
 isNegativeZeroOverLit lit
  = case ol_val lit of
-        HsIntegral i   -> 0 == il_value i && il_neg i
-        HsFractional f -> 0 == fl_value f && fl_neg f
-        _              -> False
+        HsIntegral i    -> 0 == il_value i && il_neg i
+        -- For HsFractional, the value of fl is n * (b ^^ e) so it is sufficient
+        -- to check if n = 0. b is equal to either 2 or 10. We don't call
+        -- rationalFromFractionalLit here as it is expensive when e is big.
+        HsFractional fl -> 0 == fl_signi fl && fl_neg fl
+        _               -> False
 
 {-
 Note [Negative zero]
