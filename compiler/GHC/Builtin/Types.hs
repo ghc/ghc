@@ -1959,8 +1959,6 @@ extractPromotedList tys = go tys
       | otherwise
       = pprPanic "extractPromotedList" (ppr tys)
 
-
-
 ---------------------------------------
 -- ghc-bignum
 ---------------------------------------
