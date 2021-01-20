@@ -81,7 +81,7 @@ alloc_for_copy (uint32_t size, uint32_t gen_no)
     if (gen_no < gct->evac_gen_no) {
         if (gct->eager_promotion) {
             gen_no = gct->evac_gen_no;
-        } else if (RTS_UNLIKELY(RtsFlags.GcFlags.useNonmoving) && deadlock_detect_gc) {
+        } else if (RTS_UNLIKELY(RtsFlags.GcFlags.concurrentNonmoving) && deadlock_detect_gc) {
             /* See Note [Deadlock detection under nonmoving collector]. */
             gen_no = oldest_gen->no;
         } else {
@@ -89,7 +89,7 @@ alloc_for_copy (uint32_t size, uint32_t gen_no)
         }
     }
 
-    if (RTS_UNLIKELY(RtsFlags.GcFlags.useNonmoving)) {
+    if (RTS_UNLIKELY(RtsFlags.GcFlags.concurrentNonmoving)) {
         if (gen_no == oldest_gen->no) {
             gct->copied += size;
             to = nonmovingAllocate(gct->cap, size);
@@ -354,7 +354,7 @@ evacuate_large(StgPtr p)
   new_gen = &generations[new_gen_no];
 
   __atomic_fetch_or(&bd->flags, BF_EVACUATED, __ATOMIC_ACQ_REL);
-  if (RTS_UNLIKELY(RtsFlags.GcFlags.useNonmoving && new_gen == oldest_gen)) {
+  if (RTS_UNLIKELY(RtsFlags.GcFlags.concurrentNonmoving && new_gen == oldest_gen)) {
       __atomic_fetch_or(&bd->flags, BF_NONMOVING, __ATOMIC_ACQ_REL);
   }
   initBdescr(bd, new_gen, new_gen->to);
@@ -391,7 +391,7 @@ evacuate_large(StgPtr p)
 STATIC_INLINE void
 evacuate_static_object (StgClosure **link_field, StgClosure *q)
 {
-    if (RTS_UNLIKELY(RtsFlags.GcFlags.useNonmoving)) {
+    if (RTS_UNLIKELY(RtsFlags.GcFlags.concurrentNonmoving)) {
         // See Note [Static objects under the nonmoving collector] in Storage.c.
         if (major_gc && !deadlock_detect_gc)
             markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, q);
@@ -508,7 +508,7 @@ evacuate_compact (StgPtr p)
     // for that - the only code touching the generation of the block is
     // in the GC, and that should never see blocks other than the first)
     bd->flags |= BF_EVACUATED;
-    if (RTS_UNLIKELY(RtsFlags.GcFlags.useNonmoving && new_gen == oldest_gen)) {
+    if (RTS_UNLIKELY(RtsFlags.GcFlags.concurrentNonmoving && new_gen == oldest_gen)) {
       __atomic_fetch_or(&bd->flags, BF_NONMOVING, __ATOMIC_RELAXED);
     }
     initBdescr(bd, new_gen, new_gen->to);

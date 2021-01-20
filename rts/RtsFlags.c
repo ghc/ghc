@@ -163,7 +163,8 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.heapSizeSuggestionAuto = false;
     RtsFlags.GcFlags.pcFreeHeap         = 3;    /* 3% */
     RtsFlags.GcFlags.oldGenFactor       = 2;
-    RtsFlags.GcFlags.useNonmoving       = false;
+    RtsFlags.GcFlags.useNonmovingPinned = false;
+    RtsFlags.GcFlags.concurrentNonmoving = false;
     RtsFlags.GcFlags.nonmovingSelectorOpt = false;
     RtsFlags.GcFlags.generations        = 2;
     RtsFlags.GcFlags.squeezeUpdFrames   = true;
@@ -980,12 +981,17 @@ error = true;
                   else if (strequal("copying-gc",
                                &rts_argv[arg][2])) {
                       OPTION_SAFE;
-                      RtsFlags.GcFlags.useNonmoving = false;
+                      RtsFlags.GcFlags.concurrentNonmoving = false;
                   }
                   else if (strequal("nonmoving-gc",
                                &rts_argv[arg][2])) {
                       OPTION_SAFE;
-                      RtsFlags.GcFlags.useNonmoving = true;
+                      RtsFlags.GcFlags.concurrentNonmoving = true;
+                  }
+                  else if (strequal("nonmoving-pinned",
+                               &rts_argv[arg][2])) {
+                      OPTION_SAFE;
+                      RtsFlags.GcFlags.useNonmovingPinned = true;
                   }
 #if defined(THREADED_RTS)
 #if defined(mingw32_HOST_OS)
@@ -1663,7 +1669,7 @@ error = true;
 
                 case 'n':
                     OPTION_SAFE;
-                    RtsFlags.GcFlags.useNonmoving = true;
+                    RtsFlags.GcFlags.concurrentNonmoving = true;
                     unchecked_arg_start++;
                     if (rts_argv[arg][3] == 's') {
                         RtsFlags.GcFlags.nonmovingSelectorOpt = true;
@@ -1845,16 +1851,16 @@ static void normaliseRtsOpts (void)
         RtsFlags.MiscFlags.install_seh_handlers = true;
     }
 
-    if (RtsFlags.GcFlags.useNonmoving && RtsFlags.GcFlags.generations == 1) {
+    if (RtsFlags.GcFlags.concurrentNonmoving && RtsFlags.GcFlags.generations == 1) {
         barf("The non-moving collector doesn't support -G1");
     }
 
     if (RtsFlags.ProfFlags.doHeapProfile != NO_HEAP_PROFILING &&
-            RtsFlags.GcFlags.useNonmoving) {
+            RtsFlags.GcFlags.concurrentNonmoving) {
         barf("The non-moving collector doesn't support profiling");
     }
 
-    if (RtsFlags.GcFlags.compact && RtsFlags.GcFlags.useNonmoving) {
+    if (RtsFlags.GcFlags.compact && RtsFlags.GcFlags.concurrentNonmoving) {
         errorBelch("The non-moving collector cannot be used in conjunction with\n"
                    "the compacting collector.");
         errorUsage();
