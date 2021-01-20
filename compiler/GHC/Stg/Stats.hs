@@ -32,7 +32,6 @@ import GHC.Prelude
 import GHC.Stg.Syntax
 
 import GHC.Types.Id (Id)
-import GHC.Utils.Panic
 
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -169,5 +168,3 @@ statExpr (StgCase expr _ _ alts)
   where
     stat_alts alts
         = combineSEs (map statExpr [ e | (_,_,e) <- alts ])
-
-statExpr (StgLam {}) = panic "statExpr StgLam"
