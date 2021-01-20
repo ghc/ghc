@@ -1,0 +1,5 @@
+:set -XGeneralizedNewtypeDeriving
+:set -XNoGeneralizedNewtypeDeriving
+:load T19243
+-- The following should report safe
+:info A
