@@ -1191,7 +1191,7 @@ allocatePinned (Capability *cap, W_ n /*words*/, W_ alignment /*bytes*/, W_ alig
         W_ off_w = ALIGN_WITH_OFF_W(p, alignment, align_off);
         memset(p, 0, off_w * sizeof(W_));
         p += off_w;
-        MEMSET_IF_PROFILING_W(p + n, 0, alignment_w - off_w - 1);
+        MEMSET_SLOP_W(p + n, 0, alignment_w - off_w - 1);
         return p;
     }
 
