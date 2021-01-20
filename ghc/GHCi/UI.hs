@@ -3292,7 +3292,7 @@ showLanguages' show_all dflags =
   putStrLn $ showSDoc dflags $ vcat
      [ text "base language is: " <>
          case language dflags of
-           Nothing          -> text "Haskell2010"
+           Nothing          -> text "GHC2021"
            Just Haskell98   -> text "Haskell98"
            Just Haskell2010 -> text "Haskell2010"
            Just GHC2021     -> text "GHC2021"
