@@ -252,3 +252,8 @@ test('EmptyCase009', [],  compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('EmptyCase010', [],  compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+
+# Overloaded patterns and rational pattern matching being broken.
+test('T19384',
+     expect_broken(19384),
+     compile, [''])
