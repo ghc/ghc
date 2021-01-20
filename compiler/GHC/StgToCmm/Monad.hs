@@ -2,6 +2,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 
 -----------------------------------------------------------------------------
@@ -87,6 +88,7 @@ import GHC.Data.FastString
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
+import GHC.Exts (oneShot)
 
 import Control.Monad
 import Data.List
@@ -119,8 +121,26 @@ import Data.List
 
 --------------------------------------------------------
 
-newtype FCode a = FCode { doFCode :: CgInfoDownwards -> CgState -> (a, CgState) }
-    deriving (Functor)
+newtype FCode a = FCode' { doFCode :: CgInfoDownwards -> CgState -> (a, CgState) }
+
+-- Not derived because of #18202.
+-- See Note [The one-shot state monad trick] in GHC.Utils.Monad
+instance Functor FCode where
+  fmap f (FCode m) =
+    FCode $ \info_down state ->
+      case m info_down state of
+        (x, state') -> (f x, state')
+
+-- This pattern synonym makes the simplifier monad eta-expand,
+-- which as a very beneficial effect on compiler performance
+-- See #18202.
+-- See Note [The one-shot state monad trick] in GHC.Utils.Monad
+{-# COMPLETE FCode #-}
+pattern FCode :: (CgInfoDownwards -> CgState -> (a, CgState))
+              -> FCode a
+pattern FCode m <- FCode' m
+  where
+    FCode m = FCode' $ oneShot (\cgInfoDown -> oneShot (\state ->m cgInfoDown state))
 
 instance Applicative FCode where
     pure val = FCode (\_info_down state -> (val, state))
