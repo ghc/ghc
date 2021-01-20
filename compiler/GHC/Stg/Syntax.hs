@@ -89,8 +89,6 @@ import GHC.Types.RepType ( typePrimRep1 )
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 
-import Data.List.NonEmpty ( NonEmpty, toList )
-
 {-
 ************************************************************************
 *                                                                      *
@@ -252,22 +250,6 @@ literals.
                 Type     -- Result type
                          -- We need to know this so that we can
                          -- assign result registers
-
-{-
-************************************************************************
-*                                                                      *
-StgLam
-*                                                                      *
-************************************************************************
-
-StgLam is used *only* during CoreToStg's work. Before CoreToStg has finished it
-encodes (\x -> e) as (let f = \x -> e in f) TODO: Encode this via an extension
-to GenStgExpr à la TTG.
--}
-
-  | StgLam
-        (NonEmpty (BinderP pass))
-        StgExpr    -- Body of lambda
 
 {-
 ************************************************************************
@@ -435,6 +417,30 @@ important):
         DataCon         -- Constructor. Never an unboxed tuple or sum, as those
                         -- are not allocated.
         [StgArg]        -- Args
+
+{-
+Note Stg Passes
+~~~~~~~~~~~~~~~
+Here is a short summary of the STG pipeline and where we use the different
+StgPass data type indexes:
+
+  1. CoreToStg.Prep performs several transformations that prepare the desugared
+     and simplified core to be converted to STG. One of these transformations is
+     making it so that value lambdas only exist as the RHS of a binding.
+
+  2. CoreToStg converts the prepared core to STG, specifically GenStg*
+     parameterised by 'Vanilla.
+
+  3. Stg.Pipeline does a number of passes on the generated STG. One of these is
+     the lambda-lifting pass, which internally uses the 'LiftLams
+     parameterisation to store information for deciding whether or not to lift
+     each binding.
+
+  4. Stg.FVs annotates closures with their free variables. To store these
+     annotations we use the 'CodeGen parameterisation.
+
+  5. Stg.StgToCmm generates Cmm from the annotated STG.
+-}
 
 -- | Used as a data type index for the stgSyn AST
 data StgPass
@@ -709,11 +715,6 @@ pprStgExpr opts e = case e of
    StgApp func args     -> hang (ppr func) 4 (interppSP args)
    StgConApp con args _ -> hsep [ ppr con, brackets (interppSP args) ]
    StgOpApp op args _   -> hsep [ pprStgOp op, brackets (interppSP args)]
-   StgLam bndrs body    -> let ppr_list = brackets . fsep . punctuate comma
-                           in sep [ char '\\' <+> ppr_list (map (pprBndr LambdaBind) (toList bndrs))
-                                      <+> text "->"
-                                  , pprStgExpr opts body
-                                  ]
 
 -- special case: let v = <very specific thing>
 --               in
