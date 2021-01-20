@@ -3291,11 +3291,10 @@ showLanguages' :: Bool -> DynFlags -> IO ()
 showLanguages' show_all dflags =
   putStrLn $ showSDoc dflags $ vcat
      [ text "base language is: " <>
-         case language dflags of
-           Nothing          -> text "GHC2021"
-           Just Haskell98   -> text "Haskell98"
-           Just Haskell2010 -> text "Haskell2010"
-           Just GHC2021     -> text "GHC2021"
+         case lang of
+           Haskell98   -> text "Haskell98"
+           Haskell2010 -> text "Haskell2010"
+           GHC2021     -> text "GHC2021"
      , (if show_all then text "all active language options:"
                     else text "with the following modifiers:") $$
           nest 2 (vcat (map (setting xopt) DynFlags.xFlags))
@@ -3311,10 +3310,10 @@ showLanguages' show_all dflags =
                 quiet = not show_all && test f default_dflags == is_on
 
    default_dflags =
-       defaultDynFlags (settings dflags) (llvmConfig dflags) `lang_set`
-         case language dflags of
-           Nothing -> Just Haskell2010
-           other   -> other
+       defaultDynFlags (settings dflags) (llvmConfig dflags) `lang_set` Just lang
+
+   lang = fromMaybe GHC2021 (language dflags)
+
 
 showTargets :: GHC.GhcMonad m => m ()
 showTargets = mapM_ showTarget =<< GHC.getTargets
