@@ -108,14 +108,18 @@ read_chars :: Handle -> IO String
 read_chars h = loop h ""
   where loop h acc = do
           b <- hIsEOF h
-          if b then return (reverse acc) else do
-          c <- hGetChar h
-          loop h (c:acc)
+          if b
+          then return (reverse acc)
+          else do
+              c <- hGetChar h
+              loop h (c:acc)
 
 read_lines :: Handle -> IO String
 read_lines h = loop h []
   where loop h acc = do
           b <- hIsEOF h
-          if b then return (intercalate "\n" (reverse acc)) else do
-          l <- hGetLine h
-          loop h (l : acc)
+          if b
+          then return (intercalate "\n" (reverse acc))
+          else do
+              l <- hGetLine h
+              loop h (l : acc)
