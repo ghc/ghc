@@ -284,8 +284,8 @@ noWidening = id
 depthWidening :: Widening
 depthWidening (CprSig ty) = CprSig . prune . mark_diverging $ ty
   where
-    mark_diverging ty = ty { ct_cpr = ct_cpr ty `lubCpr` divergeCpr }
-    prune ty = ty { ct_cpr = pruneDeepCpr mAX_DEPTH (ct_cpr ty) }
+    mark_diverging ty = ty { ct_cat = ct_cat ty `lubCAT` divergeCAT }
+    prune ty = ty { ct_cat = pruneDeepCAT mAX_DEPTH (ct_cat ty) }
 
 -- This constant is quite arbitrary. We might well make it a CLI flag if needed
 mAX_DEPTH :: Int
@@ -329,8 +329,9 @@ cprAnalBind top_lvl env widening id rhs
       | otherwise   = rhs_ty
 
     -- See Note [Arity trimming for CPR signatures]
+    -- See Note [Trimming CPR signatures according to Termination]
     -- See Note [Ensuring termination of fixed-point iteration]
-    sig    = widening $ mkCprSigForArity (idArity id) rhs_ty'
+    sig    = widening $ mkCprSigForFunRHS (idArity id) (idDemandInfo id) rhs_ty'
     id'    = -- pprTrace "cprAnalBind" (ppr id $$ ppr rhs_ty' $$ ppr sig) $
              setIdCprInfo id sig
     env'   = extendSigEnv env id sig
@@ -389,7 +390,7 @@ cprFix top_lvl orig_env orig_pairs
     init_sig id rhs
       -- See Note [CPR for data structures]
       | isDataStructure id rhs = topCprSig
-      | otherwise              = mkCprSig (idArity id) divergeCpr
+      | otherwise              = mkCprSig (idArity id) divergeCAT
     -- See Note [Initialising strictness] in GHC.Core.Opt.DmdAnal
     orig_virgin = ae_virgin orig_env
     init_pairs | orig_virgin  = [(setIdCprInfo id (init_sig id rhs), rhs) | (id, rhs) <- orig_pairs ]
@@ -450,6 +451,55 @@ from @f@'s, so it *will* be WW'd:
 
 And the case in @g@ can never cancel away, thus we introduced extra reboxing.
 Hence we always trim the CPR signature of a binding to idArity.
+
+Note [Trimming CPR signatures according to Termination]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+
+  f :: Int -> Maybe Int
+  f n = Just (sum [0..n]) -- assume that `sum` has the CPR property
+  g :: Int -> Int
+  g n | n < 0     = n
+       | otherwise = case f n of Just blah -> blah
+
+For the RHS of 'f', we infer the CPR type `1->#c2(*c1(#))`. That is enough to
+unbox the 'Just' constructor, but not the nested 'I#' constructor, which would
+evaluate the expensive `sum` expression. So we give 'f' the CPR signature
+`1->#c2(*)`, which inhibits WW from unboxing the 'I#'.
+
+Why not do the trimming in WW? Because then we might get CPR where we wouldn't
+expect it, like 'g' above. If we gave 'f' the CPR sig `1->#c2(*c1(#))`, then
+'blah' would have the CPR type `*c1(#)`. In total, 'g' would have the CPR sig
+`1->*c1(*)` and WW would unbox it, but the `case` on `f` would never cancel
+away and we'd rebox the `Int` returned from 'f'.
+
+Note [Improving CPR by considering strictness demand from call sites]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider `T18894`:
+
+  module T18894 (h) where
+  g :: Int -> Int -> (Int,Int)
+  g !m 1 = (2 + m, 0)
+  g m  n = (2 * m, 2 `div` n)
+  h :: Int -> Int
+  h 1 = 0
+  h m | odd m     = snd (g m 2)
+      | otherwise = uncurry (+) (g 2 m)
+
+We infer CPR type `2->#c1(#c1(*), *c1(*))` for 'g's RHS and by
+Note [Trimming CPR signatures according to Termination] we *should* trim that to
+`2->c1(c1(*), *))` for the CPR signature, because unboxing the division might in
+fact diverge and throw a div-by-zero exception.
+
+But if you look at how 'g' is called, you'll see that all call sites evaluate
+the second component of the returned pair anyway! So acutally it would have been
+OK to unbox the division, because all call sites force it anyway.
+
+Demand analysis infers a demand of `UCU(CS(P(1P(U),SP(U))))` on 'g'. Note how
+it says that all call sites evaluate the second component of the pair! We use
+that to improve the termination information with which we trim CPR, as if we
+had inferred `2->#c1(#c1(*), #c1(*))` instead, to get CPR `2->c1(c1(*),c1(*))`
+and unbox both components of the pair.
 -}
 
 data AnalEnv

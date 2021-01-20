@@ -160,7 +160,7 @@ mkWwBodies :: WwOpts
            -> Id             -- ^ The original function
            -> [Demand]       -- ^ Strictness of original function
                              -- (derived from 'idStrictness')
-           -> Cpr            -- ^ Info about function result
+           -> CAT            -- ^ Info about function result
            -> UniqSM (Maybe WwResult)
 
 -- wrap_fn_args E       = \x y -> E
@@ -184,13 +184,13 @@ mkWwBodies opts rhs_fvs fun_id arg_dmds cpr_info
              <- mkWWstr opts arg_ubx_strat wrap_args
 
         -- Do CPR w/w.  See Note [Always do CPR w/w]
-        ; (useful2, wrap_fn_cpr, work_fn_cpr, cpr_res_ty)
+        ; (useful2, wrap_fn_cat, work_fn_cat, cpr_res_ty)
               <- mkWWcpr_start opts ret_ubx_strat res_ty cpr_info
 
         ; let (work_lam_args, work_call_args) = mkWorkerArgs (wo_fun_to_thunk opts) work_args cpr_res_ty
               worker_args_dmds = [idDemandInfo v | v <- work_call_args, isId v]
-              wrapper_body = wrap_fn_args . wrap_fn_cpr . wrap_fn_str . applyToVars work_call_args . Var
-              worker_body = mkLams work_lam_args. work_fn_str . work_fn_cpr . work_fn_args
+              wrapper_body = wrap_fn_args . wrap_fn_cat . wrap_fn_str . applyToVars work_call_args . Var
+              worker_body = mkLams work_lam_args. work_fn_str . work_fn_cat . work_fn_args
 
         ; if isWorkerSmallEnough (wo_max_worker_args opts) (length arg_dmds) work_args
              && not (too_many_args_for_join_point wrap_args)
@@ -215,7 +215,7 @@ mkWwBodies opts rhs_fvs fun_id arg_dmds cpr_info
     has_inlineable_prag = isStableUnfolding (realIdUnfolding fun_id)
                           -- See Note [Do not unpack class dictionaries]
 
-    ret_ubx_strat :: UnboxingStrategy Cpr
+    ret_ubx_strat :: UnboxingStrategy CAT
     ret_ubx_strat = wantToUnboxResult (wo_fam_envs opts)
 
     -- Note [Do not split void functions]
@@ -586,10 +586,10 @@ wantToUnboxArg fam_envs has_inlineable_prag ty dmd
 
 
 -- | 'UnboxingStrategy' for constructed results
-wantToUnboxResult :: FamInstEnvs -> UnboxingStrategy Cpr
+wantToUnboxResult :: FamInstEnvs -> UnboxingStrategy CAT
 -- See Note [Which types are unboxed?]
-wantToUnboxResult fam_envs ty cpr
-  | Just (con_tag, arg_cprs) <- asConCpr cpr
+wantToUnboxResult fam_envs ty cat
+  | Just (con_tag, arg_cats) <- asConCAT cat
   , Just (tc, tc_args, co) <- normSplitTyConApp_maybe fam_envs ty
   -- See Note [non-algebraic or open body type warning]
   , Just dcs <- tyConAlgDataCons_maybe tc <|> open_body_ty_warning
@@ -604,7 +604,7 @@ wantToUnboxResult fam_envs ty cpr
   -- Deactivates CPR worker/wrapper splits on constructors with non-linear
   -- arguments, for the moment, because they require unboxed tuple with variable
   -- multiplicity fields.
-  = Unbox (DataConPatContext dc tc_args co) arg_cprs
+  = Unbox (DataConPatContext dc tc_args co) arg_cats
 
   | otherwise
   = StopUnboxing
@@ -1095,25 +1095,25 @@ dubiousDataConInstArgTys dc tc_args = arg_tys
 
 mkWWcpr_start
   :: WwOpts
-  -> UnboxingStrategy Cpr
+  -> UnboxingStrategy CAT
   -> Type                              -- function body
-  -> Cpr                               -- CPR analysis results
+  -> CAT                               -- CPR analysis results
   -> UniqSM (Bool,                     -- Is w/w'ing useful?
              CoreExpr -> CoreExpr,     -- New wrapper
              CoreExpr -> CoreExpr,     -- New worker
              Type)                     -- Type of worker's body
 -- ^ Entrypoint to CPR W/W. See Note [Worker/wrapper for CPR] for an overview.
-mkWWcpr_start opts want_to_unbox body_ty body_cpr
+mkWWcpr_start opts want_to_unbox body_ty body_cat
   | not (wo_cpr_anal opts) = return (False, id, id, body_ty)
   | otherwise = do
     -- Part (1)
-    res_bndr <- mk_res_bndr body_ty body_cpr
+    res_bndr <- mk_res_bndr body_ty body_cat
     let bind_res_bndr body scope = mkDefaultCase body res_bndr scope
         deref_res_bndr           = Var res_bndr
 
     -- Part (2)
     (useful, fromOL -> transit_vars, wrap_build_res, work_unpack_res) <-
-      mkWWcpr_one opts want_to_unbox res_bndr body_cpr
+      mkWWcpr_one opts want_to_unbox res_bndr body_cat
 
     -- Part (3)
     let (unbox_transit_tup, transit_tup) = move_transit_vars transit_vars
@@ -1129,13 +1129,13 @@ mkWWcpr_start opts want_to_unbox body_ty body_cpr
                 then (False, nop_fn, nop_fn, body_ty)
                 else (True, wrap_fn, work_fn, work_body_ty)
   where
-    mk_res_bndr :: Type -> Cpr -> UniqSM Id
-    mk_res_bndr body_ty body_cpr = do
+    mk_res_bndr :: Type -> CAT -> UniqSM Id
+    mk_res_bndr body_ty body_cat = do
       -- See Note [Linear types and CPR]
       bndr <- mkSysLocalOrCoVarM ww_prefix cprCaseBndrMult body_ty
       -- See Note [Record evaluated-ness in worker/wrapper]
       pure $ setCaseBndrEvald MarkedStrict bndr
-               `setIdCprInfo` mkCprSig 0 body_cpr -- so that we see that it terminates
+               `setIdCprInfo` mkCprSig 0 body_cat -- so that we see that it terminates
 
 -- | What part (2) of Note [Worker/wrapper for CPR] collects.
 --
@@ -1145,32 +1145,32 @@ mkWWcpr_start opts want_to_unbox body_ty body_cpr
 --   4. The result unpacking expression for the worker
 type CprWwResult = (Bool, OrdList Var, CoreExpr -> CoreExpr, CoreExpr -> CoreExpr)
 
-mkWWcpr :: WwOpts -> UnboxingStrategy Cpr -> [Id] -> [Cpr] -> UniqSM CprWwResult
-mkWWcpr opts want_to_unbox vars cprs = do
+mkWWcpr :: WwOpts -> UnboxingStrategy CAT -> [Id] -> [CAT] -> UniqSM CprWwResult
+mkWWcpr opts want_to_unbox vars cats = do
   -- No existentials in 'vars'. 'wantToUnboxResult' should have checked that.
-  MASSERT2( not (any isTyVar vars), ppr vars $$ ppr cprs )
-  MASSERT2( equalLength vars cprs, ppr vars $$ ppr cprs )
+  MASSERT2( not (any isTyVar vars), ppr vars $$ ppr cats )
+  MASSERT2( equalLength vars cats, ppr vars $$ ppr cats )
   (usefuls, varss, wrap_build_ress, work_unpack_ress) <-
-    unzip4 <$> zipWithM (mkWWcpr_one opts want_to_unbox) vars cprs
+    unzip4 <$> zipWithM (mkWWcpr_one opts want_to_unbox) vars cats
   return ( or usefuls
          , concatOL varss
          , foldl' (.) id wrap_build_ress
          , foldl' (.) id work_unpack_ress )
 
-mkWWcpr_one :: WwOpts -> UnboxingStrategy Cpr -> Id -> Cpr -> UniqSM CprWwResult
+mkWWcpr_one :: WwOpts -> UnboxingStrategy CAT -> Id -> CAT -> UniqSM CprWwResult
 -- ^ See if we want to unbox the result and hand off to 'unbox_one_result'.
-mkWWcpr_one opts want_to_unbox res_bndr cpr
+mkWWcpr_one opts want_to_unbox res_bndr cat
   | ASSERT( not (isTyVar res_bndr) ) True
-  , Unbox dcpc arg_cprs <- want_to_unbox (idType res_bndr) cpr
-  = unbox_one_result opts want_to_unbox res_bndr arg_cprs dcpc
+  , Unbox dcpc arg_cats <- want_to_unbox (idType res_bndr) cat
+  = unbox_one_result opts want_to_unbox res_bndr arg_cats dcpc
   | otherwise
   = return (False, unitOL res_bndr, nop_fn, nop_fn)
 
 unbox_one_result
-  :: WwOpts -> UnboxingStrategy Cpr -> Id -> [Cpr] -> DataConPatContext
+  :: WwOpts -> UnboxingStrategy CAT -> Id -> [CAT] -> DataConPatContext
   -> UniqSM CprWwResult
 -- ^ Implements the main bits of part (2) of Note [Worker/wrapper for CPR]
-unbox_one_result opts want_to_unbox res_bndr arg_cprs
+unbox_one_result opts want_to_unbox res_bndr arg_cats
                  DataConPatContext { dcpc_dc = dc, dcpc_tc_args = tc_args
                                    , dcpc_co = co } = do
   -- unboxer (free in `res_bndr`):       |   builder (binds `res_bndr`):
@@ -1184,7 +1184,7 @@ unbox_one_result opts want_to_unbox res_bndr arg_cprs
   MASSERT( null _exs ) -- Should have been caught by wantToUnboxResult
 
   let -- transfer cpr info to field binders
-      arg_ids' = zipWithEqual "unbox_one_result" (flip setIdCprInfo . mkCprSig 0) arg_cprs arg_ids
+      arg_ids' = zipWithEqual "unbox_one_result" (flip setIdCprInfo . mkCprSig 0) arg_cats arg_ids
       -- con_app = (C a b |> sym co)
       con_app = mkConApp2 dc tc_args arg_ids' `mkCast` mkSymCo co
       -- this_wrap_build_res body = (let res_bndr = C a b |> sym co in <body>[r])
@@ -1193,7 +1193,7 @@ unbox_one_result opts want_to_unbox res_bndr arg_cprs
       this_work_unbox_res = mkUnpackCase (Var res_bndr) co cprCaseBndrMult dc arg_ids'
 
   (nested_useful, transit_vars, wrap_build_res, work_unbox_res) <-
-    mkWWcpr opts want_to_unbox arg_ids' arg_cprs
+    mkWWcpr opts want_to_unbox arg_ids' arg_cats
 
   -- Don't try to WW an unboxed tuple return type when there's nothing inside
   -- to unbox further.
@@ -1258,9 +1258,9 @@ exploits CPR info. Here's an example:
   f :: ... -> (Int, Int)
   f ... = <body>
 ```
-Let's assume the CPR info `body_cpr` for the body of `f` says
+Let's assume the CPR info `body_cat` for the body of `f` says
 "unbox the pair and its components" and `body_ty` is the type of the function
-body `body` (i.e., `(Int, Int)`). Then `mkWWcpr_start body_ty body_cpr` returns
+body `body` (i.e., `(Int, Int)`). Then `mkWWcpr_start body_ty body_cat` returns
 
   * A result-unpacking expression for the worker, with a hole for the fun body:
     ```
@@ -1557,7 +1557,7 @@ mk_absent_let opts arg dmd
   = WARN( True, text "No absent value for" <+> ppr arg_ty )
     Nothing -- Can happen for 'State#' and things of 'VecRep'
   where
-    lifted_arg   = arg `setIdStrictness` botSig `setIdCprInfo` mkCprSig 0 divergeCpr
+    lifted_arg   = arg `setIdStrictness` botSig `setIdCprInfo` mkCprSig 0 divergeCAT
               -- Note in strictness signature that this is bottoming
               -- (for the sake of the "empty case scrutinee not known to
               -- diverge for sure lint" warning)

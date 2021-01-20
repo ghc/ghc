@@ -1,6 +1,6 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 336, types: 368, coercions: 6, joins: 0/1}
+Result size of Tidy Core = {terms: 332, types: 351, coercions: 6, joins: 0/1}
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T18174.$trModule4 :: GHC.Prim.Addr#
@@ -23,141 +23,139 @@ T18174.$trModule :: GHC.Types.Module
 T18174.$trModule = GHC.Types.Module T18174.$trModule3 T18174.$trModule1
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-lvl_r1mk :: Int
-lvl_r1mk = GHC.Types.I# 1#
+lvl_r1n3 :: Int
+lvl_r1n3 = GHC.Types.I# 1#
 
 Rec {
--- RHS size: {terms: 38, types: 38, coercions: 0, joins: 0/1}
+-- RHS size: {terms: 38, types: 37, coercions: 0, joins: 0/1}
 T18174.$wfac3 :: forall {a}. GHC.Prim.Int# -> a -> (# a, Int #)
 T18174.$wfac3
-  = \ (@a_s1d4) (ww_s1d9 :: GHC.Prim.Int#) (w_s1d6 :: a_s1d4) ->
-      case GHC.Prim.<# ww_s1d9 2# of {
+  = \ (@a_s1cU) (ww_s1cY :: GHC.Prim.Int#) (w_s1cW :: a_s1cU) ->
+      case GHC.Prim.<# ww_s1cY 2# of {
         __DEFAULT ->
           let {
-            ds_s186 :: (a_s1d4, Int)
-            ds_s186 = case T18174.$wfac3 @a_s1d4 (GHC.Prim.-# ww_s1d9 1#) w_s1d6 of { (# ww2_s1dd, ww3_s1de #) -> (ww2_s1dd, ww3_s1de) } } in
-          (# case ds_s186 of { (s'_aXb, n'_aXc) -> s'_aXb }, case ds_s186 of { (s'_aXb, n'_aXc) -> case n'_aXc of { GHC.Types.I# ww2_s1d2 -> GHC.Types.I# (GHC.Prim.*# ww2_s1d2 ww2_s1d2) } } #);
-        1# -> (# w_s1d6, lvl_r1mk #)
+            ds_s17X :: (a_s1cU, Int)
+            ds_s17X = case T18174.$wfac3 @a_s1cU (GHC.Prim.-# ww_s1cY 1#) w_s1cW of { (# ww1_s1d2, ww2_s1d3 #) -> (ww1_s1d2, ww2_s1d3) } } in
+          (# case ds_s17X of { (s'_aX7, n'_aX8) -> s'_aX7 }, case ds_s17X of { (s'_aX7, n'_aX8) -> case n'_aX8 of { GHC.Types.I# ww1_s1cS -> GHC.Types.I# (GHC.Prim.*# ww1_s1cS ww1_s1cS) } } #);
+        1# -> (# w_s1cW, lvl_r1n3 #)
       }
 end Rec }
 
--- RHS size: {terms: 14, types: 16, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 14, types: 15, coercions: 0, joins: 0/0}
 fac3 :: forall a. Int -> a -> (a, Int)
-fac3 = \ (@a_s1d4) (w_s1d5 :: Int) (w1_s1d6 :: a_s1d4) -> case w_s1d5 of { GHC.Types.I# ww1_s1d9 -> case T18174.$wfac3 @a_s1d4 ww1_s1d9 w1_s1d6 of { (# ww3_s1dd, ww4_s1de #) -> (ww3_s1dd, ww4_s1de) } }
+fac3 = \ (@a_s1cU) (w_s1cV :: Int) (w1_s1cW :: a_s1cU) -> case w_s1cV of { GHC.Types.I# ww_s1cY -> case T18174.$wfac3 @a_s1cU ww_s1cY w1_s1cW of { (# ww1_s1d2, ww2_s1d3 #) -> (ww1_s1d2, ww2_s1d3) } }
 
 Rec {
--- RHS size: {terms: 24, types: 21, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 24, types: 20, coercions: 0, joins: 0/0}
 T18174.$wfac2 :: forall {a}. GHC.Prim.Int# -> a -> (# a, GHC.Prim.Int# #)
 T18174.$wfac2
-  = \ (@a_s1dh) (ww_s1dm :: GHC.Prim.Int#) (w_s1dj :: a_s1dh) ->
-      case GHC.Prim.<# ww_s1dm 2# of {
-        __DEFAULT -> case T18174.$wfac2 @a_s1dh (GHC.Prim.-# ww_s1dm 1#) w_s1dj of { (# ww2_s1ds, ww3_s1du #) -> (# ww2_s1ds, GHC.Prim.*# ww3_s1du ww3_s1du #) };
-        1# -> (# w_s1dj, 1# #)
+  = \ (@a_s1d5) (ww_s1d9 :: GHC.Prim.Int#) (w_s1d7 :: a_s1d5) ->
+      case GHC.Prim.<# ww_s1d9 2# of {
+        __DEFAULT -> case T18174.$wfac2 @a_s1d5 (GHC.Prim.-# ww_s1d9 1#) w_s1d7 of { (# ww1_s1dd, ww2_s1dg #) -> (# ww1_s1dd, GHC.Prim.*# ww2_s1dg ww2_s1dg #) };
+        1# -> (# w_s1d7, 1# #)
       }
 end Rec }
 
--- RHS size: {terms: 15, types: 16, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 15, types: 15, coercions: 0, joins: 0/0}
 fac2 :: forall a. Int -> a -> (a, Int)
-fac2 = \ (@a_s1dh) (w_s1di :: Int) (w1_s1dj :: a_s1dh) -> case w_s1di of { GHC.Types.I# ww1_s1dm -> case T18174.$wfac2 @a_s1dh ww1_s1dm w1_s1dj of { (# ww3_s1ds, ww4_s1du #) -> (ww3_s1ds, GHC.Types.I# ww4_s1du) } }
+fac2 = \ (@a_s1d5) (w_s1d6 :: Int) (w1_s1d7 :: a_s1d5) -> case w_s1d6 of { GHC.Types.I# ww_s1d9 -> case T18174.$wfac2 @a_s1d5 ww_s1d9 w1_s1d7 of { (# ww1_s1dd, ww2_s1dg #) -> (ww1_s1dd, GHC.Types.I# ww2_s1dg) } }
 
 Rec {
--- RHS size: {terms: 24, types: 21, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 24, types: 20, coercions: 0, joins: 0/0}
 T18174.$wfac1 :: forall {a}. GHC.Prim.Int# -> a -> (# a, GHC.Prim.Int# #)
 T18174.$wfac1
-  = \ (@a_s1dx) (ww_s1dC :: GHC.Prim.Int#) (w_s1dz :: a_s1dx) ->
-      case GHC.Prim.<# ww_s1dC 2# of {
-        __DEFAULT -> case T18174.$wfac1 @a_s1dx (GHC.Prim.-# ww_s1dC 1#) w_s1dz of { (# ww2_s1dI, ww3_s1dK #) -> (# ww2_s1dI, GHC.Prim.*# ww_s1dC ww3_s1dK #) };
-        1# -> (# w_s1dz, 1# #)
+  = \ (@a_s1di) (ww_s1dm :: GHC.Prim.Int#) (w_s1dk :: a_s1di) ->
+      case GHC.Prim.<# ww_s1dm 2# of {
+        __DEFAULT -> case T18174.$wfac1 @a_s1di (GHC.Prim.-# ww_s1dm 1#) w_s1dk of { (# ww1_s1dq, ww2_s1dt #) -> (# ww1_s1dq, GHC.Prim.*# ww_s1dm ww2_s1dt #) };
+        1# -> (# w_s1dk, 1# #)
       }
 end Rec }
 
--- RHS size: {terms: 15, types: 16, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 15, types: 15, coercions: 0, joins: 0/0}
 fac1 :: forall a. Int -> a -> (a, Int)
-fac1 = \ (@a_s1dx) (w_s1dy :: Int) (w1_s1dz :: a_s1dx) -> case w_s1dy of { GHC.Types.I# ww1_s1dC -> case T18174.$wfac1 @a_s1dx ww1_s1dC w1_s1dz of { (# ww3_s1dI, ww4_s1dK #) -> (ww3_s1dI, GHC.Types.I# ww4_s1dK) } }
+fac1 = \ (@a_s1di) (w_s1dj :: Int) (w1_s1dk :: a_s1di) -> case w_s1dj of { GHC.Types.I# ww_s1dm -> case T18174.$wfac1 @a_s1di ww_s1dm w1_s1dk of { (# ww1_s1dq, ww2_s1dt #) -> (ww1_s1dq, GHC.Types.I# ww2_s1dt) } }
 
--- RHS size: {terms: 30, types: 19, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 30, types: 18, coercions: 0, joins: 0/0}
 T18174.$wg2 :: GHC.Prim.Int# -> GHC.Prim.Int# -> (# GHC.Prim.Int#, GHC.Prim.Int# #)
 T18174.$wg2
-  = \ (ww_s1dR :: GHC.Prim.Int#) (ww1_s1dV :: GHC.Prim.Int#) ->
-      case ww1_s1dV of ds_X2 {
-        __DEFAULT -> case GHC.Classes.divInt# 2# ds_X2 of ww4_a153 { __DEFAULT -> (# GHC.Prim.*# 2# ww_s1dR, ww4_a153 #) };
-        -1# -> (# GHC.Prim.*# 2# ww_s1dR, -2# #);
+  = \ (ww_s1dy :: GHC.Prim.Int#) (ww1_s1dB :: GHC.Prim.Int#) ->
+      case ww1_s1dB of ds_X2 {
+        __DEFAULT -> case GHC.Classes.divInt# 2# ds_X2 of ww2_a14U { __DEFAULT -> (# GHC.Prim.*# 2# ww_s1dy, ww2_a14U #) };
+        -1# -> (# GHC.Prim.*# 2# ww_s1dy, -2# #);
         0# -> case GHC.Real.divZeroError of wild_00 { };
-        1# -> (# GHC.Prim.+# 2# ww_s1dR, 0# #)
+        1# -> (# GHC.Prim.+# 2# ww_s1dy, 0# #)
       }
 
 -- RHS size: {terms: 26, types: 17, coercions: 0, joins: 0/0}
 T18174.$wh2 :: GHC.Prim.Int# -> GHC.Prim.Int#
 T18174.$wh2
-  = \ (ww_s1ed :: GHC.Prim.Int#) ->
-      case ww_s1ed of ds_X2 {
+  = \ (ww_s1dO :: GHC.Prim.Int#) ->
+      case ww_s1dO of ds_X2 {
         __DEFAULT ->
           case GHC.Prim.remInt# ds_X2 2# of {
-            __DEFAULT -> case T18174.$wg2 ds_X2 2# of { (# ww2_s1e4, ww3_s1e7 #) -> ww3_s1e7 };
-            0# -> case T18174.$wg2 2# ds_X2 of { (# ww2_s1e4, ww3_s1e7 #) -> GHC.Prim.+# ww2_s1e4 ww3_s1e7 }
+            __DEFAULT -> case T18174.$wg2 ds_X2 2# of { (# ww1_s1dH, ww2_s1dK #) -> ww2_s1dK };
+            0# -> case T18174.$wg2 2# ds_X2 of { (# ww1_s1dH, ww2_s1dK #) -> GHC.Prim.+# ww1_s1dH ww2_s1dK }
           };
         1# -> 0#
       }
 
 -- RHS size: {terms: 10, types: 4, coercions: 0, joins: 0/0}
 h2 :: Int -> Int
-h2 = \ (w_s1ea :: Int) -> case w_s1ea of { GHC.Types.I# ww1_s1ed -> case T18174.$wh2 ww1_s1ed of ww2_s1eh { __DEFAULT -> GHC.Types.I# ww2_s1eh } }
+h2 = \ (w_s1dM :: Int) -> case w_s1dM of { GHC.Types.I# ww_s1dO -> case T18174.$wh2 ww_s1dO of ww1_s1dS { __DEFAULT -> GHC.Types.I# ww1_s1dS } }
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T18174.h5 :: Int
-T18174.h5 = GHC.Types.I# 0#
+lvl1_r1n4 :: Int
+lvl1_r1n4 = GHC.Types.I# 0#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-lvl1_r1ml :: Int
-lvl1_r1ml = GHC.Types.I# -2#
+lvl2_r1n5 :: Int
+lvl2_r1n5 = GHC.Types.I# -2#
 
--- RHS size: {terms: 27, types: 15, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 27, types: 14, coercions: 0, joins: 0/0}
 T18174.$wg1 :: GHC.Prim.Int# -> (# GHC.Prim.Int#, Int #)
 T18174.$wg1
-  = \ (ww_s1en :: GHC.Prim.Int#) ->
-      case ww_s1en of ds_X2 {
+  = \ (ww_s1dW :: GHC.Prim.Int#) ->
+      case ww_s1dW of ds_X2 {
         __DEFAULT ->
           (# GHC.Prim.*# 2# ds_X2,
              case ds_X2 of {
-               __DEFAULT -> case GHC.Classes.divInt# 2# ds_X2 of ww4_a153 { __DEFAULT -> GHC.Types.I# ww4_a153 };
-               -1# -> lvl1_r1ml;
-               0# -> case GHC.Real.divZeroError of wild1_00 { }
+               __DEFAULT -> case GHC.Classes.divInt# 2# ds_X2 of ww2_a14U { __DEFAULT -> GHC.Types.I# ww2_a14U };
+               -1# -> lvl2_r1n5;
+               0# -> case GHC.Real.divZeroError of wild_00 { }
              } #);
-        1# -> (# 15#, T18174.h5 #)
+        1# -> (# 15#, lvl1_r1n4 #)
       }
 
 -- RHS size: {terms: 8, types: 9, coercions: 0, joins: 0/0}
 T18174.h4 :: (Int, Int)
-T18174.h4 = case T18174.$wg1 2# of { (# ww1_s1eu, ww2_s1ew #) -> (GHC.Types.I# ww1_s1eu, ww2_s1ew) }
+T18174.h4 = case T18174.$wg1 2# of { (# ww_s1e2, ww1_s1e3 #) -> (GHC.Types.I# ww_s1e2, ww1_s1e3) }
 
--- RHS size: {terms: 22, types: 16, coercions: 0, joins: 0/0}
-T18174.$wh1 :: GHC.Prim.Int# -> Int
-T18174.$wh1
-  = \ (ww_s1eC :: GHC.Prim.Int#) ->
-      case ww_s1eC of ds_X2 {
-        __DEFAULT -> case T18174.$wg1 ds_X2 of { (# ww2_s1eu, ww3_s1ew #) -> case ww3_s1ew of { GHC.Types.I# y_a15e -> GHC.Types.I# (GHC.Prim.+# ww2_s1eu y_a15e) } };
-        1# -> T18174.h5;
-        2# -> case T18174.h4 of { (ds1_a137, y_a138) -> y_a138 }
-      }
-
--- RHS size: {terms: 6, types: 3, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 25, types: 18, coercions: 0, joins: 0/0}
 h1 :: Int -> Int
-h1 = \ (w_s1ez :: Int) -> case w_s1ez of { GHC.Types.I# ww1_s1eC -> T18174.$wh1 ww1_s1eC }
+h1
+  = \ (w_s1e5 :: Int) ->
+      case w_s1e5 of { GHC.Types.I# ww_s1e7 ->
+      case ww_s1e7 of ds_X2 {
+        __DEFAULT -> case T18174.$wg1 ds_X2 of { (# ww1_s1e2, ww2_s1e3 #) -> case ww2_s1e3 of { GHC.Types.I# y_a155 -> GHC.Types.I# (GHC.Prim.+# ww1_s1e2 y_a155) } };
+        1# -> lvl1_r1n4;
+        2# -> case T18174.h4 of { (ds1_a12Y, y_a12Z) -> y_a12Z }
+      }
+      }
 
 Rec {
 -- RHS size: {terms: 23, types: 29, coercions: 0, joins: 0/0}
 T18174.$wfacIO :: GHC.Prim.Int# -> GHC.Prim.State# GHC.Prim.RealWorld -> (# GHC.Prim.State# GHC.Prim.RealWorld, GHC.Prim.Int# #)
 T18174.$wfacIO
-  = \ (ww_s1eJ :: GHC.Prim.Int#) (w_s1eG :: GHC.Prim.State# GHC.Prim.RealWorld) ->
-      case GHC.Prim.<# ww_s1eJ 2# of {
-        __DEFAULT -> case T18174.$wfacIO (GHC.Prim.-# ww_s1eJ 1#) w_s1eG of { (# ww2_s1eP, ww3_s1eR #) -> (# ww2_s1eP, GHC.Prim.*# ww_s1eJ ww3_s1eR #) };
-        1# -> (# w_s1eG, 1# #)
+  = \ (ww_s1eg :: GHC.Prim.Int#) (w_s1ee :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+      case GHC.Prim.<# ww_s1eg 2# of {
+        __DEFAULT -> case T18174.$wfacIO (GHC.Prim.-# ww_s1eg 1#) w_s1ee of { (# ww1_s1ek, ww2_s1en #) -> (# ww1_s1ek, GHC.Prim.*# ww_s1eg ww2_s1en #) };
+        1# -> (# w_s1ee, 1# #)
       }
 end Rec }
 
 -- RHS size: {terms: 14, types: 23, coercions: 0, joins: 0/0}
 T18174.facIO1 :: Int -> GHC.Prim.State# GHC.Prim.RealWorld -> (# GHC.Prim.State# GHC.Prim.RealWorld, Int #)
-T18174.facIO1 = \ (w_s1eF :: Int) (w1_s1eG :: GHC.Prim.State# GHC.Prim.RealWorld) -> case w_s1eF of { GHC.Types.I# ww1_s1eJ -> case T18174.$wfacIO ww1_s1eJ w1_s1eG of { (# ww3_s1eP, ww4_s1eR #) -> (# ww3_s1eP, GHC.Types.I# ww4_s1eR #) } }
+T18174.facIO1 = \ (w_s1ed :: Int) (w1_s1ee :: GHC.Prim.State# GHC.Prim.RealWorld) -> case w_s1ed of { GHC.Types.I# ww_s1eg -> case T18174.$wfacIO ww_s1eg w1_s1ee of { (# ww1_s1ek, ww2_s1en #) -> (# ww1_s1ek, GHC.Types.I# ww2_s1en #) } }
 
 -- RHS size: {terms: 1, types: 0, coercions: 6, joins: 0/0}
 facIO :: Int -> IO Int

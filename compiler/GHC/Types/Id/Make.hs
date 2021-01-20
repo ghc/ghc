@@ -1293,14 +1293,14 @@ mkPrimOpId prim_op
     -- PrimOps never construct a product, but we want to assume that
     --   1. Cheap ones (i.e. `+#`) terminate.
     --   2. Those which have dead end Divergence (i.e. `raise#`) have
-    --      `divergeCpr`. If we manage to evaluate them to WHNF (which we
+    --      `divergeCAT`. If we manage to evaluate them to WHNF (which we
     --      never do), they have infinitely deep CPR and termination: This is
     --      so that we give an `if ... then error "blah" else (1, 2)` the
     --      nested CPR property.
     -- In all other cases we simply assume `topCpr`.
-    cpr | primOpIsCheap prim_op   = whnfTermCpr
-        | isDeadEndSig strict_sig = divergeCpr
-        | otherwise               = topCpr
+    cpr | primOpIsCheap prim_op   = whnfTermCAT
+        | isDeadEndSig strict_sig = divergeCAT
+        | otherwise               = topCAT
 
     info = noCafIdInfo
            `setRuleInfo`           mkRuleInfo (maybeToList $ primOpRules name prim_op)
