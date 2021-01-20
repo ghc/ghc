@@ -23,8 +23,8 @@ undo ref = do
 main = do
     ref <- newIORef [S.empty]
     let fn n = do
-        doStuff ref n
-        when (rem 5 n /= 0 ) $ undo ref
+          doStuff ref n
+          when (rem 5 n /= 0 ) $ undo ref
 
     mapM_ fn (take 5000000 $ cycle [1..100])
     var <- readIORef ref

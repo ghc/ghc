@@ -8,7 +8,7 @@ import Data.STRef
 
 main =
     let f () = runST $ do
-        ref <- newSTRef 0
-        modifySTRef ref (+1)
-        readSTRef ref
+            ref <- newSTRef 0
+            modifySTRef ref (+1)
+            readSTRef ref
     in print (f () + f ())

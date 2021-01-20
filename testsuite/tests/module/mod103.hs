@@ -1,4 +1,5 @@
 {-# LANGUAGE Haskell2010 #-}
+{-# LANGUAGE NondecreasingIndentation #-}
 -- !!! Layout rule extension (restricting empty do's).
 module Foo where
 

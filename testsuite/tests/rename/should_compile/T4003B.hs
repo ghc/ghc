@@ -1,4 +1,4 @@
-
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 
 module T4003B where

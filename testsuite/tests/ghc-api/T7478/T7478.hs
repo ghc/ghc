@@ -1,4 +1,5 @@
 {-# LANGUAGE Haskell2010 #-}
+{-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE NamedFieldPuns #-}
 module Main (main) where
 
