@@ -29,6 +29,7 @@ import GHC.Types.Id
 import GHC.Core.ConLike
 import GHC.Types.Name
 import GHC.Builtin.Types
+import GHC.Builtin.Names (rationalTyConName)
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -47,7 +48,7 @@ import GHC.Core.Type
 import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Utils.Monad (concatMapM)
-
+import GHC.Types.SourceText (FractionalLit(..))
 import Control.Monad (zipWithM)
 import Data.List (elemIndex)
 import Data.List.NonEmpty ( NonEmpty(..) )
@@ -199,16 +200,34 @@ desugarPat x pat = case pat of
     -- short cutting in dsOverLit works properly) is overloaded iff either is.
     dflags <- getDynFlags
     let platform = targetPlatform dflags
-    core_expr <- case olit of
+    pm_lit <- case olit of
       OverLit{ ol_val = val, ol_ext = OverLitTc rebindable _ }
         | not rebindable
         , Just expr <- shortCutLit platform val ty
-        -> dsExpr expr
-      _ -> dsOverLit olit
-    let lit  = expectJust "failed to detect OverLit" (coreExprAsPmLit core_expr)
-    let lit' = case mb_neg of
-          Just _  -> expectJust "failed to negate lit" (negatePmLit lit)
-          Nothing -> lit
+        -> coreExprAsPmLit <$> dsExpr expr
+        | not rebindable
+        , (HsFractional f) <- val
+        , negates <- if fl_neg f then 1 else 0
+        -> do
+            rat_tc <- dsLookupTyCon rationalTyConName
+            let rat_ty = mkTyConTy rat_tc
+            return $ Just $ PmLit rat_ty (PmLitOverRat negates f)
+        | otherwise
+        -> do
+           dsLit <- dsOverLit olit
+          --  pprTraceM "desugarPat"
+          --     (
+          --       text "val" <+> ppr val $$
+          --       text "witness" <+> ppr (ol_witness olit) $$
+          --       text "expr" <+> ppr dsLit $$
+          --       text "asPmLit" <+> ppr (coreExprAsPmLit dsLit)
+          --     )
+           return $ coreExprAsPmLit dsLit
+
+    let lit = case pm_lit of
+          Just l -> l
+          Nothing -> pprPanic "failed to detect OverLit" (ppr olit)
+    let lit' = expectJust "failed to negate lit" (negatePmLit lit)
     mkPmLitGrds x lit'
 
   LitPat _ lit -> do
