@@ -2003,10 +2003,9 @@ safeFlagCheck _ dflags | safeLanguageOn dflags = (dflagsUnset, warns)
            ++ str]
 
 safeFlagCheck cmdl dflags =
-  case (safeInferOn dflags) of
-    True | safeFlags -> (dflags', warn)
-    True             -> (dflags' { safeInferred = False }, warn)
-    False            -> (dflags', warn)
+  case safeInferOn dflags of
+    True   -> (dflags' { safeInferred = safeFlags }, warn)
+    False  -> (dflags', warn)
 
   where
     -- dynflags and warn for when -fpackage-trust by itself with no safe
