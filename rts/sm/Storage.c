@@ -181,7 +181,7 @@ initStorage (void)
   initSpinLock(&gc_alloc_block_sync);
 #endif
 
-  if (RtsFlags.GcFlags.concurrentNonmoving || RtsFlags.GcFlags.nonmovingPinned)
+  if (RtsFlags.GcFlags.concurrentNonmoving || RtsFlags.GcFlags.useNonmovingPinned)
       nonmovingAddCapabilities(n_capabilities);
 
   /* The oldest generation has one step. */
@@ -283,7 +283,7 @@ void storageAddCapabilities (uint32_t from, uint32_t to)
     }
 
     // Initialize NonmovingAllocators and UpdRemSets
-    if (RtsFlags.GcFlags.concurrentNonmoving || RtsFlags.GcFlags.nonmovingPinned) {
+    if (RtsFlags.GcFlags.concurrentNonmoving || RtsFlags.GcFlags.useNonmovingPinned) {
         nonmovingAddCapabilities(to);
         for (i = 0; i < to; ++i) {
             init_upd_rem_set(&capabilities[i]->upd_rem_set);

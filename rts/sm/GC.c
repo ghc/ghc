@@ -827,7 +827,7 @@ GarbageCollect (uint32_t collect_gen,
   // N.B. This can only happen after we've moved
   // oldest_gen->scavenged_large_objects back to oldest_gen->large_objects.
   ASSERT(oldest_gen->scavenged_large_objects == NULL);
-  if (major_gc && (RtsFlags.GcFLags.useNonmovingPinned || RtsFlags.GcFlags.concurrentNonmoving)) {
+  if (major_gc && (RtsFlags.GcFlags.useNonmovingPinned || RtsFlags.GcFlags.concurrentNonmoving)) {
       // All threads in non-moving heap should be found to be alive, because
       // threads in the non-moving generation's list should live in the
       // non-moving heap, and we consider non-moving objects alive during
