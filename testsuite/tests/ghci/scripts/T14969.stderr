@@ -1,5 +1,5 @@
 
-<interactive>:1:1: error:
+<interactive>:2:1: error:
     • Non type-variable argument
         in the constraint: Num (t2 -> t1 -> t3)
       (Use FlexibleContexts to permit this)
