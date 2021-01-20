@@ -214,9 +214,15 @@ shortCutLit platform val res_ty
         -- literals, compiled without -O
 
     go_fractional f
-      | isFloatTy res_ty  = Just (mkLit floatDataCon  (HsFloatPrim noExtField f))
-      | isDoubleTy res_ty = Just (mkLit doubleDataCon (HsDoublePrim noExtField f))
-      | otherwise         = Nothing
+      | isFloatTy res_ty && valueInRange  = Just (mkLit floatDataCon  (HsFloatPrim noExtField f))
+      | isDoubleTy res_ty && valueInRange = Just (mkLit doubleDataCon (HsDoublePrim noExtField f))
+      | otherwise                         = Nothing
+      where
+        valueInRange =
+          case f of
+            FL { fl_exp = e } -> (-100) <= e && e <= 100
+            -- We limit short-cutting Fractional Literals to when their power of 10
+            -- is less than 100, which ensures desugaring isn't slow.
 
     go_string src s
       | isStringTy res_ty = Just (HsLit noExtField (HsString src s))
