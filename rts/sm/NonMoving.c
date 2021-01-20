@@ -733,7 +733,7 @@ static void free_nonmoving_allocator(struct NonmovingAllocator *alloc)
 
 void nonmovingInit(void)
 {
-    if (! RtsFlags.GcFlags.useNonmoving) return;
+    if (! USE_NONMOVING) return;
 #if defined(THREADED_RTS)
     initMutex(&nonmoving_collection_mutex);
     initCondition(&concurrent_coll_finished);
@@ -748,7 +748,7 @@ void nonmovingInit(void)
 // Stop any nonmoving collection in preparation for RTS shutdown.
 void nonmovingStop(void)
 {
-    if (! RtsFlags.GcFlags.useNonmoving) return;
+    if (! USE_NONMOVING) return;
 #if defined(THREADED_RTS)
     if (mark_thread) {
         debugTrace(DEBUG_nonmoving_gc,
@@ -761,7 +761,7 @@ void nonmovingStop(void)
 
 void nonmovingExit(void)
 {
-    if (! RtsFlags.GcFlags.useNonmoving) return;
+    if (! USE_NONMOVING) return;
 
     // First make sure collector is stopped before we tear things down.
     nonmovingStop();
@@ -1002,7 +1002,7 @@ void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
     // again for the sync if we let it go, because it'll immediately start doing
     // a major GC, because that's what we do when exiting scheduler (see
     // exitScheduler()).
-    if (sched_state == SCHED_RUNNING) {
+    if (sched_state == SCHED_RUNNING && RtsFlags.GcFlags.concurrentNonmoving) {
         concurrent_coll_running = true;
         nonmoving_write_barrier_enabled = true;
         debugTrace(DEBUG_nonmoving_gc, "Starting concurrent mark thread");
@@ -1011,7 +1011,9 @@ void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
             barf("nonmovingCollect: failed to spawn mark thread: %s", strerror(errno));
         }
     } else {
-        nonmovingConcurrentMark(mark_queue);
+        // We are either in useNonmovingPinned mode or shutting down the RTS; do a
+        // serial collection.
+        nonmovingMark_(mark_queue, dead_weaks, resurrected_threads);
     }
 #else
     // Use the weak and thread lists from the preparation for any new weaks and
@@ -1090,38 +1092,41 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
     nonmovingMarkThreadsWeaks(mark_queue);
 
 #if defined(THREADED_RTS)
-    Task *task = newBoundTask();
+    Task *task;
+    if (RtsFlags.GcFlags.concurrentNonmoving) {
+        task = newBoundTask();
 
-    // If at this point if we've decided to exit then just return
-    if (sched_state > SCHED_RUNNING) {
-        // Note that we break our invariants here and leave segments in
-        // nonmovingHeap.sweep_list, don't free nonmoving_large_objects etc.
-        // However because we won't be running mark-sweep in the final GC this
-        // is OK.
+        // If at this point if we've decided to exit then just return
+        if (sched_state > SCHED_RUNNING) {
+            // Note that we break our invariants here and leave segments in
+            // nonmovingHeap.sweep_list, don't free nonmoving_large_objects etc.
+            // However because we won't be running mark-sweep in the final GC this
+            // is OK.
 
-        // This is a RTS shutdown so we need to move our copy (snapshot) of
-        // weaks (nonmoving_old_weak_ptr_list and nonmoving_weak_ptr_list) to
-        // oldest_gen->threads to be able to run C finalizers in hs_exit_. Note
-        // that there may be more weaks added to oldest_gen->threads since we
-        // started mark, so we need to append our list to the tail of
-        // oldest_gen->threads.
-        appendWeakList(&nonmoving_old_weak_ptr_list, nonmoving_weak_ptr_list);
-        appendWeakList(&oldest_gen->weak_ptr_list, nonmoving_old_weak_ptr_list);
-        // These lists won't be used again so this is not necessary, but still
-        nonmoving_old_weak_ptr_list = NULL;
-        nonmoving_weak_ptr_list = NULL;
+            // This is a RTS shutdown so we need to move our copy (snapshot) of
+            // weaks (nonmoving_old_weak_ptr_list and nonmoving_weak_ptr_list) to
+            // oldest_gen->threads to be able to run C finalizers in hs_exit_. Note
+            // that there may be more weaks added to oldest_gen->threads since we
+            // started mark, so we need to append our list to the tail of
+            // oldest_gen->threads.
+            appendWeakList(&nonmoving_old_weak_ptr_list, nonmoving_weak_ptr_list);
+            appendWeakList(&oldest_gen->weak_ptr_list, nonmoving_old_weak_ptr_list);
+            // These lists won't be used again so this is not necessary, but still
+            nonmoving_old_weak_ptr_list = NULL;
+            nonmoving_weak_ptr_list = NULL;
 
-        goto finish;
+            goto finish;
+        }
+
+        // We're still running, request a sync
+        nonmovingBeginFlush(task);
+
+        bool all_caps_syncd;
+        do {
+            all_caps_syncd = nonmovingWaitForFlush();
+            nonmovingMarkThreadsWeaks(mark_queue);
+        } while (!all_caps_syncd);
     }
-
-    // We're still running, request a sync
-    nonmovingBeginFlush(task);
-
-    bool all_caps_syncd;
-    do {
-        all_caps_syncd = nonmovingWaitForFlush();
-        nonmovingMarkThreadsWeaks(mark_queue);
-    } while (!all_caps_syncd);
 #endif
 
     nonmovingResurrectThreads(mark_queue, resurrected_threads);
@@ -1202,8 +1207,10 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
 
     // Everything has been marked; allow the mutators to proceed
 #if defined(THREADED_RTS)
-    nonmoving_write_barrier_enabled = false;
-    nonmovingFinishFlush(task);
+    if (RtsFlags.GcFlags.concurrentNonmoving) {
+        nonmoving_write_barrier_enabled = false;
+        nonmovingFinishFlush(task);
+    }
 #endif
 
     current_mark_queue = NULL;
@@ -1244,17 +1251,19 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
 
 #if defined(THREADED_RTS)
 finish:
-    exitMyTask();
+    if (RtsFlags.GcFlags.concurrentNonmoving) {
+        exitMyTask();
 
-    // We are done...
-    mark_thread = 0;
-    stat_endNonmovingGc();
+        // We are done...
+        mark_thread = 0;
+        stat_endNonmovingGc();
 
-    // Signal that the concurrent collection is finished, allowing the next
-    // non-moving collection to proceed
-    concurrent_coll_running = false;
-    signalCondition(&concurrent_coll_finished);
-    RELEASE_LOCK(&nonmoving_collection_mutex);
+        // Signal that the concurrent collection is finished, allowing the next
+        // non-moving collection to proceed
+        concurrent_coll_running = false;
+        signalCondition(&concurrent_coll_finished);
+        RELEASE_LOCK(&nonmoving_collection_mutex);
+    }
 #endif
 }
 

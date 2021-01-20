@@ -181,7 +181,7 @@ initStorage (void)
   initSpinLock(&gc_alloc_block_sync);
 #endif
 
-  if (RtsFlags.GcFlags.useNonmoving)
+  if (RtsFlags.GcFlags.concurrentNonmoving || RtsFlags.GcFlags.useNonmovingPinned)
       nonmovingAddCapabilities(n_capabilities);
 
   /* The oldest generation has one step. */
@@ -283,7 +283,7 @@ void storageAddCapabilities (uint32_t from, uint32_t to)
     }
 
     // Initialize NonmovingAllocators and UpdRemSets
-    if (RtsFlags.GcFlags.useNonmoving) {
+    if (RtsFlags.GcFlags.concurrentNonmoving || RtsFlags.GcFlags.useNonmovingPinned) {
         nonmovingAddCapabilities(to);
         for (i = 0; i < to; ++i) {
             init_upd_rem_set(&capabilities[i]->upd_rem_set);
@@ -490,7 +490,7 @@ lockCAF (StgRegTable *reg, StgIndStatic *caf)
     caf->saved_info = orig_info;
 
     // Allocate the blackhole indirection closure
-    if (RtsFlags.GcFlags.useNonmoving) {
+    if (RtsFlags.GcFlags.concurrentNonmoving) {
         // See Note [Static objects under the nonmoving collector].
         ACQUIRE_SM_LOCK;
         bh = (StgInd *)nonmovingAllocate(cap, sizeofW(*bh));
@@ -542,7 +542,7 @@ newCAF(StgRegTable *reg, StgIndStatic *caf)
         // Put this CAF on the mutable list for the old generation.
         // N.B. the nonmoving collector works a bit differently: see
         // Note [Static objects under the nonmoving collector].
-        if (oldest_gen->no != 0 && !RtsFlags.GcFlags.useNonmoving) {
+        if (oldest_gen->no != 0 && !RtsFlags.GcFlags.concurrentNonmoving) {
             recordMutableCap((StgClosure*)caf,
                              regTableToCapability(reg), oldest_gen->no);
         }
@@ -627,7 +627,7 @@ StgInd* newGCdCAF (StgRegTable *reg, StgIndStatic *caf)
     // Put this CAF on the mutable list for the old generation.
     // N.B. the nonmoving collector works a bit differently:
     // see Note [Static objects under the nonmoving collector].
-    if (oldest_gen->no != 0 && !RtsFlags.GcFlags.useNonmoving) {
+    if (oldest_gen->no != 0 && !RtsFlags.GcFlags.concurrentNonmoving) {
         recordMutableCap((StgClosure*)caf,
                          regTableToCapability(reg), oldest_gen->no);
     }
@@ -1182,7 +1182,7 @@ allocatePinned (Capability *cap, W_ n /*words*/, W_ alignment /*bytes*/, W_ alig
     // pinned allocations are often long-lived..
     //
     // See Note [Allocating pinned objects into the non-moving heap].
-    if (RTS_UNLIKELY(RtsFlags.GcFlags.useNonmoving)
+    if (RTS_UNLIKELY(RtsFlags.GcFlags.useNonmovingPinned)
         && (n + alignment_w) * sizeof(W_) < NONMOVING_MAX_BLOCK_SZ)
     {
         ACQUIRE_SM_LOCK;
@@ -1191,7 +1191,7 @@ allocatePinned (Capability *cap, W_ n /*words*/, W_ alignment /*bytes*/, W_ alig
         W_ off_w = ALIGN_WITH_OFF_W(p, alignment, align_off);
         memset(p, 0, off_w * sizeof(W_));
         p += off_w;
-        MEMSET_IF_PROFILING_W(p + n, 0, alignment_w - off_w - 1);
+        MEMSET_SLOP_W(p + n, 0, alignment_w - off_w - 1);
         return p;
     }
 
@@ -1616,7 +1616,7 @@ calcNeeded (bool force_major, memcount *blocks_needed)
                 //  mark stack:
                 needed += gen->n_blocks / 100;
             }
-            if (gen->compact || (RtsFlags.GcFlags.useNonmoving && gen == oldest_gen)) {
+            if (gen->compact || (RtsFlags.GcFlags.concurrentNonmoving && gen == oldest_gen)) {
                 continue; // no additional space needed for compaction
             } else {
                 needed += gen->n_blocks;

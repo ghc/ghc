@@ -443,7 +443,7 @@ scavenge_block (bdescr *bd)
 
   // Sanity check: See Note [Deadlock detection under nonmoving collector].
 #if defined(DEBUG)
-  if (RtsFlags.GcFlags.useNonmoving && deadlock_detect_gc) {
+  if (RtsFlags.GcFlags.concurrentNonmoving && deadlock_detect_gc) {
       ASSERT(bd->gen == oldest_gen);
   }
 #endif
@@ -1675,7 +1675,7 @@ scavenge_mutable_list(bdescr *bd, generation *gen)
                 ;
             }
 
-            if (RtsFlags.GcFlags.useNonmoving && major_gc && gen == oldest_gen) {
+            if (RtsFlags.GcFlags.concurrentNonmoving && major_gc && gen == oldest_gen) {
                 // We can't use scavenge_one here as we need to scavenge SRTs
                 nonmovingScavengeOne((StgClosure *)p);
             } else if (scavenge_one(p)) {
@@ -1698,7 +1698,7 @@ void
 scavenge_capability_mut_lists (Capability *cap)
 {
     // In a major GC only nonmoving heap's mut list is root
-    if (RtsFlags.GcFlags.useNonmoving && major_gc) {
+    if (RtsFlags.GcFlags.concurrentNonmoving && major_gc) {
         uint32_t g = oldest_gen->no;
         scavenge_mutable_list(cap->saved_mut_lists[g], oldest_gen);
         freeChain_sync(cap->saved_mut_lists[g]);
