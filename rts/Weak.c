@@ -95,7 +95,7 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
     // n_finalizers is not necessarily zero under non-moving collection
     // because non-moving collector does not wait for the list to be consumed
     // (by doIdleGcWork()) before appending the list with more finalizers.
-    ASSERT(RtsFlags.GcFlags.useNonmoving || SEQ_CST_LOAD(&n_finalizers) == 0);
+    ASSERT(RtsFlags.GcFlags.concurrentNonmoving || SEQ_CST_LOAD(&n_finalizers) == 0);
 
     // Append finalizer_list with the new list. TODO: Perhaps cache tail of the
     // list for faster append. NOTE: We can't append `list` here! Otherwise we

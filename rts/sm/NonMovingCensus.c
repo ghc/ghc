@@ -90,7 +90,7 @@ nonmovingAllocatorCensus(struct NonmovingAllocator *alloc)
 
 void nonmovingPrintAllocatorCensus()
 {
-    if (!RtsFlags.GcFlags.useNonmoving)
+    if (! USE_NONMOVING)
         return;
 
     for (int i=0; i < NONMOVING_ALLOCA_CNT; i++) {
@@ -116,7 +116,7 @@ void nonmovingPrintAllocatorCensus()
 void nonmovingTraceAllocatorCensus()
 {
 #if defined(TRACING)
-    if (!RtsFlags.GcFlags.useNonmoving && !TRACE_nonmoving_gc)
+    if (!USE_NONMOVING && !TRACE_nonmoving_gc)
         return;
 
     for (int i=0; i < NONMOVING_ALLOCA_CNT; i++) {

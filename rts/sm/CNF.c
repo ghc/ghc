@@ -277,7 +277,7 @@ compactFree(StgCompactNFData *str)
     for ( ; block; block = next) {
         next = block->next;
         bd = Bdescr((StgPtr)block);
-        ASSERT(RtsFlags.GcFlags.useNonmoving || ((bd->flags & BF_EVACUATED) == 0));
+        ASSERT(RtsFlags.GcFlags.concurrentNonmoving || ((bd->flags & BF_EVACUATED) == 0));
             // When using the non-moving collector we leave compact object
             // evacuated to the oldset gen as BF_EVACUATED to avoid evacuating
             // objects in the non-moving heap.

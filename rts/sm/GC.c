@@ -335,7 +335,7 @@ GarbageCollect (uint32_t collect_gen,
   deadlock_detect_gc = deadlock_detect;
 
 #if defined(THREADED_RTS)
-  if (major_gc && RtsFlags.GcFlags.useNonmoving && concurrent_coll_running) {
+  if (major_gc && RtsFlags.GcFlags.concurrentNonmoving && concurrent_coll_running) {
       /* If there is already a concurrent major collection running then
        * there is no benefit to starting another.
        * TODO: Catch heap-size runaway.
@@ -349,7 +349,7 @@ GarbageCollect (uint32_t collect_gen,
   /* N.B. The nonmoving collector works a bit differently. See
    * Note [Static objects under the nonmoving collector].
    */
-  if (major_gc && !RtsFlags.GcFlags.useNonmoving) {
+  if (major_gc && !RtsFlags.GcFlags.concurrentNonmoving) {
       prev_static_flag = static_flag;
       static_flag =
           static_flag == STATIC_FLAG_A ? STATIC_FLAG_B : STATIC_FLAG_A;
@@ -675,7 +675,7 @@ GarbageCollect (uint32_t collect_gen,
     gen = &generations[g];
 
     // for generations we collected...
-    if (g <= N && !(RtsFlags.GcFlags.useNonmoving && gen == oldest_gen)) {
+    if (g <= N && !(RtsFlags.GcFlags.concurrentNonmoving && gen == oldest_gen)) {
 
         /* free old memory and shift to-space into from-space for all
          * the collected generations (except the allocation area).  These
@@ -815,7 +815,7 @@ GarbageCollect (uint32_t collect_gen,
 
   // Flush the update remembered sets. See Note [Eager update remembered set
   // flushing] in NonMovingMark.c
-  if (RtsFlags.GcFlags.useNonmoving) {
+  if (USE_NONMOVING) {
       RELEASE_SM_LOCK;
       for (n = 0; n < n_capabilities; n++) {
           nonmovingAddUpdRemSetBlocks(&capabilities[n]->upd_rem_set.queue);
@@ -827,7 +827,7 @@ GarbageCollect (uint32_t collect_gen,
   // N.B. This can only happen after we've moved
   // oldest_gen->scavenged_large_objects back to oldest_gen->large_objects.
   ASSERT(oldest_gen->scavenged_large_objects == NULL);
-  if (RtsFlags.GcFlags.useNonmoving && major_gc) {
+  if (major_gc && (RtsFlags.GcFlags.useNonmovingPinned || RtsFlags.GcFlags.concurrentNonmoving)) {
       // All threads in non-moving heap should be found to be alive, because
       // threads in the non-moving generation's list should live in the
       // non-moving heap, and we consider non-moving objects alive during
@@ -853,6 +853,9 @@ GarbageCollect (uint32_t collect_gen,
       // In the non-threaded runtime this is the only time we push to the
       // upd_rem_set
       nonmovingAddUpdRemSetBlocks(&gct->cap->upd_rem_set.queue);
+#else
+      if (RtsFlags.GcFlags.concurrentNonmoving)
+          nonmovingAddUpdRemSetBlocks(&gct->cap->upd_rem_set.queue);
 #endif
       nonmovingCollect(&dead_weak_ptr_list, &resurrected_threads);
       ACQUIRE_SM_LOCK;
@@ -862,7 +865,7 @@ GarbageCollect (uint32_t collect_gen,
   // We can't resize here in the case of the concurrent collector since we
   // don't yet know how much live data we have. This will be instead done
   // once we finish marking.
-  if (major_gc && RtsFlags.GcFlags.generations > 1 && ! RtsFlags.GcFlags.useNonmoving)
+  if (major_gc && RtsFlags.GcFlags.generations > 1 && ! RtsFlags.GcFlags.concurrentNonmoving)
       resizeGenerations();
 
   // Free the mark stack.
@@ -888,7 +891,7 @@ GarbageCollect (uint32_t collect_gen,
 #if defined(DEBUG)
   // Mark the garbage collected CAFs as dead. Done in `nonmovingGcCafs()` when
   // non-moving GC is enabled.
-  if (major_gc && !RtsFlags.GcFlags.useNonmoving) {
+  if (major_gc && !RtsFlags.GcFlags.concurrentNonmoving) {
       gcCAFs();
   }
 #endif
@@ -907,7 +910,7 @@ GarbageCollect (uint32_t collect_gen,
   // TODO: Similar to `nonmovingGcCafs` non-moving GC should have its own
   // collector for these objects, but that's currently not implemented, so we
   // simply don't unload object code when non-moving GC is enabled.
-  if (major_gc && !RtsFlags.GcFlags.useNonmoving) {
+  if (major_gc && !RtsFlags.GcFlags.concurrentNonmoving) {
       checkUnload();
   }
 
@@ -930,7 +933,7 @@ GarbageCollect (uint32_t collect_gen,
   // closures, which will cause problems with THREADED where we don't
   // fill slop. If we are using the nonmoving collector then we can't claim to
   // be *after* the major GC; it's now running concurrently.
-  IF_DEBUG(sanity, checkSanity(true /* after GC */, major_gc && !RtsFlags.GcFlags.useNonmoving));
+  IF_DEBUG(sanity, checkSanity(true /* after GC */, major_gc && !RtsFlags.GcFlags.concurrentNonmoving));
 
   // If a heap census is due, we need to do it before
   // resurrectThreads(), for the same reason as checkSanity above:
@@ -1571,7 +1574,7 @@ prepare_collected_gen (generation *gen)
 
     g = gen->no;
 
-    if (RtsFlags.GcFlags.useNonmoving && g == oldest_gen->no) {
+    if (RtsFlags.GcFlags.concurrentNonmoving && g == oldest_gen->no) {
         // Nonmoving heap's mutable list is always a root.
         for (i = 0; i < n_capabilities; i++) {
             stash_mut_list(capabilities[i], g);
@@ -1600,7 +1603,7 @@ prepare_collected_gen (generation *gen)
     // deprecate the existing blocks (except in the case of the nonmoving
     // collector since these will be preserved in nonmovingCollect for the
     // concurrent GC).
-    if (!(RtsFlags.GcFlags.useNonmoving && g == oldest_gen->no)) {
+    if (!(RtsFlags.GcFlags.concurrentNonmoving && g == oldest_gen->no)) {
         gen->old_blocks   = gen->blocks;
         gen->n_old_blocks = gen->n_blocks;
         gen->blocks       = NULL;
@@ -1787,7 +1790,7 @@ collect_gct_blocks (void)
 static void
 collect_pinned_object_blocks (void)
 {
-    const bool use_nonmoving = RtsFlags.GcFlags.useNonmoving;
+    const bool use_nonmoving = RtsFlags.GcFlags.concurrentNonmoving;
     generation *const gen = (use_nonmoving && major_gc) ? oldest_gen : g0;
 
     for (uint32_t n = 0; n < n_capabilities; n++) {
@@ -1911,7 +1914,7 @@ resizeGenerations (void)
     // Auto-enable compaction when the residency reaches a
     // certain percentage of the maximum heap size (default: 30%).
     // Except when non-moving GC is enabled.
-    if (!RtsFlags.GcFlags.useNonmoving &&
+    if (!RtsFlags.GcFlags.concurrentNonmoving &&
         (RtsFlags.GcFlags.compact ||
          (max > 0 &&
           oldest_gen->n_blocks >

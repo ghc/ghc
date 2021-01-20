@@ -855,7 +855,7 @@ static void report_summary(const RTSSummaryStats* sum)
                     TimeToSecondsDbl(gen_stats->avg_pause_ns),
                     TimeToSecondsDbl(gen_stats->max_pause_ns));
     }
-    if (RtsFlags.GcFlags.useNonmoving) {
+    if (RtsFlags.GcFlags.concurrentNonmoving) {
         const int n_major_colls = sum->gc_summary_stats[RtsFlags.GcFlags.generations-1].collections;
         statsPrintf("  Gen  1     %5d syncs"
                     ",                      %6.3fs     %3.4fs    %3.4fs\n",
@@ -906,7 +906,7 @@ static void report_summary(const RTSSummaryStats* sum)
     statsPrintf("  GC      time  %7.3fs  (%7.3fs elapsed)\n",
                 TimeToSecondsDbl(stats.gc_cpu_ns),
                 TimeToSecondsDbl(stats.gc_elapsed_ns));
-    if (RtsFlags.GcFlags.useNonmoving) {
+    if (RtsFlags.GcFlags.concurrentNonmoving) {
         statsPrintf(
                 "  CONC GC time  %7.3fs  (%7.3fs elapsed)\n",
                 TimeToSecondsDbl(stats.nonmoving_gc_cpu_ns),
@@ -1175,7 +1175,7 @@ static void report_machine_readable (const RTSSummaryStats * sum)
 #endif
     }
     // non-moving collector statistics
-    if (RtsFlags.GcFlags.useNonmoving) {
+    if (RtsFlags.GcFlags.concurrentNonmoving) {
         const int n_major_colls = sum->gc_summary_stats[RtsFlags.GcFlags.generations-1].collections;
         MR_STAT("nonmoving_sync_wall_seconds", "f",
                 TimeToSecondsDbl(stats.nonmoving_gc_sync_elapsed_ns));
