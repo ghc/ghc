@@ -1102,7 +1102,7 @@ transferIdInfo exported_id local_id
 
 dmdAnal :: DynFlags -> FamInstEnvs -> [CoreRule] -> CoreProgram -> IO CoreProgram
 dmdAnal dflags fam_envs rules binds = do
-  let opts = DmdAnalOpts
+  let !opts = DmdAnalOpts
                { dmd_strict_dicts = gopt Opt_DictsStrict dflags
                }
       binds_plus_dmds = dmdAnalProgram opts fam_envs rules binds
