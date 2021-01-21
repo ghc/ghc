@@ -936,6 +936,43 @@ run_BCO_return_unboxed:
     // Stack checks aren't necessary at return points, the stack use
     // is aggregated into the enclosing function entry point.
 
+#ifdef PROFILING
+    /*
+       Restore the current cost centre stack if a tuple is being returned.
+
+       When a "simple" unboxed value is returned, the cccs is restored with
+       an stg_restore_cccs frame on the stack, for example:
+
+           ...
+           stg_ctoi_D1
+           <CCCS>
+           stg_restore_cccs
+
+       But stg_restore_cccs cannot deal with tuples, which may have more
+       things on the stack. Therefore we store the CCCS inside the
+       stg_ctoi_t frame.
+
+       If we have a tuple being returned, the stack looks like this:
+
+           ...
+           <CCCS>           <- to restore, Sp offset <next frame + 4 words>
+           tuple_BCO
+           tuple_info
+           cont_BCO
+           stg_ctoi_t       <- next frame
+           tuple_data_1
+           ...
+           tuple_data_n
+           tuple_info
+           tuple_BCO
+           stg_ret_t        <- Sp
+     */
+
+    if(SpW(0) == (W_)&stg_ret_t_info)) {
+        cap->r.rCCCS = (CostCentreStack*)SpW(stack_frame_sizeW((StgClosure *)Sp) + 4);
+    }
+#endif
+
     goto run_BCO;
 
 run_BCO_fun:
@@ -1333,10 +1370,10 @@ run_BCO:
             W_ tuple_info = (W_)BCO_LIT(BCO_GET_LARGE_ARG);
             int o_tuple_bco = BCO_GET_LARGE_ARG;
 
-            #if defined(PROFILING)
+#if defined(PROFILING)
             SpW(-1) = (W_)cap->r.rCCCS;
             Sp_subW(1);
-            #endif
+#endif
 
             SpW(-1) = BCO_PTR(o_tuple_bco);
             SpW(-2) = tuple_info;

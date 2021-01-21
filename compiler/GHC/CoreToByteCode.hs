@@ -1164,9 +1164,8 @@ doCase d s p scrut bndr alts
 
         -- unboxed tuples get two more words, the second is a pointer (tuple_bco)
         (extra_pointers, extra_slots)
-           -- XXX should the cost centre stack be treated as a pointer?
-           | ubx_tuple_frame && profiling = ([1,2], 3) -- tuple_info, tuple_BCO, CCCS
-           | ubx_tuple_frame              = ([1], 2)   -- tuple_info, tuple_BCO
+           | ubx_tuple_frame && profiling = ([1], 3) -- tuple_info, tuple_BCO, CCCS
+           | ubx_tuple_frame              = ([1], 2) -- tuple_info, tuple_BCO
            | otherwise                    = ([], 0)
 
         bitmap_size = trunc16W $ fromIntegral extra_slots +
