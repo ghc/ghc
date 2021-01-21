@@ -6,7 +6,9 @@
 
 -- | Bytecode assembler types
 module GHC.ByteCode.Types
-  ( CompiledByteCode(..), seqCompiledByteCode, FFIInfo(..)
+  ( CompiledByteCode(..), seqCompiledByteCode
+  , FFIInfo(..), TupleInfo(..), voidTupleInfo
+  , ByteOff(..), WordOff(..)
   , UnlinkedBCO(..), BCOPtr(..), BCONPtr(..)
   , ItblEnv, ItblPtr(..)
   , CgBreakInfo(..)
@@ -67,6 +69,56 @@ seqCompiledByteCode CompiledByteCode{..} =
   rnf bc_ffis `seq`
   rnf bc_strs `seq`
   rnf (fmap seqModBreaks bc_breaks)
+
+newtype ByteOff = ByteOff Int
+    deriving (Enum, Eq, Show, Integral, Num, Ord, Real, Outputable)
+
+newtype WordOff = WordOff Int
+    deriving (Enum, Eq, Show, Integral, Num, Ord, Real, Outputable)
+
+{-
+   This contains the data we need for passing unboxed tuples between
+   bytecode and native code
+
+   In general we closely follow the native calling convention that
+   GHC uses for unboxed tuples, but we don't use any registers in
+   bytecode. All tuple elements are expanded to use a full register
+   or a full word on the stack.
+
+   The position of tuple elements that are returned on the stack in
+   the native calling convention is unchanged when returning the same
+   tuple in bytecode.
+
+   The order of the remaining elements is determined by the register in
+   which they would have been returned, rather than by their position in
+   the tuple in the Haskell source code. This makes jumping between bytecode
+   and native code easier: A map of live registers is enough to convert the
+   tuple.
+
+   See GHC.StgToByteCode.layoutTuple for more details.
+-}
+data TupleInfo = TupleInfo
+  { tupleSize            :: !WordOff -- total size of tuple in words
+  , tupleVanillaRegs     :: !Int     -- vanilla registers used (bitmap)
+  , tupleLongRegs        :: !Int     -- long registers used (bitmap)
+  , tupleFloatRegs       :: !Int     -- float registers used (bitmap)
+  , tupleDoubleRegs      :: !Int     -- double registers used (bitmap)
+  , tupleNativeStackSize :: !WordOff {- words spilled on the stack by
+                                        GHCs native calling convention -}
+  } deriving (Show)
+
+instance Outputable TupleInfo where
+  ppr TupleInfo{..} = text "<size" <+> ppr tupleSize <+>
+                      text "stack" <+> ppr tupleNativeStackSize <+>
+                      text "regs"  <+>
+                          char 'R' <> ppr tupleVanillaRegs <+>
+                          char 'L' <> ppr tupleLongRegs <+>
+                          char 'F' <> ppr tupleFloatRegs <+>
+                          char 'D' <> ppr tupleDoubleRegs <>
+                      char '>'
+
+voidTupleInfo :: TupleInfo
+voidTupleInfo = TupleInfo 0 0 0 0 0 0
 
 type ItblEnv = NameEnv (Name, ItblPtr)
         -- We need the Name in the range so we know which

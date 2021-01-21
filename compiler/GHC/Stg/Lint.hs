@@ -42,6 +42,8 @@ import GHC.Prelude
 import GHC.Stg.Syntax
 
 import GHC.Driver.Session
+import GHC.Driver.Env       ( HscEnv(..) )
+import GHC.Core.Lint        ( interactiveInScope )
 import GHC.Data.Bag         ( Bag, emptyBag, isEmptyBag, snocBag, bagToList )
 import GHC.Types.Basic      ( TopLevelFlag(..), isTopLevel )
 import GHC.Types.CostCentre ( isCurrentCCS )
@@ -62,15 +64,14 @@ import Control.Applicative ((<|>))
 import Control.Monad
 
 lintStgTopBindings :: forall a . (OutputablePass a, BinderP a ~ Id)
-                   => Logger
-                   -> DynFlags
+                   => HscEnv
                    -> Module -- ^ module being compiled
                    -> Bool   -- ^ have we run Unarise yet?
                    -> String -- ^ who produced the STG?
                    -> [GenStgTopBinding a]
                    -> IO ()
 
-lintStgTopBindings logger dflags this_mod unarised whodunnit binds
+lintStgTopBindings hsc_env this_mod unarised whodunnit binds
   = {-# SCC "StgLint" #-}
     case initL this_mod unarised opts top_level_binds (lint_binds binds) of
       Nothing  ->
@@ -86,10 +87,14 @@ lintStgTopBindings logger dflags this_mod unarised whodunnit binds
                   text "*** End of Offense ***"])
         Err.ghcExit logger dflags 1
   where
+    dflags = hsc_dflags hsc_env
+    logger = hsc_logger hsc_env
     opts = initStgPprOpts dflags
     -- Bring all top-level binds into scope because CoreToStg does not generate
     -- bindings in dependency order (so we may see a use before its definition).
-    top_level_binds = mkVarSet (bindersOfTopBinds binds)
+    top_level_binds = mkVarSet (bindersOfTopBinds binds ++
+                                interactiveInScope hsc_env
+                               )
 
     lint_binds :: [GenStgTopBinding a] -> LintM ()
 
