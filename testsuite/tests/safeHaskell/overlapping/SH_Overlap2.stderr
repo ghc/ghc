@@ -7,7 +7,7 @@ SH_Overlap2.hs:19:8: error:
         arising from a use of ‘f’
       The matching instance is:
         instance [overlap ok] [safe] C [Int]
-          -- Defined at SH_Overlap2_A.hs:11:3
+          -- Defined at SH_Overlap2_A.hs:12:3
       It is compiled in a Safe module and as such can only
       overlap instances from the same module, however it
       overlaps the following instances from different modules:
