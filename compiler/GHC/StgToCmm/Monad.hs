@@ -60,7 +60,7 @@ module GHC.StgToCmm.Monad (
         getBinds, setBinds,
         getUsedInfo, cgUsedInfo, addUsedInfo,
         -- out of general friendliness, we also export ...
-        CgInfoDownwards(..), CgState(..)        -- non-abstract
+        CgInfoDownwards(..), CgState(..), seqCgState        -- non-abstract
     ) where
 
 import GHC.Prelude hiding( sequence, succ )
@@ -322,6 +322,9 @@ data CgState
      -- but it causes an infinite loop so it is forced afterwards.
      cgs_used_info :: S.Set (CmmInfoTableWithOrd)
      }
+
+seqCgState :: CgState -> CgState
+seqCgState (MkCgState !a !b !c !d !e !f) = MkCgState a b c d e f
 
 cgUsedInfo :: CgState -> [CmmInfoTable]
 cgUsedInfo = coerce . S.toList . cgs_used_info
@@ -731,8 +734,7 @@ getHeapUsage fcode
         ; let   fstate_in = state { cgs_hp_usg  = initHpUsage }
                 (r, fstate_out) = doFCode (fcode hp_hw) info_down fstate_in
                 hp_hw = heapHWM (cgs_hp_usg fstate_out)        -- Loop here!
-
-        ; setState $ fstate_out { cgs_hp_usg = cgs_hp_usg state }
+        ; setState (fstate_out { cgs_hp_usg = cgs_hp_usg state })
         ; return r }
 
 -- ----------------------------------------------------------------------------
