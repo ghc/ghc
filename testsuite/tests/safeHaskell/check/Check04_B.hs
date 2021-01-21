@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE Safe #-}
 
 -- Since Safe we require base package be trusted to compile

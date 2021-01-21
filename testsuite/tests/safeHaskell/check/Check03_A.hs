@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE Trustworthy #-}
 module Check03_A (
         trace

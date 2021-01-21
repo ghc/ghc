@@ -59,8 +59,8 @@ test('SafeFlags28', normal, compile_fail, [''])
 test('SafeFlags29', normal, compile_fail, [''])
 
 # test certain flags are still allowed under -XSafe
-test('Flags01', normal, compile, ['-XSafe'])
-test('Flags02', normal, compile, ['-XSafe'])
+test('Flags01', normal, compile, ['-XHaskell2010 -XSafe'])
+test('Flags02', normal, compile, ['-XHaskell2010 -XSafe'])
 
 test('SafeFlags30', normal, compile_fail, [''])
 

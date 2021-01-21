@@ -1,3 +1,4 @@
+:set -XHaskell2010
 -- Test unsetting safe
 :unset +s
 :set -XSafe

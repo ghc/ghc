@@ -1,3 +1,4 @@
+:set -XHaskell2010
 -- Test you can't unset options
 :unset +s
 :set -XSafe

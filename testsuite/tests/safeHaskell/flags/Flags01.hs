@@ -1,4 +1,3 @@
-{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE CPP #-}
 
 -- | CPP should still be allowed
