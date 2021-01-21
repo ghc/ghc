@@ -2267,7 +2267,6 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
        let tmpfs           = hsc_tmpfs     hsc_env
        map1 <- case backend dflags of
          NoBackend   -> enableCodeGenForTH logger tmpfs home_unit default_backend map0
-         Interpreter -> enableCodeGenForUnboxedTuplesOrSums logger tmpfs default_backend map0
          _           -> return map0
        if null errs
          then pure $ concat $ modNodeMapElems map1
@@ -2377,33 +2376,8 @@ enableCodeGenForTH logger tmpfs home_unit =
       -- can't compile anything anyway! See #16219.
       isHomeUnitDefinite home_unit
 
--- | Update the every ModSummary that is depended on
--- by a module that needs unboxed tuples. We enable codegen to
--- the specified target, disable optimization and change the .hi
--- and .o file locations to be temporary files.
---
--- This is used in order to load code that uses unboxed tuples
--- or sums into GHCi while still allowing some code to be interpreted.
-enableCodeGenForUnboxedTuplesOrSums
-  :: Logger
-  -> TmpFs
-  -> Backend
-  -> ModNodeMap [Either ErrorMessages ExtendedModSummary]
-  -> IO (ModNodeMap [Either ErrorMessages ExtendedModSummary])
-enableCodeGenForUnboxedTuplesOrSums logger tmpfs =
-  enableCodeGenWhen logger tmpfs condition should_modify TFL_GhcSession TFL_CurrentModule
-  where
-    condition ms =
-      unboxed_tuples_or_sums (ms_hspp_opts ms) &&
-      not (gopt Opt_ByteCode (ms_hspp_opts ms)) &&
-      (isBootSummary ms == NotBoot)
-    unboxed_tuples_or_sums d =
-      xopt LangExt.UnboxedTuples d || xopt LangExt.UnboxedSums d
-    should_modify (ModSummary { ms_hspp_opts = dflags }) =
-      backend dflags == Interpreter
-
--- | Helper used to implement 'enableCodeGenForTH' and
--- 'enableCodeGenForUnboxedTuples'. In particular, this enables
+-- | Helper used to implement 'enableCodeGenForTH'.
+-- In particular, this enables
 -- unoptimized code generation for all modules that meet some
 -- condition (first parameter), or are dependencies of those
 -- modules. The second parameter is a condition to check before
