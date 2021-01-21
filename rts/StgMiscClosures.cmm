@@ -195,6 +195,274 @@ INFO_TABLE_RET( stg_ctoi_V, RET_BCO )
     jump stg_yield_to_interpreter [];
 }
 
+/*   Note [GHCi unboxed tuples stack spills]
+
+   In the calling convention for compiled code, a tuple is returned
+   in registers, with everything that doesn't fit spilled onto the STG
+   stack.
+
+   At the time the continuation is called, Sp points to the highest word
+   used on the stack:
+
+       ...
+       stg_ctoi_t  (next stack frame, continuation)
+       spilled_1
+       spilled_2
+       spilled_3   <- Sp
+
+   This makes it difficult to write a procedure that can handle tuples of
+   any size.
+
+   To get around this, we use a Cmm procedure that adjusts the stack pointer
+   to skip over the tuple:
+
+       ...
+       stg_ctoi_t3  (advances Sp by 3 words, then calls stg_ctoi_t)
+       spilled_1
+       spilled_2
+       spilled_3    <- Sp
+  
+   When stg_ctoi_t is called, the stack looks like:
+
+       ...
+       tuple_BCO
+       tuple_info
+       cont_BCO     (continuation in bytecode)
+       stg_ctoi_t3  <- Sp
+       spilled_1
+       spilled_2
+       spilled_3
+
+   stg_ctoi_t then reads the tuple_info word to determine the registers
+   to save onto the stack and construct a call to tuple_BCO. Afterwards the
+   stack looks as follows:
+
+       ...
+       tuple_BCO
+       tuple_info
+       cont_BCO
+       stg_ctoi_t3
+       spilled_1
+       spilled_2
+       spilled_3
+       saved_R2
+       saved_R1
+       saved_D3
+       ...
+       tuple_BCO
+       stg_apply_interp <- Sp
+
+
+   tuple_BCO contains the bytecode instructions to return the tuple to
+   cont_BCO. The bitmap in tuple_BCO describes the contents of
+   the tuple to the storage manager.
+
+   At this point we can safely jump to the interpreter.
+
+ */
+
+#define MK_STG_CTOI_T(N) INFO_TABLE_RET( \
+  stg_ctoi_t ## N, RET_BCO ) \
+  { Sp_adj(N); jump stg_ctoi_t [*]; }
+
+MK_STG_CTOI_T(0)
+MK_STG_CTOI_T(1)
+MK_STG_CTOI_T(2)
+MK_STG_CTOI_T(3)
+MK_STG_CTOI_T(4)
+MK_STG_CTOI_T(5)
+MK_STG_CTOI_T(6)
+MK_STG_CTOI_T(7)
+MK_STG_CTOI_T(8)
+MK_STG_CTOI_T(9)
+
+MK_STG_CTOI_T(10)
+MK_STG_CTOI_T(11)
+MK_STG_CTOI_T(12)
+MK_STG_CTOI_T(13)
+MK_STG_CTOI_T(14)
+MK_STG_CTOI_T(15)
+MK_STG_CTOI_T(16)
+MK_STG_CTOI_T(17)
+MK_STG_CTOI_T(18)
+MK_STG_CTOI_T(19)
+
+MK_STG_CTOI_T(20)
+MK_STG_CTOI_T(21)
+MK_STG_CTOI_T(22)
+MK_STG_CTOI_T(23)
+MK_STG_CTOI_T(24)
+MK_STG_CTOI_T(25)
+MK_STG_CTOI_T(26)
+MK_STG_CTOI_T(27)
+MK_STG_CTOI_T(28)
+MK_STG_CTOI_T(29)
+
+MK_STG_CTOI_T(30)
+MK_STG_CTOI_T(31)
+MK_STG_CTOI_T(32)
+MK_STG_CTOI_T(33)
+MK_STG_CTOI_T(34)
+MK_STG_CTOI_T(35)
+MK_STG_CTOI_T(36)
+MK_STG_CTOI_T(37)
+MK_STG_CTOI_T(38)
+MK_STG_CTOI_T(39)
+
+MK_STG_CTOI_T(40)
+MK_STG_CTOI_T(41)
+MK_STG_CTOI_T(42)
+MK_STG_CTOI_T(43)
+MK_STG_CTOI_T(44)
+MK_STG_CTOI_T(45)
+MK_STG_CTOI_T(46)
+MK_STG_CTOI_T(47)
+MK_STG_CTOI_T(48)
+MK_STG_CTOI_T(49)
+
+MK_STG_CTOI_T(50)
+MK_STG_CTOI_T(51)
+MK_STG_CTOI_T(52)
+MK_STG_CTOI_T(53)
+MK_STG_CTOI_T(54)
+MK_STG_CTOI_T(55)
+MK_STG_CTOI_T(56)
+MK_STG_CTOI_T(57)
+MK_STG_CTOI_T(58)
+MK_STG_CTOI_T(59)
+
+MK_STG_CTOI_T(60)
+MK_STG_CTOI_T(61)
+MK_STG_CTOI_T(62)
+
+/*
+  Note [GHCi tuple layout]
+
+  the tuple_info word describes the register and stack usage of the tuple:
+
+  [ rrrr ffff ffdd dddd llss ssss ssss ssss ]
+
+  - r: number of vanilla registers R1..Rn
+  - f: bitmap of float registers F1..F6
+  - d: bitmap of double registers D1..D6
+  - l: bitmap of long registers L1..Ln
+  - s: number of words on stack (in addition to registers)
+
+  The order in which the registers are pushed on the stack is determined by
+  the Ord instance of GHC.Cmm.Expr.GlobalReg. If you change the Ord instance,
+  the order in stg_ctoi_t and stg_ret_t needs to be adjusted accordingly.
+
+ */
+
+stg_ctoi_t
+    /* explicit stack */
+{
+
+    W_ tuple_info, tuple_stack, tuple_regs_R,
+       tuple_regs_F, tuple_regs_D, tuple_regs_L;
+    P_ tuple_BCO;
+
+    tuple_info = Sp(2); /* tuple information word */
+    tuple_BCO  = Sp(3); /* bytecode object that returns the tuple in
+                           the interpreter */
+
+#if defined(PROFILING)
+    CCCS = Sp(4);
+#endif
+
+    tuple_stack  = tuple_info & 0x3fff; /* number of words spilled on stack */
+    tuple_regs_R = (tuple_info >> 28) & 0xf;  /* number of R1..Rn */
+    tuple_regs_F = (tuple_info >> 22) & 0x3f; /* 6 bits bitmap */
+    tuple_regs_D = (tuple_info >> 16) & 0x3f; /* 6 bits bitmap */
+    tuple_regs_L = (tuple_info >> 14) & 0x3;  /* 2 bits bitmap */
+
+    Sp = Sp - WDS(tuple_stack);
+
+    /* save long registers */
+    /* fixme L2 ? */
+    if((tuple_regs_L & 1) != 0) { Sp = Sp - 8; L_[Sp] = L1; }
+
+    /* save double registers */
+    if((tuple_regs_D & 32) != 0) { Sp = Sp - SIZEOF_DOUBLE; D_[Sp] = D6; }
+    if((tuple_regs_D & 16) != 0) { Sp = Sp - SIZEOF_DOUBLE; D_[Sp] = D5; }
+    if((tuple_regs_D & 8)  != 0) { Sp = Sp - SIZEOF_DOUBLE; D_[Sp] = D4; }
+    if((tuple_regs_D & 4)  != 0) { Sp = Sp - SIZEOF_DOUBLE; D_[Sp] = D3; }
+    if((tuple_regs_D & 2)  != 0) { Sp = Sp - SIZEOF_DOUBLE; D_[Sp] = D2; }
+    if((tuple_regs_D & 1)  != 0) { Sp = Sp - SIZEOF_DOUBLE; D_[Sp] = D1; }
+
+    /* save float registers */
+    if((tuple_regs_F & 32) != 0) { Sp_adj(-1); F_[Sp] = F6; }
+    if((tuple_regs_F & 16) != 0) { Sp_adj(-1); F_[Sp] = F5; }
+    if((tuple_regs_F & 8)  != 0) { Sp_adj(-1); F_[Sp] = F4; }
+    if((tuple_regs_F & 4)  != 0) { Sp_adj(-1); F_[Sp] = F3; }
+    if((tuple_regs_F & 2)  != 0) { Sp_adj(-1); F_[Sp] = F2; }
+    if((tuple_regs_F & 1)  != 0) { Sp_adj(-1); F_[Sp] = F1; }
+
+    /* save vanilla registers */
+    if(tuple_regs_R >= 6) { Sp_adj(-1); Sp(0) = R6; }
+    if(tuple_regs_R >= 5) { Sp_adj(-1); Sp(0) = R5; }
+    if(tuple_regs_R >= 4) { Sp_adj(-1); Sp(0) = R4; }
+    if(tuple_regs_R >= 3) { Sp_adj(-1); Sp(0) = R3; }
+    if(tuple_regs_R >= 2) { Sp_adj(-1); Sp(0) = R2; }
+    if(tuple_regs_R >= 1) { Sp_adj(-1); Sp(0) = R1; }
+
+    /* jump to the BCO that will finish the return of the tuple */
+    Sp_adj(-3);
+    Sp(2) = tuple_info;
+    Sp(1) = tuple_BCO;
+    Sp(0) = stg_ret_t_info;
+
+    jump stg_yield_to_interpreter [];
+}
+
+INFO_TABLE_RET( stg_ret_t, RET_BCO )
+{
+    W_ tuple_info, tuple_stack, tuple_regs_R, tuple_regs_F,
+       tuple_regs_D, tuple_regs_L;
+
+    tuple_info = Sp(2);
+    Sp_adj(3);
+
+    tuple_stack  = tuple_info & 0x3fff; /* number of words spilled on stack */
+    tuple_regs_R = (tuple_info >> 28) & 0xf;  /* number of R1..Rn */
+    tuple_regs_F = (tuple_info >> 22) & 0x3f; /* 6 bits bitmap */
+    tuple_regs_D = (tuple_info >> 16) & 0x3f; /* 6 bits bitmap */
+    tuple_regs_L = (tuple_info >> 14) & 0x3;  /* 2 bits bitmap */
+
+    /* restore everything in the reverse order of stg_ctoi_t */
+
+    /* restore vanilla registers */
+    if(tuple_regs_R >= 1) { R1 = Sp(0); Sp_adj(1); }
+    if(tuple_regs_R >= 2) { R2 = Sp(0); Sp_adj(1); }
+    if(tuple_regs_R >= 3) { R3 = Sp(0); Sp_adj(1); }
+    if(tuple_regs_R >= 4) { R4 = Sp(0); Sp_adj(1); }
+    if(tuple_regs_R >= 5) { R5 = Sp(0); Sp_adj(1); }
+    if(tuple_regs_R >= 6) { R6 = Sp(0); Sp_adj(1); }
+
+    /* restore float registers */
+    if((tuple_regs_F & 1)  != 0) { F1 = F_[Sp]; Sp_adj(1); }
+    if((tuple_regs_F & 2)  != 0) { F2 = F_[Sp]; Sp_adj(1); }
+    if((tuple_regs_F & 4)  != 0) { F3 = F_[Sp]; Sp_adj(1); }
+    if((tuple_regs_F & 8)  != 0) { F4 = F_[Sp]; Sp_adj(1); }
+    if((tuple_regs_F & 16) != 0) { F5 = F_[Sp]; Sp_adj(1); }
+    if((tuple_regs_F & 32) != 0) { F6 = F_[Sp]; Sp_adj(1); }
+
+    /* restore double registers */
+    if((tuple_regs_D & 1)  != 0) { D1 = D_[Sp]; Sp = Sp + SIZEOF_DOUBLE; }
+    if((tuple_regs_D & 2)  != 0) { D2 = D_[Sp]; Sp = Sp + SIZEOF_DOUBLE; }
+    if((tuple_regs_D & 4)  != 0) { D3 = D_[Sp]; Sp = Sp + SIZEOF_DOUBLE; }
+    if((tuple_regs_D & 8)  != 0) { D4 = D_[Sp]; Sp = Sp + SIZEOF_DOUBLE; }
+    if((tuple_regs_D & 16) != 0) { D5 = D_[Sp]; Sp = Sp + SIZEOF_DOUBLE; }
+    if((tuple_regs_D & 32) != 0) { D6 = D_[Sp]; Sp = Sp + SIZEOF_DOUBLE; }
+
+    /* restore long registers */
+    if((tuple_regs_L & 1) != 0) { L1 = L_[Sp]; Sp = Sp + 8; }
+
+    /* Sp points to the topmost argument now */
+    jump %ENTRY_CODE(Sp(tuple_stack)) [*]; // NB. all registers live!
+}
+
+
 /*
  * Dummy info table pushed on the top of the stack when the interpreter
  * should apply the BCO on the stack to its arguments, also on the
