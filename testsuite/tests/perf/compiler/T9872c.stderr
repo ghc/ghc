@@ -1,5 +1,5 @@
 
-T9872c.hs:17:8:
+T9872c.hs:18:8:
     No instance for (Show
                        (Proxy
                           (Cons
