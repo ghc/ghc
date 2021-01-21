@@ -4,6 +4,7 @@
  * Copyright (c) The GHC Team, 1994-2002.
  * ---------------------------------------------------------------------------*/
 
+
 #include "PosixSource.h"
 #include "Rts.h"
 #include "RtsAPI.h"
@@ -681,12 +682,13 @@ do_return_unboxed:
                 || SpW(0) == (W_)&stg_ret_f_info
                 || SpW(0) == (W_)&stg_ret_d_info
                 || SpW(0) == (W_)&stg_ret_l_info
+                || SpW(0) == (W_)&stg_ret_t_info
             );
 
         IF_DEBUG(interpreter,
              debugBelch(
              "\n---------------------------------------------------------------\n");
-             debugBelch("Returning: "); printObj(obj);
+             debugBelch("Returning unboxed\n");
              debugBelch("Sp = %p\n", Sp);
 #if defined(PROFILING)
              fprintCCS(stderr, cap->r.rCCCS);
@@ -697,7 +699,7 @@ do_return_unboxed:
              debugBelch("\n\n");
             );
 
-        // get the offset of the stg_ctoi_ret_XXX itbl
+        // get the offset of the header of the next stack frame
         offset = stack_frame_sizeW((StgClosure *)Sp);
 
         switch (get_itbl((StgClosure*)(Sp_plusW(offset)))->type) {
@@ -933,6 +935,43 @@ run_BCO_return_unboxed:
     }
     // Stack checks aren't necessary at return points, the stack use
     // is aggregated into the enclosing function entry point.
+
+#if defined(PROFILING)
+    /*
+       Restore the current cost centre stack if a tuple is being returned.
+
+       When a "simple" unboxed value is returned, the cccs is restored with
+       an stg_restore_cccs frame on the stack, for example:
+
+           ...
+           stg_ctoi_D1
+           <CCCS>
+           stg_restore_cccs
+
+       But stg_restore_cccs cannot deal with tuples, which may have more
+       things on the stack. Therefore we store the CCCS inside the
+       stg_ctoi_t frame.
+
+       If we have a tuple being returned, the stack looks like this:
+
+           ...
+           <CCCS>           <- to restore, Sp offset <next frame + 4 words>
+           tuple_BCO
+           tuple_info
+           cont_BCO
+           stg_ctoi_t       <- next frame
+           tuple_data_1
+           ...
+           tuple_data_n
+           tuple_info
+           tuple_BCO
+           stg_ret_t        <- Sp
+     */
+
+    if(SpW(0) == (W_)&stg_ret_t_info) {
+        cap->r.rCCCS = (CostCentreStack*)SpW(stack_frame_sizeW((StgClosure *)Sp) + 4);
+    }
+#endif
 
     goto run_BCO;
 
@@ -1329,6 +1368,100 @@ run_BCO:
             goto nextInsn;
         }
 
+        case bci_PUSH_ALTS_T: {
+            int o_bco = BCO_GET_LARGE_ARG;
+            W_ tuple_info = (W_)BCO_LIT(BCO_GET_LARGE_ARG);
+            int o_tuple_bco = BCO_GET_LARGE_ARG;
+
+#if defined(PROFILING)
+            SpW(-1) = (W_)cap->r.rCCCS;
+            Sp_subW(1);
+#endif
+
+            SpW(-1) = BCO_PTR(o_tuple_bco);
+            SpW(-2) = tuple_info;
+            SpW(-3) = BCO_PTR(o_bco);
+            W_ ctoi_t_offset;
+            int tuple_stack_words = tuple_info & 0x3fff;
+            switch(tuple_stack_words) {
+                case 0:  ctoi_t_offset = (W_)&stg_ctoi_t0_info;  break;
+                case 1:  ctoi_t_offset = (W_)&stg_ctoi_t1_info;  break;
+                case 2:  ctoi_t_offset = (W_)&stg_ctoi_t2_info;  break;
+                case 3:  ctoi_t_offset = (W_)&stg_ctoi_t3_info;  break;
+                case 4:  ctoi_t_offset = (W_)&stg_ctoi_t4_info;  break;
+                case 5:  ctoi_t_offset = (W_)&stg_ctoi_t5_info;  break;
+                case 6:  ctoi_t_offset = (W_)&stg_ctoi_t6_info;  break;
+                case 7:  ctoi_t_offset = (W_)&stg_ctoi_t7_info;  break;
+                case 8:  ctoi_t_offset = (W_)&stg_ctoi_t8_info;  break;
+                case 9:  ctoi_t_offset = (W_)&stg_ctoi_t9_info;  break;
+
+                case 10: ctoi_t_offset = (W_)&stg_ctoi_t10_info; break;
+                case 11: ctoi_t_offset = (W_)&stg_ctoi_t11_info; break;
+                case 12: ctoi_t_offset = (W_)&stg_ctoi_t12_info; break;
+                case 13: ctoi_t_offset = (W_)&stg_ctoi_t13_info; break;
+                case 14: ctoi_t_offset = (W_)&stg_ctoi_t14_info; break;
+                case 15: ctoi_t_offset = (W_)&stg_ctoi_t15_info; break;
+                case 16: ctoi_t_offset = (W_)&stg_ctoi_t16_info; break;
+                case 17: ctoi_t_offset = (W_)&stg_ctoi_t17_info; break;
+                case 18: ctoi_t_offset = (W_)&stg_ctoi_t18_info; break;
+                case 19: ctoi_t_offset = (W_)&stg_ctoi_t19_info; break;
+
+                case 20: ctoi_t_offset = (W_)&stg_ctoi_t20_info; break;
+                case 21: ctoi_t_offset = (W_)&stg_ctoi_t21_info; break;
+                case 22: ctoi_t_offset = (W_)&stg_ctoi_t22_info; break;
+                case 23: ctoi_t_offset = (W_)&stg_ctoi_t23_info; break;
+                case 24: ctoi_t_offset = (W_)&stg_ctoi_t24_info; break;
+                case 25: ctoi_t_offset = (W_)&stg_ctoi_t25_info; break;
+                case 26: ctoi_t_offset = (W_)&stg_ctoi_t26_info; break;
+                case 27: ctoi_t_offset = (W_)&stg_ctoi_t27_info; break;
+                case 28: ctoi_t_offset = (W_)&stg_ctoi_t28_info; break;
+                case 29: ctoi_t_offset = (W_)&stg_ctoi_t29_info; break;
+
+                case 30: ctoi_t_offset = (W_)&stg_ctoi_t30_info; break;
+                case 31: ctoi_t_offset = (W_)&stg_ctoi_t31_info; break;
+                case 32: ctoi_t_offset = (W_)&stg_ctoi_t32_info; break;
+                case 33: ctoi_t_offset = (W_)&stg_ctoi_t33_info; break;
+                case 34: ctoi_t_offset = (W_)&stg_ctoi_t34_info; break;
+                case 35: ctoi_t_offset = (W_)&stg_ctoi_t35_info; break;
+                case 36: ctoi_t_offset = (W_)&stg_ctoi_t36_info; break;
+                case 37: ctoi_t_offset = (W_)&stg_ctoi_t37_info; break;
+                case 38: ctoi_t_offset = (W_)&stg_ctoi_t38_info; break;
+                case 39: ctoi_t_offset = (W_)&stg_ctoi_t39_info; break;
+
+                case 40: ctoi_t_offset = (W_)&stg_ctoi_t40_info; break;
+                case 41: ctoi_t_offset = (W_)&stg_ctoi_t41_info; break;
+                case 42: ctoi_t_offset = (W_)&stg_ctoi_t42_info; break;
+                case 43: ctoi_t_offset = (W_)&stg_ctoi_t43_info; break;
+                case 44: ctoi_t_offset = (W_)&stg_ctoi_t44_info; break;
+                case 45: ctoi_t_offset = (W_)&stg_ctoi_t45_info; break;
+                case 46: ctoi_t_offset = (W_)&stg_ctoi_t46_info; break;
+                case 47: ctoi_t_offset = (W_)&stg_ctoi_t47_info; break;
+                case 48: ctoi_t_offset = (W_)&stg_ctoi_t48_info; break;
+                case 49: ctoi_t_offset = (W_)&stg_ctoi_t49_info; break;
+
+                case 50: ctoi_t_offset = (W_)&stg_ctoi_t50_info; break;
+                case 51: ctoi_t_offset = (W_)&stg_ctoi_t51_info; break;
+                case 52: ctoi_t_offset = (W_)&stg_ctoi_t52_info; break;
+                case 53: ctoi_t_offset = (W_)&stg_ctoi_t53_info; break;
+                case 54: ctoi_t_offset = (W_)&stg_ctoi_t54_info; break;
+                case 55: ctoi_t_offset = (W_)&stg_ctoi_t55_info; break;
+                case 56: ctoi_t_offset = (W_)&stg_ctoi_t56_info; break;
+                case 57: ctoi_t_offset = (W_)&stg_ctoi_t57_info; break;
+                case 58: ctoi_t_offset = (W_)&stg_ctoi_t58_info; break;
+                case 59: ctoi_t_offset = (W_)&stg_ctoi_t59_info; break;
+
+                case 60: ctoi_t_offset = (W_)&stg_ctoi_t60_info; break;
+                case 61: ctoi_t_offset = (W_)&stg_ctoi_t61_info; break;
+                case 62: ctoi_t_offset = (W_)&stg_ctoi_t62_info; break;
+
+                default: barf("unsupported tuple size %d", tuple_stack_words);
+            }
+
+            SpW(-4) = ctoi_t_offset;
+            Sp_subW(4);
+            goto nextInsn;
+        }
+
         case bci_PUSH_APPLY_N:
             Sp_subW(1); SpW(0) = (W_)&stg_ap_n_info;
             goto nextInsn;
@@ -1708,6 +1841,12 @@ run_BCO:
             Sp_subW(1);
             SpW(0) = (W_)&stg_ret_v_info;
             goto do_return_unboxed;
+        case bci_RETURN_T: {
+            /* tuple_info and tuple_bco must already be on the stack */
+            Sp_subW(1);
+            SpW(0) = (W_)&stg_ret_t_info;
+            goto do_return_unboxed;
+        }
 
         case bci_SWIZZLE: {
             int stkoff = BCO_NEXT;
