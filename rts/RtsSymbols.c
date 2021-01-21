@@ -561,6 +561,8 @@
       SymI_HasProto(stg_ret_f_info)                                     \
       SymI_HasProto(stg_ret_d_info)                                     \
       SymI_HasProto(stg_ret_l_info)                                     \
+      SymI_HasProto(stg_ret_t_info)                                     \
+      SymI_HasProto(stg_ctoi_t)                                         \
       SymI_HasProto(stg_gc_prim_p)                                      \
       SymI_HasProto(stg_gc_prim_pp)                                     \
       SymI_HasProto(stg_gc_prim_n)                                      \

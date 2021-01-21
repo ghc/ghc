@@ -692,7 +692,7 @@ pushResume hsc_env resume = hsc_env { hsc_IC = ictxt1 }
 
   There are 3 situations where items are removed from the Id list
   (or replaced with `Nothing`):
-  1.) If function `GHC.CoreToByteCode.schemeER_wrk` (which creates
+  1.) If function `GHC.StgToByteCode.schemeER_wrk` (which creates
       the Id list) doesn't find an Id in the ByteCode environement.
   2.) If function `GHC.Runtime.Eval.bindLocalsAtBreakpoint`
       filters out unboxed elements from the Id list, because GHCi cannot

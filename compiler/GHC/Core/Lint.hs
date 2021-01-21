@@ -17,6 +17,8 @@ module GHC.Core.Lint (
     lintPassResult, lintInteractiveExpr, lintExpr,
     lintAnnots, lintAxioms,
 
+    interactiveInScope,
+
     -- ** Debug output
     endPass, endPassIO,
     displayLintResults, dumpPassResult,
@@ -379,7 +381,7 @@ lintPassResult hsc_env pass binds
   | not (gopt Opt_DoCoreLinting dflags)
   = return ()
   | otherwise
-  = do { let warns_and_errs = lintCoreBindings dflags pass (interactiveInScope hsc_env) binds
+  = do { let warns_and_errs = lintCoreBindings dflags pass (interactiveInScope $ hsc_IC hsc_env) binds
        ; Err.showPass logger dflags ("Core Linted result of " ++ showPpr dflags pass)
        ; displayLintResults logger dflags (showLintWarnings pass) (ppr pass)
                             (pprCoreBindings binds) warns_and_errs }
@@ -432,7 +434,7 @@ lintInteractiveExpr :: SDoc -- ^ The source of the linted expression
 lintInteractiveExpr what hsc_env expr
   | not (gopt Opt_DoCoreLinting dflags)
   = return ()
-  | Just err <- lintExpr dflags (interactiveInScope hsc_env) expr
+  | Just err <- lintExpr dflags (interactiveInScope $ hsc_IC hsc_env) expr
   = displayLintResults logger dflags False what (pprCoreExpr expr) (emptyBag, err)
   | otherwise
   = return ()
@@ -440,7 +442,7 @@ lintInteractiveExpr what hsc_env expr
     dflags = hsc_dflags hsc_env
     logger = hsc_logger hsc_env
 
-interactiveInScope :: HscEnv -> [Var]
+interactiveInScope :: InteractiveContext -> [Var]
 -- In GHCi we may lint expressions, or bindings arising from 'deriving'
 -- clauses, that mention variables bound in the interactive context.
 -- These are Local things (see Note [Interactively-bound Ids in GHCi] in GHC.Runtime.Context).
@@ -452,11 +454,10 @@ interactiveInScope :: HscEnv -> [Var]
 -- so this is a (cheap) no-op.
 --
 -- See #8215 for an example
-interactiveInScope hsc_env
+interactiveInScope ictxt
   = tyvars ++ ids
   where
     -- C.f. GHC.Tc.Module.setInteractiveContext, Desugar.deSugarExpr
-    ictxt                   = hsc_IC hsc_env
     (cls_insts, _fam_insts) = ic_instances ictxt
     te1    = mkTypeEnvWithImplicits (ic_tythings ictxt)
     te     = extendTypeEnvWithIds te1 (map instanceDFunId cls_insts)

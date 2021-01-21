@@ -1,4 +1,5 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP              #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 --
 --  (c) The University of Glasgow 2002-2006
@@ -17,21 +18,18 @@ import GHC.ByteCode.Types
 import GHCi.RemoteTypes
 import GHCi.FFI (C_ffi_cif)
 import GHC.StgToCmm.Layout     ( ArgRep(..) )
-import GHC.Core.Ppr
 import GHC.Utils.Outputable
-import GHC.Data.FastString
 import GHC.Types.Name
 import GHC.Types.Unique
-import GHC.Types.Id
-import GHC.Core
 import GHC.Types.Literal
 import GHC.Core.DataCon
-import GHC.Types.Var.Set
 import GHC.Builtin.PrimOps
 import GHC.Runtime.Heap.Layout
 
 import Data.Word
 import GHC.Stack.CCS (CostCentre)
+
+import GHC.Stg.Syntax
 
 -- ----------------------------------------------------------------------------
 -- Bytecode instructions
@@ -45,7 +43,7 @@ data ProtoBCO a
         protoBCOBitmapSize :: Word16,
         protoBCOArity      :: Int,
         -- what the BCO came from, for debugging only
-        protoBCOExpr       :: Either  [AnnAlt Id DVarSet] (AnnExpr Id DVarSet),
+        protoBCOExpr       :: Either [CgStgAlt] CgStgRhs,
         -- malloc'd pointers
         protoBCOFFIs       :: [FFIInfo]
    }
@@ -91,6 +89,9 @@ data BCInstr
    -- Push an alt continuation
    | PUSH_ALTS          (ProtoBCO Name)
    | PUSH_ALTS_UNLIFTED (ProtoBCO Name) ArgRep
+   | PUSH_ALTS_TUPLE    (ProtoBCO Name) -- continuation
+                        !TupleInfo
+                        (ProtoBCO Name) -- tuple return BCO
 
    -- Pushing 8, 16 and 32 bits of padding (for constructors).
    | PUSH_PAD8
@@ -173,8 +174,9 @@ data BCInstr
 
    -- To Infinity And Beyond
    | ENTER
-   | RETURN             -- return a lifted value
+   | RETURN            -- return a lifted value
    | RETURN_UBX ArgRep -- return an unlifted value, here's its rep
+   | RETURN_TUPLE      -- return an unboxed tuple (info already on stack)
 
    -- Breakpoints
    | BRK_FUN          Word16 Unique (RemotePtr CostCentre)
@@ -193,36 +195,45 @@ instance Outputable a => Outputable (ProtoBCO a) where
       = (text "ProtoBCO" <+> ppr name <> char '#' <> int arity
                 <+> text (show ffis) <> colon)
         $$ nest 3 (case origin of
-                      Left alts -> vcat (zipWith (<+>) (char '{' : repeat (char ';'))
-                                                       (map (pprCoreAltShort.deAnnAlt) alts)) <+> char '}'
-                      Right rhs -> pprCoreExprShort (deAnnotate rhs))
+                      Left alts ->
+                        vcat (zipWith (<+>) (char '{' : repeat (char ';'))
+                             (map (pprStgAltShort shortStgPprOpts) alts))
+                      Right rhs ->
+                        pprStgRhsShort shortStgPprOpts rhs
+                  )
         $$ nest 3 (text "bitmap: " <+> text (show bsize) <+> ppr bitmap)
         $$ nest 3 (vcat (map ppr instrs))
 
--- Print enough of the Core expression to enable the reader to find
--- the expression in the -ddump-prep output.  That is, we need to
+-- Print enough of the STG expression to enable the reader to find
+-- the expression in the -ddump-stg output.  That is, we need to
 -- include at least a binder.
 
-pprCoreExprShort :: CoreExpr -> SDoc
-pprCoreExprShort expr@(Lam _ _)
-  = let
-        (bndrs, _) = collectBinders expr
-    in
-    char '\\' <+> sep (map (pprBndr LambdaBind) bndrs) <+> arrow <+> text "..."
+pprStgExprShort :: OutputablePass pass => StgPprOpts -> GenStgExpr pass -> SDoc
+pprStgExprShort _ (StgCase _expr var _ty _alts) =
+  text "case of" <+> ppr var
+pprStgExprShort _ (StgLet _ bnd _) =
+  text "let" <+> pprStgBindShort bnd <+> text "in ..."
+pprStgExprShort _ (StgLetNoEscape _ bnd _) =
+  text "let-no-escape" <+> pprStgBindShort bnd <+> text "in ..."
+pprStgExprShort opts (StgTick t e) = ppr t <+> pprStgExprShort opts e
+pprStgExprShort opts e = pprStgExpr opts e
 
-pprCoreExprShort (Case _expr var _ty _alts)
- = text "case of" <+> ppr var
+pprStgBindShort :: OutputablePass pass => GenStgBinding pass -> SDoc
+pprStgBindShort (StgNonRec x _) =
+  ppr x <+> text "= ..."
+pprStgBindShort (StgRec bs) =
+  char '{' <+> ppr (fst (head bs)) <+> text "= ...; ... }"
 
-pprCoreExprShort (Let (NonRec x _) _) = text "let" <+> ppr x <+> ptext (sLit ("= ... in ..."))
-pprCoreExprShort (Let (Rec bs) _) = text "let {" <+> ppr (fst (head bs)) <+> ptext (sLit ("= ...; ... } in ..."))
+pprStgAltShort :: OutputablePass pass => StgPprOpts -> GenStgAlt pass -> SDoc
+pprStgAltShort opts (con, args, expr) =
+  ppr con <+> sep (map ppr args) <+> text "->" <+> pprStgExprShort opts expr
 
-pprCoreExprShort (Tick t e) = ppr t <+> pprCoreExprShort e
-pprCoreExprShort (Cast e _) = pprCoreExprShort e <+> text "`cast` T"
+pprStgRhsShort :: OutputablePass pass => StgPprOpts -> GenStgRhs pass -> SDoc
+pprStgRhsShort opts (StgRhsClosure _ext _cc upd_flag args body) =
+  hang (hsep [ char '\\' <> ppr upd_flag, brackets (interppSP args) ])
+       4 (pprStgExprShort opts body)
+pprStgRhsShort opts rhs = pprStgRhs opts rhs
 
-pprCoreExprShort e = pprCoreExpr e
-
-pprCoreAltShort :: CoreAlt -> SDoc
-pprCoreAltShort (Alt con args expr) = ppr con <+> sep (map ppr args) <+> text "->" <+> pprCoreExprShort expr
 
 instance Outputable BCInstr where
    ppr (STKCHECK n)          = text "STKCHECK" <+> ppr n
@@ -239,8 +250,13 @@ instance Outputable BCInstr where
    ppr (PUSH_PRIMOP op)      = text "PUSH_G  " <+> text "GHC.PrimopWrappers."
                                                <> ppr op
    ppr (PUSH_BCO bco)        = hang (text "PUSH_BCO") 2 (ppr bco)
+
    ppr (PUSH_ALTS bco)       = hang (text "PUSH_ALTS") 2 (ppr bco)
    ppr (PUSH_ALTS_UNLIFTED bco pk) = hang (text "PUSH_ALTS_UNLIFTED" <+> ppr pk) 2 (ppr bco)
+   ppr (PUSH_ALTS_TUPLE bco tuple_info tuple_bco) =
+                               hang (text "PUSH_ALTS_TUPLE" <+> ppr tuple_info)
+                                    2
+                                    (ppr tuple_bco $+$ ppr bco)
 
    ppr PUSH_PAD8             = text "PUSH_PAD8"
    ppr PUSH_PAD16            = text "PUSH_PAD16"
@@ -297,7 +313,10 @@ instance Outputable BCInstr where
    ppr ENTER                 = text "ENTER"
    ppr RETURN                = text "RETURN"
    ppr (RETURN_UBX pk)       = text "RETURN_UBX  " <+> ppr pk
+   ppr (RETURN_TUPLE)        = text "RETURN_TUPLE"
    ppr (BRK_FUN index uniq _cc) = text "BRK_FUN" <+> ppr index <+> ppr uniq <+> text "<cc>"
+
+
 
 -- -----------------------------------------------------------------------------
 -- The stack use, in words, of each bytecode insn.  These _must_ be
@@ -326,8 +345,16 @@ bciStackUse PUSH32_W{}            = 1  -- takes exactly 1 word
 bciStackUse PUSH_G{}              = 1
 bciStackUse PUSH_PRIMOP{}         = 1
 bciStackUse PUSH_BCO{}            = 1
-bciStackUse (PUSH_ALTS bco)       = 2 + protoBCOStackUse bco
-bciStackUse (PUSH_ALTS_UNLIFTED bco _) = 2 + protoBCOStackUse bco
+bciStackUse (PUSH_ALTS bco)       = 2 {- profiling only, restore CCCS -} +
+                                    3 + protoBCOStackUse bco
+bciStackUse (PUSH_ALTS_UNLIFTED bco _) = 2 {- profiling only, restore CCCS -} +
+                                         4 + protoBCOStackUse bco
+bciStackUse (PUSH_ALTS_TUPLE bco info _) =
+   -- (tuple_bco, tuple_info word, cont_bco, stg_ctoi_t)
+   -- tuple
+   -- (tuple_info, tuple_bco, stg_ret_t)
+   1 {- profiling only -} +
+   7 + fromIntegral (tupleSize info) + protoBCOStackUse bco
 bciStackUse (PUSH_PAD8)           = 1  -- overapproximation
 bciStackUse (PUSH_PAD16)          = 1  -- overapproximation
 bciStackUse (PUSH_PAD32)          = 1  -- overapproximation on 64bit arch
@@ -365,7 +392,8 @@ bciStackUse CASEFAIL{}            = 0
 bciStackUse JMP{}                 = 0
 bciStackUse ENTER{}               = 0
 bciStackUse RETURN{}              = 0
-bciStackUse RETURN_UBX{}          = 1
+bciStackUse RETURN_UBX{}          = 1 -- pushes stg_ret_X for some X
+bciStackUse RETURN_TUPLE{}        = 1 -- pushes stg_ret_t header
 bciStackUse CCALL{}               = 0
 bciStackUse SWIZZLE{}             = 0
 bciStackUse BRK_FUN{}             = 0

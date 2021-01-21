@@ -24,6 +24,7 @@ import GHC.Stg.Unarise  ( unarise )
 import GHC.Stg.CSE      ( stgCse )
 import GHC.Stg.Lift     ( stgLiftLams )
 import GHC.Unit.Module ( Module )
+import GHC.Runtime.Context ( InteractiveContext )
 
 import GHC.Driver.Session
 import GHC.Utils.Error
@@ -49,11 +50,11 @@ runStgM mask (StgM m) = evalStateT m mask
 
 stg2stg :: Logger
         -> DynFlags                  -- includes spec of what stg-to-stg passes to do
+        -> InteractiveContext
         -> Module                    -- module being compiled
         -> [StgTopBinding]           -- input program
         -> IO [StgTopBinding]        -- output program
-
-stg2stg logger dflags this_mod binds
+stg2stg logger dflags ictxt this_mod binds
   = do  { dump_when Opt_D_dump_stg_from_core "Initial STG:" binds
         ; showPass logger dflags "Stg2Stg"
         -- Do the main business!
@@ -75,7 +76,7 @@ stg2stg logger dflags this_mod binds
   where
     stg_linter unarised
       | gopt Opt_DoStgLinting dflags
-      = lintStgTopBindings logger dflags this_mod unarised
+      = lintStgTopBindings logger dflags ictxt this_mod unarised
       | otherwise
       = \ _whodunnit _binds -> return ()
 

@@ -335,7 +335,6 @@ Library
         GHC.Core.Stats
         GHC.Core.Subst
         GHC.Core.Tidy
-        GHC.CoreToByteCode
         GHC.CoreToIface
         GHC.CoreToStg
         GHC.CoreToStg.Prep
@@ -536,6 +535,7 @@ Library
         GHC.Stg.Stats
         GHC.Stg.Subst
         GHC.Stg.Syntax
+        GHC.StgToByteCode
         GHC.StgToCmm
         GHC.StgToCmm.ArgRep
         GHC.StgToCmm.Bind

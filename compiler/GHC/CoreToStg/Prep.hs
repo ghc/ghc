@@ -964,7 +964,7 @@ no further floating will occur. This allows us to safely inline things like
    GHC.Magic. This definition is used in cases where runRW is curried.
 
  * In addition to its normal Haskell definition in GHC.Magic, we give it
-   a special late inlining here in CorePrep and GHC.CoreToByteCode, avoiding
+   a special late inlining here in CorePrep and GHC.StgToByteCode, avoiding
    the incorrect sharing due to float-out noted above.
 
  * It is levity-polymorphic:

@@ -9,10 +9,10 @@
 -- | Bytecode assembler and linker
 module GHC.ByteCode.Asm (
         assembleBCOs, assembleOneBCO,
-
         bcoFreeNames,
         SizedSeq, sizeSS, ssElts,
-        iNTERP_STACK_CHECK_THRESH
+        iNTERP_STACK_CHECK_THRESH,
+        mkTupleInfoLit
   ) where
 
 #include "HsVersions.h"
@@ -27,7 +27,7 @@ import GHC.ByteCode.InfoTable
 import GHC.ByteCode.Types
 import GHCi.RemoteTypes
 import GHC.Runtime.Interpreter
-import GHC.Runtime.Heap.Layout
+import GHC.Runtime.Heap.Layout hiding ( WordOff )
 
 import GHC.Types.Name
 import GHC.Types.Name.Set
@@ -381,6 +381,16 @@ assembleI platform i = case i of
                            -> do let ul_bco = assembleBCO platform proto
                                  p <- ioptr (liftM BCOPtrBCO ul_bco)
                                  emit (push_alts pk) [Op p]
+  PUSH_ALTS_TUPLE proto tuple_info tuple_proto
+                           -> do let ul_bco = assembleBCO platform proto
+                                     ul_tuple_bco = assembleBCO platform
+                                                                tuple_proto
+                                 p <- ioptr (liftM BCOPtrBCO ul_bco)
+                                 p_tup <- ioptr (liftM BCOPtrBCO ul_tuple_bco)
+                                 info <- int (fromIntegral $
+                                              mkTupleInfoSig tuple_info)
+                                 emit bci_PUSH_ALTS_T
+                                      [Op p, Op info, Op p_tup]
   PUSH_PAD8                -> emit bci_PUSH_PAD8 []
   PUSH_PAD16               -> emit bci_PUSH_PAD16 []
   PUSH_PAD32               -> emit bci_PUSH_PAD32 []
@@ -439,6 +449,7 @@ assembleI platform i = case i of
   ENTER                    -> emit bci_ENTER []
   RETURN                   -> emit bci_RETURN []
   RETURN_UBX rep           -> emit (return_ubx rep) []
+  RETURN_TUPLE             -> emit bci_RETURN_T []
   CCALL off m_addr i       -> do np <- addr m_addr
                                  emit bci_CCALL [SmallOp off, Op np, SmallOp i]
   BRK_FUN index uniq cc    -> do p1 <- ptr BCOPtrBreakArray
@@ -515,6 +526,90 @@ return_ubx D   = bci_RETURN_D
 return_ubx V16 = error "return_ubx: vector"
 return_ubx V32 = error "return_ubx: vector"
 return_ubx V64 = error "return_ubx: vector"
+
+{-
+  we can only handle up to a fixed number of words on the stack,
+  because we need a stg_ctoi_tN stack frame for each size N. See
+  Note [unboxed tuple bytecodes and tuple_BCO].
+
+  If needed, you can support larger tuples by adding more in
+  StgMiscClosures.cmm, Interpreter.c and MiscClosures.h and
+  raising this limit.
+
+  Note that the limit is the number of words passed on the stack.
+  If the calling convention passes part of the tuple in registers, the
+  maximum number of tuple elements may be larger. Elements can also
+  take multiple words on the stack (for example Double# on a 32 bit
+  platform).
+
+ -}
+maxTupleNativeStackSize :: WordOff
+maxTupleNativeStackSize = 62
+
+{-
+  Maximum number of supported registers for returning tuples.
+
+  If GHC uses more more than these (because of a change in the calling
+  convention or a new platform) mkTupleInfoSig will panic.
+
+  You can raise the limits after modifying stg_ctoi_t and stg_ret_t
+  (StgMiscClosures.cmm) to save and restore the additional registers.
+ -}
+maxTupleVanillaRegs, maxTupleFloatRegs, maxTupleDoubleRegs,
+    maxTupleLongRegs :: Int
+maxTupleVanillaRegs = 6
+maxTupleFloatRegs = 6
+maxTupleDoubleRegs = 6
+maxTupleLongRegs = 1
+
+{-
+  Construct the tuple_info word that stg_ctoi_t and stg_ret_t use
+  to convert a tuple between the native calling convention and the
+  interpreter.
+
+  See Note [GHCi tuple layout] for more information.
+ -}
+mkTupleInfoSig :: TupleInfo -> Word32
+mkTupleInfoSig ti@TupleInfo{..}
+  | tupleNativeStackSize > maxTupleNativeStackSize =
+    pprPanic "mkTupleInfoSig: tuple too big for the bytecode compiler"
+             (ppr tupleNativeStackSize <+> text "stack words." <+>
+              text "Use -fobject-code to get around this limit"
+             )
+  | tupleVanillaRegs `shiftR` maxTupleVanillaRegs /= 0 =
+    pprPanic "mkTupleInfoSig: too many vanilla registers" (ppr tupleVanillaRegs)
+  | tupleLongRegs `shiftR` maxTupleLongRegs /= 0 =
+    pprPanic "mkTupleInfoSig: too many long registers" (ppr tupleLongRegs)
+  | tupleFloatRegs `shiftR` maxTupleFloatRegs /= 0 =
+    pprPanic "mkTupleInfoSig: too many float registers" (ppr tupleFloatRegs)
+  | tupleDoubleRegs `shiftR` maxTupleDoubleRegs /= 0 =
+    pprPanic "mkTupleInfoSig: too many double registers" (ppr tupleDoubleRegs)
+  {-
+    Check that we can pack the register counts/bitmaps and stack size
+    in the information word. In particular we check that each component
+    fits in the bits we have reserved for it.
+
+    This overlaps with some of the above checks. It's likely that if the
+    number of registers changes, the number of bits will also need to be
+    updated.
+   -}
+  | tupleNativeStackSize < 16384 && -- 14 bits stack usage
+    tupleDoubleRegs < 64 && -- 6 bit bitmap (these can be shared with float)
+    tupleFloatRegs < 64 && -- 6 bit bitmap (these can be shared with double)
+    tupleLongRegs < 4 && -- 2 bit bitmap
+    tupleVanillaRegs < 65536 && -- 4 bit count (tupleVanillaRegs is still a bitmap)
+    -- check that there are no "holes", i.e. that R1..Rn are all in use
+    tupleVanillaRegs .&. (tupleVanillaRegs + 1) == 0
+    = fromIntegral tupleNativeStackSize .|.
+      unRegBitmap (tupleLongRegs `shiftL` 14) .|.
+      unRegBitmap (tupleDoubleRegs `shiftL` 16) .|.
+      unRegBitmap (tupleFloatRegs `shiftL` 22) .|.
+      fromIntegral (countTrailingZeros (1 + tupleVanillaRegs) `shiftL` 28)
+  | otherwise = pprPanic "mkTupleInfoSig: unsupported tuple shape" (ppr ti)
+
+mkTupleInfoLit :: Platform -> TupleInfo -> Literal
+mkTupleInfoLit platform tuple_info =
+  mkLitWord platform . fromIntegral $ mkTupleInfoSig tuple_info
 
 -- Make lists of host-sized words for literals, so that when the
 -- words are placed in memory at increasing addresses, the
