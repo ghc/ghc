@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# OPTIONS_GHC -fwarn-unsafe #-}
 {-# OPTIONS_GHC -fenable-rewrite-rules #-}
 -- | Basic test to see if no safe infer flag works
