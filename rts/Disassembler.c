@@ -148,6 +148,13 @@ disInstr ( StgBCO *bco, int pc )
          debugBelch("PUSH_ALTS_V  " ); printPtr( ptrs[instrs[pc]] );
          debugBelch("\n");
          pc += 1; break;
+      case bci_PUSH_ALTS_T:
+         debugBelch("PUSH_ALTS_T  ");
+         printPtr( ptrs[instrs[pc]] );
+         debugBelch(" 0x%" FMT_HexWord " ", literals[instrs[pc+1]] );
+         printPtr( ptrs[instrs[pc+2]] );
+         debugBelch("\n");
+         pc += 3; break;
       case bci_PUSH_PAD8:
          debugBelch("PUSH_PAD8\n");
          pc += 1; break;
@@ -309,6 +316,9 @@ disInstr ( StgBCO *bco, int pc )
          break;
       case bci_RETURN_V:
          debugBelch("RETURN_V\n" );
+         break;
+      case bci_RETURN_T:
+         debugBelch("RETURN_T\n ");
          break;
 
       default:
