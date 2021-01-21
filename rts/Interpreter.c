@@ -936,7 +936,7 @@ run_BCO_return_unboxed:
     // Stack checks aren't necessary at return points, the stack use
     // is aggregated into the enclosing function entry point.
 
-#ifdef PROFILING
+#if defined(PROFILING)
     /*
        Restore the current cost centre stack if a tuple is being returned.
 
@@ -968,7 +968,7 @@ run_BCO_return_unboxed:
            stg_ret_t        <- Sp
      */
 
-    if(SpW(0) == (W_)&stg_ret_t_info)) {
+    if(SpW(0) == (W_)&stg_ret_t_info) {
         cap->r.rCCCS = (CostCentreStack*)SpW(stack_frame_sizeW((StgClosure *)Sp) + 4);
     }
 #endif
