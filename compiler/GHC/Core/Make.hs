@@ -13,7 +13,7 @@ module GHC.Core.Make (
         sortQuantVars, castBottomExpr,
 
         -- * Constructing boxed literals
-        mkWordExpr, mkWordExprWord,
+        mkWordExpr,
         mkIntExpr, mkIntExprInt, mkUncheckedIntExpr,
         mkIntegerExpr, mkNaturalExpr,
         mkFloatExpr, mkDoubleExpr,
@@ -23,7 +23,7 @@ module GHC.Core.Make (
         FloatBind(..), wrapFloat, wrapFloats, floatBindings,
 
         -- * Constructing small tuples
-        mkCoreVarTupTy, mkCoreTup, mkCoreUbxTup,
+        mkCoreVarTupTy, mkCoreTup, mkCoreUbxTup, mkCoreUbxSum,
         mkCoreTupBoxity, unitExpr,
 
         -- * Constructing big tuples
@@ -260,15 +260,11 @@ mkUncheckedIntExpr i = mkCoreConApps intDataCon  [Lit (mkLitIntUnchecked i)]
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Int@
 mkIntExprInt :: Platform -> Int -> CoreExpr         -- Result = I# i :: Int
-mkIntExprInt platform i = mkCoreConApps intDataCon  [mkIntLitInt platform i]
+mkIntExprInt platform i = mkCoreConApps intDataCon  [mkIntLit platform (fromIntegral i)]
 
 -- | Create a 'CoreExpr' which will evaluate to the a @Word@ with the given value
 mkWordExpr :: Platform -> Integer -> CoreExpr
 mkWordExpr platform w = mkCoreConApps wordDataCon [mkWordLit platform w]
-
--- | Create a 'CoreExpr' which will evaluate to the given @Word@
-mkWordExprWord :: Platform -> Word -> CoreExpr
-mkWordExprWord platform w = mkCoreConApps wordDataCon [mkWordLitWord platform w]
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Integer@
 mkIntegerExpr  :: Integer -> CoreExpr  -- Result :: Integer
@@ -402,6 +398,18 @@ mkCoreUbxTup tys exps
 mkCoreTupBoxity :: Boxity -> [CoreExpr] -> CoreExpr
 mkCoreTupBoxity Boxed   exps = mkCoreTup1 exps
 mkCoreTupBoxity Unboxed exps = mkCoreUbxTup (map exprType exps) exps
+
+-- | Build an unboxed sum.
+--
+-- Alternative number ("alt") starts from 1.
+mkCoreUbxSum :: Int -> Int -> [Type] -> CoreExpr -> CoreExpr
+mkCoreUbxSum arity alt tys exp
+  = ASSERT( length tys == arity )
+    ASSERT( alt <= arity )
+    mkCoreConApps (sumDataCon alt arity)
+                  (map (Type . getRuntimeRep) tys
+                   ++ map Type tys
+                   ++ [exp])
 
 -- | Build a big tuple holding the specified variables
 -- One-tuples are flattened; see Note [Flattening one-tuples]

@@ -205,7 +205,7 @@ integerFromWordList :: Bool -> [Word] -> Integer
 integerFromWordList True  ws = integerFromBigNatNeg# (bigNatFromWordList ws)
 integerFromWordList False ws = integerFromBigNat#    (bigNatFromWordList ws)
 
--- | Convert a Integer into a Natural
+-- | Convert an Integer into a Natural
 --
 -- Return 0 for negative Integers.
 integerToNaturalClamp :: Integer -> Natural
@@ -216,7 +216,7 @@ integerToNaturalClamp (IS x)
 integerToNaturalClamp (IP x) = naturalFromBigNat# x
 integerToNaturalClamp (IN _) = naturalZero
 
--- | Convert a Integer into a Natural
+-- | Convert an Integer into a Natural
 --
 -- Return absolute value
 integerToNatural :: Integer -> Natural
@@ -224,6 +224,17 @@ integerToNatural :: Integer -> Natural
 integerToNatural (IS x) = naturalFromWord# (wordFromAbsInt# x)
 integerToNatural (IP x) = naturalFromBigNat# x
 integerToNatural (IN x) = naturalFromBigNat# x
+
+-- | Convert an Integer into a Natural
+--
+-- Throw an Underflow exception if input is negative.
+integerToNaturalThrow :: Integer -> Natural
+{-# NOINLINE integerToNaturalThrow #-}
+integerToNaturalThrow (IS x)
+  | isTrue# (x <# 0#) = raiseUnderflow
+  | True              = naturalFromWord# (int2Word# x)
+integerToNaturalThrow (IP x) = naturalFromBigNat# x
+integerToNaturalThrow (IN _) = raiseUnderflow
 
 ---------------------------------------------------------------------
 -- Predicates
@@ -292,30 +303,30 @@ integerNe# _       _     = 1#
 -- | Greater predicate.
 integerGt# :: Integer -> Integer -> Bool#
 {-# NOINLINE integerGt# #-}
-integerGt# (IS x) (IS y)                  = x ># y
-integerGt# x y | GT <- integerCompare x y = 1#
-integerGt# _ _                            = 0#
+integerGt# (IS x) (IS y)                   = x ># y
+integerGt# x y | GT <- integerCompare' x y = 1#
+integerGt# _ _                             = 0#
 
 -- | Lower-or-equal predicate.
 integerLe# :: Integer -> Integer -> Bool#
 {-# NOINLINE integerLe# #-}
-integerLe# (IS x) (IS y)                  = x <=# y
-integerLe# x y | GT <- integerCompare x y = 0#
-integerLe# _ _                            = 1#
+integerLe# (IS x) (IS y)                   = x <=# y
+integerLe# x y | GT <- integerCompare' x y = 0#
+integerLe# _ _                             = 1#
 
 -- | Lower predicate.
 integerLt# :: Integer -> Integer -> Bool#
 {-# NOINLINE integerLt# #-}
-integerLt# (IS x) (IS y)                  = x <# y
-integerLt# x y | LT <- integerCompare x y = 1#
-integerLt# _ _                            = 0#
+integerLt# (IS x) (IS y)                   = x <# y
+integerLt# x y | LT <- integerCompare' x y = 1#
+integerLt# _ _                             = 0#
 
 -- | Greater-or-equal predicate.
 integerGe# :: Integer -> Integer -> Bool#
 {-# NOINLINE integerGe# #-}
-integerGe# (IS x) (IS y)                  = x >=# y
-integerGe# x y | LT <- integerCompare x y = 0#
-integerGe# _ _                            = 1#
+integerGe# (IS x) (IS y)                   = x >=# y
+integerGe# x y | LT <- integerCompare' x y = 0#
+integerGe# _ _                             = 1#
 
 instance Eq Integer where
    (==) = integerEq
@@ -324,18 +335,26 @@ instance Eq Integer where
 -- | Compare two Integer
 integerCompare :: Integer -> Integer -> Ordering
 {-# NOINLINE integerCompare #-}
-integerCompare (IS x) (IS y) = compareInt# x y
-integerCompare (IP x) (IP y) = bigNatCompare x y
-integerCompare (IN x) (IN y) = bigNatCompare y x
-integerCompare (IS _) (IP _) = LT
-integerCompare (IS _) (IN _) = GT
-integerCompare (IP _) (IS _) = GT
-integerCompare (IN _) (IS _) = LT
-integerCompare (IP _) (IN _) = GT
-integerCompare (IN _) (IP _) = LT
+integerCompare = integerCompare'
+
+integerCompare' :: Integer -> Integer -> Ordering
+{-# INLINE integerCompare' #-}
+integerCompare' (IS x) (IS y) = compareInt# x y
+integerCompare' (IP x) (IP y) = bigNatCompare x y
+integerCompare' (IN x) (IN y) = bigNatCompare y x
+integerCompare' (IS _) (IP _) = LT
+integerCompare' (IS _) (IN _) = GT
+integerCompare' (IP _) (IS _) = GT
+integerCompare' (IN _) (IS _) = LT
+integerCompare' (IP _) (IN _) = GT
+integerCompare' (IN _) (IP _) = LT
 
 instance Ord Integer where
    compare = integerCompare
+   (<)     = integerLt
+   (<=)    = integerLe
+   (>)     = integerGt
+   (>=)    = integerGe
 
 ---------------------------------------------------------------------
 -- Operations
@@ -988,11 +1007,11 @@ integerLogBase :: Integer -> Integer -> Word
 integerLogBase !base !i = W# (integerLogBase# base i)
 
 -- | Indicate if the value is a power of two and which one
-integerIsPowerOf2# :: Integer -> (# () | Word# #)
+integerIsPowerOf2# :: Integer -> (# (# #) | Word# #)
 integerIsPowerOf2# (IS i)
-   | isTrue# (i <=# 0#) = (# () | #)
+   | isTrue# (i <=# 0#) = (# (# #) | #)
    | True               = wordIsPowerOf2# (int2Word# i)
-integerIsPowerOf2# (IN _) = (# () | #)
+integerIsPowerOf2# (IN _) = (# (# #) | #)
 integerIsPowerOf2# (IP w) = bigNatIsPowerOf2# w
 
 #if WORD_SIZE_IN_BITS == 32
@@ -1048,14 +1067,10 @@ integerFromInt64# !x = IS x
 
 -- | Decode a Double# into (# Integer mantissa, Int# exponent #)
 integerDecodeDouble# :: Double# -> (# Integer, Int# #)
-{-# NOINLINE integerDecodeDouble# #-}
+{-# INLINE integerDecodeDouble# #-} -- decodeDouble_Int64# is constant-folded
+                                    -- in GHC.Core.Opt.ConstantFold
 integerDecodeDouble# !x = case decodeDouble_Int64# x of
                             (# m, e #) -> (# integerFromInt64# m, e #)
-
--- | Decode a Double# into (# Integer mantissa, Int# exponent #)
-integerDecodeDouble :: Double -> (Integer, Int)
-integerDecodeDouble (D# x) = case integerDecodeDouble# x of
-   (# m, e #) -> (m, I# e)
 
 -- | Encode (# Integer mantissa, Int# exponent #) into a Double#
 integerEncodeDouble# :: Integer -> Int# -> Double#

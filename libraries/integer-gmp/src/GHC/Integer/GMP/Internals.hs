@@ -244,14 +244,14 @@ plusBigNatWord (BN# a) w = BN# (B.bigNatAddWord# a w)
 {-# DEPRECATED minusBigNat "Use bigNatSub instead" #-}
 minusBigNat :: BigNat -> BigNat -> BigNat
 minusBigNat (BN# a) (BN# b) = case B.bigNatSub a b of
-   (# () | #) -> throw Underflow
-   (# | r #)  -> BN# r
+   (# (# #) | #)   -> throw Underflow
+   (#       | r #) -> BN# r
 
 {-# DEPRECATED minusBigNatWord "Use bigNatSubWord# instead" #-}
 minusBigNatWord :: BigNat -> GmpLimb# -> BigNat
 minusBigNatWord (BN# a) b = case B.bigNatSubWord# a b of
-   (# () | #) -> throw Underflow
-   (# | r #)  -> BN# r
+   (# (# #) | #)   -> throw Underflow
+   (#       | r #) -> BN# r
 
 
 {-# DEPRECATED timesBigNat "Use bigNatMul instead" #-}

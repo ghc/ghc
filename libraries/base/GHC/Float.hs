@@ -1096,9 +1096,9 @@ fromRat'' minEx@(I# me#) mantDigs@(I# md#) n d =
                          | isTrue# (ld'# ># (ln# +# 1#)) -> encodeFloat 0 0 -- result of shift < 0.5
                          | otherwise ->  -- first bit of n shifted to 0.5 place
                            case integerIsPowerOf2# n of
-                            (# |  _ #) -> encodeFloat 0 0  -- round to even
-                            (# () | #) -> encodeFloat 1 (minEx - mantDigs)
-      (# () | #) ->
+                            (#       |  _ #) -> encodeFloat 0 0  -- round to even
+                            (# (# #) |    #) -> encodeFloat 1 (minEx - mantDigs)
+      (# (# #) | #) ->
           let ln = I# (word2Int# (integerLog2# n))
               ld = I# (word2Int# (integerLog2# d))
               -- 2^(ln-ld-1) < n/d < 2^(ln-ld+1)
