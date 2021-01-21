@@ -17,6 +17,8 @@ module GHC.Core.Lint (
     lintPassResult, lintInteractiveExpr, lintExpr,
     lintAnnots, lintAxioms,
 
+    interactiveInScope,
+
     -- ** Debug output
     endPass, endPassIO,
     displayLintResults, dumpPassResult,
