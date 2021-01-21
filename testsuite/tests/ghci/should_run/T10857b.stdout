@@ -1,4 +1,2 @@
-base language is: Haskell2010
+base language is: GHC2021
 with the following modifiers:
-  -XNoDatatypeContexts
-  -XNondecreasingIndentation

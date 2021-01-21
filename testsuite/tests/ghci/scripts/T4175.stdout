@@ -7,7 +7,7 @@ type instance A (B a) b = () 	-- Defined at T4175.hs:11:15
 type B :: * -> *
 data family B a
   	-- Defined at T4175.hs:13:1
-instance G B -- Defined at T4175.hs:35:10
+instance [safe] G B -- Defined at T4175.hs:35:10
 type instance A (B a) b = () 	-- Defined at T4175.hs:11:15
 data instance B () = MkB 	-- Defined at T4175.hs:14:15
 type C :: * -> Constraint
@@ -25,7 +25,7 @@ type family E a where
 type () :: *
 data () = ()
   	-- Defined in ‘GHC.Tuple’
-instance C () -- Defined at T4175.hs:22:10
+instance [safe] C () -- Defined at T4175.hs:22:10
 instance Eq () -- Defined in ‘GHC.Classes’
 instance Monoid () -- Defined in ‘GHC.Base’
 instance Ord () -- Defined in ‘GHC.Classes’
@@ -57,7 +57,7 @@ type instance A (Maybe a) a = a 	-- Defined at T4175.hs:10:15
 type Int :: *
 data Int = GHC.Types.I# GHC.Prim.Int#
   	-- Defined in ‘GHC.Types’
-instance C Int -- Defined at T4175.hs:19:10
+instance [safe] C Int -- Defined at T4175.hs:19:10
 instance Eq Int -- Defined in ‘GHC.Classes’
 instance Ord Int -- Defined in ‘GHC.Classes’
 instance Enum Int -- Defined in ‘GHC.Enum’
@@ -72,4 +72,4 @@ type instance A Int Int = () 	-- Defined at T4175.hs:9:15
 type Z :: * -> Constraint
 class Z a
   	-- Defined at T4175.hs:29:1
-instance F (Z a) -- Defined at T4175.hs:32:10
+instance [safe] F (Z a) -- Defined at T4175.hs:32:10
