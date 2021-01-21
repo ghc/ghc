@@ -1,4 +1,6 @@
-{-# LANGUAGE CPP, DeriveFunctor #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE TypeFamilies #-}
 
 --
 -- (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
@@ -414,13 +416,9 @@ coreToStgExpr expr@(Lam _ _)
         text "Unexpected value lambda:" $$ ppr expr
 
 coreToStgExpr (Tick tick expr)
-  = do stg_tick <- case tick of
-                     HpcTick m i        -> return (HpcTick m i)
-                     ProfNote cc cnt sc -> return (ProfNote cc cnt sc)
-                     SourceNote span nm -> return (SourceNote span nm)
-                     Breakpoint{} ->
-                       panic "coreToStgExpr: breakpoint should not happen"
-       expr2 <- coreToStgExpr expr
+  = do
+       let !stg_tick = coreToStgTick (exprType expr) tick
+       !expr2 <- coreToStgExpr expr
        return (StgTick stg_tick expr2)
 
 coreToStgExpr (Cast expr _)
@@ -570,12 +568,8 @@ coreToStgApp f args ticks = do
                 TickBoxOpId {}   -> pprPanic "coreToStg TickBox" $ ppr (f,args')
                 _other           -> StgApp f args'
 
-        convert_tick (Breakpoint _ bid fvs)  = res_ty `seq` Breakpoint res_ty bid fvs
-        convert_tick (HpcTick m i)           = HpcTick m i
-        convert_tick (SourceNote span nm)    = SourceNote span nm
-        convert_tick (ProfNote cc cnt scope) = ProfNote cc cnt scope
         add_tick !t !e = StgTick t e
-        tapp = foldr add_tick app (map convert_tick ticks ++ ticks')
+        tapp = foldr add_tick app (map (coreToStgTick res_ty) ticks ++ ticks')
 
     -- Forcing these fixes a leak in the code generator, noticed while
     -- profiling for trac #4367
@@ -601,12 +595,7 @@ coreToStgArgs (Coercion _ : args) -- Coercion argument; See Note [Coercion token
 coreToStgArgs (Tick t e : args)
   = ASSERT( not (tickishIsCode t) )
     do { (args', ts) <- coreToStgArgs (e : args)
-       ; let convert_tick (Breakpoint _ bid fvs) =
-               let !ty = exprType e in Breakpoint ty bid fvs
-             convert_tick (HpcTick m i)           = HpcTick m i
-             convert_tick (SourceNote span nm)    = SourceNote span nm
-             convert_tick (ProfNote cc cnt scope) = ProfNote cc cnt scope
-             !t' = convert_tick t
+       ; let !t' = coreToStgTick (exprType e) t
        ; return (args', t':ts) }
 
 coreToStgArgs (arg : args) = do         -- Non-type argument
@@ -639,6 +628,13 @@ coreToStgArgs (arg : args) = do         -- Non-type argument
     WARN( bad_args, text "Dangerous-looking argument. Probable cause: bad unsafeCoerce#" $$ ppr arg )
      return (stg_arg : stg_args, ticks ++ aticks)
 
+coreToStgTick :: Type -- type of the ticked expression
+              -> CoreTickish
+              -> StgTickish
+coreToStgTick _ty (HpcTick m i)           = HpcTick m i
+coreToStgTick _ty (SourceNote span nm)    = SourceNote span nm
+coreToStgTick _ty (ProfNote cc cnt scope) = ProfNote cc cnt scope
+coreToStgTick !ty (Breakpoint _ bid fvs)  = Breakpoint ty bid fvs
 
 -- ---------------------------------------------------------------------------
 -- The magic for lets:
