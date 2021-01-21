@@ -699,7 +699,7 @@ do_return_unboxed:
              debugBelch("\n\n");
             );
 
-        // get the offset of the stg_ctoi_XXX itbl
+        // get the offset of the header of the next stack frame
         offset = stack_frame_sizeW((StgClosure *)Sp);
 
         switch (get_itbl((StgClosure*)(Sp_plusW(offset)))->type) {

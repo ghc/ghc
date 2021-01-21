@@ -217,10 +217,10 @@ coreExprToBCOs hsc_env this_mod bndr expr
 
 bcPrepRHS :: StgRhs -> BcM StgRhs
 -- explicitly match all constructors so we get a warning if we miss any
-
--- if we have a breakpoint directly under
--- XXX missing part of comment
 bcPrepRHS (StgRhsClosure fvs cc upd args (StgTick bp@Breakpoint{} expr)) = do
+  {- If we have a breakpoint directly under an StgRhsClosure we don't
+     need to introduce a new binding for it.
+   -}
   expr' <- bcPrepExpr expr
   pure (StgRhsClosure fvs cc upd args (StgTick bp expr'))
 bcPrepRHS (StgRhsClosure fvs cc upd args expr) =
@@ -1264,7 +1264,7 @@ layoutTuple profile start_off arg_ty reps =
                     DoubleReg n    -> (v,     f,     a d n, l    )
                     LongReg n      -> (v,     f,     d,     a l n)
                     _              ->
-                      pprPanic "CoreToByteCode.layoutTuple count_reg"
+                      pprPanic "CoreToByteCode.layoutTuple unsupported register type"
                                (ppr r)
               where a bmp n = bmp .|. (1 `shiftL` (n-1))
 
