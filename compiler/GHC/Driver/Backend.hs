@@ -67,10 +67,10 @@ data Backend
                    -- Produce ByteCode objects (BCO, see "GHC.ByteCode") that
                    -- can be interpreted. It is used by GHCi.
                    --
-                   -- Currently some extensions are not supported (unboxed
-                   -- tuples/sums, foreign primops).
+                   -- Currently some extensions are not supported
+                   -- (foreign primops).
                    --
-                   -- See "GHC.CoreToByteCode"
+                   -- See "GHC.StgToByteCode"
 
 
    | NoBackend     -- ^ No code generated.
