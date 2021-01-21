@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-
  - Instant Insanity using Closed Type Families, but no DataKinds
  -
