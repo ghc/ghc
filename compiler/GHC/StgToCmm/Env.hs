@@ -208,6 +208,6 @@ idToReg :: Platform -> NonVoid Id -> LocalReg
 --
 -- By now the Ids should be uniquely named; else one would worry
 -- about accidental collision
-idToReg platform (NonVoid id)
+idToReg !platform (NonVoid id)
              = LocalReg (idUnique id)
                         (primRepCmmType platform (idPrimRep id))

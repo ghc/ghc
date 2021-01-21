@@ -708,8 +708,7 @@ getHeapUsage fcode
         ; let   fstate_in = state { cgs_hp_usg  = initHpUsage }
                 (r, fstate_out) = doFCode (fcode hp_hw) info_down fstate_in
                 hp_hw = heapHWM (cgs_hp_usg fstate_out)        -- Loop here!
-
-        ; setState $ fstate_out { cgs_hp_usg = cgs_hp_usg state }
+        ; setState (fstate_out { cgs_hp_usg = cgs_hp_usg state })
         ; return r }
 
 -- ----------------------------------------------------------------------------
