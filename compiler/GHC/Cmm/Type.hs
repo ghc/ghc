@@ -50,7 +50,7 @@ import Data.Int
   -- and is used extensively in pattern-matching
 
 data CmmType    -- The important one!
-  = CmmType CmmCat Width
+  = CmmType CmmCat !Width
 
 data CmmCat                -- "Category" (not exported)
    = GcPtrCat              -- GC pointer
