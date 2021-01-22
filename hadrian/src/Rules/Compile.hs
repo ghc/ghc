@@ -1,3 +1,5 @@
+{-# LANGUAGE LambdaCase #-}
+
 module Rules.Compile (compilePackage) where
 
 import Hadrian.BuildPath
@@ -204,7 +206,7 @@ compileHsObjectAndHi rs objpath = do
   let ctx = objectContext b
       way = C.way ctx
   ctxPath <- contextPath ctx
-  (src, deps) <- lookupDependencies (ctxPath -/- ".dependencies") objpath
+  (src, deps) <- lookupDependencies (ctxPath -/- ".dependencies") objpath >>= \case
   need (src:deps)
 
   -- The .dependencies file lists indicating inputs. ghc will
