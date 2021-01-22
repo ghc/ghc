@@ -45,7 +45,7 @@ module GHC.StgToCmm.Utils (
         emitUpdRemSetPush,
         emitUpdRemSetPushThunk,
 
-        convertInfoProvMap
+        convertInfoProvMap, cmmInfoTableToInfoProvEnt
   ) where
 
 #include "HsVersions.h"
@@ -642,11 +642,18 @@ emitUpdRemSetPushThunk ptr =
        (ptr, AddrHint)]
       False
 
+-- | A bare bones InfoProvEnt for things which don't have a good source location
+cmmInfoTableToInfoProvEnt :: Module -> CmmInfoTable -> InfoProvEnt
+cmmInfoTableToInfoProvEnt this_mod cmit =
+    let cl = cit_lbl cmit
+        cn  = rtsClosureType (cit_rep cmit)
+    in InfoProvEnt cl cn "" this_mod Nothing
+
 -- | Convert source information collected about identifiers in 'GHC.STG.Debug'
 -- to entries suitable for placing into the info table provenenance table.
 convertInfoProvMap :: DynFlags -> [CmmInfoTable] -> Module -> InfoTableProvMap -> [InfoProvEnt]
 convertInfoProvMap dflags defns this_mod (InfoTableProvMap (UniqMap dcenv) denv) =
-  mapMaybe (\cmit ->
+  map (\cmit ->
     let cl = cit_lbl cmit
         cn  = rtsClosureType (cit_rep cmit)
 
@@ -655,7 +662,7 @@ convertInfoProvMap dflags defns this_mod (InfoTableProvMap (UniqMap dcenv) denv)
 
         lookupClosureMap, lookupDataConMap :: Maybe InfoProvEnt
         lookupClosureMap = case hasHaskellName cl >>= lookupUniqMap denv of
-                                Just (ty, ss, l) -> Just (InfoProvEnt cl cn (tyString ty) (this_mod, ss, l))
+                                Just (ty, ss, l) -> Just (InfoProvEnt cl cn (tyString ty) this_mod (Just (ss, l)))
                                 Nothing -> Nothing
 
         lookupDataConMap = do
@@ -663,7 +670,10 @@ convertInfoProvMap dflags defns this_mod (InfoTableProvMap (UniqMap dcenv) denv)
             -- This is a bit grimy, relies on the DataCon and Name having the same Unique, which they do
             (dc, ns) <- (hasHaskellName cl >>= lookupUFM_Directly dcenv . getUnique)
             -- Lookup is linear but lists will be small (< 100)
-            (ss, l) <- lookup n (NE.toList ns)
-            return $ InfoProvEnt cl cn (tyString (dataConTyCon dc)) (this_mod, ss, l)
+            return $ InfoProvEnt cl cn (tyString (dataConTyCon dc)) this_mod (lookup n (NE.toList ns))
 
-    in lookupDataConMap `firstJust` lookupClosureMap) defns
+        -- This catches things like prim closure types and anything else which doesn't have a
+        -- source location
+        simpleFallback = cmmInfoTableToInfoProvEnt this_mod cmit
+
+    in fromMaybe simpleFallback (lookupDataConMap `firstJust` lookupClosureMap)) defns

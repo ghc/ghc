@@ -25,7 +25,7 @@ import GHC.CmmToLlvm    ( llvmCodeGen )
 
 import GHC.CmmToC           ( cmmToC )
 import GHC.Cmm.Lint         ( cmmLint )
-import GHC.Cmm              ( RawCmmGroup , CmmInfoTable )
+import GHC.Cmm              ( RawCmmGroup )
 import GHC.Cmm.CLabel
 
 import GHC.Driver.Session
@@ -37,7 +37,6 @@ import GHC.Data.Stream           ( Stream )
 import qualified GHC.Data.Stream as Stream
 
 import GHC.SysTools.FileCleanup
-import GHC.StgToCmm.Utils
 
 
 import GHC.Utils.Error
@@ -50,7 +49,6 @@ import GHC.Unit.Finder      ( mkStubPaths )
 
 import GHC.Types.SrcLoc
 import GHC.Types.CostCentre
-import GHC.Types.IPE
 import GHC.Types.ForeignStubs
 import GHC.Types.Unique.Supply ( mkSplitUniqSupply )
 
@@ -226,9 +224,14 @@ outputForeignStubs dflags unit_state mod location stubs
 
         -- we need the #includes from the rts package for the stub files
         let rts_includes =
-               let rts_pkg = unsafeLookupUnitId unit_state rtsUnitId in
-               concatMap mk_include (unitIncludes rts_pkg)
-            mk_include i = "#include \"" ++ ST.unpack i ++ "\"\n"
+               let mrts_pkg = lookupUnitId unit_state rtsUnitId
+                   mk_include i = "#include \"" ++ ST.unpack i ++ "\"\n"
+               in case mrts_pkg of
+                    Just rts_pkg -> concatMap mk_include (unitIncludes rts_pkg)
+                    -- This case only happens when compiling foreign stub for the rts
+                    -- library itself. The only time we do this at the moment is for
+                    -- IPE information for the RTS info tables
+                    Nothing -> ""
 
             -- wrapper code mentions the ffi_arg type, which comes from ffi.h
             ffi_includes
@@ -318,8 +321,8 @@ profilingInitCode platform this_mod (local_CCs, singleton_CCSs)
 
 -- | Generate code to initialise info pointer origin
 -- See note [Mapping Info Tables to Source Positions]
-ipInitCode :: [CmmInfoTable] -> DynFlags -> Module -> InfoTableProvMap -> SDoc
-ipInitCode used_info dflags this_mod itmap
+ipInitCode :: DynFlags -> Module -> [InfoProvEnt] -> SDoc
+ipInitCode dflags this_mod ents
  = if not (gopt Opt_InfoTableMap dflags)
     then empty
     else withPprStyle (PprCode CStyle) $ vcat
@@ -333,7 +336,6 @@ ipInitCode used_info dflags this_mod itmap
                  ])
        ]
  where
-   ents = convertInfoProvMap dflags used_info this_mod itmap
    platform = targetPlatform dflags
    emit_ipe_decl ipe =
        text "extern InfoProvEnt" <+> ipe_lbl <> text "[];"

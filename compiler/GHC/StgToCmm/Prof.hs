@@ -11,7 +11,7 @@ module GHC.StgToCmm.Prof (
         mkCCostCentre, mkCCostCentreStack,
 
         -- infoTablePRov
-        initInfoTableProv,
+        initInfoTableProv, emitInfoTableProv,
 
         -- Cost-centre Profiling
         dynProfHdr, profDynAlloc, profAlloc, staticProfHdr, initUpdFrameProf,
@@ -274,11 +274,10 @@ sizeof_ccs_words platform
    (ws,ms) = pc_SIZEOF_CostCentreStack (platformConstants platform) `divMod` platformWordSizeInBytes platform
 
 
-initInfoTableProv ::  InfoTableProvMap -> Module -> FCode ()
+initInfoTableProv ::  [CmmInfoTable] -> InfoTableProvMap -> Module -> FCode ()
 -- Emit the declarations
-initInfoTableProv itmap this_mod
+initInfoTableProv infos itmap this_mod
   = do
-       infos <- getUsedInfo
        dflags <- getDynFlags
        let ents = convertInfoProvMap dflags infos this_mod itmap
        --pprTraceM "UsedInfo" (ppr (length infos))
@@ -289,7 +288,8 @@ initInfoTableProv itmap this_mod
 emitInfoTableProv :: InfoProvEnt  -> FCode ()
 emitInfoTableProv ip = do
   { dflags <- getDynFlags
-  ; let (mod, src, label) = infoTableProv ip
+  ; let mod = infoProvModule ip
+  ; let (src, label) = maybe ("", "") (\(s, l) -> (showPpr dflags s, l)) (infoTableProv ip)
   ; platform <- getPlatform
                         -- NB. bytesFS: we want the UTF-8 bytes here (#5559)
   ; label <- newByteStringCLit (bytesFS $ mkFastString label)
@@ -298,8 +298,7 @@ emitInfoTableProv ip = do
                                         $ mod)
 
   ; ty_string  <- newByteStringCLit (bytesFS (mkFastString (infoTableType ip)))
-  ; loc <- newByteStringCLit $ bytesFS $ mkFastString $
-                   showPpr dflags src
+  ; loc <- newByteStringCLit $ bytesFS $ mkFastString $ src
            -- XXX going via FastString to get UTF-8 encoding is silly
   ; table_name <- newByteStringCLit $ bytesFS $ mkFastString $
                     showPpr dflags (pprCLabel platform CStyle (infoTablePtr ip))

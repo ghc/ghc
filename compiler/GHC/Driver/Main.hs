@@ -166,6 +166,7 @@ import GHC.Cmm.Parser       ( parseCmmFile )
 import GHC.Cmm.Info.Build
 import GHC.Cmm.Pipeline
 import GHC.Cmm.Info
+import GHC.StgToCmm.Utils ( convertInfoProvMap )
 
 import GHC.Unit
 import GHC.Unit.External
@@ -1560,7 +1561,8 @@ hscGenHardCode hsc_env cgguts location output_filename = do
                 rawcmms1 = Stream.mapM dump rawcmms0
 
             let foreign_stubs (cgUsedInfoTables -> used_info) = do
-                  let ip_init = ipInitCode used_info dflags this_mod denv
+                  let ents = convertInfoProvMap dflags used_info this_mod denv
+                      ip_init = ipInitCode dflags this_mod ents
                   return $ foreign_stubs0 `appendStubC` prof_init `appendStubC` ip_init
 
             (output_filename, (_stub_h_exists, stub_c_exists), foreign_fps, caf_infos)
@@ -1603,22 +1605,22 @@ hscInteractive hsc_env cgguts location = do
 
 ------------------------------
 
-hscCompileCmmFile :: HscEnv -> FilePath -> FilePath -> IO ()
+hscCompileCmmFile :: HscEnv -> FilePath -> FilePath -> IO (Maybe FilePath)
 hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
     let dflags   = hsc_dflags hsc_env
         home_unit = hsc_home_unit hsc_env
         platform  = targetPlatform dflags
-    cmm <- ioMsgMaybe
+        -- Make up a module name to give the NCG. We can't pass bottom here
+        -- lest we reproduce #11784.
+        mod_name = mkModuleName $ "Cmm$" ++ FilePath.takeFileName filename
+        cmm_mod = mkHomeModule home_unit mod_name
+    (cmm, ents) <- ioMsgMaybe
                $ do
                   (warns,errs,cmm) <- withTiming dflags (text "ParseCmm"<+>brackets (text filename)) (\_ -> ())
-                                       $ parseCmmFile dflags home_unit filename
+                                       $ parseCmmFile dflags cmm_mod home_unit filename
                   return ((fmap pprWarning warns, fmap pprError errs), cmm)
     liftIO $ do
         dumpIfSet_dyn dflags Opt_D_dump_cmm_verbose_by_proc "Parsed Cmm" FormatCMM (pdoc platform cmm)
-        let -- Make up a module name to give the NCG. We can't pass bottom here
-            -- lest we reproduce #11784.
-            mod_name = mkModuleName $ "Cmm$" ++ FilePath.takeFileName filename
-            cmm_mod = mkHomeModule home_unit mod_name
 
         -- Compile decls in Cmm files one decl at a time, to avoid re-ordering
         -- them in SRT analysis.
@@ -1634,9 +1636,14 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
             FormatCMM (pdoc platform cmmgroup)
         rawCmms <- lookupHook (\x -> cmmToRawCmmHook x)
                      (\dflgs _ -> cmmToRawCmm dflgs) dflags dflags Nothing (Stream.yield cmmgroup)
-        _ <- codeOutput dflags (hsc_units hsc_env) cmm_mod output_filename no_loc [] [] (\_ -> return NoStubs)
+        let foreign_stubs _ = do
+              let ip_init = ipInitCode dflags cmm_mod ents
+              return $ (NoStubs `appendStubC` ip_init)
+
+        (_output_filename, (_stub_h_exists, stub_c_exists), _foreign_fps, _caf_infos)
+          <- codeOutput dflags (hsc_units hsc_env) cmm_mod output_filename no_loc [] [] foreign_stubs
              rawCmms
-        return ()
+        return stub_c_exists
   where
     no_loc = ModLocation{ ml_hs_file  = Just filename,
                           ml_hi_file  = panic "hscCompileCmmFile: no hi file",
