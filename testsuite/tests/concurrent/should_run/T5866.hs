@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -ddebug-output -ddump-prep -ddump-stg #-}
 import GHC.Conc
 import Control.Exception
 import System.IO.Unsafe
