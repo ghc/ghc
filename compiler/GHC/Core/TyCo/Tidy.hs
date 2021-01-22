@@ -26,7 +26,7 @@ import GHC.Core.TyCo.FVs (tyCoVarsOfTypesWellScoped, tyCoVarsOfTypeList)
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Var
 import GHC.Types.Var.Env
-import GHC.Utils.Misc (seqList)
+import GHC.Utils.Misc (strictMap)
 
 import Data.List (mapAccumL)
 
@@ -124,20 +124,25 @@ tidyTyCoVarOcc env@(_, subst) tv
 
 ---------------
 tidyTypes :: TidyEnv -> [Type] -> [Type]
-tidyTypes env tys = map (tidyType env) tys
+tidyTypes env tys = strictMap (tidyType env) tys
 
 ---------------
+
+
+-- | Tidy a type
+--
+-- This operation must not leak the TidyEnv. Doing it properly led to perf
+-- improvements (e.g. -5% bytes allocated in T5642). See #14738
 tidyType :: TidyEnv -> Type -> Type
 tidyType _   (LitTy n)             = LitTy n
-tidyType env (TyVarTy tv)          = TyVarTy (tidyTyCoVarOcc env tv)
-tidyType env (TyConApp tycon tys)  = let args = tidyTypes env tys
-                                     in args `seqList` TyConApp tycon args
+tidyType env (TyVarTy tv)          = TyVarTy $! tidyTyCoVarOcc env tv
+tidyType env (TyConApp tycon tys)  = TyConApp tycon $! tidyTypes env tys
 tidyType env (AppTy fun arg)       = (AppTy $! (tidyType env fun)) $! (tidyType env arg)
 tidyType env ty@(FunTy _ w arg res)  = let { !w'   = tidyType env w
                                            ; !arg' = tidyType env arg
                                            ; !res' = tidyType env res }
                                        in ty { ft_mult = w', ft_arg = arg', ft_res = res' }
-tidyType env (ty@(ForAllTy{}))     = mkForAllTys' (zip tvs' vis) $! tidyType env' body_ty
+tidyType env (ty@(ForAllTy{}))     = (mkForAllTys' $! (zip tvs' vis)) $! tidyType env' body_ty
   where
     (tvs, vis, body_ty) = splitForAllTyCoVars' ty
     (env', tvs') = tidyVarBndrs env tvs
@@ -197,12 +202,11 @@ tidyCo env@(_, subst) co
   = go co
   where
     go_mco MRefl    = MRefl
-    go_mco (MCo co) = MCo (go co)
+    go_mco (MCo co) = MCo $! go co
 
-    go (Refl ty)             = Refl (tidyType env ty)
-    go (GRefl r ty mco)      = GRefl r (tidyType env ty) $! go_mco mco
-    go (TyConAppCo r tc cos) = let args = map go cos
-                               in args `seqList` TyConAppCo r tc args
+    go (Refl ty)             = Refl $! tidyType env ty
+    go (GRefl r ty mco)      = (GRefl r $! tidyType env ty) $! go_mco mco
+    go (TyConAppCo r tc cos) = TyConAppCo r tc $! strictMap go cos
     go (AppCo co1 co2)       = (AppCo $! go co1) $! go co2
     go (ForAllCo tv h co)    = ((ForAllCo $! tvp) $! (go h)) $! (tidyCo envp co)
                                where (envp, tvp) = tidyVarBndr env tv
@@ -213,8 +217,7 @@ tidyCo env@(_, subst) co
                                  Nothing  -> CoVarCo cv
                                  Just cv' -> CoVarCo cv'
     go (HoleCo h)            = HoleCo h
-    go (AxiomInstCo con ind cos) = let args = map go cos
-                               in  args `seqList` AxiomInstCo con ind args
+    go (AxiomInstCo con ind cos) = AxiomInstCo con ind $! strictMap go cos
     go (UnivCo p r t1 t2)    = (((UnivCo $! (go_prov p)) $! r) $!
                                 tidyType env t1) $! tidyType env t2
     go (SymCo co)            = SymCo $! go co
@@ -224,12 +227,11 @@ tidyCo env@(_, subst) co
     go (InstCo co ty)        = (InstCo $! go co) $! go ty
     go (KindCo co)           = KindCo $! go co
     go (SubCo co)            = SubCo $! go co
-    go (AxiomRuleCo ax cos)  = let cos1 = tidyCos env cos
-                               in cos1 `seqList` AxiomRuleCo ax cos1
+    go (AxiomRuleCo ax cos)  = AxiomRuleCo ax $ strictMap go cos
 
-    go_prov (PhantomProv co)    = PhantomProv (go co)
-    go_prov (ProofIrrelProv co) = ProofIrrelProv (go co)
+    go_prov (PhantomProv co)    = PhantomProv $! go co
+    go_prov (ProofIrrelProv co) = ProofIrrelProv $! go co
     go_prov p@(PluginProv _)    = p
 
 tidyCos :: TidyEnv -> [Coercion] -> [Coercion]
-tidyCos env = map (tidyCo env)
+tidyCos env = strictMap (tidyCo env)
