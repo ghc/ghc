@@ -1126,13 +1126,13 @@ doCase d s p scrut bndr alts
            where
              real_bndrs = filterOut isTyVar bndrs
 
-        my_discr (AnnAlt DEFAULT _ _) = NoDiscr {-shouldn't really happen-}
-        my_discr (AnnAlt (DataAlt dc) _ _)
+        my_discr (DEFAULT, _, _) = NoDiscr {-shouldn't really happen-}
+        my_discr (DataAlt dc, _, _)
            | isUnboxedTupleDataCon dc || isUnboxedSumDataCon dc
            = NoDiscr
            | otherwise
            = DiscrP (fromIntegral (dataConTag dc - fIRST_TAG))
-        my_discr (AnnAlt (LitAlt l) _ _)
+        my_discr (LitAlt l, _, _)
            = case l of LitNumber LitNumInt i  -> DiscrI (fromInteger i)
                        LitNumber LitNumWord w -> DiscrW (fromInteger w)
                        LitFloat r   -> DiscrF (fromRational r)
@@ -1143,7 +1143,7 @@ doCase d s p scrut bndr alts
         maybe_ncons
            | not isAlgCase = Nothing
            | otherwise
-           = case [dc | AnnAlt (DataAlt dc) _ _ <- alts] of
+           = case [dc | (DataAlt dc, _, _) <- alts] of
                 []     -> Nothing
                 (dc:_) -> Just (tyConFamilySize (dataConTyCon dc))
 
