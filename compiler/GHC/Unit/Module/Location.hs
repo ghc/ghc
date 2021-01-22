@@ -5,6 +5,7 @@ module GHC.Unit.Module.Location
    , addBootSuffix_maybe
    , addBootSuffixLocn
    , addBootSuffixLocnOut
+   , removeBootSuffix
    )
 where
 
@@ -53,6 +54,13 @@ instance Outputable ModLocation where
 -- | Add the @-boot@ suffix to .hs, .hi and .o files
 addBootSuffix :: FilePath -> FilePath
 addBootSuffix path = path ++ "-boot"
+
+-- | Remove the @-boot@ suffix to .hs, .hi and .o files
+removeBootSuffix :: FilePath -> FilePath
+removeBootSuffix "-boot" = []
+removeBootSuffix (x:xs)  = x : removeBootSuffix xs
+removeBootSuffix []      = error "removeBootSuffix: no -boot suffix"
+
 
 -- | Add the @-boot@ suffix if the @Bool@ argument is @True@
 addBootSuffix_maybe :: IsBootInterface -> FilePath -> FilePath
