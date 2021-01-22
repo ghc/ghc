@@ -41,37 +41,38 @@ Lib.$trModule = GHC.Types.Module Lib.$trModule3 Lib.$trModule1
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 Lib.$wfoo [InlPrag=NOINLINE]
   :: GHC.Prim.Int# -> GHC.Prim.Int# -> GHC.Prim.Int#
-[GblId, Arity=2, Str=<L,U><L,U>, Unf=OtherCon []]
+[GblId, Arity=2, Str=<U><U>, Unf=OtherCon []]
 Lib.$wfoo = GHC.Prim.+#
 
 -- RHS size: {terms: 18, types: 14, coercions: 0, joins: 0/0}
-foo [InlPrag=NOUSERINLINE[final]] :: (Int, Int) -> Int -> Int
+foo [InlPrag=[final]] :: (Int, Int) -> Int -> Int
 [GblId,
  Arity=2,
- Str=<S(SL),1*U(1*U(U),A)><S,1*U(U)>,
- Cpr=m1,
+ Str=<SP(SP(U),A)><SP(U)>,
+ Term=#L#L#1(#),
+ Cpr=LL1,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (w_sEf [Occ=Once1!] :: (Int, Int))
-                 (w1_sEg [Occ=Once1!] :: Int) ->
-                 case w_sEf of { (ww1_sEj [Occ=Once1!], _ [Occ=Dead]) ->
-                 case ww1_sEj of { GHC.Types.I# ww4_sEm [Occ=Once1] ->
-                 case w1_sEg of { GHC.Types.I# ww6_sEs [Occ=Once1] ->
-                 case Lib.$wfoo ww4_sEm ww6_sEs of ww7_sEw [Occ=Once1]
+         Tmpl= \ (w_sEz [Occ=Once1!] :: (Int, Int))
+                 (w1_sEA [Occ=Once1!] :: Int) ->
+                 case w_sEz of { (ww_sEC [Occ=Once1!], _ [Occ=Dead]) ->
+                 case ww_sEC of { GHC.Types.I# ww2_sEE [Occ=Once1] ->
+                 case w1_sEA of { GHC.Types.I# ww3_sEJ [Occ=Once1] ->
+                 case Lib.$wfoo ww2_sEE ww3_sEJ of ww4_sEN [Occ=Once1]
                  { __DEFAULT ->
-                 GHC.Types.I# ww7_sEw
+                 GHC.Types.I# ww4_sEN
                  }
                  }
                  }
                  }}]
 foo
-  = \ (w_sEf :: (Int, Int)) (w1_sEg :: Int) ->
-      case w_sEf of { (ww1_sEj, ww2_sEo) ->
-      case ww1_sEj of { GHC.Types.I# ww4_sEm ->
-      case w1_sEg of { GHC.Types.I# ww6_sEs ->
-      case Lib.$wfoo ww4_sEm ww6_sEs of ww7_sEw { __DEFAULT ->
-      GHC.Types.I# ww7_sEw
+  = \ (w_sEz :: (Int, Int)) (w1_sEA :: Int) ->
+      case w_sEz of { (ww_sEC, ww1_sEG) ->
+      case ww_sEC of { GHC.Types.I# ww2_sEE ->
+      case w1_sEA of { GHC.Types.I# ww3_sEJ ->
+      case Lib.$wfoo ww2_sEE ww3_sEJ of ww4_sEN { __DEFAULT ->
+      GHC.Types.I# ww4_sEN
       }
       }
       }

@@ -15,9 +15,9 @@
 -- Lays out the abstract domain for "GHC.Core.Opt.DmdAnal".
 module GHC.Types.Demand (
     -- * Demands
-    Card(..), Demand(..), SubDemand(Prod), mkProd, viewProd,
+    Card(..), Demand(..), SubDemand(Prod, Call), mkProd, viewProd, viewCall,
     -- ** Algebra
-    absDmd, topDmd, botDmd, seqDmd, topSubDmd,
+    absDmd, topDmd, botDmd, seqDmd, topSubDmd, seqSubDmd,
     -- *** Least upper bound
     lubCard, lubDmd, lubSubDmd,
     -- *** Plus

@@ -1,4 +1,7 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 
 -- | Constructed Product Result analysis. Identifies functions that surely
 -- return heap-allocated records on every code path, so that we can eliminate
@@ -15,9 +18,11 @@ import GHC.Prelude
 
 import GHC.Driver.Session
 import GHC.Types.Demand
+import GHC.Types.Termination
 import GHC.Types.Cpr
 import GHC.Types.Unbox
 import GHC.Core
+import GHC.Core.DataCon
 import GHC.Core.Opt.Arity ( splitFunNewTys )
 import GHC.Core.Seq
 import GHC.Utils.Outputable
@@ -37,7 +42,8 @@ import GHC.Data.Maybe   ( isJust )
 import Control.Monad ( guard )
 import Data.List
 
--- import GHC.Driver.Ppr
+import GHC.Driver.Ppr
+_ = pprTrace
 
 {- Note [Constructed Product Result]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -46,41 +52,85 @@ surely return heap-allocated records on every code path, so that we can
 eliminate said heap allocation by performing a worker/wrapper split
 (via 'GHC.Core.Opt.WorkWrap.Utils.mkWWcpr_start').
 
-@swap@ below is such a function:
-
+`swap` below is such a function:
+```
   swap (a, b) = (b, a)
-
-A @case@ on an application of @swap@, like
-@case swap (10, 42) of (a, b) -> a + b@ could cancel away
-(by case-of-known-constructor) if we "inlined" @swap@ and simplified. We then
-say that @swap@ has the CPR property.
+```
+A `case` on an application of `swap`, like
+`case swap (10, 42) of (a, b) -> a + b` could cancel away
+(by case-of-known-constructor) if we \"inlined\" `swap` and simplified. We then
+say that `swap` has the CPR property.
 
 We can't inline recursive functions, but similar reasoning applies there:
-
+```
   f x n = case n of
     0 -> (x, 0)
     _ -> f (x+1) (n-1)
-
-Inductively, @case f 1 2 of (a, b) -> a + b@ could cancel away the constructed
-product with the case. So @f@, too, has the CPR property. But we can't really
-"inline" @f@, because it's recursive. Also, non-recursive functions like @swap@
+```
+Inductively, `case f 1 2 of (a, b) -> a + b` could cancel away the constructed
+product with the case. So `f`, too, has the CPR property. But we can't really
+"inline" `f`, because it's recursive. Also, non-recursive functions like `swap`
 might be too big to inline (or even marked NOINLINE). We still want to exploit
 the CPR property, and that is exactly what the worker/wrapper transformation
 can do for us:
-
+```
   $wf x n = case n of
     0 -> case (x, 0) of -> (a, b) -> (# a, b #)
     _ -> case f (x+1) (n-1) of (a, b) -> (# a, b #)
   f x n = case $wf x n of (# a, b #) -> (a, b)
-
-where $wf readily simplifies (by case-of-known-constructor and inlining @f@) to:
-
+```
+where $wf readily simplifies (by case-of-known-constructor and inlining `f`) to:
+```
   $wf x n = case n of
     0 -> (# x, 0 #)
     _ -> $wf (x+1) (n-1)
-
-Now, a call site like @case f 1 2 of (a, b) -> a + b@ can inline @f@ and
+```
+Now, a call site like `case f 1 2 of (a, b) -> a + b` can inline `f` and
 eliminate the heap-allocated pair constructor.
+
+Note [Nested CPR]
+~~~~~~~~~~~~~~~~~
+We can apply Note [Constructed Product Result] deeper than just the outer
+constructor of a function, e.g.,
+```
+  g x
+    | even x = (x,  x+1) :: (Int, Int)
+    | odd  x = (x+1,x+2)
+```
+we certainly would want to nestedly unbox the second component of the pair!
+Indeed we can give that second component the CPR property. We can even unbox
+the first component, because `x` is used strictly and thus will be unboxed
+(see Note [CPR for binders that will be unboxed]). We get
+```
+  $wg (x :: Int#)
+    | .. x .. = (# x,       x +# 1# #) :: (# Int#, Int# #)
+    | .. x .. = (# x +# 1#, x +# 2# #)
+  g (I# x) = case $wf x of (# y, z #) -> (I# y, I# z)
+```
+Nice.
+
+Note [Nested CPR needs Termination information]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+But careful! If we follow Note [Nested CPR] blindly, we would nestedly unbox
+`h1` below to get `h2`:
+```
+  h1 x = (x+1, x+2)
+  h2 x = case $wh2 x of (# y, z #) -> (I# y, I# z)
+  $wh2 (I# x) = (# x +# 1#, x +# 2# #)
+```
+Note that `h2` is strict in `x`, whereas `h1` isn't. That is unsound, as
+it changes semantics of ``h1 (error "boom") `seq` 42`` from returning 42 to
+crashing. Thus, we musn't unbox and Nested CPR feeds on elaborate termination
+information that says for `g` \"Both components of the pair terminate rapidly
+when evaluated\".
+
+The termination information is computed by an analysis that shares the same
+general structure as Nested CPR, hence it makes sense to interleave both. The
+fact that the analysis is parameterised over instances of 'ForwardLattice',
+rather than specialised to its concrete instantiations 'Term' and 'CAT' (CPR
+and Term), is a testament to that structural similarity. It's well possible
+to call the analysis for termination information only in the future, to serve
+as a higher-order 'exprOkForSpeculation' on steroids.
 
 Note [Phase ordering]
 ~~~~~~~~~~~~~~~~~~~~~
@@ -111,16 +161,19 @@ So currently we have
 cprAnalProgram :: DynFlags -> FamInstEnvs -> CoreProgram -> IO CoreProgram
 cprAnalProgram dflags fam_envs binds = do
   let env            = emptyAnalEnv fam_envs
-  let binds_plus_cpr = snd $ mapAccumL cprAnalTopBind env binds
+  let binds_plus_cpr = snd $ mapAccumL (cprAnalTopBind @CAT) env binds
+  dumpIfSet_dyn dflags Opt_D_dump_cpr_signatures "Term signatures" FormatText $
+    dumpIdInfoOfProgram (ppr . termInfo) binds_plus_cpr
   dumpIfSet_dyn dflags Opt_D_dump_cpr_signatures "Cpr signatures" FormatText $
     dumpIdInfoOfProgram (ppr . cprInfo) binds_plus_cpr
   -- See Note [Stamp out space leaks in demand analysis] in GHC.Core.Opt.DmdAnal
   seqBinds binds_plus_cpr `seq` return binds_plus_cpr
 
 -- Analyse a (group of) top-level binding(s)
-cprAnalTopBind :: AnalEnv
+cprAnalTopBind :: ForwardLattice l
+               => AnalEnv l
                -> CoreBind
-               -> (AnalEnv, CoreBind)
+               -> (AnalEnv l, CoreBind)
 cprAnalTopBind env (NonRec id rhs)
   = (env', NonRec id' rhs')
   where
@@ -138,17 +191,18 @@ cprAnalTopBind env (Rec pairs)
 -- | Analoguous to the abstract semantic function \(⟦_⟧ : Expr -> Env -> A\)
 -- from "Constructed Product Result Analysis for Haskell"
 cprAnal, cprAnal'
-  :: AnalEnv
-  -> [CprType]           -- ^ info about incoming arguments
+  :: ForwardLattice l
+  => AnalEnv l
+  -> [l]           -- ^ info about incoming arguments
   -> CoreExpr            -- ^ expression to be denoted by a 'CprType'
-  -> (CprType, CoreExpr) -- ^ the updated expression and its 'CprType'
+  -> (l, CoreExpr) -- ^ the updated expression and its 'CprType'
 
-cprAnal env args e = -- pprTraceWith "cprAnal" (\res -> ppr (fst (res)) $$ ppr e) $
-                     cprAnal' env args e
+cprAnal env args e = -- pprTrace "cprAnal" (ppr (fst (res)) $$ ppr e) $
+                     res where res = cprAnal' env args e
 
-cprAnal' _ _ (Lit lit)     = (whnfTermCprType, Lit lit)
-cprAnal' _ _ (Type ty)     = (whnfTermCprType, Type ty)      -- Doesn't happen, in fact
-cprAnal' _ _ (Coercion co) = (whnfTermCprType, Coercion co)
+cprAnal' _ _ (Lit lit)     = (whnfOk, Lit lit)
+cprAnal' _ _ (Type ty)     = (whnfOk, Type ty)      -- Doesn't happen, in fact
+cprAnal' _ _ (Coercion co) = (whnfOk, Coercion co)
 
 cprAnal' env args (Var var) = (cprTransform env args var, Var var)
 
@@ -174,7 +228,7 @@ cprAnal' env args (App fun arg)
     -- NB: arg_ty may have the CPR property. That is indeed important for data
     -- constructors.
     (fun_ty, fun') = cprAnal env (arg_ty:args) fun
-    app_ty         = applyCprTy fun_ty
+    app_ty         = app fun_ty
 cprAnal' env args (Lam var body)
   | isTyVar var
   , (body_ty, body') <- cprAnal env args body
@@ -183,22 +237,23 @@ cprAnal' env args (Lam var body)
   = (lam_ty, Lam var body')
   where
     (arg_ty, body_args)
-      | ty:args' <- args = (ty, args')      -- Info from e.g. a StrictSig or DataCon wrapper args
-      | otherwise        = (topCprType, []) -- An anonymous lambda
-    env'                 = extendSigEnv env var (CprSig arg_ty)
+      | ty:args' <- args = (ty, args') -- Info from e.g. a StrictSig or DataCon wrapper args
+      | otherwise        = (top, [])   -- An anonymous lambda
+    env'                 = extendSigEnv env var (Sig arg_ty)
     (body_ty, body')     = cprAnal env' body_args body
-    lam_ty               = abstractCprTy body_ty
+    lam_ty               = lam body_ty
 
 cprAnal' env args (Case scrut case_bndr ty alts)
-  = -- pprTrace "cprAnal:Case" (ppr scrut <+> ppr alt_tys <+> ppr res_ty) $
+  = -- pprTrace "cprAnal:Case" (ppr scrut $$ text "ty:" <+> ppr ty $$ ppr alt_tys $$ ppr res_ty) $
     (res_ty, Case scrut' case_bndr ty alts')
   where
     -- Analyse the scrutinee and additionally force the resulting CPR type with
     -- head strictness.
     (scrut_ty, scrut')        = cprAnal env [] scrut
-    (whnf_flag, case_bndr_ty) = forceCprTy seqDmd scrut_ty
-    (alt_tys, alts') = mapAndUnzip (cprAnalAlt env args case_bndr case_bndr_ty) alts
-    res_ty           = lubCprTypes alt_tys `bothCprType` whnf_flag
+    (whnf_flag, case_bndr_ty) = force seqSubDmd scrut_ty
+    env_alts         = extendSigEnv env case_bndr (Sig case_bndr_ty)
+    (alt_tys, alts') = mapAndUnzip (cprAnalAlt env_alts args case_bndr_ty) alts
+    res_ty           = lubs alt_tys `both` whnf_flag
 
 cprAnal' env args (Let (NonRec id rhs) body)
   = (body_ty, Let (NonRec id' rhs') body')
@@ -213,25 +268,23 @@ cprAnal' env args (Let (Rec pairs) body)
     (body_ty, body') = cprAnal env' args body
 
 cprAnalAlt
-  :: AnalEnv
-  -> [CprType]      -- ^ info about incoming arguments
-  -> Id             -- ^ case binder
-  -> CprType        -- ^ info about the case binder
+  :: ForwardLattice l
+  => AnalEnv l
+  -> [l]            -- ^ info about incoming arguments
+  -> l              -- ^ info about the case binder
   -> Alt Var        -- ^ current alternative
-  -> (CprType, Alt Var)
-cprAnalAlt env args case_bndr case_bndr_ty (Alt con bndrs rhs)
+  -> (l, Alt Var)
+cprAnalAlt env args case_bndr_ty (Alt con bndrs rhs)
   = (rhs_ty, Alt con bndrs rhs')
   where
-    env_case_bndr = extendSigEnv env case_bndr (CprSig case_bndr_ty)
     env_alt
       -- See Note [CPR in a DataAlt case alternative]
       | DataAlt dc  <- con
-      , Just fields <- splitConCprTy dc case_bndr_ty
-      , let ids     = filter isId bndrs
-      , let cpr_tys = map (CprSig . CprType 0) fields
-      = extendSigEnvList env_case_bndr (zipEqual "cprAnalAlt" ids cpr_tys)
+      , let ids = filter isId bndrs
+      , let tys = map Sig (expandConFields dc case_bndr_ty)
+      = extendSigEnvList env (zipEqual "cprAnalAlt" ids tys)
       | otherwise
-      = env_case_bndr
+      = env
     (rhs_ty, rhs') = cprAnal env_alt args rhs
 
 --
@@ -239,18 +292,19 @@ cprAnalAlt env args case_bndr case_bndr_ty (Alt con bndrs rhs)
 --
 
 cprTransform
-  :: AnalEnv         -- ^ The analysis environment
-  -> [CprType]       -- ^ info about incoming arguments
-  -> Id              -- ^ The function
-  -> CprType         -- ^ The demand type of the function
+  :: ForwardLattice l
+  => AnalEnv l -- ^ The analysis environment
+  -> [l]       -- ^ info about incoming arguments
+  -> Id        -- ^ The function
+  -> l         -- ^ The demand type of the function
 cprTransform env args id
   = -- pprTrace "cprTransform" (vcat [ppr id, ppr sig, ppr args])
     sig
   where
     sig
       -- Top-level binding, local let-binding, lambda arg or case binder
-      | Just sig <- lookupSigEnv env id
-      = cprTransformSig (idStrictness id) sig args
+      | Just (str_sig, sig) <- lookupSigEnv env id
+      = transformSig str_sig sig args
       -- See Note [CPR for data structures]
       | Just rhs <- cprDataStructureUnfolding_maybe id
       = fst $ cprAnal env args rhs
@@ -259,12 +313,12 @@ cprTransform env args id
       = fst $ cprAnal env args rhs
       -- Data constructor
       | Just con <- isDataConWorkId_maybe id
-      = cprTransformDataConWorkSig con args
+      = transformDataConWork con args
       -- Imported function or data con worker
       | isGlobalId id
-      = cprTransformSig (idStrictness id) (idCprInfo id) args
+      = transformSig (idStrictness id) (getAnalAnnotation id) args
       | otherwise
-      = topCprType
+      = top
 
 --
 -- * Analysing Bindings
@@ -274,18 +328,15 @@ cprTransform env args id
 -- ** Widening
 --
 
-type Widening = CprSig -> CprSig
+type Widening l = Sig l -> Sig l
 
-noWidening :: Widening
+noWidening :: Widening l
 noWidening = id
 
 -- | A widening operator on 'CprSig' to ensure termination of fixed-point
 -- iteration. See Note [Ensuring termination of fixed-point iteration]
-depthWidening :: Widening
-depthWidening (CprSig ty) = CprSig . prune . mark_diverging $ ty
-  where
-    mark_diverging ty = ty { ct_cat = ct_cat ty `lubCAT` divergeCAT }
-    prune ty = ty { ct_cat = pruneDeepCAT mAX_DEPTH (ct_cat ty) }
+depthWidening :: ForwardLattice l => Arity -> Widening l
+depthWidening n (Sig ty) = Sig . pruneDepth mAX_DEPTH . markDiverging n $ ty
 
 -- This constant is quite arbitrary. We might well make it a CLI flag if needed
 mAX_DEPTH :: Int
@@ -298,12 +349,13 @@ mAX_DEPTH = 4
 -- | Process the RHS of the binding for a sensible arity, add the CPR signature
 -- to the Id, and augment the environment with the signature as well.
 cprAnalBind
-  :: TopLevelFlag
-  -> AnalEnv
-  -> Widening -- ^ We want to specify 'depthWidening' in fixed-point iteration
+  :: forall l. ForwardLattice l
+  => TopLevelFlag
+  -> AnalEnv l
+  -> Widening l -- ^ We want to specify 'depthWidening' in fixed-point iteration
   -> Id
   -> CoreExpr
-  -> (Id, CoreExpr, AnalEnv)
+  -> (Id, CoreExpr, AnalEnv l)
 cprAnalBind top_lvl env widening id rhs
   -- See Note [CPR for data structures]
   | isDataStructure id rhs
@@ -314,26 +366,26 @@ cprAnalBind top_lvl env widening id rhs
     arg_tys             = fst (splitFunNewTys (idType id))
     -- See Note [CPR for binders that will be unboxed]
     -- See Note [Rapid termination for strict binders]
-    assumed_arg_cpr_tys = argCprTypesFromStrictSig (unboxingStrategy env)
-                                                   arg_tys
-                                                   (idStrictness id)
+    assumed_arg_cpr_tys = argsFromStrictSig (unboxingStrategy env)
+                                            arg_tys
+                                            (idStrictness id)
 
     (rhs_ty, rhs')      = cprAnal env assumed_arg_cpr_tys rhs
 
     -- possibly trim thunk CPR info
     rhs_ty'
       -- See Note [CPR for thunks]
-      | stays_thunk = trimCprTy rhs_ty
+      | stays_thunk = forgetCpr rhs_ty
       -- See Note [CPR for sum types]
-      | returns_sum = trimCprTy rhs_ty
+      | returns_sum = forgetCpr rhs_ty
       | otherwise   = rhs_ty
 
     -- See Note [Arity trimming for CPR signatures]
-    -- See Note [Trimming CPR signatures according to Termination]
+    -- See Note [Trimming CPR signatures according to Term]
     -- See Note [Ensuring termination of fixed-point iteration]
-    sig    = widening $ mkCprSigForFunRHS (idArity id) (idDemandInfo id) rhs_ty'
+    sig    = widening $ mkBindSig (idArity id) (idDemandInfo id) rhs_ty'
     id'    = -- pprTrace "cprAnalBind" (ppr id $$ ppr rhs_ty' $$ ppr sig) $
-             setIdCprInfo id sig
+             setAnalAnnotation @l id sig
     env'   = extendSigEnv env id sig
 
     -- See Note [CPR for thunks]
@@ -352,7 +404,7 @@ cprAnalBind top_lvl env widening id rhs
 isDataStructure :: Id -> CoreExpr -> Bool
 -- See Note [CPR for data structures]
 isDataStructure id rhs =
-  idArity id == 0 && exprIsHNF rhs
+  idArity id == 0 && not (isJoinId id) && exprIsHNF rhs
 
 -- | Returns an expandable unfolding
 -- (See Note [exprIsExpandable] in "GHC.Core.Utils") that has
@@ -365,7 +417,7 @@ cprDataStructureUnfolding_maybe id = do
   guard (isDataStructure id unf)
   return unf
 
-unboxingStrategy :: AnalEnv -> UnboxingStrategy Demand
+unboxingStrategy :: AnalEnv l -> UnboxingStrategy Demand
 unboxingStrategy env = wantToUnboxArg (ae_fam_envs env) has_inlineable_prag
   where
     -- Rather than maintaining in AnalEnv whether we are in an INLINEABLE
@@ -380,27 +432,28 @@ unboxingStrategy env = wantToUnboxArg (ae_fam_envs env) has_inlineable_prag
 
 -- | Fixed-point iteration
 cprFix
-  :: TopLevelFlag
-  -> AnalEnv                    -- Does not include bindings for this binding
+  :: forall l. ForwardLattice l
+  => TopLevelFlag
+  -> AnalEnv l                    -- Does not include bindings for this binding
   -> [(Id,CoreExpr)]
-  -> (AnalEnv, [(Id,CoreExpr)]) -- Binders annotated with CPR info
+  -> (AnalEnv l, [(Id,CoreExpr)]) -- Binders annotated with CPR info
 cprFix top_lvl orig_env orig_pairs
   = loop 1 init_env init_pairs
   where
     init_sig id rhs
       -- See Note [CPR for data structures]
-      | isDataStructure id rhs = topCprSig
-      | otherwise              = mkCprSig (idArity id) divergeCAT
+      | isDataStructure id rhs = Sig $ top
+      | otherwise              = Sig $ markDiverging (idArity id) bot
     -- See Note [Initialising strictness] in GHC.Core.Opt.DmdAnal
     orig_virgin = ae_virgin orig_env
-    init_pairs | orig_virgin  = [(setIdCprInfo id (init_sig id rhs), rhs) | (id, rhs) <- orig_pairs ]
+    init_pairs | orig_virgin  = [(setAnalAnnotation @l id (init_sig id rhs), rhs) | (id, rhs) <- orig_pairs ]
                | otherwise    = orig_pairs
     init_env = extendSigEnvFromIds orig_env (map fst init_pairs)
 
-    -- The fixed-point varies the idCprInfo field of the binders and and their
-    -- entries in the AnalEnv, and terminates if that annotation does not change
-    -- any more.
-    loop :: Int -> AnalEnv -> [(Id,CoreExpr)] -> (AnalEnv, [(Id,CoreExpr)])
+    -- The fixed-point varies the idCprInfo/idTermInfo field of the binders and
+    -- their entries in the AnalEnv, and terminates if that annotation does not
+    -- change any more.
+    loop :: Int -> AnalEnv l -> [(Id,CoreExpr)] -> (AnalEnv l, [(Id,CoreExpr)])
     loop n env pairs
       | found_fixpoint = (reset_env', pairs')
       | otherwise      = -- pprTrace "cprFix:loop" (ppr n <+> ppr (map _prj pairs) <+> ppr (map _prj pairs')) $
@@ -411,15 +464,17 @@ cprFix top_lvl orig_env orig_pairs
         (env', pairs') = step (applyWhen (n/=1) nonVirgin env) pairs
         -- Make sure we reset the virgin flag to what it was when we are stable
         reset_env'     = env'{ ae_virgin = orig_virgin }
-        found_fixpoint = map (idCprInfo . fst) pairs' == map (idCprInfo . fst) pairs
-        _prj (id,_)    = (id, idCprInfo id) -- a helper fun for the trace call
+        get_anns       = map (getAnalAnnotation @l . fst)
+        found_fixpoint = get_anns pairs' == get_anns pairs
+        _prj (id,_)    = (id, getAnalAnnotation @l id) -- a helper fun for the trace call
 
-    step :: AnalEnv -> [(Id, CoreExpr)] -> (AnalEnv, [(Id, CoreExpr)])
+    step :: AnalEnv l -> [(Id, CoreExpr)] -> (AnalEnv l, [(Id, CoreExpr)])
     step env pairs = mapAccumL go env pairs
       where
         go env (id, rhs) = (env', (id', rhs'))
           where
-            (id', rhs', env') = cprAnalBind top_lvl env depthWidening id rhs
+            (id', rhs', env') = cprAnalBind top_lvl env widening id rhs
+            widening = depthWidening (idArity id)
 
 {- Note [Arity trimming for CPR signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -452,15 +507,15 @@ from @f@'s, so it *will* be WW'd:
 And the case in @g@ can never cancel away, thus we introduced extra reboxing.
 Hence we always trim the CPR signature of a binding to idArity.
 
-Note [Trimming CPR signatures according to Termination]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Trimming CPR signatures according to Term]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
 
   f :: Int -> Maybe Int
   f n = Just (sum [0..n]) -- assume that `sum` has the CPR property
   g :: Int -> Int
   g n | n < 0     = n
-       | otherwise = case f n of Just blah -> blah
+      | otherwise = case f n of Just blah -> blah
 
 For the RHS of 'f', we infer the CPR type `1->#c2(*c1(#))`. That is enough to
 unbox the 'Just' constructor, but not the nested 'I#' constructor, which would
@@ -487,7 +542,7 @@ Consider `T18894`:
       | otherwise = uncurry (+) (g 2 m)
 
 We infer CPR type `2->#c1(#c1(*), *c1(*))` for 'g's RHS and by
-Note [Trimming CPR signatures according to Termination] we *should* trim that to
+Note [Trimming CPR signatures according to Term] we *should* trim that to
 `2->c1(c1(*), *))` for the CPR signature, because unboxing the division might in
 fact diverge and throw a div-by-zero exception.
 
@@ -502,10 +557,11 @@ had inferred `2->#c1(#c1(*), #c1(*))` instead, to get CPR `2->c1(c1(*),c1(*))`
 and unbox both components of the pair.
 -}
 
-data AnalEnv
+data AnalEnv l
   = AE
-  { ae_sigs   :: SigEnv
-  -- ^ Current approximation of signatures for local ids
+  { ae_sigs   :: IdEnv (StrictSig, Sig l)
+  -- ^ The 'StrictSig' from the binding site and the current approximation of
+  -- the signature for local ids. See Note [Why must AnalEnv carry StrictSigs?].
   , ae_virgin :: Bool
   -- ^ True only on every first iteration in a fixed-point
   -- iteration. See Note [Initialising strictness] in "GHC.Core.Opt.DmdAnal"
@@ -513,15 +569,13 @@ data AnalEnv
   -- ^ Needed when expanding type families and synonyms of product types.
   }
 
-type SigEnv = IdEnv CprSig
-
-instance Outputable AnalEnv where
+instance Outputable l => Outputable (AnalEnv l) where
   ppr (AE { ae_sigs = env, ae_virgin = virgin })
     = text "AE" <+> braces (vcat
          [ text "ae_virgin =" <+> ppr virgin
          , text "ae_sigs =" <+> ppr env ])
 
-emptyAnalEnv :: FamInstEnvs -> AnalEnv
+emptyAnalEnv :: FamInstEnvs -> AnalEnv l
 emptyAnalEnv fam_envs
   = AE
   { ae_sigs = emptyVarEnv
@@ -529,24 +583,129 @@ emptyAnalEnv fam_envs
   , ae_fam_envs = fam_envs
   }
 
-lookupSigEnv :: AnalEnv -> Id -> Maybe CprSig
+lookupSigEnv :: AnalEnv l -> Id -> Maybe (StrictSig, Sig l)
 lookupSigEnv env id = lookupVarEnv (ae_sigs env) id
 
-extendSigEnv :: AnalEnv -> Id -> CprSig -> AnalEnv
-extendSigEnv env id sig
-  = env { ae_sigs = extendVarEnv (ae_sigs env) id sig }
+extendSigEnv :: AnalEnv l -> Id -> (Sig l) -> AnalEnv l
+-- See Note [Why must AnalEnv carry StrictSigs?]
+extendSigEnv env id !sig
+  = env { ae_sigs = extendVarEnv (ae_sigs env) id (idStrictness id, sig) }
 
-extendSigEnvList :: AnalEnv -> [(Id, CprSig)] -> AnalEnv
+extendSigEnvList :: AnalEnv l -> [(Id, Sig l)] -> AnalEnv l
+-- See Note [Why must AnalEnv carry StrictSigs?]
 extendSigEnvList env ids_cprs
-  = env { ae_sigs = extendVarEnvList (ae_sigs env) ids_cprs }
+  = env { ae_sigs = extendVarEnvList (ae_sigs env) ids_strs_cprs }
+  where
+    ids_strs_cprs = [ (id, (str_sig, cpr)) | (id, !cpr) <- ids_cprs
+                                           , let str_sig = idStrictness id ]
 
 -- | Extend an environment with the CPR sigs attached to the ids
-extendSigEnvFromIds :: AnalEnv -> [Id] -> AnalEnv
+extendSigEnvFromIds :: ForwardLattice l => AnalEnv l -> [Id] -> AnalEnv l
 extendSigEnvFromIds env ids
-  = extendSigEnvList env [ (id, idCprInfo id) | id <- ids ]
+  = extendSigEnvList env [ (id, getAnalAnnotation id) | id <- ids ]
 
-nonVirgin :: AnalEnv -> AnalEnv
+nonVirgin :: AnalEnv l -> AnalEnv l
 nonVirgin env = env { ae_virgin = False }
+
+class (Eq l, Outputable l) => ForwardLattice l where
+  bot :: l
+  top :: l
+  lub :: l -> l -> l
+  whnfOk :: l
+  app :: l -> l
+  lam :: l -> l
+  markDiverging :: Arity -> l -> l
+  pruneDepth :: Int -> l -> l
+  force :: SubDemand -> l -> (TermFlag, l)
+  both :: l -> TermFlag -> l
+  expandConFields :: DataCon -> l -> [l]
+  argsFromStrictSig :: UnboxingStrategy Demand -> [Type] -> StrictSig -> [l]
+  forgetCpr :: l -> l
+  lamsSig :: Arity -> l -> Sig l
+  mkBindSig :: Arity -> Demand -> l -> Sig l
+  transformSig :: StrictSig -> Sig l -> [l] -> l
+  transformDataConWork :: DataCon -> [l] -> l
+  getAnalAnnotation :: Id -> Sig l
+  setAnalAnnotation :: Id -> Sig l -> Id
+
+lubs :: ForwardLattice l => [l] -> l
+lubs = foldl' lub bot
+
+instance ForwardLattice Term where
+  bot = botTerm
+  top = topTerm
+  lub = lubTerm
+  whnfOk = whnfTerm
+  app = applyTerm
+  lam = lamTerm
+  markDiverging = markDivergingTerm
+  pruneDepth = pruneDeepTerm
+  force = forceTerm
+  both = bothTerm
+  expandConFields = expandConFieldsTerm
+  argsFromStrictSig _want_to_unbox _arg_tys = argTermsFromStrictSig
+  forgetCpr = id
+  lamsSig = lamsTermSig
+  mkBindSig _arty _dmd term = Sig term -- nothing to post-process here
+  transformSig = termTransformSig
+  transformDataConWork = termTransformDataConWork
+  getAnalAnnotation = idTermInfo
+  setAnalAnnotation = setIdTermInfo
+
+-- | Joint lattice of 'Term' and 'Cpr'.
+-- (C)pr (A)nd (T)ermination, hence \"CAT\".
+data CAT = CAT !Term !Cpr
+  deriving Eq
+
+instance Outputable CAT where
+  ppr (CAT t c) = parens (ppr t <> comma <+> ppr c)
+
+unzipCAT :: [CAT] -> ([Term], [Cpr])
+unzipCAT = unzip . map (\(CAT t c) -> (t, c))
+
+-- | Like 'Control.Arrow.(***)' for 'CAT'.
+liftCAT :: (Term -> Term) -> (Cpr -> Cpr) -> CAT -> CAT
+liftCAT ft fc (CAT t c) = CAT (ft t) (fc c)
+
+instance ForwardLattice CAT where
+  bot = CAT bot botCpr
+  top = CAT top topCpr
+  lub (CAT t1 c1) (CAT t2 c2) = CAT (lub t1 t2) (lubCpr c1 c2)
+  whnfOk = CAT whnfOk topCpr
+  app = liftCAT app applyCpr
+  lam = liftCAT lam lamCpr
+  markDiverging n (CAT t c) = CAT (markDiverging n t) c
+  pruneDepth d = liftCAT (pruneDepth d) (pruneDeepCpr d)
+  force sd (CAT t c) = (tf, CAT t' c)
+    where
+      (!tf, !t') = force sd t
+  both (CAT t c) tf = CAT (t `both` tf) c
+  expandConFields dc (CAT t c) =
+    zipWith CAT (expandConFields dc t) (expandConFieldsCpr dc c)
+  argsFromStrictSig want_to_unbox arg_tys str_sig =
+    zipWith CAT (argsFromStrictSig    want_to_unbox arg_tys str_sig)
+                (argCprsFromStrictSig want_to_unbox arg_tys str_sig)
+  forgetCpr (CAT t c) = CAT t (dropNonBotCpr c)
+  lamsSig arty (CAT t c) =
+    Sig $ CAT (getSig $ lamsSig arty t) (getSig $ lamsCprSig arty c)
+  mkBindSig arity demand (CAT t c) =
+    -- This is the dependency from Term to Cpr analysis!
+    Sig $ CAT (getSig $ mkBindSig    arity demand t)
+              (getSig $ mkBindCprSig arity demand t c)
+  transformSig str_sig (Sig (CAT sig_t sig_c)) args =
+    CAT (transformSig    str_sig (Sig sig_t) arg_terms)
+        (cprTransformSig         (Sig sig_c)          )
+    where
+      (arg_terms, _arg_cprs) = unzipCAT args
+  transformDataConWork dc args =
+    CAT (transformDataConWork dc arg_terms)
+        (cprTransformDataConWork dc arg_cprs)
+    where
+      (arg_terms, arg_cprs)  = unzipCAT args
+  getAnalAnnotation id =
+    Sig $ CAT (getSig $ getAnalAnnotation id) (getSig $ idCprInfo id)
+  setAnalAnnotation id (Sig (CAT t c)) =
+    id `setAnalAnnotation` Sig t `setIdCprInfo` Sig c
 
 {- Note [Ensuring termination of fixed-point iteration]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -562,7 +721,7 @@ Hence it is important to apply a /widening/ operator between iterations to
 ensure termination. In the case of DmdAnal, that is simply a check on the
 number of iterations, defaulting to Top after a certain limit
 (See Note [Safe abortion in the fixed-point iteration] in DmdAnal).
-In case of CprAnal, we simply prune Cpr and Termination info after each
+In case of CprAnal, we simply prune Cpr and Term info after each
 iteration to a constant depth of mAX_DEPTH.
 
 Note [CPR for binders that will be unboxed]
@@ -593,7 +752,7 @@ Note that we only want to do this for something that we want to unbox
 (e.g. from \x -> x!).
 
 In practice, we derive CPR information directly from the strictness signature
-and the argument type in 'cprAnalBind' via 'argCprTypesFromStrictSig'.
+and the argument type in 'cprAnalBind' via 'argCATsFromStrictSig'.
 
 Note [Rapid termination for strict binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -616,7 +775,7 @@ evaluation beyond the first one will. We get
 
 Like for Note [CPR for binders that will be unboxed], we derive
 termination information directly from the strictness signature
-in 'cprAnalBind' via 'argCprTypesFromStrictSig'.
+in 'cprAnalBind' via 'argCATsFromStrictSig'.
 
 But in contrast to CPR information, we also have to account for termination of
 strict arguments at *call sites* of 'g'! For example
@@ -634,7 +793,7 @@ That clearly is not the case for 'z', which is a lazy binder.
 
 The solution is to "force" 'z' according to the strictness
 signature of 'g', which is what 'cprTransformSig' does. It
-accounts the TerminationFlag resulting from the forcing to
+accounts the TermFlag resulting from the forcing to
 the termination recorded in the signature, as if there was
 a case expression forcing the argument before the call. In
 case of 'g', we get that it MightDiverge because forcing of
@@ -794,8 +953,9 @@ should not get CPR signatures (#18154), because they
 Hence we don't analyse or annotate data structures in 'cprAnalBind'. To
 implement this, the isDataStructure guard is triggered for bindings that satisfy
 
-  (1) idArity id == 0 (otherwise it's a function)
-  (2) exprIsHNF rhs   (otherwise it's a thunk, Note [CPR for thunks] applies)
+  (1a) idArity id == 0   (otherwise it's a function)
+  (1b) not (isJoinId id) (otherwise it counts as a function)
+  (2) exprIsHNF rhs      (otherwise it's a thunk, Note [CPR for thunks] applies)
 
 But we can't just stop giving DataCon application bindings the CPR *property*,
 for example
@@ -849,5 +1009,13 @@ the unfolding once, upfront? Two reasons:
      would not take into account whether the arguments to the wrapper had the
      CPR property itself! That would make the CPR transformers derived from
      CPR sigs for DataCon wrappers much less precise than the transformer for
-     DataCon workers ('cprTransformDataConWorkSig').
+     DataCon workers ('cprTransformDataConWork').
+
+Note [Why must AnalEnv carry StrictSigs?]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Termination analysis depends on accurate strictness signatures at *call sites*.
+But termination analysis directly follows demand analysis! That means, the
+'idStrictness' of 'Var' uses won't have been updated yet, because there was no
+intermittent run of occurrence analysis.
+Solution: Track 'idStrictness' from the binding site in 'ae_sigs'.
 -}

@@ -8,12 +8,21 @@ Test.t2: <SP(U)><SP(U)>
 
 
 
-==================== Cpr signatures ====================
+==================== Term signatures ====================
 Test.$tc'MkT: *
 Test.$tcT: *
 Test.$trModule: *
-Test.t: #c1(#)
-Test.t2: #c1(#)
+Test.t: #L#L#1(#)
+Test.t2: #L#L#1(#)
+
+
+
+==================== Cpr signatures ====================
+Test.$tc'MkT:
+Test.$tcT:
+Test.$trModule:
+Test.t: LL1
+Test.t2: LL1
 
 
 
