@@ -28,6 +28,22 @@ facIO :: Int -> IO Int
 facIO n | n < 2     = return 1
         | otherwise = do n' <- facIO (n-1); return (n*n')
 
+-- Now some checks wrt. strict fields where we don't want to unbox.
+
+data T = MkT Int !(Int, Int)
+
+-- | Should not unbox any component, because the wrapper of 'MkT' forces
+-- 'p', which this function is lazy in. Similarly for 'x'.
+dataConWrapper :: (Int, Int) -> Int -> (T, Int)
+dataConWrapper p x = (MkT x p, x+1)
+{-# NOINLINE dataConWrapper #-}
+
+-- | Should not unbox the second component, because 'x' won't be available
+-- unboxed. It terminates, though.
+strictField :: T -> (Int, (Int, Int))
+strictField (MkT x y) = (x, y)
+{-# NOINLINE strictField #-}
+
 ----------------------------------------------------------------------
 -- The following functions are copied from T18894. This test is about
 -- *exploiting* the demand signatures that we assertedly (by T18894)

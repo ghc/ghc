@@ -49,7 +49,7 @@ import GHC.Driver.Session ( DynFlags(..), GeneralFlag( Opt_SpecConstrKeen )
                           , gopt, hasPprDebug )
 import GHC.Driver.Ppr
 import GHC.Data.Maybe     ( orElse, catMaybes, isJust, isNothing )
-import GHC.Types.Demand
+import GHC.Types.Demand hiding ( Call )
 import GHC.Types.Cpr
 import GHC.Serialized   ( deserializeWithData )
 import GHC.Utils.Misc

@@ -11,15 +11,27 @@ UnsatFun.h3: <SCS(A)>
 
 
 
-==================== Cpr signatures ====================
+==================== Term signatures ====================
 UnsatFun.$trModule: *
-UnsatFun.f: *b
-UnsatFun.g: *
-UnsatFun.g': *
-UnsatFun.g3: *c1(#)
-UnsatFun.h: *
-UnsatFun.h2: *
-UnsatFun.h3: *c1(#)
+UnsatFun.f: #L#L*(#..)
+UnsatFun.g: #
+UnsatFun.g': #
+UnsatFun.g3: #L#1(#)
+UnsatFun.h: #L#
+UnsatFun.h2: #L#
+UnsatFun.h3: #L#1(#)
+
+
+
+==================== Cpr signatures ====================
+UnsatFun.$trModule:
+UnsatFun.f: LLb
+UnsatFun.g:
+UnsatFun.g':
+UnsatFun.g3: L1
+UnsatFun.h:
+UnsatFun.h2:
+UnsatFun.h3: L1
 
 
 

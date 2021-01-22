@@ -1,6 +1,6 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 129, types: 104, coercions: 0, joins: 0/5}
+Result size of Tidy Core = {terms: 129, types: 94, coercions: 0, joins: 0/5}
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 F11.fib1 :: Integer
@@ -33,7 +33,7 @@ F11.f11_fib
       }
 end Rec }
 
--- RHS size: {terms: 52, types: 28, coercions: 0, joins: 0/5}
+-- RHS size: {terms: 52, types: 26, coercions: 0, joins: 0/5}
 F11.$wfib [InlPrag=[2]] :: forall {a} {p}. (a -> a -> Bool) -> (Num a, Num p) => a -> p
 [GblId, Arity=4, Str=<MCM(CS(U))><UP(A,UCU(CS(U)),A,A,A,A,U)><UP(UCU(CS(U)),A,A,A,A,A,1C1(U))><U>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [60 150 60 0] 460 0}]
 F11.$wfib
@@ -55,7 +55,7 @@ F11.$wfib
         [LclId]
         lvl3 = fromInteger @a w F11.fib1 } in
       letrec {
-        fib4 [Occ=LoopBreaker] :: a -> p
+        fib4 [Occ=LoopBreaker, Dmd=MCM(U)] :: a -> p
         [LclId, Arity=1, Str=<U>, Unf=OtherCon []]
         fib4
           = \ (ds :: a) ->
@@ -69,14 +69,14 @@ F11.$wfib
               }; } in
       fib4 w2
 
--- RHS size: {terms: 14, types: 21, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 14, types: 19, coercions: 0, joins: 0/0}
 fib [InlPrag=[2]] :: forall {a} {p}. (Eq a, Num a, Num p) => a -> p
 [GblId,
  Arity=4,
  Str=<SP(MCM(CS(U)),A)><UP(A,UCU(CS(U)),A,A,A,A,U)><UP(UCU(CS(U)),A,A,A,A,A,U)><U>,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=4,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (@a) (@p) (w [Occ=Once1!] :: Eq a) (w1 [Occ=Once1] :: Num a) (w2 [Occ=Once1] :: Num p) (w3 [Occ=Once1] :: a) -> case w of { GHC.Classes.C:Eq ww1 [Occ=Once1] _ [Occ=Dead] -> F11.$wfib @a @p ww1 w1 w2 w3 }}]
-fib = \ (@a) (@p) (w :: Eq a) (w1 :: Num a) (w2 :: Num p) (w3 :: a) -> case w of { GHC.Classes.C:Eq ww1 ww2 -> F11.$wfib @a @p ww1 w1 w2 w3 }
+         Tmpl= \ (@a) (@p) (w [Occ=Once1!] :: Eq a) (w1 [Occ=Once1] :: Num a) (w2 [Occ=Once1] :: Num p) (w3 [Occ=Once1] :: a) -> case w of { GHC.Classes.C:Eq ww [Occ=Once1] _ [Occ=Dead] -> F11.$wfib @a @p ww w1 w2 w3 }}]
+fib = \ (@a) (@p) (w :: Eq a) (w1 :: Num a) (w2 :: Num p) (w3 :: a) -> case w of { GHC.Classes.C:Eq ww ww1 -> F11.$wfib @a @p ww w1 w2 w3 }
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 F11.f3 :: Integer
@@ -97,7 +97,7 @@ F11.f11f1 :: Integer -> Integer
          Tmpl= \ (y [Occ=Once1] :: Integer) -> GHC.Num.Integer.integerAdd F11.f11_x y}]
 F11.f11f1 = \ (y :: Integer) -> GHC.Num.Integer.integerAdd F11.f11_x y
 
--- RHS size: {terms: 3, types: 3, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
 f11f :: forall {p}. p -> Integer -> Integer
 [GblId,
  Arity=2,

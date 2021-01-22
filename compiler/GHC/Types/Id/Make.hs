@@ -69,6 +69,7 @@ import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Demand
 import GHC.Types.Cpr
+import GHC.Types.Termination
 import GHC.Types.TyThing
 import GHC.Core
 import GHC.Types.Unique
@@ -1291,22 +1292,24 @@ mkPrimOpId prim_op
     id   = mkGlobalId (PrimOpId prim_op) name ty info
 
     -- PrimOps never construct a product, but we want to assume that
-    --   1. Cheap ones (i.e. `+#`) terminate.
+    --   1. Ok-for-spec ones (i.e. `+#`) terminate.
     --   2. Those which have dead end Divergence (i.e. `raise#`) have
-    --      `divergeCAT`. If we manage to evaluate them to WHNF (which we
+    --      `divergeTerm`. If we manage to evaluate them to WHNF (which we
     --      never do), they have infinitely deep CPR and termination: This is
     --      so that we give an `if ... then error "blah" else (1, 2)` the
     --      nested CPR property.
     -- In all other cases we simply assume `topCpr`.
-    cpr | primOpIsCheap prim_op   = whnfTermCAT
-        | isDeadEndSig strict_sig = divergeCAT
-        | otherwise               = topCAT
+    (term, cpr) | primOpOkForSpeculation prim_op = (whnfTerm,    topCpr)
+                | isDeadEndSig strict_sig        = (divergeTerm, botCpr)
+                | otherwise                      = (topTerm,     topCpr)
+
 
     info = noCafIdInfo
            `setRuleInfo`           mkRuleInfo (maybeToList $ primOpRules name prim_op)
            `setArityInfo`          arity
            `setStrictnessInfo`     strict_sig
-           `setCprInfo`            mkCprSig arity cpr
+           `setTermInfo`           lamsTermSig arity term
+           `setCprInfo`            lamsCprSig   arity cpr
            `setInlinePragInfo`     neverInlinePragma
            `setLevityInfoWithType` res_ty
                -- We give PrimOps a NOINLINE pragma so that we don't
