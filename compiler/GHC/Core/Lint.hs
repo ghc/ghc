@@ -968,6 +968,11 @@ lintIdOcc var nargs
         ; ensureEqTys occ_ty bndr_ty $
           mkBndrOccTypeMismatchMsg bndr var bndr_ty occ_ty
 
+        ; let occ_mult  = idMult var
+              bndr_mult = idMult bndr
+        ; ensureEqTys occ_mult bndr_mult $
+          mkBndrOccMultiplicityMismatchMsg bndr var bndr_mult occ_mult
+
           -- Check for a nested occurrence of the StaticPtr constructor.
           -- See Note [Checking StaticPtrs].
         ; lf <- getLintFlags
@@ -3224,6 +3229,13 @@ mkJoinBndrOccMismatchMsg bndr join_arity_bndr join_arity_occ
 mkBndrOccTypeMismatchMsg :: Var -> Var -> LintedType -> LintedType -> SDoc
 mkBndrOccTypeMismatchMsg bndr var bndr_ty var_ty
   = vcat [ text "Mismatch in type between binder and occurrence"
+         , text "Binder:" <+> ppr bndr <+> dcolon <+> ppr bndr_ty
+         , text "Occurrence:" <+> ppr var <+> dcolon <+> ppr var_ty
+         , text "  Before subst:" <+> ppr (idType var) ]
+
+mkBndrOccMultiplicityMismatchMsg :: Var -> Var -> LintedType -> LintedType -> SDoc
+mkBndrOccMultiplicityMismatchMsg bndr var bndr_ty var_ty
+  = vcat [ text "Mismatch in multiplicity between binder and occurrence"
          , text "Binder:" <+> ppr bndr <+> dcolon <+> ppr bndr_ty
          , text "Occurrence:" <+> ppr var <+> dcolon <+> ppr var_ty
          , text "  Before subst:" <+> ppr (idType var) ]
