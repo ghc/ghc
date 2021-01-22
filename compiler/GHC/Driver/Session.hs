@@ -1467,8 +1467,16 @@ flattenExtensionFlags ml = foldr f defaultExtensionFlags
 -- @docs/users_guide/exts@.
 languageExtensions :: Maybe Language -> [LangExt.Extension]
 
--- Nothing: the default case
-languageExtensions Nothing = languageExtensions (Just GHC2021)
+languageExtensions Nothing
+    -- Nothing => the default case
+    = LangExt.NondecreasingIndentation -- This has been on by default for some time
+    : delete LangExt.DatatypeContexts  -- The Haskell' committee decided to
+                                       -- remove datatype contexts from the
+                                       -- language:
+   -- http://www.haskell.org/pipermail/haskell-prime/2011-January/003335.html
+      (languageExtensions (Just Haskell2010))
+
+   -- NB: MonoPatBinds is no longer the default
 
 languageExtensions (Just Haskell98)
     = [LangExt.ImplicitPrelude,
