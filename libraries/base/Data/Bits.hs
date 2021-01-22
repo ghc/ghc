@@ -71,8 +71,14 @@ import GHC.Show
 -- >>> complement oneBits :: Word == zeroBits :: Word
 -- True
 --
+-- = Note
+--
+-- The constraint on 'oneBits' is arguably too strong. However, as some types
+-- (such as 'Natural') have undefined 'complement', this is the only safe
+-- choice.
+--
 -- @since 4.16
-oneBits :: (Bits a) => a
+oneBits :: (FiniteBits a) => a
 oneBits = complement zeroBits
 {-# INLINE oneBits #-}
 
@@ -99,8 +105,12 @@ newtype And a = And { getAnd :: a }
 instance (Bits a) => Semigroup (And a) where
   And x <> And y = And (x .&. y)
 
--- | @since 4.16
-instance (Bits a) => Monoid (And a) where
+-- | This constraint is arguably too strong. However,
+-- as some types (such as 'Natural') have undefined 'complement', this is the
+-- only safe choice.
+--
+-- @since 4.16
+instance (FiniteBits a) => Monoid (And a) where
   mempty = And oneBits
 
 -- | Monoid under bitwise inclusive OR.
@@ -177,10 +187,18 @@ newtype Iff a = Iff { getIff :: a }
                   Read -- ^ @since 4.16
                  )
 
--- | @since 4.16
-instance (Bits a) => Semigroup (Iff a) where
+-- | This constraint is arguably
+-- too strong. However, as some types (such as 'Natural') have undefined
+-- 'complement', this is the only safe choice.
+--
+-- @since 4.16
+instance (FiniteBits a) => Semigroup (Iff a) where
   Iff x <> Iff y = Iff . complement $ (x `xor` y)
 
--- | @since 4.16
-instance (Bits a) => Monoid (Iff a) where
+-- | This constraint is arguably
+-- too strong. However, as some types (such as 'Natural') have undefined
+-- 'complement', this is the only safe choice.
+--
+-- @since 4.16
+instance (FiniteBits a) => Monoid (Iff a) where
   mempty = Iff oneBits
