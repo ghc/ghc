@@ -166,7 +166,6 @@ import GHC.Cmm.Parser       ( parseCmmFile )
 import GHC.Cmm.Info.Build
 import GHC.Cmm.Pipeline
 import GHC.Cmm.Info
-import GHC.StgToCmm.Utils ( convertInfoProvMap )
 
 import GHC.Unit
 import GHC.Unit.External
@@ -1633,7 +1632,7 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
             FormatCMM (pdoc platform cmmgroup)
         rawCmms <- lookupHook (\x -> cmmToRawCmmHook x)
                      (\dflgs _ -> cmmToRawCmm dflgs) dflags dflags Nothing (Stream.yield cmmgroup)
-        let foreign_stubs _ = 
+        let foreign_stubs _ =
               let ip_init = ipInitCode dflags cmm_mod ents
               in NoStubs `appendStubC` ip_init
 

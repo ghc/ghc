@@ -276,7 +276,7 @@ sizeof_ccs_words platform
    (ws,ms) = pc_SIZEOF_CostCentreStack (platformConstants platform) `divMod` platformWordSizeInBytes platform
 
 
-initInfoTableProv ::  [CmmInfoTable] -> InfoTableProvMap -> Module -> FCode ()
+initInfoTableProv ::  [CmmInfoTable] -> InfoTableProvMap -> Module -> FCode SDoc
 -- Emit the declarations
 initInfoTableProv infos itmap this_mod
   = do
