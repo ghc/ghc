@@ -95,8 +95,8 @@ assignArgumentsPos profile off conv arg_ty reps = (stk_off, assignments)
               k (asst, regs') = assign_regs ((r, asst) : assts) rs regs'
               ty = arg_ty r
               w  = typeWidth ty
-              gcp | isGcPtrType ty = VGcPtr
-                  | otherwise      = VNonGcPtr
+              !gcp | isGcPtrType ty = VGcPtr
+                   | otherwise      = VNonGcPtr
               passFloatInXmm = passFloatArgsInXmm platform
 
 passFloatArgsInXmm :: Platform -> Bool
