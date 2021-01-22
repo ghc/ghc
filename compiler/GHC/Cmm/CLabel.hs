@@ -772,8 +772,10 @@ data InfoProvEnt = InfoProvEnt
                                -- The closure type of the info table (from ClosureMacros.h)
                                , infoTableType :: !String
                                -- The rendered Haskell type of the closure the table represents
-                               , infoTableProv :: !(Module, RealSrcSpan, String) }
-                               -- The origin module, position and information about the info table
+                               , infoProvModule :: !Module
+                               -- Origin module
+                               , infoTableProv :: !(Maybe (RealSrcSpan, String)) }
+                               -- Position and information about the info table
                                deriving (Eq, Ord)
 
 -- Constructing Cost Center Labels
@@ -1434,7 +1436,7 @@ pprCLabel platform sty lbl =
 
    CC_Label cc   -> maybe_underscore $ ppr cc
    CCS_Label ccs -> maybe_underscore $ ppr ccs
-   IPE_Label (InfoProvEnt l _ _ (m, _, _)) -> pprCode CStyle (pdoc platform l) <> text "_" <> ppr m <> text "_ipe"
+   IPE_Label (InfoProvEnt l _ _ m _) -> pprCode CStyle (pdoc platform l) <> text "_" <> ppr m <> text "_ipe"
 
 
    CmmLabel _ _ fs CmmCode     -> maybe_underscore $ ftext fs
