@@ -902,14 +902,14 @@ release-x86_64-windows:
   <<: *release
   extends: .build-x86_64-windows-hadrian
   variables:
-    BUILD_FLAVOUR: "perf"
+    FLAVOUR: "perf"
 
 release-x86_64-windows-integer-simple:
   <<: *release
   extends: .build-x86_64-windows-hadrian
   variables:
     BIGNUM_BACKEND: native
-    BUILD_FLAVOUR: "perf"
+    FLAVOUR: "perf"
 
 ############################################################
 # Cleanup
