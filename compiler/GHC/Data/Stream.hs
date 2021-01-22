@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances #-}
 -- -----------------------------------------------------------------------------
 --
 -- (c) The University of Glasgow 2012
@@ -14,6 +15,7 @@ module GHC.Data.Stream (
 import GHC.Prelude hiding (map,mapM)
 
 import Control.Monad hiding (mapM)
+import Control.Monad.IO.Class
 
 -- |
 -- @Stream m a b@ is a computation in some Monad @m@ that delivers a sequence
@@ -55,11 +57,11 @@ instance Monad m => Monad (Stream m a) where
                   Left b        -> runStream (k b)
                   Right (a,str) -> return (Right (a, str >>= k))
 
+instance MonadIO m => MonadIO (Stream m b) where
+  liftIO io = Stream $ Left <$> liftIO io
+
 yield :: Monad m => a -> Stream m a ()
 yield a = Stream (return (Right (a, return ())))
-
-liftIO :: IO a -> Stream IO b a
-liftIO io = Stream $ io >>= return . Left
 
 -- | Turn a Stream into an ordinary list, by demanding all the elements.
 collect :: Monad m => Stream m a () -> m [a]
