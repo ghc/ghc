@@ -275,7 +275,7 @@ maybeInvertCmmExpr _ = Nothing
 -----------------------------------------------------------------------------
 
 data LocalReg
-  = LocalReg {-# UNPACK #-} !Unique CmmType
+  = LocalReg {-# UNPACK #-} !Unique !CmmType
     -- ^ Parameters:
     --   1. Identifier
     --   2. Type
