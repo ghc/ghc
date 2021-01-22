@@ -690,6 +690,15 @@ release-x86_64-linux-deb10:
   <<: *release
   extends: .build-x86_64-linux-deb10
 
+validate-x86_64-linux-deb10-dwarf:
+  extends: .build-x86_64-linux-deb10
+  stage: full-build
+  variables:
+    CONFIGURE_ARGS: "--enable-dwarf-unwind"
+    BUILD_FLAVOUR: dwarf
+    TEST_ENV: "x86_64-linux-deb9-dwarf"
+    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-deb10-linux-dwarf.tar.xz"
+
 #################################
 # x86_64-linux-deb8
 #################################
