@@ -15,7 +15,7 @@ import GHC.Prelude
 import GHC.Core
 import GHC.Types.Id.Info
 import GHC.Types.Demand( seqDemand, seqStrictSig )
-import GHC.Types.Cpr( seqCprSig )
+import GHC.Types.Cpr( seqTermSig, seqCprSig )
 import GHC.Types.Basic( seqOccInfo )
 import GHC.Types.Var.Set( seqDVarSet )
 import GHC.Types.Var( varType, tyVarKind )
@@ -35,6 +35,7 @@ megaSeqIdInfo info
 
     seqDemand (demandInfo info)                 `seq`
     seqStrictSig (strictnessInfo info)          `seq`
+    seqTermSig (termInfo info)                  `seq`
     seqCprSig (cprInfo info)                    `seq`
     seqCaf (cafInfo info)                       `seq`
     seqOneShot (oneShotInfo info)               `seq`

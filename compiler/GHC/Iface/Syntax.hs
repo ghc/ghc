@@ -349,6 +349,7 @@ type IfaceIdInfo = [IfaceInfoItem]
 data IfaceInfoItem
   = HsArity         Arity
   | HsStrictness    StrictSig
+  | HsTerm          TermSig
   | HsCpr           CprSig
   | HsInline        InlinePragma
   | HsUnfold        Bool             -- True <=> isStrongLoopBreaker is true
@@ -1466,6 +1467,7 @@ instance Outputable IfaceInfoItem where
   ppr (HsInline prag)       = text "Inline:" <+> ppr prag
   ppr (HsArity arity)       = text "Arity:" <+> int arity
   ppr (HsStrictness str)    = text "Strictness:" <+> ppr str
+  ppr (HsTerm term)         = text "Term:" <+> ppr term
   ppr (HsCpr cpr)           = text "CPR:" <+> ppr cpr
   ppr HsNoCafRefs           = text "HasNoCafRefs"
   ppr HsLevity              = text "Never levity-polymorphic"
@@ -2233,6 +2235,7 @@ instance Binary IfaceInfoItem where
     put_ bh HsLevity              = putByte bh 5
     put_ bh (HsCpr cpr)           = putByte bh 6 >> put_ bh cpr
     put_ bh (HsLFInfo lf_info)    = putByte bh 7 >> put_ bh lf_info
+    put_ bh (HsTerm cpr)          = putByte bh 8 >> put_ bh cpr
 
     get bh = do
         h <- getByte bh
@@ -2247,6 +2250,7 @@ instance Binary IfaceInfoItem where
             5 -> return HsLevity
             6 -> HsCpr <$> get bh
             7 -> HsLFInfo <$> get bh
+            8 -> HsTerm <$> get bh
             _ -> pprPanic "Binary IfaceInfoItem: Invalid tag" (int (fromIntegral h))
 
 instance Binary IfaceUnfolding where
@@ -2587,8 +2591,9 @@ instance NFData IfaceInfoItem where
     HsUnfold b unf -> rnf b `seq` rnf unf
     HsNoCafRefs -> ()
     HsLevity -> ()
-    HsCpr cpr -> cpr `seq` ()
+    HsCpr cpr -> seqCprSig cpr `seq` ()
     HsLFInfo lf_info -> lf_info `seq` () -- TODO: seq further?
+    HsTerm term -> seqTermSig term `seq` ()
 
 instance NFData IfaceUnfolding where
   rnf = \case

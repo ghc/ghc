@@ -189,10 +189,10 @@ If we have
 
 where f is strict in y, we might get a more efficient loop by w/w'ing
 f.  But that would make a new unfolding which would overwrite the old
-one! So the function would no longer be INLNABLE, and in particular
+one! So the function would no longer be INLINABLE, and in particular
 will not be specialised at call sites in other modules.
 
-This comes in practice (#6056).
+This comes up in practice (#6056).
 
 Solution: do the w/w for strictness analysis, but transfer the Stable
 unfolding to the *worker*.  So we will get something like this:
@@ -482,7 +482,7 @@ tryWW dflags fam_envs is_rec fn_id rhs
         -- See Note [Don't w/w inline small non-loop-breaker things]
 
   | is_fun && is_eta_exp
-  = splitFun dflags fam_envs new_fn_id fn_info wrap_arg_dmds div cat rhs
+  = splitFun dflags fam_envs new_fn_id fn_info wrap_arg_dmds div fun_term fun_cpr rhs
 
   | isNonRec is_rec, is_thunk                        -- See Note [Thunk splitting]
   = splitThunk dflags fam_envs is_rec new_fn_id rhs
@@ -495,12 +495,8 @@ tryWW dflags fam_envs is_rec fn_id rhs
     fn_info                = idInfo fn_id
     (wrap_arg_dmds, div)   = splitStrictSig (strictnessInfo fn_info)
 
-    cpr_ty       = getCprSig (cprInfo fn_info)
-    -- Arity of the CPR sig should match idArity when it's not a join point.
-    -- See Note [Arity trimming for CPR signatures] in GHC.Core.Opt.CprAnal
-    cat          = ASSERT2( isJoinId fn_id || cpr_ty == topCprType || ct_arty cpr_ty == arityInfo fn_info
-                          , ppr fn_id <> colon <+> text "ct_arty:" <+> ppr (ct_arty cpr_ty) <+> text "arityInfo:" <+> ppr (arityInfo fn_info))
-                   ct_cat cpr_ty
+    fun_term  = getSig (termInfo fn_info)
+    fun_cpr   = getSig (cprInfo fn_info)
 
     new_fn_id = zapIdUsedOnceInfo (zapIdUsageEnvInfo fn_id)
         -- See Note [Zapping DmdEnv after Demand Analyzer] and
@@ -584,12 +580,12 @@ See https://gitlab.haskell.org/ghc/ghc/merge_requests/312#note_192064.
 
 
 ---------------------
-splitFun :: DynFlags -> FamInstEnvs -> Id -> IdInfo -> [Demand] -> Divergence -> CAT -> CoreExpr
+splitFun :: DynFlags -> FamInstEnvs -> Id -> IdInfo -> [Demand] -> Divergence -> Term -> Cpr -> CoreExpr
          -> UniqSM [(Id, CoreExpr)]
-splitFun dflags fam_envs fn_id fn_info wrap_arg_dmds div cat rhs
-  = WARN( not (wrap_arg_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_arg_dmds $$ ppr cat) ) do
+splitFun dflags fam_envs fn_id fn_info wrap_arg_dmds div fun_term fun_cpr rhs
+  = WARN( not (wrap_arg_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_arg_dmds $$ ppr body_term $$ ppr body_cpr) ) do
     -- The arity should match the signature
-    stuff <- mkWwBodies (initWwOpts dflags fam_envs) rhs_fvs fn_id wrap_arg_dmds body_cat
+    stuff <- mkWwBodies (initWwOpts dflags fam_envs) rhs_fvs fn_id wrap_arg_dmds body_term ww_cpr
     case stuff of
       Just (work_demands, join_arity, wrap_fn, work_fn) -> do
         work_uniq <- getUniqueM
@@ -630,7 +626,9 @@ splitFun dflags fam_envs fn_id fn_info wrap_arg_dmds div cat rhs
                                 -- Even though we may not be at top level,
                                 -- it's ok to give it an empty DmdEnv
 
-                        `setIdCprInfo` work_cpr_sig work_arity
+                        `setIdTermInfo` work_term_sig
+
+                        `setIdCprInfo` work_cpr_sig
 
                         `setIdDemandInfo` worker_demand
 
@@ -670,18 +668,20 @@ splitFun dflags fam_envs fn_id fn_info wrap_arg_dmds div cat rhs
                     -- The arity is set by the simplifier using exprEtaExpandArity
                     -- So it may be more than the number of top-level-visible lambdas
 
-    -- body_cat is the CPR we w/w the body for. Note that we kill it for join points,
+    body_term = iterate applyTerm fun_term !! arity
+    body_cpr  = iterate applyCpr  fun_cpr  !! arity
+    -- ww_cpr is the CPR we w/w the body for. Note that we kill it for join points,
     -- see Note [Don't w/w join points for CPR].
-    body_cat
-      | isJoinId fn_id = topCAT
-      | otherwise      = cat
+    ww_cpr
+      | isJoinId fn_id = topCpr
+      | otherwise      = body_cpr
     -- Even if we don't w/w join points for CPR, we might still do so for
     -- strictness. In which case a join point worker keeps its original CPR
     -- property; see Note [Don't w/w join points for CPR]. Otherwise, the worker
     -- doesn't have the CPR property anymore.
-    work_cpr_sig arity
-      | isJoinId fn_id = mkCprSig arity cat
-      | otherwise      = topCprSig
+    (work_term_sig, work_cpr_sig)
+      | isJoinId fn_id = (Sig fun_term, Sig fun_cpr)
+      | otherwise      = (topTermSig, topCprSig)
 
 mkStrWrapperInlinePrag :: InlinePragma -> InlinePragma
 mkStrWrapperInlinePrag (InlinePragma { inl_act = act, inl_rule = rule_info })

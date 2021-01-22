@@ -23,9 +23,9 @@ F9.f91_f [Occ=LoopBreaker] :: Integer -> Integer
 [GblId, Arity=1, Str=<MU>, Unf=OtherCon []]
 F9.f91_f
   = \ (n :: Integer) ->
-      case GHC.Num.Integer.integerCompare n lvl of {
-        __DEFAULT -> F9.f91_f (F9.f91_f (GHC.Num.Integer.integerAdd n lvl1));
-        GT -> GHC.Num.Integer.integerSub n F9.f1
+      case GHC.Num.Integer.integerLe# n lvl of {
+        __DEFAULT -> GHC.Num.Integer.integerSub n F9.f1;
+        1# -> F9.f91_f (F9.f91_f (GHC.Num.Integer.integerAdd n lvl1))
       }
 end Rec }
 

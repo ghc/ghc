@@ -76,7 +76,7 @@ import GHC.Types.Var.Set
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Tidy ( tidyCo )
 import GHC.Types.Demand ( isTopSig )
-import GHC.Types.Cpr ( topCprSig )
+import GHC.Types.Cpr ( moreTermThanArity, topCprSig )
 
 import Data.Maybe ( catMaybes )
 
@@ -449,8 +449,8 @@ toIfaceIdDetails other = pprTrace "toIfaceIdDetails" (ppr other)
 
 toIfaceIdInfo :: IdInfo -> IfaceIdInfo
 toIfaceIdInfo id_info
-  = catMaybes [arity_hsinfo, caf_hsinfo, strict_hsinfo, cpr_hsinfo,
-               inline_hsinfo,  unfold_hsinfo, levity_hsinfo]
+  = catMaybes [arity_hsinfo, caf_hsinfo, strict_hsinfo, term_hsinfo, cpr_hsinfo,
+               inline_hsinfo, unfold_hsinfo, levity_hsinfo]
                -- NB: strictness and arity must appear in the list before unfolding
                -- See GHC.IfaceToCore.tcUnfolding
   where
@@ -470,6 +470,11 @@ toIfaceIdInfo id_info
     sig_info = strictnessInfo id_info
     strict_hsinfo | not (isTopSig sig_info) = Just (HsStrictness sig_info)
                   | otherwise               = Nothing
+
+    ------------  Termination --------------
+    term_info = termInfo id_info
+    term_hsinfo | moreTermThanArity term_info arity_info = Just (HsTerm term_info)
+                | otherwise                              = Nothing
 
     ------------  CPR --------------
     cpr_info = cprInfo id_info

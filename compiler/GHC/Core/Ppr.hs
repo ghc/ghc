@@ -473,6 +473,8 @@ instance Outputable IdInfo where
     , (has_called_arity, text "CallArity=" <> int called_arity)
     , (has_caf_info,     text "Caf=" <> ppr caf_info)
     , (has_str_info,     text "Str=" <> pprStrictness str_info)
+    , (has_term_info,    text "Term=" <> ppr term_info)
+    , (has_cpr_info,     text "Cpr=" <> ppr cpr_info)
     , (has_unf,          text "Unf=" <> ppr unf_info)
     , (has_rules,        text "RULES:" <+> vcat (map pprRule rules))
     ]
@@ -501,6 +503,12 @@ instance Outputable IdInfo where
       str_info = strictnessInfo info
       has_str_info = not (isTopSig str_info)
 
+      term_info = termInfo info
+      has_term_info = moreTermThanArity term_info arity
+
+      cpr_info = cprInfo info
+      has_cpr_info = cpr_info /= topCprSig
+
       unf_info = unfoldingInfo info
       has_unf = hasSomeUnfolding unf_info
 
@@ -522,6 +530,7 @@ ppIdInfo id info
     , (has_called_arity, text "CallArity=" <> int called_arity)
     , (has_caf_info,     text "Caf=" <> ppr caf_info)
     , (has_str_info,     text "Str=" <> pprStrictness str_info)
+    , (has_term_info,    text "Term=" <> ppr term_info)
     , (has_cpr_info,     text "Cpr=" <> ppr cpr_info)
     , (has_unf,          text "Unf=" <> ppr unf_info)
     , (not (null rules), text "RULES:" <+> vcat (map pprRule rules))
@@ -544,6 +553,9 @@ ppIdInfo id info
 
     str_info = strictnessInfo info
     has_str_info = not (isTopSig str_info)
+
+    term_info = termInfo info
+    has_term_info = moreTermThanArity term_info arity
 
     cpr_info = cprInfo info
     has_cpr_info = cpr_info /= topCprSig
