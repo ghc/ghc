@@ -1,3 +1,5 @@
+{-# LANGUAGE LambdaCase #-}
+
 module Rules.Compile (compilePackage) where
 
 import Hadrian.BuildPath
@@ -204,7 +206,14 @@ compileHsObjectAndHi rs objpath = do
   let ctx = objectContext b
       way = C.way ctx
   ctxPath <- contextPath ctx
-  (src, deps) <- lookupDependencies (ctxPath -/- ".dependencies") objpath
+  (src, deps) <- lookupDependencies (ctxPath -/- ".dependencies") objpath >>= \case
+    (dep1,depn) ->
+        -- .hs needs to come before .hi-boot deps added to fix #14482
+        let xs = sortBy srt (dep1:depn)
+            srt x _y
+             | ".hi-boot" `isSuffixOf` x = GT
+             | otherwise                 = EQ
+        in return (head xs, tail xs)
   need (src:deps)
 
   -- The .dependencies file lists indicating inputs. ghc will
