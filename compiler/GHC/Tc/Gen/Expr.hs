@@ -938,6 +938,19 @@ tcExpr (ArithSeq _ witness seq) res_ty
 {-
 ************************************************************************
 *                                                                      *
+                Record dot syntax
+*                                                                      *
+************************************************************************
+-}
+
+ -- See Note [Type-checking record dot syntax] (not written yet)
+tcExpr (GetField _ _ _) _ = panic "tcExpr: GetField: Not implemented"
+tcExpr (Projection _ _) _ = panic "tcExpr: Projection: Not implemented"
+tcExpr (RecordDotUpd _ _ _ ) _ = panic "tcExpr: RecordDotUpd: Not implemented"
+
+{-
+************************************************************************
+*                                                                      *
                 Template Haskell
 *                                                                      *
 ************************************************************************
