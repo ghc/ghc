@@ -10,7 +10,7 @@ import qualified GHC.Utils.Error
 import Simple.DataStructures
 
 import Control.Monad
-import Data.Monoid
+import Data.Monoid hiding (Alt)
 import Data.Dynamic
 import qualified Language.Haskell.TH as TH
 
@@ -83,4 +83,4 @@ changeExpr anns mb_replacement e = let go = changeExpr anns mb_replacement in ca
         _ -> return e
 
 changeAlt :: VarEnv [ReplaceWith] -> Maybe String -> CoreAlt -> CoreM CoreAlt
-changeAlt anns mb_replacement (con, bs, e) = liftM (\e' -> (con, bs, e')) (changeExpr anns mb_replacement e)
+changeAlt anns mb_replacement (Alt con bs e) = liftM (\e' -> Alt con bs e') (changeExpr anns mb_replacement e)

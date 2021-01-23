@@ -7,19 +7,19 @@ T6018failclosed.hs:11:5: error:
       In the type family declaration for ‘IdProxyClosed’
 
 T6018failclosed.hs:19:5: error:
-    • Type family equation violates the family's injectivity annotation.
-      RHS of injective type family equation is a bare type variable
-      but these LHS type and kind patterns are not bare variables: ‘'Z’
-        PClosed 'Z m = m -- Defined at T6018failclosed.hs:19:5
-    • In the equations for closed type family ‘PClosed’
-      In the type family declaration for ‘PClosed’
-
-T6018failclosed.hs:19:5: error:
     • Type family equation right-hand sides overlap; this violates
       the family's injectivity annotation:
         PClosed 'Z m = m -- Defined at T6018failclosed.hs:19:5
         PClosed ('S n) m = 'S (PClosed n m)
           -- Defined at T6018failclosed.hs:20:5
+    • In the equations for closed type family ‘PClosed’
+      In the type family declaration for ‘PClosed’
+
+T6018failclosed.hs:19:5: error:
+    • Type family equation violates the family's injectivity annotation.
+      RHS of injective type family equation is a bare type variable
+      but these LHS type and kind patterns are not bare variables: ‘'Z’
+        PClosed 'Z m = m -- Defined at T6018failclosed.hs:19:5
     • In the equations for closed type family ‘PClosed’
       In the type family declaration for ‘PClosed’
 

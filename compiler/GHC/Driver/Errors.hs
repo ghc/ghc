@@ -17,9 +17,9 @@ import GHC.Types.Error
 import GHC.Utils.Outputable ( text, withPprStyle, mkErrStyle )
 import qualified GHC.Driver.CmdLine as CmdLine
 
--- | Converts a list of 'WarningMessages' into 'Messages', where the second element contains only
+-- | Converts a list of 'WarningMessages' into a tuple where the second element contains only
 -- error, i.e. warnings that are considered fatal by GHC based on the input 'DynFlags'.
-warningsToMessages :: DynFlags -> WarningMessages -> Messages
+warningsToMessages :: DynFlags -> WarningMessages -> (WarningMessages, ErrorMessages)
 warningsToMessages dflags =
   partitionBagWith $ \warn ->
     case isWarnMsgFatal dflags warn of
@@ -28,13 +28,14 @@ warningsToMessages dflags =
         Right warn{ errMsgSeverity = SevError
                   , errMsgReason = ErrReason err_reason }
 
-printBagOfErrors :: DynFlags -> Bag ErrMsg -> IO ()
+printBagOfErrors :: RenderableDiagnostic a => DynFlags -> Bag (ErrMsg a) -> IO ()
 printBagOfErrors dflags bag_of_errors
   = sequence_ [ let style = mkErrStyle unqual
                     ctx   = initSDocContext dflags style
-                in putLogMsg dflags reason sev s $ withPprStyle style (formatErrDoc ctx doc)
+                in putLogMsg dflags reason sev s
+                $ withPprStyle style (formatErrDoc ctx (renderDiagnostic doc))
               | ErrMsg { errMsgSpan      = s,
-                         errMsgDoc       = doc,
+                         errMsgDiagnostic = doc,
                          errMsgSeverity  = sev,
                          errMsgReason    = reason,
                          errMsgContext   = unqual } <- sortMsgBag (Just dflags)

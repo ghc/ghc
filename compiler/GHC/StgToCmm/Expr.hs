@@ -36,7 +36,7 @@ import GHC.Cmm.Graph
 import GHC.Cmm.BlockId
 import GHC.Cmm hiding ( succ )
 import GHC.Cmm.Info
-import GHC.Cmm.Utils ( mAX_PTR_TAG )
+import GHC.Cmm.Utils ( zeroExpr, cmmTagMask, mkWordCLit, mAX_PTR_TAG )
 import GHC.Core
 import GHC.Core.DataCon
 import GHC.Types.ForeignCall
@@ -70,15 +70,46 @@ cgExpr (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _res_ty) =
   cgIdApp a []
 
 -- dataToTag# :: a -> Int#
--- See Note [dataToTag#] in primops.txt.pp
+-- See Note [dataToTag# magic] in primops.txt.pp
 cgExpr (StgOpApp (StgPrimOp DataToTagOp) [StgVarArg a] _res_ty) = do
   platform <- getPlatform
   emitComment (mkFastString "dataToTag#")
-  tmp <- newTemp (bWord platform)
-  _ <- withSequel (AssignTo [tmp] False) (cgIdApp a [])
-  -- TODO: For small types look at the tag bits instead of reading info table
-  ptr_opts <- getPtrOpts
-  emitReturn [getConstrTag ptr_opts (cmmUntag platform (CmmReg (CmmLocal tmp)))]
+  info <- getCgIdInfo a
+  let amode = idInfoToAmode info
+  tag_reg <- assignTemp $ cmmConstrTag1 platform amode
+  result_reg <- newTemp (bWord platform)
+  let tag = CmmReg $ CmmLocal tag_reg
+      is_tagged = cmmNeWord platform tag (zeroExpr platform)
+      is_too_big_tag = cmmEqWord platform tag (cmmTagMask platform)
+  -- Here we will first check the tag bits of the pointer we were given;
+  -- if this doesn't work then enter the closure and use the info table
+  -- to determine the constructor. Note that all tag bits set means that
+  -- the constructor index is too large to fit in the pointer and therefore
+  -- we must look in the info table. See Note [Tagging big families].
+
+  slow_path <- getCode $ do
+      tmp <- newTemp (bWord platform)
+      _ <- withSequel (AssignTo [tmp] False) (cgIdApp a [])
+      ptr_opts <- getPtrOpts
+      emitAssign (CmmLocal result_reg)
+        $ getConstrTag ptr_opts (cmmUntag platform (CmmReg (CmmLocal tmp)))
+
+  fast_path <- getCode $ do
+      -- Return the constructor index from the pointer tag
+      return_ptr_tag <- getCode $ do
+          emitAssign (CmmLocal result_reg)
+            $ cmmSubWord platform tag (CmmLit $ mkWordCLit platform 1)
+      -- Return the constructor index recorded in the info table
+      return_info_tag <- getCode $ do
+          ptr_opts <- getPtrOpts
+          emitAssign (CmmLocal result_reg)
+            $ getConstrTag ptr_opts (cmmUntag platform amode)
+
+      emit =<< mkCmmIfThenElse' is_too_big_tag return_info_tag return_ptr_tag (Just False)
+
+  emit =<< mkCmmIfThenElse' is_tagged fast_path slow_path (Just True)
+  emitReturn [CmmReg $ CmmLocal result_reg]
+
 
 cgExpr (StgOpApp op args ty) = cgOpApp op args ty
 cgExpr (StgConApp con args _)= cgConApp con args

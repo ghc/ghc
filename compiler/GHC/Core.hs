@@ -12,7 +12,7 @@
 -- | GHC.Core holds all the main data types for use by for the Glasgow Haskell Compiler midsection
 module GHC.Core (
         -- * Main data types
-        Expr(..), Alt, Bind(..), AltCon(..), Arg,
+        Expr(..), Alt(..), Bind(..), AltCon(..), Arg,
         Tickish(..), TickishScoping(..), TickishPlacement(..),
         CoreProgram, CoreExpr, CoreAlt, CoreBind, CoreArg, CoreBndr,
         TaggedExpr, TaggedAlt, TaggedBind, TaggedArg, TaggedBndr(..), deTagExpr,
@@ -75,7 +75,7 @@ module GHC.Core (
         canUnfold, neverUnfoldGuidance, isStableSource,
 
         -- * Annotated expression data types
-        AnnExpr, AnnExpr'(..), AnnBind(..), AnnAlt,
+        AnnExpr, AnnExpr'(..), AnnBind(..), AnnAlt(..),
 
         -- ** Operations on annotated expressions
         collectAnnArgs, collectAnnArgsTicks,
@@ -282,7 +282,9 @@ type Arg b = Expr b
 
 -- If you edit this type, you may need to update the GHC formalism
 -- See Note [GHC Formalism] in GHC.Core.Lint
-type Alt b = (AltCon, [b], Expr b)
+data Alt b
+    = Alt AltCon [b] (Expr b)
+    deriving (Data)
 
 -- | A case alternative constructor (i.e. pattern match)
 
@@ -1834,10 +1836,10 @@ instance Outputable AltCon where
   ppr (LitAlt lit) = ppr lit
   ppr DEFAULT      = text "__DEFAULT"
 
-cmpAlt :: (AltCon, a, b) -> (AltCon, a, b) -> Ordering
-cmpAlt (con1, _, _) (con2, _, _) = con1 `cmpAltCon` con2
+cmpAlt :: Alt a -> Alt a -> Ordering
+cmpAlt (Alt con1 _ _) (Alt con2 _ _) = con1 `cmpAltCon` con2
 
-ltAlt :: (AltCon, a, b) -> (AltCon, a, b) -> Bool
+ltAlt :: Alt a -> Alt a -> Bool
 ltAlt a1 a2 = (a1 `cmpAlt` a2) == LT
 
 cmpAltCon :: AltCon -> AltCon -> Ordering
@@ -1936,7 +1938,7 @@ deTagBind (NonRec (TB b _) rhs) = NonRec b (deTagExpr rhs)
 deTagBind (Rec prs)             = Rec [(b, deTagExpr rhs) | (TB b _, rhs) <- prs]
 
 deTagAlt :: TaggedAlt t -> CoreAlt
-deTagAlt (con, bndrs, rhs) = (con, [b | TB b _ <- bndrs], deTagExpr rhs)
+deTagAlt (Alt con bndrs rhs) = Alt con [b | TB b _ <- bndrs] (deTagExpr rhs)
 
 {-
 ************************************************************************
@@ -2136,7 +2138,7 @@ rhssOfBind (NonRec _ rhs) = [rhs]
 rhssOfBind (Rec pairs)    = [rhs | (_,rhs) <- pairs]
 
 rhssOfAlts :: [Alt b] -> [Expr b]
-rhssOfAlts alts = [e | (_,_,e) <- alts]
+rhssOfAlts alts = [e | Alt _ _ e <- alts]
 
 -- | Collapse all the bindings in the supplied groups into a single
 -- list of lhs\/rhs pairs suitable for binding in a 'Rec' binding group
@@ -2299,7 +2301,7 @@ data AnnExpr' bndr annot
   | AnnCoercion Coercion
 
 -- | A clone of the 'Alt' type but allowing annotation at every tree node
-type AnnAlt bndr annot = (AltCon, [bndr], AnnExpr bndr annot)
+data AnnAlt bndr annot = AnnAlt AltCon [bndr] (AnnExpr bndr annot)
 
 -- | A clone of the 'Bind' type but allowing annotation at every tree node
 data AnnBind bndr annot
@@ -2344,7 +2346,7 @@ deAnnotate' (AnnCase scrut v t alts)
   = Case (deAnnotate scrut) v t (map deAnnAlt alts)
 
 deAnnAlt :: AnnAlt bndr annot -> Alt bndr
-deAnnAlt (con,args,rhs) = (con,args,deAnnotate rhs)
+deAnnAlt (AnnAlt con args rhs) = Alt con args (deAnnotate rhs)
 
 deAnnBind  :: AnnBind b annot -> Bind b
 deAnnBind (AnnNonRec var rhs) = NonRec var (deAnnotate rhs)

@@ -1233,8 +1233,8 @@ scExpr' env (Case scrut b ty alts)
         }
   where
     sc_con_app con args scrut'  -- Known constructor; simplify
-     = do { let (_, bs, rhs) = findAlt con alts
-                                  `orElse` (DEFAULT, [], mkImpossibleExpr ty)
+     = do { let Alt _ bs rhs = findAlt con alts
+                                  `orElse` Alt DEFAULT [] (mkImpossibleExpr ty)
                 alt_env'     = extendScSubstList env ((b,scrut') : bs `zip` trimConArgs con args)
           ; scExpr alt_env' rhs }
 
@@ -1254,7 +1254,7 @@ scExpr' env (Case scrut b ty alts)
           ; return (foldr combineUsage scrut_usg' alt_usgs,
                     Case scrut' b' (scSubstTy env ty) alts') }
 
-    sc_alt env scrut' b' (con,bs,rhs)
+    sc_alt env scrut' b' (Alt con bs rhs)
      = do { let (env1, bs1) = extendBndrsWith RecArg env bs
                 (env2, bs2) = extendCaseBndrs env1 scrut' b' con bs1
           ; (usg, rhs') <- scExpr env2 rhs
@@ -1262,7 +1262,7 @@ scExpr' env (Case scrut b ty alts)
                 scrut_occ = case con of
                                DataAlt dc -> ScrutOcc (unitUFM dc arg_occs)
                                _          -> ScrutOcc emptyUFM
-          ; return (usg', b_occ `combineOcc` scrut_occ, (con, bs2, rhs')) }
+          ; return (usg', b_occ `combineOcc` scrut_occ, Alt con bs2 rhs') }
 
 scExpr' env (Let (NonRec bndr rhs) body)
   | isTyVar bndr        -- Type-lets may be created by doBeta

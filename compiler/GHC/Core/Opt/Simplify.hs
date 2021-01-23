@@ -1222,7 +1222,7 @@ simplTick env tickish expr cont
          tickScrut e    = foldr mkTick e ticks
          -- Alternatives get annotated with all ticks that scope in some way,
          -- but we don't want to count entries.
-         tickAlt (c,bs,e) = (c,bs, foldr mkTick e ts_scope)
+         tickAlt (Alt c bs e) = Alt c bs (foldr mkTick e ts_scope)
          ts_scope         = map mkNoCount $
                             filter (not . (`tickishScopesLike` NoScope)) ticks
 
@@ -2586,8 +2586,8 @@ rebuildCase env scrut case_bndr alts cont
   , not (litIsLifted lit)
   = do  { tick (KnownBranch case_bndr)
         ; case findAlt (LitAlt lit) alts of
-            Nothing           -> missingAlt env case_bndr alts cont
-            Just (_, bs, rhs) -> simple_rhs env [] scrut bs rhs }
+            Nothing             -> missingAlt env case_bndr alts cont
+            Just (Alt _ bs rhs) -> simple_rhs env [] scrut bs rhs }
 
   | Just (in_scope', wfloats, con, ty_args, other_args)
       <- exprIsConApp_maybe (getUnfoldingInRuleMatch env) scrut
@@ -2598,12 +2598,12 @@ rebuildCase env scrut case_bndr alts cont
         ; let scaled_wfloats = map scale_float wfloats
         ; case findAlt (DataAlt con) alts of
             Nothing  -> missingAlt env0 case_bndr alts cont
-            Just (DEFAULT, bs, rhs) -> let con_app = Var (dataConWorkId con)
+            Just (Alt DEFAULT bs rhs) -> let con_app = Var (dataConWorkId con)
                                                  `mkTyApps` ty_args
                                                  `mkApps`   other_args
-                                       in simple_rhs env0 scaled_wfloats con_app bs rhs
-            Just (_, bs, rhs)       -> knownCon env0 scrut scaled_wfloats con ty_args other_args
-                                                case_bndr bs rhs cont
+                                         in simple_rhs env0 scaled_wfloats con_app bs rhs
+            Just (Alt _ bs rhs)       -> knownCon env0 scrut scaled_wfloats con ty_args other_args
+                                                  case_bndr bs rhs cont
         }
   where
     simple_rhs env wfloats scrut' bs rhs =
@@ -2650,7 +2650,7 @@ rebuildCase env scrut case_bndr alts cont
 --      2. Eliminate the case if scrutinee is evaluated
 --------------------------------------------------
 
-rebuildCase env scrut case_bndr alts@[(_, bndrs, rhs)] cont
+rebuildCase env scrut case_bndr alts@[Alt _ bndrs rhs] cont
   -- See if we can get rid of the case altogether
   -- See Note [Case elimination]
   -- mkCase made sure that if all the alternatives are equal,
@@ -2882,7 +2882,7 @@ improveSeq :: (FamInstEnv, FamInstEnv) -> SimplEnv
            -> OutExpr -> InId -> OutId -> [InAlt]
            -> SimplM (SimplEnv, OutExpr, OutId)
 -- Note [Improving seq]
-improveSeq fam_envs env scrut case_bndr case_bndr1 [(DEFAULT,_,_)]
+improveSeq fam_envs env scrut case_bndr case_bndr1 [Alt DEFAULT _ _]
   | Just (co, ty2) <- topNormaliseType_maybe fam_envs (idType case_bndr1)
   = do { case_bndr2 <- newId (fsLit "nt") Many ty2
         ; let rhs  = DoneEx (Var case_bndr2 `Cast` mkSymCo co) Nothing
@@ -2903,21 +2903,21 @@ simplAlt :: SimplEnv
          -> InAlt
          -> SimplM OutAlt
 
-simplAlt env _ imposs_deflt_cons case_bndr' cont' (DEFAULT, bndrs, rhs)
+simplAlt env _ imposs_deflt_cons case_bndr' cont' (Alt DEFAULT bndrs rhs)
   = ASSERT( null bndrs )
     do  { let env' = addBinderUnfolding env case_bndr'
                                         (mkOtherCon imposs_deflt_cons)
                 -- Record the constructors that the case-binder *can't* be.
         ; rhs' <- simplExprC env' rhs cont'
-        ; return (DEFAULT, [], rhs') }
+        ; return (Alt DEFAULT [] rhs') }
 
-simplAlt env scrut' _ case_bndr' cont' (LitAlt lit, bndrs, rhs)
+simplAlt env scrut' _ case_bndr' cont' (Alt (LitAlt lit) bndrs rhs)
   = ASSERT( null bndrs )
     do  { env' <- addAltUnfoldings env scrut' case_bndr' (Lit lit)
         ; rhs' <- simplExprC env' rhs cont'
-        ; return (LitAlt lit, [], rhs') }
+        ; return (Alt (LitAlt lit) [] rhs') }
 
-simplAlt env scrut' _ case_bndr' cont' (DataAlt con, vs, rhs)
+simplAlt env scrut' _ case_bndr' cont' (Alt (DataAlt con) vs rhs)
   = do  { -- See Note [Adding evaluatedness info to pattern-bound variables]
           let vs_with_evals = addEvals scrut' con vs
         ; (env', vs') <- simplLamBndrs env vs_with_evals
@@ -2929,7 +2929,7 @@ simplAlt env scrut' _ case_bndr' cont' (DataAlt con, vs, rhs)
 
         ; env'' <- addAltUnfoldings env' scrut' case_bndr' con_app
         ; rhs' <- simplExprC env'' rhs cont'
-        ; return (DataAlt con, vs', rhs') }
+        ; return (Alt (DataAlt con) vs' rhs') }
 
 {- Note [Adding evaluatedness info to pattern-bound variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3247,7 +3247,7 @@ altsWouldDup (alt:alts)
   | otherwise      = not (all is_bot_alt alts)
     -- otherwise case: first alt is non-bot, so all the rest must be bot
   where
-    is_bot_alt (_,_,rhs) = exprIsDeadEnd rhs
+    is_bot_alt (Alt _ _ rhs) = exprIsDeadEnd rhs
 
 -------------------------
 mkDupableCont :: SimplEnv
@@ -3435,9 +3435,9 @@ mkDupableStrictBind env arg_bndr join_rhs res_ty
 mkDupableAlt :: Platform -> OutId
              -> JoinFloats -> OutAlt
              -> SimplM (JoinFloats, OutAlt)
-mkDupableAlt platform case_bndr jfloats (con, bndrs', rhs')
+mkDupableAlt platform case_bndr jfloats (Alt con bndrs' rhs')
   | exprIsDupable platform rhs'  -- Note [Small alternative rhs]
-  = return (jfloats, (con, bndrs', rhs'))
+  = return (jfloats, Alt con bndrs' rhs')
 
   | otherwise
   = do  { simpl_opts <- initSimpleOpts <$> getDynFlags
@@ -3481,7 +3481,7 @@ mkDupableAlt platform case_bndr jfloats (con, bndrs', rhs')
         ; join_bndr <- newJoinId final_bndrs' rhs_ty'
 
         ; let join_call = mkApps (Var join_bndr) final_args
-              alt'      = (con, bndrs', join_call)
+              alt'      = Alt con bndrs' join_call
 
         ; return ( jfloats `addJoinFlts` unitJoinFloat (NonRec join_bndr join_rhs)
                  , alt') }

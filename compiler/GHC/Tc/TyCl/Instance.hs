@@ -1153,9 +1153,9 @@ tcInstDecls2 tycl_decls inst_decls
         ; let dm_binds = unionManyBags dm_binds_s
 
           -- (b) instance declarations
-        ; let dm_ids = collectHsBindsBinders dm_binds
+        ; let dm_ids = collectHsBindsBinders CollNoDictBinders dm_binds
               -- Add the default method Ids (again)
-              -- (they were arready added in GHC.Tc.TyCl.Utils.tcAddImplicits)
+              -- (they were already added in GHC.Tc.TyCl.Utils.tcAddImplicits)
               -- See Note [Default methods in the type environment]
         ; inst_binds_s <- tcExtendGlobalValEnv dm_ids $
                           mapM tcInstDecl2 inst_decls

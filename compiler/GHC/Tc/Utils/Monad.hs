@@ -188,6 +188,7 @@ import GHC.Utils.Error
 import GHC.Utils.Panic
 import GHC.Utils.Misc
 
+import GHC.Types.Error
 import GHC.Types.Fixity.Env
 import GHC.Types.Name.Reader
 import GHC.Types.Name
@@ -230,7 +231,7 @@ initTc :: HscEnv
        -> Module
        -> RealSrcSpan
        -> TcM r
-       -> IO (Messages, Maybe r)
+       -> IO (Messages ErrDoc, Maybe r)
                 -- Nothing => error thrown by the thing inside
                 -- (error messages should have been printed already)
 
@@ -352,10 +353,10 @@ initTcWithGbl :: HscEnv
               -> TcGblEnv
               -> RealSrcSpan
               -> TcM r
-              -> IO (Messages, Maybe r)
+              -> IO (Messages ErrDoc, Maybe r)
 initTcWithGbl hsc_env gbl_env loc do_this
  = do { lie_var      <- newIORef emptyWC
-      ; errs_var     <- newIORef (emptyBag, emptyBag)
+      ; errs_var     <- newIORef emptyMessages
       ; usage_var    <- newIORef zeroUE
       ; let lcl_env = TcLclEnv {
                 tcl_errs       = errs_var,
@@ -392,14 +393,13 @@ initTcWithGbl hsc_env gbl_env loc do_this
         -- Collect any error messages
       ; msgs <- readIORef (tcl_errs lcl_env)
 
-      ; let { final_res | errorsFound dflags msgs = Nothing
-                        | otherwise               = maybe_res }
+      ; let { final_res | errorsFound msgs = Nothing
+                        | otherwise        = maybe_res }
 
       ; return (msgs, final_res)
       }
-  where dflags = hsc_dflags hsc_env
 
-initTcInteractive :: HscEnv -> TcM a -> IO (Messages, Maybe a)
+initTcInteractive :: HscEnv -> TcM a -> IO (Messages ErrDoc, Maybe a)
 -- Initialise the type checker monad for use in GHCi
 initTcInteractive hsc_env thing_inside
   = initTc hsc_env HsSrcFile False
@@ -930,10 +930,10 @@ wrapLocM_ fn (L loc a) = setSrcSpan loc (fn a)
 
 -- Reporting errors
 
-getErrsVar :: TcRn (TcRef Messages)
+getErrsVar :: TcRn (TcRef (Messages ErrDoc))
 getErrsVar = do { env <- getLclEnv; return (tcl_errs env) }
 
-setErrsVar :: TcRef Messages -> TcRn a -> TcRn a
+setErrsVar :: TcRef (Messages ErrDoc) -> TcRn a -> TcRn a
 setErrsVar v = updLclEnv (\ env -> env { tcl_errs =  v })
 
 addErr :: MsgDoc -> TcRn ()
@@ -963,7 +963,7 @@ checkErr :: Bool -> MsgDoc -> TcRn ()
 -- Add the error if the bool is False
 checkErr ok msg = unless ok (addErr msg)
 
-addMessages :: Messages -> TcRn ()
+addMessages :: Messages ErrDoc -> TcRn ()
 addMessages msgs1
   = do { errs_var <- getErrsVar ;
          msgs0 <- readTcRef errs_var ;
@@ -974,13 +974,13 @@ discardWarnings :: TcRn a -> TcRn a
 -- used to ignore-unused-variable warnings inside derived code
 discardWarnings thing_inside
   = do  { errs_var <- getErrsVar
-        ; (old_warns, _) <- readTcRef errs_var
+        ; old_warns <- getWarningMessages <$> readTcRef errs_var
 
         ; result <- thing_inside
 
         -- Revert warnings to old_warns
-        ; (_new_warns, new_errs) <- readTcRef errs_var
-        ; writeTcRef errs_var (old_warns, new_errs)
+        ; new_errs <- getErrorMessages <$> readTcRef errs_var
+        ; writeTcRef errs_var $ mkMessages (old_warns `unionBags` new_errs)
 
         ; return result }
 
@@ -992,36 +992,36 @@ discardWarnings thing_inside
 ************************************************************************
 -}
 
-mkLongErrAt :: SrcSpan -> MsgDoc -> MsgDoc -> TcRn ErrMsg
+mkLongErrAt :: SrcSpan -> MsgDoc -> MsgDoc -> TcRn (ErrMsg ErrDoc)
 mkLongErrAt loc msg extra
   = do { printer <- getPrintUnqualified ;
          unit_state <- hsc_units <$> getTopEnv ;
          let msg' = pprWithUnitState unit_state msg in
          return $ mkLongErrMsg loc printer msg' extra }
 
-mkErrDocAt :: SrcSpan -> ErrDoc -> TcRn ErrMsg
+mkErrDocAt :: SrcSpan -> ErrDoc -> TcRn (ErrMsg ErrDoc)
 mkErrDocAt loc errDoc
   = do { printer <- getPrintUnqualified ;
          unit_state <- hsc_units <$> getTopEnv ;
          let f = pprWithUnitState unit_state
              errDoc' = mapErrDoc f errDoc
          in
-         return $ mkErrDoc loc printer errDoc' }
+         return $ mkErr loc printer errDoc' }
 
 addLongErrAt :: SrcSpan -> MsgDoc -> MsgDoc -> TcRn ()
 addLongErrAt loc msg extra = mkLongErrAt loc msg extra >>= reportError
 
-reportErrors :: [ErrMsg] -> TcM ()
+reportErrors :: [ErrMsg ErrDoc] -> TcM ()
 reportErrors = mapM_ reportError
 
-reportError :: ErrMsg -> TcRn ()
+reportError :: ErrMsg ErrDoc -> TcRn ()
 reportError err
   = do { traceTc "Adding error:" (pprLocErrMsg err) ;
          errs_var <- getErrsVar ;
-         (warns, errs) <- readTcRef errs_var ;
-         writeTcRef errs_var (warns, errs `snocBag` err) }
+         msgs     <- readTcRef errs_var ;
+         writeTcRef errs_var (err `addMessage` msgs) }
 
-reportWarning :: WarnReason -> ErrMsg -> TcRn ()
+reportWarning :: WarnReason -> ErrMsg ErrDoc -> TcRn ()
 reportWarning reason err
   = do { let warn = makeIntoWarning reason err
                     -- 'err' was built by mkLongErrMsg or something like that,
@@ -1030,8 +1030,8 @@ reportWarning reason err
 
        ; traceTc "Adding warning:" (pprLocErrMsg warn)
        ; errs_var <- getErrsVar
-       ; (warns, errs) <- readTcRef errs_var
-       ; writeTcRef errs_var (warns `snocBag` warn, errs) }
+       ; (warns, errs) <- partitionMessages <$> readTcRef errs_var
+       ; writeTcRef errs_var (mkMessages $ (warns `snocBag` warn) `unionBags` errs) }
 
 
 -----------------------
@@ -1058,8 +1058,7 @@ ifErrsM :: TcRn r -> TcRn r -> TcRn r
 ifErrsM bale_out normal
  = do { errs_var <- getErrsVar ;
         msgs <- readTcRef errs_var ;
-        dflags <- getDynFlags ;
-        if errorsFound dflags msgs then
+        if errorsFound msgs then
            bale_out
         else
            normal }
@@ -1192,7 +1191,7 @@ capture_constraints thing_inside
        ; lie <- readTcRef lie_var
        ; return (res, lie) }
 
-capture_messages :: TcM r -> TcM (r, Messages)
+capture_messages :: TcM r -> TcM (r, Messages ErrDoc)
 -- capture_messages simply captures and returns the
 --                  errors arnd warnings generated by thing_inside
 -- Precondition: thing_inside must not throw an exception!
@@ -1228,8 +1227,7 @@ askNoErrs thing_inside
                           ; failM }
 
            Just res -> do { emitConstraints lie
-                          ; dflags <- getDynFlags
-                          ; let errs_found = errorsFound dflags msgs
+                          ; let errs_found = errorsFound msgs
                                           || insolubleWC lie
                           ; return (res, not errs_found) } }
 
@@ -1363,7 +1361,7 @@ foldAndRecoverM f acc (x:xs) =
                                 Just acc' -> foldAndRecoverM f acc' xs  }
 
 -----------------------
-tryTc :: TcRn a -> TcRn (Maybe a, Messages)
+tryTc :: TcRn a -> TcRn (Maybe a, Messages ErrDoc)
 -- (tryTc m) executes m, and returns
 --      Just r,  if m succeeds (returning r)
 --      Nothing, if m fails
@@ -1391,9 +1389,8 @@ tryTcDiscardingErrs recover thing_inside
   = do { ((mb_res, lie), msgs) <- capture_messages    $
                                   capture_constraints $
                                   tcTryM thing_inside
-        ; dflags <- getDynFlags
         ; case mb_res of
-            Just res | not (errorsFound dflags msgs)
+            Just res | not (errorsFound msgs)
                      , not (insolubleWC lie)
               -> -- 'main' succeeded with no errors
                  do { addMessages msgs  -- msgs might still have warnings

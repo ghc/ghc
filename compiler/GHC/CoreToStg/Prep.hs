@@ -622,7 +622,7 @@ cpeRhsE env expr@(Lam {})
 
 cpeRhsE env (Case scrut bndr ty alts)
   | isUnsafeEqualityProof scrut
-  , [(con, bs, rhs)] <- alts
+  , [Alt con bs rhs] <- alts
   = do { (floats1, scrut') <- cpeBody env scrut
        ; (env1, bndr')     <- cpCloneBndr env bndr
        ; (env2, bs')       <- cpCloneBndrs env1 bs
@@ -652,10 +652,10 @@ cpeRhsE env (Case scrut bndr ty alts)
 
        ; return (floats, Case scrut' bndr2 ty alts'') }
   where
-    sat_alt env (con, bs, rhs)
+    sat_alt env (Alt con bs rhs)
        = do { (env2, bs') <- cpCloneBndrs env bs
             ; rhs' <- cpeBodyNF env2 rhs
-            ; return (con, bs', rhs') }
+            ; return (Alt con bs' rhs') }
 
 -- ---------------------------------------------------------------------------
 --              CpeBody: produces a result satisfying CpeBody
@@ -1120,7 +1120,7 @@ cpExprIsTrivial e
   = cpExprIsTrivial e
   | Case scrut _ _ alts <- e
   , isUnsafeEqualityProof scrut
-  , [(_,_,rhs)] <- alts
+  , [Alt _ _ rhs] <- alts
   = cpExprIsTrivial rhs
   | otherwise
   = exprIsTrivial e
@@ -1374,7 +1374,7 @@ wrapBinds :: Floats -> CpeBody -> CpeBody
 wrapBinds (Floats _ binds) body
   = foldrOL mk_bind body binds
   where
-    mk_bind (FloatCase rhs bndr con bs _) body = Case rhs bndr (exprType body) [(con,bs,body)]
+    mk_bind (FloatCase rhs bndr con bs _) body = Case rhs bndr (exprType body) [Alt con bs body]
     mk_bind (FloatLet bind)               body = Let bind body
     mk_bind (FloatTick tickish)           body = mkTick tickish body
 
@@ -1828,7 +1828,7 @@ collectCostCentres mod_name
       Type{} -> cs
       Coercion{} -> cs
 
-    go_alts = foldl' (\cs (_con, _bndrs, e) -> go cs e)
+    go_alts = foldl' (\cs (Alt _con _bndrs e) -> go cs e)
 
     go_bind :: S.Set CostCentre -> CoreBind -> S.Set CostCentre
     go_bind cs (NonRec b e) =

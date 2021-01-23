@@ -1,22 +1,22 @@
 
 rn_dup.hs:9:10: error:
     Multiple declarations of ‘MkT’
-    Declared at: rn_dup.hs:7:10
+    Declared at: rn_dup.hs:7:16
                  rn_dup.hs:9:10
 
 rn_dup.hs:9:10: error:
     Multiple declarations of ‘MkT’
-    Declared at: rn_dup.hs:7:16
+    Declared at: rn_dup.hs:7:10
                  rn_dup.hs:9:10
 
 rn_dup.hs:12:16: error:
     Multiple declarations of ‘rf’
-    Declared at: rn_dup.hs:11:16
+    Declared at: rn_dup.hs:11:27
                  rn_dup.hs:12:16
 
 rn_dup.hs:12:16: error:
     Multiple declarations of ‘rf’
-    Declared at: rn_dup.hs:11:27
+    Declared at: rn_dup.hs:11:16
                  rn_dup.hs:12:16
 
 rn_dup.hs:17:3: error:

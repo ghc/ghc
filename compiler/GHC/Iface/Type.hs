@@ -1681,8 +1681,11 @@ ppr_co ctxt_prec (IfaceAxiomInstCo n i cos)
 ppr_co ctxt_prec (IfaceSymCo co)
   = ppr_special_co ctxt_prec (text "Sym") [co]
 ppr_co ctxt_prec (IfaceTransCo co1 co2)
-  = maybeParen ctxt_prec opPrec $
-    ppr_co opPrec co1 <+> semi <+> ppr_co opPrec co2
+    -- chain nested TransCo
+  = let ppr_trans (IfaceTransCo c1 c2) = semi <+> ppr_co topPrec c1 : ppr_trans c2
+        ppr_trans c                    = [semi <+> ppr_co opPrec c]
+    in maybeParen ctxt_prec opPrec $
+        vcat (ppr_co topPrec co1 : ppr_trans co2)
 ppr_co ctxt_prec (IfaceNthCo d co)
   = ppr_special_co ctxt_prec (text "Nth:" <> int d) [co]
 ppr_co ctxt_prec (IfaceLRCo lr co)

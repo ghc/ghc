@@ -209,14 +209,14 @@ cprAnalAlt
   -> Id       -- ^ case binder
   -> Alt Var  -- ^ current alternative
   -> (CprType, Alt Var)
-cprAnalAlt env scrut case_bndr (con@(DataAlt dc),bndrs,rhs)
+cprAnalAlt env scrut case_bndr (Alt con@(DataAlt dc) bndrs rhs)
   -- See 'extendEnvForDataAlt' and Note [CPR in a DataAlt case alternative]
-  = (rhs_ty, (con, bndrs, rhs'))
+  = (rhs_ty, Alt con bndrs rhs')
   where
     env_alt        = extendEnvForDataAlt env scrut case_bndr dc bndrs
     (rhs_ty, rhs') = cprAnal env_alt rhs
-cprAnalAlt env _ _ (con,bndrs,rhs)
-  = (rhs_ty, (con, bndrs, rhs'))
+cprAnalAlt env _ _ (Alt con bndrs rhs)
+  = (rhs_ty, Alt con bndrs rhs')
   where
     (rhs_ty, rhs') = cprAnal env rhs
 

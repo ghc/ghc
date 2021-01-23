@@ -68,6 +68,9 @@ instance OutputableBndr b => Outputable (Bind b) where
 instance OutputableBndr b => Outputable (Expr b) where
     ppr expr = pprCoreExpr expr
 
+instance OutputableBndr b => Outputable (Alt b) where
+    ppr expr = pprCoreAlt expr
+
 {-
 ************************************************************************
 *                                                                      *
@@ -221,7 +224,7 @@ ppr_expr add_par expr@(App {})
         _ -> parens (hang (pprParendExpr fun) 2 pp_args)
     }
 
-ppr_expr add_par (Case expr var ty [(con,args,rhs)])
+ppr_expr add_par (Case expr var ty [Alt con args rhs])
   = sdocOption sdocPrintCaseAsLet $ \case
       True -> add_par $  -- See Note [Print case as let]
                sep [ sep [ text "let! {"
@@ -299,8 +302,8 @@ ppr_expr add_par (Tick tickish expr)
       True  -> ppr_expr add_par expr
       False -> add_par (sep [ppr tickish, pprCoreExpr expr])
 
-pprCoreAlt :: OutputableBndr a => (AltCon, [a] , Expr a) -> SDoc
-pprCoreAlt (con, args, rhs)
+pprCoreAlt :: OutputableBndr a => Alt a -> SDoc
+pprCoreAlt (Alt con args rhs)
   = hang (ppr_case_pat con args <+> arrow) 2 (pprCoreExpr rhs)
 
 ppr_case_pat :: OutputableBndr a => AltCon -> [a] -> SDoc

@@ -183,6 +183,7 @@ import GHC.Types.SourceError
 import GHC.Types.SafeHaskell
 import GHC.Types.ForeignStubs
 import GHC.Types.Var.Env       ( emptyTidyEnv )
+import GHC.Types.Error
 import GHC.Types.Fixity.Env
 import GHC.Types.CostCentre
 import GHC.Types.Unique.Supply
@@ -320,9 +321,10 @@ handleWarningsThrowErrors (warnings, errors) = do
 --  2. If there are no error messages, but the second result indicates failure
 --     there should be warnings in the first result. That is, if the action
 --     failed, it must have been due to the warnings (i.e., @-Werror@).
-ioMsgMaybe :: IO (Messages, Maybe a) -> Hsc a
+ioMsgMaybe :: IO (Messages ErrDoc, Maybe a) -> Hsc a
 ioMsgMaybe ioA = do
-    ((warns,errs), mb_r) <- liftIO ioA
+    (msgs, mb_r) <- liftIO ioA
+    let (warns, errs) = partitionMessages msgs
     logWarnings warns
     case mb_r of
         Nothing -> throwErrors errs
@@ -330,10 +332,10 @@ ioMsgMaybe ioA = do
 
 -- | like ioMsgMaybe, except that we ignore error messages and return
 -- 'Nothing' instead.
-ioMsgMaybe' :: IO (Messages, Maybe a) -> Hsc (Maybe a)
+ioMsgMaybe' :: IO (Messages ErrDoc, Maybe a) -> Hsc (Maybe a)
 ioMsgMaybe' ioA = do
-    ((warns,_errs), mb_r) <- liftIO $ ioA
-    logWarnings warns
+    (msgs, mb_r) <- liftIO $ ioA
+    logWarnings (getWarningMessages msgs)
     return mb_r
 
 -- -----------------------------------------------------------------------------
@@ -1132,7 +1134,7 @@ hscCheckSafeImports tcg_env = do
 
     warns rules = listToBag $ map warnRules rules
 
-    warnRules :: GenLocated SrcSpan (RuleDecl GhcTc) -> ErrMsg
+    warnRules :: GenLocated SrcSpan (RuleDecl GhcTc) -> ErrMsg ErrDoc
     warnRules (L loc (HsRule { rd_name = n })) =
         mkPlainWarnMsg loc $
             text "Rule \"" <> ftext (snd $ unLoc n) <> text "\" ignored" $+$
@@ -1605,7 +1607,7 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
                $ do
                   (warns,errs,cmm) <- withTiming dflags (text "ParseCmm"<+>brackets (text filename)) (\_ -> ())
                                        $ parseCmmFile dflags home_unit filename
-                  return ((fmap pprWarning warns, fmap pprError errs), cmm)
+                  return (mkMessages (fmap pprWarning warns `unionBags` fmap pprError errs), cmm)
     liftIO $ do
         dumpIfSet_dyn dflags Opt_D_dump_cmm_verbose_by_proc "Parsed Cmm" FormatCMM (pdoc platform cmm)
         let -- Make up a module name to give the NCG. We can't pass bottom here

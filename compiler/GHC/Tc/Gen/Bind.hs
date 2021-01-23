@@ -438,7 +438,7 @@ recursivePatSynErr loc binds
        2 (vcat $ map pprLBind . bagToList $ binds)
   where
     pprLoc loc  = parens (text "defined at" <+> ppr loc)
-    pprLBind (L loc bind) = pprWithCommas ppr (collectHsBindBinders bind)
+    pprLBind (L loc bind) = pprWithCommas ppr (collectHsBindBinders CollNoDictBinders bind)
                                 <+> pprLoc loc
 
 tc_single :: forall thing.
@@ -488,7 +488,7 @@ mkEdges sig_fn binds
 
     key_map :: NameEnv BKey     -- Which binding it comes from
     key_map = mkNameEnv [(bndr, key) | (L _ bind, key) <- keyd_binds
-                                     , bndr <- collectHsBindBinders bind ]
+                                     , bndr <- collectHsBindBinders CollNoDictBinders bind ]
 
 ------------------------
 tcPolyBinds :: TcSigFun -> TcPragEnv
@@ -531,7 +531,7 @@ tcPolyBinds sig_fn prag_fn rec_group rec_tc closed bind_list
 
     ; return result }
   where
-    binder_names = collectHsBindListBinders bind_list
+    binder_names = collectHsBindListBinders CollNoDictBinders bind_list
     loc = foldr1 combineSrcSpans (map getLoc bind_list)
          -- The mbinds have been dependency analysed and
          -- may no longer be adjacent; so find the narrowest
@@ -1245,7 +1245,7 @@ tcMonoBinds is_rec sig_fn no_gen
 
                 , mbis ) }
   where
-    bndrs = collectPatBinders pat
+    bndrs = collectPatBinders CollNoDictBinders pat
 
 -- GENERAL CASE
 tcMonoBinds _ sig_fn no_gen binds
@@ -1407,7 +1407,7 @@ tcLhs sig_fn no_gen (PatBind { pat_lhs = pat, pat_rhs = grhss })
 
         ; return (TcPatBind mbis pat' grhss pat_ty) }
   where
-    bndr_names = collectPatBinders pat
+    bndr_names = collectPatBinders CollNoDictBinders pat
     (nosig_names, sig_names) = partitionWith find_sig bndr_names
 
     find_sig :: Name -> Either Name (Name, TcIdSigInfo)
@@ -1672,7 +1672,7 @@ decideGeneralisationPlan dflags lbinds closed sig_fn
     partial_sig_mrs
       = [ null theta
         | TcIdSig (PartialSig { psig_hs_ty = hs_ty })
-            <- mapMaybe sig_fn (collectHsBindListBinders lbinds)
+            <- mapMaybe sig_fn (collectHsBindListBinders CollNoDictBinders lbinds)
         , let (L _ theta, _) = splitLHsQualTy (hsSigWcType hs_ty) ]
 
     has_partial_sigs   = not (null partial_sig_mrs)
@@ -1724,7 +1724,7 @@ isClosedBndrGroup type_env binds
          in [(f, open_fvs)]
     bindFvs (PatBind { pat_lhs = pat, pat_ext = fvs })
        = let open_fvs = get_open_fvs fvs
-         in [(b, open_fvs) | b <- collectPatBinders pat]
+         in [(b, open_fvs) | b <- collectPatBinders CollNoDictBinders pat]
     bindFvs _
        = []
 

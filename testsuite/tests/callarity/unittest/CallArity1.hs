@@ -74,7 +74,7 @@ exprs =
                           (mkLams [y] $ Var y)
                   ) $ mkLams [z] $ Var d `mkVarApps` [x]) $
         Case (go `mkLApps` [0, 0]) z intTy
-            [(DEFAULT, [], Var f `mkVarApps` [z,z])]
+            [Alt DEFAULT [] (Var f `mkVarApps` [z,z])]
   , ("go2 (in function call)",) $
      mkRFun go [x]
         (mkLetNonRec d (mkACase (Var go `mkVarApps` [x])
@@ -216,7 +216,7 @@ allBoundIds (Let (Rec binds) body) =
 allBoundIds (App e1 e2) = allBoundIds e1 `unionVarSet` allBoundIds e2
 allBoundIds (Case scrut _ _ alts) =
     allBoundIds scrut `unionVarSet` unionVarSets
-        [ allBoundIds e | (_, _ , e) <- alts ]
+        [ allBoundIds e | Alt _ _ e <- alts ]
 allBoundIds (Lam _ e)  = allBoundIds e
 allBoundIds (Tick _ e) = allBoundIds e
 allBoundIds (Cast e _) = allBoundIds e

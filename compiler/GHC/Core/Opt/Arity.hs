@@ -999,7 +999,7 @@ arityType env (Case scrut bndr _ alts)
   | otherwise                  -- In the remaining cases we may not push
   = takeWhileOneShot alts_type -- evaluation of the scrutinee in
   where
-    alts_type = foldr1 andArityType [arityType env rhs | (_,_,rhs) <- alts]
+    alts_type = foldr1 andArityType [arityType env rhs | Alt _ _ rhs <- alts]
 
 arityType env (Let (NonRec j rhs) body)
   | Just join_arity <- isJoinId_maybe j
@@ -1447,7 +1447,7 @@ etaInfoApp in_scope expr eis
         (subst1, b1) = Core.substBndr subst b
         alts' = map subst_alt alts
         ty'   = etaInfoAppTy (Core.substTy subst ty) eis
-        subst_alt (con, bs, rhs) = (con, bs', go subst2 rhs eis)
+        subst_alt (Alt con bs rhs) = Alt con bs' (go subst2 rhs eis)
                  where
                     (subst2,bs') = Core.substBndrs subst1 bs
     go subst (Let b e) eis

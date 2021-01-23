@@ -141,8 +141,9 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
    new_lhs <- rnTopBindsLHS local_fix_env val_decls ;
 
    -- Bind the LHSes (and their fixities) in the global rdr environment
-   let { id_bndrs = collectHsIdBinders new_lhs } ;  -- Excludes pattern-synonym binders
-                                                    -- They are already in scope
+   let { id_bndrs = collectHsIdBinders CollNoDictBinders new_lhs } ;
+                    -- Excludes pattern-synonym binders
+                    -- They are already in scope
    traceRn "rnSrcDecls" (ppr id_bndrs) ;
    tc_envs <- extendGlobalRdrEnvRn (map avail id_bndrs) local_fix_env ;
    setEnvs tc_envs $ do {

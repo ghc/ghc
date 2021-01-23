@@ -119,11 +119,7 @@ import qualified Data.Set as Set
 -- ---------------------------------------------------------------------------
 -- The Unit state
 
--- | Unit state is all stored in 'DynFlags', including the details of
--- all units, which units are exposed, and which modules they
--- provide.
---
--- The unit state is computed by 'initUnits', and kept in DynFlags.
+-- The unit state is computed by 'initUnits', and kept in HscEnv.
 -- It is influenced by various command-line flags:
 --
 --   * @-package \<pkg>@ and @-package-id \<pkg>@ cause @\<pkg>@ to become exposed.

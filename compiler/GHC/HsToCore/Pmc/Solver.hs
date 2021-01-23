@@ -48,6 +48,7 @@ import GHC.Utils.Error ( pprErrMsgBagWithLoc )
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Data.Bag
+import GHC.Types.Error
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.DSet
 import GHC.Types.Unique.SDFM
@@ -679,11 +680,11 @@ tyOracle ty_st@(TySt n inert) cts
   | otherwise
   = do { evs <- traverse nameTyCt cts
        ; tracePm "tyOracle" (ppr cts $$ ppr inert)
-       ; ((_warns, errs), res) <- initTcDsForSolver $ tcCheckSatisfiability inert evs
+       ; (msgs, res) <- initTcDsForSolver $ tcCheckSatisfiability inert evs
        ; case res of
             -- return the new inert set and increment the sequence number n
             Just mb_new_inert -> return (TySt (n+1) <$> mb_new_inert)
-            Nothing           -> pprPanic "tyOracle" (vcat $ pprErrMsgBagWithLoc errs) }
+            Nothing           -> pprPanic "tyOracle" (vcat $ pprErrMsgBagWithLoc (getErrorMessages msgs)) }
 
 -- | Allocates a fresh 'EvVar' name for 'PredTy's.
 nameTyCt :: PredType -> DsM EvVar

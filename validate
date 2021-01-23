@@ -178,9 +178,6 @@ else
         configure_cmd="stack --stack-yaml hadrian/stack.yaml exec -- ./configure"
     fi
     cd ..
-    # TODO: define a hadrian Flavour that mimics
-    # mk/flavours/validate.mk and use it here
-    # Until then, we're using the default flavour.
     hadrian="$hadrian_cmd -j$threads --build-root=$hadrian_build_root"
     if [ $be_quiet -eq 0 ]; then
         hadrian="$hadrian -V"

@@ -4,6 +4,7 @@ module Main where
 
 import Language.Haskell.TH (runQ)
 import GHC.Types.Basic
+import GHC.Types.Error
 import GHC.ThToHs
 import GHC.Driver.Session
 import GHC.Core.TyCo.Ppr
@@ -42,8 +43,9 @@ main = do
                        () |]
       let hs_t = fromRight (error "convertToHsType") $
                  convertToHsType Generated noSrcSpan th_t
-      ((warnings, errors), mres) <-
+      (messages, mres) <-
         tcRnType hsc_env SkolemiseFlexi True hs_t
+      let (warnings, errors) = partitionMessages messages
       case mres of
         Nothing -> do
           printBagOfErrors dflags warnings

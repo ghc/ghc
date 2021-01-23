@@ -531,7 +531,7 @@ zonkLocalBinds env (HsIPBinds x (IPBinds dict_binds binds )) = do
 zonkRecMonoBinds :: ZonkEnv -> LHsBinds GhcTc -> TcM (ZonkEnv, LHsBinds GhcTc)
 zonkRecMonoBinds env binds
  = fixM (\ ~(_, new_binds) -> do
-        { let env1 = extendIdZonkEnvRec env (collectHsBindsBinders new_binds)
+        { let env1 = extendIdZonkEnvRec env (collectHsBindsBinders CollNoDictBinders new_binds)
         ; binds' <- zonkMonoBinds env1 binds
         ; return (env1, binds') })
 
@@ -580,7 +580,7 @@ zonk_bind env (AbsBinds { abs_tvs = tyvars, abs_ev_vars = evs
        ; (env2, new_ev_binds) <- zonkTcEvBinds_s env1 ev_binds
        ; (new_val_bind, new_exports) <- fixM $ \ ~(new_val_binds, _) ->
          do { let env3 = extendIdZonkEnvRec env2 $
-                         collectHsBindsBinders new_val_binds
+                         collectHsBindsBinders CollNoDictBinders new_val_binds
             ; new_val_binds <- mapBagM (zonk_val_bind env3) val_binds
             ; new_exports   <- mapM (zonk_export env3) exports
             ; return (new_val_binds, new_exports) }
@@ -1615,10 +1615,10 @@ zonkCoreExpr env (Case scrut b ty alts)
          return $ Case scrut' b' ty' alts'
 
 zonkCoreAlt :: ZonkEnv -> CoreAlt -> TcM CoreAlt
-zonkCoreAlt env (dc, bndrs, rhs)
+zonkCoreAlt env (Alt dc bndrs rhs)
     = do (env1, bndrs') <- zonkCoreBndrsX env bndrs
          rhs' <- zonkCoreExpr env1 rhs
-         return $ (dc, bndrs', rhs')
+         return $ Alt dc bndrs' rhs'
 
 zonkCoreBind :: ZonkEnv -> CoreBind -> TcM (ZonkEnv, CoreBind)
 zonkCoreBind env (NonRec v e)

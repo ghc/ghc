@@ -147,22 +147,16 @@ A heap object is /reachable/ if:
 {- $notes
 
 A finalizer is not always called after its weak pointer\'s object becomes
-unreachable. There are two situations that can cause this:
+unreachable. If the object becomes unreachable right before the program exits,
+then GC may not be performed. Finalizers run during GC, so finalizers associated
+with the object do not run if GC does not happen.
 
- * If the object becomes unreachable right before the program exits,
-   then GC may not be performed. Finalizers run during GC, so finalizers
-   associated with the object do not run if GC does not happen.
+Other than the above caveat, users can always expect that a finalizer will be
+run after its weak pointer\'s object becomes unreachable.
 
- * If a finalizer throws an exception, subsequent finalizers that had
-   been queued to run after it do not get run. This behavior may change
-   in a future release. See issue <https://gitlab.haskell.org/ghc/ghc/issues/13167 13167>
-   on the issue tracker. Writing a finalizer that throws exceptions is
-   discouraged.
-
-Other than these two caveats, users can always expect that a finalizer
-will be run after its weak pointer\'s object becomes unreachable. However,
-the second caveat means that users need to trust that all of their
-transitive dependencies do not throw exceptions in finalizers, since
-any finalizers can end up queued together.
+If a finalizer throws an exception, the exception is silently caught without
+notice. See the commit of issue
+<https://gitlab.haskell.org/ghc/ghc/-/issues/13167 13167> for details. Writing a
+finalizer that throws exceptions is discouraged.
 
 -}

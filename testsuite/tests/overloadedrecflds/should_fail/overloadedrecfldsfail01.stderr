@@ -10,13 +10,14 @@ overloadedrecfldsfail01.hs:14:10: error:
     In an equation for ‘upd2’: upd2 r = r {x = 3, y = True, z = False}
 
 overloadedrecfldsfail01.hs:17:10: error:
-    ‘w’ is not a (visible) field of type ‘U’
+    ‘x’ is not a (visible) field of type ‘U’
     In the expression: r {w = True, x = 3, y = True} :: U
     In an equation for ‘upd3’:
         upd3 r = r {w = True, x = 3, y = True} :: U
 
 overloadedrecfldsfail01.hs:17:10: error:
-    ‘x’ is not a (visible) field of type ‘U’
+    ‘w’ is not a (visible) field of type ‘U’
     In the expression: r {w = True, x = 3, y = True} :: U
     In an equation for ‘upd3’:
         upd3 r = r {w = True, x = 3, y = True} :: U
+
