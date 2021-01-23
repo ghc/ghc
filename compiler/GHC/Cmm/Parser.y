@@ -1462,10 +1462,9 @@ parseCmmFile dflags home_unit filename = do
         let (warnings,errors) = getMessages pst
         return (warnings, errors, Nothing)
     POk pst code -> do
-        st <- initC
         let fcode = getCmm $ unEC code "global" (initEnv (targetProfile dflags)) [] >> return ()
-            (cmm,_) = runC dflags no_module st fcode
             (warnings,errors) = getMessages pst
+        (cmm,_) <- runC dflags no_module initC fcode
         if not (isEmptyBag errors)
          then return (warnings, errors, Nothing)
          else return (warnings, errors, Just cmm)

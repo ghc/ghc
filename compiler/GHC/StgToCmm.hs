@@ -84,12 +84,12 @@ codeGen dflags this_mod data_tycons
   = do  {     -- cg: run the code generator, and yield the resulting CmmGroup
               -- Using an IORef to store the state is a bit crude, but otherwise
               -- we would need to add a state monad layer.
-        ; cgref <- liftIO $ newIORef =<< initC
+        ; cgref <- liftIO $ newIORef initC
         ; let cg :: FCode () -> Stream IO CmmGroup ()
               cg fcode = do
                 cmm <- liftIO . withTimingSilent dflags (text "STG -> Cmm") (`seq` ()) $ do
                          st <- readIORef cgref
-                         let (a,st') = runC dflags this_mod st (getCmm fcode)
+                         (a,st') <- runC dflags this_mod st (getCmm fcode)
 
                          -- NB. stub-out cgs_tops and cgs_stmts.  This fixes
                          -- a big space leak.  DO NOT REMOVE!
