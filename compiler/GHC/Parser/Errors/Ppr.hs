@@ -234,6 +234,9 @@ pp_err = \case
    PsErrPrecedenceOutOfRange i
       -> text "Precedence out of range: " <> int i
 
+   PsErrRecordDotSyntaxInvalid
+      -> text "Use of RecordDotSyntax `.' not valid."
+
    PsErrInvalidDataCon t
       -> hang (text "Cannot parse data constructor in a data/newtype declaration:") 2
               (ppr t)
@@ -535,6 +538,9 @@ pp_err = \case
    PsErrSpaceInSCC
       -> text "Spaces are not allowed in SCCs"
 
+   PsErrNamedFieldPunsNotEnabled
+      -> text "For this to work enable NamedFieldPuns"
+
    PsErrEmptyDoubleQuotes th_on
       -> if th_on then vcat (msg ++ th_msg) else vcat msg
          where
@@ -607,4 +613,3 @@ pp_hint = \case
 
 perhaps_as_pat :: SDoc
 perhaps_as_pat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"
-
