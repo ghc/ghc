@@ -152,6 +152,9 @@ data PsErrorDesc
    | PsErrPrecedenceOutOfRange !Int
       -- ^ Precedence out of range
 
+   | PsErrRecordDotSyntaxInvalid
+      -- ^ Invalid use of record-dot-syntax
+
    | PsErrInvalidDataCon !(HsType GhcPs)
       -- ^ Cannot parse data constructor in a data/newtype declaration
 
@@ -335,6 +338,9 @@ data PsErrorDesc
 
    | PsErrSpaceInSCC
       -- ^ Found a space in a SCC
+
+   | PsErrNamedFieldPunsNotEnabled
+      -- ^ Named field puns should be enabled
 
    | PsErrEmptyDoubleQuotes !Bool-- Is TH on?
       -- ^ Found two single quotes
