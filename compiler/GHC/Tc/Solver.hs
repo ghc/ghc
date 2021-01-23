@@ -1870,8 +1870,7 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
   = do { inerts <- getTcSInerts
        ; traceTcS "solveImplication {" (ppr imp $$ text "Inerts" <+> ppr inerts)
 
-       -- commented out; see `where` clause below
-       -- ; when debugIsOn check_tc_level
+       ; when debugIsOn check_tc_level
 
          -- Solve the nested constraints
        ; (has_given_eqs, given_insols, residual_wanted)
@@ -1915,12 +1914,9 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
     -- Note [TcLevel invariants] in GHC.Tc.Utils.TcType),
     -- and in fact I think they should always increase one level at a time.
 
-    -- Though sensible, this check causes lots of testsuite failures. It is
-    -- remaining commented out for now.
-    {-
+  where
     check_tc_level = do { cur_lvl <- TcS.getTcLevel
                         ; MASSERT2( tclvl == pushTcLevel cur_lvl , text "Cur lvl =" <+> ppr cur_lvl $$ text "Imp lvl =" <+> ppr tclvl ) }
-    -}
 
 ----------------------
 setImplicationStatus :: Implication -> TcS (Maybe Implication)
