@@ -3312,7 +3312,7 @@ showLanguages' show_all dflags =
    default_dflags =
        defaultDynFlags (settings dflags) (llvmConfig dflags) `lang_set` Just lang
 
-   lang = fromMaybe GHC2021 (language dflags)
+   lang = fromMaybe Haskell2010 (language dflags)
 
 
 showTargets :: GHC.GhcMonad m => m ()
