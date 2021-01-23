@@ -19,3 +19,5 @@ test('CountParserDeps',
      compile_and_run,
      ['-package ghc'])
 test('LexNegLit', normal, compile_and_run, [''])
+test('RecordDotSyntax1', normal, compile_and_run, [''])
+test('RecordDotSyntax2', normal, compile_and_run, [''])
