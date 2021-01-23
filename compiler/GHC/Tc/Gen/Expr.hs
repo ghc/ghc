@@ -938,6 +938,20 @@ tcExpr (ArithSeq _ witness seq) res_ty
 {-
 ************************************************************************
 *                                                                      *
+                Record dot syntax
+*                                                                      *
+************************************************************************
+-}
+
+-- These terms have been replaced by desugaring in the renamer. See
+-- Note [Rebindable syntax and HsExpansion].
+tcExpr (GetField _ _ _) _ = panic "tcExpr: GetField: Not implemented"
+tcExpr (Projection _ _) _ = panic "tcExpr: Projection: Not implemented"
+tcExpr (RecordDotUpd _ _ _ ) _ = panic "tcExpr: RecordDotUpd: Not implemented"
+
+{-
+************************************************************************
+*                                                                      *
                 Template Haskell
 *                                                                      *
 ************************************************************************

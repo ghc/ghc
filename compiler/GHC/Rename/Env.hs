@@ -33,7 +33,7 @@ module GHC.Rename.Env (
 
         -- Rebindable Syntax
         lookupSyntax, lookupSyntaxExpr, lookupSyntaxName, lookupSyntaxNames,
-        lookupIfThenElse, lookupReboundIf,
+        lookupIfThenElse, lookupReboundIf, lookupReboundGetField, lookupReboundSetField,
 
         -- QualifiedDo
         lookupQualifiedDoExpr, lookupQualifiedDo,
@@ -1822,6 +1822,14 @@ lookupRebound nameStr = do
 -- | Lookup an @ifThenElse@ binding (see 'lookupRebound').
 lookupReboundIf :: RnM (Maybe (Located Name))
 lookupReboundIf = lookupRebound reboundIfSymbol
+
+-- | Lookup an @getField@ binding (see 'lookupRebound').
+lookupReboundGetField :: RnM (Maybe (Located Name))
+lookupReboundGetField = lookupRebound reboundGetFieldSymbol
+
+-- | Lookup an @setField@ binding (see 'lookupRebound').
+lookupReboundSetField :: RnM (Maybe (Located Name))
+lookupReboundSetField = lookupRebound reboundSetFieldSymbol
 
 -- Error messages
 

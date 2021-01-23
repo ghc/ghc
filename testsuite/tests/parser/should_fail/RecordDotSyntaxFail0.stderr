@@ -1,0 +1,2 @@
+ RecordDotSyntaxFail0.hs:3:12:
+    Use of RecordDotSyntax `.' not valid.

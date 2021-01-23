@@ -12,6 +12,9 @@
 {-# LANGUAGE TypeFamilyDependencies    #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
                                       -- in module GHC.Hs.Extension
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveTraversable #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -239,6 +242,26 @@ is Less Cool because
     typecheck do-notation with (>>=) :: m1 a -> (a -> m2 b) -> m2 b.)
 -}
 
+-- New for RecordDotSyntax.
+
+data ProjUpdate' p arg =
+  ProjUpdate {
+      pu_flds :: [Located FastString]
+    , pu_arg :: arg -- Field's new value e.g. 42
+    }
+  deriving (Data, Functor, Foldable, Traversable)
+
+type ProjUpdate p arg = ProjUpdate' p arg
+type LHsProjUpdate p arg = Located (ProjUpdate p arg)
+type RecUpdProj p = ProjUpdate' p (LHsExpr p)
+type LHsRecUpdProj p = Located (RecUpdProj p)
+
+instance (Outputable arg)
+      => Outputable (ProjUpdate' p arg) where
+  -- TODO: improve in case of pun
+  ppr ProjUpdate { pu_flds = flds, pu_arg = arg } =
+    hcat (punctuate dot (map (ppr . unLoc) flds)) <+> equals <+> ppr arg
+
 -- | A Haskell expression.
 data HsExpr p
   = HsVar     (XVar p)
@@ -460,6 +483,48 @@ data HsExpr p
   -- For a type family, the arg types are of the *instance* tycon,
   -- not the family tycon
 
+
+  -- | Record field selection e.g @z.x@.
+  --
+  --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDot'
+  --
+  -- This case only arises when the RecordDotSyntax langauge
+  -- extension is enabled.
+
+  | GetField {
+        gf_ext :: XGetField p
+      , gf_expr :: LHsExpr p
+      , gf_field :: Located FastString
+      }
+
+  -- Record dot update e.g. @a{foo.bar.baz=1, quux}@.
+  --
+  --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'{'@,
+  --         'GHC.Parser.Annotation.AnnComma, 'GHC.Parser.Annotation.AnnDot',
+  --         'GHC.Parser.Annotation.AnnClose' @'}'@
+  --
+  -- This case only arises when the RecordDotSyntax langauge
+  -- extension is enabled.
+
+  | RecordDotUpd {
+        rdupd_ext :: XRecordDotUpd p
+      , rdupd_expr :: LHsExpr p
+      , rdupd_upds :: [LHsRecUpdProj p]
+      }
+
+  -- | Record field selector. e.g. @(.x)@ or @(.x.y)@
+  --
+  --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpenP'
+  --         'GHC.Parser.Annotation.AnnDot', 'GHC.Parser.Annotation.AnnCloseP'
+  --
+  -- This case only arises when the RecordDotSyntax langauge
+  -- extensions is enabled.
+
+  | Projection {
+        proj_ext :: XProjection p
+      , proj_flds :: [Located FastString]
+      }
+
   -- | Expression with an explicit type signature. @e :: type@
   --
   --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDcolon'
@@ -658,6 +723,18 @@ type instance XRecordCon     GhcTc = RecordConTc
 type instance XRecordUpd     GhcPs = NoExtField
 type instance XRecordUpd     GhcRn = NoExtField
 type instance XRecordUpd     GhcTc = RecordUpdTc
+
+type instance XGetField     GhcPs = NoExtField
+type instance XGetField     GhcRn = NoExtField
+type instance XGetField     GhcTc = NoExtField
+
+type instance XProjection     GhcPs = NoExtField
+type instance XProjection     GhcRn = NoExtField
+type instance XProjection     GhcTc = NoExtField
+
+type instance XRecordDotUpd     GhcPs = NoExtField
+type instance XRecordDotUpd     GhcRn = NoExtField
+type instance XRecordDotUpd     GhcTc = NoExtField
 
 type instance XExprWithTySig (GhcPass _) = NoExtField
 
@@ -1193,6 +1270,14 @@ ppr_expr (RecordCon { rcon_con_name = con_id, rcon_flds = rbinds })
 ppr_expr (RecordUpd { rupd_expr = L _ aexp, rupd_flds = rbinds })
   = hang (ppr aexp) 2 (braces (fsep (punctuate comma (map ppr rbinds))))
 
+ppr_expr (GetField { gf_expr = L _ fexp, gf_field = field })
+  = ppr fexp <> dot <> ppr field
+
+ppr_expr (Projection { proj_flds = flds }) = parens (hcat (punctuate dot (map ppr flds)))
+
+ppr_expr (RecordDotUpd { rdupd_expr = L _ aexp, rdupd_upds = rbinds })
+ = hang (ppr aexp) 2 (braces (fsep (punctuate comma (map ppr rbinds))))
+
 ppr_expr (ExprWithTySig _ expr sig)
   = hang (nest 2 (ppr_lexpr expr) <+> dcolon)
          4 (ppr sig)
@@ -1351,6 +1436,11 @@ hsExprNeedsParens p = go
     go (HsBinTick _ _ _ (L _ e))      = go e
     go (RecordCon{})                  = False
     go (HsRecFld{})                   = False
+
+    go (Projection{})                 = True
+    go (GetField{})                   = False
+    go (RecordDotUpd{})               = False
+
     go (XExpr x)
       | GhcTc <- ghcPass @p
       = case x of
