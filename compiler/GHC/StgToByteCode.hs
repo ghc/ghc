@@ -10,9 +10,8 @@
 --  (c) The University of Glasgow 2002-2006
 --
 
--- | GHC.CoreToByteCode: Generate bytecode from Core
--- XXX rename to GHC.StgToByteCode
-module GHC.CoreToByteCode ( UnlinkedBCO, byteCodeGen, coreExprToBCOs ) where
+-- | GHC.StgToByteCode: Generate bytecode from STG
+module GHC.StgToByteCode ( UnlinkedBCO, byteCodeGen, stgExprToBCOs ) where
 
 #include "HsVersions.h"
 
@@ -104,7 +103,7 @@ byteCodeGen :: HscEnv
             -> IO CompiledByteCode
 byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
    = withTiming dflags
-                (text "GHC.CoreToByteCode"<+>brackets (ppr this_mod))
+                (text "GHC.StgToByteCode"<+>brackets (ppr this_mod))
                 (const ()) $ do
         -- Split top-level binds into strings and others.
         -- See Note [generating code for top-level string literal bindings].
@@ -126,7 +125,7 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
              mapM schemeTopBind flattened_binds
 
         when (notNull ffis)
-             (panic "GHC.CoreToByteCode.byteCodeGen: missing final emitBc?")
+             (panic "GHC.StgToByteCode.byteCodeGen: missing final emitBc?")
 
         dumpIfSet_dyn dflags Opt_D_dump_BCOs
            "Proto-BCOs" FormatByteCode
@@ -176,14 +175,14 @@ literals:
 -- Generating byte code for an expression
 
 -- Returns: the root BCO for this expression
-coreExprToBCOs :: HscEnv
-               -> Module
-               -> Id
-               -> StgRhs
-               -> IO UnlinkedBCO
-coreExprToBCOs hsc_env this_mod bndr expr
+stgExprToBCOs :: HscEnv
+              -> Module
+              -> Id
+              -> StgRhs
+              -> IO UnlinkedBCO
+stgExprToBCOs hsc_env this_mod bndr expr
  = withTiming dflags
-              (text "GHC.CoreToByteCode"<+>brackets (ppr this_mod))
+              (text "GHC.StgToByteCode"<+>brackets (ppr this_mod))
               (const ()) $ do
 
       -- the uniques are needed to generate fresh variables when we introduce new
@@ -196,10 +195,10 @@ coreExprToBCOs hsc_env this_mod bndr expr
               case prepd_expr of
                 (StgNonRec _ cg_expr) -> schemeR [] (idName bndr, cg_expr)
                 _                     ->
-                  panic "GHC.CoreToByteCode.coreExprToBCOs"
+                  panic "GHC.StgByteCode.stgExprToBCOs"
 
       when (notNull mallocd)
-           (panic "GHC.CoreToByteCode.coreExprToBCOs: missing final emitBc?")
+           (panic "GHC.StgToByteCode.stgExprToBCOs: missing final emitBc?")
 
       dumpIfSet_dyn dflags Opt_D_dump_BCOs "Proto-BCOs" FormatByteCode
          (ppr proto_bco)
@@ -312,7 +311,7 @@ bytesToWords platform (ByteOff bytes) =
     let (q, r) = bytes `quotRem` (platformWordSizeInBytes platform)
     in if r == 0
            then fromIntegral q
-           else panic $ "GHC.CoreToByteCode.bytesToWords: bytes=" ++ show bytes
+           else panic $ "GHC.StgToByteCode.bytesToWords: bytes=" ++ show bytes
 
 wordSize :: Platform -> ByteOff
 wordSize platform = ByteOff (platformWordSizeInBytes platform)
@@ -732,7 +731,7 @@ schemeE d s p (StgCase scrut bndr _ alts)
    = doCase d s p scrut bndr alts
 
 schemeE _ _ _ _expr
-   = panic "GHC.CoreToByteCode.schemeE"
+   = panic "GHC.StgToByteCode.schemeE"
 
 -- Is this Id a not-necessarily-lifted join point?
 -- See Note [Not-necessarily-lifted join points], step 1
@@ -877,7 +876,7 @@ schemeT d s p (StgConApp con args _tys)
 schemeT d s p (StgApp fn args)
    = doTailCall d s p fn (reverse args)
 
-schemeT _ _ _ e = pprPanic "GHC.CoreToByteCode.schemeT"
+schemeT _ _ _ e = pprPanic "GHC.StgToByteCode.schemeT"
                            (pprStgExpr shortStgPprOpts e)
 
 -- -----------------------------------------------------------------------------
@@ -980,7 +979,7 @@ findPushSeq (D: rest)
 findPushSeq (L: rest)
   = (PUSH_APPLY_L, 1, rest)
 findPushSeq _
-  = panic "GHC.CoreToByteCode.findPushSeq"
+  = panic "GHC.StgToByteCode.findPushSeq"
 
 -- -----------------------------------------------------------------------------
 -- Case expressions
@@ -1261,7 +1260,7 @@ layoutTuple profile start_off arg_ty reps =
                     DoubleReg n    -> (v,     f,     a d n, l    )
                     LongReg n      -> (v,     f,     d,     a l n)
                     _              ->
-                      pprPanic "CoreToByteCode.layoutTuple unsupported register type"
+                      pprPanic "GHC.StgToByteCode.layoutTuple unsupported register type"
                                (ppr r)
               where a bmp n = bmp .|. (1 `shiftL` (n-1))
 
@@ -1270,7 +1269,7 @@ layoutTuple profile start_off arg_ty reps =
 
       get_byte_off (x, StackParam y) = (x, fromIntegral y)
       get_byte_off _                 =
-          panic "CoreToByteCode.layoutTuple get_byte_off"
+          panic "GHC.StgToByteCode.layoutTuple get_byte_off"
 
   in ( TupleInfo
          { tupleSize        = bytesToWords platform (ByteOff new_stk_bytes)
@@ -1380,7 +1379,7 @@ generateCCall d0 s p (CCallSpec target cconv safety) result_ty args_r_to_l
          !d_after_args = d0 + wordsToBytes platform a_reps_sizeW
          a_reps_pushed_RAW
             | null a_reps_pushed_r_to_l || not (isVoidRep (head a_reps_pushed_r_to_l))
-            = panic "GHC.CoreToByteCode.generateCCall: missing or invalid World token?"
+            = panic "GHC.StgToByteCode.generateCCall: missing or invalid World token?"
             | otherwise
             = reverse (tail a_reps_pushed_r_to_l)
 
@@ -1452,7 +1451,7 @@ generateCCall d0 s p (CCallSpec target cconv safety) result_ty args_r_to_l
          a_reps --  | trace (showSDoc (ppr a_reps_pushed_RAW)) False = error "???"
                 | is_static = a_reps_pushed_RAW
                 | otherwise = if null a_reps_pushed_RAW
-                              then panic "GHC.CoreToByteCode.generateCCall: dyn with no args"
+                              then panic "GHC.StgToByteCode.generateCCall: dyn with no args"
                               else tail a_reps_pushed_RAW
 
          -- push the Addr#
@@ -1482,7 +1481,7 @@ generateCCall d0 s p (CCallSpec target cconv safety) result_ty args_r_to_l
          conv = case cconv of
            CCallConv -> FFICCall
            StdCallConv -> FFIStdCall
-           _ -> panic "GHC.CoreToByteCode: unexpected calling convention"
+           _ -> panic "GHC.StgToByteCode: unexpected calling convention"
 
      -- the only difference in libffi mode is that we prepare a cif
      -- describing the call type by calling libffi, and we attach the
@@ -2138,7 +2137,7 @@ getLabelsBc n
 
 getCCArray :: BcM (Array BreakIndex (RemotePtr CostCentre))
 getCCArray = BcM $ \st ->
-  let breaks = expectJust "GHC.CoreToByteCode.getCCArray" $ modBreaks st in
+  let breaks = expectJust "GHC.StgToByteCode.getCCArray" $ modBreaks st in
   return (st, modBreaks_ccs breaks)
 
 
