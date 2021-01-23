@@ -112,7 +112,7 @@ import GHC.Hs.Stats         ( ppSourceStats )
 
 import GHC.HsToCore
 
-import GHC.CoreToByteCode      ( byteCodeGen, coreExprToBCOs )
+import GHC.StgToByteCode    ( byteCodeGen, stgExprToBCOs )
 
 import GHC.IfaceToCore  ( typecheckIface )
 
@@ -2075,7 +2075,7 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr
                          [NonRec bco_tmp_id prepd_expr]
 
            {- Convert to BCOs -}
-         ; bcos <- coreExprToBCOs hsc_env
+         ; bcos <- stgExprToBCOs hsc_env
                      (icInteractiveModule (hsc_IC hsc_env))
                      bco_tmp_id
                      stg_expr
