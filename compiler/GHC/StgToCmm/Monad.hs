@@ -2,6 +2,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE RankNTypes #-}
 
 
 -----------------------------------------------------------------------------
@@ -89,7 +90,10 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc
 
 import Control.Monad
-import Data.List
+import Control.Monad.Fix
+import Control.Monad.IO.Class
+import Data.IORef
+import GHC.IO.Unsafe
 
 
 
@@ -119,40 +123,42 @@ import Data.List
 
 --------------------------------------------------------
 
-newtype FCode a = FCode { doFCode :: CgInfoDownwards -> CgState -> (a, CgState) }
+newtype FCode a = FCode { doFCode :: CgInfoDownwards -> CgState -> IO (a, CgState) }
     deriving (Functor)
 
 instance Applicative FCode where
-    pure val = FCode (\_info_down state -> (val, state))
+    pure val = FCode (\_info_down state -> pure (val, state))
     {-# INLINE pure #-}
     (<*>) = ap
 
 instance Monad FCode where
     FCode m >>= k = FCode $
-        \info_down state ->
-            case m info_down state of
+        \info_down state -> do
+            result <- m info_down state
+            case result of
               (m_result, new_state) ->
                  case k m_result of
                    FCode kcode -> kcode info_down new_state
     {-# INLINE (>>=) #-}
 
+instance MonadIO FCode where
+  liftIO m = FCode $ \_ s -> do
+    a <- m
+    pure (a, s)
+
 instance MonadUnique FCode where
-  getUniqueSupplyM = cgs_uniqs <$> getState
-  getUniqueM = FCode $ \_ st ->
-    let (u, us') = takeUniqFromSupply (cgs_uniqs st)
-    in (u, st { cgs_uniqs = us' })
+  getUniqueSupplyM = newUniqSupply
+  getUniqueM = newUnique
 
-initC :: IO CgState
-initC  = do { uniqs <- mkSplitUniqSupply 'c'
-            ; return (initCgState uniqs) }
+initC :: CgState
+initC = initCgState
 
-runC :: DynFlags -> Module -> CgState -> FCode a -> (a,CgState)
+runC :: DynFlags -> Module -> CgState -> FCode a -> IO (a,CgState)
 runC dflags mod st fcode = doFCode fcode (initCgInfoDown dflags mod) st
 
 fixC :: (a -> FCode a) -> FCode a
 fixC fcode = FCode $
-    \info_down state -> let (v, s) = doFCode (fcode v) info_down state
-                        in (v, s)
+    \info_down state -> mfix $ \ ~(v, _) -> doFCode (fcode v) info_down state
 
 --------------------------------------------------------
 --        The code generator environment
@@ -180,7 +186,7 @@ type CgBindings = IdEnv CgIdInfo
 
 data CgIdInfo
   = CgIdInfo
-        { cg_id :: Id   -- Id that this is the info for
+        { cg_id  :: Id   -- Id that this is the info for
         , cg_lf  :: LambdaFormInfo
         , cg_loc :: CgLoc                     -- CmmExpr for the *tagged* value
         }
@@ -310,11 +316,9 @@ data CgState
         -- Both are ordered only so that we can
         -- reduce forward references, when it's easy to do so
 
-     cgs_binds :: CgBindings,
+     cgs_binds :: !CgBindings,
 
-     cgs_hp_usg  :: HeapUsage,
-
-     cgs_uniqs :: UniqSupply }
+     cgs_hp_usg :: !HeapUsage }
 
 data HeapUsage   -- See Note [Virtual and real heap pointers]
   = HeapUsage {
@@ -358,13 +362,13 @@ Hp register.  (Changing virtHp doesn't matter.)
 -}
 
 
-initCgState :: UniqSupply -> CgState
-initCgState uniqs
+initCgState :: CgState
+initCgState
   = MkCgState { cgs_stmts  = mkNop
               , cgs_tops   = nilOL
               , cgs_binds  = emptyVarEnv
               , cgs_hp_usg = initHpUsage
-              , cgs_uniqs  = uniqs }
+              }
 
 stateIncUsage :: CgState -> CgState -> CgState
 -- stateIncUsage@ e1 e2 incorporates in e1
@@ -402,10 +406,10 @@ hp_usg `maxHpHw` hw = hp_usg { virtHp = virtHp hp_usg `max` hw }
 --------------------------------------------------------
 
 getState :: FCode CgState
-getState = FCode $ \_info_down state -> (state, state)
+getState = FCode $ \_info_down state -> pure (state, state)
 
 setState :: CgState -> FCode ()
-setState state = FCode $ \_info_down _ -> ((), state)
+setState !state = FCode $ \_info_down _ -> pure ((), state)
 
 getHpUsage :: FCode HeapUsage
 getHpUsage = do
@@ -425,7 +429,7 @@ setVirtHp new_virtHp
 getVirtHp :: FCode VirtualHpOffset
 getVirtHp
   = do  { hp_usage <- getHpUsage
-        ; return (virtHp hp_usage) }
+        ; return $ virtHp hp_usage }
 
 setRealHp ::  VirtualHpOffset -> FCode ()
 setRealHp new_realHp
@@ -443,27 +447,19 @@ setBinds new_binds = do
         setState $ state {cgs_binds = new_binds}
 
 withState :: FCode a -> CgState -> FCode (a,CgState)
-withState (FCode fcode) newstate = FCode $ \info_down state ->
-  case fcode info_down newstate of
-    (retval, state2) -> ((retval,state2), state)
+withState (FCode fcode) newstate = FCode $ \info_down state -> do
+  (retval, state2) <- fcode info_down newstate
+  pure ((retval,state2), state)
 
 newUniqSupply :: FCode UniqSupply
-newUniqSupply = do
-        state <- getState
-        let (us1, us2) = splitUniqSupply (cgs_uniqs state)
-        setState $ state { cgs_uniqs = us1 }
-        return us2
+newUniqSupply = liftIO $ mkSplitUniqSupply 'c'
 
 newUnique :: FCode Unique
-newUnique = do
-        state <- getState
-        let (u,us') = takeUniqFromSupply (cgs_uniqs state)
-        setState $ state { cgs_uniqs = us' }
-        return u
+newUnique = liftIO (uniqFromMask 'c')
 
 ------------------
 getInfoDown :: FCode CgInfoDownwards
-getInfoDown = FCode $ \info_down state -> (info_down,state)
+getInfoDown = FCode $ \info_down state -> pure (info_down,state)
 
 getSelfLoop :: FCode (Maybe SelfLoopInfo)
 getSelfLoop = do
@@ -595,13 +591,12 @@ forkClosureBody :: FCode () -> FCode ()
 forkClosureBody body_code
   = do  { platform <- getPlatform
         ; info   <- getInfoDown
-        ; us     <- newUniqSupply
         ; state  <- getState
         ; let body_info_down = info { cgd_sequel    = initSequel
                                     , cgd_updfr_off = initUpdFrameOff platform
                                     , cgd_self_loop = Nothing }
-              fork_state_in = (initCgState us) { cgs_binds = cgs_binds state }
-              ((),fork_state_out) = doFCode body_code body_info_down fork_state_in
+              fork_state_in = initCgState { cgs_binds = cgs_binds state }
+        ; ((),fork_state_out) <- liftIO $ doFCode body_code body_info_down fork_state_in
         ; setState $ state `addCodeBlocksFrom` fork_state_out }
 
 forkLneBody :: FCode a -> FCode a
@@ -613,10 +608,9 @@ forkLneBody :: FCode a -> FCode a
 -- code is discarded; it should deal with its own heap consumption.
 forkLneBody body_code
   = do  { info_down <- getInfoDown
-        ; us        <- newUniqSupply
         ; state     <- getState
-        ; let fork_state_in = (initCgState us) { cgs_binds = cgs_binds state }
-              (result, fork_state_out) = doFCode body_code info_down fork_state_in
+        ; let fork_state_in = initCgState { cgs_binds = cgs_binds state }
+        ; (result, fork_state_out) <- liftIO $ doFCode body_code info_down fork_state_in
         ; setState $ state `addCodeBlocksFrom` fork_state_out
         ; return result }
 
@@ -626,11 +620,10 @@ codeOnly :: FCode () -> FCode ()
 -- Used in almost-circular code to prevent false loop dependencies
 codeOnly body_code
   = do  { info_down <- getInfoDown
-        ; us        <- newUniqSupply
         ; state     <- getState
-        ; let   fork_state_in = (initCgState us) { cgs_binds   = cgs_binds state
-                                                 , cgs_hp_usg  = cgs_hp_usg state }
-                ((), fork_state_out) = doFCode body_code info_down fork_state_in
+        ; let fork_state_in = initCgState { cgs_binds   = cgs_binds state
+                                          , cgs_hp_usg  = cgs_hp_usg state }
+        ; ((), fork_state_out) <- liftIO $ doFCode body_code info_down fork_state_in
         ; setState $ state `addCodeBlocksFrom` fork_state_out }
 
 forkAlts :: [FCode a] -> FCode [a]
@@ -641,17 +634,13 @@ forkAlts :: [FCode a] -> FCode [a]
 
 forkAlts branch_fcodes
   = do  { info_down <- getInfoDown
-        ; us <- newUniqSupply
         ; state <- getState
-        ; let compile us branch
-                = (us2, doFCode branch info_down branch_state)
+        ; let compile branch = doFCode branch info_down branch_state
                 where
-                  (us1,us2) = splitUniqSupply us
-                  branch_state = (initCgState us1) {
-                                        cgs_binds  = cgs_binds state
-                                      , cgs_hp_usg = cgs_hp_usg state }
-              (_us, results) = mapAccumL compile us branch_fcodes
-              (branch_results, branch_out_states) = unzip results
+                  branch_state = initCgState { cgs_binds  = cgs_binds state
+                                             , cgs_hp_usg = cgs_hp_usg state }
+        ; results <- liftIO $ traverse compile branch_fcodes
+        ; let (branch_results, branch_out_states) = unzip results
         ; setState $ foldl' stateIncUsage state branch_out_states
                 -- NB foldl.  state is the *left* argument to stateIncUsage
         ; return branch_results }
@@ -700,15 +689,14 @@ getCodeScoped fcode
 -- Note the slightly subtle fixed point behaviour needed here
 
 getHeapUsage :: (VirtualHpOffset -> FCode a) -> FCode a
-getHeapUsage fcode
-  = do  { info_down <- getInfoDown
-        ; state <- getState
-        ; let   fstate_in = state { cgs_hp_usg  = initHpUsage }
-                (r, fstate_out) = doFCode (fcode hp_hw) info_down fstate_in
-                hp_hw = heapHWM (cgs_hp_usg fstate_out)        -- Loop here!
-
-        ; setState $ fstate_out { cgs_hp_usg = cgs_hp_usg state }
-        ; return r }
+getHeapUsage fcode = FCode $ \info_down state -> do {
+  ; hp_ref <- newIORef (error "Forcing heap usage too early")
+  ; hp_hw  <- unsafeDupableInterleaveIO (readIORef hp_ref)
+  ; let
+      fstate_in = state { cgs_hp_usg = initHpUsage }
+  ; (r, fstate_out) <- doFCode (fcode (heapHWM hp_hw)) info_down fstate_in
+  ; writeIORef hp_ref (cgs_hp_usg fstate_out)
+  ; return (r, fstate_out { cgs_hp_usg = cgs_hp_usg state }) }
 
 -- ----------------------------------------------------------------------------
 -- Combinators for emitting code
