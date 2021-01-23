@@ -278,6 +278,10 @@ dsExpr (HsConLikeOut _ con)   = dsConLike con
 dsExpr (HsIPVar {})           = panic "dsExpr: HsIPVar"
 dsExpr (HsOverLabel{})        = panic "dsExpr: HsOverLabel"
 
+dsExpr (GetField{})           = panic "dsExpr: GetField"
+dsExpr (Projection{})         = panic "dsExpr: Projection"
+dsExpr (RecordDotUpd{})       = panic "dsExpr: RecordDotUpd"
+
 dsExpr (HsLit _ lit)
   = do { warnAboutOverflowedLit lit
        ; dsLit (convertLit lit) }
