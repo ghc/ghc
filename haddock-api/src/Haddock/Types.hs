@@ -304,6 +304,8 @@ data DocName
 
 data DocNameI
 
+type instance NoGhcTc DocNameI = DocNameI
+
 type instance IdP DocNameI = DocName
 
 instance CollectPass DocNameI where
