@@ -12,5 +12,6 @@ tcPatSynDecl :: PatSynBind GhcRn GhcRn
              -> TcPragEnv
              -> TcM (LHsBinds GhcTc, TcGblEnv)
 
-tcPatSynBuilderBind :: PatSynBind GhcRn GhcRn -> TcM (LHsBinds GhcTc)
+tcPatSynBuilderBind :: TcPragEnv -> PatSynBind GhcRn GhcRn
+                    -> TcM (LHsBinds GhcTc)
 
