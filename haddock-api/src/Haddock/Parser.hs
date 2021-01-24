@@ -24,7 +24,7 @@ import GHC.Parser.Lexer ( mkPState, unP, ParseResult(POk, PFailed) )
 import GHC.Parser       ( parseIdentifier )
 import GHC.Types.Name.Occurrence ( occNameString )
 import GHC.Types.Name.Reader ( RdrName(..) )
-import GHC.Types.SrcLoc ( mkRealSrcLoc, GenLocated(..), unLoc )
+import GHC.Types.SrcLoc ( mkRealSrcLoc, GenLocated(..) )
 import GHC.Data.StringBuffer ( stringToStringBuffer )
 
 

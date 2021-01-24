@@ -624,7 +624,7 @@ availExportItem is_sig modMap thisMod semMod warnings exportedNames
             Just synifiedDecl -> pure synifiedDecl
             Nothing -> O.pprPanic "availExportItem" (O.text err)
 
-    availExportDecl :: HasCallStack => AvailInfo -> LHsDecl GhcRn
+    availExportDecl :: AvailInfo -> LHsDecl GhcRn
                     -> (DocForDecl Name, [(Name, DocForDecl Name)])
                     -> ErrMsgGhc [ ExportItem GhcRn ]
     availExportDecl avail decl (doc, subs)
@@ -979,7 +979,7 @@ extractDecl declMap name decl
               _ -> Left "internal: extractDecl (ClsInstD)"
       _ -> Left ("extractDecl: Unhandled decl for " ++ getOccString name)
 
-extractPatternSyn :: HasCallStack => Name -> Name -> [LHsTypeArg GhcRn] -> [LConDecl GhcRn] -> Either ErrMsg (LSig GhcRn)
+extractPatternSyn :: Name -> Name -> [LHsTypeArg GhcRn] -> [LConDecl GhcRn] -> Either ErrMsg (LSig GhcRn)
 extractPatternSyn nm t tvs cons =
   case filter matches cons of
     [] -> Left . O.showSDocUnsafe $
