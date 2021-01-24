@@ -2,7 +2,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
-
+{-# LANGUAGE RankNTypes #-}
 
 -----------------------------------------------------------------------------
 --
@@ -317,14 +317,14 @@ data CgState
 
      cgs_binds :: !CgBindings,
 
-     cgs_hp_usg :: !HeapUsage }
+     cgs_hp_usg :: HeapUsage }
 
 data HeapUsage   -- See Note [Virtual and real heap pointers]
   = HeapUsage {
-        virtHp :: VirtualHpOffset,       -- Virtual offset of highest-allocated word
-                                         --   Incremented whenever we allocate
-        realHp :: VirtualHpOffset        -- realHp: Virtual offset of real heap ptr
-                                         --   Used in instruction addressing modes
+        virtHp :: !VirtualHpOffset,       -- Virtual offset of highest-allocated word
+                                          --   Incremented whenever we allocate
+        realHp :: !VirtualHpOffset        -- realHp: Virtual offset of real heap ptr
+                                          --   Used in instruction addressing modes
     }
 
 type VirtualHpOffset = WordOff
@@ -451,7 +451,7 @@ withState (FCode fcode) newstate = FCode $ \info_down state -> do
   pure ((retval,state2), state)
 
 newUniqSupply :: FCode UniqSupply
-newUniqSupply = liftIO $ mkSplitUniqSupply 'c'
+newUniqSupply = liftIO (mkSplitUniqSupply 'c')
 
 newUnique :: FCode Unique
 newUnique = liftIO (uniqFromMask 'c')
@@ -689,7 +689,7 @@ getCodeScoped fcode
 
 getHeapUsage :: (VirtualHpOffset -> FCode a) -> FCode a
 getHeapUsage fcode = FCode $ \info_down state -> do {
-  ; hp_ref <- newIORef (error "Forcing heap usage too early")
+  ; hp_ref <- newIORef (error "Forcing VirtualHpOffset too early")
   ; hp_hw  <- unsafeDupableInterleaveIO (readIORef hp_ref)
   ; let
       fstate_in = state { cgs_hp_usg = initHpUsage }
