@@ -31,7 +31,7 @@ import GHC.Utils.Outputable as Outputable
 import GHC.Parser.Annotation (IsUnicodeSyntax(..))
 
 import Data.Char
-import Data.List
+import Data.List (intercalate, isPrefixOf)
 import Data.Maybe
 import Data.Version
 
