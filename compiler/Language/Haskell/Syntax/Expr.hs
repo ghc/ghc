@@ -595,7 +595,7 @@ data HsExpr p
 
   | HsTick
      (XTick p)
-     (Tickish (IdP p))
+     CoreTickish
      (LHsExpr p)                       -- sub-expression
 
   | HsBinTick
