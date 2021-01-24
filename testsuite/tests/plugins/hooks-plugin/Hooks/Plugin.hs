@@ -4,6 +4,7 @@ module Hooks.Plugin (plugin) where
 import GHC.Types.SourceText
 import GHC.Plugins
 import GHC.Hs.Expr
+import Language.Haskell.Syntax.Extension
 import GHC.Hs.Extension
 import GHC.Hs.Lit
 import GHC.Driver.Hooks
