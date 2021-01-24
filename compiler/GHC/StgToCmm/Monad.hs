@@ -2,7 +2,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
-
+{-# LANGUAGE RankNTypes #-}
 
 -----------------------------------------------------------------------------
 --
@@ -687,13 +687,18 @@ getCodeScoped fcode
 --
 -- Note the slightly subtle fixed point behaviour needed here
 
-getHeapUsage :: (VirtualHpOffset -> FCode a) -> FCode a
+getHeapUsage :: ((HasCallStack => VirtualHpOffset) -> FCode a) -> FCode a
 getHeapUsage fcode = FCode $ \info_down state -> do {
-  ; hp_ref <- newIORef (error "Forcing heap usage too early")
+  ; let
+      too_early :: HasCallStack => HeapUsage
+      too_early = error "Forcing VirtualHpOffset too early"
+  ; hp_ref <- newIORef too_early
   ; hp_hw  <- unsafeDupableInterleaveIO (readIORef hp_ref)
   ; let
       fstate_in = state { cgs_hp_usg = initHpUsage }
-  ; (r, fstate_out) <- doFCode (fcode (heapHWM hp_hw)) info_down fstate_in
+      get_hp :: HasCallStack => VirtualHpOffset
+      get_hp = heapHWM hp_hw
+  ; (r, fstate_out) <- doFCode (fcode get_hp) info_down fstate_in
   ; writeIORef hp_ref (cgs_hp_usg fstate_out)
   ; return (r, fstate_out { cgs_hp_usg = cgs_hp_usg state }) }
 
