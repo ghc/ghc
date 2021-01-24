@@ -2,7 +2,6 @@
 {-# LANGUAGE OverloadedLists, TypeFamilies, RebindableSyntax #-}
 
 import Prelude
-import Data.List
 
 main = do print []
           print [0,3..20]
