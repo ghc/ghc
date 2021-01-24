@@ -37,7 +37,7 @@ module GHC.Exception
 import GHC.Base
 import GHC.Show
 import GHC.Stack.Types
-import GHC.OldList
+import Data.List (intercalate, reverse) -- TODO: remove import list?
 import GHC.Prim
 import GHC.IO.Unsafe
 import {-# SOURCE #-} GHC.Stack.CCS

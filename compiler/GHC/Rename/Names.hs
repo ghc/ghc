@@ -518,6 +518,8 @@ calculateAvails home_unit iface mod_safe' want_boot imported_by =
 -- | Issue a warning if the user imports Data.List without either an import
 -- list or `qualified`. This is part of the migration plan for the
 -- `Data.List.singleton` proposal. See #17244.
+--
+-- Currently not used for anything.
 warnUnqualifiedImport :: ImportDecl GhcPs -> ModIface -> RnM ()
 warnUnqualifiedImport decl iface =
     whenWOptM Opt_WarnCompatUnqualifiedImports
@@ -546,7 +548,8 @@ warnUnqualifiedImport decl iface =
       ]
 
     -- Modules for which we warn if we see unqualified imports
-    qualifiedMods = mkModuleSet [ dATA_LIST ]
+    -- Currently empty.
+    qualifiedMods = mkModuleSet []
 
 
 warnRedundantSourceImport :: ModuleName -> SDoc

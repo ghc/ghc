@@ -126,7 +126,7 @@ import GHC.Stack
 
 import qualified Data.Coerce
 import Data.String
-import Data.OldList
+import Data.List (all, sortBy, span)
 import Data.Data
 import Data.Ord
 import Data.Version ( Version(..), makeVersion )
