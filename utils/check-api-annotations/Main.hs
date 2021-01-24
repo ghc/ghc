@@ -1,7 +1,7 @@
 {-# LANGUAGE RankNTypes #-}
 
 import Data.Data
-import Data.List
+import Data.List (intercalate)
 import GHC
 import GHC.Driver.Ppr
 import GHC.Utils.Outputable
