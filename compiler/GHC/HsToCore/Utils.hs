@@ -728,9 +728,9 @@ work out well:
 -}
 -- Remark: pattern selectors only occur in unrestricted patterns so we are free
 -- to select Many as the multiplicity of every let-expression introduced.
-mkSelectorBinds :: [[Tickish]]    -- ^ ticks to add, possibly
-                -> LPat GhcTc     -- ^ The pattern
-                -> CoreExpr       -- ^ Expression to which the pattern is bound
+mkSelectorBinds :: [[CoreTickish]] -- ^ ticks to add, possibly
+                -> LPat GhcTc      -- ^ The pattern
+                -> CoreExpr        -- ^ Expression to which the pattern is bound
                 -> DsM (Id,[(Id,CoreExpr)])
                 -- ^ Id the rhs is bound to, for desugaring strict
                 -- binds (see Note [Desugar Strict binds] in "GHC.HsToCore.Binds")
@@ -991,7 +991,7 @@ mk_fail_msg dflags ctx pat
 *                                                                      *
 ********************************************************************* -}
 
-mkOptTickBox :: [Tickish] -> CoreExpr -> CoreExpr
+mkOptTickBox :: [CoreTickish] -> CoreExpr -> CoreExpr
 mkOptTickBox = flip (foldr Tick)
 
 mkBinaryTickBox :: Int -> Int -> CoreExpr -> DsM CoreExpr
