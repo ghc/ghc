@@ -2055,7 +2055,7 @@ Constructors are rather like lambdas in this way.
 -}
 
 occAnalApp :: OccEnv
-           -> (Expr CoreBndr, [Arg CoreBndr], [Tickish])
+           -> (Expr CoreBndr, [Arg CoreBndr], [CoreTickish])
            -> (UsageDetails, Expr CoreBndr)
 -- Naked variables (not applied) end up here too
 occAnalApp env (Var fun, args, ticks)
