@@ -738,7 +738,7 @@ atJoinCeiling (fs, floats, expr')
   where
     (floats', ceils) = partitionAtJoinCeiling floats
 
-wrapTick :: Tickish -> FloatBinds -> FloatBinds
+wrapTick :: CoreTickish -> FloatBinds -> FloatBinds
 wrapTick t (FB tops ceils defns)
   = FB (mapBag wrap_bind tops) (wrap_defns ceils)
        (M.map (M.map wrap_defns) defns)

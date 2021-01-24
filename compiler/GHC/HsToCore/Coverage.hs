@@ -385,7 +385,7 @@ addTickLHsBind var_bind@(L _ (VarBind {})) = return var_bind
 addTickLHsBind patsyn_bind@(L _ (PatSynBind {})) = return patsyn_bind
 
 bindTick
-  :: TickDensity -> String -> SrcSpan -> FreeVars -> TM (Maybe Tickish)
+  :: TickDensity -> String -> SrcSpan -> FreeVars -> TM (Maybe CoreTickish)
 bindTick density name pos fvs = do
   decl_path <- getPathEntry
   let
@@ -1198,7 +1198,7 @@ allocTickBox boxLabel countEntries topOnly pos m =
 -- the tick application inherits the source position of its
 -- expression argument to support nested box allocations
 allocATickBox :: BoxLabel -> Bool -> Bool -> SrcSpan -> FreeVars
-              -> TM (Maybe Tickish)
+              -> TM (Maybe CoreTickish)
 allocATickBox boxLabel countEntries topOnly  pos fvs =
   ifGoodTickSrcSpan pos (do
     let
@@ -1212,7 +1212,7 @@ allocATickBox boxLabel countEntries topOnly  pos fvs =
 
 
 mkTickish :: BoxLabel -> Bool -> Bool -> SrcSpan -> OccEnv Id -> [String]
-          -> TM Tickish
+          -> TM CoreTickish
 mkTickish boxLabel countEntries topOnly pos fvs decl_path = do
 
   let ids = filter (not . isUnliftedType . idType) $ occEnvElts fvs
