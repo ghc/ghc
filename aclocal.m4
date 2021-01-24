@@ -1210,7 +1210,8 @@ AC_SUBST([LdHasFilelist])
 # thinks that target == host so it never checks the unqualified
 # tools for Windows. See #14274.
 AC_DEFUN([FP_PROG_AR],
-[if test -z "$fp_prog_ar"; then
+[AC_SUBST(fp_prog_ar,$AR)
+if test -z "$fp_prog_ar"; then
   if test "$HostOS" = "mingw32"
   then
     AC_PATH_PROG([fp_prog_ar], [ar])
