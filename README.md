@@ -41,11 +41,13 @@ Note: before building `haddock`, you need to build the subprojects
 `haddock-library` and `haddock-api`, in this order!
 The `cabal v2-build` takes care of this automatically.
 
-#### Using [`cabal v2-build`][cabal v2]
+#### Using `cabal`
+
+Requires cabal `>= 3.4` and GHC `== 9.0`:
 
 ```bash
-cabal v2-build -w ghc-8.10.1
-cabal v2-test -w ghc-8.10.1 all
+cabal build all --enable-tests
+cabal test all
 ```
 
 #### Using `stack`
@@ -55,22 +57,6 @@ stack init
 stack build
 export HADDOCK_PATH="$(stack exec which haddock)"
 stack test
-```
-
-#### Using Cabal sandboxes (deprecated)
-
-```bash
-cabal sandbox init
-cabal sandbox add-source haddock-library
-cabal sandbox add-source haddock-api
-cabal sandbox add-source haddock-test
-# adjust -j to the number of cores you want to use
-cabal install -j4 --dependencies-only --enable-tests
-cabal configure --enable-tests
-cabal build -j4
-# run the test suite
-export HADDOCK_PATH="dist/build/haddock/haddock"
-cabal test
 ```
 
 ### Git Branches
