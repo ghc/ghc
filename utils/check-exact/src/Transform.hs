@@ -556,7 +556,8 @@ balanceCommentsFB :: (Data b,Monad m)
   => LHsBind GhcPs -> LocatedA b -> TransformT m (LHsBind GhcPs, LocatedA b)
 balanceCommentsFB (L lf (FunBind x n (MG mx (L lm matches) o) t)) second = do
   logTr $ "balanceCommentsFB entered: " ++ showGhc (ss2range $ locA lf)
-  let (m:ms) = reverse matches
+  matches' <- balanceCommentsList' matches
+  let (m:ms) = reverse matches'
   (m',second') <- balanceComments' m second
   m'' <- balanceCommentsMatch m'
   logTr $ "balanceCommentsMatch done"
@@ -616,6 +617,14 @@ pushTrailingComments cs lb@(HsValBinds an (ValBinds _sk binds sigs))
     (lb'@(HsValBinds _ vb), _, ws2) = runTransform mempty (replaceDeclsValbinds lb decls')
 
 
+balanceCommentsList' :: (Monad m) => [LocatedA a] -> TransformT m [LocatedA a]
+balanceCommentsList' [] = return []
+balanceCommentsList' [x] = return [x]
+balanceCommentsList' (a:b:ls) = do
+  logTr $ "balanceCommentsList' entered"
+  (a',b') <- balanceComments' a b
+  r <- balanceCommentsList' (b':ls)
+  return (a':r)
 
 -- |Prior to moving an AST element, make sure any trailing comments belonging to
 -- it are attached to it, and not the following element. Of necessity this is a
@@ -629,17 +638,22 @@ balanceComments' la1 la2 = do
   logTr $ "balanceComments': (anchorFromLocatedA la1)=" ++ showGhc (anchorFromLocatedA la1)
   logTr $ "balanceComments': (sort cs2b)=" ++ showAst (sort cs2b)
   logTr $ "balanceComments': (move',stay')=" ++ showAst (move',stay')
+  logTr $ "balanceComments': (move'',stay'')=" ++ showAst (move'',stay'')
+  logTr $ "balanceComments': (move,stay)=" ++ showAst (move,stay)
   return (la1', la2')
   where
-    simpleBreak (r,_) = r > 1
+    simpleBreak n (r,_) = r > n
     L (SrcSpanAnn an1 loc1) f = la1
     L (SrcSpanAnn an2 loc2) s = la2
     anc1 = addCommentOrigDeltas $ apiAnnComments an1
     anc2 = addCommentOrigDeltas $ apiAnnComments an2
     cs1f = getFollowingComments anc1
     cs2b = priorComments anc2
-    (stay',move') = break simpleBreak (priorCommentsDeltas (anchorFromLocatedA la2) cs2b)
-    move = map snd move'
+    (stay'',move') = break (simpleBreak 1) (priorCommentsDeltas (anchorFromLocatedA la2) cs2b)
+    -- Need to also check for comments more closely attached to la1,
+    -- ie trailing on the same line
+    (move'',stay') = break (simpleBreak 0) (trailingCommentsDeltas (anchorFromLocatedA la1) (map snd stay''))
+    move = map snd (move'' ++ move')
     stay = map snd stay'
     cs1 = setFollowingComments anc1 (sort $ cs1f ++ move)
     cs2 = setPriorComments anc2 stay
@@ -720,9 +734,12 @@ commentOrigDeltas ls@(L _ (GHC.AnnComment _ p):_) = go p ls
       where
         p' = p
         (r,c) = ss2posEnd pp
-        op = if r == 0
+        op' = if r == 0
                then MovedAnchor (ss2delta (r,c+1) la)
                else MovedAnchor (ss2delta (r,c)   la)
+        op = if t == AnnEofComment && op' == MovedAnchor (DP (0,0))
+               then MovedAnchor (DP (1,0))
+               else op'
 
 addCommentOrigDeltas :: ApiAnnComments -> ApiAnnComments
 addCommentOrigDeltas (AnnComments cs) = AnnComments (commentOrigDeltas cs)
@@ -935,7 +952,7 @@ instance HasDecls (LocatedA (Match GhcPs (LocatedA (HsExpr GhcPs)))) where
         logTr "replaceDecls LMatch nonempty decls"
         -- Need to throw in a fresh where clause if the binds were empty,
         -- in the annotations.
-        case binds of
+        l' <- case binds of
           EmptyLocalBinds{} -> do
             logTr $ "replaceDecls LMatch empty binds"
             let
@@ -953,14 +970,17 @@ instance HasDecls (LocatedA (Match GhcPs (LocatedA (HsExpr GhcPs)))) where
             -- only move the comment if the original where clause was empty.
             -- toMove <- balanceTrailingComments m m
             -- insertCommentBefore (mkAnnKey m) toMove (matchApiAnn AnnWhere)
-            return ()
-          _ -> return ()
+            -- TODO: move trailing comments on the same line to before the binds
+            (L l' m1',m2') <- balanceComments' m m
+            logDataWithAnnsTr "Match.replaceDecls:(m1',m2')" (L l' m1',m2')
+            return l'
+          _ -> return l
 
         -- modifyAnnsT (captureOrderAnnKey (mkAnnKey m) newBinds)
         binds'' <- replaceDeclsValbinds binds newBinds
         -- let binds' = L (getLoc binds) binds''
         logDataWithAnnsTr "Match.replaceDecls:binds'" binds''
-        return (L l (Match xm c p (GRHSs xr rhs binds'')))
+        return (L l' (Match xm c p (GRHSs xr rhs binds'')))
   replaceDecls (L _ (Match _ _ _ (XGRHSs _))) _ = error "replaceDecls"
   replaceDecls (L _ (XMatch _)) _               = error "replaceDecls"
 
@@ -1229,7 +1249,7 @@ replaceDeclsValbinds (HsIPBinds {}) _new    = error "undefined replaceDecls HsIP
 replaceDeclsValbinds (EmptyLocalBinds _) new
     = do
         logTr "replaceDecls HsLocalBinds"
-        an <- whereAnnotation (DP (0,0))
+        an <- whereAnnotation (DP (1,4))
         let newBinds = concatMap decl2Bind new
             newSigs  = concatMap decl2Sig  new
         let decs = listToBag $ newBinds

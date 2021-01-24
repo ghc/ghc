@@ -55,7 +55,7 @@ tt = testOneFile "/home/alanz/mysrc/git.haskell.org/worktree/exactprint/_build/s
  -- "cases/LetIn1.hs" changeLetIn1
  -- "cases/WhereIn4.hs" changeWhereIn4
  -- "cases/AddDecl1.hs" changeAddDecl1
- "cases/AddDecl2.hs" changeAddDecl2
+ -- "cases/AddDecl2.hs" changeAddDecl2
  -- "cases/AddDecl3.hs" changeAddDecl3
  -- "cases/LocalDecls.hs" changeLocalDecls
  -- "cases/LocalDecls2.hs" changeLocalDecls2
@@ -64,6 +64,9 @@ tt = testOneFile "/home/alanz/mysrc/git.haskell.org/worktree/exactprint/_build/s
  -- "cases/AddLocalDecl1.hs" addLocaLDecl1
  -- "cases/AddLocalDecl2.hs" addLocaLDecl2
  -- "cases/AddLocalDecl3.hs" addLocaLDecl3
+ -- "cases/AddLocalDecl4.hs" addLocaLDecl4
+ -- "cases/AddLocalDecl5.hs" addLocaLDecl5
+ "cases/AddLocalDecl6.hs" addLocaLDecl6
 
 
 
@@ -326,10 +329,10 @@ changeAddDecl3 libdir ans top = do
 -- | Add a local declaration with signature to LocalDecl
 changeLocalDecls :: Changer
 changeLocalDecls libdir ans (L l p) = do
-  Right (declAnns, d@(L ld (ValD _ decl))) <- withDynFlags libdir (\df -> parseDecl df "decl" "nn = 2")
-  Right (sigAnns, s@(L ls (SigD _ sig)))   <- withDynFlags libdir (\df -> parseDecl df "sig"  "nn :: Int")
+  Right (_, s@(L ls (SigD _ sig)))  <- withDynFlags libdir (\df -> parseDecl df "sig"  "nn :: Int")
+  Right (_, d@(L ld (ValD _ decl))) <- withDynFlags libdir (\df -> parseDecl df "decl" "nn = 2")
   let decl' = setEntryDP' (L ld decl) (DP (1, 0))
-  let  sig' = setEntryDP' (L ls sig) (DP (0, 0))
+  let  sig' = setEntryDP' (L ls sig)  (DP (0, 0))
   let (p',(ans',_),_w) = runTransform mempty doAddLocal
       doAddLocal = everywhereM (mkM replaceLocalBinds) p
       replaceLocalBinds :: LMatch GhcPs (LHsExpr GhcPs)
@@ -342,7 +345,9 @@ changeLocalDecls libdir ans (L l p) = do
             (os:oldSigs) = concatMap decl2Sig  oldDecls'
             os' = setEntryDP' os (DP (2, 0))
         let sortKey = captureOrder' decls
-        let binds' = (HsValBinds van
+        let (ApiAnn anc (AnnList (Just (Anchor anc2 _)) a b c d) cs) = van
+        let van' = (ApiAnn anc (AnnList (Just (Anchor anc2 (MovedAnchor (DP (1,4))))) a b c d) cs)
+        let binds' = (HsValBinds van'
                           (ValBinds sortKey (listToBag $ decl':oldBinds)
                                           (sig':os':oldSigs)))
         return (L lm (Match an mln pats (GRHSs noExtField rhs binds')))
@@ -366,8 +371,9 @@ changeLocalDecls2 libdir ans (L l p) = do
       replaceLocalBinds m@(L lm (Match ma mln pats (GRHSs _ rhs EmptyLocalBinds{}))) = do
         newSpan <- uniqueSrcSpanT
         let anc = (Anchor (rs newSpan) (MovedAnchor (DP (1,2))))
+        let anc2 = (Anchor (rs newSpan) (MovedAnchor (DP (1,4))))
         let an = ApiAnn anc
-                        (AnnList (Just anc) Nothing Nothing
+                        (AnnList (Just anc2) Nothing Nothing
                                  [(undeltaSpan (rs newSpan) AnnWhere (DP (0,0)))] [])
                         noCom
         let decls = [s,d]
@@ -466,18 +472,6 @@ addLocaLDecl3 libdir ans lp = do
   Right (_, newDecl@(L ld (ValD _ decl))) <- withDynFlags libdir (\df -> parseDecl df "decl" "nn = 2")
   let
       doAddLocal = do
-         -- logDataWithAnnsTr "parsed:" lp
-         -- logDataWithAnnsTr "newDecl:" newDecl
-         -- tlDecs <- hsDecls lp
-         -- let parent = head tlDecs
-         -- balanceComments parent (head $ tail tlDecs)
-
-         -- (parent',_) <- modifyValD (getLoc parent) parent $ \m decls -> do
-         --   setPrecedingLinesT newDecl 1 0
-         --   moveTrailingComments m (last decls)
-         --   return ((decls++[newDecl]),Nothing)
-
-         -- replaceDecls lp (parent':tail tlDecs)
          (d1:d2:_) <- hsDecls lp
          (d1'',d2') <- balanceComments d1 d2
 
@@ -487,13 +481,83 @@ addLocaLDecl3 libdir ans lp = do
            return (((d':ds) ++ [newDecl']),Nothing)
            -- return (d':ds,Nothing)
 
-         replaceDecls lp [parent',d2']
+         replaceDecls (anchorEof lp) [parent',d2']
 
   (lp',(ans',_),_w) <- runTransformT mempty doAddLocal
   -- putStrLn $ "log\n" ++ intercalate "\n" _w
   debugM $ "log:[\n" ++ intercalate "\n" _w ++ "]log end\n"
   return (ans,lp')
 
+-- ---------------------------------------------------------------------
+
+addLocaLDecl4 :: Changer
+addLocaLDecl4 libdir ans lp = do
+  Right (_, newDecl@(L ld (ValD _ decl))) <- withDynFlags libdir (\df -> parseDecl df "decl" "nn = 2")
+  Right (_, newSig@(L ld (SigD _ sig)))   <- withDynFlags libdir (\df -> parseDecl df "sig"  "nn :: Int")
+  -- putStrLn $ "addLocaLDecl4:lp=" ++ showGhc lp
+  let
+      doAddLocal = do
+         (parent:ds) <- hsDecls lp
+
+         let newDecl' = setEntryDP' newDecl (DP (1, 0))
+         let newSig'  = setEntryDP' newSig  (DP (1, 4))
+
+         (parent',_) <- modifyValD (getLocA parent) parent $ \_m decls -> do
+           return ((decls++[newSig',newDecl']),Nothing)
+
+         replaceDecls (anchorEof lp) (parent':ds)
+
+  (lp',(ans',_),_w) <- runTransformT mempty doAddLocal
+  -- putStrLn $ "log\n" ++ intercalate "\n" _w
+  debugM $ "log:[\n" ++ intercalate "\n" _w ++ "]log end\n"
+  return (ans,lp')
+
+
+-- ---------------------------------------------------------------------
+
+addLocaLDecl5 :: Changer
+addLocaLDecl5 libdir ans lp = do
+  let
+      doAddLocal = do
+         decls <- hsDecls lp
+         [s1,d1,d2,d3] <- balanceCommentsList decls
+
+         let d3' = setEntryDP' d3 (DP (2,0))
+
+         (d1',_) <- modifyValD (getLocA d1) d1 $ \_m _decls -> do
+           let d2' = setEntryDP' d2 (DP (1,0))
+           return ([d2'],Nothing)
+         replaceDecls lp [s1,d1',d3']
+
+  (lp',(ans',_),_w) <- runTransformT mempty doAddLocal
+  -- putStrLn $ "log\n" ++ intercalate "\n" _w
+  debugM $ "log:[\n" ++ intercalate "\n" _w ++ "]log end\n"
+  return (ans,lp')
+-- ---------------------------------------------------------------------
+
+addLocaLDecl6 :: Changer
+addLocaLDecl6 libdir ans lp = do
+  Right (_, newDecl@(L ld (ValD _ decl))) <- withDynFlags libdir (\df -> parseDecl df "decl" "y = 3")
+  let
+      -- declAnns' = setPrecedingLines newDecl 1 4 declAnns
+      newDecl' = setEntryDP' newDecl (DP (1, 4))
+      doAddLocal = do
+        decls <- hsDecls lp
+        [d1,d2] <- balanceCommentsList decls
+
+        let L _ (ValD _ (FunBind _ _ (MG _ (L _ ms) _) _)) = d1
+        -- [m1,m2] <- balanceCommentsList' ms
+        let [m1,m2] = ms
+
+        (d1',_) <- modifyValD (getLocA m1) d1 $ \_m decls -> do
+           return ((newDecl' : decls),Nothing)
+        replaceDecls lp [d1', d2]
+        -- replaceDecls lp [d1, d2]
+
+  (lp',(ans',_),_w) <- runTransformT mempty doAddLocal
+  -- putStrLn $ "log:\n" ++ intercalate "\n" _w
+  debugM $ "log:[\n" ++ intercalate "\n" _w ++ "]log end\n"
+  return (ans,lp')
 
 -- ---------------------------------------------------------------------
 -- Next section to be moved to the appropriate library

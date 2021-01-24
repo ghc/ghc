@@ -87,6 +87,7 @@ defaultEPState as = EPState
              , dPriorMoved = Nothing
              , dPriorEndPosition = (1,1)
              , uAnchorSpan = badRealSrcSpan
+             , uExtraDP = Nothing
              , epComments = rogueComments as
              }
 
@@ -143,6 +144,10 @@ data EPState = EPState
              , uAnchorSpan :: !RealSrcSpan -- ^ in pre-changed AST
                                           -- reference frame, from
                                           -- Annotation
+             , uExtraDP :: !(Maybe DeltaPos) -- ^ Used to anchor a
+                                             -- list, added to DP of
+                                             -- first element in the
+                                             -- list
 
              -- Print phase
              , epPos        :: !Pos -- ^ Current output position
@@ -241,9 +246,16 @@ enterAnn (Entry anchor' cs) a = do
                off (ss2delta priorEndAfterComments curAnchor)
   mpm <- getPriorMovedD
   setPriorMovedD Nothing
-  let edp = case anchor_op anchor' of
+  let edp'' = case anchor_op anchor' of
         MovedAnchor dp -> dp
         _ -> maybe edp' id mpm
+  med <- getExtraDP
+  setExtraDP Nothing
+  let edp = case med of
+        Nothing -> edp''
+        -- Just dp -> addDP dp edp''
+        Just dp -> dp -- Replace original with desired one. Allows all list entry values to be DP (1,0)
+  when (isJust med) $ debugM $ "enterAnn:(med,edp)=" ++ show (med,edp)
   -- Preparation complete, perform the action
   when (priorEndAfterComments < spanStart) (do
     debugM $ "enterAnn.dPriorEndPosition:spanStart=" ++ show spanStart
@@ -418,7 +430,7 @@ instance (ExactPrint a) => ExactPrint (AnnotatedList a) where
 
   exact (AnnotatedList an ls) = do
     debugM $ "AnnotatedList:an=" ++ show an
-    markAnnotated ls
+    markAnnotatedWithLayout ls
 
 
 -- ---------------------------------------------------------------------
@@ -679,7 +691,14 @@ printOneComment c@(Comment _str loc _mo) = do
         let dp = ss2delta pe (anchor loc)
         debugM $ "printOneComment:(dp,pe,anchor loc)=" ++ showGhc (dp,pe,ss2pos $ anchor loc)
         return dp
-  dp' <- adjustDeltaForOffsetM dp
+  dp'' <- adjustDeltaForOffsetM dp
+  mep <- getExtraDP
+  dp' <- case mep of
+    Nothing -> return dp''
+    Just edp -> do
+      -- setExtraDP Nothing
+      debugM $ "printOneComment:edp=" ++ show edp
+      return edp
   LayoutStartCol dOff <- gets dLHS
   debugM $ "printOneComment:(dp,dp',dOff,mpm)=" ++ showGhc (dp,dp',dOff,mpm)
   setPriorEndD (ss2posEnd (anchor loc))
@@ -1594,10 +1613,16 @@ instance ExactPrint (HsLocalBinds GhcPs) where
   -- exact (HsValBinds _ bs) = markAnnotated bs
   exact (HsValBinds an valbinds@(ValBinds sortKey binds sigs)) = do
     markLocatedAAL an al_rest AnnWhere
-    let anc = case an of
-                ApiAnnNotUsed -> Nothing
-                _ -> al_anchor $ anns an
-    markAnnotated (AnnotatedList anc valbinds)
+    let manc = case an of
+                 ApiAnnNotUsed -> Nothing
+                 _ -> al_anchor $ anns an
+
+    case manc of
+      Just (Anchor _ (MovedAnchor dp)) -> do
+        setExtraDP (Just dp)
+      _ -> return ()
+    -- markAnnotated (AnnotatedList anc valbinds)
+    markAnnotatedWithLayout valbinds
 
   exact (HsIPBinds an bs)
     = markAnnList an (markLocatedAAL an al_rest AnnWhere >> markAnnotated bs)
@@ -4051,6 +4076,14 @@ setPriorMovedD :: (Monad m, Monoid w) => Maybe DeltaPos -> EP w m ()
 setPriorMovedD md = do
   debugM $ "setPriorMovedD:" ++ show md
   modify (\s -> s {dPriorMoved = md})
+
+getExtraDP :: (Monad m, Monoid w) => EP w m (Maybe DeltaPos)
+getExtraDP = gets uExtraDP
+
+setExtraDP :: (Monad m, Monoid w) => Maybe DeltaPos -> EP w m ()
+setExtraDP md = do
+  debugM $ "setExtraDP:" ++ show md
+  modify (\s -> s {uExtraDP = md})
 
 getPriorEndD :: (Monad m, Monoid w) => EP w m Pos
 getPriorEndD = gets dPriorEndPosition
