@@ -166,7 +166,7 @@ data SimplCont
       , sc_cont :: SimplCont }
 
   | TickIt              -- (TickIt t K)[e] = K[ tick t e ]
-        Tickish         -- Tick tickish <hole>
+        CoreTickish     -- Tick tickish <hole>
         SimplCont
 
 type StaticEnv = SimplEnv       -- Just the static part is relevant
