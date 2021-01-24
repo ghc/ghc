@@ -1,6 +1,10 @@
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE FlexibleInstances #-}
+
+{-
+   these are needed for the Outputable instance for GenTickish,
+   since we need XTickishId to be Outputable. This should immediately
+   resolve to something like Id.
+ -}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-}
 
