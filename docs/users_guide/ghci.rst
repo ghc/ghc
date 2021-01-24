@@ -3196,14 +3196,15 @@ clean GHCi session we might see something like this:
 .. code-block:: none
 
     ghci> :seti
-    base language is: Haskell2010
+    base language is: GHC2021
     with the following modifiers:
-      -XNoMonomorphismRestriction
-      -XNoDatatypeContexts
-      -XNondecreasingIndentation
       -XExtendedDefaultRules
+      -XNoMonomorphismRestriction
     GHCi-specific dynamic flag settings:
     other dynamic, non-language, flag settings:
+      -fexternal-dynamic-refs
+      -fignore-optim-changes
+      -fignore-hpc-changes
       -fimplicit-import-qualified
     warning settings:
 

@@ -47,6 +47,22 @@ Language
         -- Alternatively,
         -- type Codomain ('KProxy :: KProxy o) = NatTr (Proxy :: o -> Type)
 
+* The :extension:`GHC2021` language is supported now. It builds on top of
+  Haskell2010, adding several stable and conservative extensions, and removing
+  deprecated ones. It is now also the “default” langauge set that is active
+  when no other language set, such as :extension:`Haskell98` or
+  :extension:`Haskell2010`,  is explicitly loaded (e.g via Cabal’s
+  ``default-language``).
+
+  Because :extension:`GHC2021` includes
+  :extension:`GeneralizedNewtypeDeriving`, which is not safe for Safe Haskell,
+  users of Safe Haskell are advised to use :extension:`Haskell2010` explicitly.
+
+  The default mode of GHC until 9.0 included
+  :extension:`NondecreasingIndentation`, but :extension:`GHC2021` does not.
+  This may break code implicitly using this extension.
+
+
 Compiler
 ~~~~~~~~
 
