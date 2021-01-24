@@ -717,7 +717,7 @@ substDVarSet subst fvs
      | otherwise = tyCoFVsOfType (lookupTCvSubst subst fv) (const True) emptyVarSet $! acc
 
 ------------------
-substTickish :: Subst -> Tickish -> Tickish
+substTickish :: Subst -> CoreTickish -> CoreTickish
 substTickish subst (Breakpoint ext n ids)
    = Breakpoint ext n (map do_one ids)
  where
