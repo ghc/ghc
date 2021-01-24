@@ -23,6 +23,7 @@
 #include "Prelude.h"
 #include "ThreadLabels.h"
 #include "Updates.h"
+#include "Profiling.h"
 #include "Proftimer.h"
 #include "ProfHeap.h"
 #include "Weak.h"
@@ -70,6 +71,11 @@
 /* -----------------------------------------------------------------------------
  * Global variables
  * -------------------------------------------------------------------------- */
+
+/* Counter for number of requests for backtrace, wrap around allowed
+ * Typically triggered by SIGQUIT, i.e. Ctrl^\ pressed by user
+ */
+volatile StgWord backtrace_request = 0;
 
 #if !defined(THREADED_RTS)
 // Blocked/sleeping threads
@@ -481,6 +487,24 @@ run_thread:
         r = StgRun((StgFunPtr) stg_returnToStackTop, &cap->r);
         cap = regTableToCapability(r);
         ret = r->rRet;
+
+// TODO should really print the old cap->r and tso here, to reveal what has
+//      been keeping the CPU busy, but I doubt the access to data pointed to
+//      by the old pointers is still valid and defined behavior, after
+//      returned from `StgRun()`, esp. a context switch is expected to have
+//      been requested (or actually done?).
+//
+//      Printing against the new cap and tso as for now
+#if defined(PROFILING)
+        /* Follow backtrace_request with cost center stack dumped */
+        StgTSO *tso = cap->r.rCurrentTSO;
+        if(tso->backtrace_response != backtrace_request) {
+            tso->backtrace_response = backtrace_request;
+            fprintf(stderr, "Backtrace #%d of thread %d @ %d:\n",
+                    backtrace_request, tso->id, kernelThreadId());
+            fprintBacktrace(stderr, tso->prof.cccs, tso);
+        }
+#endif
         break;
     }
 

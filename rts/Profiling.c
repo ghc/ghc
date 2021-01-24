@@ -1005,6 +1005,54 @@ done:
     return;
 }
 
+void fprintBacktrace (FILE *f, CostCentreStack *ccs, StgTSO *tso) {
+    bool is_caf = fprintCallStack(ccs);
+
+    // traverse the stack down to the enclosing update frame to
+    // find out where this CCS was evaluated from...
+
+    StgStack *stack = tso->stackobj;
+    StgPtr frame = stack->sp;
+    CostCentreStack *prev_ccs = ccs;
+    uint32_t depth = 0;
+    const uint32_t MAX_DEPTH = 10;
+
+    for (; is_caf && depth < MAX_DEPTH; depth++)
+    {
+        switch (get_itbl((StgClosure*)frame)->type)
+        {
+        case UPDATE_FRAME:
+            ccs = ((StgUpdateFrame*)frame)->header.prof.ccs;
+            frame += sizeofW(StgUpdateFrame);
+            if (ccs == CCS_MAIN) {
+                goto done;
+            }
+            if (ccs == prev_ccs) {
+                // ignore if this is the same as the previous stack,
+                // we're probably in library code and haven't
+                // accumulated any more interesting stack items
+                // since the last update frame.
+                break;
+            }
+            prev_ccs = ccs;
+            fprintf(f, "  --> evaluated by: ");
+            is_caf = fprintCallStack(ccs);
+            break;
+        case UNDERFLOW_FRAME:
+            stack = ((StgUnderflowFrame*)frame)->next_chunk;
+            frame = stack->sp;
+            break;
+        case STOP_FRAME:
+            goto done;
+        default:
+            frame += stack_frame_sizeW((StgClosure*)frame);
+            break;
+        }
+    }
+done:
+    return;
+}
+
 #if defined(DEBUG)
 void
 debugCCS( CostCentreStack *ccs )
