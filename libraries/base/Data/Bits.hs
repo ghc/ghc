@@ -63,12 +63,16 @@ import GHC.Enum
 import GHC.Read
 import GHC.Show
 
+-- $setup
+-- >>> import Prelude
+-- >>> import Data.Word
+
 -- | A more concise version of @complement zeroBits@.
 --
--- >>> complement zeroBits :: Word == oneBits :: Word
+-- >>> complement (zeroBits :: Word) == (oneBits :: Word)
 -- True
 --
--- >>> complement oneBits :: Word == zeroBits :: Word
+-- >>> complement (oneBits :: Word) == (zeroBits :: Word)
 -- True
 --
 -- = Note
@@ -142,7 +146,7 @@ instance (Bits a) => Monoid (Ior a) where
 
 -- | Monoid under bitwise XOR.
 --
--- >>> getXor (Xor 0xab <> 0x12) :: Word8
+-- >>> getXor (Xor 0xab <> Xor 0x12) :: Word8
 -- 185
 --
 -- @since 4.16
