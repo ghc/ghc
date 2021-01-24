@@ -283,7 +283,7 @@ ppCall opts ct fptr args attrs = case fptr of
 
     where
         ppCall' (LlvmFunctionDecl _ _ cc ret argTy params _) =
-            let tc = if ct == TailCall then text "tail " else empty
+            let tc = if ct == TailCall then text "ret musttail " else empty
                 ppValues = ppCallParams opts (map snd params) args
                 ppArgTy  = (ppCommaJoin $ map (ppr . fst) params) <>
                            (case argTy of
