@@ -116,7 +116,7 @@ exprSize (Tick n e)      = tickSize n + exprSize e
 exprSize (Type _)        = 1
 exprSize (Coercion _)    = 1
 
-tickSize :: Tickish -> Int
+tickSize :: CoreTickish -> Int
 tickSize (ProfNote _ _ _) = 1
 tickSize _ = 1
 

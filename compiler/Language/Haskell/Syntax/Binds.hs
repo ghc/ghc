@@ -227,7 +227,7 @@ data HsBindLR idL idR
 
         fun_matches :: MatchGroup idR (LHsExpr idR),  -- ^ The payload
 
-        fun_tick :: [Tickish Id] -- ^ Ticks to put on the rhs, if any
+        fun_tick :: [CoreTickish] -- ^ Ticks to put on the rhs, if any
     }
 
   -- | Pattern Binding
@@ -247,7 +247,7 @@ data HsBindLR idL idR
         pat_ext    :: XPatBind idL idR, -- ^ See Note [Bind free vars]
         pat_lhs    :: LPat idL,
         pat_rhs    :: GRHSs idR (LHsExpr idR),
-        pat_ticks  :: ([Tickish Id], [[Tickish Id]])
+        pat_ticks  :: ([CoreTickish], [[CoreTickish]])
                -- ^ Ticks to put on the rhs, if any, and ticks to put on
                -- the bound variables.
     }

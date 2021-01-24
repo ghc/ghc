@@ -1161,7 +1161,7 @@ simplCoercion env co
 -- long as this is a non-scoping tick, to let case and application
 -- optimisations apply.
 
-simplTick :: SimplEnv -> Tickish -> InExpr -> SimplCont
+simplTick :: SimplEnv -> CoreTickish -> InExpr -> SimplCont
           -> SimplM (SimplFloats, OutExpr)
 simplTick env tickish expr cont
   -- A scoped tick turns into a continuation, so that we can spot

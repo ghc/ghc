@@ -19,7 +19,7 @@
 module GHC.Core (
         -- * Main data types
         Expr(..), Alt(..), Bind(..), AltCon(..), Arg,
-        GenTickish(..), Tickish, StgTickish, CmmTickish, XTickishId,
+        GenTickish(..), CoreTickish, StgTickish, CmmTickish, XTickishId,
         TickishScoping(..), TickishPlacement(..),
         CoreProgram, CoreExpr, CoreAlt, CoreBind, CoreArg, CoreBndr,
         TaggedExpr, TaggedAlt, TaggedBind, TaggedArg, TaggedBndr(..), deTagExpr,
@@ -124,7 +124,6 @@ import GHC.Unit.Module
 import GHC.Types.Basic
 import GHC.Types.Unique.Set
 import GHC.Types.SrcLoc ( RealSrcSpan, containsSpan )
-import GHC.Hs.Extension ( NoExtField )
 
 import GHC.Utils.Binary
 import GHC.Utils.Misc
@@ -132,6 +131,8 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 import GHC.Driver.Ppr
+
+import Language.Haskell.Syntax.Extension ( NoExtField )
 
 import Data.Data hiding (TyCon)
 import Data.Int
@@ -275,7 +276,7 @@ data Expr b
   | Case  (Expr b) b Type [Alt b]   -- See Note [Case expression invariants]
                                     -- and Note [Why does Case have a 'Type' field?]
   | Cast  (Expr b) Coercion
-  | Tick  Tickish (Expr b)
+  | Tick  CoreTickish (Expr b)
   | Type  Type
   | Coercion Coercion
   deriving Data
@@ -966,7 +967,7 @@ type instance XTickishId 'TickishCore = Id
 type instance XTickishId 'TickishStg = Id
 type instance XTickishId 'TickishCmm = NoExtField
 
-type Tickish    = GenTickish 'TickishCore
+type CoreTickish = GenTickish 'TickishCore
 type StgTickish = GenTickish 'TickishStg
 -- | Tickish in Cmm context (annotations only)
 type CmmTickish = GenTickish 'TickishCmm
@@ -2253,8 +2254,8 @@ stripNArgs _ _ = Nothing
 
 -- | Like @collectArgs@, but also collects looks through floatable
 -- ticks if it means that we can find more arguments.
-collectArgsTicks :: (Tickish -> Bool) -> Expr b
-                 -> (Expr b, [Arg b], [Tickish])
+collectArgsTicks :: (CoreTickish -> Bool) -> Expr b
+                 -> (Expr b, [Arg b], [CoreTickish])
 collectArgsTicks skipTick expr
   = go expr [] []
   where
@@ -2339,7 +2340,7 @@ data AnnExpr' bndr annot
   | AnnLet      (AnnBind bndr annot) (AnnExpr bndr annot)
   | AnnCast     (AnnExpr bndr annot) (annot, Coercion)
                    -- Put an annotation on the (root of) the coercion
-  | AnnTick     Tickish (AnnExpr bndr annot)
+  | AnnTick     CoreTickish (AnnExpr bndr annot)
   | AnnType     Type
   | AnnCoercion Coercion
 
@@ -2360,8 +2361,8 @@ collectAnnArgs expr
     go (_, AnnApp f a) as = go f (a:as)
     go e               as = (e, as)
 
-collectAnnArgsTicks :: (Tickish -> Bool) -> AnnExpr b a
-                       -> (AnnExpr b a, [AnnExpr b a], [Tickish])
+collectAnnArgsTicks :: (CoreTickish -> Bool) -> AnnExpr b a
+                       -> (AnnExpr b a, [AnnExpr b a], [CoreTickish])
 collectAnnArgsTicks tickishOk expr
   = go expr [] []
   where
