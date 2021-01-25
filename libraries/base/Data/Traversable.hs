@@ -78,6 +78,7 @@ import GHC.Base ( Applicative(..), Monad(..), Monoid, Maybe(..), NonEmpty(..),
                   ($), (.), id, flip )
 import GHC.Generics
 import qualified GHC.List as List ( foldr )
+import GHC.Tuple (Solo (..))
 
 -- $setup
 -- >>> import Prelude
@@ -270,6 +271,9 @@ instance Traversable NonEmpty where
 instance Traversable (Either a) where
     traverse _ (Left x) = pure (Left x)
     traverse f (Right y) = Right <$> f y
+
+-- | @since 4.15
+deriving instance Traversable Solo
 
 -- | @since 4.7.0.0
 instance Traversable ((,) a) where

@@ -72,6 +72,7 @@ import Data.List.NonEmpty (NonEmpty(..))
 import Data.Ord (Down(Down))
 import Data.Complex (Complex((:+)))
 
+import GHC.Tuple (Solo (..))
 import GHC.Read (expectP, list, paren)
 
 import Text.ParserCombinators.ReadPrec (ReadPrec, readPrec_to_S, readS_to_Prec)
@@ -506,13 +507,28 @@ instance Show2 (,) where
     liftShowsPrec2 sp1 _ sp2 _ _ (x, y) =
         showChar '(' . sp1 0 x . showChar ',' . sp2 0 y . showChar ')'
 
+-- | @since 4.15
+instance Eq1 Solo where
+  liftEq eq (Solo a) (Solo b) = a `eq` b
+
 -- | @since 4.9.0.0
 instance (Eq a) => Eq1 ((,) a) where
     liftEq = liftEq2 (==)
 
+-- | @since 4.15
+instance Ord1 Solo where
+  liftCompare cmp (Solo a) (Solo b) = cmp a b
+
 -- | @since 4.9.0.0
 instance (Ord a) => Ord1 ((,) a) where
     liftCompare = liftCompare2 compare
+
+-- | @since 4.15
+instance Read1 Solo where
+    liftReadPrec rp _ = readData (readUnaryWith rp "Solo" Solo)
+
+    liftReadListPrec = liftReadListPrecDefault
+    liftReadList     = liftReadListDefault
 
 -- | @since 4.9.0.0
 instance (Read a) => Read1 ((,) a) where
@@ -520,6 +536,10 @@ instance (Read a) => Read1 ((,) a) where
 
     liftReadListPrec = liftReadListPrecDefault
     liftReadList     = liftReadListDefault
+
+-- | @since 4.15
+instance Show1 Solo where
+    liftShowsPrec sp _ d (Solo x) = showsUnaryWith sp "Solo" d x
 
 -- | @since 4.9.0.0
 instance (Show a) => Show1 ((,) a) where
