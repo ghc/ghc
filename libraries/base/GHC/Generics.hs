@@ -743,6 +743,7 @@ import GHC.Enum    ( Bounded, Enum )
 import GHC.Read    ( Read(..) )
 import GHC.Show    ( Show(..), showString )
 import GHC.Stack.Types ( SrcLoc(..) )
+import GHC.Tuple   (Solo (..))
 import GHC.Unicode ( GeneralCategory(..) )
 import GHC.Fingerprint.Type ( Fingerprint(..) )
 
@@ -1417,6 +1418,9 @@ deriving instance Generic (Proxy t)
 -- | @since 4.6.0.0
 deriving instance Generic ()
 
+-- | @since 4.15
+deriving instance Generic (Solo a)
+
 -- | @since 4.6.0.0
 deriving instance Generic ((,) a b)
 
@@ -1461,6 +1465,9 @@ deriving instance Generic1 (Either a)
 
 -- | @since 4.6.0.0
 deriving instance Generic1 Proxy
+
+-- | @since 4.15
+deriving instance Generic1 Solo
 
 -- | @since 4.6.0.0
 deriving instance Generic1 ((,) a)
