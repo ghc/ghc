@@ -184,6 +184,7 @@ class Foldable t where
     -- 2666668666666
     --
     fold :: Monoid m => t m -> m
+    {-# INLINE fold #-}
     fold = foldMap id
 
     -- | Map each element of the structure into a monoid, and combine the
@@ -712,6 +713,8 @@ instance Foldable [] where
     foldl'  = List.foldl'
     foldl1  = List.foldl1
     foldr   = List.foldr
+    foldMap = (mconcat .) . map -- See Note [Monoidal list folds]
+    fold    = mconcat           -- See Note [Monoidal list folds]
     foldr1  = List.foldr1
     length  = List.length
     maximum = List.maximum
@@ -1458,6 +1461,19 @@ minimumBy to foldl1 solves the issue, assuming GHC's strictness analysis can the
 make these functions only use O(1) stack space.  As of base 4.16, we have
 switched to employing foldl' over foldl1, not relying on GHC's optimiser.  See
 https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
+-}
+
+{-
+Note [Monoidal list folds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Folds of lists of monoid elements should generally use 'mconcat', rather than
+@foldr mappend mempty@.  This allows specialized mconcat implementations an
+opportunity to combine elements efficiently.  For example, `mappend` of strict
+`Text` and `ByteString` values typically needs to reallocate and copy the
+existing data, making incremental construction expensive (likely quadratic in
+the number of elements combined).  The `mconcat` implementations for `Text` and
+`ByteString` preallocate the required storage, and then combine all the list
+elements in a single pass.
 -}
 
 --------------

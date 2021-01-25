@@ -22,6 +22,7 @@ module Data.Semigroup.Internal where
 
 import GHC.Base hiding (Any)
 import GHC.Enum
+import qualified GHC.List as List
 import GHC.Num
 import GHC.Read
 import GHC.Show
@@ -230,6 +231,10 @@ instance Num a => Semigroup (Sum a) where
 -- | @since 2.01
 instance Num a => Monoid (Sum a) where
         mempty = Sum 0
+        -- By default, we would get a lazy right fold. This forces the use of a strict
+        -- left fold instead.
+        mconcat = List.foldl' (<>) mempty
+        {-# INLINE mconcat #-}
 
 -- | @since 4.8.0.0
 instance Functor Sum where
@@ -268,6 +273,10 @@ instance Num a => Semigroup (Product a) where
 -- | @since 2.01
 instance Num a => Monoid (Product a) where
         mempty = Product 1
+        -- By default, we would get a lazy right fold. This forces the use of a strict
+        -- left fold instead.
+        mconcat = List.foldl' (<>) mempty
+        {-# INLINE mconcat #-}
 
 -- | @since 4.8.0.0
 instance Functor Product where
