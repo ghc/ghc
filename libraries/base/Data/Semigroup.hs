@@ -112,6 +112,7 @@ import           Data.Bitraversable
 import           Data.Coerce
 import           Data.Data
 import           GHC.Generics
+import qualified GHC.List as List
 
 -- $setup
 -- >>> import Prelude
@@ -172,6 +173,10 @@ instance Ord a => Semigroup (Min a) where
 -- | @since 4.9.0.0
 instance (Ord a, Bounded a) => Monoid (Min a) where
   mempty = maxBound
+  -- By default, we would get a lazy right fold. This forces the use of a strict
+  -- left fold instead.
+  mconcat = List.foldl' (<>) mempty
+  {-# INLINE mconcat #-}
 
 -- | @since 4.9.0.0
 instance Functor Min where
@@ -242,6 +247,10 @@ instance Ord a => Semigroup (Max a) where
 -- | @since 4.9.0.0
 instance (Ord a, Bounded a) => Monoid (Max a) where
   mempty = minBound
+  -- By default, we would get a lazy right fold. This forces the use of a strict
+  -- left fold instead.
+  mconcat = List.foldl' (<>) mempty
+  {-# INLINE mconcat #-}
 
 -- | @since 4.9.0.0
 instance Functor Max where
@@ -483,6 +492,9 @@ instance Monoid m => Semigroup (WrappedMonoid m) where
 -- | @since 4.9.0.0
 instance Monoid m => Monoid (WrappedMonoid m) where
   mempty = WrapMonoid mempty
+  -- This ensures that we use whatever mconcat is defined for the wrapped
+  -- Monoid.
+  mconcat = coerce (mconcat :: [m] -> m)
 
 -- | @since 4.9.0.0
 instance Enum a => Enum (WrappedMonoid a) where
