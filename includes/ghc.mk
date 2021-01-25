@@ -185,6 +185,9 @@ $$(includes_$1_H_PLATFORM) : includes/ghc.mk includes/Makefile | $$$$(dir $$$$@)
 	@echo "#define BUILD_VENDOR  \"$(BuildVendor_$1_CPP)\""     >> $$@
 	@echo "#define HOST_VENDOR  \"$(HostVendor_$1_CPP)\""       >> $$@
 	@echo                                                       >> $$@
+ifeq "$$(SettingsUseDistroMINGW)" "YES"
+	@echo "#define USE_INPLACE_MINGW_TOOLCHAIN 1"               >> $$@
+endif
 ifeq "$$(GhcUnregisterised)" "YES"
 	@echo "#define UnregisterisedCompiler 1"                    >> $$@
 endif
@@ -203,6 +206,7 @@ $(eval $(call includesHeaderPlatform,1))
 
 # These settings are read by GHC at runtime, so as to not cause spurious
 # rebuilds.
+# See Note [tooldir: How GHC finds mingw on Windows]
 
 includes_SETTINGS = includes/dist/build/settings
 

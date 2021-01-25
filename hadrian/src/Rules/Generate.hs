@@ -235,6 +235,7 @@ generateGhcPlatformH = do
     hostOs         <- chooseSetting HostOs        TargetOs
     hostVendor     <- chooseSetting HostVendor    TargetVendor
     ghcUnreg       <- getFlag    GhcUnregisterised
+    inplaceTools   <- getFlag    SystemDistroMINGW
     return . unlines $
         [ "#if !defined(__GHCPLATFORM_H__)"
         , "#define __GHCPLATFORM_H__"
@@ -264,12 +265,15 @@ generateGhcPlatformH = do
         , ""
         ]
         ++
+        [ "#define USE_INPLACE_MINGW_TOOLCHAIN 1" | inplaceTools ]
+        ++
         [ "#define UnregisterisedCompiler 1" | ghcUnreg ]
         ++
         [ ""
         , "#endif /* __GHCPLATFORM_H__ */"
         ]
 
+-- See Note [tooldir: How GHC finds mingw on Windows]
 generateSettings :: Expr String
 generateSettings = do
     ctx <- getContext

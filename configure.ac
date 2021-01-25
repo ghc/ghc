@@ -416,6 +416,7 @@ set_up_tarballs() {
     fi
 }
 
+# See Note [tooldir: How GHC finds mingw on Windows]
 if test "$HostOS" = "mingw32" -a "$EnableDistroToolchain" = "NO"
 then
     test -d inplace || mkdir inplace
@@ -438,6 +439,7 @@ fi
 
 # We don't want to bundle a MinGW-w64 toolchain
 # So we have to find these individual tools.
+# See Note [tooldir: How GHC finds mingw on Windows]
 if test "$EnableDistroToolchain" = "YES"
 then
     # Ideally should use AC_CHECK_TARGET_TOOL but our triples
@@ -445,6 +447,7 @@ then
     # so never tried without the prefix.
     AC_PATH_PROG([CC],[gcc], [clang])
     AC_PATH_PROG([NM],[nm])
+    AC_PATH_PROG([LD],[ld])
     AC_PATH_PROG([AR],[ar])
     AC_PATH_PROG([RANLIB],[ranlib])
     AC_PATH_PROG([OBJDUMP],[objdump])

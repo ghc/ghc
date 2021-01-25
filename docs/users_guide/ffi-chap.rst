@@ -63,6 +63,21 @@ bytecode interpreter, and further guarantees that ``unsafe`` calls will be
 performed in the calling thread.
 
 
+Varargs not supported by ``ccall`` calling convention
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Note that functions requiring varargs arguments are unsupported by the ``ccall``
+calling convention. Foreign imports needing to call such functions should rather
+use the ``capi`` convention, giving an explicit signature for the needed
+call-pattern.  For instance, one could write: ::
+
+    foreign import "capi" "printf"
+        my_printf :: Ptr CChar -> CInt -> IO ()
+
+    printInt :: CInt -> IO ()
+    printInt n = my_printf "printed number %d" n
+
+
 .. _ffi-ghcexts:
 
 GHC extensions to the FFI Chapter
