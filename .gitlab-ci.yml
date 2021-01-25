@@ -693,6 +693,9 @@ release-x86_64-linux-deb10:
 validate-x86_64-linux-deb10-dwarf:
   extends: .build-x86_64-linux-deb10
   stage: full-build
+  # N.B. cannot transclude .release since it would override BUILD_FLAVOUR.
+  rules:
+    - if: '$RELEASE_JOB == "yes"'
   variables:
     CONFIGURE_ARGS: "--enable-dwarf-unwind"
     BUILD_FLAVOUR: dwarf
