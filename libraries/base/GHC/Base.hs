@@ -338,6 +338,10 @@ instance Semigroup b => Semigroup (a -> b) where
 -- | @since 2.01
 instance Monoid b => Monoid (a -> b) where
         mempty _ = mempty
+        -- If `b` has a specialised mconcat, use that, rather than the default
+        -- mconcat, which can be much less efficient.  Inline in the hope that
+        -- it may result in list fusion.
+        mconcat = \fs x -> mconcat $ map (\f -> f x) fs
 
 -- | @since 4.9.0.0
 instance Semigroup () where
