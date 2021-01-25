@@ -50,6 +50,7 @@ instance ∀ (f ∷ ★ → ★) (g ∷ ★ → ★).
   -- Defined in ‘GHC.Generics’
 instance ∀ a. Functor (Either a) -- Defined in ‘Data.Either’
 instance Functor [] -- Defined in ‘GHC.Base’
+instance Functor Solo -- Defined in ‘GHC.Base’
 instance Functor Maybe -- Defined in ‘GHC.Base’
 instance Functor IO -- Defined in ‘GHC.Base’
 instance ∀ r. Functor ((->) r) -- Defined in ‘GHC.Base’

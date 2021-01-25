@@ -11,6 +11,10 @@
   * Add `Semigroup` and `Monoid` instances for `Data.Functor.Product` and
     `Data.Functor.Compose`.
 
+  * Add `Functor`, `Applicative`, `Monad`, `MonadFix`, `Foldable`, `Traversable`,
+    `Eq`, `Ord`, `Show`, `Read`, `Eq1`, `Ord1`, `Show1`, `Read1`, `Generic`,
+    `Generic1`, and `Data` instances for `GHC.Tuple.Solo`.
+
   * Add `Eq1`, `Read1` and `Show1` instance for `Complex`;
     add `Eq1/2`, `Ord1/2`, `Show1/2` and `Read1/2` instances for 3 and 4-tuples.
 
