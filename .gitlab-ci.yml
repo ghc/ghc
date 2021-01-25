@@ -658,6 +658,9 @@ validate-x86_64-linux-deb9-dwarf:
   variables:
     CONFIGURE_ARGS: "--enable-dwarf-unwind"
     BUILD_FLAVOUR: dwarf
+    # Ensure that we don't run the LLVM testsuite ways since LLVM is too old on Debian 9.
+    LLC: "/nonexistent/nonexistent"
+    OPT: "/nonexistent/nonexistent"
     TEST_ENV: "x86_64-linux-deb9-dwarf"
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-deb9-linux-dwarf.tar.xz"
 
