@@ -410,6 +410,7 @@ library
                  CloneStack.c
                  ClosureFlags.c
                  ClosureSize.c
+                 ClosureTable.c
                  Continuation.c
                  Disassembler.c
                  FileLock.c

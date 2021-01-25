@@ -656,3 +656,7 @@ test('T22859',
 test('TimeoutQueue',
      [c_src, only_ways(['normal', 'debug'])], compile_and_run,
      ['-debug -optc-Wall -optc-DDEBUG -I{top}/../rts'])
+
+test('ClosureTable',
+     [req_c, only_ways(['normal', 'debug']), extra_files(['ClosureTable_c.c'])], compile_and_run,
+     ['-debug -O0 ClosureTable_c.c -I{top}/../rts -I{top}/../rts/include'])
