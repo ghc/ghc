@@ -692,7 +692,7 @@ instance Foldable Maybe where
     foldl _ z Nothing = z
     foldl f z (Just x) = f z x
 
--- | @since 2.01
+-- | @since 4.16
 instance Foldable [] where
     elem    = List.elem
     foldl   = List.foldl
@@ -707,6 +707,8 @@ instance Foldable [] where
     product = List.product
     sum     = List.sum
     toList  = id
+    -- | @since 4.16
+    fold = mconcat
 
 -- | @since 4.9.0.0
 instance Foldable NonEmpty where
