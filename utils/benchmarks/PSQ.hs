@@ -1,9 +1,10 @@
 {-# LANGUAGE BangPatterns #-}
+
 module Main where
 
 import Criterion.Main
-import System.Event.PSQ (PSQ)
-import qualified System.Event.PSQ as Q
+import GHC.Event.PSQ (PSQ)
+import qualified GHC.Event.PSQ as Q
 
 main = defaultMain
     [ bench "atMost1k/length" $ whnf (atMostLength 1000) q
