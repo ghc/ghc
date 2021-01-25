@@ -500,7 +500,7 @@ run_thread:
         StgTSO *tso = cap->r.rCurrentTSO;
         if(tso->backtrace_response != backtrace_request) {
             tso->backtrace_response = backtrace_request;
-            fprintf(stderr, "Backtrace #%d of thread %d @ %d:\n",
+            fprintf(stderr, "Backtrace #%lu of thread %u @ %lu:\n",
                     backtrace_request, tso->id, kernelThreadId());
             fprintBacktrace(stderr, tso->prof.cccs, tso);
         }

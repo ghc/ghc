@@ -145,7 +145,8 @@ createThread(Capability *cap, W_ size)
     if(forking_bt_response != backtrace_request) {
         forking_bt_response = backtrace_request;
         StgTSO *forker = cap->r.rCurrentTSO;
-        fprintf(stderr, "Backtrace #%d of forker thread %d @ %d (forked %d):\n",
+        fprintf(stderr,
+                "Backtrace #%lu of forker thread %u @ %lu (forked %u):\n",
                 backtrace_request, forker->id, kernelThreadId(), tso->id);
         fprintBacktrace(stderr, tso->prof.cccs, tso);
     }
