@@ -502,13 +502,15 @@ lookupRecFieldOcc mb_con rdr_name
        ; env <- getGlobalRdrEnv
        ; let lbl      = occNameFS (rdrNameOcc rdr_name)
              mb_field = do fl <- find ((== lbl) . flLabel) flds
-                           -- We have the label, now check it is in
-                           -- scope (with the correct qualifier if
-                           -- there is one, hence calling pickGREs).
+                           -- We have the label, now check it is in scope.  If
+                           -- there is a qualifier, use pickGREs to check that
+                           -- the qualifier is correct, and return the filtered
+                           -- GRE so we get import usage right (see #17853).
                            gre <- lookupGRE_FieldLabel env fl
-                           guard (not (isQual rdr_name
-                                         && null (pickGREs rdr_name [gre])))
-                           return (fl, gre)
+                           if isQual rdr_name
+                             then do gre' <- listToMaybe (pickGREs rdr_name [gre])
+                                     return (fl, gre')
+                              else return (fl, gre)
        ; case mb_field of
            Just (fl, gre) -> do { addUsedGRE True gre
                                 ; return (flSelector fl) }
