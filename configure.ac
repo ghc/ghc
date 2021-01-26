@@ -436,6 +436,7 @@ set_up_tarballs() {
     fi
 }
 
+# See Note [tooldir: How GHC finds mingw on Windows]
 if test "$HostOS" = "mingw32" -a "$EnableDistroToolchain" = "NO"
 then
     test -d inplace || mkdir inplace
@@ -458,6 +459,7 @@ fi
 
 # We don't want to bundle a MinGW-w64 toolchain
 # So we have to find these individual tools.
+# See Note [tooldir: How GHC finds mingw on Windows]
 if test "$EnableDistroToolchain" = "YES"
 then
     # Ideally should use AC_CHECK_TARGET_TOOL but our triples
@@ -465,6 +467,7 @@ then
     # so never tried without the prefix.
     AC_PATH_PROG([CC],[gcc], [clang])
     AC_PATH_PROG([NM],[nm])
+    AC_PATH_PROG([LD],[ld])
     AC_PATH_PROG([AR],[ar])
     AC_PATH_PROG([RANLIB],[ranlib])
     AC_PATH_PROG([OBJDUMP],[objdump])
@@ -745,13 +748,25 @@ dnl --------------------------------------------------------------
 
 dnl ** Copy the files from the "fs" utility into the right folders.
 dnl --------------------------------------------------------------
-AC_MSG_NOTICE([Creating links for in-tree file handling routines.])
+AC_MSG_NOTICE([Creating links for in-tree file handling routines])
 ln -f utils/fs/fs.* utils/lndir/
 ln -f utils/fs/fs.* utils/unlit/
 ln -f utils/fs/fs.* rts/
 ln -f utils/fs/fs.h libraries/base/include/
 ln -f utils/fs/fs.c libraries/base/cbits/
 AC_MSG_NOTICE([Routines in place. Packages can now be build normally.])
+
+dnl ** Copy files for ghci wrapper C utilities.
+dnl --------------------------------------------------------------
+dnl See Note [Hadrian's ghci-wrapper package] in hadrian/src/Packages.hs
+AC_MSG_NOTICE([Creating links for ghci wrapper])
+ln -f driver/utils/getLocation.c driver/ghci/
+ln -f driver/utils/getLocation.h driver/ghci/
+ln -f driver/utils/isMinTTY.c driver/ghci/
+ln -f driver/utils/isMinTTY.h driver/ghci/
+ln -f driver/utils/cwrapper.c driver/ghci/
+ln -f driver/utils/cwrapper.h driver/ghci/
+AC_MSG_NOTICE([done.])
 
 dnl --------------------------------------------------------------
 dnl ** Can the unix package be built?
@@ -1483,7 +1498,39 @@ checkMake380() {
 checkMake380 make
 checkMake380 gmake
 
-AC_CONFIG_FILES([mk/config.mk mk/install.mk mk/project.mk rts/rts.cabal compiler/ghc.cabal ghc/ghc-bin.cabal utils/iserv/iserv.cabal utils/iserv-proxy/iserv-proxy.cabal utils/remote-iserv/remote-iserv.cabal utils/runghc/runghc.cabal utils/gen-dll/gen-dll.cabal libraries/ghc-boot/ghc-boot.cabal libraries/ghc-boot-th/ghc-boot-th.cabal libraries/ghci/ghci.cabal libraries/ghc-heap/ghc-heap.cabal libraries/libiserv/libiserv.cabal libraries/template-haskell/template-haskell.cabal docs/users_guide/ghc_config.py docs/index.html libraries/prologue.txt distrib/configure.ac])
+dnl Things specific to the make build system
+AC_CONFIG_FILES(
+[
+  mk/config.mk
+  mk/install.mk
+  mk/project.mk
+])
+
+dnl When adding things to this list be sure to update hadrian's
+dnl Rules.Configure.configureResults list.
+AC_CONFIG_FILES(
+[
+  rts/rts.cabal
+  compiler/ghc.cabal
+  ghc/ghc-bin.cabal
+  utils/runghc/runghc.cabal
+  driver/ghci/ghci-wrapper.cabal
+  utils/iserv/iserv.cabal
+  utils/iserv-proxy/iserv-proxy.cabal
+  utils/remote-iserv/remote-iserv.cabal
+  utils/gen-dll/gen-dll.cabal
+  libraries/ghc-boot/ghc-boot.cabal
+  libraries/ghc-boot-th/ghc-boot-th.cabal
+  libraries/ghci/ghci.cabal
+  libraries/ghc-heap/ghc-heap.cabal
+  libraries/libiserv/libiserv.cabal
+  libraries/template-haskell/template-haskell.cabal
+  docs/users_guide/ghc_config.py
+  docs/index.html
+  libraries/prologue.txt
+  distrib/configure.ac
+])
+
 AC_OUTPUT
 [
 if test "$print_make_warning" = "true"; then

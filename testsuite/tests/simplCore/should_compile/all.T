@@ -341,3 +341,5 @@ test('T18747B', normal, compile, [''])
 test('T18649', normal, compile, ['-O -ddump-rules -Wno-simplifiable-class-constraints'])
 
 test('T19168', normal, compile, [''])
+
+test('T18668', normal, compile, ['-dsuppress-uniques'])

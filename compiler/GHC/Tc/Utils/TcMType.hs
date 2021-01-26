@@ -61,6 +61,7 @@ module GHC.Tc.Utils.TcMType (
   expTypeToType, scaledExpTypeToType,
   checkingExpType_maybe, checkingExpType,
   inferResultToType, fillInferResult, promoteTcType,
+  promoteTyVar, promoteTyVarSet,
 
   --------------------------------
   -- Zonking and tidying
@@ -1022,6 +1023,30 @@ However, during unflatting we do
 which is usually wrong; hence the check isFmmvTyVar in level_check_ok.
 See Note [TcLevel assignment] in GHC.Tc.Utils.TcType.
 -}
+
+promoteTyVar :: TcTyVar -> TcM Bool
+-- When we float a constraint out of an implication we must restore
+-- invariant (WantedInv) in Note [TcLevel and untouchable type variables] in GHC.Tc.Utils.TcType
+-- Return True <=> we did some promotion
+-- Also returns either the original tyvar (no promotion) or the new one
+-- See Note [Promoting unification variables]
+promoteTyVar tv
+  = do { tclvl <- getTcLevel
+       ; if (isFloatedTouchableMetaTyVar tclvl tv)
+         then do { cloned_tv <- cloneMetaTyVar tv
+                 ; let rhs_tv = setMetaTyVarTcLevel cloned_tv tclvl
+                 ; writeMetaTyVar tv (mkTyVarTy rhs_tv)
+                 ; return True }
+         else return False }
+
+-- Returns whether or not *any* tyvar is defaulted
+promoteTyVarSet :: TcTyVarSet -> TcM Bool
+promoteTyVarSet tvs
+  = do { bools <- mapM promoteTyVar (nonDetEltsUniqSet tvs)
+         -- Non-determinism is OK because order of promotion doesn't matter
+
+       ; return (or bools) }
+
 
 {-
 % Generating fresh variables for pattern match check
