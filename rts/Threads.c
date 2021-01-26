@@ -146,8 +146,11 @@ createThread(Capability *cap, W_ size)
         forking_bt_response = backtrace_request;
         StgTSO *forker = cap->r.rCurrentTSO;
         fprintf(stderr,
-                "Backtrace #%lu of forker thread %u @ %lu (forked %u):\n",
-                backtrace_request, forker->id, kernelThreadId(), tso->id);
+                "Backtrace #%llu of forker thread %llu @ %llu (forked %llu):\n",
+                (unsigned long long) backtrace_request,
+                (unsigned long long) forker->id,
+                (unsigned long long) kernelThreadId(),
+                (unsigned long long) tso->id);
         fprintBacktrace(stderr, tso->prof.cccs, tso);
     }
 #endif
