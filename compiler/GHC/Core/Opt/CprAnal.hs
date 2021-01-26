@@ -384,15 +384,19 @@ cprAnalBind top_lvl env widening id rhs
     -- See Note [Arity trimming for CPR signatures]
     -- See Note [Trimming CPR signatures according to Term]
     -- See Note [Ensuring termination of fixed-point iteration]
-    sig    = widening $ mkBindSig (idArity id) (idDemandInfo id) rhs_ty'
-    id'    = -- pprTrace "cprAnalBind" (ppr id $$ ppr rhs_ty' $$ ppr (idArity id) $$ ppr (idDemandInfo id) $$ ppr sig) $
-             setAnalAnnotation @l id sig
-    env'   = extendSigEnv env id sig
+    dmd     = idDemandInfo id
+    sig     = widening $ mkBindSig (idArity id) dmd rhs_ty'
+    id'     = -- pprTrace "cprAnalBind" (ppr id $$ ppr rhs_ty' $$ ppr (idArity id) $$ ppr dmd $$ ppr sig) $
+              setAnalAnnotation @l id sig `setIdDemandInfo` imp_dmd
+    env'    = extendSigEnv env id sig
 
     -- See Note [CPR for thunks]
-    stays_thunk = is_thunk && not_strict
     is_thunk    = not (exprIsHNF rhs) && not (isJoinId id)
-    not_strict  = not (isStrUsedDmd (idDemandInfo id))
+    strict      = isStrUsedDmd dmd
+    term        = fst (force seqSubDmd rhs_ty) == Terminates
+    -- HACK: Evaluate terminating stuff eagerly by changing idDemandInfo
+    imp_dmd     = applyWhen (is_thunk && not strict && term) strictifyDmd dmd
+    stays_thunk = is_thunk && not strict && not term
     -- See Note [CPR for sum types]
     (_, ret_ty) = splitPiTys (idType id)
     returns_prod
