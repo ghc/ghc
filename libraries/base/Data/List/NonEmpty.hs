@@ -48,6 +48,9 @@ module Data.List.NonEmpty (
    , reverse     -- :: NonEmpty a -> NonEmpty a
    , inits       -- :: Foldable f => f a -> NonEmpty a
    , tails       -- :: Foldable f => f a -> NonEmpty a
+   , append      -- :: NonEmpty a -> NonEmpty a -> NonEmpty a
+   , appendList  -- :: NonEmpty a -> [a] -> NonEmpty a
+   , prependList -- :: [a] -> NonEmpty a -> NonEmpty a
    -- * Building streams
    , iterate     -- :: (a -> a) -> a -> NonEmpty a
    , repeat      -- :: a -> NonEmpty a
@@ -448,3 +451,38 @@ sortBy f = lift (List.sortBy f)
 -- > sortBy . comparing
 sortWith :: Ord o => (a -> o) -> NonEmpty a -> NonEmpty a
 sortWith = sortBy . comparing
+
+-- | A monomorphic version of '<>' for 'NonEmpty'.
+--
+-- >>> append (1 :| []) (2 :| [3])
+-- 1 :| [2,3]
+--
+-- @since 4.16
+append :: NonEmpty a -> NonEmpty a -> NonEmpty a
+append = (<>)
+
+-- | Attach a list at the end of a 'NonEmpty'.
+--
+-- >>> appendList (1 :| [2,3]) []
+-- 1 :| [2,3]
+--
+-- >>> appendList (1 :| [2,3]) [4,5]
+-- 1 :| [2,3,4,5]
+--
+-- @since 4.16
+appendList :: NonEmpty a -> [a] -> NonEmpty a
+appendList (x :| xs) ys = x :| xs <> ys
+
+-- | Attach a list at the beginning of a 'NonEmpty'.
+--
+-- >>> prependList [] (1 :| [2,3])
+-- 1 :| [2,3]
+--
+-- >>> prependList [negate 1, 0] (1 :| [2, 3])
+-- -1 :| [0,1,2,3]
+--
+-- @since 4.16
+prependList :: [a] -> NonEmpty a -> NonEmpty a
+prependList ls ne = case ls of
+  [] -> ne
+  (x : xs) -> x :| xs <> toList ne
