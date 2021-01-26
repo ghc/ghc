@@ -699,3 +699,62 @@ typedef struct {
       // Number of words of captured stack
     StgWord stack[];
 } StgContinuation;
+
+/* ----------------------------------------------------------------------------
+   TimeoutQueue data structure used by some RTS I/O managers for their timeout
+   functionality. See TimeoutQueue.{h,c} for details.
+   ------------------------------------------------------------------------- */
+
+union NotifyCompletion {
+    StgTSO    *tso;
+    StgMVar   *mvar;
+    StgTVar   *tvar;
+};
+enum NotifyCompletionType {
+    NotifyTSO  = 0,
+    NotifyMVar = 1,
+    NotifyTVar = 2
+};
+
+/* A node in the leftist heap. */
+typedef struct StgTimeoutQueue_ {
+    StgHeader header;
+
+    /* What to notify of the completion of the timeout, either a TSO,
+     * an MVar, or hopefully in future a TVar.
+     * The notify_type field below tells us which of these it is.
+     */
+    union NotifyCompletion notify;
+
+    /* Left and right sub-trees, plus parent pointer */
+    struct StgTimeoutQueue_ *parent;
+    struct StgTimeoutQueue_ *a;
+    struct StgTimeoutQueue_ *b;
+
+    /* In a leftist heap we track the "rank" of each node. */
+    StgHalfWord rank;
+
+    /* In the threaded way there is one timeout heap per capability. We have to
+     * handle cross-capability timeout cancellation specially, so we need to
+     * know which capability a heap entry belongs.
+     */
+    StgHalfWord capno: 8;
+
+    /* Tells us which thing the notify union above contains.
+     * This is a value from enum IONotify but we don't use the enum type
+     * here due to portability concerns for this size C enum bitfield.
+     */
+    StgHalfWord notify_type: 2;
+
+    /* The wakeup time, as a time absolute in the monotonic clock. This is a
+     * 64bit time, even on 32bit arches.
+     * The tree is minimum ordered heap, ordered by this key.
+     */
+    Time waketime;
+
+    /* Note that because Time is 64bit even on 32bit arches, then the size in
+     * words of this heap object is different on 32bit and 64bit platforms.
+     * We handle this in the INFO_TABLE_CONSTR decl for stg_TIMEOUT_QUEUE using
+     * Either32Or64Bit(3,2) for the non-pointer words.
+     */
+} StgTimeoutQueue;
