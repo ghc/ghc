@@ -465,6 +465,7 @@ library
                  ThreadPaused.c
                  Threads.c
                  Ticky.c
+                 TimeoutQueue.c
                  Timer.c
                  TopHandler.c
                  Trace.c

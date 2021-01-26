@@ -709,3 +709,80 @@ typedef struct {
     StgWord stack[];
 } StgContinuation;
 
+/* ----------------------------------------------------------------------------
+   TimeoutQueue data structure used by some RTS I/O managers for their timeout
+   functionality. See TimeoutQueue.{h,c} for details.
+   ------------------------------------------------------------------------- */
+
+union NotifyCompletion {
+    StgTSO    *tso;
+    StgMVar   *mvar;
+    StgTVar   *tvar;
+};
+enum NotifyCompletionType {
+    NotifyTSO  = 0, // thread-synchronous I/O
+    NotifyMVar = 1, // async I/O with MVar notification
+    NotifyTVar = 2  // async I/O with TVar notification
+};
+
+/* A node in the leftist heap. */
+typedef struct StgTimeoutQueue_ {
+    StgHeader header;
+
+    /* What to notify of the completion of the timeout, either a TSO,
+     * an MVar, or hopefully in future a TVar.
+     * The notify_type field below tells us which of these it is.
+     */
+    union NotifyCompletion notify;
+
+    /* Left and right sub-trees, plus parent pointer */
+    struct StgTimeoutQueue_ *parent;
+    struct StgTimeoutQueue_ *a;
+    struct StgTimeoutQueue_ *b;
+
+    /* In a leftist heap we track the "rank" of each node. */
+    uint32_t rank;
+
+    /* In the threaded way there is one timeout heap per capability. We have to
+     * handle cross-capability timeout cancellation specially, so we need to
+     * know which capability a heap entry belongs to.
+     */
+    uint16_t capno;
+    /* "16 bits ought to be enough for anybody!" quoth Mr Gamari, 2024 */
+
+    /* This tells us which thing the notify union above contains. It is a
+     * value from enum NotifyCompletionType but we don't use the enum type
+     * here due to portability concerns for this C bitfield.
+     */
+    uint16_t notify_type: 2;
+
+    /* 14 bits going spare! */
+
+#if defined(wasm32_HOST_ARCH)
+    /* On wasm32, the ABI alignment rules for structs are stronger than on
+     * other 32bit platforms: size 8 fields (like Time) must be 8 byte aligned,
+     * and the overall struct size must be a multiple of the maximum alignment
+     * (also 8). This means that on this platform, the non-pointer fields take
+     * up 5 words rather than 4, due to the extra padding word to get the Time
+     * field aligned. The size is thus 4 * (1+4+5) bytes, which is a multiple
+     * of 8 as required.
+     *
+     * Note that we don't strictly need this padding field. It will be inserted
+     * automagically by the wasm C compiler. This is just to be explicit, act
+     * as a sanity check, and somewhere to document this quirk.
+     */
+    uint32_t padding;
+#endif
+
+    /* The wakeup time, as a time absolute in the monotonic clock. This is a
+     * 64bit time, even on 32bit arches.
+     * The tree is a minimum ordered heap, ordered by this key.
+     */
+    Time waketime;
+
+    /* Note that because Time is 64bit even on 32bit arches, then the size in
+     * words of this heap object is different on 32bit and 64bit platforms.
+     * We handle this in the INFO_TABLE_CONSTR decl for stg_TIMEOUT_QUEUE using
+     * stg_TIMEOUT_QUEUE_NUM_NONPTRS in constants.h.
+     */
+} StgTimeoutQueue;

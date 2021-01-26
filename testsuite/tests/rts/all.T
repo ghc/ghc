@@ -647,3 +647,12 @@ test('T22859',
       when(arch('wasm32'), skip),
       omit_ways(llvm_ways)],
      compile_and_run, ['-with-rtsopts -A8K'])
+
+# These tests need access to the internal RTS headers.
+# TODO: there is probably some cleaner way to do this, and it should probably
+# be guarded for in-tree tests, since it cannot work against an arbitrary
+# installed ghc.
+
+test('TimeoutQueue',
+     [c_src, only_ways(['normal', 'debug'])], compile_and_run,
+     ['-debug -optc-Wall -optc-DDEBUG -I{top}/../rts'])

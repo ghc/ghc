@@ -371,3 +371,28 @@
  * It is known that maximum length of uint32_t in string is 10 chars (4294967295) + 1 NULL.
  */
 #define CLOSURE_DESC_BUFFER_SIZE 11
+
+/* -----------------------------------------------------------------------------
+   Constants for closures that -- depending on the word size -- have different
+   numbers of non-pointer fields.
+
+   These help ensure consistency between the CMM INFO_TABLE_CONSTR declarations
+   in StgMiscClosures.cmm and the C structure definitions in Closures.h, by
+   lettting us assert the overall C struct size.
+
+   TODO: Ideally we would have a general solution that ensures the CMM
+   declarations match the actual C struct definitions for all closure types.
+   This is a partial solution for the tricky cases.
+   -------------------------------------------------------------------------- */
+
+#define stg_TIMEOUT_QUEUE_NUM_PTRS 4
+#if SIZEOF_VOID_P == 4
+#if defined(wasm32_HOST_ARCH)
+/* ABI struct alignment rules on wasm. See struct StgTimeoutQueue comments. */
+#define stg_TIMEOUT_QUEUE_NUM_NONPTRS 5
+#else
+#define stg_TIMEOUT_QUEUE_NUM_NONPTRS 4
+#endif
+#else
+#define stg_TIMEOUT_QUEUE_NUM_NONPTRS 2
+#endif

@@ -23,6 +23,7 @@ import whitehole_lockClosure_spin;
 import whitehole_lockClosure_yield;
 #endif
 
+
 #if !defined(UnregisterisedCompiler)
 import CLOSURE CCS_SYSTEM;
 import CLOSURE ENT_DYN_IND_ctr;
@@ -981,6 +982,24 @@ INFO_TABLE( stg_COMPACT_NFDATA_CLEAN, 0, 9, COMPACT_NFDATA, "COMPACT_NFDATA", "C
 INFO_TABLE( stg_COMPACT_NFDATA_DIRTY, 0, 9, COMPACT_NFDATA, "COMPACT_NFDATA", "COMPACT_NFDATA")
     ()
 { foreign "C" barf("COMPACT_NFDATA_DIRTY object (%p) entered!", R1) never returns; }
+
+/* ----------------------------------------------------------------------------
+   StgTimeoutQueue and StgTimeoutQueue empty value
+
+   The empty value is a static nullary constructor (like []) that we use
+   for empty leaf nodes in the tree.
+   ------------------------------------------------------------------------- */
+
+INFO_TABLE_CONSTR(stg_TIMEOUT_QUEUE,
+                  stg_TIMEOUT_QUEUE_NUM_PTRS,
+                  stg_TIMEOUT_QUEUE_NUM_NONPTRS,
+                  0,MUT_PRIM,"TIMEOUT_QUEUE","TIMEOUT_QUEUE")
+{ foreign "C" barf("TIMEOUT_QUEUE object (%p) entered!", R1) never returns; }
+
+INFO_TABLE_CONSTR(stg_TIMEOUT_QUEUE_EMPTY,0,0,0,CONSTR_NOCAF,"TIMEOUT_QUEUE_EMPTY","TIMEOUT_QUEUE_EMPTY")
+{ foreign "C" barf("TIMEOUT_QUEUE_EMPTY object (%p) entered!", R1) never returns; }
+
+CLOSURE(stg_TIMEOUT_QUEUE_EMPTY_closure,stg_TIMEOUT_QUEUE_EMPTY);
 
 /* ----------------------------------------------------------------------------
    Note [CHARLIKE and INTLIKE closures]
