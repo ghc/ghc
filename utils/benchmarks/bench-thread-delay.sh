@@ -39,4 +39,8 @@ do
 done
 echo "done"
 
-gnuplot thread-delay.gnuplot
+echo -n "Generating plot file..."
+gnuplot -e "set terminal png size 1300,600 font 50; set output 'thread-delay.png';
+plot \"$OLD_DAT\" using 1:2 title 'Thread Delay (Old/with GHC I/O manager)', \"$NEW_DAT\" using 1:2
+title 'Thread Delay (New/without GHC I/O manager)'"
+echo -n "finished"
