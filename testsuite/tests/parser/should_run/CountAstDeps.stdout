@@ -175,6 +175,7 @@ GHC.Types.SourceFile
 GHC.Types.SourceText
 GHC.Types.SrcLoc
 GHC.Types.Target
+GHC.Types.Tickish
 GHC.Types.TyThing
 GHC.Types.TypeEnv
 GHC.Types.Unique
