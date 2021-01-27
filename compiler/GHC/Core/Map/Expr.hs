@@ -32,6 +32,7 @@ import GHC.Data.TrieMap
 import GHC.Core.Map.Type
 import GHC.Core
 import GHC.Core.Type
+import GHC.Types.Tickish
 import GHC.Types.Var
 
 import GHC.Utils.Misc

@@ -35,12 +35,12 @@ import {-# SOURCE #-} Language.Haskell.Syntax.Pat
 
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Type
-import GHC.Core
 import GHC.Tc.Types.Evidence
 import GHC.Core.Type
 import GHC.Types.Basic
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc as SrcLoc
+import GHC.Types.Tickish
 import GHC.Types.Var
 import GHC.Types.Fixity
 import GHC.Data.Bag

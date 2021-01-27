@@ -68,7 +68,7 @@ module GHC.Stg.Syntax (
 
 import GHC.Prelude
 
-import GHC.Core     ( AltCon, StgTickish )
+import GHC.Core     ( AltCon )
 import GHC.Types.CostCentre ( CostCentreStack )
 import Data.ByteString ( ByteString )
 import Data.Data   ( Data )
@@ -78,6 +78,7 @@ import GHC.Driver.Session
 import GHC.Types.ForeignCall ( ForeignCall )
 import GHC.Types.Id
 import GHC.Types.Name        ( isDynLinkName )
+import GHC.Types.Tickish     ( StgTickish )
 import GHC.Types.Var.Set
 import GHC.Types.Literal     ( Literal, literalType )
 import GHC.Unit.Module       ( Module )

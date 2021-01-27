@@ -83,6 +83,7 @@ import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Name
 import GHC.Types.Literal
+import GHC.Types.Tickish
 import GHC.Core.DataCon
 import GHC.Builtin.PrimOps
 import GHC.Types.Id

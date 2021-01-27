@@ -17,6 +17,7 @@ import GHC.Types.Basic
 import GHC.Core
 import GHC.Utils.Outputable
 import GHC.Core.Coercion
+import GHC.Types.Tickish
 import GHC.Types.Var
 import GHC.Core.Type(Type, typeSize)
 import GHC.Types.Id (isJoinId)

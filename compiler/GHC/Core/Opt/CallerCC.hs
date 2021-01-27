@@ -31,6 +31,7 @@ import GHC.Driver.Ppr
 import GHC.Types.CostCentre
 import GHC.Types.CostCentre.State
 import GHC.Types.Name hiding (varName)
+import GHC.Types.Tickish
 import GHC.Unit.Module.Name
 import GHC.Unit.Module.ModGuts
 import GHC.Types.SrcLoc

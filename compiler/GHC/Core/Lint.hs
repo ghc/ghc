@@ -53,6 +53,7 @@ import GHC.Types.Id.Info
 import GHC.Core.Ppr
 import GHC.Core.Coercion
 import GHC.Types.SrcLoc
+import GHC.Types.Tickish
 import GHC.Core.Type as Type
 import GHC.Core.Multiplicity
 import GHC.Core.UsageEnv

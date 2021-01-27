@@ -656,6 +656,7 @@ Library
         GHC.Types.SourceText
         GHC.Types.SrcLoc
         GHC.Types.Target
+        GHC.Types.Tickish
         GHC.Types.TypeEnv
         GHC.Types.TyThing
         GHC.Types.Unique

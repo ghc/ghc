@@ -65,6 +65,7 @@ import GHC.Data.OrdList
 import GHC.Data.Maybe
 import GHC.Types.Var.Env
 import GHC.Builtin.Names ( unsafeEqualityProofName )
+import GHC.Types.Tickish
 
 import Data.List ( genericReplicate, genericLength, intersperse
                  , partition, scanl', sort, sortBy, zip4, zip6, nub )

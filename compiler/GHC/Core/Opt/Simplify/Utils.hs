@@ -57,6 +57,7 @@ import GHC.Core.Unfold.Make
 import GHC.Types.Name
 import GHC.Types.Id
 import GHC.Types.Id.Info
+import GHC.Types.Tickish
 import GHC.Types.Var
 import GHC.Types.Demand
 import GHC.Types.Var.Set

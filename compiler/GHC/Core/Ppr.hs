@@ -46,6 +46,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Types.SrcLoc ( pprUserRealSpan )
+import GHC.Types.Tickish
 
 {-
 ************************************************************************

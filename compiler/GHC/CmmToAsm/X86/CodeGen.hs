@@ -72,7 +72,7 @@ import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.CLabel
-import GHC.Core          ( GenTickish(..) )
+import GHC.Types.Tickish ( GenTickish(..) )
 import GHC.Types.SrcLoc  ( srcSpanFile, srcSpanStartLine, srcSpanStartCol )
 
 -- The rest:

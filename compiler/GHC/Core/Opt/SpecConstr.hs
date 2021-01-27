@@ -44,6 +44,7 @@ import GHC.Core.Make    ( mkImpossibleExpr )
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Name
+import GHC.Types.Tickish
 import GHC.Types.Basic
 import GHC.Driver.Session ( DynFlags(..), GeneralFlag( Opt_SpecConstrKeen )
                           , gopt, hasPprDebug )

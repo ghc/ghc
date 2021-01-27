@@ -33,6 +33,7 @@ import GHC.Core.Opt.Arity   ( joinRhsArity )
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Basic
+import GHC.Types.Tickish
 import GHC.Unit.Module( Module )
 import GHC.Core.Coercion
 import GHC.Core.Type

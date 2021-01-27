@@ -72,6 +72,7 @@ import GHC.Types.Basic
 import GHC.Types.Name   ( NamedThing(..), nameSrcSpan, isInternalName )
 import GHC.Types.SrcLoc ( SrcSpan(..), realSrcLocSpan, mkRealSrcLoc )
 import GHC.Types.Literal
+import GHC.Types.Tickish
 import GHC.Types.TyThing
 import GHC.Types.CostCentre ( CostCentre, ccFromThisModule )
 import GHC.Types.Unique.Supply

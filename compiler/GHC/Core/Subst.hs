@@ -60,6 +60,7 @@ import GHC.Types.Var.Env
 import GHC.Types.Id
 import GHC.Types.Name     ( Name )
 import GHC.Types.Var
+import GHC.Types.Tickish
 import GHC.Types.Id.Info
 import GHC.Types.Unique.Supply
 import GHC.Data.Maybe

@@ -47,6 +47,7 @@ import GHC.Types.Basic
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique.DFM
 import GHC.Types.Name
+import GHC.Types.Tickish
 import GHC.Types.Id.Make  ( voidArgId, voidPrimId )
 import GHC.Types.Var      ( isLocalVar )
 import GHC.Types.Var.Set

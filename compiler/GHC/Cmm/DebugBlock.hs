@@ -39,13 +39,13 @@ import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
 import GHC.Cmm
 import GHC.Cmm.Utils
-import GHC.Core
 import GHC.Data.FastString ( nilFS, mkFastString )
 import GHC.Unit.Module
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Cmm.Ppr.Expr ( pprExpr )
 import GHC.Types.SrcLoc
+import GHC.Types.Tickish
 import GHC.Utils.Misc      ( seqList )
 
 import GHC.Cmm.Dataflow.Block

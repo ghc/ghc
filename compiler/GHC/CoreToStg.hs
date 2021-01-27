@@ -32,6 +32,7 @@ import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Core.DataCon
 import GHC.Types.CostCentre
+import GHC.Types.Tickish
 import GHC.Types.Var.Env
 import GHC.Unit.Module
 import GHC.Types.Name   ( isExternalName, nameModule_maybe )

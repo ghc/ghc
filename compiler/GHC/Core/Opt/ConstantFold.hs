@@ -60,6 +60,7 @@ import GHC.Core.Type
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Name.Occurrence ( occNameFS )
+import GHC.Types.Tickish
 import GHC.Builtin.Names
 import GHC.Data.Maybe      ( orElse )
 import GHC.Types.Name ( Name, nameOccName )
