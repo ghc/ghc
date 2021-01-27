@@ -34,7 +34,7 @@ import GHC.Data.FastString
 import GHC.Types.ForeignCall
 import GHC.Utils.Outputable
 import GHC.Runtime.Heap.Layout
-import GHC.Core (CmmTickish)
+import GHC.Types.Tickish (CmmTickish)
 import qualified GHC.Types.Unique as U
 
 import GHC.Cmm.Dataflow.Block
