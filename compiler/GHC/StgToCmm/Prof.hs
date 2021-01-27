@@ -45,6 +45,7 @@ import GHC.Cmm.CLabel
 
 import GHC.Types.CostCentre
 import GHC.Types.IPE
+import GHC.Types.ForeignStubs
 import GHC.Data.FastString
 import GHC.Unit.Module as Module
 import GHC.Utils.Outputable
@@ -276,7 +277,7 @@ sizeof_ccs_words platform
    (ws,ms) = pc_SIZEOF_CostCentreStack (platformConstants platform) `divMod` platformWordSizeInBytes platform
 
 
-initInfoTableProv ::  [CmmInfoTable] -> InfoTableProvMap -> Module -> FCode SDoc
+initInfoTableProv ::  [CmmInfoTable] -> InfoTableProvMap -> Module -> FCode CStub
 -- Emit the declarations
 initInfoTableProv infos itmap this_mod
   = do

@@ -159,7 +159,7 @@ deSugar hsc_env
                           ; ds_rules <- mapMaybeM dsRule rules
                           ; let hpc_init
                                   | gopt Opt_Hpc dflags = hpcInitCode (hsc_dflags hsc_env) mod ds_hpc_info
-                                  | otherwise = empty
+                                  | otherwise = mempty
                           ; return ( ds_ev_binds
                                    , foreign_prs `appOL` core_prs `appOL` spec_prs
                                    , spec_rules ++ ds_rules

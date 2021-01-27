@@ -99,13 +99,13 @@ dsForeigns' fos = do
         fe_init_code = foreignExportsInitialiser mod fe_ids
     --
     return (ForeignStubs
-             (vcat hs)
-             (vcat cs $$ fe_init_code),
+             (mconcat hs)
+             (mconcat cs `mappend` fe_init_code),
             foldr (appOL . toOL) nilOL bindss)
   where
    do_ldecl (L loc decl) = putSrcSpanDs loc (do_decl decl)
 
-   do_decl :: ForeignDecl GhcTc -> DsM (SDoc, SDoc, [Id], [Binding])
+   do_decl :: ForeignDecl GhcTc -> DsM (CHeader, CStub, [Id], [Binding])
    do_decl (ForeignImport { fd_name = id, fd_i_ext = co, fd_fi = spec }) = do
       traceIf (text "fi start" <+> ppr id)
       let id' = unLoc id
@@ -149,7 +149,7 @@ because it exposes the boxing to the call site.
 dsFImport :: Id
           -> Coercion
           -> ForeignImport
-          -> DsM ([Binding], SDoc, SDoc)
+          -> DsM ([Binding], CHeader, CStub)
 dsFImport id co (CImport cconv safety mHeader spec _) =
     dsCImport id co spec (unLoc cconv) (unLoc safety) mHeader
 
@@ -159,7 +159,7 @@ dsCImport :: Id
           -> CCallConv
           -> Safety
           -> Maybe Header
-          -> DsM ([Binding], SDoc, SDoc)
+          -> DsM ([Binding], CHeader, CStub)
 dsCImport id co (CLabel cid) cconv _ _ = do
    dflags <- getDynFlags
    let ty  = coercionLKind co
@@ -176,7 +176,7 @@ dsCImport id co (CLabel cid) cconv _ _ = do
         rhs' = Cast rhs co
         stdcall_info = fun_type_arg_stdcall_info platform cconv ty
     in
-    return ([(id, rhs')], empty, empty)
+    return ([(id, rhs')], mempty, mempty)
 
 dsCImport id co (CFunction target) cconv@PrimCallConv safety _
   = dsPrimCall id co (CCall (CCallSpec target cconv safety))
@@ -208,7 +208,7 @@ fun_type_arg_stdcall_info _ _other_conv _
 -}
 
 dsFCall :: Id -> Coercion -> ForeignCall -> Maybe Header
-        -> DsM ([(Id, Expr TyVar)], SDoc, SDoc)
+        -> DsM ([(Id, Expr TyVar)], CHeader, CStub)
 dsFCall fn_id co fcall mDeclHeader = do
     let
         ty                   = coercionLKind co
@@ -294,7 +294,7 @@ dsFCall fn_id co fcall mDeclHeader = do
                                                 simpl_opts
                                                 wrap_rhs'
 
-    return ([(work_id, work_rhs), (fn_id_w_inl, wrap_rhs')], empty, cDoc)
+    return ([(work_id, work_rhs), (fn_id_w_inl, wrap_rhs')], mempty, CStub cDoc)
 
 {-
 ************************************************************************
@@ -312,7 +312,7 @@ for calling convention they are really prim ops.
 -}
 
 dsPrimCall :: Id -> Coercion -> ForeignCall
-           -> DsM ([(Id, Expr TyVar)], SDoc, SDoc)
+           -> DsM ([(Id, Expr TyVar)], CHeader, CStub)
 dsPrimCall fn_id co fcall = do
     let
         ty                   = coercionLKind co
@@ -327,7 +327,7 @@ dsPrimCall fn_id co fcall = do
         call_app = mkFCall dflags ccall_uniq fcall (map Var args) io_res_ty
         rhs      = mkLams tvs (mkLams args call_app)
         rhs'     = Cast rhs co
-    return ([(fn_id, rhs')], empty, empty)
+    return ([(fn_id, rhs')], mempty, mempty)
 
 {-
 ************************************************************************
@@ -357,8 +357,8 @@ dsFExport :: Id                 -- Either the exported Id,
           -> Bool               -- True => foreign export dynamic
                                 --         so invoke IO action that's hanging off
                                 --         the first argument's stable pointer
-          -> DsM ( SDoc         -- contents of Module_stub.h
-                 , SDoc         -- contents of Module_stub.c
+          -> DsM ( CHeader      -- contents of Module_stub.h
+                 , CStub        -- contents of Module_stub.c
                  , String       -- string describing type to pass to createAdj.
                  , Int          -- size of args to stub function
                  )
@@ -427,7 +427,7 @@ f_helper(StablePtr s, HsBool b, HsInt i)
 dsFExportDynamic :: Id
                  -> Coercion
                  -> CCallConv
-                 -> DsM ([Binding], SDoc, SDoc)
+                 -> DsM ([Binding], CHeader, CStub)
 dsFExportDynamic id co0 cconv = do
     mod <- getModule
     dflags <- getDynFlags
@@ -517,8 +517,8 @@ mkFExportCBits :: DynFlags
                -> Type
                -> Bool          -- True <=> returns an IO type
                -> CCallConv
-               -> (SDoc,
-                   SDoc,
+               -> (CHeader,
+                   CStub,
                    String,      -- the argument reps
                    Int          -- total size of arguments
                   )
@@ -617,7 +617,7 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
   -- Now we can cook up the prototype for the exported function.
   pprCconv = ccallConvAttribute cc
 
-  header_bits = text "extern" <+> fun_proto <> semi
+  header_bits = CHeader (text "extern" <+> fun_proto <> semi)
 
   fun_args
     | null aug_arg_info = text "void"
@@ -664,7 +664,7 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
 
 
   -- finally, the whole darn thing
-  c_bits =
+  c_bits = CStub $
     space $$
     extern_decl $$
     fun_proto  $$
@@ -701,7 +701,7 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
      ]
 
 
-foreignExportsInitialiser :: Module -> [Id] -> SDoc
+foreignExportsInitialiser :: Module -> [Id] -> CStub
 foreignExportsInitialiser mod hs_fns =
    -- Initialise foreign exports by registering a stable pointer from an
    -- __attribute__((constructor)) function.
@@ -713,7 +713,7 @@ foreignExportsInitialiser mod hs_fns =
    -- (this is bad for big umbrella modules like Graphics.Rendering.OpenGL)
    --
    -- See Note [Tracking foreign exports] in rts/ForeignExports.c
-   vcat
+   CStub $ vcat
     [ text "static struct ForeignExportsList" <+> list_symbol <+> equals
          <+> braces (
            text ".exports = " <+> export_list <> comma <+>

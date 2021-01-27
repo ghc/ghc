@@ -49,6 +49,7 @@ import GHC.Types.Name
 import GHC.Types.HpcInfo
 import GHC.Types.CostCentre
 import GHC.Types.CostCentre.State
+import GHC.Types.ForeignStubs
 
 import Control.Monad
 import Data.List (isSuffixOf, intersperse)
@@ -1323,10 +1324,10 @@ static void hpc_init_Main(void)
  hs_hpc_module("Main",8,1150288664,_hpc_tickboxes_Main_hpc);}
 -}
 
-hpcInitCode :: DynFlags -> Module -> HpcInfo -> SDoc
-hpcInitCode _ _ (NoHpcInfo {}) = Outputable.empty
+hpcInitCode :: DynFlags -> Module -> HpcInfo -> CStub
+hpcInitCode _ _ (NoHpcInfo {}) = mempty
 hpcInitCode dflags this_mod (HpcInfo tickCount hashNo)
- = vcat
+ = CStub $ vcat
     [ text "static void hpc_init_" <> ppr this_mod
          <> text "(void) __attribute__((constructor));"
     , text "static void hpc_init_" <> ppr this_mod <> text "(void)"
