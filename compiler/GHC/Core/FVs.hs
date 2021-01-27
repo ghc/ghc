@@ -65,6 +65,7 @@ import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Name.Set
 import GHC.Types.Name
+import GHC.Types.Tickish
 import GHC.Types.Var.Set
 import GHC.Types.Var
 import GHC.Core.Type
