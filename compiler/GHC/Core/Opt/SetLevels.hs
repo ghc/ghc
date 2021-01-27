@@ -108,6 +108,7 @@ import GHC.Types.Cpr          ( mkCprSig, botCpr )
 import GHC.Types.Name         ( getOccName, mkSystemVarName )
 import GHC.Types.Name.Occurrence ( occNameString )
 import GHC.Types.Unique       ( hasKey )
+import GHC.Types.Tickish      ( tickishIsCode )
 import GHC.Core.Type    ( Type, splitTyConApp_maybe, tyCoVarsOfType
                         , mightBeUnliftedType, closeOverKindsDSet )
 import GHC.Core.Multiplicity     ( pattern Many )

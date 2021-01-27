@@ -30,6 +30,7 @@ import GHC.Types.Unique (getUnique)
 import GHC.Types.Unique.FM
 import GHC.Types.Name hiding (tidyNameOcc)
 import GHC.Types.SrcLoc
+import GHC.Types.Tickish
 import GHC.Data.Maybe
 import Data.List (mapAccumL)
 
