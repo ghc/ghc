@@ -73,6 +73,7 @@ import GHC.Utils.Misc
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
+import GHC.Types.Tickish
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Tidy ( tidyCo )
 import GHC.Types.Demand ( isTopSig )
