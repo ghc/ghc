@@ -58,6 +58,7 @@ import GHC.Core.Predicate ( isDictTy )
 import GHC.Core.Multiplicity
 import GHC.Types.Var.Set
 import GHC.Types.Basic
+import GHC.Types.Tickish
 import GHC.Builtin.Uniques
 import GHC.Driver.Session ( DynFlags, GeneralFlag(..), gopt )
 import GHC.Utils.Outputable

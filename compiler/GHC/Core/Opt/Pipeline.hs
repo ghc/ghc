@@ -70,6 +70,7 @@ import GHC.Types.Basic
 import GHC.Types.Demand ( zapDmdEnvSig )
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
+import GHC.Types.Tickish
 import GHC.Types.Unique.Supply ( UniqSupply )
 import GHC.Types.Unique.FM
 import GHC.Types.Name.Ppr
