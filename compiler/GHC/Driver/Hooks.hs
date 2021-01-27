@@ -49,6 +49,7 @@ import GHC.Types.CostCentre
 import GHC.Types.IPE
 import GHC.Types.Meta
 import GHC.Types.HpcInfo
+import GHC.Types.ForeignStubs
 
 import GHC.Unit.Module
 import GHC.Unit.Module.ModSummary
@@ -72,7 +73,6 @@ import GHC.Data.Bag
 import Data.Maybe
 import qualified Data.Kind
 import System.Process
-import GHC.Utils.Outputable ( SDoc )
 
 {-
 ************************************************************************
@@ -147,7 +147,7 @@ data Hooks = Hooks
                                                           -> IO (Maybe HValue))
   , createIservProcessHook :: Maybe (CreateProcess -> IO ProcessHandle)
   , stgToCmmHook           :: Maybe (DynFlags -> Module -> InfoTableProvMap -> [TyCon] -> CollectedCCs
-                                 -> [CgStgTopBinding] -> HpcInfo -> Stream IO CmmGroup (SDoc, ModuleLFInfos))
+                                 -> [CgStgTopBinding] -> HpcInfo -> Stream IO CmmGroup (CStub, ModuleLFInfos))
   , cmmToRawCmmHook        :: forall a . Maybe (DynFlags -> Maybe Module -> Stream IO CmmGroupSRTs a
                                  -> IO (Stream IO RawCmmGroup a))
   }

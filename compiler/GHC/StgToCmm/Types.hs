@@ -15,6 +15,7 @@ module GHC.StgToCmm.Types
 import GHC.Prelude
 
 import GHC.Types.Basic
+import GHC.Types.ForeignStubs
 import GHC.Core.DataCon
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
@@ -87,7 +88,7 @@ data CgInfos = CgInfos
       -- either not exported of CAFFY.
   , cgLFInfos :: !ModuleLFInfos
       -- ^ LambdaFormInfos of exported closures in the current module.
-  , cgIPEStub :: !SDoc
+  , cgIPEStub :: !CStub
       -- ^ The C stub which is used for IPE information
   }
 
