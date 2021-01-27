@@ -38,4 +38,8 @@ do
 done
 echo "done"
 
-gnuplot timers.gnuplot
+echo -n "Generating plot file..."
+gnuplot -e "set terminal png size 1300,600 font 50; set output 'timers.png';
+plot \"$EVENTS_DAT\" using 1:2 title 'Events', \"$THREADS_DAT\" using 1:2
+title 'Threads'"
+echo -n "finished"
