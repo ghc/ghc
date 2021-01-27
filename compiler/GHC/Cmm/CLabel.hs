@@ -1307,21 +1307,24 @@ and are not externally visible.
 -}
 
 instance OutputableP Platform CLabel where
-  pdoc platform lbl = getPprStyle $ \case
-                        PprCode CStyle   -> pprCLabel platform CStyle lbl
-                        PprCode AsmStyle -> pprCLabel platform AsmStyle lbl
-                        _                -> pprCLabel platform CStyle lbl
-                                            -- default to CStyle
+  {-# INLINE pdoc #-}
+  pdoc !platform lbl = getPprStyle $ \pp_sty ->
+                        let !sty = case pp_sty of
+                                    PprCode sty -> sty
+                                    _           -> CStyle
+                        in pprCLabel platform sty lbl
 
 pprCLabel :: Platform -> LabelStyle -> CLabel -> SDoc
-pprCLabel platform sty lbl =
+pprCLabel !platform !sty lbl =
   let
+    !use_leading_underscores = platformLeadingUnderscore platform
+
     -- some platform (e.g. Darwin) require a leading "_" for exported asm
     -- symbols
     maybe_underscore :: SDoc -> SDoc
     maybe_underscore doc = case sty of
-      AsmStyle | platformLeadingUnderscore platform -> pp_cSEP <> doc
-      _                                             -> doc
+      AsmStyle | use_leading_underscores -> pp_cSEP <> doc
+      _                                  -> doc
 
     tempLabelPrefixOrUnderscore :: Platform -> SDoc
     tempLabelPrefixOrUnderscore platform = case sty of
@@ -1520,13 +1523,13 @@ instance Outputable ForeignLabelSource where
 -- Machine-dependent knowledge about labels.
 
 asmTempLabelPrefix :: Platform -> PtrString  -- for formatting labels
-asmTempLabelPrefix platform = case platformOS platform of
+asmTempLabelPrefix !platform = case platformOS platform of
     OSDarwin -> sLit "L"
     OSAIX    -> sLit "__L" -- follow IBM XL C's convention
     _        -> sLit ".L"
 
 pprDynamicLinkerAsmLabel :: Platform -> DynamicLinkerLabelInfo -> SDoc -> SDoc
-pprDynamicLinkerAsmLabel platform dllInfo ppLbl =
+pprDynamicLinkerAsmLabel !platform dllInfo ppLbl =
     case platformOS platform of
       OSDarwin
         | platformArch platform == ArchX86_64 ->
