@@ -11,8 +11,7 @@ OLD_BIN="./old-thread-delay"
 NEW_DAT="new.dat"
 OLD_DAT="old.dat"
 
-rm -f $OLD_DAT $NEW_DAT
-rm -f thread-delay.png
+make data_clean
 
 make clean
 make thread-delay
