@@ -57,6 +57,7 @@ import GHC.Types.Name    ( Name, NamedThing(..), nameIsLocalOrFrom )
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Types.Unique.FM
+import GHC.Types.Tickish
 import GHC.Core.Unify as Unify ( ruleMatchTyKiX )
 import GHC.Types.Basic
 import GHC.Driver.Session      ( DynFlags, gopt, targetPlatform )

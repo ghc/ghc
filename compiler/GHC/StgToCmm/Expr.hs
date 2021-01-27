@@ -46,6 +46,7 @@ import GHC.Core.TyCon
 import GHC.Core.Type        ( isUnliftedType )
 import GHC.Types.RepType    ( isVoidTy, countConRepArgs )
 import GHC.Types.CostCentre ( CostCentreStack, currentCCS )
+import GHC.Types.Tickish
 import GHC.Data.Maybe
 import GHC.Utils.Misc
 import GHC.Data.FastString
