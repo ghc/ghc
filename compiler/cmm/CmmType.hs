@@ -50,13 +50,14 @@ import Data.Int
 
 data CmmType    -- The important one!
   = CmmType CmmCat Width
+  deriving (Show)
 
 data CmmCat                -- "Category" (not exported)
    = GcPtrCat              -- GC pointer
    | BitsCat               -- Non-pointer
    | FloatCat              -- Float
    | VecCat Length CmmCat  -- Vector
-   deriving( Eq )
+   deriving( Show, Eq )
         -- See Note [Signed vs unsigned] at the end
 
 instance Outputable CmmType where
@@ -322,8 +323,8 @@ isVecType _                       = False
 -- needed by the ABI to make the correct kind of call.
 
 data ForeignHint
-  = NoHint | AddrHint | SignedHint
-  deriving( Eq )
+  = NoHint Width | AddrHint | SignedHint Width | BadHint
+  deriving( Eq, Show )
         -- Used to give extra per-argument or per-result
         -- information needed by foreign calling conventions
 

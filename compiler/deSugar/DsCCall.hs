@@ -47,6 +47,7 @@ import Util
 
 import Data.Maybe
 
+import RepType (typePrimRep1)
 {-
 Desugaring of @ccall@s consists of adding some state manipulation,
 unboxing any boxed primitive arguments and boxing the result if
@@ -97,8 +98,20 @@ dsCCall lbl args may_gc result_ty
        uniq <- newUnique
        dflags <- getDynFlags
        let
+           arg_tys = map exprType args
+
+           raw_res_ty = case tcSplitIOType_maybe result_ty of
+             Just (_ioTyCon, res_ty) -> res_ty
+             Nothing                 -> result_ty
+
+           myPprTraceDebug :: String -> SDoc -> a -> a
+           myPprTraceDebug str doc x
+             | hasPprDebug dflags = pprTrace str doc x
+             | otherwise          = x
            target = StaticTarget NoSourceText lbl Nothing True
-           the_fcall    = CCall (CCallSpec target CCallConv may_gc)
+           the_fcall    = myPprTraceDebug "dsCCall" (text "result type:" <+> ppr result_ty
+                                                  $$ text "ccall result type" <+> ppr ccall_result_ty)
+             $ CCall (mkCCallSpec target CCallConv may_gc (typePrimRep1 raw_res_ty) (map typePrimRep1 arg_tys))
            the_prim_app = mkFCall dflags uniq the_fcall unboxed_args ccall_result_ty
        return (foldr ($) (res_wrapper the_prim_app) arg_wrappers)
 
@@ -358,4 +371,3 @@ resultWrapper result_ty
   = pprPanic "resultWrapper" (ppr result_ty)
   where
     maybe_tc_app = splitTyConApp_maybe result_ty
-

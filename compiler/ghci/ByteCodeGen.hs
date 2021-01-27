@@ -1151,7 +1151,7 @@ generateCCall
     -> Id                      -- of target, for type info
     -> [AnnExpr' Id DVarSet]   -- args (atoms)
     -> BcM BCInstrList
-generateCCall d0 s p (CCallSpec target cconv safety) fn args_r_to_l
+generateCCall d0 s p (CCallSpec target cconv safety _rep_ret _rep_args) fn args_r_to_l
  = do
      dflags <- getDynFlags
 
@@ -1861,7 +1861,7 @@ multiValException = throwGhcException (ProgramError
 
 -- | Indicate if the calling convention is supported
 isSupportedCConv :: CCallSpec -> Bool
-isSupportedCConv (CCallSpec _ cconv _) = case cconv of
+isSupportedCConv (CCallSpec _ cconv _ _ _) = case cconv of
    CCallConv            -> True     -- we explicitly pattern match on every
    StdCallConv          -> True     -- convention to ensure that a warning
    PrimCallConv         -> False    -- is triggered when a new one is added

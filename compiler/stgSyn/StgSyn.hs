@@ -54,7 +54,9 @@ module StgSyn (
         stripStgTicksTop, stripStgTicksTopE,
         stgCaseBndrInScope,
 
-        pprStgBinding, pprGenStgTopBindings, pprStgTopBindings
+        pprStgBinding, pprGenStgTopBindings, pprStgTopBindings,
+
+        isAddrRep
     ) where
 
 #include "HsVersions.h"
