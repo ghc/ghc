@@ -1533,7 +1533,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
             platform = targetPlatform dflags
             prof_init
               | sccProfilingEnabled dflags = profilingInitCode platform this_mod cost_centre_info
-              | otherwise = empty
+              | otherwise = mempty
 
         ------------------  Code generation ------------------
         -- The back-end is streamed: each top-level function goes
@@ -1560,7 +1560,8 @@ hscGenHardCode hsc_env cgguts location output_filename = do
                   return a
                 rawcmms1 = Stream.mapM dump rawcmms0
 
-            let foreign_stubs st = foreign_stubs0 `appendStubC` prof_init `appendStubC` (cgIPEStub st)
+            let foreign_stubs st = foreign_stubs0 `appendStubC` prof_init
+                                                  `appendStubC` cgIPEStub st
 
             (output_filename, (_stub_h_exists, stub_c_exists), foreign_fps, cg_infos)
                 <- {-# SCC "codeOutput" #-}
@@ -1684,7 +1685,7 @@ doCodeGen hsc_env this_mod denv data_tycons
 
     dumpIfSet_dyn dflags Opt_D_dump_stg_final "Final STG:" FormatSTG (pprGenStgTopBindings (initStgPprOpts dflags) stg_binds_w_fvs)
 
-    let cmm_stream :: Stream IO CmmGroup (SDoc, ModuleLFInfos)
+    let cmm_stream :: Stream IO CmmGroup (CStub, ModuleLFInfos)
         -- See Note [Forcing of stg_binds]
         cmm_stream = stg_binds_w_fvs `seqList` {-# SCC "StgToCmm" #-}
             lookupHook stgToCmmHook StgToCmm.codeGen dflags dflags this_mod denv data_tycons

@@ -206,7 +206,7 @@ outputForeignStubs dflags unit_state mod location stubs
      NoStubs ->
         return (False, Nothing)
 
-     ForeignStubs h_code c_code -> do
+     ForeignStubs (CHeader h_code) (CStub c_code) -> do
         let
             stub_c_output_d = pprCode CStyle c_code
             stub_c_output_w = showSDoc dflags stub_c_output_d
@@ -281,9 +281,9 @@ outputForeignStubs_help fname doc_str header footer
 -- module;
 
 -- | Generate code to initialise cost centres
-profilingInitCode :: Platform -> Module -> CollectedCCs -> SDoc
+profilingInitCode :: Platform -> Module -> CollectedCCs -> CStub
 profilingInitCode platform this_mod (local_CCs, singleton_CCSs)
- = vcat
+ = CStub $ vcat
     $  map emit_cc_decl local_CCs
     ++ map emit_ccs_decl singleton_CCSs
     ++ [emit_cc_list local_CCs]
@@ -321,11 +321,11 @@ profilingInitCode platform this_mod (local_CCs, singleton_CCSs)
 
 -- | Generate code to initialise info pointer origin
 -- See note [Mapping Info Tables to Source Positions]
-ipInitCode :: DynFlags -> Module -> [InfoProvEnt] -> SDoc
+ipInitCode :: DynFlags -> Module -> [InfoProvEnt] -> CStub
 ipInitCode dflags this_mod ents
  = if not (gopt Opt_InfoTableMap dflags)
-    then empty
-    else withPprStyle (PprCode CStyle) $ vcat
+    then mempty
+    else CStub $ vcat
     $  map emit_ipe_decl ents
     ++ [emit_ipe_list ents]
     ++ [ text "static void ip_init_" <> ppr this_mod
