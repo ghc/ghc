@@ -46,6 +46,7 @@ import GHC.Types.Basic
 import GHC.Types.Fixity
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc
+import GHC.Types.Tickish
 import GHC.Core.ConLike
 import GHC.Unit.Module (ModuleName)
 import GHC.Utils.Outputable
