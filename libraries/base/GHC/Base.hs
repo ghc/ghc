@@ -1596,8 +1596,13 @@ getTag x = dataToTag# x
 -- Definitions of the boxed PrimOps; these will be
 -- used in the case of partial applications, etc.
 
+-- See Note [INLINE division wrappers]
 {-# INLINE quotInt #-}
 {-# INLINE remInt #-}
+{-# INLINE divInt #-}
+{-# INLINE modInt #-}
+{-# INLINE quotRemInt #-}
+{-# INLINE divModInt #-}
 
 quotInt, remInt, divInt, modInt :: Int -> Int -> Int
 (I# x) `quotInt`  (I# y) = I# (x `quotInt#` y)
@@ -1624,6 +1629,17 @@ x# `divModInt#` y#
                                       (# q, r #) -> (# q -# 1#, r +# y# -# 1# #)
  | otherwise                                =
                                     x# `quotRemInt#` y#
+
+{- Note [INLINE division wrappers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The Int division functions such as 'quotRemInt' and 'divModInt' have
+been manually worker/wrappered, presumably because they construct
+*nested* products.
+We intend to preserve the exact worker/wrapper split, hence we mark
+the wrappers INLINE (#19267). That makes sure the optimiser doesn't
+accidentally inline the worker into the wrapper, undoing the manual
+split again.
+-}
 
 -- Wrappers for the shift operations.  The uncheckedShift# family are
 -- undefined when the amount being shifted by is greater than the size
