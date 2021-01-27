@@ -100,6 +100,7 @@ import GHC.Types.Name.Set
 import GHC.Types.Id
 import GHC.Types.Id.Make
 import GHC.Types.Id.Info
+import GHC.Types.Tickish
 import GHC.Types.TyThing
 
 import GHC.Fingerprint
