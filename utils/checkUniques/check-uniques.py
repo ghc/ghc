@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-from __future__ import print_function
 import os.path
 import sys
 import re
@@ -14,11 +13,8 @@ def find_uniques(source_files):
     unique_re = re.compile(r"([\w\d]+)\s*=\s*mk([\w\d']+)Unique\s+(\d+)")
     for f in source_files:
         ms = unique_re.findall(io.open(f, encoding='utf8').read())
-        for m in ms:
-            name = m[0]
-            _type = m[1]
-            n = int(m[2])
-            uniques[_type][n].add(name)
+        for name, _type, n in ms:
+            uniques[_type][int(n)].add(name)
 
     return uniques
 
@@ -37,9 +33,13 @@ def find_conflicts(uniques):
            ]
 
 top_dir = sys.argv[1]
-uniques = find_uniques(glob.glob(os.path.join(top_dir, 'compiler', 'prelude', '*.hs')))
+uniques = find_uniques(glob.glob(os.path.join(top_dir, 'compiler', 'GHC', '**', '*.hs'), recursive=True))
 #print_all(uniques)
 conflicts = find_conflicts(uniques)
+if len(uniques) < 5:
+    print("Error: check-uniques: run from wrong directory?")
+    sys.exit(1)
+
 if len(conflicts) > 0:
     print("Error: check-uniques: Found Unique conflict")
     print()
