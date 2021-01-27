@@ -33,8 +33,8 @@ cabal := $(shell which cabal 2>/dev/null)
 	hsc2hs $<
 
 # package network-bytestring is deprecated into network
-ghc-bench-flags := -package bytestring-show-0.3.5.6 \
-					-package mtl \
+# and bytestring-show is redundant
+ghc-bench-flags := -package mtl \
 					-package attoparsec \
 
 ifdef USE_GHC_IO_MANAGER
@@ -44,7 +44,9 @@ endif
 programs := dead-conn deadconn pong-server signal simple static-http \
 			thread-delay timers http-client
 
-.PHONY: all
+.PHONY: bench
+
+bench: all clean
 all: $(programs)
 
 cc = gcc
@@ -89,10 +91,15 @@ thread-delay: Args.o ThreadDelay.o
 timers: Args.o Timers.o
 	$(ghc) $(ghc-flags) -threaded -o $@ $(filter %.o,$^)
 
-.PHONY: clean
-clean:
-	-find . \( -name '*.o' -o -name '*.hi' -o -name '*.dat' \
-		-o -name 'new-thread-delay' -o -name 'old-thread-delay' \) -exec rm {} \;
+
+.PHONY: cleanall
+
+cleanall: clean data_clean
+	-find . \( -name 'events' -o -name 'threads' -o -name 'new-thread-delay' -o -name 'old-thread-delay' \) -exec rm {} \;
 	-rm -f $(programs)
-	-rm -rf ./events
-	-rm -rf ./threads
+
+clean:
+	-find . \( -name '*.o' -o -name '*.dyn_o' -o -name '*.hi' \) -exec rm {} \;
+
+data_clean:
+	-find . \( -name '*.dat' -o -name '*.png' \) -exec rm {} \;

@@ -11,14 +11,12 @@ THREADS_BIN="./threads"
 EVENTS_DAT="events.dat"
 THREADS_DAT="threads.dat"
 
-rm -f $EVENTS_DAT $THREADS_DAT
-rm -f timers.png
-
+make data_clean
 make clean
+
 make timers
 mv timers $EVENTS_BIN
 
-make clean
 make thread-delay
 mv thread-delay $THREADS_BIN
 
