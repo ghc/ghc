@@ -896,22 +896,33 @@ pipeLoop phase input_fn = do
 
            case phase of
                HscOut {} -> do
+                   -- Depending on the dynamic-too state, we first run the
+                   -- backend to generate the non-dynamic objects and then
+                   -- re-run it to generate the dynamic ones.
                    let noDynToo = do
                         (next_phase, output_fn) <- runHookedPhase phase input_fn
                         pipeLoop next_phase output_fn
                    let dynToo = do
-                          -- if Opt_BuildDynamicToo is set and if the platform
-                          -- supports it, we first run the backend to generate
-                          -- the dynamic objects and then re-run it to generate
-                          -- the non-dynamic ones.
-                          let dflags' = setDynamicNow dflags -- set "dynamicNow"
-                          setDynFlags dflags'
-                          (next_phase, output_fn) <- runHookedPhase phase input_fn
-                          _ <- pipeLoop next_phase output_fn
-                          -- TODO: we probably shouldn't ignore the result of
-                          -- the dynamic compilation
-                          setDynFlags dflags -- restore flags without "dynamicNow" set
-                          noDynToo
+                          -- we must run the non-dynamic way before the dynamic
+                          -- one because there may be interfaces loaded only in
+                          -- the backend (e.g., in CorePrep). See #19264
+                          r <- noDynToo
+
+                          -- we must check the dynamic-too state again, because
+                          -- we may have failed to load a dynamic interface in
+                          -- the backend.
+                          dynamicTooState dflags >>= \case
+                            DT_OK -> do
+                                let dflags' = setDynamicNow dflags -- set "dynamicNow"
+                                setDynFlags dflags'
+                                (next_phase, output_fn) <- runHookedPhase phase input_fn
+                                _ <- pipeLoop next_phase output_fn
+                                -- TODO: we probably shouldn't ignore the result of
+                                -- the dynamic compilation
+                                setDynFlags dflags -- restore flags without "dynamicNow" set
+                                return r
+                            _ -> return r
+
                    dynamicTooState dflags >>= \case
                      DT_Dont   -> noDynToo
                      DT_Failed -> noDynToo
