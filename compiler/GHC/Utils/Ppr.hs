@@ -71,7 +71,7 @@ module GHC.Utils.Ppr (
         -- * Constructing documents
 
         -- ** Converting values into documents
-        char, text, ftext, ptext, ztext, sizedText, zeroWidthText,
+        char, text, ftext, ptext, ztext, sizedText, zeroWidthText, emptyText,
         int, integer, float, double, rational, hex,
 
         -- ** Simple derived documents
@@ -309,6 +309,12 @@ text s = textBeside_ (Str s) (length s) Empty
     forall p n. text (unpackNBytes# p n) = ptext (PtrString (Ptr p) (I# n))
   #-}
 
+-- Empty strings are desugared into [] (not "unpackCString#..."), hence they are
+-- not matched by the text/str rule above.
+{-# RULES "text/[]"
+    text [] = emptyText
+  #-}
+
 ftext :: FastString -> Doc
 ftext s = textBeside_ (PStr s) (lengthFS s) Empty
 
@@ -326,6 +332,12 @@ sizedText l s = textBeside_ (Str s) l Empty
 -- such as a HTML or Latex tags
 zeroWidthText :: String -> Doc
 zeroWidthText = sizedText 0
+
+-- | Empty text (one line high but no width). (@emptyText = text ""@)
+emptyText :: Doc
+emptyText = sizedText 0 []
+  -- defined as a CAF. Sharing occurs especially via the text/[] rule above.
+  -- Every use of `text ""` in user code should be replaced with this.
 
 -- | The empty document, with no height and no width.
 -- 'empty' is the identity for '<>', '<+>', '$$' and '$+$', and anywhere
