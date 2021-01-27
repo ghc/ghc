@@ -14,6 +14,7 @@ test('integerRecipMod', [], compile_and_run, [''])
 test('bignumMatch', [], compile, [''])
 test('T18813', [], compile_and_run, [''])
 test('T19170', [], compile_and_run, [''])
+test('T19264', [extra_files(['T19264b.hs'])], compile, ['-dynamic-too --make -v0'])
 
 # skip ghci as it doesn't support unboxed tuples
 test('integerImportExport', [omit_ways(['ghci'])], compile_and_run, [''])
