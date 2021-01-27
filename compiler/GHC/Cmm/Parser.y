@@ -223,8 +223,6 @@ import GHC.StgToCmm.Layout     hiding (ArgRep(..))
 import GHC.StgToCmm.Ticky
 import GHC.StgToCmm.Bind  ( emitBlackHoleCode, emitUpdateFrame )
 
-import GHC.Core           ( GenTickish(SourceNote) )
-
 import GHC.Cmm.Opt
 import GHC.Cmm.Graph
 import GHC.Cmm
@@ -249,6 +247,7 @@ import GHC.Types.Literal
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.SrcLoc
+import GHC.Types.Tickish  ( GenTickish(SourceNote) )
 import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Driver.Config
