@@ -41,6 +41,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Core.DataCon
 import GHC.Types.Demand( etaConvertStrictSig )
+import GHC.Types.Tickish
 import GHC.Core.Coercion.Opt ( optCoercion, OptCoercionOpts (..) )
 import GHC.Core.Type hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
                             , isInScope, substTyVarBndr, cloneTyVarBndr )

@@ -32,7 +32,7 @@ import GHC.StgToCmm.Closure
 import GHC.StgToCmm.Foreign    (emitPrimCall)
 
 import GHC.Cmm.Graph
-import GHC.Core          ( AltCon(..), tickishIsCode )
+import GHC.Core          ( AltCon(..) )
 import GHC.Cmm.BlockId
 import GHC.Runtime.Heap.Layout
 import GHC.Cmm
@@ -49,6 +49,7 @@ import GHC.Data.List.SetOps
 import GHC.Utils.Misc
 import GHC.Types.Var.Set
 import GHC.Types.Basic
+import GHC.Types.Tickish ( tickishIsCode )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Data.FastString

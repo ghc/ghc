@@ -68,6 +68,7 @@ import GHC.Types.Name.Cache
 import GHC.Types.Name.Ppr
 import GHC.Types.Avail
 import GHC.Types.Unique.Supply
+import GHC.Types.Tickish
 import GHC.Types.TypeEnv
 
 import GHC.Unit.Module
