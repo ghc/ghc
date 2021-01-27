@@ -89,10 +89,15 @@ thread-delay: Args.o ThreadDelay.o
 timers: Args.o Timers.o
 	$(ghc) $(ghc-flags) -threaded -o $@ $(filter %.o,$^)
 
-.PHONY: clean
+.PHONY: data_clean clean dir_clean
+
+data_clean:
+	-find . \( -name '*.dat' -o -name '*.png' \) -exec rm {} \;
+
 clean:
-	-find . \( -name '*.o' -o -name '*.hi' -o -name '*.dat' \
-		-o -name 'new-thread-delay' -o -name 'old-thread-delay' \) -exec rm {} \;
+	-find . \( -name '*.o' -o -name '*.dyn_o' -o -name '*.hi' \) -exec rm {} \;
 	-rm -f $(programs)
-	-rm -rf ./events
-	-rm -rf ./threads
+
+dir_clean: clean data_clean
+	-find . \( -name 'events' -o -name 'threads' \
+			-o -name 'new-thread-delay' -o -name 'old-thread-delay' \) -exec rm {} \;
