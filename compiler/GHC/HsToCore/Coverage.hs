@@ -28,7 +28,6 @@ import GHC.Cmm.CLabel
 
 import GHC.Core.Type
 import GHC.Core.ConLike
-import GHC.Core
 import GHC.Core.TyCon
 
 import GHC.Data.Maybe
@@ -50,6 +49,7 @@ import GHC.Types.Name
 import GHC.Types.HpcInfo
 import GHC.Types.CostCentre
 import GHC.Types.CostCentre.State
+import GHC.Types.Tickish
 
 import Control.Monad
 import Data.List
