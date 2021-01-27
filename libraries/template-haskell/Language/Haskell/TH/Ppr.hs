@@ -596,7 +596,7 @@ instance Ppr Pragma where
        = text "{-# LINE" <+> int line <+> text (show file) <+> text "#-}"
     ppr (CompleteP cls mty)
        = text "{-# COMPLETE" <+> (fsep $ punctuate comma $ map ppr cls)
-                <+> maybe empty (\ty -> dcolon <+> ppr ty) mty
+                <+> maybe empty (\ty -> dcolon <+> ppr ty) mty <+> text "#-}"
 
 ------------------------------
 instance Ppr Inline where
