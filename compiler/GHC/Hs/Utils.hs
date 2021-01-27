@@ -334,10 +334,22 @@ mkRnBindStmt :: LPat GhcRn -> LocatedA (bodyR GhcRn)
 mkTcBindStmt :: LPat GhcTc -> LocatedA (bodyR GhcTc)
              -> StmtLR GhcTc GhcTc (LocatedA (bodyR GhcTc))
 
-emptyRecStmt     :: StmtLR (GhcPass idL) GhcPs bodyR
-emptyRecStmtName :: StmtLR GhcRn GhcRn bodyR
-emptyRecStmtId   :: StmtLR GhcTc GhcTc bodyR
-mkRecStmt        :: ApiAnn' AnnList
+emptyRecStmt     :: (Anno [GenLocated
+                             (Anno (StmtLR (GhcPass idL) GhcPs bodyR))
+                             (StmtLR (GhcPass idL) GhcPs bodyR)]
+                        ~ SrcSpanAnnL)
+                 => StmtLR (GhcPass idL) GhcPs bodyR
+emptyRecStmtName :: (Anno [GenLocated
+                             (Anno (StmtLR GhcRn GhcRn bodyR))
+                             (StmtLR GhcRn GhcRn bodyR)]
+                        ~ SrcSpanAnnL)
+                 => StmtLR GhcRn GhcRn bodyR
+emptyRecStmtId   :: Stmt GhcTc (LocatedA (HsCmd GhcTc))
+mkRecStmt        :: (Anno [GenLocated
+                             (Anno (StmtLR (GhcPass idL) GhcPs bodyR))
+                             (StmtLR (GhcPass idL) GhcPs bodyR)]
+                        ~ SrcSpanAnnL)
+                 => ApiAnn' AnnList
                  -> LocatedL [LStmtLR (GhcPass idL) GhcPs bodyR]
                  -> StmtLR (GhcPass idL) GhcPs bodyR
 
@@ -402,12 +414,14 @@ mkTcBindStmt pat body = BindStmt (XBindStmtTc { xbstc_bindOp = noSyntaxExpr,
                                                 xbstc_boundResultMult = Many,
                                                 xbstc_failOp = Nothing }) pat body
 
-emptyRecStmt' :: forall idL idR body. IsPass idR
+emptyRecStmt' :: forall idL idR body .
+  (WrapXRec (GhcPass idR) [LStmtLR (GhcPass idL) (GhcPass idR) body], IsPass idR)
               => XRecStmt (GhcPass idL) (GhcPass idR) body
               -> StmtLR (GhcPass idL) (GhcPass idR) body
 emptyRecStmt' tyVal =
    RecStmt
-     { recS_stmts = noLocA [], recS_later_ids = []
+     { recS_stmts = wrapXRec @(GhcPass idR) []
+     , recS_later_ids = []
      , recS_rec_ids = []
      , recS_ret_fn = noSyntaxExpr
      , recS_mfix_fn = noSyntaxExpr
@@ -643,7 +657,7 @@ mkLHsVarTuple ids ext = mkLHsTupleExpr (map nlHsVar ids) ext
 nlTuplePat :: [LPat GhcPs] -> Boxity -> LPat GhcPs
 nlTuplePat pats box = noLocA (TuplePat noAnn pats box)
 
-missingTupArg :: ApiAnn' RealSrcSpan -> HsTupArg GhcPs
+missingTupArg :: ApiAnn' AnnAnchor -> HsTupArg GhcPs
 missingTupArg ann = Missing ann
 
 mkLHsPatTup :: [LPat GhcRn] -> LPat GhcRn

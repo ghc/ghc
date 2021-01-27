@@ -66,9 +66,9 @@ data ImportDeclQualifiedStyle
 -- | Given two possible located 'qualified' tokens, compute a style
 -- (in a conforming Haskell program only one of the two can be not
 -- 'Nothing'). This is called from "GHC.Parser".
-importDeclQualifiedStyle :: Maybe RealSrcSpan
-                         -> Maybe RealSrcSpan
-                         -> (Maybe RealSrcSpan, ImportDeclQualifiedStyle)
+importDeclQualifiedStyle :: Maybe AnnAnchor
+                         -> Maybe AnnAnchor
+                         -> (Maybe AnnAnchor, ImportDeclQualifiedStyle)
 importDeclQualifiedStyle mPre mPost =
   if isJust mPre then (mPre, QualifiedPre)
   else if isJust mPost then (mPost,QualifiedPost) else (Nothing, NotQualified)
@@ -131,12 +131,12 @@ type instance Anno [LocatedA (IE (GhcPass p))] = SrcSpanAnnL
 -- API Annotations types
 
 data ApiAnnImportDecl = ApiAnnImportDecl
-  { importDeclAnnImport    :: RealSrcSpan
-  , importDeclAnnPragma    :: Maybe (RealSrcSpan, RealSrcSpan)
-  , importDeclAnnSafe      :: Maybe RealSrcSpan
-  , importDeclAnnQualified :: Maybe RealSrcSpan
-  , importDeclAnnPackage   :: Maybe RealSrcSpan
-  , importDeclAnnAs        :: Maybe RealSrcSpan
+  { importDeclAnnImport    :: AnnAnchor
+  , importDeclAnnPragma    :: Maybe (AnnAnchor, AnnAnchor)
+  , importDeclAnnSafe      :: Maybe AnnAnchor
+  , importDeclAnnQualified :: Maybe AnnAnchor
+  , importDeclAnnPackage   :: Maybe AnnAnchor
+  , importDeclAnnAs        :: Maybe AnnAnchor
   } deriving (Data)
 
 -- ---------------------------------------------------------------------
@@ -211,12 +211,12 @@ instance (OutputableBndrId p
 -- | A name in an import or export specification which may have
 -- adornments. Used primarily for accurate pretty printing of
 -- ParsedSource, and API Annotation placement. The
--- 'GHC.Types.SrcLoc.RealSrcSpan' is the location of the adornment in
+-- 'GHC.Parser.Annotation' is the location of the adornment in
 -- the original source.
 data IEWrappedName name
-  = IEName                (LocatedN name)  -- ^ no extra
-  | IEPattern RealSrcSpan (LocatedN name)  -- ^ pattern X
-  | IEType    RealSrcSpan (LocatedN name)  -- ^ type (:+:)
+  = IEName              (LocatedN name)  -- ^ no extra
+  | IEPattern AnnAnchor (LocatedN name)  -- ^ pattern X
+  | IEType    AnnAnchor (LocatedN name)  -- ^ type (:+:)
   deriving (Eq,Data)
 
 -- | Located name with possible adornment

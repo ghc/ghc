@@ -62,7 +62,7 @@ module GHC.Tc.Utils.Monad(
 
   -- * Error management
   getSrcSpanM, setSrcSpan, setSrcSpanA, addLocM, addLocMA, inGeneratedCode,
-  wrapLocM, wrapLocFstM, wrapLocFstMA, wrapLocSndM, wrapLocSndMA, wrapLocM_,
+  wrapLocM, wrapLocAM, wrapLocFstM, wrapLocFstMA, wrapLocSndM, wrapLocSndMA, wrapLocM_,
   wrapLocMA_,wrapLocMA,
   getErrsVar, setErrsVar,
   addErr,
@@ -926,6 +926,10 @@ addLocMA fn (L loc a) = setSrcSpanA loc $ fn a
 wrapLocM :: (a -> TcM b) -> Located a -> TcM (Located b)
 wrapLocM fn (L loc a) = setSrcSpan loc $ do { b <- fn a
                                             ; return (L loc b) }
+
+wrapLocAM :: (a -> TcM b) -> LocatedAn an a -> TcM (Located b)
+wrapLocAM fn (L loc a) = setSrcSpanA loc $ do { b <- fn a
+                                              ; return (L (locA loc) b) }
 
 -- wrapLocMA :: (a -> TcM b) -> LocatedA a -> TcM (LocatedA b)
 wrapLocMA :: (a -> TcM b) -> GenLocated (SrcSpanAnn' ann) a -> TcRn (GenLocated (SrcSpanAnn' ann) b)

@@ -45,7 +45,6 @@ import GHC.Core.Ppr ( {- instance OutputableBndr TyVar -} )
 import GHC.Utils.Outputable
 import GHC.Types.SrcLoc
 -- libraries:
-import Data.Data hiding (TyCon,Fixity)
 
 type LPat p = XRec p (Pat p)
 
@@ -227,9 +226,9 @@ type family ConLikeP x
 -- | Haskell Constructor Pattern Details
 type HsConPatDetails p = HsConDetails (HsPatSigType (NoGhcTc p)) (LPat p) (HsRecFields p (LPat p))
 
-hsConPatArgs :: HsConPatDetails p -> [LPat p]
+hsConPatArgs :: forall p . (UnXRec p) => HsConPatDetails p -> [LPat p]
 hsConPatArgs (PrefixCon _ ps) = ps
-hsConPatArgs (RecCon fs)      = map (hsRecFieldArg . unLoc) (rec_flds fs)
+hsConPatArgs (RecCon fs)      = map (hsRecFieldArg . unXRec @p) (rec_flds fs)
 hsConPatArgs (InfixCon p1 p2) = [p1,p2]
 
 -- | Haskell Record Fields
@@ -241,7 +240,7 @@ data HsRecFields p arg         -- A bunch of record fields
         -- Used for both expressions and patterns
   = HsRecFields { rec_flds   :: [LHsRecField p arg],
                   rec_dotdot :: Maybe (Located Int) }  -- Note [DotDot fields]
-  deriving (Functor, Foldable, Traversable)
+  -- deriving (Functor, Foldable, Traversable)
 
 
 -- Note [DotDot fields]
@@ -259,13 +258,13 @@ data HsRecFields p arg         -- A bunch of record fields
 --                     and the remainder being 'filled in' implicitly
 
 -- | Located Haskell Record Field
-type LHsRecField' p arg = Located (HsRecField' p arg)
+type LHsRecField' p id arg = XRec p (HsRecField' id arg)
 
 -- | Located Haskell Record Field
-type LHsRecField  p arg = Located (HsRecField  p arg)
+type LHsRecField  p arg = XRec p (HsRecField  p arg)
 
 -- | Located Haskell Record Update Field
-type LHsRecUpdField p   = Located (HsRecUpdField p)
+type LHsRecUpdField p   = XRec p (HsRecUpdField p)
 
 -- | Haskell Record Field
 type HsRecField    p arg = HsRecField' (FieldOcc p) arg
@@ -279,10 +278,11 @@ type HsRecUpdField p     = HsRecField' (AmbiguousFieldOcc p) (LHsExpr p)
 --
 -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 data HsRecField' id arg = HsRecField {
+        hsRecFieldAnn :: XHsRecField id,
         hsRecFieldLbl :: Located id,
         hsRecFieldArg :: arg,           -- ^ Filled in by renamer when punning
         hsRecPun      :: Bool           -- ^ Note [Punning]
-  } deriving (Data, Functor, Foldable, Traversable)
+  } deriving (Functor, Foldable, Traversable)
 
 
 -- Note [Punning]
@@ -339,12 +339,12 @@ data HsRecField' id arg = HsRecField {
 --
 -- See also Note [Disambiguating record fields] in GHC.Tc.Gen.Head.
 
-hsRecFields :: HsRecFields p arg -> [XCFieldOcc p]
-hsRecFields rbinds = map (unLoc . hsRecFieldSel . unLoc) (rec_flds rbinds)
+hsRecFields :: forall p arg. UnXRec p => HsRecFields p arg -> [XCFieldOcc p]
+hsRecFields rbinds = map (unLoc . hsRecFieldSel . unXRec @p) (rec_flds rbinds)
 
 -- Probably won't typecheck at once, things have changed :/
-hsRecFieldsArgs :: HsRecFields p arg -> [arg]
-hsRecFieldsArgs rbinds = map (hsRecFieldArg . unLoc) (rec_flds rbinds)
+hsRecFieldsArgs :: forall p arg. UnXRec p => HsRecFields p arg -> [arg]
+hsRecFieldsArgs rbinds = map (hsRecFieldArg . unXRec @p) (rec_flds rbinds)
 
 hsRecFieldSel :: HsRecField pass arg -> Located (XCFieldOcc pass)
 hsRecFieldSel = fmap extFieldOcc . hsRecFieldLbl
@@ -358,7 +358,7 @@ hsRecFieldSel = fmap extFieldOcc . hsRecFieldLbl
 ************************************************************************
 -}
 
-instance (Outputable arg)
+instance (Outputable arg, Outputable (XRec p (HsRecField p arg)))
       => Outputable (HsRecFields p arg) where
   ppr (HsRecFields { rec_flds = flds, rec_dotdot = Nothing })
         = braces (fsep (punctuate comma (map ppr flds)))

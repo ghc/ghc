@@ -31,6 +31,7 @@ import GHC.Prelude
 import Language.Haskell.Syntax.Binds
 
 import {-# SOURCE #-} GHC.Hs.Expr ( pprExpr, pprFunBind, pprPatBind )
+import {-# SOURCE #-} GHC.Hs.Pat  (pprLPat )
 
 import Language.Haskell.Syntax.Extension
 import GHC.Hs.Extension
@@ -47,6 +48,7 @@ import GHC.Data.FastString
 import GHC.Data.BooleanFormula (LBooleanFormula)
 import GHC.Types.Name.Reader
 import GHC.Types.Name
+import GHC.Types.Id
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -103,7 +105,7 @@ type instance XXHsBindsLR (GhcPass pL) (GhcPass pR) = NoExtCon
 type instance XABE       (GhcPass p) = NoExtField
 type instance XXABExport (GhcPass p) = NoExtCon
 
-type instance XPSB         (GhcPass idL) GhcPs = NoExtField
+type instance XPSB         (GhcPass idL) GhcPs = ApiAnn
 type instance XPSB         (GhcPass idL) GhcRn = NameSet
 type instance XPSB         (GhcPass idL) GhcTc = NameSet
 
@@ -550,7 +552,7 @@ isEmptyIPBindsPR (IPBinds _ is) = null is
 isEmptyIPBindsTc :: HsIPBinds GhcTc -> Bool
 isEmptyIPBindsTc (IPBinds ds is) = null is && isEmptyTcEvBinds ds
 
-type instance XCIPBind    (GhcPass p) = NoExtField
+type instance XCIPBind    (GhcPass p) = ApiAnn
 type instance XXIPBind    (GhcPass p) = NoExtCon
 
 instance OutputableBndrId p
@@ -572,17 +574,18 @@ instance OutputableBndrId p => Outputable (IPBind (GhcPass p)) where
 ************************************************************************
 -}
 
-type instance XTypeSig          (GhcPass p) = NoExtField
-type instance XPatSynSig        (GhcPass p) = NoExtField
-type instance XClassOpSig       (GhcPass p) = NoExtField
-type instance XIdSig            (GhcPass p) = NoExtField
-type instance XFixSig           (GhcPass p) = NoExtField
-type instance XInlineSig        (GhcPass p) = NoExtField
-type instance XSpecSig          (GhcPass p) = NoExtField
-type instance XSpecInstSig      (GhcPass p) = NoExtField
-type instance XMinimalSig       (GhcPass p) = NoExtField
-type instance XSCCFunSig        (GhcPass p) = NoExtField
-type instance XCompleteMatchSig (GhcPass p) = NoExtField
+type instance XTypeSig          (GhcPass p) = ApiAnn
+type instance XPatSynSig        (GhcPass p) = ApiAnn
+type instance XClassOpSig       (GhcPass p) = ApiAnn
+type instance XIdSig            (GhcPass p) = NoExtField -- No anns, generated
+type instance XFixSig           (GhcPass p) = ApiAnn
+type instance XInlineSig        (GhcPass p) = ApiAnn
+type instance XSpecSig          (GhcPass p) = ApiAnn
+type instance XSpecInstSig      (GhcPass p) = ApiAnn
+type instance XMinimalSig       (GhcPass p) = ApiAnn
+type instance XSCCFunSig        (GhcPass p) = ApiAnn
+type instance XCompleteMatchSig (GhcPass p) = ApiAnn
+
 type instance XXSig             (GhcPass p) = NoExtCon
 
 type instance XFixitySig  (GhcPass p) = NoExtField
@@ -670,3 +673,27 @@ instance Outputable TcSpecPrag where
 pprMinimalSig :: (OutputableBndr name)
               => LBooleanFormula (GenLocated l name) -> SDoc
 pprMinimalSig (L _ bf) = ppr (fmap unLoc bf)
+
+{-
+************************************************************************
+*                                                                      *
+\subsection{Anno instances}
+*                                                                      *
+************************************************************************
+-}
+
+type instance Anno (HsBindLR (GhcPass idL) (GhcPass idR)) = SrcSpanAnnA
+type instance Anno (IPBind (GhcPass p)) = SrcSpanAnnA
+type instance Anno (Sig (GhcPass p)) = SrcSpanAnnA
+
+-- For CompleteMatchSig
+type instance Anno [LocatedN RdrName] = SrcSpan
+type instance Anno [LocatedN Name]    = SrcSpan
+type instance Anno [LocatedN Id]      = SrcSpan
+
+type instance Anno (FixitySig (GhcPass p)) = SrcSpanAnnA
+
+type instance Anno StringLiteral = SrcSpan
+type instance Anno (LocatedN RdrName) = SrcSpan
+type instance Anno (LocatedN Name) = SrcSpan
+type instance Anno (LocatedN Id) = SrcSpan

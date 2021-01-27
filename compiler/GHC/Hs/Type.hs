@@ -1,15 +1,16 @@
-{-# LANGUAGE CPP                  #-}
-{-# LANGUAGE ConstraintKinds      #-}
-{-# LANGUAGE DeriveDataTypeable   #-}
-{-# LANGUAGE FlexibleContexts     #-}
-{-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE ScopedTypeVariables  #-}
-{-# LANGUAGE StandaloneDeriving   #-}
-{-# LANGUAGE TypeApplications     #-}
-{-# LANGUAGE TypeFamilies         #-}
-{-# LANGUAGE ViewPatterns         #-}
-{-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
-                                      -- in module Language.Haskell.Syntax.Extension
+{-# LANGUAGE CPP                   #-}
+{-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE DeriveDataTypeable    #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE StandaloneDeriving    #-}
+{-# LANGUAGE TypeApplications      #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE ViewPatterns          #-}
+{-# LANGUAGE UndecidableInstances  #-} -- Wrinkle in Note [Trees That Grow]
+                                       -- in module Language.Haskell.Syntax.Extension
 
 {-# OPTIONS_GHC -Wno-orphans #-} -- NamedThing, Outputable, OutputableBndrId
 
@@ -110,7 +111,6 @@ import GHC.Hs.Doc
 import GHC.Types.Basic
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
-import GHC.Parser.Annotation
 
 import Data.Maybe
 
@@ -143,18 +143,19 @@ getBangStrictness _ = (HsSrcBang NoSourceText NoSrcUnpack NoSrcStrict)
 ************************************************************************
 -}
 
-noLHsContext :: LHsContext (GhcPass p)
--- Use this when there is no context in the original program
--- It would really be more kosher to use a Maybe, to distinguish
---     class () => C a where ...
--- from
---     class C a where ...
-noLHsContext = noLoc []
+fromMaybeContext :: Maybe (LHsContext (GhcPass p)) -> HsContext (GhcPass p)
+fromMaybeContext mctxt = unLoc $ fromMaybe (noLocA []) mctxt
 
-type instance XHsForAllVis   (GhcPass _) = NoExtField
-type instance XHsForAllInvis (GhcPass _) = NoExtField
+type instance XHsForAllVis   (GhcPass _) = ApiAnnForallTy
+                                           -- Location of 'forall' and '->'
+type instance XHsForAllInvis (GhcPass _) = ApiAnnForallTy
+                                           -- Location of 'forall' and '.'
 
 type instance XXHsForAllTelescope (GhcPass _) = NoExtCon
+
+type ApiAnnForallTy = ApiAnn' (AddApiAnn, AddApiAnn)
+  -- ^ Location of 'forall' and '->' for HsForAllVis
+  -- Location of 'forall' and '.' for HsForAllInvis
 
 type HsQTvsRn = [Name]  -- Implicit variables
   -- For example, in   data T (a :: k1 -> k2) = ...
@@ -210,8 +211,8 @@ type instance XXHsPatSigType (GhcPass _) = NoExtCon
 type instance XHsSig (GhcPass _) = NoExtField
 type instance XXHsSigType (GhcPass _) = NoExtCon
 
-hsSigWcType :: LHsSigWcType pass -> LHsType pass
-hsSigWcType = sig_body . unLoc . hswc_body
+hsSigWcType :: forall p. UnXRec p => LHsSigWcType p -> LHsType p
+hsSigWcType = sig_body . unXRec @p . hswc_body
 
 dropWildCards :: LHsSigWcType pass -> LHsSigType pass
 -- Drop the wildcard part of a LHsSigWcType
@@ -260,8 +261,8 @@ mkEmptyWildCardBndrs x = HsWC { hswc_body = x
 
 --------------------------------------------------
 
-type instance XUserTyVar    (GhcPass _) = NoExtField
-type instance XKindedTyVar  (GhcPass _) = NoExtField
+type instance XUserTyVar    (GhcPass _) = ApiAnn
+type instance XKindedTyVar  (GhcPass _) = ApiAnn
 
 type instance XXTyVarBndr   (GhcPass _) = NoExtCon
 
@@ -355,7 +356,7 @@ pprHsArrow (HsUnrestrictedArrow _) = arrow
 pprHsArrow (HsLinearArrow _ _) = lollipop
 pprHsArrow (HsExplicitMult _ _ p) = (mulArrow (ppr p))
 
-type instance XConDeclField  (GhcPass _) = NoExtField
+type instance XConDeclField  (GhcPass _) = ApiAnn
 type instance XXConDeclField (GhcPass _) = NoExtCon
 
 instance OutputableBndrId p
@@ -802,7 +803,7 @@ type instance XCFieldOcc GhcTc = Id
 
 type instance XXFieldOcc (GhcPass _) = NoExtCon
 
-mkFieldOcc :: Located RdrName -> FieldOcc GhcPs
+mkFieldOcc :: LocatedN RdrName -> FieldOcc GhcPs
 mkFieldOcc rdr = FieldOcc noExtField rdr
 
 
@@ -1221,3 +1222,27 @@ parenthesizeHsContext p lctxt@(L loc ctxt) =
     [c] -> L loc [parenthesizeHsType p c]
     _   -> lctxt -- Other contexts are already "parenthesized" by virtue of
                  -- being tuples.
+{-
+************************************************************************
+*                                                                      *
+\subsection{Anno instances}
+*                                                                      *
+************************************************************************
+-}
+
+type instance Anno (BangType (GhcPass p)) = SrcSpanAnnA
+type instance Anno [LocatedA (HsType (GhcPass p))] = SrcSpanAnnC
+type instance Anno (HsType (GhcPass p)) = SrcSpanAnnA
+type instance Anno (HsSigType (GhcPass p)) = SrcSpanAnnA
+type instance Anno (HsKind (GhcPass p)) = SrcSpanAnnA
+
+type instance Anno (HsTyVarBndr _flag (GhcPass _)) = SrcSpanAnnA
+  -- Explicit pass Anno instances needed because of the NoGhcTc field
+type instance Anno (HsTyVarBndr _flag GhcPs) = SrcSpanAnnA
+type instance Anno (HsTyVarBndr _flag GhcRn) = SrcSpanAnnA
+type instance Anno (HsTyVarBndr _flag GhcTc) = SrcSpanAnnA
+
+type instance Anno (HsOuterTyVarBndrs _ (GhcPass _)) = SrcSpanAnnA
+type instance Anno HsIPName = SrcSpan
+type instance Anno (ConDeclField (GhcPass p)) = SrcSpanAnnA
+type instance Anno (FieldOcc (GhcPass p)) = SrcSpan

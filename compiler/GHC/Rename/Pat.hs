@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE CPP                 #-}
 {-# LANGUAGE DeriveFunctor       #-}
 {-# LANGUAGE FlexibleContexts    #-}
@@ -820,9 +821,9 @@ rnHsRecUpdFields flds
 getFieldIds :: [LHsRecField GhcRn arg] -> [Name]
 getFieldIds flds = map (unLoc . hsRecFieldSel . unLoc) flds
 
-getFieldLbls :: [LHsRecField id arg] -> [RdrName]
+getFieldLbls :: forall p arg . UnXRec p => [LHsRecField p arg] -> [RdrName]
 getFieldLbls flds
-  = map (unLoc . rdrNameFieldOcc . unLoc . hsRecFieldLbl . unLoc) flds
+  = map (unLoc . rdrNameFieldOcc . unLoc . hsRecFieldLbl . unXRec @p) flds
 
 getFieldUpdLbls :: [LHsRecUpdField GhcPs] -> [RdrName]
 getFieldUpdLbls flds = map (rdrNameAmbiguousFieldOcc . unLoc . hsRecFieldLbl . unLoc) flds

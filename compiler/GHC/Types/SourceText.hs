@@ -223,6 +223,10 @@ data StringLiteral = StringLiteral
                        -- StringLiteral we would not need sl_tc, but
                        -- that would cause import loops.
 
+                       -- AZ:2: sl_tc should be an AnnAnchor, to allow
+                       -- editing and reprinting the AST. Need a more
+                       -- robust solution.
+
                        } deriving Data
 
 instance Eq StringLiteral where

@@ -18,7 +18,7 @@ import GHC hiding (AnnComment)
 -- import GHC.Types.Name.Reader
 -- import GHC.Types.SrcLoc
 import GHC.Utils.Outputable hiding ( (<>) )
-import GHC.Driver.Session
+-- import GHC.Driver.Session
 import GHC.Driver.Ppr
 -- import Control.Monad.Identity
 -- import Control.Monad.RWS
@@ -154,13 +154,12 @@ data ACS' a = ACS
   } deriving (Show)
 
 instance Semigroup (ACS' AstContext) where
-  (<>) = mappend
+  ACS a <> ACS b = ACS (Map.unionWith max a b)
+  -- For Data.Map, mappend == union, which is a left-biased replace
+  -- for key collisions
 
 instance Monoid (ACS' AstContext) where
   mempty = ACS mempty
-  -- ACS a `mappend` ACS b = ACS (a `mappend` b)
-  ACS a `mappend` ACS b = ACS (Map.unionWith max a b)
-  -- For Data.Map, mappend == union, which is a left-biased replace for key collisions
 
 type AstContextSet = ACS' AstContext
 -- data AstContextSet = ACS

@@ -95,14 +95,25 @@ saying that NoGhcTcPass is idempotent.
 
 -}
 
-type instance XRec (GhcPass p) a = Located a
+-- type instance XRec (GhcPass p) a = Located a
+type instance XRec (GhcPass p) a = GenLocated (Anno a) a
+
+-- type family Anno a = b
+
+type instance Anno RdrName = SrcSpanAnnName
+type instance Anno Name    = SrcSpanAnnName
+type instance Anno Id      = SrcSpanAnnName
+
+type IsSrcSpanAnn p a = ( Anno (IdGhcP p) ~ SrcSpanAnn' (ApiAnn' a),
+                          IsPass p)
 
 instance UnXRec (GhcPass p) where
   unXRec = unLoc
 instance MapXRec (GhcPass p) where
   mapXRec = fmap
--- instance WrapXRec (GhcPass p) where
---   wrapXRec = noLoc
+
+-- instance WrapXRec (GhcPass p) a where
+--   wrapXRec = noLocA
 
 {-
 Note [NoExtCon and strict fields]

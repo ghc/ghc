@@ -97,6 +97,8 @@ keywordToString kw =
       -- (G AnnOpenPTE  ) -> "$$("
       (G AnnOpenS    ) -> "["
       (G AnnPattern  ) -> "pattern"
+      (G AnnPercent   ) -> "%"
+      (G AnnPercentOne) -> "%1"
       (G AnnProc     ) -> "proc"
       (G AnnQualified ) -> "qualified"
       (G AnnRarrow   ) -> "->"

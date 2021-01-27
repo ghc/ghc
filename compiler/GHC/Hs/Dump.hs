@@ -65,6 +65,7 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
               `extQ` lit `extQ` litr `extQ` litt
               `extQ` sourceText
               `extQ` deltaPos
+              `extQ` annAnchor
               `extQ` bytestring
               `extQ` name `extQ` occName `extQ` moduleName `extQ` var
               `extQ` dataCon
@@ -86,8 +87,8 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
 
             fastString :: FastString -> SDoc
             fastString s = braces $
-                            text "FastString: "
-                         <> text (normalize_newlines . show $ s)
+                            text "FastString:"
+                        <+> text (normalize_newlines . show $ s)
 
             bytestring :: B.ByteString -> SDoc
             bytestring = text . normalize_newlines . show
@@ -134,18 +135,22 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
               BlankSrcSpanFile -> parens $ text "SourceText" <+> text src
               _                -> parens $ text "SourceText" <+> text "blanked"
 
+            annAnchor :: AnnAnchor -> SDoc
+            annAnchor (AR r) = parens $ text "AR" <+> realSrcSpan r
+            annAnchor (AD d) = parens $ text "AR" <+> deltaPos d
+
             deltaPos :: DeltaPos -> SDoc
-            deltaPos (DP dp) = parens $ text "DP " <> ppr dp
+            deltaPos (DP dp) = parens $ text "DP" <+> ppr dp
 
             name :: Name -> SDoc
-            name nm    = braces $ text "Name: " <> ppr nm
+            name nm    = braces $ text "Name:" <+> ppr nm
 
             occName n  =  braces $
-                          text "OccName: "
-                       <> text (occNameString n)
+                          text "OccName:"
+                      <+> text (occNameString n)
 
             moduleName :: ModuleName -> SDoc
-            moduleName m = braces $ text "ModuleName: " <> ppr m
+            moduleName m = braces $ text "ModuleName:" <+> ppr m
 
             srcSpan :: SrcSpan -> SDoc
             srcSpan ss = case bs of
@@ -177,13 +182,13 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
              BlankApiAnnotations -> parens
                                       $ text "blanked:" <+> text "AddApiAnn"
              NoBlankApiAnnotations ->
-              parens $ text "AddApiAnn" <+> ppr a <+> realSrcSpan s
+              parens $ text "AddApiAnn" <+> ppr a <+> annAnchor s
 
             var  :: Var -> SDoc
-            var v      = braces $ text "Var: " <> ppr v
+            var v      = braces $ text "Var:" <+> ppr v
 
             dataCon :: DataCon -> SDoc
-            dataCon c  = braces $ text "DataCon: " <> ppr c
+            dataCon c  = braces $ text "DataCon:" <+> ppr c
 
             bagRdrName:: Bag (LocatedA (HsBind GhcPs)) -> SDoc
             bagRdrName bg =  braces $
@@ -206,8 +211,8 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
 
             fixity :: Fixity -> SDoc
             fixity fx =  braces $
-                         text "Fixity: "
-                      <> ppr fx
+                         text "Fixity:"
+                     <+> ppr fx
 
             located :: (Data a, Data b) => GenLocated a b -> SDoc
             located (L ss a)

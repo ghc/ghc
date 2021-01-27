@@ -54,14 +54,15 @@ module GHC.Hs.Pat (
 import GHC.Prelude
 
 import Language.Haskell.Syntax.Pat
-import Language.Haskell.Syntax.Expr (SyntaxExpr)
+import Language.Haskell.Syntax.Expr (HsExpr, SyntaxExpr)
 
-import {-# SOURCE #-} GHC.Hs.Expr (pprLExpr, pprSplice)
+import {-# SOURCE #-} GHC.Hs.Expr ( pprLExpr, pprSplice)
 
 -- friends:
 import GHC.Hs.Binds
 import GHC.Hs.Lit
 import Language.Haskell.Syntax.Extension
+import GHC.Parser.Annotation
 import GHC.Hs.Extension
 import GHC.Hs.Type
 import GHC.Tc.Types.Evidence
@@ -81,6 +82,7 @@ import GHC.Types.SrcLoc
 import GHC.Data.Bag -- collect ev vars from pats
 import GHC.Data.Maybe
 import GHC.Types.Name (Name)
+import Data.Data
 
 
 data ListPatTc
@@ -155,7 +157,7 @@ type instance ConLikeP GhcPs = RdrName -- IdP GhcPs
 type instance ConLikeP GhcRn = Name    -- IdP GhcRn
 type instance ConLikeP GhcTc = ConLike
 
-type instance Anno ConLike = SrcSpanAnnName
+type instance XHsRecField _ = ApiAnn
 
 -- ---------------------------------------------------------------------
 
@@ -163,8 +165,8 @@ type instance Anno ConLike = SrcSpanAnnName
 
 data ApiAnnSumPat = ApiAnnSumPat
       { sumPatParens      :: [AddApiAnn]
-      , sumPatVbarsBefore :: [RealSrcSpan]
-      , sumPatVbarsAfter  :: [RealSrcSpan]
+      , sumPatVbarsBefore :: [AnnAnchor]
+      , sumPatVbarsAfter  :: [AnnAnchor]
       } deriving Data
 
 -- ---------------------------------------------------------------------
@@ -636,3 +638,24 @@ collectEvVarsPat pat =
     SigPat  _ p _    -> collectEvVarsLPat p
     XPat (CoPat _ p _) -> collectEvVarsPat  p
     _other_pat       -> emptyBag
+
+{-
+************************************************************************
+*                                                                      *
+\subsection{Anno instances}
+*                                                                      *
+************************************************************************
+-}
+
+type instance Anno (Pat (GhcPass p)) = SrcSpanAnnA
+type instance Anno (HsOverLit (GhcPass p)) = SrcSpan
+type instance Anno ConLike = SrcSpanAnnName
+
+type instance Anno (HsRecField' p arg) = SrcSpanAnnA
+type instance Anno (HsRecField' (GhcPass p) (LocatedA (HsExpr (GhcPass p)))) = SrcSpanAnnA
+type instance Anno (HsRecField  (GhcPass p) arg) = SrcSpanAnnA
+
+-- type instance Anno (HsRecUpdField p) = SrcSpanAnnA
+type instance Anno (HsRecField' (AmbiguousFieldOcc p) (LocatedA (HsExpr p))) = SrcSpanAnnA
+
+type instance Anno (AmbiguousFieldOcc GhcTc) = SrcSpanAnnA

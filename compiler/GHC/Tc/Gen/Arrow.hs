@@ -417,13 +417,18 @@ tcArrDoStmt env ctxt (RecStmt { recS_stmts = L l stmts, recS_later_ids = later_n
         ; let ret_table = zip tup_ids tup_rets
         ; let later_rets = [r | i <- later_ids, (j, r) <- ret_table, i == j]
 
-        ; return (emptyRecStmtId { recS_stmts = L l stmts'
+        ; let
+            stmt :: Stmt GhcTc (LocatedA (HsCmd GhcTc))
+            stmt = emptyRecStmtId
+                                 { recS_stmts = L l stmts'
+                                 -- { recS_stmts = _ stmts'
                                  , recS_later_ids = later_ids
                                  , recS_rec_ids = rec_ids
                                  , recS_ext = unitRecStmtTc
                                      { recS_later_rets = later_rets
                                      , recS_rec_rets = rec_rets
-                                     , recS_ret_ty = res_ty} }, thing)
+                                     , recS_ret_ty = res_ty} }
+        ; return (stmt, thing)
         }}
 
 tcArrDoStmt _ _ stmt _ _

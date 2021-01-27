@@ -28,13 +28,13 @@ import GHC.Hs.Dump
 import Lookup
 
 -- import GHC.Data.Bag
-import GHC.Driver.Session
+-- import GHC.Driver.Session
 -- import GHC.Data.FastString
 import GHC hiding (AnnComment)
 import qualified GHC
 -- import qualified Name           as GHC
 -- import qualified NameSet        as GHC
-import GHC.Utils.Outputable
+-- import GHC.Utils.Outputable
 import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
@@ -123,11 +123,11 @@ undelta (l,c) (DP (dl,dc)) (LayoutStartCol co) = (fl,fc)
                     else co + dc
 
 undeltaSpan :: RealSrcSpan -> AnnKeywordId -> DeltaPos -> AddApiAnn
-undeltaSpan anchor kw dp = AddApiAnn kw span
+undeltaSpan anchor kw dp = AddApiAnn kw (AR sp)
   where
     (l,c) = undelta (ss2pos anchor) dp (LayoutStartCol 0)
     len = length (keywordToString (G kw))
-    span = range2rs ((l,c),(l,c+len))
+    sp = range2rs ((l,c),(l,c+len))
 
 -- | Add together two @DeltaPos@ taking into account newlines
 --
@@ -280,8 +280,11 @@ mkComment :: String -> Anchor -> Comment
 mkComment c anc = Comment c anc Nothing
 
 -- | Makes a comment which originates from a specific keyword.
-mkKWComment :: AnnKeywordId -> RealSrcSpan -> Comment
-mkKWComment kw ss = Comment (keywordToString $ G kw) (Anchor ss UnchangedAnchor) (Just kw)
+mkKWComment :: AnnKeywordId -> AnnAnchor -> Comment
+mkKWComment kw (AR ss)
+  = Comment (keywordToString $ G kw) (Anchor ss UnchangedAnchor) (Just kw)
+mkKWComment kw (AD dp)
+  = Comment (keywordToString $ G kw) (Anchor placeholderRealSpan (MovedAnchor dp)) (Just kw)
 
 comment2dp :: (Comment,  DeltaPos) -> (KeywordId, DeltaPos)
 comment2dp = first AnnComment

@@ -10,6 +10,7 @@
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
                                       -- in module Language.Haskell.Syntax.Extension
+{-# LANGUAGE ViewPatterns #-}
 
 {-
 (c) The University of Glasgow 2006
@@ -27,7 +28,7 @@
 -- @InstDecl@, @DefaultDecl@ and @ForeignDecl@.
 module Language.Haskell.Syntax.Decls (
   -- * Toplevel declarations
-  HsDecl(..), LHsDecl, HsDataDefn(..), HsDeriving, LHsFunDep,
+  HsDecl(..), LHsDecl, HsDataDefn(..), HsDeriving, LHsFunDep, FunDep(..),
   HsDerivingClause(..), LHsDerivingClause, DerivClauseTys(..), LDerivClauseTys,
   NewOrData(..), newOrDataToFlavour,
   StandaloneKindSig(..), LStandaloneKindSig,
@@ -108,7 +109,6 @@ import GHC.Types.Name.Set
 import GHC.Types.Fixity
 
 -- others:
-import GHC.Core.Class
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Types.SrcLoc
@@ -229,7 +229,7 @@ data HsGroup p
         hs_annds  :: [LAnnDecl p],
         hs_ruleds :: [LRuleDecls p],
 
-        hs_docs   :: [LDocDecl]
+        hs_docs   :: [LDocDecl p]
     }
   | XHsGroup !(XXHsGroup p)
 
@@ -436,7 +436,7 @@ data TyClDecl pass
              , tcdDataDefn :: HsDataDefn pass }
 
   | ClassDecl { tcdCExt    :: XClassDecl pass,         -- ^ Post renamer, FVs
-                tcdCtxt    :: LHsContext pass,         -- ^ Context...
+                tcdCtxt    :: Maybe (LHsContext pass), -- ^ Context...
                 tcdLName   :: LIdP pass,               -- ^ Name of the class
                 tcdTyVars  :: LHsQTyVars pass,         -- ^ Class type variables
                 tcdFixity  :: LexicalFixity, -- ^ Fixity used in the declaration
@@ -445,7 +445,7 @@ data TyClDecl pass
                 tcdMeths   :: LHsBinds pass,            -- ^ Default methods
                 tcdATs     :: [LFamilyDecl pass],       -- ^ Associated types;
                 tcdATDefs  :: [LTyFamDefltDecl pass],   -- ^ Associated type defaults
-                tcdDocs    :: [LDocDecl]                -- ^ Haddock docs
+                tcdDocs    :: [LDocDecl pass]           -- ^ Haddock docs
     }
         -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnClass',
         --           'GHC.Parser.Annotation.AnnWhere','GHC.Parser.Annotation.AnnOpen',
@@ -457,7 +457,15 @@ data TyClDecl pass
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | XTyClDecl !(XXTyClDecl pass)
 
-type LHsFunDep pass = XRec pass (FunDep (LIdP pass))
+-- type LHsFunDep pass = XRec pass (FunDep (LIdP pass))
+-- AZ version following
+data FunDep pass
+  = FunDep (XCFunDep pass)
+           [(XRec pass (IdP pass))]
+           [(XRec pass (IdP pass))]
+  | XFunDep !(XXFunDep pass)
+
+type LHsFunDep pass = XRec pass (FunDep pass)
 
 data DataDeclRn = DataDeclRn
              { tcdDataCusk :: Bool    -- ^ does this have a CUSK?
@@ -818,6 +826,7 @@ type LFamilyDecl pass = XRec pass (FamilyDecl pass)
 data FamilyDecl pass = FamilyDecl
   { fdExt            :: XCFamilyDecl pass
   , fdInfo           :: FamilyInfo pass              -- type/data, closed/open
+  , fdTopLevel       :: TopLevelFlag                 -- used for printing only
   , fdLName          :: LIdP pass                    -- type constructor
   , fdTyVars         :: LHsQTyVars pass              -- type variables
                        -- See Note [TyVar binders for associated declarations]
@@ -848,11 +857,16 @@ type LInjectivityAnn pass = XRec pass (InjectivityAnn pass)
 --
 -- This will be represented as "InjectivityAnn `r` [`a`, `c`]"
 data InjectivityAnn pass
-  = InjectivityAnn (LIdP pass) [LIdP pass]
+  = InjectivityAnn (XCInjectivityAnn pass)
+                   (LIdP pass) [LIdP pass]
+  -- = InjectivityAnn (XCInjectivityAnn pass)
+  --                  (LocatedN (IdP pass)) [LocatedN (IdP pass)]
+                       -- AZ: old one
   -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' :
   --             'GHC.Parser.Annotation.AnnRarrow', 'GHC.Parser.Annotation.AnnVbar'
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
+  | XInjectivityAnn !(XXInjectivityAnn pass)
 
 data FamilyInfo pass
   = DataFamily
@@ -891,7 +905,7 @@ data HsDataDefn pass   -- The payload of a data type defn
     -- @
     HsDataDefn { dd_ext    :: XCHsDataDefn pass,
                  dd_ND     :: NewOrData,
-                 dd_ctxt   :: LHsContext pass,           -- ^ Context
+                 dd_ctxt   :: Maybe (LHsContext pass),    -- ^ Context
                  dd_cType  :: Maybe (XRec pass CType),
                  dd_kindSig:: Maybe (LHsKind pass),
                      -- ^ Optional kind signature.
@@ -916,7 +930,9 @@ data HsDataDefn pass   -- The payload of a data type defn
   | XHsDataDefn !(XXHsDataDefn pass)
 
 -- | Haskell Deriving clause
-type HsDeriving pass = XRec pass [LHsDerivingClause pass]
+type HsDeriving pass = [LHsDerivingClause pass]
+-- type HsDeriving pass = [LHsDerivingClause pass]
+                       -- AZ: old one
   -- ^ The optional @deriving@ clauses of a data declaration. "Clauses" is
   -- plural because one can specify multiple deriving clauses using the
   -- @-XDerivingStrategies@ language extension.
@@ -1063,7 +1079,7 @@ data ConDecl pass
       { con_ext     :: XConDeclH98 pass
       , con_name    :: LIdP pass
 
-      , con_forall  :: XRec pass Bool
+      , con_forall  :: Bool
                               -- ^ True <=> explicit user-written forall
                               --     e.g. data T a = forall b. MkT b (b->a)
                               --     con_ex_tvs = {b}
@@ -1302,12 +1318,15 @@ type LTyFamDefltDecl pass = XRec pass (TyFamDefltDecl pass)
 type LTyFamInstDecl pass = XRec pass (TyFamInstDecl pass)
 
 -- | Type Family Instance Declaration
-newtype TyFamInstDecl pass = TyFamInstDecl { tfid_eqn :: TyFamInstEqn pass }
+data TyFamInstDecl pass
+  = TyFamInstDecl { tfid_xtn :: XCTyFamInstDecl pass
+                  , tfid_eqn :: TyFamInstEqn pass }
     -- ^
     --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnType',
     --           'GHC.Parser.Annotation.AnnInstance',
 
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
+  | XTyFamInstDecl !(XXTyFamInstDecl pass)
 
 ----------------- Data family instances -------------
 
@@ -1448,13 +1467,14 @@ type LDerivStrategy pass = XRec pass (DerivStrategy pass)
 -- | Which technique the user explicitly requested when deriving an instance.
 data DerivStrategy pass
   -- See Note [Deriving strategies] in GHC.Tc.Deriv
-  = StockStrategy    -- ^ GHC's \"standard\" strategy, which is to implement a
+  = StockStrategy (XStockStrategy pass)
+                     -- ^ GHC's \"standard\" strategy, which is to implement a
                      --   custom instance for the data type. This only works
                      --   for certain types that GHC knows about (e.g., 'Eq',
                      --   'Show', 'Functor' when @-XDeriveFunctor@ is enabled,
                      --   etc.)
-  | AnyclassStrategy -- ^ @-XDeriveAnyClass@
-  | NewtypeStrategy  -- ^ @-XGeneralizedNewtypeDeriving@
+  | AnyclassStrategy (XAnyClassStrategy pass) -- ^ @-XDeriveAnyClass@
+  | NewtypeStrategy  (XNewtypeStrategy pass)  -- ^ @-XGeneralizedNewtypeDeriving@
   | ViaStrategy (XViaStrategy pass)
                      -- ^ @-XDerivingVia@
 
@@ -1462,10 +1482,10 @@ data DerivStrategy pass
 derivStrategyName :: DerivStrategy a -> SDoc
 derivStrategyName = text . go
   where
-    go StockStrategy    = "stock"
-    go AnyclassStrategy = "anyclass"
-    go NewtypeStrategy  = "newtype"
-    go (ViaStrategy {}) = "via"
+    go StockStrategy    {} = "stock"
+    go AnyclassStrategy {} = "anyclass"
+    go NewtypeStrategy  {} = "newtype"
+    go ViaStrategy      {} = "via"
 
 {-
 ************************************************************************
@@ -1693,7 +1713,7 @@ pprFullRuleName (L _ (st, n)) = pprWithSourceText st (doubleQuotes $ ftext n)
 -}
 
 -- | Located Documentation comment Declaration
-type LDocDecl = Located (DocDecl)
+type LDocDecl pass = XRec pass (DocDecl)
 
 -- | Documentation comment Declaration
 data DocDecl
@@ -1756,7 +1776,7 @@ type LAnnDecl pass = XRec pass (AnnDecl pass)
 data AnnDecl pass = HsAnnotation
                       (XHsAnnotation pass)
                       SourceText -- Note [Pragma source text] in GHC.Types.SourceText
-                      (AnnProvenance (IdP pass)) (XRec pass (HsExpr pass))
+                      (AnnProvenance pass) (XRec pass (HsExpr pass))
       -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
       --           'GHC.Parser.Annotation.AnnType'
       --           'GHC.Parser.Annotation.AnnModule'
@@ -1766,18 +1786,21 @@ data AnnDecl pass = HsAnnotation
   | XAnnDecl !(XXAnnDecl pass)
 
 -- | Annotation Provenance
-data AnnProvenance name = ValueAnnProvenance (Located name)
-                        | TypeAnnProvenance (Located name)
+-- data AnnProvenance name = ValueAnnProvenance (LocatedN name)
+--                         | TypeAnnProvenance (LocatedN name)
+--                         | ModuleAnnProvenance
+data AnnProvenance pass = ValueAnnProvenance (LIdP pass)
+                        | TypeAnnProvenance (LIdP pass)
                         | ModuleAnnProvenance
-deriving instance Functor     AnnProvenance
-deriving instance Foldable    AnnProvenance
-deriving instance Traversable AnnProvenance
-deriving instance (Data pass) => Data (AnnProvenance pass)
+-- deriving instance Functor     AnnProvenance
+-- deriving instance Foldable    AnnProvenance
+-- deriving instance Traversable AnnProvenance
+-- deriving instance (Data pass) => Data (AnnProvenance pass)
 
-annProvenanceName_maybe :: AnnProvenance name -> Maybe name
-annProvenanceName_maybe (ValueAnnProvenance (L _ name)) = Just name
-annProvenanceName_maybe (TypeAnnProvenance (L _ name))  = Just name
-annProvenanceName_maybe ModuleAnnProvenance       = Nothing
+annProvenanceName_maybe :: forall p. UnXRec p => AnnProvenance p -> Maybe (IdP p)
+annProvenanceName_maybe (ValueAnnProvenance (unXRec @p -> name)) = Just name
+annProvenanceName_maybe (TypeAnnProvenance (unXRec @p -> name))  = Just name
+annProvenanceName_maybe ModuleAnnProvenance                      = Nothing
 
 {-
 ************************************************************************

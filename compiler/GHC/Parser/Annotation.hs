@@ -19,7 +19,7 @@ module GHC.Parser.Annotation (
   LocatedA, LocatedL, LocatedC, LocatedN, LocatedAn, LocatedP,
 
   SrcSpanAnnA, SrcSpanAnnL, SrcSpanAnnP, SrcSpanAnnC, SrcSpanAnnName, SrcSpanAnn'(..),
-  AddApiAnn(..),
+  AddApiAnn(..), AnnAnchor(..), annAnchorRealSrcSpan,
   ApiAnn, ApiAnn'(..), Anchor(..), AnchorOperation(..), DeltaPos(..),
   ApiAnnComments(..), LAnnotationComment, com, noCom,
   getFollowingComments, setFollowingComments, setPriorComments,
@@ -438,19 +438,32 @@ data HasE = HasE | NoE
 --
 --   The usual way an 'AddApiAnn' is created is using the 'mj' ("make jump")
 --   function, and then it can be discharged using the 'ams' function.
-data AddApiAnn = AddApiAnn AnnKeywordId RealSrcSpan deriving (Data,Show,Eq,Ord)
+-- data AddApiAnn = AddApiAnn AnnKeywordId RealSrcSpan deriving (Data,Show,Eq,Ord)
+data AddApiAnn = AddApiAnn AnnKeywordId AnnAnchor deriving (Data,Show,Eq,Ord)
+
+data AnnAnchor = AR RealSrcSpan
+               | AD DeltaPos
+               deriving (Data,Show,Eq,Ord)
+
+annAnchorRealSrcSpan :: AnnAnchor -> RealSrcSpan
+annAnchorRealSrcSpan (AR r) = r
+annAnchorRealSrcSpan (AD _) = placeholderRealSpan
+
+instance Outputable AnnAnchor where
+  ppr (AR r) = text "AR" <+> ppr r
+  ppr (AD d) = text "AD" <+> ppr d
 
 instance Outputable AddApiAnn where
   ppr (AddApiAnn kw ss) = text "AddApiAnn" <+> ppr kw <+> ppr ss
 
 data TrailingAnn
-  = AddSemiAnn RealSrcSpan
-  | AddCommaAnn RealSrcSpan
-  | AddVbarAnn RealSrcSpan
-  | AddRarrowAnn RealSrcSpan
-  | AddRarrowAnnU RealSrcSpan
-  -- | AddLollyAnn RealSrcSpan
-  | AddLollyAnnU RealSrcSpan
+  = AddSemiAnn AnnAnchor
+  | AddCommaAnn AnnAnchor
+  | AddVbarAnn AnnAnchor
+  | AddRarrowAnn AnnAnchor
+  | AddRarrowAnnU AnnAnchor
+  -- | AddLollyAnn AnnAnchor
+  | AddLollyAnnU AnnAnchor
   deriving (Data,Show,Eq, Ord)
 
 instance Outputable TrailingAnn where
@@ -535,6 +548,8 @@ data Anchor = Anchor        { anchor :: RealSrcSpan
                                  -- the annotations.
                             , anchor_op :: AnchorOperation }
         deriving (Data, Eq, Show)
+-- TODO:AZ: If anchor_op is MovedAnchor, the anchor is
+-- meaningless. Perhaps make a single sum type, instead of he two?
 
 data AnchorOperation = UnchangedAnchor
                      | MovedAnchor DeltaPos
@@ -744,8 +759,8 @@ data AnnList
 data AnnParen
   = AnnParen {
       ap_adornment :: ParenType,
-      ap_open      :: RealSrcSpan,
-      ap_close     :: RealSrcSpan
+      ap_open      :: AnnAnchor,
+      ap_close     :: AnnAnchor
       } deriving (Data)
 
 data ParenType
@@ -756,9 +771,9 @@ data ParenType
 
 data AnnContext
   = AnnContext {
-      ac_darrow    :: Maybe (IsUnicodeSyntax, RealSrcSpan),
-      ac_open      :: [RealSrcSpan],
-      ac_close     :: [RealSrcSpan]
+      ac_darrow    :: Maybe (IsUnicodeSyntax, AnnAnchor),
+      ac_open      :: [AnnAnchor],
+      ac_close     :: [AnnAnchor]
       } deriving (Data)
 
 -- | Captures the sort order of sub elements. This is needed when the
@@ -784,30 +799,30 @@ data AnnSortKey
 data NameAnn
   = NameAnn {
       nann_adornment :: NameAdornment,
-      nann_open      :: RealSrcSpan,
-      nann_name      :: RealSrcSpan,
-      nann_close     :: RealSrcSpan,
+      nann_open      :: AnnAnchor,
+      nann_name      :: AnnAnchor,
+      nann_close     :: AnnAnchor,
       nann_trailing  :: [TrailingAnn]
       }
   | NameAnnCommas {
       nann_adornment :: NameAdornment,
-      nann_open      :: RealSrcSpan,
-      nann_commas    :: [RealSrcSpan],
-      nann_close     :: RealSrcSpan,
+      nann_open      :: AnnAnchor,
+      nann_commas    :: [AnnAnchor],
+      nann_close     :: AnnAnchor,
       nann_trailing  :: [TrailingAnn]
       }
   | NameAnnOnly {
       nann_adornment :: NameAdornment,
-      nann_open      :: RealSrcSpan,
-      nann_close     :: RealSrcSpan,
+      nann_open      :: AnnAnchor,
+      nann_close     :: AnnAnchor,
       nann_trailing  :: [TrailingAnn]
       }
   | NameAnnRArrow {
-      nann_name      :: RealSrcSpan,
+      nann_name      :: AnnAnchor,
       nann_trailing  :: [TrailingAnn]
       }
   | NameAnnQuote {
-      nann_quote     :: RealSrcSpan,
+      nann_quote     :: AnnAnchor,
       nann_quoted    :: SrcSpanAnnName,
       nann_trailing  :: [TrailingAnn]
       }
@@ -858,11 +873,11 @@ addTrailingAnnToA _ t cs n = n { anns = addTrailing (anns n)
   where
     addTrailing n = n { lann_trailing = t : lann_trailing n }
 
-addTrailingCommaToN :: SrcSpan -> ApiAnn' NameAnn -> RealSrcSpan -> ApiAnn' NameAnn
+addTrailingCommaToN :: SrcSpan -> ApiAnn' NameAnn -> AnnAnchor -> ApiAnn' NameAnn
 addTrailingCommaToN s ApiAnnNotUsed l = ApiAnn (spanAsAnchor s) (NameAnnTrailing [AddCommaAnn l]) noCom
 addTrailingCommaToN _ n l = n { anns = addTrailing (anns n) l }
   where
-    addTrailing :: NameAnn -> RealSrcSpan -> NameAnn
+    addTrailing :: NameAnn -> AnnAnchor -> NameAnn
     addTrailing n l = n { nann_trailing = AddCommaAnn l : nann_trailing n }
 
 -- ---------------------------------------------------------------------
@@ -977,16 +992,20 @@ addAnnsA (SrcSpanAnn ApiAnnNotUsed loc) as cs
 -- | The annotations need to all come after the anchor.  Make sure
 -- this is the case.
 widenSpan :: SrcSpan -> [AddApiAnn] -> SrcSpan
-widenSpan s as = foldl combineSrcSpans s ss
+widenSpan s as = foldl combineSrcSpans s (go as)
   where
-    ss = map (\(AddApiAnn _ s) -> RealSrcSpan s Nothing) as
+    go [] = []
+    go (AddApiAnn _ (AR s):rest) = RealSrcSpan s Nothing : go rest
+    go (AddApiAnn _ (AD _):rest) = go rest
 
 -- | The annotations need to all come after the anchor.  Make sure
 -- this is the case.
 widenRealSpan :: RealSrcSpan -> [AddApiAnn] -> RealSrcSpan
-widenRealSpan s as = foldl combineRealSrcSpans s ss
+widenRealSpan s as = foldl combineRealSrcSpans s (go as)
   where
-    ss = map (\(AddApiAnn _ s) -> s) as
+    go [] = []
+    go (AddApiAnn _ (AR s):rest) = s : go rest
+    go (AddApiAnn _ (AD _):rest) =     go rest
 
 widenAnchor :: Anchor -> [AddApiAnn] -> Anchor
 widenAnchor (Anchor s op) as = Anchor (widenRealSpan s as) op

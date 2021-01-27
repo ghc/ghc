@@ -1083,7 +1083,7 @@ which we don't want.
 -}
 
 cvtFld :: (RdrName -> t) -> (TH.Name, TH.Exp)
-       -> CvtM (LHsRecField' t (LHsExpr GhcPs))
+       -> CvtM (LHsRecField' GhcPs t (LHsExpr GhcPs))
 cvtFld f (v,e)
   = do  { v' <- vNameL v; e' <- cvtl e
         ; return (noLocA $ HsRecField { hsRecFieldAnn = noAnn

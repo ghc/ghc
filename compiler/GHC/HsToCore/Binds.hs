@@ -660,11 +660,11 @@ dsSpecs poly_rhs (SpecPrags sps)
 dsSpec :: Maybe CoreExpr        -- Just rhs => RULE is for a local binding
                                 -- Nothing => RULE is for an imported Id
                                 --            rhs is in the Id's unfolding
-       -> LocatedA TcSpecPrag
+       -> Located TcSpecPrag
        -> DsM (Maybe (OrdList (Id,CoreExpr), CoreRule))
 dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
   | isJust (isClassOpId_maybe poly_id)
-  = putSrcSpanDsA loc $
+  = putSrcSpanDs loc $
     do { warnDs NoReason (text "Ignoring useless SPECIALISE pragma for class method selector"
                           <+> quotes (ppr poly_id))
        ; return Nothing  }  -- There is no point in trying to specialise a class op
@@ -672,14 +672,14 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
                             -- (it would be Just 0) and that in turn makes makeCorePair bleat
 
   | no_act_spec && isNeverActive rule_act
-  = putSrcSpanDsA loc $
+  = putSrcSpanDs loc $
     do { warnDs NoReason (text "Ignoring useless SPECIALISE pragma for NOINLINE function:"
                           <+> quotes (ppr poly_id))
        ; return Nothing  }  -- Function is NOINLINE, and the specialisation inherits that
                             -- See Note [Activation pragmas for SPECIALISE]
 
   | otherwise
-  = putSrcSpanDsA loc $
+  = putSrcSpanDs loc $
     do { uniq <- newUnique
        ; let poly_name = idName poly_id
              spec_occ  = mkSpecOcc (getOccName poly_name)

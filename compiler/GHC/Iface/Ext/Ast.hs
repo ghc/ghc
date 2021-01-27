@@ -1359,7 +1359,7 @@ instance ( ToHie arg , HasLoc arg , Data arg
 instance ( ToHie (RFContext (Located label))
          , ToHie arg, HasLoc arg, Data arg
          , Data label
-         ) => ToHie (RContext (LHsRecField' label arg)) where
+         ) => ToHie (RContext (LocatedA (HsRecField' label arg))) where
   toHie (RC c (L span recfld)) = concatM $ makeNode recfld (locA span) : case recfld of
     HsRecField _ label expr _ ->
       [ toHie $ RFC c (getRealSpan $ loc expr) label
@@ -2052,7 +2052,7 @@ instance ToHie (LocatedA (AnnDecl GhcRn)) where
         , toHie expr
         ]
 
-instance ToHie (Context (Located a)) => ToHie (AnnProvenance a) where
+instance ToHie (AnnProvenance GhcRn) where
   toHie (ValueAnnProvenance a) = toHie $ C Use a
   toHie (TypeAnnProvenance a) = toHie $ C Use a
   toHie ModuleAnnProvenance = pure []

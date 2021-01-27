@@ -1371,12 +1371,12 @@ glomSegments ctxt ((defs,uses,fwds,stmt) : segs)
           not_needed (defs,_,_,_) = disjointNameSet defs uses
 
 ----------------------------------------------------
-segsToStmts :: Stmt GhcRn body
+segsToStmts :: Stmt GhcRn (LocatedA (body GhcRn))
                                   -- A RecStmt with the SyntaxOps filled in
-            -> [Segment [LStmt GhcRn body]]
+            -> [Segment [LStmt GhcRn (LocatedA (body GhcRn))]]
                                   -- Each Segment has a non-empty list of Stmts
             -> FreeVars           -- Free vars used 'later'
-            -> ([LStmt GhcRn body], FreeVars)
+            -> ([LStmt GhcRn (LocatedA (body GhcRn))], FreeVars)
 
 segsToStmts _ [] fvs_later = ([], fvs_later)
 segsToStmts empty_rec_stmt ((defs, uses, fwds, ss) : segs) fvs_later

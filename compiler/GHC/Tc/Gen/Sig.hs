@@ -720,7 +720,7 @@ tcSpecPrags poly_id prag_sigs
   = do { traceTc "tcSpecPrags" (ppr poly_id <+> ppr spec_sigs)
        ; unless (null bad_sigs) warn_discarded_sigs
        ; pss <- mapAndRecoverM (wrapLocMA (tcSpecPrag poly_id)) spec_sigs
-       ; return $ concatMap (\(L l ps) -> map (L l) ps) pss }
+       ; return $ concatMap (\(L l ps) -> map (L (locA l)) ps) pss }
   where
     spec_sigs = filter isSpecLSig prag_sigs
     bad_sigs  = filter is_bad_sig prag_sigs
@@ -791,7 +791,7 @@ tcImpPrags prags
                      [L loc (name,prag)
                              | (L loc prag@(SpecSig _ (L _ name) _ _)) <- prags
                              , not (nameIsLocalOrFrom this_mod name) ]
-            ; return $ concatMap (\(L l ps) -> map (L l) ps) pss } }
+            ; return $ concatMap (\(L l ps) -> map (L (locA l)) ps) pss } }
   where
     -- Ignore SPECIALISE pragmas for imported things
     -- when we aren't specialising, or when we aren't generating

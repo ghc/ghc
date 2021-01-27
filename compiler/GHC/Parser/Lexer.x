@@ -3405,7 +3405,7 @@ clean_pragma prag = canon_ws (map toLower (unprefix prag))
 -- and end of the span
 mkParensApiAnn :: SrcSpan -> [AddApiAnn]
 mkParensApiAnn (UnhelpfulSpan _)  = []
-mkParensApiAnn (RealSrcSpan ss _) = [AddApiAnn AnnOpenP lo,AddApiAnn AnnCloseP lc]
+mkParensApiAnn (RealSrcSpan ss _) = [AddApiAnn AnnOpenP (AR lo),AddApiAnn AnnCloseP (AR lc)]
   where
     f = srcSpanFile ss
     sl = srcSpanStartLine ss

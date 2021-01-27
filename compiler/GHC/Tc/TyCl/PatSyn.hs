@@ -995,9 +995,12 @@ tcPatToExpr name args pat = go pat
 
     mkRecordConExpr :: LocatedN Name -> HsRecFields GhcRn (LPat GhcRn)
                     -> Either MsgDoc (HsExpr GhcRn)
-    mkRecordConExpr con fields
-      = do { exprFields <- mapM go fields
-           ; return (RecordCon noExtField con exprFields) }
+    mkRecordConExpr con (HsRecFields fields dd)
+      = do { exprFields <- mapM go' fields
+           ; return (RecordCon noExtField con (HsRecFields exprFields dd)) }
+
+    go' :: LHsRecField GhcRn (LPat GhcRn) -> Either MsgDoc (LHsRecField GhcRn (LHsExpr GhcRn))
+    go' (L l rf) = L l <$> traverse go rf
 
     go :: LPat GhcRn -> Either MsgDoc (LHsExpr GhcRn)
     go (L loc p) = L loc <$> go1 p

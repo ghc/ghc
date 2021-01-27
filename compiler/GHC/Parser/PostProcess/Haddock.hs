@@ -1305,7 +1305,7 @@ reportExtraDocs =
 mkDocHsDecl :: LayoutInfo -> PsLocated HdkComment -> Maybe (LHsDecl GhcPs)
 mkDocHsDecl layout_info a = mapLoc (DocD noExtField) <$> mkDocDecl layout_info a
 
-mkDocDecl :: LayoutInfo -> PsLocated HdkComment -> Maybe LDocDecl
+mkDocDecl :: LayoutInfo -> PsLocated HdkComment -> Maybe (LDocDecl GhcPs)
 mkDocDecl layout_info (L l_comment hdk_comment)
   | indent_mismatch = Nothing
   | otherwise =
@@ -1489,7 +1489,7 @@ getLHsTyVarBndrsLoc bndrs = foldr combineSrcSpans noSrcSpan $ map getLocA bndrs
 -- Precondition (unchecked): the input lists are already sorted.
 flattenBindsAndSigs
   :: (LHsBinds GhcPs, [LSig GhcPs], [LFamilyDecl GhcPs],
-      [LTyFamInstDecl GhcPs], [LDataFamInstDecl GhcPs], [LDocDecl])
+      [LTyFamInstDecl GhcPs], [LDataFamInstDecl GhcPs], [LDocDecl GhcPs])
   -> [LHsDecl GhcPs]
 flattenBindsAndSigs (all_bs, all_ss, all_ts, all_tfis, all_dfis, all_docs) =
   -- 'cmpBufSpan' is safe here with the following assumptions:

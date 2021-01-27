@@ -437,9 +437,11 @@ annBinds _ (EmptyLocalBinds x) = (EmptyLocalBinds x)
 add_where :: AddApiAnn -> ApiAnn' AnnList -> ApiAnn' AnnList
 add_where an (ApiAnn a (AnnList anc o c r t) cs)
   = ApiAnn (widenAnchor a [an]) (AnnList anc o c (an:r) t) cs
-add_where an@(AddApiAnn _ rs) ApiAnnNotUsed
+add_where an@(AddApiAnn _ (AR rs)) ApiAnnNotUsed
   = ApiAnn (Anchor rs UnchangedAnchor)
            (AnnList (Just $ Anchor rs UnchangedAnchor) Nothing Nothing [an] []) noCom
+add_where (AddApiAnn _ (AD _)) ApiAnnNotUsed = panic "add_where"
+ -- AD should only be used for transformations
 
 {- **********************************************************************
 
@@ -466,7 +468,7 @@ cvBindGroup binding
 
 cvBindsAndSigs :: OrdList (LHsDecl GhcPs)
   -> P (LHsBinds GhcPs, [LSig GhcPs], [LFamilyDecl GhcPs]
-          , [LTyFamInstDecl GhcPs], [LDataFamInstDecl GhcPs], [LDocDecl])
+          , [LTyFamInstDecl GhcPs], [LDataFamInstDecl GhcPs], [LDocDecl GhcPs])
 -- Input decls contain just value bindings and signatures
 -- and in case of class or instance declarations also
 -- associated type declarations. They might also contain Haddock comments.
@@ -967,13 +969,13 @@ checkTyClHdr is_cls ty
       let
         lr = combineRealSrcSpans (realSrcSpan l) (anchor as)
         -- lr = widenAnchorR as (realSrcSpan l)
-        an = (ApiAnn (Anchor lr UnchangedAnchor) (NameAnn NameParens o (realSrcSpan l) c []) cs)
+        an = (ApiAnn (Anchor lr UnchangedAnchor) (NameAnn NameParens o (AR $ realSrcSpan l) c []) cs)
       in SrcSpanAnn an (RealSrcSpan lr Nothing)
     newAnns _ ApiAnnNotUsed = panic "missing AnnParen"
     newAnns (SrcSpanAnn (ApiAnn ap (AnnListItem ta) csp) l) (ApiAnn as (AnnParen _ o c) cs) =
       let
         lr = combineRealSrcSpans (anchor ap) (anchor as)
-        an = (ApiAnn (Anchor lr UnchangedAnchor) (NameAnn NameParens o (realSrcSpan l) c ta) (csp Semi.<> cs))
+        an = (ApiAnn (Anchor lr UnchangedAnchor) (NameAnn NameParens o (AR $ realSrcSpan l) c ta) (csp Semi.<> cs))
       in SrcSpanAnn an (RealSrcSpan lr Nothing)
 
 -- | Yield a parse error if we have a function applied directly to a do block
@@ -1021,7 +1023,7 @@ checkContext :: LHsType GhcPs -> P (LHsContext GhcPs)
 checkContext orig_t@(L (SrcSpanAnn _ l) _orig_t) =
   check ([],[],noCom) orig_t
  where
-  check :: ([RealSrcSpan],[RealSrcSpan],ApiAnnComments)
+  check :: ([AnnAnchor],[AnnAnchor],ApiAnnComments)
         -> LHsType GhcPs -> P (LHsContext GhcPs)
   check (oparens,cparens,cs) (L _l (HsTupleTy ann' HsBoxedOrConstraintTuple ts))
     -- (Eq a, Ord b) shows up as a tuple type. Only boxed tuples can
@@ -1032,7 +1034,7 @@ checkContext orig_t@(L (SrcSpanAnn _ l) _orig_t) =
               ApiAnnNotUsed -> ([],[],noCom)
               ApiAnn _ (AnnParen _ o c) cs -> ([o],[c],cs)
         return (L (SrcSpanAnn (ApiAnn (spanAsAnchor l)
-                               (AnnContext Nothing (op++oparens) (cp++cparens)) (cs Semi.<> cs')) l) ts)
+                               (AnnContext Nothing (op Semi.<> oparens) (cp Semi.<> cparens)) (cs Semi.<> cs')) l) ts)
 
   check (opi,cpi,csi) (L _lp1 (HsParTy ann' ty))
                                   -- to be sure HsParTy doesn't get into the way
@@ -1046,8 +1048,8 @@ checkContext orig_t@(L (SrcSpanAnn _ l) _orig_t) =
   check (_opi,_cpi,_csi) _t =
                  return (L (SrcSpanAnn (ApiAnn (spanAsAnchor l) (AnnContext Nothing [] []) noCom) l) [orig_t])
 
-checkImportDecl :: Maybe RealSrcSpan
-                -> Maybe RealSrcSpan
+checkImportDecl :: Maybe AnnAnchor
+                -> Maybe AnnAnchor
                 -> P ()
 checkImportDecl mPre mPost = do
   let whenJust mg f = maybe (pure ()) f mg
@@ -1058,18 +1060,18 @@ checkImportDecl mPre mPost = do
   -- 'ImportQualifiedPost' is not in effect.
   whenJust mPost $ \post ->
     when (not importQualifiedPostEnabled) $
-      failOpNotEnabledImportQualifiedPost (RealSrcSpan post Nothing)
+      failOpNotEnabledImportQualifiedPost (RealSrcSpan (annAnchorRealSrcSpan post) Nothing)
 
   -- Error if 'qualified' occurs in both pre and postpositive
   -- positions.
   whenJust mPost $ \post ->
     when (isJust mPre) $
-      failOpImportQualifiedTwice (RealSrcSpan post Nothing)
+      failOpImportQualifiedTwice (RealSrcSpan (annAnchorRealSrcSpan post) Nothing)
 
   -- Warn if 'qualified' found in prepositive position and
   -- 'Opt_WarnPrepositiveQualifiedModule' is enabled.
   whenJust mPre $ \pre ->
-    warnPrepositiveQualifiedModule (RealSrcSpan pre Nothing)
+    warnPrepositiveQualifiedModule (RealSrcSpan (annAnchorRealSrcSpan pre) Nothing)
 
 -- -------------------------------------------------------------------------
 -- Checking Patterns.
@@ -1410,6 +1412,8 @@ type AnnoBody b
     , Anno [LocatedA (Match GhcPs (LocatedA (Body b GhcPs)))] ~ SrcSpanAnnL
     , Anno (Match GhcPs (LocatedA (Body b GhcPs))) ~ SrcSpanAnnA
     , Anno (StmtLR GhcPs GhcPs (LocatedA (Body (Body b GhcPs) GhcPs))) ~ SrcSpanAnnA
+    , Anno [LocatedA (StmtLR GhcPs GhcPs
+                       (LocatedA (Body (Body (Body b GhcPs) GhcPs) GhcPs)))] ~ SrcSpanAnnL
     )
 
 -- | Disambiguate constructs that may appear when we do not know ahead of time whether we are
@@ -2558,7 +2562,7 @@ data ImpExpSubSpec = ImpExpAbs
                    | ImpExpAllWith [LocatedA ImpExpQcSpec]
 
 data ImpExpQcSpec = ImpExpQcName (LocatedN RdrName)
-                  | ImpExpQcType RealSrcSpan (LocatedN RdrName)
+                  | ImpExpQcType AnnAnchor (LocatedN RdrName)
                   | ImpExpQcWildcard
 
 mkModuleImpExp :: [AddApiAnn] -> LocatedA ImpExpQcSpec -> ImpExpSubSpec -> P (IE GhcPs)
@@ -2626,7 +2630,7 @@ checkImportSpec ie@(L _ specs) =
 mkImpExpSubSpec :: [LocatedA ImpExpQcSpec] -> P ([AddApiAnn], ImpExpSubSpec)
 mkImpExpSubSpec [] = return ([], ImpExpList [])
 mkImpExpSubSpec [L la ImpExpQcWildcard] =
-  return ([AddApiAnn AnnDotdot (la2r la)], ImpExpAll)
+  return ([AddApiAnn AnnDotdot (AR $ la2r la)], ImpExpAll)
 mkImpExpSubSpec xs =
   if (any (isImpExpQcWildcard . unLoc) xs)
     then return $ ([], ImpExpAllWith xs)
@@ -2834,7 +2838,7 @@ mkSumOrTupleExpr l boxity (Tuple es) anns = do
     cs <- getCommentsFor (locA l)
     return $ L l (ExplicitTuple (ApiAnn (spanAsAnchor $ locA l) anns cs) (map toTupArg es) boxity)
   where
-    toTupArg :: Either (ApiAnn' RealSrcSpan) (LHsExpr GhcPs) -> HsTupArg GhcPs
+    toTupArg :: Either (ApiAnn' AnnAnchor) (LHsExpr GhcPs) -> HsTupArg GhcPs
     toTupArg (Left ann) = missingTupArg ann
     toTupArg (Right a)  = Present noAnn a
 
@@ -2861,7 +2865,7 @@ mkSumOrTuplePat l boxity (Tuple ps) anns = do
   cs <- getCommentsFor (locA l)
   return $ L l (PatBuilderPat (TuplePat (ApiAnn (spanAsAnchor $ locA l) anns cs) ps' boxity))
   where
-    toTupPat :: Either (ApiAnn' RealSrcSpan) (LocatedA (PatBuilder GhcPs)) -> PV (LPat GhcPs)
+    toTupPat :: Either (ApiAnn' AnnAnchor) (LocatedA (PatBuilder GhcPs)) -> PV (LPat GhcPs)
     toTupPat p = case p of
       Left _ -> addFatalError $ PsError PsErrTupleSectionInPat [] (locA l)
       Right p' -> checkLPat p'
@@ -2883,8 +2887,8 @@ mkLHsOpTy x op y =
 mkMultTy :: IsUnicodeSyntax -> Located Token -> LHsType GhcPs -> HsArrow GhcPs
 mkMultTy u tok t@(L _ (HsTyLit _ (HsNumTy (SourceText "1") 1)))
   -- See #18888 for the use of (SourceText "1") above
-  = HsLinearArrow u (Just $ AddApiAnn AnnPercentOne (realSrcSpan $ combineLocs tok (reLoc t)))
-mkMultTy u tok t = HsExplicitMult u (Just $ AddApiAnn AnnPercent (realSrcSpan $ getLoc tok)) t
+  = HsLinearArrow u (Just $ AddApiAnn AnnPercentOne (AR $ realSrcSpan $ combineLocs tok (reLoc t)))
+mkMultTy u tok t = HsExplicitMult u (Just $ AddApiAnn AnnPercent (AR $ realSrcSpan $ getLoc tok)) t
 
 -----------------------------------------------------------------------------
 -- Token symbols

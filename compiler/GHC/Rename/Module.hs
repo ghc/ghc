@@ -315,10 +315,13 @@ rnAnnDecl ann@(HsAnnotation _ s provenance expr)
        ; return (HsAnnotation noAnn s provenance' expr',
                  provenance_fvs `plusFV` expr_fvs) }
 
-rnAnnProvenance :: AnnProvenance RdrName
-                -> RnM (AnnProvenance Name, FreeVars)
+rnAnnProvenance :: AnnProvenance GhcPs
+                -> RnM (AnnProvenance GhcRn, FreeVars)
 rnAnnProvenance provenance = do
-    provenance' <- traverse lookupTopBndrRn provenance
+    provenance' <- case provenance of
+      ValueAnnProvenance n -> ValueAnnProvenance <$> lookupLocatedTopBndrRnN n
+      TypeAnnProvenance n  -> TypeAnnProvenance  <$> lookupLocatedTopBndrRnN n
+      ModuleAnnProvenance  -> return ModuleAnnProvenance
     return (provenance', maybe emptyFVs unitFV (annProvenanceName_maybe provenance'))
 
 {-

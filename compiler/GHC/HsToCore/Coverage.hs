@@ -992,8 +992,8 @@ addTickHsRecordBinds (HsRecFields fields dd)
   = do  { fields' <- mapM addTickHsRecField fields
         ; return (HsRecFields fields' dd) }
 
-addTickHsRecField :: LHsRecField' id (LHsExpr GhcTc)
-                  -> TM (LHsRecField' id (LHsExpr GhcTc))
+addTickHsRecField :: LHsRecField' GhcTc id (LHsExpr GhcTc)
+                  -> TM (LHsRecField' GhcTc id (LHsExpr GhcTc))
 addTickHsRecField (L l (HsRecField x id expr pun))
         = do { expr' <- addTickLHsExpr expr
              ; return (L l (HsRecField x id expr' pun)) }

@@ -6,6 +6,7 @@
 {-# LANGUAGE FlexibleContexts          #-}
 {-# LANGUAGE FlexibleInstances         #-}
 {-# LANGUAGE LambdaCase                #-}
+{-# LANGUAGE MultiParamTypeClasses     #-}
 {-# LANGUAGE ScopedTypeVariables       #-}
 {-# LANGUAGE StandaloneDeriving        #-}
 {-# LANGUAGE TypeApplications          #-}
@@ -201,14 +202,14 @@ type instance PendingTcSplice' (GhcPass _) = PendingTcSplice
 -- API Annotations types
 
 data ApiAnnHsCase = ApiAnnHsCase
-      { hsCaseAnnCase :: RealSrcSpan
-      , hsCaseAnnOf   :: RealSrcSpan
+      { hsCaseAnnCase :: AnnAnchor
+      , hsCaseAnnOf   :: AnnAnchor
       , hsCaseAnnsRest :: [AddApiAnn]
       } deriving Data
 
 data ApiAnnUnboundVar = ApiAnnUnboundVar
-     { hsUnboundBackquotes :: (RealSrcSpan, RealSrcSpan)
-     , hsUnboundHole       :: RealSrcSpan
+     { hsUnboundBackquotes :: (AnnAnchor, AnnAnchor)
+     , hsUnboundHole       :: AnnAnchor
      } deriving Data
 
 -- ---------------------------------------------------------------------
@@ -324,10 +325,8 @@ type instance XXExpr         GhcRn       = HsExpansion (HsExpr GhcRn)
 type instance XXExpr         GhcTc       = XXExprGhcTc
 
 
-                -- (XRec p [ExprLStmt p])   -- "do":one or more stmts
-                -- (LocatedL [ExprLStmt p]) -- "do":one or more stmts
-type instance Anno [LocatedA ((StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsExpr (GhcPass pr)))))] = SrcSpanAnnL
-type instance Anno [LocatedA ((StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsCmd (GhcPass pr)))))] = SrcSpanAnnL
+type instance Anno [LocatedA ((StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (body (GhcPass pr)))))] = SrcSpanAnnL
+type instance Anno (StmtLR GhcRn GhcRn (LocatedA (body GhcRn))) = SrcSpanAnnA
 
 data XXExprGhcTc
   = WrapExpr {-# UNPACK #-} !(HsWrap HsExpr)
@@ -335,21 +334,21 @@ data XXExprGhcTc
 
 data AnnExplicitSum
   = AnnExplicitSum {
-      aesOpen       :: RealSrcSpan,
-      aesBarsBefore :: [RealSrcSpan],
-      aesBarsAfter  :: [RealSrcSpan],
-      aesClose      :: RealSrcSpan
+      aesOpen       :: AnnAnchor,
+      aesBarsBefore :: [AnnAnchor],
+      aesBarsAfter  :: [AnnAnchor],
+      aesClose      :: AnnAnchor
       } deriving Data
 
 
 -- ---------------------------------------------------------------------
 
-type instance XSCC           (GhcPass _) = NoExtField
+type instance XSCC           (GhcPass _) = ApiAnn' AnnPragma
 type instance XXPragE        (GhcPass _) = NoExtCon
 
-type instance XPresent         (GhcPass _) = NoExtField
+type instance XPresent         (GhcPass _) = ApiAnn
 
-type instance XMissing         GhcPs = ApiAnn' RealSrcSpan
+type instance XMissing         GhcPs = ApiAnn' AnnAnchor
 type instance XMissing         GhcRn = NoExtField
 type instance XMissing         GhcTc = Scaled Type
 
@@ -730,7 +729,7 @@ instance Outputable (HsPragE (GhcPass p)) where
 ************************************************************************
 -}
 
-type instance XCmdArrApp  GhcPs = NoExtField
+type instance XCmdArrApp  GhcPs = ApiAnn' AddApiAnn
 type instance XCmdArrApp  GhcRn = NoExtField
 type instance XCmdArrApp  GhcTc = Type
 
@@ -904,7 +903,7 @@ type instance XMG         GhcTc b = MatchGroupTc
 
 type instance XXMatchGroup (GhcPass _) b = NoExtCon
 
-type instance XCMatch (GhcPass _) b = NoExtField
+type instance XCMatch (GhcPass _) b = ApiAnn
 type instance XXMatch (GhcPass _) b = NoExtCon
 
 instance (OutputableBndrId pr, Outputable body)
@@ -933,10 +932,19 @@ matchGroupArity (MG { mg_alts = alts })
 hsLMatchPats :: LMatch (GhcPass id) body -> [LPat (GhcPass id)]
 hsLMatchPats (L _ (Match { m_pats = pats })) = pats
 
-type instance XCGRHSs (GhcPass _) b = NoExtField
-type instance XXGRHSs (GhcPass _) b = NoExtCon
+type instance XCGRHSs (GhcPass _) _ = NoExtField
+type instance XXGRHSs (GhcPass _) _ = NoExtCon
 
-type instance XCGRHS (GhcPass _) b = NoExtField
+data GrhsAnn
+  = GrhsAnn {
+      ga_vbar :: Maybe AnnAnchor, -- TODO:AZ do we need this?
+      ga_sep  :: AddApiAnn -- ^ Match separator location
+      } deriving (Data)
+
+type instance XCGRHS (GhcPass _) _ = ApiAnn' GrhsAnn
+                                   -- Location of matchSeparator
+                                   -- TODO:AZ does this belong on the GRHS, or GRHSs?
+
 type instance XXGRHS (GhcPass _) b = NoExtCon
 
 pprMatches :: (OutputableBndrId idR, Outputable body)
@@ -1557,3 +1565,38 @@ pprStmtInCtxt ctxt stmt
     ppr_stmt (TransStmt { trS_by = by, trS_using = using
                         , trS_form = form }) = pprTransStmt by using form
     ppr_stmt stmt = pprStmt stmt
+
+{-
+************************************************************************
+*                                                                      *
+\subsection{Anno instances}
+*                                                                      *
+************************************************************************
+-}
+
+type instance Anno (HsExpr (GhcPass p)) = SrcSpanAnnA
+type instance Anno [LocatedA ((StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsExpr (GhcPass pr)))))] = SrcSpanAnnL
+type instance Anno [LocatedA ((StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsCmd (GhcPass pr)))))] = SrcSpanAnnL
+
+type instance Anno (HsCmd (GhcPass p)) = SrcSpanAnnA
+
+type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsCmd (GhcPass pr))))]
+  = SrcSpanAnnL
+type instance Anno (HsCmdTop (GhcPass p)) = SrcSpan
+type instance Anno [LocatedA (Match (GhcPass p) (LocatedA (HsExpr (GhcPass p))))] = SrcSpanAnnL
+type instance Anno [LocatedA (Match (GhcPass p) (LocatedA (HsCmd  (GhcPass p))))] = SrcSpanAnnL
+type instance Anno (Match (GhcPass p) (LocatedA (HsExpr (GhcPass p)))) = SrcSpanAnnA
+type instance Anno (Match (GhcPass p) (LocatedA (HsCmd  (GhcPass p)))) = SrcSpanAnnA
+type instance Anno (GRHS (GhcPass p) (LocatedA (HsExpr (GhcPass p)))) = SrcSpan
+type instance Anno (GRHS (GhcPass p) (LocatedA (HsCmd  (GhcPass p)))) = SrcSpan
+type instance Anno (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsExpr (GhcPass pr)))) = SrcSpanAnnA
+type instance Anno (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsCmd  (GhcPass pr)))) = SrcSpanAnnA
+
+type instance Anno (HsSplice (GhcPass p)) = SrcSpanAnnA
+
+type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsExpr (GhcPass pr))))] = SrcSpanAnnL
+type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsCmd  (GhcPass pr))))] = SrcSpanAnnL
+
+instance (Anno a ~ SrcSpanAnn' (ApiAnn' an))
+   => WrapXRec (GhcPass p) a where
+  wrapXRec = noLocA

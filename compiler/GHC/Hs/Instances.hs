@@ -258,6 +258,10 @@ deriving instance Data (WarnDecl GhcRn)
 deriving instance Data (WarnDecl GhcTc)
 
 -- deriving instance (DataIdLR p p) => Data (AnnDecl p)
+deriving instance Data (AnnProvenance GhcPs)
+deriving instance Data (AnnProvenance GhcRn)
+deriving instance Data (AnnProvenance GhcTc)
+
 deriving instance Data (AnnDecl GhcPs)
 deriving instance Data (AnnDecl GhcRn)
 deriving instance Data (AnnDecl GhcTc)
@@ -415,7 +419,8 @@ deriving instance Data ConPatTc
 
 deriving instance Data ListPatTc
 
--- deriving instance (DataIdLR p p, Data body) => Data (HsRecFields p body)
+deriving instance (Data a, Data b) => Data (HsRecField' a b)
+
 deriving instance (Data body) => Data (HsRecFields GhcPs body)
 deriving instance (Data body) => Data (HsRecFields GhcRn body)
 deriving instance (Data body) => Data (HsRecFields GhcTc body)

@@ -452,8 +452,8 @@ printStringAtSs ss str = printStringAtKw' (realSrcSpan ss) str
 -- ---------------------------------------------------------------------
 
 -- AZ:TODO get rid of this
-printStringAtMkw :: Maybe RealSrcSpan -> String -> EPP ()
-printStringAtMkw (Just r) s = printStringAtKw' r s
+printStringAtMkw :: Maybe AnnAnchor -> String -> EPP ()
+printStringAtMkw (Just aa) s = printStringAtAA aa s
 printStringAtMkw Nothing s = printStringAtLsDelta (DP (0,1)) s
 
 
@@ -481,6 +481,10 @@ addAnnotationWorker ann pa =
               `debug` ("addAnnotationWorker:(ss,ss,pe,pa,p,p',ann)=" ++ show (showGhc ss,showGhc ss,pe,showGhc pa,p,p',ann))
 
 -}
+
+printStringAtAA :: AnnAnchor -> String -> EPP ()
+printStringAtAA (AR r) s = printStringAtKw' r s
+printStringAtAA (AD d) s = printStringAtLsDelta d s
 
 -- Based on Delta.addAnnotationWorker
 printStringAtKw' :: RealSrcSpan -> String -> EPP ()
@@ -534,7 +538,7 @@ markLocatedAALS (ApiAnn _ a _) f kw (Just str) = go (f a)
   where
     go [] = return ()
     go (a@(AddApiAnn kw' rs):as)
-      | kw' == kw = printStringAtKw' rs str
+      | kw' == kw = printStringAtAA rs str
       | otherwise = go as
 
 -- ---------------------------------------------------------------------
@@ -562,7 +566,7 @@ markAnnOpen :: ApiAnn -> SourceText -> String -> EPP ()
 markAnnOpen an NoSourceText txt   = markLocatedAALS an id AnnOpen (Just txt)
 markAnnOpen an (SourceText txt) _ = markLocatedAALS an id AnnOpen (Just txt)
 
-markAnnOpen' :: Maybe RealSrcSpan -> SourceText -> String -> EPP ()
+markAnnOpen' :: Maybe AnnAnchor -> SourceText -> String -> EPP ()
 markAnnOpen' ms NoSourceText txt   = printStringAtMkw ms txt
 markAnnOpen' ms (SourceText txt) _ = printStringAtMkw ms txt
 
@@ -574,27 +578,27 @@ markClosingParen an = markParen an snd
 
 markParen :: ApiAnn' AnnParen -> (forall a. (a,a) -> a) -> EPP ()
 markParen ApiAnnNotUsed _ = return ()
-markParen (ApiAnn _ (AnnParen pt o c) _) f = markKw' (f $ kw pt) (f (o, c))
+markParen (ApiAnn _ (AnnParen pt o c) _) f = markKwA (f $ kw pt) (f (o, c))
   where
     kw AnnParens       = (AnnOpenP,  AnnCloseP)
     kw AnnParensHash   = (AnnOpenPH, AnnClosePH)
     kw AnnParensSquare = (AnnOpenS, AnnCloseS)
 
 
-markAnnKw :: ApiAnn' a -> (a -> RealSrcSpan) -> AnnKeywordId -> EPP ()
+markAnnKw :: ApiAnn' a -> (a -> AnnAnchor) -> AnnKeywordId -> EPP ()
 markAnnKw ApiAnnNotUsed  _ _  = return ()
-markAnnKw (ApiAnn _ a _) f kw = markKw' kw (f a)
+markAnnKw (ApiAnn _ a _) f kw = markKwA kw (f a)
 
-markAnnKwAll :: ApiAnn' a -> (a -> [RealSrcSpan]) -> AnnKeywordId -> EPP ()
+markAnnKwAll :: ApiAnn' a -> (a -> [AnnAnchor]) -> AnnKeywordId -> EPP ()
 markAnnKwAll ApiAnnNotUsed  _ _  = return ()
-markAnnKwAll (ApiAnn _ a _) f kw = mapM_ (markKw' kw) (sort (f a))
+markAnnKwAll (ApiAnn _ a _) f kw = mapM_ (markKwA kw) (sort (f a))
 
-markAnnKwM :: ApiAnn' a -> (a -> Maybe RealSrcSpan) -> AnnKeywordId -> EPP ()
+markAnnKwM :: ApiAnn' a -> (a -> Maybe AnnAnchor) -> AnnKeywordId -> EPP ()
 markAnnKwM ApiAnnNotUsed  _ _ = return ()
 markAnnKwM (ApiAnn _ a _) f kw = go (f a)
   where
     go Nothing = return ()
-    go (Just s) = markKw' kw s
+    go (Just s) = markKwA kw s
 
 markALocatedA :: ApiAnn' AnnListItem -> EPP ()
 markALocatedA ApiAnnNotUsed  = return ()
@@ -623,20 +627,23 @@ mark anns kw = do
       Nothing -> return ()
 
 markKwT :: TrailingAnn -> EPP ()
-markKwT (AddSemiAnn ss)    = markKw' AnnSemi ss
-markKwT (AddCommaAnn ss)   = markKw' AnnComma ss
-markKwT (AddVbarAnn ss)    = markKw' AnnVbar ss
-markKwT (AddRarrowAnn ss)  = markKw' AnnRarrow ss
-markKwT (AddRarrowAnnU ss) = markKw' AnnRarrowU ss
--- markKwT (AddLollyAnn ss)   = markKw' AnnLolly ss
-markKwT (AddLollyAnnU ss)  = markKw' AnnLollyU ss
+markKwT (AddSemiAnn ss)    = markKwA AnnSemi ss
+markKwT (AddCommaAnn ss)   = markKwA AnnComma ss
+markKwT (AddVbarAnn ss)    = markKwA AnnVbar ss
+markKwT (AddRarrowAnn ss)  = markKwA AnnRarrow ss
+markKwT (AddRarrowAnnU ss) = markKwA AnnRarrowU ss
+-- markKwT (AddLollyAnn ss)   = markKwA AnnLolly ss
+markKwT (AddLollyAnnU ss)  = markKwA AnnLollyU ss
 
 markKw :: AddApiAnn -> EPP ()
-markKw (AddApiAnn kw ss) = markKw' kw ss
+markKw (AddApiAnn kw ss) = markKwA kw ss
 
 -- | This should be the main driver of the process, managing comments
 markKw' :: AnnKeywordId -> RealSrcSpan -> EPP ()
 markKw' kw ss = printStringAtKw' ss (keywordToString (G kw))
+
+markKwA :: AnnKeywordId -> AnnAnchor -> EPP ()
+markKwA kw aa = printStringAtAA aa (keywordToString (G kw))
 
 -- ---------------------------------------------------------------------
 
@@ -2010,9 +2017,9 @@ instance ExactPrint (HsExpr GhcPs) where
     case an of
       ApiAnnNotUsed -> withPpr x
       ApiAnn _ (ApiAnnUnboundVar (ob,cb) l) _ -> do
-        printStringAtKw' ob "`"
-        printStringAtKw' l  "_"
-        printStringAtKw' cb "`"
+        printStringAtAA ob "`"
+        printStringAtAA l  "_"
+        printStringAtAA cb "`"
   -- exact x@(HsConLikeOut{})             = withPpr x
   -- exact x@(HsRecFld{})                 = withPpr x
   -- exact x@(HsOverLabel ann _ _)        = withPpr x
@@ -3222,12 +3229,12 @@ instance (ExactPrint a) => ExactPrint (LocatedC a) where
     --   Just (UnicodeSyntax, rs) -> markKw' AnnDarrowU rs
     --   Just (NormalSyntax,  rs) -> markKw' AnnDarrow  rs
     --   Nothing -> pure ()
-    mapM_ (markKw' AnnOpenP) (sort opens)
+    mapM_ (markKwA AnnOpenP) (sort opens)
     markAnnotated a
-    mapM_ (markKw' AnnCloseP) (sort closes)
+    mapM_ (markKwA AnnCloseP) (sort closes)
     case ma of
-      Just (UnicodeSyntax, rs) -> markKw' AnnDarrowU rs
-      Just (NormalSyntax,  rs) -> markKw' AnnDarrow  rs
+      Just (UnicodeSyntax, rs) -> markKwA AnnDarrowU rs
+      Just (NormalSyntax,  rs) -> markKwA AnnDarrow  rs
       Nothing -> pure ()
 
 -- ---------------------------------------------------------------------
@@ -3285,13 +3292,13 @@ instance ExactPrint (LocatedN RdrName) where
         markTrailing t
 
 markName :: NameAdornment
-         -> RealSrcSpan -> Maybe (RealSrcSpan,RdrName) -> RealSrcSpan -> EPP ()
+         -> AnnAnchor -> Maybe (AnnAnchor,RdrName) -> AnnAnchor -> EPP ()
 markName adorn open mname close = do
   let (kwo,kwc) = adornments adorn
   markKw (AddApiAnn kwo open)
   case mname of
     Nothing -> return ()
-    Just (name, a) -> printStringAtKw' name (showPprUnsafe a)
+    Just (name, a) -> printStringAtAA name (showPprUnsafe a)
   markKw (AddApiAnn kwc close)
 
 adornments :: NameAdornment -> (AnnKeywordId, AnnKeywordId)
@@ -3676,10 +3683,10 @@ instance ExactPrint (IEWrappedName RdrName) where
 
   exact (IEName n) = markAnnotated n
   exact (IEPattern r n) = do
-    printStringAtKw' r "pattern"
+    printStringAtAA r "pattern"
     markAnnotated n
   exact (IEType r n) = do
-    printStringAtKw' r "type"
+    printStringAtAA r "type"
     markAnnotated n
 
 -- markIEWrapped :: ApiAnn -> LIEWrappedName RdrName -> EPP ()

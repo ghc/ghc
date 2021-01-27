@@ -50,7 +50,7 @@ import Preprocess
 import Types
 
 import Control.Monad.RWS
-import Data.Data (Data)
+-- import Data.Data (Data)
 
 
 -- import GHC.Paths (libdir)
@@ -71,7 +71,7 @@ import qualified GHC.Utils.Error        as GHC
 
 import qualified GHC.LanguageExtensions as LangExt
 
-import qualified Data.Map as Map
+-- import qualified Data.Map as Map
 
 {-# ANN module "HLint: ignore Eta reduce" #-}
 {-# ANN module "HLint: ignore Redundant do" #-}

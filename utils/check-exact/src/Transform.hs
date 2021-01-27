@@ -68,6 +68,7 @@ module Transform
         -- *** Low level operations used in 'HasDecls'
         , balanceComments
         , balanceCommentsList
+        , balanceCommentsList'
         , balanceTrailingComments
         , moveTrailingComments
         , anchorEof
@@ -76,6 +77,7 @@ module Transform
         , captureOrder, captureOrder'
         , captureOrderAnnKey
         , captureLineSpacing
+        , captureMatchLineSpacing
 
         -- * Operations
         , isUniqueSrcSpan
@@ -169,7 +171,6 @@ logTr str = tell [str]
 -- Monad
 logDataWithAnnsTr :: (Monad m) => (Data a) => String -> a -> TransformT m ()
 logDataWithAnnsTr str ast = do
-  anns <- getAnnsT
   logTr $ str ++ showAst ast
 
 -- |Access the 'Anns' being modified in this transformation
@@ -270,7 +271,15 @@ captureOrderAnnKey parentKey ls ans = ans
 
 -- ---------------------------------------------------------------------
 
-captureLineSpacing :: [LHsDecl GhcPs] -> [LHsDecl GhcPs]
+captureMatchLineSpacing :: LHsDecl GhcPs -> LHsDecl GhcPs
+captureMatchLineSpacing (L l (ValD x (FunBind a b (MG c (L d ms ) e) f)))
+                       = L l (ValD x (FunBind a b (MG c (L d ms') e) f))
+    where
+      ms' :: [LMatch GhcPs (LHsExpr GhcPs)]
+      ms' = captureLineSpacing ms
+captureMatchLineSpacing d = d
+
+-- captureLineSpacing :: [LHsDecl GhcPs] -> [LHsDecl GhcPs]
 captureLineSpacing [] = []
 captureLineSpacing [d] = [d]
 captureLineSpacing (d1:d2:ds) = d1:captureLineSpacing (d2':ds)
@@ -574,6 +583,7 @@ balanceCommentsMatch (L l (Match am mctxt pats (GRHSs xg grhss binds))) = do
   logTr $ "balanceCommentsMatch: (logInfo)=" ++ showAst (logInfo)
   logTr $ "balanceCommentsMatch: (loc1)=" ++ showGhc (ss2range (locA l))
   logTr $ "balanceCommentsMatch: (anc1,cs1f)=" ++ showAst (anc1,cs1f)
+  logTr $ "balanceCommentsMatch: (l'', grhss')=" ++ showAst (l'', grhss')
   return (L l'' (Match am mctxt pats (GRHSs xg grhss' binds')))
   where
     simpleBreak (r,_) = r /= 0
@@ -761,6 +771,38 @@ anchorFromLocatedA (L (SrcSpanAnn an loc) _)
       ApiAnnNotUsed    -> realSrcSpan loc
       (ApiAnn anc _ _) -> anchor anc
 
+-- ---------------------------------------------------------------------
+
+balanceSameLineComments :: (Monad m)
+  => LMatch GhcPs (LHsExpr GhcPs) -> TransformT m (LMatch GhcPs (LHsExpr GhcPs))
+balanceSameLineComments (L la (Match an mctxt pats (GRHSs x grhss lb))) = do
+  logTr $ "balanceSameLineComments: (la)=" ++ showGhc (ss2range $ locA la)
+  logTr $ "balanceSameLineComments: [logInfo]=" ++ showAst logInfo
+  return (L la' (Match an mctxt pats (GRHSs x grhss' lb)))
+  where
+    simpleBreak n (r,_) = r > n
+    (la',grhss', logInfo) = case reverse grhss of
+      [] -> (la,grhss,[])
+      (L lg (GRHS ga gs rhs):grs) -> (la'',reverse $ (L lg (GRHS ga' gs rhs)):grs,[(gac,(csp,csf))])
+        where
+          (SrcSpanAnn an1 loc1) = la
+          anc1 = addCommentOrigDeltas $ apiAnnComments an1
+          (ApiAnn anc an _) = ga :: ApiAnn' GrhsAnn
+          (csp,csf) = case anc1 of
+            AnnComments cs -> ([],cs)
+            AnnCommentsBalanced p f -> (p,f)
+          (move',stay') = break (simpleBreak 0) (trailingCommentsDeltas (anchor anc) csf)
+          move = map snd move'
+          stay = map snd stay'
+          cs1 = AnnCommentsBalanced csp stay
+
+          gac = addCommentOrigDeltas $ apiAnnComments ga
+          gfc = getFollowingComments gac
+          gac' = setFollowingComments gac (sort $ gfc ++ move)
+          ga' = (ApiAnn anc an gac')
+
+          an1' = setCommentsSSA la cs1
+          la'' = an1'
 
 -- ---------------------------------------------------------------------
 
@@ -952,7 +994,7 @@ instance HasDecls (LocatedA (Match GhcPs (LocatedA (HsExpr GhcPs)))) where
         logTr "replaceDecls LMatch nonempty decls"
         -- Need to throw in a fresh where clause if the binds were empty,
         -- in the annotations.
-        l' <- case binds of
+        (l', rhs') <- case binds of
           EmptyLocalBinds{} -> do
             logTr $ "replaceDecls LMatch empty binds"
             let
@@ -971,24 +1013,25 @@ instance HasDecls (LocatedA (Match GhcPs (LocatedA (HsExpr GhcPs)))) where
             -- toMove <- balanceTrailingComments m m
             -- insertCommentBefore (mkAnnKey m) toMove (matchApiAnn AnnWhere)
             -- TODO: move trailing comments on the same line to before the binds
-            (L l' m1',m2') <- balanceComments' m m
-            logDataWithAnnsTr "Match.replaceDecls:(m1',m2')" (L l' m1',m2')
-            return l'
-          _ -> return l
+            logDataWithAnnsTr "Match.replaceDecls:balancing comments:m" m
+            L l' m' <- balanceSameLineComments m
+            logDataWithAnnsTr "Match.replaceDecls:(m1')" (L l' m')
+            return (l', grhssGRHSs $ m_grhss m')
+          _ -> return (l, rhs)
 
         -- modifyAnnsT (captureOrderAnnKey (mkAnnKey m) newBinds)
         binds'' <- replaceDeclsValbinds binds newBinds
         -- let binds' = L (getLoc binds) binds''
         logDataWithAnnsTr "Match.replaceDecls:binds'" binds''
-        return (L l' (Match xm c p (GRHSs xr rhs binds'')))
+        return (L l' (Match xm c p (GRHSs xr rhs' binds'')))
   replaceDecls (L _ (Match _ _ _ (XGRHSs _))) _ = error "replaceDecls"
   replaceDecls (L _ (XMatch _)) _               = error "replaceDecls"
 
 -- ---------------------------------------------------------------------
 
 instance HasDecls (LocatedA (HsExpr GhcPs)) where
-  hsDecls ls@(L _ (HsLet _ decls _ex)) = hsDeclsValBinds decls
-  hsDecls _                               = return []
+  hsDecls (L _ (HsLet _ decls _ex)) = hsDeclsValBinds decls
+  hsDecls _                         = return []
 
   replaceDecls e@(L l (HsLet x decls ex)) newDecls
     = do
@@ -998,6 +1041,7 @@ instance HasDecls (LocatedA (HsExpr GhcPs)) where
         -- let decls' = L (getLoc decls) decls''
         return (L l (HsLet x decls'' ex))
 
+  -- TODO: does this make sense? Especially as no hsDecls for HsPar
   replaceDecls (L l (HsPar x e)) newDecls
     = do
         logTr "replaceDecls HsPar"
@@ -1226,7 +1270,6 @@ hsDeclsValBinds lb = case lb of
     HsValBinds _ (XValBindsLR _) -> error $ "hsDecls.XValBindsLR not valid"
     HsIPBinds {}       -> return []
     EmptyLocalBinds {} -> return []
-    XHsLocalBindsLR {} -> return []
 
 -- | Utility function for returning decls to 'HsLocalBinds'. Use with
 -- care, as this does not manage the declaration order, the

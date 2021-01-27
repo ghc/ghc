@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE FlexibleInstances #-}
 
@@ -22,11 +23,12 @@ import GHC.Data.OrdList
 
 import Data.Foldable
 import GHC.Parser.Annotation
+import Language.Haskell.Syntax
 
 data SumOrTuple b
-  = Sum ConTag Arity (LocatedA b) [RealSrcSpan] [RealSrcSpan]
+  = Sum ConTag Arity (LocatedA b) [AnnAnchor] [AnnAnchor]
   -- ^ Last two are the locations of the '|' before and after the payload
-  | Tuple [Either (ApiAnn' RealSrcSpan) (LocatedA b)]
+  | Tuple [Either (ApiAnn' AnnAnchor) (LocatedA b)]
 -- data SumOrTuple b
 --   = Sum ConTag Arity (Located b)
 --   | Tuple [Located (Maybe (Located b))]
@@ -117,3 +119,5 @@ instance Outputable DataConBuilder where
     hang (ppr data_con) 2 (sep (map ppr (toList flds)))
   ppr (InfixDataConBuilder lhs data_con rhs) =
     ppr lhs <+> ppr data_con <+> ppr rhs
+
+type instance Anno [LocatedA (StmtLR GhcPs GhcPs (LocatedA (PatBuilder GhcPs)))] = SrcSpanAnnL

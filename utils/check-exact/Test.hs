@@ -66,7 +66,9 @@ tt = testOneFile "/home/alanz/mysrc/git.haskell.org/worktree/exactprint/_build/s
  -- "cases/AddLocalDecl3.hs" addLocaLDecl3
  -- "cases/AddLocalDecl4.hs" addLocaLDecl4
  -- "cases/AddLocalDecl5.hs" addLocaLDecl5
- "cases/AddLocalDecl6.hs" addLocaLDecl6
+ -- "cases/AddLocalDecl6.hs" addLocaLDecl6
+ -- "cases/RmDecl1.hs" rmDecl1
+ "cases/RmDecl2.hs" rmDecl2
 
 
 
@@ -537,27 +539,63 @@ addLocaLDecl5 libdir ans lp = do
 
 addLocaLDecl6 :: Changer
 addLocaLDecl6 libdir ans lp = do
-  Right (_, newDecl@(L ld (ValD _ decl))) <- withDynFlags libdir (\df -> parseDecl df "decl" "y = 3")
+  Right (_, newDecl@(L ld (ValD _ decl))) <- withDynFlags libdir (\df -> parseDecl df "decl" "x = 3")
   let
-      -- declAnns' = setPrecedingLines newDecl 1 4 declAnns
       newDecl' = setEntryDP' newDecl (DP (1, 4))
       doAddLocal = do
         decls <- hsDecls lp
-        [d1,d2] <- balanceCommentsList decls
+        [d1'',d2] <- balanceCommentsList decls
 
+        let d1 = captureMatchLineSpacing d1''
         let L _ (ValD _ (FunBind _ _ (MG _ (L _ ms) _) _)) = d1
-        -- [m1,m2] <- balanceCommentsList' ms
         let [m1,m2] = ms
 
         (d1',_) <- modifyValD (getLocA m1) d1 $ \_m decls -> do
            return ((newDecl' : decls),Nothing)
         replaceDecls lp [d1', d2]
-        -- replaceDecls lp [d1, d2]
 
   (lp',(ans',_),_w) <- runTransformT mempty doAddLocal
   -- putStrLn $ "log:\n" ++ intercalate "\n" _w
   debugM $ "log:[\n" ++ intercalate "\n" _w ++ "]log end\n"
   return (ans,lp')
+
+-- ---------------------------------------------------------------------
+
+rmDecl1 :: Changer
+rmDecl1 libdir ans lp = do
+  let doRmDecl = do
+         tlDecs0 <- hsDecls lp
+         tlDecs <- balanceCommentsList $ captureLineSpacing tlDecs0
+         let (d1:s1:d2:ds) = tlDecs
+
+         replaceDecls lp (d1:ds)
+
+  (lp',(ans',_),_w) <- runTransformT mempty doRmDecl
+  debugM $ "log:[\n" ++ intercalate "\n" _w ++ "]log end\n"
+  return (ans,lp')
+
+-- ---------------------------------------------------------------------
+
+rmDecl2 :: Changer
+rmDecl2 libdir ans lp = do
+  let
+      doRmDecl = do
+        let
+          go :: GHC.LHsExpr GhcPs -> Transform (GHC.LHsExpr GhcPs)
+          go e@(GHC.L _ (GHC.HsLet{})) = do
+            decs0 <- hsDecls e
+            decs <- balanceCommentsList $ captureLineSpacing decs0
+            e' <- replaceDecls e (init decs)
+            return e'
+          go x = return x
+
+        everywhereM (mkM go) lp
+
+  let (lp',(ans',_),_w) = runTransform mempty doRmDecl
+  -- putStrLn $ "log:\n" ++ intercalate "\n" _w
+  debugM $ "log:[\n" ++ intercalate "\n" _w ++ "]log end\n"
+  return (ans,lp')
+
 
 -- ---------------------------------------------------------------------
 -- Next section to be moved to the appropriate library

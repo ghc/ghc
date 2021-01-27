@@ -847,7 +847,7 @@ repAnnD (L loc (HsAnnotation _ _ ann_prov (L _ exp)))
        ; dec    <- repPragAnn target exp'
        ; return (locA loc, dec) }
 
-repAnnProv :: AnnProvenance Name -> MetaM (Core TH.AnnTarget)
+repAnnProv :: AnnProvenance GhcRn -> MetaM (Core TH.AnnTarget)
 repAnnProv (ValueAnnProvenance (L _ n))
   = do { MkC n' <- lift $ globalVar n  -- ANNs are allowed only at top-level
        ; rep2_nw valueAnnotationName [ n' ] }
