@@ -58,6 +58,7 @@ import GHC.Core.FVs     ( mkRuleInfo )
 import GHC.Core.Rules   ( lookupRule, getRules, initRuleOpts )
 import GHC.Types.Basic
 import GHC.Utils.Monad  ( mapAccumLM, liftIO )
+import GHC.Types.Tickish
 import GHC.Types.Var    ( isTyCoVar )
 import GHC.Data.Maybe   ( orElse )
 import Control.Monad

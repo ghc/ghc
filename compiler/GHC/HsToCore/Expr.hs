@@ -64,6 +64,7 @@ import GHC.Builtin.Names
 import GHC.Types.Basic
 import GHC.Data.Maybe
 import GHC.Types.SrcLoc
+import GHC.Types.Tickish
 import GHC.Utils.Misc
 import GHC.Data.Bag
 import GHC.Utils.Outputable as Outputable

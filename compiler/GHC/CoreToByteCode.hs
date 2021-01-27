@@ -64,6 +64,7 @@ import GHC.Data.OrdList
 import GHC.Data.Maybe
 import GHC.Types.Var.Env
 import GHC.Builtin.Names ( unsafeEqualityProofName )
+import GHC.Types.Tickish
 
 import Data.List
 import Foreign
