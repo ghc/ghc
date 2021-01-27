@@ -17,6 +17,7 @@ import GHC.Types.Id.Info
 import GHC.Types.Demand( seqDemand, seqStrictSig )
 import GHC.Types.Cpr( seqCprSig )
 import GHC.Types.Basic( seqOccInfo )
+import GHC.Types.Tickish
 import GHC.Types.Var.Set( seqDVarSet )
 import GHC.Types.Var( varType, tyVarKind )
 import GHC.Core.Type( seqType, isTyVar )
