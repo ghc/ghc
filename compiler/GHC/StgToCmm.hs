@@ -48,6 +48,7 @@ import GHC.Types.Basic
 import GHC.Types.Var.Set ( isEmptyDVarSet )
 import GHC.Types.Unique.FM
 import GHC.Types.Name.Env
+import GHC.Types.ForeignStubs
 
 import GHC.Core.DataCon
 import GHC.Core.TyCon
@@ -85,7 +86,7 @@ codeGen :: Logger
         -> CollectedCCs                -- (Local/global) cost-centres needing declaring/registering.
         -> [CgStgTopBinding]           -- Bindings to convert
         -> HpcInfo
-        -> Stream IO CmmGroup (SDoc, ModuleLFInfos)       -- Output as a stream, so codegen can
+        -> Stream IO CmmGroup (CStub, ModuleLFInfos)       -- Output as a stream, so codegen can
                                        -- be interleaved with output
 
 codeGen logger dflags this_mod ip_map@(InfoTableProvMap (UniqMap denv) _) data_tycons
