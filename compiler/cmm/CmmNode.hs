@@ -15,7 +15,7 @@
 module CmmNode (
      CmmNode(..), CmmFormal, CmmActual, CmmTickish,
      UpdFrameOffset, Convention(..),
-     ForeignConvention(..), ForeignTarget(..), foreignTargetHints,
+     ForeignConvention(..), ForeignTarget(..), foreignTargetHints, foreignTargetReps,
      CmmReturnInfo(..),
      mapExp, mapExpDeep, wrapRecExp, foldExp, foldExpDeep, wrapRecExpf,
      mapExpM, mapExpDeepM, wrapRecExpM, mapSuccessors, mapCollectSuccessors,
@@ -45,7 +45,9 @@ import Data.Maybe
 import Data.List (tails,sortBy)
 import Unique (nonDetCmpUnique)
 import Util
+import PprCmmExpr
 
+import {-# SOURCE #-} TyCon (PrimRep)
 
 ------------------------
 -- CmmNode
@@ -287,6 +289,8 @@ data ForeignConvention
         [ForeignHint]           -- Extra info about the args
         [ForeignHint]           -- Extra info about the result
         CmmReturnInfo
+        PrimRep                 -- return prim rep
+        [PrimRep]               -- argument prim reps
   deriving Eq
 
 data CmmReturnInfo
@@ -302,16 +306,39 @@ data ForeignTarget        -- The target of a foreign call
         CallishMachOp            -- Which one
   deriving Eq
 
-foreignTargetHints :: ForeignTarget -> ([ForeignHint], [ForeignHint])
+myPprTraceDebug :: String -> SDoc -> a -> a
+myPprTraceDebug str doc x
+  | hasPprDebug unsafeGlobalDynFlags = pprTrace str doc x
+  | otherwise                        = x
+
+foreignTargetReps :: HasCallStack => ForeignTarget -> (PrimRep, [PrimRep])
+foreignTargetReps (ForeignTarget _ (ForeignConvention _ _ _ _ rr ras)) = (rr, ras)
+foreignTargetReps (PrimTarget op) = callishMachOpReps op
+
+foreignTargetHints :: HasCallStack => ForeignTarget -> ([ForeignHint], [ForeignHint])
 foreignTargetHints target
-  = ( res_hints ++ repeat NoHint
-    , arg_hints ++ repeat NoHint )
+  = ( res_hints ++ repeat BadHint
+    , arg_hints ++ repeat BadHint )
   where
     (res_hints, arg_hints) =
        case target of
           PrimTarget op -> callishMachOpHints op
-          ForeignTarget _ (ForeignConvention _ arg_hints res_hints _) ->
-             (res_hints, arg_hints)
+          ForeignTarget _ (ForeignConvention _ arg_hints res_hints _ _ _) ->
+             myPprTraceDebug "foreignTargetHints" (pprForeignTarget target) $ (res_hints, arg_hints)
+             where
+               pprForeignTarget :: ForeignTarget -> SDoc
+               pprForeignTarget (ForeignTarget fn c) = ppr_conv c <+> ppr_target fn
+                 where
+                   ppr_target :: CmmExpr -> SDoc
+                   ppr_target t@(CmmLit _) = ppr t
+                   ppr_target fn'          = parens (ppr fn')
+                   ppr_conv :: ForeignConvention -> SDoc
+                   ppr_conv (ForeignConvention c args res ret ret_ty arg_tys) =
+                     doubleQuotes (ppr c) <+> text "arg hints:" <+> ppr (map ppr_fh args) <+> text "result hints:" <+> ppr (map ppr_fh res) $$ text "arg types:" <+> text (show arg_tys) <+> text "result types:" <+> text (show ret_ty)
+                   ppr_fh :: ForeignHint -> SDoc
+                   ppr_fh (NoHint sz) = quotes(text "unsigned" <+> ppr sz)
+                   ppr_fh (SignedHint sz) = quotes(text "signed" <+> ppr sz)
+                   ppr_fh AddrHint        = text "PtrHint"
 
 --------------------------------------------------
 -- Instances of register and slot users / definers
@@ -376,7 +403,7 @@ instance DefinerOfRegs GlobalReg (CmmNode e x) where
           activeRegs = activeStgRegs platform
           activeCallerSavesRegs = filter (callerSaves platform) activeRegs
 
-          foreignTargetRegs (ForeignTarget _ (ForeignConvention _ _ _ CmmNeverReturns)) = []
+          foreignTargetRegs (ForeignTarget _ (ForeignConvention _ _ _ CmmNeverReturns _ _)) = []
           foreignTargetRegs _ = activeCallerSavesRegs
 
 -- Note [Safe foreign calls clobber STG registers]

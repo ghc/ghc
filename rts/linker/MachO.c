@@ -157,9 +157,11 @@ ocDeinit_MachO(ObjectCode * oc) {
         }
 #if defined(aarch64_HOST_ARCH)
         freeGot(oc);
-        for(int i = 0; i < oc->n_sections; i++) {
+	if(oc->sections != NULL) {
+	  for(int i = 0; i < oc->n_sections; i++) {
             freeStubs(&oc->sections[i]);
-        }
+	  }
+	}
 #endif
         stgFree(oc->info);
         oc->info = NULL;

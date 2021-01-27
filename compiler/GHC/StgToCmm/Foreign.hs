@@ -65,7 +65,7 @@ cgForeignCall :: ForeignCall            -- the op
               -> Type                   -- result type
               -> FCode ReturnKind
 
-cgForeignCall (CCall (CCallSpec target cconv safety)) typ stg_args res_ty
+cgForeignCall (CCall (CCallSpec target cconv safety ret_rep arg_reps)) typ stg_args res_ty
   = do  { dflags <- getDynFlags
         ; let -- in the stdcall calling convention, the symbol needs @size appended
               -- to it, where size is the total number of bytes of arguments.  We
@@ -79,7 +79,23 @@ cgForeignCall (CCall (CCallSpec target cconv safety)) typ stg_args res_ty
             arg_size (arg, _) = max (widthInBytes $ typeWidth $ cmmExprType dflags arg)
                                      (wORD_SIZE dflags)
         ; cmm_args <- getFCallArgs stg_args typ
-        ; (res_regs, res_hints) <- newUnboxedTupleRegs res_ty
+        ; let myPprTraceDebug :: String -> SDoc -> a -> a
+              myPprTraceDebug str doc x
+                | hasPprDebug dflags = pprTrace str doc x
+                | otherwise          = x
+              ppr_target :: CCallTarget -> SDoc
+              ppr_target (StaticTarget _ lbl _ fn) = text "static" <+> (if fn then text "function" else text "value") <+> ppr lbl
+              ppr_target DynamicTarget = text "dynamic"
+        ; (res_regs, res_hints) <- myPprTraceDebug "cgForeignCall" (ppr_target target
+                                                                    $$ text "Foreign Function Type:" <+> ppr typ
+                                                                    $$ text "Result:" <+> ppr ret_rep
+                                                                    $$ text "Result Type:" <+> ppr res_ty
+                                                                    $$ text "Result (typePrimRep1):" <+> ppr (typePrimRep1 res_ty)
+                                                                    $$ text "StgArgTyp:" <+> ppr (map stgArgType stg_args)
+                                                                    $$ text "StgArgTyp (typePrimRep1):" <+> ppr (map (typePrimRep1 . stgArgType) stg_args)
+                                                                    $$ text "Args:" <+> ppr arg_reps) $ newUnboxedTupleRegs res_ty
+        -- ; let arg_reps' = map (typePrimRep1 . stgArgType) stg_args
+        -- ; let ret_rep'  = typePrimRep1 res_ty
         ; let ((call_args, arg_hints), cmm_target)
                 = case target of
                    StaticTarget _ _   _      False ->
@@ -97,7 +113,7 @@ cgForeignCall (CCall (CCallSpec target cconv safety)) typ stg_args res_ty
                    DynamicTarget    ->  case cmm_args of
                                            (fn,_):rest -> (unzip rest, fn)
                                            [] -> panic "cgForeignCall []"
-              fc = ForeignConvention cconv arg_hints res_hints CmmMayReturn
+              fc = ForeignConvention cconv arg_hints res_hints CmmMayReturn ret_rep arg_reps
               call_target = ForeignTarget cmm_target fc
 
         -- we want to emit code for the call, and then emitReturn.
@@ -188,17 +204,21 @@ continuation, resulting in just one proc point instead of two. Yay!
 -}
 
 
-emitCCall :: [(CmmFormal,ForeignHint)]
+emitCCall :: [(CmmFormal, PrimRep, ForeignHint)]
           -> CmmExpr
-          -> [(CmmActual,ForeignHint)]
+          -> [(CmmActual, PrimRep, ForeignHint)]
           -> FCode ()
 emitCCall hinted_results fn hinted_args
   = void $ emitForeignCall PlayRisky results target args
   where
-    (args, arg_hints) = unzip hinted_args
-    (results, result_hints) = unzip hinted_results
+    (args, arg_reps, arg_hints) = unzip3 hinted_args
+    (results, result_reps, result_hints) = unzip3 hinted_results
+    res_rep = case result_reps of
+      []  -> VoidRep
+      [r] -> r
+      _   -> error "can not deal with multiple return values in emitCCall"
     target = ForeignTarget fn fc
-    fc = ForeignConvention CCallConv arg_hints result_hints CmmMayReturn
+    fc = ForeignConvention CCallConv arg_hints result_hints CmmMayReturn res_rep arg_reps
 
 
 emitPrimCall :: [CmmFormal] -> CallishMachOp -> [CmmActual] -> FCode ()
@@ -593,11 +613,11 @@ getFCallArgs args typ
       | otherwise
       = do { cmm <- getArgAmode (NonVoid arg)
            ; dflags <- getDynFlags
-           ; return (Just (add_shim dflags typ cmm, hint)) }
+           ; return (Just (add_shim dflags typ cmm, hint dflags)) }
       where
-        arg_ty   = stgArgType arg
-        arg_reps = typePrimRep arg_ty
-        hint     = typeForeignHint arg_ty
+        arg_ty      = stgArgType arg
+        arg_reps    = typePrimRep arg_ty
+        hint dflags = typeForeignHint dflags arg_ty
 
 -- The minimum amount of information needed to determine
 -- the offset to apply to an argument to a foreign call.
@@ -653,4 +673,3 @@ typeToStgFArgType typ
   -- a type in a foreign function signature with a representationally
   -- equivalent newtype.
   tycon = tyConAppTyCon (unwrapType typ)
-

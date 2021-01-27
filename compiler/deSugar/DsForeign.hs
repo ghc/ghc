@@ -173,9 +173,9 @@ dsCImport id co (CLabel cid) cconv _ _ = do
     return ([(id, rhs')], empty, empty)
 
 dsCImport id co (CFunction target) cconv@PrimCallConv safety _
-  = dsPrimCall id co (CCall (CCallSpec target cconv safety))
+  = dsPrimCall id co (CCall (mkCCallSpec target cconv safety undefined undefined))
 dsCImport id co (CFunction target) cconv safety mHeader
-  = dsFCall id co (CCall (CCallSpec target cconv safety)) mHeader
+  = dsFCall id co (CCall (mkCCallSpec target cconv safety undefined undefined)) mHeader
 dsCImport id co CWrapper cconv _ _
   = dsFExportDynamic id co cconv
 
@@ -203,7 +203,21 @@ fun_type_arg_stdcall_info _ _other_conv _
 
 dsFCall :: Id -> Coercion -> ForeignCall -> Maybe Header
         -> DsM ([(Id, Expr TyVar)], SDoc, SDoc)
-dsFCall fn_id co fcall mDeclHeader = do
+dsFCall fn_id co (CCall (CCallSpec target cconv safety _ _)) mDeclHeader = do
+
+    let myTypePrimRep1 :: Type -> PrimRep
+        myTypePrimRep1 t = case typePrimRep1 t of
+          LiftedRep -> case getUnique (typeTyCon t) of
+            key | key == int8TyConKey   -> Int8Rep
+                | key == int16TyConKey  -> Int16Rep
+                | key == int32TyConKey  -> Int32Rep
+                | key == int64TyConKey  -> Int64Rep
+                | key == word8TyConKey  -> Word8Rep
+                | key == word16TyConKey -> Word16Rep
+                | key == word32TyConKey -> Word32Rep
+                | key == word64TyConKey -> Word64Rep
+            _              -> LiftedRep
+          other     -> other
     let
         ty                   = pFst $ coercionKind co
         (tv_bndrs, rho)      = tcSplitForAllVarBndrs ty
@@ -221,16 +235,37 @@ dsFCall fn_id co fcall mDeclHeader = do
     work_uniq  <- newUnique
 
     dflags <- getDynFlags
-    (fcall', cDoc) <-
-              case fcall of
+
+    let
+      raw_res_ty = case tcSplitIOType_maybe io_res_ty of
+        Just (_ioTyCon, res_ty) -> res_ty
+        Nothing                 -> io_res_ty
+
+      myPprTraceDebug :: String -> SDoc -> a -> a
+      myPprTraceDebug str doc x
+        | hasPprDebug dflags = pprTrace str doc x
+        | otherwise          = x
+
+      fcall = myPprTraceDebug "dsFCall" (   text "result type                   :" <+> ppr io_res_ty
+                                         $$ text "raw result type               :" <+> ppr raw_res_ty
+                                         $$ text "raw result type (unwrapped)   :" <+> ppr (unwrapType raw_res_ty)
+                                         $$ text "raw result type (typePrimRep1):" <+> ppr (typePrimRep1 raw_res_ty)
+                                         $$ text "arg types                     :" <+> ppr arg_tys
+                                         $$ text "int types                     :" <+> ppr [int8PrimTy, int16PrimTy, int32PrimTy, intPrimTy]
+                                         $$ text "arg types (unwrapped)         :" <+> ppr (map unwrapType arg_tys)
+                                         $$ text "arg types (typePrimRep1)      :" <+> ppr (map typePrimRep1 arg_tys)
+                                         $$ text "arg types (myTypePrimRep1)    :" <+> ppr (map myTypePrimRep1 arg_tys))
+              $ CCall (mkCCallSpec target cconv safety (myTypePrimRep1 raw_res_ty) (map myTypePrimRep1 arg_tys))
+
+    (fcall', cDoc) <- case fcall of
               CCall (CCallSpec (StaticTarget _ cName mUnitId isFun)
-                               CApiConv safety) ->
+                               CApiConv safety _ _) ->
                do wrapperName <- mkWrapperName "ghc_wrapper" (unpackFS cName)
-                  let fcall' = CCall (CCallSpec
+                  let fcall' = CCall (mkCCallSpec
                                       (StaticTarget NoSourceText
                                                     wrapperName mUnitId
                                                     True)
-                                      CApiConv safety)
+                                      CApiConv safety (typePrimRep1 raw_res_ty) (map typePrimRep1 arg_tys))
                       c = includes
                        $$ fun_proto <+> braces (cRet <> semi)
                       includes = vcat [ text "#include \"" <> ftext h
@@ -304,7 +339,7 @@ for calling convention they are really prim ops.
 
 dsPrimCall :: Id -> Coercion -> ForeignCall
            -> DsM ([(Id, Expr TyVar)], SDoc, SDoc)
-dsPrimCall fn_id co fcall = do
+dsPrimCall fn_id co (CCall (CCallSpec target cconv safety _ _)) = do
     let
         ty                   = pFst $ coercionKind co
         (tvs, fun_ty)        = tcSplitForAllTys ty
@@ -315,6 +350,19 @@ dsPrimCall fn_id co fcall = do
     ccall_uniq <- newUnique
     dflags <- getDynFlags
     let
+        raw_res_ty = case tcSplitIOType_maybe io_res_ty of
+          Just (_ioTyCon, res_ty) -> res_ty
+          Nothing                 -> io_res_ty
+
+        myPprTraceDebug :: String -> SDoc -> a -> a
+        myPprTraceDebug str doc x
+          | hasPprDebug dflags = pprTrace str doc x
+          | otherwise          = x
+
+        fcall = myPprTraceDebug "dsPrimCall" (text "result type:" <+> ppr io_res_ty
+                                              $$ text "raw result type" <+> ppr raw_res_ty
+                                              $$ text "arg types:" <+> ppr arg_tys)
+                $ CCall (mkCCallSpec target cconv safety undefined undefined) -- (typePrimRep1 raw_res_ty) (map typePrimRep1 arg_tys))
         call_app = mkFCall dflags ccall_uniq fcall (map Var args) io_res_ty
         rhs      = mkLams tvs (mkLams args call_app)
         rhs'     = Cast rhs co
@@ -822,7 +870,7 @@ primTyDescChar dflags ty
      Int16Rep    -> 'S'
      Word16Rep   -> 's'
      Int32Rep    -> 'W'
-     Word32Rep   -> 'w'     
+     Word32Rep   -> 'w'
      Int64Rep    -> 'L'
      Word64Rep   -> 'l'
      AddrRep     -> 'p'
