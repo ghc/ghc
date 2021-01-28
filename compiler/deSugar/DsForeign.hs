@@ -204,20 +204,6 @@ fun_type_arg_stdcall_info _ _other_conv _
 dsFCall :: Id -> Coercion -> ForeignCall -> Maybe Header
         -> DsM ([(Id, Expr TyVar)], SDoc, SDoc)
 dsFCall fn_id co (CCall (CCallSpec target cconv safety _ _)) mDeclHeader = do
-
-    let myTypePrimRep1 :: Type -> PrimRep
-        myTypePrimRep1 t = case typePrimRep1 t of
-          LiftedRep -> case getUnique (typeTyCon t) of
-            key | key == int8TyConKey   -> Int8Rep
-                | key == int16TyConKey  -> Int16Rep
-                | key == int32TyConKey  -> Int32Rep
-                | key == int64TyConKey  -> Int64Rep
-                | key == word8TyConKey  -> Word8Rep
-                | key == word16TyConKey -> Word16Rep
-                | key == word32TyConKey -> Word32Rep
-                | key == word64TyConKey -> Word64Rep
-            _              -> LiftedRep
-          other     -> other
     let
         ty                   = pFst $ coercionKind co
         (tv_bndrs, rho)      = tcSplitForAllVarBndrs ty
@@ -254,8 +240,9 @@ dsFCall fn_id co (CCall (CCallSpec target cconv safety _ _)) mDeclHeader = do
                                          $$ text "int types                     :" <+> ppr [int8PrimTy, int16PrimTy, int32PrimTy, intPrimTy]
                                          $$ text "arg types (unwrapped)         :" <+> ppr (map unwrapType arg_tys)
                                          $$ text "arg types (typePrimRep1)      :" <+> ppr (map typePrimRep1 arg_tys)
-                                         $$ text "arg types (myTypePrimRep1)    :" <+> ppr (map myTypePrimRep1 arg_tys))
-              $ CCall (mkCCallSpec target cconv safety (myTypePrimRep1 raw_res_ty) (map myTypePrimRep1 arg_tys))
+                                        --  $$ text "arg types (myTypePrimRep1)    :" <+> ppr (map myTypePrimRep1 arg_tys)
+                                         )
+              $ CCall (mkCCallSpec target cconv safety io_res_ty arg_tys)
 
     (fcall', cDoc) <- case fcall of
               CCall (CCallSpec (StaticTarget _ cName mUnitId isFun)
@@ -265,7 +252,7 @@ dsFCall fn_id co (CCall (CCallSpec target cconv safety _ _)) mDeclHeader = do
                                       (StaticTarget NoSourceText
                                                     wrapperName mUnitId
                                                     True)
-                                      CApiConv safety (typePrimRep1 raw_res_ty) (map typePrimRep1 arg_tys))
+                                      CApiConv safety io_res_ty arg_tys)
                       c = includes
                        $$ fun_proto <+> braces (cRet <> semi)
                       includes = vcat [ text "#include \"" <> ftext h
@@ -362,7 +349,7 @@ dsPrimCall fn_id co (CCall (CCallSpec target cconv safety _ _)) = do
         fcall = myPprTraceDebug "dsPrimCall" (text "result type:" <+> ppr io_res_ty
                                               $$ text "raw result type" <+> ppr raw_res_ty
                                               $$ text "arg types:" <+> ppr arg_tys)
-                $ CCall (mkCCallSpec target cconv safety undefined undefined) -- (typePrimRep1 raw_res_ty) (map typePrimRep1 arg_tys))
+                $ CCall (mkCCallSpec target cconv safety io_res_ty arg_tys)
         call_app = mkFCall dflags ccall_uniq fcall (map Var args) io_res_ty
         rhs      = mkLams tvs (mkLams args call_app)
         rhs'     = Cast rhs co

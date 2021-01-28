@@ -47,7 +47,7 @@ import Util
 
 import Data.Maybe
 
-import RepType (typePrimRep1)
+import RepType (typePrimRep1, mkCCallSpec)
 {-
 Desugaring of @ccall@s consists of adding some state manipulation,
 unboxing any boxed primitive arguments and boxing the result if
@@ -111,7 +111,7 @@ dsCCall lbl args may_gc result_ty
            target = StaticTarget NoSourceText lbl Nothing True
            the_fcall    = myPprTraceDebug "dsCCall" (text "result type:" <+> ppr result_ty
                                                   $$ text "ccall result type" <+> ppr ccall_result_ty)
-             $ CCall (mkCCallSpec target CCallConv may_gc (typePrimRep1 raw_res_ty) (map typePrimRep1 arg_tys))
+             $ CCall (mkCCallSpec target CCallConv may_gc raw_res_ty arg_tys)
            the_prim_app = mkFCall dflags uniq the_fcall unboxed_args ccall_result_ty
        return (foldr ($) (res_wrapper the_prim_app) arg_wrappers)
 

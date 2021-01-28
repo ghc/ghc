@@ -56,11 +56,11 @@ llvmCodeGen dflags h cmm_stream
          debugTraceMsg dflags 2
               (text "Using LLVM version:" <+> text (llvmVersionStr ver))
          let doWarn = wopt Opt_WarnUnsupportedLlvmVersion dflags
-         when (not (llvmVersionSupported ver) && doWarn) $ putMsg dflags $
-           "You are using an unsupported version of LLVM!" $$
-           "Currently only " <> text (llvmVersionStr supportedLlvmVersion) <> " is supported." <+>
-           "System LLVM version: " <> text (llvmVersionStr ver) $$
-           "We will try though..."
+        --  when (not (llvmVersionSupported ver) && doWarn) $ putMsg dflags $
+        --    "You are using an unsupported version of LLVM!" $$
+        --    "Currently only " <> text (llvmVersionStr supportedLlvmVersion) <> " is supported." <+>
+        --    "System LLVM version: " <> text (llvmVersionStr ver) $$
+        --    "We will try though..."
          let isS390X = platformArch (targetPlatform dflags) == ArchS390X
          let major_ver = head . llvmVersionList $ ver
          when (isS390X && major_ver < 10 && doWarn) $ putMsg dflags $
