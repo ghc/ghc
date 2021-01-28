@@ -4,7 +4,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}  -- instance MonadThings is necessarily an
                                        -- orphan
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
-                                      -- in module GHC.Hs.Extension
+                                      -- in module Language.Haskell.Syntax.Extension
 {-# LANGUAGE TypeFamilies #-}
 
 module GHC.Tc.Utils.Env(

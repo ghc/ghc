@@ -271,9 +271,9 @@ wordSizeInBase# _    0## = 0##
 wordSizeInBase# base w   = 1## `plusWord#` wordLogBase# base w
 
 -- | Indicate if the value is a power of two and which one
-wordIsPowerOf2# :: Word# -> (# () | Word# #)
+wordIsPowerOf2# :: Word# -> (# (# #) | Word# #)
 wordIsPowerOf2# w
-   | isTrue# (popCnt# w `neWord#` 1##) = (# () | #)
+   | isTrue# (popCnt# w `neWord#` 1##) = (# (# #) | #)
    | True                              = (# | ctz# w #)
 
 -- | Reverse bytes in a Word#

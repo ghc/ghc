@@ -155,7 +155,7 @@ library
                       rts/GetTime.h
                       rts/Globals.h
                       rts/Hpc.h
-                      rts/IOManager.h
+                      rts/IOInterface.h
                       rts/Libdw.h
                       rts/LibdwPool.h
                       rts/Linker.h
@@ -433,6 +433,7 @@ library
                HsFFI.c
                Inlines.c
                Interpreter.c
+               IOManager.c
                LdvProfile.c
                Libdw.c
                LibdwPool.c
@@ -534,7 +535,7 @@ library
                   win32/ConsoleHandler.c
                   win32/GetEnv.c
                   win32/GetTime.c
-                  win32/IOManager.c
+                  win32/MIOManager.c
                   win32/OSMem.c
                   win32/OSThreads.c
                   win32/ThrIOManager.c

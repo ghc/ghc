@@ -290,16 +290,13 @@ getTupleDataConName boxity n =
       _          -> panic "getTupleDataConName: impossible"
 
 {-
-************************************************************************
-*                                                                      *
-\subsection[Uniques-prelude]{@Uniques@ for wired-in Prelude things}
-*                                                                      *
-************************************************************************
-
+Note [Uniques for wired-in prelude things and known masks]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Allocation of unique supply characters:
         v,t,u : for renumbering value-, type- and usage- vars.
         B:   builtin
         C-E: pseudo uniques     (used in native-code generator)
+        I:   GHCi evaluation
         X:   uniques from mkLocalUnique
         _:   unifiable tyvars   (above)
         0-9: prelude things below
@@ -308,15 +305,20 @@ Allocation of unique supply characters:
 
         other a-z: lower case chars for unique supplies.  Used so far:
 
+        a       TypeChecking?
+        c       StgToCmm/Renamer
         d       desugarer
         f       AbsC flattener
         g       SimplStg
+        i       TypeChecking interface files
         j       constraint tuple superclass selectors
         k       constraint tuple tycons
         m       constraint tuple datacons
-        n       Native codegen
+        n       Native/LLVM codegen
         r       Hsc name cache
         s       simplifier
+        u       Cmm pipeline
+        y       GHCi bytecode generator
         z       anonymous sums
 -}
 

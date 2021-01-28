@@ -7,7 +7,7 @@ import GHC.Driver.Plugins
 import GHC.Plugins
 import GHC.Data.Bag
 import GHC.Tc.Types
-import GHC.Hs.Extension
+import Language.Haskell.Syntax.Extension
 import GHC.Hs.Expr
 import GHC.Utils.Outputable
 import GHC.Utils.Panic

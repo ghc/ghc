@@ -169,6 +169,37 @@ This improves efficiency slightly but significantly for most programs,
 and is bad for only a few. To suppress this bogus "optimisation" use
 ``-fpedantic-bottoms``.
 
+.. _infelicities-failable-pats:
+
+Failable patterns
+^^^^^^^^^^^^^^^^^
+
+Since the `MonadFail Proposal (MFP) <https://gitlab.haskell.org/haskell/prime/-/wikis/libraries/proposals/monad-fail>`__,
+do-notation blocks that contain a failable pattern need a `MonadFail <https://hackage.haskell.org/package/base-4.14.1.0/docs/Control-Monad-Fail.html#t:MonadFail>`__ constraint.
+
+For example
+
+::
+
+    mayFail :: (MonadIO m) => m ()
+    mayFail = do
+      (Just value) <- fetchData
+      putStrLn value
+
+Will warn you with
+
+::
+
+    • Could not deduce (MonadFail m)
+        arising from a do statement
+        with the failable pattern ‘(Just x)’
+      from the context: MonadIO m
+        bound by the type signature for:
+                   mayFail :: forall (m :: * -> *). MonadIO m => m ()
+
+And indeed, since the `Monad <https://hackage.haskell.org/package/base-4.14.1.0/docs/Control-Monad.html#t:Monad>`__ class does not have the ``fail`` method anymore,
+we need to explicitly add ``(MonadFail m)`` to the contraints of the function.
+
 .. _infelicities-recursive-groups:
 
 Typechecking of recursive binding groups

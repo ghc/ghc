@@ -108,13 +108,13 @@ withNewWordArray2Trimed# sz1 sz2 act = withNewWordArray2# sz1 sz2 \mwa1 mwa2 s -
 withNewWordArrayTrimedMaybe#
    :: Int#  -- ^ Size in Word
    -> (MutableWordArray# RealWorld -> State# RealWorld -> (# State# RealWorld, Bool# #))
-   -> (# () | WordArray# #)
+   -> (# (# #) | WordArray# #)
 withNewWordArrayTrimedMaybe# sz act = case runRW# io of (# _, a #) -> a
    where
       io s =
          case newWordArray# sz s of
             (# s, mwa #) -> case act mwa s of
-               (# s, 0# #) -> (# s, (# () | #) #)
+               (# s, 0# #) -> (# s, (# (# #) | #) #)
                (# s, _  #) -> case mwaTrimZeroes# mwa s of
                   s -> case unsafeFreezeByteArray# mwa s of
                      (# s, ba #) -> (# s, (# | ba #) #)

@@ -1083,7 +1083,7 @@ We do kind inference as follows:
   These unification variables
     - Are TyVarTvs: that is, unification variables that can
       unify only with other type variables.
-      See Note [Signature skolems] in GHC.Tc.Utils.TcType
+      See Note [TyVarTv] in GHC.Tc.Utils.TcMType
 
     - Have complete fresh Names; see GHC.Tc.Utils.TcMType
       Note [Unification variables need fresh Names]

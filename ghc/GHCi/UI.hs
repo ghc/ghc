@@ -45,6 +45,9 @@ import GHC.Runtime.Interpreter.Types
 import GHCi.RemoteTypes
 import GHCi.BreakArray
 import GHC.ByteCode.Types
+import GHC.Core.DataCon
+import GHC.Core.ConLike
+import GHC.Core.PatSyn
 import GHC.Driver.Errors
 import GHC.Driver.Phases
 import GHC.Driver.Session as DynFlags
@@ -67,6 +70,7 @@ import GHC.Types.TyThing.Ppr
 import GHC.Types.SafeHaskell ( getSafeMode )
 import GHC.Types.Name
 import GHC.Types.SourceText
+import GHC.Types.Var ( varType )
 import GHC.Iface.Syntax ( showToHeader )
 import GHC.Builtin.Names
 import GHC.Builtin.Types( stringTyCon_RDR )
@@ -1806,33 +1810,78 @@ docCmd "" =
 docCmd s  = do
   -- TODO: Maybe also get module headers for module names
   names <- GHC.parseName s
-  e_docss <- sequence <$> mapM GHC.getDocs names
-  sdocs <- either handleGetDocsFailure (pure . pprDocs) e_docss
-  let sdocs' = vcat (intersperse (text "") sdocs)
+
+  docs <- traverse (buildDocComponents s) names
+
+  let sdocs = pprDocs docs
+      sdocs' = vcat (intersperse (text "") sdocs)
   unqual <- GHC.getPrintUnqual
   dflags <- getDynFlags
   unit_state <- hsc_units <$> GHC.getSession
   (liftIO . putStrLn . showSDocForUser dflags unit_state unqual) sdocs'
 
-pprDocs :: [(Maybe HsDocString, Map Int HsDocString)] -> [SDoc]
+data DocComponents =
+  DocComponents
+    { docs      :: Maybe HsDocString   -- ^ subject's haddocks
+    , sigAndLoc :: Maybe SDoc          -- ^ type signature + category + location
+    , argDocs   :: Map Int HsDocString -- ^ haddocks for arguments
+    }
+
+buildDocComponents :: GHC.GhcMonad m => String -> Name -> m DocComponents
+buildDocComponents str name = do
+  mbThing <- GHC.lookupName name
+  let sigAndLoc = sigAndLocDoc str <$> mbThing
+  (docs, argDocs)
+    <- either handleGetDocsFailure pure
+         =<< GHC.getDocs name
+
+  pure DocComponents{..}
+
+-- | Produce output containing the type/kind signature, category, and definiton
+-- location of a TyThing.
+sigAndLocDoc :: String -> TyThing -> SDoc
+sigAndLocDoc str tyThing =
+  let tyThingTyDoc :: TyThing -> SDoc
+      tyThingTyDoc = \case
+        AnId i                      -> pprTypeForUser $ varType i
+        AConLike (RealDataCon dc)   -> pprTypeForUser $ dataConDisplayType False dc
+        AConLike (PatSynCon patSyn) -> pprPatSynType patSyn
+        ATyCon tyCon                -> pprTypeForUser $ GHC.tyConKind tyCon
+        ACoAxiom _                  -> empty
+
+      tyDoc = tyThingTyDoc tyThing
+      sigDoc = text str <+> nest 2 (dcolon <+> tyDoc)
+      comment =
+        hsep [ char '\t' <> text "--"
+             , pprTyThingCategory tyThing
+             , text "defined" <+> pprNameDefnLoc (getName tyThing)
+             ]
+   in hang sigDoc 2 comment
+
+pprDocs :: [DocComponents] -> [SDoc]
 pprDocs docs
   | null nonEmptyDocs = pprDoc <$> take 1 docs
   -- elide <has no documentation> if there's at least one non-empty doc (#15784)
   | otherwise = pprDoc <$> nonEmptyDocs
   where
-    empty (mb_decl_docs, arg_docs)
+    empty DocComponents{docs = mb_decl_docs, argDocs = arg_docs}
       = isNothing mb_decl_docs && null arg_docs
     nonEmptyDocs = filter (not . empty) docs
 
 -- TODO: also print arg docs.
-pprDoc :: (Maybe HsDocString, Map Int HsDocString) -> SDoc
-pprDoc (mb_decl_docs, _arg_docs) =
+pprDoc :: DocComponents -> SDoc
+pprDoc DocComponents{sigAndLoc = mb_sig_loc, docs = mb_decl_docs} =
   maybe
     (text "<has no documentation>")
-    (text . unpackHDS)
+    formatDoc
     mb_decl_docs
+  where
+    formatDoc doc =
+      vcat [ fromMaybe empty mb_sig_loc -- print contextual info (#19055)
+           , text $ unpackHDS doc
+           ]
 
-handleGetDocsFailure :: GHC.GhcMonad m => GetDocsFailure -> m [SDoc]
+handleGetDocsFailure :: GHC.GhcMonad m => GetDocsFailure -> m a
 handleGetDocsFailure no_docs = do
   dflags <- getDynFlags
   let msg = showPpr dflags no_docs

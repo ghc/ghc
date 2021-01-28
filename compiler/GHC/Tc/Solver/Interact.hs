@@ -2151,7 +2151,7 @@ Other notes:
      - natural numbers
      - Typeable
 
-* See also Note [What might match later?] in GHC.Tc.Solver.Monad.
+* See also Note [What might equal later?] in GHC.Tc.Solver.Monad.
 
 * The given-overlap problem is arguably not easy to appear in practice
   due to our aggressive prioritization of equality solving over other
@@ -2263,8 +2263,8 @@ matchLocalInst :: TcPredType -> CtLoc -> TcS ClsInstResult
 -- Look up the predicate in Given quantified constraints,
 -- which are effectively just local instance declarations.
 matchLocalInst pred loc
-  = do { ics <- getInertCans
-       ; case match_local_inst (inert_insts ics) of
+  = do { inerts@(IS { inert_cans = ics }) <- getTcSInerts
+       ; case match_local_inst inerts (inert_insts ics) of
            ([], False) -> do { traceTcS "No local instance for" (ppr pred)
                              ; return NoInstance }
            ([(dfun_ev, inst_tys)], unifs)
@@ -2281,14 +2281,15 @@ matchLocalInst pred loc
   where
     pred_tv_set = tyCoVarsOfType pred
 
-    match_local_inst :: [QCInst]
+    match_local_inst :: InertSet
+                     -> [QCInst]
                      -> ( [(CtEvidence, [DFunInstType])]
                         , Bool )      -- True <=> Some unify but do not match
-    match_local_inst []
+    match_local_inst _inerts []
       = ([], False)
-    match_local_inst (qci@(QCI { qci_tvs = qtvs, qci_pred = qpred
+    match_local_inst inerts (qci@(QCI { qci_tvs = qtvs, qci_pred = qpred
                                , qci_ev = ev })
-                     : qcis)
+                             : qcis)
       | let in_scope = mkInScopeSet (qtv_set `unionVarSet` pred_tv_set)
       , Just tv_subst <- ruleMatchTyKiX qtv_set (mkRnEnv2 in_scope)
                                         emptyTvSubstEnv qpred pred
@@ -2303,5 +2304,5 @@ matchLocalInst pred loc
         (matches, unif || this_unif)
       where
         qtv_set = mkVarSet qtvs
-        this_unif = mightMatchLater qpred (ctEvLoc ev) pred loc
-        (matches, unif) = match_local_inst qcis
+        this_unif = mightEqualLater inerts qpred (ctEvLoc ev) pred loc
+        (matches, unif) = match_local_inst inerts qcis

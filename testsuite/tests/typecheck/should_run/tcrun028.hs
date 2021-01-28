@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -dcore-lint #-}
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies, FlexibleContexts,
              FlexibleInstances, UndecidableInstances #-}
 
 -- This is a rather exotic functional-dependency test.

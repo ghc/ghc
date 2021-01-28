@@ -32,8 +32,9 @@
 #include "Capability.h"
 #include "Task.h"
 #include "AwaitEvent.h"
+#include "IOManager.h"
 #if defined(mingw32_HOST_OS)
-#include "win32/IOManager.h"
+#include "win32/MIOManager.h"
 #include "win32/AsyncWinIO.h"
 #endif
 #include "Trace.h"
@@ -2199,9 +2200,7 @@ forkProcess(HsStablePtr *entry
         // like startup event, capabilities, process info etc
         traceTaskCreate(task, cap);
 
-#if defined(THREADED_RTS)
-        ioManagerStartCap(&cap);
-#endif
+        initIOManagerAfterFork(&cap);
 
         // Install toplevel exception handlers, so interruption
         // signal will be sent to the main thread.
@@ -2894,7 +2893,7 @@ void wakeUpRts(void)
     // This forces the IO Manager thread to wakeup, which will
     // in turn ensure that some OS thread wakes up and runs the
     // scheduler loop, which will cause a GC and deadlock check.
-    ioManagerWakeup();
+    wakeupIOManager();
 }
 #endif
 

@@ -83,7 +83,7 @@ class TestConfig:
         self.wordsize = ''
 
         # Verbosity level
-        self.verbose = 3
+        self.verbose = 2
 
         # See Note [validate and testsuite speed] in toplevel Makefile.
         self.speed = 1

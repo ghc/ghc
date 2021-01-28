@@ -656,9 +656,7 @@ checkFunDeps inst_envs (ClsInst { is_tvs = qtvs1, is_cls = cls
         (ltys1, rtys1) = instFD fd cls_tvs tys1
         (ltys2, rtys2) = instFD fd cls_tvs tys2
         qtv_set2       = mkVarSet qtvs2
-        bind_fn tv | tv `elemVarSet` qtv_set1 = BindMe
-                   | tv `elemVarSet` qtv_set2 = BindMe
-                   | otherwise                = Skolem
+        bind_fn        = matchBindFun (qtv_set1 `unionVarSet` qtv_set2)
 
     eq_inst i1 i2 = instanceDFunId i1 == instanceDFunId i2
         -- A single instance may appear twice in the un-nubbed conflict list

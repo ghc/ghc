@@ -6,6 +6,8 @@
 --
 
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE TypeFamilies #-}
 module Test where
 
 -- | This is the haddock comment of a data declaration for Data1.
@@ -46,3 +48,14 @@ func2 x y = x + y
 -- Here's multiple line comment for func3.
 func3 :: Int -> Int -> Int
 func3 x y = x + y
+
+-- | This is the haddock comment of a pattern synonym
+pattern PatSyn :: Int
+pattern PatSyn = 1
+
+-- | This is the haddock comment of a type class
+class TyCl a where
+
+-- | This is the haddock comment of a type family
+type family TyFam a where
+  TyFam Int = Bool

@@ -606,7 +606,7 @@ def have_thread_sanitizer( ) -> bool:
 # appears to change (up or down) when the underlying profile hasn't
 # really changed. To further minimize this effect we run with a single
 # generation (meaning we get a residency sample on every GC) with a small
-# allocation area (as suggested in #17387). That's what +RTS -h -i0 will do.
+# allocation area (as suggested in #17387). That's what +RTS -hT -i0 will do.
 # If you find that a test is flaky, sampling frequency can be adjusted by
 # shrinking the allocation area (+RTS -A64k, for example).
 #
@@ -614,13 +614,13 @@ def have_thread_sanitizer( ) -> bool:
 # a change in one of these figures, please check whether it is real or
 # not as follows:
 #
-#  * Run the test with old and new compilers, adding +RTS -h -i0.001
+#  * Run the test with old and new compilers, adding +RTS -hT -i0.001
 #    (you don't need to compile anything for profiling or enable profiling
 #    libraries to get a heap profile).
 #  * view the heap profiles, read off the maximum residency.  If it has
 #    really changed, then you know there's an issue.
 
-RESIDENCY_OPTS = '+RTS -A256k -i0 -h -RTS'
+RESIDENCY_OPTS = '+RTS -A256k -i0 -hT -RTS'
 
 # See Note [Measuring residency].
 def collect_runtime_residency(tolerance_pct: float):
@@ -1084,7 +1084,8 @@ def do_test(name: TestName,
         [len(t.unexpected_passes),
          len(t.unexpected_failures),
          len(t.framework_failures)]]
-    if_verbose(2, "=====> {0} {1} of {2} {3}".format(*progress_args))
+    if t.total_tests % 100 == 0: if_verbose(2, "=====> {1} of {2} {3}".format(*progress_args))
+    if_verbose(3, "=====> {0} {1} of {2} {3}".format(*progress_args))
 
     # Update terminal title
     # useful progress indicator even when make test VERBOSE=1
@@ -1710,7 +1711,7 @@ def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: str) -> 
                            stderr=read_stderr(name),
                            stdout=read_stdout(name))
 
-    check_hp = '-h' in my_rts_flags and opts.check_hp
+    check_hp = '-hT' in my_rts_flags and opts.check_hp
     check_prof = '-p' in my_rts_flags
 
     # exit_code > 127 probably indicates a crash, so don't try to run hp2ps.

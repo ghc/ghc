@@ -29,10 +29,7 @@
 #include "RtsUtils.h"
 #include "sm/OSMem.h"
 #include "sm/BlockAlloc.h" // for countBlocks()
-
-#if !defined(mingw32_HOST_OS)
-#include "rts/IOManager.h" // for setIOManagerControlFd()
-#endif
+#include "IOManager.h"
 
 #include <string.h>
 
@@ -1224,7 +1221,15 @@ shutdownCapability (Capability *cap USED_IF_THREADS,
             //
             // To reproduce this deadlock: run ffi002(threaded1)
             // repeatedly on a loaded machine.
-            ioManagerDie();
+            //
+            // FIXME: stopIOManager is not a per-capability action. It shuts
+            // down the I/O subsystem for all capabilities, but here we call
+            // it once per cap, so this is accidentally quadratic, but mainly
+            // it is confusing. Replace this with a per-capability stop, and
+            // perhaps make it synchronous so it works the first time and we
+            // don't have to come back and try again here.
+            //
+            stopIOManager();
             yieldThread();
             continue;
         }
@@ -1361,18 +1366,5 @@ bool checkSparkCountInvariant (void)
     return (sparks.created ==
               sparks.converted + remaining + sparks.gcd + sparks.fizzled);
 
-}
-#endif
-
-#if !defined(mingw32_HOST_OS)
-void
-setIOManagerControlFd(uint32_t cap_no USED_IF_THREADS, int fd USED_IF_THREADS) {
-#if defined(THREADED_RTS)
-    if (cap_no < n_capabilities) {
-        RELAXED_STORE(&capabilities[cap_no]->io_manager_control_wr_fd, fd);
-    } else {
-        errorBelch("warning: setIOManagerControlFd called with illegal capability number.");
-    }
-#endif
 }
 #endif

@@ -10,7 +10,7 @@ A function can request its call-site with the ``HasCallStack`` constraint
 and access it as a Haskell value by using ``callStack``.
 
 One can then use functions from ``GHC.Stack`` to inspect or pretty
-print (as is done in ``f`` below) the call stack.
+print (as is done in ``f`` below) the call stack. ::
 
    f :: HasCallStack => IO ()
    f = putStrLn (prettyCallStack callStack)

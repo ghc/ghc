@@ -47,6 +47,10 @@ Language
         -- Alternatively,
         -- type Codomain ('KProxy :: KProxy o) = NatTr (Proxy :: o -> Type)
 
+* Previously, ``-XUndecidableInstances`` accidentally implied ``-XFlexibleContexts``.
+  This is now fixed, but it means that some programs will newly require
+  ``-XFlexibleContexts``.
+
 * The :extension:`GHC2021` language is supported now. It builds on top of
   Haskell2010, adding several stable and conservative extensions, and removing
   deprecated ones. It is now also the “default” langauge set that is active
@@ -100,6 +104,9 @@ Runtime system
   Moreover, we now correctly account for the size of the array, meaning that
   space lost to fragmentation is no longer counted as live data.
 
+
+- The :rts-flag:`-h` flag has been deprecated, use either :rts-flag:`-hc` or
+  :rts-flag:`-hT` explicitly, as appropiate.
 
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~

@@ -587,7 +587,7 @@ fromIntegral = fromInteger . toInteger
 
 {-# RULES
 "fromIntegral/Word->Natural"    fromIntegral = naturalFromWord
-"fromIntegral/Int->Natural"     fromIntegral = naturalFromInt
+"fromIntegral/Int->Natural"     fromIntegral = naturalFromWord . fromIntegral
   #-}
 
 -- | general coercion to fractional types

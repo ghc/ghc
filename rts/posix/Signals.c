@@ -12,6 +12,7 @@
 #include "Schedule.h"
 #include "RtsSignals.h"
 #include "Signals.h"
+#include "IOManager.h"
 #include "RtsUtils.h"
 #include "Prelude.h"
 #include "Ticker.h"

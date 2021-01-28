@@ -522,7 +522,7 @@ compatibleBranches (CoAxBranch { cab_lhs = lhs1, cab_rhs = rhs1 })
                    (CoAxBranch { cab_lhs = lhs2, cab_rhs = rhs2 })
   = let (commonlhs1, commonlhs2) = zipAndUnzip lhs1 lhs2
              -- See Note [Compatibility of eta-reduced axioms]
-    in case tcUnifyTysFG (const BindMe) commonlhs1 commonlhs2 of
+    in case tcUnifyTysFG alwaysBindFun commonlhs1 commonlhs2 of
       SurelyApart -> True
       Unifiable subst
         | Type.substTyAddInScope subst rhs1 `eqType`
@@ -1204,7 +1204,7 @@ apartnessCheck :: [Type]
                -> Bool       -- ^ True <=> equation can fire
 apartnessCheck flattened_target (CoAxBranch { cab_incomps = incomps })
   = all (isSurelyApart
-         . tcUnifyTysFG (const BindMe) flattened_target
+         . tcUnifyTysFG alwaysBindFun flattened_target
          . coAxBranchLHS) incomps
   where
     isSurelyApart SurelyApart = True

@@ -4,7 +4,6 @@ module Hadrian.Oracles.Path (
     ) where
 
 import Control.Monad
-import Data.Maybe
 import Data.Char
 import Data.List.Extra
 import Development.Shake
@@ -56,7 +55,10 @@ pathOracle = do
         return windowsPath
 
     void $ addOracleCache $ \(LookupInPath name) -> do
-        let unpack = fromMaybe . error $ "Cannot find executable " ++ quote name
-        path <- unifyPath . unpack <$> liftIO (findExecutable name)
-        putLoud $ "| Executable found: " ++ name ++ " => " ++ path
-        return path
+        path <- liftIO getSearchPath
+        exes <- liftIO (findExecutablesInDirectories path name)
+        exe <- case exes of
+          []      -> error $ "Cannot find executable " ++ quote name
+          (exe:_) -> pure $ unifyPath exe
+        putLoud $ "| Executable found: " ++ name ++ " => " ++ exe
+        return exe

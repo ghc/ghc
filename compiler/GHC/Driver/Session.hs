@@ -3688,8 +3688,6 @@ xFlagsDeps = [
   flagSpec "LinearTypes"                      LangExt.LinearTypes,
   flagSpec "MagicHash"                        LangExt.MagicHash,
   flagSpec "MonadComprehensions"              LangExt.MonadComprehensions,
-  depFlagSpec "MonadFailDesugaring"           LangExt.MonadFailDesugaring
-    "MonadFailDesugaring is now the default behavior",
   flagSpec "MonoLocalBinds"                   LangExt.MonoLocalBinds,
   depFlagSpecCond "MonoPatBinds"              LangExt.MonoPatBinds
     id

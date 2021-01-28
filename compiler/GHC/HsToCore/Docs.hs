@@ -17,6 +17,7 @@ import GHC.Data.Bag
 import GHC.Hs.Binds
 import GHC.Hs.Doc
 import GHC.Hs.Decls
+import Language.Haskell.Syntax.Extension
 import GHC.Hs.Extension
 import GHC.Hs.Type
 import GHC.Hs.Utils

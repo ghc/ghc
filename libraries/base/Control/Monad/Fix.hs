@@ -33,6 +33,7 @@ import Data.Ord ( Down(..) )
 import GHC.Base ( Monad, NonEmpty(..), errorWithoutStackTrace, (.) )
 import GHC.Generics
 import GHC.List ( head, tail )
+import GHC.Tuple (Solo (..))
 import Control.Monad.ST.Imp
 import System.IO
 
@@ -62,6 +63,11 @@ class (Monad m) => MonadFix m where
         mfix :: (a -> m a) -> m a
 
 -- Instances of MonadFix for Prelude monads
+
+-- | @since 4.15
+instance MonadFix Solo where
+    mfix f = let a = f (unSolo a) in a
+             where unSolo (Solo x) = x
 
 -- | @since 2.01
 instance MonadFix Maybe where
