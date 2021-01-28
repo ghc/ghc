@@ -323,7 +323,7 @@ isVecType _                       = False
 -- needed by the ABI to make the correct kind of call.
 
 data ForeignHint
-  = NoHint Width | AddrHint | SignedHint Width | BadHint
+  = NoHint | AddrHint | SignedHint
   deriving( Eq, Show )
         -- Used to give extra per-argument or per-result
         -- information needed by foreign calling conventions
@@ -437,4 +437,3 @@ C calling convention rather early on in the compiler).  However, given
 this, the cons outweigh the pros.
 
 -}
-

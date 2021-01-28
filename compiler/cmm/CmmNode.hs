@@ -306,39 +306,20 @@ data ForeignTarget        -- The target of a foreign call
         CallishMachOp            -- Which one
   deriving Eq
 
-myPprTraceDebug :: String -> SDoc -> a -> a
-myPprTraceDebug str doc x
-  | hasPprDebug unsafeGlobalDynFlags = pprTrace str doc x
-  | otherwise                        = x
-
 foreignTargetReps :: HasCallStack => ForeignTarget -> (PrimRep, [PrimRep])
 foreignTargetReps (ForeignTarget _ (ForeignConvention _ _ _ _ rr ras)) = (rr, ras)
 foreignTargetReps (PrimTarget op) = callishMachOpReps op
 
 foreignTargetHints :: HasCallStack => ForeignTarget -> ([ForeignHint], [ForeignHint])
 foreignTargetHints target
-  = ( res_hints ++ repeat BadHint
-    , arg_hints ++ repeat BadHint )
+  = ( res_hints ++ repeat NoHint
+    , arg_hints ++ repeat NoHint )
   where
     (res_hints, arg_hints) =
        case target of
           PrimTarget op -> callishMachOpHints op
           ForeignTarget _ (ForeignConvention _ arg_hints res_hints _ _ _) ->
-             myPprTraceDebug "foreignTargetHints" (pprForeignTarget target) $ (res_hints, arg_hints)
-             where
-               pprForeignTarget :: ForeignTarget -> SDoc
-               pprForeignTarget (ForeignTarget fn c) = ppr_conv c <+> ppr_target fn
-                 where
-                   ppr_target :: CmmExpr -> SDoc
-                   ppr_target t@(CmmLit _) = ppr t
-                   ppr_target fn'          = parens (ppr fn')
-                   ppr_conv :: ForeignConvention -> SDoc
-                   ppr_conv (ForeignConvention c args res ret ret_ty arg_tys) =
-                     doubleQuotes (ppr c) <+> text "arg hints:" <+> ppr (map ppr_fh args) <+> text "result hints:" <+> ppr (map ppr_fh res) $$ text "arg types:" <+> text (show arg_tys) <+> text "result types:" <+> text (show ret_ty)
-                   ppr_fh :: ForeignHint -> SDoc
-                   ppr_fh (NoHint sz) = quotes(text "unsigned" <+> ppr sz)
-                   ppr_fh (SignedHint sz) = quotes(text "signed" <+> ppr sz)
-                   ppr_fh AddrHint        = text "PtrHint"
+             (res_hints, arg_hints)
 
 --------------------------------------------------
 -- Instances of register and slot users / definers

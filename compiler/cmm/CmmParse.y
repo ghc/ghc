@@ -263,7 +263,7 @@ import qualified Data.Map as M
 import qualified Data.ByteString.Char8 as BS8
 
 import TyCon (PrimRep(..))
-				       
+
 #include "HsVersions.h"
 }
 
@@ -1063,14 +1063,14 @@ parseSafety str      = fail ("unrecognised safety: " ++ str)
 
 parseCmmHint :: String -> PD ForeignHint
 parseCmmHint "ptr"    = return AddrHint
-parseCmmHint "signed" = return (SignedHint W64)
+parseCmmHint "signed" = return SignedHint
 parseCmmHint str      = fail ("unrecognised hint: " ++ str)
 
 -- labels are always pointers, so we might as well infer the hint
 inferCmmHint :: CmmExpr -> ForeignHint
 inferCmmHint (CmmLit (CmmLabel _)) = AddrHint
 inferCmmHint (CmmReg (CmmGlobal g)) | isPtrGlobalReg g = AddrHint
-inferCmmHint _ = NoHint W64
+inferCmmHint _ = NoHint
 
 isPtrGlobalReg Sp                    = True
 isPtrGlobalReg SpLim                 = True
@@ -1208,18 +1208,18 @@ foreignCall conv_string results_code expr_code args_code safety ret
                   res_cmm_tys = zip (map localRegType res_regs) res_hints
                   arg_cmm_tys = zip (map (cmmExprType dflags) arg_exprs) arg_hints
                   res_rep :: (CmmType, ForeignHint) -> PrimRep
-                  res_rep (_                 , AddrHint)       = AddrRep
-                  res_rep (t, _) | isGcPtrType t               = Word64Rep
-                  res_rep (t, SignedHint _) | t `cmmEqType` b8 = Int8Rep
-                  res_rep (t, SignedHint _) | t `cmmEqType` b16        = Int16Rep
-                  res_rep (t, SignedHint _) | t `cmmEqType` b32        = Int32Rep
-                  res_rep (t, SignedHint _) | t `cmmEqType` b64        = Int64Rep                  
-                  res_rep (t, NoHint _)     | t `cmmEqType` b8         = Word8Rep
-                  res_rep (t, NoHint _)     | t `cmmEqType` b16        = Word16Rep
-                  res_rep (t, NoHint _)     | t `cmmEqType` b32        = Word32Rep
-                  res_rep (t, NoHint _)     | t `cmmEqType` b64        = Word64Rep
-                  res_rep (t, _)            | t `cmmEqType` f32        = FloatRep
-                  res_rep (t, _)            | t `cmmEqType` f64 = DoubleRep
+                  res_rep (_, AddrHint)                       = AddrRep
+                  res_rep (t, _)          | isGcPtrType t     = Word64Rep
+                  res_rep (t, SignedHint) | t `cmmEqType` b8  = Int8Rep
+                  res_rep (t, SignedHint) | t `cmmEqType` b16 = Int16Rep
+                  res_rep (t, SignedHint) | t `cmmEqType` b32 = Int32Rep
+                  res_rep (t, SignedHint) | t `cmmEqType` b64 = Int64Rep
+                  res_rep (t, NoHint)     | t `cmmEqType` b8  = Word8Rep
+                  res_rep (t, NoHint)     | t `cmmEqType` b16 = Word16Rep
+                  res_rep (t, NoHint)     | t `cmmEqType` b32 = Word32Rep
+                  res_rep (t, NoHint)     | t `cmmEqType` b64 = Word64Rep
+                  res_rep (t, _)          | t `cmmEqType` f32 = FloatRep
+                  res_rep (t, _)          | t `cmmEqType` f64 = DoubleRep
 
                   ret_rep = case (map res_rep res_cmm_tys) of
                     [] -> VoidRep

@@ -1191,7 +1191,7 @@ callSuspendThread :: DynFlags -> LocalReg -> Bool -> CmmNode O O
 callSuspendThread dflags id intrbl =
   CmmUnsafeForeignCall
        (ForeignTarget (foreignLbl (fsLit "suspendThread"))
-        (ForeignConvention CCallConv [AddrHint, NoHint W32] [AddrHint] CmmMayReturn AddrRep [AddrRep, Word32Rep]))
+        (ForeignConvention CCallConv [AddrHint, NoHint] [AddrHint] CmmMayReturn AddrRep [AddrRep, Word32Rep]))
        [id] [baseExpr, mkIntExpr dflags (fromEnum intrbl)]
 
 -- StgRegTable * resumeThread  (void *);

@@ -297,7 +297,7 @@ emitPrimOp dflags = \case
     -- for now, just implement this in a C function
     -- later, we might want to inline it.
     emitCCall
-        [(res, Int64Rep, SignedHint W64)]
+        [(res, Int64Rep, SignedHint)]
         (CmmLit (CmmLabel (mkForeignLabel (fsLit "newSpark") Nothing ForeignLabelInExternalPackage IsFunction)))
         [(baseExpr, AddrRep, AddrHint), (arg, AddrRep, AddrHint)]
 
@@ -308,7 +308,7 @@ emitPrimOp dflags = \case
     tmp <- assignTemp arg
     tmp2 <- newTemp (bWord dflags)
     emitCCall
-        [(tmp2, Int64Rep, SignedHint W64)]
+        [(tmp2, Int64Rep, SignedHint)]
         (CmmLit (CmmLabel (mkForeignLabel (fsLit "newSpark") Nothing ForeignLabelInExternalPackage IsFunction)))
         [(baseExpr, AddrRep, AddrHint), ((CmmReg (CmmLocal tmp)), AddrRep, AddrHint)]
     emitAssign (CmmLocal res) (CmmReg (CmmLocal tmp))

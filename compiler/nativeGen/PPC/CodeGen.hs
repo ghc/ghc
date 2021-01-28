@@ -1855,7 +1855,7 @@ genCCall' dflags gcp target dest_regs args
                    | isBitsType rep = intFormat (wordWidth dflags)
                    | otherwise      = cmmTypeFormat rep
                 conv_op = case hint of
-                            SignedHint _ -> MO_SS_Conv
+                            SignedHint -> MO_SS_Conv
                             _            -> MO_UU_Conv
 
                 stackOffset' = case gcp of

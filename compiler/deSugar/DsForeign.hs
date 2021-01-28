@@ -223,26 +223,7 @@ dsFCall fn_id co (CCall (CCallSpec target cconv safety _ _)) mDeclHeader = do
     dflags <- getDynFlags
 
     let
-      raw_res_ty = case tcSplitIOType_maybe io_res_ty of
-        Just (_ioTyCon, res_ty) -> res_ty
-        Nothing                 -> io_res_ty
-
-      myPprTraceDebug :: String -> SDoc -> a -> a
-      myPprTraceDebug str doc x
-        | hasPprDebug dflags = pprTrace str doc x
-        | otherwise          = x
-
-      fcall = myPprTraceDebug "dsFCall" (   text "result type                   :" <+> ppr io_res_ty
-                                         $$ text "raw result type               :" <+> ppr raw_res_ty
-                                         $$ text "raw result type (unwrapped)   :" <+> ppr (unwrapType raw_res_ty)
-                                         $$ text "raw result type (typePrimRep1):" <+> ppr (typePrimRep1 raw_res_ty)
-                                         $$ text "arg types                     :" <+> ppr arg_tys
-                                         $$ text "int types                     :" <+> ppr [int8PrimTy, int16PrimTy, int32PrimTy, intPrimTy]
-                                         $$ text "arg types (unwrapped)         :" <+> ppr (map unwrapType arg_tys)
-                                         $$ text "arg types (typePrimRep1)      :" <+> ppr (map typePrimRep1 arg_tys)
-                                        --  $$ text "arg types (myTypePrimRep1)    :" <+> ppr (map myTypePrimRep1 arg_tys)
-                                         )
-              $ CCall (mkCCallSpec target cconv safety io_res_ty arg_tys)
+      fcall = CCall (mkCCallSpec target cconv safety io_res_ty arg_tys)
 
     (fcall', cDoc) <- case fcall of
               CCall (CCallSpec (StaticTarget _ cName mUnitId isFun)
@@ -337,19 +318,7 @@ dsPrimCall fn_id co (CCall (CCallSpec target cconv safety _ _)) = do
     ccall_uniq <- newUnique
     dflags <- getDynFlags
     let
-        raw_res_ty = case tcSplitIOType_maybe io_res_ty of
-          Just (_ioTyCon, res_ty) -> res_ty
-          Nothing                 -> io_res_ty
-
-        myPprTraceDebug :: String -> SDoc -> a -> a
-        myPprTraceDebug str doc x
-          | hasPprDebug dflags = pprTrace str doc x
-          | otherwise          = x
-
-        fcall = myPprTraceDebug "dsPrimCall" (text "result type:" <+> ppr io_res_ty
-                                              $$ text "raw result type" <+> ppr raw_res_ty
-                                              $$ text "arg types:" <+> ppr arg_tys)
-                $ CCall (mkCCallSpec target cconv safety io_res_ty arg_tys)
+        fcall = CCall (mkCCallSpec target cconv safety io_res_ty arg_tys)
         call_app = mkFCall dflags ccall_uniq fcall (map Var args) io_res_ty
         rhs      = mkLams tvs (mkLams args call_app)
         rhs'     = Cast rhs co

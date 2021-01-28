@@ -422,33 +422,8 @@ genCall target res args = runStmtsDecls $ do
         primRepToLlvmTy FloatRep  = (Signed, LMFloat)
         primRepToLlvmTy DoubleRep = (Signed, LMDouble)
 
-    -- parameter types
-    let arg_type (_, AddrHint) = i8Ptr
-        arg_type (_, SignedHint W8) = i8
-        arg_type (_, SignedHint W16) = i16
-        arg_type (_, SignedHint W32) = i32
-        arg_type (_, SignedHint W64) = i64
-        -- cast pointers to i8*. Llvm equivalent of void*
-        arg_type (expr, _) = cmmToLlvmType $ cmmExprType dflags expr
-
-        -- We also need to know what Cmm thinks this type should be.
-        -- In Cmm (until ~9.2) i8, i16, ... are all i64, we may need
-        -- to perform some widening or narrowing.
-        arg_type_cmm (_, AddrHint) = i8Ptr
-        arg_type_cmm (expr, _)     = cmmToLlvmType $ cmmExprType dflags expr
-
     -- ret type
-    let ret_type [] = LMVoid
-        ret_type [(_, AddrHint)] = i8Ptr
-        ret_type [(_, SignedHint W8)] = i8
-        ret_type [(_, SignedHint W16)] = i16
-        ret_type [(_, SignedHint W32)] = i32
-        ret_type [(_, SignedHint W64)] = i64
-        ret_type [(reg, _)]      = cmmToLlvmType $ localRegType reg
-        ret_type t = panic $ "genCall: Too many return values! Can only handle"
-                        ++ " 0 or 1, given " ++ show (length t) ++ "."
-
-        -- similarly to arg_type_cmm, we may need to widen/narrow the result.
+    let -- similarly to arg_type_cmm, we may need to widen/narrow the result.
         -- most likely widen, as cmm regs will be 64bit wide.
         ret_type_cmm []              = LMVoid
         ret_type_cmm [(_, AddrHint)] = i8Ptr
@@ -493,13 +468,7 @@ genCall target res args = runStmtsDecls $ do
     let ress_hints = zip res  res_hints
     let ccTy  = StdCall -- tail calls should be done through CmmJump
 
-    let retTy = ret_type ress_hints
     let retTyCmm = ret_type_cmm ress_hints
-
-    let argTy0 = map arg_type args_hints
-    let argTyCmm0 = map arg_type_cmm args_hints
-
-    -- let argTy = tysToParams argTy0
 
     -- discard signage, we don't need that for the function signature.
     -- the take length is such a hack. The issue is that we end up with
@@ -525,14 +494,9 @@ genCall target res args = runStmtsDecls $ do
     doTrashStmts
 
     -- make the actual call
-    myPprTraceDebug "CCall" (   text "Target         :" <+> ppr target
-                             $$ text "Arguments      :" <+> ppr args_rep
-                             $$ text "Arguments (cmm):" <+> ppr argTyCmm0
-                             $$ text "Result         :" <+> ppr ret_rep
-                             $$ text "Result (cmm)   :" <+> ppr retTyCmm) $ do
-      argVars <- arg_varsW2 args_with_reps ([], nilOL, [])
-      fptr    <- getFunPtrW funTy target
-      case retTy of
+    argVars <- arg_varsW2 args_with_reps ([], nilOL, [])
+    fptr    <- getFunPtrW funTy target
+    case retTy of
         LMVoid -> do
             statement $ Expr $ Call ccTy fptr argVars fnAttrs
 
@@ -765,15 +729,15 @@ arg_vars ((e, AddrHint):rest) (vars, stmts, tops)
        arg_vars rest (vars ++ [v2], stmts `appOL` stmts' `snocOL` s1,
                                tops ++ top')
 
-arg_vars ((e, SignedHint w):rest) (vars, stmts, tops)
-  = do (v1, stmts', top') <- exprToVar e
-       dflags <- getDynFlags
-       (v2, s1) <- castVar Signed v1 (signedType w)
-       arg_vars rest (vars ++ [v2], stmts `appOL` stmts' `snocOL` s1, tops ++ top')
-  where signedType W8 = i8
-        signedType W16 = i16
-        signedType W32 = i32
-        signedType W64 = i64
+-- arg_vars ((e, SignedHint w):rest) (vars, stmts, tops)
+--   = do (v1, stmts', top') <- exprToVar e
+--        dflags <- getDynFlags
+--        (v2, s1) <- castVar Signed v1 (signedType w)
+--        arg_vars rest (vars ++ [v2], stmts `appOL` stmts' `snocOL` s1, tops ++ top')
+--   where signedType W8 = i8
+--         signedType W16 = i16
+--         signedType W32 = i32
+--         signedType W64 = i64
 
 
 arg_vars ((e, _):rest) (vars, stmts, tops)

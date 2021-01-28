@@ -79,23 +79,7 @@ cgForeignCall (CCall (CCallSpec target cconv safety ret_rep arg_reps)) typ stg_a
             arg_size (arg, _) = max (widthInBytes $ typeWidth $ cmmExprType dflags arg)
                                      (wORD_SIZE dflags)
         ; cmm_args <- getFCallArgs stg_args typ
-        ; let myPprTraceDebug :: String -> SDoc -> a -> a
-              myPprTraceDebug str doc x
-                | hasPprDebug dflags = pprTrace str doc x
-                | otherwise          = x
-              ppr_target :: CCallTarget -> SDoc
-              ppr_target (StaticTarget _ lbl _ fn) = text "static" <+> (if fn then text "function" else text "value") <+> ppr lbl
-              ppr_target DynamicTarget = text "dynamic"
-        ; (res_regs, res_hints) <- myPprTraceDebug "cgForeignCall" (ppr_target target
-                                                                    $$ text "Foreign Function Type:" <+> ppr typ
-                                                                    $$ text "Result:" <+> ppr ret_rep
-                                                                    $$ text "Result Type:" <+> ppr res_ty
-                                                                    $$ text "Result (typePrimRep1):" <+> ppr (typePrimRep1 res_ty)
-                                                                    $$ text "StgArgTyp:" <+> ppr (map stgArgType stg_args)
-                                                                    $$ text "StgArgTyp (typePrimRep1):" <+> ppr (map (typePrimRep1 . stgArgType) stg_args)
-                                                                    $$ text "Args:" <+> ppr arg_reps) $ newUnboxedTupleRegs res_ty
-        -- ; let arg_reps' = map (typePrimRep1 . stgArgType) stg_args
-        -- ; let ret_rep'  = typePrimRep1 res_ty
+        ; (res_regs, res_hints) <- newUnboxedTupleRegs res_ty
         ; let ((call_args, arg_hints), cmm_target)
                 = case target of
                    StaticTarget _ _   _      False ->
@@ -213,6 +197,7 @@ emitCCall hinted_results fn hinted_args
   where
     (args, arg_reps, arg_hints) = unzip3 hinted_args
     (results, result_reps, result_hints) = unzip3 hinted_results
+    -- extract result, we can only deal with 0 or 1 result types.
     res_rep = case result_reps of
       []  -> VoidRep
       [r] -> r
@@ -613,11 +598,11 @@ getFCallArgs args typ
       | otherwise
       = do { cmm <- getArgAmode (NonVoid arg)
            ; dflags <- getDynFlags
-           ; return (Just (add_shim dflags typ cmm, hint dflags)) }
+           ; return (Just (add_shim dflags typ cmm, hint)) }
       where
-        arg_ty      = stgArgType arg
-        arg_reps    = typePrimRep arg_ty
-        hint dflags = typeForeignHint dflags arg_ty
+        arg_ty   = stgArgType arg
+        arg_reps = typePrimRep arg_ty
+        hint     = typeForeignHint arg_ty
 
 -- The minimum amount of information needed to determine
 -- the offset to apply to an argument to a foreign call.

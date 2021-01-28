@@ -125,8 +125,8 @@ pprInfoTable (CmmInfoTable { cit_lbl = lbl, cit_rep = rep
          , text "srt: " <> ppr srt ]
 
 instance Outputable ForeignHint where
-  ppr (NoHint sz)     = quotes(text "unsigned" <+> ppr sz)
-  ppr (SignedHint sz) = quotes(text "signed" <+> ppr sz)
+  ppr NoHint     = quotes(text "unsigned")
+  ppr SignedHint = quotes(text "signed")
 --  ppr AddrHint   = quotes(text "address")
 -- Temp Jan08
   ppr AddrHint   = (text "PtrHint")
