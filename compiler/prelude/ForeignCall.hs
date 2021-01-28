@@ -11,7 +11,7 @@ module ForeignCall (
         Safety(..), playSafe, playInterruptible,
 
         CExportSpec(..), CLabelString, isCLabelString, pprCLabelString,
-        CCallSpec(..), mkCCallSpec,
+        CCallSpec(..),
         CCallTarget(..), isDynamicTarget,
         CCallConv(..), defaultCCallConv, ccallConvToInt, ccallConvAttribute,
 
@@ -28,10 +28,11 @@ import BasicTypes ( SourceText, pprWithSourceText )
 
 import Data.Char
 import Data.Data
-import {-# SOURCE #-} TyCon (PrimRep)
+import {-# SOURCE #-} TyCon (PrimRep (..))
 
 import GHC.Stack( HasCallStack )
 import Debug.Trace (traceStack)
+
 {-
 ************************************************************************
 *                                                                      *
@@ -106,13 +107,6 @@ data CCallSpec
                 PrimRep         -- result
                 [PrimRep]       -- args
   deriving( Eq )
-
-mkCCallSpec :: HasCallStack
-            => CCallTarget -> CCallConv -> Safety -> PrimRep -> [PrimRep] -> CCallSpec
-mkCCallSpec t c s r as = traceStack ("mkCallSpec (" ++ ppr_target t ++")") (CCallSpec t c s r as)
-        where ppr_target :: CCallTarget -> String
-              ppr_target (StaticTarget _ lbl _ fn) = "static " ++ (if fn then "function " else "value ") ++ show lbl
-              ppr_target DynamicTarget = "dynamic"
 
 -- The call target:
 
