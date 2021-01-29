@@ -81,8 +81,6 @@
 -fspec-constr-recursive
 -fspecialize
 -fspecialize-aggressively
--fstg-lift-lams-non-rec-args-any
--fstg-lift-lams-rec-args-any
 -fth
 -ftype-function-depth
 -funfolding-keeness-factor
