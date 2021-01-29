@@ -747,7 +747,7 @@ by saying ``-fno-wombat``.
 
 .. ghc-flag:: -fregs-graph
     :shortdesc: Use the graph colouring register allocator for register
-        allocation in the native code generator. Implied by :ghc-flag:`-O2`.
+        allocation in the native code generator.
     :type: dynamic
     :reverse: -fno-regs-graph
     :category:
@@ -759,9 +759,6 @@ by saying ``-fno-wombat``.
     generator. By default, GHC uses a simpler, faster linear register allocator.
     The downside being that the linear register allocator usually generates
     worse code.
-
-    Note that the graph colouring allocator is a bit experimental and may fail
-    when faced with code with high register pressure :ghc-ticket:`8657`.
 
 .. ghc-flag:: -fregs-iterative
     :shortdesc: Use the iterative coalescing graph colouring register allocator
