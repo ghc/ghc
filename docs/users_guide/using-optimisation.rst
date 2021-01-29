@@ -1102,7 +1102,7 @@ by saying ``-fno-wombat``.
     :shortdesc: Create top-level non-recursive functions with at most <n>
         parameters while performing late lambda lifting.
     :type: dynamic
-    :reverse: -fno-stg-lift-lams-non-rec-args-any
+    :reverse: -fstg-lift-lams-non-rec-args-any
     :category:
 
     :default: 5
@@ -1115,7 +1115,7 @@ by saying ``-fno-wombat``.
     :shortdesc: Create top-level recursive functions with at most <n>
         parameters while performing late lambda lifting.
     :type: dynamic
-    :reverse: -fno-stg-lift-lams-rec-args-any
+    :reverse: -fstg-lift-lams-rec-args-any
     :category:
 
     :default: 5
