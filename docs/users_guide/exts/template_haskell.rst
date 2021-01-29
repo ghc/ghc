@@ -386,7 +386,7 @@ splices and quotations are supported.)
 .. ghc-flag:: -fenable-th-splice-warnings
     :shortdesc: Generate warnings for Template Haskell splices
     :type: dynamic
-    :reverse: -fno-enable-th-splices
+    :reverse: -fno-enable-th-splice-warnings
     :category: warnings
 
     Template Haskell splices won't be checked for warnings, because the code

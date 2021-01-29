@@ -63,6 +63,7 @@
 -fghci-history
 -fghci-sandbox
 -fhistory-size
+-fimplicit-import-qualified
 -fimplicit-params
 -fimplicit-prelude
 -firrefutable-tuples
@@ -72,6 +73,7 @@
 -fmonomorphism-restriction
 -fnum-constant-folding
 -fpre-inlining
+-fprint-bind-contents
 -freduction-depth
 -frewrite-rules
 -fscoped-type-variables
@@ -112,7 +114,6 @@
 -rtsopts=ignoreAll
 -rtsopts=none
 -rtsopts=some
--smp
 -syslib
 -this-component-id
 -ticky-LNE

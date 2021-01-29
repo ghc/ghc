@@ -3295,6 +3295,7 @@ read:
 .. ghc-flag:: -ignore-dot-ghci
     :shortdesc: Disable reading of ``.ghci`` files
     :type: dynamic
+    :reverse: -no-ignore-dot-ghci
     :category:
 
     Don't read either :file:`./.ghci` or the other startup files when
