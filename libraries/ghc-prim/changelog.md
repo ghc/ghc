@@ -1,6 +1,6 @@
-## 0.7.0 (edit as necessary)
+## 0.7.0 (*Jan 2021*)
 
-- Shipped with GHC 8.12.1
+- Shipped with GHC 9.0.1
 
 - Add known-key `cstringLength#` to `GHC.CString`. This is just the
   C function `strlen`, but a built-in rewrite rule allows GHC to
@@ -12,7 +12,7 @@
         unpackAppendCStringUtf8# :: Addr# -> [Char] -> [Char]
         unpackFoldrCStringUtf8# :: Addr# -> (Char -> a -> a) -> a -> a
 
-- unpackFoldrCString* variants can now inline in phase [0].
+- `unpackFoldrCString*` variants can now inline in phase `[0]`.
 
   If the folding function is known this allows for unboxing of the
   Char argument resulting in much faster code.
@@ -24,7 +24,7 @@
         atomicExchangeAddrAddr# :: Addr# -> Addr# -> State# s -> (# State# s, Addr# #)
         atomicExchangeWordAddr# :: Addr# -> Word# -> State# s -> (# State# s, Word# #)
 
-- Add primops for atomic compare and swap at a given Addr#:
+- Add primops for atomic compare and swap at a given `Addr#`:
 
         atomicCasAddrAddr# :: Addr# -> Addr# -> Addr# -> State# s -> (# State# s, Addr# #)
         atomicCasWordAddr# :: Addr# -> Word# -> Word# -> State# s -> (# State# s, Word# #)
@@ -37,7 +37,7 @@
   the soundness issues of the latter (see
   [#17760](https://gitlab.haskell.org/ghc/ghc/-/issues/17760)).
 
-## 0.6.1 (edit as necessary)
+## 0.6.1 (*March 2020*)
 
 - Shipped with GHC 8.10.1
 
