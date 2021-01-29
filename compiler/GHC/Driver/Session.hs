@@ -2820,9 +2820,9 @@ dynamic_flags_deps = [
   , make_ord_flag defFlag "fstg-lift-lams-rec-args-any"
       (noArg (\d -> d { liftLamsRecArgs = Nothing }))
   , make_ord_flag defFlag "fstg-lift-lams-non-rec-args"
-      (intSuffix (\n d -> d { liftLamsRecArgs = Just n }))
+      (intSuffix (\n d -> d { liftLamsNonRecArgs = Just n }))
   , make_ord_flag defFlag "fstg-lift-lams-non-rec-args-any"
-      (noArg (\d -> d { liftLamsRecArgs = Nothing }))
+      (noArg (\d -> d { liftLamsNonRecArgs = Nothing }))
   , make_ord_flag defFlag "fstg-lift-lams-known"
       (noArg (\d -> d { liftLamsKnown = True }))
   , make_ord_flag defFlag "fno-stg-lift-lams-known"
