@@ -6,6 +6,7 @@ Version 9.0.1
 The significant changes to the various parts of the compiler are listed in the
 following sections.
 
+The :ghc-flag:`LLVM backend <-fllvm>` of this release is to be used with LLVM 9.
 
 Highlights
 ----------
