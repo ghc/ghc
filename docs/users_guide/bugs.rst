@@ -121,6 +121,8 @@ Context-free syntax
     :shortdesc: Allow nested contexts to be at the same indentation level as
       its enclosing context.
 
+    :since: 7.2.1
+
     Allow nested contexts to be at the same indentation level as
     its enclosing context.
 
@@ -189,7 +191,7 @@ For example
 
 Will warn you with
 
-::
+.. code-block:: none
 
     • Could not deduce (MonadFail m)
         arising from a do statement
@@ -199,7 +201,7 @@ Will warn you with
                    mayFail :: forall (m :: * -> *). MonadIO m => m ()
 
 And indeed, since the `Monad <https://hackage.haskell.org/package/base-4.14.1.0/docs/Control-Monad.html#t:Monad>`__ class does not have the ``fail`` method anymore,
-we need to explicitly add ``(MonadFail m)`` to the contraints of the function.
+we need to explicitly add ``(MonadFail m)`` to the constraints of the function.
 
 .. _infelicities-decls:
 
@@ -337,10 +339,10 @@ Numbers, basic types, and built-in classes
     by:
 
     -  Whenever you make a ``Num`` instance of a type, also make
-        ``Show`` and ``Eq`` instances, and
+       ``Show`` and ``Eq`` instances, and
 
     -  Whenever you give a function, instance or class a ``Num t``
-        constraint, also give it ``Show t`` and ``Eq t`` constraints.
+       constraint, also give it ``Show t`` and ``Eq t`` constraints.
 
 ``Bits`` superclass
     The ``Bits`` class does not have a ``Num`` superclass. It
@@ -350,13 +352,13 @@ Numbers, basic types, and built-in classes
     You can make code that works with both Haskell 2010 and GHC by:
 
     -  Whenever you make a ``Bits`` instance of a type, also make a
-        ``Num`` instance, and
+       ``Num`` instance, and
 
     -  Whenever you give a function, instance or class a ``Bits t``
-        constraint, also give it a ``Num t`` constraint, and
+       constraint, also give it a ``Num t`` constraint, and
 
     -  Always define the ``bit``, ``testBit`` and ``popCount`` methods
-        in ``Bits`` instances.
+       in ``Bits`` instances.
 
 ``Read`` class methods
     The ``Read`` class has two extra methods, ``readPrec`` and

@@ -572,16 +572,15 @@ by saying ``-fno-wombat``.
     function calls.
 
 .. ghc-flag:: -fllvm-pass-vectors-in-regs
-    :shortdesc: Pass vector value in vector registers for function calls
+    :shortdesc: *(deprecated)* Does nothing
     :type: dynamic
-    :reverse: -fno-llvm-pass-vectors-in-regs
     :category:
 
     :default: on
 
-    Instructs GHC to use the platform's native vector registers to pass vector
-    arguments during function calls. As with all vector support, this requires
-    :ghc-flag:`-fllvm`.
+    This flag has no effect since GHC 8.8 - its behavior is always on.
+    It used to instruct GHC to use the platform's native vector registers
+    to pass vector arguments during function calls.
 
 .. ghc-flag:: -fmax-inline-alloc-size=⟨n⟩
     :shortdesc: *default: 128.* Set the maximum size of inline array allocations
