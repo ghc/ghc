@@ -57,6 +57,16 @@ module Transform
         , modifyValD
         -- *** Utility, does not manage layout
         , hsDeclsValBinds, replaceDeclsValbinds
+        , WithWhere(..)
+
+        -- ** New gen functions
+        , noAnnSrcSpanDP
+        , noAnnSrcSpanDP0
+        , noAnnSrcSpanDP1
+        , noAnnSrcSpanDPn
+        , d0, d1, dn
+        , m0, m1, mn
+        , addComma
 
         -- ** Managing lists, Transform monad
         , insertAt
@@ -74,10 +84,11 @@ module Transform
         , anchorEof
 
         -- ** Managing lists, pure functions
-        , captureOrder, captureOrder'
+        , captureOrder
         , captureOrderAnnKey
         , captureLineSpacing
         , captureMatchLineSpacing
+        , captureTypeSigSpacing
 
         -- * Operations
         , isUniqueSrcSpan
@@ -248,16 +259,10 @@ graftT origAnns = everywhereM (return `ext2M` replaceLocated)
 
 -- ---------------------------------------------------------------------
 
-
-captureOrder' :: [LocatedA b] -> AnnSortKey
-captureOrder' ls = AnnSortKey $ map (rs . getLocA) ls
-
 -- |If a list has been re-ordered or had items added, capture the new order in
--- the appropriate 'annSortKey' attached to the 'Annotation' for the first
--- parameter.
-captureOrder :: (Data a) => LocatedA a -> [LocatedA b] -> Anns -> Anns
-captureOrder parent ls ans = ans
--- captureOrder parent ls ans = captureOrderAnnKey (mkAnnKey parent) ls ans
+-- the appropriate 'AnnSortKey' attached to the 'Annotation' for the list.
+captureOrder :: [LocatedA b] -> AnnSortKey
+captureOrder ls = AnnSortKey $ map (rs . getLocA) ls
 
 -- |If a list has been re-ordered or had items added, capture the new order in
 -- the appropriate 'annSortKey' item of the supplied 'AnnKey'
@@ -287,6 +292,44 @@ captureLineSpacing (d1:d2:ds) = d1:captureLineSpacing (d2':ds)
     (l1,_) = ss2pos $ rs $ getLocA d1
     (l2,_) = ss2pos $ rs $ getLocA d2
     d2' = setEntryDP' d2 (DP (l2-l1,0))
+
+-- ---------------------------------------------------------------------
+
+captureTypeSigSpacing :: LHsDecl GhcPs -> LHsDecl GhcPs
+captureTypeSigSpacing (L l (SigD x (TypeSig (ApiAnn anc (AnnSig dc rs) cs) ns (HsWC xw ty))))
+  = (L l (SigD x (TypeSig (ApiAnn anc (AnnSig dc' rs) cs) ns (HsWC xw ty'))))
+  where
+    -- we want DPs for the distance from the end of the ns to the
+    -- AnnDColon, and to the start of the ty
+    AddApiAnn kw dca = dc
+    rd = case last ns of
+      L (SrcSpanAnn ApiAnnNotUsed    l) _ -> realSrcSpan l
+      L (SrcSpanAnn (ApiAnn anc _ _) _) _ -> anchor anc -- TODO MovedAnchor?
+    -- DP (line, col) = ss2delta (ss2pos $ anchor $ getLoc lc) r
+    dc' = case dca of
+      AR r -> AddApiAnn kw (AD $ ss2delta (ss2posEnd rd) r)
+      AD d -> AddApiAnn kw dca
+
+    -- ---------------------------------
+
+    ty' = case ty of
+      (L (SrcSpanAnn ApiAnnNotUsed    l) b)
+        -> let
+             op = case dca of
+               AR r -> MovedAnchor (ss2delta (ss2posEnd r) (realSrcSpan l))
+               AD _ -> MovedAnchor (DP (0,1))
+           in (L (SrcSpanAnn (ApiAnn (Anchor (realSrcSpan l) op) mempty noCom) l) b)
+      (L (SrcSpanAnn (ApiAnn (Anchor r op) a c) l) b)
+        -> let
+              op' = case op of
+                MovedAnchor _ -> op
+                _ -> case dca of
+                  AR dcr -> MovedAnchor (ss2delta (ss2posEnd dcr) r)
+                  AD _ -> MovedAnchor (DP (0,1))
+           in (L (SrcSpanAnn (ApiAnn (Anchor r op') a c) l) b)
+
+
+captureTypeSigSpacing s = s
 
 -- ---------------------------------------------------------------------
 
@@ -416,10 +459,23 @@ getEntryDP anns ast =
 
 -- ---------------------------------------------------------------------
 
+setEntryDPDecl :: LHsDecl GhcPs -> DeltaPos -> LHsDecl GhcPs
+setEntryDPDecl decl@(L l (ValD x (FunBind a b (MG c (L d ms ) e) f))) dp
+                       = L l' (ValD x (FunBind a b (MG c (L d ms') e) f))
+    where
+      L l' _ = setEntryDP' decl dp
+      ms' :: [LMatch GhcPs (LHsExpr GhcPs)]
+      ms' = case ms of
+        [] -> []
+        (m0:ms) -> setEntryDP' m0 dp : ms
+setEntryDPDecl d dp = setEntryDP' d dp
+
+-- ---------------------------------------------------------------------
+
 -- |Set the true entry 'DeltaPos' from the annotation for a given AST
 -- element. This is the 'DeltaPos' ignoring any comments.
 -- setEntryDP' :: (Data a) => LocatedA a -> DeltaPos -> LocatedA a
-setEntryDP' :: LocatedA a -> DeltaPos -> LocatedA a
+setEntryDP' :: (Monoid t) => LocatedAn t a -> DeltaPos -> LocatedAn t a
 setEntryDP' (L (SrcSpanAnn ApiAnnNotUsed l) a) dp
   = L (SrcSpanAnn
            (ApiAnn (Anchor (realSrcSpan l) (MovedAnchor dp)) mempty noCom)
@@ -442,6 +498,7 @@ setEntryDP' (L (SrcSpanAnn (ApiAnn (Anchor r _) an cs) l) a) dp
                 cs'' = setPriorComments cs (L (Anchor (anchor ca) (MovedAnchor dp)) c:cs')
                 lc = head $ reverse $ (L ca c:cs')
                 DP (line, col) = ss2delta (ss2pos $ anchor $ getLoc lc) r
+                -- TODO: this adjustment by 1 happens all over the place. Generalise it
                 edp' = if line == 0 then DP (line, col)
                                     else DP (line, col - 1)
                 edp = edp' `debug` ("setEntryDP' :" ++ showGhc (edp', (ss2pos $ anchor $ getLoc lc), r))
@@ -452,12 +509,24 @@ setEntryDP' (L (SrcSpanAnn (ApiAnn (Anchor r _) an cs) l) a) dp
 -- element. This is the 'DeltaPos' ignoring any comments.
 setEntryDP :: (Data a) => LocatedA a -> DeltaPos -> Anns -> Anns
 setEntryDP ast dp anns = anns
--- setEntryDP ast dp anns =
---   case Map.lookup (mkAnnKey ast) anns of
---     Nothing  -> Map.insert (mkAnnKey ast) (annNone { annEntryDelta = dp}) anns
---     Just ann -> Map.insert (mkAnnKey ast) (ann'    { annEntryDelta = annCommentEntryDelta ann' dp}) anns
---       where
---         ann' = setCommentEntryDP ann dp
+
+-- ---------------------------------------------------------------------
+
+addAnnAnchorDelta :: LayoutStartCol -> RealSrcSpan -> AnnAnchor -> AnnAnchor
+addAnnAnchorDelta off anc (AD d) = AD d
+addAnnAnchorDelta off anc (AR r)
+  = AD (adjustDeltaForOffset 0 off (ss2deltaEnd anc r))
+
+-- Set the entry DP for an element coming after an existing keyword annotation
+setEntryDPFromAnchor :: LayoutStartCol -> AnnAnchor -> LocatedA t -> LocatedA t
+setEntryDPFromAnchor off (AD d) (L la a) = L la a
+setEntryDPFromAnchor off (AR anc) ll@(L la a) = setEntryDP' ll dp'
+  where
+    r = case la of
+      (SrcSpanAnn ApiAnnNotUsed l) -> realSrcSpan l
+      (SrcSpanAnn (ApiAnn (Anchor r _) _ _) _) -> r
+    dp' = adjustDeltaForOffset 0 off (ss2deltaEnd anc r)
+    dp = error $ "setEntryDPFromAnchor:" ++ show (off,rs2range anc,rs2range r,dp')
 
 -- ---------------------------------------------------------------------
 
@@ -475,31 +544,58 @@ setCommentEntryDP ann dp = ann'
 
 -- |Take the annEntryDelta associated with the first item and associate it with the second.
 -- Also transfer any comments occuring before it.
-transferEntryDP :: (Data a, Data b) => LocatedA a -> LocatedA b -> Anns -> Anns
-transferEntryDP a b anns = anns
--- transferEntryDP a b anns = (const anns2) anns
---   where
---     maybeAnns = do -- Maybe monad
---       anA <- Map.lookup (mkAnnKey a) anns
---       anB <- Map.lookup (mkAnnKey b) anns
---       let anB'  = Ann
---             { annEntryDelta        = DP (0,0) -- Need to adjust for comments after
---             , annPriorComments     = annPriorComments     anB
---             , annFollowingComments = annFollowingComments anB
---             , annsDP               = annsDP          anB
---             , annSortKey           = annSortKey      anB
---             , annCapturedSpan      = annCapturedSpan anB
---             }
---       return ((Map.insert (mkAnnKey b) anB' anns),annLeadingCommentEntryDelta anA)
---     (anns',dp) = fromMaybe
---                   (error $ "transferEntryDP: lookup failed (a,b)=" ++ show (mkAnnKey a,mkAnnKey b))
---                   maybeAnns
---     anns2 = setEntryDP b dp anns'
+transferEntryDP :: (Monad m, Monoid t) => LocatedAn t a -> LocatedAn t b -> TransformT m (LocatedAn t b)
+transferEntryDP (L (SrcSpanAnn ApiAnnNotUsed l1) _) (L (SrcSpanAnn ApiAnnNotUsed _) b) = do
+  logTr $ "transferEntryDP': ApiAnnNotUsed,ApiAnnNotUsed"
+  return (L (SrcSpanAnn ApiAnnNotUsed l1) b)
+transferEntryDP (L (SrcSpanAnn (ApiAnn anc an cs) l1) _) (L (SrcSpanAnn ApiAnnNotUsed l2) b) = do
+  logTr $ "transferEntryDP': ApiAnn,ApiAnnNotUsed"
+  return (L (SrcSpanAnn (ApiAnn anc mempty cs) l2) b)
+transferEntryDP (L (SrcSpanAnn (ApiAnn anc1 an1 cs1) l1) _) (L (SrcSpanAnn (ApiAnn anc2 an2 cs2) l2) b) = do
+  logTr $ "transferEntryDP': ApiAnn,ApiAnn"
+  -- Problem: if the original had preceding comments, blindly
+  -- transferring the location is not correct
+  case priorComments cs1 of
+    [] -> return (L (SrcSpanAnn (ApiAnn anc1 an2 cs2) l2) b)
+    -- TODO: what happens if the receiving side already has comments?
+    (L anc _:_) -> do
+      logDataWithAnnsTr "transferEntryDP':priorComments anc=" anc
+      return (L (SrcSpanAnn (ApiAnn (kludgeAnchor anc) an2 cs2) l2) b)
+transferEntryDP (L (SrcSpanAnn ApiAnnNotUsed l1) _) (L (SrcSpanAnn (ApiAnn anc2 an2 cs2) l2) b) = do
+  logTr $ "transferEntryDP': ApiAnnNotUsed,ApiAnn"
+  return (L (SrcSpanAnn (ApiAnn anc2' an2 cs2) l2) b)
+    where
+      anc2' = case anc2 of
+        Anchor a op   -> Anchor (realSrcSpan l2) op
 
-transferEntryDP' :: (Monad m) => LocatedA a -> LocatedA b -> TransformT m (LocatedA b)
-transferEntryDP' a b = do
-  logTr $ "transferEntryDP': fudging for now"
-  return $ setEntryDP' b (DP (0,0))
+-- |Take the annEntryDelta associated with the first item and associate it with the second.
+-- Also transfer any comments occuring before it.
+-- TODO: call transferEntryDP, and use pushDeclDP
+transferEntryDP' :: (Monad m) => LHsDecl GhcPs -> LHsDecl GhcPs -> TransformT m (LHsDecl GhcPs)
+transferEntryDP' la lb = do
+  (L l2 b) <- transferEntryDP la lb
+  return (L l2 (pushDeclDP b (DP (0,0))))
+
+-- There is an off-by-one in DPs. I *think* it has to do wether we
+-- calculate the final position when applying it against the stored
+-- final pos or against another RealSrcSpan.  Must get to the bottom
+-- of it and come up with a canonical DP.  This function adjusts a
+-- "comment space" DP to a "enterAnn" space one
+kludgeAnchor :: Anchor -> Anchor
+kludgeAnchor a@(Anchor _ (MovedAnchor (DP (0,_)))) = a
+kludgeAnchor (Anchor a (MovedAnchor (DP (r,c)))) = (Anchor a (MovedAnchor (DP (r,c - 1))))
+kludgeAnchor a = a
+
+pushDeclDP :: HsDecl GhcPs -> DeltaPos -> HsDecl GhcPs
+pushDeclDP decl@(ValD x (FunBind a b (MG c (L d  ms ) e) f)) dp
+               = ValD x (FunBind a b (MG c (L d' ms') e) f)
+    where
+      L d' _ = setEntryDP' (L d ms) dp
+      ms' :: [LMatch GhcPs (LHsExpr GhcPs)]
+      ms' = case ms of
+        [] -> []
+        (m0:ms) -> setEntryDP' m0 dp : ms
+pushDeclDP d _dp = d
 
 -- ---------------------------------------------------------------------
 
@@ -603,7 +699,7 @@ balanceCommentsMatch (L l (Match am mctxt pats (GRHSs xg grhss binds))) = do
               an1' = setCommentsSSA l anc1'
 
               -- ---------------------------------
-              (moved,bindsm) = pushTrailingComments (AnnCommentsBalanced [] move) binds
+              (moved,bindsm) = pushTrailingComments WithWhere (AnnCommentsBalanced [] move) binds
               -- ---------------------------------
 
               (ApiAnn anc an lgc) = ag
@@ -615,16 +711,16 @@ balanceCommentsMatch (L l (Match am mctxt pats (GRHSs xg grhss binds))) = do
 
             in (an1', (reverse $ (L lg (GRHS ag' grs rhs):gs)), bindsm, (anc1',an1'))
 
-pushTrailingComments :: ApiAnnComments -> HsLocalBinds GhcPs -> (Bool, HsLocalBinds GhcPs)
-pushTrailingComments _cs b@EmptyLocalBinds{} = (False, b)
-pushTrailingComments cs lb@(HsValBinds an (ValBinds _sk binds sigs))
+pushTrailingComments :: WithWhere -> ApiAnnComments -> HsLocalBinds GhcPs -> (Bool, HsLocalBinds GhcPs)
+pushTrailingComments _ _cs b@EmptyLocalBinds{} = (False, b)
+pushTrailingComments w cs lb@(HsValBinds an (ValBinds _sk binds sigs))
   = (True, HsValBinds an' vb)
   where
     (decls, _, ws1) = runTransform mempty (hsDeclsValBinds lb)
     (an', decls') = case reverse decls of
       [] -> (addCommentsToApiAnn (spanHsLocaLBinds lb) an cs, decls)
       (L la d:ds) -> (an, L (addCommentsToSSA la cs) d:ds)
-    (lb'@(HsValBinds _ vb), _, ws2) = runTransform mempty (replaceDeclsValbinds lb decls')
+    (lb'@(HsValBinds _ vb), _, ws2) = runTransform mempty (replaceDeclsValbinds w lb decls')
 
 
 balanceCommentsList' :: (Monad m) => [LocatedA a] -> TransformT m [LocatedA a]
@@ -874,7 +970,48 @@ deltaAnchor (Anchor anc _) ss = Anchor anc (MovedAnchor dp)
 
 -- ---------------------------------------------------------------------
 
--- |Insert a declaration into an AST element having sub-declarations
+-- | Create a @SrcSpanAnn@ with a @MovedAnchor@ operation using the
+-- given @DeltaPos@.
+noAnnSrcSpanDP :: (Monoid ann) => SrcSpan -> DeltaPos -> SrcSpanAnn' (ApiAnn' ann)
+noAnnSrcSpanDP l dp
+  = SrcSpanAnn (ApiAnn (Anchor (realSrcSpan l) (MovedAnchor dp)) mempty noCom) l
+
+noAnnSrcSpanDP0 :: (Monoid ann) => SrcSpan -> SrcSpanAnn' (ApiAnn' ann)
+noAnnSrcSpanDP0 l = noAnnSrcSpanDP l (DP (0,0))
+
+noAnnSrcSpanDP1 :: (Monoid ann) => SrcSpan -> SrcSpanAnn' (ApiAnn' ann)
+noAnnSrcSpanDP1 l = noAnnSrcSpanDP l (DP (0,1))
+
+noAnnSrcSpanDPn :: (Monoid ann) => SrcSpan -> Int -> SrcSpanAnn' (ApiAnn' ann)
+noAnnSrcSpanDPn l s = noAnnSrcSpanDP l (DP (0,s))
+
+d0 :: AnnAnchor
+d0 = AD $ DP (0,0)
+
+d1 :: AnnAnchor
+d1 = AD $ DP (0,1)
+
+dn :: Int -> AnnAnchor
+dn n = AD $ DP (0,n)
+
+m0 :: AnchorOperation
+m0 = MovedAnchor $ DP (0,0)
+
+m1 :: AnchorOperation
+m1 = MovedAnchor $ DP (0,1)
+
+mn :: Int -> AnchorOperation
+mn n = MovedAnchor $ DP (0,n)
+
+addComma :: SrcSpanAnnA -> SrcSpanAnnA
+addComma (SrcSpanAnn ApiAnnNotUsed l)
+  = (SrcSpanAnn (ApiAnn (spanAsAnchor l) (AnnListItem [AddCommaAnn d0]) noCom) l)
+addComma (SrcSpanAnn (ApiAnn anc (AnnListItem as) cs) l)
+  = (SrcSpanAnn (ApiAnn anc (AnnListItem (AddCommaAnn d0:as)) cs) l)
+
+-- ---------------------------------------------------------------------
+
+-- | Insert a declaration into an AST element having sub-declarations
 -- (@HasDecls@) according to the given location function.
 insertAt :: (HasDecls ast)
               => (LHsDecl GhcPs
@@ -971,22 +1108,7 @@ instance HasDecls (LocatedA (Match GhcPs (LocatedA (HsExpr GhcPs)))) where
   replaceDecls m@(L l (Match xm c p (GRHSs xr rhs binds))) []
     = do
         logTr "replaceDecls LMatch empty decls"
-        let
-          noWhere (G AnnWhere,_) = False
-          noWhere _              = True
-
-          removeWhere mkds =
-            error "TBD"
-            -- case Map.lookup (mkAnnKey m) mkds of
-            --   Nothing -> error "wtf"
-            --   Just ann -> Map.insert (mkAnnKey m) ann1 mkds
-            --     where
-            --       ann1 = ann { annsDP = filter noWhere (annsDP ann)
-            --                      }
-        modifyAnnsT removeWhere
-
-        binds'' <- replaceDeclsValbinds binds []
-        -- let binds' = L (getLoc binds) binds''
+        binds'' <- replaceDeclsValbinds WithoutWhere binds []
         return (L l (Match xm c p (GRHSs xr rhs binds'')))
 
   replaceDecls m@(L l (Match xm c p (GRHSs xr rhs binds))) newBinds
@@ -997,16 +1119,6 @@ instance HasDecls (LocatedA (Match GhcPs (LocatedA (HsExpr GhcPs)))) where
         (l', rhs') <- case binds of
           EmptyLocalBinds{} -> do
             logTr $ "replaceDecls LMatch empty binds"
-            let
-              addWhere mkds =
-                error "TBD"
-                -- case Map.lookup (mkAnnKey m) mkds of
-                --   Nothing -> error "wtf"
-                --   Just ann -> Map.insert (mkAnnKey m) ann1 mkds
-                --     where
-                --       ann1 = ann { annsDP = annsDP ann ++ [(G AnnWhere,DP (1,2))]
-                --                  }
-            modifyAnnsT addWhere
             modifyAnnsT (setPrecedingLines (ghead "LMatch.replaceDecls" newBinds) 1 4)
 
             -- only move the comment if the original where clause was empty.
@@ -1018,10 +1130,7 @@ instance HasDecls (LocatedA (Match GhcPs (LocatedA (HsExpr GhcPs)))) where
             logDataWithAnnsTr "Match.replaceDecls:(m1')" (L l' m')
             return (l', grhssGRHSs $ m_grhss m')
           _ -> return (l, rhs)
-
-        -- modifyAnnsT (captureOrderAnnKey (mkAnnKey m) newBinds)
-        binds'' <- replaceDeclsValbinds binds newBinds
-        -- let binds' = L (getLoc binds) binds''
+        binds'' <- replaceDeclsValbinds WithWhere binds newBinds
         logDataWithAnnsTr "Match.replaceDecls:binds'" binds''
         return (L l' (Match xm c p (GRHSs xr rhs' binds'')))
   replaceDecls (L _ (Match _ _ _ (XGRHSs _))) _ = error "replaceDecls"
@@ -1033,13 +1142,30 @@ instance HasDecls (LocatedA (HsExpr GhcPs)) where
   hsDecls (L _ (HsLet _ decls _ex)) = hsDeclsValBinds decls
   hsDecls _                         = return []
 
-  replaceDecls e@(L l (HsLet x decls ex)) newDecls
+  replaceDecls e@(L l (HsLet x binds ex)) newDecls
     = do
         logTr "replaceDecls HsLet"
-        modifyAnnsT (captureOrder e newDecls)
-        decls'' <- replaceDeclsValbinds decls newDecls
-        -- let decls' = L (getLoc decls) decls''
-        return (L l (HsLet x decls'' ex))
+        -- modifyAnnsT (captureOrder e newDecls)
+        let lastAnc = realSrcSpan $ spanHsLocaLBinds binds
+        -- TODO: may be an intervening comment, take account for lastAnc
+        let (x', ex',newDecls') = case x of
+              ApiAnnNotUsed -> (x, ex, newDecls)
+              (ApiAnn a (AnnsLet l i) cs) ->
+                let
+                  off = case l of
+                          (AR r) -> LayoutStartCol $ snd $ ss2pos r
+                          (AD (DP (0,_))) -> LayoutStartCol 0
+                          (AD (DP (_,c))) -> LayoutStartCol c
+                  ex'' = setEntryDPFromAnchor off i ex
+                  newDecls'' = case newDecls of
+                    [] -> newDecls
+                    -- (d:ds) -> setEntryDP' d (DP (0,0)) : ds
+                    (d:ds) -> setEntryDPDecl d (DP (0,0)) : ds
+                in ( ApiAnn a (AnnsLet l (addAnnAnchorDelta off lastAnc i)) cs
+                   , ex''
+                   , newDecls'')
+        binds' <- replaceDeclsValbinds WithoutWhere binds newDecls'
+        return (L l (HsLet x' binds' ex'))
 
   -- TODO: does this make sense? Especially as no hsDecls for HsPar
   replaceDecls (L l (HsPar x e)) newDecls
@@ -1108,7 +1234,7 @@ replaceDeclsPatBind p@(L l (PatBind x a (GRHSs xr rhss binds) b)) newDecls
           _ -> return ()
 
         -- modifyAnnsT (captureOrderAnnKey (mkAnnKey p) newDecls)
-        binds'' <- replaceDeclsValbinds binds newDecls
+        binds'' <- replaceDeclsValbinds WithWhere binds newDecls
         -- let binds' = L (getLoc binds) binds''
         return (L l (PatBind x a (GRHSs xr rhss binds'') b))
 replaceDeclsPatBind x _ = error $ "replaceDeclsPatBind called for:" ++ showGhc x
@@ -1124,8 +1250,8 @@ instance HasDecls (LocatedA (Stmt GhcPs (LocatedA (HsExpr GhcPs)))) where
 
   replaceDecls s@(L l (LetStmt x lb)) newDecls
     = do
-        modifyAnnsT (captureOrder s newDecls)
-        lb'' <- replaceDeclsValbinds lb newDecls
+        -- modifyAnnsT (captureOrder s newDecls)
+        lb'' <- replaceDeclsValbinds WithWhere lb newDecls
         -- let lb' = L (getLoc lb) lb''
         return (L l (LetStmt x lb''))
   replaceDecls (L l (LastStmt x e d se)) newDecls
@@ -1252,7 +1378,8 @@ orderedDecls :: (Monad m)
 orderedDecls sortKey decls = do
   case sortKey of
     NoAnnSortKey -> do
-      return decls
+      -- return decls
+      return $ sortBy (\a b -> compare (realSrcSpan $ getLocA a) (realSrcSpan $ getLocA b)) decls
     AnnSortKey keys -> do
       let ds = map (\s -> (rs $ getLocA s,s)) decls
           ordered = map snd $ orderByKey ds keys
@@ -1271,43 +1398,97 @@ hsDeclsValBinds lb = case lb of
     HsIPBinds {}       -> return []
     EmptyLocalBinds {} -> return []
 
+data WithWhere = WithWhere
+               | WithoutWhere
+               deriving (Eq,Show)
+
 -- | Utility function for returning decls to 'HsLocalBinds'. Use with
 -- care, as this does not manage the declaration order, the
 -- ordering should be done by the calling function from the 'HsLocalBinds'
 -- context in the AST.
 replaceDeclsValbinds :: (Monad m)
-                     => HsLocalBinds GhcPs -> [LHsDecl GhcPs]
+                     => WithWhere
+                     -> HsLocalBinds GhcPs -> [LHsDecl GhcPs]
                      -> TransformT m (HsLocalBinds GhcPs)
-replaceDeclsValbinds _ [] = do
+replaceDeclsValbinds _ _ [] = do
   return (EmptyLocalBinds NoExtField)
-replaceDeclsValbinds (HsValBinds _ _b) new
+replaceDeclsValbinds w b@(HsValBinds a _) new
     = do
-        logTr "replaceDecls HsLocalBinds"
-        an <- whereAnnotation (DP (0,1))
+        logTr "replaceDeclsValbinds"
+        let oldSpan = spanHsLocaLBinds b
+        an <- oldWhereAnnotation a w (realSrcSpan oldSpan)
         let decs = listToBag $ concatMap decl2Bind new
         let sigs = concatMap decl2Sig new
-        let sortKey = captureOrder' new
+        let sortKey = captureOrder new
         return (HsValBinds an (ValBinds sortKey decs sigs))
-replaceDeclsValbinds (HsIPBinds {}) _new    = error "undefined replaceDecls HsIPBinds"
-replaceDeclsValbinds (EmptyLocalBinds _) new
+replaceDeclsValbinds _ (HsIPBinds {}) _new    = error "undefined replaceDecls HsIPBinds"
+replaceDeclsValbinds w (EmptyLocalBinds _) new
     = do
         logTr "replaceDecls HsLocalBinds"
-        an <- whereAnnotation (DP (1,4))
+        an <- newWhereAnnotation w
         let newBinds = concatMap decl2Bind new
             newSigs  = concatMap decl2Sig  new
         let decs = listToBag $ newBinds
         let sigs = newSigs
-        let sortKey = captureOrder' new
+        let sortKey = captureOrder new
         return (HsValBinds an (ValBinds sortKey decs sigs))
-replaceDeclsValbinds (XHsLocalBindsLR _) _ = error "replaceDeclsValbinds. XHsLocalBindsLR"
+replaceDeclsValbinds _ (XHsLocalBindsLR _) _ = error "replaceDeclsValbinds. XHsLocalBindsLR"
 
-whereAnnotation :: (Monad m) => DeltaPos -> TransformT m (ApiAnn' AnnList)
-whereAnnotation dp = do
+oldWhereAnnotation :: (Monad m)
+  => ApiAnn' AnnList -> WithWhere -> RealSrcSpan -> TransformT m (ApiAnn' AnnList)
+oldWhereAnnotation ApiAnnNotUsed ww _oldSpan = do
+  newSpan <- uniqueSrcSpanT
+  let w = case ww of
+        WithWhere -> [AddApiAnn AnnWhere (AD (DP (0,0)))]
+        WithoutWhere -> []
+  let anc2' = Anchor (rs newSpan) (MovedAnchor (DP (0,1)))
+  (anc, anc2) <- do
+          newSpan <- uniqueSrcSpanT
+          return ( Anchor (rs newSpan) (MovedAnchor (DP (1,2)))
+                 , anc2')
+  let an = ApiAnn anc
+                  (AnnList (Just anc2) Nothing Nothing w [])
+                  noCom
+  return an
+oldWhereAnnotation (ApiAnn anc an cs) ww oldSpan = do
+  -- TODO: when we set DP (0,0) for the HsValBinds ApiAnnAnchor, change the AnnList anchor to have the correct DP too
+  let (AnnList ancl o c r t) = an
+  let w = case ww of
+        WithWhere -> [AddApiAnn AnnWhere (AD (DP (0,0)))]
+        WithoutWhere -> []
+  -- let anc2 = Anchor (anchor anc) (MovedAnchor (DP (0,1)))
+  let anc2 = anc
+  -- TODO: updated ancl to have MovedAnchor based on oldSpan
+  -- let dp = ss2delta (ss2pos $ anchor $ getLoc lc) oldSpan
+  -- let ancl' = case ancl of
+  --       Nothing -> anc
+  --       Just aa@(Anchor a (MovedAnchor _)) -> aa
+  --       Just (Anchor a _) -> Anchor a (MovedAnchor dp)
+  (anc', ancl') <- do
+        case ww of
+          WithWhere -> return (anc, ancl)
+          WithoutWhere -> return (anc, ancl)
+          -- WithoutWhere -> return ( Anchor (anchor anc)  (MovedAnchor (DP (0,0)))
+          --                        , ancl'')
+          --   where
+          --     ancl'' = case ancl of
+          --       Nothing -> Nothing
+          --       Just a -> Just (Anchor (anchor a) (MovedAnchor (DP (0,0))))
+  let an = ApiAnn anc'
+                  (AnnList ancl' o c w t)
+                  cs
+  return an
+
+newWhereAnnotation :: (Monad m) => WithWhere -> TransformT m (ApiAnn' AnnList)
+newWhereAnnotation ww = do
   newSpan <- uniqueSrcSpanT
   let anc  = Anchor (rs newSpan) (MovedAnchor (DP (1,2)))
-  let anc2 = Anchor (rs newSpan) (MovedAnchor dp)
+  let anc2 = Anchor (rs newSpan) (MovedAnchor (DP (1,4)))
+  let w = case ww of
+        WithWhere -> [AddApiAnn AnnWhere (AD (DP (0,0)))]
+        WithoutWhere -> []
   let an = ApiAnn anc
-                  (AnnList (Just anc2) Nothing Nothing [(undeltaSpan (rs newSpan) AnnWhere (DP (0,0)))] [])
+                  (AnnList (Just anc2) Nothing Nothing w [])
                   noCom
   return an
 

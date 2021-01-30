@@ -55,6 +55,7 @@ import GHC.Utils.Panic
 
 import Data.List hiding ( foldr )
 import Data.Function
+import Data.Data (Data)
 
 {-
 ************************************************************************
@@ -574,9 +575,9 @@ instance OutputableBndrId p => Outputable (IPBind (GhcPass p)) where
 ************************************************************************
 -}
 
-type instance XTypeSig          (GhcPass p) = ApiAnn
-type instance XPatSynSig        (GhcPass p) = ApiAnn
-type instance XClassOpSig       (GhcPass p) = ApiAnn
+type instance XTypeSig          (GhcPass p) = ApiAnn' AnnSig
+type instance XPatSynSig        (GhcPass p) = ApiAnn' AnnSig
+type instance XClassOpSig       (GhcPass p) = ApiAnn' AnnSig
 type instance XIdSig            (GhcPass p) = NoExtField -- No anns, generated
 type instance XFixSig           (GhcPass p) = ApiAnn
 type instance XInlineSig        (GhcPass p) = ApiAnn
@@ -590,6 +591,13 @@ type instance XXSig             (GhcPass p) = NoExtCon
 
 type instance XFixitySig  (GhcPass p) = NoExtField
 type instance XXFixitySig (GhcPass p) = NoExtCon
+
+data AnnSig
+  = AnnSig {
+      asDcolon :: AddApiAnn, -- Not an AnnAnchor to capture unicode option
+      asRest   :: [AddApiAnn]
+      } deriving Data
+
 
 instance OutputableBndrId p => Outputable (Sig (GhcPass p)) where
     ppr sig = ppr_sig sig

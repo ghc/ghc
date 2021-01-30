@@ -68,8 +68,18 @@ tt = testOneFile "/home/alanz/mysrc/git.haskell.org/worktree/exactprint/_build/s
  -- "cases/AddLocalDecl5.hs" addLocaLDecl5
  -- "cases/AddLocalDecl6.hs" addLocaLDecl6
  -- "cases/RmDecl1.hs" rmDecl1
- "cases/RmDecl2.hs" rmDecl2
+ -- "cases/RmDecl2.hs" rmDecl2
+ -- "cases/RmDecl3.hs" rmDecl3
+ -- "cases/RmDecl4.hs" rmDecl4
+ -- "cases/RmDecl5.hs" rmDecl5
+ -- "cases/RmDecl6.hs" rmDecl6
+ -- "cases/RmDecl7.hs" rmDecl7
+ -- "cases/RmTypeSig1.hs" rmTypeSig1
+ -- "cases/RmTypeSig2.hs" rmTypeSig2
+ -- "cases/AddHiding1.hs" addHiding1
+ "cases/AddHiding2.hs" addHiding2
 
+-- cloneT does not need a test, function can be retired
 
 
 -- exact = ppr
@@ -346,7 +356,7 @@ changeLocalDecls libdir ans (L l p) = do
         let oldBinds     = concatMap decl2Bind oldDecls'
             (os:oldSigs) = concatMap decl2Sig  oldDecls'
             os' = setEntryDP' os (DP (2, 0))
-        let sortKey = captureOrder' decls
+        let sortKey = captureOrder decls
         let (ApiAnn anc (AnnList (Just (Anchor anc2 _)) a b c d) cs) = van
         let van' = (ApiAnn anc (AnnList (Just (Anchor anc2 (MovedAnchor (DP (1,4))))) a b c d) cs)
         let binds' = (HsValBinds van'
@@ -379,7 +389,7 @@ changeLocalDecls2 libdir ans (L l p) = do
                                  [(undeltaSpan (rs newSpan) AnnWhere (DP (0,0)))] [])
                         noCom
         let decls = [s,d]
-        let sortKey = captureOrder' decls
+        let sortKey = captureOrder decls
         let binds = (HsValBinds an (ValBinds sortKey (listToBag $ [decl'])
                                     [sig']))
         return (L lm (Match ma mln pats (GRHSs noExtField rhs binds)))
@@ -472,6 +482,7 @@ addLocaLDecl2 libdir ans lp = do
 addLocaLDecl3 :: Changer
 addLocaLDecl3 libdir ans lp = do
   Right (_, newDecl@(L ld (ValD _ decl))) <- withDynFlags libdir (\df -> parseDecl df "decl" "nn = 2")
+  -- Right (_, newDecl@(L ld (ValD _ decl))) <- withDynFlags libdir (\df -> parseDecl df "decl" "jj = 2")
   let
       doAddLocal = do
          (d1:d2:_) <- hsDecls lp
@@ -480,7 +491,8 @@ addLocaLDecl3 libdir ans lp = do
          (parent',_) <- modifyValD (getLocA d1) d1'' $ \_m (d:ds) -> do
            let newDecl' = setEntryDP' newDecl (DP (1, 0))
            let d' = setEntryDP' d (DP (0,0))
-           return (((d':ds) ++ [newDecl']),Nothing)
+           return (((d:ds) ++ [newDecl']),Nothing)
+           -- return (((d':ds) ++ [newDecl']),Nothing)
            -- return (d':ds,Nothing)
 
          replaceDecls (anchorEof lp) [parent',d2']
@@ -592,10 +604,213 @@ rmDecl2 libdir ans lp = do
         everywhereM (mkM go) lp
 
   let (lp',(ans',_),_w) = runTransform mempty doRmDecl
-  -- putStrLn $ "log:\n" ++ intercalate "\n" _w
   debugM $ "log:[\n" ++ intercalate "\n" _w ++ "]log end\n"
   return (ans,lp')
 
+-- ---------------------------------------------------------------------
+
+rmDecl3 :: Changer
+rmDecl3 libdir ans lp = do
+  let
+      doRmDecl = do
+         [d1,d2] <- hsDecls lp
+
+         (d1',Just sd1) <- modifyValD (getLocA d1) d1 $ \_m [sd1] -> do
+           let sd1' = setEntryDP' sd1 (DP (2,0))
+           return ([],Just sd1')
+
+         replaceDecls lp [d1',sd1,d2]
+
+  (lp',(ans',_),_w) <- runTransformT mempty doRmDecl
+  debugM $ "log:[\n" ++ intercalate "\n" _w ++ "]log end\n"
+  return (ans,lp')
+
+-- ---------------------------------------------------------------------
+
+rmDecl4 :: Changer
+rmDecl4 libdir ans lp = do
+  let
+      doRmDecl = do
+         [d1] <- hsDecls lp
+
+         (d1',Just sd1) <- modifyValD (getLocA d1) d1 $ \_m [sd1,sd2] -> do
+           -- [sd1,sd2] <- hsDecls d1
+           sd2' <- transferEntryDP' sd1 sd2
+
+           -- setPrecedingLinesDeclT sd1 2 0
+           let sd1' = setEntryDP' sd1 (DP (2,0))
+           -- let sd2' = setEntryDP' sd2 (DP (0,0))
+           -- d1' <- replaceDecls d1 [sd2]
+           return ([sd2'],Just sd1')
+
+         replaceDecls (anchorEof lp) [d1',sd1]
+
+  (lp',(ans',_),_w) <- runTransformT mempty doRmDecl
+  debugM $ "log:[\n" ++ intercalate "\n" _w ++ "]log end\n"
+  return (ans,lp')
+
+-- ---------------------------------------------------------------------
+
+rmDecl5 :: Changer
+rmDecl5 libdir ans lp = do
+  let
+      doRmDecl = do
+        let
+          go :: HsExpr GhcPs -> Transform (HsExpr GhcPs)
+          go e@(HsLet a lb expr) = do
+            decs <- hsDeclsValBinds lb
+            let dec = last decs
+            transferEntryDPT (head decs) dec
+            lb' <- replaceDeclsValbinds WithoutWhere lb [dec]
+            return (HsLet a lb' expr)
+          go x = return x
+
+        everywhereM (mkM go) lp
+
+  let (lp',(ans',_),_w) = runTransform mempty doRmDecl
+  debugM $ "log:[\n" ++ intercalate "\n" _w ++ "]log end\n"
+  return (ans,lp')
+-- ---------------------------------------------------------------------
+
+rmDecl6 :: Changer
+rmDecl6 libdir ans lp = do
+  let
+      doRmDecl = do
+         [d1] <- hsDecls lp
+
+         (d1',_) <- modifyValD (getLocA d1) d1 $ \_m subDecs -> do
+           let (ss1:_sd1:sd2:sds) = subDecs
+           sd2' <- transferEntryDP' ss1 sd2
+
+           -- logTr $ "rmDecl6:locs=" ++ show (map (rs . getLocA) subDecs)
+           return (sd2':sds,Nothing)
+
+         replaceDecls lp [d1']
+
+  (lp',(ans',_),_w) <- runTransformT mempty doRmDecl
+  -- putStrLn $ "log:" ++ intercalate "\n" _w
+  debugM $ "log:[\n" ++ intercalate "\n" _w ++ "]log end\n"
+  return (ans,lp')
+-- ---------------------------------------------------------------------
+
+rmDecl7 :: Changer
+rmDecl7 libdir ans lp = do
+  let
+      doRmDecl = do
+         tlDecs <- hsDecls lp
+         -- [s1,d1,d2,d3] <- balanceCommentsList $ captureLineSpacing tlDecs
+         [s1,d1,d2,d3] <- balanceCommentsList tlDecs
+         -- let [s1,d1,d2,d3] = captureLineSpacing tlDecs
+
+         -- balanceComments d1 d2
+         -- balanceComments d2 d3
+
+         d3' <- transferEntryDP' d2 d3
+
+         replaceDecls lp [s1,d1,d3']
+         -- replaceDecls lp [s1,d1,d2,d3]
+
+  (lp',(ans',_),_w) <- runTransformT mempty doRmDecl
+  -- putStrLn $ "log:" ++ intercalate "\n" _w
+  debugM $ "log:[\n" ++ intercalate "\n" _w ++ "]log end\n"
+  return (ans,lp')
+
+-- ---------------------------------------------------------------------
+
+rmTypeSig1 :: Changer
+rmTypeSig1 libdir ans lp = do
+  let doRmDecl = do
+         tlDecs <- hsDecls lp
+         let (s0:d1:d2) = tlDecs
+             s1 = captureTypeSigSpacing s0
+             (L l (SigD x1 (TypeSig x2 [n1,n2] typ))) = s1
+         n2' <- transferEntryDP n1 n2
+         let s1' = (L l (SigD x1 (TypeSig x2 [n2'] typ)))
+         replaceDecls lp (s1':d1:d2)
+
+  let (lp',(ans',_),_w) = runTransform mempty doRmDecl
+  debugM $ "log:[\n" ++ intercalate "\n" _w ++ "]log end\n"
+  return (ans,lp')
+
+-- ---------------------------------------------------------------------
+
+rmTypeSig2 :: Changer
+rmTypeSig2 libdir ans lp = do
+  let doRmDecl = do
+         tlDecs <- hsDecls lp
+         let [d1] = tlDecs
+
+         (d1',_) <- modifyValD (getLocA d1) d1 $ \_m [s,d] -> do
+           d' <- transferEntryDPT s d
+           return ([d'],Nothing)
+         replaceDecls lp [d1']
+
+  let (lp',(ans',_),_w) = runTransform mempty doRmDecl
+  -- putStrLn $ "log:" ++ intercalate "\n" _w
+  debugM $ "log:[\n" ++ intercalate "\n" _w ++ "]log end\n"
+  return (ans,lp')
+-- ---------------------------------------------------------------------
+
+addHiding1 :: Changer
+addHiding1 libdir ans (L l p) = do
+  let doTransform = do
+        l0 <- uniqueSrcSpanT
+        l1 <- uniqueSrcSpanT
+        l2 <- uniqueSrcSpanT
+        let
+          [L li imp1,imp2] = hsmodImports p
+          n1 = L (noAnnSrcSpanDP0 l1) (mkVarUnqual (mkFastString "n1"))
+          n2 = L (noAnnSrcSpanDP0 l2) (mkVarUnqual (mkFastString "n2"))
+          v1 = L (addComma $ noAnnSrcSpanDP0 l1) (IEVar noExtField (L (noAnnSrcSpanDP0 l1) (IEName n1)))
+          v2 = L (           noAnnSrcSpanDP0 l2) (IEVar noExtField (L (noAnnSrcSpanDP0 l2) (IEName n2)))
+          impHiding = L (SrcSpanAnn (ApiAnn (Anchor (realSrcSpan l0) m0)
+                                     (AnnList Nothing
+                                              (Just (AddApiAnn AnnOpenP  d1))
+                                              (Just (AddApiAnn AnnCloseP d0))
+                                              [(AddApiAnn AnnHiding d1)]
+                                              [])
+                                       noCom) l0) [v1,v2]
+          imp1' = imp1 { ideclHiding = Just (True,impHiding)}
+          p' = p { hsmodImports = [L li imp1',imp2]}
+        return (L l p')
+
+  let (lp',(ans',_),_w) = runTransform mempty doTransform
+  debugM $ "log:[\n" ++ intercalate "\n" _w ++ "]log end\n"
+  return (ans,lp')
+-- ---------------------------------------------------------------------
+
+addHiding2 :: Changer
+addHiding2 libdir ans (L l p) = do
+  let doTransform = do
+        l1 <- uniqueSrcSpanT
+        l2 <- uniqueSrcSpanT
+        let
+          [L li imp1] = hsmodImports p
+          Just (_,L lh ns) = ideclHiding imp1
+          lh' = (SrcSpanAnn (ApiAnn (Anchor (realSrcSpan (locA lh)) m0)
+                                     (AnnList Nothing
+                                              (Just (AddApiAnn AnnOpenP  d1))
+                                              (Just (AddApiAnn AnnCloseP d0))
+                                              [(AddApiAnn AnnHiding d1)]
+                                              [])
+                                       noCom) (locA lh))
+          n1 = L (noAnnSrcSpanDP0 l1) (mkVarUnqual (mkFastString "n1"))
+          n2 = L (noAnnSrcSpanDP0 l2) (mkVarUnqual (mkFastString "n2"))
+          v1 = L (addComma $ noAnnSrcSpanDP0 l1) (IEVar noExtField (L (noAnnSrcSpanDP0 l1) (IEName n1)))
+          v2 = L (           noAnnSrcSpanDP0 l2) (IEVar noExtField (L (noAnnSrcSpanDP0 l2) (IEName n2)))
+          L ln n = last ns
+          n' = L (addComma ln) n
+          imp1' = imp1 { ideclHiding = Just (True,L lh' (init ns ++ [n',v1,v2]))}
+          p' = p { hsmodImports = [L li imp1']}
+        -- addSimpleAnnT n1        (DP (0,0)) [((G AnnVal),DP (0,0))]
+        -- addSimpleAnnT v1        (DP (0,0)) [((G AnnComma),DP (0,0))]
+        -- addSimpleAnnT n2        (DP (0,0)) [((G AnnVal),DP (0,0))]
+        -- addTrailingCommaT (last ns)
+        return (L l p')
+
+  let (lp',(ans',_),_w) = runTransform mempty doTransform
+  debugM $ "log:[\n" ++ intercalate "\n" _w ++ "]log end\n"
+  return (ans,lp')
 
 -- ---------------------------------------------------------------------
 -- Next section to be moved to the appropriate library

@@ -69,6 +69,7 @@ import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
 import GHC.Utils.Binary
 import GHC.Utils.Outputable hiding ( (<>) )
+import GHC.Utils.Panic
 
 {-
 Note [Api annotations]
@@ -1089,6 +1090,12 @@ instance Semigroup AnnList where
 
 instance Monoid AnnList where
   mempty = AnnList Nothing Nothing Nothing [] []
+
+instance Semigroup NameAnn where
+  _ <> _ = panic "semigroup nameann"
+
+instance Monoid NameAnn where
+  mempty = NameAnnTrailing []
 
 
 instance Semigroup AnnSortKey where

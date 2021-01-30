@@ -109,7 +109,7 @@ tt = testOneFile "/home/alanz/mysrc/git.haskell.org/worktree/exactprint/_build/s
  -- "../../testsuite/tests/printer/Test16230.hs"
  -- "../../testsuite/tests/printer/Test16236.hs"
  -- "../../testsuite/tests/printer/AnnotationLet.hs"
- "../../testsuite/tests/printer/AnnotationTuple.hs"
+ -- "../../testsuite/tests/printer/AnnotationTuple.hs"
  -- "../../testsuite/tests/ghc-api/annotations/CommentsTest.hs"
  -- "../../testsuite/tests/hiefile/should_compile/Scopes.hs"
  -- "../../testsuite/tests/printer/Ppr053.hs"
@@ -119,6 +119,7 @@ tt = testOneFile "/home/alanz/mysrc/git.haskell.org/worktree/exactprint/_build/s
  -- "./cases/LocalDecls2.expected.hs"
  -- "./cases/WhereIn3a.hs"
  -- "./cases/AddLocalDecl1.hs"
+ "./cases/LayoutIn1.hs"
 
 -- exact = ppr
 

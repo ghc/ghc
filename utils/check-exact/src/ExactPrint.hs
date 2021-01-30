@@ -84,7 +84,6 @@ defaultEPState as = EPState
              , pMarkLayout = False
              , pLHS = 1
              , dMarkLayout = False
-             , dPriorMoved = Nothing
              , dPriorEndPosition = (1,1)
              , uAnchorSpan = badRealSrcSpan
              , uExtraDP = Nothing
@@ -144,9 +143,7 @@ data EPState = EPState
              , uAnchorSpan :: !RealSrcSpan -- ^ in pre-changed AST
                                           -- reference frame, from
                                           -- Annotation
-             , uExtraDP :: !(Maybe DeltaPos) -- ^ Used to anchor a
-                                             -- list, added to DP of
-                                             -- first element in the
+             , uExtraDP :: !(Maybe Anchor) -- ^ Used to anchor a
                                              -- list
 
              -- Print phase
@@ -160,7 +157,6 @@ data EPState = EPState
                                          -- preceding element
              , dMarkLayout :: !Bool
              , dLHS        :: !LayoutStartCol
-             , dPriorMoved :: !(Maybe DeltaPos)
 
              -- Shared
              , epComments :: ![Comment]
@@ -218,18 +214,22 @@ enterAnn (Entry anchor' cs) a = do
   p <- getPosP
   debugM $ "enterAnn:(p,a) =" ++ show (p, astId a) ++ " starting"
   let curAnchor = anchor anchor' -- As a base for the current AST element
+  debugM $ "enterAnn:(curAnchor):=" ++ show (rs2range curAnchor)
+  addCommentsA (priorComments cs)
+  printComments curAnchor
+  -- -------------------------
   case anchor_op anchor' of
     MovedAnchor dp -> do
       debugM $ "enterAnn: MovedAnchor:" ++ show dp
-      case (priorComments cs) of
-        (L loc _:_) -> do
-            addCommentsA (priorComments cs)
-            printComments curAnchor
-        _ -> return ()
+      -- Set the original anchor as prior end, so the rest of this AST
+      -- fragment has a reference
+      -- BUT: this means the entry DP can be calculated incorrectly too,
+      -- for immediately nested items.
       setPriorEndNoLayoutD (ss2pos curAnchor)
     _ -> do
-      addCommentsA (priorComments cs)
-      printComments curAnchor
+      return ()
+  -- -------------------------
+  priorAnchor <- getAnchorU
   setAnchorU curAnchor
   -- -------------------------------------------------------------------
   -- The first part corresponds to the delta phase, so should only use
@@ -244,24 +244,32 @@ enterAnn (Entry anchor' cs) a = do
                -- Note that we need to use the new offset if it has
                -- changed.
                off (ss2delta priorEndAfterComments curAnchor)
-  mpm <- getPriorMovedD
-  setPriorMovedD Nothing
+  debugM $ "enterAnn: (edp',off,priorEndAfterComments,curAnchor):" ++ show (edp',off,priorEndAfterComments,rs2range curAnchor)
   let edp'' = case anchor_op anchor' of
         MovedAnchor dp -> dp
-        _ -> maybe edp' id mpm
+        _ -> edp'
+  -- ---------------------------------------------
+  -- let edp = edp''
   med <- getExtraDP
   setExtraDP Nothing
   let edp = case med of
         Nothing -> edp''
         -- Just dp -> addDP dp edp''
-        Just dp -> dp -- Replace original with desired one. Allows all list entry values to be DP (1,0)
+        Just (Anchor _ (MovedAnchor dp)) -> dp
+                   -- Replace original with desired one. Allows all
+                   -- list entry values to be DP (1,0)
+        Just (Anchor r _) -> dp
+          where
+            dp = adjustDeltaForOffset 0
+                   off (ss2delta priorEndAfterComments r)
   when (isJust med) $ debugM $ "enterAnn:(med,edp)=" ++ show (med,edp)
+  -- ---------------------------------------------
   -- Preparation complete, perform the action
   when (priorEndAfterComments < spanStart) (do
     debugM $ "enterAnn.dPriorEndPosition:spanStart=" ++ show spanStart
     modify (\s -> s { dPriorEndPosition    = spanStart } ))
 
-  debugM $ "enterAnn: (anchor_op, curAnchor,mpm):" ++ show (anchor_op anchor', rs2range curAnchor, mpm)
+  debugM $ "enterAnn: (anchor_op, curAnchor):" ++ show (anchor_op anchor', rs2range curAnchor)
   debugM $ "enterAnn: (dLHS,spanStart,pec,edp)=" ++ show (off,spanStart,priorEndAfterComments,edp)
 
   -- end of delta phase processing
@@ -279,7 +287,6 @@ enterAnn (Entry anchor' cs) a = do
 
   case anchor_op anchor' of
     DeletedAnchor a -> setPriorEndASTD False a
-    -- MovedAnchor _ -> setPriorMovedD (Just (DP (2,0)))
     _ -> return ()
 
 -- ---------------------------------------------------------------------
@@ -457,34 +464,15 @@ printStringAtMkw (Just aa) s = printStringAtAA aa s
 printStringAtMkw Nothing s = printStringAtLsDelta (DP (0,1)) s
 
 
-{-
--- Delta equivalent of mark
-addAnnotationWorker :: KeywordId -> AnnSpan -> Delta ()
-addAnnotationWorker ann pa =
-  -- Zero-width source spans are injected by the GHC Lexer when it puts virtual
-  -- '{', ';' and '}' tokens in for layout
-  unless (isPointSrcSpan pa) $
-    do
-      pe <- getPriorEnd
-      ss <- getSrcSpan
-      let p = ss2delta pe (sr pa)
-      case (ann,isGoodDelta p) of
-        (G GHC.AnnComma,False) -> return ()
-        (G GHC.AnnSemi, False) -> return ()
-        (G GHC.AnnOpen, False) -> return ()
-        (G GHC.AnnClose,False) -> return ()
-        _ -> do
-          p' <- adjustDeltaForOffsetM p
-          commentAllocation (priorComment (ss2pos (sr pa))) (mapM_ (uncurry addDeltaComment))
-          addAnnDeltaPos ann p'
-          setPriorEndASTD pa
-              `debug` ("addAnnotationWorker:(ss,ss,pe,pa,p,p',ann)=" ++ show (showGhc ss,showGhc ss,pe,showGhc pa,p,p',ann))
-
--}
-
 printStringAtAA :: AnnAnchor -> String -> EPP ()
 printStringAtAA (AR r) s = printStringAtKw' r s
-printStringAtAA (AD d) s = printStringAtLsDelta d s
+printStringAtAA (AD d) s = do
+  pe <- getPriorEndD
+  p1 <- getPosP
+  printStringAtLsDelta d s
+  p2 <- getPosP
+  debugM $ "printStringAtAA:(pe,p1,p2)=" ++ show (pe,p1,p2)
+  setPriorEndASTPD True (p1,p2)
 
 -- Based on Delta.addAnnotationWorker
 printStringAtKw' :: RealSrcSpan -> String -> EPP ()
@@ -678,19 +666,6 @@ printComments ss = do
 printOneComment :: Comment -> EPP ()
 printOneComment c@(Comment _str loc _mo) = do
   debugM $ "printOneComment:c=" ++ showGhc c
-  mpm <- getPriorMovedD
-  -- dp <- case mpm of
-  --   Nothing -> do
-  --     case anchor_op loc of
-  --       MovedAnchor dp -> return dp
-  --       _ -> do
-  --         pe <- getPriorEndD
-  --         let dp = ss2delta pe (anchor loc)
-  --         debugM $ "printOneComment:(dp,pe,anchor loc)=" ++ showGhc (dp,pe,ss2pos $ anchor loc)
-  --         return dp
-  --   Just dp -> do
-  --     setPriorMovedD Nothing
-  --     return dp
   dp <-case anchor_op loc of
     MovedAnchor dp -> return dp
     _ -> do
@@ -702,12 +677,17 @@ printOneComment c@(Comment _str loc _mo) = do
   mep <- getExtraDP
   dp' <- case mep of
     Nothing -> return dp''
-    Just edp -> do
+    Just (Anchor _ (MovedAnchor edp)) -> do
       -- setExtraDP Nothing
       debugM $ "printOneComment:edp=" ++ show edp
       return edp
+    Just (Anchor r _) -> do
+        pe <- getPriorEndD
+        let dp = ss2delta pe r
+        debugM $ "printOneComment:extraDP(dp,pe,anchor loc)=" ++ showGhc (dp,pe,ss2pos r)
+        return dp
   LayoutStartCol dOff <- gets dLHS
-  debugM $ "printOneComment:(dp,dp',dOff,mpm)=" ++ showGhc (dp,dp',dOff,mpm)
+  debugM $ "printOneComment:(dp,dp',dOff)=" ++ showGhc (dp,dp',dOff)
   setPriorEndD (ss2posEnd (anchor loc))
   printQueuedComment (anchor loc) c dp'
 
@@ -1625,9 +1605,10 @@ instance ExactPrint (HsLocalBinds GhcPs) where
                  _ -> al_anchor $ anns an
 
     case manc of
-      Just (Anchor _ (MovedAnchor dp)) -> do
-        setExtraDP (Just dp)
+      Just anc -> do
+        setExtraDP (Just anc)
       _ -> return ()
+
     -- markAnnotated (AnnotatedList anc valbinds)
     markAnnotatedWithLayout valbinds
 
@@ -1743,21 +1724,15 @@ instance ExactPrint (Sig GhcPs) where
 -- instance Annotate (Sig GhcPs) where
 
   exact (TypeSig an vars ty)  = exactVarSig an vars ty
---   markAST _ (TypeSig _ lns st)  = do
---     setContext (Set.singleton PrefixOp) $ markListNoPrecedingSpace True lns
---     mark AnnDcolon
---     markLHsSigWcType st
---     markTrailingSemi
---     tellContext (Set.singleton FollowingLine)
 
   exact (PatSynSig an lns typ) = do
-    markApiAnn an AnnPattern
+    markLocatedAAL an asRest AnnPattern
     markAnnotated lns
-    markApiAnn an AnnDcolon
+    markLocatedAA an asDcolon
     markAnnotated typ
 
   exact (ClassOpSig an is_deflt vars ty)
-    | is_deflt  = markApiAnn an AnnDefault >> exactVarSig an vars ty
+    | is_deflt  = markLocatedAAL an asRest AnnDefault >> exactVarSig an vars ty
     | otherwise = exactVarSig an vars ty
 
 --   markAST _ (IdSig {}) =
@@ -1839,10 +1814,10 @@ instance ExactPrint (Sig GhcPs) where
 
 -- ---------------------------------------------------------------------
 
-exactVarSig :: (ExactPrint a) => ApiAnn -> [LocatedN RdrName] -> a -> EPP ()
+exactVarSig :: (ExactPrint a) => ApiAnn' AnnSig -> [LocatedN RdrName] -> a -> EPP ()
 exactVarSig an vars ty = do
   mapM_ markAnnotated vars
-  markApiAnn an AnnDcolon
+  markLocatedAA an asDcolon
   markAnnotated ty
 
 -- ---------------------------------------------------------------------
@@ -2127,15 +2102,11 @@ instance ExactPrint (HsExpr GhcPs) where
 
   exact (HsLet an binds e) = do
     setLayoutBoth $ do -- Make sure the 'in' gets indented too
-      markApiAnn an AnnLet
-      markApiAnn an AnnOpenC -- '{'
+      markAnnKw an alLet AnnLet
       debugM $ "HSlet:binds coming"
-      -- setLayoutD $ markAnnotated binds
       setLayoutBoth $ markAnnotated binds
-      -- markAnnotated binds
       debugM $ "HSlet:binds done"
-      markApiAnn an AnnCloseC -- '}'
-      markApiAnn an AnnIn
+      markAnnKw an alIn AnnIn
       debugM $ "HSlet:expr coming"
       markAnnotated e
 
@@ -4076,18 +4047,10 @@ setPosP l = do
   debugM $ "setPosP:" ++ show l
   modify (\s -> s {epPos = l})
 
-getPriorMovedD :: (Monad m, Monoid w) => EP w m (Maybe DeltaPos)
-getPriorMovedD = gets dPriorMoved
-
-setPriorMovedD :: (Monad m, Monoid w) => Maybe DeltaPos -> EP w m ()
-setPriorMovedD md = do
-  debugM $ "setPriorMovedD:" ++ show md
-  modify (\s -> s {dPriorMoved = md})
-
-getExtraDP :: (Monad m, Monoid w) => EP w m (Maybe DeltaPos)
+getExtraDP :: (Monad m, Monoid w) => EP w m (Maybe Anchor)
 getExtraDP = gets uExtraDP
 
-setExtraDP :: (Monad m, Monoid w) => Maybe DeltaPos -> EP w m ()
+setExtraDP :: (Monad m, Monoid w) => Maybe Anchor -> EP w m ()
 setExtraDP md = do
   debugM $ "setExtraDP:" ++ show md
   modify (\s -> s {uExtraDP = md})
@@ -4109,7 +4072,16 @@ setPriorEndNoLayoutD pe = do
   modify (\s -> s { dPriorEndPosition = pe })
 
 setPriorEndASTD :: (Monad m, Monoid w) => Bool -> RealSrcSpan -> EP w m ()
-setPriorEndASTD layout pe = do
+setPriorEndASTD layout pe = setPriorEndASTPD layout (rs2range pe)
+
+setPriorEndASTPD :: (Monad m, Monoid w) => Bool -> (Pos,Pos) -> EP w m ()
+setPriorEndASTPD layout pe@(fm,to) = do
+  debugM $ "setPriorEndASTD:pe=" ++ show pe
+  when layout $ setLayoutStartD (snd fm)
+  modify (\s -> s { dPriorEndPosition = to } )
+
+setPriorEndASTD' :: (Monad m, Monoid w) => Bool -> RealSrcSpan -> EP w m ()
+setPriorEndASTD' layout pe = do
   debugM $ "setPriorEndASTD:pe=" ++ show (rs2range pe)
   when layout $ setLayoutStartD (snd (ss2pos pe))
   modify (\s -> s { dPriorEndPosition    = ss2posEnd pe } )
@@ -4207,9 +4179,9 @@ adjustDeltaForOffsetM dp = do
   colOffset <- gets dLHS
   return (adjustDeltaForOffset 0 colOffset dp)
 
-adjustDeltaForOffset :: Int -> LayoutStartCol -> DeltaPos -> DeltaPos
-adjustDeltaForOffset _ _colOffset                      dp@(DP (0,_)) = dp -- same line
-adjustDeltaForOffset d (LayoutStartCol colOffset) (DP (l,c)) = DP (l,c - colOffset - d)
+-- adjustDeltaForOffset :: Int -> LayoutStartCol -> DeltaPos -> DeltaPos
+-- adjustDeltaForOffset _ _colOffset                      dp@(DP (0,_)) = dp -- same line
+-- adjustDeltaForOffset d (LayoutStartCol colOffset) (DP (l,c)) = DP (l,c - colOffset - d)
 
 -- ---------------------------------------------------------------------
 -- Printing functions

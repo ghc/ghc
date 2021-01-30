@@ -1656,7 +1656,7 @@ where_decls :: { LocatedL (OrdList (LHsDecl GhcPs)) }
 pattern_synonym_sig :: { LSig GhcPs }
         : 'pattern' con_list '::' sigtype
                    {% acsA (\cs -> sLL $1 (reLoc $>)
-                                $ PatSynSig (ApiAnn (glR $1) [mj AnnPattern $1, mu AnnDcolon $3] cs)
+                                $ PatSynSig (ApiAnn (glR $1) (AnnSig (mu AnnDcolon $3) [mj AnnPattern $1]) cs)
                                   (unLoc $2) $4) }
 
 qvarcon :: { LocatedN RdrName }
@@ -1678,7 +1678,7 @@ decl_cls  : at_decl_cls                 { $1 }
                        do { v <- checkValSigLhs $2
                           ; let err = text "in default signature" <> colon <+>
                                       quotes (ppr $2)
-                          ; acsA (\cs -> sLL $1 (reLoc $>) $ SigD noExtField $ ClassOpSig (ApiAnn (glR $1) [mj AnnDefault $1,mu AnnDcolon $3] cs) True [v] $4) }}
+                          ; acsA (\cs -> sLL $1 (reLoc $>) $ SigD noExtField $ ClassOpSig (ApiAnn (glR $1) (AnnSig (mu AnnDcolon $3) [mj AnnDefault $1]) cs) True [v] $4) }}
 
 -- TODO:AZ: get rid of [AddApiAnn] below. Except they will be used for
 -- leading semicolons? Or decls with nothing but semicolons?
@@ -2549,11 +2549,11 @@ sigdecl :: { LHsDecl GhcPs }
                         {% do { $1 <- runPV (unECP $1)
                               ; v <- checkValSigLhs $1
                               ; acsA (\cs -> (sLLAl $1 (reLoc $>) $ SigD noExtField $
-                                  TypeSig (ApiAnn (glAR $1) [mu AnnDcolon $2] cs) [v] (mkHsWildCardBndrs $3)))} }
+                                  TypeSig (ApiAnn (glAR $1) (AnnSig (mu AnnDcolon $2) []) cs) [v] (mkHsWildCardBndrs $3)))} }
 
         | var ',' sig_vars '::' sigtype
            {% do { v <- addTrailingCommaN $1 (gl $2)
-                 ; let sig cs = TypeSig (ApiAnn (glNR $1) [mu AnnDcolon $4] cs) (v : reverse (unLoc $3))
+                 ; let sig cs = TypeSig (ApiAnn (glNR $1) (AnnSig (mu AnnDcolon $4) []) cs) (v : reverse (unLoc $3))
                                       (mkHsWildCardBndrs $5)
                  ; acsA (\cs -> sLL (reLocN $1) (reLoc $>) $ SigD noExtField (sig cs) ) }}
 
@@ -2802,7 +2802,7 @@ aexp    :: { ECP }
         | 'let' binds 'in' exp          {  ECP $
                                            unECP $4 >>= \ $4 ->
                                            mkHsLetPV (comb2A $1 $>) (unLoc $2) $4
-                                                 [mj AnnLet $1,mj AnnIn $3] }
+                                                 (AnnsLet (glAA $1) (glAA $3)) }
         | '\\' 'lcase' altslist
             {  ECP $ $3 >>= \ $3 ->
                  mkHsLamCasePV (comb2 $1 (reLoc $>)) $3 [mj AnnLam $1,mj AnnCase $2] }
