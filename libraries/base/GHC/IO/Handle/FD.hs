@@ -23,6 +23,7 @@ module GHC.IO.Handle.FD (
 
 import GHC.Base
 import GHC.Show
+import Control.Exception.Base (bracketOnError)
 import Data.Maybe
 import Data.Typeable
 import Foreign.C.Types
@@ -179,23 +180,22 @@ openBinaryFile fp m =
     (\e -> ioError (addFilePathToIOError "openBinaryFile" fp e))
 
 openFile' :: String -> IOMode -> Bool -> Bool -> IO Handle
-openFile' filepath iomode binary non_blocking = do
-  -- first open the file to get an FD
-  (fd, fd_type) <- FD.openFile filepath iomode non_blocking
-
-  mb_codec <- if binary then return Nothing else fmap Just getLocaleEncoding
-
-  -- then use it to make a Handle
-  mkHandleFromFD fd fd_type filepath iomode
-                   False {- do not *set* non-blocking mode -}
-                   mb_codec
-            `onException` IODevice.close fd
-        -- NB. don't forget to close the FD if mkHandleFromFD fails, otherwise
-        -- this FD leaks.
-        -- ASSERT: if we just created the file, then fdToHandle' won't fail
-        -- (so we don't need to worry about removing the newly created file
-        --  in the event of an error).
-
+openFile' filepath iomode binary non_blocking =
+  -- NB. don't forget to close the FD if mkHandleFromFD fails, otherwise
+  -- this FD leaks.
+  -- ASSERT: if we just created the file, then fdToHandle' won't fail
+  -- (so we don't need to worry about removing the newly created file
+  --  in the event of an error).
+  bracketOnError
+    -- first open the file to get an FD
+    (FD.openFile filepath iomode non_blocking)
+    (\(fd, _) -> IODevice.close fd)
+    (\(fd, fd_type) -> do
+      mb_codec <- if binary then return Nothing else fmap Just getLocaleEncoding
+      mkHandleFromFD fd fd_type filepath iomode
+                     False {- do not *set* non-blocking mode -}
+                     mb_codec
+    )
 
 -- ---------------------------------------------------------------------------
 -- Converting file descriptors from/to Handles
