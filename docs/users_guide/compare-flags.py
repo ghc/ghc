@@ -49,8 +49,11 @@ def read_documented_flags(doc_flags) -> Set[str]:
 
 def read_ghc_flags(ghc_path: str) -> Set[str]:
     ghc_output = subprocess.check_output([ghc_path, '--show-options'])
-    flags = {flag.strip() for flag in ghc_output.decode('UTF-8').split('\n')}
-    return {flag for flag in flags
+    ghci_output = subprocess.check_output([ghc_path, '--interactive', '--show-options'])
+
+    return {flag
+            for flag in ghc_output.decode('UTF-8').splitlines() +
+                        ghci_output.decode('UTF-8').splitlines()
             if not expected_undocumented(flag)
             if flag != ''}
 
@@ -61,9 +64,11 @@ def main() -> None:
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--ghc', type=argparse.FileType('r'),
-                        help='path of GHC executable')
+                        help='path of GHC executable',
+                        required=True)
     parser.add_argument('--doc-flags', type=argparse.FileType(mode='r', encoding='UTF-8'),
-                        help='path of ghc-flags.txt output from Sphinx')
+                        help='path of ghc-flags.txt output from Sphinx',
+                        required=True)
     args = parser.parse_args()
 
     doc_flags = read_documented_flags(args.doc_flags)

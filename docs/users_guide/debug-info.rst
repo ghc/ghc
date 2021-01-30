@@ -268,7 +268,7 @@ In particular GHC produces the following DWARF sections,
 ``.debug_arange``
   Address range information necessary for efficient lookup in debug information.
 
-.. _dwarf_dies:
+.. _dwarf-dies:
 
 Debugging information entities
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

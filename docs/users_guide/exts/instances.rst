@@ -324,6 +324,8 @@ Overlapping instances
 .. extension:: OverlappingInstances
     :shortdesc: Enable overlapping instances.
 
+    :since: 6.8.1
+
     Deprecated extension to weaken checks intended to ensure instance resolution
     termination.
 

@@ -300,7 +300,7 @@ configurable by a few flags.
        in the output.
     :type: dynamic
     :category: verbosity
-    :reverse: -fno-type-of-hole-fits
+    :reverse: -fno-show-type-of-hole-fits
 
     :default: on
 
