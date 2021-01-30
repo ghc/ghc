@@ -272,7 +272,7 @@ type instance XMultiIf       GhcPs = ApiAnn
 type instance XMultiIf       GhcRn = NoExtField
 type instance XMultiIf       GhcTc = Type
 
-type instance XLet           GhcPs = ApiAnn
+type instance XLet           GhcPs = ApiAnn' AnnsLet
 type instance XLet           GhcRn = NoExtField
 type instance XLet           GhcTc = NoExtField
 
@@ -340,6 +340,15 @@ data AnnExplicitSum
       aesClose      :: AnnAnchor
       } deriving Data
 
+data AnnsLet
+  = AnnsLet {
+      alTrailAnchor :: Anchor,
+       -- ^ The binds in a Let statement can change, this anchor lets
+       -- us adapt the 'in' part when editing the AST for exact
+       -- printing
+      alLet :: AnnAnchor,
+      alIn :: AnnAnchor
+      } deriving Data
 
 -- ---------------------------------------------------------------------
 
@@ -751,7 +760,7 @@ type instance XCmdIf      GhcPs = ApiAnn
 type instance XCmdIf      GhcRn = NoExtField
 type instance XCmdIf      GhcTc = NoExtField
 
-type instance XCmdLet     GhcPs = ApiAnn
+type instance XCmdLet     GhcPs = ApiAnn' AnnsLet
 type instance XCmdLet     GhcRn = NoExtField
 type instance XCmdLet     GhcTc = NoExtField
 

@@ -773,6 +773,27 @@ anchorFromLocatedA (L (SrcSpanAnn an loc) _)
 
 -- ---------------------------------------------------------------------
 
+addAnnOrigDeltas :: RealSrcSpan -> [AddApiAnn] -> [AddApiAnn]
+addAnnOrigDeltas anc ans = map doOne ans
+  where
+    doOne aa@(AddApiAnn kw (AD _)) = aa
+    doOne (AddApiAnn kw (AR r)) = (AddApiAnn kw (AD dp))
+      where
+       dp = ss2delta (ss2pos anc) r
+
+addApiAnnOrigDeltas :: RealSrcSpan -> ApiAnn -> ApiAnn
+addApiAnnOrigDeltas _ ApiAnnNotUsed = ApiAnnNotUsed
+addApiAnnOrigDeltas anc (ApiAnn a ans cs)
+  = ApiAnn a (addAnnOrigDeltas anc ans) cs
+
+
+-- lastSpan :: LocatedA a -> RealSrcSpan
+-- lastSpan (L (ApiAnn ApiAnnNotUsed loc) _) = loc
+-- lastSpan (L (ApiAnn ApiAnnNotUsed loc) _) = l
+--   where
+
+-- ---------------------------------------------------------------------
+
 balanceSameLineComments :: (Monad m)
   => LMatch GhcPs (LHsExpr GhcPs) -> TransformT m (LMatch GhcPs (LHsExpr GhcPs))
 balanceSameLineComments (L la (Match an mctxt pats (GRHSs x grhss lb))) = do
@@ -1039,7 +1060,12 @@ instance HasDecls (LocatedA (HsExpr GhcPs)) where
         modifyAnnsT (captureOrder e newDecls)
         decls'' <- replaceDeclsValbinds decls newDecls
         -- let decls' = L (getLoc decls) decls''
-        return (L l (HsLet x decls'' ex))
+        let lastAnc = case x of
+              ApiAnnNotUsed -> undefined
+              (ApiAnn _ a _) -> alTrailAnchor a
+        -- let x' = addApiAnnOrigDeltas lastAnc x
+        let x' = x
+        return (L l (HsLet x' decls'' ex))
 
   -- TODO: does this make sense? Especially as no hsDecls for HsPar
   replaceDecls (L l (HsPar x e)) newDecls

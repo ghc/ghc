@@ -2127,15 +2127,15 @@ instance ExactPrint (HsExpr GhcPs) where
 
   exact (HsLet an binds e) = do
     setLayoutBoth $ do -- Make sure the 'in' gets indented too
-      markApiAnn an AnnLet
-      markApiAnn an AnnOpenC -- '{'
+      markAnnKw an alIn AnnLet
+      -- markApiAnn an AnnOpenC -- '{'
       debugM $ "HSlet:binds coming"
       -- setLayoutD $ markAnnotated binds
       setLayoutBoth $ markAnnotated binds
       -- markAnnotated binds
       debugM $ "HSlet:binds done"
-      markApiAnn an AnnCloseC -- '}'
-      markApiAnn an AnnIn
+      -- markApiAnn an AnnCloseC -- '}'
+      markAnnKw an alIn AnnIn
       debugM $ "HSlet:expr coming"
       markAnnotated e
 
