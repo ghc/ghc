@@ -1431,7 +1431,7 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
     :: SrcSpan -> (ApiAnnComments -> MatchGroup GhcPs (LocatedA b)) -> PV (LocatedA b)
   -- | Disambiguate "let ... in ..."
   mkHsLetPV
-    :: SrcSpan -> HsLocalBinds GhcPs -> LocatedA b -> [AddApiAnn] -> PV (LocatedA b)
+    :: SrcSpan -> HsLocalBinds GhcPs -> LocatedA b -> AnnsLet -> PV (LocatedA b)
   -- | Infix operator representation
   type InfixOp b
   -- | Bring superclass constraints on InfixOp into scope.

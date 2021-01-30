@@ -104,6 +104,29 @@ isGoodDelta (DP (ro,co)) = ro >= 0 && co >= 0
 ss2delta :: Pos -> RealSrcSpan -> DeltaPos
 ss2delta ref ss = pos2delta ref (ss2pos ss)
 
+-- | create a delta from the end of a current span.  The +1 is because
+-- the stored position ends up one past the span, this is prior to
+-- that adjustment
+ss2deltaEnd :: RealSrcSpan -> RealSrcSpan -> DeltaPos
+ss2deltaEnd rs ss = ss2delta ref ss
+  where
+    (r,c) = ss2posEnd rs
+    ref = if r == 0
+             then (r,c+1)
+             else (r,c)
+
+-- | create a delta from the start of a current span.  The +1 is
+-- because the stored position ends up one past the span, this is
+-- prior to that adjustment
+ss2deltaStart :: RealSrcSpan -> RealSrcSpan -> DeltaPos
+ss2deltaStart rs ss = ss2delta ref ss
+  where
+    (r,c) = ss2pos rs
+    ref = if r == 0
+             -- then (r,c+1)
+             then (r,c)
+             else (r,c)
+
 -- | Convert the start of the second @Pos@ to be an offset from the
 -- first. The assumption is the reference starts before the second @Pos@
 pos2delta :: Pos -> Pos -> DeltaPos
@@ -168,6 +191,12 @@ stepDP (DP (a,b)) (DP (c,d))
 
 -- ---------------------------------------------------------------------
 
+adjustDeltaForOffset :: Int -> LayoutStartCol -> DeltaPos -> DeltaPos
+adjustDeltaForOffset _ _colOffset                      dp@(DP (0,_)) = dp -- same line
+adjustDeltaForOffset d (LayoutStartCol colOffset) (DP (l,c)) = DP (l,c - colOffset - d)
+
+-- ---------------------------------------------------------------------
+
 ss2pos :: RealSrcSpan -> Pos
 ss2pos ss = (srcSpanStartLine ss,srcSpanStartCol ss)
 
@@ -193,23 +222,6 @@ badRealSrcSpan :: RealSrcSpan
 badRealSrcSpan = mkRealSrcSpan bad bad
   where
     bad = mkRealSrcLoc (fsLit "ghc-exactprint-nospan") 0 0
-
-
--- srcSpanEndColumn :: SrcSpan -> Int
--- srcSpanEndColumn (RealSrcSpan s) = srcSpanEndCol s
--- srcSpanEndColumn _ = 0
-
--- srcSpanStartColumn :: SrcSpan -> Int
--- srcSpanStartColumn (RealSrcSpan s) = srcSpanStartCol s
--- srcSpanStartColumn _ = 0
-
--- srcSpanEndLine :: SrcSpan -> Int
--- srcSpanEndLine (RealSrcSpan s) = srcSpanEndLine s
--- srcSpanEndLine _ = 0
-
--- srcSpanStartLine :: SrcSpan -> Int
--- srcSpanStartLine (RealSrcSpan s) = srcSpanStartLine s
--- srcSpanStartLine _ = 0
 
 spanLength :: RealSrcSpan -> Int
 spanLength = (-) <$> srcSpanEndCol <*> srcSpanStartCol

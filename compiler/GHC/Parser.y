@@ -2802,7 +2802,7 @@ aexp    :: { ECP }
         | 'let' binds 'in' exp          {  ECP $
                                            unECP $4 >>= \ $4 ->
                                            mkHsLetPV (comb2A $1 $>) (unLoc $2) $4
-                                                 [mj AnnLet $1,mj AnnIn $3] }
+                                                 (AnnsLet (glAA $1) (glAA $3)) }
         | '\\' 'lcase' altslist
             {  ECP $ $3 >>= \ $3 ->
                  mkHsLamCasePV (comb2 $1 (reLoc $>)) $3 [mj AnnLam $1,mj AnnCase $2] }

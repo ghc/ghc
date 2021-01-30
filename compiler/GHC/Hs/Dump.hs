@@ -137,7 +137,7 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
 
             annAnchor :: AnnAnchor -> SDoc
             annAnchor (AR r) = parens $ text "AR" <+> realSrcSpan r
-            annAnchor (AD d) = parens $ text "AR" <+> deltaPos d
+            annAnchor (AD d) = parens $ text "AD" <+> deltaPos d
 
             deltaPos :: DeltaPos -> SDoc
             deltaPos (DP dp) = parens $ text "DP" <+> ppr dp

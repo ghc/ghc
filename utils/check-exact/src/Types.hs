@@ -329,4 +329,3 @@ instance Show LayoutStartCol where
 -- Duplicated here so it can be used in show instances
 showGhc :: (Outputable a) => a -> String
 showGhc = showPprUnsafe
-
