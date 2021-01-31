@@ -16,7 +16,7 @@ module GHCi.UI.Monad (
         GHCiOption(..), isOptionSet, setOption, unsetOption,
         Command(..), CommandResult(..), cmdSuccess,
         LocalConfigBehaviour(..),
-        PromptFunction,
+        PromptFunction, PromptFunctionWays(..),
         BreakLocation(..),
         TickArray,
         getDynFlags,
@@ -86,8 +86,8 @@ data GHCiState = GHCiState
         progname       :: String,
         args           :: [String],
         evalWrapper    :: ForeignHValue, -- ^ of type @IO a -> IO a@
-        prompt         :: PromptFunction,
-        prompt_cont    :: PromptFunction,
+        prompt         :: PromptFunctionWays,
+        prompt_cont    :: PromptFunctionWays,
         editor         :: String,
         stop           :: String,
         localConfig    :: LocalConfigBehaviour,
@@ -230,6 +230,14 @@ data BreakLocation
 instance Eq BreakLocation where
   loc1 == loc2 = breakModule loc1 == breakModule loc2 &&
                  breakTick loc1   == breakTick loc2
+
+-- | The different ways to specify a prompt function
+data PromptFunctionWays =
+        PfFun PromptFunction
+            -- ^ Full prompt function (from :set prompt / :set prompt-cont)
+        | PfNam String
+            -- ^ Only the name of the prompt function
+            --     (from :set prompt-function / :set prompt-cont-function)
 
 prettyLocations :: IntMap.IntMap BreakLocation -> SDoc
 prettyLocations  locs =

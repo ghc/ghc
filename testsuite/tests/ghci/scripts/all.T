@@ -98,7 +98,7 @@ test('ghci057', extra_hc_opts("-fno-ghci-leak-check"), ghci_script, ['ghci057.sc
   # See Note [Disabling ghci-leak-check]
 
 test('ghci060', normal, ghci_script, ['ghci060.script'])
-test('ghci061', normal, ghci_script, ['ghci061.script'])
+test('ghci061', extra_ways(['ghci-ext']), ghci_script, ['ghci061.script'])
 test('ghci062', [extra_files(['ghci062/', 'ghci062/Test.hs']),
                  when(config.have_ext_interp, extra_ways(['ghci-ext']))],
 		ghci_script, ['ghci062.script'])
