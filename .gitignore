@@ -125,6 +125,7 @@ _darcs/
 /docs/users_guide/utils.pyc
 /driver/ghci/ghc-pkg-inplace
 /driver/ghci/ghci-inplace
+/driver/ghci/ghci-wrapper.cabal
 /driver/ghci/ghci.res
 /driver/ghci/cwrapper.c
 /driver/ghci/cwrapper.h

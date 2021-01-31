@@ -1,3 +1,6 @@
+-- WARNING: ghci-wrapper.cabal is automatically generated from ghci-wrapper.cabal.in by
+-- ./configure.  Make sure you are editing ghci-wrapper.cabal.in, not ghci-wrapper.cabal.
+
 Name: ghci-wrapper
 Version: @ProjectVersion@
 Copyright: XXX
