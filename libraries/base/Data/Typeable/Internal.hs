@@ -990,7 +990,7 @@ mkTypeLitFromString :: TypeLitSort -> String -> SomeTypeRep
 mkTypeLitFromString TypeLitSymbol s =
     SomeTypeRep $ (typeLitTypeRep s tcSymbol :: TypeRep Symbol)
 mkTypeLitFromString TypeLitNat s =
-    SomeTypeRep $ (typeLitTypeRep s tcSymbol :: TypeRep Nat)
+    SomeTypeRep $ (typeLitTypeRep s tcNat :: TypeRep Nat)
 
 tcSymbol :: TyCon
 tcSymbol = typeRepTyCon (typeRep @Symbol)
