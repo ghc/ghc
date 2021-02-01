@@ -332,7 +332,8 @@ start:
                     break;
                 default:
                     if (tso->why_blocked != NotBlocked) {
-                        barf("awaitRequests: odd thread state");
+                        barf("awaitRequests: unexpected blocked reason: %u",
+                             tso->why_blocked);
                     }
                     break;
                 }
