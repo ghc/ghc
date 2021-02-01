@@ -18,6 +18,9 @@
   * Add `Eq1`, `Read1` and `Show1` instance for `Complex`;
     add `Eq1/2`, `Ord1/2`, `Show1/2` and `Read1/2` instances for 3 and 4-tuples.
 
+  * `(Data.Function.&)` is now levity-polymorphic in the function result
+    type, just like `($)`.
+
 ## 4.15.0.0 *TBA*
 
   * `openFile` now calls the `open` system call with an `interruptible` FFI

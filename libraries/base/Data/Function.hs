@@ -1,3 +1,5 @@
+{-# LANGUAGE ExplicitForAll #-}
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
@@ -25,7 +27,8 @@ module Data.Function
   , on
   ) where
 
-import GHC.Base ( ($), (.), id, const, flip )
+import GHC.Base ( ($), (.), id, const, flip, RuntimeRep )
+import GHC.Prim ( TYPE )
 
 infixl 0 `on`
 infixl 1 &
@@ -116,7 +119,7 @@ on :: (b -> b -> c) -> (a -> b) -> a -> a -> c
 -- "6"
 --
 -- @since 4.8.0.0
-(&) :: a -> (a -> b) -> b
+(&) :: forall {rep :: RuntimeRep} a (b :: TYPE rep). a -> (a -> b) -> b
 x & f = f x
 
 -- $setup
