@@ -1102,9 +1102,9 @@ check_valid_theta _ _ _ []
   = return ()
 check_valid_theta env ctxt expand theta
   = do { dflags <- getDynFlags
-       ; warnTcM (Reason Opt_WarnDuplicateConstraints)
-                 (wopt Opt_WarnDuplicateConstraints dflags && notNull dups)
-                 (dupPredWarn env dups)
+       ; diagnosticTcM (WarningWithFlag Opt_WarnDuplicateConstraints)
+                       (wopt Opt_WarnDuplicateConstraints dflags && notNull dups)
+                       (dupPredWarn env dups)
        ; traceTc "check_valid_theta" (ppr theta)
        ; mapM_ (check_pred_ty env dflags ctxt expand) theta }
   where
@@ -1297,8 +1297,8 @@ checkSimplifiableClassConstraint env dflags ctxt cls tys
   = do { result <- matchGlobalInst dflags False cls tys
        ; case result of
            OneInst { cir_what = what }
-              -> addWarnTc (Reason Opt_WarnSimplifiableClassConstraints)
-                                   (simplifiable_constraint_warn what)
+              -> addDiagnosticTc (WarningWithFlag Opt_WarnSimplifiableClassConstraints)
+                                 (simplifiable_constraint_warn what)
            _          -> return () }
   where
     pred = mkClassPred cls tys
@@ -2048,7 +2048,7 @@ checkValidCoAxiom ax@(CoAxiom { co_ax_tc = fam_tc, co_ax_branches = branches })
     --   (b) failure of injectivity
     check_branch_compat prev_branches cur_branch
       | cur_branch `isDominatedBy` prev_branches
-      = do { addWarnAt NoReason (coAxBranchSpan cur_branch) $
+      = do { addDiagnosticAt WarningWithoutFlag (coAxBranchSpan cur_branch) $
              inaccessibleCoAxBranch fam_tc cur_branch
            ; return prev_branches }
       | otherwise

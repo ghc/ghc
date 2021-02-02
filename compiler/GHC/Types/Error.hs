@@ -14,25 +14,31 @@ module GHC.Types.Error
    , unionMessages
    , MsgEnvelope (..)
    , WarnMsg
+
+   -- * Classifying Messages
+
+   , MessageClass (..)
+   , Severity (..)
+   , mkMCDiagnostic
+   , Diagnostic (..)
+   , DiagnosticMessage (..)
+   , DiagnosticReason (..)
+
+    -- * Rendering Messages
+
    , SDoc
    , DecoratedSDoc (unDecorated)
-   , Severity (..)
-   , RenderableDiagnostic (..)
    , pprMessageBag
    , mkDecorated
    , mkLocMessage
    , mkLocMessageAnn
-   , getSeverityColour
    , getCaretDiagnostic
-   , makeIntoWarning
-   -- * Constructing individual errors
+   -- * Constructing individual diagnostic messages
    , mkMsgEnvelope
    , mkPlainMsgEnvelope
-   , mkErr
    , mkLongMsgEnvelope
-   , mkWarnMsg
-   , mkPlainWarnMsg
-   , mkLongWarnMsg
+   , mkShortMsgEnvelope
+   , defaultReasonSeverity
    -- * Queries
    , isErrorMessage
    , isWarningMessage
@@ -65,10 +71,10 @@ We represent the 'Messages' as a single bag of warnings and errors.
 
 The reason behind that is that there is a fluid relationship between errors and warnings and we want to
 be able to promote or demote errors and warnings based on certain flags (e.g. -Werror, -fdefer-type-errors
-or -XPartialTypeSignatures). For now we rely on the 'Severity' to distinguish between a warning and an
-error, although the 'Severity' can be /more/ than just 'SevWarn' and 'SevError', and as such it probably
-shouldn't belong to an 'MsgEnvelope' to begin with, as it might potentially lead to the construction of
-"impossible states" (e.g. a waning with 'SevInfo', for example).
+or -XPartialTypeSignatures). More specifically, every diagnostic has a 'DiagnosticReason', but a warning
+'DiagnosticReason' might be associated with 'SevError', in the case of -Werror.
+
+We rely on the 'Severity' to distinguish between a warning and an error.
 
 'WarningMessages' and 'ErrorMessages' are for now simple type aliases to retain backward compatibility, but
 in future iterations these can be either parameterised over an 'e' message type (to make type signatures
@@ -98,10 +104,10 @@ addMessage x (Messages xs) = Messages (x `consBag` xs)
 unionMessages :: Messages e -> Messages e -> Messages e
 unionMessages (Messages msgs1) (Messages msgs2) = Messages (msgs1 `unionBags` msgs2)
 
-type WarningMessages = Bag (MsgEnvelope DecoratedSDoc)
-type ErrorMessages   = Bag (MsgEnvelope DecoratedSDoc)
+type WarningMessages = Bag (MsgEnvelope DiagnosticMessage)
+type ErrorMessages   = Bag (MsgEnvelope DiagnosticMessage)
 
-type WarnMsg         = MsgEnvelope DecoratedSDoc
+type WarnMsg         = MsgEnvelope DiagnosticMessage
 
 -- | A 'DecoratedSDoc' is isomorphic to a '[SDoc]' but it carries the invariant that the input '[SDoc]'
 -- needs to be rendered /decorated/ into its final form, where the typical case would be adding bullets
@@ -119,38 +125,83 @@ Note [Rendering Messages]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Turning 'Messages' into something that renders nicely for the user is one of the last steps, and it
-happens typically at the application boundaries (i.e. from the 'Driver' upwards).
+happens typically at the application's boundaries (i.e. from the 'Driver' upwards).
 
-For now (see #18516) this class is very boring as it has only one instance, but the idea is that as
+For now (see #18516) this class has few instance, but the idea is that as
 the more domain-specific types are defined, the more instances we would get. For example, given something like:
 
-data TcRnMessage
-  = TcRnOutOfScope ..
-  | ..
+  data TcRnDiagnostic
+    = TcRnOutOfScope ..
+    | ..
 
-We could then define how a 'TcRnMessage' is displayed to the user. Rather than scattering pieces of
+  newtype TcRnMessage = TcRnMessage (DiagnosticMessage TcRnDiagnostic)
+
+We could then define how a 'TcRnDiagnostic' is displayed to the user. Rather than scattering pieces of
 'SDoc' around the codebase, we would write once for all:
 
-instance RenderableDiagnostic TcRnMessage where
-  renderDiagnostic = \case
-    TcRnOutOfScope .. -> Decorated [text "Out of scope error ..."]
-    ...
+  instance Diagnostic TcRnDiagnostic where
+    diagnosticMessage (TcRnMessage msg) = case diagMessage msg of
+      TcRnOutOfScope .. -> Decorated [text "Out of scope error ..."]
+      ...
 
 This way, we can easily write generic rendering functions for errors that all they care about is the
-knowledge that a given type 'e' has a 'RenderableDiagnostic' constraint.
+knowledge that a given type 'e' has a 'Diagnostic' constraint.
 
 -}
 
--- | A class for types (typically errors and warnings) which can be \"rendered\" into an opaque 'DecoratedSDoc'.
--- For more information, see Note [Rendering Messages].
-class RenderableDiagnostic a where
-  renderDiagnostic :: a -> DecoratedSDoc
+-- | A class identifying a diagnostic.
+-- Dictionary.com defines a diagnostic as:
+--
+-- \"a message output by a computer diagnosing an error in a computer program, computer system,
+-- or component device\".
+--
+-- A 'Diagnostic' carries the /actual/ description of the message (which, in GHC's case, it can be
+-- an error or a warning) and the /reason/ why such message was generated in the first place.
+-- See also Note [Rendering Messages].
+class Diagnostic a where
+  diagnosticMessage :: a -> DecoratedSDoc
+  diagnosticReason  :: a -> DiagnosticReason
+
+-- | A generic 'Diagnostic' message, without any further classification or provenance:
+-- By looking at a 'DiagnosticMessage' we don't know neither /where/ it was generated nor how to
+-- intepret its payload (as it's just a structured document). All we can do is to print it out and
+-- look at its 'DiagnosticReason'.
+data DiagnosticMessage = DiagnosticMessage
+  { diagMessage :: !DecoratedSDoc
+  , diagReason  :: !DiagnosticReason
+  }
+
+instance Diagnostic DiagnosticMessage where
+  diagnosticMessage = diagMessage
+  diagnosticReason  = diagReason
+
+-- | The reason /why/ a 'Diagnostic' was emitted in the first place. Diagnostic messages
+-- are born within GHC with a very precise reason, which can be completely statically-computed
+-- (i.e. this is an error or a warning no matter what), or influenced by the specific state
+-- of the 'DynFlags' at the moment of the creation of a new 'Diagnostic'. For example, a parsing
+-- error is /always/ going to be an error, whereas a 'WarningWithoutFlag Opt_WarnUnusedImports' might turn
+-- into an error due to '-Werror' or '-Werror=warn-unused-imports'. Interpreting a 'DiagnosticReason'
+-- together with its associated 'Severity' gives us the full picture.
+data DiagnosticReason
+  = WarningWithoutFlag
+  -- ^ Born as a warning.
+  | WarningWithFlag !WarningFlag
+  -- ^ Warning was enabled with the flag.
+  | ErrorWithoutFlag
+  -- ^ Born as an error.
+  deriving (Eq, Show)
+
+instance Outputable DiagnosticReason where
+  ppr = \case
+    WarningWithoutFlag              -> text "WarningWithoutFlag"
+    WarningWithFlag wf              -> text ("WarningWithFlag " ++ show wf)
+    ErrorWithoutFlag                -> text "ErrorWithoutFlag"
 
 -- | An envelope for GHC's facts about a running program, parameterised over the
 -- /domain-specific/ (i.e. parsing, typecheck-renaming, etc) diagnostics.
 --
 -- To say things differently, GHC emits /diagnostics/ about the running program, each of which is wrapped
--- into a 'MsgEnvelope' that carries specific information like where the error happened, its severity, etc.
+-- into a 'MsgEnvelope' that carries specific information like where the error happened, etc.
 -- Finally, multiple 'MsgEnvelope's are aggregated into 'Messages' that are returned to the user.
 data MsgEnvelope e = MsgEnvelope
    { errMsgSpan        :: SrcSpan
@@ -158,102 +209,139 @@ data MsgEnvelope e = MsgEnvelope
    , errMsgContext     :: PrintUnqualified
    , errMsgDiagnostic  :: e
    , errMsgSeverity    :: Severity
-   , errMsgReason      :: WarnReason
    } deriving Functor
 
-instance RenderableDiagnostic DecoratedSDoc where
-  renderDiagnostic = id
+-- | The class for a diagnostic message. The main purpose is to classify a message within GHC,
+-- to distinguish it from a debug/dump message vs a proper diagnostic, for which we include a 'DiagnosticReason'.
+data MessageClass
+  = MCOutput
+  | MCFatal
+  | MCInteractive
 
-data Severity
-  = SevOutput
-  | SevFatal
-  | SevInteractive
-
-  | SevDump
+  | MCDump
     -- ^ Log message intended for compiler developers
     -- No file\/line\/column stuff
 
-  | SevInfo
+  | MCInfo
     -- ^ Log messages intended for end users.
     -- No file\/line\/column stuff.
 
-  | SevWarning
-  | SevError
-    -- ^ SevWarning and SevError are used for warnings and errors
-    --   o The message has a file\/line\/column heading,
-    --     plus "warning:" or "error:",
-    --     added by mkLocMessags
-    --   o Output is intended for end users
+  | MCDiagnostic Severity DiagnosticReason
+    -- ^ Diagnostics from the compiler. This constructor
+    -- is very powerful as it allows the construction
+    -- of a 'MessageClass' with a completely arbitrary
+    -- permutation of 'Severity' and 'DiagnosticReason'. As such,
+    -- users are encouraged to use the 'mkMCDiagnostic' smart constructor instead.
+    -- Use this constructor directly only if you need to construct and manipulate diagnostic
+    -- messages directly, for example inside 'GHC.Utils.Error'. In all the other circumstances,
+    -- /especially/ when emitting compiler diagnostics, use the smart constructor.
   deriving (Eq, Show)
 
+-- | Make a 'MessageClass' for a given 'DiagnosticReason', without consulting the 'DynFlags'.
+-- This will not respect -Werror or warning suppression and so is probably wrong
+-- for any warning.
+mkMCDiagnostic :: DiagnosticReason -> MessageClass
+mkMCDiagnostic reason = MCDiagnostic (defaultReasonSeverity reason) reason
+
+-- | Used to describe warnings and errors
+--   o The message has a file\/line\/column heading,
+--     plus "warning:" or "error:",
+--     added by mkLocMessage
+--   o Output is intended for end users
+data Severity
+  = SevWarning
+  | SevError
+  deriving (Eq, Show)
+
+instance Outputable Severity where
+  ppr = \case
+    SevWarning -> text "SevWarning"
+    SevError   -> text "SevError"
 
 instance ToJson Severity where
   json s = JSString (show s)
 
-instance Show (MsgEnvelope DecoratedSDoc) where
+instance ToJson MessageClass where
+  json MCOutput = JSString "MCOutput"
+  json MCFatal  = JSString "MCFatal"
+  json MCInteractive = JSString "MCInteractive"
+  json MCDump = JSString "MCDump"
+  json MCInfo = JSString "MCInfo"
+  json (MCDiagnostic sev reason) =
+    JSString $ renderWithContext defaultSDocContext (ppr $ text "MCDiagnostic" <+> ppr sev <+> ppr reason)
+
+instance Show (MsgEnvelope DiagnosticMessage) where
     show = showMsgEnvelope
 
 -- | Shows an 'MsgEnvelope'.
-showMsgEnvelope :: RenderableDiagnostic a => MsgEnvelope a -> String
+showMsgEnvelope :: Diagnostic a => MsgEnvelope a -> String
 showMsgEnvelope err =
-  renderWithContext defaultSDocContext (vcat (unDecorated . renderDiagnostic $ errMsgDiagnostic err))
+  renderWithContext defaultSDocContext (vcat (unDecorated . diagnosticMessage $ errMsgDiagnostic err))
 
 pprMessageBag :: Bag SDoc -> SDoc
 pprMessageBag msgs = vcat (punctuate blankLine (bagToList msgs))
 
 -- | Make an unannotated error message with location info.
-mkLocMessage :: Severity -> SrcSpan -> SDoc -> SDoc
+mkLocMessage :: MessageClass -> SrcSpan -> SDoc -> SDoc
 mkLocMessage = mkLocMessageAnn Nothing
 
 -- | Make a possibly annotated error message with location info.
 mkLocMessageAnn
   :: Maybe String                       -- ^ optional annotation
-  -> Severity                           -- ^ severity
+  -> MessageClass                       -- ^ What kind of message?
   -> SrcSpan                            -- ^ location
-  -> SDoc                             -- ^ message
+  -> SDoc                               -- ^ message
   -> SDoc
   -- Always print the location, even if it is unhelpful.  Error messages
   -- are supposed to be in a standard format, and one without a location
   -- would look strange.  Better to say explicitly "<no location info>".
-mkLocMessageAnn ann severity locn msg
+mkLocMessageAnn ann msg_class locn msg
     = sdocOption sdocColScheme $ \col_scheme ->
       let locn' = sdocOption sdocErrorSpans $ \case
                      True  -> ppr locn
                      False -> ppr (srcSpanStart locn)
 
-          sevColour = getSeverityColour severity col_scheme
+          msgColour = getMessageClassColour msg_class col_scheme
 
           -- Add optional information
           optAnn = case ann of
             Nothing -> text ""
-            Just i  -> text " [" <> coloured sevColour (text i) <> text "]"
+            Just i  -> text " [" <> coloured msgColour (text i) <> text "]"
 
           -- Add prefixes, like    Foo.hs:34: warning:
           --                           <the warning message>
           header = locn' <> colon <+>
-                   coloured sevColour sevText <> optAnn
+                   coloured msgColour msgText <> optAnn
 
       in coloured (Col.sMessage col_scheme)
                   (hang (coloured (Col.sHeader col_scheme) header) 4
                         msg)
 
   where
-    sevText =
-      case severity of
-        SevWarning -> text "warning:"
-        SevError   -> text "error:"
-        SevFatal   -> text "fatal:"
-        _          -> empty
+    msgText =
+      case msg_class of
+        MCDiagnostic SevError _reason   -> text "error:"
+        MCDiagnostic SevWarning _reason -> text "warning:"
+        MCFatal                         -> text "fatal:"
+        _                               -> empty
 
-getSeverityColour :: Severity -> Col.Scheme -> Col.PprColour
-getSeverityColour SevWarning = Col.sWarning
-getSeverityColour SevError   = Col.sError
-getSeverityColour SevFatal   = Col.sFatal
-getSeverityColour _          = const mempty
+-- | Computes a severity from a reason in the absence of DynFlags. This will likely
+-- be wrong in the presence of -Werror. It will be removed in the context of #18516.
+defaultReasonSeverity :: DiagnosticReason -> Severity
+defaultReasonSeverity = \case
+  WarningWithoutFlag    -> SevWarning
+  WarningWithFlag _flag -> SevWarning
+  ErrorWithoutFlag      -> SevError
 
-getCaretDiagnostic :: Severity -> SrcSpan -> IO SDoc
+getMessageClassColour :: MessageClass -> Col.Scheme -> Col.PprColour
+getMessageClassColour (MCDiagnostic SevError _reason)   = Col.sError
+getMessageClassColour (MCDiagnostic SevWarning _reason) = Col.sWarning
+getMessageClassColour MCFatal                           = Col.sFatal
+getMessageClassColour _                                 = const mempty
+
+getCaretDiagnostic :: MessageClass -> SrcSpan -> IO SDoc
 getCaretDiagnostic _ (UnhelpfulSpan _) = pure empty
-getCaretDiagnostic severity (RealSrcSpan span _) =
+getCaretDiagnostic msg_class (RealSrcSpan span _) =
   caretDiagnostic <$> getSrcLine (srcSpanFile span) row
   where
     getSrcLine fn i =
@@ -286,7 +374,7 @@ getCaretDiagnostic severity (RealSrcSpan span _) =
     caretDiagnostic Nothing = empty
     caretDiagnostic (Just srcLineWithNewline) =
       sdocOption sdocColScheme$ \col_scheme ->
-      let sevColour = getSeverityColour severity col_scheme
+      let sevColour = getMessageClassColour msg_class col_scheme
           marginColour = Col.sMargin col_scheme
       in
       coloured marginColour (text marginSpace) <>
@@ -327,61 +415,79 @@ getCaretDiagnostic severity (RealSrcSpan span _) =
                       | otherwise = ""
         caretLine = replicate start ' ' ++ replicate width '^' ++ caretEllipsis
 
-makeIntoWarning :: WarnReason -> MsgEnvelope e -> MsgEnvelope e
-makeIntoWarning reason err = err
-    { errMsgSeverity = SevWarning
-    , errMsgReason = reason }
-
 --
 -- Creating MsgEnvelope(s)
 --
 
-mk_err_msg
-  :: Severity -> SrcSpan -> PrintUnqualified -> e -> MsgEnvelope e
-mk_err_msg sev locn print_unqual err
+mkMsgEnvelope
+  :: Diagnostic e
+  => Severity
+  -> SrcSpan
+  -> PrintUnqualified
+  -> e
+  -> MsgEnvelope e
+mkMsgEnvelope sev locn print_unqual err
  = MsgEnvelope { errMsgSpan = locn
                , errMsgContext = print_unqual
                , errMsgDiagnostic = err
                , errMsgSeverity = sev
-               , errMsgReason = NoReason }
+               }
 
-mkErr :: SrcSpan -> PrintUnqualified -> e -> MsgEnvelope e
-mkErr = mk_err_msg SevError
+-- | A long (multi-line) diagnostic message.
+-- The 'Severity' will be calculated out of the 'DiagnosticReason', and will likely be
+-- incorrect in the presence of '-Werror'.
+mkLongMsgEnvelope :: DiagnosticReason
+                  -> SrcSpan
+                  -> PrintUnqualified
+                  -> SDoc
+                  -> SDoc
+                  -> MsgEnvelope DiagnosticMessage
+mkLongMsgEnvelope rea locn unqual msg extra =
+  mkMsgEnvelope (defaultReasonSeverity rea) -- wrong, but will be fixed in printOrThrowWarnings
+                locn unqual (DiagnosticMessage (mkDecorated [msg,extra]) rea)
 
-mkLongMsgEnvelope, mkLongWarnMsg   :: SrcSpan -> PrintUnqualified -> SDoc -> SDoc -> MsgEnvelope DecoratedSDoc
--- ^ A long (multi-line) error message
-mkMsgEnvelope, mkWarnMsg           :: SrcSpan -> PrintUnqualified -> SDoc         -> MsgEnvelope DecoratedSDoc
--- ^ A short (one-line) error message
-mkPlainMsgEnvelope, mkPlainWarnMsg :: SrcSpan ->                     SDoc         -> MsgEnvelope DecoratedSDoc
--- ^ Variant that doesn't care about qualified/unqualified names
+-- | A short (one-line) diagnostic message.
+-- Same 'Severity' considerations as for 'mkLongMsgEnvelope'.
+mkShortMsgEnvelope :: DiagnosticReason
+                   -> SrcSpan
+                   -> PrintUnqualified
+                   -> SDoc
+                   -> MsgEnvelope DiagnosticMessage
+mkShortMsgEnvelope rea locn unqual msg =
+  mkMsgEnvelope (defaultReasonSeverity rea) -- wrong, but will be fixed in printOrThrowWarnings
+                locn unqual (DiagnosticMessage (mkDecorated [msg]) rea)
 
-mkLongMsgEnvelope   locn unqual msg extra = mk_err_msg SevError   locn unqual        (mkDecorated [msg,extra])
-mkMsgEnvelope       locn unqual msg       = mk_err_msg SevError   locn unqual        (mkDecorated [msg])
-mkPlainMsgEnvelope  locn        msg       = mk_err_msg SevError   locn alwaysQualify (mkDecorated [msg])
-mkLongWarnMsg       locn unqual msg extra = mk_err_msg SevWarning locn unqual        (mkDecorated [msg,extra])
-mkWarnMsg           locn unqual msg       = mk_err_msg SevWarning locn unqual        (mkDecorated [msg])
-mkPlainWarnMsg      locn        msg       = mk_err_msg SevWarning locn alwaysQualify (mkDecorated [msg])
+-- | Variant that doesn't care about qualified/unqualified names.
+-- Same 'Severity' considerations as for 'mkLongMsgEnvelope'.
+mkPlainMsgEnvelope :: DiagnosticReason
+                   -> SrcSpan
+                   -> SDoc
+                   -> MsgEnvelope DiagnosticMessage
+mkPlainMsgEnvelope rea locn msg =
+  mkMsgEnvelope (defaultReasonSeverity rea) -- wrong, but will be fixed in printOrThrowWarnings
+                locn alwaysQualify (DiagnosticMessage (mkDecorated [msg]) rea)
 
 --
 -- Queries
 --
 
-isErrorMessage :: MsgEnvelope e -> Bool
-isErrorMessage = (== SevError) . errMsgSeverity
+isErrorMessage :: Diagnostic e => MsgEnvelope e -> Bool
+isErrorMessage MsgEnvelope { errMsgSeverity = SevError } = True
+isErrorMessage _ = False
 
-isWarningMessage :: MsgEnvelope e -> Bool
+isWarningMessage :: Diagnostic e => MsgEnvelope e -> Bool
 isWarningMessage = not . isErrorMessage
 
-errorsFound :: Messages e -> Bool
+errorsFound :: Diagnostic e => Messages e -> Bool
 errorsFound (Messages msgs) = any isErrorMessage msgs
 
-getWarningMessages :: Messages e -> Bag (MsgEnvelope e)
+getWarningMessages :: Diagnostic e => Messages e -> Bag (MsgEnvelope e)
 getWarningMessages (Messages xs) = fst $ partitionBag isWarningMessage xs
 
-getErrorMessages :: Messages e -> Bag (MsgEnvelope e)
+getErrorMessages :: Diagnostic e => Messages e -> Bag (MsgEnvelope e)
 getErrorMessages (Messages xs) = fst $ partitionBag isErrorMessage xs
 
 -- | Partitions the 'Messages' and returns a tuple which first element are the warnings, and the
 -- second the errors.
-partitionMessages :: Messages e -> (Bag (MsgEnvelope e), Bag (MsgEnvelope e))
+partitionMessages :: Diagnostic e => Messages e -> (Bag (MsgEnvelope e), Bag (MsgEnvelope e))
 partitionMessages (Messages xs) = partitionBag isWarningMessage xs
