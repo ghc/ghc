@@ -393,31 +393,24 @@ initUnitConfig dflags cached_dbs =
 type ModuleNameProvidersMap =
     Map ModuleName (Map Module ModuleOrigin)
 
-data UnitState = UnitState {
+data ConsolidatedUnitDb = ConsolidatedUnitDb {
   -- | A mapping of 'Unit' to 'UnitInfo'.  This list is adjusted
   -- so that only valid units are here.  'UnitInfo' reflects
   -- what was stored *on disk*, except for the 'trusted' flag, which
   -- is adjusted at runtime.  (In particular, some units in this map
   -- may have the 'exposed' flag be 'False'.)
   unitInfoMap :: UnitInfoMap,
-
-  -- | The set of transitively reachable units according
-  -- to the explicitly provided command line arguments.
-  -- A fully instantiated VirtUnit may only be replaced by a RealUnit from
-  -- this set.
-  -- See Note [VirtUnit to RealUnit improvement]
-  preloadClosure :: PreloadUnitClosure,
-
   -- | A mapping of 'PackageName' to 'IndefUnitId'.  This is used when
   -- users refer to packages in Backpack includes.
   packageNameMap            :: UniqFM PackageName IndefUnitId,
-
   -- | A mapping from database unit keys to wired in unit ids.
   wireMap :: Map UnitId UnitId,
-
   -- | A mapping from wired in unit ids to unit keys from the database.
   unwireMap :: Map UnitId UnitId,
 
+  }
+
+data ExternalModuleView = ExternalModuleView  {
   -- | The units we're going to link in eagerly.  This list
   -- should be in reverse dependency order; that is, a unit
   -- is always mentioned before the units it depends on.
@@ -443,7 +436,6 @@ data UnitState = UnitState {
   --
   -- There's an entry in this map for each hole in our home library.
   requirementContext :: Map ModuleName [InstantiatedModule],
-
   -- | Indicate if we can instantiate units on-the-fly.
   --
   -- This should only be true when we are type-checking an indefinite unit.
