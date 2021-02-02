@@ -1,4 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP, MagicHash, NoImplicitPrelude, UnboxedTuples #-}
 
 module GHC.Event.IntVar
@@ -9,13 +10,15 @@ module GHC.Event.IntVar
     ) where
 
 import GHC.Base
+import GHC.Bits
 
 data IntVar = IntVar (MutableByteArray# RealWorld)
 
 newIntVar :: Int -> IO IntVar
 newIntVar n = do
+  let !(I# size) = finiteBitSize (0 :: Int) `unsafeShiftR` 3
   iv <- IO $ \s ->
-    case newByteArray# 1# s of
+    case newByteArray# size s of
       (# s', mba #) -> (# s', IntVar mba #)
   writeIntVar iv n
   return iv

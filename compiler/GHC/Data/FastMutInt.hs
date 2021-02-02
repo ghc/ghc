@@ -34,7 +34,7 @@ data FastMutInt = FastMutInt (MutableByteArray# RealWorld)
 newFastMutInt = IO $ \s ->
   case newByteArray# size s of { (# s, arr #) ->
   (# s, FastMutInt arr #) }
-  where !(I# size) = finiteBitSize (0 :: Int)
+  where !(I# size) = finiteBitSize (0 :: Int) `unsafeShiftR` 3
 
 readFastMutInt (FastMutInt arr) = IO $ \s ->
   case readIntArray# arr 0# s of { (# s, i #) ->
@@ -50,7 +50,7 @@ newFastMutPtr = IO $ \s ->
   case newByteArray# size s of { (# s, arr #) ->
   (# s, FastMutPtr arr #) }
   -- GHC assumes 'sizeof (Int) == sizeof (Ptr a)'
-  where !(I# size) = finiteBitSize (0 :: Int)
+  where !(I# size) = finiteBitSize (0 :: Int) `unsafeShiftR` 3
 
 readFastMutPtr (FastMutPtr arr) = IO $ \s ->
   case readAddrArray# arr 0# s of { (# s, i #) ->
