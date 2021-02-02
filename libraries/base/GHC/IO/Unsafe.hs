@@ -102,7 +102,8 @@ like 'Control.Exception.bracket' cannot be used safely within
 @since 4.4.0.0
 -}
 unsafeDupablePerformIO  :: IO a -> a
-unsafeDupablePerformIO (IO m) = case runRW# m of (# _, a #) -> a
+-- See Note [NOINLINE and strictness] in GHC.Core.Opt.DmdAnal about the `lazy`
+unsafeDupablePerformIO (IO m) = case runRW# m of (# _, a #) -> lazy a
 
 {-|
 'unsafeInterleaveIO' allows an 'IO' computation to be deferred lazily.

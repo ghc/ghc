@@ -1319,7 +1319,7 @@ This should be strict in x.
 
 So the new plan is to define unsafePerformIO using the 'lazy' combinator:
 
-        unsafePerformIO (IO m) = lazy (case m realWorld# of (# _, r #) -> r)
+        unsafePerformIO (IO m) = (case m realWorld# of (# _, r #) -> lazy r)
 
 Remember, 'lazy' is a wired-in identity-function Id, of type a->a, which is
 magically NON-STRICT, and is inlined after strictness analysis.  So
