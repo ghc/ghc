@@ -3,7 +3,7 @@ T13610.hs:11:15: error:
     • Couldn't match a lifted type with an unlifted type
       When matching types
         a :: *
-        Weak# () :: TYPE 'UnliftedRep
+        Weak# () :: TYPE ('BoxedRep 'Unlifted)
       Expected: (# State# RealWorld, a #)
         Actual: (# State# RealWorld, Weak# () #)
     • In the expression: mkWeakNoFinalizer# double () s

@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP                #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE MultiWayIf         #-}
 
 {-# OPTIONS_HADDOCK not-home #-}
 
@@ -90,7 +91,7 @@ import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 
 -- others
-import GHC.Builtin.Names ( liftedRepDataConKey )
+import GHC.Builtin.Names ( liftedTypeKindTyConKey, boxedRepDataConKey, liftedDataConKey, manyDataConKey, tYPETyConKey )
 import {-# SOURCE #-} GHC.Builtin.Types ( liftedTypeKind, manyDataConTy )
 import {-# SOURCE #-} GHC.Builtin.Types.Prim ( tYPETyCon )
 import GHC.Types.Basic ( LeftOrRight(..), pickLR )
@@ -1064,9 +1065,12 @@ See #17958.
 -- | Given a RuntimeRep, applies TYPE to it.
 -- See Note [TYPE and RuntimeRep] in GHC.Builtin.Types.Prim.
 tYPE :: Type -> Type
-tYPE (TyConApp tc [])
+tYPE rr@(TyConApp tc [arg])
   -- See Note [Prefer Type of TYPE 'LiftedRep]
-  | tc `hasKey` liftedRepDataConKey = liftedTypeKind  -- TYPE 'LiftedRep
+  | tc `hasKey` boxedRepDataConKey
+  , TyConApp tc' [] <- arg
+  , tc' `hasKey` liftedDataConKey
+  = liftedTypeKind  -- TYPE 'LiftedRep
 tYPE rr = TyConApp tYPETyCon [rr]
 
 {-
