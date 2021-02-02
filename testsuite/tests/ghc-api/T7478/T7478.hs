@@ -12,9 +12,10 @@ import qualified GHC.Driver.Ppr as GHC
 import GHC.Driver.Monad (liftIO)
 import GHC.Utils.Outputable (PprStyle, queryQual)
 import GHC.Unit.State
+import GHC.Types.Error
 
 compileInGhc :: [FilePath]          -- ^ Targets
-             -> (String -> IO ())   -- ^ handler for each SevOutput message
+             -> (String -> IO ())   -- ^ handler for each MCOutput message
              -> Ghc ()
 compileInGhc targets handlerOutput = do
     -- Set flags
@@ -44,9 +45,9 @@ compileInGhc targets handlerOutput = do
         TargetFile file Nothing -> file
         _ -> error "fileFromTarget: not a known target"
 
-    collectSrcError handlerOutput flags _ SevOutput _srcspan msg
+    collectSrcError handlerOutput flags MCOutput _srcspan msg
       = handlerOutput $ GHC.showSDocForUser flags emptyUnitState alwaysQualify msg
-    collectSrcError _ _ _ _ _ _
+    collectSrcError _ _ _ _ _
       = return ()
 
 main :: IO ()

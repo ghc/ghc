@@ -133,7 +133,7 @@ reportUnsolved wanted
        ; defer_errors <- goptM Opt_DeferTypeErrors
        ; warn_errors <- woptM Opt_WarnDeferredTypeErrors -- implement #10283
        ; let type_errors | not defer_errors = TypeError
-                         | warn_errors      = TypeWarn (Reason Opt_WarnDeferredTypeErrors)
+                         | warn_errors      = TypeWarn (WarnReason Opt_WarnDeferredTypeErrors)
                          | otherwise        = TypeDefer
 
        ; defer_holes <- goptM Opt_DeferTypedHoles
@@ -187,7 +187,7 @@ reportAllUnsolved wanted
 warnAllUnsolved :: WantedConstraints -> TcM ()
 warnAllUnsolved wanted
   = do { ev_binds <- newTcEvBinds
-       ; report_unsolved (TypeWarn NoReason) HoleWarn HoleWarn HoleWarn
+       ; report_unsolved (TypeWarn NoWarnReason) HoleWarn HoleWarn HoleWarn
                          ev_binds wanted }
 
 -- | Report unsolved goals as errors or warnings.
@@ -493,13 +493,13 @@ warnRedundantConstraints ctxt env info ev_vars
    addErrCtxt (text "In" <+> ppr info) $
    do { env <- getLclEnv
       ; msg <- mkErrorReport ctxt env (important doc)
-      ; reportWarning (Reason Opt_WarnRedundantConstraints) msg }
+      ; reportWarning $ demote_error (WarnReason Opt_WarnRedundantConstraints) msg }
 
  | otherwise  -- But for InstSkol there already *is* a surrounding
               -- "In the instance declaration for Eq [a]" context
               -- and we don't want to say it twice. Seems a bit ad-hoc
  = do { msg <- mkErrorReport ctxt env (important doc)
-      ; reportWarning (Reason Opt_WarnRedundantConstraints) msg }
+      ; reportWarning $ demote_error (WarnReason Opt_WarnRedundantConstraints) msg }
  where
    doc = text "Redundant constraint" <> plural redundant_evs <> colon
          <+> pprEvVarTheta redundant_evs
@@ -779,7 +779,7 @@ mkGivenErrorReporter ctxt cts
        ; err <- mkEqErr_help dflags ctxt report ct' ty1 ty2
 
        ; traceTc "mkGivenErrorReporter" (ppr ct)
-       ; reportWarning (Reason Opt_WarnInaccessibleCode) err }
+       ; reportWarning $ demote_error (WarnReason Opt_WarnInaccessibleCode) err }
   where
     (ct : _ )  = cts    -- Never empty
     (ty1, ty2) = getEqPredTys (ctPred ct)
@@ -889,7 +889,7 @@ maybeReportHoleError ctxt hole err
     case cec_out_of_scope_holes ctxt of
       HoleError -> reportError err
       HoleWarn  ->
-        reportWarning (Reason Opt_WarnDeferredOutOfScopeVariables) err
+        reportWarning $ demote_error (WarnReason Opt_WarnDeferredOutOfScopeVariables) err
       HoleDefer -> return ()
 
 -- Unlike maybeReportError, these "hole" errors are
@@ -906,7 +906,7 @@ maybeReportHoleError ctxt (Hole { hole_sort = hole_sort }) err
     -- only if -fwarn-partial-type-signatures is on
     case cec_type_holes ctxt of
        HoleError -> reportError err
-       HoleWarn  -> reportWarning (Reason Opt_WarnPartialTypeSignatures) err
+       HoleWarn  -> reportWarning $ demote_error (WarnReason Opt_WarnPartialTypeSignatures) err
        HoleDefer -> return ()
 
 maybeReportHoleError ctxt hole err
@@ -917,7 +917,7 @@ maybeReportHoleError ctxt hole err
     ASSERT( not (isOutOfScopeHole hole) )
     case cec_expr_holes ctxt of
        HoleError -> reportError err
-       HoleWarn  -> reportWarning (Reason Opt_WarnTypedHoles) err
+       HoleWarn  -> reportWarning $ demote_error (WarnReason Opt_WarnTypedHoles) err
        HoleDefer -> return ()
 
 maybeReportError :: ReportErrCtxt -> MsgEnvelope DecoratedSDoc -> TcM ()
@@ -929,7 +929,7 @@ maybeReportError ctxt err
   | otherwise
   = case cec_defer_type_errors ctxt of
       TypeDefer       -> return ()
-      TypeWarn reason -> reportWarning reason err
+      TypeWarn reason -> reportWarning $ demote_error reason err
       TypeError       -> reportError err
 
 addDeferredBinding :: ReportErrCtxt -> MsgEnvelope DecoratedSDoc -> Ct -> TcM ()
@@ -1055,7 +1055,8 @@ mkErrorMsgFromCt ctxt ct report
 mkErrorReport :: ReportErrCtxt -> TcLclEnv -> Report -> TcM (MsgEnvelope DecoratedSDoc)
 mkErrorReport ctxt tcl_env (Report important relevant_bindings valid_subs)
   = do { context <- mkErrInfo (cec_tidy ctxt) (tcl_ctxt tcl_env)
-       ; mkDecoratedSDocAt (RealSrcSpan (tcl_loc tcl_env) Nothing)
+       ; mkDecoratedSDocAt sevErrorNoReason
+                           (RealSrcSpan (tcl_loc tcl_env) Nothing)
                            (vcat important)
                            context
                            (vcat $ relevant_bindings ++ valid_subs)
@@ -1176,7 +1177,8 @@ mkHoleError _tidy_simples _ctxt hole@(Hole { hole_occ = occ
        ; imp_info <- getImports
        ; curr_mod <- getModule
        ; hpt <- getHpt
-       ; mkDecoratedSDocAt (RealSrcSpan (tcl_loc lcl_env) Nothing)
+       ; mkDecoratedSDocAt sevErrorNoReason
+                           (RealSrcSpan (tcl_loc lcl_env) Nothing)
                            out_of_scope_msg O.empty
                            (unknownNameSuggestions dflags hpt curr_mod rdr_env
                             (tcl_rdr lcl_env) imp_info (mkRdrUnqual occ)) }
@@ -3004,7 +3006,7 @@ warnDefaulting wanteds default_ty
                            , quotes (ppr default_ty) ])
                      2
                      ppr_wanteds
-       ; setCtLocM loc $ warnTc (Reason Opt_WarnTypeDefaults) warn_default warn_msg }
+       ; setCtLocM loc $ warnTc (WarnReason Opt_WarnTypeDefaults) warn_default warn_msg }
 
 {-
 Note [Runtime skolems]
@@ -3041,3 +3043,7 @@ solverDepthErrorTcS loc ty
       , text "(any upper bound you could choose might fail unpredictably with"
       , text " minor updates to GHC, so disabling the check is recommended if"
       , text " you're sure that type checking should terminate)" ]
+
+-- | Demotes an error into a warning.
+demote_error :: WarnReason -> MsgEnvelope e -> MsgEnvelope e
+demote_error reason msg = msg { errMsgSeverity = SevWarning reason }

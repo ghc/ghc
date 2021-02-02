@@ -1098,7 +1098,7 @@ instance TH.Quasi TcM where
   -- 'msg' is forced to ensure exceptions don't escape,
   -- see Note [Exceptions in TH]
   qReport True msg  = seqList msg $ addErr  (text msg)
-  qReport False msg = seqList msg $ addWarn NoReason (text msg)
+  qReport False msg = seqList msg $ addWarn NoWarnReason (text msg)
 
   qLocation = do { m <- getModule
                  ; l <- getSrcSpanM

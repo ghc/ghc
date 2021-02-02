@@ -12,11 +12,12 @@
 module GHC.Utils.Error (
         -- * Basic types
         Validity(..), andValid, allValid, isValid, getInvalids, orValid,
-        Severity(..),
+        Severity(..), sevWarnNoReason, sevErrorNoReason,
 
         -- * Messages
         WarnMsg,
         MsgEnvelope(..),
+        MessageClass(..),
         SDoc,
         DecoratedSDoc(unDecorated),
         Messages, ErrorMessages, WarningMessages,
@@ -29,10 +30,8 @@ module GHC.Utils.Error (
         formatBulleted,
 
         -- ** Construction
-        emptyMessages, mkDecorated, mkLocMessage, mkLocMessageAnn, makeIntoWarning,
-        mkMsgEnvelope, mkPlainMsgEnvelope, mkErr, mkLongMsgEnvelope, mkWarnMsg,
-        mkPlainWarnMsg,
-        mkLongWarnMsg,
+        emptyMessages, mkDecorated, mkLocMessage, mkLocMessageAnn,
+        mkMsgEnvelope, mkPlainMsgEnvelope, mkLongMsgEnvelope,
 
         -- * Utilities
         doIfSet, doIfSet_dyn,
@@ -129,7 +128,7 @@ pprLocMsgEnvelope (MsgEnvelope { errMsgSpan      = s
                                , errMsgSeverity  = sev
                                , errMsgContext   = unqual })
   = sdocWithContext $ \ctx ->
-    withErrStyle unqual $ mkLocMessage sev s (formatBulleted ctx $ renderDiagnostic e)
+    withErrStyle unqual $ mkLocMessage (MCDiagnostic sev) s (formatBulleted ctx $ renderDiagnostic e)
 
 sortMsgBag :: Maybe DynFlags -> Bag (MsgEnvelope e) -> [MsgEnvelope e]
 sortMsgBag dflags = maybeLimit . sortBy (cmp `on` errMsgSpan) . bagToList
@@ -170,15 +169,15 @@ ifVerbose dflags val act
 
 errorMsg :: Logger -> DynFlags -> SDoc -> IO ()
 errorMsg logger dflags msg
-   = putLogMsg logger dflags NoReason SevError noSrcSpan $ withPprStyle defaultErrStyle msg
+   = putLogMsg logger dflags (MCDiagnostic sevErrorNoReason) noSrcSpan $ withPprStyle defaultErrStyle msg
 
 warningMsg :: Logger -> DynFlags -> SDoc -> IO ()
 warningMsg logger dflags msg
-   = putLogMsg logger dflags NoReason SevWarning noSrcSpan $ withPprStyle defaultErrStyle msg
+   = putLogMsg logger dflags (MCDiagnostic sevWarnNoReason) noSrcSpan $ withPprStyle defaultErrStyle msg
 
 fatalErrorMsg :: Logger -> DynFlags -> SDoc -> IO ()
 fatalErrorMsg logger dflags msg =
-    putLogMsg logger dflags NoReason SevFatal noSrcSpan $ withPprStyle defaultErrStyle msg
+    putLogMsg logger dflags MCFatal noSrcSpan $ withPprStyle defaultErrStyle msg
 
 fatalErrorMsg'' :: FatalMessager -> String -> IO ()
 fatalErrorMsg'' fm msg = fm msg
@@ -336,12 +335,13 @@ printOutputForUser logger dflags print_unqual msg
 
 logInfo :: Logger -> DynFlags -> SDoc -> IO ()
 logInfo logger dflags msg
-  = putLogMsg logger dflags NoReason SevInfo noSrcSpan msg
+  = putLogMsg logger dflags MCInfo noSrcSpan msg
 
 -- | Like 'logInfo' but with 'SevOutput' rather then 'SevInfo'
 logOutput :: Logger -> DynFlags -> SDoc -> IO ()
 logOutput logger dflags msg
-  = putLogMsg logger dflags NoReason SevOutput noSrcSpan msg
+  = putLogMsg logger dflags MCOutput noSrcSpan msg
+
 
 prettyPrintGhcErrors :: ExceptionMonad m => DynFlags -> m a -> m a
 prettyPrintGhcErrors dflags

@@ -349,17 +349,17 @@ reportWarnings dflags ctx@(DsMatchContext kind loc) vars
           approx   = precision == Approximate
 
       when (approx && (exists_u || exists_i)) $
-        putSrcSpanDs loc (warnDs NoReason approx_msg)
+        putSrcSpanDs loc (warnDs NoWarnReason approx_msg)
 
       when exists_b $ forM_ redundant_bangs $ \(SrcInfo (L l q)) ->
-        putSrcSpanDs l (warnDs (Reason Opt_WarnRedundantBangPatterns)
+        putSrcSpanDs l (warnDs (WarnReason Opt_WarnRedundantBangPatterns)
                                (pprEqn q "has redundant bang"))
 
       when exists_r $ forM_ redundant_rhss $ \(SrcInfo (L l q)) ->
-        putSrcSpanDs l (warnDs (Reason Opt_WarnOverlappingPatterns)
+        putSrcSpanDs l (warnDs (WarnReason Opt_WarnOverlappingPatterns)
                                (pprEqn q "is redundant"))
       when exists_i $ forM_ inaccessible_rhss $ \(SrcInfo (L l q)) ->
-        putSrcSpanDs l (warnDs (Reason Opt_WarnOverlappingPatterns)
+        putSrcSpanDs l (warnDs (WarnReason Opt_WarnOverlappingPatterns)
                                (pprEqn q "has inaccessible right hand side"))
 
       when exists_u $ putSrcSpanDs loc $ warnDs flag_u_reason $
@@ -368,7 +368,7 @@ reportWarnings dflags ctx@(DsMatchContext kind loc) vars
     flag_i = overlapping dflags kind
     flag_u = exhaustive dflags kind
     flag_b = redundantBang dflags
-    flag_u_reason = maybe NoReason Reason (exhaustiveWarningFlag kind)
+    flag_u_reason = maybe NoWarnReason WarnReason (exhaustiveWarningFlag kind)
 
     maxPatterns = maxUncoveredPatterns dflags
 

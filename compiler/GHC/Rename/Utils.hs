@@ -167,7 +167,7 @@ checkShadowedOccs (global_env,local_env) get_loc_occ ns
                 -- we don't find any GREs that are in scope qualified-only
 
           complain []      = return ()
-          complain pp_locs = addWarnAt (Reason Opt_WarnNameShadowing)
+          complain pp_locs = addWarnAt (WarnReason Opt_WarnNameShadowing)
                                        loc
                                        (shadowedNameWarn occ pp_locs)
 
@@ -384,7 +384,7 @@ checkUnusedRecordWildcard loc fvs (Just dotdot_names) =
 warnRedundantRecordWildcard :: RnM ()
 warnRedundantRecordWildcard =
   whenWOptM Opt_WarnRedundantRecordWildcards
-            (addWarn (Reason Opt_WarnRedundantRecordWildcards)
+            (addWarn (WarnReason Opt_WarnRedundantRecordWildcards)
                      redundantWildcardWarning)
 
 
@@ -473,7 +473,7 @@ reportable child
 
 addUnusedWarning :: WarningFlag -> OccName -> SrcSpan -> SDoc -> RnM ()
 addUnusedWarning flag occ span msg
-  = addWarnAt (Reason flag) span $
+  = addWarnAt (WarnReason flag) span $
     sep [msg <> colon,
          nest 2 $ pprNonVarNameSpace (occNameSpace occ)
                         <+> quotes (ppr occ)]
