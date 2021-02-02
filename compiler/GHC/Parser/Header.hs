@@ -313,7 +313,7 @@ checkProcessArgsResult flags
   = when (notNull flags) $
       liftIO $ throwIO $ mkSrcErr $ listToBag $ map mkMsg flags
     where mkMsg (L loc flag)
-              = mkPlainMsgEnvelope loc $
+              = mkPlainMsgEnvelope sevErrorNoReason loc $
                   (text "unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+>
                    text flag)
 
@@ -357,7 +357,7 @@ optionsErrorMsgs unhandled_flags flags_lines _filename
                                 , L l f' <- flags_lines
                                 , f == f' ]
         mkMsg (L flagSpan flag) =
-            mkPlainMsgEnvelope flagSpan $
+            mkPlainMsgEnvelope sevErrorNoReason flagSpan $
                     text "unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+> text flag
 
 optionsParseError :: String -> SrcSpan -> a     -- #15053
@@ -370,4 +370,4 @@ optionsParseError str loc =
 
 throwErr :: SrcSpan -> SDoc -> a                -- #15053
 throwErr loc doc =
-  throw $ mkSrcErr $ unitBag $ mkPlainMsgEnvelope loc doc
+  throw $ mkSrcErr $ unitBag $ mkPlainMsgEnvelope sevErrorNoReason loc doc
