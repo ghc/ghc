@@ -443,7 +443,7 @@ it will additionally offer up a list of refinement hole fits, in this case: ::
       with const @Integer @[Integer]
       where const :: forall a b. a -> b -> a
     ($) (_ :: [Integer] -> Integer)
-      with ($) @'GHC.Types.LiftedRep @[Integer] @Integer
+      with ($) @GHC.Types.LiftedRep @[Integer] @Integer
       where ($) :: forall a b. (a -> b) -> a -> b
     fail (_ :: String)
       with fail @((->) [Integer]) @Integer

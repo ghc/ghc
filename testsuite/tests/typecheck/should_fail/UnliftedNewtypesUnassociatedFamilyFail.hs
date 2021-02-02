@@ -11,7 +11,7 @@ module UnliftedNewtypesUnassociatedFamily where
 import GHC.Int (Int(I#))
 import GHC.Word (Word(W#))
 import GHC.Exts (Int#,Word#)
-import GHC.Exts (TYPE,RuntimeRep(LiftedRep,IntRep,WordRep,TupleRep))
+import GHC.Exts (TYPE,RuntimeRep(IntRep,WordRep,TupleRep))
 
 data family DF :: TYPE (r :: RuntimeRep)
 
