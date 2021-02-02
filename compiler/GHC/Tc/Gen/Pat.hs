@@ -975,7 +975,7 @@ tcPatSynPat :: PatEnv -> Located Name -> PatSyn
             -> Scaled ExpSigmaType         -- Type of the pattern
             -> HsConPatDetails GhcRn -> TcM a
             -> TcM (Pat GhcTc, a)
-tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
+tcPatSynPat penv (L con_span con_name) pat_syn pat_ty arg_pats thing_inside
   = do  { let (univ_tvs, req_theta, ex_tvs, prov_theta, arg_tys, ty) = patSynSig pat_syn
 
         ; (subst, univ_tvs') <- newMetaTyVars univ_tvs
@@ -1010,7 +1010,9 @@ tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
                             LamPat mc -> PatSkol (PatSynCon pat_syn) mc
                             LetPat {} -> UnkSkol -- Doesn't matter
 
-        ; req_wrap <- instCall PatOrigin (mkTyVarTys univ_tvs') req_theta'
+        ; req_wrap <- instCall (OccurrenceOf con_name) (mkTyVarTys univ_tvs') req_theta'
+                      -- Origin (OccurrenceOf con_name):
+                      -- see Note [Call-stack tracing of pattern synonyms]
         ; traceTc "instCall" (ppr req_wrap)
 
         ; traceTc "checkConstraints {" Outputable.empty
@@ -1032,6 +1034,29 @@ tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
         ; pat_ty <- readExpType (scaledThing pat_ty)
         ; return (mkHsWrapPat (wrap <.> mult_wrap) res_pat pat_ty, res) }
 
+{- Note [Call-stack tracing of pattern synonyms]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+   f :: HasCallStack => blah
+
+   pattern Annotated :: HasCallStack => (CallStack, a) -> a
+   pattern Annotated x <- (f -> x)
+
+When we pattern-match against `Annotated` we will call `f`, and must
+pass a call-stack.  We may want `Annotated` itself to propagate the call
+stack, so we give it a HasCallStack constraint too.  But then we expect
+to see `Annotated` in the call stack.
+
+This is achieve easily, but a bit trickily.  When we instantiate
+Annotated's "required" constraints, in tcPatSynPat, give them a
+CtOrigin of (OccurrenceOf "Annotated"). That way the special magic
+in GHC.Tc.Solver.Canonical.canClassNC which deals with CallStack
+constraints will kick in: that logic only fires on constraints
+whose Origin is (OccurrenceOf f).
+
+See also Note [Overview of implicit CallStacks] in GHC.Tc.Types.Evidence
+and Note [Solving CallStack constraints] in GHC.Tc.Solver.Monad
+-}
 ----------------------------
 -- | Convenient wrapper for calling a matchExpectedXXX function
 matchExpectedPatTy :: (TcRhoType -> TcM (TcCoercionN, a))
