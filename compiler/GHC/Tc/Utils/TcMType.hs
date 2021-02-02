@@ -1797,6 +1797,10 @@ defaultTyVar default_kind tv
   = do { traceTc "Defaulting a Multiplicty var to Many" (ppr tv)
        ; writeMetaTyVar tv manyDataConTy
        ; return True }
+  | isLevityVar tv
+  = do { traceTc "Defaulting a Levity var to Lifted" (ppr tv)
+       ; writeMetaTyVar tv liftedDataConTy
+       ; return True }
 
   | default_kind            -- -XNoPolyKinds and this is a kind var
   = default_kind_var tv     -- so default it to * if possible
