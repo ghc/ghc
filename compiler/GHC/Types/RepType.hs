@@ -361,10 +361,11 @@ but RuntimeRep has some extra cases:
 data RuntimeRep = VecRep VecCount VecElem   -- ^ a SIMD vector type
                 | TupleRep [RuntimeRep]     -- ^ An unboxed tuple of the given reps
                 | SumRep [RuntimeRep]       -- ^ An unboxed sum of the given reps
-                | LiftedRep       -- ^ lifted; represented by a pointer
-                | UnliftedRep     -- ^ unlifted; represented by a pointer
+                | BoxedRep Levity -- ^ boxed; represented by a pointer
                 | IntRep          -- ^ signed, word-sized value
                 ...etc...
+data Levity     = Lifted
+                | Unlifted
 
 It's all in 1-1 correspondence with PrimRep except for TupleRep and SumRep,
 which describe unboxed products and sums respectively. RuntimeRep is defined
@@ -373,6 +374,13 @@ GHC.Builtin.Types.runtimeRepTyCon. The unarisation pass, in GHC.Stg.Unarise, tra
 program, so that every variable has a type that has a PrimRep. For
 example, unarisation transforms our utup function above, to take two Int
 arguments instead of one (# Int, Int #) argument.
+
+Also, note that boxed types are represented slightly differently in RuntimeRep
+and PrimRep. PrimRep just has the nullary LiftedRep and UnliftedRep data
+constructors. RuntimeRep has a BoxedRep data constructor, which accepts a
+Levity. The subtle distinction is that since BoxedRep can accept a variable
+argument, RuntimeRep can talk about levity polymorphic types. PrimRep, by
+contrast, cannot.
 
 See also Note [Getting from RuntimeRep to PrimRep] and Note [VoidRep].
 
