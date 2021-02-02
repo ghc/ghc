@@ -13,6 +13,12 @@ Language
   <https://www.microsoft.com/en-us/research/publication/a-quick-look-at-impredicativity/>`__
   (Serrano et al, ICFP 2020).  More information here: :ref:`impredicative-polymorphism`.
   This replaces the old (undefined, flaky) behaviour of the :extension:`ImpredicativeTypes` extension.
+* The first stage of the `Pointer Rep Proposal`_ has been implemented. All
+  boxed types, both lifted and unlifted, now have representation kinds of
+  the shape ``BoxedRep r``. Code that references ``LiftedRep`` and ``UnliftedRep``
+  will need to be updated.
+
+.. _Pointer Rep Proposal: https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0203-pointer-rep.rst
 
 * Kind inference for data/newtype instance declarations is slightly
   more restrictive than before.  See the user manual :ref:`kind-inference-data-family-instances`.

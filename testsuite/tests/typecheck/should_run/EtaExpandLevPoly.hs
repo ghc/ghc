@@ -6,12 +6,12 @@ module Main where
 import GHC.Exts
 
 data G a where
-  MkG :: G (TupleRep [LiftedRep, IntRep])
+  MkG :: G (TupleRep [BoxedRep Lifted, IntRep])
 
 -- tests that we don't eta-expand functions that are levity-polymorphic
 -- see CoreArity.mkEtaWW
 foo :: forall a (b :: TYPE a). G a -> b -> b
-foo MkG = (\x -> x) :: forall (c :: TYPE (TupleRep [LiftedRep, IntRep])). c -> c
+foo MkG = (\x -> x) :: forall (c :: TYPE (TupleRep [BoxedRep Lifted, IntRep])). c -> c
 
 data H a where
   MkH :: H IntRep

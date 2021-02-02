@@ -17,17 +17,27 @@ coercibleTyCon, heqTyCon :: TyCon
 unitTy :: Type
 
 liftedTypeKind :: Kind
+unliftedTypeKind :: Kind
+
 liftedTypeKindTyCon :: TyCon
+unliftedTypeKindTyCon :: TyCon
+
+liftedRepTyCon :: TyCon
+unliftedRepTyCon :: TyCon
 
 constraintKind :: Kind
 
-runtimeRepTyCon, vecCountTyCon, vecElemTyCon :: TyCon
+runtimeRepTyCon, levityTyCon, vecCountTyCon, vecElemTyCon :: TyCon
 runtimeRepTy :: Type
 
-liftedRepDataConTyCon, vecRepDataConTyCon, tupleRepDataConTyCon :: TyCon
+boxedRepDataConTyCon :: TyCon
+liftedDataConTyCon :: TyCon
+vecRepDataConTyCon, tupleRepDataConTyCon :: TyCon
 
-liftedRepDataConTy, unliftedRepDataConTy,
-  intRepDataConTy,
+liftedRepTy, unliftedRepTy :: Type
+liftedDataConTy, unliftedDataConTy :: Type
+
+intRepDataConTy,
   int8RepDataConTy, int16RepDataConTy, int32RepDataConTy, int64RepDataConTy,
   wordRepDataConTy,
   word8RepDataConTy, word16RepDataConTy, word32RepDataConTy, word64RepDataConTy,
