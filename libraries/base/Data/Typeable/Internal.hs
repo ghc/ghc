@@ -1,3 +1,4 @@
+{-# LANGUAGE UnliftedFFITypes #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -80,6 +81,9 @@ module Data.Typeable.Internal (
     mkTrType, mkTrCon, mkTrApp, mkTrAppChecked, mkTrFun,
     mkTyCon, mkTyCon#,
     typeSymbolTypeRep, typeNatTypeRep,
+
+    -- Jank
+    trLiftedRep
   ) where
 
 import GHC.Prim ( FUN )
@@ -375,7 +379,12 @@ mkTrCon tc kind_vars = TrTyCon
 -- constructor, so we need to build it here.
 fpTYPELiftedRep :: Fingerprint
 fpTYPELiftedRep = fingerprintFingerprints
-      [tyConFingerprint tyConTYPE, typeRepFingerprint trLiftedRep]
+      [ tyConFingerprint tyConTYPE
+      , fingerprintFingerprints
+        [ tyConFingerprint tyCon'BoxedRep
+        , tyConFingerprint tyCon'Lifted
+        ]
+      ]
 -- There is absolutely nothing to gain and everything to lose
 -- by inlining the worker. The wrapper should inline anyway.
 {-# NOINLINE fpTYPELiftedRep #-}
@@ -383,7 +392,7 @@ fpTYPELiftedRep = fingerprintFingerprints
 trTYPE :: TypeRep TYPE
 trTYPE = typeRep
 
-trLiftedRep :: TypeRep 'LiftedRep
+trLiftedRep :: TypeRep ('BoxedRep 'Lifted)
 trLiftedRep = typeRep
 
 trMany :: TypeRep 'Many
@@ -399,23 +408,23 @@ mkTrApp :: forall k1 k2 (a :: k1 -> k2) (b :: k1).
         -> TypeRep (b :: k1)
         -> TypeRep (a b)
 mkTrApp a b -- See Note [Kind caching], Wrinkle 2
-  | Just HRefl <- a `eqTypeRep` trTYPE
-  , Just HRefl <- b `eqTypeRep` trLiftedRep
-  = TrType
+    | Just HRefl <- a `eqTypeRep` trTYPE
+    , Just HRefl <- b `eqTypeRep` trLiftedRep
+    = TrType
 
-  | TrFun {trFunRes = res_kind} <- typeRepKind a
-  = TrApp
-    { trAppFingerprint = fpr
-    , trAppFun = a
-    , trAppArg = b
-    , trAppKind = res_kind }
+    | TrFun {trFunRes = res_kind} <- typeRepKind a
+    = TrApp
+      { trAppFingerprint = fpr
+      , trAppFun = a
+      , trAppArg = b
+      , trAppKind = res_kind }
 
-  | otherwise = error ("Ill-kinded type application: "
-                           ++ show (typeRepKind a))
-  where
-    fpr_a = typeRepFingerprint a
-    fpr_b = typeRepFingerprint b
-    fpr   = fingerprintFingerprints [fpr_a, fpr_b]
+    | otherwise = error ("Ill-kinded type application: "
+                             ++ show (typeRepKind a))
+    where
+      fpr_a = typeRepFingerprint a
+      fpr_b = typeRepFingerprint b
+      fpr   = fingerprintFingerprints [fpr_a, fpr_b]
 
 -- | Construct a representation for a type application that
 -- may be a saturated arrow type. This is renamed to mkTrApp in
@@ -623,7 +632,7 @@ instantiateKindRep vars = go
       = SomeTypeRep $ mkTrApp (unsafeCoerceRep $ go f) (unsafeCoerceRep $ go a)
     go (KindRepFun a b)
       = SomeTypeRep $ mkTrFun trMany (unsafeCoerceRep $ go a) (unsafeCoerceRep $ go b)
-    go (KindRepTYPE LiftedRep) = SomeTypeRep TrType
+    go (KindRepTYPE (BoxedRep Lifted)) = SomeTypeRep TrType
     go (KindRepTYPE r) = unkindedTypeRep $ tYPE `kApp` runtimeRepTypeRep r
     go (KindRepTypeLitS sort s)
       = mkTypeLitFromString sort (unpackCStringUtf8# s)
@@ -662,8 +671,9 @@ buildList = foldr cons nil
 runtimeRepTypeRep :: RuntimeRep -> SomeKindedTypeRep RuntimeRep
 runtimeRepTypeRep r =
     case r of
-      LiftedRep   -> rep @'LiftedRep
-      UnliftedRep -> rep @'UnliftedRep
+      BoxedRep Lifted -> SomeKindedTypeRep trLiftedRep
+      BoxedRep v  -> kindedTypeRep @_ @'BoxedRep
+                     `kApp` levityTypeRep v
       VecRep c e  -> kindedTypeRep @_ @'VecRep
                      `kApp` vecCountTypeRep c
                      `kApp` vecElemTypeRep e
@@ -687,6 +697,15 @@ runtimeRepTypeRep r =
   where
     rep :: forall (a :: RuntimeRep). Typeable a => SomeKindedTypeRep RuntimeRep
     rep = kindedTypeRep @RuntimeRep @a
+
+levityTypeRep :: Levity -> SomeKindedTypeRep Levity
+levityTypeRep c =
+    case c of
+      Lifted   -> rep @'Lifted
+      Unlifted -> rep @'Unlifted
+  where
+    rep :: forall (a :: Levity). Typeable a => SomeKindedTypeRep Levity
+    rep = kindedTypeRep @Levity @a
 
 vecCountTypeRep :: VecCount -> SomeKindedTypeRep VecCount
 vecCountTypeRep c =
@@ -840,13 +859,40 @@ splitApps = go []
 -- produce a TypeRep for without difficulty), and then just substitute in the
 -- appropriate module and constructor names.
 --
+-- Prior to the introduction of BoxedRep, this was bad, but now it is
+-- even worse! We have to construct several different TyCons by hand
+-- so that we can build the fingerprint for TYPE ('BoxedRep 'LiftedRep).
+-- If we call `typeRep @('BoxedRep 'LiftedRep)` while trying to compute
+-- the fingerprint of `TYPE ('BoxedRep 'LiftedRep)`, we get a loop.
+--
 -- The ticket to find a better way to deal with this is
 -- #14480.
+
+tyConRuntimeRep :: TyCon
+tyConRuntimeRep = mkTyCon ghcPrimPackage "GHC.Types" "RuntimeRep" 0
+  (KindRepTYPE (BoxedRep Lifted))
+
 tyConTYPE :: TyCon
-tyConTYPE = mkTyCon (tyConPackage liftedRepTyCon) "GHC.Prim" "TYPE" 0
-       (KindRepFun (KindRepTyConApp liftedRepTyCon []) (KindRepTYPE LiftedRep))
-  where
-    liftedRepTyCon = typeRepTyCon (typeRep @RuntimeRep)
+tyConTYPE = mkTyCon ghcPrimPackage "GHC.Prim" "TYPE" 0
+    (KindRepFun
+      (KindRepTyConApp tyConRuntimeRep [])
+      (KindRepTYPE (BoxedRep Lifted))
+    )
+
+tyConLevity :: TyCon
+tyConLevity = mkTyCon ghcPrimPackage "GHC.Types" "Levity" 0
+  (KindRepTYPE (BoxedRep Lifted))
+
+tyCon'Lifted :: TyCon
+tyCon'Lifted = mkTyCon ghcPrimPackage "GHC.Types" "'Lifted" 0
+  (KindRepTyConApp tyConLevity [])
+
+tyCon'BoxedRep :: TyCon
+tyCon'BoxedRep = mkTyCon ghcPrimPackage "GHC.Types" "'BoxedRep" 0
+  (KindRepFun (KindRepTyConApp tyConLevity []) (KindRepTyConApp tyConRuntimeRep []))
+
+ghcPrimPackage :: String
+ghcPrimPackage = tyConPackage (typeRepTyCon (typeRep @Bool))
 
 funTyCon :: TyCon
 funTyCon = typeRepTyCon (typeRep @(->))

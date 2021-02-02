@@ -77,8 +77,9 @@ import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Builtin.Types
                                  ( coercibleTyCon, heqTyCon
-                                 , liftedRepDataConTyCon, tupleTyConName
-                                 , manyDataConTyCon, oneDataConTyCon )
+                                 , liftedDataConTyCon, tupleTyConName
+                                 , manyDataConTyCon, oneDataConTyCon
+                                 , boxedRepDataConTyCon )
 import {-# SOURCE #-} GHC.Core.Type ( isRuntimeRepTy, isMultiplicityTy )
 
 import GHC.Core.TyCon hiding ( pprPromotionQuote )
@@ -413,15 +414,35 @@ IfaceHoleCo to ensure that they don't end up in an interface file.
 ifaceTyConHasKey :: IfaceTyCon -> Unique -> Bool
 ifaceTyConHasKey tc key = ifaceTyConName tc `hasKey` key
 
+-- | Given a kind K, is K of the form (TYPE ('BoxedRep 'LiftedRep))?
 isIfaceLiftedTypeKind :: IfaceKind -> Bool
 isIfaceLiftedTypeKind (IfaceTyConApp tc IA_Nil)
   = isLiftedTypeKindTyConName (ifaceTyConName tc)
-isIfaceLiftedTypeKind (IfaceTyConApp tc
-                       (IA_Arg (IfaceTyConApp ptr_rep_lifted IA_Nil)
-                               Required IA_Nil))
-  =  tc `ifaceTyConHasKey` tYPETyConKey
-  && ptr_rep_lifted `ifaceTyConHasKey` liftedRepDataConKey
+isIfaceLiftedTypeKind (IfaceTyConApp tc1 args1)
+  = isIfaceTyConAppLiftedTypeKind tc1 args1
 isIfaceLiftedTypeKind _ = False
+
+-- | Given a kind constructor K and arguments A, returns true if
+-- both of the following statements are true:
+--
+-- * K is TYPE
+-- * A is a singleton IfaceAppArgs of the form ('BoxedRep 'LiftedRep)
+--
+-- For the second condition, we must also check for the type
+-- synonym LiftedRep.
+isIfaceTyConAppLiftedTypeKind :: IfaceTyCon -> IfaceAppArgs -> Bool
+isIfaceTyConAppLiftedTypeKind tc1 args1
+  | tc1 `ifaceTyConHasKey` tYPETyConKey
+  , IA_Arg soleArg1 Required IA_Nil <- args1
+  , IfaceTyConApp rep args2 <- soleArg1 =
+    if | rep `ifaceTyConHasKey` boxedRepDataConKey
+       , IA_Arg soleArg2 Required IA_Nil <- args2
+       , IfaceTyConApp lev IA_Nil <- soleArg2
+       , lev `ifaceTyConHasKey` liftedDataConKey -> True
+       | rep `ifaceTyConHasKey` liftedRepTyConKey
+       , IA_Nil <- args2 -> True
+       | otherwise -> False
+  | otherwise = False
 
 splitIfaceSigmaTy :: IfaceType -> ([IfaceForAllBndr], [IfacePredType], IfaceType)
 -- Mainly for printing purposes
@@ -1080,11 +1101,17 @@ defaultNonStandardVars do_runtimereps do_multiplicities ty = go False emptyFsEnv
         | do_multiplicities, tc `ifaceTyConHasKey` multiplicityTyConKey = Just many_ty
     check_substitution _ = Nothing
 
+-- The type ('BoxedRep 'LiftedRep)
 liftedRep_ty :: IfaceType
 liftedRep_ty =
-    IfaceTyConApp (IfaceTyCon dc_name (IfaceTyConInfo IsPromoted IfaceNormalTyCon))
-                  IA_Nil
-  where dc_name = getName liftedRepDataConTyCon
+  IfaceTyConApp boxedRep (IA_Arg (IfaceTyConApp lifted IA_Nil) Required IA_Nil)
+  where
+    boxedRep :: IfaceTyCon
+    boxedRep = IfaceTyCon dc_name (IfaceTyConInfo IsPromoted IfaceNormalTyCon)
+      where dc_name = getName boxedRepDataConTyCon
+    lifted :: IfaceTyCon
+    lifted = IfaceTyCon dc_name (IfaceTyConInfo IsPromoted IfaceNormalTyCon)
+      where dc_name = getName liftedDataConTyCon
 
 many_ty :: IfaceType
 many_ty =
@@ -1408,9 +1435,7 @@ pprTyTcApp ctxt_prec tc tys =
        , isInvisibleArgFlag argf
        -> pprIfaceTyList ctxt_prec ty1 ty2
 
-       | tc `ifaceTyConHasKey` tYPETyConKey
-       , IA_Arg (IfaceTyConApp rep IA_Nil) Required IA_Nil <- tys
-       , rep `ifaceTyConHasKey` liftedRepDataConKey
+       | isIfaceTyConAppLiftedTypeKind tc tys
        , print_type_abbreviations  -- See Note [Printing type abbreviations]
        -> ppr_kind_type ctxt_prec
 
