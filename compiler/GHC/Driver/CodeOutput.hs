@@ -99,8 +99,7 @@ codeOutput logger dflags unit_state this_mod filenm location genForeignStubs for
                 { case cmmLint (targetPlatform dflags) cmm of
                         Just err -> do { putLogMsg logger
                                                    dflags
-                                                   NoReason
-                                                   SevDump
+                                                   MCDump
                                                    noSrcSpan
                                                    $ withPprStyle defaultDumpStyle err
                                        ; ghcExit logger dflags 1
