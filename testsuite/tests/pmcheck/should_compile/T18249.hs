@@ -14,7 +14,7 @@ f :: Int# -> Int
 f !_ | False = 1
 f _ = 2
 
-newtype UVoid :: TYPE 'UnliftedRep where
+newtype UVoid :: TYPE ('BoxedRep 'Unlifted) where
   UVoid :: UVoid -> UVoid
 
 g :: UVoid -> Int
