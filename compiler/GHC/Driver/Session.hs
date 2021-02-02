@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE LambdaCase #-}
 
 -------------------------------------------------------------------------------
 --
@@ -21,7 +22,7 @@ module GHC.Driver.Session (
         -- * Dynamic flags and associated configuration types
         DumpFlag(..),
         GeneralFlag(..),
-        WarningFlag(..), WarnReason(..),
+        WarningFlag(..), WarnReason(..), ErrReason(..),
         Language(..),
         PlatformConstants(..),
         FatalMessager, LogAction, FlushOut(..), FlushErr(..),
@@ -1331,8 +1332,7 @@ defaultWays settings = if pc_DYNAMIC_BY_DEFAULT (sPlatformConstants settings)
 type FatalMessager = String -> IO ()
 
 type LogAction = DynFlags
-              -> WarnReason
-              -> Severity
+              -> MessageClass
               -> SrcSpan
               -> SDoc
               -> IO ()
@@ -1344,7 +1344,7 @@ defaultFatalMessager = hPutStrLn stderr
 -- See Note [JSON Error Messages]
 --
 jsonLogAction :: LogAction
-jsonLogAction dflags reason severity srcSpan msg
+jsonLogAction dflags msg_class srcSpan msg
   =
     defaultLogActionHPutStrDoc dflags True stdout
       (withPprStyle (PprCode CStyle) (doc $$ text ""))
@@ -1353,55 +1353,55 @@ jsonLogAction dflags reason severity srcSpan msg
       doc = renderJSON $
               JSObject [ ( "span", json srcSpan )
                        , ( "doc" , JSString str )
-                       , ( "severity", json severity )
-                       , ( "reason" ,   json reason )
+                       , ( "messageClass", json msg_class )
                        ]
 
 
 defaultLogAction :: LogAction
-defaultLogAction dflags reason severity srcSpan msg
-    = case severity of
-      SevOutput      -> printOut msg
-      SevDump        -> printOut (msg $$ blankLine)
-      SevInteractive -> putStrSDoc msg
-      SevInfo        -> printErrs msg
-      SevFatal       -> printErrs msg
-      SevWarning     -> printWarns
-      SevError       -> printWarns
+defaultLogAction dflags msg_class srcSpan msg
+    = case msg_class of
+      MCOutput         -> printOut msg
+      MCDump           -> printOut (msg $$ blankLine)
+      MCInteractive    -> putStrSDoc msg
+      MCInfo           -> printErrs msg
+      MCFatal          -> printErrs msg
+      MCDiagnostic sev -> printDiagnostics sev
     where
       printOut   = defaultLogActionHPrintDoc  dflags False stdout
       printErrs  = defaultLogActionHPrintDoc  dflags False stderr
       putStrSDoc = defaultLogActionHPutStrDoc dflags False stdout
       -- Pretty print the warning flag, if any (#10752)
-      message = mkLocMessageAnn flagMsg severity srcSpan msg
+      message sev = mkLocMessageAnn (flagMsg sev) msg_class srcSpan msg
 
-      printWarns = do
+      printDiagnostics severity = do
         hPutChar stderr '\n'
         caretDiagnostic <-
             if gopt Opt_DiagnosticsShowCaret dflags
-            then getCaretDiagnostic severity srcSpan
+            then getCaretDiagnostic msg_class srcSpan
             else pure empty
         printErrs $ getPprStyle $ \style ->
           withPprStyle (setStyleColoured True style)
-            (message $+$ caretDiagnostic)
+            (message severity $+$ caretDiagnostic)
         -- careful (#2302): printErrs prints in UTF-8,
         -- whereas converting to string first and using
         -- hPutStr would just emit the low 8 bits of
         -- each unicode char.
 
-      flagMsg =
-        case reason of
-          NoReason -> Nothing
-          Reason wflag -> do
+      flagMsg = \case
+          SevWarning NoWarnReason -> Nothing
+          SevWarning (WarnReason wflag) -> do
             spec <- flagSpecOf wflag
             return ("-W" ++ flagSpecName spec ++ warnFlagGrp wflag)
-          ErrReason Nothing ->
-            return "-Werror"
-          ErrReason (Just wflag) -> do
-            spec <- flagSpecOf wflag
-            return $
-              "-W" ++ flagSpecName spec ++ warnFlagGrp wflag ++
-              ", -Werror=" ++ flagSpecName spec
+          SevWarning (WarnDemotedFromError _genFlag) -> Nothing
+          SevError NoErrReason     -> Nothing
+          SevError (ErrPromotedFromWarning reason) -> case reason of
+            Right wflag -> do
+              spec <- flagSpecOf wflag
+              return $
+                "-W" ++ flagSpecName spec ++ warnFlagGrp wflag ++
+                ", -Werror=" ++ flagSpecName spec
+            Left Opt_WarnIsError -> return "-Werror"
+            Left _genFlag        -> Nothing
 
       warnFlagGrp flag
           | gopt Opt_ShowWarnGroups dflags =
@@ -1980,7 +1980,7 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
   return (dflags4, leftover, warns' ++ warns)
 
 -- | Write an error or warning to the 'LogOutput'.
-putLogMsg :: DynFlags -> WarnReason -> Severity -> SrcSpan -> SDoc -> IO ()
+putLogMsg :: DynFlags -> MessageClass -> SrcSpan -> SDoc -> IO ()
 putLogMsg dflags = log_action dflags dflags
 
 -- | Check (and potentially disable) any extensions that aren't allowed

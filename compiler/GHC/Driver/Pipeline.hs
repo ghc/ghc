@@ -150,7 +150,7 @@ preprocess hsc_env input_fn mb_input_buf mb_phase =
   where
     srcspan = srcLocSpan $ mkSrcLoc (mkFastString input_fn) 1 1
     handler (ProgramError msg) = return $ Left $ unitBag $
-        mkPlainMsgEnvelope srcspan $ text msg
+        mkPlainMsgEnvelope (SevError NoErrReason) srcspan $ text msg
     handler ex = throwGhcExceptionIO ex
 
 -- ---------------------------------------------------------------------------
@@ -1815,7 +1815,7 @@ getHCFilePackages filename =
 linkDynLibCheck :: DynFlags -> UnitEnv -> [String] -> [UnitId] -> IO ()
 linkDynLibCheck dflags unit_env o_files dep_units = do
   when (haveRtsOptsFlags dflags) $
-    putLogMsg dflags NoReason SevInfo noSrcSpan
+    putLogMsg dflags MCInfo noSrcSpan
       $ withPprStyle defaultUserStyle
       (text "Warning: -rtsopts and -with-rtsopts have no effect with -shared." $$
       text "    Call hs_init_ghc() from your main() function to set these options.")

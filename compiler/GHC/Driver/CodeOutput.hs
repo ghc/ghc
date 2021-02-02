@@ -95,8 +95,7 @@ codeOutput dflags unit_state this_mod filenm location foreign_stubs foreign_fps 
                 { case cmmLint (targetPlatform dflags) cmm of
                         Just err -> do { log_action dflags
                                                    dflags
-                                                   NoReason
-                                                   SevDump
+                                                   MCDump
                                                    noSrcSpan
                                                    $ withPprStyle defaultDumpStyle err
                                        ; ghcExit dflags 1

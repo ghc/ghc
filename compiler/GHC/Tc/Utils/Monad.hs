@@ -787,7 +787,7 @@ wrapDocLoc doc = do
   if hasPprDebug dflags
     then do
       loc <- getSrcSpanM
-      return (mkLocMessage SevOutput loc doc)
+      return (mkLocMessage MCOutput loc doc)
     else
       return doc
 
@@ -997,9 +997,10 @@ mkLongErrAt loc msg extra
   = do { printer <- getPrintUnqualified ;
          unit_state <- hsc_units <$> getTopEnv ;
          let msg' = pprWithUnitState unit_state msg in
-         return $ mkLongMsgEnvelope loc printer msg' extra }
+         return $ mkLongMsgEnvelope (SevError NoErrReason) loc printer msg' extra }
 
-mkDecoratedSDocAt :: SrcSpan
+mkDecoratedSDocAt :: Severity
+                  -> SrcSpan
                   -> SDoc
                   -- ^ The important part of the message
                   -> SDoc
@@ -1007,14 +1008,14 @@ mkDecoratedSDocAt :: SrcSpan
                   -> SDoc
                   -- ^ Any supplementary information.
                   -> TcRn (MsgEnvelope DecoratedSDoc)
-mkDecoratedSDocAt loc important context extra
+mkDecoratedSDocAt sev loc important context extra
   = do { printer <- getPrintUnqualified ;
          unit_state <- hsc_units <$> getTopEnv ;
          let f = pprWithUnitState unit_state
              errDoc  = [important, context, extra]
              errDoc' = mkDecorated $ map f errDoc
          in
-         return $ mkErr loc printer errDoc' }
+         return $ mkMsgEnvelope sev loc printer errDoc' }
 
 addLongErrAt :: SrcSpan -> SDoc -> SDoc -> TcRn ()
 addLongErrAt loc msg extra = mkLongErrAt loc msg extra >>= reportError
@@ -1029,14 +1030,12 @@ reportError err
          msgs     <- readTcRef errs_var ;
          writeTcRef errs_var (err `addMessage` msgs) }
 
-reportWarning :: WarnReason -> MsgEnvelope DecoratedSDoc -> TcRn ()
-reportWarning reason err
-  = do { let warn = makeIntoWarning reason err
-                    -- 'err' was built by mkLongMsgEnvelope or something like that,
-                    -- so it's of error severity.  For a warning we downgrade
-                    -- its severity to SevWarning
-
-       ; traceTc "Adding warning:" (pprLocMsgEnvelope warn)
+-- | Reports the input warning.
+-- /INVARIANT/: The input 'MsgEnvelope' needs to be given the correct
+-- 'Severity'.
+reportWarning :: MsgEnvelope DecoratedSDoc -> TcRn ()
+reportWarning warn
+  = do { traceTc "Adding warning:" (pprLocMsgEnvelope warn)
        ; errs_var <- getErrsVar
        ; (warns, errs) <- partitionMessages <$> readTcRef errs_var
        ; writeTcRef errs_var (mkMessages $ (warns `snocBag` warn) `unionBags` errs) }
@@ -1468,12 +1467,12 @@ warnIfFlag :: WarningFlag -> Bool -> SDoc -> TcRn ()
 warnIfFlag warn_flag is_bad msg
   = do { warn_on <- woptM warn_flag
        ; when (warn_on && is_bad) $
-         addWarn (Reason warn_flag) msg }
+         addWarn (WarnReason warn_flag) msg }
 
 -- | Display a warning if a condition is met.
 warnIf :: Bool -> SDoc -> TcRn ()
 warnIf is_bad msg
-  = when is_bad (addWarn NoReason msg)
+  = when is_bad (addWarn NoWarnReason msg)
 
 -- | Display a warning if a condition is met.
 warnTc :: WarnReason -> Bool -> SDoc -> TcM ()
@@ -1519,9 +1518,10 @@ add_warn reason msg extra_info
 add_warn_at :: WarnReason -> SrcSpan -> SDoc -> SDoc -> TcRn ()
 add_warn_at reason loc msg extra_info
   = do { printer <- getPrintUnqualified ;
-         let { warn = mkLongWarnMsg loc printer
-                                    msg extra_info } ;
-         reportWarning reason warn }
+         let { warn = mkLongMsgEnvelope (SevWarning reason)
+                                        loc printer
+                                        msg extra_info } ;
+         reportWarning warn }
 
 
 {-
@@ -2062,7 +2062,7 @@ failIfM msg
   = do  { env <- getLclEnv
         ; let full_msg = (if_loc env <> colon) $$ nest 2 msg
         ; dflags <- getDynFlags
-        ; liftIO (putLogMsg dflags NoReason SevFatal
+        ; liftIO (putLogMsg dflags MCFatal
                    noSrcSpan $ withPprStyle defaultErrStyle full_msg)
         ; failM }
 
@@ -2096,8 +2096,7 @@ forkM_maybe doc thing_inside
                       let msg = hang (text "forkM failed:" <+> doc)
                                    2 (text (show exn))
                       liftIO $ putLogMsg dflags
-                                         NoReason
-                                         SevFatal
+                                         MCFatal
                                          noSrcSpan
                                          $ withPprStyle defaultErrStyle msg
 

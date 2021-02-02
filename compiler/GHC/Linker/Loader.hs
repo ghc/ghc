@@ -422,7 +422,7 @@ classifyLdInput dflags f
   | isObjectFilename platform f = return (Just (Objects [f]))
   | isDynLibFilename platform f = return (Just (DLLPath f))
   | otherwise          = do
-        putLogMsg dflags NoReason SevInfo noSrcSpan
+        putLogMsg dflags MCInfo noSrcSpan
             $ withPprStyle defaultUserStyle
             (text ("Warning: ignoring unrecognised input `" ++ f ++ "'"))
         return Nothing
@@ -577,7 +577,7 @@ loadExpr hsc_env span root_ul_bco
         -- by default, so we can safely ignore them here.
 
 dieWith :: DynFlags -> SrcSpan -> SDoc -> IO a
-dieWith dflags span msg = throwGhcExceptionIO (ProgramError (showSDoc dflags (mkLocMessage SevFatal span msg)))
+dieWith dflags span msg = throwGhcExceptionIO (ProgramError (showSDoc dflags (mkLocMessage MCFatal span msg)))
 
 
 checkNonStdWay :: HscEnv -> SrcSpan -> IO (Maybe FilePath)
@@ -1418,7 +1418,7 @@ load_dyn hsc_env crash_early dll = do
         else let dflags = hsc_dflags hsc_env in
           when (wopt Opt_WarnMissedExtraSharedLib dflags)
             $ putLogMsg dflags
-                (Reason Opt_WarnMissedExtraSharedLib) SevWarning
+                (MCDiagnostic $ SevWarning $ WarnReason Opt_WarnMissedExtraSharedLib)
                   noSrcSpan $ withPprStyle defaultUserStyle (note err)
   where
     note err = vcat $ map text
@@ -1708,8 +1708,7 @@ maybePutSDoc :: DynFlags -> SDoc -> IO ()
 maybePutSDoc dflags s
     = when (verbosity dflags > 1) $
           putLogMsg dflags
-              NoReason
-              SevInteractive
+              MCInteractive
               noSrcSpan
               $ withPprStyle defaultUserStyle s
 

@@ -17,6 +17,7 @@ module GHC.Utils.Error (
         -- * Messages
         WarnMsg,
         MsgEnvelope(..),
+        MessageClass(..),
         SDoc,
         DecoratedSDoc(unDecorated),
         Messages, ErrorMessages, WarningMessages,
@@ -29,10 +30,8 @@ module GHC.Utils.Error (
         formatBulleted,
 
         -- ** Construction
-        emptyMessages, mkDecorated, mkLocMessage, mkLocMessageAnn, makeIntoWarning,
-        mkMsgEnvelope, mkPlainMsgEnvelope, mkErr, mkLongMsgEnvelope, mkWarnMsg,
-        mkPlainWarnMsg,
-        mkLongWarnMsg,
+        emptyMessages, mkDecorated, mkLocMessage, mkLocMessageAnn,
+        mkMsgEnvelope, mkPlainMsgEnvelope, mkLongMsgEnvelope,
 
         -- * Utilities
         doIfSet, doIfSet_dyn,
@@ -141,7 +140,7 @@ pprLocMsgEnvelope (MsgEnvelope { errMsgSpan      = s
                                , errMsgSeverity  = sev
                                , errMsgContext   = unqual })
   = sdocWithContext $ \ctx ->
-    withErrStyle unqual $ mkLocMessage sev s (formatBulleted ctx $ renderDiagnostic e)
+    withErrStyle unqual $ mkLocMessage (MCDiagnostic sev) s (formatBulleted ctx $ renderDiagnostic e)
 
 sortMsgBag :: Maybe DynFlags -> Bag (MsgEnvelope e) -> [MsgEnvelope e]
 sortMsgBag dflags = maybeLimit . sortBy (cmp `on` errMsgSpan) . bagToList
@@ -180,8 +179,7 @@ dumpIfSet dflags flag hdr doc
 doDump :: DynFlags -> String -> SDoc -> IO ()
 doDump dflags hdr doc =
   putLogMsg dflags
-            NoReason
-            SevDump
+            MCDump
             noSrcSpan
             (withPprStyle defaultDumpStyle
               (mkDumpDoc hdr doc))
@@ -272,10 +270,10 @@ dumpSDocWithStyle sty dflags dumpOpt hdr doc =
 
     -- write the dump to stdout
     writeDump Nothing = do
-        let (doc', severity)
-              | null hdr  = (doc, SevOutput)
-              | otherwise = (mkDumpDoc hdr doc, SevDump)
-        putLogMsg dflags NoReason severity noSrcSpan (withPprStyle sty doc')
+        let (doc', msg_class)
+              | null hdr  = (doc, MCOutput)
+              | otherwise = (mkDumpDoc hdr doc, MCDump)
+        putLogMsg dflags msg_class noSrcSpan (withPprStyle sty doc')
 
 
 -- | Choose where to put a dump file based on DynFlags
@@ -356,15 +354,15 @@ ifVerbose dflags val act
 
 errorMsg :: DynFlags -> SDoc -> IO ()
 errorMsg dflags msg
-   = putLogMsg dflags NoReason SevError noSrcSpan $ withPprStyle defaultErrStyle msg
+   = putLogMsg dflags (MCDiagnostic $ SevError NoErrReason) noSrcSpan $ withPprStyle defaultErrStyle msg
 
 warningMsg :: DynFlags -> SDoc -> IO ()
 warningMsg dflags msg
-   = putLogMsg dflags NoReason SevWarning noSrcSpan $ withPprStyle defaultErrStyle msg
+   = putLogMsg dflags (MCDiagnostic $ SevWarning NoWarnReason) noSrcSpan $ withPprStyle defaultErrStyle msg
 
 fatalErrorMsg :: DynFlags -> SDoc -> IO ()
 fatalErrorMsg dflags msg =
-    putLogMsg dflags NoReason SevFatal noSrcSpan $ withPprStyle defaultErrStyle msg
+    putLogMsg dflags MCFatal noSrcSpan $ withPprStyle defaultErrStyle msg
 
 fatalErrorMsg'' :: FatalMessager -> String -> IO ()
 fatalErrorMsg'' fm msg = fm msg
@@ -548,12 +546,12 @@ printOutputForUser dflags print_unqual msg
 
 logInfo :: DynFlags -> SDoc -> IO ()
 logInfo dflags msg
-  = putLogMsg dflags NoReason SevInfo noSrcSpan msg
+  = putLogMsg dflags MCInfo noSrcSpan msg
 
 -- | Like 'logInfo' but with 'SevOutput' rather then 'SevInfo'
 logOutput :: DynFlags -> SDoc -> IO ()
 logOutput dflags msg
-  = putLogMsg dflags NoReason SevOutput noSrcSpan msg
+  = putLogMsg dflags MCOutput noSrcSpan msg
 
 prettyPrintGhcErrors :: ExceptionMonad m => DynFlags -> m a -> m a
 prettyPrintGhcErrors dflags

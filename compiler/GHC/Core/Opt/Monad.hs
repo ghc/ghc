@@ -64,7 +64,7 @@ import GHC.Types.Name.Env
 import GHC.Types.SrcLoc
 
 import GHC.Utils.Outputable as Outputable
-import GHC.Utils.Error ( Severity(..), DumpFormat (..), dumpAction, dumpOptionsFromFlag )
+import GHC.Utils.Error ( MessageClass(..), Severity(..), DumpFormat (..), dumpAction, dumpOptionsFromFlag )
 import GHC.Utils.Monad
 
 import GHC.Data.FastString
@@ -788,20 +788,19 @@ we aren't using annotations heavily.
 ************************************************************************
 -}
 
-msg :: Severity -> WarnReason -> SDoc -> CoreM ()
-msg sev reason doc
+msg :: MessageClass -> SDoc -> CoreM ()
+msg msg_class doc
   = do { dflags <- getDynFlags
        ; loc    <- getSrcSpanM
        ; unqual <- getPrintUnqualified
-       ; let sty = case sev of
-                     SevError   -> err_sty
-                     SevWarning -> err_sty
-                     SevDump    -> dump_sty
-                     _          -> user_sty
+       ; let sty = case msg_class of
+                     MCDiagnostic _ -> err_sty
+                     MCDump         -> dump_sty
+                     _              -> user_sty
              err_sty  = mkErrStyle unqual
              user_sty = mkUserStyle unqual AllTheWay
              dump_sty = mkDumpStyle unqual
-       ; liftIO $ putLogMsg dflags reason sev loc (withPprStyle sty doc) }
+       ; liftIO $ putLogMsg dflags msg_class loc (withPprStyle sty doc) }
 
 -- | Output a String message to the screen
 putMsgS :: String -> CoreM ()
@@ -809,7 +808,7 @@ putMsgS = putMsg . text
 
 -- | Output a message to the screen
 putMsg :: SDoc -> CoreM ()
-putMsg = msg SevInfo NoReason
+putMsg = msg MCInfo
 
 -- | Output an error to the screen. Does not cause the compiler to die.
 errorMsgS :: String -> CoreM ()
@@ -817,10 +816,10 @@ errorMsgS = errorMsg . text
 
 -- | Output an error to the screen. Does not cause the compiler to die.
 errorMsg :: SDoc -> CoreM ()
-errorMsg = msg SevError NoReason
+errorMsg = msg (MCDiagnostic $ SevError NoErrReason)
 
 warnMsg :: WarnReason -> SDoc -> CoreM ()
-warnMsg = msg SevWarning
+warnMsg reason = msg (MCDiagnostic $ SevWarning reason)
 
 -- | Output a fatal error to the screen. Does not cause the compiler to die.
 fatalErrorMsgS :: String -> CoreM ()
@@ -828,7 +827,7 @@ fatalErrorMsgS = fatalErrorMsg . text
 
 -- | Output a fatal error to the screen. Does not cause the compiler to die.
 fatalErrorMsg :: SDoc -> CoreM ()
-fatalErrorMsg = msg SevFatal NoReason
+fatalErrorMsg = msg MCFatal
 
 -- | Output a string debugging message at verbosity level of @-v@ or higher
 debugTraceMsgS :: String -> CoreM ()
@@ -836,7 +835,7 @@ debugTraceMsgS = debugTraceMsg . text
 
 -- | Outputs a debugging message at verbosity level of @-v@ or higher
 debugTraceMsg :: SDoc -> CoreM ()
-debugTraceMsg = msg SevDump NoReason
+debugTraceMsg = msg MCDump
 
 -- | Show some labelled 'SDoc' if a particular flag is set or at a verbosity level of @-v -ddump-most@ or higher
 dumpIfSet_dyn :: DumpFlag -> String -> DumpFormat -> SDoc -> CoreM ()

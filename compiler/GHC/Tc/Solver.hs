@@ -1332,7 +1332,7 @@ decideMonoTyVars infer_mode name_taus psigs candidates
            -- Warn about the monomorphism restriction
        ; warn_mono <- woptM Opt_WarnMonomorphism
        ; when (case infer_mode of { ApplyMR -> warn_mono; _ -> False}) $
-         warnTc (Reason Opt_WarnMonomorphism)
+         warnTc (WarnReason Opt_WarnMonomorphism)
                 (constrained_tvs `intersectsVarSet` tyCoVarsOfTypes taus)
                 mr_msg
 

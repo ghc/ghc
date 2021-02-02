@@ -390,7 +390,7 @@ displayLintResults :: DynFlags
                    -> IO ()
 displayLintResults dflags display_warnings pp_what pp_pgm (warns, errs)
   | not (isEmptyBag errs)
-  = do { putLogMsg dflags NoReason Err.SevDump noSrcSpan
+  = do { putLogMsg dflags Err.MCDump noSrcSpan
            $ withPprStyle defaultDumpStyle
            (vcat [ lint_banner "errors" pp_what, Err.pprMessageBag errs
                  , text "*** Offending Program ***"
@@ -403,7 +403,7 @@ displayLintResults dflags display_warnings pp_what pp_pgm (warns, errs)
   , display_warnings
   -- If the Core linter encounters an error, output to stderr instead of
   -- stdout (#13342)
-  = putLogMsg dflags NoReason Err.SevInfo noSrcSpan
+  = putLogMsg dflags Err.MCInfo noSrcSpan
       $ withPprStyle defaultDumpStyle
         (lint_banner "warnings" pp_what $$ Err.pprMessageBag (mapBag ($$ blankLine) warns))
 
@@ -2754,7 +2754,7 @@ addMsg is_error env msgs msg
                           , isGoodSrcSpan span ] of
                []    -> noSrcSpan
                (s:_) -> s
-   mk_msg msg = mkLocMessage SevWarning msg_span
+   mk_msg msg = mkLocMessage (MCDiagnostic $ SevWarning NoWarnReason) msg_span
                              (msg $$ context)
 
 addLoc :: LintLocInfo -> LintM a -> LintM a

@@ -300,11 +300,11 @@ builderMainLoop dflags filter_fn pgm real_args mb_cwd mb_env = do
       msg <- readChan chan
       case msg of
         BuildMsg msg -> do
-          putLogMsg dflags NoReason SevInfo noSrcSpan
+          putLogMsg dflags MCInfo noSrcSpan
               $ withPprStyle defaultUserStyle msg
           log_loop chan t
         BuildError loc msg -> do
-          putLogMsg dflags NoReason SevError (mkSrcSpan loc loc)
+          putLogMsg dflags (MCDiagnostic $ SevError NoErrReason) (mkSrcSpan loc loc)
               $ withPprStyle defaultUserStyle msg
           log_loop chan t
         EOF ->

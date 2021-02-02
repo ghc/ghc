@@ -74,7 +74,7 @@ lintStgTopBindings dflags this_mod unarised whodunnit binds
       Nothing  ->
         return ()
       Just msg -> do
-        putLogMsg dflags NoReason Err.SevDump noSrcSpan
+        putLogMsg dflags Err.MCDump noSrcSpan
           $ withPprStyle defaultDumpStyle
           (vcat [ text "*** Stg Lint ErrMsgs: in" <+>
                         text whodunnit <+> text "***",
@@ -350,7 +350,8 @@ addErr errs_so_far msg locs
   = errs_so_far `snocBag` mk_msg locs
   where
     mk_msg (loc:_) = let (l,hdr) = dumpLoc loc
-                     in  mkLocMessage SevWarning l (hdr $$ msg)
+                     in  mkLocMessage (Err.MCDiagnostic $ SevWarning NoWarnReason)
+                                      l (hdr $$ msg)
     mk_msg []      = msg
 
 addLoc :: LintLocInfo -> LintM a -> LintM a

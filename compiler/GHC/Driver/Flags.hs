@@ -3,6 +3,7 @@ module GHC.Driver.Flags
    , GeneralFlag(..)
    , WarningFlag(..)
    , WarnReason (..)
+   , ErrReason (..)
    , Language(..)
    , optimisationFlags
    )
@@ -511,22 +512,34 @@ data WarningFlag =
 -- displayed. If a warning isn't controlled by a flag, this is made
 -- explicit at the point of use.
 data WarnReason
-  = NoReason
+  = NoWarnReason
   -- | Warning was enabled with the flag
-  | Reason !WarningFlag
-  -- | Warning was made an error because of -Werror or -Werror=WarningFlag
-  | ErrReason !(Maybe WarningFlag)
-  deriving Show
+  | WarnReason !WarningFlag
+  -- | Warning was made out of a demoted error (typically Opt_DeferTypeErrors or similar).
+  | WarnDemotedFromError !GeneralFlag
+  deriving (Eq, Show)
+
+data ErrReason
+  = NoErrReason
+  -- | Error was made out of a promoted warning because of -Werror or -Werror=WarningFlag
+  | ErrPromotedFromWarning !(Either GeneralFlag WarningFlag)
+  deriving (Eq, Show)
 
 instance Outputable WarnReason where
   ppr = text . show
 
 instance ToJson WarnReason where
-  json NoReason = JSNull
-  json (Reason wf) = JSString (show wf)
-  json (ErrReason Nothing) = JSString "Opt_WarnIsError"
-  json (ErrReason (Just wf)) = JSString (show wf)
+  json NoWarnReason = JSNull
+  json (WarnReason wf) = JSString (show wf)
+  json (WarnDemotedFromError gf) = JSString (show gf)
 
+instance Outputable ErrReason where
+  ppr = text . show
+
+instance ToJson ErrReason where
+  json NoErrReason = JSNull
+  json (ErrPromotedFromWarning (Left gf))  = JSString (show gf)
+  json (ErrPromotedFromWarning (Right wf)) = JSString (show wf)
 
 data Language = Haskell98 | Haskell2010
    deriving (Eq, Enum, Show, Bounded)

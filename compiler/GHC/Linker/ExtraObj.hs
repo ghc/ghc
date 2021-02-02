@@ -90,7 +90,7 @@ mkExtraObj dflags unit_state extn xs
 mkExtraObjToLinkIntoBinary :: DynFlags -> UnitState -> IO FilePath
 mkExtraObjToLinkIntoBinary dflags unit_state = do
   when (gopt Opt_NoHsMain dflags && haveRtsOptsFlags dflags) $
-     putLogMsg dflags NoReason SevInfo noSrcSpan
+     putLogMsg dflags MCInfo noSrcSpan
          $ withPprStyle defaultUserStyle
          (text "Warning: -rtsopts and -with-rtsopts have no effect with -no-hs-main." $$
           text "    Call hs_init_ghc() from your main() function to set these options.")

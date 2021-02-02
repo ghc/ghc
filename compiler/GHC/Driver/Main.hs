@@ -559,12 +559,12 @@ tcRnModule' sum save_rn_syntax mod = do
     hsc_env <- getHscEnv
     dflags   <- getDynFlags
 
+    let sev = SevWarning (WarnReason Opt_WarnMissingSafeHaskellMode)
     -- -Wmissing-safe-haskell-mode
     when (not (safeHaskellModeEnabled dflags)
           && wopt Opt_WarnMissingSafeHaskellMode dflags) $
         logWarnings $ unitBag $
-        makeIntoWarning (Reason Opt_WarnMissingSafeHaskellMode) $
-        mkPlainWarnMsg (getLoc (hpm_module mod)) $
+        mkPlainMsgEnvelope sev (getLoc (hpm_module mod)) $
         warnMissingSafeHaskellMode
 
     tcg_res <- {-# SCC "Typecheck-Rename" #-}
@@ -592,14 +592,14 @@ tcRnModule' sum save_rn_syntax mod = do
               True
                 | safeHaskell dflags == Sf_Safe -> return ()
                 | otherwise -> (logWarnings $ unitBag $
-                       makeIntoWarning (Reason Opt_WarnSafe) $
-                       mkPlainWarnMsg (warnSafeOnLoc dflags) $
+                       mkPlainMsgEnvelope (SevWarning $ WarnReason Opt_WarnSafe)
+                                          (warnSafeOnLoc dflags) $
                        errSafe tcg_res')
               False | safeHaskell dflags == Sf_Trustworthy &&
                       wopt Opt_WarnTrustworthySafe dflags ->
                       (logWarnings $ unitBag $
-                       makeIntoWarning (Reason Opt_WarnTrustworthySafe) $
-                       mkPlainWarnMsg (trustworthyOnLoc dflags) $
+                       mkPlainMsgEnvelope (SevWarning $ WarnReason Opt_WarnTrustworthySafe)
+                                          (trustworthyOnLoc dflags) $
                        errTwthySafe tcg_res')
               False -> return ()
           return tcg_res'
@@ -1136,7 +1136,7 @@ hscCheckSafeImports tcg_env = do
 
     warnRules :: GenLocated SrcSpan (RuleDecl GhcTc) -> MsgEnvelope DecoratedSDoc
     warnRules (L loc (HsRule { rd_name = n })) =
-        mkPlainWarnMsg loc $
+        mkPlainMsgEnvelope (SevWarning NoWarnReason) loc $
             text "Rule \"" <> ftext (snd $ unLoc n) <> text "\" ignored" $+$
             text "User defined rules are disabled under Safe Haskell"
 
@@ -1212,7 +1212,7 @@ checkSafeImports tcg_env
     cond' :: ImportedModsVal -> ImportedModsVal -> Hsc ImportedModsVal
     cond' v1 v2
         | imv_is_safe v1 /= imv_is_safe v2
-        = throwOneError $ mkPlainMsgEnvelope (imv_span v1)
+        = throwOneError $ mkPlainMsgEnvelope (SevError NoErrReason) (imv_span v1)
               (text "Module" <+> ppr (imv_name v1) <+>
               (text $ "is imported both as a safe and unsafe import!"))
         | otherwise
@@ -1280,7 +1280,7 @@ hscCheckSafe' m l = do
         iface <- lookup' m
         case iface of
             -- can't load iface to check trust!
-            Nothing -> throwOneError $ mkPlainMsgEnvelope l
+            Nothing -> throwOneError $ mkPlainMsgEnvelope (SevError NoErrReason) l
                          $ text "Can't load the interface file for" <+> ppr m
                            <> text ", to check that it can be safely imported"
 
@@ -1313,21 +1313,21 @@ hscCheckSafe' m l = do
                 where
                     state = hsc_units hsc_env
                     inferredImportWarn = unitBag
-                        $ makeIntoWarning (Reason Opt_WarnInferredSafeImports)
-                        $ mkWarnMsg l (pkgQual state)
+                        $ mkShortMsgEnvelope (SevWarning $ WarnReason Opt_WarnInferredSafeImports)
+                                             l (pkgQual state)
                         $ sep
                             [ text "Importing Safe-Inferred module "
                                 <> ppr (moduleName m)
                                 <> text " from explicitly Safe module"
                             ]
-                    pkgTrustErr = unitBag $ mkMsgEnvelope l (pkgQual state) $
+                    pkgTrustErr = unitBag $ mkShortMsgEnvelope (SevError NoErrReason) l (pkgQual state) $
                         sep [ ppr (moduleName m)
                                 <> text ": Can't be safely imported!"
                             , text "The package ("
                                 <> (pprWithUnitState state $ ppr (moduleUnit m))
                                 <> text ") the module resides in isn't trusted."
                             ]
-                    modTrustErr = unitBag $ mkMsgEnvelope l (pkgQual state) $
+                    modTrustErr = unitBag $ mkShortMsgEnvelope (SevError NoErrReason) l (pkgQual state) $
                         sep [ ppr (moduleName m)
                                 <> text ": Can't be safely imported!"
                             , text "The module itself isn't safe." ]
@@ -1373,7 +1373,7 @@ checkPkgTrust pkgs = do
             | unitIsTrusted $ unsafeLookupUnitId state pkg
             = acc
             | otherwise
-            = (:acc) $ mkMsgEnvelope noSrcSpan (pkgQual state)
+            = (:acc) $ mkShortMsgEnvelope (SevError NoErrReason) noSrcSpan (pkgQual state)
                      $ pprWithUnitState state
                      $ text "The package ("
                         <> ppr pkg
@@ -1396,9 +1396,10 @@ markUnsafeInfer :: TcGblEnv -> WarningMessages -> Hsc TcGblEnv
 markUnsafeInfer tcg_env whyUnsafe = do
     dflags <- getDynFlags
 
+    let sev = SevWarning (WarnReason Opt_WarnUnsafe)
     when (wopt Opt_WarnUnsafe dflags)
-         (logWarnings $ unitBag $ makeIntoWarning (Reason Opt_WarnUnsafe) $
-             mkPlainWarnMsg (warnUnsafeOnLoc dflags) (whyUnsafe' dflags))
+         (logWarnings $ unitBag $
+             mkPlainMsgEnvelope sev (warnUnsafeOnLoc dflags) (whyUnsafe' dflags))
 
     liftIO $ writeIORef (tcg_safeInfer tcg_env) (False, whyUnsafe)
     -- NOTE: Only wipe trust when not in an explicitly safe haskell mode. Other
@@ -1419,7 +1420,7 @@ markUnsafeInfer tcg_env whyUnsafe = do
                          ]
     badFlags df   = concatMap (badFlag df) unsafeFlagsForInfer
     badFlag df (str,loc,on,_)
-        | on df     = [mkLocMessage SevOutput (loc df) $
+        | on df     = [mkLocMessage MCOutput (loc df) $
                             text str <+> text "is not allowed in Safe Haskell"]
         | otherwise = []
     badInsts insts = concatMap badInst insts
@@ -1428,7 +1429,7 @@ markUnsafeInfer tcg_env whyUnsafe = do
     checkOverlap _             = True
 
     badInst ins | checkOverlap (overlapMode (is_flag ins))
-                = [mkLocMessage SevOutput (nameSrcSpan $ getName $ is_dfun ins) $
+                = [mkLocMessage MCOutput (nameSrcSpan $ getName $ is_dfun ins) $
                       ppr (overlapMode $ is_flag ins) <+>
                       text "overlap mode isn't allowed in Safe Haskell"]
                 | otherwise = []
@@ -1924,7 +1925,7 @@ hscImport hsc_env str = runInteractiveHsc hsc_env $ do
     case is of
         [L _ i] -> return i
         _ -> liftIO $ throwOneError $
-                 mkPlainMsgEnvelope noSrcSpan $
+                 mkPlainMsgEnvelope (SevError NoErrReason) noSrcSpan $
                      text "parse error in import declaration"
 
 -- | Typecheck an expression (but don't run it)
@@ -1953,7 +1954,7 @@ hscParseExpr expr = do
   maybe_stmt <- hscParseStmt expr
   case maybe_stmt of
     Just (L _ (BodyStmt _ expr _ _)) -> return expr
-    _ -> throwOneError $ mkPlainMsgEnvelope noSrcSpan
+    _ -> throwOneError $ mkPlainMsgEnvelope (SevError NoErrReason) noSrcSpan
       (text "not an expression:" <+> quotes (text expr))
 
 hscParseStmt :: String -> Hsc (Maybe (GhciLStmt GhcPs))

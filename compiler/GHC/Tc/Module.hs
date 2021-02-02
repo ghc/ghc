@@ -208,7 +208,7 @@ tcRnModule hsc_env mod_sum save_rn_syntax
     hsc_src = ms_hsc_src mod_sum
     dflags = hsc_dflags hsc_env
     home_unit = hsc_home_unit hsc_env
-    err_msg = mkPlainMsgEnvelope loc $
+    err_msg = mkPlainMsgEnvelope (SevError NoErrReason) loc $
               text "Module does not have a RealSrcSpan:" <+> ppr this_mod
 
     pair :: (Module, SrcSpan)
@@ -256,7 +256,7 @@ tcRnModuleTcRnM hsc_env mod_sum
 
         ; whenWOptM Opt_WarnImplicitPrelude $
              when (notNull prel_imports) $
-                addWarn (Reason Opt_WarnImplicitPrelude) (implicitPreludeWarn)
+                addWarn (WarnReason Opt_WarnImplicitPrelude) (implicitPreludeWarn)
 
         ; -- TODO This is a little skeevy; maybe handle a bit more directly
           let { simplifyImport (L _ idecl) =
@@ -1569,7 +1569,7 @@ tcPreludeClashWarn warnFlag name = do
     ; traceTc "tcPreludeClashWarn/prelude_functions"
                 (hang (ppr name) 4 (sep [ppr clashingElts]))
 
-    ; let warn_msg x = addWarnAt (Reason warnFlag) (nameSrcSpan (greMangledName x)) (hsep
+    ; let warn_msg x = addWarnAt (WarnReason warnFlag) (nameSrcSpan (greMangledName x)) (hsep
               [ text "Local definition of"
               , (quotes . ppr . nameOccName . greMangledName) x
               , text "clashes with a future Prelude name." ]
@@ -1680,7 +1680,7 @@ tcMissingParentClassWarn warnFlag isName shouldName
            -- <should>" e.g. "Foo is an instance of Monad but not Applicative"
            ; let instLoc = srcLocSpan . nameSrcLoc $ getName isInst
                  warnMsg (Just name:_) =
-                      addWarnAt (Reason warnFlag) instLoc $
+                      addWarnAt (WarnReason warnFlag) instLoc $
                            hsep [ (quotes . ppr . nameOccName) name
                                 , text "is an instance of"
                                 , (ppr . nameOccName . className) isClass
@@ -3122,5 +3122,5 @@ mark_plugin_unsafe dflags = unless (gopt Opt_PluginTrustworthy dflags) $
   recordUnsafeInfer pluginUnsafe
   where
     unsafeText = "Use of plugins makes the module unsafe"
-    pluginUnsafe = unitBag ( mkPlainWarnMsg noSrcSpan
+    pluginUnsafe = unitBag ( mkPlainMsgEnvelope (SevWarning NoWarnReason) noSrcSpan
                                    (Outputable.text unsafeText) )
