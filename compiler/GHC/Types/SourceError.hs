@@ -27,7 +27,7 @@ srcErrorMessages (SourceError msgs) = msgs
 throwErrors :: MonadIO io => ErrorMessages -> io a
 throwErrors = liftIO . throwIO . mkSrcErr
 
-throwOneError :: MonadIO io => MsgEnvelope DecoratedSDoc -> io a
+throwOneError :: MonadIO io => MsgEnvelope DiagnosticMessage -> io a
 throwOneError = throwErrors . unitBag
 
 -- | A source error is an error that is caused by one or more errors in the

@@ -1640,7 +1640,7 @@ warnUnusedForAll :: OutputableBndrFlag flag
 warnUnusedForAll doc (L loc tv) used_names
   = whenWOptM Opt_WarnUnusedForalls $
     unless (hsTyVarName tv `elemNameSet` used_names) $
-    addWarnAt (Reason Opt_WarnUnusedForalls) loc $
+    addDiagnosticAt (WarningWithFlag Opt_WarnUnusedForalls) loc $
     vcat [ text "Unused quantified type variable" <+> quotes (ppr tv)
          , inHsDocContext doc ]
 
