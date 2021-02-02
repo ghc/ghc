@@ -101,7 +101,7 @@ import GHC.Prelude
 import {-# SOURCE #-} GHC.Builtin.Types
   ( runtimeRepTy, unboxedTupleKind, liftedTypeKind
   , vecRepDataConTyCon, tupleRepDataConTyCon
-  , liftedRepDataConTy, unliftedRepDataConTy
+  , liftedRepTy, unliftedRepTy
   , intRepDataConTy
   , int8RepDataConTy, int16RepDataConTy, int32RepDataConTy, int64RepDataConTy
   , wordRepDataConTy
@@ -129,7 +129,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Core.TyCo.Rep -- Doesn't need special access, but this is easier to avoid
                          -- import loops which show up if you import Type instead
-import {-# SOURCE #-} GHC.Core.Type ( mkTyConTy )
+import {-# SOURCE #-} GHC.Core.Type ( mkTyConTy, tYPE )
 
 import Data.Char
 
@@ -368,7 +368,7 @@ alphaTy, betaTy, gammaTy, deltaTy :: Type
 (alphaTy:betaTy:gammaTy:deltaTy:_) = alphaTys
 
 alphaTyVarsUnliftedRep :: [TyVar]
-alphaTyVarsUnliftedRep = mkTemplateTyVars $ repeat (tYPE unliftedRepDataConTy)
+alphaTyVarsUnliftedRep = mkTemplateTyVars $ repeat (tYPE unliftedRepTy)
 
 alphaTyVarUnliftedRep :: TyVar
 (alphaTyVarUnliftedRep:_) = alphaTyVarsUnliftedRep
@@ -460,26 +460,28 @@ Note [TYPE and RuntimeRep]
 All types that classify values have a kind of the form (TYPE rr), where
 
     data RuntimeRep     -- Defined in ghc-prim:GHC.Types
-      = LiftedRep
-      | UnliftedRep
+      = BoxedRep Levity
       | IntRep
       | FloatRep
       .. etc ..
+
+    data Levity = Lifted | Unlifted
 
     rr :: RuntimeRep
 
     TYPE :: RuntimeRep -> TYPE 'LiftedRep  -- Built in
 
 So for example:
-    Int        :: TYPE 'LiftedRep
-    Array# Int :: TYPE 'UnliftedRep
+    Int        :: TYPE ('BoxedRep 'Lifted)
+    Array# Int :: TYPE ('BoxedRep 'Unlifted)
     Int#       :: TYPE 'IntRep
     Float#     :: TYPE 'FloatRep
-    Maybe      :: TYPE 'LiftedRep -> TYPE 'LiftedRep
+    Maybe      :: TYPE ('BoxedRep 'Lifted) -> TYPE ('BoxedRep 'Lifted)
     (# , #)    :: TYPE r1 -> TYPE r2 -> TYPE (TupleRep [r1, r2])
 
 We abbreviate '*' specially:
-    type * = TYPE 'LiftedRep
+    type LiftedRep = 'BoxedRep 'Lifted
+    type * = TYPE LiftedRep
 
 The 'rr' parameter tells us how the value is represented at runtime.
 
@@ -512,7 +514,7 @@ generator never has to manipulate a value of type 'a :: TYPE rr'.
 Note [PrimRep and kindPrimRep]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 As part of its source code, in GHC.Core.TyCon, GHC has
-  data PrimRep = LiftedRep | UnliftedRep | IntRep | FloatRep | ...etc...
+  data PrimRep = BoxedRep Levity | IntRep | FloatRep | ...etc...
 
 Notice that
  * RuntimeRep is part of the syntax tree of the program being compiled
@@ -586,8 +588,8 @@ pcPrimTyCon name roles rep
 primRepToRuntimeRep :: PrimRep -> Type
 primRepToRuntimeRep rep = case rep of
   VoidRep       -> TyConApp tupleRepDataConTyCon [mkPromotedListTy runtimeRepTy []]
-  LiftedRep     -> liftedRepDataConTy
-  UnliftedRep   -> unliftedRepDataConTy
+  LiftedRep     -> liftedRepTy
+  UnliftedRep   -> unliftedRepTy
   IntRep        -> intRepDataConTy
   Int8Rep       -> int8RepDataConTy
   Int16Rep      -> int16RepDataConTy

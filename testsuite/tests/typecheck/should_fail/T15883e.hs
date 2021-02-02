@@ -13,6 +13,6 @@ import GHC.Exts
 import Data.Data (Data)
 
 newtype Foo rep = MkFoo (forall (a :: TYPE rep). a)
-deriving stock instance Data (Foo LiftedRep)
+deriving stock instance Data (Foo (BoxedRep Lifted))
 
 
