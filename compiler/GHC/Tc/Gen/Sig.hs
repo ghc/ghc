@@ -594,7 +594,7 @@ addInlinePrags poly_id prags_for_me
          warn_multiple_inlines inl2 inls
        | otherwise
        = setSrcSpan loc $
-         addWarnTc NoReason
+         addWarnTc NoWarnReason
                      (hang (text "Multiple INLINE pragmas for" <+> ppr poly_id)
                        2 (vcat (text "Ignoring all but the first"
                                 : map pp_inl (inl1:inl2:inls))))
@@ -727,7 +727,7 @@ tcSpecPrags poly_id prag_sigs
     is_bad_sig s = not (isSpecLSig s || isInlineLSig s || isSCCFunSig s)
 
     warn_discarded_sigs
-      = addWarnTc NoReason
+      = addWarnTc NoWarnReason
                   (hang (text "Discarding unexpected pragmas for" <+> ppr poly_id)
                       2 (vcat (map (ppr . getLoc) bad_sigs)))
 
@@ -809,7 +809,7 @@ tcImpSpec (name, prag)
  = do { id <- tcLookupId name
       ; if isAnyInlinePragma (idInlinePragma id)
         then tcSpecPrag id prag
-        else do { addWarnTc NoReason (impSpecErr name)
+        else do { addWarnTc NoWarnReason (impSpecErr name)
                 ; return [] } }
       -- If there is no INLINE/INLINABLE pragma there will be no unfolding. In
       -- that case, just delete the SPECIALISE pragma altogether, lest the

@@ -305,7 +305,7 @@ builderMainLoop logger dflags filter_fn pgm real_args mb_cwd mb_env = do
           logInfo logger dflags $ withPprStyle defaultUserStyle msg
           log_loop chan t
         BuildError loc msg -> do
-          putLogMsg logger dflags NoReason SevError (mkSrcSpan loc loc)
+          putLogMsg logger dflags (MCDiagnostic sevErrorNoReason) (mkSrcSpan loc loc)
               $ withPprStyle defaultUserStyle msg
           log_loop chan t
         EOF ->

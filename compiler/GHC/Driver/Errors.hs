@@ -1,9 +1,10 @@
+{-# LANGUAGE ViewPatterns #-}
+
 module GHC.Driver.Errors (
-    warningsToMessages
-  , printOrThrowWarnings
+    printOrThrowWarnings
   , printBagOfErrors
-  , isWarnMsgFatal
   , handleFlagWarnings
+  , partitionMessageBag
   ) where
 
 import GHC.Driver.Session
@@ -18,27 +19,24 @@ import GHC.Utils.Outputable ( text, withPprStyle, mkErrStyle )
 import GHC.Utils.Logger
 import qualified GHC.Driver.CmdLine as CmdLine
 
--- | Converts a list of 'WarningMessages' into a tuple where the second element contains only
--- error, i.e. warnings that are considered fatal by GHC based on the input 'DynFlags'.
-warningsToMessages :: DynFlags -> WarningMessages -> (WarningMessages, ErrorMessages)
-warningsToMessages dflags =
-  partitionBagWith $ \warn ->
-    case isWarnMsgFatal dflags warn of
-      Nothing -> Left warn
-      Just err_reason ->
-        Right warn{ errMsgSeverity = SevError
-                  , errMsgReason = ErrReason err_reason }
+-- | Promotes a 'WarnMsg' into an error, given a proper 'ErrReason'.
+promoteWarningToError :: ErrReason -> WarnMsg -> MsgEnvelope DecoratedSDoc
+promoteWarningToError errReason msg = msg { errMsgSeverity = SevError errReason }
+
+-- | Partitions the messages and returns a tuple which first element are the warnings, and the
+-- second the errors.
+partitionMessageBag :: Bag (MsgEnvelope e) -> (Bag (MsgEnvelope e), Bag (MsgEnvelope e))
+partitionMessageBag = partitionBag isWarningMessage
 
 printBagOfErrors :: RenderableDiagnostic a => Logger -> DynFlags -> Bag (MsgEnvelope a) -> IO ()
 printBagOfErrors logger dflags bag_of_errors
   = sequence_ [ let style = mkErrStyle unqual
                     ctx   = initSDocContext dflags style
-                in putLogMsg logger dflags reason sev s $
+                in putLogMsg logger dflags (MCDiagnostic sev) s $
                    withPprStyle style (formatBulleted ctx (renderDiagnostic doc))
               | MsgEnvelope { errMsgSpan      = s,
                               errMsgDiagnostic = doc,
                               errMsgSeverity  = sev,
-                              errMsgReason    = reason,
                               errMsgContext   = unqual } <- sortMsgBag (Just dflags)
                                                                        bag_of_errors ]
 
@@ -48,21 +46,24 @@ handleFlagWarnings logger dflags warns = do
 
       -- It would be nicer if warns :: [Located SDoc], but that
       -- has circular import problems.
-      bag = listToBag [ mkPlainWarnMsg loc (text warn)
+      bag = listToBag [ mkPlainMsgEnvelope sevWarnNoReason loc (text warn)
                       | CmdLine.Warn _ (L loc warn) <- warns' ]
 
   printOrThrowWarnings logger dflags bag
 
 -- | Checks if given 'WarnMsg' is a fatal warning.
-isWarnMsgFatal :: DynFlags -> WarnMsg -> Maybe (Maybe WarningFlag)
-isWarnMsgFatal dflags MsgEnvelope{errMsgReason = Reason wflag}
-  = if wopt_fatal wflag dflags
-      then Just (Just wflag)
-      else Nothing
-isWarnMsgFatal dflags _
-  = if gopt Opt_WarnIsError dflags
-      then Just Nothing
-      else Nothing
+isWarnMsgFatal :: DynFlags -> WarnMsg -> Maybe ErrReason
+isWarnMsgFatal dflags (errMsgSeverity -> severity) =
+  case severity of
+    SevError _              -> Nothing -- nothing to do, this is already an error.
+    SevWarning NoWarnReason ->
+      if gopt Opt_WarnIsError dflags
+        then Just ErrPromotedWithWError
+        else Nothing
+    SevWarning (WarnReason wflag) ->
+      if wopt_fatal wflag dflags
+        then Just $ ErrPromotedFromWarning wflag
+        else Nothing
 
 -- Given a warn reason, check to see if it's associated -W opt is enabled
 shouldPrintWarning :: DynFlags -> CmdLine.WarnReason -> Bool
@@ -84,9 +85,7 @@ printOrThrowWarnings logger dflags warns = do
               Nothing ->
                 (make_err, warn)
               Just err_reason ->
-                (True, warn{ errMsgSeverity = SevError
-                           , errMsgReason = ErrReason err_reason
-                           }))
+                (True, promoteWarningToError err_reason warn))
           False warns
   if make_error
     then throwIO (mkSrcErr warns')
