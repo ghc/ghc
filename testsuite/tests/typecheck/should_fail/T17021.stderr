@@ -2,5 +2,5 @@
 T17021.hs:18:5: error:
     A levity-polymorphic type is not allowed here:
       Type: Int
-      Kind: TYPE (Id 'LiftedRep)
+      Kind: TYPE (Id ('BoxedRep 'Lifted))
     When trying to create a variable of type: Int
