@@ -419,7 +419,7 @@ dsRule (L loc (HsRule { rd_name = name
         -- and take the body apart into a (f args) form
         ; dflags <- getDynFlags
         ; case decomposeRuleLhs dflags bndrs'' lhs'' of {
-                Left msg -> do { warnDs NoReason msg; return Nothing } ;
+                Left msg -> do { warnDs NoWarnReason msg; return Nothing } ;
                 Right (final_bndrs, fn_id, args) -> do
 
         { let is_local = isLocalId fn_id
@@ -455,7 +455,7 @@ warnRuleShadowing rule_name rule_act fn_id arg_ids
       | isLocalId lhs_id || canUnfold (idUnfolding lhs_id)
                        -- If imported with no unfolding, no worries
       , idInlineActivation lhs_id `competesWith` rule_act
-      = warnDs (Reason Opt_WarnInlineRuleShadowing)
+      = warnDs (WarnReason Opt_WarnInlineRuleShadowing)
                (vcat [ hang (text "Rule" <+> pprRuleName rule_name
                                <+> text "may never fire")
                             2 (text "because" <+> quotes (ppr lhs_id)
@@ -466,7 +466,7 @@ warnRuleShadowing rule_name rule_act fn_id arg_ids
 
       | check_rules_too
       , bad_rule : _ <- get_bad_rules lhs_id
-      = warnDs (Reason Opt_WarnInlineRuleShadowing)
+      = warnDs (WarnReason Opt_WarnInlineRuleShadowing)
                (vcat [ hang (text "Rule" <+> pprRuleName rule_name
                                <+> text "may never fire")
                             2 (text "because rule" <+> pprRuleName (ruleName bad_rule)

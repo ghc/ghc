@@ -14,25 +14,29 @@ module GHC.Types.Error
    , unionMessages
    , MsgEnvelope (..)
    , WarnMsg
+
+   -- * Classifying Messages
+
+   , MessageClass (..)
+   , Severity (..)
+   , sevErrorNoReason
+   , sevWarnNoReason
+   , RenderableDiagnostic (..)
+
+    -- * Rendering Messages
+
    , SDoc
    , DecoratedSDoc (unDecorated)
-   , Severity (..)
-   , RenderableDiagnostic (..)
    , pprMessageBag
    , mkDecorated
    , mkLocMessage
    , mkLocMessageAnn
-   , getSeverityColour
    , getCaretDiagnostic
-   , makeIntoWarning
-   -- * Constructing individual errors
+   -- * Constructing individual diagnostic messages
    , mkMsgEnvelope
    , mkPlainMsgEnvelope
-   , mkErr
    , mkLongMsgEnvelope
-   , mkWarnMsg
-   , mkPlainWarnMsg
-   , mkLongWarnMsg
+   , mkShortMsgEnvelope
    -- * Queries
    , isErrorMessage
    , isWarningMessage
@@ -65,10 +69,8 @@ We represent the 'Messages' as a single bag of warnings and errors.
 
 The reason behind that is that there is a fluid relationship between errors and warnings and we want to
 be able to promote or demote errors and warnings based on certain flags (e.g. -Werror, -fdefer-type-errors
-or -XPartialTypeSignatures). For now we rely on the 'Severity' to distinguish between a warning and an
-error, although the 'Severity' can be /more/ than just 'SevWarn' and 'SevError', and as such it probably
-shouldn't belong to an 'MsgEnvelope' to begin with, as it might potentially lead to the construction of
-"impossible states" (e.g. a waning with 'SevInfo', for example).
+or -XPartialTypeSignatures). We rely on the 'Severity' to distinguish between a warning and an
+error.
 
 'WarningMessages' and 'ErrorMessages' are for now simple type aliases to retain backward compatibility, but
 in future iterations these can be either parameterised over an 'e' message type (to make type signatures
@@ -158,37 +160,59 @@ data MsgEnvelope e = MsgEnvelope
    , errMsgContext     :: PrintUnqualified
    , errMsgDiagnostic  :: e
    , errMsgSeverity    :: Severity
-   , errMsgReason      :: WarnReason
+   -- ^ The 'Severity' of this message.
    } deriving Functor
 
 instance RenderableDiagnostic DecoratedSDoc where
   renderDiagnostic = id
 
-data Severity
-  = SevOutput
-  | SevFatal
-  | SevInteractive
+-- | The class for a diagnostic message. The main purpose is to classify a message within GHC,
+-- to distinguish it from a debug/dump message vs a proper diagnostic, for which we include a 'Severity'.
+data MessageClass
+  = MCOutput
+  | MCFatal
+  | MCInteractive
 
-  | SevDump
+  | MCDump
     -- ^ Log message intended for compiler developers
     -- No file\/line\/column stuff
 
-  | SevInfo
+  | MCInfo
     -- ^ Log messages intended for end users.
     -- No file\/line\/column stuff.
 
-  | SevWarning
-  | SevError
-    -- ^ SevWarning and SevError are used for warnings and errors
-    --   o The message has a file\/line\/column heading,
-    --     plus "warning:" or "error:",
-    --     added by mkLocMessags
-    --   o Output is intended for end users
+  | MCDiagnostic Severity
   deriving (Eq, Show)
 
 
+-- | Used to describe warnings and errors
+--   o The message has a file\/line\/column heading,
+--     plus "warning:" or "error:",
+--     added by mkLocMessage
+--   o Output is intended for end users
+data Severity
+  = SevWarning !WarnReason -- ^ Born as a warning or demoted from an error.
+  | SevError   !ErrReason  -- ^ Born as an error  or promoted from a warning (e.g. -Werror)
+  deriving (Eq, Show)
+
+-- | The default 'Severity' for an error without a specific reason.
+sevErrorNoReason :: Severity
+sevErrorNoReason = SevError NoErrReason
+
+-- | The default 'Severity' for a warning without a specific reason.
+sevWarnNoReason :: Severity
+sevWarnNoReason = SevWarning NoWarnReason
+
 instance ToJson Severity where
   json s = JSString (show s)
+
+instance ToJson MessageClass where
+  json MCOutput = JSString "MCOutput"
+  json MCFatal  = JSString "MCFatal"
+  json MCInteractive = JSString "MCInteractive"
+  json MCDump = JSString "MCDump"
+  json MCInfo = JSString "MCInfo"
+  json (MCDiagnostic sev) = json sev
 
 instance Show (MsgEnvelope DecoratedSDoc) where
     show = showMsgEnvelope
@@ -202,58 +226,58 @@ pprMessageBag :: Bag SDoc -> SDoc
 pprMessageBag msgs = vcat (punctuate blankLine (bagToList msgs))
 
 -- | Make an unannotated error message with location info.
-mkLocMessage :: Severity -> SrcSpan -> SDoc -> SDoc
+mkLocMessage :: MessageClass -> SrcSpan -> SDoc -> SDoc
 mkLocMessage = mkLocMessageAnn Nothing
 
 -- | Make a possibly annotated error message with location info.
 mkLocMessageAnn
   :: Maybe String                       -- ^ optional annotation
-  -> Severity                           -- ^ severity
+  -> MessageClass                       -- ^ What kind of message?
   -> SrcSpan                            -- ^ location
-  -> SDoc                             -- ^ message
+  -> SDoc                               -- ^ message
   -> SDoc
   -- Always print the location, even if it is unhelpful.  Error messages
   -- are supposed to be in a standard format, and one without a location
   -- would look strange.  Better to say explicitly "<no location info>".
-mkLocMessageAnn ann severity locn msg
+mkLocMessageAnn ann msg_class locn msg
     = sdocOption sdocColScheme $ \col_scheme ->
       let locn' = sdocOption sdocErrorSpans $ \case
                      True  -> ppr locn
                      False -> ppr (srcSpanStart locn)
 
-          sevColour = getSeverityColour severity col_scheme
+          msgColour = getMessageClassColour msg_class col_scheme
 
           -- Add optional information
           optAnn = case ann of
             Nothing -> text ""
-            Just i  -> text " [" <> coloured sevColour (text i) <> text "]"
+            Just i  -> text " [" <> coloured msgColour (text i) <> text "]"
 
           -- Add prefixes, like    Foo.hs:34: warning:
           --                           <the warning message>
           header = locn' <> colon <+>
-                   coloured sevColour sevText <> optAnn
+                   coloured msgColour msgText <> optAnn
 
       in coloured (Col.sMessage col_scheme)
                   (hang (coloured (Col.sHeader col_scheme) header) 4
                         msg)
 
   where
-    sevText =
-      case severity of
-        SevWarning -> text "warning:"
-        SevError   -> text "error:"
-        SevFatal   -> text "fatal:"
-        _          -> empty
+    msgText =
+      case msg_class of
+        MCDiagnostic (SevError {})   -> text "error:"
+        MCDiagnostic (SevWarning {}) -> text "warning:"
+        MCFatal                      -> text "fatal:"
+        _                            -> empty
 
-getSeverityColour :: Severity -> Col.Scheme -> Col.PprColour
-getSeverityColour SevWarning = Col.sWarning
-getSeverityColour SevError   = Col.sError
-getSeverityColour SevFatal   = Col.sFatal
-getSeverityColour _          = const mempty
+getMessageClassColour :: MessageClass -> Col.Scheme -> Col.PprColour
+getMessageClassColour (MCDiagnostic (SevError {}))   = Col.sError
+getMessageClassColour (MCDiagnostic (SevWarning {})) = Col.sWarning
+getMessageClassColour MCFatal                        = Col.sFatal
+getMessageClassColour _                              = const mempty
 
-getCaretDiagnostic :: Severity -> SrcSpan -> IO SDoc
+getCaretDiagnostic :: MessageClass -> SrcSpan -> IO SDoc
 getCaretDiagnostic _ (UnhelpfulSpan _) = pure empty
-getCaretDiagnostic severity (RealSrcSpan span _) =
+getCaretDiagnostic msg_class (RealSrcSpan span _) =
   caretDiagnostic <$> getSrcLine (srcSpanFile span) row
   where
     getSrcLine fn i =
@@ -286,7 +310,7 @@ getCaretDiagnostic severity (RealSrcSpan span _) =
     caretDiagnostic Nothing = empty
     caretDiagnostic (Just srcLineWithNewline) =
       sdocOption sdocColScheme$ \col_scheme ->
-      let sevColour = getSeverityColour severity col_scheme
+      let sevColour = getMessageClassColour msg_class col_scheme
           marginColour = Col.sMargin col_scheme
       in
       coloured marginColour (text marginSpace) <>
@@ -327,47 +351,38 @@ getCaretDiagnostic severity (RealSrcSpan span _) =
                       | otherwise = ""
         caretLine = replicate start ' ' ++ replicate width '^' ++ caretEllipsis
 
-makeIntoWarning :: WarnReason -> MsgEnvelope e -> MsgEnvelope e
-makeIntoWarning reason err = err
-    { errMsgSeverity = SevWarning
-    , errMsgReason = reason }
-
 --
 -- Creating MsgEnvelope(s)
 --
 
-mk_err_msg
+mkMsgEnvelope
   :: Severity -> SrcSpan -> PrintUnqualified -> e -> MsgEnvelope e
-mk_err_msg sev locn print_unqual err
+mkMsgEnvelope sev locn print_unqual err
  = MsgEnvelope { errMsgSpan = locn
                , errMsgContext = print_unqual
                , errMsgDiagnostic = err
                , errMsgSeverity = sev
-               , errMsgReason = NoReason }
+               }
 
-mkErr :: SrcSpan -> PrintUnqualified -> e -> MsgEnvelope e
-mkErr = mk_err_msg SevError
+-- | A long (multi-line) diagnostic message
+mkLongMsgEnvelope :: Severity -> SrcSpan -> PrintUnqualified -> SDoc -> SDoc -> MsgEnvelope DecoratedSDoc
+mkLongMsgEnvelope sev locn unqual msg extra = mkMsgEnvelope sev locn unqual (mkDecorated [msg,extra])
 
-mkLongMsgEnvelope, mkLongWarnMsg   :: SrcSpan -> PrintUnqualified -> SDoc -> SDoc -> MsgEnvelope DecoratedSDoc
--- ^ A long (multi-line) error message
-mkMsgEnvelope, mkWarnMsg           :: SrcSpan -> PrintUnqualified -> SDoc         -> MsgEnvelope DecoratedSDoc
--- ^ A short (one-line) error message
-mkPlainMsgEnvelope, mkPlainWarnMsg :: SrcSpan ->                     SDoc         -> MsgEnvelope DecoratedSDoc
--- ^ Variant that doesn't care about qualified/unqualified names
+-- | A short (one-line) diagnostic message
+mkShortMsgEnvelope :: Severity -> SrcSpan -> PrintUnqualified -> SDoc -> MsgEnvelope DecoratedSDoc
+mkShortMsgEnvelope sev locn unqual msg = mkMsgEnvelope sev locn unqual (mkDecorated [msg])
 
-mkLongMsgEnvelope   locn unqual msg extra = mk_err_msg SevError   locn unqual        (mkDecorated [msg,extra])
-mkMsgEnvelope       locn unqual msg       = mk_err_msg SevError   locn unqual        (mkDecorated [msg])
-mkPlainMsgEnvelope  locn        msg       = mk_err_msg SevError   locn alwaysQualify (mkDecorated [msg])
-mkLongWarnMsg       locn unqual msg extra = mk_err_msg SevWarning locn unqual        (mkDecorated [msg,extra])
-mkWarnMsg           locn unqual msg       = mk_err_msg SevWarning locn unqual        (mkDecorated [msg])
-mkPlainWarnMsg      locn        msg       = mk_err_msg SevWarning locn alwaysQualify (mkDecorated [msg])
+-- | Variant that doesn't care about qualified/unqualified names
+mkPlainMsgEnvelope :: Severity -> SrcSpan -> SDoc -> MsgEnvelope DecoratedSDoc
+mkPlainMsgEnvelope sev locn msg = mkMsgEnvelope sev locn alwaysQualify (mkDecorated [msg])
 
 --
 -- Queries
 --
 
 isErrorMessage :: MsgEnvelope e -> Bool
-isErrorMessage = (== SevError) . errMsgSeverity
+isErrorMessage (MsgEnvelope { errMsgSeverity = SevError {} }) = True
+isErrorMessage _                                              = False
 
 isWarningMessage :: MsgEnvelope e -> Bool
 isWarningMessage = not . isErrorMessage

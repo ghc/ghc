@@ -29,8 +29,7 @@ mkParserErr span doc = MsgEnvelope
    { errMsgSpan        = span
    , errMsgContext     = alwaysQualify
    , errMsgDiagnostic  = mkDecorated [doc]
-   , errMsgSeverity    = SevError
-   , errMsgReason      = NoReason
+   , errMsgSeverity    = sevErrorNoReason
    }
 
 mkParserWarn :: WarningFlag -> SrcSpan -> SDoc -> MsgEnvelope DecoratedSDoc
@@ -38,8 +37,7 @@ mkParserWarn flag span doc = MsgEnvelope
    { errMsgSpan        = span
    , errMsgContext     = alwaysQualify
    , errMsgDiagnostic  = mkDecorated [doc]
-   , errMsgSeverity    = SevWarning
-   , errMsgReason      = Reason flag
+   , errMsgSeverity    = SevWarning (WarnReason flag)
    }
 
 pprWarning :: PsWarning -> MsgEnvelope DecoratedSDoc

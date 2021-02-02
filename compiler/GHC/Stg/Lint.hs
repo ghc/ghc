@@ -50,7 +50,7 @@ import GHC.Types.Var.Set
 import GHC.Core.DataCon
 import GHC.Core             ( AltCon(..) )
 import GHC.Types.Name       ( getSrcLoc, nameIsLocalOrFrom )
-import GHC.Utils.Error      ( Severity(..), mkLocMessage )
+import GHC.Utils.Error      ( sevWarnNoReason, mkLocMessage )
 import GHC.Core.Type
 import GHC.Types.RepType
 import GHC.Types.SrcLoc
@@ -76,7 +76,7 @@ lintStgTopBindings logger dflags this_mod unarised whodunnit binds
       Nothing  ->
         return ()
       Just msg -> do
-        putLogMsg logger dflags NoReason Err.SevDump noSrcSpan
+        putLogMsg logger dflags Err.MCDump noSrcSpan
           $ withPprStyle defaultDumpStyle
           (vcat [ text "*** Stg Lint ErrMsgs: in" <+>
                         text whodunnit <+> text "***",
@@ -352,7 +352,8 @@ addErr errs_so_far msg locs
   = errs_so_far `snocBag` mk_msg locs
   where
     mk_msg (loc:_) = let (l,hdr) = dumpLoc loc
-                     in  mkLocMessage SevWarning l (hdr $$ msg)
+                     in  mkLocMessage (Err.MCDiagnostic sevWarnNoReason)
+                                      l (hdr $$ msg)
     mk_msg []      = msg
 
 addLoc :: LintLocInfo -> LintM a -> LintM a
