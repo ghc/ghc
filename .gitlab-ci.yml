@@ -984,6 +984,9 @@ release-x86_64-linux-deb10-dwarf:
     BUILD_FLAVOUR: dwarf
     TEST_ENV: "x86_64-linux-deb10-dwarf"
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-deb10-linux-dwarf.tar.xz"
+  artifacts:
+    when: always
+    expire_in: 1 year
 
 validate-x86_64-linux-deb10-llvm:
   extends: .build-x86_64-linux-deb10
