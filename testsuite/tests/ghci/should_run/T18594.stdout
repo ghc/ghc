@@ -8,8 +8,8 @@ instance Monad ((->) r) -- Defined in ‘GHC.Base’
 instance Monoid b => Monoid (a -> b) -- Defined in ‘GHC.Base’
 instance Semigroup b => Semigroup (a -> b) -- Defined in ‘GHC.Base’
 type Type :: *
-type Type = TYPE 'LiftedRep
+type Type = TYPE LiftedRep
   	-- Defined in ‘GHC.Types’
 type Type :: Type
-type Type = TYPE 'LiftedRep
+type Type = TYPE LiftedRep
   	-- Defined in ‘GHC.Types’
