@@ -2,7 +2,6 @@ module GHC.Driver.Flags
    ( DumpFlag(..)
    , GeneralFlag(..)
    , WarningFlag(..)
-   , WarnReason (..)
    , Language(..)
    , optimisationFlags
    )
@@ -11,7 +10,6 @@ where
 import GHC.Prelude
 import GHC.Utils.Outputable
 import GHC.Data.EnumSet as EnumSet
-import GHC.Utils.Json
 
 -- | Debugging flags
 data DumpFlag
@@ -512,27 +510,6 @@ data WarningFlag =
    | Opt_WarnAmbiguousFields                -- Since 9.2
    | Opt_WarnImplicitLift                 -- Since 9.2
    deriving (Eq, Show, Enum)
-
--- | Used when outputting warnings: if a reason is given, it is
--- displayed. If a warning isn't controlled by a flag, this is made
--- explicit at the point of use.
-data WarnReason
-  = NoReason
-  -- | Warning was enabled with the flag
-  | Reason !WarningFlag
-  -- | Warning was made an error because of -Werror or -Werror=WarningFlag
-  | ErrReason !(Maybe WarningFlag)
-  deriving Show
-
-instance Outputable WarnReason where
-  ppr = text . show
-
-instance ToJson WarnReason where
-  json NoReason = JSNull
-  json (Reason wf) = JSString (show wf)
-  json (ErrReason Nothing) = JSString "Opt_WarnIsError"
-  json (ErrReason (Just wf)) = JSString (show wf)
-
 
 data Language = Haskell98 | Haskell2010 | GHC2021
    deriving (Eq, Enum, Show, Bounded)

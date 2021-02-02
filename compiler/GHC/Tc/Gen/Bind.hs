@@ -1015,7 +1015,7 @@ warnMissingSignatures :: WarningFlag -> SDoc -> Id -> TcM ()
 warnMissingSignatures flag msg id
   = do  { env0 <- tcInitTidyEnv
         ; let (env1, tidy_ty) = tidyOpenType env0 (idType id)
-        ; addWarnTcM (Reason flag) (env1, mk_msg tidy_ty) }
+        ; addDiagnosticTcM (WarningWithFlag flag) (env1, mk_msg tidy_ty) }
   where
     mk_msg ty = sep [ msg, nest 2 $ pprPrefixName (idName id) <+> dcolon <+> ppr ty ]
 

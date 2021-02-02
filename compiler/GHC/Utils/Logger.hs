@@ -1,4 +1,5 @@
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE LambdaCase #-}
 
 -- | Logger
 module GHC.Utils.Logger
@@ -66,8 +67,7 @@ import Control.Concurrent.MVar
 import System.IO.Unsafe
 
 type LogAction = DynFlags
-              -> WarnReason
-              -> Severity
+              -> MessageClass
               -> SrcSpan
               -> SDoc
               -> IO ()
@@ -181,8 +181,8 @@ makeThreadSafe logger = do
         with_lock :: forall a. IO a -> IO a
         with_lock act = withMVar lock (const act)
 
-        log action dflags reason sev loc doc =
-            with_lock (action dflags reason sev loc doc)
+        log action dflags msg_class loc doc =
+            with_lock (action dflags msg_class loc doc)
 
         dmp action dflags sty opts str fmt doc =
             with_lock (action dflags sty opts str fmt doc)
@@ -199,7 +199,7 @@ makeThreadSafe logger = do
 -- See Note [JSON Error Messages]
 --
 jsonLogAction :: LogAction
-jsonLogAction dflags reason severity srcSpan msg
+jsonLogAction dflags msg_class srcSpan msg
   =
     defaultLogActionHPutStrDoc dflags True stdout
       (withPprStyle (PprCode CStyle) (doc $$ text ""))
@@ -208,56 +208,54 @@ jsonLogAction dflags reason severity srcSpan msg
       doc = renderJSON $
               JSObject [ ( "span", json srcSpan )
                        , ( "doc" , JSString str )
-                       , ( "severity", json severity )
-                       , ( "reason" ,   json reason )
+                       , ( "messageClass", json msg_class )
                        ]
 
-
 defaultLogAction :: LogAction
-defaultLogAction dflags reason severity srcSpan msg
-  | dopt Opt_D_dump_json dflags = jsonLogAction dflags reason severity srcSpan msg
-  | otherwise = case severity of
-      SevOutput      -> printOut msg
-      SevDump        -> printOut (msg $$ blankLine)
-      SevInteractive -> putStrSDoc msg
-      SevInfo        -> printErrs msg
-      SevFatal       -> printErrs msg
-      SevWarning     -> printWarns
-      SevError       -> printWarns
+defaultLogAction dflags msg_class srcSpan msg
+  | dopt Opt_D_dump_json dflags = jsonLogAction dflags msg_class srcSpan msg
+  | otherwise = case msg_class of
+      MCOutput             -> printOut msg
+      MCDump               -> printOut (msg $$ blankLine)
+      MCInteractive        -> putStrSDoc msg
+      MCInfo               -> printErrs msg
+      MCFatal              -> printErrs msg
+      MCDiagnostic sev rea -> printDiagnostics sev rea
     where
       printOut   = defaultLogActionHPrintDoc  dflags False stdout
       printErrs  = defaultLogActionHPrintDoc  dflags False stderr
       putStrSDoc = defaultLogActionHPutStrDoc dflags False stdout
       -- Pretty print the warning flag, if any (#10752)
-      message = mkLocMessageAnn flagMsg severity srcSpan msg
+      message sev rea = mkLocMessageAnn (flagMsg sev rea) msg_class srcSpan msg
 
-      printWarns = do
+      printDiagnostics severity reason = do
         hPutChar stderr '\n'
         caretDiagnostic <-
             if gopt Opt_DiagnosticsShowCaret dflags
-            then getCaretDiagnostic severity srcSpan
+            then getCaretDiagnostic msg_class srcSpan
             else pure empty
         printErrs $ getPprStyle $ \style ->
           withPprStyle (setStyleColoured True style)
-            (message $+$ caretDiagnostic)
+            (message severity reason $+$ caretDiagnostic)
         -- careful (#2302): printErrs prints in UTF-8,
         -- whereas converting to string first and using
         -- hPutStr would just emit the low 8 bits of
         -- each unicode char.
 
-      flagMsg =
-        case reason of
-          NoReason -> Nothing
-          Reason wflag -> do
-            spec <- flagSpecOf wflag
-            return ("-W" ++ flagSpecName spec ++ warnFlagGrp wflag)
-          ErrReason Nothing ->
-            return "-Werror"
-          ErrReason (Just wflag) -> do
-            spec <- flagSpecOf wflag
-            return $
-              "-W" ++ flagSpecName spec ++ warnFlagGrp wflag ++
-              ", -Werror=" ++ flagSpecName spec
+      flagMsg :: Severity -> DiagnosticReason -> Maybe String
+      flagMsg SevError WarningWithoutFlag =  Just "-Werror"
+      flagMsg SevError (WarningWithFlag wflag) = do
+        spec <- flagSpecOf wflag
+        return $
+          "-W" ++ flagSpecName spec ++ warnFlagGrp wflag ++
+          ", -Werror=" ++ flagSpecName spec
+      flagMsg SevError ErrorWithoutFlag = Nothing
+      flagMsg SevWarning WarningWithoutFlag = Nothing
+      flagMsg SevWarning (WarningWithFlag wflag) = do
+        spec <- flagSpecOf wflag
+        return ("-W" ++ flagSpecName spec ++ warnFlagGrp wflag)
+      flagMsg SevWarning ErrorWithoutFlag =
+        panic "SevWarning with ErrorWithoutFlag"
 
       warnFlagGrp flag
           | gopt Opt_ShowWarnGroups dflags =
@@ -330,10 +328,10 @@ dumpSDocWithStyle dumps log_action sty dflags flag hdr doc =
 
     -- write the dump to stdout
     writeDump Nothing = do
-        let (doc', severity)
-              | null hdr  = (doc, SevOutput)
-              | otherwise = (mkDumpDoc hdr doc, SevDump)
-        log_action dflags NoReason severity noSrcSpan (withPprStyle sty doc')
+        let (doc', msg_class)
+              | null hdr  = (doc, MCOutput)
+              | otherwise = (mkDumpDoc hdr doc, MCDump)
+        log_action dflags msg_class noSrcSpan (withPprStyle sty doc')
 
 
 -- | Run an action with the handle of a 'DumpFlag' if we are outputting to a
@@ -404,8 +402,7 @@ chooseDumpFile dflags flag
 doDump :: Logger -> DynFlags -> String -> SDoc -> IO ()
 doDump logger dflags hdr doc =
   putLogMsg logger dflags
-            NoReason
-            SevDump
+            MCDump
             noSrcSpan
             (withPprStyle defaultDumpStyle
               (mkDumpDoc hdr doc))

@@ -1103,7 +1103,7 @@ instance TH.Quasi TcM where
   -- 'msg' is forced to ensure exceptions don't escape,
   -- see Note [Exceptions in TH]
   qReport True msg  = seqList msg $ addErr  (text msg)
-  qReport False msg = seqList msg $ addWarn NoReason (text msg)
+  qReport False msg = seqList msg $ addDiagnostic WarningWithoutFlag (text msg)
 
   qLocation = do { m <- getModule
                  ; l <- getSrcSpanM
@@ -1436,7 +1436,7 @@ runTH ty fhv = do
 -- See Note [Remote Template Haskell] in libraries/ghci/GHCi/TH.hs.
 runRemoteTH
   :: IServInstance
-  -> [Messages DecoratedSDoc]   --  saved from nested calls to qRecover
+  -> [Messages DiagnosticMessage]   --  saved from nested calls to qRecover
   -> TcM ()
 runRemoteTH iserv recovers = do
   THMsg msg <- liftIO $ readIServ iserv getTHMessage

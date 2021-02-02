@@ -1054,7 +1054,7 @@ showIface hsc_env filename = do
    let dflags  = hsc_dflags hsc_env
    let logger  = hsc_logger hsc_env
        unit_state = hsc_units hsc_env
-       printer = putLogMsg logger dflags NoReason SevOutput noSrcSpan . withPprStyle defaultDumpStyle
+       printer = putLogMsg logger dflags MCOutput noSrcSpan . withPprStyle defaultDumpStyle
 
    -- skip the hi way check; we don't want to worry about profiled vs.
    -- non-profiled interfaces, for example.
@@ -1068,7 +1068,7 @@ showIface hsc_env filename = do
        print_unqual = QueryQualify qualifyImportedNames
                                    neverQualifyModules
                                    neverQualifyPackages
-   putLogMsg logger dflags NoReason SevDump noSrcSpan
+   putLogMsg logger dflags MCDump noSrcSpan
       $ withPprStyle (mkDumpStyle print_unqual)
       $ pprModIface unit_state iface
 
