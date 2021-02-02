@@ -65,7 +65,7 @@ main
                @()
                (putStrLn (unpackCString# "efg"#))
                (Control.Exception.Base.patError
-                  @'LiftedRep @(IO ()) "T9400.hs:(17,5)-(18,29)|case"#))))
+                  @LiftedRep @(IO ()) "T9400.hs:(17,5)-(18,29)|case"#))))
 
 
 
