@@ -13,21 +13,25 @@ Here are the key definitions, all available from ``GHC.Exts``: ::
 
   TYPE :: RuntimeRep -> Type   -- highly magical, built into GHC
 
-  data RuntimeRep = LiftedRep     -- for things like `Int`
-                  | UnliftedRep   -- for things like `Array#`
-                  | IntRep        -- for `Int#`
+  data Levity = Lifted    -- for things like `Int`
+              | Unlifted  -- for things like `Array#`
+
+  data RuntimeRep = BoxedRep Levity  -- for anything represented by a GC-managed pointer
+                  | IntRep           -- for `Int#`
                   | TupleRep [RuntimeRep]  -- unboxed tuples, indexed by the representations of the elements
                   | SumRep [RuntimeRep]    -- unboxed sums, indexed by the representations of the disjuncts
                   | ...
+
+  type LiftedRep = BoxedRep Lifted
 
   type Type = TYPE LiftedRep    -- Type is just an ordinary type synonym
 
 The idea is that we have a new fundamental type constant ``TYPE``, which
 is parameterised by a ``RuntimeRep``. We thus get ``Int# :: TYPE 'IntRep``
-and ``Bool :: TYPE 'LiftedRep``. Anything with a type of the form
+and ``Bool :: TYPE LiftedRep``. Anything with a type of the form
 ``TYPE x`` can appear to either side of a function arrow ``->``. We can
 thus say that ``->`` has type
-``TYPE r1 -> TYPE r2 -> TYPE 'LiftedRep``. The result is always lifted
+``TYPE r1 -> TYPE r2 -> TYPE LiftedRep``. The result is always lifted
 because all functions are lifted in GHC.
 
 .. _levity-polymorphic-restrictions:
@@ -102,13 +106,13 @@ Printing levity-polymorphic types
     :category: verbosity
 
     Print ``RuntimeRep`` parameters as they appear; otherwise, they are
-    defaulted to ``'LiftedRep``.
+    defaulted to ``LiftedRep``.
 
 Most GHC users will not need to worry about levity polymorphism
 or unboxed types. For these users, seeing the levity polymorphism
 in the type of ``$`` is unhelpful. And thus, by default, it is suppressed,
-by supposing all type variables of type ``RuntimeRep`` to be ``'LiftedRep``
-when printing, and printing ``TYPE 'LiftedRep`` as ``Type`` (or ``*`` when
+by supposing all type variables of type ``RuntimeRep`` to be ``LiftedRep``
+when printing, and printing ``TYPE LiftedRep`` as ``Type`` (or ``*`` when
 :extension:`StarIsType` is on).
 
 Should you wish to see levity polymorphism in your types, enable
