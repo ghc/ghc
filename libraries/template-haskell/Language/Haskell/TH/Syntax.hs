@@ -61,6 +61,10 @@ import Foreign.ForeignPtr
 import Foreign.C.String
 import Foreign.C.Types
 
+#if __GLASGOW_HASKELL__ >= 901
+import GHC.Types ( Levity(..) )
+#endif
+
 -----------------------------------------------------
 --
 --              The Quasi class
@@ -816,7 +820,11 @@ class Lift (t :: TYPE r) where
   -- | Turn a value into a Template Haskell expression, suitable for use in
   -- a splice.
   lift :: Quote m => t -> m Exp
+#if __GLASGOW_HASKELL__ >= 901
+  default lift :: (r ~ ('BoxedRep 'Lifted), Quote m) => t -> m Exp
+#else
   default lift :: (r ~ 'LiftedRep, Quote m) => t -> m Exp
+#endif
   lift = unTypeCode . liftTyped
 
   -- | Turn a value into a Template Haskell typed expression, suitable for use
