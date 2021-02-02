@@ -1,18 +1,18 @@
 
-UnliftedNewtypesUnassociatedFamilyFail.hs:21:30: error:
-    • Expecting a lifted type, but ‘Int#’ is unlifted
-    • In the type ‘Int#’
+UnliftedNewtypesUnassociatedFamilyFail.hs:21:30:
+     Expecting a lifted type, but ‘Int#’ is unlifted
+     In the type ‘Int#’
       In the definition of data constructor ‘MkDF1a’
       In the newtype instance declaration for ‘DF’
 
-UnliftedNewtypesUnassociatedFamilyFail.hs:22:30: error:
-    • Expecting a lifted type, but ‘Word#’ is unlifted
-    • In the type ‘Word#’
+UnliftedNewtypesUnassociatedFamilyFail.hs:22:30:
+     Expecting a lifted type, but ‘Word#’ is unlifted
+     In the type ‘Word#’
       In the definition of data constructor ‘MkDF2a’
       In the newtype instance declaration for ‘DF’
 
-UnliftedNewtypesUnassociatedFamilyFail.hs:23:30: error:
-    • Expecting a lifted type, but ‘(# Int#, Word# #)’ is unlifted
-    • In the type ‘(# Int#, Word# #)’
+UnliftedNewtypesUnassociatedFamilyFail.hs:23:30:
+     Expecting a lifted type, but ‘(# Int#, Word# #)’ is unlifted
+     In the type ‘(# Int#, Word# #)’
       In the definition of data constructor ‘MkDF3a’
       In the newtype instance declaration for ‘DF’
