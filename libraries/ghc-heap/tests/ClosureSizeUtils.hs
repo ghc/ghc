@@ -30,7 +30,7 @@ assertSize x =
   assertSizeBox (asBox x) (typeRep @a)
 
 assertSizeUnlifted
-  :: forall (a :: TYPE 'UnliftedRep). (HasCallStack, Typeable a)
+  :: forall (a :: TYPE ('BoxedRep 'Unlifted)). (HasCallStack, Typeable a)
   => a     -- ^ closure
   -> Int   -- ^ expected size in words
   -> IO ()
