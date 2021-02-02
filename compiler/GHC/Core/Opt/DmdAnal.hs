@@ -1113,46 +1113,16 @@ annotateLamIdBndr env arg_of_dfun dmd_ty id
     main_ty = addDemand dmd dmd_ty'
     (dmd_ty', dmd) = findBndrDmd env arg_of_dfun dmd_ty id
 
-deleteFVs :: DmdType -> [Var] -> DmdType
-deleteFVs (DmdType fvs dmds res) bndrs
-  = DmdType (delVarEnvList fvs bndrs) dmds res
+{- Note [NOINLINE and strictness]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+At one point we disabled strictness for NOINLINE functions, on the
+grounds that they should be entirely opaque.  But that lost lots of
+useful semantic strictness information, so now we analyse them like
+any other function, and pin strictness information on them.
 
-{-
-Note [NOINLINE and strictness]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The strictness analyser used to have a HACK which ensured that NOINLNE
-things were not strictness-analysed.  The reason was unsafePerformIO.
-Left to itself, the strictness analyser would discover this strictness
-for unsafePerformIO:
-        unsafePerformIO:  C(U(AV))
-But then consider this sub-expression
-        unsafePerformIO (\s -> let r = f x in
-                               case writeIORef v r s of (# s1, _ #) ->
-                               (# s1, r #)
-The strictness analyser will now find that r is sure to be eval'd,
-and may then hoist it out.  This makes tests/lib/should_run/memo002
-deadlock.
+That in turn forces us to worker/wrapper them; see
+Note [Worker-wrapper for NOINLINE functions] in GHC.Core.Opt.WorkWrap.
 
-Solving this by making all NOINLINE things have no strictness info is overkill.
-In particular, it's overkill for runST, which is perfectly respectable.
-Consider
-        f x = runST (return x)
-This should be strict in x.
-
-So the new plan is to define unsafePerformIO using the 'lazy' combinator:
-
-        unsafePerformIO (IO m) = lazy (case m realWorld# of (# _, r #) -> r)
-
-Remember, 'lazy' is a wired-in identity-function Id, of type a->a, which is
-magically NON-STRICT, and is inlined after strictness analysis.  So
-unsafePerformIO will look non-strict, and that's what we want.
-
-Now we don't need the hack in the strictness analyser.  HOWEVER, this
-decision does mean that even a NOINLINE function is not entirely
-opaque: some aspect of its implementation leaks out, notably its
-strictness.  For example, if you have a function implemented by an
-error stub, but which has RULES, you may want it not to be eliminated
-in favour of error!
 
 Note [Lazy and unleashable free variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
