@@ -64,7 +64,6 @@ newtype SimplM result
                  -> IO (result, SimplCount)}
     -- We only need IO here for dump output, but since we already have it
     -- we might as well use it for uniques.
-    deriving (Functor)
 
 pattern SM :: (SimplTopEnv -> SimplCount
                -> IO (result, SimplCount))
@@ -75,7 +74,7 @@ pattern SM :: (SimplTopEnv -> SimplCount
 -- See Note [The one-shot state monad trick] in GHC.Utils.Monad
 pattern SM m <- SM' m
   where
-    SM m = SM' (oneShot m)
+    SM m = SM' (oneShot $ \env -> oneShot $ \ct -> m env ct)
 
 data SimplTopEnv
   = STE { st_flags     :: DynFlags
@@ -129,7 +128,10 @@ computeMaxTicks dflags size
 {-# INLINE thenSmpl #-}
 {-# INLINE thenSmpl_ #-}
 {-# INLINE returnSmpl #-}
+{-# INLINE mapSmpl #-}
 
+instance Functor SimplM where
+  fmap = mapSmpl
 
 instance Applicative SimplM where
     pure  = returnSmpl
@@ -139,6 +141,9 @@ instance Applicative SimplM where
 instance Monad SimplM where
    (>>)   = (*>)
    (>>=)  = thenSmpl
+
+mapSmpl :: (a -> b) -> SimplM a -> SimplM b
+mapSmpl f m = thenSmpl m (returnSmpl . f)
 
 returnSmpl :: a -> SimplM a
 returnSmpl e = SM (\_st_env sc -> return (e, sc))
