@@ -19,7 +19,7 @@ foreign import ccall unsafe "head_bytearray"
 foreign import ccall unsafe "head_bytearray"
   c_head_bytearray_b :: MyArray# -> IO Word8
 
-newtype MyArray# :: TYPE 'UnliftedRep where
+newtype MyArray# :: TYPE ('BoxedRep 'Unlifted) where
   MyArray# :: MutableByteArray# RealWorld -> MyArray#
 
 data MutableByteArray :: Type where

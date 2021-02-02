@@ -20,5 +20,5 @@ data family Maybe(x :: TYPE (r :: RuntimeRep))
 data instance Maybe (a :: Type ) where
   MaybeSum :: (# a  | (# #) #) -> Maybe a
 
-data instance Maybe (x :: TYPE 'UnliftedRep) where
+data instance Maybe (x :: TYPE ('BoxedRep 'Unlifted)) where
   MaybeSumU :: (# x | (# #) #) -> Maybe x

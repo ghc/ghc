@@ -1793,6 +1793,10 @@ defaultTyVar default_kind tv
   = do { traceTc "Defaulting a RuntimeRep var to LiftedRep" (ppr tv)
        ; writeMetaTyVar tv liftedRepTy
        ; return True }
+  | isLevityVar tv
+  = do { traceTc "Defaulting a Levity var to Lifted" (ppr tv)
+       ; writeMetaTyVar tv liftedDataConTy
+       ; return True }
   | isMultiplicityVar tv
   = do { traceTc "Defaulting a Multiplicty var to Many" (ppr tv)
        ; writeMetaTyVar tv manyDataConTy
