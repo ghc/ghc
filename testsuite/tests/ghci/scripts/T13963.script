@@ -1,5 +1,5 @@
 :set -XPolyKinds -XDataKinds -XRankNTypes
-import GHC.Exts (TYPE, RuntimeRep(LiftedRep))
+import GHC.Exts (TYPE, RuntimeRep, LiftedRep)
 type Pair (a :: TYPE rep) (b :: TYPE rep') rep'' = forall (r :: TYPE rep''). (a -> b -> r)
 :kind Pair
 :kind Pair Int
