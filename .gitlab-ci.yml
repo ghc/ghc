@@ -200,7 +200,6 @@ lint-release-changelogs:
     - .gitlab/ci.sh setup
     - .gitlab/ci.sh configure
     - .gitlab/ci.sh build_hadrian
-    - .gitlab/ci.sh test_hadrian
   cache:
     key: hadrian
     paths:
@@ -361,7 +360,6 @@ lint-base:
     - .gitlab/ci.sh setup
     - .gitlab/ci.sh configure
     - .gitlab/ci.sh build_make
-    - .gitlab/ci.sh test_make
   dependencies: []
   artifacts:
     reports:
