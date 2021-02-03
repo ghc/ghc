@@ -162,7 +162,7 @@ go label mods cnd =
 
     liftIO $ mapM_ writeMod mods
 
-    tgt <- guessTarget "A" Nothing
+    tgt <- guessTarget "A" Nothing Nothing
 
     setTargets [tgt]
 
