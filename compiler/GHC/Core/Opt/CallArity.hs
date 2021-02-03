@@ -21,6 +21,7 @@ import GHC.Core.Utils ( exprIsCheap, exprIsTrivial )
 import GHC.Data.Graph.UnVar
 import GHC.Types.Demand
 import GHC.Utils.Misc
+import GHC.Core.Seq (seqBinds)
 
 import Control.Arrow ( first, second )
 
@@ -433,7 +434,7 @@ choice, and hence Call Arity sets the call arity for join points as well.
 -- Main entry point
 
 callArityAnalProgram :: DynFlags -> CoreProgram -> CoreProgram
-callArityAnalProgram _dflags binds = binds'
+callArityAnalProgram _dflags binds = seqBinds binds' `seq` binds'
   where
     (_, binds') = callArityTopLvl [] emptyVarSet binds
 
