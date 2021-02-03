@@ -2207,7 +2207,7 @@ warnUnnecessarySourceImports sccs = do
 
         warn :: Located ModuleName -> WarnMsg
         warn (L loc mod) =
-           mkPlainMsgEnvelope (SevWarning NoWarnReason) loc
+           mkPlainMsgEnvelope sevWarnNoReason loc
                 (text "Warning: {-# SOURCE #-} unnecessary in import of "
                  <+> quotes (ppr mod))
 
@@ -2276,7 +2276,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
                 if exists || isJust maybe_buf
                     then summariseFile hsc_env old_summaries file mb_phase
                                        obj_allowed maybe_buf
-                    else return $ Left $ unitBag $ mkPlainMsgEnvelope (SevError NoErrReason) noSrcSpan $
+                    else return $ Left $ unitBag $ mkPlainMsgEnvelope sevErrorNoReason noSrcSpan $
                            text "can't find file:" <+> text file
         getRootSummary (Target (TargetModule modl) obj_allowed maybe_buf)
            = do maybe_summary <- summariseModule hsc_env old_summary_map NotBoot
@@ -2716,7 +2716,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
               | otherwise = HsSrcFile
 
         when (pi_mod_name /= wanted_mod) $
-                throwE $ unitBag $ mkPlainMsgEnvelope (SevError NoErrReason) pi_mod_name_loc $
+                throwE $ unitBag $ mkPlainMsgEnvelope sevErrorNoReason pi_mod_name_loc $
                               text "File name does not match module name:"
                               $$ text "Saw:" <+> quotes (ppr pi_mod_name)
                               $$ text "Expected:" <+> quotes (ppr wanted_mod)
@@ -2728,7 +2728,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
                         | (k,v) <- ((pi_mod_name, mkHoleModule pi_mod_name)
                                 : homeUnitInstantiations home_unit)
                         ])
-            in throwE $ unitBag $ mkPlainMsgEnvelope (SevError NoErrReason) pi_mod_name_loc $
+            in throwE $ unitBag $ mkPlainMsgEnvelope sevErrorNoReason pi_mod_name_loc $
                 text "Unexpected signature:" <+> quotes (ppr pi_mod_name)
                 $$ if gopt Opt_BuildingCabalPackage dflags
                     then parens (text "Try adding" <+> quotes (ppr pi_mod_name)
@@ -2889,21 +2889,21 @@ withDeferredDiagnostics f = do
 noModError :: HscEnv -> SrcSpan -> ModuleName -> FindResult -> MsgEnvelope DecoratedSDoc
 -- ToDo: we don't have a proper line number for this error
 noModError hsc_env loc wanted_mod err
-  = mkPlainMsgEnvelope (SevError NoErrReason) loc $ cannotFindModule hsc_env wanted_mod err
+  = mkPlainMsgEnvelope sevErrorNoReason loc $ cannotFindModule hsc_env wanted_mod err
 
 noHsFileErr :: SrcSpan -> String -> ErrorMessages
 noHsFileErr loc path
-  = unitBag $ mkPlainMsgEnvelope (SevError NoErrReason) loc $ text "Can't find" <+> text path
+  = unitBag $ mkPlainMsgEnvelope sevErrorNoReason loc $ text "Can't find" <+> text path
 
 moduleNotFoundErr :: ModuleName -> ErrorMessages
 moduleNotFoundErr mod
-  = unitBag $ mkPlainMsgEnvelope (SevError NoErrReason) noSrcSpan $
+  = unitBag $ mkPlainMsgEnvelope sevErrorNoReason noSrcSpan $
         text "module" <+> quotes (ppr mod) <+> text "cannot be found locally"
 
 multiRootsErr :: [ModSummary] -> IO ()
 multiRootsErr [] = panic "multiRootsErr"
 multiRootsErr summs@(summ1:_)
-  = throwOneError $ mkPlainMsgEnvelope (SevError NoErrReason) noSrcSpan $
+  = throwOneError $ mkPlainMsgEnvelope sevErrorNoReason noSrcSpan $
         text "module" <+> quotes (ppr mod) <+>
         text "is defined in multiple files:" <+>
         sep (map text files)

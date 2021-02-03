@@ -29,7 +29,7 @@ mkParserErr span doc = MsgEnvelope
    { errMsgSpan        = span
    , errMsgContext     = alwaysQualify
    , errMsgDiagnostic  = mkDecorated [doc]
-   , errMsgSeverity    = SevError NoErrReason
+   , errMsgSeverity    = sevErrorNoReason
    }
 
 mkParserWarn :: WarningFlag -> SrcSpan -> SDoc -> MsgEnvelope DecoratedSDoc

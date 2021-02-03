@@ -997,7 +997,7 @@ mkLongErrAt loc msg extra
   = do { printer <- getPrintUnqualified ;
          unit_state <- hsc_units <$> getTopEnv ;
          let msg' = pprWithUnitState unit_state msg in
-         return $ mkLongMsgEnvelope (SevError NoErrReason) loc printer msg' extra }
+         return $ mkLongMsgEnvelope sevErrorNoReason loc printer msg' extra }
 
 mkDecoratedSDocAt :: Severity
                   -> SrcSpan

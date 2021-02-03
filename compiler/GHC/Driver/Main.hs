@@ -1136,7 +1136,7 @@ hscCheckSafeImports tcg_env = do
 
     warnRules :: GenLocated SrcSpan (RuleDecl GhcTc) -> MsgEnvelope DecoratedSDoc
     warnRules (L loc (HsRule { rd_name = n })) =
-        mkPlainMsgEnvelope (SevWarning NoWarnReason) loc $
+        mkPlainMsgEnvelope sevWarnNoReason loc $
             text "Rule \"" <> ftext (snd $ unLoc n) <> text "\" ignored" $+$
             text "User defined rules are disabled under Safe Haskell"
 
@@ -1212,7 +1212,7 @@ checkSafeImports tcg_env
     cond' :: ImportedModsVal -> ImportedModsVal -> Hsc ImportedModsVal
     cond' v1 v2
         | imv_is_safe v1 /= imv_is_safe v2
-        = throwOneError $ mkPlainMsgEnvelope (SevError NoErrReason) (imv_span v1)
+        = throwOneError $ mkPlainMsgEnvelope sevErrorNoReason (imv_span v1)
               (text "Module" <+> ppr (imv_name v1) <+>
               (text $ "is imported both as a safe and unsafe import!"))
         | otherwise
@@ -1280,7 +1280,7 @@ hscCheckSafe' m l = do
         iface <- lookup' m
         case iface of
             -- can't load iface to check trust!
-            Nothing -> throwOneError $ mkPlainMsgEnvelope (SevError NoErrReason) l
+            Nothing -> throwOneError $ mkPlainMsgEnvelope sevErrorNoReason l
                          $ text "Can't load the interface file for" <+> ppr m
                            <> text ", to check that it can be safely imported"
 
@@ -1320,14 +1320,14 @@ hscCheckSafe' m l = do
                                 <> ppr (moduleName m)
                                 <> text " from explicitly Safe module"
                             ]
-                    pkgTrustErr = unitBag $ mkShortMsgEnvelope (SevError NoErrReason) l (pkgQual state) $
+                    pkgTrustErr = unitBag $ mkShortMsgEnvelope sevErrorNoReason l (pkgQual state) $
                         sep [ ppr (moduleName m)
                                 <> text ": Can't be safely imported!"
                             , text "The package ("
                                 <> (pprWithUnitState state $ ppr (moduleUnit m))
                                 <> text ") the module resides in isn't trusted."
                             ]
-                    modTrustErr = unitBag $ mkShortMsgEnvelope (SevError NoErrReason) l (pkgQual state) $
+                    modTrustErr = unitBag $ mkShortMsgEnvelope sevErrorNoReason l (pkgQual state) $
                         sep [ ppr (moduleName m)
                                 <> text ": Can't be safely imported!"
                             , text "The module itself isn't safe." ]
@@ -1373,7 +1373,7 @@ checkPkgTrust pkgs = do
             | unitIsTrusted $ unsafeLookupUnitId state pkg
             = acc
             | otherwise
-            = (:acc) $ mkShortMsgEnvelope (SevError NoErrReason) noSrcSpan (pkgQual state)
+            = (:acc) $ mkShortMsgEnvelope sevErrorNoReason noSrcSpan (pkgQual state)
                      $ pprWithUnitState state
                      $ text "The package ("
                         <> ppr pkg
@@ -1925,7 +1925,7 @@ hscImport hsc_env str = runInteractiveHsc hsc_env $ do
     case is of
         [L _ i] -> return i
         _ -> liftIO $ throwOneError $
-                 mkPlainMsgEnvelope (SevError NoErrReason) noSrcSpan $
+                 mkPlainMsgEnvelope sevErrorNoReason noSrcSpan $
                      text "parse error in import declaration"
 
 -- | Typecheck an expression (but don't run it)
@@ -1954,7 +1954,7 @@ hscParseExpr expr = do
   maybe_stmt <- hscParseStmt expr
   case maybe_stmt of
     Just (L _ (BodyStmt _ expr _ _)) -> return expr
-    _ -> throwOneError $ mkPlainMsgEnvelope (SevError NoErrReason) noSrcSpan
+    _ -> throwOneError $ mkPlainMsgEnvelope sevErrorNoReason noSrcSpan
       (text "not an expression:" <+> quotes (text expr))
 
 hscParseStmt :: String -> Hsc (Maybe (GhciLStmt GhcPs))

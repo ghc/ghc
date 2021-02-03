@@ -19,6 +19,8 @@ module GHC.Types.Error
 
    , MessageClass (..)
    , Severity (..)
+   , sevErrorNoReason
+   , sevWarnNoReason
    , RenderableDiagnostic (..)
 
     -- * Rendering Messages
@@ -194,6 +196,13 @@ data Severity
   | SevError   !ErrReason  -- ^ Born as an error  or promoted from a warning (e.g. -Werror)
   deriving (Eq, Show)
 
+-- | The default 'Severity' for an error without a specific reason.
+sevErrorNoReason :: Severity
+sevErrorNoReason = SevError NoErrReason
+
+-- | The default 'Severity' for a warning without a specific reason.
+sevWarnNoReason :: Severity
+sevWarnNoReason = SevWarning NoWarnReason
 
 instance ToJson Severity where
   json s = JSString (show s)

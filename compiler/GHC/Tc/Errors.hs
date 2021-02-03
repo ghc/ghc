@@ -1055,7 +1055,7 @@ mkErrorMsgFromCt ctxt ct report
 mkErrorReport :: ReportErrCtxt -> TcLclEnv -> Report -> TcM (MsgEnvelope DecoratedSDoc)
 mkErrorReport ctxt tcl_env (Report important relevant_bindings valid_subs)
   = do { context <- mkErrInfo (cec_tidy ctxt) (tcl_ctxt tcl_env)
-       ; mkDecoratedSDocAt (SevError NoErrReason)
+       ; mkDecoratedSDocAt sevErrorNoReason
                            (RealSrcSpan (tcl_loc tcl_env) Nothing)
                            (vcat important)
                            context
@@ -1177,7 +1177,7 @@ mkHoleError _tidy_simples _ctxt hole@(Hole { hole_occ = occ
        ; imp_info <- getImports
        ; curr_mod <- getModule
        ; hpt <- getHpt
-       ; mkDecoratedSDocAt (SevError NoErrReason)
+       ; mkDecoratedSDocAt sevErrorNoReason
                            (RealSrcSpan (tcl_loc lcl_env) Nothing)
                            out_of_scope_msg O.empty
                            (unknownNameSuggestions dflags hpt curr_mod rdr_env

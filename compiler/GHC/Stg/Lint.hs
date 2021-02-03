@@ -50,7 +50,7 @@ import GHC.Types.Var.Set
 import GHC.Core.DataCon
 import GHC.Core             ( AltCon(..) )
 import GHC.Types.Name       ( getSrcLoc, nameIsLocalOrFrom )
-import GHC.Utils.Error      ( Severity(..), mkLocMessage )
+import GHC.Utils.Error      ( sevWarnNoReason, mkLocMessage )
 import GHC.Core.Type
 import GHC.Types.RepType
 import GHC.Types.SrcLoc
@@ -350,7 +350,7 @@ addErr errs_so_far msg locs
   = errs_so_far `snocBag` mk_msg locs
   where
     mk_msg (loc:_) = let (l,hdr) = dumpLoc loc
-                     in  mkLocMessage (Err.MCDiagnostic $ SevWarning NoWarnReason)
+                     in  mkLocMessage (Err.MCDiagnostic sevWarnNoReason)
                                       l (hdr $$ msg)
     mk_msg []      = msg
 

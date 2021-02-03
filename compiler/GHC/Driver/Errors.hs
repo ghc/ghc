@@ -49,7 +49,7 @@ handleFlagWarnings dflags warns = do
 
       -- It would be nicer if warns :: [Located SDoc], but that
       -- has circular import problems.
-      bag = listToBag [ mkPlainMsgEnvelope (SevWarning NoWarnReason) loc (text warn)
+      bag = listToBag [ mkPlainMsgEnvelope sevWarnNoReason loc (text warn)
                       | CmdLine.Warn _ (L loc warn) <- warns' ]
 
   printOrThrowWarnings dflags bag

@@ -12,7 +12,7 @@
 module GHC.Utils.Error (
         -- * Basic types
         Validity(..), andValid, allValid, isValid, getInvalids, orValid,
-        Severity(..),
+        Severity(..), sevWarnNoReason, sevErrorNoReason,
 
         -- * Messages
         WarnMsg,
@@ -354,11 +354,11 @@ ifVerbose dflags val act
 
 errorMsg :: DynFlags -> SDoc -> IO ()
 errorMsg dflags msg
-   = putLogMsg dflags (MCDiagnostic $ SevError NoErrReason) noSrcSpan $ withPprStyle defaultErrStyle msg
+   = putLogMsg dflags (MCDiagnostic sevErrorNoReason) noSrcSpan $ withPprStyle defaultErrStyle msg
 
 warningMsg :: DynFlags -> SDoc -> IO ()
 warningMsg dflags msg
-   = putLogMsg dflags (MCDiagnostic $ SevWarning NoWarnReason) noSrcSpan $ withPprStyle defaultErrStyle msg
+   = putLogMsg dflags (MCDiagnostic sevWarnNoReason) noSrcSpan $ withPprStyle defaultErrStyle msg
 
 fatalErrorMsg :: DynFlags -> SDoc -> IO ()
 fatalErrorMsg dflags msg =

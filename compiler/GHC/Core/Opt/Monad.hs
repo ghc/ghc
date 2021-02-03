@@ -64,7 +64,12 @@ import GHC.Types.Name.Env
 import GHC.Types.SrcLoc
 
 import GHC.Utils.Outputable as Outputable
-import GHC.Utils.Error ( MessageClass(..), Severity(..), DumpFormat (..), dumpAction, dumpOptionsFromFlag )
+import GHC.Utils.Error ( MessageClass(..)
+                       , sevErrorNoReason
+                       , Severity(..)
+                       , DumpFormat (..)
+                       , dumpAction
+                       , dumpOptionsFromFlag )
 import GHC.Utils.Monad
 
 import GHC.Data.FastString
@@ -816,7 +821,7 @@ errorMsgS = errorMsg . text
 
 -- | Output an error to the screen. Does not cause the compiler to die.
 errorMsg :: SDoc -> CoreM ()
-errorMsg = msg (MCDiagnostic $ SevError NoErrReason)
+errorMsg = msg (MCDiagnostic sevErrorNoReason)
 
 warnMsg :: WarnReason -> SDoc -> CoreM ()
 warnMsg reason = msg (MCDiagnostic $ SevWarning reason)
