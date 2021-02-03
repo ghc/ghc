@@ -157,7 +157,7 @@ createIfaces verbosity modules flags instIfaceMap = do
   -- alive to be able to find all the instances.
   modifySession installHaddockPlugin
 
-  targets <- mapM (\filePath -> guessTarget filePath Nothing) modules
+  targets <- mapM (\filePath -> guessTarget filePath Nothing Nothing) modules
   setTargets targets
 
   loadOk <- withTimingM "load" (const ()) $
