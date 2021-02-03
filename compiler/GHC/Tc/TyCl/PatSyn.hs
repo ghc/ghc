@@ -59,6 +59,7 @@ import GHC.Core.ConLike
 import GHC.Types.FieldLabel
 import GHC.Rename.Env
 import GHC.Data.Bag
+import GHC.Driver.Session
 import GHC.Utils.Misc
 import GHC.Utils.Error
 import Data.Maybe( mapMaybe )
@@ -713,7 +714,8 @@ tc_patsyn_finish lname dir is_infix lpat'
                         field_labels
 
        -- Selectors
-       ; let rn_rec_sel_binds = mkPatSynRecSelBinds patSyn (patSynFieldLabels patSyn)
+       ; has_sel <- xopt_FieldSelectors <$> getDynFlags
+       ; let rn_rec_sel_binds = mkPatSynRecSelBinds patSyn (patSynFieldLabels patSyn) has_sel
              tything = AConLike (PatSynCon patSyn)
        ; tcg_env <- tcExtendGlobalEnv [tything] $
                     tcRecSelBinds rn_rec_sel_binds
@@ -814,9 +816,10 @@ tcPatSynMatcher (L loc name) lpat
 
 mkPatSynRecSelBinds :: PatSyn
                     -> [FieldLabel]  -- ^ Visible field labels
+                    -> FieldSelectors
                     -> [(Id, LHsBind GhcRn)]
-mkPatSynRecSelBinds ps fields
-  = [ mkOneRecordSelector [PatSynCon ps] (RecSelPatSyn ps) fld_lbl
+mkPatSynRecSelBinds ps fields has_sel
+  = [ mkOneRecordSelector [PatSynCon ps] (RecSelPatSyn ps) fld_lbl has_sel
     | fld_lbl <- fields ]
 
 isUnidirectional :: HsPatSynDir a -> Bool
