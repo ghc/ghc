@@ -342,7 +342,7 @@ compileOne' m_tc_result mHscMessage
        current_dir = takeDirectory basename
        old_paths   = includePaths dflags2
        loadAsByteCode
-         | Just (Target _ obj _) <- findTarget summary (hsc_targets hsc_env0)
+         | Just (Target _ obj _ _) <- findTarget summary (hsc_targets hsc_env0)
          , not obj
          = True
          | otherwise = False

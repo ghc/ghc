@@ -30,6 +30,7 @@ testOneFile libdir fileName = do
                         _ <- setSessionDynFlags dflags
                         addTarget Target { targetId = TargetFile fileName Nothing
                                          , targetAllowObjCode = True
+                                         , targetUnitId = homeUnitId_ dflags
                                          , targetContents = Nothing }
                         _ <- load LoadAllTargets
                         graph <- getModuleGraph
