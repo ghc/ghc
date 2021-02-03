@@ -352,13 +352,6 @@ getCaretDiagnostic msg_class (RealSrcSpan span _) =
                       | otherwise = ""
         caretLine = replicate start ' ' ++ replicate width '^' ++ caretEllipsis
 
-{-
-makeIntoWarning :: WarnReason -> MsgEnvelope e -> MsgEnvelope e
-makeIntoWarning reason err = err
-    { errMsgSeverity = SevWarning
-    , errMsgReason = reason }
--}
-
 --
 -- Creating MsgEnvelope(s)
 --
