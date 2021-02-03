@@ -1775,7 +1775,18 @@ run_BCO:
             // the call.
             p = (StgPtr)arguments;
             for (i = 0; i < nargs; i++) {
+#if defined(WORDS_BIGENDIAN)
+                // Arguments passed to the interpreter are extended to whole
+                // words.  More precisely subwords are passed in the low bytes
+                // of a word.  This means p must be adjusted in order to point
+                // to the proper subword.  In all other cases the size of the
+                // argument type is a multiple of word size as e.g. for type
+                // double on 32bit machines and p must not be adjusted.
+                argptrs[i] = (void *)((StgWord8 *)p + (sizeof(W_) > cif->arg_types[i]->size
+                                                       ? sizeof(W_) - cif->arg_types[i]->size : 0));
+#else
                 argptrs[i] = (void *)p;
+#endif
                 // get the size from the cif
                 p += ROUND_UP_WDS(cif->arg_types[i]->size);
             }
@@ -1844,8 +1855,19 @@ run_BCO:
             cap->r.rCurrentTSO->saved_errno = errno;
 
             // Copy the return value back to the TSO stack.  It is at
-            // most 2 words large, and resides at arguments[0].
-            memcpy(Sp, ret, sizeof(W_) * stg_min(stk_offset,ret_size));
+            // most 2 words large.
+#if defined(WORDS_BIGENDIAN)
+            if (sizeof(W_) >= cif->rtype->size) {
+                // In contrast to function arguments where subwords are passed
+                // in the low bytes of a word, the return value is expected to
+                // reside in the high bytes of a word.
+                SpW(0) = (*(StgPtr)ret) << ((sizeof(W_) - cif->rtype->size) * 8);
+            } else {
+                memcpy(Sp, ret, sizeof(W_) * ret_size);
+            }
+#else
+            memcpy(Sp, ret, sizeof(W_) * ret_size);
+#endif
 
             goto nextInsn;
         }
