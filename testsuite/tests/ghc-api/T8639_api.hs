@@ -12,7 +12,7 @@ main
       ; runGhc (Just libdir) $ do
            flags <- getSessionDynFlags
            setSessionDynFlags (flags{ backend = Interpreter, ghcLink = LinkInMemory})
-           target <- guessTarget "T8639_api_a.hs" Nothing
+           target <- guessTarget "T8639_api_a.hs" Nothing Nothing
            setTargets [target]
            load LoadAllTargets
            imps <- mapM parseImportDecl ["import Prelude", "import System.IO", "import T8639_api_a"]

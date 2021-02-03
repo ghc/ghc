@@ -65,7 +65,7 @@ main = do
       GHC.setTargets []
       _ <- GHC.load LoadAllTargets
 
-      target <- guessTarget "static-plugins-module.hs" Nothing
+      target <- guessTarget "static-plugins-module.hs" Nothing Nothing
       setTargets [target]
 
       modifySession (\hsc_env -> hsc_env { hsc_static_plugins = the_plugins})

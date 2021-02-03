@@ -9,7 +9,8 @@ main :: IO ()
 main = do
     flags <- getArgs
     runGhc' flags $ do
-      setTargets [Target (TargetFile "T10052-input.hs" Nothing) True Nothing]
+      dflags <- getSessionDynFlags
+      setTargets [Target (TargetFile "T10052-input.hs" Nothing) True (homeUnitId_ dflags) Nothing]
       _success <- load LoadAllTargets
       return ()
 

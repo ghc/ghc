@@ -30,7 +30,7 @@ main = do
                                 , ghcLink   = LinkInMemory
                                 , verbosity = 0 -- silence please
                                 }
-    root_mod <- guessTarget "A.hs" Nothing
+    root_mod <- guessTarget "A.hs" Nothing Nothing
     setTargets [root_mod]
     ok <- load LoadAllTargets
     when (failed ok) $ error "Couldn't load A.hs in nothing mode"

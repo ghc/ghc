@@ -29,6 +29,7 @@ testOneFile libdir fileName = do
         let mn =mkModuleName fileName
         addTarget Target { targetId = TargetModule mn
                          , targetAllowObjCode = True
+                         , targetUnitId = homeUnitId_ dflags
                          , targetContents = Nothing }
         load LoadAllTargets
         modSum <- getModSummary mn

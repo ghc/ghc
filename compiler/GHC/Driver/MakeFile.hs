@@ -86,7 +86,7 @@ doMkDependHS srcs = do
     files <- liftIO $ beginMkDependHS logger tmpfs dflags
 
     -- Do the downsweep to find all the modules
-    targets <- mapM (\s -> GHC.guessTarget s Nothing) srcs
+    targets <- mapM (\s -> GHC.guessTarget s Nothing Nothing) srcs
     GHC.setTargets targets
     let excl_mods = depExcludeMods dflags
     module_graph <- GHC.depanal excl_mods True {- Allow dup roots -}

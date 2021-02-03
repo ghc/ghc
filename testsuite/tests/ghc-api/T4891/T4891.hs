@@ -35,7 +35,7 @@ doit = do
   dflags' <- getSessionDynFlags
   primPackages <- setSessionDynFlags dflags'
   dflags <- getSessionDynFlags
-  target <- guessTarget "X.hs" Nothing
+  target <- guessTarget "X.hs" Nothing Nothing
   setTargets [target]
   load LoadAllTargets
 
