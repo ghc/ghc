@@ -341,7 +341,7 @@ compileOne' m_tc_result mHscMessage
        old_paths   = includePaths dflags2
        !prevailing_dflags = hsc_dflags hsc_env0
        loadAsByteCode
-         | Just (Target _ obj _) <- findTarget summary (hsc_targets hsc_env0)
+         | Just (Target _ obj _ _) <- findTarget summary (hsc_targets hsc_env0)
          , not obj
          = True
          | otherwise = False
