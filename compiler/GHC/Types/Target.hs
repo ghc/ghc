@@ -25,6 +25,7 @@ data Target
   = Target {
       targetId           :: TargetId, -- ^ module or filename
       targetAllowObjCode :: Bool,     -- ^ object code allowed?
+      targetUnitId       :: UnitId,   -- ^ id of the unit this target is part of
       targetContents     :: Maybe (InputFileBuffer, UTCTime)
       -- ^ Optional in-memory buffer containing the source code GHC should
       -- use for this target instead of reading it from disk.
@@ -52,7 +53,7 @@ type InputFileBuffer = StringBuffer
 
 
 pprTarget :: Target -> SDoc
-pprTarget (Target id obj _) =
+pprTarget Target { targetId = id, targetAllowObjCode = obj } =
     (if obj then empty else char '*') <> pprTargetId id
 
 instance Outputable Target where
