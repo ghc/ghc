@@ -21,7 +21,10 @@ main = do
                         dflags <- getSessionDynFlags
                         setSessionDynFlags dflags
                         let mn =mkModuleName "Test"
-                        addTarget Target { targetId = TargetModule mn, targetAllowObjCode = True, targetContents = Nothing }
+                        addTarget Target { targetId = TargetModule mn
+                                         , targetAllowObjCode = True
+                                         , targetUnitId = homeUnitId_ dflags
+                                         , targetContents = Nothing}
                         load LoadAllTargets
                         modSum <- getModSummary mn
                         p <- parseModule modSum
