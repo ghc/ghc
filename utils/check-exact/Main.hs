@@ -338,6 +338,7 @@ parseOneFile libdir fileName = do
          let dflags2 = dflags `gopt_set` Opt_KeepRawTokenStream
          _ <- setSessionDynFlags dflags2
          addTarget Target { targetId = TargetFile fileName Nothing
+                          , targetUnitId = homeUnitId_ dflags
                           , targetAllowObjCode = True
                           , targetContents = Nothing }
          _ <- load LoadAllTargets
