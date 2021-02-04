@@ -28,7 +28,7 @@ module GHC.Tc.Utils.Monad(
   whenDOptM, whenGOptM, whenWOptM,
   whenXOptM, unlessXOptM,
   getGhcMode,
-  withDynamicNow, withoutDynamicNow,
+  withoutDynamicNow,
   getEpsVar,
   getEps,
   updateEps, updateEps_,
@@ -49,7 +49,7 @@ module GHC.Tc.Utils.Monad(
   dumpTcRn,
   getPrintUnqualified,
   printForUserTcRn,
-  traceIf, traceHiDiffs, traceOptIf,
+  traceIf, traceOptIf,
   debugTc,
 
   -- * Typechecker global environment
@@ -551,11 +551,6 @@ unlessXOptM flag thing_inside = do b <- xoptM flag
 getGhcMode :: TcRnIf gbl lcl GhcMode
 getGhcMode = do { env <- getTopEnv; return (ghcMode (hsc_dflags env)) }
 
-withDynamicNow :: TcRnIf gbl lcl a -> TcRnIf gbl lcl a
-withDynamicNow =
-  updTopEnv (\top@(HscEnv { hsc_dflags = dflags }) ->
-              top { hsc_dflags = setDynamicNow dflags })
-
 withoutDynamicNow :: TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 withoutDynamicNow =
   updTopEnv (\top@(HscEnv { hsc_dflags = dflags }) ->
@@ -596,10 +591,9 @@ getEpsAndHpt = do { env <- getTopEnv; eps <- readMutVar (hsc_EPS env)
 
 -- | A convenient wrapper for taking a @MaybeErr SDoc a@ and throwing
 -- an exception if it is an error.
-withException :: TcRnIf gbl lcl (MaybeErr SDoc a) -> TcRnIf gbl lcl a
-withException do_this = do
+withException :: MonadIO m => DynFlags -> m (MaybeErr SDoc a) -> m a
+withException dflags do_this = do
     r <- do_this
-    dflags <- getDynFlags
     case r of
         Failed err -> liftIO $ throwGhcExceptionIO (ProgramError (showSDoc dflags err))
         Succeeded result -> return result
@@ -813,16 +807,14 @@ printForUserTcRn doc = do
     liftIO (printOutputForUser logger dflags printer doc)
 
 {-
-traceIf and traceHiDiffs work in the TcRnIf monad, where no RdrEnv is
+traceIf works in the TcRnIf monad, where no RdrEnv is
 available.  Alas, they behave inconsistently with the other stuff;
 e.g. are unaffected by -dump-to-file.
 -}
 
-traceIf, traceHiDiffs :: SDoc -> TcRnIf m n ()
-traceIf      = traceOptIf Opt_D_dump_if_trace
-traceHiDiffs = traceOptIf Opt_D_dump_hi_diffs
+traceIf :: SDoc -> TcRnIf m n ()
+traceIf = traceOptIf Opt_D_dump_if_trace
 {-# INLINE traceIf #-}
-{-# INLINE traceHiDiffs #-}
   -- see Note [INLINE conditional tracing utilities]
 
 traceOptIf :: DumpFlag -> SDoc -> TcRnIf m n ()
