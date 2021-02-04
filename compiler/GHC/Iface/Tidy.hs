@@ -23,6 +23,7 @@ import GHC.Driver.Ppr
 import GHC.Driver.Env
 
 import GHC.Tc.Types
+import GHC.Tc.Utils.Env
 
 import GHC.Core
 import GHC.Core.Unfold
@@ -43,9 +44,6 @@ import GHC.Core.Class
 
 import GHC.Iface.Tidy.StaticPtrTable
 import GHC.Iface.Env
-
-import GHC.Tc.Utils.Env
-import GHC.Tc.Utils.Monad
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc( filterOut )
@@ -82,7 +80,6 @@ import GHC.Data.Maybe
 import Control.Monad
 import Data.Function
 import Data.List        ( sortBy, mapAccumL )
-import Data.IORef       ( atomicModifyIORef' )
 
 {-
 Constructing the TypeEnv, Instances, Rules from which the
@@ -635,7 +632,7 @@ chooseExternalIds hsc_env mod omit_prags expose_all binds implicit_binds imp_id_
        ; let internal_ids = filter (not . (`elemVarEnv` unfold_env1)) binders
        ; tidy_internal internal_ids unfold_env1 occ_env1 }
  where
-  nc_var = hsc_NC hsc_env
+  name_cache = hsc_NC hsc_env
 
   -- init_ext_ids is the initial list of Ids that should be
   -- externalised.  It serves as the starting point for finding a
@@ -697,7 +694,7 @@ chooseExternalIds hsc_env mod omit_prags expose_all binds implicit_binds imp_id_
   search ((idocc,referrer) : rest) unfold_env occ_env
     | idocc `elemVarEnv` unfold_env = search rest unfold_env occ_env
     | otherwise = do
-      (occ_env', name') <- tidyTopName mod nc_var (Just referrer) occ_env idocc
+      (occ_env', name') <- tidyTopName mod name_cache (Just referrer) occ_env idocc
       let
           (new_ids, show_unfold) = addExternal omit_prags expose_all refined_id
 
@@ -717,7 +714,7 @@ chooseExternalIds hsc_env mod omit_prags expose_all binds implicit_binds imp_id_
                 -> IO (UnfoldEnv, TidyOccEnv)
   tidy_internal []       unfold_env occ_env = return (unfold_env,occ_env)
   tidy_internal (id:ids) unfold_env occ_env = do
-      (occ_env', name') <- tidyTopName mod nc_var Nothing occ_env id
+      (occ_env', name') <- tidyTopName mod name_cache Nothing occ_env id
       let unfold_env' = extendVarEnv unfold_env id (name',False)
       tidy_internal ids unfold_env' occ_env'
 
@@ -1024,9 +1021,9 @@ was previously local, we have to give it a unique occurrence name if
 we intend to externalise it.
 -}
 
-tidyTopName :: Module -> IORef NameCache -> Maybe Id -> TidyOccEnv
+tidyTopName :: Module -> NameCache -> Maybe Id -> TidyOccEnv
             -> Id -> IO (TidyOccEnv, Name)
-tidyTopName mod nc_var maybe_ref occ_env id
+tidyTopName mod name_cache maybe_ref occ_env id
   | global && internal = return (occ_env, localiseName name)
 
   | global && external = return (occ_env, name)
@@ -1037,7 +1034,7 @@ tidyTopName mod nc_var maybe_ref occ_env id
   -- Now we get to the real reason that all this is in the IO Monad:
   -- we have to update the name cache in a nice atomic fashion
 
-  | local  && internal = do { new_local_name <- atomicModifyIORef' nc_var mk_new_local
+  | local  && internal = do { new_local_name <- updateNameCache' name_cache mk_new_local
                             ; return (occ_env', new_local_name) }
         -- Even local, internal names must get a unique occurrence, because
         -- if we do -split-objs we externalise the name later, in the code generator
@@ -1045,7 +1042,7 @@ tidyTopName mod nc_var maybe_ref occ_env id
         -- Similarly, we must make sure it has a system-wide Unique, because
         -- the byte-code generator builds a system-wide Name->BCO symbol table
 
-  | local  && external = do { new_external_name <- atomicModifyIORef' nc_var mk_new_external
+  | local  && external = do { new_external_name <- updateNameCache' name_cache mk_new_external
                             ; return (occ_env', new_external_name) }
 
   | otherwise = panic "tidyTopName"
@@ -1101,7 +1098,7 @@ tidyTopName mod nc_var maybe_ref occ_env id
 -}
 
 -- TopTidyEnv: when tidying we need to know
---   * nc_var: The NameCache, containing a unique supply and any pre-ordained Names.
+--   * name_cache: The NameCache, containing a unique supply and any pre-ordained Names.
 --        These may have arisen because the
 --        renamer read in an interface file mentioning M.$wf, say,
 --        and assigned it unique r77.  If, on this compilation, we've
