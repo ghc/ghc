@@ -52,9 +52,7 @@ module Documentation.Haddock (
   -- * Interface files
   InterfaceFile(..),
   readInterfaceFile,
-  nameCacheFromGhc,
   freshNameCache,
-  NameCacheAccessor,
 
   -- * Flags and options
   Flag(..),
