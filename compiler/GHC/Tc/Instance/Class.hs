@@ -673,11 +673,6 @@ We need to call addUsedGRE as well because there may be a deprecation warning on
 the field, which will be reported by addUsedGRE.  But calling addUsedGRE without
 keepAlive is not enough, because the field might be defined locally, and
 addUsedGRE extends tcg_used_gres with imported GREs only.
-
-While we still support the ugly disambiguation of record fields (described by
-Note [Disambiguating record fields] in GHC.Tc.Gen.Head), that can also result in
-the type-checker discovering a usage of a field, and the same requirement to
-call both addUsedGRE and keepAlive applies.
 -}
 
 -- See Note [HasField instances]
