@@ -384,6 +384,11 @@ lint-base:
     TEST_TYPE: test
     MAKE_ARGS: "-Werror"
   script:
+      # Build hyperlinked sources for documentation when building releases
+    - |
+      if [[ "$RELEASE_JOB" = "yes" ]]; then
+        HADDOCK_HYPERLINKED_SOURCES=1
+      fi
     - .gitlab/ci.sh setup
     - .gitlab/ci.sh configure
     - .gitlab/ci.sh build_make
