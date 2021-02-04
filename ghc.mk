@@ -1246,7 +1246,7 @@ sdist-windows-tarballs-prep :
 	mkdir -p $(SRC_DIST_WINDOWS_TARBALLS_ROOT)
 	mkdir -p $(SRC_DIST_WINDOWS_TARBALLS_DIR)
 	mkdir -p $(SRC_DIST_WINDOWS_TARBALLS_DIR)/ghc-tarballs
-	cd $(SRC_DIST_WINDOWS_TARBALLS_DIR)/ghc-tarballs && ln -s $(TOP)/ghc-tarballs/i686 . && ln -s $(TOP)/ghc-tarballs/x86_64
+	cd $(SRC_DIST_WINDOWS_TARBALLS_DIR)/ghc-tarballs && ln -s $(TOP)/ghc-tarballs/mingw-w64 .
 	$(call removeTrees,$(SRC_DIST_WINDOWS_TARBALLS_DIR)/ghc-tarballs/.git)
 
 .PHONY: sdist-testsuite-prep
