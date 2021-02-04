@@ -1,5 +1,6 @@
 module GHC.Unit.Finder.Types
-   ( FinderCache
+   ( FinderCache (..)
+   , FinderCacheState
    , FindResult (..)
    , InstalledFindResult (..)
    )
@@ -9,12 +10,15 @@ import GHC.Prelude
 import GHC.Unit
 import GHC.Unit.State
 
+import Data.IORef
+
 -- | The 'FinderCache' maps modules to the result of
 -- searching for that module. It records the results of searching for
 -- modules along the search path. On @:load@, we flush the entire
 -- contents of this cache.
 --
-type FinderCache = InstalledModuleEnv InstalledFindResult
+type FinderCacheState = InstalledModuleEnv InstalledFindResult
+newtype FinderCache = FinderCache (IORef FinderCacheState)
 
 data InstalledFindResult
   = InstalledFound ModLocation InstalledModule
