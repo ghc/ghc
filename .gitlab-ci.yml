@@ -704,6 +704,9 @@ validate-x86_64-linux-deb10-dwarf:
     BUILD_FLAVOUR: dwarf
     TEST_ENV: "x86_64-linux-deb9-dwarf"
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-deb10-linux-dwarf.tar.xz"
+  artifacts:
+    when: always
+    expire_in: 1 year
 
 #################################
 # x86_64-linux-deb8
@@ -923,7 +926,6 @@ release-x86_64-windows-integer-simple:
   extends: .build-x86_64-windows-hadrian
   variables:
     BIGNUM_BACKEND: native
-    BUILD_FLAVOUR: "perf"
 
 ############################################################
 # Cleanup
