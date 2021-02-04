@@ -16,7 +16,7 @@
 -- Functions over HsSyn specialised to RdrName.
 
 module GHC.Parser.PostProcess (
-        mkRdrGetField, mkRdrProjection, isGetField, Fbind(..), -- RecordDot
+        mkRdrGetField, mkRdrProjection, isGetField, Fbind, -- RecordDot
         mkHsOpApp,
         mkHsIntegral, mkHsFractional, mkHsIsString,
         mkHsDo, mkSpliceDecl,
@@ -150,23 +150,6 @@ import Data.Data       ( dataTypeOf, fromConstr, dataTypeConstrs )
 import Data.Kind       ( Type )
 
 #include "HsVersions.h"
-
-data Fbind b = Fbind (LHsRecField GhcPs (Located b))
-             | Pbind (LHsProjUpdate GhcPs (Located b))
-
-fbindsToEithers :: [Fbind b]
-                -> [Either
-                      (LHsRecField GhcPs (Located b))
-                      (LHsProjUpdate GhcPs (Located b))
-                   ]
-fbindsToEithers = fmap fbindToEither
-  where
-    fbindToEither :: Fbind b
-                  -> Either
-                       (LHsRecField GhcPs (Located b))
-                       (LHsProjUpdate GhcPs (Located b))
-    fbindToEither (Fbind x) = Left x
-    fbindToEither (Pbind x) = Right x
 
 {- **********************************************************************
 
@@ -1263,6 +1246,12 @@ ecpFromExp a = ECP (ecpFromExp' a)
 ecpFromCmd :: LHsCmd GhcPs -> ECP
 ecpFromCmd a = ECP (ecpFromCmd' a)
 
+-- The 'fbinds1' parser rule produces values of this type. See Note
+-- [How record dot notation is handled] (not written yet).
+type Fbind b = Either
+                 (LHsRecField GhcPs (Located b))
+                 (LHsProjUpdate GhcPs (Located b))
+
 -- | Disambiguate infix operators.
 -- See Note [Ambiguous syntactic categories]
 class DisambInfixOp b where
@@ -1451,7 +1440,7 @@ instance DisambECP (HsCmd GhcPs) where
     brackets (fsep (punctuate comma (map ppr xs)))
   mkHsSplicePV (L l sp) = cmdFail l (ppr sp)
   mkHsRecordPV _ l _ a (fbinds, ddLoc) = do
-    let (fs, ps) = partitionEithers $ fbindsToEithers fbinds
+    let (fs, ps) = partitionEithers fbinds
     if not (null ps)
       then addFatalError $ PsError PsErrRecordDotSyntaxInvalid [] l
       else cmdFail l $ ppr a <+> ppr (mk_rec_fields fs ddLoc)
@@ -1566,7 +1555,7 @@ instance DisambECP (PatBuilder GhcPs) where
     return (L l (PatBuilderPat (ListPat noExtField ps)))
   mkHsSplicePV (L l sp) = return $ L l (PatBuilderPat (SplicePat noExtField sp))
   mkHsRecordPV _ l _ a (fbinds, ddLoc) = do
-    let (fs, ps) = partitionEithers $ fbindsToEithers fbinds
+    let (fs, ps) = partitionEithers fbinds
     if not (null ps)
      then addFatalError $ PsError PsErrRecordDotSyntaxInvalid [] l
      else do
@@ -2175,7 +2164,7 @@ mkRecConstrOrUpdate
 mkRecConstrOrUpdate _ (L l (HsVar _ (L _ c))) _lrec (fbinds,dd)
   | isRdrDataCon c
   = do
-      let (fs, ps) = partitionEithers $ fbindsToEithers fbinds
+      let (fs, ps) = partitionEithers fbinds
       if not (null ps)
         then addFatalError $ PsError PsErrRecordDotSyntaxInvalid [] (getLoc (head ps))
         else return (mkRdrRecordCon (L l c) (mk_rec_fields fs dd))
@@ -2187,13 +2176,13 @@ mkRdrRecordDotUpd :: Bool -> LHsExpr GhcPs -> [Fbind (HsExpr GhcPs)] -> PV (HsEx
 mkRdrRecordDotUpd dot exp@(L _ _) fbinds =
   if not dot
     then do
-      let (fs, ps) = partitionEithers $ fbindsToEithers fbinds
+      let (fs, ps) = partitionEithers fbinds
       if not (null ps)
       then
         -- If RecordDotSyntax is not enabled (as indicated by the
         -- value of 'dot'), then the lexer can't ever issue an ITproj
         -- token and so this case is refuted.
-        panic "mkRdrRecordUpd': The impossible happened!"
+        panic "mkRdrRecordUpd: The impossible happened!"
       else return $ mkRdrRecordUpd exp (map (fmap mk_rec_upd_field) fs)
   else
      return RecordDotUpd {
@@ -2203,9 +2192,10 @@ mkRdrRecordDotUpd dot exp@(L _ _) fbinds =
                 }
   where
     toProjUpdates :: [Fbind (HsExpr GhcPs)] -> [LHsRecUpdProj GhcPs]
-    toProjUpdates = map (\case { Pbind p -> p
-                               ; Fbind f -> recUpdFieldToProjUpdate (fmap mk_rec_upd_field f)
-                        })
+    toProjUpdates =
+      map (\case { Right p -> p
+                 ; Left f -> recUpdFieldToProjUpdate (fmap mk_rec_upd_field f)
+                 } )
 
 mkRdrRecordUpd :: LHsExpr GhcPs -> [LHsRecUpdField GhcPs] -> HsExpr GhcPs
 mkRdrRecordUpd exp flds
