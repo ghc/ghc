@@ -1,29 +1,15 @@
 True
-type S :: *
-data S = MkS {Ghci1.foo :: Int}
-  	-- Defined at <interactive>:3:16
-
 type T :: * -> *
-data T a = MkT {Ghci2.foo :: Bool, ...}
+data T a = MkT {foo :: Bool, ...}
   	-- Defined at <interactive>:4:18
+foo :: T a -> Bool
 
-<interactive>:1:1: error:
-    Ambiguous occurrence ‘foo’
-    It could refer to
-       either the field ‘foo’, defined at <interactive>:3:16
-           or the field ‘foo’, defined at <interactive>:4:18
-
-<interactive>:9:1: error:
-    Ambiguous occurrence ‘foo’
-    It could refer to
-       either the field ‘foo’, defined at <interactive>:3:16
-           or the field ‘foo’, defined at <interactive>:4:18
+<interactive>:9:6: error:
+    • Couldn't match expected type ‘T a0’ with actual type ‘S’
+    • In the first argument of ‘foo’, namely ‘(MkS 42)’
+      In the expression: foo (MkS 42)
+      In an equation for ‘it’: it = foo (MkS 42)
 True
-
-<interactive>:1:1: error:
-    Ambiguous occurrence ‘foo’
-    It could refer to
-       either the field ‘foo’, defined at <interactive>:3:16
-           or the field ‘foo’, defined at <interactive>:4:18
+foo :: T a -> Bool
 foo :: U -> Int
 42
