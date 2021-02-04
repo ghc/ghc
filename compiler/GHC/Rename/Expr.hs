@@ -46,9 +46,7 @@ import GHC.Rename.HsType
 import GHC.Rename.Pat
 import GHC.Driver.Session
 import GHC.Builtin.Names
-import GHC.Builtin.Uniques
 
-import GHC.Types.Basic
 import GHC.Types.Fixity
 import GHC.Types.Name
 import GHC.Types.Name.Set

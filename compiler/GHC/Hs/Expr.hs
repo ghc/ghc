@@ -243,22 +243,23 @@ is Less Cool because
     typecheck do-notation with (>>=) :: m1 a -> (a -> m2 b) -> m2 b.)
 -}
 
--- New for RecordDotSyntax.
-
-data ProjUpdate' p arg =
+-- | RecordDotSyntax field updates
+--
+-- Field projection updates (e.g. @a{foo.bar.baz = 1}@). See Note [How
+-- record dot notation is handled] (not written yet).
+data ProjUpdate p arg =
   ProjUpdate {
       pu_flds :: [Located FastString]
     , pu_arg :: arg -- Field's new value e.g. 42
     }
   deriving (Data, Functor, Foldable, Traversable)
 
-type ProjUpdate p arg = ProjUpdate' p arg
 type LHsProjUpdate p arg = Located (ProjUpdate p arg)
-type RecUpdProj p = ProjUpdate' p (LHsExpr p)
+type RecUpdProj p = ProjUpdate p (LHsExpr p)
 type LHsRecUpdProj p = Located (RecUpdProj p)
 
 instance (Outputable arg)
-      => Outputable (ProjUpdate' p arg) where
+      => Outputable (ProjUpdate p arg) where
   -- TODO: improve in case of pun
   ppr ProjUpdate { pu_flds = flds, pu_arg = arg } =
     hcat (punctuate dot (map (ppr . unLoc) flds)) <+> equals <+> ppr arg
@@ -728,14 +729,20 @@ type instance XRecordUpd     GhcTc = RecordUpdTc
 type instance XGetField     GhcPs = NoExtField
 type instance XGetField     GhcRn = NoExtField
 type instance XGetField     GhcTc = Void
+-- GetField is eliminated by the renamer. See Note [How record dot
+-- notation is handled] (not written yet).
 
 type instance XProjection     GhcPs = NoExtField
 type instance XProjection     GhcRn = NoExtField
 type instance XProjection     GhcTc = Void
+-- Projection is eliminated by the renamer. See Note [How record dot
+-- notation is handled] (not written yet).
 
 type instance XRecordDotUpd     GhcPs = NoExtField
 type instance XRecordDotUpd     GhcRn = NoExtField
 type instance XRecordDotUpd     GhcTc = Void
+-- RecordDotUpd is eliminated by the renamer. See Note [How record dot
+-- notation is handled] (not written yet).
 
 type instance XExprWithTySig (GhcPass _) = NoExtField
 
