@@ -25,7 +25,7 @@ warningsToMessages dflags =
   partitionBagWith $ \warn ->
     case isWarnMsgFatal dflags warn of
       Nothing     -> Left warn
-      Just reason -> Right (promoteWarningToError (ErrPromotedFromWarning reason) warn)
+      Just reason -> Right (promoteWarningToError reason warn)
 
 -- | Promotes a 'WarnMsg' into an error, given a proper 'ErrReason'.
 promoteWarningToError :: ErrReason -> WarnMsg -> MsgEnvelope DecoratedSDoc
@@ -55,19 +55,18 @@ handleFlagWarnings dflags warns = do
   printOrThrowWarnings dflags bag
 
 -- | Checks if given 'WarnMsg' is a fatal warning.
-isWarnMsgFatal :: DynFlags -> WarnMsg -> Maybe (Either GeneralFlag WarningFlag)
+isWarnMsgFatal :: DynFlags -> WarnMsg -> Maybe ErrReason
 isWarnMsgFatal dflags (errMsgSeverity -> severity) =
   case severity of
     SevError _              -> Nothing -- nothing to do, this is already an error.
     SevWarning NoWarnReason ->
       if gopt Opt_WarnIsError dflags
-        then Just (Left Opt_WarnIsError)
+        then Just ErrPromotedWithWError
         else Nothing
     SevWarning (WarnReason wflag) ->
       if wopt_fatal wflag dflags
-        then Just (Right wflag)
+        then Just $ ErrPromotedFromWarning wflag
         else Nothing
-    SevWarning (WarnDemotedFromError _) -> Nothing
 
 -- Given a warn reason, check to see if it's associated -W opt is enabled
 shouldPrintWarning :: DynFlags -> CmdLine.WarnReason -> Bool
@@ -89,7 +88,7 @@ printOrThrowWarnings dflags warns = do
               Nothing ->
                 (make_err, warn)
               Just err_reason ->
-                (True, promoteWarningToError (ErrPromotedFromWarning err_reason) warn))
+                (True, promoteWarningToError err_reason warn))
           False warns
   if make_error
     then throwIO (mkSrcErr warns')

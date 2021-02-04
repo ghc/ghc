@@ -493,13 +493,13 @@ warnRedundantConstraints ctxt env info ev_vars
    addErrCtxt (text "In" <+> ppr info) $
    do { env <- getLclEnv
       ; msg <- mkErrorReport ctxt env (important doc)
-      ; reportWarning $ demoteError (WarnReason Opt_WarnRedundantConstraints) msg }
+      ; reportWarning $ demote_error (WarnReason Opt_WarnRedundantConstraints) msg }
 
  | otherwise  -- But for InstSkol there already *is* a surrounding
               -- "In the instance declaration for Eq [a]" context
               -- and we don't want to say it twice. Seems a bit ad-hoc
  = do { msg <- mkErrorReport ctxt env (important doc)
-      ; reportWarning $ demoteError (WarnReason Opt_WarnRedundantConstraints) msg }
+      ; reportWarning $ demote_error (WarnReason Opt_WarnRedundantConstraints) msg }
  where
    doc = text "Redundant constraint" <> plural redundant_evs <> colon
          <+> pprEvVarTheta redundant_evs
@@ -779,7 +779,7 @@ mkGivenErrorReporter ctxt cts
        ; err <- mkEqErr_help dflags ctxt report ct' ty1 ty2
 
        ; traceTc "mkGivenErrorReporter" (ppr ct)
-       ; reportWarning $ demoteError (WarnReason Opt_WarnInaccessibleCode) err }
+       ; reportWarning $ demote_error (WarnReason Opt_WarnInaccessibleCode) err }
   where
     (ct : _ )  = cts    -- Never empty
     (ty1, ty2) = getEqPredTys (ctPred ct)
@@ -889,7 +889,7 @@ maybeReportHoleError ctxt hole err
     case cec_out_of_scope_holes ctxt of
       HoleError -> reportError err
       HoleWarn  ->
-        reportWarning $ demoteError (WarnReason Opt_WarnDeferredOutOfScopeVariables) err
+        reportWarning $ demote_error (WarnReason Opt_WarnDeferredOutOfScopeVariables) err
       HoleDefer -> return ()
 
 -- Unlike maybeReportError, these "hole" errors are
@@ -906,7 +906,7 @@ maybeReportHoleError ctxt (Hole { hole_sort = hole_sort }) err
     -- only if -fwarn-partial-type-signatures is on
     case cec_type_holes ctxt of
        HoleError -> reportError err
-       HoleWarn  -> reportWarning $ demoteError (WarnReason Opt_WarnPartialTypeSignatures) err
+       HoleWarn  -> reportWarning $ demote_error (WarnReason Opt_WarnPartialTypeSignatures) err
        HoleDefer -> return ()
 
 maybeReportHoleError ctxt hole err
@@ -917,7 +917,7 @@ maybeReportHoleError ctxt hole err
     ASSERT( not (isOutOfScopeHole hole) )
     case cec_expr_holes ctxt of
        HoleError -> reportError err
-       HoleWarn  -> reportWarning $ demoteError (WarnReason Opt_WarnTypedHoles) err
+       HoleWarn  -> reportWarning $ demote_error (WarnReason Opt_WarnTypedHoles) err
        HoleDefer -> return ()
 
 maybeReportError :: ReportErrCtxt -> MsgEnvelope DecoratedSDoc -> TcM ()
@@ -929,7 +929,7 @@ maybeReportError ctxt err
   | otherwise
   = case cec_defer_type_errors ctxt of
       TypeDefer       -> return ()
-      TypeWarn reason -> reportWarning $ demoteError reason err
+      TypeWarn reason -> reportWarning $ demote_error reason err
       TypeError       -> reportError err
 
 addDeferredBinding :: ReportErrCtxt -> MsgEnvelope DecoratedSDoc -> Ct -> TcM ()
@@ -3043,3 +3043,7 @@ solverDepthErrorTcS loc ty
       , text "(any upper bound you could choose might fail unpredictably with"
       , text " minor updates to GHC, so disabling the check is recommended if"
       , text " you're sure that type checking should terminate)" ]
+
+-- | Demotes an error into a warning.
+demote_error :: WarnReason -> MsgEnvelope e -> MsgEnvelope e
+demote_error reason msg = msg { errMsgSeverity = SevWarning reason }

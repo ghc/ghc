@@ -44,7 +44,6 @@ module GHC.Types.Error
    , getWarningMessages
    , partitionMessages
    , errorsFound
-   , demoteError
    )
 where
 
@@ -401,7 +400,3 @@ getErrorMessages (Messages xs) = fst $ partitionBag isErrorMessage xs
 -- second the errors.
 partitionMessages :: Messages e -> (Bag (MsgEnvelope e), Bag (MsgEnvelope e))
 partitionMessages (Messages xs) = partitionBag isWarningMessage xs
-
--- | Demotes an error into a warning.
-demoteError :: WarnReason -> MsgEnvelope e -> MsgEnvelope e
-demoteError reason msg = msg { errMsgSeverity = SevWarning reason }
