@@ -28,7 +28,6 @@ module GHC.Iface.Binary (
         putSymbolTable,
         BinSymbolTable(..),
         BinDictionary(..)
-
     ) where
 
 #include "HsVersions.h"
@@ -37,16 +36,13 @@ import GHC.Prelude
 
 import GHC.Tc.Utils.Monad
 import GHC.Builtin.Utils   ( isKnownKeyName, lookupKnownKeyName )
-import GHC.Iface.Env
 import GHC.Unit
 import GHC.Unit.Module.ModIface
 import GHC.Types.Name
 import GHC.Platform.Profile
 import GHC.Types.Unique.FM
-import GHC.Types.Unique.Supply
 import GHC.Utils.Panic
 import GHC.Utils.Binary as Binary
-import GHC.Types.SrcLoc
 import GHC.Data.FastMutInt
 import GHC.Types.Unique
 import GHC.Utils.Outputable
@@ -83,12 +79,12 @@ data TraceBinIFace
 -- | Read an interface file.
 readBinIface
   :: Profile
-  -> NameCacheUpdater
+  -> NameCache
   -> CheckHiWay
   -> TraceBinIFace
   -> FilePath
   -> IO ModIface
-readBinIface profile ncu checkHiWay traceBinIFace hi_path = do
+readBinIface profile name_cache checkHiWay traceBinIFace hi_path = do
     let platform = profilePlatform profile
 
         wantedGot :: String -> a -> a -> (a -> SDoc) -> IO ()
@@ -131,7 +127,7 @@ readBinIface profile ncu checkHiWay traceBinIFace hi_path = do
 
     extFields_p <- get bh
 
-    mod_iface <- getWithUserData ncu bh
+    mod_iface <- getWithUserData name_cache bh
 
     seekBin bh extFields_p
     extFields <- get bh
@@ -142,8 +138,8 @@ readBinIface profile ncu checkHiWay traceBinIFace hi_path = do
 -- | This performs a get action after reading the dictionary and symbol
 -- table. It is necessary to run this before trying to deserialise any
 -- Names or FastStrings.
-getWithUserData :: Binary a => NameCacheUpdater -> BinHandle -> IO a
-getWithUserData ncu bh = do
+getWithUserData :: Binary a => NameCache -> BinHandle -> IO a
+getWithUserData name_cache bh = do
     -- Read the dictionary
     -- The next word in the file is a pointer to where the dictionary is
     -- (probably at the end of the file)
@@ -160,11 +156,11 @@ getWithUserData ncu bh = do
         symtab_p <- Binary.get bh     -- Get the symtab ptr
         data_p <- tellBin bh          -- Remember where we are now
         seekBin bh symtab_p
-        symtab <- getSymbolTable bh ncu
+        symtab <- getSymbolTable bh name_cache
         seekBin bh data_p             -- Back to where we were before
 
         -- It is only now that we know how to get a Name
-        return $ setUserData bh $ newReadState (getSymtabName ncu dict symtab)
+        return $ setUserData bh $ newReadState (getSymtabName name_cache dict symtab)
                                                (getDictFastString dict)
 
     -- Read the interface file
@@ -284,11 +280,11 @@ putSymbolTable bh next_off symtab = do
       -- indices that array uses to create order
     mapM_ (\n -> serialiseName bh n symtab) names
 
-getSymbolTable :: BinHandle -> NameCacheUpdater -> IO SymbolTable
-getSymbolTable bh ncu = do
+getSymbolTable :: BinHandle -> NameCache -> IO SymbolTable
+getSymbolTable bh name_cache = do
     sz <- get bh
     od_names <- sequence (replicate sz (get bh))
-    updateNameCache ncu $ \namecache ->
+    updateNameCache' name_cache $ \namecache ->
         runST $ flip State.evalStateT namecache $ do
             mut_arr <- lift $ newSTArray_ (0, sz-1)
             for_ (zip [0..] od_names) $ \(i, odn) -> do
@@ -302,20 +298,6 @@ getSymbolTable bh ncu = do
     -- This binding is required because the type of newArray_ cannot be inferred
     newSTArray_ :: forall s. (Int, Int) -> ST s (STArray s Int Name)
     newSTArray_ = newArray_
-
-type OnDiskName = (Unit, ModuleName, OccName)
-
-fromOnDiskName :: NameCache -> OnDiskName -> (NameCache, Name)
-fromOnDiskName nc (pid, mod_name, occ) =
-    let mod   = mkModule pid mod_name
-        cache = nsNames nc
-    in case lookupOrigNameCache cache  mod occ of
-           Just name -> (nc, name)
-           Nothing   ->
-               let (uniq, us) = takeUniqFromSupply (nsUniqs nc)
-                   name       = mkExternalName uniq mod occ noSrcSpan
-                   new_cache  = extendNameCache cache mod occ name
-               in ( nc{ nsUniqs = us, nsNames = new_cache }, name )
 
 serialiseName :: BinHandle -> Name -> UniqFM key (Int,Name) -> IO ()
 serialiseName bh name _ = do
@@ -366,10 +348,10 @@ putName _dict BinSymbolTable{
             put_ bh (fromIntegral off :: Word32)
 
 -- See Note [Symbol table representation of names]
-getSymtabName :: NameCacheUpdater
+getSymtabName :: NameCache
               -> Dictionary -> SymbolTable
               -> BinHandle -> IO Name
-getSymtabName _ncu _dict symtab bh = do
+getSymtabName _name_cache _dict symtab bh = do
     i :: Word32 <- get bh
     case i .&. 0xC0000000 of
       0x00000000 -> return $! symtab ! fromIntegral i
