@@ -1,3 +1,3 @@
 
 T10637.hs:3:23: warning:
-    warning: {-# SOURCE #-} unnecessary in import of  ‘A’
+    {-# SOURCE #-} unnecessary in import of  ‘A’

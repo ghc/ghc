@@ -1031,8 +1031,7 @@ reportError err
          writeTcRef errs_var (err `addMessage` msgs) }
 
 -- | Reports the input warning.
--- /INVARIANT/: The input 'MsgEnvelope' needs to be given the correct
--- 'Severity'.
+-- /INVARIANT/: The input 'MsgEnvelope' needs to have a 'SevWarning' severity.
 reportWarning :: MsgEnvelope DecoratedSDoc -> TcRn ()
 reportWarning warn
   = do { traceTc "Adding warning:" (pprLocMsgEnvelope warn)

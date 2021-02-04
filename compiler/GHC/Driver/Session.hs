@@ -1392,16 +1392,13 @@ defaultLogAction dflags msg_class srcSpan msg
           SevWarning (WarnReason wflag) -> do
             spec <- flagSpecOf wflag
             return ("-W" ++ flagSpecName spec ++ warnFlagGrp wflag)
-          SevWarning (WarnDemotedFromError _genFlag) -> Nothing
           SevError NoErrReason     -> Nothing
-          SevError (ErrPromotedFromWarning reason) -> case reason of
-            Right wflag -> do
+          SevError (ErrPromotedFromWarning wflag) -> do
               spec <- flagSpecOf wflag
               return $
                 "-W" ++ flagSpecName spec ++ warnFlagGrp wflag ++
                 ", -Werror=" ++ flagSpecName spec
-            Left Opt_WarnIsError -> return "-Werror"
-            Left _genFlag        -> Nothing
+          SevError ErrPromotedWithWError -> return "-Werror"
 
       warnFlagGrp flag
           | gopt Opt_ShowWarnGroups dflags =

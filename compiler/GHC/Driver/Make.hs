@@ -2208,7 +2208,7 @@ warnUnnecessarySourceImports sccs = do
         warn :: Located ModuleName -> WarnMsg
         warn (L loc mod) =
            mkPlainMsgEnvelope sevWarnNoReason loc
-                (text "Warning: {-# SOURCE #-} unnecessary in import of "
+                (text "{-# SOURCE #-} unnecessary in import of "
                  <+> quotes (ppr mod))
 
 
