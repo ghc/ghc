@@ -220,7 +220,7 @@ depanalPartial excluded_mods allow_dup_roots = do
     -- source files may have appeared in the home package that shadow
     -- external package modules, so we have to discard the existing
     -- cached finder data.
-    liftIO $ flushFinderCaches hsc_env
+    liftIO $ flushFinderCaches (hsc_FC hsc_env) (hsc_home_unit hsc_env)
 
     mod_summariesE <- liftIO $ downsweep
       hsc_env (mgExtendedModSummaries old_graph)
@@ -2549,7 +2549,10 @@ summariseFile hsc_env old_summaries src_fn mb_phase obj_allowed maybe_buf
 
         -- Tell the Finder cache where it is, so that subsequent calls
         -- to findModule will find it, even if it's not on any search path
-        mod <- liftIO $ addHomeModuleToFinder hsc_env pi_mod_name location
+        mod <- liftIO $ do
+          let home_unit = hsc_home_unit hsc_env
+          let fc        = hsc_FC hsc_env
+          addHomeModuleToFinder fc home_unit pi_mod_name location
 
         liftIO $ makeNewModSummary hsc_env $ MakeNewModSummary
             { nms_src_fn = src_fn
@@ -2600,7 +2603,10 @@ checkSummaryTimestamp
            -- and it was likely flushed in depanal. This is not technically
            -- needed when we're called from sumariseModule but it shouldn't
            -- hurt.
-           _ <- addHomeModuleToFinder hsc_env
+           _ <- do
+              let home_unit = hsc_home_unit hsc_env
+              let fc        = hsc_FC hsc_env
+              addHomeModuleToFinder fc home_unit
                   (moduleName (ms_mod old_summary)) location
 
            hi_timestamp <- maybeGetIfaceDate dflags location
@@ -2661,8 +2667,10 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
 
   | otherwise  = find_it
   where
-    dflags = hsc_dflags hsc_env
+    dflags    = hsc_dflags hsc_env
     home_unit = hsc_home_unit hsc_env
+    fc        = hsc_FC hsc_env
+    units     = hsc_units hsc_env
 
     check_timestamp old_summary location src_fn =
         checkSummaryTimestamp
@@ -2671,7 +2679,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
           old_summary location
 
     find_it = do
-        found <- findImportedModule hsc_env wanted_mod Nothing
+        found <- findImportedModule fc units home_unit dflags wanted_mod Nothing
         case found of
              Found location mod
                 | isJust (ml_hs_file location) ->

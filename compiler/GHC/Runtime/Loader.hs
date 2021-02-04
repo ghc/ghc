@@ -259,8 +259,12 @@ lessUnsafeCoerce logger dflags context what = do
 lookupRdrNameInModuleForPlugins :: HscEnv -> ModuleName -> RdrName
                                 -> IO (Maybe (Name, ModIface))
 lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
+    let dflags    = hsc_dflags hsc_env
+    let fc        = hsc_FC hsc_env
+    let units     = hsc_units hsc_env
+    let home_unit = hsc_home_unit hsc_env
     -- First find the unit the module resides in by searching exposed units and home modules
-    found_module <- findPluginModule hsc_env mod_name
+    found_module <- findPluginModule fc units home_unit dflags mod_name
     case found_module of
         Found _ mod -> do
             -- Find the exports of the module
@@ -282,7 +286,6 @@ lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
                 Nothing -> throwCmdLineErrorS dflags $ hsep [text "Could not determine the exports of the module", ppr mod_name]
         err -> throwCmdLineErrorS dflags $ cannotFindModule hsc_env mod_name err
   where
-    dflags = hsc_dflags hsc_env
     doc = text "contains a name used in an invocation of lookupRdrNameInModule"
 
 wrongTyThingError :: Name -> TyThing -> SDoc

@@ -169,7 +169,8 @@ importDecl :: Name -> IfM lcl (MaybeErr SDoc TyThing)
 importDecl name
   = ASSERT( not (isWiredInName name) )
     do  { dflags <- getDynFlags
-        ; liftIO $ trace_if dflags nd_doc
+        ; logger <- getLogger
+        ; liftIO $ trace_if logger dflags nd_doc
 
         -- Load the interface, which should populate the PTE
         ; mb_iface <- ASSERT2( isExternalName name, ppr name )
@@ -244,7 +245,8 @@ checkWiredInTyCon tc
   | otherwise
   = do  { mod <- getModule
         ; dflags <- getDynFlags
-        ; liftIO $ trace_if dflags (text "checkWiredInTyCon" <+> ppr tc_name $$ ppr mod)
+        ; logger <- getLogger
+        ; liftIO $ trace_if logger dflags (text "checkWiredInTyCon" <+> ppr tc_name $$ ppr mod)
         ; ASSERT( isExternalName tc_name )
           when (mod /= nameModule tc_name)
                (initIfaceTcRn (loadWiredInHomeIface tc_name))
@@ -315,12 +317,16 @@ loadSrcInterface_maybe doc mod want_boot maybe_pkg
   -- and create a ModLocation.  If successful, loadIface will read the
   -- interface; it will call the Finder again, but the ModLocation will be
   -- cached from the first search.
-  = do { hsc_env <- getTopEnv
-       ; res <- liftIO $ findImportedModule hsc_env mod maybe_pkg
-       ; case res of
+  = do hsc_env <- getTopEnv
+       let fc = hsc_FC hsc_env
+       let dflags = hsc_dflags hsc_env
+       let units = hsc_units hsc_env
+       let home_unit = hsc_home_unit hsc_env
+       res <- liftIO $ findImportedModule fc units home_unit dflags mod maybe_pkg
+       case res of
            Found _ mod -> initIfaceTcRn $ loadInterface doc mod (ImportByUser want_boot)
            -- TODO: Make sure this error message is good
-           err         -> return (Failed (cannotFindModule hsc_env mod err)) }
+           err         -> return (Failed (cannotFindModule hsc_env mod err))
 
 -- | Load interface directly for a fully qualified 'Module'.  (This is a fairly
 -- rare operation, but in particular it is used to load orphan modules
@@ -445,8 +451,9 @@ loadInterface doc_str mod from
           (eps,hpt) <- getEpsAndHpt
         ; gbl_env <- getGblEnv
         ; dflags <- getDynFlags
+        ; logger <- getLogger
 
-        ; liftIO $ trace_if dflags (text "Considering whether to load" <+> ppr mod <+> ppr from)
+        ; liftIO $ trace_if logger dflags (text "Considering whether to load" <+> ppr mod <+> ppr from)
 
                 -- Check whether we have the interface already
         ; hsc_env <- getTopEnv
@@ -681,20 +688,25 @@ computeInterface
   -> Module
   -> IO (MaybeErr SDoc (ModIface, FilePath))
 computeInterface hsc_env doc_str hi_boot_file mod0 = do
-    MASSERT( not (isHoleModule mod0) )
-    let home_unit = hsc_home_unit hsc_env
-    case getModuleInstantiation mod0 of
-        (imod, Just indef) | isHomeUnitIndefinite home_unit -> do
-            r <- findAndReadIface hsc_env doc_str imod mod0 hi_boot_file
-            case r of
-                Succeeded (iface0, path) -> do
-                    r <- rnModIface hsc_env (instUnitInsts (moduleUnit indef))
-                                   Nothing iface0
-                    case r of
-                        Right x -> return (Succeeded (x, path))
-                        Left errs -> throwIO . mkSrcErr $ errs
-                Failed err -> return (Failed err)
-        (mod, _) -> findAndReadIface hsc_env doc_str mod mod0 hi_boot_file
+  MASSERT( not (isHoleModule mod0) )
+  let name_cache = hsc_NC hsc_env
+  let fc         = hsc_FC hsc_env
+  let home_unit  = hsc_home_unit hsc_env
+  let units      = hsc_units hsc_env
+  let dflags     = hsc_dflags hsc_env
+  let logger     = hsc_logger hsc_env
+  let hooks      = hsc_hooks hsc_env
+  let find_iface m = findAndReadIface logger name_cache fc hooks units home_unit dflags doc_str
+                                      m mod0 hi_boot_file
+  case getModuleInstantiation mod0 of
+      (imod, Just indef) | isHomeUnitIndefinite home_unit ->
+        find_iface imod >>= \case
+          Succeeded (iface0, path) ->
+            rnModIface hsc_env (instUnitInsts (moduleUnit indef)) Nothing iface0 >>= \case
+              Right x   -> return (Succeeded (x, path))
+              Left errs -> throwIO . mkSrcErr $ errs
+          Failed err -> return (Failed err)
+      (mod, _) -> find_iface mod
 
 -- | Compute the signatures which must be compiled in order to
 -- load the interface for a 'Module'.  The output of this function
@@ -714,8 +726,9 @@ moduleFreeHolesPrecise doc_str mod
    case getModuleInstantiation mod of
     (imod, Just indef) -> do
         dflags <- getDynFlags
+        logger <- getLogger
         let insts = instUnitInsts (moduleUnit indef)
-        liftIO $ trace_if dflags (text "Considering whether to load" <+> ppr mod <+>
+        liftIO $ trace_if logger dflags (text "Considering whether to load" <+> ppr mod <+>
                  text "to compute precise free module holes")
         (eps, hpt) <- getEpsAndHpt
         case tryEpsAndHpt eps hpt `firstJust` tryDepsCache eps imod insts of
@@ -731,7 +744,16 @@ moduleFreeHolesPrecise doc_str mod
             _otherwise -> Nothing
     readAndCache imod insts = do
         hsc_env <- getTopEnv
-        mb_iface <- liftIO $ findAndReadIface hsc_env (text "moduleFreeHolesPrecise" <+> doc_str) imod mod NotBoot
+        let nc        = hsc_NC hsc_env
+        let fc        = hsc_FC hsc_env
+        let home_unit = hsc_home_unit hsc_env
+        let units     = hsc_units hsc_env
+        let dflags    = hsc_dflags hsc_env
+        let logger    = hsc_logger hsc_env
+        let hooks     = hsc_hooks hsc_env
+        mb_iface <- liftIO $ findAndReadIface logger nc fc hooks units home_unit dflags
+                                              (text "moduleFreeHolesPrecise" <+> doc_str)
+                                              imod mod NotBoot
         case mb_iface of
             Succeeded (iface, _) -> do
                 let ifhs = mi_free_holes iface
@@ -820,32 +842,25 @@ This actually happened with P=base, Q=ghc-prim, via the AMP warnings.
 See #8320.
 -}
 
-findAndReadIface :: HscEnv
-                 -> SDoc
-                 -- The unique identifier of the on-disk module we're
-                 -- looking for
-                 -> InstalledModule
-                 -- The *actual* module we're looking for.  We use
-                 -- this to check the consistency of the requirements
-                 -- of the module we read out.
-                 -> Module
-                 -> IsBootInterface     -- True  <=> Look for a .hi-boot file
-                                        -- False <=> Look for .hi file
-                 -> IO (MaybeErr SDoc (ModIface, FilePath))
-        -- Nothing <=> file not found, or unreadable, or illegible
-        -- Just x  <=> successfully found and parsed
+findAndReadIface
+  :: Logger
+  -> NameCache
+  -> FinderCache
+  -> Hooks
+  -> UnitState
+  -> HomeUnit
+  -> DynFlags
+  -> SDoc            -- ^ Reason for loading the iface (used for tracing)
+  -> InstalledModule -- ^ The unique identifier of the on-disk module we're looking for
+  -> Module          -- ^ The *actual* module we're looking for.  We use
+                     -- this to check the consistency of the requirements of the
+                     -- module we read out.
+  -> IsBootInterface -- ^ Looking for .hi-boot or .hi file
+  -> IO (MaybeErr SDoc (ModIface, FilePath))
+findAndReadIface logger name_cache fc hooks unit_state home_unit dflags doc_str mod wanted_mod hi_boot_file = do
+  let profile = targetProfile dflags
 
-        -- It *doesn't* add an error to the monad, because
-        -- sometimes it's ok to fail... see notes with loadInterface
-findAndReadIface hsc_env doc_str mod wanted_mod hi_boot_file = do
-  let dflags     = hsc_dflags hsc_env
-  let home_unit  = hsc_home_unit hsc_env
-  let unit_env   = hsc_unit_env hsc_env
-  let profile    = targetProfile dflags
-  let name_cache = hsc_NC hsc_env
-  let unit_state = hsc_units hsc_env
-
-  trace_if dflags (sep [hsep [text "Reading",
+  trace_if logger dflags (sep [hsep [text "Reading",
                            if hi_boot_file == IsBoot
                              then text "[boot]"
                              else Outputable.empty,
@@ -858,14 +873,13 @@ findAndReadIface hsc_env doc_str mod wanted_mod hi_boot_file = do
   -- TODO: make this check a function
   if mod `installedModuleEq` gHC_PRIM
       then do
-          hooks <- getHooks
           let iface = case ghcPrimIfaceHook hooks of
                        Nothing -> ghcPrimIface
                        Just h  -> h
           return (Succeeded (iface, "<built in interface for GHC.Prim>"))
       else do
           -- Look for the file
-          mb_found <- liftIO (findExactModule hsc_env mod)
+          mb_found <- liftIO (findExactModule fc dflags unit_state home_unit mod)
           case mb_found of
               InstalledFound loc mod -> do
                   -- Found file, so read it
@@ -875,53 +889,54 @@ findAndReadIface hsc_env doc_str mod wanted_mod hi_boot_file = do
                      not (isOneShot (ghcMode dflags))
                       then return (Failed (homeModError mod loc))
                       else do
-                        r <- read_file name_cache unit_state dflags wanted_mod file_path
+                        r <- read_file logger name_cache unit_state dflags wanted_mod file_path
                         case r of
                           Failed _
                             -> return ()
                           Succeeded (iface,fp)
-                            -> load_dynamic_too_maybe name_cache unit_state
+                            -> load_dynamic_too_maybe logger name_cache unit_state
                                                       dflags wanted_mod
                                                       hi_boot_file iface fp
                         return r
               err -> do
-                  trace_if dflags (text "...not found")
+                  trace_if logger dflags (text "...not found")
                   return $ Failed $ cannotFindInterface
-                                      unit_env
+                                      unit_state
+                                      home_unit
                                       profile
-                                      (may_show_locations (hsc_dflags hsc_env))
+                                      (may_show_locations dflags)
                                       (moduleName mod)
                                       err
 
 -- | Check if we need to try the dynamic interface for -dynamic-too
-load_dynamic_too_maybe :: NameCache -> UnitState -> DynFlags -> Module -> IsBootInterface -> ModIface -> FilePath -> IO ()
-load_dynamic_too_maybe name_cache unit_state dflags wanted_mod is_boot iface file_path
+load_dynamic_too_maybe :: Logger -> NameCache -> UnitState -> DynFlags -> Module -> IsBootInterface -> ModIface -> FilePath -> IO ()
+load_dynamic_too_maybe logger name_cache unit_state dflags wanted_mod is_boot iface file_path
   -- Indefinite interfaces are ALWAYS non-dynamic.
   | not (moduleIsDefinite (mi_module iface)) = return ()
   | otherwise = dynamicTooState dflags  >>= \case
       DT_Dont   -> return ()
       DT_Failed -> return ()
-      DT_Dyn    -> load_dynamic_too name_cache unit_state dflags wanted_mod is_boot iface file_path
-      DT_OK     -> load_dynamic_too name_cache unit_state (setDynamicNow dflags) wanted_mod is_boot iface file_path
+      DT_Dyn    -> load_dynamic_too logger name_cache unit_state dflags wanted_mod is_boot iface file_path
+      DT_OK     -> load_dynamic_too logger name_cache unit_state (setDynamicNow dflags) wanted_mod is_boot iface file_path
 
-load_dynamic_too :: NameCache -> UnitState -> DynFlags -> Module -> IsBootInterface -> ModIface -> FilePath -> IO ()
-load_dynamic_too name_cache unit_state dflags wanted_mod is_boot iface file_path = do
+load_dynamic_too :: Logger -> NameCache -> UnitState -> DynFlags -> Module -> IsBootInterface -> ModIface -> FilePath -> IO ()
+load_dynamic_too logger name_cache unit_state dflags wanted_mod is_boot iface file_path = do
   let dynFilePath = addBootSuffix_maybe is_boot
                   $ replaceExtension file_path (hiSuf dflags)
-  read_file name_cache unit_state dflags wanted_mod dynFilePath >>= \case
+  read_file logger name_cache unit_state dflags wanted_mod dynFilePath >>= \case
     Succeeded (dynIface, _)
      | mi_mod_hash (mi_final_exts iface) == mi_mod_hash (mi_final_exts dynIface)
      -> return ()
      | otherwise ->
-        do trace_if dflags (text "Dynamic hash doesn't match")
+        do trace_if logger dflags (text "Dynamic hash doesn't match")
            setDynamicTooFailed dflags
     Failed err ->
-        do trace_if dflags (text "Failed to load dynamic interface file:" $$ err)
+        do trace_if logger dflags (text "Failed to load dynamic interface file:" $$ err)
            setDynamicTooFailed dflags
 
-read_file :: NameCache -> UnitState -> DynFlags -> Module -> FilePath -> IO (MaybeErr SDoc (ModIface, FilePath))
-read_file name_cache unit_state dflags wanted_mod file_path = do
-  trace_if dflags (text "readIFace" <+> text file_path)
+read_file :: Logger -> NameCache -> UnitState -> DynFlags -> Module -> FilePath -> IO (MaybeErr SDoc (ModIface, FilePath))
+read_file logger name_cache unit_state dflags wanted_mod file_path = do
+  trace_if logger dflags (text "readIFace" <+> text file_path)
 
   -- Figure out what is recorded in mi_module.  If this is
   -- a fully definite interface, it'll match exactly, but
@@ -1282,25 +1297,24 @@ homeModError mod location
 -- -----------------------------------------------------------------------------
 -- Error messages
 
-cannotFindInterface :: UnitEnv -> Profile -> ([FilePath] -> SDoc) -> ModuleName -> InstalledFindResult -> SDoc
+cannotFindInterface :: UnitState -> HomeUnit -> Profile -> ([FilePath] -> SDoc) -> ModuleName -> InstalledFindResult -> SDoc
 cannotFindInterface = cantFindInstalledErr (sLit "Failed to load interface for")
                                            (sLit "Ambiguous interface for")
 
 cantFindInstalledErr
     :: PtrString
     -> PtrString
-    -> UnitEnv
+    -> UnitState
+    -> HomeUnit
     -> Profile
     -> ([FilePath] -> SDoc)
     -> ModuleName
     -> InstalledFindResult
     -> SDoc
-cantFindInstalledErr cannot_find _ unit_env profile tried_these mod_name find_result
+cantFindInstalledErr cannot_find _ unit_state home_unit profile tried_these mod_name find_result
   = ptext cannot_find <+> quotes (ppr mod_name)
     $$ more_info
   where
-    home_unit  = ue_home_unit unit_env
-    unit_state = ue_units unit_env
     build_tag  = waysBuildTag (profileWays profile)
 
     more_info

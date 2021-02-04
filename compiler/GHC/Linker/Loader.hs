@@ -731,7 +731,10 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
         | otherwise
         = do    -- It's not in the HPT because we are in one shot mode,
                 -- so use the Finder to get a ModLocation...
-             mb_stuff <- findHomeModule hsc_env mod_name
+             let fc = hsc_FC hsc_env
+             let home_unit = hsc_home_unit hsc_env
+             let dflags = hsc_dflags hsc_env
+             mb_stuff <- findHomeModule fc home_unit dflags mod_name
              case mb_stuff of
                   Found loc mod -> found loc mod
                   _ -> no_obj mod_name

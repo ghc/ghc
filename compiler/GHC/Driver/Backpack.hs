@@ -737,6 +737,7 @@ summariseRequirement :: PackageName -> ModuleName -> BkpM ModSummary
 summariseRequirement pn mod_name = do
     hsc_env <- getSession
     let dflags = hsc_dflags hsc_env
+    let home_unit = hsc_home_unit hsc_env
 
     let PackageName pn_fs = pn
     location <- liftIO $ mkHomeModLocation2 dflags mod_name
@@ -748,7 +749,8 @@ summariseRequirement pn mod_name = do
     hie_timestamp <- liftIO $ modificationTimeIfExists (ml_hie_file location)
     let loc = srcLocSpan (mkSrcLoc (mkFastString (bkp_filename env)) 1 1)
 
-    mod <- liftIO $ addHomeModuleToFinder hsc_env mod_name location
+    let fc = hsc_FC hsc_env
+    mod <- liftIO $ addHomeModuleToFinder fc home_unit mod_name location
 
     extra_sig_imports <- liftIO $ findExtraSigImports hsc_env HsigFile mod_name
 
@@ -861,7 +863,10 @@ hsModuleToModSummary pn hsc_src modname
     (implicit_sigs, inst_deps) <- liftIO $ implicitRequirementsShallow hsc_env normal_imports
 
     -- So that Finder can find it, even though it doesn't exist...
-    this_mod <- liftIO $ addHomeModuleToFinder hsc_env modname location
+    this_mod <- liftIO $ do
+      let home_unit = hsc_home_unit hsc_env
+      let fc        = hsc_FC hsc_env
+      addHomeModuleToFinder fc home_unit modname location
     return $ ExtendedModSummary
       { emsModSummary =
           ModSummary {

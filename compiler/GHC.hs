@@ -990,7 +990,9 @@ guessTarget str Nothing
 -- you should also unload the current program (set targets to empty,
 -- followed by load).
 workingDirectoryChanged :: GhcMonad m => m ()
-workingDirectoryChanged = withSession $ (liftIO . flushFinderCaches)
+workingDirectoryChanged = do
+  hsc_env <- getSession
+  liftIO $ flushFinderCaches (hsc_FC hsc_env) (hsc_home_unit hsc_env)
 
 
 -- %************************************************************************
@@ -1652,11 +1654,13 @@ showRichTokenStream ts = go startLoc ts ""
 -- using the algorithm that is used for an @import@ declaration.
 findModule :: GhcMonad m => ModuleName -> Maybe FastString -> m Module
 findModule mod_name maybe_pkg = withSession $ \hsc_env -> do
-  let dflags     = hsc_dflags hsc_env
-      home_unit  = hsc_home_unit hsc_env
+  let fc        = hsc_FC hsc_env
+  let home_unit = hsc_home_unit hsc_env
+  let units     = hsc_units hsc_env
+  let dflags    = hsc_dflags hsc_env
   case maybe_pkg of
     Just pkg | not (isHomeUnit home_unit (fsToUnit pkg)) && pkg /= fsLit "this" -> liftIO $ do
-      res <- findImportedModule hsc_env mod_name maybe_pkg
+      res <- findImportedModule fc units home_unit dflags mod_name maybe_pkg
       case res of
         Found _ m -> return m
         err       -> throwOneError $ noModError hsc_env noSrcSpan mod_name err
@@ -1665,7 +1669,7 @@ findModule mod_name maybe_pkg = withSession $ \hsc_env -> do
       case home of
         Just m  -> return m
         Nothing -> liftIO $ do
-           res <- findImportedModule hsc_env mod_name maybe_pkg
+           res <- findImportedModule fc units home_unit dflags mod_name maybe_pkg
            case res of
              Found loc m | not (isHomeModule home_unit m) -> return m
                          | otherwise -> modNotLoadedError dflags m loc
@@ -1691,7 +1695,10 @@ lookupModule mod_name Nothing = withSession $ \hsc_env -> do
   case home of
     Just m  -> return m
     Nothing -> liftIO $ do
-      res <- findExposedPackageModule hsc_env mod_name Nothing
+      let fc     = hsc_FC hsc_env
+      let units  = hsc_units hsc_env
+      let dflags = hsc_dflags hsc_env
+      res <- findExposedPackageModule fc units dflags mod_name Nothing
       case res of
         Found _ m -> return m
         err       -> throwOneError $ noModError hsc_env noSrcSpan mod_name err

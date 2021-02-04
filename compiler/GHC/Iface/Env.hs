@@ -15,7 +15,7 @@ module GHC.Iface.Env (
 
         ifaceExportNames,
 
-        trace_if, trace_hi_diffs, -- FIXME: temporary
+        trace_if, trace_hi_diffs,
 
         -- Name-cache stuff
         allocateGlobalBinder,
@@ -48,6 +48,7 @@ import GHC.Types.SrcLoc
 
 import GHC.Utils.Outputable
 import GHC.Utils.Error
+import GHC.Utils.Logger
 
 import Data.List     ( partition )
 import Control.Monad
@@ -276,10 +277,10 @@ newIfaceNames occs
         ; return [ mkInternalName uniq occ noSrcSpan
                  | (occ,uniq) <- occs `zip` uniqsFromSupply uniqs] }
 
-trace_if :: DynFlags -> SDoc -> IO ()
+trace_if :: Logger -> DynFlags -> SDoc -> IO ()
 {-# INLINE trace_if #-}
-trace_if dflags doc = when (dopt Opt_D_dump_if_trace dflags) $ putMsg dflags doc
+trace_if logger dflags doc = when (dopt Opt_D_dump_if_trace dflags) $ putMsg logger dflags doc
 
-trace_hi_diffs :: DynFlags -> SDoc -> IO ()
+trace_hi_diffs :: Logger -> DynFlags -> SDoc -> IO ()
 {-# INLINE trace_hi_diffs #-}
-trace_hi_diffs dflags doc = when (dopt Opt_D_dump_hi_diffs dflags) $ putMsg dflags doc
+trace_hi_diffs logger dflags doc = when (dopt Opt_D_dump_hi_diffs dflags) $ putMsg logger dflags doc

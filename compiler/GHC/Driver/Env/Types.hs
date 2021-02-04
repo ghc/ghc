@@ -106,7 +106,7 @@ data HscEnv
                 -- ^ Global Name cache so that each Name gets a single Unique.
                 -- Also track the origin of the Names.
 
-        hsc_FC   :: {-# UNPACK #-} !(IORef FinderCache),
+        hsc_FC   :: {-# UNPACK #-} !FinderCache,
                 -- ^ The cached result of performing finding in the file system
 
         hsc_type_env_var :: Maybe (Module, IORef TypeEnv)

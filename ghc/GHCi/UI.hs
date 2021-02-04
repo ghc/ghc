@@ -1998,8 +1998,12 @@ addModule files = do
     checkTargetModule :: GHC.GhcMonad m => ModuleName -> m Bool
     checkTargetModule m = do
       hsc_env <- GHC.getSession
+      let fc        = hsc_FC hsc_env
+      let home_unit = hsc_home_unit hsc_env
+      let units     = hsc_units hsc_env
+      let dflags    = hsc_dflags hsc_env
       result <- liftIO $
-        Finder.findImportedModule hsc_env m (Just (fsLit "this"))
+        Finder.findImportedModule fc units home_unit dflags m (Just (fsLit "this"))
       case result of
         Found _ _ -> return True
         _ -> (liftIO $ putStrLn $

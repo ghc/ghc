@@ -1303,7 +1303,10 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
         PipeState{hsc_env=hsc_env'} <- getPipeState
 
   -- Tell the finder cache about this module
-        mod <- liftIO $ addHomeModuleToFinder hsc_env' mod_name location
+        mod <- liftIO $ do
+          let home_unit = hsc_home_unit hsc_env'
+          let fc        = hsc_FC hsc_env'
+          addHomeModuleToFinder fc home_unit mod_name location
 
   -- Make the ModSummary to hand to hscMain
         let
