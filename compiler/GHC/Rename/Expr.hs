@@ -2327,8 +2327,8 @@ mkSet :: SrcSpan -> Name -> LHsExpr GhcRn -> (Located FastString, LHsExpr GhcRn)
 mkSet loc set_field acc (field, g) = mkSetField loc set_field (mkParen loc g) field (mkParen loc acc)
 
 -- mkProjection fields calculates a projection.
--- e.g. .x = mkProjection x = \z -> z.x = \z -> (getField @field x)
---      .x.y = mkProjection [.x, .y] = (.y) . (.x) = (\z -> z.y) . (\z -> z.x)
+-- e.g. .x = mkProjection [x] = getField @"x"
+--      .x.y = mkProjection [.x, .y] = (.y) . (.x) = getField @"y" . getField @"x"
 mkProjection :: SrcSpan -> Name -> Name -> [Located FastString] -> HsExpr GhcRn
 mkProjection loc getFieldName circName (field : fields) = unLoc (foldl' f (proj field) fields)
   where
@@ -2336,21 +2336,15 @@ mkProjection loc getFieldName circName (field : fields) = unLoc (foldl' f (proj 
     f acc field = (mkParen loc . mkOpApp loc (proj field) (circ loc)) acc
 
     proj :: Located FastString -> LHsExpr GhcRn
-    proj f =
-      let body = L loc $ mkGetField loc getFieldName (zVar loc) f
-          grhs = L loc $ GRHS noExtField [] body
-          ghrss = GRHSs noExtField [grhs] (L loc (EmptyLocalBinds noExtField))
-          m = L loc $ Match {m_ext=noExtField, m_ctxt=LambdaExpr, m_pats=[zPat loc], m_grhss=ghrss} in
-      mkParen loc (L loc $ HsLam noExtField MG {mg_ext=noExtField, mg_alts=L loc [m], mg_origin=Generated})
+    proj (L _ f) = mkAppType loc (L loc (HsVar noExtField (L loc getFieldName))) (mkSelector loc f)
 
-    zPat :: SrcSpan -> LPat GhcRn
-    zVar, circ :: SrcSpan -> LHsExpr GhcRn
-    zPat loc = L loc $ VarPat noExtField (L loc $ mkSystemVarName (mkVarOccUnique (fsLit "z")) (fsLit "z"))
-    zVar loc = L loc $ HsVar noExtField (L loc $ mkSystemVarName (mkVarOccUnique (fsLit "z")) (fsLit "z"))
+    circ :: SrcSpan -> LHsExpr GhcRn
     circ loc = L loc $ HsVar noExtField (L loc $ circName)
-mkProjection _ _ _ [] = panic "mkProj': The impossible happened"
+mkProjection _ _ _ [] = panic "mkProjection: The impossible happened"
 
 -- mkProjUpdateSetField calculates functions representing dot notation record updates.
+-- e.g. Suppose an update like foo.bar = 1.
+--      We calculate the function \a -> setField @"foo" a (setField @"bar" (getField @"foo" a) 1).
 mkProjUpdateSetField :: SrcSpan -> Name -> Name -> LHsProjUpdate GhcRn (LHsExpr GhcRn) -> (LHsExpr GhcRn -> LHsExpr GhcRn)
 mkProjUpdateSetField loc get_field set_field (L _ (ProjUpdate { pu_flds = flds, pu_arg = arg } ))
   = let {
