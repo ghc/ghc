@@ -3,6 +3,7 @@
 import GHC
 import GHC.Driver.Make
 import GHC.Driver.Session
+import GHC.Driver.Env
 import GHC.Unit.Module.ModSummary (ExtendedModSummary(..))
 import GHC.Unit.Finder
 
@@ -45,7 +46,7 @@ main = do
 
     _emss <- downsweep hsc_env [] [] False
 
-    flushFinderCaches hsc_env
+    flushFinderCaches (hsc_FC hsc_env) (hsc_home_unit hsc_env)
     createDirectoryIfMissing False "mydir"
     renameFile "B.hs" "mydir/B.hs"
 
