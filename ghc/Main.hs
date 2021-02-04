@@ -826,13 +826,16 @@ abiHash :: [String] -- ^ List of module names
         -> Ghc ()
 abiHash strs = do
   hsc_env <- getSession
-  let dflags = hsc_dflags hsc_env
+  let fc        = hsc_FC hsc_env
+  let home_unit = hsc_home_unit hsc_env
+  let units     = hsc_units hsc_env
+  let dflags    = hsc_dflags hsc_env
 
   liftIO $ do
 
   let find_it str = do
          let modname = mkModuleName str
-         r <- findImportedModule hsc_env modname Nothing
+         r <- findImportedModule fc units home_unit dflags modname Nothing
          case r of
            Found _ m -> return m
            _error    -> throwGhcException $ CmdLineError $ showSDoc dflags $

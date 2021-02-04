@@ -15,7 +15,7 @@ module GHC.Iface.Env (
 
         ifaceExportNames,
 
-        trace_if, trace_hi_diffs, -- FIXME: temporary
+        trace_if, trace_hi_diffs,
 
         -- Name-cache stuff
         allocateGlobalBinder,
