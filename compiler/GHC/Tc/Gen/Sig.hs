@@ -41,6 +41,7 @@ import GHC.Tc.Utils.Unify( tcSkolemise, unifyType )
 import GHC.Tc.Utils.Instantiate( topInstantiate, tcInstTypeBndrs )
 import GHC.Tc.Utils.Env( tcLookupId )
 import GHC.Tc.Types.Evidence( HsWrapper, (<.>) )
+import GHC.Core( hasSomeUnfolding )
 import GHC.Core.Type ( mkTyVarBinders )
 import GHC.Core.Multiplicity
 
@@ -48,7 +49,8 @@ import GHC.Driver.Session
 import GHC.Driver.Backend
 import GHC.Driver.Ppr
 import GHC.Types.Var ( TyVar, Specificity(..), tyVarKind, binderVars )
-import GHC.Types.Id  ( Id, idName, idType, idInlinePragma, setInlinePragma, mkLocalId )
+import GHC.Types.Id  ( Id, idName, idType, setInlinePragma
+                     , mkLocalId, realIdUnfolding )
 import GHC.Builtin.Names( mkUnboundName )
 import GHC.Types.Basic
 import GHC.Unit.Module( getModule )
@@ -807,20 +809,36 @@ tcImpPrags prags
 tcImpSpec :: (Name, Sig GhcRn) -> TcM [TcSpecPrag]
 tcImpSpec (name, prag)
  = do { id <- tcLookupId name
-      ; if isAnyInlinePragma (idInlinePragma id)
+      ; if hasSomeUnfolding (realIdUnfolding id)
+           -- See Note [SPECIALISE pragmas for imported Ids]
         then tcSpecPrag id prag
         else do { addWarnTc NoReason (impSpecErr name)
                 ; return [] } }
-      -- If there is no INLINE/INLINABLE pragma there will be no unfolding. In
-      -- that case, just delete the SPECIALISE pragma altogether, lest the
-      -- desugarer fall over because it can't find the unfolding. See #18118.
 
 impSpecErr :: Name -> SDoc
 impSpecErr name
   = hang (text "You cannot SPECIALISE" <+> quotes (ppr name))
-       2 (vcat [ text "because its definition has no INLINE/INLINABLE pragma"
-               , parens $ sep
-                   [ text "or its defining module" <+> quotes (ppr mod)
-                   , text "was compiled without -O"]])
+       2 (vcat [ text "because its definition is not visible in this module"
+               , text "Hint: make sure" <+> ppr mod <+> text "is compiled with -O"
+               , text "      and that" <+> quotes (ppr name)
+                 <+> text "has an INLINABLE pragma" ])
   where
     mod = nameModule name
+
+{- Note [SPECIALISE pragmas for imported Ids]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An imported Id may or may not have an unfolding.  If not, we obviously
+can't specialise it here; indeed the desugar falls over (#18118).
+
+We used to test whether it had a user-specified INLINABLE pragma but,
+because of Note [Worker-wrapper for INLINABLE functions] in
+GHC.Core.Opt.WorkWrap, even an INLINABLE function may end up with
+a wrapper that has no pragma, just an unfolding (#19246).  So now
+we just test whether the function has an unfolding.
+
+There's a risk that a pragma-free function may have an unfolding now
+(because it is fairly small), and then gets a bit bigger, and no
+longer has an unfolding in the future.  But then you'll get a helpful
+error message suggesting an INLINABLE pragma, which you can follow.
+That seems enough for now.
+-}
