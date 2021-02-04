@@ -541,7 +541,13 @@ tcHiBootIface hsc_src mod
         -- to check consistency against, rather than just when we notice
         -- that an hi-boot is necessary due to a circular import.
         { hsc_env <- getTopEnv
-        ; read_result <- liftIO $ findAndReadIface hsc_env
+        ; let nc        = hsc_NC hsc_env
+        ; let fc        = hsc_FC hsc_env
+        ; let home_unit = hsc_home_unit hsc_env
+        ; let units     = hsc_units hsc_env
+        ; let dflags    = hsc_dflags hsc_env
+        ; let logger    = hsc_logger hsc_env
+        ; read_result <- liftIO $ findAndReadIface logger nc fc units home_unit dflags
                                 need (fst (getModuleInstantiation mod)) mod
                                 IsBoot  -- Hi-boot file
 
