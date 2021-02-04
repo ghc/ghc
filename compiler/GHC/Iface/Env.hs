@@ -15,9 +15,11 @@ module GHC.Iface.Env (
 
         ifaceExportNames,
 
+        trace_if, trace_hi_diffs, -- FIXME: temporary
+
         -- Name-cache stuff
         allocateGlobalBinder, updNameCacheTc, updNameCache,
-        mkNameCacheUpdater, NameCacheUpdater(..),
+        mkNameCacheUpdater, mkNameCacheUpdaterM, NameCacheUpdater(..),
    ) where
 
 #include "HsVersions.h"
@@ -25,6 +27,7 @@ module GHC.Iface.Env (
 import GHC.Prelude
 
 import GHC.Driver.Env
+import GHC.Driver.Session
 
 import GHC.Tc.Utils.Monad
 import GHC.Core.Type
@@ -45,8 +48,11 @@ import GHC.Types.Unique.Supply
 import GHC.Types.SrcLoc
 
 import GHC.Utils.Outputable
+import GHC.Utils.Error
+
 import Data.List     ( partition )
 import Data.IORef
+import Control.Monad
 
 {-
 *********************************************************
@@ -134,10 +140,13 @@ ifaceExportNames exports = return exports
 newtype NameCacheUpdater
       = NCU { updateNameCache :: forall c. (NameCache -> (NameCache, c)) -> IO c }
 
-mkNameCacheUpdater :: TcRnIf a b NameCacheUpdater
-mkNameCacheUpdater = do { hsc_env <- getTopEnv
-                        ; let !ncRef = hsc_NC hsc_env
-                        ; return (NCU (updNameCache ncRef)) }
+mkNameCacheUpdater :: HscEnv -> NameCacheUpdater
+mkNameCacheUpdater hsc_env = NCU (updNameCache ncRef)
+  where
+    !ncRef = hsc_NC hsc_env
+
+mkNameCacheUpdaterM :: TcRnIf a b NameCacheUpdater
+mkNameCacheUpdaterM = mkNameCacheUpdater <$> getTopEnv
 
 updNameCacheTc :: Module -> OccName -> (NameCache -> (NameCache, c))
                -> TcRnIf a b c
@@ -320,3 +329,10 @@ updNameCache :: IORef NameCache
 updNameCache ncRef upd_fn
   = atomicModifyIORef' ncRef upd_fn
 
+trace_if :: DynFlags -> SDoc -> IO ()
+{-# INLINE trace_if #-}
+trace_if dflags doc = when (dopt Opt_D_dump_if_trace dflags) $ putMsg dflags doc
+
+trace_hi_diffs :: DynFlags -> SDoc -> IO ()
+{-# INLINE trace_hi_diffs #-}
+trace_hi_diffs dflags doc = when (dopt Opt_D_dump_hi_diffs dflags) $ putMsg dflags doc

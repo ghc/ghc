@@ -13,7 +13,6 @@ module GHC.Iface.Binary (
         -- * Public API for interface file serialisation
         writeBinIface,
         readBinIface,
-        readBinIface_,
         getSymtabName,
         getDictFastString,
         CheckHiWay(..),
@@ -42,7 +41,6 @@ import GHC.Iface.Env
 import GHC.Unit
 import GHC.Unit.Module.ModIface
 import GHC.Types.Name
-import GHC.Driver.Session
 import GHC.Platform.Profile
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply
@@ -82,20 +80,15 @@ data TraceBinIFace
    = TraceBinIFace (SDoc -> IO ())
    | QuietBinIFace
 
--- | Read an interface file
-readBinIface :: CheckHiWay -> TraceBinIFace -> FilePath
-             -> TcRnIf a b ModIface
-readBinIface checkHiWay traceBinIFaceReading hi_path = do
-    ncu <- mkNameCacheUpdater
-    dflags <- getDynFlags
-    let profile = targetProfile dflags
-    liftIO $ readBinIface_ profile checkHiWay traceBinIFaceReading hi_path ncu
-
--- | Read an interface file in 'IO'.
-readBinIface_ :: Profile -> CheckHiWay -> TraceBinIFace -> FilePath
-              -> NameCacheUpdater
-              -> IO ModIface
-readBinIface_ profile checkHiWay traceBinIFace hi_path ncu = do
+-- | Read an interface file.
+readBinIface
+  :: Profile
+  -> NameCacheUpdater
+  -> CheckHiWay
+  -> TraceBinIFace
+  -> FilePath
+  -> IO ModIface
+readBinIface profile ncu checkHiWay traceBinIFace hi_path = do
     let platform = profilePlatform profile
 
         wantedGot :: String -> a -> a -> (a -> SDoc) -> IO ()
