@@ -167,7 +167,7 @@ check_old_iface hsc_env mod_summary src_modified maybe_iface
 
         loadIface = do
              let iface_path = msHiFilePath mod_summary
-             let ncu        = mkNameCacheUpdater hsc_env
+             let ncu        = hsc_NC hsc_env
              read_result <- readIface dflags ncu (ms_mod mod_summary) iface_path
              case read_result of
                  Failed err -> do

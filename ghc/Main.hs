@@ -244,7 +244,10 @@ main' postLoadMode dflags0 args flagWarnings = do
        GHC.printException e
        liftIO $ exitWith (ExitFailure 1)) $ do
     case postLoadMode of
-       ShowInterface f        -> liftIO $ showIface hsc_env f
+       ShowInterface f        -> liftIO $ showIface (hsc_dflags hsc_env)
+                                                    (hsc_units  hsc_env)
+                                                    (hsc_NC     hsc_env)
+                                                    f
        DoMake                 -> doMake srcs
        DoMkDependHS           -> doMkDependHS (map fst srcs)
        StopBefore p           -> liftIO (oneShot hsc_env p srcs)
