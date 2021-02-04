@@ -102,10 +102,9 @@ data HscEnv
                 -- This is mutable because packages will be demand-loaded during
                 -- a compilation run as required.
 
-        hsc_NC  :: {-# UNPACK #-} !(IORef NameCache),
-                -- ^ As with 'hsc_EPS', this is side-effected by compiling to
-                -- reflect sucking in interface files.  They cache the state of
-                -- external interface files, in effect.
+        hsc_NC  :: {-# UNPACK #-} !NameCache,
+                -- ^ Global Name cache so that each Name gets a single Unique.
+                -- Also track the origin of the Names.
 
         hsc_FC   :: {-# UNPACK #-} !(IORef FinderCache),
                 -- ^ The cached result of performing finding in the file system
