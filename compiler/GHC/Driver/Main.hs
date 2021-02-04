@@ -165,6 +165,7 @@ import GHC.Cmm.Pipeline
 import GHC.Cmm.Info
 
 import GHC.Unit
+import GHC.Unit.Finder
 import GHC.Unit.External
 import GHC.Unit.State
 import GHC.Unit.Module.ModDetails
@@ -240,7 +241,7 @@ newHscEnv dflags = do
     eps_var <- newIORef (initExternalPackageState (homeUnitId_ dflags))
     us      <- mkSplitUniqSupply 'r'
     nc_var  <- initNameCache us knownKeyNames
-    fc_var  <- newIORef emptyInstalledModuleEnv
+    fc_var  <- initFinderCache
     emptyLoader <- uninitializedLoader
     -- FIXME: it's sad that we have so many "unitialized" fields filled with
     -- empty stuff or lazy panics. We should have two kinds of HscEnv

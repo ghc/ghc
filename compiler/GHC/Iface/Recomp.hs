@@ -178,7 +178,7 @@ check_old_iface hsc_env mod_summary src_modified maybe_iface
                      return $ Just iface
 
         src_changed
-            | gopt Opt_ForceRecomp (hsc_dflags hsc_env) = True
+            | gopt Opt_ForceRecomp dflags    = True
             | SourceModified <- src_modified = True
             | otherwise = False
     in do
@@ -244,7 +244,7 @@ checkVersions hsc_env mod_summary iface
        ; if recompileRequired recomp then return (recomp, Nothing) else do {
        ; recomp <- liftIO $ checkMergedSignatures hsc_env mod_summary iface
        ; if recompileRequired recomp then return (recomp, Nothing) else do {
-       ; recomp <- liftIO $ checkHsig hsc_env mod_summary iface
+       ; recomp <- liftIO $ checkHsig home_unit dflags mod_summary iface
        ; if recompileRequired recomp then return (recomp, Nothing) else do {
        ; recomp <- pure (checkHie dflags mod_summary)
        ; if recompileRequired recomp then return (recomp, Nothing) else do {
@@ -351,11 +351,9 @@ pluginRecompileToRecompileRequired old_fp new_fp pr
 
 -- | Check if an hsig file needs recompilation because its
 -- implementing module has changed.
-checkHsig :: HscEnv -> ModSummary -> ModIface -> IO RecompileRequired
-checkHsig hsc_env mod_summary iface = do
-    let home_unit = hsc_home_unit hsc_env
-        dflags    = hsc_dflags hsc_env
-        outer_mod = ms_mod mod_summary
+checkHsig :: HomeUnit -> DynFlags -> ModSummary -> ModIface -> IO RecompileRequired
+checkHsig home_unit dflags mod_summary iface = do
+    let outer_mod = ms_mod mod_summary
         inner_mod = homeModuleNameInstantiation home_unit (moduleName outer_mod)
     MASSERT( isHomeModule home_unit outer_mod )
     case inner_mod == mi_semantic_module iface of
@@ -476,7 +474,11 @@ checkDependencies hsc_env summary iface
    home_unit     = hsc_home_unit hsc_env
 
    dep_missing (mb_pkg, L _ mod) = do
-     find_res <- findImportedModule hsc_env mod (mb_pkg)
+     let fc        = hsc_FC hsc_env
+     let home_unit = hsc_home_unit hsc_env
+     let units     = hsc_units hsc_env
+     let dflags    = hsc_dflags hsc_env
+     find_res <- findImportedModule fc units home_unit dflags mod (mb_pkg)
      let reason = moduleNameString mod ++ " changed"
      case find_res of
         Found _ mod
@@ -516,7 +518,7 @@ checkDependencies hsc_env summary iface
      if not (isOldHomeDeps mname)
        then return (UpToDate, [])
        else do
-         mb_result <- getFromModIface "need mi_deps for" mod $ \imported_iface -> liftIO $ do
+         mb_result <- getFromModIface "need mi_deps for" mod $ \imported_iface -> do
            let mnames = mname:(map gwib_mod $ filter ((== NotBoot) . gwib_isBoot) $
                  dep_mods $ mi_deps imported_iface)
            case find (not . isOldHomeDeps) mnames of
@@ -559,18 +561,18 @@ needInterface mod continue
       mb_recomp <- getFromModIface
         "need version info for"
         mod
-        (liftIO . continue)
+        continue
       case mb_recomp of
         Nothing -> return MustCompile
         Just recomp -> return recomp
 
-getFromModIface :: String -> Module -> (ModIface -> IfG a)
+getFromModIface :: String -> Module -> (ModIface -> IO a)
               -> IfG (Maybe a)
 getFromModIface doc_msg mod getter
   = do  -- Load the imported interface if possible
     dflags <- getDynFlags
     let doc_str = sep [text doc_msg, ppr mod]
-    liftIO $ trace_hi_diffs dflags (text "Checking innterface for module" <+> ppr mod)
+    liftIO $ trace_hi_diffs dflags (text "Checking interface for module" <+> ppr mod)
 
     mb_iface <- loadInterface doc_str mod ImportBySystem
         -- Load the interface, but don't complain on failure;
@@ -584,7 +586,7 @@ getFromModIface doc_msg mod getter
                   -- old interface file.  Don't complain: it might
                   -- just be that the current module doesn't need that
                   -- import and it's been deleted
-      Succeeded iface -> Just <$> getter iface
+      Succeeded iface -> Just <$> liftIO (getter iface)
 
 -- | Given the usage information extracted from the old
 -- M.hi file for the module being compiled, figure out
