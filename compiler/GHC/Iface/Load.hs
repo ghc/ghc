@@ -57,6 +57,7 @@ import GHC.Iface.Syntax
 import GHC.Iface.Ext.Fields
 import GHC.Iface.Binary
 import GHC.Iface.Rename
+import GHC.Iface.Env
 
 import GHC.Tc.Utils.Monad
 
@@ -166,7 +167,8 @@ importDecl :: Name -> IfM lcl (MaybeErr SDoc TyThing)
 -- It's not a wired-in thing -- the caller caught that
 importDecl name
   = ASSERT( not (isWiredInName name) )
-    do  { traceIf nd_doc
+    do  { dflags <- getDynFlags
+        ; liftIO $ trace_if dflags nd_doc
 
         -- Load the interface, which should populate the PTE
         ; mb_iface <- ASSERT2( isExternalName name, ppr name )
@@ -240,7 +242,8 @@ checkWiredInTyCon tc
   = return ()
   | otherwise
   = do  { mod <- getModule
-        ; traceIf (text "checkWiredInTyCon" <+> ppr tc_name $$ ppr mod)
+        ; dflags <- getDynFlags
+        ; liftIO $ trace_if dflags (text "checkWiredInTyCon" <+> ppr tc_name $$ ppr mod)
         ; ASSERT( isExternalName tc_name )
           when (mod /= nameModule tc_name)
                (initIfaceTcRn (loadWiredInHomeIface tc_name))
@@ -405,7 +408,9 @@ loadPluginInterface doc mod_name
 -- | A wrapper for 'loadInterface' that throws an exception if it fails
 loadInterfaceWithException :: SDoc -> Module -> WhereFrom -> IfM lcl ModIface
 loadInterfaceWithException doc mod_name where_from
-  = withException (loadInterface doc mod_name where_from)
+  = do
+    dflags <- getDynFlags
+    withException dflags (loadInterface doc mod_name where_from)
 
 ------------------
 loadInterface :: SDoc -> Module -> WhereFrom
@@ -438,8 +443,9 @@ loadInterface doc_str mod from
         {       -- Read the state
           (eps,hpt) <- getEpsAndHpt
         ; gbl_env <- getGblEnv
+        ; dflags <- getDynFlags
 
-        ; traceIf (text "Considering whether to load" <+> ppr mod <+> ppr from)
+        ; liftIO $ trace_if dflags (text "Considering whether to load" <+> ppr mod <+> ppr from)
 
                 -- Check whether we have the interface already
         ; hsc_env <- getTopEnv
@@ -674,7 +680,7 @@ computeInterface doc_str hi_boot_file mod0 = do
     let home_unit = hsc_home_unit hsc_env
     case getModuleInstantiation mod0 of
         (imod, Just indef) | isHomeUnitIndefinite home_unit -> do
-            r <- findAndReadIface doc_str imod mod0 hi_boot_file
+            r <- liftIO $ findAndReadIface hsc_env doc_str imod mod0 hi_boot_file
             case r of
                 Succeeded (iface0, path) -> do
                     hsc_env <- getTopEnv
@@ -685,8 +691,8 @@ computeInterface doc_str hi_boot_file mod0 = do
                         Right x -> return (Succeeded (x, path))
                         Left errs -> liftIO . throwIO . mkSrcErr $ errs
                 Failed err -> return (Failed err)
-        (mod, _) ->
-            findAndReadIface doc_str mod mod0 hi_boot_file
+        (mod, _) -> liftIO $
+            findAndReadIface hsc_env doc_str mod mod0 hi_boot_file
 
 -- | Compute the signatures which must be compiled in order to
 -- load the interface for a 'Module'.  The output of this function
@@ -705,8 +711,9 @@ moduleFreeHolesPrecise doc_str mod
  | otherwise =
    case getModuleInstantiation mod of
     (imod, Just indef) -> do
+        dflags <- getDynFlags
         let insts = instUnitInsts (moduleUnit indef)
-        traceIf (text "Considering whether to load" <+> ppr mod <+>
+        liftIO $ trace_if dflags (text "Considering whether to load" <+> ppr mod <+>
                  text "to compute precise free module holes")
         (eps, hpt) <- getEpsAndHpt
         case tryEpsAndHpt eps hpt `firstJust` tryDepsCache eps imod insts of
@@ -721,7 +728,8 @@ moduleFreeHolesPrecise doc_str mod
             Just ifhs  -> Just (renameFreeHoles ifhs insts)
             _otherwise -> Nothing
     readAndCache imod insts = do
-        mb_iface <- findAndReadIface (text "moduleFreeHolesPrecise" <+> doc_str) imod mod NotBoot
+        hsc_env <- getTopEnv
+        mb_iface <- liftIO $ findAndReadIface hsc_env (text "moduleFreeHolesPrecise" <+> doc_str) imod mod NotBoot
         case mb_iface of
             Succeeded (iface, _) -> do
                 let ifhs = mi_free_holes iface
@@ -810,7 +818,8 @@ This actually happened with P=base, Q=ghc-prim, via the AMP warnings.
 See #8320.
 -}
 
-findAndReadIface :: SDoc
+findAndReadIface :: HscEnv
+                 -> SDoc
                  -- The unique identifier of the on-disk module we're
                  -- looking for
                  -> InstalledModule
@@ -820,14 +829,21 @@ findAndReadIface :: SDoc
                  -> Module
                  -> IsBootInterface     -- True  <=> Look for a .hi-boot file
                                         -- False <=> Look for .hi file
-                 -> TcRnIf gbl lcl (MaybeErr SDoc (ModIface, FilePath))
+                 -> IO (MaybeErr SDoc (ModIface, FilePath))
         -- Nothing <=> file not found, or unreadable, or illegible
         -- Just x  <=> successfully found and parsed
 
         -- It *doesn't* add an error to the monad, because
         -- sometimes it's ok to fail... see notes with loadInterface
-findAndReadIface doc_str mod wanted_mod_with_insts hi_boot_file
-  = do traceIf (sep [hsep [text "Reading",
+findAndReadIface hsc_env doc_str mod wanted_mod hi_boot_file = do
+  let dflags     = hsc_dflags hsc_env
+  let home_unit  = hsc_home_unit hsc_env
+  let unit_env   = hsc_unit_env hsc_env
+  let profile    = targetProfile dflags
+  let name_cache = mkNameCacheUpdater hsc_env
+  let unit_state = hsc_units hsc_env
+
+  trace_if dflags (sep [hsep [text "Reading",
                            if hi_boot_file == IsBoot
                              then text "[boot]"
                              else Outputable.empty,
@@ -835,92 +851,91 @@ findAndReadIface doc_str mod wanted_mod_with_insts hi_boot_file
                            ppr mod <> semi],
                      nest 4 (text "reason:" <+> doc_str)])
 
-       -- Check for GHC.Prim, and return its static interface
-       -- See Note [GHC.Prim] in primops.txt.pp.
-       -- TODO: make this check a function
-       if mod `installedModuleEq` gHC_PRIM
-           then do
-               hooks <- getHooks
-               let iface = case ghcPrimIfaceHook hooks of
-                            Nothing -> ghcPrimIface
-                            Just h  -> h
-               return (Succeeded (iface, "<built in interface for GHC.Prim>"))
-           else do
-               dflags <- getDynFlags
-               -- Look for the file
-               hsc_env <- getTopEnv
-               mb_found <- liftIO (findExactModule hsc_env mod)
-               let home_unit  = hsc_home_unit hsc_env
-               case mb_found of
-                   InstalledFound loc mod -> do
-                       -- Found file, so read it
-                       let file_path = addBootSuffix_maybe hi_boot_file
-                                                           (ml_hi_file loc)
+  -- Check for GHC.Prim, and return its static interface
+  -- See Note [GHC.Prim] in primops.txt.pp.
+  -- TODO: make this check a function
+  if mod `installedModuleEq` gHC_PRIM
+      then do
+          hooks <- getHooks
+          let iface = case ghcPrimIfaceHook hooks of
+                       Nothing -> ghcPrimIface
+                       Just h  -> h
+          return (Succeeded (iface, "<built in interface for GHC.Prim>"))
+      else do
+          -- Look for the file
+          mb_found <- liftIO (findExactModule hsc_env mod)
+          case mb_found of
+              InstalledFound loc mod -> do
+                  -- Found file, so read it
+                  let file_path = addBootSuffix_maybe hi_boot_file (ml_hi_file loc)
+                  -- See Note [Home module load error]
+                  if isHomeInstalledModule home_unit mod &&
+                     not (isOneShot (ghcMode dflags))
+                      then return (Failed (homeModError mod loc))
+                      else do
+                        r <- read_file name_cache unit_state dflags wanted_mod file_path
+                        case r of
+                          Failed _
+                            -> return ()
+                          Succeeded (iface,fp)
+                            -> load_dynamic_too_maybe name_cache unit_state
+                                                      dflags wanted_mod
+                                                      hi_boot_file iface fp
+                        return r
+              err -> do
+                  trace_if dflags (text "...not found")
+                  return $ Failed $ cannotFindInterface
+                                      unit_env
+                                      profile
+                                      (may_show_locations (hsc_dflags hsc_env))
+                                      (moduleName mod)
+                                      err
 
-                       -- See Note [Home module load error]
-                       if isHomeInstalledModule home_unit mod &&
-                          not (isOneShot (ghcMode dflags))
-                           then return (Failed (homeModError mod loc))
-                           else do r <- read_file file_path
-                                   checkBuildDynamicToo r
-                                   return r
-                   err -> do
-                       traceIf (text "...not found")
-                       hsc_env <- getTopEnv
-                       let profile = Profile (targetPlatform dflags) (ways dflags)
-                       return $ Failed $ cannotFindInterface
-                                           (hsc_unit_env hsc_env)
-                                           profile
-                                           (may_show_locations (hsc_dflags hsc_env))
-                                           (moduleName mod)
-                                           err
-    where read_file file_path = do
-              traceIf (text "readIFace" <+> text file_path)
-              -- Figure out what is recorded in mi_module.  If this is
-              -- a fully definite interface, it'll match exactly, but
-              -- if it's indefinite, the inside will be uninstantiated!
-              unit_state <- hsc_units <$> getTopEnv
-              let wanted_mod =
-                    case getModuleInstantiation wanted_mod_with_insts of
-                        (_, Nothing) -> wanted_mod_with_insts
-                        (_, Just indef_mod) ->
-                          instModuleToModule unit_state
-                            (uninstantiateInstantiatedModule indef_mod)
-              read_result <- readIface wanted_mod file_path
-              case read_result of
-                Failed err -> return (Failed (badIfaceFile file_path err))
-                Succeeded iface -> return (Succeeded (iface, file_path))
-                            -- Don't forget to fill in the package name...
+-- | Check if we need to try the dynamic interface for -dynamic-too
+load_dynamic_too_maybe :: NameCacheUpdater -> UnitState -> DynFlags -> Module -> IsBootInterface -> ModIface -> FilePath -> IO ()
+load_dynamic_too_maybe name_cache unit_state dflags wanted_mod is_boot iface file_path
+  -- Indefinite interfaces are ALWAYS non-dynamic.
+  | not (moduleIsDefinite (mi_module iface)) = return ()
+  | otherwise = dynamicTooState dflags  >>= \case
+      DT_Dont   -> return ()
+      DT_Failed -> return ()
+      DT_Dyn    -> load_dynamic_too name_cache unit_state dflags wanted_mod is_boot iface file_path
+      DT_OK     -> load_dynamic_too name_cache unit_state (setDynamicNow dflags) wanted_mod is_boot iface file_path
 
-          -- Indefinite interfaces are ALWAYS non-dynamic.
-          checkBuildDynamicToo (Succeeded (iface, _filePath))
-            | not (moduleIsDefinite (mi_module iface)) = return ()
+load_dynamic_too :: NameCacheUpdater -> UnitState -> DynFlags -> Module -> IsBootInterface -> ModIface -> FilePath -> IO ()
+load_dynamic_too name_cache unit_state dflags wanted_mod is_boot iface file_path = do
+  let dynFilePath = addBootSuffix_maybe is_boot
+                  $ replaceExtension file_path (hiSuf dflags)
+  read_file name_cache unit_state dflags wanted_mod dynFilePath >>= \case
+    Succeeded (dynIface, _)
+     | mi_mod_hash (mi_final_exts iface) == mi_mod_hash (mi_final_exts dynIface)
+     -> return ()
+     | otherwise ->
+        do trace_if dflags (text "Dynamic hash doesn't match")
+           setDynamicTooFailed dflags
+    Failed err ->
+        do trace_if dflags (text "Failed to load dynamic interface file:" $$ err)
+           setDynamicTooFailed dflags
 
-          checkBuildDynamicToo (Succeeded (iface, filePath)) = do
-              let load_dynamic = do
-                     dflags <- getDynFlags
-                     let dynFilePath = addBootSuffix_maybe hi_boot_file
-                                     $ replaceExtension filePath (hiSuf dflags)
-                     r <- read_file dynFilePath
-                     case r of
-                         Succeeded (dynIface, _)
-                          | mi_mod_hash (mi_final_exts iface) == mi_mod_hash (mi_final_exts dynIface) ->
-                             return ()
-                          | otherwise ->
-                             do traceIf (text "Dynamic hash doesn't match")
-                                setDynamicTooFailed dflags
-                         Failed err ->
-                             do traceIf (text "Failed to load dynamic interface file:" $$ err)
-                                setDynamicTooFailed dflags
+read_file :: NameCacheUpdater -> UnitState -> DynFlags -> Module -> FilePath -> IO (MaybeErr SDoc (ModIface, FilePath))
+read_file name_cache unit_state dflags wanted_mod file_path = do
+  trace_if dflags (text "readIFace" <+> text file_path)
 
-              dflags <- getDynFlags
-              dynamicTooState dflags >>= \case
-                DT_Dont   -> return ()
-                DT_Failed -> return ()
-                DT_Dyn    -> load_dynamic
-                DT_OK     -> withDynamicNow load_dynamic
+  -- Figure out what is recorded in mi_module.  If this is
+  -- a fully definite interface, it'll match exactly, but
+  -- if it's indefinite, the inside will be uninstantiated!
+  let wanted_mod' =
+        case getModuleInstantiation wanted_mod of
+            (_, Nothing) -> wanted_mod
+            (_, Just indef_mod) ->
+              instModuleToModule unit_state
+                (uninstantiateInstantiatedModule indef_mod)
+  read_result <- readIface dflags name_cache wanted_mod' file_path
+  case read_result of
+    Failed err -> return (Failed (badIfaceFile file_path err))
+    Succeeded iface -> return (Succeeded (iface, file_path))
+                -- Don't forget to fill in the package name...
 
-          checkBuildDynamicToo _ = return ()
 
 -- | Write interface file
 writeIface :: Logger -> DynFlags -> FilePath -> ModIface -> IO ()
@@ -930,29 +945,32 @@ writeIface logger dflags hi_file_path new_iface
              profile = targetProfile dflags
          writeBinIface profile printer hi_file_path new_iface
 
--- @readIface@ tries just the one file.
-readIface :: Module -> FilePath
-          -> TcRnIf gbl lcl (MaybeErr SDoc ModIface)
-        -- Failed err    <=> file not found, or unreadable, or illegible
-        -- Succeeded iface <=> successfully found and parsed
+-- | @readIface@ tries just the one file.
+--
+-- Failed err    <=> file not found, or unreadable, or illegible
+-- Succeeded iface <=> successfully found and parsed
+readIface
+  :: DynFlags
+  -> NameCacheUpdater
+  -> Module
+  -> FilePath
+  -> IO (MaybeErr SDoc ModIface)
+readIface dflags name_cache wanted_mod file_path = do
+  let profile = targetProfile dflags
+  res <- tryMost $ readBinIface profile name_cache CheckHiWay QuietBinIFace file_path
+  case res of
+    Right iface
+        -- NB: This check is NOT just a sanity check, it is
+        -- critical for correctness of recompilation checking
+        -- (it lets us tell when -this-unit-id has changed.)
+        | wanted_mod == actual_mod
+                        -> return (Succeeded iface)
+        | otherwise     -> return (Failed err)
+        where
+          actual_mod = mi_module iface
+          err = hiModuleNameMismatchWarn wanted_mod actual_mod
 
-readIface wanted_mod file_path
-  = do  { res <- tryMostM $
-                 readBinIface CheckHiWay QuietBinIFace file_path
-        ; case res of
-            Right iface
-                -- NB: This check is NOT just a sanity check, it is
-                -- critical for correctness of recompilation checking
-                -- (it lets us tell when -this-unit-id has changed.)
-                | wanted_mod == actual_mod
-                                -> return (Succeeded iface)
-                | otherwise     -> return (Failed err)
-                where
-                  actual_mod = mi_module iface
-                  err = hiModuleNameMismatchWarn wanted_mod actual_mod
-
-            Left exn    -> return (Failed (text (showException exn)))
-    }
+    Left exn    -> return (Failed (text (showException exn)))
 
 {-
 *********************************************************
@@ -1054,12 +1072,14 @@ showIface hsc_env filename = do
    let dflags  = hsc_dflags hsc_env
    let logger  = hsc_logger hsc_env
        unit_state = hsc_units hsc_env
+       profile = targetProfile dflags
        printer = putLogMsg logger dflags NoReason SevOutput noSrcSpan . withPprStyle defaultDumpStyle
+       name_cache = mkNameCacheUpdater hsc_env
 
    -- skip the hi way check; we don't want to worry about profiled vs.
    -- non-profiled interfaces, for example.
    iface <- initTcRnIf 's' hsc_env () () $
-       readBinIface IgnoreHiWay (TraceBinIFace printer) filename
+       liftIO $ readBinIface profile name_cache IgnoreHiWay (TraceBinIFace printer) filename
 
    let -- See Note [Name qualification with --show-iface]
        qualifyImportedNames mod _

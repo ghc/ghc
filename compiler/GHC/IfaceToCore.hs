@@ -543,7 +543,8 @@ tcHiBootIface hsc_src mod
         -- Re #9245, we always check if there is an hi-boot interface
         -- to check consistency against, rather than just when we notice
         -- that an hi-boot is necessary due to a circular import.
-        { read_result <- findAndReadIface
+        { hsc_env <- getTopEnv
+        ; read_result <- liftIO $ findAndReadIface hsc_env
                                 need (fst (getModuleInstantiation mod)) mod
                                 IsBoot  -- Hi-boot file
 
