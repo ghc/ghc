@@ -14,7 +14,6 @@ module GHC.Iface.Ext.Binary
    , HieFileResult(..)
    , hieMagic
    , hieNameOcc
-   , NameCacheUpdater(..)
    )
 where
 
@@ -34,7 +33,6 @@ import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Unique.Supply    ( takeUniqFromSupply )
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
-import GHC.Iface.Env (NameCacheUpdater(..))
 
 import qualified Data.Array as A
 import Data.IORef
@@ -153,23 +151,23 @@ type HieHeader = (Integer, ByteString)
 -- an existing `NameCache`. Allows you to specify
 -- which versions of hieFile to attempt to read.
 -- `Left` case returns the failing header versions.
-readHieFileWithVersion :: (HieHeader -> Bool) -> NameCacheUpdater -> FilePath -> IO (Either HieHeader HieFileResult)
-readHieFileWithVersion readVersion ncu file = do
+readHieFileWithVersion :: (HieHeader -> Bool) -> NameCache -> FilePath -> IO (Either HieHeader HieFileResult)
+readHieFileWithVersion readVersion name_cache file = do
   bh0 <- readBinMem file
 
   (hieVersion, ghcVersion) <- readHieFileHeader file bh0
 
   if readVersion (hieVersion, ghcVersion)
   then do
-    hieFile <- readHieFileContents bh0 ncu
+    hieFile <- readHieFileContents bh0 name_cache
     return $ Right (HieFileResult hieVersion ghcVersion hieFile)
   else return $ Left (hieVersion, ghcVersion)
 
 
 -- | Read a `HieFile` from a `FilePath`. Can use
 -- an existing `NameCache`.
-readHieFile :: NameCacheUpdater -> FilePath -> IO HieFileResult
-readHieFile ncu file = do
+readHieFile :: NameCache -> FilePath -> IO HieFileResult
+readHieFile name_cache file = do
 
   bh0 <- readBinMem file
 
@@ -183,7 +181,7 @@ readHieFile ncu file = do
                     , show hieVersion
                     , "but got", show readHieVersion
                     ]
-  hieFile <- readHieFileContents bh0 ncu
+  hieFile <- readHieFileContents bh0 name_cache
   return $ HieFileResult hieVersion ghcVersion hieFile
 
 readBinLine :: BinHandle -> IO ByteString
@@ -218,8 +216,8 @@ readHieFileHeader file bh0 = do
                         ]
       return (readHieVersion, ghcVersion)
 
-readHieFileContents :: BinHandle -> NameCacheUpdater -> IO HieFile
-readHieFileContents bh0 ncu = do
+readHieFileContents :: BinHandle -> NameCache -> IO HieFile
+readHieFileContents bh0 name_cache = do
   dict <- get_dictionary bh0
   -- read the symbol table so we are capable of reading the actual data
   bh1 <- do
@@ -246,7 +244,7 @@ readHieFileContents bh0 ncu = do
       symtab_p <- get bh1
       data_p'  <- tellBin bh1
       seekBin bh1 symtab_p
-      symtab <- getSymbolTable bh1 ncu
+      symtab <- getSymbolTable bh1 name_cache
       seekBin bh1 data_p'
       return symtab
 
@@ -270,11 +268,11 @@ putSymbolTable bh next_off symtab = do
   let names = A.elems (A.array (0,next_off-1) (nonDetEltsUFM symtab))
   mapM_ (putHieName bh) names
 
-getSymbolTable :: BinHandle -> NameCacheUpdater -> IO SymbolTable
-getSymbolTable bh ncu = do
+getSymbolTable :: BinHandle -> NameCache -> IO SymbolTable
+getSymbolTable bh name_cache = do
   sz <- get bh
   od_names <- replicateM sz (getHieName bh)
-  updateNameCache ncu $ \nc ->
+  updateNameCache' name_cache $ \nc ->
     let arr = A.listArray (0,sz-1) names
         (nc', names) = mapAccumR fromHieName nc od_names
         in (nc',arr)
@@ -312,7 +310,7 @@ putName (HieSymbolTable next ref) bh name = do
 
 -- ** Converting to and from `HieName`'s
 
-fromHieName :: NameCache -> HieName -> (NameCache, Name)
+fromHieName :: NameCacheState -> HieName -> (NameCacheState, Name)
 fromHieName nc (ExternalName mod occ span) =
     let cache = nsNames nc
     in case lookupOrigNameCache cache mod occ of
@@ -320,7 +318,7 @@ fromHieName nc (ExternalName mod occ span) =
          Nothing ->
            let (uniq, us) = takeUniqFromSupply (nsUniqs nc)
                name       = mkExternalName uniq mod occ span
-               new_cache  = extendNameCache cache mod occ name
+               new_cache  = extendOrigNameCache cache mod occ name
            in ( nc{ nsUniqs = us, nsNames = new_cache }, name )
 fromHieName nc (LocalName occ span) =
     let (uniq, us) = takeUniqFromSupply (nsUniqs nc)

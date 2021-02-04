@@ -123,9 +123,8 @@ import GHC.Iface.Recomp
 import GHC.Iface.Tidy
 import GHC.Iface.Ext.Ast    ( mkHieFile )
 import GHC.Iface.Ext.Types  ( getAsts, hie_asts, hie_module )
-import GHC.Iface.Ext.Binary ( readHieFile, writeHieFile , hie_file_result, NameCacheUpdater(..))
+import GHC.Iface.Ext.Binary ( readHieFile, writeHieFile , hie_file_result)
 import GHC.Iface.Ext.Debug  ( diffFile, validateScopes )
-import GHC.Iface.Env        ( updNameCache )
 
 import GHC.Core
 import GHC.Core.Tidy           ( tidyExpr )
@@ -245,7 +244,7 @@ newHscEnv dflags = do
     -- allow `setSessionDynFlags` to be used to set unit db flags.
     eps_var <- newIORef initExternalPackageState
     us      <- mkSplitUniqSupply 'r'
-    nc_var  <- newIORef (initNameCache us knownKeyNames)
+    nc_var  <- initNameCache us knownKeyNames
     fc_var  <- newIORef emptyInstalledModuleEnv
     logger  <- initLogger
     tmpfs   <- initTmpFs
@@ -505,7 +504,7 @@ extract_renamed_stuff mod_summary tc_result = do
                     putMsg logger dflags $ text "Got invalid scopes"
                     mapM_ (putMsg logger dflags) xs
               -- Roundtrip testing
-              file' <- readHieFile (NCU $ updNameCache $ hsc_NC hs_env) out_file
+              file' <- readHieFile (hsc_NC hs_env) out_file
               case diffFile hieFile (hie_file_result file') of
                 [] ->
                   putMsg logger dflags $ text "Got no roundtrip errors"
