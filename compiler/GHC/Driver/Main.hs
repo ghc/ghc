@@ -168,6 +168,7 @@ import GHC.Cmm.Pipeline
 import GHC.Cmm.Info
 
 import GHC.Unit
+import GHC.Unit.Finder
 import GHC.Unit.External
 import GHC.Unit.State
 import GHC.Unit.Module.ModDetails
@@ -245,7 +246,7 @@ newHscEnv dflags = do
     eps_var <- newIORef initExternalPackageState
     us      <- mkSplitUniqSupply 'r'
     nc_var  <- initNameCache us knownKeyNames
-    fc_var  <- newIORef emptyInstalledModuleEnv
+    fc_var  <- initFinderCache
     logger  <- initLogger
     tmpfs   <- initTmpFs
     -- FIXME: it's sad that we have so many "unitialized" fields filled with
