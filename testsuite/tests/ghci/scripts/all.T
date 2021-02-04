@@ -240,10 +240,8 @@ test('T11098', normal, ghci_script, ['T11098.script'])
 test('T8316', expect_broken(8316), ghci_script, ['T8316.script'])
 test('T11252', normal, ghci_script, ['T11252.script'])
 
-test('T10576a', [extra_files(['T10576.hs']), expect_broken(10576)],
-     ghci_script, ['T10576a.script'])
-test('T10576b', [extra_files(['T10576.hs']), expect_broken(10576)],
-     ghci_script, ['T10576b.script'])
+test('T10576a', extra_files(['T10576.hs']), ghci_script, ['T10576a.script'])
+test('T10576b', extra_files(['T10576.hs']), ghci_script, ['T10576b.script'])
 test('T11051a', normal, ghci_script, ['T11051a.script'])
 test('T11051b', normal, ghci_script, ['T11051b.script'])
 test('T11266', ignore_stdout, ghci_script, ['T11266.script'])
