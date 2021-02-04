@@ -279,6 +279,11 @@ hadrian-ghc-in-ghci:
     TEST_TYPE: test
     MAKE_ARGS: "-Werror"
   script:
+      # Build hyperlinked sources for documentation when building releases
+    - |
+      if [[ "$RELEASE_JOB" = "yes" ]]; then
+        HADDOCK_HYPERLINKED_SOURCES=1
+      fi
     - .gitlab/ci.sh setup
     - .gitlab/ci.sh configure
     - .gitlab/ci.sh build_make
@@ -442,12 +447,6 @@ validate-x86_64-darwin:
   variables:
     BUILD_FLAVOUR: "perf"
   before_script:
-      # Build hyperlinked sources for documentation when building releases
-    - |
-      if [[ -n "$CI_COMMIT_TAG" ]]; then
-        HADDOCK_HYPERLINKED_SOURCES=1
-      fi
-
     # workaround for docker permissions
     - sudo chown ghc:ghc -R .
   after_script:
