@@ -1,137 +1,89 @@
 .. _field-selectors:
 
-Field Selectors
-------------
+Field selectors
+---------------
 
-.. extension:: FieldSelectors
-    :shortdesc: Generate field selector functions.
-        Implied by :extension:`Haskell98`
+.. extension:: NoFieldSelectors
+    :shortdesc: Disable field selector functions.
 
-    :implied by: :extension:`Haskell98`
     :since: 9.2.1
 
-Set the visibility of `record field selector functions
-<https://www.haskell.org/onlinereport/haskell2010/haskellch3.html#x8-500003.15.1>__.
+    Suppress visibility of `record field selector functions
+    <https://www.haskell.org/onlinereport/haskell2010/haskellch3.html#x8-500003.15.1>`_
+    in expressions.
 
-``NoFieldSelectors`` negates this feature, and allows uses of field labels that overlap with other names.
-Field labels are still usable within record construction, updates and patterns.
+By default, defining a record datatype brings a selector function into scope for
+each field in the record. :extension:`NoFieldSelectors` negates this feature,
+making it possible to declare a value binding with the same name as a field, and
+refer to this value binding unambiguously in expressions.  Field labels are
+still usable within record construction, updates and pattern matching.
 
-Given a data structure
+For example, given a datatype definition ::
 
-    data Foo = Foo { bar :: Int, baz :: String }
+    data Foo = MkFoo { bar :: Int, baz :: String }
 
 The following will be available:
 
-1. the type constructor ``Foo``
-2. the data constructor ``Foo``
-3. the fields ``bar`` and ``baz`` for record construction, update, and patterns
-4. the two functions ``bar`` and ``baz``, which are ``Foo -> Int`` and ``Foo -> String``
+1. the type constructor ``Foo``;
+2. the data constructor ``MkFoo``;
+3. the fields ``bar`` and ``baz`` for record construction, update, and pattern
+   matching; and
+4. the selector functions ``bar :: Foo -> Int`` and ``baz :: Foo -> String``.
 
-If the language extension ``NoFieldSelectors`` is enabled, items (1), (2), and (3)
-will still be generated, but (4) will not.
+If the :extension:`NoFieldSelectors` extension is enabled at the datatype
+definition site, items (1), (2), and (3) will still be available, but (4) will
+not.  Correspondingly, it is permitted to define a value binding with the same
+name as a field, and using this name in an expression unambiguously refers to
+the non-field.  For exmaple, the following is permitted: ::
 
-Wildcard exports will work as before, except for the two functions. Even if
-these functions are otherwise defined, the wildcard will not export them.
-Exporting the names for record construction now has to be specific to the
-record. Without ambiguitiy, previously this was equivalent
+    data Foo = MkFoo { bar :: Int, baz :: String }
+    bar = ()  -- does not conflict with `bar` field
+    baz = bar -- unambiguously refers to `bar` the unit value, not the field
 
-.. code-block:: haskell
+If you have multiple datatypes with the same field name, you need to enable
+:extension:`DuplicateRecordFields` to allow them to be declared simultaneously.
+It is never permitted for a single module to define multiple value bindings with
+the same name.
 
-    module A where (Foo(Foo, bar, baz))
-    data Foo = Foo { bar :: Int, baz :: Int }
+The :extension:`DisambiguateRecordFields` extension (implied by
+:extension:`DuplicateRecordFields`) is useful in conjunction with
+:extension:`NoFieldSelectors`, because it excludes non-fields from consideration
+when resolving field names in record construction, update and pattern matching.
 
-.. code-block:: haskell
 
-    module B where (Foo(Foo, bar), baz)
-    data Foo = Foo { bar :: Int, baz :: Int }
+Import and export of selector functions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Under ``NoFieldSelectors``, these two export statements are now different. The
-first one will export the field ``baz``, but not the function ``baz``, while the
-second one will export the function ``baz`` (assuming one is defined), but not
-the field ``baz``. Because of this change, writing out all selector functions by
-hand is still different, because they all have to be exported separately.
+Under :extension:`FieldSelectors`, these modules are equivalent: ::
 
-.. code-block:: haskell
+    module A (Foo(MkFoo, bar, baz)) where
+      data Foo = MkFoo { bar :: Int, baz :: Int }
 
-    {-# LANGUAGE NoFieldSelectors #-}
-    module Exports where (Foo(Foo, bar, baz))
-    data Foo = Foo { bar :: Int, baz :: Int }
+    module B (Foo(MkFoo, bar), baz) where
+      data Foo = MkFoo { bar :: Int, baz :: Int }
 
-    bar (Foo x _) = x
-    baz (Foo _ x) = x
+Under :extension:`NoFieldSelectors`, these two export statements are now
+different. The first one will export the field ``baz``, but not the value
+binding ``baz``, while the second one would export the value binding ``baz`` (if
+one were defined), but not the field ``baz``.
 
-is different from
-
-.. code-block:: haskell
-
-    module Exports where (Foo(Foo, bar, baz))
-    data Foo = Foo { bar :: Int, baz :: Int }
-
-Because the functions in the first example don't get exported.
-
-Let's take a module ``A`` with a function with the same name as a field, with
-the extension enabled:
-
-.. code-block:: haskell
+Because of this change, using :extension:`NoFieldSelectors` and writing out
+selector functions explicitly is different to using :extension:`FieldSelectors`:
+in the former case the fields and functions must be exported separately.  For
+example, here the selector functions are not exported: ::
 
     {-# LANGUAGE NoFieldSelectors #-}
-    module A where (Foo(Foo, bar, baz))
-    data Foo = Foo { bar :: Int, baz :: Int }
-    baz = 42
+    module M (Foo(MkFoo, bar, baz)) where -- or equivalently Foo(..)
+    data Foo = MkFoo { bar :: Int, baz :: Int }
 
-Which would be equivalent to:
+    bar (MkFoo x _) = x
+    baz (MkFoo _ x) = x
 
-.. code-block:: haskell
+whereas here the selector functions are exported: ::
 
-    {-# LANGUAGE NoFieldSelectors #-}
-    module A where (Foo(..))
-    data Foo = Foo { bar :: Int, baz :: Int }
-    baz = 42
+    {-# LANGUAGE FieldSelectors #-}
+    module M (Foo(MkFoo, bar, baz)) where -- or equivalently Foo(..)
+    data Foo = MkFoo { bar :: Int, baz :: Int }
 
-A second module, ``B``, which does not export the selector ``baz`` of
-constructor ``Foo``, but instead exports the toplevel binder ``baz``. The fields
-can still be used when exported (as in module ``A``).
-
-.. code-block:: haskell
-
-    {-# LANGUAGE NoFieldSelectors #-}
-    module B where (Foo(Foo, bar), baz)
-    data Foo = Foo { bar :: Int, baz :: Int }
-    baz = 42
-
-Using ``baz`` as a field when importing ``B`` will fail, because the field
-``baz`` is not in scope anymore, because it is not exported by ``B``.
-
-.. code-block:: haskell
-
-    import B
-    foo = Foo 23 42
-    foo { baz = 1 }
-
-However, it is possible to use the imported variable ``baz``, because ``B`` exports it.
-
-.. code-block:: haskell
-
-    import B
-    main = print baz
-
-If you wanted to use both, you'd have to export both explicitly:
-
-.. code-block:: haskell
-
-    {-# LANGUAGE NoFieldSelectors #-}
-    module C where (Foo(Foo, bar, baz), baz)
-    data Foo = Foo { bar :: Int, baz :: Int }
-    baz = 42
-
-Now ``baz`` here assigns the value ``42`` to the field ``baz``.
-
-.. code-block:: haskell
-
-   import C
-    foo = Foo 23 1
-    foo { baz = baz }
-
-Note that if you have multiple datatypes with the same field name, you need :extension:`DuplicateRecordFields` to disambiguate them.
-
-See also the `Import and export of record fields` section of :ref:`duplicate-record-fields`.
+Wildcard exports will export the field labels, but will not export a value
+binding that happens to have the same name.
