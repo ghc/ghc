@@ -3466,9 +3466,18 @@ completeMacro = wrapIdentCompleter $ \w -> do
 completeIdentifier line@(left, _) =
   -- Note: `left` is a reversed input
   case left of
-    (x:_) | isSymbolChar x -> wrapCompleter (specials ++ spaces) complete line
-    _                      -> wrapIdentCompleter complete line
+    ('.':_)  -> wrapCompleter (specials ++ spaces) complete line
+               -- operator or qualification
+    (x:_) | isSymbolChar x -> wrapCompleter (specials ++ spaces)
+                                 complete (takeOpChars line)         -- operator
+    _                      -> wrapIdentCompleter complete (takeIdentChars line)
   where
+    takeOpChars (l, r) = (takeWhile isSymbolChar l, r)               -- #10576
+       -- An operator contains only symbol characters
+    takeIdentChars (l, r) = (takeWhile notOpChar l, r)
+       -- An identifier doesn't contain symbol characters with the
+       -- exception of a dot
+    notOpChar c = (not .isSymbol ) c || c == '.'
     complete w = do
       rdrs <- GHC.getRdrNamesInScope
       dflags <- GHC.getSessionDynFlags
