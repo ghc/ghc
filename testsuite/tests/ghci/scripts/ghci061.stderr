@@ -4,15 +4,21 @@
                      with: Int -> IO String
       Expected: [String] -> Int -> IO String
         Actual: [String] -> IO String
-    • In the expression: (two_args) :: [String] -> Int -> IO String
+    • In the expression: two_args :: [String] -> Int -> IO String
+      In the expression:
+        (two_args :: [String] -> Int -> IO String) ["*Main"] 3
       In an equation for ‘_compileParsedExpr’:
-          _compileParsedExpr = (two_args) :: [String] -> Int -> IO String
+          _compileParsedExpr
+            = (two_args :: [String] -> Int -> IO String) ["*Main"] 3
 
 <interactive>:1:2: error:
     • Couldn't match type: IO String
                      with: Int -> IO String
       Expected: [String] -> Int -> IO String
         Actual: [String] -> IO String
-    • In the expression: (two_args) :: [String] -> Int -> IO String
+    • In the expression: two_args :: [String] -> Int -> IO String
+      In the expression:
+        (two_args :: [String] -> Int -> IO String) ["*Main"] 5
       In an equation for ‘_compileParsedExpr’:
-          _compileParsedExpr = (two_args) :: [String] -> Int -> IO String
+          _compileParsedExpr
+            = (two_args :: [String] -> Int -> IO String) ["*Main"] 5

@@ -60,7 +60,8 @@ import GHC ( LoadHowMuch(..), Target(..),  TargetId(..),
              Resume, SingleStep, Ghc,
              GetDocsFailure(..),
              getModuleGraph, handleSourceError, ms_mod )
-import GHC.Driver.Main (hscParseDeclsWithLocation, hscParseStmtWithLocation)
+import GHC.Driver.Main (hscParseDeclsWithLocation, hscParseStmtWithLocation,
+             hscParseExpr)
 import GHC.Hs.ImpExp
 import GHC.Hs
 import GHC.Driver.Env
@@ -145,8 +146,6 @@ import System.Process
 import Text.Printf
 import Text.Read ( readMaybe )
 import Text.Read.Lex (isSymbolChar)
-
-import Unsafe.Coerce
 
 #if !defined(mingw32_HOST_OS)
 import System.Posix hiding ( getEnv )
@@ -512,8 +511,8 @@ interactiveUI config srcs maybe_exprs = do
         GHCiState{ progname           = default_progname,
                    args               = default_args,
                    evalWrapper        = eval_wrapper,
-                   prompt             = defPrompt config,
-                   prompt_cont        = defPromptCont config,
+                   prompt             = PfFun $ defPrompt config,
+                   prompt_cont        = PfFun $ defPromptCont config,
                    stop               = default_stop,
                    editor             = default_editor,
                    options            = [],
@@ -970,10 +969,19 @@ mkPrompt = do
   st <- getGHCiState
   dflags <- getDynFlags
   (context, modules_names, line) <- getInfoForPrompt
-
-  prompt_string <- (prompt st) modules_names line
+  prompt_string <- case prompt st of                        -- #17677
+    PfFun fPrompt  -> fPrompt modules_names line
+          -- Evaluate a promt function from a string directly.
+    PfNam userFunc -> do
+          -- Evaluate user defined prompt functions in the interpreter.
+      mbPrompt <- evalUserPrompt userFunc
+      case mbPrompt of
+        Just prompt -> return $ text prompt
+        Nothing     -> return $ text
+          ("Error while evaluating user prompt function: " ++ userFunc ++ " :")
+               -- This should not occur, even if the recompilation of
+               --   of the user defined prompt function fails.
   let prompt_doc = context <> prompt_string
-
   return (showSDoc dflags prompt_doc)
 
 queryQueue :: GhciMonad m => m (Maybe String)
@@ -2847,12 +2855,12 @@ setCmd str
         setPromptString setPrompt (dropWhile isSpace rest)
                         "syntax: set prompt <string>"
     Right ("prompt-function",  rest) ->
-        setPromptFunc setPrompt $ dropWhile isSpace rest
+        setUserPromptFunc setUserPrompt $ dropWhile isSpace rest
     Right ("prompt-cont",          rest) ->
         setPromptString setPromptCont (dropWhile isSpace rest)
                         "syntax: :set prompt-cont <string>"
     Right ("prompt-cont-function", rest) ->
-        setPromptFunc setPromptCont $ dropWhile isSpace rest
+        setUserPromptFunc setUserPromptCont $ dropWhile isSpace rest
 
     Right ("editor",  rest) -> setEditor  $ dropWhile isSpace rest
     Right ("stop",    rest) -> setStop    $ dropWhile isSpace rest
@@ -2960,24 +2968,39 @@ setStop str@(c:_) | isDigit c
 setStop cmd = modifyGHCiState (\st -> st { stop = cmd })
 
 setPrompt :: GhciMonad m => PromptFunction -> m ()
-setPrompt v = modifyGHCiState (\st -> st {prompt = v})
+setPrompt v = modifyGHCiState (\st -> st {prompt = PfFun v})
 
 setPromptCont :: GhciMonad m => PromptFunction -> m ()
-setPromptCont v = modifyGHCiState (\st -> st {prompt_cont = v})
+setPromptCont v = modifyGHCiState (\st -> st {prompt_cont = PfFun v})
 
-setPromptFunc :: GHC.GhcMonad m => (PromptFunction -> m ()) -> String -> m ()
-setPromptFunc fSetPrompt s = do
-    -- We explicitly annotate the type of the expression to ensure
-    -- that unsafeCoerce# is passed the exact type necessary rather
-    -- than a more general one
-    let exprStr = "(" ++ s ++ ") :: [String] -> Int -> IO String"
-    (HValue funValue) <- GHC.compileExpr exprStr
-    fSetPrompt (convertToPromptFunction $ unsafeCoerce funValue)
-    where
-      convertToPromptFunction :: ([String] -> Int -> IO String)
-                              -> PromptFunction
-      convertToPromptFunction func = (\mods line -> liftIO $
-                                       liftM text (func mods line))
+setUserPrompt :: GhciMonad m => String -> m ()
+setUserPrompt v = modifyGHCiState (\st -> st {prompt = PfNam v})
+
+setUserPromptCont :: GhciMonad m => String -> m ()
+setUserPromptCont v = modifyGHCiState (\st -> st {prompt_cont = PfNam v})
+
+setUserPromptFunc :: GhciMonad m => (String -> m ()) -> String -> m ()
+setUserPromptFunc fSetter funName = do
+    -- We explicitly annotate the type of the user function to ensure
+    -- that a potential error message shows the exact type necessary rather
+    -- than a more general one.
+    let exprStr = "(" ++ funName ++ " :: [String] -> Int -> IO String) "
+    mbPrompt <- evalUserPrompt exprStr
+    when (isJust mbPrompt) (fSetter exprStr)
+       -- When the user defined prompt function compiles (and evaluates)
+       --    then save it to be used to generate the next prompt message!
+    return ()
+
+evalUserPrompt :: GhciMonad m => String -> m (Maybe String)
+evalUserPrompt funName =
+  GHC.handleSourceError (\e -> do GHC.printException e; return Nothing) $ do
+    (_, modules_names, line) <- getInfoForPrompt
+    hsc_env <- GHC.getSession
+    let str_expr = funName ++ " " ++ show modules_names ++ " " ++ show line
+    new_expr <- liftIO $ runInteractiveHsc hsc_env $ hscParseExpr str_expr
+    hv <- GHC.compileParsedExprRemote new_expr
+    prompt <- liftIO $ evalString hsc_env hv
+    return $ Just prompt
 
 setPromptString :: MonadIO m
                 => (PromptFunction -> m ()) -> String -> String -> m ()
