@@ -1319,7 +1319,7 @@ sortOn f =
 -- >>> singleton True
 -- [True]
 --
--- @since 4.14.0.0
+-- @since 4.15.0.0
 --
 singleton :: a -> [a]
 singleton x = [x]
