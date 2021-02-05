@@ -133,10 +133,8 @@ recordStgIdPosition id best_span ss = do
     cc <- asks rSpan
     --Useful for debugging why a certain Id gets given a certain span
     --pprTraceM "recordStgIdPosition" (ppr id $$ ppr cc $$ ppr best_span $$ ppr ss)
-    case best_span <|> cc <|> ss of
-      Nothing -> return ()
-      Just (SpanWithLabel rss d) ->
-        lift $ modify (\env -> env { provClosure = addToUniqMap (provClosure env) (idName id) (idType id, rss, d)})
+    let mbspan = (\(SpanWithLabel rss d) -> (rss, d)) <$> (best_span <|> cc <|> ss)
+    lift $ modify (\env -> env { provClosure = addToUniqMap (provClosure env) (idName id) (idType id, mbspan) })
 
 numberDataCon :: DataCon -> [Tickish Id] -> M ConstructorNumber
 -- Unboxed tuples and sums do not allocate so they
@@ -146,20 +144,16 @@ numberDataCon dc _ | isUnboxedSumDataCon dc = return NoNumber
 numberDataCon dc ts = do
   dflags <- asks rDynFlags
   if not (gopt Opt_DistinctConstructorTables dflags) then return NoNumber else do
-          env <- lift get
-          mcc <- asks rSpan
-          let mbest_span = selectTick ts <|> mcc
-          case mbest_span of
-            Nothing -> return NoNumber
-            Just (SpanWithLabel rss l) -> do
-              let best_span = (rss, l)
-              let dcMap' = alterUniqMap (maybe (Just ((0, best_span) :| [] ))
-                                  (\xs@((k, _):|_) -> Just ((k + 1, best_span) `NE.cons` xs))) (provDC env) dc
-              lift $ put (env { provDC = dcMap' })
-              let r = lookupUniqMap dcMap' dc
-              return $ case r of
-                Nothing -> NoNumber
-                Just res -> Numbered (fst (NE.head res))
+    env <- lift get
+    mcc <- asks rSpan
+    let mbest_span = (\(SpanWithLabel rss l) -> (rss, l)) <$> (selectTick ts <|> mcc)
+    let dcMap' = alterUniqMap (maybe (Just ((0, mbest_span) :| [] ))
+                        (\xs@((k, _):|_) -> Just ((k + 1, mbest_span) `NE.cons` xs))) (provDC env) dc
+    lift $ put (env { provDC = dcMap' })
+    let r = lookupUniqMap dcMap' dc
+    return $ case r of
+      Nothing -> NoNumber
+      Just res -> Numbered (fst (NE.head res))
 
 selectTick :: [Tickish Id] -> Maybe SpanWithLabel
 selectTick [] = Nothing
