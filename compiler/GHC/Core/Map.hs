@@ -30,7 +30,7 @@ module GHC.Core.Map (
    -- * Map for compressing leaves. See Note [Compressed TrieMap]
    GenMap,
    -- * 'TrieMap' class
-   TrieMap(..), insertTM, deleteTM,
+   TrieMap(..), XT, insertTM, deleteTM,
    lkDFreeVar, xtDFreeVar,
    lkDNamed, xtDNamed,
    (>.>), (|>), (|>>),

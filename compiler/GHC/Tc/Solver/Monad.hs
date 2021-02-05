@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, DeriveFunctor, TypeFamilies #-}
+{-# LANGUAGE CPP, DeriveFunctor, TypeFamilies, ScopedTypeVariables #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -1648,7 +1648,7 @@ add_item ics@(IC { inert_irreds = irreds, inert_count = count })
 
 
 add_item ics item@(CDictCan { cc_ev = ev, cc_class = cls, cc_tyargs = tys })
-  = ics { inert_dicts = addDict (inert_dicts ics) cls tys item
+  = ics { inert_dicts = addDictCt (inert_dicts ics) cls tys item
         , inert_count = bumpUnsolvedCount ev (inert_count ics) }
 
 add_item _ item
@@ -1912,7 +1912,7 @@ Hence:
 --------------
 addInertSafehask :: InertCans -> Ct -> InertCans
 addInertSafehask ics item@(CDictCan { cc_class = cls, cc_tyargs = tys })
-  = ics { inert_safehask = addDict (inert_dicts ics) cls tys item }
+  = ics { inert_safehask = addDictCt (inert_dicts ics) cls tys item }
 
 addInertSafehask _ item
   = pprPanic "addInertSafehask: can't happen! Inserting " $ ppr item
@@ -2056,7 +2056,7 @@ get_sc_pending this_lvl ic@(IC { inert_dicts = dicts, inert_insts = insts })
 
     add :: Ct -> DictMap Ct -> DictMap Ct
     add ct@(CDictCan { cc_class = cls, cc_tyargs = tys }) dicts
-        = addDict dicts cls tys ct
+        = addDictCt dicts cls tys ct
     add ct _ = pprPanic "getPendingScDicts" (ppr ct)
 
     get_pending_inst :: [Ct] -> QCInst -> ([Ct], QCInst)
@@ -2372,16 +2372,16 @@ lookupInInerts loc pty
   | ClassPred cls tys <- classifyPredType pty
   = do { inerts <- getTcSInerts
        ; return (lookupSolvedDict inerts loc cls tys `mplus`
-                 lookupInertDict (inert_cans inerts) loc cls tys) }
+                 fmap ctEvidence (lookupInertDict (inert_cans inerts) loc cls tys)) }
   | otherwise -- NB: No caching for equalities, IPs, holes, or errors
   = return Nothing
 
 -- | Look up a dictionary inert. NB: the returned 'CtEvidence' might not
 -- match the input exactly. Note [Use loose types in inert set].
-lookupInertDict :: InertCans -> CtLoc -> Class -> [Type] -> Maybe CtEvidence
+lookupInertDict :: InertCans -> CtLoc -> Class -> [Type] -> Maybe Ct
 lookupInertDict (IC { inert_dicts = dicts }) loc cls tys
   = case findDict dicts loc cls tys of
-      Just ct -> Just (ctEvidence ct)
+      Just ct -> Just ct
       _       -> Nothing
 
 -- | Look up a solved inert. NB: the returned 'CtEvidence' might not
@@ -2445,6 +2445,12 @@ insertTcApp :: TcAppMap a -> Unique -> [Type] -> a -> TcAppMap a
 insertTcApp m cls tys ct = alterUDFM alter_tm m cls
   where
     alter_tm mb_tm = Just (insertTM tys ct (mb_tm `orElse` emptyTM))
+
+alterTcApp :: forall a. TcAppMap a -> Unique -> [Type] -> XT a -> TcAppMap a
+alterTcApp m cls tys xt_ct = alterUDFM alter_tm m cls
+  where
+    alter_tm :: Maybe (ListMap LooseTypeMap a) -> Maybe (ListMap LooseTypeMap a)
+    alter_tm mb_tm = Just (alterTM tys xt_ct (mb_tm `orElse` emptyTM))
 
 -- mapTcApp :: (a->b) -> TcAppMap a -> TcAppMap b
 -- mapTcApp f = mapUDFM (mapTM f)
@@ -2546,6 +2552,26 @@ delDict m cls tys = delTcApp m (getUnique cls) tys
 
 addDict :: DictMap a -> Class -> [Type] -> a -> DictMap a
 addDict m cls tys item = insertTcApp m (getUnique cls) tys item
+
+addDictCt :: DictMap Ct -> Class -> [Type] -> Ct -> DictMap Ct
+-- Like addDict, but combines [W] and [D] to [WD]
+-- See Note [KeepBoth] in GHC.Tc.Solver.Interact
+addDictCt m cls tys new_ct = alterTcApp m (getUnique cls) tys xt_ct
+  where
+    new_ct_ev = ctEvidence new_ct
+
+    xt_ct :: Maybe Ct -> Maybe Ct
+    xt_ct (Just old_ct)
+      | CtWanted { ctev_nosh = WOnly } <- old_ct_ev
+      , CtDerived {} <- new_ct_ev
+      = Just (old_ct { cc_ev = old_ct_ev { ctev_nosh = WDeriv }})
+      | CtDerived {} <- old_ct_ev
+      , CtWanted { ctev_nosh = WOnly } <- new_ct_ev
+      = Just (new_ct { cc_ev = new_ct_ev { ctev_nosh = WDeriv }})
+      where
+        old_ct_ev = ctEvidence old_ct
+
+    xt_ct _ = Just new_ct
 
 addDictsByClass :: DictMap Ct -> Class -> Bag Ct -> DictMap Ct
 addDictsByClass m cls items
