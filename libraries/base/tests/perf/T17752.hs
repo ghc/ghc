@@ -1,6 +1,6 @@
 module T17752 where
 
--- All occurences of elem should be optimized away.
+-- All occurrences of elem should be optimized away.
 -- For strings these should result in loops after inlining foldCString.
 -- For lists it should result in a case expression.
 

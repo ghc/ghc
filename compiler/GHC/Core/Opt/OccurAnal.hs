@@ -302,7 +302,7 @@ in Note [IMP-RULES: local rules for imported functions].
 
 So, during loop-breaker analysis:
 
-- for each active RULE for a local function 'f' we add an edge bewteen
+- for each active RULE for a local function 'f' we add an edge between
   'f' and the local FVs of the rule RHS
 
 - for each active RULE for an *imported* function we add dependency
@@ -639,7 +639,7 @@ propagate.
           {-# RULES "SPEC k 0" k 0 = j #-}
           k x y = x + 2 * y
       in ...
-  If we eta-expanded the rule all woudl be well, but as it stands the
+  If we eta-expanded the rule all would be well, but as it stands the
   one arg of the rule don't match the join-point arity of 2.
 
   Conceivably we could notice that a potential join point would have

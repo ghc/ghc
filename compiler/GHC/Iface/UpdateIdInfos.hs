@@ -27,7 +27,7 @@ import GHC.Utils.Panic
 
 #include "HsVersions.h"
 
--- | Update CafInfos and LFInfos of all occurences (in rules, unfoldings, class
+-- | Update CafInfos and LFInfos of all occurrences (in rules, unfoldings, class
 -- instances).
 --
 -- See Note [Conveying CAF-info and LFInfo between modules] in

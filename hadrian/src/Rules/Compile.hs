@@ -69,7 +69,7 @@ compilePackage rs = do
                -- or if some of the dynamic artifacts have been removed by the
                -- user, "needing" the non dynamic artifacts is not enough as
                -- Shake won't execute the associated action. Hence we detect
-               -- this case and we explictly build the dynamic artifacts here:
+               -- this case and we explicitly build the dynamic artifacts here:
                case changed of
                   [] -> compileHsObjectAndHi rs dyn_o
                   _  -> pure ()

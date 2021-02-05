@@ -632,7 +632,7 @@ tcPolyCheck prag_fn
                              (mkCheckExpType rho_ty)
 
        -- We make a funny AbsBinds, abstracting over nothing,
-       -- just so we haev somewhere to put the SpecPrags.
+       -- just so we have somewhere to put the SpecPrags.
        -- Otherwise we could just use the FunBind
        -- Hence poly_id2 is just a clone of poly_id;
        -- We re-use mono-name, but we could equally well use a fresh one

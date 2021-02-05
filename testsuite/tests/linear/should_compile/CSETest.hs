@@ -2,7 +2,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE UnicodeSyntax #-}
 {- This test makes sure that if two expressions with conflicting types are
-   CSEd then appropiate things happen. -}
+   CSEd then appropriate things happen. -}
 module CSETest where
 
 minimal :: a ⊸ a

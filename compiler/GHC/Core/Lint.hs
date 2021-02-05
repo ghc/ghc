@@ -212,14 +212,14 @@ in GHC.Core.Opt.WorkWrap.Utils.  (Maybe there are other "clients" of this featur
 * Alas, when cloning a coercion variable we might choose a unique
   that happens to clash with an inner Id, thus
       \cv_66 -> let wild_X7 = blah in blah
-  We decide to clone `cv_66` becuase it's already in scope.  Fine,
+  We decide to clone `cv_66` because it's already in scope.  Fine,
   choose a new unique.  Aha, X7 looks good.  So we check the lambda
   body with le_subst of [cv_66 :-> cv_X7]
 
   This is all fine, even though we use the same unique as wild_X7.
   As (SI2) says, we do /not/ return a new lambda
      (\cv_X7 -> let wild_X7 = blah in ...)
-  We simply use the le_subst subsitution in types/coercions only, when
+  We simply use the le_subst substitution in types/coercions only, when
   checking for equality.
 
 * We still need to check that Id occurrences are bound by some

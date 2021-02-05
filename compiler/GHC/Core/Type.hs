@@ -1158,7 +1158,7 @@ is equivalent to,
     FunTy (Anon a) b
 
 Note how the RuntimeReps are implied in the FunTy representation. For this
-reason we must be careful when recontructing the TyConApp representation (see,
+reason we must be careful when reconstructing the TyConApp representation (see,
 for instance, splitTyConApp_maybe).
 
 In the compiler we maintain the invariant that all saturated applications of

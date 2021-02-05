@@ -487,7 +487,7 @@ def get_commit_metric_value_str_or_none(gitNoteRef,
     return str(result.value)
 
 # gets the average commit metric from git notes.
-# gitNoteRef: git notes ref sapce e.g. "perf" or "ci/perf"
+# gitNoteRef: git notes ref space e.g. "perf" or "ci/perf"
 # ref: git commit
 # test_env: test environment
 # name: test name

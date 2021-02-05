@@ -16,7 +16,7 @@ data F1 s where
 bar1 :: F1 s -> Int -> F1 s
 bar1 z y = z { foo1 = y }
 
--- Orinary data family
+-- Ordinary data family
 data family F3 a
 data instance F3 (s,t) where
   MkF2b :: { foo3 :: Int } -> F3 (s,t)

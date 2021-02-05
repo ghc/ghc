@@ -529,7 +529,7 @@ instance Monad UnifyResultM where
                             SurelyApart     -> SurelyApart
   Unifiable x  >>= f = f x
 
--- | @tcUnifyTysFG bind_tv tys1 tys2@ attepts to find a substitution @s@ (whose
+-- | @tcUnifyTysFG bind_tv tys1 tys2@ attempts to find a substitution @s@ (whose
 -- domain elements all respond 'BindMe' to @bind_tv@) such that
 -- @s(tys1)@ and that of @s(tys2)@ are equal, as witnessed by the returned
 -- Coercions. This version requires that the kinds of the types are the same,
