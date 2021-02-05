@@ -21,62 +21,9 @@ This project consists of three packages:
 
 ## Contributing
 
-Please create issues when you have any problems and pull requests if you have
-some code.
+See [CONTRIBUTING.md](CONTRIBUTING.md) to see how to make contributions to the
+project.
 
-## Hacking
-
-To get started you'll need the latest GHC release installed.
-
-Clone the repository:
-
-```bash
-git clone https://github.com/haskell/haddock.git
-cd haddock
-```
-
-and then proceed using your favourite build tool.
-
-Note: before building `haddock`, you need to build the subprojects
-`haddock-library` and `haddock-api`, in this order!
-The `cabal v2-build` takes care of this automatically.
-
-#### Using `cabal`
-
-Requires cabal `>= 3.4` and GHC `== 9.0`:
-
-```bash
-cabal build all --enable-tests
-cabal test all
-```
-
-#### Using `stack`
-
-```bash
-stack init
-stack build
-export HADDOCK_PATH="$(stack exec which haddock)"
-stack test
-```
-
-### Git Branches
-
-If you're a GHC developer and want to update Haddock to work with your changes,
-you should be working on the `ghc-head` branch. See instructions at
-<https://gitlab.haskell.org/ghc/ghc/-/wikis/working-conventions/git/submodules>
-for an example workflow.
-
-### Updating golden testsuite outputs
-
-If you've changed Haddock's output, you will probably need to accept the new
-output of Haddock's golden test suites (`html-test`, `latex-test`,
-`hoogle-test`, and `hypsrc-test`). This can be done by passing the `--accept`
-argument to these test suites. With a new enough version of `cabal-install`:
-
-```
-cabal v2-test html-test latex-test hoogle-test hypsrc-test \
-  --test-option='--accept'
-```
 
 [CI page]: https://travis-ci.org/haskell/haddock
 [CI badge]: https://travis-ci.org/haskell/haddock.svg?branch=ghc-8.10
