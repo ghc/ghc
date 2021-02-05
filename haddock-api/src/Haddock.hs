@@ -153,11 +153,16 @@ haddockWithGhc ghc args = handleTopExceptions $ do
   sinceQual <- rightOrThrowE (sinceQualification flags)
 
   -- inject dynamic-too into flags before we proceed
-  flags' <- ghc flags $ do
+  flags'' <- ghc flags $ do
         df <- getDynFlags
         case lookup "GHC Dynamic" (compilerInfo df) of
           Just "YES" -> return $ Flag_OptGhc "-dynamic-too" : flags
           _ -> return flags
+
+  flags' <- pure $ case optParCount flags'' of
+    Nothing       -> flags''
+    Just Nothing  -> Flag_OptGhc "-j" : flags''
+    Just (Just n) -> Flag_OptGhc ("-j" ++ show n) : flags''
 
   -- bypass the interface version check
   let noChecks = Flag_BypassInterfaceVersonCheck `elem` flags

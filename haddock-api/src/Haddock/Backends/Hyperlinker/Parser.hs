@@ -12,7 +12,7 @@ import qualified Data.ByteString as BS
 
 import GHC.Types.SourceText
 import GHC.Driver.Session
-import GHC.Utils.Error     ( pprLocErrMsg )
+import GHC.Utils.Error     ( pprLocMsgEnvelope )
 import GHC.Data.FastString ( mkFastString )
 import GHC.Parser.Errors.Ppr ( pprError )
 import GHC.Parser.Lexer    as Lexer
@@ -42,7 +42,7 @@ parse dflags fpath bs = case unP (go False []) initState of
     PFailed pst ->
       let err:_ = bagToList (fmap pprError (getErrorMessages pst)) in
       panic $ showSDoc dflags $
-        text "Hyperlinker parse error:" $$ pprLocErrMsg err
+        text "Hyperlinker parse error:" $$ pprLocMsgEnvelope err
   where
 
     initState = initParserState pflags buf start

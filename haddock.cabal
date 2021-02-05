@@ -85,7 +85,8 @@ executable haddock
       bytestring,
       parsec,
       text,
-      transformers
+      transformers,
+      mtl
 
     other-modules:
       CompatPrelude

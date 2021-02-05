@@ -35,7 +35,6 @@ import GHC.Driver.Ppr (showPpr )
 import GHC.Types.Name
 import GHC.Unit.Module
 import GHC
-import GHC.Core.Class
 import GHC.Driver.Session
 import GHC.Types.Basic
 import GHC.Types.SrcLoc  ( advanceSrcLoc )
@@ -190,7 +189,7 @@ getGADTConType (ConDeclH98 {}) = panic "getGADTConType"
 getMainDeclBinderI :: HsDecl DocNameI -> [IdP DocNameI]
 getMainDeclBinderI (TyClD _ d) = [tcdNameI d]
 getMainDeclBinderI (ValD _ d) =
-  case collectHsBindBinders d of
+  case collectHsBindBinders CollNoDictBinders d of
     []       -> []
     (name:_) -> [name]
 getMainDeclBinderI (SigD _ d) = sigNameNoLoc d
@@ -525,14 +524,6 @@ modifySessionDynFlags f = do
   _ <- setSessionDynFlags (f dflags)
   return ()
 
-
--- Extract the minimal complete definition of a Name, if one exists
-minimalDef :: GhcMonad m => Name -> m (Maybe ClassMinimalDef)
-minimalDef n = do
-  mty <- lookupGlobalName n
-  case mty of
-    Just (ATyCon (tyConClass_maybe -> Just c)) -> return . Just $ classMinimalDef c
-    _ -> return Nothing
 
 -------------------------------------------------------------------------------
 -- * DynFlags

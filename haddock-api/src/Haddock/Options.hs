@@ -24,6 +24,7 @@ module Haddock.Options (
   optSourceCssFile,
   sourceUrls,
   wikiUrls,
+  optParCount,
   optDumpInterfaceFile,
   optShowInterfaceFile,
   optLaTeXStyle,
@@ -110,6 +111,7 @@ data Flag
   | Flag_Reexport String
   | Flag_SinceQualification String
   | Flag_IgnoreLinkSymbol String
+  | Flag_ParCount (Maybe Int)
   deriving (Eq, Show)
 
 
@@ -223,7 +225,9 @@ options backwardsCompat =
     Option []  ["since-qual"] (ReqArg Flag_SinceQualification "QUAL")
       "package qualification of @since, one of\n'always' (default) or 'only-external'",
     Option [] ["ignore-link-symbol"] (ReqArg Flag_IgnoreLinkSymbol "SYMBOL")
-      "name of a symbol which does not trigger a warning in case of link issue"
+      "name of a symbol which does not trigger a warning in case of link issue",
+    Option ['j'] [] (OptArg (\count -> Flag_ParCount (fmap read count)) "n")
+      "load modules in parallel"
   ]
 
 
@@ -306,10 +310,11 @@ optShowInterfaceFile flags = optLast [ str | Flag_ShowInterface str <- flags ]
 optLaTeXStyle :: [Flag] -> Maybe String
 optLaTeXStyle flags = optLast [ str | Flag_LaTeXStyle str <- flags ]
 
-
 optMathjax :: [Flag] -> Maybe String
 optMathjax flags = optLast [ str | Flag_Mathjax str <- flags ]
 
+optParCount :: [Flag] -> Maybe (Maybe Int)
+optParCount flags = optLast [ n | Flag_ParCount n <- flags ]
 
 qualification :: [Flag] -> Either String QualOption
 qualification flags =
