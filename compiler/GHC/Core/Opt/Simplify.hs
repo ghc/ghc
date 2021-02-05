@@ -3653,7 +3653,7 @@ Pushing the call inward (being careful not to duplicate E)
 
 and now the (&& a F) etc can optimise.  Moreover there might
 be a RULE for the function that can fire when it "sees" the
-particular case alterantive.
+particular case alternative.
 
 But Plan A can have terrible, terrible behaviour. Here is a classic
 case:

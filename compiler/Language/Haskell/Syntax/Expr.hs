@@ -1267,7 +1267,7 @@ data ParStmtBlock idL idR
 
 -- | The fail operator
 --
--- This is used for `.. <-` "bind statments" in do notation, including
+-- This is used for `.. <-` "bind statements" in do notation, including
 -- non-monadic "binds" in applicative.
 --
 -- The fail operator is 'Just expr' if it potentially fail monadically. if the

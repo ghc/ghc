@@ -40,7 +40,7 @@ Highlights
     GHC is now able to detect the case alt returning 3 as redundant.
   - Some more performance improvements in edge cases.
 
-* Windows: Use the larg address space allocator.
+* Windows: Use the large address space allocator.
 
   This improves runtime but causes increased memory usage on Windows versions
   older than Win 8.1/Server 2012.

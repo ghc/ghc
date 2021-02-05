@@ -1595,7 +1595,7 @@ Parallel garbage collector counters:
 * scav_find_work:
     Counts iterations of scavenge loop
 * max_n_todo_overflow:
-    Tracks the maximum length of todo_overflow lists in the gc_thread structre.
+    Tracks the maximum length of todo_overflow lists in the gc_thread structure.
     See comment in grab_local_todo_block.
 */
 

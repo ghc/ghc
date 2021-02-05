@@ -857,7 +857,7 @@ looks_like_an_input m =  isSourceFilename m
 -- away. Note the asymmetry of FilePath.normalise:
 --    Linux:   p\/q -> p\/q; p\\q -> p\\q
 --    Windows: p\/q -> p\\q; p\\q -> p\\q
--- #12674: Filenames starting with a hypen get normalised from ./-foo.hs
+-- #12674: Filenames starting with a hyphen get normalised from ./-foo.hs
 -- to -foo.hs. We have to re-prepend the current directory.
 normalise_hyp :: FilePath -> FilePath
 normalise_hyp fp

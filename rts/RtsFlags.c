@@ -502,7 +502,7 @@ usage_text[] = {
 #if defined(mingw32_HOST_OS)
 "  --io-manager-threads=<num>",
 "            The number of worker threads to use in the native I/O manager to",
-"            handle completion events. (defualt: num cores)",
+"            handle completion events. (default: num cores)",
 #endif
 "  -e<n>     Maximum number of outstanding local sparks (default: 4096)",
 #endif

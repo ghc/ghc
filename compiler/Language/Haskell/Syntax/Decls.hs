@@ -950,7 +950,7 @@ type LDerivClauseTys pass = XRec pass (DerivClauseTys pass)
 -- | The types mentioned in a single @deriving@ clause. This can come in two
 -- forms, 'DctSingle' or 'DctMulti', depending on whether the types are
 -- surrounded by enclosing parentheses or not. These parentheses are
--- semantically differnt than 'HsParTy'. For example, @deriving ()@ means
+-- semantically different than 'HsParTy'. For example, @deriving ()@ means
 -- \"derive zero classes\" rather than \"derive an instance of the 0-tuple\".
 --
 -- 'DerivClauseTys' use 'LHsSigType' because @deriving@ clauses can mention

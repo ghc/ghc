@@ -6,7 +6,7 @@
 
 module Scopes where
 
--- Verify that evidence bound by patern
+-- Verify that evidence bound by pattern
 -- synonyms has correct scope
 pattern LL :: Num a => a -> a
 pattern LL x <- (subtract 1 -> x)
@@ -19,7 +19,7 @@ data T = C { x :: Int, y :: Char }
 -- have correct scope
 foo = C { x = 1 , y = 'a' }
 
--- Verify that implicit paramters have correct scope
+-- Verify that implicit parameters have correct scope
 bar :: (?x :: Int) => Int
 bar = ?x + 1
 

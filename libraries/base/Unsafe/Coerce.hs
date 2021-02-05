@@ -132,7 +132,7 @@ several ways
             x = K a
         in ...
      Flaoting the case is OK here, even though it broardens the
-     scope, becuase we are done with simplification.
+     scope, because we are done with simplification.
 
 (U4) GHC.CoreToStg.Prep.cpeExprIsTrivial anticipates the
      upcoming discard of unsafeEqualityProof.
@@ -220,7 +220,7 @@ There are yet more wrinkles
       GHCi debugger, and GHCi itself uses unsafeCoerce.
 
       Moreover, in GHC.Tc.Module.tcGhciStmts we use unsafeCoerce#, rather
-      than the more kosher unsafeCoerce, becuase (with -O0) the latter
+      than the more kosher unsafeCoerce, because (with -O0) the latter
       may not be inlined.
 
       Sigh

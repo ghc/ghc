@@ -1378,7 +1378,7 @@ pprCLabel platform sty lbl =
 -- Note that these labels are *not* referred to by code. They are strictly for
 -- diagnostics purposes.
 --
--- To avoid confusion, it is desireable to add a module-qualifier to the
+-- To avoid confusion, it is desirable to add a module-qualifier to the
 -- symbol name. However, the Name type's Internal constructor doesn't carry
 -- knowledge of the current Module. Consequently, we have to pass this around
 -- explicitly.

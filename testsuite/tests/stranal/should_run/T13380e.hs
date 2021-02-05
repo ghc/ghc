@@ -3,7 +3,7 @@ import Control.Exception
 -- This is just like T13380d, but doesn't look through the IO abstraction.
 -- With Nested CPR, it will result in very similar code, however!
 
--- | An IO action that throws a precise excpetion that isn't inlined.
+-- | An IO action that throws a precise exception that isn't inlined.
 throws :: IO ()
 throws = throwIO (userError "What")
 {-# NOINLINE throws #-}

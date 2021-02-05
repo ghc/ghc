@@ -176,7 +176,7 @@ before looking for an arrow type.
 
 But if it doesn't find an arrow type, it wants to generate a message
 like "f is applied to two arguments but its type only has one".
-To do that, it needs to konw about the args that tcArgs has already
+To do that, it needs to know about the args that tcArgs has already
 munched up -- hence passing in n_val_args_in_call and arg_tys_so_far;
 and hence also the accumulating so_far arg to 'go'.
 

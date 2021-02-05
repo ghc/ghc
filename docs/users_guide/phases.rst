@@ -190,7 +190,7 @@ the following flags:
     specified compiler will support it. This flag can be used to indicate
     that ``-no-pie`` is supported. It has to be passed after ``-pgmc``.
 
-    This flag is not neccessary when ``-pgmc`` is not used, since GHC
+    This flag is not necessary when ``-pgmc`` is not used, since GHC
     remembers whether the default C compiler supports ``-no-pie`` in
     an internal settings file.
 

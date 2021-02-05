@@ -139,7 +139,7 @@ loop_end:                                                              \
     foreign "C" free(dst);                                             \
     return (0);
 
-// This is not exactly beutiful but we need the separate functions to
+// This is not exactly beautiful but we need the separate functions to
 // avoid collisions between labels.
 //
 // The specific tests are selected with knowledge of the implementation

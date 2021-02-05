@@ -169,7 +169,7 @@ class TestConfig:
         # run.
         self.broken_tests = set() # type: Set[TestName]
 
-        # Baseline commit for performane metric comparisons.
+        # Baseline commit for performance metric comparisons.
         self.baseline_commit = None # type: Optional[GitRef]
 
         # Additional package dbs to inspect for test dependencies.

@@ -110,7 +110,7 @@ the location range in which we search for HdkCommentPrev is as follows:
 We search for comments after  HsTyVar "Int"  and until the next syntactic
 element, in this case  HsTyVar "Bool".
 
-Ignoring the "->" allows us to accomodate alternative coding styles:
+Ignoring the "->" allows us to accommodate alternative coding styles:
 
   f :: Int ->   -- ^ comment on argument
        Bool     -- ^ comment on result
@@ -1540,7 +1540,7 @@ Sometimes handling documentation comments during parsing led to bugs (#17561),
 and sometimes it simply made it hard to modify and extend the grammar.
 
 Another issue was that sometimes Haddock would fail to parse code
-that GHC could parse succesfully:
+that GHC could parse successfully:
 
   class BadIndent where
     f :: a -> Int
