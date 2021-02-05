@@ -474,13 +474,16 @@ data HsExpr p
   -- | Record update
   --
   --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'{'@,
-  --         'GHC.Parser.Annotation.AnnDotdot','GHC.Parser.Annotation.AnnClose' @'}'@
+  --         'GHC.Parser.Annotation.AnnComma, 'GHC.Parser.Annotation.AnnDot',
+  --         'GHC.Parser.Annotation.AnnClose' @'}'@
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | RecordUpd
       { rupd_ext  :: XRecordUpd p
+      , rupd_dot  :: Bool -- Is RecordDotSyntax in effect?
       , rupd_expr :: LHsExpr p
       , rupd_flds :: [LHsRecUpdField p]
+      , rupd_upds :: [LHsRecUpdProj p]
       }
   -- For a type family, the arg types are of the *instance* tycon,
   -- not the family tycon
@@ -497,21 +500,6 @@ data HsExpr p
         gf_ext :: XGetField p
       , gf_expr :: LHsExpr p
       , gf_field :: Located FastString
-      }
-
-  -- Record dot update e.g. @a{foo.bar.baz=1, quux}@.
-  --
-  --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'{'@,
-  --         'GHC.Parser.Annotation.AnnComma, 'GHC.Parser.Annotation.AnnDot',
-  --         'GHC.Parser.Annotation.AnnClose' @'}'@
-  --
-  -- This case only arises when the RecordDotSyntax langauge
-  -- extension is enabled.
-
-  | RecordDotUpd {
-        rdupd_ext :: XRecordDotUpd p
-      , rdupd_expr :: LHsExpr p
-      , rdupd_upds :: [LHsRecUpdProj p]
       }
 
   -- | Record field selector. e.g. @(.x)@ or @(.x.y)@
@@ -736,12 +724,6 @@ type instance XProjection     GhcPs = NoExtField
 type instance XProjection     GhcRn = NoExtField
 type instance XProjection     GhcTc = Void
 -- Projection is eliminated by the renamer. See Note [How record dot
--- notation is handled] (not written yet).
-
-type instance XRecordDotUpd     GhcPs = NoExtField
-type instance XRecordDotUpd     GhcRn = NoExtField
-type instance XRecordDotUpd     GhcTc = Void
--- RecordDotUpd is eliminated by the renamer. See Note [How record dot
 -- notation is handled] (not written yet).
 
 type instance XExprWithTySig (GhcPass _) = NoExtField
@@ -1275,16 +1257,17 @@ ppr_expr (ExplicitList _ _ exprs)
 ppr_expr (RecordCon { rcon_con_name = con_id, rcon_flds = rbinds })
   = hang (ppr con_id) 2 (ppr rbinds)
 
-ppr_expr (RecordUpd { rupd_expr = L _ aexp, rupd_flds = rbinds })
-  = hang (ppr aexp) 2 (braces (fsep (punctuate comma (map ppr rbinds))))
+ppr_expr (RecordUpd { rupd_expr = L _ aexp, rupd_dot = dot, rupd_flds = rbinds, rupd_upds = pbinds })
+  = if not dot
+      then
+        hang (ppr aexp) 2 (braces (fsep (punctuate comma (map ppr rbinds))))
+      else
+        hang (ppr aexp) 2 (braces (fsep (punctuate comma (map ppr pbinds))))
 
 ppr_expr (GetField { gf_expr = L _ fexp, gf_field = field })
   = ppr fexp <> dot <> ppr field
 
 ppr_expr (Projection { proj_flds = flds }) = parens (hcat (punctuate dot (map ppr flds)))
-
-ppr_expr (RecordDotUpd { rdupd_expr = L _ aexp, rdupd_upds = rbinds })
- = hang (ppr aexp) 2 (braces (fsep (punctuate comma (map ppr rbinds))))
 
 ppr_expr (ExprWithTySig _ expr sig)
   = hang (nest 2 (ppr_lexpr expr) <+> dcolon)
@@ -1447,7 +1430,6 @@ hsExprNeedsParens p = go
 
     go (Projection{})                 = True
     go (GetField{})                   = False
-    go (RecordDotUpd{})               = False
 
     go (XExpr x)
       | GhcTc <- ghcPass @p

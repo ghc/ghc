@@ -2170,39 +2170,24 @@ mkRecConstrOrUpdate _ (L l (HsVar _ (L _ c))) _lrec (fbinds,dd)
         else return (mkRdrRecordCon (L l c) (mk_rec_fields fs dd))
 mkRecConstrOrUpdate dot exp _ (fs,dd)
   | Just dd_loc <- dd = addFatalError $ PsError PsErrDotsInRecordUpdate [] dd_loc
-  | otherwise = mkRdrRecordDotUpd dot exp fs
+  | otherwise = mkRdrRecordUpd dot exp fs
 
-mkRdrRecordDotUpd :: Bool -> LHsExpr GhcPs -> [Fbind (HsExpr GhcPs)] -> PV (HsExpr GhcPs)
-mkRdrRecordDotUpd dot exp@(L _ _) fbinds =
-  if not dot
-    then do
-      let (fs, ps) = partitionEithers fbinds
-      if not (null ps)
-      then
-        -- If RecordDotSyntax is not enabled (as indicated by the
-        -- value of 'dot'), then the lexer can't ever issue an ITproj
-        -- token and so this case is refuted.
-        panic "mkRdrRecordUpd: The impossible happened!"
-      else return $ mkRdrRecordUpd exp (map (fmap mk_rec_upd_field) fs)
-  else
-     return RecordDotUpd {
-                  rdupd_ext = noExtField
-                , rdupd_expr = exp
-                , rdupd_upds = toProjUpdates fbinds
-                }
+mkRdrRecordUpd :: Bool -> LHsExpr GhcPs -> [Fbind (HsExpr GhcPs)] -> PV (HsExpr GhcPs)
+mkRdrRecordUpd dot exp@(L _ _) fbinds = do
+  let (fs, ps) = partitionEithers fbinds
+  return RecordUpd {
+    rupd_ext = noExtField
+  , rupd_dot = dot
+  , rupd_expr = exp
+  , rupd_flds = if dot then [] else (map (fmap mk_rec_upd_field) fs)
+  , rupd_upds = if dot then toProjUpdates fbinds else []
+  }
   where
     toProjUpdates :: [Fbind (HsExpr GhcPs)] -> [LHsRecUpdProj GhcPs]
     toProjUpdates =
       map (\case { Right p -> p
                  ; Left f -> recUpdFieldToProjUpdate (fmap mk_rec_upd_field f)
                  } )
-
-mkRdrRecordUpd :: LHsExpr GhcPs -> [LHsRecUpdField GhcPs] -> HsExpr GhcPs
-mkRdrRecordUpd exp flds
-  = RecordUpd { rupd_ext  = noExtField
-              , rupd_expr = exp
-              , rupd_flds = flds }
-
 
 mkRdrRecordCon :: Located RdrName -> HsRecordBinds GhcPs -> HsExpr GhcPs
 mkRdrRecordCon con flds

@@ -506,7 +506,6 @@ exprCtOrigin (HsDo {})           = DoOrigin
 exprCtOrigin (ExplicitList {})   = Shouldn'tHappenOrigin "list"
 exprCtOrigin (RecordCon {})      = Shouldn'tHappenOrigin "record construction"
 exprCtOrigin (RecordUpd {})      = Shouldn'tHappenOrigin "record update"
-exprCtOrigin (RecordDotUpd {})   = Shouldn'tHappenOrigin "record dot update"
 exprCtOrigin (ExprWithTySig {})  = ExprSigOrigin
 exprCtOrigin (ArithSeq {})       = Shouldn'tHappenOrigin "arithmetic sequence"
 exprCtOrigin (HsPragE _ _ e)     = lexprCtOrigin e

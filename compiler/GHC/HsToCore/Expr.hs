@@ -281,7 +281,6 @@ dsExpr (HsOverLabel{})        = panic "dsExpr: HsOverLabel"
 
 dsExpr (GetField x _ _)       = absurd x
 dsExpr (Projection x _)       = absurd x
-dsExpr (RecordDotUpd x _ _)   = absurd x
 
 dsExpr (HsLit _ lit)
   = do { warnAboutOverflowedLit lit

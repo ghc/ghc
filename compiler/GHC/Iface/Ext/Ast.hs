@@ -1173,7 +1173,6 @@ instance HiePass p => ToHie (Located (HsExpr (GhcPass p))) where
         ]
       GetField {} -> []
       Projection {} -> []
-      RecordDotUpd {} -> []
       XExpr x
         | GhcTc <- ghcPass @p
         , WrapExpr (HsWrap w a) <- x
