@@ -21,3 +21,4 @@ test('CountParserDeps',
 test('LexNegLit', normal, compile_and_run, [''])
 test('RecordDotSyntax1', normal, compile_and_run, [''])
 test('RecordDotSyntax2', normal, compile_and_run, [''])
+test('RecordDotSyntax3', [extra_files(['RecordDotSyntaxA.hs'])], multimod_compile_and_run, ['RecordDotSyntax3', ''])
