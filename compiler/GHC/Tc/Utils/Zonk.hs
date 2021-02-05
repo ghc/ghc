@@ -895,21 +895,35 @@ zonkExpr env expr@(RecordCon { rcon_ext = ext, rcon_flds = rbinds })
         ; return (expr { rcon_ext  = ext { rcon_con_expr = new_con_expr }
                        , rcon_flds = new_rbinds }) }
 
-zonkExpr env (RecordUpd { rupd_flds = rbinds
+-- Record updates via dot syntax are replaced by desugared expressions
+-- in the renamer. See Note [Rebindable Syntax and HsExpansion]. This
+-- is why we match on 'rupd_dot = False' here and panic otherwise.
+zonkExpr env (RecordUpd { rupd_dot = False
+                        , rupd_flds = rbinds
+                        , rupd_upds = []
                         , rupd_expr = expr
-                        , rupd_ext = RecordUpdTc
-                            { rupd_cons = cons, rupd_in_tys = in_tys
-                            , rupd_out_tys = out_tys, rupd_wrap = req_wrap }})
+                        , rupd_ext = RecordUpdTc {
+                                       rupd_cons = cons
+                                     , rupd_in_tys = in_tys
+                                     , rupd_out_tys = out_tys
+                                     , rupd_wrap = req_wrap }})
   = do  { new_expr    <- zonkLExpr env expr
         ; new_in_tys  <- mapM (zonkTcTypeToTypeX env) in_tys
         ; new_out_tys <- mapM (zonkTcTypeToTypeX env) out_tys
         ; new_rbinds  <- zonkRecUpdFields env rbinds
         ; (_, new_recwrap) <- zonkCoFn env req_wrap
-        ; return (RecordUpd { rupd_expr = new_expr, rupd_flds =  new_rbinds
-                            , rupd_ext = RecordUpdTc
-                                { rupd_cons = cons, rupd_in_tys = new_in_tys
-                                , rupd_out_tys = new_out_tys
-                                , rupd_wrap = new_recwrap }}) }
+        ; return (
+            RecordUpd {
+                  rupd_dot = False
+                , rupd_expr = new_expr
+                , rupd_flds = new_rbinds
+                , rupd_upds = []
+                , rupd_ext = RecordUpdTc {
+                               rupd_cons = cons
+                             , rupd_in_tys = new_in_tys
+                             , rupd_out_tys = new_out_tys
+                             , rupd_wrap = new_recwrap }}) }
+zonkExpr _ (RecordUpd {}) = panic "GHC.Tc.Utils.Zonk: zonkExpr: The impossible happened!"
 
 zonkExpr env (ExprWithTySig _ e ty)
   = do { e' <- zonkLExpr env e

@@ -3365,7 +3365,7 @@ fbinds1 :: { forall b. DisambECP b => PV ([AddAnn],([Fbind b], Maybe SrcSpan)) }
         : fbind ',' fbinds1
                  { $1 >>= \ $1 ->
                    $3 >>= \ $3 ->
-                   let gl' = \case { Fbind (L l _) -> l;  Pbind (L l _) -> l } in
+                   let gl' = \case { Left (L l _) -> l;  Right (L l _) -> l } in
                    addAnnotation (gl' $1) AnnComma (gl $2) >>
                    return (case $3 of (ma,(flds, dd)) -> (ma,($1 : flds, dd))) }
         | fbind                         { $1 >>= \ $1 ->
@@ -3374,14 +3374,14 @@ fbinds1 :: { forall b. DisambECP b => PV ([AddAnn],([Fbind b], Maybe SrcSpan)) }
 
 fbind   :: { forall b. DisambECP b => PV (Fbind b) }
         : qvar '=' texp  { unECP $3 >>= \ $3 ->
-                           fmap Fbind $ ams  (sLL $1 $> $ HsRecField (sL1 $1 $ mkFieldOcc $1) $3 False) [mj AnnEqual $2]
+                           fmap Left $ ams  (sLL $1 $> $ HsRecField (sL1 $1 $ mkFieldOcc $1) $3 False) [mj AnnEqual $2]
                           }
                         -- RHS is a 'texp', allowing view patterns (#6038)
                         -- and, incidentally, sections.  Eg
                         -- f (R { x = show -> s }) = ...
 
         | qvar          { placeHolderPunRhs >>= \rhs ->
-                          fmap Fbind $ return (sLL $1 $> $ HsRecField (sL1 $1 $ mkFieldOcc $1) rhs True)
+                          fmap Left $ return (sLL $1 $> $ HsRecField (sL1 $1 $ mkFieldOcc $1) rhs True)
                         }
                         -- In the punning case, use a place-holder
                         -- The renamer fills in the final value
@@ -3390,7 +3390,7 @@ fbind   :: { forall b. DisambECP b => PV (Fbind b) }
         | field TIGHT_INFIX_PROJ fieldToUpdate '=' texp
                         { do
                             $5 <- unECP $5
-                            fmap Pbind $ mkHsProjUpdatePV (comb2 $1 $5) ($1 : reverse $3) $5
+                            fmap Right $ mkHsProjUpdatePV (comb2 $1 $5) ($1 : reverse $3) $5
                         }
 
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
@@ -3404,7 +3404,7 @@ fbind   :: { forall b. DisambECP b => PV (Fbind b) }
                             when (not puns) $
                               addError $ PsError PsErrNamedFieldPunsNotEnabled [] l
                             var <- mkHsVarPV (noLoc (mkRdrUnqual . mkVarOcc . unpackFS . unLoc $ final))
-                            fmap Pbind $ mkHsProjUpdatePV l fields var
+                            fmap Right $ mkHsProjUpdatePV l fields var
                         }
 
 fieldToUpdate :: { [Located FastString] }
