@@ -439,11 +439,31 @@ interactWithInertsStage wi
 data InteractResult
    = KeepInert   -- Keep the inert item, and solve the work item from it
                  -- (if the latter is Wanted; just discard it if not)
-   | KeepWork    -- Keep the work item, and solve the intert item from it
+   | KeepWork    -- Keep the work item, and solve the inert item from it
+
+   | KeepBoth    -- See Note [KeepBoth]
 
 instance Outputable InteractResult where
+  ppr KeepBoth  = text "keep both"
   ppr KeepInert = text "keep inert"
   ppr KeepWork  = text "keep work-item"
+
+{- Note [KeepBoth]
+~~~~~~~~~~~~~~~~~~
+Consider
+   Inert:     [WD] C ty1 ty2
+   Work item: [D]  C ty1 ty2
+
+Here we can simply drop the work item. But what about
+   Inert:     [W] C ty1 ty2
+   Work item: [D] C ty1 ty2
+
+Here we /cannot/ drop the work item, becuase we lose the [D] form, and
+that is essential for e.g. fundeps, see isImprovable.  We could zap
+the inert item to [WD], but the simplest thing to do is simply to keep
+both. (They probably started as [WD] and got split; this is relatively
+rare and it doesn't seem worth trying to put them back together again.)
+-}
 
 solveOneFromTheOther :: CtEvidence  -- Inert
                      -> CtEvidence  -- WorkItem
@@ -456,22 +476,37 @@ solveOneFromTheOther :: CtEvidence  -- Inert
 -- two wanteds into one by solving one from the other
 
 solveOneFromTheOther ev_i ev_w
-  | isDerived ev_w         -- Work item is Derived; just discard it
-  = return KeepInert
+  | CtDerived {} <- ev_w         -- Work item is Derived
+  = case ev_i of
+      CtWanted { ctev_nosh = WOnly } -> return KeepBoth
+      _                              -> return KeepInert
 
-  | isDerived ev_i     -- The inert item is Derived, we can just throw it away,
-  = return KeepWork    -- The ev_w is inert wrt earlier inert-set items,
-                       -- so it's safe to continue on from this point
+  | CtDerived {} <- ev_i         -- Inert item is Derived
+  = case ev_w of
+      CtWanted { ctev_nosh = WOnly } -> return KeepBoth
+      _                              -> return KeepWork
+              -- The ev_w is inert wrt earlier inert-set items,
+              -- so it's safe to continue on from this point
 
+  -- After this, neither ev_i or ev_w are Derived
   | CtWanted { ctev_loc = loc_w } <- ev_w
   , prohibitedSuperClassSolve (ctEvLoc ev_i) loc_w
   = -- inert must be Given
     do { traceTcS "prohibitedClassSolve1" (ppr ev_i $$ ppr ev_w)
        ; return KeepWork }
 
-  | CtWanted {} <- ev_w
+  | CtWanted { ctev_nosh = nosh_w } <- ev_w
        -- Inert is Given or Wanted
-  = return KeepInert
+  = case ev_i of
+      CtWanted { ctev_nosh = WOnly }
+          | WDeriv <- nosh_w -> return KeepWork
+      _                      -> return KeepInert
+      -- Consider work  item [WD] C ty1 ty2
+      --          inert item [W]  C ty1 ty2
+      -- Then we must keep the work item.  But if the
+      -- work item was       [W]  C ty1 ty2
+      -- then we are free to discard the work item in favour of inert
+      -- Remember, no Deriveds at this point
 
   -- From here on the work-item is Given
 
@@ -643,6 +678,7 @@ interactIrred inerts workItem@(CIrredCan { cc_ev = ev_w, cc_status = status })
   = do { what_next <- solveOneFromTheOther ev_i ev_w
        ; traceTcS "iteractIrred" (ppr workItem $$ ppr what_next $$ ppr ct_i)
        ; case what_next of
+            KeepBoth  -> continueWith workItem
             KeepInert -> do { setEvBindIfWanted ev_w (swap_me swap ev_i)
                             ; return (Stop ev_w (text "Irred equal" <+> parens (ppr what_next))) }
             KeepWork ->  do { setEvBindIfWanted ev_i (swap_me swap ev_w)
@@ -969,7 +1005,8 @@ Passing along the solved_dicts important for two reasons:
 
 interactDict :: InertCans -> Ct -> TcS (StopOrContinue Ct)
 interactDict inerts workItem@(CDictCan { cc_ev = ev_w, cc_class = cls, cc_tyargs = tys })
-  | Just ev_i <- lookupInertDict inerts (ctEvLoc ev_w) cls tys
+  | Just ct_i <- lookupInertDict inerts (ctEvLoc ev_w) cls tys
+  , let ev_i = ctEvidence ct_i
   = -- There is a matching dictionary in the inert set
     do { -- First to try to solve it /completely/ from top level instances
          -- See Note [Shortcut solving]
@@ -984,6 +1021,7 @@ interactDict inerts workItem@(CDictCan { cc_ev = ev_w, cc_class = cls, cc_tyargs
          what_next <- solveOneFromTheOther ev_i ev_w
        ; traceTcS "lookupInertDict" (ppr what_next)
        ; case what_next of
+           KeepBoth  -> continueWith workItem
            KeepInert -> do { setEvBindIfWanted ev_w (ctEvTerm ev_i)
                            ; return $ Stop ev_w (text "Dict equal" <+> parens (ppr what_next)) }
            KeepWork  -> do { setEvBindIfWanted ev_i (ctEvTerm ev_w)
