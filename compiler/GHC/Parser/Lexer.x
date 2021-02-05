@@ -2744,8 +2744,8 @@ mkParserOpts warningFlags extensionFlags
       .|. GadtSyntaxBit               `xoptBit` LangExt.GADTSyntax
       .|. ImportQualifiedPostBit      `xoptBit` LangExt.ImportQualifiedPost
       .|. LinearTypesBit              `xoptBit` LangExt.LinearTypes
-      .|. NoLexicalNegationBit     `xoptNotBit` LangExt.LexicalNegation -- See Note [Why not LexicalNegationBit]
-      .|. RecordPunsBit          `xoptBit` LangExt.RecordPuns
+      .|. NoLexicalNegationBit        `xoptNotBit` LangExt.LexicalNegation -- See Note [Why not LexicalNegationBit]
+      .|. RecordPunsBit               `xoptBit` LangExt.RecordPuns -- Enable testing via 'getBit RecordPunsBit' in the parser (RecordDotSyntax parsing uses that information).
       .|. RecordDotSyntaxBit          `xoptBit` LangExt.RecordDotSyntax
     optBits =
           HaddockBit        `setBitIf` isHaddock

@@ -749,7 +749,10 @@ following.
 
 -}
 
-tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
+-- Record updates via dot syntax are replaced by desugared expressions
+-- in the renamer. See Note [Rebindable Syntax and HsExpansion]. This
+-- is why we match on 'rupd_dot = False' here and panic otherwise.
+tcExpr expr@(RecordUpd { rupd_dot = False, rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
   = ASSERT( notNull rbnds )
     do  { -- STEP -2: typecheck the record_expr, the record to be updated
           (record_expr', record_rho) <- tcScalingUsage Many $ tcInferRho record_expr
@@ -914,12 +917,15 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
                                    , rupd_in_tys = scrut_inst_tys
                                    , rupd_out_tys = result_inst_tys
                                    , rupd_wrap = req_wrap }
-              expr' = RecordUpd { rupd_expr = mkLHsWrap fam_co $
-                                              mkLHsWrapCo co_scrut record_expr'
+              expr' = RecordUpd { rupd_dot = False
+                                , rupd_expr = mkLHsWrap fam_co $
+                                                mkLHsWrapCo co_scrut record_expr'
                                 , rupd_flds = rbinds'
+                                , rupd_upds = []
                                 , rupd_ext = upd_tc }
 
         ; tcWrapResult expr expr' rec_res_ty res_ty }
+tcExpr (RecordUpd {}) _ = panic "GHC.Tc.Gen.Expr: tcExpr: The impossible happened!"
 
 
 {-
@@ -947,7 +953,6 @@ tcExpr (ArithSeq _ witness seq) res_ty
 -- Note [Rebindable syntax and HsExpansion].
 tcExpr (GetField _ _ _) _ = panic "tcExpr: GetField: Not implemented"
 tcExpr (Projection _ _) _ = panic "tcExpr: Projection: Not implemented"
-tcExpr (RecordDotUpd _ _ _ ) _ = panic "tcExpr: RecordDotUpd: Not implemented"
 
 {-
 ************************************************************************
