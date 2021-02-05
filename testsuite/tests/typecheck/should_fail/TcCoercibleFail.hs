@@ -22,7 +22,7 @@ foo5 = coerce :: Void -> ()
 
 
 ------------------------------------
--- This next one generates an exponentally big type as it
+-- This next one generates an exponentially big type as it
 -- tries to unwrap.  See comment:15 in #11518
 -- Adding assertions that force the types can make us
 -- run out of space.

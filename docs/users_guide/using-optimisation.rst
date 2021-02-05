@@ -1147,8 +1147,8 @@ by saying ``-fno-wombat``.
     dummy value at the call site or omitted altogether.
 
     The worker/wrapper transformation (:ghc-flag:`-fworker-wrapper`) is
-    reponsible for exploiting unboxing opportunities and replacing absent
-    arguments by dummies. For arugments that can't be unboxed, opportunities
+    responsible for exploiting unboxing opportunities and replacing absent
+    arguments by dummies. For arguments that can't be unboxed, opportunities
     for call-by-value and call-by-name are exploited in CorePrep when
     translating to STG.
 

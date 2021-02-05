@@ -177,7 +177,7 @@ That is, a series of right-nested pairs, where the @fst@ are the exported
 binders of the last enclosing let binding and @snd@ continues the nested
 lets.
 
-Variables occuring free in RULE RHSs are to be handled the same as exported Ids.
+Variables occurring free in RULE RHSs are to be handled the same as exported Ids.
 See also Note [Absence analysis for stable unfoldings and RULES].
 
 Note [Why care for top-level demand annotations?]
@@ -204,7 +204,7 @@ to unbox deeper. From T18894:
   h m = ... snd (g m 2) ... uncurry (+) (g 2 m) ...
 Only @h@ is exported, hence we see that @g@ is always called in contexts were we
 also force the division in the second component of the pair returned by @g@.
-This allows Nested CPR to evalute the division eagerly and return an I# in its
+This allows Nested CPR to evaluate the division eagerly and return an I# in its
 position.
 -}
 
@@ -1181,7 +1181,7 @@ For (2) consider
   f _ (MkT n t) = f n t
 
 Here f is lazy in T, but its *usage* is infinite: U(U,U(U,U(U, ...))).
-Notice that this happens becuase T is a product type, and is recrusive.
+Notice that this happens because T is a product type, and is recrusive.
 If we are not careful, we'll fail to iterate to a fixpoint in dmdFix,
 and bale out entirely, which is inefficient and over-conservative.
 

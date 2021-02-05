@@ -1577,7 +1577,7 @@ by unification, there are two cases to consider
      alpha[n] is at level n, and so if we set, say,
           alpha[n] := Maybe beta[m],
      we must ensure that when unifying beta we do skolem-escape checks
-     etc relevent to level n.  Simple way to do that: promote beta to
+     etc relevant to level n.  Simple way to do that: promote beta to
      level n.
 
   2. Set the Unification Level Flag to record that a level-n unification has
@@ -1586,7 +1586,7 @@ by unification, there are two cases to consider
 NB: UnifySameLevel is just an optimisation for UnifyOuterLevel. Promotion
 would be a no-op, and setting the unification flag unnecessarily would just
 make the solver iterate more often.  (We don't need to iterate when unifying
-at the ambient level becuase of the kick-out mechanism.)
+at the ambient level because of the kick-out mechanism.)
 
 
 ************************************************************************

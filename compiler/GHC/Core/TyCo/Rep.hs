@@ -1909,7 +1909,7 @@ foldTyCo (TyCoFolder { tcf_view       = view
       = let !env' = tycobinder env tv vis  -- Avoid building a thunk here
         in go_ty env (varType tv) `mappend` go_ty env' inner
 
-    -- Explicit recursion becuase using foldr builds a local
+    -- Explicit recursion because using foldr builds a local
     -- loop (with env free) and I'm not confident it'll be
     -- lambda lifted in the end
     go_tys _   []     = mempty

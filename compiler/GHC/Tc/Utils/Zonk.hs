@@ -1777,7 +1777,7 @@ Solution: (see #15552 for other variants)
       the treatment of lexically-scoped variables in ze_tv_env and
       ze_id_env.)
 
-    Is the extra work worth it?  Some non-sytematic perf measurements
+    Is the extra work worth it?  Some non-systematic perf measurements
     suggest that compiler allocation is reduced overall (by 0.5% or so)
     but compile time really doesn't change.
 -}

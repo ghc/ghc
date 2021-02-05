@@ -938,7 +938,7 @@ type RulesOnly = Bool
 type BranchCount = Int
   -- For OneOcc, the BranchCount says how many syntactic occurrences there are
   -- At the moment we really only check for 1 or >1, but in principle
-  --   we could pay attention to how *many* occurences there are
+  --   we could pay attention to how *many* occurrences there are
   --   (notably in postInlineUnconditionally).
   -- But meanwhile, Ints are very efficiently represented.
 

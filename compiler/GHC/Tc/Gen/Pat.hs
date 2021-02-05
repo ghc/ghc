@@ -458,7 +458,7 @@ Consider this exotic example:
    f :: Int -> blah
    f (pair True -> x) = ...here (x :: forall b. b -> (Int,b))
 
-The expresion (pair True) should have type
+The expression (pair True) should have type
     pair True :: Int -> forall b. b -> (Int,b)
 so that it is ready to consume the incoming Int. It should be an
 arrow type (t1 -> t2); hence using (tcInferRho expr).

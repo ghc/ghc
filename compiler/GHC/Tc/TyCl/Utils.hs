@@ -1105,6 +1105,6 @@ We want to generate HsBinds for unT that look something like this:
 Note that the type of recSelError is `forall r (a :: TYPE r). Addr# -> a`.
 Therefore, when used in the right-hand side of `unT`, GHC attempts to
 instantiate `a` with `(forall b. b -> b) -> Int`, which is impredicative.
-To make sure that GHC is OK with this, we enable ImpredicativeTypes interally
+To make sure that GHC is OK with this, we enable ImpredicativeTypes internally
 when typechecking these HsBinds so that the user does not have to.
 -}

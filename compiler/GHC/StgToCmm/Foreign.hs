@@ -460,7 +460,7 @@ Opening the nursery corresponds to the following code:
    tso->alloc_limit += bdfree - bdstart;
 
    // Set Hp to the last occupied word of the heap block.  Why not the
-   // next unocupied word?  Doing it this way means that we get to use
+   // next unoccupied word?  Doing it this way means that we get to use
    // an offset of zero more often, which might lead to slightly smaller
    // code on some architectures.
    Hp = bdfree - WDS(1);

@@ -1479,7 +1479,7 @@ different way (Note [Duplicating StrictArg] in Simplify).
 So I just set an arbitrary, high limit of 100, to stop any
 totally exponential behaviour.
 
-This still leaves the nasty possiblity that /ordinary/ inlining (not
+This still leaves the nasty possibility that /ordinary/ inlining (not
 postInlineUnconditionally) might inline these join points, each of
 which is individually quiet small.  I'm still not sure what to do
 about this (e.g. see #15488).

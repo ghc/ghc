@@ -2040,7 +2040,7 @@ NB: we could in principle avoid kick-out:
   b) For Givens, after a unification.  By (GivenInv) in GHC.Tc.Utils.TcType
      Note [TcLevel invariants], a Given can't include a meta-tyvar from
      its own level, so it falls under (a).  Of course, we must still
-     kick out Givens when adding a new non-unificaiton Given.
+     kick out Givens when adding a new non-unification Given.
 
 But kicking out more vigorously may lead to earlier unification and fewer
 iterations, so we don't take advantage of these possibilities.
@@ -3438,7 +3438,7 @@ Answer: if any unification of a tyvar at level n takes place
 
 * What if a unification takes place at level n, in the ic_simples of
   level n?  No need to track this, because the kick-out mechanism deals
-  with it.  (We can't drop kick-out in favour of iteration, becuase kick-out
+  with it.  (We can't drop kick-out in favour of iteration, because kick-out
   works for skolem-equalities, not just unifications.)
 
 So the monad-global Unification Level Flag, kept in tcs_unif_lvl keeps

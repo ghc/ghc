@@ -141,7 +141,7 @@ bound regsOfClass regAlias classN classesC
 -- | The total squeese on a particular node with a list of neighbors.
 --
 --   A version of this should be constructed for each particular architecture,
---   possibly including uses of bound, so that alised registers don't get
+--   possibly including uses of bound, so that aliased registers don't get
 --   counted twice, as per the paper.
 squeese :: (RegClass    -> UniqSet Reg)
         -> (Reg         -> UniqSet Reg)

@@ -604,7 +604,7 @@ foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
 -- Left ("That's odd",9)
 --
 -- The 'Foldable' instance should be defined in a manner that avoids
--- construction of an unnecesary copy of the container.
+-- construction of an unnecessary copy of the container.
 --
 -- The @Foldable@ method 'mapM_' and its flipped version 'forM_' can be used
 -- to sequence IO actions over all the elements of a @Traversable@ container

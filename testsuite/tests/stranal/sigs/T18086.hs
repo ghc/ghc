@@ -13,7 +13,7 @@ m = do
   putStrLn "foo"
   error "bar"
 
--- Dito, just in a more complex scenario (the original reproducer of #18086)
+-- Ditto, just in a more complex scenario (the original reproducer of #18086)
 panic :: String -> a
 panic x = unsafeDupablePerformIO $ do
   stack <- ccsToStrings =<< getCurrentCCS x

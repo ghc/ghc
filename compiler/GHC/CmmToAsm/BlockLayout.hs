@@ -539,7 +539,7 @@ mergeChains edges chains
 -- An Edge is irrelevant if the ends are part of the same chain.
 -- We say these edges are already linked
 buildChains :: [CfgEdge] -> [BlockId]
-            -> ( LabelMap BlockChain  -- Resulting chains, indexd by end if chain.
+            -> ( LabelMap BlockChain  -- Resulting chains, indexed by end if chain.
                , Set.Set (BlockId, BlockId)) --List of fused edges.
 buildChains edges blocks
   = runST $ buildNext setEmpty mapEmpty mapEmpty edges Set.empty

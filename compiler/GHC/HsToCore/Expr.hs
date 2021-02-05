@@ -240,7 +240,7 @@ dsUnliftedBind bind body = pprPanic "dsLet: unlifted" (ppr bind $$ ppr body)
 -}
 
 
--- | Replace the body of the fucntion with this block to test the hsExprType
+-- | Replace the body of the function with this block to test the hsExprType
 -- function in GHC.Tc.Utils.Zonk:
 -- putSrcSpanDs loc $ do
 --   { core_expr <- dsExpr e
@@ -682,7 +682,7 @@ We have
             MkF (co2::s ~# Int) _ -> $WMkF @t y |> co3
 
 (Side note: here (z |> co1) is built by typechecking the scrutinee, so
-we ignore it here.  In general the scrutinee is an aribtrary expression.)
+we ignore it here.  In general the scrutinee is an arbitrary expression.)
 
 The question is: what is co3, the cast for the RHS?
       co3 :: F (Int,t) ~ F (s,t)

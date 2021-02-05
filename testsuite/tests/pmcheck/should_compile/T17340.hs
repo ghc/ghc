@@ -51,4 +51,4 @@ w _      _    = ()
 z :: T2 a -> Bool -> ()
 z _ True                = ()
 z t2 !x | T2 _ <- t2, x = () -- redundant
-        | !_ <- t2, x   = () -- inaccessable
+        | !_ <- t2, x   = () -- inaccessible

@@ -1838,7 +1838,7 @@ buildDocComponents str name = do
 
   pure DocComponents{..}
 
--- | Produce output containing the type/kind signature, category, and definiton
+-- | Produce output containing the type/kind signature, category, and definition
 -- location of a TyThing.
 sigAndLocDoc :: String -> TyThing -> SDoc
 sigAndLocDoc str tyThing =

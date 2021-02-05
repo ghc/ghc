@@ -1112,7 +1112,7 @@ lookupGlobalOccRn rdr_name =
       Nothing -> do { traceRn "lookupGlobalOccRn" (ppr rdr_name)
                     ; unboundName WL_Global rdr_name }
 
--- Looks up a RdrName occurence in the GlobalRdrEnv and with
+-- Looks up a RdrName occurrence in the GlobalRdrEnv and with
 -- lookupQualifiedNameGHCi. Does not try to find an Exact or Orig name first.
 -- lookupQualifiedNameGHCi here is used when we're in GHCi and a name like
 -- 'Data.Map.elems' is typed, even if you didn't import Data.Map

@@ -530,7 +530,7 @@ forbiddenOpEvi = Sub $
     OpAbsent -> Dict
     OpPresent -> error "impossible"
 
--- | Reify 'HasNoOp' contraint from 'ForbidOp'.
+-- | Reify 'HasNoOp' constraint from 'ForbidOp'.
 --
 -- Left for backward compatibility.
 forbiddenOp
@@ -566,7 +566,7 @@ forbiddenNestedBigMaps
   -> a
 forbiddenNestedBigMaps = withDict $ forbiddenNestedBigMapsEvi @t
 
--- | Reify 'HasNoContract' contraint from 'ForbidContract'.
+-- | Reify 'HasNoContract' constraint from 'ForbidContract'.
 forbiddenContractTypeEvi
   :: forall t. (SingI t, ForbidContract t) :- HasNoContract t
 forbiddenContractTypeEvi = Sub $
@@ -574,7 +574,7 @@ forbiddenContractTypeEvi = Sub $
     ContractAbsent -> Dict
     ContractPresent -> error "impossible"
 
--- | Reify 'HasNoContract' contraint from 'ForbidContract'.
+-- | Reify 'HasNoContract' constraint from 'ForbidContract'.
 forbiddenContractType
   :: forall t a.
      (SingI t, ForbidContract t)

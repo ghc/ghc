@@ -134,7 +134,7 @@ data ForeignPtrContents
     -- reachable (by GC) whenever the 'ForeignPtr' is reachable. When the
     -- 'ForeignPtr' becomes unreachable, the runtime\'s normal GC recovers
     -- the memory backing it. Here, the finalizer function intended to be used
-    -- to @free()@ any ancilliary *unmanaged* memory pointed to by the
+    -- to @free()@ any ancillary *unmanaged* memory pointed to by the
     -- 'MutableByteArray#'. See the @zlib@ library for an example of this use.
     --
     -- 1. Invariant: The 'Addr#' in the parent 'ForeignPtr' is an interior
