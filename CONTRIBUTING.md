@@ -9,6 +9,16 @@ Please open a ticket if you get an unexpected behaviour from Haddock!
 You should ideally include a [Short, Self Contained, Correct (Compilable), Example][SSCCE]
 in your ticket, so that the maintainers may easily reproduce your issue.
 
+Here is a list of things you should include in your ticket
+
+* Your GHC version.
+
+* Your platform, OS and distribution if applicable.
+
+* Your cabal version if applicable.
+
+* Include any other info you think might be relevant (sandbox? unusual setup?).
+
 ## Hacking
 
 To get started you'll need the latest GHC release installed.
@@ -22,9 +32,13 @@ cd haddock
 
 ### Git Branches
 
-Please **always** base your pull request on the current GHC version branch
+If your patch consists of glue code and interface changes with GHC, please
+open a Pull Request targeting the `ghc-head` branch.
+
+Otherwise, for improvements to the documentation generator,
+please base your pull request on the current GHC version branch
 (`ghc-9.0` for instance). The PR will be forward-ported to `ghc-head`
-so that GHC can use it.
+so that documentation built within GHC can benefit from it.
 
 ### Building the packages
 
