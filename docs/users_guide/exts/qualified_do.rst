@@ -19,7 +19,7 @@ the monadic combinators that the ``do`` notation desugars to.
 When ``-XQualifiedDo`` is enabled, you can *qualify* the ``do`` notation by writing ``modid.do``, where
 ``modid`` is a module name in scope: ::
 
-    {-# LANGAUGE QualifiedDo #-}
+    {-# LANGUAGE QualifiedDo #-}
     import qualified Some.Module.Monad as M
 
     action :: M.SomeType a
