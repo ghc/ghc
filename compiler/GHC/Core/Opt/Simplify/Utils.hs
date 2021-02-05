@@ -1692,7 +1692,6 @@ tryEtaExpandRhs mode bndr rhs
 
 wantEtaExpansion :: CoreExpr -> Bool
 -- Mostly True; but False of PAPs which will immediately eta-reduce again
--- See
 -- See Note [Which RHSs do we eta-expand?]
 wantEtaExpansion (Cast e _)             = wantEtaExpansion e
 wantEtaExpansion (Tick _ e)             = wantEtaExpansion e

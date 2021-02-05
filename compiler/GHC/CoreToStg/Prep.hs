@@ -1298,24 +1298,6 @@ cpeEtaExpand arity expr
   | arity == 0 = expr
   | otherwise  = etaExpand arity expr
 
-{-
--- -----------------------------------------------------------------------------
---      Eta reduction
--- -----------------------------------------------------------------------------
-Why try eta reduction?  Hasn't the simplifier already done eta?
-But the simplifier only eta reduces if that leaves something
-trivial (like f, or f Int).  But for deLam it would be enough to
-get to a partial application:
-        case x of { p -> \xs. map f xs }
-    ==> case x of { p -> map f }
--}
-
-{-
-tryEtaReducePrep :: [CoreBndr] -> CoreExpr -> Maybe CoreExpr
-tryEtaReducePrep = tryEtaReduce False
-  -- The 'False' says not to eta-reduce a hasNoBinding id
-  -- We want them to be saturated
--}
 
 {-
 ************************************************************************
