@@ -96,6 +96,7 @@ import qualified Data.List.NonEmpty as NE
 import GHC.Core.DataCon
 import GHC.Types.Unique.FM
 import GHC.Data.Maybe
+import Control.Monad
 
 -------------------------------------------------------------------------
 --
@@ -662,7 +663,7 @@ convertInfoProvMap dflags defns this_mod (InfoTableProvMap (UniqMap dcenv) denv)
 
         lookupClosureMap :: Maybe InfoProvEnt
         lookupClosureMap = case hasHaskellName cl >>= lookupUniqMap denv of
-                                Just (ty, ss, l) -> Just (InfoProvEnt cl cn (tyString ty) this_mod (Just (ss, l)))
+                                Just (ty, mbspan) -> Just (InfoProvEnt cl cn (tyString ty) this_mod mbspan)
                                 Nothing -> Nothing
 
         lookupDataConMap = do
@@ -670,7 +671,7 @@ convertInfoProvMap dflags defns this_mod (InfoTableProvMap (UniqMap dcenv) denv)
             -- This is a bit grimy, relies on the DataCon and Name having the same Unique, which they do
             (dc, ns) <- (hasHaskellName cl >>= lookupUFM_Directly dcenv . getUnique)
             -- Lookup is linear but lists will be small (< 100)
-            return $ InfoProvEnt cl cn (tyString (dataConTyCon dc)) this_mod (lookup n (NE.toList ns))
+            return $ InfoProvEnt cl cn (tyString (dataConTyCon dc)) this_mod (join $ lookup n (NE.toList ns))
 
         -- This catches things like prim closure types and anything else which doesn't have a
         -- source location
