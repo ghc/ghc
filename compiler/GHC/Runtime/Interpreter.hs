@@ -202,7 +202,7 @@ iservCmd hsc_env msg = withInterp hsc_env $ \case
 withInterp :: HscEnv -> (Interp -> IO a) -> IO a
 withInterp hsc_env action = action (hscInterp hsc_env)
 
--- | Retreive the targe code interpreter
+-- | Retrieve the targe code interpreter
 --
 -- Fails if no target code interpreter is available
 hscInterp :: HscEnv -> Interp

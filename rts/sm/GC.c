@@ -1412,7 +1412,7 @@ waitForGcThreads (Capability *cap, bool idle_cap[])
         }
     }
 
-    ASSERT(n_threads < n_capabilities); // must be less becasue we don't count ourself
+    ASSERT(n_threads < n_capabilities); // must be less because we don't count ourself
     if(n_threads == 0) { return; }
 
     ACQUIRE_LOCK(&gc_entry_mutex);

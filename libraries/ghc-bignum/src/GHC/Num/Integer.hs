@@ -577,7 +577,7 @@ integerTestBit# (IN x) i
    | isTrue# (iw >=# n)
    = 1#
    -- if all the limbs j with j < iw are null, then we have to consider the
-   -- carry of the 2's complement convertion. Otherwise we just have to return
+   -- carry of the 2's complement conversion. Otherwise we just have to return
    -- the inverse of the bit test
    | allZ iw = testBitW# (xi `minusWord#` 1##) ib ==# 0#
    | True    = testBitW# xi ib ==# 0#

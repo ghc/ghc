@@ -1300,7 +1300,7 @@ But the demand fed into f might be less than CS(CS(U)). Then we have to
    - We have to multiply divergence with C_01. If r says that f Diverges for sure,
      then this holds when the demand guarantees that two arguments are going to
      be passed. If the demand is lower, we may just as well converge.
-     If we were tracking definite convegence, than that would still hold under
+     If we were tracking definite convergence, than that would still hold under
      a weaker demand than expected by the demand transformer.
  * Used more than once, e.g. CM(CS(U)):
    - Multiply with C_1N. Even if f puts a used-once demand on any of its argument

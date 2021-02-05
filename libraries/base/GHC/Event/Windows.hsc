@@ -564,7 +564,7 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
         -- relied on for non-file handles we need a way to prevent
         -- us from handling a request inline and handle a completion
         -- event handled without a queued I/O operation.  Which means we
-        -- can't solely rely on the number of oustanding requests but most
+        -- can't solely rely on the number of outstanding requests but most
         -- also check intermediate status.
         reqs <- addRequest
         debugIO $ "+1.. " ++ show reqs ++ " requests queued. | " ++ show lpol

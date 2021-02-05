@@ -1112,7 +1112,7 @@ the /data constructor/ declarations altogether, looking only at the
 data instance /header/.
 
 Observations:
-* This choice is simple to describe, as well as simple to implment.
+* This choice is simple to describe, as well as simple to implement.
   For a data/newtype instance decl, the instance kinds are influenced
   /only/ by the header.
 

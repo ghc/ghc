@@ -149,7 +149,7 @@
   * call ioManagerStart()
   * Creat a thread to execute "runner"
 
-  We never truely shut down the IO Manager. While this means we
+  We never truly shut down the IO Manager. While this means we
   might block forever on the IOPort if the IO Manager is no longer
   needed we consider this cheap compared to the complexity of
   properly handling pausing and resuming of the manager.
@@ -284,7 +284,7 @@ void shutdownAsyncWinIO(bool wait_threads)
   ioManagerDie ();
 }
 
-/* Register the I/O completetion port handle PORT that the I/O manager will be
+/* Register the I/O completion port handle PORT that the I/O manager will be
    monitoring.  All handles are expected to be associated with this handle.  */
 void registerIOCPHandle (HANDLE port)
 {
@@ -365,7 +365,7 @@ void registerAlertableWait (bool has_timeout, DWORD mssec)
   ReleaseSRWLockExclusive (&wio_runner_lock);
 
   /* Since we call registerAlertableWait only after
-     processing I/O requests it's always desireable to wake
+     processing I/O requests it's always desirable to wake
      up the runner here.  */
   WakeConditionVariable (&wakeEvent);
 

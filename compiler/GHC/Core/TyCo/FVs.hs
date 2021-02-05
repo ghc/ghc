@@ -383,7 +383,7 @@ shallowTcvFolder = TyCoFolder { tcf_view = noView
 {- Note [Finding free coercion varibles]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Here we are only interested in the free /coercion/ variables.
-We can achieve this through a slightly differnet TyCo folder.
+We can achieve this through a slightly different TyCo folder.
 
 Notice that we look deeply, into kinds.
 

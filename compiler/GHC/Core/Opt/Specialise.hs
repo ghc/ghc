@@ -867,7 +867,7 @@ call to spec_imorpts in spec_import, we must include the dict-binds
 from the parent.  Lacking this caused #17151, a really nasty bug.
 
 Here is what happened.
-* Class struture:
+* Class structure:
     Source is a superclass of Mut
     Index is a superclass of Source
 

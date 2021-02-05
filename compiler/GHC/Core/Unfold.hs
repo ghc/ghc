@@ -810,7 +810,7 @@ binary sizes shrink significantly either.
 Note [Discounts and thresholds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Constants for discounts and thesholds are defined in 'UnfoldingOpts'. They are:
+Constants for discounts and thresholds are defined in 'UnfoldingOpts'. They are:
 
 unfoldingCreationThreshold
      At a definition site, if the unfolding is bigger than this, we
