@@ -2372,16 +2372,16 @@ lookupInInerts loc pty
   | ClassPred cls tys <- classifyPredType pty
   = do { inerts <- getTcSInerts
        ; return (lookupSolvedDict inerts loc cls tys `mplus`
-                 lookupInertDict (inert_cans inerts) loc cls tys) }
+                 fmap ctEvidence (lookupInertDict (inert_cans inerts) loc cls tys)) }
   | otherwise -- NB: No caching for equalities, IPs, holes, or errors
   = return Nothing
 
 -- | Look up a dictionary inert. NB: the returned 'CtEvidence' might not
 -- match the input exactly. Note [Use loose types in inert set].
-lookupInertDict :: InertCans -> CtLoc -> Class -> [Type] -> Maybe CtEvidence
+lookupInertDict :: InertCans -> CtLoc -> Class -> [Type] -> Maybe Ct
 lookupInertDict (IC { inert_dicts = dicts }) loc cls tys
   = case findDict dicts loc cls tys of
-      Just ct -> Just (ctEvidence ct)
+      Just ct -> Just ct
       _       -> Nothing
 
 -- | Look up a solved inert. NB: the returned 'CtEvidence' might not
