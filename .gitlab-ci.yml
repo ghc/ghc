@@ -1011,7 +1011,7 @@ source-tarball:
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   dependencies: []
   rules:
-    - if: $CI_COMMIT_TAG
+    - if: $RELEASE_JOB
       when: always
   artifacts:
     paths:
