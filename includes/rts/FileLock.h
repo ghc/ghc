@@ -21,7 +21,7 @@
  * Instead we keep track of locked files in a data structure in
  * the RTS. This file provides the interface to this data structure.
  *
- * In the base librarie we then use this interface to "lock" files.
+ * In the base libraries we then use this interface to "lock" files.
  * This means it's very much still possible for users outside of the
  * rts/base library to open the files in question even if they are
  * locked.

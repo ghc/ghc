@@ -682,7 +682,7 @@ This example happens a lot; it first showed up in Andy Gill's thesis,
 fifteen years ago!  It also shows up in the code for 'rnf' on lists
 in #4138.
 
-We do the neccessary, quite simple fixed-point iteration in 'findRhsArity',
+We do the necessary, quite simple fixed-point iteration in 'findRhsArity',
 which assumes for a single binding 'ABot' on the first run and iterates
 until it finds a stable arity type. Two wrinkles
 
@@ -1339,7 +1339,7 @@ a (\eta) around the outside and use etaInfoApp to apply each
 alternative to 'eta'.  We want to beta-reduce all that junk
 away.
 
-#18223 was a dramtic example in which the intermediate term was
+#18223 was a dramatic example in which the intermediate term was
 grotesquely huge, even though the next Simplifier iteration squashed
 it.  Better to kill it at birth.
 -}

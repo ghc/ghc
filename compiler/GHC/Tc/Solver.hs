@@ -223,7 +223,7 @@ simplifyAndEmitFlatConstraints wanted
                          ; tclvl  <- TcM.getTcLevel
                          ; implic <- buildTvImplication UnkSkol [] tclvl wanted
                                      -- UnkSkol: doesn't matter, because
-                                     -- we bind no skolem varaibles here
+                                     -- we bind no skolem variables here
                          ; emitImplication implic
                          ; failM }
            Just (simples, holes)
@@ -312,7 +312,7 @@ should be well. BUT it's hard to see that when kind-checking the signature
 for undefined.  We want to emit a residual (a~b) constraint, to solve
 later.
 
-Another possiblity is that we might have something like
+Another possibility is that we might have something like
    F alpha ~ [Int]
 where alpha is bound further out, which might become soluble
 "later" when we learn more about alpha.  So we want to emit

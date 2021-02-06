@@ -36,7 +36,7 @@ import System.FilePath ((</>), (<.>))
 -- @-l@ and @-rpath@ to the linker will result in the unnecesasry libraries not
 -- being included in the load commands, however the @-rpath@ entries are all
 -- forced to be included.  This can lead to 100s of @-rpath@ entries being
--- included when only a handful of libraries end up being truely linked.
+-- included when only a handful of libraries end up being truly linked.
 --
 -- Thus after building the library, we run a fixup phase where we inject the
 -- @-rpath@ for each found library (in the given library search paths) into the

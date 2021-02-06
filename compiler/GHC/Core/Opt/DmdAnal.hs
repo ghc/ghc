@@ -177,7 +177,7 @@ That is, a series of right-nested pairs, where the @fst@ are the exported
 binders of the last enclosing let binding and @snd@ continues the nested
 lets.
 
-Variables occuring free in RULE RHSs are to be handled the same as exported Ids.
+Variables occurring free in RULE RHSs are to be handled the same as exported Ids.
 See also Note [Absence analysis for stable unfoldings and RULES].
 
 Note [Why care for top-level demand annotations?]
@@ -204,7 +204,7 @@ to unbox deeper. From T18894:
   h m = ... snd (g m 2) ... uncurry (+) (g 2 m) ...
 Only @h@ is exported, hence we see that @g@ is always called in contexts were we
 also force the division in the second component of the pair returned by @g@.
-This allows Nested CPR to evalute the division eagerly and return an I# in its
+This allows Nested CPR to evaluate the division eagerly and return an I# in its
 position.
 -}
 
@@ -1181,7 +1181,7 @@ For (2) consider
   f _ (MkT n t) = f n t
 
 Here f is lazy in T, but its *usage* is infinite: U(U,U(U,U(U, ...))).
-Notice that this happens becuase T is a product type, and is recrusive.
+Notice that this happens because T is a product type, and is recrusive.
 If we are not careful, we'll fail to iterate to a fixpoint in dmdFix,
 and bale out entirely, which is inefficient and over-conservative.
 
@@ -1295,42 +1295,16 @@ annotateLamIdBndr env arg_of_dfun dmd_ty id
     main_ty = addDemand dmd dmd_ty'
     (dmd_ty', dmd) = findBndrDmd env arg_of_dfun dmd_ty id
 
-{-
-Note [NOINLINE and strictness]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The strictness analyser used to have a HACK which ensured that NOINLNE
-things were not strictness-analysed.  The reason was unsafePerformIO.
-Left to itself, the strictness analyser would discover this strictness
-for unsafePerformIO:
-        unsafePerformIO:  C(U(AV))
-But then consider this sub-expression
-        unsafePerformIO (\s -> let r = f x in
-                               case writeIORef v r s of (# s1, _ #) ->
-                               (# s1, r #)
-The strictness analyser will now find that r is sure to be eval'd,
-and may then hoist it out.  This makes tests/lib/should_run/memo002
-deadlock.
+{- Note [NOINLINE and strictness]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+At one point we disabled strictness for NOINLINE functions, on the
+grounds that they should be entirely opaque.  But that lost lots of
+useful semantic strictness information, so now we analyse them like
+any other function, and pin strictness information on them.
 
-Solving this by making all NOINLINE things have no strictness info is overkill.
-In particular, it's overkill for runST, which is perfectly respectable.
-Consider
-        f x = runST (return x)
-This should be strict in x.
+That in turn forces us to worker/wrapper them; see
+Note [Worker-wrapper for NOINLINE functions] in GHC.Core.Opt.WorkWrap.
 
-So the new plan is to define unsafePerformIO using the 'lazy' combinator:
-
-        unsafePerformIO (IO m) = lazy (case m realWorld# of (# _, r #) -> r)
-
-Remember, 'lazy' is a wired-in identity-function Id, of type a->a, which is
-magically NON-STRICT, and is inlined after strictness analysis.  So
-unsafePerformIO will look non-strict, and that's what we want.
-
-Now we don't need the hack in the strictness analyser.  HOWEVER, this
-decision does mean that even a NOINLINE function is not entirely
-opaque: some aspect of its implementation leaks out, notably its
-strictness.  For example, if you have a function implemented by an
-error stub, but which has RULES, you may want it not to be eliminated
-in favour of error!
 
 Note [Lazy and unleashable free variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

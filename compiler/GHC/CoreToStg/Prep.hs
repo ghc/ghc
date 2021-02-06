@@ -1028,7 +1028,7 @@ Performing the transform described above would result in:
 
 If runRW# were a "normal" function this call to join point j would not be
 allowed in its continuation argument. However, since runRW# is inlined (as
-described in Note [runRW magic] above), such join point occurences are
+described in Note [runRW magic] above), such join point occurrences are
 completely fine. Both occurrence analysis (see the runRW guard in occAnalApp)
 and Core Lint (see the App case of lintCoreExpr) have special treatment for
 runRW# applications. See Note [Linting of runRW#] for details on the latter.

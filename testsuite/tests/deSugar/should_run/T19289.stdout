@@ -1,0 +1,4 @@
+No lines from within 'someAnnotatedValue' (i.e. line 24) will show up here:
+CallStack (from HasCallStack):
+  addCallStack, called at T19289.hs:12:25 in main:Main
+  Annotated, called at T19289.hs:24:26 in main:Main

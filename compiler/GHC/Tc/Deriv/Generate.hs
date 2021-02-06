@@ -2682,7 +2682,7 @@ avoid name clashes:
     toEnum a = $tag2con_T{Uniq2} a
 
    -- $tag2con_T{Uniq1} and $tag2con_T{Uniq2} are Exact RdrNames with
-   -- underyling System Names
+   -- underlying System Names
 
    $tag2con_T{Uniq1} :: Int -> T
    $tag2con_T{Uniq1} = ...code....

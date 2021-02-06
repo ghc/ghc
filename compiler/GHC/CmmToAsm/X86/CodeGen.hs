@@ -3054,7 +3054,7 @@ genCCall32' target dest_regs args = do
                                    X87Store fmt  tmp_amode,
                                    -- X87Store only supported for the CDECL ABI
                                    -- NB: This code will need to be
-                                   -- revisted once GHC does more work around
+                                   -- revisited once GHC does more work around
                                    -- SIGFPE f
                                    MOV fmt (OpAddr tmp_amode) (OpReg r_dest),
                                    ADD II32 (OpImm (ImmInt b)) (OpReg esp),

@@ -291,7 +291,7 @@ tcApp rn_expr exp_res_ty
 
        -- Zonk the result type, to ensure that we substitute out
        -- any filled-in instantiation variable before calling tcWrapResultMono
-       -- In the Check case, this isn't really necessary, becuase tcWrapResultMono
+       -- In the Check case, this isn't really necessary, because tcWrapResultMono
        -- just drops to tcUnify; but in the Infer case a filled-in instantiation
        -- variable might perhaps escape into the constraint generator. The safe
        -- thing to do is to any instantaition variables away.
@@ -318,7 +318,7 @@ wantQuickLook _                                          = xoptM LangExt.Impredi
 
 zonkQuickLook :: Bool -> TcType -> TcM TcType
 -- After all Quick Look unifications are done, zonk to ensure that all
--- instantation variables are substituted away
+-- instantiation variables are substituted away
 --
 -- So far as the paper is concerned, this step applies
 -- the poly-substitution Theta, learned by QL, so that we
@@ -677,7 +677,7 @@ over any visible type arguments.  We've already inferred the type of
 the function (in tcInferAppHead), so we'll /already/ have emitted a
 Hole constraint; failing preserves that constraint.
 
-We do /not/ want to fail altogether in this case (via failM) becuase
+We do /not/ want to fail altogether in this case (via failM) because
 that may abandon an entire instance decl, which (in the presence of
 -fdefer-type-errors) leads to leading to #17792.
 

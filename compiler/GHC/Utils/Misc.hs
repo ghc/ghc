@@ -785,7 +785,7 @@ splitAtList xs ys = go 0# xs ys
 -- drop from the end of a list
 dropTail :: Int -> [a] -> [a]
 -- Specification: dropTail n = reverse . drop n . reverse
--- Better implemention due to Joachim Breitner
+-- Better implementation due to Joachim Breitner
 -- http://www.joachim-breitner.de/blog/archives/600-On-taking-the-last-n-elements-of-a-list.html
 dropTail n xs
   = go (drop n xs) xs

@@ -2849,7 +2849,7 @@ getMessages :: PState -> (Bag PsWarning, Bag PsError)
 getMessages p =
   let ws = warnings p
       -- we add the tabulation warning on the fly because
-      -- we count the number of occurences of tab characters
+      -- we count the number of occurrences of tab characters
       ws' = case tab_first p of
                Nothing -> ws
                Just tf -> PsWarnTab (RealSrcSpan tf Nothing) (tab_count p)

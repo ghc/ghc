@@ -720,7 +720,7 @@ PauseToken *rts_pause (void)
     Task * task = getMyTask();
     if (rts_pausing_task == task)
     {
-        // This task already pased the RTS.
+        // This task already passed the RTS.
         errorBelch("error: rts_pause: This thread has already paused the RTS.");
         stg_exit(EXIT_FAILURE);
     }
@@ -799,7 +799,7 @@ static void assert_isPausedOnMyTask(const char *functionName)
     if (task != rts_pausing_task)
     {
         // We don't have ownership of rts_pausing_task, so it may have changed
-        // just after the above read. Still, we are garanteed that
+        // just after the above read. Still, we are guaranteed that
         // rts_pausing_task won't be set to the current task (because the
         // current task is here now!), so the error messages are still correct.
         errorBelch (
