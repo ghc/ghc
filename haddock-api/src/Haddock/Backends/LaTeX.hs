@@ -1149,6 +1149,7 @@ ppr_mono_ty (HsStarTy _ isUni) unicode = starSymbol (isUni || unicode)
 ppr_tylit :: HsTyLit -> Bool -> LaTeX
 ppr_tylit (HsNumTy _ n) _ = integer n
 ppr_tylit (HsStrTy _ s) _ = text (show s)
+ppr_tylit (HsCharTy _ c) _ = text (show c)
   -- XXX: Ok in verbatim, but not otherwise
   -- XXX: Do something with Unicode parameter?
 
