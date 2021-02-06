@@ -57,8 +57,7 @@ import GHC.Parser.Annotation (IsUnicodeSyntax(..))
 
 import Haddock.Types
 import Haddock.Interface.Specialize
-import Haddock.GhcUtils                      ( orderedFVs, defaultRuntimeRepVars )
-import Haddock.Utils                         ( mkEmptySigType )
+import Haddock.GhcUtils                      ( orderedFVs, defaultRuntimeRepVars, mkEmptySigType )
 
 import Data.Maybe                            ( catMaybes, mapMaybe, maybeToList )
 
@@ -167,8 +166,7 @@ synifyAxBranch tc (CoAxBranch { cab_tvs = tkvs, cab_lhs = args, cab_rhs = rhs })
   = let name            = synifyName tc
         args_types_only = filterOutInvisibleTypes tc args
         typats          = map (synifyType WithinType []) args_types_only
-        annot_typats    = zipWith3 annotHsType (mkIsPolyTvs fam_tvs)
-                                   args_types_only typats
+        annot_typats    = zipWith3 annotHsType args_poly args_types_only typats
         hs_rhs          = synifyType WithinType [] rhs
         outer_bndrs     = HsOuterImplicit{hso_ximplicit = map tyVarName tkvs}
                                        -- TODO: this must change eventually
@@ -179,7 +177,7 @@ synifyAxBranch tc (CoAxBranch { cab_tvs = tkvs, cab_lhs = args, cab_rhs = rhs })
               , feqn_fixity = synifyFixity name
               , feqn_rhs    = hs_rhs }
   where
-    fam_tvs = tyConVisibleTyVars tc
+    args_poly = tyConArgsPolyKinded tc
 
 synifyAxiom :: CoAxiom br -> Either ErrMsg (HsDecl GhcRn)
 synifyAxiom ax@(CoAxiom { co_ax_tc = tc })
@@ -506,17 +504,26 @@ annotHsType True ty hs_ty
     in noLoc (HsKindSig noExtField hs_ty hs_ki)
 annotHsType _    _ hs_ty = hs_ty
 
--- | For every type variable in the input,
--- report whether or not the tv is poly-kinded. This is used to eventually
--- feed into 'annotHsType'.
-mkIsPolyTvs :: [TyVar] -> [Bool]
-mkIsPolyTvs = map is_poly_tv
+-- | For every argument type that a type constructor accepts,
+-- report whether or not the argument is poly-kinded. This is used to
+-- eventually feed into 'annotThType'.
+tyConArgsPolyKinded :: TyCon -> [Bool]
+tyConArgsPolyKinded tc =
+     map (is_poly_ty . tyVarKind)      tc_vis_tvs
+  ++ map (is_poly_ty . tyCoBinderType) tc_res_kind_vis_bndrs
+  ++ repeat True
   where
-    is_poly_tv tv = not $
+    is_poly_ty :: Type -> Bool
+    is_poly_ty ty = not $
                     isEmptyVarSet $
                     filterVarSet isTyVar $
-                    tyCoVarsOfType $
-                    tyVarKind tv
+                    tyCoVarsOfType ty
+
+    tc_vis_tvs :: [TyVar]
+    tc_vis_tvs = tyConVisibleTyVars tc
+
+    tc_res_kind_vis_bndrs :: [TyCoBinder]
+    tc_res_kind_vis_bndrs = filter isVisibleBinder $ fst $ splitPiTys $ tyConResKind tc
 
 --states of what to do with foralls:
 data SynifyTypeState
@@ -641,11 +648,14 @@ synifyType _ vs (TyConApp tc tys)
         in noLoc $ HsKindSig noExtField ty' full_kind'
       | otherwise = ty'
 
-synifyType s vs (AppTy t1 (CoercionTy {})) = synifyType s vs t1
-synifyType _ vs (AppTy t1 t2) = let
-  s1 = synifyType WithinType vs t1
-  s2 = synifyType WithinType vs t2
-  in noLoc $ HsAppTy noExtField s1 s2
+synifyType _ vs ty@(AppTy {}) = let
+  (ty_head, ty_args) = splitAppTys ty
+  ty_head' = synifyType WithinType vs ty_head
+  ty_args' = map (synifyType WithinType vs) $
+             filterOut isCoercionTy $
+             filterByList (map isVisibleArgFlag $ appTyArgFlags ty_head ty_args)
+                          ty_args
+  in foldl (\t1 t2 -> noLoc $ HsAppTy noExtField t1 t2) ty_head' ty_args'
 synifyType s vs funty@(FunTy InvisArg _ _ _) = synifySigmaType s vs funty
 synifyType _ vs       (FunTy VisArg w t1 t2) = let
   s1 = synifyType WithinType vs t1
@@ -838,8 +848,8 @@ synifyInstHead (vs, preds, cls, types) = specializeInstHead $ InstHead
     cls_tycon = classTyCon cls
     ts  = filterOutInvisibleTypes cls_tycon types
     ts' = map (synifyType WithinType vs) ts
-    annot_ts = zipWith3 annotHsType is_poly_tvs ts ts'
-    is_poly_tvs = mkIsPolyTvs (tyConVisibleTyVars cls_tycon)
+    annot_ts = zipWith3 annotHsType args_poly ts ts'
+    args_poly = tyConArgsPolyKinded cls_tycon
     synifyClsIdSig = synifyIdSig ShowRuntimeRep DeleteTopLevelQuantification vs
 
 -- Convert a family instance, this could be a type family or data family
@@ -878,8 +888,8 @@ synifyFamInst fi opaque = do
     ts = filterOutInvisibleTypes fam_tc eta_expanded_lhs
     synifyTypes = map (synifyType WithinType [])
     ts' = synifyTypes ts
-    annot_ts = zipWith3 annotHsType is_poly_tvs ts ts'
-    is_poly_tvs = mkIsPolyTvs (tyConVisibleTyVars fam_tc)
+    annot_ts = zipWith3 annotHsType args_poly ts ts'
+    args_poly = tyConArgsPolyKinded fam_tc
 
 {-
 Note [Invariant: Never expand type synonyms]

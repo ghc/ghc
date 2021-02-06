@@ -44,11 +44,11 @@ import Haddock.Types
 import Haddock.Utils
 
 import Control.Monad
+import Control.Monad.IO.Class ( MonadIO, liftIO )
 import Data.IORef
-import Data.List
+import Data.List (foldl', isPrefixOf, nub)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import Distribution.Verbosity
 import Text.Printf
 
 import GHC.Unit.Module.Env (mkModuleSet, emptyModuleSet, unionModuleSet, ModuleSet)
@@ -69,6 +69,7 @@ import GHC.Types.Name.Occurrence (isTcOcc)
 import GHC.Types.Name.Reader (unQualOK, greMangledName, globalRdrEnvElts)
 import GHC.Utils.Error (withTimingD)
 import GHC.HsToCore.Docs
+import GHC.Runtime.Loader (initializePlugins)
 import GHC.Plugins (Outputable, StaticPlugin(..), Plugin(..), PluginWithArgs(..),
                      defaultPlugin, keepRenamedSource)
 
@@ -126,7 +127,7 @@ processModules verbosity modules flags extIfaces = do
   let warnings = Flag_NoWarnings `notElem` flags
   dflags <- getDynFlags
   let (interfaces'', msgs) =
-         runWriter $ mapM (renameInterface dflags links warnings) interfaces'
+         runWriter $ mapM (renameInterface dflags (ignoredSymbols flags) links warnings) interfaces'
   liftIO $ mapM_ putStrLn msgs
 
   return (interfaces'', homeLinks)
@@ -364,3 +365,4 @@ buildHomeLinks ifaces = foldl upd Map.empty (reverse ifaces)
         mdl            = ifaceMod iface
         keep_old env n = Map.insertWith (\_ old -> old) n mdl env
         keep_new env n = Map.insert n mdl env
+

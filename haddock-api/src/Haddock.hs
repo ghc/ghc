@@ -42,6 +42,8 @@ import Haddock.Utils
 import Haddock.GhcUtils (modifySessionDynFlags, setOutputDir)
 
 import Control.Monad hiding (forM_)
+import Control.Monad.IO.Class (MonadIO(..))
+import Data.Bifunctor (second)
 import Data.Foldable (forM_, foldl')
 import Data.Traversable (for)
 import Data.List (isPrefixOf)
@@ -53,9 +55,9 @@ import Data.Version (makeVersion)
 import qualified Data.Map as Map
 import System.IO
 import System.Exit
+import System.FilePath
 
 #ifdef IN_GHC_TREE
-import System.FilePath
 import System.Environment (getExecutablePath)
 #else
 import qualified GHC.Paths as GhcPaths
@@ -67,12 +69,12 @@ import Text.ParserCombinators.ReadP (readP_to_S)
 import GHC hiding (verbosity)
 import GHC.Settings.Config
 import GHC.Driver.Session hiding (projectVersion, verbosity)
+import GHC.Utils.Outputable (defaultUserStyle, withPprStyle)
 import GHC.Driver.Env
 import GHC.Utils.Error
 import GHC.Unit
 import GHC.Utils.Panic (handleGhcException)
 import GHC.Data.FastString
-import qualified GHC.Runtime.Loader
 
 --------------------------------------------------------------------------------
 -- * Exception handling
@@ -188,7 +190,7 @@ haddockWithGhc ghc args = handleTopExceptions $ do
     forM_ (optShowInterfaceFile flags) $ \path -> liftIO $ do
       mIfaceFile <- readInterfaceFiles freshNameCache [(("", Nothing), path)] noChecks
       forM_ mIfaceFile $ \(_, ifaceFile) -> do
-        putMsg dflags (renderJson (jsonInterfaceFile ifaceFile))
+        logOutput dflags $ withPprStyle defaultUserStyle (renderJson (jsonInterfaceFile ifaceFile))
 
     if not (null files) then do
       (packages, ifaces, homeLinks) <- readPackagesAndProcessModules flags files
@@ -430,7 +432,7 @@ render dflags unit_state flags sinceQual qual ifaces installedIfaces extSrcMap =
   when (Flag_HyperlinkedSource `elem` flags && not (null ifaces)) $ do
     withTiming dflags' "ppHyperlinkedSource" (const ()) $ do
       _ <- {-# SCC ppHyperlinkedSource #-}
-           ppHyperlinkedSource odir libDir opt_source_css pretty srcMap ifaces
+           ppHyperlinkedSource (verbosity flags) odir libDir opt_source_css pretty srcMap ifaces
       return ()
 
 
@@ -477,10 +479,7 @@ withGhc' libDir needHieFiles flags ghcActs = runGhc (Just libDir) $ do
   -- that may need to be re-linked: Haddock doesn't do any
   -- dynamic or static linking at all!
   _ <- setSessionDynFlags dynflags''
-  hsc_env <- GHC.getSession
-  hsc_env'' <- liftIO (GHC.Runtime.Loader.initializePlugins hsc_env)
-  _ <- GHC.setSession hsc_env''
-  ghcActs (hsc_dflags hsc_env'')
+  ghcActs dynflags''
   where
 
     -- ignore sublists of flags that start with "+RTS" and end in "-RTS"
@@ -696,7 +695,7 @@ getPrologue dflags flags =
       h <- openFile filename ReadMode
       hSetEncoding h utf8
       str <- hGetContents h -- semi-closes the handle
-      return . Just $! parseParas dflags Nothing str
+      return . Just $! second (fmap rdrName) $ parseParas dflags Nothing str
     _ -> throwE "multiple -p/--prologue options"
 
 

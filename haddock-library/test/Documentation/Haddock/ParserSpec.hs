@@ -3,6 +3,7 @@
 
 module Documentation.Haddock.ParserSpec (main, spec) where
 
+import           Data.Char (isSpace)
 import           Data.String
 import qualified Documentation.Haddock.Parser as Parse
 import           Documentation.Haddock.Types
@@ -112,7 +113,7 @@ spec = do
         "``" `shouldParseTo` "``"
 
       it "can parse an identifier in infix notation enclosed within backticks" $ do
-        "``infix``" `shouldParseTo` "`" <> DocIdentifier "infix" <> "`"
+        "``infix``" `shouldParseTo` DocIdentifier "`infix`"
 
       it "can parse identifiers containing a single quote" $ do
         "'don't'" `shouldParseTo` DocIdentifier "don't"
@@ -131,6 +132,19 @@ spec = do
 
       it "can parse an identifier that starts with an underscore" $ do
         "'_x'" `shouldParseTo` DocIdentifier "_x"
+
+      it "can parse value-namespaced identifiers" $ do
+        "v'foo'" `shouldParseTo` DocIdentifier "foo"
+
+      it "can parse type-namespaced identifiers" $ do
+        "t'foo'" `shouldParseTo` DocIdentifier "foo"
+
+      it "can parse parenthesized operators and backticked identifiers" $ do
+        "'(<|>)'" `shouldParseTo` DocIdentifier "(<|>)"
+        "'`elem`'" `shouldParseTo` DocIdentifier "`elem`"
+
+      it "can properly figure out the end of identifiers" $ do
+        "'DbModule'/'DbUnitId'" `shouldParseTo` DocIdentifier "DbModule" <> "/" <> DocIdentifier "DbUnitId"
 
     context "when parsing operators" $ do
       it "can parse an operator enclosed within single quotes" $ do
@@ -275,8 +289,10 @@ spec = do
       it "parses a single word anchor" $ do
         "#foo#" `shouldParseTo` DocAName "foo"
 
-      it "parses a multi word anchor" $ do
-        "#foo bar#" `shouldParseTo` DocAName "foo bar"
+      -- Spaces are not allowed:
+      -- https://www.w3.org/TR/html51/dom.html#the-id-attribute
+      it "doesn't parse a multi word anchor" $ do
+        "#foo bar#" `shouldParseTo` "#foo bar#"
 
       it "parses a unicode anchor" $ do
         "#灼眼のシャナ#" `shouldParseTo` DocAName "灼眼のシャナ"
@@ -290,6 +306,9 @@ spec = do
 
       it "does not accept empty anchors" $ do
         "##" `shouldParseTo` "##"
+
+      it "does not accept anchors containing spaces" $ do
+        "{-# LANGUAGE GADTs #-}" `shouldParseTo` "{-# LANGUAGE GADTs #-}"
 
     context "when parsing emphasised text" $ do
       it "emphasises a word on its own" $ do
@@ -417,6 +436,9 @@ spec = do
       it "accepts anchor reference syntax as DocModule" $ do
         "\"Foo#bar\"" `shouldParseTo` DocModule "Foo#bar"
 
+      it "accepts anchor with hyphen as DocModule" $ do
+        "\"Foo#bar-baz\"" `shouldParseTo` DocModule "Foo#bar-baz"
+
       it "accepts old anchor reference syntax as DocModule" $ do
         "\"Foo\\#bar\"" `shouldParseTo` DocModule "Foo\\#bar"
 
@@ -428,6 +450,10 @@ spec = do
     it "is total" $ do
       property $ \xs ->
         (length . show . parseParas) xs `shouldSatisfy` (> 0)
+
+    -- See <https://github.com/haskell/haddock/issues/1142>
+    it "doesn't crash on unicode whitespace" $ do
+      "\8197" `shouldParseTo` DocEmpty
 
     context "when parsing @since" $ do
       it "adds specified version to the result" $ do
@@ -457,7 +483,8 @@ spec = do
 
 
     context "when parsing text paragraphs" $ do
-      let filterSpecial = filter (`notElem` (".(=#-[*`\v\f\n\t\r\\\"'_/@<> " :: String))
+      let isSpecial c = isSpace c || c `elem` (".(=#-[*`\\\"'_/@<>" :: String)
+          filterSpecial = filter (not . isSpecial)
 
       it "parses an empty paragraph" $ do
         "" `shouldParseTo` DocEmpty

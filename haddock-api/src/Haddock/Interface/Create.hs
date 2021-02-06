@@ -1,4 +1,4 @@
-{-# LANGUAGE StandaloneDeriving, FlexibleInstances, MultiParamTypeClasses, CPP, TupleSections, BangPatterns, LambdaCase, NamedFieldPuns, ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving, FlexibleInstances, MultiParamTypeClasses, CPP, TupleSections, BangPatterns, LambdaCase, NamedFieldPuns, ScopedTypeVariables, RecordWildCards #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE DerivingStrategies #-}
@@ -38,6 +38,7 @@ import Data.Map (Map)
 import Data.List
 import Data.Maybe
 import Data.Traversable
+import GHC.Stack
 
 import GHC.Tc.Utils.Monad (finalSafeMode)
 import GHC.Types.Avail hiding (avail)
@@ -64,7 +65,6 @@ import GHC.Utils.Panic
 import GHC.HsToCore.Docs hiding (mkMaps)
 import GHC.Parser.Annotation (IsUnicodeSyntax(..))
 import GHC.Unit.Module.Warnings
-
 
 newtype IfEnv m = IfEnv
   {
@@ -687,11 +687,11 @@ availExportItem is_sig modMap thisMod semMod warnings exportedNames
                     let newDecl = L loc . SigD noExtField . fromJust $ filterSigNames (== t) sig
                     in availExportDecl avail newDecl docs_
 
-                  L loc (TyClD _ cl@ClassDecl{}) -> do
+                  L loc (TyClD _ ClassDecl {..}) -> do
                     mdef <- minimalDef t
                     let sig = maybeToList $ fmap (noLoc . MinimalSig noExtField NoSourceText . noLoc . fmap noLoc) mdef
                     availExportDecl avail
-                      (L loc $ TyClD noExtField cl { tcdSigs = sig ++ tcdSigs cl }) docs_
+                      (L loc $ TyClD noExtField ClassDecl { tcdSigs = sig ++ tcdSigs, .. }) docs_
 
                   _ -> availExportDecl avail decl docs_
 
@@ -716,11 +716,24 @@ availExportItem is_sig modMap thisMod semMod warnings exportedNames
 
         _ -> return []
 
-    availExportDecl :: AvailInfo -> LHsDecl GhcRn
+    -- Tries 'extractDecl' first then falls back to 'hiDecl' if that fails
+    availDecl :: Name -> LHsDecl GhcRn -> IfM m (LHsDecl GhcRn)
+    availDecl declName parentDecl =
+      case extractDecl declMap declName parentDecl of
+        Right d -> pure d
+        Left err -> do
+          synifiedDeclOpt <- hiDecl dflags declName
+          case synifiedDeclOpt of
+            Just synifiedDecl -> pure synifiedDecl
+            Nothing -> pprPanic "availExportItem" (O.text err)
+
+    availExportDecl :: HasCallStack => AvailInfo -> LHsDecl GhcRn
                     -> (DocForDecl Name, [(Name, DocForDecl Name)])
                     -> IfM m [ ExportItem GhcRn ]
     availExportDecl avail decl (doc, subs)
       | availExportsDecl avail = do
+          extractedDecl <- availDecl (availName avail) decl
+
           -- bundled pattern synonyms only make sense if the declaration is
           -- exported (otherwise there would be nothing to bundle to)
           bundledPatSyns <- findBundledPatterns avail
@@ -736,8 +749,7 @@ availExportItem is_sig modMap thisMod semMod warnings exportedNames
                 ]
 
           return [ ExportDecl {
-                       expItemDecl      = restrictTo (fmap fst subs)
-                                            (extractDecl declMap (availName avail) decl)
+                       expItemDecl      = restrictTo (fmap fst subs) extractedDecl
                      , expItemPats      = bundledPatSyns
                      , expItemMbDoc     = doc
                      , expItemSubDocs   = subs
@@ -747,18 +759,18 @@ availExportItem is_sig modMap thisMod semMod warnings exportedNames
                      }
                  ]
 
-      | otherwise =
-          return [ ExportDecl {
-                       expItemDecl      = extractDecl declMap sub decl
+      | otherwise = for subs $ \(sub, sub_doc) -> do
+          extractedDecl <- availDecl sub decl
+
+          return ( ExportDecl {
+                       expItemDecl      = extractedDecl
                      , expItemPats      = []
                      , expItemMbDoc     = sub_doc
                      , expItemSubDocs   = []
                      , expItemInstances = []
                      , expItemFixities  = [ (sub, f) | Just f <- [M.lookup sub fixMap] ]
                      , expItemSpliced   = False
-                     }
-                 | (sub, sub_doc) <- subs
-                 ]
+                     } )
 
     exportedNameSet = mkNameSet exportedNames
     isExported n = elemNameSet n exportedNameSet
@@ -975,16 +987,26 @@ fullModuleContents is_sig modMap pkgName thisMod semMod warnings gre exportedNam
 -- it might be an individual record selector or a class method.  In these
 -- cases we have to extract the required declaration (and somehow cobble
 -- together a type signature for it...).
-extractDecl :: DeclMap -> Name -> LHsDecl GhcRn -> LHsDecl GhcRn
+--
+-- This function looks through the declarations in this module to try to find
+-- the one with the right name.
+extractDecl
+  :: HasCallStack
+  => DeclMap                   -- ^ all declarations in the file
+  -> Name                      -- ^ name of the declaration to extract
+  -> LHsDecl GhcRn             -- ^ parent declaration
+  -> Either ErrMsg (LHsDecl GhcRn)
 extractDecl declMap name decl
-  | name `elem` getMainDeclBinder (unLoc decl) = decl
+  | name `elem` getMainDeclBinder (unLoc decl) = pure decl
   | otherwise  =
     case unLoc decl of
-      TyClD _ d@ClassDecl {} ->
+      TyClD _ d@ClassDecl { tcdLName = L _ clsNm
+                          , tcdSigs = clsSigs
+                          , tcdATs = clsATs } ->
         let
           matchesMethod =
             [ lsig
-            | lsig <- tcdSigs d
+            | lsig <- clsSigs
             , ClassOpSig _ False _ _ <- pure $ unLoc lsig
               -- Note: exclude `default` declarations (see #505)
             , name `elem` sigName lsig
@@ -992,29 +1014,31 @@ extractDecl declMap name decl
 
           matchesAssociatedType =
             [ lfam_decl
-            | lfam_decl <- tcdATs d
+            | lfam_decl <- clsATs
             , name == unLoc (fdLName (unLoc lfam_decl))
             ]
 
             -- TODO: document fixity
         in case (matchesMethod, matchesAssociatedType)  of
-          ([s0], _) -> let (n, tyvar_names) = (tcdName d, tyClDeclTyVars d)
-                           L pos sig = addClassContext n tyvar_names s0
-                       in L pos (SigD noExtField sig)
-          (_, [L pos fam_decl]) -> L pos (TyClD noExtField (FamDecl noExtField fam_decl))
+          ([s0], _) -> let tyvar_names = tyClDeclTyVars d
+                           L pos sig = addClassContext clsNm tyvar_names s0
+                       in pure (L pos (SigD noExtField sig))
+          (_, [L pos fam_decl]) -> pure (L pos (TyClD noExtField (FamDecl noExtField fam_decl)))
 
           ([], [])
             | Just (famInstDecl:_) <- M.lookup name declMap
             -> extractDecl declMap name famInstDecl
-          _ -> pprPanic "extractDecl" (O.text "Ambiguous decl for" O.<+> O.ppr name O.<+> O.text "in class:"
-                                         O.$$ O.nest 4 (O.ppr d)
-                                         O.$$ O.text "Matches:"
-                                         O.$$ O.nest 4 (O.ppr matchesMethod O.<+> O.ppr matchesAssociatedType))
-      TyClD _ d@DataDecl {} ->
-        let (n, tyvar_tys) = (tcdName d, lHsQTyVarsToTypes (tyClDeclTyVars d))
-        in if isDataConName name
-           then SigD noExtField <$> extractPatternSyn name n tyvar_tys (dd_cons (tcdDataDefn d))
-           else SigD noExtField <$> extractRecSel name n tyvar_tys (dd_cons (tcdDataDefn d))
+          _ -> Left (concat [ "Ambiguous decl for ", getOccString name
+                            , " in class ", getOccString clsNm ])
+
+      TyClD _ d@DataDecl { tcdLName = L _ dataNm
+                         , tcdDataDefn = HsDataDefn { dd_cons = dataCons } } -> do
+        let ty_args = lHsQTyVarsToTypes (tyClDeclTyVars d)
+        lsig <- if isDataConName name
+                  then extractPatternSyn name dataNm ty_args dataCons
+                  else extractRecSel name dataNm ty_args dataCons
+        pure (SigD noExtField <$> lsig)
+
       TyClD _ FamDecl {}
         | isValName name
         , Just (famInst:_) <- M.lookup name declMap
@@ -1024,8 +1048,8 @@ extractDecl declMap name decl
                                     , feqn_pats  = tys
                                     , feqn_rhs   = defn }))) ->
         if isDataConName name
-        then SigD noExtField <$> extractPatternSyn name n tys (dd_cons defn)
-        else SigD noExtField <$> extractRecSel name n tys (dd_cons defn)
+        then fmap (SigD noExtField) <$> extractPatternSyn name n tys (dd_cons defn)
+        else fmap (SigD noExtField) <$> extractRecSel name n tys (dd_cons defn)
       InstD _ (ClsInstD _ ClsInstDecl { cid_datafam_insts = insts })
         | isDataConName name ->
             let matches = [ d' | L _ d'@(DataFamInstDecl (FamEqn { feqn_rhs = dd })) <- insts
@@ -1033,9 +1057,9 @@ extractDecl declMap name decl
                                ]
             in case matches of
                 [d0] -> extractDecl declMap name (noLoc (InstD noExtField (DataFamInstD noExtField d0)))
-                _    -> error "internal: extractDecl (ClsInstD)"
+                _    -> Left "internal: extractDecl (ClsInstD)"
         | otherwise ->
-            let matches = [ d' | L _ d'@(DataFamInstDecl d)
+            let matches = [ d' | L _ d'@(DataFamInstDecl d )
                                    <- insts
                                  -- , L _ ConDecl { con_details = RecCon rec } <- dd_cons (feqn_rhs d)
                                , Just rec <- map (getRecConArgs_maybe . unLoc) (dd_cons (feqn_rhs d))
@@ -1045,16 +1069,18 @@ extractDecl declMap name decl
                           ]
             in case matches of
               [d0] -> extractDecl declMap name (noLoc . InstD noExtField $ DataFamInstD noExtField d0)
-              _ -> error "internal: extractDecl (ClsInstD)"
-      _ -> pprPanic "extractDecl" $
-        O.text "Unhandled decl for" O.<+> O.ppr name O.<> O.text ":"
-        O.$$ O.nest 4 (O.ppr decl)
+              _ -> Left "internal: extractDecl (ClsInstD)"
+      _ -> Left ("extractDecl: Unhandled decl for " ++ getOccString name)
 
-extractPatternSyn :: Name -> Name -> [LHsTypeArg GhcRn] -> [LConDecl GhcRn] -> LSig GhcRn
+extractPatternSyn :: HasCallStack
+                  => Name -> Name
+                  -> [LHsTypeArg GhcRn] -> [LConDecl GhcRn]
+                  -> Either ErrMsg (LSig GhcRn)
 extractPatternSyn nm t tvs cons =
   case filter matches cons of
-    [] -> error "extractPatternSyn: constructor pattern not found"
-    con:_ -> extract <$> con
+    [] -> Left . O.showSDocOneLine O.defaultSDocContext $
+          O.text "constructor pattern " O.<+> O.ppr nm O.<+> O.text "not found in type" O.<+> O.ppr t
+    con:_ -> pure (extract <$> con)
  where
   matches :: LConDecl GhcRn -> Bool
   matches (L _ con) = nm `elem` (unLoc <$> getConNames con)
@@ -1089,13 +1115,13 @@ extractPatternSyn nm t tvs cons =
                           mkAppTyArg f (HsArgPar _) = HsParTy noExtField f
 
 extractRecSel :: Name -> Name -> [LHsTypeArg GhcRn] -> [LConDecl GhcRn]
-              -> LSig GhcRn
-extractRecSel _ _ _ [] = error "extractRecSel: selector not found"
+              -> Either ErrMsg (LSig GhcRn)
+extractRecSel _ _ _ [] = Left "extractRecSel: selector not found"
 
 extractRecSel nm t tvs (L _ con : rest) =
   case getRecConArgs_maybe con of
     Just (L _ fields) | ((l,L _ (ConDeclField _ _nn ty _)) : _) <- matching_fields fields ->
-      L l (TypeSig noExtField [noLoc nm] (mkEmptySigWcType (noLoc (HsFunTy noExtField (HsUnrestrictedArrow NormalSyntax) data_ty (getBangType ty)))))
+      pure (L l (TypeSig noExtField [noLoc nm] (mkEmptyWildCardBndrs $ mkEmptySigType (noLoc (HsFunTy noExtField (HsUnrestrictedArrow NormalSyntax) data_ty (getBangType ty))))))
     _ -> extractRecSel nm t tvs rest
  where
   matching_fields :: [LConDeclField GhcRn] -> [(SrcSpan, LConDeclField GhcRn)]
