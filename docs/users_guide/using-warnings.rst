@@ -111,6 +111,7 @@ The following flags are simple ways to select standard "packages" of warnings:
         * :ghc-flag:`-Wmissing-deriving-strategies`
         * :ghc-flag:`-Wunused-packages`
         * :ghc-flag:`-Wunused-type-patterns`
+        * :ghc-flag:`-Wsafe`
 
 .. ghc-flag:: -Weverything
     :shortdesc: enable all warnings supported by GHC
