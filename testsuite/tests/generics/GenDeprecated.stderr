@@ -1,3 +1,0 @@
-
-GenDeprecated.hs:1:14:
-    Warning: -XGenerics is deprecated: it does nothing; look into -XDefaultSignatures and -XDeriveGeneric for generic programming support.
