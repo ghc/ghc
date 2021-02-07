@@ -18,7 +18,6 @@
 module Documentation.Haddock.Parser (
   parseString,
   parseParas,
-  parseModLink,
   overIdentifier,
   toRegular,
   Identifier
@@ -136,9 +135,6 @@ parseString = parseText . T.pack
 -- drops leading whitespace.
 parseText :: Text -> DocH mod Identifier
 parseText = parseParagraph . T.dropWhile isSpace . T.filter (/= '\r')
-
-parseModLink :: String -> DocH mod id
-parseModLink s = snd $ parse moduleName (T.pack s)
 
 parseParagraph :: Text -> DocH mod Identifier
 parseParagraph = snd . parse p
