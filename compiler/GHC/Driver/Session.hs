@@ -1342,8 +1342,6 @@ languageExtensions Nothing
    -- http://www.haskell.org/pipermail/haskell-prime/2011-January/003335.html
       (languageExtensions (Just Haskell2010))
 
-   -- NB: MonoPatBinds is no longer the default
-
 languageExtensions (Just Haskell98)
     = [LangExt.ImplicitPrelude,
        -- See Note [When is StarIsType enabled]
@@ -2843,14 +2841,6 @@ dynamic_flags_deps = [
  ++ map (mkFlag turnOff "XNo"       unSetExtensionFlag) xFlagsDeps
  ++ map (mkFlag turnOn  "X"         setLanguage       ) languageFlagsDeps
  ++ map (mkFlag turnOn  "X"         setSafeHaskell    ) safeHaskellFlagsDeps
- ++ [ make_dep_flag defFlag "XGenerics"
-        (NoArg $ return ())
-                  ("it does nothing; look into -XDefaultSignatures " ++
-                   "and -XDeriveGeneric for generic programming support.")
-    , make_dep_flag defFlag "XNoGenerics"
-        (NoArg $ return ())
-               ("it does nothing; look into -XDefaultSignatures and " ++
-                  "-XDeriveGeneric for generic programming support.") ]
 
 -- | This is where we handle unrecognised warning flags. We only issue a warning
 -- if -Wunrecognised-warning-flags is set. See #11429 for context.
@@ -3371,8 +3361,6 @@ fLangFlagsDeps = [
     (deprecatedForExtension "BangPatterns"),
   depFlagSpec' "monomorphism-restriction"       LangExt.MonomorphismRestriction
     (deprecatedForExtension "MonomorphismRestriction"),
-  depFlagSpec' "mono-pat-binds"                 LangExt.MonoPatBinds
-    (deprecatedForExtension "MonoPatBinds"),
   depFlagSpec' "extended-default-rules"         LangExt.ExtendedDefaultRules
     (deprecatedForExtension "ExtendedDefaultRules"),
   depFlagSpec' "implicit-params"                LangExt.ImplicitParams
@@ -3511,9 +3499,6 @@ xFlagsDeps = [
   flagSpec "MagicHash"                        LangExt.MagicHash,
   flagSpec "MonadComprehensions"              LangExt.MonadComprehensions,
   flagSpec "MonoLocalBinds"                   LangExt.MonoLocalBinds,
-  depFlagSpecCond "MonoPatBinds"              LangExt.MonoPatBinds
-    id
-         "Experimental feature now removed; has no effect",
   flagSpec "MonomorphismRestriction"          LangExt.MonomorphismRestriction,
   flagSpec "MultiParamTypeClasses"            LangExt.MultiParamTypeClasses,
   flagSpec "MultiWayIf"                       LangExt.MultiWayIf,

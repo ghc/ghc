@@ -9,10 +9,8 @@
 -XAutoDeriveTypeable
 -XDoAndIfThenElse
 -XDoRec
--XGenerics
 -XImplicitPrelude
 -XJavaScriptFFI
--XMonoPatBinds
 -XMonomorphismRestriction
 -XParallelArrays
 -XPatternGuards
@@ -69,7 +67,6 @@
 -firrefutable-tuples
 -fmax-errors
 -fmax-pmcheck-iterations
--fmono-pat-binds
 -fmonomorphism-restriction
 -fnum-constant-folding
 -fpre-inlining
