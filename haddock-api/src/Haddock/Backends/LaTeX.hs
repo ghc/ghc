@@ -1241,7 +1241,12 @@ latexMarkup = Markup
   , markupAppend               = \l r v -> l v . r v
   , markupIdentifier           = \i v -> inlineElem (markupId v (fmap occName i))
   , markupIdentifierUnchecked  = \i v -> inlineElem (markupId v (fmap snd i))
-  , markupModule               = \m _ -> inlineElem (let (mdl,_ref) = break (=='#') m in (tt (text mdl)))
+  , markupModule               =
+      \(ModLink m mLabel) v ->
+        case mLabel of
+          Just lbl -> inlineElem . tt $ lbl v empty
+          Nothing -> inlineElem (let (mdl,_ref) = break (=='#') m
+                                 in (tt (text mdl)))
   , markupWarning              = \p v -> p v
   , markupEmphasis             = \p v -> inlineElem (emph (p v empty))
   , markupBold                 = \p v -> inlineElem (bold (p v empty))

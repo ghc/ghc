@@ -190,6 +190,7 @@ test-suite spec
                , containers
                , deepseq
                , directory
+               , exceptions
                , filepath
                , ghc-boot
                , transformers

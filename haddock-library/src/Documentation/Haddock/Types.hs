@@ -73,6 +73,11 @@ data Hyperlink id = Hyperlink
   , hyperlinkLabel :: Maybe id
   } deriving (Eq, Show, Functor, Foldable, Traversable)
 
+data ModLink id = ModLink
+  { modLinkName   :: String
+  , modLinkLabel :: Maybe id
+  } deriving (Eq, Show, Functor, Foldable, Traversable)
+
 data Picture = Picture
   { pictureUri   :: String
   , pictureTitle :: Maybe String
@@ -111,7 +116,8 @@ data DocH mod id
   | DocIdentifier id
   | DocIdentifierUnchecked mod
   -- ^ A qualified identifier that couldn't be resolved.
-  | DocModule String
+  | DocModule (ModLink (DocH mod id))
+  -- ^ A link to a module, with an optional label.
   | DocWarning (DocH mod id)
   -- ^ This constructor has no counterpart in Haddock markup.
   | DocEmphasis (DocH mod id)
@@ -142,7 +148,7 @@ instance Bifunctor DocH where
   bimap f g (DocParagraph doc) = DocParagraph (bimap f g doc)
   bimap _ g (DocIdentifier i) = DocIdentifier (g i)
   bimap f _ (DocIdentifierUnchecked m) = DocIdentifierUnchecked (f m)
-  bimap _ _ (DocModule s) = DocModule s
+  bimap f g (DocModule (ModLink m lbl)) = DocModule (ModLink m (fmap (bimap f g) lbl))
   bimap f g (DocWarning doc) = DocWarning (bimap f g doc)
   bimap f g (DocEmphasis doc) = DocEmphasis (bimap f g doc)
   bimap f g (DocMonospaced doc) = DocMonospaced (bimap f g doc)
@@ -189,7 +195,7 @@ instance Bitraversable DocH where
   bitraverse f g (DocParagraph doc) = DocParagraph <$> bitraverse f g doc
   bitraverse _ g (DocIdentifier i) = DocIdentifier <$> g i
   bitraverse f _ (DocIdentifierUnchecked m) = DocIdentifierUnchecked <$> f m
-  bitraverse _ _ (DocModule s) = pure (DocModule s)
+  bitraverse f g (DocModule (ModLink m lbl)) = DocModule <$> (ModLink m <$> traverse (bitraverse f g) lbl)
   bitraverse f g (DocWarning doc) = DocWarning <$> bitraverse f g doc
   bitraverse f g (DocEmphasis doc) = DocEmphasis <$> bitraverse f g doc
   bitraverse f g (DocMonospaced doc) = DocMonospaced <$> bitraverse f g doc
@@ -234,7 +240,7 @@ data DocMarkupH mod id a = Markup
   , markupAppend               :: a -> a -> a
   , markupIdentifier           :: id -> a
   , markupIdentifierUnchecked  :: mod -> a
-  , markupModule               :: String -> a
+  , markupModule               :: ModLink a -> a
   , markupWarning              :: a -> a
   , markupEmphasis             :: a -> a
   , markupBold                 :: a -> a

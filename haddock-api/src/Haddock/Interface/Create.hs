@@ -727,7 +727,7 @@ availExportItem is_sig modMap thisMod semMod warnings exportedNames
             Just synifiedDecl -> pure synifiedDecl
             Nothing -> pprPanic "availExportItem" (O.text err)
 
-    availExportDecl :: HasCallStack => AvailInfo -> LHsDecl GhcRn
+    availExportDecl :: AvailInfo -> LHsDecl GhcRn
                     -> (DocForDecl Name, [(Name, DocForDecl Name)])
                     -> IfM m [ ExportItem GhcRn ]
     availExportDecl avail decl (doc, subs)

@@ -291,8 +291,7 @@ processModule1 verbosity flags ifaces inst_ifaces hsc_env mod_summary tc_gbl_env
       ifaceHaddockCoverage interface
 
     percentage :: Int
-    percentage =
-      round (fromIntegral haddocked * 100 / fromIntegral haddockable :: Double)
+    percentage = div (haddocked * 100) haddockable
 
     modString :: String
     modString = moduleString (ifaceMod interface)
@@ -365,4 +364,3 @@ buildHomeLinks ifaces = foldl upd Map.empty (reverse ifaces)
         mdl            = ifaceMod iface
         keep_old env n = Map.insertWith (\_ old -> old) n mdl env
         keep_new env n = Map.insert n mdl env
-

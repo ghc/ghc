@@ -510,6 +510,9 @@ instance NFData id => NFData (Header id) where
 instance NFData id => NFData (Hyperlink id) where
   rnf (Hyperlink a b) = a `deepseq` b `deepseq` ()
 
+instance NFData id => NFData (ModLink id) where
+  rnf (ModLink a b) = a `deepseq` b `deepseq` ()
+
 instance NFData Picture where
   rnf (Picture a b) = a `deepseq` b `deepseq` ()
 

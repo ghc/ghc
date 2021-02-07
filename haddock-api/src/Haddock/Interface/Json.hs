@@ -98,9 +98,9 @@ jsonDoc (DocIdentifierUnchecked modName) = jsonObject
     , ("modName", jsonString (showModName modName))
     ]
 
-jsonDoc (DocModule s) = jsonObject
+jsonDoc (DocModule (ModLink m _l)) = jsonObject
     [ ("tag", jsonString "DocModule")
-    , ("string", jsonString s)
+    , ("string", jsonString m)
     ]
 
 jsonDoc (DocWarning x) = jsonObject
