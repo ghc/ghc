@@ -982,6 +982,11 @@ is valid before turning it into a link but unlike with identifiers,
 whether the module is in scope isn't checked and will always be turned
 into a link.
 
+It is also possible to specify alternate text for the generated link
+using syntax analogous to that used for URLs: ::
+
+  -- | This is a reference to [the main module]("Module.Main").
+
 Itemized and Enumerated Lists
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
