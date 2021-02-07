@@ -1213,10 +1213,15 @@ ppr_mono_ty (HsTyVar _ prom (L _ name)) _ q _
   | otherwise = ppDocName q Prefix True name
 ppr_mono_ty (HsStarTy _ isUni) u _ _ =
   toHtml (if u || isUni then "★" else "*")
-ppr_mono_ty (HsFunTy _ _ ty1 ty2) u q e =
+ppr_mono_ty (HsFunTy _ mult ty1 ty2) u q e =
   hsep [ ppr_mono_lty ty1 u q HideEmptyContexts
-       , arrow u <+> ppr_mono_lty ty2 u q e
+       , arr <+> ppr_mono_lty ty2 u q e
        ]
+   where arr = case mult of
+                 HsLinearArrow _ -> lollipop u
+                 HsUnrestrictedArrow _ -> arrow u
+                 HsExplicitMult _ m -> multAnnotation <> ppr_mono_lty m u q e <+> arrow u
+
 ppr_mono_ty (HsTupleTy _ con tys) u q _ =
   tupleParens con (map (ppLType u q HideEmptyContexts) tys)
 ppr_mono_ty (HsSumTy _ tys) u q _ =
