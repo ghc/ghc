@@ -1612,10 +1612,7 @@ mkFunTyCon name binders rep_nm
         tcRepName    = rep_nm
     }
 
--- | This is the making of an algebraic 'TyCon'. Notably, you have to
--- pass in the generic (in the -XGenerics sense) information about the
--- type constructor - you can get hold of it easily (see Generics
--- module)
+-- | This is the making of an algebraic 'TyCon'.
 mkAlgTyCon :: Name
            -> [TyConBinder]  -- ^ Binders of the 'TyCon'
            -> Kind              -- ^ Result kind

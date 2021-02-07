@@ -29,7 +29,6 @@ data Extension
    | IncoherentInstances
    | UndecidableSuperClasses
    | MonomorphismRestriction
-   | MonoPatBinds
    | MonoLocalBinds
    | RelaxedPolyRec           -- Deprecated
    | ExtendedDefaultRules     -- Use GHC's extended rules for defaulting

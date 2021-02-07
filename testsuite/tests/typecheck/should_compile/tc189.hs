@@ -1,6 +1,3 @@
-{-# LANGUAGE NoMonoPatBinds #-}
-        -- Disable experimental monomorphic pattern bindings
-
 -- Nasty test for type signatures
 -- In both groups of declarations below, the type variables 'a' and 'b'
 -- end up being unified together.
