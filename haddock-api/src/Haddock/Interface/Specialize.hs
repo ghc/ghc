@@ -11,6 +11,7 @@ module Haddock.Interface.Specialize
     ) where
 
 
+import Haddock.GhcUtils ( hsTyVarBndrName )
 import Haddock.Syb
 import Haddock.Types
 
@@ -58,13 +59,9 @@ specialize specs = go spec_map0
 -- Again, it is just a convenience function around 'specialize'. Note that
 -- length of type list should be the same as the number of binders.
 specializeTyVarBndrs :: Data a => LHsQTyVars GhcRn -> [HsType GhcRn] -> a -> a
-specializeTyVarBndrs bndrs typs =
-    specialize $ zip bndrs' typs
+specializeTyVarBndrs bndrs typs = specialize $ zip bndrs' typs
   where
-    bndrs' = map (bname . unLoc) . hsq_explicit $ bndrs
-    bname (UserTyVar _ _ (L _ name)) = name
-    bname (KindedTyVar _ _ (L _ name) _) = name
-    bname (XTyVarBndr _) = error "haddock:specializeTyVarBndrs"
+    bndrs' = map (hsTyVarBndrName . unLoc) . hsq_explicit $ bndrs
 
 
 
