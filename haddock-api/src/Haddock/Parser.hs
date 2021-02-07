@@ -19,8 +19,9 @@ import Documentation.Haddock.Types
 import Haddock.Types
 
 import GHC.Driver.Session ( DynFlags )
+import GHC.Driver.Config
 import GHC.Data.FastString   ( fsLit )
-import GHC.Parser.Lexer ( mkPState, unP, ParseResult(POk, PFailed) )
+import GHC.Parser.Lexer ( initParserState, unP, ParseResult(POk, PFailed) )
 import GHC.Parser       ( parseIdentifier )
 import GHC.Types.Name.Occurrence ( occNameString )
 import GHC.Types.Name.Reader ( RdrName(..) )
@@ -48,7 +49,7 @@ parseIdent dflags ns str0 =
     PFailed{} -> Nothing
   where
     realSrcLc = mkRealSrcLoc (fsLit "<unknown file>") 0 0
-    pstate str = mkPState dflags (stringToStringBuffer str) realSrcLc
+    pstate str = initParserState (initParserOpts dflags) (stringToStringBuffer str) realSrcLc
     (wrap,str1) = case str0 of
                     '(' : s@(c : _) | c /= ',', c /= ')'  -- rule out tuple names
                                     -> (Parenthesized, init s)

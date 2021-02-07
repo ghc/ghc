@@ -3,6 +3,9 @@
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -----------------------------------------------------------------------------
@@ -25,20 +28,24 @@ module Haddock.Types (
   , HsDocString, LHsDocString
   , Fixity(..)
   , module Documentation.Haddock.Types
+
+  -- $ Reexports
+  , runWriter
+  , tell
  ) where
 
-import Control.Arrow hiding ((<+>))
 import Control.DeepSeq
 import Control.Exception (throw)
-import Control.Monad (ap)
 import Control.Monad.Catch
 import Control.Monad.IO.Class (MonadIO(..))
+import Control.Monad.Writer.Strict (Writer, WriterT, MonadWriter(..), lift, runWriter, runWriterT)
 import Data.Typeable (Typeable)
 import Data.Map (Map)
 import Data.Data (Data)
 import Data.Void (Void)
 import Documentation.Haddock.Types
-import GHC.Types.Basic (Fixity(..), PromotionFlag(..))
+import GHC.Types.Basic (PromotionFlag(..))
+import GHC.Types.Fixity (Fixity(..))
 
 import GHC
 import GHC.Driver.Session (Language)
@@ -305,10 +312,12 @@ data DocName
 
 data DocNameI
 
+type instance NoGhcTc DocNameI = DocNameI
+
 type instance IdP DocNameI = DocName
 
 instance CollectPass DocNameI where
-  collectXXPat _ ext = noExtCon ext
+  collectXXPat _ _ ext = noExtCon ext
 
 instance NamedThing DocName where
   getName (Documented name _) = name
@@ -628,26 +637,7 @@ data SinceQual
 
 
 type ErrMsg = String
-newtype ErrMsgM a = Writer { runWriter :: (a, [ErrMsg]) }
-
-
-instance Functor ErrMsgM where
-        fmap f (Writer (a, msgs)) = Writer (f a, msgs)
-
-instance Applicative ErrMsgM where
-    pure a = Writer (a, [])
-    (<*>)  = ap
-
-instance Monad ErrMsgM where
-        return   = pure
-        m >>= k  = Writer $ let
-                (a, w)  = runWriter m
-                (b, w') = runWriter (k a)
-                in (b, w ++ w')
-
-
-tell :: [ErrMsg] -> ErrMsgM ()
-tell w = Writer ((), w)
+type ErrMsgM = Writer [ErrMsg]
 
 
 -- Exceptions
@@ -681,46 +671,36 @@ withExceptionContext ctxt =
 -- @Haddock.Types.ErrMsg@s a lot, like @ErrMsgM@ does,
 -- but we can't just use @GhcT ErrMsgM@ because GhcT requires the
 -- transformed monad to be MonadIO.
-newtype ErrMsgGhc a = WriterGhc { runWriterGhc :: Ghc (a, [ErrMsg]) }
---instance MonadIO ErrMsgGhc where
---  liftIO = WriterGhc . fmap (\a->(a,[])) liftIO
---er, implementing GhcMonad involves annoying ExceptionMonad and
---WarnLogMonad classes, so don't bother.
+newtype ErrMsgGhc a = ErrMsgGhc { unErrMsgGhc :: WriterT [ErrMsg] Ghc a }
+
+
+deriving newtype instance Functor ErrMsgGhc
+deriving newtype instance Applicative ErrMsgGhc
+deriving newtype instance Monad ErrMsgGhc
+deriving newtype instance (MonadWriter [ErrMsg]) ErrMsgGhc
+deriving newtype instance MonadIO ErrMsgGhc
+
+
+runWriterGhc :: ErrMsgGhc a -> Ghc (a, [ErrMsg])
+runWriterGhc = runWriterT . unErrMsgGhc
+
 liftGhcToErrMsgGhc :: Ghc a -> ErrMsgGhc a
-liftGhcToErrMsgGhc = WriterGhc . fmap (\a->(a,[]))
+liftGhcToErrMsgGhc = ErrMsgGhc . lift
+
 liftErrMsg :: ErrMsgM a -> ErrMsgGhc a
-liftErrMsg = WriterGhc . return . runWriter
---  for now, use (liftErrMsg . tell) for this
---tell :: [ErrMsg] -> ErrMsgGhc ()
---tell msgs = WriterGhc $ return ( (), msgs )
-
-
-instance Functor ErrMsgGhc where
-  fmap f (WriterGhc x) = WriterGhc (fmap (first f) x)
-
-instance Applicative ErrMsgGhc where
-    pure a = WriterGhc (return (a, []))
-    (<*>) = ap
-
-instance Monad ErrMsgGhc where
-  return = pure
-  m >>= k = WriterGhc $ runWriterGhc m >>= \ (a, msgs1) ->
-               fmap (second (msgs1 ++)) (runWriterGhc (k a))
-
-instance MonadIO ErrMsgGhc where
-  liftIO m = WriterGhc (fmap (\x -> (x, [])) (liftIO m))
-
-instance MonadThrow ErrMsgGhc where
-  throwM e = WriterGhc (throwM e)
-
-instance MonadCatch ErrMsgGhc where
-  catch (WriterGhc m) f = WriterGhc (catch m (runWriterGhc . f))
+liftErrMsg = writer . runWriter
 
 -----------------------------------------------------------------------------
 -- * Pass sensitive types
 -----------------------------------------------------------------------------
 
-type instance XRec DocNameI f = Located (f DocNameI)
+type instance XRec DocNameI a = Located a
+instance UnXRec DocNameI where
+  unXRec = unLoc
+instance MapXRec DocNameI where
+  mapXRec = fmap
+instance WrapXRec DocNameI where
+  wrapXRec = noLoc
 
 type instance XForAllTy        DocNameI = NoExtField
 type instance XQualTy          DocNameI = NoExtField
@@ -744,7 +724,7 @@ type instance XExplicitListTy  DocNameI = NoExtField
 type instance XExplicitTupleTy DocNameI = NoExtField
 type instance XTyLit           DocNameI = NoExtField
 type instance XWildCardTy      DocNameI = NoExtField
-type instance XXType           DocNameI = NewHsTypeX
+type instance XXType           DocNameI = HsCoreTy
 
 type instance XHsForAllVis        DocNameI = NoExtField
 type instance XHsForAllInvis      DocNameI = NoExtField
@@ -799,9 +779,14 @@ type instance XFamDecl      DocNameI = NoExtField
 type instance XXFamilyDecl  DocNameI = NoExtCon
 type instance XXTyClDecl    DocNameI = NoExtCon
 
-type instance XHsIB             DocNameI _ = NoExtField
-type instance XHsWC             DocNameI _ = NoExtField
-type instance XXHsImplicitBndrs DocNameI _ = NoExtCon
+type instance XHsWC DocNameI _ = NoExtField
+
+type instance XHsOuterExplicit    DocNameI _ = NoExtField
+type instance XHsOuterImplicit    DocNameI   = NoExtField
+type instance XXHsOuterTyVarBndrs DocNameI   = NoExtCon
+
+type instance XHsSig      DocNameI = NoExtField
+type instance XXHsSigType DocNameI = NoExtCon
 
 type instance XHsQTvs        DocNameI = NoExtField
 type instance XConDeclField  DocNameI = NoExtField

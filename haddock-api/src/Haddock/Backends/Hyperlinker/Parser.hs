@@ -10,15 +10,18 @@ import Data.List           ( isPrefixOf, isSuffixOf )
 
 import qualified Data.ByteString as BS
 
-import GHC.Types.Basic     ( IntegralLit(..) )
+import GHC.Types.SourceText
 import GHC.Driver.Session
-import GHC.Utils.Error     ( pprLocErrMsg )
+import GHC.Utils.Error     ( pprLocMsgEnvelope )
 import GHC.Data.FastString ( mkFastString )
+import GHC.Parser.Errors.Ppr ( pprError )
 import GHC.Parser.Lexer    as Lexer
                            ( P(..), ParseResult(..), PState(..), Token(..)
-                           , mkPStatePure, lexer, mkParserFlags', getErrorMessages)
+                           , initParserState, lexer, mkParserOpts, getErrorMessages)
 import GHC.Data.Bag         ( bagToList )
-import GHC.Utils.Outputable ( showSDoc, panic, text, ($$) )
+import GHC.Utils.Outputable ( text, ($$) )
+import GHC.Utils.Panic      ( panic )
+import GHC.Driver.Ppr       ( showSDoc )
 import GHC.Types.SrcLoc
 import GHC.Data.StringBuffer ( StringBuffer, atEnd )
 
@@ -37,17 +40,16 @@ parse
 parse dflags fpath bs = case unP (go False []) initState of
     POk _ toks -> reverse toks
     PFailed pst ->
-      let err:_ = bagToList (getErrorMessages pst dflags) in
+      let err:_ = bagToList (fmap pprError (getErrorMessages pst)) in
       panic $ showSDoc dflags $
-        text "Hyperlinker parse error:" $$ pprLocErrMsg err
+        text "Hyperlinker parse error:" $$ pprLocMsgEnvelope err
   where
 
-    initState = mkPStatePure pflags buf start
+    initState = initParserState pflags buf start
     buf = stringBufferFromByteString bs
     start = mkRealSrcLoc (mkFastString fpath) 1 1
-    pflags = mkParserFlags' (warningFlags dflags)
+    pflags = mkParserOpts   (warningFlags dflags)
                             (extensionFlags dflags)
-                            (homeUnitId dflags)
                             (safeImportsOn dflags)
                             False -- lex Haddocks as comment tokens
                             True  -- produce comment tokens
@@ -240,7 +242,6 @@ classify tok =
     ITline_prag         {} -> TkPragma
     ITcolumn_prag       {} -> TkPragma
     ITscc_prag          {} -> TkPragma
-    ITgenerated_prag    {} -> TkPragma
     ITunpack_prag       {} -> TkPragma
     ITnounpack_prag     {} -> TkPragma
     ITann_prag          {} -> TkPragma
@@ -381,7 +382,6 @@ inPragma False tok =
     ITline_prag         {} -> True
     ITcolumn_prag       {} -> True
     ITscc_prag          {} -> True
-    ITgenerated_prag    {} -> True
     ITunpack_prag       {} -> True
     ITnounpack_prag     {} -> True
     ITann_prag          {} -> True

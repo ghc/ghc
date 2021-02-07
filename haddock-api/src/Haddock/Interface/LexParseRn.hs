@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wwarn #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ViewPatterns #-}
   -----------------------------------------------------------------------------
 -- |
@@ -21,8 +22,8 @@ module Haddock.Interface.LexParseRn
 
 import Control.Arrow
 import Control.Monad
-import Data.Functor (($>))
-import Data.List (maximumBy, (\\))
+import Data.Functor
+import Data.List ((\\), maximumBy)
 import Data.Ord
 import Documentation.Haddock.Doc (metaDocConcat)
 import GHC.Driver.Session (languageExtensions)
@@ -32,8 +33,9 @@ import Haddock.Interface.ParseModuleHeader
 import Haddock.Parser
 import Haddock.Types
 import GHC.Types.Name
+import GHC.Types.Avail ( availName )
 import GHC.Parser.PostProcess
-import GHC.Utils.Outputable ( showPpr, showSDoc )
+import GHC.Driver.Ppr ( showPpr, showSDoc )
 import GHC.Types.Name.Reader
 import GHC.Data.EnumSet as EnumSet
 
@@ -134,7 +136,7 @@ rename dflags gre = rn
 
           -- There is only one name in the environment that matches so
           -- use it.
-          [a] -> pure (DocIdentifier (i $> gre_name a))
+          [a] -> pure $ DocIdentifier (i $> greMangledName a)
 
           -- There are multiple names available.
           gres -> ambiguous dflags i gres
@@ -199,9 +201,10 @@ ambiguous :: DynFlags
           -> [GlobalRdrElt] -- ^ More than one @gre@s sharing the same `RdrName` above.
           -> ErrMsgM (Doc Name)
 ambiguous dflags x gres = do
-  let dflt = maximumBy (comparing (gre_lcl &&& isTyConName . gre_name)) gres
+  let noChildren = map availName (gresToAvailInfo gres)
+      dflt = maximumBy (comparing (isLocalName &&& isTyConName)) noChildren
       msg = "Warning: " ++ showNsRdrName dflags x ++ " is ambiguous. It is defined\n" ++
-            concatMap (\n -> "    * " ++ defnLoc n ++ "\n") gres ++
+            concatMap (\n -> "    * " ++ defnLoc n ++ "\n") (map greMangledName gres) ++
             "    You may be able to disambiguate the identifier by qualifying it or\n" ++
             "    by specifying the type/value namespace explicitly.\n" ++
             "    Defaulting to the one defined " ++ defnLoc dflt
@@ -210,10 +213,12 @@ ambiguous dflags x gres = do
   -- of the same name, but not the only constructor.
   -- For example, for @data D = C | D@, someone may want to reference the @D@
   -- constructor.
-  when (length (gresToAvailInfo gres) > 1) $ tell [msg]
-  pure (DocIdentifier (x $> gre_name dflt))
+  when (length noChildren > 1) $ tell [msg]
+  pure (DocIdentifier (x $> dflt))
   where
-    defnLoc = showSDoc dflags . pprNameDefnLoc . gre_name
+    isLocalName (nameSrcLoc -> RealSrcLoc {}) = True
+    isLocalName _ = False
+    defnLoc = showSDoc dflags . pprNameDefnLoc
 
 -- | Handle value-namespaced names that cannot be for values.
 --

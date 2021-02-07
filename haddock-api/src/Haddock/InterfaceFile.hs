@@ -38,7 +38,7 @@ import GHC.Data.FastMutInt
 import GHC.Data.FastString
 import GHC hiding (NoLink)
 import GHC.Driver.Monad (withSession)
-import GHC.Driver.Types
+import GHC.Driver.Env
 import GHC.Types.Name.Cache
 import GHC.Iface.Env
 import GHC.Types.Name
@@ -94,7 +94,7 @@ binaryInterfaceMagic = 0xD0Cface
 -- (2) set `binaryInterfaceVersionCompatibility` to [binaryInterfaceVersion]
 --
 binaryInterfaceVersion :: Word16
-#if MIN_VERSION_ghc(9,0,0) && !MIN_VERSION_ghc(9,1,0)
+#if MIN_VERSION_ghc(9,1,0) && !MIN_VERSION_ghc(9,2,0)
 binaryInterfaceVersion = 38
 
 binaryInterfaceVersionCompatibility :: [Word16]

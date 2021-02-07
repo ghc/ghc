@@ -24,6 +24,7 @@ module Haddock.Options (
   optSourceCssFile,
   sourceUrls,
   wikiUrls,
+  optParCount,
   optDumpInterfaceFile,
   optShowInterfaceFile,
   optLaTeXStyle,
@@ -45,10 +46,10 @@ import qualified Data.Char as Char
 import           Data.Version
 import           Control.Applicative
 import           GHC.Data.FastString
-import           GHC ( DynFlags, Module, moduleUnit, unitState )
+import           GHC ( Module, moduleUnit )
+import           GHC.Unit.State
 import           Haddock.Types
 import           Haddock.Utils
-import           GHC.Unit.State
 import           System.Console.GetOpt
 import qualified Text.ParserCombinators.ReadP as RP
 
@@ -110,6 +111,7 @@ data Flag
   | Flag_Reexport String
   | Flag_SinceQualification String
   | Flag_IgnoreLinkSymbol String
+  | Flag_ParCount (Maybe Int)
   deriving (Eq, Show)
 
 
@@ -223,7 +225,9 @@ options backwardsCompat =
     Option []  ["since-qual"] (ReqArg Flag_SinceQualification "QUAL")
       "package qualification of @since, one of\n'always' (default) or 'only-external'",
     Option [] ["ignore-link-symbol"] (ReqArg Flag_IgnoreLinkSymbol "SYMBOL")
-      "name of a symbol which does not trigger a warning in case of link issue"
+      "name of a symbol which does not trigger a warning in case of link issue",
+    Option ['j'] [] (OptArg (\count -> Flag_ParCount (fmap read count)) "n")
+      "load modules in parallel"
   ]
 
 
@@ -306,10 +310,11 @@ optShowInterfaceFile flags = optLast [ str | Flag_ShowInterface str <- flags ]
 optLaTeXStyle :: [Flag] -> Maybe String
 optLaTeXStyle flags = optLast [ str | Flag_LaTeXStyle str <- flags ]
 
-
 optMathjax :: [Flag] -> Maybe String
 optMathjax flags = optLast [ str | Flag_Mathjax str <- flags ]
 
+optParCount :: [Flag] -> Maybe (Maybe Int)
+optParCount flags = optLast [ n | Flag_ParCount n <- flags ]
 
 qualification :: [Flag] -> Either String QualOption
 qualification flags =
@@ -375,16 +380,16 @@ optLast xs = Just (last xs)
 --
 -- The @--package-name@ and @--package-version@ Haddock flags allow the user to
 -- specify this information manually and it is returned here if present.
-modulePackageInfo :: DynFlags
+modulePackageInfo :: UnitState
                   -> [Flag] -- ^ Haddock flags are checked as they may contain
                             -- the package name or version provided by the user
                             -- which we prioritise
                   -> Maybe Module
                   -> (Maybe PackageName, Maybe Data.Version.Version)
-modulePackageInfo _dflags _flags Nothing = (Nothing, Nothing)
-modulePackageInfo dflags flags (Just modu) =
+modulePackageInfo _unit_state _flags Nothing = (Nothing, Nothing)
+modulePackageInfo unit_state flags (Just modu) =
   ( optPackageName flags    <|> fmap unitPackageName pkgDb
   , optPackageVersion flags <|> fmap unitPackageVersion pkgDb
   )
   where
-    pkgDb = lookupUnit (unitState dflags) (moduleUnit modu)
+    pkgDb = lookupUnit unit_state (moduleUnit modu)

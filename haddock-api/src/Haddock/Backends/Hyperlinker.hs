@@ -70,10 +70,10 @@ ppHyperlinkedModuleSource verbosity srcdir pretty srcs iface = case ifaceHieFile
         -- Get the AST and tokens corresponding to the source file we want
         let fileFs = mkFastString file
             mast | M.size asts == 1 = snd <$> M.lookupMin asts
-                 | otherwise        = M.lookup fileFs asts
+                 | otherwise        = M.lookup (HiePath (mkFastString file)) asts
+            tokens = parse df file rawSrc
             ast = fromMaybe (emptyHieAst fileFs) mast
             fullAst = recoverFullIfaceTypes df types ast
-            tokens = parse df file rawSrc
 
         -- Warn if we didn't find an AST, but there were still ASTs
         if M.null asts
