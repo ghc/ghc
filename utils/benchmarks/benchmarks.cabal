@@ -2,11 +2,11 @@ cabal-version:        3.0
 name:                 benchmarks
 version:              0.1.0.0
 description:          These programs are from the Event package (before it was
-                      made an internal GHC module) and have been modified to be 
+                      made an internal GHC module) and have been modified to be
                       use as simple executables to benchmark GHC's I/O manager.
 license:              BSD-3-Clause
 license-file:         LICENSE
-synopsis:             Utilities to benchmark GHC's I/O manager 
+synopsis:             Utilities to benchmark GHC's I/O manager
 author:               Bryan O'Sullivan <bos@serpentine.com>
                       Johan Tibell <johan.tibell@gmail.com>
 maintainer:           TBD
