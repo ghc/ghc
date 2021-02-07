@@ -46,9 +46,6 @@ import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique
 
-import Documentation.Haddock.Parser (parseModLink)
-
-
 data InterfaceFile = InterfaceFile {
   ifLinkEnv         :: LinkEnv,
   ifInstalledIfaces :: [InstalledInterface]
@@ -625,7 +622,10 @@ instance (Binary mod, Binary id) => Binary (DocH mod id) where
               -- See note [The DocModule story]
               5 -> do
                     af <- get bh
-                    return (parseModLink af)
+                    return $ DocModule ModLink
+                      { modLinkName  = af
+                      , modLinkLabel = Nothing
+                      }
               6 -> do
                     ag <- get bh
                     return (DocEmphasis ag)
