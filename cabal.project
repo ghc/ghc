@@ -3,5 +3,12 @@ packages: ./
           ./haddock-library
           ./haddock-test
 
+with-compiler: ghc-9.0
+
+allow-newer:
+  ghc-paths:Cabal,
+  *:base,
+  *:ghc-prim
+
 -- Pinning the index-state helps to make reasonably CI deterministic
-index-state: 2020-12-08T20:13:44Z
+index-state: 2021-01-24T12:09:34Z

@@ -149,6 +149,9 @@ instance ToExpr id => ToExpr (Header id)
 deriving instance Generic (Hyperlink id)
 instance ToExpr id => ToExpr (Hyperlink id)
 
+deriving instance Generic (ModLink id)
+instance ToExpr id => ToExpr (ModLink id)
+
 deriving instance Generic Picture
 instance ToExpr Picture
 

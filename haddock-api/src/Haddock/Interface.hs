@@ -59,15 +59,15 @@ import GHC.Data.Graph.Directed
 import GHC.Driver.Session hiding (verbosity)
 import GHC hiding (verbosity)
 import GHC.Driver.Env
-import GHC.Driver.Monad (Session(..), modifySession, reflectGhc)
+import GHC.Driver.Monad
 import GHC.Data.FastString (unpackFS)
+import GHC.Utils.Error
 import GHC.Tc.Types (TcM, TcGblEnv(..))
 import GHC.Tc.Utils.Monad (getTopEnv, setGblEnv)
 import GHC.Tc.Utils.Env (tcLookupGlobal)
 import GHC.Types.Name (nameIsFromExternalPackage, nameOccName)
 import GHC.Types.Name.Occurrence (isTcOcc)
 import GHC.Types.Name.Reader (unQualOK, greMangledName, globalRdrEnvElts)
-import GHC.Utils.Error (withTimingD)
 import GHC.HsToCore.Docs
 import GHC.Runtime.Loader (initializePlugins)
 import GHC.Plugins (Outputable, StaticPlugin(..), Plugin(..), PluginWithArgs(..),
@@ -113,7 +113,7 @@ processModules verbosity modules flags extIfaces = do
       mods = Set.fromList $ map ifaceMod interfaces
   out verbosity verbose "Attaching instances..."
   interfaces' <- {-# SCC attachInstances #-}
-                 withTimingD "attachInstances" (const ()) $ do
+                 withTimingM "attachInstances" (const ()) $ do
                    attachInstances (exportedNames, mods) interfaces instIfaceMap ms
 
   out verbosity verbose "Building cross-linking environment..."
@@ -161,7 +161,7 @@ createIfaces verbosity modules flags instIfaceMap = do
   targets <- mapM (\filePath -> guessTarget filePath Nothing) modules
   setTargets targets
 
-  loadOk <- withTimingD "load" (const ()) $
+  loadOk <- withTimingM "load" (const ()) $
     {-# SCC load #-} GHC.load LoadAllTargets
 
   case loadOk of
@@ -212,7 +212,8 @@ plugin verbosity flags instIfaceMap = liftIO $ do
       | otherwise = do
           hsc_env <- getTopEnv
           ifaces <- liftIO $ readIORef ifaceMapRef
-          (iface, modules) <- withTimingD "processModule" (const ()) $
+          (iface, modules) <- withTiming (hsc_logger hsc_env) (hsc_dflags hsc_env)
+                                "processModule" (const ()) $
             processModule1 verbosity flags ifaces instIfaceMap hsc_env mod_summary tc_gbl_env
 
           liftIO $ do
@@ -263,8 +264,11 @@ processModule1 verbosity flags ifaces inst_ifaces hsc_env mod_summary tc_gbl_env
 
     unit_state = hsc_units hsc_env
 
-  (!interface, messages) <- {-# SCC createInterface #-}
-    withTimingD "createInterface" (const ()) $ runIfM (fmap Just . tcLookupGlobal) $
+  (!interface, messages) <- do
+    logger <- getLogger
+    dflags <- getDynFlags
+    {-# SCC createInterface #-}
+     withTiming logger dflags "createInterface" (const ()) $ runIfM (fmap Just . tcLookupGlobal) $
       createInterface1 flags unit_state mod_summary tc_gbl_env
         ifaces inst_ifaces
 
@@ -291,8 +295,7 @@ processModule1 verbosity flags ifaces inst_ifaces hsc_env mod_summary tc_gbl_env
       ifaceHaddockCoverage interface
 
     percentage :: Int
-    percentage =
-      round (fromIntegral haddocked * 100 / fromIntegral haddockable :: Double)
+    percentage = div (haddocked * 100) haddockable
 
     modString :: String
     modString = moduleString (ifaceMod interface)
@@ -365,4 +368,3 @@ buildHomeLinks ifaces = foldl upd Map.empty (reverse ifaces)
         mdl            = ifaceMod iface
         keep_old env n = Map.insertWith (\_ old -> old) n mdl env
         keep_new env n = Map.insert n mdl env
-

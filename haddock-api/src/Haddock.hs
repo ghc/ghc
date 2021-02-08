@@ -185,12 +185,13 @@ haddockWithGhc ghc args = handleTopExceptions $ do
 
   ghc flags' $ withDir $ do
     dflags <- getDynFlags
+    logger <- getLogger
     unit_state <- hsc_units <$> getSession
 
     forM_ (optShowInterfaceFile flags) $ \path -> liftIO $ do
       mIfaceFile <- readInterfaceFiles freshNameCache [(("", Nothing), path)] noChecks
       forM_ mIfaceFile $ \(_, ifaceFile) -> do
-        logOutput dflags $ withPprStyle defaultUserStyle (renderJson (jsonInterfaceFile ifaceFile))
+        putMsg logger dflags $ renderJson (jsonInterfaceFile ifaceFile)
 
     if not (null files) then do
       (packages, ifaces, homeLinks) <- readPackagesAndProcessModules flags files
@@ -203,7 +204,7 @@ haddockWithGhc ghc args = handleTopExceptions $ do
           }
 
       -- Render the interfaces.
-      liftIO $ renderStep dflags unit_state flags sinceQual qual packages ifaces
+      liftIO $ renderStep logger dflags unit_state flags sinceQual qual packages ifaces
 
     else do
       when (any (`elem` [Flag_Html, Flag_Hoogle, Flag_LaTeX]) flags) $
@@ -213,7 +214,7 @@ haddockWithGhc ghc args = handleTopExceptions $ do
       packages <- liftIO $ readInterfaceFiles freshNameCache (readIfaceArgs flags) noChecks
 
       -- Render even though there are no input files (usually contents/index).
-      liftIO $ renderStep dflags unit_state flags sinceQual qual packages []
+      liftIO $ renderStep logger dflags unit_state flags sinceQual qual packages []
 
 -- | Run the GHC action using a temporary output directory
 withTempOutputDir :: Ghc a -> Ghc a
@@ -262,9 +263,9 @@ readPackagesAndProcessModules flags files = do
     return (packages, ifaces, homeLinks)
 
 
-renderStep :: DynFlags -> UnitState -> [Flag] -> SinceQual -> QualOption
+renderStep :: Logger -> DynFlags -> UnitState -> [Flag] -> SinceQual -> QualOption
            -> [(DocPaths, InterfaceFile)] -> [Interface] -> IO ()
-renderStep dflags unit_state flags sinceQual nameQual pkgs interfaces = do
+renderStep logger dflags unit_state flags sinceQual nameQual pkgs interfaces = do
   updateHTMLXRefs pkgs
   let
     ifaceFiles = map snd pkgs
@@ -273,12 +274,12 @@ renderStep dflags unit_state flags sinceQual nameQual pkgs interfaces = do
       ((_, Just path), ifile) <- pkgs
       iface <- ifInstalledIfaces ifile
       return (instMod iface, path)
-  render dflags unit_state flags sinceQual nameQual interfaces installedIfaces extSrcMap
+  render logger dflags unit_state flags sinceQual nameQual interfaces installedIfaces extSrcMap
 
 -- | Render the interfaces with whatever backend is specified in the flags.
-render :: DynFlags -> UnitState -> [Flag] -> SinceQual -> QualOption -> [Interface]
+render :: Logger -> DynFlags -> UnitState -> [Flag] -> SinceQual -> QualOption -> [Interface]
        -> [InstalledInterface] -> Map Module FilePath -> IO ()
-render dflags unit_state flags sinceQual qual ifaces installedIfaces extSrcMap = do
+render logger dflags unit_state flags sinceQual qual ifaces installedIfaces extSrcMap = do
 
   let
     title                = fromMaybe "" (optTitle flags)
@@ -368,7 +369,7 @@ render dflags unit_state flags sinceQual qual ifaces installedIfaces extSrcMap =
   let withQuickjump = Flag_QuickJumpIndex `elem` flags
 
   when (Flag_GenIndex `elem` flags) $ do
-    withTiming dflags' "ppHtmlIndex" (const ()) $ do
+    withTiming logger dflags' "ppHtmlIndex" (const ()) $ do
       _ <- {-# SCC ppHtmlIndex #-}
            ppHtmlIndex odir title pkgStr
                   themes opt_mathjax opt_contents_url sourceUrls' opt_wiki_urls
@@ -378,7 +379,7 @@ render dflags unit_state flags sinceQual qual ifaces installedIfaces extSrcMap =
     copyHtmlBits odir libDir themes withQuickjump
 
   when (Flag_GenContents `elem` flags) $ do
-    withTiming dflags' "ppHtmlContents" (const ()) $ do
+    withTiming logger dflags' "ppHtmlContents" (const ()) $ do
       _ <- {-# SCC ppHtmlContents #-}
            ppHtmlContents unit_state odir title pkgStr
                      themes opt_mathjax opt_index_url sourceUrls' opt_wiki_urls
@@ -388,7 +389,7 @@ render dflags unit_state flags sinceQual qual ifaces installedIfaces extSrcMap =
     copyHtmlBits odir libDir themes withQuickjump
 
   when (Flag_Html `elem` flags) $ do
-    withTiming dflags' "ppHtml" (const ()) $ do
+    withTiming logger dflags' "ppHtml" (const ()) $ do
       _ <- {-# SCC ppHtml #-}
            ppHtml unit_state title pkgStr visibleIfaces reexportedIfaces odir
                   prologue
@@ -423,14 +424,14 @@ render dflags unit_state flags sinceQual qual ifaces installedIfaces extSrcMap =
           ]
 
   when (Flag_LaTeX `elem` flags) $ do
-    withTiming dflags' "ppLatex" (const ()) $ do
+    withTiming logger dflags' "ppLatex" (const ()) $ do
       _ <- {-# SCC ppLatex #-}
            ppLaTeX title pkgStr visibleIfaces odir (fmap _doc prologue) opt_latex_style
                    libDir
       return ()
 
   when (Flag_HyperlinkedSource `elem` flags && not (null ifaces)) $ do
-    withTiming dflags' "ppHyperlinkedSource" (const ()) $ do
+    withTiming logger dflags' "ppHyperlinkedSource" (const ()) $ do
       _ <- {-# SCC ppHyperlinkedSource #-}
            ppHyperlinkedSource (verbosity flags) odir libDir opt_source_css pretty srcMap ifaces
       return ()
@@ -469,7 +470,8 @@ readInterfaceFiles name_cache_accessor pairs bypass_version_check = do
 -- compilation and linking. Then run the given 'Ghc' action.
 withGhc' :: String -> Bool -> [String] -> (DynFlags -> Ghc a) -> IO a
 withGhc' libDir needHieFiles flags ghcActs = runGhc (Just libDir) $ do
-  dynflags' <- parseGhcFlags =<< getSessionDynFlags
+  logger <- getLogger
+  dynflags' <- parseGhcFlags logger =<< getSessionDynFlags
 
   -- We disable pattern match warnings because than can be very
   -- expensive to check
@@ -493,8 +495,8 @@ withGhc' libDir needHieFiles flags ghcActs = runGhc (Just libDir) $ do
             go arg    func True = arg : func True
 
 
-    parseGhcFlags :: MonadIO m => DynFlags -> m DynFlags
-    parseGhcFlags dynflags = do
+    parseGhcFlags :: MonadIO m => Logger -> DynFlags -> m DynFlags
+    parseGhcFlags logger dynflags = do
       -- TODO: handle warnings?
 
       let extra_opts | needHieFiles = [Opt_WriteHie, Opt_Haddock]
@@ -506,7 +508,7 @@ withGhc' libDir needHieFiles flags ghcActs = runGhc (Just libDir) $ do
                         }
           flags' = filterRtsFlags flags
 
-      (dynflags'', rest, _) <- parseDynamicFlags dynflags' (map noLoc flags')
+      (dynflags'', rest, _) <- parseDynamicFlags logger dynflags' (map noLoc flags')
       if not (null rest)
         then throwE ("Couldn't parse GHC options: " ++ unwords flags')
         else return dynflags''

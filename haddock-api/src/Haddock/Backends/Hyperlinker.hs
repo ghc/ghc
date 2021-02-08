@@ -18,7 +18,7 @@ import Data.Maybe
 import System.Directory
 import System.FilePath
 
-import GHC.Iface.Ext.Types
+import GHC.Iface.Ext.Types  ( HieFile(..), HieASTs(..), HieAST(..), SourcedNodeInfo(..) )
 import GHC.Iface.Ext.Binary ( readHieFile, hie_file_result, NameCacheUpdater(..))
 import GHC.Types.SrcLoc     ( realSrcLocSpan, mkRealSrcLoc )
 import Data.Map as M

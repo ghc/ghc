@@ -46,7 +46,6 @@ import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique
 
-
 data InterfaceFile = InterfaceFile {
   ifLinkEnv         :: LinkEnv,
   ifInstalledIfaces :: [InstalledInterface]
@@ -69,6 +68,18 @@ ifUnitId if_ =
 binaryInterfaceMagic :: Word32
 binaryInterfaceMagic = 0xD0Cface
 
+-- Note [The DocModule story]
+--
+-- Breaking changes to the DocH type result in Haddock being unable to read
+-- existing interfaces. This is especially painful for interfaces shipped
+-- with GHC distributions since there is no easy way to regenerate them!
+--
+-- PR #1315 introduced a breaking change to the DocModule constructor. To
+-- maintain backward compatibility we
+--
+-- Parse the old DocModule constructor format (tag 5) and parse the contained
+-- string into a proper ModLink structure. When writing interfaces we exclusively
+-- use the new DocModule format (tag 24)
 
 -- IMPORTANT: Since datatypes in the GHC API might change between major
 -- versions, and because we store GHC datatypes in our interface files, we need
@@ -87,7 +98,7 @@ binaryInterfaceVersion :: Word16
 binaryInterfaceVersion = 38
 
 binaryInterfaceVersionCompatibility :: [Word16]
-binaryInterfaceVersionCompatibility = [binaryInterfaceVersion]
+binaryInterfaceVersionCompatibility = [37, binaryInterfaceVersion]
 #else
 #error Unsupported GHC version
 #endif
@@ -159,7 +170,7 @@ writeInterfaceFile filename iface = do
 type NameCacheAccessor m = (m NameCache, NameCache -> m ())
 
 
-nameCacheFromGhc :: forall m. (GhcMonad m, MonadIO m) => NameCacheAccessor m
+nameCacheFromGhc :: forall m. GhcMonad m => NameCacheAccessor m
 nameCacheFromGhc = ( read_from_session , write_to_session )
   where
     read_from_session = do
@@ -444,6 +455,15 @@ instance Binary a => Binary (Hyperlink a) where
         label <- get bh
         return (Hyperlink url label)
 
+instance Binary a => Binary (ModLink a) where
+    put_ bh (ModLink m label) = do
+        put_ bh m
+        put_ bh label
+    get bh = do
+        m <- get bh
+        label <- get bh
+        return (ModLink m label)
+
 instance Binary Picture where
     put_ bh (Picture uri title) = do
         put_ bh uri
@@ -522,9 +542,6 @@ instance (Binary mod, Binary id) => Binary (DocH mod id) where
     put_ bh (DocIdentifier ae) = do
             putByte bh 4
             put_ bh ae
-    put_ bh (DocModule af) = do
-            putByte bh 5
-            put_ bh af
     put_ bh (DocEmphasis ag) = do
             putByte bh 6
             put_ bh ag
@@ -579,6 +596,10 @@ instance (Binary mod, Binary id) => Binary (DocH mod id) where
     put_ bh (DocTable x) = do
             putByte bh 23
             put_ bh x
+    -- See note [The DocModule story]
+    put_ bh (DocModule af) = do
+            putByte bh 24
+            put_ bh af
 
     get bh = do
             h <- getByte bh
@@ -598,9 +619,13 @@ instance (Binary mod, Binary id) => Binary (DocH mod id) where
               4 -> do
                     ae <- get bh
                     return (DocIdentifier ae)
+              -- See note [The DocModule story]
               5 -> do
                     af <- get bh
-                    return (DocModule af)
+                    return $ DocModule ModLink
+                      { modLinkName  = af
+                      , modLinkLabel = Nothing
+                      }
               6 -> do
                     ag <- get bh
                     return (DocEmphasis ag)
@@ -655,6 +680,10 @@ instance (Binary mod, Binary id) => Binary (DocH mod id) where
               23 -> do
                     x <- get bh
                     return (DocTable x)
+              -- See note [The DocModule story]
+              24 -> do
+                    af <- get bh
+                    return (DocModule af)
               _ -> error "invalid binary data found in the interface file"
 
 

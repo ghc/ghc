@@ -345,7 +345,7 @@ renameLBinder :: LHsTyVarBndr flag GhcRn -> Rename (IdP GhcRn) (LHsTyVarBndr fla
 renameLBinder = located renameBinder
 
 -- | Core renaming logic.
-renameName :: (Eq name, SetName name) => name -> Rename name name
+renameName :: SetName name => name -> Rename name name
 renameName name = do
     RenameEnv { .. } <- get
     case Map.lookup (getName name) rneCtx of
