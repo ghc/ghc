@@ -435,6 +435,7 @@ validate-aarch64-darwin:
   script: |
     #! /usr/bin/env nix-shell
     #! nix-shell -I nixpkgs=https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz .gitlab/shell.nix --pure --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --argstr system "aarch64-darwin" -i bash
+    env
     .gitlab/ci.sh setup
     .gitlab/ci.sh configure
     .gitlab/ci.sh build_make
