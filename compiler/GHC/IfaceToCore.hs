@@ -53,6 +53,7 @@ import GHC.Core.TyCo.Subst ( substTyCoVars )
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
 import GHC.Core
+import GHC.Core.Unify( RoughMatchTc(..) )
 import GHC.Core.Utils
 import GHC.Core.Unfold.Make
 import GHC.Core.Lint
@@ -1145,13 +1146,17 @@ look at it.
 ************************************************************************
 -}
 
+tcRoughTyCon :: Maybe IfaceTyCon -> RoughMatchTc
+tcRoughTyCon (Just tc) = KnownTc (ifaceTyConName tc)
+tcRoughTyCon Nothing   = OtherTc
+
 tcIfaceInst :: IfaceClsInst -> IfL ClsInst
 tcIfaceInst (IfaceClsInst { ifDFun = dfun_name, ifOFlag = oflag
                           , ifInstCls = cls, ifInstTys = mb_tcs
                           , ifInstOrph = orph })
   = do { dfun <- forkM (text "Dict fun" <+> ppr dfun_name) $
                     fmap tyThingId (tcIfaceImplicit dfun_name)
-       ; let mb_tcs' = map (fmap ifaceTyConName) mb_tcs
+       ; let mb_tcs' = map tcRoughTyCon mb_tcs
        ; return (mkImportedInstance cls mb_tcs' dfun_name dfun oflag orph) }
 
 tcIfaceFamInst :: IfaceFamInst -> IfL FamInst
@@ -1161,7 +1166,7 @@ tcIfaceFamInst (IfaceFamInst { ifFamInstFam = fam, ifFamInstTys = mb_tcs
                      tcIfaceCoAxiom axiom_name
              -- will panic if branched, but that's OK
          ; let axiom'' = toUnbranchedAxiom axiom'
-               mb_tcs' = map (fmap ifaceTyConName) mb_tcs
+               mb_tcs' = map tcRoughTyCon mb_tcs
          ; return (mkImportedFamInst fam mb_tcs' axiom'') }
 
 {-
