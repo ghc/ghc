@@ -426,6 +426,8 @@ validate-aarch64-darwin:
     # inside th shell.
     CPUS: 8
   script:
+    - env
+    - echo $GHC_VERSION
     - nix-shell -I nixpkgs=https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz .gitlab/shell.nix --pure --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --argstr system "aarch64-darwin" --run '.gitlab/ci.sh setup'
     - nix-shell -I nixpkgs=https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz .gitlab/shell.nix --pure --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --argstr system "aarch64-darwin" --run '.gitlab/ci.sh configure'
     - nix-shell -I nixpkgs=https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz .gitlab/shell.nix --pure --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --argstr system "aarch64-darwin" --run '.gitlab/ci.sh build_make'
@@ -461,7 +463,6 @@ validate-aarch64-darwin:
     TEST_ENV: "x86_64-darwin-hadrian"
     FLAVOUR: "validate"
   script:
-    - env
     - .gitlab/ci.sh setup
     - .gitlab/ci.sh configure
     - .gitlab/ci.sh build_hadrian
