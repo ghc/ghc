@@ -5,14 +5,9 @@
 module GHC.Types.Name.Cache
   ( NameCache (..)
   , initNameCache
+  , takeUniqFromNameCache
   , updateNameCache'
   , updateNameCache
-  , OnDiskName
-  , fromOnDiskName
-
-  -- * Immutable state
-  , NameCacheState (..)
-  , initNameCacheState
 
   -- * OrigNameCache
   , OrigNameCache
@@ -25,7 +20,6 @@ where
 import GHC.Prelude
 
 import GHC.Unit.Module
-import GHC.Types.SrcLoc
 import GHC.Types.Name
 import GHC.Types.Unique.Supply
 import GHC.Builtin.Types
@@ -35,7 +29,8 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
-import Data.IORef
+import Control.Concurrent.MVar
+import Control.Monad
 
 #include "HsVersions.h"
 
@@ -97,18 +92,16 @@ are two reasons why we might look up an Orig RdrName for built-in syntax,
 -- | The NameCache makes sure that there is just one Unique assigned for
 -- each original name; i.e. (module-name, occ-name) pair and provides
 -- something of a lookup mechanism for those names.
-newtype NameCache = NameCache (IORef NameCacheState)
-
--- | The NameCache makes sure that there is just one Unique assigned for
--- each original name; i.e. (module-name, occ-name) pair and provides
--- something of a lookup mechanism for those names.
-data NameCacheState = NameCacheState
-  { nsUniqs :: !UniqSupply    -- ^ Supply of uniques
-  , nsNames :: !OrigNameCache -- ^ Ensures that one original name gets one unique
+data NameCache = NameCache
+  { nsUniqChar :: {-# UNPACK #-} !Char
+  , nsNames    :: {-# UNPACK #-} !(MVar OrigNameCache)
   }
 
 -- | Per-module cache of original 'OccName's given 'Name's
 type OrigNameCache   = ModuleEnv (OccEnv Name)
+
+takeUniqFromNameCache :: NameCache -> IO Unique
+takeUniqFromNameCache (NameCache c _) = uniqFromMask c
 
 lookupOrigNameCache :: OrigNameCache -> Module -> OccName -> Maybe Name
 lookupOrigNameCache nc mod occ
@@ -135,14 +128,8 @@ extendOrigNameCache nc mod occ name
   where
     combine _ occ_env = extendOccEnv occ_env occ name
 
-initNameCacheState :: UniqSupply -> [Name] -> NameCacheState
-initNameCacheState us names = NameCacheState
-  { nsUniqs = us
-  , nsNames = initOrigNames names
-  }
-
-initNameCache :: UniqSupply -> [Name] -> IO NameCache
-initNameCache us names = NameCache <$> newIORef (initNameCacheState us names)
+initNameCache :: Char -> [Name] -> IO NameCache
+initNameCache c names = NameCache c <$> newMVar (initOrigNames names)
 
 initOrigNames :: [Name] -> OrigNameCache
 initOrigNames names = foldl' extendOrigNameCache' emptyModuleEnv names
@@ -150,10 +137,13 @@ initOrigNames names = foldl' extendOrigNameCache' emptyModuleEnv names
 -- | Update the name cache with the given function
 updateNameCache'
   :: NameCache
-  -> (NameCacheState -> (NameCacheState, c))  -- The updating function
+  -> (OrigNameCache -> IO (OrigNameCache, c))  -- The updating function
   -> IO c
-updateNameCache' (NameCache ncRef) upd_fn
-  = atomicModifyIORef' ncRef upd_fn
+updateNameCache' (NameCache _c nc) upd_fn = modifyMVar' nc upd_fn
+
+-- this should be in `base`
+modifyMVar' :: MVar a -> (a -> IO (a,b)) -> IO b
+modifyMVar' m f = modifyMVar m $ f >=> \c -> fst c `seq` pure c
 
 -- | Update the name cache with the given function
 --
@@ -167,22 +157,7 @@ updateNameCache
   :: NameCache
   -> Module
   -> OccName
-  -> (NameCacheState -> (NameCacheState, c))
+  -> (OrigNameCache -> IO (OrigNameCache, c))
   -> IO c
 updateNameCache name_cache !_mod !_occ upd_fn
   = updateNameCache' name_cache upd_fn
-
-type OnDiskName = (Unit, ModuleName, OccName)
-
-fromOnDiskName :: NameCacheState -> OnDiskName -> (NameCacheState, Name)
-fromOnDiskName nc (pid, mod_name, occ) =
-    let mod   = mkModule pid mod_name
-        cache = nsNames nc
-    in case lookupOrigNameCache cache mod occ of
-           Just name -> (nc, name)
-           Nothing   ->
-               let (uniq, us) = takeUniqFromSupply (nsUniqs nc)
-                   name       = mkExternalName uniq mod occ noSrcSpan
-                   new_cache  = extendOrigNameCache cache mod occ name
-               in ( nc{ nsUniqs = us, nsNames = new_cache }, name )
-
