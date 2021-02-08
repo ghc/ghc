@@ -66,7 +66,6 @@ import GHC.Types.Name.Set
 import GHC.Types.Name.Cache
 import GHC.Types.Name.Ppr
 import GHC.Types.Avail
-import GHC.Types.Unique.Supply
 import GHC.Types.Tickish
 import GHC.Types.TypeEnv
 
@@ -1034,16 +1033,23 @@ tidyTopName mod name_cache maybe_ref occ_env id
   -- Now we get to the real reason that all this is in the IO Monad:
   -- we have to update the name cache in a nice atomic fashion
 
-  | local  && internal = do { new_local_name <- updateNameCache' name_cache mk_new_local
-                            ; return (occ_env', new_local_name) }
+  | local  && internal = do uniq <- takeUniqFromNameCache name_cache
+                            let new_local_name = mkInternalName uniq occ' loc
+                            return (occ_env', new_local_name)
         -- Even local, internal names must get a unique occurrence, because
         -- if we do -split-objs we externalise the name later, in the code generator
         --
         -- Similarly, we must make sure it has a system-wide Unique, because
         -- the byte-code generator builds a system-wide Name->BCO symbol table
 
-  | local  && external = do { new_external_name <- updateNameCache' name_cache mk_new_external
-                            ; return (occ_env', new_external_name) }
+  | local  && external = do new_external_name <- allocateGlobalBinder name_cache mod occ' loc
+                            return (occ_env', new_external_name)
+        -- If we want to externalise a currently-local name, check
+        -- whether we have already assigned a unique for it.
+        -- If so, use it; if not, extend the table.
+        -- All this is done by allocateGlobalBinder.
+        -- This is needed when *re*-compiling a module in GHCi; we must
+        -- use the same name for externally-visible things as we did before.
 
   | otherwise = panic "tidyTopName"
   where
@@ -1077,17 +1083,6 @@ tidyTopName mod name_cache maybe_ref occ_env id
 
     (occ_env', occ') = tidyOccName occ_env new_occ
 
-    mk_new_local nc = (nc { nsUniqs = us }, mkInternalName uniq occ' loc)
-                    where
-                      (uniq, us) = takeUniqFromSupply (nsUniqs nc)
-
-    mk_new_external nc = allocateGlobalBinder nc mod occ' loc
-        -- If we want to externalise a currently-local name, check
-        -- whether we have already assigned a unique for it.
-        -- If so, use it; if not, extend the table.
-        -- All this is done by allcoateGlobalBinder.
-        -- This is needed when *re*-compiling a module in GHCi; we must
-        -- use the same name for externally-visible things as we did before.
 
 {-
 ************************************************************************

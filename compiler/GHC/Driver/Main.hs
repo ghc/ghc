@@ -190,7 +190,6 @@ import GHC.Types.Error
 import GHC.Types.Fixity.Env
 import GHC.Types.CostCentre
 import GHC.Types.IPE
-import GHC.Types.Unique.Supply
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
 import GHC.Types.Name
@@ -244,8 +243,7 @@ newHscEnv dflags = do
     -- we don't store the unit databases and the unit state to still
     -- allow `setSessionDynFlags` to be used to set unit db flags.
     eps_var <- newIORef initExternalPackageState
-    us      <- mkSplitUniqSupply 'r'
-    nc_var  <- initNameCache us knownKeyNames
+    nc_var  <- initNameCache 'r' knownKeyNames
     fc_var  <- initFinderCache
     logger  <- initLogger
     tmpfs   <- initTmpFs
