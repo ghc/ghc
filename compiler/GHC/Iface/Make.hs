@@ -48,6 +48,7 @@ import GHC.Core.Type
 import GHC.Core.Multiplicity
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
+import GHC.Core.Unify( RoughMatchTc(..) )
 
 import GHC.Driver.Env
 import GHC.Driver.Backend
@@ -685,34 +686,25 @@ tidyTyVar (_, subst) tv = toIfaceTyVar (lookupVarEnv subst tv `orElse` tv)
 instanceToIfaceInst :: ClsInst -> IfaceClsInst
 instanceToIfaceInst (ClsInst { is_dfun = dfun_id, is_flag = oflag
                              , is_cls_nm = cls_name, is_cls = cls
-                             , is_tcs = mb_tcs
+                             , is_tcs = rough_tcs
                              , is_orphan = orph })
   = ASSERT( cls_name == className cls )
-    IfaceClsInst { ifDFun    = dfun_name,
-                ifOFlag   = oflag,
-                ifInstCls = cls_name,
-                ifInstTys = map do_rough mb_tcs,
-                ifInstOrph = orph }
-  where
-    do_rough Nothing  = Nothing
-    do_rough (Just n) = Just (toIfaceTyCon_name n)
-
-    dfun_name = idName dfun_id
-
+    IfaceClsInst { ifDFun     = idName dfun_id
+                 , ifOFlag    = oflag
+                 , ifInstCls  = cls_name
+                 , ifInstTys  = ifaceRoughMatchTcs rough_tcs
+                 , ifInstOrph = orph }
 
 --------------------------
 famInstToIfaceFamInst :: FamInst -> IfaceFamInst
 famInstToIfaceFamInst (FamInst { fi_axiom    = axiom,
                                  fi_fam      = fam,
-                                 fi_tcs      = roughs })
+                                 fi_tcs      = rough_tcs })
   = IfaceFamInst { ifFamInstAxiom    = coAxiomName axiom
                  , ifFamInstFam      = fam
-                 , ifFamInstTys      = map do_rough roughs
+                 , ifFamInstTys      = ifaceRoughMatchTcs rough_tcs
                  , ifFamInstOrph     = orph }
   where
-    do_rough Nothing  = Nothing
-    do_rough (Just n) = Just (toIfaceTyCon_name n)
-
     fam_decl = tyConName $ coAxiomTyCon axiom
     mod = ASSERT( isExternalName (coAxiomName axiom) )
           nameModule (coAxiomName axiom)
@@ -724,6 +716,12 @@ famInstToIfaceFamInst (FamInst { fi_axiom    = axiom,
          = NotOrphan (nameOccName fam_decl)
          | otherwise
          = chooseOrphanAnchor lhs_names
+
+ifaceRoughMatchTcs :: [RoughMatchTc] -> [Maybe IfaceTyCon]
+ifaceRoughMatchTcs tcs = map do_rough tcs
+  where
+    do_rough OtherTc     = Nothing
+    do_rough (KnownTc n) = Just (toIfaceTyCon_name n)
 
 --------------------------
 coreRuleToIfaceRule :: CoreRule -> IfaceRule
