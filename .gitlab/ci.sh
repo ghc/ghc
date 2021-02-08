@@ -137,6 +137,7 @@ function set_toolchain_paths() {
   fi
 
   if [[ -n "${IN_NIX_SHELL}" ]]; then
+      needs_toolchain="";
       GHC="$(which ghc)"
       CABAL="$(which cabal)"
       HAPPY="$(which happy)"
