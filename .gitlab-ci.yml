@@ -417,8 +417,8 @@ validate-aarch64-darwin:
   variables:
     TEST_TYPE: test
     MAKE_ARGS: "-Werror"
-    GHC_VERSION: 8.10.3
-    CABAL_INSTALL_VERSION: 3.2.0.0
+    GHC_VERSION: "8.10.3"
+    CABAL_INSTALL_VERSION: "3.2.0.0"
     BUILD_FLAVOUR: "quick"
     BIN_DIST_PREP_TAR_COMP: "ghc-arm64-apple-darwin.tar.xz"
     # we run on M1's for now, getconf can't be built with nix yet,
@@ -427,11 +427,10 @@ validate-aarch64-darwin:
     CPUS: 8
   script:
     - env
-    - echo $GHC_VERSION
-    - nix-shell -I nixpkgs=https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz .gitlab/shell.nix --pure --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --argstr system "aarch64-darwin" --run '.gitlab/ci.sh setup'
-    - nix-shell -I nixpkgs=https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz .gitlab/shell.nix --pure --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --argstr system "aarch64-darwin" --run '.gitlab/ci.sh configure'
-    - nix-shell -I nixpkgs=https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz .gitlab/shell.nix --pure --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --argstr system "aarch64-darwin" --run '.gitlab/ci.sh build_make'
-    - nix-shell -I nixpkgs=https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz .gitlab/shell.nix --pure --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --argstr system "aarch64-darwin" --run '.gitlab/ci.sh test_make'
+    - GHC_VERSION=$GHC_VERSION nix-shell -I nixpkgs=https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz .gitlab/shell.nix --pure --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --argstr system "aarch64-darwin" --run '.gitlab/ci.sh setup'
+    - GHC_VERSION=$GHC_VERSION nix-shell -I nixpkgs=https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz .gitlab/shell.nix --pure --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --argstr system "aarch64-darwin" --run '.gitlab/ci.sh configure'
+    - GHC_VERSION=$GHC_VERSION nix-shell -I nixpkgs=https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz .gitlab/shell.nix --pure --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --argstr system "aarch64-darwin" --run '.gitlab/ci.sh build_make'
+    - GHC_VERSION=$GHC_VERSION nix-shell -I nixpkgs=https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz .gitlab/shell.nix --pure --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --argstr system "aarch64-darwin" --run '.gitlab/ci.sh test_make'
   dependencies: []
   artifacts:
     reports:
