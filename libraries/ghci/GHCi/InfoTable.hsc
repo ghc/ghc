@@ -369,7 +369,11 @@ newExecConItbl obj con_desc
                -- table, because on a 64-bit platform we reference this string
                -- with a 32-bit offset relative to the info table, so if we
                -- allocated the string separately it might be out of range.
+#if MIN_VERSION_rts(1,0,1)
         wr_ptr <- _allocateWrite (sz + fromIntegral lcon_desc)
+#else
+        wr_ptr <- _allocateExec (sz + fromIntegral lcon_desc)
+#endif
         let ex_ptr = wr_ptr
         -- wr_ptr <- _allocateExec (sz + fromIntegral lcon_desc) pcode
         -- ex_ptr <- peek pcode
@@ -398,10 +402,10 @@ foreign import ccall unsafe "allocateExec"
 foreign import ccall unsafe "flushExec"
   _flushExec :: CUInt -> Ptr a -> IO ()
 
+#if MIN_VERSION_rts(1,0,1)
 foreign import ccall unsafe "allocateWrite"
   _allocateWrite :: CUInt -> IO (Ptr a)
 #if defined(RTS_LINKER_USE_MMAP)
-#if MIN_VERSION_rts(1,0,1)
 foreign import ccall unsafe "markExec"
   _markExec :: CUInt -> Ptr a -> IO ()
 #endif
