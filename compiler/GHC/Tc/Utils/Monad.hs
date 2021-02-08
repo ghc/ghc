@@ -75,8 +75,8 @@ module GHC.Tc.Utils.Monad(
   tcCollectingUsage, tcScalingUsage, tcEmitBindingUsage,
 
   -- * Shared error message stuff: renamer and typechecker
-  mkLongErrAt, mkDecoratedSDocAt, addLongErrAt, reportErrors, reportError,
-  reportWarning, recoverM, mapAndRecoverM, mapAndReportM, foldAndRecoverM,
+  mkLongErrAt, mkDecoratedSDocAt, addLongErrAt, reportDiagnostic, reportDiagnostics,
+  recoverM, mapAndRecoverM, mapAndReportM, foldAndRecoverM,
   attemptM, tryTc,
   askNoErrs, discardErrs, tryTcDiscardingErrs,
   checkNoErrs, whenNoErrs,
@@ -1026,28 +1026,17 @@ mkDecoratedSDocAt sev loc important context extra
          return $ mkMsgEnvelope sev loc printer errDoc' }
 
 addLongErrAt :: SrcSpan -> SDoc -> SDoc -> TcRn ()
-addLongErrAt loc msg extra = mkLongErrAt loc msg extra >>= reportError
+addLongErrAt loc msg extra = mkLongErrAt loc msg extra >>= reportDiagnostic
 
-reportErrors :: [MsgEnvelope DecoratedSDoc] -> TcM ()
-reportErrors = mapM_ reportError
+reportDiagnostics :: [MsgEnvelope DecoratedSDoc] -> TcM ()
+reportDiagnostics = mapM_ reportDiagnostic
 
-reportError :: MsgEnvelope DecoratedSDoc -> TcRn ()
-reportError err
-  = do { traceTc "Adding error:" (pprLocMsgEnvelope err) ;
+reportDiagnostic :: MsgEnvelope DecoratedSDoc -> TcRn ()
+reportDiagnostic msg
+  = do { traceTc "Adding diagnostic:" (pprLocMsgEnvelope msg) ;
          errs_var <- getErrsVar ;
          msgs     <- readTcRef errs_var ;
-         writeTcRef errs_var (err `addMessage` msgs) }
-
--- | Reports the input warning.
--- /INVARIANT/: The input 'MsgEnvelope' needs to have a 'SevWarning' severity.
-reportWarning :: MsgEnvelope DecoratedSDoc -> TcRn ()
-reportWarning warn
-  = ASSERT(isWarningMessage warn)
-  do { traceTc "Adding warning:" (pprLocMsgEnvelope warn)
-     ; errs_var <- getErrsVar
-     ; (warns, errs) <- partitionMessages <$> readTcRef errs_var
-     ; writeTcRef errs_var (mkMessages $ (warns `snocBag` warn) `unionBags` errs) }
-
+         writeTcRef errs_var (msg `addMessage` msgs) }
 
 -----------------------
 checkNoErrs :: TcM r -> TcM r
@@ -1543,7 +1532,7 @@ add_warn_at reason loc msg extra_info
          let { warn = mkLongMsgEnvelope (SevWarning reason)
                                         loc printer
                                         msg extra_info } ;
-         reportWarning warn }
+         reportDiagnostic warn }
 
 
 {-
