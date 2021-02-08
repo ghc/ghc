@@ -114,6 +114,7 @@ import GHC.Core.DataCon
 import GHC.Core.Type
 import GHC.Core.Class
 import GHC.Core.Coercion.Axiom
+import GHC.Core.Unify( RoughMatchTc(..) )
 import GHC.Core.FamInstEnv
    ( FamInst, pprFamInst, famInstsRepTyCons
    , famInstEnvElts, extendFamInstEnvList, normaliseType )
@@ -1679,7 +1680,7 @@ tcMissingParentClassWarn warnFlag isName shouldName
            -- "<location>: Warning: <type> is an instance of <is> but not
            -- <should>" e.g. "Foo is an instance of Monad but not Applicative"
            ; let instLoc = srcLocSpan . nameSrcLoc $ getName isInst
-                 warnMsg (Just name:_) =
+                 warnMsg (KnownTc name:_) =
                       addWarnAt (Reason warnFlag) instLoc $
                            hsep [ (quotes . ppr . nameOccName) name
                                 , text "is an instance of"
