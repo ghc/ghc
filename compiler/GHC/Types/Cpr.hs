@@ -5,7 +5,7 @@ module GHC.Types.Cpr (
     CprResult, topCpr, botCpr, conCpr, asConCpr,
     CprType (..), topCprType, botCprType, conCprType,
     lubCprType, applyCprTy, abstractCprTy, ensureCprTyArity, trimCprTy,
-    CprSig (..), topCprSig, mkCprSigForArity, mkCprSig, seqCprSig
+    CprSig (..), topCprSig, mkCprSigForArity, mkCprSig, cprSigArity, seqCprSig
   ) where
 
 import GHC.Prelude
@@ -128,6 +128,9 @@ topCprSig = CprSig topCprType
 
 mkCprSig :: Arity -> CprResult -> CprSig
 mkCprSig arty cpr = CprSig (CprType arty cpr)
+
+cprSigArity :: CprSig -> Arity
+cprSigArity (CprSig ct) = ct_arty ct
 
 seqCprSig :: CprSig -> ()
 seqCprSig sig = sig `seq` ()

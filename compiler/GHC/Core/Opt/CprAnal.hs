@@ -20,6 +20,7 @@ import GHC.Core
 import GHC.Core.Seq
 import GHC.Utils.Outputable
 import GHC.Types.Var.Env
+import GHC.Types.Var.Set
 import GHC.Types.Basic
 import GHC.Core.DataCon
 import GHC.Types.Id
@@ -178,8 +179,9 @@ cprAnal' env (Lam var body)
   | otherwise
   = (lam_ty, Lam var body')
   where
-    env'             = extendSigEnvForDemand env var (idDemandInfo var)
-    (body_ty, body') = cprAnal env' body
+    env1             = applyWhen (not (isOneShotBndr var)) enterMultiShotLam env
+    env2             = extendSigEnvForDemand env1 var (idDemandInfo var)
+    (body_ty, body') = cprAnal env2 body
     lam_ty           = abstractCprTy body_ty
 
 cprAnal' env (Case scrut case_bndr ty alts)
@@ -234,9 +236,11 @@ cprTransform env id
     sig
       -- Top-level binding, local let-binding or case binder
       | Just sig <- lookupSigEnv env id
+      , cprWontLoseSharing env id (cprSigArity sig)
       = getCprSig sig
       -- See Note [CPR for data structures]
       | Just rhs <- cprDataStructureUnfolding_maybe id
+      , cprWontLoseSharing env id (0 :: Arity) -- rhs has arity 0, so will its CPR sig
       = fst $ cprAnal env rhs
       -- Imported function or data con worker
       | isGlobalId id
@@ -299,7 +303,7 @@ cprAnalBind
 cprAnalBind top_lvl env id rhs
   -- See Note [CPR for data structures]
   | isDataStructure id rhs
-  = (id,  rhs,  env) -- Data structure => no code => need to analyse rhs
+  = (id,  rhs,  env `addSameLvl` id) -- Data structure => no code => need to analyse rhs
   | otherwise
   = (id', rhs', env')
   where
@@ -377,6 +381,8 @@ data AnalEnv
   = AE
   { ae_sigs   :: SigEnv
   -- ^ Current approximation of signatures for local ids
+  , ae_same_lvl :: IdSet
+  -- ^ Binders that are defined on the same one-shot level.
   , ae_virgin :: Bool
   -- ^ True only on every first iteration in a fixed-point
   -- iteration. See Note [Initialising strictness] in "GHC.Core.Opt.DmdAnal"
@@ -396,6 +402,7 @@ emptyAnalEnv :: FamInstEnvs -> AnalEnv
 emptyAnalEnv fam_envs
   = AE
   { ae_sigs = emptyVarEnv
+  , ae_same_lvl = emptyVarSet
   , ae_virgin = True
   , ae_fam_envs = fam_envs
   }
@@ -403,16 +410,29 @@ emptyAnalEnv fam_envs
 -- | Extend an environment with the CPR sigs attached to the id
 extendSigEnvList :: AnalEnv -> [Id] -> AnalEnv
 extendSigEnvList env ids
-  = env { ae_sigs = sigs' }
+  = env { ae_sigs = sigs', ae_same_lvl = same_lvl' }
   where
     sigs' = extendVarEnvList (ae_sigs env) [ (id, idCprInfo id) | id <- ids ]
+    same_lvl' = extendVarSetList (ae_same_lvl env) ids
 
 extendSigEnv :: AnalEnv -> Id -> CprSig -> AnalEnv
 extendSigEnv env id sig
-  = env { ae_sigs = extendVarEnv (ae_sigs env) id sig }
+  = env { ae_sigs = extendVarEnv (ae_sigs env) id sig
+        , ae_same_lvl = extendVarSet (ae_same_lvl env) id }
 
 lookupSigEnv :: AnalEnv -> Id -> Maybe CprSig
 lookupSigEnv env id = lookupVarEnv (ae_sigs env) id
+
+enterMultiShotLam :: AnalEnv -> AnalEnv
+enterMultiShotLam env
+  = env { ae_same_lvl = emptyVarSet }
+
+addSameLvl :: AnalEnv -> Id -> AnalEnv
+addSameLvl env id = env { ae_same_lvl = extendVarSet (ae_same_lvl env) id }
+
+cprWontLoseSharing :: AnalEnv -> Id -> Arity -> Bool
+cprWontLoseSharing env id 0 = id `elemVarSet` ae_same_lvl env
+cprWontLoseSharing _   _  _ = True
 
 nonVirgin :: AnalEnv -> AnalEnv
 nonVirgin env = env { ae_virgin = False }
