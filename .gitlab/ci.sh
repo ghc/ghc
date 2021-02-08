@@ -118,8 +118,9 @@ function show_tool() {
 
 function set_toolchain_paths() {
   needs_toolchain=1
-  case "$(uname)" in
-    Linux) needs_toolchain="" ;;
+  case "$(uname -m)-$(uname)" in
+    *-Linux) needs_toolchain="" ;;
+    arm64-Darwin) needs_toolchain="" ;;
     *) ;;
   esac
 
@@ -136,8 +137,8 @@ function set_toolchain_paths() {
       ALEX="$HOME/.cabal/bin/alex"
   fi
 
-  if [[ -n "${IN_NIX_SHELL}" ]]; then
-      needs_toolchain="";
+  if [[ -n "$IN_NIX_SHELL" ]]; then
+      needs_toolchain=""
       GHC="$(which ghc)"
       CABAL="$(which cabal)"
       HAPPY="$(which happy)"
