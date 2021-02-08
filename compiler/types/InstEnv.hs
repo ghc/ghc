@@ -50,7 +50,7 @@ import UniqDFM
 import Util
 import Id
 import Data.Data        ( Data )
-import Data.Maybe       ( isJust, isNothing )
+import Data.Maybe       ( isJust )
 
 {-
 ************************************************************************
@@ -67,8 +67,8 @@ data ClsInst
   = ClsInst {   -- Used for "rough matching"; see
                 -- Note [ClsInst laziness and the rough-match fields]
                 -- INVARIANT: is_tcs = roughMatchTcs is_tys
-               is_cls_nm :: Name        -- ^ Class name
-             , is_tcs  :: [Maybe Name]  -- ^ Top of type args
+               is_cls_nm :: Name          -- ^ Class name
+             , is_tcs  :: [RoughMatchTc]  -- ^ Top of type args
 
                -- | @is_dfun_name = idName . is_dfun@.
                --
@@ -104,10 +104,10 @@ fuzzyClsInstCmp x y =
     stableNameCmp (is_cls_nm x) (is_cls_nm y) `mappend`
     mconcat (map cmp (zip (is_tcs x) (is_tcs y)))
   where
-    cmp (Nothing, Nothing) = EQ
-    cmp (Nothing, Just _) = LT
-    cmp (Just _, Nothing) = GT
-    cmp (Just x, Just y) = stableNameCmp x y
+    cmp (OtherTc,   OtherTc)   = EQ
+    cmp (OtherTc,   KnownTc _) = LT
+    cmp (KnownTc _, OtherTc)   = GT
+    cmp (KnownTc x, KnownTc y) = stableNameCmp x y
 
 isOverlappable, isOverlapping, isIncoherent :: ClsInst -> Bool
 isOverlappable i = hasOverlappableFlag (overlapMode (is_flag i))
@@ -132,25 +132,16 @@ We avoid this as follows:
   pull in interfaces that it refers to. See Note [Proper-match fields].
 
 * Rough-match fields. During instance lookup, we use the is_cls_nm :: Name and
-  is_tcs :: [Maybe Name] fields to perform a "rough match", *without* poking
+  is_tcs :: [RoughMatchTc] fields to perform a "rough match", *without* poking
   inside the DFunId. The rough-match fields allow us to say "definitely does not
-  match", based only on Names.
+  match", based only on Names.  See GHC.Core.Unify
+  Note [Rough matching in class and family instances]
 
-  This laziness is very important; see Trac #12367. Try hard to avoid pulling on
+  This laziness is very important; see #12367. Try hard to avoid pulling on
   the structured fields unless you really need the instance.
 
 * Another place to watch is InstEnv.instIsVisible, which needs the module to
   which the ClsInst belongs. We can get this from is_dfun_name.
-
-* In is_tcs,
-    Nothing  means that this type arg is a type variable
-
-    (Just n) means that this type arg is a
-                TyConApp with a type constructor of n.
-                This is always a real tycon, never a synonym!
-                (Two different synonyms might match, but two
-                different real tycons can't.)
-                NB: newtypes are not transparent, though!
 -}
 
 {-
@@ -203,7 +194,7 @@ updateClsInstDFun :: (DFunId -> DFunId) -> ClsInst -> ClsInst
 updateClsInstDFun tidy_dfun ispec
   = ispec { is_dfun = tidy_dfun (is_dfun ispec) }
 
-instanceRoughTcs :: ClsInst -> [Maybe Name]
+instanceRoughTcs :: ClsInst -> [RoughMatchTc]
 instanceRoughTcs = is_tcs
 
 
@@ -297,12 +288,12 @@ mkLocalInstance dfun oflag tvs cls tys
 
     choose_one nss = chooseOrphanAnchor (unionNameSets nss)
 
-mkImportedInstance :: Name         -- ^ the name of the class
-                   -> [Maybe Name] -- ^ the types which the class was applied to
-                   -> Name         -- ^ the 'Name' of the dictionary binding
-                   -> DFunId       -- ^ the 'Id' of the dictionary.
-                   -> OverlapFlag  -- ^ may this instance overlap?
-                   -> IsOrphan     -- ^ is this instance an orphan?
+mkImportedInstance :: Name           -- ^ the name of the class
+                   -> [RoughMatchTc] -- ^ the types which the class was applied to
+                   -> Name           -- ^ the 'Name' of the dictionary binding
+                   -> DFunId         -- ^ the 'Id' of the dictionary.
+                   -> OverlapFlag    -- ^ may this instance overlap?
+                   -> IsOrphan       -- ^ is this instance an orphan?
                    -> ClsInst
 -- Used for imported instances, where we get the rough-match stuff
 -- from the interface file
@@ -784,7 +775,6 @@ lookupInstEnv' ie vis_mods cls tys
   = lookup ie
   where
     rough_tcs  = roughMatchTcs tys
-    all_tvs    = all isNothing rough_tcs
 
     --------------
     lookup env = case lookupUDFM env cls of
@@ -813,7 +803,7 @@ lookupInstEnv' ie vis_mods cls tys
 
       | otherwise
       = ASSERT2( tyCoVarsOfTypes tys `disjointVarSet` tpl_tv_set,
-                 (ppr cls <+> ppr tys <+> ppr all_tvs) $$
+                 (ppr cls <+> ppr tys) $$
                  (ppr tpl_tvs <+> ppr tpl_tys)
                 )
                 -- Unification will break badly if the variables overlap

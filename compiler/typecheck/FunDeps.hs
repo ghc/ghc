@@ -227,7 +227,7 @@ improveFromInstEnv _ _ _ = []
 
 improveClsFD :: [TyVar] -> FunDep TyVar    -- One functional dependency from the class
              -> ClsInst                    -- An instance template
-             -> [Type] -> [Maybe Name]     -- Arguments of this (C tys) predicate
+             -> [Type] -> [RoughMatchTc]   -- Arguments of this (C tys) predicate
              -> [([TyCoVar], [TypeEqn])]   -- Empty or singleton
 
 improveClsFD clas_tvs fd
@@ -659,7 +659,7 @@ checkFunDeps inst_envs (ClsInst { is_tvs = qtvs1, is_cls = cls
         --      instance C Int Char Char
         -- The second instance conflicts with the first by *both* fundeps
 
-trimRoughMatchTcs :: [TyVar] -> FunDep TyVar -> [Maybe Name] -> [Maybe Name]
+trimRoughMatchTcs :: [TyVar] -> FunDep TyVar -> [RoughMatchTc] -> [RoughMatchTc]
 -- Computing rough_tcs for a particular fundep
 --     class C a b c | a -> b where ...
 -- For each instance .... => C ta tb tc
@@ -672,4 +672,4 @@ trimRoughMatchTcs clas_tvs (ltvs, _) mb_tcs
   = zipWith select clas_tvs mb_tcs
   where
     select clas_tv mb_tc | clas_tv `elem` ltvs = mb_tc
-                         | otherwise           = Nothing
+                         | otherwise           = OtherTc

@@ -105,8 +105,9 @@ data FamInst  -- See Note [FamInsts and CoAxioms]
             , fi_fam   :: Name          -- Family name
 
                 -- Used for "rough matching"; same idea as for class instances
-                -- See Note [Rough-match field] in InstEnv
-            , fi_tcs   :: [Maybe Name]  -- Top of type args
+                -- See Note [Rough matching in class and family instances]
+                -- in GHC.Core.Unify
+            , fi_tcs   :: [RoughMatchTc]  -- Top of type args
                 -- INVARIANT: fi_tcs = roughMatchTcs fi_tys
 
             -- Used for "proper matching"; ditto
@@ -263,7 +264,7 @@ also.
 -- interface file.  In particular, we get the rough match info from the iface
 -- (instead of computing it here).
 mkImportedFamInst :: Name               -- Name of the family
-                  -> [Maybe Name]       -- Rough match info
+                  -> [RoughMatchTc]     -- Rough match info
                   -> CoAxiom Unbranched -- Axiom introduced
                   -> FamInst            -- Resulting family instance
 mkImportedFamInst fam mb_tcs axiom
