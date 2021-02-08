@@ -413,25 +413,32 @@ validate-x86_64-darwin:
       - toolchain
 
 validate-aarch64-darwin:
-  <<: *only-default
+  extends: .validate
+  # stage: full-build
+  stage: quick-build
+  tags:
+    - aarch64-darwin
   variables:
     TEST_TYPE: test
     MAKE_ARGS: "-Werror"
-    GHC_VERSION: "8.10.3"
-    CABAL_INSTALL_VERSION: "3.2.0.0"
+    GHC_VERSION: 8.10.3
+    CABAL_INSTALL_VERSION: 3.2.0.0
     BUILD_FLAVOUR: "quick"
     BIN_DIST_PREP_TAR_COMP: "ghc-arm64-apple-darwin.tar.xz"
     # we run on M1's for now, getconf can't be built with nix yet,
     # and we use a pure shell, so we can't/shouldn't use /usr/bin/getconf
     # inside th shell.
     CPUS: 8
+    LANG: "en_US.UTF-8"
+    CONFIGURE_ARGS: "--with-intree-gmp"
+
   script:
     - env
-    - GHC_VERSION=$GHC_VERSION nix-shell -I nixpkgs=https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz .gitlab/shell.nix --pure --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --argstr system "aarch64-darwin" --run '.gitlab/ci.sh setup'
-    - GHC_VERSION=$GHC_VERSION nix-shell -I nixpkgs=https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz .gitlab/shell.nix --pure --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --argstr system "aarch64-darwin" --run '.gitlab/ci.sh configure'
-    - GHC_VERSION=$GHC_VERSION nix-shell -I nixpkgs=https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz .gitlab/shell.nix --pure --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --argstr system "aarch64-darwin" --run '.gitlab/ci.sh build_make'
-    - GHC_VERSION=$GHC_VERSION nix-shell -I nixpkgs=https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz .gitlab/shell.nix --pure --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --argstr system "aarch64-darwin" --run '.gitlab/ci.sh test_make'
-  dependencies: []
+    - nix-shell -I nixpkgs=https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz .gitlab/shell.nix --pure --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --argstr system "aarch64-darwin" --run '.gitlab/ci.sh setup'
+    - nix-shell -I nixpkgs=https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz .gitlab/shell.nix --pure --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --argstr system "aarch64-darwin" --run '.gitlab/ci.sh configure'
+    - nix-shell -I nixpkgs=https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz .gitlab/shell.nix --pure --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --argstr system "aarch64-darwin" --run '.gitlab/ci.sh build_make'
+    - nix-shell -I nixpkgs=https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz .gitlab/shell.nix --pure --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --argstr system "aarch64-darwin" --run '.gitlab/ci.sh test_make'
+
   artifacts:
     reports:
       junit: junit.xml
@@ -440,12 +447,6 @@ validate-aarch64-darwin:
       - $BIN_DIST_PREP_TAR_COMP
       - junit.xml
       - performance-metrics.tsv
-  # stage: full-build
-  stage: quick-build
-  tags:
-    - aarch64-darwin
-  variables:
-
 
 # Disabled because of OS X CI capacity
 .validate-x86_64-darwin-hadrian:
