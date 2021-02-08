@@ -925,6 +925,7 @@ release-x86_64-windows-integer-simple:
   extends: .build-x86_64-windows-hadrian
   variables:
     BIGNUM_BACKEND: native
+    BUILD_FLAVOUR: "perf"
 
 ############################################################
 # Cleanup
