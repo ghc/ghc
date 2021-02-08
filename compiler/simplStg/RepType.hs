@@ -38,7 +38,6 @@ import Type
 import Util
 import TysPrim
 import {-# SOURCE #-} TysWiredIn ( anyTypeOfKind, unitTyConKey )
-import PrelNames
 import {-# SOURCE #-} TcType (tcSplitIOType_maybe)
 
 import Data.List (sort)
@@ -46,15 +45,9 @@ import qualified Data.IntSet as IS
 
 import ForeignCall (CCallSpec(..), CCallTarget(..), CCallConv(..), Safety(..), CCallTarget(..))
 
-import Debug.Trace
-
 mkCCallSpec :: CCallTarget -> CCallConv -> Safety -> Type -> [Type] -> CCallSpec
 mkCCallSpec t c s r as = CCallSpec t c s (myTypePrimRep1 r') (map myTypePrimRep1 as')
-        where ppr_target :: CCallTarget -> String
-              ppr_target (StaticTarget _ lbl _ fn) = "static " ++ (if fn then "function " else "value ") ++ show lbl
-              ppr_target DynamicTarget = "dynamic"
-
-              r'= case tcSplitIOType_maybe r of
+        where r'= case tcSplitIOType_maybe r of
                 Just (_ioTyCon, res_ty) -> res_ty
                 Nothing                 -> r
 

@@ -221,7 +221,6 @@ genCall t@(PrimTarget (MO_Prefetch_Data localityInt)) [] args
                              CC_Ccc LMVoid FixedArgs (tysToParams argTy) Nothing
 
     let (_, arg_hints) = foreignTargetHints t
-    let (ret_rep, args_rep) = foreignTargetReps t
     let args_hints' = zip args arg_hints
     argVars <- arg_varsW args_hints' ([], nilOL, [])
     fptr    <- liftExprData $ getFunPtr funTy t
@@ -421,6 +420,7 @@ genCall target res args = runStmtsDecls $ do
         primRepToLlvmTy Word64Rep = (Unsigned, i64)
         primRepToLlvmTy FloatRep  = (Signed, LMFloat)
         primRepToLlvmTy DoubleRep = (Signed, LMDouble)
+        primRepToLlvmTy _ = panic "LlvmCodeGen.CodeGen.genCall: Invalid primRep; cannot convert to llvm type"
 
     -- ret type
     let -- similarly to arg_type_cmm, we may need to widen/narrow the result.
@@ -428,6 +428,7 @@ genCall target res args = runStmtsDecls $ do
         ret_type_cmm []              = LMVoid
         ret_type_cmm [(_, AddrHint)] = i8Ptr
         ret_type_cmm [(reg, _)]      = cmmToLlvmType $ localRegType reg
+        ret_type_cmm _               = panic "LlvmCodeGen.CodeGen.genCall: invalid return type; we only support single return values"
 
     -- extract Cmm call convention, and translate to LLVM call convention
     let lmconv = case target of
@@ -464,7 +465,6 @@ genCall target res args = runStmtsDecls $ do
     let (res_hints, arg_hints) = foreignTargetHints target
     let (ret_rep, args_rep) = foreignTargetReps target
 
-    let args_hints = zip args arg_hints
     let ress_hints = zip res  res_hints
     let ccTy  = StdCall -- tail calls should be done through CmmJump
 
@@ -485,11 +485,6 @@ genCall target res args = runStmtsDecls $ do
     let doReturn | ccTy == TailCall  = statement $ Return Nothing
                  | never_returns     = statement $ Unreachable
                  | otherwise         = return ()
-
-    let myPprTraceDebug :: String -> SDoc -> a -> a
-        myPprTraceDebug str doc x
-          | hasPprDebug dflags = pprTrace str doc x
-          | otherwise          = x
 
     doTrashStmts
 
@@ -749,7 +744,7 @@ arg_vars2 :: [(CmmActual, (Signage, LlvmType))]
           -> ([LlvmVar], LlvmStatements, [LlvmCmmDecl])
           -> LlvmM ([LlvmVar], LlvmStatements, [LlvmCmmDecl])
 arg_vars2 [] x = return x
-arg_vars2 ((e, (s, ty0)):rest) (vars, stmts, tops)
+arg_vars2 ((e, (_s, ty0)):rest) (vars, stmts, tops)
   | ty0 == i8Ptr
   = do (v1, stmts', top') <- exprToVar e
        dflags <- getDynFlags
@@ -765,7 +760,6 @@ arg_vars2 ((e, (s, ty0)):rest) (vars, stmts, tops)
 
 arg_vars2 ((e, (s, ty)):rest) (vars, stmts, tops)
   = do (v1, stmts', top') <- exprToVar e
-       dflags <- getDynFlags
        (v2, s1) <- castVar s v1 ty
        arg_vars2 rest (vars ++ [v2], stmts `appOL` stmts' `snocOL` s1, tops ++ top')
 

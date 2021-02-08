@@ -45,7 +45,6 @@ import Data.Maybe
 import Data.List (tails,sortBy)
 import Unique (nonDetCmpUnique)
 import Util
-import PprCmmExpr
 
 import {-# SOURCE #-} TyCon (PrimRep)
 

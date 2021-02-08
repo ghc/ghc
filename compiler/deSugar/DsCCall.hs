@@ -34,7 +34,6 @@ import TcType
 import Type
 import Id   ( Id )
 import Coercion
-import PrimOp
 import TysPrim
 import TyCon
 import TysWiredIn
@@ -47,7 +46,7 @@ import Util
 
 import Data.Maybe
 
-import RepType (typePrimRep1, mkCCallSpec)
+import RepType (mkCCallSpec)
 {-
 Desugaring of @ccall@s consists of adding some state manipulation,
 unboxing any boxed primitive arguments and boxing the result if
@@ -360,8 +359,7 @@ resultWrapper result_ty
   | Just (tycon, tycon_arg_tys) <- maybe_tc_app
   , Just data_con <- isDataProductTyCon_maybe tycon  -- One constructor, no existentials
   , [unwrapped_res_ty] <- dataConInstOrigArgTys data_con tycon_arg_tys  -- One argument
-  = do { dflags <- getDynFlags
-       ; (maybe_ty, wrapper) <- resultWrapper unwrapped_res_ty
+  = do { (maybe_ty, wrapper) <- resultWrapper unwrapped_res_ty
        ; let marshal_con e  = Var (dataConWrapId data_con)
                               `mkTyApps` tycon_arg_tys
                               `App` wrapper e
