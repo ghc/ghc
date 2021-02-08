@@ -7,7 +7,7 @@ T16728a.hs:4:22: warning: [-Wpartial-type-signatures (in -Wdefault)]
                  h :: a -> w
                at T16728a.hs:(5,1)-(7,9)
     • In the type ‘a -> _’
-      In the type signature: h :: forall a. a -> _
+      In the type signature: g :: forall a. a -> _
 
 T16728a.hs:4:22: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘w’
@@ -17,4 +17,5 @@ T16728a.hs:4:22: warning: [-Wpartial-type-signatures (in -Wdefault)]
                  h :: a -> w
                at T16728a.hs:(5,1)-(7,9)
     • In the type ‘a -> _’
-      In the type signature: g :: forall a. a -> _
+      In the type signature: h :: forall a. a -> _
+

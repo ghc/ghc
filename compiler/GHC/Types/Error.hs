@@ -203,6 +203,11 @@ sevErrorNoReason = SevError NoErrReason
 sevWarnNoReason :: Severity
 sevWarnNoReason = SevWarning NoWarnReason
 
+instance Outputable Severity where
+  ppr = \case
+    SevWarning reason -> text "SevWarning " <+> ppr reason
+    SevError  reason  -> text "SevError " <+>  ppr reason
+
 instance ToJson Severity where
   json s = JSString (show s)
 
