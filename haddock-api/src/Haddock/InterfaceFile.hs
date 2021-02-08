@@ -23,11 +23,7 @@ module Haddock.InterfaceFile (
 
 import Haddock.Types
 
-import Control.Monad
-import Control.Monad.IO.Class ( MonadIO(..) )
-import Data.Array
 import Data.IORef
-import Data.List (mapAccumR)
 import qualified Data.Map as Map
 import Data.Map (Map)
 import Data.Word
@@ -37,13 +33,8 @@ import GHC.Utils.Binary
 import GHC.Data.FastMutInt
 import GHC.Data.FastString
 import GHC hiding (NoLink)
-import GHC.Driver.Monad (withSession)
-import GHC.Driver.Env
 import GHC.Types.Name.Cache
-import GHC.Iface.Env
-import GHC.Types.Name
 import GHC.Types.Unique.FM
-import GHC.Types.Unique.Supply
 import GHC.Types.Unique
 
 data InterfaceFile = InterfaceFile {
@@ -166,9 +157,8 @@ writeInterfaceFile filename iface = do
 
 
 freshNameCache :: IO NameCache
-freshNameCache = do
-  u  <- mkSplitUniqSupply 'a' -- ??
-  initNameCache u []
+freshNameCache = initNameCache 'a' -- ??
+                               []
 
 -- | Read a Haddock (@.haddock@) interface file. Return either an
 -- 'InterfaceFile' or an error message.
