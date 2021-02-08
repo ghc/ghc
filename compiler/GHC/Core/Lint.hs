@@ -478,10 +478,17 @@ lintCoreBindings dflags pass local_in_scope binds
      -- into use 'unexpectedly'; see Note [Glomming] in "GHC.Core.Opt.OccurAnal"
     binders = map fst all_pairs
 
+
+    check_linearity2 = gopt Opt_DoLinearCoreLinting dflags || (
+                        case pass of
+                          CoreDesugar -> True
+                          _           -> False)
+
     flags = (defaultLintFlags dflags)
                { lf_check_global_ids = check_globals
                , lf_check_inline_loop_breakers = check_lbs
-               , lf_check_static_ptrs = check_static_ptrs }
+               , lf_check_static_ptrs = check_static_ptrs
+               , lf_check_linearity2 = check_linearity2 }
 
     -- See Note [Checking for global Ids]
     check_globals = case pass of
@@ -970,7 +977,9 @@ lintIdOcc var nargs
 
         ; let occ_mult  = idMult var
               bndr_mult = idMult bndr
-        ; ensureEqTys occ_mult bndr_mult $
+        ; flags <- getLintFlags
+        ; when (lf_check_linearity2 flags) $
+          ensureEqTys occ_mult bndr_mult $
           mkBndrOccMultiplicityMismatchMsg bndr var bndr_mult occ_mult
 
           -- Check for a nested occurrence of the StaticPtr constructor.
@@ -2528,6 +2537,7 @@ data LintFlags
        , lf_check_static_ptrs :: StaticPtrCheck -- ^ See Note [Checking StaticPtrs]
        , lf_report_unsat_syns :: Bool -- ^ See Note [Linting type synonym applications]
        , lf_check_linearity :: Bool -- ^ See Note [Linting linearity]
+       , lf_check_linearity2 :: Bool -- ^ See Note [Linting linearity]
        , lf_check_levity_poly :: Bool -- See Note [Checking for levity polymorphism]
     }
 
@@ -2546,6 +2556,7 @@ defaultLintFlags dflags = LF { lf_check_global_ids = False
                              , lf_check_inline_loop_breakers = True
                              , lf_check_static_ptrs = AllowAnywhere
                              , lf_check_linearity = gopt Opt_DoLinearCoreLinting dflags
+                             , lf_check_linearity2 = False
                              , lf_report_unsat_syns = True
                              , lf_check_levity_poly = True
                              }
