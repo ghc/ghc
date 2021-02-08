@@ -371,12 +371,11 @@ newExecConItbl obj con_desc
                -- allocated the string separately it might be out of range.
 #if MIN_VERSION_rts(1,0,1)
         wr_ptr <- _allocateWrite (sz + fromIntegral lcon_desc)
-#else
-        wr_ptr <- _allocateExec (sz + fromIntegral lcon_desc)
-#endif
         let ex_ptr = wr_ptr
-        -- wr_ptr <- _allocateExec (sz + fromIntegral lcon_desc) pcode
-        -- ex_ptr <- peek pcode
+#else
+        wr_ptr <- _allocateExec (sz + fromIntegral lcon_desc) pcode
+        ex_ptr <- peek pcode
+#endif
         let cinfo = StgConInfoTable { conDesc = ex_ptr `plusPtr` fromIntegral sz
                                     , infoTable = obj }
         pokeConItbl wr_ptr ex_ptr cinfo
@@ -385,10 +384,8 @@ newExecConItbl obj con_desc
         let null_off = fromIntegral sz + fromIntegral (BS.length con_desc)
         poke (castPtr wr_ptr `plusPtr` null_off) (0 :: Word8)
         _flushExec sz ex_ptr -- Cache flush (if needed)
-#if defined(RTS_LINKER_USE_MMAP)
 #if MIN_VERSION_rts(1,0,1)
         _markExec (sz + fromIntegral lcon_desc) ex_ptr
-#endif
 #endif
 #if defined(TABLES_NEXT_TO_CODE)
         return (castPtrToFunPtr (ex_ptr `plusPtr` conInfoTableSizeB))
@@ -405,10 +402,8 @@ foreign import ccall unsafe "flushExec"
 #if MIN_VERSION_rts(1,0,1)
 foreign import ccall unsafe "allocateWrite"
   _allocateWrite :: CUInt -> IO (Ptr a)
-#if defined(RTS_LINKER_USE_MMAP)
 foreign import ccall unsafe "markExec"
   _markExec :: CUInt -> Ptr a -> IO ()
-#endif
 #endif
 -- -----------------------------------------------------------------------------
 -- Constants and config
