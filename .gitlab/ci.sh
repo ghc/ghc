@@ -135,6 +135,14 @@ function set_toolchain_paths() {
       HAPPY="$HOME/.cabal/bin/happy"
       ALEX="$HOME/.cabal/bin/alex"
   fi
+
+  if [[ -n "${IN_NIX_SHELL}" ]]; then
+      GHC="$(which ghc)"
+      CABAL="$(which cabal)"
+      HAPPY="$(which happy)"
+      ALEX="$(which alex)"
+  fi
+
   export GHC
   export CABAL
   export HAPPY

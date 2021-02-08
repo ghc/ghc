@@ -417,11 +417,19 @@ validate-aarch64-darwin:
   variables:
     TEST_TYPE: test
     MAKE_ARGS: "-Werror"
+    GHC_VERSION: 8.10.3
+    CABAL_INSTALL_VERSION: 3.2.0.0
+    BUILD_FLAVOUR: "quick"
+    BIN_DIST_PREP_TAR_COMP: "ghc-arm64-apple-darwin.tar.xz"
+    # we run on M1's for now, getconf can't be built with nix yet,
+    # and we use a pure shell, so we can't/shouldn't use /usr/bin/getconf
+    # inside th shell.
+    CPUS: 8
   script:
-    - nix-shell shell.nix --option extra-platforms aarch64-darwin --pure --argstr system "aarch64-darwin" --run '.gitlab/ci.sh setup'
-    - nix-shell shell.nix --option extra-platforms aarch64-darwin --pure --argstr system "aarch64-darwin" --run '.gitlab/ci.sh configure'
-    - nix-shell shell.nix --option extra-platforms aarch64-darwin --pure --argstr system "aarch64-darwin" --run '.gitlab/ci.sh build_make'
-    - nix-shell shell.nix --option extra-platforms aarch64-darwin --pure --argstr system "aarch64-darwin" --run '.gitlab/ci.sh test_make'
+    - nix-shell shell.nix --option extra-platforms aarch64-darwin --pure --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --argstr system "aarch64-darwin" --run '.gitlab/ci.sh setup'
+    - nix-shell shell.nix --option extra-platforms aarch64-darwin --pure --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --argstr system "aarch64-darwin" --run '.gitlab/ci.sh configure'
+    - nix-shell shell.nix --option extra-platforms aarch64-darwin --pure --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --argstr system "aarch64-darwin" --run '.gitlab/ci.sh build_make'
+    - nix-shell shell.nix --option extra-platforms aarch64-darwin --pure --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --argstr system "aarch64-darwin" --run '.gitlab/ci.sh test_make'
   dependencies: []
   artifacts:
     reports:
