@@ -360,7 +360,11 @@ sizeOfEntryCode
 -- Note: Must return proper pointer for use in a closure
 newExecConItbl :: StgInfoTable -> ByteString -> IO (FunPtr ())
 newExecConItbl obj con_desc
+#if MIN_VERSION_rts(1,0,1)
    = do
+#else
+   = alloca $ \pcode -> do
+#endif
         let lcon_desc = BS.length con_desc + 1{- null terminator -}
             -- SCARY
             -- This size represents the number of bytes in an StgConInfoTable.
