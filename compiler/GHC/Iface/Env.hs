@@ -74,8 +74,7 @@ newGlobalBinder :: Module -> OccName -> SrcSpan -> TcRnIf a b Name
 
 newGlobalBinder mod occ loc
   = do { hsc_env <- getTopEnv
-       ; name <- liftIO $ updateNameCache (hsc_NC hsc_env) mod occ $ \name_cache ->
-                 allocateGlobalBinder name_cache mod occ loc
+       ; name <- liftIO $ allocateGlobalBinder (hsc_NC hsc_env) mod occ loc
        ; traceIf (text "newGlobalBinder" <+>
                   (vcat [ ppr mod <+> ppr occ <+> ppr loc, ppr name]))
        ; return name }
@@ -83,18 +82,18 @@ newGlobalBinder mod occ loc
 newInteractiveBinder :: HscEnv -> OccName -> SrcSpan -> IO Name
 -- Works in the IO monad, and gets the Module
 -- from the interactive context
-newInteractiveBinder hsc_env occ loc
- = do { let mod = icInteractiveModule (hsc_IC hsc_env)
-       ; updateNameCache (hsc_NC hsc_env) mod occ $ \name_cache ->
-         allocateGlobalBinder name_cache mod occ loc }
+newInteractiveBinder hsc_env occ loc = do
+  let mod = icInteractiveModule (hsc_IC hsc_env)
+  allocateGlobalBinder (hsc_NC hsc_env) mod occ loc
 
 allocateGlobalBinder
-  :: NameCacheState
+  :: NameCache
   -> Module -> OccName -> SrcSpan
-  -> (NameCacheState, Name)
+  -> IO Name
 -- See Note [The Name Cache] in GHC.Types.Name.Cache
-allocateGlobalBinder name_supply mod occ loc
-  = case lookupOrigNameCache (nsNames name_supply) mod occ of
+allocateGlobalBinder nc mod occ loc
+  = updateNameCache nc mod occ $ \cache0 -> do
+      case lookupOrigNameCache cache0 mod occ of
         -- A hit in the cache!  We are at the binding site of the name.
         -- This is the moment when we know the SrcLoc
         -- of the Name, so we set this field in the Name we return.
@@ -112,24 +111,22 @@ allocateGlobalBinder name_supply mod occ loc
         --            and their Module is correct.
 
         Just name | isWiredInName name
-                  -> (name_supply, name)
+                  -> pure (cache0, name)
                   | otherwise
-                  -> (new_name_supply, name')
+                  -> pure (new_cache, name')
                   where
-                    uniq            = nameUnique name
-                    name'           = mkExternalName uniq mod occ loc
-                                      -- name' is like name, but with the right SrcSpan
-                    new_cache       = extendOrigNameCache (nsNames name_supply) mod occ name'
-                    new_name_supply = name_supply {nsNames = new_cache}
+                    uniq      = nameUnique name
+                    name'     = mkExternalName uniq mod occ loc
+                                -- name' is like name, but with the right SrcSpan
+                    new_cache = extendOrigNameCache cache0 mod occ name'
 
         -- Miss in the cache!
         -- Build a completely new Name, and put it in the cache
-        _ -> (new_name_supply, name)
-                  where
-                    (uniq, us')     = takeUniqFromSupply (nsUniqs name_supply)
-                    name            = mkExternalName uniq mod occ loc
-                    new_cache       = extendOrigNameCache (nsNames name_supply) mod occ name
-                    new_name_supply = name_supply {nsUniqs = us', nsNames = new_cache}
+        _ -> do
+              uniq <- takeUniqFromNameCache nc
+              let name      = mkExternalName uniq mod occ loc
+              let new_cache = extendOrigNameCache cache0 mod occ name
+              pure (new_cache, name)
 
 ifaceExportNames :: [IfaceExport] -> TcRnIf gbl lcl [AvailInfo]
 ifaceExportNames exports = return exports
@@ -149,29 +146,27 @@ lookupOrig :: Module -> OccName -> TcRnIf a b Name
 lookupOrig mod occ = do
   hsc_env <- getTopEnv
   traceIf (text "lookup_orig" <+> ppr mod <+> ppr occ)
-  liftIO $ updateNameCache (hsc_NC hsc_env) mod occ $ lookupNameCache mod occ
+  liftIO $ lookupNameCache (hsc_NC hsc_env) mod occ
 
 lookupOrigIO :: HscEnv -> Module -> OccName -> IO Name
 lookupOrigIO hsc_env mod occ
-  = updateNameCache (hsc_NC hsc_env) mod occ $ lookupNameCache mod occ
+  = lookupNameCache (hsc_NC hsc_env) mod occ
 
-lookupNameCache :: Module -> OccName -> NameCacheState -> (NameCacheState, Name)
+lookupNameCache :: NameCache -> Module -> OccName -> IO Name
 -- Lookup up the (Module,OccName) in the NameCache
 -- If you find it, return it; if not, allocate a fresh original name and extend
 -- the NameCache.
 -- Reason: this may the first occurrence of (say) Foo.bar we have encountered.
 -- If we need to explore its value we will load Foo.hi; but meanwhile all we
 -- need is a Name for it.
-lookupNameCache mod occ name_cache =
-  case lookupOrigNameCache (nsNames name_cache) mod occ of {
-    Just name -> (name_cache, name);
-    Nothing   ->
-        case takeUniqFromSupply (nsUniqs name_cache) of {
-          (uniq, us) ->
-              let
-                name      = mkExternalName uniq mod occ noSrcSpan
-                new_cache = extendOrigNameCache (nsNames name_cache) mod occ name
-              in (name_cache{ nsUniqs = us, nsNames = new_cache }, name) }}
+lookupNameCache nc mod occ = updateNameCache nc mod occ $ \cache0 ->
+  case lookupOrigNameCache cache0 mod occ of
+    Just name -> pure (cache0, name)
+    Nothing   -> do
+      uniq <- takeUniqFromNameCache nc
+      let name      = mkExternalName uniq mod occ noSrcSpan
+      let new_cache = extendOrigNameCache cache0 mod occ name
+      pure (new_cache, name)
 
 externaliseName :: Module -> Name -> TcRnIf m n Name
 -- Take an Internal Name and make it an External one,
@@ -182,10 +177,10 @@ externaliseName mod name
              uniq = nameUnique name
        ; occ `seq` return ()  -- c.f. seq in newGlobalBinder
        ; hsc_env <- getTopEnv
-       ; liftIO $ updateNameCache (hsc_NC hsc_env) mod occ $ \ ns ->
-         let name' = mkExternalName uniq mod occ loc
-             ns'   = ns { nsNames = extendOrigNameCache (nsNames ns) mod occ name' }
-         in (ns', name') }
+       ; liftIO $ updateNameCache (hsc_NC hsc_env) mod occ $ \cache -> do
+         let name'  = mkExternalName uniq mod occ loc
+             cache' = extendOrigNameCache cache mod occ name'
+         pure (cache', name') }
 
 -- | Set the 'Module' of a 'Name'.
 setNameModule :: Maybe Module -> Name -> TcRnIf m n Name

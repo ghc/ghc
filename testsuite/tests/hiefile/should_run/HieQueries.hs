@@ -42,9 +42,7 @@ point' = (37,9)
 data A = A deriving Show
 
 makeNc :: IO NameCache
-makeNc = do
-  uniq_supply <- mkSplitUniqSupply 'z'
-  initNameCache uniq_supply []
+makeNc = initNameCache 'z' []
 
 dynFlagsForPrinting :: String -> IO DynFlags
 dynFlagsForPrinting libdir = do

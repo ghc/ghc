@@ -30,7 +30,6 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Builtin.Utils
 import GHC.Types.SrcLoc as SrcLoc
-import GHC.Types.Unique.Supply    ( takeUniqFromSupply )
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 
@@ -39,7 +38,6 @@ import Data.IORef
 import Data.ByteString            ( ByteString )
 import qualified Data.ByteString  as BS
 import qualified Data.ByteString.Char8 as BSC
-import Data.List                  ( mapAccumR )
 import Data.Word                  ( Word8, Word32 )
 import Control.Monad              ( replicateM, when )
 import System.Directory           ( createDirectoryIfMissing )
@@ -272,10 +270,8 @@ getSymbolTable :: BinHandle -> NameCache -> IO SymbolTable
 getSymbolTable bh name_cache = do
   sz <- get bh
   od_names <- replicateM sz (getHieName bh)
-  updateNameCache' name_cache $ \nc ->
-    let arr = A.listArray (0,sz-1) names
-        (nc', names) = mapAccumR fromHieName nc od_names
-        in (nc',arr)
+  names <- mapM (fromHieName name_cache) od_names
+  pure $ A.listArray (0,sz-1) names
 
 getSymTabName :: SymbolTable -> BinHandle -> IO Name
 getSymTabName st bh = do
@@ -310,24 +306,28 @@ putName (HieSymbolTable next ref) bh name = do
 
 -- ** Converting to and from `HieName`'s
 
-fromHieName :: NameCacheState -> HieName -> (NameCacheState, Name)
-fromHieName nc (ExternalName mod occ span) =
-    let cache = nsNames nc
-    in case lookupOrigNameCache cache mod occ of
-         Just name -> (nc, name)
-         Nothing ->
-           let (uniq, us) = takeUniqFromSupply (nsUniqs nc)
-               name       = mkExternalName uniq mod occ span
-               new_cache  = extendOrigNameCache cache mod occ name
-           in ( nc{ nsUniqs = us, nsNames = new_cache }, name )
-fromHieName nc (LocalName occ span) =
-    let (uniq, us) = takeUniqFromSupply (nsUniqs nc)
-        name       = mkInternalName uniq occ span
-    in ( nc{ nsUniqs = us }, name )
-fromHieName nc (KnownKeyName u) = case lookupKnownKeyName u of
-    Nothing -> pprPanic "fromHieName:unknown known-key unique"
-                        (ppr (unpkUnique u))
-    Just n -> (nc, n)
+fromHieName :: NameCache -> HieName -> IO Name
+fromHieName nc hie_name = do
+
+  case hie_name of
+    ExternalName mod occ span -> updateNameCache nc mod occ $ \cache -> do
+      case lookupOrigNameCache cache mod occ of
+        Just name -> pure (cache, name)
+        Nothing   -> do
+          uniq <- takeUniqFromNameCache nc
+          let name       = mkExternalName uniq mod occ span
+              new_cache  = extendOrigNameCache cache mod occ name
+          pure (new_cache, name)
+
+    LocalName occ span -> do
+      uniq <- takeUniqFromNameCache nc
+      -- don't update the NameCache for local names
+      pure $ mkInternalName uniq occ span
+
+    KnownKeyName u -> case lookupKnownKeyName u of
+      Nothing -> pprPanic "fromHieName:unknown known-key unique"
+                          (ppr (unpkUnique u))
+      Just n -> pure n
 
 -- ** Reading and writing `HieName`'s
 
