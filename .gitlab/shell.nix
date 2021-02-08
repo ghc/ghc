@@ -1,6 +1,6 @@
 { system ? "aarch64-darwin"
-, nixpkgs ? fetchTarball https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz #apple-silicon.tar.gz
-, pkgs ? import nixpkgs { inherit system; }
+#, nixpkgs ? fetchTarball https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz #apple-silicon.tar.gz
+, pkgs ? import <nixpkgs> { inherit system; }
 }: pkgs.mkShell {
   nativeBuildInputs = with pkgs; [
     haskell.compiler.ghc8103Binary
@@ -16,6 +16,7 @@
 
     gmp
     ncurses
+    libiconv
 
     git
 
