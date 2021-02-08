@@ -148,12 +148,19 @@ We avoid this as follows:
 * In is_tcs,
     Nothing  means that this type arg is a type variable
 
-    (Just n) means that this type arg is a
-                TyConApp with a type constructor of n.
-                This is always a real tycon, never a synonym!
-                (Two different synonyms might match, but two
-                different real tycons can't.)
-                NB: newtypes are not transparent, though!
+    (Just tc_name) means that this type arg is a
+                   TyConApp with a type constructor of tc_name.
+
+* INVARIANT: if (Just tc_name) is in is_tcs, then tc_name is always
+  a real, generative tycon, like Maybe or Either, including
+  a newtype or a data family, both of which are generative.
+  But it is never
+    - A type synonym
+      E.g. Int and (S Bool) might match
+           if (S Bool) is a synonym for Int
+    - A type family (#19336)
+      E.g.   (Just a) and (F a) might match if (F a) reduces to (Just a)
+             albeit perhaps only after 'a' is instantiated.
 -}
 
 {-

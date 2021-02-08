@@ -258,14 +258,17 @@ alwaysBindFun _tv _ty = BindMe
 *                                                                      *
 ********************************************************************* -}
 
--- See Note [Rough match] field in GHC.Core.InstEnv
+-- See Note [ClsInst laziness and the rough-match fields]  in GHC.Core.InstEnv
 
 roughMatchTcs :: [Type] -> [Maybe Name]
 roughMatchTcs tys = map rough tys
   where
     rough ty
       | Just (ty', _) <- splitCastTy_maybe ty   = rough ty'
-      | Just (tc,_)   <- splitTyConApp_maybe ty = Just (tyConName tc)
+      | Just (tc,_)   <- splitTyConApp_maybe ty
+      , not (isTypeFamilyTyCon tc)              = Just (tyConName tc)
+        -- See INVARIANT of Note [ClsInst laziness and the rough-match fields]
+        -- in GHC.Core.InstEnv for why we must exclude type families here
       | otherwise                               = Nothing
 
 instanceCantMatch :: [Maybe Name] -> [Maybe Name] -> Bool
