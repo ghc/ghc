@@ -461,6 +461,7 @@ validate-aarch64-darwin:
     TEST_ENV: "x86_64-darwin-hadrian"
     FLAVOUR: "validate"
   script:
+    - env
     - .gitlab/ci.sh setup
     - .gitlab/ci.sh configure
     - .gitlab/ci.sh build_hadrian
