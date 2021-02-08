@@ -301,7 +301,7 @@ handleWarningsThrowErrors (warnings, errors) = do
         errs  = fmap pprError   errors
     logWarnings warns
     dflags <- getDynFlags
-    (wWarns, wErrs) <- warningsToMessages dflags <$> getWarnings
+    let (wWarns, wErrs) = partitionMessageBag warns
     liftIO $ printBagOfErrors dflags wWarns
     throwErrors (unionBags errs wErrs)
 

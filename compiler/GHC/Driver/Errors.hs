@@ -1,10 +1,10 @@
 {-# LANGUAGE ViewPatterns #-}
 
 module GHC.Driver.Errors (
-    warningsToMessages
-  , printOrThrowWarnings
+    printOrThrowWarnings
   , printBagOfErrors
   , handleFlagWarnings
+  , partitionMessageBag
   ) where
 
 import GHC.Driver.Session
@@ -18,18 +18,14 @@ import GHC.Types.Error
 import GHC.Utils.Outputable ( text, withPprStyle, mkErrStyle )
 import qualified GHC.Driver.CmdLine as CmdLine
 
--- | Converts a list of 'WarningMessages' into a tuple where the second element contains only
--- error, i.e. warnings that are considered fatal by GHC based on the input 'DynFlags'.
-warningsToMessages :: DynFlags -> WarningMessages -> (WarningMessages, ErrorMessages)
-warningsToMessages dflags =
-  partitionBagWith $ \warn ->
-    case isWarnMsgFatal dflags warn of
-      Nothing     -> Left warn
-      Just reason -> Right (promoteWarningToError reason warn)
-
 -- | Promotes a 'WarnMsg' into an error, given a proper 'ErrReason'.
 promoteWarningToError :: ErrReason -> WarnMsg -> MsgEnvelope DecoratedSDoc
 promoteWarningToError errReason msg = msg { errMsgSeverity = SevError errReason }
+
+-- | Partitions the messages and returns a tuple which first element are the warnings, and the
+-- second the errors.
+partitionMessageBag :: Bag (MsgEnvelope e) -> (Bag (MsgEnvelope e), Bag (MsgEnvelope e))
+partitionMessageBag = partitionBag isWarningMessage
 
 printBagOfErrors :: RenderableDiagnostic a => DynFlags -> Bag (MsgEnvelope a) -> IO ()
 printBagOfErrors dflags bag_of_errors
