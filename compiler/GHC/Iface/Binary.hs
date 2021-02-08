@@ -47,23 +47,20 @@ import GHC.Data.FastMutInt
 import GHC.Types.Unique
 import GHC.Utils.Outputable
 import GHC.Types.Name.Cache
+import GHC.Types.SrcLoc
 import GHC.Platform
 import GHC.Data.FastString
 import GHC.Settings.Constants
 import GHC.Utils.Misc
 
 import Data.Array
-import Data.Array.ST
+import Data.Array.IO
 import Data.Array.Unsafe
 import Data.Bits
 import Data.Char
 import Data.Word
 import Data.IORef
-import Data.Foldable
 import Control.Monad
-import Control.Monad.ST
-import Control.Monad.Trans.Class
-import qualified Control.Monad.Trans.State.Strict as State
 
 -- ---------------------------------------------------------------------------
 -- Reading and writing binary interface files
@@ -280,24 +277,31 @@ putSymbolTable bh next_off symtab = do
       -- indices that array uses to create order
     mapM_ (\n -> serialiseName bh n symtab) names
 
+
 getSymbolTable :: BinHandle -> NameCache -> IO SymbolTable
 getSymbolTable bh name_cache = do
-    sz <- get bh
+    sz <- get bh :: IO Int
     od_names <- sequence (replicate sz (get bh))
-    updateNameCache' name_cache $ \namecache ->
-        runST $ flip State.evalStateT namecache $ do
-            mut_arr <- lift $ newSTArray_ (0, sz-1)
-            for_ (zip [0..] od_names) $ \(i, odn) -> do
-                (nc, !n) <- State.gets $ \nc -> fromOnDiskName nc odn
-                lift $ writeArray mut_arr i n
-                State.put nc
-            arr <- lift $ unsafeFreeze mut_arr
-            namecache' <- State.get
-            return (namecache', arr)
-  where
-    -- This binding is required because the type of newArray_ cannot be inferred
-    newSTArray_ :: forall s. (Int, Int) -> ST s (STArray s Int Name)
-    newSTArray_ = newArray_
+
+    -- create an array of Names for the symbols and add them to the NameCache
+    updateNameCache' name_cache $ \cache0 -> do
+        mut_arr <- newArray_ (0, sz-1) :: IO (IOArray Int Name)
+        let go cache ((uid, mod_name, occ),i) = do
+              let mod = mkModule uid mod_name
+              case lookupOrigNameCache cache mod occ of
+                Just name -> do
+                  writeArray mut_arr i name
+                  return cache
+                Nothing   -> do
+                  uniq <- takeUniqFromNameCache name_cache
+                  let name      = mkExternalName uniq mod occ noSrcSpan
+                      new_cache = extendOrigNameCache cache mod occ name
+                  writeArray mut_arr i name
+                  return new_cache
+
+        cache <- foldM go cache0 (zip od_names [0..])
+        arr <- unsafeFreeze mut_arr
+        return (cache, arr)
 
 serialiseName :: BinHandle -> Name -> UniqFM key (Int,Name) -> IO ()
 serialiseName bh name _ = do
