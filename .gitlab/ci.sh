@@ -315,7 +315,7 @@ endif
 GhcLibHcOpts+=-haddock
 EOF
 
-  if [ -n "$HADDOCK_HYPERLINKED_SOURCES" ]; then
+  if [ -n "${HADDOCK_HYPERLINKED_SOURCES:-}" ]; then
     echo "EXTRA_HADDOCK_OPTS += --hyperlinked-source --quickjump" >> mk/build.mk
   fi
 
