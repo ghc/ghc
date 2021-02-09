@@ -9,7 +9,6 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-
 -- CmmNode type for representation using Hoopl graphs.
 
 module CmmNode (
