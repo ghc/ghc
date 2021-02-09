@@ -433,14 +433,11 @@ validate-aarch64-darwin:
     CONFIGURE_ARGS: "--with-intree-gmp"
 
   script: |
-    #! /usr/bin/env nix-shell
-    #! nix-shell ./.gitlab/shell.nix -I nixpkgs=https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz --pure --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --argstr system "aarch64-darwin"
-    set -Eeuxo pipefail
-    env
-    bash .gitlab/ci.sh setup
-    bash .gitlab/ci.sh configure
-    bash .gitlab/ci.sh build_make
-    bash .gitlab/ci.sh test_make
+    nix-shell --run "env"                      .gitlab/shell.nix -I nixpkgs=https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz --pure --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --argstr system "aarch64-darwin"
+    nix-shell --run ".gitlab/ci.sh setup"      .gitlab/shell.nix -I nixpkgs=https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz --pure --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --argstr system "aarch64-darwin"
+    nix-shell --run ".gitlab/ci.sh configure"  .gitlab/shell.nix -I nixpkgs=https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz --pure --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --argstr system "aarch64-darwin"
+    nix-shell --run ".gitlab/ci.sh build_make" .gitlab/shell.nix -I nixpkgs=https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz --pure --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --argstr system "aarch64-darwin"
+    nix-shell --run ".gitlab/ci.sh test_make"  .gitlab/shell.nix -I nixpkgs=https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz --pure --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --argstr system "aarch64-darwin"
 
   artifacts:
     reports:
