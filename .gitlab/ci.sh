@@ -335,7 +335,7 @@ function configure() {
   end_section "booting"
 
   local target_args=""
-  if [[ -n "$triple" ]]; then
+  if [[ -n "${triple:-}" ]]; then
     target_args="--target=$triple"
   fi
 
