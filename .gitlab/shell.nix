@@ -1,7 +1,7 @@
 { system ? "aarch64-darwin"
 #, nixpkgs ? fetchTarball https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz #apple-silicon.tar.gz
 , pkgs ? import <nixpkgs> { inherit system; }
-}: pkgs.mkShell (rec {
+}: pkgs.mkDerivation (rec {
 #   IN_NIX_SHELL = "pure";
 #   PATH = stdenv.lib.makeBinPath buildInputs;
 
