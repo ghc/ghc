@@ -69,7 +69,6 @@ import Text.ParserCombinators.ReadP (readP_to_S)
 import GHC hiding (verbosity)
 import GHC.Settings.Config
 import GHC.Driver.Session hiding (projectVersion, verbosity)
-import GHC.Utils.Outputable (defaultUserStyle, withPprStyle)
 import GHC.Driver.Env
 import GHC.Utils.Error
 import GHC.Unit

@@ -44,7 +44,7 @@ import Haddock.Types
 import Haddock.Utils
 
 import Control.Monad
-import Control.Monad.IO.Class ( MonadIO, liftIO )
+import Control.Monad.IO.Class ( MonadIO )
 import Data.IORef
 import Data.List (foldl', isPrefixOf, nub)
 import qualified Data.Map as Map
@@ -69,7 +69,6 @@ import GHC.Types.Name (nameIsFromExternalPackage, nameOccName)
 import GHC.Types.Name.Occurrence (isTcOcc)
 import GHC.Types.Name.Reader (unQualOK, greMangledName, globalRdrEnvElts)
 import GHC.HsToCore.Docs
-import GHC.Runtime.Loader (initializePlugins)
 import GHC.Plugins (Outputable, StaticPlugin(..), Plugin(..), PluginWithArgs(..),
                      defaultPlugin, keepRenamedSource)
 
