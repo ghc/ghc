@@ -1,7 +1,10 @@
 { system ? "aarch64-darwin"
 #, nixpkgs ? fetchTarball https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz #apple-silicon.tar.gz
 , pkgs ? import <nixpkgs> { inherit system; }
-}: pkgs.mkShell {
+}: pkgs.mkShell (rec {
+#   IN_NIX_SHELL = "pure";
+#   PATH = stdenv.lib.makeBinPath buildInputs;
+
   buildInputs = with pkgs; [
     haskell.compiler.ghc8103Binary
     haskell.packages.ghc8103Binary.cabal-install
