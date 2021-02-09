@@ -124,7 +124,7 @@ function set_toolchain_paths() {
     *) ;;
   esac
 
-  if [[ -n "$IN_NIX_SHELL" ]]; then
+  if [[ -n "${IN_NIX_SHELL:-}" ]]; then
       needs_toolchain=""
       GHC="$(which ghc)"
       CABAL="$(which cabal)"
