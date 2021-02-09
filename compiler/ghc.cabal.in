@@ -442,6 +442,7 @@ Library
         GHC.Hs.Utils
         GHC.Iface.Binary
         GHC.Iface.Env
+        GHC.Iface.Errors
         GHC.Iface.Ext.Ast
         GHC.Iface.Ext.Binary
         GHC.Iface.Ext.Debug

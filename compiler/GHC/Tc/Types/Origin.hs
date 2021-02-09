@@ -172,10 +172,10 @@ isSigMaybe _                = Nothing
 -- pretty-print a particular 'LHsTyVarBndr'.
 data RenderableTyVarBndr where
   RenderableTyVarBndr :: forall flag pass.
-                      ( OutputableBndrFlag flag
-                      , Outputable (LHsTyVarBndr flag pass)
+                      ( OutputableBndrFlag flag pass
+                      , Outputable (LHsTyVarBndr flag (GhcPass pass))
                       )
-                      => LHsTyVarBndr flag pass
+                      => LHsTyVarBndr flag (GhcPass pass)
                       -> RenderableTyVarBndr
 
 -- SkolemInfo gives the origin of *given* constraints
