@@ -45,7 +45,7 @@ module GHC.Types.Unique.FM (
         addToUFM_Directly,
         addListToUFM_Directly,
         adjustUFM, alterUFM,
-        adjustUFM_Directly,
+        adjustUFM_Directly, alterUFM_Directly,
         delFromUFM,
         delFromUFM_Directly,
         delListFromUFM,
@@ -186,6 +186,13 @@ alterUFM
   -> key                       -- new
   -> UniqFM key elt                -- result
 alterUFM f (UFM m) k = UFM (M.alter f (getKey $ getUnique k) m)
+
+alterUFM_Directly
+  :: (Maybe elt -> Maybe elt)  -- How to adjust
+  -> UniqFM key elt            -- old
+  -> Unique                    -- new
+  -> UniqFM key elt            -- result
+alterUFM_Directly f (UFM m) u = UFM (M.alter f (getKey u) m)
 
 -- | Add elements to the map, combining existing values with inserted ones using
 -- the given function.
