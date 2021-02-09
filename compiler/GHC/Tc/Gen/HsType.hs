@@ -1336,15 +1336,31 @@ tupKindSort_maybe k
   | otherwise            = Nothing
 
 tc_tuple :: HsType GhcRn -> TcTyMode -> TupleSort -> [LHsType GhcRn] -> TcKind -> TcM TcType
-tc_tuple rn_ty mode tup_sort tys exp_kind
+tc_tuple rn_ty mode tup_sort original_types exp_kind
   = do { arg_kinds <- case tup_sort of
            BoxedTuple      -> return (replicate arity liftedTypeKind)
            UnboxedTuple    -> replicateM arity newOpenTypeKind
-           ConstraintTuple -> return (replicate arity constraintKind)
+           ConstraintTuple -> do
+             return (replicate arity constraintKind)
        ; tau_tys <- zipWithM (tc_lhs_type mode) tys arg_kinds
        ; finish_tuple rn_ty tup_sort tau_tys arg_kinds exp_kind }
   where
-    arity   = length tys
+    arity = length tys
+    branchOnTupleX :: LHsType GhcRn -> LHsType GhcRn
+    branchOnTupleX x = fmap branchOnTuple x
+    branchOnTuple :: HsType GhcRn -> HsType GhcRn
+    branchOnTuple (HsTupleTy ext sort args) =
+      let new_args = rejectEmptyTuple args
+       in HsTupleTy ext sort new_args
+    branchOnTuple r = r
+    rejectEmptyTuple :: [LHsType GhcRn] -> [LHsType GhcRn]
+    rejectEmptyTuple args = filter (not . isTupleEmpty) $ fmap branchOnTupleX args
+    isTupleEmpty :: LHsType GhcRn -> Bool
+    isTupleEmpty (HsTupleTy _ _ []) = True
+    isTupleEmpty _                  = False
+    tys = case tup_sort of
+            ConstraintTuple -> rejectEmptyTuple original_types
+            _               -> original_types
 
 finish_tuple :: HsType GhcRn
              -> TupleSort
