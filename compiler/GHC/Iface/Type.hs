@@ -1419,8 +1419,10 @@ pprTyTcApp ctxt_prec tc tys =
        , IA_Arg (IfaceTyConApp rep IA_Nil) Required args <- tys
        , rep `ifaceTyConHasKey` manyDataConKey
        , print_type_abbreviations  -- See Note [Printing type abbreviations]
-       -> pprIfacePrefixApp ctxt_prec (parens arrow) (map (ppr_ty appPrec) $
-          appArgsIfaceTypes $ stripInvisArgs (PrintExplicitKinds print_kinds) args)
+       -> pprIfacePrefixApp ctxt_prec (parens arrow) (map (ppr_app_arg appPrec) $
+          appArgsIfaceTypesArgFlags $ stripInvisArgs (PrintExplicitKinds print_kinds) args)
+          -- Use appArgsIfaceTypesArgFlags to print invisible arguments
+          -- correctly (#19310)
 
        | tc `ifaceTyConHasKey` errorMessageTypeErrorFamKey
        , not debug
