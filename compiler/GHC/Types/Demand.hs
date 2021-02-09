@@ -1046,6 +1046,40 @@ not accounted for in the type, by consulting 'defaultArgDmd':
     it's perfectly possible to enter the additional lambda and evaluate it
     in unforeseen ways (so, not absent).
 
+Note [Bottom CPR iff Dead-Ending Divergence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Both CPR analysis and Demand analysis have a notion to encode "bottom", denoting
+non-terminating or exception-throwing terms. It is convenient to assume that
+these values
+
+  1. Have the CPR property, because they never return and thus it doesn't matter
+     whether a `case` cancels away.
+  2. Are strict in their free variables, because computation diverges
+     anyway and eagerly evaluating an argument will only trade one source
+     of divergence (evaluating the term) for another potential source of
+     divergence (evaluating the argument).
+
+But (2) misses a crucial point: Handling of precise exceptions! We should not
+mask a precise exception by eagerly evaluating an argument that can potentially
+diverge. See Note [Precise vs imprecise exceptions].
+
+This detail is irrelevant to (1), however, so CPR only has a single
+bottom result to denote divergence, while the 'Divergence' type of
+Demand analysis has 'exnDiv' and 'botDiv', which show up as `x` and
+`b` in Demand signatures, respectively.
+
+Thus, it is possible for a function to have 'exnDiv' in its Demand signature,
+but regular 'botCpr' in its CPR signature, as is the case for basically any
+non-trivial function in 'IO', such as "GHC.Utils.Panic.panic" or the following
+function (from #18086):
+
+ioTest :: IO ()
+ioTest = do
+  putStrLn "hi"
+  undefined
+
+It should however always be the case that a function has botCpr if and only if
+it has a dead-ending 'Divergence'.
 
 ************************************************************************
 *                                                                      *
