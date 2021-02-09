@@ -32,6 +32,8 @@
     wget
     file
 
+    xz
+
     cacert
   ];
 }
