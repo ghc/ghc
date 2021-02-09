@@ -378,7 +378,7 @@ function push_perf_notes() {
 
 function test_make() {
   run "$MAKE" test_bindist TEST_PREP=YES
-  run "$MAKE" V=0 VERBOSE=0 test \
+  run "$MAKE" V=0 VERBOSE=1 test \
     THREADS="$cores" \
     JUNIT_FILE=../../junit.xml
 }
