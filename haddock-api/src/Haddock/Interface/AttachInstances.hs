@@ -28,6 +28,7 @@ import Data.Maybe ( maybeToList, mapMaybe, fromMaybe )
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
+import GHC.Data.FastString (unpackFS)
 import GHC.Core.Class
 import GHC.Driver.Session
 import GHC.Core (isOrphan)
@@ -194,7 +195,9 @@ instance Ord SName where
 -- For the benefit of the user (looks nice and predictable) and the
 -- tests (which prefer output to be deterministic).
 data SimpleType = SimpleType SName [SimpleType]
-                | SimpleTyLit TyLit
+                | SimpleIntTyLit Integer
+                | SimpleStringTyLit String
+                | SimpleCharTyLit Char
                   deriving (Eq,Ord)
 
 
@@ -218,7 +221,9 @@ simplify (AppTy t1 t2) = SimpleType s (ts ++ maybeToList (simplify_maybe t2))
 simplify (TyVarTy v) = SimpleType (SName (tyVarName v)) []
 simplify (TyConApp tc ts) = SimpleType (SName (tyConName tc))
                                        (mapMaybe simplify_maybe ts)
-simplify (LitTy l) = SimpleTyLit l
+simplify (LitTy (NumTyLit n)) = SimpleIntTyLit n
+simplify (LitTy (StrTyLit s)) = SimpleStringTyLit (unpackFS s)
+simplify (LitTy (CharTyLit c)) = SimpleCharTyLit c
 simplify (CastTy ty _) = simplify ty
 simplify (CoercionTy _) = error "simplify:Coercion"
 
