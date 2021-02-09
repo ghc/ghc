@@ -3,7 +3,8 @@
 
 # This is the primary driver of the GitLab CI infrastructure.
 
-set -e -o pipefail
+# set -e -o pipefail
+set -Eeuxo pipefail
 
 # Configuration:
 hackage_index_state="@1579718451"
