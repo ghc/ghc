@@ -46,6 +46,8 @@ import Data.List (tails,sortBy)
 import Unique (nonDetCmpUnique)
 import Util
 
+import {-# SOURCE #-} TyCon (PrimRep)
+
 ------------------------
 -- CmmNode
 
