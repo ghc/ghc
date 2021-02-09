@@ -274,8 +274,14 @@ instance Binary Literal where
                     -- Note [Types of LitNumbers]
                     let t = case nt of
                             LitNumInt     -> intPrimTy
+                            LitNumInt8    -> int8PrimTy
+                            LitNumInt16   -> int16PrimTy
+                            LitNumInt32   -> int32PrimTy
                             LitNumInt64   -> int64PrimTy
                             LitNumWord    -> wordPrimTy
+                            LitNumWord8   -> word8PrimTy
+                            LitNumWord16  -> word16PrimTy
+                            LitNumWord32  -> word32PrimTy
                             LitNumWord64  -> word64PrimTy
                             -- See Note [Integer literals]
                             LitNumInteger ->
@@ -619,8 +625,8 @@ isLitValue = isJust . isLitValue_maybe
 
 narrow8IntLit, narrow16IntLit, narrow32IntLit,
   narrow8WordLit, narrow16WordLit, narrow32WordLit,
-  int8Lit, int16Lit, int32Lit,
-  word8Lit, word16Lit, word32Lit,
+  -- int8Lit, int16Lit, int32Lit,
+  -- word8Lit, word16Lit, word32Lit,
   char2IntLit, int2CharLit,
   float2IntLit, int2FloatLit, double2IntLit, int2DoubleLit,
   float2DoubleLit, double2FloatLit
@@ -655,14 +661,14 @@ narrow8WordLit  = narrowLit' (Proxy :: Proxy Word8)  LitNumWord
 narrow16WordLit = narrowLit' (Proxy :: Proxy Word16) LitNumWord
 narrow32WordLit = narrowLit' (Proxy :: Proxy Word32) LitNumWord
 
-narrowInt8Lit, narrowInt16Lit, narrowInt32Lit,
-  narrowWord8Lit, narrowWord16Lit, narrowWord32Lit :: Literal -> Literal
-narrowInt8Lit   = narrowLit' (Proxy :: Proxy Int8)   LitNumInt8
-narrowInt16Lit  = narrowLit' (Proxy :: Proxy Int16)  LitNumInt16
-narrowInt32Lit  = narrowLit' (Proxy :: Proxy Int32)  LitNumInt32
-narrowWord8Lit  = narrowLit' (Proxy :: Proxy Word8)  LitNumWord8
-narrowWord16Lit = narrowLit' (Proxy :: Proxy Word16) LitNumWord16
-narrowWord32Lit = narrowLit' (Proxy :: Proxy Word32) LitNumWord32
+-- narrowInt8Lit, narrowInt16Lit, narrowInt32Lit,
+--   narrowWord8Lit, narrowWord16Lit, narrowWord32Lit :: Literal -> Literal
+-- narrowInt8Lit   = narrowLit' (Proxy :: Proxy Int8)   LitNumInt8
+-- narrowInt16Lit  = narrowLit' (Proxy :: Proxy Int16)  LitNumInt16
+-- narrowInt32Lit  = narrowLit' (Proxy :: Proxy Int32)  LitNumInt32
+-- narrowWord8Lit  = narrowLit' (Proxy :: Proxy Word8)  LitNumWord8
+-- narrowWord16Lit = narrowLit' (Proxy :: Proxy Word16) LitNumWord16
+-- narrowWord32Lit = narrowLit' (Proxy :: Proxy Word32) LitNumWord32
 
 -- | Extend a fixed-width literal (e.g. 'Int16#') to a word-sized literal (e.g.
 -- 'Int#').
@@ -672,18 +678,18 @@ narrowWord32Lit = narrowLit' (Proxy :: Proxy Word32) LitNumWord32
 -- extendIntLit  platform (LitNumber _nt i _)  = mkLitInt platform i
 -- extendIntLit  _platform l                   = pprPanic "extendIntLit" (ppr l)
 
-int8Lit (LitNumber _ i _)   = mkLitInt8 i
-int8Lit l                   = pprPanic "int8Lit" (ppr l)
-int16Lit (LitNumber _ i _)  = mkLitInt16 i
-int16Lit l                  = pprPanic "int16Lit" (ppr l)
-int32Lit (LitNumber _ i _)  = mkLitInt32 i
-int32Lit l                  = pprPanic "int32Lit" (ppr l)
-word8Lit (LitNumber _ i _)  = mkLitWord8 i
-word8Lit l                  = pprPanic "word8Lit" (ppr l)
-word16Lit (LitNumber _ i _) = mkLitWord16 i
-word16Lit l                 = pprPanic "word16Lit" (ppr l)
-word32Lit (LitNumber _ i _) = mkLitWord32 i
-word32Lit l                 = pprPanic "word32Lit" (ppr l)
+-- int8Lit (LitNumber _ i _)   = mkLitInt8 i
+-- int8Lit l                   = pprPanic "int8Lit" (ppr l)
+-- int16Lit (LitNumber _ i _)  = mkLitInt16 i
+-- int16Lit l                  = pprPanic "int16Lit" (ppr l)
+-- int32Lit (LitNumber _ i _)  = mkLitInt32 i
+-- int32Lit l                  = pprPanic "int32Lit" (ppr l)
+-- word8Lit (LitNumber _ i _)  = mkLitWord8 i
+-- word8Lit l                  = pprPanic "word8Lit" (ppr l)
+-- word16Lit (LitNumber _ i _) = mkLitWord16 i
+-- word16Lit l                 = pprPanic "word16Lit" (ppr l)
+-- word32Lit (LitNumber _ i _) = mkLitWord32 i
+-- word32Lit l                 = pprPanic "word32Lit" (ppr l)
 
 char2IntLit (LitChar c)       = mkLitIntUnchecked (toInteger (ord c))
 char2IntLit l                 = pprPanic "char2IntLit" (ppr l)
@@ -912,8 +918,20 @@ pprLiteral add_par (LitNumber nt i _)
        LitNumInteger -> pprIntegerVal add_par i
        LitNumNatural -> pprIntegerVal add_par i
        LitNumInt     -> pprPrimInt i
+       -- these should be pprPrimInt<N> i, however for backwards compatibility
+       -- we'll keep pprPrimInt for now.
+       LitNumInt8    -> pprPrimInt i
+       LitNumInt16   -> pprPrimInt i
+       LitNumInt32   -> pprPrimInt i
+
        LitNumInt64   -> pprPrimInt64 i
+
        LitNumWord    -> pprPrimWord i
+       -- see comment above, this should be pprPrimWord<N> ...
+       LitNumWord8   -> pprPrimWord i
+       LitNumWord16  -> pprPrimWord i
+       LitNumWord32  -> pprPrimWord i
+
        LitNumWord64  -> pprPrimWord64 i
 pprLiteral add_par (LitLabel l mb fod) =
     add_par (text "__label" <+> b <+> ppr fod)
