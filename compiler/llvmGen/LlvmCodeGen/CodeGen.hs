@@ -462,7 +462,7 @@ genCall target res args = runStmtsDecls $ do
              _ -> False
 
     -- fun type
-    let (res_hints, arg_hints) = foreignTargetHints target
+    let (res_hints, _arg_hints) = foreignTargetHints target
     let (ret_rep, args_rep) = foreignTargetReps target
 
     let ress_hints = zip res  res_hints
@@ -498,7 +498,7 @@ genCall target res args = runStmtsDecls $ do
         _ -> do
             let (signage, retTy) = primRepToLlvmTy ret_rep
             v0 <- doExprW retTy $ Call ccTy fptr argVars fnAttrs
-            v1 <- castVarW Signed v0 retTyCmm
+            v1 <- castVarW signage v0 retTyCmm
             -- get the return register
             let ret_reg [reg] = reg
                 ret_reg t = panic $ "genCall: Bad number of registers! Can only handle"
