@@ -443,7 +443,7 @@ validate-aarch64-darwin:
         --pure \
         --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR \
         --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --keep PROJECT_DIR \
-        --keep CI_PROJECT_DIR --kep MAKE_ARGS \
+        --keep CI_PROJECT_DIR --keep MAKE_ARGS \
         --keep LANG --keep CONFIGURE_ARGS \
         --run "$1"
     }
