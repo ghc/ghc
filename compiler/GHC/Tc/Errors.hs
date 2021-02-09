@@ -1098,30 +1098,48 @@ mkIrredErr ctxt cts
   where
     (ct1:_) = cts
 
+{- Note [Constructing Hole Errors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Whether or not 'mkHoleError' returns an error is not influenced by cec_suppress. In other terms,
+these "hole" errors are /not/ suppressed by cec_suppress. We want to see them!
+
+There are two cases to consider:
+
+1. We always report an error for out-of-scope variables, unless -fdefer-out-of-scope-variables is on,
+   in which case the messages are discarded. See also #12170 and #12406. If deferring, report a warning
+   only if -Wout-of-scope-variables is on.
+
+2. The general case: not an out-of-scope error. When -XPartialTypeSignatures is on, warnings
+   (instead of errors) are generated for holes in partial type signatures, unless
+   -fwarn-partial-type-signatures is not on, in which case the messages are discarded.
+   For partial type signatures, generate warnings only, and do that only if -fwarn-partial-type-signatures
+   is on, otherwise this is a typed hole in an expression, but not for an out-of-scope variable
+   (because that goes through a different function). If deferring, report a warning only if -Wtyped-holes
+   is on.
+
+-}
+
 ----------------
+-- | Constructs a new hole error, unless this is deferred. See Note [Constructing Hole Errors].
 mkHoleError :: [Ct] -> ReportErrCtxt -> Hole -> TcM (Maybe (MsgEnvelope DecoratedSDoc))
 mkHoleError _tidy_simples ctxt hole@(Hole { hole_occ = occ
                                            , hole_ty = hole_ty
                                            , hole_loc = ct_loc })
--- Always report an error for out-of-scope variables
--- Unless -fdefer-out-of-scope-variables is on,
--- in which case the messages are discarded.
--- See #12170, #12406
--- If deferring, report a warning only if -Wout-of-scope-variables is on
--- Unlike maybeReportError, these "hole" errors are
--- /not/ suppressed by cec_suppress.  We want to see them!
   | isOutOfScopeHole hole
   = do { dflags  <- getDynFlags
        ; rdr_env <- getGlobalRdrEnv
        ; imp_info <- getImports
        ; curr_mod <- getModule
        ; hpt <- getHpt
-       ; for (cec_out_of_scope_holes ctxt)
-         $ \sev -> mkDecoratedSDocAt sev (RealSrcSpan (tcl_loc lcl_env) Nothing)
-                                         out_of_scope_msg O.empty
-                                         (unknownNameSuggestions dflags hpt curr_mod rdr_env
-                                         (tcl_rdr lcl_env) imp_info (mkRdrUnqual occ))
-             }
+       ; let mk_err sev = mkDecoratedSDocAt sev (RealSrcSpan (tcl_loc lcl_env) Nothing)
+                                            out_of_scope_msg O.empty
+                                            (unknownNameSuggestions dflags hpt curr_mod rdr_env
+                                            (tcl_rdr lcl_env) imp_info (mkRdrUnqual occ))
+
+       ; maybeAddDeferredBindings ctxt hole mk_err
+       ; for (cec_out_of_scope_holes ctxt) mk_err
+       }
   where
     herald | isDataOcc occ = text "Data constructor not in scope:"
            | otherwise     = text "Variable not in scope:"
@@ -1133,23 +1151,12 @@ mkHoleError _tidy_simples ctxt hole@(Hole { hole_occ = occ
     lcl_env     = ctLocEnv ct_loc
     boring_type = isTyVarTy hole_ty
 
--- general case: not an out-of-scope error
--- When -XPartialTypeSignatures is on, warnings (instead of errors) are
--- generated for holes in partial type signatures.
--- Unless -fwarn-partial-type-signatures is not on,
--- in which case the messages are discarded.
--- For partial type signatures, generate warnings only, and do that
--- only if -fwarn-partial-type-signatures is on
--- Otherwise this is a typed hole in an expression,
--- but not for an out-of-scope variable (because that goes through a
--- different function)
--- If deferring, report a warning only if -Wtyped-holes is on
-mkHoleError tidy_simples ctxt0 hole@(Hole { hole_occ = occ
+mkHoleError tidy_simples ctxt hole@(Hole { hole_occ = occ
                                          , hole_ty = hole_ty
                                          , hole_sort = sort
                                          , hole_loc = ct_loc })
   = do { (ctxt, binds_msg)
-           <- relevant_bindings False ctxt0 lcl_env (tyCoVarsOfType hole_ty)
+           <- relevant_bindings False ctxt lcl_env (tyCoVarsOfType hole_ty)
                -- The 'False' means "don't filter the bindings"; see Trac #8191
 
        ; show_hole_constraints <- goptM Opt_ShowHoleConstraints
@@ -1169,22 +1176,14 @@ mkHoleError tidy_simples ctxt0 hole@(Hole { hole_occ = occ
                             mk_relevant_bindings (binds_msg $$ constraints_msg) `mappend`
                             valid_hole_fits sub_msg
 
+       ; maybeAddDeferredBindings ctxt hole mk_err
        ; case sort of
-           TypeHole       -> for (cec_type_holes ctxt0) mk_err
-           ConstraintHole -> for (cec_type_holes ctxt0) mk_err
-           ExprHole (HER ref ref_ty _) -> do
-             -- Only add bindings for holes in expressions
-             -- not for holes in partial type signatures
-             -- cf. addDeferredBinding
-             when (deferringAnyBindings ctxt0) $ do
-               dflags <- getDynFlags
-               err    <- mk_err sevErrorNoReason
-               let err_tm = mkErrorTerm dflags ref_ty err
-                 -- NB: ref_ty, not hole_ty. hole_ty might be rewritten.
-                 -- See Note [Holes] in GHC.Tc.Types.Constraint
-               writeMutVar ref err_tm
-
-             for (cec_expr_holes ctxt0) mk_err
+           TypeHole
+             -> for (cec_type_holes ctxt) mk_err
+           ConstraintHole
+             -> for (cec_type_holes ctxt) mk_err
+           ExprHole _
+             -> for (cec_expr_holes ctxt) mk_err
 
        }
 
@@ -1214,7 +1213,7 @@ mkHoleError tidy_simples ctxt0 hole@(Hole { hole_occ = occ
 
     tyvars_msg = ppUnless (null tyvars) $
                  text "Where:" <+> (vcat (map loc_msg other_tvs)
-                                    $$ pprSkols ctxt0 skol_tvs)
+                                    $$ pprSkols ctxt skol_tvs)
        where
          (skol_tvs, other_tvs) = partition is_skol tyvars
          is_skol tv = isTcTyVar tv && isSkolemTyVar tv
@@ -1222,7 +1221,7 @@ mkHoleError tidy_simples ctxt0 hole@(Hole { hole_occ = occ
                       -- hole, via kind casts
 
     type_hole_hint
-         | Just (SevError _) <- cec_type_holes ctxt0
+         | Just (SevError _) <- cec_type_holes ctxt
          = text "To use the inferred type, enable PartialTypeSignatures"
          | otherwise
          = empty
@@ -1242,6 +1241,25 @@ mkHoleError tidy_simples ctxt0 hole@(Hole { hole_occ = occ
        | otherwise  -- A coercion variable can be free in the hole type
        = ppWhenOption sdocPrintExplicitCoercions $
            quotes (ppr tv) <+> text "is a coercion variable"
+
+maybeAddDeferredBindings :: ReportErrCtxt
+                         -> Hole
+                         -> (Severity -> TcM (MsgEnvelope DecoratedSDoc))
+                         -> TcM ()
+maybeAddDeferredBindings ctxt hole mk_err = do
+  case hole_sort hole of
+    ExprHole (HER ref ref_ty _) -> do
+      -- Only add bindings for holes in expressions
+      -- not for holes in partial type signatures
+      -- cf. addDeferredBinding
+      when (deferringAnyBindings ctxt) $ do
+        dflags <- getDynFlags
+        err    <- mk_err sevErrorNoReason
+        let err_tm = mkErrorTerm dflags ref_ty err
+          -- NB: ref_ty, not hole_ty. hole_ty might be rewritten.
+          -- See Note [Holes] in GHC.Tc.Types.Constraint
+        writeMutVar ref err_tm
+    _ -> pure ()
 
 pp_occ_with_type :: OccName -> Type -> SDoc
 pp_occ_with_type occ hole_ty = hang (pprPrefixOcc occ) 2 (dcolon <+> pprType hole_ty)
