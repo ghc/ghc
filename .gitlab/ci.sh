@@ -119,7 +119,7 @@ function show_tool() {
 
 function set_toolchain_paths() {
   needs_toolchain=1
-  case "$(uname)" in
+  case "$(uname -m)-$(uname)" in
     *-Linux) needs_toolchain="" ;;
     *) ;;
   esac
