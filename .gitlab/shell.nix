@@ -2,8 +2,9 @@
 #, nixpkgs ? fetchTarball https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz #apple-silicon.tar.gz
 , pkgs ? import <nixpkgs> { inherit system; }
 }: pkgs.mkShell {
-#   IN_NIX_SHELL = "pure";
-#   PATH = stdenv.lib.makeBinPath buildInputs;
+  # this prevents nix from trying to write the env-vars file.
+  # we can't really, as NIX_BUILD_TOP/env-vars is not set.
+  noDumpEnvVars=1;
 
   buildInputs = with pkgs; [
     haskell.compiler.ghc8103Binary

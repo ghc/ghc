@@ -432,12 +432,24 @@ validate-aarch64-darwin:
     LANG: "en_US.UTF-8"
     CONFIGURE_ARGS: "--with-intree-gmp"
 
+  # I wish we could just use the nix #! logic, but we can't --run and -i bash
+  # behave very differently. -i bash does not pass any nix related env vars
+  # the whole $stdenv/setup part seems to be missing.
   script: |
-    nix-shell --run "env"                      .gitlab/shell.nix -I nixpkgs=https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz --pure --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --argstr system "aarch64-darwin"
-    nix-shell --run ".gitlab/ci.sh setup"      .gitlab/shell.nix -I nixpkgs=https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz --pure --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --argstr system "aarch64-darwin"
-    nix-shell --run ".gitlab/ci.sh configure"  .gitlab/shell.nix -I nixpkgs=https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz --pure --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --argstr system "aarch64-darwin"
-    nix-shell --run ".gitlab/ci.sh build_make" .gitlab/shell.nix -I nixpkgs=https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz --pure --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --argstr system "aarch64-darwin"
-    nix-shell --run ".gitlab/ci.sh test_make"  .gitlab/shell.nix -I nixpkgs=https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz --pure --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --argstr system "aarch64-darwin"
+    function runInNixShell() {
+      nix-shell .gitlab/shell.nix \
+        -I nixpkgs=https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz \
+        --argstr system "aarch64-darwin" \
+        --pure \
+        --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR \
+        --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --keep PROJECT_DIR \
+        --run "$1"
+    }
+    runInNixShell "env"
+    runInNixShell ".gitlab/ci.sh setup"
+    runInNixShell ".gitlab/ci.sh configure"
+    runInNixShell ".gitlab/ci.sh build_make"
+    runInNixShell ".gitlab/ci.sh test_make"
 
   artifacts:
     reports:
