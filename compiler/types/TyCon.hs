@@ -1475,6 +1475,7 @@ instance Binary PrimRep where
     14 -> pure FloatRep
     15 -> pure DoubleRep
     16 -> VecRep <$> get bh <*> get bh
+    _  -> panic "Decoding PrimRep, invalid byte."
 
 data PrimElemRep
   = Int8ElemRep
@@ -1511,7 +1512,7 @@ instance Binary PrimElemRep where
     7 -> pure Word64ElemRep
     8 -> pure FloatElemRep
     9 -> pure DoubleElemRep
-
+    _  -> panic "Decoding PrimElemRep, invalid byte."
 
 instance Outputable PrimRep where
   ppr r = text (show r)
