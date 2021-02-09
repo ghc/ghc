@@ -1,3 +1,5 @@
+{- For some reason ghc-in-ghci believes that that TyCon import is unnecessary -}
+{-# OPTIONS_GHC -Wno-error #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ExplicitForAll #-}
