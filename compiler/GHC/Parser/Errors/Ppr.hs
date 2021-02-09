@@ -1,8 +1,9 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE FlexibleContexts #-}
 
-{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# OPTIONS_GHC -Wno-orphans #-} -- instance RenderableDiagnostic PsMessage
 
 module GHC.Parser.Errors.Ppr
    ( mkParserWarn
@@ -37,9 +38,6 @@ instance Diagnostic PsMessage where
 
 mk_parser_err :: SrcSpan -> SDoc -> MsgEnvelope DiagnosticMessage
 mk_parser_err span doc = MsgEnvelope
-
-mkParserErr :: SrcSpan -> SDoc -> MsgEnvelope DecoratedSDoc
-mkParserErr span doc = MsgEnvelope
    { errMsgSpan        = span
    , errMsgContext     = alwaysQualify
    , errMsgDiagnostic  = DiagnosticMessage (mkDecorated [doc]) ErrorWithoutFlag

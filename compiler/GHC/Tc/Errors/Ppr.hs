@@ -21,9 +21,11 @@ import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
 import GHC.Unit.State ( pprWithUnitState )
 import GHC.Utils.Outputable
+import qualified Data.List.NonEmpty as NE
 
-instance RenderableDiagnostic TcRnMessage where
-  renderDiagnostic = pprTcRnMessage
+instance Diagnostic TcRnMessage where
+  diagnosticMessage = pprTcRnMessage
+  diagnosticReason _ = ErrorWithoutFlag -- FIXME(adn)
 
 notInScopeErr :: RdrName -> SDoc
 notInScopeErr rdr_name
@@ -33,23 +35,6 @@ notInScopeErr rdr_name
                   2 (what <+> quotes (ppr rdr_name))
   where
     what = pprNonVarNameSpace (occNameSpace (rdrNameOcc rdr_name))
-
-{- Note [When to show/hide the module-not-imported line]           -- #15611
-For the error message:
-    Not in scope X.Y
-    Module X does not export Y
-    No module named ‘X’ is imported:
-there are 2 cases, where we hide the last "no module is imported" line:
-1. If the module X has been imported.
-2. If the module X is the current module. There are 2 subcases:
-   2.1 If the unknown module name is in a input source file,
-       then we can use the getModule function to get the current module name.
-       (See test T15611a)
-   2.2 If the unknown module name has been entered by the user in GHCi,
-       then the getModule function returns something like "interactive:Ghci1",
-       and we have to check the current module in the last added entry of
-       the HomePackageTable. (See test T15611b)
--}
 
 exactNameErr :: Name -> SDoc
 exactNameErr name =
@@ -133,7 +118,7 @@ instance Outputable ImportSuggestion where
            , text "is imported."
            ]
     SuggestModulesDoNotExport mods occ
-      | [mod] <- mods ->
+      | mod NE.:| [] <- mods ->
           hsep [ text "Module"
                , quotes (ppr mod)
                , text "does not export"
@@ -141,12 +126,12 @@ instance Outputable ImportSuggestion where
                ]
       | otherwise ->
           hsep [ text "Neither"
-               , quotedListWithNor (map ppr mods)
+               , quotedListWithNor (map ppr $ NE.toList mods)
                , text "exports"
                , quotes (ppr occ) <> dot
                ]
     SuggestAddNameToImportLists occ mods
-      | [(mod, imvspan)] <- mods ->
+      | (mod, imvspan) NE.:| [] <- mods ->
           fsep [ text "Perhaps you want to add"
                , quotes (ppr occ)
                , text "to the import list"
@@ -162,10 +147,10 @@ instance Outputable ImportSuggestion where
           $$
           nest 2 (vcat
               [ quotes (ppr mod) <+> parens (ppr imvspan)
-              | (mod, imvspan) <- mods
+              | (mod, imvspan) <- NE.toList mods
               ])
     SuggestRemoveNameFromHidingLists occ mods
-      | [(mod, imvspan)] <- mods ->
+      | (mod, imvspan) NE.:| [] <- mods ->
           fsep [ text "Perhaps you want to remove"
                , quotes (ppr occ)
                , text "from the explicit hiding list"
@@ -182,7 +167,7 @@ instance Outputable ImportSuggestion where
           $$
           nest 2 (vcat
               [ quotes (ppr mod) <+> parens (ppr imvspan)
-              | (mod, imvspan) <- mods
+              | (mod, imvspan) <- NE.toList mods
               ])
 
 instance Outputable ExtensionSuggestion where

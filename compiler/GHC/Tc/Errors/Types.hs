@@ -8,12 +8,11 @@ module GHC.Tc.Errors.Types (
   , ExtensionSuggestion(..)
   , OutOfScopeSuggestions(..)
   -- * Constructing messages
-  , mkTcRnWarn
+  -- , mkTcRnWarn
   -- * Constructing suggestions
   , noOutOfScopeSuggestions
   ) where
 
-import GHC.Driver.Flags
 import GHC.Prelude
 import GHC.Tc.Types.Origin ( RenderableTyVarBndr )
 import GHC.Tc.Utils.TcType
@@ -25,18 +24,18 @@ import GHC.Types.Var
 import GHC.Unit.Module.Name
 import GHC.Unit.State ( UnitState )
 import GHC.Unit.Types
-import GHC.Utils.Outputable
+import Data.List.NonEmpty (NonEmpty)
 
 -- | Creates a new 'ErrMsg' parameterised over the input 'Warning', attaching the
 -- correct 'WarnReason' to it.
-mkTcRnWarn :: WarnReason -> SrcSpan -> PrintUnqualified -> TcRnMessage -> MsgEnvelope TcRnMessage
-mkTcRnWarn reason loc printer warn = makeIntoWarning reason (mkErr loc printer warn)
+--mkTcRnWarn :: WarnReason -> SrcSpan -> PrintUnqualified -> TcRnMessage -> MsgEnvelope TcRnMessage
+--mkTcRnWarn reason loc printer warn = makeIntoWarning reason (mkErr loc printer warn)
 
 -- | An error which might arise during typechecking/renaming.
 data TcRnMessage
   = TcRnUnknownMessage !DecoratedSDoc
 
-  -- See 'mkErrDocAt' in 'GHC.Tc.Utils.Monad', where we need the 'UnitState'
+  -- See 'mkDecoratedSDocAt' in 'GHC.Tc.Utils.Monad', where we need the 'UnitState'
   -- to render the 'Unit' properly. This is a type constructor to build an embellished
   -- 'Error' which can be pretty-printed with the fully qualified 'UnitState'.
   | TcRnMessageWithUnitState !UnitState !TcRnMessage
@@ -45,12 +44,12 @@ data TcRnMessage
   | TcRnBadTelescope
       [RenderableTyVarBndr] -- telescope
       [TyCoVar] -- sorted tyvars (in a correct order)
-      !SDoc      -- context
+      !SDoc     -- context. TODO: Make it structured, eventually (#18516).
   | TcRnOutOfScope
       !RdrName -- name tried
       !OutOfScopeSuggestions -- similar name, import, etc suggestions
-      !SDoc -- extra contents (see 'unboundNameX')
-      !SDoc -- context lines
+      !SDoc -- extra contents (see 'unboundNameX'). TODO: Make it structured, eventually (#18516).
+      !SDoc -- context lines. TODO: Make it structured, eventually (#18516).
   | TcRnOutOfScopeHole
       !OccName -- out of scope name
       !TcType  -- type of the hole
@@ -73,8 +72,8 @@ newtype NameSuggestions = NameSuggestions [(RdrName, HowInScope)]
 
 data ImportSuggestion
   = SuggestNoModuleImported !ModuleName
-  | SuggestModulesDoNotExport [Module] !OccName
-  | SuggestAddNameToImportLists !OccName [(Module, SrcSpan)]
-  | SuggestRemoveNameFromHidingLists !OccName [(Module, SrcSpan)]
+  | SuggestModulesDoNotExport (NonEmpty Module) !OccName
+  | SuggestAddNameToImportLists !OccName (NonEmpty (Module, SrcSpan))
+  | SuggestRemoveNameFromHidingLists !OccName (NonEmpty (Module, SrcSpan))
 
 data ExtensionSuggestion = SuggestRecursiveDo
