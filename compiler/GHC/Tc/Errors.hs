@@ -1116,12 +1116,25 @@ mkHoleError _tidy_simples ctxt hole@(Hole { hole_occ = occ
        ; imp_info <- getImports
        ; curr_mod <- getModule
        ; hpt <- getHpt
-       ; for (cec_out_of_scope_holes ctxt)
-         $ \sev -> mkDecoratedSDocAt sev (RealSrcSpan (tcl_loc lcl_env) Nothing)
-                                         out_of_scope_msg O.empty
-                                         (unknownNameSuggestions dflags hpt curr_mod rdr_env
-                                         (tcl_rdr lcl_env) imp_info (mkRdrUnqual occ))
-             }
+       ; let mk_err sev = mkDecoratedSDocAt sev (RealSrcSpan (tcl_loc lcl_env) Nothing)
+                                            out_of_scope_msg O.empty
+                                            (unknownNameSuggestions dflags hpt curr_mod rdr_env
+                                            (tcl_rdr lcl_env) imp_info (mkRdrUnqual occ))
+       ; case hole_sort hole of
+           ExprHole (HER ref ref_ty _) -> do
+             -- Only add bindings for holes in expressions
+             -- not for holes in partial type signatures
+             -- cf. addDeferredBinding
+             when (deferringAnyBindings ctxt) $ do
+               dflags <- getDynFlags
+               err    <- mk_err sevErrorNoReason
+               let err_tm = mkErrorTerm dflags ref_ty err
+                 -- NB: ref_ty, not hole_ty. hole_ty might be rewritten.
+                 -- See Note [Holes] in GHC.Tc.Types.Constraint
+               writeMutVar ref err_tm
+           _ -> pure ()
+       ; for (cec_out_of_scope_holes ctxt) mk_err
+       }
   where
     herald | isDataOcc occ = text "Data constructor not in scope:"
            | otherwise     = text "Variable not in scope:"
