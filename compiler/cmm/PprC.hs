@@ -1016,9 +1016,9 @@ pprCall ppr_fn cconv results args
      pprArg (expr, _other)
         = pprExpr expr
 
-     pprUnHint AddrHint       rep = parens (machRepCType rep)
-     pprUnHint (SignedHint) rep = parens (machRepCType rep)
-     pprUnHint _              _   = empty
+     pprUnHint AddrHint   rep = parens (machRepCType rep)
+     pprUnHint SignedHint rep = parens (machRepCType rep)
+     pprUnHint _          _   = empty
 
 -- Currently we only have these two calling conventions, but this might
 -- change in the future...
@@ -1181,9 +1181,9 @@ isCmmWordType dflags ty = not (isFloatType ty)
 -- argument, we always cast the argument to (void *), to avoid warnings from
 -- the C compiler.
 machRepHintCType :: CmmType -> ForeignHint -> SDoc
-machRepHintCType _   AddrHint       = text "void *"
-machRepHintCType rep (SignedHint) = machRep_S_CType (typeWidth rep)
-machRepHintCType rep _other         = machRepCType rep
+machRepHintCType _   AddrHint   = text "void *"
+machRepHintCType rep SignedHint = machRep_S_CType (typeWidth rep)
+machRepHintCType rep _other     = machRepCType rep
 
 machRepPtrCType :: CmmType -> SDoc
 machRepPtrCType r

@@ -724,17 +724,6 @@ arg_vars ((e, AddrHint):rest) (vars, stmts, tops)
        arg_vars rest (vars ++ [v2], stmts `appOL` stmts' `snocOL` s1,
                                tops ++ top')
 
--- arg_vars ((e, SignedHint w):rest) (vars, stmts, tops)
---   = do (v1, stmts', top') <- exprToVar e
---        dflags <- getDynFlags
---        (v2, s1) <- castVar Signed v1 (signedType w)
---        arg_vars rest (vars ++ [v2], stmts `appOL` stmts' `snocOL` s1, tops ++ top')
---   where signedType W8 = i8
---         signedType W16 = i16
---         signedType W32 = i32
---         signedType W64 = i64
-
-
 arg_vars ((e, _):rest) (vars, stmts, tops)
   = do (v1, stmts', top') <- exprToVar e
        arg_vars rest (vars ++ [v1], stmts `appOL` stmts', tops ++ top')
