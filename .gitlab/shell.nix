@@ -17,6 +17,7 @@
 
     automake
     autoconf
+    m4
 
     gmp
     ncurses
