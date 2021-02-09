@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -Wno-error #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ExplicitForAll #-}
