@@ -30,6 +30,7 @@ module GHC.HsToCore.Utils (
         wrapBind, wrapBinds,
 
         mkErrorAppDs, mkCoreAppDs, mkCoreAppsDs, mkCastDs,
+        mkFailExpr,
 
         seqVar,
 
@@ -409,6 +410,41 @@ mkErrorAppDs err_id ty msg = do
         core_msg = Lit (mkLitString full_msg)
         -- mkLitString returns a result of type String#
     return (mkApps (Var err_id) [Type (getRuntimeRep ty), Type ty, core_msg])
+
+{-
+Note [Incompleteness and linearity]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A partial pattern match is compiled to a call to 'error'.
+Because of linearity, we wrap it with an empty case, which accounts for
+linear variables with the 'Bottom' usage environment. Example:
+
+f :: a %1 -> Bool -> a
+f x True = False
+
+Adding 'f x False = error "Non-exhaustive pattern..."' would violate
+the linearity of x.
+Instead, we use 'f x False = case error "Non-exhausive pattern..." :: Void of {}'.
+We use 'Void' instead of the original return type ('a' in this case)
+because there might be levity polymorphism, e.g. in
+
+g :: forall (a :: TYPE r). ((# #) -> a) #-> Bool -> a
+g x True = x (# #)
+
+adding 'g x False = case error "Non-exhaustive pattern" :: a of {}'
+would create an illegal levity-polymorphic binder.
+This is important for pattern synonym matchers, which often look like this 'g'.
+
+Similarly, a hole
+h :: a %1 -> a
+h x = _
+is desugared to 'case error "Hole" :: Void of {}'. Test: LinearHole.
+-}
+
+mkFailExpr :: HsMatchContext GhcRn -> Type -> DsM CoreExpr
+mkFailExpr ctxt ty
+  = do fail_expr <- mkErrorAppDs pAT_ERROR_ID voidTy (matchContextErrString ctxt)
+       return $ mkWildCase fail_expr (unrestricted voidTy) ty []
+       -- See Note [Incompleteness and linearity]
 
 {-
 'mkCoreAppDs' and 'mkCoreAppsDs' handle the special-case desugaring of 'seq'.

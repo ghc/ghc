@@ -13,6 +13,7 @@ import GHC.Tc.Types.Evidence
 import GHC.Unit
 
 import GHC.Builtin.Names
+import GHC.Builtin.Types ( liftedRepTy, voidTy )
 
 import GHC.Core.Type
 import GHC.Core
@@ -32,7 +33,10 @@ import GHC.Data.FastString
 evDelayedError :: Type -> FastString -> EvTerm
 evDelayedError ty msg
   = EvExpr $
-    Var errorId `mkTyApps` [getRuntimeRep ty, ty] `mkApps` [litMsg]
+    let fail_expr = Var errorId `mkTyApps` [liftedRepTy, voidTy] `mkApps` [litMsg]
+    in mkWildCase fail_expr (unrestricted voidTy) ty []
+       -- See Note [Incompleteness and linearity] in GHC.HsToCore.Utils
+
   where
     errorId = tYPE_ERROR_ID
     litMsg  = Lit (LitString (bytesFS msg))

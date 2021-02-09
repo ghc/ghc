@@ -467,6 +467,9 @@ basicKnownKeyNames
         -- The Either type
         , eitherTyConName, leftDataConName, rightDataConName
 
+        -- Data.Void
+        , voidTyConName
+
         -- Plugins
         , pluginTyConName
         , frontendPluginTyConName
@@ -554,7 +557,7 @@ gHC_PRIM, gHC_PRIM_PANIC, gHC_PRIM_EXCEPTION,
     rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, mONAD_ZIP, mONAD_FAIL,
     aRROW, cONTROL_APPLICATIVE, gHC_DESUGAR, rANDOM, gHC_EXTS,
     cONTROL_EXCEPTION_BASE, gHC_TYPELITS, gHC_TYPENATS, dATA_TYPE_EQUALITY,
-    dATA_COERCE, dEBUG_TRACE, uNSAFE_COERCE :: Module
+    dATA_COERCE, dEBUG_TRACE, uNSAFE_COERCE, dATA_VOID :: Module
 
 gHC_PRIM        = mkPrimModule (fsLit "GHC.Prim")   -- Primitive types and values
 gHC_PRIM_PANIC  = mkPrimModule (fsLit "GHC.Prim.Panic")
@@ -584,6 +587,7 @@ dATA_LIST       = mkBaseModule (fsLit "Data.List")
 dATA_STRING     = mkBaseModule (fsLit "Data.String")
 dATA_FOLDABLE   = mkBaseModule (fsLit "Data.Foldable")
 dATA_TRAVERSABLE= mkBaseModule (fsLit "Data.Traversable")
+dATA_VOID       = mkBaseModule (fsLit "Data.Void")
 gHC_CONC        = mkBaseModule (fsLit "GHC.Conc")
 gHC_IO          = mkBaseModule (fsLit "GHC.IO")
 gHC_IO_Exception = mkBaseModule (fsLit "GHC.IO.Exception")
@@ -968,6 +972,9 @@ eitherTyConName, leftDataConName, rightDataConName :: Name
 eitherTyConName   = tcQual  dATA_EITHER (fsLit "Either") eitherTyConKey
 leftDataConName   = dcQual dATA_EITHER (fsLit "Left")   leftDataConKey
 rightDataConName  = dcQual dATA_EITHER (fsLit "Right")  rightDataConKey
+
+voidTyConName :: Name
+voidTyConName = tcQual dATA_VOID (fsLit "Void") voidTyConKey
 
 -- Generics (types)
 v1TyConName, u1TyConName, par1TyConName, rec1TyConName,
@@ -1913,8 +1920,9 @@ funPtrTyConKey                          = mkPreludeTyConUnique 78
 tVarPrimTyConKey                        = mkPreludeTyConUnique 79
 compactPrimTyConKey                     = mkPreludeTyConUnique 80
 
-eitherTyConKey :: Unique
+eitherTyConKey, voidTyConKey :: Unique
 eitherTyConKey                          = mkPreludeTyConUnique 84
+voidTyConKey                            = mkPreludeTyConUnique 85
 
 -- Kind constructors
 liftedTypeKindTyConKey, tYPETyConKey,

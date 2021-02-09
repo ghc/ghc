@@ -81,6 +81,9 @@ module GHC.Builtin.Types (
         unboxedTupleKind, unboxedSumKind,
         filterCTuple,
 
+        -- * Void
+        voidTyCon, voidTy,
+
         -- ** Constraint tuples
         cTupleTyCon, cTupleTyConName, cTupleTyConNames, isCTupleTyConName,
         cTupleTyConNameArity_maybe,
@@ -1888,6 +1891,13 @@ mkBoxedTupleTy tys = mkTupleTy Boxed tys
 
 unitTy :: Type
 unitTy = mkTupleTy Boxed []
+
+-- Void
+voidTyCon :: TyCon
+voidTyCon = pcTyCon voidTyConName Nothing [] []
+
+voidTy :: Type
+voidTy = mkTyConApp voidTyCon []
 
 {- *********************************************************************
 *                                                                      *
