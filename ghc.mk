@@ -971,7 +971,7 @@ install_packages: rts/dist/package.conf.install
 	$(call installLibsTo, $(RTS_INSTALL_LIBS), "$(DESTDIR)$(topdir)/rts")
 	$(foreach p, $(INSTALL_PACKAGES),                             \
 	    $(call make-command,                                      \
-	           "$(ghc-cabal_INPLACE)" copy                        \
+	           @"$(ghc-cabal_INPLACE)" copy                        \
 	                                  $p $(INSTALL_DISTDIR_$p)    \
 	                                  "$(STRIP_CMD)"              \
 	                                  '$(DESTDIR)'                \
@@ -982,7 +982,7 @@ install_packages: rts/dist/package.conf.install
 	"$(INSTALLED_GHC_PKG_REAL)" --force --global-package-db "$(INSTALLED_PACKAGE_CONF)" update rts/dist/package.conf.install
 	$(foreach p, $(INSTALL_PACKAGES),                             \
 	    $(call make-command,                                      \
-	           "$(ghc-cabal_INPLACE)" register                    \
+	           @"$(ghc-cabal_INPLACE)" register                    \
 	                                  $p $(INSTALL_DISTDIR_$p)    \
 	                                  "$(INSTALLED_GHC_REAL)"     \
 	                                  "$(INSTALLED_GHC_PKG_REAL)" \
