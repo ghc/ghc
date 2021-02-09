@@ -1,5 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# OPTIONS_GHC -Wno-orphans #-} -- RenderableDiagnostic for DriverMessage and GhcMessage
 
 module GHC.Driver.Errors.Ppr where
 
@@ -16,10 +16,10 @@ import GHC.Unit.State
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 
-import GHC.Parser.Errors.Ppr ()
+import GHC.Parser.Errors.Ppr ()   -- instance RenderableDiagnostic PsMessage
 import GHC.Tc.Errors.Types
-import GHC.Tc.Errors.Ppr ()
-import GHC.HsToCore.Errors.Ppr ()
+import GHC.Tc.Errors.Ppr ()       -- instance RenderableDiagnostic TcRnMessage
+import GHC.HsToCore.Errors.Ppr () -- instance RenderableDiagnostic DsMessage
 
 instance RenderableDiagnostic GhcMessage where
   renderDiagnostic = \case
