@@ -119,13 +119,18 @@ function show_tool() {
 
 function set_toolchain_paths() {
   needs_toolchain=1
-  case "$(uname -m)-$(uname)" in
+  case "$(uname)" in
     *-Linux) needs_toolchain="" ;;
-    arm64-Darwin) needs_toolchain="" ;;
     *) ;;
   esac
 
-  if [[ -n "$needs_toolchain" ]]; then
+  if [[ -n "$IN_NIX_SHELL" ]]; then
+      needs_toolchain=""
+      GHC="$(which ghc)"
+      CABAL="$(which cabal)"
+      HAPPY="$(which happy)"
+      ALEX="$(which alex)"
+  elif [[ -n "$needs_toolchain" ]]; then
       # These are populated by setup_toolchain
       GHC="$toolchain/bin/ghc$exe"
       CABAL="$toolchain/bin/cabal$exe"
@@ -136,14 +141,6 @@ function set_toolchain_paths() {
       CABAL="/usr/local/bin/cabal"
       HAPPY="$HOME/.cabal/bin/happy"
       ALEX="$HOME/.cabal/bin/alex"
-  fi
-
-  if [[ -n "$IN_NIX_SHELL" ]]; then
-      needs_toolchain=""
-      GHC="$(which ghc)"
-      CABAL="$(which cabal)"
-      HAPPY="$(which happy)"
-      ALEX="$(which alex)"
   fi
 
   export GHC
