@@ -25,6 +25,7 @@
     zlib.out
     zlib.dev
     glibcLocales
+    locale
 
     git
 
