@@ -403,7 +403,7 @@ foreign import ccall unsafe "allocateExec"
 foreign import ccall unsafe "flushExec"
   _flushExec :: CUInt -> Ptr a -> IO ()
 
-#if MIN_VERSION_rts(1,0,1)
+#if MIN_VERSION_rts(1,0,1) || defined(darwin_HOST_OS)
 foreign import ccall unsafe "allocateWrite"
   _allocateWrite :: CUInt -> IO (Ptr a)
 foreign import ccall unsafe "markExec"
