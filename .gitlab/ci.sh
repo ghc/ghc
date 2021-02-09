@@ -2,9 +2,7 @@
 # shellcheck disable=SC2230
 
 # This is the primary driver of the GitLab CI infrastructure.
-
-# set -e -o pipefail
-set -Eeuxo pipefail
+set -Eeuo pipefail
 
 # Configuration:
 hackage_index_state="@1579718451"

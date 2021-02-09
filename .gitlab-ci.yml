@@ -436,6 +436,7 @@ validate-aarch64-darwin:
   # behave very differently. -i bash does not pass any nix related env vars
   # the whole $stdenv/setup part seems to be missing.
   script: |
+    set -Eeuo pipefail
     function runInNixShell() {
       nix-shell .gitlab/shell.nix \
         -I nixpkgs=https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz \
@@ -447,8 +448,9 @@ validate-aarch64-darwin:
         --keep LANG --keep CONFIGURE_ARGS \
         --run "$1"
     }
-    env
-    runInNixShell "env"
+    # fix up config.sub in libraries for the time.
+    # aarch64-darwin is not supported in older config.sub's
+    find libraries -name config.sub -exec cp config.sub {} \;
     runInNixShell ".gitlab/ci.sh setup"
     runInNixShell ".gitlab/ci.sh configure"
     runInNixShell ".gitlab/ci.sh build_make"
