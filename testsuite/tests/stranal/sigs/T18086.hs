@@ -8,6 +8,7 @@ import System.IO.Unsafe
 
 -- Should have strictness signature <L,U>x, emphasis on the exceptional
 -- divergence result.
+-- CPR should still be b, as per Note [Bottom CPR iff Dead-Ending Divergence].
 m :: IO ()
 m = do
   putStrLn "foo"
