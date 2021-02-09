@@ -28,10 +28,6 @@ import BasicTypes ( SourceText, pprWithSourceText )
 
 import Data.Char
 import Data.Data
-import {-# SOURCE #-} TyCon (PrimRep (..))
-
-import GHC.Stack( HasCallStack )
-import Debug.Trace (traceStack)
 
 {-
 ************************************************************************
