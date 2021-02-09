@@ -1,7 +1,8 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE GADTs #-}
 
-{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# OPTIONS_GHC -Wno-orphans #-} -- instance RenderableDiagnostic PsMessage
 
 module GHC.Parser.Errors.Ppr
    ( pprWarning
@@ -29,7 +30,7 @@ import GHC.Builtin.Types (filterCTuple)
 
 -- This is a totally uninteresting instance will will be populated in the context of #18516.
 instance RenderableDiagnostic PsMessage where
-  renderDiagnostic _ = mkDecorated []
+  renderDiagnostic = \case {}
 
 mkParserErr :: SrcSpan -> SDoc -> MsgEnvelope DecoratedSDoc
 mkParserErr span doc = MsgEnvelope

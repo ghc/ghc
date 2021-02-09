@@ -7,6 +7,7 @@ module GHC.Driver.Errors (
   ) where
 
 import GHC.Driver.Session
+import GHC.Driver.Errors.Types ( ghcUnknownMessage )
 import GHC.Data.Bag
 import GHC.Utils.Exception
 import GHC.Utils.Error ( formatBulleted, sortMsgBag )
@@ -89,5 +90,5 @@ printOrThrowWarnings logger dflags warns = do
                            }))
           False warns
   if make_error
-    then throwIO (mkSrcErr warns')
+    then throwIO (mkSrcErr . fmap ghcUnknownMessage . mkMessages $ warns')
     else printBagOfErrors logger dflags warns
