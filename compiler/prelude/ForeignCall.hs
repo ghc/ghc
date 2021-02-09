@@ -28,6 +28,7 @@ import BasicTypes ( SourceText, pprWithSourceText )
 
 import Data.Char
 import Data.Data
+import {-# SOURCE #-} TyCon (PrimRep)
 
 {-
 ************************************************************************
