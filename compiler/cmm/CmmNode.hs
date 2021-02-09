@@ -1,4 +1,3 @@
-{- For some reason ghc-in-ghci believes that that TyCon import is unnecessary -}
 {-# OPTIONS_GHC -Wno-error #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
@@ -47,7 +46,7 @@ import Data.List (tails,sortBy)
 import Unique (nonDetCmpUnique)
 import Util
 
-import {-# SOURCE #-} TyCon (PrimRep)
+import TyCon (PrimRep)
 
 ------------------------
 -- CmmNode
