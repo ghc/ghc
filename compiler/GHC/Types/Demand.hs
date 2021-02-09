@@ -15,7 +15,7 @@
 -- Lays out the abstract domain for "GHC.Core.Opt.DmdAnal".
 module GHC.Types.Demand (
     -- * Demands
-    Card(..), Demand(..), SubDemand(Prod), mkProd, viewProd,
+    Card(..), Demand(..), SubDemand(Prod), viewProd,
     -- ** Algebra
     absDmd, topDmd, botDmd, seqDmd, topSubDmd,
     -- *** Least upper bound
@@ -26,8 +26,8 @@ module GHC.Types.Demand (
     multCard, multDmd, multSubDmd,
     -- ** Predicates on @Card@inalities and @Demand@s
     isAbs, isUsedOnce, isStrict,
-    isAbsDmd, isUsedOnceDmd, isStrUsedDmd, isStrictDmd,
-    isTopDmd, isSeqDmd, isWeakDmd,
+    isAbsDmd, isUsedOnceDmd, isStrUsedDmd, isStrUsedDmd_maybe, isStrictDmd,
+    isTopDmd, isWeakDmd,
     -- ** Special demands
     evalDmd,
     -- *** Demands used in PrimOp signatures
@@ -35,7 +35,7 @@ module GHC.Types.Demand (
     -- ** Other @Demand@ operations
     oneifyCard, oneifyDmd, strictifyDmd, strictifyDictDmd, mkWorkerDemand,
     peelCallDmd, peelManyCalls, mkCalledOnceDmd, mkCalledOnceDmds,
-    addCaseBndrDmd,
+    addCaseBndrDmd, mkScrutProdDmd, unboxFieldDmds_maybe,
     -- ** Extracting one-shot information
     argOneShots, argsOneShots, saturatedByOneShots,
 
@@ -86,7 +86,7 @@ import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Unique.FM
 import GHC.Types.Basic
-import GHC.Data.Maybe   ( orElse )
+import GHC.Data.Maybe   ( expectJust, orElse )
 
 import GHC.Core.Type    ( Type )
 import GHC.Core.TyCon   ( isNewTyCon, isClassTyCon )
@@ -289,7 +289,9 @@ data SubDemand
   -- Expands to 'Call' via 'viewCall' and to 'Prod' via 'viewProd'.
   --
   -- @Poly n@ is semantically equivalent to @Prod [n :* Poly n, ...]@ or
-  -- @Call n (Poly n)@. 'mkCall' and 'mkProd' do these rewrites.
+  -- @Call n (Poly n)@. 'mkCall' does the rewrite.
+  --
+  -- TODO
   --
   -- In Note [Demand notation]: @U === P(U,U,...)@ and @U === CU(U)@,
   --                            @S === P(S,S,...)@ and @S === CS(S)@, and so on.
@@ -328,22 +330,6 @@ polyDmd C_0N = C_0N :* poly0N
 polyDmd C_11 = C_11 :* poly11
 polyDmd C_1N = C_1N :* poly1N
 polyDmd C_10 = C_10 :* poly10
-
--- | A smart constructor for 'Prod', applying rewrite rules along the semantic
--- equality @Prod [polyDmd n, ...] === polyDmd n@, simplifying to 'Poly'
--- 'SubDemand's when possible. Note that this degrades boxity information! E.g. a
--- polymorphic demand will never unbox.
-mkProd :: [Demand] -> SubDemand
-mkProd [] = seqSubDmd
-mkProd ds@(n:*sd : _)
-  | want_to_simplify n, all (== polyDmd n) ds = sd
-  | otherwise                                 = Prod ds
-  where
-    -- We only want to simplify absent and bottom demands and unbox the others.
-    -- See also Note [U should win] and Note [Don't optimise UP(U,U,...) to U].
-    want_to_simplify C_00 = True
-    want_to_simplify C_10 = True
-    want_to_simplify _    = False
 
 -- | @viewProd n sd@ interprets @sd@ as a 'Prod' of arity @n@, expanding 'Poly'
 -- demands as necessary.
@@ -463,10 +449,11 @@ isStrictDmd (n :* _) = isStrict n
 isStrUsedDmd :: Demand -> Bool
 isStrUsedDmd (n :* _) = isStrict n && not (isAbs n)
 
-isSeqDmd :: Demand -> Bool
-isSeqDmd (C_11 :* sd) = sd == seqSubDmd
-isSeqDmd (C_1N :* sd) = sd == seqSubDmd -- I wonder if we need this case.
-isSeqDmd _            = False
+-- | Version of 'isStrUsedDmd' that returns the 'SubDemand' if True
+isStrUsedDmd_maybe :: Demand -> Maybe SubDemand
+isStrUsedDmd_maybe (n :* sd)
+  | isStrict n && not (isAbs n) = Just sd
+  | otherwise                   = Nothing
 
 -- | Is the value used at most once?
 isUsedOnceDmd :: Demand -> Bool
@@ -577,15 +564,34 @@ mkWorkerDemand n = C_01 :* go n
   where go 0 = topSubDmd
         go n = Call C_01 $ go (n-1)
 
-addCaseBndrDmd :: SubDemand -- On the case binder
-               -> [Demand]  -- On the components of the constructor
-               -> [Demand]  -- Final demands for the components of the constructor
-addCaseBndrDmd (Poly n) alt_dmds
-  | isAbs n   = alt_dmds
--- See Note [Demand on case-alternative binders]
-addCaseBndrDmd sd       alt_dmds = zipWith plusDmd ds alt_dmds -- fuse ds!
+-- | See Note [Demand on case-alternative binders]
+addCaseBndrDmd :: SubDemand -- ^ On the case binder
+               -> [Demand]  -- ^ On the alt binders
+               -> [Demand]  -- ^ Final demands for the alt binders
+addCaseBndrDmd sd alt_dmds
+  | Poly n <- sd, isAbs n
+  = alt_dmds
+  | otherwise
+  = zipWith plusDmd ds alt_dmds -- fuse ds!
   where
-    Just ds = viewProd (length alt_dmds) sd -- Guaranteed not to be a call
+    ds = expectJust "sd can't be a Call" $ viewProd (length alt_dmds) sd
+
+mkScrutProdDmd :: SubDemand -- ^ On the case binder
+               -> [Demand]  -- ^ On the alt binders
+               -> SubDemand -- ^ Final sub-demand on the scrutinee
+mkScrutProdDmd case_bndr_sd alt_bndr_dmds
+  -- See Note [Scrutinee demands and unboxing]
+  | all is_dead alt_bndr_dmds = case_bndr_sd
+  | otherwise                 = Prod $ addCaseBndrDmd case_bndr_sd alt_bndr_dmds
+  where
+    is_dead (n :* _) = isAbs n
+
+unboxFieldDmds_maybe :: Arity -> SubDemand -> Maybe [Demand]
+unboxFieldDmds_maybe arity sd
+  -- See Note [Scrutinee demands and unboxing]
+  | Poly n  <- sd, isAbs n = Just (replicate arity absDmd)
+  | Prod ds <- sd          = Just ds
+  | otherwise              = Nothing
 
 argsOneShots :: StrictSig -> Arity -> [[OneShotInfo]]
 -- ^ See Note [Computing one-shot info]
@@ -677,8 +683,8 @@ is hurt and we can assume that the nested demand is 'botSubDmd'. That ensures
 that @g@ above actually gets the @SP(U)@ demand on its second pair component,
 rather than the lazy @1P(U)@ if we 'lub'bed with an absent demand.
 
-Demand on case-alternative binders]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Demand on case-alternative binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The demand on a binder in a case alternative comes
   (a) From the demand on the binder itself
   (b) From the demand on the case binder
@@ -706,43 +712,83 @@ consequences play out.
 This is needed even for non-product types, in case the case-binder
 is used but the components of the case alternative are not.
 
-Note [Don't optimise UP(U,U,...) to U]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-These two SubDemands:
-   UP(U,U) (@Prod [topDmd, topDmd]@)   and   U (@topSubDmd@)
-are semantically equivalent, but we do not turn the former into
-the latter, for a regrettable-subtle reason.  Consider
-  f p1@(x,y) = (y,x)
-  g h p2@(_,_) = h p
-We want to unbox @p1@ of @f@, but not @p2@ of @g@, because @g@ only uses
-@p2@ boxed and we'd have to rebox. So we give @p1@ demand UP(U,U) and @p2@
-demand @U@ to inform 'GHC.Core.Opt.WorkWrap.Utils.wantToUnbox', which will
-say "unbox" for @p1@ and "don't unbox" for @p2@.
+Note [Scrutinee demands and unboxing]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Here is the story why we encode boxity information in 'Prod' sub-demands and how
+we exploit it in worker/wrapper. Consider (#16859, #18907):
+```hs
+foo :: Int -> Int -> (Int, Int)
+foo x y = x `seq` (x, y) -- don't unbox x
 
-So the solution is: don't aggressively collapse @Prod [topDmd, topDmd]@ to
-@topSubDmd@; instead leave it as-is. In effect we are using the UseDmd to do a
-little bit of boxity analysis.  Not very nice.
+bar :: Int -> (Int -> Int) -> Int
+bar n f = n `seq` f n    -- similarly, don't unbox n
 
-Note [U should win]
-~~~~~~~~~~~~~~~~~~~
-Both in 'lubSubDmd' and 'plusSubDmd' we want @U `plusSubDmd` UP(..)) to be @U@.
-Why?  Because U carries the implication the whole thing is used, box and all,
-so we don't want to w/w it, cf. Note [Don't optimise UP(U,U,...) to U].
-If we use it both boxed and unboxed, then we are definitely using the box,
-and so we are quite likely to pay a reboxing cost. So we make U win here.
+baz :: Int -> Int -> (Int, Int)
+baz a b = a `seq` (b, b) -- unbox a
+
+buz :: (Int, Int) -> (Int, Int)
+buz p@(x,y) = (y,x)      -- obviously, unbox p
+```
+We should not unbox `x`: Although it is used strictly, we don't look
+into its field, so there is no point in unboxing. In fact, it's harmful
+to unbox `x`, because the returned pair needs `x` boxed, leading to reboxing.
+
+On the other hand, we *should* unbox `a`! It's only seq'd but not used
+further. If we unbox it, the seq ends up in the wrapper and no field
+is passed on to the worker, because it is absent.
+
+We achieve that by enconding *boxity information* in the semantics
+of 'Prod'. That is: `SP(U)` means "Strictly used and the field is
+used too, so unbox", whereas the otherwise semantically equivalent
+'Poly' sub-demand `SU` says "Strictly used and the field *might* be
+used too, just not by this function, so better don't unbox".
+
+Strictness Analysis then has to give `x`, `n` and `a` 'Poly' demands `SU`, `SU`
+and `SA`, respectively, while `p` continues to have 'Prod' demand `SP(U,U)`. The
+crux is in determining the sub-demand to put the scrutinee under when analysing
+Case expressions: 'mkScrutProdDmd' computes that sub-demand, returning a 'Prod'
+only when the case binder demand is a 'Prod' or when any of the field binders
+was used (as is only the case for `p`), which indicates that unboxing might be
+beneficial.
+
+Now, if WW would strictly follow the rule "Poly means don't unbox",
+then it won't unbox `a` either, because it has demand `SA`. But it
+sees that actually none of the fields of `a` are used (this test
+is done via 'unboxFieldDmds_maybe'), so it unboxes `a` either way,
+because then the seq happens in the wrapper and nothing has to be
+passed to the worker.
+
+A corollary is that although `SP(U,U)` and `SU` are semantically equivalent, we
+should *not* collapse the former into the latter willy-nilly, because that
+affects what we can unbox.
+
+Coda: Obviously, this approach to boxity analysis is a huge hack, as we can't
+differentiate "The fields are used" and "The fields are used, but the box is
+also used". We currently interpret the latter (ex: `SP(U)`) as the former.
+If we could discern the two, then in the latter case it might be beneficial to
+pass both the fields and the box to the worker. This hack has caused a few
+hiccups, like #13331, but otherwise served us well.
+
+Note [Poly should win over Prod]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Both in 'lubSubDmd' and 'plusSubDmd' we want ``SU `plusSubDmd` SP(U))`` to be
+`SU`. Why? Because `SU` carries the implication the whole thing is used, box and
+all, so we don't want to w/w it, cf. Note [Scrutinee demands and unboxing].
+If we use it both boxed and unboxed, then we are definitely using the box, and
+so we are quite likely to pay a reboxing cost. So we make SU win here.
 TODO: Investigate why since 2013, we don't.
 
 Example is in the Buffer argument of GHC.IO.Handle.Internals.writeCharBuffer
 
-Baseline: (A) Not making Used win (UProd wins)
-Compare with: (B) making Used win for lub and both
+Baseline: (A) Not making SU win (SP(U) wins)
+Compare with: (B) making SU win for lub and plus
 
             Min          -0.3%     -5.6%    -10.7%    -11.0%    -33.3%
             Max          +0.3%    +45.6%    +11.5%    +11.5%     +6.9%
  Geometric Mean          -0.0%     +0.5%     +0.3%     +0.2%     -0.8%
 
-Baseline: (B) Making Used win for both lub and both
-Compare with: (C) making Used win for plus, but UProd win for lub
+Baseline: (B) Making SU win for both lub and plus
+Compare with: (C) making SU win for plus, but SP(U) win for lub
 
             Min          -0.1%     -0.3%     -7.9%     -8.0%     -6.5%
             Max          +0.1%     +1.0%    +21.0%    +21.0%     +0.5%

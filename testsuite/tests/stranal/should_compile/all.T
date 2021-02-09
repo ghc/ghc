@@ -58,6 +58,10 @@ test('T18122',  [ grep_errmsg(r'wfoo =') ], compile, ['-ddump-simpl'])
 
 # We care about the call demand on $wg
 test('T18903',  [ grep_errmsg(r'Dmd=\S+C\S+') ], compile, ['-ddump-simpl -dsuppress-uniques'])
+# We care about the type of the workers of f and g
+test('T18907',  [ grep_errmsg(r'\$w\w+ ::') ], compile, ['-dppr-cols=1000 -ddump-simpl -dsuppress-idinfo -dsuppress-uniques'])
+# We care about the worker of mkInternalName and foo:
+test('T16859',  [ grep_errmsg(r'\$w\w+ ::') ], compile, ['-dppr-cols=1000 -ddump-simpl -dsuppress-idinfo -dsuppress-uniques -package ghc'])
 # We care about the call demand on $wg1 and $wg2
 test('T18894',  [ grep_errmsg(r'Dmd=\S+C\S+') ], compile, ['-ddump-stranal -dsuppress-uniques'])
 # We care about the Arity 2 on eta, as a result of the annotated Dmd

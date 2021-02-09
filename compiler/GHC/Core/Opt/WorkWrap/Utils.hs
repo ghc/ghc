@@ -548,8 +548,11 @@ mkWWstr dflags fam_envs has_inlineable_prag args
                                   , work_fn1 . work_fn2) }
 
 {-
-Note [Unpacking arguments with product and polymorphic demands]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Historical Note [Unpacking arguments with product and polymorphic demands]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This Note is superseded by Note [Scrutinee demands and unboxing] in
+GHC.Types.Demand. The example below may still be of interest, though.
+
 The argument is unpacked in a case if it has a product type and has a
 strict *and* used demand put on it. I.e., arguments, with demands such
 as the following ones:
@@ -614,23 +617,16 @@ wantToUnbox :: FamInstEnvs -> Bool -> Type -> Demand -> Maybe ([Demand], DataCon
 wantToUnbox fam_envs has_inlineable_prag ty dmd =
   case splitArgType_maybe fam_envs ty of
     Just dcpc@DataConPatContext{ dcpc_dc = dc }
-      | isStrUsedDmd dmd
+      | Just sd <- isStrUsedDmd_maybe dmd
       , let arity = dataConRepArity dc
-      -- See Note [Unpacking arguments with product and polymorphic demands]
-      , Just cs <- split_prod_dmd_arity dmd arity
+      -- See Note [Scrutinee demands and unboxing] in GHC.Types.Demand
+      , Just cs <- unboxFieldDmds_maybe arity sd
       -- See Note [Do not unpack class dictionaries]
       , not (has_inlineable_prag && isClassPred ty)
       -- See Note [mkWWstr and unsafeCoerce]
       , cs `lengthIs` arity
       -> Just (cs, dcpc)
     _ -> Nothing
-  where
-    split_prod_dmd_arity dmd arity
-      -- For seqDmd, it should behave like <S(AAAA)>, for some
-      -- suitable arity
-      | isSeqDmd dmd        = Just (replicate arity absDmd)
-      | _ :* Prod ds <- dmd = Just ds
-      | otherwise           = Nothing
 
 unbox_one :: DynFlags -> FamInstEnvs -> Var
           -> [Demand]

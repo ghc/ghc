@@ -1,0 +1,88 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core = {terms: 114, types: 118, coercions: 0, joins: 0/0}
+
+-- RHS size: {terms: 8, types: 8, coercions: 0, joins: 0/0}
+T18907.$wg :: Int -> Int -> (# Int, Int #)
+T18907.$wg = \ (ww :: Int) (ww1 :: Int) -> case ww of p { GHC.Types.I# ipv -> (# p, ww1 #) }
+
+-- RHS size: {terms: 12, types: 17, coercions: 0, joins: 0/0}
+g :: (Int, Int) -> (Int, Int)
+g = \ (w :: (Int, Int)) -> case w of { (ww1, ww2) -> case T18907.$wg ww1 ww2 of { (# ww4, ww5 #) -> (ww4, ww5) } }
+
+-- RHS size: {terms: 8, types: 5, coercions: 0, joins: 0/0}
+seq' :: forall {a} {b}. a -> b -> b
+seq' = \ (@a) (@b) (a1 :: a) (b1 :: b) -> case a1 of { __DEFAULT -> b1 }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T18907.$trModule4 :: GHC.Prim.Addr#
+T18907.$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T18907.$trModule3 :: GHC.Types.TrName
+T18907.$trModule3 = GHC.Types.TrNameS T18907.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T18907.$trModule2 :: GHC.Prim.Addr#
+T18907.$trModule2 = "T18907"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T18907.$trModule1 :: GHC.Types.TrName
+T18907.$trModule1 = GHC.Types.TrNameS T18907.$trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T18907.$trModule :: GHC.Types.Module
+T18907.$trModule = GHC.Types.Module T18907.$trModule3 T18907.$trModule1
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+lvl :: Int
+lvl = GHC.Types.I# 1#
+
+-- RHS size: {terms: 4, types: 3, coercions: 0, joins: 0/0}
+T18907.$wh :: Int -> Int
+T18907.$wh = \ (w :: Int) -> seq' @Int @Int lvl w
+
+-- RHS size: {terms: 7, types: 4, coercions: 0, joins: 0/0}
+h :: Int -> Int -> Int
+h = \ (w :: Int) (w1 :: Int) -> case w of { GHC.Types.I# ww1 -> T18907.$wh w1 }
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+lvl1 :: Int
+lvl1 = GHC.Types.I# 0#
+
+Rec {
+-- RHS size: {terms: 16, types: 3, coercions: 0, joins: 0/0}
+$wgo3 :: GHC.Prim.Int# -> GHC.Prim.Int# -> GHC.Prim.Int#
+$wgo3
+  = \ (w :: GHC.Prim.Int#) (ww :: GHC.Prim.Int#) ->
+      case w of wild {
+        __DEFAULT -> $wgo3 (GHC.Prim.+# wild 1#) (GHC.Prim.+# ww wild);
+        24# -> GHC.Prim.+# ww 24#
+      }
+end Rec }
+
+-- RHS size: {terms: 8, types: 1, coercions: 0, joins: 0/0}
+lvl2 :: Bool
+lvl2
+  = case $wgo3 0# 0# of {
+      __DEFAULT -> GHC.Types.False;
+      1# -> GHC.Types.True
+    }
+
+-- RHS size: {terms: 14, types: 17, coercions: 0, joins: 0/0}
+T18907.$wf :: (Int, Int) -> (# Int, Int #)
+T18907.$wf
+  = \ (w :: (Int, Int)) ->
+      case w of { (ds, ds1) ->
+      case lvl2 of {
+        False -> (# lvl1, lvl1 #);
+        True -> (# ds, ds1 #)
+      }
+      }
+
+-- RHS size: {terms: 8, types: 12, coercions: 0, joins: 0/0}
+f :: (Int, Int) -> (Int, Int)
+f = \ (w :: (Int, Int)) -> case T18907.$wf w of { (# ww1, ww2 #) -> (ww1, ww2) }
+
+
+

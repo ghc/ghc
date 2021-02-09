@@ -1,0 +1,182 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core = {terms: 278, types: 249, coercions: 4, joins: 0/0}
+
+-- RHS size: {terms: 18, types: 8, coercions: 1, joins: 0/0}
+T16859.$WName :: NameSort %1 -> OccName %1 -> Unique %1 -> SrcSpan %1 -> Name
+T16859.$WName = \ (dt :: NameSort) (dt :: OccName) (dt :: Unique) (dt :: SrcSpan) -> case dt of dt { __DEFAULT -> case dt `cast` (GHC.Types.Unique.N:Unique[0] :: Unique ~R# Int) of { GHC.Types.I# dt -> case dt of dt { __DEFAULT -> T16859.Name dt dt dt dt } } }
+
+-- RHS size: {terms: 5, types: 6, coercions: 0, joins: 0/0}
+n_loc :: Name -> SrcSpan
+n_loc = \ (ds :: Name) -> case ds of { Name ds1 ds2 dt ds3 -> ds3 }
+
+-- RHS size: {terms: 6, types: 6, coercions: 2, joins: 0/0}
+n_uniq :: Name -> Unique
+n_uniq = \ (ds :: Name) -> case ds of { Name ds1 ds2 dt ds3 -> (GHC.Types.I# dt) `cast` (Sym (GHC.Types.Unique.N:Unique[0]) :: Int ~R# Unique) }
+
+-- RHS size: {terms: 5, types: 6, coercions: 0, joins: 0/0}
+n_occ :: Name -> OccName
+n_occ = \ (ds :: Name) -> case ds of { Name ds1 ds2 dt ds3 -> ds2 }
+
+-- RHS size: {terms: 5, types: 6, coercions: 0, joins: 0/0}
+n_sort :: Name -> NameSort
+n_sort = \ (ds :: Name) -> case ds of { Name ds1 ds2 dt ds3 -> ds1 }
+
+-- RHS size: {terms: 14, types: 15, coercions: 0, joins: 0/0}
+T16859.$wmkInternalName :: GHC.Prim.Int# -> OccName -> SrcSpan -> (# NameSort, OccName, GHC.Prim.Int#, SrcSpan #)
+T16859.$wmkInternalName = \ (ww :: GHC.Prim.Int#) (w :: OccName) (w1 :: SrcSpan) -> case w of dt { GHC.Types.Name.Occurrence.OccName ipv ipv1 -> case w1 of dt1 { __DEFAULT -> (# T16859.Internal, dt, ww, dt1 #) } }
+
+-- RHS size: {terms: 17, types: 18, coercions: 1, joins: 0/0}
+mkInternalName :: Unique -> OccName -> SrcSpan -> Name
+mkInternalName = \ (w :: Unique) (w1 :: OccName) (w2 :: SrcSpan) -> case w `cast` (GHC.Types.Unique.N:Unique[0] :: Unique ~R# Int) of { GHC.Types.I# ww1 -> case T16859.$wmkInternalName ww1 w1 w2 of { (# ww3, ww4, ww5, ww6 #) -> T16859.Name ww3 ww4 ww5 ww6 } }
+
+-- RHS size: {terms: 8, types: 8, coercions: 0, joins: 0/0}
+T16859.$wfoo :: Int -> Int -> (# Int, Int #)
+T16859.$wfoo = \ (w :: Int) (w1 :: Int) -> case w of x { GHC.Types.I# ipv -> (# x, w1 #) }
+
+-- RHS size: {terms: 10, types: 11, coercions: 0, joins: 0/0}
+foo :: Int -> Int -> (Int, Int)
+foo = \ (w :: Int) (w1 :: Int) -> case T16859.$wfoo w w1 of { (# ww1, ww2 #) -> (ww1, ww2) }
+
+-- RHS size: {terms: 4, types: 5, coercions: 0, joins: 0/0}
+T16859.$wbar :: Int -> (# Int, Int #)
+T16859.$wbar = \ (w :: Int) -> (# w, w #)
+
+-- RHS size: {terms: 12, types: 13, coercions: 0, joins: 0/0}
+bar :: Int -> Int -> (Int, Int)
+bar = \ (w :: Int) (w1 :: Int) -> case w of { GHC.Types.I# ww1 -> case T16859.$wbar w1 of { (# ww3, ww4 #) -> (ww3, ww4) } }
+
+-- RHS size: {terms: 5, types: 6, coercions: 0, joins: 0/0}
+T16859.$wbuz :: Int -> Int -> (# Int, Int #)
+T16859.$wbuz = \ (ww :: Int) (ww1 :: Int) -> (# ww1, ww #)
+
+-- RHS size: {terms: 12, types: 17, coercions: 0, joins: 0/0}
+buz :: (Int, Int) -> (Int, Int)
+buz = \ (w :: (Int, Int)) -> case w of { (ww1, ww2) -> case T16859.$wbuz ww1 ww2 of { (# ww4, ww5 #) -> (ww4, ww5) } }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T16859.$trModule4 :: GHC.Prim.Addr#
+T16859.$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T16859.$trModule3 :: GHC.Types.TrName
+T16859.$trModule3 = GHC.Types.TrNameS T16859.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T16859.$trModule2 :: GHC.Prim.Addr#
+T16859.$trModule2 = "T16859"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T16859.$trModule1 :: GHC.Types.TrName
+T16859.$trModule1 = GHC.Types.TrNameS T16859.$trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T16859.$trModule :: GHC.Types.Module
+T16859.$trModule = GHC.Types.Module T16859.$trModule3 T16859.$trModule1
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+$krep :: GHC.Types.KindRep
+$krep = GHC.Types.KindRepTyConApp GHC.Types.SrcLoc.$tcSrcSpan (GHC.Types.[] @GHC.Types.KindRep)
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+$krep1 :: GHC.Types.KindRep
+$krep1 = GHC.Types.KindRepTyConApp GHC.Types.Unique.$tcUnique (GHC.Types.[] @GHC.Types.KindRep)
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+$krep2 :: GHC.Types.KindRep
+$krep2 = GHC.Types.KindRepTyConApp GHC.Types.Name.Occurrence.$tcOccName (GHC.Types.[] @GHC.Types.KindRep)
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T16859.$tcNameSort2 :: GHC.Prim.Addr#
+T16859.$tcNameSort2 = "NameSort"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T16859.$tcNameSort1 :: GHC.Types.TrName
+T16859.$tcNameSort1 = GHC.Types.TrNameS T16859.$tcNameSort2
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+T16859.$tcNameSort :: GHC.Types.TyCon
+T16859.$tcNameSort = GHC.Types.TyCon 12401893980286669143## 13108152160491614238## T16859.$trModule T16859.$tcNameSort1 0# GHC.Types.krep$*
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+T16859.$tc'External1 :: GHC.Types.KindRep
+T16859.$tc'External1 = GHC.Types.KindRepTyConApp T16859.$tcNameSort (GHC.Types.[] @GHC.Types.KindRep)
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T16859.$tc'Internal2 :: GHC.Prim.Addr#
+T16859.$tc'Internal2 = "'Internal"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T16859.$tc'Internal1 :: GHC.Types.TrName
+T16859.$tc'Internal1 = GHC.Types.TrNameS T16859.$tc'Internal2
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+T16859.$tc'Internal :: GHC.Types.TyCon
+T16859.$tc'Internal = GHC.Types.TyCon 11363474980591478045## 16143980624492238634## T16859.$trModule T16859.$tc'Internal1 0# T16859.$tc'External1
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T16859.$tc'External3 :: GHC.Prim.Addr#
+T16859.$tc'External3 = "'External"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T16859.$tc'External2 :: GHC.Types.TrName
+T16859.$tc'External2 = GHC.Types.TrNameS T16859.$tc'External3
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+T16859.$tc'External :: GHC.Types.TyCon
+T16859.$tc'External = GHC.Types.TyCon 15854086861732328093## 8015185116764953966## T16859.$trModule T16859.$tc'External2 0# T16859.$tc'External1
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T16859.$tcName2 :: GHC.Prim.Addr#
+T16859.$tcName2 = "Name"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T16859.$tcName1 :: GHC.Types.TrName
+T16859.$tcName1 = GHC.Types.TrNameS T16859.$tcName2
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+T16859.$tcName :: GHC.Types.TyCon
+T16859.$tcName = GHC.Types.TyCon 16573135907244213379## 926532026695774645## T16859.$trModule T16859.$tcName1 0# GHC.Types.krep$*
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+$krep3 :: GHC.Types.KindRep
+$krep3 = GHC.Types.KindRepTyConApp T16859.$tcName (GHC.Types.[] @GHC.Types.KindRep)
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep4 :: GHC.Types.KindRep
+$krep4 = GHC.Types.KindRepFun $krep $krep3
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep5 :: GHC.Types.KindRep
+$krep5 = GHC.Types.KindRepFun $krep1 $krep4
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep6 :: GHC.Types.KindRep
+$krep6 = GHC.Types.KindRepFun $krep2 $krep5
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T16859.$tc'Name1 :: GHC.Types.KindRep
+T16859.$tc'Name1 = GHC.Types.KindRepFun T16859.$tc'External1 $krep6
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T16859.$tc'Name3 :: GHC.Prim.Addr#
+T16859.$tc'Name3 = "'Name"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T16859.$tc'Name2 :: GHC.Types.TrName
+T16859.$tc'Name2 = GHC.Types.TrNameS T16859.$tc'Name3
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+T16859.$tc'Name :: GHC.Types.TyCon
+T16859.$tc'Name = GHC.Types.TyCon 16701807050114729930## 17238414091700286055## T16859.$trModule T16859.$tc'Name2 0# T16859.$tc'Name1
+
+-- RHS size: {terms: 13, types: 8, coercions: 0, joins: 0/0}
+T16859.$wbaz :: Int -> GHC.Prim.Int# -> (Int -> Int) -> GHC.Prim.Int#
+T16859.$wbaz = \ (w :: Int) (ww :: GHC.Prim.Int#) (w1 :: Int -> Int) -> case w of x { GHC.Types.I# ipv -> case w1 x of { GHC.Types.I# x1 -> GHC.Prim.+# x1 ww } }
+
+-- RHS size: {terms: 14, types: 7, coercions: 0, joins: 0/0}
+baz :: Int -> Int -> (Int -> Int) -> Int
+baz = \ (w :: Int) (w1 :: Int) (w2 :: Int -> Int) -> case w1 of { GHC.Types.I# ww1 -> case T16859.$wbaz w ww1 w2 of ww2 { __DEFAULT -> GHC.Types.I# ww2 } }
+
+
+

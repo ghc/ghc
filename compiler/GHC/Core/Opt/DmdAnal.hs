@@ -20,7 +20,7 @@ where
 import GHC.Prelude
 
 import GHC.Core.Opt.WorkWrap.Utils
-import GHC.Types.Demand   -- All of it
+import GHC.Types.Demand
 import GHC.Core
 import GHC.Core.Multiplicity ( scaledThing )
 import GHC.Utils.Outputable
@@ -430,7 +430,7 @@ dmdAnal' env dmd (Case scrut case_bndr ty [Alt alt bndrs rhs])
   | is_single_data_alt alt
   = let
         (rhs_ty, rhs')           = dmdAnal env dmd rhs
-        (alt_ty1, dmds)          = findBndrsDmds env rhs_ty bndrs
+        (alt_ty1, alt_bndr_dmds)          = findBndrsDmds env rhs_ty bndrs
         (alt_ty2, case_bndr_dmd) = findBndrDmd env False alt_ty1 case_bndr
         -- Evaluation cardinality on the case binder is irrelevant and a no-op.
         -- What matters is its nested sub-demand!
@@ -438,9 +438,10 @@ dmdAnal' env dmd (Case scrut case_bndr ty [Alt alt bndrs rhs])
         -- Compute demand on the scrutinee
         (bndrs', scrut_sd)
           | DataAlt _ <- alt
-          , id_dmds <- addCaseBndrDmd case_bndr_sd dmds
-          -- See Note [Demand on scrutinee of a product case]
-          = (setBndrsDemandInfo bndrs id_dmds, mkProd id_dmds)
+          -- See Note [Demand on case-alternative binders] in GHC.Types.Demand
+          , alt_bndr_dmds' <- addCaseBndrDmd case_bndr_sd alt_bndr_dmds
+          -- See Note [Scrutinee demands and unboxing] in GHC.Types.Demand
+          = (setBndrsDemandInfo bndrs alt_bndr_dmds', mkScrutProdDmd case_bndr_sd alt_bndr_dmds)
           | otherwise
           -- __DEFAULT and literal alts. Simply add demands and discard the
           -- evaluation cardinality, as we evaluate the scrutinee exactly once.
@@ -540,7 +541,7 @@ dmdAnalSumAlt env dmd case_bndr (Alt con bndrs rhs)
   | (rhs_ty, rhs') <- dmdAnal env dmd rhs
   , (alt_ty, dmds) <- findBndrsDmds env rhs_ty bndrs
   , let (_ :* case_bndr_sd) = findIdDemand alt_ty case_bndr
-        -- See Note [Demand on scrutinee of a product case]
+        -- See Note [Demand on case-alternative binders] in GHC.Types.Demand
         id_dmds             = addCaseBndrDmd case_bndr_sd dmds
   = (alt_ty, Alt con (setBndrsDemandInfo bndrs id_dmds) rhs')
 
@@ -640,19 +641,6 @@ In !3014 we tried a more sophisticated analysis by introducing ConOrDiv (nic)
 to the Divergence lattice, but in practice it turned out to be hard to untaint
 from 'topDiv' to 'conDiv', leading to bugs, performance regressions and
 complexity that didn't justify the single fixed testcase T13380c.
-
-Note [Demand on the scrutinee of a product case]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When figuring out the demand on the scrutinee of a product case,
-we use the demands of the case alternative, i.e. id_dmds.
-But note that these include the demand on the case binder;
-see Note [Demand on case-alternative binders] in GHC.Types.Demand.
-This is crucial. Example:
-   f x = case x of y { (a,b) -> k y a }
-If we just take scrut_demand = U(L,A), then we won't pass x to the
-worker, so the worker will rebuild
-     x = (a, absent-error)
-and that'll crash.
 
 Note [Aggregated demand for cardinality]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
