@@ -347,7 +347,7 @@ importSuggestions where_look global_env hpt currMod imports rdr_name
   (helpful_imports_hiding, helpful_imports_non_hiding)
     = partition (imv_is_hiding . snd) helpful_imports
 
-  -- See note [When to show/hide the module-not-imported line]
+  -- See Note [When to show/hide the module-not-imported line]
   show_not_imported_line :: ModuleName -> Bool                    -- #15611
   show_not_imported_line modnam
       | modnam `elem` globMods                = False    -- #14225     -- 1
@@ -363,6 +363,26 @@ importSuggestions where_look global_env hpt currMod imports rdr_name
                      , isGreOk where_look gre
                      , (mod, _) <- qualsInScope gre
                      ]
+
+{- Note [When to show/hide the module-not-imported line]           -- #15611
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For the error message:
+    Not in scope X.Y
+    Module X does not export Y
+    No module named ‘X’ is imported:
+there are 2 cases, where we hide the last "no module is imported" line:
+1. If the module X has been imported.
+2. If the module X is the current module. There are 2 subcases:
+   2.1 If the unknown module name is in a input source file,
+       then we can use the getModule function to get the current module name.
+       (See test T15611a)
+   2.2 If the unknown module name has been entered by the user in GHCi,
+       then the getModule function returns something like "interactive:Ghci1",
+       and we have to check the current module in the last added entry of
+       the HomePackageTable. (See test T15611b)
+-}
+
 
 extensionSuggestions :: RdrName -> SDoc
 extensionSuggestions rdrName

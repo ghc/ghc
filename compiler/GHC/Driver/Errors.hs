@@ -58,6 +58,6 @@ handleFlagWarnings logger dflags warns = do
 printOrThrowDiagnostics :: Logger -> DynFlags -> Bag WarnMsg -> IO ()
 printOrThrowDiagnostics logger dflags warns
   | any ((==) SevError . errMsgSeverity) warns
-  = throwIO (mkSrcErr warns)
+  = throwIO (mkSrcErr . mkMessages $ warns)
   | otherwise
   = printBagOfErrors logger dflags warns

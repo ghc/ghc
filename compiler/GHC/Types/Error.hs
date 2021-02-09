@@ -11,6 +11,7 @@ module GHC.Types.Error
    , getMessages
    , emptyMessages
    , isEmptyMessages
+   , singleMessage
    , addMessage
    , unionMessages
    , MsgEnvelope (..)
@@ -28,7 +29,6 @@ module GHC.Types.Error
 
    , SDoc
    , DecoratedSDoc (unDecorated)
-   , Severity (..)
    , mapDecorated
    , pprMessageBag
    , mkDecorated
@@ -92,6 +92,9 @@ mkMessages = Messages
 
 isEmptyMessages :: Messages e -> Bool
 isEmptyMessages (Messages msgs) = isEmptyBag msgs
+
+singleMessage :: MsgEnvelope e -> Messages e
+singleMessage e = addMessage e emptyMessages
 
 {- Note [Discarding Messages]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -304,14 +307,6 @@ instance ToJson MessageClass where
   json MCInfo = JSString "MCInfo"
   json (MCDiagnostic sev reason) =
     JSString $ renderWithContext defaultSDocContext (ppr $ text "MCDiagnostic" <+> ppr sev <+> ppr reason)
-
-instance Show (MsgEnvelope DiagnosticMessage) where
-    show = showMsgEnvelope
-
--- | Shows an 'MsgEnvelope'.
-showMsgEnvelope :: Diagnostic a => MsgEnvelope a -> String
-showMsgEnvelope err =
-  renderWithContext defaultSDocContext (vcat (unDecorated . diagnosticMessage $ errMsgDiagnostic err))
 
 mapDecorated :: (SDoc -> SDoc) -> DecoratedSDoc -> DecoratedSDoc
 mapDecorated f (Decorated xs) = Decorated (map f xs)

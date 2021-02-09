@@ -61,6 +61,7 @@ import GHC.Driver.Backend
 import GHC.Driver.Monad
 import GHC.Driver.Env
 import GHC.Driver.Errors
+import GHC.Driver.Errors.Types ( GhcMessage, ghcUnknownMessage )
 import GHC.Driver.Main
 
 import GHC.Parser.Header
@@ -70,7 +71,7 @@ import GHC.Iface.Load      ( cannotFindModule )
 import GHC.IfaceToCore     ( typecheckIface )
 import GHC.Iface.Recomp    ( RecompileRequired ( MustCompile ) )
 
-import GHC.Data.Bag        ( unitBag, listToBag, unionManyBags, isEmptyBag )
+import GHC.Data.Bag        ( listToBag )
 import GHC.Data.Graph.Directed
 import GHC.Data.FastString
 import GHC.Data.Maybe      ( expectJust )
@@ -164,7 +165,7 @@ depanal :: GhcMonad m =>
         -> m ModuleGraph
 depanal excluded_mods allow_dup_roots = do
     (errs, mod_graph) <- depanalE excluded_mods allow_dup_roots
-    if isEmptyBag errs
+    if isEmptyMessages errs
       then pure mod_graph
       else throwErrors errs
 
@@ -173,11 +174,11 @@ depanal excluded_mods allow_dup_roots = do
 depanalE :: GhcMonad m =>     -- New for #17459
             [ModuleName]      -- ^ excluded modules
             -> Bool           -- ^ allow duplicate roots
-            -> m (ErrorMessages, ModuleGraph)
+            -> m (Messages GhcMessage, ModuleGraph)
 depanalE excluded_mods allow_dup_roots = do
     hsc_env <- getSession
     (errs, mod_graph) <- depanalPartial excluded_mods allow_dup_roots
-    if isEmptyBag errs
+    if isEmptyMessages errs
       then do
         warnMissingHomeModules hsc_env mod_graph
         setSession hsc_env { hsc_mod_graph = mod_graph }
@@ -202,7 +203,7 @@ depanalPartial
     :: GhcMonad m
     => [ModuleName]  -- ^ excluded modules
     -> Bool          -- ^ allow duplicate roots
-    -> m (ErrorMessages, ModuleGraph)
+    -> m (Messages GhcMessage, ModuleGraph)
     -- ^ possibly empty 'Bag' of errors and a module graph.
 depanalPartial excluded_mods allow_dup_roots = do
   hsc_env <- getSession
@@ -230,7 +231,7 @@ depanalPartial excluded_mods allow_dup_roots = do
       (errs, mod_summaries) = partitionEithers mod_summariesE
       mod_graph = mkModuleGraph' $
         fmap ModuleNode mod_summaries ++ instantiationNodes (hsc_units hsc_env)
-    return (unionManyBags errs, mod_graph)
+    return (foldl' unionMessages emptyMessages errs, mod_graph)
 
 -- | Collect the instantiations of dependencies to create 'InstantiationNode' work graph nodes.
 -- These are used to represent the type checking that is done after
@@ -351,7 +352,7 @@ load how_much = do
     (errs, mod_graph) <- depanalE [] False                        -- #17459
     success <- load' how_much (Just batchMsg) mod_graph
     warnUnusedPackages
-    if isEmptyBag errs
+    if isEmptyMessages errs
       then pure success
       else throwErrors errs
 
@@ -1418,7 +1419,7 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_logger lcl_tmpfs lcl_dflags
         hsc_env <- readMVar hsc_env_var
         old_hpt <- readIORef old_hpt_var
 
-        let logg err = printBagOfErrors lcl_logger lcl_dflags (srcErrorMessages err)
+        let logg err = printBagOfErrors lcl_logger lcl_dflags (getMessages $ srcErrorMessages err)
 
         -- Limit the number of parallel compiles.
         let withSem sem = MC.bracket_ (waitQSem sem) (signalQSem sem)
@@ -2249,7 +2250,7 @@ downsweep :: HscEnv
           -> Bool               -- True <=> allow multiple targets to have
                                 --          the same module name; this is
                                 --          very useful for ghc -M
-          -> IO [Either ErrorMessages ExtendedModSummary]
+          -> IO [Either (Messages GhcMessage) ExtendedModSummary]
                 -- The non-error elements of the returned list all have distinct
                 -- (Modules, IsBoot) identifiers, unless the Bool is true in
                 -- which case there can be repeats
@@ -2285,7 +2286,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
         old_summary_map :: ModNodeMap ExtendedModSummary
         old_summary_map = mkNodeMap old_summaries
 
-        getRootSummary :: Target -> IO (Either ErrorMessages ExtendedModSummary)
+        getRootSummary :: Target -> IO (Either (Messages GhcMessage) ExtendedModSummary)
         getRootSummary Target { targetId = TargetFile file mb_phase
                               , targetAllowObjCode = obj_allowed
                               , targetContents = maybe_buf
@@ -2294,7 +2295,8 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
                 if exists || isJust maybe_buf
                     then summariseFile hsc_env old_summaries file mb_phase
                                        obj_allowed maybe_buf
-                    else return $ Left $ unitBag $ mkPlainErrorMsgEnvelope noSrcSpan $
+                    else return $ Left $ singleMessage $
+                           fmap ghcUnknownMessage $ mkPlainErrorMsgEnvelope noSrcSpan $
                            text "can't find file:" <+> text file
         getRootSummary Target { targetId = TargetModule modl
                               , targetAllowObjCode = obj_allowed
@@ -2304,7 +2306,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
                                            (L rootLoc modl) obj_allowed
                                            maybe_buf excl_mods
                 case maybe_summary of
-                   Nothing -> return $ Left $ moduleNotFoundErr modl
+                   Nothing -> return $ Left (singleMessage $ moduleNotFoundErr modl)
                    Just s  -> return s
 
         rootLoc = mkGeneralSrcSpan (fsLit "<command line>")
@@ -2315,7 +2317,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
         -- ignored, leading to confusing behaviour).
         checkDuplicates
           :: ModNodeMap
-               [Either ErrorMessages
+               [Either (Messages GhcMessage)
                        ExtendedModSummary]
           -> IO ()
         checkDuplicates root_map
@@ -2328,11 +2330,11 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
 
         loop :: [GenWithIsBoot (Located ModuleName)]
                         -- Work list: process these modules
-             -> ModNodeMap [Either ErrorMessages ExtendedModSummary]
+             -> ModNodeMap [Either (Messages GhcMessage) ExtendedModSummary]
                         -- Visited set; the range is a list because
                         -- the roots can have the same module names
                         -- if allow_dup_roots is True
-             -> IO (ModNodeMap [Either ErrorMessages ExtendedModSummary])
+             -> IO (ModNodeMap [Either (Messages GhcMessage) ExtendedModSummary])
                         -- The result is the completed NodeMap
         loop [] done = return done
         loop (s : ss) done
@@ -2372,8 +2374,8 @@ enableCodeGenForTH
   -> TmpFs
   -> HomeUnit
   -> Backend
-  -> ModNodeMap [Either ErrorMessages ExtendedModSummary]
-  -> IO (ModNodeMap [Either ErrorMessages ExtendedModSummary])
+  -> ModNodeMap [Either (Messages GhcMessage) ExtendedModSummary]
+  -> IO (ModNodeMap [Either (Messages GhcMessage) ExtendedModSummary])
 enableCodeGenForTH logger tmpfs home_unit =
   enableCodeGenWhen logger tmpfs condition should_modify TFL_CurrentModule TFL_GhcSession
   where
@@ -2398,8 +2400,8 @@ enableCodeGenWhen
   -> TempFileLifetime
   -> TempFileLifetime
   -> Backend
-  -> ModNodeMap [Either ErrorMessages ExtendedModSummary]
-  -> IO (ModNodeMap [Either ErrorMessages ExtendedModSummary])
+  -> ModNodeMap [Either (Messages GhcMessage) ExtendedModSummary]
+  -> IO (ModNodeMap [Either (Messages GhcMessage) ExtendedModSummary])
 enableCodeGenWhen logger tmpfs condition should_modify staticLife dynLife bcknd nodemap =
   traverse (traverse (traverse enable_code_gen)) nodemap
   where
@@ -2468,7 +2470,7 @@ enableCodeGenWhen logger tmpfs condition should_modify staticLife dynLife bcknd 
 
 mkRootMap
   :: [ExtendedModSummary]
-  -> ModNodeMap [Either ErrorMessages ExtendedModSummary]
+  -> ModNodeMap [Either (Messages GhcMessage) ExtendedModSummary]
 mkRootMap summaries = ModNodeMap $ Map.insertListWith
   (flip (++))
   [ (msKey $ emsModSummary s, [Right s]) | s <- summaries ]
@@ -2513,7 +2515,7 @@ summariseFile
         -> Maybe Phase                  -- start phase
         -> Bool                         -- object code allowed?
         -> Maybe (StringBuffer,UTCTime)
-        -> IO (Either ErrorMessages ExtendedModSummary)
+        -> IO (Either (Messages GhcMessage) ExtendedModSummary)
 
 summariseFile hsc_env old_summaries src_fn mb_phase obj_allowed maybe_buf
         -- we can use a cached summary if one is available and the
@@ -2641,7 +2643,7 @@ summariseModule
           -> Bool               -- object code allowed?
           -> Maybe (StringBuffer, UTCTime)
           -> [ModuleName]               -- Modules to exclude
-          -> IO (Maybe (Either ErrorMessages ExtendedModSummary))      -- Its new summary
+          -> IO (Maybe (Either (Messages GhcMessage) ExtendedModSummary))      -- Its new summary
 
 summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
                 obj_allowed maybe_buf excl_mods
@@ -2708,7 +2710,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
                 -- It might have been deleted since the Finder last found it
         maybe_t <- modificationTimeIfExists src_fn
         case maybe_t of
-          Nothing -> return $ Left $ noHsFileErr loc src_fn
+          Nothing -> return $ Left $ singleMessage $ noHsFileErr loc src_fn
           Just t  -> new_summary location' mod src_fn t
 
     new_summary location mod src_fn src_timestamp
@@ -2729,10 +2731,11 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
               | otherwise = HsSrcFile
 
         when (pi_mod_name /= wanted_mod) $
-                throwE $ unitBag $ mkPlainErrorMsgEnvelope pi_mod_name_loc $
-                              text "File name does not match module name:"
-                              $$ text "Saw:" <+> quotes (ppr pi_mod_name)
-                              $$ text "Expected:" <+> quotes (ppr wanted_mod)
+                throwE $ singleMessage . fmap ghcUnknownMessage $
+                  mkPlainErrorMsgEnvelope pi_mod_name_loc $
+                    text "File name does not match module name:"
+                    $$ text "Saw:" <+> quotes (ppr pi_mod_name)
+                    $$ text "Expected:" <+> quotes (ppr wanted_mod)
 
         when (hsc_src == HsigFile && isNothing (lookup pi_mod_name (homeUnitInstantiations home_unit))) $
             let suggested_instantiated_with =
@@ -2741,16 +2744,17 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
                         | (k,v) <- ((pi_mod_name, mkHoleModule pi_mod_name)
                                 : homeUnitInstantiations home_unit)
                         ])
-            in throwE $ unitBag $ mkPlainErrorMsgEnvelope pi_mod_name_loc $
-                text "Unexpected signature:" <+> quotes (ppr pi_mod_name)
-                $$ if gopt Opt_BuildingCabalPackage dflags
-                    then parens (text "Try adding" <+> quotes (ppr pi_mod_name)
-                            <+> text "to the"
-                            <+> quotes (text "signatures")
-                            <+> text "field in your Cabal file.")
-                    else parens (text "Try passing -instantiated-with=\"" <>
-                                 suggested_instantiated_with <> text "\"" $$
-                                text "replacing <" <> ppr pi_mod_name <> text "> as necessary.")
+            in throwE $ singleMessage . fmap ghcUnknownMessage $
+                mkPlainErrorMsgEnvelope pi_mod_name_loc $
+                  text "Unexpected signature:" <+> quotes (ppr pi_mod_name)
+                  $$ if gopt Opt_BuildingCabalPackage dflags
+                      then parens (text "Try adding" <+> quotes (ppr pi_mod_name)
+                              <+> text "to the"
+                              <+> quotes (text "signatures")
+                              <+> text "field in your Cabal file.")
+                      else parens (text "Try passing -instantiated-with=\"" <>
+                                   suggested_instantiated_with <> text "\"" $$
+                                  text "replacing <" <> ppr pi_mod_name <> text "> as necessary.")
 
         liftIO $ makeNewModSummary hsc_env $ MakeNewModSummary
             { nms_src_fn = src_fn
@@ -2844,7 +2848,7 @@ getPreprocessedImports
     -> Maybe Phase
     -> Maybe (StringBuffer, UTCTime)
     -- ^ optional source code buffer and modification time
-    -> ExceptT ErrorMessages IO PreprocessedImports
+    -> ExceptT (Messages GhcMessage) IO PreprocessedImports
 getPreprocessedImports hsc_env src_fn mb_phase maybe_buf = do
   (pi_local_dflags, pi_hspp_fn)
       <- ExceptT $ preprocess hsc_env src_fn (fst <$> maybe_buf) mb_phase
@@ -2854,7 +2858,7 @@ getPreprocessedImports hsc_env src_fn mb_phase maybe_buf = do
           let imp_prelude = xopt LangExt.ImplicitPrelude pi_local_dflags
               popts = initParserOpts pi_local_dflags
           mimps <- getImports popts imp_prelude pi_hspp_buf pi_hspp_fn src_fn
-          return (first (fmap mkParserErr) mimps)
+          return (first (mkMessages . fmap (fmap ghcUnknownMessage . mkParserErr)) mimps)
   return PreprocessedImports {..}
 
 
@@ -2898,24 +2902,24 @@ withDeferredDiagnostics f = do
       (\_ -> popLogHookM >> printDeferredDiagnostics)
       (\_ -> f)
 
-noModError :: HscEnv -> SrcSpan -> ModuleName -> FindResult -> MsgEnvelope DiagnosticMessage
+noModError :: HscEnv -> SrcSpan -> ModuleName -> FindResult -> MsgEnvelope GhcMessage
 -- ToDo: we don't have a proper line number for this error
 noModError hsc_env loc wanted_mod err
-  = mkPlainErrorMsgEnvelope loc $ cannotFindModule hsc_env wanted_mod err
+  = fmap ghcUnknownMessage $ mkPlainErrorMsgEnvelope loc $ cannotFindModule hsc_env wanted_mod err
 
-noHsFileErr :: SrcSpan -> String -> ErrorMessages
+noHsFileErr :: SrcSpan -> String -> MsgEnvelope GhcMessage
 noHsFileErr loc path
-  = unitBag $ mkPlainErrorMsgEnvelope loc $ text "Can't find" <+> text path
+  = fmap ghcUnknownMessage $ mkPlainErrorMsgEnvelope loc $ text "Can't find" <+> text path
 
-moduleNotFoundErr :: ModuleName -> ErrorMessages
+moduleNotFoundErr :: ModuleName -> MsgEnvelope GhcMessage
 moduleNotFoundErr mod
-  = unitBag $ mkPlainErrorMsgEnvelope noSrcSpan $
+  = fmap ghcUnknownMessage $ mkPlainErrorMsgEnvelope noSrcSpan $
         text "module" <+> quotes (ppr mod) <+> text "cannot be found locally"
 
 multiRootsErr :: [ModSummary] -> IO ()
 multiRootsErr [] = panic "multiRootsErr"
 multiRootsErr summs@(summ1:_)
-  = throwOneError $ mkPlainErrorMsgEnvelope noSrcSpan $
+  = throwOneError . fmap ghcUnknownMessage $ mkPlainErrorMsgEnvelope noSrcSpan $
         text "module" <+> quotes (ppr mod) <+>
         text "is defined in multiple files:" <+>
         sep (map text files)

@@ -1,5 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# OPTIONS_GHC -Wno-orphans #-} -- Diagnostic for DriverMessage and GhcMessage
 
 module GHC.Driver.Errors.Ppr where
 
@@ -11,37 +11,49 @@ import GHC.Types.Basic
 import GHC.Types.Error
 import GHC.Types.Name ( nameSrcSpan, getName )
 import GHC.Driver.Errors.Types
-import GHC.Iface.Load  ( cannotFindModule )
+-- import GHC.Iface.Load  ( cannotFindModule )
 import GHC.Unit.State
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 
-import GHC.Parser.Errors.Ppr ()
+import GHC.Parser.Errors.Ppr ()   -- instance Diagnostic PsMessage
 import GHC.Tc.Errors.Types
-import GHC.Tc.Errors.Ppr ()
-import GHC.HsToCore.Errors.Ppr ()
+import GHC.Tc.Errors.Ppr ()       -- instance Diagnostic TcRnMessage
+import GHC.HsToCore.Errors.Ppr () -- instance Diagnostic DsMessage
 
-instance RenderableDiagnostic GhcMessage where
-  renderDiagnostic = \case
+instance Diagnostic GhcMessage where
+  diagnosticMessage = \case
     GhcPsMessage m
-      -> renderDiagnostic m
+      -> diagnosticMessage m
     GhcTcRnMessage m
-      -> renderDiagnostic m
+      -> diagnosticMessage m
     GhcDsMessage m
-      -> renderDiagnostic m
+      -> diagnosticMessage m
     GhcDriverMessage m
-      -> renderDiagnostic m
+      -> diagnosticMessage m
     GhcUnknownMessage m
-      -> renderDiagnostic m
+      -> diagnosticMessage m
+  diagnosticReason = \case
+    GhcPsMessage m
+      -> diagnosticReason m
+    GhcTcRnMessage m
+      -> diagnosticReason m
+    GhcDsMessage m
+      -> diagnosticReason m
+    GhcDriverMessage m
+      -> diagnosticReason m
+    GhcUnknownMessage m
+      -> diagnosticReason m
 
-instance RenderableDiagnostic DriverMessage where
-  renderDiagnostic = \case
+instance Diagnostic DriverMessage where
+  diagnosticReason _ = ErrorWithoutFlag -- FIXME(adn)
+  diagnosticMessage = \case
 
     DriverUnknownMessage d
       -> d
 
-    DriverCannotFindModule env m res
-      -> mkDecorated [ cannotFindModule env m res ]
+    DriverCannotFindModule _env _m _res
+      -> mkDecorated [ {- cannotFindModule env m res -} ]
 
     DriverNotAnExpression str
       -> mkDecorated [ text "not an expression:" <+> quotes (text str) ]
@@ -71,16 +83,16 @@ instance RenderableDiagnostic DriverMessage where
                      ]
          where
            getReasons :: Messages TcRnMessage -> [SDoc]
-           getReasons = pprMsgEnvelopeBagWithLoc . getMessages . fmap renderDiagnostic
+           getReasons = pprMsgEnvelopeBagWithLoc . getMessages
 
            badFlags df   = concatMap (badFlag df) unsafeFlagsForInfer
            badFlag df (str,loc,on,_)
-               | on df     = [mkLocMessage SevOutput (loc df) $
+               | on df     = [mkLocMessage MCOutput (loc df) $ -- FIXME(adn) MCOutput is fishy.
                                    text str <+> text "is not allowed in Safe Haskell"]
                | otherwise = []
 
            badInst ins | checkOverlap (overlapMode (is_flag ins))
-                       = [mkLocMessage SevOutput (nameSrcSpan $ getName $ is_dfun ins) $
+                       = [mkLocMessage MCOutput (nameSrcSpan $ getName $ is_dfun ins) $ -- FIXME(adn) MCOutput is fishy.
                              ppr (overlapMode $ is_flag ins) <+>
                              text "overlap mode isn't allowed in Safe Haskell"]
                        | otherwise = []

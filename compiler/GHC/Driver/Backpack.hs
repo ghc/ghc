@@ -43,6 +43,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Iface.Recomp
 import GHC.Builtin.Names
 
+import GHC.Types.Error ( mkMessages )
 import GHC.Types.SrcLoc
 import GHC.Types.SourceError
 import GHC.Types.SourceText
@@ -107,7 +108,7 @@ doBackpack [src_filename] = do
     buf <- liftIO $ hGetStringBuffer src_filename
     let loc = mkRealSrcLoc (mkFastString src_filename) 1 1 -- TODO: not great
     case unP parseBackpack (initParserState (initParserOpts dflags) buf loc) of
-        PFailed pst -> throwErrors (fmap mkParserErr (getErrorMessages pst))
+        PFailed pst -> throwErrors $ mkMessages (fmap mkParserErr (getErrorMessages pst))
         POk _ pkgname_bkp -> do
             -- OK, so we have an LHsUnit PackageName, but we want an
             -- LHsUnit HsComponentId.  So let's rename it.

@@ -390,7 +390,7 @@ import GHC.Types.Name.Env
 import GHC.Types.Name.Ppr
 import GHC.Types.TypeEnv
 import GHC.Types.SourceFile
-import GHC.Types.Error ( DiagnosticMessage )
+import GHC.Types.Error ( mkMessages, DiagnosticMessage )
 
 import GHC.Unit
 import GHC.Unit.Env
@@ -1598,7 +1598,7 @@ getTokenStream mod = do
   let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
   case lexTokenStream (initParserOpts dflags) source startLoc of
     POk _ ts    -> return ts
-    PFailed pst -> throwErrors (fmap mkParserErr (getErrorMessages pst))
+    PFailed pst -> throwErrors $ mkMessages (fmap mkParserErr (getErrorMessages pst))
 
 -- | Give even more information on the source than 'getTokenStream'
 -- This function allows reconstructing the source completely with
@@ -1609,7 +1609,7 @@ getRichTokenStream mod = do
   let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
   case lexTokenStream (initParserOpts dflags) source startLoc of
     POk _ ts    -> return $ addSourceToTokens startLoc source ts
-    PFailed pst -> throwErrors (fmap mkParserErr (getErrorMessages pst))
+    PFailed pst -> throwErrors $ mkMessages (fmap mkParserErr (getErrorMessages pst))
 
 -- | Given a source location and a StringBuffer corresponding to this
 -- location, return a rich token stream with the source associated to the

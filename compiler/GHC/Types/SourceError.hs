@@ -10,25 +10,29 @@ module GHC.Types.SourceError
 where
 
 import GHC.Prelude
-import GHC.Data.Bag
 import GHC.Types.Error
+import GHC.Driver.Errors.Types (ghcUnknownMessage,  GhcMessage )
+import GHC.Driver.Errors.Ppr () -- instance Diagnostic GhcMessage
 import GHC.Utils.Monad
 import GHC.Utils.Panic
 import GHC.Utils.Exception
 
 import Control.Monad.Catch as MC (MonadCatch, catch)
+import GHC.Utils.Error (pprMsgEnvelopeBagWithLoc)
+import GHC.Utils.Outputable
+import Data.Data (Typeable)
 
-mkSrcErr :: ErrorMessages -> SourceError
-mkSrcErr = SourceError
+mkSrcErr :: (Diagnostic e, Typeable e) => Messages e -> SourceError
+mkSrcErr = SourceError . fmap ghcUnknownMessage
 
-srcErrorMessages :: SourceError -> ErrorMessages
+srcErrorMessages :: SourceError -> Messages GhcMessage
 srcErrorMessages (SourceError msgs) = msgs
 
-throwErrors :: MonadIO io => ErrorMessages -> io a
+throwErrors :: (Diagnostic e, Typeable e, MonadIO io) => Messages e -> io a
 throwErrors = liftIO . throwIO . mkSrcErr
 
-throwOneError :: MonadIO io => MsgEnvelope DiagnosticMessage -> io a
-throwOneError = throwErrors . unitBag
+throwOneError :: (Diagnostic e, Typeable e, MonadIO io) => MsgEnvelope e -> io a
+throwOneError = throwErrors . singleMessage
 
 -- | A source error is an error that is caused by one or more errors in the
 -- source code.  A 'SourceError' is thrown by many functions in the
@@ -46,10 +50,15 @@ throwOneError = throwErrors . unitBag
 --
 -- See 'printExceptionAndWarnings' for more information on what to take care
 -- of when writing a custom error handler.
-newtype SourceError = SourceError ErrorMessages
+newtype SourceError = SourceError (Messages GhcMessage)
 
 instance Show SourceError where
-  show (SourceError msgs) = unlines . map show . bagToList $ msgs
+  show (SourceError msgs) =
+      renderWithContext defaultSDocContext
+    . vcat
+    . pprMsgEnvelopeBagWithLoc
+    . getMessages
+    $ msgs
 
 instance Exception SourceError
 
