@@ -22,6 +22,9 @@
     gmp
     ncurses
     libiconv
+    zlib.out
+    zlib.dev
+    glibcLocales
 
     git
 
@@ -34,6 +37,7 @@
     file
 
     xz
+    xlibs.lndir
 
     cacert
   ];
