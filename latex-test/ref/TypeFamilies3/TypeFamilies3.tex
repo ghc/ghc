@@ -27,7 +27,7 @@ An open family\par}
 \end{haddockdesc}
 \begin{haddockdesc}
 \item[\begin{tabular}{@{}l}
-type instance Bar Int = ()\\type instance Bar () = Int
+type instance Bar () = Int\\type instance Bar Int = ()
 \end{tabular}]
 \end{haddockdesc}
 \begin{haddockdesc}
@@ -39,6 +39,6 @@ A data family\par}
 \end{haddockdesc}
 \begin{haddockdesc}
 \item[\begin{tabular}{@{}l}
-newtype instance Baz Double\\data instance Baz Int\\data instance Baz ()
+data instance Baz ()\\newtype instance Baz Double\\data instance Baz Int
 \end{tabular}]
 \end{haddockdesc}
