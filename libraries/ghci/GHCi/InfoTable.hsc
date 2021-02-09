@@ -360,7 +360,7 @@ sizeOfEntryCode
 -- Note: Must return proper pointer for use in a closure
 newExecConItbl :: StgInfoTable -> ByteString -> IO (FunPtr ())
 newExecConItbl obj con_desc
-#if MIN_VERSION_rts(1,0,1)
+#if MIN_VERSION_rts(1,0,1) || defined(darwin_HOST_OS)
    = do
 #else
    = alloca $ \pcode -> do
@@ -373,7 +373,7 @@ newExecConItbl obj con_desc
                -- table, because on a 64-bit platform we reference this string
                -- with a 32-bit offset relative to the info table, so if we
                -- allocated the string separately it might be out of range.
-#if MIN_VERSION_rts(1,0,1)
+#if MIN_VERSION_rts(1,0,1) || defined(darwin_HOST_OS)
         wr_ptr <- _allocateWrite (sz + fromIntegral lcon_desc)
         let ex_ptr = wr_ptr
 #else
@@ -388,7 +388,7 @@ newExecConItbl obj con_desc
         let null_off = fromIntegral sz + fromIntegral (BS.length con_desc)
         poke (castPtr wr_ptr `plusPtr` null_off) (0 :: Word8)
         _flushExec sz ex_ptr -- Cache flush (if needed)
-#if MIN_VERSION_rts(1,0,1)
+#if MIN_VERSION_rts(1,0,1) || defined(darwin_HOST_OS)
         _markExec (sz + fromIntegral lcon_desc) ex_ptr
 #endif
 #if defined(TABLES_NEXT_TO_CODE)
