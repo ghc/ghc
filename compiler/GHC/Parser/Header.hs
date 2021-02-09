@@ -29,6 +29,7 @@ import GHC.Platform
 
 import GHC.Driver.Session
 import GHC.Driver.Config
+import GHC.Driver.Errors.Types ( ghcUnknownMessage )
 
 import GHC.Parser.Errors.Ppr
 import GHC.Parser.Errors
@@ -52,7 +53,7 @@ import GHC.Utils.Exception as Exception
 
 import GHC.Data.StringBuffer
 import GHC.Data.Maybe
-import GHC.Data.Bag         ( Bag, listToBag, unitBag, isEmptyBag )
+import GHC.Data.Bag         ( Bag, listToBag, isEmptyBag )
 import GHC.Data.FastString
 
 import Control.Monad
@@ -90,7 +91,7 @@ getImports popts implicit_prelude buf filename source_filename = do
       -- don't log warnings: they'll be reported when we parse the file
       -- for real.  See #2500.
       if not (isEmptyBag errs)
-        then throwIO $ mkSrcErr (fmap pprError errs)
+        then throwErrors . fmap ghcUnknownMessage . mkMessages . fmap pprError $ errs
         else
           let   hsmod = unLoc rdr_module
                 mb_mod = hsmodName hsmod
@@ -311,7 +312,7 @@ getOptions' dflags toks
 checkProcessArgsResult :: MonadIO m => [Located String] -> m ()
 checkProcessArgsResult flags
   = when (notNull flags) $
-      liftIO $ throwIO $ mkSrcErr $ listToBag $ map mkMsg flags
+      liftIO . throwErrors . fmap ghcUnknownMessage . mkMessages . listToBag . map mkMsg $ flags
     where mkMsg (L loc flag)
               = mkPlainMsgEnvelope loc $
                   (text "unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+>
@@ -370,4 +371,5 @@ optionsParseError str loc =
 
 throwErr :: SrcSpan -> SDoc -> a                -- #15053
 throwErr loc doc =
-  throw $ mkSrcErr $ unitBag $ mkPlainMsgEnvelope loc doc
+  throw . mkSrcErr . fmap ghcUnknownMessage . singleMessage $
+    mkPlainMsgEnvelope loc doc

@@ -302,6 +302,7 @@ import GHC.Driver.Phases   ( Phase(..), isHaskellSrcFilename
                            , isSourceFilename, startPhase )
 import GHC.Driver.Env
 import GHC.Driver.Errors
+import GHC.Driver.Errors.Types ( ghcUnknownMessage )
 import GHC.Driver.CmdLine
 import GHC.Driver.Session hiding (WarnReason(..))
 import GHC.Driver.Backend
@@ -383,6 +384,7 @@ import GHC.Types.Name.Env
 import GHC.Types.Name.Ppr
 import GHC.Types.TypeEnv
 import GHC.Types.SourceFile
+import GHC.Types.Error ( mkMessages )
 
 import GHC.Unit
 import GHC.Unit.Env
@@ -1579,7 +1581,8 @@ getTokenStream mod = do
   let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
   case lexTokenStream (initParserOpts dflags) source startLoc of
     POk _ ts    -> return ts
-    PFailed pst -> throwErrors (fmap pprError (getErrorMessages pst))
+    PFailed pst ->
+      throwErrors (fmap ghcUnknownMessage . mkMessages $ fmap pprError (getErrorMessages pst))
 
 -- | Give even more information on the source than 'getTokenStream'
 -- This function allows reconstructing the source completely with
@@ -1590,7 +1593,8 @@ getRichTokenStream mod = do
   let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
   case lexTokenStream (initParserOpts dflags) source startLoc of
     POk _ ts    -> return $ addSourceToTokens startLoc source ts
-    PFailed pst -> throwErrors (fmap pprError (getErrorMessages pst))
+    PFailed pst ->
+      throwErrors (fmap ghcUnknownMessage . mkMessages $ fmap pprError (getErrorMessages pst))
 
 -- | Given a source location and a StringBuffer corresponding to this
 -- location, return a rich token stream with the source associated to the

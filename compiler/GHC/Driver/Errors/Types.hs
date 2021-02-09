@@ -47,6 +47,11 @@ data GhcMessage where
   -- into something which can be eventually converted into an 'SDoc'.
   GhcUnknownMessage :: forall a. (RenderableDiagnostic a, Typeable a) => a -> GhcMessage
 
+-- | Creates a new 'GhcMessage' out of a 'DecoratedSDoc'. This function is provided to ease the integration
+-- of #18516 (structured-error-messages) by allowing unstructured errors to be wrapped into the general
+-- (but structured) 'GhcMessage' type, so that the conversion can happen gradually. Ideally, this function
+-- should be needed very rarely within GHC, as it would typically be used by plugin or library authors
+-- (see comment for the 'GhcUnknownMessage' type constructor).
 ghcUnknownMessage :: DecoratedSDoc -> GhcMessage
 ghcUnknownMessage = GhcUnknownMessage
 

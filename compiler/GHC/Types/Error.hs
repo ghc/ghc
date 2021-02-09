@@ -11,6 +11,7 @@ module GHC.Types.Error
    , getMessages
    , emptyMessages
    , isEmptyMessages
+   , singleMessage
    , addMessage
    , unionMessages
    , MsgEnvelope (..)
@@ -19,6 +20,7 @@ module GHC.Types.Error
    , DecoratedSDoc (unDecorated)
    , Severity (..)
    , RenderableDiagnostic (..)
+   , showMsgEnvelope
    , mapDecorated
    , pprMessageBag
    , mkDecorated
@@ -92,6 +94,9 @@ mkMessages = Messages
 
 isEmptyMessages :: Messages e -> Bool
 isEmptyMessages (Messages msgs) = isEmptyBag msgs
+
+singleMessage :: MsgEnvelope e -> Messages e
+singleMessage e = addMessage e emptyMessages
 
 addMessage :: MsgEnvelope e -> Messages e -> Messages e
 addMessage x (Messages xs) = Messages (x `consBag` xs)
@@ -191,9 +196,6 @@ data Severity
 
 instance ToJson Severity where
   json s = JSString (show s)
-
-instance Show (MsgEnvelope DecoratedSDoc) where
-    show = showMsgEnvelope
 
 -- | Shows an 'MsgEnvelope'.
 showMsgEnvelope :: RenderableDiagnostic a => MsgEnvelope a -> String

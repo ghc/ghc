@@ -34,6 +34,7 @@ import GHC.Utils.Monad
 import GHC.Utils.Exception
 import GHC.Utils.Error
 
+import GHC.Types.Error ( getMessages )
 import GHC.Types.SourceError
 
 import Control.Monad
@@ -190,7 +191,7 @@ instance ExceptionMonad m => GhcMonad (GhcT m) where
 printException :: GhcMonad m => SourceError -> m ()
 printException err = do
   dflags <- getSessionDynFlags
-  liftIO $ printBagOfErrors dflags (srcErrorMessages err)
+  liftIO $ printBagOfErrors dflags (getMessages $ srcErrorMessages err)
 
 -- | A function called to log warnings and errors.
 type WarnErrLogger = forall m. GhcMonad m => Maybe SourceError -> m ()

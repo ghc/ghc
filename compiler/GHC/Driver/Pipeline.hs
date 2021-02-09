@@ -47,6 +47,7 @@ import GHC.Tc.Types
 import GHC.Driver.Main
 import GHC.Driver.Env hiding ( Hsc )
 import GHC.Driver.Errors
+import GHC.Driver.Errors.Types ( GhcMessage, ghcUnknownMessage )
 import GHC.Driver.Pipeline.Monad
 import GHC.Driver.Config
 import GHC.Driver.Phases
@@ -80,7 +81,6 @@ import GHC.CmmToLlvm         ( llvmFixupAsm, llvmVersionList )
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Settings
 
-import GHC.Data.Bag            ( unitBag )
 import GHC.Data.FastString     ( mkFastString )
 import GHC.Data.StringBuffer   ( hGetStringBuffer, hPutStringBuffer )
 import GHC.Data.Maybe          ( expectJust )
@@ -89,6 +89,7 @@ import GHC.Iface.Make          ( mkFullIface )
 import GHC.Iface.UpdateIdInfos ( updateModDetailsIdInfos )
 
 import GHC.Types.Basic       ( SuccessFlag(..) )
+import GHC.Types.Error       ( mkMessages, singleMessage )
 import GHC.Types.Target
 import GHC.Types.SrcLoc
 import GHC.Types.SourceFile
@@ -131,7 +132,7 @@ preprocess :: HscEnv
            -> Maybe InputFileBuffer
            -- ^ optional buffer to use instead of reading the input file
            -> Maybe Phase -- ^ starting phase
-           -> IO (Either ErrorMessages (DynFlags, FilePath))
+           -> IO (Either (Messages GhcMessage) (DynFlags, FilePath))
 preprocess hsc_env input_fn mb_input_buf mb_phase =
   handleSourceError (\err -> return (Left (srcErrorMessages err))) $
   MC.handle handler $
@@ -149,7 +150,8 @@ preprocess hsc_env input_fn mb_input_buf mb_phase =
   return (dflags, fp)
   where
     srcspan = srcLocSpan $ mkSrcLoc (mkFastString input_fn) 1 1
-    handler (ProgramError msg) = return $ Left $ unitBag $
+    handler (ProgramError msg) =
+      return $ Left $ fmap ghcUnknownMessage . singleMessage $
         mkPlainMsgEnvelope srcspan $ text msg
     handler ex = throwGhcExceptionIO ex
 
@@ -1229,9 +1231,10 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
                 popts = initParserOpts dflags
             eimps <- getImports popts imp_prelude buf input_fn (basename <.> suff)
             case eimps of
-              Left errs -> throwErrors (fmap pprError errs)
-              Right (src_imps,imps,L _ mod_name) -> return
-                  (Just buf, mod_name, imps, src_imps)
+              Left errs
+                -> throwErrors . fmap ghcUnknownMessage . mkMessages $ (fmap pprError errs)
+              Right (src_imps,imps,L _ mod_name)
+                -> return (Just buf, mod_name, imps, src_imps)
 
   -- Take -o into account if present
   -- Very like -ohi, but we must *only* do this if we aren't linking

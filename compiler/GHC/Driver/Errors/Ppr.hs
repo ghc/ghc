@@ -11,7 +11,7 @@ import GHC.Types.Basic
 import GHC.Types.Error
 import GHC.Types.Name ( nameSrcSpan, getName )
 import GHC.Driver.Errors.Types
-import GHC.Iface.Load  ( cannotFindModule )
+-- import GHC.Iface.Load  ( cannotFindModule )
 import GHC.Unit.State
 import GHC.Utils.Error
 import GHC.Utils.Outputable
@@ -40,8 +40,8 @@ instance RenderableDiagnostic DriverMessage where
     DriverUnknownMessage d
       -> d
 
-    DriverCannotFindModule env m res
-      -> mkDecorated [ cannotFindModule env m res ]
+    DriverCannotFindModule _env _m _res
+      -> mkDecorated [ {- cannotFindModule env m res -} ]
 
     DriverNotAnExpression str
       -> mkDecorated [ text "not an expression:" <+> quotes (text str) ]
