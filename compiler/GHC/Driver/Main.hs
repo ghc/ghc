@@ -93,6 +93,7 @@ import GHC.Driver.Session
 import GHC.Driver.Backend
 import GHC.Driver.Env
 import GHC.Driver.Errors
+import GHC.Driver.Errors.Types ( ghcUnknownMessage )
 import GHC.Driver.CodeOutput
 import GHC.Driver.Config
 import GHC.Driver.Hooks
@@ -295,7 +296,8 @@ logWarningsReportErrors (warnings,errors) = do
     let warns = fmap pprWarning warnings
         errs  = fmap pprError   errors
     logWarnings warns
-    when (not $ isEmptyBag errs) $ throwErrors errs
+    when (not $ isEmptyBag errs) $
+      throwErrors . fmap ghcUnknownMessage . mkMessages $ errs
 
 -- | Log warnings and throw errors, assuming the messages
 -- contain at least one error (e.g. coming from PFailed)
@@ -308,7 +310,7 @@ handleWarningsThrowErrors (warnings, errors) = do
     logger <- getLogger
     (wWarns, wErrs) <- warningsToMessages dflags <$> getWarnings
     liftIO $ printBagOfErrors logger dflags wWarns
-    throwErrors (unionBags errs wErrs)
+    throwErrors . fmap ghcUnknownMessage . mkMessages $ unionBags errs wErrs
 
 -- | Deal with errors and warnings returned by a compilation step
 --
@@ -332,7 +334,7 @@ ioMsgMaybe ioA = do
     let (warns, errs) = partitionMessages msgs
     logWarnings warns
     case mb_r of
-        Nothing -> throwErrors errs
+        Nothing -> throwErrors . fmap ghcUnknownMessage . mkMessages $ errs
         Just r  -> ASSERT( isEmptyBag errs ) return r
 
 -- | like ioMsgMaybe, except that we ignore error messages and return
@@ -427,7 +429,8 @@ hscParse' mod_summary
                         FormatHaskell (showAstData NoBlankSrcSpan rdr_module)
             liftIO $ dumpIfSet_dyn logger dflags Opt_D_source_stats "Source Statistics"
                         FormatText (ppSourceStats False rdr_module)
-            when (not $ isEmptyBag errs) $ throwErrors errs
+            when (not $ isEmptyBag errs) $
+              throwErrors . fmap ghcUnknownMessage . mkMessages $ errs
 
             -- To get the list of extra source files, we take the list
             -- that the parser gave us,
@@ -1197,7 +1200,8 @@ checkSafeImports tcg_env
 
         case (isEmptyBag safeErrs) of
           -- Failed safe check
-          False -> liftIO . throwIO . mkSrcErr $ safeErrs
+          False ->
+            liftIO . throwIO . mkSrcErr . fmap ghcUnknownMessage . mkMessages $ safeErrs
 
           -- Passed safe check
           True -> do
@@ -1225,7 +1229,7 @@ checkSafeImports tcg_env
     cond' :: ImportedModsVal -> ImportedModsVal -> Hsc ImportedModsVal
     cond' v1 v2
         | imv_is_safe v1 /= imv_is_safe v2
-        = throwOneError $ mkPlainMsgEnvelope (imv_span v1)
+        = throwOneError . fmap ghcUnknownMessage $ mkPlainMsgEnvelope (imv_span v1)
               (text "Module" <+> ppr (imv_name v1) <+>
               (text $ "is imported both as a safe and unsafe import!"))
         | otherwise
@@ -1293,7 +1297,7 @@ hscCheckSafe' m l = do
         iface <- lookup' m
         case iface of
             -- can't load iface to check trust!
-            Nothing -> throwOneError $ mkPlainMsgEnvelope l
+            Nothing -> throwOneError . fmap ghcUnknownMessage $ mkPlainMsgEnvelope l
                          $ text "Can't load the interface file for" <+> ppr m
                            <> text ", to check that it can be safely imported"
 
@@ -1393,7 +1397,7 @@ checkPkgTrust pkgs = do
                         <> text ") is required to be trusted but it isn't!"
     case errors of
         [] -> return ()
-        _  -> (liftIO . throwIO . mkSrcErr . listToBag) errors
+        _  -> (liftIO . throwIO . mkSrcErr . fmap ghcUnknownMessage . mkMessages . listToBag) errors
 
 -- | Set module to unsafe and (potentially) wipe trust information.
 --
@@ -1940,7 +1944,7 @@ hscImport hsc_env str = runInteractiveHsc hsc_env $ do
        hscParseThing parseModule str
     case is of
         [L _ i] -> return i
-        _ -> liftIO $ throwOneError $
+        _ -> liftIO $ throwOneError . fmap ghcUnknownMessage $
                  mkPlainMsgEnvelope noSrcSpan $
                      text "parse error in import declaration"
 
@@ -1970,7 +1974,7 @@ hscParseExpr expr = do
   maybe_stmt <- hscParseStmt expr
   case maybe_stmt of
     Just (L _ (BodyStmt _ expr _ _)) -> return expr
-    _ -> throwOneError $ mkPlainMsgEnvelope noSrcSpan
+    _ -> throwOneError . fmap ghcUnknownMessage $ mkPlainMsgEnvelope noSrcSpan
       (text "not an expression:" <+> quotes (text expr))
 
 hscParseStmt :: String -> Hsc (Maybe (GhciLStmt GhcPs))
