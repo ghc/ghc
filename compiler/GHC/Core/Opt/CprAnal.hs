@@ -25,7 +25,6 @@ import GHC.Core.DataCon
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Core.Utils   ( exprIsHNF, dumpIdInfoOfProgram )
-import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.FamInstEnv
 import GHC.Core.Opt.WorkWrap.Utils
@@ -90,8 +89,8 @@ Ideally, we would want the following pipeline:
 4. worker/wrapper (for CPR)
 
 Currently, we omit 2. and anticipate the results of worker/wrapper.
-See Note [CPR in a DataAlt case alternative]
-and Note [CPR for binders that will be unboxed].
+See Note [CPR for binders that will be unboxed]
+and Note [Optimistic field binder CPR].
 An additional w/w pass would simplify things, but probably add slight overhead.
 So currently we have
 
@@ -185,11 +184,13 @@ cprAnal' env (Lam var body)
 cprAnal' env (Case scrut case_bndr ty alts)
   = (res_ty, Case scrut' case_bndr ty alts')
   where
-    (_, scrut')      = cprAnal env scrut
-    -- Regardless whether scrut had the CPR property or not, the case binder
-    -- certainly has it. See 'extendEnvForDataAlt'.
-    (alt_tys, alts') = mapAndUnzip (cprAnalAlt env scrut case_bndr) alts
-    res_ty           = foldl' lubCprType botCprType alt_tys
+    (scrut_ty, scrut') = cprAnal env scrut
+    -- We used to give the case binder the CPR property unconditionally.
+    -- See Historic Note [Optimistic case binder CPR]
+    env'               = extendSigEnv env case_bndr (CprSig scrut_ty)
+    be_optimistic      = assumeOptimisticFieldCpr scrut scrut_ty
+    (alt_tys, alts')   = mapAndUnzip (cprAnalAlt env' be_optimistic) alts
+    res_ty             = foldl' lubCprType botCprType alt_tys
 
 cprAnal' env (Let (NonRec id rhs) body)
   = (body_ty, Let (NonRec id' rhs') body')
@@ -205,20 +206,48 @@ cprAnal' env (Let (Rec pairs) body)
 
 cprAnalAlt
   :: AnalEnv
-  -> CoreExpr -- ^ scrutinee
-  -> Id       -- ^ case binder
+  -> Bool     -- ^ Does Note [Optimistic field binder CPR] apply?
   -> Alt Var  -- ^ current alternative
   -> (CprType, Alt Var)
-cprAnalAlt env scrut case_bndr (Alt con@(DataAlt dc) bndrs rhs)
-  -- See 'extendEnvForDataAlt' and Note [CPR in a DataAlt case alternative]
+cprAnalAlt env be_optimistic (Alt con bndrs rhs)
   = (rhs_ty, Alt con bndrs rhs')
   where
-    env_alt        = extendEnvForDataAlt env scrut case_bndr dc bndrs
+    env_alt
+      | DataAlt dc <- con, be_optimistic
+      -- Optimistically give strictly used field binders the CPR property.
+      -- See Note [Optimistic field binder CPR].
+      -- What we actually want here is Nested CPR.
+      = giveStrictFieldsCpr env dc bndrs
+      | otherwise
+      = env
     (rhs_ty, rhs') = cprAnal env_alt rhs
-cprAnalAlt env _ _ (Alt con bndrs rhs)
-  = (rhs_ty, Alt con bndrs rhs')
+
+giveStrictFieldsCpr :: AnalEnv -> DataCon -> [Id] -> AnalEnv
+-- See Note [Optimistic field binder CPR]
+giveStrictFieldsCpr env dc bs = foldl' do_one_field env (fields_w_dmds dc bs)
   where
-    (rhs_ty, rhs') = cprAnal env rhs
+    -- 'extendSigEnvForDemand' gives 'id' the CPR property if 'dmd' is strict
+    do_one_field env (id, dmd) = extendSigEnvForDemand env id dmd
+    fields_w_dmds dc bndrs = -- returns the fields paired with their 'idDemandInfo'
+       -- See Note [Add demands for strict constructors] in GHC.Core.Opt.WorkWrap.Utils
+       [ (id, applyWhen (isMarkedStrict mark) strictifyDmd (idDemandInfo id))
+       | (id, mark) <- filter isId bndrs `zip` dataConRepStrictness dc
+       ]
+
+-- | Decide whether to optimistically give 'DataAlt' field binders the CPR
+-- property based on strictness.
+-- Tests (A) and (B) of Note [Optimistic field binder CPR].
+assumeOptimisticFieldCpr :: CoreExpr -> CprType -> Bool
+assumeOptimisticFieldCpr scrut scrut_ty = is_var scrut && case_will_cancel
+  where
+    -- Test (A): The case will only cancel when 'scrut' has the CPR property.
+    case_will_cancel | CprType 0 cpr <- scrut_ty = isJust (asConCpr cpr)
+                     | otherwise                 = False
+    -- Test (B): Guess whether 'scrut' is a parameter. Surely not if it's not a
+    -- variable!
+    is_var (Cast e _) = is_var e
+    is_var (Var v)    = isLocalId v
+    is_var _          = False
 
 --
 -- * CPR transformer
@@ -437,41 +466,6 @@ extendSigEnvForDemand env id dmd
     -- opportunities on dicts it prohibits are probably irrelevant to CPR.
     has_inlineable_prag = False
 
-extendEnvForDataAlt :: AnalEnv -> CoreExpr -> Id -> DataCon -> [Var] -> AnalEnv
--- See Note [CPR in a DataAlt case alternative]
-extendEnvForDataAlt env scrut case_bndr dc bndrs
-  = foldl' do_con_arg env' ids_w_strs
-  where
-    env' = extendSigEnv env case_bndr (CprSig case_bndr_ty)
-
-    ids_w_strs    = filter isId bndrs `zip` dataConRepStrictness dc
-
-    is_algebraic   = isJust (tyConAlgDataCons_maybe (dataConTyCon dc))
-    no_exs         = null (dataConExTyCoVars dc)
-    case_bndr_ty
-      | is_algebraic, no_exs = conCprType (dataConTag dc)
-      -- The tycon wasn't algebraic or the datacon had existentials.
-      -- See Note [Which types are unboxed?] for why no existentials.
-      | otherwise            = topCprType
-
-    -- We could have much deeper CPR info here with Nested CPR, which could
-    -- propagate available unboxed things from the scrutinee, getting rid of
-    -- the is_var_scrut heuristic. See Note [CPR in a DataAlt case alternative].
-    -- Giving strict binders the CPR property only makes sense for products, as
-    -- the arguments in Note [CPR for binders that will be unboxed] don't apply
-    -- to sums (yet); we lack WW for strict binders of sum type.
-    do_con_arg env (id, str)
-       | is_var scrut
-       -- See Note [Add demands for strict constructors] in GHC.Core.Opt.WorkWrap.Utils
-       , let dmd = applyWhen (isMarkedStrict str) strictifyDmd (idDemandInfo id)
-       = extendSigEnvForDemand env id dmd
-       | otherwise
-       = env
-
-    is_var (Cast e _) = is_var e
-    is_var (Var v)    = isLocalId v
-    is_var _          = False
-
 {- Note [Safe abortion in the fixed-point iteration]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -479,57 +473,6 @@ Fixed-point iteration may fail to terminate. But we cannot simply give up and
 return the environment and code unchanged! We still need to do one additional
 round, to ensure that all expressions have been traversed at least once, and any
 unsound CPR annotations have been updated.
-
-Note [CPR in a DataAlt case alternative]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In a case alternative, we want to give some of the binders the CPR property.
-Specifically
-
- * The case binder; inside the alternative, the case binder always has
-   the CPR property, meaning that a case on it will successfully cancel.
-   Example:
-        f True  x = case x of y { I# x' -> if x' ==# 3
-                                           then y
-                                           else I# 8 }
-        f False x = I# 3
-
-   By giving 'y' the CPR property, we ensure that 'f' does too, so we get
-        f b x = case fw b x of { r -> I# r }
-        fw True  x = case x of y { I# x' -> if x' ==# 3 then x' else 8 }
-        fw False x = 3
-
-   Of course there is the usual risk of re-boxing: we have 'x' available
-   boxed and unboxed, but we return the unboxed version for the wrapper to
-   box.  If the wrapper doesn't cancel with its caller, we'll end up
-   re-boxing something that we did have available in boxed form.
-
- * Any strict binders with product type, can use
-   Note [CPR for binders that will be unboxed]
-   to anticipate worker/wrappering for strictness info.
-   But we can go a little further. Consider
-
-      data T = MkT !Int Int
-
-      f2 (MkT x y) | y>0       = f2 (MkT x (y-1))
-                   | otherwise = x
-
-   For $wf2 we are going to unbox the MkT *and*, since it is strict, the
-   first argument of the MkT; see Note [Add demands for strict constructors].
-   But then we don't want box it up again when returning it!  We want
-   'f2' to have the CPR property, so we give 'x' the CPR property.
-
- * It's a bit delicate because we're brittly anticipating worker/wrapper here.
-   If the case above is scrutinising something other than an argument the
-   original function, we really don't have the unboxed version available.  E.g
-      g v = case foo v of
-              MkT x y | y>0       -> ...
-                      | otherwise -> x
-   Here we don't have the unboxed 'x' available.  Hence the
-   is_var_scrut test when making use of the strictness annotation.
-   Slightly ad-hoc, because even if the scrutinee *is* a variable it
-   might not be a onre of the arguments to the original function, or a
-   sub-component thereof.  But it's simple, and nothing terrible
-   happens if we get it wrong.  e.g. Trac #10694.
 
 Note [CPR for binders that will be unboxed]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -553,16 +496,96 @@ Moreover, if f itself is strict in x, then we'll pass x unboxed to
 f1, and so the boxed version *won't* be available; in that case it's
 very helpful to give 'x' the CPR property.
 
+This is all done in 'extendSigEnvForDemand'.
+
 Note that
 
-  * We only want to do this for something that definitely
-    has product type, else we may get over-optimistic CPR results
-    (e.g. from \x -> x!).
+  * We only want to do this for something that definitely unboxes as per
+    'wantToUnbox', else we may get over-optimistic CPR results e.g.
+    (from \x -> x!).
 
   * This also (approximately) applies to DataAlt field binders;
-    See Note [CPR in a DataAlt case alternative].
+    See Note [Optimistic field binder CPR].
 
   * See Note [CPR examples]
+
+Note [Optimistic field binder CPR]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+
+  data T a = MkT a
+  f :: T Int -> Int
+  f x = ... (case x of
+    MkT y -> y) ...
+
+And assume we know from strictness analysis that `f` is strict in `x` and its
+field `y` and we unbox both. Then we give `x` the CPR property according
+to Note [CPR for binders that will be unboxed]. But `x`'s sole field `y`
+likewise will be unboxed and it should also get the CPR property. We'd
+need a *nested* CPR property here for `x` to express that and unwrap one level
+when we analyse the Case to give the CPR property to `y`.
+
+Lacking Nested CPR, we have to guess a bit, by looking for
+
+  (A) Flat CPR on the scrutinee
+  (B) A variable scrutinee. Otherwise surely it can't be a parameter.
+  (C) Strict demand on the field binder `y` (or it binds a strict field)
+
+(A) and (B) are tested in 'assumeOptimisticFieldCpr',
+(C) in 'giveStrictFieldsCpr' via 'extendSigEnvForDemand'.
+
+While (A) is a necessary condition to give a field the CPR property, there are
+ways in which (B) and (C) are too lax, leading to unsound analysis results and
+thus reboxing in the wrapper:
+
+  (b) We could scrutinise some other variable than a parameter, like in
+
+        g :: T Int -> Int
+        g x = let z = foo x in -- assume `z` has CPR property
+              case z of MkT y -> y
+
+      Lacking Nested CPR and multiple levels of unboxing, only the outer box
+      of `z` will be available and a case on `y` won't actually cancel away.
+      But it's simple, and nothing terrible happens if we get it wrong. e.g.
+      #10694.
+
+  (c) A strictly used field binder doesn't mean the function is strict in it.
+
+        h :: T Int -> Int -> Int
+        h !x 0 = 0
+        h  x 0 = case x of MkT y -> y
+
+      Here, `y` is used strictly, but the field of `x` certainly is not and
+      consequently will not be available unboxed.
+      Why not look at the demand of `x` instead to determine whether `y` is
+      unboxed? Because the 'idDemandInfo' on `x` will not have been propagated
+      to its occurrence in the scrutinee when CprAnal runs directly after
+      DmdAnal.
+
+We used to give the case binder the CPR property unconditionally instead of
+deriving it from the case scrutinee.
+See Historical Note [Optimistic case binder CPR].
+
+Historical Note [Optimistic case binder CPR]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We used to give the case binder the CPR property unconditionally, which is too
+optimistic (#19232). Here are the details:
+
+Inside the alternative, the case binder always has the CPR property, meaning
+that a case on it will successfully cancel.
+Example:
+  f True  x = case x of y { I# x' -> if x' ==# 3
+                                     then y
+                                     else I# 8 }
+  f False x = I# 3
+By giving 'y' the CPR property, we ensure that 'f' does too, so we get
+  f b x = case fw b x of { r -> I# r }
+  fw True  x = case x of y { I# x' -> if x' ==# 3 then x' else 8 }
+  fw False x = 3
+Of course there is the usual risk of re-boxing: we have 'x' available boxed
+and unboxed, but we return the unboxed version for the wrapper to box. If the
+wrapper doesn't cancel with its caller, we'll end up re-boxing something that
+we did have available in boxed form.
 
 Note [CPR for sum types]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -719,7 +742,7 @@ data structure RHSs.
 Note [CPR examples]
 ~~~~~~~~~~~~~~~~~~~~
 Here are some examples (stranal/should_compile/T10482a) of the
-usefulness of Note [CPR in a DataAlt case alternative].  The main
+usefulness of Note [Optimistic field binder CPR].  The main
 point: all of these functions can have the CPR property.
 
     ------- f1 -----------
