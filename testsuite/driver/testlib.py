@@ -1706,9 +1706,10 @@ def interpreter_run(name: TestName,
 
     # check the exit code
     if exit_code != getTestOpts().exit_code:
-        print('Wrong exit code for ' + name + '(' + way + ') (expected', getTestOpts().exit_code, ', actual', exit_code, ')')
-        dump_stdout(name)
-        dump_stderr(name)
+        if config.verbose >= 1 and _expect_pass(way):
+            print('Wrong exit code for ' + name + '(' + way + ') (expected', getTestOpts().exit_code, ', actual', exit_code, ')')
+            dump_stdout(name)
+            dump_stderr(name)
         return failBecause('bad exit code (%d)' % exit_code,
                            stderr=read_stderr(name),
                            stdout=read_stdout(name))
@@ -2129,7 +2130,7 @@ def normalise_errmsg(s: str) -> str:
 
     s = re.sub('You are using an unsupported version of LLVM!', '', s)
     s = re.sub('Currently only 9 is supported. System LLVM version: 11.0.0', '', s)
-    s = re.sub('We will try though...', '', s)    
+    s = re.sub('We will try though...', '', s)
     s = re.sub('ld: warning: passed two min versions \(10.16.0, 10.12\) for platform macOS. Using 10.12.','',s)
     s = re.sub('ld: warning: -sdk_version and -platform_version are not compatible, ignoring -sdk_version','',s)
     return s
@@ -2206,10 +2207,15 @@ def normalise_output( s: str ) -> str:
     # requires for -fPIC
     s = re.sub('  -fexternal-dynamic-refs\n','',s)
     s = re.sub('You are using an unsupported version of LLVM!', '', s)
-    s = re.sub('Currently only 9 is supported. System LLVM version: 11.0.0', '', s)
+    s = re.sub('Currently only [0-9]+ is supported. System LLVM version: [\.0-9]+', '', s)
     s = re.sub('We will try though...', '', s)
-    s = re.sub('ld: warning: passed two min versions \(10.16.0, 10.12\) for platform macOS. Using 10.12.','',s)
+    s = re.sub('ld: warning: passed .* min versions \(.*\) for platform macOS. Using [\.0-9]+.','',s)
     s = re.sub('ld: warning: -sdk_version and -platform_version are not compatible, ignoring -sdk_version','',s)
+    s = re.sub(".*strip: hanges being made to the file will invalidate the code signature in.*",'',s)
+    # ignore llvm cyclone march warning
+    s = re.sub('.*warning: instruction movi.2d with immediate #0 may not function correctly on this CPU, converting to equivalent movi.16b.*','',s)
+    s = re.sub('.*movi\.2d v., #0000000000000000.*','',s)
+    s = re.sub('.*^.*','',s)
     return s
 
 def normalise_asm( s: str ) -> str:
