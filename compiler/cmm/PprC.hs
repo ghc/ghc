@@ -235,7 +235,7 @@ pprStmt stmt =
         hresults = zip results res_hints
         hargs    = zip args arg_hints
 
-        ForeignConvention cconv _ _ ret = conv
+        ForeignConvention cconv _ _ ret _ _ = conv
 
         cast_fn = parens (cCast (pprCFunType (char '*') cconv hresults hargs) fn)
 
@@ -1164,7 +1164,7 @@ cLoad expr rep
           bewareLoadStoreAlignment ArchMipseb   = True
           bewareLoadStoreAlignment ArchMipsel   = True
           bewareLoadStoreAlignment (ArchARM {}) = True
-          bewareLoadStoreAlignment ArchARM64    = True
+          bewareLoadStoreAlignment ArchAArch64    = True
           bewareLoadStoreAlignment ArchSPARC    = True
           bewareLoadStoreAlignment ArchSPARC64  = True
           -- Pessimistically assume that they will also cause problems
