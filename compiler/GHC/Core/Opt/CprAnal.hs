@@ -25,7 +25,6 @@ import GHC.Core.DataCon
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Core.Utils   ( exprIsHNF, dumpIdInfoOfProgram )
-import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.FamInstEnv
 import GHC.Core.Opt.WorkWrap.Utils
@@ -185,10 +184,10 @@ cprAnal' env (Lam var body)
 cprAnal' env (Case scrut case_bndr ty alts)
   = (res_ty, Case scrut' case_bndr ty alts')
   where
-    (_, scrut')      = cprAnal env scrut
+    (scrut_ty, scrut')      = cprAnal env scrut
     -- Regardless whether scrut had the CPR property or not, the case binder
     -- certainly has it. See 'extendEnvForDataAlt'.
-    (alt_tys, alts') = mapAndUnzip (cprAnalAlt env scrut case_bndr) alts
+    (alt_tys, alts') = mapAndUnzip (cprAnalAlt env scrut_ty scrut case_bndr) alts
     res_ty           = foldl' lubCprType botCprType alt_tys
 
 cprAnal' env (Let (NonRec id rhs) body)
@@ -205,17 +204,18 @@ cprAnal' env (Let (Rec pairs) body)
 
 cprAnalAlt
   :: AnalEnv
+  -> CprType  -- ^ CPR type of the scrutinee
   -> CoreExpr -- ^ scrutinee
   -> Id       -- ^ case binder
   -> Alt Var  -- ^ current alternative
   -> (CprType, Alt Var)
-cprAnalAlt env scrut case_bndr (Alt con@(DataAlt dc) bndrs rhs)
+cprAnalAlt env scrut_ty scrut case_bndr (Alt con@(DataAlt dc) bndrs rhs)
   -- See 'extendEnvForDataAlt' and Note [CPR in a DataAlt case alternative]
   = (rhs_ty, Alt con bndrs rhs')
   where
-    env_alt        = extendEnvForDataAlt env scrut case_bndr dc bndrs
+    env_alt        = extendEnvForDataAlt env scrut_ty scrut case_bndr dc bndrs
     (rhs_ty, rhs') = cprAnal env_alt rhs
-cprAnalAlt env _ _ (Alt con bndrs rhs)
+cprAnalAlt env _ _ _ (Alt con bndrs rhs)
   = (rhs_ty, Alt con bndrs rhs')
   where
     (rhs_ty, rhs') = cprAnal env rhs
@@ -437,36 +437,29 @@ extendSigEnvForDemand env id dmd
     -- opportunities on dicts it prohibits are probably irrelevant to CPR.
     has_inlineable_prag = False
 
-extendEnvForDataAlt :: AnalEnv -> CoreExpr -> Id -> DataCon -> [Var] -> AnalEnv
+extendEnvForDataAlt :: AnalEnv -> CprType -> CoreExpr -> Id -> DataCon -> [Var] -> AnalEnv
 -- See Note [CPR in a DataAlt case alternative]
-extendEnvForDataAlt env scrut case_bndr dc bndrs
+extendEnvForDataAlt env scrut_ty scrut case_bndr dc bndrs
   = foldl' do_con_arg env' ids_w_strs
   where
-    env' = extendSigEnv env case_bndr (CprSig case_bndr_ty)
+    env' = extendSigEnv env case_bndr (CprSig scrut_ty)
 
     ids_w_strs    = filter isId bndrs `zip` dataConRepStrictness dc
 
-    is_algebraic   = isJust (tyConAlgDataCons_maybe (dataConTyCon dc))
-    no_exs         = null (dataConExTyCoVars dc)
-    case_bndr_ty
-      | is_algebraic, no_exs = conCprType (dataConTag dc)
-      -- The tycon wasn't algebraic or the datacon had existentials.
-      -- See Note [Which types are unboxed?] for why no existentials.
-      | otherwise            = topCprType
-
     -- We could have much deeper CPR info here with Nested CPR, which could
     -- propagate available unboxed things from the scrutinee, getting rid of
-    -- the is_var_scrut heuristic. See Note [CPR in a DataAlt case alternative].
-    -- Giving strict binders the CPR property only makes sense for products, as
-    -- the arguments in Note [CPR for binders that will be unboxed] don't apply
-    -- to sums (yet); we lack WW for strict binders of sum type.
+    -- the is_var heuristic. See Note [CPR in a DataAlt case alternative].
     do_con_arg env (id, str)
-       | is_var scrut
+       | is_var scrut, case_will_cancel
        -- See Note [Add demands for strict constructors] in GHC.Core.Opt.WorkWrap.Utils
        , let dmd = applyWhen (isMarkedStrict str) strictifyDmd (idDemandInfo id)
        = extendSigEnvForDemand env id dmd
        | otherwise
        = env
+
+    -- The case will cancel when the scrutinee has the CPR property
+    case_will_cancel | CprType 0 cpr <- scrut_ty = isJust (asConCpr cpr)
+                     | otherwise                 = False
 
     is_var (Cast e _) = is_var e
     is_var (Var v)    = isLocalId v
@@ -485,7 +478,42 @@ Note [CPR in a DataAlt case alternative]
 In a case alternative, we want to give some of the binders the CPR property.
 Specifically
 
- * The case binder; inside the alternative, the case binder always has
+ * Any strict binder with product type will have the CPR property according
+   to Note [CPR for binders that will be unboxed]
+   to anticipate worker/wrappering for strictness info. The CPR property
+   transfers to the case scrutinee, from where we can give it to the case
+   binder. But we can go a little further. Consider
+
+      data T = MkT !Int Int
+
+      f2 (MkT x y) | y>0       = f2 (MkT x (y-1))
+                   | otherwise = x
+
+   For $wf2 we are going to unbox the MkT *and*, since it is strict, the
+   first argument of the MkT; see Note [Add demands for strict constructors].
+   But then we don't want box it up again when returning it! We want
+   'f2' to have the CPR property, so we give 'x' the CPR property.
+   This is optimistic; the proper way to do this is Nested CPR (#18174).
+
+ * It's a bit delicate because we're brittly anticipating worker/wrapper here.
+   If the case above is scrutinising something other than an argument the
+   original function, we really don't have the unboxed version available.  E.g
+      g v = case foo v of
+              MkT x y | y>0       -> ...
+                      | otherwise -> x
+   Here we don't have the unboxed 'x' available.  Hence the
+   is_var_scrut test when making use of the strictness annotation.
+   Slightly ad-hoc, because even if the scrutinee *is* a variable it
+   might not be a onre of the arguments to the original function, or a
+   sub-component thereof.  But it's simple, and nothing terrible
+   happens if we get it wrong.  e.g. Trac #10694.
+   The proper way would be to track Nested CPR (#18174), which has its own
+   issues.
+
+ * Historically, we used to give the case binder the CPR property, which is
+   too optimistic (#19232). Here are the details:
+   ---
+   Inside the alternative, the case binder always has
    the CPR property, meaning that a case on it will successfully cancel.
    Example:
         f True  x = case x of y { I# x' -> if x' ==# 3
@@ -503,33 +531,6 @@ Specifically
    box.  If the wrapper doesn't cancel with its caller, we'll end up
    re-boxing something that we did have available in boxed form.
 
- * Any strict binders with product type, can use
-   Note [CPR for binders that will be unboxed]
-   to anticipate worker/wrappering for strictness info.
-   But we can go a little further. Consider
-
-      data T = MkT !Int Int
-
-      f2 (MkT x y) | y>0       = f2 (MkT x (y-1))
-                   | otherwise = x
-
-   For $wf2 we are going to unbox the MkT *and*, since it is strict, the
-   first argument of the MkT; see Note [Add demands for strict constructors].
-   But then we don't want box it up again when returning it!  We want
-   'f2' to have the CPR property, so we give 'x' the CPR property.
-
- * It's a bit delicate because we're brittly anticipating worker/wrapper here.
-   If the case above is scrutinising something other than an argument the
-   original function, we really don't have the unboxed version available.  E.g
-      g v = case foo v of
-              MkT x y | y>0       -> ...
-                      | otherwise -> x
-   Here we don't have the unboxed 'x' available.  Hence the
-   is_var_scrut test when making use of the strictness annotation.
-   Slightly ad-hoc, because even if the scrutinee *is* a variable it
-   might not be a onre of the arguments to the original function, or a
-   sub-component thereof.  But it's simple, and nothing terrible
-   happens if we get it wrong.  e.g. Trac #10694.
 
 Note [CPR for binders that will be unboxed]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
