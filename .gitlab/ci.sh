@@ -412,11 +412,11 @@ function clean() {
 }
 
 function run_hadrian() {
-  if [ -n "${VERBOSE:-}" ]; then HADRIAN_ARGS="$HADRIAN_ARGS -V"; fi
+  if [ -n "${VERBOSE:-}" ]; then HADRIAN_ARGS="${HADRIAN_ARGS:-} -V"; fi
   run hadrian/build.cabal.sh \
     --flavour="$FLAVOUR" \
     -j"$cores" \
-    $HADRIAN_ARGS \
+    ${HADRIAN_ARGS:-} \
     $@
 }
 
