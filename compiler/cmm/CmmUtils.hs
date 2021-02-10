@@ -11,7 +11,7 @@
 
 module CmmUtils(
         -- CmmType
-        primRepCmmType, slotCmmType, slotForeignHint,
+        primRepCmmType, slotCmmType,
         typeCmmType, typeForeignHint, primRepForeignHint,
 
         -- CmmLit
@@ -138,33 +138,27 @@ typeCmmType :: DynFlags -> UnaryType -> CmmType
 typeCmmType dflags ty = primRepCmmType dflags (typePrimRep1 ty)
 
 primRepForeignHint :: PrimRep -> ForeignHint
-primRepForeignHint VoidRep      = panic "primRepForeignHint:VoidRep"
-primRepForeignHint LiftedRep    = AddrHint
-primRepForeignHint UnliftedRep  = AddrHint
-primRepForeignHint IntRep       = SignedHint
-primRepForeignHint Int8Rep      = SignedHint
-primRepForeignHint Int16Rep     = SignedHint
-primRepForeignHint Int32Rep     = SignedHint
-primRepForeignHint Int64Rep     = SignedHint
-primRepForeignHint WordRep      = NoHint
-primRepForeignHint Word8Rep     = NoHint
-primRepForeignHint Word16Rep    = NoHint
-primRepForeignHint Word32Rep    = NoHint
-primRepForeignHint Word64Rep    = NoHint
-primRepForeignHint AddrRep      = AddrHint -- NB! AddrHint, but NonPtrArg
-primRepForeignHint FloatRep     = NoHint
-primRepForeignHint DoubleRep    = NoHint
-primRepForeignHint (VecRep {})  = NoHint
-
-slotForeignHint :: SlotTy -> ForeignHint
-slotForeignHint PtrSlot       = AddrHint
-slotForeignHint WordSlot      = NoHint
-slotForeignHint Word64Slot    = NoHint
-slotForeignHint FloatSlot     = NoHint
-slotForeignHint DoubleSlot    = NoHint
+primRepForeignHint VoidRep     = panic "primRepForeignHint:VoidRep"
+primRepForeignHint LiftedRep   = AddrHint
+primRepForeignHint UnliftedRep = AddrHint
+primRepForeignHint IntRep      = SignedHint
+primRepForeignHint Int8Rep     = SignedHint
+primRepForeignHint Int16Rep    = SignedHint
+primRepForeignHint Int32Rep    = SignedHint
+primRepForeignHint Int64Rep    = SignedHint
+primRepForeignHint WordRep     = NoHint
+primRepForeignHint Word8Rep    = NoHint
+primRepForeignHint Word16Rep   = NoHint
+primRepForeignHint Word32Rep   = NoHint
+primRepForeignHint Word64Rep   = NoHint
+primRepForeignHint AddrRep     = AddrHint -- NB! AddrHint, but NonPtrArg
+primRepForeignHint FloatRep    = NoHint
+primRepForeignHint DoubleRep   = NoHint
+primRepForeignHint (VecRep {}) = NoHint
 
 typeForeignHint :: UnaryType -> ForeignHint
 typeForeignHint = primRepForeignHint . typePrimRep1
+
 
 ---------------------------------------------------
 --

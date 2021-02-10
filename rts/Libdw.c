@@ -133,8 +133,9 @@ int libdwLookupLocation(LibdwSession *session, Location *frame,
     Dwfl_Module *mod = dwfl_addrmodule(session->dwfl, addr);
     if (mod == NULL)
         return 1;
+    void *object_file = &frame->object_file;
     dwfl_module_info(mod, NULL, NULL, NULL, NULL, NULL,
-                     &frame->object_file, NULL);
+                     object_file, NULL);
 
     // Find function name
     frame->function = dwfl_module_addrname(mod, addr);

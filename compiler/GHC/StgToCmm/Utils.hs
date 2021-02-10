@@ -179,19 +179,19 @@ tagToClosure dflags tycon tag
 --
 -------------------------------------------------------------------------
 
-emitRtsCall :: UnitId -> FastString -> [(CmmExpr,ForeignHint)] -> Bool -> FCode ()
+emitRtsCall :: UnitId -> FastString -> [(CmmExpr, PrimRep, ForeignHint)] -> Bool -> FCode ()
 emitRtsCall pkg fun args safe = emitRtsCallGen [] (mkCmmCodeLabel pkg fun) args safe
 
-emitRtsCallWithResult :: LocalReg -> ForeignHint -> UnitId -> FastString
-        -> [(CmmExpr,ForeignHint)] -> Bool -> FCode ()
-emitRtsCallWithResult res hint pkg fun args safe
-   = emitRtsCallGen [(res,hint)] (mkCmmCodeLabel pkg fun) args safe
+emitRtsCallWithResult :: LocalReg -> PrimRep -> ForeignHint -> UnitId -> FastString
+        -> [(CmmExpr, PrimRep, ForeignHint)] -> Bool -> FCode ()
+emitRtsCallWithResult res rep hint pkg fun args safe
+   = emitRtsCallGen [(res, rep, hint)] (mkCmmCodeLabel pkg fun) args safe
 
 -- Make a call to an RTS C procedure
 emitRtsCallGen
-   :: [(LocalReg,ForeignHint)]
+   :: [(LocalReg, PrimRep, ForeignHint)]
    -> CLabel
-   -> [(CmmExpr,ForeignHint)]
+   -> [(CmmExpr, PrimRep, ForeignHint)]
    -> Bool -- True <=> CmmSafe call
    -> FCode ()
 emitRtsCallGen res lbl args safe
@@ -206,10 +206,14 @@ emitRtsCallGen res lbl args safe
       if safe then
         emit =<< mkCmmCall fun_expr res' args' updfr_off
       else do
-        let conv = ForeignConvention CCallConv arg_hints res_hints CmmMayReturn
+        let conv = ForeignConvention CCallConv arg_hints res_hints CmmMayReturn res_rep arg_reps
         emit $ mkUnsafeCall (ForeignTarget fun_expr conv) res' args'
-    (args', arg_hints) = unzip args
-    (res',  res_hints) = unzip res
+    (args', arg_reps, arg_hints) = unzip3 args
+    (res',  res_reps, res_hints) = unzip3 res
+    res_rep = case res_reps of
+      []  -> VoidRep
+      [r] -> r
+      _   -> error "can not deal with multiple return values"
     fun_expr = mkLblExpr lbl
 
 
@@ -608,8 +612,8 @@ emitUpdRemSetPush ptr = do
     emitRtsCall
       rtsUnitId
       (fsLit "updateRemembSetPushClosure_")
-      [(CmmReg (CmmGlobal BaseReg), AddrHint),
-       (ptr, AddrHint)]
+      [(CmmReg (CmmGlobal BaseReg), AddrRep, AddrHint),
+       (ptr, AddrRep, AddrHint)]
       False
 
 emitUpdRemSetPushThunk :: CmmExpr -- ^ the thunk
@@ -618,6 +622,6 @@ emitUpdRemSetPushThunk ptr = do
     emitRtsCall
       rtsUnitId
       (fsLit "updateRemembSetPushThunk_")
-      [(CmmReg (CmmGlobal BaseReg), AddrHint),
-       (ptr, AddrHint)]
+      [(CmmReg (CmmGlobal BaseReg), AddrRep, AddrHint),
+       (ptr, AddrRep, AddrHint)]
       False
