@@ -114,6 +114,8 @@ ghcilink006 :
 	echo "key: test-XXX" >>$(PKG006)
 ifeq "$(WINDOWS)" "YES"
 	echo "extra-libraries: stdc++-6" >>$(PKG006)
+else ifeq "$(DARWIN)" "YES"
+	echo "extra-libraries: c++" >>$(PKG006)
 else
 	echo "extra-libraries: stdc++" >>$(PKG006)
 endif
