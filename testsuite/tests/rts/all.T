@@ -61,8 +61,7 @@ test('divbyzero',
       when(platform('powerpc64le-unknown-linux'), [ignore_stdout, exit_code(0)]),
       when(opsys('mingw32'), [ignore_stderr, exit_code(8)]),
       # The output under OS X is too unstable to readily compare
-      when(platform('i386-apple-darwin'), [ignore_stderr, exit_code(136)]),
-      when(platform('x86_64-apple-darwin'), [ignore_stderr, exit_code(136)]),
+      when(opsys('darwin'), [ignore_stderr, exit_code(136)]),
       # ThreadSanitizer changes the output
       when(have_thread_sanitizer(), skip),
       # since these test are supposed to crash the
