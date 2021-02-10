@@ -262,6 +262,8 @@ import Data.Maybe
 import qualified Data.Map as M
 import qualified Data.ByteString.Char8 as BS8
 
+import TyCon (PrimRep(..))
+
 #include "HsVersions.h"
 }
 
@@ -1203,7 +1205,27 @@ foreignCall conv_string results_code expr_code args_code safety ret
                   expr' = adjCallTarget dflags conv expr args
                   (arg_exprs, arg_hints) = unzip args
                   (res_regs,  res_hints) = unzip results
-                  fc = ForeignConvention conv arg_hints res_hints ret
+                  res_cmm_tys = zip (map localRegType res_regs) res_hints
+                  arg_cmm_tys = zip (map (cmmExprType dflags) arg_exprs) arg_hints
+                  res_rep :: (CmmType, ForeignHint) -> PrimRep
+                  res_rep (_, AddrHint)                       = AddrRep
+                  res_rep (t, _)          | isGcPtrType t     = Word64Rep
+                  res_rep (t, SignedHint) | t `cmmEqType` b8  = Int8Rep
+                  res_rep (t, SignedHint) | t `cmmEqType` b16 = Int16Rep
+                  res_rep (t, SignedHint) | t `cmmEqType` b32 = Int32Rep
+                  res_rep (t, SignedHint) | t `cmmEqType` b64 = Int64Rep
+                  res_rep (t, NoHint)     | t `cmmEqType` b8  = Word8Rep
+                  res_rep (t, NoHint)     | t `cmmEqType` b16 = Word16Rep
+                  res_rep (t, NoHint)     | t `cmmEqType` b32 = Word32Rep
+                  res_rep (t, NoHint)     | t `cmmEqType` b64 = Word64Rep
+                  res_rep (t, _)          | t `cmmEqType` f32 = FloatRep
+                  res_rep (t, _)          | t `cmmEqType` f64 = DoubleRep
+
+                  ret_rep = case (map res_rep res_cmm_tys) of
+                    [] -> VoidRep
+                    [r] -> r
+                    x -> (error $ show x)
+                  fc = ForeignConvention conv arg_hints res_hints ret ret_rep (map res_rep arg_cmm_tys)
                   target = ForeignTarget expr' fc
           _ <- code $ emitForeignCall safety res_regs target arg_exprs
           return ()

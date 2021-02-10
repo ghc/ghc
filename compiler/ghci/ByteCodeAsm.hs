@@ -457,8 +457,14 @@ assembleI dflags i = case i of
        -- LitString requires a zero-terminator when emitted
     literal (LitNumber nt i _) = case nt of
       LitNumInt     -> int (fromIntegral i)
-      LitNumWord    -> int (fromIntegral i)
+      LitNumInt8    -> int8 (fromIntegral i)
+      LitNumInt16   -> int16 (fromIntegral i)
+      LitNumInt32   -> int32 (fromIntegral i)
       LitNumInt64   -> int64 (fromIntegral i)
+      LitNumWord    -> int (fromIntegral i)
+      LitNumWord8   -> int8 (fromIntegral i)
+      LitNumWord16  -> int16 (fromIntegral i)
+      LitNumWord32  -> int32 (fromIntegral i)
       LitNumWord64  -> int64 (fromIntegral i)
       LitNumInteger -> panic "ByteCodeAsm.literal: LitNumInteger"
       LitNumNatural -> panic "ByteCodeAsm.literal: LitNumNatural"
@@ -472,6 +478,9 @@ assembleI dflags i = case i of
     float = words . mkLitF
     double = words . mkLitD dflags
     int = words . mkLitI
+    int8 = words . mkLitI
+    int16 = words . mkLitI
+    int32 = words . mkLitI
     int64 = words . mkLitI64 dflags
     words ws = lit (map BCONPtrWord ws)
     word w = words [w]

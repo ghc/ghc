@@ -44,6 +44,8 @@ import Outputable
 import Control.Monad
 import Data.Char (ord)
 
+import TyCon (PrimRep (..))
+
 -----------------------------------------------------------------------------
 --
 -- Cost-centre-stack Profiling
@@ -178,8 +180,8 @@ enterCostCentreFun ccs closure =
     if isCurrentCCS ccs
        then do dflags <- getDynFlags
                emitRtsCall rtsUnitId (fsLit "enterFunCCS")
-                   [(baseExpr, AddrHint),
-                    (costCentreFrom dflags closure, AddrHint)] False
+                   [(baseExpr, AddrRep, AddrHint),
+                    (costCentreFrom dflags closure, AddrRep, AddrHint)] False
        else return () -- top-level function, nothing to do
 
 ifProfiling :: FCode () -> FCode ()
@@ -278,10 +280,10 @@ emitSetCCC cc tick push
 
 pushCostCentre :: LocalReg -> CmmExpr -> CostCentre -> FCode ()
 pushCostCentre result ccs cc
-  = emitRtsCallWithResult result AddrHint
+  = emitRtsCallWithResult result AddrRep AddrHint
         rtsUnitId
-        (fsLit "pushCostCentre") [(ccs,AddrHint),
-                                (CmmLit (mkCCostCentre cc), AddrHint)]
+        (fsLit "pushCostCentre") [(ccs, AddrRep, AddrHint),
+                                (CmmLit (mkCCostCentre cc), AddrRep, AddrHint)]
         False
 
 bumpSccCount :: DynFlags -> CmmExpr -> CmmAGraph
