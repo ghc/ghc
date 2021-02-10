@@ -414,10 +414,13 @@ validate-x86_64-darwin:
 
 validate-aarch64-darwin:
   extends: .validate
-  # stage: full-build
-  stage: quick-build
+  stage: full-build
   tags:
     - aarch64-darwin
+
+  # for now make this non mandatory to pass.
+  allow_failure: true
+
   variables:
     TEST_TYPE: test
     MAKE_ARGS: "-Werror"
@@ -430,6 +433,7 @@ validate-aarch64-darwin:
     # inside th shell.
     CPUS: 8
     LANG: "en_US.UTF-8"
+    # WARNING: this is overridden in the shell.nix, see shell.nix!
     CONFIGURE_ARGS: "--with-intree-gmp"
 
   # I wish we could just use the nix #! logic, but we can't --run and -i bash
