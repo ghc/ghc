@@ -618,11 +618,13 @@ wantToUnbox fam_envs has_inlineable_prag ty dmd =
       , let arity = dataConRepArity dc
       -- See Note [Unpacking arguments with product and polymorphic demands]
       , Just cs <- split_prod_dmd_arity dmd arity
+      -- See Note [Add demands for strict constructors]
+      , let cs' = addDataConStrictness dc cs
       -- See Note [Do not unpack class dictionaries]
       , not (has_inlineable_prag && isClassPred ty)
       -- See Note [mkWWstr and unsafeCoerce]
-      , cs `lengthIs` arity
-      -> Just (cs, dcpc)
+      , cs' `lengthIs` arity
+      -> Just (cs', dcpc)
     _ -> Nothing
   where
     split_prod_dmd_arity dmd arity
@@ -643,9 +645,7 @@ unbox_one dflags fam_envs arg cs
        ; let ex_name_fss     = map getOccFS $ dataConExTyCoVars dc
              (ex_tvs', arg_ids) =
                dataConRepFSInstPat (ex_name_fss ++ repeat ww_prefix) pat_bndrs_uniqs (idMult arg) dc tc_args
-             -- See Note [Add demands for strict constructors]
-             cs'       = addDataConStrictness dc cs
-             arg_ids'  = zipWithEqual "unbox_one" setIdDemandInfo arg_ids cs'
+             arg_ids'  = zipWithEqual "unbox_one" setIdDemandInfo arg_ids cs
              unbox_fn  = mkUnpackCase (Var arg) co (idMult arg) case_bndr_uniq
                                       dc (ex_tvs' ++ arg_ids')
              arg_no_unf = zapStableUnfolding arg
