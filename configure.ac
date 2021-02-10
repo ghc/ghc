@@ -1211,6 +1211,27 @@ AC_CHECK_FUNC(pthread_create,
 AC_DEFINE_UNQUOTED([NEED_PTHREAD_LIB], [$need_lpthread],
     [Define 1 if we need to link code using pthreads with -lpthread])
 
+AC_MSG_CHECKING(whether -latomic is needed for sub-word-sized atomic operations)
+AC_CHECK_FUNC(atomic_fetch_or,
+    [
+        AC_MSG_RESULT(no)
+        AC_SUBST([CabalNeedAtomic],[False])
+        need_latomic=0
+    ],
+    [
+        AC_CHECK_LIB(atomic, atomic_fetch_or,
+            [
+                AC_MSG_RESULT(yes)
+                AC_SUBST([CabalNeedAtomic],[True])
+                need_latomic=1
+            ],
+            [
+                AC_SUBST([CabalNeedAtomic],[False])
+                AC_MSG_ERROR([sub-word-sized atomic operations not available.])
+                need_latomic=0
+            ])
+    ])
+
 dnl ** pthread_setname_np is a recent addition to glibc, and OS X has
 dnl    a different single-argument version.
 AC_CHECK_LIB(pthread, pthread_setname_np)
