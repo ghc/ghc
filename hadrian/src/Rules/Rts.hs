@@ -5,6 +5,8 @@ import Rules.Libffi
 import Hadrian.Utilities
 import Settings.Builders.Common
 
+import Context.Type as Ctx
+
 -- | This rule has priority 3 to override the general rule for generating shared
 -- library files (see Rules.Library.libraryRules).
 rtsRules :: Rules ()
@@ -18,7 +20,7 @@ rtsRules = priority 3 $ do
       root -/- "**/libHSrts-ghc*.so",
       root -/- "**/libHSrts-ghc*.dylib"]
       |%> \ rtsLibFilePath' -> do
-            let ctx@Context {..} = rtsContext Stage1
+            let Context { .. } = rtsContext Stage1
             rtsWithVersion <- pkgFileName package "libHS" ""
             createFileLink
                 (replaceLibFilePrefix "libHSrts" rtsWithVersion $ takeFileName rtsLibFilePath')
@@ -150,10 +152,19 @@ needRtsLibffiTargets stage = do
 needRtsSymLinks :: Stage -> [Way] -> Action ()
 needRtsSymLinks stage rtsWays
     = forM_ (filter (wayUnit Dynamic) rtsWays) $ \ way -> do
-        let ctx@Context {..} = Context stage rts way
+        let ctx = Context stage rts way
         libPath     <- libPath ctx
         distDir     <- distDir stage
         rtsLibFile  <- takeFileName <$> pkgLibraryFile ctx
         -- pkgFileName :: Package -> String -> String -> Action FilePath
-        rtsWithVersion <- pkgFileName package "libHS" ""
+        rtsWithVersion <- pkgFileName (Ctx.package ctx) "libHS" ""
         need [replaceLibFilePrefix rtsWithVersion "libHSrts" (libPath </> distDir </> rtsLibFile)]
+
+replaceLibFilePrefix :: String -> String -> FilePath -> FilePath
+replaceLibFilePrefix oldPrefix newPrefix oldFilePath = let
+    oldFileName = takeFileName oldFilePath
+    newFileName = maybe
+        (error $ "Expected RTS library file to start with " ++ oldPrefix)
+        (newPrefix ++)
+        (stripPrefix oldPrefix oldFileName)
+    in replaceFileName oldFilePath newFileName

@@ -5,6 +5,9 @@ module Context (
     -- * Expressions
     getStage, getPackage, getWay, getStagedSettingList, getBuildPath,
 
+    -- * Packages
+    pkgFileName,
+
     -- * Paths
     contextDir, buildPath, buildDir, pkgInplaceConfig, pkgSetupConfigFile,
     pkgHaddockFile, pkgRegisteredLibraryFile, pkgLibraryFile, pkgGhciLibraryFile,
