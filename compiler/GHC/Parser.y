@@ -2126,6 +2126,10 @@ ftype :: { forall b. DisambTD b => PV (Located b) }
 tyarg :: { LHsType GhcPs }
         : atype                         { $1 }
         | unpackedness atype            {% addUnpackednessP $1 $2 }
+        | '{' fielddecls '}'            {% amms (checkRecordSyntax
+                                                   (sLL $1 $> $ HsRecTy noExtField $2))
+                                                       -- Constructor sigs only
+                                                [moc $1,mcc $3] }
 
 tyop :: { Located RdrName }
         : qtyconop                      { $1 }
@@ -2146,10 +2150,6 @@ atype :: { LHsType GhcPs }
         | PREFIX_TILDE atype             {% ams (sLL $1 $> (mkBangTy SrcLazy $2)) [mj AnnTilde $1] }
         | PREFIX_BANG  atype             {% ams (sLL $1 $> (mkBangTy SrcStrict $2)) [mj AnnBang $1] }
 
-        | '{' fielddecls '}'             {% amms (checkRecordSyntax
-                                                    (sLL $1 $> $ HsRecTy noExtField $2))
-                                                        -- Constructor sigs only
-                                                 [moc $1,mcc $3] }
         | '(' ')'                        {% ams (sLL $1 $> $ HsTupleTy noExtField
                                                     HsBoxedOrConstraintTuple [])
                                                 [mop $1,mcp $2] }
@@ -2322,10 +2322,45 @@ gadt_constrs :: { Located [LConDecl GhcPs] }
 gadt_constr :: { LConDecl GhcPs }
     -- see Note [Difference in parsing GADT and data constructors]
     -- Returns a list because of:   C,D :: ty
-        : optSemi con_list '::' sigtype
+        : optSemi con_list '::' gadt_con_sig
                 {% do { (decl, anns) <- mkGadtDecl (unLoc $2) $4
                       ; ams (sLL $2 $> decl)
                             (mu AnnDcolon $3:anns) } }
+
+gadt_con_sig :: { Located GadtConSig }
+  : btype %shift           { sL1 $1 (GadtConSigRes $1) }
+  | forall_telescope gadt_con_sig
+           {% do { let (forall_anns, forall_tele) = unLoc $1
+                 ; ams (sLL $1 $> $ GadtConSigForAll forall_tele $2) forall_anns
+                 } }
+  | context '=>' gadt_con_sig
+           {% do { addAnnotation (gl $1) (toUnicodeAnn AnnDarrow $2) (gl $2)
+                 ; return (sLL $1 $> $ GadtConSigQual $1 $3)
+                 } }
+  | '{' fielddecls '}' '->' gadt_con_sig
+           {% do { r <- amms (checkRecordSyntax (sLL $1 $3 $2)) [moc $1,mcc $3]
+                 ; ams r [mu AnnRarrow $4] -- See Note [GADT decl discards annotations]
+                 ; ams (sLL $1 $> $ GadtConSigRecSyn r $5)
+                       [mu AnnRarrow $4]
+                 } }
+  | btype '->' gadt_con_sig
+           {% do { ams $1 [mu AnnRarrow $2] -- See Note [GADT decl discards annotations]
+                 ; ams (sLL $1 $> $ GadtConSigFunArg (HsScaled (HsUnrestrictedArrow (toUnicode $2)) $1) $3)
+                       [mu AnnRarrow $2]
+                 } }
+  | btype mult '->' gadt_con_sig
+           {% do { hintLinear (getLoc $2)
+                 ; let (arr, ann) = (unLoc $2) (toUnicode $3)
+                 ; ams $1 [ann, mu AnnRarrow $3] -- See Note [GADT decl discards annotations]
+                 ; ams (sLL $1 $> $ GadtConSigFunArg (HsScaled arr $1) $4)
+                       [ann, mu AnnRarrow $3]
+                 } }
+  | btype '->.' gadt_con_sig
+           {% do { hintLinear (getLoc $2)
+                 ; ams $1 [mu AnnLollyU $2] -- See Note [GADT decl discards annotations]
+                 ; ams (sLL $1 $> $ GadtConSigFunArg (HsScaled (HsLinearArrow UnicodeSyntax) $1) $3)
+                       [mu AnnLollyU $2]
+                 } }
 
 {- Note [Difference in parsing GADT and data constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -89,6 +89,9 @@ module GHC.Parser.PostProcess (
 
         SumOrTuple (..),
 
+        LGadtConSig,
+        GadtConSig(..),
+
         -- Expression/command/pattern ambiguity resolution
         PV,
         runPV,
@@ -623,6 +626,69 @@ mkConDeclH98 name mb_forall mb_cxt args
                , con_args   = args
                , con_doc    = Nothing }
 
+type LGadtConSig = Located GadtConSig
+
+data GadtConSig
+  = GadtConSigRes !(LHsType GhcPs)
+  | GadtConSigRecSyn !(Located [LConDeclField GhcPs]) LGadtConSig
+  | GadtConSigFunArg !(HsScaled GhcPs (LHsType GhcPs)) LGadtConSig
+  | GadtConSigForAll !(HsForAllTelescope GhcPs) LGadtConSig
+  | GadtConSigQual !(LHsContext GhcPs) LGadtConSig
+
+data GadtConSigParts =
+  GadtConSigParts
+    !(HsOuterSigTyVarBndrs GhcPs)
+    !(Maybe (LHsContext GhcPs))
+    !(HsConDeclGADTDetails GhcPs)
+    !(LHsType GhcPs)
+
+-- | Decompose a GADT type into its constituent parts.
+--
+-- This function is careful not to look through parentheses.
+-- See @Note [GADT abstract syntax] (Wrinkle: No nested foralls or contexts)@
+-- "GHC.Hs.Decls" for why this is important.
+splitGadtSig :: LGadtConSig -> ([PsError], GadtConSigParts, [AddAnn])
+splitGadtSig gsig0 = do
+    let (bndrs, gsig_rho) = split_bndrs gsig0
+        (mctxt, gsig_tau) = split_ctxt gsig_rho
+    case unLoc gsig_tau of
+      GadtConSigRecSyn rec gsig' -> do
+        let details = RecConGADT rec
+        case gsig' of
+          L _ (GadtConSigRes res) -> ([], GadtConSigParts bndrs mctxt details res, [])
+          L l _ -> ( [PsError PsErrIllegalGadtConSig [] l]
+                   , GadtConSigParts bndrs mctxt details (L l (HsWildCardTy noExtField))
+                   , [] )
+      _ -> do
+        let (args1, gsig') = split_args [] gsig_tau
+        case gsig' of
+          L _ (GadtConSigRes res) -> do
+            let (args2, res', anns) = splitHsFunType res
+                details = PrefixConGADT (args1 ++ args2)
+            ([], GadtConSigParts bndrs mctxt details res', anns)
+          L l _ -> do
+            let details = PrefixConGADT args1
+            ( [PsError PsErrIllegalGadtConSig [] l],
+              GadtConSigParts bndrs mctxt details (L l (HsWildCardTy noExtField)),
+              [] )
+  where
+    -- See also: GHC.Hs.Utils.hsTypeToHsSigType
+    split_bndrs (L _ (GadtConSigForAll forall_tele gsig))
+      | HsForAllInvis { hsf_invis_bndrs = bndrs } <- forall_tele
+      = (mkHsOuterExplicit bndrs, gsig)
+    split_bndrs gsig
+      = (mkHsOuterImplicit, gsig)
+
+    -- See also: GHC.Hs.Type.splitLHsQualTy_KP
+    split_ctxt (L _ (GadtConSigQual ctxt gsig)) = (Just ctxt, gsig)
+    split_ctxt gsig = (Nothing, gsig)
+
+    -- See also: GHC.Hs.Type.splitHsFunType
+    split_args args gsig =
+      case gsig of
+        L _ (GadtConSigFunArg arg gsig') -> split_args (arg : args) gsig'
+        _ -> (reverse args, gsig)
+
 -- | Construct a GADT-style data constructor from the constructor names and
 -- their type. Some interesting aspects of this function:
 --
@@ -631,26 +697,20 @@ mkConDeclH98 name mb_forall mb_cxt args
 --   records whether this is a prefix or record GADT constructor. See
 --   Note [GADT abstract syntax] in "GHC.Hs.Decls" for more details.
 mkGadtDecl :: [Located RdrName]
-           -> LHsSigType GhcPs
+           -> Located GadtConSig
            -> P (ConDecl GhcPs, [AddAnn])
-mkGadtDecl names ty = do
-  let (args, res_ty, anns)
-        | L _ (HsFunTy _ _w (L loc (HsRecTy _ rf)) res_ty) <- body_ty
-        = (RecConGADT (L loc rf), res_ty, [])
-        | otherwise
-        = let (arg_types, res_type, anns) = splitHsFunType body_ty
-          in (PrefixConGADT arg_types, res_type, anns)
-
+mkGadtDecl names gsig = do
+  let (errs, parts, anns) = splitGadtSig gsig
+  mapM_ addError errs
+  let GadtConSigParts bndrs mctxt details res = parts
   pure ( ConDeclGADT { con_g_ext  = noExtField
                      , con_names  = names
-                     , con_bndrs  = L (getLoc ty) outer_bndrs
-                     , con_mb_cxt = mcxt
-                     , con_g_args = args
-                     , con_res_ty = res_ty
+                     , con_bndrs  = L (getLoc gsig) bndrs
+                     , con_mb_cxt = mctxt
+                     , con_g_args = details
+                     , con_res_ty = res
                      , con_doc    = Nothing }
        , anns )
-  where
-    (outer_bndrs, mcxt, body_ty) = splitLHsGadtTy ty
 
 setRdrNameSpace :: RdrName -> NameSpace -> RdrName
 -- ^ This rather gruesome function is used mainly by the parser.

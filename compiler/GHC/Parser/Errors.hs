@@ -385,6 +385,8 @@ data PsErrorDesc
       --
       -- TODO: distinguish errors without using SDoc
 
+   | PsErrIllegalGadtConSig  -- TODO (int-index): add a description of the problem
+
 
 newtype StarIsType = StarIsType Bool
 

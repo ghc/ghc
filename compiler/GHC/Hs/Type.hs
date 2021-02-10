@@ -70,7 +70,7 @@ module GHC.Hs.Type (
         splitLHsInstDeclTy, getLHsInstDeclHead, getLHsInstDeclClass_maybe,
         splitLHsPatSynTy,
         splitLHsForAllTyInvis, splitLHsForAllTyInvis_KP, splitLHsQualTy,
-        splitLHsSigmaTyInvis, splitLHsGadtTy,
+        splitLHsSigmaTyInvis,
         splitHsFunType, hsTyGetAppHead_maybe,
         mkHsOpTy, mkHsAppTy, mkHsAppTys, mkHsAppKindTy,
         ignoreParens, hsSigWcType, hsPatSigType,
@@ -549,32 +549,6 @@ splitLHsSigmaTyInvis ty
   | (tvs,  ty1) <- splitLHsForAllTyInvis ty
   , (ctxt, ty2) <- splitLHsQualTy ty1
   = (tvs, ctxt, ty2)
-
--- | Decompose a GADT type into its constituent parts.
--- Returns @(outer_bndrs, mb_ctxt, body)@, where:
---
--- * @outer_bndrs@ are 'HsOuterExplicit' if the type has explicit, outermost
---   type variable binders. Otherwise, they are 'HsOuterImplicit'.
---
--- * @mb_ctxt@ is @Just@ the context, if it is provided.
---   Otherwise, it is @Nothing@.
---
--- * @body@ is the body of the type after the optional @forall@s and context.
---
--- This function is careful not to look through parentheses.
--- See @Note [GADT abstract syntax] (Wrinkle: No nested foralls or contexts)@
--- "GHC.Hs.Decls" for why this is important.
-splitLHsGadtTy ::
-     LHsSigType GhcPs
-  -> (HsOuterSigTyVarBndrs GhcPs, Maybe (LHsContext GhcPs), LHsType GhcPs)
-splitLHsGadtTy (L _ sig_ty)
-  | (outer_bndrs, rho_ty) <- split_bndrs sig_ty
-  , (mb_ctxt, tau_ty)     <- splitLHsQualTy_KP rho_ty
-  = (outer_bndrs, mb_ctxt, tau_ty)
-  where
-    split_bndrs :: HsSigType GhcPs -> (HsOuterSigTyVarBndrs GhcPs, LHsType GhcPs)
-    split_bndrs (HsSig{sig_bndrs = outer_bndrs, sig_body = body_ty}) =
-      (outer_bndrs, body_ty)
 
 -- | Decompose a type of the form @forall <tvs>. body@ into its constituent
 -- parts. Only splits type variable binders that

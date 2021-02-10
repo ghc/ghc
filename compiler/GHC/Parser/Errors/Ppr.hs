@@ -587,6 +587,9 @@ pp_err = \case
          , text "Perhaps you intended to use QualifiedDo"
          ]
 
+   PsErrIllegalGadtConSig
+      -> text "Illegal GADT constructor signature"
+
 pp_unexpected_fun_app :: Outputable a => SDoc -> a -> SDoc
 pp_unexpected_fun_app e a =
    text "Unexpected " <> e <> text " in function application:"
