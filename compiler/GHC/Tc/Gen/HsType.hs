@@ -1355,7 +1355,7 @@ tc_tuple rn_ty mode tup_sort original_types exp_kind
     rejectEmptyTuple :: [LHsType GhcRn] -> [LHsType GhcRn]
     rejectEmptyTuple args = filter (not . isTupleEmpty) $ fmap branchOnTupleX args
     isTupleEmpty :: LHsType GhcRn -> Bool
-    isTupleEmpty x | HsTupleTy _ _ [] <- unXRec x = True
+    isTupleEmpty x | HsTupleTy _ _ [] <- unLoc x = True
                    | otherwise = False
     tys = case tup_sort of
             ConstraintTuple -> rejectEmptyTuple original_types
