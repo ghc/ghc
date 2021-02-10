@@ -199,8 +199,10 @@ typedef struct _CONCURRENT_FLAGS {
  * When linkerAlwaysPic is true, the runtime linker assume that all object
  * files were compiled with -fPIC -fexternal-dynamic-refs and load them
  * anywhere in the address space.
+ * Note that there is no 32bit darwin system we can realistically expect to
+ * run on or compile for.
  */
-#if defined(x86_64_HOST_ARCH) && defined(darwin_HOST_OS)
+#if defined(darwin_HOST_OS) || defined(aarch64_HOST_ARCH)
 #define DEFAULT_LINKER_ALWAYS_PIC true
 #else
 #define DEFAULT_LINKER_ALWAYS_PIC false

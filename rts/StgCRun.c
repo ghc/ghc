@@ -982,7 +982,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
         "br %1\n\t"
 
         ".globl " STG_RETURN "\n\t"
-#if !(defined(ios_HOST_OS) || defined(darwin_HOST_OS))
+#if !defined(ios_HOST_OS) && !defined(darwin_HOST_OS)
         ".type " STG_RETURN ", %%function\n"
 #endif
         STG_RETURN ":\n\t"
@@ -991,7 +991,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
          */
         "add sp, sp, %3\n\t"
         /*
-         * Return the new register table, taking it from Stg's R1 (ARM64's R22).
+         * Return the new register table, taking it from Stg's R1 (AArch64's R22).
          */
         "mov %0, x22\n\t"
         /*
