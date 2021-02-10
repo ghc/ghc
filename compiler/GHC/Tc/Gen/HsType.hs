@@ -1340,8 +1340,7 @@ tc_tuple rn_ty mode tup_sort original_types exp_kind
   = do { arg_kinds <- case tup_sort of
            BoxedTuple      -> return (replicate arity liftedTypeKind)
            UnboxedTuple    -> replicateM arity newOpenTypeKind
-           ConstraintTuple -> do
-             return (replicate arity constraintKind)
+           ConstraintTuple -> return (replicate arity constraintKind)
        ; tau_tys <- zipWithM (tc_lhs_type mode) tys arg_kinds
        ; finish_tuple rn_ty tup_sort tau_tys arg_kinds exp_kind }
   where
@@ -1356,8 +1355,8 @@ tc_tuple rn_ty mode tup_sort original_types exp_kind
     rejectEmptyTuple :: [LHsType GhcRn] -> [LHsType GhcRn]
     rejectEmptyTuple args = filter (not . isTupleEmpty) $ fmap branchOnTupleX args
     isTupleEmpty :: LHsType GhcRn -> Bool
-    isTupleEmpty (HsTupleTy _ _ []) = True
-    isTupleEmpty _                  = False
+    isTupleEmpty x | HsTupleTy _ _ [] <- unXRec x = True
+                   | otherwise = False
     tys = case tup_sort of
             ConstraintTuple -> rejectEmptyTuple original_types
             _               -> original_types
