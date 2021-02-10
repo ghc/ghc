@@ -29,7 +29,8 @@
     zlib.out
     zlib.dev
     glibcLocales
-    locale
+    # locale doesn't build yet :-/
+    # locale
 
     git
 
