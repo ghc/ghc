@@ -8,7 +8,7 @@
 
   # we need to inject ncurses into --with-curses-libraries.
   # the real fix is to teach terminfo to use libcurses on macOS.
-  CONFIGURE_ARGS = "--with-intree-gmp --with-curses-libraries=${pkgs.ncurses.out}/lib"
+  CONFIGURE_ARGS = "--with-intree-gmp --with-curses-libraries=${pkgs.ncurses.out}/lib";
 
   buildInputs = with pkgs; [
     haskell.compiler.ghc8103Binary
