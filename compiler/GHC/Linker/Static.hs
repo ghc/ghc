@@ -35,6 +35,7 @@ import GHC.Driver.Session
 import System.FilePath
 import System.Directory
 import Control.Monad
+import Data.Maybe
 
 -----------------------------------------------------------------------------
 -- Static linking, of .o files
@@ -137,7 +138,7 @@ linkBinary' staticLink logger dflags unit_env o_files dep_units = do
     let lib_paths = libraryPaths dflags
     let lib_path_opts = map ("-L"++) lib_paths
 
-    extraLinkObj <- mkExtraObjToLinkIntoBinary logger dflags unit_state
+    extraLinkObj <- maybeToList <$> mkExtraObjToLinkIntoBinary logger dflags unit_state
     noteLinkObjs <- mkNoteObjsToLinkIntoBinary logger dflags unit_env dep_units
 
     let
@@ -253,7 +254,8 @@ linkBinary' staticLink logger dflags unit_env o_files dep_units = do
                          rc_objs
                       ++ framework_opts
                       ++ pkg_lib_path_opts
-                      ++ extraLinkObj:noteLinkObjs
+                      ++ extraLinkObj
+                      ++ noteLinkObjs
                       ++ pkg_link_opts
                       ++ pkg_framework_opts
                       ++ (if platformOS platform == OSDarwin

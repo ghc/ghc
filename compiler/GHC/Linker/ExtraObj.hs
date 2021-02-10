@@ -87,23 +87,34 @@ mkExtraObj logger dflags unit_state extn xs
 --
 -- On Windows, when making a shared library we also may need a DllMain.
 --
-mkExtraObjToLinkIntoBinary :: Logger -> DynFlags -> UnitState -> IO FilePath
+mkExtraObjToLinkIntoBinary :: Logger -> DynFlags -> UnitState -> IO (Maybe FilePath)
 mkExtraObjToLinkIntoBinary logger dflags unit_state = do
   when (gopt Opt_NoHsMain dflags && haveRtsOptsFlags dflags) $
      logInfo logger dflags $ withPprStyle defaultUserStyle
          (text "Warning: -rtsopts and -with-rtsopts have no effect with -no-hs-main." $$
           text "    Call hs_init_ghc() from your main() function to set these options.")
 
-  mkExtraObj logger dflags unit_state "c" (showSDoc dflags main)
-  where
-    main
-      | gopt Opt_NoHsMain dflags = Outputable.empty
+  case ghcLink dflags of
+    -- Don't try to build the extra object if it is not needed.  Compiling the
+    -- extra object assumes the presence of the RTS in the unit database
+    -- (because the extra object imports Rts.h) but GHC's build system may try
+    -- to build some helper programs before building and registering the RTS!
+    -- See #18938 for an example where hp2ps failed to build because of a failed
+    -- (unsafe) lookup for the RTS in the unit db.
+    _ | gopt Opt_NoHsMain dflags
+      -> return Nothing
+
+    LinkDynLib
+      | OSMinGW32 <- platformOS (targetPlatform dflags)
+      -> mk_extra_obj dllMain
+
       | otherwise
-          = case ghcLink dflags of
-                  LinkDynLib -> if platformOS (targetPlatform dflags) == OSMinGW32
-                                    then dllMain
-                                    else Outputable.empty
-                  _                      -> exeMain
+      -> return Nothing
+
+    _ -> mk_extra_obj exeMain
+
+  where
+    mk_extra_obj = fmap Just . mkExtraObj logger dflags unit_state "c" . showSDoc dflags
 
     exeMain = vcat [
         text "#include <Rts.h>",
