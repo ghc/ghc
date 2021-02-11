@@ -580,14 +580,26 @@ fromIntegral = fromInteger . toInteger
     #-}
 
 {-# RULES
-"fromIntegral/Natural->Natural"  fromIntegral = id :: Natural -> Natural
-"fromIntegral/Natural->Integer"  fromIntegral = toInteger :: Natural->Integer
-"fromIntegral/Natural->Word"     fromIntegral = naturalToWord
+"fromIntegral/Natural->Natural"  fromIntegral = id            :: Natural -> Natural
+"fromIntegral/Natural->Integer"  fromIntegral = toInteger     :: Natural -> Integer
+"fromIntegral/Natural->Word"     fromIntegral = naturalToWord :: Natural -> Word
   #-}
 
+-- Don't forget the types in the following rules! See #19345 for an example of
+-- bug introduced because of a missing type in the following rule:
+--
+--    "fromIntegral/Int->Natural" fromIntegral = naturalFromWord . fromIntegral
+--
+-- The inferred type for this rule is: forall a. Integral a => a -> Natural
+-- 
+-- However this rule is certainly not valid for every Integral type!
+-- `naturalFromWord` has a wrapping behavior for values that are out of Word
+-- range, so every value greater than (maxBound :: Word) is incorrectly wrapped.
+-- In #19345, (2^64 :: Integer) was incorrectly wrapped to (0 :: Natural).
+
 {-# RULES
-"fromIntegral/Word->Natural"    fromIntegral = naturalFromWord
-"fromIntegral/Int->Natural"     fromIntegral = naturalFromWord . fromIntegral
+"fromIntegral/Word->Natural"    fromIntegral = naturalFromWord                :: Word -> Natural
+"fromIntegral/Int->Natural"     fromIntegral = naturalFromWord . fromIntegral :: Int -> Natural
   #-}
 
 -- | general coercion to fractional types
