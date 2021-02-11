@@ -26,7 +26,7 @@ module GHC.Types.Basic (
 
         ConTag, ConTagZ, fIRST_TAG,
 
-        Arity, RepArity, JoinArity,
+        Arity, RepArity, JoinArity, FullArgCount,
 
         Alignment, mkAlignment, alignmentOf, alignmentBytes,
 
@@ -171,6 +171,11 @@ type RepArity = Int
 -- point is created (or converted from a value). Both type and value arguments
 -- are counted.
 type JoinArity = Int
+
+-- | FullArgCount is the number of type or value arguments in an application,
+-- or the number of type or value binders in a lambda.  Note: it includes
+-- both type and value arguments!
+type FullArgCount = Int
 
 {-
 ************************************************************************

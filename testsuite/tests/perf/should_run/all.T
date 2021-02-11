@@ -385,3 +385,8 @@ test('T18574',
     compile_and_run,
     ['-O'])
 
+test('T19347',
+    [collect_stats('bytes allocated', 5), only_ways(['normal'])],
+    compile_and_run,
+    ['-O'])
+
