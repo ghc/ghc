@@ -580,14 +580,14 @@ fromIntegral = fromInteger . toInteger
     #-}
 
 {-# RULES
-"fromIntegral/Natural->Natural"  fromIntegral = id :: Natural -> Natural
-"fromIntegral/Natural->Integer"  fromIntegral = toInteger :: Natural->Integer
-"fromIntegral/Natural->Word"     fromIntegral = naturalToWord
+"fromIntegral/Natural->Natural"  fromIntegral = id            :: Natural -> Natural
+"fromIntegral/Natural->Integer"  fromIntegral = toInteger     :: Natural -> Integer
+"fromIntegral/Natural->Word"     fromIntegral = naturalToWord :: Natural -> Word
   #-}
 
 {-# RULES
-"fromIntegral/Word->Natural"    fromIntegral = naturalFromWord
-"fromIntegral/Int->Natural"     fromIntegral = naturalFromWord . fromIntegral
+"fromIntegral/Word->Natural"    fromIntegral = naturalFromWord                :: Word -> Natural
+"fromIntegral/Int->Natural"     fromIntegral = naturalFromWord . fromIntegral :: Int -> Natural
   #-}
 
 -- | general coercion to fractional types
