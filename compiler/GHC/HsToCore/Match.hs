@@ -1063,7 +1063,6 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     -- the instance for IPName derives using the id, so this works if the
     -- above does
     exp (HsIPVar _ i) (HsIPVar _ i') = i == i'
-    exp (HsOverLabel _ l x) (HsOverLabel _ l' x') = l == l' && x == x'
     exp (HsOverLit _ l) (HsOverLit _ l') =
         -- Overloaded lits are equal if they have the same type
         -- and the data is the same.
@@ -1133,8 +1132,17 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
 
     ---------
     ev_term :: EvTerm -> EvTerm -> Bool
-    ev_term (EvExpr (Var a)) (EvExpr  (Var b)) = a==b
-    ev_term (EvExpr (Coercion a)) (EvExpr (Coercion b)) = a `eqCoercion` b
+    ev_term (EvExpr (Var a)) (EvExpr  (Var b))
+      = idType a `eqType` idType b
+        -- The /type/ of the evidence matters, not its precise proof term.
+        -- Caveat: conceivably a sufficiently exotic use of incoherent instances
+        -- could make a difference, but remember this is only used within the
+        -- pattern matches for a single function, so it's hard to see how that
+        -- could really happen.  And we don't want accidentally different proofs
+        -- to prevent spotting equalities, and hence degrade pattern-match
+        -- overlap checking.
+    ev_term (EvExpr (Coercion a)) (EvExpr (Coercion b))
+      = a `eqCoercion` b
     ev_term _ _ = False
 
     ---------
