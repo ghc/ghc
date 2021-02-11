@@ -105,7 +105,7 @@ The only restriction is that it is coercible with the
 original data type. This means there can be arbitrary nesting of newtypes,
 as in the following example: ::
 
-    newtype Kleisli m a b = (a -> m b)
+    newtype Kleisli m a b = Kleisli (a -> m b)
       deriving (Semigroup, Monoid)
         via (a -> App m b)
 
