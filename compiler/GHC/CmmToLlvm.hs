@@ -35,6 +35,7 @@ import GHC.Utils.Error
 import GHC.Data.FastString
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Logger
 import GHC.SysTools ( figureLlvmVersion )
 import qualified GHC.Data.Stream as Stream
 
@@ -45,37 +46,37 @@ import System.IO
 -- -----------------------------------------------------------------------------
 -- | Top-level of the LLVM Code generator
 --
-llvmCodeGen :: DynFlags -> Handle
+llvmCodeGen :: Logger -> DynFlags -> Handle
                -> Stream.Stream IO RawCmmGroup a
                -> IO a
-llvmCodeGen dflags h cmm_stream
-  = withTiming dflags (text "LLVM CodeGen") (const ()) $ do
+llvmCodeGen logger dflags h cmm_stream
+  = withTiming logger dflags (text "LLVM CodeGen") (const ()) $ do
        bufh <- newBufHandle h
 
        -- Pass header
-       showPass dflags "LLVM CodeGen"
+       showPass logger dflags "LLVM CodeGen"
 
        -- get llvm version, cache for later use
-       mb_ver <- figureLlvmVersion dflags
+       mb_ver <- figureLlvmVersion logger dflags
 
        -- warn if unsupported
        forM_ mb_ver $ \ver -> do
-         debugTraceMsg dflags 2
+         debugTraceMsg logger dflags 2
               (text "Using LLVM version:" <+> text (llvmVersionStr ver))
          let doWarn = wopt Opt_WarnUnsupportedLlvmVersion dflags
-         when (not (llvmVersionSupported ver) && doWarn) $ putMsg dflags $
+         when (not (llvmVersionSupported ver) && doWarn) $ putMsg logger dflags $
            "You are using an unsupported version of LLVM!" $$
            "Currently only " <> text (llvmVersionStr supportedLlvmVersion) <> " is supported." <+>
            "System LLVM version: " <> text (llvmVersionStr ver) $$
            "We will try though..."
          let isS390X = platformArch (targetPlatform dflags) == ArchS390X
          let major_ver = head . llvmVersionList $ ver
-         when (isS390X && major_ver < 10 && doWarn) $ putMsg dflags $
+         when (isS390X && major_ver < 10 && doWarn) $ putMsg logger dflags $
            "Warning: For s390x the GHC calling convention is only supported since LLVM version 10." <+>
            "You are using LLVM version: " <> text (llvmVersionStr ver)
 
        -- run code generation
-       a <- runLlvm dflags (fromMaybe supportedLlvmVersion mb_ver) bufh $
+       a <- runLlvm logger dflags (fromMaybe supportedLlvmVersion mb_ver) bufh $
          llvmCodeGen' dflags (liftStream cmm_stream)
 
        bFlush bufh

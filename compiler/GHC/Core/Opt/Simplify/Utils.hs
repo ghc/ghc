@@ -70,6 +70,7 @@ import GHC.Utils.Misc
 import GHC.Data.OrdList ( isNilOL )
 import GHC.Utils.Monad
 import GHC.Utils.Outputable
+import GHC.Utils.Logger
 import GHC.Utils.Panic
 import GHC.Core.Opt.ConstantFold
 import GHC.Data.FastString ( fsLit )
@@ -858,10 +859,11 @@ GHC.Core.Opt.Monad
         sm_eta_expand :: Bool     -- Whether eta-expansion is enabled
 -}
 
-simplEnvForGHCi :: DynFlags -> SimplEnv
-simplEnvForGHCi dflags
+simplEnvForGHCi :: Logger -> DynFlags -> SimplEnv
+simplEnvForGHCi logger dflags
   = mkSimplEnv $ SimplMode { sm_names  = ["GHCi"]
                            , sm_phase  = InitialPhase
+                           , sm_logger = logger
                            , sm_dflags = dflags
                            , sm_uf_opts = uf_opts
                            , sm_rules  = rules_on
