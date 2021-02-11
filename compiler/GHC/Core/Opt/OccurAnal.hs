@@ -1932,17 +1932,25 @@ occAnal env (Lam x body)
     (markAllNonTail body_usage, Lam x body')
     }
 
--- For value lambdas we do a special hack.  Consider
---      (\x. \y. ...x...)
--- If we did nothing, x is used inside the \y, so would be marked
--- as dangerous to dup.  But in the common case where the abstraction
--- is applied to two arguments this is over-pessimistic.
--- So instead, we just mark each binder with its occurrence
--- info in the *body* of the multiple lambda.
--- Then, the simplifier is careful when partially applying lambdas.
+{- Note [Occurrence analysis for lambda binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For value lambdas we do a special hack.  Consider
+     (\x. \y. ...x...)
+If we did nothing, x is used inside the \y, so would be marked
+as dangerous to dup.  But in the common case where the abstraction
+is applied to two arguments this is over-pessimistic, which delays
+inlining x, which forces more simplifier iterations.
+
+So instead, we just mark each binder with its occurrence info in the
+*body* of the multiple lambda.  Then, the simplifier is careful when
+partially applying lambdas. See the calls to zapLamBndrs in
+  GHC.Core.Opt.Simplify.simplExprF1
+  GHC.Core.SimpleOpt.simple_app
+-}
 
 occAnal env expr@(Lam _ _)
-  = case occAnalLamOrRhs env bndrs body of { (usage, tagged_bndrs, body') ->
+  = -- See Note [Occurrence analysis for lambda binders]
+    case occAnalLamOrRhs env bndrs body of { (usage, tagged_bndrs, body') ->
     let
         expr'       = mkLams tagged_bndrs body'
         usage1      = markAllNonTail usage
