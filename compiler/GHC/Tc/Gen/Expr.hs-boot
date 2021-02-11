@@ -1,7 +1,8 @@
 module GHC.Tc.Gen.Expr where
 import GHC.Hs              ( HsExpr, LHsExpr, SyntaxExprRn
                            , SyntaxExprTc )
-import GHC.Tc.Utils.TcType ( TcRhoType, TcSigmaType, SyntaxOpType, ExpType, ExpRhoType )
+import GHC.Tc.Utils.TcType ( TcRhoType, TcSigmaType, SyntaxOpType
+                           , ExpType, ExpRhoType, ExpSigmaType )
 import GHC.Tc.Types        ( TcM )
 import GHC.Tc.Types.Origin ( CtOrigin )
 import GHC.Core.Type ( Mult )
@@ -21,7 +22,8 @@ tcCheckMonoExpr, tcCheckMonoExprNC ::
        -> TcRhoType
        -> TcM (LHsExpr GhcTc)
 
-tcExpr :: HsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
+tcPolyExpr :: HsExpr GhcRn -> ExpSigmaType -> TcM (HsExpr GhcTc)
+tcExpr     :: HsExpr GhcRn -> ExpRhoType   -> TcM (HsExpr GhcTc)
 
 tcInferRho, tcInferRhoNC ::
           LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcRhoType)

@@ -1482,7 +1482,7 @@ instance DisambECP (HsExpr GhcPs) where
   mkHsOverLitPV (L l a) = return $ L l (HsOverLit noExtField a)
   mkHsWildCardPV l = return $ L l hsHoleExpr
   mkHsTySigPV l a sig = return $ L l (ExprWithTySig noExtField a (hsTypeToHsSigWcType sig))
-  mkHsExplicitListPV l xs = return $ L l (ExplicitList noExtField Nothing xs)
+  mkHsExplicitListPV l xs = return $ L l (ExplicitList noExtField xs)
   mkHsSplicePV sp = return $ mapLoc (HsSpliceE noExtField) sp
   mkHsRecordPV l lrec a (fbinds, ddLoc) = do
     r <- mkRecConstrOrUpdate a lrec (fbinds, ddLoc)

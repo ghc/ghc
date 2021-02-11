@@ -160,7 +160,6 @@ Library
         GHC.Builtin.Names
         GHC.Builtin.Names.TH
         GHC.Builtin.PrimOps
-        GHC.Builtin.RebindableNames
         GHC.Builtin.Types
         GHC.Builtin.Types.Literals
         GHC.Builtin.Types.Prim

@@ -496,7 +496,6 @@ to try and
 
 {- Note [Rebindable syntax and Template Haskell]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 When processing Template Haskell quotes with Rebindable Syntax (RS) enabled,
 there are two possibilities: apply the RS rules to the quotes or don't.
 

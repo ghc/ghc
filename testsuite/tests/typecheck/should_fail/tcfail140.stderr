@@ -18,10 +18,9 @@ tcfail140.hs:12:10: error:
 
 tcfail140.hs:14:15: error:
     • Couldn't match expected type ‘a -> b’ with actual type ‘Int’
-    • The operator ‘f’ takes two value arguments,
-        but its type ‘Int -> Int’ has only one
-      In the first argument of ‘map’, namely ‘(3 `f`)’
+    • In the first argument of ‘map’, namely ‘(3 `f`)’
       In the expression: map (3 `f`) xs
+      In an equation for ‘bot’: bot xs = map (3 `f`) xs
     • Relevant bindings include
         xs :: [a] (bound at tcfail140.hs:14:5)
         bot :: [a] -> [b] (bound at tcfail140.hs:14:1)

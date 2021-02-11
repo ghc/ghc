@@ -87,6 +87,8 @@ import GHC.Types.Name.Env
 import GHC.TypeLits
 import Data.Kind (Constraint)
 
+import qualified GHC.LanguageExtensions as LangExt
+
 import Data.ByteString ( unpack )
 import Control.Monad
 import Data.List (sort, sortBy)
@@ -1482,7 +1484,7 @@ repE (HsVar _ (L _ x)) =
         Just (DsSplice e)  -> do { e' <- lift $ dsExpr e
                                  ; return (MkC e') } }
 repE (HsIPVar _ n) = rep_implicit_param_name n >>= repImplicitParamVar
-repE (HsOverLabel _ _ s) = repOverLabel s
+repE (HsOverLabel _ s) = repOverLabel s
 
 repE e@(HsRecFld _ f) = case f of
   Unambiguous x _ -> repE (HsVar noExtField (noLoc x))
@@ -1554,7 +1556,7 @@ repE e@(HsDo _ ctxt (L _ sts))
   | otherwise
   = notHandled "monad comprehension and [: :]" (ppr e)
 
-repE (ExplicitList _ _ es) = do { xs <- repLEs es; repListExp xs }
+repE (ExplicitList _ es) = do { xs <- repLEs es; repListExp xs }
 repE (ExplicitTuple _ es boxity) =
   let tupArgToCoreExp :: LHsTupArg GhcRn -> MetaM (Core (Maybe (M TH.Exp)))
       tupArgToCoreExp (L _ a)
@@ -1614,9 +1616,37 @@ repE (HsUnboundVar _ uv)   = do
                                occ   <- occNameLit uv
                                sname <- repNameS occ
                                repUnboundVar sname
-repE (XExpr (HsExpanded _ b))        = repE b
-repE e@(HsPragE _ HsPragSCC  {} _)   = notHandled "Cost centres" (ppr e)
-repE e                     = notHandled "Expression form" (ppr e)
+repE (XExpr (HsExpanded orig_expr ds_expr))
+  = do { rebindable_on <- lift $ xoptM LangExt.RebindableSyntax
+       ; if rebindable_on  -- See Note [Quotation and rebindable syntax]
+         then repE ds_expr
+         else repE orig_expr }
+
+repE e@(HsPragE _ (HsPragSCC {}) _) = notHandled "Cost centres" (ppr e)
+repE e                              = notHandled "Expression form" (ppr e)
+
+{- Note [Quotation and rebindable syntax]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  f = [| (* 3) |]
+
+Because of Note [Handling overloaded and rebindable constructs] in GHC.Rename.Expr,
+the renamer will expand (* 3) to (rightSection (*) 3), regardless of RebindableSyntax.
+Then, concerning the TH quotation,
+
+* If RebindableSyntax is off, we want the TH quote to generate the section (* 3),
+  as the user originally wrote.
+
+* If RebindableSyntax is on, we perhaps want the TH quote to generate
+  (rightSection (*) 3), using whatever 'rightSection' is in scope, because
+  (a) RebindableSyntax might not be on in the splicing context
+  (b) Even if it is, 'rightSection' might not be in scope
+  (c) At least in the case of Typed Template Haskell we should never get
+      a type error from the splice.
+
+We consult the module-wide RebindableSyntax flag here. We could instead record
+the choice in HsExpanded, but it seems simpler to consult the flag (again).
+-}
 
 -----------------------------------------------------------------------------
 -- Building representations of auxiliary structures like Match, Clause, Stmt,

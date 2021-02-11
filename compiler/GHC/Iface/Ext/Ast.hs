@@ -720,7 +720,7 @@ instance HiePass p => HasType (Located (HsExpr (GhcPass p))) where
               HsLamCase _ (MG { mg_ext = groupTy }) -> Just (matchGroupType groupTy)
               HsCase _  _ (MG { mg_ext = groupTy }) -> Just (mg_res_ty groupTy)
 
-              ExplicitList  ty _ _   -> Just (mkListTy ty)
+              ExplicitList  ty _     -> Just (mkListTy ty)
               ExplicitSum   ty _ _ _ -> Just (mkSumTy ty)
               HsDo          ty _ _   -> Just ty
               HsMultiIf     ty _     -> Just ty
@@ -1043,7 +1043,7 @@ instance HiePass p => ToHie (Located (HsExpr (GhcPass p))) where
       HsRecFld _ fld ->
         [ toHie $ RFC RecFieldOcc Nothing (L mspan fld)
         ]
-      HsOverLabel _ _ _ -> []
+      HsOverLabel {} -> []
       HsIPVar _ _ -> []
       HsOverLit _ _ -> []
       HsLit _ _ -> []
@@ -1106,7 +1106,7 @@ instance HiePass p => ToHie (Located (HsExpr (GhcPass p))) where
         [ locOnly ispan
         , toHie $ listScopes NoScope stmts
         ]
-      ExplicitList _ _ exprs ->
+      ExplicitList _ exprs ->
         [ toHie exprs
         ]
       RecordCon { rcon_con = con, rcon_flds = binds} ->

@@ -17,6 +17,3 @@ t = ((\Just x -> x) :: Maybe a -> a) (Just 1)
 
 g :: Int -> Int
 g x y = True
-
-
-

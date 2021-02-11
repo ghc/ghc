@@ -1,4 +1,4 @@
-#x :: GHC.OverloadedLabels.IsLabel "x" t => t
+#x :: GHC.OverloadedLabels.IsLabel "x" a => a
 "hello"
 "hello world"
 "goodbye world"

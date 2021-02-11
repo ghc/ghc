@@ -1,6 +1,6 @@
 
 overloadedlabelsfail01.hs:6:5: error:
-    • No instance for (IsLabel "x" t0)
+    • No instance for (IsLabel "x" a0)
         arising from the overloaded label ‘#x’
     • In the expression: #x
       In an equation for ‘a’: a = #x

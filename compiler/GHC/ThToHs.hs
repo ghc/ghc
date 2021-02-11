@@ -970,7 +970,7 @@ cvtl e = wrapL (cvt e)
                                           ; return (HsLit noExtField l') }
              -- Note [Converting strings]
       | otherwise       = do { xs' <- mapM cvtl xs
-                             ; return $ ExplicitList noExtField Nothing xs'
+                             ; return $ ExplicitList noExtField xs'
                              }
 
     -- Infix expressions
@@ -1027,7 +1027,7 @@ cvtl e = wrapL (cvt e)
                               -- constructor names - see #14627.
                               { s' <- vcName s
                               ; return $ HsVar noExtField (noLoc s') }
-    cvt (LabelE s)       = return $ HsOverLabel noExtField Nothing (fsLit s)
+    cvt (LabelE s)       = return $ HsOverLabel noExtField (fsLit s)
     cvt (ImplicitParamVarE n) = do { n' <- ipName n; return $ HsIPVar noExtField n' }
 
 {- | #16895 Ensure an infix expression's operator is a variable/constructor.

@@ -896,19 +896,23 @@ getSrcSpanM :: TcRn SrcSpan
         -- Avoid clash with Name.getSrcLoc
 getSrcSpanM = do { env <- getLclEnv; return (RealSrcSpan (tcl_loc env) Nothing) }
 
--- See Note [Rebindable syntax and HsExpansion].
+-- See Note [Error contexts in generated code]
 inGeneratedCode :: TcRn Bool
 inGeneratedCode = tcl_in_gen_code <$> getLclEnv
 
 setSrcSpan :: SrcSpan -> TcRn a -> TcRn a
-setSrcSpan (RealSrcSpan loc _) thing_inside =
-  updLclEnv (\env -> env { tcl_loc = loc, tcl_in_gen_code = False })
-            thing_inside
+-- See Note [Error contexts in generated code]
+-- for the tcl_in_gen_code manipulation
+setSrcSpan (RealSrcSpan loc _) thing_inside
+  = updLclEnv (\env -> env { tcl_loc = loc, tcl_in_gen_code = False })
+              thing_inside
+
 setSrcSpan loc@(UnhelpfulSpan _) thing_inside
-  -- See Note [Rebindable syntax and HsExpansion].
-  | isGeneratedSrcSpan loc =
-      updLclEnv (\env -> env { tcl_in_gen_code = True }) thing_inside
-  | otherwise = thing_inside
+  | isGeneratedSrcSpan loc
+  = updLclEnv (\env -> env { tcl_in_gen_code = True }) thing_inside
+
+  | otherwise
+  = thing_inside
 
 addLocM :: (a -> TcM b) -> Located a -> TcM b
 addLocM fn (L loc a) = setSrcSpan loc $ fn a
@@ -1101,7 +1105,20 @@ is applied to four arguments.  See #18379 for a concrete example.
 This reliance on delicate inlining and Called Arity is not good.
 See #18202 for a more general approach.  But meanwhile, these
 ininings seem unobjectional, and they solve the immediate
-problem. -}
+problem.
+
+Note [Error contexts in generated code]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* setSrcSpan sets tc_in_gen_code to True if the SrcSpan is GeneratedSrcSpan,
+  and back to False when we get a useful SrcSpan
+
+* When tc_in_gen_code is True, addErrCtxt becomes a no-op.
+
+So typically it's better to do setSrcSpan /before/ addErrCtxt.
+
+See Note [Rebindable syntax and HsExpansion] in GHC.Hs.Expr for
+more discussion of this fancy footwork.
+-}
 
 getErrCtxt :: TcM [ErrCtxt]
 getErrCtxt = do { env <- getLclEnv; return (tcl_ctxt env) }
@@ -1119,7 +1136,7 @@ addErrCtxt msg = addErrCtxtM (\env -> return (env, msg))
 -- | Add a message to the error context. This message may do tidying.
 addErrCtxtM :: (TidyEnv -> TcM (TidyEnv, SDoc)) -> TcM a -> TcM a
 {-# INLINE addErrCtxtM #-}  -- Note [Inlining addErrCtxt]
-addErrCtxtM ctxt m = updCtxt (push_ctxt (False, ctxt)) m
+addErrCtxtM ctxt = pushCtxt (False, ctxt)
 
 -- | Add a fixed landmark message to the error context. A landmark
 -- message is always sure to be reported, even if there is a lot of
@@ -1133,24 +1150,25 @@ addLandmarkErrCtxt msg = addLandmarkErrCtxtM (\env -> return (env, msg))
 -- and tidying.
 addLandmarkErrCtxtM :: (TidyEnv -> TcM (TidyEnv, SDoc)) -> TcM a -> TcM a
 {-# INLINE addLandmarkErrCtxtM #-}  -- Note [Inlining addErrCtxt]
-addLandmarkErrCtxtM ctxt m = updCtxt (push_ctxt (True, ctxt)) m
+addLandmarkErrCtxtM ctxt = pushCtxt (True, ctxt)
 
-push_ctxt :: (Bool, TidyEnv -> TcM (TidyEnv, SDoc))
-          -> Bool -> [ErrCtxt] -> [ErrCtxt]
-push_ctxt ctxt in_gen ctxts
-  | in_gen    = ctxts
-  | otherwise = ctxt : ctxts
+pushCtxt :: ErrCtxt -> TcM a -> TcM a
+{-# INLINE pushCtxt #-} -- Note [Inlining addErrCtxt]
+pushCtxt ctxt = updLclEnv (updCtxt ctxt)
 
-updCtxt :: (Bool -> [ErrCtxt] -> [ErrCtxt]) -> TcM a -> TcM a
-{-# INLINE updCtxt #-} -- Note [Inlining addErrCtxt]
--- Helper function for the above
--- The Bool is true if we are in generated code
-updCtxt upd = updLclEnv (\ env@(TcLclEnv { tcl_ctxt = ctxt
-                                         , tcl_in_gen_code = in_gen }) ->
-                           env { tcl_ctxt = upd in_gen ctxt })
+updCtxt :: ErrCtxt -> TcLclEnv -> TcLclEnv
+-- Do not update the context if we are in generated code
+-- See Note [Rebindable syntax and HsExpansion] in GHC.Hs.Expr
+updCtxt ctxt env@(TcLclEnv { tcl_ctxt = ctxts, tcl_in_gen_code = in_gen })
+  | in_gen    = env
+  | otherwise = env { tcl_ctxt = ctxt : ctxts }
 
 popErrCtxt :: TcM a -> TcM a
-popErrCtxt = updCtxt (\ _ msgs -> case msgs of { [] -> []; (_ : ms) -> ms })
+popErrCtxt = updLclEnv (\ env@(TcLclEnv { tcl_ctxt = ctxt }) ->
+                          env { tcl_ctxt = pop ctxt })
+           where
+             pop []       = []
+             pop (_:msgs) = msgs
 
 getCtLocM :: CtOrigin -> Maybe TypeOrKind -> TcM CtLoc
 getCtLocM origin t_or_k

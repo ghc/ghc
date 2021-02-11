@@ -17,10 +17,9 @@
 module GHC.Tc.Gen.App
        ( tcApp
        , tcInferSigma
-       , tcValArg
        , tcExprPrag ) where
 
-import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcCheckPolyExprNC )
+import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcPolyExpr )
 
 import GHC.Builtin.Types (multiplicityTy)
 import GHC.Tc.Gen.Head
@@ -137,13 +136,13 @@ tcInferSigma :: Bool -> LHsExpr GhcRn -> TcM TcSigmaType
 -- True  <=> instantiate -- return a rho-type
 -- False <=> don't instantiate -- return a sigma-type
 tcInferSigma inst (L loc rn_expr)
-  | (rn_fun, rn_args, _) <- splitHsApps rn_expr
+  | (fun@(rn_fun,_), rn_args) <- splitHsApps rn_expr
   = addExprCtxt rn_expr $
     setSrcSpan loc      $
     do { do_ql <- wantQuickLook rn_fun
-       ; (tc_fun, fun_sigma) <- tcInferAppHead rn_fun rn_args Nothing
-       ; (_delta, inst_args, app_res_sigma) <- tcInstFun do_ql inst rn_fun fun_sigma rn_args
-       ; _tc_args <- tcValArgs do_ql tc_fun inst_args
+       ; (_tc_fun, fun_sigma) <- tcInferAppHead fun rn_args Nothing
+       ; (_delta, inst_args, app_res_sigma) <- tcInstFun do_ql inst fun fun_sigma rn_args
+       ; _tc_args <- tcValArgs do_ql inst_args
        ; return app_res_sigma }
 
 {- *********************************************************************
@@ -168,6 +167,7 @@ app :: head
 head ::= f             -- HsVar:    variables
       |  fld           -- HsRecFld: record field selectors
       |  (expr :: ty)  -- ExprWithTySig: expr with user type sig
+      |  lit           -- HsOverLit: overloaded literals
       |  other_expr    -- Other expressions
 
 When tcExpr sees something that starts an application chain (namely,
@@ -259,18 +259,33 @@ Some cases that /won't/ work:
    we'll delegate back to tcExpr, which will instantiate f's type
    and the type application to @Int will fail.  Too bad!
 
+Note [Quick Look for particular Ids]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We switch on Quick Look (regardless of -XImpredicativeTypes) for certain
+particular Ids:
+
+* ($): For a long time GHC has had a special typing rule for ($), that
+  allows it to type (runST $ foo), which requires impredicative instantiation
+  of ($), without language flags.  It's a bit ad-hoc, but it's been that
+  way for ages.  Using quickLookIds is the only special treatment ($) needs
+  now, which is a lot better.
+
+* leftSection, rightSection: these are introduced by the expansion step in
+  the renamer (Note [Handling overloaded and rebindable constructs] in
+  GHC.Rename.Expr), and we want them to be instantiated impredicatively
+  so that (f `op`), say, will work OK even if `f` is higher rank.
 -}
 
 tcApp :: HsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
 -- See Note [tcApp: typechecking applications]
 tcApp rn_expr exp_res_ty
-  | (rn_fun, rn_args, rebuild) <- splitHsApps rn_expr
-  = do { (tc_fun, fun_sigma) <- tcInferAppHead rn_fun rn_args
+  | (fun@(rn_fun, fun_ctxt), rn_args) <- splitHsApps rn_expr
+  = do { (tc_fun, fun_sigma) <- tcInferAppHead fun rn_args
                                     (checkingExpType_maybe exp_res_ty)
 
        -- Instantiate
        ; do_ql <- wantQuickLook rn_fun
-       ; (delta, inst_args, app_res_rho) <- tcInstFun do_ql True rn_fun fun_sigma rn_args
+       ; (delta, inst_args, app_res_rho) <- tcInstFun do_ql True fun fun_sigma rn_args
 
        -- Quick look at result
        ; quickLookResultType do_ql delta app_res_rho exp_res_ty
@@ -287,7 +302,7 @@ tcApp rn_expr exp_res_ty
                                , text "rn_expr:"     <+> ppr rn_expr ]) }
 
        -- Typecheck the value arguments
-       ; tc_args <- tcValArgs do_ql tc_fun inst_args
+       ; tc_args <- tcValArgs do_ql inst_args
 
        -- Zonk the result type, to ensure that we substitute out
        -- any filled-in instantiation variable before calling tcWrapResultMono
@@ -300,21 +315,35 @@ tcApp rn_expr exp_res_ty
 
        -- Special case for tagToEnum#
        ; if isTagToEnum rn_fun
-         then tcTagToEnum rn_expr tc_fun tc_args app_res_rho exp_res_ty
+         then tcTagToEnum rn_expr tc_fun fun_ctxt tc_args app_res_rho exp_res_ty
          else
 
     do { -- Reconstruct
-       ; let tc_expr = rebuild tc_fun tc_args
+       ; let tc_expr = rebuildHsApps tc_fun fun_ctxt tc_args
+
+             -- Set a context for the helpful
+             --    "Probably cause: f applied to too many args"
+             -- But not in generated code, where we don't want
+             -- to mention internal (rebindable syntax) function names
+             set_res_ctxt thing_inside
+                | insideExpansion tc_args
+                = thing_inside
+                | otherwise
+                = addFunResCtxt tc_fun tc_args app_res_rho exp_res_ty thing_inside
 
        -- Wrap the result
-       ; addFunResCtxt tc_fun tc_args app_res_rho exp_res_ty $
-         tcWrapResultMono rn_expr tc_expr app_res_rho exp_res_ty } }
+       ; set_res_ctxt $ tcWrapResultMono rn_expr tc_expr app_res_rho exp_res_ty } }
 
 --------------------
 wantQuickLook :: HsExpr GhcRn -> TcM Bool
 -- GHC switches on impredicativity all the time for ($)
-wantQuickLook (HsVar _ f) | unLoc f `hasKey` dollarIdKey = return True
-wantQuickLook _                                          = xoptM LangExt.ImpredicativeTypes
+wantQuickLook (HsVar _ (L _ f))
+  | getUnique f `elem` quickLookKeys = return True
+wantQuickLook _                      = xoptM LangExt.ImpredicativeTypes
+
+quickLookKeys :: [Unique]
+-- See Note [Quick Look for particular Ids]
+quickLookKeys = [dollarIdKey, leftSectionKey, rightSectionKey]
 
 zonkQuickLook :: Bool -> TcType -> TcM TcType
 -- After all Quick Look unifications are done, zonk to ensure that all
@@ -343,24 +372,18 @@ zonkArg arg = return arg
 
 ----------------
 tcValArgs :: Bool                    -- Quick-look on?
-          -> HsExpr GhcTc            -- The function (for error messages)
           -> [HsExprArg 'TcpInst]    -- Actual argument
           -> TcM [HsExprArg 'TcpTc]  -- Resulting argument
-tcValArgs do_ql fun args
-  = go 1 args
+tcValArgs do_ql args
+  = mapM tc_arg args
   where
-    go _ [] = return []
-    go n (arg:args) = do { (n',arg') <- tc_arg n arg
-                         ; args'     <- go n' args
-                         ; return (arg' : args') }
+    tc_arg :: HsExprArg 'TcpInst -> TcM (HsExprArg 'TcpTc)
+    tc_arg (EPrag l p)           = return (EPrag l (tcExprPrag p))
+    tc_arg (EWrap w)             = return (EWrap w)
+    tc_arg (ETypeArg l hs_ty ty) = return (ETypeArg l hs_ty ty)
 
-    tc_arg :: Int -> HsExprArg 'TcpInst -> TcM (Int, HsExprArg 'TcpTc)
-    tc_arg n (EPar l)              = return (n,   EPar l)
-    tc_arg n (EPrag l p)           = return (n,   EPrag l (tcExprPrag p))
-    tc_arg n (EWrap wrap)          = return (n,   EWrap wrap)
-    tc_arg n (ETypeArg l hs_ty ty) = return (n+1, ETypeArg l hs_ty ty)
-
-    tc_arg n eva@(EValArg { eva_arg = arg, eva_arg_ty = Scaled mult arg_ty })
+    tc_arg eva@(EValArg { eva_arg = arg, eva_arg_ty = Scaled mult arg_ty
+                        , eva_ctxt = ctxt })
       = do { -- Crucial step: expose QL results before checking arg_ty
              -- So far as the paper is concerned, this step applies
              -- the poly-substitution Theta, learned by QL, so that we
@@ -373,47 +396,34 @@ tcValArgs do_ql fun args
              arg_ty <- zonkQuickLook do_ql arg_ty
 
              -- Now check the argument
-           ; arg' <- addErrCtxt (funAppCtxt fun (eValArgExpr arg) n) $
-                     tcScalingUsage mult $
+           ; arg' <- tcScalingUsage mult $
                      do { traceTc "tcEValArg" $
-                          vcat [ ppr n <+> text "of" <+> ppr fun
+                          vcat [ ppr ctxt
                                , text "arg type:" <+> ppr arg_ty
                                , text "arg:" <+> ppr arg ]
-                        ; tcEValArg arg arg_ty }
+                        ; tcEValArg ctxt arg arg_ty }
 
-           ; return (n+1, eva { eva_arg = ValArg arg'
-                              , eva_arg_ty = Scaled mult arg_ty }) }
+           ; return (eva { eva_arg    = ValArg arg'
+                         , eva_arg_ty = Scaled mult arg_ty }) }
 
-tcEValArg :: EValArg 'TcpInst -> TcSigmaType -> TcM (LHsExpr GhcTc)
+tcEValArg :: AppCtxt -> EValArg 'TcpInst -> TcSigmaType -> TcM (LHsExpr GhcTc)
 -- Typecheck one value argument of a function call
-tcEValArg (ValArg arg) exp_arg_sigma
-  = tcCheckPolyExprNC arg exp_arg_sigma
+tcEValArg ctxt (ValArg larg@(L arg_loc arg)) exp_arg_sigma
+  = addArgCtxt ctxt larg $
+    do { arg' <- tcPolyExpr arg (mkCheckExpType exp_arg_sigma)
+       ; return (L arg_loc arg') }
 
-tcEValArg (ValArgQL { va_expr = L loc _, va_fun = fun, va_args = args
-                    , va_ty = app_res_rho, va_rebuild = rebuild }) exp_arg_sigma
-  = setSrcSpan loc $
-    do { traceTc "tcEValArg {" (vcat [ ppr fun <+> ppr args ])
-       ; tc_args <- tcValArgs True fun args
-       ; co <- unifyType Nothing app_res_rho exp_arg_sigma
+tcEValArg ctxt (ValArgQL { va_expr = larg@(L arg_loc _)
+                         , va_fun = (inner_fun, fun_ctxt)
+                         , va_args = inner_args
+                         , va_ty = app_res_rho }) exp_arg_sigma
+  = addArgCtxt ctxt larg $
+    do { traceTc "tcEValArgQL {" (vcat [ ppr inner_fun <+> ppr inner_args ])
+       ; tc_args <- tcValArgs True inner_args
+       ; co      <- unifyType Nothing app_res_rho exp_arg_sigma
        ; traceTc "tcEValArg }" empty
-       ; return (L loc $ mkHsWrapCo co $ rebuild fun tc_args) }
-
-----------------
-tcValArg :: HsExpr GhcRn          -- The function (for error messages)
-         -> LHsExpr GhcRn         -- Actual argument
-         -> Scaled TcSigmaType    -- expected arg type
-         -> Int                   -- # of argument
-         -> TcM (LHsExpr GhcTc)   -- Resulting argument
--- tcValArg is called only from Gen.Expr, dealing with left and right sections
-tcValArg fun arg (Scaled mult arg_ty) arg_no
-   = addErrCtxt (funAppCtxt fun arg arg_no) $
-     tcScalingUsage mult $
-     do { traceTc "tcValArg" $
-          vcat [ ppr arg_no <+> text "of" <+> ppr fun
-               , text "arg type:" <+> ppr arg_ty
-               , text "arg:" <+> ppr arg ]
-        ; tcCheckPolyExprNC arg arg_ty }
-
+       ; return (L arg_loc $ mkHsWrapCo co $
+                 rebuildHsApps inner_fun fun_ctxt tc_args) }
 
 {- *********************************************************************
 *                                                                      *
@@ -435,18 +445,33 @@ tcInstFun :: Bool   -- True  <=> Do quick-look
                     --    in tcInferSigma, which is used only to implement :type
                     -- Otherwise we do eager instantiation; in Fig 5 of the paper
                     --    |-inst returns a rho-type
-          -> HsExpr GhcRn -> TcSigmaType -> [HsExprArg 'TcpRn]
+          -> (HsExpr GhcRn, AppCtxt)        -- Error messages only
+          -> TcSigmaType -> [HsExprArg 'TcpRn]
           -> TcM ( Delta
                  , [HsExprArg 'TcpInst]
                  , TcSigmaType )
 -- This function implements the |-inst judgement in Fig 4, plus the
 -- modification in Fig 5, of the QL paper:
 -- "A quick look at impredicativity" (ICFP'20).
-tcInstFun do_ql inst_final rn_fun fun_sigma rn_args
-  = do { traceTc "tcInstFun" (ppr rn_fun $$ ppr rn_args $$ text "do_ql" <+> ppr do_ql)
+tcInstFun do_ql inst_final (rn_fun, fun_ctxt) fun_sigma rn_args
+  = do { traceTc "tcInstFun" (vcat [ ppr rn_fun, ppr fun_sigma
+                                   , text "args:" <+> ppr rn_args
+                                   , text "do_ql" <+> ppr do_ql ])
        ; go emptyVarSet [] [] fun_sigma rn_args }
   where
-    fun_orig = exprCtOrigin rn_fun
+    fun_loc  = appCtxtLoc fun_ctxt
+    fun_orig = exprCtOrigin (case fun_ctxt of
+                               VAExpansion e _ -> e
+                               VACall e _ _    -> e)
+    set_fun_ctxt thing_inside
+      | not (isGoodSrcSpan fun_loc)   -- noSrcSpan => no arguments
+      = thing_inside                  -- => context is already set
+      | otherwise
+      = setSrcSpan fun_loc $
+        case fun_ctxt of
+          VAExpansion orig _ -> addExprCtxt orig thing_inside
+          VACall {}          -> thing_inside
+
     herald = sep [ text "The function" <+> quotes (ppr rn_fun)
                  , text "is applied to"]
 
@@ -497,13 +522,14 @@ tcInstFun do_ql inst_final rn_fun fun_sigma rn_args
     --      ('go' dealt with that case)
 
     -- Rule IALL from Fig 4 of the QL paper
+    -- c.f. GHC.Tc.Utils.Instantiate.topInstantiate
     go1 delta acc so_far fun_ty args
       | (tvs,   body1) <- tcSplitSomeForAllTyVars (inst_fun args) fun_ty
       , (theta, body2) <- tcSplitPhiTy body1
       , not (null tvs && null theta)
-      = do { (inst_tvs, wrap, fun_rho) <- setSrcSpanFromArgs rn_args $
+      = do { (inst_tvs, wrap, fun_rho) <- set_fun_ctxt $
                                           instantiateSigma fun_orig tvs theta body2
-                 -- setSrcSpanFromArgs: important for the class constraints
+                 -- set_fun_ctxt: important for the class constraints
                  -- that may be emitted from instantiating fun_sigma
            ; go (delta `extendVarSetList` inst_tvs)
                 (addArgWrap wrap acc) so_far fun_rho args }
@@ -515,21 +541,21 @@ tcInstFun do_ql inst_final rn_fun fun_sigma rn_args
        = do { traceTc "tcInstFun:ret" (ppr fun_ty)
             ; return (delta, reverse acc, fun_ty) }
 
-    go1 delta acc so_far fun_ty (EPar sp : args)
-      = go1 delta (EPar sp : acc) so_far fun_ty args
+    go1 delta acc so_far fun_ty (EWrap w : args)
+      = go1 delta (EWrap w : acc) so_far fun_ty args
 
     go1 delta acc so_far fun_ty (EPrag sp prag : args)
       = go1 delta (EPrag sp prag : acc) so_far fun_ty args
 
     -- Rule ITYARG from Fig 4 of the QL paper
-    go1 delta acc so_far fun_ty ( ETypeArg { eva_loc = loc, eva_hs_ty = hs_ty }
+    go1 delta acc so_far fun_ty ( ETypeArg { eva_ctxt = ctxt, eva_hs_ty = hs_ty }
                                 : rest_args )
       | fun_is_out_of_scope   -- See Note [VTA for out-of-scope functions]
       = go delta acc so_far fun_ty rest_args
 
       | otherwise
       = do { (ty_arg, inst_ty) <- tcVTA fun_ty hs_ty
-           ; let arg' = ETypeArg { eva_loc = loc, eva_hs_ty = hs_ty, eva_ty = ty_arg }
+           ; let arg' = ETypeArg { eva_ctxt = ctxt, eva_hs_ty = hs_ty, eva_ty = ty_arg }
            ; go delta (arg' : acc) so_far inst_ty rest_args }
 
     -- Rule IVAR from Fig 4 of the QL paper:
@@ -573,15 +599,12 @@ tcInstFun do_ql inst_final rn_fun fun_sigma rn_args
 
     -- Rule IARG from Fig 4 of the QL paper:
     go1 delta acc so_far fun_ty
-        (eva@(EValArg { eva_arg = ValArg arg })  : rest_args)
+        (eva@(EValArg { eva_arg = ValArg arg, eva_ctxt = ctxt })  : rest_args)
       = do { (wrap, arg_ty, res_ty) <- matchActualFunTySigma herald
                                           (Just (ppr rn_fun))
                                           (n_val_args, so_far) fun_ty
-          ; let arg_no = 1 + count isVisibleArg acc
-                -- We could cache this in a pair with acc; but
-                -- it's only evaluated if there's a type error
           ; (delta', arg') <- if do_ql
-                              then addErrCtxt (funAppCtxt rn_fun arg arg_no) $
+                              then addArgCtxt ctxt arg $
                                    -- Context needed for constraints
                                    -- generated by calls in arg
                                    quickLookArg delta arg arg_ty
@@ -591,6 +614,21 @@ tcInstFun do_ql inst_final rn_fun fun_sigma rn_args
           ; go delta' acc' (arg_ty:so_far) res_ty rest_args }
 
 
+addArgCtxt :: AppCtxt -> LHsExpr GhcRn
+           -> TcM a -> TcM a
+-- Adds a "In the third argument of f, namely blah"
+-- context, unless we are in generated code, in which case
+-- use "In the expression: arg"
+---See Note [Rebindable syntax and HsExpansion] in GHC.Hs.Expr
+addArgCtxt (VACall fun arg_no _) (L arg_loc arg) thing_inside
+  = setSrcSpan arg_loc $
+    addErrCtxt (funAppCtxt fun arg arg_no) $
+    thing_inside
+
+addArgCtxt (VAExpansion {}) (L arg_loc arg) thing_inside
+  = setSrcSpan arg_loc $
+    addExprCtxt arg    $  -- Auto-suppressed if arg_loc is generated
+    thing_inside
 
 {- *********************************************************************
 *                                                                      *
@@ -756,7 +794,7 @@ quickLookArg delta larg (Scaled _ arg_ty)
   | isEmptyVarSet delta  = skipQuickLook delta larg
   | otherwise            = go arg_ty
   where
-    guarded         = isGuardedTy arg_ty
+    guarded = isGuardedTy arg_ty
       -- NB: guardedness is computed based on the original,
       -- unzonked arg_ty, so we deliberately do not exploit
       -- guardedness that emerges a result of QL on earlier args
@@ -785,9 +823,8 @@ isGuardedTy ty
 
 quickLookArg1 :: Bool -> Delta -> LHsExpr GhcRn -> TcSigmaType
               -> TcM (Delta, EValArg 'TcpInst)
-quickLookArg1 guarded delta larg@(L loc arg) arg_ty
-  = setSrcSpan loc $
-    do { let (rn_fun,rn_args,rebuild) = splitHsApps arg
+quickLookArg1 guarded delta larg@(L _ arg) arg_ty
+  = do { let (fun@(rn_fun, fun_ctxt), rn_args) = splitHsApps arg
        ; mb_fun_ty <- tcInferAppHead_maybe rn_fun rn_args (Just arg_ty)
        ; traceTc "quickLookArg 1" $
          vcat [ text "arg:" <+> ppr arg
@@ -797,19 +834,20 @@ quickLookArg1 guarded delta larg@(L loc arg) arg_ty
        ; case mb_fun_ty of {
            Nothing     -> -- fun is too complicated
                           skipQuickLook delta larg ;
-           Just (fun', fun_sigma) ->
+           Just (tc_fun, fun_sigma) ->
 
     do { let no_free_kappas = findNoQuantVars fun_sigma rn_args
        ; traceTc "quickLookArg 2" $
          vcat [ text "no_free_kappas:" <+> ppr no_free_kappas
-              , text "guarded:" <+> ppr guarded ]
+              , text "guarded:" <+> ppr guarded
+              , text "tc_fun:" <+> ppr tc_fun
+              , text "fun_sigma:" <+> ppr fun_sigma ]
        ; if not (guarded || no_free_kappas)
          then skipQuickLook delta larg
          else
     do { do_ql <- wantQuickLook rn_fun
-       ; (delta_app, inst_args, app_res_rho)
-             <- tcInstFun do_ql True rn_fun fun_sigma rn_args
-       ; traceTc "quickLookArg" $
+       ; (delta_app, inst_args, app_res_rho) <- tcInstFun do_ql True fun fun_sigma rn_args
+       ; traceTc "quickLookArg 3" $
          vcat [ text "arg:" <+> ppr arg
               , text "delta:" <+> ppr delta
               , text "delta_app:" <+> ppr delta_app
@@ -821,10 +859,10 @@ quickLookArg1 guarded delta larg@(L loc arg) arg_ty
        ; let delta' = delta `unionVarSet` delta_app
        ; qlUnify delta' arg_ty app_res_rho
 
-       ; let ql_arg = ValArgQL { va_expr = larg, va_fun = fun'
-                               , va_args = inst_args
-                               , va_ty = app_res_rho
-                               , va_rebuild = rebuild }
+       ; let ql_arg = ValArgQL { va_expr  = larg
+                               , va_fun   = (tc_fun, fun_ctxt)
+                               , va_args  = inst_args
+                               , va_ty    = app_res_rho }
        ; return (delta', ql_arg) } } } }
 
 skipQuickLook :: Delta -> LHsExpr GhcRn -> TcM (Delta, EValArg 'TcpInst)
@@ -1013,7 +1051,7 @@ findNoQuantVars fun_ty args
 
     go bvs fun_ty [] =  tyCoVarsOfType fun_ty `disjointVarSet` bvs
 
-    go bvs fun_ty (EPar {}  : args) = go bvs fun_ty args
+    go bvs fun_ty (EWrap {} : args) = go bvs fun_ty args
     go bvs fun_ty (EPrag {} : args) = go bvs fun_ty args
 
     go bvs fun_ty args@(ETypeArg {} : rest_args)
@@ -1071,12 +1109,13 @@ isTagToEnum :: HsExpr GhcRn -> Bool
 isTagToEnum (HsVar _ (L _ fun_id)) = fun_id `hasKey` tagToEnumKey
 isTagToEnum _ = False
 
-tcTagToEnum :: HsExpr GhcRn -> HsExpr GhcTc -> [HsExprArg 'TcpTc]
+tcTagToEnum :: HsExpr GhcRn
+            -> HsExpr GhcTc -> AppCtxt -> [HsExprArg 'TcpTc]
             -> TcRhoType -> ExpRhoType
             -> TcM (HsExpr GhcTc)
 -- tagToEnum# :: forall a. Int# -> a
 -- See Note [tagToEnum#]   Urgh!
-tcTagToEnum expr fun args app_res_ty res_ty
+tcTagToEnum expr fun fun_ctxt args app_res_ty res_ty
   | null val_args
   = failWithTc (text "tagToEnum# must appear applied to one argument")
 
@@ -1101,7 +1140,7 @@ tcTagToEnum expr fun args app_res_ty res_ty
          check_enumeration ty' rep_tc
        ; let rep_ty  = mkTyConApp rep_tc rep_args
              fun'    = mkHsWrap (WpTyApp rep_ty) fun
-             expr'   = rebuildPrefixApps fun' val_args
+             expr'   = rebuildHsApps fun' fun_ctxt val_args
              df_wrap = mkWpCastR (mkTcSymCo coi)
        ; return (mkHsWrap df_wrap expr') }}}}}
 
@@ -1109,7 +1148,7 @@ tcTagToEnum expr fun args app_res_ty res_ty
     val_args = dropWhile (not . isHsValArg) args
 
     vanilla_result
-      = do { let expr' = rebuildPrefixApps fun args
+      = do { let expr' = rebuildHsApps fun fun_ctxt args
            ; tcWrapResultMono expr expr' app_res_ty res_ty }
 
     check_enumeration ty' tc

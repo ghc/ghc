@@ -40,8 +40,9 @@ module GHC.Rename.Env (
         lookupGreAvailRn,
 
         -- Rebindable Syntax
-        lookupSyntax, lookupSyntaxExpr, lookupSyntaxName, lookupSyntaxNames,
-        lookupIfThenElse, lookupReboundIf,
+        lookupSyntax, lookupSyntaxExpr, lookupSyntaxNames,
+        lookupSyntaxName,
+        lookupIfThenElse,
 
         -- QualifiedDo
         lookupQualifiedDoExpr, lookupQualifiedDo,
@@ -67,7 +68,6 @@ import GHC.Types.Name.Reader
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
 import GHC.Parser.PostProcess ( setRdrNameSpace )
-import GHC.Builtin.RebindableNames
 import GHC.Builtin.Types
 import GHC.Types.Name
 import GHC.Types.Name.Set
@@ -1950,40 +1950,42 @@ We treat the original (standard) names as free-vars too, because the type checke
 checks the type of the user thing against the type of the standard thing.
 -}
 
-lookupIfThenElse :: Bool  -- False <=> don't use rebindable syntax under any conditions
-                 -> RnM (SyntaxExpr GhcRn, FreeVars)
--- Different to lookupSyntax because in the non-rebindable
--- case we desugar directly rather than calling an existing function
--- Hence the (Maybe (SyntaxExpr GhcRn)) return type
-lookupIfThenElse maybe_use_rs
+lookupIfThenElse :: RnM (Maybe Name)
+-- Looks up "ifThenElse" if rebindable syntax is on
+lookupIfThenElse
   = do { rebindable_on <- xoptM LangExt.RebindableSyntax
-       ; if not (rebindable_on && maybe_use_rs)
-         then return (NoSyntaxExprRn, emptyFVs)
+       ; if not rebindable_on
+         then return Nothing
          else do { ite <- lookupOccRn (mkVarUnqual (fsLit "ifThenElse"))
-                 ; return ( mkRnSyntaxExpr ite
-                          , unitFV ite ) } }
+                 ; return (Just ite) } }
 
-lookupSyntaxName :: Name                      -- ^ The standard name
-                 -> RnM (Name, FreeVars)      -- ^ Possibly a non-standard name
+lookupSyntaxName :: Name                 -- ^ The standard name
+                 -> RnM (Name, FreeVars) -- ^ Possibly a non-standard name
+-- Lookup a Name that may be subject to Rebindable Syntax (RS).
+--
+-- - When RS is off, just return the supplied (standard) Name
+--
+-- - When RS is on, look up the OccName of the supplied Name; return
+--   what we find, or the supplied Name if there is nothing in scope
 lookupSyntaxName std_name
-  = do { rebindable_on <- xoptM LangExt.RebindableSyntax
-       ; if not rebindable_on then
-           return (std_name, emptyFVs)
-         else
-            -- Get the similarly named thing from the local environment
-           do { usr_name <- lookupOccRn (mkRdrUnqual (nameOccName std_name))
-              ; return (usr_name, unitFV usr_name) } }
+  = do { rebind <- xoptM LangExt.RebindableSyntax
+       ; if not rebind
+         then return (std_name, emptyFVs)
+         else do { nm <- lookupOccRn (mkRdrUnqual (nameOccName std_name))
+                 ; return (nm, unitFV nm) } }
 
 lookupSyntaxExpr :: Name                          -- ^ The standard name
                  -> RnM (HsExpr GhcRn, FreeVars)  -- ^ Possibly a non-standard name
 lookupSyntaxExpr std_name
-  = fmap (first nl_HsVar) $ lookupSyntaxName std_name
+  = do { (name, fvs) <- lookupSyntaxName std_name
+       ; return (nl_HsVar name, fvs) }
 
 lookupSyntax :: Name                             -- The standard name
              -> RnM (SyntaxExpr GhcRn, FreeVars) -- Possibly a non-standard
                                                  -- name
 lookupSyntax std_name
-  = fmap (first mkSyntaxExpr) $ lookupSyntaxExpr std_name
+  = do { (expr, fvs) <- lookupSyntaxExpr std_name
+       ; return (mkSyntaxExpr expr, fvs) }
 
 lookupSyntaxNames :: [Name]                         -- Standard names
      -> RnM ([HsExpr GhcRn], FreeVars) -- See comments with HsExpr.ReboundNames
@@ -1995,6 +1997,7 @@ lookupSyntaxNames std_names
         else
           do { usr_names <- mapM (lookupOccRn . mkRdrUnqual . nameOccName) std_names
              ; return (map (HsVar noExtField . noLoc) usr_names, mkFVs usr_names) } }
+
 
 {-
 Note [QualifiedDo]
@@ -2040,33 +2043,7 @@ lookupQualifiedDoName ctxt std_name
       Just modName -> lookupNameWithQualifier std_name modName
 
 
--- Lookup a locally-rebound name for Rebindable Syntax (RS).
---
--- - When RS is off, 'lookupRebound' just returns 'Nothing', whatever
---   name it is given.
---
--- - When RS is on, we always try to return a 'Just', and GHC errors out
---   if no suitable name is found in the environment.
---
--- 'Nothing' really is "reserved" and means that rebindable syntax is off.
-lookupRebound :: FastString -> RnM (Maybe (Located Name))
-lookupRebound nameStr = do
-  rebind <- xoptM LangExt.RebindableSyntax
-  if rebind
-    -- If repetitive lookups ever become a problem perormance-wise,
-    -- we could lookup all the names we will ever care about just once
-    -- at the beginning and stick them in the environment, possibly
-    -- populating that "cache" lazily too.
-    then (\nm -> Just (L (nameSrcSpan nm) nm)) <$>
-         lookupOccRn (mkVarUnqual nameStr)
-    else pure Nothing
-
--- | Lookup an @ifThenElse@ binding (see 'lookupRebound').
-lookupReboundIf :: RnM (Maybe (Located Name))
-lookupReboundIf = lookupRebound reboundIfSymbol
-
 -- Error messages
-
 
 opDeclErr :: RdrName -> SDoc
 opDeclErr n

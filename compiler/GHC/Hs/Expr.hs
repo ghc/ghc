@@ -66,14 +66,13 @@ import Data.Data hiding (Fixity(..))
 import qualified Data.Data as Data (Fixity(..))
 import qualified Data.Kind
 import Data.Maybe (isJust)
+import Data.Void  ( Void )
 
-{-
-************************************************************************
+{- *********************************************************************
 *                                                                      *
-\subsection{Expressions proper}
+                Expressions proper
 *                                                                      *
-************************************************************************
--}
+********************************************************************* -}
 
 -- | Post-Type checking Expression
 --
@@ -191,16 +190,33 @@ type instance PendingTcSplice' (GhcPass _) = PendingTcSplice
 
 -- ---------------------------------------------------------------------
 
+{- Note [Constructor cannot occur]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Some data constructors can't occur in certain phases; e.g. the output
+of the type checker never has OverLabel. We signal this by setting
+the extension field to Void. For example:
+   type instance XOverLabel GhcTc = Void
+   dsExpr (HsOverLabel x _) = absurd x
+
+It would be better to omit the pattern match altogether, but we
+could only do that if the extension field was strict (#18764)
+-}
+
 type instance XVar           (GhcPass _) = NoExtField
 type instance XConLikeOut    (GhcPass _) = NoExtField
 type instance XRecFld        (GhcPass _) = NoExtField
-type instance XOverLabel     (GhcPass _) = NoExtField
 type instance XIPVar         (GhcPass _) = NoExtField
 type instance XOverLitE      (GhcPass _) = NoExtField
 type instance XLitE          (GhcPass _) = NoExtField
 type instance XLam           (GhcPass _) = NoExtField
 type instance XLamCase       (GhcPass _) = NoExtField
 type instance XApp           (GhcPass _) = NoExtField
+
+-- OverLabel not present in GhcTc pass; see GHC.Rename.Expr
+-- Note [Handling overloaded and rebindable constructs]
+type instance XOverLabel     GhcPs = NoExtField
+type instance XOverLabel     GhcRn = NoExtField
+type instance XOverLabel     GhcTc = Void  -- See Note [Constructor cannot occur]
 
 type instance XUnboundVar    GhcPs = NoExtField
 type instance XUnboundVar    GhcRn = NoExtField
@@ -214,14 +230,24 @@ type instance XAppTypeE      GhcPs = NoExtField
 type instance XAppTypeE      GhcRn = NoExtField
 type instance XAppTypeE      GhcTc = Type
 
+-- OpApp not present in GhcTc pass; see GHC.Rename.Expr
+-- Note [Handling overloaded and rebindable constructs]
 type instance XOpApp         GhcPs = NoExtField
 type instance XOpApp         GhcRn = Fixity
-type instance XOpApp         GhcTc = Fixity
+type instance XOpApp         GhcTc = Void  -- See Note [Constructor cannot occur]
+
+-- SectionL, SectionR not present in GhcTc pass; see GHC.Rename.Expr
+-- Note [Handling overloaded and rebindable constructs]
+type instance XSectionL      GhcPs = NoExtField
+type instance XSectionR      GhcPs = NoExtField
+type instance XSectionL      GhcRn = NoExtField
+type instance XSectionR      GhcRn = NoExtField
+type instance XSectionL      GhcTc = Void  -- See Note [Constructor cannot occur]
+type instance XSectionR      GhcTc = Void  -- See Note [Constructor cannot occur]
+
 
 type instance XNegApp        (GhcPass _) = NoExtField
 type instance XPar           (GhcPass _) = NoExtField
-type instance XSectionL      (GhcPass _) = NoExtField
-type instance XSectionR      (GhcPass _) = NoExtField
 type instance XExplicitTuple (GhcPass _) = NoExtField
 
 type instance XExplicitSum   GhcPs = NoExtField
@@ -245,6 +271,13 @@ type instance XDo            GhcTc = Type
 type instance XExplicitList  GhcPs = NoExtField
 type instance XExplicitList  GhcRn = NoExtField
 type instance XExplicitList  GhcTc = Type
+-- GhcPs: ExplicitList includes all source-level
+--   list literals, including overloaded ones
+-- GhcRn and GhcTc: ExplicitList used only for list literals
+--   that denote Haskell's built-in lists.  Overloaded lists
+--   have been expanded away in the renamer
+-- See Note [Handling overloaded and rebindable constructs]
+-- in  GHC.Rename.Expr
 
 type instance XRecordCon     GhcPs = NoExtField
 type instance XRecordCon     GhcRn = NoExtField
@@ -287,8 +320,6 @@ type instance XXExpr         GhcTc       = XXExprGhcTc
 data XXExprGhcTc
   = WrapExpr {-# UNPACK #-} !(HsWrap HsExpr)
   | ExpansionExpr {-# UNPACK #-} !(HsExpansion (HsExpr GhcRn) (HsExpr GhcTc))
-
-
 
 -- ---------------------------------------------------------------------
 
@@ -346,7 +377,7 @@ ppr_expr (HsUnboundVar _ uv) = pprPrefixOcc uv
 ppr_expr (HsConLikeOut _ c)  = pprPrefixOcc c
 ppr_expr (HsRecFld _ f)      = pprPrefixOcc f
 ppr_expr (HsIPVar _ v)       = ppr v
-ppr_expr (HsOverLabel _ _ l) = char '#' <> ppr l
+ppr_expr (HsOverLabel _ l)   = char '#' <> ppr l
 ppr_expr (HsLit _ lit)       = ppr lit
 ppr_expr (HsOverLit _ lit)   = ppr lit
 ppr_expr (HsPar _ e)         = parens (ppr_lexpr e)
@@ -465,7 +496,7 @@ ppr_expr (HsLet _ (L _ binds) expr)
 
 ppr_expr (HsDo _ do_or_list_comp (L _ stmts)) = pprDo do_or_list_comp stmts
 
-ppr_expr (ExplicitList _ _ exprs)
+ppr_expr (ExplicitList _ exprs)
   = brackets (pprDeeperList fsep (punctuate comma (map ppr_lexpr exprs)))
 
 ppr_expr (RecordCon { rcon_con = con, rcon_flds = rbinds })
@@ -676,6 +707,139 @@ instance Outputable (HsPragE (GhcPass p)) where
      -- no doublequotes if stl empty, for the case where the SCC was written
      -- without quotes.
     <+> pprWithSourceText stl (ftext lbl) <+> text "#-}"
+
+
+{- *********************************************************************
+*                                                                      *
+             HsExpansion and rebindable syntax
+*                                                                      *
+********************************************************************* -}
+
+{- Note [Rebindable syntax and HsExpansion]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We implement rebindable syntax (RS) support by performing a desugaring
+in the renamer. We transform GhcPs expressions affected by RS into the
+appropriate desugared form, but **annotated with the original expression**.
+
+Let us consider a piece of code like:
+
+    {-# LANGUAGE RebindableSyntax #-}
+    ifThenElse :: Char -> () -> () -> ()
+    ifThenElse _ _ _ = ()
+    x = if 'a' then () else True
+
+The parsed AST for the RHS of x would look something like (slightly simplified):
+
+    L locif (HsIf (L loca 'a') (L loctrue ()) (L locfalse True))
+
+Upon seeing such an AST with RS on, we could transform it into a
+mere function call, as per the RS rules, equivalent to the
+following function application:
+
+    ifThenElse 'a' () True
+
+which doesn't typecheck. But GHC would report an error about
+not being able to match the third argument's type (Bool) with the
+expected type: (), in the expression _as desugared_, i.e in
+the aforementioned function application. But the user never
+wrote a function application! This would be pretty bad.
+
+To remedy this, instead of transforming the original HsIf
+node into mere applications of 'ifThenElse', we keep the
+original 'if' expression around too, using the TTG
+XExpr extension point to allow GHC to construct an
+'HsExpansion' value that will keep track of the original
+expression in its first field, and the desugared one in the
+second field. The resulting renamed AST would look like:
+
+    L locif (XExpr
+      (HsExpanded
+        (HsIf (L loca 'a')
+              (L loctrue ())
+              (L locfalse True)
+        )
+        (App (L generatedSrcSpan
+                (App (L generatedSrcSpan
+                        (App (L generatedSrcSpan (Var ifThenElse))
+                             (L loca 'a')
+                        )
+                     )
+                     (L loctrue ())
+                )
+             )
+             (L locfalse True)
+        )
+      )
+    )
+
+When comes the time to typecheck the program, we end up calling
+tcMonoExpr on the AST above. If this expression gives rise to
+a type error, then it will appear in a context line and GHC
+will pretty-print it using the 'Outputable (HsExpansion a b)'
+instance defined below, which *only prints the original
+expression*. This is the gist of the idea, but is not quite
+enough to recover the error messages that we had with the
+SyntaxExpr-based, typechecking/desugaring-to-core time
+implementation of rebindable syntax. The key idea is to decorate
+some elements of the desugared expression so as to be able to
+give them a special treatment when typechecking the desugared
+expression, to print a different context line or skip one
+altogether.
+
+Whenever we 'setSrcSpan' a 'generatedSrcSpan', we update a field in
+TcLclEnv called 'tcl_in_gen_code', setting it to True, which indicates that we
+entered generated code, i.e code fabricated by the compiler when rebinding some
+syntax. If someone tries to push some error context line while that field is set
+to True, the pushing won't actually happen and the context line is just dropped.
+Once we 'setSrcSpan' a real span (for an expression that was in the original
+source code), we set 'tcl_in_gen_code' back to False, indicating that we
+"emerged from the generated code tunnel", and that the expressions we will be
+processing are relevant to report in context lines again.
+
+You might wonder why TcLclEnv has both
+   tcl_loc         :: RealSrcSpan
+   tcl_in_gen_code :: Bool
+Could we not store a Maybe RealSrcSpan? The problem is that we still
+generate constraints when processing generated code, and a CtLoc must
+contain a RealSrcSpan -- otherwise, error messages might appear
+without source locations. So tcl_loc keeps the RealSrcSpan of the last
+location spotted that wasn't generated; it's as good as we're going to
+get in generated code. Once we get to sub-trees that are not
+generated, then we update the RealSrcSpan appropriately, and set the
+tcl_in_gen_code Bool to False.
+
+---
+
+A general recipe to follow this approach for new constructs could go as follows:
+
+- Remove any GhcRn-time SyntaxExpr extensions to the relevant constructor for your
+  construct, in HsExpr or related syntax data types.
+- At renaming-time:
+    - take your original node of interest (HsIf above)
+    - rename its subexpressions (condition, true branch, false branch above)
+    - construct the suitable "rebound"-and-renamed result (ifThenElse call
+      above), where the 'SrcSpan' attached to any _fabricated node_ (the
+      HsVar/HsApp nodes, above) is set to 'generatedSrcSpan'
+    - take both the original node and that rebound-and-renamed result and wrap
+      them in an XExpr: XExpr (HsExpanded <original node> <desugared>)
+ - At typechecking-time:
+    - remove any logic that was previously dealing with your rebindable
+      construct, typically involving [tc]SyntaxOp, SyntaxExpr and friends.
+    - the XExpr (HsExpanded ... ...) case in tcExpr already makes sure that we
+      typecheck the desugared expression while reporting the original one in
+      errors
+
+-}
+
+-- See Note [Rebindable syntax and HsExpansion] just above.
+data HsExpansion a b
+  = HsExpanded a b
+  deriving Data
+
+-- | Just print the original expression (the @a@).
+instance (Outputable a, Outputable b) => Outputable (HsExpansion a b) where
+  ppr (HsExpanded a b) = ifPprDebug (vcat [ppr a, ppr b]) (ppr a)
+
 
 {-
 ************************************************************************

@@ -16,10 +16,10 @@
 -}
 
 module GHC.Tc.Gen.Head
-       ( HsExprArg(..), EValArg(..), TcPass(..), Rebuilder
-       , splitHsApps
-       , addArgWrap, eValArgExpr, isHsValArg, setSrcSpanFromArgs
-       , countLeadingValArgs, isVisibleArg, pprHsExprArgTc, rebuildPrefixApps
+       ( HsExprArg(..), EValArg(..), TcPass(..), AppCtxt(..), appCtxtLoc
+       , splitHsApps, rebuildHsApps
+       , addArgWrap, isHsValArg, insideExpansion
+       , countLeadingValArgs, isVisibleArg, pprHsExprArgTc
 
        , tcInferAppHead, tcInferAppHead_maybe
        , tcInferId, tcCheckId
@@ -27,7 +27,7 @@ module GHC.Tc.Gen.Head
        , tyConOf, tyConOfET, lookupParents, fieldNotInType
        , notSelector, nonBidirectionalErr
 
-       , addExprCtxt, addLExprCtxt, addFunResCtxt ) where
+       , addExprCtxt, addFunResCtxt ) where
 
 import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcExpr, tcCheckMonoExprNC, tcCheckPolyExprNC )
 
@@ -47,6 +47,7 @@ import GHC.Rename.Env         ( addUsedGRE )
 import GHC.Rename.Utils       ( addNameClashErrRn, unknownSubordinateErr )
 import GHC.Tc.Solver          ( InferMode(..), simplifyInfer )
 import GHC.Tc.Utils.Env
+import GHC.Tc.Utils.Zonk      ( hsLitType )
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType as TcType
@@ -134,20 +135,24 @@ Invariants:
    under the conditions when quick-look should happen (eg the argument
    type is guarded) -- see quickLookArg
 
-Note [splitHsApps and Rebuilder]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [splitHsApps]
+~~~~~~~~~~~~~~~~~~
 The key function
-  splitHsApps :: HsExpr GhcRn -> (HsExpr GhcRn, [HsExprArg 'TcpRn], Rebuilder)
+  splitHsApps :: HsExpr GhcRn -> (HsExpr GhcRn, HsExpr GhcRn, [HsExprArg 'TcpRn])
 takes apart either an HsApp, or an infix OpApp, returning
 
-* The "head" of the application, an expression that is often a variable
+* The "head" of the application, an expression that is often a variable;
+  this is used for typechecking
+
+* The "user head" or "error head" of the application, to be reported to the
+  user in case of an error.  Example:
+         (`op` e)
+  expands (via HsExpanded) to
+         (rightSection op e)
+  but we don't want to see 'rightSection' in error messages. So we keep the
+  innermost un-expanded head as the "error head".
 
 * A list of HsExprArg, the arguments
-
-* A Rebuilder function which reconstructs the original form, given the
-  head and arguments.  This allows us to reconstruct infix
-  applications (OpApp) as well as prefix applications (HsApp),
-  thereby retaining the structure of the original tree.
 -}
 
 data TcPass = TcpRn     -- Arguments decomposed
@@ -156,34 +161,52 @@ data TcPass = TcpRn     -- Arguments decomposed
 
 data HsExprArg (p :: TcPass)
   = -- See Note [HsExprArg]
-    EValArg  { eva_loc    :: SrcSpan        -- Of the function
+    EValArg  { eva_ctxt   :: AppCtxt
              , eva_arg    :: EValArg p
              , eva_arg_ty :: !(XEVAType p) }
 
-  | ETypeArg { eva_loc   :: SrcSpan          -- Of the function
+  | ETypeArg { eva_ctxt  :: AppCtxt
              , eva_hs_ty :: LHsWcType GhcRn  -- The type arg
              , eva_ty    :: !(XETAType p) }  -- Kind-checked type arg
 
-  | EPrag    SrcSpan
+  | EPrag    AppCtxt
              (HsPragE (GhcPass (XPass p)))
 
-  | EPar     SrcSpan         -- Of the nested expr
+  | EWrap    EWrap
 
-  | EWrap    !(XEWrap p)     -- Wrapper, after instantiation
+data EWrap = EPar    AppCtxt
+           | EExpand (HsExpr GhcRn)
+           | EHsWrap HsWrapper
 
 data EValArg (p :: TcPass) where  -- See Note [EValArg]
   ValArg   :: LHsExpr (GhcPass (XPass p))
            -> EValArg p
-  ValArgQL :: { va_expr :: LHsExpr GhcRn        -- Original expression
+
+  ValArgQL :: { va_expr :: LHsExpr GhcRn        -- Original application
                                                 -- For location and error msgs
-              , va_fun  :: HsExpr GhcTc         -- Function, typechecked
+              , va_fun  :: (HsExpr GhcTc, AppCtxt) -- Function of the application,
+                                                   -- typechecked, plus its context
               , va_args :: [HsExprArg 'TcpInst] -- Args, instantiated
-              , va_ty   :: TcRhoType            -- Result type
-              , va_rebuild :: Rebuilder }       -- How to reassemble
+              , va_ty   :: TcRhoType }          -- Result type
            -> EValArg 'TcpInst  -- Only exists in TcpInst phase
 
-type Rebuilder = HsExpr GhcTc -> [HsExprArg 'TcpTc]-> HsExpr GhcTc
--- See Note [splitHsApps and Rebuilder]
+data AppCtxt
+  = VAExpansion
+       (HsExpr GhcRn)    -- Inside an expansion of this expression
+       SrcSpan           -- The SrcSpan of the expression
+                         --    noSrcSpan if outermost
+
+  | VACall
+       (HsExpr GhcRn) Int  -- In the third argument of function f
+       SrcSpan             -- The SrcSpan of the application (f e1 e2 e3)
+
+appCtxtLoc :: AppCtxt -> SrcSpan
+appCtxtLoc (VAExpansion _ l) = l
+appCtxtLoc (VACall _ _ l)    = l
+
+instance Outputable AppCtxt where
+  ppr (VAExpansion e _) = text "VAExpansion" <+> ppr e
+  ppr (VACall f n _)    = text "VACall" <+> int n <+> ppr f
 
 type family XPass p where
   XPass 'TcpRn   = 'Renamed
@@ -198,80 +221,92 @@ type family XEVAType p where  -- Value arguments
   XEVAType 'TcpRn = NoExtField
   XEVAType _      = Scaled Type
 
-type family XEWrap p where
-  XEWrap 'TcpRn = NoExtCon
-  XEWrap _      = HsWrapper
+mkEValArg :: AppCtxt -> LHsExpr GhcRn -> HsExprArg 'TcpRn
+mkEValArg ctxt e = EValArg { eva_arg = ValArg e, eva_ctxt = ctxt
+                           , eva_arg_ty = noExtField }
 
-mkEValArg :: SrcSpan -> LHsExpr GhcRn -> HsExprArg 'TcpRn
-mkEValArg l e = EValArg { eva_loc = l, eva_arg = ValArg e
-                        , eva_arg_ty = noExtField }
-
-mkETypeArg :: SrcSpan -> LHsWcType GhcRn -> HsExprArg 'TcpRn
-mkETypeArg l hs_ty = ETypeArg { eva_loc = l, eva_hs_ty = hs_ty
-                              , eva_ty = noExtField }
-
-eValArgExpr :: EValArg 'TcpInst -> LHsExpr GhcRn
-eValArgExpr (ValArg e)                 = e
-eValArgExpr (ValArgQL { va_expr = e }) = e
+mkETypeArg :: AppCtxt -> LHsWcType GhcRn -> HsExprArg 'TcpRn
+mkETypeArg ctxt hs_ty = ETypeArg { eva_ctxt = ctxt, eva_hs_ty = hs_ty
+                                 , eva_ty = noExtField }
 
 addArgWrap :: HsWrapper -> [HsExprArg 'TcpInst] -> [HsExprArg 'TcpInst]
 addArgWrap wrap args
  | isIdHsWrapper wrap = args
- | otherwise          = EWrap wrap : args
+ | otherwise          = EWrap (EHsWrap wrap) : args
 
-splitHsApps :: HsExpr GhcRn -> (HsExpr GhcRn, [HsExprArg 'TcpRn], Rebuilder)
--- See Note [splitHsApps and Rebuilder]
-splitHsApps e
-  = go e []
+splitHsApps :: HsExpr GhcRn
+            -> ( (HsExpr GhcRn, AppCtxt)  -- Head
+               , [HsExprArg 'TcpRn])      -- Args
+-- See Note [splitHsApps]
+splitHsApps e = go e (top_ctxt 0 e) []
   where
-    go (HsPar _     (L l fun))       args = go fun (EPar       l       : args)
-    go (HsPragE _ p (L l fun))       args = go fun (EPrag      l p     : args)
-    go (HsAppType _ (L l fun) hs_ty) args = go fun (mkETypeArg l hs_ty : args)
-    go (HsApp _     (L l fun) arg)   args = go fun (mkEValArg  l arg   : args)
+    top_ctxt n (HsPar _ fun)               = top_lctxt n fun
+    top_ctxt n (HsPragE _ _ fun)           = top_lctxt n fun
+    top_ctxt n (HsAppType _ fun _)         = top_lctxt (n+1) fun
+    top_ctxt n (HsApp _ fun _)             = top_lctxt (n+1) fun
+    top_ctxt n (XExpr (HsExpanded orig _)) = VACall orig      n noSrcSpan
+    top_ctxt n other_fun                   = VACall other_fun n noSrcSpan
 
-    go (OpApp fix arg1 (L l op) arg2) args
-      = (op, mkEValArg l arg1 : mkEValArg l arg2 : args, rebuild_infix fix)
+    top_lctxt n (L _ fun) = top_ctxt n fun
 
-    go e args = (e, args, rebuildPrefixApps)
+    go :: HsExpr GhcRn -> AppCtxt -> [HsExprArg 'TcpRn]
+       -> ((HsExpr GhcRn, AppCtxt), [HsExprArg 'TcpRn])
+    go (HsPar _     (L l fun))    ctxt args = go fun (set l ctxt) (EWrap (EPar ctxt)   : args)
+    go (HsPragE _ p (L l fun))    ctxt args = go fun (set l ctxt) (EPrag      ctxt p   : args)
+    go (HsAppType _ (L l fun) ty) ctxt args = go fun (dec l ctxt) (mkETypeArg ctxt ty  : args)
+    go (HsApp _ (L l fun) arg)    ctxt args = go fun (dec l ctxt) (mkEValArg  ctxt arg : args)
 
-    rebuild_infix :: Fixity -> Rebuilder
-    rebuild_infix fix fun args
-      = go fun args
-      where
-        go fun (EValArg { eva_arg = ValArg arg1, eva_loc = l } :
-                EValArg { eva_arg = ValArg arg2 } : args)
-                                   = rebuildPrefixApps (OpApp fix arg1 (L l fun) arg2) args
-        go fun (EWrap wrap : args) = go (mkHsWrap wrap fun) args
-        go fun args                = rebuildPrefixApps fun args
-           -- This last case fails to rebuild a OpApp, which is sad.
-           -- It can happen if we have (e1 `op` e2),
-           -- and op :: Int -> forall a. a -> Int, and e2 :: Bool
-           -- Then we'll get   [ e1, @Bool, e2 ]
-           -- Could be fixed with WpFun, but extra complexity.
+    -- See Note [Looking through HsExpanded]
+    go (XExpr (HsExpanded orig fun)) ctxt args
+      = go fun (VAExpansion orig (appCtxtLoc ctxt)) (EWrap (EExpand orig) : args)
 
-rebuildPrefixApps :: Rebuilder
-rebuildPrefixApps fun args
-  = go fun args
+    -- See Note [Desugar OpApp in the typechecker]
+    go e@(OpApp _ arg1 (L l op) arg2) _ args
+      = ( (op, VACall op 0 l)
+        ,   mkEValArg (VACall op 1 generatedSrcSpan) arg1
+          : mkEValArg (VACall op 2 generatedSrcSpan) arg2
+          : EWrap (EExpand e)
+          : args )
+
+    go e ctxt args = ((e,ctxt), args)
+
+    set :: SrcSpan -> AppCtxt -> AppCtxt
+    set l (VACall f n _)        = VACall f n l
+    set _ ctxt@(VAExpansion {}) = ctxt
+
+    dec :: SrcSpan -> AppCtxt -> AppCtxt
+    dec l (VACall f n _)        = VACall f (n-1) l
+    dec _ ctxt@(VAExpansion {}) = ctxt
+
+rebuildHsApps :: HsExpr GhcTc -> AppCtxt -> [HsExprArg 'TcpTc]-> HsExpr GhcTc
+rebuildHsApps fun _ [] = fun
+rebuildHsApps fun ctxt (arg : args)
+  = case arg of
+      EValArg { eva_arg = ValArg arg, eva_ctxt = ctxt' }
+        -> rebuildHsApps (HsApp noExtField lfun arg) ctxt' args
+      ETypeArg { eva_hs_ty = hs_ty, eva_ty  = ty, eva_ctxt = ctxt' }
+        -> rebuildHsApps (HsAppType ty lfun hs_ty) ctxt' args
+      EPrag ctxt' p
+        -> rebuildHsApps (HsPragE noExtField p lfun) ctxt' args
+      EWrap (EPar ctxt')
+        -> rebuildHsApps (HsPar noExtField lfun) ctxt' args
+      EWrap (EExpand orig)
+        -> rebuildHsApps (XExpr (ExpansionExpr (HsExpanded orig fun))) ctxt args
+      EWrap (EHsWrap wrap)
+        -> rebuildHsApps (mkHsWrap wrap fun) ctxt args
   where
-    go fun [] = fun
-    go fun (EWrap wrap : args)               = go (mkHsWrap wrap fun) args
-    go fun (EValArg { eva_arg = ValArg arg
-                    , eva_loc = l } : args)  = go (HsApp noExtField (L l fun) arg) args
-    go fun (ETypeArg { eva_hs_ty = hs_ty
-                     , eva_ty  = ty
-                     , eva_loc = l } : args) = go (HsAppType ty (L l fun) hs_ty) args
-    go fun (EPar l : args)                   = go (HsPar noExtField (L l fun)) args
-    go fun (EPrag l p : args)                = go (HsPragE noExtField p (L l fun)) args
+    lfun = L (appCtxtLoc ctxt) fun
 
 isHsValArg :: HsExprArg id -> Bool
 isHsValArg (EValArg {}) = True
 isHsValArg _            = False
 
 countLeadingValArgs :: [HsExprArg id] -> Int
-countLeadingValArgs (EValArg {} : args) = 1 + countLeadingValArgs args
-countLeadingValArgs (EPar {}    : args) = countLeadingValArgs args
-countLeadingValArgs (EPrag {}   : args) = countLeadingValArgs args
-countLeadingValArgs _                   = 0
+countLeadingValArgs []                   = 0
+countLeadingValArgs (EValArg {}  : args) = 1 + countLeadingValArgs args
+countLeadingValArgs (EWrap {}    : args) = countLeadingValArgs args
+countLeadingValArgs (EPrag {}    : args) = countLeadingValArgs args
+countLeadingValArgs (ETypeArg {} : _)    = 0
 
 isValArg :: HsExprArg id -> Bool
 isValArg (EValArg {}) = True
@@ -282,27 +317,22 @@ isVisibleArg (EValArg {})  = True
 isVisibleArg (ETypeArg {}) = True
 isVisibleArg _             = False
 
-setSrcSpanFromArgs :: [HsExprArg 'TcpRn] -> TcM a -> TcM a
-setSrcSpanFromArgs [] thing_inside
-  = thing_inside
-setSrcSpanFromArgs (arg:_) thing_inside
-  = setSrcSpan (argFunLoc arg) thing_inside
-
-argFunLoc :: HsExprArg 'TcpRn -> SrcSpan
-argFunLoc (EValArg { eva_loc = l }) = l
-argFunLoc (ETypeArg { eva_loc = l}) = l
-argFunLoc (EPrag l _)               = l
-argFunLoc (EPar l)                  = l
+insideExpansion :: [HsExprArg p] -> Bool
+insideExpansion args = any is_expansion args
+  where
+    is_expansion (EWrap (EExpand {})) = True
+    is_expansion _                    = False
 
 instance OutputableBndrId (XPass p) => Outputable (HsExprArg p) where
   ppr (EValArg { eva_arg = arg })      = text "EValArg" <+> ppr arg
   ppr (EPrag _ p)                      = text "EPrag" <+> ppr p
   ppr (ETypeArg { eva_hs_ty = hs_ty }) = char '@' <> ppr hs_ty
-  ppr (EPar _)                         = text "EPar"
-  ppr (EWrap _)                        = text "EWrap"
-  -- ToDo: to print the wrapper properly we'll need to work harder
-  -- "Work harder" = replicate the ghcPass approach, but I didn't
-  -- think it was worth the effort to do so.
+  ppr (EWrap wrap)                     = ppr wrap
+
+instance Outputable EWrap where
+  ppr (EPar _)       = text "EPar"
+  ppr (EHsWrap w)    = text "EHsWrap" <+> ppr w
+  ppr (EExpand orig) = text "EExpand" <+> ppr orig
 
 instance OutputableBndrId (XPass p) => Outputable (EValArg p) where
   ppr (ValArg e) = ppr e
@@ -315,6 +345,27 @@ pprHsExprArgTc (EValArg { eva_arg = tm, eva_arg_ty = ty })
   = text "EValArg" <+> hang (ppr tm) 2 (dcolon <+> ppr ty)
 pprHsExprArgTc arg = ppr arg
 
+{- Note [Desugar OpApp in the typechecker]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Operator sections are desugared in the renamer; see GHC.Rename.Expr
+Note [Handling overloaded and rebindable constructs].
+But for reasons explained there, we rename OpApp to OpApp.  Then,
+here in the typechecker, we desugar it to a use of HsExpanded.
+That makes it possible to typecheck something like
+     e1 `f` e2
+where
+   f :: forall a. t1 -> forall b. t2 -> t3
+
+Note [Looking through HsExpanded]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When creating an application chain in splitHsApps, we must deal with
+     HsExpanded f1 (f `HsApp` e1) `HsApp` e2 `HsApp` e3
+
+as a single application chain `f e1 e2 e3`.  Otherwise stuff like overloaded
+labels (#19154) won't work.
+
+It's easy to achieve this: `splitHsApps` unwraps `HsExpanded`.
+-}
 
 {- *********************************************************************
 *                                                                      *
@@ -322,7 +373,7 @@ pprHsExprArgTc arg = ppr arg
 *                                                                      *
 ********************************************************************* -}
 
-tcInferAppHead :: HsExpr GhcRn
+tcInferAppHead :: (HsExpr GhcRn, AppCtxt)
                -> [HsExprArg 'TcpRn] -> Maybe TcRhoType
                -- These two args are solely for tcInferRecSelId
                -> TcM (HsExpr GhcTc, TcSigmaType)
@@ -347,8 +398,8 @@ tcInferAppHead :: HsExpr GhcRn
 --     cases are dealt with by splitHsApps.
 --
 -- See Note [tcApp: typechecking applications] in GHC.Tc.Gen.App
-tcInferAppHead fun args mb_res_ty
-  = setSrcSpanFromArgs args $
+tcInferAppHead (fun,ctxt) args mb_res_ty
+  = setSrcSpan (appCtxtLoc ctxt) $
     do { mb_tc_fun <- tcInferAppHead_maybe fun args mb_res_ty
        ; case mb_tc_fun of
             Just (fun', fun_sigma) -> return (fun', fun_sigma)
@@ -367,6 +418,7 @@ tcInferAppHead_maybe fun args mb_res_ty
       HsRecFld _ f              -> Just <$> tcInferRecSelId f args mb_res_ty
       ExprWithTySig _ e hs_ty   -> add_head_ctxt fun args $
                                    Just <$> tcExprWithSig e hs_ty
+      HsOverLit _ lit           -> Just <$> tcInferOverLit lit
       _                         -> return Nothing
 
 add_head_ctxt :: HsExpr GhcRn -> [HsExprArg 'TcpRn] -> TcM a -> TcM a
@@ -720,6 +772,45 @@ no constraints so we'll complain about not being able to solve
 Storable w.  Instead, don't generalise; then _ gets instantiated to
 CLong, as it should.
 -}
+
+
+{- *********************************************************************
+*                                                                      *
+                 Overloaded literals
+*                                                                      *
+********************************************************************* -}
+
+tcInferOverLit :: HsOverLit GhcRn -> TcM (HsExpr GhcTc, TcSigmaType)
+tcInferOverLit lit@(OverLit { ol_val = val
+                            , ol_witness = HsVar _ (L loc from_name)
+                            , ol_ext = rebindable })
+  = -- Desugar "3" to (fromInteger (3 :: Integer))
+    --   where fromInteger is gotten by looking up from_name, and
+    --   the (3 :: Integer) is returned by mkOverLit
+    -- Ditto the string literal "foo" to (fromString ("foo" :: String))
+    do { from_id <- tcLookupId from_name
+       ; (wrap1, from_ty) <- topInstantiate orig (idType from_id)
+
+       ; (wrap2, sarg_ty, res_ty) <- matchActualFunTySigma herald mb_doc
+                                                           (1, []) from_ty
+       ; hs_lit <- mkOverLit val
+       ; co <- unifyType mb_doc (hsLitType hs_lit) (scaledThing sarg_ty)
+
+       ; let lit_expr = L loc $ mkHsWrapCo co $
+                        HsLit noExtField hs_lit
+             from_expr = mkHsWrap (wrap2 <.> wrap1) $
+                         HsVar noExtField (L loc from_id)
+             lit' = lit { ol_witness = HsApp noExtField (L loc from_expr) lit_expr
+                        , ol_ext = OverLitTc rebindable res_ty }
+       ; return (HsOverLit noExtField lit', res_ty) }
+  where
+    orig   = LiteralOrigin lit
+    mb_doc = Just (ppr from_name)
+    herald = sep [ text "The function" <+> quotes (ppr from_name)
+                 , text "is applied to"]
+
+tcInferOverLit lit
+  = pprPanic "tcInferOverLit" (ppr lit)
 
 
 {- *********************************************************************
@@ -1093,12 +1184,12 @@ addFunResCtxt fun args fun_res_ty env_ty
                        = Outputable.empty
 
            ; return info }
-      where
-        not_fun ty   -- ty is definitely not an arrow type,
-                     -- and cannot conceivably become one
-          = case tcSplitTyConApp_maybe ty of
-              Just (tc, _) -> isAlgTyCon tc
-              Nothing      -> False
+
+    not_fun ty   -- ty is definitely not an arrow type,
+                 -- and cannot conceivably become one
+      = case tcSplitTyConApp_maybe ty of
+          Just (tc, _) -> isAlgTyCon tc
+          Nothing      -> False
 
 {-
 Note [Splitting nested sigma types in mismatched function types]
@@ -1144,9 +1235,6 @@ provided.
              Misc utility functions
 *                                                                      *
 ********************************************************************* -}
-
-addLExprCtxt :: LHsExpr GhcRn -> TcRn a -> TcRn a
-addLExprCtxt (L _ e) thing_inside = addExprCtxt e thing_inside
 
 addExprCtxt :: HsExpr GhcRn -> TcRn a -> TcRn a
 addExprCtxt e thing_inside

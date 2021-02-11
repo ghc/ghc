@@ -700,12 +700,11 @@ zapIdStrictness id = modifyIdInfo (`setStrictnessInfo` nopSig) id
 -- type, we still want @isStrictId id@ to be @True@.
 isStrictId :: Id -> Bool
 isStrictId id
-  = ASSERT2( isId id, text "isStrictId: not an id: " <+> ppr id )
-         not (isJoinId id) && (
-           (isStrictType (idType id)) ||
-           -- Take the best of both strictnesses - old and new
-           (isStrUsedDmd (idDemandInfo id))
-         )
+  | ASSERT2( isId id, text "isStrictId: not an id: " <+> ppr id )
+    isJoinId id = False
+  | otherwise   = isStrictType (idType id) ||
+                  isStrUsedDmd (idDemandInfo id)
+                  -- Take the best of both strictnesses - old and new
 
         ---------------------------------
         -- UNFOLDING
