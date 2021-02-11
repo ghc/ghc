@@ -17,12 +17,9 @@ rtsRules = priority 3 $ do
       root -/- "**/libHSrts_*-ghc*.dylib",
       root -/- "**/libHSrts-ghc*.so",
       root -/- "**/libHSrts-ghc*.dylib"]
-      |%> \ rtsLibFilePath' -> do
-            let ctx@Context {..} = rtsContext Stage1
-            rtsWithVersion <- pkgFileName package "libHS" ""
-            createFileLink
-                (replaceLibFilePrefix "libHSrts" rtsWithVersion $ takeFileName rtsLibFilePath')
-                rtsLibFilePath'
+      |%> \ rtsLibFilePath' -> createFileLink
+            (addRtsDummyVersion $ takeFileName rtsLibFilePath')
+            rtsLibFilePath'
 
     -- Libffi
     forM_ [Stage1 ..] $ \ stage -> do
@@ -150,10 +147,31 @@ needRtsLibffiTargets stage = do
 needRtsSymLinks :: Stage -> [Way] -> Action ()
 needRtsSymLinks stage rtsWays
     = forM_ (filter (wayUnit Dynamic) rtsWays) $ \ way -> do
-        let ctx@Context {..} = Context stage rts way
+        let ctx = Context stage rts way
         libPath     <- libPath ctx
         distDir     <- distDir stage
         rtsLibFile  <- takeFileName <$> pkgLibraryFile ctx
-        -- pkgFileName :: Package -> String -> String -> Action FilePath
-        rtsWithVersion <- pkgFileName package "libHS" ""
-        need [replaceLibFilePrefix rtsWithVersion "libHSrts" (libPath </> distDir </> rtsLibFile)]
+        need [removeRtsDummyVersion (libPath </> distDir </> rtsLibFile)]
+
+prefix, versionlessPrefix :: String
+versionlessPrefix = "libHSrts"
+prefix = versionlessPrefix ++ "-1.0"
+
+-- removeRtsDummyVersion "a/libHSrts-1.0-ghc1.2.3.4.so"
+--                    == "a/libHSrts-ghc1.2.3.4.so"
+removeRtsDummyVersion :: FilePath -> FilePath
+removeRtsDummyVersion = replaceLibFilePrefix prefix versionlessPrefix
+
+-- addRtsDummyVersion "a/libHSrts-ghc1.2.3.4.so"
+--                 == "a/libHSrts-1.0-ghc1.2.3.4.so"
+addRtsDummyVersion :: FilePath -> FilePath
+addRtsDummyVersion = replaceLibFilePrefix versionlessPrefix prefix
+
+replaceLibFilePrefix :: String -> String -> FilePath -> FilePath
+replaceLibFilePrefix oldPrefix newPrefix oldFilePath = let
+    oldFileName = takeFileName oldFilePath
+    newFileName = maybe
+        (error $ "Expected RTS library file to start with " ++ oldPrefix)
+        (newPrefix ++)
+        (stripPrefix oldPrefix oldFileName)
+    in replaceFileName oldFilePath newFileName
