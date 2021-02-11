@@ -8,3 +8,5 @@ test('NFSDRF', normal, compile, [''])
 test('NFSImport', [extra_files(['NFSExport.hs'])], multimod_compile, ['NFSImport NFSExport', '-v0'])
 test('T18999_NoFieldSelectors', normal, compile, [''])
 test('T18999_FieldSelectors', normal, compile, [''])
+test('T19154', normal, compile, [''])
+

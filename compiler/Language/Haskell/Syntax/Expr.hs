@@ -178,12 +178,8 @@ data HsExpr p
               -- The renamer renames record-field selectors to HsRecFld
               -- The typechecker preserves HsRecFld
 
-  | HsOverLabel (XOverLabel p)
-                (Maybe (IdP p)) FastString
+  | HsOverLabel (XOverLabel p) FastString
      -- ^ Overloaded label (Note [Overloaded labels] in GHC.OverloadedLabels)
-     --   @Just id@ means @RebindableSyntax@ is in use, and gives the id of the
-     --   in-scope 'fromLabel'.
-     --   NB: Not in use after typechecking
 
   | HsIPVar   (XIPVar p)
               HsIPName   -- ^ Implicit parameter (not in use after typechecking)
@@ -224,8 +220,8 @@ data HsExpr p
   -- | Operator applications:
   -- NB Bracketed ops such as (+) come out as Vars.
 
-  -- NB We need an expr for the operator in an OpApp/Section since
-  -- the typechecker may need to apply the operator to a few types.
+  -- NB Sadly, we need an expr for the operator in an OpApp/Section since
+  -- the renamer may turn a HsVar into HsRecFld or HsUnboundVar
 
   | OpApp       (XOpApp p)
                 (LHsExpr p)       -- left operand
@@ -343,8 +339,6 @@ data HsExpr p
   -- See Note [Empty lists]
   | ExplicitList
                 (XExplicitList p)  -- Gives type of components of list
-                (Maybe (SyntaxExpr p))
-                                   -- For OverloadedLists, the fromListN witness
                 [LHsExpr p]
 
   -- | Record construction
@@ -472,7 +466,7 @@ data HsExpr p
 
   | XExpr       !(XXExpr p)
   -- Note [Trees that Grow] extension constructor for the
-  -- general idea, and Note [Rebindable syntax and HsExpansion]
+  -- general idea, and Note [Rebindable syntax and HsExpansion] in GHC.Hs.Expr
   -- for an example of how we use it.
 
 -- | The AST used to hard-refer to GhcPass, which was a layer violation. For now,
@@ -481,147 +475,6 @@ type family HsDoRn p
 type family HsBracketRn p
 type family PendingRnSplice' p
 type family PendingTcSplice' p
-
--- ---------------------------------------------------------------------
-
-{-
-Note [Rebindable syntax and HsExpansion]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-We implement rebindable syntax (RS) support by performing a desugaring
-in the renamer. We transform GhcPs expressions affected by RS into the
-appropriate desugared form, but **annotated with the original expression**.
-
-Let us consider a piece of code like:
-
-    {-# LANGUAGE RebindableSyntax #-}
-    ifThenElse :: Char -> () -> () -> ()
-    ifThenElse _ _ _ = ()
-    x = if 'a' then () else True
-
-The parsed AST for the RHS of x would look something like (slightly simplified):
-
-    L locif (HsIf (L loca 'a') (L loctrue ()) (L locfalse True))
-
-Upon seeing such an AST with RS on, we could transform it into a
-mere function call, as per the RS rules, equivalent to the
-following function application:
-
-    ifThenElse 'a' () True
-
-which doesn't typecheck. But GHC would report an error about
-not being able to match the third argument's type (Bool) with the
-expected type: (), in the expression _as desugared_, i.e in
-the aforementioned function application. But the user never
-wrote a function application! This would be pretty bad.
-
-To remedy this, instead of transforming the original HsIf
-node into mere applications of 'ifThenElse', we keep the
-original 'if' expression around too, using the TTG
-XExpr extension point to allow GHC to construct an
-'HsExpansion' value that will keep track of the original
-expression in its first field, and the desugared one in the
-second field. The resulting renamed AST would look like:
-
-    L locif (XExpr
-      (HsExpanded
-        (HsIf (L loca 'a')
-              (L loctrue ())
-              (L locfalse True)
-        )
-        (App (L generatedSrcSpan
-                (App (L generatedSrcSpan
-                        (App (L generatedSrcSpan (Var ifThenElse))
-                             (L loca 'a')
-                        )
-                     )
-                     (L loctrue ())
-                )
-             )
-             (L locfalse True)
-        )
-      )
-    )
-
-When comes the time to typecheck the program, we end up calling
-tcMonoExpr on the AST above. If this expression gives rise to
-a type error, then it will appear in a context line and GHC
-will pretty-print it using the 'Outputable (HsExpansion a b)'
-instance defined below, which *only prints the original
-expression*. This is the gist of the idea, but is not quite
-enough to recover the error messages that we had with the
-SyntaxExpr-based, typechecking/desugaring-to-core time
-implementation of rebindable syntax. The key idea is to decorate
-some elements of the desugared expression so as to be able to
-give them a special treatment when typechecking the desugared
-expression, to print a different context line or skip one
-altogether.
-
-Whenever we 'setSrcSpan' a 'generatedSrcSpan', we update a field in
-TcLclEnv called 'tcl_in_gen_code', setting it to True, which indicates that we
-entered generated code, i.e code fabricated by the compiler when rebinding some
-syntax. If someone tries to push some error context line while that field is set
-to True, the pushing won't actually happen and the context line is just dropped.
-Once we 'setSrcSpan' a real span (for an expression that was in the original
-source code), we set 'tcl_in_gen_code' back to False, indicating that we
-"emerged from the generated code tunnel", and that the expressions we will be
-processing are relevant to report in context lines again.
-
-You might wonder why we store a RealSrcSpan in addition to a Bool in
-the TcLclEnv: could we not store a Maybe RealSrcSpan? The problem is
-that we still generate constraints when processing generated code,
-and a CtLoc must contain a RealSrcSpan -- otherwise, error messages
-might appear without source locations. So we keep the RealSrcSpan of
-the last location spotted that wasn't generated; it's as good as
-we're going to get in generated code. Once we get to sub-trees that
-are not generated, then we update the RealSrcSpan appropriately, and
-set the tcl_in_gen_code Bool to False.
-
----
-
-A general recipe to follow this approach for new constructs could go as follows:
-
-- Remove any GhcRn-time SyntaxExpr extensions to the relevant constructor for your
-  construct, in HsExpr or related syntax data types.
-- At renaming-time:
-    - take your original node of interest (HsIf above)
-    - rename its subexpressions (condition, true branch, false branch above)
-    - construct the suitable "rebound"-and-renamed result (ifThenElse call
-      above), where the 'SrcSpan' attached to any _fabricated node_ (the
-      HsVar/HsApp nodes, above) is set to 'generatedSrcSpan'
-    - take both the original node and that rebound-and-renamed result and wrap
-      them in an XExpr: XExpr (HsExpanded <original node> <desugared>)
- - At typechecking-time:
-    - remove any logic that was previously dealing with your rebindable
-      construct, typically involving [tc]SyntaxOp, SyntaxExpr and friends.
-    - the XExpr (HsExpanded ... ...) case in tcExpr already makes sure that we
-      typecheck the desugared expression while reporting the original one in
-      errors
-
--}
-
--- See Note [Rebindable syntax and HsExpansion] just above.
-data HsExpansion a b
-  = HsExpanded a b
-  deriving Data
-
--- | Build a "wrapped" 'HsExpansion' out of an extension constructor,
---   and the two components of the expansion: original and desugared
---   expressions.
---
---   See Note [Rebindable Syntax and HsExpansion] above for more details.
-mkExpanded
-  :: (HsExpansion a b -> b) -- ^ XExpr, XCmd, ...
-  -> a                      -- ^ source expression ('GhcPs')
-  -> b                      -- ^ "desugared" expression
-                            --   ('GhcRn')
-  -> b                      -- ^ suitably wrapped
-                            --   'HsExpansion'
-mkExpanded xwrap a b = xwrap (HsExpanded a b)
-
--- | Just print the original expression (the @a@).
-instance (Outputable a, Outputable b) => Outputable (HsExpansion a b) where
-  ppr (HsExpanded a b) = ifPprDebug (vcat [ppr a, ppr b]) (ppr a)
 
 -- ---------------------------------------------------------------------
 

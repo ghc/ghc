@@ -70,8 +70,7 @@ import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Core.PatSyn
 import Control.Monad
-
-import qualified GHC.LanguageExtensions as LangExt
+import Data.Void( absurd )
 
 {-
 ************************************************************************
@@ -276,7 +275,6 @@ dsExpr (ExprWithTySig _ e _)  = dsLExpr e
 
 dsExpr (HsConLikeOut _ con)   = dsConLike con
 dsExpr (HsIPVar {})           = panic "dsExpr: HsIPVar"
-dsExpr (HsOverLabel{})        = panic "dsExpr: HsOverLabel"
 
 dsExpr (HsLit _ lit)
   = do { warnAboutOverflowedLit lit
@@ -285,7 +283,10 @@ dsExpr (HsLit _ lit)
 dsExpr (HsOverLit _ lit)
   = do { warnAboutOverflowedOverLit lit
        ; dsOverLit lit }
-dsExpr (XExpr (ExpansionExpr (HsExpanded _ b))) = dsExpr b
+
+dsExpr (XExpr (ExpansionExpr (HsExpanded _ b)))
+  = dsExpr b
+
 dsExpr hswrap@(XExpr (WrapExpr (HsWrap co_fn e)))
   = do { e' <- case e of
                  HsVar _ (L _ var) -> return $ varToCoreExpr var
@@ -349,101 +350,7 @@ Then we get
 
 That 'g' in the 'in' part is an evidence variable, and when
 converting to core it must become a CO.
-
-
-Note [Desugaring operator sections]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Desugaring left sections with -XPostfixOperators is straightforward: convert
-(expr `op`) to (op expr).
-
-Without -XPostfixOperators it's a bit more tricky. At first it looks as if we
-can convert
-
-    (expr `op`)
-
-naively to
-
-    \x -> op expr x
-
-But no!  expr might be a redex, and we can lose laziness badly this
-way.  Consider
-
-    map (expr `op`) xs
-
-for example. If expr were a redex then eta-expanding naively would
-result in multiple evaluations where the user might only have expected one.
-
-So we convert instead to
-
-    let y = expr in \x -> op y x
-
-Also, note that we must do this for both right and (perhaps surprisingly) left
-sections. Why are left sections necessary? Consider the program (found in #18151),
-
-    seq (True `undefined`) ()
-
-according to the Haskell Report this should reduce to () (as it specifies
-desugaring via eta expansion). However, if we fail to eta expand we will rather
-bottom. Consequently, we must eta expand even in the case of a left section.
-
-If `expr` is actually just a variable, say, then the simplifier
-will inline `y`, eliminating the redundant `let`.
-
-Note that this works even in the case that `expr` is unlifted. In this case
-bindNonRec will automatically do the right thing, giving us:
-
-    case expr of y -> (\x -> op y x)
-
-See #18151.
 -}
-
-dsExpr e@(OpApp _ e1 op e2)
-  = -- for the type of y, we need the type of op's 2nd argument
-    do { op' <- dsLExpr op
-       ; dsWhenNoErrs (mapM dsLExprNoLP [e1, e2])
-                      (\exprs' -> mkCoreAppsDs (text "opapp" <+> ppr e) op' exprs') }
-
--- dsExpr (SectionL op expr)  ===  (expr `op`)  ~>  \y -> op expr y
---
--- See Note [Desugaring operator sections].
--- N.B. this also must handle postfix operator sections due to -XPostfixOperators.
-dsExpr e@(SectionL _ expr op) = do
-  postfix_operators <- xoptM LangExt.PostfixOperators
-  if postfix_operators then
-    -- Desugar (e !) to ((!) e)
-    do { op' <- dsLExpr op
-       ; dsWhenNoErrs (dsLExprNoLP expr) $ \expr' ->
-         mkCoreAppDs (text "sectionl" <+> ppr expr) op' expr' }
-  else do
-    core_op <- dsLExpr op
-    x_core <- dsLExpr expr
-    case splitFunTys (exprType core_op) of
-      -- Binary operator section
-      (x_ty:y_ty:_, _) ->
-        dsWhenNoErrs
-          (newSysLocalsDsNoLP [x_ty, y_ty])
-          (\[x_id, y_id] ->
-            bindNonRec x_id x_core
-            $ Lam y_id (mkCoreAppsDs (text "sectionl" <+> ppr e)
-                                     core_op [Var x_id, Var y_id]))
-
-      -- Postfix operator section
-      (_:_, _) ->
-        return $ mkCoreAppDs (text "sectionl" <+> ppr e) core_op x_core
-
-      _ -> pprPanic "dsExpr(SectionL)" (ppr e)
-
--- dsExpr (SectionR op expr)  === (`op` expr)  ~>  \x -> op x expr
---
--- See Note [Desugaring operator sections].
-dsExpr e@(SectionR _ op expr) = do
-    core_op <- dsLExpr op
-    let (x_ty:y_ty:_, _) = splitFunTys (exprType core_op)
-    y_core <- dsLExpr expr
-    dsWhenNoErrs (newSysLocalsDsNoLP [x_ty, y_ty])
-                 (\[x_id, y_id] -> bindNonRec y_id y_core $
-                                   Lam x_id (mkCoreAppsDs (text "sectionr" <+> ppr e)
-                                                          core_op [Var x_id, Var y_id]))
 
 dsExpr (ExplicitTuple _ tup_args boxity)
   = do { let go (lam_vars, args) (L _ (Missing (Scaled mult ty)))
@@ -516,8 +423,7 @@ dsExpr (HsMultiIf res_ty alts)
              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -}
 
-dsExpr (ExplicitList elt_ty wit xs)
-  = dsExplicitList elt_ty wit xs
+dsExpr (ExplicitList elt_ty xs) = dsExplicitList elt_ty xs
 
 dsExpr (ArithSeq expr witness seq)
   = case witness of
@@ -878,9 +784,18 @@ dsExpr (HsBinTick _ ixT ixF e) = do
        mkBinaryTickBox ixT ixF e2
      }
 
+
+-- HsSyn constructs that just shouldn't be here, because
+-- the renamer removed them.  See GHC.Rename.Expr.
+-- Note [Handling overloaded and rebindable constructs]
+dsExpr (HsOverLabel x _) = absurd x
+dsExpr (OpApp x _ _ _)   = absurd x
+dsExpr (SectionL x _ _)  = absurd x
+dsExpr (SectionR x _ _)  = absurd x
+
 -- HsSyn constructs that just shouldn't be here:
-dsExpr (HsBracket     {})  = panic "dsExpr:HsBracket"
-dsExpr (HsDo          {})  = panic "dsExpr:HsDo"
+dsExpr (HsBracket   {}) = panic "dsExpr:HsBracket"
+dsExpr (HsDo        {}) = panic "dsExpr:HsDo"
 
 ds_prag_expr :: HsPragE GhcTc -> LHsExpr GhcTc -> DsM CoreExpr
 ds_prag_expr (HsPragSCC _ _ cc) expr = do
@@ -976,10 +891,10 @@ time.
 maxBuildLength :: Int
 maxBuildLength = 32
 
-dsExplicitList :: Type -> Maybe (SyntaxExpr GhcTc) -> [LHsExpr GhcTc]
+dsExplicitList :: Type -> [LHsExpr GhcTc]
                -> DsM CoreExpr
 -- See Note [Desugaring explicit lists]
-dsExplicitList elt_ty Nothing xs
+dsExplicitList elt_ty xs
   = do { dflags <- getDynFlags
        ; xs' <- mapM dsLExprNoLP xs
        ; if xs' `lengthExceeds` maxBuildLength
@@ -994,12 +909,6 @@ dsExplicitList elt_ty Nothing xs
   where
     mk_build_list xs' (cons, _) (nil, _)
       = return (foldr (App . App (Var cons)) (Var nil) xs')
-
-dsExplicitList elt_ty (Just fln) xs
-  = do { list <- dsExplicitList elt_ty Nothing xs
-       ; dflags <- getDynFlags
-       ; let platform = targetPlatform dflags
-       ; dsSyntaxExpr fln [mkIntExprInt platform (length xs), list] }
 
 dsArithSeq :: PostTcExpr -> (ArithSeqInfo GhcTc) -> DsM CoreExpr
 dsArithSeq expr (From from)
