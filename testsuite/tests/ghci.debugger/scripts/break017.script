@@ -2,6 +2,7 @@
 :set -fbreak-on-exception
 :trace qsort ("abc" ++ undefined)
 :back
+:back
 putStrLn "Printing 1"
 :print as
 putStrLn "Forcing"

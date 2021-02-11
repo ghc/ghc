@@ -2450,7 +2450,7 @@ tcGhciStmts stmts
            -- Note [Implementing unsafeCoerce] in base:Unsafe.Coerce
 
       ; let ret_expr = nlHsApp (nlHsTyApp ret_id [ret_ty]) $
-                       noLoc $ ExplicitList unitTy Nothing $
+                       noLoc $ ExplicitList unitTy $
                        map mk_item ids
 
             mk_item id = unsafe_coerce_id `nlHsTyApp` [ getRuntimeRep (idType id)
