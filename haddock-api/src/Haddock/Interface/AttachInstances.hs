@@ -28,6 +28,7 @@ import Data.Maybe ( maybeToList, mapMaybe, fromMaybe )
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
+import GHC.Data.FastString (unpackFS)
 import GHC.Core.Class
 import GHC.Driver.Session
 import GHC.Core (isOrphan)
@@ -178,19 +179,30 @@ findFixity iface ifaceMap instIfaceMap = \name ->
 -- Collecting and sorting instances
 --------------------------------------------------------------------------------
 
+-- | Stable name for stable comparisons. GHC's `Name` uses unstable
+-- ordering based on their `Unique`'s.
+newtype SName = SName Name
+
+instance Eq SName where
+  SName n1 == SName n2 = n1 `stableNameCmp` n2 == EQ
+
+instance Ord SName where
+  SName n1 `compare` SName n2 = n1 `stableNameCmp` n2
 
 -- | Simplified type for sorting types, ignoring qualification (not visible
 -- in Haddock output) and unifying special tycons with normal ones.
 -- For the benefit of the user (looks nice and predictable) and the
 -- tests (which prefer output to be deterministic).
-data SimpleType = SimpleType Name [SimpleType]
-                | SimpleTyLit TyLit
+data SimpleType = SimpleType SName [SimpleType]
+                | SimpleIntTyLit Integer
+                | SimpleStringTyLit String
+                | SimpleCharTyLit Char
                   deriving (Eq,Ord)
 
 
-instHead :: ([TyVar], [PredType], Class, [Type]) -> ([Int], Name, [SimpleType])
+instHead :: ([TyVar], [PredType], Class, [Type]) -> ([Int], SName, [SimpleType])
 instHead (_, _, cls, args)
-  = (map argCount args, className cls, map simplify args)
+  = (map argCount args, SName (className cls), map simplify args)
 
 argCount :: Type -> Int
 argCount (AppTy t _)     = argCount t + 1
@@ -201,14 +213,16 @@ argCount (CastTy t _)    = argCount t
 argCount _ = 0
 
 simplify :: Type -> SimpleType
-simplify (FunTy _ _ t1 t2)  = SimpleType funTyConName [simplify t1, simplify t2]
+simplify (FunTy _ _ t1 t2)  = SimpleType (SName funTyConName) [simplify t1, simplify t2]
 simplify (ForAllTy _ t) = simplify t
 simplify (AppTy t1 t2) = SimpleType s (ts ++ maybeToList (simplify_maybe t2))
   where (SimpleType s ts) = simplify t1
-simplify (TyVarTy v) = SimpleType (tyVarName v) []
-simplify (TyConApp tc ts) = SimpleType (tyConName tc)
+simplify (TyVarTy v) = SimpleType (SName (tyVarName v)) []
+simplify (TyConApp tc ts) = SimpleType (SName (tyConName tc))
                                        (mapMaybe simplify_maybe ts)
-simplify (LitTy l) = SimpleTyLit l
+simplify (LitTy (NumTyLit n)) = SimpleIntTyLit n
+simplify (LitTy (StrTyLit s)) = SimpleStringTyLit (unpackFS s)
+simplify (LitTy (CharTyLit c)) = SimpleCharTyLit c
 simplify (CastTy ty _) = simplify ty
 simplify (CoercionTy _) = error "simplify:Coercion"
 
@@ -217,9 +231,9 @@ simplify_maybe (CoercionTy {}) = Nothing
 simplify_maybe ty              = Just (simplify ty)
 
 -- Used for sorting
-instFam :: FamInst -> ([Int], Name, [SimpleType], Int, SimpleType)
+instFam :: FamInst -> ([Int], SName, [SimpleType], Int, SimpleType)
 instFam FamInst { fi_fam = n, fi_tys = ts, fi_rhs = t }
-  = (map argCount ts, n, map simplify ts, argCount t, simplify t)
+  = (map argCount ts, SName n, map simplify ts, argCount t, simplify t)
 
 
 --------------------------------------------------------------------------------
