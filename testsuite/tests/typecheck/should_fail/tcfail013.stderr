@@ -4,4 +4,4 @@ tcfail013.hs:4:3: error:
     • In the pattern: True
       In an equation for ‘f’: f True = 2
     • Relevant bindings include
-        f :: [a] -> p (bound at tcfail013.hs:3:1)
+        f :: [a] -> a1 (bound at tcfail013.hs:3:1)
