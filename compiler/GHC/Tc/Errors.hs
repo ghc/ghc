@@ -67,14 +67,13 @@ import qualified GHC.LanguageExtensions as LangExt
 import GHC.Utils.FV ( fvVarList, unionFV )
 
 import Control.Monad    ( when )
-import Data.Foldable    (for_,  toList )
+import Data.Foldable    ( toList )
 import Data.List        ( partition, mapAccumL, sortBy, unfoldr )
 
 import {-# SOURCE #-} GHC.Tc.Errors.Hole ( findValidHoleFits )
 
 -- import Data.Semigroup   ( Semigroup )
 import qualified Data.Semigroup as Semigroup
-import Data.Traversable (for)
 
 
 {-
@@ -730,7 +729,7 @@ reportHoles :: [Ct]  -- other (tidied) constraints
 reportHoles tidy_cts ctxt
   = mapM_ $ \hole -> do
      msg_mb <- mkHoleError tidy_cts ctxt hole
-     for_ msg_mb reportDiagnostic
+     whenIsJust msg_mb reportDiagnostic
 
 mkUserTypeErrorReporter :: Reporter
 mkUserTypeErrorReporter ctxt
@@ -1106,17 +1105,15 @@ these "hole" errors are /not/ suppressed by cec_suppress. We want to see them!
 
 There are two cases to consider:
 
-1. We always report an error for out-of-scope variables, unless -fdefer-out-of-scope-variables is on,
+1. For out-of-scope variables we always report an error, unless -fdefer-out-of-scope-variables is on,
    in which case the messages are discarded. See also #12170 and #12406. If deferring, report a warning
    only if -Wout-of-scope-variables is on.
 
-2. The general case: not an out-of-scope error. When -XPartialTypeSignatures is on, warnings
-   (instead of errors) are generated for holes in partial type signatures, unless
-   -fwarn-partial-type-signatures is not on, in which case the messages are discarded.
-   For partial type signatures, generate warnings only, and do that only if -fwarn-partial-type-signatures
-   is on, otherwise this is a typed hole in an expression, but not for an out-of-scope variable
-   (because that goes through a different function). If deferring, report a warning only if -Wtyped-holes
-   is on.
+2. For the general case, when -XPartialTypeSignatures is on, warnings (instead of errors) are generated
+   for holes in partial type signatures, unless -Wpartial-type-signatures is not on, in which case
+   the messages are discarded. If deferring, report a warning only if -Wtyped-holes is on.
+
+See also 'reportUnresolved'.
 
 -}
 
@@ -1138,7 +1135,7 @@ mkHoleError _tidy_simples ctxt hole@(Hole { hole_occ = occ
                                             (tcl_rdr lcl_env) imp_info (mkRdrUnqual occ))
 
        ; maybeAddDeferredBindings ctxt hole mk_err
-       ; for (cec_out_of_scope_holes ctxt) mk_err
+       ; whenNotDeferring (cec_out_of_scope_holes ctxt) mk_err
        }
   where
     herald | isDataOcc occ = text "Data constructor not in scope:"
@@ -1179,11 +1176,11 @@ mkHoleError tidy_simples ctxt hole@(Hole { hole_occ = occ
        ; maybeAddDeferredBindings ctxt hole mk_err
        ; case sort of
            TypeHole
-             -> for (cec_type_holes ctxt) mk_err
+             -> whenNotDeferring (cec_type_holes ctxt) mk_err
            ConstraintHole
-             -> for (cec_type_holes ctxt) mk_err
+             -> whenNotDeferring (cec_type_holes ctxt) mk_err
            ExprHole _
-             -> for (cec_expr_holes ctxt) mk_err
+             -> whenNotDeferring (cec_expr_holes ctxt) mk_err
 
        }
 
@@ -1242,6 +1239,17 @@ mkHoleError tidy_simples ctxt hole@(Hole { hole_occ = occ
        = ppWhenOption sdocPrintExplicitCoercions $
            quotes (ppr tv) <+> text "is a coercion variable"
 
+
+-- | Similar in spirit to 'whenIsJust', but the action returns a value 'b'.
+whenNotDeferring :: Monad m => Maybe a -> (a -> m b) -> m (Maybe b)
+whenNotDeferring Nothing _  = pure Nothing
+whenNotDeferring (Just a) f = Just <$> f a
+
+-- | Adds deferred bindings (as errors).
+-- We take as input a function from a 'Severity' to a message because we
+-- want to call this function as part of 'mkHoleError' even if the latter
+-- won't return a 'MsgEnvelope' (because deferred). In that case we still
+-- want to reuse the /same/ diagnostic message, just with a different 'Severity'.
 maybeAddDeferredBindings :: ReportErrCtxt
                          -> Hole
                          -> (Severity -> TcM (MsgEnvelope DecoratedSDoc))
