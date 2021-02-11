@@ -1,13 +1,13 @@
 
 T7354.hs:28:11: error:
-    • Couldn't match type ‘p’ with ‘Base t (Prim [p] p)’
-      Expected: Prim [p] p -> Base t (Prim [p] p)
-        Actual: Prim [p] p -> p
-      ‘p’ is a rigid type variable bound by
-        the inferred type of foo :: Prim [p] p -> t
+    • Couldn't match type ‘a’ with ‘Base t (Prim [a] a)’
+      Expected: Prim [a] a -> Base t (Prim [a] a)
+        Actual: Prim [a] a -> a
+      ‘a’ is a rigid type variable bound by
+        the inferred type of foo :: Prim [a] a -> t
         at T7354.hs:28:1-13
     • In the first argument of ‘ana’, namely ‘alg’
       In the expression: ana alg
       In an equation for ‘foo’: foo = ana alg
     • Relevant bindings include
-        foo :: Prim [p] p -> t (bound at T7354.hs:28:1)
+        foo :: Prim [a] a -> t (bound at T7354.hs:28:1)
