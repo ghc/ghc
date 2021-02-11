@@ -68,8 +68,9 @@ module GHC.Types.Var (
 
         -- * ArgFlags
         ArgFlag(Invisible,Required,Specified,Inferred),
-        isVisibleArgFlag, isInvisibleArgFlag, sameVis,
         AnonArgFlag(..), Specificity(..),
+        isVisibleArgFlag, isInvisibleArgFlag, isInferredArgFlag,
+        sameVis,
 
         -- * TyVar's
         VarBndr(..), TyCoVarBinder, TyVarBinder, InvisTVBinder, ReqTVBinder,
@@ -468,12 +469,17 @@ pattern Specified = Invisible SpecifiedSpec
 
 -- | Does this 'ArgFlag' classify an argument that is written in Haskell?
 isVisibleArgFlag :: ArgFlag -> Bool
-isVisibleArgFlag Required = True
-isVisibleArgFlag _        = False
+isVisibleArgFlag af = not (isInvisibleArgFlag af)
 
 -- | Does this 'ArgFlag' classify an argument that is not written in Haskell?
 isInvisibleArgFlag :: ArgFlag -> Bool
-isInvisibleArgFlag = not . isVisibleArgFlag
+isInvisibleArgFlag (Invisible {}) = True
+isInvisibleArgFlag Required       = False
+
+isInferredArgFlag :: ArgFlag -> Bool
+-- More restrictive than isInvisibleArgFlag
+isInferredArgFlag (Invisible InferredSpec) = True
+isInferredArgFlag _                        = False
 
 -- | Do these denote the same level of visibility? 'Required'
 -- arguments are visible, others are not. So this function
