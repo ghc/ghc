@@ -23,3 +23,5 @@ test('integerImportExport', [omit_ways(['ghci'])], compile_and_run, [''])
 
 # Disable GMP only tests
 #test('integerGmpInternals', [], compile_and_run, [''])
+
+test('T19345', [], compile_and_run, [''])
