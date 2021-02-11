@@ -50,7 +50,8 @@ import GHC.Core.Seq (seqBinds)
 import GHC.Core.FamInstEnv
 
 import qualified GHC.Utils.Error as Err
-import GHC.Utils.Error  ( withTiming, withTimingD, DumpFormat (..) )
+import GHC.Utils.Error  ( withTiming )
+import GHC.Utils.Logger as Logger
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -88,7 +89,7 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
                                 , mg_loc     = loc
                                 , mg_deps    = deps
                                 , mg_rdr_env = rdr_env })
-  = do { let builtin_passes = getCoreToDo dflags
+  = do { let builtin_passes = getCoreToDo logger dflags
              orph_mods = mkModuleSet (mod : dep_orphs deps)
              uniq_mask = 's'
        ;
@@ -100,13 +101,14 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
                                                 builtin_passes
                               ; runCorePasses all_passes guts }
 
-       ; Err.dumpIfSet_dyn dflags Opt_D_dump_simpl_stats
+       ; Logger.dumpIfSet_dyn logger dflags Opt_D_dump_simpl_stats
              "Grand total simplifier statistics"
              FormatText
              (pprSimplCount stats)
 
        ; return guts2 }
   where
+    logger         = hsc_logger hsc_env
     dflags         = hsc_dflags hsc_env
     home_pkg_rules = hptRules hsc_env (dep_mods deps)
     hpt_rule_base  = mkRuleBase home_pkg_rules
@@ -125,8 +127,8 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
 ************************************************************************
 -}
 
-getCoreToDo :: DynFlags -> [CoreToDo]
-getCoreToDo dflags
+getCoreToDo :: Logger -> DynFlags -> [CoreToDo]
+getCoreToDo logger dflags
   = flatten_todos core_todo
   where
     opt_level     = optLevel           dflags
@@ -162,6 +164,7 @@ getCoreToDo dflags
     base_mode = SimplMode { sm_phase      = panic "base_mode"
                           , sm_names      = []
                           , sm_dflags     = dflags
+                          , sm_logger     = logger
                           , sm_uf_opts    = unfoldingOpts dflags
                           , sm_rules      = rules_on
                           , sm_eta_expand = eta_expand_on
@@ -462,70 +465,76 @@ runCorePasses passes guts
   where
     do_pass guts CoreDoNothing = return guts
     do_pass guts (CoreDoPasses ps) = runCorePasses ps guts
-    do_pass guts pass =
-       withTimingD (ppr pass <+> brackets (ppr mod))
+    do_pass guts pass = do
+      dflags <- getDynFlags
+      logger <- getLogger
+      withTiming logger dflags (ppr pass <+> brackets (ppr mod))
                    (const ()) $ do
-            { guts' <- lintAnnots (ppr pass) (doCorePass pass) guts
-            ; endPass pass (mg_binds guts') (mg_rules guts')
-            ; return guts' }
+            guts' <- lintAnnots (ppr pass) (doCorePass pass) guts
+            endPass pass (mg_binds guts') (mg_rules guts')
+            return guts'
 
     mod = mg_module guts
 
 doCorePass :: CoreToDo -> ModGuts -> CoreM ModGuts
-doCorePass pass@(CoreDoSimplify {})  = {-# SCC "Simplify" #-}
-                                       simplifyPgm pass
+doCorePass pass guts = do
+  logger <- getLogger
+  case pass of
+    CoreDoSimplify {}         -> {-# SCC "Simplify" #-}
+                                 simplifyPgm pass guts
 
-doCorePass CoreCSE                   = {-# SCC "CommonSubExpr" #-}
-                                       doPass cseProgram
+    CoreCSE                   -> {-# SCC "CommonSubExpr" #-}
+                                 doPass cseProgram guts
 
-doCorePass CoreLiberateCase          = {-# SCC "LiberateCase" #-}
-                                       doPassD liberateCase
+    CoreLiberateCase          -> {-# SCC "LiberateCase" #-}
+                                 doPassD liberateCase guts
 
-doCorePass CoreDoFloatInwards        = {-# SCC "FloatInwards" #-}
-                                       floatInwards
+    CoreDoFloatInwards        -> {-# SCC "FloatInwards" #-}
+                                 floatInwards guts
 
-doCorePass (CoreDoFloatOutwards f)   = {-# SCC "FloatOutwards" #-}
-                                       doPassDUM (floatOutwards f)
+    CoreDoFloatOutwards f     -> {-# SCC "FloatOutwards" #-}
+                                 doPassDUM (floatOutwards logger f) guts
 
-doCorePass CoreDoStaticArgs          = {-# SCC "StaticArgs" #-}
-                                       doPassU doStaticArgs
+    CoreDoStaticArgs          -> {-# SCC "StaticArgs" #-}
+                                 doPassU doStaticArgs guts
 
-doCorePass CoreDoCallArity           = {-# SCC "CallArity" #-}
-                                       doPassD callArityAnalProgram
+    CoreDoCallArity           -> {-# SCC "CallArity" #-}
+                                 doPassD callArityAnalProgram guts
 
-doCorePass CoreDoExitify             = {-# SCC "Exitify" #-}
-                                       doPass exitifyProgram
+    CoreDoExitify             -> {-# SCC "Exitify" #-}
+                                 doPass exitifyProgram guts
 
-doCorePass CoreDoDemand              = {-# SCC "DmdAnal" #-}
-                                       doPassDFRM dmdAnal
+    CoreDoDemand              -> {-# SCC "DmdAnal" #-}
+                                 doPassDFRM (dmdAnal logger) guts
 
-doCorePass CoreDoCpr                 = {-# SCC "CprAnal" #-}
-                                       doPassDFM cprAnalProgram
+    CoreDoCpr                 -> {-# SCC "CprAnal" #-}
+                                 doPassDFM (cprAnalProgram logger) guts
 
-doCorePass CoreDoWorkerWrapper       = {-# SCC "WorkWrap" #-}
-                                       doPassDFU wwTopBinds
+    CoreDoWorkerWrapper       -> {-# SCC "WorkWrap" #-}
+                                 doPassDFU wwTopBinds guts
 
-doCorePass CoreDoSpecialising        = {-# SCC "Specialise" #-}
-                                       specProgram
+    CoreDoSpecialising        -> {-# SCC "Specialise" #-}
+                                 specProgram guts
 
-doCorePass CoreDoSpecConstr          = {-# SCC "SpecConstr" #-}
-                                       specConstrProgram
+    CoreDoSpecConstr          -> {-# SCC "SpecConstr" #-}
+                                 specConstrProgram guts
 
-doCorePass CoreAddCallerCcs          = {-# SCC "AddCallerCcs" #-}
-                                       addCallerCostCentres
+    CoreAddCallerCcs          -> {-# SCC "AddCallerCcs" #-}
+                                 addCallerCostCentres guts
 
-doCorePass CoreDoPrintCore              = observe   printCore
-doCorePass (CoreDoRuleCheck phase pat)  = ruleCheckPass phase pat
-doCorePass CoreDoNothing                = return
-doCorePass (CoreDoPasses passes)        = runCorePasses passes
+    CoreDoPrintCore           -> observe (printCore logger) guts
 
-doCorePass (CoreDoPluginPass _ pass) = {-# SCC "Plugin" #-} pass
+    CoreDoRuleCheck phase pat -> ruleCheckPass phase pat guts
+    CoreDoNothing             -> return guts
+    CoreDoPasses passes       -> runCorePasses passes guts
 
-doCorePass pass@CoreDesugar          = pprPanic "doCorePass" (ppr pass)
-doCorePass pass@CoreDesugarOpt       = pprPanic "doCorePass" (ppr pass)
-doCorePass pass@CoreTidy             = pprPanic "doCorePass" (ppr pass)
-doCorePass pass@CorePrep             = pprPanic "doCorePass" (ppr pass)
-doCorePass pass@CoreOccurAnal        = pprPanic "doCorePass" (ppr pass)
+    CoreDoPluginPass _ p      -> {-# SCC "Plugin" #-} p guts
+
+    CoreDesugar               -> pprPanic "doCorePass" (ppr pass)
+    CoreDesugarOpt            -> pprPanic "doCorePass" (ppr pass)
+    CoreTidy                  -> pprPanic "doCorePass" (ppr pass)
+    CorePrep                  -> pprPanic "doCorePass" (ppr pass)
+    CoreOccurAnal             -> pprPanic "doCorePass" (ppr pass)
 
 {-
 ************************************************************************
@@ -535,25 +544,26 @@ doCorePass pass@CoreOccurAnal        = pprPanic "doCorePass" (ppr pass)
 ************************************************************************
 -}
 
-printCore :: DynFlags -> CoreProgram -> IO ()
-printCore dflags binds
-    = Err.dumpIfSet dflags True "Print Core" (pprCoreBindings binds)
+printCore :: Logger -> DynFlags -> CoreProgram -> IO ()
+printCore logger dflags binds
+    = Logger.dumpIfSet logger dflags True "Print Core" (pprCoreBindings binds)
 
 ruleCheckPass :: CompilerPhase -> String -> ModGuts -> CoreM ModGuts
-ruleCheckPass current_phase pat guts =
-    withTimingD (text "RuleCheck"<+>brackets (ppr $ mg_module guts))
+ruleCheckPass current_phase pat guts = do
+    dflags <- getDynFlags
+    logger <- getLogger
+    withTiming logger dflags (text "RuleCheck"<+>brackets (ppr $ mg_module guts))
                 (const ()) $ do
-    { rb <- getRuleBase
-    ; dflags <- getDynFlags
-    ; vis_orphs <- getVisibleOrphanMods
-    ; let rule_fn fn = getRules (RuleEnv rb vis_orphs) fn
-                        ++ (mg_rules guts)
-    ; let ropts = initRuleOpts dflags
-    ; liftIO $ putLogMsg dflags NoReason Err.SevDump noSrcSpan
-                   $ withPprStyle defaultDumpStyle
-                   (ruleCheckProgram ropts current_phase pat
-                      rule_fn (mg_binds guts))
-    ; return guts }
+        rb <- getRuleBase
+        vis_orphs <- getVisibleOrphanMods
+        let rule_fn fn = getRules (RuleEnv rb vis_orphs) fn
+                          ++ (mg_rules guts)
+        let ropts = initRuleOpts dflags
+        liftIO $ putLogMsg logger dflags NoReason Err.SevDump noSrcSpan
+                     $ withPprStyle defaultDumpStyle
+                     (ruleCheckProgram ropts current_phase pat
+                        rule_fn (mg_binds guts))
+        return guts
 
 doPassDUM :: (DynFlags -> UniqSupply -> CoreProgram -> IO CoreProgram) -> ModGuts -> CoreM ModGuts
 doPassDUM do_pass = doPassM $ \binds -> do
@@ -626,23 +636,23 @@ simplifyExpr :: HscEnv -- includes spec of what core-to-core passes to do
 -- simplifyExpr is called by the driver to simplify an
 -- expression typed in at the interactive prompt
 simplifyExpr hsc_env expr
-  = withTiming dflags (text "Simplify [expr]") (const ()) $
+  = withTiming logger dflags (text "Simplify [expr]") (const ()) $
     do  { eps <- hscEPS hsc_env ;
         ; let rule_env  = mkRuleEnv (eps_rule_base eps) []
               fi_env    = ( eps_fam_inst_env eps
                           , extendFamInstEnvList emptyFamInstEnv $
                             snd $ ic_instances $ hsc_IC hsc_env )
-              simpl_env = simplEnvForGHCi dflags
+              simpl_env = simplEnvForGHCi logger dflags
 
         ; let sz = exprSize expr
 
-        ; (expr', counts) <- initSmpl dflags rule_env fi_env sz $
+        ; (expr', counts) <- initSmpl logger dflags rule_env fi_env sz $
                              simplExprGently simpl_env expr
 
-        ; Err.dumpIfSet dflags (dopt Opt_D_dump_simpl_stats dflags)
+        ; Logger.dumpIfSet logger dflags (dopt Opt_D_dump_simpl_stats dflags)
                   "Simplifier statistics" (pprSimplCount counts)
 
-        ; Err.dumpIfSet_dyn dflags Opt_D_dump_simpl "Simplified expression"
+        ; Logger.dumpIfSet_dyn logger dflags Opt_D_dump_simpl "Simplified expression"
                         FormatCore
                         (pprCoreExpr expr')
 
@@ -650,6 +660,7 @@ simplifyExpr hsc_env expr
         }
   where
     dflags = hsc_dflags hsc_env
+    logger = hsc_logger hsc_env
 
 simplExprGently :: SimplEnv -> CoreExpr -> SimplM CoreExpr
 -- Simplifies an expression
@@ -704,7 +715,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
   = do { (termination_msg, it_count, counts_out, guts')
            <- do_iteration 1 [] binds rules
 
-        ; Err.dumpIfSet dflags (dopt Opt_D_verbose_core2core dflags &&
+        ; Logger.dumpIfSet logger dflags (dopt Opt_D_verbose_core2core dflags &&
                                 dopt Opt_D_dump_simpl_stats  dflags)
                   "Simplifier statistics for following pass"
                   (vcat [text termination_msg <+> text "after" <+> ppr it_count
@@ -716,6 +727,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
     }
   where
     dflags       = hsc_dflags hsc_env
+    logger       = hsc_logger hsc_env
     print_unqual = mkPrintUnqualified (hsc_unit_env hsc_env) rdr_env
     simpl_env    = mkSimplEnv mode
     active_rule  = activeRule mode
@@ -755,7 +767,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
                      occurAnalysePgm this_mod active_unf active_rule rules
                                      binds
                } ;
-           Err.dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"
+           Logger.dumpIfSet_dyn logger dflags Opt_D_dump_occur_anal "Occurrence analysis"
                      FormatCore
                      (pprCoreBindings tagged_binds);
 
@@ -773,7 +785,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
 
                 -- Simplify the program
            ((binds1, rules1), counts1) <-
-             initSmpl dflags (mkRuleEnv rule_base2 vis_orphs) fam_envs sz $
+             initSmpl logger dflags (mkRuleEnv rule_base2 vis_orphs) fam_envs sz $
                do { (floats, env1) <- {-# SCC "SimplTopBinds" #-}
                                       simplTopBinds simpl_env tagged_binds
 
@@ -803,7 +815,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
            let { binds2 = {-# SCC "ZapInd" #-} shortOutIndirections binds1 } ;
 
                 -- Dump the result of this iteration
-           dump_end_iteration dflags print_unqual iteration_no counts1 binds2 rules1 ;
+           dump_end_iteration logger dflags print_unqual iteration_no counts1 binds2 rules1 ;
            lintPassResult hsc_env pass binds2 ;
 
                 -- Loop
@@ -821,10 +833,10 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
 simplifyPgmIO _ _ _ _ = panic "simplifyPgmIO"
 
 -------------------
-dump_end_iteration :: DynFlags -> PrintUnqualified -> Int
+dump_end_iteration :: Logger -> DynFlags -> PrintUnqualified -> Int
                    -> SimplCount -> CoreProgram -> [CoreRule] -> IO ()
-dump_end_iteration dflags print_unqual iteration_no counts binds rules
-  = dumpPassResult dflags print_unqual mb_flag hdr pp_counts binds rules
+dump_end_iteration logger dflags print_unqual iteration_no counts binds rules
+  = dumpPassResult logger dflags print_unqual mb_flag hdr pp_counts binds rules
   where
     mb_flag | dopt Opt_D_dump_simpl_iterations dflags = Just Opt_D_dump_simpl_iterations
             | otherwise                               = Nothing
@@ -1095,13 +1107,13 @@ transferIdInfo exported_id local_id
 
 
 
-dmdAnal :: DynFlags -> FamInstEnvs -> [CoreRule] -> CoreProgram -> IO CoreProgram
-dmdAnal dflags fam_envs rules binds = do
+dmdAnal :: Logger -> DynFlags -> FamInstEnvs -> [CoreRule] -> CoreProgram -> IO CoreProgram
+dmdAnal logger dflags fam_envs rules binds = do
   let !opts = DmdAnalOpts
                { dmd_strict_dicts = gopt Opt_DictsStrict dflags
                }
       binds_plus_dmds = dmdAnalProgram opts fam_envs rules binds
-  Err.dumpIfSet_dyn dflags Opt_D_dump_str_signatures "Strictness signatures" FormatText $
+  Logger.dumpIfSet_dyn logger dflags Opt_D_dump_str_signatures "Strictness signatures" FormatText $
     dumpIdInfoOfProgram (ppr . zapDmdEnvSig . strictnessInfo) binds_plus_dmds
   -- See Note [Stamp out space leaks in demand analysis] in GHC.Core.Opt.DmdAnal
   seqBinds binds_plus_dmds `seq` return binds_plus_dmds
