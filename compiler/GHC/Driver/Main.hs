@@ -2011,6 +2011,8 @@ hscCompileCoreExpr hsc_env =
 hscCompileCoreExpr' :: HscEnv -> SrcSpan -> CoreExpr -> IO ForeignHValue
 hscCompileCoreExpr' hsc_env srcspan ds_expr
     = do { {- Simplify it -}
+           -- Question: should we call SimpleOpt.simpleOptExpr here instead?
+           -- It is, well, simpler, and does less inlining etc.
            simpl_expr <- simplifyExpr hsc_env ds_expr
 
            {- Tidy it (temporary, until coreSat does cloning) -}
