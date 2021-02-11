@@ -103,14 +103,8 @@ dsCCall lbl args may_gc result_ty
              Just (_ioTyCon, res_ty) -> res_ty
              Nothing                 -> result_ty
 
-           myPprTraceDebug :: String -> SDoc -> a -> a
-           myPprTraceDebug str doc x
-             | hasPprDebug dflags = pprTrace str doc x
-             | otherwise          = x
            target = StaticTarget NoSourceText lbl Nothing True
-           the_fcall    = myPprTraceDebug "dsCCall" (text "result type:" <+> ppr result_ty
-                                                  $$ text "ccall result type" <+> ppr ccall_result_ty)
-             $ CCall (mkCCallSpec target CCallConv may_gc raw_res_ty arg_tys)
+           the_fcall    = CCall (mkCCallSpec target CCallConv may_gc raw_res_ty arg_tys)
            the_prim_app = mkFCall dflags uniq the_fcall unboxed_args ccall_result_ty
        return (foldr ($) (res_wrapper the_prim_app) arg_wrappers)
 
