@@ -270,9 +270,9 @@ if [ $testsuite_only -eq 0 ]; then
             dynamicGhc=$("../../$ghc" --info | grep "GHC Dynamic" | cut -d',' -f3 | cut -d'"' -f2)
             if [ "$dynamicGhc" = "NO" ]
             then
-                libFlags="--enable-shared --disable-library-vanilla"
-            else
                 libFlags="--disable-shared --enable-library-vanilla"
+            else
+                libFlags="--enable-shared --disable-library-vanilla"
             fi
             libFlags="$libFlags --disable-library-prof"
 
