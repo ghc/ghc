@@ -4655,7 +4655,7 @@ default_PIC platform =
     -- on AArch64 does not permit arbitrary relocations.  Under ASLR, we can't
     -- control much how far apart symbols are in memory for our in-memory static
     -- linker;  and thus need to ensure we get sufficiently capable relocations.
-    -- This requires PIC on AArch64, and ExternalDynamicRefs on Linux as on top
+    -- This requires PIC on AArch64, and ExternalDynamicRefs on Linux on top
     -- of that.  Subsequently we expect all code on aarch64/linux (and macOS) to
     -- be built with -fPIC.
     (OSDarwin,  ArchAArch64) -> [Opt_PIC]
