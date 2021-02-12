@@ -1,4 +1,4 @@
-# FP_COMPUTE_INT(EXPRESSION, VARIABLE, INCLUDES, IF-FAILS)
+# FP_COMPUTE_INT(VARIABLE, EXPRESSION, INCLUDES, IF-FAILS)
 # --------------------------------------------------------
 # Assign VARIABLE the value of the compile-time EXPRESSION using INCLUDES for
 # compilation. Execute IF-FAILS when unable to determine the value. Works for
@@ -10,7 +10,7 @@
 # The public AC_COMPUTE_INT macro isn't supported by some versions of
 # autoconf.
 AC_DEFUN([FP_COMPUTE_INT],
-[_AC_COMPUTE_INT([$2], [$1], [$3], [$4])[]dnl
+[AC_COMPUTE_INT([$1], [$2], [$3], [$4])[]dnl
 ])# FP_COMPUTE_INT
 
 
@@ -33,7 +33,7 @@ AS_VAR_POPDEF([fp_Cache])[]dnl
 # ---------------------------------------
 # autoheader helper for FP_CHECK_CONSTS
 m4_define([FP_CHECK_CONSTS_TEMPLATE],
-[AC_FOREACH([fp_Const], [$1],
+[m4_foreach_w([fp_Const], [$1],
   [AH_TEMPLATE(AS_TR_CPP(CONST_[]fp_Const),
                [The value of ]fp_Const[.])])[]dnl
 ])# FP_CHECK_CONSTS_TEMPLATE
