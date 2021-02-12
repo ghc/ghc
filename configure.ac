@@ -917,9 +917,6 @@ dnl --------------------------------------------------
 dnl * Platform header file and syscall feature tests
 dnl ### checking the state of the local header files and syscalls ###
 
-dnl ** check for full ANSI header (.h) files
-AC_HEADER_STDC
-
 dnl ** Enable large file support.  NB. do this before testing the type of
 dnl    off_t, because it will affect the result of that test.
 AC_SYS_LARGEFILE
