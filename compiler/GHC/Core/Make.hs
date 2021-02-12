@@ -25,7 +25,7 @@ module GHC.Core.Make (
         -- * Constructing small tuples
         mkCoreVarTupTy, mkCoreTup, mkCoreUbxTup, mkCoreUbxSum,
         mkCoreTupBoxity, unitExpr,
-        mkCoreUbxSum, mkUbxSumAltTy,
+        mkUbxSumAltTy,
 
         -- * Constructing big tuples
         mkBigCoreVarTup, mkBigCoreVarTup1,

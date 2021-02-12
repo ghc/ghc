@@ -1029,6 +1029,7 @@ dataConSrcToImplBang dflags fam_envs arg_ty
   , let mb_co   = topNormaliseType_maybe fam_envs (scaledThing arg_ty)
                      -- Unwrap type families and newtypes
         arg_ty' = case mb_co of { Just (_,ty) -> scaledSet arg_ty ty; Nothing -> arg_ty }
+  , all (not . isNewTyCon . fst) (splitTyConApp_maybe $ scaledThing arg_ty')
   , isUnpackableType dflags fam_envs (scaledThing arg_ty')
   , doUnpacking dflags unpk_prag arg_ty'
   = case mb_co of
@@ -1219,6 +1220,7 @@ dataConArgUnpackProduct
      , (Unboxer, Boxer) )
 dataConArgUnpackProduct (Scaled arg_mult _) tc_args con =
   ASSERT( null (dataConExTyCoVars con) )
+  ASSERT( not (isNewTyCon (dataConTyCon con) ))
     -- Note [Unpacking GADTs and existentials]
   let rep_tys = map (scaleScaled arg_mult) $ dataConInstArgTys con tc_args
   in ( rep_tys `zip` dataConRepStrictness con
@@ -1264,16 +1266,15 @@ dataConArgUnpackSum (Scaled arg_mult arg_ty) tc tc_args =
 
       let
         mk_ubx_sum_alt :: Int -> DataCon -> [Var] -> CoreAlt
-        mk_ubx_sum_alt alt con [] =
-          ( DataAlt con, [],
-            mkCoreUbxSum sum_alt_tys alt (Var (dataConWorkId (tupleDataCon Unboxed 0))) )
+        mk_ubx_sum_alt alt con [] = Alt (DataAlt con) []
+            (mkCoreUbxSum ubx_sum_arity alt sum_alt_tys (Var (dataConWorkId (tupleDataCon Unboxed 0))) )
 
-        mk_ubx_sum_alt alt con [bndr] =
-          ( DataAlt con, [bndr], mkCoreUbxSum sum_alt_tys alt (Var bndr) )
+        mk_ubx_sum_alt alt con [bndr] = Alt (DataAlt con) [bndr]
+            (mkCoreUbxSum ubx_sum_arity alt sum_alt_tys (Var bndr))
 
         mk_ubx_sum_alt alt con bndrs =
           let tuple = mkCoreUbxTup (map idType bndrs) (map Var bndrs)
-           in ( DataAlt con, bndrs, mkCoreUbxSum sum_alt_tys alt tuple )
+           in Alt (DataAlt con) bndrs (mkCoreUbxSum ubx_sum_arity alt sum_alt_tys tuple )
 
         ubx_sum :: CoreExpr
         ubx_sum =
@@ -1299,20 +1300,20 @@ dataConArgUnpackSum (Scaled arg_mult arg_ty) tc tc_args =
 
               let mk_sum_alt :: Int -> DataCon -> Var -> [Var] -> CoreAlt
                   mk_sum_alt alt con tuple_bndr [] =
-                    ( DataAlt (sumDataCon alt ubx_sum_arity), [tuple_bndr],
-                      Var (dataConWorkId con) `mkTyApps` tc_args' )
+                    ( Alt (DataAlt (sumDataCon alt ubx_sum_arity)) [tuple_bndr]
+                      (Var (dataConWorkId con) `mkTyApps` tc_args' ))
 
                   mk_sum_alt alt con _ [datacon_bndr] =
-                    ( DataAlt (sumDataCon alt ubx_sum_arity), [datacon_bndr],
-                      Var (dataConWorkId con) `mkTyApps`  tc_args'
-                                              `mkVarApps` [datacon_bndr] )
+                    ( Alt (DataAlt (sumDataCon alt ubx_sum_arity)) [datacon_bndr]
+                      (Var (dataConWorkId con) `mkTyApps`  tc_args'
+                                              `mkVarApps` [datacon_bndr] ))
 
                   mk_sum_alt alt con tuple_bndr datacon_bndrs =
-                    ( DataAlt (sumDataCon alt ubx_sum_arity), [tuple_bndr],
+                    ( Alt (DataAlt (sumDataCon alt ubx_sum_arity)) [tuple_bndr] (
                       Case (Var tuple_bndr) tuple_bndr arg_ty'
-                        [ ( DataAlt (tupleDataCon Unboxed (length datacon_bndrs)), datacon_bndrs,
-                            Var (dataConWorkId con) `mkTyApps`  tc_args'
-                                                    `mkVarApps` datacon_bndrs ) ] )
+                        [ Alt (DataAlt (tupleDataCon Unboxed (length datacon_bndrs))) datacon_bndrs
+                            (Var (dataConWorkId con) `mkTyApps`  tc_args'
+                                                    `mkVarApps` datacon_bndrs ) ] ))
 
               return ( [unboxed_field_id],
                        Case (Var unboxed_field_id) unboxed_field_id arg_ty'
