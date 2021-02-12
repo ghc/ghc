@@ -23,6 +23,7 @@ import GHC.Core.Multiplicity ( scaledThing )
 import GHC.Core.Seq     ( seqBinds )
 import GHC.Utils.Outputable
 import GHC.Types.Var.Env
+import GHC.Types.Var.Set
 import GHC.Types.Basic
 import Data.List        ( mapAccumL )
 import GHC.Core.DataCon
@@ -32,6 +33,7 @@ import GHC.Types.Id.Info
 import GHC.Core.Utils
 import GHC.Core.TyCon
 import GHC.Core.Type
+import GHC.Core.FVs      ( exprFreeIds, ruleRhsFreeIds )
 import GHC.Core.Coercion ( Coercion, coVarsOfCo )
 import GHC.Core.FamInstEnv
 import GHC.Utils.Misc
@@ -550,7 +552,9 @@ dmdAnalRhsLetDown rec_flag env let_dmd id rhs
             -- See Note [Demand signatures are computed for a threshold demand based on idArity]
             = mkRhsDmd env rhs_arity rhs
 
-    (DmdType rhs_fv rhs_dmds rhs_div, rhs') = dmdAnal env rhs_dmd rhs
+    (rhs_dmd_ty, rhs') = dmdAnal env rhs_dmd rhs
+    DmdType rhs_fv rhs_dmds rhs_div = rhs_dmd_ty
+
     sig = mkStrictSigForArity rhs_arity (DmdType sig_fv rhs_dmds rhs_div)
 
     -- See Note [Aggregated demand for cardinality]
@@ -558,9 +562,22 @@ dmdAnalRhsLetDown rec_flag env let_dmd id rhs
                 Just bs -> reuseEnv (delVarEnvList rhs_fv bs)
                 Nothing -> rhs_fv
 
+    rhs_fv2 = rhs_fv1 `keepAliveDmdEnv` extra_fvs
+
     -- See Note [Lazy and unleashable free variables]
-    (lazy_fv, sig_fv) = splitFVs is_thunk rhs_fv1
+    (lazy_fv, sig_fv) = splitFVs is_thunk rhs_fv2
     is_thunk = not (exprIsHNF rhs) && not (isJoinId id)
+
+    -- Find the RHS free vars of the unfoldings and RULES
+    -- See Note [Absence analysis for stable unfoldings and RULES]
+    extra_fvs = foldr (unionVarSet . ruleRhsFreeIds) unf_fvs $
+                idCoreRules id
+
+    unf = realIdUnfolding id
+    unf_fvs | isStableUnfolding unf
+            , Just unf_body <- maybeUnfoldingTemplate unf
+            = exprFreeIds unf_body
+            | otherwise = emptyVarSet
 
 -- | @mkRhsDmd env rhs_arity rhs@ creates a 'CleanDemand' for
 -- unleashing on the given function's @rhs@, by creating
@@ -797,6 +814,43 @@ Fortunately, GHC.Core.Opt.Arity gives 'foo' arity 2, which is enough for LetDown
 forward plusInt's demand signature, and all is well (see Note [Newtype arity] in
 GHC.Core.Opt.Arity)! A small example is the test case NewtypeArity.
 
+Note [Absence analysis for stable unfoldings and RULES]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Ticket #18638 shows that it's really important to do absence analysis
+for stable unfoldings. Consider
+
+   g = blah
+
+   f = \x.  ...no use of g....
+   {- f's stable unfolding is f = \x. ...g... -}
+
+If f is ever inlined we use 'g'. But f's current RHS makes no use
+of 'g', so if we don't look at the unfolding we'll mark g as Absent,
+and transform to
+
+   g = error "Entered absent value"
+   f = \x. ...
+   {- f's stable unfolding is f = \x. ...g... -}
+
+Now if f is subsequently inlined, we'll use 'g' and ... disaster.
+
+SOLUTION: if f has a stable unfolding, adjust its DmdEnv (the demands
+on its free variables) so that no variable mentioned in its unfolding
+is Absent.  This is done by the function Demand.keepAliveDmdEnv.
+
+ALSO: do the same for Ids free in the RHS of any RULES for f.
+
+PS: You may wonder how it can be that f's optimised RHS has somehow
+discarded 'g', but when f is inlined we /don't/ discard g in the same
+way. I think a simple example is
+   g = (a,b)
+   f = \x.  fst g
+   {-# INLINE f #-}
+
+Now f's optimised RHS will be \x.a, but if we change g to (error "..")
+(since it is apparently Absent) and then inline (\x. fst g) we get
+disaster.  But regardless, #18638 was a more complicated version of
+this, that actually happened in practice.
 
 Historical Note [Product demands for function body]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
