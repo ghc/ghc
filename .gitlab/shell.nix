@@ -1,6 +1,7 @@
 { system ? "aarch64-darwin"
 #, nixpkgs ? fetchTarball https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz #apple-silicon.tar.gz
 , pkgs ? import <nixpkgs> { inherit system; }
+, compiler ? if system == "aarch64-darwin" then "ghc8103Binary" else "ghc8103"
 }: pkgs.mkShell {
   # this prevents nix from trying to write the env-vars file.
   # we can't really, as NIX_BUILD_TOP/env-vars is not set.
@@ -11,10 +12,10 @@
   CONFIGURE_ARGS = "--with-intree-gmp --with-curses-libraries=${pkgs.ncurses.out}/lib";
 
   buildInputs = with pkgs; [
-    haskell.compiler.ghc8103Binary
-    haskell.packages.ghc8103Binary.cabal-install
-    haskell.packages.ghc8103Binary.alex
-    haskell.packages.ghc8103Binary.happy_1_19_12
+    haskell.compiler.${compiler}
+    haskell.packages.${compiler}.cabal-install
+    haskell.packages.${compiler}.alex
+    haskell.packages.${compiler}.happy_1_19_12
 
     clang_11
     llvm_11
