@@ -38,13 +38,6 @@ module GHC.Utils.Error (
         doIfSet, doIfSet_dyn,
         getCaretDiagnostic,
 
-        -- * Dump files
-        dumpIfSet, dumpIfSet_dyn, dumpIfSet_dyn_printer,
-        dumpOptionsFromFlag, DumpOptions (..),
-        DumpFormat (..), DumpAction, dumpAction, defaultDumpAction,
-        TraceAction, traceAction, defaultTraceAction,
-        touchDumpFile,
-
         -- * Issuing messages during compilation
         putMsg, printInfoForUser, printOutputForUser,
         logInfo, logOutput,
@@ -52,7 +45,7 @@ module GHC.Utils.Error (
         fatalErrorMsg, fatalErrorMsg'',
         compilationProgressMsg,
         showPass,
-        withTiming, withTimingSilent, withTimingD, withTimingSilentD,
+        withTiming, withTimingSilent,
         debugTraceMsg,
         ghcExit,
         prettyPrintGhcErrors,
@@ -72,23 +65,18 @@ import GHC.Data.Bag
 import GHC.Utils.Exception
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Logger
 import GHC.Types.Error
 import GHC.Types.SrcLoc as SrcLoc
 
-import System.Directory
 import System.Exit      ( ExitCode(..), exitWith )
-import System.FilePath  ( takeDirectory, (</>) )
-import Data.List        ( sortBy, stripPrefix )
-import qualified Data.Set as Set
-import Data.IORef
+import Data.List        ( sortBy )
 import Data.Maybe       ( fromMaybe )
 import Data.Function
-import Data.Time
 import Debug.Trace
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Catch as MC (handle)
-import System.IO
 import GHC.Conc         ( getAllocationCounter )
 import System.CPUTime
 
@@ -152,10 +140,10 @@ sortMsgBag dflags = maybeLimit . sortBy (cmp `on` errMsgSpan) . bagToList
           Nothing        -> id
           Just err_limit -> take err_limit
 
-ghcExit :: DynFlags -> Int -> IO ()
-ghcExit dflags val
+ghcExit :: Logger -> DynFlags -> Int -> IO ()
+ghcExit logger dflags val
   | val == 0  = exitWith ExitSuccess
-  | otherwise = do errorMsg dflags (text "\nCompilation had errors\n\n")
+  | otherwise = do errorMsg logger dflags (text "\nCompilation had errors\n\n")
                    exitWith (ExitFailure val)
 
 doIfSet :: Bool -> IO () -> IO ()
@@ -165,180 +153,6 @@ doIfSet flag action | flag      = action
 doIfSet_dyn :: DynFlags -> GeneralFlag -> IO () -> IO()
 doIfSet_dyn dflags flag action | gopt flag dflags = action
                                | otherwise        = return ()
-
--- -----------------------------------------------------------------------------
--- Dumping
-
-dumpIfSet :: DynFlags -> Bool -> String -> SDoc -> IO ()
-dumpIfSet dflags flag hdr doc
-  | not flag   = return ()
-  | otherwise  = doDump dflags hdr doc
-{-# INLINE dumpIfSet #-}  -- see Note [INLINE conditional tracing utilities]
-
--- | This is a helper for 'dumpIfSet' to ensure that it's not duplicated
--- despite the fact that 'dumpIfSet' has an @INLINE@.
-doDump :: DynFlags -> String -> SDoc -> IO ()
-doDump dflags hdr doc =
-  putLogMsg dflags
-            NoReason
-            SevDump
-            noSrcSpan
-            (withPprStyle defaultDumpStyle
-              (mkDumpDoc hdr doc))
-
--- | A wrapper around 'dumpAction'.
--- First check whether the dump flag is set
--- Do nothing if it is unset
-dumpIfSet_dyn :: DynFlags -> DumpFlag -> String -> DumpFormat -> SDoc -> IO ()
-dumpIfSet_dyn = dumpIfSet_dyn_printer alwaysQualify
-{-# INLINE dumpIfSet_dyn #-}  -- see Note [INLINE conditional tracing utilities]
-
--- | A wrapper around 'dumpAction'.
--- First check whether the dump flag is set
--- Do nothing if it is unset
---
--- Unlike 'dumpIfSet_dyn', has a printer argument
-dumpIfSet_dyn_printer :: PrintUnqualified -> DynFlags -> DumpFlag -> String
-                         -> DumpFormat -> SDoc -> IO ()
-dumpIfSet_dyn_printer printer dflags flag hdr fmt doc
-  = when (dopt flag dflags) $ do
-      let sty = mkDumpStyle printer
-      dumpAction dflags sty (dumpOptionsFromFlag flag) hdr fmt doc
-{-# INLINE dumpIfSet_dyn_printer #-}  -- see Note [INLINE conditional tracing utilities]
-
-mkDumpDoc :: String -> SDoc -> SDoc
-mkDumpDoc hdr doc
-   = vcat [blankLine,
-           line <+> text hdr <+> line,
-           doc,
-           blankLine]
-     where
-        line = text (replicate 20 '=')
-
-
--- | Ensure that a dump file is created even if it stays empty
-touchDumpFile :: DynFlags -> DumpOptions -> IO ()
-touchDumpFile dflags dumpOpt = withDumpFileHandle dflags dumpOpt (const (return ()))
-
--- | Run an action with the handle of a 'DumpFlag' if we are outputting to a
--- file, otherwise 'Nothing'.
-withDumpFileHandle :: DynFlags -> DumpOptions -> (Maybe Handle -> IO ()) -> IO ()
-withDumpFileHandle dflags dumpOpt action = do
-    let mFile = chooseDumpFile dflags dumpOpt
-    case mFile of
-      Just fileName -> do
-        let gdref = generatedDumps dflags
-        gd <- readIORef gdref
-        let append = Set.member fileName gd
-            mode = if append then AppendMode else WriteMode
-        unless append $
-            writeIORef gdref (Set.insert fileName gd)
-        createDirectoryIfMissing True (takeDirectory fileName)
-        withFile fileName mode $ \handle -> do
-            -- We do not want the dump file to be affected by
-            -- environment variables, but instead to always use
-            -- UTF8. See:
-            -- https://gitlab.haskell.org/ghc/ghc/issues/10762
-            hSetEncoding handle utf8
-
-            action (Just handle)
-      Nothing -> action Nothing
-
-
--- | Write out a dump.
--- If --dump-to-file is set then this goes to a file.
--- otherwise emit to stdout.
---
--- When @hdr@ is empty, we print in a more compact format (no separators and
--- blank lines)
-dumpSDocWithStyle :: PprStyle -> DynFlags -> DumpOptions -> String -> SDoc -> IO ()
-dumpSDocWithStyle sty dflags dumpOpt hdr doc =
-    withDumpFileHandle dflags dumpOpt writeDump
-  where
-    -- write dump to file
-    writeDump (Just handle) = do
-        doc' <- if null hdr
-                then return doc
-                else do t <- getCurrentTime
-                        let timeStamp = if (gopt Opt_SuppressTimestamps dflags)
-                                          then empty
-                                          else text (show t)
-                        let d = timeStamp
-                                $$ blankLine
-                                $$ doc
-                        return $ mkDumpDoc hdr d
-        -- When we dump to files we use UTF8. Which allows ascii spaces.
-        defaultLogActionHPrintDoc dflags True handle (withPprStyle sty doc')
-
-    -- write the dump to stdout
-    writeDump Nothing = do
-        let (doc', severity)
-              | null hdr  = (doc, SevOutput)
-              | otherwise = (mkDumpDoc hdr doc, SevDump)
-        putLogMsg dflags NoReason severity noSrcSpan (withPprStyle sty doc')
-
-
--- | Choose where to put a dump file based on DynFlags
---
-chooseDumpFile :: DynFlags -> DumpOptions -> Maybe FilePath
-chooseDumpFile dflags dumpOpt
-
-        | gopt Opt_DumpToFile dflags || dumpForcedToFile dumpOpt
-        , Just prefix <- getPrefix
-        = Just $ setDir (prefix ++ dumpSuffix dumpOpt)
-
-        | otherwise
-        = Nothing
-
-        where getPrefix
-                 -- dump file location is being forced
-                 --      by the --ddump-file-prefix flag.
-               | Just prefix <- dumpPrefixForce dflags
-                  = Just prefix
-                 -- dump file location chosen by GHC.Driver.Pipeline.runPipeline
-               | Just prefix <- dumpPrefix dflags
-                  = Just prefix
-                 -- we haven't got a place to put a dump file.
-               | otherwise
-                  = Nothing
-              setDir f = case dumpDir dflags of
-                         Just d  -> d </> f
-                         Nothing ->       f
-
--- | Dump options
---
--- Dumps are printed on stdout by default except when the `dumpForcedToFile`
--- field is set to True.
---
--- When `dumpForcedToFile` is True or when `-ddump-to-file` is set, dumps are
--- written into a file whose suffix is given in the `dumpSuffix` field.
---
-data DumpOptions = DumpOptions
-   { dumpForcedToFile :: Bool   -- ^ Must be dumped into a file, even if
-                                --   -ddump-to-file isn't set
-   , dumpSuffix       :: String -- ^ Filename suffix used when dumped into
-                                --   a file
-   }
-
--- | Create dump options from a 'DumpFlag'
-dumpOptionsFromFlag :: DumpFlag -> DumpOptions
-dumpOptionsFromFlag Opt_D_th_dec_file =
-   DumpOptions                        -- -dth-dec-file dumps expansions of TH
-      { dumpForcedToFile = True       -- splices into MODULE.th.hs even when
-      , dumpSuffix       = "th.hs"    -- -ddump-to-file isn't set
-      }
-dumpOptionsFromFlag flag =
-   DumpOptions
-      { dumpForcedToFile = False
-      , dumpSuffix       = suffix -- build a suffix from the flag name
-      }                           -- e.g. -ddump-asm => ".dump-asm"
-   where
-      str  = show flag
-      suff = case stripPrefix "Opt_D_" str of
-             Just x  -> x
-             Nothing -> panic ("Bad flag name: " ++ str)
-      suffix = map (\c -> if c == '_' then '-' else c) suff
-
 
 -- -----------------------------------------------------------------------------
 -- Outputting messages from the compiler
@@ -354,32 +168,32 @@ ifVerbose dflags val act
   | otherwise               = return ()
 {-# INLINE ifVerbose #-}  -- see Note [INLINE conditional tracing utilities]
 
-errorMsg :: DynFlags -> SDoc -> IO ()
-errorMsg dflags msg
-   = putLogMsg dflags NoReason SevError noSrcSpan $ withPprStyle defaultErrStyle msg
+errorMsg :: Logger -> DynFlags -> SDoc -> IO ()
+errorMsg logger dflags msg
+   = putLogMsg logger dflags NoReason SevError noSrcSpan $ withPprStyle defaultErrStyle msg
 
-warningMsg :: DynFlags -> SDoc -> IO ()
-warningMsg dflags msg
-   = putLogMsg dflags NoReason SevWarning noSrcSpan $ withPprStyle defaultErrStyle msg
+warningMsg :: Logger -> DynFlags -> SDoc -> IO ()
+warningMsg logger dflags msg
+   = putLogMsg logger dflags NoReason SevWarning noSrcSpan $ withPprStyle defaultErrStyle msg
 
-fatalErrorMsg :: DynFlags -> SDoc -> IO ()
-fatalErrorMsg dflags msg =
-    putLogMsg dflags NoReason SevFatal noSrcSpan $ withPprStyle defaultErrStyle msg
+fatalErrorMsg :: Logger -> DynFlags -> SDoc -> IO ()
+fatalErrorMsg logger dflags msg =
+    putLogMsg logger dflags NoReason SevFatal noSrcSpan $ withPprStyle defaultErrStyle msg
 
 fatalErrorMsg'' :: FatalMessager -> String -> IO ()
 fatalErrorMsg'' fm msg = fm msg
 
-compilationProgressMsg :: DynFlags -> SDoc -> IO ()
-compilationProgressMsg dflags msg = do
+compilationProgressMsg :: Logger -> DynFlags -> SDoc -> IO ()
+compilationProgressMsg logger dflags msg = do
     let str = showSDoc dflags msg
     traceEventIO $ "GHC progress: " ++ str
     ifVerbose dflags 1 $
-        logOutput dflags $ withPprStyle defaultUserStyle msg
+        logOutput logger dflags $ withPprStyle defaultUserStyle msg
 
-showPass :: DynFlags -> String -> IO ()
-showPass dflags what
+showPass :: Logger -> DynFlags -> String -> IO ()
+showPass logger dflags what
   = ifVerbose dflags 2 $
-    logInfo dflags $ withPprStyle defaultUserStyle (text "***" <+> text what <> colon)
+    logInfo logger dflags $ withPprStyle defaultUserStyle (text "***" <+> text what <> colon)
 
 data PrintTimings = PrintTimings | DontPrintTimings
   deriving (Eq, Show)
@@ -409,26 +223,15 @@ data PrintTimings = PrintTimings | DontPrintTimings
 --
 -- See Note [withTiming] for more.
 withTiming :: MonadIO m
-           => DynFlags     -- ^ DynFlags
+           => Logger
+           -> DynFlags     -- ^ DynFlags
            -> SDoc         -- ^ The name of the phase
            -> (a -> ())    -- ^ A function to force the result
                            -- (often either @const ()@ or 'rnf')
            -> m a          -- ^ The body of the phase to be timed
            -> m a
-withTiming dflags what force action =
-  withTiming' dflags what force PrintTimings action
-
--- | Like withTiming but get DynFlags from the Monad.
-withTimingD :: (MonadIO m, HasDynFlags m)
-           => SDoc         -- ^ The name of the phase
-           -> (a -> ())    -- ^ A function to force the result
-                           -- (often either @const ()@ or 'rnf')
-           -> m a          -- ^ The body of the phase to be timed
-           -> m a
-withTimingD what force action = do
-  dflags <- getDynFlags
-  withTiming' dflags what force PrintTimings action
-
+withTiming logger dflags what force action =
+  withTiming' logger dflags what force PrintTimings action
 
 -- | Same as 'withTiming', but doesn't print timings in the
 --   console (when given @-vN@, @N >= 2@ or @-ddump-timings@).
@@ -436,45 +239,30 @@ withTimingD what force action = do
 --   See Note [withTiming] for more.
 withTimingSilent
   :: MonadIO m
-  => DynFlags   -- ^ DynFlags
+  => Logger
+  -> DynFlags   -- ^ DynFlags
   -> SDoc       -- ^ The name of the phase
   -> (a -> ())  -- ^ A function to force the result
                 -- (often either @const ()@ or 'rnf')
   -> m a        -- ^ The body of the phase to be timed
   -> m a
-withTimingSilent dflags what force action =
-  withTiming' dflags what force DontPrintTimings action
-
--- | Same as 'withTiming', but doesn't print timings in the
---   console (when given @-vN@, @N >= 2@ or @-ddump-timings@)
---   and gets the DynFlags from the given Monad.
---
---   See Note [withTiming] for more.
-withTimingSilentD
-  :: (MonadIO m, HasDynFlags m)
-  => SDoc       -- ^ The name of the phase
-  -> (a -> ())  -- ^ A function to force the result
-                -- (often either @const ()@ or 'rnf')
-  -> m a        -- ^ The body of the phase to be timed
-  -> m a
-withTimingSilentD what force action = do
-  dflags <- getDynFlags
-  withTiming' dflags what force DontPrintTimings action
+withTimingSilent logger dflags what force action =
+  withTiming' logger dflags what force DontPrintTimings action
 
 -- | Worker for 'withTiming' and 'withTimingSilent'.
 withTiming' :: MonadIO m
-            => DynFlags   -- ^ A means of getting a 'DynFlags' (often
-                            -- 'getDynFlags' will work here)
+            => Logger
+            -> DynFlags   -- ^ 'DynFlags'
             -> SDoc         -- ^ The name of the phase
             -> (a -> ())    -- ^ A function to force the result
                             -- (often either @const ()@ or 'rnf')
             -> PrintTimings -- ^ Whether to print the timings
             -> m a          -- ^ The body of the phase to be timed
             -> m a
-withTiming' dflags what force_result prtimings action
+withTiming' logger dflags what force_result prtimings action
   = if verbosity dflags >= 2 || dopt Opt_D_dump_timings dflags
     then do whenPrintTimings $
-              logInfo dflags $ withPprStyle defaultUserStyle $
+              logInfo logger dflags $ withPprStyle defaultUserStyle $
                 text "***" <+> what <> colon
             let ctx = initDefaultSDocContext dflags
             alloc0 <- liftIO getAllocationCounter
@@ -492,7 +280,7 @@ withTiming' dflags what force_result prtimings action
                 time = realToFrac (end - start) * 1e-9
 
             when (verbosity dflags >= 2 && prtimings == PrintTimings)
-                $ liftIO $ logInfo dflags $ withPprStyle defaultUserStyle
+                $ liftIO $ logInfo logger dflags $ withPprStyle defaultUserStyle
                     (text "!!!" <+> what <> colon <+> text "finished in"
                      <+> doublePrec 2 time
                      <+> text "milliseconds"
@@ -502,7 +290,7 @@ withTiming' dflags what force_result prtimings action
                      <+> text "megabytes")
 
             whenPrintTimings $
-                dumpIfSet_dyn dflags Opt_D_dump_timings "" FormatText
+                dumpIfSet_dyn logger dflags Opt_D_dump_timings "" FormatText
                     $ text $ showSDocOneLine ctx
                     $ hsep [ what <> colon
                            , text "alloc=" <> ppr alloc
@@ -529,31 +317,31 @@ withTiming' dflags what force_result prtimings action
           eventBeginsDoc ctx w = showSDocOneLine ctx $ text "GHC:started:" <+> w
           eventEndsDoc   ctx w = showSDocOneLine ctx $ text "GHC:finished:" <+> w
 
-debugTraceMsg :: DynFlags -> Int -> SDoc -> IO ()
-debugTraceMsg dflags val msg =
+debugTraceMsg :: Logger -> DynFlags -> Int -> SDoc -> IO ()
+debugTraceMsg logger dflags val msg =
    ifVerbose dflags val $
-      logInfo dflags (withPprStyle defaultDumpStyle msg)
+      logInfo logger dflags (withPprStyle defaultDumpStyle msg)
 {-# INLINE debugTraceMsg #-}  -- see Note [INLINE conditional tracing utilities]
 
-putMsg :: DynFlags -> SDoc -> IO ()
-putMsg dflags msg = logInfo dflags (withPprStyle defaultUserStyle msg)
+putMsg :: Logger -> DynFlags -> SDoc -> IO ()
+putMsg logger dflags msg = logInfo logger dflags (withPprStyle defaultUserStyle msg)
 
-printInfoForUser :: DynFlags -> PrintUnqualified -> SDoc -> IO ()
-printInfoForUser dflags print_unqual msg
-  = logInfo dflags (withUserStyle print_unqual AllTheWay msg)
+printInfoForUser :: Logger -> DynFlags -> PrintUnqualified -> SDoc -> IO ()
+printInfoForUser logger dflags print_unqual msg
+  = logInfo logger dflags (withUserStyle print_unqual AllTheWay msg)
 
-printOutputForUser :: DynFlags -> PrintUnqualified -> SDoc -> IO ()
-printOutputForUser dflags print_unqual msg
-  = logOutput dflags (withUserStyle print_unqual AllTheWay msg)
+printOutputForUser :: Logger -> DynFlags -> PrintUnqualified -> SDoc -> IO ()
+printOutputForUser logger dflags print_unqual msg
+  = logOutput logger dflags (withUserStyle print_unqual AllTheWay msg)
 
-logInfo :: DynFlags -> SDoc -> IO ()
-logInfo dflags msg
-  = putLogMsg dflags NoReason SevInfo noSrcSpan msg
+logInfo :: Logger -> DynFlags -> SDoc -> IO ()
+logInfo logger dflags msg
+  = putLogMsg logger dflags NoReason SevInfo noSrcSpan msg
 
 -- | Like 'logInfo' but with 'SevOutput' rather then 'SevInfo'
-logOutput :: DynFlags -> SDoc -> IO ()
-logOutput dflags msg
-  = putLogMsg dflags NoReason SevOutput noSrcSpan msg
+logOutput :: Logger -> DynFlags -> SDoc -> IO ()
+logOutput logger dflags msg
+  = putLogMsg logger dflags NoReason SevOutput noSrcSpan msg
 
 prettyPrintGhcErrors :: ExceptionMonad m => DynFlags -> m a -> m a
 prettyPrintGhcErrors dflags
@@ -569,12 +357,12 @@ prettyPrintGhcErrors dflags
       where
          ctx = initSDocContext dflags defaultUserStyle
 
-traceCmd :: DynFlags -> String -> String -> IO a -> IO a
+traceCmd :: Logger -> DynFlags -> String -> String -> IO a -> IO a
 -- trace the command (at two levels of verbosity)
-traceCmd dflags phase_name cmd_line action
+traceCmd logger dflags phase_name cmd_line action
  = do   { let verb = verbosity dflags
-        ; showPass dflags phase_name
-        ; debugTraceMsg dflags 3 (text cmd_line)
+        ; showPass logger dflags phase_name
+        ; debugTraceMsg logger dflags 3 (text cmd_line)
         ; case flushErr dflags of
               FlushErr io -> io
 
@@ -582,8 +370,8 @@ traceCmd dflags phase_name cmd_line action
         ; action `catchIO` handle_exn verb
         }
   where
-    handle_exn _verb exn = do { debugTraceMsg dflags 2 (char '\n')
-                              ; debugTraceMsg dflags 2
+    handle_exn _verb exn = do { debugTraceMsg logger dflags 2 (char '\n')
+                              ; debugTraceMsg logger dflags 2
                                 (text "Failed:"
                                  <+> text cmd_line
                                  <+> text (show exn))
@@ -686,41 +474,3 @@ spent in each label).
 -}
 
 
--- | Format of a dump
---
--- Dump formats are loosely defined: dumps may contain various additional
--- headers and annotations and they may be partial. 'DumpFormat' is mainly a hint
--- (e.g. for syntax highlighters).
-data DumpFormat
-   = FormatHaskell   -- ^ Haskell
-   | FormatCore      -- ^ Core
-   | FormatSTG       -- ^ STG
-   | FormatByteCode  -- ^ ByteCode
-   | FormatCMM       -- ^ Cmm
-   | FormatASM       -- ^ Assembly code
-   | FormatC         -- ^ C code/header
-   | FormatLLVM      -- ^ LLVM bytecode
-   | FormatText      -- ^ Unstructured dump
-   deriving (Show,Eq)
-
-type DumpAction = DynFlags -> PprStyle -> DumpOptions -> String
-                  -> DumpFormat -> SDoc -> IO ()
-
-type TraceAction = forall a. DynFlags -> String -> SDoc -> a -> a
-
--- | Default action for 'dumpAction' hook
-defaultDumpAction :: DumpAction
-defaultDumpAction dflags sty dumpOpt title _fmt doc =
-  dumpSDocWithStyle sty dflags dumpOpt title doc
-
--- | Default action for 'traceAction' hook
-defaultTraceAction :: TraceAction
-defaultTraceAction dflags title doc = pprTraceWithFlags dflags title doc
-
--- | Helper for `dump_action`
-dumpAction :: DumpAction
-dumpAction dflags = dump_action dflags dflags
-
--- | Helper for `trace_action`
-traceAction :: TraceAction
-traceAction dflags = trace_action dflags dflags
