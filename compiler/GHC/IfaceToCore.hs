@@ -73,6 +73,7 @@ import GHC.Unit.Home.ModInfo
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Utils.Logger
 
 import GHC.Data.Bag
 import GHC.Data.Maybe
@@ -1202,8 +1203,9 @@ tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bnd
                                         exprsFreeIdsList args')
                       ; case lintExpr dflags in_scope rhs' of
                           Nothing   -> return ()
-                          Just errs -> liftIO $
-                            displayLintResults dflags False doc
+                          Just errs -> do
+                            logger <- getLogger
+                            liftIO $ displayLintResults logger dflags False doc
                                                (pprCoreExpr rhs')
                                                (emptyBag, errs) }
                    ; return (bndrs', args', rhs') }
@@ -1724,10 +1726,11 @@ tcPragExpr is_compulsory toplvl name expr
       whenGOptM Opt_DoCoreLinting $ do
         in_scope <- get_in_scope
         dflags   <- getDynFlags
+        logger   <- getLogger
         case lintUnfolding is_compulsory dflags noSrcLoc in_scope core_expr' of
           Nothing   -> return ()
           Just errs -> liftIO $
-            displayLintResults dflags False doc
+            displayLintResults logger dflags False doc
                                (pprCoreExpr core_expr') (emptyBag, errs)
     return core_expr'
   where

@@ -66,6 +66,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Utils.Monad
+import GHC.Utils.Logger
 
 import GHC.Types.Id
 import GHC.Types.Id.Info
@@ -136,8 +137,9 @@ deSugar hsc_env
                             })
 
   = do { let dflags = hsc_dflags hsc_env
+             logger = hsc_logger hsc_env
              print_unqual = mkPrintUnqualified (hsc_unit_env hsc_env) rdr_env
-        ; withTiming dflags
+        ; withTiming logger dflags
                      (text "Desugar"<+>brackets (ppr mod))
                      (const ()) $
      do { -- Desugar the program
@@ -188,7 +190,7 @@ deSugar hsc_env
                 = simpleOptPgm simpl_opts mod final_pgm rules_for_imps
                          -- The simpleOptPgm gets rid of type
                          -- bindings plus any stupid dead code
-        ; dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"
+        ; dumpIfSet_dyn logger dflags Opt_D_dump_occur_anal "Occurrence analysis"
             FormatCore (pprCoreBindings occ_anald_binds $$ pprRules ds_rules_for_imps )
 
         ; endPassIO hsc_env print_unqual CoreDesugarOpt ds_binds ds_rules_for_imps
@@ -284,22 +286,22 @@ and Rec the rest.
 -}
 
 deSugarExpr :: HscEnv -> LHsExpr GhcTc -> IO (Messages DecoratedSDoc, Maybe CoreExpr)
+deSugarExpr hsc_env tc_expr = do
+    let dflags = hsc_dflags hsc_env
+    let logger = hsc_logger hsc_env
 
-deSugarExpr hsc_env tc_expr = do {
-         let dflags = hsc_dflags hsc_env
+    showPass logger dflags "Desugar"
 
-       ; showPass dflags "Desugar"
-
-         -- Do desugaring
-       ; (msgs, mb_core_expr) <- runTcInteractive hsc_env $ initDsTc $
+    -- Do desugaring
+    (msgs, mb_core_expr) <- runTcInteractive hsc_env $ initDsTc $
                                  dsLExpr tc_expr
 
-       ; case mb_core_expr of
-            Nothing   -> return ()
-            Just expr -> dumpIfSet_dyn dflags Opt_D_dump_ds "Desugared"
-                         FormatCore (pprCoreExpr expr)
+    case mb_core_expr of
+       Nothing   -> return ()
+       Just expr -> dumpIfSet_dyn logger dflags Opt_D_dump_ds "Desugared"
+                    FormatCore (pprCoreExpr expr)
 
-       ; return (msgs, mb_core_expr) }
+    return (msgs, mb_core_expr)
 
 {-
 ************************************************************************
