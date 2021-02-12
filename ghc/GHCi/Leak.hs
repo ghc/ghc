@@ -1,4 +1,9 @@
 {-# LANGUAGE RecordWildCards, LambdaCase #-}
+
+-- We need to optimise to avoid leaking the leak indicators by building an IO
+-- thunk in getLeakIndicators (see #19356)
+{-# OPTIONS_GHC -O #-}
+
 module GHCi.Leak
   ( LeakIndicators
   , getLeakIndicators
@@ -26,26 +31,39 @@ import GHC.Types.Unique.DFM
 -- Checking for space leaks in GHCi. See #15111, and the
 -- -fghci-leak-check flag.
 
-data LeakIndicators = LeakIndicators [LeakModIndicators]
+data LeakIndicators = LeakIndicators ![LeakModIndicators]
 
 data LeakModIndicators = LeakModIndicators
-  { leakMod :: Weak HomeModInfo
-  , leakIface :: Weak ModIface
-  , leakDetails :: Weak ModDetails
-  , leakLinkable :: Maybe (Weak Linkable)
+  { leakMod      :: !(Weak HomeModInfo)
+  , leakIface    :: !(Weak ModIface)
+  , leakDetails  :: !(Weak ModDetails)
+  , leakLinkable :: !(Maybe (Weak Linkable))
   }
 
 -- | Grab weak references to some of the data structures representing
 -- the currently loaded modules.
 getLeakIndicators :: HscEnv -> IO LeakIndicators
-getLeakIndicators HscEnv{..} =
-  fmap LeakIndicators $
-    forM (eltsUDFM hsc_HPT) $ \hmi@HomeModInfo{..} -> do
+getLeakIndicators HscEnv{..} = do
+  let
+    go []     = return []
+    go (x:xs) = do
+      !x' <- f x
+      !xs' <- go xs
+      return (x':xs')
+
+    f hmi@HomeModInfo{..} = do
       leakMod <- mkWeakPtr hmi Nothing
       leakIface <- mkWeakPtr hm_iface Nothing
       leakDetails <- mkWeakPtr hm_details Nothing
-      leakLinkable <- mapM (`mkWeakPtr` Nothing) hm_linkable
-      return $ LeakModIndicators{..}
+      leakLinkable <- case hm_linkable of
+        Nothing -> return Nothing
+        Just l  -> do
+          l' <- mkWeakPtr l Nothing
+          return $! (Just $! l')
+      return $! LeakModIndicators{..}
+
+  ls <- go (eltsUDFM hsc_HPT)
+  return $! (LeakIndicators $! ls)
 
 -- | Look at the LeakIndicators collected by an earlier call to
 -- `getLeakIndicators`, and print messasges if any of them are still
