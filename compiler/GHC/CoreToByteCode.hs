@@ -47,6 +47,7 @@ import GHC.Types.RepType
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Utils.Misc
+import GHC.Utils.Logger
 import GHC.Types.Var.Set
 import GHC.Builtin.Types ( unboxedUnitTy )
 import GHC.Builtin.Types.Prim
@@ -97,7 +98,7 @@ byteCodeGen :: HscEnv
             -> Maybe ModBreaks
             -> IO CompiledByteCode
 byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
-   = withTiming dflags
+   = withTiming logger dflags
                 (text "GHC.CoreToByteCode"<+>brackets (ppr this_mod))
                 (const ()) $ do
         -- Split top-level binds into strings and others.
@@ -117,7 +118,7 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
         when (notNull ffis)
              (panic "GHC.CoreToByteCode.byteCodeGen: missing final emitBc?")
 
-        dumpIfSet_dyn dflags Opt_D_dump_BCOs
+        dumpIfSet_dyn logger dflags Opt_D_dump_BCOs
            "Proto-BCOs" FormatByteCode
            (vcat (intersperse (char ' ') (map ppr proto_bcos)))
 
@@ -137,6 +138,7 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
         return cbc
 
   where dflags = hsc_dflags hsc_env
+        logger = hsc_logger hsc_env
 
 allocateTopStrings
   :: HscEnv
@@ -170,7 +172,7 @@ coreExprToBCOs :: HscEnv
                -> CoreExpr
                -> IO UnlinkedBCO
 coreExprToBCOs hsc_env this_mod expr
- = withTiming dflags
+ = withTiming logger dflags
               (text "GHC.CoreToByteCode"<+>brackets (ppr this_mod))
               (const ()) $ do
       -- create a totally bogus name for the top-level BCO; this
@@ -187,11 +189,12 @@ coreExprToBCOs hsc_env this_mod expr
       when (notNull mallocd)
            (panic "GHC.CoreToByteCode.coreExprToBCOs: missing final emitBc?")
 
-      dumpIfSet_dyn dflags Opt_D_dump_BCOs "Proto-BCOs" FormatByteCode
+      dumpIfSet_dyn logger dflags Opt_D_dump_BCOs "Proto-BCOs" FormatByteCode
          (ppr proto_bco)
 
       assembleOneBCO hsc_env proto_bco
   where dflags = hsc_dflags hsc_env
+        logger = hsc_logger hsc_env
 
 -- The regular freeVars function gives more information than is useful to
 -- us here. We need only the free variables, not everything in an FVAnn.

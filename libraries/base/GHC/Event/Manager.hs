@@ -402,7 +402,8 @@ unregisterFd mgr reg = do
   wake <- unregisterFd_ mgr reg
   when wake $ wakeManager mgr
 
--- | Close a file descriptor in a race-safe way.
+-- | Close a file descriptor in a race-safe way.  It might block, although for
+-- a very short time; and thus it is interruptible by asynchronous exceptions.
 closeFd :: EventManager -> (Fd -> IO ()) -> Fd -> IO ()
 closeFd mgr close fd = do
   fds <- withMVar (callbackTableVar mgr fd) $ \tbl -> do
@@ -423,9 +424,9 @@ closeFd mgr close fd = do
 -- holds the callback table lock for the fd. It must hold this lock because
 -- this command executes a backend command on the fd.
 closeFd_ :: EventManager
-            -> IntTable [FdData]
-            -> Fd
-            -> IO (IO ())
+         -> IntTable [FdData]
+         -> Fd
+         -> IO (IO ())
 closeFd_ mgr tbl fd = do
   prev <- IT.delete (fromIntegral fd) tbl
   case prev of
