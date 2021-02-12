@@ -1204,9 +1204,9 @@ dataConArgUnpack
        , (Unboxer, Boxer) )
 dataConArgUnpack scaledTy@(Scaled _ arg_ty)
   | Just (tc, tc_args) <- splitTyConApp_maybe arg_ty
-  = case tyConSingleAlgDataCon_maybe tc of
-      Nothing -> dataConArgUnpackSum scaledTy tc tc_args
+  = case tyConSingleDataCon_maybe tc of -- = case tyConSingleAlgDataCon_maybe tc of
       Just con -> dataConArgUnpackProduct scaledTy tc_args con
+      Nothing -> dataConArgUnpackSum scaledTy tc tc_args
   | otherwise
   = pprPanic "dataConArgUnpack" (ppr arg_ty)
     -- An interface file specified Unpacked, but we couldn't unpack it
@@ -1226,8 +1226,9 @@ dataConArgUnpackProduct (Scaled arg_mult _) tc_args con =
          do { rep_ids <- mapM newLocal rep_tys
             ; let r_mult = idMult arg_id
             ; let rep_ids' = map (scaleIdBy r_mult) rep_ids
-            ; let unbox_fn body
-                    = mkSingleAltCase (Var arg_id) arg_id
+            ; let unbox_fn body = if isNewTyCon (dataConTyCon con)
+                    then mkDefaultCase (Var arg_id) (case rep_ids' of {[rep_id'] -> rep_id' ; _ -> panic "newtype arity" }) body
+                    else mkSingleAltCase (Var arg_id) arg_id
                                (DataAlt con) rep_ids' body
             ; return (rep_ids, unbox_fn) }
        , Boxer $ \ subst ->
