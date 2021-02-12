@@ -658,7 +658,7 @@ AC_DEFUN([FP_SET_CFLAGS_C99],
     CPPFLAGS="$$3"
     unset ac_cv_prog_cc_c99
     dnl perform detection
-    _AC_PROG_CC_C99
+    AC_PROG_CC_C99
     fp_cc_c99="$ac_cv_prog_cc_c99"
     case "x$ac_cv_prog_cc_c99" in
       x)   ;; # noop
@@ -860,7 +860,7 @@ AC_SUBST(ContextDiffCmd, [$fp_cv_context_diff])
 # is supported in autoconf versions 2.50 up to the actual 2.57, so there is
 # little risk.
 AC_DEFUN([FP_COMPUTE_INT],
-[_AC_COMPUTE_INT([$1], [$2], [$3], [$4])[]dnl
+[AC_COMPUTE_INT([$2], [$1], [$3], [$4])[]dnl
 ])# FP_COMPUTE_INT
 
 
