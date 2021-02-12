@@ -893,18 +893,5 @@ people since we're linking GHC dynamically, but most things themselves
 link statically.
 -}
 
--- If GHC_LOADED_INTO_GHCI is not set when GHC is loaded into GHCi, then
--- running it causes an error like this:
---
--- Loading temp shared object failed:
--- /tmp/ghc13836_0/libghc_1872.so: undefined symbol: initGCStatistics
---
--- Skipping the foreign call fixes this problem, and the outer GHCi
--- should have already made this call anyway.
-#if defined(GHC_LOADED_INTO_GHCI)
-initGCStatistics :: IO ()
-initGCStatistics = return ()
-#else
 foreign import ccall safe "initGCStatistics"
   initGCStatistics :: IO ()
-#endif
