@@ -2440,7 +2440,9 @@ genCCall' dflags is32Bit (PrimTarget (MO_PopCnt width)) dest_regs@[dst]
                           CallReference lbl
             let target = ForeignTarget targetExpr (ForeignConvention CCallConv
                                                            [NoHint] [NoHint]
-                                                           CmmMayReturn undefined undefined)
+                                                           CmmMayReturn
+                                                           (panic "Missing Return PrimRep")
+                                                           (panic "Missing Argument PrimReps"))
             genCCall' dflags is32Bit target dest_regs args bid
   where
     format = intFormat width
@@ -2473,7 +2475,9 @@ genCCall' dflags is32Bit (PrimTarget (MO_Pdep width)) dest_regs@[dst]
                           CallReference lbl
             let target = ForeignTarget targetExpr (ForeignConvention CCallConv
                                                            [NoHint] [NoHint]
-                                                           CmmMayReturn undefined undefined)
+                                                           CmmMayReturn
+                                                           (panic "Missing Return PrimRep")
+                                                           (panic "Missing Argument PrimReps"))
             genCCall' dflags is32Bit target dest_regs args bid
   where
     format = intFormat width
@@ -2506,7 +2510,9 @@ genCCall' dflags is32Bit (PrimTarget (MO_Pext width)) dest_regs@[dst]
                           CallReference lbl
             let target = ForeignTarget targetExpr (ForeignConvention CCallConv
                                                            [NoHint] [NoHint]
-                                                           CmmMayReturn undefined undefined)
+                                                           CmmMayReturn
+                                                           (panic "Missing Return PrimRep")
+                                                           (panic "Missing Argument PrimReps"))
             genCCall' dflags is32Bit target dest_regs args bid
   where
     format = intFormat width
@@ -2518,7 +2524,9 @@ genCCall' dflags is32Bit (PrimTarget (MO_Clz width)) dest_regs@[dst] args@[src] 
     targetExpr <- cmmMakeDynamicReference dflags CallReference lbl
     let target = ForeignTarget targetExpr (ForeignConvention CCallConv
                                            [NoHint] [NoHint]
-                                           CmmMayReturn undefined undefined)
+                                           CmmMayReturn
+                                           (panic "Missing Return PrimRep")
+                                           (panic "Missing Argument PrimReps"))
     genCCall' dflags is32Bit target dest_regs args bid
 
   | otherwise = do
@@ -2561,7 +2569,9 @@ genCCall' dflags is32Bit (PrimTarget (MO_UF_Conv width)) dest_regs args bid = do
                   CallReference lbl
     let target = ForeignTarget targetExpr (ForeignConvention CCallConv
                                            [NoHint] [NoHint]
-                                           CmmMayReturn undefined undefined)
+                                           CmmMayReturn
+                                           (panic "Missing Return PrimRep")
+                                           (panic "Missing Argument PrimReps"))
     genCCall' dflags is32Bit target dest_regs args bid
   where
     lbl = mkCmmCodeLabel primUnitId (fsLit (word2FloatLabel width))
@@ -3274,7 +3284,9 @@ outOfLineCmmOp bid mop res args
       dflags <- getDynFlags
       targetExpr <- cmmMakeDynamicReference dflags CallReference lbl
       let target = ForeignTarget targetExpr
-                           (ForeignConvention CCallConv [] [] CmmMayReturn undefined undefined)
+                           (ForeignConvention CCallConv [] [] CmmMayReturn
+                                              (panic "Missing Return PrimRep")
+                                              (panic "Missing Argument PrimReps"))
 
       -- We know foreign calls results in no new basic blocks, so we can ignore
       -- the returned block id.

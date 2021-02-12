@@ -173,9 +173,13 @@ dsCImport id co (CLabel cid) cconv _ _ = do
     return ([(id, rhs')], empty, empty)
 
 dsCImport id co (CFunction target) cconv@PrimCallConv safety _
-  = dsPrimCall id co (CCall (mkCCallSpec target cconv safety undefined undefined))
+  = dsPrimCall id co (CCall (mkCCallSpec target cconv safety
+                                         (panic "Missing Return PrimRep")
+                                         (panic "Missing Argument PrimReps")))
 dsCImport id co (CFunction target) cconv safety mHeader
-  = dsFCall id co (CCall (mkCCallSpec target cconv safety undefined undefined)) mHeader
+  = dsFCall id co (CCall (mkCCallSpec target cconv safety
+                                      (panic "Missing Return PrimRep")
+                                      (panic "Missing Argument PrimReps"))) mHeader
 dsCImport id co CWrapper cconv _ _
   = dsFExportDynamic id co cconv
 
