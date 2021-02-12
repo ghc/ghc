@@ -47,6 +47,7 @@ import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Env
 
 import GHC.Core.TyCon
+import GHC.Core.TyCo.Rep (Type (..) )
 import GHC.Types.Name
 import GHC.Types.Name.Occurrence as OccName
 import GHC.Unit.Module
@@ -725,10 +726,24 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
                                            _   -> return ty)
                                  term
                       zonkTerm zterm'
+   let (new_tvs, _ ) = quantifyType $ termType term
+       newTerm =
+         if (isForAllTy old_ty && not (null new_tvs)) then do          -- #12449
+           -- If the old type was a forall type, then the `forall` constraint
+           -- was cut off above. We re-add a new `forall` constaint with
+           -- eventually changed variables to the type of the reconstructed term.
+           -- Recover the flags that control how to print the forall constraint
+           -- from the input type.
+            let fNewType = case old_ty of
+                 (ForAllTy (Bndr _ argFlag) _)
+                   -> mkForAllTys (mkTyCoVarBinders argFlag new_tvs)
+                 _ -> id
+            mapTermType fNewType term
+         else term
    traceTR (text "Term reconstruction completed." $$
-            text "Term obtained: " <> ppr term $$
-            text "Type obtained: " <> ppr (termType term))
-   return term
+            text "Term obtained: " <> ppr newTerm $$
+            text "Type obtained: " <> ppr (termType newTerm))
+   return newTerm
     where
   go :: Int -> Type -> Type -> ForeignHValue -> TcM Term
    -- I believe that my_ty should not have any enclosing
