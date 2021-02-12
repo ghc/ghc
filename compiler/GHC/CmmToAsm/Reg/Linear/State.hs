@@ -1,9 +1,6 @@
 {-# LANGUAGE CPP, PatternSynonyms, DeriveFunctor #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-
-#if !defined(GHC_LOADED_INTO_GHCI)
 {-# LANGUAGE UnboxedTuples #-}
-#endif
 
 -- | State monad for the linear register allocator.
 
@@ -56,20 +53,11 @@ import GHC.Types.Unique.Supply
 
 import Control.Monad (ap)
 
--- Avoids using unboxed tuples when loading into GHCi
-#if !defined(GHC_LOADED_INTO_GHCI)
-
 type RA_Result freeRegs a = (# RA_State freeRegs, a #)
 
 pattern RA_Result :: a -> b -> (# a, b #)
 pattern RA_Result a b = (# a, b #)
 {-# COMPLETE RA_Result #-}
-#else
-
-data RA_Result freeRegs a = RA_Result {-# UNPACK #-} !(RA_State freeRegs) !a
-  deriving (Functor)
-
-#endif
 
 -- | The register allocator monad type.
 newtype RegM freeRegs a

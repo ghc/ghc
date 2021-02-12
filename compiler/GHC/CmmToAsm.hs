@@ -10,11 +10,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
-
-
-#if !defined(GHC_LOADED_INTO_GHCI)
 {-# LANGUAGE UnboxedTuples #-}
-#endif
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -979,18 +975,11 @@ cmmToCmm config (CmmProc info lbl live graph)
       do blocks' <- mapM cmmBlockConFold (toBlockList graph)
          return $ CmmProc info lbl live (ofBlockList (g_entry graph) blocks')
 
--- Avoids using unboxed tuples when loading into GHCi
-#if !defined(GHC_LOADED_INTO_GHCI)
-
 type OptMResult a = (# a, [CLabel] #)
 
 pattern OptMResult :: a -> b -> (# a, b #)
 pattern OptMResult x y = (# x, y #)
 {-# COMPLETE OptMResult #-}
-#else
-
-data OptMResult a = OptMResult !a ![CLabel] deriving (Functor)
-#endif
 
 newtype CmmOptM a = CmmOptM (NCGConfig -> [CLabel] -> OptMResult a)
     deriving (Functor)
