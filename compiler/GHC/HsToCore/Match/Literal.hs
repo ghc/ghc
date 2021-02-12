@@ -1,5 +1,8 @@
 {-# LANGUAGE CPP                 #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE MultiWayIf          #-}
+{-# LANGUAGE TypeApplications    #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -63,7 +66,6 @@ import Data.Int
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NEL
 import Data.Word
-import Data.Proxy
 
 {-
 ************************************************************************
@@ -192,34 +194,46 @@ warnAboutOverflowedLiterals
 warnAboutOverflowedLiterals dflags lit
  | wopt Opt_WarnOverflowedLiterals dflags
  , Just (i, tc) <- lit
- =  if      tc == intTyConName     then check i tc (Proxy :: Proxy Int)
-
+ = if
     -- These only show up via the 'HsOverLit' route
-    else if tc == int8TyConName    then check i tc (Proxy :: Proxy Int8)
-    else if tc == int16TyConName   then check i tc (Proxy :: Proxy Int16)
-    else if tc == int32TyConName   then check i tc (Proxy :: Proxy Int32)
-    else if tc == int64TyConName   then check i tc (Proxy :: Proxy Int64)
-    else if tc == wordTyConName    then check i tc (Proxy :: Proxy Word)
-    else if tc == word8TyConName   then check i tc (Proxy :: Proxy Word8)
-    else if tc == word16TyConName  then check i tc (Proxy :: Proxy Word16)
-    else if tc == word32TyConName  then check i tc (Proxy :: Proxy Word32)
-    else if tc == word64TyConName  then check i tc (Proxy :: Proxy Word64)
-    else if tc == naturalTyConName then checkPositive i tc
+    | tc == intTyConName        -> check i tc minInt         maxInt
+    | tc == wordTyConName       -> check i tc minWord        maxWord
+    | tc == int8TyConName       -> check i tc (min' @Int8)   (max' @Int8)
+    | tc == int16TyConName      -> check i tc (min' @Int16)  (max' @Int16)
+    | tc == int32TyConName      -> check i tc (min' @Int32)  (max' @Int32)
+    | tc == int64TyConName      -> check i tc (min' @Int64)  (max' @Int64)
+    | tc == word8TyConName      -> check i tc (min' @Word8)  (max' @Word8)
+    | tc == word16TyConName     -> check i tc (min' @Word16) (max' @Word16)
+    | tc == word32TyConName     -> check i tc (min' @Word32) (max' @Word32)
+    | tc == word64TyConName     -> check i tc (min' @Word64) (max' @Word64)
+    | tc == naturalTyConName    -> checkPositive i tc
 
     -- These only show up via the 'HsLit' route
-    else if tc == intPrimTyConName    then check i tc (Proxy :: Proxy Int)
-    else if tc == int8PrimTyConName   then check i tc (Proxy :: Proxy Int8)
-    else if tc == int32PrimTyConName  then check i tc (Proxy :: Proxy Int32)
-    else if tc == int64PrimTyConName  then check i tc (Proxy :: Proxy Int64)
-    else if tc == wordPrimTyConName   then check i tc (Proxy :: Proxy Word)
-    else if tc == word8PrimTyConName  then check i tc (Proxy :: Proxy Word8)
-    else if tc == word32PrimTyConName then check i tc (Proxy :: Proxy Word32)
-    else if tc == word64PrimTyConName then check i tc (Proxy :: Proxy Word64)
+    | tc == intPrimTyConName    -> check i tc minInt         maxInt
+    | tc == wordPrimTyConName   -> check i tc minWord        maxWord
+    | tc == int8PrimTyConName   -> check i tc (min' @Int8)   (max' @Int8)
+    | tc == int16PrimTyConName  -> check i tc (min' @Int16)  (max' @Int16)
+    | tc == int32PrimTyConName  -> check i tc (min' @Int32)  (max' @Int32)
+    | tc == int64PrimTyConName  -> check i tc (min' @Int64)  (max' @Int64)
+    | tc == word8PrimTyConName  -> check i tc (min' @Word8)  (max' @Word8)
+    | tc == word16PrimTyConName -> check i tc (min' @Word16) (max' @Word16)
+    | tc == word32PrimTyConName -> check i tc (min' @Word32) (max' @Word32)
+    | tc == word64PrimTyConName -> check i tc (min' @Word64) (max' @Word64)
 
-    else return ()
+    | otherwise -> return ()
 
   | otherwise = return ()
   where
+    -- use target Int/Word sizes! See #17336
+    platform          = targetPlatform dflags
+    (minInt,maxInt)   = (platformMinInt platform, platformMaxInt platform)
+    (minWord,maxWord) = (0,                       platformMaxWord platform)
+
+    min' :: forall a. (Integral a, Bounded a) => Integer
+    min' = fromIntegral (minBound :: a)
+
+    max' :: forall a. (Integral a, Bounded a) => Integer
+    max' = fromIntegral (maxBound :: a)
 
     checkPositive :: Integer -> Name -> DsM ()
     checkPositive i tc
@@ -230,8 +244,7 @@ warnAboutOverflowedLiterals dflags lit
                        <+> ptext (sLit "only supports positive numbers")
                      ])
 
-    check :: forall a. (Bounded a, Integral a) => Integer -> Name -> Proxy a -> DsM ()
-    check i tc _proxy
+    check i tc minB maxB
       = when (i < minB || i > maxB) $
         warnDs (Reason Opt_WarnOverflowedLiterals)
                (vcat [ text "Literal" <+> integer i
@@ -239,8 +252,6 @@ warnAboutOverflowedLiterals dflags lit
                        <+> integer minB <> text ".." <> integer maxB
                      , sug ])
       where
-        minB = toInteger (minBound :: a)
-        maxB = toInteger (maxBound :: a)
         sug | minB == -i   -- Note [Suggest NegativeLiterals]
             , i > 0
             , not (xopt LangExt.NegativeLiterals dflags)
@@ -268,35 +279,46 @@ warnAboutEmptyEnumerations fam_envs dflags fromExpr mThnExpr toExpr
   | not $ wopt Opt_WarnEmptyEnumerations dflags
   = return ()
   -- Numeric Literals
-  | Just from_ty@(from,_) <- getLHsIntegralLit fromExpr
-  , Just (_, tc)          <- getNormalisedTyconName fam_envs from_ty
-  , Just mThn             <- traverse getLHsIntegralLit mThnExpr
-  , Just (to,_)           <- getLHsIntegralLit toExpr
-  , let check :: forall a. (Enum a, Num a) => Proxy a -> DsM ()
-        check _proxy
-          = when (null enumeration) raiseWarning
+  | Just from_ty@(from',_) <- getLHsIntegralLit fromExpr
+  , Just (_, tc)           <- getNormalisedTyconName fam_envs from_ty
+  , Just mThn'             <- traverse getLHsIntegralLit mThnExpr
+  , Just (to',_)           <- getLHsIntegralLit toExpr
+  = do
+      let
+        check :: forall a. (Integral a, Num a) => DsM ()
+        check = when (null enumeration) raiseWarning
           where
-            enumeration :: [a]
             enumeration = case mThn of
-                            Nothing      -> [fromInteger from                    .. fromInteger to]
-                            Just (thn,_) -> [fromInteger from, fromInteger thn   .. fromInteger to]
+              Nothing  -> [from      .. to]
+              Just thn -> [from, thn .. to]
+            wrap :: forall a. (Integral a, Num a) => Integer -> Integer
+            wrap i = toInteger (fromIntegral i :: a)
+            from = wrap @a from'
+            to   = wrap @a to'
+            mThn = fmap (wrap @a . fst) mThn'
 
-  = if      tc == intTyConName    then check (Proxy :: Proxy Int)
-    else if tc == int8TyConName   then check (Proxy :: Proxy Int8)
-    else if tc == int16TyConName  then check (Proxy :: Proxy Int16)
-    else if tc == int32TyConName  then check (Proxy :: Proxy Int32)
-    else if tc == int64TyConName  then check (Proxy :: Proxy Int64)
-    else if tc == wordTyConName   then check (Proxy :: Proxy Word)
-    else if tc == word8TyConName  then check (Proxy :: Proxy Word8)
-    else if tc == word16TyConName then check (Proxy :: Proxy Word16)
-    else if tc == word32TyConName then check (Proxy :: Proxy Word32)
-    else if tc == word64TyConName then check (Proxy :: Proxy Word64)
-    else if tc == integerTyConName then check (Proxy :: Proxy Integer)
-    else if tc == naturalTyConName then check (Proxy :: Proxy Integer)
-      -- We use 'Integer' because otherwise a negative 'Natural' literal
-      -- could cause a compile time crash (instead of a runtime one).
-      -- See the T10930b test case for an example of where this matters.
-    else return ()
+      platform <- targetPlatform <$> getDynFlags
+         -- Be careful to use target Int/Word sizes! cf #17336
+      if | tc == intTyConName     -> case platformWordSize platform of
+                                      PW4 -> check @Int32
+                                      PW8 -> check @Int64
+         | tc == wordTyConName    -> case platformWordSize platform of
+                                      PW4 -> check @Word32
+                                      PW8 -> check @Word64
+         | tc == int8TyConName    -> check @Int8
+         | tc == int16TyConName   -> check @Int16
+         | tc == int32TyConName   -> check @Int32
+         | tc == int64TyConName   -> check @Int64
+         | tc == word8TyConName   -> check @Word8
+         | tc == word16TyConName  -> check @Word16
+         | tc == word32TyConName  -> check @Word32
+         | tc == word64TyConName  -> check @Word64
+         | tc == integerTyConName -> check @Integer
+         | tc == naturalTyConName -> check @Integer
+            -- We use 'Integer' because otherwise a negative 'Natural' literal
+            -- could cause a compile time crash (instead of a runtime one).
+            -- See the T10930b test case for an example of where this matters.
+         | otherwise -> return ()
 
   -- Char literals (#18402)
   | Just fromChar <- getLHsCharLit fromExpr
