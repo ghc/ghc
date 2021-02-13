@@ -328,7 +328,8 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
         [AC_LANG_PROGRAM([], [__asm__ (".subsections_via_symbols");])],
         [AC_MSG_RESULT(yes)
          if test x"$TargetArch" = xaarch64; then
-            dnl subsections via symbols is busted on arm64
+            dnl subsections via symbols is busted on arm64 (aarch64-darwin)
+            dnl see #19379
             TargetHasSubsectionsViaSymbols=NO
          else
             TargetHasSubsectionsViaSymbols=YES

@@ -368,7 +368,7 @@ library
 
     if os(osx)
       ld-options: "-Wl,-search_paths_first"
-      if !arch(x86_64)
+      if !arch(x86_64) && !arch(aarch64)
          ld-options: -read_only_relocs warning
 
     cmm-sources: Apply.cmm
