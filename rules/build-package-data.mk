@@ -100,8 +100,18 @@ ifeq "$$(GMP_FORCE_INTREE)" "YES"
 $1_$2_CONFIGURE_OPTS += --configure-option=--with-intree-gmp
 endif
 
+ifeq "$3" "0"
+ifneq "$$(CURSES_LIB_DIRS_STAGE0)" ""
+$1_$2_CONFIGURE_OPTS += --configure-option=--with-curses-libraries="$$(CURSES_LIB_DIRS_STAGE0)"
+else
 ifneq "$$(CURSES_LIB_DIRS)" ""
 $1_$2_CONFIGURE_OPTS += --configure-option=--with-curses-libraries="$$(CURSES_LIB_DIRS)"
+endif
+endif
+else
+ifneq "$$(CURSES_LIB_DIRS)" ""
+$1_$2_CONFIGURE_OPTS += --configure-option=--with-curses-libraries="$$(CURSES_LIB_DIRS)"
+endif
 endif
 
 ifeq "$$(CrossCompiling)" "YES"
