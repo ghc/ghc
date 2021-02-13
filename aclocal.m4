@@ -653,7 +653,7 @@ AC_DEFUN([FP_SET_CFLAGS_C99],
     CPPFLAGS="$$3"
     unset ac_cv_prog_cc_c99
     dnl perform detection
-    _AC_PROG_CC_C99
+    AC_PROG_CC_C99
     fp_cc_c99="$ac_cv_prog_cc_c99"
     case "x$ac_cv_prog_cc_c99" in
       x)   ;; # noop
