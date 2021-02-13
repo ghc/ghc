@@ -70,6 +70,7 @@ library
         GHCi.TH.Binary
 
     Build-Depends:
+        rts,
         array            == 0.5.*,
         base             >= 4.8 && < 4.17,
         ghc-prim         >= 0.5.0 && < 0.9,
