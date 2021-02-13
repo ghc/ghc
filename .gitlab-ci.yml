@@ -417,6 +417,63 @@ validate-x86_64-darwin:
       - cabal-cache
       - toolchain
 
+validate-aarch64-darwin:
+  extends: .validate
+  stage: full-build
+  tags:
+    - aarch64-darwin
+
+  # for now make this non mandatory to pass.
+  allow_failure: true
+
+  variables:
+    TEST_TYPE: test
+    MAKE_ARGS: "-Werror"
+    GHC_VERSION: 8.10.3
+    CABAL_INSTALL_VERSION: 3.2.0.0
+    BUILD_FLAVOUR: "quick"
+    BIN_DIST_PREP_TAR_COMP: "ghc-arm64-apple-darwin.tar.xz"
+    # we run on M1's for now, getconf can't be built with nix yet,
+    # and we use a pure shell, so we can't/shouldn't use /usr/bin/getconf
+    # inside th shell.
+    CPUS: 8
+    LANG: "en_US.UTF-8"
+    # WARNING: this is overridden in the shell.nix, see shell.nix!
+    CONFIGURE_ARGS: "--with-intree-gmp"
+
+  # I wish we could just use the nix #! logic, but we can't --run and -i bash
+  # behave very differently. -i bash does not pass any nix related env vars
+  # the whole $stdenv/setup part seems to be missing.
+  script: |
+    set -Eeuo pipefail
+    function runInNixShell() {
+      nix-shell .gitlab/shell.nix \
+        -I nixpkgs=https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz \
+        --argstr system "aarch64-darwin" \
+        --pure \
+        --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR \
+        --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --keep PROJECT_DIR \
+        --keep CI_PROJECT_DIR --keep MAKE_ARGS \
+        --keep LANG --keep CONFIGURE_ARGS \
+        --run "$1"
+    }
+    # fix up config.sub in libraries for the time.
+    # aarch64-darwin is not supported in older config.sub's
+    find libraries -name config.sub -exec cp config.sub {} \;
+    runInNixShell ".gitlab/ci.sh setup"
+    runInNixShell ".gitlab/ci.sh configure"
+    runInNixShell ".gitlab/ci.sh build_make"
+    runInNixShell ".gitlab/ci.sh test_make"
+
+  artifacts:
+    reports:
+      junit: junit.xml
+    expire_in: 2 week
+    paths:
+      - $BIN_DIST_PREP_TAR_COMP
+      - junit.xml
+      - performance-metrics.tsv
+
 # Disabled because of OS X CI capacity
 .validate-x86_64-darwin-hadrian:
   <<: *only-default
