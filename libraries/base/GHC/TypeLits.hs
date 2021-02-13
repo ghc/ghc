@@ -40,6 +40,8 @@ module GHC.TypeLits
   , N.SomeNat(..), SomeSymbol(..), SomeChar(..)
   , someNatVal, someSymbolVal, someCharVal
   , N.sameNat, sameSymbol, sameChar
+  , OrderingI(..)
+  , N.cmpNat, cmpSymbol, cmpChar
 
 
     -- * Functions on type literals
@@ -65,6 +67,7 @@ import GHC.Prim(magicDict, Proxy#)
 import Data.Maybe(Maybe(..))
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality((:~:)(Refl))
+import Data.Type.Ord(Compare, OrderingI(..))
 import Unsafe.Coerce(unsafeCoerce)
 
 import GHC.TypeNats (Natural, Nat, KnownNat)
@@ -269,6 +272,37 @@ sameChar :: (KnownChar a, KnownChar b) =>
 sameChar x y
   | charVal x == charVal y  = Just (unsafeCoerce Refl)
   | otherwise                = Nothing
+
+type instance Compare (a :: Symbol) b = CmpSymbol a b
+
+-- | Like 'sameSymbol', but if the symbols aren't equal, this additionally
+-- provides proof of LT or GT.
+-- @since 4.16.0.0
+cmpSymbol :: forall a b proxy1 proxy2. (KnownSymbol a, KnownSymbol b)
+          => proxy1 a -> proxy2 b -> OrderingI a b
+cmpSymbol x y = case compare (symbolVal x) (symbolVal y) of
+  EQ -> case unsafeCoerce (Refl, Refl) :: (CmpSymbol a b :~: 'EQ, a :~: b) of
+    (Refl, Refl) -> EQI
+  LT -> case unsafeCoerce Refl :: (CmpSymbol a b :~: 'LT) of
+    Refl -> LTI
+  GT -> case unsafeCoerce Refl :: (CmpSymbol a b :~: 'GT) of
+    Refl -> GTI
+
+type instance Compare (a :: Char) b = CmpChar a b
+
+-- | Like 'sameChar', but if the Chars aren't equal, this additionally
+-- provides proof of LT or GT.
+-- @since 4.16.0.0
+cmpChar :: forall a b proxy1 proxy2. (KnownChar a, KnownChar b)
+        => proxy1 a -> proxy2 b -> OrderingI a b
+cmpChar x y = case compare (charVal x) (charVal y) of
+  EQ -> case unsafeCoerce (Refl, Refl) :: (CmpChar a b :~: 'EQ, a :~: b) of
+    (Refl, Refl) -> EQI
+  LT -> case unsafeCoerce Refl :: (CmpChar a b :~: 'LT) of
+    Refl -> LTI
+  GT -> case unsafeCoerce Refl :: (CmpChar a b :~: 'GT) of
+    Refl -> GTI
+
 
 --------------------------------------------------------------------------------
 -- PRIVATE:
