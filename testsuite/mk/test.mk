@@ -34,6 +34,10 @@ ifeq "$(GhcUnregisterised)" "YES"
     EXTRA_HC_OPTS += -optc-fno-builtin
 endif
 
+ifneq "$(findstring llvm,$(BUILD_FLAVOUR))" ""
+    EXTRA_HC_OPTS += -fno-unsupported-llvm-version
+endif
+
 # TEST_HC_OPTS is passed to every invocation of TEST_HC
 # in nested Makefiles
 TEST_HC_OPTS = -dcore-lint -dstg-lint -dcmm-lint \
