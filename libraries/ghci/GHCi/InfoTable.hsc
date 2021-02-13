@@ -360,7 +360,11 @@ sizeOfEntryCode
 -- Note: Must return proper pointer for use in a closure
 newExecConItbl :: StgInfoTable -> ByteString -> IO (FunPtr ())
 newExecConItbl obj con_desc
+#if RTS_LINKER_USE_MMAP && MIN_VERSION_rts(1,0,1)
+   = do
+#else
    = alloca $ \pcode -> do
+#endif
         let lcon_desc = BS.length con_desc + 1{- null terminator -}
             -- SCARY
             -- This size represents the number of bytes in an StgConInfoTable.
@@ -369,8 +373,13 @@ newExecConItbl obj con_desc
                -- table, because on a 64-bit platform we reference this string
                -- with a 32-bit offset relative to the info table, so if we
                -- allocated the string separately it might be out of range.
+#if RTS_LINKER_USE_MMAP && MIN_VERSION_rts(1,0,1)
+        wr_ptr <- _allocateWrite (sz + fromIntegral lcon_desc)
+        let ex_ptr = wr_ptr
+#else
         wr_ptr <- _allocateExec (sz + fromIntegral lcon_desc) pcode
         ex_ptr <- peek pcode
+#endif
         let cinfo = StgConInfoTable { conDesc = ex_ptr `plusPtr` fromIntegral sz
                                     , infoTable = obj }
         pokeConItbl wr_ptr ex_ptr cinfo
@@ -379,6 +388,9 @@ newExecConItbl obj con_desc
         let null_off = fromIntegral sz + fromIntegral (BS.length con_desc)
         poke (castPtr wr_ptr `plusPtr` null_off) (0 :: Word8)
         _flushExec sz ex_ptr -- Cache flush (if needed)
+#if RTS_LINKER_USE_MMAP && MIN_VERSION_rts(1,0,1)
+        _markExec (sz + fromIntegral lcon_desc) ex_ptr
+#endif
 #if defined(TABLES_NEXT_TO_CODE)
         return (castPtrToFunPtr (ex_ptr `plusPtr` conInfoTableSizeB))
 #else
@@ -391,6 +403,12 @@ foreign import ccall unsafe "allocateExec"
 foreign import ccall unsafe "flushExec"
   _flushExec :: CUInt -> Ptr a -> IO ()
 
+#if RTS_LINKER_USE_MMAP && MIN_VERSION_rts(1,0,1)
+foreign import ccall unsafe "allocateWrite"
+  _allocateWrite :: CUInt -> IO (Ptr a)
+foreign import ccall unsafe "markExec"
+  _markExec :: CUInt -> Ptr a -> IO ()
+#endif
 -- -----------------------------------------------------------------------------
 -- Constants and config
 
