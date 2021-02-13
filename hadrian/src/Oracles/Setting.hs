@@ -36,7 +36,6 @@ data Setting = BuildArch
              | BuildOs
              | BuildPlatform
              | BuildVendor
-             | CursesLibDir
              | DynamicExtension
              | FfiIncludeDir
              | FfiLibDir
@@ -76,6 +75,8 @@ data Setting = BuildArch
              | TargetArchHaskell
              | TargetOsHaskell
              | TargetArmVersion
+             -- staged settings
+             | CursesLibDir Stage
 
 -- TODO: Reduce the variety of similar flags (e.g. CPP and non-CPP versions).
 -- | Each 'SettingList' comes from the file @hadrian/cfg/system.config@,
@@ -132,7 +133,6 @@ setting key = lookupValueOrError configFile $ case key of
     BuildOs            -> "build-os"
     BuildPlatform      -> "build-platform"
     BuildVendor        -> "build-vendor"
-    CursesLibDir       -> "curses-lib-dir"
     DynamicExtension   -> "dynamic-extension"
     FfiIncludeDir      -> "ffi-include-dir"
     FfiLibDir          -> "ffi-lib-dir"
@@ -172,6 +172,8 @@ setting key = lookupValueOrError configFile $ case key of
     TargetVendor       -> "target-vendor"
     TargetArchHaskell  -> "target-arch-haskell"
     TargetOsHaskell    -> "target-os-haskell"
+    -- Staged settings
+    CursesLibDir stage -> "curses-lib-dir-" ++ stageString stage
 
 -- | Look up the value of a 'SettingList' in @cfg/system.config@, tracking the
 -- result.

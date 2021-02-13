@@ -171,7 +171,10 @@ target-arm-version    = @ARM_ISA@
 # Include and library directories:
 #=================================
 
-curses-lib-dir    = @CURSES_LIB_DIRS@
+curses-lib-dir-stage0 = @CURSES_LIB_DIRS_STAGE0@
+curses-lib-dir-stage1 = @CURSES_LIB_DIRS@
+curses-lib-dir-stage2 = @CURSES_LIB_DIRS@
+curses-lib-dir-stage3 = @CURSES_LIB_DIRS@
 
 iconv-include-dir = @ICONV_INCLUDE_DIRS@
 iconv-lib-dir     = @ICONV_LIB_DIRS@
