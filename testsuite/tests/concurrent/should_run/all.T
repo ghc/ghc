@@ -197,6 +197,7 @@ test('conc036', skip, compile_and_run, [''])
 test('foreignInterruptible', [when(fast(), skip),
                               when(opsys('mingw32'),expect_fail),
                               when(unregisterised(), fragile(15467)),
+                              fragile_for(18391, ['ghci', 'ghci-ext', 'ghci-ext-prof']),
                               # I don't think we support interrupting Sleep()
                               # on Windows.  --SDM
                               only_threaded_ways,
