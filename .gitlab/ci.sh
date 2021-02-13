@@ -3,9 +3,7 @@
 
 # This is the primary driver of the GitLab CI infrastructure.
 # Run `ci.sh usage` for usage information.
-
-
-set -e -o pipefail
+set -Eeuo pipefail
 
 # Configuration:
 HACKAGE_INDEX_STATE="2020-12-21T14:48:20Z" # TODO dedup with yaml's def
@@ -178,7 +176,13 @@ function set_toolchain_paths() {
     *) ;;
   esac
 
-  if [[ "$needs_toolchain" = "1" ]]; then
+  if [[ -n "${IN_NIX_SHELL:-}" ]]; then
+      needs_toolchain=""
+      GHC="$(which ghc)"
+      CABAL="$(which cabal)"
+      HAPPY="$(which happy)"
+      ALEX="$(which alex)"
+  elif [[ -n "$needs_toolchain" = "1" ]]; then
       # These are populated by setup_toolchain
       GHC="$toolchain/bin/ghc$exe"
       CABAL="$toolchain/bin/cabal$exe"
@@ -363,7 +367,7 @@ endif
 GhcLibHcOpts+=-haddock
 EOF
 
-  if [ -n "$HADDOCK_HYPERLINKED_SOURCES" ]; then
+  if [ -n "${HADDOCK_HYPERLINKED_SOURCES:-}" ]; then
     echo "EXTRA_HADDOCK_OPTS += --hyperlinked-source --quickjump" >> mk/build.mk
   fi
 
@@ -382,7 +386,7 @@ function configure() {
   end_section "booting"
 
   local target_args=""
-  if [[ -n "$target_triple" ]]; then
+  if [[ -n "${target_triple:-}" ]]; then
     target_args="--target=$target_triple"
   fi
 
@@ -403,7 +407,7 @@ function build_make() {
   if [[ -z "$BIN_DIST_PREP_TAR_COMP" ]]; then
     fail "BIN_DIST_PREP_TAR_COMP is not set"
   fi
-  if [[ -n "$VERBOSE" ]]; then
+  if [[ -n "${VERBOSE:-}" ]]; then
     MAKE_ARGS="$MAKE_ARGS V=1"
   else
     MAKE_ARGS="$MAKE_ARGS V=0"
@@ -445,7 +449,7 @@ function test_make() {
   fi
 
   run "$MAKE" test_bindist TEST_PREP=YES
-  run "$MAKE" V=0 test \
+  run "$MAKE" V=0 VERBOSE=1 test \
     THREADS="$cores" \
     JUNIT_FILE=../../junit.xml \
     EXTRA_RUNTEST_OPTS="$RUNTEST_ARGS"
