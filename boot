@@ -8,6 +8,7 @@ import argparse
 from textwrap import dedent
 import subprocess
 import re
+import shutil
 
 cwd = os.getcwd()
 
@@ -137,6 +138,8 @@ def autoreconf():
     for dir_ in ['.'] + glob.glob('libraries/*/'):
         if os.path.isfile(os.path.join(dir_, 'configure.ac')):
             print("Booting %s" % dir_)
+            if dir_ != '.':
+                shutil.copyfile('config.sub', os.path.join(dir_, 'config.sub'))
             processes[dir_] = subprocess.Popen(['sh', '-c', reconf_cmd], cwd=dir_)
 
     # Wait for all child processes to finish.

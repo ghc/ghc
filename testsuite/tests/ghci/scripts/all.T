@@ -328,4 +328,3 @@ test('T19197', normal, ghci_script, ['T19197.script'])
 test('T19158', normal, ghci_script, ['T19158.script'])
 test('T19279', normal, ghci_script, ['T19279.script'])
 test('T19310', normal, ghci_script, ['T19310.script'])
-
