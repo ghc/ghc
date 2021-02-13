@@ -5,7 +5,7 @@
 #include "MachDeps.h"
 
 name:           rts
-version:        1.0
+version:        1.0.1
 id:             rts
 key:            rts
 license:        BSD-3-Clause

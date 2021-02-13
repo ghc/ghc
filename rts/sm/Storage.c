@@ -11,6 +11,18 @@
  *
  * ---------------------------------------------------------------------------*/
 
+#include <ghcconfig.h>
+#if RTS_LINKER_USE_MMAP
+/*
+ * On FreeBSD and Darwin, when _XOPEN_SOURCE is defined, MAP_ANONYMOUS is not
+ * exposed from <sys/mman.h>.  Include <sys/mman.h> before "PosixSource.h".
+ *
+ * Alternatively, we could drop "PosixSource.h" from this file, but for just
+ * one non-POSIX macro, that seems a needless price to pay.
+ */
+#include <sys/mman.h>
+#endif
+
 #include "PosixSource.h"
 #include "Rts.h"
 
@@ -32,6 +44,10 @@
 #include "NonMoving.h"
 #if defined(ios_HOST_OS) || defined(darwin_HOST_OS)
 #include "Hash.h"
+#endif
+
+#if RTS_LINKER_USE_MMAP
+#include "LinkerInternals.h"
 #endif
 
 #include <string.h>
@@ -1791,6 +1807,20 @@ void flushExec (W_ len, AdjustorExecutable exec_addr)
 #endif
 }
 
+#if RTS_LINKER_USE_MMAP
+AdjustorWritable allocateWrite(W_ bytes) {
+    return mmapForLinker(bytes, PROT_READ | PROT_WRITE, MAP_ANONYMOUS, -1, 0);
+}
+
+void markExec(W_ bytes, AdjustorWritable writ) {
+    mmapForLinkerMarkExecutable(writ, bytes);
+}
+
+void freeWrite(W_ bytes, AdjustorWritable writ) {
+    munmap(writ, bytes);
+}
+#endif
+
 #if defined(linux_HOST_OS) || defined(netbsd_HOST_OS)
 
 // On Linux we need to use libffi for allocating executable memory,
@@ -1820,7 +1850,7 @@ void freeExec (AdjustorExecutable addr)
     RELEASE_SM_LOCK
 }
 
-#elif (defined(arm_HOST_ARCH) || defined(aarch64_HOST_ARCH)) && (defined(ios_HOST_OS) || defined(darwin_HOST_OS))
+#elif defined(darwin_HOST_OS)
 
 static HashTable* allocatedExecs;
 
@@ -1828,6 +1858,11 @@ AdjustorWritable allocateExec(W_ bytes, AdjustorExecutable *exec_ret)
 {
     AdjustorWritable writ;
     ffi_closure* cl;
+    // This check is necessary as we can't use allocateExec for anything *but*
+    // ffi_closures on ios/darwin on arm.  libffi does some heavy lifting to
+    // get around the X^W restrictions, and we can't just use this codepath
+    // to allocate generic executable space. For those cases we have to refer
+    // back to allocateWrite/markExec/freeWrite (see above.)
     if (bytes != sizeof(ffi_closure)) {
         barf("allocateExec: for ffi_closure only");
     }
