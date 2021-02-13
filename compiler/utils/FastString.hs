@@ -233,7 +233,7 @@ cmpFS f1@(FastString u1 _ _ _) f2@(FastString u2 _ _ _) =
   compare (bytesFS f1) (bytesFS f2)
 
 foreign import ccall unsafe "memcmp"
-  memcmp :: Ptr a -> Ptr b -> Int -> IO Int
+  memcmp :: Ptr a -> Ptr b -> CSize -> IO CInt
 
 -- -----------------------------------------------------------------------------
 -- Construction
@@ -376,7 +376,7 @@ lower-level `sharedCAF` mechanism that relies on Globals.c.
 -}
 
 mkFastString# :: Addr# -> FastString
-mkFastString# a# = mkFastStringBytes ptr (ptrStrLength ptr)
+mkFastString# a# = mkFastStringBytes ptr (fromIntegral (ptrStrLength ptr))
   where ptr = Ptr a#
 
 {- Note [Updating the FastString table]
@@ -528,7 +528,7 @@ copyBytesToForeignPtr ptr len = do
 
 cmpStringPrefix :: Ptr Word8 -> Ptr Word8 -> Int -> IO Bool
 cmpStringPrefix ptr1 ptr2 len =
- do r <- memcmp ptr1 ptr2 len
+ do r <- memcmp ptr1 ptr2 (fromIntegral len)
     return (r == 0)
 
 hashStr  :: Ptr Word8 -> Int -> Int
@@ -641,7 +641,7 @@ data PtrString = PtrString !(Ptr Word8) !Int
 
 -- | Wrap an unboxed address into a 'PtrString'.
 mkPtrString# :: Addr# -> PtrString
-mkPtrString# a# = PtrString (Ptr a#) (ptrStrLength (Ptr a#))
+mkPtrString# a# = PtrString (Ptr a#) (fromIntegral (ptrStrLength (Ptr a#)))
 
 -- | Encode a 'String' into a newly allocated 'PtrString' using Latin-1
 -- encoding.  The original string must not contain non-Latin-1 characters
@@ -677,7 +677,7 @@ lengthPS (PtrString _ n) = n
 -- under the carpet
 
 foreign import ccall unsafe "strlen"
-  ptrStrLength :: Ptr Word8 -> Int
+  ptrStrLength :: Ptr Word8 -> CSize
 
 {-# NOINLINE sLit #-}
 sLit :: String -> PtrString
