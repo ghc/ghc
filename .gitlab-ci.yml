@@ -280,11 +280,42 @@ hadrian-ghc-in-ghci:
   variables:
     TEST_TYPE: test
     MAKE_ARGS: "-Werror"
-  script:
-    - .gitlab/ci.sh setup
-    - .gitlab/ci.sh configure
-    - .gitlab/ci.sh build_make
-    - .gitlab/ci.sh test_make
+  script: |
+    # Build hyperlinked sources for documentation when building releases
+    if [[ "$RELEASE_JOB" = "yes" ]]; then
+      HADDOCK_HYPERLINKED_SOURCES=1
+    fi
+    TIME_START=$(date +%s)
+    time .gitlab/ci.sh setup 2>&1
+    TIME_SETUP=$(date +%s)
+    TIME_SETUP_DELTA=$(expr $TIME_SETUP - $TIME_START)
+    echo "Setup took $TIME_SETUP_DELTA seconds"
+
+    time .gitlab/ci.sh configure 2>&1
+    TIME_CONFIGURE=$(date +%s)
+    TIME_CONFIGURE_DELTA=$(expr $TIME_CONFIGURE - $TIME_SETUP)
+    echo "Configure took $TIME_CONFIGURE_DELTA seconds"
+
+    time .gitlab/ci.sh build_make 2>&1
+    TIME_BUILD=$(date +%s)
+    TIME_BUILD_DELTA=$(expr $TIME_BUILD - $TIME_CONFIGURE)
+    echo "Build took $TIME_BUILD_DELTA seconds"
+
+    set +e
+    time .gitlab/ci.sh test_make 2>&1
+    status=$?
+    set -e
+    TIME_TEST=$(date +%s)
+    TIME_TEST_DELTA=$(expr $TIME_TEST - $TIME_BUILD)
+    echo "Test took $TIME_TEST_DELTA seconds"
+
+    echo "=== TIMINGS ==="
+    echo "Setup      | $TIME_SETUP_DELTA"
+    echo "Configure  | $TIME_CONFIGURE_DELTA"
+    echo "Build      | $TIME_BUILD_DELTA"
+    echo "Test       | $TIME_TEST_DELTA"
+    exit $status
+
   dependencies: []
   artifacts:
     reports:
@@ -383,7 +414,11 @@ validate-x86_64-darwin:
   extends: .validate
   stage: full-build
   tags:
-    - x86_64-darwin
+    - x86_64-darwin-m1
+
+  # for now make this non mandatory to pass.
+  allow_failure: true
+
   variables:
     GHC_VERSION: 8.8.4
     CABAL_INSTALL_VERSION: 3.0.0.0
@@ -393,18 +428,164 @@ validate-x86_64-darwin:
     ac_cv_func_clock_gettime: "no"
     # Only newer OS Xs support utimensat. See #17895
     ac_cv_func_utimensat: "no"
+
+    TEST_TYPE: test
+    MAKE_ARGS: "-Werror"
+    # we run on M1's for now, getconf can't be built with nix yet,
+    # and we use a pure shell, so we can't/shouldn't use /usr/bin/getconf
+    # inside th shell.
+    CPUS: 8
     LANG: "en_US.UTF-8"
+    # WARNING: this is overridden in the shell.nix, see shell.nix!
     CONFIGURE_ARGS: "--with-intree-gmp"
     TEST_ENV: "x86_64-darwin"
     BUILD_FLAVOUR: "perf"
   after_script:
     - cp -Rf $HOME/.cabal cabal-cache
     - .gitlab/ci.sh clean
+
+  # I wish we could just use the nix #! logic, but we can't --run and -i bash
+  # behave very differently. -i bash does not pass any nix related env vars
+  # the whole $stdenv/setup part seems to be missing.
+  script: |
+    set -Eeuo pipefail
+    function runInNixShell() {
+      time nix-shell .gitlab/shell.nix \
+        -I nixpkgs=https://github.com/angerman/nixpkgs/archive/75f7281738b.tar.gz \
+        --argstr system "x86_64-darwin" \
+        --pure \
+        --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR \
+        --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --keep PROJECT_DIR \
+        --keep CI_PROJECT_DIR --keep MAKE_ARGS \
+        --keep LANG --keep CONFIGURE_ARGS \
+        --keep MACOSX_DEPLOYMENT_TARGET --keep ac_cv_func_clock_gettime \
+        --run "$1" 2>&1
+    }
+    # fix up config.sub in libraries for the time.
+    # aarch64-darwin is not supported in older config.sub's
+    TIME_START=$(date +%s)
+    find libraries -name config.sub -exec cp config.sub {} \;
+
+    runInNixShell ".gitlab/ci.sh setup" 2>&1
+    TIME_SETUP=$(date +%s)
+    TIME_SETUP_DELTA=$(expr $TIME_SETUP - $TIME_START)
+    echo "Setup took $TIME_SETUP_DELTA seconds"
+
+    runInNixShell ".gitlab/ci.sh configure" 2>&1
+    TIME_CONFIGURE=$(date +%s)
+    TIME_CONFIGURE_DELTA=$(expr $TIME_CONFIGURE - $TIME_SETUP)
+    echo "Configure took $TIME_CONFIGURE_DELTA seconds"
+
+    runInNixShell ".gitlab/ci.sh build_make" 2>&1
+    TIME_BUILD=$(date +%s)
+    TIME_BUILD_DELTA=$(expr $TIME_BUILD - $TIME_CONFIGURE)
+    echo "Build took $TIME_BUILD_DELTA seconds"
+
+    set +e
+    runInNixShell ".gitlab/ci.sh test_make" 2>&1
+    status=$?
+    set -e
+
+    TIME_TEST=$(date +%s)
+    TIME_TEST_DELTA=$(expr $TIME_TEST - $TIME_BUILD)
+    echo "Test took $TIME_TEST_DELTA seconds"
+
+    echo "=== TIMINGS ==="
+    echo "Setup      | $TIME_SETUP_DELTA"
+    echo "Configure  | $TIME_CONFIGURE_DELTA"
+    echo "Build      | $TIME_BUILD_DELTA"
+    echo "Test       | $TIME_TEST_DELTA"
+    exit $status
+
   artifacts:
     when: always
     expire_in: 2 week
   cache:
-    key: "darwin-$GHC_VERSION"
+    key: "darwin-x86_64-$GHC_VERSION"
+    paths:
+      - cabal-cache
+      - toolchain
+
+validate-aarch64-darwin:
+  extends: .validate
+  stage: full-build
+  tags:
+    - aarch64-darwin-m1
+
+  # for now make this non mandatory to pass.
+  allow_failure: true
+
+  variables:
+    TEST_TYPE: test
+    MAKE_ARGS: "-Werror"
+    GHC_VERSION: 8.10.3
+    CABAL_INSTALL_VERSION: 3.2.0.0
+    BUILD_FLAVOUR: "perf"
+    BIN_DIST_PREP_TAR_COMP: "ghc-arm64-apple-darwin.tar.xz"
+    # we run on M1's for now, getconf can't be built with nix yet,
+    # and we use a pure shell, so we can't/shouldn't use /usr/bin/getconf
+    # inside th shell.
+    CPUS: 8
+    LANG: "en_US.UTF-8"
+    # WARNING: this is overridden in the shell.nix, see shell.nix!
+    CONFIGURE_ARGS: "--with-intree-gmp"
+
+  # I wish we could just use the nix #! logic, but we can't --run and -i bash
+  # behave very differently. -i bash does not pass any nix related env vars
+  # the whole $stdenv/setup part seems to be missing.
+  script: |
+    set -Eeuo pipefail
+    function runInNixShell() {
+      time nix-shell .gitlab/shell.nix \
+        -I nixpkgs=https://github.com/angerman/nixpkgs/archive/75f7281738b.tar.gz \
+        --argstr system "aarch64-darwin" \
+        --pure \
+        --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR \
+        --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --keep PROJECT_DIR \
+        --keep CI_PROJECT_DIR --keep MAKE_ARGS \
+        --keep LANG --keep CONFIGURE_ARGS \
+        --run "$1" 2>&1
+    }
+    # fix up config.sub in libraries for the time.
+    # aarch64-darwin is not supported in older config.sub's
+    TIME_START=$(date +%s)
+    find libraries -name config.sub -exec cp config.sub {} \;
+
+    time runInNixShell ".gitlab/ci.sh setup" 2>&1
+    TIME_SETUP=$(date +%s)
+    TIME_SETUP_DELTA=$(expr $TIME_SETUP - $TIME_START)
+    echo "Setup took $TIME_SETUP_DELTA seconds"
+
+    runInNixShell ".gitlab/ci.sh configure" 2>&1
+    TIME_CONFIGURE=$(date +%s)
+    TIME_CONFIGURE_DELTA=$(expr $TIME_CONFIGURE - $TIME_SETUP)
+    echo "Setup took $TIME_CONFIGURE_DELTA seconds"
+
+    runInNixShell ".gitlab/ci.sh build_make" 2>&1
+    TIME_BUILD=$(date +%s)
+    TIME_BUILD_DELTA=$(expr $TIME_BUILD - $TIME_CONFIGURE)
+    echo "Build took $TIME_BUILD_DELTA seconds"
+
+    set +e
+    runInNixShell ".gitlab/ci.sh test_make" 2>&1
+    status=$?
+    set -e
+    TIME_TEST=$(date +%s)
+    TIME_TEST_DELTA=$(expr $TIME_TEST - $TIME_BUILD)
+    echo "Test took $TIME_TEST_DELTA seconds"
+
+    echo "=== TIMINGS ==="
+    echo "Setup      | $TIME_SETUP_DELTA"
+    echo "Configure  | $TIME_CONFIGURE_DELTA"
+    echo "Build      | $TIME_BUILD_DELTA"
+    echo "Test       | $TIME_TEST_DELTA"
+    exit $status
+
+  artifacts:
+    when: always
+    expire_in: 2 week
+  cache:
+    key: "darwin-aarch64-$GHC_VERSION"
     paths:
       - cabal-cache
       - toolchain

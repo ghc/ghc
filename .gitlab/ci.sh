@@ -2,8 +2,8 @@
 # shellcheck disable=SC2230
 
 # This is the primary driver of the GitLab CI infrastructure.
-
-set -e -o pipefail
+# Run `ci.sh usage` for usage information.
+set -Eeuo pipefail
 
 # Configuration:
 hackage_index_state="2021-04-08T21:41:19Z"
@@ -114,13 +114,19 @@ function show_tool() {
 }
 
 function set_toolchain_paths() {
-  needs_toolchain=1
-  case "$(uname)" in
-    Linux) needs_toolchain="" ;;
+  needs_toolchain="1"
+  case "$(uname -m)-$(uname)" in
+    *-Linux) needs_toolchain="" ;;
     *) ;;
   esac
 
-  if [[ -n "$needs_toolchain" ]]; then
+  if [[ -n "${IN_NIX_SHELL:-}" ]]; then
+      needs_toolchain=""
+      GHC="$(which ghc)"
+      CABAL="$(which cabal)"
+      HAPPY="$(which happy)"
+      ALEX="$(which alex)"
+  elif [[ -n "$needs_toolchain" ]]; then
       # These are populated by setup_toolchain
       GHC="$toolchain/bin/ghc$exe"
       CABAL="$toolchain/bin/cabal$exe"
@@ -295,7 +301,7 @@ BUILD_SPHINX_HTML=$BUILD_SPHINX_HTML
 BUILD_SPHINX_PDF=$BUILD_SPHINX_PDF
 BeConservative=YES
 BIGNUM_BACKEND=$BIGNUM_BACKEND
-XZ_CMD=$XZ
+XZ_CMD=${XZ:-}
 
 BuildFlavour=$BUILD_FLAVOUR
 ifneq "\$(BuildFlavour)" ""
@@ -304,7 +310,7 @@ endif
 GhcLibHcOpts+=-haddock
 EOF
 
-  if [ -n "$HADDOCK_HYPERLINKED_SOURCES" ]; then
+  if [ -n "${HADDOCK_HYPERLINKED_SOURCES:-}" ]; then
     echo "EXTRA_HADDOCK_OPTS += --hyperlinked-source --quickjump" >> mk/build.mk
   fi
 
@@ -323,7 +329,7 @@ function configure() {
   end_section "booting"
 
   local target_args=""
-  if [[ -n "$triple" ]]; then
+  if [[ -n "${triple:-}" ]]; then
     target_args="--target=$triple"
   fi
 
@@ -344,6 +350,11 @@ function build_make() {
   if [[ -z "$BIN_DIST_PREP_TAR_COMP" ]]; then
     fail "BIN_DIST_PREP_TAR_COMP is not set"
   fi
+  if [[ -n "${VERBOSE:-}" ]]; then
+    MAKE_ARGS="$MAKE_ARGS V=1"
+  else
+    MAKE_ARGS="$MAKE_ARGS V=0"
+  fi
 
   echo "include mk/flavours/${BUILD_FLAVOUR}.mk" > mk/build.mk
   echo 'GhcLibHcOpts+=-haddock' >> mk/build.mk
@@ -358,6 +369,11 @@ function fetch_perf_notes() {
 }
 
 function push_perf_notes() {
+  if [ -n "${CROSS_TARGET:-}" ]; then
+    info "Can't test cross-compiled build."
+    return
+  fi
+
   info "Pushing perf notes..."
   "$TOP/.gitlab/test-metrics.sh" push
 }
@@ -371,7 +387,7 @@ function determine_metric_baseline() {
 
 function test_make() {
   run "$MAKE" test_bindist TEST_PREP=YES
-  run "$MAKE" V=0 test \
+  run "$MAKE" V=0 VERBOSE=1 test \
     THREADS="$cores" \
     JUNIT_FILE=../../junit.xml
 }
@@ -405,13 +421,13 @@ function clean() {
 }
 
 function run_hadrian() {
-  if [ -z "$BIGNUM_BACKEND" ]; then BIGNUM_BACKEND="gmp"; fi
+  if [ -z "${BIGNUM_BACKEND:-}" ]; then BIGNUM_BACKEND="gmp"; fi
   run hadrian/build-cabal \
     --flavour="$BUILD_FLAVOUR" \
     -j"$cores" \
-    --broken-test="$BROKEN_TESTS" \
+    --broken-test="${BROKEN_TESTS:-}" \
     --bignum=$BIGNUM_BACKEND \
-    $HADRIAN_ARGS \
+    ${HADRIAN_ARGS:-} \
     $@
 }
 
