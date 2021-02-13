@@ -2127,6 +2127,9 @@ def normalise_errmsg(s: str) -> str:
     # filter out nix garbage, that just keeps on showing up as errors on darwin
     s = modify_lines(s, lambda l: re.sub('^(.+)\.dylib, ignoring unexpected dylib file$','', l))
 
+    s = re.sub('You are using an unsupported version of LLVM!.*\n','',s)
+    s = re.sub('Currently only [\.0-9]+ is supported. System LLVM version: [\.0-9]+.*\n','',s)
+    s = re.sub('We will try though\.\.\..*\n','',s)
     return s
 
 # normalise a .prof file, so that we can reasonably compare it against
@@ -2200,6 +2203,11 @@ def normalise_output( s: str ) -> str:
     # ghci outputs are pretty unstable with -fexternal-dynamic-refs, which is
     # requires for -fPIC
     s = re.sub('  -fexternal-dynamic-refs\n','',s)
+
+    s = re.sub('You are using an unsupported version of LLVM!.*\n','',s)
+    s = re.sub('Currently only [\.0-9]+ is supported. System LLVM version: [\.0-9]+.*\n','',s)
+    s = re.sub('We will try though\.\.\..*\n','',s)
+
     return s
 
 def normalise_asm( s: str ) -> str:
