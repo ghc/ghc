@@ -71,6 +71,7 @@ library
         SizedSeq
 
     Build-Depends:
+        rts,
         array            == 0.5.*,
         base             >= 4.8 && < 4.16,
         binary           == 0.8.*,

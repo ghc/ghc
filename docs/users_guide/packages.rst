@@ -75,7 +75,7 @@ To see which packages are currently available, use the ``ghc-pkg list`` command:
         pretty-1.0.1.0
         process-1.0.1.1
         random-1.0.0.1
-        rts-1.0
+        rts-1.0.1
         syb-0.1.0.0
         template-haskell-2.4.0.0
         terminfo-0.3.1

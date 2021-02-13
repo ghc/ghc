@@ -13,6 +13,11 @@
 #include "linker/M32Alloc.h"
 
 #if RTS_LINKER_USE_MMAP
+#if defined(ios_HOST_OS) || defined(darwin_HOST_OS)
+/* Inclusion of system headers usually requires _DARWIN_C_SOURCE on Mac OS X
+ * because of some specific defines like MMAP_ANON, MMAP_ANONYMOUS. */
+#define _DARWIN_C_SOURCE 1
+#endif
 #include <sys/mman.h>
 #endif
 

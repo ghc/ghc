@@ -46,6 +46,10 @@
 #include "Hash.h"
 #endif
 
+#if RTS_LINKER_USE_MMAP
+#include "LinkerInternals.h"
+#endif
+
 #include <string.h>
 
 #include "ffi.h"
@@ -1717,6 +1721,20 @@ void flushExec (W_ len, AdjustorExecutable exec_addr)
 #endif
 }
 
+#if RTS_LINKER_USE_MMAP
+AdjustorWritable allocateWrite(W_ bytes) {
+    return mmapForLinker(bytes, PROT_READ | PROT_WRITE, MAP_ANONYMOUS, -1, 0);
+}
+
+void markExec(W_ bytes, AdjustorWritable writ) {
+    mmapForLinkerMarkExecutable(writ, bytes);
+}
+
+void freeWrite(W_ bytes, AdjustorWritable writ) {
+    munmap(writ, bytes);
+}
+#endif
+
 #if defined(linux_HOST_OS) || defined(netbsd_HOST_OS)
 
 // On Linux we need to use libffi for allocating executable memory,
@@ -1746,7 +1764,7 @@ void freeExec (AdjustorExecutable addr)
     RELEASE_SM_LOCK
 }
 
-#elif defined(USE_LIBFFI_FOR_ADJUSTORS) && defined(darwin_HOST_OS)
+#elif defined(darwin_HOST_OS)
 
 static HashTable* allocatedExecs;
 
@@ -1754,6 +1772,11 @@ AdjustorWritable allocateExec(W_ bytes, AdjustorExecutable *exec_ret)
 {
     AdjustorWritable writ;
     ffi_closure* cl;
+    // This check is necessary as we can't use allocateExec for anything *but*
+    // ffi_closures on ios/darwin on arm.  libffi does some heavy lifting to
+    // get around the X^W restrictions, and we can't just use this codepath
+    // to allocate generic executable space. For those cases we have to refer
+    // back to allocateWrite/markExec/freeWrite (see above.)
     if (bytes != sizeof(ffi_closure)) {
         barf("allocateExec: for ffi_closure only");
     }

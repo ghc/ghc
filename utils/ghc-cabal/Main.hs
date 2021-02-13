@@ -383,7 +383,7 @@ generate directory distdir config_args
           transitiveDepLibNames
             | packageKeySupported comp = map fixupRtsLibName transitiveDeps
             | otherwise = transitiveDeps
-          fixupRtsLibName "rts-1.0" = "rts"
+          fixupRtsLibName x | "rts-" `isPrefixOf` x = "rts"
           fixupRtsLibName x = x
           transitiveDepNames = map (display . packageName) transitive_dep_ids
 

@@ -202,8 +202,14 @@ typedef void* AdjustorExecutable;
 
 AdjustorWritable allocateExec(W_ len, AdjustorExecutable *exec_addr);
 void flushExec(W_ len, AdjustorExecutable exec_addr);
-#if (defined(arm_HOST_ARCH) || defined(aarch64_HOST_ARCH)) && (defined(ios_HOST_OS) || defined(darwin_HOST_OS))
+#if defined(darwin_HOST_OS)
 AdjustorWritable execToWritable(AdjustorExecutable exec);
+#endif
+
+#if RTS_LINKER_USE_MMAP
+AdjustorWritable allocateWrite(W_ bytes);
+void markExec(W_ bytes, AdjustorWritable writ);
+void freeWrite(W_ bytes, AdjustorWritable writ);
 #endif
 void             freeExec (AdjustorExecutable p);
 

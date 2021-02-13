@@ -87,7 +87,7 @@ Library
         Unsafe
 
     build-depends:
-        rts == 1.0,
+        rts == 1.0.*,
         ghc-prim >= 0.5.1.0 && < 0.8,
         ghc-bignum >= 1.0 && < 2.0
 
