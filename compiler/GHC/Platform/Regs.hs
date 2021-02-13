@@ -1,4 +1,3 @@
-
 module GHC.Platform.Regs
        (callerSaves, activeStgRegs, haveRegBase, globalRegMaybe, freeReg)
        where
@@ -10,7 +9,7 @@ import GHC.Platform
 import Reg
 
 import qualified GHC.Platform.ARM        as ARM
-import qualified GHC.Platform.ARM64      as ARM64
+import qualified GHC.Platform.AArch64    as AArch64
 import qualified GHC.Platform.PPC        as PPC
 import qualified GHC.Platform.S390X      as S390X
 import qualified GHC.Platform.SPARC      as SPARC
@@ -26,12 +25,12 @@ callerSaves platform
  | platformUnregisterised platform = NoRegs.callerSaves
  | otherwise
  = case platformArch platform of
-   ArchX86    -> X86.callerSaves
-   ArchX86_64 -> X86_64.callerSaves
-   ArchS390X  -> S390X.callerSaves
-   ArchSPARC  -> SPARC.callerSaves
-   ArchARM {} -> ARM.callerSaves
-   ArchARM64  -> ARM64.callerSaves
+   ArchX86     -> X86.callerSaves
+   ArchX86_64  -> X86_64.callerSaves
+   ArchS390X   -> S390X.callerSaves
+   ArchSPARC   -> SPARC.callerSaves
+   ArchARM {}  -> ARM.callerSaves
+   ArchAArch64 -> AArch64.callerSaves
    arch
     | arch `elem` [ArchPPC, ArchPPC_64 ELF_V1, ArchPPC_64 ELF_V2] ->
         PPC.callerSaves
@@ -48,12 +47,12 @@ activeStgRegs platform
  | platformUnregisterised platform = NoRegs.activeStgRegs
  | otherwise
  = case platformArch platform of
-   ArchX86    -> X86.activeStgRegs
-   ArchX86_64 -> X86_64.activeStgRegs
-   ArchS390X  -> S390X.activeStgRegs
-   ArchSPARC  -> SPARC.activeStgRegs
-   ArchARM {} -> ARM.activeStgRegs
-   ArchARM64  -> ARM64.activeStgRegs
+   ArchX86     -> X86.activeStgRegs
+   ArchX86_64  -> X86_64.activeStgRegs
+   ArchS390X   -> S390X.activeStgRegs
+   ArchSPARC   -> SPARC.activeStgRegs
+   ArchARM {}  -> ARM.activeStgRegs
+   ArchAArch64 -> AArch64.activeStgRegs
    arch
     | arch `elem` [ArchPPC, ArchPPC_64 ELF_V1, ArchPPC_64 ELF_V2] ->
         PPC.activeStgRegs
@@ -65,12 +64,12 @@ haveRegBase platform
  | platformUnregisterised platform = NoRegs.haveRegBase
  | otherwise
  = case platformArch platform of
-   ArchX86    -> X86.haveRegBase
-   ArchX86_64 -> X86_64.haveRegBase
-   ArchS390X  -> S390X.haveRegBase
-   ArchSPARC  -> SPARC.haveRegBase
-   ArchARM {} -> ARM.haveRegBase
-   ArchARM64  -> ARM64.haveRegBase
+   ArchX86     -> X86.haveRegBase
+   ArchX86_64  -> X86_64.haveRegBase
+   ArchS390X   -> S390X.haveRegBase
+   ArchSPARC   -> SPARC.haveRegBase
+   ArchARM {}  -> ARM.haveRegBase
+   ArchAArch64 -> AArch64.haveRegBase
    arch
     | arch `elem` [ArchPPC, ArchPPC_64 ELF_V1, ArchPPC_64 ELF_V2] ->
         PPC.haveRegBase
@@ -82,12 +81,12 @@ globalRegMaybe platform
  | platformUnregisterised platform = NoRegs.globalRegMaybe
  | otherwise
  = case platformArch platform of
-   ArchX86    -> X86.globalRegMaybe
-   ArchX86_64 -> X86_64.globalRegMaybe
-   ArchS390X  -> S390X.globalRegMaybe
-   ArchSPARC  -> SPARC.globalRegMaybe
-   ArchARM {} -> ARM.globalRegMaybe
-   ArchARM64  -> ARM64.globalRegMaybe
+   ArchX86     -> X86.globalRegMaybe
+   ArchX86_64  -> X86_64.globalRegMaybe
+   ArchS390X   -> S390X.globalRegMaybe
+   ArchSPARC   -> SPARC.globalRegMaybe
+   ArchARM {}  -> ARM.globalRegMaybe
+   ArchAArch64 -> AArch64.globalRegMaybe
    arch
     | arch `elem` [ArchPPC, ArchPPC_64 ELF_V1, ArchPPC_64 ELF_V2] ->
         PPC.globalRegMaybe
@@ -99,15 +98,14 @@ freeReg platform
  | platformUnregisterised platform = NoRegs.freeReg
  | otherwise
  = case platformArch platform of
-   ArchX86    -> X86.freeReg
-   ArchX86_64 -> X86_64.freeReg
-   ArchS390X  -> S390X.freeReg
-   ArchSPARC  -> SPARC.freeReg
-   ArchARM {} -> ARM.freeReg
-   ArchARM64  -> ARM64.freeReg
+   ArchX86     -> X86.freeReg
+   ArchX86_64  -> X86_64.freeReg
+   ArchS390X   -> S390X.freeReg
+   ArchSPARC   -> SPARC.freeReg
+   ArchARM {}  -> ARM.freeReg
+   ArchAArch64 -> AArch64.freeReg
    arch
     | arch `elem` [ArchPPC, ArchPPC_64 ELF_V1, ArchPPC_64 ELF_V2] ->
         PPC.freeReg
 
     | otherwise -> NoRegs.freeReg
-
