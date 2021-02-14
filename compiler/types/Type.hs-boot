@@ -3,7 +3,7 @@
 module Type where
 
 import GhcPrelude
-import TyCon
+import {-# SOURCE #-} TyCon
 import {-# SOURCE #-} TyCoRep( Type, Coercion )
 import Util
 

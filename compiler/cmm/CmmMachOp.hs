@@ -17,7 +17,7 @@ module CmmMachOp
     , mo_32To8, mo_32To16, mo_WordTo8, mo_WordTo16, mo_WordTo32, mo_WordTo64
 
     -- CallishMachOp
-    , CallishMachOp(..), callishMachOpHints
+    , CallishMachOp(..), callishMachOpHints, callishMachOpReps
     , pprCallishMachOp
     , machOpMemcpyishAlign
 
@@ -31,6 +31,8 @@ import GhcPrelude
 import CmmType
 import Outputable
 import DynFlags
+
+import TyCon (PrimRep (..))
 
 -----------------------------------------------------------------------------
 --              MachOp
@@ -649,12 +651,92 @@ pprCallishMachOp mo = text (show mo)
 
 callishMachOpHints :: CallishMachOp -> ([ForeignHint], [ForeignHint])
 callishMachOpHints op = case op of
-  MO_Memcpy _  -> ([], [AddrHint,AddrHint,NoHint])
-  MO_Memset _  -> ([], [AddrHint,NoHint,NoHint])
-  MO_Memmove _ -> ([], [AddrHint,AddrHint,NoHint])
+  --  void * memcpy(void *restrict dst, const void *restrict src, size_t n);
+  MO_Memcpy _  -> ([], [AddrHint, AddrHint, NoHint])
+  -- void * memset(void *b, int c, size_t len);
+  MO_Memset _  -> ([], [AddrHint, SignedHint, NoHint])
+  -- void * memmove(void *dst, const void *src, size_t len);
+  MO_Memmove _ -> ([], [AddrHint, AddrHint, NoHint])
+  --  int memcmp(const void *s1, const void *s2, size_t n);
   MO_Memcmp _  -> ([], [AddrHint, AddrHint, NoHint])
   _            -> ([],[])
   -- empty lists indicate NoHint
+
+callishMachOpReps :: CallishMachOp -> (PrimRep, [PrimRep])
+callishMachOpReps op = case op of
+  MO_Memcpy _  -> (AddrRep, [AddrRep, AddrRep, WordRep])
+  MO_Memset _  -> (AddrRep, [AddrRep, IntRep,  WordRep])
+  MO_Memmove _ -> (AddrRep, [AddrRep, AddrRep, WordRep])
+  MO_Memcmp _  -> (IntRep, [AddrRep, AddrRep, WordRep])
+
+  MO_F64_Pwr   -> (DoubleRep, [DoubleRep, DoubleRep])
+
+  MO_F64_Sin   -> (DoubleRep, [DoubleRep])
+  MO_F64_Cos   -> (DoubleRep, [DoubleRep])
+  MO_F64_Tan   -> (DoubleRep, [DoubleRep])
+
+  MO_F64_Sinh  -> (DoubleRep, [DoubleRep])
+  MO_F64_Cosh  -> (DoubleRep, [DoubleRep])
+  MO_F64_Tanh  -> (DoubleRep, [DoubleRep])
+
+  MO_F64_Asin  -> (DoubleRep, [DoubleRep])
+  MO_F64_Acos  -> (DoubleRep, [DoubleRep])
+  MO_F64_Atan  -> (DoubleRep, [DoubleRep])
+
+  MO_F64_Asinh -> (DoubleRep, [DoubleRep])
+  MO_F64_Acosh -> (DoubleRep, [DoubleRep])
+  MO_F64_Atanh -> (DoubleRep, [DoubleRep])
+
+  MO_F64_Log   -> (DoubleRep, [DoubleRep])
+  MO_F64_Log1P -> (DoubleRep, [DoubleRep])
+  MO_F64_Exp   -> (DoubleRep, [DoubleRep])
+  MO_F64_ExpM1 -> (DoubleRep, [DoubleRep])
+
+  MO_F64_Fabs  -> (DoubleRep, [DoubleRep])
+  MO_F64_Sqrt  -> (DoubleRep, [DoubleRep])
+
+  MO_F32_Pwr   -> (FloatRep, [FloatRep, FloatRep])
+
+  MO_F32_Sin   -> (FloatRep, [FloatRep])
+  MO_F32_Cos   -> (FloatRep, [FloatRep])
+  MO_F32_Tan   -> (FloatRep, [FloatRep])
+
+  MO_F32_Sinh  -> (FloatRep, [FloatRep])
+  MO_F32_Cosh  -> (FloatRep, [FloatRep])
+  MO_F32_Tanh  -> (FloatRep, [FloatRep])
+
+  MO_F32_Asin  -> (FloatRep, [FloatRep])
+  MO_F32_Acos  -> (FloatRep, [FloatRep])
+  MO_F32_Atan  -> (FloatRep, [FloatRep])
+
+  MO_F32_Asinh -> (FloatRep, [FloatRep])
+  MO_F32_Acosh -> (FloatRep, [FloatRep])
+  MO_F32_Atanh -> (FloatRep, [FloatRep])
+
+  MO_F32_Log   -> (FloatRep, [FloatRep])
+  MO_F32_Log1P -> (FloatRep, [FloatRep])
+  MO_F32_Exp   -> (FloatRep, [FloatRep])
+  MO_F32_ExpM1 -> (FloatRep, [FloatRep])
+
+  MO_F32_Fabs  -> (FloatRep, [FloatRep])
+  MO_F32_Sqrt  -> (FloatRep, [FloatRep])
+
+  MO_PopCnt W8 -> (Word8Rep, [Word8Rep])
+  MO_PopCnt W16 -> (Word16Rep, [Word16Rep])
+  MO_PopCnt W32 -> (Word32Rep, [Word32Rep])
+  MO_PopCnt W64 -> (Word64Rep, [Word64Rep])
+
+  MO_BSwap W8 -> (Word8Rep, [Word8Rep])
+  MO_BSwap W16 -> (Word16Rep, [Word16Rep])
+  MO_BSwap W32 -> (Word32Rep, [Word32Rep])
+  MO_BSwap W64 -> (Word64Rep, [Word64Rep])
+
+  MO_BRev W8 -> (Word8Rep, [Word8Rep])
+  MO_BRev W16 -> (Word16Rep, [Word16Rep])
+  MO_BRev W32 -> (Word32Rep, [Word32Rep])
+  MO_BRev W64 -> (Word64Rep, [Word64Rep])
+
+  _            -> (VoidRep, [])
 
 -- | The alignment of a 'memcpy'-ish operation.
 machOpMemcpyishAlign :: CallishMachOp -> Maybe Int
