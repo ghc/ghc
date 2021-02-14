@@ -1,0 +1,11 @@
+RecordDotSyntaxFail5.hs:17:11:
+      Can't find interface-file declaration for variable GHC.Records.setField
+         Probable cause: bug in .hi-boot file, or inconsistent .hi file
+         Use -ddump-if-trace to get an idea of which file caused the error
+     In the second argument of ‘($)’, namely
+        ‘(....bar.baz) {quux = 2}’
+      In a stmt of a 'do' block: print $ (....bar.baz) {quux = 2}
+      In the expression:
+        do let a = ...
+           putStrLn "-- updates:"
+           print $ (....baz) {quux = 2}

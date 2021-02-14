@@ -276,6 +276,9 @@ dsExpr (ExprWithTySig _ e _)  = dsLExpr e
 dsExpr (HsConLikeOut _ con)   = dsConLike con
 dsExpr (HsIPVar {})           = panic "dsExpr: HsIPVar"
 
+dsExpr (HsGetField x _ _)     = absurd x
+dsExpr (HsProjection x _)     = absurd x
+
 dsExpr (HsLit _ lit)
   = do { warnAboutOverflowedLit lit
        ; dsLit (convertLit lit) }
