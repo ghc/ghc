@@ -9,13 +9,12 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-
 -- CmmNode type for representation using Hoopl graphs.
 
 module CmmNode (
      CmmNode(..), CmmFormal, CmmActual, CmmTickish,
      UpdFrameOffset, Convention(..),
-     ForeignConvention(..), ForeignTarget(..), foreignTargetHints,
+     ForeignConvention(..), ForeignTarget(..), foreignTargetHints, foreignTargetReps,
      CmmReturnInfo(..),
      mapExp, mapExpDeep, wrapRecExp, foldExp, foldExpDeep, wrapRecExpf,
      mapExpM, mapExpDeepM, wrapRecExpM, mapSuccessors, mapCollectSuccessors,
@@ -46,6 +45,7 @@ import Data.List (tails,sortBy)
 import Unique (nonDetCmpUnique)
 import Util
 
+import TyCon (PrimRep)
 
 ------------------------
 -- CmmNode
@@ -281,12 +281,36 @@ data Convention
        -- (TODO: I don't think we need this --SDM)
   deriving( Eq )
 
+
+--------------------------------------------------
+-- Note [ForeignConvention PrimRep Carry]
+--
+-- With the advert of aarch64-darwin, a new AAPCS was brought into mainstream.
+-- This AAPCS requires us to pack arguments in excess of registers by their
+-- size on the stack as well as extends values as necessary.
+--
+-- GHC's internal represetnation of values ends up being either Words or Ints,
+-- both of which are assumed to be Word size[1].  Thus in the CodeGen there is no
+-- way to recover the origial size of arguments.
+--
+-- In GHC 9.2 this has been rectified in !4390 (commit 3e3555cc); however for
+-- GHCs before 9.2 to support aarch64-darwin, we need a more lightweight solution.
+-- Thus we inject the PrimRep signature during the desugar phase into the
+-- ForeignConvention and carry it through to the CodeGen where we can inspect
+-- it and produce the correct ABI calls.
+--
+-- See https://developer.apple.com/documentation/xcode/writing_arm64_code_for_apple_platforms
+--
+-- [1]: Int8 = I8# Int#, Word8 = W8# Word#
+
 data ForeignConvention
   = ForeignConvention
         CCallConv               -- Which foreign-call convention
         [ForeignHint]           -- Extra info about the args
         [ForeignHint]           -- Extra info about the result
         CmmReturnInfo
+        PrimRep                 -- return prim rep
+        [PrimRep]               -- argument prim reps
   deriving Eq
 
 data CmmReturnInfo
@@ -302,7 +326,11 @@ data ForeignTarget        -- The target of a foreign call
         CallishMachOp            -- Which one
   deriving Eq
 
-foreignTargetHints :: ForeignTarget -> ([ForeignHint], [ForeignHint])
+foreignTargetReps :: HasCallStack => ForeignTarget -> (PrimRep, [PrimRep])
+foreignTargetReps (ForeignTarget _ (ForeignConvention _ _ _ _ rr ras)) = (rr, ras)
+foreignTargetReps (PrimTarget op) = callishMachOpReps op
+
+foreignTargetHints :: HasCallStack => ForeignTarget -> ([ForeignHint], [ForeignHint])
 foreignTargetHints target
   = ( res_hints ++ repeat NoHint
     , arg_hints ++ repeat NoHint )
@@ -310,7 +338,7 @@ foreignTargetHints target
     (res_hints, arg_hints) =
        case target of
           PrimTarget op -> callishMachOpHints op
-          ForeignTarget _ (ForeignConvention _ arg_hints res_hints _) ->
+          ForeignTarget _ (ForeignConvention _ arg_hints res_hints _ _ _) ->
              (res_hints, arg_hints)
 
 --------------------------------------------------
@@ -376,7 +404,7 @@ instance DefinerOfRegs GlobalReg (CmmNode e x) where
           activeRegs = activeStgRegs platform
           activeCallerSavesRegs = filter (callerSaves platform) activeRegs
 
-          foreignTargetRegs (ForeignTarget _ (ForeignConvention _ _ _ CmmNeverReturns)) = []
+          foreignTargetRegs (ForeignTarget _ (ForeignConvention _ _ _ CmmNeverReturns _ _)) = []
           foreignTargetRegs _ = activeCallerSavesRegs
 
 -- Note [Safe foreign calls clobber STG registers]
