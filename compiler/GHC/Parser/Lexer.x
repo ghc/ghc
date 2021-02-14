@@ -131,7 +131,7 @@ $tab         = \t
 
 $ascdigit  = 0-9
 $unidigit  = \x03 -- Trick Alex into handling Unicode. See [Unicode in Alex].
-$decdigit  = $ascdigit -- for now, should really be $digit (ToDo)
+$decdigit  = $ascdigit -- exactly $ascdigit, no more no less.
 $digit     = [$ascdigit $unidigit]
 
 $special   = [\(\)\,\;\[\]\`\{\}]
@@ -147,17 +147,17 @@ $unismall  = \x02 -- Trick Alex into handling Unicode. See [Unicode in Alex].
 $ascsmall  = [a-z]
 $small     = [$ascsmall $unismall \_]
 
+$uniidchar = \x07 -- Trick Alex into handling Unicode. See [Unicode in Alex].
+$idchar    = [$small $large $digit $uniidchar \']
+
 $unigraphic = \x06 -- Trick Alex into handling Unicode. See [Unicode in Alex].
-$graphic   = [$small $large $symbol $digit $special $unigraphic \"\']
+$graphic   = [$small $large $symbol $digit $idchar $special $unigraphic \"\']
 
 $binit     = 0-1
 $octit     = 0-7
 $hexit     = [$decdigit A-F a-f]
 
-$uniidchar = \x07 -- Trick Alex into handling Unicode. See [Unicode in Alex].
-$idchar    = [$small $large $digit $uniidchar \']
-
-$pragmachar = [$small $large $digit]
+$pragmachar = [$small $large $digit $uniidchar ]
 
 $docsym    = [\| \^ \* \$]
 
@@ -2521,7 +2521,7 @@ adjustChar c = fromIntegral $ ord adj_c
                   SpacingCombiningMark  -> other_graphic
                   EnclosingMark         -> other_graphic
                   DecimalNumber         -> digit
-                  LetterNumber          -> other_graphic
+                  LetterNumber          -> digit
                   OtherNumber           -> digit -- see #4373
                   ConnectorPunctuation  -> symbol
                   DashPunctuation       -> symbol
