@@ -58,7 +58,7 @@ import System.Directory
 import System.FilePath  ( takeDirectory, (</>) )
 import qualified Data.Set as Set
 import Data.Set (Set)
-import Data.List
+import Data.List (intercalate, stripPrefix)
 import Data.Time
 import System.IO
 import Control.Monad
