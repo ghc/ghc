@@ -1,0 +1,10 @@
+-- selectors:
+Bar {bar = Baz {baz = Quux {quux = 42}}}
+Baz {baz = Quux {quux = 42}}
+Quux {quux = 42}
+42
+-- selections:
+42
+Quux {quux = 42}
+Baz {baz = Quux {quux = 42}}
+Bar {bar = Baz {baz = Quux {quux = 42}}}

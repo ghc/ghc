@@ -70,6 +70,7 @@ import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Core.PatSyn
 import Control.Monad
+import Data.Void
 
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -277,6 +278,9 @@ dsExpr (ExprWithTySig _ e _)  = dsLExpr e
 dsExpr (HsConLikeOut _ con)   = dsConLike con
 dsExpr (HsIPVar {})           = panic "dsExpr: HsIPVar"
 dsExpr (HsOverLabel{})        = panic "dsExpr: HsOverLabel"
+
+dsExpr (HsGetField x _ _)     = absurd x
+dsExpr (HsProjection x _)     = absurd x
 
 dsExpr (HsLit _ lit)
   = do { warnAboutOverflowedLit lit

@@ -13,3 +13,4 @@ Records
     record_puns
     record_wildcards
     hasfield
+    record_dot_syntax
