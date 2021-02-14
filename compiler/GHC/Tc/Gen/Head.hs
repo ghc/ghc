@@ -1113,6 +1113,12 @@ checkCrossStageLifting top_lvl id (Brack _ (TcPending ps_var lie_var q))
                                        GHC.Builtin.Names.TH.liftName
                                        [getRuntimeRep id_ty, id_ty]
 
+                   -- Warning for implicit lift (#17804)
+        ; whenWOptM Opt_WarnImplicitLift $
+            addWarnTc (Reason Opt_WarnImplicitLift)
+                       (text "The variable" <+> quotes (ppr id) <+>
+                        text "is implicitly lifted in the TH quotation")
+
                    -- Update the pending splices
         ; ps <- readMutVar ps_var
         ; let pending_splice = PendingTcSplice id_name

@@ -113,6 +113,7 @@ The following flags are simple ways to select standard "packages" of warnings:
         * :ghc-flag:`-Wunused-packages`
         * :ghc-flag:`-Wunused-type-patterns`
         * :ghc-flag:`-Wsafe`
+        * :ghc-flag:`-Wimplicit-lift`
 
 .. ghc-flag:: -Weverything
     :shortdesc: enable all warnings supported by GHC
@@ -855,6 +856,22 @@ of ``-W(no-)*``.
     This can be fixed by explicitly quantifying over ``k``: ::
 
         f :: forall k (a :: k). Proxy a
+
+.. ghc-flag:: -Wimplicit-lift
+    :shortdesc: warn about implicit ``lift`` in Template Haskell quotes
+    :type: dynamic
+    :reverse: -Wno-implicit-lift
+    :category: warnings
+
+    :since: 9.2
+
+    Template Haskell quotes referring to local variables bound outside
+    of the quote are implicitly converted to use ``lift`. For example,
+    ``f x = [| reverse x |]`` becomes ``f x = [| reverse $(lift x) |])``.
+    This flag issues a warning for every such implicit addition of ``lift``.
+    This can be useful when debugging more complex staged programs,
+    where an implicit `lift`` can accidentally conceal a variable
+    used at a wrong stage.
 
 .. ghc-flag:: -Wimplicit-prelude
     :shortdesc: warn when the Prelude is implicitly imported
