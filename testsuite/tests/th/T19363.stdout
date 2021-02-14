@@ -1,0 +1,6 @@
+data Operator_0
+    = (:*_1) GHC.Types.Int | (:**_2) {(^**_3) :: GHC.Types.Int}
+f_4 = (:**_2){(^**_3) = 42}
+infix 5 `f_4`
+g_5 ((:**_2) {(^**_3) = x_6}) = x_6
+pattern a_7 `H_8` b_9 = a_7 :**_2 b_9

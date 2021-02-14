@@ -75,7 +75,7 @@ ppr_sig v ty = pprName' Applied v <+> dcolon <+> ppr ty
 
 pprFixity :: Name -> Fixity -> Doc
 pprFixity _ f | f == defaultFixity = empty
-pprFixity v (Fixity i d) = ppr_fix d <+> int i <+> ppr v
+pprFixity v (Fixity i d) = ppr_fix d <+> int i <+> pprName' Infix v
     where ppr_fix InfixR = text "infixr"
           ppr_fix InfixL = text "infixl"
           ppr_fix InfixN = text "infix"
@@ -216,7 +216,7 @@ pprExp _ (ArithSeqE d) = ppr d
 pprExp _ (ListE es) = brackets (commaSep es)
 pprExp i (SigE e t) = parensIf (i > noPrec) $ pprExp sigPrec e
                                           <+> dcolon <+> ppr t
-pprExp _ (RecConE nm fs) = ppr nm <> braces (pprFields fs)
+pprExp _ (RecConE nm fs) = pprName' Applied nm <> braces (pprFields fs)
 pprExp _ (RecUpdE e fs) = pprExp appPrec e <> braces (pprFields fs)
 pprExp i (StaticE e) = parensIf (i >= appPrec) $
                          text "static"<+> pprExp appPrec e
@@ -225,7 +225,7 @@ pprExp _ (LabelE s) = text "#" <> text s
 pprExp _ (ImplicitParamVarE n) = text ('?' : n)
 
 pprFields :: [(Name,Exp)] -> Doc
-pprFields = sep . punctuate comma . map (\(s,e) -> ppr s <+> equals <+> ppr e)
+pprFields = sep . punctuate comma . map (\(s,e) -> pprName' Applied s <+> equals <+> ppr e)
 
 pprMaybeExp :: Precedence -> Maybe Exp -> Doc
 pprMaybeExp _ Nothing = empty
@@ -328,9 +328,9 @@ pprPat i (AsP v p)    = parensIf (i > noPrec) $ ppr v <> text "@"
                                                       <> pprPat appPrec p
 pprPat _ WildP        = text "_"
 pprPat _ (RecP nm fs)
- = parens $     ppr nm
+ = parens $     pprName' Applied nm
             <+> braces (sep $ punctuate comma $
-                        map (\(s,p) -> ppr s <+> equals <+> ppr p) fs)
+                        map (\(s,p) -> pprName' Applied s <+> equals <+> ppr p) fs)
 pprPat _ (ListP ps) = brackets (commaSep ps)
 pprPat i (SigP p t) = parensIf (i > noPrec) $ ppr p <+> dcolon <+> ppr t
 pprPat _ (ViewP e p) = parens $ pprExp noPrec e <+> text "->" <+> pprPat noPrec p
@@ -411,7 +411,7 @@ ppr_dec _ (DefaultSigD n ty)
 ppr_dec _ (PatSynD name args dir pat)
   = text "pattern" <+> pprNameArgs <+> ppr dir <+> pprPatRHS
   where
-    pprNameArgs | InfixPatSyn a1 a2 <- args = ppr a1 <+> ppr name <+> ppr a2
+    pprNameArgs | InfixPatSyn a1 a2 <- args = ppr a1 <+> pprName' Infix name <+> ppr a2
                 | otherwise                 = ppr name <+> ppr args
     pprPatRHS   | ExplBidir cls <- dir = hang (ppr pat <+> text "where")
                                            nestDepth (ppr name <+> ppr cls)
@@ -627,10 +627,10 @@ instance Ppr Clause where
 
 ------------------------------
 instance Ppr Con where
-    ppr (NormalC c sts) = ppr c <+> sep (map pprBangType sts)
+    ppr (NormalC c sts) = pprName' Applied c <+> sep (map pprBangType sts)
 
     ppr (RecC c vsts)
-        = ppr c <+> braces (sep (punctuate comma $ map pprVarBangType vsts))
+        = pprName' Applied c <+> braces (sep (punctuate comma $ map pprVarBangType vsts))
 
     ppr (InfixC st1 c st2) = pprBangType st1
                          <+> pprName' Infix c
@@ -702,7 +702,7 @@ pprGadtRHS sts ty
 ------------------------------
 pprVarBangType :: VarBangType -> Doc
 -- Slight infelicity: with print non-atomic type with parens
-pprVarBangType (v, bang, t) = ppr v <+> dcolon <+> pprBangType (bang, t)
+pprVarBangType (v, bang, t) = pprName' Applied v <+> dcolon <+> pprBangType (bang, t)
 
 ------------------------------
 pprBangType :: BangType -> Doc
