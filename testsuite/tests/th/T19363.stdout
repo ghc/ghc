@@ -1,0 +1,20 @@
+data Operator_0
+    = (:*_1) GHC.Types.Int | (:**_2) {(^**_3) :: GHC.Types.Int}
+data (%*%_4) = (:%*%_5)
+{-# COMPLETE (:%*%_5) :: (%*%_4) #-}
+{-# ANN type (%*%_4) "yargh" #-}
+f_6 = (:**_2){(^**_3) = 42}
+infix 5 `f_6`
+(%%_7) :: [a_8] -> [a_8] -> [a_8]
+(%%_7) = (GHC.Base.++)
+{-# INLINE (%%_7) #-}
+{-# SPECIALISE (%%_7) ::
+                 GHC.Base.String -> GHC.Base.String -> GHC.Base.String #-}
+{-# ANN (%%_7) "blah" #-}
+g_9 ((:**_2) {(^**_3) = x_10}) = x_10
+pattern a_11 `H_12` b_13 = (a_11, b_13)
+pattern (:***_14) {(^***_15)} <- (:**_2) (^***_15) where
+                                     (:***_14) (^***_16) = (:**_2) (^***_16)
+foreign import ccall unsafe "static blah" (<^>_17) :: GHC.Types.Int
+type family (<%>_18) a_19
+type (<%%>_20) a_21 = a_21
