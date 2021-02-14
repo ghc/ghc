@@ -35,7 +35,7 @@ import Control.Monad.Writer.Strict hiding (tell)
 import Data.Bitraversable
 import qualified Data.Map as M
 import Data.Map (Map)
-import Data.List
+import Data.List (foldl', find)
 import Data.Maybe
 import Data.Traversable
 import GHC.Stack
