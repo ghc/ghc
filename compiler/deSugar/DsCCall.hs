@@ -47,6 +47,7 @@ import Util
 
 import Data.Maybe
 
+import RepType (mkCCallSpec)
 {-
 Desugaring of @ccall@s consists of adding some state manipulation,
 unboxing any boxed primitive arguments and boxing the result if
@@ -97,8 +98,14 @@ dsCCall lbl args may_gc result_ty
        uniq <- newUnique
        dflags <- getDynFlags
        let
+           arg_tys = map exprType args
+
+           raw_res_ty = case tcSplitIOType_maybe result_ty of
+             Just (_ioTyCon, res_ty) -> res_ty
+             Nothing                 -> result_ty
+
            target = StaticTarget NoSourceText lbl Nothing True
-           the_fcall    = CCall (CCallSpec target CCallConv may_gc)
+           the_fcall    = CCall (mkCCallSpec target CCallConv may_gc raw_res_ty arg_tys)
            the_prim_app = mkFCall dflags uniq the_fcall unboxed_args ccall_result_ty
        return (foldr ($) (res_wrapper the_prim_app) arg_wrappers)
 
