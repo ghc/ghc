@@ -235,7 +235,7 @@ pprStmt stmt =
         hresults = zip results res_hints
         hargs    = zip args arg_hints
 
-        ForeignConvention cconv _ _ ret = conv
+        ForeignConvention cconv _ _ ret _ _ = conv
 
         cast_fn = parens (cCast (pprCFunType (char '*') cconv hresults hargs) fn)
 

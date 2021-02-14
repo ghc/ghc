@@ -65,7 +65,7 @@ cgForeignCall :: ForeignCall            -- the op
               -> Type                   -- result type
               -> FCode ReturnKind
 
-cgForeignCall (CCall (CCallSpec target cconv safety)) typ stg_args res_ty
+cgForeignCall (CCall (CCallSpec target cconv safety ret_rep arg_reps)) typ stg_args res_ty
   = do  { dflags <- getDynFlags
         ; let -- in the stdcall calling convention, the symbol needs @size appended
               -- to it, where size is the total number of bytes of arguments.  We
@@ -97,7 +97,7 @@ cgForeignCall (CCall (CCallSpec target cconv safety)) typ stg_args res_ty
                    DynamicTarget    ->  case cmm_args of
                                            (fn,_):rest -> (unzip rest, fn)
                                            [] -> panic "cgForeignCall []"
-              fc = ForeignConvention cconv arg_hints res_hints CmmMayReturn
+              fc = ForeignConvention cconv arg_hints res_hints CmmMayReturn ret_rep arg_reps
               call_target = ForeignTarget cmm_target fc
 
         -- we want to emit code for the call, and then emitReturn.
@@ -188,17 +188,22 @@ continuation, resulting in just one proc point instead of two. Yay!
 -}
 
 
-emitCCall :: [(CmmFormal,ForeignHint)]
+emitCCall :: [(CmmFormal, PrimRep, ForeignHint)]
           -> CmmExpr
-          -> [(CmmActual,ForeignHint)]
+          -> [(CmmActual, PrimRep, ForeignHint)]
           -> FCode ()
 emitCCall hinted_results fn hinted_args
   = void $ emitForeignCall PlayRisky results target args
   where
-    (args, arg_hints) = unzip hinted_args
-    (results, result_hints) = unzip hinted_results
+    (args, arg_reps, arg_hints) = unzip3 hinted_args
+    (results, result_reps, result_hints) = unzip3 hinted_results
+    -- extract result, we can only deal with 0 or 1 result types.
+    res_rep = case result_reps of
+      []  -> VoidRep
+      [r] -> r
+      _   -> error "can not deal with multiple return values in emitCCall"
     target = ForeignTarget fn fc
-    fc = ForeignConvention CCallConv arg_hints result_hints CmmMayReturn
+    fc = ForeignConvention CCallConv arg_hints result_hints CmmMayReturn res_rep arg_reps
 
 
 emitPrimCall :: [CmmFormal] -> CallishMachOp -> [CmmActual] -> FCode ()
@@ -653,4 +658,3 @@ typeToStgFArgType typ
   -- a type in a foreign function signature with a representationally
   -- equivalent newtype.
   tycon = tyConAppTyCon (unwrapType typ)
-
