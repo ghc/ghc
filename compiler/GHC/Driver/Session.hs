@@ -3167,7 +3167,8 @@ wWarningFlagsDeps = [
   flagSpec "compat-unqualified-imports"  Opt_WarnCompatUnqualifiedImports,
   flagSpec "invalid-haddock"             Opt_WarnInvalidHaddock,
   flagSpec "operator-whitespace-ext-conflict"  Opt_WarnOperatorWhitespaceExtConflict,
-  flagSpec "operator-whitespace"         Opt_WarnOperatorWhitespace
+  flagSpec "operator-whitespace"         Opt_WarnOperatorWhitespace,
+  flagSpec "implicit-lift"               Opt_WarnImplicitLift
  ]
 
 -- | These @-\<blah\>@ flags can all be reversed with @-no-\<blah\>@
