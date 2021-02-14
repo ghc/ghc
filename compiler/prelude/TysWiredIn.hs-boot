@@ -5,6 +5,7 @@ import {-# SOURCE #-} TyCoRep    (Type, Kind)
 
 import BasicTypes (Arity, TupleSort)
 import Name (Name)
+import Unique (Unique)
 
 listTyCon :: TyCon
 typeNatKind, typeSymbolKind :: Type
@@ -43,3 +44,5 @@ unboxedTupleKind :: [Type] -> Type
 mkPromotedListTy :: Type -> [Type] -> Type
 
 tupleTyConName :: TupleSort -> Arity -> Name
+
+unitTyConKey :: Unique
