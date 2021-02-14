@@ -1,5 +1,5 @@
 pattern Q1 x1_0 x2_1 x3_2 <- ((x1_0, x2_1), [x3_2], _, _)
-pattern x1_0 Q2 x2_1 = GHC.Tuple.Solo (x1_0, x2_1)
+pattern x1_0 `Q2` x2_1 = GHC.Tuple.Solo (x1_0, x2_1)
 pattern Q3 {qx3, qy3, qz3} <- ((qx3, qy3), [qz3]) where
                                   Q3 qx3 qy3 qz3 = ((qx3, qy3), [qz3])
 T8761.hs:(16,1)-(39,13): Splicing declarations
@@ -83,8 +83,8 @@ T8761.hs:(71,1)-(105,39): Splicing declarations
                   forall a. (Num a, Eq a) => forall b. a -> b -> ([a], Ex)
         pattern Pure x y <- ([x, 1], MkEx y)
         pattern Purep ::
-                  forall a.
-                  (Num a, Eq a) => forall b. Show b => a -> b -> ([a], ExProv)
+                  forall a. (Num a, Eq a) =>
+                            forall b. Show b => a -> b -> ([a], ExProv)
         pattern Purep x y <- ([x, 1], MkExProv y)
         pattern Pep :: () => forall a. Show a => a -> ExProv
         pattern Pep x <- MkExProv x
@@ -111,8 +111,8 @@ T8761.hs:(71,1)-(105,39): Splicing declarations
               forall a. (Num a, Eq a) => forall b. a -> b -> ([a], Ex)
     pattern Pure x y <- ([x, 1], MkEx y)
     pattern Purep ::
-              forall a.
-              (Num a, Eq a) => forall b. Show b => a -> b -> ([a], ExProv)
+              forall a. (Num a, Eq a) =>
+                        forall b. Show b => a -> b -> ([a], ExProv)
     pattern Purep x y <- ([x, 1], MkExProv y)
     pattern Pep :: () => forall a. Show a => a -> ExProv
     pattern Pep x <- MkExProv x
