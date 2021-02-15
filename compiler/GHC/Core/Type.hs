@@ -1499,9 +1499,6 @@ mkTyConTy tycon = tyConNullaryTy tycon
 -- its arguments.  Applies its arguments to the constructor from left to right.
 mkTyConApp :: TyCon -> [Type] -> Type
 mkTyConApp tycon tys
-  | [] <- tys
-  = mkTyConTy tycon
-
   | isFunTyCon tycon
   , [w, _rep1,_rep2,ty1,ty2] <- tys
   -- The FunTyCon (->) is always a visible one
