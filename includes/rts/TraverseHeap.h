@@ -3,7 +3,7 @@
  * (c) The GHC Team, 2019,2020
  * Author: Daniel Gröber
  *
- * Generalised profiling heap traversal.
+ * See Note [Generalised profiling heap traversal].
  *
  * ---------------------------------------------------------------------------*/
 
