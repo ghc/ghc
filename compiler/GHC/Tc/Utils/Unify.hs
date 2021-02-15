@@ -22,7 +22,7 @@ module GHC.Tc.Utils.Unify (
   buildImplicationFor, buildTvImplication, emitResidualTvConstraint,
 
   -- Various unifications
-  unifyType, unifyKind,
+  unifyType, unifyKind, unifyExpectedType,
   uType, promoteTcType,
   swapOverTyVars, canSolveByUnification,
 
@@ -543,10 +543,17 @@ tcWrapResultMono :: HsExpr GhcRn -> HsExpr GhcTc
 -- It means we don't need to pass in a CtOrigin
 tcWrapResultMono rn_expr expr act_ty res_ty
   = ASSERT2( isRhoTy act_ty, ppr act_ty $$ ppr rn_expr )
-    do { co <- case res_ty of
-                  Infer inf_res -> fillInferResult act_ty inf_res
-                  Check exp_ty  -> unifyType (Just (ppr rn_expr)) act_ty exp_ty
+    do { co <- unifyExpectedType rn_expr act_ty res_ty
        ; return (mkHsWrapCo co expr) }
+
+unifyExpectedType :: HsExpr GhcRn
+                  -> TcRhoType   -- Actual -- a rho-type not a sigma-type
+                  -> ExpRhoType  -- Expected
+                  -> TcM TcCoercionN
+unifyExpectedType rn_expr act_ty exp_ty
+  = case exp_ty of
+      Infer inf_res -> fillInferResult act_ty inf_res
+      Check exp_ty  -> unifyType (Just (ppr rn_expr)) act_ty exp_ty
 
 ------------------------
 tcSubTypePat :: CtOrigin -> UserTypeCtxt
@@ -1249,7 +1256,7 @@ uType t_or_k origin orig_ty1 orig_ty2
       = do { let ty1 = coercionType co1
                  ty2 = coercionType co2
            ; kco <- uType KindLevel
-                          (KindEqOrigin orig_ty1 (Just orig_ty2) origin
+                          (KindEqOrigin orig_ty1 orig_ty2 origin
                                         (Just t_or_k))
                           ty1 ty2
            ; return $ mkProofIrrelCo Nominal kco co1 co2 }
@@ -1463,7 +1470,7 @@ uUnfilledVar2 origin t_or_k swapped tv1 ty2
             ; defer }
 
     ty1 = mkTyVarTy tv1
-    kind_origin = KindEqOrigin ty1 (Just ty2) origin (Just t_or_k)
+    kind_origin = KindEqOrigin ty1 ty2 origin (Just t_or_k)
 
     defer = unSwap swapped (uType_defer t_or_k origin) ty1 ty2
 

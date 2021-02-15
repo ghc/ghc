@@ -1,6 +1,9 @@
 
 T15870.hs:32:34: error:
     • Couldn't match kind ‘k’ with ‘*’
+      When matching kinds
+        b :: *
+        a :: k
       Expected kind ‘Optic a’, but ‘g2’ has kind ‘Optic b’
       ‘k’ is a rigid type variable bound by
         a family instance declaration
