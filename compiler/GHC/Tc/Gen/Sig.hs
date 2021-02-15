@@ -596,10 +596,10 @@ addInlinePrags poly_id prags_for_me
          warn_multiple_inlines inl2 inls
        | otherwise
        = setSrcSpan loc $
-         addWarnTc NoWarnReason
-                     (hang (text "Multiple INLINE pragmas for" <+> ppr poly_id)
-                       2 (vcat (text "Ignoring all but the first"
-                                : map pp_inl (inl1:inl2:inls))))
+         addDiagnosticTc WarnReason
+                         (hang (text "Multiple INLINE pragmas for" <+> ppr poly_id)
+                           2 (vcat (text "Ignoring all but the first"
+                                    : map pp_inl (inl1:inl2:inls))))
 
     pp_inl (L loc prag) = ppr prag <+> parens (ppr loc)
 
@@ -729,9 +729,9 @@ tcSpecPrags poly_id prag_sigs
     is_bad_sig s = not (isSpecLSig s || isInlineLSig s || isSCCFunSig s)
 
     warn_discarded_sigs
-      = addWarnTc NoWarnReason
-                  (hang (text "Discarding unexpected pragmas for" <+> ppr poly_id)
-                      2 (vcat (map (ppr . getLoc) bad_sigs)))
+      = addDiagnosticTc WarnReason
+                        (hang (text "Discarding unexpected pragmas for" <+> ppr poly_id)
+                            2 (vcat (map (ppr . getLoc) bad_sigs)))
 
 --------------
 tcSpecPrag :: TcId -> Sig GhcRn -> TcM [TcSpecPrag]
@@ -812,7 +812,7 @@ tcImpSpec (name, prag)
       ; if hasSomeUnfolding (realIdUnfolding id)
            -- See Note [SPECIALISE pragmas for imported Ids]
         then tcSpecPrag id prag
-        else do { addWarnTc NoWarnReason (impSpecErr name)
+        else do { addDiagnosticTc WarnReason (impSpecErr name)
                 ; return [] } }
 
 impSpecErr :: Name -> SDoc

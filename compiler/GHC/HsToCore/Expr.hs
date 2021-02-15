@@ -1094,8 +1094,8 @@ warnDiscardedDoBindings rhs rhs_ty
 
            -- Warn about discarding non-() things in 'monadic' binding
        ; if warn_unused && not (isUnitTy norm_elt_ty)
-         then warnDs (WarnReason Opt_WarnUnusedDoBind)
-                     (badMonadBind rhs elt_ty)
+         then diagnosticDs (WarnReasonWithFlag Opt_WarnUnusedDoBind)
+                           (badMonadBind rhs elt_ty)
          else
 
            -- Warn about discarding m a things in 'monadic' binding of the same type,
@@ -1104,8 +1104,8 @@ warnDiscardedDoBindings rhs rhs_ty
                 case tcSplitAppTy_maybe norm_elt_ty of
                       Just (elt_m_ty, _)
                          | m_ty `eqType` topNormaliseType fam_inst_envs elt_m_ty
-                         -> warnDs (WarnReason Opt_WarnWrongDoBind)
-                                   (badMonadBind rhs elt_ty)
+                         -> diagnosticDs (WarnReasonWithFlag Opt_WarnWrongDoBind)
+                                         (badMonadBind rhs elt_ty)
                       _ -> return () } }
 
   | otherwise   -- RHS does have type of form (m ty), which is weird

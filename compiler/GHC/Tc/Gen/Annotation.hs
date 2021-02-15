@@ -43,7 +43,7 @@ warnAnns :: [LAnnDecl GhcRn] -> TcM [Annotation]
 --- No GHCI; emit a warning (not an error) and ignore. cf #4268
 warnAnns [] = return []
 warnAnns anns@(L loc _ : _)
-  = do { setSrcSpan loc $ addWarnTc NoWarnReason $
+  = do { setSrcSpan loc $ addDiagnosticTc WarnReason $
              (text "Ignoring ANN annotation" <> plural anns <> comma
              <+> text "because this is a stage-1 compiler without -fexternal-interpreter or doesn't support GHCi")
        ; return [] }
