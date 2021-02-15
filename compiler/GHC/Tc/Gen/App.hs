@@ -244,9 +244,13 @@ tcApp works like this:
    when in checking mode.  This is the shaded part of APP-Downarrow
    in Fig 5.
 
-5. Use tcValArgs to typecheck the value arguments
+5. Use unifyResultType to match up the result type of the call
+   with that expected by the context.  See Note [Unify with
+   expected type before typechecking arguments]
 
-6. After a gruesome special case for tagToEnum, rebuild the result.
+6. Use tcValArgs to typecheck the value arguments
+
+7. After a gruesome special case for tagToEnum, rebuild the result.
 
 
 Some cases that /won't/ work:
@@ -274,6 +278,34 @@ particular Ids:
   the renamer (Note [Handling overloaded and rebindable constructs] in
   GHC.Rename.Expr), and we want them to be instantiated impredicatively
   so that (f `op`), say, will work OK even if `f` is higher rank.
+
+Note [Unify with expected type before typechecking arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this (#19364)
+  data Pair a b = Pair a b
+  baz :: MkPair Int Bool
+  baz = MkPair "yes" "no"
+
+We instantiate MkPair with `alpha`, `beta`, and push its argument
+types (`alpha` and `beta`) into the arguments ("yes" and "no").
+But if we first unify the result type (Pair alpha beta) with the expected
+type (Pair Int Bool) we will push the much more informative types
+`Int` and `Bool` into the arguments.   This makes a difference:
+
+Unify result type /after/ typechecking the args
+    • Couldn't match type ‘[Char]’ with ‘Bool’
+      Expected type: Pair Foo Bar
+        Actual type: Pair [Char] [Char]
+    • In the expression: Pair "yes" "no"
+
+Unify result type /before/ typechecking the args
+    • Couldn't match type ‘[Char]’ with ‘Bool’
+      Expected: Foo
+        Actual: String
+    • In the first argument of ‘Pair’, namely ‘"yes"’
+
+The latter is much better. That is why we call unifyExpectedType
+before tcValArgs.
 -}
 
 tcApp :: HsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
@@ -288,7 +320,26 @@ tcApp rn_expr exp_res_ty
        ; (delta, inst_args, app_res_rho) <- tcInstFun do_ql True fun fun_sigma rn_args
 
        -- Quick look at result
-       ; quickLookResultType do_ql delta app_res_rho exp_res_ty
+       ; app_res_rho <- if do_ql
+                        then quickLookResultType delta app_res_rho exp_res_ty
+                        else return app_res_rho
+
+       -- Unify with expected type from the context
+       -- See Note [Unify with expected type before typechecking arguments]
+       --
+       -- perhaps_add_res_ty_ctxt: Inside an expansion, the addFunResCtxt stuff is
+       --    more confusing than helpful because the function at the head isn't in
+       --    the source program; it was added by the renamer.  See
+       --    Note [Handling overloaded and rebindable constructs] in GHC.Rename.Expr
+       ; let  perhaps_add_res_ty_ctxt thing_inside
+                 | insideExpansion fun_ctxt
+                 = thing_inside
+                 | otherwise
+                 = addFunResCtxt rn_fun rn_args app_res_rho exp_res_ty $
+                   thing_inside
+
+       ; res_co <- perhaps_add_res_ty_ctxt $
+                   unifyExpectedType rn_expr app_res_rho exp_res_ty
 
        ; whenDOptM Opt_D_dump_tc_trace $
          do { inst_args <- mapM zonkArg inst_args  -- Only when tracing
@@ -304,35 +355,13 @@ tcApp rn_expr exp_res_ty
        -- Typecheck the value arguments
        ; tc_args <- tcValArgs do_ql inst_args
 
-       -- Zonk the result type, to ensure that we substitute out
-       -- any filled-in instantiation variable before calling tcWrapResultMono
-       -- In the Check case, this isn't really necessary, because tcWrapResultMono
-       -- just drops to tcUnify; but in the Infer case a filled-in instantiation
-       -- variable might perhaps escape into the constraint generator. The safe
-       -- thing to do is to any instantaition variables away.
-       -- See Note [Instantiation variables are short lived]
-       ; app_res_rho <- zonkQuickLook do_ql app_res_rho
-
-       -- Special case for tagToEnum#
-       ; if isTagToEnum rn_fun
-         then tcTagToEnum rn_expr tc_fun fun_ctxt tc_args app_res_rho exp_res_ty
-         else
-
-    do { -- Reconstruct
-       ; let tc_expr = rebuildHsApps tc_fun fun_ctxt tc_args
-
-             -- Set a context for the helpful
-             --    "Probably cause: f applied to too many args"
-             -- But not in generated code, where we don't want
-             -- to mention internal (rebindable syntax) function names
-             set_res_ctxt thing_inside
-                | insideExpansion tc_args
-                = thing_inside
-                | otherwise
-                = addFunResCtxt tc_fun tc_args app_res_rho exp_res_ty thing_inside
+       -- Reconstruct, with special case for tagToEnum#
+       ; tc_expr <- if isTagToEnum rn_fun
+                    then tcTagToEnum tc_fun fun_ctxt tc_args app_res_rho
+                    else return (rebuildHsApps tc_fun fun_ctxt tc_args)
 
        -- Wrap the result
-       ; set_res_ctxt $ tcWrapResultMono rn_expr tc_expr app_res_rho exp_res_ty } }
+       ; return (mkHsWrapCo res_co tc_expr) }
 
 --------------------
 wantQuickLook :: HsExpr GhcRn -> TcM Bool
@@ -869,18 +898,28 @@ skipQuickLook :: Delta -> LHsExpr GhcRn -> TcM (Delta, EValArg 'TcpInst)
 skipQuickLook delta larg = return (delta, ValArg larg)
 
 ----------------
-quickLookResultType :: Bool -> Delta -> TcRhoType -> ExpRhoType -> TcM ()
+quickLookResultType :: Delta -> TcRhoType -> ExpRhoType -> TcM TcRhoType
 -- This function implements the shaded bit of rule APP-Downarrow in
 -- Fig 5 of the QL paper: "A quick look at impredicativity" (ICFP'20).
+-- It returns its second argument, but with any variables in Delta
+-- substituted out, so no variables in Delta escape
 
-quickLookResultType do_ql delta app_res_rho exp_res_ty
-  | do_ql
-  , not (isEmptyVarSet delta)  -- Optimisation only
-  , Just exp_rho <- checkingExpType_maybe exp_res_ty
-                               -- In checking mode only
-  = qlUnify delta app_res_rho exp_rho
-  | otherwise
-  = return ()
+quickLookResultType delta app_res_rho (Check exp_rho)
+  = -- In checking mode only, do qlUnify with the expected result type
+    do { unless (isEmptyVarSet delta)  $ -- Optimisation only
+         qlUnify delta app_res_rho exp_rho
+       ; return app_res_rho }
+
+quickLookResultType _ app_res_rho (Infer {})
+  = zonkTcType app_res_rho
+    -- Zonk the result type, to ensure that we substitute out any
+    -- filled-in instantiation variable before calling
+    -- unifyExpectedType. In the Check case, this isn't necessary,
+    -- because unifyExpectedType just drops to tcUnify; but in the
+    -- Infer case a filled-in instantiation variable (filled in by
+    -- tcInstFun) might perhaps escape into the constraint
+    -- generator. The safe thing to do is to zonk any instantiation
+    -- variables away.  See Note [Instantiation variables are short lived]
 
 ---------------------
 qlUnify :: Delta -> TcType -> TcType -> TcM ()
@@ -1080,8 +1119,7 @@ findNoQuantVars fun_ty args
 {- Note [tagToEnum#]
 ~~~~~~~~~~~~~~~~~~~~
 Nasty check to ensure that tagToEnum# is applied to a type that is an
-enumeration TyCon.  Unification may refine the type later, but this
-check won't see that, alas.  It's crude, because it relies on our
+enumeration TyCon.  It's crude, because it relies on our
 knowing *now* that the type is ok, which in turn relies on the
 eager-unification part of the type checker pushing enough information
 here.  In theory the Right Thing to do is to have a new form of
@@ -1109,54 +1147,48 @@ isTagToEnum :: HsExpr GhcRn -> Bool
 isTagToEnum (HsVar _ (L _ fun_id)) = fun_id `hasKey` tagToEnumKey
 isTagToEnum _ = False
 
-tcTagToEnum :: HsExpr GhcRn
-            -> HsExpr GhcTc -> AppCtxt -> [HsExprArg 'TcpTc]
-            -> TcRhoType -> ExpRhoType
+tcTagToEnum :: HsExpr GhcTc -> AppCtxt -> [HsExprArg 'TcpTc]
+            -> TcRhoType
             -> TcM (HsExpr GhcTc)
 -- tagToEnum# :: forall a. Int# -> a
 -- See Note [tagToEnum#]   Urgh!
-tcTagToEnum expr fun fun_ctxt args app_res_ty res_ty
-  | null val_args
-  = failWithTc (text "tagToEnum# must appear applied to one argument")
-
-  | otherwise
-  = do { res_ty <- readExpType res_ty
-       ; ty'    <- zonkTcType res_ty
+tcTagToEnum tc_fun fun_ctxt tc_args res_ty
+  | [val_arg] <- dropWhile (not . isHsValArg) tc_args
+  = do { res_ty <- zonkTcType res_ty
 
        -- Check that the type is algebraic
-       ; case tcSplitTyConApp_maybe ty' of {
-           Nothing -> do { addErrTc (mk_error ty' doc1)
+       ; case tcSplitTyConApp_maybe res_ty of {
+           Nothing -> do { addErrTc (mk_error res_ty doc1)
                          ; vanilla_result } ;
            Just (tc, tc_args) ->
 
     do { -- Look through any type family
        ; fam_envs <- tcGetFamInstEnvs
        ; case tcLookupDataFamInst_maybe fam_envs tc tc_args of {
-           Nothing -> do { check_enumeration ty' tc
+           Nothing -> do { check_enumeration res_ty tc
                          ; vanilla_result } ;
            Just (rep_tc, rep_args, coi) ->
 
     do { -- coi :: tc tc_args ~R rep_tc rep_args
-         check_enumeration ty' rep_tc
+         check_enumeration res_ty rep_tc
        ; let rep_ty  = mkTyConApp rep_tc rep_args
-             fun'    = mkHsWrap (WpTyApp rep_ty) fun
-             expr'   = rebuildHsApps fun' fun_ctxt val_args
+             tc_fun' = mkHsWrap (WpTyApp rep_ty) tc_fun
+             tc_expr = rebuildHsApps tc_fun' fun_ctxt [val_arg]
              df_wrap = mkWpCastR (mkTcSymCo coi)
-       ; return (mkHsWrap df_wrap expr') }}}}}
+       ; return (mkHsWrap df_wrap tc_expr) }}}}}
+
+  | otherwise
+  = failWithTc (text "tagToEnum# must appear applied to one value argument")
 
   where
-    val_args = dropWhile (not . isHsValArg) args
-
-    vanilla_result
-      = do { let expr' = rebuildHsApps fun fun_ctxt args
-           ; tcWrapResultMono expr expr' app_res_ty res_ty }
+    vanilla_result = return (rebuildHsApps tc_fun fun_ctxt tc_args)
 
     check_enumeration ty' tc
       | isEnumerationTyCon tc = return ()
       | otherwise             = addErrTc (mk_error ty' doc2)
 
     doc1 = vcat [ text "Specify the type by giving a type signature"
-                , text "e.g. (tagToEnum# x) :: Bool" ]
+               , text "e.g. (tagToEnum# x) :: Bool" ]
     doc2 = text "Result type must be an enumeration type"
 
     mk_error :: TcType -> SDoc -> SDoc
@@ -1174,5 +1206,3 @@ tcTagToEnum expr fun fun_ctxt args app_res_ty res_ty
 
 tcExprPrag :: HsPragE GhcRn -> HsPragE GhcTc
 tcExprPrag (HsPragSCC x1 src ann) = HsPragSCC x1 src ann
-
-
