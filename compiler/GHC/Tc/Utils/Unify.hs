@@ -22,7 +22,7 @@ module GHC.Tc.Utils.Unify (
   buildImplicationFor, buildTvImplication, emitResidualTvConstraint,
 
   -- Various unifications
-  unifyType, unifyKind,
+  unifyType, unifyKind, unifyExpectedType,
   uType, promoteTcType,
   swapOverTyVars, canSolveByUnification,
 
@@ -543,10 +543,17 @@ tcWrapResultMono :: HsExpr GhcRn -> HsExpr GhcTc
 -- It means we don't need to pass in a CtOrigin
 tcWrapResultMono rn_expr expr act_ty res_ty
   = ASSERT2( isRhoTy act_ty, ppr act_ty $$ ppr rn_expr )
-    do { co <- case res_ty of
-                  Infer inf_res -> fillInferResult act_ty inf_res
-                  Check exp_ty  -> unifyType (Just (ppr rn_expr)) act_ty exp_ty
+    do { co <- unifyExpectedType rn_expr act_ty res_ty
        ; return (mkHsWrapCo co expr) }
+
+unifyExpectedType :: HsExpr GhcRn
+                  -> TcRhoType   -- Actual -- a rho-type not a sigma-type
+                  -> ExpRhoType  -- Expected
+                  -> TcM TcCoercionN
+unifyExpectedType rn_expr act_ty exp_ty
+  = case exp_ty of
+      Infer inf_res -> fillInferResult act_ty inf_res
+      Check exp_ty  -> unifyType (Just (ppr rn_expr)) act_ty exp_ty
 
 ------------------------
 tcSubTypePat :: CtOrigin -> UserTypeCtxt

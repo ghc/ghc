@@ -813,9 +813,10 @@ tcCheckId :: Name -> ExpRhoType -> TcM (HsExpr GhcTc)
 tcCheckId name res_ty
   = do { (expr, actual_res_ty) <- tcInferId name
        ; traceTc "tcCheckId" (vcat [ppr name, ppr actual_res_ty, ppr res_ty])
-       ; addFunResCtxt expr [] actual_res_ty res_ty $
-         tcWrapResultO (OccurrenceOf name) (HsVar noExtField (noLoc name)) expr
-                                           actual_res_ty res_ty }
+       ; addFunResCtxt rn_fun [] actual_res_ty res_ty $
+         tcWrapResultO (OccurrenceOf name) rn_fun expr actual_res_ty res_ty }
+  where
+    rn_fun = HsVar noExtField (noLoc name)
 
 ------------------------
 tcInferId :: Name -> TcM (HsExpr GhcTc, TcSigmaType)
@@ -1120,13 +1121,19 @@ naughtiness in both branches.  c.f. TcTyClsBindings.mkAuxBinds.
 *                                                                      *
 ********************************************************************* -}
 
-addFunResCtxt :: HsExpr GhcTc -> [HsExprArg 'TcpTc]
+addFunResCtxt :: HsExpr GhcRn -> [HsExprArg 'TcpRn]
               -> TcType -> ExpRhoType
               -> TcM a -> TcM a
 -- When we have a mis-match in the return type of a function
 -- try to give a helpful message about too many/few arguments
-addFunResCtxt fun args fun_res_ty env_ty
-  = addLandmarkErrCtxtM (\env -> (env, ) <$> mk_msg)
+-- But not in generated code, where we don't want
+-- to mention internal (rebindable syntax) function names
+addFunResCtxt fun args fun_res_ty env_ty thing_inside
+  | insideExpansion args
+  = thing_inside
+
+  | otherwise
+  = addLandmarkErrCtxtM (\env -> (env, ) <$> mk_msg) thing_inside
       -- NB: use a landmark error context, so that an empty context
       -- doesn't suppress some more useful context
   where
