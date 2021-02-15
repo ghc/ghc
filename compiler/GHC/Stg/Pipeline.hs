@@ -19,8 +19,6 @@ import GHC.Prelude
       map,
       ($),
       Eq((/=)),
-      Monad(return),
-      Functor,
       Applicative,
       Bool(..),
       Char,
