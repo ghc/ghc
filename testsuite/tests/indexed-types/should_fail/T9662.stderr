@@ -2,7 +2,7 @@
 T9662.hs:49:8: error:
     • Couldn't match type ‘n’ with ‘Int’
       Expected: Exp (((sh :. k) :. m) :. n)
-                -> Exp (((sh :. k) :. m) :. n)
+                -> Exp (((sh :. m) :. n) :. k)
         Actual: Exp
                   (Tuple (((Atom a0 :. Atom Int) :. Atom Int) :. Atom Int))
                 -> Exp
