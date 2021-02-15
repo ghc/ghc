@@ -848,11 +848,14 @@ repAnnD (L loc (HsAnnotation _ _ ann_prov (L _ exp)))
        ; return (loc, dec) }
 
 repAnnProv :: AnnProvenance Name -> MetaM (Core TH.AnnTarget)
-repAnnProv (ValueAnnProvenance (L _ n))
-  = do { MkC n' <- lift $ globalVar n  -- ANNs are allowed only at top-level
+repAnnProv (ValueAnnProvenance n)
+  = do { -- An ANN references an identifier bound elsewhere in the module, so
+         -- we must look it up using lookupLOcc (#19377).
+         -- Similarly for TypeAnnProvenance (`ANN type`) below.
+         MkC n' <- lookupLOcc n
        ; rep2_nw valueAnnotationName [ n' ] }
-repAnnProv (TypeAnnProvenance (L _ n))
-  = do { MkC n' <- lift $ globalVar n
+repAnnProv (TypeAnnProvenance n)
+  = do { MkC n' <- lookupLOcc n
        ; rep2_nw typeAnnotationName [ n' ] }
 repAnnProv ModuleAnnProvenance
   = rep2_nw moduleAnnotationName []
