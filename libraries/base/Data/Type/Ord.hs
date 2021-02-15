@@ -35,6 +35,7 @@ module Data.Type.Ord (
   ) where
 
 import GHC.Show(Show(..))
+import GHC.TypeLits.Internal
 import Data.Bool
 import Data.Ord
 import Data.Eq
@@ -44,6 +45,10 @@ import Data.Eq
 -- @since 4.16.0.0
 type Compare :: k -> k -> Ordering
 type family Compare a b
+
+type instance Compare (a :: Nat)    b = CmpNat    a b
+type instance Compare (a :: Symbol) b = CmpSymbol a b
+type instance Compare (a :: Char)   b = CmpChar   a b
 
 -- | Ordering data type for type literals that provides proof of their ordering.
 -- @since 4.16.0.0
