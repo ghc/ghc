@@ -91,7 +91,7 @@ import GHC.Core.Coercion.Axiom
 
 -- others
 import GHC.Builtin.Names ( liftedRepDataConKey )
-import {-# SOURCE #-} GHC.Builtin.Types ( liftedTypeKindTyCon, liftedTypeKind, manyDataConTy )
+import {-# SOURCE #-} GHC.Builtin.Types ( liftedTypeKind, manyDataConTy )
 import {-# SOURCE #-} GHC.Builtin.Types.Prim ( tYPETyCon )
 import GHC.Types.Basic ( LeftOrRight(..), pickLR )
 import GHC.Types.Unique ( hasKey, Uniquable(..) )
