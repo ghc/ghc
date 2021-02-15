@@ -4,18 +4,18 @@
 # Catch-all
 * @bgamari
 
-# Build system
+[Build system]
 /hadrian/                         @snowleopard @alp @DavidEichmann @angerman
 /configure.ac                    @angerman @hvr
 /aclocal.m4                      @angerman @hvr
 /config.sub                      @angerman @hvr
 
-# RTS-like things
+[RTS-like things]
 /rts/                             @bgamari @simonmar @osa1 @Phyx @angerman
 /rts/linker/                      @angerman @Phyx @simonmar
 /includes/                        @bgamari @simonmar @osa1
 
-# The compiler
+[The compiler]
 /compiler/parser/                  @int-index
 /compiler/GHC/Hs/                  @simonpj @rae
 /compiler/GHC/Tc/                  @simonpj @rae
@@ -37,19 +37,19 @@
 /compiler/GHC/Core/Op/DmdAnal.hs   @simonpj @sgraf
 /compiler/GHC/ThToHs.hs            @rae
 
-# Core libraries
+[Core libraries]
 /libraries/base/                  @hvr
 /libraries/ghci/                  @simonmar
 /libraries/template-haskell/      @rae
 
-# Internal utilities and libraries
+[Internal utilities and libraries]
 /libraries/libiserv/              @angerman @simonmar
 /utils/iserv-proxy/               @angerman @simonmar
 /utils/iserv/                     @angerman @simonmar
 /utils/gen-dll/                   @Phyx
 /utils/fs/                        @Phyx
 
-# WinIO related code
+[WinIO related code]
 /libraries/base/GHC/Event/Windows/                   @Phyx
 /libraries/base/GHC/IO/Windows/                      @Phyx
 /rts/win32/                                          @Phyx
