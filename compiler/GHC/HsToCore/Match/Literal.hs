@@ -152,10 +152,10 @@ warnAboutIdentities dflags (Var conv_fn) type_of_conv
   , idName conv_fn `elem` conversionNames
   , Just (_, arg_ty, res_ty) <- splitFunTy_maybe type_of_conv
   , arg_ty `eqType` res_ty  -- So we are converting  ty -> ty
-  = warnDs (WarnReason Opt_WarnIdentities)
-           (vcat [ text "Call of" <+> ppr conv_fn <+> dcolon <+> ppr type_of_conv
-                 , nest 2 $ text "can probably be omitted"
-           ])
+  = diagnosticDs (WarnReasonWithFlag Opt_WarnIdentities)
+                 (vcat [ text "Call of" <+> ppr conv_fn <+> dcolon <+> ppr type_of_conv
+                       , nest 2 $ text "can probably be omitted"
+                 ])
 warnAboutIdentities _ _ _ = return ()
 
 conversionNames :: [Name]
@@ -224,20 +224,20 @@ warnAboutOverflowedLiterals dflags lit
     checkPositive :: Integer -> Name -> DsM ()
     checkPositive i tc
       = when (i < 0) $
-        warnDs (WarnReason Opt_WarnOverflowedLiterals)
-               (vcat [ text "Literal" <+> integer i
-                       <+> text "is negative but" <+> ppr tc
-                       <+> ptext (sLit "only supports positive numbers")
-                     ])
+        diagnosticDs (WarnReasonWithFlag Opt_WarnOverflowedLiterals)
+                     (vcat [ text "Literal" <+> integer i
+                             <+> text "is negative but" <+> ppr tc
+                             <+> ptext (sLit "only supports positive numbers")
+                           ])
 
     check :: forall a. (Bounded a, Integral a) => Integer -> Name -> Proxy a -> DsM ()
     check i tc _proxy
       = when (i < minB || i > maxB) $
-        warnDs (WarnReason Opt_WarnOverflowedLiterals)
-               (vcat [ text "Literal" <+> integer i
-                       <+> text "is out of the" <+> ppr tc <+> ptext (sLit "range")
-                       <+> integer minB <> text ".." <> integer maxB
-                     , sug ])
+        diagnosticDs (WarnReasonWithFlag Opt_WarnOverflowedLiterals)
+                     (vcat [ text "Literal" <+> integer i
+                             <+> text "is out of the" <+> ppr tc <+> ptext (sLit "range")
+                             <+> integer minB <> text ".." <> integer maxB
+                           , sug ])
       where
         minB = toInteger (minBound :: a)
         maxB = toInteger (maxBound :: a)
@@ -309,7 +309,8 @@ warnAboutEmptyEnumerations fam_envs dflags fromExpr mThnExpr toExpr
 
   | otherwise = return ()
   where
-    raiseWarning = warnDs (WarnReason Opt_WarnEmptyEnumerations) (text "Enumeration is empty")
+    raiseWarning =
+      diagnosticDs (WarnReasonWithFlag Opt_WarnEmptyEnumerations) (text "Enumeration is empty")
 
 getLHsIntegralLit :: LHsExpr GhcTc -> Maybe (Integer, Type)
 -- ^ See if the expression is an 'Integral' literal.
