@@ -82,6 +82,7 @@ import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Types.Name.Ppr
 import GHC.Types.HpcInfo
+import GHC.Types.Error
 
 import GHC.Unit
 import GHC.Unit.Module.ModGuts
@@ -101,7 +102,7 @@ import GHC.Driver.Plugins ( LoadedPlugin(..) )
 -}
 
 -- | Main entry point to the desugarer.
-deSugar :: HscEnv -> ModLocation -> TcGblEnv -> IO (Messages DecoratedSDoc, Maybe ModGuts)
+deSugar :: HscEnv -> ModLocation -> TcGblEnv -> IO (Messages DecoratedMessage, Maybe ModGuts)
 -- Can modify PCS by faulting in more declarations
 
 deSugar hsc_env
@@ -285,7 +286,7 @@ So we pull out the type/coercion variables (which are in dependency order),
 and Rec the rest.
 -}
 
-deSugarExpr :: HscEnv -> LHsExpr GhcTc -> IO (Messages DecoratedSDoc, Maybe CoreExpr)
+deSugarExpr :: HscEnv -> LHsExpr GhcTc -> IO (Messages DecoratedMessage, Maybe CoreExpr)
 deSugarExpr hsc_env tc_expr = do
     let dflags = hsc_dflags hsc_env
     let logger = hsc_logger hsc_env
@@ -419,7 +420,7 @@ dsRule (L loc (HsRule { rd_name = name
         -- and take the body apart into a (f args) form
         ; dflags <- getDynFlags
         ; case decomposeRuleLhs dflags bndrs'' lhs'' of {
-                Left msg -> do { warnDs NoWarnReason msg; return Nothing } ;
+                Left msg -> do { diagnosticDs WarnReason msg; return Nothing } ;
                 Right (final_bndrs, fn_id, args) -> do
 
         { let is_local = isLocalId fn_id
@@ -455,25 +456,25 @@ warnRuleShadowing rule_name rule_act fn_id arg_ids
       | isLocalId lhs_id || canUnfold (idUnfolding lhs_id)
                        -- If imported with no unfolding, no worries
       , idInlineActivation lhs_id `competesWith` rule_act
-      = warnDs (WarnReason Opt_WarnInlineRuleShadowing)
-               (vcat [ hang (text "Rule" <+> pprRuleName rule_name
-                               <+> text "may never fire")
-                            2 (text "because" <+> quotes (ppr lhs_id)
-                               <+> text "might inline first")
-                     , text "Probable fix: add an INLINE[n] or NOINLINE[n] pragma for"
-                       <+> quotes (ppr lhs_id)
-                     , whenPprDebug (ppr (idInlineActivation lhs_id) $$ ppr rule_act) ])
+      = diagnosticDs (WarnReasonWithFlag Opt_WarnInlineRuleShadowing)
+                     (vcat [ hang (text "Rule" <+> pprRuleName rule_name
+                                     <+> text "may never fire")
+                                  2 (text "because" <+> quotes (ppr lhs_id)
+                                     <+> text "might inline first")
+                           , text "Probable fix: add an INLINE[n] or NOINLINE[n] pragma for"
+                             <+> quotes (ppr lhs_id)
+                           , whenPprDebug (ppr (idInlineActivation lhs_id) $$ ppr rule_act) ])
 
       | check_rules_too
       , bad_rule : _ <- get_bad_rules lhs_id
-      = warnDs (WarnReason Opt_WarnInlineRuleShadowing)
-               (vcat [ hang (text "Rule" <+> pprRuleName rule_name
-                               <+> text "may never fire")
-                            2 (text "because rule" <+> pprRuleName (ruleName bad_rule)
-                               <+> text "for"<+> quotes (ppr lhs_id)
-                               <+> text "might fire first")
-                      , text "Probable fix: add phase [n] or [~n] to the competing rule"
-                      , whenPprDebug (ppr bad_rule) ])
+      = diagnosticDs (WarnReasonWithFlag Opt_WarnInlineRuleShadowing)
+                     (vcat [ hang (text "Rule" <+> pprRuleName rule_name
+                                     <+> text "may never fire")
+                                  2 (text "because rule" <+> pprRuleName (ruleName bad_rule)
+                                     <+> text "for"<+> quotes (ppr lhs_id)
+                                     <+> text "might fire first")
+                            , text "Probable fix: add phase [n] or [~n] to the competing rule"
+                            , whenPprDebug (ppr bad_rule) ])
 
       | otherwise
       = return ()

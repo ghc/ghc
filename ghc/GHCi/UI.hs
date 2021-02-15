@@ -65,6 +65,7 @@ import GHC.Hs.ImpExp
 import GHC.Hs
 import GHC.Driver.Env
 import GHC.Runtime.Context
+import GHC.Types.Error ( reasonSeverity )
 import GHC.Types.TyThing
 import GHC.Types.TyThing.Ppr
 import GHC.Types.SafeHaskell ( getSafeMode )
@@ -579,7 +580,7 @@ ghciLogAction lastErrLocations old_log_action
               dflags msg_class srcSpan msg = do
     old_log_action dflags msg_class srcSpan msg
     case msg_class of
-        MCDiagnostic (SevError _mb_reason) -> case srcSpan of
+        MCDiagnostic reason | SevError <- reasonSeverity reason -> case srcSpan of
             RealSrcSpan rsp _ -> modifyIORef lastErrLocations
                 (++ [(srcLocFile (realSrcSpanStart rsp), srcLocLine (realSrcSpanStart rsp))])
             _ -> return ()
