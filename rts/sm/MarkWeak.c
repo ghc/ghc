@@ -417,7 +417,6 @@ markWeakPtrList ( void )
         for (w = gen->weak_ptr_list; w != NULL; w = RELAXED_LOAD(&w->link)) {
             // w might be WEAK, EVACUATED, or DEAD_WEAK (actually CON_STATIC) here
 
-#if defined(DEBUG)
             {   // careful to do this assertion only reading the info ptr
                 // once, because during parallel GC it might change under our feet.
                 const StgInfoTable *info = RELAXED_LOAD(&w->header.info);
@@ -425,7 +424,6 @@ markWeakPtrList ( void )
                        || info == &stg_DEAD_WEAK_info
                        || INFO_PTR_TO_STRUCT(info)->type == WEAK);
             }
-#endif
 
             evacuate((StgClosure **)last_w);
             w = *last_w;
