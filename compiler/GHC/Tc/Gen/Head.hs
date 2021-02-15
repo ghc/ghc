@@ -268,8 +268,8 @@ splitHsApps e = go e (top_ctxt 0 e) []
     -- See Note [Desugar OpApp in the typechecker]
     go e@(OpApp _ arg1 (L l op) arg2) _ args
       = ( (op, VACall op 0 l)
-        ,   mkEValArg (VACall op 1 generatedSrcSpan) arg1
-          : mkEValArg (VACall op 2 generatedSrcSpan) arg2
+        ,   mkEValArg (VACall op 1 rebindableSyntaxSrcSpan) arg1
+          : mkEValArg (VACall op 2 rebindableSyntaxSrcSpan) arg2
           : EWrap (EExpand e)
           : args )
 

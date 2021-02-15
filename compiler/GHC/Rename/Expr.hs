@@ -244,7 +244,7 @@ rnExpr (HsOverLabel _ v)
                   HsAppType noExtField (genLHsVar from_label) hs_ty_arg
                 , fvs ) }
   where
-    hs_ty_arg = mkEmptyWildCardBndrs $ wrapGenSpan $
+    hs_ty_arg = mkEmptyWildCardBndrs $ wrapRebindableSyntaxSpan $
                 HsTyLit noExtField (HsStrTy NoSourceText v)
 
 rnExpr (HsLit x lit@(HsString src s))
@@ -391,8 +391,8 @@ rnExpr (ExplicitList x exps)
     do { (from_list_n_name, fvs') <- lookupSyntaxName fromListNName
        ; let rn_list  = ExplicitList x exps'
              lit_n    = mkIntegralLit (length exps)
-             hs_lit   = wrapGenSpan (HsLit noExtField (HsInt noExtField lit_n))
-             exp_list = genHsApps from_list_n_name [hs_lit, wrapGenSpan rn_list]
+             hs_lit   = wrapRebindableSyntaxSpan (HsLit noExtField (HsInt noExtField lit_n))
+             exp_list = genHsApps from_list_n_name [hs_lit, wrapRebindableSyntaxSpan rn_list]
        ; return ( mkExpandedExpr rn_list exp_list
                 , fvs `plusFV` fvs') } }
 
@@ -574,7 +574,7 @@ rnSection section@(SectionL x expr op)
               ds_section
                 | postfix_ops = HsApp noExtField op' expr'
                 | otherwise   = genHsApps leftSectionName
-                                   [wrapGenSpan $ HsApp noExtField op' expr']
+                                   [wrapRebindableSyntaxSpan $ HsApp noExtField op' expr']
         ; return ( mkExpandedExpr rn_section ds_section
                  , fvs_op `plusFV` fvs_expr) }
 
@@ -2525,24 +2525,24 @@ genHsApps :: Name -> [LHsExpr GhcRn] -> HsExpr GhcRn
 genHsApps fun args = foldl genHsApp (genHsVar fun) args
 
 genHsApp :: HsExpr GhcRn -> LHsExpr GhcRn -> HsExpr GhcRn
-genHsApp fun arg = HsApp noExtField (wrapGenSpan fun) arg
+genHsApp fun arg = HsApp noExtField (wrapRebindableSyntaxSpan fun) arg
 
 genLHsVar :: Name -> LHsExpr GhcRn
-genLHsVar nm = wrapGenSpan $ genHsVar nm
+genLHsVar nm = wrapRebindableSyntaxSpan $ genHsVar nm
 
 genHsVar :: Name -> HsExpr GhcRn
-genHsVar nm = HsVar noExtField $ wrapGenSpan nm
+genHsVar nm = HsVar noExtField $ wrapRebindableSyntaxSpan nm
 
 genAppType :: HsExpr GhcRn -> HsType (NoGhcTc GhcRn) -> HsExpr GhcRn
-genAppType expr = HsAppType noExtField (wrapGenSpan expr) . mkEmptyWildCardBndrs . wrapGenSpan
+genAppType expr = HsAppType noExtField (wrapRebindableSyntaxSpan expr) . mkEmptyWildCardBndrs . wrapRebindableSyntaxSpan
 
 genHsTyLit :: FastString -> HsType GhcRn
 genHsTyLit = HsTyLit noExtField . HsStrTy NoSourceText
 
-wrapGenSpan :: a -> Located a
--- Wrap something in a "generatedSrcSpan"
+wrapRebindableSyntaxSpan :: a -> Located a
+-- Wrap something in a "rebindableSyntaxSrcSpan"
 -- See Note [Rebindable syntax and HsExpansion]
-wrapGenSpan x = L generatedSrcSpan x
+wrapRebindableSyntaxSpan x = L rebindableSyntaxSrcSpan x
 
 -- | Build a 'HsExpansion' out of an extension constructor,
 --   and the two components of the expansion: original and
@@ -2571,11 +2571,11 @@ mkSetField set_field a (L _ field) b =
 
 mkGet :: Name -> [LHsExpr GhcRn] -> Located FieldLabelString -> [LHsExpr GhcRn]
 mkGet get_field l@(r : _) (L _ field) =
-  wrapGenSpan (genHsApp (genHsVar get_field `genAppType` genHsTyLit field) r) : l
+  wrapRebindableSyntaxSpan (genHsApp (genHsVar get_field `genAppType` genHsTyLit field) r) : l
 mkGet _ [] _ = panic "mkGet : The impossible has happened!"
 
 mkSet :: Name -> LHsExpr GhcRn -> (Located FieldLabelString, LHsExpr GhcRn) -> LHsExpr GhcRn
-mkSet set_field acc (field, g) = wrapGenSpan (mkSetField set_field g field acc)
+mkSet set_field acc (field, g) = wrapRebindableSyntaxSpan (mkSetField set_field g field acc)
 
 -- mkProjection fields calculates a projection.
 -- e.g. .x = mkProjection [x] = getField @"x"
@@ -2584,7 +2584,7 @@ mkProjection :: Name -> Name -> [Located FieldLabelString] -> HsExpr GhcRn
 mkProjection getFieldName circName (field : fields) = foldl' f (proj field) fields
   where
     f :: HsExpr GhcRn -> Located FieldLabelString -> HsExpr GhcRn
-    f acc field = genHsApps circName $ map wrapGenSpan [proj field, acc]
+    f acc field = genHsApps circName $ map wrapRebindableSyntaxSpan [proj field, acc]
 
     proj :: Located FieldLabelString -> HsExpr GhcRn
     proj (L _ f) = genHsVar getFieldName `genAppType` genHsTyLit f
@@ -2610,7 +2610,7 @@ mkRecordDotUpd :: Name -> Name -> LHsExpr GhcRn -> [LHsRecUpdProj GhcRn] -> HsEx
 mkRecordDotUpd get_field set_field exp updates = foldl' fieldUpdate (unLoc exp) updates
   where
     fieldUpdate :: HsExpr GhcRn -> LHsRecUpdProj GhcRn -> HsExpr GhcRn
-    fieldUpdate acc lpu =  unLoc $ (mkProjUpdateSetField get_field set_field lpu) (wrapGenSpan acc)
+    fieldUpdate acc lpu =  unLoc $ (mkProjUpdateSetField get_field set_field lpu) (wrapRebindableSyntaxSpan acc)
 
 rnHsUpdProjs :: [LHsRecUpdProj GhcPs] -> RnM ([LHsRecUpdProj GhcRn], FreeVars)
 rnHsUpdProjs us = do

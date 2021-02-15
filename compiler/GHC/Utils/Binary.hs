@@ -1085,11 +1085,11 @@ instance Binary BufSpan where
 
 instance Binary UnhelpfulSpanReason where
   put_ bh r = case r of
-    UnhelpfulNoLocationInfo -> putByte bh 0
-    UnhelpfulWiredIn        -> putByte bh 1
-    UnhelpfulInteractive    -> putByte bh 2
-    UnhelpfulGenerated      -> putByte bh 3
-    UnhelpfulOther fs       -> putByte bh 4 >> put_ bh fs
+    UnhelpfulNoLocationInfo   -> putByte bh 0
+    UnhelpfulWiredIn          -> putByte bh 1
+    UnhelpfulInteractive      -> putByte bh 2
+    UnhelpfulRebindableSyntax -> putByte bh 3
+    UnhelpfulOther fs         -> putByte bh 4 >> put_ bh fs
 
   get bh = do
     h <- getByte bh
@@ -1097,7 +1097,7 @@ instance Binary UnhelpfulSpanReason where
       0 -> return UnhelpfulNoLocationInfo
       1 -> return UnhelpfulWiredIn
       2 -> return UnhelpfulInteractive
-      3 -> return UnhelpfulGenerated
+      3 -> return UnhelpfulRebindableSyntax
       _ -> UnhelpfulOther <$> get bh
 
 instance Binary SrcSpan where
