@@ -2244,9 +2244,9 @@ rebindIf
   -> HsExpr GhcRn  -- rebound if expression
 rebindIf ifteName p b1 b2 =
   let ifteOrig = HsIf noExtField p b1 b2
-      ifteFun  = L generatedSrcSpan (HsVar noExtField ifteName)
+      ifteFun  = L rebindableSyntaxSrcSpan (HsVar noExtField ifteName)
                  -- ifThenElse var
-      ifteApp  = mkHsAppsWith (\_ _ e -> L generatedSrcSpan e)
+      ifteApp  = mkHsAppsWith (\_ _ e -> L rebindableSyntaxSrcSpan e)
                               ifteFun
                               [p, b1, b2]
                  -- desugared_if_expr =
