@@ -361,7 +361,7 @@ data CtOrigin
                  }
 
   | KindEqOrigin
-      TcType (Maybe TcType)     -- A kind equality arising from unifying these two types
+      TcType TcType             -- A kind equality arising from unifying these two types
       CtOrigin                  -- originally arising from this
       (Maybe TypeOrKind)        -- the level of the eq this arises from
 
@@ -559,16 +559,15 @@ pprCtOrigin (FunDepOrigin2 pred1 orig1 pred2 loc2)
                , hang (text "instance" <+> quotes (ppr pred2))
                     2 (text "at" <+> ppr loc2) ])
 
-pprCtOrigin (KindEqOrigin t1 (Just t2) _ _)
-  = hang (ctoHerald <+> text "a kind equality arising from")
-       2 (sep [ppr t1, char '~', ppr t2])
-
 pprCtOrigin AssocFamPatOrigin
   = text "when matching a family LHS with its class instance head"
 
-pprCtOrigin (KindEqOrigin t1 Nothing _ _)
-  = hang (ctoHerald <+> text "a kind equality when matching")
-       2 (ppr t1)
+pprCtOrigin (TypeEqOrigin { uo_actual = t1, uo_expected =  t2, uo_visible = vis })
+  = text "a type equality" <> brackets (ppr vis) <+> sep [ppr t1, char '~', ppr t2]
+
+pprCtOrigin (KindEqOrigin t1 t2 _ _)
+  = hang (ctoHerald <+> text "a kind equality arising from")
+       2 (sep [ppr t1, char '~', ppr t2])
 
 pprCtOrigin (DerivOriginDC dc n _)
   = hang (ctoHerald <+> text "the" <+> speakNth n
@@ -641,7 +640,6 @@ pprCtO DefaultOrigin         = text "a 'default' declaration"
 pprCtO DoOrigin              = text "a do statement"
 pprCtO MCompOrigin           = text "a statement in a monad comprehension"
 pprCtO ProcOrigin            = text "a proc expression"
-pprCtO (TypeEqOrigin t1 t2 _ _)= text "a type equality" <+> sep [ppr t1, char '~', ppr t2]
 pprCtO AnnOrigin             = text "an annotation"
 pprCtO (ExprHoleOrigin occ)  = text "a use of" <+> quotes (ppr occ)
 pprCtO (TypeHoleOrigin occ)  = text "a use of wildcard" <+> quotes (ppr occ)
