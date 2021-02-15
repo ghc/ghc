@@ -23,3 +23,7 @@ test('CountParserDeps',
      compile_and_run,
      ['-package ghc'])
 test('LexNegLit', normal, compile_and_run, [''])
+test('RecordDotSyntax1', normal, compile_and_run, [''])
+test('RecordDotSyntax2', normal, compile_and_run, [''])
+test('RecordDotSyntax3', [extra_files(['RecordDotSyntaxA.hs'])], multimod_compile_and_run, ['RecordDotSyntax3', ''])
+test('RecordDotSyntax4', [extra_files(['RecordDotSyntaxA.hs'])], multimod_compile_and_run, ['RecordDotSyntax4', ''])
