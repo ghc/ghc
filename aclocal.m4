@@ -1906,7 +1906,7 @@ AC_DEFUN([FP_CURSES],
 
   AC_ARG_WITH([curses-libraries-stage0],
     [AC_HELP_STRING([--with-curses-libraries-stage0],
-       [directory containing curses lirbaries (for stage0: boot)])],
+       [directory containing build-platform curses libraries (for stage0 build)])],
        [CURSES_LIB_DIRS_STAGE0=$withval])
 
   AC_SUBST(CURSES_LIB_DIRS_STAGE0)
