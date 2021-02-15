@@ -109,16 +109,26 @@ import Data.Data
 
 -- | A unique, unambiguous name for something, containing information about where
 -- that thing originated.
-data Name = Name {
-                n_sort :: NameSort,     -- What sort of name it is
-                n_occ  :: !OccName,     -- Its occurrence name
-                n_uniq :: {-# UNPACK #-} !Unique,
-                n_loc  :: !SrcSpan      -- Definition site
-            }
+data Name = Name
+  { n_sort :: NameSort
+    -- ^ What sort of name it is
 
--- NOTE: we make the n_loc field strict to eliminate some potential
--- (and real!) space leaks, due to the fact that we don't look at
--- the SrcLoc in a Name all that often.
+  , n_occ  :: OccName
+    -- ^ Its occurrence name.
+    --
+    -- NOTE: kept lazy to allow known names to be known constructor applications
+    -- and to inline better. See Note [Fast comparison for built-in Names]
+
+  , n_uniq :: {-# UNPACK #-} !Unique
+    -- ^ Its unique.
+
+  , n_loc  :: !SrcSpan
+    -- ^ Definition site
+    --
+    -- NOTE: we make the n_loc field strict to eliminate some potential
+    -- (and real!) space leaks, due to the fact that we don't look at
+    -- the SrcLoc in a Name all that often.
+  }
 
 -- See Note [About the NameSorts]
 data NameSort
@@ -155,6 +165,36 @@ instance NFData NameSort where
 -- which have special syntactic forms.  They aren't in scope
 -- as such.
 data BuiltInSyntax = BuiltInSyntax | UserSyntax
+
+{-
+Note [Fast comparison for built-in Names]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this wired-in Name in GHC.Builtin.Names:
+
+   int8TyConName = tcQual gHC_INT  (fsLit "Int8")  int8TyConKey
+
+Ultimately this turns into something like:
+
+   int8TyConName = Name gHC_INT (mkOccName ..."Int8") int8TyConKey
+
+So a comparison like `x == int8TyConName` will turn into `getUnique x ==
+int8TyConKey`, nice and efficient.  But if the `n_occ` field is strict, that
+definition will look like:
+
+   int8TyCOnName = case (mkOccName..."Int8") of occ ->
+                   Name gHC_INT occ int8TyConKey
+
+and now the comparison will not optimise.  This matters even more when there are
+numerous comparisons (see #19386):
+
+if | tc == int8TyCon  -> ...
+   | tc == int16TyCon -> ...
+   ...etc...
+
+when we would like to get a single multi-branched case.
+
+TL;DR: we make the `n_occ` field lazy.
+-}
 
 {-
 Note [About the NameSorts]
@@ -401,6 +441,7 @@ mkDerivedInternalName derive_occ uniq (Name { n_occ = occ, n_loc = loc })
 
 -- | Create a name which definitely originates in the given module
 mkExternalName :: Unique -> Module -> OccName -> SrcSpan -> Name
+{-# INLINE mkExternalName #-}
 -- WATCH OUT! External Names should be in the Name Cache
 -- (see Note [The Name Cache] in GHC.Iface.Env), so don't just call mkExternalName
 -- with some fresh unique without populating the Name Cache
@@ -410,6 +451,7 @@ mkExternalName uniq mod occ loc
 
 -- | Create a name which is actually defined by the compiler itself
 mkWiredInName :: Module -> OccName -> Unique -> TyThing -> BuiltInSyntax -> Name
+{-# INLINE mkWiredInName #-}
 mkWiredInName mod occ uniq thing built_in
   = Name { n_uniq = uniq,
            n_sort = WiredIn mod thing built_in,
