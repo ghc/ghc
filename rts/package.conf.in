@@ -296,7 +296,7 @@ ld-options:
          , "-Wl,-search_paths_first"
 #endif
 
-#if defined(darwin_HOST_OS) && !defined(x86_64_HOST_ARCH)
+#if defined(darwin_HOST_OS) && !defined(x86_64_HOST_ARCH) && !defined(aarch64_HOST_ARCH)
          , "-read_only_relocs", "warning"
 #endif
 

@@ -1854,10 +1854,10 @@ linkBinary' staticLink dflags o_files dep_packages = do
                              not staticLink &&
                              (platformOS platform == OSDarwin) &&
                              case platformArch platform of
-                               ArchX86 -> True
-                               ArchX86_64 -> True
-                               ArchARM {} -> True
-                               ArchARM64  -> True
+                               ArchX86     -> True
+                               ArchX86_64  -> True
+                               ArchARM {}  -> True
+                               ArchAArch64 -> True
                                _ -> False
                           then ["-Wl,-no_compact_unwind"]
                           else [])
