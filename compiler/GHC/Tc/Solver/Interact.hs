@@ -465,11 +465,12 @@ both. (They probably started as [WD] and got split; this is relatively
 rare and it doesn't seem worth trying to put them back together again.)
 -}
 
-solveOneFromTheOther :: CtEvidence  -- Inert
-                     -> CtEvidence  -- WorkItem
+solveOneFromTheOther :: CtEvidence  -- Inert    (Dict or Irred)
+                     -> CtEvidence  -- WorkItem (same predicate as inert)
                      -> TcS InteractResult
 -- Precondition:
 -- * inert and work item represent evidence for the /same/ predicate
+-- * Both are CDictCan or CIrredCan
 --
 -- We can always solve one from the other: even if both are wanted,
 -- although we don't rewrite wanteds with wanteds, we can combine
@@ -499,8 +500,8 @@ solveOneFromTheOther ev_i ev_w
        -- Inert is Given or Wanted
   = case ev_i of
       CtWanted { ctev_nosh = WOnly }
-          | WDeriv <- nosh_w -> return KeepWork
-      _                      -> return KeepInert
+          | WDeriv <- nosh_w           -> return KeepWork
+      _                                -> return KeepInert
       -- Consider work  item [WD] C ty1 ty2
       --          inert item [W]  C ty1 ty2
       -- Then we must keep the work item.  But if the
@@ -511,7 +512,7 @@ solveOneFromTheOther ev_i ev_w
   -- From here on the work-item is Given
 
   | CtWanted { ctev_loc = loc_i } <- ev_i
-  , prohibitedSuperClassSolve (ctEvLoc ev_w) loc_i
+  , prohibitedSuperClassSolve loc_w loc_i
   = do { traceTcS "prohibitedClassSolve2" (ppr ev_i $$ ppr ev_w)
        ; return KeepInert }      -- Just discard the un-usable Given
                                  -- This never actually happens because
@@ -1439,49 +1440,107 @@ solving.
 **********************************************************************
 -}
 
-inertsCanDischarge :: InertCans -> CanEqLHS -> TcType -> CtFlavourRole
+{- Note [Combining equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have
+   Inert:     g1 :: a ~ t
+   Work item: g2 :: a ~ t
+
+Then we can simply solve g2 from g1, thus g2 := g1.  Easy!
+But it's not so simple:
+
+* If t is a type variable, the equalties might be oriented differently:
+      e.g. (g1 :: a~b) and (g2 :: b~a)
+  So we look both ways round.  Hence the SwapFlag result to
+  inertsCanDischarge.
+
+* We can only do g2 := g1 if g1 can discharge g2; that depends on
+  (a) the role and (b) the flavour.  E.g. a representational equality
+  cannot discharge a nominal one; a Wanted cannot discharge a Given.
+  The predicate is eqCanDischargeFR.
+
+* If the inert is [W] and the work-item is [WD] we don't want to
+  forget the [D] part; hence the Bool result of inertsCanDischarge.
+
+* Visibility. Suppose  S :: forall k. k -> Type, and consider unifying
+      S @Type (a::Type)  ~   S @(Type->Type) (b::Type->Type)
+  From the first argument we get (Type ~ Type->Type); from the second
+  argument we get (a ~ b) which in turn gives (Type ~ Type->Type).
+  See typecheck/should_fail/T16204c.
+
+  That first argument is invisible in the source program (aside from
+  visible type application), so we'd much prefer to get the error from
+  the second. We track visiblity in the uo_visible field of a TypeEqOrigin.
+  We use this to prioritise visible errors (see GHC.Tc.Errors.tryReporters,
+  the partition on isVisibleOrigin).
+
+  So when combining two otherwise-identical equalites, we want to
+  keep the visible one, and discharge the invisible one.  Hence the
+  call to strictly_more_visible.
+-}
+
+inertsCanDischarge :: InertCans -> Ct
                    -> Maybe ( CtEvidence  -- The evidence for the inert
                             , SwapFlag    -- Whether we need mkSymCo
                             , Bool)       -- True <=> keep a [D] version
                                           --          of the [WD] constraint
-inertsCanDischarge inerts lhs rhs fr
+inertsCanDischarge inerts (CEqCan { cc_lhs = lhs_w, cc_rhs = rhs_w
+                                  , cc_ev = ev_w, cc_eq_rel = eq_rel })
   | (ev_i : _) <- [ ev_i | CEqCan { cc_ev = ev_i, cc_rhs = rhs_i
                                   , cc_eq_rel = eq_rel }
-                             <- findEq inerts lhs
-                         , (ctEvFlavour ev_i, eq_rel) `eqCanDischargeFR` fr
-                         , rhs_i `tcEqType` rhs ]
+                             <- findEq inerts lhs_w
+                         , rhs_i `tcEqType` rhs_w
+                         , inert_beats_wanted ev_i eq_rel ]
   =  -- Inert:     a ~ ty
      -- Work item: a ~ ty
     Just (ev_i, NotSwapped, keep_deriv ev_i)
 
-  | Just rhs_lhs <- canEqLHS_maybe rhs
+  | Just rhs_lhs <- canEqLHS_maybe rhs_w
   , (ev_i : _) <- [ ev_i | CEqCan { cc_ev = ev_i, cc_rhs = rhs_i
                                   , cc_eq_rel = eq_rel }
                              <- findEq inerts rhs_lhs
-                         , (ctEvFlavour ev_i, eq_rel) `eqCanDischargeFR` fr
-                         , rhs_i `tcEqType` canEqLHSType lhs ]
+                         , rhs_i `tcEqType` canEqLHSType lhs_w
+                         , inert_beats_wanted ev_i eq_rel ]
   =  -- Inert:     a ~ b
      -- Work item: b ~ a
      Just (ev_i, IsSwapped, keep_deriv ev_i)
 
-  | otherwise
-  = Nothing
-
   where
+    loc_w  = ctEvLoc ev_w
+    flav_w = ctEvFlavour ev_w
+    fr_w   = (flav_w, eq_rel)
+
+    inert_beats_wanted ev_i eq_rel
+      = -- eqCanDischargeFR:    see second bullet of Note [Combining equalities]
+        -- strictly_more_visible: see last bullet of Note [Combining equalities]
+        fr_i`eqCanDischargeFR` fr_w
+        && not ((loc_w `strictly_more_visible` ctEvLoc ev_i)
+                 && (fr_w `eqCanDischargeFR` fr_i))
+      where
+        fr_i = (ctEvFlavour ev_i, eq_rel)
+
+    -- See Note [Combining equalities], third bullet
     keep_deriv ev_i
       | Wanted WOnly  <- ctEvFlavour ev_i  -- inert is [W]
-      , (Wanted WDeriv, _) <- fr           -- work item is [WD]
+      , Wanted WDeriv <- flav_w            -- work item is [WD]
       = True   -- Keep a derived version of the work item
       | otherwise
       = False  -- Work item is fully discharged
 
+    -- See Note [Combining equalities], final bullet
+    strictly_more_visible loc1 loc2
+       = not (isVisibleOrigin (ctLocOrigin loc2)) &&
+         isVisibleOrigin (ctLocOrigin loc1)
+
+inertsCanDischarge _ _ = Nothing
+
+
 interactEq :: InertCans -> Ct -> TcS (StopOrContinue Ct)
 interactEq inerts workItem@(CEqCan { cc_lhs = lhs
-                                         , cc_rhs = rhs
-                                         , cc_ev = ev
-                                         , cc_eq_rel = eq_rel })
-  | Just (ev_i, swapped, keep_deriv)
-       <- inertsCanDischarge inerts lhs rhs (ctEvFlavour ev, eq_rel)
+                                   , cc_rhs = rhs
+                                   , cc_ev = ev
+                                   , cc_eq_rel = eq_rel })
+  | Just (ev_i, swapped, keep_deriv) <- inertsCanDischarge inerts workItem
   = do { setEvBindIfWanted ev $
          evCoercion (maybeTcSymCo swapped $
                      tcDowngradeRole (eqRelRole eq_rel)

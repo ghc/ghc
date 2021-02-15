@@ -20,19 +20,15 @@ T15370.hs:20:13: warning: [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match type ‘S r’ with ‘()’
       Expected: ()
         Actual: S r
-    • In the expression: no + _
+    • In the first argument of ‘(+)’, namely ‘no’
+      In the expression: no + _
       In a case alternative: Refl -> no + _
-      In the expression: case mkRefl @x @y of { Refl -> no + _ }
     • Relevant bindings include
         no :: S r (bound at T15370.hs:18:7)
         right :: S r -> () (bound at T15370.hs:18:1)
 
 T15370.hs:20:18: warning: [-Wtyped-holes (in -Wdefault)]
-    • Found hole: _ :: S r
-      Where: ‘r’, ‘y’, ‘x’ are rigid type variables bound by
-               the type signature for:
-                 right :: forall x y (r :: Either x y). S r -> ()
-               at T15370.hs:(16,1)-(17,18)
+    • Found hole: _ :: ()
     • In the second argument of ‘(+)’, namely ‘_’
       In the expression: no + _
       In a case alternative: Refl -> no + _
@@ -40,3 +36,8 @@ T15370.hs:20:18: warning: [-Wtyped-holes (in -Wdefault)]
         no :: S r (bound at T15370.hs:18:7)
         right :: S r -> () (bound at T15370.hs:18:1)
       Constraints include y ~ x (from T15370.hs:20:5-8)
+      Valid hole fits include
+        () :: ()
+        mempty :: forall a. Monoid a => a
+        maxBound :: forall a. Bounded a => a
+        minBound :: forall a. Bounded a => a
