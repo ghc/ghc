@@ -48,6 +48,7 @@ import GHC.Tc.Utils.TcType  ( tcSplitTyConApp_maybe )
 import GHC.Builtin.Types    ( anyTypeOfKind )
 import GHC.Core.Coercion as Coercion
 import GHC.Core.Tidy     ( tidyRules )
+import GHC.Types.Demand ( Demand(..), SubDemand, topSubDmd, lubSubDmd )
 import GHC.Types.Id
 import GHC.Types.Id.Info ( RuleInfo( RuleInfo ) )
 import GHC.Types.Var
@@ -174,12 +175,12 @@ where pi' :: Lift Int# is the specialised version of pi.
 -}
 
 mkRule :: Module -> Bool -> Bool -> RuleName -> Activation
-       -> Name -> [CoreBndr] -> [CoreExpr] -> CoreExpr -> CoreRule
+       -> Name -> [CoreBndr] -> [CoreExpr] -> SubDemand -> CoreExpr -> CoreRule
 -- ^ Used to make 'CoreRule' for an 'Id' defined in the module being
 -- compiled. See also 'GHC.Core.CoreRule'
-mkRule this_mod is_auto is_local name act fn bndrs args rhs
+mkRule this_mod is_auto is_local name act fn bndrs args res_sd rhs
   = Rule { ru_name = name, ru_fn = fn, ru_act = act,
-           ru_bndrs = bndrs, ru_args = args,
+           ru_bndrs = bndrs, ru_args = args, ru_res_sd = res_sd,
            ru_rhs = rhs,
            ru_rough = roughTopNames args,
            ru_origin = this_mod,
@@ -378,13 +379,13 @@ pprRuleBase rules = pprUFM rules $ \rss ->
 -- context, returning the rule applied and the resulting expression if
 -- successful.
 lookupRule :: RuleOpts -> InScopeEnv
-           -> (Activation -> Bool)      -- When rule is active
-           -> Id -> [CoreExpr]
+           -> (Activation -> Bool)          -- When rule is active
+           -> Id -> [CoreExpr] -> SubDemand -- The given context
            -> [CoreRule] -> Maybe (CoreRule, CoreExpr)
 
 -- See Note [Extra args in rule matching]
 -- See comments on matchRule
-lookupRule opts in_scope is_active fn args rules
+lookupRule opts in_scope is_active fn args res_sd rules
   = -- pprTrace "matchRules" (ppr fn <+> ppr args $$ ppr rules ) $
     case go [] rules of
         []     -> Nothing
@@ -401,7 +402,7 @@ lookupRule opts in_scope is_active fn args rules
     go :: [(CoreRule,CoreExpr)] -> [CoreRule] -> [(CoreRule,CoreExpr)]
     go ms [] = ms
     go ms (r:rs)
-      | Just e <- matchRule opts in_scope is_active fn args' rough_args r
+      | Just e <- matchRule opts in_scope is_active fn args' rough_args res_sd r
       = go ((r,mkTicks ticks e):ms) rs
       | otherwise
       = -- pprTrace "match failed" (ppr r $$ ppr args $$
@@ -446,12 +447,20 @@ isMoreSpecific :: CoreRule -> CoreRule -> Bool
 --      {-# RULES "truncate/Double->Int" truncate = double2Int #-}
 --      double2Int :: Double -> Int
 --   We want the specific RULE to beat the built-in class-op rule
+--
+-- SG: It appears this function is a bit fuzzy wrt. to "equally
+-- specific". For equally specific BuiltinRules it returns False,
+-- but for equally specific Rules it returns True. So it's neither
+-- <, nor <=. I think that's a problem when findBest has to decide
+-- between two builtin rules: Neither is more specific than the
+-- other, thus we'll trigger the debug message.
 isMoreSpecific (BuiltinRule {}) _                = False
 isMoreSpecific (Rule {})        (BuiltinRule {}) = True
-isMoreSpecific (Rule { ru_bndrs = bndrs1, ru_args = args1 })
-               (Rule { ru_bndrs = bndrs2, ru_args = args2
+isMoreSpecific (Rule { ru_bndrs = bndrs1, ru_args = args1, ru_res_sd = sd1 })
+               (Rule { ru_bndrs = bndrs2, ru_args = args2, ru_res_sd = sd2
                      , ru_name = rule_name2, ru_rhs = rhs })
   = isJust (matchN (in_scope, id_unfolding_fun) rule_name2 bndrs2 args2 args1 rhs)
+  && matchResDemand sd2 sd1
   where
    id_unfolding_fun _ = NoUnfolding     -- Don't expand in templates
    in_scope = mkInScopeSet (mkVarSet bndrs1)
@@ -481,7 +490,7 @@ to lookupRule are the result of a lazy substitution
 
 ------------------------------------
 matchRule :: RuleOpts -> InScopeEnv -> (Activation -> Bool)
-          -> Id -> [CoreExpr] -> [Maybe Name]
+          -> Id -> [CoreExpr] -> [Maybe Name] -> SubDemand
           -> CoreRule -> Maybe CoreExpr
 
 -- If (matchRule rule args) returns Just (name,rhs)
@@ -506,18 +515,20 @@ matchRule :: RuleOpts -> InScopeEnv -> (Activation -> Bool)
 -- Any 'surplus' arguments in the input are simply put on the end
 -- of the output.
 
-matchRule opts rule_env _is_active fn args _rough_args
+matchRule opts rule_env _is_active fn args _rough_args _res_sd
           (BuiltinRule { ru_try = match_fn })
 -- Built-in rules can't be switched off, it seems
   = case match_fn opts rule_env fn args of
         Nothing   -> Nothing
         Just expr -> Just expr
 
-matchRule _ in_scope is_active _ args rough_args
+matchRule _ in_scope is_active _ args rough_args res_sd
           (Rule { ru_name = rule_name, ru_act = act, ru_rough = tpl_tops
-                , ru_bndrs = tpl_vars, ru_args = tpl_args, ru_rhs = rhs })
-  | not (is_active act)               = Nothing
-  | ruleCantMatch tpl_tops rough_args = Nothing
+                , ru_bndrs = tpl_vars, ru_args = tpl_args, ru_res_sd = tpl_sd
+                , ru_rhs = rhs })
+  | not (is_active act)                = Nothing
+  | ruleCantMatch tpl_tops rough_args  = Nothing
+  | not $ matchResDemand tpl_sd res_sd = Nothing
   | otherwise = matchN in_scope rule_name tpl_vars tpl_args args rhs
 
 
@@ -529,6 +540,11 @@ initRuleOpts dflags = RuleOpts
   , roExcessRationalPrecision = gopt Opt_ExcessPrecision dflags
   }
 
+leqSubDmd :: SubDemand -> SubDemand -> Bool
+leqSubDmd a b = (a `lubSubDmd` b) == b
+
+matchResDemand :: SubDemand -> SubDemand -> Bool
+matchResDemand tpl_sd sd = sd `leqSubDmd` tpl_sd
 
 ---------------------------------------
 matchN  :: InScopeEnv
@@ -1205,32 +1221,36 @@ ruleCheck _   (Var _)       = emptyBag
 ruleCheck _   (Lit _)       = emptyBag
 ruleCheck _   (Type _)      = emptyBag
 ruleCheck _   (Coercion _)  = emptyBag
-ruleCheck env (App f a)     = ruleCheckApp env (App f a) []
+ruleCheck env (App f a)     = ruleCheckApp env (App f a) [] topSubDmd
 ruleCheck env (Tick _ e)  = ruleCheck env e
 ruleCheck env (Cast e _)    = ruleCheck env e
 ruleCheck env (Let bd e)    = ruleCheckBind env bd `unionBags` ruleCheck env e
 ruleCheck env (Lam _ e)     = ruleCheck env e
+ruleCheck env (Case (App f a) b _ as)
+  | _ :* sd <- idDemandInfo b
+  = ruleCheckApp env (App f a) [] sd `unionBags`
+    unionManyBags [ruleCheck env r | Alt _ _ r <- as]
 ruleCheck env (Case e _ _ as) = ruleCheck env e `unionBags`
                                 unionManyBags [ruleCheck env r | Alt _ _ r <- as]
 
-ruleCheckApp :: RuleCheckEnv -> Expr CoreBndr -> [Arg CoreBndr] -> Bag SDoc
-ruleCheckApp env (App f a) as = ruleCheck env a `unionBags` ruleCheckApp env f (a:as)
-ruleCheckApp env (Var f) as   = ruleCheckFun env f as
-ruleCheckApp env other _      = ruleCheck env other
+ruleCheckApp :: RuleCheckEnv -> Expr CoreBndr -> [Arg CoreBndr] -> SubDemand -> Bag SDoc
+ruleCheckApp env (App f a) as res_sd = ruleCheck env a `unionBags` ruleCheckApp env f (a:as) res_sd
+ruleCheckApp env (Var f) as   res_sd = ruleCheckFun env f as res_sd
+ruleCheckApp env other _      _      = ruleCheck env other
 
-ruleCheckFun :: RuleCheckEnv -> Id -> [CoreExpr] -> Bag SDoc
+ruleCheckFun :: RuleCheckEnv -> Id -> [CoreExpr] -> SubDemand -> Bag SDoc
 -- Produce a report for all rules matching the predicate
 -- saying why it doesn't match the specified application
 
-ruleCheckFun env fn args
+ruleCheckFun env fn args res_sd
   | null name_match_rules = emptyBag
-  | otherwise             = unitBag (ruleAppCheck_help env fn args name_match_rules)
+  | otherwise             = unitBag (ruleAppCheck_help env fn args res_sd name_match_rules)
   where
     name_match_rules = filter match (rc_rules env fn)
     match rule = (rc_pattern env) `isPrefixOf` unpackFS (ruleName rule)
 
-ruleAppCheck_help :: RuleCheckEnv -> Id -> [CoreExpr] -> [CoreRule] -> SDoc
-ruleAppCheck_help env fn args rules
+ruleAppCheck_help :: RuleCheckEnv -> Id -> [CoreExpr] -> SubDemand -> [CoreRule] -> SDoc
+ruleAppCheck_help env fn args res_sd rules
   =     -- The rules match the pattern, so we want to print something
     vcat [text "Expression:" <+> ppr (mkApps (Var fn) args),
           vcat (map check_rule rules)]
@@ -1248,7 +1268,7 @@ ruleAppCheck_help env fn args rules
 
     rule_info opts rule
         | Just _ <- matchRule opts (emptyInScopeSet, rc_id_unf env)
-                              noBlackList fn args rough_args rule
+                              noBlackList fn args rough_args res_sd rule
         = text "matches (which is very peculiar!)"
 
     rule_info _ (BuiltinRule {}) = text "does not match"

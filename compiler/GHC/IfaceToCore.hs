@@ -80,6 +80,7 @@ import GHC.Data.FastString
 import GHC.Data.List.SetOps
 
 import GHC.Types.Annotations
+import GHC.Types.Demand ( topSubDmd )
 import GHC.Types.SourceFile
 import GHC.Types.SourceText
 import GHC.Types.Basic hiding ( SuccessFlag(..) )
@@ -1210,15 +1211,16 @@ tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bnd
         ; let mb_tcs = map ifTopFreeName args
         ; this_mod <- getIfModule
         ; return (Rule { ru_name = name, ru_fn = fn, ru_act = act,
-                          ru_bndrs = bndrs', ru_args = args',
-                          ru_rhs = occurAnalyseExpr rhs',
-                          ru_rough = mb_tcs,
-                          ru_origin = this_mod,
-                          ru_orphan = orph,
-                          ru_auto = auto,
-                          ru_local = False }) } -- An imported RULE is never for a local Id
-                                                -- or, even if it is (module loop, perhaps)
-                                                -- we'll just leave it in the non-local set
+                         ru_bndrs = bndrs', ru_args = args',
+                         ru_res_sd = topSubDmd,
+                         ru_rhs = occurAnalyseExpr rhs',
+                         ru_rough = mb_tcs,
+                         ru_origin = this_mod,
+                         ru_orphan = orph,
+                         ru_auto = auto,
+                         ru_local = False }) } -- An imported RULE is never for a local Id
+                                               -- or, even if it is (module loop, perhaps)
+                                               -- we'll just leave it in the non-local set
   where
         -- This function *must* mirror exactly what Rules.roughTopNames does
         -- We could have stored the ru_rough field in the iface file

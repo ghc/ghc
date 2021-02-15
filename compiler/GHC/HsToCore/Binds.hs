@@ -54,6 +54,7 @@ import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.Multiplicity
 import GHC.Builtin.Types ( naturalTy, typeSymbolKind, charTy )
+import GHC.Types.Demand ( topSubDmd )
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Var.Set
@@ -766,7 +767,7 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
 dsMkUserRule :: Module -> Bool -> RuleName -> Activation
        -> Name -> [CoreBndr] -> [CoreExpr] -> CoreExpr -> DsM CoreRule
 dsMkUserRule this_mod is_local name act fn bndrs args rhs = do
-    let rule = mkRule this_mod False is_local name act fn bndrs args rhs
+    let rule = mkRule this_mod False is_local name act fn bndrs args topSubDmd rhs
     dflags <- getDynFlags
     when (isOrphan (ru_orphan rule) && wopt Opt_WarnOrphans dflags) $
         warnDs (Reason Opt_WarnOrphans) (ruleOrphWarn rule)

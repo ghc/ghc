@@ -41,7 +41,7 @@ import GHC.Core.Opt.Monad ( Tick(..), SimplMode(..) )
 import GHC.Core
 import GHC.Builtin.Types.Prim( realWorldStatePrimTy )
 import GHC.Builtin.Names( runRWKey )
-import GHC.Types.Demand ( StrictSig(..), Demand, dmdTypeDepth, isStrUsedDmd
+import GHC.Types.Demand ( StrictSig(..), Demand(..), dmdTypeDepth, isStrUsedDmd
                         , mkClosedStrictSig, topDmd, seqDmd, isDeadEndDiv )
 import GHC.Types.Cpr    ( mkCprSig, botCpr )
 import GHC.Core.Ppr     ( pprCoreExpr )
@@ -2147,7 +2147,7 @@ tryRules env rules fn args call_cont
 
   | Just (rule, rule_rhs) <- lookupRule ropts (getUnfoldingInRuleMatch env)
                                         (activeRule (getMode env)) fn
-                                        (argInfoAppArgs args) rules
+                                        (argInfoAppArgs args) res_sd rules
   -- Fire a rule for the function
   = do { checkedTick (RuleFired (ruleName rule))
        ; let cont' = pushSimplifiedArgs zapped_env
@@ -2171,6 +2171,10 @@ tryRules env rules fn args call_cont
     ropts      = initRuleOpts dflags
     dflags     = seDynFlags env
     zapped_env = zapSubstEnv env  -- See Note [zapSubstEnv]
+
+    -- The result sub-demand that the call site puts on the app
+    _ :* res_sd | Select{sc_bndr=case_bndr} <- call_cont = idDemandInfo case_bndr
+                | otherwise                              = topDmd
 
     printRuleModule rule
       = parens (maybe (text "BUILTIN")

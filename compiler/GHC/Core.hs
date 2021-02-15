@@ -108,6 +108,7 @@ import GHC.Types.Var.Env( InScopeSet )
 import GHC.Types.Var
 import GHC.Core.Type
 import GHC.Core.Coercion
+import GHC.Types.Demand ( SubDemand )
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env( NameEnv, emptyNameEnv )
@@ -1351,6 +1352,9 @@ data CoreRule
         -- see comments with InstEnv.ClsInst( is_tvs, is_tys )
         ru_bndrs :: [CoreBndr],         -- ^ Variables quantified over
         ru_args  :: [CoreExpr],         -- ^ Left hand side arguments
+        ru_res_sd :: SubDemand,         -- ^ Applicable only if result of LHS is
+                                        -- evaluated at least with this demand.
+                                        -- 'topSubDmd' most of the time.
 
         -- And the right-hand side
         ru_rhs   :: CoreExpr,           -- ^ Right hand side of the rule
