@@ -227,9 +227,8 @@ compactAllocateBlockInternal(Capability            *cap,
         break;
 
     default:
-#if defined(DEBUG)
         ASSERT(!"code should not be reached");
-#else
+#if !defined(DEBUG)
         RTS_UNREACHABLE;
 #endif
     }

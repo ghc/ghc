@@ -1545,8 +1545,8 @@ releaseGCThreads (Capability *cap USED_IF_THREADS, bool idle_cap[])
     const uint32_t n_threads = n_capabilities;
     const uint32_t me = cap->no;
     uint32_t i;
-#if defined(DEBUG)
     uint32_t num_idle = 0;
+#if defined(ASSERTS_ENABLED)
     for(i=0; i < n_threads; ++i) {
         ASSERT(!(i==me && idle_cap[i]));
         if (idle_cap[i]) { ++num_idle;}
