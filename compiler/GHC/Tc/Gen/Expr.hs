@@ -129,7 +129,7 @@ tcPolyExprNC (L loc expr) res_ty
         -- the logic behind this location/context tweaking.
         set_loc_and_ctxt l e m = do
           inGenCode <- inRebindableSyntax <$> getLclEnv
-          if inGenCode && not (isGeneratedSrcSpan l)
+          if inGenCode && not (isRebindableSyntaxSrcSpan l)
             then setSrcSpan l $
                  addExprCtxt e m
             else setSrcSpan l m
@@ -963,7 +963,7 @@ tcExpr e@(HsRnBracketOut _ brack ps) res_ty = tcUntypedBracket e brack ps res_ty
 -- See Note [Rebindable syntax and HsExpansion].
 tcExpr (XExpr (HsExpanded a b)) t
   = fmap (XExpr . ExpansionExpr . HsExpanded a) $
-      setSrcSpan generatedSrcSpan (tcExpr b t)
+      setSrcSpan rebindableSyntaxSrcSpan (tcExpr b t)
 
 {-
 ************************************************************************
