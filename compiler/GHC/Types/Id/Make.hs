@@ -1029,6 +1029,7 @@ dataConSrcToImplBang dflags fam_envs arg_ty
   , let mb_co   = topNormaliseType_maybe fam_envs (scaledThing arg_ty)
                      -- Unwrap type families and newtypes
         arg_ty' = case mb_co of { Just (_,ty) -> scaledSet arg_ty ty; Nothing -> arg_ty }
+  , all (not . isNewTyCon . fst) (splitTyConApp_maybe $ scaledThing arg_ty')
   , isUnpackableType dflags fam_envs (scaledThing arg_ty')
   , doUnpacking dflags unpk_prag arg_ty'
   = case mb_co of
