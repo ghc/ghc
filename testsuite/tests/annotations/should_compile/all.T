@@ -4,6 +4,7 @@
 # now, just disable the profiling ways.
 test('ann01', [req_interp, omit_ways(prof_ways)], compile, ['-v0'])
 test('T14129', [req_interp, omit_ways(prof_ways)], compile, ['-v0'])
+test('T19374a', [req_interp, omit_ways(prof_ways)], compile, ['-v0'])
 
 """"
 Helpful things to C+P:
