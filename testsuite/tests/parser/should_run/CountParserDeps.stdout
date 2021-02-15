@@ -1,4 +1,4 @@
-Found 247 GHC.Parser module dependencies
+Found 255 GHC.Parser module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.Types
@@ -82,6 +82,8 @@ GHC.Driver.CmdLine
 GHC.Driver.Env
 GHC.Driver.Env.Types
 GHC.Driver.Errors
+GHC.Driver.Errors.Ppr
+GHC.Driver.Errors.Types
 GHC.Driver.Flags
 GHC.Driver.Hooks
 GHC.Driver.Monad
@@ -102,6 +104,8 @@ GHC.Hs.Lit
 GHC.Hs.Pat
 GHC.Hs.Type
 GHC.Hs.Utils
+GHC.HsToCore.Errors.Ppr
+GHC.HsToCore.Errors.Types
 GHC.Iface.Ext.Fields
 GHC.Iface.Recomp.Binary
 GHC.Iface.Syntax
@@ -111,6 +115,8 @@ GHC.Parser
 GHC.Parser.Annotation
 GHC.Parser.CharClass
 GHC.Parser.Errors
+GHC.Parser.Errors.Ppr
+GHC.Parser.Errors.Types
 GHC.Parser.Lexer
 GHC.Parser.PostProcess
 GHC.Parser.PostProcess.Haddock
@@ -144,6 +150,8 @@ GHC.SysTools.BaseDir
 GHC.SysTools.FileCleanup
 GHC.SysTools.Terminal
 GHC.Tc.Errors.Hole.FitTypes
+GHC.Tc.Errors.Ppr
+GHC.Tc.Errors.Types
 GHC.Tc.Types
 GHC.Tc.Types.Constraint
 GHC.Tc.Types.Evidence

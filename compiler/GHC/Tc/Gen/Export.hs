@@ -395,8 +395,8 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
              when (null gres) $
                   if isTyConName name
                   then when warnDodgyExports $
-                           addWarn (WarnReason Opt_WarnDodgyExports)
-                                   (dodgyExportWarn name)
+                           addDiagnostic (WarnReasonWithFlag Opt_WarnDodgyExports)
+                                         (dodgyExportWarn name)
                   else -- This occurs when you export T(..), but
                        -- only import T abstractly, or T is a synonym.
                        addErr (exportItemErr ie)

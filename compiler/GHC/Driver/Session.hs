@@ -22,7 +22,7 @@ module GHC.Driver.Session (
         -- * Dynamic flags and associated configuration types
         DumpFlag(..),
         GeneralFlag(..),
-        WarningFlag(..), WarnReason(..), ErrReason(..),
+        WarningFlag(..), DiagnosticReason(..),
         Language(..),
         PlatformConstants(..),
         FatalMessager, FlushOut(..), FlushErr(..),
@@ -246,6 +246,7 @@ import GHC.Utils.Misc
 import GHC.Utils.GlobalVars
 import GHC.Data.Maybe
 import GHC.Utils.Monad
+import GHC.Types.Error (DiagnosticReason(..))
 import GHC.Types.SrcLoc
 import GHC.Types.SafeHaskell
 import GHC.Types.Basic ( Alignment, alignmentOf, IntWithInf, treatZeroAsInf )
