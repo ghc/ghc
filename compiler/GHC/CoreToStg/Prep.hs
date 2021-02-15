@@ -806,9 +806,8 @@ cpeApp top_env expr
           : CpeApp arg
           : CpeApp s0
           : CpeApp k
-          : rest <- pprTrace "cpe_app keepAlive#" (ppr args) args
-        = do { pprTraceM "cpe_app(keepAlive#)" (ppr n)
-             ; y <- newVar result_ty
+          : rest <- args
+        = do { y <- newVar result_ty
              ; s2 <- newVar realWorldStatePrimTy
              ; -- beta reduce if possible
              ; (floats, k') <- case k of
@@ -818,7 +817,6 @@ cpeApp top_env expr
                    expr = Case k' y result_ty [Alt DEFAULT [] rhs]
                    rhs = let scrut = mkApps (Var touchId) [Type arg_rep, Type arg_ty, arg, Var realWorldPrimId]
                          in Case scrut s2 result_ty [Alt DEFAULT [] (Var y)]
-             ; pprTraceM "cpe_app(keepAlive)" (ppr expr)
              ; (floats', expr') <- cpeBody env expr
              ; return (floats `appendFloats` floats', expr')
              }
