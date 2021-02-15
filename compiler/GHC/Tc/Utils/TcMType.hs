@@ -137,7 +137,6 @@ import GHC.Types.Basic ( TypeOrKind(..) )
 
 import Control.Monad
 import GHC.Data.Maybe
-import Control.Arrow    ( second )
 import qualified Data.Semigroup as Semi
 
 {-
@@ -2516,13 +2515,11 @@ zonkTidyOrigin env orig@(TypeEqOrigin { uo_actual   = act
        ; (env2, exp') <- zonkTidyTcType env1 exp
        ; return ( env2, orig { uo_actual   = act'
                              , uo_expected = exp' }) }
-zonkTidyOrigin env (KindEqOrigin ty1 m_ty2 orig t_or_k)
-  = do { (env1, ty1')   <- zonkTidyTcType env  ty1
-       ; (env2, m_ty2') <- case m_ty2 of
-                             Just ty2 -> second Just <$> zonkTidyTcType env1 ty2
-                             Nothing  -> return (env1, Nothing)
-       ; (env3, orig')  <- zonkTidyOrigin env2 orig
-       ; return (env3, KindEqOrigin ty1' m_ty2' orig' t_or_k) }
+zonkTidyOrigin env (KindEqOrigin ty1 ty2 orig t_or_k)
+  = do { (env1, ty1')  <- zonkTidyTcType env  ty1
+       ; (env2, ty2')  <- zonkTidyTcType env1 ty2
+       ; (env3, orig') <- zonkTidyOrigin env2 orig
+       ; return (env3, KindEqOrigin ty1' ty2' orig' t_or_k) }
 zonkTidyOrigin env (FunDepOrigin1 p1 o1 l1 p2 o2 l2)
   = do { (env1, p1') <- zonkTidyTcType env  p1
        ; (env2, p2') <- zonkTidyTcType env1 p2

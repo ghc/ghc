@@ -1559,10 +1559,9 @@ instance Outputable TcEvDest where
 
 instance Outputable CtEvidence where
   ppr ev = ppr (ctEvFlavour ev)
-           <+> pp_ev
-           <+> braces (ppr (ctl_depth (ctEvLoc ev))) <> dcolon
-                  -- Show the sub-goal depth too
-           <+> ppr (ctEvPred ev)
+           <+> pp_ev <+> braces (ppr (ctl_depth (ctEvLoc ev)))
+                         -- Show the sub-goal depth too
+               <> dcolon <+> ppr (ctEvPred ev)
     where
       pp_ev = case ev of
              CtGiven { ctev_evar = v } -> ppr v
@@ -1860,7 +1859,7 @@ data CtLoc = CtLoc { ctl_origin :: CtOrigin
 mkKindLoc :: TcType -> TcType   -- original *types* being compared
           -> CtLoc -> CtLoc
 mkKindLoc s1 s2 loc = setCtLocOrigin (toKindLoc loc)
-                        (KindEqOrigin s1 (Just s2) (ctLocOrigin loc)
+                        (KindEqOrigin s1 s2 (ctLocOrigin loc)
                                       (ctLocTypeOrKind_maybe loc))
 
 -- | Take a CtLoc and moves it to the kind level

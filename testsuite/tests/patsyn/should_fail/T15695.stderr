@@ -33,12 +33,13 @@ T15695.hs:39:14: warning: [-Wdeferred-type-errors (in -Wdefault)]
         from' :: ApplyT (* -> * -> *) Either ctx -> NS (NP NA) '[ '[ 'VO]]
           (bound at T15695.hs:39:1)
 
-T15695.hs:40:26: warning: [-Wdeferred-type-errors (in -Wdefault)]
+T15695.hs:40:33: warning: [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match type: a0 : as0
                      with: '[]
-      Expected: NS (NP NA) '[ '[ 'VO]]
-        Actual: NS (NP NA) ('[ 'VO] : a0 : as0)
-    • In the expression: There (Here undefined)
+      Expected: NS (NP NA) '[]
+        Actual: NS (NP NA) (a0 : as0)
+    • In the first argument of ‘There’, namely ‘(Here undefined)’
+      In the expression: There (Here undefined)
       In an equation for ‘from'’:
           from' (ASSO (Right b)) = There (Here undefined)
     • Relevant bindings include

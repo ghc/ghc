@@ -1,10 +1,17 @@
 
-T10945.hs:7:4: error:
+T10945.hs:7:11: error:
     • Couldn't match type: [Dec]
                      with: Q [Dec]
-      Expected: Code Q DecsQ
-        Actual: Code Q [Dec]
-    • In the expression:
+      Expected: DecsQ
+        Actual: [Dec]
+    • In the first argument of ‘return’, namely
+        ‘[SigD
+            (mkName "m")
+            (ForallT
+               [PlainTV (mkName "a") SpecifiedSpec] []
+               (AppT (AppT ArrowT (VarT (mkName "a"))) (VarT (mkName "a")))),
+          FunD (mkName "m") [Clause [...] (NormalB (VarE (mkName "x"))) []]]’
+      In the expression:
         return
           [SigD
              (mkName "m")
@@ -20,11 +27,3 @@ T10945.hs:7:4: error:
                    [PlainTV (mkName "a") SpecifiedSpec] []
                    (AppT (AppT ArrowT (VarT (mkName "a"))) (VarT (mkName "a")))),
               FunD (mkName "m") [Clause [...] (NormalB (VarE (mkName "x"))) []]])
-      In the expression:
-        $$(return
-             [SigD
-                (mkName "m")
-                (ForallT
-                   [PlainTV (mkName "a") SpecifiedSpec] []
-                   (AppT (AppT ArrowT (VarT (mkName "a"))) (VarT (mkName "a")))),
-              FunD (mkName "m") [Clause ... (NormalB (VarE (mkName "x"))) []]])
