@@ -6,4 +6,4 @@ import qualified RecordDotSyntaxA as A
 
 main = do
   let bar = A.Foo {A.foo = 1}
-  print $ bar.foo -- Not 'bar.A.foo' (which is not supprted syntax)
+  print $ bar{A.foo = 2} -- Qualified labels ok in regular updates.

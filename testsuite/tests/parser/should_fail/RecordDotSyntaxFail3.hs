@@ -1,7 +1,7 @@
 {-# LANGUAGE AllowAmbiguousTypes, FunctionalDependencies, ScopedTypeVariables, PolyKinds, TypeApplications, DataKinds #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE RecordDotSyntax #-}
+{-# LANGUAGE OverloadedRecordSelection #-}
 
 class HasField x r a | x r -> a where
   hasField :: r -> (a -> r, a)

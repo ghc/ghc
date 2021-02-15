@@ -2844,10 +2844,12 @@ aexp    :: { ECP }
 
 aexp1   :: { ECP }
         : aexp1 '{' fbinds '}' { ECP $
-                                   getBit RecordDotSyntaxBit >>= \ dot ->
+                                   getBit OverloadedRecordSelectionBit >>= \ select ->
+                                   getBit OverloadedRecordUpdateBit >>= \ updates ->
+                                   getBit RebindableSyntaxBit >>= \ rebinds ->
                                    unECP $1 >>= \ $1 ->
                                    $3 >>= \ $3 ->
-                                   amms (mkHsRecordPV dot (comb2 $1 $>) (comb2 $2 $4) $1 (snd $3))
+                                   amms (mkHsRecordPV (RecordDotSyntaxOpts select updates rebinds) (comb2 $1 $>) (comb2 $2 $4) $1 (snd $3))
                                         (moc $2:mcc $4:(fst $3))
                                }
         | aexp2                { $1 }
@@ -2878,7 +2880,7 @@ aexp2   :: { ECP }
                                            amms (mkSumOrTuplePV (comb2 $1 $>) Boxed (snd $2))
                                                 ((mop $1:fst $2) ++ [mcp $3]) }
 
-        -- This case is only possible when 'RecordDotSyntax' is enabled.
+        -- This case is only possible when 'OverloadedRecordSelectionBit' is enabled.
         | '(' projection ')'            { ECP $
                                             let (loc, (anns, fIELDS)) = $2
                                                 span = combineSrcSpans (combineSrcSpans (getLoc $1) loc) (getLoc $3)

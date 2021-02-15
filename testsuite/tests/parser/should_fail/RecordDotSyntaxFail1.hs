@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordDotSyntax #-}
+{-# LANGUAGE OverloadedRecordSelection #-}
 
 no Foo { bar.baz = x } = undefined
   -- Syntax error: Field selector syntax doesn't participate

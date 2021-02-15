@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordDotSyntax #-}
+{-# LANGUAGE OverloadedRecordSelection #-}
 
 module Main where
 

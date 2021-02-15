@@ -790,7 +790,7 @@ data Token
   | ITpercent  -- Prefix (%) only, e.g. a %1 -> b
   | ITstar              IsUnicodeSyntax
   | ITdot
-  | ITproj Bool -- RecordDotSyntax
+  | ITproj Bool -- Extension: OverloadedRecordSelectionBit
 
   | ITbiglam                    -- GHC-extension symbols
 
@@ -1608,7 +1608,7 @@ varsym_prefix = sym $ \span exts s ->
      | s == fsLit "-" ->
          return ITprefixminus -- Only when LexicalNegation is on, otherwise we get ITminus
                               -- and don't hit this code path. See Note [Minus tokens]
-     | s == fsLit ".", RecordDotSyntaxBit `xtest` exts ->
+     | s == fsLit ".", OverloadedRecordSelectionBit `xtest` exts ->
          return (ITproj True) -- e.g. '(.x)'
      | s == fsLit "." -> return ITdot
      | s == fsLit "!" -> return ITbang
@@ -1633,7 +1633,7 @@ varsym_suffix = sym $ \span _ s ->
 varsym_tight_infix :: Action
 varsym_tight_infix = sym $ \span exts s ->
   if | s == fsLit "@" -> return ITat
-     | s == fsLit ".", RecordDotSyntaxBit `xtest` exts  -> return (ITproj False)
+     | s == fsLit ".", OverloadedRecordSelectionBit `xtest` exts  -> return (ITproj False)
      | s == fsLit "." -> return ITdot
      | otherwise ->
          do { addWarning Opt_WarnOperatorWhitespace $
@@ -1658,8 +1658,8 @@ sym con span buf len =
     Just (keyword, NormalSyntax, 0) -> do
       exts <- getExts
       if fs == fsLit "." &&
-         exts .&. (xbit RecordDotSyntaxBit) /= 0 &&
-         xtest RecordDotSyntaxBit exts
+         exts .&. (xbit OverloadedRecordSelectionBit) /= 0 &&
+         xtest OverloadedRecordSelectionBit exts
       then L span <$!> con span exts fs  -- Process by varsym_*.
       else return $ L span keyword
     Just (keyword, NormalSyntax, i) -> do
@@ -2668,7 +2668,9 @@ data ExtBits
   | LinearTypesBit
   | NoLexicalNegationBit   -- See Note [Why not LexicalNegationBit]
   | RecordPunsBit
-  | RecordDotSyntaxBit
+  | RebindableSyntaxBit
+  | OverloadedRecordSelectionBit
+  | OverloadedRecordUpdateBit
 
   -- Flags that are updated once parsing starts
   | InRulePragBit
@@ -2746,7 +2748,9 @@ mkParserOpts warningFlags extensionFlags
       .|. LinearTypesBit              `xoptBit` LangExt.LinearTypes
       .|. NoLexicalNegationBit        `xoptNotBit` LangExt.LexicalNegation -- See Note [Why not LexicalNegationBit]
       .|. RecordPunsBit               `xoptBit` LangExt.RecordPuns -- Enable testing via 'getBit RecordPunsBit' in the parser (RecordDotSyntax parsing uses that information).
-      .|. RecordDotSyntaxBit          `xoptBit` LangExt.RecordDotSyntax
+      .|. RebindableSyntaxBit         `xoptBit` LangExt.RebindableSyntax -- Enable testing via 'getBit RebindableSyntax' in the parser (RecordDotSyntax parsing uses that information).
+      .|. OverloadedRecordSelectionBit `xoptBit` LangExt.OverloadedRecordSelection  -- Enable testing via 'getBit OverloadedRecordSelectionBit' in the parser (RecordDotSyntax parsing uses that information).
+      .|. OverloadedRecordUpdateBit   `xoptBit` LangExt.OverloadedRecordUpdate  -- Enable testing via 'getBit OverloadedRecordUpdateBit' in the parser (RecordDotSyntax parsing uses that information).
     optBits =
           HaddockBit        `setBitIf` isHaddock
       .|. RawTokenStreamBit `setBitIf` rawTokStream
