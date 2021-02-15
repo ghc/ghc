@@ -1,0 +1,2 @@
+RecordDotSyntaxFail5.hs:17:11:
+ For this to work, both OverloadedRecordUpdate and RebindableSyntax must be enabled
