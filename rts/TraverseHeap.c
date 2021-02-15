@@ -3,7 +3,22 @@
  * (c) The GHC Team, 2001,2019,2020
  * Author: Sungwoo Park, Daniel Gröber
  *
- * Generalised profiling heap traversal.
+ * Note [Generalised profiling heap traversal]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ *
+ * This module provides a visitor interface for depth first traversal of the
+ * graph underlying the live data on the Haskell heap.
+ *
+ * The overall worklow goes like this:
+ *
+ * - One or more closures are pushed onto the "traversal stack" using
+ *   traversePushRoot(),
+ *
+ * - traverseWorkStack() runs callbacks for each reachable closure in depth
+ *   first order,
+ *
+ * - Callbacks may use traverseSetClosureData/traverseGetClosureData to store
+ *   per-closure to do their jobs.
  *
  * ---------------------------------------------------------------------------*/
 
