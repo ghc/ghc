@@ -313,7 +313,7 @@ checkProcessArgsResult flags
   = when (notNull flags) $
       liftIO $ throwIO $ mkSrcErr $ listToBag $ map mkMsg flags
     where mkMsg (L loc flag)
-              = mkPlainMsgEnvelope sevErrorNoReason loc $
+              = mkPlainMsgEnvelope ErrReason loc $
                   (text "unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+>
                    text flag)
 
@@ -348,7 +348,7 @@ unsupportedExtnError dflags loc unsup =
      suggestions = fuzzyMatch unsup supported
 
 
-optionsErrorMsgs :: [String] -> [Located String] -> FilePath -> Messages DecoratedSDoc
+optionsErrorMsgs :: [String] -> [Located String] -> FilePath -> Messages DecoratedMessage
 optionsErrorMsgs unhandled_flags flags_lines _filename
   = mkMessages $ listToBag (map mkMsg unhandled_flags_lines)
   where unhandled_flags_lines :: [Located String]
@@ -357,7 +357,7 @@ optionsErrorMsgs unhandled_flags flags_lines _filename
                                 , L l f' <- flags_lines
                                 , f == f' ]
         mkMsg (L flagSpan flag) =
-            mkPlainMsgEnvelope sevErrorNoReason flagSpan $
+            mkPlainMsgEnvelope ErrReason flagSpan $
                     text "unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+> text flag
 
 optionsParseError :: String -> SrcSpan -> a     -- #15053
@@ -370,4 +370,4 @@ optionsParseError str loc =
 
 throwErr :: SrcSpan -> SDoc -> a                -- #15053
 throwErr loc doc =
-  throw $ mkSrcErr $ unitBag $ mkPlainMsgEnvelope sevErrorNoReason loc doc
+  throw $ mkSrcErr $ unitBag $ mkPlainMsgEnvelope ErrReason loc doc

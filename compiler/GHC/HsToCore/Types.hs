@@ -9,6 +9,7 @@ module GHC.HsToCore.Types (
 import Data.IORef
 
 import GHC.Types.CostCentre.State
+import GHC.Types.Error
 import GHC.Types.Name.Env
 import GHC.Types.SrcLoc
 import GHC.Types.Var
@@ -18,7 +19,6 @@ import GHC.Tc.Types (TcRnIf, IfGblEnv, IfLclEnv, CompleteMatches)
 import GHC.HsToCore.Pmc.Types (Nablas)
 import GHC.Core (CoreExpr)
 import GHC.Core.FamInstEnv
-import GHC.Utils.Error
 import GHC.Utils.Outputable as Outputable
 import GHC.Unit.Module
 import GHC.Driver.Hooks (DsForeignsHook)
@@ -47,7 +47,7 @@ data DsGblEnv
                                           -- constructors are in scope during
                                           -- pattern-match satisfiability checking
   , ds_unqual  :: PrintUnqualified
-  , ds_msgs    :: IORef (Messages DecoratedSDoc) -- Warning messages
+  , ds_msgs    :: IORef (Messages DecoratedMessage) -- Diagnostic messages
   , ds_if_env  :: (IfGblEnv, IfLclEnv)    -- Used for looking up global,
                                           -- possibly-imported things
   , ds_complete_matches :: CompleteMatches

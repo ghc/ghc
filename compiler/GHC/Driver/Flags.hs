@@ -2,8 +2,6 @@ module GHC.Driver.Flags
    ( DumpFlag(..)
    , GeneralFlag(..)
    , WarningFlag(..)
-   , WarnReason (..)
-   , ErrReason (..)
    , Language(..)
    , optimisationFlags
    )
@@ -12,7 +10,6 @@ where
 import GHC.Prelude
 import GHC.Utils.Outputable
 import GHC.Data.EnumSet as EnumSet
-import GHC.Utils.Json
 
 -- | Debugging flags
 data DumpFlag
@@ -507,49 +504,6 @@ data WarningFlag =
    | Opt_WarnOperatorWhitespaceExtConflict  -- Since 9.2
    | Opt_WarnOperatorWhitespace             -- Since 9.2
    deriving (Eq, Show, Enum)
-
-{-
-Note [Warning Reasons]
-~~~~~~~~~~~~~~~~~~~~~~
-
-If we accept a fluid relationship between errors and warnings,
-it might make sense in the future have another type constructor
-like 'WarnDemotedFromError GeneralFlag' to witness the fact the
-diagnostic was born as an error but it has been demoted to a
-warning for example due to 'Opt_DeferTypeErrors'.
--}
-
--- | Used when outputting warnings: if a reason is given, it is
--- displayed. If a warning isn't controlled by a flag, this is made
--- explicit at the point of use. See also Note [Warning Reasons].
-data WarnReason
-  = NoWarnReason
-  -- | Warning was enabled with the flag
-  | WarnReason !WarningFlag
-  deriving (Eq, Show)
-
-data ErrReason
-  = NoErrReason
-  -- | Error was made out of a promoted warning because of -Werror=WarningFlag
-  | ErrPromotedFromWarning !WarningFlag
-  -- | Error was made out of a promoted warning because of -Werror
-  | ErrPromotedWithWError
-  deriving (Eq, Show)
-
-instance Outputable WarnReason where
-  ppr = text . show
-
-instance ToJson WarnReason where
-  json NoWarnReason = JSNull
-  json (WarnReason wf) = JSString (show wf)
-
-instance Outputable ErrReason where
-  ppr = text . show
-
-instance ToJson ErrReason where
-  json NoErrReason = JSNull
-  json (ErrPromotedFromWarning wf) = JSString (show wf)
-  json ErrPromotedWithWError       = JSString (show Opt_WarnIsError)
 
 data Language = Haskell98 | Haskell2010
    deriving (Eq, Enum, Show, Bounded)

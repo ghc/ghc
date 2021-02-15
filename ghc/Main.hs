@@ -23,7 +23,7 @@ import GHC.Driver.CmdLine
 import GHC.Driver.Env
 import GHC.Driver.Errors
 import GHC.Driver.Phases
-import GHC.Driver.Session hiding (WarnReason(..))
+import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Driver.Pipeline  ( oneShot, compileFile )
 import GHC.Driver.MakeFile  ( doMkDependHS )

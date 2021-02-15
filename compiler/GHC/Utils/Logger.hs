@@ -220,13 +220,13 @@ defaultLogAction dflags msg_class srcSpan msg
       MCInteractive    -> putStrSDoc msg
       MCInfo           -> printErrs msg
       MCFatal          -> printErrs msg
-      MCDiagnostic sev -> printDiagnostics sev
+      MCDiagnostic rea -> printDiagnostics rea
     where
       printOut   = defaultLogActionHPrintDoc  dflags False stdout
       printErrs  = defaultLogActionHPrintDoc  dflags False stderr
       putStrSDoc = defaultLogActionHPutStrDoc dflags False stdout
       -- Pretty print the warning flag, if any (#10752)
-      message sev = mkLocMessageAnn (flagMsg sev) msg_class srcSpan msg
+      message rea = mkLocMessageAnn (flagMsg rea) msg_class srcSpan msg
 
       printDiagnostics severity = do
         hPutChar stderr '\n'
@@ -243,17 +243,17 @@ defaultLogAction dflags msg_class srcSpan msg
         -- each unicode char.
 
       flagMsg = \case
-          SevWarning NoWarnReason -> Nothing
-          SevWarning (WarnReason wflag) -> do
+          GHC.Types.Error.WarnReason -> Nothing
+          (WarnReasonWithFlag wflag) -> do
             spec <- flagSpecOf wflag
             return ("-W" ++ flagSpecName spec ++ warnFlagGrp wflag)
-          SevError NoErrReason     -> Nothing
-          SevError (ErrPromotedFromWarning wflag) -> do
+          ErrReason     -> Nothing
+          (ErrReasonPromotedFromWarning wflag) -> do
               spec <- flagSpecOf wflag
               return $
                 "-W" ++ flagSpecName spec ++ warnFlagGrp wflag ++
                 ", -Werror=" ++ flagSpecName spec
-          SevError ErrPromotedWithWError -> return "-Werror"
+          ErrReasonPromotedWithWError -> return "-Werror"
 
       warnFlagGrp flag
           | gopt Opt_ShowWarnGroups dflags =

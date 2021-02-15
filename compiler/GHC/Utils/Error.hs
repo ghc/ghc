@@ -12,7 +12,7 @@
 module GHC.Utils.Error (
         -- * Basic types
         Validity(..), andValid, allValid, isValid, getInvalids, orValid,
-        Severity(..), sevWarnNoReason, sevErrorNoReason,
+        Severity(..), sevWarn, sevError,
 
         -- * Messages
         WarnMsg,
@@ -119,16 +119,16 @@ formatBulleted ctx (unDecorated -> docs)
     msgs    = filter (not . Outputable.isEmpty ctx) docs
     starred = (bullet<+>)
 
-pprMsgEnvelopeBagWithLoc :: Bag (MsgEnvelope DecoratedSDoc) -> [SDoc]
+pprMsgEnvelopeBagWithLoc :: Diagnostic e => Bag (MsgEnvelope e) -> [SDoc]
 pprMsgEnvelopeBagWithLoc bag = [ pprLocMsgEnvelope item | item <- sortMsgBag Nothing bag ]
 
-pprLocMsgEnvelope :: RenderableDiagnostic e => MsgEnvelope e -> SDoc
+pprLocMsgEnvelope :: Diagnostic e => MsgEnvelope e -> SDoc
 pprLocMsgEnvelope (MsgEnvelope { errMsgSpan      = s
                                , errMsgDiagnostic = e
-                               , errMsgSeverity  = sev
                                , errMsgContext   = unqual })
   = sdocWithContext $ \ctx ->
-    withErrStyle unqual $ mkLocMessage (MCDiagnostic sev) s (formatBulleted ctx $ renderDiagnostic e)
+    withErrStyle unqual $
+      mkLocMessage (MCDiagnostic $ diagnosticReason e) s (formatBulleted ctx $ diagnosticMessage e)
 
 sortMsgBag :: Maybe DynFlags -> Bag (MsgEnvelope e) -> [MsgEnvelope e]
 sortMsgBag dflags = maybeLimit . sortBy (cmp `on` errMsgSpan) . bagToList
@@ -169,11 +169,11 @@ ifVerbose dflags val act
 
 errorMsg :: Logger -> DynFlags -> SDoc -> IO ()
 errorMsg logger dflags msg
-   = putLogMsg logger dflags (MCDiagnostic sevErrorNoReason) noSrcSpan $ withPprStyle defaultErrStyle msg
+   = putLogMsg logger dflags (MCDiagnostic ErrReason) noSrcSpan $ withPprStyle defaultErrStyle msg
 
 warningMsg :: Logger -> DynFlags -> SDoc -> IO ()
 warningMsg logger dflags msg
-   = putLogMsg logger dflags (MCDiagnostic sevWarnNoReason) noSrcSpan $ withPprStyle defaultErrStyle msg
+   = putLogMsg logger dflags (MCDiagnostic WarnReason) noSrcSpan $ withPprStyle defaultErrStyle msg
 
 fatalErrorMsg :: Logger -> DynFlags -> SDoc -> IO ()
 fatalErrorMsg logger dflags msg =

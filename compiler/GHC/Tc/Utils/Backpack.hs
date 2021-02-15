@@ -23,6 +23,7 @@ import GHC.Driver.Env
 import GHC.Driver.Ppr
 
 import GHC.Types.Basic (TypeOrKind(..))
+import GHC.Types.Error ( DecoratedMessage )
 import GHC.Types.Fixity (defaultFixity)
 import GHC.Types.Fixity.Env
 import GHC.Types.TypeEnv
@@ -361,7 +362,7 @@ checkUnit (VirtUnit indef) = do
 -- an @hsig@ file.)
 tcRnCheckUnit ::
     HscEnv -> Unit ->
-    IO (Messages DecoratedSDoc, Maybe ())
+    IO (Messages DecoratedMessage, Maybe ())
 tcRnCheckUnit hsc_env uid =
    withTiming logger dflags
               (text "Check unit id" <+> ppr uid)
@@ -382,7 +383,7 @@ tcRnCheckUnit hsc_env uid =
 -- | Top-level driver for signature merging (run after typechecking
 -- an @hsig@ file).
 tcRnMergeSignatures :: HscEnv -> HsParsedModule -> TcGblEnv {- from local sig -} -> ModIface
-                    -> IO (Messages DecoratedSDoc, Maybe TcGblEnv)
+                    -> IO (Messages DecoratedMessage, Maybe TcGblEnv)
 tcRnMergeSignatures hsc_env hpm orig_tcg_env iface =
   withTiming logger dflags
              (text "Signature merging" <+> brackets (ppr this_mod))
@@ -914,7 +915,7 @@ mergeSignatures
 -- an @hsig@ file.)
 tcRnInstantiateSignature ::
     HscEnv -> Module -> RealSrcSpan ->
-    IO (Messages DecoratedSDoc, Maybe TcGblEnv)
+    IO (Messages DecoratedMessage, Maybe TcGblEnv)
 tcRnInstantiateSignature hsc_env this_mod real_loc =
    withTiming logger dflags
               (text "Signature instantiation"<+>brackets (ppr this_mod))

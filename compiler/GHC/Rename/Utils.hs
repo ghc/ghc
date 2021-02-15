@@ -167,9 +167,9 @@ checkShadowedOccs (global_env,local_env) get_loc_occ ns
                 -- we don't find any GREs that are in scope qualified-only
 
           complain []      = return ()
-          complain pp_locs = addWarnAt (WarnReason Opt_WarnNameShadowing)
-                                       loc
-                                       (shadowedNameWarn occ pp_locs)
+          complain pp_locs = addDiagnosticAt (WarnReasonWithFlag Opt_WarnNameShadowing)
+                                             loc
+                                             (shadowedNameWarn occ pp_locs)
 
     is_shadowed_gre :: GlobalRdrElt -> RnM Bool
         -- Returns False for record selectors that are shadowed, when
@@ -384,8 +384,8 @@ checkUnusedRecordWildcard loc fvs (Just dotdot_names) =
 warnRedundantRecordWildcard :: RnM ()
 warnRedundantRecordWildcard =
   whenWOptM Opt_WarnRedundantRecordWildcards
-            (addWarn (WarnReason Opt_WarnRedundantRecordWildcards)
-                     redundantWildcardWarning)
+            (addDiagnostic (WarnReasonWithFlag Opt_WarnRedundantRecordWildcards)
+                           redundantWildcardWarning)
 
 
 -- | Produce a warning when no variables bound by a `..` pattern are used.
@@ -473,7 +473,7 @@ reportable child
 
 addUnusedWarning :: WarningFlag -> OccName -> SrcSpan -> SDoc -> RnM ()
 addUnusedWarning flag occ span msg
-  = addWarnAt (WarnReason flag) span $
+  = addDiagnosticAt (WarnReasonWithFlag flag) span $
     sep [msg <> colon,
          nest 2 $ pprNonVarNameSpace (occNameSpace occ)
                         <+> quotes (ppr occ)]

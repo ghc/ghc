@@ -2763,7 +2763,7 @@ addMsg is_error env msgs msg
                           , isGoodSrcSpan span ] of
                []    -> noSrcSpan
                (s:_) -> s
-   mk_msg msg = mkLocMessage (MCDiagnostic sevWarnNoReason) msg_span
+   mk_msg msg = mkLocMessage (MCDiagnostic WarnReason) msg_span
                              (msg $$ context)
 
 addLoc :: LintLocInfo -> LintM a -> LintM a

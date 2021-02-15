@@ -2938,7 +2938,7 @@ failTcS, panicTcS  :: SDoc -> TcS a
 warnTcS   :: WarningFlag -> SDoc -> TcS ()
 addErrTcS :: SDoc -> TcS ()
 failTcS      = wrapTcS . TcM.failWith
-warnTcS flag = wrapTcS . TcM.addWarn (WarnReason flag)
+warnTcS flag = wrapTcS . TcM.addDiagnostic (WarnReasonWithFlag flag)
 addErrTcS    = wrapTcS . TcM.addErr
 panicTcS doc = pprPanic "GHC.Tc.Solver.Canonical" doc
 

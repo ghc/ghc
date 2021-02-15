@@ -310,7 +310,7 @@ import GHC.Driver.Phases   ( Phase(..), isHaskellSrcFilename
 import GHC.Driver.Env
 import GHC.Driver.Errors
 import GHC.Driver.CmdLine
-import GHC.Driver.Session hiding (WarnReason(..))
+import GHC.Driver.Session
 import qualified GHC.Driver.Session as Session
 import GHC.Driver.Backend
 import GHC.Driver.Config
@@ -392,6 +392,7 @@ import GHC.Types.Name.Env
 import GHC.Types.Name.Ppr
 import GHC.Types.TypeEnv
 import GHC.Types.SourceFile
+import GHC.Types.Error ( DecoratedMessage )
 
 import GHC.Unit
 import GHC.Unit.Env
@@ -898,7 +899,7 @@ checkNewInteractiveDynFlags logger dflags0 = do
   -- the REPL. See #12356.
   if xopt LangExt.StaticPointers dflags0
   then do liftIO $ printOrThrowWarnings logger dflags0 $ listToBag
-            [mkPlainMsgEnvelope (SevWarning Session.NoWarnReason) interactiveSrcSpan
+            [mkPlainMsgEnvelope Session.WarnReason interactiveSrcSpan
              $ text "StaticPointers is not supported in GHCi interactive expressions."]
           return $ xopt_unset dflags0 LangExt.StaticPointers
   else return dflags0
@@ -1482,7 +1483,7 @@ getNameToInstancesIndex :: GhcMonad m
                      -- if it is visible from at least one module in the list.
   -> Maybe [Module]  -- ^ modules to load. If this is not specified, we load
                      -- modules for everything that is in scope unqualified.
-  -> m (Messages DecoratedSDoc, Maybe (NameEnv ([ClsInst], [FamInst])))
+  -> m (Messages DecoratedMessage, Maybe (NameEnv ([ClsInst], [FamInst])))
 getNameToInstancesIndex visible_mods mods_to_load = do
   hsc_env <- getSession
   liftIO $ runTcInteractive hsc_env $

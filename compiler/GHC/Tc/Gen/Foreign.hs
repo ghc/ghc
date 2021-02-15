@@ -344,8 +344,8 @@ checkMissingAmpersand :: DynFlags -> [Type] -> Type -> TcM ()
 checkMissingAmpersand dflags arg_tys res_ty
   | null arg_tys && isFunPtrTy res_ty &&
     wopt Opt_WarnDodgyForeignImports dflags
-  = addWarn (WarnReason Opt_WarnDodgyForeignImports)
-        (text "possible missing & in foreign import of FunPtr")
+  = addDiagnosticTc (WarnReasonWithFlag Opt_WarnDodgyForeignImports)
+                    (text "possible missing & in foreign import of FunPtr")
   | otherwise
   = return ()
 
@@ -529,7 +529,7 @@ checkCConv StdCallConv  = do dflags <- getDynFlags
                                  then return StdCallConv
                                  else do -- This is a warning, not an error. see #3336
                                          when (wopt Opt_WarnUnsupportedCallingConventions dflags) $
-                                             addWarnTc (WarnReason Opt_WarnUnsupportedCallingConventions)
+                                             addDiagnosticTc (WarnReasonWithFlag Opt_WarnUnsupportedCallingConventions)
                                                  (text "the 'stdcall' calling convention is unsupported on this platform," $$ text "treating as ccall")
                                          return CCallConv
 checkCConv PrimCallConv = do addErrTc (text "The `prim' calling convention can only be used with `foreign import'")

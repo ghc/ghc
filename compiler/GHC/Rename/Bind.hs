@@ -488,7 +488,7 @@ rnBind _ bind@(PatBind { pat_lhs = pat
         -- See Note [Pattern bindings that bind no variables]
         ; whenWOptM Opt_WarnUnusedPatternBinds $
           when (null bndrs && not ok_nobind_pat) $
-          addWarn (WarnReason Opt_WarnUnusedPatternBinds) $
+          addDiagnostic (WarnReasonWithFlag Opt_WarnUnusedPatternBinds) $
           unusedPatBindWarn bind'
 
         ; fvs' `seq` -- See Note [Free-variable space leak]
@@ -1233,7 +1233,7 @@ rnGRHS' ctxt rnBody (GRHS _ guards rhs)
                                     rnBody rhs
 
         ; unless (pattern_guards_allowed || is_standard_guard guards')
-                 (addWarn NoWarnReason (nonStdGuardErr guards'))
+                 (addDiagnostic WarnReason (nonStdGuardErr guards'))
 
         ; return (GRHS noExtField guards' rhs', fvs) }
   where

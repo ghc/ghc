@@ -801,13 +801,13 @@ tryWarnMissingSpecs :: DynFlags -> [Id] -> Id -> [CallInfo] -> CoreM ()
 tryWarnMissingSpecs dflags callers fn calls_for_fn
   | wopt Opt_WarnMissedSpecs dflags
     && not (null callers)
-    && allCallersInlined                  = doWarn $ WarnReason Opt_WarnMissedSpecs
-  | wopt Opt_WarnAllMissedSpecs dflags    = doWarn $ WarnReason Opt_WarnAllMissedSpecs
+    && allCallersInlined                  = doWarn $ WarnReasonWithFlag Opt_WarnMissedSpecs
+  | wopt Opt_WarnAllMissedSpecs dflags    = doWarn $ WarnReasonWithFlag Opt_WarnAllMissedSpecs
   | otherwise                             = return ()
   where
     allCallersInlined = all (isAnyInlinePragma . idInlinePragma) callers
     doWarn reason =
-      warnMsg reason
+      diagnosticMsg reason
         (vcat [ hang (text ("Could not specialise imported function") <+> quotes (ppr fn))
                 2 (vcat [ text "when specialising" <+> quotes (ppr caller)
                         | caller <- callers])
