@@ -234,8 +234,11 @@ pp_err = \case
    PsErrPrecedenceOutOfRange i
       -> text "Precedence out of range: " <> int i
 
-   PsErrRecordDotSyntaxInvalid
-      -> text "Use of RecordDotSyntax `.' not valid."
+   PsErrOverloadedRecordSelectionInvalid
+      -> text "Use of OverloadedRecordSelection `.' not valid."
+
+   PsErrOverloadedRecordUpdateInvalid
+      -> text "For this to work, both OverloadedRecordUpdate and RebindableSyntax must be enabled"
 
    PsErrInvalidDataCon t
       -> hang (text "Cannot parse data constructor in a data/newtype declaration:") 2

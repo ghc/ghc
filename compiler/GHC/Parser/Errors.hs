@@ -153,8 +153,11 @@ data PsErrorDesc
    | PsErrPrecedenceOutOfRange !Int
       -- ^ Precedence out of range
 
-   | PsErrRecordDotSyntaxInvalid
-      -- ^ Invalid use of record-dot-syntax
+   | PsErrOverloadedRecordSelectionInvalid
+      -- ^ Invalid use of record dot syntax `.'
+
+   | PsErrOverloadedRecordUpdateInvalid
+      -- ^ Context requires `OverloadedRecordUpdate` and `RebindableSyntax`
 
    | PsErrInvalidDataCon !(HsType GhcPs)
       -- ^ Cannot parse data constructor in a data/newtype declaration

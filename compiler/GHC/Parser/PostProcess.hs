@@ -16,7 +16,7 @@
 -- Functions over HsSyn specialised to RdrName.
 
 module GHC.Parser.PostProcess (
-        mkRdrGetField, mkRdrProjection, isGetField, Fbind, -- RecordDot
+        mkRdrGetField, mkRdrProjection, isGetField, Fbind, RecordDotSyntaxOpts(..), -- RecordDot
         mkHsOpApp,
         mkHsIntegral, mkHsFractional, mkHsIsString,
         mkHsDo, mkSpliceDecl,
@@ -150,6 +150,14 @@ import Data.Data       ( dataTypeOf, fromConstr, dataTypeConstrs )
 import Data.Kind       ( Type )
 
 #include "HsVersions.h"
+
+-- 'mkHsRecordPV' requires this context.
+data RecordDotSyntaxOpts =
+  RecordDotSyntaxOpts  {
+      overloadedRecordSelection :: Bool -- Is `OverloadedRecordSelection` in effect?
+    , overloadedRecordUpdate :: Bool -- Is `OverloadedRecordUpdate` in effect?
+    , rebindableSyntax :: Bool -- Is `RebindableSyntax` in effect?
+    }
 
 {- **********************************************************************
 
@@ -1337,7 +1345,7 @@ class b ~ (Body b) GhcPs => DisambECP b where
   mkHsSplicePV :: Located (HsSplice GhcPs) -> PV (Located b)
   -- | Disambiguate "f { a = b, ... }" syntax (record construction and record updates)
   mkHsRecordPV ::
-    Bool -> -- Is RecordDotSyntax in effect?
+    RecordDotSyntaxOpts -> -- Is `RecordDotSyntax` in effect?
     SrcSpan ->
     SrcSpan ->
     Located b ->
@@ -1408,7 +1416,7 @@ instance DisambECP (HsCmd GhcPs) where
   type Body (HsCmd GhcPs) = HsCmd
   ecpFromCmd' = return
   ecpFromExp' (L l e) = cmdFail l (ppr e)
-  mkHsProjUpdatePV l _ _ = addFatalError $ PsError PsErrRecordDotSyntaxInvalid [] l
+  mkHsProjUpdatePV l _ _ = addFatalError $ PsError PsErrOverloadedRecordSelectionInvalid [] l
   mkHsLamPV l mg = return $ L l (HsCmdLam noExtField mg)
   mkHsLetPV l bs e = return $ L l (HsCmdLet noExtField bs e)
   type InfixOp (HsCmd GhcPs) = HsExpr GhcPs
@@ -1442,7 +1450,7 @@ instance DisambECP (HsCmd GhcPs) where
   mkHsRecordPV _ l _ a (fbinds, ddLoc) = do
     let (fs, ps) = partitionEithers fbinds
     if not (null ps)
-      then addFatalError $ PsError PsErrRecordDotSyntaxInvalid [] l
+      then addFatalError $ PsError PsErrOverloadedRecordSelectionInvalid [] l
       else cmdFail l $ ppr a <+> ppr (mk_rec_fields fs ddLoc)
   mkHsNegAppPV l a = cmdFail l (text "-" <> ppr a)
   mkHsSectionR_PV l op c = cmdFail l $
@@ -1499,8 +1507,8 @@ instance DisambECP (HsExpr GhcPs) where
   mkHsTySigPV l a sig = return $ L l (ExprWithTySig noExtField a (hsTypeToHsSigWcType sig))
   mkHsExplicitListPV l xs = return $ L l (ExplicitList noExtField xs)
   mkHsSplicePV sp = return $ mapLoc (HsSpliceE noExtField) sp
-  mkHsRecordPV dot l lrec a (fbinds, ddLoc) = do
-    r <- mkRecConstrOrUpdate dot a lrec (fbinds, ddLoc)
+  mkHsRecordPV opts l lrec a (fbinds, ddLoc) = do
+    r <- mkRecConstrOrUpdate opts a lrec (fbinds, ddLoc)
     checkRecordSyntax (L l r)
   mkHsNegAppPV l a = return $ L l (NegApp noExtField a noSyntaxExpr)
   mkHsSectionR_PV l op e = return $ L l (SectionR noExtField op e)
@@ -1528,7 +1536,7 @@ instance DisambECP (PatBuilder GhcPs) where
   ecpFromExp' (L l e)    = addFatalError $ PsError (PsErrArrowExprInPat e) [] l
   mkHsLamPV l _          = addFatalError $ PsError PsErrLambdaInPat [] l
   mkHsLetPV l _ _        = addFatalError $ PsError PsErrLetInPat [] l
-  mkHsProjUpdatePV l _ _ = addFatalError $ PsError PsErrRecordDotSyntaxInvalid [] l
+  mkHsProjUpdatePV l _ _ = addFatalError $ PsError PsErrOverloadedRecordSelectionInvalid [] l
   type InfixOp (PatBuilder GhcPs) = RdrName
   superInfixOp m = m
   mkHsOpAppPV l p1 op p2 = return $ L l $ PatBuilderOpApp p1 op p2
@@ -1557,7 +1565,7 @@ instance DisambECP (PatBuilder GhcPs) where
   mkHsRecordPV _ l _ a (fbinds, ddLoc) = do
     let (fs, ps) = partitionEithers fbinds
     if not (null ps)
-     then addFatalError $ PsError PsErrRecordDotSyntaxInvalid [] l
+     then addFatalError $ PsError PsErrOverloadedRecordSelectionInvalid [] l
      else do
        r <- mkPatRec a (mk_rec_fields fs ddLoc)
        checkRecordSyntax (L l r)
@@ -2156,7 +2164,7 @@ checkPrecP (L l (_,i)) (L _ ol)
                                    , getRdrName unrestrictedFunTyCon ]
 
 mkRecConstrOrUpdate
-        :: Bool
+        :: RecordDotSyntaxOpts
         -> LHsExpr GhcPs
         -> SrcSpan
         -> ([Fbind (HsExpr GhcPs)], Maybe SrcSpan)
@@ -2166,37 +2174,60 @@ mkRecConstrOrUpdate _ (L l (HsVar _ (L _ c))) _lrec (fbinds,dd)
   = do
       let (fs, ps) = partitionEithers fbinds
       if not (null ps)
-        then addFatalError $ PsError PsErrRecordDotSyntaxInvalid [] (getLoc (head ps))
+        then addFatalError $ PsError PsErrOverloadedRecordSelectionInvalid [] (getLoc (head ps))
         else return (mkRdrRecordCon (L l c) (mk_rec_fields fs dd))
-mkRecConstrOrUpdate dot exp _ (fs,dd)
+mkRecConstrOrUpdate opts exp _ (fs,dd)
   | Just dd_loc <- dd = addFatalError $ PsError PsErrDotsInRecordUpdate [] dd_loc
-  | otherwise = mkRdrRecordUpd dot exp fs
+  | otherwise = mkRdrRecordUpd opts exp fs
 
-mkRdrRecordUpd :: Bool -> LHsExpr GhcPs -> [Fbind (HsExpr GhcPs)] -> PV (HsExpr GhcPs)
-mkRdrRecordUpd dot exp@(L _ _) fbinds = do
-  let fs' = map (fmap mk_rec_upd_field) (lefts fbinds)
-  if not dot
-    then
+mkRdrRecordUpd :: RecordDotSyntaxOpts -> LHsExpr GhcPs -> [Fbind (HsExpr GhcPs)] -> PV (HsExpr GhcPs)
+mkRdrRecordUpd opts exp@(L loc _) fbinds = do
+  let overloaded_update = overloadedRecordUpdate opts
+      rebindable_syntax = rebindableSyntax opts
+  let (fs, ps) = partitionEithers fbinds
+      fs' = map (fmap mk_rec_upd_field) fs
+
+  case overloaded_update of
+    False | not $ null ps ->
+      -- There's a '.' in an update and OverloadedRecordUpdate isn't
+      -- enabled.
+      addFatalError $ PsError PsErrOverloadedRecordUpdateInvalid [] loc
+      -- Error: For this to work, both OverloadedRecordUpdate and
+      -- RebindableSyntax must be enabled.
+    False ->
+      -- This is just a regular record update.
       return RecordUpd {
         rupd_ext = noExtField
-      , rupd_dot = dot
+      , rupd_dot = False
       , rupd_expr = exp
       , rupd_flds = fs'
-      , rupd_upds = []
-    }
-    else do
-      let qualifiedFields = [ L l lbl | L _ (HsRecField (L l lbl) _ _) <- fs', isQualLbl lbl ]
-      if not $ null qualifiedFields -- RecordDotSyntax doesn't support qualified fields right now.
-        then
-          addFatalError $ PsError PsErrRecordDotSyntaxInvalid [] (getLoc (head qualifiedFields))
-        else
-          return RecordUpd {
-            rupd_ext = noExtField
-          , rupd_dot = dot
-          , rupd_expr = exp
-          , rupd_flds = []
-          , rupd_upds = toProjUpdates fbinds
-        }
+      , rupd_upds = [] }
+    True ->
+      case rebindable_syntax of
+        False ->
+            -- For the time being we don't support
+            -- OverloadedRecordUpdate without RebindableSyntax (no
+            -- built-in 'GHC.Records.setField' available yet).
+            addFatalError $ PsError PsErrOverloadedRecordUpdateInvalid [] loc
+            -- Error: For this to work, both OverloadedRecordUpdate and
+            -- RebindableSyntax must be enabled.
+        True -> do
+            let qualifiedFields =
+                  [ L l lbl | L _ (HsRecField (L l lbl) _ _) <- fs'
+                            , isQualLbl lbl ]
+            if not $ null qualifiedFields
+            then
+              -- RecordDotSyntax doesn't support qualified fields.
+              addFatalError $ PsError PsErrOverloadedRecordSelectionInvalid [] (getLoc (head qualifiedFields))
+              -- Error: Use of OverloadedRecordSelection `.' not valid.
+            else
+              -- This is a RecordDotSyntax update.
+              return RecordUpd {
+                  rupd_ext = noExtField
+                , rupd_dot = True
+                , rupd_expr = exp
+                , rupd_flds = []
+                , rupd_upds = toProjUpdates fbinds }
   where
     isQualLbl:: AmbiguousFieldOcc GhcPs -> Bool
     isQualLbl = \case

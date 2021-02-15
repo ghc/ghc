@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordDotSyntax #-}
+{-# LANGUAGE OverloadedRecordSelection, OverloadedRecordUpdate #-}
 {-# LANGUAGE NoRebindableSyntax #-}
 
 data Foo = Foo { foo :: Bar } deriving (Show, Eq)

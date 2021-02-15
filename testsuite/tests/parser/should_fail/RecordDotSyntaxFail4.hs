@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordDotSyntax #-}
+{-# LANGUAGE OverloadedRecordSelection #-}
 
 data Foo = Foo { foo :: Int }
 

@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordDotSyntax #-}
+{-# LANGUAGE OverloadedRecordSelection #-}
 {-# LANGUAGE NoRebindableSyntax #-}
 
 data Foo = Foo { foo :: Bar } deriving (Show, Eq)
@@ -27,3 +27,6 @@ main = do
   --
   -- We don't support these (in the case Rebindable Syntax is off) yet
   -- (waiting on HasField support).
+  --
+  -- Regular updates are fine though!
+  print $ a{foo=(foo a){bar = (bar (foo a)){baz = (baz (bar (foo a))){quux = quux (baz (bar (foo a))) + 1}}}}
