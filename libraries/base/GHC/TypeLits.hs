@@ -31,7 +31,7 @@ working with type-level data will be defined in a separate library.
 
 module GHC.TypeLits
   ( -- * Kinds
-    Natural, Nat, Symbol  -- Symbol is declared in GHC.Types in package ghc-prim
+    N.Natural, Nat, Symbol  -- Symbol is declared in GHC.Types in package ghc-prim
 
     -- * Linking type and value level
   , N.KnownNat, natVal, natVal'
@@ -58,7 +58,6 @@ module GHC.TypeLits
   ) where
 
 import GHC.Base(Eq(..), Ord(..), Ordering(..), String, otherwise)
-import GHC.Types(Symbol, Char)
 import GHC.Num(Integer, fromInteger)
 import GHC.Show(Show(..))
 import GHC.Read(Read(..))
@@ -67,10 +66,10 @@ import GHC.Prim(magicDict, Proxy#)
 import Data.Maybe(Maybe(..))
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality((:~:)(Refl))
-import Data.Type.Ord(Compare, OrderingI(..))
+import Data.Type.Ord(OrderingI(..))
 import Unsafe.Coerce(unsafeCoerce)
 
-import GHC.TypeNats (Natural, Nat, KnownNat)
+import GHC.TypeLits.Internal
 import qualified GHC.TypeNats as N
 
 --------------------------------------------------------------------------------
@@ -83,7 +82,7 @@ class KnownSymbol (n :: Symbol) where
   symbolSing :: SSymbol n
 
 -- | @since 4.7.0.0
-natVal :: forall n proxy. KnownNat n => proxy n -> Integer
+natVal :: forall n proxy. N.KnownNat n => proxy n -> Integer
 natVal p = toInteger (N.natVal p)
 
 -- | @since 4.7.0.0
@@ -92,7 +91,7 @@ symbolVal _ = case symbolSing :: SSymbol n of
                 SSymbol x -> x
 
 -- | @since 4.8.0.0
-natVal' :: forall n. KnownNat n => Proxy# n -> Integer
+natVal' :: forall n. N.KnownNat n => Proxy# n -> Integer
 natVal' p = toInteger (N.natVal' p)
 
 -- | @since 4.8.0.0
@@ -174,11 +173,6 @@ instance Read SomeChar where
 
 --------------------------------------------------------------------------------
 
--- | Comparison of type-level symbols, as a function.
---
--- @since 4.7.0.0
-type family CmpSymbol (m :: Symbol) (n :: Symbol) :: Ordering
-
 -- | Concatenation of type-level symbols.
 --
 -- @since 4.10.0.0
@@ -234,11 +228,6 @@ type family TypeError (a :: ErrorMessage) :: b where
 
 -- Char-related type families
 
--- | Comparison of type-level characters.
---
--- @since 4.16.0.0
-type family CmpChar (a :: Char) (b :: Char) :: Ordering
-
 -- | Extending a type-level symbol with a type-level character
 --
 -- @since 4.16.0.0
@@ -273,8 +262,6 @@ sameChar x y
   | charVal x == charVal y  = Just (unsafeCoerce Refl)
   | otherwise                = Nothing
 
-type instance Compare (a :: Symbol) b = CmpSymbol a b
-
 -- | Like 'sameSymbol', but if the symbols aren't equal, this additionally
 -- provides proof of LT or GT.
 -- @since 4.16.0.0
@@ -287,8 +274,6 @@ cmpSymbol x y = case compare (symbolVal x) (symbolVal y) of
     Refl -> LTI
   GT -> case unsafeCoerce Refl :: (CmpSymbol a b :~: 'GT) of
     Refl -> GTI
-
-type instance Compare (a :: Char) b = CmpChar a b
 
 -- | Like 'sameChar', but if the Chars aren't equal, this additionally
 -- provides proof of LT or GT.

@@ -47,17 +47,11 @@ import GHC.Prim(magicDict, Proxy#)
 import Data.Maybe(Maybe(..))
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality((:~:)(Refl))
-import Data.Type.Ord(Compare, OrderingI(..), type (<=), type (<=?))
+import Data.Type.Ord(OrderingI(..), type (<=), type (<=?))
 import Unsafe.Coerce(unsafeCoerce)
 
+import GHC.TypeNats.Internal
 
--- | A type synonym for 'Natural'.
---
--- Prevously, this was an opaque data type, but it was changed to a type synonym
--- @since @base-4.15.0.0@.
-
-type Nat = Natural
---------------------------------------------------------------------------------
 
 -- | This class gives the integer associated with a type-level natural.
 -- There are instances of the class for every concrete literal: 0, 1, 2, etc.
@@ -169,11 +163,6 @@ infixl 6 +, -
 infixl 7 *, `Div`, `Mod`
 infixr 8 ^
 
--- | Comparison of type-level naturals, as a function.
---
--- @since 4.7.0.0
-type family CmpNat    (m :: Nat)    (n :: Nat)    :: Ordering
-
 -- | Addition of type-level naturals.
 --
 -- @since 4.7.0.0
@@ -223,8 +212,6 @@ sameNat :: (KnownNat a, KnownNat b) =>
 sameNat x y
   | natVal x == natVal y = Just (unsafeCoerce Refl)
   | otherwise            = Nothing
-
-type instance Compare (a :: Nat) b = CmpNat  a b
 
 -- | Like 'sameNat', but if the numbers aren't equal, this additionally
 -- provides proof of LT or GT.
