@@ -29,7 +29,9 @@ def get_cpu_features():
         return flags
 
     elif config.os == 'darwin':
-        out = subprocess.check_output(['sysctl', 'hw']).decode('UTF-8')
+        # we hardcode the sysctl path, otherwise we rely on /usr/sbin being in
+        # path.
+        out = subprocess.check_output(['/usr/sbin/sysctl', 'hw']).decode('UTF-8')
         features = set()
         def check_feature(darwin_name, our_name=None):
             if re.search(r'hw\.optional.%s:\s*1' % darwin_name, out) is not None:
@@ -66,4 +68,3 @@ if __name__ == '__main__':
     import sys
     config.os = sys.argv[1]
     print(get_cpu_features())
-
