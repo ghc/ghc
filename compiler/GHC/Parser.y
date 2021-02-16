@@ -2786,6 +2786,11 @@ aexp    :: { ECP }
                                      :mj AnnElse $7
                                      :(map (\l -> mj AnnSemi l) (fst $3))
                                     ++(map (\l -> mj AnnSemi l) (fst $6))) }
+        | 'if' exp optSemi 'then' exp optSemi 'else' error        {% hintParsingErrorWithContext $7 "parse error in else clause" }
+        | 'if' exp optSemi 'then' exp optSemi error        {% hintParsingErrorWithContext $4 "Missing else clause" }
+        | 'if' exp optSemi 'then' error        {% hintParsingErrorWithContext $4 "error in then clause" }
+        | 'if' exp optSemi error        {% hintParsingErrorWithContext $1 "missing then clause" }
+        | 'if' error        {% hintParsingErrorWithContext $1 "error in if condition" }
         | 'if' ifgdpats                 {% hintMultiWayIf (getLoc $1) >>= \_ ->
                                            fmap ecpFromExp $
                                            ams (sLL $1 $> $ HsMultiIf noExtField
