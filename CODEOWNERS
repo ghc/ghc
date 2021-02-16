@@ -15,6 +15,19 @@
 /rts/linker/                      @angerman @Phyx @simonmar
 /includes/                        @bgamari @simonmar @osa1
 
+[RTS heap profiling]
+/docs/users_guide/profiling.rst   @DanielG
+/includes/rts/ProfHeap.h          @DanielG
+/includes/rts/TraverseHeap.h      @DanielG
+/includes/rts/storage/ClosureMacros.h @DanielG
+/rts/LdvProfile*                  @DanielG
+/rts/ProfHeap*                    @DanielG
+/rts/Retainer*                    @DanielG
+/rts/TraverseHeap*                @DanielG
+/rts/sm/GC.c                      @DanielG
+/rts/sm/Storage*                  @DanielG
+/testsuite/tests/profiling/should_run/TraverseHeap* @DanielG
+
 [The compiler]
 /compiler/parser/                  @int-index
 /compiler/GHC/Hs/                  @simonpj @rae
