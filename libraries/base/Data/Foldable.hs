@@ -1878,7 +1878,7 @@ make these functions only use O(1) stack space. As of base 4.16, we have switche
 --     `all`     :: Foldable t => (a -> Bool) -> t a -> Bool
 --     @
 --
--- * Many instances of '<|>' (e.g. the 'Maybe' instance) are conditionally
+-- * Many instances of @('<|>')@ (e.g. the 'Maybe' instance) are conditionally
 --   lazy, and use or don't use their second argument depending on the value
 --   of the first.  These are used with the folds below, which terminate as
 --   early as possible, but otherwise generally keep going.  Some instances
@@ -1891,7 +1891,7 @@ make these functions only use O(1) stack space. As of base 4.16, we have switche
 --     `msum` :: (Foldable t, MonadPlus m) => t (m a) -> m a
 --     @
 --
--- * Likewise, the '*>' operator in some `Applicative` functors, and '>>'
+-- * Likewise, the @('*>')@ operator in some `Applicative` functors, and @('>>')@
 --   in some monads are conditionally lazy and can /short-circuit/ a chain of
 --   computations.  The below folds will terminate as early as possible, but
 --   even infinite loops can be productive here, when evaluated solely for
