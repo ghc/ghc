@@ -149,7 +149,7 @@ class Foldable t where
     -- | Given a structure with elements whose type is a 'Monoid', combine them
     -- via the monoid's @('<>')@ operator.  This fold is right-associative and
     -- lazy in the accumulator.  When you need a strict left-associative fold,
-    -- use `foldMap'` instead, with 'id' as the map.
+    -- use 'foldMap'' instead, with 'id' as the map.
     --
     -- ==== __Examples__
     --
@@ -179,7 +179,7 @@ class Foldable t where
 
     -- | Map each element of the structure into a monoid, and combine the
     -- results with @('<>')@.  This fold is right-associative and lazy in the
-    -- accumulator.  For strict left-associative folds consider `foldMap'`
+    -- accumulator.  For strict left-associative folds consider 'foldMap''
     -- instead.
     --
     -- ==== __Examples__
@@ -326,7 +326,7 @@ class Foldable t where
     -- 'foldl' will diverge if given an infinite list.
     --
     -- If you want an efficient strict left-fold, you probably want to use
-    -- `foldl'` instead of 'foldl'.  The reason for this is that the latter
+    -- 'foldl'' instead of 'foldl'.  The reason for this is that the latter
     -- does not force the /inner/ results (e.g. @z \`f\` x1@ in the above
     -- example) before applying them to the operator (e.g. to @(\`f\` x2)@).
     -- This results in a thunk chain \(\mathcal{O}(n)\) elements long, which
@@ -340,7 +340,7 @@ class Foldable t where
     -- ==== __Examples__
     --
     -- The first example is a strict fold, which in practice is best performed
-    -- with `foldl'`.
+    -- with 'foldl''.
     --
     -- >>> foldl (+) 42 [1,2,3,4]
     -- 52
@@ -1465,10 +1465,10 @@ GHC has chosen to adopt that approach for now.
 --   with the contributions of all its successors.
 --
 -- These two types of folds are typified by the left-associative strict
--- `foldl'` and the right-associative lazy `foldr`.
+-- 'foldl'' and the right-associative lazy `foldr`.
 --
 -- @
--- `foldl'` :: Foldable t => (b -> a -> b) -> b -> t a -> b
+-- 'foldl'' :: Foldable t => (b -> a -> b) -> b -> t a -> b
 -- `foldr`  :: Foldable t => (a -> b -> b) -> b -> t a -> b
 -- @
 --
@@ -1492,7 +1492,7 @@ GHC has chosen to adopt that approach for now.
 -- The third and final argument is a @Foldable@ structure containing elements
 -- @(a, b, c, &#x2026;)@.
 --
--- * __`foldl'`__ takes an operator function of the form:
+-- * __'foldl''__ takes an operator function of the form:
 --
 --     @
 --     f :: b -- accumulated fold of the initial elements
@@ -1507,7 +1507,7 @@ GHC has chosen to adopt that approach for now.
 --       where g element !acc = f acc element
 --     @
 --
---     Since `foldl'` is strict in the accumulator, this is always
+--     Since 'foldl'' is strict in the accumulator, this is always
 --     a [strict](#strict) reduction with no opportunity for early return or
 --     intermediate results.  The structure must be finite, since no result is
 --     returned until the last element is processed.  The advantage of
@@ -1537,7 +1537,7 @@ GHC has chosen to adopt that approach for now.
 --     `foldr` is well suited to define both [corecursive](#corec)
 --     and [short-circuit](#short) reductions.
 --
---     When the operator is always strict in the second argument, `foldl'` is
+--     When the operator is always strict in the second argument, 'foldl'' is
 --     generally a better choice than `foldr`.  When `foldr` is called with a
 --     strict operator, evaluation cannot begin until the last element is
 --     reached, by which point a deep stack of pending function applications
@@ -1604,20 +1604,20 @@ GHC has chosen to adopt that approach for now.
 -- processing of the tail of the input structure is generally not only
 -- unnecessary, but also inefficient.  Thus, these and similar folds should be
 -- implemented in terms of strict left-associative @Foldable@ methods (typically
--- `foldl'`) to perform an efficient reduction in constant space.
+-- 'foldl'') to perform an efficient reduction in constant space.
 --
 -- Conversely, an implementation of @Foldable@ for a new structure should
--- ensure that `foldl'` actually performs a strict left-associative reduction.
+-- ensure that 'foldl'' actually performs a strict left-associative reduction.
 --
--- The `foldMap'` method is a special case of `foldl'`, in which the initial
+-- The 'foldMap'' method is a special case of 'foldl'', in which the initial
 -- accumulator is `mempty` and the operator is @mappend . f@, where @f@ maps
--- each input element into the 'Monoid' in question.  Therefore, `foldMap'` is
--- an appropriate choice under essentially the same conditions as `foldl'`, and
+-- each input element into the 'Monoid' in question.  Therefore, 'foldMap'' is
+-- an appropriate choice under essentially the same conditions as 'foldl'', and
 -- its implementation for a given @Foldable@ structure should also be a strict
 -- left-associative reduction.
 --
 -- While the examples below are not necessarily the most optimal definitions of
--- the intended functions, they are all cases in which `foldMap'` is far more
+-- the intended functions, they are all cases in which 'foldMap'' is far more
 -- appropriate (as well as more efficient) than the lazy `foldMap`.
 --
 -- > length  = getSum     . foldMap' (const (Sum 1))
@@ -1635,11 +1635,11 @@ GHC has chosen to adopt that approach for now.
 --
 -- * Provided the operator is strict in its left argument:
 --
---     @`foldl'` :: Foldable t => (b -> a -> b) -> b -> t a -> b@
+--     @'foldl'' :: Foldable t => (b -> a -> b) -> b -> t a -> b@
 --
 -- * Provided `mappend` is strict in its left argument:
 --
---     @`foldMap'` :: (Foldable t, Monoid m) => (a -> m) -> t a -> m@
+--     @'foldMap'' :: (Foldable t, Monoid m) => (a -> m) -> t a -> m@
 --
 -- * Provided the instance is correctly defined:
 --
@@ -1766,7 +1766,7 @@ GHC has chosen to adopt that approach for now.
 --     `all`     :: Foldable t => (a -> Bool) -> t a -> Bool
 --     @
 --
--- * Many instances of '<|>' (e.g. the 'Maybe' instance) are conditionally
+-- * Many instances of @('<|>')@ (e.g. the 'Maybe' instance) are conditionally
 --   lazy, and use or don't use their second argument depending on the value
 --   of the first.  These are used with the folds below, which terminate as
 --   early as possible, but otherwise generally keep going.  Some instances
@@ -1779,7 +1779,7 @@ GHC has chosen to adopt that approach for now.
 --     `msum` :: (Foldable t, MonadPlus m) => t (m a) -> m a
 --     @
 --
--- * Likewise, the '*>' operator in some `Applicative` functors, and '>>'
+-- * Likewise, the @('*>')@ operator in some `Applicative` functors, and @('>>')@
 --   in some monads are conditionally lazy and can /short-circuit/ a chain of
 --   computations.  The below folds will terminate as early as possible, but
 --   even infinite loops can be productive here, when evaluated solely for
@@ -1852,7 +1852,7 @@ GHC has chosen to adopt that approach for now.
 -- They do have specialised uses, but are best avoided when in doubt.
 --
 -- @
--- `foldr'` :: (a -> b -> b) -> b -> t a -> b
+-- 'foldr'' :: (a -> b -> b) -> b -> t a -> b
 -- `foldl` :: (b -> a -> b) -> b -> t a -> b
 -- `foldl1` :: (a -> a -> a) -> t a -> a
 -- `foldrM` :: (Foldable t, Monad m) => (a -> b -> m b) -> b -> t a -> m b
@@ -1863,7 +1863,7 @@ GHC has chosen to adopt that approach for now.
 -- instances take advantage of efficient right-to-left iteration to perform
 -- lazy left folds outside-in from the right-most element.
 --
--- The strict `foldr'` is the least likely to be useful, structures that
+-- The strict 'foldr'' is the least likely to be useful, structures that
 -- support efficient sequencing /only/ right-to-left are not at all common.
 
 --------------
@@ -1966,7 +1966,7 @@ GHC has chosen to adopt that approach for now.
 --
 -- Returning to simpler instances, defined just in terms of `foldr`, it is
 -- somewhat surprising that a fairly efficient /default/ implementation of the
--- strict `foldl'` is defined in terms of lazy `foldr` when only the latter is
+-- strict 'foldl'' is defined in terms of lazy `foldr` when only the latter is
 -- explicitly provided by the instance.  It may be instructive to take a look
 -- at how this works.
 
@@ -2051,7 +2051,7 @@ GHC has chosen to adopt that approach for now.
 -- > instance Foldable FRList where
 -- >     foldr f z l = unFR l f z
 -- >     -- With older versions of @base@, also define sum, product, ...
--- >     -- to ensure use of the strict `foldl'`.
+-- >     -- to ensure use of the strict 'foldl''.
 -- >     -- sum = foldl' (+) 0
 -- >     -- ...
 --
