@@ -295,8 +295,9 @@ The available mode flags are:
 
     Expression-evaluation mode. This is very similar to interactive
     mode, except that there is a single expression to evaluate (⟨expr⟩)
-    which is given on the command line. See :ref:`eval-mode` for more
-    details.
+    which is given on the command line. This flag may be given multiple
+    times, in which case each expression is evaluated sequentially.
+    See :ref:`eval-mode` for more details.
 
 .. ghc-flag:: -E
     :shortdesc: Stop after preprocessing (``.hspp`` file)
