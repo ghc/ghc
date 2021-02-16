@@ -1909,6 +1909,15 @@ AC_DEFUN([FP_CURSES],
 
   AC_SUBST(CURSES_INCLUDE_DIRS)
   AC_SUBST(CURSES_LIB_DIRS)
+
+  AC_ARG_WITH([curses-libraries-stage0],
+    [AC_HELP_STRING([--with-curses-libraries-stage0],
+       [directory containing build-platform curses libraries (for stage0 build)])],
+       [CURSES_LIB_DIRS_STAGE0=$withval],
+       [CURSES_LIB_DIRS_STAGE0=$CURSES_LIB_DIRS])
+
+  AC_SUBST(CURSES_LIB_DIRS_STAGE0)
+
 ])# FP_CURSES
 
 # --------------------------------------------------------------
@@ -2054,14 +2063,6 @@ AC_DEFUN([GHC_LLVM_TARGET], [
       llvm_target_vendor="unknown"
       llvm_target_os="windows"
       ;;
-    # retain any android and gnueabi linux flavours
-    # for the LLVM Target. Otherwise these would be
-    # turned into just `-linux` and fail to be found
-    # in the `llvm-targets` file.
-    *-android*|*-gnueabi*|*-musleabi*)
-      GHC_CONVERT_VENDOR([$3],[llvm_target_vendor])
-      llvm_target_os="$4"
-      ;;
     # apple is a bit about their naming scheme for
     # aarch64; and clang on macOS doesn't know that
     # aarch64 would be arm64. So for LLVM we'll need
@@ -2076,6 +2077,16 @@ AC_DEFUN([GHC_LLVM_TARGET], [
       GHC_CONVERT_VENDOR([$3],[llvm_target_vendor])
       GHC_CONVERT_OS([$4],[$2],[llvm_target_os])
       ;;
+  esac
+  case "$4" in
+      # retain any android and gnueabi linux flavours
+      # for the LLVM Target. Otherwise these would be
+      # turned into just `-linux` and fail to be found
+      # in the `llvm-targets` file.
+      *-android*|*-gnueabi*|*-musleabi*)
+        GHC_CONVERT_VENDOR([$3],[llvm_target_vendor])
+        llvm_target_os="$4"
+        ;;
   esac
   $5="$llvm_target_cpu-$llvm_target_vendor-$llvm_target_os"
 ])

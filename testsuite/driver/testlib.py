@@ -2127,8 +2127,11 @@ def normalise_errmsg(s: str) -> str:
 
     # filter out nix garbage, that just keeps on showing up as errors on darwin
     s = modify_lines(s, lambda l: re.sub('^(.+)\.dylib, ignoring unexpected dylib file$','', l))
-    s = re.sub('ld: warning: passed two min versions \(10.16.0, 10.12\) for platform macOS. Using 10.12.','',s)
+    s = re.sub('ld: warning: passed .* min versions \(.*\) for platform macOS. Using [\.0-9]+.','',s)
     s = re.sub('ld: warning: -sdk_version and -platform_version are not compatible, ignoring -sdk_version','',s)
+    s = re.sub('You are using an unsupported version of LLVM!.*\n','',s)
+    s = re.sub('Currently only [\.0-9]+ is supported. System LLVM version: [\.0-9]+.*\n','',s)
+    s = re.sub('We will try though\.\.\..*\n','',s)
     return s
 
 # normalise a .prof file, so that we can reasonably compare it against
@@ -2204,6 +2207,10 @@ def normalise_output( s: str ) -> str:
     s = re.sub('  -fexternal-dynamic-refs\n','',s)
     s = re.sub('ld: warning: passed .* min versions \(.*\) for platform macOS. Using [\.0-9]+.','',s)
     s = re.sub('ld: warning: -sdk_version and -platform_version are not compatible, ignoring -sdk_version','',s)
+    s = re.sub('You are using an unsupported version of LLVM!.*\n','',s)
+    s = re.sub('Currently only [\.0-9]+ is supported. System LLVM version: [\.0-9]+.*\n','',s)
+    s = re.sub('We will try though\.\.\..*\n','',s)
+
     return s
 
 def normalise_asm( s: str ) -> str:

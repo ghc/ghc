@@ -52,6 +52,8 @@ import DynFlags
 
 import Control.Monad
 
+import TyCon (PrimRep (..))
+
 ------------------------------------------------------------------------
 --              Top-level bindings
 ------------------------------------------------------------------------
@@ -716,9 +718,9 @@ link_caf node = do
   ; let newCAF_lbl = mkForeignLabel (fsLit "newCAF") Nothing
                                     ForeignLabelInExternalPackage IsFunction
   ; bh <- newTemp (bWord dflags)
-  ; emitRtsCallGen [(bh,AddrHint)] newCAF_lbl
-      [ (baseExpr,  AddrHint),
-        (CmmReg (CmmLocal node), AddrHint) ]
+  ; emitRtsCallGen [(bh, AddrRep, AddrHint)] newCAF_lbl
+      [ (baseExpr, AddrRep, AddrHint),
+        (CmmReg (CmmLocal node), AddrRep, AddrHint) ]
       False
 
   -- see Note [atomic CAF entry] in rts/sm/Storage.c

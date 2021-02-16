@@ -3,7 +3,9 @@ module Context (
     Context (..), vanillaContext, stageContext,
 
     -- * Expressions
-    getStage, getPackage, getWay, getStagedSettingList, getBuildPath,
+    getStage, getPackage, getWay,
+    getStagedSetting, getStagedSettingList,
+    getBuildPath,
 
     -- * Paths
     contextDir, buildPath, buildDir, pkgInplaceConfig, pkgSetupConfigFile,
@@ -43,6 +45,10 @@ getWay = way <$> getContext
 -- | Get a list of configuration settings for the current stage.
 getStagedSettingList :: (Stage -> SettingList) -> Args Context b
 getStagedSettingList f = getSettingList . f =<< getStage
+
+-- | Get a configuration setting for the current stage.
+getStagedSetting :: (Stage -> Setting) -> Expr Context b String
+getStagedSetting f = getSetting . f =<< getStage
 
 -- | Path to the directory containg the final artifact in a given 'Context'.
 libPath :: Context -> Action FilePath

@@ -37,6 +37,7 @@ import Control.Monad.Fix
 import Data.Array as Array
 import Data.Bits
 import Data.List (nub)
+import TyCon (PrimRep (..))
 
 {- Note [Stack Layout]
 
@@ -1185,18 +1186,20 @@ lowerSafeForeignCall dflags block
 foreignLbl :: FastString -> CmmExpr
 foreignLbl name = CmmLit (CmmLabel (mkForeignLabel name Nothing ForeignLabelInExternalPackage IsFunction))
 
+-- void * suspendThread (StgRegTable *, bool interruptible);
 callSuspendThread :: DynFlags -> LocalReg -> Bool -> CmmNode O O
 callSuspendThread dflags id intrbl =
   CmmUnsafeForeignCall
        (ForeignTarget (foreignLbl (fsLit "suspendThread"))
-        (ForeignConvention CCallConv [AddrHint, NoHint] [AddrHint] CmmMayReturn))
+        (ForeignConvention CCallConv [AddrHint, NoHint] [AddrHint] CmmMayReturn AddrRep [AddrRep, Word32Rep]))
        [id] [baseExpr, mkIntExpr dflags (fromEnum intrbl)]
 
+-- StgRegTable * resumeThread  (void *);
 callResumeThread :: LocalReg -> LocalReg -> CmmNode O O
 callResumeThread new_base id =
   CmmUnsafeForeignCall
        (ForeignTarget (foreignLbl (fsLit "resumeThread"))
-            (ForeignConvention CCallConv [AddrHint] [AddrHint] CmmMayReturn))
+            (ForeignConvention CCallConv [AddrHint] [AddrHint] CmmMayReturn AddrRep [AddrRep]))
        [new_base] [CmmReg (CmmLocal id)]
 
 -- -----------------------------------------------------------------------------

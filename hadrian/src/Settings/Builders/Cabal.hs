@@ -124,7 +124,7 @@ configureArgs = do
         , conf "--with-iconv-libraries"   $ arg =<< getSetting IconvLibDir
         , conf "--with-gmp-includes"      $ arg =<< getSetting GmpIncludeDir
         , conf "--with-gmp-libraries"     $ arg =<< getSetting GmpLibDir
-        , conf "--with-curses-libraries"  $ arg =<< getSetting CursesLibDir
+        , conf "--with-curses-libraries"  $ arg =<< getStagedSetting CursesLibDir
         , flag CrossCompiling ? (conf "--host" $ arg =<< getSetting TargetPlatformFull)
         , conf "--with-cc" $ arg =<< getBuilderPath . (Cc CompileC) =<< getStage
         , notStage0 ? (arg =<< ("--ghc-option=-ghcversion-file=" ++) <$> expr ((-/-) <$> topDirectory <*> ghcVersionH stage))]
