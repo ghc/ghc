@@ -125,22 +125,24 @@ Note [Rendering Messages]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Turning 'Messages' into something that renders nicely for the user is one of the last steps, and it
-happens typically at the application boundaries (i.e. from the 'Driver' upwards).
+happens typically at the application's boundaries (i.e. from the 'Driver' upwards).
 
-For now (see #18516) this class is very boring as it has only one instance, but the idea is that as
+For now (see #18516) this class has few instance, but the idea is that as
 the more domain-specific types are defined, the more instances we would get. For example, given something like:
 
-data TcRnMessage
-  = TcRnOutOfScope ..
-  | ..
+  data TcRnDiagnostic
+    = TcRnOutOfScope ..
+    | ..
 
-We could then define how a 'TcRnMessage' is displayed to the user. Rather than scattering pieces of
+  newtype TcRnMessage = TcRnMessage (DecoratedMessage TcRnDiagnostic)
+
+We could then define how a 'TcRnDiagnostic' is displayed to the user. Rather than scattering pieces of
 'SDoc' around the codebase, we would write once for all:
 
-instance Diagnostic TcRnMessage where
-  diagnosticMessage = \case
-    TcRnOutOfScope .. -> Decorated [text "Out of scope error ..."]
-    ...
+  instance Diagnostic TcRnDiagnostic where
+    diagnosticMessage (TcRnMessage msg) = case diagMessage msg of
+      TcRnOutOfScope .. -> Decorated [text "Out of scope error ..."]
+      ...
 
 This way, we can easily write generic rendering functions for errors that all they care about is the
 knowledge that a given type 'e' has a 'Diagnostic' constraint.
@@ -148,20 +150,20 @@ knowledge that a given type 'e' has a 'Diagnostic' constraint.
 -}
 
 -- | A class identifying a diagnostic.
--- Dictionary.com defines diagnostic as:
+-- Dictionary.com defines a diagnostic as:
 --
 -- \"a message output by a computer diagnosing an error in a computer program, computer system,
 -- or component device\".
 --
 -- A 'Diagnostic' carries the /actual/ description of the message (which, in GHC's case, it can be
 -- an error or a warning) and the /reason/ why such message was generated in the first place.
--- See also NOTE [Rendering Messages].
+-- See also Note [Rendering Messages].
 class Diagnostic a where
   diagnosticMessage :: a -> DecoratedSDoc
   diagnosticReason  :: a -> DiagnosticReason
 
 -- | A generic, unstructured 'Diagnostic' message, without any further classification or provenance:
--- By looking at a 'DiagnosticMessage' we don't know neither /where/ it was generated, nor how to
+-- By looking at a 'DiagnosticMessage' we don't know neither /where/ it was generated nor how to
 -- intepret its payload (as it's unstructured). All we can do is to print it out and look at its
 -- 'DiagnosticReason'.
 data DiagnosticMessage a = DiagnosticMessage
@@ -184,13 +186,13 @@ instance Diagnostic DecoratedMessage where
 Note [Diagnostic Reasons]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If we accept a fluid relationship between errors and warnings,
+If we fully embrace the fluid relationship between errors and warnings,
 it might make sense in the future have another type constructor
 like 'WarnReasonDemotedFromError GeneralFlag' to witness the fact the
 diagnostic was born as an error but it has been demoted to a
 warning for example due to 'Opt_DeferTypeErrors'.
--}
 
+-}
 
 -- | The reason /why/ a 'Diagnostic' was emitted in the first place. Diagnostic messages
 -- are born within GHC with a very precise reason, which can be completely statically-computed
@@ -200,7 +202,7 @@ warning for example due to 'Opt_DeferTypeErrors'.
 -- into an error due to '-Werror' or '-Werror=warn-unused-imports', in which case this is reflected
 -- in the 'DiagnosticReason' type, resulting in a 'ErrReasonPromotedFromWarning Opt_WarnUnusedImports' in the
 -- former case or a 'ErrReasonPromotedWithError' in the latter.
--- See also NOTE [Diagnostic Reasons].
+-- See also Note [Diagnostic Reasons].
 data DiagnosticReason
   = WarnReason
   -- ^ Born as a warning.
@@ -226,7 +228,7 @@ instance Outputable DiagnosticReason where
 -- /domain-specific/ (i.e. parsing, typecheck-renaming, etc) diagnostics.
 --
 -- To say things differently, GHC emits /diagnostics/ about the running program, each of which is wrapped
--- into a 'MsgEnvelope' that carries specific information like where the error happened, its severity, etc.
+-- into a 'MsgEnvelope' that carries specific information like where the error happened, etc.
 -- Finally, multiple 'MsgEnvelope's are aggregated into 'Messages' that are returned to the user.
 data MsgEnvelope e = MsgEnvelope
    { errMsgSpan        :: SrcSpan
@@ -236,7 +238,7 @@ data MsgEnvelope e = MsgEnvelope
    } deriving Functor
 
 -- | The class for a diagnostic message. The main purpose is to classify a message within GHC,
--- to distinguish it from a debug/dump message vs a proper diagnostic, for which we include a 'Severity'.
+-- to distinguish it from a debug/dump message vs a proper diagnostic, for which we include a 'DiagnosticReason'.
 data MessageClass
   = MCOutput
   | MCFatal
