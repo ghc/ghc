@@ -1,0 +1,29 @@
+-- WARNING: ghci-wrapper.cabal is automatically generated from ghci-wrapper.cabal.in by
+-- ./configure.  Make sure you are editing ghci-wrapper.cabal.in, not ghci-wrapper.cabal.
+
+Name: ghci-wrapper
+Version: 9.3.20210513
+Copyright: XXX
+License: BSD3
+-- XXX License-File: LICENSE
+Author: XXX
+Maintainer: XXX
+Synopsis: A wrapper around GHCi allowing convenient execution of scripts
+Description:
+    @ghci@ is a small wrapper program around GHC used on Windows
+    to ensure that console setup is performed correctly.
+Category: Development
+build-type: Simple
+cabal-version: >=1.10
+
+Executable ghci
+    Default-Language: Haskell2010
+    Main-Is: ghci.c
+    -- This is only used on Windows.
+    if !os(windows)
+      buildable: False
+    Include-Dirs: ../utils
+    C-Sources:
+       ghci.c
+       -- the following get copied from ../utils by hadrian
+       getLocation.c isMinTTY.c cwrapper.c
