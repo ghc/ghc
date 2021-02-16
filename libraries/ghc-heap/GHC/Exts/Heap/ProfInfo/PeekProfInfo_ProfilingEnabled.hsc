@@ -165,8 +165,8 @@ import Foreign
 
 import GHC.Exts.Heap.ProfInfo.Types
 
-peekStgTSOProfInfo :: Ptr a -> IO (Maybe StgTSOProfInfo)
-peekStgTSOProfInfo _ = return Nothing
+peekStgTSOProfInfo :: (Ptr b -> IO (Maybe CostCentreStack)) -> Ptr a -> IO (Maybe StgTSOProfInfo)
+peekStgTSOProfInfo _ _ = return Nothing
 
 peekTopCCS :: Ptr a -> IO (Maybe CostCentreStack)
 peekTopCCS _ = return Nothing
