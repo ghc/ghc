@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE TupleSections #-}
 
@@ -7,7 +9,11 @@
 
 module GHC.CmmToAsm.SSA (
         SsaLiveCmmDecl, prunedSSAFromLiveCmmDecl,
-        fromBlockLookupTable
+
+        fromBlockLookupTable,
+        SSABasicBlock(..), PhiFun(..),
+
+        pprSsaLiveCmmDecl
 ) where
 
 import GHC.Prelude
@@ -49,6 +55,7 @@ import GHC.Types.Unique.Supply (UniqSM, UniqSupply, takeUniqFromSupply, getUniqu
 
 import GHC.Utils.Misc (HasDebugCallStack)
 import GHC.Utils.Monad.State
+import GHC.Utils.Outputable
 import GHC.Utils.Panic (panic)
 
 
@@ -60,6 +67,7 @@ type SsaLiveCmmDecl statics instr
                 LiveInfo
                 (BlockLookupTable instr)
 
+
 -- | Map of register to blocks in which it is defined.
 --   This should only ever contain virtual regs.
 type DefSites = RegMap (UniqSet BlockId)
@@ -69,6 +77,7 @@ type IDomList = [(Node, Node)]
 
 type BlockLookupTable instr
         = UniqDFM BlockId (SccBits (SSABasicBlock instr))
+
 
 -- Store blocks with additional info to be able to rebuild SCCs
 -- CyclicBit carries number of CyclicSCC to distinguish consecutive
@@ -99,9 +108,11 @@ data PhiFun = PhiF RegId RegId [RegId]
 phiDef :: PhiFun -> RegId
 phiDef (PhiF _ def _) = def
 
+
 -- | Wrapping a LiveBasicBlock to add Phi-Functions
 data SSABasicBlock instr
         = SSABB [PhiFun] (LiveBasicBlock instr)
+        deriving (Functor)
 
 
 mkSSABasicBlock
@@ -137,7 +148,7 @@ ssaBBlockPhiFuns (SSABB phis _) = phis
 prunedSSAFromLiveCmmDecl
         :: (HasDebugCallStack, Instruction instr)
         => Platform
-        -> CFG 
+        -> CFG
         -> LiveCmmDecl statics instr
         -> UniqSM (SsaLiveCmmDecl statics instr)
 
@@ -174,31 +185,32 @@ constructPrunedSSA platform cfg (CmmProc liveInfo lbl live sccs)
 
          -- Bring CFG in shape for dom. Taken from GHC.CmmToAsm.CFG.loopInfo
          -- TODO: Refactor - extract to Utils or something
-         let toIntSet s     = IS.fromList . map fromBlockId . setElems $ s
-         let toIntMap m     = IM.fromList $ map (\(x,y) -> (fromBlockId x,y)) $ mapToList m
          let graph          = fmap (setFromList . mapKeys ) cfg :: LabelMap LabelSet
          let rooted         = ( fromBlockId entry
                               , toIntMap $ fmap toIntSet graph) :: (Node, IntMap IntSet)
 
          -- All immediate dominators
          let idomList   = idom rooted
-         let ssaSccs    = placePhis cfg entry idomList defsites liveVRegsOnEntry sccs
+         let ssaSccs    = {-# SCC "placePhis" #-}
+                 placePhis cfg entry idomList defsites liveVRegsOnEntry sccs
          let blkTbl     = toBlockLookupTable ssaSccs
          let domTree    = domTreeFromList entry idomList
 
          (liveInsRenamed, blkTblRenamed)
-                <- renameVars platform cfg blkTbl liveVRegsOnEntry domTree
+                <- {-# SCC "renameVars" #-}
+                   renameVars platform cfg blkTbl liveVRegsOnEntry domTree
 
-         -- TODO: maybe lint/assert that liveInsRenamed only contains vregs?
-         let liveInsRenamed'
-                        = mapMap (\rs -> if isEmptyUniqSet $ filterUniqSet isRealReg rs
-                                           then rs
-                                           else panic "GHC.CmmToAsm.SSA.constructPrunedSSA: liveInsRenamed contains RealReg!")
-                          liveInsRenamed
+         -- TODO: maybe lint/assert that phis etc. only contain vregs?
 
          return (CmmProc
-                        (LiveInfo info entries liveInsRenamed' liveStackSlots)
+                        (LiveInfo info entries liveInsRenamed liveStackSlots)
                         lbl live blkTblRenamed)
+
+toIntSet :: LabelSet -> IntSet
+toIntSet s     = IS.fromList . map fromBlockId . setElems $ s
+
+toIntMap :: LabelMap a -> IntMap a
+toIntMap m     = IM.fromList $ map (\(x,y) -> (fromBlockId x,y)) $ mapToList m
 
 
 -- Adapted from "Modern Compiler Implementation in ML" by A.W. Appel
@@ -730,3 +742,30 @@ popDef mp x = adjustUFM_Directly (drop 1) mp x
 peekDef :: UniqFM RegId [RegId] -> RegId -> Maybe RegId
 peekDef mp k = let mStack = lookupUFM_Directly mp k
                in  mStack >>= (\s -> if null s then Nothing else Just $ head s)
+
+
+-- Pretty printing machinery
+
+instance Outputable PhiFun where
+        ppr (PhiF old new args)
+                = hsep [(ppr new), equals, phi
+                       , parens $ hcat (punctuate comma $ map ppr args)
+                       , space, brackets (text "old: " <> ppr old)]
+                where phi = unicodeSyntax (char 'φ') (text "Phi")
+
+
+instance (Instruction instr) => OutputableP Platform (SSABasicBlock instr) where
+        pdoc platform (SSABB phis liveBB)
+            = vcat (map ppr phis)
+              $$ ppr (fmap (fmap (pprInstr platform)) liveBB)
+
+
+pprSsaLiveCmmDecl
+    :: (OutputableP Platform statics, Instruction instr)
+    => Platform
+    -> SsaLiveCmmDecl statics instr
+    -> SDoc
+
+pprSsaLiveCmmDecl platform ssaThing
+    = let pprSsaBBs = fmap (eltsUDFM . mapUDFM (sccBitBlock . fmap (pdoc platform)))
+      in  pdoc platform (pprSsaBBs ssaThing)

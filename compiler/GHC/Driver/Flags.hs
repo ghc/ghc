@@ -44,6 +44,7 @@ data DumpFlag
    | Opt_D_dump_asm
    | Opt_D_dump_asm_native
    | Opt_D_dump_asm_liveness
+   | Opt_D_dump_asm_ssa
    | Opt_D_dump_asm_regalloc
    | Opt_D_dump_asm_regalloc_stages
    | Opt_D_dump_asm_conflicts
