@@ -18,14 +18,22 @@
 [RTS heap profiling]
 /docs/users_guide/profiling.rst   @DanielG
 /includes/rts/ProfHeap.h          @DanielG
+/includes/rts/RootProfile.h       @DanielG
+/includes/rts/SyntheticHeap.h     @DanielG
 /includes/rts/TraverseHeap.h      @DanielG
 /includes/rts/storage/ClosureMacros.h @DanielG
+/libraries/base/GHC/Profiling.hs  @DanielG
 /rts/LdvProfile*                  @DanielG
 /rts/ProfHeap*                    @DanielG
 /rts/Retainer*                    @DanielG
+/rts/RootProfile*                 @DanielG
+/rts/SyntheticHeap*               @DanielG
 /rts/TraverseHeap*                @DanielG
 /rts/sm/GC.c                      @DanielG
 /rts/sm/Storage*                  @DanielG
+/testsuite/tests/profiling/should_run/ProfHeap* @DanielG
+/testsuite/tests/profiling/should_run/RootProf* @DanielG
+/testsuite/tests/profiling/should_run/TestHeap* @DanielG
 /testsuite/tests/profiling/should_run/TraverseHeap* @DanielG
 
 [The compiler]
