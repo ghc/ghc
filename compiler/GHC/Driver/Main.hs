@@ -274,8 +274,8 @@ getWarnings = Hsc $ \_ w -> return (w, w)
 clearWarnings :: Hsc ()
 clearWarnings = Hsc $ \_ _ -> return ((), emptyBag)
 
-logWarnings :: WarningMessages -> Hsc ()
-logWarnings w = Hsc $ \_ w0 -> return ((), w0 `unionBags` w)
+logDiagnostics :: WarningMessages -> Hsc ()
+logDiagnostics w = Hsc $ \_ w0 -> return ((), w0 `unionBags` w)
 
 getHscEnv :: Hsc HscEnv
 getHscEnv = Hsc $ \e w -> return (e, w)
@@ -294,7 +294,7 @@ logWarningsReportErrors :: (Bag PsWarning, Bag PsError) -> Hsc ()
 logWarningsReportErrors (warnings,errors) = do
     let warns = fmap pprWarning warnings
         errs  = fmap pprError   errors
-    logWarnings warns
+    logDiagnostics warns
     when (not $ isEmptyBag errs) $ throwErrors errs
 
 -- | Log warnings and throw errors, assuming the messages
@@ -303,7 +303,7 @@ handleWarningsThrowErrors :: (Bag PsWarning, Bag PsError) -> Hsc a
 handleWarningsThrowErrors (warnings, errors) = do
     let warns = fmap pprWarning warnings
         errs  = fmap pprError   errors
-    logWarnings warns
+    logDiagnostics warns
     dflags <- getDynFlags
     logger <- getLogger
     let (wWarns, wErrs) = partitionMessageBag warns
@@ -330,7 +330,7 @@ ioMsgMaybe :: IO (Messages DecoratedMessage, Maybe a) -> Hsc a
 ioMsgMaybe ioA = do
     (msgs, mb_r) <- liftIO ioA
     let (warns, errs) = partitionMessages msgs
-    logWarnings warns
+    logDiagnostics warns
     case mb_r of
         Nothing -> throwErrors errs
         Just r  -> ASSERT( isEmptyBag errs ) return r
@@ -340,7 +340,7 @@ ioMsgMaybe ioA = do
 ioMsgMaybe' :: IO (Messages DecoratedMessage, Maybe a) -> Hsc (Maybe a)
 ioMsgMaybe' ioA = do
     (msgs, mb_r) <- liftIO $ ioA
-    logWarnings (getWarningMessages msgs)
+    logDiagnostics (getWarningMessages msgs)
     return mb_r
 
 -- -----------------------------------------------------------------------------
@@ -420,7 +420,7 @@ hscParse' mod_summary
             handleWarningsThrowErrors (getMessages pst)
         POk pst rdr_module -> do
             let (warns, errs) = bimap (fmap pprWarning) (fmap pprError) (getMessages pst)
-            logWarnings warns
+            logDiagnostics warns
             liftIO $ dumpIfSet_dyn logger dflags Opt_D_dump_parsed "Parser"
                         FormatHaskell (ppr rdr_module)
             liftIO $ dumpIfSet_dyn logger dflags Opt_D_dump_parsed_ast "Parser AST"
@@ -571,7 +571,7 @@ tcRnModule' sum save_rn_syntax mod = do
     -- -Wmissing-safe-haskell-mode
     when (not (safeHaskellModeEnabled dflags)
           && wopt Opt_WarnMissingSafeHaskellMode dflags) $
-        logWarnings $ unitBag $
+        logDiagnostics $ unitBag $
         mkPlainMsgEnvelope reason (getLoc (hpm_module mod)) $
         warnMissingSafeHaskellMode
 
@@ -599,13 +599,13 @@ tcRnModule' sum save_rn_syntax mod = do
             case wopt Opt_WarnSafe dflags of
               True
                 | safeHaskell dflags == Sf_Safe -> return ()
-                | otherwise -> (logWarnings $ unitBag $
+                | otherwise -> (logDiagnostics $ unitBag $
                        mkPlainMsgEnvelope (WarnReasonWithFlag Opt_WarnSafe)
                                           (warnSafeOnLoc dflags) $
                        errSafe tcg_res')
               False | safeHaskell dflags == Sf_Trustworthy &&
                       wopt Opt_WarnTrustworthySafe dflags ->
-                      (logWarnings $ unitBag $
+                      (logDiagnostics $ unitBag $
                        mkPlainMsgEnvelope (WarnReasonWithFlag Opt_WarnTrustworthySafe)
                                           (trustworthyOnLoc dflags) $
                        errTwthySafe tcg_res')
@@ -1134,7 +1134,7 @@ hscCheckSafeImports tcg_env = do
       case safeLanguageOn dflags of
           True -> do
               -- XSafe: we nuke user written RULES
-              logWarnings $ warns (tcg_rules tcg_env')
+              logDiagnostics $ warns (tcg_rules tcg_env')
               return tcg_env' { tcg_rules = [] }
           False
                 -- SafeInferred: user defined RULES, so not safe
@@ -1193,7 +1193,7 @@ checkSafeImports tcg_env
                      return (infErrs, infPkgs)
 
         -- restore old errors
-        logWarnings oldErrs
+        logDiagnostics oldErrs
 
         case (isEmptyBag safeErrs) of
           -- Failed safe check
@@ -1319,8 +1319,8 @@ hscCheckSafe' m l = do
                         (True, False) -> pkgTrustErr
                         (False, _   ) -> modTrustErr
                 in do
-                    logWarnings warns
-                    logWarnings errs
+                    logDiagnostics warns
+                    logDiagnostics errs
                     return (trust == Sf_Trustworthy, pkgRs)
 
                 where
@@ -1411,7 +1411,7 @@ markUnsafeInfer tcg_env whyUnsafe = do
 
     let reason = WarnReasonWithFlag Opt_WarnUnsafe
     when (wopt Opt_WarnUnsafe dflags)
-         (logWarnings $ unitBag $
+         (logDiagnostics $ unitBag $
              mkPlainMsgEnvelope reason (warnUnsafeOnLoc dflags) (whyUnsafe' dflags))
 
     liftIO $ writeIORef (tcg_safeInfer tcg_env) (False, whyUnsafe)
