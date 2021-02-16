@@ -1113,7 +1113,7 @@ There are two cases to consider:
    for holes in partial type signatures, unless -Wpartial-type-signatures is not on, in which case
    the messages are discarded. If deferring, report a warning only if -Wtyped-holes is on.
 
-See also 'reportUnresolved'.
+See also 'reportUnsolved'.
 
 -}
 
