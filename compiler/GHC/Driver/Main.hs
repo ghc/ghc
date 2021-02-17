@@ -239,7 +239,7 @@ newHscEnv :: DynFlags -> IO HscEnv
 newHscEnv dflags = do
     -- we don't store the unit databases and the unit state to still
     -- allow `setSessionDynFlags` to be used to set unit db flags.
-    eps_var <- newIORef (initExternalPackageState (homeUnitId_ dflags))
+    eps_var <- newIORef initExternalPackageState
     us      <- mkSplitUniqSupply 'r'
     nc_var  <- newIORef (initNameCache us knownKeyNames)
     fc_var  <- newIORef emptyInstalledModuleEnv
