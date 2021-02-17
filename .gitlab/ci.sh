@@ -394,7 +394,7 @@ function configure() {
   run ./configure \
     --enable-tarballs-autodownload \
     $target_args \
-    $CONFIGURE_ARGS \
+    ${CONFIGURE_ARGS:-} \
     GHC="$GHC" \
     HAPPY="$HAPPY" \
     ALEX="$ALEX" \
