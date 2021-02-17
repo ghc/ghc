@@ -28,7 +28,7 @@ data PROCESS_INFORMATION = PROCESS_INFORMATION
 
 instance Storable PROCESS_INFORMATION where
     sizeOf = const #size PROCESS_INFORMATION
-    alignment = sizeOf
+    alignment = const #alignment PROCESS_INFORMATION
     poke buf pi = do
         (#poke PROCESS_INFORMATION, hProcess)    buf (piProcess   pi)
         (#poke PROCESS_INFORMATION, hThread)     buf (piThread    pi)
@@ -67,7 +67,7 @@ data STARTUPINFO = STARTUPINFO
 
 instance Storable STARTUPINFO where
     sizeOf = const #size STARTUPINFO
-    alignment = sizeOf
+    alignment = const #alignment STARTUPINFO
     poke buf si = do
         (#poke STARTUPINFO, cb)              buf (siCb si)
         (#poke STARTUPINFO, lpDesktop)       buf (siDesktop si)

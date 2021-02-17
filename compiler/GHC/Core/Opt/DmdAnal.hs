@@ -331,6 +331,10 @@ dmdAnal' env dmd (Let (Rec pairs) body)
     body_ty2 `seq`
     (body_ty2,  Let (Rec pairs') body')
 
+deleteFVs :: DmdType -> [Var] -> DmdType
+deleteFVs (DmdType fvs dmds res) bndrs
+  = DmdType (delVarEnvList fvs bndrs) dmds res
+
 -- | A simple, syntactic analysis of whether an expression MAY throw a precise
 -- exception when evaluated. It's always sound to return 'True'.
 -- See Note [Which scrutinees may throw precise exceptions].
