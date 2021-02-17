@@ -131,6 +131,7 @@ data GCFlags = GCFlags
     , heapSizeSuggestion    :: Word32
     , heapSizeSuggestionAuto :: Bool
     , oldGenFactor          :: Double
+    , returnDecayFactor     :: Double
     , pcFreeHeap            :: Double
     , generations           :: Word32
     , squeezeUpdFrames      :: Bool
@@ -432,6 +433,7 @@ getGCFlags = do
           <*> (toBool <$>
                 (#{peek GC_FLAGS, heapSizeSuggestionAuto} ptr :: IO CBool))
           <*> #{peek GC_FLAGS, oldGenFactor} ptr
+          <*> #{peek GC_FLAGS, returnDecayFactor} ptr
           <*> #{peek GC_FLAGS, pcFreeHeap} ptr
           <*> #{peek GC_FLAGS, generations} ptr
           <*> (toBool <$>
