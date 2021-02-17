@@ -15,8 +15,23 @@ import Foreign
 import Foreign.C.Types
 import System.Win32.File
 import System.Win32.Types
+import Data.Bits -- Compute alignment
 
 #include <windows.h>
+
+{-# INLINE alignmentFromSize #-}
+-- Round up to the next power of two.
+alignmentFromSize :: Int -> Int
+alignmentFromSize size
+    | isPowerOfTwo size = size
+    | otherwise = alignment
+    where
+        isPowerOfTwo :: (Bits i, Integral i) => i -> Bool
+        isPowerOfTwo x = x .&. (x-1) == 0
+        -- Rounding down
+        logBase2 x = finiteBitSize x - 1 - countLeadingZeros x
+        -- Get the next power of two
+        alignment = 2^(logBase2 size + 1)
 
 type LPPROCESS_INFORMATION = Ptr PROCESS_INFORMATION
 data PROCESS_INFORMATION = PROCESS_INFORMATION
@@ -28,7 +43,7 @@ data PROCESS_INFORMATION = PROCESS_INFORMATION
 
 instance Storable PROCESS_INFORMATION where
     sizeOf = const #size PROCESS_INFORMATION
-    alignment = sizeOf
+    alignment = alignmentFromSize . sizeOf
     poke buf pinfo = do
         (#poke PROCESS_INFORMATION, hProcess)    buf (piProcess   pinfo)
         (#poke PROCESS_INFORMATION, hThread)     buf (piThread    pinfo)
@@ -67,7 +82,7 @@ data STARTUPINFO = STARTUPINFO
 
 instance Storable STARTUPINFO where
     sizeOf = const #size STARTUPINFO
-    alignment = sizeOf
+    alignment = alignmentFromSize . sizeOf
     poke buf si = do
         (#poke STARTUPINFO, cb)              buf (siCb si)
         (#poke STARTUPINFO, lpDesktop)       buf (siDesktop si)
