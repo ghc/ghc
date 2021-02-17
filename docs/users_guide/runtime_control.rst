@@ -594,7 +594,7 @@ performance.
 
     Increasing this factor will make the rate memory is returned slower, decreasing
     it will make memory be returned more eagerly. Setting it to 0 will disable the
-    memory return (which will enumulate the behaviour in releases prior to 9.2).
+    memory return (which will emulate the behaviour in releases prior to 9.2).
 
 .. rts-flag:: -G ⟨generations⟩
 
