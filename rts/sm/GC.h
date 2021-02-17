@@ -19,6 +19,7 @@
 
 void GarbageCollect (uint32_t collect_gen,
                      bool do_heap_census,
+                     bool is_overflow_gc,
                      bool deadlock_detect,
                      uint32_t gc_type,
                      Capability *cap,

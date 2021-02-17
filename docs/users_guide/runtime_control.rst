@@ -577,6 +577,25 @@ performance.
     The :rts-flag:`-F ⟨factor⟩` setting will be automatically reduced by the garbage
     collector when the maximum heap size (the :rts-flag:`-M ⟨size⟩` setting) is approaching.
 
+.. rts-flag:: -Fd ⟨factor⟩
+
+    :default: 4
+
+    .. index::
+       single: heap size, factor
+
+    The inverse rate at which unused memory is returned to the OS when it is no longer
+    needed. After a large amount of allocation the RTS will start by retaining
+    a lot of allocated blocks in case it will need them again shortly but then
+    it will gradually release them based on the :rts-flag:`-Fd ⟨factor⟩`. On
+    each subsequent major collection which is not caused by a heap overflow a little
+    more memory will attempt to be returned until the amount retained is similar to
+    the amount of live bytes.
+
+    Increasing this factor will make the rate memory is returned slower, decreasing
+    it will make memory be returned more eagerly. Setting it to 0 will disable the
+    memory return (which will emulate the behaviour in releases prior to 9.2).
+
 .. rts-flag:: -G ⟨generations⟩
 
     :default: 2
