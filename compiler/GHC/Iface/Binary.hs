@@ -281,25 +281,21 @@ putSymbolTable bh next_off symtab = do
 getSymbolTable :: BinHandle -> NameCache -> IO SymbolTable
 getSymbolTable bh name_cache = do
     sz <- get bh :: IO Int
-    od_names <- sequence (replicate sz (get bh))
-
     -- create an array of Names for the symbols and add them to the NameCache
     updateNameCache' name_cache $ \cache0 -> do
         mut_arr <- newArray_ (0, sz-1) :: IO (IOArray Int Name)
-        let go cache ((uid, mod_name, occ),i) = do
-              let mod = mkModule uid mod_name
-              case lookupOrigNameCache cache mod occ of
-                Just name -> do
-                  writeArray mut_arr i name
-                  return cache
-                Nothing   -> do
-                  uniq <- takeUniqFromNameCache name_cache
-                  let name      = mkExternalName uniq mod occ noSrcSpan
-                      new_cache = extendOrigNameCache cache mod occ name
-                  writeArray mut_arr i name
-                  return new_cache
-
-        cache <- foldM go cache0 (zip od_names [0..])
+        cache <- foldGet (fromIntegral sz) bh cache0 $ \i (uid, mod_name, occ) cache -> do
+          let mod = mkModule uid mod_name
+          case lookupOrigNameCache cache mod occ of
+            Just name -> do
+              writeArray mut_arr (fromIntegral i) name
+              return cache
+            Nothing   -> do
+              uniq <- takeUniqFromNameCache name_cache
+              let name      = mkExternalName uniq mod occ noSrcSpan
+                  new_cache = extendOrigNameCache cache mod occ name
+              writeArray mut_arr (fromIntegral i) name
+              return new_cache
         arr <- unsafeFreeze mut_arr
         return (cache, arr)
 
