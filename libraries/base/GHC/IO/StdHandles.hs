@@ -50,7 +50,7 @@ openFile = POSIX.openFile <!> Win.openFile
 withFile :: FilePath -> IOMode -> (Handle -> IO r) -> IO r
 withFile = POSIX.withFile <!> wf
   where
-    wf path mode act = bracket (openFile path mode) hClose_impl act
+    wf path mode act = bracket (Win.openFile path mode) hClose_impl act
 
 openBinaryFile :: FilePath -> IOMode -> IO Handle
 openBinaryFile = POSIX.openBinaryFile <!> Win.openBinaryFile
@@ -58,7 +58,7 @@ openBinaryFile = POSIX.openBinaryFile <!> Win.openBinaryFile
 withBinaryFile :: FilePath -> IOMode -> (Handle -> IO r) -> IO r
 withBinaryFile = POSIX.withBinaryFile <!> wf
   where
-    wf path mode act = bracket (openBinaryFile path mode) hClose_impl act
+    wf path mode act = bracket (Win.openBinaryFile path mode) hClose_impl act
 
 openFileBlocking :: FilePath -> IOMode -> IO Handle
 openFileBlocking = POSIX.openFileBlocking <!> Win.openFileBlocking
@@ -66,7 +66,7 @@ openFileBlocking = POSIX.openFileBlocking <!> Win.openFileBlocking
 withFileBlocking :: FilePath -> IOMode -> (Handle -> IO r) -> IO r
 withFileBlocking = POSIX.withFileBlocking <!> wf
   where
-    wf path mode act = bracket (openFileBlocking path mode) hClose_impl act
+    wf path mode act = bracket (Win.openFileBlocking path mode) hClose_impl act
 
 #else
 
