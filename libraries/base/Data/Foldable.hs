@@ -117,6 +117,12 @@ import GHC.Generics
 import GHC.Tuple (Solo (..))
 import GHC.Num  ( Num(..) )
 
+-- $setup
+-- >>> :set -XDeriveFoldable
+-- >>> import Prelude
+-- >>> import Data.Monoid (Product (..), Sum (..))
+-- >>> data Tree a = Empty | Leaf a | Node (Tree a) a (Tree a) deriving (Show, Foldable)
+
 infix  4 `elem`, `notElem`
 
 -- XXX: Missing haddock feature.  Links to anchors in other modules
@@ -593,12 +599,13 @@ class Foldable t where
     -- @since 4.8.0.0
     maximum :: forall a . Ord a => t a -> a
     maximum = fromMaybe (errorWithoutStackTrace "maximum: empty structure") .
-       getMax . foldMap (Max #. (Just :: a -> Maybe a))
+       getMax . foldMap' (Max #. (Just :: a -> Maybe a))
+    {-# INLINEABLE maximum #-}
 
     -- | The least element of a non-empty structure.
     --
     -- This function is non-total and will raise a runtime exception if the
-    -- structure happens to be empty A structure that supports random access
+    -- structure happens to be empty.  A structure that supports random access
     -- and maintains its elements in order should provide a specialised
     -- implementation to return the minimum in faster than linear time.
     --
@@ -618,7 +625,8 @@ class Foldable t where
     -- @since 4.8.0.0
     minimum :: forall a . Ord a => t a -> a
     minimum = fromMaybe (errorWithoutStackTrace "minimum: empty structure") .
-       getMin . foldMap (Min #. (Just :: a -> Maybe a))
+       getMin . foldMap' (Min #. (Just :: a -> Maybe a))
+    {-# INLINEABLE minimum #-}
 
     -- | The 'sum' function computes the sum of the numbers of a structure.
     --
@@ -643,7 +651,8 @@ class Foldable t where
     --
     -- @since 4.8.0.0
     sum :: Num a => t a -> a
-    sum = getSum #. foldMap Sum
+    sum = getSum #. foldMap' Sum
+    {-# INLINEABLE sum #-}
 
     -- | The 'product' function computes the product of the numbers of a
     -- structure.
@@ -669,7 +678,8 @@ class Foldable t where
     --
     -- @since 4.8.0.0
     product :: Num a => t a -> a
-    product = getProduct #. foldMap Product
+    product = getProduct #. foldMap' Product
+    {-# INLINEABLE product #-}
 
 -- instances for Prelude types
 
@@ -1268,10 +1278,15 @@ all p = getAll #. foldMap (All #. p)
 
 -- See Note [maximumBy/minimumBy space usage]
 maximumBy :: Foldable t => (a -> a -> Ordering) -> t a -> a
-maximumBy cmp = foldl1 max'
-  where max' x y = case cmp x y of
-                        GT -> x
-                        _  -> y
+maximumBy cmp = fromMaybe (errorWithoutStackTrace "maximumBy: empty structure")
+  . foldl' max' Nothing
+  where
+    max' mx y = Just $! case mx of
+      Nothing -> y
+      Just x -> case cmp x y of
+        GT -> x
+        _ -> y
+{-# INLINEABLE maximumBy #-}
 
 -- | The least element of a non-empty structure with respect to the
 -- given comparison function.
@@ -1285,10 +1300,15 @@ maximumBy cmp = foldl1 max'
 
 -- See Note [maximumBy/minimumBy space usage]
 minimumBy :: Foldable t => (a -> a -> Ordering) -> t a -> a
-minimumBy cmp = foldl1 min'
-  where min' x y = case cmp x y of
-                        GT -> y
-                        _  -> x
+minimumBy cmp = fromMaybe (errorWithoutStackTrace "minimumBy: empty structure")
+  . foldl' min' Nothing
+  where
+    min' mx y = Just $! case mx of
+      Nothing -> y
+      Just x -> case cmp x y of
+        GT -> y
+        _ -> x
+{-# INLINEABLE minimumBy #-}
 
 -- | 'notElem' is the negation of 'elem'.
 --
@@ -1422,14 +1442,8 @@ proportional to the size of the data structure.  For the common case of lists,
 this could be particularly bad (see #10830).
 
 For the common case of lists, switching the implementations of maximumBy and
-minimumBy to foldl1 solves the issue, as GHC's strictness analysis can then
-make these functions only use O(1) stack space.  It is perhaps not the optimal
-way to fix this problem, as there are other conceivable data structures
-(besides lists) which might benefit from specialized implementations for
-maximumBy and minimumBy (see
-https://gitlab.haskell.org/ghc/ghc/issues/10830#note_129843 for a further
-discussion).  But using foldl1 is at least always better than using foldr1, so
-GHC has chosen to adopt that approach for now.
+minimumBy to foldl1 solves the issue, assuming GHC's strictness analysis can then
+make these functions only use O(1) stack space. As of base 4.16, we have switched to employing foldl' over foldl1, not relying on GHC's optimiser. See https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 -}
 
 --------------
