@@ -161,12 +161,29 @@ tryM (IOEnv thing) = IOEnv (\ env -> tryIOEnvFailure (thing env))
 tryIOEnvFailure :: IO a -> IO (Either IOEnvFailure a)
 tryIOEnvFailure = try
 
--- XXX We shouldn't be catching everything, e.g. timeouts
 tryAllM :: IOEnv env r -> IOEnv env (Either SomeException r)
--- Catch *all* exceptions
+-- Catch *all* synchronous exceptions
 -- This is used when running a Template-Haskell splice, when
 -- even a pattern-match failure is a programmer error
-tryAllM (IOEnv thing) = IOEnv (\ env -> try (thing env))
+tryAllM (IOEnv thing) = IOEnv (\ env -> safeTry (thing env))
+
+-- | Like 'try', but doesn't catch asynchronous exceptions
+safeTry :: Exception e => IO a -> IO (Either e a)
+safeTry x = do
+  r <- try x
+  case r of
+    Left e
+      | isSyncException e -> pure $ Left e
+      | otherwise -> throwIO e
+    Right a -> pure $ pure a
+
+-- | Detect if a exception is synchronous
+-- Taken from safe-exceptions
+isSyncException :: Exception e => e -> Bool
+isSyncException e =
+    case fromException (toException e) of
+        Just (SomeAsyncException _) -> False
+        Nothing -> True
 
 tryMostM :: IOEnv env r -> IOEnv env (Either SomeException r)
 tryMostM (IOEnv thing) = IOEnv (\ env -> tryMost (thing env))
