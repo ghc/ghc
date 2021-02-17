@@ -42,6 +42,8 @@ module GHC.Utils.Binary
    castBin,
    withBinBuffer,
 
+   foldGet,
+
    writeBinMem,
    readBinMem,
 
@@ -276,6 +278,23 @@ expandBin (BinMem _ _ sz_r arr_r) !off = do
       = sz
       | otherwise
       = getSize (sz * 2)
+
+foldGet
+  :: Binary a 
+  => Word -- n elements 
+  -> BinHandle
+  -> b -- initial accumulator 
+  -> (Word -> a -> b -> IO b)
+  -> IO b
+foldGet n bh init_b f = go 0 init_b
+  where
+    go i b
+      | i == n    = return b
+      | otherwise = do
+          a <- get bh
+          b' <- f i a b
+          go (i+1) b'
+
 
 -- -----------------------------------------------------------------------------
 -- Low-level reading/writing of bytes
