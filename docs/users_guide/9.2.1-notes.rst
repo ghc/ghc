@@ -114,12 +114,16 @@ Runtime system
   Moreover, we now correctly account for the size of the array, meaning that
   space lost to fragmentation is no longer counted as live data.
 
-
-
 - The ``-xt`` RTS flag has been removed. Now STACK and TSO closures are always
   included in heap profiles. Tooling can choose to filter out these closure types
 `  if necessary.
 
+- The RTS will now gradually return unused memory back to the OS rather than
+  retaining a large amount (up to 4 * live) indefinitely. The rate at which memory
+  is returned is controlled by the :rts-flag:`-Fd ⟨factor⟩`.
+
+``ghc-prim`` library
+~~~~~~~~~~~~~~~~~~~~
 
 - ``Void#`` is now a type synonym for the unboxed tuple ``(# #)``.
   Code using ``Void#`` now has to enable :extension:`UnboxedTuples`.
