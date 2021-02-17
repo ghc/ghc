@@ -142,6 +142,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Fingerprint
 import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Utils.Logger
 
 import GHC.Builtin.Names ( isUnboundName )
 
@@ -235,6 +236,9 @@ data Env gbl lcl
 
 instance ContainsDynFlags (Env gbl lcl) where
     extractDynFlags env = hsc_dflags (env_top env)
+
+instance ContainsLogger (Env gbl lcl) where
+    extractLogger env = hsc_logger (env_top env)
 
 instance ContainsModule gbl => ContainsModule (Env gbl lcl) where
     extractModule env = extractModule (env_gbl env)
@@ -676,6 +680,9 @@ We gather three sorts of usage information
           Coercible solver updates tcg_keep's TcRef whenever it
           encounters a use of `coerce` that crosses newtype boundaries.
 
+      (e) Record fields that are used to solve HasField constraints
+          (see Note [Unused name reporting and HasField] in GHC.Tc.Instance.Class)
+
       The tcg_keep field is used in two distinct ways:
 
       * Desugar.addExportFlagsAndRules.  Where things like (a-c) are locally
@@ -748,7 +755,7 @@ data TcLclEnv           -- Changes as we move inside an expression
                                       -- and for tidying types
 
         tcl_lie  :: TcRef WantedConstraints,    -- Place to accumulate type constraints
-        tcl_errs :: TcRef (Messages ErrDoc)     -- Place to accumulate errors
+        tcl_errs :: TcRef (Messages DecoratedSDoc)     -- Place to accumulate errors
     }
 
 setLclEnvTcLevel :: TcLclEnv -> TcLevel -> TcLclEnv
@@ -763,7 +770,7 @@ setLclEnvLoc env loc = env { tcl_loc = loc }
 getLclEnvLoc :: TcLclEnv -> RealSrcSpan
 getLclEnvLoc = tcl_loc
 
-type ErrCtxt = (Bool, TidyEnv -> TcM (TidyEnv, MsgDoc))
+type ErrCtxt = (Bool, TidyEnv -> TcM (TidyEnv, SDoc))
         -- Monadic so that we have a chance
         -- to deal with bound type variables just before error
         -- message construction
@@ -1712,8 +1719,8 @@ getRoleAnnots bndrs role_env
 
 -- | Check the 'TcGblEnv' for consistency. Currently, only checks
 -- axioms, but should check other aspects, too.
-lintGblEnv :: DynFlags -> TcGblEnv -> TcM ()
-lintGblEnv dflags tcg_env =
-  liftIO $ lintAxioms dflags (text "TcGblEnv axioms") axioms
+lintGblEnv :: Logger -> DynFlags -> TcGblEnv -> TcM ()
+lintGblEnv logger dflags tcg_env =
+  liftIO $ lintAxioms logger dflags (text "TcGblEnv axioms") axioms
   where
     axioms = typeEnvCoAxioms (tcg_type_env tcg_env)

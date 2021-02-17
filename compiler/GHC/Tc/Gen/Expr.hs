@@ -569,7 +569,7 @@ tcExpr (HsStatic fvs expr) res_ty
 ************************************************************************
 -}
 
-tcExpr expr@(RecordCon { rcon_con_name = L loc con_name
+tcExpr expr@(RecordCon { rcon_con = L loc con_name
                        , rcon_flds = rbinds }) res_ty
   = do  { con_like <- tcLookupConLike con_name
 
@@ -580,22 +580,19 @@ tcExpr expr@(RecordCon { rcon_con_name = L loc con_name
         ; let arity = conLikeArity con_like
               Right (arg_tys, actual_res_ty) = tcSplitFunTysN arity con_tau
 
-        ; case conLikeWrapId_maybe con_like of {
-               Nothing -> nonBidirectionalErr (conLikeName con_like) ;
-               Just con_id ->
+        ; checkTc (conLikeHasBuilder con_like) $
+          nonBidirectionalErr (conLikeName con_like)
 
-     do { rbinds' <- tcRecordBinds con_like (map scaledThing arg_tys) rbinds
+        ; rbinds' <- tcRecordBinds con_like (map scaledThing arg_tys) rbinds
                    -- It is currently not possible for a record to have
                    -- multiplicities. When they do, `tcRecordBinds` will take
                    -- scaled types instead. Meanwhile, it's safe to take
                    -- `scaledThing` above, as we know all the multiplicities are
                    -- Many.
 
-        ; let rcon_tc = RecordConTc
-                           { rcon_con_like = con_like
-                           , rcon_con_expr = mkHsWrap con_wrap con_expr }
+        ; let rcon_tc = mkHsWrap con_wrap con_expr
               expr' = RecordCon { rcon_ext = rcon_tc
-                                , rcon_con_name = L loc con_id
+                                , rcon_con = L loc con_like
                                 , rcon_flds = rbinds' }
 
         ; ret <- tcWrapResultMono expr expr' actual_res_ty res_ty
@@ -610,7 +607,7 @@ tcExpr expr@(RecordCon { rcon_con_name = L loc con_name
         -- via a new `HoleSort`.  But that seems too much work.
         ; checkMissingFields con_like rbinds arg_tys
 
-        ; return ret } } }
+        ; return ret }
   where
     orig = OccurrenceOf con_name
 
@@ -837,8 +834,8 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
 
         -- Check that we're not dealing with a unidirectional pattern
         -- synonym
-        ; unless (isJust $ conLikeWrapId_maybe con1)
-                 (nonBidirectionalErr (conLikeName con1))
+        ; checkTc (conLikeHasBuilder con1) $
+          nonBidirectionalErr (conLikeName con1)
 
         -- STEP 3    Note [Criteria for update]
         -- Check that each updated field is polymorphic; that is, its type
@@ -1286,7 +1283,6 @@ getFixedTyVars upd_fld_occs univ_tvs cons
                       , (tv1,tv) <- univ_tvs `zip` u_tvs
                       , tv `elemVarSet` fixed_tvs ]
 
-
 -- Disambiguate the fields in a record update.
 -- See Note [Disambiguating record fields] in GHC.Tc.Gen.Head
 disambiguateRecordBinds :: LHsExpr GhcRn -> TcRhoType
@@ -1319,7 +1315,7 @@ disambiguateRecordBinds record_expr record_rho rbnds res_ty
                                 , [(RecSelParent, GlobalRdrElt)])]
     getUpdFieldsParents
       = fmap (zip rbnds) $ mapM
-          (lookupParents . unLoc . hsRecUpdFieldRdr . unLoc)
+          (lookupParents False . unLoc . hsRecUpdFieldRdr . unLoc)
           rbnds
 
     -- Given a the lists of possible parents for each field,

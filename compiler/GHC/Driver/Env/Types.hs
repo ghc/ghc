@@ -20,6 +20,7 @@ import GHC.Unit.Module.Graph
 import GHC.Unit.Env
 import GHC.Unit.State
 import GHC.Unit.Types
+import GHC.Utils.Logger
 import {-# SOURCE #-} GHC.Driver.Plugins
 
 import Control.Monad ( ap )
@@ -44,6 +45,10 @@ instance MonadIO Hsc where
 
 instance HasDynFlags Hsc where
     getDynFlags = Hsc $ \e w -> return (hsc_dflags e, w)
+
+instance HasLogger Hsc where
+    getLogger = Hsc $ \e w -> return (hsc_logger e, w)
+
 
 -- | HscEnv is like 'GHC.Driver.Monad.Session', except that some of the fields are immutable.
 -- An HscEnv is used to compile a single module from plain Haskell source
@@ -147,5 +152,8 @@ data HscEnv
                 --
                 -- Initialized from the databases cached in 'hsc_unit_dbs' and
                 -- from the DynFlags.
+
+        , hsc_logger :: !Logger
+                -- ^ Logger
  }
 

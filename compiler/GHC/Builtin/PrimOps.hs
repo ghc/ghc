@@ -634,7 +634,7 @@ Note [Eta expanding primops]
 
 STG requires that primop applications be saturated. This makes code generation
 significantly simpler since otherwise we would need to define a calling
-convention for curried applications that can accomodate levity polymorphism.
+convention for curried applications that can accommodate levity polymorphism.
 
 To ensure saturation, CorePrep eta expands expand all primop applications as
 described in Note [Eta expansion of hasNoBinding things in CorePrep] in

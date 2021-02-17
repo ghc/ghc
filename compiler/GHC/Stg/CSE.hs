@@ -95,8 +95,6 @@ import GHC.Prelude
 import GHC.Core.DataCon
 import GHC.Types.Id
 import GHC.Stg.Syntax
-import GHC.Utils.Outputable
-import GHC.Utils.Panic
 import GHC.Types.Basic (isWeakLoopBreaker)
 import GHC.Types.Var.Env
 import GHC.Core (AltCon(..))
@@ -312,8 +310,6 @@ stgCseExpr _ (StgLit lit)
 stgCseExpr env (StgOpApp op args tys)
     = StgOpApp op args' tys
   where args' = substArgs env args
-stgCseExpr _ (StgLam _ _)
-    = pprPanic "stgCseExp" (text "StgLam")
 stgCseExpr env (StgTick tick body)
     = let body' = stgCseExpr env body
       in StgTick tick body'

@@ -139,7 +139,7 @@ import GHC.Utils.Panic
 import GHC.Platform
 
 import Data.Maybe
-import Data.List
+import Data.List (partition, nub)
 import Control.Monad
 import Control.Applicative
 

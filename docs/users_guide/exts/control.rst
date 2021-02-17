@@ -95,6 +95,7 @@ Language extensions can be controlled (i.e. allowed or not) in two ways:
      * :extension:`MonomorphismRestriction`
      * :extension:`DatatypeContexts`
      * :extension:`TraditionalRecordSyntax`
+     * :extension:`FieldSelectors`
      * :extension:`EmptyDataDecls`
      * :extension:`ForeignFunctionInterface`
      * :extension:`PatternGuards`
@@ -117,6 +118,7 @@ Language extensions can be controlled (i.e. allowed or not) in two ways:
      * :extension:`NPlusKPatterns`
      * :extension:`DatatypeContexts`
      * :extension:`TraditionalRecordSyntax`
+     * :extension:`FieldSelectors`
      * :extension:`NondecreasingIndentation`
 
 

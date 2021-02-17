@@ -89,7 +89,7 @@ import Data.Kind (Constraint)
 
 import Data.ByteString ( unpack )
 import Control.Monad
-import Data.List
+import Data.List (sort, sortBy)
 import Data.Function
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class
@@ -848,11 +848,14 @@ repAnnD (L loc (HsAnnotation _ _ ann_prov (L _ exp)))
        ; return (loc, dec) }
 
 repAnnProv :: AnnProvenance Name -> MetaM (Core TH.AnnTarget)
-repAnnProv (ValueAnnProvenance (L _ n))
-  = do { MkC n' <- lift $ globalVar n  -- ANNs are allowed only at top-level
+repAnnProv (ValueAnnProvenance n)
+  = do { -- An ANN references an identifier bound elsewhere in the module, so
+         -- we must look it up using lookupLOcc (#19377).
+         -- Similarly for TypeAnnProvenance (`ANN type`) below.
+         MkC n' <- lookupLOcc n
        ; rep2_nw valueAnnotationName [ n' ] }
-repAnnProv (TypeAnnProvenance (L _ n))
-  = do { MkC n' <- lift $ globalVar n
+repAnnProv (TypeAnnProvenance n)
+  = do { MkC n' <- lookupLOcc n
        ; rep2_nw typeAnnotationName [ n' ] }
 repAnnProv ModuleAnnProvenance
   = rep2_nw moduleAnnotationName []
@@ -1418,6 +1421,9 @@ repTyLit (HsNumTy _ i) = rep2 numTyLitName [mkIntegerExpr i]
 repTyLit (HsStrTy _ s) = do { s' <- mkStringExprFS s
                             ; rep2 strTyLitName [s']
                             }
+repTyLit (HsCharTy _ c) = do { c' <- return (mkCharExpr c)
+                             ; rep2 charTyLitName [c']
+                             }
 
 -- | Represent a type wrapped in a Maybe
 repMaybeLTy :: Maybe (LHsKind GhcRn)
@@ -1568,7 +1574,7 @@ repE (ExplicitSum _ alt arity e)
  = do { e1 <- repLE e
       ; repUnboxedSum e1 alt arity }
 
-repE (RecordCon { rcon_con_name = c, rcon_flds = flds })
+repE (RecordCon { rcon_con = c, rcon_flds = flds })
  = do { x <- lookupLOcc c;
         fs <- repFields flds;
         repRecCon x fs }

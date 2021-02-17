@@ -29,7 +29,6 @@ data Extension
    | IncoherentInstances
    | UndecidableSuperClasses
    | MonomorphismRestriction
-   | MonoPatBinds
    | MonoLocalBinds
    | RelaxedPolyRec           -- Deprecated
    | ExtendedDefaultRules     -- Use GHC's extended rules for defaulting
@@ -146,6 +145,7 @@ data Extension
    | CUSKs
    | StandaloneKindSignatures
    | LexicalNegation
+   | FieldSelectors
    deriving (Eq, Enum, Show, Generic, Bounded)
 -- 'Ord' and 'Bounded' are provided for GHC API users (see discussions
 -- in https://gitlab.haskell.org/ghc/ghc/merge_requests/2707 and

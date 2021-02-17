@@ -38,9 +38,7 @@ When the compiler “does the wrong thing”
 Sensitivity to ``.hi`` interface files
     GHC is very sensitive about interface files. For example, if it
     picks up a non-standard ``Prelude.hi`` file, pretty terrible things
-    will happen. If you turn on
-    ``-XNoImplicitPrelude`` option, the compiler will
-    almost surely die, unless you know what you are doing.
+    will happen.
 
     Furthermore, as sketched below, you may have big problems running
     programs compiled using unstable interfaces.

@@ -50,10 +50,11 @@ import GHC.Types.Var.Set
 import GHC.Core.DataCon
 import GHC.Core             ( AltCon(..) )
 import GHC.Types.Name       ( getSrcLoc, nameIsLocalOrFrom )
-import GHC.Utils.Error      ( MsgDoc, Severity(..), mkLocMessage )
+import GHC.Utils.Error      ( Severity(..), mkLocMessage )
 import GHC.Core.Type
 import GHC.Types.RepType
 import GHC.Types.SrcLoc
+import GHC.Utils.Logger
 import GHC.Utils.Outputable
 import GHC.Unit.Module            ( Module )
 import qualified GHC.Utils.Error as Err
@@ -61,20 +62,21 @@ import Control.Applicative ((<|>))
 import Control.Monad
 
 lintStgTopBindings :: forall a . (OutputablePass a, BinderP a ~ Id)
-                   => DynFlags
+                   => Logger
+                   -> DynFlags
                    -> Module -- ^ module being compiled
                    -> Bool   -- ^ have we run Unarise yet?
                    -> String -- ^ who produced the STG?
                    -> [GenStgTopBinding a]
                    -> IO ()
 
-lintStgTopBindings dflags this_mod unarised whodunnit binds
+lintStgTopBindings logger dflags this_mod unarised whodunnit binds
   = {-# SCC "StgLint" #-}
     case initL this_mod unarised opts top_level_binds (lint_binds binds) of
       Nothing  ->
         return ()
       Just msg -> do
-        putLogMsg dflags NoReason Err.SevDump noSrcSpan
+        putLogMsg logger dflags NoReason Err.SevDump noSrcSpan
           $ withPprStyle defaultDumpStyle
           (vcat [ text "*** Stg Lint ErrMsgs: in" <+>
                         text whodunnit <+> text "***",
@@ -82,7 +84,7 @@ lintStgTopBindings dflags this_mod unarised whodunnit binds
                   text "*** Offending Program ***",
                   pprGenStgTopBindings opts binds,
                   text "*** End of Offense ***"])
-        Err.ghcExit dflags 1
+        Err.ghcExit logger dflags 1
   where
     opts = initStgPprOpts dflags
     -- Bring all top-level binds into scope because CoreToStg does not generate
@@ -192,10 +194,6 @@ lintStgExpr app@(StgConApp con args _arg_tys) = do
 lintStgExpr (StgOpApp _ args _) =
     mapM_ lintStgArg args
 
-lintStgExpr lam@(StgLam _ _) = do
-    opts <- getStgPprOpts
-    addErrL (text "Unexpected StgLam" <+> pprStgExpr opts lam)
-
 lintStgExpr (StgLet _ binds body) = do
     binders <- lintStgBinds NotTopLevel binds
     addLoc (BodyOfLetRec binders) $
@@ -246,8 +244,8 @@ newtype LintM a = LintM
               -> StgPprOpts        -- Pretty-printing options
               -> [LintLocInfo]     -- Locations
               -> IdSet             -- Local vars in scope
-              -> Bag MsgDoc        -- Error messages so far
-              -> (a, Bag MsgDoc)   -- Result and error messages (if any)
+              -> Bag SDoc        -- Error messages so far
+              -> (a, Bag SDoc)   -- Result and error messages (if any)
     }
     deriving (Functor)
 
@@ -277,7 +275,7 @@ pp_binders bs
     pp_binder b
       = hsep [ppr b, dcolon, ppr (idType b)]
 
-initL :: Module -> Bool -> StgPprOpts -> IdSet -> LintM a -> Maybe MsgDoc
+initL :: Module -> Bool -> StgPprOpts -> IdSet -> LintM a -> Maybe SDoc
 initL this_mod unarised opts locals (LintM m) = do
   let (_, errs) = m this_mod (LintFlags unarised) opts [] locals emptyBag
   if isEmptyBag errs then
@@ -304,7 +302,7 @@ thenL_ m k = LintM $ \mod lf opts loc scope errs
   -> case unLintM m mod lf opts loc scope errs of
       (_, errs') -> unLintM k mod lf opts loc scope errs'
 
-checkL :: Bool -> MsgDoc -> LintM ()
+checkL :: Bool -> SDoc -> LintM ()
 checkL True  _   = return ()
 checkL False msg = addErrL msg
 
@@ -346,10 +344,10 @@ checkPostUnariseId id =
     in
       is_sum <|> is_tuple <|> is_void
 
-addErrL :: MsgDoc -> LintM ()
+addErrL :: SDoc -> LintM ()
 addErrL msg = LintM $ \_mod _lf _opts loc _scope errs -> ((), addErr errs msg loc)
 
-addErr :: Bag MsgDoc -> MsgDoc -> [LintLocInfo] -> Bag MsgDoc
+addErr :: Bag SDoc -> SDoc -> [LintLocInfo] -> Bag SDoc
 addErr errs_so_far msg locs
   = errs_so_far `snocBag` mk_msg locs
   where

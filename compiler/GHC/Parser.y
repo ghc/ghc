@@ -1921,7 +1921,7 @@ annotation :: { LHsDecl GhcPs }
                                             (ValueAnnProvenance $2) $3))
                                             [mo $1,mc $4] }
 
-    | '{-# ANN' 'type' tycon aexp '#-}'  {% runPV (unECP $4) >>= \ $4 ->
+    | '{-# ANN' 'type' otycon aexp '#-}' {% runPV (unECP $4) >>= \ $4 ->
                                             ams (sLL $1 $> (AnnD noExtField $ HsAnnotation noExtField
                                             (getANN_PRAGs $1)
                                             (TypeAnnProvenance $3) $4))
@@ -2188,6 +2188,8 @@ atype :: { LHsType GhcPs }
                                                  [mos $1,mcs $5] }
         | INTEGER              { sLL $1 $> $ HsTyLit noExtField $ HsNumTy (getINTEGERs $1)
                                                            (il_value (getINTEGER $1)) }
+        | CHAR                 { sLL $1 $> $ HsTyLit noExtField $ HsCharTy (getCHARs $1)
+                                                                        (getCHAR $1) }
         | STRING               { sLL $1 $> $ HsTyLit noExtField $ HsStrTy (getSTRINGs $1)
                                                                      (getSTRING  $1) }
         | '_'                  { sL1 $1 $ mkAnonWildCardTy }
@@ -3560,6 +3562,12 @@ tyconsym :: { Located RdrName }
         | '-'                   { sL1 $1 $! mkUnqual tcClsName (fsLit "-") }
         | '.'                   { sL1 $1 $! mkUnqual tcClsName (fsLit ".") }
 
+-- An "ordinary" unqualified tycon. See `oqtycon` for the qualified version.
+-- These can appear in `ANN type` declarations (#19374).
+otycon :: { Located RdrName }
+        : tycon                 { $1 }
+        | '(' tyconsym ')'      {% ams (sLL $1 $> (unLoc $2))
+                                       [mop $1,mj AnnVal $2,mcp $3] }
 
 -----------------------------------------------------------------------------
 -- Operators

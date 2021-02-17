@@ -48,6 +48,7 @@ import Control.Monad
 import Control.Monad.Trans.Reader
 import Control.Monad.Catch (MonadCatch, MonadMask, MonadThrow)
 import GHC.Utils.Monad
+import GHC.Utils.Logger
 import Control.Applicative (Alternative(..))
 import GHC.Exts( oneShot )
 
@@ -109,6 +110,11 @@ instance Exception IOEnvFailure
 instance ContainsDynFlags env => HasDynFlags (IOEnv env) where
     getDynFlags = do env <- getEnv
                      return $! extractDynFlags env
+
+instance ContainsLogger env => HasLogger (IOEnv env) where
+    getLogger = do env <- getEnv
+                   return $! extractLogger env
+
 
 instance ContainsModule env => HasModule (IOEnv env) where
     getModule = do env <- getEnv

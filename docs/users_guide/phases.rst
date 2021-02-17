@@ -190,7 +190,7 @@ the following flags:
     specified compiler will support it. This flag can be used to indicate
     that ``-no-pie`` is supported. It has to be passed after ``-pgmc``.
 
-    This flag is not neccessary when ``-pgmc`` is not used, since GHC
+    This flag is not necessary when ``-pgmc`` is not used, since GHC
     remembers whether the default C compiler supports ``-no-pie`` in
     an internal settings file.
 
@@ -727,7 +727,7 @@ Options affecting code generation
 
     Request that GHC emits verbose symbol tables which include local symbols
     for module-internal functions. These can be useful for tools like
-    :ref:`perf <https://perf.wiki.kernel.org/>` but increase object file sizes.
+    `perf <https://perf.wiki.kernel.org/>`__ but increase object file sizes.
     This is implied by :ghc-flag:`-g2 <-g>` and above.
 
     :ghc-flag:`-fno-expose-internal-symbols <-fexpose-internal-symbols>`

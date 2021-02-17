@@ -60,7 +60,7 @@ import GHC.Types.FieldLabel
 import GHC.Rename.Env
 import GHC.Data.Bag
 import GHC.Utils.Misc
-import GHC.Utils.Error
+import GHC.Driver.Session ( getDynFlags, xopt_FieldSelectors )
 import Data.Maybe( mapMaybe )
 import Control.Monad ( zipWithM )
 import Data.List( partition, mapAccumL )
@@ -103,13 +103,12 @@ recoverPSB (PSB { psb_id = L _ name
                         ([mkTyVarBinder SpecifiedSpec alphaTyVar], []) ([], [])
                         [] -- Arg tys
                         alphaTy
-                        (matcher_id, True) Nothing
+                        (matcher_name, matcher_ty, True) Nothing
                         []  -- Field labels
        where
          -- The matcher_id is used only by the desugarer, so actually
          -- and error-thunk would probably do just as well here.
-         matcher_id = mkLocalId matcher_name Many $
-                      mkSpecForAllTys [alphaTyVar] alphaTy
+         matcher_ty = mkSpecForAllTys [alphaTyVar] alphaTy
 
 {- Note [Pattern synonym error recovery]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -699,17 +698,17 @@ tc_patsyn_finish lname dir is_infix lpat' prag_fn
            ppr pat_ty
 
        -- Make the 'matcher'
-       ; (matcher_id, matcher_bind) <- tcPatSynMatcher lname lpat' prag_fn
+       ; (matcher, matcher_bind) <- tcPatSynMatcher lname lpat' prag_fn
                                          (binderVars univ_tvs, req_theta, req_ev_binds, req_dicts)
                                          (binderVars ex_tvs, ex_tys, prov_theta, prov_dicts)
                                          (args, arg_tys)
                                          pat_ty
 
        -- Make the 'builder'
-       ; builder_id <- mkPatSynBuilderId dir lname
-                                         univ_tvs req_theta
-                                         ex_tvs   prov_theta
-                                         arg_tys pat_ty prag_fn
+       ; builder <- mkPatSynBuilder dir lname
+                                    univ_tvs req_theta
+                                    ex_tvs   prov_theta
+                                    arg_tys pat_ty
 
        -- Make the PatSyn itself
        ; let patSyn = mkPatSyn (unLoc lname) is_infix
@@ -717,11 +716,12 @@ tc_patsyn_finish lname dir is_infix lpat' prag_fn
                         (ex_tvs, prov_theta)
                         arg_tys
                         pat_ty
-                        matcher_id builder_id
+                        matcher builder
                         field_labels
 
        -- Selectors
-       ; let rn_rec_sel_binds = mkPatSynRecSelBinds patSyn (patSynFieldLabels patSyn)
+       ; has_sel <- xopt_FieldSelectors <$> getDynFlags
+       ; let rn_rec_sel_binds = mkPatSynRecSelBinds patSyn (patSynFieldLabels patSyn) has_sel
              tything = AConLike (PatSynCon patSyn)
        ; tcg_env <- tcExtendGlobalEnv [tything] $
                     tcRecSelBinds rn_rec_sel_binds
@@ -744,7 +744,7 @@ tcPatSynMatcher :: Located Name
                 -> ([TcTyVar], [TcType], ThetaType, [EvTerm])
                 -> ([LHsExpr GhcTc], [TcType])
                 -> TcType
-                -> TcM ((Id, Bool), LHsBinds GhcTc)
+                -> TcM (PatSynMatcher, LHsBinds GhcTc)
 -- See Note [Matchers and builders for pattern synonyms] in GHC.Core.PatSyn
 tcPatSynMatcher (L loc name) lpat prag_fn
                 (univ_tvs, req_theta, req_ev_binds, req_dicts)
@@ -770,6 +770,7 @@ tcPatSynMatcher (L loc name) lpat prag_fn
        ; cont         <- newSysLocalId (fsLit "cont")  Many cont_ty
        ; fail         <- newSysLocalId (fsLit "fail")  Many fail_ty
 
+       ; dflags       <- getDynFlags
        ; let matcher_tau   = mkVisFunTysMany [pat_ty, cont_ty, fail_ty] res_ty
              matcher_sigma = mkInfSigmaTy (rr_tv:res_tv:univ_tvs) req_theta matcher_tau
              matcher_id    = mkExportedVanillaId matcher_name matcher_sigma
@@ -782,7 +783,7 @@ tcPatSynMatcher (L loc name) lpat prag_fn
 
              args = map nlVarPat [scrutinee, cont, fail]
              lwpat = noLoc $ WildPat pat_ty
-             cases = if isIrrefutableHsPat lpat
+             cases = if isIrrefutableHsPat dflags lpat
                      then [mkHsCaseAlt lpat  cont']
                      else [mkHsCaseAlt lpat  cont',
                            mkHsCaseAlt lwpat fail']
@@ -821,13 +822,14 @@ tcPatSynMatcher (L loc name) lpat prag_fn
        ; traceTc "tcPatSynMatcher" (ppr name $$ ppr (idType matcher_id))
        ; traceTc "tcPatSynMatcher" (ppr matcher_bind)
 
-       ; return ((matcher_prag_id, is_unlifted), matcher_bind) }
+       ; return ((matcher_name, matcher_sigma, is_unlifted), matcher_bind) }
 
 mkPatSynRecSelBinds :: PatSyn
                     -> [FieldLabel]  -- ^ Visible field labels
+                    -> FieldSelectors
                     -> [(Id, LHsBind GhcRn)]
-mkPatSynRecSelBinds ps fields
-  = [ mkOneRecordSelector [PatSynCon ps] (RecSelPatSyn ps) fld_lbl
+mkPatSynRecSelBinds ps fields has_sel
+  = [ mkOneRecordSelector [PatSynCon ps] (RecSelPatSyn ps) fld_lbl has_sel
     | fld_lbl <- fields ]
 
 isUnidirectional :: HsPatSynDir a -> Bool
@@ -843,15 +845,14 @@ isUnidirectional ExplicitBidirectional{} = False
 ************************************************************************
 -}
 
-mkPatSynBuilderId :: HsPatSynDir a -> Located Name
-                  -> [InvisTVBinder] -> ThetaType
-                  -> [InvisTVBinder] -> ThetaType
-                  -> [Type] -> Type
-                  -> TcPragEnv
-                  -> TcM (Maybe (Id, Bool))
-mkPatSynBuilderId dir (L _ name)
+mkPatSynBuilder :: HsPatSynDir a -> Located Name
+                -> [InvisTVBinder] -> ThetaType
+                -> [InvisTVBinder] -> ThetaType
+                -> [Type] -> Type
+                -> TcM PatSynBuilder
+mkPatSynBuilder dir (L _ name)
                   univ_bndrs req_theta ex_bndrs prov_theta
-                  arg_tys pat_ty prag_fn
+                  arg_tys pat_ty
   | isUnidirectional dir
   = return Nothing
   | otherwise
@@ -864,44 +865,47 @@ mkPatSynBuilderId dir (L _ name)
                               mkPhiTy theta $
                               mkVisFunTysMany arg_tys $
                               pat_ty
-             builder_id     = mkExportedVanillaId builder_name builder_sigma
-              -- See Note [Exported LocalIds] in GHC.Types.Id
+       ; return (Just (builder_name, builder_sigma, need_dummy_arg)) }
 
-             builder_id'    = modifyIdInfo (`setLevityInfoWithType` pat_ty) builder_id
-             prags          = lookupPragEnv prag_fn name
-             -- See Note [Pragmas for pattern synonyms]
-
-       ; builder_prag_id <- addInlinePrags builder_id' prags
-       ; return (Just (builder_prag_id, need_dummy_arg)) }
-
-tcPatSynBuilderBind :: PatSynBind GhcRn GhcRn
+tcPatSynBuilderBind :: TcPragEnv
+                    -> PatSynBind GhcRn GhcRn
                     -> TcM (LHsBinds GhcTc)
 -- See Note [Matchers and builders for pattern synonyms] in GHC.Core.PatSyn
-tcPatSynBuilderBind (PSB { psb_id = L loc name
-                         , psb_def = lpat
-                         , psb_dir = dir
-                         , psb_args = details })
+tcPatSynBuilderBind prag_fn (PSB { psb_id = ps_lname@(L loc ps_name)
+                                 , psb_def = lpat
+                                 , psb_dir = dir
+                                 , psb_args = details })
   | isUnidirectional dir
   = return emptyBag
 
   | Left why <- mb_match_group       -- Can't invert the pattern
   = setSrcSpan (getLoc lpat) $ failWithTc $
     vcat [ hang (text "Invalid right-hand side of bidirectional pattern synonym"
-                 <+> quotes (ppr name) <> colon)
+                 <+> quotes (ppr ps_name) <> colon)
               2 why
          , text "RHS pattern:" <+> ppr lpat ]
 
   | Right match_group <- mb_match_group  -- Bidirectional
-  = do { patsyn <- tcLookupPatSyn name
+  = do { patsyn <- tcLookupPatSyn ps_name
        ; case patSynBuilder patsyn of {
            Nothing -> return emptyBag ;
              -- This case happens if we found a type error in the
              -- pattern synonym, recovered, and put a placeholder
              -- with patSynBuilder=Nothing in the environment
 
-           Just (builder_id, need_dummy_arg) ->  -- Normal case
+           Just (builder_name, builder_ty, need_dummy_arg) ->  -- Normal case
     do { -- Bidirectional, so patSynBuilder returns Just
-         let match_group' | need_dummy_arg = add_dummy_arg match_group
+         let pat_ty = patSynResultType patsyn
+             builder_id = modifyIdInfo (`setLevityInfoWithType` pat_ty) $
+                          mkExportedVanillaId builder_name builder_ty
+                         -- See Note [Exported LocalIds] in GHC.Types.Id
+             prags = lookupPragEnv prag_fn ps_name
+             -- See Note [Pragmas for pattern synonyms]
+             -- Keyed by the PatSyn Name, not the (internal) builder name
+
+       ; builder_id <- addInlinePrags builder_id prags
+
+       ; let match_group' | need_dummy_arg = add_dummy_arg match_group
                           | otherwise      = match_group
 
              bind = FunBind { fun_id      = L loc (idName builder_id)
@@ -909,10 +913,12 @@ tcPatSynBuilderBind (PSB { psb_id = L loc name
                             , fun_ext     = emptyNameSet
                             , fun_tick    = [] }
 
-             sig = completeSigFromId (PatSynCtxt name) builder_id
+             sig = completeSigFromId (PatSynCtxt ps_name) builder_id
 
        ; traceTc "tcPatSynBuilderBind {" $
-         ppr patsyn $$ ppr builder_id <+> dcolon <+> ppr (idType builder_id)
+         vcat [ ppr patsyn
+              , ppr builder_id <+> dcolon <+> ppr (idType builder_id)
+              , ppr prags ]
        ; (builder_binds, _) <- tcPolyCheck emptyPragEnv sig (noLoc bind)
        ; traceTc "tcPatSynBuilderBind }" $ ppr builder_binds
        ; return builder_binds } } }
@@ -924,7 +930,7 @@ tcPatSynBuilderBind (PSB { psb_id = L loc name
     mb_match_group
        = case dir of
            ExplicitBidirectional explicit_mg -> Right explicit_mg
-           ImplicitBidirectional -> fmap mk_mg (tcPatToExpr name args lpat)
+           ImplicitBidirectional -> fmap mk_mg (tcPatToExpr ps_name args lpat)
            Unidirectional -> panic "tcPatSynBuilderBind"
 
     mk_mg :: LHsExpr GhcRn -> MatchGroup GhcRn (LHsExpr GhcRn)
@@ -932,7 +938,7 @@ tcPatSynBuilderBind (PSB { psb_id = L loc name
           where
             builder_args  = [L loc (VarPat noExtField (L loc n))
                             | L loc n <- args]
-            builder_match = mkMatch (mkPrefixFunRhs (L loc name))
+            builder_match = mkMatch (mkPrefixFunRhs ps_lname)
                                     builder_args body
                                     (noLoc (EmptyLocalBinds noExtField))
 
@@ -951,13 +957,12 @@ tcPatSynBuilderBind (PSB { psb_id = L loc name
 
 patSynBuilderOcc :: PatSyn -> Maybe (HsExpr GhcTc, TcSigmaType)
 patSynBuilderOcc ps
-  | Just (builder_id, add_void_arg) <- patSynBuilder ps
+  | Just (_, builder_ty, add_void_arg) <- patSynBuilder ps
   , let builder_expr = HsConLikeOut noExtField (PatSynCon ps)
-        builder_ty   = idType builder_id
   = Just $
     if add_void_arg
-    then ( builder_expr   -- still just return builder_expr; the void# arg is added
-                          -- by dsConLike in the desugarer
+    then ( builder_expr   -- still just return builder_expr; the void# arg
+                          -- is added by dsConLike in the desugarer
          , tcFunResultTy builder_ty )
     else (builder_expr, builder_ty)
 
@@ -970,7 +975,7 @@ add_void need_dummy_arg ty
   | otherwise      = ty
 
 tcPatToExpr :: Name -> [Located Name] -> LPat GhcRn
-            -> Either MsgDoc (LHsExpr GhcRn)
+            -> Either SDoc (LHsExpr GhcRn)
 -- Given a /pattern/, return an /expression/ that builds a value
 -- that matches the pattern.  E.g. if the pattern is (Just [x]),
 -- the expression is (Just [x]).  They look the same, but the
@@ -985,7 +990,7 @@ tcPatToExpr name args pat = go pat
 
     -- Make a prefix con for prefix and infix patterns for simplicity
     mkPrefixConExpr :: Located Name -> [LPat GhcRn]
-                    -> Either MsgDoc (HsExpr GhcRn)
+                    -> Either SDoc (HsExpr GhcRn)
     mkPrefixConExpr lcon@(L loc _) pats
       = do { exprs <- mapM go pats
            ; let con = L loc (HsVar noExtField lcon)
@@ -993,15 +998,15 @@ tcPatToExpr name args pat = go pat
            }
 
     mkRecordConExpr :: Located Name -> HsRecFields GhcRn (LPat GhcRn)
-                    -> Either MsgDoc (HsExpr GhcRn)
+                    -> Either SDoc (HsExpr GhcRn)
     mkRecordConExpr con fields
       = do { exprFields <- mapM go fields
            ; return (RecordCon noExtField con exprFields) }
 
-    go :: LPat GhcRn -> Either MsgDoc (LHsExpr GhcRn)
+    go :: LPat GhcRn -> Either SDoc (LHsExpr GhcRn)
     go (L loc p) = L loc <$> go1 p
 
-    go1 :: Pat GhcRn -> Either MsgDoc (HsExpr GhcRn)
+    go1 :: Pat GhcRn -> Either SDoc (HsExpr GhcRn)
     go1 (ConPat NoExtField con info)
       = case info of
           PrefixCon _ ps -> mkPrefixConExpr con ps

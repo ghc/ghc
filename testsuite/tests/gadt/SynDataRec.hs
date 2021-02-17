@@ -2,7 +2,7 @@
 
 module SynDataRec where
 
--- This mutual recursion betwen a data type and
+-- This mutual recursion between a data type and
 -- a type synonym is a little delicate.  See
 -- Note [GADT return types] in GHC.Tc.TyCl
 

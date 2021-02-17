@@ -8,13 +8,13 @@
 
 module GHC.Core.Opt.Simplify.Env (
         -- * The simplifier mode
-        setMode, getMode, updMode, seDynFlags, seUnfoldingOpts,
+        setMode, getMode, updMode, seDynFlags, seUnfoldingOpts, seLogger,
 
         -- * Environments
         SimplEnv(..), pprSimplEnv,   -- Temp not abstract
         mkSimplEnv, extendIdSubst,
         extendTvSubst, extendCvSubst,
-        zapSubstEnv, setSubstEnv,
+        zapSubstEnv, setSubstEnv, bumpCaseDepth,
         getInScope, setInScopeFromE, setInScopeFromF,
         setInScopeSet, modifyInScope, addNewInScopeIds,
         getSimplRules,
@@ -60,7 +60,6 @@ import GHC.Data.OrdList
 import GHC.Types.Id as Id
 import GHC.Core.Make            ( mkWildValBinder )
 import GHC.Driver.Session       ( DynFlags )
-import GHC.Driver.Ppr
 import GHC.Builtin.Types
 import GHC.Core.TyCo.Rep        ( TyCoBinder(..) )
 import qualified GHC.Core.Type as Type
@@ -72,6 +71,7 @@ import GHC.Utils.Monad
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
+import GHC.Utils.Logger
 import GHC.Types.Unique.FM      ( pprUniqFM )
 
 import Data.List (mapAccumL)
@@ -104,6 +104,8 @@ data SimplEnv
         -- The current set of in-scope variables
         -- They are all OutVars, and all bound in this module
       , seInScope   :: InScopeSet       -- OutVars only
+
+      , seCaseDepth :: !Int  -- Depth of multi-branch case alternatives
     }
 
 data SimplFloats
@@ -273,11 +275,12 @@ points we're substituting. -}
 
 mkSimplEnv :: SimplMode -> SimplEnv
 mkSimplEnv mode
-  = SimplEnv { seMode = mode
-             , seInScope = init_in_scope
-             , seTvSubst = emptyVarEnv
-             , seCvSubst = emptyVarEnv
-             , seIdSubst = emptyVarEnv }
+  = SimplEnv { seMode      = mode
+             , seInScope   = init_in_scope
+             , seTvSubst   = emptyVarEnv
+             , seCvSubst   = emptyVarEnv
+             , seIdSubst   = emptyVarEnv
+             , seCaseDepth = 0 }
         -- The top level "enclosing CC" is "SUBSUMED".
 
 init_in_scope :: InScopeSet
@@ -310,6 +313,10 @@ getMode env = seMode env
 seDynFlags :: SimplEnv -> DynFlags
 seDynFlags env = sm_dflags (seMode env)
 
+seLogger :: SimplEnv -> Logger
+seLogger env = sm_logger (seMode env)
+
+
 seUnfoldingOpts :: SimplEnv -> UnfoldingOpts
 seUnfoldingOpts env = sm_uf_opts (seMode env)
 
@@ -319,6 +326,9 @@ setMode mode env = env { seMode = mode }
 
 updMode :: (SimplMode -> SimplMode) -> SimplEnv -> SimplEnv
 updMode upd env = env { seMode = upd (seMode env) }
+
+bumpCaseDepth :: SimplEnv -> SimplEnv
+bumpCaseDepth env = env { seCaseDepth = seCaseDepth env + 1 }
 
 ---------------------
 extendIdSubst :: SimplEnv -> Id -> SimplSR -> SimplEnv
@@ -683,7 +693,8 @@ refineFromInScope :: InScopeSet -> Var -> Var
 refineFromInScope in_scope v
   | isLocalId v = case lookupInScope in_scope v of
                   Just v' -> v'
-                  Nothing -> WARN( True, ppr v ) v  -- This is an error!
+                  Nothing -> pprPanic "refineFromInScope" (ppr in_scope $$ ppr v)
+                             -- c.f #19074 for a subtle place where this went wrong
   | otherwise = v
 
 lookupRecBndr :: SimplEnv -> InId -> OutId

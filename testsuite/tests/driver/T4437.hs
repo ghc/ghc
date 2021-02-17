@@ -40,6 +40,7 @@ expectedGhcOnlyExtensions =
     [ "RelaxedLayout"
     , "AlternativeLayoutRule"
     , "AlternativeLayoutRuleTransitional"
+    , "FieldSelectors"
     ]
 
 expectedCabalOnlyExtensions :: [String]
@@ -54,5 +55,6 @@ expectedCabalOnlyExtensions = ["Generics",
                                "Safe",
                                "Unsafe",
                                "Trustworthy",
-                               "MonadFailDesugaring"
+                               "MonadFailDesugaring",
+                               "MonoPatBinds"
                               ]

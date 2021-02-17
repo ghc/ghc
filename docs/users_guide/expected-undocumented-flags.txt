@@ -9,10 +9,8 @@
 -XAutoDeriveTypeable
 -XDoAndIfThenElse
 -XDoRec
--XGenerics
 -XImplicitPrelude
 -XJavaScriptFFI
--XMonoPatBinds
 -XMonomorphismRestriction
 -XParallelArrays
 -XPatternGuards
@@ -63,15 +61,16 @@
 -fghci-history
 -fghci-sandbox
 -fhistory-size
+-fimplicit-import-qualified
 -fimplicit-params
 -fimplicit-prelude
 -firrefutable-tuples
 -fmax-errors
 -fmax-pmcheck-iterations
--fmono-pat-binds
 -fmonomorphism-restriction
 -fnum-constant-folding
 -fpre-inlining
+-fprint-bind-contents
 -freduction-depth
 -frewrite-rules
 -fscoped-type-variables
@@ -81,8 +80,6 @@
 -fspec-constr-recursive
 -fspecialize
 -fspecialize-aggressively
--fstg-lift-lams-non-rec-args-any
--fstg-lift-lams-rec-args-any
 -fth
 -ftype-function-depth
 -funfolding-keeness-factor
@@ -112,7 +109,6 @@
 -rtsopts=ignoreAll
 -rtsopts=none
 -rtsopts=some
--smp
 -syslib
 -this-component-id
 -ticky-LNE

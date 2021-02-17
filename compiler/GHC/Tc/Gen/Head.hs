@@ -73,6 +73,7 @@ import GHC.Utils.Panic
 import Control.Monad
 
 import Data.Function
+import qualified Data.List.NonEmpty as NE
 
 #include "HsVersions.h"
 
@@ -539,13 +540,15 @@ finish_ambiguous_selector lr@(L _ rdr) parent_type
           Nothing -> ambiguousSelector lr ;
           Just p  ->
 
-    do { xs <- lookupParents rdr
+    do { xs <- lookupParents True rdr
        ; let parent = RecSelData p
        ; case lookup parent xs of {
            Nothing  -> failWithTc (fieldNotInType parent rdr) ;
            Just gre ->
 
+    -- See Note [Unused name reporting and HasField] in GHC.Tc.Instance.Class
     do { addUsedGRE True gre
+       ; keepAlive (greMangledName gre)
        ; return (greMangledName gre) } } } } }
 
 -- This field name really is ambiguous, so add a suitable "ambiguous
@@ -561,7 +564,9 @@ addAmbiguousNameErr :: RdrName -> TcM ()
 addAmbiguousNameErr rdr
   = do { env <- getGlobalRdrEnv
        ; let gres = lookupGRE_RdrName rdr env
-       ; setErrCtxt [] $ addNameClashErrRn rdr gres}
+       ; case gres of
+         [] -> panic "addAmbiguousNameErr: not found"
+         gre : gres -> setErrCtxt [] $ addNameClashErrRn rdr $ gre NE.:| gres}
 
 -- A type signature on the argument of an ambiguous record selector or
 -- the record expression in an update must be "obvious", i.e. the
@@ -590,10 +595,15 @@ tyConOfET fam_inst_envs ty0 = tyConOf fam_inst_envs =<< checkingExpType_maybe ty
 
 -- For an ambiguous record field, find all the candidate record
 -- selectors (as GlobalRdrElts) and their parents.
-lookupParents :: RdrName -> RnM [(RecSelParent, GlobalRdrElt)]
-lookupParents rdr
+lookupParents :: Bool -> RdrName -> RnM [(RecSelParent, GlobalRdrElt)]
+lookupParents is_selector rdr
   = do { env <- getGlobalRdrEnv
-       ; let gres = lookupGRE_RdrName rdr env
+        -- Filter by isRecFldGRE because otherwise a non-selector variable with
+        -- an overlapping name can get through when NoFieldSelectors is enabled.
+        -- See Note [NoFieldSelectors] in GHC.Rename.Env.
+       ; let all_gres = lookupGRE_RdrName' rdr env
+       ; let gres | is_selector = filter isFieldSelectorGRE all_gres
+                  | otherwise   = filter isRecFldGRE all_gres
        ; mapM lookupParent gres }
   where
     lookupParent :: GlobalRdrElt -> RnM (RecSelParent, GlobalRdrElt)
@@ -773,7 +783,7 @@ tc_infer_id id_name
                    | Just (expr, ty) <- patSynBuilderOcc ps
                    -> return (expr, ty)
                    | otherwise
-                   -> nonBidirectionalErr id_name
+                   -> failWithTc (nonBidirectionalErr id_name)
 
              AGlobal (ATyCon ty_con)
                -> fail_tycon global_env ty_con
@@ -855,10 +865,9 @@ check_naughty lbl id
   | isNaughtyRecordSelector id = failWithTc (naughtyRecordSel lbl)
   | otherwise                  = return ()
 
-nonBidirectionalErr :: Outputable name => name -> TcM a
-nonBidirectionalErr name = failWithTc $
-    text "non-bidirectional pattern synonym"
-    <+> quotes (ppr name) <+> text "used in an expression"
+nonBidirectionalErr :: Outputable name => name -> SDoc
+nonBidirectionalErr name = text "non-bidirectional pattern synonym"
+                           <+> quotes (ppr name) <+> text "used in an expression"
 
 {-
 Note [Linear fields generalization]

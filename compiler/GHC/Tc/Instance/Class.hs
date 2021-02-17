@@ -30,7 +30,7 @@ import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim( eqPrimTyCon, eqReprPrimTyCon )
 import GHC.Builtin.Names
 
-import GHC.Types.Name.Reader( lookupGRE_FieldLabel )
+import GHC.Types.Name.Reader( lookupGRE_FieldLabel, greMangledName )
 import GHC.Types.SafeHaskell
 import GHC.Types.Name   ( Name, pprDefinedAt )
 import GHC.Types.Var.Env ( VarEnv )
@@ -39,7 +39,7 @@ import GHC.Types.Id
 import GHC.Core.Predicate
 import GHC.Core.InstEnv
 import GHC.Core.Type
-import GHC.Core.Make ( mkStringExprFS, mkNaturalExpr )
+import GHC.Core.Make ( mkCharExpr, mkStringExprFS, mkNaturalExpr )
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.Class
@@ -141,6 +141,8 @@ matchGlobalInst dflags short_cut clas tys
   = matchKnownNat    dflags short_cut clas tys
   | cls_name == knownSymbolClassName
   = matchKnownSymbol dflags short_cut clas tys
+  | cls_name == knownCharClassName
+  = matchKnownChar dflags short_cut clas tys
   | isCTupleClass clas                = matchCTuple          clas tys
   | cls_name == typeableClassName     = matchTypeable        clas tys
   | clas `hasKey` heqTyConKey         = matchHeteroEquality       tys
@@ -377,6 +379,16 @@ matchKnownSymbol df sc clas tys = matchInstEnv df sc clas tys
  -- See Note [Fabricating Evidence for Literals in Backpack] for why
  -- this lookup into the instance environment is required.
 
+matchKnownChar :: DynFlags
+                 -> Bool      -- True <=> caller is the short-cut solver
+                              -- See Note [Shortcut solving: overlap]
+                 -> Class -> [Type] -> TcM ClsInstResult
+matchKnownChar _ _ clas [ty]  -- clas = KnownChar
+  | Just s <- isCharLitTy ty = makeLitDict clas ty (mkCharExpr s)
+matchKnownChar df sc clas tys = matchInstEnv df sc clas tys
+ -- See Note [Fabricating Evidence for Literals in Backpack] for why
+ -- this lookup into the instance environment is required.
+
 makeLitDict :: Class -> Type -> EvExpr -> TcM ClsInstResult
 -- makeLitDict adds a coercion that will convert the literal into a dictionary
 -- of the appropriate type.  See Note [KnownNat & KnownSymbol and EvLit]
@@ -424,6 +436,7 @@ matchTypeable clas [k,t]  -- clas = Typeable
   -- Now cases that do work
   | k `eqType` naturalTy                   = doTyLit knownNatClassName         t
   | k `eqType` typeSymbolKind              = doTyLit knownSymbolClassName      t
+  | k `eqType` charTy                      = doTyLit knownCharClassName        t
   | tcIsConstraintKind t                   = doTyConApp clas t constraintKindTyCon []
   | Just (mult,arg,ret) <- splitFunTy_maybe t   = doFunTy    clas t mult arg ret
   | Just (tc, ks) <- splitTyConApp_maybe t -- See Note [Typeable (T a b c)]
@@ -659,6 +672,20 @@ may be solved by a user-supplied HasField instance.  Similarly, if we
 encounter a HasField constraint where the field is not a literal
 string, or does not belong to the type, then we fall back on the
 normal constraint solver behaviour.
+
+
+Note [Unused name reporting and HasField]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When a HasField constraint is solved by the type-checker, we must record a use
+of the corresponding field name, as otherwise it might be reported as unused.
+See #19213.  We need to call keepAlive to add the name to the tcg_keep set,
+which accumulates names used by the constraint solver, as described by
+Note [Tracking unused binding and imports] in GHC.Tc.Types.
+
+We need to call addUsedGRE as well because there may be a deprecation warning on
+the field, which will be reported by addUsedGRE.  But calling addUsedGRE without
+keepAlive is not enough, because the field might be defined locally, and
+addUsedGRE extends tcg_used_gres with imported GREs only.
 -}
 
 -- See Note [HasField instances]
@@ -708,7 +735,9 @@ matchHasField dflags short_cut clas tys
                      -- cannot have an existentially quantified type), and
                      -- it must not be higher-rank.
                    ; if not (isNaughtyRecordSelector sel_id) && isTauTy sel_ty
-                     then do { addUsedGRE True gre
+                     then do { -- See Note [Unused name reporting and HasField]
+                               addUsedGRE True gre
+                             ; keepAlive (greMangledName gre)
                              ; return OneInst { cir_new_theta = theta
                                               , cir_mk_ev     = mk_ev
                                               , cir_what      = BuiltinInstance } }

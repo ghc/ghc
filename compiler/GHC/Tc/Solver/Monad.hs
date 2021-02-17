@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP, DeriveFunctor, TypeFamilies, ScopedTypeVariables, TypeApplications,
-             DerivingStrategies, GeneralizedNewtypeDeriving #-}
+             DerivingStrategies, GeneralizedNewtypeDeriving, ScopedTypeVariables #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates -Wno-incomplete-uni-patterns #-}
 
@@ -152,7 +152,6 @@ import qualified GHC.Core.TyCo.Rep as Rep  -- this needs to be used only very lo
 import GHC.Core.Coercion
 import GHC.Core.Unify
 
-import GHC.Utils.Error
 import GHC.Tc.Types.Evidence
 import GHC.Core.Class
 import GHC.Core.TyCon
@@ -168,6 +167,7 @@ import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Logger
 import GHC.Data.Bag as Bag
 import GHC.Types.Unique.Supply
 import GHC.Utils.Misc
@@ -1702,7 +1702,7 @@ add_item tc_lvl ics@(IC { inert_irreds = irreds }) item@(CIrredCan {})
     ics { inert_irreds = irreds `Bag.snocBag` item }
 
 add_item _ ics item@(CDictCan { cc_class = cls, cc_tyargs = tys })
-  = ics { inert_dicts = addDict (inert_dicts ics) cls tys item }
+  = ics { inert_dicts = addDictCt (inert_dicts ics) cls tys item }
 
 add_item _ _ item
   = pprPanic "upd_inert set: can't happen! Inserting " $
@@ -2040,7 +2040,7 @@ NB: we could in principle avoid kick-out:
   b) For Givens, after a unification.  By (GivenInv) in GHC.Tc.Utils.TcType
      Note [TcLevel invariants], a Given can't include a meta-tyvar from
      its own level, so it falls under (a).  Of course, we must still
-     kick out Givens when adding a new non-unificaiton Given.
+     kick out Givens when adding a new non-unification Given.
 
 But kicking out more vigorously may lead to earlier unification and fewer
 iterations, so we don't take advantage of these possibilities.
@@ -2071,7 +2071,7 @@ Hence:
 --------------
 addInertSafehask :: InertCans -> Ct -> InertCans
 addInertSafehask ics item@(CDictCan { cc_class = cls, cc_tyargs = tys })
-  = ics { inert_safehask = addDict (inert_dicts ics) cls tys item }
+  = ics { inert_safehask = addDictCt (inert_dicts ics) cls tys item }
 
 addInertSafehask _ item
   = pprPanic "addInertSafehask: can't happen! Inserting " $ ppr item
@@ -2214,7 +2214,7 @@ get_sc_pending this_lvl ic@(IC { inert_dicts = dicts, inert_insts = insts })
 
     add :: Ct -> DictMap Ct -> DictMap Ct
     add ct@(CDictCan { cc_class = cls, cc_tyargs = tys }) dicts
-        = addDict dicts cls tys ct
+        = addDictCt dicts cls tys ct
     add ct _ = pprPanic "getPendingScDicts" (ppr ct)
 
     get_pending_inst :: [Ct] -> QCInst -> ([Ct], QCInst)
@@ -2555,15 +2555,15 @@ lookupInInerts loc pty
   | ClassPred cls tys <- classifyPredType pty
   = do { inerts <- getTcSInerts
        ; return (lookupSolvedDict inerts loc cls tys `mplus`
-                 lookupInertDict (inert_cans inerts) loc cls tys) }
+                 fmap ctEvidence (lookupInertDict (inert_cans inerts) loc cls tys)) }
   | otherwise -- NB: No caching for equalities, IPs, holes, or errors
   = return Nothing
 
 -- | Look up a dictionary inert.
-lookupInertDict :: InertCans -> CtLoc -> Class -> [Type] -> Maybe CtEvidence
+lookupInertDict :: InertCans -> CtLoc -> Class -> [Type] -> Maybe Ct
 lookupInertDict (IC { inert_dicts = dicts }) loc cls tys
   = case findDict dicts loc cls tys of
-      Just ct -> Just (ctEvidence ct)
+      Just ct -> Just ct
       _       -> Nothing
 
 -- | Look up a solved inert.
@@ -2673,7 +2673,7 @@ insertTcApp m tc tys ct = alterDTyConEnv alter_tm m tc
   where
     alter_tm mb_tm = Just (insertTM tys ct (mb_tm `orElse` emptyTM))
 
-alterTcApp :: forall a. TcAppMap a -> TyCon -> [Type] -> (Maybe a -> Maybe a) -> TcAppMap a
+alterTcApp :: forall a. TcAppMap a -> TyCon -> [Type] -> XT a -> TcAppMap a
 alterTcApp m tc tys upd = alterDTyConEnv alter_tm m tc
   where
     alter_tm :: Maybe (ListMap LooseTypeMap a) -> Maybe (ListMap LooseTypeMap a)
@@ -2772,6 +2772,26 @@ delDict m cls tys = delTcApp m (classTyCon cls) tys
 
 addDict :: DictMap a -> Class -> [Type] -> a -> DictMap a
 addDict m cls tys item = insertTcApp m (classTyCon cls) tys item
+
+addDictCt :: DictMap Ct -> Class -> [Type] -> Ct -> DictMap Ct
+-- Like addDict, but combines [W] and [D] to [WD]
+-- See Note [KeepBoth] in GHC.Tc.Solver.Interact
+addDictCt m cls tys new_ct = alterTcApp m (classTyCon cls) tys xt_ct
+  where
+    new_ct_ev = ctEvidence new_ct
+
+    xt_ct :: Maybe Ct -> Maybe Ct
+    xt_ct (Just old_ct)
+      | CtWanted { ctev_nosh = WOnly } <- old_ct_ev
+      , CtDerived {} <- new_ct_ev
+      = Just (old_ct { cc_ev = old_ct_ev { ctev_nosh = WDeriv }})
+      | CtDerived {} <- old_ct_ev
+      , CtWanted { ctev_nosh = WOnly } <- new_ct_ev
+      = Just (new_ct { cc_ev = new_ct_ev { ctev_nosh = WDeriv }})
+      where
+        old_ct_ev = ctEvidence old_ct
+
+    xt_ct _ = Just new_ct
 
 addDictsByClass :: DictMap Ct -> Class -> Bag Ct -> DictMap Ct
 addDictsByClass m cls items
@@ -2966,7 +2986,7 @@ csTraceTcM mk_doc
                   || dopt Opt_D_dump_tc_trace dflags )
               ( do { msg <- mk_doc
                    ; TcM.dumpTcRn False
-                       (dumpOptionsFromFlag Opt_D_dump_cs_trace)
+                       Opt_D_dump_cs_trace
                        "" FormatText
                        msg }) }
 {-# INLINE csTraceTcM #-}  -- see Note [INLINE conditional tracing utilities]
@@ -3438,7 +3458,7 @@ Answer: if any unification of a tyvar at level n takes place
 
 * What if a unification takes place at level n, in the ic_simples of
   level n?  No need to track this, because the kick-out mechanism deals
-  with it.  (We can't drop kick-out in favour of iteration, becuase kick-out
+  with it.  (We can't drop kick-out in favour of iteration, because kick-out
   works for skolem-equalities, not just unifications.)
 
 So the monad-global Unification Level Flag, kept in tcs_unif_lvl keeps

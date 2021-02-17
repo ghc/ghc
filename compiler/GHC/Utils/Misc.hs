@@ -36,7 +36,7 @@ module GHC.Utils.Misc (
 
         dropWhileEndLE, spanEnd, last2, lastMaybe,
 
-        foldl1', foldl2, count, countWhile, all2,
+        List.foldl1', foldl2, count, countWhile, all2,
 
         lengthExceeds, lengthIs, lengthIsNot,
         lengthAtLeast, lengthAtMost, lengthLessThan,
@@ -140,7 +140,7 @@ import GHC.Utils.Exception
 import GHC.Utils.Panic.Plain
 
 import Data.Data
-import Data.List        hiding (group)
+import qualified Data.List as List
 import Data.List.NonEmpty  ( NonEmpty(..) )
 
 import GHC.Exts
@@ -314,7 +314,7 @@ zipWith4Equal   :: String -> (a->b->c->d->e) -> [a]->[b]->[c]->[d]->[e]
 zipEqual      _ = zip
 zipWithEqual  _ = zipWith
 zipWith3Equal _ = zipWith3
-zipWith4Equal _ = zipWith4
+zipWith4Equal _ = List.zipWith4
 #else
 zipEqual _   []     []     = []
 zipEqual msg (a:as) (b:bs) = (a,b) : zipEqual msg as bs
@@ -785,7 +785,7 @@ splitAtList xs ys = go 0# xs ys
 -- drop from the end of a list
 dropTail :: Int -> [a] -> [a]
 -- Specification: dropTail n = reverse . drop n . reverse
--- Better implemention due to Joachim Breitner
+-- Better implementation due to Joachim Breitner
 -- http://www.joachim-breitner.de/blog/archives/600-On-taking-the-last-n-elements-of-a-list.html
 dropTail n xs
   = go (drop n xs) xs
@@ -819,7 +819,7 @@ spanEnd p l = go l [] [] l
 -- | Get the last two elements in a list. Partial!
 {-# INLINE last2 #-}
 last2 :: [a] -> (a,a)
-last2 = foldl' (\(_,x2) x -> (x2,x)) (partialError,partialError)
+last2 = List.foldl' (\(_,x2) x -> (x2,x)) (partialError,partialError)
   where
     partialError = panic "last2 - list length less than two"
 
@@ -948,7 +948,7 @@ restrictedDamerauLevenshteinDistance'
 restrictedDamerauLevenshteinDistance' _bv_dummy m n str1 str2
   | [] <- str1 = n
   | otherwise  = extractAnswer $
-                 foldl' (restrictedDamerauLevenshteinDistanceWorker
+                 List.foldl' (restrictedDamerauLevenshteinDistanceWorker
                              (matchVectors str1) top_bit_mask vector_mask)
                         (0, 0, m_ones, 0, m) str2
   where
@@ -987,7 +987,7 @@ sizedComplement :: Bits bv => bv -> bv -> bv
 sizedComplement vector_mask vect = vector_mask `xor` vect
 
 matchVectors :: (Bits bv, Num bv) => String -> IM.IntMap bv
-matchVectors = snd . foldl' go (0 :: Int, IM.empty)
+matchVectors = snd . List.foldl' go (0 :: Int, IM.empty)
   where
     go (ix, im) char = let ix' = ix + 1
                            im' = IM.insertWith (.|.) (ord char) (2 ^ ix) im
@@ -1020,7 +1020,7 @@ fuzzyMatch key vals = fuzzyLookup key [(v,v) | v <- vals]
 -- returning a small number of ranked results
 fuzzyLookup :: String -> [(String,a)] -> [a]
 fuzzyLookup user_entered possibilites
-  = map fst $ take mAX_RESULTS $ sortBy (comparing snd)
+  = map fst $ take mAX_RESULTS $ List.sortBy (comparing snd)
     [ (poss_val, distance) | (poss_str, poss_val) <- possibilites
                        , let distance = restrictedDamerauLevenshteinDistance
                                             poss_str user_entered
@@ -1254,7 +1254,7 @@ readHexRational__ ('0' : x : rest)
              (ds,"") | not (null ds) -> Just (steps 10 0 ds)
              _ -> Nothing
 
-  steps base n ds = foldl' (step base) n ds
+  steps base n ds = List.foldl' (step base) n ds
   step  base n d  = base * n + fromIntegral (digitToInt d)
 
   span' _ xs@[]         =  (xs, xs)

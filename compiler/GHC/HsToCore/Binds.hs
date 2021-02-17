@@ -53,7 +53,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.Multiplicity
-import GHC.Builtin.Types ( naturalTy, typeSymbolKind )
+import GHC.Builtin.Types ( naturalTy, typeSymbolKind, charTy )
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Var.Set
@@ -1306,6 +1306,7 @@ ds_ev_typeable ty (EvTypeableTyLit ev)
     -- of    typeSymbolTypeRep :: KnownSymbol a => TypeRep a
     tr_fun | ty_kind `eqType` naturalTy      = typeNatTypeRepName
            | ty_kind `eqType` typeSymbolKind = typeSymbolTypeRepName
+           | ty_kind `eqType` charTy         = typeCharTypeRepName
            | otherwise = panic "dsEvTypeable: unknown type lit kind"
 
 ds_ev_typeable ty ev

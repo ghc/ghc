@@ -48,9 +48,7 @@ import GHC.Stg.Syntax
 import GHC.Types.Id
 import GHC.Types.Var.Set
 import GHC.Core    ( Tickish(Breakpoint) )
-import GHC.Utils.Outputable
 import GHC.Utils.Misc
-import GHC.Utils.Panic
 
 import Data.Maybe ( mapMaybe )
 
@@ -128,7 +126,6 @@ expr env = go
     go (StgLit lit) = (StgLit lit, emptyDVarSet)
     go (StgConApp dc as tys) = (StgConApp dc as tys, args env as)
     go (StgOpApp op as ty) = (StgOpApp op as ty, args env as)
-    go StgLam{} = pprPanic "StgFVs: StgLam" empty
     go (StgCase scrut bndr ty alts) = (StgCase scrut' bndr ty alts', fvs)
       where
         (scrut', scrut_fvs) = go scrut

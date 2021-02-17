@@ -111,6 +111,7 @@ The following flags are simple ways to select standard "packages" of warnings:
         * :ghc-flag:`-Wmissing-deriving-strategies`
         * :ghc-flag:`-Wunused-packages`
         * :ghc-flag:`-Wunused-type-patterns`
+        * :ghc-flag:`-Wsafe`
 
 .. ghc-flag:: -Weverything
     :shortdesc: enable all warnings supported by GHC
@@ -640,7 +641,7 @@ of ``-W(no-)*``.
 .. ghc-flag:: -Wdodgy-foreign-imports
     :shortdesc: warn about dodgy foreign imports
     :type: dynamic
-    :reverse: -Wno-dodgy-foreign-import
+    :reverse: -Wno-dodgy-foreign-imports
     :category:
 
     Causes a warning to be emitted for foreign imports of the following
@@ -1007,7 +1008,7 @@ of ``-W(no-)*``.
     :shortdesc: warn when a module declaration does not explicitly list all
         exports
     :type: dynamic
-    :reverse: -fnowarn-missing-export-lists
+    :reverse: -Wno-missing-export-lists
     :category:
 
     :since: 8.4.1
@@ -1032,7 +1033,7 @@ of ``-W(no-)*``.
     :shortdesc: warn when an import declaration does not explicitly list all the
         names brought into scope
     :type: dynamic
-    :reverse: -fnowarn-missing-import-lists
+    :reverse: -Wno-missing-import-lists
     :category:
 
     .. index::

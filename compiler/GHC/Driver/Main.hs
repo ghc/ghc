@@ -203,6 +203,7 @@ import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Exception
 import GHC.Utils.Misc
+import GHC.Utils.Logger
 
 import GHC.Data.FastString
 import GHC.Data.Bag
@@ -243,10 +244,12 @@ newHscEnv dflags = do
     nc_var  <- newIORef (initNameCache us knownKeyNames)
     fc_var  <- newIORef emptyInstalledModuleEnv
     emptyLoader <- uninitializedLoader
+    logger  <- initLogger
     -- FIXME: it's sad that we have so many "unitialized" fields filled with
     -- empty stuff or lazy panics. We should have two kinds of HscEnv
     -- (initialized or not) instead and less fields that are mutable over time.
     return HscEnv {  hsc_dflags         = dflags
+                  ,  hsc_logger         = logger
                   ,  hsc_targets        = []
                   ,  hsc_mod_graph      = emptyMG
                   ,  hsc_IC             = emptyInteractiveContext dflags
@@ -280,8 +283,9 @@ getHscEnv = Hsc $ \e w -> return (e, w)
 handleWarnings :: Hsc ()
 handleWarnings = do
     dflags <- getDynFlags
+    logger <- getLogger
     w <- getWarnings
-    liftIO $ printOrThrowWarnings dflags w
+    liftIO $ printOrThrowWarnings logger dflags w
     clearWarnings
 
 -- | log warning in the monad, and if there are errors then
@@ -301,8 +305,9 @@ handleWarningsThrowErrors (warnings, errors) = do
         errs  = fmap pprError   errors
     logWarnings warns
     dflags <- getDynFlags
+    logger <- getLogger
     (wWarns, wErrs) <- warningsToMessages dflags <$> getWarnings
-    liftIO $ printBagOfErrors dflags wWarns
+    liftIO $ printBagOfErrors logger dflags wWarns
     throwErrors (unionBags errs wErrs)
 
 -- | Deal with errors and warnings returned by a compilation step
@@ -321,7 +326,7 @@ handleWarningsThrowErrors (warnings, errors) = do
 --  2. If there are no error messages, but the second result indicates failure
 --     there should be warnings in the first result. That is, if the action
 --     failed, it must have been due to the warnings (i.e., @-Werror@).
-ioMsgMaybe :: IO (Messages ErrDoc, Maybe a) -> Hsc a
+ioMsgMaybe :: IO (Messages DecoratedSDoc, Maybe a) -> Hsc a
 ioMsgMaybe ioA = do
     (msgs, mb_r) <- liftIO ioA
     let (warns, errs) = partitionMessages msgs
@@ -332,7 +337,7 @@ ioMsgMaybe ioA = do
 
 -- | like ioMsgMaybe, except that we ignore error messages and return
 -- 'Nothing' instead.
-ioMsgMaybe' :: IO (Messages ErrDoc, Maybe a) -> Hsc (Maybe a)
+ioMsgMaybe' :: IO (Messages DecoratedSDoc, Maybe a) -> Hsc (Maybe a)
 ioMsgMaybe' ioA = do
     (msgs, mb_r) <- liftIO $ ioA
     logWarnings (getWarningMessages msgs)
@@ -388,10 +393,12 @@ hscParse hsc_env mod_summary = runHsc hsc_env $ hscParse' mod_summary
 hscParse' :: ModSummary -> Hsc HsParsedModule
 hscParse' mod_summary
  | Just r <- ms_parsed_mod mod_summary = return r
- | otherwise = {-# SCC "Parser" #-}
-    withTimingD (text "Parser"<+>brackets (ppr $ ms_mod mod_summary))
-                (const ()) $ do
+ | otherwise = do
     dflags <- getDynFlags
+    logger <- getLogger
+    {-# SCC "Parser" #-} withTiming logger dflags
+                (text "Parser"<+>brackets (ppr $ ms_mod mod_summary))
+                (const ()) $ do
     let src_filename  = ms_hspp_file mod_summary
         maybe_src_buf = ms_hspp_buf  mod_summary
 
@@ -414,11 +421,11 @@ hscParse' mod_summary
         POk pst rdr_module -> do
             let (warns, errs) = bimap (fmap pprWarning) (fmap pprError) (getMessages pst)
             logWarnings warns
-            liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser"
+            liftIO $ dumpIfSet_dyn logger dflags Opt_D_dump_parsed "Parser"
                         FormatHaskell (ppr rdr_module)
-            liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed_ast "Parser AST"
+            liftIO $ dumpIfSet_dyn logger dflags Opt_D_dump_parsed_ast "Parser AST"
                         FormatHaskell (showAstData NoBlankSrcSpan rdr_module)
-            liftIO $ dumpIfSet_dyn dflags Opt_D_source_stats "Source Statistics"
+            liftIO $ dumpIfSet_dyn logger dflags Opt_D_source_stats "Source Statistics"
                         FormatText (ppSourceStats False rdr_module)
             when (not $ isEmptyBag errs) $ throwErrors errs
 
@@ -474,7 +481,8 @@ extract_renamed_stuff mod_summary tc_result = do
     let rn_info = getRenamedStuff tc_result
 
     dflags <- getDynFlags
-    liftIO $ dumpIfSet_dyn dflags Opt_D_dump_rn_ast "Renamer"
+    logger <- getLogger
+    liftIO $ dumpIfSet_dyn logger dflags Opt_D_dump_rn_ast "Renamer"
                 FormatHaskell (showAstData NoBlankSrcSpan rn_info)
 
     -- Create HIE files
@@ -484,7 +492,7 @@ extract_renamed_stuff mod_summary tc_result = do
         hieFile <- mkHieFile mod_summary tc_result (fromJust rn_info)
         let out_file = ml_hie_file $ ms_location mod_summary
         liftIO $ writeHieFile out_file hieFile
-        liftIO $ dumpIfSet_dyn dflags Opt_D_dump_hie "HIE AST" FormatHaskell (ppr $ hie_asts hieFile)
+        liftIO $ dumpIfSet_dyn logger dflags Opt_D_dump_hie "HIE AST" FormatHaskell (ppr $ hie_asts hieFile)
 
         -- Validate HIE files
         when (gopt Opt_ValidateHie dflags) $ do
@@ -492,18 +500,18 @@ extract_renamed_stuff mod_summary tc_result = do
             liftIO $ do
               -- Validate Scopes
               case validateScopes (hie_module hieFile) $ getAsts $ hie_asts hieFile of
-                  [] -> putMsg dflags $ text "Got valid scopes"
+                  [] -> putMsg logger dflags $ text "Got valid scopes"
                   xs -> do
-                    putMsg dflags $ text "Got invalid scopes"
-                    mapM_ (putMsg dflags) xs
+                    putMsg logger dflags $ text "Got invalid scopes"
+                    mapM_ (putMsg logger dflags) xs
               -- Roundtrip testing
               file' <- readHieFile (NCU $ updNameCache $ hsc_NC hs_env) out_file
               case diffFile hieFile (hie_file_result file') of
                 [] ->
-                  putMsg dflags $ text "Got no roundtrip errors"
+                  putMsg logger dflags $ text "Got no roundtrip errors"
                 xs -> do
-                  putMsg dflags $ text "Got roundtrip errors"
-                  mapM_ (putMsg (dopt_set dflags Opt_D_ppr_debug)) xs
+                  putMsg logger dflags $ text "Got roundtrip errors"
+                  mapM_ (putMsg logger (dopt_set dflags Opt_D_ppr_debug)) xs
     return rn_info
 
 
@@ -844,8 +852,9 @@ finish :: ModSummary
        -> Hsc HscStatus
 finish summary tc_result mb_old_hash = do
   hsc_env <- getHscEnv
-  let dflags = hsc_dflags hsc_env
-      bcknd  = backend dflags
+  dflags <- getDynFlags
+  logger <- getLogger
+  let bcknd  = backend dflags
       hsc_src = ms_hsc_src summary
 
   -- Desugar, if appropriate
@@ -889,7 +898,7 @@ finish summary tc_result mb_old_hash = do
         (iface, mb_old_iface_hash, details) <- liftIO $
           hscSimpleIface hsc_env tc_result mb_old_hash
 
-        liftIO $ hscMaybeWriteIface dflags True iface mb_old_iface_hash (ms_location summary)
+        liftIO $ hscMaybeWriteIface logger dflags True iface mb_old_iface_hash (ms_location summary)
 
         return $ case bcknd of
           NoBackend -> HscNotGeneratingCode iface details
@@ -943,8 +952,8 @@ suffixes. The interface file name can be overloaded with "-ohi", except when
 -}
 
 -- | Write interface files
-hscMaybeWriteIface :: DynFlags -> Bool -> ModIface -> Maybe Fingerprint -> ModLocation -> IO ()
-hscMaybeWriteIface dflags is_simple iface old_iface mod_location = do
+hscMaybeWriteIface :: Logger -> DynFlags -> Bool -> ModIface -> Maybe Fingerprint -> ModLocation -> IO ()
+hscMaybeWriteIface logger dflags is_simple iface old_iface mod_location = do
     let force_write_interface = gopt Opt_WriteInterface dflags
         write_interface = case backend dflags of
                             NoBackend    -> False
@@ -963,7 +972,7 @@ hscMaybeWriteIface dflags is_simple iface old_iface mod_location = do
 
         write_iface dflags' iface =
           {-# SCC "writeIface" #-}
-          writeIface dflags' (buildIfName (hiSuf dflags')) iface
+          writeIface logger dflags' (buildIfName (hiSuf dflags')) iface
 
     when (write_interface || force_write_interface) $ do
 
@@ -984,7 +993,7 @@ hscMaybeWriteIface dflags is_simple iface old_iface mod_location = do
 
       dt <- dynamicTooState dflags
 
-      when (dopt Opt_D_dump_if_trace dflags) $ putMsg dflags $
+      when (dopt Opt_D_dump_if_trace dflags) $ putMsg logger dflags $
         hang (text "Writing interface(s):") 2 $ vcat
          [ text "Kind:" <+> if is_simple then text "simple" else text "full"
          , text "Hash change:" <+> ppr (not no_change)
@@ -1028,10 +1037,13 @@ oneShotMsg :: HscEnv -> RecompileRequired -> IO ()
 oneShotMsg hsc_env recomp =
     case recomp of
         UpToDate ->
-            compilationProgressMsg (hsc_dflags hsc_env) $
+            compilationProgressMsg logger dflags $
                    text "compilation IS NOT required"
         _ ->
             return ()
+    where
+        dflags = hsc_dflags hsc_env
+        logger = hsc_logger hsc_env
 
 batchMsg :: Messager
 batchMsg hsc_env mod_index recomp node = case node of
@@ -1039,20 +1051,21 @@ batchMsg hsc_env mod_index recomp node = case node of
         case recomp of
             MustCompile -> showMsg (text "Instantiating ") empty
             UpToDate
-                | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg (text "Skipping  ") empty
+                | verbosity dflags >= 2 -> showMsg (text "Skipping  ") empty
                 | otherwise -> return ()
             RecompBecause reason -> showMsg (text "Instantiating ") (text " [" <> text reason <> text "]")
     ModuleNode _ ->
         case recomp of
             MustCompile -> showMsg (text "Compiling ") empty
             UpToDate
-                | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg (text "Skipping  ") empty
+                | verbosity dflags >= 2 -> showMsg (text "Skipping  ") empty
                 | otherwise -> return ()
             RecompBecause reason -> showMsg (text "Compiling ") (text " [" <> text reason <> text "]")
     where
         dflags = hsc_dflags hsc_env
+        logger = hsc_logger hsc_env
         showMsg msg reason =
-            compilationProgressMsg dflags $
+            compilationProgressMsg logger dflags $
             (showModuleIndex mod_index <>
             msg <> showModMsg dflags (recompileRequired recomp) node)
                 <> reason
@@ -1134,7 +1147,7 @@ hscCheckSafeImports tcg_env = do
 
     warns rules = listToBag $ map warnRules rules
 
-    warnRules :: GenLocated SrcSpan (RuleDecl GhcTc) -> ErrMsg ErrDoc
+    warnRules :: GenLocated SrcSpan (RuleDecl GhcTc) -> MsgEnvelope DecoratedSDoc
     warnRules (L loc (HsRule { rd_name = n })) =
         mkPlainWarnMsg loc $
             text "Rule \"" <> ftext (snd $ unLoc n) <> text "\" ignored" $+$
@@ -1212,7 +1225,7 @@ checkSafeImports tcg_env
     cond' :: ImportedModsVal -> ImportedModsVal -> Hsc ImportedModsVal
     cond' v1 v2
         | imv_is_safe v1 /= imv_is_safe v2
-        = throwOneError $ mkPlainErrMsg (imv_span v1)
+        = throwOneError $ mkPlainMsgEnvelope (imv_span v1)
               (text "Module" <+> ppr (imv_name v1) <+>
               (text $ "is imported both as a safe and unsafe import!"))
         | otherwise
@@ -1280,7 +1293,7 @@ hscCheckSafe' m l = do
         iface <- lookup' m
         case iface of
             -- can't load iface to check trust!
-            Nothing -> throwOneError $ mkPlainErrMsg l
+            Nothing -> throwOneError $ mkPlainMsgEnvelope l
                          $ text "Can't load the interface file for" <+> ppr m
                            <> text ", to check that it can be safely imported"
 
@@ -1320,14 +1333,14 @@ hscCheckSafe' m l = do
                                 <> ppr (moduleName m)
                                 <> text " from explicitly Safe module"
                             ]
-                    pkgTrustErr = unitBag $ mkErrMsg l (pkgQual state) $
+                    pkgTrustErr = unitBag $ mkMsgEnvelope l (pkgQual state) $
                         sep [ ppr (moduleName m)
                                 <> text ": Can't be safely imported!"
                             , text "The package ("
                                 <> (pprWithUnitState state $ ppr (moduleUnit m))
                                 <> text ") the module resides in isn't trusted."
                             ]
-                    modTrustErr = unitBag $ mkErrMsg l (pkgQual state) $
+                    modTrustErr = unitBag $ mkMsgEnvelope l (pkgQual state) $
                         sep [ ppr (moduleName m)
                                 <> text ": Can't be safely imported!"
                             , text "The module itself isn't safe." ]
@@ -1373,7 +1386,7 @@ checkPkgTrust pkgs = do
             | unitIsTrusted $ unsafeLookupUnitId state pkg
             = acc
             | otherwise
-            = (:acc) $ mkErrMsg noSrcSpan (pkgQual state)
+            = (:acc) $ mkMsgEnvelope noSrcSpan (pkgQual state)
                      $ pprWithUnitState state
                      $ text "The package ("
                         <> ppr pkg
@@ -1414,7 +1427,7 @@ markUnsafeInfer tcg_env whyUnsafe = do
     whyUnsafe' df = vcat [ quotes pprMod <+> text "has been inferred as unsafe!"
                          , text "Reason:"
                          , nest 4 $ (vcat $ badFlags df) $+$
-                                    (vcat $ pprErrMsgBagWithLoc whyUnsafe) $+$
+                                    (vcat $ pprMsgEnvelopeBagWithLoc whyUnsafe) $+$
                                     (vcat $ badInsts $ tcg_insts tcg_env)
                          ]
     badFlags df   = concatMap (badFlag df) unsafeFlagsForInfer
@@ -1510,6 +1523,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
                     cg_dep_pkgs = dependencies,
                     cg_hpc_info = hpc_info } = cgguts
             dflags = hsc_dflags hsc_env
+            logger = hsc_logger hsc_env
             data_tycons = filter isDataTyCon tycons
             -- cg_tycons includes newtypes, for the benefit of External Core,
             -- but we don't generate any code for newtypes
@@ -1523,7 +1537,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
         -----------------  Convert to STG ------------------
         (stg_binds, (caf_ccs, caf_cc_stacks))
             <- {-# SCC "CoreToStg" #-}
-               myCoreToStg dflags this_mod prepd_binds
+               myCoreToStg logger dflags this_mod prepd_binds
 
         let cost_centre_info = (S.toList local_ccs ++ caf_ccs, caf_cc_stacks)
             platform = targetPlatform dflags
@@ -1539,7 +1553,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
         -- top-level function, so showPass isn't very useful here.
         -- Hence we have one showPass for the whole backend, the
         -- next showPass after this will be "Assembler".
-        withTiming dflags
+        withTiming logger dflags
                    (text "CodeGen"<+>brackets (ppr this_mod))
                    (const ()) $ do
             cmms <- {-# SCC "StgToCmm" #-}
@@ -1549,18 +1563,18 @@ hscGenHardCode hsc_env cgguts location output_filename = do
 
             ------------------  Code output -----------------------
             rawcmms0 <- {-# SCC "cmmToRawCmm" #-}
-                      lookupHook (\x -> cmmToRawCmmHook x)
-                        (\dflg _ -> cmmToRawCmm dflg) dflags dflags (Just this_mod) cmms
+                      lookupHook (\a -> cmmToRawCmmHook a)
+                        (\dflg _ -> cmmToRawCmm logger dflg) dflags dflags (Just this_mod) cmms
 
             let dump a = do
                   unless (null a) $
-                    dumpIfSet_dyn dflags Opt_D_dump_cmm_raw "Raw Cmm" FormatCMM (pdoc platform a)
+                    dumpIfSet_dyn logger dflags Opt_D_dump_cmm_raw "Raw Cmm" FormatCMM (pdoc platform a)
                   return a
                 rawcmms1 = Stream.mapM dump rawcmms0
 
             (output_filename, (_stub_h_exists, stub_c_exists), foreign_fps, cg_infos)
                 <- {-# SCC "codeOutput" #-}
-                  codeOutput dflags (hsc_units hsc_env) this_mod output_filename location
+                  codeOutput logger dflags (hsc_units hsc_env) this_mod output_filename location
                   foreign_stubs foreign_files dependencies rawcmms1
             return (output_filename, stub_c_exists, foreign_fps, cg_infos)
 
@@ -1571,6 +1585,7 @@ hscInteractive :: HscEnv
                -> IO (Maybe FilePath, CompiledByteCode, [SptEntry])
 hscInteractive hsc_env cgguts location = do
     let dflags = hsc_dflags hsc_env
+    let logger = hsc_logger hsc_env
     let CgGuts{ -- This is the last use of the ModGuts in a compilation.
                 -- From now on, we just use the bits we need.
                cg_module   = this_mod,
@@ -1593,7 +1608,7 @@ hscInteractive hsc_env cgguts location = do
     comp_bc <- byteCodeGen hsc_env this_mod prepd_binds data_tycons mod_breaks
     ------------------ Create f-x-dynamic C-side stuff -----
     (_istub_h_exists, istub_c_exists)
-        <- outputForeignStubs dflags (hsc_units hsc_env) this_mod location foreign_stubs
+        <- outputForeignStubs logger dflags (hsc_units hsc_env) this_mod location foreign_stubs
     return (istub_c_exists, comp_bc, spt_entries)
 
 ------------------------------
@@ -1601,15 +1616,16 @@ hscInteractive hsc_env cgguts location = do
 hscCompileCmmFile :: HscEnv -> FilePath -> FilePath -> IO ()
 hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
     let dflags   = hsc_dflags hsc_env
+    let logger   = hsc_logger hsc_env
         home_unit = hsc_home_unit hsc_env
         platform  = targetPlatform dflags
     cmm <- ioMsgMaybe
                $ do
-                  (warns,errs,cmm) <- withTiming dflags (text "ParseCmm"<+>brackets (text filename)) (\_ -> ())
+                  (warns,errs,cmm) <- withTiming logger dflags (text "ParseCmm"<+>brackets (text filename)) (\_ -> ())
                                        $ parseCmmFile dflags home_unit filename
                   return (mkMessages (fmap pprWarning warns `unionBags` fmap pprError errs), cmm)
     liftIO $ do
-        dumpIfSet_dyn dflags Opt_D_dump_cmm_verbose_by_proc "Parsed Cmm" FormatCMM (pdoc platform cmm)
+        dumpIfSet_dyn logger dflags Opt_D_dump_cmm_verbose_by_proc "Parsed Cmm" FormatCMM (pdoc platform cmm)
         let -- Make up a module name to give the NCG. We can't pass bottom here
             -- lest we reproduce #11784.
             mod_name = mkModuleName $ "Cmm$" ++ FilePath.takeFileName filename
@@ -1625,11 +1641,11 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
           concatMapM (\cmm -> snd <$> cmmPipeline hsc_env (emptySRT cmm_mod) [cmm]) cmm
 
         unless (null cmmgroup) $
-          dumpIfSet_dyn dflags Opt_D_dump_cmm "Output Cmm"
+          dumpIfSet_dyn logger dflags Opt_D_dump_cmm "Output Cmm"
             FormatCMM (pdoc platform cmmgroup)
         rawCmms <- lookupHook (\x -> cmmToRawCmmHook x)
-                     (\dflgs _ -> cmmToRawCmm dflgs) dflags dflags Nothing (Stream.yield cmmgroup)
-        _ <- codeOutput dflags (hsc_units hsc_env) cmm_mod output_filename no_loc NoStubs [] []
+                     (\dflgs _ -> cmmToRawCmm logger dflgs) dflags dflags Nothing (Stream.yield cmmgroup)
+        _ <- codeOutput logger dflags (hsc_units hsc_env) cmm_mod output_filename no_loc NoStubs [] []
              rawCmms
         return ()
   where
@@ -1669,16 +1685,17 @@ doCodeGen   :: HscEnv -> Module -> [TyCon]
 doCodeGen hsc_env this_mod data_tycons
               cost_centre_info stg_binds hpc_info = do
     let dflags = hsc_dflags hsc_env
+    let logger = hsc_logger hsc_env
         platform = targetPlatform dflags
 
     let stg_binds_w_fvs = annTopBindingsFreeVars stg_binds
 
-    dumpIfSet_dyn dflags Opt_D_dump_stg_final "Final STG:" FormatSTG (pprGenStgTopBindings (initStgPprOpts dflags) stg_binds_w_fvs)
+    dumpIfSet_dyn logger dflags Opt_D_dump_stg_final "Final STG:" FormatSTG (pprGenStgTopBindings (initStgPprOpts dflags) stg_binds_w_fvs)
 
     let cmm_stream :: Stream IO CmmGroup ModuleLFInfos
         -- See Note [Forcing of stg_binds]
         cmm_stream = stg_binds_w_fvs `seqList` {-# SCC "StgToCmm" #-}
-            lookupHook stgToCmmHook StgToCmm.codeGen dflags dflags this_mod data_tycons
+            lookupHook stgToCmmHook (StgToCmm.codeGen logger) dflags dflags this_mod data_tycons
                            cost_centre_info stg_binds_w_fvs hpc_info
 
         -- codegen consumes a stream of CmmGroup, and produces a new
@@ -1688,7 +1705,7 @@ doCodeGen hsc_env this_mod data_tycons
 
     let dump1 a = do
           unless (null a) $
-            dumpIfSet_dyn dflags Opt_D_dump_cmm_from_stg
+            dumpIfSet_dyn logger dflags Opt_D_dump_cmm_from_stg
               "Cmm produced by codegen" FormatCMM (pdoc platform a)
           return a
 
@@ -1705,22 +1722,22 @@ doCodeGen hsc_env this_mod data_tycons
 
         dump2 a = do
           unless (null a) $
-            dumpIfSet_dyn dflags Opt_D_dump_cmm "Output Cmm" FormatCMM (pdoc platform a)
+            dumpIfSet_dyn logger dflags Opt_D_dump_cmm "Output Cmm" FormatCMM (pdoc platform a)
           return a
 
     return (Stream.mapM dump2 pipeline_stream)
 
-myCoreToStg :: DynFlags -> Module -> CoreProgram
+myCoreToStg :: Logger -> DynFlags -> Module -> CoreProgram
             -> IO ( [StgTopBinding] -- output program
                   , CollectedCCs )  -- CAF cost centre info (declared and used)
-myCoreToStg dflags this_mod prepd_binds = do
+myCoreToStg logger dflags this_mod prepd_binds = do
     let (stg_binds, cost_centre_info)
          = {-# SCC "Core2Stg" #-}
            coreToStg dflags this_mod prepd_binds
 
     stg_binds2
         <- {-# SCC "Stg2Stg" #-}
-           stg2stg dflags this_mod stg_binds
+           stg2stg logger dflags this_mod stg_binds
 
     return (stg_binds2, cost_centre_info)
 
@@ -1924,7 +1941,7 @@ hscImport hsc_env str = runInteractiveHsc hsc_env $ do
     case is of
         [L _ i] -> return i
         _ -> liftIO $ throwOneError $
-                 mkPlainErrMsg noSrcSpan $
+                 mkPlainMsgEnvelope noSrcSpan $
                      text "parse error in import declaration"
 
 -- | Typecheck an expression (but don't run it)
@@ -1953,7 +1970,7 @@ hscParseExpr expr = do
   maybe_stmt <- hscParseStmt expr
   case maybe_stmt of
     Just (L _ (BodyStmt _ expr _ _)) -> return expr
-    _ -> throwOneError $ mkPlainErrMsg noSrcSpan
+    _ -> throwOneError $ mkPlainMsgEnvelope noSrcSpan
       (text "not an expression:" <+> quotes (text expr))
 
 hscParseStmt :: String -> Hsc (Maybe (GhciLStmt GhcPs))
@@ -1977,25 +1994,26 @@ hscParseThing = hscParseThingWithLocation "<interactive>" 1
 
 hscParseThingWithLocation :: (Outputable thing, Data thing) => String -> Int
                           -> Lexer.P thing -> String -> Hsc thing
-hscParseThingWithLocation source linenumber parser str
-  = withTimingD
+hscParseThingWithLocation source linenumber parser str = do
+    dflags <- getDynFlags
+    logger <- getLogger
+    withTiming logger dflags
                (text "Parser [source]")
                (const ()) $ {-# SCC "Parser" #-} do
-    dflags <- getDynFlags
 
-    let buf = stringToStringBuffer str
-        loc = mkRealSrcLoc (fsLit source) linenumber 1
+        let buf = stringToStringBuffer str
+            loc = mkRealSrcLoc (fsLit source) linenumber 1
 
-    case unP parser (initParserState (initParserOpts dflags) buf loc) of
-        PFailed pst ->
-            handleWarningsThrowErrors (getMessages pst)
-        POk pst thing -> do
-            logWarningsReportErrors (getMessages pst)
-            liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser"
-                        FormatHaskell (ppr thing)
-            liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed_ast "Parser AST"
-                        FormatHaskell (showAstData NoBlankSrcSpan thing)
-            return thing
+        case unP parser (initParserState (initParserOpts dflags) buf loc) of
+            PFailed pst ->
+                handleWarningsThrowErrors (getMessages pst)
+            POk pst thing -> do
+                logWarningsReportErrors (getMessages pst)
+                liftIO $ dumpIfSet_dyn logger dflags Opt_D_dump_parsed "Parser"
+                            FormatHaskell (ppr thing)
+                liftIO $ dumpIfSet_dyn logger dflags Opt_D_dump_parsed_ast "Parser AST"
+                            FormatHaskell (showAstData NoBlankSrcSpan thing)
+                return thing
 
 
 {- **********************************************************************
@@ -2011,6 +2029,8 @@ hscCompileCoreExpr hsc_env =
 hscCompileCoreExpr' :: HscEnv -> SrcSpan -> CoreExpr -> IO ForeignHValue
 hscCompileCoreExpr' hsc_env srcspan ds_expr
     = do { {- Simplify it -}
+           -- Question: should we call SimpleOpt.simpleOptExpr here instead?
+           -- It is, well, simpler, and does less inlining etc.
            simpl_expr <- simplifyExpr hsc_env ds_expr
 
            {- Tidy it (temporary, until coreSat does cloning) -}
@@ -2039,11 +2059,12 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr
 dumpIfaceStats :: HscEnv -> IO ()
 dumpIfaceStats hsc_env = do
     eps <- readIORef (hsc_EPS hsc_env)
-    dumpIfSet dflags (dump_if_trace || dump_rn_stats)
+    dumpIfSet logger dflags (dump_if_trace || dump_rn_stats)
               "Interface statistics"
               (ifaceStats eps)
   where
     dflags = hsc_dflags hsc_env
+    logger = hsc_logger hsc_env
     dump_rn_stats = dopt Opt_D_dump_rn_stats dflags
     dump_if_trace = dopt Opt_D_dump_if_trace dflags
 

@@ -21,8 +21,9 @@ compileInGhc :: [FilePath]          -- ^ Targets
 compileInGhc targets handlerOutput = do
     -- Set flags
     flags0 <- getSessionDynFlags
-    let flags = flags0 {verbosity = 1, log_action = collectSrcError handlerOutput}
+    let flags = flags0 {verbosity = 1 }
     setSessionDynFlags flags
+    pushLogHookM (const (collectSrcError handlerOutput))
     -- Set up targets.
     oldTargets <- getTargets
     let oldFiles = map fileFromTarget oldTargets

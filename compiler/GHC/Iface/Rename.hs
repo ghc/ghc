@@ -76,7 +76,7 @@ failWithRn doc = do
     errs_var <- fmap sh_if_errs getGblEnv
     errs <- readTcRef errs_var
     -- TODO: maybe associate this with a source location?
-    writeTcRef errs_var (errs `snocBag` mkPlainErrMsg noSrcSpan doc)
+    writeTcRef errs_var (errs `snocBag` mkPlainMsgEnvelope noSrcSpan doc)
     failM
 
 -- | What we have is a generalized ModIface, which corresponds to
@@ -259,9 +259,9 @@ rnGreName (NormalGreName n) = NormalGreName <$> rnIfaceGlobal n
 rnGreName (FieldGreName fl) = FieldGreName  <$> rnFieldLabel fl
 
 rnFieldLabel :: Rename FieldLabel
-rnFieldLabel (FieldLabel l b sel) = do
-    sel' <- rnIfaceGlobal sel
-    return (FieldLabel l b sel')
+rnFieldLabel fl = do
+    sel' <- rnIfaceGlobal (flSelector fl)
+    return (fl { flSelector = sel' })
 
 
 
@@ -414,7 +414,7 @@ rnIfaceNeverExported name = do
 rnIfaceClsInst :: Rename IfaceClsInst
 rnIfaceClsInst cls_inst = do
     n <- rnIfaceGlobal (ifInstCls cls_inst)
-    tys <- mapM rnMaybeIfaceTyCon (ifInstTys cls_inst)
+    tys <- mapM rnRoughMatchTyCon (ifInstTys cls_inst)
 
     dfun <- rnIfaceNeverExported (ifDFun cls_inst)
     return cls_inst { ifInstCls = n
@@ -422,14 +422,14 @@ rnIfaceClsInst cls_inst = do
                     , ifDFun = dfun
                     }
 
-rnMaybeIfaceTyCon :: Rename (Maybe IfaceTyCon)
-rnMaybeIfaceTyCon Nothing = return Nothing
-rnMaybeIfaceTyCon (Just tc) = Just <$> rnIfaceTyCon tc
+rnRoughMatchTyCon :: Rename (Maybe IfaceTyCon)
+rnRoughMatchTyCon Nothing = return Nothing
+rnRoughMatchTyCon (Just tc) = Just <$> rnIfaceTyCon tc
 
 rnIfaceFamInst :: Rename IfaceFamInst
 rnIfaceFamInst d = do
     fam <- rnIfaceGlobal (ifFamInstFam d)
-    tys <- mapM rnMaybeIfaceTyCon (ifFamInstTys d)
+    tys <- mapM rnRoughMatchTyCon (ifFamInstTys d)
     axiom <- rnIfaceGlobal (ifFamInstAxiom d)
     return d { ifFamInstFam = fam, ifFamInstTys = tys, ifFamInstAxiom = axiom }
 

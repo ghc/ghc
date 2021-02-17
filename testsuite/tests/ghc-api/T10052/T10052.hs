@@ -19,7 +19,8 @@ runGhc' args act = do
         flags  = map noLoc (tail args)
     runGhc (Just libdir) $ do
       dflags0 <- getSessionDynFlags
-      (dflags1, _leftover, _warns) <- parseDynamicFlags dflags0 flags
+      logger <- getLogger
+      (dflags1, _leftover, _warns) <- parseDynamicFlags logger dflags0 flags
       let dflags2 = dflags1 {
               backend   = Interpreter
             , ghcLink   = LinkInMemory

@@ -12,12 +12,13 @@ import GHC.Prelude
 import GHC.Driver.Session
 import GHC.Utils.Error
 import GHC.Utils.Outputable
+import GHC.Utils.Logger
 import GHC.Utils.Misc
 import GHC.Utils.Exception as Exception
 import GHC.Driver.Phases
 
 import Control.Monad
-import Data.List
+import Data.List (partition)
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 import Data.IORef
@@ -40,17 +41,17 @@ data TempFileLifetime
   -- runGhc(T)
   deriving (Show)
 
-cleanTempDirs :: DynFlags -> IO ()
-cleanTempDirs dflags
+cleanTempDirs :: Logger -> DynFlags -> IO ()
+cleanTempDirs logger dflags
    = unless (gopt Opt_KeepTmpFiles dflags)
    $ mask_
    $ do let ref = dirsToClean dflags
         ds <- atomicModifyIORef' ref $ \ds -> (Map.empty, ds)
-        removeTmpDirs dflags (Map.elems ds)
+        removeTmpDirs logger dflags (Map.elems ds)
 
 -- | Delete all files in @filesToClean dflags@.
-cleanTempFiles :: DynFlags -> IO ()
-cleanTempFiles dflags
+cleanTempFiles :: Logger -> DynFlags -> IO ()
+cleanTempFiles logger dflags
    = unless (gopt Opt_KeepTmpFiles dflags)
    $ mask_
    $ do let ref = filesToClean dflags
@@ -60,21 +61,21 @@ cleanTempFiles dflags
                 , ftcGhcSession = gs_files
                 } -> ( emptyFilesToClean
                      , Set.toList cm_files ++ Set.toList gs_files)
-        removeTmpFiles dflags to_delete
+        removeTmpFiles logger dflags to_delete
 
 -- | Delete all files in @filesToClean dflags@. That have lifetime
 -- TFL_CurrentModule.
 -- If a file must be cleaned eventually, but must survive a
 -- cleanCurrentModuleTempFiles, ensure it has lifetime TFL_GhcSession.
-cleanCurrentModuleTempFiles :: DynFlags -> IO ()
-cleanCurrentModuleTempFiles dflags
+cleanCurrentModuleTempFiles :: Logger -> DynFlags -> IO ()
+cleanCurrentModuleTempFiles logger dflags
    = unless (gopt Opt_KeepTmpFiles dflags)
    $ mask_
    $ do let ref = filesToClean dflags
         to_delete <- atomicModifyIORef' ref $
             \ftc@FilesToClean{ftcCurrentModule = cm_files} ->
                 (ftc {ftcCurrentModule = Set.empty}, Set.toList cm_files)
-        removeTmpFiles dflags to_delete
+        removeTmpFiles logger dflags to_delete
 
 -- | Ensure that new_files are cleaned on the next call of
 -- 'cleanTempFiles' or 'cleanCurrentModuleTempFiles', depending on lifetime.
@@ -117,9 +118,9 @@ newTempSuffix dflags =
   atomicModifyIORef' (nextTempSuffix dflags) $ \n -> (n+1,n)
 
 -- Find a temporary name that doesn't already exist.
-newTempName :: DynFlags -> TempFileLifetime -> Suffix -> IO FilePath
-newTempName dflags lifetime extn
-  = do d <- getTempDir dflags
+newTempName :: Logger -> DynFlags -> TempFileLifetime -> Suffix -> IO FilePath
+newTempName logger dflags lifetime extn
+  = do d <- getTempDir logger dflags
        findTempName (d </> "ghc_") -- See Note [Deterministic base name]
   where
     findTempName :: FilePath -> IO FilePath
@@ -132,9 +133,9 @@ newTempName dflags lifetime extn
                         addFilesToClean dflags lifetime [filename]
                         return filename
 
-newTempDir :: DynFlags -> IO FilePath
-newTempDir dflags
-  = do d <- getTempDir dflags
+newTempDir :: Logger -> DynFlags -> IO FilePath
+newTempDir logger dflags
+  = do d <- getTempDir logger dflags
        findTempDir (d </> "ghc_")
   where
     findTempDir :: FilePath -> IO FilePath
@@ -147,10 +148,10 @@ newTempDir dflags
                         -- see mkTempDir below; this is wrong: -> consIORef (dirsToClean dflags) filename
                         return filename
 
-newTempLibName :: DynFlags -> TempFileLifetime -> Suffix
+newTempLibName :: Logger -> DynFlags -> TempFileLifetime -> Suffix
   -> IO (FilePath, FilePath, String)
-newTempLibName dflags lifetime extn
-  = do d <- getTempDir dflags
+newTempLibName logger dflags lifetime extn
+  = do d <- getTempDir logger dflags
        findTempName d ("ghc_")
   where
     findTempName :: FilePath -> String -> IO (FilePath, FilePath, String)
@@ -167,8 +168,8 @@ newTempLibName dflags lifetime extn
 
 -- Return our temporary directory within tmp_dir, creating one if we
 -- don't have one yet.
-getTempDir :: DynFlags -> IO FilePath
-getTempDir dflags = do
+getTempDir :: Logger -> DynFlags -> IO FilePath
+getTempDir logger dflags = do
     mapping <- readIORef dir_ref
     case Map.lookup tmp_dir mapping of
         Nothing -> do
@@ -199,7 +200,7 @@ getTempDir dflags = do
         -- directory we created.  Otherwise return the directory we created.
         case their_dir of
             Nothing  -> do
-                debugTraceMsg dflags 2 $
+                debugTraceMsg logger dflags 2 $
                     text "Created temporary directory:" <+> text our_dir
                 return our_dir
             Just dir -> do
@@ -219,18 +220,18 @@ the process id).
 
 This is ok, as the temporary directory used contains the pid (see getTempDir).
 -}
-removeTmpDirs :: DynFlags -> [FilePath] -> IO ()
-removeTmpDirs dflags ds
-  = traceCmd dflags "Deleting temp dirs"
+removeTmpDirs :: Logger -> DynFlags -> [FilePath] -> IO ()
+removeTmpDirs logger dflags ds
+  = traceCmd logger dflags "Deleting temp dirs"
              ("Deleting: " ++ unwords ds)
-             (mapM_ (removeWith dflags removeDirectory) ds)
+             (mapM_ (removeWith logger dflags removeDirectory) ds)
 
-removeTmpFiles :: DynFlags -> [FilePath] -> IO ()
-removeTmpFiles dflags fs
+removeTmpFiles :: Logger -> DynFlags -> [FilePath] -> IO ()
+removeTmpFiles logger dflags fs
   = warnNon $
-    traceCmd dflags "Deleting temp files"
+    traceCmd logger dflags "Deleting temp files"
              ("Deleting: " ++ unwords deletees)
-             (mapM_ (removeWith dflags removeFile) deletees)
+             (mapM_ (removeWith logger dflags removeFile) deletees)
   where
      -- Flat out refuse to delete files that are likely to be source input
      -- files (is there a worse bug than having a compiler delete your source
@@ -241,21 +242,21 @@ removeTmpFiles dflags fs
     warnNon act
      | null non_deletees = act
      | otherwise         = do
-        putMsg dflags (text "WARNING - NOT deleting source files:"
+        putMsg logger dflags (text "WARNING - NOT deleting source files:"
                        <+> hsep (map text non_deletees))
         act
 
     (non_deletees, deletees) = partition isHaskellUserSrcFilename fs
 
-removeWith :: DynFlags -> (FilePath -> IO ()) -> FilePath -> IO ()
-removeWith dflags remover f = remover f `catchIO`
+removeWith :: Logger -> DynFlags -> (FilePath -> IO ()) -> FilePath -> IO ()
+removeWith logger dflags remover f = remover f `catchIO`
   (\e ->
    let msg = if isDoesNotExistError e
              then text "Warning: deleting non-existent" <+> text f
              else text "Warning: exception raised when deleting"
                                             <+> text f <> colon
                $$ text (show e)
-   in debugTraceMsg dflags 2 msg
+   in debugTraceMsg logger dflags 2 msg
   )
 
 #if defined(mingw32_HOST_OS)

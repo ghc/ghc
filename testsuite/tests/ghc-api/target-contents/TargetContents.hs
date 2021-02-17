@@ -30,7 +30,8 @@ main = do
   createDirectoryIfMissing False "outdir"
   runGhc (Just libdir) $ do
     dflags0 <- getSessionDynFlags
-    (dflags1, xs, warn) <- parseDynamicFlags dflags0 $ map noLoc $
+    logger <- getLogger
+    (dflags1, xs, warn) <- parseDynamicFlags logger dflags0 $ map noLoc $
         [ "-outputdir", "./outdir"
         , "-fno-diagnostics-show-caret"
         ] ++ args

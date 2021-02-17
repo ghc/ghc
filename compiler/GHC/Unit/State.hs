@@ -98,8 +98,8 @@ import GHC.Data.Maybe
 import System.Environment ( getEnv )
 import GHC.Data.FastString
 import qualified GHC.Data.ShortText as ST
-import GHC.Utils.Error  ( debugTraceMsg, dumpIfSet_dyn,
-                          withTiming, DumpFormat (..) )
+import GHC.Utils.Logger
+import GHC.Utils.Error
 import GHC.Utils.Exception
 
 import System.Directory
@@ -107,7 +107,7 @@ import System.FilePath as FilePath
 import Control.Monad
 import Data.Graph (stronglyConnComp, SCC(..))
 import Data.Char ( toUpper )
-import Data.List as List
+import Data.List ( intersperse, partition, sortBy, isSuffixOf )
 import Data.Map (Map)
 import Data.Set (Set)
 import Data.Monoid (First(..))
@@ -573,18 +573,18 @@ listUnitInfo state = Map.elems (unitInfoMap state)
 -- 'initUnits' can be called again subsequently after updating the
 -- 'packageFlags' field of the 'DynFlags', and it will update the
 -- 'unitState' in 'DynFlags'.
-initUnits :: DynFlags -> Maybe [UnitDatabase UnitId] -> IO ([UnitDatabase UnitId], UnitState, HomeUnit)
-initUnits dflags cached_dbs = do
+initUnits :: Logger -> DynFlags -> Maybe [UnitDatabase UnitId] -> IO ([UnitDatabase UnitId], UnitState, HomeUnit)
+initUnits logger dflags cached_dbs = do
 
   let forceUnitInfoMap (state, _) = unitInfoMap state `seq` ()
   let ctx     = initSDocContext dflags defaultUserStyle -- SDocContext used to render exception messages
-  let printer = debugTraceMsg dflags                    -- printer for trace messages
+  let printer = debugTraceMsg logger dflags             -- printer for trace messages
 
-  (unit_state,dbs) <- withTiming dflags (text "initializing unit database")
+  (unit_state,dbs) <- withTiming logger dflags (text "initializing unit database")
                    forceUnitInfoMap
                  $ mkUnitState ctx printer (initUnitConfig dflags cached_dbs)
 
-  dumpIfSet_dyn dflags Opt_D_dump_mod_map "Module Map"
+  dumpIfSet_dyn logger dflags Opt_D_dump_mod_map "Module Map"
     FormatText (updSDocContext (\ctx -> ctx {sdocLineLength = 200})
                 $ pprModuleMap (moduleNameProvidersMap unit_state))
 

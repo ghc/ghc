@@ -441,7 +441,7 @@ counters are not exported. So we ignore ticky counters in SRT analysis (which
 are never CAFFY and never exported).
 
 Not doing this caused #17947 where we analysed the function first mapped the
-name to CAFFY. We then saw the ticky constructor, and becuase it has the same
+name to CAFFY. We then saw the ticky constructor, and because it has the same
 Name as the function and is not CAFFY we overrode the CafInfo of the name as
 non-CAFFY.
 -}

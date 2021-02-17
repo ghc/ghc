@@ -47,13 +47,14 @@ import GHC.Rename.Pat
 import GHC.Driver.Session
 import GHC.Builtin.Names
 
+import GHC.Types.FieldLabel
 import GHC.Types.Fixity
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
 import GHC.Types.Unique.Set
 import GHC.Types.SourceText
-import Data.List
+import Data.List (unzip4, minimumBy)
 import Data.Maybe (isJust, isNothing)
 import GHC.Utils.Misc
 import GHC.Data.List.SetOps ( removeDups )
@@ -120,12 +121,13 @@ rnUnboundVar v =
           ; return (HsVar noExtField (noLoc n), emptyFVs) }
 
 rnExpr (HsVar _ (L l v))
-  = do { opt_DuplicateRecordFields <- xoptM LangExt.DuplicateRecordFields
-       ; mb_name <- lookupOccRn_overloaded opt_DuplicateRecordFields v
-       ; dflags <- getDynFlags
+  = do { dflags <- getDynFlags
+       ; let dup_fields_ok = xopt_DuplicateRecordFields dflags
+       ; mb_name <- lookupExprOccRn dup_fields_ok v
+
        ; case mb_name of {
            Nothing -> rnUnboundVar v ;
-           Just (Left name)
+           Just (UnambiguousGre (NormalGreName name))
               | name == nilDataConName -- Treat [] as an ExplicitList, so that
                                        -- OverloadedLists works correctly
                                        -- Note [Empty lists] in GHC.Hs.Expr
@@ -134,12 +136,12 @@ rnExpr (HsVar _ (L l v))
 
               | otherwise
               -> finishHsVar (L l name) ;
-            Just (Right [s]) ->
-              return ( HsRecFld noExtField (Unambiguous s (L l v) ), unitFV s) ;
-           Just (Right fs@(_:_:_)) ->
-              return ( HsRecFld noExtField (Ambiguous noExtField (L l v))
-                     , mkFVs fs);
-           Just (Right [])         -> panic "runExpr/HsVar" } }
+            Just (UnambiguousGre (FieldGreName fl)) ->
+              let sel_name = flSelector fl in
+              return ( HsRecFld noExtField (Unambiguous sel_name (L l v) ), unitFV sel_name) ;
+            Just AmbiguousFields ->
+              return ( HsRecFld noExtField (Ambiguous noExtField (L l v) ), emptyFVs) } }
+
 
 rnExpr (HsIPVar x v)
   = return (HsIPVar x v, emptyFVs)
@@ -294,14 +296,14 @@ rnExpr (ExplicitSum x alt arity expr)
   = do { (expr', fvs) <- rnLExpr expr
        ; return (ExplicitSum x alt arity expr', fvs) }
 
-rnExpr (RecordCon { rcon_con_name = con_id
+rnExpr (RecordCon { rcon_con = con_id
                   , rcon_flds = rec_binds@(HsRecFields { rec_dotdot = dd }) })
   = do { con_lname@(L _ con_name) <- lookupLocatedOccRn con_id
        ; (flds, fvs)   <- rnHsRecFields (HsRecFieldCon con_name) mk_hs_var rec_binds
        ; (flds', fvss) <- mapAndUnzipM rn_field flds
        ; let rec_binds' = HsRecFields { rec_flds = flds', rec_dotdot = dd }
        ; return (RecordCon { rcon_ext = noExtField
-                           , rcon_con_name = con_lname, rcon_flds = rec_binds' }
+                           , rcon_con = con_lname, rcon_flds = rec_binds' }
                 , fvs `plusFV` plusFVs fvss `addOneFV` con_name) }
   where
     mk_hs_var l n = HsVar noExtField (L l n)
@@ -1707,10 +1709,11 @@ stmtTreeToStmts monad_names ctxt (StmtTreeBind before after) tail tail_fvs = do
 
 stmtTreeToStmts monad_names ctxt (StmtTreeApplicative trees) tail tail_fvs = do
    pairs <- mapM (stmtTreeArg ctxt tail_fvs) trees
+   dflags <- getDynFlags
    let (stmts', fvss) = unzip pairs
    let (need_join, tail') =
      -- See Note [ApplicativeDo and refutable patterns]
-         if any hasRefutablePattern stmts'
+         if any (hasRefutablePattern dflags) stmts'
          then (True, tail)
          else needJoin monad_names tail
 
@@ -1865,10 +1868,11 @@ of a refutable pattern, in order for the types to work out.
 
 -}
 
-hasRefutablePattern :: ApplicativeArg GhcRn -> Bool
-hasRefutablePattern (ApplicativeArgOne { app_arg_pattern = pat
-                                       , is_body_stmt = False}) = not (isIrrefutableHsPat pat)
-hasRefutablePattern _ = False
+hasRefutablePattern :: DynFlags -> ApplicativeArg GhcRn -> Bool
+hasRefutablePattern dflags (ApplicativeArgOne { app_arg_pattern = pat
+                                              , is_body_stmt = False}) =
+                                         not (isIrrefutableHsPat dflags pat)
+hasRefutablePattern _ _ = False
 
 isLetStmt :: LStmt (GhcPass a) b -> Bool
 isLetStmt (L _ LetStmt{}) = True
@@ -2155,17 +2159,18 @@ badIpBinds what binds
 monadFailOp :: LPat GhcPs
             -> HsStmtContext GhcRn
             -> RnM (FailOperator GhcRn, FreeVars)
-monadFailOp pat ctxt
-  -- If the pattern is irrefutable (e.g.: wildcard, tuple, ~pat, etc.)
-  -- we should not need to fail.
-  | isIrrefutableHsPat pat = return (Nothing, emptyFVs)
+monadFailOp pat ctxt = do
+    dflags <- getDynFlags
+        -- If the pattern is irrefutable (e.g.: wildcard, tuple, ~pat, etc.)
+        -- we should not need to fail.
+    if | isIrrefutableHsPat dflags pat -> return (Nothing, emptyFVs)
 
-  -- For non-monadic contexts (e.g. guard patterns, list
-  -- comprehensions, etc.) we should not need to fail, or failure is handled in
-  -- a different way. See Note [Failing pattern matches in Stmts].
-  | not (isMonadStmtContext ctxt) = return (Nothing, emptyFVs)
+        -- For non-monadic contexts (e.g. guard patterns, list
+        -- comprehensions, etc.) we should not need to fail, or failure is handled in
+        -- a different way. See Note [Failing pattern matches in Stmts].
+       | not (isMonadStmtContext ctxt) -> return (Nothing, emptyFVs)
 
-  | otherwise = getMonadFailOp ctxt
+       | otherwise -> getMonadFailOp ctxt
 
 {-
 Note [Monad fail : Rebindable syntax, overloaded strings]

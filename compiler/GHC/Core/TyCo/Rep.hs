@@ -192,13 +192,19 @@ instance Outputable Type where
 data TyLit
   = NumTyLit Integer
   | StrTyLit FastString
+  | CharTyLit Char
   deriving (Eq, Data.Data)
 
 instance Ord TyLit where
-   compare (NumTyLit _) (StrTyLit _) = LT
-   compare (StrTyLit _) (NumTyLit _) = GT
-   compare (NumTyLit x) (NumTyLit y) = compare x y
-   compare (StrTyLit x) (StrTyLit y) = uniqCompareFS x y
+  compare (NumTyLit x) (NumTyLit y)   = compare x y
+  compare (StrTyLit x) (StrTyLit y)   = uniqCompareFS x y
+  compare (CharTyLit x) (CharTyLit y) = compare x y
+  compare a b = compare (tag a) (tag b)
+    where
+      tag :: TyLit -> Int
+      tag NumTyLit{}  = 0
+      tag StrTyLit{}  = 1
+      tag CharTyLit{} = 2
 
 instance Outputable TyLit where
    ppr = pprTyLit
@@ -1903,7 +1909,7 @@ foldTyCo (TyCoFolder { tcf_view       = view
       = let !env' = tycobinder env tv vis  -- Avoid building a thunk here
         in go_ty env (varType tv) `mappend` go_ty env' inner
 
-    -- Explicit recursion becuase using foldr builds a local
+    -- Explicit recursion because using foldr builds a local
     -- loop (with env free) and I'm not confident it'll be
     -- lambda lifted in the end
     go_tys _   []     = mempty

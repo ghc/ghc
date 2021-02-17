@@ -63,6 +63,7 @@ module GHC.Core.Type (
 
         mkNumLitTy, isNumLitTy,
         mkStrLitTy, isStrLitTy,
+        mkCharLitTy, isCharLitTy,
         isLitTy,
 
         isPredTy,
@@ -255,7 +256,7 @@ import GHC.Types.Unique.Set
 import GHC.Core.TyCon
 import GHC.Builtin.Types.Prim
 import {-# SOURCE #-} GHC.Builtin.Types
-                                 ( naturalTy, listTyCon
+                                 ( charTy, naturalTy, listTyCon
                                  , typeSymbolKind, liftedTypeKind
                                  , constraintKind
                                  , unrestrictedFunTyCon
@@ -1074,7 +1075,17 @@ isStrLitTy ty
   | LitTy (StrTyLit s) <- coreFullView ty = Just s
   | otherwise                             = Nothing
 
--- | Is this a type literal (symbol or numeric).
+mkCharLitTy :: Char -> Type
+mkCharLitTy c = LitTy (CharTyLit c)
+
+-- | Is this a char literal? We also look through type synonyms.
+isCharLitTy :: Type -> Maybe Char
+isCharLitTy ty
+  | LitTy (CharTyLit s) <- coreFullView ty = Just s
+  | otherwise                              = Nothing
+
+
+-- | Is this a type literal (symbol, numeric, or char)?
 isLitTy :: Type -> Maybe TyLit
 isLitTy ty
   | LitTy l <- coreFullView ty = Just l
@@ -1147,7 +1158,7 @@ is equivalent to,
     FunTy (Anon a) b
 
 Note how the RuntimeReps are implied in the FunTy representation. For this
-reason we must be careful when recontructing the TyConApp representation (see,
+reason we must be careful when reconstructing the TyConApp representation (see,
 for instance, splitTyConApp_maybe).
 
 In the compiler we maintain the invariant that all saturated applications of
@@ -2684,6 +2695,7 @@ tcReturnsConstraintKind _                       = False
 typeLiteralKind :: TyLit -> Kind
 typeLiteralKind (NumTyLit {}) = naturalTy
 typeLiteralKind (StrTyLit {}) = typeSymbolKind
+typeLiteralKind (CharTyLit {}) = charTy
 
 -- | Returns True if a type is levity polymorphic. Should be the same
 -- as (isKindLevPoly . typeKind) but much faster.

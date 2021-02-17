@@ -5,7 +5,7 @@ import Control.Exception
 import GHC.Exts
 import GHC.IO
 
--- | An "unboxed" IO action that throws a precise excpetion that isn't inlined.
+-- | An "unboxed" IO action that throws a precise exception that isn't inlined.
 throws :: State# RealWorld -> State# RealWorld
 throws s = case raiseIO# (toException (userError "What")) s of (# s', _ #) -> s'
 {-# NOINLINE throws #-}

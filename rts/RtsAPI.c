@@ -37,7 +37,7 @@ rts_mkChar (Capability *cap, HsChar c)
   } else {
     p = (StgClosure *)allocate(cap, CONSTR_sizeW(0,1));
     SET_HDR(p, Czh_con_info, CCS_SYSTEM);
-    p->payload[0]  = (StgClosure *)(StgWord)(StgChar)c;
+    p->payload[0] = (StgClosure *)(StgWord)(StgChar)c;
   }
   return TAG_CLOSURE(1, p);
 }
@@ -52,7 +52,7 @@ rts_mkInt (Capability *cap, HsInt i)
   } else {
     p = (StgClosure *)allocate(cap,CONSTR_sizeW(0,1));
     SET_HDR(p, Izh_con_info, CCS_SYSTEM);
-    p->payload[0]  = (StgClosure *)(StgInt)i;
+    *(StgInt *)p->payload = i;
   }
   return TAG_CLOSURE(1, p);
 }
@@ -62,8 +62,7 @@ rts_mkInt8 (Capability *cap, HsInt8 i)
 {
   StgClosure *p = (StgClosure *)allocate(cap,CONSTR_sizeW(0,1));
   SET_HDR(p, I8zh_con_info, CCS_SYSTEM);
-  /* Make sure we mask out the bits above the lowest 8 */
-  p->payload[0]  = (StgClosure *)(StgInt)i;
+  *(StgInt8 *)p->payload = i;
   return TAG_CLOSURE(1, p);
 }
 
@@ -72,8 +71,7 @@ rts_mkInt16 (Capability *cap, HsInt16 i)
 {
   StgClosure *p = (StgClosure *)allocate(cap,CONSTR_sizeW(0,1));
   SET_HDR(p, I16zh_con_info, CCS_SYSTEM);
-  /* Make sure we mask out the relevant bits */
-  p->payload[0]  = (StgClosure *)(StgInt)i;
+  *(StgInt16 *)p->payload = i;
   return TAG_CLOSURE(1, p);
 }
 
@@ -82,7 +80,7 @@ rts_mkInt32 (Capability *cap, HsInt32 i)
 {
   StgClosure *p = (StgClosure *)allocate(cap,CONSTR_sizeW(0,1));
   SET_HDR(p, I32zh_con_info, CCS_SYSTEM);
-  p->payload[0]  = (StgClosure *)(StgInt)i;
+  *(StgInt32 *)p->payload = i;
   return TAG_CLOSURE(1, p);
 }
 
@@ -100,37 +98,34 @@ rts_mkWord (Capability *cap, HsWord i)
 {
   StgClosure *p = (StgClosure *)allocate(cap,CONSTR_sizeW(0,1));
   SET_HDR(p, Wzh_con_info, CCS_SYSTEM);
-  p->payload[0]  = (StgClosure *)(StgWord)i;
+  *(StgWord *)p->payload = i;
   return TAG_CLOSURE(1, p);
 }
 
 HaskellObj
 rts_mkWord8 (Capability *cap, HsWord8 w)
 {
-  /* see rts_mkInt* comments */
   StgClosure *p = (StgClosure *)allocate(cap,CONSTR_sizeW(0,1));
   SET_HDR(p, W8zh_con_info, CCS_SYSTEM);
-  p->payload[0]  = (StgClosure *)(StgWord)(w & 0xff);
+  *(StgWord8 *)p->payload = w;
   return TAG_CLOSURE(1, p);
 }
 
 HaskellObj
 rts_mkWord16 (Capability *cap, HsWord16 w)
 {
-  /* see rts_mkInt* comments */
   StgClosure *p = (StgClosure *)allocate(cap,CONSTR_sizeW(0,1));
   SET_HDR(p, W16zh_con_info, CCS_SYSTEM);
-  p->payload[0]  = (StgClosure *)(StgWord)(w & 0xffff);
+  *(StgWord16 *)p->payload = w;
   return TAG_CLOSURE(1, p);
 }
 
 HaskellObj
 rts_mkWord32 (Capability *cap, HsWord32 w)
 {
-  /* see rts_mkInt* comments */
   StgClosure *p = (StgClosure *)allocate(cap,CONSTR_sizeW(0,1));
   SET_HDR(p, W32zh_con_info, CCS_SYSTEM);
-  p->payload[0]  = (StgClosure *)(StgWord)(w & 0xffffffff);
+  *(StgWord32 *)p->payload = w;
   return TAG_CLOSURE(1, p);
 }
 
@@ -138,7 +133,6 @@ HaskellObj
 rts_mkWord64 (Capability *cap, HsWord64 w)
 {
   StgClosure *p = (StgClosure *)allocate(cap,CONSTR_sizeW(0,sizeofW(StgWord64)));
-  /* see mk_Int8 comment */
   SET_HDR(p, W64zh_con_info, CCS_SYSTEM);
   ASSIGN_Word64((P_)&(p->payload[0]), w);
   return TAG_CLOSURE(1, p);
@@ -168,7 +162,7 @@ rts_mkStablePtr (Capability *cap, HsStablePtr s)
 {
   StgClosure *p = (StgClosure *)allocate(cap,sizeofW(StgHeader)+1);
   SET_HDR(p, StablePtr_con_info, CCS_SYSTEM);
-  p->payload[0]  = (StgClosure *)s;
+  p->payload[0] = (StgClosure *)s;
   return TAG_CLOSURE(1, p);
 }
 
@@ -177,7 +171,7 @@ rts_mkPtr (Capability *cap, HsPtr a)
 {
   StgClosure *p = (StgClosure *)allocate(cap,sizeofW(StgHeader)+1);
   SET_HDR(p, Ptr_con_info, CCS_SYSTEM);
-  p->payload[0]  = (StgClosure *)a;
+  p->payload[0] = (StgClosure *)a;
   return TAG_CLOSURE(1, p);
 }
 
@@ -186,7 +180,7 @@ rts_mkFunPtr (Capability *cap, HsFunPtr a)
 {
   StgClosure *p = (StgClosure *)allocate(cap,sizeofW(StgHeader)+1);
   SET_HDR(p, FunPtr_con_info, CCS_SYSTEM);
-  p->payload[0]  = (StgClosure *)a;
+  p->payload[0] = (StgClosure *)a;
   return TAG_CLOSURE(1, p);
 }
 
@@ -245,7 +239,7 @@ rts_getInt (HaskellObj p)
     // See comment above:
     // ASSERT(p->header.info == Izh_con_info ||
     //        p->header.info == Izh_static_info);
-    return (HsInt)(UNTAG_CLOSURE(p)->payload[0]);
+    return *(HsInt *)(UNTAG_CLOSURE(p)->payload);
 }
 
 HsInt8
@@ -254,7 +248,7 @@ rts_getInt8 (HaskellObj p)
     // See comment above:
     // ASSERT(p->header.info == I8zh_con_info ||
     //        p->header.info == I8zh_static_info);
-    return (HsInt8)(HsInt)(UNTAG_CLOSURE(p)->payload[0]);
+    return *(HsInt8 *)(UNTAG_CLOSURE(p)->payload);
 }
 
 HsInt16
@@ -263,7 +257,7 @@ rts_getInt16 (HaskellObj p)
     // See comment above:
     // ASSERT(p->header.info == I16zh_con_info ||
     //        p->header.info == I16zh_static_info);
-    return (HsInt16)(HsInt)(UNTAG_CLOSURE(p)->payload[0]);
+    return *(HsInt16 *)(UNTAG_CLOSURE(p)->payload);
 }
 
 HsInt32
@@ -272,7 +266,7 @@ rts_getInt32 (HaskellObj p)
     // See comment above:
     // ASSERT(p->header.info == I32zh_con_info ||
     //        p->header.info == I32zh_static_info);
-  return (HsInt32)(HsInt)(UNTAG_CLOSURE(p)->payload[0]);
+    return *(HsInt32 *)(UNTAG_CLOSURE(p)->payload);
 }
 
 HsInt64
@@ -290,7 +284,7 @@ rts_getWord (HaskellObj p)
     // See comment above:
     // ASSERT(p->header.info == Wzh_con_info ||
     //        p->header.info == Wzh_static_info);
-    return (HsWord)(UNTAG_CLOSURE(p)->payload[0]);
+    return *(HsWord *)(UNTAG_CLOSURE(p)->payload);
 }
 
 HsWord8
@@ -299,7 +293,7 @@ rts_getWord8 (HaskellObj p)
     // See comment above:
     // ASSERT(p->header.info == W8zh_con_info ||
     //        p->header.info == W8zh_static_info);
-    return (HsWord8)(HsWord)(UNTAG_CLOSURE(p)->payload[0]);
+    return *(HsWord8 *)(UNTAG_CLOSURE(p)->payload);
 }
 
 HsWord16
@@ -308,7 +302,7 @@ rts_getWord16 (HaskellObj p)
     // See comment above:
     // ASSERT(p->header.info == W16zh_con_info ||
     //        p->header.info == W16zh_static_info);
-    return (HsWord16)(HsWord)(UNTAG_CLOSURE(p)->payload[0]);
+    return *(HsWord16 *)(UNTAG_CLOSURE(p)->payload);
 }
 
 HsWord32
@@ -317,7 +311,7 @@ rts_getWord32 (HaskellObj p)
     // See comment above:
     // ASSERT(p->header.info == W32zh_con_info ||
     //        p->header.info == W32zh_static_info);
-    return (HsWord32)(HsWord)(UNTAG_CLOSURE(p)->payload[0]);
+    return *(HsWord32 *)(UNTAG_CLOSURE(p)->payload);
 }
 
 HsWord64
@@ -726,7 +720,7 @@ PauseToken *rts_pause (void)
     Task * task = getMyTask();
     if (rts_pausing_task == task)
     {
-        // This task already pased the RTS.
+        // This task already passed the RTS.
         errorBelch("error: rts_pause: This thread has already paused the RTS.");
         stg_exit(EXIT_FAILURE);
     }
@@ -805,7 +799,7 @@ static void assert_isPausedOnMyTask(const char *functionName)
     if (task != rts_pausing_task)
     {
         // We don't have ownership of rts_pausing_task, so it may have changed
-        // just after the above read. Still, we are garanteed that
+        // just after the above read. Still, we are guaranteed that
         // rts_pausing_task won't be set to the current task (because the
         // current task is here now!), so the error messages are still correct.
         errorBelch (

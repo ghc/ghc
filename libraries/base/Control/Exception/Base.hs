@@ -214,6 +214,22 @@ onException io what = io `catch` \e -> do _ <- what
 --
 -- > withFile name mode = bracket (openFile name mode) hClose
 --
+-- Bracket wraps the release action with 'mask', which is sufficient to ensure
+-- that the release action executes to completion when it does not invoke any
+-- interruptible actions, even in the presence of asynchronous exceptions.  For
+-- example, `hClose` is uninterruptible when it is not racing other uses of the
+-- handle.  Similarly, closing a socket (from \"network\" package) is also
+-- uninterruptible under similar conditions.  An example of an interruptible
+-- action is 'killThread'.  Completion of interruptible release actions can be
+-- ensured by wrapping them in in 'uninterruptibleMask_', but this risks making
+-- the program non-responsive to @Control-C@, or timeouts.  Another option is to
+-- run the release action asynchronously in its own thread:
+--
+-- > void $ uninterruptibleMask_ $ forkIO $ do { ... }
+--
+-- The resource will be released as soon as possible, but the thread that invoked
+-- bracket will not block in an uninterruptible state.
+--
 bracket
         :: IO a         -- ^ computation to run first (\"acquire resource\")
         -> (a -> IO b)  -- ^ computation to run last (\"release resource\")

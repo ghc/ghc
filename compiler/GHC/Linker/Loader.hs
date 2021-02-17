@@ -70,6 +70,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Utils.Error
+import GHC.Utils.Logger
 
 import GHC.Unit.Env
 import GHC.Unit.Finder
@@ -308,6 +309,7 @@ loadCmdLineLibs' hsc_env pls =
       let dflags@(DynFlags { ldInputs = cmdline_ld_inputs
                            , libraryPaths = lib_paths_base})
             = hsc_dflags hsc_env
+      let logger = hsc_logger hsc_env
 
       -- (c) Link libraries from the command-line
       let minus_ls_1 = [ lib | Option ('-':'l':lib) <- cmdline_ld_inputs ]
@@ -323,20 +325,20 @@ loadCmdLineLibs' hsc_env pls =
                        OSMinGW32 -> "pthread" : minus_ls_1
                        _         -> minus_ls_1
       -- See Note [Fork/Exec Windows]
-      gcc_paths <- getGCCPaths dflags os
+      gcc_paths <- getGCCPaths logger dflags os
 
       lib_paths_env <- addEnvPaths "LIBRARY_PATH" lib_paths_base
 
-      maybePutStrLn dflags "Search directories (user):"
-      maybePutStr dflags (unlines $ map ("  "++) lib_paths_env)
-      maybePutStrLn dflags "Search directories (gcc):"
-      maybePutStr dflags (unlines $ map ("  "++) gcc_paths)
+      maybePutStrLn logger dflags "Search directories (user):"
+      maybePutStr logger dflags (unlines $ map ("  "++) lib_paths_env)
+      maybePutStrLn logger dflags "Search directories (gcc):"
+      maybePutStr logger dflags (unlines $ map ("  "++) gcc_paths)
 
       libspecs
         <- mapM (locateLib hsc_env False lib_paths_env gcc_paths) minus_ls
 
       -- (d) Link .o files from the command-line
-      classified_ld_inputs <- mapM (classifyLdInput dflags)
+      classified_ld_inputs <- mapM (classifyLdInput logger dflags)
                                 [ f | FileOption _ f <- cmdline_ld_inputs ]
 
       -- (e) Link any MacOS frameworks
@@ -368,13 +370,13 @@ loadCmdLineLibs' hsc_env pls =
            pls1 <- foldM (preloadLib hsc_env lib_paths framework_paths) pls
                          merged_specs
 
-           maybePutStr dflags "final link ... "
+           maybePutStr logger dflags "final link ... "
            ok <- resolveObjs hsc_env
 
            -- DLLs are loaded, reset the search paths
            mapM_ (removeLibrarySearchPath hsc_env) $ reverse pathCache
 
-           if succeeded ok then maybePutStrLn dflags "done"
+           if succeeded ok then maybePutStrLn logger dflags "done"
            else throwGhcExceptionIO (ProgramError "linking extra libraries/objects failed")
 
            return pls1
@@ -417,12 +419,12 @@ package I want to link in eagerly". Would that be too complicated for
 users?
 -}
 
-classifyLdInput :: DynFlags -> FilePath -> IO (Maybe LibrarySpec)
-classifyLdInput dflags f
+classifyLdInput :: Logger -> DynFlags -> FilePath -> IO (Maybe LibrarySpec)
+classifyLdInput logger dflags f
   | isObjectFilename platform f = return (Just (Objects [f]))
   | isDynLibFilename platform f = return (Just (DLLPath f))
   | otherwise          = do
-        putLogMsg dflags NoReason SevInfo noSrcSpan
+        putLogMsg logger dflags NoReason SevInfo noSrcSpan
             $ withPprStyle defaultUserStyle
             (text ("Warning: ignoring unrecognised input `" ++ f ++ "'"))
         return Nothing
@@ -432,22 +434,22 @@ preloadLib
   :: HscEnv -> [String] -> [String] -> LoaderState
   -> LibrarySpec -> IO LoaderState
 preloadLib hsc_env lib_paths framework_paths pls lib_spec = do
-  maybePutStr dflags ("Loading object " ++ showLS lib_spec ++ " ... ")
+  maybePutStr logger dflags ("Loading object " ++ showLS lib_spec ++ " ... ")
   case lib_spec of
     Objects static_ishs -> do
       (b, pls1) <- preload_statics lib_paths static_ishs
-      maybePutStrLn dflags (if b  then "done" else "not found")
+      maybePutStrLn logger dflags (if b  then "done" else "not found")
       return pls1
 
     Archive static_ish -> do
       b <- preload_static_archive lib_paths static_ish
-      maybePutStrLn dflags (if b  then "done" else "not found")
+      maybePutStrLn logger dflags (if b  then "done" else "not found")
       return pls
 
     DLL dll_unadorned -> do
       maybe_errstr <- loadDLL hsc_env (platformSOName platform dll_unadorned)
       case maybe_errstr of
-         Nothing -> maybePutStrLn dflags "done"
+         Nothing -> maybePutStrLn logger dflags "done"
          Just mm | platformOS platform /= OSDarwin ->
            preloadFailed mm lib_paths lib_spec
          Just mm | otherwise -> do
@@ -457,14 +459,14 @@ preloadLib hsc_env lib_paths framework_paths pls lib_spec = do
            let libfile = ("lib" ++ dll_unadorned) <.> "so"
            err2 <- loadDLL hsc_env libfile
            case err2 of
-             Nothing -> maybePutStrLn dflags "done"
+             Nothing -> maybePutStrLn logger dflags "done"
              Just _  -> preloadFailed mm lib_paths lib_spec
       return pls
 
     DLLPath dll_path -> do
       do maybe_errstr <- loadDLL hsc_env dll_path
          case maybe_errstr of
-            Nothing -> maybePutStrLn dflags "done"
+            Nothing -> maybePutStrLn logger dflags "done"
             Just mm -> preloadFailed mm lib_paths lib_spec
          return pls
 
@@ -472,19 +474,20 @@ preloadLib hsc_env lib_paths framework_paths pls lib_spec = do
       if platformUsesFrameworks (targetPlatform dflags)
       then do maybe_errstr <- loadFramework hsc_env framework_paths framework
               case maybe_errstr of
-                 Nothing -> maybePutStrLn dflags "done"
+                 Nothing -> maybePutStrLn logger dflags "done"
                  Just mm -> preloadFailed mm framework_paths lib_spec
               return pls
       else throwGhcExceptionIO (ProgramError "preloadLib Framework")
 
   where
     dflags = hsc_dflags hsc_env
+    logger = hsc_logger hsc_env
 
     platform = targetPlatform dflags
 
     preloadFailed :: String -> [String] -> LibrarySpec -> IO ()
     preloadFailed sys_errmsg paths spec
-       = do maybePutStr dflags "failed.\n"
+       = do maybePutStr logger dflags "failed.\n"
             throwGhcExceptionIO $
               CmdLineError (
                     "user specified .o/.so/.DLL could not be loaded ("
@@ -576,7 +579,7 @@ loadExpr hsc_env span root_ul_bco
         -- All wired-in names are in the base package, which we link
         -- by default, so we can safely ignore them here.
 
-dieWith :: DynFlags -> SrcSpan -> MsgDoc -> IO a
+dieWith :: DynFlags -> SrcSpan -> SDoc -> IO a
 dieWith dflags span msg = throwGhcExceptionIO (ProgramError (showSDoc dflags (mkLocMessage SevFatal span msg)))
 
 
@@ -914,12 +917,13 @@ dynLoadObjs :: HscEnv -> LoaderState -> [FilePath] -> IO LoaderState
 dynLoadObjs _       pls                           []   = return pls
 dynLoadObjs hsc_env pls@LoaderState{..} objs = do
     let unit_env = hsc_unit_env hsc_env
-    let dflags = hsc_dflags hsc_env
+    let dflags   = hsc_dflags hsc_env
+    let logger   = hsc_logger hsc_env
     let platform = ue_platform unit_env
     let minus_ls = [ lib | Option ('-':'l':lib) <- ldInputs dflags ]
     let minus_big_ls = [ lib | Option ('-':'L':lib) <- ldInputs dflags ]
     (soFile, libPath , libName) <-
-      newTempLibName dflags TFL_CurrentModule (platformSOExt platform)
+      newTempLibName logger dflags TFL_CurrentModule (platformSOExt platform)
     let
         dflags2 = dflags {
                       -- We don't want the original ldInputs in
@@ -965,7 +969,7 @@ dynLoadObjs hsc_env pls@LoaderState{..} objs = do
     -- link all "loaded packages" so symbols in those can be resolved
     -- Note: We are loading packages with local scope, so to see the
     -- symbols in this link we must link all loaded packages again.
-    linkDynLib dflags2 unit_env objs pkgs_loaded
+    linkDynLib logger dflags2 unit_env objs pkgs_loaded
 
     -- if we got this far, extend the lifetime of the library file
     changeTempFilesLifetime dflags TFL_GhcSession [soFile]
@@ -1096,9 +1100,10 @@ unload hsc_env linkables
                  return (pls1, pls1)
 
         let dflags = hsc_dflags hsc_env
-        debugTraceMsg dflags 3 $
+        let logger = hsc_logger hsc_env
+        debugTraceMsg logger dflags 3 $
           text "unload: retaining objs" <+> ppr (objs_loaded new_pls)
-        debugTraceMsg dflags 3 $
+        debugTraceMsg logger dflags 3 $
           text "unload: retaining bcos" <+> ppr (bcos_loaded new_pls)
         return ()
 
@@ -1276,6 +1281,7 @@ loadPackage :: HscEnv -> UnitInfo -> IO ()
 loadPackage hsc_env pkg
    = do
         let dflags    = hsc_dflags hsc_env
+        let logger    = hsc_logger hsc_env
             platform  = targetPlatform dflags
             is_dyn    = interpreterDynamic (hscInterp hsc_env)
             dirs | is_dyn    = map ST.unpack $ Packages.unitLibraryDynDirs pkg
@@ -1303,7 +1309,7 @@ loadPackage hsc_env pkg
             extra_libs = extdeplibs ++ linkerlibs
 
         -- See Note [Fork/Exec Windows]
-        gcc_paths <- getGCCPaths dflags (platformOS platform)
+        gcc_paths <- getGCCPaths logger dflags (platformOS platform)
         dirs_env <- addEnvPaths "LIBRARY_PATH" dirs
 
         hs_classifieds
@@ -1325,7 +1331,7 @@ loadPackage hsc_env pkg
         all_paths_env <- addEnvPaths "LD_LIBRARY_PATH" all_paths
         pathCache <- mapM (addLibrarySearchPath hsc_env) all_paths_env
 
-        maybePutSDoc dflags
+        maybePutSDoc logger dflags
             (text "Loading unit " <> pprUnitInfoForUser pkg <> text " ... ")
 
         -- See comments with partOfGHCi
@@ -1345,7 +1351,7 @@ loadPackage hsc_env pkg
         mapM_ (loadObj hsc_env) objs
         mapM_ (loadArchive hsc_env) archs
 
-        maybePutStr dflags "linking ... "
+        maybePutStr logger dflags "linking ... "
         ok <- resolveObjs hsc_env
 
         -- DLLs are loaded, reset the search paths
@@ -1355,7 +1361,7 @@ loadPackage hsc_env pkg
         mapM_ (removeLibrarySearchPath hsc_env) $ reverse pathCache
 
         if succeeded ok
-           then maybePutStrLn dflags "done."
+           then maybePutStrLn logger dflags "done."
            else let errmsg = text "unable to load unit `"
                              <> pprUnitInfoForUser pkg <> text "'"
                  in throwGhcExceptionIO (InstallationError (showSDoc dflags errmsg))
@@ -1415,12 +1421,14 @@ load_dyn hsc_env crash_early dll = do
     Just err ->
       if crash_early
         then cmdLineErrorIO err
-        else let dflags = hsc_dflags hsc_env in
+        else
           when (wopt Opt_WarnMissedExtraSharedLib dflags)
-            $ putLogMsg dflags
+            $ putLogMsg logger dflags
                 (Reason Opt_WarnMissedExtraSharedLib) SevWarning
                   noSrcSpan $ withPprStyle defaultUserStyle (note err)
   where
+    dflags = hsc_dflags hsc_env
+    logger = hsc_logger hsc_env
     note err = vcat $ map text
       [ err
       , "It's OK if you don't want to use symbols from it directly."
@@ -1500,6 +1508,7 @@ locateLib hsc_env is_hs lib_dirs gcc_dirs lib
 
    where
      dflags = hsc_dflags hsc_env
+     logger = hsc_logger hsc_env
      interp = hscInterp hsc_env
      dirs   = lib_dirs ++ gcc_dirs
      gcc    = False
@@ -1540,7 +1549,7 @@ locateLib hsc_env is_hs lib_dirs gcc_dirs lib
                      in liftM (fmap DLLPath) $ findFile dirs' dyn_lib_file
      findSysDll    = fmap (fmap $ DLL . dropExtension . takeFileName) $
                         findSystemLibrary hsc_env so_name
-     tryGcc        = let search   = searchForLibUsingGcc dflags
+     tryGcc        = let search   = searchForLibUsingGcc logger dflags
                          dllpath  = liftM (fmap DLLPath)
                          short    = dllpath $ search so_name lib_dirs
                          full     = dllpath $ search lib_so_name lib_dirs
@@ -1570,7 +1579,7 @@ locateLib hsc_env is_hs lib_dirs gcc_dirs lib
       , not loading_dynamic_hs_libs
       , interpreterProfiled interp
       = do
-          warningMsg dflags
+          warningMsg logger dflags
             (text "Interpreter failed to load profiled static library" <+> text lib <> char '.' $$
               text " \tTrying dynamic library instead. If this fails try to rebuild" <+>
               text "libraries with profiling support.")
@@ -1590,11 +1599,11 @@ locateLib hsc_env is_hs lib_dirs gcc_dirs lib
      arch = platformArch platform
      os = platformOS platform
 
-searchForLibUsingGcc :: DynFlags -> String -> [FilePath] -> IO (Maybe FilePath)
-searchForLibUsingGcc dflags so dirs = do
+searchForLibUsingGcc :: Logger -> DynFlags -> String -> [FilePath] -> IO (Maybe FilePath)
+searchForLibUsingGcc logger dflags so dirs = do
    -- GCC does not seem to extend the library search path (using -L) when using
    -- --print-file-name. So instead pass it a new base location.
-   str <- askLd dflags (map (FileOption "-B") dirs
+   str <- askLd logger dflags (map (FileOption "-B") dirs
                           ++ [Option "--print-file-name", Option so])
    let file = case lines str of
                 []  -> ""
@@ -1606,11 +1615,11 @@ searchForLibUsingGcc dflags so dirs = do
 
 -- | Retrieve the list of search directory GCC and the System use to find
 --   libraries and components. See Note [Fork/Exec Windows].
-getGCCPaths :: DynFlags -> OS -> IO [FilePath]
-getGCCPaths dflags os
+getGCCPaths :: Logger -> DynFlags -> OS -> IO [FilePath]
+getGCCPaths logger dflags os
   = case os of
       OSMinGW32 ->
-        do gcc_dirs <- getGccSearchDirectory dflags "libraries"
+        do gcc_dirs <- getGccSearchDirectory logger dflags "libraries"
            sys_dirs <- getSystemDirectories
            return $ nub $ gcc_dirs ++ sys_dirs
       _         -> return []
@@ -1630,13 +1639,13 @@ gccSearchDirCache = unsafePerformIO $ newIORef []
 -- which hopefully is written in an optimized mannor to take advantage of
 -- caching. At the very least we remove the overhead of the fork/exec and waits
 -- which dominate a large percentage of startup time on Windows.
-getGccSearchDirectory :: DynFlags -> String -> IO [FilePath]
-getGccSearchDirectory dflags key = do
+getGccSearchDirectory :: Logger -> DynFlags -> String -> IO [FilePath]
+getGccSearchDirectory logger dflags key = do
     cache <- readIORef gccSearchDirCache
     case lookup key cache of
       Just x  -> return x
       Nothing -> do
-        str <- askLd dflags [Option "--print-search-dirs"]
+        str <- askLd logger dflags [Option "--print-search-dirs"]
         let line = dropWhile isSpace str
             name = key ++ ": ="
         if null line
@@ -1704,17 +1713,17 @@ addEnvPaths name list
 
   ********************************************************************* -}
 
-maybePutSDoc :: DynFlags -> SDoc -> IO ()
-maybePutSDoc dflags s
+maybePutSDoc :: Logger -> DynFlags -> SDoc -> IO ()
+maybePutSDoc logger dflags s
     = when (verbosity dflags > 1) $
-          putLogMsg dflags
+          putLogMsg logger dflags
               NoReason
               SevInteractive
               noSrcSpan
               $ withPprStyle defaultUserStyle s
 
-maybePutStr :: DynFlags -> String -> IO ()
-maybePutStr dflags s = maybePutSDoc dflags (text s)
+maybePutStr :: Logger -> DynFlags -> String -> IO ()
+maybePutStr logger dflags s = maybePutSDoc logger dflags (text s)
 
-maybePutStrLn :: DynFlags -> String -> IO ()
-maybePutStrLn dflags s = maybePutStr dflags (s ++ "\n")
+maybePutStrLn :: Logger -> DynFlags -> String -> IO ()
+maybePutStrLn logger dflags s = maybePutSDoc logger dflags (text s <> text "\n")

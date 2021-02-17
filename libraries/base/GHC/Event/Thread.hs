@@ -30,7 +30,7 @@ import GHC.Conc.Sync (TVar, ThreadId, ThreadStatus(..), atomically, forkIO,
                       labelThread, modifyMVar_, withMVar, newTVar, sharedCAF,
                       getNumCapabilities, threadCapability, myThreadId, forkOn,
                       threadStatus, writeTVar, newTVarIO, readTVar, retry,throwSTM,STM)
-import GHC.IO (mask_, onException)
+import GHC.IO (mask_, uninterruptibleMask_, onException)
 import GHC.IO.Exception (ioError)
 import GHC.IOArray (IOArray, newIOArray, readIOArray, writeIOArray,
                     boundsIOArray)
@@ -104,7 +104,10 @@ closeFdWith close fd = do
   mgrs <- flip mapM [low..high] $ \i -> do
     Just (_,!mgr) <- readIOArray eventManagerArray i
     return mgr
-  mask_ $ do
+  -- 'takeMVar', and 'M.closeFd_' might block, although for a very short time.
+  -- To make 'closeFdWith' safe in presence of asynchronous exceptions we have
+  -- to use uninterruptible mask.
+  uninterruptibleMask_ $ do
     tables <- flip mapM mgrs $ \mgr -> takeMVar $ M.callbackTableVar mgr fd
     cbApps <- zipWithM (\mgr table -> M.closeFd_ mgr table fd) mgrs tables
     close fd `finally` sequence_ (zipWith3 finish mgrs tables cbApps)

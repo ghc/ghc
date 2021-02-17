@@ -36,8 +36,8 @@ data PsWarning
 
      -- | Warn when tabulations are found
    = PsWarnTab
-      { tabFirst :: !SrcSpan -- ^ First occurence of a tab
-      , tabCount :: !Word    -- ^ Number of other occurences
+      { tabFirst :: !SrcSpan -- ^ First occurrence of a tab
+      , tabCount :: !Word    -- ^ Number of other occurrences
       }
 
    | PsWarnTransitionalLayout !SrcSpan !TransLayoutReason
@@ -53,7 +53,7 @@ data PsWarning
       -- ^ Multiple Haddock comment for the same entity
 
    | PsWarnStarBinder !SrcSpan
-      -- ^ Found binding occurence of "*" while StarIsType is enabled
+      -- ^ Found binding occurrence of "*" while StarIsType is enabled
 
    | PsWarnStarIsType !SrcSpan
       -- ^ Using "*" for "Type" without StarIsType enabled
@@ -103,7 +103,7 @@ data PsErrorDesc
       -- ^ Lexer error
 
    | PsErrSuffixAT
-      -- ^ Suffix occurence of `@`
+      -- ^ Suffix occurrence of `@`
 
    | PsErrParse !String
       -- ^ Parse errors

@@ -889,10 +889,10 @@ zonkExpr env (ExplicitList ty wit exprs)
    where zonkWit env Nothing    = return (env, Nothing)
          zonkWit env (Just fln) = second Just <$> zonkSyntaxExpr env fln
 
-zonkExpr env expr@(RecordCon { rcon_ext = ext, rcon_flds = rbinds })
-  = do  { new_con_expr <- zonkExpr env (rcon_con_expr ext)
+zonkExpr env expr@(RecordCon { rcon_ext = con_expr, rcon_flds = rbinds })
+  = do  { new_con_expr <- zonkExpr env con_expr
         ; new_rbinds   <- zonkRecFields env rbinds
-        ; return (expr { rcon_ext  = ext { rcon_con_expr = new_con_expr }
+        ; return (expr { rcon_ext  = new_con_expr
                        , rcon_flds = new_rbinds }) }
 
 zonkExpr env (RecordUpd { rupd_flds = rbinds
@@ -1777,7 +1777,7 @@ Solution: (see #15552 for other variants)
       the treatment of lexically-scoped variables in ze_tv_env and
       ze_id_env.)
 
-    Is the extra work worth it?  Some non-sytematic perf measurements
+    Is the extra work worth it?  Some non-systematic perf measurements
     suggest that compiler allocation is reduced overall (by 0.5% or so)
     but compile time really doesn't change.
 -}

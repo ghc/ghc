@@ -55,6 +55,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Error
+import GHC.Utils.Logger
 
 import GHC.Unit
 import GHC.Unit.Env
@@ -90,6 +91,8 @@ import qualified Data.Set as Set
 -- | Entry point to compile a Backpack file.
 doBackpack :: [FilePath] -> Ghc ()
 doBackpack [src_filename] = do
+    logger <- getLogger
+
     -- Apply options from file to dflags
     dflags0 <- getDynFlags
     let dflags1 = dflags0
@@ -98,7 +101,7 @@ doBackpack [src_filename] = do
     modifySession (\hsc_env -> hsc_env {hsc_dflags = dflags})
     -- Cribbed from: preprocessFile / GHC.Driver.Pipeline
     liftIO $ checkProcessArgsResult unhandled_flags
-    liftIO $ handleFlagWarnings dflags warns
+    liftIO $ handleFlagWarnings logger dflags warns
     -- TODO: Preprocessing not implemented
 
     buf <- liftIO $ hGetStringBuffer src_filename
@@ -413,6 +416,7 @@ compileExe lunit = do
 addUnit :: GhcMonad m => UnitInfo -> m ()
 addUnit u = do
     hsc_env <- getSession
+    logger <- getLogger
     newdbs <- case hsc_unit_dbs hsc_env of
         Nothing  -> panic "addUnit: called too early"
         Just dbs ->
@@ -421,7 +425,7 @@ addUnit u = do
                , unitDatabaseUnits = [u]
                }
          in return (dbs ++ [newdb]) -- added at the end because ordering matters
-    (dbs,unit_state,home_unit) <- liftIO $ initUnits (hsc_dflags hsc_env) (Just newdbs)
+    (dbs,unit_state,home_unit) <- liftIO $ initUnits logger (hsc_dflags hsc_env) (Just newdbs)
     let unit_env = UnitEnv
           { ue_platform  = targetPlatform (hsc_dflags hsc_env)
           , ue_namever   = ghcNameVersion (hsc_dflags hsc_env)
@@ -473,6 +477,9 @@ data BkpEnv
 -- TODO: just make a proper new monad for BkpM, rather than use IOEnv
 instance {-# OVERLAPPING #-} HasDynFlags BkpM where
     getDynFlags = fmap hsc_dflags getSession
+instance {-# OVERLAPPING #-} HasLogger BkpM where
+    getLogger = fmap hsc_logger getSession
+
 
 instance GhcMonad BkpM where
     getSession = do
@@ -526,9 +533,9 @@ initBkpM file bkp m =
 
 -- | Print a compilation progress message, but with indentation according
 -- to @level@ (for nested compilation).
-backpackProgressMsg :: Int -> DynFlags -> SDoc -> IO ()
-backpackProgressMsg level dflags msg =
-    compilationProgressMsg dflags $ text (replicate (level * 2) ' ') -- TODO: use GHC.Utils.Ppr.RStr
+backpackProgressMsg :: Int -> Logger -> DynFlags -> SDoc -> IO ()
+backpackProgressMsg level logger dflags msg =
+    compilationProgressMsg logger dflags $ text (replicate (level * 2) ' ') -- TODO: use GHC.Utils.Ppr.RStr
                                       <> msg
 
 -- | Creates a 'Messager' for Backpack compilation; this is basically
@@ -539,9 +546,10 @@ mkBackpackMsg = do
     level <- getBkpLevel
     return $ \hsc_env mod_index recomp node ->
       let dflags = hsc_dflags hsc_env
+          logger = hsc_logger hsc_env
           state = hsc_units hsc_env
           showMsg msg reason =
-            backpackProgressMsg level dflags $ pprWithUnitState state $
+            backpackProgressMsg level logger dflags $ pprWithUnitState state $
                 showModuleIndex mod_index <>
                 msg <> showModMsg dflags (recompileRequired recomp) node
                     <> reason
@@ -575,18 +583,20 @@ backpackStyle =
 msgTopPackage :: (Int,Int) -> HsComponentId -> BkpM ()
 msgTopPackage (i,n) (HsComponentId (PackageName fs_pn) _) = do
     dflags <- getDynFlags
+    logger <- getLogger
     level <- getBkpLevel
-    liftIO . backpackProgressMsg level dflags
+    liftIO . backpackProgressMsg level logger dflags
         $ showModuleIndex (i, n) <> text "Processing " <> ftext fs_pn
 
 -- | Message when we instantiate a Backpack unit.
 msgUnitId :: Unit -> BkpM ()
 msgUnitId pk = do
     dflags <- getDynFlags
+    logger <- getLogger
     hsc_env <- getSession
     level <- getBkpLevel
     let state = hsc_units hsc_env
-    liftIO . backpackProgressMsg level dflags
+    liftIO . backpackProgressMsg level logger dflags
         $ pprWithUnitState state
         $ text "Instantiating "
            <> withPprStyle backpackStyle (ppr pk)
@@ -595,10 +605,11 @@ msgUnitId pk = do
 msgInclude :: (Int,Int) -> Unit -> BkpM ()
 msgInclude (i,n) uid = do
     dflags <- getDynFlags
+    logger <- getLogger
     hsc_env <- getSession
     level <- getBkpLevel
     let state = hsc_units hsc_env
-    liftIO . backpackProgressMsg level dflags
+    liftIO . backpackProgressMsg level logger dflags
         $ pprWithUnitState state
         $ showModuleIndex (i, n) <> text "Including "
             <> withPprStyle backpackStyle (ppr uid)
@@ -786,7 +797,7 @@ summariseDecl _pn hsc_src lmodname@(L loc modname) Nothing
                          Nothing -- GHC API buffer support not supported
                          [] -- No exclusions
          case r of
-            Nothing -> throwOneError (mkPlainErrMsg loc (text "module" <+> ppr modname <+> text "was not found"))
+            Nothing -> throwOneError (mkPlainMsgEnvelope loc (text "module" <+> ppr modname <+> text "was not found"))
             Just (Left err) -> throwErrors err
             Just (Right summary) -> return summary
 

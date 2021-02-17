@@ -96,7 +96,7 @@ import GHC.Utils.Misc
 import Control.Monad
 import Data.Function ( on )
 import Data.Functor.Identity
-import Data.List
+import Data.List (nubBy, partition)
 import Data.List.NonEmpty ( NonEmpty(..) )
 import qualified Data.Set as Set
 import Data.Tuple( swap )
@@ -779,7 +779,7 @@ swizzleTcTyConBndrs tc_infos
                       | (tc, scoped_prs, kind) <- tc_infos ]
 
     swizzle_prs :: [(Name,TyVar)]
-    -- Pairs the user-specifed Name with its representative TyVar
+    -- Pairs the user-specified Name with its representative TyVar
     -- See Note [Swizzling the tyvars before generaliseTcTyCon]
     swizzle_prs = [ pr | (_, prs, _) <- tc_infos, pr <- prs ]
 

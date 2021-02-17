@@ -68,7 +68,7 @@ import Data.IORef
 runHsc :: HscEnv -> Hsc a -> IO a
 runHsc hsc_env (Hsc hsc) = do
     (a, w) <- hsc hsc_env emptyBag
-    printOrThrowWarnings (hsc_dflags hsc_env) w
+    printOrThrowWarnings (hsc_logger hsc_env) (hsc_dflags hsc_env) w
     return a
 
 -- | Switches in the DynFlags and Plugins from the InteractiveContext
@@ -285,4 +285,3 @@ lookupIfaceByModule hpt pit mod
 
 mainModIs :: HscEnv -> Module
 mainModIs hsc_env = mkHomeModule (hsc_home_unit hsc_env) (mainModuleNameIs (hsc_dflags hsc_env))
-

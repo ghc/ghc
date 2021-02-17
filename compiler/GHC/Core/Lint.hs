@@ -65,8 +65,10 @@ import GHC.Core.TyCon as TyCon
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Unify
 import GHC.Types.Basic
-import GHC.Utils.Error hiding ( dumpIfSet )
+import GHC.Utils.Error
 import qualified GHC.Utils.Error as Err
+import GHC.Utils.Logger (Logger, putLogMsg, putDumpMsg, DumpFormat (..), getLogger)
+import qualified GHC.Utils.Logger as Logger
 import GHC.Data.List.SetOps
 import GHC.Builtin.Names
 import GHC.Utils.Outputable as Outputable
@@ -212,14 +214,14 @@ in GHC.Core.Opt.WorkWrap.Utils.  (Maybe there are other "clients" of this featur
 * Alas, when cloning a coercion variable we might choose a unique
   that happens to clash with an inner Id, thus
       \cv_66 -> let wild_X7 = blah in blah
-  We decide to clone `cv_66` becuase it's already in scope.  Fine,
+  We decide to clone `cv_66` because it's already in scope.  Fine,
   choose a new unique.  Aha, X7 looks good.  So we check the lambda
   body with le_subst of [cv_66 :-> cv_X7]
 
   This is all fine, even though we use the same unique as wild_X7.
   As (SI2) says, we do /not/ return a new lambda
      (\cv_X7 -> let wild_X7 = blah in ...)
-  We simply use the le_subst subsitution in types/coercions only, when
+  We simply use the le_subst substitution in types/coercions only, when
   checking for equality.
 
 * We still need to check that Id occurrences are bound by some
@@ -288,21 +290,23 @@ endPassIO :: HscEnv -> PrintUnqualified
           -> CoreToDo -> CoreProgram -> [CoreRule] -> IO ()
 -- Used by the IO-is CorePrep too
 endPassIO hsc_env print_unqual pass binds rules
-  = do { dumpPassResult dflags print_unqual mb_flag
+  = do { dumpPassResult logger dflags print_unqual mb_flag
                         (ppr pass) (pprPassDetails pass) binds rules
        ; lintPassResult hsc_env pass binds }
   where
+    logger  = hsc_logger hsc_env
     dflags  = hsc_dflags hsc_env
     mb_flag = case coreDumpFlag pass of
                 Just flag | dopt flag dflags                    -> Just flag
                           | dopt Opt_D_verbose_core2core dflags -> Just flag
                 _ -> Nothing
 
-dumpIfSet :: DynFlags -> Bool -> CoreToDo -> SDoc -> SDoc -> IO ()
-dumpIfSet dflags dump_me pass extra_info doc
-  = Err.dumpIfSet dflags dump_me (showSDoc dflags (ppr pass <+> extra_info)) doc
+dumpIfSet :: Logger -> DynFlags -> Bool -> CoreToDo -> SDoc -> SDoc -> IO ()
+dumpIfSet logger dflags dump_me pass extra_info doc
+  = Logger.dumpIfSet logger dflags dump_me (showSDoc dflags (ppr pass <+> extra_info)) doc
 
-dumpPassResult :: DynFlags
+dumpPassResult :: Logger
+               -> DynFlags
                -> PrintUnqualified
                -> Maybe DumpFlag        -- Just df => show details in a file whose
                                         --            name is specified by df
@@ -310,16 +314,16 @@ dumpPassResult :: DynFlags
                -> SDoc                  -- Extra info to appear after header
                -> CoreProgram -> [CoreRule]
                -> IO ()
-dumpPassResult dflags unqual mb_flag hdr extra_info binds rules
+dumpPassResult logger dflags unqual mb_flag hdr extra_info binds rules
   = do { forM_ mb_flag $ \flag -> do
            let sty = mkDumpStyle unqual
-           dumpAction dflags sty (dumpOptionsFromFlag flag)
+           putDumpMsg logger dflags sty flag
               (showSDoc dflags hdr) FormatCore dump_doc
 
          -- Report result size
          -- This has the side effect of forcing the intermediate to be evaluated
          -- if it's not already forced by a -ddump flag.
-       ; Err.debugTraceMsg dflags 2 size_doc
+       ; Err.debugTraceMsg logger dflags 2 size_doc
        }
 
   where
@@ -375,35 +379,37 @@ lintPassResult hsc_env pass binds
   = return ()
   | otherwise
   = do { let warns_and_errs = lintCoreBindings dflags pass (interactiveInScope hsc_env) binds
-       ; Err.showPass dflags ("Core Linted result of " ++ showPpr dflags pass)
-       ; displayLintResults dflags (showLintWarnings pass) (ppr pass)
+       ; Err.showPass logger dflags ("Core Linted result of " ++ showPpr dflags pass)
+       ; displayLintResults logger dflags (showLintWarnings pass) (ppr pass)
                             (pprCoreBindings binds) warns_and_errs }
   where
     dflags = hsc_dflags hsc_env
+    logger = hsc_logger hsc_env
 
-displayLintResults :: DynFlags
+displayLintResults :: Logger
+                   -> DynFlags
                    -> Bool -- ^ If 'True', display linter warnings.
                            --   If 'False', ignore linter warnings.
                    -> SDoc -- ^ The source of the linted program
                    -> SDoc -- ^ The linted program, pretty-printed
                    -> WarnsAndErrs
                    -> IO ()
-displayLintResults dflags display_warnings pp_what pp_pgm (warns, errs)
+displayLintResults logger dflags display_warnings pp_what pp_pgm (warns, errs)
   | not (isEmptyBag errs)
-  = do { putLogMsg dflags NoReason Err.SevDump noSrcSpan
+  = do { putLogMsg logger dflags NoReason Err.SevDump noSrcSpan
            $ withPprStyle defaultDumpStyle
            (vcat [ lint_banner "errors" pp_what, Err.pprMessageBag errs
                  , text "*** Offending Program ***"
                  , pp_pgm
                  , text "*** End of Offense ***" ])
-       ; Err.ghcExit dflags 1 }
+       ; Err.ghcExit logger dflags 1 }
 
   | not (isEmptyBag warns)
   , not (hasNoDebugOutput dflags)
   , display_warnings
   -- If the Core linter encounters an error, output to stderr instead of
   -- stdout (#13342)
-  = putLogMsg dflags NoReason Err.SevInfo noSrcSpan
+  = putLogMsg logger dflags NoReason Err.SevInfo noSrcSpan
       $ withPprStyle defaultDumpStyle
         (lint_banner "warnings" pp_what $$ Err.pprMessageBag (mapBag ($$ blankLine) warns))
 
@@ -426,11 +432,12 @@ lintInteractiveExpr what hsc_env expr
   | not (gopt Opt_DoCoreLinting dflags)
   = return ()
   | Just err <- lintExpr dflags (interactiveInScope hsc_env) expr
-  = displayLintResults dflags False what (pprCoreExpr expr) (emptyBag, err)
+  = displayLintResults logger dflags False what (pprCoreExpr expr) (emptyBag, err)
   | otherwise
   = return ()
   where
     dflags = hsc_dflags hsc_env
+    logger = hsc_logger hsc_env
 
 interactiveInScope :: HscEnv -> [Var]
 -- In GHCi we may lint expressions, or bindings arising from 'deriving'
@@ -541,7 +548,7 @@ lintUnfolding :: Bool               -- True <=> is a compulsory unfolding
               -> SrcLoc
               -> VarSet             -- Treat these as in scope
               -> CoreExpr
-              -> Maybe (Bag MsgDoc) -- Nothing => OK
+              -> Maybe (Bag SDoc) -- Nothing => OK
 
 lintUnfolding is_compulsory dflags locn var_set expr
   | isEmptyBag errs = Nothing
@@ -559,7 +566,7 @@ lintUnfolding is_compulsory dflags locn var_set expr
 lintExpr :: DynFlags
          -> [Var]               -- Treat these as in scope
          -> CoreExpr
-         -> Maybe (Bag MsgDoc)  -- Nothing => OK
+         -> Maybe (Bag SDoc)  -- Nothing => OK
 
 lintExpr dflags vars expr
   | isEmptyBag errs = Nothing
@@ -1767,6 +1774,7 @@ lintTyLit (NumTyLit n)
   | otherwise = failWithL msg
     where msg = text "Negative type literal:" <+> integer n
 lintTyLit (StrTyLit _) = return ()
+lintTyLit (CharTyLit _) = return ()
 
 lint_app :: SDoc -> LintedKind -> [LintedType] -> LintM ()
 -- (lint_app d fun_kind arg_tys)
@@ -2313,12 +2321,13 @@ lintCoercion (HoleCo h)
 ************************************************************************
 -}
 
-lintAxioms :: DynFlags
+lintAxioms :: Logger
+           -> DynFlags
            -> SDoc -- ^ The source of the linted axioms
            -> [CoAxiom Branched]
            -> IO ()
-lintAxioms dflags what axioms =
-  displayLintResults dflags True what (vcat $ map pprCoAxiom axioms) $
+lintAxioms logger dflags what axioms =
+  displayLintResults logger dflags True what (vcat $ map pprCoAxiom axioms) $
   initL dflags (defaultLintFlags dflags) [] $
   do { mapM_ lint_axiom axioms
      ; let axiom_groups = groupWith coAxiomTyCon axioms
@@ -2551,7 +2560,7 @@ newtype LintM a =
             (Maybe a, WarnsAndErrs) } -- Result and messages (if any)
    deriving (Functor)
 
-type WarnsAndErrs = (Bag MsgDoc, Bag MsgDoc)
+type WarnsAndErrs = (Bag SDoc, Bag SDoc)
 
 {- Note [Checking for global Ids]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2710,31 +2719,31 @@ noLPChecks thing_inside
 getLintFlags :: LintM LintFlags
 getLintFlags = LintM $ \ env errs -> (Just (le_flags env), errs)
 
-checkL :: Bool -> MsgDoc -> LintM ()
+checkL :: Bool -> SDoc -> LintM ()
 checkL True  _   = return ()
 checkL False msg = failWithL msg
 
 -- like checkL, but relevant to type checking
-lintL :: Bool -> MsgDoc -> LintM ()
+lintL :: Bool -> SDoc -> LintM ()
 lintL = checkL
 
-checkWarnL :: Bool -> MsgDoc -> LintM ()
+checkWarnL :: Bool -> SDoc -> LintM ()
 checkWarnL True   _  = return ()
 checkWarnL False msg = addWarnL msg
 
-failWithL :: MsgDoc -> LintM a
+failWithL :: SDoc -> LintM a
 failWithL msg = LintM $ \ env (warns,errs) ->
                 (Nothing, (warns, addMsg True env errs msg))
 
-addErrL :: MsgDoc -> LintM ()
+addErrL :: SDoc -> LintM ()
 addErrL msg = LintM $ \ env (warns,errs) ->
               (Just (), (warns, addMsg True env errs msg))
 
-addWarnL :: MsgDoc -> LintM ()
+addWarnL :: SDoc -> LintM ()
 addWarnL msg = LintM $ \ env (warns,errs) ->
               (Just (), (addMsg False env warns msg, errs))
 
-addMsg :: Bool -> LintEnv ->  Bag MsgDoc -> MsgDoc -> Bag MsgDoc
+addMsg :: Bool -> LintEnv ->  Bag SDoc -> SDoc -> Bag SDoc
 addMsg is_error env msgs msg
   = ASSERT2( notNull loc_msgs, msg )
     msgs `snocBag` mk_msg msg
@@ -2862,7 +2871,7 @@ varCallSiteUsage id =
          Nothing -> unitUE id One
          Just id_ue -> id_ue
 
-ensureEqTys :: LintedType -> LintedType -> MsgDoc -> LintM ()
+ensureEqTys :: LintedType -> LintedType -> SDoc -> LintM ()
 -- check ty2 is subtype of ty1 (ie, has same structure but usage
 -- annotations need only be consistent, not equal)
 -- Assumes ty1,ty2 are have already had the substitution applied
@@ -2996,36 +3005,36 @@ pp_binder b | isId b    = hsep [ppr b, dcolon, ppr (idType b)]
 ------------------------------------------------------
 --      Messages for case expressions
 
-mkDefaultArgsMsg :: [Var] -> MsgDoc
+mkDefaultArgsMsg :: [Var] -> SDoc
 mkDefaultArgsMsg args
   = hang (text "DEFAULT case with binders")
          4 (ppr args)
 
-mkCaseAltMsg :: CoreExpr -> Type -> Type -> MsgDoc
+mkCaseAltMsg :: CoreExpr -> Type -> Type -> SDoc
 mkCaseAltMsg e ty1 ty2
   = hang (text "Type of case alternatives not the same as the annotation on case:")
          4 (vcat [ text "Actual type:" <+> ppr ty1,
                    text "Annotation on case:" <+> ppr ty2,
                    text "Alt Rhs:" <+> ppr e ])
 
-mkScrutMsg :: Id -> Type -> Type -> TCvSubst -> MsgDoc
+mkScrutMsg :: Id -> Type -> Type -> TCvSubst -> SDoc
 mkScrutMsg var var_ty scrut_ty subst
   = vcat [text "Result binder in case doesn't match scrutinee:" <+> ppr var,
           text "Result binder type:" <+> ppr var_ty,--(idType var),
           text "Scrutinee type:" <+> ppr scrut_ty,
      hsep [text "Current TCv subst", ppr subst]]
 
-mkNonDefltMsg, mkNonIncreasingAltsMsg :: CoreExpr -> MsgDoc
+mkNonDefltMsg, mkNonIncreasingAltsMsg :: CoreExpr -> SDoc
 mkNonDefltMsg e
   = hang (text "Case expression with DEFAULT not at the beginning") 4 (ppr e)
 mkNonIncreasingAltsMsg e
   = hang (text "Case expression with badly-ordered alternatives") 4 (ppr e)
 
-nonExhaustiveAltsMsg :: CoreExpr -> MsgDoc
+nonExhaustiveAltsMsg :: CoreExpr -> SDoc
 nonExhaustiveAltsMsg e
   = hang (text "Case expression with non-exhaustive alternatives") 4 (ppr e)
 
-mkBadConMsg :: TyCon -> DataCon -> MsgDoc
+mkBadConMsg :: TyCon -> DataCon -> SDoc
 mkBadConMsg tycon datacon
   = vcat [
         text "In a case alternative, data constructor isn't in scrutinee type:",
@@ -3033,7 +3042,7 @@ mkBadConMsg tycon datacon
         text "Data con:" <+> ppr datacon
     ]
 
-mkBadPatMsg :: Type -> Type -> MsgDoc
+mkBadPatMsg :: Type -> Type -> SDoc
 mkBadPatMsg con_result_ty scrut_ty
   = vcat [
         text "In a case alternative, pattern result type doesn't match scrutinee type:",
@@ -3041,17 +3050,17 @@ mkBadPatMsg con_result_ty scrut_ty
         text "Scrutinee type:" <+> ppr scrut_ty
     ]
 
-integerScrutinisedMsg :: MsgDoc
+integerScrutinisedMsg :: SDoc
 integerScrutinisedMsg
   = text "In a LitAlt, the literal is lifted (probably Integer)"
 
-mkBadAltMsg :: Type -> CoreAlt -> MsgDoc
+mkBadAltMsg :: Type -> CoreAlt -> SDoc
 mkBadAltMsg scrut_ty alt
   = vcat [ text "Data alternative when scrutinee is not a tycon application",
            text "Scrutinee type:" <+> ppr scrut_ty,
            text "Alternative:" <+> pprCoreAlt alt ]
 
-mkNewTyDataConAltMsg :: Type -> CoreAlt -> MsgDoc
+mkNewTyDataConAltMsg :: Type -> CoreAlt -> SDoc
 mkNewTyDataConAltMsg scrut_ty alt
   = vcat [ text "Data alternative for newtype datacon",
            text "Scrutinee type:" <+> ppr scrut_ty,
@@ -3061,21 +3070,21 @@ mkNewTyDataConAltMsg scrut_ty alt
 ------------------------------------------------------
 --      Other error messages
 
-mkAppMsg :: Type -> Type -> CoreExpr -> MsgDoc
+mkAppMsg :: Type -> Type -> CoreExpr -> SDoc
 mkAppMsg fun_ty arg_ty arg
   = vcat [text "Argument value doesn't match argument type:",
               hang (text "Fun type:") 4 (ppr fun_ty),
               hang (text "Arg type:") 4 (ppr arg_ty),
               hang (text "Arg:") 4 (ppr arg)]
 
-mkNonFunAppMsg :: Type -> Type -> CoreExpr -> MsgDoc
+mkNonFunAppMsg :: Type -> Type -> CoreExpr -> SDoc
 mkNonFunAppMsg fun_ty arg_ty arg
   = vcat [text "Non-function type in function position",
               hang (text "Fun type:") 4 (ppr fun_ty),
               hang (text "Arg type:") 4 (ppr arg_ty),
               hang (text "Arg:") 4 (ppr arg)]
 
-mkLetErr :: TyVar -> CoreExpr -> MsgDoc
+mkLetErr :: TyVar -> CoreExpr -> SDoc
 mkLetErr bndr rhs
   = vcat [text "Bad `let' binding:",
           hang (text "Variable:")
@@ -3083,7 +3092,7 @@ mkLetErr bndr rhs
           hang (text "Rhs:")
                  4 (ppr rhs)]
 
-mkTyAppMsg :: Type -> Type -> MsgDoc
+mkTyAppMsg :: Type -> Type -> SDoc
 mkTyAppMsg ty arg_ty
   = vcat [text "Illegal type application:",
               hang (text "Exp type:")
@@ -3091,10 +3100,10 @@ mkTyAppMsg ty arg_ty
               hang (text "Arg type:")
                  4 (ppr arg_ty <+> dcolon <+> ppr (typeKind arg_ty))]
 
-emptyRec :: CoreExpr -> MsgDoc
+emptyRec :: CoreExpr -> SDoc
 emptyRec e = hang (text "Empty Rec binding:") 2 (ppr e)
 
-mkRhsMsg :: Id -> SDoc -> Type -> MsgDoc
+mkRhsMsg :: Id -> SDoc -> Type -> SDoc
 mkRhsMsg binder what ty
   = vcat
     [hsep [text "The type of this binder doesn't match the type of its" <+> what <> colon,
@@ -3102,29 +3111,29 @@ mkRhsMsg binder what ty
      hsep [text "Binder's type:", ppr (idType binder)],
      hsep [text "Rhs type:", ppr ty]]
 
-mkLetAppMsg :: CoreExpr -> MsgDoc
+mkLetAppMsg :: CoreExpr -> SDoc
 mkLetAppMsg e
   = hang (text "This argument does not satisfy the let/app invariant:")
        2 (ppr e)
 
-badBndrTyMsg :: Id -> SDoc -> MsgDoc
+badBndrTyMsg :: Id -> SDoc -> SDoc
 badBndrTyMsg binder what
   = vcat [ text "The type of this binder is" <+> what <> colon <+> ppr binder
          , text "Binder's type:" <+> ppr (idType binder) ]
 
-mkNonTopExportedMsg :: Id -> MsgDoc
+mkNonTopExportedMsg :: Id -> SDoc
 mkNonTopExportedMsg binder
   = hsep [text "Non-top-level binder is marked as exported:", ppr binder]
 
-mkNonTopExternalNameMsg :: Id -> MsgDoc
+mkNonTopExternalNameMsg :: Id -> SDoc
 mkNonTopExternalNameMsg binder
   = hsep [text "Non-top-level binder has an external name:", ppr binder]
 
-mkTopNonLitStrMsg :: Id -> MsgDoc
+mkTopNonLitStrMsg :: Id -> SDoc
 mkTopNonLitStrMsg binder
   = hsep [text "Top-level Addr# binder has a non-literal rhs:", ppr binder]
 
-mkKindErrMsg :: TyVar -> Type -> MsgDoc
+mkKindErrMsg :: TyVar -> Type -> SDoc
 mkKindErrMsg tyvar arg_ty
   = vcat [text "Kinds don't match in type application:",
           hang (text "Type variable:")
@@ -3132,10 +3141,10 @@ mkKindErrMsg tyvar arg_ty
           hang (text "Arg type:")
                  4 (ppr arg_ty <+> dcolon <+> ppr (typeKind arg_ty))]
 
-mkCastErr :: CoreExpr -> Coercion -> Type -> Type -> MsgDoc
+mkCastErr :: CoreExpr -> Coercion -> Type -> Type -> SDoc
 mkCastErr expr = mk_cast_err "expression" "type" (ppr expr)
 
-mkCastTyErr :: Type -> Coercion -> Kind -> Kind -> MsgDoc
+mkCastTyErr :: Type -> Coercion -> Kind -> Kind -> SDoc
 mkCastTyErr ty = mk_cast_err "type" "kind" (ppr ty)
 
 mk_cast_err :: String -- ^ What sort of casted thing this is
@@ -3143,7 +3152,7 @@ mk_cast_err :: String -- ^ What sort of casted thing this is
             -> String -- ^ What sort of coercion is being used
                       --   (\"type\" or \"kind\").
             -> SDoc   -- ^ The thing being casted.
-            -> Coercion -> Type -> Type -> MsgDoc
+            -> Coercion -> Type -> Type -> SDoc
 mk_cast_err thing_str co_str pp_thing co from_ty thing_ty
   = vcat [from_msg <+> text "of Cast differs from" <+> co_msg
             <+> text "of" <+> enclosed_msg,
@@ -3234,16 +3243,16 @@ mkBadJoinPointRuleMsg bndr join_arity rule
          , text "Join arity:" <+> ppr join_arity
          , text "Rule:" <+> ppr rule ]
 
-pprLeftOrRight :: LeftOrRight -> MsgDoc
+pprLeftOrRight :: LeftOrRight -> SDoc
 pprLeftOrRight CLeft  = text "left"
 pprLeftOrRight CRight = text "right"
 
-dupVars :: [NonEmpty Var] -> MsgDoc
+dupVars :: [NonEmpty Var] -> SDoc
 dupVars vars
   = hang (text "Duplicate variables brought into scope")
        2 (ppr (map toList vars))
 
-dupExtVars :: [NonEmpty Name] -> MsgDoc
+dupExtVars :: [NonEmpty Name] -> SDoc
 dupExtVars vars
   = hang (text "Duplicate top-level variables with the same qualified name")
        2 (ppr (map toList vars))
@@ -3264,16 +3273,17 @@ lintAnnots :: SDoc -> (ModGuts -> CoreM ModGuts) -> ModGuts -> CoreM ModGuts
 lintAnnots pname pass guts = do
   -- Run the pass as we normally would
   dflags <- getDynFlags
+  logger <- getLogger
   when (gopt Opt_DoAnnotationLinting dflags) $
-    liftIO $ Err.showPass dflags "Annotation linting - first run"
+    liftIO $ Err.showPass logger dflags "Annotation linting - first run"
   nguts <- pass guts
   -- If appropriate re-run it without debug annotations to make sure
   -- that they made no difference.
   when (gopt Opt_DoAnnotationLinting dflags) $ do
-    liftIO $ Err.showPass dflags "Annotation linting - second run"
+    liftIO $ Err.showPass logger dflags "Annotation linting - second run"
     nguts' <- withoutAnnots pass guts
     -- Finally compare the resulting bindings
-    liftIO $ Err.showPass dflags "Annotation linting - comparison"
+    liftIO $ Err.showPass logger dflags "Annotation linting - comparison"
     let binds = flattenBinds $ mg_binds nguts
         binds' = flattenBinds $ mg_binds nguts'
         (diffs,_) = diffBinds True (mkRnEnv2 emptyInScopeSet) binds binds'

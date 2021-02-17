@@ -34,8 +34,6 @@ import GHC.Core.Stats   (coreBindsStats, CoreStats(..))
 import GHC.Core.Seq     (seqBinds)
 import GHC.Core.Lint
 import GHC.Core.Rules
-import GHC.Core.PatSyn
-import GHC.Core.ConLike
 import GHC.Core.Opt.Arity   ( exprArity, exprBotStrictness_maybe )
 import GHC.Core.InstEnv
 import GHC.Core.Type     ( tidyTopType )
@@ -52,6 +50,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Utils.Outputable
 import GHC.Utils.Misc( filterOut )
 import GHC.Utils.Panic
+import GHC.Utils.Logger as Logger
 import qualified GHC.Utils.Error as Err
 
 import GHC.Types.ForeignStubs
@@ -163,7 +162,7 @@ mkBootModDetailsTc hsc_env
                 }
   = -- This timing isn't terribly useful since the result isn't forced, but
     -- the message is useful to locating oneself in the compilation process.
-    Err.withTiming dflags
+    Err.withTiming logger dflags
                    (text "CoreTidy"<+>brackets (ppr this_mod))
                    (const ()) $
     return (ModDetails { md_types            = type_env'
@@ -176,6 +175,7 @@ mkBootModDetailsTc hsc_env
                        })
   where
     dflags = hsc_dflags hsc_env
+    logger = hsc_logger hsc_env
 
     -- Find the LocalIds in the type env that are exported
     -- Make them into GlobalIds, and tidy their types
@@ -194,10 +194,8 @@ mkBootModDetailsTc hsc_env
 
     final_tcs  = filterOut isWiredIn tcs
                  -- See Note [Drop wired-in things]
-    type_env1  = typeEnvFromEntities final_ids final_tcs fam_insts
-    insts'     = mkFinalClsInsts type_env1 insts
-    pat_syns'  = mkFinalPatSyns  type_env1 pat_syns
-    type_env'  = extendTypeEnvWithPatSyns pat_syns' type_env1
+    type_env'  = typeEnvFromEntities final_ids final_tcs pat_syns fam_insts
+    insts'     = mkFinalClsInsts type_env' insts
 
     -- Default methods have their export flag set (isExportedId),
     -- but everything else doesn't (yet), because this is
@@ -220,13 +218,6 @@ lookupFinalId type_env id
 
 mkFinalClsInsts :: TypeEnv -> [ClsInst] -> [ClsInst]
 mkFinalClsInsts env = map (updateClsInstDFun (lookupFinalId env))
-
-mkFinalPatSyns :: TypeEnv -> [PatSyn] -> [PatSyn]
-mkFinalPatSyns env = map (updatePatSynIds (lookupFinalId env))
-
-extendTypeEnvWithPatSyns :: [PatSyn] -> TypeEnv -> TypeEnv
-extendTypeEnvWithPatSyns tidy_patsyns type_env
-  = extendTypeEnvList type_env [AConLike (PatSynCon ps) | ps <- tidy_patsyns ]
 
 globaliseAndTidyBootId :: Id -> Id
 -- For a LocalId with an External Name,
@@ -379,7 +370,7 @@ tidyProgram hsc_env  (ModGuts { mg_module           = mod
                               , mg_modBreaks        = modBreaks
                               })
 
-  = Err.withTiming dflags
+  = Err.withTiming logger dflags
                    (text "CoreTidy"<+>brackets (ppr mod))
                    (const ()) $
     do  { let { omit_prags = gopt Opt_OmitInterfacePragmas dflags
@@ -430,10 +421,8 @@ tidyProgram hsc_env  (ModGuts { mg_module           = mod
 
               ; final_tcs      = filterOut isWiredIn tcs
                                  -- See Note [Drop wired-in things]
-              ; type_env       = typeEnvFromEntities final_ids final_tcs fam_insts
-              ; tidy_cls_insts = mkFinalClsInsts type_env cls_insts
-              ; tidy_patsyns   = mkFinalPatSyns  type_env patsyns
-              ; tidy_type_env  = extendTypeEnvWithPatSyns tidy_patsyns type_env
+              ; tidy_type_env  = typeEnvFromEntities final_ids final_tcs patsyns fam_insts
+              ; tidy_cls_insts = mkFinalClsInsts tidy_type_env cls_insts
               ; tidy_rules     = tidyRules tidy_env trimmed_rules
 
               ; -- See Note [Injecting implicit bindings]
@@ -455,15 +444,15 @@ tidyProgram hsc_env  (ModGuts { mg_module           = mod
           -- If the endPass didn't print the rules, but ddump-rules is
           -- on, print now
         ; unless (dopt Opt_D_dump_simpl dflags) $
-            Err.dumpIfSet_dyn dflags Opt_D_dump_rules
+            Logger.dumpIfSet_dyn logger dflags Opt_D_dump_rules
               (showSDoc dflags (ppr CoreTidy <+> text "rules"))
-              Err.FormatText
+              FormatText
               (pprRulesForUser tidy_rules)
 
           -- Print one-line size info
         ; let cs = coreBindsStats tidy_binds
-        ; Err.dumpIfSet_dyn dflags Opt_D_dump_core_stats "Core Stats"
-            Err.FormatText
+        ; Logger.dumpIfSet_dyn logger dflags Opt_D_dump_core_stats "Core Stats"
+            FormatText
             (text "Tidy size (terms,types,coercions)"
              <+> ppr (moduleName mod) <> colon
              <+> int (cs_tm cs)
@@ -491,6 +480,7 @@ tidyProgram hsc_env  (ModGuts { mg_module           = mod
         }
   where
     dflags = hsc_dflags hsc_env
+    logger = hsc_logger hsc_env
 
 --------------------------
 trimId :: Bool -> Id -> Id

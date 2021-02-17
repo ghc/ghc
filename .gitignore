@@ -125,7 +125,14 @@ _darcs/
 /docs/users_guide/utils.pyc
 /driver/ghci/ghc-pkg-inplace
 /driver/ghci/ghci-inplace
+/driver/ghci/ghci-wrapper.cabal
 /driver/ghci/ghci.res
+/driver/ghci/cwrapper.c
+/driver/ghci/cwrapper.h
+/driver/ghci/getLocation.c
+/driver/ghci/getLocation.h
+/driver/ghci/isMinTTY.c
+/driver/ghci/isMinTTY.h
 /driver/package.conf
 /driver/package.conf.inplace.old
 /settings
@@ -215,11 +222,6 @@ GIT_COMMIT_ID
 
 # Should be equal to testdir_suffix from testsuite/driver/testlib.py.
 *.run
-
-# -----------------------------------------------------------------------------
-# Output of ghc-in-ghci
-
-/.ghci-objects/
 
 # -----------------------------------------------------------------------------
 # ghc.nix

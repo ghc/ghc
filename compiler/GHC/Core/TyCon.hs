@@ -1612,10 +1612,7 @@ mkFunTyCon name binders rep_nm
         tcRepName    = rep_nm
     }
 
--- | This is the making of an algebraic 'TyCon'. Notably, you have to
--- pass in the generic (in the -XGenerics sense) information about the
--- type constructor - you can get hold of it easily (see Generics
--- module)
+-- | This is the making of an algebraic 'TyCon'.
 mkAlgTyCon :: Name
            -> [TyConBinder]  -- ^ Binders of the 'TyCon'
            -> Kind              -- ^ Result kind
@@ -2257,13 +2254,14 @@ expandSynTyCon_maybe
                                   -- type of the synonym (not yet substituted)
                                   -- and any arguments remaining from the
                                   -- application
-
--- ^ Expand a type synonym application, if any
+-- ^ Expand a type synonym application
+-- Return Nothing if the TyCon is not a synonym,
+-- or if not enough arguments are supplied
 expandSynTyCon_maybe tc tys
   | SynonymTyCon { tyConTyVars = tvs, synTcRhs = rhs, tyConArity = arity } <- tc
-  = case tys of
-      [] -> Just ([], rhs, []) -- Avoid a bit of work in the case of nullary synonyms
-      _  -> case tys `listLengthCmp` arity of
+  = if arity == 0
+    then Just ([], rhs, tys)  -- Avoid a bit of work in the case of nullary synonyms
+    else case tys `listLengthCmp` arity of
               GT -> Just (tvs `zip` tys, rhs, drop arity tys)
               EQ -> Just (tvs `zip` tys, rhs, [])
               LT -> Nothing

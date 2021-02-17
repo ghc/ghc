@@ -354,10 +354,9 @@ data HsExpr p
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | RecordCon
-      { rcon_ext      :: XRecordCon p
-      , rcon_con_name :: LIdP p             -- The constructor name;
-                                            --  not used after type checking
-      , rcon_flds     :: HsRecordBinds p }  -- The fields
+      { rcon_ext  :: XRecordCon p
+      , rcon_con  :: XRec p (ConLikeP p)  -- The constructor
+      , rcon_flds :: HsRecordBinds p }    -- The fields
 
   -- | Record update
   --
@@ -1268,7 +1267,7 @@ data ParStmtBlock idL idR
 
 -- | The fail operator
 --
--- This is used for `.. <-` "bind statments" in do notation, including
+-- This is used for `.. <-` "bind statements" in do notation, including
 -- non-monadic "binds" in applicative.
 --
 -- The fail operator is 'Just expr' if it potentially fail monadically. if the

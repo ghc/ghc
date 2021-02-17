@@ -884,7 +884,7 @@ openFile' filepath iomode non_blocking tmp_opts =
                -- on the Haskell side by using existing mechanisms such as MVar
                -- or IOPorts.
                then #{const FILE_FLAG_OVERLAPPED}
-                    -- I beleive most haskell programs do sequential scans, so
+                    -- I believe most haskell programs do sequential scans, so
                     -- optimize for the common case.  Though ideally, this would
                     -- be parameterized by openFile.  This will absolutely trash
                     -- the cache on reverse scans.

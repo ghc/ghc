@@ -473,7 +473,7 @@ tc_lhs_sig_type skol_info (L loc (HsSig { sig_bndrs = hs_outer_bndrs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 tcHsSigType is tricky.  Consider (T11142)
   foo :: forall b. (forall k (a :: k). SameKind a b) -> ()
-This is ill-kinded becuase of a nested skolem-escape.
+This is ill-kinded because of a nested skolem-escape.
 
 That will show up as an un-solvable constraint in the implication
 returned by buildTvImplication in tc_lhs_sig_type.  See Note [Skolem
@@ -680,6 +680,9 @@ tcFamTyPats fam_tc hs_pats
        ; let fun_ty = mkTyConApp fam_tc []
        ; (fam_app, res_kind) <- tcInferTyApps mode lhs_fun fun_ty hs_pats
 
+       -- Hack alert: see Note [tcFamTyPats: zonking the result kind]
+       ; res_kind <- zonkTcType res_kind
+
        ; traceTc "End tcFamTyPats }" $
          vcat [ ppr fam_tc, text "res_kind:" <+> ppr res_kind ]
 
@@ -688,6 +691,34 @@ tcFamTyPats fam_tc hs_pats
     fam_name  = tyConName fam_tc
     fam_arity = tyConArity fam_tc
     lhs_fun   = noLoc (HsTyVar noExtField NotPromoted (noLoc fam_name))
+
+{- Note [tcFamTyPats: zonking the result kind]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider (#19250)
+    F :: forall k. k -> k
+    type instance F (x :: Constraint) = ()
+
+The tricky point is this:
+  is that () an empty type tuple (() :: Type), or
+  an empty constraint tuple (() :: Constraint)?
+We work this out in a hacky way, by looking at the expected kind:
+see Note [Inferring tuple kinds].
+
+In this case, we kind-check the RHS using the kind gotten from the LHS:
+see the call to tcCheckLHsType in tcTyFamInstEqnGuts in GHC.Tc.Tycl.
+
+But we want the kind from the LHS to be /zonked/, so that when
+kind-checking the RHS (tcCheckLHsType) we can "see" what we learned
+from kind-checking the LHS (tcFamTyPats).  In our example above, the
+type of the LHS is just `kappa` (by instantiating the forall k), but
+then we learn (from x::Constraint) that kappa ~ Constraint.  We want
+that info when kind-checking the RHS.
+
+Easy solution: just zonk that return kind.  Of course this won't help
+if there is lots of type-family reduction to do, but it works fine in
+common cases.
+-}
+
 
 {-
 ************************************************************************
@@ -1194,6 +1225,9 @@ tc_hs_type _ rn_ty@(HsTyLit _ (HsNumTy _ n)) exp_kind
 tc_hs_type _ rn_ty@(HsTyLit _ (HsStrTy _ s)) exp_kind
   = do { checkWiredInTyCon typeSymbolKindCon
        ; checkExpectedKind rn_ty (mkStrLitTy s) typeSymbolKind exp_kind }
+tc_hs_type _ rn_ty@(HsTyLit _ (HsCharTy _ c)) exp_kind
+  = do { checkWiredInTyCon charTyCon
+       ; checkExpectedKind rn_ty (mkCharLitTy c) charTy exp_kind }
 
 --------- Wildcards
 
@@ -3215,7 +3249,7 @@ bindImplicitTKBndrsX skol_mode@(SM { sm_parent = check_parent, sm_kind = ctxt_ki
 --           SkolemMode
 --------------------------------------
 
--- | 'SkolemMode' decribes how to typecheck an explicit ('HsTyVarBndr') or
+-- | 'SkolemMode' describes how to typecheck an explicit ('HsTyVarBndr') or
 -- implicit ('Name') binder in a type. It is just a record of flags
 -- that describe what sort of 'TcTyVar' to create.
 data SkolemMode
@@ -3396,7 +3430,7 @@ filterConstrainedCandidates wanted dvs
        ; _ <- promoteTyVarSet to_promote
        ; return dvs' }
 
--- |- Specialised verison of 'kindGeneralizeSome', but with empty
+-- |- Specialised version of 'kindGeneralizeSome', but with empty
 -- WantedConstraints, so no filtering is needed
 -- i.e.   kindGeneraliseAll = kindGeneralizeSome emptyWC
 kindGeneralizeAll :: TcType -> TcM [KindVar]
@@ -3406,7 +3440,7 @@ kindGeneralizeAll kind_or_type
        ; quantifyTyVars dvs }
 
 -- | Specialized version of 'kindGeneralizeSome', but where no variables
--- can be generalized, but perhaps some may neeed to be promoted.
+-- can be generalized, but perhaps some may need to be promoted.
 -- Use this variant when it is unknowable whether metavariables might
 -- later be constrained.
 --
@@ -3877,7 +3911,7 @@ We achieve this as follows:
 - For /named/ wildcards such sas
      g :: forall b. (forall la. a -> _x) -> b
   there is no problem: we create them at the outer level (ie the
-  ambient level of teh signature itself), and push the level when we
+  ambient level of the signature itself), and push the level when we
   go inside a forall.  So now the unification variable for the "_x"
   can't unify with skolem 'a'.
 

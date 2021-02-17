@@ -53,6 +53,7 @@ import GHC.Core.TyCo.Subst ( substTyCoVars )
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
 import GHC.Core
+import GHC.Core.Unify( RoughMatchTc(..) )
 import GHC.Core.Utils
 import GHC.Core.Unfold.Make
 import GHC.Core.Lint
@@ -73,6 +74,7 @@ import GHC.Unit.Home.ModInfo
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Utils.Logger
 
 import GHC.Data.Bag
 import GHC.Data.Maybe
@@ -870,9 +872,9 @@ tc_iface_decl _ _ (IfacePatSyn{ ifName = name
        ; return $ AConLike . PatSynCon $ patsyn }}}
   where
      mk_doc n = text "Pattern synonym" <+> ppr n
-     tc_pr :: (IfExtName, Bool) -> IfL (Id, Bool)
+     tc_pr :: (IfExtName, Bool) -> IfL (Name, Type, Bool)
      tc_pr (nm, b) = do { id <- forkM (ppr nm) (tcIfaceExtId nm)
-                        ; return (id, b) }
+                        ; return (nm, idType id, b) }
 
 tcIfaceDecls :: Bool
           -> [(Fingerprint, IfaceDecl)]
@@ -1144,13 +1146,17 @@ look at it.
 ************************************************************************
 -}
 
+tcRoughTyCon :: Maybe IfaceTyCon -> RoughMatchTc
+tcRoughTyCon (Just tc) = KnownTc (ifaceTyConName tc)
+tcRoughTyCon Nothing   = OtherTc
+
 tcIfaceInst :: IfaceClsInst -> IfL ClsInst
 tcIfaceInst (IfaceClsInst { ifDFun = dfun_name, ifOFlag = oflag
                           , ifInstCls = cls, ifInstTys = mb_tcs
                           , ifInstOrph = orph })
   = do { dfun <- forkM (text "Dict fun" <+> ppr dfun_name) $
                     fmap tyThingId (tcIfaceImplicit dfun_name)
-       ; let mb_tcs' = map (fmap ifaceTyConName) mb_tcs
+       ; let mb_tcs' = map tcRoughTyCon mb_tcs
        ; return (mkImportedInstance cls mb_tcs' dfun_name dfun oflag orph) }
 
 tcIfaceFamInst :: IfaceFamInst -> IfL FamInst
@@ -1160,7 +1166,7 @@ tcIfaceFamInst (IfaceFamInst { ifFamInstFam = fam, ifFamInstTys = mb_tcs
                      tcIfaceCoAxiom axiom_name
              -- will panic if branched, but that's OK
          ; let axiom'' = toUnbranchedAxiom axiom'
-               mb_tcs' = map (fmap ifaceTyConName) mb_tcs
+               mb_tcs' = map tcRoughTyCon mb_tcs
          ; return (mkImportedFamInst fam mb_tcs' axiom'') }
 
 {-
@@ -1202,8 +1208,9 @@ tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bnd
                                         exprsFreeIdsList args')
                       ; case lintExpr dflags in_scope rhs' of
                           Nothing   -> return ()
-                          Just errs -> liftIO $
-                            displayLintResults dflags False doc
+                          Just errs -> do
+                            logger <- getLogger
+                            liftIO $ displayLintResults logger dflags False doc
                                                (pprCoreExpr rhs')
                                                (emptyBag, errs) }
                    ; return (bndrs', args', rhs') }
@@ -1347,6 +1354,7 @@ tcIfaceCtxt sts = mapM tcIfaceType sts
 tcIfaceTyLit :: IfaceTyLit -> IfL TyLit
 tcIfaceTyLit (IfaceNumTyLit n) = return (NumTyLit n)
 tcIfaceTyLit (IfaceStrTyLit n) = return (StrTyLit n)
+tcIfaceTyLit (IfaceCharTyLit n) = return (CharTyLit n)
 
 {-
 %************************************************************************
@@ -1723,10 +1731,11 @@ tcPragExpr is_compulsory toplvl name expr
       whenGOptM Opt_DoCoreLinting $ do
         in_scope <- get_in_scope
         dflags   <- getDynFlags
+        logger   <- getLogger
         case lintUnfolding is_compulsory dflags noSrcLoc in_scope core_expr' of
           Nothing   -> return ()
           Just errs -> liftIO $
-            displayLintResults dflags False doc
+            displayLintResults logger dflags False doc
                                (pprCoreExpr core_expr') (emptyBag, errs)
     return core_expr'
   where

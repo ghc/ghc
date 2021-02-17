@@ -572,16 +572,15 @@ by saying ``-fno-wombat``.
     function calls.
 
 .. ghc-flag:: -fllvm-pass-vectors-in-regs
-    :shortdesc: Pass vector value in vector registers for function calls
+    :shortdesc: *(deprecated)* Does nothing
     :type: dynamic
-    :reverse: -fno-llvm-pass-vectors-in-regs
     :category:
 
     :default: on
 
-    Instructs GHC to use the platform's native vector registers to pass vector
-    arguments during function calls. As with all vector support, this requires
-    :ghc-flag:`-fllvm`.
+    This flag has no effect since GHC 8.8 - its behavior is always on.
+    It used to instruct GHC to use the platform's native vector registers
+    to pass vector arguments during function calls.
 
 .. ghc-flag:: -fmax-inline-alloc-size=⟨n⟩
     :shortdesc: *default: 128.* Set the maximum size of inline array allocations
@@ -747,7 +746,7 @@ by saying ``-fno-wombat``.
 
 .. ghc-flag:: -fregs-graph
     :shortdesc: Use the graph colouring register allocator for register
-        allocation in the native code generator. Implied by :ghc-flag:`-O2`.
+        allocation in the native code generator.
     :type: dynamic
     :reverse: -fno-regs-graph
     :category:
@@ -759,9 +758,6 @@ by saying ``-fno-wombat``.
     generator. By default, GHC uses a simpler, faster linear register allocator.
     The downside being that the linear register allocator usually generates
     worse code.
-
-    Note that the graph colouring allocator is a bit experimental and may fail
-    when faced with code with high register pressure :ghc-ticket:`8657`.
 
 .. ghc-flag:: -fregs-iterative
     :shortdesc: Use the iterative coalescing graph colouring register allocator
@@ -1102,7 +1098,7 @@ by saying ``-fno-wombat``.
     :shortdesc: Create top-level non-recursive functions with at most <n>
         parameters while performing late lambda lifting.
     :type: dynamic
-    :reverse: -fno-stg-lift-lams-non-rec-args-any
+    :reverse: -fstg-lift-lams-non-rec-args-any
     :category:
 
     :default: 5
@@ -1115,7 +1111,7 @@ by saying ``-fno-wombat``.
     :shortdesc: Create top-level recursive functions with at most <n>
         parameters while performing late lambda lifting.
     :type: dynamic
-    :reverse: -fno-stg-lift-lams-rec-args-any
+    :reverse: -fstg-lift-lams-rec-args-any
     :category:
 
     :default: 5
@@ -1151,8 +1147,8 @@ by saying ``-fno-wombat``.
     dummy value at the call site or omitted altogether.
 
     The worker/wrapper transformation (:ghc-flag:`-fworker-wrapper`) is
-    reponsible for exploiting unboxing opportunities and replacing absent
-    arguments by dummies. For arugments that can't be unboxed, opportunities
+    responsible for exploiting unboxing opportunities and replacing absent
+    arguments by dummies. For arguments that can't be unboxed, opportunities
     for call-by-value and call-by-name are exploited in CorePrep when
     translating to STG.
 
@@ -1427,6 +1423,73 @@ by saying ``-fno-wombat``.
     determines if a function definition will be kept around at all for
     potential inlining.
 
+.. ghc-flag:: -funfolding-case-threshold=⟨n⟩
+    :shortdesc: *default: 2.* Reduce inlining for cases nested deeper than n.
+    :type: dynamic
+    :category:
+
+    :default: 2
+
+    .. index::
+       single: inlining, controlling
+       single: unfolding, controlling
+
+    GHC is in general quite eager to inline small functions. However sometimes
+    these functions will be expanded by more inlining after inlining. Since
+    they are now applied to "interesting" arguments. Even worse, their expanded
+    form might reference again a small function, which will be inlined and expanded
+    afterwards. This can repeat often and lead to explosive growth of programs.
+
+    As it happened in #18730.
+
+    Starting with GHC 9.0 we will be less eager to inline deep into nested cases.
+    We achieve this by applying a inlining penalty that increases as the nesting
+    gets deeper. However sometimes a specific (maybe quite high!) threshold of nesting
+    is to be expected.
+
+    In such cases this flag can be used to ignore the first ⟨n⟩ levels of nesting
+    when computing the penalty.
+
+    This flag in combination with :ghc-flag:`-funfolding-case-scaling=⟨n⟩` can
+    be used to break inlining loops without disabling inlining completely. For
+    this purpose a smaller value is more likely to break such loops although
+    often adjusting the scaling is enough and preferably.
+
+.. ghc-flag:: -funfolding-case-scaling=⟨n⟩
+    :shortdesc: *default: 30.* Apply a penalty of (inlining_cost * `1/n`) for each level of case nesting.
+    :type: dynamic
+    :category:
+
+    :default: 30
+
+    .. index::
+       single: inlining, controlling
+       single: unfolding, controlling
+
+    GHC is in general quite eager to inline small functions. However sometimes
+    these functions will be expanded by more inlining after inlining. Since
+    they are now applied to "interesting" arguments. Even worse, their expanded
+    form might reference again a small function, which will be inlined and expanded
+    afterwards. This can repeat often and lead to explosive growth of programs.
+
+    As it happened in #18730.
+
+    Starting with GHC 9.0 we will be less eager to inline deep into nested cases.
+    We achieve this by applying a inlining penalty that increases as the nesting
+    gets deeper. However sometimes we are ok with inlining a lot in the name of
+    performance.
+
+    In such cases this flag can be used to tune how hard we penalize inlining into
+    deeply nested cases beyond the threshold set by :ghc-flag:`-funfolding-case-threshold=⟨n⟩`.
+    Cases are only counted against the nesting level if they have more than one alternative.
+
+    We use 1/n to scale the penalty. That is a higher value gives a lower penalty.
+
+    This can be used to break inlining loops. For this purpose a lower value is
+    recommended. Values in the range 10 <= n <= 20 allow some inlining to take place
+    while still allowing GHC to compile modules containing such inlining loops.
+
+
 .. ghc-flag:: -fworker-wrapper
     :shortdesc: Enable the worker/wrapper transformation.
     :type: dynamic
@@ -1459,3 +1522,5 @@ by saying ``-fno-wombat``.
     This flag sets the size (in bytes) threshold above which the second approach
     is used. You can disable the second approach entirely by setting the
     threshold to 0.
+
+

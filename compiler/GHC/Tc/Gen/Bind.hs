@@ -230,7 +230,7 @@ tcHsBootSigs binds sigs
         -- Notice that we make GlobalIds, not LocalIds
     tc_boot_sig s = pprPanic "tcHsBootSigs/tc_boot_sig" (ppr s)
 
-badBootDeclErr :: MsgDoc
+badBootDeclErr :: SDoc
 badBootDeclErr = text "Illegal declarations in an hs-boot file"
 
 ------------------------
@@ -320,7 +320,7 @@ tcValBinds top_lvl binds sigs thing_inside
                  do { thing <- thing_inside
                        -- See Note [Pattern synonym builders don't yield dependencies]
                        --     in GHC.Rename.Bind
-                    ; patsyn_builders <- mapM tcPatSynBuilderBind patsyns
+                    ; patsyn_builders <- mapM (tcPatSynBuilderBind prag_fn) patsyns
                     ; let extra_binds = [ (NonRecursive, builder)
                                         | builder <- patsyn_builders ]
                     ; return (extra_binds, thing) }
@@ -632,7 +632,7 @@ tcPolyCheck prag_fn
                              (mkCheckExpType rho_ty)
 
        -- We make a funny AbsBinds, abstracting over nothing,
-       -- just so we haev somewhere to put the SpecPrags.
+       -- just so we have somewhere to put the SpecPrags.
        -- Otherwise we could just use the FunBind
        -- Hence poly_id2 is just a clone of poly_id;
        -- We re-use mono-name, but we could equally well use a fresh one

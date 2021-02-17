@@ -259,6 +259,7 @@ toIfaceTyCon_name n = IfaceTyCon n info
 toIfaceTyLit :: TyLit -> IfaceTyLit
 toIfaceTyLit (NumTyLit x) = IfaceNumTyLit x
 toIfaceTyLit (StrTyLit x) = IfaceStrTyLit x
+toIfaceTyLit (CharTyLit x) = IfaceCharTyLit x
 
 ----------------
 toIfaceCoercion :: Coercion -> IfaceCoercion
@@ -405,7 +406,7 @@ patSynToIfaceDecl ps
     ex_bndrs   = patSynExTyVarBinders ps
     (env1, univ_bndrs') = tidyTyCoVarBinders emptyTidyEnv univ_bndrs
     (env2, ex_bndrs')   = tidyTyCoVarBinders env1 ex_bndrs
-    to_if_pr (id, needs_dummy) = (idName id, needs_dummy)
+    to_if_pr (name, _type, needs_dummy) = (name, needs_dummy)
 
 {-
 ************************************************************************

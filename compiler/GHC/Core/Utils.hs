@@ -40,8 +40,8 @@ module GHC.Core.Utils (
         cheapEqExpr, cheapEqExpr', eqExpr,
         diffExpr, diffBinds,
 
-        -- * Eta reduction
-        tryEtaReduce,
+        -- * Lambdas and eta reduction
+        tryEtaReduce, zapLamBndrs,
 
         -- * Manipulating data constructors and types
         exprToType, exprToCoercion_maybe,
@@ -99,12 +99,12 @@ import GHC.Utils.Panic
 import GHC.Data.FastString
 import GHC.Data.Maybe
 import GHC.Data.List.SetOps( minusList )
-import GHC.Types.Basic     ( Arity )
+import GHC.Types.Basic     ( Arity, FullArgCount )
 import GHC.Utils.Misc
 import GHC.Data.Pair
 import Data.ByteString     ( ByteString )
 import Data.Function       ( on )
-import Data.List
+import Data.List           ( sort, sortBy, partition, zipWith4, mapAccumL )
 import Data.Ord            ( comparing )
 import GHC.Data.OrdList
 import qualified Data.Set as Set
@@ -1642,6 +1642,8 @@ app_ok primop_ok fun args
         -> False       --     for the special cases for SeqOp and DataToTagOp
         | DataToTagOp <- op
         -> False
+        | KeepAliveOp <- op
+        -> False
 
         | otherwise
         -> primop_ok op  -- Check the primop itself
@@ -2521,9 +2523,34 @@ to the rule that
 we can eta-reduce    \x. f x  ===>  f
 
 This turned up in #7542.
+-}
+
+{- *********************************************************************
+*                                                                      *
+                  Zapping lambda binders
+*                                                                      *
+********************************************************************* -}
+
+zapLamBndrs :: FullArgCount -> [Var] -> [Var]
+-- If (\xyz. t) appears under-applied to only two arguments,
+-- we must zap the occ-info on x,y, because they appear under the \x
+-- See Note [Occurrence analysis for lambda binders] in GHc.Core.Opt.OccurAnal
+--
+-- NB: both `arg_count` and `bndrs` include both type and value args/bndrs
+zapLamBndrs arg_count bndrs
+  | no_need_to_zap = bndrs
+  | otherwise      = zap_em arg_count bndrs
+  where
+    no_need_to_zap = all isOneShotBndr (drop arg_count bndrs)
+
+    zap_em :: FullArgCount -> [Var] -> [Var]
+    zap_em 0 bs = bs
+    zap_em _ [] = []
+    zap_em n (b:bs) | isTyVar b = b              : zap_em (n-1) bs
+                    | otherwise = zapLamIdInfo b : zap_em (n-1) bs
 
 
-************************************************************************
+{- *********************************************************************
 *                                                                      *
 \subsection{Determining non-updatable right-hand-sides}
 *                                                                      *

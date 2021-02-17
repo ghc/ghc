@@ -104,7 +104,7 @@ templateHaskellNames = [
     promotedTName, promotedTupleTName, promotedNilTName, promotedConsTName,
     wildCardTName, implicitParamTName,
     -- TyLit
-    numTyLitName, strTyLitName,
+    numTyLitName, strTyLitName, charTyLitName,
     -- TyVarBndr
     plainTVName, kindedTVName,
     plainInvisTVName, kindedInvisTVName,
@@ -470,9 +470,10 @@ infixTName          = libFun (fsLit "infixT")         infixTIdKey
 implicitParamTName  = libFun (fsLit "implicitParamT") implicitParamTIdKey
 
 -- data TyLit = ...
-numTyLitName, strTyLitName :: Name
+numTyLitName, strTyLitName, charTyLitName :: Name
 numTyLitName = libFun (fsLit "numTyLit") numTyLitIdKey
 strTyLitName = libFun (fsLit "strTyLit") strTyLitIdKey
+charTyLitName = libFun (fsLit "charTyLit") charTyLitIdKey
 
 -- data TyVarBndr = ...
 plainTVName, kindedTVName :: Name
@@ -991,14 +992,15 @@ implicitParamTIdKey = mkPreludeMiscIdUnique 409
 infixTIdKey         = mkPreludeMiscIdUnique 410
 
 -- data TyLit = ...
-numTyLitIdKey, strTyLitIdKey :: Unique
-numTyLitIdKey = mkPreludeMiscIdUnique 411
-strTyLitIdKey = mkPreludeMiscIdUnique 412
+numTyLitIdKey, strTyLitIdKey, charTyLitIdKey :: Unique
+numTyLitIdKey  = mkPreludeMiscIdUnique 411
+strTyLitIdKey  = mkPreludeMiscIdUnique 412
+charTyLitIdKey = mkPreludeMiscIdUnique 413
 
 -- data TyVarBndr = ...
 plainTVIdKey, kindedTVIdKey :: Unique
-plainTVIdKey       = mkPreludeMiscIdUnique 413
-kindedTVIdKey      = mkPreludeMiscIdUnique 414
+plainTVIdKey       = mkPreludeMiscIdUnique 414
+kindedTVIdKey      = mkPreludeMiscIdUnique 415
 
 plainInvisTVIdKey, kindedInvisTVIdKey :: Unique
 plainInvisTVIdKey       = mkPreludeMiscIdUnique 482
@@ -1006,10 +1008,10 @@ kindedInvisTVIdKey      = mkPreludeMiscIdUnique 483
 
 -- data Role = ...
 nominalRIdKey, representationalRIdKey, phantomRIdKey, inferRIdKey :: Unique
-nominalRIdKey          = mkPreludeMiscIdUnique 415
-representationalRIdKey = mkPreludeMiscIdUnique 416
-phantomRIdKey          = mkPreludeMiscIdUnique 417
-inferRIdKey            = mkPreludeMiscIdUnique 418
+nominalRIdKey          = mkPreludeMiscIdUnique 416
+representationalRIdKey = mkPreludeMiscIdUnique 417
+phantomRIdKey          = mkPreludeMiscIdUnique 418
+inferRIdKey            = mkPreludeMiscIdUnique 419
 
 -- data Kind = ...
 starKIdKey, constraintKIdKey :: Unique

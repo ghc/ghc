@@ -75,6 +75,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Utils.Monad
 import GHC.Utils.Exception as Exception
+import GHC.Utils.Logger
 
 import GHC.CmmToLlvm         ( llvmFixupAsm, llvmVersionList )
 import qualified GHC.LanguageExtensions as LangExt
@@ -150,7 +151,7 @@ preprocess hsc_env input_fn mb_input_buf mb_phase =
   where
     srcspan = srcLocSpan $ mkSrcLoc (mkFastString input_fn) 1 1
     handler (ProgramError msg) = return $ Left $ unitBag $
-        mkPlainErrMsg srcspan $ text msg
+        mkPlainMsgEnvelope srcspan $ text msg
     handler ex = throwGhcExceptionIO ex
 
 -- ---------------------------------------------------------------------------
@@ -194,7 +195,8 @@ compileOne' m_tc_result mHscMessage
             source_modified0
  = do
 
-   debugTraceMsg dflags1 2 (text "compile: input file" <+> text input_fnpp)
+   let logger = hsc_logger hsc_env0
+   debugTraceMsg logger dflags1 2 (text "compile: input file" <+> text input_fnpp)
 
    -- Run the pipeline up to codeGen (so everything up to, but not including, STG)
    (status, plugin_hsc_env) <- hscIncrementalCompile
@@ -228,13 +230,13 @@ compileOne' m_tc_result mHscMessage
         (HscUpdateBoot iface hmi_details, Interpreter) ->
             return $! HomeModInfo iface hmi_details Nothing
         (HscUpdateBoot iface hmi_details, _) -> do
-            touchObjectFile dflags object_filename
+            touchObjectFile logger dflags object_filename
             return $! HomeModInfo iface hmi_details Nothing
         (HscUpdateSig iface hmi_details, Interpreter) -> do
             let !linkable = LM (ms_hs_date summary) this_mod []
             return $! HomeModInfo iface hmi_details (Just linkable)
         (HscUpdateSig iface hmi_details, _) -> do
-            output_fn <- getOutputFilename next_phase
+            output_fn <- getOutputFilename logger next_phase
                             (Temporary TFL_CurrentModule) basename dflags
                             next_phase (Just location)
 
@@ -262,7 +264,7 @@ compileOne' m_tc_result mHscMessage
             -- In interpreted mode the regular codeGen backend is not run so we
             -- generate a interface without codeGen info.
             final_iface <- mkFullIface hsc_env' partial_iface Nothing
-            liftIO $ hscMaybeWriteIface dflags True final_iface mb_old_iface_hash (ms_location summary)
+            liftIO $ hscMaybeWriteIface logger dflags True final_iface mb_old_iface_hash (ms_location summary)
 
             (hasStub, comp_bc, spt_entries) <- hscInteractive hsc_env' cgguts mod_location
 
@@ -284,7 +286,7 @@ compileOne' m_tc_result mHscMessage
                            (hs_unlinked ++ stub_o)
             return $! HomeModInfo final_iface hmi_details (Just linkable)
         (HscRecomp{}, _) -> do
-            output_fn <- getOutputFilename next_phase
+            output_fn <- getOutputFilename logger next_phase
                             (Temporary TFL_CurrentModule)
                             basename dflags next_phase (Just location)
             -- We're in --make mode: finish the compilation pipeline.
@@ -339,7 +341,6 @@ compileOne' m_tc_result mHscMessage
        -- imports a _stub.h file that we created here.
        current_dir = takeDirectory basename
        old_paths   = includePaths dflags2
-       !prevailing_dflags = hsc_dflags hsc_env0
        loadAsByteCode
          | Just (Target _ obj _) <- findTarget summary (hsc_targets hsc_env0)
          , not obj
@@ -355,14 +356,8 @@ compileOne' m_tc_result mHscMessage
          = (Interpreter, dflags2 { backend = Interpreter })
          | otherwise
          = (backend dflags, dflags2)
-       dflags =
-          dflags3 { includePaths = addQuoteInclude old_paths [current_dir]
-                  , log_action = log_action prevailing_dflags }
-                  -- use the prevailing log_action / log_finaliser,
-                  -- not the one cached in the summary.  This is so
-                  -- that we can change the log_action without having
-                  -- to re-summarize all the source files.
-       hsc_env     = hsc_env0 {hsc_dflags = dflags}
+       dflags  = dflags3 { includePaths = addQuoteInclude old_paths [current_dir] }
+       hsc_env = hsc_env0 {hsc_dflags = dflags}
 
        -- -fforce-recomp should also work with --make
        force_recomp = gopt Opt_ForceRecomp dflags
@@ -422,7 +417,8 @@ compileEmptyStub dflags hsc_env basename location mod_name = do
   -- so that ranlib on OS X doesn't complain, see
   -- https://gitlab.haskell.org/ghc/ghc/issues/12673
   -- and https://github.com/haskell/cabal/issues/2257
-  empty_stub <- newTempName dflags TFL_CurrentModule "c"
+  let logger = hsc_logger hsc_env
+  empty_stub <- newTempName logger dflags TFL_CurrentModule "c"
   let home_unit = hsc_home_unit hsc_env
       src = text "int" <+> ppr (mkHomeModule home_unit mod_name) <+> text "= 0;"
   writeFile empty_stub (showSDoc dflags (pprCode CStyle src))
@@ -487,6 +483,7 @@ compileEmptyStub dflags hsc_env basename location mod_name = do
 -- folders, such that one runpath would be sufficient for multiple/all
 -- libraries.
 link :: GhcLink                 -- ^ interactive or batch
+     -> Logger                  -- ^ Logger
      -> DynFlags                -- ^ dynamic flags
      -> UnitEnv                 -- ^ unit environment
      -> Bool                    -- ^ attempt linking in batch mode?
@@ -500,38 +497,34 @@ link :: GhcLink                 -- ^ interactive or batch
 -- exports main, i.e., we have good reason to believe that linking
 -- will succeed.
 
-link ghcLink dflags unit_env
+link ghcLink logger dflags unit_env
   = lookupHook linkHook l dflags ghcLink dflags
   where
-    l LinkInMemory _ _ _
-      = if platformMisc_ghcWithInterpreter $ platformMisc dflags
-        then -- Not Linking...(demand linker will do the job)
-             return Succeeded
-        else panicBadLink LinkInMemory
+    l k dflags batch_attempt_linking hpt = case k of
+        NoLink        -> return Succeeded
+        LinkBinary    -> link' logger dflags unit_env batch_attempt_linking hpt
+        LinkStaticLib -> link' logger dflags unit_env batch_attempt_linking hpt
+        LinkDynLib    -> link' logger dflags unit_env batch_attempt_linking hpt
+        LinkInMemory
+            | platformMisc_ghcWithInterpreter $ platformMisc dflags
+            -> -- Not Linking...(demand linker will do the job)
+               return Succeeded
+            | otherwise
+            -> panicBadLink LinkInMemory
 
-    l NoLink _ _ _
-      = return Succeeded
-
-    l LinkBinary dflags batch_attempt_linking hpt
-      = link' dflags unit_env batch_attempt_linking hpt
-
-    l LinkStaticLib dflags batch_attempt_linking hpt
-      = link' dflags unit_env batch_attempt_linking hpt
-
-    l LinkDynLib dflags batch_attempt_linking hpt
-      = link' dflags unit_env batch_attempt_linking hpt
 
 panicBadLink :: GhcLink -> a
 panicBadLink other = panic ("link: GHC not built to link this way: " ++
                             show other)
 
-link' :: DynFlags                -- ^ dynamic flags
+link' :: Logger
+      -> DynFlags                -- ^ dynamic flags
       -> UnitEnv                 -- ^ unit environment
       -> Bool                    -- ^ attempt linking in batch mode?
       -> HomePackageTable        -- ^ what to link
       -> IO SuccessFlag
 
-link' dflags unit_env batch_attempt_linking hpt
+link' logger dflags unit_env batch_attempt_linking hpt
    | batch_attempt_linking
    = do
         let
@@ -547,11 +540,11 @@ link' dflags unit_env batch_attempt_linking hpt
             -- the linkables to link
             linkables = map (expectJust "link".hm_linkable) home_mod_infos
 
-        debugTraceMsg dflags 3 (text "link: linkables are ..." $$ vcat (map ppr linkables))
+        debugTraceMsg logger dflags 3 (text "link: linkables are ..." $$ vcat (map ppr linkables))
 
         -- check for the -no-link flag
         if isNoLink (ghcLink dflags)
-          then do debugTraceMsg dflags 3 (text "link(batch): linking omitted (-c flag given).")
+          then do debugTraceMsg logger dflags 3 (text "link(batch): linking omitted (-c flag given).")
                   return Succeeded
           else do
 
@@ -560,14 +553,14 @@ link' dflags unit_env batch_attempt_linking hpt
             platform  = targetPlatform dflags
             exe_file  = exeFileName platform staticLink (outputFile dflags)
 
-        linking_needed <- linkingNeeded dflags unit_env staticLink linkables pkg_deps
+        linking_needed <- linkingNeeded logger dflags unit_env staticLink linkables pkg_deps
 
         if not (gopt Opt_ForceRecomp dflags) && not linking_needed
-           then do debugTraceMsg dflags 2 (text exe_file <+> text "is up to date, linking not required.")
+           then do debugTraceMsg logger dflags 2 (text exe_file <+> text "is up to date, linking not required.")
                    return Succeeded
            else do
 
-        compilationProgressMsg dflags (text "Linking " <> text exe_file <> text " ...")
+        compilationProgressMsg logger dflags (text "Linking " <> text exe_file <> text " ...")
 
         -- Don't showPass in Batch mode; doLink will do that for us.
         let link = case ghcLink dflags of
@@ -575,21 +568,21 @@ link' dflags unit_env batch_attempt_linking hpt
                 LinkStaticLib -> linkStaticLib
                 LinkDynLib    -> linkDynLibCheck
                 other         -> panicBadLink other
-        link dflags unit_env obj_files pkg_deps
+        link logger dflags unit_env obj_files pkg_deps
 
-        debugTraceMsg dflags 3 (text "link: done")
+        debugTraceMsg logger dflags 3 (text "link: done")
 
         -- linkBinary only returns if it succeeds
         return Succeeded
 
    | otherwise
-   = do debugTraceMsg dflags 3 (text "link(batch): upsweep (partially) failed OR" $$
+   = do debugTraceMsg logger dflags 3 (text "link(batch): upsweep (partially) failed OR" $$
                                 text "   Main.main not exported; not linking.")
         return Succeeded
 
 
-linkingNeeded :: DynFlags -> UnitEnv -> Bool -> [Linkable] -> [UnitId] -> IO Bool
-linkingNeeded dflags unit_env staticLink linkables pkg_deps = do
+linkingNeeded :: Logger -> DynFlags -> UnitEnv -> Bool -> [Linkable] -> [UnitId] -> IO Bool
+linkingNeeded logger dflags unit_env staticLink linkables pkg_deps = do
         -- if the modification time on the executable is later than the
         -- modification times on all of the objects and libraries, then omit
         -- linking (unless the -fforce-recomp flag was given).
@@ -622,7 +615,7 @@ linkingNeeded dflags unit_env staticLink linkables pkg_deps = do
         let (lib_errs,lib_times) = partitionEithers e_lib_times
         if not (null lib_errs) || any (t <) lib_times
            then return True
-           else checkLinkInfo dflags unit_env pkg_deps exe_file
+           else checkLinkInfo logger dflags unit_env pkg_deps exe_file
 
 findHSLib :: Platform -> Ways -> [String] -> String -> IO (Maybe FilePath)
 findHSLib platform ws dirs lib = do
@@ -682,12 +675,13 @@ doLink hsc_env stop_phase o_files
   | otherwise
   = let
         dflags   = hsc_dflags   hsc_env
+        logger   = hsc_logger   hsc_env
         unit_env = hsc_unit_env hsc_env
     in case ghcLink dflags of
         NoLink        -> return ()
-        LinkBinary    -> linkBinary         dflags unit_env o_files []
-        LinkStaticLib -> linkStaticLib      dflags unit_env o_files []
-        LinkDynLib    -> linkDynLibCheck    dflags unit_env o_files []
+        LinkBinary    -> linkBinary         logger dflags unit_env o_files []
+        LinkStaticLib -> linkStaticLib      logger dflags unit_env o_files []
+        LinkDynLib    -> linkDynLibCheck    logger dflags unit_env o_files []
         other         -> panicBadLink other
 
 
@@ -723,6 +717,7 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_input_buf, mb_phase)
              -- Decide where dump files should go based on the pipeline output
              dflags = dflags0 { dumpPrefix = Just (basename ++ ".") }
              hsc_env = hsc_env0 {hsc_dflags = dflags}
+             logger = hsc_logger hsc_env
 
              (input_basename, suffix) = splitExtension input_fn
              suffix' = drop 1 suffix -- strip off the .
@@ -770,7 +765,7 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_input_buf, mb_phase)
          input_fn' <- case (start_phase, mb_input_buf) of
              (RealPhase real_start_phase, Just input_buf) -> do
                  let suffix = phaseInputExt real_start_phase
-                 fn <- newTempName dflags TFL_CurrentModule suffix
+                 fn <- newTempName logger dflags TFL_CurrentModule suffix
                  hdl <- openBinaryFile fn WriteMode
                  -- Add a LINE pragma so reported source locations will
                  -- mention the real input file, not this temp file.
@@ -780,7 +775,7 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_input_buf, mb_phase)
                  return fn
              (_, _) -> return input_fn
 
-         debugTraceMsg dflags 4 (text "Running the pipeline")
+         debugTraceMsg logger dflags 4 (text "Running the pipeline")
          r <- runPipeline' start_phase hsc_env env input_fn'
                            maybe_loc foreign_os
 
@@ -810,13 +805,13 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_input_buf, mb_phase)
                    -- NB: Currently disabled on Windows (ref #7134, #8228, and #5987)
                    | OSMinGW32 <- platformOS (targetPlatform dflags) -> return ()
                    | otherwise -> do
-                       debugTraceMsg dflags 4
+                       debugTraceMsg logger dflags 4
                            (text "Running the full pipeline again for -dynamic-too")
                        let dflags' = flip gopt_unset Opt_BuildDynamicToo
                                       $ setDynamicNow
                                       $ dflags
                        hsc_env' <- newHscEnv dflags'
-                       (dbs,unit_state,home_unit) <- initUnits dflags' Nothing
+                       (dbs,unit_state,home_unit) <- initUnits logger dflags' Nothing
                        let unit_env = UnitEnv
                              { ue_platform  = targetPlatform dflags'
                              , ue_namever   = ghcNameVersion dflags'
@@ -857,6 +852,7 @@ pipeLoop :: PhasePlus -> FilePath -> CompPipeline FilePath
 pipeLoop phase input_fn = do
   env <- getPipeEnv
   dflags <- getDynFlags
+  logger <- getLogger
   -- See Note [Partial ordering on phases]
   let happensBefore' = happensBefore (targetPlatform dflags)
       stopPhase = stop_phase env
@@ -872,13 +868,13 @@ pipeLoop phase input_fn = do
             return input_fn
         output ->
             do pst <- getPipeState
-               final_fn <- liftIO $ getOutputFilename
+               final_fn <- liftIO $ getOutputFilename logger
                                         stopPhase output (src_basename env)
                                         dflags stopPhase (maybe_loc pst)
                when (final_fn /= input_fn) $ do
                   let msg = ("Copying `" ++ input_fn ++"' to `" ++ final_fn ++ "'")
                       line_prag = Just ("{-# LINE 1 \"" ++ src_filename env ++ "\" #-}\n")
-                  liftIO $ copyWithHeader dflags msg line_prag input_fn final_fn
+                  liftIO $ copyWithHeader logger dflags msg line_prag input_fn final_fn
                return final_fn
 
 
@@ -891,27 +887,38 @@ pipeLoop phase input_fn = do
            " but I wanted to stop at phase " ++ show stopPhase)
 
    _
-     -> do liftIO $ debugTraceMsg dflags 4
+     -> do liftIO $ debugTraceMsg logger dflags 4
                                   (text "Running phase" <+> ppr phase)
 
            case phase of
                HscOut {} -> do
+                   -- Depending on the dynamic-too state, we first run the
+                   -- backend to generate the non-dynamic objects and then
+                   -- re-run it to generate the dynamic ones.
                    let noDynToo = do
                         (next_phase, output_fn) <- runHookedPhase phase input_fn
                         pipeLoop next_phase output_fn
                    let dynToo = do
-                          -- if Opt_BuildDynamicToo is set and if the platform
-                          -- supports it, we first run the backend to generate
-                          -- the dynamic objects and then re-run it to generate
-                          -- the non-dynamic ones.
-                          let dflags' = setDynamicNow dflags -- set "dynamicNow"
-                          setDynFlags dflags'
-                          (next_phase, output_fn) <- runHookedPhase phase input_fn
-                          _ <- pipeLoop next_phase output_fn
-                          -- TODO: we probably shouldn't ignore the result of
-                          -- the dynamic compilation
-                          setDynFlags dflags -- restore flags without "dynamicNow" set
-                          noDynToo
+                          -- we must run the non-dynamic way before the dynamic
+                          -- one because there may be interfaces loaded only in
+                          -- the backend (e.g., in CorePrep). See #19264
+                          r <- noDynToo
+
+                          -- we must check the dynamic-too state again, because
+                          -- we may have failed to load a dynamic interface in
+                          -- the backend.
+                          dynamicTooState dflags >>= \case
+                            DT_OK -> do
+                                let dflags' = setDynamicNow dflags -- set "dynamicNow"
+                                setDynFlags dflags'
+                                (next_phase, output_fn) <- runHookedPhase phase input_fn
+                                _ <- pipeLoop next_phase output_fn
+                                -- TODO: we probably shouldn't ignore the result of
+                                -- the dynamic compilation
+                                setDynFlags dflags -- restore flags without "dynamicNow" set
+                                return r
+                            _ -> return r
+
                    dynamicTooState dflags >>= \case
                      DT_Dont   -> noDynToo
                      DT_Failed -> noDynToo
@@ -944,9 +951,10 @@ runHookedPhase pp input = do
 phaseOutputFilename :: Phase{-next phase-} -> CompPipeline FilePath
 phaseOutputFilename next_phase = do
   PipeEnv{stop_phase, src_basename, output_spec} <- getPipeEnv
-  PipeState{maybe_loc, hsc_env} <- getPipeState
-  let dflags = hsc_dflags hsc_env
-  liftIO $ getOutputFilename stop_phase output_spec
+  PipeState{maybe_loc} <- getPipeState
+  dflags <- getDynFlags
+  logger <- getLogger
+  liftIO $ getOutputFilename logger stop_phase output_spec
                              src_basename dflags next_phase maybe_loc
 
 -- | Computes the next output filename for something in the compilation
@@ -965,17 +973,17 @@ phaseOutputFilename next_phase = do
 --         compiling; this can be used to override the default output
 --         of an object file.  (TODO: do we actually need this?)
 getOutputFilename
-  :: Phase -> PipelineOutput -> String
+  :: Logger -> Phase -> PipelineOutput -> String
   -> DynFlags -> Phase{-next phase-} -> Maybe ModLocation -> IO FilePath
-getOutputFilename stop_phase output basename dflags next_phase maybe_location
+getOutputFilename logger stop_phase output basename dflags next_phase maybe_location
  | is_last_phase, Persistent   <- output = persistent_fn
  | is_last_phase, SpecificFile <- output = case outputFile dflags of
                                            Just f -> return f
                                            Nothing ->
                                                panic "SpecificFile: No filename"
  | keep_this_output                      = persistent_fn
- | Temporary lifetime <- output          = newTempName dflags lifetime suffix
- | otherwise                             = newTempName dflags TFL_CurrentModule
+ | Temporary lifetime <- output          = newTempName logger dflags lifetime suffix
+ | otherwise                             = newTempName logger dflags TFL_CurrentModule
    suffix
     where
           hcsuf      = hcSuf dflags
@@ -1112,8 +1120,9 @@ runPhase (RealPhase (Unlit sf)) input_fn = do
                 , GHC.SysTools.FileOption "" output_fn
                 ]
 
-    dflags <- hsc_dflags <$> getPipeSession
-    liftIO $ GHC.SysTools.runUnlit dflags flags
+    dflags <- getDynFlags
+    logger <- getLogger
+    liftIO $ GHC.SysTools.runUnlit logger dflags flags
 
     return (RealPhase (Cpp sf), output_fn)
 
@@ -1124,6 +1133,7 @@ runPhase (RealPhase (Unlit sf)) input_fn = do
 runPhase (RealPhase (Cpp sf)) input_fn
   = do
        dflags0 <- getDynFlags
+       logger <- getLogger
        src_opts <- liftIO $ getOptionsFromFile dflags0 input_fn
        (dflags1, unhandled_flags, warns)
            <- liftIO $ parseDynamicFilePragma dflags0 src_opts
@@ -1133,7 +1143,7 @@ runPhase (RealPhase (Cpp sf)) input_fn
        if not (xopt LangExt.Cpp dflags1) then do
            -- we have to be careful to emit warnings only once.
            unless (gopt Opt_Pp dflags1) $
-               liftIO $ handleFlagWarnings dflags1 warns
+               liftIO $ handleFlagWarnings logger dflags1 warns
 
            -- no need to preprocess CPP, just pass input file along
            -- to the next phase of the pipeline.
@@ -1141,7 +1151,7 @@ runPhase (RealPhase (Cpp sf)) input_fn
         else do
             output_fn <- phaseOutputFilename (HsPp sf)
             hsc_env <- getPipeSession
-            liftIO $ doCpp (hsc_dflags hsc_env) (hsc_unit_env hsc_env)
+            liftIO $ doCpp logger (hsc_dflags hsc_env) (hsc_unit_env hsc_env)
                            True{-raw-}
                            input_fn output_fn
             -- re-read the pragmas now that we've preprocessed the file
@@ -1151,7 +1161,7 @@ runPhase (RealPhase (Cpp sf)) input_fn
                 <- liftIO $ parseDynamicFilePragma dflags0 src_opts
             liftIO $ checkProcessArgsResult unhandled_flags
             unless (gopt Opt_Pp dflags2) $
-                liftIO $ handleFlagWarnings dflags2 warns
+                liftIO $ handleFlagWarnings logger dflags2 warns
             -- the HsPp pass below will emit warnings
 
             setDynFlags dflags2
@@ -1163,6 +1173,7 @@ runPhase (RealPhase (Cpp sf)) input_fn
 
 runPhase (RealPhase (HsPp sf)) input_fn = do
     dflags <- getDynFlags
+    logger <- getLogger
     if not (gopt Opt_Pp dflags) then
       -- no need to preprocess, just pass input file along
       -- to the next phase of the pipeline.
@@ -1171,7 +1182,7 @@ runPhase (RealPhase (HsPp sf)) input_fn = do
         PipeEnv{src_basename, src_suffix} <- getPipeEnv
         let orig_fn = src_basename <.> src_suffix
         output_fn <- phaseOutputFilename (Hsc sf)
-        liftIO $ GHC.SysTools.runPp dflags
+        liftIO $ GHC.SysTools.runPp logger dflags
                        ( [ GHC.SysTools.Option     orig_fn
                          , GHC.SysTools.Option     input_fn
                          , GHC.SysTools.FileOption "" output_fn
@@ -1184,7 +1195,7 @@ runPhase (RealPhase (HsPp sf)) input_fn = do
             <- liftIO $ parseDynamicFilePragma dflags src_opts
         setDynFlags dflags1
         liftIO $ checkProcessArgsResult unhandled_flags
-        liftIO $ handleFlagWarnings dflags1 warns
+        liftIO $ handleFlagWarnings logger dflags1 warns
 
         return (RealPhase (Hsc sf), output_fn)
 
@@ -1300,6 +1311,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
 
 runPhase (HscOut src_flavour mod_name result) _ = do
         dflags <- getDynFlags
+        logger <- getLogger
         location <- getLocation src_flavour mod_name
         setModLocation location
 
@@ -1311,7 +1323,7 @@ runPhase (HscOut src_flavour mod_name result) _ = do
                 return (RealPhase StopLn,
                         panic "No output filename from Hsc when no-code")
             HscUpToDate _ _ ->
-                do liftIO $ touchObjectFile dflags o_file
+                do liftIO $ touchObjectFile logger dflags o_file
                    -- The .o file must have a later modification date
                    -- than the source file (else we wouldn't get Nothing)
                    -- but we touch it anyway, to keep 'make' happy (we think).
@@ -1319,7 +1331,7 @@ runPhase (HscOut src_flavour mod_name result) _ = do
             HscUpdateBoot _ _ ->
                 do -- In the case of hs-boot files, generate a dummy .o-boot
                    -- stamp file for the benefit of Make
-                   liftIO $ touchObjectFile dflags o_file
+                   liftIO $ touchObjectFile logger dflags o_file
                    return (RealPhase StopLn, o_file)
             HscUpdateSig _ _ ->
                 do -- We need to create a REAL but empty .o file
@@ -1352,7 +1364,7 @@ runPhase (HscOut src_flavour mod_name result) _ = do
                     setIface final_iface final_mod_details
 
                     -- See Note [Writing interface files]
-                    liftIO $ hscMaybeWriteIface dflags False final_iface mb_old_iface_hash mod_location
+                    liftIO $ hscMaybeWriteIface logger dflags False final_iface mb_old_iface_hash mod_location
 
                     stub_o <- liftIO (mapM (compileStub hsc_env') mStub)
                     foreign_os <- liftIO $
@@ -1366,8 +1378,9 @@ runPhase (HscOut src_flavour mod_name result) _ = do
 
 runPhase (RealPhase CmmCpp) input_fn = do
        hsc_env <- getPipeSession
+       logger <- getLogger
        output_fn <- phaseOutputFilename Cmm
-       liftIO $ doCpp (hsc_dflags hsc_env) (hsc_unit_env hsc_env)
+       liftIO $ doCpp logger (hsc_dflags hsc_env) (hsc_unit_env hsc_env)
                       False{-not raw-}
                       input_fn output_fn
        return (RealPhase Cmm, output_fn)
@@ -1467,7 +1480,8 @@ runPhase (RealPhase cc_phase) input_fn
 
         ghcVersionH <- liftIO $ getGhcVersionPathName dflags unit_env
 
-        liftIO $ GHC.SysTools.runCc (phaseForeignLanguage cc_phase) dflags (
+        logger <- getLogger
+        liftIO $ GHC.SysTools.runCc (phaseForeignLanguage cc_phase) logger dflags (
                         [ GHC.SysTools.FileOption "" input_fn
                         , GHC.SysTools.Option "-o"
                         , GHC.SysTools.FileOption "" output_fn
@@ -1524,6 +1538,7 @@ runPhase (RealPhase (As with_cpp)) input_fn
   = do
         hsc_env <- getPipeSession
         let dflags     = hsc_dflags   hsc_env
+        let logger     = hsc_logger   hsc_env
         let unit_env   = hsc_unit_env hsc_env
         let platform   = ue_platform unit_env
 
@@ -1545,7 +1560,7 @@ runPhase (RealPhase (As with_cpp)) input_fn
         -- might be a hierarchical module.
         liftIO $ createDirectoryIfMissing True (takeDirectory output_fn)
 
-        ccInfo <- liftIO $ getCompilerInfo dflags
+        ccInfo <- liftIO $ getCompilerInfo logger dflags
         let global_includes = [ GHC.SysTools.Option ("-I" ++ p)
                               | p <- includePathsGlobal cmdline_include_paths ]
         let local_includes = [ GHC.SysTools.Option ("-iquote" ++ p)
@@ -1554,7 +1569,7 @@ runPhase (RealPhase (As with_cpp)) input_fn
               = liftIO $
                   withAtomicRename outputFilename $ \temp_outputFilename ->
                     as_prog
-                       dflags
+                       logger dflags
                        (local_includes ++ global_includes
                        -- See Note [-fPIC for assembler]
                        ++ map GHC.SysTools.Option pic_c_flags
@@ -1587,7 +1602,7 @@ runPhase (RealPhase (As with_cpp)) input_fn
                           , GHC.SysTools.FileOption "" temp_outputFilename
                           ])
 
-        liftIO $ debugTraceMsg dflags 4 (text "Running the assembler")
+        liftIO $ debugTraceMsg logger dflags 4 (text "Running the assembler")
         runAssembler input_fn output_fn
 
         return (RealPhase next_phase, output_fn)
@@ -1596,9 +1611,9 @@ runPhase (RealPhase (As with_cpp)) input_fn
 -----------------------------------------------------------------------------
 -- LlvmOpt phase
 runPhase (RealPhase LlvmOpt) input_fn = do
-    hsc_env <- getPipeSession
-    let dflags = hsc_dflags hsc_env
-        -- we always (unless -optlo specified) run Opt since we rely on it to
+    dflags <- getDynFlags
+    logger <- getLogger
+    let -- we always (unless -optlo specified) run Opt since we rely on it to
         -- fix up some pretty big deficiencies in the code we generate
         optIdx = max 0 $ min 2 $ optLevel dflags  -- ensure we're in [0,2]
         llvmOpts = case lookup optIdx $ llvmPasses $ llvmConfig dflags of
@@ -1619,7 +1634,7 @@ runPhase (RealPhase LlvmOpt) input_fn = do
 
     output_fn <- phaseOutputFilename LlvmLlc
 
-    liftIO $ GHC.SysTools.runLlvmOpt dflags
+    liftIO $ GHC.SysTools.runLlvmOpt logger dflags
                (   optFlag
                 ++ defaultOptions ++
                 [ GHC.SysTools.FileOption "" input_fn
@@ -1673,7 +1688,8 @@ runPhase (RealPhase LlvmLlc) input_fn = do
     --
     -- Observed at least with -mtriple=arm-unknown-linux-gnueabihf -enable-tbaa
     --
-    dflags <- hsc_dflags <$> getPipeSession
+    dflags <- getDynFlags
+    logger <- getLogger
     let
         llvmOpts = case optLevel dflags of
           0 -> "-O1" -- required to get the non-naive reg allocator. Passing -regalloc=greedy is not sufficient.
@@ -1692,7 +1708,7 @@ runPhase (RealPhase LlvmLlc) input_fn = do
 
     output_fn <- phaseOutputFilename next_phase
 
-    liftIO $ GHC.SysTools.runLlvmLlc dflags
+    liftIO $ GHC.SysTools.runLlvmLlc logger dflags
                 (  optFlag
                 ++ defaultOptions
                 ++ [ GHC.SysTools.FileOption "" input_fn
@@ -1711,8 +1727,9 @@ runPhase (RealPhase LlvmLlc) input_fn = do
 runPhase (RealPhase LlvmMangle) input_fn = do
       let next_phase = As False
       output_fn <- phaseOutputFilename next_phase
-      dflags <- hsc_dflags <$> getPipeSession
-      liftIO $ llvmFixupAsm dflags input_fn output_fn
+      dflags <- getDynFlags
+      logger <- getLogger
+      liftIO $ llvmFixupAsm logger dflags input_fn output_fn
       return (RealPhase next_phase, output_fn)
 
 -----------------------------------------------------------------------------
@@ -1725,8 +1742,9 @@ runPhase (RealPhase MergeForeign) input_fn = do
      if null foreign_os
        then panic "runPhase(MergeForeign): no foreign objects"
        else do
-         dflags <- hsc_dflags <$> getPipeSession
-         liftIO $ joinObjectFiles dflags (input_fn : foreign_os) output_fn
+         dflags <- getDynFlags
+         logger <- getLogger
+         liftIO $ joinObjectFiles logger dflags (input_fn : foreign_os) output_fn
          return (RealPhase StopLn, output_fn)
 
 -- warning suppression
@@ -1801,14 +1819,14 @@ getHCFilePackages filename =
           return []
 
 
-linkDynLibCheck :: DynFlags -> UnitEnv -> [String] -> [UnitId] -> IO ()
-linkDynLibCheck dflags unit_env o_files dep_units = do
+linkDynLibCheck :: Logger -> DynFlags -> UnitEnv -> [String] -> [UnitId] -> IO ()
+linkDynLibCheck logger dflags unit_env o_files dep_units = do
   when (haveRtsOptsFlags dflags) $
-    putLogMsg dflags NoReason SevInfo noSrcSpan
+    putLogMsg logger dflags NoReason SevInfo noSrcSpan
       $ withPprStyle defaultUserStyle
       (text "Warning: -rtsopts and -with-rtsopts have no effect with -shared." $$
       text "    Call hs_init_ghc() from your main() function to set these options.")
-  linkDynLib dflags unit_env o_files dep_units
+  linkDynLib logger dflags unit_env o_files dep_units
 
 
 -- -----------------------------------------------------------------------------
@@ -1817,8 +1835,8 @@ linkDynLibCheck dflags unit_env o_files dep_units = do
 -- | Run CPP
 --
 -- UnitState is needed to compute MIN_VERSION macros
-doCpp :: DynFlags -> UnitEnv -> Bool -> FilePath -> FilePath -> IO ()
-doCpp dflags unit_env raw input_fn output_fn = do
+doCpp :: Logger -> DynFlags -> UnitEnv -> Bool -> FilePath -> FilePath -> IO ()
+doCpp logger dflags unit_env raw input_fn output_fn = do
     let hscpp_opts = picPOpts dflags
     let cmdline_include_paths = includePaths dflags
     let unit_state = ue_units unit_env
@@ -1832,8 +1850,8 @@ doCpp dflags unit_env raw input_fn output_fn = do
 
     let verbFlags = getVerbFlags dflags
 
-    let cpp_prog args | raw       = GHC.SysTools.runCpp dflags args
-                      | otherwise = GHC.SysTools.runCc Nothing dflags (GHC.SysTools.Option "-E" : args)
+    let cpp_prog args | raw       = GHC.SysTools.runCpp logger dflags args
+                      | otherwise = GHC.SysTools.runCc Nothing logger dflags (GHC.SysTools.Option "-E" : args)
 
     let platform   = targetPlatform dflags
         targetArch = stringEncodeArch $ platformArch platform
@@ -1864,7 +1882,7 @@ doCpp dflags unit_env raw input_fn output_fn = do
           [ "-D__AVX512F__"  | isAvx512fEnabled  dflags ] ++
           [ "-D__AVX512PF__" | isAvx512pfEnabled dflags ]
 
-    backend_defs <- getBackendDefs dflags
+    backend_defs <- getBackendDefs logger dflags
 
     let th_defs = [ "-D__GLASGOW_HASKELL_TH__" ]
     -- Default CPP defines in Haskell source
@@ -1876,7 +1894,7 @@ doCpp dflags unit_env raw input_fn output_fn = do
         pkgs = catMaybes (map (lookupUnit unit_state) uids)
     mb_macro_include <-
         if not (null pkgs) && gopt Opt_VersionMacros dflags
-            then do macro_stub <- newTempName dflags TFL_CurrentModule "h"
+            then do macro_stub <- newTempName logger dflags TFL_CurrentModule "h"
                     writeFile macro_stub (generatePackageVersionMacros pkgs)
                     -- Include version macros for every *exposed* package.
                     -- Without -hide-all-packages and with a package database
@@ -1916,9 +1934,9 @@ doCpp dflags unit_env raw input_fn output_fn = do
                        , GHC.SysTools.FileOption "" output_fn
                        ])
 
-getBackendDefs :: DynFlags -> IO [String]
-getBackendDefs dflags | backend dflags == LLVM = do
-    llvmVer <- figureLlvmVersion dflags
+getBackendDefs :: Logger -> DynFlags -> IO [String]
+getBackendDefs logger dflags | backend dflags == LLVM = do
+    llvmVer <- figureLlvmVersion logger dflags
     return $ case fmap llvmVersionList llvmVer of
                Just [m] -> [ "-D__GLASGOW_HASKELL_LLVM__=" ++ format (m,0) ]
                Just (m:n:_) -> [ "-D__GLASGOW_HASKELL_LLVM__=" ++ format (m,n) ]
@@ -1928,7 +1946,7 @@ getBackendDefs dflags | backend dflags == LLVM = do
       | minor >= 100 = error "getBackendDefs: Unsupported minor version"
       | otherwise = show $ (100 * major + minor :: Int) -- Contract is Int
 
-getBackendDefs _ =
+getBackendDefs _ _ =
     return []
 
 -- ---------------------------------------------------------------------------
@@ -2006,12 +2024,12 @@ via gcc.
 
 -}
 
-joinObjectFiles :: DynFlags -> [FilePath] -> FilePath -> IO ()
-joinObjectFiles dflags o_files output_fn = do
+joinObjectFiles :: Logger -> DynFlags -> [FilePath] -> FilePath -> IO ()
+joinObjectFiles logger dflags o_files output_fn = do
   let toolSettings' = toolSettings dflags
       ldIsGnuLd = toolSettings_ldIsGnuLd toolSettings'
       osInfo = platformOS (targetPlatform dflags)
-      ld_r args = GHC.SysTools.runMergeObjects dflags (
+      ld_r args = GHC.SysTools.runMergeObjects logger dflags (
                         -- See Note [Produce big objects on Windows]
                         concat
                           [ [GHC.SysTools.Option "--oformat", GHC.SysTools.Option "pe-bigobj-x86-64"]
@@ -2031,14 +2049,14 @@ joinObjectFiles dflags o_files output_fn = do
 
   if ldIsGnuLd
      then do
-          script <- newTempName dflags TFL_CurrentModule "ldscript"
+          script <- newTempName logger dflags TFL_CurrentModule "ldscript"
           cwd <- getCurrentDirectory
           let o_files_abs = map (\x -> "\"" ++ (cwd </> x) ++ "\"") o_files
           writeFile script $ "INPUT(" ++ unwords o_files_abs ++ ")"
           ld_r [GHC.SysTools.FileOption "" script]
      else if toolSettings_ldSupportsFilelist toolSettings'
      then do
-          filelist <- newTempName dflags TFL_CurrentModule "filelist"
+          filelist <- newTempName logger dflags TFL_CurrentModule "filelist"
           writeFile filelist $ unlines o_files
           ld_r [GHC.SysTools.Option "-filelist",
                 GHC.SysTools.FileOption "" filelist]
@@ -2077,10 +2095,10 @@ hscPostBackendPhase _ bcknd =
         NoBackend   -> StopLn
         Interpreter -> StopLn
 
-touchObjectFile :: DynFlags -> FilePath -> IO ()
-touchObjectFile dflags path = do
+touchObjectFile :: Logger -> DynFlags -> FilePath -> IO ()
+touchObjectFile logger dflags path = do
   createDirectoryIfMissing True $ takeDirectory path
-  GHC.SysTools.touch dflags "Touching object file" path
+  GHC.SysTools.touch logger dflags "Touching object file" path
 
 -- | Find out path to @ghcversion.h@ file
 getGhcVersionPathName :: DynFlags -> UnitEnv -> IO FilePath

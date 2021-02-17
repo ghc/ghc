@@ -697,8 +697,8 @@ C++. For example:
     #include "HsFFI.h"
 
     HsBool mylib_init(void){
-      int argc = 2;
-      char *argv[] = { "+RTS", "-A32m", NULL };
+      int argc = 3;
+      char *argv[] = { "mylib", "+RTS", "-A32m", NULL };
       char **pargv = argv;
 
       // Initialize Haskell runtime

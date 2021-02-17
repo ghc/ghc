@@ -700,7 +700,7 @@ simplifyInstanceContexts infer_specs
       where
         the_pred = mkClassPred clas inst_tys
 
-derivInstCtxt :: PredType -> MsgDoc
+derivInstCtxt :: PredType -> SDoc
 derivInstCtxt pred
   = text "When deriving the instance for" <+> parens (ppr pred)
 

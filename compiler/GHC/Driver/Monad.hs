@@ -19,6 +19,14 @@ module GHC.Driver.Monad (
         Session(..), withSession, modifySession, modifySessionM,
         withTempSession,
 
+        -- * Logger
+        modifyLogger,
+        pushLogHookM,
+        popLogHookM,
+        putLogMsgM,
+        putMsgM,
+        withTimingM,
+
         -- ** Warnings
         logWarnings, printException,
         WarnErrLogger, defaultWarnErrLogger
@@ -33,7 +41,9 @@ import GHC.Driver.Errors ( printOrThrowWarnings, printBagOfErrors )
 import GHC.Utils.Monad
 import GHC.Utils.Exception
 import GHC.Utils.Error
+import GHC.Utils.Logger
 
+import GHC.Types.SrcLoc
 import GHC.Types.SourceError
 
 import Control.Monad
@@ -57,7 +67,7 @@ import Data.IORef
 -- If you do not use 'Ghc' or 'GhcT', make sure to call 'GHC.initGhcMonad'
 -- before any call to the GHC API functions can occur.
 --
-class (Functor m, ExceptionMonad m, HasDynFlags m) => GhcMonad m where
+class (Functor m, ExceptionMonad m, HasDynFlags m, HasLogger m ) => GhcMonad m where
   getSession :: m HscEnv
   setSession :: HscEnv -> m ()
 
@@ -92,13 +102,52 @@ withTempSession :: GhcMonad m => (HscEnv -> HscEnv) -> m a -> m a
 withTempSession f m =
   withSavedSession $ modifySession f >> m
 
+----------------------------------------
+-- Logging
+----------------------------------------
+
+-- | Modify the logger
+modifyLogger :: GhcMonad m => (Logger -> Logger) -> m ()
+modifyLogger f = modifySession $ \hsc_env ->
+    hsc_env { hsc_logger = f (hsc_logger hsc_env) }
+
+-- | Push a log hook on the stack
+pushLogHookM :: GhcMonad m => (LogAction -> LogAction) -> m ()
+pushLogHookM = modifyLogger . pushLogHook
+
+-- | Pop a log hook from the stack
+popLogHookM :: GhcMonad m => m ()
+popLogHookM  = modifyLogger popLogHook
+
+-- | Put a log message
+putMsgM :: GhcMonad m => SDoc -> m ()
+putMsgM doc = do
+    dflags <- getDynFlags
+    logger <- getLogger
+    liftIO $ putMsg logger dflags doc
+
+-- | Put a log message
+putLogMsgM :: GhcMonad m => WarnReason -> Severity -> SrcSpan -> SDoc -> m ()
+putLogMsgM reason sev loc doc = do
+    dflags <- getDynFlags
+    logger <- getLogger
+    liftIO $ putLogMsg logger dflags reason sev loc doc
+
+-- | Time an action
+withTimingM :: GhcMonad m => SDoc -> (b -> ()) -> m b -> m b
+withTimingM doc force action = do
+    logger <- getLogger
+    dflags <- getDynFlags
+    withTiming logger dflags doc force action
+
 -- -----------------------------------------------------------------------------
 -- | A monad that allows logging of warnings.
 
 logWarnings :: GhcMonad m => WarningMessages -> m ()
 logWarnings warns = do
   dflags <- getSessionDynFlags
-  liftIO $ printOrThrowWarnings dflags warns
+  logger <- getLogger
+  liftIO $ printOrThrowWarnings logger dflags warns
 
 -- -----------------------------------------------------------------------------
 -- | A minimal implementation of a 'GhcMonad'.  If you need a custom monad,
@@ -129,6 +178,9 @@ instance MonadFix Ghc where
 
 instance HasDynFlags Ghc where
   getDynFlags = getSessionDynFlags
+
+instance HasLogger Ghc where
+  getLogger = hsc_logger <$> getSession
 
 instance GhcMonad Ghc where
   getSession = Ghc $ \(Session r) -> readIORef r
@@ -180,6 +232,9 @@ instance MonadIO m => MonadIO (GhcT m) where
 instance MonadIO m => HasDynFlags (GhcT m) where
   getDynFlags = GhcT $ \(Session r) -> liftM hsc_dflags (liftIO $ readIORef r)
 
+instance MonadIO m => HasLogger (GhcT m) where
+  getLogger = GhcT $ \(Session r) -> liftM hsc_logger (liftIO $ readIORef r)
+
 instance ExceptionMonad m => GhcMonad (GhcT m) where
   getSession = GhcT $ \(Session r) -> liftIO $ readIORef r
   setSession s' = GhcT $ \(Session r) -> liftIO $ writeIORef r s'
@@ -190,7 +245,8 @@ instance ExceptionMonad m => GhcMonad (GhcT m) where
 printException :: GhcMonad m => SourceError -> m ()
 printException err = do
   dflags <- getSessionDynFlags
-  liftIO $ printBagOfErrors dflags (srcErrorMessages err)
+  logger <- getLogger
+  liftIO $ printBagOfErrors logger dflags (srcErrorMessages err)
 
 -- | A function called to log warnings and errors.
 type WarnErrLogger = forall m. GhcMonad m => Maybe SourceError -> m ()

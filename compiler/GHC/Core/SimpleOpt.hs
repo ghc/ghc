@@ -54,7 +54,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Data.Maybe       ( orElse )
 import GHC.Data.FastString
-import Data.List
+import Data.List (mapAccumL)
 import qualified Data.ByteString as BS
 
 {-
@@ -333,10 +333,21 @@ simple_app env (Var v) as
 simple_app env (App e1 e2) as
   = simple_app env e1 ((env, e2) : as)
 
-simple_app env (Lam b e) (a:as)
-  = wrapLet mb_pr (simple_app env' e as)
+simple_app env e@(Lam {}) as@(_:_)
+  | (bndrs, body) <- collectBinders e
+  , let zapped_bndrs = zapLamBndrs (length as) bndrs
+    -- Be careful to zap the lambda binders if necessary
+    -- c.f. the Lam caes of simplExprF1 in GHC.Core.Opt.Simplify
+    -- Lacking this zap caused #19347, when we had a redex
+    --   (\ a b. K a b) e1 e2
+    -- where (as it happens) the eta-expanded K is produced by
+    -- Note [Linear fields generalization] in GHC.Tc.Gen.Head
+  = do_beta env zapped_bndrs body as
   where
-     (env', mb_pr) = simple_bind_pair env b Nothing a NotTopLevel
+    do_beta env (b:bs) body (a:as)
+      | (env', mb_pr) <- simple_bind_pair env b Nothing a NotTopLevel
+      = wrapLet mb_pr $ do_beta env' bs body as
+    do_beta env bs body as = simple_app env (mkLams bs body) as
 
 simple_app env (Tick t e) as
   -- Okay to do "(Tick t e) x ==> Tick t (e x)"?

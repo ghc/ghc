@@ -251,13 +251,26 @@ associate( StgClosure *c, RetainerSet *s )
 {
     // StgWord has the same size as pointers, so the following type
     // casting is okay.
-    RSET(c) = (RetainerSet *)((StgWord)s | flip);
+    setTravData(&g_retainerTraverseState, c, (StgWord)s);
+}
+
+bool isRetainerSetValid( const StgClosure *c )
+{
+    return isTravDataValid(&g_retainerTraverseState, c);
+}
+
+inline RetainerSet*
+retainerSetOf( const StgClosure *c )
+{
+    ASSERT(isRetainerSetValid(c));
+    return (RetainerSet*)getTravData(c);
 }
 
 static bool
-retainVisitClosure( StgClosure *c, const StgClosure *cp, const stackData data, const bool first_visit, stackData *out_data )
+retainVisitClosure( StgClosure *c, const StgClosure *cp, const stackData data, const bool first_visit, stackAccum *acc, stackData *out_data )
 {
     (void) first_visit;
+    (void) acc;
 
     retainer r = data.c_child_r;
     RetainerSet *s, *retainerSetOfc;
@@ -347,11 +360,11 @@ retainRoot(void *user, StgClosure **tl)
     // be a root.
 
     c = UNTAG_CLOSURE(*tl);
-    traverseMaybeInitClosureData(c);
+    traverseMaybeInitClosureData(&g_retainerTraverseState, c);
     if (c != &stg_END_TSO_QUEUE_closure && isRetainer(c)) {
-        traversePushClosure(ts, c, c, (stackData)getRetainerFrom(c));
+        traversePushRoot(ts, c, c, (stackData)getRetainerFrom(c));
     } else {
-        traversePushClosure(ts, c, c, (stackData)CCS_SYSTEM);
+        traversePushRoot(ts, c, c, (stackData)CCS_SYSTEM);
     }
 
     // NOT TRUE: ASSERT(isMember(getRetainerFrom(*tl), retainerSetOf(*tl)));
@@ -367,6 +380,8 @@ computeRetainerSet( traverseState *ts )
 {
     StgWeak *weak;
     uint32_t g, n;
+
+    traverseInvalidateClosureData(ts);
 
     markCapabilities(retainRoot, (void*)ts); // for scheduler roots
 

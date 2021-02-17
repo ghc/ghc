@@ -32,7 +32,10 @@ import GHC.Tc.Utils.Env
 import GHC.Unit
 
 import GHC.Builtin.Names
+import GHC.Builtin.PrimOps
 import GHC.Builtin.Types
+import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
+import GHC.Types.Id.Make ( realWorldPrimId, mkPrimOpId )
 
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity
@@ -47,6 +50,7 @@ import GHC.Core.TyCon
 import GHC.Core.DataCon
 import GHC.Core.Opt.OccurAnal
 
+
 import GHC.Data.Maybe
 import GHC.Data.OrdList
 import GHC.Data.FastString
@@ -56,6 +60,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Outputable
 import GHC.Utils.Monad  ( mapAccumLM )
+import GHC.Utils.Logger
 
 import GHC.Types.Demand
 import GHC.Types.Var
@@ -63,7 +68,6 @@ import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import GHC.Types.Id.Make ( realWorldPrimId )
 import GHC.Types.Basic
 import GHC.Types.Name   ( NamedThing(..), nameSrcSpan, isInternalName )
 import GHC.Types.SrcLoc ( SrcSpan(..), realSrcLocSpan, mkRealSrcLoc )
@@ -186,7 +190,7 @@ type CpeRhs  = CoreExpr    -- Non-terminal 'rhs'
 corePrepPgm :: HscEnv -> Module -> ModLocation -> CoreProgram -> [TyCon]
             -> IO (CoreProgram, S.Set CostCentre)
 corePrepPgm hsc_env this_mod mod_loc binds data_tycons =
-    withTiming dflags
+    withTiming logger dflags
                (text "CorePrep"<+>brackets (ppr this_mod))
                (const ()) $ do
     us <- mkSplitUniqSupply 's'
@@ -211,15 +215,17 @@ corePrepPgm hsc_env this_mod mod_loc binds data_tycons =
     return (binds_out, cost_centres)
   where
     dflags = hsc_dflags hsc_env
+    logger = hsc_logger hsc_env
 
 corePrepExpr :: HscEnv -> CoreExpr -> IO CoreExpr
 corePrepExpr hsc_env expr = do
     let dflags = hsc_dflags hsc_env
-    withTiming dflags (text "CorePrep [expr]") (const ()) $ do
+    let logger = hsc_logger hsc_env
+    withTiming logger dflags (text "CorePrep [expr]") (const ()) $ do
       us <- mkSplitUniqSupply 's'
       initialCorePrepEnv <- mkInitialCorePrepEnv hsc_env
       let new_expr = initUs_ us (cpeBodyNF initialCorePrepEnv expr)
-      dumpIfSet_dyn dflags Opt_D_dump_prep "CorePrep" FormatCore (ppr new_expr)
+      dumpIfSet_dyn logger dflags Opt_D_dump_prep "CorePrep" FormatCore (ppr new_expr)
       return new_expr
 
 corePrepTopBinds :: CorePrepEnv -> [CoreBind] -> UniqSM Floats
@@ -787,6 +793,38 @@ cpeApp top_env expr
         -- rather than the far superior "f x y".  Test case is par01.
         = let (terminal, args', depth') = collect_args arg
           in cpe_app env terminal (args' ++ args) (depth + depth' - 1)
+
+    cpe_app env
+            (Var f)
+            args
+            n
+        | Just KeepAliveOp <- isPrimOpId_maybe f
+        , CpeApp (Type arg_rep)
+          : CpeApp (Type arg_ty)
+          : CpeApp (Type _result_rep)
+          : CpeApp (Type result_ty)
+          : CpeApp arg
+          : CpeApp s0
+          : CpeApp k
+          : rest <- pprTrace "cpe_app keepAlive#" (ppr args) args
+        = do { pprTraceM "cpe_app(keepAlive#)" (ppr n)
+             ; y <- newVar result_ty
+             ; s2 <- newVar realWorldStatePrimTy
+             ; -- beta reduce if possible
+             ; (floats, k') <- case k of
+                  Lam s body -> cpe_app (extendCorePrepEnvExpr env s s0) body rest (n-2)
+                  _          -> cpe_app env k (CpeApp s0 : rest) (n-1)
+             ; let touchId = mkPrimOpId TouchOp
+                   expr = Case k' y result_ty [Alt DEFAULT [] rhs]
+                   rhs = let scrut = mkApps (Var touchId) [Type arg_rep, Type arg_ty, arg, Var realWorldPrimId]
+                         in Case scrut s2 result_ty [Alt DEFAULT [] (Var y)]
+             ; pprTraceM "cpe_app(keepAlive)" (ppr expr)
+             ; (floats', expr') <- cpeBody env expr
+             ; return (floats `appendFloats` floats', expr')
+             }
+        | Just KeepAliveOp <- isPrimOpId_maybe f
+        = panic "invalid keepAlive# application"
+
     cpe_app env (Var f) (CpeApp _runtimeRep@Type{} : CpeApp _type@Type{} : CpeApp arg : rest) n
         | f `hasKey` runRWKey
         -- N.B. While it may appear that n == 1 in the case of runRW#
@@ -1028,7 +1066,7 @@ Performing the transform described above would result in:
 
 If runRW# were a "normal" function this call to join point j would not be
 allowed in its continuation argument. However, since runRW# is inlined (as
-described in Note [runRW magic] above), such join point occurences are
+described in Note [runRW magic] above), such join point occurrences are
 completely fine. Both occurrence analysis (see the runRW guard in occAnalApp)
 and Core Lint (see the App case of lintCoreExpr) have special treatment for
 runRW# applications. See Note [Linting of runRW#] for details on the latter.

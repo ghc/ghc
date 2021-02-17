@@ -15,6 +15,7 @@ import GHC.Prelude
 
 import GHC.Utils.Monad
 import GHC.Utils.Outputable
+import GHC.Utils.Logger
 
 import GHC.Driver.Session
 import GHC.Driver.Phases
@@ -117,6 +118,9 @@ getPipeSession = P $ \_env state -> return (state, hsc_env state)
 
 instance HasDynFlags CompPipeline where
     getDynFlags = P $ \_env state -> return (state, hsc_dflags (hsc_env state))
+
+instance HasLogger CompPipeline where
+    getLogger = P $ \_env state -> return (state, hsc_logger (hsc_env state))
 
 setDynFlags :: DynFlags -> CompPipeline ()
 setDynFlags dflags = P $ \_env state ->

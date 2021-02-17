@@ -70,6 +70,7 @@ import GHC.Utils.Misc
 import GHC.Data.OrdList ( isNilOL )
 import GHC.Utils.Monad
 import GHC.Utils.Outputable
+import GHC.Utils.Logger
 import GHC.Utils.Panic
 import GHC.Core.Opt.ConstantFold
 import GHC.Data.FastString ( fsLit )
@@ -858,10 +859,11 @@ GHC.Core.Opt.Monad
         sm_eta_expand :: Bool     -- Whether eta-expansion is enabled
 -}
 
-simplEnvForGHCi :: DynFlags -> SimplEnv
-simplEnvForGHCi dflags
+simplEnvForGHCi :: Logger -> DynFlags -> SimplEnv
+simplEnvForGHCi logger dflags
   = mkSimplEnv $ SimplMode { sm_names  = ["GHCi"]
                            , sm_phase  = InitialPhase
+                           , sm_logger = logger
                            , sm_dflags = dflags
                            , sm_uf_opts = uf_opts
                            , sm_rules  = rules_on
@@ -1479,7 +1481,7 @@ different way (Note [Duplicating StrictArg] in Simplify).
 So I just set an arbitrary, high limit of 100, to stop any
 totally exponential behaviour.
 
-This still leaves the nasty possiblity that /ordinary/ inlining (not
+This still leaves the nasty possibility that /ordinary/ inlining (not
 postInlineUnconditionally) might inline these join points, each of
 which is individually quiet small.  I'm still not sure what to do
 about this (e.g. see #15488).

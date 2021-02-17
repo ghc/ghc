@@ -240,7 +240,7 @@ dsUnliftedBind bind body = pprPanic "dsLet: unlifted" (ppr bind $$ ppr body)
 -}
 
 
--- | Replace the body of the fucntion with this block to test the hsExprType
+-- | Replace the body of the function with this block to test the hsExprType
 -- function in GHC.Tc.Utils.Zonk:
 -- putSrcSpanDs loc $ do
 --   { core_expr <- dsExpr e
@@ -580,9 +580,9 @@ We also handle @C{}@ as valid construction syntax for an unlabelled
 constructor @C@, setting all of @C@'s fields to bottom.
 -}
 
-dsExpr (RecordCon { rcon_flds = rbinds
-                  , rcon_ext = RecordConTc { rcon_con_expr = con_expr
-                                           , rcon_con_like = con_like }})
+dsExpr (RecordCon { rcon_con  = L _ con_like
+                  , rcon_flds = rbinds
+                  , rcon_ext  = con_expr })
   = do { con_expr' <- dsExpr con_expr
        ; let
              (arg_tys, _) = tcSplitFunTys (exprType con_expr')
@@ -682,7 +682,7 @@ We have
             MkF (co2::s ~# Int) _ -> $WMkF @t y |> co3
 
 (Side note: here (z |> co1) is built by typechecking the scrutinee, so
-we ignore it here.  In general the scrutinee is an aribtrary expression.)
+we ignore it here.  In general the scrutinee is an arbitrary expression.)
 
 The question is: what is co3, the cast for the RHS?
       co3 :: F (Int,t) ~ F (s,t)
@@ -1155,11 +1155,15 @@ dsHsVar var
 
 dsConLike :: ConLike -> DsM CoreExpr
 dsConLike (RealDataCon dc) = dsHsVar (dataConWrapId dc)
-dsConLike (PatSynCon ps)   = return $ case patSynBuilder ps of
-  Just (id, add_void)
-    | add_void  -> mkCoreApp (text "dsConLike" <+> ppr ps) (Var id) (Var voidPrimId)
-    | otherwise -> Var id
-  _ -> pprPanic "dsConLike" (ppr ps)
+dsConLike (PatSynCon ps)
+  | Just (builder_name, _, add_void) <- patSynBuilder ps
+  = do { builder_id <- dsLookupGlobalId builder_name
+       ; return (if add_void
+                 then mkCoreApp (text "dsConLike" <+> ppr ps)
+                                (Var builder_id) (Var voidPrimId)
+                 else Var builder_id) }
+  | otherwise
+  = pprPanic "dsConLike" (ppr ps)
 
 {-
 ************************************************************************

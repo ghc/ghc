@@ -39,6 +39,9 @@ compilePackage rs = do
       [ root -/- "**/build/cmm/**/*." ++ wayPat ++ "o"
         | wayPat <- wayPats] |%> compileNonHsObject rs Cmm
 
+      [ root -/- "**/build/cpp/**/*." ++ wayPat ++ "o"
+        | wayPat <- wayPats] |%> compileNonHsObject rs Cxx
+
       [ root -/- "**/build/s/**/*." ++ wayPat ++ "o"
         | wayPat <- wayPats] |%> compileNonHsObject rs Asm
 
@@ -66,7 +69,7 @@ compilePackage rs = do
                -- or if some of the dynamic artifacts have been removed by the
                -- user, "needing" the non dynamic artifacts is not enough as
                -- Shake won't execute the associated action. Hence we detect
-               -- this case and we explictly build the dynamic artifacts here:
+               -- this case and we explicitly build the dynamic artifacts here:
                case changed of
                   [] -> compileHsObjectAndHi rs dyn_o
                   _  -> pure ()
@@ -112,12 +115,13 @@ compilePackage rs = do
 -}
 
 -- | Non Haskell source languages that we compile to get object files.
-data SourceLang = Asm | C | Cmm deriving (Eq, Show)
+data SourceLang = Asm | C | Cmm | Cxx deriving (Eq, Show)
 
 parseSourceLang :: Parsec.Parsec String () SourceLang
 parseSourceLang = Parsec.choice
   [ Parsec.char 'c' *> Parsec.choice
       [ Parsec.string "mm" *> pure Cmm
+      , Parsec.string "pp" *> pure Cxx
       , pure C
       ]
   , Parsec.char 's' *> pure Asm
@@ -227,11 +231,13 @@ compileNonHsObject rs lang path = do
     ctx = objectContext b
     builder = case lang of
       C -> Ghc CompileCWithGhc
+      Cxx-> Ghc CompileCppWithGhc
       _ -> Ghc CompileHs
   src <- case lang of
       Asm -> obj2src "S"   (const False)      ctx path
       C   -> obj2src "c"   (const False)      ctx path
       Cmm -> obj2src "cmm" isGeneratedCmmFile ctx path
+      Cxx -> obj2src "cpp" (const False) ctx path
   need [src]
   needDependencies ctx src (path <.> "d")
   buildWithResources rs $ target ctx (builder stage) [src] [path]

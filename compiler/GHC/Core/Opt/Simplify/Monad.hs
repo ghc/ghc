@@ -39,7 +39,7 @@ import GHC.Core.Opt.Monad
 import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Utils.Monad
-import GHC.Utils.Error as Err
+import GHC.Utils.Logger as Logger
 import GHC.Utils.Misc      ( count )
 import GHC.Utils.Panic     (throwGhcExceptionIO, GhcException (..))
 import GHC.Types.Basic     ( IntWithInf, treatZeroAsInf, mkIntWithInf )
@@ -64,7 +64,6 @@ newtype SimplM result
                  -> IO (result, SimplCount)}
     -- We only need IO here for dump output, but since we already have it
     -- we might as well use it for uniques.
-    deriving (Functor)
 
 pattern SM :: (SimplTopEnv -> SimplCount
                -> IO (result, SimplCount))
@@ -75,10 +74,11 @@ pattern SM :: (SimplTopEnv -> SimplCount
 -- See Note [The one-shot state monad trick] in GHC.Utils.Monad
 pattern SM m <- SM' m
   where
-    SM m = SM' (oneShot m)
+    SM m = SM' (oneShot $ \env -> oneShot $ \ct -> m env ct)
 
 data SimplTopEnv
   = STE { st_flags     :: DynFlags
+        , st_logger    :: !Logger
         , st_max_ticks :: IntWithInf  -- ^ Max #ticks in this simplifier run
         , st_rules     :: RuleEnv
         , st_fams      :: (FamInstEnv, FamInstEnv)
@@ -87,19 +87,20 @@ data SimplTopEnv
             -- ^ Coercion optimiser options
         }
 
-initSmpl :: DynFlags -> RuleEnv -> (FamInstEnv, FamInstEnv)
+initSmpl :: Logger -> DynFlags -> RuleEnv -> (FamInstEnv, FamInstEnv)
          -> Int                 -- Size of the bindings, used to limit
                                 -- the number of ticks we allow
          -> SimplM a
          -> IO (a, SimplCount)
 
-initSmpl dflags rules fam_envs size m
+initSmpl logger dflags rules fam_envs size m
   = do -- No init count; set to 0
        let simplCount = zeroSimplCount dflags
        (result, count) <- unSM m env simplCount
        return (result, count)
   where
     env = STE { st_flags = dflags
+              , st_logger = logger
               , st_rules = rules
               , st_max_ticks = computeMaxTicks dflags size
               , st_fams = fam_envs
@@ -129,7 +130,10 @@ computeMaxTicks dflags size
 {-# INLINE thenSmpl #-}
 {-# INLINE thenSmpl_ #-}
 {-# INLINE returnSmpl #-}
+{-# INLINE mapSmpl #-}
 
+instance Functor SimplM where
+  fmap = mapSmpl
 
 instance Applicative SimplM where
     pure  = returnSmpl
@@ -139,6 +143,9 @@ instance Applicative SimplM where
 instance Monad SimplM where
    (>>)   = (*>)
    (>>=)  = thenSmpl
+
+mapSmpl :: (a -> b) -> SimplM a -> SimplM b
+mapSmpl f m = thenSmpl m (returnSmpl . f)
 
 returnSmpl :: a -> SimplM a
 returnSmpl e = SM (\_st_env sc -> return (e, sc))
@@ -163,10 +170,11 @@ thenSmpl_ m k
 
 traceSmpl :: String -> SDoc -> SimplM ()
 traceSmpl herald doc
-  = do { dflags <- getDynFlags
-       ; liftIO $ Err.dumpIfSet_dyn dflags Opt_D_dump_simpl_trace "Simpl Trace"
-           FormatText
-           (hang (text herald) 2 doc) }
+  = do dflags <- getDynFlags
+       logger <- getLogger
+       liftIO $ Logger.dumpIfSet_dyn logger dflags Opt_D_dump_simpl_trace "Simpl Trace"
+         FormatText
+         (hang (text herald) 2 doc)
 {-# INLINE traceSmpl #-}  -- see Note [INLINE conditional tracing utilities]
 
 {-
@@ -187,6 +195,9 @@ instance MonadUnique SimplM where
 
 instance HasDynFlags SimplM where
     getDynFlags = SM (\st_env sc -> return (st_flags st_env, sc))
+
+instance HasLogger SimplM where
+    getLogger = SM (\st_env sc -> return (st_logger st_env, sc))
 
 instance MonadIO SimplM where
     liftIO m = SM $ \_ sc -> do
@@ -249,8 +260,13 @@ checkedTick t
       [ text "When trying" <+> ppr t
       , text "To increase the limit, use -fsimpl-tick-factor=N (default 100)."
       , space
-      , text "If you need to increase the limit substantially, please file a"
-      , text "bug report and indicate the factor you needed."
+      , text "In addition try adjusting -funfolding-case-threshold=N and"
+      , text "-funfolding-case-scaling=N for the module in question."
+      , text "Using threshold=1 and scaling=5 should break most inlining loops."
+      , space
+      , text "If you need to increase the tick factor substantially, while also"
+      , text "adjusting unfolding parameters please file a bug report and"
+      , text "indicate the factor you needed."
       , space
       , text "If GHC was unable to complete compilation even"
                <+> text "with a very large factor"

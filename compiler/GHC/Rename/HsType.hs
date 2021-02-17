@@ -70,7 +70,7 @@ import GHC.Data.FastString
 import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
 
-import Data.List
+import Data.List (sortBy, nubBy, partition)
 import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty (NonEmpty(..))
 import Control.Monad
@@ -690,6 +690,7 @@ rnHsTyKi env tyLit@(HsTyLit _ t)
   where
     negLit (HsStrTy _ _) = False
     negLit (HsNumTy _ i) = i < 0
+    negLit (HsCharTy _ _) = False
     negLitErr = text "Illegal literal in type (type literals must not be negative):" <+> ppr tyLit
 
 rnHsTyKi env (HsAppTy _ ty1 ty2)

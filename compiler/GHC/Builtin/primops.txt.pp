@@ -1625,19 +1625,21 @@ primtype MutableByteArray# s
 primop  NewByteArrayOp_Char "newByteArray#" GenPrimOp
    Int# -> State# s -> (# State# s, MutableByteArray# s #)
    {Create a new mutable byte array of specified size (in bytes), in
-    the specified state thread.}
+    the specified state thread. The size of the memory underlying the
+    array will be rounded up to the platform's word size.}
    with out_of_line = True
         has_side_effects = True
 
 primop  NewPinnedByteArrayOp_Char "newPinnedByteArray#" GenPrimOp
    Int# -> State# s -> (# State# s, MutableByteArray# s #)
-   {Create a mutable byte array that the GC guarantees not to move.}
+   {Like 'newByteArray#' but GC guarantees not to move it.}
    with out_of_line = True
         has_side_effects = True
 
 primop  NewAlignedPinnedByteArrayOp_Char "newAlignedPinnedByteArray#" GenPrimOp
    Int# -> Int# -> State# s -> (# State# s, MutableByteArray# s #)
-   {Create a mutable byte array, aligned by the specified amount, that the GC guarantees not to move.}
+   {Like 'newPinnedByteArray#' but allow specifying an arbitrary
+    alignment, which must be a power of two.}
    with out_of_line = True
         has_side_effects = True
 
@@ -3120,6 +3122,20 @@ primop NumSparks "numSparks#" GenPrimOp
    with
    has_side_effects = True
    out_of_line = True
+
+
+------------------------------------------------------------------------
+section "Controlling object lifetime"
+        {Ensuring that objects don't die a premature death.}
+------------------------------------------------------------------------
+
+-- See Note [keepAlive# magic] in GHC.CoreToStg.Prep.
+primop KeepAliveOp "keepAlive#" GenPrimOp
+   o -> State# RealWorld -> (State# RealWorld -> p) -> p
+   { TODO. }
+   with
+   strictness = { \ _arity -> mkClosedStrictSig [topDmd, topDmd, strictOnceApply1Dmd] topDiv }
+
 
 ------------------------------------------------------------------------
 section "Tag to enum stuff"

@@ -27,7 +27,6 @@ import GHC.Unit
 import GHC.Cmm.CLabel
 
 import GHC.Core.Type
-import GHC.Core.ConLike
 import GHC.Core
 import GHC.Core.TyCon
 
@@ -36,10 +35,10 @@ import GHC.Data.FastString
 import GHC.Data.Bag
 
 import GHC.Utils.Misc
-import GHC.Utils.Error
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Monad
+import GHC.Utils.Logger
 
 import GHC.Types.SrcLoc
 import GHC.Types.Basic
@@ -52,7 +51,7 @@ import GHC.Types.CostCentre
 import GHC.Types.CostCentre.State
 
 import Control.Monad
-import Data.List
+import Data.List (isSuffixOf, intersperse)
 import Data.Array
 import Data.Time
 import System.Directory
@@ -85,8 +84,9 @@ addTicksToBinds
 
 addTicksToBinds hsc_env mod mod_loc exports tyCons binds
   | let dflags = hsc_dflags hsc_env
-        passes = coveragePasses dflags, not (null passes),
-    Just orig_file <- ml_hs_file mod_loc = do
+        passes = coveragePasses dflags
+  , not (null passes)
+  , Just orig_file <- ml_hs_file mod_loc = do
 
      let  orig_file2 = guessSourceFile binds orig_file
 
@@ -122,7 +122,8 @@ addTicksToBinds hsc_env mod mod_loc exports tyCons binds
      hashNo <- writeMixEntries dflags mod tickCount entries orig_file2
      modBreaks <- mkModBreaks hsc_env mod tickCount entries
 
-     dumpIfSet_dyn dflags Opt_D_dump_ticked "HPC" FormatHaskell
+     let logger = hsc_logger hsc_env
+     dumpIfSet_dyn logger dflags Opt_D_dump_ticked "HPC" FormatHaskell
        (pprLHsBinds binds1)
 
      return (binds1, HpcInfo tickCount hashNo, modBreaks)
@@ -514,8 +515,11 @@ addTickHsExpr e@(HsVar _ (L _ id))  = do freeVar id; return e
 addTickHsExpr e@(HsUnboundVar {})   = return e
 addTickHsExpr e@(HsRecFld _ (Ambiguous id _))   = do freeVar id; return e
 addTickHsExpr e@(HsRecFld _ (Unambiguous id _)) = do freeVar id; return e
-addTickHsExpr e@(HsConLikeOut _ con)
-  | Just id <- conLikeWrapId_maybe con = do freeVar id; return e
+
+addTickHsExpr e@(HsConLikeOut {}) = return e
+  -- We used to do a freeVar on a pat-syn builder, but actually
+  -- such builders are never in the inScope env, which
+  -- doesn't include top level bindings
 addTickHsExpr e@(HsIPVar {})     = return e
 addTickHsExpr e@(HsOverLit {})   = return e
 addTickHsExpr e@(HsOverLabel{})  = return e
@@ -641,9 +645,6 @@ addTickHsExpr (XExpr (WrapExpr (HsWrap w e))) =
 addTickHsExpr (XExpr (ExpansionExpr (HsExpanded a b))) =
         liftM (XExpr . ExpansionExpr . HsExpanded a) $
               (addTickHsExpr b)
-
--- Others should never happen in expression content.
-addTickHsExpr e  = pprPanic "addTickHsExpr" (ppr e)
 
 addTickTupArg :: LHsTupArg GhcTc -> TM (LHsTupArg GhcTc)
 addTickTupArg (L l (Present x e))  = do { e' <- addTickLHsExpr e

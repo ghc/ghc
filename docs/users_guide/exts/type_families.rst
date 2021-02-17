@@ -544,11 +544,6 @@ However see :ref:`ghci-decls` for the overlap rules in GHCi.
 Decidability of type synonym instances
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. extension:: UndecidableInstances
-    :noindex:
-
-    Relax restrictions on the decidability of type synonym family instances.
-
 In order to guarantee that type inference in the presence of type
 families is decidable, we need to place a number of additional restrictions
 on the formation of type instance declarations (c.f., Definition 5
@@ -577,9 +572,10 @@ as ``a ~ [F a]``, where a recursive occurrence of a type variable is
 underneath a family application and data constructor application - see
 the above mentioned paper for details.
 
-If the option :extension:`UndecidableInstances` is passed to the compiler, the
-above restrictions are not enforced and it is on the programmer to ensure
-termination of the normalisation of type families during type inference.
+If the option :extension:`UndecidableInstances` is passed to the compiler
+(see :ref:`undecidable-instances`), the above restrictions are not enforced
+and it is on the programmer to ensure termination of the normalisation
+of type families during type inference.
 
 Reducing type family applications
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

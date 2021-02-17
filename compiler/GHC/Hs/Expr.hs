@@ -159,12 +159,6 @@ instance Outputable SyntaxExprTc where
 
   ppr NoSyntaxExprTc = text "<no syntax expr>"
 
--- | Extra data fields for a 'RecordCon', added by the type checker
-data RecordConTc = RecordConTc
-      { rcon_con_like :: ConLike      -- The data constructor or pattern synonym
-      , rcon_con_expr :: PostTcExpr   -- Instantiated constructor function
-      }
-
 -- | Extra data fields for a 'RecordUpd', added by the type checker
 data RecordUpdTc = RecordUpdTc
       { rupd_cons :: [ConLike]
@@ -254,7 +248,7 @@ type instance XExplicitList  GhcTc = Type
 
 type instance XRecordCon     GhcPs = NoExtField
 type instance XRecordCon     GhcRn = NoExtField
-type instance XRecordCon     GhcTc = RecordConTc
+type instance XRecordCon     GhcTc = PostTcExpr   -- Instantiated constructor function
 
 type instance XRecordUpd     GhcPs = NoExtField
 type instance XRecordUpd     GhcRn = NoExtField
@@ -474,8 +468,15 @@ ppr_expr (HsDo _ do_or_list_comp (L _ stmts)) = pprDo do_or_list_comp stmts
 ppr_expr (ExplicitList _ _ exprs)
   = brackets (pprDeeperList fsep (punctuate comma (map ppr_lexpr exprs)))
 
-ppr_expr (RecordCon { rcon_con_name = con_id, rcon_flds = rbinds })
-  = hang (ppr con_id) 2 (ppr rbinds)
+ppr_expr (RecordCon { rcon_con = con, rcon_flds = rbinds })
+  = hang pp_con 2 (ppr rbinds)
+  where
+    -- con :: ConLikeP (GhcPass p)
+    -- so we need case analysis to know to print it
+    pp_con = case ghcPass @p of
+               GhcPs -> ppr con
+               GhcRn -> ppr con
+               GhcTc -> ppr con
 
 ppr_expr (RecordUpd { rupd_expr = L _ aexp, rupd_flds = rbinds })
   = hang (ppr aexp) 2 (braces (fsep (punctuate comma (map ppr rbinds))))

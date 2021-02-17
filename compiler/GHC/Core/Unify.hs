@@ -2,7 +2,7 @@
 
 {-# LANGUAGE ScopedTypeVariables, PatternSynonyms #-}
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFunctor, DeriveDataTypeable #-}
 
 module GHC.Core.Unify (
         tcMatchTy, tcMatchTyKi,
@@ -11,8 +11,8 @@ module GHC.Core.Unify (
         tcMatchTyX_BM, ruleMatchTyKiX,
 
         -- * Rough matching
-        roughMatchTcs, instanceCantMatch,
-        typesCantMatch,
+        RoughMatchTc(..), roughMatchTcs, instanceCantMatch,
+        typesCantMatch, isRoughOtherTc,
 
         -- Side-effect free unification
         tcUnifyTy, tcUnifyTyKi, tcUnifyTys, tcUnifyTyKis,
@@ -53,6 +53,7 @@ import GHC.Exts( oneShot )
 import GHC.Utils.Panic
 import GHC.Data.FastString
 
+import Data.Data ( Data )
 import Data.List ( mapAccumL )
 import Control.Monad
 import qualified Data.Semigroup as S
@@ -258,26 +259,70 @@ alwaysBindFun _tv _ty = BindMe
 *                                                                      *
 ********************************************************************* -}
 
--- See Note [Rough match] field in GHC.Core.InstEnv
+{- Note [Rough matching in class and family instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  instance C (Maybe [Tree a]) Bool
+and suppose we are looking up
+     C Bool Bool
 
-roughMatchTcs :: [Type] -> [Maybe Name]
+We can very quickly rule the instance out, because the first
+argument is headed by Maybe, whereas in the constraint we are looking
+up has first argument headed by Bool.  These "headed by" TyCons are
+called the "rough match TyCons" of the constraint or instance.
+They are used for a quick filter, to check when an instance cannot
+possibly match.
+
+The main motivation is to avoid sucking in whole instance
+declarations that are utterly useless.  See GHC.Core.InstEnv
+Note [ClsInst laziness and the rough-match fields].
+
+INVARIANT: a rough-match TyCons `tc` is always a real, generative tycon,
+like Maybe or Either, including a newtype or a data family, both of
+which are generative. It replies True to `isGenerativeTyCon tc Nominal`.
+
+But it is never
+    - A type synonym
+      E.g. Int and (S Bool) might match
+           if (S Bool) is a synonym for Int
+
+    - A type family (#19336)
+      E.g.   (Just a) and (F a) might match if (F a) reduces to (Just a)
+             albeit perhaps only after 'a' is instantiated.
+-}
+
+data RoughMatchTc
+  = KnownTc Name   -- INVARIANT: Name refers to a TyCon tc that responds
+                   -- true to `isGenerativeTyCon tc Nominal`. See
+                   -- Note [Rough matching in class and family instances]
+  | OtherTc        -- e.g. type variable at the head
+  deriving( Data )
+
+isRoughOtherTc :: RoughMatchTc -> Bool
+isRoughOtherTc OtherTc      = True
+isRoughOtherTc (KnownTc {}) = False
+
+roughMatchTcs :: [Type] -> [RoughMatchTc]
 roughMatchTcs tys = map rough tys
   where
     rough ty
       | Just (ty', _) <- splitCastTy_maybe ty   = rough ty'
-      | Just (tc,_)   <- splitTyConApp_maybe ty = Just (tyConName tc)
-      | otherwise                               = Nothing
+      | Just (tc,_)   <- splitTyConApp_maybe ty
+      , not (isTypeFamilyTyCon tc)              = ASSERT2( isGenerativeTyCon tc Nominal, ppr tc )
+                                                  KnownTc (tyConName tc)
+        -- See Note [Rough matching in class and family instances]
+      | otherwise                               = OtherTc
 
-instanceCantMatch :: [Maybe Name] -> [Maybe Name] -> Bool
+instanceCantMatch :: [RoughMatchTc] -> [RoughMatchTc] -> Bool
 -- (instanceCantMatch tcs1 tcs2) returns True if tcs1 cannot
 -- possibly be instantiated to actual, nor vice versa;
 -- False is non-committal
 instanceCantMatch (mt : ts) (ma : as) = itemCantMatch mt ma || instanceCantMatch ts as
 instanceCantMatch _         _         =  False  -- Safe
 
-itemCantMatch :: Maybe Name -> Maybe Name -> Bool
-itemCantMatch (Just t) (Just a) = t /= a
-itemCantMatch _        _        = False
+itemCantMatch :: RoughMatchTc -> RoughMatchTc -> Bool
+itemCantMatch (KnownTc t) (KnownTc a) = t /= a
+itemCantMatch _           _           = False
 
 
 {-
@@ -529,7 +574,7 @@ instance Monad UnifyResultM where
                             SurelyApart     -> SurelyApart
   Unifiable x  >>= f = f x
 
--- | @tcUnifyTysFG bind_tv tys1 tys2@ attepts to find a substitution @s@ (whose
+-- | @tcUnifyTysFG bind_tv tys1 tys2@ attempts to find a substitution @s@ (whose
 -- domain elements all respond 'BindMe' to @bind_tv@) such that
 -- @s(tys1)@ and that of @s(tys2)@ are equal, as witnessed by the returned
 -- Coercions. This version requires that the kinds of the types are the same,

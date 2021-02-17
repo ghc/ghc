@@ -65,6 +65,7 @@ import GHC.Data.FastString
 import GHC.Unit.Module
 
 import GHC.Types.Basic
+import GHC.Types.FieldLabel
 import GHC.Types.SrcLoc
 import GHC.Types.SourceFile
 import GHC.Types.SourceText
@@ -865,12 +866,13 @@ mkRecSelBinds tycons
 mkRecSelBind :: (TyCon, FieldLabel) -> (Id, LHsBind GhcRn)
 mkRecSelBind (tycon, fl)
   = mkOneRecordSelector all_cons (RecSelData tycon) fl
+        FieldSelectors  -- See Note [NoFieldSelectors and naughty record selectors]
   where
     all_cons = map RealDataCon (tyConDataCons tycon)
 
-mkOneRecordSelector :: [ConLike] -> RecSelParent -> FieldLabel
+mkOneRecordSelector :: [ConLike] -> RecSelParent -> FieldLabel -> FieldSelectors
                     -> (Id, LHsBind GhcRn)
-mkOneRecordSelector all_cons idDetails fl
+mkOneRecordSelector all_cons idDetails fl has_sel
   = (sel_id, L loc sel_bind)
   where
     loc      = getSrcSpan sel_name
@@ -890,6 +892,7 @@ mkOneRecordSelector all_cons idDetails fl
                  conLikeUserTyVarBinders con1
     data_tv_set= tyCoVarsOfTypes inst_tys
     is_naughty = not (tyCoVarsOfType field_ty `subVarSet` data_tv_set)
+                    || has_sel == NoFieldSelectors
     sel_ty | is_naughty = unitTy  -- See Note [Naughty record selectors]
            | otherwise  = mkForAllTys (tyVarSpecToBinders data_tvbs) $
                           mkPhiTy (conLikeStupidTheta con1) $   -- Urgh!
@@ -1032,6 +1035,26 @@ so that the later type-check will add them to the environment, and they'll be
 exported.  The function is never called, because the typechecker spots the
 sel_naughty field.
 
+Note [NoFieldSelectors and naughty record selectors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Under NoFieldSelectors (see Note [NoFieldSelectors] in GHC.Rename.Env), record
+selectors will not be in scope in the renamer.  However, for normal datatype
+declarations we still generate the underlying selector functions, so they can be
+used for constructing the dictionaries for HasField constraints (as described by
+Note [HasField instances] in GHC.Tc.Instance.Class).  Hence the call to
+mkOneRecordSelector in mkRecSelBind always uses FieldSelectors.
+
+However, record pattern synonyms are not used with HasField, so when
+NoFieldSelectors is used we do not need to generate selector functions.  Thus
+mkPatSynRecSelBinds passes the current state of the FieldSelectors extension to
+mkOneRecordSelector, and in the NoFieldSelectors case it will treat them as
+"naughty" fields (see Note [Naughty record selectors]).
+
+Why generate a naughty binding, rather than no binding at all? Because when
+type-checking a record update, we need to look up Ids for the fields. In
+particular, disambiguateRecordBinds calls lookupParents which needs to look up
+the RecSelIds to determine the sel_tycon.
+
 Note [GADT record selectors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For GADTs, we require that all constructors with a common field 'f' have the same
@@ -1105,6 +1128,6 @@ We want to generate HsBinds for unT that look something like this:
 Note that the type of recSelError is `forall r (a :: TYPE r). Addr# -> a`.
 Therefore, when used in the right-hand side of `unT`, GHC attempts to
 instantiate `a` with `(forall b. b -> b) -> Int`, which is impredicative.
-To make sure that GHC is OK with this, we enable ImpredicativeTypes interally
+To make sure that GHC is OK with this, we enable ImpredicativeTypes internally
 when typechecking these HsBinds so that the user does not have to.
 -}

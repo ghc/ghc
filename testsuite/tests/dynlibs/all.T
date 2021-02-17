@@ -20,5 +20,5 @@ test('T18072', [req_shared_libs, unless(opsys('linux'), skip)], makefile_test, [
 # test that -shared and -flink-rts respects alternative RTS flavours
 test('T18072debug', [extra_files(['T18072.hs']), req_shared_libs, unless(opsys('linux'), skip)], makefile_test, [])
 
-# check that -staticlib and -fno-link-rts results in an archive without the RTR libary 
+# check that -staticlib and -fno-link-rts results in an archive without the RTR library 
 test('T18072static', [extra_files(['T18072.hs']), unless(opsys('linux'), skip)], makefile_test, [])

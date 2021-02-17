@@ -61,7 +61,7 @@ import GHC.Data.FastString
 import GHC.Types.Unique.FM
 import GHC.Utils.Monad
 import Control.Monad    ( zipWithM )
-import Data.List
+import Data.List (nubBy, sortBy, partition)
 import GHC.Builtin.Names ( specTyConKey )
 import GHC.Unit.Module
 import GHC.Core.TyCon ( TyCon )

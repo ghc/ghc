@@ -21,8 +21,9 @@ import GHC.SysTools.Tasks
 import GHC.Runtime.Interpreter (loadDLL)
 
 import GHC.Utils.Exception
+import GHC.Utils.Logger
 
-import Data.List
+import Data.List (isPrefixOf, nub, sort, intersperse, intercalate)
 import Control.Monad (join, forM, filterM)
 import System.Directory (doesFileExist, getHomeDirectory)
 import System.FilePath ((</>), (<.>))
@@ -36,20 +37,20 @@ import System.FilePath ((</>), (<.>))
 -- @-l@ and @-rpath@ to the linker will result in the unnecesasry libraries not
 -- being included in the load commands, however the @-rpath@ entries are all
 -- forced to be included.  This can lead to 100s of @-rpath@ entries being
--- included when only a handful of libraries end up being truely linked.
+-- included when only a handful of libraries end up being truly linked.
 --
 -- Thus after building the library, we run a fixup phase where we inject the
 -- @-rpath@ for each found library (in the given library search paths) into the
 -- dynamic library through @-add_rpath@.
 --
 -- See Note [Dynamic linking on macOS]
-runInjectRPaths :: DynFlags -> [FilePath] -> FilePath -> IO ()
-runInjectRPaths dflags lib_paths dylib = do
-  info <- lines <$> askOtool dflags Nothing [Option "-L", Option dylib]
+runInjectRPaths :: Logger -> DynFlags -> [FilePath] -> FilePath -> IO ()
+runInjectRPaths logger dflags lib_paths dylib = do
+  info <- lines <$> askOtool logger dflags Nothing [Option "-L", Option dylib]
   -- filter the output for only the libraries. And then drop the @rpath prefix.
   let libs = fmap (drop 7) $ filter (isPrefixOf "@rpath") $ fmap (head.words) $ info
   -- find any pre-existing LC_PATH items
-  info <- fmap words.lines <$> askOtool dflags Nothing [Option "-l", Option dylib]
+  info <- fmap words.lines <$> askOtool logger dflags Nothing [Option "-l", Option dylib]
   let paths = concatMap f info
         where f ("path":p:_) = [p]
               f _            = []
@@ -59,7 +60,7 @@ runInjectRPaths dflags lib_paths dylib = do
   -- inject the rpaths
   case rpaths of
     [] -> return ()
-    _  -> runInstallNameTool dflags $ map Option $ "-add_rpath":(intersperse "-add_rpath" rpaths) ++ [dylib]
+    _  -> runInstallNameTool logger dflags $ map Option $ "-add_rpath":(intersperse "-add_rpath" rpaths) ++ [dylib]
 
 getUnitFrameworkOpts :: UnitEnv -> [UnitId] -> IO [String]
 getUnitFrameworkOpts unit_env dep_packages

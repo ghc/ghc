@@ -18,6 +18,13 @@
   * Add `Eq1`, `Read1` and `Show1` instance for `Complex`;
     add `Eq1/2`, `Ord1/2`, `Show1/2` and `Read1/2` instances for 3 and 4-tuples.
 
+  * Remove `Data.Semigroup.Option` and the accompanying `option` function.
+
+  * Make `allocaBytesAligned` and `alloca` throw an IOError when the
+    alignment is not a power-of-two. The underlying primop
+    `newAlignedPinnedByteArray#` actually always assumed this but we didn't
+    document this fact in the user facing API until now.
+
 ## 4.15.0.0 *TBA*
 
   * `openFile` now calls the `open` system call with an `interruptible` FFI
@@ -50,9 +57,20 @@
   * Add `MonadFix` and `MonadZip` instances for `Complex`
 
   * Add `Ix` instances for tuples of size 6 through 15
+   
+  * Correct `Bounded` instance and remove `Enum` and `Integral` instances for
+    `Data.Ord.Down`.
 
   * `catMaybes` is now implemented using `mapMaybe`, so that it is both a "good
     consumer" and "good producer" for list-fusion (#18574)
+
+  * `Foreign.ForeignPtr.withForeignPtr` is now less aggressively optimised,
+    avoiding the soundness issue reported in
+    [#17760](https://gitlab.haskell.org/ghc/ghc/-/issues/17760) in exchange for
+    a small amount more allocation. If your application regresses significantly
+    *and* the continuation given to `withForeignPtr` will *not* provably
+    diverge then the previous optimisation behavior can be recovered by instead
+    using `GHC.ForeignPtr.unsafeWithForeignPtr`.
 
   * Correct `Bounded` instance and remove `Enum` and `Integral` instances for
     `Data.Ord.Down`.
@@ -60,7 +78,7 @@
   * `Data.Foldable` methods `maximum{,By}`, `minimum{,By}`, `product` and `sum`
     are now stricter by default, as well as in the class implementation for List.
 
-## 4.14.0.0 *TBA*
+## 4.14.0.0 *Jan 2020*
   * Bundled with GHC 8.10.1
 
   * Add a `TestEquality` instance for the `Compose` newtype.
@@ -352,7 +370,7 @@
     in constant space when applied to lists. (#10830)
 
   * `mkFunTy`, `mkAppTy`, and `mkTyConApp` from `Data.Typeable` no longer exist.
-    This functionality is superseded by the interfaces provided by
+    This functionality is superceded by the interfaces provided by
     `Type.Reflection`.
 
   * `mkTyCon3` is no longer exported by `Data.Typeable`. This function is

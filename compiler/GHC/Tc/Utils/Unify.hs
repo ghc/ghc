@@ -159,7 +159,7 @@ matchActualFunTySigma herald mb_thing err_info fun_ty
            ; return (mkWpCastN co, Scaled mult arg_ty, res_ty) }
 
     ------------
-    mk_ctxt :: TcType -> TidyEnv -> TcM (TidyEnv, MsgDoc)
+    mk_ctxt :: TcType -> TidyEnv -> TcM (TidyEnv, SDoc)
     mk_ctxt res_ty env = mkFunTysMsg env herald (reverse arg_tys_so_far)
                                      res_ty n_val_args_in_call
     (n_val_args_in_call, arg_tys_so_far) = err_info
@@ -176,7 +176,7 @@ before looking for an arrow type.
 
 But if it doesn't find an arrow type, it wants to generate a message
 like "f is applied to two arguments but its type only has one".
-To do that, it needs to konw about the args that tcArgs has already
+To do that, it needs to know about the args that tcArgs has already
 munched up -- hence passing in n_val_args_in_call and arg_tys_so_far;
 and hence also the accumulating so_far arg to 'go'.
 
@@ -371,7 +371,7 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
            ; return (wrap, result) }
 
     ------------
-    mk_ctxt :: [Scaled ExpSigmaType] -> TcType -> TidyEnv -> TcM (TidyEnv, MsgDoc)
+    mk_ctxt :: [Scaled ExpSigmaType] -> TcType -> TidyEnv -> TcM (TidyEnv, SDoc)
     mk_ctxt arg_tys res_ty env
       = mkFunTysMsg env herald arg_tys' res_ty arity
       where
@@ -380,7 +380,7 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
             -- this is safe b/c we're called from "go"
 
 mkFunTysMsg :: TidyEnv -> SDoc -> [Scaled TcType] -> TcType -> Arity
-            -> TcM (TidyEnv, MsgDoc)
+            -> TcM (TidyEnv, SDoc)
 mkFunTysMsg env herald arg_tys res_ty n_val_args_in_call
   = do { (env', fun_rho) <- zonkTidyTcType env $
                             mkVisFunTys arg_tys res_ty

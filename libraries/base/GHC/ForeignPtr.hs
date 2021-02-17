@@ -45,8 +45,11 @@ module GHC.ForeignPtr
         unsafeForeignPtrToPtr,
         castForeignPtr,
         plusForeignPtr,
-        -- * Finalization
+        -- * Control over lifetype
+        withForeignPtr,
+        unsafeWithForeignPtr,
         touchForeignPtr,
+        -- * Finalization
         finalizeForeignPtr
         -- * Commentary
         -- $commentary
@@ -134,7 +137,7 @@ data ForeignPtrContents
     -- reachable (by GC) whenever the 'ForeignPtr' is reachable. When the
     -- 'ForeignPtr' becomes unreachable, the runtime\'s normal GC recovers
     -- the memory backing it. Here, the finalizer function intended to be used
-    -- to @free()@ any ancilliary *unmanaged* memory pointed to by the
+    -- to @free()@ any ancillary *unmanaged* memory pointed to by the
     -- 'MutableByteArray#'. See the @zlib@ library for an example of this use.
     --
     -- 1. Invariant: The 'Addr#' in the parent 'ForeignPtr' is an interior
@@ -503,21 +506,64 @@ newForeignPtr_ (Ptr obj) =  do
   r <- newIORef NoFinalizers
   return (ForeignPtr obj (PlainForeignPtr r))
 
+withForeignPtr :: ForeignPtr a -> (Ptr a -> IO b) -> IO b
+-- ^This is a way to look at the pointer living inside a
+-- foreign object.  This function takes a function which is
+-- applied to that pointer. The resulting 'IO' action is then
+-- executed. The foreign object is kept alive at least during
+-- the whole action, even if it is not used directly
+-- inside. Note that it is not safe to return the pointer from
+-- the action and use it after the action completes. All uses
+-- of the pointer should be inside the
+-- 'withForeignPtr' bracket.  The reason for
+-- this unsafeness is the same as for
+-- 'unsafeForeignPtrToPtr' below: the finalizer
+-- may run earlier than expected, because the compiler can only
+-- track usage of the 'ForeignPtr' object, not
+-- a 'Ptr' object made from it.
+--
+-- This function is normally used for marshalling data to
+-- or from the object pointed to by the
+-- 'ForeignPtr', using the operations from the
+-- 'Storable' class.
+withForeignPtr fo@(ForeignPtr _ r) f = IO $ \s ->
+  case f (unsafeForeignPtrToPtr fo) of
+    IO action# -> keepAlive# r s action#
+
+-- | This is similar to 'withForeignPtr' but comes with an important caveat:
+-- the user must guarantee that the continuation does not diverge (e.g. loop or
+-- throw an exception). In exchange for this loss of generality, this function
+-- offers the ability of GHC to optimise more aggressively.
+--
+-- Specifically, applications of the form:
+-- @
+-- unsafeWithForeignPtr fptr ('Control.Monad.forever' something)
+-- @
+--
+-- See GHC issue #17760 for more information about the unsoundness behavior
+-- that this function can result in.
+unsafeWithForeignPtr :: ForeignPtr a -> (Ptr a -> IO b) -> IO b
+unsafeWithForeignPtr fo f = do
+  r <- f (unsafeForeignPtrToPtr fo)
+  touchForeignPtr fo
+  return r
+
 touchForeignPtr :: ForeignPtr a -> IO ()
 -- ^This function ensures that the foreign object in
 -- question is alive at the given place in the sequence of IO
--- actions. In particular 'Foreign.ForeignPtr.withForeignPtr'
--- does a 'touchForeignPtr' after it
--- executes the user action.
+-- actions. However, this comes with a significant caveat: the contract above
+-- does not hold if GHC can demonstrate that the code preceeding
+-- @touchForeignPtr@ diverges (e.g. by looping infinitely or throwing an
+-- exception). For this reason, you are strongly advised to use instead
+-- 'withForeignPtr' where possible.
 --
--- Note that this function should not be used to express dependencies
--- between finalizers on 'ForeignPtr's.  For example, if the finalizer
--- for a 'ForeignPtr' @F1@ calls 'touchForeignPtr' on a second
--- 'ForeignPtr' @F2@, then the only guarantee is that the finalizer
--- for @F2@ is never started before the finalizer for @F1@.  They
--- might be started together if for example both @F1@ and @F2@ are
--- otherwise unreachable, and in that case the scheduler might end up
--- running the finalizer for @F2@ first.
+-- Also, note that this function should not be used to express dependencies
+-- between finalizers on 'ForeignPtr's.  For example, if the finalizer for a
+-- 'ForeignPtr' @F1@ calls 'touchForeignPtr' on a second 'ForeignPtr' @F2@,
+-- then the only guarantee is that the finalizer for @F2@ is never started
+-- before the finalizer for @F1@.  They might be started together if for
+-- example both @F1@ and @F2@ are otherwise unreachable, and in that case the
+-- scheduler might end up running the finalizer for @F2@ first.
 --
 -- In general, it is not recommended to use finalizers on separate
 -- objects with ordering constraints between them.  To express the

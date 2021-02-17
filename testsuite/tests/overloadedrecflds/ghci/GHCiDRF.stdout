@@ -1,0 +1,48 @@
+GHCiDRF.foo :: T -> Int
+
+<interactive>:1:1: error:
+    Ambiguous occurrence ‘GHCiDRF.bar’
+    It could refer to
+       either the field ‘bar’, defined at GHCiDRF.hs:4:16
+           or the field ‘bar’, defined at GHCiDRF.hs:3:28
+type T :: *
+data T = MkT {foo :: Int, ...}
+  	-- Defined at GHCiDRF.hs:3:16
+type U :: *
+data U = MkU {GHCiDRF.bar :: Bool}
+  	-- Defined at GHCiDRF.hs:4:16
+
+type T :: *
+data T = MkT {..., GHCiDRF.bar :: Int}
+  	-- Defined at GHCiDRF.hs:3:28
+GHCiDRF.foo :: GHCiDRF.T -> Int
+
+<interactive>:1:1: error:
+    Ambiguous occurrence ‘GHCiDRF.bar’
+    It could refer to
+       either the field ‘bar’,
+              imported qualified from ‘GHCiDRF’
+              (and originally defined at GHCiDRF.hs:3:28-30)
+           or the field ‘bar’,
+              imported qualified from ‘GHCiDRF’
+              (and originally defined at GHCiDRF.hs:4:16-18)
+type GHCiDRF.T :: *
+data GHCiDRF.T = GHCiDRF.MkT {GHCiDRF.foo :: Int, ...}
+  	-- Defined at GHCiDRF.hs:3:16
+type GHCiDRF.T :: *
+data GHCiDRF.T = GHCiDRF.MkT {..., GHCiDRF.bar :: Int}
+  	-- Defined at GHCiDRF.hs:3:28
+
+type GHCiDRF.U :: *
+data GHCiDRF.U = GHCiDRF.MkU {GHCiDRF.bar :: Bool}
+  	-- Defined at GHCiDRF.hs:4:16
+
+<interactive>:11:1: error:
+    Ambiguous occurrence ‘GHCiDRF.bar’
+    It could refer to
+       either the field ‘bar’,
+              imported qualified from ‘GHCiDRF’
+              (and originally defined at GHCiDRF.hs:3:28-30)
+           or the field ‘bar’,
+              imported qualified from ‘GHCiDRF’
+              (and originally defined at GHCiDRF.hs:4:16-18)

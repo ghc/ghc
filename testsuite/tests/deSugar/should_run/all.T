@@ -70,3 +70,4 @@ test('T18172', [], ghci_script, ['T18172.script'])
 
 test('DsDoExprFailMsg', exit_code(1), compile_and_run, [''])
 test('DsMonadCompFailMsg', exit_code(1), compile_and_run, [''])
+test('T19289', normal, compile_and_run, [''])

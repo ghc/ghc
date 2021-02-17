@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, NoMonoLocalBinds, NoMonoPatBinds #-}
+{-# LANGUAGE BangPatterns, NoMonoLocalBinds #-}
 
 module T4498 where
 

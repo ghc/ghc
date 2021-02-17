@@ -84,7 +84,9 @@ class Storable a where
    alignment   :: a -> Int
    -- ^ Computes the alignment constraint of the argument.  An
    -- alignment constraint @x@ is fulfilled by any address divisible
-   -- by @x@.  The value of the argument is not used.
+   -- by @x@. The alignment must be a power of two if this instance
+   -- is to be used with 'alloca' or 'allocaArray'.  The value of
+   -- the argument is not used.
 
    peekElemOff :: Ptr a -> Int      -> IO a
    -- ^       Read a value from a memory area regarded as an array

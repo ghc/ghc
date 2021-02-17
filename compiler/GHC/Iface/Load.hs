@@ -65,6 +65,7 @@ import GHC.Utils.Error
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
+import GHC.Utils.Logger
 
 import GHC.Settings.Constants
 
@@ -140,7 +141,7 @@ where the code that e1 expands to might import some defns that
 also turn out to be needed by the code that e2 expands to.
 -}
 
-tcLookupImported_maybe :: Name -> TcM (MaybeErr MsgDoc TyThing)
+tcLookupImported_maybe :: Name -> TcM (MaybeErr SDoc TyThing)
 -- Returns (Failed err) if we can't find the interface file for the thing
 tcLookupImported_maybe name
   = do  { hsc_env <- getTopEnv
@@ -149,7 +150,7 @@ tcLookupImported_maybe name
             Just thing -> return (Succeeded thing)
             Nothing    -> tcImportDecl_maybe name }
 
-tcImportDecl_maybe :: Name -> TcM (MaybeErr MsgDoc TyThing)
+tcImportDecl_maybe :: Name -> TcM (MaybeErr SDoc TyThing)
 -- Entry point for *source-code* uses of importDecl
 tcImportDecl_maybe name
   | Just thing <- wiredInNameTyThing_maybe name
@@ -160,7 +161,7 @@ tcImportDecl_maybe name
   | otherwise
   = initIfaceTcRn (importDecl name)
 
-importDecl :: Name -> IfM lcl (MaybeErr MsgDoc TyThing)
+importDecl :: Name -> IfM lcl (MaybeErr SDoc TyThing)
 -- Get the TyThing for this Name from an interface file
 -- It's not a wired-in thing -- the caller caught that
 importDecl name
@@ -302,7 +303,7 @@ loadSrcInterface_maybe :: SDoc
                        -> ModuleName
                        -> IsBootInterface     -- {-# SOURCE #-} ?
                        -> Maybe FastString    -- "package", if any
-                       -> RnM (MaybeErr MsgDoc ModIface)
+                       -> RnM (MaybeErr SDoc ModIface)
 
 loadSrcInterface_maybe doc mod want_boot maybe_pkg
   -- We must first find which Module this import refers to.  This involves
@@ -408,7 +409,7 @@ loadInterfaceWithException doc mod_name where_from
 
 ------------------
 loadInterface :: SDoc -> Module -> WhereFrom
-              -> IfM lcl (MaybeErr MsgDoc ModIface)
+              -> IfM lcl (MaybeErr SDoc ModIface)
 
 -- loadInterface looks in both the HPT and PIT for the required interface
 -- If not found, it loads it, and puts it in the PIT (always).
@@ -430,8 +431,11 @@ loadInterface doc_str mod from
        -- Redo search for our local hole module
        loadInterface doc_str (mkHomeModule home_unit (moduleName mod)) from
   | otherwise
-  = withTimingSilentD (text "loading interface") (pure ()) $
-    do  {       -- Read the state
+  = do
+    logger <- getLogger
+    dflags <- getDynFlags
+    withTimingSilent logger dflags (text "loading interface") (pure ()) $ do
+        {       -- Read the state
           (eps,hpt) <- getEpsAndHpt
         ; gbl_env <- getGblEnv
 
@@ -663,7 +667,7 @@ is_external_sig home_unit iface =
 -- we are actually typechecking p.)
 computeInterface ::
        SDoc -> IsBootInterface -> Module
-    -> TcRnIf gbl lcl (MaybeErr MsgDoc (ModIface, FilePath))
+    -> TcRnIf gbl lcl (MaybeErr SDoc (ModIface, FilePath))
 computeInterface doc_str hi_boot_file mod0 = do
     MASSERT( not (isHoleModule mod0) )
     hsc_env <- getTopEnv
@@ -695,7 +699,7 @@ computeInterface doc_str hi_boot_file mod0 = do
 -- @p[A=\<A>,B=\<B>]:B@ never includes B.
 moduleFreeHolesPrecise
     :: SDoc -> Module
-    -> TcRnIf gbl lcl (MaybeErr MsgDoc (UniqDSet ModuleName))
+    -> TcRnIf gbl lcl (MaybeErr SDoc (UniqDSet ModuleName))
 moduleFreeHolesPrecise doc_str mod
  | moduleIsDefinite mod = return (Succeeded emptyUniqDSet)
  | otherwise =
@@ -728,7 +732,7 @@ moduleFreeHolesPrecise doc_str mod
             Failed err -> return (Failed err)
 
 wantHiBootFile :: HomeUnit -> ExternalPackageState -> Module -> WhereFrom
-               -> MaybeErr MsgDoc IsBootInterface
+               -> MaybeErr SDoc IsBootInterface
 -- Figure out whether we want Foo.hi or Foo.hi-boot
 wantHiBootFile home_unit eps mod from
   = case from of
@@ -816,7 +820,7 @@ findAndReadIface :: SDoc
                  -> Module
                  -> IsBootInterface     -- True  <=> Look for a .hi-boot file
                                         -- False <=> Look for .hi file
-                 -> TcRnIf gbl lcl (MaybeErr MsgDoc (ModIface, FilePath))
+                 -> TcRnIf gbl lcl (MaybeErr SDoc (ModIface, FilePath))
         -- Nothing <=> file not found, or unreadable, or illegible
         -- Just x  <=> successfully found and parsed
 
@@ -917,16 +921,16 @@ findAndReadIface doc_str mod wanted_mod_with_insts hi_boot_file
           checkBuildDynamicToo _ = return ()
 
 -- | Write interface file
-writeIface :: DynFlags -> FilePath -> ModIface -> IO ()
-writeIface dflags hi_file_path new_iface
+writeIface :: Logger -> DynFlags -> FilePath -> ModIface -> IO ()
+writeIface logger dflags hi_file_path new_iface
     = do createDirectoryIfMissing True (takeDirectory hi_file_path)
-         let printer = TraceBinIFace (debugTraceMsg dflags 3)
+         let printer = TraceBinIFace (debugTraceMsg logger dflags 3)
              profile = targetProfile dflags
          writeBinIface profile printer hi_file_path new_iface
 
 -- @readIface@ tries just the one file.
 readIface :: Module -> FilePath
-          -> TcRnIf gbl lcl (MaybeErr MsgDoc ModIface)
+          -> TcRnIf gbl lcl (MaybeErr SDoc ModIface)
         -- Failed err    <=> file not found, or unreadable, or illegible
         -- Succeeded iface <=> successfully found and parsed
 
@@ -1052,8 +1056,9 @@ For some background on this choice see trac #15269.
 showIface :: HscEnv -> FilePath -> IO ()
 showIface hsc_env filename = do
    let dflags  = hsc_dflags hsc_env
+   let logger  = hsc_logger hsc_env
        unit_state = hsc_units hsc_env
-       printer = putLogMsg dflags NoReason SevOutput noSrcSpan . withPprStyle defaultDumpStyle
+       printer = putLogMsg logger dflags NoReason SevOutput noSrcSpan . withPprStyle defaultDumpStyle
 
    -- skip the hi way check; we don't want to worry about profiled vs.
    -- non-profiled interfaces, for example.
@@ -1067,7 +1072,7 @@ showIface hsc_env filename = do
        print_unqual = QueryQualify qualifyImportedNames
                                    neverQualifyModules
                                    neverQualifyPackages
-   putLogMsg dflags NoReason SevDump noSrcSpan
+   putLogMsg logger dflags NoReason SevDump noSrcSpan
       $ withPprStyle (mkDumpStyle print_unqual)
       $ pprModIface unit_state iface
 
@@ -1229,7 +1234,7 @@ badIfaceFile file err
   = vcat [text "Bad interface file:" <+> text file,
           nest 4 err]
 
-hiModuleNameMismatchWarn :: Module -> Module -> MsgDoc
+hiModuleNameMismatchWarn :: Module -> Module -> SDoc
 hiModuleNameMismatchWarn requested_mod read_mod
  | moduleUnit requested_mod == moduleUnit read_mod =
     sep [text "Interface file contains module" <+> quotes (ppr read_mod) <> comma,

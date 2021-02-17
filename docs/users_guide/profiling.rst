@@ -429,7 +429,7 @@ compiled program.
 .. ghc-flag:: -fprof-auto-calls
     :shortdesc: Auto-add ``SCC``\\ s to all call sites
     :type: dynamic
-    :reverse: -fno-prof-auto-calls
+    :reverse: -fno-prof-auto
     :category:
 
     Adds an automatic ``SCC`` annotation to all *call sites*. This is

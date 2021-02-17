@@ -66,6 +66,19 @@ Language
   :extension:`NondecreasingIndentation`, but :extension:`GHC2021` does not.
   This may break code implicitly using this extension.
 
+* Various records-related extensions have been improved:
+
+  - A new extension :extension:`NoFieldSelectors` hides record field selector
+    functions, so it is possible to define top-level bindings with the same names.
+
+  - The :extension:`DisambiguateRecordFields` extension now works for updates.
+    An update ``expr { field = value }`` will be accepted if there is a single
+    field called ``field`` in scope, regardless of whether there are non-fields
+    in scope with the same name.
+
+  - The :extension:`DuplicateRecordFields` extension now applies to fields in
+    record pattern synonyms.  In particular, it is possible for a single module
+    to define multiple pattern synonyms using the same field names.
 
 Compiler
 ~~~~~~~~
@@ -95,6 +108,14 @@ Compiler
   that the compiler automatically insert cost-centres on all call-sites of
   the named function.
 
+GHCi
+~~~~
+
+- GHCi's :ghci-cmd:`:edit` command now looks for an editor in
+  the :envvar:`VISUAL` environment variable before
+  :envvar:`EDITOR`, following UNIX convention.
+  (:ghc-ticket:`19030`)
+
 Runtime system
 ~~~~~~~~~~~~~~
 
@@ -106,7 +127,7 @@ Runtime system
 
 
 - The :rts-flag:`-h` flag has been deprecated, use either :rts-flag:`-hc` or
-  :rts-flag:`-hT` explicitly, as appropiate.
+  :rts-flag:`-hT` explicitly, as appropriate.
 
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
@@ -171,6 +192,19 @@ Runtime system
   ``Natural``. As a consequence, one must enable ``TypeSynonymInstances``
   in order to define instances for ``Nat``.
 
-  The ``Numeric`` module recieves ``showBin`` and ``readBin`` to show and
+  The ``Numeric`` module receives ``showBin`` and ``readBin`` to show and
   read integer numbers in binary.
 
+- ``Char`` gets type-level support by analogy with strings and natural numbers.
+  We extend the ``GHC.TypeLits`` module with these built-in type-families: ::
+
+    type family CmpChar (a :: Char) (b :: Char) :: Ordering
+    type family ConsSymbol (a :: Char) (b :: Symbol) :: Symbol
+    type family UnconsSymbol (a :: Symbol) :: Maybe (Char, Symbol)
+
+  and with the type class ``KnownChar`` (and such additional functions as ``charVal`` and ``charVal'``): ::
+
+    class KnownChar (n :: Char)
+
+    charVal :: forall n proxy. KnownChar n => proxy n -> Char
+    charVal' :: forall n. KnownChar n => Proxy# n -> Char

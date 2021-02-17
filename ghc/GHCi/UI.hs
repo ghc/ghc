@@ -58,7 +58,7 @@ import GHC.Driver.Config
 import qualified GHC
 import GHC ( LoadHowMuch(..), Target(..),  TargetId(..),
              Resume, SingleStep, Ghc,
-             GetDocsFailure(..),
+             GetDocsFailure(..), putLogMsgM, pushLogHookM,
              getModuleGraph, handleSourceError, ms_mod )
 import GHC.Driver.Main (hscParseDeclsWithLocation, hscParseStmtWithLocation)
 import GHC.Hs.ImpExp
@@ -86,6 +86,7 @@ import GHC.Unit.Module.ModSummary
 
 import GHC.Data.StringBuffer
 import GHC.Utils.Outputable
+import GHC.Utils.Logger
 
 -- Other random utilities
 import GHC.Types.Basic hiding ( isTopLevel )
@@ -427,13 +428,14 @@ defFullHelpText =
 
 findEditor :: IO String
 findEditor = do
-  getEnv "EDITOR"
-    `catchIO` \_ -> do
+    getEnv "VISUAL" <|> getEnv "EDITOR" <|> defaultEditor
+  where
+    defaultEditor = do
 #if defined(mingw32_HOST_OS)
-        win <- System.Win32.getWindowsDirectory
-        return (win </> "notepad.exe")
+      win <- System.Win32.getWindowsDirectory
+      return (win </> "notepad.exe")
 #else
-        return ""
+      return ""
 #endif
 
 default_progname, default_stop :: String
@@ -477,13 +479,10 @@ interactiveUI config srcs maybe_exprs = do
                $ dflags
    GHC.setInteractiveDynFlags dflags'
 
+   -- Update the LogAction. Ensure we don't override the user's log action lest
+   -- we break -ddump-json (#14078)
    lastErrLocationsRef <- liftIO $ newIORef []
-   progDynFlags <- GHC.getProgramDynFlags
-   _ <- GHC.setProgramDynFlags $
-      -- Ensure we don't override the user's log action lest we break
-      -- -ddump-json (#14078)
-      progDynFlags { log_action = ghciLogAction (log_action progDynFlags)
-                                                lastErrLocationsRef }
+   pushLogHookM (ghciLogAction lastErrLocationsRef)
 
    when (isNothing maybe_exprs) $ do
         -- Only for GHCi (not runghc and ghc -e):
@@ -575,8 +574,8 @@ resetLastErrorLocations = do
     st <- getGHCiState
     liftIO $ writeIORef (lastErrorLocations st) []
 
-ghciLogAction :: LogAction -> IORef [(FastString, Int)] ->  LogAction
-ghciLogAction old_log_action lastErrLocations
+ghciLogAction :: IORef [(FastString, Int)] -> LogAction -> LogAction
+ghciLogAction lastErrLocations old_log_action
               dflags flag severity srcSpan msg = do
     old_log_action dflags flag severity srcSpan msg
     case severity of
@@ -1837,7 +1836,7 @@ buildDocComponents str name = do
 
   pure DocComponents{..}
 
--- | Produce output containing the type/kind signature, category, and definiton
+-- | Produce output containing the type/kind signature, category, and definition
 -- location of a TyThing.
 sigAndLocDoc :: String -> TyThing -> SDoc
 sigAndLocDoc str tyThing =
@@ -3013,10 +3012,11 @@ newDynFlags :: GhciMonad m => Bool -> [String] -> m ()
 newDynFlags interactive_only minus_opts = do
       let lopts = map noLoc minus_opts
 
+      logger <- getLogger
       idflags0 <- GHC.getInteractiveDynFlags
-      (idflags1, leftovers, warns) <- GHC.parseDynamicFlags idflags0 lopts
+      (idflags1, leftovers, warns) <- GHC.parseDynamicFlags logger idflags0 lopts
 
-      liftIO $ handleFlagWarnings idflags1 warns
+      liftIO $ handleFlagWarnings logger idflags1 warns
       when (not $ null leftovers)
            (throwGhcException . CmdLineError
             $ "Some flags have not been recognized: "
@@ -3030,7 +3030,7 @@ newDynFlags interactive_only minus_opts = do
       dflags0 <- getDynFlags
 
       when (not interactive_only) $ do
-        (dflags1, _, _) <- liftIO $ GHC.parseDynamicFlags dflags0 lopts
+        (dflags1, _, _) <- liftIO $ GHC.parseDynamicFlags logger dflags0 lopts
         must_reload <- GHC.setProgramDynFlags dflags1
 
         -- if the package flags changed, reset the context and link
@@ -3167,8 +3167,7 @@ showCmd str = do
             , action "bindings"   $ showBindings
             , action "linker"     $ do
                msg <- liftIO $ Loader.showLoaderState (hsc_loader hsc_env)
-               dflags <- getDynFlags
-               liftIO $ putLogMsg dflags NoReason SevDump noSrcSpan msg
+               putLogMsgM NoReason SevDump noSrcSpan msg
             , action "breaks"     $ showBkptTable
             , action "context"    $ showContext
             , action "packages"   $ showUnits
@@ -3467,9 +3466,18 @@ completeMacro = wrapIdentCompleter $ \w -> do
 completeIdentifier line@(left, _) =
   -- Note: `left` is a reversed input
   case left of
-    (x:_) | isSymbolChar x -> wrapCompleter (specials ++ spaces) complete line
-    _                      -> wrapIdentCompleter complete line
+    ('.':_)  -> wrapCompleter (specials ++ spaces) complete line
+               -- operator or qualification
+    (x:_) | isSymbolChar x -> wrapCompleter (specials ++ spaces)
+                                 complete (takeOpChars line)         -- operator
+    _                      -> wrapIdentCompleter complete (takeIdentChars line)
   where
+    takeOpChars (l, r) = (takeWhile isSymbolChar l, r)               -- #10576
+       -- An operator contains only symbol characters
+    takeIdentChars (l, r) = (takeWhile notOpChar l, r)
+       -- An identifier doesn't contain symbol characters with the
+       -- exception of a dot
+    notOpChar c = (not .isSymbol ) c || c == '.'
     complete w = do
       rdrs <- GHC.getRdrNamesInScope
       dflags <- GHC.getSessionDynFlags

@@ -92,6 +92,7 @@ import GHC.Core.PatSyn
 import GHC.Core.ConLike
 import GHC.Core.DataCon as DataCon
 
+import GHC.Types.FieldLabel
 import GHC.Types.SrcLoc
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
@@ -119,6 +120,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Panic as Panic
 import GHC.Utils.Lexeme
 import GHC.Utils.Outputable
+import GHC.Utils.Logger
 
 import GHC.SysTools.FileCleanup ( newTempName, TempFileLifetime(..) )
 
@@ -789,7 +791,7 @@ runAnnotation target expr = do
                ann_value = serialized
            }
 
-convertAnnotationWrapper :: ForeignHValue -> TcM (Either MsgDoc Serialized)
+convertAnnotationWrapper :: ForeignHValue -> TcM (Either SDoc Serialized)
 convertAnnotationWrapper fhv = do
   interp <- tcGetInterp
   case interp of
@@ -910,7 +912,7 @@ runMetaD = runMeta metaRequestD
 ---------------
 runMeta' :: Bool                 -- Whether code should be printed in the exception message
          -> (hs_syn -> SDoc)                                    -- how to print the code
-         -> (SrcSpan -> ForeignHValue -> TcM (Either MsgDoc hs_syn))        -- How to run x
+         -> (SrcSpan -> ForeignHValue -> TcM (Either SDoc hs_syn))        -- How to run x
          -> LHsExpr GhcTc        -- Of type x; typically x = Q TH.Exp, or
                                  --    something like that
          -> TcM hs_syn           -- Of type t
@@ -1135,7 +1137,8 @@ instance TH.Quasi TcM where
 
   qAddTempFile suffix = do
     dflags <- getDynFlags
-    liftIO $ newTempName dflags TFL_GhcSession suffix
+    logger <- getLogger
+    liftIO $ newTempName logger dflags TFL_GhcSession suffix
 
   qAddTopDecls thds = do
       l <- getSrcSpanM
@@ -1285,7 +1288,7 @@ runTH ty fhv = do
 -- See Note [Remote Template Haskell] in libraries/ghci/GHCi/TH.hs.
 runRemoteTH
   :: IServInstance
-  -> [Messages ErrDoc]   --  saved from nested calls to qRecover
+  -> [Messages DecoratedSDoc]   --  saved from nested calls to qRecover
   -> TcM ()
 runRemoteTH iserv recovers = do
   THMsg msg <- liftIO $ readIServ iserv getTHMessage
@@ -1497,11 +1500,8 @@ lookupName :: Bool      -- True  <=> type namespace
                         -- False <=> value namespace
            -> String -> TcM (Maybe TH.Name)
 lookupName is_type_name s
-  = do { lcl_env <- getLocalRdrEnv
-       ; case lookupLocalRdrEnv lcl_env rdr_name of
-           Just n  -> return (Just (reifyName n))
-           Nothing -> do { mb_nm <- lookupGlobalOccRn_maybe rdr_name
-                         ; return (fmap reifyName mb_nm) } }
+  = do { mb_nm <- lookupOccRn_maybe rdr_name
+       ; return (fmap reifyName mb_nm) }
   where
     th_name = TH.mkName s       -- Parses M.x into a base of 'x' and a module of 'M'
 
@@ -1550,18 +1550,10 @@ lookupThName th_name = do
 
 lookupThName_maybe :: TH.Name -> TcM (Maybe Name)
 lookupThName_maybe th_name
-  =  do { names <- mapMaybeM lookup (thRdrNameGuesses th_name)
+  =  do { names <- mapMaybeM lookupOccRn_maybe (thRdrNameGuesses th_name)
           -- Pick the first that works
           -- E.g. reify (mkName "A") will pick the class A in preference to the data constructor A
         ; return (listToMaybe names) }
-  where
-    lookup rdr_name
-        = do {  -- Repeat much of lookupOccRn, because we want
-                -- to report errors in a TH-relevant way
-             ; rdr_env <- getLocalRdrEnv
-             ; case lookupLocalRdrEnv rdr_env rdr_name of
-                 Just name -> return (Just name)
-                 Nothing   -> lookupGlobalOccRn_maybe rdr_name }
 
 tcLookupTh :: Name -> TcM TcTyThing
 -- This is a specialised version of GHC.Tc.Utils.Env.tcLookup; specialised mainly in that
@@ -2162,6 +2154,7 @@ reify_for_all argf ty
 reifyTyLit :: TyCoRep.TyLit -> TcM TH.TyLit
 reifyTyLit (NumTyLit n) = return (TH.NumTyLit n)
 reifyTyLit (StrTyLit s) = return (TH.StrTyLit (unpackFS s))
+reifyTyLit (CharTyLit c) = return (TH.CharTyLit c)
 
 reifyTypes :: [Type] -> TcM [TH.Type]
 reifyTypes = mapM reifyType

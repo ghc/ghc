@@ -6,6 +6,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE UnliftedFFITypes #-}
 
 {-# OPTIONS_GHC -O2 -funbox-strict-fields #-}
 -- We always optimise this, otherwise performance of a non-optimised
@@ -71,6 +72,7 @@ module GHC.Data.FastString
 
         -- ** Deconstruction
         unpackFS,           -- :: FastString -> String
+        unconsFS,           -- :: FastString -> Maybe (Char, FastString)
 
         -- ** Encoding
         zEncodeFS,
@@ -425,6 +427,7 @@ lower-level `sharedCAF` mechanism that relies on Globals.c.
 -}
 
 mkFastString# :: Addr# -> FastString
+{-# INLINE mkFastString# #-}
 mkFastString# a# = mkFastStringBytes ptr (ptrStrLength ptr)
   where ptr = Ptr a#
 
@@ -606,6 +609,12 @@ headFS fs = head $ unpackFS fs
 consFS :: Char -> FastString -> FastString
 consFS c fs = mkFastString (c : unpackFS fs)
 
+unconsFS :: FastString -> Maybe (Char, FastString)
+unconsFS fs =
+  case unpackFS fs of
+    []          -> Nothing
+    (chr : str) -> Just (chr, mkFastString str)
+
 uniqueOfFS :: FastString -> Int
 uniqueOfFS fs = uniq fs
 
@@ -653,6 +662,7 @@ data PtrString = PtrString !(Ptr Word8) !Int
 
 -- | Wrap an unboxed address into a 'PtrString'.
 mkPtrString# :: Addr# -> PtrString
+{-# INLINE mkPtrString# #-}
 mkPtrString# a# = PtrString (Ptr a#) (ptrStrLength (Ptr a#))
 
 -- | Encode a 'String' into a newly allocated 'PtrString' using Latin-1
@@ -688,8 +698,14 @@ lengthPS (PtrString _ n) = n
 -- -----------------------------------------------------------------------------
 -- under the carpet
 
+#if !MIN_VERSION_GLASGOW_HASKELL(9,0,0,0)
 foreign import ccall unsafe "strlen"
-  ptrStrLength :: Ptr Word8 -> Int
+  cstringLength# :: Addr# -> Int#
+#endif
+
+ptrStrLength :: Ptr Word8 -> Int
+{-# INLINE ptrStrLength #-}
+ptrStrLength (Ptr a) = I# (cstringLength# a)
 
 {-# NOINLINE sLit #-}
 sLit :: String -> PtrString

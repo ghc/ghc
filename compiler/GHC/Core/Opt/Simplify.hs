@@ -57,6 +57,7 @@ import GHC.Core.FVs     ( mkRuleInfo )
 import GHC.Core.Rules   ( lookupRule, getRules, initRuleOpts )
 import GHC.Types.Basic
 import GHC.Utils.Monad  ( mapAccumLM, liftIO )
+import GHC.Utils.Logger
 import GHC.Types.Var    ( isTyCoVar )
 import GHC.Data.Maybe   ( orElse )
 import Control.Monad
@@ -64,7 +65,6 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Data.FastString
 import GHC.Utils.Misc
-import GHC.Utils.Error
 import GHC.Unit.Module ( moduleName, pprModuleName )
 import GHC.Core.Multiplicity
 import GHC.Builtin.PrimOps ( PrimOp (SeqOp) )
@@ -267,6 +267,7 @@ simplRecOrTopPair env top_lvl is_rec mb_cont old_bndr new_bndr rhs
 
   where
     dflags = seDynFlags env
+    logger = seLogger env
 
     -- trace_bind emits a trace for each top-level binding, which
     -- helps to locate the tracing for inlining and rule firing
@@ -274,7 +275,7 @@ simplRecOrTopPair env top_lvl is_rec mb_cont old_bndr new_bndr rhs
       | not (dopt Opt_D_verbose_core2core dflags)
       = thing_inside
       | otherwise
-      = traceAction dflags ("SimplBind " ++ what)
+      = putTraceMsg logger dflags ("SimplBind " ++ what)
          (ppr old_bndr) thing_inside
 
 --------------------------
@@ -387,8 +388,13 @@ simplNonRecX env bndr new_rhs
 
   | otherwise
   = do  { (env', bndr') <- simplBinder env bndr
-        ; completeNonRecX NotTopLevel env' (isStrictId bndr) bndr bndr' new_rhs }
-                -- simplNonRecX is only used for NotTopLevel things
+        ; completeNonRecX NotTopLevel env' (isStrictId bndr') bndr bndr' new_rhs }
+          -- NotTopLevel: simplNonRecX is only used for NotTopLevel things
+          --
+          -- isStrictId: use bndr' because in a levity-polymorphic setting
+          -- the InId bndr might have a levity-polymorphic type, which
+          -- which isStrictId doesn't expect
+          -- c.f. Note [Dark corner with levity polymorphism]
 
 --------------------------
 completeNonRecX :: TopLevelFlag -> SimplEnv
@@ -1032,17 +1038,10 @@ simplExprF1 env expr@(Lam {}) cont
         -- occ-info, UNLESS the remaining binders are one-shot
   where
     (bndrs, body) = collectBinders expr
-    zapped_bndrs | need_to_zap = map zap bndrs
-                 | otherwise   = bndrs
-
-    need_to_zap = any zappable_bndr (drop n_args bndrs)
+    zapped_bndrs = zapLamBndrs n_args bndrs
     n_args = countArgs cont
         -- NB: countArgs counts all the args (incl type args)
         -- and likewise drop counts all binders (incl type lambdas)
-
-    zappable_bndr b = isId b && not (isOneShotBndr b)
-    zap b | isTyVar b = b
-          | otherwise = zapLamIdInfo b
 
 simplExprF1 env (Case scrut bndr _ alts) cont
   = {-#SCC "simplExprF1-Case" #-}
@@ -1573,21 +1572,22 @@ simplNonRecE env bndr (rhs, rhs_se) (bndrs, body) cont
        ; -- pprTrace "preInlineUncond" (ppr bndr <+> ppr rhs) $
          simplLam env' bndrs body cont }
 
-  -- Deal with strict bindings
-  | isStrictId bndr          -- Includes coercions, and unlifted types
-  , sm_case_case (getMode env)
-  = simplExprF (rhs_se `setInScopeFromE` env) rhs
-               (StrictBind { sc_bndr = bndr, sc_bndrs = bndrs, sc_body = body
-                           , sc_env = env, sc_cont = cont, sc_dup = NoDup })
-
-  -- Deal with lazy bindings
   | otherwise
-  = ASSERT( not (isTyVar bndr) )
-    do { (env1, bndr1) <- simplNonRecBndr env bndr
-       ; (env2, bndr2) <- addBndrRules env1 bndr bndr1 Nothing
+  = do { (env1, bndr1) <- simplNonRecBndr env bndr
+
+       -- Deal with strict bindings
+       -- See Note [Dark corner with levity polymorphism]
+       ; if isStrictId bndr1 && sm_case_case (getMode env)
+         then simplExprF (rhs_se `setInScopeFromE` env) rhs
+                   (StrictBind { sc_bndr = bndr, sc_bndrs = bndrs, sc_body = body
+                               , sc_env = env, sc_cont = cont, sc_dup = NoDup })
+
+       -- Deal with lazy bindings
+         else do
+       { (env2, bndr2) <- addBndrRules env1 bndr bndr1 Nothing
        ; (floats1, env3) <- simplLazyBind env2 NotTopLevel NonRecursive bndr bndr2 rhs rhs_se
        ; (floats2, expr') <- simplLam env3 bndrs body cont
-       ; return (floats1 `addFloats` floats2, expr') }
+       ; return (floats1 `addFloats` floats2, expr') } }
 
 ------------------
 simplRecE :: SimplEnv
@@ -1608,7 +1608,26 @@ simplRecE env pairs body cont
         ; (floats2, expr') <- simplExprF env2 body cont
         ; return (floats1 `addFloats` floats2, expr') }
 
-{- Note [Avoiding exponential behaviour]
+{- Note [Dark corner with levity polymorphism]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In `simplNonRecE`, the call to `isStrictId` will fail if the binder
+has a levity-polymorphic type, of kind (TYPE r).  So we are careful to
+call `isStrictId` on the OutId, not the InId, in case we have
+     ((\(r::RuntimeRep) \(x::Type r). blah) Lifted arg)
+That will lead to `simplNonRecE env (x::Type r) arg`, and we can't tell
+if x is lifted or unlifted from that.
+
+We only get such redexes from the compulsory inlining of a wired-in,
+levity-polymorphic function like `rightSection` (see
+GHC.Types.Id.Make).  Mind you, SimpleOpt should probably have inlined
+such compulsory inlinings already, but belt and braces does no harm.
+
+Plus, it turns out that GHC.Driver.Main.hscCompileCoreExpr calls the
+Simplifier without first calling SimpleOpt, so anything involving
+GHCi or TH and operator sections will fall over if we don't take
+care here.
+
+Note [Avoiding exponential behaviour]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 One way in which we can get exponential behaviour is if we simplify a
 big expression, and the re-simplify it -- and then this happens in a
@@ -1882,7 +1901,7 @@ simplIdF env var cont
 
 completeCall :: SimplEnv -> OutId -> SimplCont -> SimplM (SimplFloats, OutExpr)
 completeCall env var cont
-  | Just expr <- callSiteInline dflags var active_unf
+  | Just expr <- callSiteInline logger dflags case_depth var active_unf
                                 lone_variable arg_infos interesting_cont
   -- Inline the variable's RHS
   = do { checkedTick (UnfoldingDone var)
@@ -1897,16 +1916,18 @@ completeCall env var cont
        ; rebuildCall env info cont }
 
   where
-    dflags = seDynFlags env
+    dflags     = seDynFlags env
+    case_depth = seCaseDepth env
+    logger     = seLogger env
     (lone_variable, arg_infos, call_cont) = contArgs cont
     n_val_args       = length arg_infos
     interesting_cont = interestingCallContext env call_cont
     active_unf       = activeUnfolding (getMode env) var
 
     log_inlining doc
-      = liftIO $ dumpAction dflags
+      = liftIO $ putDumpMsg logger dflags
            (mkDumpStyle alwaysQualify)
-           (dumpOptionsFromFlag Opt_D_dump_inlinings)
+           Opt_D_dump_inlinings
            "" FormatText doc
 
     dump_inline unfolding cont
@@ -2169,6 +2190,7 @@ tryRules env rules fn args call_cont
   where
     ropts      = initRuleOpts dflags
     dflags     = seDynFlags env
+    logger     = seLogger env
     zapped_env = zapSubstEnv env  -- See Note [zapSubstEnv]
 
     printRuleModule rule
@@ -2197,11 +2219,11 @@ tryRules env rules fn args call_cont
     nodump
       | dopt Opt_D_dump_rule_rewrites dflags
       = liftIO $
-          touchDumpFile dflags (dumpOptionsFromFlag Opt_D_dump_rule_rewrites)
+          touchDumpFile logger dflags Opt_D_dump_rule_rewrites
 
       | dopt Opt_D_dump_rule_firings dflags
       = liftIO $
-          touchDumpFile dflags (dumpOptionsFromFlag Opt_D_dump_rule_firings)
+          touchDumpFile logger dflags Opt_D_dump_rule_firings
 
       | otherwise
       = return ()
@@ -2209,7 +2231,7 @@ tryRules env rules fn args call_cont
     log_rule dflags flag hdr details
       = liftIO $ do
           let sty = mkDumpStyle alwaysQualify
-          dumpAction dflags sty (dumpOptionsFromFlag flag) "" FormatText $
+          putDumpMsg logger dflags sty flag "" FormatText $
               sep [text hdr, nest 4 details]
 
 trySeqRules :: SimplEnv
@@ -2724,9 +2746,11 @@ reallyRebuildCase env scrut case_bndr alts cont
        ; rebuild env case_expr cont }
 
   | otherwise
-  = do { (floats, cont') <- mkDupableCaseCont env alts cont
-       ; case_expr <- simplAlts (env `setInScopeFromF` floats)
-                                scrut (scaleIdBy holeScaling case_bndr) (scaleAltsBy holeScaling alts) cont'
+  = do { (floats, env', cont') <- mkDupableCaseCont env alts cont
+       ; case_expr <- simplAlts env' scrut
+                                (scaleIdBy holeScaling case_bndr)
+                                (scaleAltsBy holeScaling alts)
+                                cont'
        ; return (floats, case_expr) }
   where
     holeScaling = contHoleScaling cont
@@ -3234,10 +3258,15 @@ join points and inlining them away.  See #4930.
 
 --------------------
 mkDupableCaseCont :: SimplEnv -> [InAlt] -> SimplCont
-                  -> SimplM (SimplFloats, SimplCont)
+                  -> SimplM ( SimplFloats  -- Join points (if any)
+                            , SimplEnv     -- Use this for the alts
+                            , SimplCont)
 mkDupableCaseCont env alts cont
-  | altsWouldDup alts = mkDupableCont env cont
-  | otherwise         = return (emptyFloats env, cont)
+  | altsWouldDup alts = do { (floats, cont) <- mkDupableCont env cont
+                           ; let env' = bumpCaseDepth $
+                                        env `setInScopeFromF` floats
+                           ; return (floats, env', cont) }
+  | otherwise         = return (emptyFloats env, env, cont)
 
 altsWouldDup :: [InAlt] -> Bool -- True iff strictly > 1 non-bottom alternative
 altsWouldDup []  = False        -- See Note [Bottom alternatives]
@@ -3370,12 +3399,11 @@ mkDupableContWithDmds env _
         --              in case [...hole...] of { pi -> ji xij }
         -- NB: sc_dup /= OkToDup; that is caught earlier by contIsDupable
     do  { tick (CaseOfCase case_bndr)
-        ; (floats, alt_cont) <- mkDupableCaseCont env alts cont
+        ; (floats, alt_env, alt_cont) <- mkDupableCaseCont (se `setInScopeFromE` env) alts cont
                 -- NB: We call mkDupableCaseCont here to make cont duplicable
                 --     (if necessary, depending on the number of alts)
                 -- And this is important: see Note [Fusing case continuations]
 
-        ; let alt_env = se `setInScopeFromF` floats
         ; let cont_scaling = contHoleScaling cont
           -- See Note [Scaling in case-of-case]
         ; (alt_env', case_bndr') <- simplBinder alt_env (scaleIdBy cont_scaling case_bndr)
@@ -3653,7 +3681,7 @@ Pushing the call inward (being careful not to duplicate E)
 
 and now the (&& a F) etc can optimise.  Moreover there might
 be a RULE for the function that can fire when it "sees" the
-particular case alterantive.
+particular case alternative.
 
 But Plan A can have terrible, terrible behaviour. Here is a classic
 case:

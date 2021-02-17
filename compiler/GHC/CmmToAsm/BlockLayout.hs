@@ -44,7 +44,7 @@ import GHC.Data.Maybe
 import GHC.Data.List.SetOps (removeDups)
 
 import GHC.Data.OrdList
-import Data.List
+import Data.List (sortOn, sortBy)
 import Data.Foldable (toList)
 
 import qualified Data.Set as Set
@@ -539,7 +539,7 @@ mergeChains edges chains
 -- An Edge is irrelevant if the ends are part of the same chain.
 -- We say these edges are already linked
 buildChains :: [CfgEdge] -> [BlockId]
-            -> ( LabelMap BlockChain  -- Resulting chains, indexd by end if chain.
+            -> ( LabelMap BlockChain  -- Resulting chains, indexed by end if chain.
                , Set.Set (BlockId, BlockId)) --List of fused edges.
 buildChains edges blocks
   = runST $ buildNext setEmpty mapEmpty mapEmpty edges Set.empty
