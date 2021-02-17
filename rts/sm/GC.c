@@ -120,6 +120,8 @@ bool unload_mark_needed;
  */
 static W_ g0_pcnt_kept = 30; // percentage of g0 live at last minor GC
 
+static int consec_idle_gcs = 0;
+
 /* Mut-list stats */
 #if defined(DEBUG)
 // For lack of a better option we protect mutlist_scav_stats with oldest_gen->sync
@@ -261,6 +263,7 @@ addMutListScavStats(const MutListScavStats *src,
 void
 GarbageCollect (uint32_t collect_gen,
                 const bool do_heap_census,
+                const bool is_overflow_gc,
                 const bool deadlock_detect,
                 uint32_t gc_type USED_IF_THREADS,
                 Capability *cap,
@@ -981,11 +984,26 @@ GarbageCollect (uint32_t collect_gen,
       }
 #endif
 
-      /* If the amount of data remains constant, next major GC we'll
-       * require (F+1)*live + prealloc. We leave (F+2)*live + prealloc
-       * in order to reduce repeated deallocation and reallocation. #14702
-       */
-      need = need_prealloc + (RtsFlags.GcFlags.oldGenFactor + 2) * need_live;
+      // Reset the counter if the major GC was caused by a heap overflow
+      consec_idle_gcs = is_overflow_gc ? 0 : consec_idle_gcs + 1;
+
+      // See Note [Scaling retained memory]
+      double scaled_factor =
+        RtsFlags.GcFlags.returnDecayFactor > 0
+          ? RtsFlags.GcFlags.oldGenFactor / pow(2, (float) consec_idle_gcs / RtsFlags.GcFlags.returnDecayFactor)
+          : RtsFlags.GcFlags.oldGenFactor;
+
+      debugTrace(DEBUG_gc, "factors: %f %d %f", RtsFlags.GcFlags.oldGenFactor, consec_idle_gcs, scaled_factor  );
+
+      // Unavoidable need depends on GC strategy
+      // * Copying need 2 * live
+      // * Compacting need 1.x * live (we choose 1.2)
+      // * Nonmoving needs ~ 1.x * live
+      double unavoidable_need_factor = (oldest_gen->compact || RtsFlags.GcFlags.useNonmoving)
+                                          ? 1.2 : 2;
+      W_ scaled_needed = (scaled_factor + unavoidable_need_factor) * need_live;
+      debugTrace(DEBUG_gc, "factors_2: %f %d", unavoidable_need_factor, scaled_needed);
+      need = need_prealloc + scaled_needed;
 
       /* Also, if user set heap size, do not drop below it.
        */
@@ -1003,6 +1021,7 @@ GarbageCollect (uint32_t collect_gen,
       need = BLOCKS_TO_MBLOCKS(need);
 
       got = mblocks_allocated;
+      debugTrace(DEBUG_gc,"Returning: %d %d", got, need);
 
       if (got > need) {
           returnMemoryToOS(got - need);
@@ -2206,3 +2225,53 @@ bool doIdleGCWork(Capability *cap STG_UNUSED, bool all)
  * work_stealing is "mostly immutable". We set it to false when we begin the
  * final sequential collections, for the benefit of notifyTodoBlock.
  * */
+
+/* Note [Scaling retained memory]
+ * Tickets: #19381 #19359 #14702
+ *
+ * After a spike in memory usage we have been conservative about returning
+ * allocated blocks to the OS in case we are still allocating a lot and would
+ * end up just reallocating them. The result of this was that up to 4 * live_bytes
+ * of blocks would be retained once they were allocated even if memory usage ended up
+ * a lot lower.
+ *
+ * For a heap of size ~1.5G, this would result in OS memory reporting 6G which is
+ * both misleading and worrying for users.
+ * In long-lived server applications this results in consistent high memory
+ * usage when the live data size is much more reasonable (for example ghcide)
+ *
+ * Therefore we have a new (2021) strategy which starts by retaining up to 4 * live_bytes
+ * of blocks before gradually returning uneeded memory back to the OS on subsequent
+ * major GCs which are NOT caused by a heap overflow.
+ *
+ * Each major GC which is NOT caused by heap overflow increases the consec_idle_gcs
+ * counter and the amount of memory which is retained is inversely proportional to this number.
+ * By default the excess memory retained is
+ *  oldGenFactor (controlled by -F) / 2 ^ (consec_idle_gcs * returnDecayFactor)
+ *
+ * On a major GC caused by a heap overflow, the `consec_idle_gcs` variable is reset to 0
+ * (as we could continue to allocate more, so retaining all the memory might make sense).
+ *
+ * Therefore setting bigger values for `-Fd` makes the rate at which memory is returned slower.
+ * Smaller values make it get returned faster. Setting `-Fd0` means no additional memory
+ * is retained.
+ *
+ * The default is `-Fd4` which results in the following scaling:
+ *
+ * > mapM print [(x, 1/ (2**(x / 4))) | x <- [1 :: Double ..20]]
+ * (1.0,0.8408964152537146)
+ * ...
+ * (4.0,0.5)
+ * ...
+ * (12.0,0.125)
+ * ...
+ * (20.0,3.125e-2)
+ *
+ * So after 12 consecutive GCs only 0.1 of the maximum memory used will be retained.
+ *
+ * Further to this decay factor, the amount of memory we attempt to retain is
+ * also influenced by the GC strategy for the oldest generation. If we are using
+ * a copying strategy then we will need at least 2 * live_bytes for copying to take
+ * place, so we always keep that much. If using compacting or nonmoving then we need a lower number,
+ * so we just retain at least `1.2 * live_bytes` for some protection.
+ */
