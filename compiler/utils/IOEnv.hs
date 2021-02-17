@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 --
 -- (c) The University of Glasgow 2002-2006
 --
@@ -46,6 +47,8 @@ import Control.Monad
 import qualified Control.Monad.Fail as MonadFail
 import MonadUtils
 import Control.Applicative (Alternative(..))
+import Control.Concurrent.MVar (newEmptyMVar, readMVar, putMVar)
+import Control.Concurrent (forkIO, killThread)
 
 ----------------------------------------------------------------------
 -- Defining the monad type
@@ -149,12 +152,26 @@ tryM (IOEnv thing) = IOEnv (\ env -> tryIOEnvFailure (thing env))
 tryIOEnvFailure :: IO a -> IO (Either IOEnvFailure a)
 tryIOEnvFailure = try
 
--- XXX We shouldn't be catching everything, e.g. timeouts
 tryAllM :: IOEnv env r -> IOEnv env (Either SomeException r)
--- Catch *all* exceptions
+-- Catch *all* synchronous exceptions
 -- This is used when running a Template-Haskell splice, when
 -- even a pattern-match failure is a programmer error
-tryAllM (IOEnv thing) = IOEnv (\ env -> try (thing env))
+tryAllM (IOEnv thing) = IOEnv (\ env -> safeTry (thing env))
+
+-- | Like 'try', but doesn't catch asynchronous exceptions
+safeTry :: IO a -> IO (Either SomeException a)
+safeTry act = do
+  var <- newEmptyMVar
+  -- uninterruptible because we want to mask around 'killThread', which is interruptible.
+  uninterruptibleMask $ \restore -> do
+    -- Fork, so that 'act' is safe from all asynchronous exceptions other than the ones we send it
+    t <- forkIO $ try (restore act) >>= putMVar var
+    restore (readMVar var)
+      `catch` \(e :: SomeException) -> do
+        -- Control reaches this point only if the parent thread was sent an async exception
+        -- In that case, kill the 'act' thread and re-raise the exception
+        killThread t
+        throwIO e
 
 tryMostM :: IOEnv env r -> IOEnv env (Either SomeException r)
 tryMostM (IOEnv thing) = IOEnv (\ env -> tryMost (thing env))
