@@ -164,6 +164,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.heapSizeSuggestionAuto = false;
     RtsFlags.GcFlags.pcFreeHeap         = 3;    /* 3% */
     RtsFlags.GcFlags.oldGenFactor       = 2;
+    RtsFlags.GcFlags.returnDecayFactor  = 4;
     RtsFlags.GcFlags.useNonmoving       = false;
     RtsFlags.GcFlags.nonmovingSelectorOpt = false;
     RtsFlags.GcFlags.generations        = 2;
@@ -323,6 +324,12 @@ usage_text[] = {
 "  -F<n>     Sets the collecting threshold for old generations as a factor of",
 "            the live data in that generation the last time it was collected",
 "            (default: 2.0)",
+"  -Fd<n>    Sets the inverse rate which memory is returned to the OS after being",
+"            optimistically retained after being allocated. Subsequent major",
+"            collections not caused by heap overflow will return an amount of",
+"            memory controlled by this factor (higher is slower). Setting the factor",
+"            to 0 means memory is not returned.",
+"            (default 4.0)",
 "  -n<size>  Allocation area chunk size (0 = disabled, default: 0)",
 "  -O<size>  Sets the minimum size of the old generation (default 1M)",
 "  -M<size>  Sets the maximum heap size (default unlimited)  Egs: -M256k -M1G",
@@ -1132,10 +1139,19 @@ error = true;
 
               case 'F':
                 OPTION_UNSAFE;
-                RtsFlags.GcFlags.oldGenFactor = atof(rts_argv[arg]+2);
+                switch(rts_argv[arg][2]) {
+                case 'd':
+                  RtsFlags.GcFlags.returnDecayFactor = atof(rts_argv[arg]+3);
+                  if (RtsFlags.GcFlags.returnDecayFactor < 0)
+                    bad_option( rts_argv[arg] );
+                  break;
+                default:
+                  RtsFlags.GcFlags.oldGenFactor = atof(rts_argv[arg]+2);
 
-                if (RtsFlags.GcFlags.oldGenFactor < 0)
-                  bad_option( rts_argv[arg] );
+                  if (RtsFlags.GcFlags.oldGenFactor < 0)
+                    bad_option( rts_argv[arg] );
+                  break;
+                };
                 break;
 
               case 'D':
