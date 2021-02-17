@@ -35,7 +35,6 @@ module GHC.Core.Opt.ConstantFold
    ( primOpRules
    , builtinRules
    , caseRules
-   , EnableBignumRules (..)
    )
 where
 
@@ -1676,11 +1675,9 @@ bindings (see occurAnalysePgm), which sorts out the dependency, so all
 is fine.
 -}
 
-newtype EnableBignumRules = EnableBignumRules Bool
-
-builtinRules :: EnableBignumRules -> [CoreRule]
+builtinRules :: [CoreRule]
 -- Rules for non-primops that can't be expressed using a RULE pragma
-builtinRules enableBignumRules
+builtinRules
   = [BuiltinRule { ru_name = fsLit "AppendLitString",
                    ru_fn = unpackCStringFoldrName,
                    ru_nargs = 4, ru_try = match_append_lit_C },
@@ -1719,14 +1716,13 @@ builtinRules enableBignumRules
             `App` arg `App` mkIntVal platform (d - 1)
         ]
      ]
- ++ builtinBignumRules enableBignumRules
+ ++ builtinBignumRules
 {-# NOINLINE builtinRules #-}
 -- there is no benefit to inlining these yet, despite this, GHC produces
 -- unfoldings for this regardless since the floated list entries look small.
 
-builtinBignumRules :: EnableBignumRules -> [CoreRule]
-builtinBignumRules (EnableBignumRules False) = []
-builtinBignumRules _ =
+builtinBignumRules :: [CoreRule]
+builtinBignumRules =
   [ -- conversions
     lit_to_integer "Word# -> Integer"   integerFromWordName
   , lit_to_integer "Int64# -> Integer"  integerFromInt64Name
@@ -1872,7 +1868,10 @@ builtinBignumRules _ =
       { ru_name = fsLit str
       , ru_fn = name
       , ru_nargs = nargs
-      , ru_try = runRuleM f
+      , ru_try = runRuleM $ do
+          env <- getEnv
+          guard (roBignumRules env)
+          f
       }
 
     integer_to_lit str name convert = mkRule str name 1 $ do
