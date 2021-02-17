@@ -107,7 +107,6 @@ GHC.Iface.Syntax
 GHC.Iface.Type
 GHC.Linker.Types
 GHC.Parser.Annotation
-GHC.Parser.Types
 GHC.Platform
 GHC.Platform.AArch64
 GHC.Platform.ARM
