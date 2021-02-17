@@ -13,7 +13,7 @@ import datetime
 import copy
 import glob
 import sys
-from math import ceil, trunc
+from math import ceil, trunc, floor, log
 from pathlib import Path, PurePath
 import collections
 import subprocess
@@ -1079,13 +1079,20 @@ def do_test(name: TestName,
     opts = getTestOpts()
 
     full_name = name + '(' + way + ')'
-
-    progress_args = [ full_name, t.total_tests, len(allTestNames),
+    test_n = len(allTestNames)
+    progress_args = [ full_name, t.total_tests, test_n,
         [len(t.unexpected_passes),
          len(t.unexpected_failures),
          len(t.framework_failures)]]
-    if t.total_tests % 100 == 0: if_verbose(2, "=====> {1} of {2} {3}".format(*progress_args))
-    if_verbose(3, "=====> {0} {1} of {2} {3}".format(*progress_args))
+    # For n = [0..100] - Report every test
+    #     n = [100..1000] - Report every 10 tests
+    #     n = [1000...10000] - report every 100 tests
+    #     and so on...
+    report_every = 10 ** max(0, floor(log(test_n, 10)) - 1)
+    if t.total_tests % report_every == 0 and config.verbose <= 2:
+        if_verbose(2, "=====> {1} of {2} {3}".format(*progress_args))
+    else:
+        if_verbose(3, "=====> {0} {1} of {2} {3}".format(*progress_args))
 
     # Update terminal title
     # useful progress indicator even when make test VERBOSE=1
