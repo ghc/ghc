@@ -2769,8 +2769,8 @@ aexp    :: { ECP }
                                            amms (mkHsLetPV (comb2 $1 $>) (snd (unLoc $2)) $4)
                                                (mj AnnLet $1:mj AnnIn $3
                                                  :(fst $ unLoc $2)) }
-        | 'let' binds 'in' error         {% hintParsingErrorWithContext $3 "let/in clause without body. Please add a body." }
-        | 'let' binds error        {% hintParsingErrorWithContext $1 "let/in clause without in. Please add a (in body)." }
+        | 'let' binds 'in' error         {% hintParsingErrorWithContext $3 "missing body in 'let/in' clause" }
+        | 'let' binds error        {% hintParsingErrorWithContext $1 "missing 'in' in 'let/in' clause" }
         | '\\' 'lcase' altslist
             {  ECP $ $3 >>= \ $3 ->
                amms (mkHsLamCasePV (comb2 $1 $>)
@@ -2786,11 +2786,11 @@ aexp    :: { ECP }
                                      :mj AnnElse $7
                                      :(map (\l -> mj AnnSemi l) (fst $3))
                                     ++(map (\l -> mj AnnSemi l) (fst $6))) }
-        | 'if' exp optSemi 'then' exp optSemi 'else' error        {% hintParsingErrorWithContext $7 "parse error in else clause" }
-        | 'if' exp optSemi 'then' exp optSemi error        {% hintParsingErrorWithContext $4 "Missing else clause" }
-        | 'if' exp optSemi 'then' error        {% hintParsingErrorWithContext $4 "error in then clause" }
-        | 'if' exp optSemi error        {% hintParsingErrorWithContext $1 "missing then clause" }
-        | 'if' error        {% hintParsingErrorWithContext $1 "error in if condition" }
+        | 'if' exp optSemi 'then' exp optSemi 'else' error        {% hintParsingErrorWithContext $7 "parse error in 'else' clause" }
+        | 'if' exp optSemi 'then' exp optSemi error        {% hintParsingErrorWithContext $4 "missing 'else' clause" }
+        | 'if' exp optSemi 'then' error        {% hintParsingErrorWithContext $4 "parse error in 'then' clause" }
+        | 'if' exp optSemi error        {% hintParsingErrorWithContext $1 "missing 'then' clause" }
+        | 'if' error        {% hintParsingErrorWithContext $1 "parse error in 'if' condition" }
         | 'if' ifgdpats                 {% hintMultiWayIf (getLoc $1) >>= \_ ->
                                            fmap ecpFromExp $
                                            ams (sLL $1 $> $ HsMultiIf noExtField
@@ -2804,7 +2804,7 @@ aexp    :: { ECP }
                                                (mj AnnCase $1:mj AnnOf $3
                                                   :(fst $ unLoc $4)) }
         | 'case' exp error  {% do
-            hintParsingErrorWithContext $1 "case of without the of. Please add the of."
+            hintParsingErrorWithContext $1 "missing 'of' in 'case' clause"
         }
 
         -- QualifiedDo.
@@ -2862,25 +2862,25 @@ aexp2   :: { ECP }
         | '(' texp ')'              { ECP $
                                            unECP $2 >>= \ $2 ->
                                            amms (mkHsParPV (comb2 $1 $>) $2) [mop $1,mcp $3] }
-        | '(' texp error                  {% hintParsingErrorWithContext $1 "please close this brace." }
+        | '(' texp error                  {% hintParsingErrorWithContext $1 "missing closing brace ')'" }
         | '(' tup_exprs ')' { ECP $
                                            $2 >>= \ $2 ->
                                            amms (mkSumOrTuplePV (comb2 $1 $>) Boxed (snd $2))
                                                 ((mop $1:fst $2) ++ [mcp $3]) }
-        | '(' tup_exprs error {% hintParsingErrorWithContext $1 "please close this tuple brace." }
+        | '(' tup_exprs error {% hintParsingErrorWithContext $1 "missing closing tuple brace ')'" }
         | '(#' texp '#)'                { ECP $
                                            unECP $2 >>= \ $2 ->
                                            amms (mkSumOrTuplePV (comb2 $1 $>) Unboxed (Tuple [L (gl $2) (Just $2)]))
                                                 [mo $1,mc $3] }
-        | '(#' texp error {% hintParsingErrorWithContext $1 "please close this expression." }
+        | '(#' texp error {% hintParsingErrorWithContext $1 "missing closing unboxed tuple/sum brace '#)'" }
         | '(#' tup_exprs '#)'           { ECP $
                                            $2 >>= \ $2 ->
                                            amms (mkSumOrTuplePV (comb2 $1 $>) Unboxed (snd $2))
                                                 ((mo $1:fst $2) ++ [mc $3]) }
 
-        | '(#' tup_exprs error {% hintParsingErrorWithContext $1 "please close this strict tuple brace." }
+        | '(#' tup_exprs error {% hintParsingErrorWithContext $1 "missing closing unboxed tuple brace '#)'" }
         | '[' list ']'  { ECP $ $2 (comb2 $1 $>) >>= \a -> ams a [mos $1,mcs $3] }
-        | '[' list  error   {% hintParsingErrorWithContext $1 "please close this list." }
+        | '[' list  error   {% hintParsingErrorWithContext $1 "missing closing list bracket ']'" }
         | '_'               { ECP $ mkHsWildCardPV (getLoc $1) }
 
         -- Template Haskell Extension
@@ -2898,24 +2898,24 @@ aexp2   :: { ECP }
                                  ams (sLL $1 $> $ HsBracket noExtField (ExpBr noExtField $2))
                                       (if (hasE $1) then [mj AnnOpenE $1, mu AnnCloseQ $3]
                                                     else [mu AnnOpenEQ $1,mu AnnCloseQ $3]) }
-        | '[|' exp error {% hintParsingErrorWithContext $1 "please close this TH quote" }
+        | '[|' exp error {% hintParsingErrorWithContext $1 "missing closing TH quote '|]'" }
         | '[||' exp '||]'     {% runPV (unECP $2) >>= \ $2 ->
                                  fmap ecpFromExp $
                                  ams (sLL $1 $> $ HsBracket noExtField (TExpBr noExtField $2))
                                       (if (hasE $1) then [mj AnnOpenE $1,mc $3] else [mo $1,mc $3]) }
-        | '[||' exp error {% hintParsingErrorWithContext $1 "please close this TTH quote" }
+        | '[||' exp error {% hintParsingErrorWithContext $1 "missing typed TH quote '|]]'" }
         | '[t|' ktype '|]'    {% fmap ecpFromExp $
                                  ams (sLL $1 $> $ HsBracket noExtField (TypBr noExtField $2)) [mo $1,mu AnnCloseQ $3] }
-        | '[t|' ktype error {% hintParsingErrorWithContext $1 "please close this TH type QQ" }
+        | '[t|' ktype error {% hintParsingErrorWithContext $1 "missing closing TH type quote '|]'" }
         | '[p|' infixexp '|]' {% (checkPattern <=< runPV) (unECP $2) >>= \p ->
                                       fmap ecpFromExp $
                                       ams (sLL $1 $> $ HsBracket noExtField (PatBr noExtField p))
                                           [mo $1,mu AnnCloseQ $3] }
-        | '[p|' infixexp error {% hintParsingErrorWithContext $1 "please close this TH pattern QQ" }
+        | '[p|' infixexp error {% hintParsingErrorWithContext $1 "missing closing TH pattern quote '|]'" }
         | '[d|' cvtopbody '|]' {% fmap ecpFromExp $
                                   ams (sLL $1 $> $ HsBracket noExtField (DecBrL noExtField (snd $2)))
                                       (mo $1:mu AnnCloseQ $3:fst $2) }
-        | '[d|' cvtopbody error {% hintParsingErrorWithContext $1 "please close this TH definition QQ" }
+        | '[d|' cvtopbody error {% hintParsingErrorWithContext $1 "missing closing TH definition quote '|]'" }
         | quasiquote          { ECP $ mkHsSplicePV $1 }
 
         -- arrow notation extension
@@ -2924,7 +2924,7 @@ aexp2   :: { ECP }
                                      ams (sLL $1 $> $ HsCmdArrForm noExtField $2 Prefix
                                                           Nothing (reverse $3))
                                          [mu AnnOpenB $1,mu AnnCloseB $4] }
-        | '(|' aexp cmdargs error {% hintParsingErrorWithContext $1 "please close this arrow notation" }
+        | '(|' aexp cmdargs error {% hintParsingErrorWithContext $1 "missing closing arrow notation '|)'" }
 
 splice_exp :: { LHsExpr GhcPs }
         : splice_untyped { mapLoc (HsSpliceE noExtField) $1 }
