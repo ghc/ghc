@@ -42,6 +42,9 @@ module GHC.Utils.Binary
    castBin,
    withBinBuffer,
 
+   foldGet,
+   foldGet_,
+
    writeBinMem,
    readBinMem,
 
@@ -85,6 +88,8 @@ import GHC.Types.SrcLoc
 import Control.DeepSeq
 import Foreign
 import Data.Array
+import Data.Array.IO
+import Data.Array.Unsafe
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Unsafe   as BS
@@ -276,6 +281,38 @@ expandBin (BinMem _ _ sz_r arr_r) !off = do
       = sz
       | otherwise
       = getSize (sz * 2)
+
+foldGet
+  :: Binary a
+  => Word -- n elements
+  -> BinHandle
+  -> b -- initial accumulator
+  -> (Word -> a -> b -> IO b)
+  -> IO b
+foldGet n bh init_b f = go 0 init_b
+  where
+    go i b
+      | i == n    = return b
+      | otherwise = do
+          a <- get bh
+          b' <- f i a b
+          go (i+1) b'
+
+foldGet_
+  :: Binary a
+  => Word -- n elements
+  -> BinHandle
+  -> (Word -> a -> IO b)
+  -> IO ()
+foldGet_ n bh f = go 0
+  where
+    go i
+      | i == n    = return ()
+      | otherwise = do
+          a <- get bh
+          f i a
+          go (i+1)
+
 
 -- -----------------------------------------------------------------------------
 -- Low-level reading/writing of bytes
@@ -987,9 +1024,11 @@ putDictionary bh sz dict = do
 
 getDictionary :: BinHandle -> IO Dictionary
 getDictionary bh = do
-  sz <- get bh
-  elems <- sequence (take sz (repeat (getFS bh)))
-  return (listArray (0,sz-1) elems)
+  sz <- get bh :: IO Int
+  mut_arr <- newArray_ (0, sz-1) :: IO (IOArray Int FastString)
+  foldGet_ (fromIntegral sz) bh $ \i fs -> do
+    writeArray mut_arr (fromIntegral i) fs
+  unsafeFreeze mut_arr
 
 ---------------------------------------------------------
 -- The Symbol Table
