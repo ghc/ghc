@@ -33,13 +33,15 @@ import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 
-import qualified Data.Array as A
+import qualified Data.Array        as A
+import qualified Data.Array.IO     as A
+import qualified Data.Array.Unsafe as A
 import Data.IORef
 import Data.ByteString            ( ByteString )
 import qualified Data.ByteString  as BS
 import qualified Data.ByteString.Char8 as BSC
 import Data.Word                  ( Word8, Word32 )
-import Control.Monad              ( replicateM, when )
+import Control.Monad              ( replicateM, when, forM_ )
 import System.Directory           ( createDirectoryIfMissing )
 import System.FilePath            ( takeDirectory )
 
@@ -269,9 +271,12 @@ putSymbolTable bh next_off symtab = do
 getSymbolTable :: BinHandle -> NameCache -> IO SymbolTable
 getSymbolTable bh name_cache = do
   sz <- get bh
-  od_names <- replicateM sz (getHieName bh)
-  names <- mapM (fromHieName name_cache) od_names
-  pure $ A.listArray (0,sz-1) names
+  mut_arr <- A.newArray_ (0, sz-1) :: IO (A.IOArray Int Name)
+  forM_ [0..(sz-1)] $ \i -> do
+    od_name <- getHieName bh
+    name <- fromHieName name_cache od_name
+    A.writeArray mut_arr i name
+  A.unsafeFreeze mut_arr
 
 getSymTabName :: SymbolTable -> BinHandle -> IO Name
 getSymTabName st bh = do
