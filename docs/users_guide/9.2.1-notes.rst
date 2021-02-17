@@ -114,6 +114,10 @@ Runtime system
 - The :rts-flag:`-h` flag has been deprecated, use either :rts-flag:`-hc` or
   :rts-flag:`-hT` explicitly, as appropriate.
 
+- The RTS will now gradually return unused memory back to the OS rather than
+  retaining a large amount (up to 4 * live) indefinitely. The rate at which memory
+  is returned is controlled by the :rts-flag:`-Fd ⟨factor⟩`.
+
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 
