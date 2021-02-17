@@ -78,7 +78,7 @@ import GHC.Core.TyCon
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
 
-import GHC.Types.Id.Make      ( seqId, EnableBignumRules(..) )
+import GHC.Types.Id.Make      ( seqId )
 import GHC.Types.Annotations
 import GHC.Types.Name
 import GHC.Types.Name.Env
@@ -962,8 +962,8 @@ readIface wanted_mod file_path
 *********************************************************
 -}
 
-initExternalPackageState :: UnitId -> ExternalPackageState
-initExternalPackageState home_unit_id
+initExternalPackageState :: ExternalPackageState
+initExternalPackageState
   = EPS {
       eps_is_boot          = emptyUFM,
       eps_PIT              = emptyPackageIfaceTable,
@@ -971,21 +971,15 @@ initExternalPackageState home_unit_id
       eps_PTE              = emptyTypeEnv,
       eps_inst_env         = emptyInstEnv,
       eps_fam_inst_env     = emptyFamInstEnv,
-      eps_rule_base        = mkRuleBase builtinRules',
+      eps_rule_base        = mkRuleBase builtinRules,
         -- Initialise the EPS rule pool with the built-in rules
       eps_mod_fam_inst_env = emptyModuleEnv,
       eps_complete_matches = [],
       eps_ann_env          = emptyAnnEnv,
       eps_stats = EpsStats { n_ifaces_in = 0, n_decls_in = 0, n_decls_out = 0
                            , n_insts_in = 0, n_insts_out = 0
-                           , n_rules_in = length builtinRules', n_rules_out = 0 }
+                           , n_rules_in = length builtinRules, n_rules_out = 0 }
     }
-    where
-      enableBignumRules
-         | home_unit_id == primUnitId   = EnableBignumRules False
-         | home_unit_id == bignumUnitId = EnableBignumRules False
-         | otherwise                    = EnableBignumRules True
-      builtinRules' = builtinRules enableBignumRules
 
 {-
 *********************************************************
