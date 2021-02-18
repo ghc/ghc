@@ -20,10 +20,10 @@ DmdAnalGADTs.$tcD:
 DmdAnalGADTs.$trModule:
 DmdAnalGADTs.diverges: b
 DmdAnalGADTs.f:
-DmdAnalGADTs.f': m1
+DmdAnalGADTs.f': 1
 DmdAnalGADTs.g:
 DmdAnalGADTs.hasCPR:
-DmdAnalGADTs.hasStrSig: m1
+DmdAnalGADTs.hasStrSig: 1
 
 
 
