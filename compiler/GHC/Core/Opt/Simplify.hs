@@ -165,6 +165,26 @@ It's quite convenient. This way we don't need to manipulate the substitution all
 the time: every update to a binder is automatically reflected to its bound
 occurrences.
 
+Note [Bangs in the Simplifier]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Both SimplFloats and SimplEnv do *not* generally benefit from making
+their fields strict. I don't know if this is because of good use of
+laziness or unintended side effects like closures capturing more variables.
+
+But the end result is that we keep these lazy, but force them in some places
+where we know it's beneficial to the compiler.
+
+Similary environments returned from functions aren't *always* beneficial to
+force. In some places they would never be demanded so forcing them early
+increases allocation. In other places they almost always get demanded so
+it's worthwhile to force them early.
+
+The result sadly is that we end up with "random" bangs in the simplifier
+where we sometimes force e.g. the returned environment from a function and
+sometimes we don't for the same function. Depending on the context around
+the call.
+
 ************************************************************************
 *                                                                      *
 \subsection{Bindings}
