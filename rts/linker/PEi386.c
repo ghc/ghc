@@ -327,6 +327,11 @@ void initLinker_PEi386()
   HeapSetInformation(code_heap, HeapEnableTerminationOnCorruption,
                      &HeapInformation, sizeof(HeapInformation));
   HeapSetInformation(code_heap, HeapOptimizeResources, NULL, 0);
+
+  /* Register the cleanup routine as an exit handler,  this gives other exit handlers
+     a chance to run which may need linker information.  Exit handlers are ran in
+     reverse registration order so this needs to be before the linker loads anything.  */
+  atexit (exitLinker_PEi386);
 }
 
 void exitLinker_PEi386()
