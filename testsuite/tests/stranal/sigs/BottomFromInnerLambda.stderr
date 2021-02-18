@@ -8,7 +8,7 @@ BottomFromInnerLambda.f: <1P(SL)>
 
 ==================== Cpr signatures ====================
 BottomFromInnerLambda.$trModule:
-BottomFromInnerLambda.expensive: m1
+BottomFromInnerLambda.expensive: 1
 BottomFromInnerLambda.f:
 
 
