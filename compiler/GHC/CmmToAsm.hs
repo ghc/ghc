@@ -523,9 +523,9 @@ cmmNativeGen logger dflags modLoc ncgImpl us fileIds dbgMap cmm count
                                     $ mapM (prunedSSAFromLiveCmmDecl platform cfg) withLiveness
                         Nothing  -> ([], usLive)
 
-        dumpIfSet_dyn dflags
+        dumpIfSet_dyn logger dflags
                 Opt_D_dump_asm_ssa "Pruned SSA Constructed"
-                FormatASM
+                FormatCMM
                 (vcat $ map (pprSsaLiveCmmDecl platform) ssaLive)
 
         -- allocate registers

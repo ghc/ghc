@@ -18,8 +18,9 @@ module GHC.CmmToAsm.SSA (
 
 import GHC.Prelude
 
-import Data.Bifunctor (second)
-import Data.Containers.ListUtils (nubInt)
+import Control.Monad (foldM)
+
+import Data.Bifunctor (Bifunctor (bimap))
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IM
 import Data.IntSet (IntSet)
@@ -33,19 +34,19 @@ import Data.Tuple (swap)
 import GHC.Cmm (GenCmmDecl(..), GenBasicBlock(..))
 import GHC.Cmm.BlockId (BlockId, mkBlockId)
 import GHC.Cmm.Dataflow.Collections
-    ( IsMap(..), IsSet(setFromList, setElems) )
+    ( IsMap(..), IsSet(..) )
 import GHC.Cmm.Dataflow.Label (LabelMap, LabelSet)
 
 import GHC.CmmToAsm.CFG
 import GHC.CmmToAsm.CFG.Dominators
-    ( Node, idom, fromEdges, ancestors, asTree )
+    ( Node, idom, fromEdges, asTree )
 import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.Reg.Liveness
 
 import GHC.Data.Graph.Directed (SCC(..))
 
 import GHC.Platform (Platform)
-import GHC.Platform.Reg (isVirtualReg, Reg (RegVirtual, RegReal), renameVirtualReg, isRealReg)
+import GHC.Platform.Reg (isVirtualReg, Reg (RegVirtual, RegReal), renameVirtualReg)
 
 import GHC.Types.Unique
 import GHC.Types.Unique.DFM
@@ -57,6 +58,9 @@ import GHC.Utils.Misc (HasDebugCallStack)
 import GHC.Utils.Monad.State
 import GHC.Utils.Outputable
 import GHC.Utils.Panic (panic)
+
+-- Debugging only
+-- import Debug.Trace
 
 
 -- TODO: Should we also bundle CFG? Not useful without. Maybe even idomList...
@@ -192,15 +196,14 @@ constructPrunedSSA platform cfg (CmmProc liveInfo lbl live sccs)
          -- All immediate dominators
          let idomList   = idom rooted
          let ssaSccs    = {-# SCC "placePhis" #-}
-                 placePhis cfg entry idomList defsites liveVRegsOnEntry sccs
+                 placePhis cfg idomList defsites liveVRegsOnEntry sccs
+
          let blkTbl     = toBlockLookupTable ssaSccs
          let domTree    = domTreeFromList entry idomList
 
-         (liveInsRenamed, blkTblRenamed)
+         (blkTblRenamed, liveInsRenamed)
                 <- {-# SCC "renameVars" #-}
                    renameVars platform cfg blkTbl liveVRegsOnEntry domTree
-
-         -- TODO: maybe lint/assert that phis etc. only contain vregs?
 
          return (CmmProc
                         (LiveInfo info entries liveInsRenamed liveStackSlots)
@@ -217,39 +220,53 @@ toIntMap m     = IM.fromList $ map (\(x,y) -> (fromBlockId x,y)) $ mapToList m
 placePhis
         :: Instruction instr
         => CFG                  -- ^ Control Flow Graph
-        -> BlockId              -- ^ BlockId of proc entry point
         -> IDomList             -- ^ List of pre-computed immediate dominator for each node
         -> DefSites             -- ^ Map of vregs to blocks where they are defined
         -> BlockMap RegSet      -- ^ Live_in sets
         -> [SCC (LiveBasicBlock instr)]
         -> [SCC (SSABasicBlock instr)]
 
-placePhis cfg root idomList defsites liveIns sccs
+placePhis cfg idomList defsites liveIns sccs
  = map (fmap (mkSSABasicBlock allPhis)) sccs
  where
-         -- Dominance Frontier of node n
-         df n = mapFindWithDefault [] n $ domFrontiers cfg root idomList
-
-         -- Map of Blocks to Phi-Funcs to insert
-         allPhis = foldr (overVar) mapEmpty $ nonDetUFMToList defsites
-         -- ^ See Note [Unique Determinism and code generation]
+         -- 'Globals' as in alive outside of block with definition.
+         -- See Note [Unique Determinism and code generation]
          -- Order of Phi-nodes not important, only order of copies inserted
          -- in out-of-ssa transformation.
+         globals = filterUniqSet isVirtualReg
+                 $ unionManyUniqSets
+                 $ mapElems liveIns
+
+         -- Global to its definition sites
+         globalDefs = intersectUFM defsites $ getUniqSet globals
+
+         -- Dominance Frontier of node n
+         df n = mapFindWithDefault [] n
+              $ domFrontiers cfg idomList
+
+         -- Map of Blocks to Phi-Funcs to insert
+         allPhis = foldl' overVar mapEmpty $ nonDetUFMToList globalDefs
+         -- ^ See Note [Unique Determinism and code generation]
 
          -- Top level fun for mkVarPhi
-         overVar (u, defs) phis = mkVarPhi phis u $ nonDetEltsUniqSet defs
+         overVar !phis (u, defs) = mkVarPhi phis setEmpty u $ nonDetEltsUniqSet defs
          -- ^ See Note [Unique Determinism and code generation]
 
          -- Makes all Phi-Funcs for a variable
-         mkVarPhi phis _ []     = phis
-         mkVarPhi phis u (b:bs) = let (phis', wl) = overDF phis u b
-                                  in  mkVarPhi phis' u (wl ++ bs)
+         mkVarPhi :: BlockMap [PhiFun] -> LabelSet -> RegId -> [BlockId] -> BlockMap [PhiFun]
+         mkVarPhi phis _ _ []           = phis
+         mkVarPhi phis visited u (b:bs)
+                = let visited' = setInsert b visited
+                      (phis', wl) = overDF phis visited' u b
+                  in  mkVarPhi phis' visited' u (wl ++ bs)
 
          -- Function over DF(n), adding Phi-Funcs to blocks and
          -- return work-list with new nodes to visit
-         overDF phis u n = foldr
-                (\x (ph, wl) -> (if isLive u x        then mkBlockPhi ph u x else ph,
-                                 if isOriginalDef u x then wl                else x:wl))
+         overDF phis visited u n =
+                foldl'
+                (\(ph, wl) x
+                        -> (if isLive u x          then mkBlockPhi ph u x else ph,
+                            if setMember x visited then wl                else x:wl))
                 (phis, [])
                 $ df n
 
@@ -271,10 +288,6 @@ placePhis cfg root idomList defsites liveIns sccs
 
          -- Is vreg live in block b?
          isLive u b = maybe False (elemUniqSet_Directly u) (mapLookup b liveIns)
-
-         -- Was there a def of u in b already? If not, we have to visit this block too
-         isOriginalDef u b = elementOfUniqSet b
-                           $ lookupWithDefaultUFM_Directly defsites emptyUniqSet u
 
 
 adjustUDFM_M
@@ -303,7 +316,7 @@ renameVars
         -> BlockMap RegSet              -- ^ Live_in sets
         -> Tree Node                    -- ^ Precomputed Dominator Tree
                 -- | Result: Live_in sets with new definitions, blocks with renamed vars
-        -> RenameM (BlockMap RegSet, BlockLookupTable instr)
+        -> RenameM (BlockLookupTable instr, BlockMap RegSet)
 
 renameVars platform cfg blkTbl liveIns (T.Node n sub)
  = do
@@ -319,23 +332,26 @@ renameVars platform cfg blkTbl liveIns (T.Node n sub)
         -- Update Live_in set
         -- With "Phi functions are parallel copies"-semantics, given a_n = Phi(a_0,...),
         -- a_n is in Live_in of Block b_n and for k < n, a_k is in Live_out of Block b_k
-        let mBlk = lookupUDFM blkTbl2 bid
-        let mPhis = fmap (ssaBBlockPhiFuns . sccBitBlock) mBlk
+        let mBlk     = lookupUDFM blkTbl2 bid
+        let mPhis    = fmap (ssaBBlockPhiFuns . sccBitBlock) mBlk
         let liveIns2 = maybe liveIns
                         (\phis -> mapAdjust (\rs -> foldl' mergeMaybe rs phis) bid liveIns)
                         mPhis
 
         -- Recursing into successors in DomTree, i.e., DFS pre-order iteration
-        (liveIns_updated, blkTbl_updated)
+        (blkTbl_updated, liveIns_updated)
                 <- if null sub
-                        then return (liveIns2, blkTbl2)
-                        else renameVars platform cfg blkTbl2 liveIns2 (head sub)
+                        then return (blkTbl2, liveIns2)
+                        else foldM
+                                (\(bs, ls) tr -> renameVars platform cfg bs ls tr)
+                                (blkTbl2, liveIns2)
+                                sub
 
         leaveScope
 
-        return (liveIns_updated, blkTbl_updated)
+        return (blkTbl_updated, liveIns_updated)
  where
-         mergeMaybe rs phi      = fromMaybe rs (mergePhiToLiveSet rs phi)
+         mergeMaybe rs phi = fromMaybe rs (mergePhiToLiveSet rs phi)
 
 
 renameVars_block
@@ -368,8 +384,8 @@ addSuccessorPhiArgs cfg blkTbl bid
  = do
          let succs    =  getSuccessors cfg bid
          rds          <- gets stateReachingDef
-         let blkTbl'  =  foldl' (adjustUDFM $ fmap (mapOverPhis $ insertPhiArg rds)) blkTbl succs
-         return (blkTbl')
+         let blkTbl'  =  foldl' (adjustUDFM $ fmap (mapOverPhis (insertPhiArg rds))) blkTbl succs
+         return blkTbl'
  where
          mapOverPhis f (SSABB phis blk) = SSABB (map f phis) blk
 
@@ -573,54 +589,36 @@ slurpDefs platfrom defs (BasicBlock bid instrs)
                                  $ zipToUFM newDefs (repeat $ unitUniqSet bid)
 
 -- | Calculate dominance frontier for each node in graph.
--- TODO: Implement this internally in Dominators, s.t. we can reuse the internal state
+-- TODO: Maybe implement this internally in Dominators, s.t. we can reuse the internal state
 domFrontiers
         :: HasDebugCallStack
         => CFG          -- ^ Control Flow Graph
-        -> BlockId      -- ^ BlockId of proc entry point
         -> IDomList     -- ^ List of pre-computed immediate dominator for each node
         -> BlockMap [BlockId]
-domFrontiers cfg root idomList
+domFrontiers cfg idomList
  = let
-         -- All immediate dominators
+         cfgNodeIds     = getCfgNodes cfg
          idoms          = IM.fromList idomList
 
-         successors bid = getSuccessors cfg bid
+         df_inner n df r = if Just r == (IM.lookup n idoms)
+                           then df
+                           else let df' = (IM.insertWith (++) n [r] df)
+                                in case IM.lookup r idoms of
+                                        Nothing -> df'
+                                        Just r' -> df_inner n df' r'
 
-         cfgNodeIds     = getCfgNodes cfg
+         df_preds df bid
+                = let preds = map fromBlockId $ getPredecessors cfg bid
+                      n     = fromBlockId bid
+                  in  if length preds <= 1
+                      then df
+                      else foldl' (df_inner n) df preds
 
-         -- Dominators from GHC.CmmToAsm.CFG.Dominators, but using precomputed idoms
-         doms =
-                let     r  = fromBlockId root
-                        is = filter ((/= r) . fst) idomList
-                        tg = fromEdges (fmap swap is)
-                in IM.fromList
-                        $ map (second IS.fromList)
-                        $ ancestors
-                        $ asTree (r,tg)
 
-         -- Successors of n, not strictly dominated by n
-         df_local n     = let  lookupIDom x = IM.findWithDefault (-1 :: Node) x idoms
-                          in   filter
-                                 (\y -> (lookupIDom y) /= n)
-                                 $ map fromBlockId
-                                 $ successors (toBlockId n)
 
-         -- Map of n to children of n in dominator tree, i.e., the nodes that n immediately dominates
-         idomees = foldl' (\res (x, y) -> IM.insertWith IS.union y (IS.singleton x) res) IM.empty idomList
+         dominanceFrontiers = foldl' df_preds IM.empty cfgNodeIds
 
-         -- Nodes in the dominance frontier of n, that are not dominated by n's
-         -- immediate dominator
-         df_up n        = let  children    = IS.toList $ IM.findWithDefault IS.empty n idomees
-                               df_children = nubInt $ concatMap df children
-                               domset x    = IM.findWithDefault IS.empty x doms
-                          in   filter (IS.member n . domset) df_children
-
-         -- Wait, are DF_local and DF_up disjoint or not???
-         df n           = IS.toList $ IS.fromList (df_local n) `IS.union` IS.fromList (df_up n)
-
-   in   mapFromList $ map (\n -> (n, map toBlockId $ df $ fromBlockId n)) cfgNodeIds
-
+   in    toBlockMap $ IM.toList dominanceFrontiers
 
 -- | Build the dominator tree from given list of immediate dominators
 --   (Adapted from GHC.CmmToAsm.CFG.Dominators.domTree)
@@ -642,6 +640,10 @@ numPred cfg = count mapEmpty $ edgeList cfg
                 = let m' = mapAlter (fmap succ) to m
                   in  count m' rem
 
+getPredecessors :: CFG -> BlockId -> [BlockId]
+getPredecessors cfg n = let reverseCfg = reverseEdges cfg
+                        in  getSuccessors reverseCfg n
+
 -- TODO refactor to Utils
 fromBlockId :: BlockId -> Int
 fromBlockId= getKey . getUnique
@@ -649,6 +651,9 @@ fromBlockId= getKey . getUnique
 
 toBlockId :: Int -> BlockId
 toBlockId = mkBlockId . mkUniqueGrimily
+
+toBlockMap :: [(Int, [Int])] -> BlockMap [BlockId]
+toBlockMap xs = mapFromList $ map (bimap toBlockId (map toBlockId)) xs
 
 -- Rename Monad -----------------------------------------------------
 
@@ -756,8 +761,9 @@ instance Outputable PhiFun where
 
 instance (Instruction instr) => OutputableP Platform (SSABasicBlock instr) where
         pdoc platform (SSABB phis liveBB)
-            = vcat (map ppr phis)
-              $$ ppr (fmap (fmap (pprInstr platform)) liveBB)
+            =  text "Phi-Functions:"
+            $$ nest 8 (vcat (map ppr phis))
+            $$ ppr (fmap (fmap (pprInstr platform)) liveBB)
 
 
 pprSsaLiveCmmDecl
