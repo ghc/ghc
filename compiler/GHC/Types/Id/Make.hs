@@ -610,14 +610,14 @@ mkDataConWorkId wkr_name data_con
                    mkLams univ_tvs $ Lam id_arg1 $
                    wrapNewTypeBody tycon res_ty_args (Var id_arg1)
 
-dataConCPR :: DataCon -> CprResult
+dataConCPR :: DataCon -> Cpr
 dataConCPR con
   | isDataTyCon tycon     -- Real data types only; that is,
                           -- not unboxed tuples or newtypes
   , null (dataConExTyCoVars con)  -- No existentials
   , wkr_arity > 0
   , wkr_arity <= mAX_CPR_SIZE
-  = conCpr (dataConTag con)
+  = flatConCpr (dataConTag con)
   | otherwise
   = topCpr
   where
