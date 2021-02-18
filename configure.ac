@@ -1497,8 +1497,7 @@ checkMake380 gmake
 
 dnl Things specific to the make build system
 AC_CONFIG_FILES(
-[
-  mk/config.mk
+[ mk/config.mk
   mk/install.mk
   mk/project.mk
 ])
@@ -1506,8 +1505,7 @@ AC_CONFIG_FILES(
 dnl When adding things to this list be sure to update hadrian's
 dnl Rules.Configure.configureResults list.
 AC_CONFIG_FILES(
-[
-  rts/rts.cabal
+[ rts/rts.cabal
   compiler/ghc.cabal
   ghc/ghc-bin.cabal
   utils/runghc/runghc.cabal
