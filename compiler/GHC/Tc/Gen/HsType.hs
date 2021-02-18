@@ -1127,7 +1127,7 @@ tc_hs_type mode (HsQualTy { hst_ctxt = ctxt, hst_body = rn_ty }) exp_kind
        ; ek <- newOpenTypeKind  -- The body kind (result of the function) can
                                 -- be TYPE r, for any r, hence newOpenTypeKind
        ; ty' <- tc_lhs_type mode rn_ty ek
-       ; checkExpectedKind (unLoc rn_ty) (mkPhiTy ctxt' ty')
+       ; checkExpectedKind (unLoc rn_ty) (mkUserPhiTy ctxt' ty')
                            liftedTypeKind exp_kind }
 
 --------- Lists, arrays, and tuples
@@ -1242,6 +1242,63 @@ tc_hs_type mode ty@(HsAppKindTy{})         ek = tc_infer_hs_type_ek mode ty ek
 tc_hs_type mode ty@(HsOpTy {})             ek = tc_infer_hs_type_ek mode ty ek
 tc_hs_type mode ty@(HsKindSig {})          ek = tc_infer_hs_type_ek mode ty ek
 tc_hs_type mode ty@(XHsType {})            ek = tc_infer_hs_type_ek mode ty ek
+
+-- | Make a phi type where all the empty-tuple constraints are filtered out
+-- See Note [Eliminating empty constraint tuples]
+
+mkUserPhiTy :: [PredType] -> Type -> Type
+mkUserPhiTy context ty = mkPhiTy (filter (not . isTupleEmpty) context) ty
+  where
+    isTupleEmpty :: PredType -> Bool
+    isTupleEmpty predTy =
+      case splitTyConApp_maybe predTy of
+        Just (tc, []) -> cTupleTyConNameArity_maybe (tyConName tc) == Just 0
+        _             -> False
+
+{-
+Note [Eliminating empty constraint tuples]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose the user writes type signatures like this:
+   f1 :: () => blah
+   f2 :: ((), ()) => blah
+   f3 :: ((), Eq a, ()) => blah
+
+   type Foo = ()
+   f4 :: Foo => blah
+   f5 :: (Eq a, Foo) => blah
+
+Then we'd like to behave just as if they had written
+   f1 :: blah
+   f2 :: blah
+   f3 :: Eq a => blah
+   f4 :: blah
+   f5 :: Eq a => blah
+
+That is, eliminate any empty constraint tuple.
+
+* We want to "look through" any type synonyms, such
+  as `Foo` above
+
+* Do any users write such signatures?  Answer: yes, if they
+  use CPP.  See #19275
+
+* We must *only* do this tuple-elimination when desugaring a user-written
+  `HsType` into a `Type`.  It would be very wrong to do this
+  empty-tuple-elimination in general, because it affects the API of the
+  function concerned.
+
+* It's slightly alarming changing the type that the user wrote.
+  For example, consider
+     f :: forall a c. (c => a -> a) -> a -> a
+  and the call
+     ...(f @Int @() (e :: () => Int -> Int))....
+
+  Here `f`, instantiated at c=(), expects an argument of type `() => Int -> Int`.
+  We give `e` precisely that signature, but it turns into `e :: Int -> Int`,
+  which isn't quite what `f` expects.  But all is well because we'll generalise
+  (driven by f's expected type).
+-}
+
 
 {-
 Note [Variable Specificity and Forall Visibility]
