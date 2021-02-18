@@ -2234,7 +2234,7 @@ bool doIdleGCWork(Capability *cap STG_UNUSED, bool all)
  * a lot lower.
  *
  * For a heap of size ~1.5G, this would result in OS memory reporting 6G which is
- * both misleading and worrying for clients.
+ * both misleading and worrying for users.
  * In long-lived server applications this results in consistent high memory
  * usage when the live data size is much more reasonable (for example ghcide)
  *
