@@ -1,61 +1,70 @@
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
--- | Types for the Constructed Product Result lattice. "GHC.Core.Opt.CprAnal" and "GHC.Core.Opt.WorkWrap.Utils"
+-- | Types for the Constructed Product Result lattice.
+-- "GHC.Core.Opt.CprAnal" and "GHC.Core.Opt.WorkWrap.Utils"
 -- are its primary customers via 'GHC.Types.Id.idCprInfo'.
 module GHC.Types.Cpr (
-    CprResult, topCpr, botCpr, conCpr, asConCpr,
-    CprType (..), topCprType, botCprType, conCprType,
+    Cpr, topCpr, botCpr, flatConCpr, asConCpr,
+    CprType (..), topCprType, botCprType, flatConCprType,
     lubCprType, applyCprTy, abstractCprTy, ensureCprTyArity, trimCprTy,
+    expandConFieldsCpr, argCprType,
     CprSig (..), topCprSig, mkCprSigForArity, mkCprSig, seqCprSig
   ) where
 
 import GHC.Prelude
 
+import GHC.Core.DataCon
+import GHC.Core.Multiplicity
+import GHC.Core.Type
 import GHC.Types.Basic
-import GHC.Utils.Outputable
+import GHC.Types.Unbox
 import GHC.Utils.Binary
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 --
--- * CprResult
+-- * Cpr
 --
 
--- | The constructed product result lattice.
---
--- @
---                    NoCPR
---                      |
---                 ConCPR ConTag
---                      |
---                    BotCPR
--- @
-data CprResult = NoCPR          -- ^ Top of the lattice
-               | ConCPR !ConTag -- ^ Returns a constructor from a data type
-               | BotCPR         -- ^ Bottom of the lattice
-               deriving( Eq, Show )
+data Cpr
+  = BotCpr
+  | ConCpr !ConTag ![Cpr] -- Empty field CPR means topCpr everywhere
+  | TopCpr
+  deriving Eq
 
-lubCpr :: CprResult -> CprResult -> CprResult
-lubCpr (ConCPR t1) (ConCPR t2)
-  | t1 == t2               = ConCPR t1
-lubCpr BotCPR      cpr     = cpr
-lubCpr cpr         BotCPR  = cpr
-lubCpr _           _       = NoCPR
+lubCpr :: Cpr -> Cpr -> Cpr
+lubCpr BotCpr      cpr     = cpr
+lubCpr cpr         BotCpr  = cpr
+lubCpr (ConCpr t1 cs1) (ConCpr t2 cs2)
+  | t1 == t2 = ConCpr t1 (lubFieldCprs cs1 cs2)
+lubCpr _           _       = TopCpr
 
-topCpr :: CprResult
-topCpr = NoCPR
+lubFieldCprs :: [Cpr] -> [Cpr] -> [Cpr]
+lubFieldCprs as bs
+  | as `equalLength` bs = zipWith lubCpr as bs
+  | otherwise           = []
 
-botCpr :: CprResult
-botCpr = BotCPR
+topCpr :: Cpr
+topCpr = TopCpr
 
-conCpr :: ConTag -> CprResult
-conCpr = ConCPR
+botCpr :: Cpr
+botCpr = BotCpr
 
-trimCpr :: CprResult -> CprResult
-trimCpr ConCPR{} = NoCPR
+flatConCpr :: ConTag -> Cpr
+flatConCpr t = ConCpr t []
+
+trimCpr :: Cpr -> Cpr
+trimCpr ConCpr{} = TopCpr
 trimCpr cpr      = cpr
 
-asConCpr :: CprResult -> Maybe ConTag
-asConCpr (ConCPR t)  = Just t
-asConCpr NoCPR       = Nothing
-asConCpr BotCPR      = Nothing
+asConCpr :: Cpr -> Maybe (ConTag, [Cpr])
+asConCpr (ConCpr t cs) = Just (t, cs)
+asConCpr TopCpr        = Nothing
+asConCpr BotCpr        = Nothing
+
+seqCpr :: Cpr -> ()
+seqCpr (ConCpr _ cs) = foldr (seq . seqCpr) () cs
+seqCpr _             = ()
 
 --
 -- * CprType
@@ -64,10 +73,10 @@ asConCpr BotCPR      = Nothing
 -- | The abstract domain \(A_t\) from the original 'CPR for Haskell' paper.
 data CprType
   = CprType
-  { ct_arty :: !Arity     -- ^ Number of value arguments the denoted expression
-                          --   eats before returning the 'ct_cpr'
-  , ct_cpr  :: !CprResult -- ^ 'CprResult' eventually unleashed when applied to
-                          --   'ct_arty' arguments
+  { ct_arty :: !Arity -- ^ Number of value arguments the denoted expression
+                      --   eats before returning the 'ct_cpr'
+  , ct_cpr  :: !Cpr   -- ^ 'Cpr' eventually unleashed when applied to
+                      --   'ct_arty' arguments
   }
 
 instance Eq CprType where
@@ -78,10 +87,10 @@ topCprType :: CprType
 topCprType = CprType 0 topCpr
 
 botCprType :: CprType
-botCprType = CprType 0 botCpr -- TODO: Figure out if arity 0 does what we want... Yes it does: arity zero means we may unleash it under any number of incoming arguments
+botCprType = CprType 0 botCpr
 
-conCprType :: ConTag -> CprType
-conCprType con_tag = CprType 0 (conCpr con_tag)
+flatConCprType :: ConTag -> CprType
+flatConCprType con_tag = CprType 0 (flatConCpr con_tag)
 
 lubCprType :: CprType -> CprType -> CprType
 lubCprType ty1@(CprType n1 cpr1) ty2@(CprType n2 cpr2)
@@ -112,6 +121,38 @@ ensureCprTyArity n ty@(CprType m _)
 trimCprTy :: CprType -> CprType
 trimCprTy (CprType arty res) = CprType arty (trimCpr res)
 
+-- | Unpacks a 'ConCpr'-shaped 'CprType' and returns the field 'Cpr's.
+-- The length of the returned list matches the arity of the 'DataCon'.
+expandConFieldsCpr :: DataCon -> CprType -> [Cpr]
+expandConFieldsCpr dc (CprType 0 BotCpr) = replicate (dataConRepArity dc) botCpr
+expandConFieldsCpr dc (CprType 0 (ConCpr t cs))
+  | t == dataConTag dc, cs `lengthIs` dataConRepArity dc = cs
+expandConFieldsCpr dc _                  = replicate (dataConRepArity dc) topCpr
+
+-- | Produces a 'CprType' according to how a strict argument will be unboxed.
+-- Examples:
+--
+--   * A head-strict demand `S` on `Int` would translate to `1`
+--   * A tuple demand `S(S,L)` on `(Int, Bool)` would translate to `1(1,)`
+--   * A tuple demand `S(S,L)` on `(a , Bool)` would translate to `1(,)`,
+--     because the unboxing strategy would not unbox the `a`.
+argCprType :: UnboxingStrategy s -> Type -> s -> CprType
+argCprType want_to_unbox arg_ty s = CprType 0 (go arg_ty s)
+  where
+    go ty s
+      | Unbox (DataConPatContext { dcpc_dc = dc, dcpc_tc_args = tc_args }) ss
+          <- want_to_unbox ty s
+      -- No existentials; see Note [Which types are unboxed?])
+      -- Otherwise we'd need to call dataConRepInstPat here and thread a UniqSupply
+      , null (dataConExTyCoVars dc)
+      , let arg_tys = map scaledThing (dataConInstArgTys dc tc_args)
+      = ConCpr (dataConTag dc) (zipWith go arg_tys ss)
+      | otherwise
+      = topCpr
+
+seqCprTy :: CprType -> ()
+seqCprTy (CprType _ cpr) = seqCpr cpr
+
 -- | The arity of the wrapped 'CprType' is the arity at which it is safe
 -- to unleash. See Note [Understanding DmdType and StrictSig] in "GHC.Types.Demand"
 newtype CprSig = CprSig { getCprSig :: CprType }
@@ -126,16 +167,28 @@ mkCprSigForArity arty ty = CprSig (ensureCprTyArity arty ty)
 topCprSig :: CprSig
 topCprSig = CprSig topCprType
 
-mkCprSig :: Arity -> CprResult -> CprSig
+mkCprSig :: Arity -> Cpr -> CprSig
 mkCprSig arty cpr = CprSig (CprType arty cpr)
 
 seqCprSig :: CprSig -> ()
-seqCprSig sig = sig `seq` ()
+seqCprSig (CprSig ty) = seqCprTy ty
 
-instance Outputable CprResult where
-  ppr NoCPR        = empty
-  ppr (ConCPR n)   = char 'm' <> int n
-  ppr BotCPR       = char 'b'
+-- | BNF:
+-- ```
+--   cpr ::= ''                               -- TopCpr
+--        |  n '(' cpr1 ',' cpr2 ',' ... ')'  -- ConCpr n [cpr1,cpr2,...]
+--        |  n                                -- ConCpr n [TopCpr,TopCpr...]
+--        |  'b'                              -- BotCpr
+-- ```
+-- Examples:
+--   * `f x = f x` has denotation `b`
+--   * `1(1,)` is a valid (nested) 'Cpr' denotation for `(I# 42#, f 42)`.
+instance Outputable Cpr where
+  ppr TopCpr             = empty
+  ppr (ConCpr n cs)
+    | all (== topCpr) cs = int n
+    | otherwise          = int n <> parens (pprWithCommas ppr cs)
+  ppr BotCpr             = char 'b'
 
 instance Outputable CprType where
   ppr (CprType arty res) = ppr arty <> ppr res
@@ -144,20 +197,18 @@ instance Outputable CprType where
 instance Outputable CprSig where
   ppr (CprSig ty) = ppr (ct_cpr ty)
 
-instance Binary CprResult where
-  put_ bh (ConCPR n)   = do { putByte bh 0; put_ bh n }
-  put_ bh NoCPR        = putByte bh 1
-  put_ bh BotCPR       = putByte bh 2
-
+instance Binary Cpr where
+  put_ bh (ConCpr n cs) = putByte bh 0 *> put_ bh n *> put_ bh cs
+  put_ bh TopCpr        = putByte bh 1
+  put_ bh BotCpr        = putByte bh 2
   get  bh = do
-          h <- getByte bh
-          case h of
-            0 -> do { n <- get bh; return (ConCPR n) }
-            1 -> return NoCPR
-            _ -> return BotCPR
+    h <- getByte bh
+    case h of
+      0 -> ConCpr <$> get bh <*> get bh
+      1 -> return TopCpr
+      2 -> return BotCpr
+      _ -> pprPanic "Binary Cpr: Invalid tag" (int (fromIntegral h))
 
 instance Binary CprType where
-  put_ bh (CprType arty cpr) = do
-    put_ bh arty
-    put_ bh cpr
-  get  bh = CprType <$> get bh <*> get bh
+  put_ bh (CprType arty cpr) = put_ bh arty *> put_ bh cpr
+  get  bh                    = CprType <$> get bh <*> get bh

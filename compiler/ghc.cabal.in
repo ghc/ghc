@@ -657,6 +657,7 @@ Library
         GHC.Types.Target
         GHC.Types.TypeEnv
         GHC.Types.TyThing
+        GHC.Types.Unbox
         GHC.Types.Unique
         GHC.Types.Unique.DFM
         GHC.Types.Unique.DSet
