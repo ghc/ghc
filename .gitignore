@@ -86,7 +86,6 @@ _darcs/
 /compiler/stage1/
 /compiler/stage2/
 /compiler/stage3/
-/compiler/dist-newstyle/
 /ghc/stage1/
 /ghc/stage2/
 /ghc/stage3/
