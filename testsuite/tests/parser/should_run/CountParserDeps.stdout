@@ -186,6 +186,7 @@ GHC.Types.SrcLoc
 GHC.Types.Target
 GHC.Types.TyThing
 GHC.Types.TypeEnv
+GHC.Types.Unbox
 GHC.Types.Unique
 GHC.Types.Unique.DFM
 GHC.Types.Unique.DSet
