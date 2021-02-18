@@ -1,4 +1,4 @@
-Found 249 GHC.Parser module dependencies
+Found 250 GHC.Parser module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.Types
@@ -186,6 +186,7 @@ GHC.Types.SrcLoc
 GHC.Types.Target
 GHC.Types.TyThing
 GHC.Types.TypeEnv
+GHC.Types.Unbox
 GHC.Types.Unique
 GHC.Types.Unique.DFM
 GHC.Types.Unique.DSet
