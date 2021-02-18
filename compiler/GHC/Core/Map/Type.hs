@@ -165,7 +165,7 @@ trieMapView ty
   -- First check for TyConApps that need to be expanded to
   -- AppTy chains.
   | Just (tc, tys@(_:_)) <- tcSplitTyConApp_maybe ty
-  = Just $ foldl' AppTy (TyConApp tc []) tys
+  = Just $ foldl' AppTy (mkTyConTy tc) tys
 
   -- Then resolve any remaining nullary synonyms.
   | Just ty' <- tcView ty = Just ty'
