@@ -491,9 +491,6 @@ initLinker_ (int retain_cafs)
 
 void
 exitLinker( void ) {
-#if defined(OBJFORMAT_PEi386)
-   exitLinker_PEi386();
-#endif
 #if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
    if (linker_init_done == 1) {
       regfree(&re_invalid);
