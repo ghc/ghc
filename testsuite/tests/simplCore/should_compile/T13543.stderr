@@ -8,8 +8,8 @@ Foo.g: <1P(1P(L),1P(L))>
 
 ==================== Cpr signatures ====================
 Foo.$trModule:
-Foo.f: m1
-Foo.g: m1
+Foo.f: 1
+Foo.g: 1
 
 
 
