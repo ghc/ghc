@@ -1127,7 +1127,7 @@ tc_hs_type mode (HsQualTy { hst_ctxt = ctxt, hst_body = rn_ty }) exp_kind
        ; ek <- newOpenTypeKind  -- The body kind (result of the function) can
                                 -- be TYPE r, for any r, hence newOpenTypeKind
        ; ty' <- tc_lhs_type mode rn_ty ek
-       ; checkExpectedKind (unLoc rn_ty) (mkPhiTy ctxt' ty')
+       ; checkExpectedKind (unLoc rn_ty) (mkPhiTy' ctxt' ty')
                            liftedTypeKind exp_kind }
 
 --------- Lists, arrays, and tuples
