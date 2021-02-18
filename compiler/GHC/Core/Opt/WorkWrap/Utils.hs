@@ -26,6 +26,7 @@ import GHC.Types.Id.Info ( JoinArity )
 import GHC.Core.DataCon
 import GHC.Types.Demand
 import GHC.Types.Cpr
+import GHC.Types.Unbox
 import GHC.Core.Make    ( mkAbsentErrorApp, mkCoreUbxTup
                         , mkCoreApp, mkCoreLet )
 import GHC.Types.Id.Make ( voidArgId, voidPrimId )
@@ -135,7 +136,7 @@ mkWwBodies :: DynFlags
                              -- See Note [Freshen WW arguments]
            -> Id             -- The original function
            -> [Demand]       -- Strictness of original function
-           -> CprResult      -- Info about function result
+           -> Cpr            -- Info about function result
            -> UniqSM (Maybe WwResult)
 
 -- wrap_fn_args E       = \x y -> E
@@ -599,8 +600,8 @@ mkWWstr_one dflags fam_envs has_inlineable_prag arg
      -- (that's what mk_absent_let does)
   = return (True, [], nop_fn, work_fn)
 
-  | Just (cs, acdc) <- wantToUnbox fam_envs has_inlineable_prag arg_ty dmd
-  = unbox_one dflags fam_envs arg cs acdc
+  | Unbox dcpc cs <- wantToUnbox fam_envs has_inlineable_prag arg_ty dmd
+  = unbox_one dflags fam_envs arg cs dcpc
 
   | otherwise   -- Other cases
   = return (False, [arg], nop_fn, nop_fn)
@@ -609,7 +610,7 @@ mkWWstr_one dflags fam_envs has_inlineable_prag arg
     arg_ty = idType arg
     dmd    = idDemandInfo arg
 
-wantToUnbox :: FamInstEnvs -> Bool -> Type -> Demand -> Maybe ([Demand], DataConPatContext)
+wantToUnbox :: FamInstEnvs -> Bool -> UnboxingStrategy Demand
 -- See Note [Which types are unboxed?]
 wantToUnbox fam_envs has_inlineable_prag ty dmd =
   case splitArgType_maybe fam_envs ty of
@@ -622,8 +623,10 @@ wantToUnbox fam_envs has_inlineable_prag ty dmd =
       , not (has_inlineable_prag && isClassPred ty)
       -- See Note [mkWWstr and unsafeCoerce]
       , cs `lengthIs` arity
-      -> Just (cs, dcpc)
-    _ -> Nothing
+      -- See Note [Add demands for strict constructors]
+      , let cs' = addDataConStrictness dc cs
+      -> Unbox dcpc cs'
+    _ -> StopUnboxing
   where
     split_prod_dmd_arity dmd arity
       -- For seqDmd, it should behave like <S(AAAA)>, for some
@@ -643,9 +646,7 @@ unbox_one dflags fam_envs arg cs
        ; let ex_name_fss     = map getOccFS $ dataConExTyCoVars dc
              (ex_tvs', arg_ids) =
                dataConRepFSInstPat (ex_name_fss ++ repeat ww_prefix) pat_bndrs_uniqs (idMult arg) dc tc_args
-             -- See Note [Add demands for strict constructors]
-             cs'       = addDataConStrictness dc cs
-             arg_ids'  = zipWithEqual "unbox_one" setIdDemandInfo arg_ids cs'
+             arg_ids'  = zipWithEqual "unbox_one" setIdDemandInfo arg_ids cs
              unbox_fn  = mkUnpackCase (Var arg) co (idMult arg) case_bndr_uniq
                                       dc (ex_tvs' ++ arg_ids')
              arg_no_unf = zapStableUnfolding arg
@@ -663,6 +664,10 @@ nop_fn body = body
 
 addDataConStrictness :: DataCon -> [Demand] -> [Demand]
 -- See Note [Add demands for strict constructors]
+addDataConStrictness con ds
+  | Nothing <- dataConWrapId_maybe con
+  -- DataCon worker=wrapper. Implies no strict fields, so nothing to do
+  = ds
 addDataConStrictness con ds
   = zipWithEqual "addDataConStrictness" add ds strs
   where
@@ -935,22 +940,6 @@ off the unpacking in mkWWstr_one (see the isClassPred test).
 Historical note: #14955 describes how I got this fix wrong the first time.
 -}
 
--- | The result of 'splitArgType_maybe' and 'splitResultType_maybe'.
---
--- Both splits
---   * Take a type `ty`
---   * Succeed with (DataConPatContext dc tys co)
---     iff co :: T tys ~ ty
---     and `dc` is the appropriate DataCon of `T`
---     and `T` is suitable for the kind of split
---     (differs for strictness and CPR, see Note [Which types are unboxed?])
-data DataConPatContext
-  = DataConPatContext
-  { dcpc_dc        :: !DataCon
-  , dcpc_tc_args   :: ![Type]
-  , dcpc_co        :: !Coercion
-  }
-
 -- | If @splitArgType_maybe ty = Just (dc, tys, co)@
 -- then @dc \@tys \@_ex_tys (_args::_arg_tys) :: tc tys@
 -- and  @co :: ty ~ tc tys@
@@ -1118,7 +1107,7 @@ left-to-right traversal of the result structure.
 mkWWcpr :: Bool
         -> FamInstEnvs
         -> Type                              -- function body type
-        -> CprResult                         -- CPR analysis results
+        -> Cpr                               -- CPR analysis results
         -> UniqSM (Bool,                     -- Is w/w'ing useful?
                    CoreExpr -> CoreExpr,     -- New wrapper
                    CoreExpr -> CoreExpr,     -- New worker
@@ -1131,12 +1120,13 @@ mkWWcpr opt_CprAnal fam_envs body_ty cpr
   | otherwise
   = case asConCpr cpr of
        Nothing      -> return (False, id, id, body_ty)  -- No CPR info
-       Just con_tag | Just dcpc <- splitResultType_maybe fam_envs con_tag body_ty
-                    -> mkWWcpr_help dcpc
-                    |  otherwise
-                       -- See Note [non-algebraic or open body type warning]
-                    -> WARN( True, text "mkWWcpr: non-algebraic or open body type" <+> ppr body_ty )
-                       return (False, id, id, body_ty)
+       Just (con_tag, _cprs)
+         | Just dcpc <- splitResultType_maybe fam_envs con_tag body_ty
+         -> mkWWcpr_help dcpc
+         |  otherwise
+         -- See Note [non-algebraic or open body type warning]
+         -> WARN( True, text "mkWWcpr: non-algebraic or open body type" <+> ppr body_ty )
+            return (False, id, id, body_ty)
 
 mkWWcpr_help :: DataConPatContext
              -> UniqSM (Bool, CoreExpr -> CoreExpr, CoreExpr -> CoreExpr, Type)
