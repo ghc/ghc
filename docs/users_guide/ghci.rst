@@ -2063,7 +2063,7 @@ mostly obvious.
     :reverse: -fno-local-ghci-history
     :category:
 
-    By default, GHCi keeps global history in ``~/.ghc/ghci_history`` or
+    By default, GHCi keeps global history in ``$XDG_DATA_HOME/ghc/ghci_history`` or
     ``%APPDATA%/<app>/ghci_history``, but you can use current directory, e.g.:
 
     .. code-block:: none
@@ -3249,7 +3249,7 @@ they exist:
    Unix or :file:`C:/Documents and Settings/user/Application
    Data/ghc` on Windows.
 
-2. :file:`$HOME/.ghci`
+2. :file:`$XDG_CONFIG_HOME/.ghci`
 
 3. :file:`./.ghci`
 

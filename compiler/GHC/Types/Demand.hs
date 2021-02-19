@@ -1046,6 +1046,30 @@ not accounted for in the type, by consulting 'defaultArgDmd':
     it's perfectly possible to enter the additional lambda and evaluate it
     in unforeseen ways (so, not absent).
 
+Note [Bottom CPR iff Dead-Ending Divergence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Both CPR analysis and Demand analysis handle recursive functions by doing
+fixed-point iteration. To find the *least* (e.g., most informative) fixed-point,
+iteration starts with the bottom element of the semantic domain. Diverging
+functions generally have the bottom element as their least fixed-point.
+
+One might think that CPR analysis and Demand analysis then agree in when a
+function gets a bottom denotation. E.g., whenever it has 'botCpr', it should
+also have 'botDiv'. But that is not the case, because strictness analysis has to
+be careful around precise exceptions, see Note [Precise vs imprecise exceptions].
+
+So Demand analysis gives some diverging functions 'exnDiv' (which is *not* the
+bottom element) when the CPR signature says 'botCpr', and that's OK. Here's an
+example (from #18086) where that is the case:
+
+ioTest :: IO ()
+ioTest = do
+  putStrLn "hi"
+  undefined
+
+However, one can loosely say that we give a function 'botCpr' whenever its
+'Divergence' is 'exnDiv' or 'botDiv', i.e., dead-ending. But that's just
+a consequence of fixed-point iteration, it's not important that they agree.
 
 ************************************************************************
 *                                                                      *

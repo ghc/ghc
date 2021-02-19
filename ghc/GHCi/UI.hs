@@ -587,7 +587,21 @@ ghciLogAction lastErrLocations old_log_action
 
 withGhcAppData :: (FilePath -> IO a) -> IO a -> IO a
 withGhcAppData right left = do
-    either_dir <- tryIO (getAppUserDataDirectory "ghc")
+    either_dir <- tryIO (getXdgDirectory XdgData "ghc")
+    case either_dir of
+        Right dir ->
+            do createDirectoryIfMissing False dir `catchIO` \_ -> return ()
+               right dir
+        _ -> left
+
+withGhcConfig :: (FilePath -> IO a) -> IO a -> IO a
+withGhcConfig right left = do
+    old_path <- getAppUserDataDirectory "ghc"
+    use_old_path <- doesPathExist old_path
+    let path = (if use_old_path
+                 then getAppUserDataDirectory "ghc"
+                 else getXdgDirectory XdgConfig "ghc")
+    either_dir <- tryIO (path)
     case either_dir of
         Right dir ->
             do createDirectoryIfMissing False dir `catchIO` \_ -> return ()
@@ -600,7 +614,7 @@ runGHCi paths maybe_exprs = do
   let
    ignore_dot_ghci = gopt Opt_IgnoreDotGhci dflags
 
-   app_user_dir = liftIO $ withGhcAppData
+   app_user_dir = liftIO $ withGhcConfig
                     (\dir -> return (Just (dir </> "ghci.conf")))
                     (return Nothing)
 

@@ -393,7 +393,7 @@ GHC knows about two package databases in particular:
    e.g. ``/usr/lib/ghc-6.12.1/package.conf.d``.
 
 -  The *user package database* private to each user. On Unix systems this will
-   be ``$HOME/.ghc/arch-os-version/package.conf.d``, and on Windows it will
+   be ``$XDG_DATA_HOME/ghc/arch-os-version/package.conf.d``, and on Windows it will
    be something like
    ``C:\Documents And Settings\user\ghc\package.conf.d``. The
    ``ghc-pkg`` tool knows where this file should be located, and will
@@ -515,7 +515,7 @@ The ``GHC_PACKAGE_PATH`` environment variable
 
     .. code-block:: none
 
-        $ export GHC_PACKAGE_PATH=$HOME/.my-ghc-packages.conf:
+        $ export GHC_PACKAGE_PATH=$XDG_DATA_HOME/.my-ghc-packages.conf:
 
     To check whether your `GHC_PACKAGE_PATH` setting is doing the right
     thing, ``ghc-pkg list`` will list all the databases in use, in the
@@ -578,7 +578,7 @@ must be relative to the location of the package environment file.
     :category:
 
     Use the package environment in ⟨file⟩, or in
-    ``$HOME/.ghc/arch-os-version/environments/⟨name⟩``
+    ``$XDG_DATA_HOME/ghc/arch-os-version/environments/⟨name⟩``
     If set to ``-`` no package environment is read.
 
 .. envvar:: GHC_ENVIRONMENT
@@ -591,13 +591,13 @@ locations:
 
 -  File ⟨file⟩ if you pass the option :ghc-flag:`-package-env ⟨file⟩|⟨name⟩`.
 
--  File ``$HOME/.ghc/arch-os-version/environments/name`` if you pass the
+-  File ``$XDG_DATA_HOME/ghc/arch-os-version/environments/name`` if you pass the
    option ``-package-env ⟨name⟩``.
 
 -  File ⟨file⟩ if the environment variable :envvar:`GHC_ENVIRONMENT` is set to
    ⟨file⟩.
 
--  File ``$HOME/.ghc/arch-os-version/environments/name`` if the
+-  File ``$XDG_DATA_HOME/ghc/arch-os-version/environments/name`` if the
    environment variable :envvar:`GHC_ENVIRONMENT` is set to ⟨name⟩.
 
 Additionally, unless ``-hide-all-packages`` is specified ``ghc`` will also
@@ -606,7 +606,7 @@ look for the package environment in the following locations:
 -  File ``.ghc.environment.arch-os-version`` if it exists in the current
    directory or any parent directory (but not the user's home directory).
 
--  File ``$HOME/.ghc/arch-os-version/environments/default`` if it
+-  File ``$XDG_DATA_HOME/ghc/arch-os-version/environments/default`` if it
    exists.
 
 Package environments can be modified by further command line arguments;
