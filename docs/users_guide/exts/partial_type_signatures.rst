@@ -39,6 +39,9 @@ However, because GHC must *infer* the type when part of a type is left
 out, it is unable to use polymorphic recursion. The same restriction
 takes place when the type signature is omitted completely.
 
+A partial type signature als makes GHC generalise the binding even if
+:extension:`MonoLocalBinds` is on; see :ref:`mono-local-binds`.
+
 .. _pts-syntax:
 
 Syntax
