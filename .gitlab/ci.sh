@@ -328,6 +328,7 @@ EOF
 
 function configure() {
   start_section "booting"
+  run find libraries -name config.sub -exec cp config.sub {} \;
   run python3 boot
   end_section "booting"
 
