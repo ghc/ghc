@@ -153,8 +153,10 @@ missing pieces.
   have success using it, or you may not. Expect it to be really unreliable.
 - There is currently no support for multiplicity annotations such as
   ``x :: a %p``, ``\(x :: a %p) -> ...``.
-- All ``case`` expressions consume their scrutinee ``Many`` times.
-  All ``let`` and ``where`` statements consume their right hand side
+- A ``case`` expression may consume its scrutinee ``One`` time,
+  or ``Many`` times. But the inference is still experimental, and may
+  over-eagerly guess that it ought to consume the scrutinee ``Many`` times.
+- All ``let`` and ``where`` statements consume their right hand side
   ``Many`` times. That is, the following will not type check:
 
   ::
@@ -164,8 +166,7 @@ missing pieces.
 
       f :: A %1 -> C
       f x =
-        case g x of
-          (y, z) -> h y z
+        let (y, z) = g x in h y z
 
   This can be worked around by defining extra functions which are
   specified to be linear, such as:
