@@ -723,6 +723,11 @@ performance.
     and too small an interval could adversely affect interactive
     responsiveness.
 
+    The idle period timer only resets after some activity
+    by a Haskell thread. If your program is doing literally nothing then
+    after the first idle collection is triggered then no more future collections
+    will be scheduled until more work is performed.
+
     This is an experimental feature, please let us know if it causes
     problems and/or could benefit from further tuning.
 
@@ -951,6 +956,8 @@ performance.
     The GC sync time, along with other GC stats, are available by
     calling the ``getRTSStats()`` function from C, or
     ``GHC.Stats.getRTSStats`` from Haskell.
+
+
 
 .. _rts-options-statistics:
 
