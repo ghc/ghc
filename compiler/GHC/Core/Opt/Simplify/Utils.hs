@@ -883,12 +883,12 @@ simplEnvForGHCi logger dflags
 
 updModeForStableUnfoldings :: Activation -> SimplMode -> SimplMode
 -- See Note [Simplifying inside stable unfoldings]
-updModeForStableUnfoldings inline_rule_act current_mode
-  = current_mode { sm_phase      = phaseFromActivation inline_rule_act
+updModeForStableUnfoldings unf_act current_mode
+  = current_mode { sm_phase      = phaseFromActivation unf_act
                  , sm_inline     = True
                  , sm_eta_expand = False }
-                     -- sm_eta_expand: see Note [No eta expansion in stable unfoldings]
-       -- For sm_rules, just inherit; sm_rules might be "off"
+       -- sm_eta_expand: see Note [No eta expansion in stable unfoldings]
+       -- sm_rules: just inherit; sm_rules might be "off"
        -- because of -fno-enable-rewrite-rules
   where
     phaseFromActivation (ActiveAfter _ n) = Phase n

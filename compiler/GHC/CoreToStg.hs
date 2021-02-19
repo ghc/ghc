@@ -949,18 +949,33 @@ myCollectArgs expr
   where
     go (Var v)          as ts = (v, as, ts)
     go (App f a)        as ts = go f (a:as) ts
-    go (Tick t e)       as ts = ASSERT( all isTypeArg as )
+    go (Tick t e)       as ts = ASSERT2( not (tickishIsCode t) || all isTypeArg as
+                                       , ppr e $$ ppr as $$ ppr ts )
+                                -- See Note [Ticks in applications]
                                 go e as (t:ts) -- ticks can appear in type apps
     go (Cast e _)       as ts = go e as ts
     go (Lam b e)        as ts
        | isTyVar b            = go e as ts -- Note [Collect args]
     go _                _  _  = pprPanic "CoreToStg.myCollectArgs" (ppr expr)
 
--- Note [Collect args]
--- ~~~~~~~~~~~~~~~~~~~
---
--- This big-lambda case occurred following a rather obscure eta expansion.
--- It all seems a bit yukky to me.
+{- Note [Collect args]
+~~~~~~~~~~~~~~~~~~~~~~
+This big-lambda case occurred following a rather obscure eta expansion.
+It all seems a bit yukky to me.
+
+Note [Ticks in applications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We can get an application like
+   (tick t f) True False
+via inlining in the CorePrep pass; see Note [Inlining in CorePrep]
+in GHC.CoreToStg.Prep.  The tick does not satisfy tickishIsCode;
+the inlining-in-CorePrep happens for cpExprIsTrivial which tests
+tickishIsCode.
+
+So we test the same thing here, pushing any non-code ticks to
+the top (they don't generate any code, after all).  This showed
+up in the fallout from fixing #19360.
+-}
 
 stgArity :: Id -> HowBound -> Arity
 stgArity _ (LetBound _ arity) = arity
