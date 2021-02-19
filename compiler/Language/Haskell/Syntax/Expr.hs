@@ -12,6 +12,9 @@
 {-# LANGUAGE TypeFamilyDependencies    #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
                                       -- in module Language.Haskell.Syntax.Extension
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveTraversable #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -58,6 +61,27 @@ import qualified Data.Data as Data (Fixity(..))
 
 import GHCi.RemoteTypes ( ForeignRef )
 import qualified Language.Haskell.TH as TH (Q)
+
+-- | RecordDotSyntax field updates
+--
+-- Field projection updates (e.g. @a{foo.bar.baz = 1}@). See Note [How
+-- record dot notation is handled] (not written yet).
+data ProjUpdate p arg =
+  ProjUpdate {
+      pu_flds :: [Located FastString]
+    , pu_arg :: arg -- Field's new value e.g. 42
+    }
+  deriving (Data, Functor, Foldable, Traversable)
+
+type LHsProjUpdate p arg = Located (ProjUpdate p arg)
+type RecUpdProj p = ProjUpdate p (LHsExpr p)
+type LHsRecUpdProj p = Located (RecUpdProj p)
+
+instance (Outputable arg)
+      => Outputable (ProjUpdate p arg) where
+  -- TODO: improve in case of pun
+  ppr ProjUpdate { pu_flds = flds, pu_arg = arg } =
+    hcat (punctuate dot (map (ppr . unLoc) flds)) <+> equals <+> ppr arg
 
 {-
 ************************************************************************
@@ -356,15 +380,45 @@ data HsExpr p
   --
   --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'{'@,
   --         'GHC.Parser.Annotation.AnnDotdot','GHC.Parser.Annotation.AnnClose' @'}'@
+  --         'GHC.Parser.Annotation.AnnComma, 'GHC.Parser.Annotation.AnnDot',
+  --         'GHC.Parser.Annotation.AnnClose' @'}'@
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | RecordUpd
       { rupd_ext  :: XRecordUpd p
+      , rupd_dot  :: Bool -- Is RecordDotSyntax in effect?
       , rupd_expr :: LHsExpr p
       , rupd_flds :: [LHsRecUpdField p]
+      , rupd_upds :: [LHsRecUpdProj p]
       }
   -- For a type family, the arg types are of the *instance* tycon,
   -- not the family tycon
+
+  -- | Record field selection e.g @z.x@.
+  --
+  --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDot'
+  --
+  -- This case only arises when the RecordDotSyntax langauge
+  -- extension is enabled.
+
+  | HsGetField {
+        gf_ext :: XGetField p
+      , gf_expr :: LHsExpr p
+      , gf_field :: Located FastString
+      }
+
+  -- | Record field selector. e.g. @(.x)@ or @(.x.y)@
+  --
+  --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpenP'
+  --         'GHC.Parser.Annotation.AnnDot', 'GHC.Parser.Annotation.AnnCloseP'
+  --
+  -- This case only arises when the RecordDotSyntax langauge
+  -- extensions is enabled.
+
+  | HsProjection {
+        proj_ext :: XProjection p
+      , proj_flds :: [Located FastString]
+      }
 
   -- | Expression with an explicit type signature. @e :: type@
   --

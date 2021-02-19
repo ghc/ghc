@@ -287,6 +287,18 @@ type instance XRecordUpd     GhcPs = NoExtField
 type instance XRecordUpd     GhcRn = NoExtField
 type instance XRecordUpd     GhcTc = RecordUpdTc
 
+type instance XGetField     GhcPs = NoExtField
+type instance XGetField     GhcRn = NoExtField
+type instance XGetField     GhcTc = Void
+-- HsGetField is eliminated by the renamer. See [Handling overloaded
+-- and rebindable constructs].
+
+type instance XProjection     GhcPs = NoExtField
+type instance XProjection     GhcRn = NoExtField
+type instance XProjection     GhcTc = Void
+-- HsProjection is eliminated by the renamer. See [Handling overloaded
+-- and rebindable constructs].
+
 type instance XExprWithTySig (GhcPass _) = NoExtField
 
 type instance XArithSeq      GhcPs = NoExtField
@@ -509,8 +521,17 @@ ppr_expr (RecordCon { rcon_con = con, rcon_flds = rbinds })
                GhcRn -> ppr con
                GhcTc -> ppr con
 
-ppr_expr (RecordUpd { rupd_expr = L _ aexp, rupd_flds = rbinds })
-  = hang (ppr aexp) 2 (braces (fsep (punctuate comma (map ppr rbinds))))
+ppr_expr (RecordUpd { rupd_expr = L _ aexp, rupd_dot = dot, rupd_flds = rbinds, rupd_upds = pbinds })
+  = if not dot
+      then
+        hang (ppr aexp) 2 (braces (fsep (punctuate comma (map ppr rbinds))))
+      else
+        hang (ppr aexp) 2 (braces (fsep (punctuate comma (map ppr pbinds))))
+
+ppr_expr (HsGetField { gf_expr = L _ fexp, gf_field = field })
+  = ppr fexp <> dot <> ppr field
+
+ppr_expr (HsProjection { proj_flds = flds }) = parens (hcat (punctuate dot (map ppr flds)))
 
 ppr_expr (ExprWithTySig _ expr sig)
   = hang (nest 2 (ppr_lexpr expr) <+> dcolon)
@@ -655,6 +676,8 @@ hsExprNeedsParens p = go
     go (HsBinTick _ _ _ (L _ e))      = go e
     go (RecordCon{})                  = False
     go (HsRecFld{})                   = False
+    go (HsProjection{})               = True
+    go (HsGetField{})                 = False
     go (XExpr x)
       | GhcTc <- ghcPass @p
       = case x of

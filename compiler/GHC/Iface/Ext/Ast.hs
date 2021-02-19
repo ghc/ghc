@@ -1159,6 +1159,8 @@ instance HiePass p => ToHie (Located (HsExpr (GhcPass p))) where
       HsSpliceE _ x ->
         [ toHie $ L mspan x
         ]
+      HsGetField {} -> []
+      HsProjection {} -> []
       XExpr x
         | GhcTc <- ghcPass @p
         , WrapExpr (HsWrap w a) <- x
