@@ -999,7 +999,18 @@ suffixes. The interface file name can be overloaded with "-ohi", except when
 -}
 
 -- | Write interface files
-hscMaybeWriteIface :: Logger -> DynFlags -> Bool -> ModIface -> Maybe Fingerprint -> ModLocation -> IO ()
+hscMaybeWriteIface
+  :: Logger
+  -> DynFlags
+  -> Bool
+  -- ^ Is this a simple interface generated after the core pipeline, or one
+  -- with information from the backend? See: Note [Writing interface files]
+  -> ModIface
+  -> Maybe Fingerprint
+  -- ^ The old interface hash, used to decide if we need to actually write the
+  -- new interface.
+  -> ModLocation
+  -> IO ()
 hscMaybeWriteIface logger dflags is_simple iface old_iface mod_location = do
     let force_write_interface = gopt Opt_WriteInterface dflags
         write_interface = case backend dflags of
@@ -1019,41 +1030,41 @@ hscMaybeWriteIface logger dflags is_simple iface old_iface mod_location = do
 
     if (write_interface || force_write_interface) then do
 
-      -- FIXME: with -dynamic-too, "no_change" is only meaningful for the
+      -- FIXME: with -dynamic-too, "change" is only meaningful for the
       -- non-dynamic interface, not for the dynamic one. We should have another
       -- flag for the dynamic interface. In the meantime:
       --
       --    * when we write a single full interface, we check if we are
       --    currently writing the dynamic interface due to -dynamic-too, in
-      --    which case we ignore "no_change".
+      --    which case we ignore "change".
       --
       --    * when we write two simple interfaces at once because of
-      --    dynamic-too, we use "no_change" both for the non-dynamic and the
+      --    dynamic-too, we use "change" both for the non-dynamic and the
       --    dynamic interfaces. Hopefully both the dynamic and the non-dynamic
       --    interfaces stay in sync...
       --
-      let no_change = old_iface == Just (mi_iface_hash (mi_final_exts iface))
+      let change = old_iface /= Just (mi_iface_hash (mi_final_exts iface))
 
       let dt = dynamicTooState dflags
 
       when (logHasDumpFlag logger Opt_D_dump_if_trace) $ putMsg logger $
         hang (text "Writing interface(s):") 2 $ vcat
          [ text "Kind:" <+> if is_simple then text "simple" else text "full"
-         , text "Hash change:" <+> ppr (not no_change)
+         , text "Hash change:" <+> ppr change
          , text "DynamicToo state:" <+> text (show dt)
          ]
 
       if is_simple
-         then unless no_change $ do -- FIXME: see no_change' comment above
+         then when change $ do -- FIXME: see 'change' comment above
             write_iface dflags iface
             case dt of
                DT_Dont   -> return ()
                DT_Dyn    -> panic "Unexpected DT_Dyn state when writing simple interface"
                DT_OK     -> write_iface (setDynamicNow dflags) iface
          else case dt of
-               DT_Dont | not no_change             -> write_iface dflags iface
-               DT_OK   | not no_change             -> write_iface dflags iface
-               -- FIXME: see no_change' comment above
+               DT_Dont | change                    -> write_iface dflags iface
+               DT_OK   | change                    -> write_iface dflags iface
+               -- FIXME: see change' comment above
                DT_Dyn                              -> write_iface dflags iface
                _                                   -> return ()
 
