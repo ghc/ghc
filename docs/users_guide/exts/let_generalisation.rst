@@ -16,24 +16,30 @@ An ML-style language usually generalises the type of any ``let``\-bound or
 extension :extension:`MonoLocalBinds` GHC implements a slightly more conservative
 policy, using the following rules:
 
+-  With :extension:`MonoLocalBinds`, a binding group  is *generalised* if and only if
+
+   - Each of its free variables is either *imported* or *closed* (see next bullet), or
+
+   - Any of its binders has a partial type signature (see :ref:`partial-type-signatures`).
+     Adding a partial type signature `f :: _` provides a per-binding way to ask GHC to
+     perform let-generalisation, even though :extension:`MonoLocalBinds` is on.
+
+   NB: even if the binding is generalised, it may still be affected by the
+   monomorphism restriction, which reduces generalisation
+      (`Haskell Report, Section
+      4.5.5 <http://www.haskell.org/onlinereport/decls.html#sect4.5.5>`__)
+
+
 -  A variable is *closed* if and only if
 
-   -  the variable is let-bound
+   -  the variable is let-bound, and
 
    -  one of the following holds:
 
       -  the variable has an explicit type signature that has no free
          type variables, or
 
-      -  its binding group is fully generalised (see next bullet)
-
--  A binding group is *fully generalised* if and only if
-
-   -  each of its free variables is either imported or closed, and
-
-   -  the binding is not affected by the monomorphism restriction
-      (`Haskell Report, Section
-      4.5.5 <http://www.haskell.org/onlinereport/decls.html#sect4.5.5>`__)
+      -  its binding group is fully generalised, so it has a closed type
 
 For example, consider ::
 
