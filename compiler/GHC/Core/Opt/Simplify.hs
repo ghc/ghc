@@ -3996,14 +3996,17 @@ simplRules env mb_new_id rules mb_cont
       = return rule
 
     simpl_rule rule@(Rule { ru_bndrs = bndrs, ru_args = args
-                          , ru_fn = fn_name, ru_rhs = rhs })
+                          , ru_fn = fn_name, ru_rhs = rhs
+                          , ru_act = act })
       = do { (env', bndrs') <- simplBinders env bndrs
            ; let rhs_ty = substTy env' (exprType rhs)
                  rhs_cont = case mb_cont of  -- See Note [Rules and unfolding for join points]
                                 Nothing   -> mkBoringStop rhs_ty
                                 Just cont -> ASSERT2( join_ok, bad_join_msg )
                                              cont
-                 rule_env = updMode updModeForRules env'
+                 lhs_env = updMode updModeForRules env'
+                 rhs_env = updMode (updModeForStableUnfoldings act) env'
+                           -- See Note [Simplifying the RHS of a RULE]
                  fn_name' = case mb_new_id of
                               Just id -> idName id
                               Nothing -> fn_name
@@ -4018,9 +4021,18 @@ simplRules env mb_new_id rules mb_cont
                  bad_join_msg = vcat [ ppr mb_new_id, ppr rule
                                      , ppr (fmap isJoinId_maybe mb_new_id) ]
 
-           ; args' <- mapM (simplExpr rule_env) args
-           ; rhs'  <- simplExprC rule_env rhs rhs_cont
+           ; args' <- mapM (simplExpr lhs_env) args
+           ; rhs'  <- simplExprC rhs_env rhs rhs_cont
            ; return (rule { ru_bndrs = bndrs'
                           , ru_fn    = fn_name'
                           , ru_args  = args'
                           , ru_rhs   = rhs' }) }
+
+{- Note [Simplifying the RHS of a RULE]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We can simplify the RHS of a RULE much as we do the RHS of a stable
+unfolding.  We used to use the much more conservative updModeForRules
+for the RHS as well as the LHS, but that seems more conservative
+than necesary.  Allowing some inlining might, for example, eliminate
+a binding.
+-}
