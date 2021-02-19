@@ -72,19 +72,20 @@ mkEmptyContInfoTable info_lbl
 cmmToRawCmm :: Logger -> DynFlags -> Stream IO CmmGroupSRTs a
             -> IO (Stream IO RawCmmGroup a)
 cmmToRawCmm logger dflags cmms
-  = do { uniqs <- mkSplitUniqSupply 'i'
-       ; let do_one :: UniqSupply -> [CmmDeclSRTs] -> IO (UniqSupply, [RawCmmDecl])
-             do_one uniqs cmm =
+  = do {
+       ; let do_one :: [CmmDeclSRTs] -> IO [RawCmmDecl]
+             do_one cmm = do
+               uniqs <- mkSplitUniqSupply 'i'
                -- NB. strictness fixes a space leak.  DO NOT REMOVE.
                withTimingSilent logger dflags (text "Cmm -> Raw Cmm")
-                                forceRes $
-                 case initUs uniqs $ concatMapM (mkInfoTable dflags) cmm of
-                   (b,uniqs') -> return (uniqs',b)
-       ; return (snd <$> Stream.mapAccumL_ do_one uniqs cmms)
+                          (\x -> seqList x ())
+                  -- TODO: It might be better to make `mkInfoTable` run in
+                  -- IO as well so we don't have to pass around
+                  -- a UniqSupply (see #16843)
+                 (return $ initUs_ uniqs $ concatMapM (mkInfoTable dflags) cmm)
+       ; return (Stream.mapM do_one cmms)
        }
 
-    where forceRes (uniqs, rawcmms) =
-            uniqs `seq` foldr (\decl r -> decl `seq` r) () rawcmms
 
 -- Make a concrete info table, represented as a list of CmmStatic
 -- (it can't be simply a list of Word, because the SRT field is

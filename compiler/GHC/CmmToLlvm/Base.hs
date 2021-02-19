@@ -19,14 +19,14 @@ module GHC.CmmToLlvm.Base (
         llvmVersionStr, llvmVersionList,
 
         LlvmM,
-        runLlvm, liftStream, withClearVars, varLookup, varInsert,
+        runLlvm, withClearVars, varLookup, varInsert,
         markStackReg, checkStackReg,
         funLookup, funInsert, getLlvmVer, getDynFlags,
         dumpIfSetLlvm, renderLlvm, markUsedVar, getUsedVars,
         ghcInternalFunctions, getPlatform, getLlvmOpts,
 
         getMetaUniqueId,
-        setUniqMeta, getUniqMeta,
+        setUniqMeta, getUniqMeta, liftIO,
 
         cmmToLlvmType, widthToLlvmFloat, widthToLlvmInt, llvmFunTy,
         llvmFunSig, llvmFunArgs, llvmStdFunAttrs, llvmFunAlign, llvmInfAlign,
@@ -62,7 +62,6 @@ import GHC.Utils.BufHandle   ( BufHandle )
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.Supply
 import GHC.Utils.Logger
-import qualified GHC.Data.Stream as Stream
 
 import Data.Maybe (fromJust)
 import Control.Monad (ap)
@@ -386,14 +385,6 @@ getEnv f = LlvmM (\env -> return (f env, env))
 -- | Modify environment (internal)
 modifyEnv :: (LlvmEnv -> LlvmEnv) -> LlvmM ()
 modifyEnv f = LlvmM (\env -> return ((), f env))
-
--- | Lift a stream into the LlvmM monad
-liftStream :: Stream.Stream IO a x -> Stream.Stream LlvmM a x
-liftStream s = Stream.Stream $ do
-  r <- liftIO $ Stream.runStream s
-  case r of
-    Left b        -> return (Left b)
-    Right (a, r2) -> return (Right (a, liftStream r2))
 
 -- | Clear variables from the environment for a subcomputation
 withClearVars :: LlvmM a -> LlvmM a
