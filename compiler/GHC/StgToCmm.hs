@@ -98,8 +98,8 @@ codeGen logger dflags this_mod ip_map@(InfoTableProvMap (UniqMap denv) _) data_t
         ; cgref <- liftIO $ initC >>= \s -> newIORef (CodeGenState mempty s)
         ; let cg :: FCode a -> Stream IO CmmGroup a
               cg fcode = do
-                (a, cmm) <- withTimingSilent logger dflags (text "STG -> Cmm") (`seq` ()) $ do
-                         CodeGenState ts st <- liftIO $ readIORef cgref
+                (a, cmm) <- liftIO . withTimingSilent logger dflags (text "STG -> Cmm") (`seq` ()) $ do
+                         CodeGenState ts st <- readIORef cgref
                          let (a,st') = runC dflags this_mod st (getCmm fcode)
 
                          -- NB. stub-out cgs_tops and cgs_stmts.  This fixes
@@ -108,7 +108,7 @@ codeGen logger dflags this_mod ip_map@(InfoTableProvMap (UniqMap denv) _) data_t
                          let !used_info
                                 | gopt Opt_InfoTableMap dflags = toOL (mapMaybe topInfoTable (snd a)) `mappend` ts
                                 | otherwise = mempty
-                         liftIO $ writeIORef cgref $!
+                         writeIORef cgref $!
                                     CodeGenState used_info
                                       (st'{ cgs_tops = nilOL,
                                             cgs_stmts = mkNop
