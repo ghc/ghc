@@ -90,6 +90,7 @@ import qualified Data.IntSet as S
 import Data.Data
 import qualified Data.Semigroup as Semi
 import Data.Functor.Classes (Eq1 (..))
+import Data.Bits
 
 -- | A finite map from @uniques@ of one type to
 -- elements in another type.
@@ -104,6 +105,27 @@ newtype UniqFM key ele = UFM (M.IntMap ele)
   -- Nondeterministic Foldable and Traversable instances are accessible through
   -- use of the 'NonDetUniqFM' wrapper.
   -- See Note [Deterministic UniqFM] in GHC.Types.Unique.DFM to learn about determinism.
+
+perturbate :: Int -> Int
+{-# INLINE perturbate #-}
+-- https://gist.github.com/degski/6e2069d6035ae04d5d6f64981c995ec2
+perturbate x = fromIntegral $ f $ g $ f $ g $ f $ fromIntegral x
+  where
+    f y = (y `shiftR` s) `xor` y
+    g z = z * k
+#if UNIQUE_TAG_BITS == 8
+    s = 32
+    -- inverse uses constant 0xCFEE444D8B59A89B instead
+    k = 0xD6E8FEB86659FD93 :: Word
+#else
+    s = 16
+    -- inverse uses constant 0x119DE1F3 instead
+    k = 0x45D9F3B :: Word
+#endif
+
+getPertKey :: Unique -> Int
+{-# INLINE getPertKey #-}
+getPertKey = perturbate . getKey
 
 emptyUFM :: UniqFM key elt
 emptyUFM = UFM M.empty
