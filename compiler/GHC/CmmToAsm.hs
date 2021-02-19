@@ -11,6 +11,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -296,7 +297,7 @@ finishNativeGen logger dflags config modLoc bufh@(BufHandle _ _ h) us ngs
                    Opt_D_dump_asm_stats "NCG stats"
                    FormatText
 
-cmmNativeGenStream :: (OutputableP Platform statics, Outputable jumpDest, Instruction instr)
+cmmNativeGenStream :: forall statics jumpDest instr a . (OutputableP Platform statics, Outputable jumpDest, Instruction instr)
               => Logger
               -> DynFlags
               -> NCGConfig
@@ -304,14 +305,21 @@ cmmNativeGenStream :: (OutputableP Platform statics, Outputable jumpDest, Instru
               -> NcgImpl statics instr jumpDest
               -> BufHandle
               -> UniqSupply
-              -> Stream IO RawCmmGroup a
+              -> Stream.Stream IO RawCmmGroup a
               -> NativeGenAcc statics instr
               -> IO (NativeGenAcc statics instr, UniqSupply, a)
 
 cmmNativeGenStream logger dflags config modLoc ncgImpl h us cmm_stream ngs
- = do r <- Stream.runStream cmm_stream
-      case r of
-        Left a ->
+ = loop us (Stream.runStream cmm_stream) ngs
+  where
+    ncglabel = text "NCG"
+    loop :: UniqSupply
+              -> Stream.StreamS IO RawCmmGroup a
+              -> NativeGenAcc statics instr
+              -> IO (NativeGenAcc statics instr, UniqSupply, a)
+    loop us s ngs =
+      case s of
+        Stream.Done a ->
           return (ngs { ngs_imports = reverse $ ngs_imports ngs
                       , ngs_natives = reverse $ ngs_natives ngs
                       , ngs_colorStats = reverse $ ngs_colorStats ngs
@@ -319,7 +327,8 @@ cmmNativeGenStream logger dflags config modLoc ncgImpl h us cmm_stream ngs
                       },
                   us,
                   a)
-        Right (cmms, cmm_stream') -> do
+        Stream.Effect m -> m >>= \cmm_stream' -> loop us cmm_stream' ngs
+        Stream.Yield cmms cmm_stream' -> do
           (us', ngs'') <-
             withTimingSilent logger
                 dflags
@@ -345,10 +354,8 @@ cmmNativeGenStream logger dflags config modLoc ncgImpl h us cmm_stream ngs
               let ngs'' = ngs' { ngs_debug = ngs_debug ngs' ++ ldbgs, ngs_labels = [] }
               return (us', ngs'')
 
-          cmmNativeGenStream logger dflags config modLoc ncgImpl h us'
-              cmm_stream' ngs''
+          loop us' cmm_stream' ngs''
 
-    where ncglabel = text "NCG"
 
 -- | Do native code generation on all these cmms.
 --
