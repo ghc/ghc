@@ -1382,6 +1382,7 @@ languageExtensions (Just GHC2021)
        LangExt.ForeignFunctionInterface,
        LangExt.PatternGuards,
        LangExt.DoAndIfThenElse,
+       LangExt.FieldSelectors,
        LangExt.RelaxedPolyRec,
        -- Now the new extensions (not in Haskell2010)
        LangExt.BangPatterns,
