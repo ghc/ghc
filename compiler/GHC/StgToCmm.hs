@@ -72,8 +72,7 @@ import GHC.Utils.Misc
 import System.IO.Unsafe
 import qualified Data.ByteString as BS
 import Data.Maybe
-import Control.Monad.Trans.State
-import Control.Monad.Trans.Class
+import Data.IORef
 
 data CodeGenState = CodeGenState { codegen_used_info :: !(OrdList CmmInfoTable)
                                  , codegen_state :: !CgState }
@@ -92,13 +91,15 @@ codeGen :: Logger
 
 codeGen logger dflags this_mod ip_map@(InfoTableProvMap (UniqMap denv) _) data_tycons
         cost_centre_info stg_binds hpc_info
-  = liftIO initC >>= \c -> flip evalStateT (CodeGenState mempty c) $ do  {     -- cg: run the code generator, and yield the resulting CmmGroup
+  = do  {     -- cg: run the code generator, and yield the resulting CmmGroup
               -- Using an IORef to store the state is a bit crude, but otherwise
-              -- we would need to add a state monad layer.
-        ; let cg :: FCode a -> StateT CodeGenState (Stream IO CmmGroup) a
+              -- we would need to add a state monad layer which regresses
+              -- allocations by 0.5-2%.
+        ; cgref <- liftIO $ initC >>= \s -> newIORef (CodeGenState mempty s)
+        ; let cg :: FCode a -> Stream IO CmmGroup a
               cg fcode = do
                 (a, cmm) <- withTimingSilent logger dflags (text "STG -> Cmm") (`seq` ()) $ do
-                         CodeGenState ts st <- get
+                         CodeGenState ts st <- liftIO $ readIORef cgref
                          let (a,st') = runC dflags this_mod st (getCmm fcode)
 
                          -- NB. stub-out cgs_tops and cgs_stmts.  This fixes
@@ -107,13 +108,14 @@ codeGen logger dflags this_mod ip_map@(InfoTableProvMap (UniqMap denv) _) data_t
                          let !used_info
                                 | gopt Opt_InfoTableMap dflags = toOL (mapMaybe topInfoTable (snd a)) `mappend` ts
                                 | otherwise = mempty
-                         put $! CodeGenState used_info
-                                  (st'{ cgs_tops = nilOL,
-                                        cgs_stmts = mkNop
-                                      })
+                         liftIO $ writeIORef cgref $!
+                                    CodeGenState used_info
+                                      (st'{ cgs_tops = nilOL,
+                                            cgs_stmts = mkNop
+                                          })
 
                          return a
-                lift $ yield cmm
+                yield cmm
                 return a
 
                -- Note [codegen-split-init] the cmm_init block must come
@@ -137,14 +139,14 @@ codeGen logger dflags this_mod ip_map@(InfoTableProvMap (UniqMap denv) _) data_t
 
         ; mapM_ do_tycon data_tycons
 
-        ; cg_id_infos <- cgs_binds . codegen_state <$> get
-
 
         -- Emit special info tables for everything used in this module
         -- This will only do something if  `-fdistinct-info-tables` is turned on.
         ; mapM_ (\(dc, ns) -> forM_ ns $ \(k, _ss) -> cg (cgDataCon (UsageSite this_mod k) dc)) (nonDetEltsUFM denv)
 
-        ; used_info <- fromOL . codegen_used_info <$> get
+        ; final_state <- liftIO (readIORef cgref)
+        ; let cg_id_infos = cgs_binds . codegen_state $ final_state
+              used_info = fromOL . codegen_used_info $ final_state
         ; !foreign_stub <- cg (initInfoTableProv used_info ip_map this_mod)
 
           -- See Note [Conveying CAF-info and LFInfo between modules] in
