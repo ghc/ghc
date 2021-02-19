@@ -17,6 +17,7 @@ Some of the other hair in this code is to be able to use a
 Haskell).
 -}
 
+{-# OPTIONS_GHC -O2 #-} -- optimise perturbate. Also this module is performance critical
 {-# LANGUAGE CPP, BangPatterns, MagicHash #-}
 
 module GHC.Types.Unique (
@@ -114,7 +115,26 @@ newTagUnique :: Unique -> Char -> Unique
 mkUniqueGrimily = MkUnique
 
 {-# INLINE getKey #-}
-getKey (MkUnique x) = x
+getKey (MkUnique x) = perturbate x
+
+perturbate :: Int -> Int
+#if UNIQUE_TAG_BITS == 8
+-- https://gist.github.com/degski/6e2069d6035ae04d5d6f64981c995ec2
+-- inverse uses constant 0xCFEE444D8B59A89B instead
+perturbate x = fromIntegral $ f $ g $ f $ g $ f $ fromIntegral x
+  where
+    f y = (y `shiftR` 32) `xor` y
+    g z = z * k
+    k = 0xD6E8FEB86659FD93 :: Word
+#else
+-- https://gist.github.com/degski/6e2069d6035ae04d5d6f64981c995ec2
+-- inverse uses constant 0x45D9F3B instead
+perturbate x = fromIntegral $ f $ g $ f $ g $ f $ fromIntegral x
+  where
+    f y = (y `shiftR` 16) `xor` y
+    g z = z * k
+    k = 0x45D9F3B :: Word
+#endif
 
 incrUnique (MkUnique i) = MkUnique (i + 1)
 stepUnique (MkUnique i) n = MkUnique (i + n)
