@@ -90,6 +90,7 @@ import qualified Data.IntSet as S
 import Data.Data
 import qualified Data.Semigroup as Semi
 import Data.Functor.Classes (Eq1 (..))
+import Data.Bits
 
 -- | A finite map from @uniques@ of one type to
 -- elements in another type.
@@ -105,6 +106,38 @@ newtype UniqFM key ele = UFM (M.IntMap ele)
   -- use of the 'NonDetUniqFM' wrapper.
   -- See Note [Deterministic UniqFM] in GHC.Types.Unique.DFM to learn about determinism.
 
+-- | https://gist.github.com/degski/6e2069d6035ae04d5d6f64981c995ec2
+mix :: Word -> Int -> Int
+{-# INLINE mix #-}
+mix k x = fromIntegral $ f $ g $ f $ g $ f $ fromIntegral x
+  where
+    f y = (y `shiftR` s) `xor` y
+    g z = z * k
+    s = finiteBitSize k `shiftR` 1 -- 32 for 64 bit, 16 for 32 bit
+
+kFORWARD, kBACKWARD :: Word
+-- These are like "encryption" and "decryption" keys to mix
+#if UNIQUE_TAG_BITS == 8
+kFORWARD  = 0xD6E8FEB86659FD93
+kBACKWARD = 0xCFEE444D8B59A89B
+#else
+kFORWARD  = 0x45D9F3B
+kBACKWARD = 0x119DE1F3
+#endif
+enc, dec :: Int -> Int
+enc = mix kFORWARD
+dec = mix kBACKWARD
+{-# INLINE enc #-}
+{-# INLINE dec #-}
+
+getMixedKey :: Unique -> Int
+{-# INLINE getMixedKey #-}
+getMixedKey = enc . getKey
+
+getUnmixedUnique :: Int -> Unique
+{-# INLINE getUnmixedUnique #-}
+getUnmixedUnique = getUnique . dec
+
 emptyUFM :: UniqFM key elt
 emptyUFM = UFM M.empty
 
@@ -112,11 +145,11 @@ isNullUFM :: UniqFM key elt -> Bool
 isNullUFM (UFM m) = M.null m
 
 unitUFM :: Uniquable key => key -> elt -> UniqFM key elt
-unitUFM k v = UFM (M.singleton (getKey $ getUnique k) v)
+unitUFM k v = UFM (M.singleton (getMixedKey $ getUnique k) v)
 
 -- when you've got the Unique already
 unitDirectlyUFM :: Unique -> elt -> UniqFM key elt
-unitDirectlyUFM u v = UFM (M.singleton (getKey u) v)
+unitDirectlyUFM u v = UFM (M.singleton (getMixedKey u) v)
 
 -- zipToUFM ks vs = listToUFM (zip ks vs)
 -- This function exists because it's a common case (#18535), and
@@ -148,7 +181,7 @@ listToUFM_C
 listToUFM_C f = foldl' (\m (k, v) -> addToUFM_C f m k v) emptyUFM
 
 addToUFM :: Uniquable key => UniqFM key elt -> key -> elt  -> UniqFM key elt
-addToUFM (UFM m) k v = UFM (M.insert (getKey $ getUnique k) v m)
+addToUFM (UFM m) k v = UFM (M.insert (getMixedKey $ getUnique k) v m)
 
 addListToUFM :: Uniquable key => UniqFM key elt -> [(key,elt)] -> UniqFM key elt
 addListToUFM = foldl' (\m (k, v) -> addToUFM m k v)
@@ -157,7 +190,7 @@ addListToUFM_Directly :: UniqFM key elt -> [(Unique,elt)] -> UniqFM key elt
 addListToUFM_Directly = foldl' (\m (k, v) -> addToUFM_Directly m k v)
 
 addToUFM_Directly :: UniqFM key elt -> Unique -> elt -> UniqFM key elt
-addToUFM_Directly (UFM m) u v = UFM (M.insert (getKey u) v m)
+addToUFM_Directly (UFM m) u v = UFM (M.insert (getMixedKey u) v m)
 
 addToUFM_C
   :: Uniquable key
@@ -167,7 +200,7 @@ addToUFM_C
   -> UniqFM key elt           -- result
 -- Arguments of combining function of M.insertWith and addToUFM_C are flipped.
 addToUFM_C f (UFM m) k v =
-  UFM (M.insertWith (flip f) (getKey $ getUnique k) v m)
+  UFM (M.insertWith (flip f) (getMixedKey $ getUnique k) v m)
 
 addToUFM_Acc
   :: Uniquable key
@@ -177,7 +210,7 @@ addToUFM_Acc
   -> key -> elt             -- new
   -> UniqFM key elts            -- result
 addToUFM_Acc exi new (UFM m) k v =
-  UFM (M.insertWith (\_new old -> exi v old) (getKey $ getUnique k) (new v) m)
+  UFM (M.insertWith (\_new old -> exi v old) (getMixedKey $ getUnique k) (new v) m)
 
 alterUFM
   :: Uniquable key
@@ -185,7 +218,7 @@ alterUFM
   -> UniqFM key elt                -- old
   -> key                       -- new
   -> UniqFM key elt                -- result
-alterUFM f (UFM m) k = UFM (M.alter f (getKey $ getUnique k) m)
+alterUFM f (UFM m) k = UFM (M.alter f (getMixedKey $ getUnique k) m)
 
 -- | Add elements to the map, combining existing values with inserted ones using
 -- the given function.
@@ -197,13 +230,13 @@ addListToUFM_C
 addListToUFM_C f = foldl' (\m (k, v) -> addToUFM_C f m k v)
 
 adjustUFM :: Uniquable key => (elt -> elt) -> UniqFM key elt -> key -> UniqFM key elt
-adjustUFM f (UFM m) k = UFM (M.adjust f (getKey $ getUnique k) m)
+adjustUFM f (UFM m) k = UFM (M.adjust f (getMixedKey $ getUnique k) m)
 
 adjustUFM_Directly :: (elt -> elt) -> UniqFM key elt -> Unique -> UniqFM key elt
-adjustUFM_Directly f (UFM m) u = UFM (M.adjust f (getKey u) m)
+adjustUFM_Directly f (UFM m) u = UFM (M.adjust f (getMixedKey u) m)
 
 delFromUFM :: Uniquable key => UniqFM key elt -> key    -> UniqFM key elt
-delFromUFM (UFM m) k = UFM (M.delete (getKey $ getUnique k) m)
+delFromUFM (UFM m) k = UFM (M.delete (getMixedKey $ getUnique k) m)
 
 delListFromUFM :: Uniquable key => UniqFM key elt -> [key] -> UniqFM key elt
 delListFromUFM = foldl' delFromUFM
@@ -212,7 +245,7 @@ delListFromUFM_Directly :: UniqFM key elt -> [Unique] -> UniqFM key elt
 delListFromUFM_Directly = foldl' delFromUFM_Directly
 
 delFromUFM_Directly :: UniqFM key elt -> Unique -> UniqFM key elt
-delFromUFM_Directly (UFM m) u = UFM (M.delete (getKey u) m)
+delFromUFM_Directly (UFM m) u = UFM (M.delete (getMixedKey u) m)
 
 -- Bindings in right argument shadow those in the left
 plusUFM :: UniqFM key elt -> UniqFM key elt -> UniqFM key elt
@@ -320,23 +353,23 @@ sizeUFM :: UniqFM key elt -> Int
 sizeUFM (UFM m) = M.size m
 
 elemUFM :: Uniquable key => key -> UniqFM key elt -> Bool
-elemUFM k (UFM m) = M.member (getKey $ getUnique k) m
+elemUFM k (UFM m) = M.member (getMixedKey $ getUnique k) m
 
 elemUFM_Directly :: Unique -> UniqFM key elt -> Bool
-elemUFM_Directly u (UFM m) = M.member (getKey u) m
+elemUFM_Directly u (UFM m) = M.member (getMixedKey u) m
 
 lookupUFM :: Uniquable key => UniqFM key elt -> key -> Maybe elt
-lookupUFM (UFM m) k = M.lookup (getKey $ getUnique k) m
+lookupUFM (UFM m) k = M.lookup (getMixedKey $ getUnique k) m
 
 -- when you've got the Unique already
 lookupUFM_Directly :: UniqFM key elt -> Unique -> Maybe elt
-lookupUFM_Directly (UFM m) u = M.lookup (getKey u) m
+lookupUFM_Directly (UFM m) u = M.lookup (getMixedKey u) m
 
 lookupWithDefaultUFM :: Uniquable key => UniqFM key elt -> elt -> key -> elt
-lookupWithDefaultUFM (UFM m) v k = M.findWithDefault v (getKey $ getUnique k) m
+lookupWithDefaultUFM (UFM m) v k = M.findWithDefault v (getMixedKey $ getUnique k) m
 
 lookupWithDefaultUFM_Directly :: UniqFM key elt -> elt -> Unique -> elt
-lookupWithDefaultUFM_Directly (UFM m) v u = M.findWithDefault v (getKey u) m
+lookupWithDefaultUFM_Directly (UFM m) v u = M.findWithDefault v (getMixedKey u) m
 
 eltsUFM :: UniqFM key elt -> [elt]
 eltsUFM (UFM m) = M.elems m
@@ -366,7 +399,7 @@ nonDetEltsUFM (UFM m) = M.elems m
 -- If you use this please provide a justification why it doesn't introduce
 -- nondeterminism.
 nonDetKeysUFM :: UniqFM key elt -> [Unique]
-nonDetKeysUFM (UFM m) = map getUnique $ M.keys m
+nonDetKeysUFM (UFM m) = map getUnmixedUnique $ M.keys m
 
 -- See Note [Deterministic UniqFM] to learn about nondeterminism.
 -- If you use this please provide a justification why it doesn't introduce
@@ -378,13 +411,13 @@ nonDetStrictFoldUFM k z (UFM m) = M.foldl' (flip k) z m
 -- If you use this please provide a justification why it doesn't introduce
 -- nondeterminism.
 nonDetStrictFoldUFM_Directly:: (Unique -> elt -> a -> a) -> a -> UniqFM key elt -> a
-nonDetStrictFoldUFM_Directly k z (UFM m) = M.foldlWithKey' (\z' i x -> k (getUnique i) x z') z m
+nonDetStrictFoldUFM_Directly k z (UFM m) = M.foldlWithKey' (\z' i x -> k (getUnmixedUnique i) x z') z m
 
 -- See Note [Deterministic UniqFM] to learn about nondeterminism.
 -- If you use this please provide a justification why it doesn't introduce
 -- nondeterminism.
 nonDetUFMToList :: UniqFM key elt -> [(Unique, elt)]
-nonDetUFMToList (UFM m) = map (\(k, v) -> (getUnique k, v)) $ M.toList m
+nonDetUFMToList (UFM m) = map (\(k, v) -> (getUnmixedUnique k, v)) $ M.toList m
 
 -- | A wrapper around 'UniqFM' with the sole purpose of informing call sites
 -- that the provided 'Foldable' and 'Traversable' instances are
