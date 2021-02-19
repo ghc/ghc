@@ -746,6 +746,10 @@ You might also want to take a look at
 `hp2any <https://www.haskell.org/haskellwiki/Hp2any>`__, a more advanced
 suite of tools (not distributed with GHC) for displaying heap profiles.
 
+Note that there might be a big difference between the OS reported memory usage
+of your program and the amount of live data as reported by heap profiling.
+The reasons for the difference are explained in :ref:`hints-os-memory`.
+
 .. _rts-options-heap-prof:
 
 RTS options for heap profiling
