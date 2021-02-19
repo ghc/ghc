@@ -102,7 +102,6 @@ import GHC.Core.ConLike
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.Coercion.Axiom
-import GHC.Core.Coercion
 import GHC.Core.Class
 
 import GHC.Unit.Module
@@ -663,8 +662,7 @@ tcCheckUsage name id_mult thing_inside
            ; wrapper <- case actual_u of
                Bottom -> return idHsWrapper
                Zero     -> tcSubMult (UsageEnvironmentOf name) Many id_mult
-               MUsage m -> do { m <- zonkTcType m
-                              ; m <- promote_mult m
+               MUsage m -> do { m <- promote_mult m
                               ; tcSubMult (UsageEnvironmentOf name) m id_mult }
            ; tcEmitBindingUsage (deleteUE uenv name)
            ; return wrapper }
@@ -690,16 +688,13 @@ tcCheckUsage name id_mult thing_inside
     -- so we can't use it here. Thus, this dirtiness.
     --
     -- It works nicely in practice.
-    (promote_mult, _, _, _) = mapTyCo mapper
-    mapper = TyCoMapper { tcm_tyvar = \ () tv -> if isMetaTyVar tv
-                                                 then do { tclvl <- getTcLevel
-                                                         ; _ <- promoteMetaTyVarTo tclvl tv
-                                                         ; zonkTcTyVar tv }
-                                                 else return (mkTyVarTy tv)
-                        , tcm_covar = \ () cv -> return (mkCoVarCo cv)
-                        , tcm_hole  = \ () h  -> return (mkHoleCo h)
-                        , tcm_tycobinder = \ () tcv _flag -> return ((), tcv)
-                        , tcm_tycon = return }
+    --
+    -- We use a set to avoid calling promoteMetaTyVarTo twice on the same
+    -- metavariable. This happened in #19400.
+    promote_mult m = do { fvs <- zonkTyCoVarsAndFV (tyCoVarsOfType m)
+                        ; any_promoted <- promoteTyVarSet fvs
+                        ; if any_promoted then zonkTcType m else return m
+                        }
 
 {- *********************************************************************
 *                                                                      *
