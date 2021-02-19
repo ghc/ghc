@@ -335,13 +335,19 @@ warnAboutEmptyEnumerations fam_envs dflags fromExpr mThnExpr toExpr
 
 getLHsIntegralLit :: LHsExpr GhcTc -> Maybe (Integer, Type)
 -- ^ See if the expression is an 'Integral' literal.
--- Remember to look through automatically-added tick-boxes! (#8384)
-getLHsIntegralLit (L _ (HsPar _ e))            = getLHsIntegralLit e
-getLHsIntegralLit (L _ (HsTick _ _ e))         = getLHsIntegralLit e
-getLHsIntegralLit (L _ (HsBinTick _ _ _ e))    = getLHsIntegralLit e
-getLHsIntegralLit (L _ (HsOverLit _ over_lit)) = getIntegralLit over_lit
-getLHsIntegralLit (L _ (HsLit _ lit))          = getSimpleIntegralLit lit
-getLHsIntegralLit _ = Nothing
+getLHsIntegralLit (L _ e) = go e
+  where
+    go (HsPar _ e)            = getLHsIntegralLit e
+    go (HsOverLit _ over_lit) = getIntegralLit over_lit
+    go (HsLit _ lit)          = getSimpleIntegralLit lit
+
+    -- Remember to look through automatically-added tick-boxes! (#8384)
+    go (HsTick _ _ e)         = getLHsIntegralLit e
+    go (HsBinTick _ _ _ e)    = getLHsIntegralLit e
+
+    -- The literal might be wrapped in a case with -XOverloadedLists
+    go (XExpr (WrapExpr (HsWrap _ e))) = go e
+    go _ = Nothing
 
 -- | If 'Integral', extract the value and type of the overloaded literal.
 -- See Note [Literals and the OverloadedLists extension]
