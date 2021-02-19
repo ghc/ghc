@@ -111,8 +111,8 @@ data RecompileRequiredWithEvidence
   | NeedsRecompileWithOld
      CompileReason
      -- ^ the reason we need to recompile.
-     (Maybe ModIface)
-     -- ^ The old interface, if it exists, used to extract a fingerprint.
+     (Maybe Fingerprint)
+     -- ^ The old interface fingerprint to use in order to decide whether the interface needs rewriting.
 
 data CompileReason
   = MustCompile
@@ -191,13 +191,13 @@ check_old_iface hsc_env mod_summary src_modified maybe_iface
             -- avoid reading an interface; just return the one we might
             -- have been supplied with.
             True | not (backendProducesObject $ backend dflags) ->
-                return $ NeedsRecompileWithOld MustCompile maybe_iface
+                return $ NeedsRecompileWithOld MustCompile (mi_iface_hash . mi_final_exts <$> maybe_iface)
 
             -- Try and read the old interface for the current module
             -- from the .hi file left from the last time we compiled it
             True -> do
                 maybe_iface' <- getIface
-                return $ NeedsRecompileWithOld MustCompile maybe_iface'
+                return $ NeedsRecompileWithOld MustCompile (mi_iface_hash . mi_final_exts <$> maybe_iface')
 
             False -> do
                 maybe_iface' <- getIface
@@ -248,7 +248,7 @@ checkVersions hsc_env mod_summary iface
        ; recomp <- checkHie mod_summary
        ; case recomp of (NeedsRecompile reason) -> return $ NeedsRecompileWithOld reason Nothing ; _ -> do {
        ; recomp <- checkDependencies hsc_env mod_summary iface
-       ; case recomp of (NeedsRecompile reason) -> return $ NeedsRecompileWithOld reason (Just iface) ; _ -> do {
+       ; case recomp of (NeedsRecompile reason) -> return $ NeedsRecompileWithOld reason (Just (mi_iface_hash . mi_final_exts $ iface)) ; _ -> do {
        ; recomp <- checkPlugins hsc_env iface
        ; case recomp of (NeedsRecompile reason) -> return $ NeedsRecompileWithOld reason Nothing ; _ -> do {
 
