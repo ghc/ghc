@@ -77,13 +77,13 @@ llvmCodeGen logger dflags h cmm_stream
 
        -- run code generation
        a <- runLlvm logger dflags (fromMaybe supportedLlvmVersion mb_ver) bufh $
-         llvmCodeGen' dflags (liftStream cmm_stream)
+         llvmCodeGen' dflags cmm_stream
 
        bFlush bufh
 
        return a
 
-llvmCodeGen' :: DynFlags -> Stream.Stream LlvmM RawCmmGroup a -> LlvmM a
+llvmCodeGen' :: DynFlags -> Stream.Stream IO RawCmmGroup a -> LlvmM a
 llvmCodeGen' dflags cmm_stream
   = do  -- Preamble
         renderLlvm header
@@ -91,7 +91,7 @@ llvmCodeGen' dflags cmm_stream
         cmmMetaLlvmPrelude
 
         -- Procedures
-        a <- Stream.consume cmm_stream llvmGroupLlvmGens
+        a <- Stream.consume cmm_stream liftIO llvmGroupLlvmGens
 
         -- Declare aliases for forward references
         opts <- getLlvmOpts
