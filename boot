@@ -157,6 +157,7 @@ def boot_pkgs():
 def autoreconf():
     # Run autoreconf on everything that needs it.
     processes = {}
+    processes2 = {}
     if os.name == 'nt':
         # Get the normalized ACLOCAL_PATH for Windows
         # This is necessary since on Windows this will be a Windows
@@ -166,13 +167,16 @@ def autoreconf():
         ac_local_arg = re.sub(r'\\', r'/', ac_local_arg)
         ac_local_arg = re.sub(r'(\w):/', r'/\1/', ac_local_arg)
         reconf_cmd = 'ACLOCAL_PATH=%s autoreconf' % ac_local_arg
+        acmake_cmd = 'ACLOCAL_PATH=%s automake --add-missing' % ac_local_arg
     else:
         reconf_cmd = 'autoreconf'
+        acmake_cmd = 'automake --add-missing'
 
     for dir_ in ['.'] + glob.glob('libraries/*/'):
         if os.path.isfile(os.path.join(dir_, 'configure.ac')):
             print("Booting %s" % dir_)
             processes[dir_] = subprocess.Popen(['sh', '-c', reconf_cmd], cwd=dir_)
+            processes2[dir_] = subprocess.Popen(['sh', '-c', acmake_cmd], cwd=dir_)
 
     # Wait for all child processes to finish.
     fail = False
@@ -182,6 +186,12 @@ def autoreconf():
             print_err('autoreconf in %s failed with exit code %d' % (k, code))
             fail = True
 
+    for k,v in processes2.items():
+        code = v.wait()
+        if code != 0:
+            print_err('automake in %s failed with exit code %d' % (k, code))
+            fail = True
+            
     if fail:
         sys.exit(1)
 
