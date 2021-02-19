@@ -46,7 +46,7 @@ import qualified Data.IntSet as IS
 import ForeignCall (CCallSpec(..), CCallTarget(..), CCallConv(..), Safety(..), CCallTarget(..))
 
 mkCCallSpec :: CCallTarget -> CCallConv -> Safety -> Type -> [Type] -> CCallSpec
-mkCCallSpec t c s r as = CCallSpec t c s (myTypePrimRep1 r') (map myTypePrimRep1 as')
+mkCCallSpec t c s r as = CCallSpec t c s (myTypePrimRep r') (map myTypePrimRep as')
         where r'= case tcSplitIOType_maybe r of
                 Just (_ioTyCon, res_ty) -> res_ty
                 Nothing                 -> r
@@ -66,9 +66,10 @@ mkCCallSpec t c s r as = CCallSpec t c s (myTypePrimRep1 r') (map myTypePrimRep1
                 | otherwise
                 = pprPanic "DsForeign.typeTyCon" (ppr ty)
 
-              myTypePrimRep1 :: Type -> PrimRep
-              myTypePrimRep1 t = case typePrimRep1 t of
-                LiftedRep -> case getUnique (typeTyCon t) of
+              myTypePrimRep :: Type -> PrimRep
+              myTypePrimRep t = case typePrimRep t of
+                []          -> VoidRep
+                [LiftedRep] -> case getUnique (typeTyCon t) of
                   key | key == int8TyConKey   -> Int8Rep
                       | key == int16TyConKey  -> Int16Rep
                       | key == int32TyConKey  -> Int32Rep
@@ -83,7 +84,12 @@ mkCCallSpec t c s r as = CCallSpec t c s (myTypePrimRep1 r') (map myTypePrimRep1
                       | key == doubleTyConKey -> DoubleRep
                       | key == unitTyConKey   -> VoidRep
                   _                           -> LiftedRep
-                other     -> other
+                [rep]     -> rep
+                -- Anything, else e.g. tuples, ..., those will
+                -- need to be passed as structs or unions or
+                -- some other datastructure, for which we only have
+                -- address pointers in C.
+                _         -> AddrRep
 
 
 {- **********************************************************************
