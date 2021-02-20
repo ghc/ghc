@@ -1254,8 +1254,8 @@ ecpFromExp a = ECP (ecpFromExp' a)
 ecpFromCmd :: LHsCmd GhcPs -> ECP
 ecpFromCmd a = ECP (ecpFromCmd' a)
 
--- The 'fbinds1' parser rule produces values of this type. See Note
--- [How record dot notation is handled] (not written yet).
+-- The 'fbinds' parser rule produces values of this type. See Note
+-- [RecordDotSyntax field updates].
 type Fbind b = Either
                  (LHsRecField GhcPs (Located b))
                  (LHsProjUpdate GhcPs (Located b))
@@ -2198,10 +2198,8 @@ mkRdrRecordUpd opts exp@(L loc _) fbinds = do
       -- This is just a regular record update.
       return RecordUpd {
         rupd_ext = noExtField
-      , rupd_dot = False
       , rupd_expr = exp
-      , rupd_flds = fs'
-      , rupd_upds = [] }
+      , rupd_flds = Left fs' }
     True ->
       case rebindable_syntax of
         False ->
@@ -2224,10 +2222,8 @@ mkRdrRecordUpd opts exp@(L loc _) fbinds = do
               -- This is a RecordDotSyntax update.
               return RecordUpd {
                   rupd_ext = noExtField
-                , rupd_dot = True
                 , rupd_expr = exp
-                , rupd_flds = []
-                , rupd_upds = toProjUpdates fbinds }
+                , rupd_flds = Right (toProjUpdates fbinds) }
   where
     isQualLbl:: AmbiguousFieldOcc GhcPs -> Bool
     isQualLbl = \case

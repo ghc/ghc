@@ -62,10 +62,92 @@ import qualified Data.Data as Data (Fixity(..))
 import GHCi.RemoteTypes ( ForeignRef )
 import qualified Language.Haskell.TH as TH (Q)
 
+{- Note [RecordDotSyntax field updates]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The extensions @OverloadedRecordDot@ @OverloadedRecordUpdate@ together
+enable record updates like @a{foo.bar.baz = 1}@. Introducing this
+syntax slightly complicates parsing. This note explains how it's done.
+
+In the event a record is being constructed or updated, it's this
+production that's in play:
+@
+aexp1 -> aexp1 '{' fbinds '}' {
+  ...
+  mkHsRecordPV ... $1 (snd $3)
+}
+@
+@fbinds@ is a list of field bindings. @mkHsRecordPV@ is a function of
+the @DisambECP b@ typeclass, see Note [Ambiguous syntactic
+categories].
+
+The "normal" rules for an @fbind@ are:
+@
+fbind
+        : qvar '=' texp
+        | qvar
+@
+These rules compute values of @LHsRecField GhcPs (Located b)@. They
+apply in the context of record construction, record updates, record
+patterns and record expressions. That is, @b@ ranges over @HsExpr
+GhcPs@, @HsPat GhcPs@ and @HsCmd GhcPs@.
+
+When @OverloadedRecordDot@ and @OverloadedRecordUpdate@ are together
+in effect, two additional @fbind@ rules are admitted:
+@
+        | field TIGHT_INFIX_PROJ fieldToUpdate '=' texp
+        | field TIGHT_INFIX_PROJ fieldToUpdate
+@
+These rules only make sense when parsing record update expressions
+(that is, not for patterns, not for commands and not for record
+construction). The results of these rules cannot be represented by
+@LHsRecField GhcPs (LHsExpr GhcPs)@ values as they are defined today.
+
+To extend the @fbind@ rule set in a fashion that minimized the
+disturbing of existing code, the approach taken was for these new
+rules to calculate @LHsProjUpdate GhcPs (Located b)@ ("projection
+update") values.
+@
+-- e.g. foo.bar.baz = 1
+data ProjUpdate p arg =
+  ProjUpdate {
+      pu_flds :: [Located FastString] -- foo.bar.baz
+    , pu_arg :: arg                   --             = 1
+    }
+type LHsProjUpdate p arg = Located (ProjUpdate p arg)
+type RecUpdProj p = ProjUpdate p (LHsExpr p)
+type LHsRecUpdProj p = Located (RecUpdProj p)
+@
+The @fbind@ rule is then given the type @fbind :: { forall b.
+DisambECP b => PV (Fbind b) }@ accomodating both alternatives.
+@
+data Fbind b = Fbind (LHsRecField GhcPs (Located b))
+             | Pbind (LHsProjUpdate GhcPs (Located b))
+@
+
+In @data HsExpr p@, the @RecordUpd@ constuctor indicates regular
+updates vs. projection updates by means of an @Either@ in its
+@rupd_flds@ member:
+@
+  | RecordUpd
+      { rupd_ext  :: XRecordUpd p
+      , rupd_expr :: LHsExpr p
+      , rupd_flds :: Either [LHsRecUpdField p] [LHsRecUpdProj p]
+      }
+@
+A @Left@ value indicates a regular record update, a @Right@ value an
+update desugared to @setField@s.
+-}
+
 -- | RecordDotSyntax field updates
 --
--- Field projection updates (e.g. @a{foo.bar.baz = 1}@). See Note [How
--- record dot notation is handled] (not written yet).
+-- Field projection updates (e.g. @foo.bar.baz = 1@). See Note
+-- [RecordDotSyntax field updates].
+--
+-- @p@ is phantom; here to ease the defintion of @data Fbind b@
+-- (defined in 'GHC.Parser.PostProcess').
+-- type FieldLabelString = FastString
+-- type ProjUpdate p arg = HsRecField' [Located FastString] arg
 data ProjUpdate p arg =
   ProjUpdate {
       pu_flds :: [Located FastString]
@@ -386,10 +468,8 @@ data HsExpr p
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | RecordUpd
       { rupd_ext  :: XRecordUpd p
-      , rupd_dot  :: Bool -- Is RecordDotSyntax in effect?
       , rupd_expr :: LHsExpr p
-      , rupd_flds :: [LHsRecUpdField p]
-      , rupd_upds :: [LHsRecUpdProj p]
+      , rupd_flds :: Either [LHsRecUpdField p] [LHsRecUpdProj p]
       }
   -- For a type family, the arg types are of the *instance* tycon,
   -- not the family tycon

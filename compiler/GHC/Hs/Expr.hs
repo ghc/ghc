@@ -521,12 +521,10 @@ ppr_expr (RecordCon { rcon_con = con, rcon_flds = rbinds })
                GhcRn -> ppr con
                GhcTc -> ppr con
 
-ppr_expr (RecordUpd { rupd_expr = L _ aexp, rupd_dot = dot, rupd_flds = rbinds, rupd_upds = pbinds })
-  = if not dot
-      then
-        hang (ppr aexp) 2 (braces (fsep (punctuate comma (map ppr rbinds))))
-      else
-        hang (ppr aexp) 2 (braces (fsep (punctuate comma (map ppr pbinds))))
+ppr_expr (RecordUpd { rupd_expr = L _ aexp, rupd_flds = flds })
+  = case flds of
+      Left rbinds -> hang (ppr aexp) 2 (braces (fsep (punctuate comma (map ppr rbinds))))
+      Right pbinds -> hang (ppr aexp) 2 (braces (fsep (punctuate comma (map ppr pbinds))))
 
 ppr_expr (HsGetField { gf_expr = L _ fexp, gf_field = field })
   = ppr fexp <> dot <> ppr field
