@@ -305,7 +305,7 @@ rnExpr (NegApp _ e _)
 -- Record dot syntax
 
 rnExpr (HsGetField _ e f)
- = do { getField <- lookupGetField
+ = do { getField <- lookupReboundOrQualName gHC_RECORDS (fsLit "getField")
       ; (e, fv_e) <- rnLExpr e
       ; return ( mkExpandedExpr
                    (HsGetField noExtField e f)
@@ -313,7 +313,7 @@ rnExpr (HsGetField _ e f)
                , fv_e `plusFV` unitFV getField ) }
 
 rnExpr (HsProjection _ fs)
-  = do { getField <- lookupGetField
+  = do { getField <- lookupReboundOrQualName gHC_RECORDS (fsLit "getField")
        ; circ <- lookupOccRn compose_RDR
        ; return ( mkExpandedExpr
                     (HsProjection noExtField fs)
@@ -422,7 +422,7 @@ rnExpr (RecordCon { rcon_con = con_id
     rn_field (L l fld) = do { (arg', fvs) <- rnLExpr (hsRecFieldArg fld)
                             ; return (L l (fld { hsRecFieldArg = arg' }), fvs) }
 
-rnExpr (u@RecordUpd { rupd_expr = expr, rupd_flds = rbinds })
+rnExpr (RecordUpd { rupd_expr = expr, rupd_flds = rbinds })
   = case rbinds of
       Left flds -> -- 'OverloadedRecordUpdate' is not in effect. Regular record update.
         do  { ; (e, fv_e) <- rnLExpr expr
@@ -432,8 +432,8 @@ rnExpr (u@RecordUpd { rupd_expr = expr, rupd_flds = rbinds })
       Right flds ->  -- 'OverloadedRecordUpdate' is in effect. Record dot update desugaring.
         do { ; unlessXOptM LangExt.RebindableSyntax $
                  addErr $ text "RebindableSyntax is required if OverloadedRecordUpdate is enabled."
-             ; getField <- lookupGetField
-             ; setField <- lookupSetField
+             ; getField <- lookupReboundOrQualName gHC_RECORDS (fsLit "getField")
+             ; setField <- lookupReboundOrQualName gHC_RECORDS (fsLit "setField")
              ; (e, fv_e) <- rnLExpr expr
              ; (us, fv_us) <- rnHsUpdProjs flds
              ; return ( mkExpandedExpr
@@ -2611,29 +2611,3 @@ rnHsUpdProjs us =
     rnRecUpdProj (L l (HsRecField fs arg pun))
       = do { (arg, fv) <- rnLExpr arg
            ; return $ (L l (HsRecField { hsRecFieldLbl = fs, hsRecFieldArg = arg, hsRecPun = pun}), fv) }
-
--- When rebindable syntax is on retrieve the 'getField' in scope
--- otherwise 'Ghc.Records.getField'.
-lookupGetField :: RnM Name
-lookupGetField = do
-  mGetFieldName <- lookupReboundGetField
-  case mGetFieldName of
-    Just (L _ name) ->
-      -- Rebindable syntax is on; 'name' is the 'getField' in scope.
-      pure name
-    Nothing ->
-      -- Rebindable syntax is off; use the 'getField' from 'GHC.Records'.
-      lookupOccRn (mkOrig gHC_RECORDS (mkVarOccFS (fsLit "getField")))
-
--- When rebindable syntax is on retrieve the 'setField' in scope
--- otherwise 'Ghc.Records.setField'.
-lookupSetField :: RnM Name
-lookupSetField = do
-  mSetFieldName <- lookupReboundSetField
-  case mSetFieldName of
-    Just (L _ name) ->
-      -- Rebindable syntax is on; 'name' is the 'setField' in scope.
-      pure name
-    Nothing ->
-      -- Rebindable syntax is off; use the 'setField' from 'GHC.Records'.
-      lookupOccRn (mkOrig gHC_RECORDS (mkVarOccFS (fsLit "setField")))
