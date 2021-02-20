@@ -60,3 +60,6 @@ sharing = do
     ]
 
   performMajorGC
+
+  -- Ensure the list is kept alive during the above GC
+  print x1
