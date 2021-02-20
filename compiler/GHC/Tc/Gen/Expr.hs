@@ -644,8 +644,8 @@ following.
 
 -- Record updates via dot syntax are replaced by desugared expressions
 -- in the renamer. See Note [Rebindable Syntax and HsExpansion]. This
--- is why we match on 'rupd_dot = False' here and panic otherwise.
-tcExpr expr@(RecordUpd { rupd_dot = False, rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
+-- is why we match on 'rupd_flds = Left rbnds' here and panic otherwise.
+tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = Left rbnds }) res_ty
   = ASSERT( notNull rbnds )
     do  { -- STEP -2: typecheck the record_expr, the record to be updated
           (record_expr', record_rho) <- tcScalingUsage Many $ tcInferRho record_expr
@@ -810,11 +810,9 @@ tcExpr expr@(RecordUpd { rupd_dot = False, rupd_expr = record_expr, rupd_flds = 
                                    , rupd_in_tys = scrut_inst_tys
                                    , rupd_out_tys = result_inst_tys
                                    , rupd_wrap = req_wrap }
-              expr' = RecordUpd { rupd_dot = False
-                                , rupd_expr = mkLHsWrap fam_co $
+              expr' = RecordUpd { rupd_expr = mkLHsWrap fam_co $
                                                 mkLHsWrapCo co_scrut record_expr'
-                                , rupd_flds = rbinds'
-                                , rupd_upds = []
+                                , rupd_flds = Left rbinds'
                                 , rupd_ext = upd_tc }
 
         ; tcWrapResult expr expr' rec_res_ty res_ty }
@@ -1739,4 +1737,3 @@ checkClosedInStaticForm name = do
 -- When @n@ is not closed, we traverse the graph reachable from @n@ to build
 -- the reason.
 --
-
