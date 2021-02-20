@@ -82,9 +82,12 @@ so we reuse the desugaring code in @GHC.HsToCore.Foreign.Call@ to deal with thes
 type Binding = (Id, CoreExpr) -- No rec/nonrec structure;
                               -- the occurrence analyser will sort it all out
 
-dsForeigns :: [LForeignDecl GhcTc]
-           -> DsM (ForeignStubs, OrdList Binding)
-dsForeigns fos = getHooked dsForeignsHook dsForeigns' >>= ($ fos)
+dsForeigns :: [LForeignDecl GhcTc] -> DsM (ForeignStubs, OrdList Binding)
+dsForeigns fos = do
+    hooks <- getHooks
+    case dsForeignsHook hooks of
+        Nothing -> dsForeigns' fos
+        Just h  -> h fos
 
 dsForeigns' :: [LForeignDecl GhcTc]
             -> DsM (ForeignStubs, OrdList Binding)

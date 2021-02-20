@@ -4,6 +4,7 @@ module GHC.Driver.Env.Types
   , HscEnv(..)
   ) where
 
+import {-# SOURCE #-} GHC.Driver.Hooks
 import GHC.Driver.Session ( DynFlags, HasDynFlags(..) )
 import GHC.Linker.Types ( Loader )
 import GHC.Prelude
@@ -155,5 +156,8 @@ data HscEnv
 
         , hsc_logger :: !Logger
                 -- ^ Logger
+
+        , hsc_hooks :: !Hooks
+                -- ^ Hooks
  }
 
