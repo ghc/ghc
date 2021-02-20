@@ -109,7 +109,7 @@ module GHC.Parser.PostProcess (
 import GHC.Prelude
 import GHC.Hs           -- Lots of it
 import GHC.Core.TyCon          ( TyCon, isTupleTyCon, tyConSingleDataCon_maybe )
-import GHC.Core.DataCon        ( DataCon, dataConTyCon )
+import GHC.Core.DataCon        ( DataCon, dataConTyCon, FieldLabelString )
 import GHC.Core.ConLike        ( ConLike(..) )
 import GHC.Core.Coercion.Axiom ( Role, fsFromRole )
 import GHC.Types.Name.Reader
@@ -1256,9 +1256,7 @@ ecpFromCmd a = ECP (ecpFromCmd' a)
 
 -- The 'fbinds' parser rule produces values of this type. See Note
 -- [RecordDotSyntax field updates].
-type Fbind b = Either
-                 (LHsRecField GhcPs (Located b))
-                 (LHsProjUpdate GhcPs (Located b))
+type Fbind b = Either (LHsRecField GhcPs (Located b)) (LHsProjUpdate GhcPs (Located b))
 
 -- | Disambiguate infix operators.
 -- See Note [Ambiguous syntactic categories]
@@ -1288,7 +1286,7 @@ class b ~ (Body b) GhcPs => DisambECP b where
   -- | Return an expression without ambiguity, or fail in a non-expression context.
   ecpFromExp' :: LHsExpr GhcPs -> PV (Located b)
   -- | This can only be satified by expressions.
-  mkHsProjUpdatePV :: SrcSpan -> [Located FastString] -> Located b -> PV (LHsProjUpdate GhcPs (Located b))
+  mkHsProjUpdatePV :: SrcSpan -> Located [Located FieldLabelString] -> Located b -> Bool -> PV (LHsProjUpdate GhcPs (Located b))
   -- | Disambiguate "\... -> ..." (lambda)
   mkHsLamPV :: SrcSpan -> MatchGroup GhcPs (Located b) -> PV (Located b)
   -- | Disambiguate "let ... in ..."
@@ -1416,7 +1414,7 @@ instance DisambECP (HsCmd GhcPs) where
   type Body (HsCmd GhcPs) = HsCmd
   ecpFromCmd' = return
   ecpFromExp' (L l e) = cmdFail l (ppr e)
-  mkHsProjUpdatePV l _ _ = addFatalError $ PsError PsErrOverloadedRecordDotInvalid [] l
+  mkHsProjUpdatePV l _ _ _ = addFatalError $ PsError PsErrOverloadedRecordDotInvalid [] l
   mkHsLamPV l mg = return $ L l (HsCmdLam noExtField mg)
   mkHsLetPV l bs e = return $ L l (HsCmdLet noExtField bs e)
   type InfixOp (HsCmd GhcPs) = HsExpr GhcPs
@@ -1477,7 +1475,7 @@ instance DisambECP (HsExpr GhcPs) where
     addError $ PsError (PsErrArrowCmdInExpr c) [] l
     return (L l hsHoleExpr)
   ecpFromExp' = return
-  mkHsProjUpdatePV l fields arg = return $ mkRdrProjUpdate l fields arg
+  mkHsProjUpdatePV l fields arg isPun = return $ mkRdrProjUpdate l fields arg isPun
   mkHsLamPV l mg = return $ L l (HsLam noExtField mg)
   mkHsLetPV l bs c = return $ L l (HsLet noExtField bs c)
   type InfixOp (HsExpr GhcPs) = HsExpr GhcPs
@@ -1536,7 +1534,7 @@ instance DisambECP (PatBuilder GhcPs) where
   ecpFromExp' (L l e)    = addFatalError $ PsError (PsErrArrowExprInPat e) [] l
   mkHsLamPV l _          = addFatalError $ PsError PsErrLambdaInPat [] l
   mkHsLetPV l _ _        = addFatalError $ PsError PsErrLetInPat [] l
-  mkHsProjUpdatePV l _ _ = addFatalError $ PsError PsErrOverloadedRecordDotInvalid [] l
+  mkHsProjUpdatePV l _ _ _ = addFatalError $ PsError PsErrOverloadedRecordDotInvalid [] l
   type InfixOp (PatBuilder GhcPs) = RdrName
   superInfixOp m = m
   mkHsOpAppPV l p1 op p2 = return $ L l $ PatBuilderOpApp p1 op p2
@@ -2724,7 +2722,7 @@ isGetField :: LHsExpr GhcPs -> Bool
 isGetField (L _ HsGetField{}) = True
 isGetField _ = False
 
-mkRdrGetField :: SrcSpan -> LHsExpr GhcPs -> Located FastString -> LHsExpr GhcPs
+mkRdrGetField :: SrcSpan -> LHsExpr GhcPs -> Located FieldLabelString -> LHsExpr GhcPs
 mkRdrGetField loc arg field =
   L loc HsGetField {
       gf_ext = noExtField
@@ -2732,7 +2730,7 @@ mkRdrGetField loc arg field =
     , gf_field = field
     }
 
-mkRdrProjection :: SrcSpan -> [Located FastString] -> LHsExpr GhcPs
+mkRdrProjection :: SrcSpan -> [Located FieldLabelString] -> LHsExpr GhcPs
 mkRdrProjection _ [] = panic "mkRdrProjection: The impossible has happened!"
 mkRdrProjection loc flds =
   L loc HsProjection {
@@ -2740,27 +2738,23 @@ mkRdrProjection loc flds =
     , proj_flds = flds
     }
 
-mkRdrProjUpdate :: SrcSpan -> [Located FastString] -> LHsExpr GhcPs -> LHsProjUpdate GhcPs (LHsExpr GhcPs)
-mkRdrProjUpdate _ [] _ = panic "mkRdrProjUpdate: The impossible has happened!"
-mkRdrProjUpdate loc flds arg =
-  L loc ProjUpdate {
-      pu_flds = flds
-    , pu_arg = arg
-    }
+mkRdrProjUpdate :: SrcSpan -> Located [Located FieldLabelString] -> LHsExpr GhcPs -> Bool -> LHsProjUpdate GhcPs (LHsExpr GhcPs)
+mkRdrProjUpdate _ (L _ []) _ _ = panic "mkRdrProjUpdate: The impossible has happened!"
+mkRdrProjUpdate loc (L l flds) arg isPun =
+  L loc HsRecField {
+      hsRecFieldLbl = L l (FieldLabelStrings flds)
+    , hsRecFieldArg = arg
+    , hsRecPun = isPun
+  }
 
 recUpdFieldToProjUpdate :: LHsRecUpdField GhcPs -> LHsRecUpdProj GhcPs
-recUpdFieldToProjUpdate (L l (HsRecField occ arg _)) =
-  mkRdrProjUpdate l [L loc (fsLit f)] (val arg)
+recUpdFieldToProjUpdate (L l (HsRecField occ arg pun)) =
+  mkRdrProjUpdate l (L loc [L loc (fsLit f)]) (val arg) pun
   where
     (loc, f) = field occ
 
     val :: LHsExpr GhcPs -> LHsExpr GhcPs
-    val arg = if isPun arg then mkVar $ snd (field occ) else arg
-
-    isPun :: LHsExpr GhcPs -> Bool
-    isPun = \case
-      L _ (HsVar _ (L _ p)) -> p == pun_RDR
-      _ -> False
+    val arg = if pun then mkVar $ snd (field occ) else arg
 
     field :: Located (AmbiguousFieldOcc GhcPs) -> (SrcSpan, String)
     field = \case

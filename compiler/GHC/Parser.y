@@ -3393,8 +3393,13 @@ fbind   :: { forall b. DisambECP b => PV (Fbind b) }
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
         | field TIGHT_INFIX_PROJ fieldToUpdate '=' texp
                         { do
+                            let top = $1
+                                fields = top : reverse $3
+                                final = last fields
+                                l = comb2 top final
+                                isPun = False
                             $5 <- unECP $5
-                            fmap Right $ mkHsProjUpdatePV (comb2 $1 $5) ($1 : reverse $3) $5
+                            fmap Right $ mkHsProjUpdatePV (comb2 $1 $5) (L l fields) $5 isPun
                         }
 
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
@@ -3404,11 +3409,12 @@ fbind   :: { forall b. DisambECP b => PV (Fbind b) }
                                 fields = top : reverse $3
                                 final = last fields
                                 l = comb2 top final
+                                isPun = True
                             puns <- getBit RecordPunsBit
                             when (not puns) $
                               addError $ PsError PsErrNamedFieldPunsNotEnabled [] l
                             var <- mkHsVarPV (noLoc (mkRdrUnqual . mkVarOcc . unpackFS . unLoc $ final))
-                            fmap Right $ mkHsProjUpdatePV l fields var
+                            fmap Right $ mkHsProjUpdatePV l (L l fields) var isPun
                         }
 
 fieldToUpdate :: { [Located FastString] }
