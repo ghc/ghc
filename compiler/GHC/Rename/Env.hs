@@ -41,7 +41,7 @@ module GHC.Rename.Env (
 
         -- Rebindable Syntax
         lookupSyntax, lookupSyntaxExpr, lookupSyntaxName, lookupSyntaxNames,
-        lookupIfThenElse, lookupReboundGetField, lookupReboundSetField,
+        lookupIfThenElse, lookupReboundOrOrigName,
 
         -- QualifiedDo
         lookupQualifiedDoExpr, lookupQualifiedDo,
@@ -63,6 +63,7 @@ import GHC.Prelude
 import GHC.Iface.Load   ( loadInterfaceForName, loadSrcInterface_maybe )
 import GHC.Iface.Env
 import GHC.Hs
+import GHC.Unit.Module
 import GHC.Types.Name.Reader
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
@@ -72,7 +73,6 @@ import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Types.Avail
-import GHC.Unit.Module
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.Warnings  ( WarningTxt, pprWarningTxtForMsg )
 import GHC.Core.ConLike
@@ -2041,36 +2041,6 @@ lookupQualifiedDoName ctxt std_name
       Nothing -> lookupSyntaxName std_name
       Just modName -> lookupNameWithQualifier std_name modName
 
-
--- Lookup a locally-rebound name for Rebindable Syntax (RS).
---
--- - When RS is off, 'lookupRebound' just returns 'Nothing', whatever
---   name it is given.
---
--- - When RS is on, we always try to return a 'Just', and GHC errors out
---   if no suitable name is found in the environment.
---
--- 'Nothing' really is "reserved" and means that rebindable syntax is off.
-lookupRebound :: FastString -> RnM (Maybe (Located Name))
-lookupRebound nameStr = do
-  rebind <- xoptM LangExt.RebindableSyntax
-  if rebind
-    -- If repetitive lookups ever become a problem performance-wise,
-    -- we could lookup all the names we will ever care about just once
-    -- at the beginning and stick them in the environment, possibly
-    -- populating that "cache" lazily too.
-    then (\nm -> Just (L (nameSrcSpan nm) nm)) <$>
-         lookupOccRn (mkVarUnqual nameStr)
-    else pure Nothing
-
--- | Lookup an @getField@ binding (see 'lookupRebound').
-lookupReboundGetField :: RnM (Maybe (Located Name))
-lookupReboundGetField = lookupRebound (fsLit "getField")
-
--- | Lookup an @setField@ binding (see 'lookupRebound').
-lookupReboundSetField :: RnM (Maybe (Located Name))
-lookupReboundSetField = lookupRebound (fsLit "setField")
-
 -- Error messages
 
 opDeclErr :: RdrName -> SDoc
@@ -2094,3 +2064,19 @@ badOrigBinding name
     -- (See #13968.)
   where
     occ = rdrNameOcc $ filterCTuple name
+
+-- When rebindable syntax is on retrieve the name in scope otherwise
+-- the name defined in the provided module.
+lookupReboundOrOrigName :: Module -> OccName -> RnM Name
+lookupReboundOrOrigName mod occName = do
+  mName <- lookupRebound (occNameFS occName)
+  case mName of
+    Just (L _ name) -> pure name -- Rebindable on; name is the one in scope.
+    Nothing -> -- Rebindable off; use the name from mod.
+      lookupOccRn (mkOrig mod occName) -- Errors out if the name isn't there.
+  where
+    lookupRebound nameStr = do
+      rebind <- xoptM LangExt.RebindableSyntax
+      if rebind
+        then (\nm -> Just (L (nameSrcSpan nm) nm)) <$>  lookupOccRn (mkVarUnqual nameStr)
+        else pure Nothing
