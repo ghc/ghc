@@ -2844,12 +2844,10 @@ aexp    :: { ECP }
 
 aexp1   :: { ECP }
         : aexp1 '{' fbinds '}' { ECP $
-                                   getBit OverloadedRecordDotBit >>= \ select ->
-                                   getBit OverloadedRecordUpdateBit >>= \ updates ->
-                                   getBit RebindableSyntaxBit >>= \ rebinds ->
+                                   getBit OverloadedRecordUpdateBit >>= \ overloaded ->
                                    unECP $1 >>= \ $1 ->
                                    $3 >>= \ $3 ->
-                                   amms (mkHsRecordPV (RecordDotSyntaxOpts select updates rebinds) (comb2 $1 $>) (comb2 $2 $4) $1 (snd $3))
+                                   amms (mkHsRecordPV overloaded (comb2 $1 $>) (comb2 $2 $4) $1 (snd $3))
                                         (moc $2:mcc $4:(fst $3))
                                }
         | aexp2                { $1 }

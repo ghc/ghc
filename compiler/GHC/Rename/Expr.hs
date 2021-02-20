@@ -422,23 +422,25 @@ rnExpr (RecordCon { rcon_con = con_id
     rn_field (L l fld) = do { (arg', fvs) <- rnLExpr (hsRecFieldArg fld)
                             ; return (L l (fld { hsRecFieldArg = arg' }), fvs) }
 
-rnExpr (RecordUpd { rupd_expr = expr, rupd_flds = rbinds })
+rnExpr (u@RecordUpd { rupd_expr = expr, rupd_flds = rbinds })
   = case rbinds of
-      Left flds -> -- RecordDotSyntax is not in effect. Regular record update.
-        do  { (e, fv_e) <- rnLExpr expr
-            ; (rs, fv_rs) <- rnHsRecUpdFields flds
-            ; return ( RecordUpd noExtField e (Left rs), fv_e `plusFV` fv_rs )
+      Left flds -> -- 'OverloadedRecordUpdate' is not in effect. Regular record update.
+        do  { ; (e, fv_e) <- rnLExpr expr
+              ; (rs, fv_rs) <- rnHsRecUpdFields flds
+              ; return ( RecordUpd noExtField e (Left rs), fv_e `plusFV` fv_rs )
             }
-      Right flds ->  -- RecordDotSyntax is in effect. Record dot update desugaring.
-        do { getField <- lookupGetField
-           ; setField <- lookupSetField
-           ; (e, fv_e) <- rnLExpr expr
-           ; (us, fv_us) <- rnHsUpdProjs flds
-           ; return ( mkExpandedExpr
-                         (RecordUpd noExtField e (Right us))
-                         (mkRecordDotUpd generatedSrcSpan getField setField e us)
-                     , plusFVs $ mkFVs [getField, setField] : fv_e : fv_us )
-         }
+      Right flds ->  -- 'OverloadedRecordUpdate' is in effect. Record dot update desugaring.
+        do { ; unlessXOptM LangExt.RebindableSyntax $
+                 addErr $ text "RebindableSyntax is required if OverloadedRecordUpdate is enabled."
+             ; getField <- lookupGetField
+             ; setField <- lookupSetField
+             ; (e, fv_e) <- rnLExpr expr
+             ; (us, fv_us) <- rnHsUpdProjs flds
+             ; return ( mkExpandedExpr
+                          (RecordUpd noExtField e (Right us))
+                          (mkRecordDotUpd generatedSrcSpan getField setField e us)
+                         , plusFVs $ mkFVs [getField, setField] : fv_e : fv_us )
+             }
 
 rnExpr (ExprWithTySig _ expr pty)
   = do  { (pty', fvTy)    <- rnHsSigWcType ExprWithTySigCtx pty
