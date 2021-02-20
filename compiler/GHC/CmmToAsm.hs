@@ -519,7 +519,7 @@ cmmNativeGen logger dflags modLoc ncgImpl us fileIds dbgMap cmm count
 
         let (ssaLive, usSsa) =
                 case livenessCfg of
-                        Just cfg -> {-# SCC "prunedSSA" #-}
+                        Just cfg -> {-# SCC "prunedSSA-Construction" #-}
                                     initUs usLive
                                     $ mapM (prunedSSAFromLiveCmmDecl platform cfg) withLiveness
                         Nothing  -> ([], usLive)
@@ -528,6 +528,12 @@ cmmNativeGen logger dflags modLoc ncgImpl us fileIds dbgMap cmm count
                 Opt_D_dump_asm_ssa "Pruned SSA Constructed"
                 FormatCMM
                 (vcat $ map (pprSsaLiveCmmDecl platform) ssaLive)
+
+        let renumberedCode =
+                if isJust livenessCfg
+                        then {-# SCC "ssa-destruction" #-}
+                             map (cssaToLiveCmmDecl platform) ssaLive
+                        else withLiveness
 
         -- allocate registers
         (alloced, usAlloc, ppr_raStatsColor, ppr_raStatsLinear, raStats, stack_updt_blks) <-
@@ -544,13 +550,13 @@ cmmNativeGen logger dflags modLoc ncgImpl us fileIds dbgMap cmm count
                 -- do the graph coloring register allocation
                 let ((alloced, maybe_more_stack, regAllocStats), usAlloc)
                         = {-# SCC "RegAlloc-color" #-}
-                          initUs usLive
+                          initUs usSsa
                           $ Color.regAlloc
                                 config
                                 alloc_regs
                                 (mkUniqSet [0 .. maxSpillSlots ncgImpl])
                                 (maxSpillSlots ncgImpl)
-                                withLiveness
+                                renumberedCode
                                 livenessCfg
 
                 let ((alloced', stack_updt_blks), usAlloc')
@@ -604,9 +610,9 @@ cmmNativeGen logger dflags modLoc ncgImpl us fileIds dbgMap cmm count
 
                 let ((alloced, regAllocStats, stack_updt_blks), usAlloc)
                         = {-# SCC "RegAlloc-linear" #-}
-                          initUs usLive
+                          initUs usSsa
                           $ liftM unzip3
-                          $ mapM reg_alloc withLiveness
+                          $ mapM reg_alloc renumberedCode
 
                 dumpIfSet_dyn logger dflags
                         Opt_D_dump_asm_regalloc "Registers allocated"
