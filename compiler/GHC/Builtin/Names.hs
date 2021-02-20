@@ -443,7 +443,7 @@ basicKnownKeyNames
         knownNatClassName, knownSymbolClassName, knownCharClassName,
 
         -- Overloaded labels
-        isLabelClassName,
+        fromLabelClassOpName,
 
         -- Implicit Parameters
         ipClassName,
@@ -1626,9 +1626,9 @@ knownCharClassName :: Name
 knownCharClassName  = clsQual gHC_TYPELITS (fsLit "KnownChar") knownCharClassNameKey
 
 -- Overloaded labels
-isLabelClassName :: Name
-isLabelClassName
- = clsQual gHC_OVER_LABELS (fsLit "IsLabel") isLabelClassNameKey
+fromLabelClassOpName :: Name
+fromLabelClassOpName
+ = varQual gHC_OVER_LABELS (fsLit "fromLabel") fromLabelClassOpKey
 
 -- Implicit Parameters
 ipClassName :: Name
@@ -1699,13 +1699,18 @@ fingerprintDataConName =
 All these are original names; hence mkOrig
 -}
 
+{-# INLINE varQual #-}
+{-# INLINE tcQual #-}
+{-# INLINE clsQual #-}
+{-# INLINE dcQual #-}
 varQual, tcQual, clsQual, dcQual :: Module -> FastString -> Unique -> Name
-varQual  = mk_known_key_name varName
-tcQual   = mk_known_key_name tcName
-clsQual  = mk_known_key_name clsName
-dcQual   = mk_known_key_name dataName
+varQual  modu str unique = mk_known_key_name varName modu str unique
+tcQual   modu str unique = mk_known_key_name tcName modu str unique
+clsQual  modu str unique = mk_known_key_name clsName modu str unique
+dcQual   modu str unique = mk_known_key_name dataName modu str unique
 
 mk_known_key_name :: NameSpace -> Module -> FastString -> Unique -> Name
+{-# INLINE mk_known_key_name #-}
 mk_known_key_name space modu str unique
   = mkExternalName unique modu (mkOccNameFS space str) noSrcSpan
 
@@ -1785,9 +1790,6 @@ knownCharClassNameKey = mkPreludeClassUnique 44
 
 ghciIoClassKey :: Unique
 ghciIoClassKey = mkPreludeClassUnique 45
-
-isLabelClassNameKey :: Unique
-isLabelClassNameKey = mkPreludeClassUnique 46
 
 semigroupClassKey, monoidClassKey :: Unique
 semigroupClassKey = mkPreludeClassUnique 47
@@ -2332,6 +2334,9 @@ sndIdKey                      = mkPreludeMiscIdUnique 42
 otherwiseIdKey                = mkPreludeMiscIdUnique 43
 assertIdKey                   = mkPreludeMiscIdUnique 44
 
+leftSectionKey, rightSectionKey :: Unique
+leftSectionKey                = mkPreludeMiscIdUnique 45
+rightSectionKey               = mkPreludeMiscIdUnique 46
 
 rootMainKey, runMainKey :: Unique
 rootMainKey                   = mkPreludeMiscIdUnique 101
@@ -2412,6 +2417,10 @@ mfixIdKey       = mkPreludeMiscIdUnique 175
 -- MonadFail operations
 failMClassOpKey :: Unique
 failMClassOpKey = mkPreludeMiscIdUnique 176
+
+-- fromLabel
+fromLabelClassOpKey :: Unique
+fromLabelClassOpKey = mkPreludeMiscIdUnique 177
 
 -- Arrow notation
 arrAIdKey, composeAIdKey, firstAIdKey, appAIdKey, choiceAIdKey,
