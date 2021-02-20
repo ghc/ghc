@@ -52,6 +52,8 @@ import GHC.Utils.Monad
 import GHC.Utils.Logger
 import Control.Applicative (Alternative(..))
 import GHC.Exts( oneShot )
+import Control.Concurrent.MVar (newEmptyMVar, readMVar, putMVar)
+import Control.Concurrent (forkIO, killThread)
 
 ----------------------------------------------------------------------
 -- Defining the monad type
@@ -168,22 +170,21 @@ tryAllM :: IOEnv env r -> IOEnv env (Either SomeException r)
 tryAllM (IOEnv thing) = IOEnv (\ env -> safeTry (thing env))
 
 -- | Like 'try', but doesn't catch asynchronous exceptions
-safeTry :: Exception e => IO a -> IO (Either e a)
-safeTry x = do
-  r <- try x
-  case r of
-    Left e
-      | isSyncException e -> pure $ Left e
-      | otherwise -> throwIO e
-    Right a -> pure $ pure a
-
--- | Detect if a exception is synchronous
--- Taken from safe-exceptions
-isSyncException :: Exception e => e -> Bool
-isSyncException e =
-    case fromException (toException e) of
-        Just (SomeAsyncException _) -> False
-        Nothing -> True
+safeTry :: IO a -> IO (Either SomeException a)
+safeTry act = do
+  var <- newEmptyMVar
+  uninterruptibleMask $ \restore -> do
+    -- Fork, so that 'act' is safe from all asynchronous exceptions other than the ones we send it
+    t <- forkIO $ try (restore act) >>= putMVar var
+    r <- (restore $ readMVar var)
+           `catch` \(e :: SomeException) -> do
+             -- Control reaches this point only if the parent thread was sent an async exception
+             -- In that case, kill the 'act' thread and re-raise the exception
+             killThread t
+             throwIO e
+    -- cleanup and return
+    killThread t
+    pure r
 
 tryMostM :: IOEnv env r -> IOEnv env (Either SomeException r)
 tryMostM (IOEnv thing) = IOEnv (\ env -> tryMost (thing env))
