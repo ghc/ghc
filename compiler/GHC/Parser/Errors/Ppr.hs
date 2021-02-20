@@ -235,10 +235,13 @@ pp_err = \case
       -> text "Precedence out of range: " <> int i
 
    PsErrOverloadedRecordDotInvalid
-      -> text "Use of OverloadedRecordDot `.' not valid."
+      -> text "Use of OverloadedRecordDot `.' not valid"
 
-   PsErrOverloadedRecordUpdateInvalid
-      -> text "For this to work, both OverloadedRecordUpdate and RebindableSyntax must be enabled"
+   PsErrOverloadedRecordUpdateNoQualifiedFields
+      -> text "Fields cannot be qualified when OverloadedRecordUpdate is enabled"
+
+   PsErrOverloadedRecordUpdateNotEnabled
+      -> text "OverloadedRecordUpdate needs to be enabled"
 
    PsErrInvalidDataCon t
       -> hang (text "Cannot parse data constructor in a data/newtype declaration:") 2
