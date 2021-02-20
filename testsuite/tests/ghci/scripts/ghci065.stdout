@@ -26,7 +26,7 @@ func3 :: Int -> Int -> Int
  Here's multiple line comment for func3.
 PatSyn :: Int 	-- Pattern synonym defined at ghci065.hs:54:1
  This is the haddock comment of a pattern synonym
-TyCl :: * -> Constraint 	-- Class defined at ghci065.hs:57:1
+TyCl :: k -> Constraint 	-- Class defined at ghci065.hs:57:1
  This is the haddock comment of a type class
 TyFam :: * -> * 	-- Type constructor defined at ghci065.hs:60:1
  This is the haddock comment of a type family
