@@ -1,0 +1,9 @@
+RecordDotSyntaxFail9.hs:7:11:
+     Couldn't match type ‘Int’ with ‘[Char]’
+        arising from selecting the field ‘foo’
+     In the expression: a.foo :: String
+      In a pattern binding: _ = a.foo :: String
+      In the expression:
+        do let a = ...
+           let _ = ...
+           undefined
