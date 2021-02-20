@@ -521,12 +521,10 @@ ppr_expr (RecordCon { rcon_con = con, rcon_flds = rbinds })
                GhcRn -> ppr con
                GhcTc -> ppr con
 
-ppr_expr (RecordUpd { rupd_expr = L _ aexp, rupd_dot = dot, rupd_flds = rbinds, rupd_upds = pbinds })
-  = if not dot
-      then
-        hang (ppr aexp) 2 (braces (fsep (punctuate comma (map ppr rbinds))))
-      else
-        hang (ppr aexp) 2 (braces (fsep (punctuate comma (map ppr pbinds))))
+ppr_expr (RecordUpd { rupd_expr = L _ aexp, rupd_flds = flds })
+  = case flds of
+      Left rbinds -> hang (ppr aexp) 2 (braces (fsep (punctuate comma (map ppr rbinds))))
+      Right pbinds -> hang (ppr aexp) 2 (braces (fsep (punctuate comma (map ppr pbinds))))
 
 ppr_expr (HsGetField { gf_expr = L _ fexp, gf_field = field })
   = ppr fexp <> dot <> ppr field
@@ -851,7 +849,40 @@ A general recipe to follow this approach for new constructs could go as follows:
     - the XExpr (HsExpanded ... ...) case in tcExpr already makes sure that weHs
       typecheck the desugared expression while reporting the original one in
       errors
+-}
 
+{- Note [Rebindable syntax for record dot syntax]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The language extensions @OverloadedRecordDot@ and
+@OverloadedRecordUpdate@ (providing "record dot syntax") are
+implemented using the techniques of Note [Rebindable syntax and
+HsExpansion].
+
+When OverloadedRecordDot is enabled:
+- Field selection expressions
+  - e.g. foo.bar.baz
+  - Have abstract syntax HsGetField
+  - After renaming are XExpr (HsExpanded (HsGetField ...) (getField @"..."...)) expressions
+- Field selectors e.g. (.x.y)
+  - Have abstract syntax HsProjection
+  - After renaming are XExpr (HsExpanded (HsProjection ...) ((getField @"...") . (getField @"...") . ...) expressions
+
+When OverloadedRecordUpdate is enabled:
+- Record update expressions
+  - e.g. a{foo.bar=1, quux="corge", baz}
+  - Have abstract syntax RecUpd
+  - After renaming are XExpr (HsExpanded (RecordUpd ...) (setField@"..." ...) expressions
+
+When OverloadedRecordDot is enabled and RebindableSyntax is not
+enabled the name 'getField' is resolved to GHC.Records.getField. When
+OverloadedRecordDot is enabled and RebindableSyntax is enabled the
+name 'getField' is whatever in-scope name that is.
+
+When OverloadedRecordUpd is enabled and RebindableSyntax is not
+enabled it is an error for now. When OverloadedRecordUpd is enabled
+and RebindableSyntax is enabled the names 'getField' and 'setField'
+are whatever in-scope names they are.
 -}
 
 -- See Note [Rebindable syntax and HsExpansion] just above.
