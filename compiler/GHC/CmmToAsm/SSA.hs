@@ -8,7 +8,9 @@
 --
 
 module GHC.CmmToAsm.SSA (
-        SsaLiveCmmDecl, prunedSSAFromLiveCmmDecl,
+        SsaLiveCmmDecl,
+        prunedSSAFromLiveCmmDecl,
+        cssaToLiveCmmDecl,
 
         fromBlockLookupTable,
         SSABasicBlock(..), PhiFun(..),
@@ -21,12 +23,13 @@ import GHC.Prelude
 import Control.Monad (foldM)
 
 import Data.Bifunctor (Bifunctor (bimap))
+import Data.Containers.ListUtils (nubOrd)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IM
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IS
 import Data.List (intersect)
-import Data.Maybe (fromMaybe, listToMaybe)
+import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Tree (Tree)
 import qualified Data.Tree as T
 import Data.Tuple (swap)
@@ -51,6 +54,7 @@ import GHC.Platform.Reg (isVirtualReg, Reg (RegVirtual, RegReal), renameVirtualR
 import GHC.Types.Unique
 import GHC.Types.Unique.DFM
 import GHC.Types.Unique.FM
+import GHC.Types.Unique.SDFM
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.Supply (UniqSM, UniqSupply, takeUniqFromSupply, getUniqueSupplyM)
 
@@ -63,7 +67,6 @@ import GHC.Utils.Panic (panic)
 -- import Debug.Trace
 
 
--- TODO: Should we also bundle CFG? Not useful without. Maybe even idomList...
 -- | Wrapping SSA-Blocks in Top Level CmmDecl
 type SsaLiveCmmDecl statics instr
         = GenCmmDecl
@@ -138,6 +141,10 @@ ssaBBlockPhiFuns :: SSABasicBlock instr -> [PhiFun]
 ssaBBlockPhiFuns (SSABB phis _) = phis
 
 
+ssaBBlockLiveBB :: SSABasicBlock instr -> LiveBasicBlock instr
+ssaBBlockLiveBB (SSABB _ li) = li
+
+
 {- Note [ASM-SSA construction]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -165,6 +172,8 @@ prunedSSAFromLiveCmmDecl platform cfg liveCmmDecl
                          (initRenameS us)
 
         return (ssaCmmDecl)
+
+------- SSA construction ----------------------------------
 
 constructPrunedSSA
         :: (HasDebugCallStack, Instruction instr)
@@ -458,7 +467,6 @@ renameVars_instr platform (LiveInstr instr mLiveness)
         let instr_def   = foldl' (uncurry . patchInstr) instr_use defRenames
 
         -- Update Liveness info
-        -- TODO: This may be wrong: SSA book 7.1 says only a_n is live in, for a_n = Phi(a_0,...)
         let allRenames     = (listToUFM renames) `addListToUFM` defRenames
         let mLiveness'     = updateLiveness allRenames <$> mLiveness
 
@@ -472,11 +480,13 @@ renameVars_instr platform (LiveInstr instr mLiveness)
                         RegVirtual{}   -> (r,) <$> newDef ru
                         RegReal{}      -> return (r, ru)
 
-         -- Update instructon liveness info
-         -- No non-determinism, See Note [Unique Determinism and code generation]
-         updateLiveness renames (Liveness born dieRead dieWrite)
-                = let upd = mkUniqSet . map (replaceReg renames) . nonDetEltsUniqSet
-                  in  Liveness (upd born) (upd dieRead) (upd dieWrite)
+
+-- | Update instructon liveness info
+--   No non-determinism, See Note [Unique Determinism and code generation]
+updateLiveness :: RegMap RegId -> Liveness -> Liveness
+updateLiveness renames (Liveness born dieRead dieWrite)
+ = let upd = mkUniqSet . map (replaceReg (lookupUFM renames)) . nonDetEltsUniqSet
+   in  Liveness (upd born) (upd dieRead) (upd dieWrite)
 
 
 -- | Patch reg in instruction. Adapted from Spill.hs
@@ -505,13 +515,89 @@ patchReg old new instr
 
 
 -- | Helper function to replace unique in reg if in given lookup table.
-replaceReg :: RegMap RegId -> Reg -> Reg
-replaceReg _ old@(RegReal{})    = old
+replaceReg :: (Reg -> Maybe RegId) -> Reg -> Reg
+replaceReg _ old@(RegReal{}) = old
 replaceReg renames old@(RegVirtual vr)
- = case lookupUFM renames old of
-         Just nu                -> RegVirtual (renameVirtualReg nu vr)
-         Nothing                -> old
+ = case renames old of
+         Just nu        -> RegVirtual (renameVirtualReg nu vr)
+         Nothing        -> old
 
+
+------- SSA destruction -----------------------------------
+
+
+-- | Precondition: MUST be in conventional SSA, otherwise transformation is *wrong*.
+--   Since CSSA means, that vars connected by Phi-functions don't interfere,
+--   they can simply be renamed to one variable.
+--   This is **not correct** if transformations have been applied and SSA is
+--   no longer conventional. In that case, copies may be needed.
+cssaToLiveCmmDecl
+        :: (HasDebugCallStack, Instruction instr)
+        => Platform
+        -> SsaLiveCmmDecl statics instr
+        -> LiveCmmDecl statics instr
+
+cssaToLiveCmmDecl _ (CmmData i d)
+ = CmmData i d
+
+cssaToLiveCmmDecl platform (CmmProc liveInfo lbl live blkTbl)
+ | LiveInfo info entries liveVRegsOnEntry liveStackSlots <- liveInfo
+ = let phiWebs  = discoverPhiWebs blkTbl
+       liveIns' = mapMap (mapUniqSet $ replaceReg ((lookupUSDFM phiWebs) . getUnique)) liveVRegsOnEntry
+       info'    = LiveInfo info entries liveIns' liveStackSlots
+       blkTbl'  = mapUDFM (renamePhiWebs platform phiWebs) blkTbl
+       sccs     = map (fmap ssaBBlockLiveBB) $ fromBlockLookupTable blkTbl'
+   in  (CmmProc info' lbl live sccs)
+
+
+-- | Given conventional SSA form, perform union-find on Phi-functions to
+--   build webs.
+discoverPhiWebs
+        :: BlockLookupTable instr
+        -> UniqSDFM RegId RegId
+
+discoverPhiWebs blkTbl
+ = let bitPhis ssaBit = ssaBBlockPhiFuns $ sccBitBlock ssaBit
+       unionNames dset ssaBit = foldl' unionPhi dset $ bitPhis ssaBit
+       unionPhi dset (PhiF _ new args)
+        = foldl' (\ds k -> snd $ equateUSDFM ds k new) (addToUSDFM dset new new) args
+   in  foldl' unionNames emptyUSDFM $ eltsUDFM blkTbl
+
+
+renamePhiWebs
+        :: Instruction instr
+        => Platform
+        -> UniqSDFM RegId RegId                 -- ^ Disjoint-set of vreg uniques
+        -> SccBits (SSABasicBlock instr)        -- ^ Block to apply renames to
+        -> SccBits (SSABasicBlock instr)
+
+renamePhiWebs platform dset sccBit
+ | (SSABB phis (BasicBlock bid ins))    <- sccBitBlock sccBit
+ = let ins' = map (renamePhiWebs_instr platform dset) ins
+   in (SSABB phis (BasicBlock bid ins')) <$ sccBit
+
+
+-- | Rename all occurences of vregs in the instruction with
+--   the new name of their respective Phi-Web.
+renamePhiWebs_instr
+        :: Instruction instr
+        => Platform
+        -> UniqSDFM RegId RegId -- ^ Disjoint-set of vreg uniques
+        -> LiveInstr instr
+        -> LiveInstr instr
+
+renamePhiWebs_instr platform dset (LiveInstr instr mLiveness)
+ = let  RU rlRead rlWritten
+                   = regUsageOfInstr platform instr
+        rsUsed     = nubOrd $ filter isVirtualReg (rlRead ++ rlWritten)
+        rsRenames  = mapMaybe (\r -> (r,) <$> (lookupUSDFM dset $ getUnique r)) rsUsed
+        instr'     = foldl' (uncurry . patchInstr) instr rsRenames
+        mLiveness' = updateLiveness (listToUFM rsRenames) <$> mLiveness
+
+   in   LiveInstr instr' mLiveness'
+
+
+------ Block Lookup Tabe ----------------------------------
 
 -- | We need to iterate over blocks in dfs pre-order of dominator tree,
 --   but we have a list of SCCs...
@@ -630,13 +716,13 @@ domTreeFromList root idomList
 
 -- | Count number of predessecors of nodes.
 -- Is there a better way to do this?
-numPred :: CFG -> BlockMap Int
-numPred cfg = count mapEmpty $ edgeList cfg
- where
-         count m [] = m
-         count m ((_, to):rem)
-                = let m' = mapAlter (fmap succ) to m
-                  in  count m' rem
+-- numPred :: CFG -> BlockMap Int
+-- numPred cfg = count mapEmpty $ edgeList cfg
+--  where
+--          count m [] = m
+--          count m ((_, to):rem)
+--                 = let m' = mapAlter (fmap succ) to m
+--                   in  count m' rem
 
 getPredecessors :: CFG -> BlockId -> [BlockId]
 getPredecessors cfg n = let reverseCfg = reverseEdges cfg
@@ -710,13 +796,13 @@ leaveScope = modify $ \s -> s {
 }
 
 -- | Return current reaching definition of 'old' or Nothing.
-reachingDef :: RegId -> RenameM (Maybe RegId)
-reachingDef old
- = do
-         rd             <- gets stateReachingDef
-         let mStack     = lookupUFM_Directly rd old
-         let res        = mStack >>= listToMaybe
-         return res
+-- reachingDef :: RegId -> RenameM (Maybe RegId)
+-- reachingDef old
+--  = do
+--          rd             <- gets stateReachingDef
+--          let mStack     = lookupUFM_Directly rd old
+--          let res        = mStack >>= listToMaybe
+--          return res
 
 
 -- | Will return the current reaching name of 'old', or 'old'
