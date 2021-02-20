@@ -8,4 +8,4 @@ data Quux = Quux { quux :: Int }
 
 no :: Foo -> Foo
 no foo = foo { bar.baz = Quux { quux = 42 } } } }
--- For this to work, both OverloadedRecordUpdate and RebindableSyntax must be enabled
+-- For this to work, OverloadedRecordUpdate must be enabled

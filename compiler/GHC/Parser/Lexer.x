@@ -2668,7 +2668,6 @@ data ExtBits
   | LinearTypesBit
   | NoLexicalNegationBit   -- See Note [Why not LexicalNegationBit]
   | RecordPunsBit
-  | RebindableSyntaxBit
   | OverloadedRecordDotBit
   | OverloadedRecordUpdateBit
 
@@ -2748,8 +2747,7 @@ mkParserOpts warningFlags extensionFlags
       .|. LinearTypesBit              `xoptBit` LangExt.LinearTypes
       .|. NoLexicalNegationBit        `xoptNotBit` LangExt.LexicalNegation -- See Note [Why not LexicalNegationBit]
       .|. RecordPunsBit               `xoptBit` LangExt.RecordPuns -- Enable testing via 'getBit RecordPunsBit' in the parser (RecordDotSyntax parsing uses that information).
-      .|. RebindableSyntaxBit         `xoptBit` LangExt.RebindableSyntax -- Enable testing via 'getBit RebindableSyntax' in the parser (RecordDotSyntax parsing uses that information).
-      .|. OverloadedRecordDotBit `xoptBit` LangExt.OverloadedRecordDot  -- Enable testing via 'getBit OverloadedRecordDotBit' in the parser (RecordDotSyntax parsing uses that information).
+      .|. OverloadedRecordDotBit      `xoptBit` LangExt.OverloadedRecordDot
       .|. OverloadedRecordUpdateBit   `xoptBit` LangExt.OverloadedRecordUpdate  -- Enable testing via 'getBit OverloadedRecordUpdateBit' in the parser (RecordDotSyntax parsing uses that information).
     optBits =
           HaddockBit        `setBitIf` isHaddock
