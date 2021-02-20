@@ -183,6 +183,22 @@ rootProfileVisitRoots(traverseState *ts, visitClosure_cb visit_cb, returnClosure
 
     for(StgWord i = 0; i < ps->n_roots; i++) {
         StgClosure *c = (StgClosure*)deRefStablePtr(ps->roots[i]);
+
+        /* The root is allowed to be wrapped in a GHC.Weak.Weak, which is a
+         * wrapper around Weak# (StgWeak) itself. We need to follow the ptrs to
+         * get at the real root closure we're interested. */
+        StgClosure *w = UNTAG_CLOSURE(c);
+        const StgInfoTable *itbl = get_itbl(w);
+
+        if (itbl->type == CONSTR_1_0)
+            w = UNTAG_CLOSURE(w->payload[0]);
+
+        /* If the weak ptr is dead just skip this root */
+        if (w->header.info == &stg_DEAD_WEAK_info)
+            continue;
+        else if (w->header.info == &stg_WEAK_info)
+            c = ((StgWeak*)w)->value;
+
         debug(2, "\npush %s, root=%lu, %p\n", ps->descs[i], i, c);
 
         current_root = i;

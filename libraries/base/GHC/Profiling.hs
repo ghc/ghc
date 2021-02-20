@@ -24,8 +24,9 @@ import Foreign.Ptr
 import Foreign.StablePtr
 import GHC.List (length)
 import GHC.Real (fromIntegral)
-import Unsafe.Coerce
 import GHC.Show (show)
+import GHC.Weak (Weak, mkWeak)
+import Unsafe.Coerce
 #endif
 
 import Data.IORef
@@ -101,11 +102,11 @@ emitHeapProfilingRootsWarning = unsafePerformIO (newIORef True)
 #if defined(PROFILING)
 
 foreign import ccall unsafe "setRootProfPtrs" c_setRootProfPtrs
-  :: Int -> Ptr (StablePtr a) -> Ptr CString -> IO Int
+  :: Int -> Ptr (StablePtr (Weak a)) -> Ptr CString -> IO Int
 
 setHeapProfilingRoots xs = do
   descs <- mapM (newCString . rootDescr) xs
-  sps   <- mapM (\(Root _ a) -> newStablePtr (unsafeCoerce# a)) xs
+  sps   <- mapM (\(Root _ a) -> newStablePtr =<< mkWeakPtr (unsafeCoerce# a)) xs
   withArray descs $ \descs_arr ->
     withArray sps $ \sps_arr -> do
       let len = fromIntegral $ length xs
@@ -116,6 +117,8 @@ setHeapProfilingRoots xs = do
           hPutStrLn stderr $
             "WARNING: setHeapProfilingRoots was called with "++show len++" roots, but only "++show len'++" are supported. The rest will be ignored."
           writeIORef emitHeapProfilingRootsWarning False
+  where
+    mkWeakPtr key = mkWeak key key Nothing
 
 maximumSupportedRoots =
   Just $ unsafePerformIO $ c_setRootProfPtrs (-1) nullPtr nullPtr
