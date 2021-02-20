@@ -30,6 +30,7 @@ import GHC.Prelude
 import GHC.Rename.Bind ( rnLocalBindsAndThen, rnLocalValBindsLHS, rnLocalValBindsRHS
                         , rnMatchGroup, rnGRHS, makeMiniFixityEnv)
 import GHC.Hs
+import GHC.Core.DataCon ( FieldLabelString )
 import GHC.Tc.Utils.Env ( isBrackStage )
 import GHC.Tc.Utils.Monad
 import GHC.Unit.Module ( getModule )
@@ -2558,17 +2559,17 @@ mkSelector loc = L loc . HsTyLit noExtField . HsStrTy NoSourceText
 
 -- mkGetField arg field calcuates a get_field @field arg expression.
 -- e.g. z.x = mkGet z x = get_field @x z
-mkGetField :: SrcSpan -> Name -> LHsExpr GhcRn -> Located FastString -> HsExpr GhcRn
+mkGetField :: SrcSpan -> Name -> LHsExpr GhcRn -> Located FieldLabelString -> HsExpr GhcRn
 mkGetField loc get_field arg field = unLoc (head $ mkGet loc get_field [arg] field)
 
 -- mkSetField a field b calculates a set_field @field expression.
 -- e.g mkSet a field b = set_field @"field" a b (read as "set field 'field' on a to b").
-mkSetField :: SrcSpan -> Name -> LHsExpr GhcRn -> Located FastString -> LHsExpr GhcRn -> LHsExpr GhcRn
+mkSetField :: SrcSpan -> Name -> LHsExpr GhcRn -> Located FieldLabelString -> LHsExpr GhcRn -> LHsExpr GhcRn
 mkSetField loc set_field a (L _ field) b =
   mkApp loc (mkApp loc (mkAppType loc (L loc (HsVar noExtField (L loc set_field))) (mkSelector loc field)) a) b
 
 -- See Note [Use of mkParen in RecordDotSyntax desugaring].
-mkGet :: SrcSpan -> Name -> [LHsExpr GhcRn] -> Located FastString -> [LHsExpr GhcRn]
+mkGet :: SrcSpan -> Name -> [LHsExpr GhcRn] -> Located FieldLabelString -> [LHsExpr GhcRn]
 mkGet loc get_field l@(r : _) (L _ field) =
   mkApp loc (mkAppType loc (L loc (HsVar noExtField (L loc get_field)))
                (mkSelector loc field)) (mkParen loc r)
@@ -2576,20 +2577,20 @@ mkGet loc get_field l@(r : _) (L _ field) =
 mkGet _ _ [] _ = panic "mkGet : The impossible has happened!"
 
 -- See Note [Use of mkParen in RecordDotSyntax desugaring].
-mkSet :: SrcSpan -> Name -> LHsExpr GhcRn -> (Located FastString, LHsExpr GhcRn) -> LHsExpr GhcRn
+mkSet :: SrcSpan -> Name -> LHsExpr GhcRn -> (Located FieldLabelString, LHsExpr GhcRn) -> LHsExpr GhcRn
 mkSet loc set_field acc (field, g) = mkSetField loc set_field (mkParen loc g) field (mkParen loc acc)
 
 -- mkProjection fields calculates a projection.
 -- e.g. .x = mkProjection [x] = getField @"x"
 --      .x.y = mkProjection [.x, .y] = (.y) . (.x) = getField @"y" . getField @"x"
-mkProjection :: SrcSpan -> Name -> Name -> [Located FastString] -> HsExpr GhcRn
+mkProjection :: SrcSpan -> Name -> Name -> [Located FieldLabelString] -> HsExpr GhcRn
 mkProjection loc getFieldName circName (field : fields) = unLoc (foldl' f (proj field) fields)
   where
     -- See Note [Use of mkParen in RecordDotSyntax desugaring].
-    f :: LHsExpr GhcRn -> Located FastString -> LHsExpr GhcRn
+    f :: LHsExpr GhcRn -> Located FieldLabelString -> LHsExpr GhcRn
     f acc field = (mkParen loc . mkOpApp loc (proj field) (circ loc)) acc
 
-    proj :: Located FastString -> LHsExpr GhcRn
+    proj :: Located FieldLabelString -> LHsExpr GhcRn
     proj (L _ f) = mkAppType loc (L loc (HsVar noExtField (L loc getFieldName))) (mkSelector loc f)
 
     circ :: SrcSpan -> LHsExpr GhcRn
@@ -2600,7 +2601,7 @@ mkProjection _ _ _ [] = panic "mkProjection: The impossible happened"
 -- e.g. Suppose an update like foo.bar = 1.
 --      We calculate the function \a -> setField @"foo" a (setField @"bar" (getField @"foo" a) 1).
 mkProjUpdateSetField :: SrcSpan -> Name -> Name -> LHsProjUpdate GhcRn (LHsExpr GhcRn) -> (LHsExpr GhcRn -> LHsExpr GhcRn)
-mkProjUpdateSetField loc get_field set_field (L _ (ProjUpdate { pu_flds = flds, pu_arg = arg } ))
+mkProjUpdateSetField loc get_field set_field (L _ (HsRecField { hsRecFieldLbl = (L _ (FieldLabelStrings flds)), hsRecFieldArg = arg } ))
   = let {
       ; final = last flds  -- quux
       ; fields = init flds   -- [foo, bar, baz]
@@ -2623,9 +2624,9 @@ rnHsUpdProjs us =
   unzip <$> mapM rnRecUpdProj us
   where
     rnRecUpdProj :: LHsRecUpdProj GhcPs -> RnM (LHsRecUpdProj GhcRn, FreeVars)
-    rnRecUpdProj (L l (ProjUpdate fs arg))
+    rnRecUpdProj (L l (HsRecField fs arg pun))
       = do { (arg, fv) <- rnLExpr arg
-           ; return $ (L l (ProjUpdate { pu_flds = fs, pu_arg = arg }), fv) }
+           ; return $ (L l (HsRecField { hsRecFieldLbl = fs, hsRecFieldArg = arg, hsRecPun = pun}), fv) }
 
 -- When rebindable syntax is on retrieve the 'getField' in scope
 -- otherwise 'Ghc.Records.getField'.

@@ -43,6 +43,7 @@ import Language.Haskell.Syntax.Binds
 -- others:
 import GHC.Tc.Types.Evidence
 import GHC.Core
+import GHC.Core.DataCon (FieldLabelString)
 import GHC.Types.Name
 import GHC.Types.Basic
 import GHC.Types.Fixity
@@ -92,42 +93,41 @@ apply in the context of record construction, record updates, record
 patterns and record expressions. That is, @b@ ranges over @HsExpr
 GhcPs@, @HsPat GhcPs@ and @HsCmd GhcPs@.
 
-When @OverloadedRecordDot@ and @OverloadedRecordUpdate@ are together
-in effect, two additional @fbind@ rules are admitted:
+When @OverloadedRecordDot@ and @OverloadedRecordUpdate@ are in both
+enabled, two additional @fbind@ rules are admitted:
 @
         | field TIGHT_INFIX_PROJ fieldToUpdate '=' texp
         | field TIGHT_INFIX_PROJ fieldToUpdate
 @
+
 These rules only make sense when parsing record update expressions
 (that is, not for patterns, not for commands and not for record
-construction). The results of these rules cannot be represented by
-@LHsRecField GhcPs (LHsExpr GhcPs)@ values as they are defined today.
+construction).
 
-To extend the @fbind@ rule set in a fashion that minimized the
-disturbing of existing code, the approach taken was for these new
-rules to calculate @LHsProjUpdate GhcPs (Located b)@ ("projection
-update") values.
+The results of these new rules cannot be represented by @LHsRecField
+GhcPs (LHsExpr GhcPs)@ values as the type is defined today.
+
+To extend the @fbind@ rule set in a fashion that minimizes changes to
+existing code, these new rules instead calculate @LHsProjUpdate GhcPs
+(Located b)@ ("projection update") values:
 @
--- e.g. foo.bar.baz = 1
-data ProjUpdate p arg =
-  ProjUpdate {
-      pu_flds :: [Located FastString] -- foo.bar.baz
-    , pu_arg :: arg                   --             = 1
-    }
+newtype FieldLabelStrings = FieldLabelStrings [Located FieldLabelString]
+type ProjUpdate p arg = HsRecField' FieldLabelStrings arg
 type LHsProjUpdate p arg = Located (ProjUpdate p arg)
-type RecUpdProj p = ProjUpdate p (LHsExpr p)
-type LHsRecUpdProj p = Located (RecUpdProj p)
 @
+
 The @fbind@ rule is then given the type @fbind :: { forall b.
-DisambECP b => PV (Fbind b) }@ accomodating both alternatives.
+DisambECP b => PV (Fbind b) }@ accomodating both alternatives:
 @
 data Fbind b = Fbind (LHsRecField GhcPs (Located b))
              | Pbind (LHsProjUpdate GhcPs (Located b))
 @
+(with names chosen so that @Fbind@ means "field binding", @Pbind@
+meaning "projection binding").
 
 In @data HsExpr p@, the @RecordUpd@ constuctor indicates regular
-updates vs. projection updates by means of an @Either@ in its
-@rupd_flds@ member:
+updates vs. projection updates by means of the @rupd_flds@ member
+type, an @Either@ instance:
 @
   | RecordUpd
       { rupd_ext  :: XRecordUpd p
@@ -135,8 +135,18 @@ updates vs. projection updates by means of an @Either@ in its
       , rupd_flds :: Either [LHsRecUpdField p] [LHsRecUpdProj p]
       }
 @
+where
+@
+type RecUpdProj p = ProjUpdate p (LHsExpr p)
+type LHsRecUpdProj p = Located (RecUpdProj p)
+@
+
 A @Left@ value indicates a regular record update, a @Right@ value an
 update desugared to @setField@s.
+
+If @OverloadedRecordUpdate@ is enabled, updates parsed as @LHsRecField
+GhcPs@ values are converted to @LHsRecUpdProj GhcPs@ values (see
+function @mkRdrRecordUpd@ in 'GHC.Parser.PostProcess').
 -}
 
 -- | RecordDotSyntax field updates
@@ -144,26 +154,19 @@ update desugared to @setField@s.
 -- Field projection updates (e.g. @foo.bar.baz = 1@). See Note
 -- [RecordDotSyntax field updates].
 --
--- @p@ is phantom; here to ease the defintion of @data Fbind b@
--- (defined in 'GHC.Parser.PostProcess').
--- type FieldLabelString = FastString
--- type ProjUpdate p arg = HsRecField' [Located FastString] arg
-data ProjUpdate p arg =
-  ProjUpdate {
-      pu_flds :: [Located FastString]
-    , pu_arg :: arg -- Field's new value e.g. 42
-    }
-  deriving (Data, Functor, Foldable, Traversable)
-
+-- @p@ is a phantom type; I'm not actively looking to eliminate it because:
+--   - It makes the definition of @data Fbind p@ easier to follow in 'GHC.Parser.PostProcess';
+--   - I think removing it would induce a dependence of this module on 'GHC.Hs.Extension' at least.
+newtype FieldLabelStrings =
+  FieldLabelStrings [Located FieldLabelString]
+                               deriving (Data)
+instance Outputable FieldLabelStrings where
+  ppr (FieldLabelStrings flds) =
+    hcat (punctuate dot (map (ppr . unLoc) flds))
+type ProjUpdate p arg = HsRecField' FieldLabelStrings arg
 type LHsProjUpdate p arg = Located (ProjUpdate p arg)
 type RecUpdProj p = ProjUpdate p (LHsExpr p)
 type LHsRecUpdProj p = Located (RecUpdProj p)
-
-instance (Outputable arg)
-      => Outputable (ProjUpdate p arg) where
-  -- TODO: improve in case of pun
-  ppr ProjUpdate { pu_flds = flds, pu_arg = arg } =
-    hcat (punctuate dot (map (ppr . unLoc) flds)) <+> equals <+> ppr arg
 
 {-
 ************************************************************************
@@ -484,7 +487,7 @@ data HsExpr p
   | HsGetField {
         gf_ext :: XGetField p
       , gf_expr :: LHsExpr p
-      , gf_field :: Located FastString
+      , gf_field :: Located FieldLabelString
       }
 
   -- | Record field selector. e.g. @(.x)@ or @(.x.y)@
@@ -497,7 +500,7 @@ data HsExpr p
 
   | HsProjection {
         proj_ext :: XProjection p
-      , proj_flds :: [Located FastString]
+      , proj_flds :: [Located FieldLabelString]
       }
 
   -- | Expression with an explicit type signature. @e :: type@

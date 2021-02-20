@@ -1124,7 +1124,6 @@ instance HiePass p => ToHie (Located (HsExpr (GhcPass p))) where
         ]
       RecordUpd {rupd_expr = expr, rupd_flds = Right _}->
         [ toHie expr
-        -- This needs improvement.
         ]
       ExprWithTySig _ expr sig ->
         [ toHie expr
