@@ -606,7 +606,11 @@ we want, namely
 
 -}
 
-dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
+dsExpr RecordUpd { rupd_flds = Right _} =
+  -- Not possible due to elimination in the renamer. See Note
+  -- [Handling overloaded and rebindable constructs]
+  panic "The impossible happened"
+dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = Left fields
                        , rupd_ext = RecordUpdTc
                            { rupd_cons = cons_to_upd
                            , rupd_in_tys = in_inst_tys
