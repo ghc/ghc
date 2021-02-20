@@ -942,10 +942,8 @@ zonkExpr env expr@(RecordCon { rcon_ext = con_expr, rcon_flds = rbinds })
 
 -- Record updates via dot syntax are replaced by desugared expressions
 -- in the renamer. See Note [Rebindable Syntax and HsExpansion]. This
--- is why we match on 'rupd_dot = False' here and panic otherwise.
-zonkExpr env (RecordUpd { rupd_dot = False
-                        , rupd_flds = rbinds
-                        , rupd_upds = []
+-- is why we match on 'rupd_flds = Left rbinds' here and panic otherwise.
+zonkExpr env (RecordUpd { rupd_flds = Left rbinds
                         , rupd_expr = expr
                         , rupd_ext = RecordUpdTc {
                                        rupd_cons = cons
@@ -959,10 +957,8 @@ zonkExpr env (RecordUpd { rupd_dot = False
         ; (_, new_recwrap) <- zonkCoFn env req_wrap
         ; return (
             RecordUpd {
-                  rupd_dot = False
-                , rupd_expr = new_expr
-                , rupd_flds = new_rbinds
-                , rupd_upds = []
+                  rupd_expr = new_expr
+                , rupd_flds = Left new_rbinds
                 , rupd_ext = RecordUpdTc {
                                rupd_cons = cons
                              , rupd_in_tys = new_in_tys
