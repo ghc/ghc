@@ -2532,19 +2532,6 @@ mkExpandedExpr a b = XExpr (HsExpanded a b)
 --
 -- See Note [Rebindable syntax and HsExpansion].
 
-{-
-Note [Use of mkParen in RecordDotSyntax desugaring]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-We use 'mkParen' liberally (perhaps sometimes unneccessarily) in the
-routines that follow that desugar RecordDotSyntax. The intent is to
-avoid any possibility of rearrangments of the AST in later stages due
-to fixity considerations affecting the interpretation of these
-expressions.
--}
-mkParen :: SrcSpan -> LHsExpr GhcRn -> LHsExpr GhcRn
-mkParen loc = L loc . HsPar noExtField
-
 mkApp :: SrcSpan -> LHsExpr GhcRn -> LHsExpr GhcRn -> LHsExpr GhcRn
 mkApp loc x = L loc . HsApp noExtField x
 
@@ -2558,27 +2545,23 @@ mkSelector :: SrcSpan -> FastString -> LHsType GhcRn
 mkSelector loc = L loc . HsTyLit noExtField . HsStrTy NoSourceText
 
 -- mkGetField arg field calcuates a get_field @field arg expression.
--- e.g. z.x = mkGet z x = get_field @x z
+-- e.g. z.x = mkGetField z x = get_field @x z
 mkGetField :: SrcSpan -> Name -> LHsExpr GhcRn -> Located FieldLabelString -> HsExpr GhcRn
 mkGetField loc get_field arg field = unLoc (head $ mkGet loc get_field [arg] field)
 
 -- mkSetField a field b calculates a set_field @field expression.
--- e.g mkSet a field b = set_field @"field" a b (read as "set field 'field' on a to b").
+-- e.g mkSetSetField a field b = set_field @"field" a b (read as "set field 'field' on a to b").
 mkSetField :: SrcSpan -> Name -> LHsExpr GhcRn -> Located FieldLabelString -> LHsExpr GhcRn -> LHsExpr GhcRn
 mkSetField loc set_field a (L _ field) b =
   mkApp loc (mkApp loc (mkAppType loc (L loc (HsVar noExtField (L loc set_field))) (mkSelector loc field)) a) b
 
--- See Note [Use of mkParen in RecordDotSyntax desugaring].
 mkGet :: SrcSpan -> Name -> [LHsExpr GhcRn] -> Located FieldLabelString -> [LHsExpr GhcRn]
 mkGet loc get_field l@(r : _) (L _ field) =
-  mkApp loc (mkAppType loc (L loc (HsVar noExtField (L loc get_field)))
-               (mkSelector loc field)) (mkParen loc r)
-  : l
+  mkApp loc (mkAppType loc (L loc (HsVar noExtField (L loc get_field)))(mkSelector loc field)) r : l
 mkGet _ _ [] _ = panic "mkGet : The impossible has happened!"
 
--- See Note [Use of mkParen in RecordDotSyntax desugaring].
 mkSet :: SrcSpan -> Name -> LHsExpr GhcRn -> (Located FieldLabelString, LHsExpr GhcRn) -> LHsExpr GhcRn
-mkSet loc set_field acc (field, g) = mkSetField loc set_field (mkParen loc g) field (mkParen loc acc)
+mkSet loc set_field acc (field, g) = mkSetField loc set_field g field acc
 
 -- mkProjection fields calculates a projection.
 -- e.g. .x = mkProjection [x] = getField @"x"
@@ -2586,9 +2569,8 @@ mkSet loc set_field acc (field, g) = mkSetField loc set_field (mkParen loc g) fi
 mkProjection :: SrcSpan -> Name -> Name -> [Located FieldLabelString] -> HsExpr GhcRn
 mkProjection loc getFieldName circName (field : fields) = unLoc (foldl' f (proj field) fields)
   where
-    -- See Note [Use of mkParen in RecordDotSyntax desugaring].
     f :: LHsExpr GhcRn -> Located FieldLabelString -> LHsExpr GhcRn
-    f acc field = (mkParen loc . mkOpApp loc (proj field) (circ loc)) acc
+    f acc field = (mkOpApp loc (proj field) (circ loc)) acc
 
     proj :: Located FieldLabelString -> LHsExpr GhcRn
     proj (L _ f) = mkAppType loc (L loc (HsVar noExtField (L loc getFieldName))) (mkSelector loc f)
