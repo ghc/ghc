@@ -13,5 +13,5 @@ Records
     record_puns
     record_wildcards
     hasfield
-    overloaded_record_selection
+    overloaded_record_dot
     overloaded_record_update

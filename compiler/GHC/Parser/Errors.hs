@@ -156,8 +156,11 @@ data PsErrorDesc
    | PsErrOverloadedRecordDotInvalid
       -- ^ Invalid use of record dot syntax `.'
 
-   | PsErrOverloadedRecordUpdateInvalid
-      -- ^ Context requires `OverloadedRecordUpdate` and `RebindableSyntax`
+   | PsErrOverloadedRecordUpdateNotEnabled
+      -- ^ `OverloadedRecordUpdate` is not enabled.
+
+   | PsErrOverloadedRecordUpdateNoQualifiedFields
+      -- ^ Can't use qualified fields when OverloadedRecordUpdate is enabled.
 
    | PsErrInvalidDataCon !(HsType GhcPs)
       -- ^ Cannot parse data constructor in a data/newtype declaration
