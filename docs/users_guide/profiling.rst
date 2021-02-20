@@ -369,7 +369,7 @@ compiled program.
     they appear in the source program (e.g. a call to ``f`` may inlined with
     its wrapper, resulting in an occurrence of its worker, ``$wf``).
 
-    In addition to plain module-qualified names (e.g. ``Data.List.map``),
+    In addition to plain module-qualified names (e.g. ``GHC.Base.map``),
     ⟨name⟩ also accepts a small globbing language using ``*`` as a wildcard
     symbol:
 
