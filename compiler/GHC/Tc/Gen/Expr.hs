@@ -639,7 +639,11 @@ following.
 
 -}
 
-tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
+-- Record updates via dot syntax are replaced by desugared expressions
+-- in the renamer. See Note [Overview of record dot syntax] in
+-- GHC.Hs.Expr. This is why we match on 'rupd_flds = Left rbnds' here
+-- and panic otherwise.
+tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = Left rbnds }) res_ty
   = ASSERT( notNull rbnds )
     do  { -- STEP -2: typecheck the record_expr, the record to be updated
           (record_expr', record_rho) <- tcScalingUsage Many $ tcInferRho record_expr
@@ -805,11 +809,12 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
                                    , rupd_out_tys = result_inst_tys
                                    , rupd_wrap = req_wrap }
               expr' = RecordUpd { rupd_expr = mkLHsWrap fam_co $
-                                              mkLHsWrapCo co_scrut record_expr'
-                                , rupd_flds = rbinds'
+                                                mkLHsWrapCo co_scrut record_expr'
+                                , rupd_flds = Left rbinds'
                                 , rupd_ext = upd_tc }
 
         ; tcWrapResult expr expr' rec_res_ty res_ty }
+tcExpr (RecordUpd {}) _ = panic "GHC.Tc.Gen.Expr: tcExpr: The impossible happened!"
 
 
 {-
@@ -824,6 +829,19 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
 
 tcExpr (ArithSeq _ witness seq) res_ty
   = tcArithSeq witness seq res_ty
+
+{-
+************************************************************************
+*                                                                      *
+                Record dot syntax
+*                                                                      *
+************************************************************************
+-}
+
+-- These terms have been replaced by desugaring in the renamer. See
+-- Note [Overview of record dot syntax].
+tcExpr (HsGetField _ _ _) _ = panic "GHC.Tc.Gen.Expr: tcExpr: HsGetField: Not implemented"
+tcExpr (HsProjection _ _) _ = panic "GHC.Tc.Gen.Expr: tcExpr: HsProjection: Not implemented"
 
 {-
 ************************************************************************
@@ -1274,7 +1292,7 @@ disambiguateRecordBinds record_expr record_rho rbnds res_ty
                , text "This will not be supported by -XDuplicateRecordFields in future releases of GHC."
                ]
       where
-        rupd = RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds, rupd_ext = noExtField }
+        rupd = RecordUpd { rupd_expr = record_expr, rupd_flds = Left rbnds, rupd_ext = noExtField }
         loc  = getLoc (head rbnds)
 
 {-

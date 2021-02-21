@@ -3554,6 +3554,8 @@ xFlagsDeps = [
   flagSpec "Rank2Types"                       LangExt.RankNTypes,
   flagSpec "RankNTypes"                       LangExt.RankNTypes,
   flagSpec "RebindableSyntax"                 LangExt.RebindableSyntax,
+  flagSpec "OverloadedRecordDot"              LangExt.OverloadedRecordDot,
+  flagSpec "OverloadedRecordUpdate"           LangExt.OverloadedRecordUpdate,
   depFlagSpec' "RecordPuns"                   LangExt.RecordPuns
     (deprecatedForExtension "NamedFieldPuns"),
   flagSpec "RecordWildCards"                  LangExt.RecordWildCards,
