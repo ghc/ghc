@@ -1,0 +1,36 @@
+
+RecordDotSyntaxFail12.hs:123:25:
+    Illegal use of punning for field ‘quux’
+    Use NamedFieldPuns to permit this
+
+RecordDotSyntaxFail12.hs:123:46:
+    Illegal use of punning for field ‘baz’
+    Use NamedFieldPuns to permit this
+
+RecordDotSyntaxFail12.hs:123:65:
+    Illegal use of punning for field ‘bar’
+    Use NamedFieldPuns to permit this
+
+RecordDotSyntaxFail12.hs:124:11:
+    For this to work enable NamedFieldPuns.
+
+RecordDotSyntaxFail12.hs:125:11:
+    For this to work enable NamedFieldPuns.
+
+RecordDotSyntaxFail12.hs:126:11:
+    For this to work enable NamedFieldPuns.
+
+RecordDotSyntaxFail12.hs:127:11:
+    For this to work enable NamedFieldPuns.
+
+RecordDotSyntaxFail12.hs:129:11:
+    For this to work enable NamedFieldPuns.
+
+RecordDotSyntaxFail12.hs:132:11:
+    For this to work enable NamedFieldPuns.
+
+RecordDotSyntaxFail12.hs:133:11:
+    For this to work enable NamedFieldPuns.
+
+RecordDotSyntaxFail12.hs:134:11:
+    For this to work enable NamedFieldPuns.
