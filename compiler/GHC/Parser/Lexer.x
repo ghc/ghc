@@ -2434,8 +2434,8 @@ adjustChar c = fromIntegral $ ord adj_c
                   SpacingCombiningMark  -> other_graphic
                   EnclosingMark         -> other_graphic
                   DecimalNumber         -> digit
-                  LetterNumber          -> other_graphic
-                  OtherNumber           -> digit -- see #4373
+                  LetterNumber          -> uniidchar -- see #18158
+                  OtherNumber           -> uniidchar -- see #4373
                   ConnectorPunctuation  -> symbol
                   DashPunctuation       -> symbol
                   OpenPunctuation       -> other_graphic
