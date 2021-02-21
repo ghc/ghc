@@ -736,7 +736,7 @@ data HsType pass
 
   | HsQualTy   -- See Note [HsType binders]
       { hst_xqual :: XQualTy pass
-      , hst_ctxt  :: LHsContext pass       -- Context C => blah
+      , hst_ctxt  :: Maybe (LHsContext pass)  -- Context C => blah
       , hst_body  :: LHsType pass }
 
   | HsTyVar  (XTyVar pass)

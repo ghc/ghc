@@ -16,8 +16,7 @@
      (ClassDecl
       (VirtualBraces
        (3))
-      ({ <no location info> }
-       [])
+      (Nothing)
       ({ T17544.hs:5:7-8 }
        (Unqual
         {OccName: C1}))
@@ -80,8 +79,7 @@
      (ClassDecl
       (VirtualBraces
        (3))
-      ({ <no location info> }
-       [])
+      (Nothing)
       ({ T17544.hs:9:7-8 }
        (Unqual
         {OccName: C2}))
@@ -141,8 +139,7 @@
      (ClassDecl
       (VirtualBraces
        (3))
-      ({ <no location info> }
-       [])
+      (Nothing)
       ({ T17544.hs:13:7-8 }
        (Unqual
         {OccName: C3}))
@@ -205,8 +202,7 @@
      (ClassDecl
       (VirtualBraces
        (3))
-      ({ <no location info> }
-       [])
+      (Nothing)
       ({ T17544.hs:17:7-8 }
        (Unqual
         {OccName: C4}))
@@ -293,8 +289,7 @@
      (NoExtField)
      (ClassDecl
       (ExplicitBraces)
-      ({ <no location info> }
-       [])
+      (Nothing)
       ({ T17544.hs:22:7-8 }
        (Unqual
         {OccName: C5}))
@@ -389,8 +384,7 @@
            (HsDataDefn
             (NoExtField)
             (DataType)
-            ({ <no location info> }
-             [])
+            (Nothing)
             (Nothing)
             (Nothing)
             [({ T17544.hs:25:5-18 }
@@ -431,8 +425,7 @@
      (NoExtField)
      (ClassDecl
       (ExplicitBraces)
-      ({ <no location info> }
-       [])
+      (Nothing)
       ({ T17544.hs:28:7-8 }
        (Unqual
         {OccName: C6}))
@@ -527,8 +520,7 @@
            (HsDataDefn
             (NoExtField)
             (DataType)
-            ({ <no location info> }
-             [])
+            (Nothing)
             (Nothing)
             (Nothing)
             [({ T17544.hs:31:5-18 }
@@ -569,8 +561,7 @@
      (NoExtField)
      (ClassDecl
       (ExplicitBraces)
-      ({ <no location info> }
-       [])
+      (Nothing)
       ({ T17544.hs:34:7-8 }
        (Unqual
         {OccName: C7}))
@@ -665,8 +656,7 @@
            (HsDataDefn
             (NoExtField)
             (DataType)
-            ({ <no location info> }
-             [])
+            (Nothing)
             (Nothing)
             (Nothing)
             [({ T17544.hs:37:5-18 }
@@ -707,8 +697,7 @@
      (NoExtField)
      (ClassDecl
       (ExplicitBraces)
-      ({ <no location info> }
-       [])
+      (Nothing)
       ({ T17544.hs:40:7-8 }
        (Unqual
         {OccName: C8}))
@@ -803,8 +792,7 @@
            (HsDataDefn
             (NoExtField)
             (DataType)
-            ({ <no location info> }
-             [])
+            (Nothing)
             (Nothing)
             (Nothing)
             [({ T17544.hs:43:5-18 }
@@ -845,8 +833,7 @@
      (NoExtField)
      (ClassDecl
       (ExplicitBraces)
-      ({ <no location info> }
-       [])
+      (Nothing)
       ({ T17544.hs:46:7-8 }
        (Unqual
         {OccName: C9}))
@@ -941,8 +928,7 @@
            (HsDataDefn
             (NoExtField)
             (DataType)
-            ({ <no location info> }
-             [])
+            (Nothing)
             (Nothing)
             (Nothing)
             [({ T17544.hs:49:5-18 }
@@ -983,8 +969,7 @@
      (NoExtField)
      (ClassDecl
       (ExplicitBraces)
-      ({ <no location info> }
-       [])
+      (Nothing)
       ({ T17544.hs:52:7-9 }
        (Unqual
         {OccName: C10}))
@@ -1079,8 +1064,7 @@
            (HsDataDefn
             (NoExtField)
             (DataType)
-            ({ <no location info> }
-             [])
+            (Nothing)
             (Nothing)
             (Nothing)
             [({ T17544.hs:55:5-20 }
