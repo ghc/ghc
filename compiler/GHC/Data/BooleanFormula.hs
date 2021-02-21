@@ -24,6 +24,7 @@ import Data.Data
 import GHC.Utils.Monad
 import GHC.Utils.Outputable
 import GHC.Utils.Binary
+import GHC.Parser.Annotation ( LocatedL )
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
 import GHC.Types.Unique.Set
@@ -32,7 +33,7 @@ import GHC.Types.Unique.Set
 -- Boolean formula type and smart constructors
 ----------------------------------------------------------------------
 
-type LBooleanFormula a = Located (BooleanFormula a)
+type LBooleanFormula a = LocatedL (BooleanFormula a)
 
 data BooleanFormula a = Var a | And [LBooleanFormula a] | Or [LBooleanFormula a]
                       | Parens (LBooleanFormula a)

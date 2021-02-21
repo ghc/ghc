@@ -340,9 +340,9 @@ gk2gkDC Gen1_{} d = Gen1_DC $ last $ dataConUnivTyVars d
 mkBindsRep :: DynFlags -> GenericKind -> TyCon -> (LHsBinds GhcPs, [LSig GhcPs])
 mkBindsRep dflags gk tycon = (binds, sigs)
       where
-        binds = unitBag (mkRdrFunBind (L loc from01_RDR) [from_eqn])
+        binds = unitBag (mkRdrFunBind (L loc' from01_RDR) [from_eqn])
               `unionBags`
-                unitBag (mkRdrFunBind (L loc to01_RDR) [to_eqn])
+                unitBag (mkRdrFunBind (L loc' to01_RDR) [to_eqn])
 
         -- See Note [Generics performance tricks]
         sigs = if     gopt Opt_InlineGenericsAggressively dflags
@@ -361,7 +361,7 @@ mkBindsRep dflags gk tycon = (binds, sigs)
                cons       = length datacons
                max_fields = maximum $ map dataConSourceArity datacons
 
-           inline1 f = L loc . InlineSig noExtField (L loc f)
+           inline1 f = L loc'' . InlineSig noAnn (L loc' f)
                      $ alwaysInlinePragma { inl_act = ActiveAfter NoSourceText 1 }
 
         -- The topmost M1 (the datatype metadata) has the exact same type
@@ -375,6 +375,8 @@ mkBindsRep dflags gk tycon = (binds, sigs)
         from_matches  = [mkHsCaseAlt pat rhs | (pat,rhs) <- from_alts]
         to_matches    = [mkHsCaseAlt pat rhs | (pat,rhs) <- to_alts  ]
         loc           = srcLocSpan (getSrcLoc tycon)
+        loc'          = noAnnSrcSpan loc
+        loc''         = noAnnSrcSpan loc
         datacons      = tyConDataCons tycon
 
         (from01_RDR, to01_RDR) = case gk of

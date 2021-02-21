@@ -2,7 +2,6 @@
 {-# LANGUAGE ConstraintKinds         #-}
 {-# LANGUAGE DataKinds               #-}
 {-# LANGUAGE DeriveDataTypeable      #-}
-{-# LANGUAGE EmptyCase               #-}
 {-# LANGUAGE EmptyDataDeriving       #-}
 {-# LANGUAGE FlexibleContexts        #-}
 {-# LANGUAGE FlexibleInstances       #-}
@@ -28,9 +27,10 @@ import Language.Haskell.Syntax.Extension
 import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.Var
-import GHC.Utils.Outputable
-import GHC.Types.SrcLoc (Located, unLoc, noLoc)
+import GHC.Utils.Outputable hiding ((<>))
+import GHC.Types.SrcLoc (GenLocated(..), unLoc)
 import GHC.Utils.Panic
+import GHC.Parser.Annotation
 
 {-
 Note [IsPass]
@@ -67,7 +67,7 @@ Type. We never build an HsType GhcTc. Why do this? Because we need to be
 able to compare type-checked types for equality, and we don't want to do
 this with HsType.
 
-This causes wrinkles within the AST, where we normally thing that the whole
+This causes wrinkles within the AST, where we normally think that the whole
 AST travels through the GhcPs --> GhcRn --> GhcTc pipeline as one. So we
 have the NoGhcTc type family, which just replaces GhcTc with GhcRn, so that
 user-written types can be preserved (as HsType GhcRn) even in e.g. HsExpr GhcTc.
@@ -94,14 +94,23 @@ saying that NoGhcTcPass is idempotent.
 
 -}
 
-type instance XRec (GhcPass p) a = Located a
+-- See Note [XRec and Anno in the AST] in GHC.Parser.Annotation
+type instance XRec (GhcPass p) a = GenLocated (Anno a) a
+
+type instance Anno RdrName = SrcSpanAnnN
+type instance Anno Name    = SrcSpanAnnN
+type instance Anno Id      = SrcSpanAnnN
+
+type IsSrcSpanAnn p a = ( Anno (IdGhcP p) ~ SrcSpanAnn' (ApiAnn' a),
+                          IsPass p)
 
 instance UnXRec (GhcPass p) where
   unXRec = unLoc
 instance MapXRec (GhcPass p) where
   mapXRec = fmap
-instance WrapXRec (GhcPass p) where
-  wrapXRec = noLoc
+
+-- instance WrapXRec (GhcPass p) a where
+--   wrapXRec = noLocA
 
 {-
 Note [NoExtCon and strict fields]
@@ -203,6 +212,8 @@ type family NoGhcTcPass (p :: Pass) :: Pass where
 type OutputableBndrId pass =
   ( OutputableBndr (IdGhcP pass)
   , OutputableBndr (IdGhcP (NoGhcTcPass pass))
+  , Outputable (GenLocated (Anno (IdGhcP pass)) (IdGhcP pass))
+  , Outputable (GenLocated (Anno (IdGhcP (NoGhcTcPass pass))) (IdGhcP (NoGhcTcPass pass)))
   , IsPass pass
   )
 

@@ -20,8 +20,8 @@ import Language.Haskell.Syntax.Expr
   )
 import GHC.Hs.Extension ( OutputableBndrId, GhcPass )
 
-instance OutputableBndrId p => Outputable (HsExpr (GhcPass p))
-instance OutputableBndrId p => Outputable (HsCmd (GhcPass p))
+instance (OutputableBndrId p) => Outputable (HsExpr (GhcPass p))
+instance (OutputableBndrId p) => Outputable (HsCmd (GhcPass p))
 
 pprLExpr :: (OutputableBndrId p) => LHsExpr (GhcPass p) -> SDoc
 
@@ -32,10 +32,9 @@ pprSplice :: (OutputableBndrId p) => HsSplice (GhcPass p) -> SDoc
 pprSpliceDecl ::  (OutputableBndrId p)
           => HsSplice (GhcPass p) -> SpliceExplicitFlag -> SDoc
 
-pprPatBind :: forall bndr p body. (OutputableBndrId bndr,
-                                   OutputableBndrId p,
-                                   Outputable body)
-           => LPat (GhcPass bndr) -> GRHSs (GhcPass p) body -> SDoc
+pprPatBind :: forall bndr p . (OutputableBndrId bndr,
+                               OutputableBndrId p)
+           => LPat (GhcPass bndr) -> GRHSs (GhcPass p) (LHsExpr (GhcPass p)) -> SDoc
 
-pprFunBind :: (OutputableBndrId idR, Outputable body)
-           => MatchGroup (GhcPass idR) body -> SDoc
+pprFunBind :: (OutputableBndrId idR)
+           => MatchGroup (GhcPass idR) (LHsExpr (GhcPass idR)) -> SDoc

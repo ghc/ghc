@@ -1,0 +1,32 @@
+Name: check-exact
+Version: 0.1
+Copyright: XXX
+License: BSD3
+-- XXX License-File: LICENSE
+Author: XXX
+Maintainer: XXX
+Synopsis: A utilities for checking the consistency of GHC's exact printer
+Description:
+    This utility is used to check the consistency of the GHC exact
+    printer, by parsing a file, exact printing it, and then comparing
+    it to the original version.  version. See
+    @utils/check-exact/README@ in GHC's source distribution for
+    details.
+Category: Development
+build-type: Simple
+cabal-version: >=1.10
+
+Executable check-exact
+    Default-Language: Haskell2010
+    Main-Is: Main.hs
+    Hs-Source-Dirs:
+      .
+      src
+    Ghc-Options: -Wall
+    Build-Depends: base       >= 4   && < 5,
+                   bytestring,
+                   containers,
+                   Cabal      >= 3.0 && < 3.6,
+                   directory,
+                   filepath,
+                   ghc

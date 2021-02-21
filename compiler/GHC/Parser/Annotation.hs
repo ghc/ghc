@@ -6,15 +6,11 @@
 module GHC.Parser.Annotation (
   -- * Out-of-tree API Annotations. Exist for the duration of !5158,
   -- * will be removed by !2418
-  getAnnotation, getAndRemoveAnnotation,
-  getAnnotationComments,getAndRemoveAnnotationComments,
   ApiAnns(..),
-  ApiAnnKey,
-  AddAnn(..), mkParensApiAnn,
 
   -- * Core API Annotation types
   AnnKeywordId(..),
-  AnnotationComment(..),
+  AnnotationComment(..), AnnotationCommentTok(..),
   IsUnicodeSyntax(..),
   unicodeAnn,
   HasE(..),
@@ -67,6 +63,7 @@ module GHC.Parser.Annotation (
   getLocAnn,
   apiAnnAnns, apiAnnAnnsL,
   annParen2AddApiAnn,
+  apiAnnComments,
 
   -- ** Working with locations of annotations
   sortLocatedA,
@@ -93,7 +90,6 @@ import GHC.Prelude
 import Data.Data
 import Data.Function (on)
 import Data.List (sortBy)
-import qualified Data.Map as Map
 import Data.Semigroup
 import GHC.Data.FastString
 import GHC.Types.Name
@@ -168,102 +164,11 @@ https://gitlab.haskell.org/ghc/ghc/wikis/api-annotations
 -}
 -- ---------------------------------------------------------------------
 
--- This section should be removed when we move to the new APi Annotations
-
-
 data ApiAnns =
   ApiAnns
-    { apiAnnItems :: Map.Map ApiAnnKey [RealSrcSpan],
-      apiAnnEofPos :: Maybe RealSrcSpan,
-      apiAnnComments :: Map.Map RealSrcSpan [RealLocated AnnotationComment],
-      apiAnnRogueComments :: [RealLocated AnnotationComment]
+    { apiAnnRogueComments :: [LAnnotationComment]
     }
 
--- If you update this, update the Note [Api annotations] above
-type ApiAnnKey = (RealSrcSpan,AnnKeywordId)
-
-
--- ---------------------------------------------------------------------
-
--- | Encapsulated call to addAnnotation, requiring only the SrcSpan of
---   the AST construct the annotation belongs to; together with the
---   AnnKeywordId, this is the key of the annotation map.
---
---   This type is useful for places in the parser where it is not yet
---   known what SrcSpan an annotation should be added to.  The most
---   common situation is when we are parsing a list: the annotations
---   need to be associated with the AST element that *contains* the
---   list, not the list itself.  'AddAnn' lets us defer adding the
---   annotations until we finish parsing the list and are now parsing
---   the enclosing element; we then apply the 'AddAnn' to associate
---   the annotations.  Another common situation is where a common fragment of
---   the AST has been factored out but there is no separate AST node for
---   this fragment (this occurs in class and data declarations). In this
---   case, the annotation belongs to the parent data declaration.
---
---   The usual way an 'AddAnn' is created is using the 'mj' ("make jump")
---   function, and then it can be discharged using the 'ams' function.
-data AddAnn = AddAnn AnnKeywordId SrcSpan
-
--- |Given a 'SrcSpan' that surrounds a 'HsPar' or 'HsParTy', generate
--- 'AddAnn' values for the opening and closing bordering on the start
--- and end of the span
-mkParensApiAnn :: SrcSpan -> [AddAnn]
-mkParensApiAnn (UnhelpfulSpan _)  = []
-mkParensApiAnn (RealSrcSpan ss _) = [AddAnn AnnOpenP lo,AddAnn AnnCloseP lc]
-  where
-    f = srcSpanFile ss
-    sl = srcSpanStartLine ss
-    sc = srcSpanStartCol ss
-    el = srcSpanEndLine ss
-    ec = srcSpanEndCol ss
-    lo = RealSrcSpan (mkRealSrcSpan (realSrcSpanStart ss)        (mkRealSrcLoc f sl (sc+1))) Nothing
-    lc = RealSrcSpan (mkRealSrcSpan (mkRealSrcLoc f el (ec - 1)) (realSrcSpanEnd ss))        Nothing
-
--- ---------------------------------------------------------------------
--- | Retrieve a list of annotation 'SrcSpan's based on the 'SrcSpan'
--- of the annotated AST element, and the known type of the annotation.
-getAnnotation :: ApiAnns -> RealSrcSpan -> AnnKeywordId -> [RealSrcSpan]
-getAnnotation anns span ann =
-  case Map.lookup ann_key ann_items of
-    Nothing -> []
-    Just ss -> ss
-  where ann_items = apiAnnItems anns
-        ann_key = (span,ann)
-
--- | Retrieve a list of annotation 'SrcSpan's based on the 'SrcSpan'
--- of the annotated AST element, and the known type of the annotation.
--- The list is removed from the annotations.
-getAndRemoveAnnotation :: ApiAnns -> RealSrcSpan -> AnnKeywordId
-                       -> ([RealSrcSpan],ApiAnns)
-getAndRemoveAnnotation anns span ann =
-  case Map.lookup ann_key ann_items of
-    Nothing -> ([],anns)
-    Just ss -> (ss,anns{ apiAnnItems = Map.delete ann_key ann_items })
-  where ann_items = apiAnnItems anns
-        ann_key = (span,ann)
-
--- |Retrieve the comments allocated to the current 'SrcSpan'
---
---  Note: A given 'SrcSpan' may appear in multiple AST elements,
---  beware of duplicates
-getAnnotationComments :: ApiAnns -> RealSrcSpan -> [RealLocated AnnotationComment]
-getAnnotationComments anns span =
-  case Map.lookup span (apiAnnComments anns) of
-    Just cs -> cs
-    Nothing -> []
-
--- |Retrieve the comments allocated to the current 'SrcSpan', and
--- remove them from the annotations
-getAndRemoveAnnotationComments :: ApiAnns -> RealSrcSpan
-                               -> ([RealLocated AnnotationComment],ApiAnns)
-getAndRemoveAnnotationComments anns span =
-  case Map.lookup span ann_comments of
-    Just cs -> (cs, anns{ apiAnnComments = Map.delete span ann_comments })
-    Nothing -> ([], anns)
-  where ann_comments = apiAnnComments anns
-
--- End of section to be removed with new API Annotations
 -- --------------------------------------------------------------------
 
 -- | API Annotations exist so that tools can perform source to source
@@ -394,7 +299,14 @@ instance Outputable AnnKeywordId where
 
 -- ---------------------------------------------------------------------
 
-data AnnotationComment =
+data AnnotationComment = AnnComment { ac_tok :: AnnotationCommentTok
+                                    , ac_prior_tok :: RealSrcSpan
+                                    -- ^ The location of the prior
+                                    -- token, used for exact printing
+                                    }
+    deriving (Eq, Ord, Data, Show)
+
+data AnnotationCommentTok =
   -- Documentation annotations
     AnnDocCommentNext  String     -- ^ something beginning '-- |'
   | AnnDocCommentPrev  String     -- ^ something beginning '-- ^'
@@ -403,6 +315,8 @@ data AnnotationComment =
   | AnnDocOptions      String     -- ^ doc options (prune, ignore-exports, etc)
   | AnnLineComment     String     -- ^ comment starting by "--"
   | AnnBlockComment    String     -- ^ comment in {- -}
+  | AnnEofComment                 -- ^ empty comment, capturing
+                                  -- location of EOF
     deriving (Eq, Ord, Data, Show)
 -- Note: these are based on the Token versions, but the Token type is
 -- defined in GHC.Parser.Lexer and bringing it in here would create a loop
@@ -1056,10 +970,9 @@ annParen2AddApiAnn (ApiAnn _ (AnnParen pt o c) _)
   where
     (ai,ac) = parenTypeKws pt
 
--- TODO: enable when we migrate
--- apiAnnComments :: ApiAnn' an -> ApiAnnComments
--- apiAnnComments ApiAnnNotUsed = AnnComments []
--- apiAnnComments (ApiAnn _ _ cs) = cs
+apiAnnComments :: ApiAnn' an -> ApiAnnComments
+apiAnnComments ApiAnnNotUsed = AnnComments []
+apiAnnComments (ApiAnn _ _ cs) = cs
 
 -- ---------------------------------------------------------------------
 -- sortLocatedA :: [LocatedA a] -> [LocatedA a]

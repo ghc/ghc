@@ -10,7 +10,6 @@
 {-# LANGUAGE MultiParamTypeClasses   #-}
 {-# LANGUAGE RankNTypes              #-}
 {-# LANGUAGE ScopedTypeVariables     #-}
-{-# LANGUAGE TypeApplications        #-}
 {-# LANGUAGE TypeFamilyDependencies  #-}
 {-# LANGUAGE UndecidableInstances    #-} -- Wrinkle in Note [Trees That Grow]
                                          -- in module Language.Haskell.Syntax.Extension
@@ -105,6 +104,8 @@ noExtCon x = case x of {}
 -- See Note [XRec and SrcSpans in the AST]
 type family XRec p a = r | r -> a
 
+type family Anno a = b -- See Note [XRec and Anno in the AST] in GHC.Parser.Annotation
+
 {-
 Note [XRec and SrcSpans in the AST]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -134,13 +135,16 @@ class UnXRec p where
 
 -- | We can map over the underlying type contained in an @XRec@ while preserving
 -- the annotation as is.
--- See Note [XRec and SrcSpans in the AST]
 class MapXRec p where
-  mapXRec :: (a -> b) -> XRec p a -> XRec p b
+  mapXRec :: (Anno a ~ Anno b) => (a -> b) -> XRec p a -> XRec p b
+-- See Note [XRec and SrcSpans in the AST]
+-- See Note [XRec and Anno in the AST] in GHC.Parser.Annotation
+-- AZ: Is there a way to not have Anno in this file, but still have MapXRec?
+--     Perhaps define XRec with an additional b parameter, only used in Hs as (Anno b)?
 
 -- | The trivial wrapper that carries no additional information
 -- See Note [XRec and SrcSpans in the AST]
-class WrapXRec p where
+class WrapXRec p a where
   wrapXRec :: a -> XRec p a
 
 -- | Maps the "normal" id type for a given pass
@@ -246,6 +250,11 @@ type family XClassDecl     x
 type family XXTyClDecl     x
 
 -- -------------------------------------
+-- FunDep type families
+type family XCFunDep      x
+type family XXFunDep      x
+
+-- -------------------------------------
 -- TyClGroup type families
 type family XCTyClGroup      x
 type family XXTyClGroup      x
@@ -290,6 +299,11 @@ type family XCFamEqn      x r
 type family XXFamEqn      x r
 
 -- -------------------------------------
+-- TyFamInstDecl type families
+type family XCTyFamInstDecl x
+type family XXTyFamInstDecl x
+
+-- -------------------------------------
 -- ClsInstDecl type families
 type family XCClsInstDecl      x
 type family XXClsInstDecl      x
@@ -308,7 +322,10 @@ type family XXDerivDecl      x
 
 -- -------------------------------------
 -- DerivStrategy type family
-type family XViaStrategy x
+type family XStockStrategy    x
+type family XAnyClassStrategy x
+type family XNewtypeStrategy  x
+type family XViaStrategy      x
 
 -- -------------------------------------
 -- DefaultDecl type families
@@ -356,6 +373,11 @@ type family XXAnnDecl      x
 -- RoleAnnotDecl type families
 type family XCRoleAnnotDecl  x
 type family XXRoleAnnotDecl  x
+
+-- -------------------------------------
+-- InjectivityAnn type families
+type family XCInjectivityAnn  x
+type family XXInjectivityAnn  x
 
 -- =====================================================================
 -- Type families for the HsExpr extension points
@@ -535,24 +557,25 @@ type family XXOverLit x
 -- =====================================================================
 -- Type families for the HsPat extension points
 
-type family XWildPat   x
-type family XVarPat    x
-type family XLazyPat   x
-type family XAsPat     x
-type family XParPat    x
-type family XBangPat   x
-type family XListPat   x
-type family XTuplePat  x
-type family XSumPat    x
-type family XConPat    x
-type family XViewPat   x
-type family XSplicePat x
-type family XLitPat    x
-type family XNPat      x
-type family XNPlusKPat x
-type family XSigPat    x
-type family XCoPat     x
-type family XXPat      x
+type family XWildPat    x
+type family XVarPat     x
+type family XLazyPat    x
+type family XAsPat      x
+type family XParPat     x
+type family XBangPat    x
+type family XListPat    x
+type family XTuplePat   x
+type family XSumPat     x
+type family XConPat     x
+type family XViewPat    x
+type family XSplicePat  x
+type family XLitPat     x
+type family XNPat       x
+type family XNPlusKPat  x
+type family XSigPat     x
+type family XCoPat      x
+type family XXPat       x
+type family XHsRecField x
 
 -- =====================================================================
 -- Type families for the HsTypes type families

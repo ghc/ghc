@@ -181,7 +181,7 @@ lookupFixityRn_help' name occ
     doc = text "Checking fixity for" <+> ppr name
 
 ---------------
-lookupTyFixityRn :: Located Name -> RnM Fixity
+lookupTyFixityRn :: LocatedN Name -> RnM Fixity
 lookupTyFixityRn = lookupFixityRn . unLoc
 
 -- | Look up the fixity of a (possibly ambiguous) occurrence of a record field

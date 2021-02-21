@@ -25,4 +25,4 @@ Linear13.hs:15:24: error:
     • Couldn't match type ‘'Many’ with ‘'One’
         arising from multiplicity of ‘x’
     • In an equation for ‘incorrectCasePromotion’:
-          incorrectCasePromotion x = case x of { (a, b) -> b }
+          incorrectCasePromotion x = case x of (a, b) -> b
