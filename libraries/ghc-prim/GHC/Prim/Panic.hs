@@ -9,6 +9,7 @@
 module GHC.Prim.Panic
    ( absentSumFieldError
    , panicError
+   , absentError
    )
 where
 
@@ -20,6 +21,8 @@ default () -- Double and Integer aren't available yet
 -- `stg_panic#` never returns but it can't just return `State# RealWorld` so we
 -- indicate that it returns `(# #)` too to make the compiler happy.
 foreign import prim "stg_paniczh" panic# :: Addr# -> State# RealWorld -> (# State# RealWorld, (# #) #)
+
+foreign import prim "stg_absentErrorzh" stg_absentError# :: Addr# -> State# RealWorld -> (# State# RealWorld, (# #) #)
 
 -- | Display the CString whose address is given as an argument and exit.
 panicError :: Addr# -> a
@@ -43,3 +46,14 @@ absentSumFieldError = panicError "entered absent sum field!"#
 -- introduced in Stg.Unarise, long after inlining has stopped, but it seems
 -- more direct simply to give it a NOINLINE pragma
 {-# NOINLINE absentSumFieldError #-}
+
+-- | Displays "Oops!  Entered absent arg" ++ errormsg and exits the program.
+{-# NOINLINE absentError #-}
+absentError :: Addr# -> a
+absentError errmsg =
+  runRW# (\s ->
+    case stg_absentError# errmsg s of
+      (# _, _ #) -> -- This bottom is unreachable but we can't
+                    -- use an empty case lest the pattern match
+                    -- checker squawks.
+                    let x = x in x)

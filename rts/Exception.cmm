@@ -660,3 +660,8 @@ stg_paniczh (W_ str)
 {
     ccall barf(str) never returns;
 }
+
+stg_absentErrorzh (W_ str)
+{
+    ccall barf("Oops!  Entered absent arg %s", str) never returns;
+}
