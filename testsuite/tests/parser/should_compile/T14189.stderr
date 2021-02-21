@@ -27,8 +27,7 @@
         (HsDataDefn
          (NoExtField)
          (DataType)
-         ({ <no location info> }
-          [])
+         (Nothing)
          (Nothing)
          (Nothing)
          [({ T14189.hs:6:15-20 }
