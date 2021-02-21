@@ -95,7 +95,7 @@ module Control.Exception.Base (
         -- * Calls for GHC runtime
         recSelError, recConError, runtimeError,
         nonExhaustiveGuardsError, patError, noMethodBindingError,
-        absentError, typeError,
+        typeError,
         nonTermination, nestedAtomically,
   ) where
 
@@ -391,15 +391,15 @@ instance Exception NestedAtomically
 
 -----
 
+-- See Note [Compiler error functions] in ghc-prim:GHC.Prim.Panic
 recSelError, recConError, runtimeError,
   nonExhaustiveGuardsError, patError, noMethodBindingError,
-  absentError, typeError
+  typeError
         :: Addr# -> a   -- All take a UTF8-encoded C string
 
 recSelError              s = throw (RecSelError ("No match in record selector "
                                                  ++ unpackCStringUtf8# s))  -- No location info unfortunately
 runtimeError             s = errorWithoutStackTrace (unpackCStringUtf8# s)                   -- No location info unfortunately
-absentError              s = errorWithoutStackTrace ("Oops!  Entered absent arg " ++ unpackCStringUtf8# s)
 
 nonExhaustiveGuardsError s = throw (PatternMatchFail (untangle s "Non-exhaustive guards in"))
 recConError              s = throw (RecConError      (untangle s "Missing field in record construction"))

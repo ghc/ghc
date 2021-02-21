@@ -660,3 +660,9 @@ stg_paniczh (W_ str)
 {
     ccall barf(str) never returns;
 }
+
+// See Note [Compiler error functions] in GHC.Prim.Panic
+stg_absentErrorzh (W_ str)
+{
+    ccall barf("Oops!  Entered absent arg %s", str) never returns;
+}
