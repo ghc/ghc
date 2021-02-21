@@ -594,10 +594,14 @@ addTickHsExpr expr@(RecordCon { rcon_flds = rec_binds })
   = do { rec_binds' <- addTickHsRecordBinds rec_binds
        ; return (expr { rcon_flds = rec_binds' }) }
 
-addTickHsExpr expr@(RecordUpd { rupd_expr = e, rupd_flds = flds })
+addTickHsExpr expr@(RecordUpd { rupd_expr = e, rupd_flds = Left flds })
   = do { e' <- addTickLHsExpr e
        ; flds' <- mapM addTickHsRecField flds
-       ; return (expr { rupd_expr = e', rupd_flds = flds' }) }
+       ; return (expr { rupd_expr = e', rupd_flds = Left flds' }) }
+addTickHsExpr expr@(RecordUpd { rupd_expr = e, rupd_flds = Right flds })
+  = do { e' <- addTickLHsExpr e
+       ; flds' <- mapM addTickHsRecField flds
+       ; return (expr { rupd_expr = e', rupd_flds = Right flds' }) }
 
 addTickHsExpr (ExprWithTySig x e ty) =
         liftM3 ExprWithTySig
@@ -626,6 +630,8 @@ addTickHsExpr e@(HsBracket     {})   = return e
 addTickHsExpr e@(HsTcBracketOut  {}) = return e
 addTickHsExpr e@(HsRnBracketOut  {}) = return e
 addTickHsExpr e@(HsSpliceE  {})      = return e
+addTickHsExpr e@(HsGetField {})      = return e
+addTickHsExpr e@(HsProjection {})    = return e
 addTickHsExpr (HsProc x pat cmdtop) =
         liftM2 (HsProc x)
                 (addTickLPat pat)
@@ -985,7 +991,6 @@ addTickHsRecField :: LHsRecField' id (LHsExpr GhcTc)
 addTickHsRecField (L l (HsRecField id expr pun))
         = do { expr' <- addTickLHsExpr expr
              ; return (L l (HsRecField id expr' pun)) }
-
 
 addTickArithSeqInfo :: ArithSeqInfo GhcTc -> TM (ArithSeqInfo GhcTc)
 addTickArithSeqInfo (From e1) =

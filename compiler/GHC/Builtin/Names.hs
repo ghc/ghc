@@ -330,6 +330,9 @@ basicKnownKeyNames
         fromListNName,
         toListName,
 
+        -- Overloaded record dot, record update
+        getFieldName, setFieldName,
+
         -- List operations
         concatName, filterName, mapName,
         zipName, foldrName, buildName, augmentName, appendName,
@@ -1520,6 +1523,11 @@ fromListName    = varQual gHC_EXTS (fsLit "fromList")  fromListClassOpKey
 fromListNName   = varQual gHC_EXTS (fsLit "fromListN") fromListNClassOpKey
 toListName      = varQual gHC_EXTS (fsLit "toList")    toListClassOpKey
 
+-- HasField class ops
+getFieldName, setFieldName :: Name
+getFieldName   = varQual gHC_RECORDS (fsLit "getField") getFieldClassOpKey
+setFieldName   = varQual gHC_RECORDS (fsLit "setField") setFieldClassOpKey
+
 -- Class Show
 showClassName :: Name
 showClassName   = clsQual gHC_SHOW (fsLit "Show")      showClassKey
@@ -2539,6 +2547,10 @@ unsafeEqualityProofIdKey, unsafeCoercePrimIdKey :: Unique
 unsafeEqualityProofIdKey = mkPreludeMiscIdUnique 570
 unsafeCoercePrimIdKey    = mkPreludeMiscIdUnique 571
 
+-- HasField class ops
+getFieldClassOpKey, setFieldClassOpKey :: Unique
+getFieldClassOpKey = mkPreludeMiscIdUnique 572
+setFieldClassOpKey = mkPreludeMiscIdUnique 573
 
 ------------------------------------------------------
 -- ghc-bignum uses 600-699 uniques
