@@ -417,7 +417,7 @@ pp_err = \case
 
    PsErrIllegalDataTypeContext c
       -> text "Illegal datatype context (use DatatypeContexts):"
-         <+> pprLHsContext c
+         <+> pprLHsContext (Just c)
 
    PsErrMalformedDecl what for
       -> text "Malformed" <+> what

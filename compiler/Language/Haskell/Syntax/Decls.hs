@@ -436,7 +436,7 @@ data TyClDecl pass
              , tcdDataDefn :: HsDataDefn pass }
 
   | ClassDecl { tcdCExt    :: XClassDecl pass,         -- ^ Post renamer, FVs
-                tcdCtxt    :: LHsContext pass,         -- ^ Context...
+                tcdCtxt    :: Maybe (LHsContext pass), -- ^ Context...
                 tcdLName   :: LIdP pass,               -- ^ Name of the class
                 tcdTyVars  :: LHsQTyVars pass,         -- ^ Class type variables
                 tcdFixity  :: LexicalFixity, -- ^ Fixity used in the declaration
@@ -891,7 +891,7 @@ data HsDataDefn pass   -- The payload of a data type defn
     -- @
     HsDataDefn { dd_ext    :: XCHsDataDefn pass,
                  dd_ND     :: NewOrData,
-                 dd_ctxt   :: LHsContext pass,           -- ^ Context
+                 dd_ctxt   :: Maybe (LHsContext pass), -- ^ Context
                  dd_cType  :: Maybe (XRec pass CType),
                  dd_kindSig:: Maybe (LHsKind pass),
                      -- ^ Optional kind signature.
