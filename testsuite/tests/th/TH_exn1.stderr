@@ -3,4 +3,4 @@ TH_exn1.hs:1:1: error:
     Exception when trying to run compile-time code:
       TH_exn1.hs:(9,4)-(10,23): Non-exhaustive patterns in case
 
-    Code: (case reverse "no" of { [] -> return [] })
+    Code: (case reverse "no" of [] -> return [])

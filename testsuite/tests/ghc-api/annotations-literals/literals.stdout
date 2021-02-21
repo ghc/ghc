@@ -1,4 +1,4 @@
-(LiteralsTest.hs:1:1-26,ITblockComment "{-# LANGUAGE MagicHash #-}",[{-# LANGUAGE MagicHash #-}]),
+(LiteralsTest.hs:1:1-26,ITblockComment "{-# LANGUAGE MagicHash #-}" (PsSpan {psRealSpan = SrcSpanPoint "./LiteralsTest.hs" 1 1, psBufSpan = BufSpan {bufSpanStart = BufPos {bufPos = 0}, bufSpanEnd = BufPos {bufPos = 0}}}),[{-# LANGUAGE MagicHash #-}]),
 
 (LiteralsTest.hs:2:1-6,ITmodule,[module]),
 

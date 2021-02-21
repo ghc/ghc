@@ -432,7 +432,7 @@ data HsPSRn = HsPSRn
   deriving Data
 
 -- | Located Haskell Signature Type
-type LHsSigType   pass = Located (HsSigType pass)               -- Implicit only
+type LHsSigType   pass = XRec pass (HsSigType pass)               -- Implicit only
 
 -- | Located Haskell Wildcard Type
 type LHsWcType    pass = HsWildCardBndrs pass (LHsType pass)    -- Wildcard only
@@ -893,7 +893,7 @@ data HsType pass
 
   -- For adding new constructors via Trees that Grow
   | XHsType
-      (XXType pass)
+      !(XXType pass)
 
 -- An escape hatch for tunnelling a Core 'Type' through 'HsType'.
 -- For more details on how this works, see:
@@ -917,9 +917,9 @@ data HsTyLit
 data HsArrow pass
   = HsUnrestrictedArrow IsUnicodeSyntax
     -- ^ a -> b or a → b
-  | HsLinearArrow IsUnicodeSyntax
+  | HsLinearArrow IsUnicodeSyntax (Maybe AddApiAnn)
     -- ^ a %1 -> b or a %1 → b, or a ⊸ b
-  | HsExplicitMult IsUnicodeSyntax (LHsType pass)
+  | HsExplicitMult IsUnicodeSyntax (Maybe AddApiAnn) (LHsType pass)
     -- ^ a %m -> b or a %m → b (very much including `a %Many -> b`!
     -- This is how the programmer wrote it). It is stored as an
     -- `HsType` so as to preserve the syntax as written in the
@@ -939,7 +939,7 @@ hsScaledThing (HsScaled _ t) = t
 -- the shorthands work trivially at each pass.
 hsUnrestricted, hsLinear :: a -> HsScaled pass a
 hsUnrestricted = HsScaled (HsUnrestrictedArrow NormalSyntax)
-hsLinear = HsScaled (HsLinearArrow NormalSyntax)
+hsLinear = HsScaled (HsLinearArrow NormalSyntax Nothing)
 
 instance Outputable a => Outputable (HsScaled pass a) where
    ppr (HsScaled _cnt t) = -- ppr cnt <> ppr t
@@ -1258,7 +1258,7 @@ type LFieldOcc pass = XRec pass (FieldOcc pass)
 -- We store both the 'RdrName' the user originally wrote, and after the renamer,
 -- the selector function.
 data FieldOcc pass = FieldOcc { extFieldOcc     :: XCFieldOcc pass
-                              , rdrNameFieldOcc :: Located RdrName
+                              , rdrNameFieldOcc :: LocatedN RdrName
                                  -- ^ See Note [Located RdrNames] in "GHC.Hs.Expr"
                               }
 
@@ -1270,6 +1270,13 @@ deriving instance (Eq (XCFieldOcc pass), Eq (XXFieldOcc pass)) => Eq (FieldOcc p
 instance Outputable (FieldOcc pass) where
   ppr = ppr . rdrNameFieldOcc
 
+instance OutputableBndr (FieldOcc pass) where
+  pprInfixOcc  = pprInfixOcc . unLoc . rdrNameFieldOcc
+  pprPrefixOcc = pprPrefixOcc . unLoc . rdrNameFieldOcc
+
+instance OutputableBndr (GenLocated SrcSpan (FieldOcc pass)) where
+  pprInfixOcc  = pprInfixOcc . unLoc
+  pprPrefixOcc = pprPrefixOcc . unLoc
 
 -- | Ambiguous Field Occurrence
 --
@@ -1284,8 +1291,8 @@ instance Outputable (FieldOcc pass) where
 -- Note [Disambiguating record fields] in "GHC.Tc.Gen.Head".
 -- See Note [Located RdrNames] in "GHC.Hs.Expr"
 data AmbiguousFieldOcc pass
-  = Unambiguous (XUnambiguous pass) (Located RdrName)
-  | Ambiguous   (XAmbiguous pass)   (Located RdrName)
+  = Unambiguous (XUnambiguous pass) (LocatedN RdrName)
+  | Ambiguous   (XAmbiguous pass)   (LocatedN RdrName)
   | XAmbiguousFieldOcc !(XXAmbiguousFieldOcc pass)
 
 

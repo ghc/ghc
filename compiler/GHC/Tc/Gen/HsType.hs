@@ -1,4 +1,6 @@
 {-# LANGUAGE CPP                 #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies        #-}
@@ -51,7 +53,7 @@ module GHC.Tc.Gen.HsType (
         kcDeclHeader,
         tcHsLiftedType,   tcHsOpenType,
         tcHsLiftedTypeNC, tcHsOpenTypeNC,
-        tcInferLHsTypeKind, tcInferLHsType, tcInferLHsTypeUnsaturated,
+        tcInferLHsType, tcInferLHsTypeKind, tcInferLHsTypeUnsaturated,
         tcCheckLHsType,
         tcHsContext, tcLHsPredType,
 
@@ -121,7 +123,6 @@ import GHC.Data.FastString
 import GHC.Builtin.Names hiding ( wildCardName )
 import GHC.Driver.Session
 import qualified GHC.LanguageExtensions as LangExt
-import GHC.Parser.Annotation
 
 import GHC.Data.Maybe
 import GHC.Data.Bag( unitBag )
@@ -335,19 +336,19 @@ we promote the metavariable to level 1. This is all done in kindGeneralizeNone.
 
 -}
 
-funsSigCtxt :: [Located Name] -> UserTypeCtxt
+funsSigCtxt :: [LocatedN Name] -> UserTypeCtxt
 -- Returns FunSigCtxt, with no redundant-context-reporting,
 -- form a list of located names
 funsSigCtxt (L _ name1 : _) = FunSigCtxt name1 False
 funsSigCtxt []              = panic "funSigCtxt"
 
-addSigCtxt :: Outputable hs_ty => UserTypeCtxt -> Located hs_ty -> TcM a -> TcM a
+addSigCtxt :: Outputable hs_ty => UserTypeCtxt -> LocatedA hs_ty -> TcM a -> TcM a
 addSigCtxt ctxt hs_ty thing_inside
-  = setSrcSpan (getLoc hs_ty) $
+  = setSrcSpan (getLocA hs_ty) $
     addErrCtxt (pprSigCtxt ctxt hs_ty) $
     thing_inside
 
-pprSigCtxt :: Outputable hs_ty => UserTypeCtxt -> Located hs_ty -> SDoc
+pprSigCtxt :: Outputable hs_ty => UserTypeCtxt -> LocatedA hs_ty -> SDoc
 -- (pprSigCtxt ctxt <extra> <type>)
 -- prints    In the type signature for 'f':
 --              f :: <type>
@@ -367,7 +368,7 @@ tcHsSigWcType :: UserTypeCtxt -> LHsSigWcType GhcRn -> TcM Type
 -- already checked this, so we can simply ignore it.
 tcHsSigWcType ctxt sig_ty = tcHsSigType ctxt (dropWildCards sig_ty)
 
-kcClassSigType :: [Located Name] -> LHsSigType GhcRn -> TcM ()
+kcClassSigType :: [LocatedN Name] -> LHsSigType GhcRn -> TcM ()
 -- This is a special form of tcClassSigType that is used during the
 -- kind-checking phase to infer the kind of class variables. Cf. tc_lhs_sig_type.
 -- Importantly, this does *not* kind-generalize. Consider
@@ -387,7 +388,7 @@ kcClassSigType names
               tcLHsType hs_ty liftedTypeKind
        ; return () }
 
-tcClassSigType :: [Located Name] -> LHsSigType GhcRn -> TcM Type
+tcClassSigType :: [LocatedN Name] -> LHsSigType GhcRn -> TcM Type
 -- Does not do validity checking
 tcClassSigType names sig_ty
   = addSigCtxt sig_ctxt sig_ty $
@@ -446,7 +447,7 @@ tc_lhs_sig_type :: SkolemInfo -> LHsSigType GhcRn
 -- Returns also an implication for the unsolved constraints
 tc_lhs_sig_type skol_info (L loc (HsSig { sig_bndrs = hs_outer_bndrs
                                        , sig_body = hs_ty })) ctxt_kind
-  = setSrcSpan loc $
+  = setSrcSpanA loc $
     do { (tc_lvl, wanted, (outer_bndrs, ty))
               <- pushLevelAndSolveEqualitiesX "tc_lhs_sig_type" $
                  -- See Note [Failure in local type signatures]
@@ -523,7 +524,7 @@ tc_top_lhs_type :: TypeOrKind -> UserTypeCtxt -> LHsSigType GhcRn -> TcM Type
 -- Used for both types and kinds
 tc_top_lhs_type tyki ctxt (L loc sig_ty@(HsSig { sig_bndrs = hs_outer_bndrs
                                                , sig_body = body }))
-  = setSrcSpan loc $
+  = setSrcSpanA loc $
     do { traceTc "tc_top_lhs_type {" (ppr sig_ty)
        ; (tclvl, wanted, (outer_bndrs, ty))
               <- pushLevelAndSolveEqualitiesX "tc_top_lhs_type"    $
@@ -580,9 +581,12 @@ tcDerivStrategy mb_lds
   where
     tc_deriv_strategy :: DerivStrategy GhcRn
                       -> TcM (DerivStrategy GhcTc, [TyVar])
-    tc_deriv_strategy StockStrategy    = boring_case StockStrategy
-    tc_deriv_strategy AnyclassStrategy = boring_case AnyclassStrategy
-    tc_deriv_strategy NewtypeStrategy  = boring_case NewtypeStrategy
+    tc_deriv_strategy (StockStrategy    _)
+                                     = boring_case (StockStrategy noExtField)
+    tc_deriv_strategy (AnyclassStrategy _)
+                                     = boring_case (AnyclassStrategy noExtField)
+    tc_deriv_strategy (NewtypeStrategy  _)
+                                     = boring_case (NewtypeStrategy noExtField)
     tc_deriv_strategy (ViaStrategy ty) = do
       ty' <- checkNoErrs $ tcTopLHsType DerivClauseCtxt ty
       let (via_tvs, via_pred) = splitForAllTyCoVars ty'
@@ -596,7 +600,7 @@ tcHsClsInstType :: UserTypeCtxt    -- InstDeclCtxt or SpecInstCtxt
                 -> TcM Type
 -- Like tcHsSigType, but for a class instance declaration
 tcHsClsInstType user_ctxt hs_inst_ty
-  = setSrcSpan (getLoc hs_inst_ty) $
+  = setSrcSpan (getLocA hs_inst_ty) $
     do { -- Fail eagerly if tcTopLHsType fails.  We are at top level so
          -- these constraints will never be solved later. And failing
          -- eagerly avoids follow-on errors when checkValidInstance
@@ -690,7 +694,7 @@ tcFamTyPats fam_tc hs_pats
   where
     fam_name  = tyConName fam_tc
     fam_arity = tyConArity fam_tc
-    lhs_fun   = noLoc (HsTyVar noExtField NotPromoted (noLoc fam_name))
+    lhs_fun   = noLocA (HsTyVar noAnn NotPromoted (noLocA fam_name))
 
 {- Note [tcFamTyPats: zonking the result kind]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -756,7 +760,7 @@ tcInferLHsTypeKind :: LHsType GhcRn -> TcM (TcType, TcKind)
 -- Eagerly instantiate any trailing invisible binders
 tcInferLHsTypeKind lhs_ty@(L loc hs_ty)
   = addTypeCtxt lhs_ty $
-    setSrcSpan loc     $  -- Cover the tcInstInvisibleTyBinders
+    setSrcSpanA loc    $  -- Cover the tcInstInvisibleTyBinders
     do { (res_ty, res_kind) <- tc_infer_hs_type typeLevelMode hs_ty
        ; tcInstInvisibleTyBinders res_ty res_kind }
   -- See Note [Do not always instantiate eagerly in types]
@@ -934,7 +938,7 @@ missing any patterns.
 -- level.
 tc_infer_lhs_type :: TcTyMode -> LHsType GhcRn -> TcM (TcType, TcKind)
 tc_infer_lhs_type mode (L span ty)
-  = setSrcSpan span $
+  = setSrcSpanA span $
     tc_infer_hs_type mode ty
 
 ---------------------------
@@ -1051,7 +1055,7 @@ tcLHsType hs_ty exp_kind
 
 tc_lhs_type :: TcTyMode -> LHsType GhcRn -> TcKind -> TcM TcType
 tc_lhs_type mode (L span ty) exp_kind
-  = setSrcSpan span $
+  = setSrcSpanA span $
     tc_hs_type mode ty exp_kind
 
 tc_hs_type :: TcTyMode -> HsType GhcRn -> TcKind -> TcM TcType
@@ -1159,7 +1163,7 @@ tc_hs_type mode rn_ty@(HsTupleTy _ HsBoxedOrConstraintTuple hs_tys) exp_kind
                     [] -> (liftedTypeKind, BoxedTuple)
          -- In the [] case, it's not clear what the kind is, so guess *
 
-       ; tys' <- sequence [ setSrcSpan loc $
+       ; tys' <- sequence [ setSrcSpanA loc $
                             checkExpectedKind hs_ty ty kind arg_kind
                           | ((L loc hs_ty),ty,kind) <- zip3 hs_tys tys kinds ]
 
@@ -1279,13 +1283,13 @@ tc_fun_type mode mult ty1 ty2 exp_kind = case mode_tyki mode of
        ; ty1' <- tc_lhs_type mode ty1 arg_k
        ; ty2' <- tc_lhs_type mode ty2 res_k
        ; mult' <- tc_mult mode mult
-       ; checkExpectedKind (HsFunTy noExtField mult ty1 ty2) (mkVisFunTy mult' ty1' ty2')
+       ; checkExpectedKind (HsFunTy noAnn mult ty1 ty2) (mkVisFunTy mult' ty1' ty2')
                            liftedTypeKind exp_kind }
   KindLevel ->  -- no representation polymorphism in kinds. yet.
     do { ty1' <- tc_lhs_type mode ty1 liftedTypeKind
        ; ty2' <- tc_lhs_type mode ty2 liftedTypeKind
        ; mult' <- tc_mult mode mult
-       ; checkExpectedKind (HsFunTy noExtField mult ty1 ty2) (mkVisFunTy mult' ty1' ty2')
+       ; checkExpectedKind (HsFunTy noAnn mult ty1 ty2) (mkVisFunTy mult' ty1' ty2')
                            liftedTypeKind exp_kind }
 
 {- Note [Skolem escape and forall-types]
@@ -1431,7 +1435,7 @@ since the two constraints should be semantically equivalent.
 
 splitHsAppTys :: HsType GhcRn -> Maybe (LHsType GhcRn, [LHsTypeArg GhcRn])
 splitHsAppTys hs_ty
-  | is_app hs_ty = Just (go (noLoc hs_ty) [])
+  | is_app hs_ty = Just (go (noLocA hs_ty) [])
   | otherwise    = Nothing
   where
     is_app :: HsType GhcRn -> Bool
@@ -1446,11 +1450,15 @@ splitHsAppTys hs_ty
     is_app (HsParTy _ (L _ ty))    = is_app ty
     is_app _                       = False
 
+    go :: LHsType GhcRn
+       -> [HsArg (LHsType GhcRn) (LHsKind GhcRn)]
+       -> (LHsType GhcRn,
+           [HsArg (LHsType GhcRn) (LHsKind GhcRn)]) -- AZ temp
     go (L _  (HsAppTy _ f a))      as = go f (HsValArg a : as)
     go (L _  (HsAppKindTy l ty k)) as = go ty (HsTypeArg l k : as)
-    go (L sp (HsParTy _ f))        as = go f (HsArgPar sp : as)
+    go (L sp (HsParTy _ f))        as = go f (HsArgPar (locA sp) : as)
     go (L _  (HsOpTy _ l op@(L sp _) r)) as
-      = ( L sp (HsTyVar noExtField NotPromoted op)
+      = ( L (na2la sp) (HsTyVar noAnn NotPromoted op)
         , HsValArg l : HsValArg r : as )
     go f as = (f, as)
 
@@ -2962,7 +2970,7 @@ tcTKTelescope mode tele thing_inside = case tele of
 --    HsOuterTyVarBndrs
 --------------------------------------
 
-bindOuterTKBndrsX :: OutputableBndrFlag flag
+bindOuterTKBndrsX :: OutputableBndrFlag flag 'Renamed
                   => SkolemMode
                   -> HsOuterTyVarBndrs flag GhcRn
                   -> TcM a
@@ -3034,7 +3042,7 @@ bindOuterFamEqnTKBndrs hs_bndrs thing_inside
     -- sm_clone=False: see Note [Cloning for type variable binders]
 
 ---------------
-tcOuterTKBndrs :: OutputableBndrFlag flag
+tcOuterTKBndrs :: OutputableBndrFlag flag 'Renamed
                => SkolemInfo
                -> HsOuterTyVarBndrs flag GhcRn
                -> TcM a -> TcM (HsOuterTyVarBndrs flag GhcTc, a)
@@ -3042,7 +3050,7 @@ tcOuterTKBndrs = tcOuterTKBndrsX (smVanilla { sm_clone = False })
   -- Do not clone the outer binders
   -- See Note [Cloning for type variable binder] under "must not"
 
-tcOuterTKBndrsX :: OutputableBndrFlag flag
+tcOuterTKBndrsX :: OutputableBndrFlag flag 'Renamed
                 => SkolemMode -> SkolemInfo
                 -> HsOuterTyVarBndrs flag GhcRn
                 -> TcM a -> TcM (HsOuterTyVarBndrs flag GhcTc, a)
@@ -3063,13 +3071,13 @@ tcOuterTKBndrsX skol_mode skol_info outer_bndrs thing_inside
 --    Explicit tyvar binders
 --------------------------------------
 
-tcExplicitTKBndrs :: OutputableBndrFlag flag
+tcExplicitTKBndrs :: OutputableBndrFlag flag 'Renamed
                   => [LHsTyVarBndr flag GhcRn]
                   -> TcM a
                   -> TcM ([VarBndr TyVar flag], a)
 tcExplicitTKBndrs = tcExplicitTKBndrsX (smVanilla { sm_clone = True })
 
-tcExplicitTKBndrsX :: OutputableBndrFlag flag
+tcExplicitTKBndrsX :: OutputableBndrFlag flag 'Renamed
                    => SkolemMode
                    -> [LHsTyVarBndr flag GhcRn]
                    -> TcM a
@@ -3095,7 +3103,7 @@ tcExplicitTKBndrsX skol_mode bndrs thing_inside
 -- | Skolemise the 'HsTyVarBndr's in an 'HsForAllTelescope' with the supplied
 -- 'TcTyMode'.
 bindExplicitTKBndrs_Skol, bindExplicitTKBndrs_Tv
-    :: (OutputableBndrFlag flag)
+    :: (OutputableBndrFlag flag 'Renamed)
     => [LHsTyVarBndr flag GhcRn]
     -> TcM a
     -> TcM ([VarBndr TyVar flag], a)
@@ -3124,7 +3132,7 @@ bindExplicitTKBndrs_Q_Tv ctxt_kind hs_bndrs thing_inside
                          hs_bndrs thing_inside
     -- sm_clone=False: see Note [Cloning for type variable binders]
 
-bindExplicitTKBndrsX :: (OutputableBndrFlag flag)
+bindExplicitTKBndrsX :: (OutputableBndrFlag flag 'Renamed)
     => SkolemMode
     -> [LHsTyVarBndr flag GhcRn]
     -> TcM a
@@ -3873,7 +3881,7 @@ tcPartialContext _ Nothing = return ([], Nothing)
 tcPartialContext mode (Just (L _ hs_theta))
   | Just (hs_theta1, hs_ctxt_last) <- snocView hs_theta
   , L wc_loc ty@(HsWildCardTy _) <- ignoreParens hs_ctxt_last
-  = do { wc_tv_ty <- setSrcSpan wc_loc $
+  = do { wc_tv_ty <- setSrcSpanA wc_loc $
                      tcAnonWildCardOcc YesExtraConstraint mode ty constraintKind
        ; theta <- mapM (tc_lhs_pred mode) hs_theta1
        ; return (theta, Just wc_tv_ty) }
