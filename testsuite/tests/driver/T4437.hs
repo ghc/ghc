@@ -41,6 +41,8 @@ expectedGhcOnlyExtensions =
     , "AlternativeLayoutRule"
     , "AlternativeLayoutRuleTransitional"
     , "FieldSelectors"
+    , "OverloadedRecordDot"
+    , "OverloadedRecordUpdate"
     ]
 
 expectedCabalOnlyExtensions :: [String]
