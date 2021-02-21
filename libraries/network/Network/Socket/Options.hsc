@@ -82,75 +82,75 @@ packSocketOption so =
   -- would be a serious nuisance.
   -- (NB: comments elsewhere in this file refer to this one)
   case Just so of
-#ifdef SOL_SOCKET
-#ifdef SO_DEBUG
+#if defined(SOL_SOCKET)
+#if defined(SO_DEBUG)
     Just Debug         -> Just ((#const SOL_SOCKET), (#const SO_DEBUG))
 #endif
-#ifdef SO_REUSEADDR
+#if defined(SO_REUSEADDR)
     Just ReuseAddr     -> Just ((#const SOL_SOCKET), (#const SO_REUSEADDR))
 #endif
-#ifdef SO_TYPE
+#if defined(SO_TYPE)
     Just Type          -> Just ((#const SOL_SOCKET), (#const SO_TYPE))
 #endif
-#ifdef SO_ERROR
+#if defined(SO_ERROR)
     Just SoError       -> Just ((#const SOL_SOCKET), (#const SO_ERROR))
 #endif
-#ifdef SO_DONTROUTE
+#if defined(SO_DONTROUTE)
     Just DontRoute     -> Just ((#const SOL_SOCKET), (#const SO_DONTROUTE))
 #endif
-#ifdef SO_BROADCAST
+#if defined(SO_BROADCAST)
     Just Broadcast     -> Just ((#const SOL_SOCKET), (#const SO_BROADCAST))
 #endif
-#ifdef SO_SNDBUF
+#if defined(SO_SNDBUF)
     Just SendBuffer    -> Just ((#const SOL_SOCKET), (#const SO_SNDBUF))
 #endif
-#ifdef SO_RCVBUF
+#if defined(SO_RCVBUF)
     Just RecvBuffer    -> Just ((#const SOL_SOCKET), (#const SO_RCVBUF))
 #endif
-#ifdef SO_KEEPALIVE
+#if defined(SO_KEEPALIVE)
     Just KeepAlive     -> Just ((#const SOL_SOCKET), (#const SO_KEEPALIVE))
 #endif
-#ifdef SO_OOBINLINE
+#if defined(SO_OOBINLINE)
     Just OOBInline     -> Just ((#const SOL_SOCKET), (#const SO_OOBINLINE))
 #endif
-#ifdef SO_LINGER
+#if defined(SO_LINGER)
     Just Linger        -> Just ((#const SOL_SOCKET), (#const SO_LINGER))
 #endif
-#ifdef SO_REUSEPORT
+#if defined(SO_REUSEPORT)
     Just ReusePort     -> Just ((#const SOL_SOCKET), (#const SO_REUSEPORT))
 #endif
-#ifdef SO_RCVLOWAT
+#if defined(SO_RCVLOWAT)
     Just RecvLowWater  -> Just ((#const SOL_SOCKET), (#const SO_RCVLOWAT))
 #endif
-#ifdef SO_SNDLOWAT
+#if defined(SO_SNDLOWAT)
     Just SendLowWater  -> Just ((#const SOL_SOCKET), (#const SO_SNDLOWAT))
 #endif
-#ifdef SO_RCVTIMEO
+#if defined(SO_RCVTIMEO)
     Just RecvTimeOut   -> Just ((#const SOL_SOCKET), (#const SO_RCVTIMEO))
 #endif
-#ifdef SO_SNDTIMEO
+#if defined(SO_SNDTIMEO)
     Just SendTimeOut   -> Just ((#const SOL_SOCKET), (#const SO_SNDTIMEO))
 #endif
-#ifdef SO_USELOOPBACK
+#if defined(SO_USELOOPBACK)
     Just UseLoopBack   -> Just ((#const SOL_SOCKET), (#const SO_USELOOPBACK))
 #endif
 #endif // SOL_SOCKET
 #if HAVE_DECL_IPPROTO_IP
-#ifdef IP_TTL
+#if defined(IP_TTL)
     Just TimeToLive    -> Just ((#const IPPROTO_IP), (#const IP_TTL))
 #endif
 #endif // HAVE_DECL_IPPROTO_IP
 #if HAVE_DECL_IPPROTO_TCP
-#ifdef TCP_MAXSEG
+#if defined(TCP_MAXSEG)
     Just MaxSegment    -> Just ((#const IPPROTO_TCP), (#const TCP_MAXSEG))
 #endif
-#ifdef TCP_NODELAY
+#if defined(TCP_NODELAY)
     Just NoDelay       -> Just ((#const IPPROTO_TCP), (#const TCP_NODELAY))
 #endif
-#ifdef TCP_USER_TIMEOUT
+#if defined(TCP_USER_TIMEOUT)
     Just UserTimeout   -> Just ((#const IPPROTO_TCP), (#const TCP_USER_TIMEOUT))
 #endif
-#ifdef TCP_CORK
+#if defined(TCP_CORK)
     Just Cork          -> Just ((#const IPPROTO_TCP), (#const TCP_CORK))
 #endif
 #endif // HAVE_DECL_IPPROTO_TCP
@@ -171,7 +171,7 @@ packSocketOption' caller so = maybe err return (packSocketOption so)
   err = ioError . userError . concat $ ["Network.Socket.", caller,
     ": socket option ", show so, " unsupported on this system"]
 
-#ifdef SO_LINGER
+#if defined(SO_LINGER)
 data StructLinger = StructLinger CInt CInt
 
 instance Storable StructLinger where
@@ -194,7 +194,7 @@ setSocketOption :: Socket
                 -> SocketOption -- Option Name
                 -> Int          -- Option Value
                 -> IO ()
-#ifdef SO_LINGER
+#if defined(SO_LINGER)
 setSocketOption s Linger v = do
    (level, opt) <- packSocketOption' "setSocketOption" Linger
    let arg = if v == 0 then StructLinger 0 0 else StructLinger 1 (fromIntegral v)
@@ -219,7 +219,7 @@ setSocketOption s so v = do
 getSocketOption :: Socket
                 -> SocketOption  -- Option Name
                 -> IO Int        -- Option Value
-#ifdef SO_LINGER
+#if defined(SO_LINGER)
 getSocketOption s Linger = do
    (level, opt) <- packSocketOption' "getSocketOption" Linger
    alloca $ \ptr_v -> do

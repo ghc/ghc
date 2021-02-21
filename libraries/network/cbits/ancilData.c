@@ -2,7 +2,7 @@
  *  Copyright(c), 2002 The GHC Team.
  */
 
-#ifdef aix_HOST_OS
+#if defined(aix_HOST_OS)
 #define _LINUX_SOURCE_COMPAT
 // Required to get CMSG_SPACE/CMSG_LEN macros.  See #265.
 // Alternative is to #define COMPAT_43 and use the
