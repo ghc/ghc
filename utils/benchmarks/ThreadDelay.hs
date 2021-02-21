@@ -12,7 +12,7 @@ import System.Console.GetOpt (ArgDescr(ReqArg), OptDescr(..))
 import System.Environment (getArgs)
 import GHC.Event.Thread (ensureIOManagerIsRunning)
 import Control.Concurrent.STM
-#ifdef USE_GHC_IO_MANAGER
+#if defined(USE_GHC_IO_MANAGER)
 import Control.Concurrent (threadDelay)
 #else
 import GHC.Event.Thread (threadDelay)

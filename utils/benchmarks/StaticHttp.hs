@@ -8,7 +8,7 @@ import qualified Data.Attoparsec.ByteString as A
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy as L
 import Network.Socket hiding (accept)
-#ifdef USE_GHC_IO_MANAGER
+#if defined(USE_GHC_IO_MANAGER)
 import Network.Socket (accept)
 import Network.Socket.ByteString (recv, sendAll)
 #else
@@ -29,7 +29,7 @@ main = do
       myHints = defaultHints { addrFlags = [AI_PASSIVE]
                              , addrSocketType = Stream }
   (ai:_) <- getAddrInfo (Just myHints) Nothing (Just port)
-#ifndef USE_GHC_IO_MANAGER
+#if !defined(USE_GHC_IO_MANAGER)
   ensureIOManagerIsRunning
 #endif
   sock <- socket (addrFamily ai) (addrSocketType ai) (addrProtocol ai)

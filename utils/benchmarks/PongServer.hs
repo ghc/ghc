@@ -14,7 +14,7 @@ import Data.Monoid (Last(..))
 import Network.Socket hiding (accept)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as C ()
-#ifdef USE_GHC_IO_MANAGER
+#if defined(USE_GHC_IO_MANAGER)
 import Network.Socket (accept)
 import Network.Socket.ByteString (recv, sendAll)
 #else
@@ -34,7 +34,7 @@ main = do
       lim  = ResourceLimit . fromIntegral . theLast cfgMaxFds $ cfg
       myHints = defaultHints { addrFlags = [AI_PASSIVE]
                              , addrSocketType = Stream }
-#ifndef USE_GHC_IO_MANAGER
+#if !defined(USE_GHC_IO_MANAGER)
   ensureIOManagerIsRunning
 #endif
   setResourceLimit ResourceOpenFiles
