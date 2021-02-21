@@ -40,9 +40,8 @@ module GHC.Rename.Env (
         lookupGreAvailRn,
 
         -- Rebindable Syntax
-        lookupSyntax, lookupSyntaxExpr, lookupSyntaxNames,
-        lookupSyntaxName,
-        lookupIfThenElse,
+        lookupSyntax, lookupSyntaxExpr, lookupSyntaxName, lookupSyntaxNames,
+        lookupIfThenElse, lookupReboundOrOrigName,
 
         -- QualifiedDo
         lookupQualifiedDoExpr, lookupQualifiedDo,
@@ -2066,3 +2065,19 @@ badOrigBinding name
     -- (See #13968.)
   where
     occ = rdrNameOcc $ filterCTuple name
+
+-- When rebindable syntax is on retrieve the name in scope otherwise
+-- the name defined in the provided module.
+lookupReboundOrOrigName :: Module -> OccName -> RnM Name
+lookupReboundOrOrigName mod occName = do
+  mName <- lookupRebound (occNameFS occName)
+  case mName of
+    Just (L _ name) -> pure name -- Rebindable on; name is the one in scope.
+    Nothing -> -- Rebindable off; use the name from mod.
+      lookupOccRn (mkOrig mod occName) -- Errors out if the name isn't there.
+  where
+    lookupRebound nameStr = do
+      rebind <- xoptM LangExt.RebindableSyntax
+      if rebind
+        then (\nm -> Just (L (nameSrcSpan nm) nm)) <$>  lookupOccRn (mkVarUnqual nameStr)
+        else pure Nothing
