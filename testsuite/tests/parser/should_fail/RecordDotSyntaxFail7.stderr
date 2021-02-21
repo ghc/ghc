@@ -1,0 +1,4 @@
+[1 of 2] Compiling RecordDotSyntaxA ( RecordDotSyntaxA.hs, RecordDotSyntaxA.o )
+[2 of 2] Compiling Main             ( RecordDotSyntaxFail7.hs, RecordDotSyntaxFail7.o )
+
+RecordDotSyntaxFail7.hs:9:16: parse error on input ‘A.foo’
