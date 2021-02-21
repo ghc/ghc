@@ -59,7 +59,7 @@ getWSErrorDescr(int err)
   case WSASYSNOTREADY:     return "Network subsystem is unavailable (WSASYSNOTREADY)";
   case WSAVERNOTSUPPORTED: return "Winsock.dll version out of range (WSAVERNOTSUPPORTED)";
   case WSANOTINITIALISED:  return "Successful WSAStartup not yet performed (WSANOTINITIALISED)";
-#ifdef WSATYPE_NOT_FOUND
+#if defined(WSATYPE_NOT_FOUND)
   case WSATYPE_NOT_FOUND:  return "Class type not found (WSATYPE_NOT_FOUND)";
 #endif
   case WSAHOST_NOT_FOUND:  return "Host not found (WSAHOST_NOT_FOUND)";

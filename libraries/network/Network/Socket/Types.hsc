@@ -311,19 +311,19 @@ packSocketType' stype = case Just stype of
     -- the Just above is to disable GHC's overlapping pattern
     -- detection: see comments for packSocketOption
     Just NoSocketType -> Just 0
-#ifdef SOCK_STREAM
+#if defined(SOCK_STREAM)
     Just Stream -> Just #const SOCK_STREAM
 #endif
-#ifdef SOCK_DGRAM
+#if defined(SOCK_DGRAM)
     Just Datagram -> Just #const SOCK_DGRAM
 #endif
-#ifdef SOCK_RAW
+#if defined(SOCK_RAW)
     Just Raw -> Just #const SOCK_RAW
 #endif
-#ifdef SOCK_RDM
+#if defined(SOCK_RDM)
     Just RDM -> Just #const SOCK_RDM
 #endif
-#ifdef SOCK_SEQPACKET
+#if defined(SOCK_SEQPACKET)
     Just SeqPacket -> Just #const SOCK_SEQPACKET
 #endif
 
@@ -345,19 +345,19 @@ packSocketTypeOrThrow caller stype = maybe err return (packSocketType' stype)
 unpackSocketType:: CInt -> Maybe SocketType
 unpackSocketType t = case t of
         0 -> Just NoSocketType
-#ifdef SOCK_STREAM
+#if defined(SOCK_STREAM)
         (#const SOCK_STREAM) -> Just Stream
 #endif
-#ifdef SOCK_DGRAM
+#if defined(SOCK_DGRAM)
         (#const SOCK_DGRAM) -> Just Datagram
 #endif
-#ifdef SOCK_RAW
+#if defined(SOCK_RAW)
         (#const SOCK_RAW) -> Just Raw
 #endif
-#ifdef SOCK_RDM
+#if defined(SOCK_RDM)
         (#const SOCK_RDM) -> Just RDM
 #endif
-#ifdef SOCK_SEQPACKET
+#if defined(SOCK_SEQPACKET)
         (#const SOCK_SEQPACKET) -> Just SeqPacket
 #endif
         _ -> Nothing
@@ -464,199 +464,199 @@ packFamily' f = case Just f of
     -- the Just above is to disable GHC's overlapping pattern
     -- detection: see comments for packSocketOption
     Just AF_UNSPEC -> Just #const AF_UNSPEC
-#ifdef AF_UNIX
+#if defined(AF_UNIX)
     Just AF_UNIX -> Just #const AF_UNIX
 #endif
-#ifdef AF_INET
+#if defined(AF_INET)
     Just AF_INET -> Just #const AF_INET
 #endif
-#ifdef AF_INET6
+#if defined(AF_INET6)
     Just AF_INET6 -> Just #const AF_INET6
 #endif
-#ifdef AF_IMPLINK
+#if defined(AF_IMPLINK)
     Just AF_IMPLINK -> Just #const AF_IMPLINK
 #endif
-#ifdef AF_PUP
+#if defined(AF_PUP)
     Just AF_PUP -> Just #const AF_PUP
 #endif
-#ifdef AF_CHAOS
+#if defined(AF_CHAOS)
     Just AF_CHAOS -> Just #const AF_CHAOS
 #endif
-#ifdef AF_NS
+#if defined(AF_NS)
     Just AF_NS -> Just #const AF_NS
 #endif
-#ifdef AF_NBS
+#if defined(AF_NBS)
     Just AF_NBS -> Just #const AF_NBS
 #endif
-#ifdef AF_ECMA
+#if defined(AF_ECMA)
     Just AF_ECMA -> Just #const AF_ECMA
 #endif
-#ifdef AF_DATAKIT
+#if defined(AF_DATAKIT)
     Just AF_DATAKIT -> Just #const AF_DATAKIT
 #endif
-#ifdef AF_CCITT
+#if defined(AF_CCITT)
     Just AF_CCITT -> Just #const AF_CCITT
 #endif
-#ifdef AF_SNA
+#if defined(AF_SNA)
     Just AF_SNA -> Just #const AF_SNA
 #endif
-#ifdef AF_DECnet
+#if defined(AF_DECnet)
     Just AF_DECnet -> Just #const AF_DECnet
 #endif
-#ifdef AF_DLI
+#if defined(AF_DLI)
     Just AF_DLI -> Just #const AF_DLI
 #endif
-#ifdef AF_LAT
+#if defined(AF_LAT)
     Just AF_LAT -> Just #const AF_LAT
 #endif
-#ifdef AF_HYLINK
+#if defined(AF_HYLINK)
     Just AF_HYLINK -> Just #const AF_HYLINK
 #endif
-#ifdef AF_APPLETALK
+#if defined(AF_APPLETALK)
     Just AF_APPLETALK -> Just #const AF_APPLETALK
 #endif
-#ifdef AF_ROUTE
+#if defined(AF_ROUTE)
     Just AF_ROUTE -> Just #const AF_ROUTE
 #endif
-#ifdef AF_NETBIOS
+#if defined(AF_NETBIOS)
     Just AF_NETBIOS -> Just #const AF_NETBIOS
 #endif
-#ifdef AF_NIT
+#if defined(AF_NIT)
     Just AF_NIT -> Just #const AF_NIT
 #endif
-#ifdef AF_802
+#if defined(AF_802)
     Just AF_802 -> Just #const AF_802
 #endif
-#ifdef AF_ISO
+#if defined(AF_ISO)
     Just AF_ISO -> Just #const AF_ISO
 #endif
-#ifdef AF_OSI
+#if defined(AF_OSI)
     Just AF_OSI -> Just #const AF_OSI
 #endif
-#ifdef AF_NETMAN
+#if defined(AF_NETMAN)
     Just AF_NETMAN -> Just #const AF_NETMAN
 #endif
-#ifdef AF_X25
+#if defined(AF_X25)
     Just AF_X25 -> Just #const AF_X25
 #endif
-#ifdef AF_AX25
+#if defined(AF_AX25)
     Just AF_AX25 -> Just #const AF_AX25
 #endif
-#ifdef AF_OSINET
+#if defined(AF_OSINET)
     Just AF_OSINET -> Just #const AF_OSINET
 #endif
-#ifdef AF_GOSSIP
+#if defined(AF_GOSSIP)
     Just AF_GOSSIP -> Just #const AF_GOSSIP
 #endif
-#ifdef AF_IPX
+#if defined(AF_IPX)
     Just AF_IPX -> Just #const AF_IPX
 #endif
-#ifdef Pseudo_AF_XTP
+#if defined(Pseudo_AF_XTP)
     Just Pseudo_AF_XTP -> Just #const Pseudo_AF_XTP
 #endif
-#ifdef AF_CTF
+#if defined(AF_CTF)
     Just AF_CTF -> Just #const AF_CTF
 #endif
-#ifdef AF_WAN
+#if defined(AF_WAN)
     Just AF_WAN -> Just #const AF_WAN
 #endif
-#ifdef AF_SDL
+#if defined(AF_SDL)
     Just AF_SDL -> Just #const AF_SDL
 #endif
-#ifdef AF_NETWARE
+#if defined(AF_NETWARE)
     Just AF_NETWARE -> Just #const AF_NETWARE
 #endif
-#ifdef AF_NDD
+#if defined(AF_NDD)
     Just AF_NDD -> Just #const AF_NDD
 #endif
-#ifdef AF_INTF
+#if defined(AF_INTF)
     Just AF_INTF -> Just #const AF_INTF
 #endif
-#ifdef AF_COIP
+#if defined(AF_COIP)
     Just AF_COIP -> Just #const AF_COIP
 #endif
-#ifdef AF_CNT
+#if defined(AF_CNT)
     Just AF_CNT -> Just #const AF_CNT
 #endif
-#ifdef Pseudo_AF_RTIP
+#if defined(Pseudo_AF_RTIP)
     Just Pseudo_AF_RTIP -> Just #const Pseudo_AF_RTIP
 #endif
-#ifdef Pseudo_AF_PIP
+#if defined(Pseudo_AF_PIP)
     Just Pseudo_AF_PIP -> Just #const Pseudo_AF_PIP
 #endif
-#ifdef AF_SIP
+#if defined(AF_SIP)
     Just AF_SIP -> Just #const AF_SIP
 #endif
-#ifdef AF_ISDN
+#if defined(AF_ISDN)
     Just AF_ISDN -> Just #const AF_ISDN
 #endif
-#ifdef Pseudo_AF_KEY
+#if defined(Pseudo_AF_KEY)
     Just Pseudo_AF_KEY -> Just #const Pseudo_AF_KEY
 #endif
-#ifdef AF_NATM
+#if defined(AF_NATM)
     Just AF_NATM -> Just #const AF_NATM
 #endif
-#ifdef AF_ARP
+#if defined(AF_ARP)
     Just AF_ARP -> Just #const AF_ARP
 #endif
-#ifdef Pseudo_AF_HDRCMPLT
+#if defined(Pseudo_AF_HDRCMPLT)
     Just Pseudo_AF_HDRCMPLT -> Just #const Pseudo_AF_HDRCMPLT
 #endif
-#ifdef AF_ENCAP
+#if defined(AF_ENCAP)
     Just AF_ENCAP -> Just #const AF_ENCAP
 #endif
-#ifdef AF_LINK
+#if defined(AF_LINK)
     Just AF_LINK -> Just #const AF_LINK
 #endif
-#ifdef AF_RAW
+#if defined(AF_RAW)
     Just AF_RAW -> Just #const AF_RAW
 #endif
-#ifdef AF_RIF
+#if defined(AF_RIF)
     Just AF_RIF -> Just #const AF_RIF
 #endif
-#ifdef AF_NETROM
+#if defined(AF_NETROM)
     Just AF_NETROM -> Just #const AF_NETROM
 #endif
-#ifdef AF_BRIDGE
+#if defined(AF_BRIDGE)
     Just AF_BRIDGE -> Just #const AF_BRIDGE
 #endif
-#ifdef AF_ATMPVC
+#if defined(AF_ATMPVC)
     Just AF_ATMPVC -> Just #const AF_ATMPVC
 #endif
-#ifdef AF_ROSE
+#if defined(AF_ROSE)
     Just AF_ROSE -> Just #const AF_ROSE
 #endif
-#ifdef AF_NETBEUI
+#if defined(AF_NETBEUI)
     Just AF_NETBEUI -> Just #const AF_NETBEUI
 #endif
-#ifdef AF_SECURITY
+#if defined(AF_SECURITY)
     Just AF_SECURITY -> Just #const AF_SECURITY
 #endif
-#ifdef AF_PACKET
+#if defined(AF_PACKET)
     Just AF_PACKET -> Just #const AF_PACKET
 #endif
-#ifdef AF_ASH
+#if defined(AF_ASH)
     Just AF_ASH -> Just #const AF_ASH
 #endif
-#ifdef AF_ECONET
+#if defined(AF_ECONET)
     Just AF_ECONET -> Just #const AF_ECONET
 #endif
-#ifdef AF_ATMSVC
+#if defined(AF_ATMSVC)
     Just AF_ATMSVC -> Just #const AF_ATMSVC
 #endif
-#ifdef AF_IRDA
+#if defined(AF_IRDA)
     Just AF_IRDA -> Just #const AF_IRDA
 #endif
-#ifdef AF_PPPOX
+#if defined(AF_PPPOX)
     Just AF_PPPOX -> Just #const AF_PPPOX
 #endif
-#ifdef AF_WANPIPE
+#if defined(AF_WANPIPE)
     Just AF_WANPIPE -> Just #const AF_WANPIPE
 #endif
-#ifdef AF_BLUETOOTH
+#if defined(AF_BLUETOOTH)
     Just AF_BLUETOOTH -> Just #const AF_BLUETOOTH
 #endif
-#ifdef AF_CAN
+#if defined(AF_CAN)
     Just AF_CAN -> Just #const AF_CAN
 #endif
     _ -> Nothing
@@ -667,201 +667,201 @@ packFamily' f = case Just f of
 unpackFamily :: CInt -> Family
 unpackFamily f = case f of
         (#const AF_UNSPEC) -> AF_UNSPEC
-#ifdef AF_UNIX
+#if defined(AF_UNIX)
         (#const AF_UNIX) -> AF_UNIX
 #endif
-#ifdef AF_INET
+#if defined(AF_INET)
         (#const AF_INET) -> AF_INET
 #endif
-#ifdef AF_INET6
+#if defined(AF_INET6)
         (#const AF_INET6) -> AF_INET6
 #endif
-#ifdef AF_IMPLINK
+#if defined(AF_IMPLINK)
         (#const AF_IMPLINK) -> AF_IMPLINK
 #endif
-#ifdef AF_PUP
+#if defined(AF_PUP)
         (#const AF_PUP) -> AF_PUP
 #endif
-#ifdef AF_CHAOS
+#if defined(AF_CHAOS)
         (#const AF_CHAOS) -> AF_CHAOS
 #endif
-#ifdef AF_NS
+#if defined(AF_NS)
         (#const AF_NS) -> AF_NS
 #endif
-#ifdef AF_NBS
+#if defined(AF_NBS)
         (#const AF_NBS) -> AF_NBS
 #endif
-#ifdef AF_ECMA
+#if defined(AF_ECMA)
         (#const AF_ECMA) -> AF_ECMA
 #endif
-#ifdef AF_DATAKIT
+#if defined(AF_DATAKIT)
         (#const AF_DATAKIT) -> AF_DATAKIT
 #endif
-#ifdef AF_CCITT
+#if defined(AF_CCITT)
         (#const AF_CCITT) -> AF_CCITT
 #endif
-#ifdef AF_SNA
+#if defined(AF_SNA)
         (#const AF_SNA) -> AF_SNA
 #endif
-#ifdef AF_DECnet
+#if defined(AF_DECnet)
         (#const AF_DECnet) -> AF_DECnet
 #endif
-#ifdef AF_DLI
+#if defined(AF_DLI)
         (#const AF_DLI) -> AF_DLI
 #endif
-#ifdef AF_LAT
+#if defined(AF_LAT)
         (#const AF_LAT) -> AF_LAT
 #endif
-#ifdef AF_HYLINK
+#if defined(AF_HYLINK)
         (#const AF_HYLINK) -> AF_HYLINK
 #endif
-#ifdef AF_APPLETALK
+#if defined(AF_APPLETALK)
         (#const AF_APPLETALK) -> AF_APPLETALK
 #endif
-#ifdef AF_ROUTE
+#if defined(AF_ROUTE)
         (#const AF_ROUTE) -> AF_ROUTE
 #endif
-#ifdef AF_NETBIOS
+#if defined(AF_NETBIOS)
         (#const AF_NETBIOS) -> AF_NETBIOS
 #endif
-#ifdef AF_NIT
+#if defined(AF_NIT)
         (#const AF_NIT) -> AF_NIT
 #endif
-#ifdef AF_802
+#if defined(AF_802)
         (#const AF_802) -> AF_802
 #endif
-#ifdef AF_ISO
+#if defined(AF_ISO)
         (#const AF_ISO) -> AF_ISO
 #endif
-#ifdef AF_OSI
-# if (!defined(AF_ISO)) || (defined(AF_ISO) && (AF_ISO != AF_OSI))
+#if defined(AF_OSI)
+# if (!defined((AF_ISO)) || (defined((AF_ISO) && (AF_ISO != AF_OSI))
         (#const AF_OSI) -> AF_OSI
 # endif
 #endif
-#ifdef AF_NETMAN
+#if defined(AF_NETMAN)
         (#const AF_NETMAN) -> AF_NETMAN
 #endif
-#ifdef AF_X25
+#if defined(AF_X25)
         (#const AF_X25) -> AF_X25
 #endif
-#ifdef AF_AX25
+#if defined(AF_AX25)
         (#const AF_AX25) -> AF_AX25
 #endif
-#ifdef AF_OSINET
+#if defined(AF_OSINET)
         (#const AF_OSINET) -> AF_OSINET
 #endif
-#ifdef AF_GOSSIP
+#if defined(AF_GOSSIP)
         (#const AF_GOSSIP) -> AF_GOSSIP
 #endif
 #if defined(AF_IPX) && (!defined(AF_NS) || AF_NS != AF_IPX)
         (#const AF_IPX) -> AF_IPX
 #endif
-#ifdef Pseudo_AF_XTP
+#if defined(Pseudo_AF_XTP)
         (#const Pseudo_AF_XTP) -> Pseudo_AF_XTP
 #endif
-#ifdef AF_CTF
+#if defined(AF_CTF)
         (#const AF_CTF) -> AF_CTF
 #endif
-#ifdef AF_WAN
+#if defined(AF_WAN)
         (#const AF_WAN) -> AF_WAN
 #endif
-#ifdef AF_SDL
+#if defined(AF_SDL)
         (#const AF_SDL) -> AF_SDL
 #endif
-#ifdef AF_NETWARE
+#if defined(AF_NETWARE)
         (#const AF_NETWARE) -> AF_NETWARE
 #endif
-#ifdef AF_NDD
+#if defined(AF_NDD)
         (#const AF_NDD) -> AF_NDD
 #endif
-#ifdef AF_INTF
+#if defined(AF_INTF)
         (#const AF_INTF) -> AF_INTF
 #endif
-#ifdef AF_COIP
+#if defined(AF_COIP)
         (#const AF_COIP) -> AF_COIP
 #endif
-#ifdef AF_CNT
+#if defined(AF_CNT)
         (#const AF_CNT) -> AF_CNT
 #endif
-#ifdef Pseudo_AF_RTIP
+#if defined(Pseudo_AF_RTIP)
         (#const Pseudo_AF_RTIP) -> Pseudo_AF_RTIP
 #endif
-#ifdef Pseudo_AF_PIP
+#if defined(Pseudo_AF_PIP)
         (#const Pseudo_AF_PIP) -> Pseudo_AF_PIP
 #endif
-#ifdef AF_SIP
+#if defined(AF_SIP)
         (#const AF_SIP) -> AF_SIP
 #endif
-#ifdef AF_ISDN
+#if defined(AF_ISDN)
         (#const AF_ISDN) -> AF_ISDN
 #endif
-#ifdef Pseudo_AF_KEY
+#if defined(Pseudo_AF_KEY)
         (#const Pseudo_AF_KEY) -> Pseudo_AF_KEY
 #endif
-#ifdef AF_NATM
+#if defined(AF_NATM)
         (#const AF_NATM) -> AF_NATM
 #endif
-#ifdef AF_ARP
+#if defined(AF_ARP)
         (#const AF_ARP) -> AF_ARP
 #endif
-#ifdef Pseudo_AF_HDRCMPLT
+#if defined(Pseudo_AF_HDRCMPLT)
         (#const Pseudo_AF_HDRCMPLT) -> Pseudo_AF_HDRCMPLT
 #endif
-#ifdef AF_ENCAP
+#if defined(AF_ENCAP)
         (#const AF_ENCAP) -> AF_ENCAP
 #endif
-#ifdef AF_LINK
+#if defined(AF_LINK)
         (#const AF_LINK) -> AF_LINK
 #endif
-#ifdef AF_RAW
+#if defined(AF_RAW)
         (#const AF_RAW) -> AF_RAW
 #endif
-#ifdef AF_RIF
+#if defined(AF_RIF)
         (#const AF_RIF) -> AF_RIF
 #endif
-#ifdef AF_NETROM
+#if defined(AF_NETROM)
         (#const AF_NETROM) -> AF_NETROM
 #endif
-#ifdef AF_BRIDGE
+#if defined(AF_BRIDGE)
         (#const AF_BRIDGE) -> AF_BRIDGE
 #endif
-#ifdef AF_ATMPVC
+#if defined(AF_ATMPVC)
         (#const AF_ATMPVC) -> AF_ATMPVC
 #endif
-#ifdef AF_ROSE
+#if defined(AF_ROSE)
         (#const AF_ROSE) -> AF_ROSE
 #endif
-#ifdef AF_NETBEUI
+#if defined(AF_NETBEUI)
         (#const AF_NETBEUI) -> AF_NETBEUI
 #endif
-#ifdef AF_SECURITY
+#if defined(AF_SECURITY)
         (#const AF_SECURITY) -> AF_SECURITY
 #endif
-#ifdef AF_PACKET
+#if defined(AF_PACKET)
         (#const AF_PACKET) -> AF_PACKET
 #endif
-#ifdef AF_ASH
+#if defined(AF_ASH)
         (#const AF_ASH) -> AF_ASH
 #endif
-#ifdef AF_ECONET
+#if defined(AF_ECONET)
         (#const AF_ECONET) -> AF_ECONET
 #endif
-#ifdef AF_ATMSVC
+#if defined(AF_ATMSVC)
         (#const AF_ATMSVC) -> AF_ATMSVC
 #endif
-#ifdef AF_IRDA
+#if defined(AF_IRDA)
         (#const AF_IRDA) -> AF_IRDA
 #endif
-#ifdef AF_PPPOX
+#if defined(AF_PPPOX)
         (#const AF_PPPOX) -> AF_PPPOX
 #endif
-#ifdef AF_WANPIPE
+#if defined(AF_WANPIPE)
         (#const AF_WANPIPE) -> AF_WANPIPE
 #endif
-#ifdef AF_BLUETOOTH
+#if defined(AF_BLUETOOTH)
         (#const AF_BLUETOOTH) -> AF_BLUETOOTH
 #endif
-#ifdef AF_CAN
+#if defined(AF_CAN)
         (#const AF_CAN) -> AF_CAN
 #endif
         unknown -> error $
@@ -1019,7 +1019,7 @@ type CSaFamily = (#type sa_family_t)
 -- in that the value of the argument /is/ used.
 sizeOfSockAddr :: SockAddr -> Int
 #if defined(DOMAIN_SOCKET_SUPPORT)
-# ifdef linux_HOST_OS
+# if defined(linux_HOST_OS)
 -- http://man7.org/linux/man-pages/man7/unix.7.html says:
 -- "an abstract socket address is distinguished (from a
 -- pathname socket) by the fact that sun_path[0] is a null byte

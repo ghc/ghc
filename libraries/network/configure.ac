@@ -7,52 +7,52 @@ dnl See also HsNet.h
 ac_includes_default="#define _GNU_SOURCE 1  /* for struct ucred on Linux */
 $ac_includes_default
 
-#ifdef _WIN32
+#if defined(_WIN32)
 # include <winsock2.h>
 # include <ws2tcpip.h>
 # define IPV6_V6ONLY 27
 #endif
 
-#ifdef HAVE_LIMITS_H
+#if defined(HAVE_LIMITS_H)
 # include <limits.h>
 #endif
-#ifdef HAVE_STDLIB_H
+#if defined(HAVE_STDLIB_H)
 # include <stdlib.h>
 #endif
-#ifdef HAVE_UNISTD_H
+#if defined(HAVE_UNISTD_H)
 #include <unistd.h>
 #endif
-#ifdef HAVE_SYS_TYPES_H
+#if defined(HAVE_SYS_TYPES_H)
 # include <sys/types.h>
 #endif
-#ifdef HAVE_FCNTL_H
+#if defined(HAVE_FCNTL_H)
 # include <fcntl.h>
 #endif
-#ifdef HAVE_SYS_UIO_H
+#if defined(HAVE_SYS_UIO_H)
 # include <sys/uio.h>
 #endif
-#ifdef HAVE_SYS_SOCKET_H
+#if defined(HAVE_SYS_SOCKET_H)
 # include <sys/socket.h>
 #endif
-#ifdef HAVE_NETINET_IN_H
+#if defined(HAVE_NETINET_IN_H)
 # include <netinet/in.h>
 #endif
-#ifdef HAVE_NETINET_TCP_H
+#if defined(HAVE_NETINET_TCP_H)
 # include <netinet/tcp.h>
 #endif
-#ifdef HAVE_SYS_UN_H
+#if defined(HAVE_SYS_UN_H)
 # include <sys/un.h>
 #endif
-#ifdef HAVE_ARPA_INET_H
+#if defined(HAVE_ARPA_INET_H)
 # include <arpa/inet.h>
 #endif
-#ifdef HAVE_NETDB_H
+#if defined(HAVE_NETDB_H)
 #include <netdb.h>
 #endif
-#ifdef HAVE_NET_IF_H
+#if defined(HAVE_NET_IF_H)
 # include <net/if.h>
 #endif
-#ifdef HAVE_NETIOAPI_H
+#if defined(HAVE_NETIOAPI_H)
 # include <netioapi.h>
 #endif
 "

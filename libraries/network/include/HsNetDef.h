@@ -1,4 +1,4 @@
-#ifndef HSNETDEF_H
+#if !defined(HSNETDEF_H)
 #define HSNETDEF_H
 
 #include "HsNetworkConfig.h"
@@ -20,7 +20,7 @@
 # undef HAVE_STRUCT_UCRED_SO_PEERCRED
 #endif
 
-#ifdef HAVE_ACCEPT4
+#if defined(HAVE_ACCEPT4)
 # define HAVE_ADVANCED_SOCKET_FLAGS 1
 #else
 # undef HAVE_ADVANCED_SOCKET_FLAGS
