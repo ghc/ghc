@@ -9,6 +9,7 @@ import GHC.Hs.Extension
 import GHC.Hs.Lit
 import GHC.Driver.Hooks
 import GHC.Tc.Utils.Monad
+import GHC.Parser.Annotation
 
 plugin :: Plugin
 plugin = defaultPlugin { driverPlugin = hooksP }
@@ -33,7 +34,7 @@ fakeRunMeta opts (MetaE r) _ = do
   pure $ r zero
 
   where zero :: LHsExpr GhcPs
-        zero = L noSrcSpan $ HsLit NoExtField $
+        zero = noLocA $ HsLit noAnn $
           HsInt NoExtField (mkIntegralLit (0 :: Int))
 
 fakeRunMeta _ _ _ = error "fakeRunMeta: unimplemented"
