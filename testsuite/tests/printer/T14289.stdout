@@ -14,3 +14,19 @@ T14289.ppr.hs:(7,2)-(9,26): Splicing declarations
     data Foo a
       = Foo a
       deriving (C a)
+T14289.hs:10:2-43: Splicing declarations
+    [d| data Foo a
+          = Foo a
+          deriving (C a) |]
+  ======>
+    data Foo a
+      = Foo a
+      deriving (C a)
+T14289.ppr.hs:10:2-43: Splicing declarations
+    [d| data Foo a
+          = Foo a
+          deriving (C a) |]
+  ======>
+    data Foo a
+      = Foo a
+      deriving (C a)
