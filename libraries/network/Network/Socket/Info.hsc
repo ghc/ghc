@@ -330,7 +330,7 @@ foreign import ccall safe "hsnet_freeaddrinfo"
 
 gai_strerror :: CInt -> IO String
 
-#ifdef HAVE_GAI_STRERROR
+#if defined(HAVE_GAI_STRERROR)
 gai_strerror n = c_gai_strerror n >>= peekCString
 
 foreign import ccall safe "gai_strerror"

@@ -19,20 +19,20 @@ import Network.Socket.Types
 #if defined(HAVE_GETPEEREID)
 import System.IO.Error (catchIOError)
 #endif
-#ifdef HAVE_STRUCT_UCRED_SO_PEERCRED
+#if defined(HAVE_STRUCT_UCRED_SO_PEERCRED)
 import Foreign.Marshal.Utils (with)
 #endif
-#ifdef HAVE_GETPEEREID
+#if defined(HAVE_GETPEEREID)
 import Foreign.Marshal.Alloc (alloca)
 #endif
-#ifdef DOMAIN_SOCKET_SUPPORT
+#if defined(DOMAIN_SOCKET_SUPPORT)
 import Foreign.Marshal.Alloc (allocaBytes)
 import Foreign.Marshal.Array (peekArray)
 
 import Network.Socket.Fcntl
 import Network.Socket.Internal
 #endif
-#ifdef HAVE_STRUCT_UCRED_SO_PEERCRED
+#if defined(HAVE_STRUCT_UCRED_SO_PEERCRED)
 import Network.Socket.Options (c_getsockopt)
 #endif
 
@@ -49,7 +49,7 @@ import Network.Socket.Options (c_getsockopt)
 --
 --   Since 2.7.0.0.
 getPeerCredential :: Socket -> IO (Maybe CUInt, Maybe CUInt, Maybe CUInt)
-#ifdef HAVE_STRUCT_UCRED_SO_PEERCRED
+#if defined(HAVE_STRUCT_UCRED_SO_PEERCRED)
 getPeerCredential sock = do
     (pid, uid, gid) <- getPeerCred sock
     if uid == maxBound then
@@ -72,7 +72,7 @@ getPeerCredential _ = return (Nothing, Nothing, Nothing)
 --
 -- Only available on platforms that support SO_PEERCRED.
 getPeerCred :: Socket -> IO (CUInt, CUInt, CUInt)
-#ifdef HAVE_STRUCT_UCRED_SO_PEERCRED
+#if defined(HAVE_STRUCT_UCRED_SO_PEERCRED)
 getPeerCred s = do
   let sz = (#const sizeof(struct ucred))
   withFdSocket s $ \fd -> allocaBytes sz $ \ ptr_cr ->
