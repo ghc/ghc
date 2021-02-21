@@ -16,7 +16,7 @@ sortBy cmp = []
   where
     sequences (a:b:xs)
       | a `cmp` b == GT = descending b [a]  xs
-      | otherwise       = ascending  b (a:) xs
+      | otherwise       = ascending  b (a :) xs
     sequences xs = [xs]
 
 --    descending :: a -> [a] -> [a] -> [[a]]
