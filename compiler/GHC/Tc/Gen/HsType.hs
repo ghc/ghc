@@ -53,7 +53,7 @@ module GHC.Tc.Gen.HsType (
         tcHsLiftedTypeNC, tcHsOpenTypeNC,
         tcInferLHsTypeKind, tcInferLHsType, tcInferLHsTypeUnsaturated,
         tcCheckLHsType,
-        tcHsMbContext, tcHsContext, tcLHsPredType,
+        tcHsContext, tcLHsPredType,
 
         kindGeneralizeAll, kindGeneralizeSome, kindGeneralizeNone,
 
@@ -1112,7 +1112,7 @@ tc_hs_type mode (HsForAllTy { hst_tele = tele, hst_body = ty }) exp_kind
        ; return (mkForAllTys tv_bndrs ty') }
 
 tc_hs_type mode (HsQualTy { hst_ctxt = ctxt, hst_body = rn_ty }) exp_kind
-  | null (unLoc ctxt)
+  | null (fromMaybeContext ctxt)
   = tc_lhs_type mode rn_ty exp_kind
 
   -- See Note [Body kind of a HsQualTy]
@@ -1860,18 +1860,16 @@ checkExpectedKind hs_ty ty act_kind exp_kind
       n_to_inst         = n_act_invis_bndrs - n_exp_invis_bndrs
 
 ---------------------------
-tcHsMbContext :: Maybe (LHsContext GhcRn) -> TcM [PredType]
-tcHsMbContext Nothing    = return []
-tcHsMbContext (Just cxt) = tcHsContext cxt
 
-tcHsContext :: LHsContext GhcRn -> TcM [PredType]
+tcHsContext :: Maybe (LHsContext GhcRn) -> TcM [PredType]
 tcHsContext cxt = tc_hs_context typeLevelMode cxt
 
 tcLHsPredType :: LHsType GhcRn -> TcM PredType
 tcLHsPredType pred = tc_lhs_pred typeLevelMode pred
 
-tc_hs_context :: TcTyMode -> LHsContext GhcRn -> TcM [PredType]
-tc_hs_context mode ctxt = mapM (tc_lhs_pred mode) (unLoc ctxt)
+tc_hs_context :: TcTyMode -> Maybe (LHsContext GhcRn) -> TcM [PredType]
+tc_hs_context _ Nothing = return []
+tc_hs_context mode (Just ctxt) = mapM (tc_lhs_pred mode) (unLoc ctxt)
 
 tc_lhs_pred :: TcTyMode -> LHsType GhcRn -> TcM PredType
 tc_lhs_pred mode pred = tc_lhs_type mode pred constraintKind
@@ -3775,7 +3773,7 @@ tcHsPartialSigType
 tcHsPartialSigType ctxt sig_ty
   | HsWC { hswc_ext  = sig_wcs, hswc_body = sig_ty } <- sig_ty
   , L _ (HsSig{sig_bndrs = hs_outer_bndrs, sig_body = body_ty}) <- sig_ty
-  , (L _ hs_ctxt, hs_tau) <- splitLHsQualTy body_ty
+  , (hs_ctxt, hs_tau) <- splitLHsQualTy body_ty
   = addSigCtxt ctxt sig_ty $
     do { mode <- mkHoleMode TypeLevel HM_Sig
        ; (outer_bndrs, (wcs, wcx, theta, tau))
@@ -3829,8 +3827,9 @@ tcHsPartialSigType ctxt sig_ty
        ; traceTc "tcHsPartialSigType" (ppr tv_prs)
        ; return (wcs, wcx, tv_prs, theta, tau) }
 
-tcPartialContext :: TcTyMode -> HsContext GhcRn -> TcM (TcThetaType, Maybe TcType)
-tcPartialContext mode hs_theta
+tcPartialContext :: TcTyMode -> Maybe (LHsContext GhcRn) -> TcM (TcThetaType, Maybe TcType)
+tcPartialContext _ Nothing = return ([], Nothing)
+tcPartialContext mode (Just (L _ hs_theta))
   | Just (hs_theta1, hs_ctxt_last) <- snocView hs_theta
   , L wc_loc ty@(HsWildCardTy _) <- ignoreParens hs_ctxt_last
   = do { wc_tv_ty <- setSrcSpan wc_loc $
