@@ -769,7 +769,6 @@ absentSumFieldErrorName :: Name
 raiseOverflowName, raiseUnderflowName, raiseDivZeroName :: Name
 
 recSelErrorName     = err_nm "recSelError"     recSelErrorIdKey     rEC_SEL_ERROR_ID
-absentErrorName     = err_nm "absentError"     absentErrorIdKey     aBSENT_ERROR_ID
 runtimeErrorName    = err_nm "runtimeError"    runtimeErrorIdKey    rUNTIME_ERROR_ID
 recConErrorName     = err_nm "recConError"     recConErrorIdKey     rEC_CON_ERROR_ID
 patErrorName        = err_nm "patError"        patErrorIdKey        pAT_ERROR_ID
@@ -859,6 +858,13 @@ absentSumFieldErrorName
       (fsLit "absentSumFieldError")
       absentSumFieldErrorIdKey
       aBSENT_SUM_FIELD_ERROR_ID
+
+absentErrorName
+   = mkWiredInIdName
+      gHC_PRIM_PANIC
+      (fsLit "absentError")
+      absentErrorIdKey
+      aBSENT_ERROR_ID
 
 raiseOverflowName
    = mkWiredInIdName
