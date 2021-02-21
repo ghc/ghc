@@ -621,7 +621,7 @@ gen_wrappers (Info _ entries)
         -- Performing WW on this module is harmful even, two reasons:
         --   1. Inferred strictness signatures are all bottom, which is a lie
         --   2. Doing the worker/wrapper split based on that information will
-        --      introduce references to Control.Exception.Base.absentError,
+        --      introduce references to absentError,
         --      which isn't available at this point.
      ++ "module GHC.PrimopWrappers where\n"
      ++ "import qualified GHC.Prim\n"
