@@ -73,8 +73,7 @@
         (HsDataDefn
          (NoExtField)
          (DataType)
-         ({ <no location info> }
-          [])
+         (Nothing)
          (Nothing)
          (Nothing)
          [({ DumpRenamedAst.hs:9:14-17 }
@@ -328,8 +327,7 @@
           (HsDataDefn
            (NoExtField)
            (NewType)
-           ({ <no location info> }
-            [])
+           (Nothing)
            (Nothing)
            (Just
             ({ DumpRenamedAst.hs:18:42-60 }
@@ -488,8 +486,7 @@
         (HsDataDefn
          (NoExtField)
          (DataType)
-         ({ <no location info> }
-          [])
+         (Nothing)
          (Nothing)
          (Nothing)
          [({ DumpRenamedAst.hs:21:21-29 }
