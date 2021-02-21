@@ -25,6 +25,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.SrcLoc
 import GHC.Tc.Types
+import GHC.Parser.Annotation
 
 import Control.Applicative
 import Control.Monad.IO.Class
@@ -99,7 +100,7 @@ mkMaps instances decls =
              -> ( [(Name, HsDocString)]
                 , [(Name, IntMap HsDocString)]
                 )
-    mappings (L (RealSrcSpan l _) decl, docStrs) =
+    mappings (L (SrcSpanAnn _ (RealSrcSpan l _)) decl, docStrs) =
            (dm, am)
       where
         doc = concatDocs docStrs
@@ -115,7 +116,7 @@ mkMaps instances decls =
         subNs = [ n | (n, _, _) <- subs ]
         dm = [(n, d) | (n, Just d) <- zip ns (repeat doc) ++ zip subNs subDocs]
         am = [(n, args) | n <- ns] ++ zip subNs subArgs
-    mappings (L (UnhelpfulSpan _) _, _) = ([], [])
+    mappings (L (SrcSpanAnn _ (UnhelpfulSpan _)) _, _) = ([], [])
 
     instanceMap :: Map RealSrcSpan Name
     instanceMap = M.fromList [(l, n) | n <- instances, RealSrcSpan l _ <- [getSrcSpan n] ]
@@ -134,8 +135,8 @@ looking at GHC sources). We can assume that commented instances are
 user-written. This lets us relate Names (from ClsInsts) to comments
 (associated with InstDecls and DerivDecls).
 -}
-
-getMainDeclBinder :: CollectPass (GhcPass p) => HsDecl (GhcPass p) -> [IdP (GhcPass p)]
+getMainDeclBinder :: (Anno (IdGhcP p) ~ SrcSpanAnnN, CollectPass (GhcPass p))
+                  => HsDecl (GhcPass p) -> [IdP (GhcPass p)]
 getMainDeclBinder (TyClD _ d) = [tcdName d]
 getMainDeclBinder (ValD _ d) =
   case collectHsBindBinders CollNoDictBinders d of
@@ -159,9 +160,9 @@ sigNameNoLoc _                             = []
 -- Extract the source location where an instance is defined. This is used
 -- to correlate InstDecls with their Instance/CoAxiom Names, via the
 -- instanceMap.
-getInstLoc :: InstDecl (GhcPass p) -> SrcSpan
+getInstLoc :: Anno (IdGhcP p) ~ SrcSpanAnnN => InstDecl (GhcPass p) -> SrcSpan
 getInstLoc = \case
-  ClsInstD _ (ClsInstDecl { cid_poly_ty = ty }) -> getLoc ty
+  ClsInstD _ (ClsInstDecl { cid_poly_ty = ty }) -> getLocA ty
   -- The Names of data and type family instances have their SrcSpan's attached
   -- to the *type constructor*. For example, the Name "D:R:Foo:Int" would have
   -- its SrcSpan attached here:
@@ -169,12 +170,12 @@ getInstLoc = \case
   --   type instance Foo Int = Bool
   --                 ^^^
   DataFamInstD _ (DataFamInstDecl
-    { dfid_eqn = FamEqn { feqn_tycon = L l _ }}) -> l
+    { dfid_eqn = FamEqn { feqn_tycon = L l _ }}) -> locA l
   -- Since CoAxioms' Names refer to the whole line for type family instances
   -- in particular, we need to dig a bit deeper to pull out the entire
   -- equation. This does not happen for data family instances, for some reason.
   TyFamInstD _ (TyFamInstDecl
-    { tfid_eqn = FamEqn { feqn_tycon = L l _ }}) -> l
+    { tfid_eqn = FamEqn { feqn_tycon = L l _ }}) -> locA l
 
 -- | Get all subordinate declarations inside a declaration, and their docs.
 -- A subordinate declaration is something like the associate type or data
@@ -187,7 +188,7 @@ subordinates instMap decl = case decl of
     DataFamInstDecl { dfid_eqn =
       FamEqn { feqn_tycon = L l _
              , feqn_rhs   = defn }} <- unLoc <$> cid_datafam_insts d
-    [ (n, [], IM.empty) | Just n <- [lookupSrcSpan l instMap] ] ++ dataSubs defn
+    [ (n, [], IM.empty) | Just n <- [lookupSrcSpan (locA l) instMap] ] ++ dataSubs defn
 
   InstD _ (DataFamInstD _ (DataFamInstDecl d))
     -> dataSubs (feqn_rhs d)
@@ -215,7 +216,8 @@ subordinates instMap decl = case decl of
         derivs  = [ (instName, [unLoc doc], IM.empty)
                   | (l, doc) <- concatMap (extract_deriv_clause_tys .
                                            deriv_clause_tys . unLoc) $
-                                unLoc $ dd_derivs dd
+                                -- unLoc $ dd_derivs dd
+                                dd_derivs dd
                   , Just instName <- [lookupSrcSpan l instMap] ]
 
         extract_deriv_clause_tys :: LDerivClauseTys GhcRn -> [(SrcSpan, LHsDocString)]
@@ -228,7 +230,7 @@ subordinates instMap decl = case decl of
         extract_deriv_ty (L l (HsSig{sig_body = L _ ty})) =
           case ty of
             -- deriving (C a {- ^ Doc comment -})
-            HsDocTy _ _ doc -> Just (l, doc)
+            HsDocTy _ _ doc -> Just (locA l, doc)
             _               -> Nothing
 
 -- | Extract constructor argument docs from inside constructor decls.
@@ -264,7 +266,7 @@ isValD _ = False
 -- | All the sub declarations of a class (that we handle), ordered by
 -- source location, with documentation attached if it exists.
 classDecls :: TyClDecl GhcRn -> [(LHsDecl GhcRn, [HsDocString])]
-classDecls class_ = filterDecls . collectDocs . sortLocated $ decls
+classDecls class_ = filterDecls . collectDocs . sortLocatedA $ decls
   where
     decls = docs ++ defs ++ sigs ++ ats
     docs  = mkDecls tcdDocs (DocD noExtField) class_
@@ -312,7 +314,7 @@ sigTypeDocs (HsSig{sig_body = body}) = typeDocs (unLoc body)
 -- | The top-level declarations of a module that we care about,
 -- ordered by source location, with documentation attached if it exists.
 topDecls :: HsGroup GhcRn -> [(LHsDecl GhcRn, [HsDocString])]
-topDecls = filterClasses . filterDecls . collectDocs . sortLocated . ungroup
+topDecls = filterClasses . filterDecls . collectDocs . sortLocatedA . ungroup
 
 -- | Take all declarations except pragmas, infix decls, rules from an 'HsGroup'.
 ungroup :: HsGroup GhcRn -> [LHsDecl GhcRn]
@@ -369,12 +371,12 @@ filterDecls = filter (isHandled . unXRec @p . fst)
 
 
 -- | Go through all class declarations and filter their sub-declarations
-filterClasses :: forall p doc. (UnXRec p, MapXRec p) => [(LHsDecl p, doc)] -> [(LHsDecl p, doc)]
-filterClasses = map (first (mapXRec @p filterClass))
+filterClasses :: forall p doc. (IsPass p) => [(LHsDecl (GhcPass p), doc)] -> [(LHsDecl (GhcPass p), doc)]
+filterClasses = map (first (mapLoc filterClass))
   where
     filterClass (TyClD x c@(ClassDecl {})) =
       TyClD x $ c { tcdSigs =
-        filter (liftA2 (||) (isUserSig . unXRec @p) isMinimalLSig) (tcdSigs c) }
+        filter (liftA2 (||) (isUserSig . unLoc) isMinimalLSig) (tcdSigs c) }
     filterClass d = d
 
 -- | Was this signature given by the user?
@@ -386,10 +388,10 @@ isUserSig _             = False
 
 -- | Take a field of declarations from a data structure and create HsDecls
 -- using the given constructor
-mkDecls :: (struct -> [Located decl])
+mkDecls :: (struct -> [GenLocated l decl])
         -> (decl -> hsDecl)
         -> struct
-        -> [Located hsDecl]
+        -> [GenLocated l hsDecl]
 mkDecls field con = map (mapLoc con) . field
 
 -- | Extracts out individual maps of documentation added via Template Haskell's
