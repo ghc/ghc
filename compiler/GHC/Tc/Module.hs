@@ -329,10 +329,14 @@ tcRnModuleTcRnM hsc_env mod_sum
                         reportUnusedNames tcg_env hsc_src
                       ; -- add extra source files to tcg_dependent_files
                         addDependentFiles src_files
-                      ; tcg_env <- runTypecheckerPlugin mod_sum tcg_env
-                      ; -- Dump output and return
-                        tcDump tcg_env
-                      ; return tcg_env }
+                        -- Ensure plugins run with the same tcg_env that we pass in
+                      ; setGblEnv tcg_env
+                        $ do { tcg_env <- runTypecheckerPlugin mod_sum tcg_env
+                             ; -- Dump output and return
+                               tcDump tcg_env
+                             ; return tcg_env
+                             }
+                      }
                }
         }
       }
@@ -2453,7 +2457,7 @@ tcGhciStmts stmts
            -- Note [Implementing unsafeCoerce] in base:Unsafe.Coerce
 
       ; let ret_expr = nlHsApp (nlHsTyApp ret_id [ret_ty]) $
-                       noLoc $ ExplicitList unitTy Nothing $
+                       noLoc $ ExplicitList unitTy $
                        map mk_item ids
 
             mk_item id = unsafe_coerce_id `nlHsTyApp` [ getRuntimeRep (idType id)
