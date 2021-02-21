@@ -304,6 +304,25 @@ rnExpr (NegApp _ e _)
        ; return (final_e, fv_e `plusFV` fv_neg) }
 
 ------------------------------------------
+-- Record dot syntax
+
+rnExpr (HsGetField _ e f)
+ = do { (getField, fv_getField) <- lookupSyntaxName getFieldName
+      ; (e, fv_e) <- rnLExpr e
+      ; return ( mkExpandedExpr
+                   (HsGetField noExtField e f)
+                   (mkGetField getField e f)
+               , fv_e `plusFV` fv_getField ) }
+
+rnExpr (HsProjection _ fs)
+  = do { (getField, fv_getField) <- lookupSyntaxName getFieldName
+       ; circ <- lookupOccRn compose_RDR
+       ; return ( mkExpandedExpr
+                    (HsProjection noExtField fs)
+                    (mkProjection getField circ fs)
+                , unitFV circ `plusFV` fv_getField) }
+
+------------------------------------------
 -- Template Haskell extensions
 rnExpr e@(HsBracket _ br_body) = rnBracket e br_body
 
@@ -406,11 +425,28 @@ rnExpr (RecordCon { rcon_con = con_id
                             ; return (L l (fld { hsRecFieldArg = arg' }), fvs) }
 
 rnExpr (RecordUpd { rupd_expr = expr, rupd_flds = rbinds })
-  = do  { (expr', fvExpr) <- rnLExpr expr
-        ; (rbinds', fvRbinds) <- rnHsRecUpdFields rbinds
-        ; return (RecordUpd { rupd_ext = noExtField, rupd_expr = expr'
-                            , rupd_flds = rbinds' }
-                 , fvExpr `plusFV` fvRbinds) }
+  = case rbinds of
+      Left flds -> -- 'OverloadedRecordUpdate' is not in effect. Regular record update.
+        do  { ; (e, fv_e) <- rnLExpr expr
+              ; (rs, fv_rs) <- rnHsRecUpdFields flds
+              ; return ( RecordUpd noExtField e (Left rs), fv_e `plusFV` fv_rs )
+            }
+      Right flds ->  -- 'OverloadedRecordUpdate' is in effect. Record dot update desugaring.
+        do { ; unlessXOptM LangExt.RebindableSyntax $
+                 addErr $ text "RebindableSyntax is required if OverloadedRecordUpdate is enabled."
+             ; let punnedFields = [fld | (L _ fld) <- flds, hsRecPun fld]
+             ; punsEnabled <-xoptM LangExt.RecordPuns
+             ; unless (null punnedFields || punsEnabled) $
+                 addErr $ text "For this to work enable NamedFieldPuns."
+             ; (getField, fv_getField) <- lookupSyntaxName getFieldName
+             ; (setField, fv_setField) <- lookupSyntaxName setFieldName
+             ; (e, fv_e) <- rnLExpr expr
+             ; (us, fv_us) <- rnHsUpdProjs flds
+             ; return ( mkExpandedExpr
+                          (RecordUpd noExtField e (Right us))
+                          (mkRecordDotUpd getField setField e us)
+                         , plusFVs [fv_getField, fv_setField, fv_e, fv_us] )
+             }
 
 rnExpr (ExprWithTySig _ expr pty)
   = do  { (pty', fvTy)    <- rnHsSigWcType ExprWithTySigCtx pty
@@ -2497,6 +2533,12 @@ genLHsVar nm = wrapGenSpan $ genHsVar nm
 genHsVar :: Name -> HsExpr GhcRn
 genHsVar nm = HsVar noExtField $ wrapGenSpan nm
 
+genAppType :: HsExpr GhcRn -> HsType (NoGhcTc GhcRn) -> HsExpr GhcRn
+genAppType expr = HsAppType noExtField (wrapGenSpan expr) . mkEmptyWildCardBndrs . wrapGenSpan
+
+genHsTyLit :: FastString -> HsType GhcRn
+genHsTyLit = HsTyLit noExtField . HsStrTy NoSourceText
+
 wrapGenSpan :: a -> Located a
 -- Wrap something in a "generatedSrcSpan"
 -- See Note [Rebindable syntax and HsExpansion]
@@ -2510,3 +2552,72 @@ mkExpandedExpr
   -> HsExpr GhcRn           -- ^ expanded expression
   -> HsExpr GhcRn           -- ^ suitably wrapped 'HsExpansion'
 mkExpandedExpr a b = XExpr (HsExpanded a b)
+
+-----------------------------------------
+-- Bits and pieces for RecordDotSyntax.
+--
+-- See Note [Overview of record dot syntax] in GHC.Hs.Expr.
+
+-- mkGetField arg field calcuates a get_field @field arg expression.
+-- e.g. z.x = mkGetField z x = get_field @x z
+mkGetField :: Name -> LHsExpr GhcRn -> Located FieldLabelString -> HsExpr GhcRn
+mkGetField get_field arg field = unLoc (head $ mkGet get_field [arg] field)
+
+-- mkSetField a field b calculates a set_field @field expression.
+-- e.g mkSetSetField a field b = set_field @"field" a b (read as "set field 'field' on a to b").
+mkSetField :: Name -> LHsExpr GhcRn -> Located FieldLabelString -> LHsExpr GhcRn -> HsExpr GhcRn
+mkSetField set_field a (L _ field) b =
+  genHsApp (genHsApp (genHsVar set_field `genAppType` genHsTyLit field)  a) b
+
+mkGet :: Name -> [LHsExpr GhcRn] -> Located FieldLabelString -> [LHsExpr GhcRn]
+mkGet get_field l@(r : _) (L _ field) =
+  wrapGenSpan (genHsApp (genHsVar get_field `genAppType` genHsTyLit field) r) : l
+mkGet _ [] _ = panic "mkGet : The impossible has happened!"
+
+mkSet :: Name -> LHsExpr GhcRn -> (Located FieldLabelString, LHsExpr GhcRn) -> LHsExpr GhcRn
+mkSet set_field acc (field, g) = wrapGenSpan (mkSetField set_field g field acc)
+
+-- mkProjection fields calculates a projection.
+-- e.g. .x = mkProjection [x] = getField @"x"
+--      .x.y = mkProjection [.x, .y] = (.y) . (.x) = getField @"y" . getField @"x"
+mkProjection :: Name -> Name -> [Located FieldLabelString] -> HsExpr GhcRn
+mkProjection getFieldName circName (field : fields) = foldl' f (proj field) fields
+  where
+    f :: HsExpr GhcRn -> Located FieldLabelString -> HsExpr GhcRn
+    f acc field = genHsApps circName $ map wrapGenSpan [proj field, acc]
+
+    proj :: Located FieldLabelString -> HsExpr GhcRn
+    proj (L _ f) = genHsVar getFieldName `genAppType` genHsTyLit f
+mkProjection _ _ [] = panic "mkProjection: The impossible happened"
+
+-- mkProjUpdateSetField calculates functions representing dot notation record updates.
+-- e.g. Suppose an update like foo.bar = 1.
+--      We calculate the function \a -> setField @"foo" a (setField @"bar" (getField @"foo" a) 1).
+mkProjUpdateSetField :: Name -> Name -> LHsRecProj GhcRn (LHsExpr GhcRn) -> (LHsExpr GhcRn -> LHsExpr GhcRn)
+mkProjUpdateSetField get_field set_field (L _ (HsRecField { hsRecFieldLbl = (L _ (FieldLabelStrings flds)), hsRecFieldArg = arg } ))
+  = let {
+      ; final = last flds  -- quux
+      ; fields = init flds   -- [foo, bar, baz]
+      ; getters = \a -> foldl' (mkGet get_field) [a] fields  -- Ordered from deep to shallow.
+          -- [getField@"baz"(getField@"bar"(getField@"foo" a), getField@"bar"(getField@"foo" a), getField@"foo" a, a]
+      ; zips = \a -> (final, head (getters a)) : zip (reverse fields) (tail (getters a)) -- Ordered from deep to shallow.
+          -- [("quux", getField@"baz"(getField@"bar"(getField@"foo" a)), ("baz", getField@"bar"(getField@"foo" a)), ("bar", getField@"foo" a), ("foo", a)]
+      }
+    in (\a -> foldl' (mkSet set_field) arg (zips a))
+          -- setField@"foo" (a) (setField@"bar" (getField @"foo" (a))(setField@"baz" (getField @"bar" (getField @"foo" (a)))(setField@"quux" (getField @"baz" (getField @"bar" (getField @"foo" (a))))(quux))))
+
+mkRecordDotUpd :: Name -> Name -> LHsExpr GhcRn -> [LHsRecUpdProj GhcRn] -> HsExpr GhcRn
+mkRecordDotUpd get_field set_field exp updates = foldl' fieldUpdate (unLoc exp) updates
+  where
+    fieldUpdate :: HsExpr GhcRn -> LHsRecUpdProj GhcRn -> HsExpr GhcRn
+    fieldUpdate acc lpu =  unLoc $ (mkProjUpdateSetField get_field set_field lpu) (wrapGenSpan acc)
+
+rnHsUpdProjs :: [LHsRecUpdProj GhcPs] -> RnM ([LHsRecUpdProj GhcRn], FreeVars)
+rnHsUpdProjs us = do
+  (u, fvs) <- unzip <$> mapM rnRecUpdProj us
+  pure (u, plusFVs fvs)
+  where
+    rnRecUpdProj :: LHsRecUpdProj GhcPs -> RnM (LHsRecUpdProj GhcRn, FreeVars)
+    rnRecUpdProj (L l (HsRecField fs arg pun))
+      = do { (arg, fv) <- rnLExpr arg
+           ; return $ (L l (HsRecField { hsRecFieldLbl = fs, hsRecFieldArg = arg, hsRecPun = pun}), fv) }
