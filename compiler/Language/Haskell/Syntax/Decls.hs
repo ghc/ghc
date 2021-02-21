@@ -436,7 +436,7 @@ data TyClDecl pass
              , tcdDataDefn :: HsDataDefn pass }
 
   | ClassDecl { tcdCExt    :: XClassDecl pass,         -- ^ Post renamer, FVs
-                tcdCtxt    :: LHsContext pass,         -- ^ Context...
+                tcdCtxt    :: Maybe (LHsContext pass), -- ^ Context...
                 tcdLName   :: LIdP pass,               -- ^ Name of the class
                 tcdTyVars  :: LHsQTyVars pass,         -- ^ Class type variables
                 tcdFixity  :: LexicalFixity, -- ^ Fixity used in the declaration
