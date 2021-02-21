@@ -1,0 +1,2 @@
+RecordDotSyntaxFail2.hs:10:10:
+    OverloadedRecordUpdate needs to be enabled

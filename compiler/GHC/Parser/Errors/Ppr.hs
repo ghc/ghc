@@ -234,6 +234,15 @@ pp_err = \case
    PsErrPrecedenceOutOfRange i
       -> text "Precedence out of range: " <> int i
 
+   PsErrOverloadedRecordDotInvalid
+      -> text "Use of OverloadedRecordDot '.' not valid ('.' isn't allowed when constructing records or in record patterns)"
+
+   PsErrOverloadedRecordUpdateNoQualifiedFields
+      -> text "Fields cannot be qualified when OverloadedRecordUpdate is enabled"
+
+   PsErrOverloadedRecordUpdateNotEnabled
+      -> text "OverloadedRecordUpdate needs to be enabled"
+
    PsErrInvalidDataCon t
       -> hang (text "Cannot parse data constructor in a data/newtype declaration:") 2
               (ppr t)
@@ -607,4 +616,3 @@ pp_hint = \case
 
 perhaps_as_pat :: SDoc
 perhaps_as_pat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"
-
