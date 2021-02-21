@@ -1,5 +1,6 @@
-module Ppr001 where
+module  Ppr001   where
 
+-- This is the main function
 main = putStrLn "hello"
 
 foo x = y + 3
