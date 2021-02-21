@@ -37,8 +37,7 @@
       (HsDataDefn
        (NoExtField)
        (DataType)
-       ({ <no location info> }
-        [])
+       (Nothing)
        (Nothing)
        (Nothing)
        [({ DumpParsedAst.hs:7:14-17 }
@@ -243,8 +242,7 @@
       (HsDataDefn
        (NoExtField)
        (DataType)
-       ({ <no location info> }
-        [])
+       (Nothing)
        (Nothing)
        (Nothing)
        [({ DumpParsedAst.hs:14:21-29 }

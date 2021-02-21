@@ -1622,7 +1622,7 @@ kcConDecl new_or_data tc_res_kind (ConDeclH98
   = addErrCtxt (dataConCtxt [name]) $
     discardResult                   $
     bindExplicitTKBndrs_Tv ex_tvs $
-    do { _ <- tcHsMbContext ex_ctxt
+    do { _ <- tcHsContext ex_ctxt
        ; kcConH98Args new_or_data tc_res_kind args
          -- We don't need to check the telescope here,
          -- because that's done in tcConDecl
@@ -1638,7 +1638,7 @@ kcConDecl new_or_data
     discardResult                      $
     bindOuterSigTKBndrs_Tv outer_bndrs $
         -- Why "_Tv"?  See Note [Using TyVarTvs for kind-checking GADTs]
-    do { _ <- tcHsMbContext cxt
+    do { _ <- tcHsContext cxt
        ; traceTc "kcConDecl:GADT {" (ppr names $$ ppr res_ty)
        ; con_res_kind <- newOpenTypeKind
        ; _ <- tcCheckLHsType res_ty (TheKind con_res_kind)
@@ -2325,7 +2325,7 @@ tcTyClDecl1 _parent roles_info
 *                                                                      *
 ********************************************************************* -}
 
-tcClassDecl1 :: RolesInfo -> Name -> LHsContext GhcRn
+tcClassDecl1 :: RolesInfo -> Name -> Maybe (LHsContext GhcRn)
              -> LHsBinds GhcRn -> [LHsFunDep GhcRn] -> [LSig GhcRn]
              -> [LFamilyDecl GhcRn] -> [LTyFamDefltDecl GhcRn]
              -> TcM Class
@@ -3210,11 +3210,12 @@ that 'a' must have that kind, and to bring 'k' into scope.
 -}
 
 dataDeclChecks :: Name -> NewOrData
-               -> LHsContext GhcRn -> [LConDecl GhcRn]
+               -> Maybe (LHsContext GhcRn) -> [LConDecl GhcRn]
                -> TcM Bool
-dataDeclChecks tc_name new_or_data (L _ stupid_theta) cons
-  = do {   -- Check that we don't use GADT syntax in H98 world
-         gadtSyntax_ok <- xoptM LangExt.GADTSyntax
+dataDeclChecks tc_name new_or_data mctxt cons
+  = do { let stupid_theta = fromMaybeContext mctxt
+         -- Check that we don't use GADT syntax in H98 world
+       ;  gadtSyntax_ok <- xoptM LangExt.GADTSyntax
        ; let gadt_syntax = consUseGadtSyntax cons
        ; checkTc (gadtSyntax_ok || not gadt_syntax) (badGadtDecl tc_name)
 
@@ -3296,7 +3297,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs res_kind tag_map
        ; (tclvl, wanted, (exp_tvbndrs, (ctxt, arg_tys, field_lbls, stricts)))
            <- pushLevelAndSolveEqualitiesX "tcConDecl:H98"  $
               tcExplicitTKBndrs explicit_tkv_nms            $
-              do { ctxt <- tcHsMbContext hs_ctxt
+              do { ctxt <- tcHsContext hs_ctxt
                  ; let exp_kind = getArgExpKind new_or_data res_kind
                  ; btys <- tcConH98Args exp_kind hs_args
                  ; field_lbls <- lookupConstructorFields name
@@ -3382,7 +3383,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
        ; (tclvl, wanted, (outer_bndrs, (ctxt, arg_tys, res_ty, field_lbls, stricts)))
            <- pushLevelAndSolveEqualitiesX "tcConDecl:GADT" $
               tcOuterTKBndrs skol_info outer_hs_bndrs       $
-              do { ctxt <- tcHsMbContext cxt
+              do { ctxt <- tcHsContext cxt
                  ; (res_ty, res_kind) <- tcInferLHsTypeKind hs_res_ty
                          -- See Note [GADT return kinds]
 

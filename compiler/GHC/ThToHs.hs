@@ -239,7 +239,7 @@ cvtDec (DataD ctxt tc tvs ksig constrs derivs)
         ; derivs' <- cvtDerivs derivs
         ; let defn = HsDataDefn { dd_ext = noExtField
                                 , dd_ND = DataType, dd_cType = Nothing
-                                , dd_ctxt = ctxt'
+                                , dd_ctxt = Just ctxt'
                                 , dd_kindSig = ksig'
                                 , dd_cons = cons', dd_derivs = derivs' }
         ; returnJustL $ TyClD noExtField $
@@ -255,7 +255,7 @@ cvtDec (NewtypeD ctxt tc tvs ksig constr derivs)
         ; derivs' <- cvtDerivs derivs
         ; let defn = HsDataDefn { dd_ext = noExtField
                                 , dd_ND = NewType, dd_cType = Nothing
-                                , dd_ctxt = ctxt'
+                                , dd_ctxt = Just ctxt'
                                 , dd_kindSig = ksig'
                                 , dd_cons = [con']
                                 , dd_derivs = derivs' }
@@ -275,7 +275,7 @@ cvtDec (ClassD ctxt cl tvs fds decs)
                    $$ (Outputable.ppr adts'))
         ; returnJustL $ TyClD noExtField $
           ClassDecl { tcdCExt = NoLayoutInfo
-                    , tcdCtxt = cxt', tcdLName = tc', tcdTyVars = tvs'
+                    , tcdCtxt = Just cxt', tcdLName = tc', tcdTyVars = tvs'
                     , tcdFixity = Prefix
                     , tcdFDs = fds', tcdSigs = Hs.mkClassOpSigs sigs'
                     , tcdMeths = binds'
@@ -325,7 +325,7 @@ cvtDec (DataInstD ctxt bndrs tys ksig constrs derivs)
        ; derivs' <- cvtDerivs derivs
        ; let defn = HsDataDefn { dd_ext = noExtField
                                , dd_ND = DataType, dd_cType = Nothing
-                               , dd_ctxt = ctxt'
+                               , dd_ctxt = Just ctxt'
                                , dd_kindSig = ksig'
                                , dd_cons = cons', dd_derivs = derivs' }
 
@@ -346,7 +346,7 @@ cvtDec (NewtypeInstD ctxt bndrs tys ksig constr derivs)
        ; derivs' <- cvtDerivs derivs
        ; let defn = HsDataDefn { dd_ext = noExtField
                                , dd_ND = NewType, dd_cType = Nothing
-                               , dd_ctxt = ctxt'
+                               , dd_ctxt = Just ctxt'
                                , dd_kindSig = ksig'
                                , dd_cons = [con'], dd_derivs = derivs' }
        ; returnJustL $ InstD noExtField $ DataFamInstD
@@ -1787,14 +1787,14 @@ cvtPatSynSigTy (ForallT univs reqs (ForallT exis provs ty))
   | null univs, null reqs = do { l   <- getL
                                ; ty' <- cvtType (ForallT exis provs ty)
                                ; return $ L l $ mkHsImplicitSigType
-                                        $ L l (HsQualTy { hst_ctxt = L l []
+                                        $ L l (HsQualTy { hst_ctxt = Nothing
                                                         , hst_xqual = noExtField
                                                         , hst_body = ty' }) }
   | null reqs             = do { l      <- getL
                                ; univs' <- cvtTvs univs
                                ; ty'    <- cvtType (ForallT exis provs ty)
                                ; let forTy = mkHsExplicitSigType univs' $ L l cxtTy
-                                     cxtTy = HsQualTy { hst_ctxt = L l []
+                                     cxtTy = HsQualTy { hst_ctxt = Nothing
                                                       , hst_xqual = noExtField
                                                       , hst_body = ty' }
                                ; return $ L l forTy }
@@ -1880,7 +1880,7 @@ mkHsQualTy :: TH.Cxt
 mkHsQualTy ctxt loc ctxt' ty
   | null ctxt = ty
   | otherwise = L loc $ HsQualTy { hst_xqual = noExtField
-                                 , hst_ctxt  = ctxt'
+                                 , hst_ctxt  = Just ctxt'
                                  , hst_body  = ty }
 
 mkHsOuterFamEqnTyVarBndrs :: Maybe [LHsTyVarBndr () GhcPs] -> HsOuterFamEqnTyVarBndrs GhcPs
