@@ -857,7 +857,7 @@ TyVarEnv will simply be empty, and there is nothing to worry about.
 -----------------------
 tcDataFamInstHeader
     :: AssocInstInfo -> TyCon -> HsOuterFamEqnTyVarBndrs GhcRn
-    -> LexicalFixity -> LHsContext GhcRn
+    -> LexicalFixity -> Maybe (LHsContext GhcRn)
     -> HsTyPats GhcRn -> Maybe (LHsKind GhcRn)
     -> NewOrData
     -> TcM ([TyVar], [Type], Kind, ThetaType)

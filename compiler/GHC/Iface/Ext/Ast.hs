@@ -1393,7 +1393,7 @@ instance ToHie (Located (TyClDecl GhcRn)) where
         , toHie defn
         ]
         where
-          quant_scope = mkLScope $ dd_ctxt defn
+          quant_scope = mkLScope $ fromMaybe (noLoc []) $ dd_ctxt defn
           rhs_scope = sig_sc `combineScopes` con_sc `combineScopes` deriv_sc
           sig_sc = maybe NoScope mkLScope $ dd_kindSig defn
           con_sc = foldr combineScopes NoScope $ map mkLScope $ dd_cons defn
@@ -1418,7 +1418,7 @@ instance ToHie (Located (TyClDecl GhcRn)) where
         , toHie deftyps
         ]
         where
-          context_scope = mkLScope context
+          context_scope = mkLScope $ fromMaybe (noLoc []) context
           rhs_scope = foldl1' combineScopes $ map mkScope
             [ loc deps, loc sigs, loc (bagToList meths), loc typs, loc deftyps]
 

@@ -1670,10 +1670,10 @@ decideGeneralisationPlan dflags lbinds closed sig_fn
     --      so we should apply the MR
     -- See Note [Partial type signatures and generalisation]
     partial_sig_mrs
-      = [ null theta
+      = [ null $ fromMaybeContext mtheta
         | TcIdSig (PartialSig { psig_hs_ty = hs_ty })
             <- mapMaybe sig_fn (collectHsBindListBinders CollNoDictBinders lbinds)
-        , let (L _ theta, _) = splitLHsQualTy (hsSigWcType hs_ty) ]
+        , let (mtheta, _) = splitLHsQualTy (hsSigWcType hs_ty) ]
 
     has_partial_sigs   = not (null partial_sig_mrs)
 

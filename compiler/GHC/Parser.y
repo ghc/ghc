@@ -2041,7 +2041,7 @@ ctype   :: { LHsType GhcPs }
                                              forall_anns }
         | context '=>' ctype          {% addAnnotation (gl $1) (toUnicodeAnn AnnDarrow $2) (gl $2)
                                          >> return (sLL $1 $> $
-                                            HsQualTy { hst_ctxt = $1
+                                            HsQualTy { hst_ctxt = Just $1
                                                      , hst_xqual = noExtField
                                                      , hst_body = $3 }) }
         | ipvar '::' type             {% ams (sLL $1 $> (HsIParamTy noExtField $1 $3))
