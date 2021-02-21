@@ -40,9 +40,8 @@ module GHC.Rename.Env (
         lookupGreAvailRn,
 
         -- Rebindable Syntax
-        lookupSyntax, lookupSyntaxExpr, lookupSyntaxNames,
-        lookupSyntaxName,
-        lookupIfThenElse,
+        lookupSyntax, lookupSyntaxExpr, lookupSyntaxName, lookupSyntaxNames,
+        lookupIfThenElse, lookupReboundOrOrigName,
 
         -- QualifiedDo
         lookupQualifiedDoExpr, lookupQualifiedDo,
@@ -64,6 +63,7 @@ import GHC.Prelude
 import GHC.Iface.Load   ( loadInterfaceForName, loadSrcInterface_maybe )
 import GHC.Iface.Env
 import GHC.Hs
+import GHC.Unit.Module
 import GHC.Types.Name.Reader
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
@@ -73,7 +73,6 @@ import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Types.Avail
-import GHC.Unit.Module
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.Warnings  ( WarningTxt, pprWarningTxtForMsg )
 import GHC.Core.ConLike
@@ -2042,7 +2041,6 @@ lookupQualifiedDoName ctxt std_name
       Nothing -> lookupSyntaxName std_name
       Just modName -> lookupNameWithQualifier std_name modName
 
-
 -- Error messages
 
 opDeclErr :: RdrName -> SDoc
@@ -2066,3 +2064,19 @@ badOrigBinding name
     -- (See #13968.)
   where
     occ = rdrNameOcc $ filterCTuple name
+
+-- When rebindable syntax is on retrieve the name in scope otherwise
+-- the name defined in the provided module.
+lookupReboundOrOrigName :: Module -> OccName -> RnM Name
+lookupReboundOrOrigName mod occName = do
+  mName <- lookupRebound (occNameFS occName)
+  case mName of
+    Just (L _ name) -> pure name -- Rebindable on; name is the one in scope.
+    Nothing -> -- Rebindable off; use the name from mod.
+      lookupOccRn (mkOrig mod occName) -- Errors out if the name isn't there.
+  where
+    lookupRebound nameStr = do
+      rebind <- xoptM LangExt.RebindableSyntax
+      if rebind
+        then (\nm -> Just (L (nameSrcSpan nm) nm)) <$>  lookupOccRn (mkVarUnqual nameStr)
+        else pure Nothing
