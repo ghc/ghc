@@ -17,7 +17,9 @@
 
 module GHC.IO.Handle.FD ( 
   stdin, stdout, stderr,
-  openFile, openBinaryFile, openFileBlocking,
+  openFile, withFile,
+  openBinaryFile, withBinaryFile,
+  openFileBlocking, withFileBlocking,
   mkHandleFromFD, fdToHandle, fdToHandle', handleToFd
  ) where
 
@@ -138,6 +140,9 @@ addFilePathToIOError fun fp ioe
 --  * 'System.IO.Error.isPermissionError' if the user does not have permission
 --     to open the file.
 --
+-- On POSIX systems, 'openFile' is an /interruptible operation/ as
+-- described in "Control.Exception".
+--
 -- Note: if you will be working with files containing binary data, you'll want to
 -- be using 'openBinaryFile'.
 openFile :: FilePath -> IOMode -> IO Handle
@@ -146,22 +151,49 @@ openFile fp im =
     (openFile' fp im dEFAULT_OPEN_IN_BINARY_MODE True)
     (\e -> ioError (addFilePathToIOError "openFile" fp e))
 
+-- | @'withFile' name mode act@ opens a file like 'openFile' and passes
+-- the resulting handle to the computation @act@.  The handle will be
+-- closed on exit from 'withFile', whether by normal termination or by
+-- raising an exception.  If closing the handle raises an exception, then
+-- this exception will be raised by 'withFile' rather than any exception
+-- raised by @act@.
+withFile :: FilePath -> IOMode -> (Handle -> IO r) -> IO r
+withFile fp im act =
+  catchException
+    (withFile' fp im dEFAULT_OPEN_IN_BINARY_MODE True act)
+    (\e -> ioError (addFilePathToIOError "withFile" fp e))
+
 -- | Like 'openFile', but opens the file in ordinary blocking mode.
 -- This can be useful for opening a FIFO for writing: if we open in
 -- non-blocking mode then the open will fail if there are no readers,
 -- whereas a blocking open will block until a reader appear.
--- 
+--
 -- Note: when blocking happens, an OS thread becomes tied up with the
 -- processing, so the program must have at least another OS thread if
 -- it wants to unblock itself. By corollary, a non-threaded runtime
 -- will need a process-external trigger in order to become unblocked.
+--
+-- On POSIX systems, 'openFileBlocking' is an /interruptible operation/ as
+-- described in "Control.Exception".
 --
 -- @since 4.4.0.0
 openFileBlocking :: FilePath -> IOMode -> IO Handle
 openFileBlocking fp im =
   catchException
     (openFile' fp im dEFAULT_OPEN_IN_BINARY_MODE False)
-    (\e -> ioError (addFilePathToIOError "openFile" fp e))
+    (\e -> ioError (addFilePathToIOError "openFileBlocking" fp e))
+
+-- | @'withFileBlocking' name mode act@ opens a file like 'openFileBlocking'
+-- and passes the resulting handle to the computation @act@.  The handle will
+-- be closed on exit from 'withFileBlocking', whether by normal termination or
+-- by raising an exception.  If closing the handle raises an exception, then
+-- this exception will be raised by 'withFile' rather than any exception raised
+-- by @act@.
+withFileBlocking :: FilePath -> IOMode -> (Handle -> IO r) -> IO r
+withFileBlocking fp im act =
+  catchException
+    (withFile' fp im dEFAULT_OPEN_IN_BINARY_MODE False act)
+    (\e -> ioError (addFilePathToIOError "withFileBlocking" fp e))
 
 -- | Like 'openFile', but open the file in binary mode.
 -- On Windows, reading a file in text mode (which is the default)
@@ -172,35 +204,72 @@ openFileBlocking fp im =
 -- treatment of end-of-line and end-of-file characters.
 -- (See also 'System.IO.hSetBinaryMode'.)
 
+-- On POSIX systems, 'openBinaryFile' is an /interruptible operation/ as
+-- described in "Control.Exception".
 openBinaryFile :: FilePath -> IOMode -> IO Handle
 openBinaryFile fp m =
   catchException
     (openFile' fp m True True)
     (\e -> ioError (addFilePathToIOError "openBinaryFile" fp e))
 
-openFile' :: String -> IOMode -> Bool -> Bool -> IO Handle
-openFile' filepath iomode binary non_blocking = do
+-- | A version of `openBinaryFile` that takes an action to perform
+-- with the handle. If an exception occurs in the action, then
+-- the file will be closed automatically. The action /should/
+-- close the file when finished with it so the file does not remain
+-- open until the garbage collector collects the handle.
+withBinaryFile :: FilePath -> IOMode -> (Handle -> IO r) -> IO r
+withBinaryFile fp im act =
+  catchException
+    (withFile' fp im True True act)
+    (\e -> ioError (addFilePathToIOError "withBinaryFile" fp e))
+
+-- | Open a file and perform an action with it. If the action throws an
+-- exception, then the file will be closed. If the last argument is 'True',
+-- then the file will be closed on successful completion as well. We use this to
+-- implement both the `withFile` family of functions (via `withFile'`) and the
+-- `openFile` family (via `openFile'`).
+withOpenFile' :: String -> IOMode -> Bool -> Bool -> (Handle -> IO r) -> Bool -> IO r
+withOpenFile' filepath iomode binary non_blocking act close_finally =
   -- first open the file to get an FD
-  (fd, fd_type) <- FD.openFile filepath iomode non_blocking
+  FD.openFileWith filepath iomode non_blocking (\fd fd_type -> do
 
-  mb_codec <- if binary then return Nothing else fmap Just getLocaleEncoding
+      mb_codec <- if binary then return Nothing else fmap Just getLocaleEncoding
 
-  -- then use it to make a Handle
-  mkHandleFromFD fd fd_type filepath iomode
-                   False {- do not *set* non-blocking mode -}
-                   mb_codec
-            `onException` IODevice.close fd
-        -- NB. don't forget to close the FD if mkHandleFromFD fails, otherwise
-        -- this FD leaks.
+      -- Then use it to make a Handle. If this fails, openFileWith
+      -- will take care of closing the file.
+      mkHandleFromFDNoFinalizer fd fd_type filepath iomode
+                       False {- do not *set* non-blocking mode -}
+                       mb_codec)
+
+    -- Add a finalizer to the handle. This is done under a mask,
+    -- so there are no asynchronous exceptions, and (satisfying
+    -- the conditions of openFileWith), addHandleFinalizer
+    -- cannot throw a synchronous exception.
+    (\restore hndl -> do
+        addHandleFinalizer hndl handleFinalizer
+        r <- restore (act hndl) `onException` hClose_impl hndl
+        when close_finally $ hClose_impl hndl
+        pure r
+        )
+
         -- ASSERT: if we just created the file, then fdToHandle' won't fail
         -- (so we don't need to worry about removing the newly created file
         --  in the event of an error).
 
+-- | Open a file and perform an action with it. When the action
+-- completes or throws/receives an exception, the file will be closed.
+withFile' :: String -> IOMode -> Bool -> Bool -> (Handle -> IO r) -> IO r
+withFile' filepath iomode binary non_blocking act =
+  withOpenFile' filepath iomode binary non_blocking act True
+
+openFile' :: String -> IOMode -> Bool -> Bool -> IO Handle
+openFile' filepath iomode binary non_blocking =
+  withOpenFile' filepath iomode binary non_blocking pure False
 
 -- ---------------------------------------------------------------------------
 -- Converting file descriptors from/to Handles
 
-mkHandleFromFD
+mkHandleFromFDNoFinalizer
    :: FD.FD
    -> IODeviceType
    -> FilePath  -- a string describing this file descriptor (e.g. the filename)
@@ -209,7 +278,7 @@ mkHandleFromFD
    -> Maybe TextEncoding
    -> IO Handle
 
-mkHandleFromFD fd0 fd_type filepath iomode set_non_blocking mb_codec
+mkHandleFromFDNoFinalizer fd0 fd_type filepath iomode set_non_blocking mb_codec
   = do
 #if !defined(mingw32_HOST_OS)
     -- turn on non-blocking mode
@@ -233,11 +302,24 @@ mkHandleFromFD fd0 fd_type filepath iomode set_non_blocking mb_codec
            -- only *Streams* can be DuplexHandles.  Other read/write
            -- Handles must share a buffer.
            | ReadWriteMode <- iomode -> 
-                mkDuplexHandle fd filepath mb_codec nl
-                   
+                mkDuplexHandleNoFinalizer fd filepath mb_codec nl
 
         _other -> 
-           mkFileHandle fd filepath iomode mb_codec nl
+           mkFileHandleNoFinalizer fd filepath iomode mb_codec nl
+
+mkHandleFromFD
+   :: FD.FD
+   -> IODeviceType
+   -> FilePath  -- a string describing this file descriptor (e.g. the filename)
+   -> IOMode
+   -> Bool      --  *set* non-blocking mode on the FD
+   -> Maybe TextEncoding
+   -> IO Handle
+mkHandleFromFD fd0 fd_type filepath iomode set_non_blocking mb_codec = do
+  h <- mkHandleFromFDNoFinalizer fd0 fd_type filepath iomode
+                                 set_non_blocking mb_codec
+  addHandleFinalizer h handleFinalizer
+  pure h
 
 -- | Old API kept to avoid breaking clients
 fdToHandle' :: CInt
