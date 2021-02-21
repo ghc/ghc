@@ -381,7 +381,7 @@ instance (OutputableBndrId p) => Outputable (TyClDecl (GhcPass p)) where
     ppr (SynDecl { tcdLName = ltycon, tcdTyVars = tyvars, tcdFixity = fixity
                  , tcdRhs = rhs })
       = hang (text "type" <+>
-              pp_vanilla_decl_head ltycon tyvars fixity noLHsContext <+> equals)
+              pp_vanilla_decl_head ltycon tyvars fixity Nothing <+> equals)
           4 (ppr rhs)
 
     ppr (DataDecl { tcdLName = ltycon, tcdTyVars = tyvars, tcdFixity = fixity
@@ -424,7 +424,7 @@ pp_vanilla_decl_head :: (OutputableBndrId p)
    => Located (IdP (GhcPass p))
    -> LHsQTyVars (GhcPass p)
    -> LexicalFixity
-   -> LHsContext (GhcPass p)
+   -> Maybe (LHsContext (GhcPass p))
    -> SDoc
 pp_vanilla_decl_head thing (HsQTvs { hsq_explicit = tyvars }) fixity context
  = hsep [pprLHsContext context, pp_tyvars tyvars]
@@ -512,7 +512,7 @@ pprFamilyDecl top_level (FamilyDecl { fdInfo = info, fdLName = ltycon
                                     , fdResultSig = L _ result
                                     , fdInjectivityAnn = mb_inj })
   = vcat [ pprFlavour info <+> pp_top_level <+>
-           pp_vanilla_decl_head ltycon tyvars fixity noLHsContext <+>
+           pp_vanilla_decl_head ltycon tyvars fixity Nothing <+>
            pp_kind <+> pp_inj <+> pp_where
          , nest 2 $ pp_eqns ]
   where
@@ -607,7 +607,7 @@ hsConDeclTheta Nothing            = []
 hsConDeclTheta (Just (L _ theta)) = theta
 
 pp_data_defn :: (OutputableBndrId p)
-                  => (LHsContext (GhcPass p) -> SDoc)   -- Printing the header
+                  => (Maybe (LHsContext (GhcPass p)) -> SDoc)   -- Printing the header
                   -> HsDataDefn (GhcPass p)
                   -> SDoc
 pp_data_defn pp_hdr (HsDataDefn { dd_ND = new_or_data, dd_ctxt = context
@@ -661,7 +661,7 @@ pprConDecl (ConDeclH98 { con_name = L _ con
                        , con_args = args
                        , con_doc = doc })
   = sep [ ppr_mbDoc doc
-        , pprHsForAll (mkHsForAllInvisTele ex_tvs) cxt
+        , pprHsForAll (mkHsForAllInvisTele ex_tvs) mcxt
         , ppr_details args ]
   where
     -- In ppr_details: let's not print the multiplicities (they are always 1, by
@@ -673,19 +673,17 @@ pprConDecl (ConDeclH98 { con_name = L _ con
                                     : map (pprHsType . unLoc . hsScaledThing) tys)
     ppr_details (RecCon fields)  = pprPrefixOcc con
                                  <+> pprConDeclFields (unLoc fields)
-    cxt = fromMaybe noLHsContext mcxt
 
 pprConDecl (ConDeclGADT { con_names = cons, con_bndrs = L _ outer_bndrs
                         , con_mb_cxt = mcxt, con_g_args = args
                         , con_res_ty = res_ty, con_doc = doc })
   = ppr_mbDoc doc <+> ppr_con_names cons <+> dcolon
-    <+> (sep [pprHsOuterSigTyVarBndrs outer_bndrs <+> pprLHsContext cxt,
+    <+> (sep [pprHsOuterSigTyVarBndrs outer_bndrs <+> pprLHsContext mcxt,
               ppr_arrow_chain (get_args args ++ [ppr res_ty]) ])
   where
     get_args (PrefixConGADT args) = map ppr args
     get_args (RecConGADT fields)  = [pprConDeclFields (unLoc fields)]
 
-    cxt = fromMaybe noLHsContext mcxt
 
     ppr_arrow_chain (a:as) = sep (a : map (arrow <+>) as)
     ppr_arrow_chain []     = empty
@@ -740,7 +738,7 @@ ppr_fam_inst_eqn (FamEqn { feqn_tycon  = L _ tycon
                          , feqn_pats   = pats
                          , feqn_fixity = fixity
                          , feqn_rhs    = rhs })
-    = pprHsFamInstLHS tycon bndrs pats fixity noLHsContext <+> equals <+> ppr rhs
+    = pprHsFamInstLHS tycon bndrs pats fixity Nothing <+> equals <+> ppr rhs
 
 instance OutputableBndrId p
        => Outputable (DataFamInstDecl (GhcPass p)) where
@@ -770,7 +768,7 @@ pprHsFamInstLHS :: (OutputableBndrId p)
    -> HsOuterFamEqnTyVarBndrs (GhcPass p)
    -> HsTyPats (GhcPass p)
    -> LexicalFixity
-   -> LHsContext (GhcPass p)
+   -> Maybe (LHsContext (GhcPass p))
    -> SDoc
 pprHsFamInstLHS thing bndrs typats fixity mb_ctxt
    = hsep [ pprHsOuterFamEqnTyVarBndrs bndrs
