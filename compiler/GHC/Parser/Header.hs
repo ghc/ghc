@@ -139,18 +139,19 @@ mkPrelImports this_mod loc implicit_prelude import_decls
             Just b  -> sl_fs b == unitIdFS baseUnitId
 
 
+      loc' = noAnnSrcSpan loc
       preludeImportDecl :: LImportDecl GhcPs
       preludeImportDecl
-        = L loc $ ImportDecl { ideclExt       = noExtField,
-                               ideclSourceSrc = NoSourceText,
-                               ideclName      = L loc pRELUDE_NAME,
-                               ideclPkgQual   = Nothing,
-                               ideclSource    = NotBoot,
-                               ideclSafe      = False,  -- Not a safe import
-                               ideclQualified = NotQualified,
-                               ideclImplicit  = True,   -- Implicit!
-                               ideclAs        = Nothing,
-                               ideclHiding    = Nothing  }
+        = L loc' $ ImportDecl { ideclExt       = noAnn,
+                                ideclSourceSrc = NoSourceText,
+                                ideclName      = L loc pRELUDE_NAME,
+                                ideclPkgQual   = Nothing,
+                                ideclSource    = NotBoot,
+                                ideclSafe      = False,  -- Not a safe import
+                                ideclQualified = NotQualified,
+                                ideclImplicit  = True,   -- Implicit!
+                                ideclAs        = Nothing,
+                                ideclHiding    = Nothing  }
 
 --------------------------------------------------------------
 -- Get options
@@ -268,8 +269,8 @@ getOptions' dflags toks
               = map (L (getLoc open)) ["-#include",removeSpaces str] ++
                 parseToks xs
           parseToks (open:close:xs)
-              | ITdocOptions str <- unLoc open
-              , ITclose_prag     <- unLoc close
+              | ITdocOptions str _ <- unLoc open
+              , ITclose_prag       <- unLoc close
               = map (L (getLoc open)) ["-haddock-opts", removeSpaces str]
                 ++ parseToks xs
           parseToks (open:xs)

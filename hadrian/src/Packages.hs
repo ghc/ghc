@@ -1,7 +1,8 @@
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 module Packages (
     -- * GHC packages
-    array, base, binary, bytestring, cabal, checkApiAnnotations, checkPpr,
+    array, base, binary, bytestring, cabal, checkPpr,
+    checkExact,
     compareSizes, compiler, containers, deepseq, deriveConstants, directory,
     exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh,
     ghcCompact, ghcHeap, ghci, ghciWrapper, ghcPkg, ghcPrim, haddock, haskeline,
@@ -31,7 +32,7 @@ import Oracles.Setting
 -- packages and modify build default build conditions in "UserSettings".
 ghcPackages :: [Package]
 ghcPackages =
-    [ array, base, binary, bytestring, cabal, checkPpr, checkApiAnnotations
+    [ array, base, binary, bytestring, cabal, checkPpr
     , compareSizes, compiler, containers, deepseq, deriveConstants, directory
     , exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh
     , ghcCompact, ghcHeap, ghci, ghciWrapper, ghcPkg, ghcPrim, haddock, haskeline, hsc2hs
@@ -50,8 +51,8 @@ base                = lib  "base"
 binary              = lib  "binary"
 bytestring          = lib  "bytestring"
 cabal               = lib  "Cabal"           `setPath` "libraries/Cabal/Cabal"
-checkApiAnnotations = util "check-api-annotations"
 checkPpr            = util "check-ppr"
+checkExact          = util "check-exact"
 compareSizes        = util "compareSizes"    `setPath` "utils/compare_sizes"
 compiler            = top  "ghc"             `setPath` "compiler"
 containers          = lib  "containers"      `setPath` "libraries/containers/containers"

@@ -14,7 +14,7 @@ gadt7.hs:16:38: error:
       Possible fix: add a type signature for ‘i1b’
     • In the expression: y1
       In a case alternative: K -> y1
-      In the expression: case t1 of { K -> y1 }
+      In the expression: case t1 of K -> y1
     • Relevant bindings include
         y1 :: p (bound at gadt7.hs:16:16)
         y :: p (bound at gadt7.hs:16:7)

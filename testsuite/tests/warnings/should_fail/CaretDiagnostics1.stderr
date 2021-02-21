@@ -30,7 +30,7 @@ CaretDiagnostics1.hs:13:7-11: error:
         Actual: String
     • In the pattern: "γηξ"
       In a case alternative: "γηξ" -> () '0'
-      In the expression: case id of { "γηξ" -> () '0' }
+      In the expression: case id of "γηξ" -> () '0'
    |
 13 |       "γηξ" -> (
    |       ^^^^^

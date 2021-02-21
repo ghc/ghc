@@ -50,7 +50,8 @@ testOneFile libdir fileName useHaddock = do
         return (pm_annotations p)
 
     let anns = p
-        ann_comments = apiAnnComments anns
+        -- ann_comments = apiAnnComments anns
+        ann_comments = Map.empty
         ann_rcomments = apiAnnRogueComments anns
         comments =
           map (\(s,v) -> (RealSrcSpan s Nothing, v)) (Map.toList ann_comments)

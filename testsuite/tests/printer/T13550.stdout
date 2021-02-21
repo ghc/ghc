@@ -20,3 +20,14 @@ T13550.ppr.hs:(5,2)-(8,70): Splicing declarations
     type instance Foo (Maybe a) b = Either (Maybe a) (Maybe b)
     data family Bar a b
     data instance Bar (Maybe a) b = BarMaybe (Maybe a) (Maybe b)
+T13550.ppr.hs:(6,2)-(11,7): Splicing declarations
+    [d| type family Foo a b
+        data family Bar a b
+        
+        type instance Foo (Maybe a) b = Either (Maybe a) (Maybe b)
+        data instance Bar (Maybe a) b = BarMaybe (Maybe a) (Maybe b) |]
+  ======>
+    type family Foo a b
+    type instance Foo (Maybe a) b = Either (Maybe a) (Maybe b)
+    data family Bar a b
+    data instance Bar (Maybe a) b = BarMaybe (Maybe a) (Maybe b)
