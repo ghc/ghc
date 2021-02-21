@@ -287,6 +287,18 @@ type instance XRecordUpd     GhcPs = NoExtField
 type instance XRecordUpd     GhcRn = NoExtField
 type instance XRecordUpd     GhcTc = RecordUpdTc
 
+type instance XGetField     GhcPs = NoExtField
+type instance XGetField     GhcRn = NoExtField
+type instance XGetField     GhcTc = Void
+-- HsGetField is eliminated by the renamer. See [Handling overloaded
+-- and rebindable constructs].
+
+type instance XProjection     GhcPs = NoExtField
+type instance XProjection     GhcRn = NoExtField
+type instance XProjection     GhcTc = Void
+-- HsProjection is eliminated by the renamer. See [Handling overloaded
+-- and rebindable constructs].
+
 type instance XExprWithTySig (GhcPass _) = NoExtField
 
 type instance XArithSeq      GhcPs = NoExtField
@@ -509,8 +521,15 @@ ppr_expr (RecordCon { rcon_con = con, rcon_flds = rbinds })
                GhcRn -> ppr con
                GhcTc -> ppr con
 
-ppr_expr (RecordUpd { rupd_expr = L _ aexp, rupd_flds = rbinds })
-  = hang (ppr aexp) 2 (braces (fsep (punctuate comma (map ppr rbinds))))
+ppr_expr (RecordUpd { rupd_expr = L _ aexp, rupd_flds = flds })
+  = case flds of
+      Left rbinds -> hang (ppr aexp) 2 (braces (fsep (punctuate comma (map ppr rbinds))))
+      Right pbinds -> hang (ppr aexp) 2 (braces (fsep (punctuate comma (map ppr pbinds))))
+
+ppr_expr (HsGetField { gf_expr = L _ fexp, gf_field = field })
+  = ppr fexp <> dot <> ppr field
+
+ppr_expr (HsProjection { proj_flds = flds }) = parens (hcat (punctuate dot (map ppr flds)))
 
 ppr_expr (ExprWithTySig _ expr sig)
   = hang (nest 2 (ppr_lexpr expr) <+> dcolon)
@@ -655,6 +674,8 @@ hsExprNeedsParens p = go
     go (HsBinTick _ _ _ (L _ e))      = go e
     go (RecordCon{})                  = False
     go (HsRecFld{})                   = False
+    go (HsProjection{})               = True
+    go (HsGetField{})                 = False
     go (XExpr x)
       | GhcTc <- ghcPass @p
       = case x of
@@ -828,7 +849,43 @@ A general recipe to follow this approach for new constructs could go as follows:
     - the XExpr (HsExpanded ... ...) case in tcExpr already makes sure that we
       typecheck the desugared expression while reporting the original one in
       errors
+-}
 
+{- Note [Overview of record dot syntax]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This is the note that explains all the moving parts for record dot
+syntax.
+
+The language extensions @OverloadedRecordDot@ and
+@OverloadedRecordUpdate@ (providing "record dot syntax") are
+implemented using the techniques of Note [Rebindable syntax and
+HsExpansion].
+
+When OverloadedRecordDot is enabled:
+- Field selection expressions
+  - e.g. foo.bar.baz
+  - Have abstract syntax HsGetField
+  - After renaming are XExpr (HsExpanded (HsGetField ...) (getField @"..."...)) expressions
+- Field selector expressions e.g. (.x.y)
+  - Have abstract syntax HsProjection
+  - After renaming are XExpr (HsExpanded (HsProjection ...) ((getField @"...") . (getField @"...") . ...) expressions
+
+When OverloadedRecordUpdate is enabled:
+- Record update expressions
+  - e.g. a{foo.bar=1, quux="corge", baz}
+  - Have abstract syntax RecUpd
+  - After renaming are XExpr (HsExpanded (RecordUpd ...) (setField@"..." ...) expressions
+    - Note that this is true for all record updates even for those that do not involve '.'
+
+When OverloadedRecordDot is enabled and RebindableSyntax is not
+enabled the name 'getField' is resolved to GHC.Records.getField. When
+OverloadedRecordDot is enabled and RebindableSyntax is enabled the
+name 'getField' is whatever in-scope name that is.
+
+When OverloadedRecordUpd is enabled and RebindableSyntax is not
+enabled it is an error for now. When OverloadedRecordUpd is enabled
+and RebindableSyntax is enabled the names 'getField' and 'setField'
+are whatever in-scope names they are.
 -}
 
 -- See Note [Rebindable syntax and HsExpansion] just above.

@@ -1580,10 +1580,15 @@ repE (RecordCon { rcon_con = c, rcon_flds = flds })
  = do { x <- lookupLOcc c;
         fs <- repFields flds;
         repRecCon x fs }
-repE (RecordUpd { rupd_expr = e, rupd_flds = flds })
+repE (RecordUpd { rupd_expr = e, rupd_flds = Left flds })
  = do { x <- repLE e;
         fs <- repUpdFields flds;
         repRecUpd x fs }
+repE (RecordUpd { rupd_flds = Right _ })
+  = do
+      -- Not possible due to elimination in the renamer. See Note
+      -- [Handling overloaded and rebindable constructs]
+      panic "The impossible has happened!"
 
 repE (ExprWithTySig _ e wc_ty)
   = addSimpleTyVarBinds (get_scoped_tvs_from_sig sig_ty) $

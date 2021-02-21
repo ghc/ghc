@@ -1118,9 +1118,12 @@ instance HiePass p => ToHie (Located (HsExpr (GhcPass p))) where
           con_name = case hiePass @p of       -- Like ConPat
                        HieRn -> con
                        HieTc -> fmap conLikeName con
-      RecordUpd {rupd_expr = expr, rupd_flds = upds}->
+      RecordUpd {rupd_expr = expr, rupd_flds = Left upds}->
         [ toHie expr
         , toHie $ map (RC RecFieldAssign) upds
+        ]
+      RecordUpd {rupd_expr = expr, rupd_flds = Right _}->
+        [ toHie expr
         ]
       ExprWithTySig _ expr sig ->
         [ toHie expr
@@ -1159,6 +1162,8 @@ instance HiePass p => ToHie (Located (HsExpr (GhcPass p))) where
       HsSpliceE _ x ->
         [ toHie $ L mspan x
         ]
+      HsGetField {} -> []
+      HsProjection {} -> []
       XExpr x
         | GhcTc <- ghcPass @p
         , WrapExpr (HsWrap w a) <- x
