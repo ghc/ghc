@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE QuasiQuotes #-}
 module UsingQuasiquotes where
 

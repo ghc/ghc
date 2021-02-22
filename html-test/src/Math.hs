@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 -- | Math (display) for 'normalDensity'
 --
 -- \[

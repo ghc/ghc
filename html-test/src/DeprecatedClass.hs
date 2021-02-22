@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 module DeprecatedClass where
 
 -- | some class

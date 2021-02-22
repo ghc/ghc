@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 module A where
 
 data A = A

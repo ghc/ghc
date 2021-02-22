@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# OPTIONS_HADDOCK ignore-exports #-}
 module IgnoreExports (Foo, foo) where
 

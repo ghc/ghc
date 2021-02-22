@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE PatternSynonyms #-}
 module Bug946 (
   AnInt(AnInt, Zero),

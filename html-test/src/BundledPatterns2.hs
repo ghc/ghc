@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE DataKinds, GADTs, KindSignatures, PatternSynonyms, TypeOperators,
              ViewPatterns #-}
 module BundledPatterns2 (Vec((:>), Empty), RTree(..)) where

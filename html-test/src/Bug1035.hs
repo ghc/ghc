@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 module Bug1035 where
 
 data Foo = Bar

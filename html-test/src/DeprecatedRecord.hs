@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 module DeprecatedRecord where
 
 -- | type Foo

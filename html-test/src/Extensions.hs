@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE Haskell2010, ExplicitForAll, MonomorphismRestriction #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 module Extensions where

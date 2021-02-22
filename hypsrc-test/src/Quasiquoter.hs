@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 module Quasiquoter ( string ) where
 
 import Language.Haskell.TH.Quote

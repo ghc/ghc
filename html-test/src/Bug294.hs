@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE TypeFamilies, FlexibleInstances, GADTs #-}
 -- This tests that we are able to extract record selectors for
 -- associated types when the type itself is not exported. Making this

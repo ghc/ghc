@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 -- | Documentation for "DeprecatedModule".
 module DeprecatedModule {-# DEPRECATED "Use \"Foo\" instead" #-} where
 

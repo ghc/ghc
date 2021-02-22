@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 module PositionPragmas where
 
 {-# LINE 8 "hypsrc-test/src/PositionPragmas.hs" #-}

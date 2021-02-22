@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 -- | This tests the new MINIMAL pragma present in GHC 7.8
 module Minimal
   ( Foo(..)

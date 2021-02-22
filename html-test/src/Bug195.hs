@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 module Bug195 where
 
 data T = A { someField :: () -- ^ Doc for someField of A

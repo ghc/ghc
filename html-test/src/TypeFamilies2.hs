@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE TypeFamilies #-}
 -- This tests what happens if we have unexported types
 -- in type instances. The expected behaviour is

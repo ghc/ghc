@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE UnboxedSums, UnboxedTuples #-}
 module UnboxedStuff where
 
