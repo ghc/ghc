@@ -197,3 +197,6 @@ Runtime system
 
     charVal :: forall n proxy. KnownChar n => proxy n -> Char
     charVal' :: forall n. KnownChar n => Proxy# n -> Char
+
+- On POSIX, ``System.IO.openFile`` can no longer leak a file descriptor if it
+  is interrupted by an asynchronous exception (#19114, #19115).
