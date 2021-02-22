@@ -325,14 +325,12 @@ data IfaceAnnotation
 
 type IfaceAnnTarget = AnnTarget OccName
 
-newtype IfaceCompleteMatch = IfaceCompleteMatch [IfExtName]
+data IfaceCompleteMatch = IfaceCompleteMatch [IfExtName] (Maybe IfaceType)
 
 instance Outputable IfaceCompleteMatch where
-  ppr (IfaceCompleteMatch cls) = text "COMPLETE" <> colon <+> ppr cls
-
-
-
-
+  ppr (IfaceCompleteMatch cls mty) = text "COMPLETE" <> colon <+> ppr cls <+> case mty of
+    Nothing -> empty
+    Just ty -> dcolon <+> ppr ty
 
 -- Here's a tricky case:
 --   * Compile with -O module A, and B which imports A.f
@@ -2493,8 +2491,8 @@ instance Binary IfaceTyConParent where
                 return $ IfDataInstance ax pr ty
 
 instance Binary IfaceCompleteMatch where
-  put_ bh (IfaceCompleteMatch cs) = put_ bh cs
-  get bh = IfaceCompleteMatch <$> get bh
+  put_ bh (IfaceCompleteMatch cs mty) = put_ bh cs >> put_ bh mty
+  get bh = IfaceCompleteMatch <$> get bh <*> get bh
 
 
 {-
@@ -2653,7 +2651,7 @@ instance NFData IfaceConAlt where
     IfaceLitAlt lit -> lit `seq` ()
 
 instance NFData IfaceCompleteMatch where
-  rnf (IfaceCompleteMatch f1) = rnf f1
+  rnf (IfaceCompleteMatch f1 mty) = rnf f1 `seq` rnf mty
 
 instance NFData IfaceRule where
   rnf (IfaceRule f1 f2 f3 f4 f5 f6 f7 f8) =

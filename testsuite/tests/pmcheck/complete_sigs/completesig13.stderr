@@ -1,0 +1,7 @@
+
+completesig13.hs:31:1: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘bar’:
+        Patterns of type ‘List t’ not matched:
+            Nil
+            Cons _ _
