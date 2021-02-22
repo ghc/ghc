@@ -1,8 +1,17 @@
-{-# LANGUAGE StandaloneDeriving, FlexibleInstances, MultiParamTypeClasses, CPP, TupleSections, BangPatterns, LambdaCase, NamedFieldPuns, ScopedTypeVariables, RecordWildCards #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# OPTIONS_GHC -Wwarn #-}
 -----------------------------------------------------------------------------
 -- |
@@ -38,33 +47,33 @@ import Data.Map (Map)
 import Data.List (foldl', find)
 import Data.Maybe
 import Data.Traversable
-import GHC.Stack
 
+import GHC.Stack
+import GHC hiding (lookupName)
+import GHC.Core.Class
+import GHC.Core.ConLike (ConLike (..))
+import GHC.Data.FastString (bytesFS, unpackFS)
+import GHC.Driver.Ppr
+import GHC.HsToCore.Docs hiding (mkMaps)
+import GHC.Parser.Annotation (IsUnicodeSyntax (..))
+import GHC.Tc.Types hiding (IfM)
 import GHC.Tc.Utils.Monad (finalSafeMode)
 import GHC.Types.Avail hiding (avail)
-import qualified GHC.Types.Avail  as Avail
+import qualified GHC.Types.Avail as Avail
+import GHC.Types.Basic (PromotionFlag (..))
+import GHC.Types.Name
+import GHC.Types.Name.Env
+import GHC.Types.Name.Reader
+import GHC.Types.Name.Set
+import GHC.Types.SourceFile
+import GHC.Types.SourceText
+import qualified GHC.Types.SrcLoc as SrcLoc
 import qualified GHC.Unit.Module as Module
 import GHC.Unit.Module.ModSummary
-import qualified GHC.Types.SrcLoc as SrcLoc
-import GHC.Types.SourceFile
-import GHC.Core.Class
-import GHC.Core.ConLike (ConLike(..))
-import GHC hiding (lookupName)
-import GHC.Driver.Ppr
-import GHC.Types.Name
-import GHC.Types.Name.Set
-import GHC.Types.Name.Env
+import GHC.Unit.Module.Warnings
 import GHC.Unit.State
-import GHC.Types.Name.Reader
-import GHC.Tc.Types hiding (IfM)
-import GHC.Data.FastString ( unpackFS, bytesFS )
-import GHC.Types.Basic ( PromotionFlag(..) )
-import GHC.Types.SourceText
 import qualified GHC.Utils.Outputable as O
 import GHC.Utils.Panic
-import GHC.HsToCore.Docs hiding (mkMaps)
-import GHC.Parser.Annotation (IsUnicodeSyntax(..))
-import GHC.Unit.Module.Warnings
 
 newtype IfEnv m = IfEnv
   {
