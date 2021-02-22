@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 -- | This module caused a duplicate instance in the documentation for the Foo
 -- type.

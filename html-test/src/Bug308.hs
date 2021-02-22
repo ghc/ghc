@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 -- From 2.14.x onwards we were forgetting to swallow ‘#’ as a special
 -- character resulting in broken anchors if they accured
 -- mid-paragraph. Here we check that anchors get generated as

@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE ImplicitParams, RankNTypes #-}
 module ImplicitParams where
 

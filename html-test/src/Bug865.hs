@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 module Bug865 where
 
 -- | An emphasized link [yes /this/ is emphasized while this is

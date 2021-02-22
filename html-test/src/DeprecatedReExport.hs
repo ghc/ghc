@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 -- |
 -- What is tested here:
 --

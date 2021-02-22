@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 module DeprecatedFunction3 where
 
 

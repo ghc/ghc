@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 module Bug873 (($), ($$)) where
 infixr 0 $$
 

@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 module B ( module A, test, reExport, X(..) ) where
 import A ( A(..), test2, reExport, X(..) )
 

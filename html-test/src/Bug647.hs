@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 module Bug647 where
 
 class Bug647 a where

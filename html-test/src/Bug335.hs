@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 -- Tests for collapsable headers
 module Bug335 where
 

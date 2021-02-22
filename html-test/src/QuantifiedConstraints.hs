@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE QuantifiedConstraints #-}
 module QuantifiedConstraints where
 

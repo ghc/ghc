@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE TemplateHaskell, QuasiQuotes #-}
 
 -- example taken from the GHC documentation

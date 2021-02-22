@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 -- Just like Bug308 module but here we test that referring to anchors
 -- from other modules works.
 module Bug308CrossModule where

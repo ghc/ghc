@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE EmptyDataDecls, KindSignatures #-}
 -- |
 -- What is tested here:

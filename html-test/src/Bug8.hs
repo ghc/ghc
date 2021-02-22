@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 module Bug8 where
 
 infix -->

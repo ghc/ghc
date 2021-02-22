@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 module Examples where
 
 -- | Fibonacci number of given 'Integer'.

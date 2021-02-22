@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 -- test for #192
 module BugExportHeadings (
 -- * Foo

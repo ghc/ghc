@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 module Example where
 
 -- | Example use.

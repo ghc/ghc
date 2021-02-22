@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 module Bold where
 -- | Some __bold text__.
 --

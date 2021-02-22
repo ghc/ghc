@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 module DeprecatedFunction where
 
 -- | some documentation for foo

@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 -- | The first list is incorrectly numbered as 1. 2. 1.; the second example
 -- renders fine (1. 2. 3.).
 --
