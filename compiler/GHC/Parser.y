@@ -1978,10 +1978,6 @@ opt_sig :: { ([AddAnn], Maybe (LHsType GhcPs)) }
         : {- empty -}                   { ([],Nothing) }
         | '::' ctype                    { ([mu AnnDcolon $1],Just $2) }
 
-opt_tyconsig :: { ([AddAnn], Maybe (Located RdrName)) }
-             : {- empty -}              { ([], Nothing) }
-             | '::' gtycon              { ([mu AnnDcolon $1], Just $2) }
-
 -- Like ktype, but for types that obey the forall-or-nothing rule.
 -- See Note [forall-or-nothing rule] in GHC.Hs.Type.
 sigktype :: { LHsSigType GhcPs }
@@ -1996,6 +1992,10 @@ sigktype :: { LHsSigType GhcPs }
 -- surgery on the LHsType it returns to turn it into an LHsSigType.
 sigtype :: { LHsSigType GhcPs }
         : ctype                            { hsTypeToHsSigType $1 }
+
+opt_patsigtype :: { ([AddAnn], Maybe (HsPatSigType GhcPs)) }
+  : {- empty -}   { ([], Nothing) }
+  | '::' type     { ([mu AnnDcolon $1], Just (mkHsPatSigType $2)) }
 
 sig_vars :: { Located [Located RdrName] }    -- Returned in reversed order
          : sig_vars ',' var           {% addAnnotation (gl $ head $ unLoc $1)
@@ -2521,7 +2521,7 @@ sigdecl :: { LHsDecl GhcPs }
 
         | pattern_synonym_sig   { sLL $1 $> . SigD noExtField . unLoc $ $1 }
 
-        | '{-# COMPLETE' con_list opt_tyconsig  '#-}'
+        | '{-# COMPLETE' con_list opt_patsigtype '#-}'
                 {% let (dcolon, tc) = $3
                    in ams
                        (sLL $1 $>
