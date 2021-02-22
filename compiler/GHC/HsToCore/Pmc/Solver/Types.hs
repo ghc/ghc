@@ -46,6 +46,7 @@ import GHC.Types.Unique.SDFM
 import GHC.Types.Name
 import GHC.Core.DataCon
 import GHC.Core.ConLike
+import GHC.Core.Unify
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Data.List.SetOps (unionLists)
@@ -61,7 +62,7 @@ import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
 import GHC.Tc.Solver.Monad (InertSet, emptyInert)
 import GHC.Tc.Utils.TcType (isStringTy)
-import GHC.Types.CompleteMatch (CompleteMatch)
+import GHC.Types.CompleteMatch (CompleteMatch(..))
 
 import Numeric (fromRat)
 import Data.Foldable (find)
@@ -366,25 +367,25 @@ data PmAltCon = PmAltConLike ConLike
 data PmAltConSet = PACS !CompleteMatch ![PmLit]
 
 emptyPmAltConSet :: PmAltConSet
-emptyPmAltConSet = PACS emptyUniqDSet []
+emptyPmAltConSet = PACS (CompleteMatch emptyUniqDSet Nothing) []
 
 isEmptyPmAltConSet :: PmAltConSet -> Bool
-isEmptyPmAltConSet (PACS cls lits) = isEmptyUniqDSet cls && null lits
+isEmptyPmAltConSet (PACS (CompleteMatch cls _ty) lits) = isEmptyUniqDSet cls && null lits
 
 -- | Whether there is a 'PmAltCon' in the 'PmAltConSet' that compares 'Equal' to
 -- the given 'PmAltCon' according to 'eqPmAltCon'.
-elemPmAltConSet :: PmAltCon -> PmAltConSet -> Bool
-elemPmAltConSet (PmAltConLike cl) (PACS cls _   ) = elementOfUniqDSet cl cls
-elemPmAltConSet (PmAltLit lit)    (PACS _   lits) = elem lit lits
+elemPmAltConSet :: Type -> PmAltCon -> PmAltConSet -> Bool
+elemPmAltConSet ty (PmAltConLike cl) (PACS (CompleteMatch cls mty) _) = all (\ty' -> isJust (tcUnifyTyKi ty ty')) mty && elementOfUniqDSet cl cls
+elemPmAltConSet _ (PmAltLit lit) (PACS _ lits) = elem lit lits
 
 extendPmAltConSet :: PmAltConSet -> PmAltCon -> PmAltConSet
-extendPmAltConSet (PACS cls lits) (PmAltConLike cl)
-  = PACS (addOneToUniqDSet cls cl) lits
+extendPmAltConSet (PACS (CompleteMatch cls mty) lits) (PmAltConLike cl)
+  = PACS (CompleteMatch (addOneToUniqDSet cls cl) mty) lits
 extendPmAltConSet (PACS cls lits) (PmAltLit lit)
   = PACS cls (unionLists lits [lit])
 
 pmAltConSetElems :: PmAltConSet -> [PmAltCon]
-pmAltConSetElems (PACS cls lits)
+pmAltConSetElems (PACS (CompleteMatch cls _) lits)
   = map PmAltConLike (uniqDSetToList cls) ++ map PmAltLit lits
 
 instance Outputable PmAltConSet where
