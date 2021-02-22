@@ -85,6 +85,7 @@ import GHC.Types.Annotations
 import GHC.Types.SourceFile
 import GHC.Types.SourceText
 import GHC.Types.Basic hiding ( SuccessFlag(..) )
+import GHC.Types.CompleteMatch
 import GHC.Types.SrcLoc
 import GHC.Types.TypeEnv
 import GHC.Types.Unique.FM
@@ -1280,8 +1281,10 @@ tcIfaceCompleteMatches :: [IfaceCompleteMatch] -> IfL [CompleteMatch]
 tcIfaceCompleteMatches = mapM tcIfaceCompleteMatch
 
 tcIfaceCompleteMatch :: IfaceCompleteMatch -> IfL CompleteMatch
-tcIfaceCompleteMatch (IfaceCompleteMatch ms) =
-  mkUniqDSet <$> mapM (forkM doc . tcIfaceConLike) ms
+tcIfaceCompleteMatch (IfaceCompleteMatch ms mtc) = do
+  conlikes <- mkUniqDSet <$> mapM (forkM doc . tcIfaceConLike) ms
+  mtc' <- traverse tcIfaceTyCon mtc
+  return (CompleteMatch conlikes mtc')
   where
     doc = text "COMPLETE sig" <+> ppr ms
 
