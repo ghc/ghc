@@ -4,12 +4,8 @@ AC_INIT([GHC BigNum library], [1.0], [libraries@haskell.org], [ghc-bignum])
 # Safety check: Ensure that we are in the correct source directory.
 AC_CONFIG_SRCDIR([cbits/gmp_wrappers.c])
 
-AC_CANONICAL_TARGET
-
-AC_PROG_CC
 dnl make extensions visible to allow feature-tests to detect them lateron
 AC_USE_SYSTEM_EXTENSIONS
-
 
 dnl--------------------------------------------------------------------
 dnl * Deal with arguments telling us gmp is somewhere odd
