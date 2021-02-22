@@ -49,6 +49,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Core.Type (mkStrLitTy, tidyOpenType, mkCastTy)
 import GHC.Builtin.Types ( mkBoxedTupleTy )
 import GHC.Builtin.Types.Prim
+import GHC.Types.CompleteMatch
 import GHC.Types.SourceText
 import GHC.Types.Id
 import GHC.Types.Var as Var
@@ -200,14 +201,27 @@ tcTopBinds binds sigs
 
 tcCompleteSigs  :: [LSig GhcRn] -> TcM [CompleteMatch]
 tcCompleteSigs sigs =
-  let
+  let orphanError :: SDoc
+      orphanError =
+        text "Orphan COMPLETE pragmas not supported" $$
+        text "A COMPLETE pragma must mention at least one data constructor" $$
+        text "or pattern synonym defined in the same module."
+
       doOne :: LSig GhcRn -> TcM (Maybe CompleteMatch)
-      -- We don't need to "type-check" COMPLETE signatures anymore; if their
-      -- combinations are invalid it will be found so at match sites. Hence we
-      -- keep '_mtc' only for backwards compatibility.
-      doOne (L loc c@(CompleteMatchSig _ext _src_txt (L _ ns) _mtc))
-        = fmap Just $ setSrcSpan loc $ addErrCtxt (text "In" <+> ppr c) $
-            mkUniqDSet <$> mapM (addLocM tcLookupConLike) ns
+      doOne (L loc c@(CompleteMatchSig _ext _src_txt (L _ ns) mty))
+        = do this_mod <- fmap tcg_mod getGblEnv
+             mt <- forM mty $ \ty -> do
+               (_,_,t) <- tcHsPatSigType CompletePragCtxt HM_FamPat ty OpenKind
+               return t
+
+             fmap Just $ setSrcSpan loc $ addErrCtxt (text "In" <+> ppr c) $ do
+               -- Check if this COMPLETE pragma is an orphan.
+               unless (any (nameIsLocalOrFrom this_mod . unLoc) ns || any (nameSetAny (nameIsLocalOrFrom this_mod) . orphNamesOfType) mt) $
+                 -- Why 'any'? See Note [Orphan COMPLETE pragmas]
+                 failWithTc orphanError
+               -- Look up the ConLikes mentioned
+               conlikes <- mkUniqDSet <$> mapM (addLocM tcLookupConLike) ns
+               return (CompleteMatch { cmConLikes = conlikes, cmScrutineeType = mt })
       doOne _ = return Nothing
 
   -- For some reason I haven't investigated further, the signatures come in

@@ -14,7 +14,7 @@ pattern B <- (const False -> True)
 pattern C :: a
 pattern C <- (const True -> True)
 
-{-# COMPLETE B, C :: T #-}
+{-# COMPLETE B, C :: T t #-}
 
 f :: a :~: () -> T a -> ()
 f _    B = ()
