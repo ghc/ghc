@@ -109,9 +109,7 @@ ifneq "$$(CURSES_LIB_DIRS)" ""
 $1_$2_CONFIGURE_OPTS += --configure-option=--with-curses-libraries="$$(CURSES_LIB_DIRS)"
 endif
 
-ifeq "$$(CrossCompiling)" "YES"
 $1_$2_CONFIGURE_OPTS += --configure-option=--host=$(TargetPlatformFull)
-endif
 
 ifeq "$3" "0"
 $1_$2_CONFIGURE_OPTS += $$(BOOT_PKG_CONSTRAINTS)
