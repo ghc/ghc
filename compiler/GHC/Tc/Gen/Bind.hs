@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE TypeFamilies        #-}
 
 {-
@@ -65,6 +66,7 @@ import GHC.Data.Graph.Directed
 import GHC.Data.Maybe
 import GHC.Utils.Misc
 import GHC.Types.Basic
+import GHC.Types.CompleteMatch
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Builtin.Names( ipClassName )
@@ -203,11 +205,14 @@ tcCompleteSigs sigs =
   let
       doOne :: LSig GhcRn -> TcM (Maybe CompleteMatch)
       -- We don't need to "type-check" COMPLETE signatures anymore; if their
-      -- combinations are invalid it will be found so at match sites. Hence we
-      -- keep '_mtc' only for backwards compatibility.
-      doOne (L loc c@(CompleteMatchSig _ext _src_txt (L _ ns) _mtc))
-        = fmap Just $ setSrcSpan loc $ addErrCtxt (text "In" <+> ppr c) $
-            mkUniqDSet <$> mapM (addLocM tcLookupConLike) ns
+      -- combinations are invalid it will be found so at match sites.
+      -- There it is also where we consider if the type of the pattern match is
+      -- compatible with the result type constructor 'mb_tc'.
+      doOne (L loc c@(CompleteMatchSig _ext _src_txt (L _ ns) mb_tc_nm))
+        = fmap Just $ setSrcSpan loc $ addErrCtxt (text "In" <+> ppr c) $ do
+            cls   <- mkUniqDSet <$> mapM (addLocM tcLookupConLike) ns
+            mb_tc <- traverse @Maybe tcLookupLocatedTyCon mb_tc_nm
+            pure CompleteMatch { cmConLikes = cls, cmResultTyCon = mb_tc }
       doOne _ = return Nothing
 
   -- For some reason I haven't investigated further, the signatures come in
