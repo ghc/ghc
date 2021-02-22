@@ -24,13 +24,45 @@
 
 #if defined(THREADED_RTS)
 
+#if defined(PROF_SPIN)
+
+ATTR_ALWAYS_INLINE static inline bool try_acquire_spin_slow_path(SpinLock * p)
+{
+    StgWord r;
+    r = cas((StgVolatilePtr)&(p->lock), 1, 0);
+    if (r == 0) RELAXED_ADD(&p->spin, 1);
+    return r != 0;
+}
+
+#else /* !PROF_SPIN */
+
+ATTR_ALWAYS_INLINE static inline bool try_acquire_spin_slow_path(SpinLock * p)
+{
+    StgWord r;
+    // Note
+    //
+    // Here we first check if we can obtain the lock without trying to cas.
+    // The cas instruction will add extra inter-CPU traffic on most CPU
+    // architectures as it has to invalidate cache lines. Rather than adding
+    // this traffic in the spin loop, we rather restrict it to times when the
+    // lock might be available.
+    //
+    // We do not need to do this when PROF_SPIN is enabled, since we write to
+    // the lock in both cases (acquired/not acquired).
+    r = RELAXED_LOAD(&p->lock);
+    if (r != 0) {
+        r = cas((StgVolatilePtr)&(p->lock), 1, 0);
+    }
+    return r != 0;
+}
+
+#endif
+
 void acquire_spin_lock_slow_path(SpinLock * p)
 {
     do {
         for (uint32_t i = 0; i < SPIN_COUNT; i++) {
-            StgWord32 r = cas((StgVolatilePtr)&(p->lock), 1, 0);
-            if (r != 0) return;
-            IF_PROF_SPIN(RELAXED_ADD(&p->spin, 1));
+            if (try_acquire_spin_slow_path(p)) return;
             busy_wait_nop();
         }
         IF_PROF_SPIN(RELAXED_ADD(&p->yield, 1));
