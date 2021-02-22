@@ -245,11 +245,11 @@ tidyCo env@(_, subst) co
     go (InstCo co ty)        = (InstCo $! go co) $! go ty
     go (KindCo co)           = KindCo $! go co
     go (SubCo co)            = SubCo $! go co
-    go (AxiomRuleCo ax cos)  = AxiomRuleCo ax $ strictMap go cos
+    go (AxiomRuleCo ax cos)  = AxiomRuleCo ax $! strictMap go cos
 
     go_prov (PhantomProv co)    = PhantomProv $! go co
     go_prov (ProofIrrelProv co) = ProofIrrelProv $! go co
     go_prov p@(PluginProv _)    = p
 
 tidyCos :: TidyEnv -> [Coercion] -> [Coercion]
-tidyCos env = strictMap (tidyCo env)
+tidyCos env cos = strictMap (tidyCo env) cos
