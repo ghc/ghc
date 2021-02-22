@@ -23,7 +23,7 @@ instance WrappedIn (App f a) (f a) where
 
 pattern Unwrapped :: WrappedIn s a => a -> s
 pattern Unwrapped x <- (unwrap -> x)
-{-# COMPLETE Unwrapped :: App #-}
+{-# COMPLETE Unwrapped :: App t #-}
 
 boom :: HideArg (App Identity) -> Bool
 boom (HideArg (Unwrapped (Identity _))) = True

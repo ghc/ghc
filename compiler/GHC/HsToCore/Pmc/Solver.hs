@@ -48,6 +48,7 @@ import GHC.Utils.Error ( pprMsgEnvelopeBagWithLoc )
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Data.Bag
+import GHC.Types.CompleteMatch
 import GHC.Types.Error
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.DSet
@@ -77,7 +78,7 @@ import GHC.Builtin.Types.Prim (tYPETyCon)
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type
 import GHC.Tc.Solver   (tcNormalise, tcCheckSatisfiability)
-import GHC.Core.Unify    (tcMatchTy)
+import GHC.Core.Unify    (tcMatchTy, tcUnifyTyKi)
 import GHC.Core.Coercion
 import GHC.HsToCore.Monad hiding (foldlM)
 import GHC.Tc.Instance.Family
@@ -147,7 +148,7 @@ vanillaCompleteMatchTC tc =
       -- special case.
       mb_dcs | tc == tYPETyCon = Just []
              | otherwise       = tyConDataCons_maybe tc
-  in mkUniqDSet . map RealDataCon <$> mb_dcs
+  in vanillaCompleteMatch . mkUniqDSet . map RealDataCon <$> mb_dcs
 
 -- | Initialise from 'dsGetCompleteMatches' (containing all COMPLETE pragmas)
 -- if the given 'ResidualCompleteMatches' were empty.
@@ -161,6 +162,9 @@ addConLikeMatches :: ConLike -> ResidualCompleteMatches -> DsM ResidualCompleteM
 addConLikeMatches (RealDataCon dc) rcm = addTyConMatches (dataConTyCon dc) rcm
 addConLikeMatches (PatSynCon _)    rcm = addCompleteMatches rcm
 
+filterRCMsByType :: Type -> ResidualCompleteMatches -> ResidualCompleteMatches
+filterRCMsByType ty (RCM v mcms) = RCM v (fmap (filterCompleteMatches ty) mcms)
+
 -- | Adds
 --    * the 'CompleteMatches' from COMPLETE pragmas
 --    * and the /vanilla/ 'CompleteMatch' from the data 'TyCon'
@@ -173,16 +177,17 @@ addTyConMatches tc rcm = add_tc_match <$> addCompleteMatches rcm
     add_tc_match rcm
       = rcm{rcm_vanilla = rcm_vanilla rcm <|> vanillaCompleteMatchTC tc}
 
-markMatched :: PmAltCon -> ResidualCompleteMatches -> DsM (Maybe ResidualCompleteMatches)
+markMatched :: Type -> PmAltCon -> ResidualCompleteMatches -> DsM (Maybe ResidualCompleteMatches)
 -- Nothing means the PmAltCon didn't occur in any COMPLETE set.
 -- See Note [Shortcutting the inhabitation test] for how this is useful for
 -- performance on T17836.
-markMatched (PmAltLit _)      _   = pure Nothing -- lits are never part of a COMPLETE set
-markMatched (PmAltConLike cl) rcm = do
-  rcm' <- addConLikeMatches cl rcm
-  let go cm = case lookupUniqDSet cm cl of
+markMatched _ (PmAltLit _)      _   = pure Nothing -- lits are never part of a COMPLETE set
+markMatched ty (PmAltConLike cl) rcm = do
+  rcm' <- filterRCMsByType ty <$> addConLikeMatches cl rcm
+  tracePm "markMatched" (ppr ty <> text ", " <> ppr cl <> text ", " <> ppr rcm <> text " -> " <> ppr rcm')
+  let go cm = case lookupUniqDSet (cmConLikes cm) cl of
         Nothing -> (False, cm)
-        Just _  -> (True,  delOneFromUniqDSet cm cl)
+        Just _  -> (True,  cm { cmConLikes = delOneFromUniqDSet (cmConLikes cm) cl })
   pure $ updRcm go rcm'
 
 {-
@@ -786,7 +791,7 @@ addNotConCt nabla x nalt = do
       MASSERT( isPmAltConMatchStrict nalt )
       let vi' = vi{ vi_neg = neg', vi_bot = IsNotBot }
       -- 3. Make sure there's at least one other possible constructor
-      mb_rcm' <- lift (markMatched nalt rcm)
+      mb_rcm' <- lift (markMatched (varType x') nalt rcm)
       pure $ case mb_rcm' of
         -- If nalt could be removed from a COMPLETE set, we'll get back Just and
         -- have to mark x dirty, by returning Just x'.
@@ -813,7 +818,7 @@ addConCt :: Nabla -> Id -> PmAltCon -> [TyVar] -> [Id] -> MaybeT DsM Nabla
 addConCt nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_facts=env } } x alt tvs args = do
   let vi@(VI _ pos neg bot _) = lookupVarInfo ts x
   -- First try to refute with a negative fact
-  guard (not (elemPmAltConSet alt neg))
+  guard (not (elemPmAltConSet (varType x) alt neg))
   -- Then see if any of the other solutions (remember: each of them is an
   -- additional refinement of the possible values x could take) indicate a
   -- contradiction
@@ -1338,7 +1343,7 @@ anyConLikeSolution p = any (go . paca_con)
     go (PmAltConLike cl) = p cl
     go _                 = False
 
--- | @instCompleteSet fuel nabla nabla cls@ iterates over @cls@ until it finds
+-- | @instCompleteSet fuel nabla x cls@ iterates over @cls@ until it finds
 -- the first inhabited ConLike (as per 'instCon'). Any failed instantiation
 -- attempts of a ConLike are recorded as negative information in the returned
 -- 'Nabla', so that later calls to this function can skip repeatedly fruitless
@@ -1350,7 +1355,7 @@ anyConLikeSolution p = any (go . paca_con)
 -- entirely as an optimisation.
 instCompleteSet :: Int -> Nabla -> Id -> CompleteMatch -> MaybeT DsM Nabla
 instCompleteSet fuel nabla x cs
-  | anyConLikeSolution (`elementOfUniqDSet` cs) (vi_pos vi)
+  | anyConLikeSolution (`elementOfUniqDSet` (cmConLikes cs)) (vi_pos vi)
   -- No need to instantiate a constructor of this COMPLETE set if we already
   -- have a solution!
   = pure nabla
@@ -1360,13 +1365,14 @@ instCompleteSet fuel nabla x cs
     vi = lookupVarInfo (nabla_tm_st nabla) x
 
     sorted_candidates :: CompleteMatch -> [ConLike]
-    sorted_candidates cs
+    sorted_candidates cm
       -- If there aren't many candidates, we can try to sort them by number of
       -- strict fields, type constraints, etc., so that we are fast in the
       -- common case
       -- (either many simple constructors *or* few "complicated" ones).
       | sizeUniqDSet cs <= 5 = sortBy compareConLikeTestability (uniqDSetToList cs)
       | otherwise            = uniqDSetToList cs
+      where cs = cmConLikes cm
 
     go :: Nabla -> [ConLike] -> MaybeT DsM Nabla
     go _     []         = mzero
@@ -1780,7 +1786,7 @@ generateInhabitingPatterns (x:xs) n nabla = do
 
           -- Test all COMPLETE sets for inhabitants (n inhs at max). Take care of ⊥.
           clss <- pickApplicableCompleteSets rep_ty rcm
-          case NE.nonEmpty (uniqDSetToList <$> clss) of
+          case NE.nonEmpty (uniqDSetToList . cmConLikes <$> clss) of
             Nothing ->
               -- No COMPLETE sets ==> inhabited
               generateInhabitingPatterns xs n newty_nabla
@@ -1833,7 +1839,17 @@ generateInhabitingPatterns (x:xs) n nabla = do
 pickApplicableCompleteSets :: Type -> ResidualCompleteMatches -> DsM [CompleteMatch]
 pickApplicableCompleteSets ty rcm = do
   env <- dsGetFamInstEnvs
-  pure $ filter (all (is_valid env) . uniqDSetToList) (getRcm rcm)
+  let isRelevant :: CompleteMatch -> Bool
+      isRelevant cm = (all (is_valid env) . uniqDSetToList $ cmConLikes cm)
+                   && all (isJust . (\t -> tcUnifyTyKi t ty)) (cmScrutineeType cm)
+      relevantSets = filter isRelevant (getRcm rcm)
+  tracePm "pickApplicableCompleteSets:" $
+    vcat
+      [ ppr ty
+      , ppr rcm
+      , ppr relevantSets
+      ]
+  pure $ relevantSets
   where
     is_valid :: FamInstEnvs -> ConLike -> Bool
     is_valid env cl = isJust (guessConLikeUnivTyArgsFromResTy env ty cl)
