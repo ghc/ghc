@@ -224,14 +224,16 @@ fromFlag :: ModuleOrigin
 fromFlag = ModOrigin Nothing [] [] True
 
 instance Semigroup ModuleOrigin where
-    ModOrigin e res rhs f <> ModOrigin e' res' rhs' f' =
+    x@(ModOrigin e res rhs f) <> y@(ModOrigin e' res' rhs' f') =
         ModOrigin (g e e') (res ++ res') (rhs ++ rhs') (f || f')
       where g (Just b) (Just b')
                 | b == b'   = Just b
-                | otherwise = panic "ModOrigin: package both exposed/hidden"
+                | otherwise = pprPanic "ModOrigin: package both exposed/hidden" $
+                    text "x: " <> ppr x $$ text "y: " <> ppr y
             g Nothing x = x
             g x Nothing = x
-    _x <> _y = panic "ModOrigin: hidden module redefined"
+    x <> y = pprPanic "ModOrigin: hidden module redefined" $
+                 text "x: " <> ppr x $$ text "y: " <> ppr y
 
 instance Monoid ModuleOrigin where
     mempty = ModOrigin Nothing [] [] False

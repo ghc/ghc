@@ -327,6 +327,11 @@ void initLinker_PEi386()
   HeapSetInformation(code_heap, HeapEnableTerminationOnCorruption,
                      &HeapInformation, sizeof(HeapInformation));
   HeapSetInformation(code_heap, HeapOptimizeResources, NULL, 0);
+
+  /* Register the cleanup routine as an exit handler,  this gives other exit handlers
+     a chance to run which may need linker information.  Exit handlers are ran in
+     reverse registration order so this needs to be before the linker loads anything.  */
+  atexit (exitLinker_PEi386);
 }
 
 void exitLinker_PEi386()
@@ -1831,7 +1836,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
    /* ToDo: should be variable-sized?  But is at least safe in the
       sense of buffer-overrun-proof. */
    uint8_t symbol[1000];
-   /* debugBelch("resolving for %s\n", oc->fileName); */
+    /* debugBelch("resolving for %"PATH_FMT "\n", oc->fileName); */
 
    /* Such libraries have been partially freed and can't be resolved.  */
    if (oc->status == OBJECT_DONT_RESOLVE)
