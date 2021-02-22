@@ -48,6 +48,7 @@ import GHC.Utils.Error ( pprMsgEnvelopeBagWithLoc )
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Data.Bag
+import GHC.Types.CompleteMatch
 import GHC.Types.Error
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.DSet
@@ -147,7 +148,7 @@ vanillaCompleteMatchTC tc =
       -- special case.
       mb_dcs | tc == tYPETyCon = Just []
              | otherwise       = tyConDataCons_maybe tc
-  in mkUniqDSet . map RealDataCon <$> mb_dcs
+  in vanillaCompleteMatch . mkUniqDSet . map RealDataCon <$> mb_dcs
 
 -- | Initialise from 'dsGetCompleteMatches' (containing all COMPLETE pragmas)
 -- if the given 'ResidualCompleteMatches' were empty.
@@ -180,9 +181,9 @@ markMatched :: PmAltCon -> ResidualCompleteMatches -> DsM (Maybe ResidualComplet
 markMatched (PmAltLit _)      _   = pure Nothing -- lits are never part of a COMPLETE set
 markMatched (PmAltConLike cl) rcm = do
   rcm' <- addConLikeMatches cl rcm
-  let go cm = case lookupUniqDSet cm cl of
+  let go cm = case lookupUniqDSet (cmConLikes cm) cl of
         Nothing -> (False, cm)
-        Just _  -> (True,  delOneFromUniqDSet cm cl)
+        Just _  -> (True,  cm { cmConLikes = delOneFromUniqDSet (cmConLikes cm) cl })
   pure $ updRcm go rcm'
 
 {-
@@ -1338,7 +1339,7 @@ anyConLikeSolution p = any (go . paca_con)
     go (PmAltConLike cl) = p cl
     go _                 = False
 
--- | @instCompleteSet fuel nabla nabla cls@ iterates over @cls@ until it finds
+-- | @instCompleteSet fuel nabla x cls@ iterates over @cls@ until it finds
 -- the first inhabited ConLike (as per 'instCon'). Any failed instantiation
 -- attempts of a ConLike are recorded as negative information in the returned
 -- 'Nabla', so that later calls to this function can skip repeatedly fruitless
@@ -1350,9 +1351,11 @@ anyConLikeSolution p = any (go . paca_con)
 -- entirely as an optimisation.
 instCompleteSet :: Int -> Nabla -> Id -> CompleteMatch -> MaybeT DsM Nabla
 instCompleteSet fuel nabla x cs
-  | anyConLikeSolution (`elementOfUniqDSet` cs) (vi_pos vi)
+  | anyConLikeSolution (`elementOfUniqDSet` (cmConLikes cs)) (vi_pos vi)
   -- No need to instantiate a constructor of this COMPLETE set if we already
   -- have a solution!
+  = pure nabla
+  | not (completeMatchAppliesAtType (varType x) cs)
   = pure nabla
   | otherwise
   = go nabla (sorted_candidates cs)
@@ -1360,13 +1363,14 @@ instCompleteSet fuel nabla x cs
     vi = lookupVarInfo (nabla_tm_st nabla) x
 
     sorted_candidates :: CompleteMatch -> [ConLike]
-    sorted_candidates cs
+    sorted_candidates cm
       -- If there aren't many candidates, we can try to sort them by number of
       -- strict fields, type constraints, etc., so that we are fast in the
       -- common case
       -- (either many simple constructors *or* few "complicated" ones).
       | sizeUniqDSet cs <= 5 = sortBy compareConLikeTestability (uniqDSetToList cs)
       | otherwise            = uniqDSetToList cs
+      where cs = cmConLikes cm
 
     go :: Nabla -> [ConLike] -> MaybeT DsM Nabla
     go _     []         = mzero
@@ -1780,7 +1784,7 @@ generateInhabitingPatterns (x:xs) n nabla = do
 
           -- Test all COMPLETE sets for inhabitants (n inhs at max). Take care of ⊥.
           clss <- pickApplicableCompleteSets rep_ty rcm
-          case NE.nonEmpty (uniqDSetToList <$> clss) of
+          case NE.nonEmpty (uniqDSetToList . cmConLikes <$> clss) of
             Nothing ->
               -- No COMPLETE sets ==> inhabited
               generateInhabitingPatterns xs n newty_nabla
@@ -1833,7 +1837,17 @@ generateInhabitingPatterns (x:xs) n nabla = do
 pickApplicableCompleteSets :: Type -> ResidualCompleteMatches -> DsM [CompleteMatch]
 pickApplicableCompleteSets ty rcm = do
   env <- dsGetFamInstEnvs
-  pure $ filter (all (is_valid env) . uniqDSetToList) (getRcm rcm)
+  let applicable :: CompleteMatch -> Bool
+      applicable cm = all (is_valid env) (uniqDSetToList (cmConLikes cm))
+                   && completeMatchAppliesAtType ty cm
+      applicableMatches = filter applicable (getRcm rcm)
+  tracePm "pickApplicableCompleteSets:" $
+    vcat
+      [ ppr ty
+      , ppr rcm
+      , ppr applicableMatches
+      ]
+  return applicableMatches
   where
     is_valid :: FamInstEnvs -> ConLike -> Bool
     is_valid env cl = isJust (guessConLikeUnivTyArgsFromResTy env ty cl)
