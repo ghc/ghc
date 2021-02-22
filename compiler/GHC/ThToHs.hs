@@ -827,7 +827,7 @@ cvtPragmaD (LineP line file)
        }
 cvtPragmaD (CompleteP cls mty)
   = do { cls' <- noLoc <$> mapM cNameL cls
-       ; mty'  <- traverse tconNameL mty
+       ; mty' <- traverse tconNameL mty
        ; returnJustL $ Hs.SigD noExtField
                    $ CompleteMatchSig noExtField NoSourceText cls' mty' }
 

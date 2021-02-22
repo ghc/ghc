@@ -48,6 +48,7 @@ import GHC.Utils.Error ( pprMsgEnvelopeBagWithLoc )
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Data.Bag
+import GHC.Types.CompleteMatch
 import GHC.Types.Error
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.DSet
@@ -147,7 +148,7 @@ vanillaCompleteMatchTC tc =
       -- special case.
       mb_dcs | tc == tYPETyCon = Just []
              | otherwise       = tyConDataCons_maybe tc
-  in mkUniqDSet . map RealDataCon <$> mb_dcs
+  in vanillaCompleteMatch . mkUniqDSet . map RealDataCon <$> mb_dcs
 
 -- | Initialise from 'dsGetCompleteMatches' (containing all COMPLETE pragmas)
 -- if the given 'ResidualCompleteMatches' were empty.
@@ -180,9 +181,9 @@ markMatched :: PmAltCon -> ResidualCompleteMatches -> DsM (Maybe ResidualComplet
 markMatched (PmAltLit _)      _   = pure Nothing -- lits are never part of a COMPLETE set
 markMatched (PmAltConLike cl) rcm = do
   rcm' <- addConLikeMatches cl rcm
-  let go cm = case lookupUniqDSet cm cl of
+  let go cm = case lookupUniqDSet (cmConLikes cm) cl of
         Nothing -> (False, cm)
-        Just _  -> (True,  delOneFromUniqDSet cm cl)
+        Just _  -> (True,  cm { cmConLikes = delOneFromUniqDSet (cmConLikes cm) cl })
   pure $ updRcm go rcm'
 
 {-
@@ -203,10 +204,34 @@ function, it gives rise to a total function. An example is:
   booleanToInt F = 0
   booleanToInt T = 1
 
-COMPLETE sets are represented internally in GHC a set of 'ConLike's. For
+COMPLETE sets are represented internally in GHC as a set of 'ConLike's. For
 example, the pragma {-# COMPLETE F, T #-} would be represented as:
 
-  {F, T}
+  CompleteMatch {F, T} Nothing
+
+What is the Maybe for? Answer: COMPLETE pragmas may optionally specify a
+result *type constructor* (cf. T14422):
+
+  class C f where
+    foo :: f a -> ()
+  pattern P :: C f => f a
+  pattern P <- (foo -> ())
+
+  instance C State where
+    foo _ = ()
+  {-# COMPLETE P :: State #-}
+
+  f :: State a -> ()
+  f P = ()
+  g :: C f => f a -> ()
+  g P = ()
+
+The @:: State@ here means that the types at which the COMPLETE pragma *applies*
+is restricted to scrutinee types that are applications of the 'State' TyCon. So
+it applies to the match in @f@ but not in @g@ above, resulting in a warning for
+the latter but not for the former. The pragma is represented as
+
+  CompleteMatch {P} (Just State)
 
 GHC collects all COMPLETE pragmas from the current module and from imports
 into a field in the DsM environment, which can be accessed with
@@ -228,18 +253,20 @@ we know a particular variable can't be (through negative constructor constraints
 testing). If *any* of the COMPLETE sets become empty, we know that the match
 was exhaustive.
 
-We assume that a COMPLETE set is non-empty if for one of its ConLikes
-we fail to 'guessConLikeUnivTyArgsFromResTy'. That accounts for ill-typed
-COMPLETE sets. So why don't we simply prune those ill-typed COMPLETE sets from
-'ResidualCompleteMatches'? The answer is that additional type constraints might
-make more COMPLETE sets applicable! Example:
+We assume that a COMPLETE set does not apply if for one of its
+ConLikes we fail to 'guessConLikeUnivTyArgsFromResTy' or the
+type of the match variable isn't an application of the optional
+result type constructor from the pragma. Why don't we simply
+prune inapplicable COMPLETE sets from 'ResidualCompleteMatches'?
+The answer is that additional type constraints might make more
+COMPLETE sets applicable! Example:
 
-  f :: a -> a :~: Boolean -> ()
-  f x Refl | T <- x = ()
+  h :: a -> a :~: Boolean -> ()
+  h x Refl | T <- x = ()
            | F <- x = ()
 
 If we eagerly prune {F,T} from the residual matches of @x@, then we don't see
-that the match in the guards of @f@ is exhaustive, where the COMPLETE set
+that the match in the guards of @h@ is exhaustive, where the COMPLETE set
 applies due to refined type information.
 -}
 
@@ -1338,7 +1365,7 @@ anyConLikeSolution p = any (go . paca_con)
     go (PmAltConLike cl) = p cl
     go _                 = False
 
--- | @instCompleteSet fuel nabla nabla cls@ iterates over @cls@ until it finds
+-- | @instCompleteSet fuel nabla x cls@ iterates over @cls@ until it finds
 -- the first inhabited ConLike (as per 'instCon'). Any failed instantiation
 -- attempts of a ConLike are recorded as negative information in the returned
 -- 'Nabla', so that later calls to this function can skip repeatedly fruitless
@@ -1350,9 +1377,11 @@ anyConLikeSolution p = any (go . paca_con)
 -- entirely as an optimisation.
 instCompleteSet :: Int -> Nabla -> Id -> CompleteMatch -> MaybeT DsM Nabla
 instCompleteSet fuel nabla x cs
-  | anyConLikeSolution (`elementOfUniqDSet` cs) (vi_pos vi)
+  | anyConLikeSolution (`elementOfUniqDSet` (cmConLikes cs)) (vi_pos vi)
   -- No need to instantiate a constructor of this COMPLETE set if we already
   -- have a solution!
+  = pure nabla
+  | not (completeMatchAppliesAtType (varType x) cs)
   = pure nabla
   | otherwise
   = go nabla (sorted_candidates cs)
@@ -1360,13 +1389,14 @@ instCompleteSet fuel nabla x cs
     vi = lookupVarInfo (nabla_tm_st nabla) x
 
     sorted_candidates :: CompleteMatch -> [ConLike]
-    sorted_candidates cs
+    sorted_candidates cm
       -- If there aren't many candidates, we can try to sort them by number of
       -- strict fields, type constraints, etc., so that we are fast in the
       -- common case
       -- (either many simple constructors *or* few "complicated" ones).
       | sizeUniqDSet cs <= 5 = sortBy compareConLikeTestability (uniqDSetToList cs)
       | otherwise            = uniqDSetToList cs
+      where cs = cmConLikes cm
 
     go :: Nabla -> [ConLike] -> MaybeT DsM Nabla
     go _     []         = mzero
@@ -1780,7 +1810,7 @@ generateInhabitingPatterns (x:xs) n nabla = do
 
           -- Test all COMPLETE sets for inhabitants (n inhs at max). Take care of ⊥.
           clss <- pickApplicableCompleteSets rep_ty rcm
-          case NE.nonEmpty (uniqDSetToList <$> clss) of
+          case NE.nonEmpty (uniqDSetToList . cmConLikes <$> clss) of
             Nothing ->
               -- No COMPLETE sets ==> inhabited
               generateInhabitingPatterns xs n newty_nabla
@@ -1831,9 +1861,20 @@ generateInhabitingPatterns (x:xs) n nabla = do
       pure (con_nablas ++ other_cons_nablas)
 
 pickApplicableCompleteSets :: Type -> ResidualCompleteMatches -> DsM [CompleteMatch]
+-- See Note [Implementation of COMPLETE pragmas] on what "applicable" means
 pickApplicableCompleteSets ty rcm = do
   env <- dsGetFamInstEnvs
-  pure $ filter (all (is_valid env) . uniqDSetToList) (getRcm rcm)
+  let applicable :: CompleteMatch -> Bool
+      applicable cm = all (is_valid env) (uniqDSetToList (cmConLikes cm))
+                   && completeMatchAppliesAtType ty cm
+      applicableMatches = filter applicable (getRcm rcm)
+  tracePm "pickApplicableCompleteSets:" $
+    vcat
+      [ ppr ty
+      , ppr rcm
+      , ppr applicableMatches
+      ]
+  return applicableMatches
   where
     is_valid :: FamInstEnvs -> ConLike -> Bool
     is_valid env cl = isJust (guessConLikeUnivTyArgsFromResTy env ty cl)
