@@ -109,6 +109,7 @@ data UserTypeCtxt
   | DataKindCtxt Name   -- The kind of a data/newtype (instance)
   | TySynKindCtxt Name  -- The kind of the RHS of a type synonym
   | TyFamResKindCtxt Name   -- The result kind of a type family
+  | CompletePragCtxt    -- The scrutinee type of a COMPLETE pragma
 
 {-
 -- Notes re TySynCtxt
@@ -150,6 +151,7 @@ pprUserTypeCtxt (TyVarBndrKindCtxt n) = text "the kind annotation on the type va
 pprUserTypeCtxt (DataKindCtxt n)  = text "the kind annotation on the declaration for" <+> quotes (ppr n)
 pprUserTypeCtxt (TySynKindCtxt n) = text "the kind annotation on the declaration for" <+> quotes (ppr n)
 pprUserTypeCtxt (TyFamResKindCtxt n) = text "the result kind for" <+> quotes (ppr n)
+pprUserTypeCtxt CompletePragCtxt  = text "the scrutinee type of a COMPLETE pragma"
 
 isSigMaybe :: UserTypeCtxt -> Maybe Name
 isSigMaybe (FunSigCtxt n _) = Just n
