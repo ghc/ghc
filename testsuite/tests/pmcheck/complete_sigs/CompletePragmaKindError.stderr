@@ -1,0 +1,6 @@
+
+CompletePragmaKindError.hs:21:27: error:
+    • Expecting one more argument to ‘App t’
+      Expected a type, but ‘App t’ has kind ‘* -> *’
+    • In the type ‘App t’
+      In the scrutinee type of a COMPLETE pragma: App t

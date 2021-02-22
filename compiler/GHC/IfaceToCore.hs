@@ -1281,10 +1281,10 @@ tcIfaceCompleteMatches :: [IfaceCompleteMatch] -> IfL [CompleteMatch]
 tcIfaceCompleteMatches = mapM tcIfaceCompleteMatch
 
 tcIfaceCompleteMatch :: IfaceCompleteMatch -> IfL CompleteMatch
-tcIfaceCompleteMatch (IfaceCompleteMatch ms mtc) = do
+tcIfaceCompleteMatch (IfaceCompleteMatch ms mty) = do
   conlikes <- mkUniqDSet <$> mapM (forkM doc . tcIfaceConLike) ms
-  mtc' <- traverse tcIfaceTyCon mtc
-  return (CompleteMatch conlikes mtc')
+  mty' <- traverse tcIfaceType mty
+  return (CompleteMatch conlikes mty')
   where
     doc = text "COMPLETE sig" <+> ppr ms
 

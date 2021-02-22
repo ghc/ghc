@@ -1,5 +1,3 @@
-{-# LANGUAGE TypeApplications #-}
-
 -- | COMPLETE signature
 module GHC.Types.CompleteMatch where
 
@@ -7,20 +5,22 @@ import GHC.Prelude
 import GHC.Core.TyCo.Rep
 import GHC.Types.Unique.DSet
 import GHC.Core.ConLike
-import GHC.Core.TyCon
-import GHC.Core.Type ( splitTyConApp_maybe )
 import GHC.Utils.Outputable
+import GHC.Core.Unify
+
+import Data.Maybe
 
 -- | A list of conlikes which represents a complete pattern match.
 -- These arise from @COMPLETE@ signatures.
 -- See also Note [Implementation of COMPLETE pragmas].
 data CompleteMatch = CompleteMatch
   { cmConLikes :: UniqDSet ConLike -- ^ The set of `ConLike` values
-  , cmResultTyCon :: Maybe TyCon   -- ^ The optional, concrete result TyCon the set applies to
+  , cmResultType :: Maybe Type -- ^ A type to be unified with the type of the scrutinee of a pattern match to determine if this pragma applies to the given match.
+                               -- It should be a type which is possibly the type of result of each of the constructors, though at present, we don't check this.
   }
 
 vanillaCompleteMatch :: UniqDSet ConLike -> CompleteMatch
-vanillaCompleteMatch cls = CompleteMatch { cmConLikes = cls, cmResultTyCon = Nothing }
+vanillaCompleteMatch cls = CompleteMatch { cmConLikes = cls, cmResultType = Nothing }
 
 instance Outputable CompleteMatch where
   ppr (CompleteMatch cls mty) = case mty of
@@ -30,11 +30,5 @@ instance Outputable CompleteMatch where
 type CompleteMatches = [CompleteMatch]
 
 completeMatchAppliesAtType :: Type -> CompleteMatch -> Bool
-completeMatchAppliesAtType ty cm = all @Maybe ty_matches (cmResultTyCon cm)
-  where
-    ty_matches sig_tc
-      | Just (tc, _arg_tys) <- splitTyConApp_maybe ty
-      , tc == sig_tc
-      = True
-      | otherwise
-      = False
+completeMatchAppliesAtType ty cm = all (isJust . (\t -> tcUnifyTyKi t ty)) (cmResultType cm)
+ -- NB: We're using all (from Foldable) on a Maybe here.

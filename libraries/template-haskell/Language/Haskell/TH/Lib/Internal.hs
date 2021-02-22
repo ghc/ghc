@@ -513,8 +513,14 @@ pragAnnD target expr
 pragLineD :: Quote m => Int -> String -> m Dec
 pragLineD line file = pure $ PragmaD $ LineP line file
 
-pragCompleteD :: Quote m => [Name] -> Maybe Name -> m Dec
-pragCompleteD cls mty = pure $ PragmaD $ CompleteP cls mty
+pragCompleteD :: Quote m => [Name] -> Maybe (m Type) -> m Dec
+pragCompleteD cls mty =
+  case mty of
+    Nothing -> pure $ PragmaD $ CompleteP cls Nothing
+    Just ty ->
+      do
+        t <- ty
+        pure $ PragmaD $ CompleteP cls (Just t)
 
 dataInstD :: Quote m => m Cxt -> (Maybe [m (TyVarBndr ())]) -> m Type -> Maybe (m Kind) -> [m Con]
           -> [m DerivClause] -> m Dec

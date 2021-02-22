@@ -887,12 +887,12 @@ modules. ``COMPLETE`` pragmas should be thought of as asserting a
 universal truth about a set of patterns and as a result, should not be
 used to silence context specific incomplete match warnings.
 
-It is also possible to restrict the types to which a ``COMPLETE`` pragma applies
-by putting a double colon ``::`` after the list of constructors, followed by a
-result type constructor, which will be used to restrict the cases in which the
-pragma applies. GHC will compare the annotated result type constructor with the
-type constructor in the head of the scrutinee type in a pattern match to see if
-the ``COMPLETE`` pragma is meant to apply to it.
+It is also possible to restrict the types to which a ``COMPLETE`` pragma
+applies by putting a double colon ``::`` after the list of constructors,
+followed by a result type, which will be used to restrict the cases
+in which the pragma applies. GHC will attempt to unify that result type
+with the type of the scrutinee in a pattern match to see if the
+``COMPLETE`` pragma is meant to apply to it.
 
 This is especially useful in cases that the constructors specified are
 polymorphic, e.g.::
@@ -923,8 +923,8 @@ polymorphic, e.g.::
       isCons [] = Nothing
       isCons (x:xs) = Just (x,xs)
 
-    {-# COMPLETE Empty :: Proxy #-}
-    {-# COMPLETE Empty, Cons :: [] #-}
+    {-# COMPLETE Empty :: Proxy a #-}
+    {-# COMPLETE Empty, Cons :: [a] #-}
 
     foo :: Proxy a -> Int
     foo Empty = 0

@@ -19,7 +19,7 @@ $([d| class LL f where
       pattern T2 :: LL f => f a
       pattern T2 <- (go -> ())
 
-      {-# COMPLETE T2 :: [] #-}
+      {-# COMPLETE T2 :: [a] #-}
 
       -- No warning
       foo :: [a] -> Int

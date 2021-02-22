@@ -62,9 +62,8 @@ import GHC.Builtin.Types.Prim
 import GHC.Tc.Solver.Monad (InertSet, emptyInert)
 import GHC.Tc.Utils.TcType (isStringTy)
 import GHC.Types.CompleteMatch (CompleteMatch(..))
-import GHC.Types.SourceText (SourceText(..), mkFractionalLit, FractionalLit
-                            , fractionalLitFromRational
-                            , FractionalExponentBase(..))
+import GHC.Types.SourceText (mkFractionalLit, FractionalLit, fractionalLitFromRational,
+  FractionalExponentBase(..), SourceText(..))
 import Numeric (fromRat)
 import Data.Foldable (find)
 import Data.Ratio
@@ -379,8 +378,8 @@ isEmptyPmAltConSet (PACS cls lits) = isEmptyUniqDSet cls && null lits
 -- | Whether there is a 'PmAltCon' in the 'PmAltConSet' that compares 'Equal' to
 -- the given 'PmAltCon' according to 'eqPmAltCon'.
 elemPmAltConSet :: PmAltCon -> PmAltConSet -> Bool
-elemPmAltConSet (PmAltConLike cl) (PACS cls _   ) = elementOfUniqDSet cl cls
-elemPmAltConSet (PmAltLit lit)    (PACS _   lits) = elem lit lits
+elemPmAltConSet (PmAltConLike cl) (PACS cls _) = elementOfUniqDSet cl cls
+elemPmAltConSet (PmAltLit lit) (PACS _ lits) = elem lit lits
 
 extendPmAltConSet :: PmAltConSet -> PmAltCon -> PmAltConSet
 extendPmAltConSet (PACS cls lits) (PmAltConLike cl)

@@ -1133,11 +1133,13 @@ repPhases (ActiveAfter _ i)  = do { MkC arg <- coreIntLit i
 repPhases _                  = dataCon allPhasesDataConName
 
 rep_complete_sig :: Located [Located Name]
-                 -> Maybe (Located Name)
+                 -> Maybe (HsPatSigType GhcRn)
                  -> SrcSpan
                  -> MetaM [(SrcSpan, Core (M TH.Dec))]
 rep_complete_sig (L _ cls) mty loc
-  = do { mty' <- repMaybe nameTyConName lookupLOcc mty
+  = do { qTyCon <- lift $ dsLookupTyCon qTyConName
+       ; typeTy <- lookupType typeTyConName
+       ; mty' <- repMaybeT (mkTyConApp qTyCon [typeTy]) (repLTy . hsPatSigType) mty
        ; cls' <- repList nameTyConName lookupLOcc cls
        ; sig <- repPragComplete cls' mty'
        ; return [(loc, sig)] }
@@ -2595,7 +2597,7 @@ repPragSpecInl (MkC nm) (MkC ty) (MkC inline) (MkC phases)
 repPragSpecInst :: Core (M TH.Type) -> MetaM (Core (M TH.Dec))
 repPragSpecInst (MkC ty) = rep2 pragSpecInstDName [ty]
 
-repPragComplete :: Core [TH.Name] -> Core (Maybe TH.Name) -> MetaM (Core (M TH.Dec))
+repPragComplete :: Core [TH.Name] -> Core (Maybe (M TH.Type)) -> MetaM (Core (M TH.Dec))
 repPragComplete (MkC cls) (MkC mty) = rep2 pragCompleteDName [cls, mty]
 
 repPragRule :: Core String -> Core (Maybe [(M (TH.TyVarBndr ()))])
@@ -2945,11 +2947,13 @@ coreStringLit s = do { z <- mkStringExpr s; return(MkC z) }
 
 ------------------- Maybe ------------------
 
+{- -- Presently unused.
 repMaybe :: Name -> (a -> MetaM (Core b))
                     -> Maybe a -> MetaM (Core (Maybe b))
 repMaybe tc_name f m = do
   t <- lookupType tc_name
   repMaybeT t f m
+-}
 
 repMaybeT :: Type -> (a -> MetaM (Core b))
                     -> Maybe a -> MetaM (Core (Maybe b))

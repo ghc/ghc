@@ -780,7 +780,7 @@ data Sig pass
   | CompleteMatchSig (XCompleteMatchSig pass)
                      SourceText
                      (XRec pass [LIdP pass])
-                     (Maybe (LIdP pass))
+                     (Maybe (HsPatSigType pass))
   | XSig !(XXSig pass)
 
 -- | Located Fixity Signature

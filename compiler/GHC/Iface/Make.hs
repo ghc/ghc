@@ -348,8 +348,8 @@ mkIface_ hsc_env
 -}
 
 mkIfaceCompleteMatch :: CompleteMatch -> IfaceCompleteMatch
-mkIfaceCompleteMatch (CompleteMatch cls mtc) =
-  IfaceCompleteMatch (map conLikeName (uniqDSetToList cls)) (toIfaceTyCon <$> mtc)
+mkIfaceCompleteMatch (CompleteMatch cls mty) =
+  IfaceCompleteMatch (map conLikeName (uniqDSetToList cls)) (fmap toIfaceType mty)
 
 
 {-

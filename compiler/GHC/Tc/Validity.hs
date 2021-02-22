@@ -377,6 +377,7 @@ checkValidType ctxt ty
                  DataKindCtxt _      -> rank1
                  TySynKindCtxt _     -> rank1
                  TyFamResKindCtxt _  -> rank1
+                 CompletePragCtxt -> rank1
 
                  _              -> panic "checkValidType"
                                           -- Can't happen; not used for *user* sigs
@@ -507,6 +508,7 @@ typeOrKindCtxt (SigmaCtxt {})       = OnlyTypeCtxt
 typeOrKindCtxt (DataTyCtxt {})      = OnlyTypeCtxt
 typeOrKindCtxt (DerivClauseCtxt {}) = OnlyTypeCtxt
 typeOrKindCtxt (ConArgCtxt {})      = OnlyTypeCtxt
+typeOrKindCtxt (CompletePragCtxt {}) = OnlyTypeCtxt
   -- Although data constructors can be promoted with DataKinds, we always
   -- validity-check them as though they are the types of terms. We may need
   -- to revisit this decision if we ever allow visible dependent quantification
@@ -1376,6 +1378,7 @@ okIPCtxt (TyVarBndrKindCtxt {}) = False
 okIPCtxt (DataKindCtxt {})      = False
 okIPCtxt (TySynKindCtxt {})     = False
 okIPCtxt (TyFamResKindCtxt {})  = False
+okIPCtxt (CompletePragCtxt {})  = False
 
 {-
 Note [Kind polymorphic type classes]
