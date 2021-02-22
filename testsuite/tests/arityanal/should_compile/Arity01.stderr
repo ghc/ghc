@@ -1,6 +1,6 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 61, types: 45, coercions: 0, joins: 0/0}
+Result size of Tidy Core = {terms: 61, types: 41, coercions: 0, joins: 0/0}
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 F1.f2 :: Integer
@@ -10,12 +10,12 @@ F1.f2 = 1
 Rec {
 -- RHS size: {terms: 18, types: 4, coercions: 0, joins: 0/0}
 F1.f1_h1 [Occ=LoopBreaker] :: Integer -> Integer -> Integer -> Integer
-[GblId, Arity=3, Str=<MU><MU><MU>, Unf=OtherCon []]
+[GblId, Arity=3, Str=<SL><SL><SL>, Unf=OtherCon []]
 F1.f1_h1
   = \ (n :: Integer) (x :: Integer) (eta :: Integer) ->
-      case GHC.Num.Integer.integerCompare x n of {
+      case GHC.Num.Integer.integerLt# x n of {
         __DEFAULT -> eta;
-        LT -> F1.f1_h1 n (GHC.Num.Integer.integerAdd x F1.f2) (GHC.Num.Integer.integerAdd x eta)
+        1# -> F1.f1_h1 n (GHC.Num.Integer.integerAdd x F1.f2) (GHC.Num.Integer.integerAdd x eta)
       }
 end Rec }
 
@@ -33,7 +33,7 @@ f1 = F1.f1_h1 F1.f3 F1.f2 F1.f3
 g :: Integer -> Integer -> Integer -> Integer -> Integer -> Integer
 [GblId,
  Arity=5,
- Str=<SU><MU><MU><MU><MU>,
+ Str=<1L><SL><SL><SL><SL>,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=5,unsat_ok=True,boring_ok=False)
          Tmpl= \ (x1 [Occ=Once1] :: Integer) (x2 [Occ=Once1] :: Integer) (x3 [Occ=Once1] :: Integer) (x4 [Occ=Once1] :: Integer) (x5 [Occ=Once1] :: Integer) -> GHC.Num.Integer.integerAdd (GHC.Num.Integer.integerAdd (GHC.Num.Integer.integerAdd (GHC.Num.Integer.integerAdd x1 x2) x3) x4) x5}]
 g = \ (x1 :: Integer) (x2 :: Integer) (x3 :: Integer) (x4 :: Integer) (x5 :: Integer) -> GHC.Num.Integer.integerAdd (GHC.Num.Integer.integerAdd (GHC.Num.Integer.integerAdd (GHC.Num.Integer.integerAdd x1 x2) x3) x4) x5
@@ -43,11 +43,11 @@ F1.s1 :: Integer
 [GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
 F1.s1 = 3
 
--- RHS size: {terms: 8, types: 9, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 8, types: 7, coercions: 0, joins: 0/0}
 s :: forall {t1} {t2}. Num t1 => (t1 -> t2) -> t2
 [GblId,
  Arity=2,
- Str=<1P(A,A,A,A,A,A,1C1(U))><SCS(U)>,
+ Str=<MP(A,A,A,A,A,A,MCM(L))><1C1(L)>,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
          Tmpl= \ (@t) (@t1) ($dNum [Occ=Once1] :: Num t) (f [Occ=Once1!] :: t -> t1) -> f (fromInteger @t $dNum F1.s1)}]
 s = \ (@t) (@t1) ($dNum :: Num t) (f :: t -> t1) -> f (fromInteger @t $dNum F1.s1)
@@ -61,7 +61,7 @@ F1.h1 = 24
 h :: Integer -> Integer
 [GblId,
  Arity=1,
- Str=<MU>,
+ Str=<SL>,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (x5 [Occ=Once1] :: Integer) -> GHC.Num.Integer.integerAdd F1.h1 x5}]
 h = \ (x5 :: Integer) -> GHC.Num.Integer.integerAdd F1.h1 x5

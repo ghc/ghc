@@ -1,7 +1,7 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 84, types: 55, coercions: 0, joins: 0/1}
+  = {terms: 84, types: 54, coercions: 0, joins: 0/1}
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T18903.$trModule4 :: GHC.Prim.Addr#
@@ -53,19 +53,19 @@ T18903.h2 :: Int
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 T18903.h2 = GHC.Types.I# -2#
 
--- RHS size: {terms: 56, types: 41, coercions: 0, joins: 0/1}
+-- RHS size: {terms: 56, types: 40, coercions: 0, joins: 0/1}
 T18903.$wh [InlPrag=[2]] :: GHC.Prim.Int# -> Int
 [GblId,
  Arity=1,
- Str=<MU>,
+ Str=<SL>,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [70] 262 10}]
 T18903.$wh
   = \ (ww :: GHC.Prim.Int#) ->
       let {
-        $wg [InlPrag=NOINLINE, Dmd=1C1(P(1P(U),SP(U)))]
+        $wg [InlPrag=NOINLINE, Dmd=MCM(P(MP(L),1P(L)))]
           :: GHC.Prim.Int# -> (# Int, Int #)
-        [LclId, Arity=1, Str=<SU>, Unf=OtherCon []]
+        [LclId, Arity=1, Str=<1L>, Unf=OtherCon []]
         $wg
           = \ (ww1 [OS=OneShot] :: GHC.Prim.Int#) ->
               case ww1 of ds {
@@ -96,7 +96,7 @@ T18903.$wh
 h [InlPrag=[2]] :: Int -> Int
 [GblId,
  Arity=1,
- Str=<SP(MU)>,
+ Str=<1P(SL)>,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
