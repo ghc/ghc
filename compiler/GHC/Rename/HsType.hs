@@ -13,6 +13,7 @@ module GHC.Rename.HsType (
         rnHsType, rnLHsType, rnLHsTypes, rnContext,
         rnHsKind, rnLHsKind, rnLHsTypeArgs,
         rnHsSigType, rnHsWcType, rnHsPatSigTypeBindingVars,
+        rnHsCompletePragType,
         HsPatSigTypeScoping(..), rnHsSigWcType, rnHsPatSigType,
         newTyVarNameRn,
         rnConDeclFields,
@@ -137,6 +138,25 @@ rnHsSigWcType doc (HsWC { hswc_body =
                 HsSig { sig_ext = noExtField
                       , sig_bndrs = outer_bndrs', sig_body = body_ty' }}
               , fvs) } }
+
+rnHsCompletePragType :: HsDocContext
+                     -> HsPatSigType GhcPs
+                     -> RnM (HsPatSigType GhcRn)
+-- Simplified version of rnHsPatSigType used for scrutinee types in COMPLETE pragmas.
+-- Doesn't check for any extensions.
+-- All type variables and wildcards are allowed but we don't keep track of the free type variables, since
+-- they never scope over anything further.
+rnHsCompletePragType ctx sig_ty
+  = do { let free_vars = extractHsTyRdrTyVars pat_sig_ty
+       ; (res, _) <- rnImplicitTvOccs Nothing free_vars $ \ imp_tvs ->
+            do { (nwcs, pat_sig_ty', fvs1) <- rnWcBody ctx [] pat_sig_ty
+               ; let sig_names = HsPSRn { hsps_nwcs = nwcs, hsps_imp_tvs = imp_tvs }
+                     sig_ty'   = HsPS { hsps_ext = sig_names, hsps_body = pat_sig_ty' }
+               ; return (sig_ty', fvs1) }
+       ; return res
+       }
+  where
+    pat_sig_ty = hsPatSigType sig_ty
 
 rnHsPatSigType :: HsPatSigTypeScoping
                -> HsDocContext
