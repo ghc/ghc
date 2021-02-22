@@ -84,14 +84,14 @@ The semantics of ``do`` notation statements with ``-XQualifiedDo`` is as follows
 
     M.do { pat <- u; stmts }  =  u M.>>= \case pat -> M.do { stmts }
 
-*  The desugaring of ``-XApplicativeDo`` uses ``(M.<$>)``, ``(M.<*>)``,
+*  The desugaring of ``-XApplicativeDo`` uses ``M.fmap``, ``(M.<*>)``,
    and ``M.join`` (after the the applicative-do grouping has been performed) ::
 
     M.do { (x1 <- u1 | … | xn <- un); M.return e }  =
-      (\x1 … xn -> e) M.<$> u1 M.<*> … M.<*> un
+      (\x1 … xn -> e) `M.fmap` u1 M.<*> … M.<*> un
 
     M.do { (x1 <- u1 | … | xn <- un); stmts }  =
-      M.join ((\x1 … xn -> M.do { stmts }) M.<$> u1 M.<*> … M.<*> un)
+      M.join ((\x1 … xn -> M.do { stmts }) `M.fmap` u1 M.<*> … M.<*> un)
 
   Note that ``M.join`` is only needed if the final expression is not
   identifiably a ``return``. With ``-XQualifiedDo`` enabled, ``-XApplicativeDo``
