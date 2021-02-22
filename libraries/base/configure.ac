@@ -6,16 +6,12 @@ AC_CONFIG_SRCDIR([include/HsBase.h])
 
 AC_CONFIG_HEADERS([include/HsBaseConfig.h include/EventConfig.h])
 
-AC_CANONICAL_BUILD
-AC_CANONICAL_HOST
-AC_CANONICAL_TARGET
-
 AC_PROG_CC
 dnl make extensions visible to allow feature-tests to detect them lateron
 AC_USE_SYSTEM_EXTENSIONS
 
 AC_MSG_CHECKING(for WINDOWS platform)
-case $host in
+case $host_alias in
     *mingw32*|*mingw64*|*cygwin*|*msys*)
         WINDOWS=YES;;
     *)
