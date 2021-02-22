@@ -211,9 +211,12 @@ test('T12234',
      compile,
      [''])
 
+# T12545 is sensitive to -dunique-increments changes, see #19414.
+# I've seen variations of 3% by playing with that parameter, so that's the
+# current acceptance window.
 test('T12545',
      [ only_ways(['normal']),
-       collect_compiler_stats('bytes allocated', 1),
+       collect_compiler_stats('bytes allocated', 3),
        extra_clean(['T12545a.hi', 'T12545a.o'])
      ],
      multimod_compile,
