@@ -215,7 +215,7 @@ synifyTyCon prr _coax tc
            , tcdDataDefn = HsDataDefn { dd_ext = noExtField
                                       , dd_ND = DataType  -- arbitrary lie, they are neither
                                                     -- algebraic data nor newtype:
-                                      , dd_ctxt = noLoc []
+                                      , dd_ctxt = Nothing
                                       , dd_cType = Nothing
                                       , dd_kindSig = synifyDataTyConReturnKind tc
                                                -- we have their kind accurately:
@@ -377,7 +377,7 @@ synifyDataCon use_gadt_syntax dc =
 
   -- skip any EqTheta, use 'orig'inal syntax
   ctx | null theta = Nothing
-      | otherwise = Just $ synifyCtx theta
+      | otherwise = synifyCtx theta
 
   linear_tys =
     zipWith (\ty bang ->
@@ -461,8 +461,8 @@ synifyTcIdSig vs (i, dm) =
     mainSig t = synifySigType DeleteTopLevelQuantification vs t
     defSig t = synifySigType ImplicitizeForAll vs t
 
-synifyCtx :: [PredType] -> LHsContext GhcRn
-synifyCtx = noLoc . map (synifyType WithinType [])
+synifyCtx :: [PredType] -> Maybe (LHsContext GhcRn)
+synifyCtx ts = Just (noLoc ( map (synifyType WithinType []) ts))
 
 
 synifyTyVars :: [TyVar] -> LHsQTyVars GhcRn

@@ -37,7 +37,7 @@ import           Text.XHtml hiding     ( name, title, p, quote )
 
 import GHC.Core.Type ( Specificity(..) )
 import GHC.Types.Basic (PromotionFlag(..), isPromoted)
-import GHC hiding (LexicalFixity(..))
+import GHC hiding (LexicalFixity(..), fromMaybeContext)
 import GHC.Exts
 import GHC.Types.Name
 import GHC.Data.BooleanFormula
@@ -167,7 +167,7 @@ ppSubSigLike unicode qual typ argDocs subdocs sep emptyCtxts = do_sig_args 0 sep
         leader' = leader <+> ppForAllPart unicode qual tele
 
     do_args n leader (HsQualTy _ lctxt ltype)
-      | null (unLoc lctxt)
+      | null (fromMaybeContext lctxt)
       = do_largs n leader ltype
       | otherwise
       = (leader <+> ppLContextNoArrow lctxt unicode qual emptyCtxts, Nothing, [])
@@ -435,10 +435,12 @@ ppTypeApp n ts ppDN ppT = ppDN Prefix n <+> hsep (map ppT ts)
 -------------------------------------------------------------------------------
 
 
-ppLContext, ppLContextNoArrow :: Located (HsContext DocNameI) -> Unicode
+ppLContext, ppLContextNoArrow :: Maybe (LHsContext DocNameI) -> Unicode
                               -> Qualification -> HideEmptyContexts -> Html
-ppLContext        = ppContext        . unLoc
-ppLContextNoArrow = ppContextNoArrow . unLoc
+ppLContext        Nothing  u q h = ppContext        []        u q h
+ppLContext        (Just c) u q h = ppContext        (unLoc c) u q h
+ppLContextNoArrow Nothing  u q h = ppContextNoArrow []        u q h
+ppLContextNoArrow (Just c) u q h = ppContextNoArrow (unLoc c) u q h
 
 ppContextNoArrow :: HsContext DocNameI -> Unicode -> Qualification -> HideEmptyContexts -> Html
 ppContextNoArrow cxt unicode qual emptyCtxts = fromMaybe noHtml $
@@ -472,12 +474,12 @@ ppHsContext cxt unicode qual = parenList (map (ppType unicode qual HideEmptyCont
 -------------------------------------------------------------------------------
 
 
-ppClassHdr :: Bool -> Located [LHsType DocNameI] -> DocName
+ppClassHdr :: Bool -> Maybe (Located [LHsType DocNameI]) -> DocName
            -> LHsQTyVars DocNameI -> [Located ([Located DocName], [Located DocName])]
            -> Unicode -> Qualification -> Html
 ppClassHdr summ lctxt n tvs fds unicode qual =
   keyword "class"
-  <+> (if not . null . unLoc $ lctxt then ppLContext lctxt unicode qual HideEmptyContexts else noHtml)
+  <+> (if not (null $ fromMaybeContext lctxt) then ppLContext lctxt unicode qual HideEmptyContexts else noHtml)
   <+> ppAppDocNameTyVarBndrs summ unicode qual n (hsQTvExplicit tvs)
   <+> ppFds fds unicode qual
 
@@ -855,7 +857,7 @@ ppShortConstrParts summary dataInst con unicode qual
                 , con_ex_tvs = tyVars
                 , con_forall = L _ forall_
                 , con_mb_cxt = cxt
-                } -> let context = unLoc (fromMaybe (noLoc []) cxt)
+                } -> let context = fromMaybeContext cxt
                          header_ = ppConstrHdr forall_ tyVars context unicode qual
                      in case det of
 
@@ -927,7 +929,7 @@ ppSideBySideConstr subdocs fixities unicode pkg qual (L _ con)
                 , con_ex_tvs = tyVars
                 , con_forall = L _ forall_
                 , con_mb_cxt = cxt
-                } -> let context = unLoc (fromMaybe (noLoc []) cxt)
+                } -> let context = fromMaybeContext cxt
                          header_ = ppConstrHdr forall_ tyVars context unicode qual
                      in case det of
         -- Prefix constructor, e.g. 'Just a'
@@ -1181,13 +1183,13 @@ patSigContext sig_typ | hasNonEmptyContext typ && isFirstContextEmpty typ =  Sho
     hasNonEmptyContext t =
       case unLoc t of
         HsForAllTy _ _ s -> hasNonEmptyContext s
-        HsQualTy _ cxt s -> if null (unLoc cxt) then hasNonEmptyContext s else True
+        HsQualTy _ cxt s -> if null (fromMaybeContext cxt) then hasNonEmptyContext s else True
         HsFunTy _ _ _ s    -> hasNonEmptyContext s
         _ -> False
     isFirstContextEmpty t =
       case unLoc t of
         HsForAllTy _ _ s -> isFirstContextEmpty s
-        HsQualTy _ cxt _ -> null (unLoc cxt)
+        HsQualTy _ cxt _ -> null (fromMaybeContext cxt)
         HsFunTy _ _ _ s    -> isFirstContextEmpty s
         _ -> False
 

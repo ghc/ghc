@@ -284,7 +284,7 @@ renameType (HsForAllTy x tele lt) =
         <*> renameLType lt
 renameType (HsQualTy x lctxt lt) =
     HsQualTy x
-        <$> located renameContext lctxt
+        <$> renameMContext lctxt
         <*> renameLType lt
 renameType (HsTyVar x ip name) = HsTyVar x ip <$> located renameName name
 renameType t@(HsStarTy _ _) = pure t
@@ -325,6 +325,11 @@ renameLKind = renameLType
 renameLTypes :: [LHsType GhcRn] -> Rename (IdP GhcRn) [LHsType GhcRn]
 renameLTypes = mapM renameLType
 
+renameMContext :: Maybe (LHsContext GhcRn) -> Rename (IdP GhcRn) (Maybe (LHsContext GhcRn))
+renameMContext Nothing = return Nothing
+renameMContext (Just (L l ctxt)) = do
+  ctxt' <- renameContext ctxt
+  return (Just (L l ctxt'))
 
 renameContext :: HsContext GhcRn -> Rename (IdP GhcRn) (HsContext GhcRn)
 renameContext = renameLTypes

@@ -258,7 +258,7 @@ renameType t = case t of
                        , hst_tele = tele', hst_body = ltype' })
 
   HsQualTy { hst_ctxt = lcontext , hst_body = ltype } -> do
-    lcontext' <- renameLContext lcontext
+    lcontext' <- traverse renameLContext lcontext
     ltype'    <- renameLType ltype
     return (HsQualTy { hst_xqual = noExtField, hst_ctxt = lcontext', hst_body = ltype' })
 
@@ -432,7 +432,7 @@ renameTyClD d = case d of
 
   ClassDecl { tcdCtxt = lcontext, tcdLName = lname, tcdTyVars = ltyvars, tcdFixity = fixity
             , tcdFDs = lfundeps, tcdSigs = lsigs, tcdATs = ats, tcdATDefs = at_defs } -> do
-    lcontext' <- renameLContext lcontext
+    lcontext' <- traverse renameLContext lcontext
     lname'    <- renameL lname
     ltyvars'  <- renameLHsQTyVars ltyvars
     lfundeps' <- mapM renameLFunDep lfundeps
@@ -490,7 +490,7 @@ renameFamilyInfo (ClosedTypeFamily eqns)
 renameDataDefn :: HsDataDefn GhcRn -> RnM (HsDataDefn DocNameI)
 renameDataDefn (HsDataDefn { dd_ND = nd, dd_ctxt = lcontext, dd_cType = cType
                            , dd_kindSig = k, dd_cons = cons }) = do
-    lcontext' <- renameLContext lcontext
+    lcontext' <- traverse renameLContext lcontext
     k'        <- renameMaybeLKind k
     cons'     <- mapM (mapM renameCon) cons
     -- I don't think we need the derivings, so we return Nothing

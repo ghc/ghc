@@ -24,7 +24,7 @@ module Haddock.GhcUtils where
 
 import Control.Arrow
 import Data.Char ( isSpace )
-import Data.Maybe ( mapMaybe )
+import Data.Maybe ( mapMaybe, fromMaybe )
 
 import Haddock.Types( DocName, DocNameI )
 
@@ -172,7 +172,7 @@ getGADTConType (ConDeclGADT { con_bndrs = L _ outer_bndrs
                 , sig_body  = theta_ty })
  where
    theta_ty | Just theta <- mcxt
-            = noLoc (HsQualTy { hst_xqual = noExtField, hst_ctxt = theta, hst_body = tau_ty })
+            = noLoc (HsQualTy { hst_xqual = noExtField, hst_ctxt = Just theta, hst_body = tau_ty })
             | otherwise
             = tau_ty
 
@@ -226,10 +226,12 @@ addClassContext cls tvs0 (L pos (ClassOpSig _ _ lname ltype))
                          , hst_ctxt = add_ctxt ctxt, hst_body = ty })
     go_ty (L loc ty)
        = L loc (HsQualTy { hst_xqual = noExtField
-                         , hst_ctxt = add_ctxt (L loc []), hst_body = L loc ty })
+                         , hst_ctxt = add_ctxt Nothing, hst_body = L loc ty })
 
     extra_pred = nlHsTyConApp Prefix cls (lHsQTyVarsToTypes tvs0)
-    add_ctxt (L loc preds) = L loc (extra_pred : preds)
+
+    add_ctxt Nothing              = Just $ noLoc [extra_pred]
+    add_ctxt (Just (L loc preds)) = Just $ L loc (extra_pred : preds)
 
 addClassContext _ _ sig = sig   -- E.g. a MinimalSig is fine
 
@@ -355,7 +357,9 @@ reparenTypePrec = go
   go p (HsQualTy x ctxt ty)
     = let p' [_] = PREC_CTX
           p' _   = PREC_TOP -- parens will get added anyways later...
-          ctxt' = mapXRec @a (\xs -> map (goL (p' xs)) xs) ctxt
+          ctxt' = case ctxt of
+            Nothing -> Nothing
+            Just c -> Just $ mapXRec @a (\xs -> map (goL (p' xs)) xs) c
       in paren p PREC_CTX $ HsQualTy x ctxt' (goL PREC_TOP ty)
   go p (HsFunTy x w ty1 ty2)
     = paren p PREC_FUN $ HsFunTy x w (goL PREC_FUN ty1) (goL PREC_TOP ty2)
@@ -758,3 +762,5 @@ defaultRuntimeRepVars = go emptyVarEnv
     go _ ty@(LitTy {}) = ty
     go _ ty@(CoercionTy {}) = ty
 
+fromMaybeContext :: Maybe (LHsContext DocNameI) -> HsContext DocNameI
+fromMaybeContext mctxt = unLoc $ fromMaybe (noLoc []) mctxt

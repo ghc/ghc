@@ -1098,9 +1098,9 @@ extractPatternSyn nm t tvs cons =
         typ = longArrow args (data_ty con)
         typ' =
           case con of
-            ConDeclH98 { con_mb_cxt = Just cxt } -> noLoc (HsQualTy noExtField cxt typ)
+            ConDeclH98 { con_mb_cxt = Just cxt } -> noLoc (HsQualTy noExtField (Just cxt) typ)
             _ -> typ
-        typ'' = noLoc (HsQualTy noExtField (noLoc []) typ')
+        typ'' = noLoc (HsQualTy noExtField Nothing typ')
     in PatSynSig noExtField [noLoc nm] (mkEmptySigType typ'')
 
   longArrow :: [LHsType GhcRn] -> LHsType GhcRn -> LHsType GhcRn

@@ -25,7 +25,7 @@ import GHC.Utils.Ppr hiding (Doc, quote)
 import qualified GHC.Utils.Ppr as Pretty
 
 import GHC.Types.Basic        ( PromotionFlag(..) )
-import GHC
+import GHC hiding (fromMaybeContext )
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name        ( nameOccName )
 import GHC.Types.Name.Reader ( rdrNameOcc )
@@ -597,12 +597,12 @@ rDoc = maybeDoc . fmap latexStripTrailingWhitespace
 -------------------------------------------------------------------------------
 
 
-ppClassHdr :: Bool -> Located [LHsType DocNameI] -> DocName
+ppClassHdr :: Bool -> Maybe (Located [LHsType DocNameI]) -> DocName
            -> LHsQTyVars DocNameI -> [Located ([Located DocName], [Located DocName])]
            -> Bool -> LaTeX
 ppClassHdr summ lctxt n tvs fds unicode =
   keyword "class"
-  <+> (if not . null . unLoc $ lctxt then ppLContext lctxt unicode else empty)
+  <+> (if not (null $ fromMaybeContext lctxt) then ppLContext lctxt unicode else empty)
   <+> ppAppDocNameNames summ n (tyvarNames tvs)
   <+> ppFds fds unicode
 
@@ -806,7 +806,7 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
                 , con_ex_tvs = tyVars
                 , con_forall = L _ forall_
                 , con_mb_cxt = cxt
-                } -> let context = unLoc (fromMaybe (noLoc []) cxt)
+                } -> let context = fromMaybeContext cxt
                          header_ = ppConstrHdr forall_ tyVars context unicode
                      in case det of
         -- Prefix constructor, e.g. 'Just a'
@@ -980,9 +980,11 @@ ppTypeApp n ts ppDN ppT = ppDN n <+> hsep (map ppT ts)
 -------------------------------------------------------------------------------
 
 
-ppLContext, ppLContextNoArrow :: Located (HsContext DocNameI) -> Bool -> LaTeX
-ppLContext        = ppContext        . unLoc
-ppLContextNoArrow = ppContextNoArrow . unLoc
+ppLContext, ppLContextNoArrow :: Maybe (LHsContext DocNameI) -> Bool -> LaTeX
+ppLContext        Nothing _ = empty
+ppLContext        (Just ctxt) unicode  = ppContext        (unLoc ctxt) unicode
+ppLContextNoArrow Nothing _ = empty
+ppLContextNoArrow (Just ctxt) unicode = ppContextNoArrow (unLoc ctxt) unicode
 
 ppContextNoLocsMaybe :: [HsType DocNameI] -> Bool -> Maybe LaTeX
 ppContextNoLocsMaybe [] _ = Nothing
