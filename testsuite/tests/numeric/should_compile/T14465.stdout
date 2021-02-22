@@ -74,7 +74,7 @@ twoTimesTwo = 4
 plusOne :: Natural -> Natural
 [GblId,
  Arity=1,
- Str=<SU>,
+ Str=<1L>,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)

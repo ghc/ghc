@@ -1,7 +1,7 @@
 
 ==================== Strictness signatures ====================
 StrAnalExample.$trModule:
-StrAnalExample.foo: <SU>
+StrAnalExample.foo: <1L>
 
 
 
@@ -13,6 +13,6 @@ StrAnalExample.foo:
 
 ==================== Strictness signatures ====================
 StrAnalExample.$trModule:
-StrAnalExample.foo: <SU>
+StrAnalExample.foo: <1L>
 
 
