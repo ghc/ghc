@@ -6,7 +6,7 @@ import GHC.Utils.Panic.Plain
 import Control.Exception
 import System.IO.Unsafe
 
--- Should have strictness signature <L,U>x, emphasis on the exceptional
+-- Should have strictness signature <L>x, emphasis on the exceptional
 -- divergence result.
 m :: IO ()
 m = do
