@@ -51,26 +51,25 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Text.Printf
 
-import GHC.Unit.Module.Env (mkModuleSet, emptyModuleSet, unionModuleSet, ModuleSet)
-import GHC.Unit.Module.ModSummary
-import GHC.Unit.Module.Graph
-import GHC.Unit.Types
-import GHC.Data.Graph.Directed
-import GHC.Driver.Session hiding (verbosity)
 import GHC hiding (verbosity)
+import GHC.Data.FastString (unpackFS)
+import GHC.Data.Graph.Directed
 import GHC.Driver.Env
 import GHC.Driver.Monad
-import GHC.Data.FastString (unpackFS)
-import GHC.Utils.Error
+import GHC.Driver.Session hiding (verbosity)
+import GHC.HsToCore.Docs
+import GHC.Plugins (Outputable, StaticPlugin(..), Plugin(..), PluginWithArgs(..), defaultPlugin, keepRenamedSource)
 import GHC.Tc.Types (TcM, TcGblEnv(..))
-import GHC.Tc.Utils.Monad (getTopEnv, setGblEnv)
 import GHC.Tc.Utils.Env (tcLookupGlobal)
+import GHC.Tc.Utils.Monad (getTopEnv, setGblEnv)
 import GHC.Types.Name (nameIsFromExternalPackage, nameOccName)
 import GHC.Types.Name.Occurrence (isTcOcc)
 import GHC.Types.Name.Reader (unQualOK, greMangledName, globalRdrEnvElts)
-import GHC.HsToCore.Docs
-import GHC.Plugins (Outputable, StaticPlugin(..), Plugin(..), PluginWithArgs(..),
-                     defaultPlugin, keepRenamedSource)
+import GHC.Unit.Module.Env (mkModuleSet, emptyModuleSet, unionModuleSet, ModuleSet)
+import GHC.Unit.Module.Graph
+import GHC.Unit.Module.ModSummary
+import GHC.Unit.Types
+import GHC.Utils.Error
 
 #if defined(mingw32_HOST_OS)
 import System.IO
