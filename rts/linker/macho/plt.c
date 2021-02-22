@@ -1,5 +1,6 @@
 #include "Rts.h"
 #include "plt.h"
+#include "RtsUtils.h"
 
 #if defined(aarch64_HOST_ARCH)
 
