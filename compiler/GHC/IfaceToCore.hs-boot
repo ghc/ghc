@@ -8,7 +8,7 @@ import GHC.Tc.Types        ( IfL )
 import GHC.Core.InstEnv    ( ClsInst )
 import GHC.Core.FamInstEnv ( FamInst )
 import GHC.Core         ( CoreRule )
-import GHC.Types.CompleteMatch ( CompleteMatch )
+import GHC.Types.CompleteMatch
 import GHC.Types.Annotations ( Annotation )
 import GHC.Types.Name
 import GHC.Fingerprint.Type

@@ -73,6 +73,7 @@ import GHC.Types.TypeEnv
 import GHC.Types.SourceFile
 import GHC.Types.TyThing
 import GHC.Types.HpcInfo
+import GHC.Types.CompleteMatch
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -347,8 +348,8 @@ mkIface_ hsc_env
 -}
 
 mkIfaceCompleteMatch :: CompleteMatch -> IfaceCompleteMatch
-mkIfaceCompleteMatch cls =
-  IfaceCompleteMatch (map conLikeName (uniqDSetToList cls))
+mkIfaceCompleteMatch (CompleteMatch cls mtc) =
+  IfaceCompleteMatch (map conLikeName (uniqDSetToList cls)) (toIfaceTyCon <$> mtc)
 
 
 {-

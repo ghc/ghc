@@ -61,10 +61,10 @@ import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
 import GHC.Tc.Solver.Monad (InertSet, emptyInert)
 import GHC.Tc.Utils.TcType (isStringTy)
-import GHC.Types.CompleteMatch (CompleteMatch)
-import GHC.Types.SourceText (mkFractionalLit, FractionalLit, fractionalLitFromRational,
-  FractionalExponentBase(..), SourceText(..))
-
+import GHC.Types.CompleteMatch (CompleteMatch(..))
+import GHC.Types.SourceText (SourceText(..), mkFractionalLit, FractionalLit
+                            , fractionalLitFromRational
+                            , FractionalExponentBase(..))
 import Numeric (fromRat)
 import Data.Foldable (find)
 import Data.Ratio
@@ -368,7 +368,7 @@ eqConLike _                 _                 = PossiblyOverlap
 data PmAltCon = PmAltConLike ConLike
               | PmAltLit     PmLit
 
-data PmAltConSet = PACS !CompleteMatch ![PmLit]
+data PmAltConSet = PACS !(UniqDSet ConLike) ![PmLit]
 
 emptyPmAltConSet :: PmAltConSet
 emptyPmAltConSet = PACS emptyUniqDSet []
