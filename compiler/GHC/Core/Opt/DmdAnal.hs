@@ -145,7 +145,7 @@ Consider a CoreProgram like
 where e* are exported, but n* are not.
 Intuitively, we can see that @n1@ is only ever called with two arguments
 and in every call site, the first component of the result of the call
-is evaluated. Thus, we'd like it to have idDemandInfo @UCU(C1(P(SU,A))@.
+is evaluated. Thus, we'd like it to have idDemandInfo @LCL(CM(P(1L,A))@.
 NB: We may *not* give e2 a similar annotation, because it is exported and
 external callers might use it in arbitrary ways, expressed by 'topDmd'.
 This can then be exploited by Nested CPR and eta-expansion,
@@ -313,24 +313,6 @@ dmdAnalBindLetDown top_lvl env dmd bind anal_body = case bind of
         -- the vanilla call demand seem to be due to (b).  So we don't
         -- bother to re-analyse the RHS.
 
-{-
-Note [Ensure demand is strict]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-It's important not to analyse e with a lazy demand because
-a) When we encounter   case s of (a,b) ->
-        we demand s with U(d1d2)... but if the overall demand is lazy
-        that is wrong, and we'd need to reduce the demand on s,
-        which is inconvenient
-b) More important, consider
-        f (let x = R in x+x), where f is lazy
-   We still want to mark x as demanded, because it will be when we
-   enter the let.  If we analyse f's arg with a Lazy demand, we'll
-   just mark x as Lazy
-c) The application rule wouldn't be right either
-   Evaluating (f x) in a L demand does *not* cause
-   evaluation of f in a C(L) demand!
--}
-
 -- If e is complicated enough to become a thunk, its contents will be evaluated
 -- at most once, so oneify it.
 dmdTransformThunkDmd :: CoreExpr -> Demand -> Demand
@@ -356,9 +338,6 @@ dmdAnalStar env (n :* cd) e
 dmdAnal, dmdAnal' :: AnalEnv
         -> SubDemand         -- The main one takes a *SubDemand*
         -> CoreExpr -> (DmdType, CoreExpr)
-
--- The SubDemand is always strict and not absent
---    See Note [Ensure demand is strict]
 
 dmdAnal env d e = -- pprTrace "dmdAnal" (ppr d <+> ppr e) $
                   dmdAnal' env d e
@@ -649,7 +628,7 @@ But note that these include the demand on the case binder;
 see Note [Demand on case-alternative binders] in GHC.Types.Demand.
 This is crucial. Example:
    f x = case x of y { (a,b) -> k y a }
-If we just take scrut_demand = U(L,A), then we won't pass x to the
+If we just take scrut_demand = 1P(L,A), then we won't pass x to the
 worker, so the worker will rebuild
      x = (a, absent-error)
 and that'll crash.
@@ -761,12 +740,12 @@ dmdTransform env var dmd
 -- | @dmdAnalRhsSig@ analyses the given RHS to compute a demand signature
 -- for the LetDown rule. It works as follows:
 --
---  * assuming a demand of <U>
+--  * assuming the weakest possible body sub-demand, L
 --  * looking at the definition
 --  * determining a strictness signature
 --
--- Since it assumed a demand of <U>, the resulting signature is applicable at
--- any call site.
+-- Since it assumed a body sub-demand of L, the resulting signature is
+-- applicable at any call site.
 dmdAnalRhsSig
   :: TopLevelFlag
   -> RecFlag
@@ -906,10 +885,10 @@ look a little puzzling.  E.g.
     (     B -> j 4             )
     (     C -> \y. blah        )
 
-The entire thing is in a C(S) context, so j's strictness signature
+The entire thing is in a C1(L) context, so j's strictness signature
 will be    [A]b
 meaning one absent argument, returns bottom.  That seems odd because
-there's a \y inside.  But it's right because when consumed in a C(1)
+there's a \y inside.  But it's right because when consumed in a C1(L)
 context the RHS of the join point is indeed bottom.
 
 Note [Demand signatures are computed for a threshold demand based on idArity]
@@ -940,12 +919,12 @@ arguments than idArity. Example:
       then \y -> ... y ...
       else \y -> ... y ...
 
-We'd analyse `f` under a unary call demand C(S), corresponding to idArity
+We'd analyse `f` under a unary call demand C1(L), corresponding to idArity
 being 1. That's enough to look under the manifest lambda and find out how a
 unary call would use `x`, but not enough to look into the lambdas in the if
 branches.
 
-On the other hand, if we analysed for call demand C(C(S)), we'd get useful
+On the other hand, if we analysed for call demand C1(C1(L)), we'd get useful
 strictness info for `y` (and more precise info on `x`) and possibly CPR
 information, but
 
@@ -977,7 +956,7 @@ Consider the following expression, for example:
 
     (let go x y = `x` seq ... in go) |> co
 
-`go` might have a strictness signature of `<S><L>`. The simplifier will identify
+`go` might have a strictness signature of `<1L><L>`. The simplifier will identify
 `go` as a nullary join point through `joinPointBinding_maybe` and float the
 coercion into the binding, leading to an arity decrease:
 
@@ -1058,11 +1037,11 @@ Here we *really* want to unbox z, even though it appears to be used boxed in
 the Nil case.  Partly the Nil case is not a hot path.  But more specifically,
 the whole function gets the CPR property if we do.
 
-That motivated using a demand of C(C(C(S(L,L)))) for the RHS, where
+That motivated using a demand of C1(C1(C1(P(L,L)))) for the RHS, where
 (solely because the result was a product) we used a product demand
 (albeit with lazy components) for the body. But that gives very silly
 behaviour -- see #17932.   Happily it turns out now to be entirely
-unnecessary: we get good results with C(C(C(S))).   So I simply
+unnecessary: we get good results with C1(C1(C1(L))).   So I simply
 deleted the special case.
 -}
 
@@ -1169,7 +1148,7 @@ Now to the reasons. For (1) consider
           A g1 -> case (x |> g1) of (p,q) -> ...
           B    -> error "urk"
 
-where A,B are the constructors of a GADT.  We'll get a U(U,U) demand
+where A,B are the constructors of a GADT.  We'll get a 1P(L,L) demand
 on x from the A branch, but that's a stupid demand for x itself, which
 has type 'a'. Indeed we get ASSERTs going off (notably in
 splitUseProdDmd, #8569).
@@ -1180,7 +1159,7 @@ For (2) consider
   f 0 _         = 0
   f _ (MkT n t) = f n t
 
-Here f is lazy in T, but its *usage* is infinite: U(U,U(U,U(U, ...))).
+Here f is lazy in T, but its *usage* is infinite: P(L,P(L,P(L, ...))).
 Notice that this happens because T is a product type, and is recrusive.
 If we are not careful, we'll fail to iterate to a fixpoint in dmdFix,
 and bale out entirely, which is inefficient and over-conservative.
@@ -1221,11 +1200,11 @@ addVarDmd (DmdType fv ds res) var dmd
 addLazyFVs :: DmdType -> DmdEnv -> DmdType
 addLazyFVs dmd_ty lazy_fvs
   = dmd_ty `plusDmdType` mkPlusDmdArg lazy_fvs
-        -- Using bothDmdType (rather than just both'ing the envs)
+        -- Using plusDmdType (rather than just plus'ing the envs)
         -- is vital.  Consider
         --      let f = \x -> (x,y)
         --      in  error (f 3)
-        -- Here, y is treated as a lazy-fv of f, but we must `bothDmd` that L
+        -- Here, y is treated as a lazy-fv of f, but we must `plusDmd` that L
         -- demand with the bottom coming up from 'error'
         --
         -- I got a loop in the fixpointer without this, due to an interaction
@@ -1521,10 +1500,10 @@ Note [Final Demand Analyser run]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Some of the information that the demand analyser determines is not always
 preserved by the simplifier.  For example, the simplifier will happily rewrite
-  \y [Demand=1*U] let x = y in x + x
+  \y [Demand=MU] let x = y in x + x
 to
-  \y [Demand=1*U] y + y
-which is quite a lie.
+  \y [Demand=MU] y + y
+which is quite a lie: Now y occurs more than just once.
 
 The once-used information is (currently) only used by the code
 generator, though.  So:
@@ -1541,7 +1520,7 @@ generator, though.  So:
    This way, correct information finds its way into the module interface
    (strictness signatures!) and the code generator (single-entry thunks!)
 
-Note that, in contrast, the single-call information (C1(..)) /can/ be
+Note that, in contrast, the single-call information (CM(..)) /can/ be
 relied upon, as the simplifier tends to be very careful about not
 duplicating actual function calls.
 

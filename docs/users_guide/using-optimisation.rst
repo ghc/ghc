@@ -1169,18 +1169,18 @@ by saying ``-fno-wombat``.
     +----------+------------------------------+--------+---------------------------------------+
     | Interval | Set of denoted cardinalities | Syntax | Explanation tying syntax to semantics |
     +==========+==============================+========+=======================================+
-    | [1,0]    | {}                           | ``B``  | bottom element                        |
+    | [1,0]    | {}                           | ``B``  | Bottom element                        |
     +----------+------------------------------+--------+---------------------------------------+
-    | [0,0]    | {0}                          | ``A``  | absent                                |
+    | [0,0]    | {0}                          | ``A``  | Absent                                |
     +----------+------------------------------+--------+---------------------------------------+
-    | [0,1]    | {0,1}                        | ``1``  | used at most once                     |
+    | [0,1]    | {0,1}                        | ``M``  | Used at most once ("Maybe")           |
     +----------+------------------------------+--------+---------------------------------------+
-    | [0,ω]    | {0,1,ω}                      | ``U``  | top element, no information,          |
+    | [0,ω]    | {0,1,ω}                      | ``L``  | Lazy. Top element, no information,    |
     |          |                              |        | used at least 0, at most many times   |
     +----------+------------------------------+--------+---------------------------------------+
-    | [1,1]    | {1}                          | ``S``  | strict, used exactly once             |
+    | [1,1]    | {1}                          | ``1``  | Strict, used exactly once             |
     +----------+------------------------------+--------+---------------------------------------+
-    | [1,ω]    | {1,ω}                        | ``M``  | strict, used possibly many times      |
+    | [1,ω]    | {1,ω}                        | ``S``  | Strict, used possibly many times      |
     +----------+------------------------------+--------+---------------------------------------+
 
     Note that it's never interesting to differentiate between a cardinality
@@ -1195,7 +1195,7 @@ by saying ``-fno-wombat``.
 
     .. code-block:: none
 
-        card ::= B | A | 1 | U | S | M    semantics as in the table above
+        card ::= B | A | M | L | 1 | S    semantics as in the table above
 
         d    ::= card sd                  card = how often, sd = how deep
               |  card                     abbreviation: Same as "card card"
@@ -1206,23 +1206,23 @@ by saying ``-fno-wombat``.
 
     For example, ``fst`` is strict in its argument, and also in the first
     component of the argument.  It will not evaluate the argument's second
-    component. That is expressed by the demand ``SP(SU,A)``. The ``P`` is for
+    component. That is expressed by the demand ``1P(1L,A)``. The ``P`` is for
     "product sub-demand", which has a *demand* for each product field. The
-    notation ``SU`` just says "evaluated strictly (``S``), with everything
-    nested inside evaluated according to ``U``" -- e.g., no information,
+    notation ``1L`` just says "evaluated strictly (``1``), with everything
+    nested inside evaluated according to ``L``" -- e.g., no information,
     because that would depend on the evaluation context of the call site of
-    ``fst``. The role of ``U`` in ``SU`` is that of a *polymorphic* sub-demand,
-    being semantically equivalent to the sub-demand ``P(UP(..))``, which we
+    ``fst``. The role of ``L`` in ``1L`` is that of a *polymorphic* sub-demand,
+    being semantically equivalent to the sub-demand ``P(LP(..))``, which we
     simply abbreviate by the (consequently overloaded) cardinality notation
-    ``U``.
+    ``L``.
 
     For another example, the expression ``x + 1`` evaluates ``x`` according to
-    demand ``SP(U)``. We have seen single letters stand for cardinalities and
-    polymorphic sub-demands, but what does the single letter ``U`` mean for a
+    demand ``1P(L)``. We have seen single letters stand for cardinalities and
+    polymorphic sub-demands, but what does the single letter ``L`` mean for a
     *demand*? Such a single letter demand simply expands to a cardinality and
-    a polymorphic sub-demand of the same letter: E.g. ``U`` is equivalent to
-    ``UU`` by expansion of the single letter demand, which is equivalent to
-    ``UP(UP(..))``, so ``U``\s all the way down. It is always clear from
+    a polymorphic sub-demand of the same letter: E.g. ``L`` is equivalent to
+    ``LL`` by expansion of the single letter demand, which is equivalent to
+    ``LP(LP(..))``, so ``L``\s all the way down. It is always clear from
     context whether we talk about about a cardinality, sub-demand or demand.
 
     **Demand signatures**
@@ -1243,15 +1243,15 @@ by saying ``-fno-wombat``.
                                               no information)
 
     We summarise ``fst``'s demand properties in its *demand signature*
-    ``<SP(SU,A)>``, which just says "If ``fst`` is applied to one argument,
-    that argument is evaluated according to ``SP(SU,A)``". For another
-    example, the demand signature of ``seq`` would be ``<SA>`` and that of
-    ``+`` would be ``<SP(U)><SP(U)>``.
+    ``<1P(1L,A)>``, which just says "If ``fst`` is applied to one argument,
+    that argument is evaluated according to ``1P(1L,A)``". For another
+    example, the demand signature of ``seq`` would be ``<1A><1L>`` and that of
+    ``+`` would be ``<1P(L)><1P(L)>``.
 
     If not omitted, the divergence information can be ``b`` (surely diverges)
     or ``x`` (surely diverges or throws a precise exception).  For example,
-    ``error`` has demand signature ``<M>b`` and ``throwIO`` (which is the
-    only way to throw precise exceptions) has demand signature ``<_><U><U>x``
+    ``error`` has demand signature ``<S>b`` and ``throwIO`` (which is the
+    only way to throw precise exceptions) has demand signature ``<_><L><L>x``
     (leaving out the complicated demand on the ``Exception`` dictionary).
 
     **Call sub-demands**
@@ -1262,16 +1262,16 @@ by saying ``-fno-wombat``.
         maybe n _ Nothing  = n
         maybe _ s (Just a) = s a
 
-    We give it demand signature ``<U><1C1(U)><SU>``.  The ``C1(U)`` is a *call
+    We give it demand signature ``<L><MCM(L)><1L>``.  The ``CM(L)`` is a *call
     sub-demand* that says "Called at most once, where the result is used
-    according to ``U``". The expression ``f `seq` f 1 2`` puts ``f`` under
-    demand ``MCS(U)`` and serves as an example where the upper bound on
+    according to ``L``". The expression ``f `seq` f 1`` puts ``f`` under
+    demand ``SC1(L)`` and serves as an example where the upper bound on
     evaluation cardinality doesn't conincide with that of the call cardinality.
 
     Cardinality is always relative to the enclosing call cardinality, so
-    ``g 1 2 + g 3 4`` puts ``g`` under demand ``MCM(CS(U))``, which says
-    "called multiple times (``M``), but every time it is called with one
-    argument, it is applied exactly once to another argument (``S``)".
+    ``g 1 2 + g 3 4`` puts ``g`` under demand ``SCS(C1(L))``, which says
+    "called multiple times (``S``), but every time it is called with one
+    argument, it is applied exactly once to another argument (``1``)".
 
 .. ghc-flag:: -fstrictness-before=⟨n⟩
     :shortdesc: Run an additional demand analysis before simplifier phase ⟨n⟩
