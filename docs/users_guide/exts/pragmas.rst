@@ -887,6 +887,59 @@ modules. ``COMPLETE`` pragmas should be thought of as asserting a
 universal truth about a set of patterns and as a result, should not be
 used to silence context specific incomplete match warnings.
 
+It is also possible to restrict the types to which a ``COMPLETE`` pragma applies
+by putting a double colon ``::`` after the list of constructors, followed by a
+result type constructor, which will be used to restrict the cases in which the
+pragma applies. GHC will compare the annotated result type constructor with the
+type constructor in the head of the scrutinee type in a pattern match to see if
+the ``COMPLETE`` pragma is meant to apply to it.
+
+This is especially useful in cases that the constructors specified are
+polymorphic, e.g.::
+
+    data Proxy a = Proxy
+
+    class IsEmpty a where
+      isEmpty :: a -> Bool
+
+    class IsCons a where
+      type Elt a
+      isCons :: a -> Maybe (Elt a, a)
+
+    pattern Empty :: IsEmpty a => a
+    pattern Empty <- (isEmpty -> True)
+
+    pattern Cons :: IsCons a => Elt a -> a -> a
+    pattern Cons x xs <- (isCons -> Just (x,xs))
+
+    instance IsEmpty (Proxy a) where
+      isEmpty Proxy = True
+
+    instance IsEmpty [a] where
+      isEmpty = null
+
+    instance IsCons [a] where
+      type Elt [a] = a
+      isCons [] = Nothing
+      isCons (x:xs) = Just (x,xs)
+
+    {-# COMPLETE Empty :: Proxy #-}
+    {-# COMPLETE Empty, Cons :: [] #-}
+
+    foo :: Proxy a -> Int
+    foo Empty = 0
+
+    bar :: [a] -> Int
+    bar Empty = 0
+    bar (Cons _ _) = 1
+
+    baz :: [a] -> Int
+    baz Empty = 0
+
+In this example, ``foo`` and ``bar`` will not be warned about, as their
+pattern matches are covered by the two ``COMPLETE`` pragmas above, but
+``baz`` will be warned about as incomplete.
+
 .. _overlap-pragma:
 
 ``OVERLAPPING``, ``OVERLAPPABLE``, ``OVERLAPS``, and ``INCOHERENT`` pragmas
