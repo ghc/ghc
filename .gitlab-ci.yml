@@ -35,6 +35,8 @@ variables:
   #     -0            34.40s  156 MB
   #
   XZ_OPT: "-1"
+default:
+  interruptible: true
 
 stages:
   - tool-lint      # Source linting of the tools
