@@ -1,7 +1,7 @@
 
 ==================== Strictness signatures ====================
 HyperStrUse.$trModule:
-HyperStrUse.f: <SP(SP(U),A)><SU>
+HyperStrUse.f: <1P(1P(L),A)><1L>
 
 
 
@@ -13,6 +13,6 @@ HyperStrUse.f: m1
 
 ==================== Strictness signatures ====================
 HyperStrUse.$trModule:
-HyperStrUse.f: <SP(SP(U),A)><SU>
+HyperStrUse.f: <1P(1P(L),A)><1L>
 
 

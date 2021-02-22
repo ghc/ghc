@@ -5,8 +5,8 @@ expensive 0 = 0
 expensive n = expensive n
 {-# NOINLINE expensive #-}
 
--- We could be saying "<S(S),1*(U(U))><L,A>b"
--- but we are saying "<S(S),1*(U(U))>"
--- We should not be saying "<S(S),1*(U(U))>b"
+-- We could be saying "<1P(1)><A>b"
+-- but we are saying "<1P(1)>"
+-- We should not be saying "<1P(1)>b"
 f :: Int -> Int -> Int
 f x = expensive x `seq` (\y -> error (show y))
