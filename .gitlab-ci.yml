@@ -16,6 +16,9 @@ variables:
 
   GIT_SUBMODULE_STRATEGY: "recursive"
 
+default:
+  interruptible: true
+
 stages:
   - tool-lint      # Source linting of the tools
   - quick-build    # A very quick smoke-test to weed out broken commits
