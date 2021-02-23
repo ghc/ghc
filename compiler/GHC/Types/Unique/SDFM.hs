@@ -88,8 +88,8 @@ equateUSDFM usdfm@(USDFM env) x y =
   case (lu x, lu y) of
     ((x', _)    , (y', _))
       | getUnique x' == getUnique y' -> (Nothing, usdfm) -- nothing to do
-    ((x', _)    , (_ , Nothing))     -> (Nothing, set_indirect y x')
-    ((_ , mb_ex), (y', _))           -> (mb_ex,   set_indirect x y')
+    ((x', _)    , (y', Nothing))     -> (Nothing, set_indirect y' x')
+    ((x', mb_ex), (y', _))           -> (mb_ex,   set_indirect x' y')
   where
     lu = lookupReprAndEntryUSDFM usdfm
     set_indirect a b = USDFM $ addToUDFM env a (Indirect b)
