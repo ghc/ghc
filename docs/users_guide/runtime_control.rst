@@ -958,7 +958,7 @@ Secondly, after doing some allocation GHC is quite reluctant to return
 the memory to the OS. This is because after performing a major collection the program might
 still be allocating a lot and it costs to have to request
 more memory. Therefore the RTS keeps an extra amount to reuse which
-depends on the :rts-flag:`-F ⟨factor⟩`. By default
+depends on the :rts-flag:`-F ⟨factor⟩` option. By default
 the RTS will keep up to ``(2 + F) * live_bytes`` after performing a major collection due to
 exhausting the available heap. The default value is ``F = 2`` so you
 can see OS memory usage reported to be as high as 4 times the amount used by your
@@ -971,7 +971,7 @@ spike up to 6G for a short period, then OS reported memory would never dip below
 is what happened before GHC 9.2. In GHC 9.2 memory is gradually returned to the OS so OS memory
 usage returns closer to the theoretical minimums.
 
-The :rts-flag:`-Fd ⟨factor⟩` controls the rate at which memory is returned to
+The :rts-flag:`-Fd ⟨factor⟩` option controls the rate at which memory is returned to
 the OS. On consecutive major collections which are not triggered by heap overflows, a
 counter (``t``) is increased and the ``F`` factor is inversly scaled according to the
 value of ``t`` and ``Fd``. The factor is scaled by the equation:
