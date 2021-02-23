@@ -198,7 +198,7 @@ Runtime system
     charVal :: forall n proxy. KnownChar n => proxy n -> Char
     charVal' :: forall n. KnownChar n => Proxy# n -> Char
 
-- New binding ``GHC.Exts.considerAccessible``. It's equivalent to ``True``
+- There is a new binding ``GHC.Exts.considerAccessible`` that is equivalent to ``True``
   and allows the programmer to turn off redundancy warnings for particular
   clauses, like the third one here ::
 
