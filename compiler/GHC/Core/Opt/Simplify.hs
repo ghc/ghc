@@ -965,7 +965,7 @@ might do the same again.
 -}
 
 simplExpr :: SimplEnv -> CoreExpr -> SimplM CoreExpr
-simplExpr env (Type ty)
+simplExpr !env (Type ty)
   = do { ty' <- simplType env ty  -- See Note [Avoiding space leaks in OutType]
        ; return (Type ty') }
 
