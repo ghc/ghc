@@ -294,7 +294,14 @@ tcRnModuleTcRnM hsc_env mod_sum
           $ do { -- Rename and type check the declarations
                  traceRn "rn1a" empty
                ; tcg_env <- if isHsBootOrSig hsc_src
-                            then tcRnHsBootDecls hsc_src local_decls
+                            then do {
+                              ; tcg_env' <- tcRnHsBootDecls hsc_src local_decls
+                              ; traceRn "rn4a: before exports" empty
+                              ; tcg_env <- setGblEnv tcg_env' $
+                                    tcRnExports explicit_mod_hdr export_ies tcg_env'
+                              ; traceRn "rn4b: after exports" empty
+                              ; return tcg_env
+                              }
                             else {-# SCC "tcRnSrcDecls" #-}
                                  tcRnSrcDecls explicit_mod_hdr local_decls export_ies
 
@@ -303,10 +310,10 @@ tcRnModuleTcRnM hsc_env mod_sum
 
                ; setGblEnv tcg_env
                  $ do { -- Process the export list
-                        traceRn "rn4a: before exports" empty
-                      ; tcg_env <- tcRnExports explicit_mod_hdr export_ies
-                                     tcg_env
-                      ; traceRn "rn4b: after exports" empty
+                      --  traceRn "rn4a: before exports" empty
+                      -- ; tcg_env <- tcRnExports explicit_mod_hdr export_ies -- RSX
+                      --                tcg_env
+                      -- ; traceRn "rn4b: after exports" empty
                       ; -- Compare hi-boot iface (if any) with the real thing
                         -- Must be done after processing the exports
                         tcg_env <- checkHiBootIface tcg_env boot_info
@@ -436,14 +443,16 @@ tcRnSrcDecls :: Bool  -- False => no 'module M(..) where' header at all
              -> TcM TcGblEnv
 tcRnSrcDecls explicit_mod_hdr decls export_ies
  = do { -- Do all the declarations
-      ; (tcg_env, tcl_env, lie) <- tc_rn_src_decls decls
+      ; (tcg_env', tcl_env, lie) <- tc_rn_src_decls decls
+      ; tcg_env <- setGblEnv tcg_env' $
+                   tcRnExports explicit_mod_hdr export_ies tcg_env'
 
         -- Check for the 'main' declaration
         -- Must do this inside the captureTopConstraints
         -- NB: always set envs *before* captureTopConstraints
       ; (tcg_env, lie_main) <- setEnvs (tcg_env, tcl_env) $
                                captureTopConstraints $
-                               checkMain explicit_mod_hdr export_ies
+                               checkMain explicit_mod_hdr -- export_ies
 
       ; setEnvs (tcg_env, tcl_env) $ do {
 
@@ -1748,17 +1757,18 @@ tcTyClsInstDecls tycl_decls deriv_decls binds
 -}
 
 checkMain :: Bool  -- False => no 'module M(..) where' header at all
-          -> Maybe (Located [LIE GhcPs])  -- Export specs of Main module
+          -- -> Maybe (Located [LIE GhcPs])  -- Export specs of Main module
           -> TcM TcGblEnv
 -- If we are in module Main, check that 'main' is defined and exported.
-checkMain explicit_mod_hdr export_ies
+checkMain explicit_mod_hdr -- export_ies
  = do   { hsc_env  <- getTopEnv
         ; tcg_env <- getGblEnv
-        ; check_main hsc_env tcg_env explicit_mod_hdr export_ies }
+        ; let exports = tcg_exports tcg_env
+        ; check_main hsc_env tcg_env explicit_mod_hdr exports }
 
-check_main :: HscEnv -> TcGblEnv -> Bool -> Maybe (Located [LIE GhcPs])
+check_main :: HscEnv -> TcGblEnv -> Bool -> [AvailInfo]
            -> TcM TcGblEnv
-check_main hsc_env tcg_env explicit_mod_hdr export_ies
+check_main hsc_env tcg_env explicit_mod_hdr exports
  | mod /= main_mod
  = traceTc "checkMain not" (ppr main_mod <+> ppr mod) >>
    return tcg_env
@@ -1766,9 +1776,7 @@ check_main hsc_env tcg_env explicit_mod_hdr export_ies
  | otherwise
    -- Compare the list of main functions in scope with those
    --   specified in the export list.
- = do mains_all <- lookupInfoOccRn main_fn
-                    -- get all 'main' functions in scope
-                    -- They may also be imported from other modules!
+ = do
       case exportedMains of -- check the main(s) specified in the export list
         [ ] -> do
           -- The module has no main functions in the export spec, so we must give
@@ -1779,6 +1787,8 @@ check_main hsc_env tcg_env explicit_mod_hdr export_ies
           complain_no_main
           -- In order to reduce the number of potential error messages, we check
           -- to see if there are any main functions defined (but not exported)...
+          mains_all <- lookupInfoOccRn main_fn
+            -- get all 'main' functions in scope
           case getSomeMain mains_all of
             Nothing -> return tcg_env
               -- ...if there are no such main functions, there is nothing we can do...
@@ -1787,15 +1797,9 @@ check_main hsc_env tcg_env explicit_mod_hdr export_ies
                 -- typechecker. This can prevent a spurious "Ambiguous type variable"
                 -- error message in certain cases, as described in
                 -- Note [Main module without a main function in the export spec].
-        _ -> do    -- The module has one or more main functions in the export spec
-          let mains = filterInsMains exportedMains mains_all
-          case mains of
-            [] -> do  --
-              traceTc "checkMain fail" ppr_mod_mainfn
-              complain_no_main
-              return tcg_env
-            [main_name] -> use_as_main main_name
-            _ -> do           -- multiple main functions are exported
+
+        [main_name] -> use_as_main main_name    -- The module has one or more main functions in the export spec
+        _ -> do           -- multiple main functions are exported
               addAmbiguousNameErr main_fn          -- issue error msg
               return tcg_env
   where
@@ -1806,7 +1810,8 @@ check_main hsc_env tcg_env explicit_mod_hdr export_ies
     main_fn     = getMainFun dflags
     occ_main_fn = occName main_fn
     interactive = ghcLink dflags == LinkInMemory
-    exportedMains = selExportMains export_ies
+    exportedNames = concatMap availNames exports
+    exportedMains = filter (\n -> nameOccName n == occ_main_fn ) exportedNames
     ppr_mod_mainfn = ppr main_mod <+> ppr main_fn
 
     -- There is a single exported 'main' function.
@@ -1864,37 +1869,6 @@ check_main hsc_env tcg_env explicit_mod_hdr export_ies
     defOrExp  = if null exportedMains then "exported by" else "defined in"
 
     pp_main_fn = ppMainFn main_fn
-
-    -- Select the main functions from the export list.
-    -- Only the module name is needed, the function name is fixed.
-    selExportMains :: Maybe (Located [LIE GhcPs]) -> [ModuleName]    -- #16453
-    selExportMains Nothing = [main_mod_nm]
-        -- no main specified, but there is a header.
-    selExportMains (Just exps) = fmap fst $
-        filter (\(_,n) -> n == occ_main_fn ) texp
-      where
-        ies = fmap unLoc $ unLoc exps
-        texp = mapMaybe transExportIE ies
-
-    -- Filter all main functions in scope that match the export specs
-    filterInsMains :: [ModuleName] -> [Name] -> [Name]               -- #16453
-    filterInsMains export_mains inscope_mains =
-      [mod | mod <- inscope_mains,
-          (moduleName . nameModule) mod `elem` export_mains]
-
-    -- Transform an export_ie to a (ModuleName, OccName) pair.
-    -- 'IEVar' constructors contain exported values (functions), eg '(Main.main)'
-    -- 'IEModuleContents' constructors contain fully exported modules, eg '(Main)'
-    -- All other 'IE...' constructors are not used and transformed to Nothing.
-    transExportIE :: IE GhcPs -> Maybe (ModuleName, OccName)         -- #16453
-    transExportIE (IEVar _  var) = isQual_maybe $
-         upqual $ ieWrappedName $ unLoc var
-       where
-         -- A module name is always needed, so qualify 'UnQual' rdr names.
-         upqual (Unqual occ) = Qual main_mod_nm occ
-         upqual rdr = rdr
-    transExportIE (IEModuleContents _ mod) = Just (unLoc mod, occ_main_fn)
-    transExportIE _ = Nothing
 
     -- Get a main function that is in scope.
     -- See Note [Main module without a main function in the export spec]
