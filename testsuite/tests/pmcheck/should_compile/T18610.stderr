@@ -1,0 +1,9 @@
+
+T18610.hs:11:3: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In a case alternative: (True, False) -> ...
+
+T18610.hs:20:7: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In a case alternative:
+        Patterns of type ‘(Bool, Bool)’ not matched: (_, _)
