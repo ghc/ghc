@@ -78,7 +78,7 @@ import GHC.Builtin.Types.Prim (tYPETyCon)
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type
 import GHC.Tc.Solver   (tcNormalise, tcCheckSatisfiability)
-import GHC.Core.Unify    (tcMatchTy, tcUnifyTyKi)
+import GHC.Core.Unify    (tcMatchTy)
 import GHC.Core.Coercion
 import GHC.HsToCore.Monad hiding (foldlM)
 import GHC.Tc.Instance.Family
@@ -162,9 +162,6 @@ addConLikeMatches :: ConLike -> ResidualCompleteMatches -> DsM ResidualCompleteM
 addConLikeMatches (RealDataCon dc) rcm = addTyConMatches (dataConTyCon dc) rcm
 addConLikeMatches (PatSynCon _)    rcm = addCompleteMatches rcm
 
-filterRCMsByType :: Type -> ResidualCompleteMatches -> ResidualCompleteMatches
-filterRCMsByType ty (RCM v mcms) = RCM v (fmap (filterCompleteMatches ty) mcms)
-
 -- | Adds
 --    * the 'CompleteMatches' from COMPLETE pragmas
 --    * and the /vanilla/ 'CompleteMatch' from the data 'TyCon'
@@ -177,14 +174,13 @@ addTyConMatches tc rcm = add_tc_match <$> addCompleteMatches rcm
     add_tc_match rcm
       = rcm{rcm_vanilla = rcm_vanilla rcm <|> vanillaCompleteMatchTC tc}
 
-markMatched :: Type -> PmAltCon -> ResidualCompleteMatches -> DsM (Maybe ResidualCompleteMatches)
+markMatched :: PmAltCon -> ResidualCompleteMatches -> DsM (Maybe ResidualCompleteMatches)
 -- Nothing means the PmAltCon didn't occur in any COMPLETE set.
 -- See Note [Shortcutting the inhabitation test] for how this is useful for
 -- performance on T17836.
-markMatched _ (PmAltLit _)      _   = pure Nothing -- lits are never part of a COMPLETE set
-markMatched ty (PmAltConLike cl) rcm = do
-  rcm' <- filterRCMsByType ty <$> addConLikeMatches cl rcm
-  tracePm "markMatched" (ppr ty <> text ", " <> ppr cl <> text ", " <> ppr rcm <> text " -> " <> ppr rcm')
+markMatched (PmAltLit _)      _   = pure Nothing -- lits are never part of a COMPLETE set
+markMatched (PmAltConLike cl) rcm = do
+  rcm' <- addConLikeMatches cl rcm
   let go cm = case lookupUniqDSet (cmConLikes cm) cl of
         Nothing -> (False, cm)
         Just _  -> (True,  cm { cmConLikes = delOneFromUniqDSet (cmConLikes cm) cl })
@@ -791,7 +787,7 @@ addNotConCt nabla x nalt = do
       MASSERT( isPmAltConMatchStrict nalt )
       let vi' = vi{ vi_neg = neg', vi_bot = IsNotBot }
       -- 3. Make sure there's at least one other possible constructor
-      mb_rcm' <- lift (markMatched (varType x') nalt rcm)
+      mb_rcm' <- lift (markMatched nalt rcm)
       pure $ case mb_rcm' of
         -- If nalt could be removed from a COMPLETE set, we'll get back Just and
         -- have to mark x dirty, by returning Just x'.
@@ -1359,6 +1355,8 @@ instCompleteSet fuel nabla x cs
   -- No need to instantiate a constructor of this COMPLETE set if we already
   -- have a solution!
   = pure nabla
+  | not (completeMatchAppliesAtType (varType x) cs)
+  = pure nabla
   | otherwise
   = go nabla (sorted_candidates cs)
   where
@@ -1839,17 +1837,17 @@ generateInhabitingPatterns (x:xs) n nabla = do
 pickApplicableCompleteSets :: Type -> ResidualCompleteMatches -> DsM [CompleteMatch]
 pickApplicableCompleteSets ty rcm = do
   env <- dsGetFamInstEnvs
-  let isRelevant :: CompleteMatch -> Bool
-      isRelevant cm = (all (is_valid env) . uniqDSetToList $ cmConLikes cm)
-                   && all (isJust . (\t -> tcUnifyTyKi t ty)) (cmScrutineeType cm)
-      relevantSets = filter isRelevant (getRcm rcm)
+  let applicable :: CompleteMatch -> Bool
+      applicable cm = all (is_valid env) (uniqDSetToList (cmConLikes cm))
+                   && completeMatchAppliesAtType ty cm
+      applicableMatches = filter applicable (getRcm rcm)
   tracePm "pickApplicableCompleteSets:" $
     vcat
       [ ppr ty
       , ppr rcm
-      , ppr relevantSets
+      , ppr applicableMatches
       ]
-  pure $ relevantSets
+  return applicableMatches
   where
     is_valid :: FamInstEnvs -> ConLike -> Bool
     is_valid env cl = isJust (guessConLikeUnivTyArgsFromResTy env ty cl)

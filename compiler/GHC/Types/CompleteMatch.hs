@@ -25,5 +25,6 @@ instance Outputable CompleteMatch where
 
 type CompleteMatches = [CompleteMatch]
 
-filterCompleteMatches :: Type -> CompleteMatches -> CompleteMatches
-filterCompleteMatches ty cms = filter (\cm -> all (isJust . (\t -> tcUnifyTyKi t ty)) (cmScrutineeType cm)) cms
+completeMatchAppliesAtType :: Type -> CompleteMatch -> Bool
+completeMatchAppliesAtType ty cm = all (isJust . (\t -> tcUnifyTyKi t ty)) (cmScrutineeType cm)
+ -- NB: We're using all (from Foldable) on a Maybe here.
