@@ -203,3 +203,13 @@ Runtime system
 
 - On POSIX, ``System.IO.openFile`` can no longer leak a file descriptor if it
   is interrupted by an asynchronous exception (#19114, #19115).
+
+- There's a new binding ``GHC.Exts.considerAccessible``. It's equivalent to
+  ``True`` and allows the programmer to turn off redundancy warnings for
+  particular clauses, like the third one here ::
+
+    g :: Bool -> Int
+    g x = case (x, x) of
+      (True,  True)  -> 1
+      (False, False) -> 2
+      (True,  False) | considerAccessible -> 3 -- No warning!
