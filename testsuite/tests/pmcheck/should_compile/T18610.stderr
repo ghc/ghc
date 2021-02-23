@@ -1,0 +1,17 @@
+
+T18610.hs:15:3: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In a case alternative: (True, False) -> ...
+
+T18610.hs:24:7: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In a case alternative:
+        Patterns of type ‘(Bool, Bool)’ not matched: (_, _)
+
+T18610.hs:53:3: warning: [-Winaccessible-code (in -Wdefault)]
+    • Couldn't match type ‘Bool’ with ‘Int’
+      Inaccessible code in
+        a pattern with constructor: Refl :: forall {k} (a :: k). a :~: a,
+        in an equation for ‘k’
+    • In the pattern: Refl
+      In an equation for ‘k’: k Refl _ | considerAccessible = 2
