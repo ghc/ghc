@@ -262,9 +262,7 @@ instance ToJson MessageClass where
   json MCDump = JSString "MCDump"
   json MCInfo = JSString "MCInfo"
   json (MCDiagnostic sev reason) =
-    JSObject [("severity", JSString $ renderWithContext defaultSDocContext (ppr sev))
-             ,("reason", JSString $ renderWithContext defaultSDocContext   (ppr reason))
-             ]
+    JSString $ renderWithContext defaultSDocContext (ppr $ text "MCDiagnostic" <+> ppr sev <+> ppr reason)
 
 instance Show (MsgEnvelope DiagnosticMessage) where
     show = showMsgEnvelope
