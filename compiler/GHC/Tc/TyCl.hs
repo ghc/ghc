@@ -239,7 +239,9 @@ tcTyClDecls tyclds kisig_env role_annots
             -- loops yet and could fall into a black hole.
        ; fixM $ \ ~(rec_tyclss, _) -> do
            { tcg_env <- getGblEnv
-           ; let roles = inferRoles (tcg_src tcg_env) role_annots rec_tyclss
+                 -- Forced so we don't retain a reference to the TcGblEnv
+           ; let !src  = tcg_src tcg_env
+                 roles = inferRoles src role_annots rec_tyclss
 
                  -- Populate environment with knot-tied ATyCon for TyCons
                  -- NB: if the decls mention any ill-staged data cons
