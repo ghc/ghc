@@ -127,6 +127,8 @@ Intervals describe sets, so the underlying lattice is the powerset lattice.
 
 Usually l<=u, but we also have C_10, the interval [1,0], the empty interval,
 denoting the empty set.   This is the bottom element of the lattice.
+
+See Note [Demand notation] for the notation we use for each of the constructors.
 -}
 
 
@@ -244,18 +246,19 @@ multCard _    _    = C_0N
 -- The "how deep" component is represented by a 'SubDemand'.
 -- Examples (using Note [Demand notation]):
 --
---   * 'seq' puts demand @SA@ on its argument: It evaluates the argument
---     strictly (@S@), but not any deeper (@A@).
---   * 'fst' puts demand @SP(SU,A)@ on its argument: It evaluates the argument
+--   * 'seq' puts demand @1A@ on its first argument: It evaluates the argument
+--     strictly (@1@), but not any deeper (@A@).
+--   * 'fst' puts demand @1P(1L,A)@ on its argument: It evaluates the argument
 --     pair strictly and the first component strictly, but no nested info
---     beyond that (@U@). Its second argument is not used at all.
---   * '$' puts demand @SCS(U)@ on its first argument: It calls (@C@) the
---     argument function with one argument, exactly once (@S@). No info
---     on how the result of that call is evaluated (@U@).
---   * 'maybe' puts demand @1C1(U)@ on its second argument: It evaluates
---     the argument function lazily and calls it once when it is evaluated.
---   * @fst p + fst p@ puts demand @MP(MU,A)@ on @p@: It's @SP(SU,A)@
---     multiplied by two, so we get @M@ (used at least once, possibly multiple
+--     beyond that (@L@). Its second argument is not used at all.
+--   * '$' puts demand @1C1(L)@ on its first argument: It calls (@C@) the
+--     argument function with one argument, exactly once (@1@). No info
+--     on how the result of that call is evaluated (@L@).
+--   * 'maybe' puts demand @MCM(L)@ on its second argument: It evaluates
+--     the argument function at most once ((M)aybe) and calls it once when
+--     it is evaluated.
+--   * @fst p + fst p@ puts demand @SP(SL,A)@ on @p@: It's @1P(1L,A)@
+--     multiplied by two, so we get @S@ (used at least once, possibly multiple
 --     times).
 --
 -- This data type is quite similar to @'Scaled' 'SubDemand'@, but it's scaled
@@ -269,14 +272,14 @@ data Demand
 -- denoted thing is evaluated. See 'Demand' for examples.
 --
 -- The nested 'SubDemand' @d@ of a 'Call' @Cn(d)@ is /relative/ to a single such call.
--- E.g. The expression @f 1 2 + f 3 4@ puts call demand @MCM(CS(U))@ on @f@:
--- @f@ is called exactly twice (@M@), each time exactly once (@S@) with an
+-- E.g. The expression @f 1 2 + f 3 4@ puts call demand @SCS(C1(L))@ on @f@:
+-- @f@ is called exactly twice (@S@), each time exactly once (@1@) with an
 -- additional argument.
 --
 -- The nested 'Demand's @dn@ of a 'Prod' @P(d1,d2,...)@ apply /absolutely/:
 -- If @dn@ is a used once demand (cf. 'isUsedOnce'), then that means that
 -- the denoted sub-expression is used once in the entire evaluation context
--- described by the surrounding 'Demand'. E.g., @UP(1U)@ means that the
+-- described by the surrounding 'Demand'. E.g., @LP(ML)@ means that the
 -- field of the denoted expression is used at most once, although the
 -- entire expression might be used many times.
 --
@@ -291,12 +294,12 @@ data SubDemand
   -- @Poly n@ is semantically equivalent to @Prod [n :* Poly n, ...]@ or
   -- @Call n (Poly n)@. 'mkCall' and 'mkProd' do these rewrites.
   --
-  -- In Note [Demand notation]: @U === P(U,U,...)@ and @U === CU(U)@,
-  --                            @S === P(S,S,...)@ and @S === CS(S)@, and so on.
+  -- In Note [Demand notation]: @L === P(L,L,...)@ and @L === CL(L)@,
+  --                            @1 === P(1,1,...)@ and @1 === C1(1)@, and so on.
   --
-  -- We only really use 'Poly' with 'C_10' (bottom), 'C_00' (absent),
-  -- 'C_0N' (top) and sometimes 'C_1N', but it's simpler to treat it uniformly
-  -- than to have a special constructor for each of the three cases.
+  -- We only really use 'Poly' with 'C_10' (B), 'C_00' (A), 'C_0N' (L) and
+  -- sometimes 'C_1N' (S), but it's simpler to treat it uniformly than to
+  -- have a special constructor for each of the three cases.
   | Call !Card !SubDemand
   -- ^ @Call n sd@ describes the evaluation context of @n@ function
   -- applications, where every individual result is evaluated according to @sd@.
@@ -340,7 +343,7 @@ mkProd ds@(n:*sd : _)
   | otherwise                                 = Prod ds
   where
     -- We only want to simplify absent and bottom demands and unbox the others.
-    -- See also Note [U should win] and Note [Don't optimise UP(U,U,...) to U].
+    -- See also Note [L should win] and Note [Don't optimise LP(L,L,...) to L].
     want_to_simplify C_00 = True
     want_to_simplify C_10 = True
     want_to_simplify _    = False
@@ -491,22 +494,22 @@ isWeakDmd dmd@(n :* _) = not (isStrict n) && is_plus_idem_dmd dmd
 evalDmd :: Demand
 evalDmd = C_1N :* topSubDmd
 
--- | First argument of 'GHC.Exts.maskAsyncExceptions#': @SCS(U)@.
+-- | First argument of 'GHC.Exts.maskAsyncExceptions#': @1C1(L)@.
 -- Called exactly once.
 strictOnceApply1Dmd :: Demand
 strictOnceApply1Dmd = C_11 :* mkCall C_11 topSubDmd
 
--- | First argument of 'GHC.Exts.atomically#': @MCM(U)@.
+-- | First argument of 'GHC.Exts.atomically#': @SCS(L)@.
 -- Called at least once, possibly many times.
 strictManyApply1Dmd :: Demand
 strictManyApply1Dmd = C_1N :* mkCall C_1N topSubDmd
 
--- | First argument of catch#: @1C1(U)@.
+-- | First argument of catch#: @MCM(L)@.
 -- Evaluates its arg lazily, but then applies it exactly once to one argument.
 lazyApply1Dmd :: Demand
 lazyApply1Dmd = C_01 :* mkCall C_01 topSubDmd
 
--- | Second argument of catch#: @1C1(CS(U))@.
+-- | Second argument of catch#: @MCM(C1(L))@.
 -- Calls its arg lazily, but then applies it exactly once to an additional argument.
 lazyApply2Dmd :: Demand
 lazyApply2Dmd = C_01 :* mkCall C_01 (mkCall C_11 topSubDmd)
@@ -548,11 +551,11 @@ strictifyDictDmd ty (n :* Prod ds)
       = Nothing
 strictifyDictDmd _  dmd = dmd
 
--- | Wraps the 'SubDemand' with a one-shot call demand: @d@ -> @CS(d)@.
+-- | Wraps the 'SubDemand' with a one-shot call demand: @d@ -> @C1(d)@.
 mkCalledOnceDmd :: SubDemand -> SubDemand
 mkCalledOnceDmd sd = mkCall C_11 sd
 
--- | @mkCalledOnceDmds n d@ returns @CS(CS...(CS d))@ where there are @n@ @CS@'s.
+-- | @mkCalledOnceDmds n d@ returns @C1(C1...(C1 d))@ where there are @n@ @C1@'s.
 mkCalledOnceDmds :: Arity -> SubDemand -> SubDemand
 mkCalledOnceDmds arity sd = iterate mkCalledOnceDmd sd !! arity
 
@@ -613,9 +616,9 @@ argOneShots (_ :* sd) = go sd -- See Note [Call demands are relative]
     go _    = []
 
 -- |
--- @saturatedByOneShots n C1(C1(...)) = True@
+-- @saturatedByOneShots n CM(CM(...)) = True@
 --   <=>
--- There are at least n nested C1(..) calls.
+-- There are at least n nested CM(..) calls.
 -- See Note [Demand on the worker] in GHC.Core.Opt.WorkWrap
 saturatedByOneShots :: Int -> Demand -> Bool
 saturatedByOneShots n (_ :* sd) = isUsedOnce (peelManyCalls n sd)
@@ -643,12 +646,12 @@ In #7319 we get
 Note [Call demands are relative]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The expression @if b then 0 else f 1 2 + f 3 4@ uses @f@ according to the demand
-@UCU(CS(P(U)))@, meaning
+@LCL(C1(P(L)))@, meaning
 
-  "f is called multiple times or not at all (CU), but each time it
-   is called, it's called with *exactly one* (CS) more argument.
+  "f is called multiple times or not at all (CL), but each time it
+   is called, it's called with *exactly one* (C1) more argument.
    Whenever it is called with two arguments, we have no info on how often
-   the field of the product result is used (U)."
+   the field of the product result is used (L)."
 
 So the 'SubDemand' nested in a 'Call' demand is relative to exactly one call.
 And that extends to the information we have how its results are used in each
@@ -665,7 +668,7 @@ call site. Consider (#18903)
       2 -> snd (g m)
       _ -> uncurry (+) (g m)
 
-We want to give @g@ the demand @1C1(P(1P(U),SP(U)))@, so we see that in each call
+We want to give @g@ the demand @MCM(P(MP(L),1P(L)))@, so we see that in each call
 site of @g@, we are strict in the second component of the returned pair.
 
 This relative cardinality leads to an otherwise unexpected call to 'lubSubDmd'
@@ -674,8 +677,8 @@ in 'plusSubDmd', but if you do the math it's just the right thing.
 There's one more subtlety: Since the nested demand is relative to exactly one
 call, in the case where we have *at most zero calls* (e.g. CA(...)), the premise
 is hurt and we can assume that the nested demand is 'botSubDmd'. That ensures
-that @g@ above actually gets the @SP(U)@ demand on its second pair component,
-rather than the lazy @1P(U)@ if we 'lub'bed with an absent demand.
+that @g@ above actually gets the @1P(L)@ demand on its second pair component,
+rather than the lazy @MP(L)@ if we 'lub'bed with an absent demand.
 
 Demand on case-alternative binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -691,10 +694,10 @@ Example. Source code:
   foo (p,q)    = foo (q,p)
 
 After strictness analysis:
-  f = \ (x_an1 [Dmd=<SP(SL),1*UP(U,1*U)>] :: (Bool, Bool)) ->
+  f = \ (x_an1 [Dmd=1P(1L,ML)] :: (Bool, Bool)) ->
       case x_an1
-      of wild_X7 [Dmd=<L,1*UP(1*U,1*U)>]
-      { (p_an2 [Dmd=<S,1*U>], ds_dnz [Dmd=<L,A>]) ->
+      of wild_X7 [Dmd=MP(ML,ML)]
+      { (p_an2 [Dmd=1L], ds_dnz [Dmd=A]) ->
       case p_an2 of _ {
         False -> GHC.Types.True;
         True -> foo wild_X7 }
@@ -706,43 +709,43 @@ consequences play out.
 This is needed even for non-product types, in case the case-binder
 is used but the components of the case alternative are not.
 
-Note [Don't optimise UP(U,U,...) to U]
+Note [Don't optimise LP(L,L,...) to L]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 These two SubDemands:
-   UP(U,U) (@Prod [topDmd, topDmd]@)   and   U (@topSubDmd@)
+   LP(L,L) (@Prod [topDmd, topDmd]@)   and   L (@topSubDmd@)
 are semantically equivalent, but we do not turn the former into
 the latter, for a regrettable-subtle reason.  Consider
   f p1@(x,y) = (y,x)
   g h p2@(_,_) = h p
 We want to unbox @p1@ of @f@, but not @p2@ of @g@, because @g@ only uses
-@p2@ boxed and we'd have to rebox. So we give @p1@ demand UP(U,U) and @p2@
-demand @U@ to inform 'GHC.Core.Opt.WorkWrap.Utils.wantToUnbox', which will
+@p2@ boxed and we'd have to rebox. So we give @p1@ demand LP(L,L) and @p2@
+demand @L@ to inform 'GHC.Core.Opt.WorkWrap.Utils.wantToUnbox', which will
 say "unbox" for @p1@ and "don't unbox" for @p2@.
 
 So the solution is: don't aggressively collapse @Prod [topDmd, topDmd]@ to
 @topSubDmd@; instead leave it as-is. In effect we are using the UseDmd to do a
 little bit of boxity analysis.  Not very nice.
 
-Note [U should win]
+Note [L should win]
 ~~~~~~~~~~~~~~~~~~~
-Both in 'lubSubDmd' and 'plusSubDmd' we want @U `plusSubDmd` UP(..)) to be @U@.
+Both in 'lubSubDmd' and 'plusSubDmd' we want @L `plusSubDmd` LP(..))@ to be @L@.
 Why?  Because U carries the implication the whole thing is used, box and all,
-so we don't want to w/w it, cf. Note [Don't optimise UP(U,U,...) to U].
+so we don't want to w/w it, cf. Note [Don't optimise LP(L,L,...) to L].
 If we use it both boxed and unboxed, then we are definitely using the box,
 and so we are quite likely to pay a reboxing cost. So we make U win here.
 TODO: Investigate why since 2013, we don't.
 
 Example is in the Buffer argument of GHC.IO.Handle.Internals.writeCharBuffer
 
-Baseline: (A) Not making Used win (UProd wins)
+Baseline: (A) Not making Used win (LP(..) wins)
 Compare with: (B) making Used win for lub and both
 
             Min          -0.3%     -5.6%    -10.7%    -11.0%    -33.3%
             Max          +0.3%    +45.6%    +11.5%    +11.5%     +6.9%
  Geometric Mean          -0.0%     +0.5%     +0.3%     +0.2%     -0.8%
 
-Baseline: (B) Making Used win for both lub and both
-Compare with: (C) making Used win for plus, but UProd win for lub
+Baseline: (B) Making L win for both lub and both
+Compare with: (C) making L win for plus, but LP(..) win for lub
 
             Min          -0.1%     -0.3%     -7.9%     -8.0%     -6.5%
             Max          +0.1%     +1.0%    +21.0%    +21.0%     +0.5%
@@ -753,7 +756,7 @@ Note [Computing one-shot info]
 Consider a call
     f (\pqr. e1) (\xyz. e2) e3
 where f has usage signature
-    C1(C(C1(U))) C1(U) U
+    <CM(CL(CM(L)))><CM(L)><L>
 Then argsOneShots returns a [[OneShotInfo]] of
     [[OneShot,NoOneShotInfo,OneShot],  [OneShot]]
 The occurrence analyser propagates this one-shot infor to the
@@ -1262,18 +1265,18 @@ scenario.
 Consider
   err x y = x `seq` y `seq` error (show x)
 this has a strictness signature of
-  <SU><SU>b
+  <1L><1L>b
 meaning that we don't know what happens when we call err in weaker contexts than
-CS(CS(U)), like @err `seq` ()@ (SU) and @err 1 `seq` ()@ (CS(U)). We
+C1(C1(L)), like @err `seq` ()@ (1A) and @err 1 `seq` ()@ (CS(A)). We
 may not unleash the botDiv, hence assume topDiv. Of course, in
-@err 1 2 `seq` ()@ the incoming demand CS(CS(S)) is strong enough and we see
+@err 1 2 `seq` ()@ the incoming demand CS(CS(A)) is strong enough and we see
 that the expression diverges.
 
 Now consider a function
   f g = g 1 2
-with signature <CS(CS(U))>, and the expression
+with signature <C1(C1(L))>, and the expression
   f err `seq` ()
-now f puts a strictness demand of CS(CS(U)) onto its argument, which is unleashed
+now f puts a strictness demand of C1(C1(L)) onto its argument, which is unleashed
 on err via the App rule. In contrast to weaker head strictness, this demand is
 strong enough to unleash err's signature and hence we see that the whole
 expression diverges!
@@ -1308,7 +1311,7 @@ Note [Demands from unsaturated function calls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider a demand transformer d1 -> d2 -> r for f.
 If a sufficiently detailed demand is fed into this transformer,
-e.g <CS(CS(U))> arising from "f x1 x2" in a strict, use-once context,
+e.g <C1(C1(L))> arising from "f x1 x2" in a strict, use-once context,
 then d1 and d2 is precisely the demand unleashed onto x1 and x2 (similar for
 the free variable environment) and furthermore the result information r is the
 one we want to use.
@@ -1316,9 +1319,9 @@ one we want to use.
 An anonymous lambda is also an unsaturated function all (needs one argument,
 none given), so this applies to that case as well.
 
-But the demand fed into f might be less than CS(CS(U)). Then we have to
+But the demand fed into f might be less than C1(C1(L)). Then we have to
 'multDmdType' the announced demand type. Examples:
- * Not strict enough, e.g. C1(C1(U)):
+ * Not strict enough, e.g. C1(C1(L)):
    - We have to multiply all argument and free variable demands with C_01,
      zapping strictness.
    - We have to multiply divergence with C_01. If r says that f Diverges for sure,
@@ -1326,7 +1329,7 @@ But the demand fed into f might be less than CS(CS(U)). Then we have to
      be passed. If the demand is lower, we may just as well converge.
      If we were tracking definite convergence, than that would still hold under
      a weaker demand than expected by the demand transformer.
- * Used more than once, e.g. CM(CS(U)):
+ * Used more than once, e.g. CS(C1(L)):
    - Multiply with C_1N. Even if f puts a used-once demand on any of its argument
      or free variables, if we call f multiple times, we may evaluate this
      argument or free variable multiple times.
@@ -1373,13 +1376,13 @@ demand on all arguments. Otherwise, the demand is specified by Id's
 signature.
 
 For example, the demand transformer described by the demand signature
-        StrictSig (DmdType {x -> <S,1*U>} <L,A><C_,(U,U)>m)
+        StrictSig (DmdType {x -> <1L>} <A><1P(L,L)>)
 says that when the function is applied to two arguments, it
-unleashes demand <S,1*U> on the free var x, <L,A> on the first arg,
-and <C_,(U,U)> on the second, then returning a constructor.
+unleashes demand 1L on the free var x, A on the first arg,
+and 1P(L,L) on the second.
 
 If this same function is applied to one arg, all we can say is that it
-uses x with <C_,>, and its arg with demand <C_,>.
+uses x with 1L, and its arg with demand 1P(L,L).
 
 Note [Understanding DmdType and StrictSig]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1395,9 +1398,9 @@ yields a more precise demand type:
 
     incoming demand   |  demand type
     --------------------------------
-    SA                  |  <U><U>{}
-    CS(CS(U))           |  <SP(U)><U>{}
-    CS(CS(SP(SP(U),A))) |  <SP(A)><A>{}
+    1A                  |  <L><L>{}
+    C1(C1(L))           |  <1P(L)><L>{}
+    C1(C1(1P(1P(L),A))) |  <1P(A)><A>{}
 
 Note that in the first example, the depth of the demand type was *higher* than
 the arity of the incoming call demand due to the anonymous lambda.
@@ -1574,11 +1577,11 @@ was evaluated. Here's an example:
       else \z -> z * ...
 
 The abstract transformer (let's call it F_e) of the if expression (let's
-call it e) would transform an incoming (undersaturated!) head demand SA into
-a demand type like {x-><SU>,y-><U>}<U>. In pictures:
+call it e) would transform an incoming (undersaturated!) head demand 1A into
+a demand type like {x-><1L>,y-><L>}<L>. In pictures:
 
      Demand ---F_e---> DmdType
-     <SA>              {x-><SU>,y-><U>}<U>
+     <1A>              {x-><1L>,y-><L>}<L>
 
 Let's assume that the demand transformers we compute for an expression are
 correct wrt. to some concrete semantics for Core. How do demand signatures fit
@@ -1586,7 +1589,7 @@ in? They are strange beasts, given that they come with strict rules when to
 it's sound to unleash them.
 
 Fortunately, we can formalise the rules with Galois connections. Consider
-f's strictness signature, {}<SU><U>. It's a single-point approximation of
+f's strictness signature, {}<1L><L>. It's a single-point approximation of
 the actual abstract transformer of f's RHS for arity 2. So, what happens is that
 we abstract *once more* from the abstract domain we already are in, replacing
 the incoming Demand by a simple lattice with two elements denoting incoming
@@ -1600,14 +1603,14 @@ element). Here's the diagram:
   SubDemand --F_f----> DmdType
 
 With
-  α(CS(CS(_))) = >=2
+  α(C1(C1(_))) = >=2
   α(_)         =  <2
   γ(ty)        =  ty
 and F_f being the abstract transformer of f's RHS and f_f being the abstracted
 abstract transformer computable from our demand signature simply by
 
-  f_f(>=2) = {}<S,1*U><L,U>
-  f_f(<2)  = multDmdType C_0N {}<S,1*U><L,U>
+  f_f(>=2) = {}<1L><L>
+  f_f(<2)  = multDmdType C_0N {}<1L><L>
 
 where multDmdType makes a proper top element out of the given demand type.
 
@@ -1616,14 +1619,14 @@ exactly the Card with which we have to multDmdType. The Card for arity n
 is computed by calling @peelManyCalls n@, which corresponds to α above.
 
 Note [Demand transformer for a dictionary selector]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If we evaluate (op dict-expr) under demand 'd', then we can push the demand 'd'
 into the appropriate field of the dictionary. What *is* the appropriate field?
 We just look at the strictness signature of the class op, which will be
-something like: UP(AAASAAAAA).  Then replace the 'S' by the demand 'd'.
+something like: P(AAA1AAAAA).  Then replace the '1' by the demand 'd'.
 
 For single-method classes, which are represented by newtypes the signature
-of 'op' won't look like UP(...), so matching on Prod will fail.
+of 'op' won't look like P(...), so matching on Prod will fail.
 That's fine: if we are doing strictness analysis we are also doing inlining,
 so we'll have inlined 'op' into a cast.  So we can bale out in a conservative
 way, returning nopDmdType.
@@ -1650,7 +1653,7 @@ zapUsageDemand = kill_usage $ KillFlags
     , kf_called_once = True
     }
 
--- | Remove all 1* information (but not C1 information) from the demand
+-- | Remove all `C_01 :*` info (but not `CM` sub-demands) from the demand
 zapUsedOnceDemand :: Demand -> Demand
 zapUsedOnceDemand = kill_usage $ KillFlags
     { kf_abs         = False
@@ -1658,7 +1661,7 @@ zapUsedOnceDemand = kill_usage $ KillFlags
     , kf_called_once = False
     }
 
--- | Remove all 1* information (but not C1 information) from the strictness
+-- | Remove all `C_01 :*` info (but not `CM` sub-demands) from the strictness
 --   signature
 zapUsedOnceSig :: StrictSig -> StrictSig
 zapUsedOnceSig (StrictSig (DmdType env ds r))
@@ -1756,7 +1759,12 @@ in the user's guide.
 For pretty-printing demands, we use quite a compact notation with some
 abbreviations. Here's the BNF:
 
-  card ::= B | A | 1 | U | S | M    {}, {0}, {0,1}, {0,1,n}, {1}, {1,n}
+  card ::= B    {}
+        |  A    {0}
+        |  M    {0,1}
+        |  L    {0,1,n}
+        |  1    {1}
+        |  S    {1,n}
 
   d    ::= card sd                  The :* constructor, just juxtaposition
         |  card                     abbreviation: Same as "card card",
@@ -1766,7 +1774,7 @@ abbreviations. Here's the BNF:
         |  P(d,d,..)                @Prod [d1,d2,..]@
         |  Ccard(sd)                @Call card sd@
 
-So, U can denote a 'Card', polymorphic 'SubDemand' or polymorphic 'Demand',
+So, L can denote a 'Card', polymorphic 'SubDemand' or polymorphic 'Demand',
 but it's always clear from context which "overload" is meant. It's like
 return-type inference of e.g. 'read'.
 
@@ -1792,13 +1800,14 @@ This is the syntax for demand signatures:
 -}
 
 -- | See Note [Demand notation]
+-- Current syntax was discussed in #19016.
 instance Outputable Card where
-  ppr C_00 = char 'A'
-  ppr C_01 = char '1'
-  ppr C_0N = char 'U'
-  ppr C_11 = char 'S'
-  ppr C_1N = char 'M'
-  ppr C_10 = char 'B'
+  ppr C_00 = char 'A' -- "Absent"
+  ppr C_01 = char 'M' -- "Maybe"
+  ppr C_0N = char 'L' -- "Lazy"
+  ppr C_11 = char '1' -- "exactly 1"
+  ppr C_1N = char 'S' -- "Strict"
+  ppr C_10 = char 'B' -- "Bottom"
 
 -- | See Note [Demand notation]
 instance Outputable Demand where

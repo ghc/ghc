@@ -149,7 +149,7 @@ outputC logger dflags filenm cmm_stream packages =
                           FormatC
                           doc
             printForC dflags h doc
-      Stream.consume cmm_stream writeC
+      Stream.consume cmm_stream id writeC
 
 {-
 ************************************************************************
