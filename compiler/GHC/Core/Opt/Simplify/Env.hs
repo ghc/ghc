@@ -773,8 +773,8 @@ simplBinder !env bndr
 ---------------
 simplNonRecBndr :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
 -- A non-recursive let binder
-simplNonRecBndr env id
-  = do  { let (env1, id1) = substIdBndr env id
+simplNonRecBndr !env id
+  = do  { let (!env1, id1) = substIdBndr env id
         ; seqId id1 `seq` return (env1, id1) }
 
 ---------------
@@ -782,7 +782,7 @@ simplRecBndrs :: SimplEnv -> [InBndr] -> SimplM SimplEnv
 -- Recursive let binders
 simplRecBndrs env@(SimplEnv {}) ids
   = ASSERT(all (not . isJoinId) ids)
-    do  { let (env1, ids1) = mapAccumL substIdBndr env ids
+    do  { let (!env1, ids1) = mapAccumL substIdBndr env ids
         ; seqIds ids1 `seq` return env1 }
 
 
