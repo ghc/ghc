@@ -357,11 +357,16 @@ static ObjectCode *findOC(OCSectionIndices *s_indices, const void *addr) {
 
 static bool markObjectLive(void *data STG_UNUSED, StgWord key, const void *value STG_UNUSED) {
     ObjectCode *oc = (ObjectCode*)key;
-    if (oc->mark == object_code_mark_bit) {
+
+    // N.B. we may be called by the parallel GC and therefore this must be
+    // thread-safe. To avoid taking the linker_mutex in the fast path
+    // (when the object is already marked) we do an atomic exchange here and
+    // only take the lock in the case that the object is unmarked.
+    if (xchg(&oc->mark, object_code_mark_bit) == object_code_mark_bit) {
         return true; // for hash table iteration
     }
 
-    oc->mark = object_code_mark_bit;
+    ACQUIRE_LOCK(&linker_mutex);
     // Remove from 'old_objects' list
     if (oc->prev != NULL) {
         // TODO(osa): Maybe 'prev' should be a pointer to the referencing
@@ -381,6 +386,7 @@ static bool markObjectLive(void *data STG_UNUSED, StgWord key, const void *value
         objects->prev = oc;
     }
     objects = oc;
+    RELEASE_LOCK(&linker_mutex);
 
     // Mark its dependencies
     iterHashTable(oc->dependencies, NULL, markObjectLive);
