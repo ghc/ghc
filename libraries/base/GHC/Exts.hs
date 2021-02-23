@@ -316,7 +316,7 @@ resizeSmallMutableArray# arr0 szNew a s0 =
             s3 -> (# s3, arr1 #)
         else (# s1, arr0 #)
 
--- | Semantically, `considerAccessible = True`. But it has special meaning
+-- | Semantically, @considerAccessible = True@. But it has special meaning
 -- to the pattern-match checker, which will never flag the clause in which
 -- `considerAccessible` occurs as a guard as redundant or inaccessible.
 -- Example:
