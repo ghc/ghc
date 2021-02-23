@@ -238,10 +238,6 @@ instance Semigroup CIRB where
 instance Monoid CIRB where
   mempty = CIRB mempty mempty mempty mempty
 
-markAllRedundant :: CIRB -> CIRB
-markAllRedundant CIRB { cirb_cov = cov, cirb_inacc = inacc, cirb_red = red } =
-  mempty { cirb_red = cov Semi.<> inacc Semi.<> red }
-
 -- See Note [Determining inaccessible clauses]
 ensureOneNotRedundant :: CIRB -> CIRB
 ensureOneNotRedundant ci = case ci of
@@ -279,12 +275,14 @@ cirbsMatchGroup (PmMatchGroup matches) =
 
 cirbsMatch :: PmMatch Post -> DsM CIRB
 cirbsMatch PmMatch { pm_pats = red, pm_grhss = grhss } = do
-  (is_covered, may_diverge, red_bangs) <- testRedSets red
+  (_is_covered, may_diverge, red_bangs) <- testRedSets red
+  -- Don't look at is_covered: If it is True, all children are redundant anyway,
+  -- unless there is a 'considerAccessible', which may break that rule
+  -- intentionally. See Note [considerAccessible] in "GHC.HsToCore.Pmc.Check".
   cirb <- cirbsGRHSs grhss
   pure $ addRedundantBangs red_bangs
        -- See Note [Determining inaccessible clauses]
        $ applyWhen may_diverge ensureOneNotRedundant
-       $ applyWhen (not is_covered) markAllRedundant
        $ cirb
 
 cirbsGRHSs :: PmGRHSs Post -> DsM CIRB
