@@ -147,3 +147,8 @@ test('UnliftedNewtypesIdentityRun', normal, compile_and_run, [''])
 test('UnliftedNewtypesCoerceRun', normal, compile_and_run, [''])
 test('T17104', normal, compile_and_run, [''])
 test('T18627', normal, compile_and_run, ['-O'])  # Optimisation shows up the bug
+test('T19397M0', extra_files(['T19397S.hs']), compile_and_run, [''])
+test('T19397M1', extra_files(['T19397S.hs']), compile_and_run, [''])
+test('T19397M2', extra_files(['T19397S.hs']), compile_and_run, ['-main-is foo'])
+test('T19397M3', extra_files(['T19397S.hs']), compile_and_run, ['-main-is foo'])
+test('T19397M4', extra_files(['T19397S.hs']), compile_and_run, ['-main-is foo'])
