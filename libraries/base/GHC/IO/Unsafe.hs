@@ -40,7 +40,7 @@ Consider this sub-expression (from tests/lib/should_run/memo002)
 It's super-important that the `let r = f x` is lazy. If the demand
 analyser sees that `r` is sure to be demanded, it'll use call-by-value
 for (f x), that will try to lock the already-locked table => deadlock.
-See #19181.
+See #19181 and #19413.
 
 Now `r` doesn't look strict, because it's wrapped in a `return`.
 But if we were to define unsafePerformIO like this
