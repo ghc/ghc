@@ -262,7 +262,7 @@ struct _ObjectCode {
     struct _ObjectCode *next_loaded_object;
 
     // Mark bit
-    uint8_t mark;
+    StgWord mark;
 
     // Set of dependencies (ObjectCode*) of the object file. Traverse
     // dependencies using `iterHashTable`.
