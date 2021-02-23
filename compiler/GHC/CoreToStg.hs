@@ -271,7 +271,9 @@ coreTopBindsToStg _      _        env ccs []
 coreTopBindsToStg dflags this_mod env ccs (b:bs)
   = (env2, ccs2, b':bs')
   where
-        (env1, ccs1, b' ) =
+        -- Force this, otherwise you end up not evaluating the thunk until
+        -- the function returns.
+        !(!env1, !ccs1, b' ) =
           coreTopBindToStg dflags this_mod env ccs b
         (env2, ccs2, bs') =
           coreTopBindsToStg dflags this_mod env1 ccs1 bs
