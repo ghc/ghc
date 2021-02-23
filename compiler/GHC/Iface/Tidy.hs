@@ -714,8 +714,8 @@ chooseExternalIds hsc_env mod omit_prags expose_all binds implicit_binds imp_id_
 
   tidy_internal :: [Id] -> UnfoldEnv -> TidyOccEnv
                 -> IO (UnfoldEnv, TidyOccEnv)
-  tidy_internal []       unfold_env occ_env = return (unfold_env,occ_env)
-  tidy_internal (id:ids) unfold_env occ_env = do
+  tidy_internal []       !unfold_env occ_env = return (unfold_env,occ_env)
+  tidy_internal (id:ids) !unfold_env occ_env = do
       (occ_env', name') <- tidyTopName mod nc_var Nothing occ_env id
       let unfold_env' = extendVarEnv unfold_env id (name',False)
       tidy_internal ids unfold_env' occ_env'
