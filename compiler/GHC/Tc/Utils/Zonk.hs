@@ -97,6 +97,7 @@ import GHC.Data.Bag
 
 import Control.Monad
 import Data.List  ( partition )
+import Data.List.NonEmpty( NonEmpty(..) )
 import Control.Arrow ( second )
 
 {-
@@ -452,6 +453,13 @@ zonkTopBndrs ids = initZonkEnv $ \ ze -> zonkIdBndrs ze ids
 zonkFieldOcc :: ZonkEnv -> FieldOcc GhcTc -> TcM (FieldOcc GhcTc)
 zonkFieldOcc env (FieldOcc sel lbl)
   = fmap ((flip FieldOcc) lbl) $ zonkIdBndr env sel
+
+zonkFieldOcc' :: ZonkEnv -> NonEmpty (FieldOcc GhcTc) -> TcM (NonEmpty (FieldOcc GhcTc))
+zonkFieldOcc' env (FieldOcc sel lbl :| []) =
+ do
+   r <- zonkIdBndr env sel
+   return ((FieldOcc r lbl) :| [])
+zonkFieldOcc' _ _ = panic "zonkFieldOcc': The impossible happened!"
 
 zonkEvBndrsX :: ZonkEnv -> [EvVar] -> TcM (ZonkEnv, [Var])
 zonkEvBndrsX = mapAccumLM zonkEvBndrX
@@ -940,10 +948,7 @@ zonkExpr env expr@(RecordCon { rcon_ext = con_expr, rcon_flds = rbinds })
         ; return (expr { rcon_ext  = new_con_expr
                        , rcon_flds = new_rbinds }) }
 
--- Record updates via dot syntax are replaced by desugared expressions
--- in the renamer. See Note [Rebindable Syntax and HsExpansion]. This
--- is why we match on 'rupd_flds = Left rbinds' here and panic otherwise.
-zonkExpr env (RecordUpd { rupd_flds = Left rbinds
+zonkExpr env (RecordUpd { rupd_flds = rbinds
                         , rupd_expr = expr
                         , rupd_ext = RecordUpdTc {
                                        rupd_cons = cons
@@ -958,13 +963,12 @@ zonkExpr env (RecordUpd { rupd_flds = Left rbinds
         ; return (
             RecordUpd {
                   rupd_expr = new_expr
-                , rupd_flds = Left new_rbinds
+                , rupd_flds = new_rbinds
                 , rupd_ext = RecordUpdTc {
                                rupd_cons = cons
                              , rupd_in_tys = new_in_tys
                              , rupd_out_tys = new_out_tys
                              , rupd_wrap = new_recwrap }}) }
-zonkExpr _ (RecordUpd {}) = panic "GHC.Tc.Utils.Zonk: zonkExpr: The impossible happened!"
 
 zonkExpr env (ExprWithTySig _ e ty)
   = do { e' <- zonkLExpr env e
@@ -1363,15 +1367,20 @@ zonkRecFields env (HsRecFields flds dd)
            ; return (L l (fld { hsRecFieldLbl = new_id
                               , hsRecFieldArg = new_expr })) }
 
-zonkRecUpdFields :: ZonkEnv -> [LHsRecUpdField GhcTc]
-                 -> TcM [LHsRecUpdField GhcTc]
+zonkRecUpdFields :: ZonkEnv -> [LHsRecUpdField GhcTc] -> TcM [LHsRecUpdField GhcTc]
 zonkRecUpdFields env = mapM zonk_rbind
   where
     zonk_rbind (L l fld)
-      = do { new_id   <- wrapLocM (zonkFieldOcc env) (hsRecUpdFieldOcc fld)
+      = do { new_id   <- wrapLocM (zonkFieldOcc' env) (hsRecUpdFieldOcc' fld)
            ; new_expr <- zonkLExpr env (hsRecFieldArg fld)
-           ; return (L l (fld { hsRecFieldLbl = fmap ambiguousFieldOcc new_id
-                              , hsRecFieldArg = new_expr })) }
+           ; return (L l (fld { hsRecFieldLbl = ambig new_id
+                              , hsRecFieldArg = new_expr }))
+           }
+
+    ambig id =
+      case id of
+        L l (fieldOcc :| []) -> L l ((ambiguousFieldOcc fieldOcc) :| [])
+        _ ->  panic "zonkRecUpdFields: The impossible happened!"
 
 -------------------------------------------------------------------------
 mapIPNameTc :: (a -> TcM b) -> Either (Located HsIPName) a

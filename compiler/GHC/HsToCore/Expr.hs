@@ -606,11 +606,7 @@ we want, namely
 
 -}
 
-dsExpr RecordUpd { rupd_flds = Right _} =
-  -- Not possible due to elimination in the renamer. See Note
-  -- [Handling overloaded and rebindable constructs]
-  panic "The impossible happened"
-dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = Left fields
+dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
                        , rupd_ext = RecordUpdTc
                            { rupd_cons = cons_to_upd
                            , rupd_in_tys = in_inst_tys
@@ -650,7 +646,7 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = Left fields
       -- Hence 'lcl_id'.  Cf #2735
     ds_field (L _ rec_field)
       = do { rhs <- dsLExpr (hsRecFieldArg rec_field)
-           ; let fld_id = unLoc (hsRecUpdFieldId rec_field)
+           ; let fld_id = unLoc (hsRecUpdFieldId' rec_field)
            ; lcl_id <- newSysLocalDs (idMult fld_id) (idType fld_id)
            ; return (idName fld_id, lcl_id, rhs) }
 

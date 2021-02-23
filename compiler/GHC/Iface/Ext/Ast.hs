@@ -71,6 +71,8 @@ import qualified Data.Array as A
 import qualified Data.ByteString as BS
 import qualified Data.Map as M
 import qualified Data.Set as S
+import qualified Data.List.NonEmpty as NE
+import Data.List.NonEmpty ( NonEmpty(..) )
 import Data.Data                  ( Data, Typeable )
 import Data.Void                  ( Void, absurd )
 import Control.Monad              ( forM_ )
@@ -778,6 +780,8 @@ class ( IsPass p
       , ToHie (Context (Located (IdGhcP p)))
       , ToHie (RFContext (Located (AmbiguousFieldOcc (GhcPass p))))
       , ToHie (RFContext (Located (FieldOcc (GhcPass p))))
+      , ToHie (RFContext (Located (NonEmpty (AmbiguousFieldOcc (GhcPass p)))))
+      , ToHie (RFContext (Located (NonEmpty (FieldOcc (GhcPass p)))))
       , ToHie (TScoped (LHsWcType (GhcPass (NoGhcTcPass p))))
       , ToHie (TScoped (LHsSigWcType (GhcPass (NoGhcTcPass p))))
       )
@@ -1118,12 +1122,9 @@ instance HiePass p => ToHie (Located (HsExpr (GhcPass p))) where
           con_name = case hiePass @p of       -- Like ConPat
                        HieRn -> con
                        HieTc -> fmap conLikeName con
-      RecordUpd {rupd_expr = expr, rupd_flds = Left upds}->
+      RecordUpd { rupd_expr = expr, rupd_flds = upds}->
         [ toHie expr
         , toHie $ map (RC RecFieldAssign) upds
-        ]
-      RecordUpd {rupd_expr = expr, rupd_flds = Right _}->
-        [ toHie expr
         ]
       ExprWithTySig _ expr sig ->
         [ toHie expr
@@ -1296,6 +1297,35 @@ instance ToHie (RFContext (Located (AmbiguousFieldOcc GhcRn))) where
 
 instance ToHie (RFContext (Located (AmbiguousFieldOcc GhcTc))) where
   toHie (RFC c rhs (L nspan afo)) = concatM $ case afo of
+    Unambiguous var _ ->
+      [ toHie $ C (RecField c rhs) (L nspan var)
+      ]
+    Ambiguous var _ ->
+      [ toHie $ C (RecField c rhs) (L nspan var)
+      ]
+
+instance ToHie (RFContext (Located (NonEmpty (FieldOcc GhcRn)))) where
+  toHie (RFC c rhs (L nspan f)) = concatM $ case (NE.head f) of
+    FieldOcc name _ ->
+      [ toHie $ C (RecField c rhs) (L nspan name)
+      ]
+
+instance ToHie (RFContext (Located (NonEmpty (FieldOcc GhcTc)))) where
+  toHie (RFC c rhs (L nspan f)) = concatM $ case (NE.head f) of
+    FieldOcc var _ ->
+      [ toHie $ C (RecField c rhs) (L nspan var)
+      ]
+
+instance ToHie (RFContext (Located (NonEmpty (AmbiguousFieldOcc GhcRn)))) where
+  toHie (RFC c rhs (L nspan afo)) = concatM $ case (NE.head afo) of
+    Unambiguous name _ ->
+      [ toHie $ C (RecField c rhs) $ L nspan name
+      ]
+    Ambiguous _name _ ->
+      [ ]
+
+instance ToHie (RFContext (Located (NonEmpty (AmbiguousFieldOcc GhcTc)))) where
+  toHie (RFC c rhs (L nspan afo)) = concatM $ case (NE.head afo) of
     Unambiguous var _ ->
       [ toHie $ C (RecField c rhs) (L nspan var)
       ]

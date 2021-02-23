@@ -45,6 +45,7 @@ import GHC.Hs.Binds
 -- others:
 import GHC.Tc.Types.Evidence
 import GHC.Types.Name
+import GHC.Types.Name.Reader
 import GHC.Types.Name.Set
 import GHC.Types.Basic
 import GHC.Types.Fixity
@@ -62,6 +63,7 @@ import GHC.Tc.Utils.TcType (TcType)
 import {-# SOURCE #-} GHC.Tc.Types (TcLclEnv)
 
 -- libraries:
+import qualified Data.List.NonEmpty as NE
 import Data.Data hiding (Fixity(..))
 import qualified Data.Data as Data (Fixity(..))
 import qualified Data.Kind
@@ -522,9 +524,12 @@ ppr_expr (RecordCon { rcon_con = con, rcon_flds = rbinds })
                GhcTc -> ppr con
 
 ppr_expr (RecordUpd { rupd_expr = L _ aexp, rupd_flds = flds })
-  = case flds of
-      Left rbinds -> hang (ppr aexp) 2 (braces (fsep (punctuate comma (map ppr rbinds))))
-      Right pbinds -> hang (ppr aexp) 2 (braces (fsep (punctuate comma (map ppr pbinds))))
+  = hang (ppr aexp) 2 (braces (fsep (punctuate comma (map print_update flds))))
+  where
+    print_update (L _ u) =
+      let flds = map fieldName (NE.toList (unLoc $ hsRecFieldLbl u)) in
+      hcat (punctuate dot (map ppr flds))
+    fieldName f = occNameFS (rdrNameOcc (rdrNameAmbiguousFieldOcc f))
 
 ppr_expr (HsGetField { gf_expr = L _ fexp, gf_field = field })
   = ppr fexp <> dot <> ppr field

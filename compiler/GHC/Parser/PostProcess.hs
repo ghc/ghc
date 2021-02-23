@@ -139,6 +139,8 @@ import GHC.Utils.Misc
 import GHC.Parser.Annotation
 import Data.Either
 import Data.List
+import Data.List.NonEmpty( NonEmpty(..) )
+import qualified Data.List.NonEmpty as NE
 import Data.Foldable
 import GHC.Driver.Flags ( WarningFlag(..) )
 import GHC.Utils.Panic
@@ -2187,10 +2189,10 @@ mkRdrRecordUpd overloaded_on exp@(L loc _) fbinds = do
       return RecordUpd {
         rupd_ext = noExtField
       , rupd_expr = exp
-      , rupd_flds = Left fs' }
+      , rupd_flds = fs' }
     True -> do
       let qualifiedFields =
-            [ L l lbl | L _ (HsRecField (L l lbl) _ _) <- fs'
+            [ L l lbl | L _ (HsRecField (L l (lbl :| [])) _ _) <- fs'
                       , isQual . rdrNameAmbiguousFieldOcc $ lbl
             ]
       if not $ null qualifiedFields
@@ -2198,16 +2200,29 @@ mkRdrRecordUpd overloaded_on exp@(L loc _) fbinds = do
           addFatalError $ PsError PsErrOverloadedRecordUpdateNoQualifiedFields [] (getLoc (head qualifiedFields))
         else -- This is a RecordDotSyntax update.
           return RecordUpd {
-            rupd_ext = noExtField
+             rupd_ext = noExtField
            , rupd_expr = exp
-           , rupd_flds = Right (toProjUpdates fbinds) }
+           , rupd_flds = toProjUpdates fbinds }
   where
 
-    toProjUpdates :: [Fbind (HsExpr GhcPs)] -> [LHsRecUpdProj GhcPs]
-    toProjUpdates =
-      map (\case { Right p -> p
-                 ; Left f -> recUpdFieldToProjUpdate (fmap mk_rec_upd_field f)
-                 } )
+    toProjUpdates :: [Fbind (HsExpr GhcPs)] -> [LHsRecUpdField GhcPs]
+    toProjUpdates = map f
+
+    f :: Fbind (HsExpr GhcPs) -> LHsRecUpdField GhcPs
+    f upd = case upd of
+        Left (L l recField@(HsRecField (L loc (FieldOcc _ rdr)) arg pun)) ->
+          if pun
+            then L l (mk_rec_upd_field recField{
+                     hsRecFieldArg = mkVar (occNameString . rdrNameOcc $ (unLoc rdr))}
+                 )
+            else L l (mk_rec_upd_field recField)
+        Right (L l (HsRecField (L loc (FieldLabelStrings fs)) arg pun)) ->
+          let fs' = map (Ambiguous noExtField . fmap mkVarUnqual) fs
+          in L l ( HsRecField {
+                    hsRecFieldLbl = L loc (NE.fromList fs')
+                  , hsRecFieldArg = arg
+                  , hsRecPun = pun } )
+    mkVar = noLoc . HsVar noExtField . noLoc . mkRdrUnqual . mkVarOcc
 
 mkRdrRecordCon :: Located RdrName -> HsRecordBinds GhcPs -> HsExpr GhcPs
 mkRdrRecordCon con flds
@@ -2220,7 +2235,10 @@ mk_rec_fields fs (Just s)  = HsRecFields { rec_flds = fs
 
 mk_rec_upd_field :: HsRecField GhcPs (LHsExpr GhcPs) -> HsRecUpdField GhcPs
 mk_rec_upd_field (HsRecField (L loc (FieldOcc _ rdr)) arg pun)
-  = HsRecField (L loc (Unambiguous noExtField rdr)) arg pun
+  =
+  let fieldOcc = Unambiguous noExtField rdr
+      fieldOccs = fieldOcc :| [] -- Singleton
+  in HsRecField (L loc fieldOccs) arg pun
 
 mkInlinePragma :: SourceText -> (InlineSpec, RuleMatchInfo) -> Maybe Activation
                -> InlinePragma
@@ -2718,23 +2736,7 @@ mkRdrProjUpdate _ (L _ []) _ _ = panic "mkRdrProjUpdate: The impossible has happ
 mkRdrProjUpdate loc (L l flds) arg isPun =
   L loc HsRecField {
       hsRecFieldLbl = L l (FieldLabelStrings flds)
-    , hsRecFieldArg = arg
+    , hsRecFieldArg = arg -- Parser handleds pun
     , hsRecPun = isPun
   }
-
-recUpdFieldToProjUpdate :: LHsRecUpdField GhcPs -> LHsRecUpdProj GhcPs
-recUpdFieldToProjUpdate (L l (HsRecField occ arg pun)) =
-  mkRdrProjUpdate l (L loc [L loc (fsLit f)]) (val arg) pun
-  where
-    (loc, f) = field occ
-
-    val :: LHsExpr GhcPs -> LHsExpr GhcPs
-    val arg = if pun then mkVar $ snd (field occ) else arg
-
-    field :: Located (AmbiguousFieldOcc GhcPs) -> (SrcSpan, String)
-    field = \case
-        L _ (Ambiguous _ (L loc lbl)) ->  (loc, occNameString . rdrNameOcc $ lbl)
-        L _ (Unambiguous _ (L loc lbl)) -> (loc, occNameString . rdrNameOcc $ lbl)
-
-    mkVar :: String -> LHsExpr GhcPs
-    mkVar = noLoc . HsVar noExtField . noLoc . mkRdrUnqual . mkVarOcc
+  -- where  mkVar = noLoc . HsVar noExtField . noLoc . mkRdrUnqual . mkVarOcc

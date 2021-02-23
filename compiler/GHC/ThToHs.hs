@@ -59,6 +59,7 @@ import qualified Data.ByteString as BS
 import Control.Monad( unless, ap )
 
 import Data.Maybe( catMaybes, isNothing )
+import Data.List.NonEmpty(NonEmpty(..))
 import Language.Haskell.TH as TH hiding (sigP)
 import Language.Haskell.TH.Syntax as TH
 import Foreign.ForeignPtr
@@ -1018,9 +1019,9 @@ cvtl e = wrapL (cvt e)
                               ; return $ mkRdrRecordCon c' (HsRecFields flds' Nothing) }
     cvt (RecUpdE e flds) = do { e' <- cvtl e
                               ; flds'
-                                  <- mapM (cvtFld (mkAmbiguousFieldOcc . noLoc))
+                                  <- mapM (cvtFld (\r -> mkAmbiguousFieldOcc (noLoc r) :| []))
                                            flds
-                              ; return $ RecordUpd noExtField e' (Left flds') }
+                              ; return $ RecordUpd noExtField e' flds' }
     cvt (StaticE e)      = fmap (HsStatic noExtField) $ cvtl e
     cvt (UnboundVarE s)  = do -- Use of 'vcName' here instead of 'vName' is
                               -- important, because UnboundVarE may contain

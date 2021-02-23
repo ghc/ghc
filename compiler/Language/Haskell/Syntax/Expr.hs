@@ -470,7 +470,7 @@ data HsExpr p
   | RecordUpd
       { rupd_ext  :: XRecordUpd p
       , rupd_expr :: LHsExpr p
-      , rupd_flds :: Either [LHsRecUpdField p] [LHsRecUpdProj p]
+      , rupd_flds :: [LHsRecUpdField p]
       }
   -- For a type family, the arg types are of the *instance* tycon,
   -- not the family tycon

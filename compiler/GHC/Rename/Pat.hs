@@ -79,6 +79,7 @@ import GHC.Driver.Session ( getDynFlags, xopt_DuplicateRecordFields )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad       ( when, ap, guard, forM, unless )
+import Data.List.NonEmpty(NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe
 import Data.Ratio
@@ -765,7 +766,7 @@ rnHsRecUpdFields flds
     rn_fld pun_ok dup_fields_ok (L l (HsRecField { hsRecFieldLbl = L loc f
                                                , hsRecFieldArg = arg
                                                , hsRecPun      = pun }))
-      = do { let lbl = rdrNameAmbiguousFieldOcc f
+      = do { let lbl = rdrNameAmbiguousFieldOcc (NE.head f)
            ; mb_sel <- setSrcSpan loc $
                       -- Defer renaming of overloaded fields to the typechecker
                       -- See Note [Disambiguating record fields] in GHC.Tc.Gen.Head
@@ -783,7 +784,7 @@ rnHsRecUpdFields flds
                                            in (Unambiguous sel_name (L loc lbl), fvs `addOneFV` sel_name)
                    AmbiguousFields       -> (Ambiguous   noExtField (L loc lbl), fvs)
 
-           ; return (L l (HsRecField { hsRecFieldLbl = L loc lbl'
+           ; return (L l (HsRecField { hsRecFieldLbl = L loc (lbl' :| [])
                                      , hsRecFieldArg = arg''
                                      , hsRecPun      = pun }), fvs') }
 
@@ -803,7 +804,7 @@ getFieldLbls flds
   = map (unLoc . rdrNameFieldOcc . unLoc . hsRecFieldLbl . unLoc) flds
 
 getFieldUpdLbls :: [LHsRecUpdField GhcPs] -> [RdrName]
-getFieldUpdLbls flds = map (rdrNameAmbiguousFieldOcc . unLoc . hsRecFieldLbl . unLoc) flds
+getFieldUpdLbls flds = map (rdrNameAmbiguousFieldOcc . (NE.head) . unLoc . hsRecFieldLbl . unLoc) flds
 
 needFlagDotDot :: HsRecFieldContext -> SDoc
 needFlagDotDot ctxt = vcat [text "Illegal `..' in record" <+> pprRFC ctxt,

@@ -34,7 +34,7 @@ module GHC.Hs.Pat (
         HsRecField, LHsRecField,
         HsRecUpdField, LHsRecUpdField,
         hsRecFields, hsRecFieldSel, hsRecFieldId, hsRecFieldsArgs,
-        hsRecUpdFieldId, hsRecUpdFieldOcc, hsRecUpdFieldRdr,
+        hsRecUpdFieldId, hsRecUpdFieldId', hsRecUpdFieldOcc, hsRecUpdFieldOcc', hsRecUpdFieldRdr,
 
         mkPrefixConPat, mkCharLitPat, mkNilPat,
 
@@ -74,6 +74,7 @@ import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Core.Type
 import GHC.Types.SrcLoc
 import GHC.Data.Bag -- collect ev vars from pats
@@ -81,7 +82,8 @@ import GHC.Data.Maybe
 import GHC.Types.Name (Name)
 import GHC.Driver.Session
 import qualified GHC.LanguageExtensions as LangExt
-
+import Data.List.NonEmpty(NonEmpty(..))
+import qualified Data.List.NonEmpty as NonEmpty
 
 data ListPatTc
   = ListPatTc
@@ -197,13 +199,38 @@ hsRecFieldId :: HsRecField GhcTc arg -> Located Id
 hsRecFieldId = hsRecFieldSel
 
 hsRecUpdFieldRdr :: HsRecUpdField (GhcPass p) -> Located RdrName
-hsRecUpdFieldRdr = fmap rdrNameAmbiguousFieldOcc . hsRecFieldLbl
+hsRecUpdFieldRdr upd =
+  -- In this context hsRecFieldLbl can only ever contain a singleton
+  -- list of FieldOccs.
+  let (L l fieldOccs) = hsRecFieldLbl upd
+      fieldOcc = NonEmpty.head fieldOccs in
+  L l (rdrNameAmbiguousFieldOcc fieldOcc)
 
 hsRecUpdFieldId :: HsRecField' (AmbiguousFieldOcc GhcTc) arg -> Located Id
 hsRecUpdFieldId = fmap extFieldOcc . hsRecUpdFieldOcc
 
+hsRecUpdFieldId' :: HsRecField' (NonEmpty (AmbiguousFieldOcc GhcTc)) arg -> Located Id
+hsRecUpdFieldId' fld =
+  let L l fieldOccs = hsRecUpdFieldOcc' fld
+      fieldOcc = NonEmpty.head fieldOccs
+  in L l (extFieldOcc fieldOcc)
+
 hsRecUpdFieldOcc :: HsRecField' (AmbiguousFieldOcc GhcTc) arg -> LFieldOcc GhcTc
 hsRecUpdFieldOcc = fmap unambiguousFieldOcc . hsRecFieldLbl
+
+hsRecUpdFieldOcc' :: HsRecField' (NonEmpty (AmbiguousFieldOcc GhcTc)) arg -> Located (NonEmpty (FieldOcc GhcTc))
+hsRecUpdFieldOcc' fld =
+  let L l fieldOccs = hsRecFieldLbl fld
+      fieldOcc = NonEmpty.head fieldOccs
+   in L l ((unambiguousFieldOcc fieldOcc) :| [])
+
+{-
+hsRecUpdFieldOcc' :: HsRecField' (NonEmpty (AmbiguousFieldOcc GhcTc)) arg -> Located (NonEmpty (FieldOcc GhcTc))
+hsRecUpdFieldOcc' fld =
+   case hsRecFieldLbl fld of
+     L l (fieldOcc :| []) -> L l ((unambiguousFieldOcc fieldOcc) :| [])
+     _ -> panic "hsRecUpdFieldOcc': The impossible happened!"
+-}
 
 
 {-

@@ -46,6 +46,7 @@ import GHC.Utils.Outputable
 import GHC.Types.SrcLoc
 -- libraries:
 import Data.Data hiding (TyCon,Fixity)
+import Data.List.NonEmpty(NonEmpty(..))
 
 type LPat p = XRec p (Pat p)
 
@@ -271,7 +272,7 @@ type LHsRecUpdField p   = Located (HsRecUpdField p)
 type HsRecField    p arg = HsRecField' (FieldOcc p) arg
 
 -- | Haskell Record Update Field
-type HsRecUpdField p     = HsRecField' (AmbiguousFieldOcc p) (LHsExpr p)
+type HsRecUpdField p     = HsRecField' (NonEmpty (AmbiguousFieldOcc p)) (LHsExpr p)
 
 -- | Haskell Record Field
 --

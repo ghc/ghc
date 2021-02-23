@@ -424,25 +424,28 @@ rnExpr (RecordCon { rcon_con = con_id
     rn_field (L l fld) = do { (arg', fvs) <- rnLExpr (hsRecFieldArg fld)
                             ; return (L l (fld { hsRecFieldArg = arg' }), fvs) }
 
-rnExpr (RecordUpd { rupd_expr = expr, rupd_flds = rbinds })
-  = case rbinds of
-      Left flds -> -- 'OverloadedRecordUpdate' is not in effect. Regular record update.
-        do  { ; (e, fv_e) <- rnLExpr expr
-              ; (rs, fv_rs) <- rnHsRecUpdFields flds
-              ; return ( RecordUpd noExtField e (Left rs), fv_e `plusFV` fv_rs )
-            }
-      Right flds ->  -- 'OverloadedRecordUpdate' is in effect. Record dot update desugaring.
-        do { ; unlessXOptM LangExt.RebindableSyntax $
-                 addErr $ text "RebindableSyntax is required if OverloadedRecordUpdate is enabled."
-             ; (getField, fv_getField) <- lookupSyntaxName getFieldName
-             ; (setField, fv_setField) <- lookupSyntaxName setFieldName
-             ; (e, fv_e) <- rnLExpr expr
-             ; (us, fv_us) <- rnHsUpdProjs flds
-             ; return ( mkExpandedExpr
-                          (RecordUpd noExtField e (Right us))
-                          (mkRecordDotUpd getField setField e us)
-                         , plusFVs [fv_getField, fv_setField, fv_e, fv_us] )
-             }
+rnExpr (RecordUpd { rupd_expr = expr, rupd_flds = flds })
+  = do
+       { ; overloaded_on <- xoptM LangExt.OverloadedRecordUpdate
+         ; if not overloaded_on
+           then -- 'OverloadedRecordUpdate' is not in effect. Regular record update.
+             do  { ; (e, fv_e) <- rnLExpr expr
+                   ; (rs, fv_rs) <- rnHsRecUpdFields flds
+                   ; return ( RecordUpd noExtField e rs, fv_e `plusFV` fv_rs )
+                 }
+           else  -- 'OverloadedRecordUpdate' is in effect. Record dot update desugaring.
+             do { ; unlessXOptM LangExt.RebindableSyntax $
+                      addErr $ text "RebindableSyntax is required if OverloadedRecordUpdate is enabled."
+                  ; (getField, fv_getField) <- lookupSyntaxName getFieldName
+                  ; (setField, fv_setField) <- lookupSyntaxName setFieldName
+                  ; (e, fv_e) <- rnLExpr expr
+                  ; (us, fv_us) <- rnHsUpdProjs flds
+                  ; return ( mkExpandedExpr
+                               (RecordUpd noExtField e us)
+                               (mkRecordDotUpd getField setField e us)
+                              , plusFVs [fv_getField, fv_setField, fv_e, fv_us] )
+                  }
+       }
 
 rnExpr (ExprWithTySig _ expr pty)
   = do  { (pty', fvTy)    <- rnHsSigWcType ExprWithTySigCtx pty
@@ -2602,18 +2605,29 @@ mkProjUpdateSetField get_field set_field (L _ (HsRecField { hsRecFieldLbl = (L _
     in (\a -> foldl' (mkSet set_field) arg (zips a))
           -- setField@"foo" (a) (setField@"bar" (getField @"foo" (a))(setField@"baz" (getField @"bar" (getField @"foo" (a)))(setField@"quux" (getField @"baz" (getField @"bar" (getField @"foo" (a))))(quux))))
 
-mkRecordDotUpd :: Name -> Name -> LHsExpr GhcRn -> [LHsRecUpdProj GhcRn] -> HsExpr GhcRn
+mkRecordDotUpd :: Name -> Name -> LHsExpr GhcRn -> [LHsRecUpdField GhcRn] -> HsExpr GhcRn
 mkRecordDotUpd get_field set_field exp updates = foldl' fieldUpdate (unLoc exp) updates
   where
-    fieldUpdate :: HsExpr GhcRn -> LHsRecUpdProj GhcRn -> HsExpr GhcRn
-    fieldUpdate acc lpu =  unLoc $ (mkProjUpdateSetField get_field set_field lpu) (wrapGenSpan acc)
+    fieldUpdate :: HsExpr GhcRn -> LHsRecUpdField GhcRn -> HsExpr GhcRn
+    fieldUpdate acc (L l (HsRecField (L ll lbl) arg pun)) =
+      let afos = lbl
+          afos' = NE.toList afos
+          fieldNames = map (wrapGenSpan . occNameFS . rdrNameOcc . rdrNameAmbiguousFieldOcc) afos'
+          fields = L ll (FieldLabelStrings fieldNames)
+          lpu = L l (HsRecField fields arg pun)
+      in unLoc $ (mkProjUpdateSetField get_field set_field lpu) (wrapGenSpan acc)
 
-rnHsUpdProjs :: [LHsRecUpdProj GhcPs] -> RnM ([LHsRecUpdProj GhcRn], FreeVars)
+rnHsUpdProjs :: [LHsRecUpdField GhcPs] -> RnM ([LHsRecUpdField GhcRn], FreeVars)
 rnHsUpdProjs us = do
   (u, fvs) <- unzip <$> mapM rnRecUpdProj us
   pure (u, plusFVs fvs)
   where
-    rnRecUpdProj :: LHsRecUpdProj GhcPs -> RnM (LHsRecUpdProj GhcRn, FreeVars)
+    rnRecUpdProj :: LHsRecUpdField GhcPs -> RnM (LHsRecUpdField GhcRn, FreeVars)
     rnRecUpdProj (L l (HsRecField fs arg pun))
       = do { (arg, fv) <- rnLExpr arg
-           ; return $ (L l (HsRecField { hsRecFieldLbl = fs, hsRecFieldArg = arg, hsRecPun = pun}), fv) }
+           ; return $ (L l (HsRecField { hsRecFieldLbl = fmap (NE.map f) fs, hsRecFieldArg = arg, hsRecPun = pun}), fv) }
+
+    f :: AmbiguousFieldOcc GhcPs -> AmbiguousFieldOcc GhcRn
+    f (Ambiguous _ rdr) = Ambiguous noExtField rdr
+    f (Unambiguous _ rdr) = Ambiguous noExtField rdr
+    f _ = panic "rnHsUpdProjs: The impossible happened!"
