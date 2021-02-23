@@ -59,7 +59,7 @@ import GHC.Data.Graph.Directed (flattenSCCs)
 import GHC.Driver.Env (hsc_dflags, hsc_home_unit, hsc_logger, hsc_static_plugins, hsc_units)
 import GHC.Driver.Monad (modifySession, withTimingM)
 import GHC.Driver.Session hiding (verbosity)
-import GHC.HsToCore.Docs
+import GHC.HsToCore.Docs (getMainDeclBinder)
 import GHC.Plugins (Outputable, Plugin (..), PluginWithArgs (..), StaticPlugin (..), defaultPlugin, keepRenamedSource)
 import GHC.Tc.Types (TcGblEnv (..), TcM)
 import GHC.Tc.Utils.Env (tcLookupGlobal)
@@ -158,7 +158,7 @@ createIfaces verbosity modules flags instIfaceMap = do
   -- alive to be able to find all the instances.
   modifySession installHaddockPlugin
 
-  targets <- mapM (\filePath -> guessTarget filePath Nothing Nothing) modules
+  targets <- mapM (\filePath -> guessTarget filePath Nothing) modules
   setTargets targets
 
   loadOk <- withTimingM "load" (const ()) $
