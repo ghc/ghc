@@ -114,15 +114,12 @@ Runtime system
   Moreover, we now correctly account for the size of the array, meaning that
   space lost to fragmentation is no longer counted as live data.
 
-- The :rts-flag:`-h` flag has been deprecated, use either :rts-flag:`-hc` or
-  :rts-flag:`-hT` explicitly, as appropriate.
+
 
 - The ``-xt`` RTS flag has been removed. Now STACK and TSO closures are always
   included in heap profiles. Tooling can choose to filter out these closure types
-  if necessary.
+`  if necessary.
 
-``ghc-prim`` library
-~~~~~~~~~~~~~~~~~~~~
 
 - ``Void#`` is now a type synonym for the unboxed tuple ``(# #)``.
   Code using ``Void#`` now has to enable :extension:`UnboxedTuples`.
@@ -203,3 +200,13 @@ Runtime system
 
 - On POSIX, ``System.IO.openFile`` can no longer leak a file descriptor if it
   is interrupted by an asynchronous exception (#19114, #19115).
+
+- There's a new binding ``GHC.Exts.considerAccessible``. It's equivalent to
+  ``True`` and allows the programmer to turn off pattern-match redundancy
+  warnings for particular clauses, like the third one here ::
+
+    g :: Bool -> Int
+    g x = case (x, x) of
+      (True,  True)  -> 1
+      (False, False) -> 2
+      (True,  False) | considerAccessible -> 3 -- No warning!

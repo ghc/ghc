@@ -319,6 +319,7 @@ basicKnownKeyNames
 
         -- GHC Extensions
         groupWithName,
+        considerAccessibleName,
 
         -- Strings and lists
         unpackCStringName, unpackCStringUtf8Name,
@@ -1122,8 +1123,9 @@ alternativeClassKey = mkPreludeMiscIdUnique 754
 
 
 -- Functions for GHC extensions
-groupWithName :: Name
-groupWithName = varQual gHC_EXTS (fsLit "groupWith") groupWithIdKey
+groupWithName, considerAccessibleName :: Name
+groupWithName          = varQual gHC_EXTS (fsLit "groupWith")          groupWithIdKey
+considerAccessibleName = varQual gHC_EXTS (fsLit "considerAccessible") considerAccessibleIdKey
 
 -- Random PrelBase functions
 fromStringName, otherwiseIdName, foldrName, buildName, augmentName,
@@ -2362,15 +2364,13 @@ inlineIdKey, noinlineIdKey :: Unique
 inlineIdKey                   = mkPreludeMiscIdUnique 120
 -- see below
 
-mapIdKey, groupWithIdKey, dollarIdKey :: Unique
-mapIdKey              = mkPreludeMiscIdUnique 121
-groupWithIdKey        = mkPreludeMiscIdUnique 122
-dollarIdKey           = mkPreludeMiscIdUnique 123
-
-coercionTokenIdKey :: Unique
-coercionTokenIdKey    = mkPreludeMiscIdUnique 124
-
-noinlineIdKey                 = mkPreludeMiscIdUnique 125
+mapIdKey, groupWithIdKey, dollarIdKey, coercionTokenIdKey, considerAccessibleIdKey :: Unique
+mapIdKey                = mkPreludeMiscIdUnique 121
+groupWithIdKey          = mkPreludeMiscIdUnique 122
+dollarIdKey             = mkPreludeMiscIdUnique 123
+coercionTokenIdKey      = mkPreludeMiscIdUnique 124
+noinlineIdKey           = mkPreludeMiscIdUnique 125
+considerAccessibleIdKey = mkPreludeMiscIdUnique 126
 
 rationalToFloatIdKey, rationalToDoubleIdKey :: Unique
 rationalToFloatIdKey   = mkPreludeMiscIdUnique 130
