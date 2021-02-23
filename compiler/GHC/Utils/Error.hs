@@ -125,10 +125,11 @@ pprMsgEnvelopeBagWithLoc bag = [ pprLocMsgEnvelope item | item <- sortMsgBag Not
 pprLocMsgEnvelope :: Diagnostic e => MsgEnvelope e -> SDoc
 pprLocMsgEnvelope (MsgEnvelope { errMsgSpan      = s
                                , errMsgDiagnostic = e
+                               , errMsgSeverity  = sev
                                , errMsgContext   = unqual })
   = sdocWithContext $ \ctx ->
     withErrStyle unqual $
-      mkLocMessage (MCDiagnostic $ diagnosticReason e) s (formatBulleted ctx $ diagnosticMessage e)
+      mkLocMessage (MCDiagnostic sev (diagnosticReason e)) s (formatBulleted ctx $ diagnosticMessage e)
 
 sortMsgBag :: Maybe DynFlags -> Bag (MsgEnvelope e) -> [MsgEnvelope e]
 sortMsgBag dflags = maybeLimit . sortBy (cmp `on` errMsgSpan) . bagToList
@@ -169,11 +170,13 @@ ifVerbose dflags val act
 
 errorMsg :: Logger -> DynFlags -> SDoc -> IO ()
 errorMsg logger dflags msg
-   = putLogMsg logger dflags (MCDiagnostic ErrReason) noSrcSpan $ withPprStyle defaultErrStyle msg
+   = putLogMsg logger dflags (MCDiagnostic SevError ErrorWithoutFlag) noSrcSpan $
+     withPprStyle defaultErrStyle msg
 
 warningMsg :: Logger -> DynFlags -> SDoc -> IO ()
 warningMsg logger dflags msg
-   = putLogMsg logger dflags (MCDiagnostic WarnReason) noSrcSpan $ withPprStyle defaultErrStyle msg
+   = putLogMsg logger dflags (MCDiagnostic SevWarning WarningWithoutFlag) noSrcSpan $
+     withPprStyle defaultErrStyle msg
 
 fatalErrorMsg :: Logger -> DynFlags -> SDoc -> IO ()
 fatalErrorMsg logger dflags msg =

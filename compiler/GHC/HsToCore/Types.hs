@@ -47,7 +47,7 @@ data DsGblEnv
                                           -- constructors are in scope during
                                           -- pattern-match satisfiability checking
   , ds_unqual  :: PrintUnqualified
-  , ds_msgs    :: IORef (Messages DecoratedMessage) -- Diagnostic messages
+  , ds_msgs    :: IORef (Messages DiagnosticMessage) -- Diagnostic messages
   , ds_if_env  :: (IfGblEnv, IfLclEnv)    -- Used for looking up global,
                                           -- possibly-imported things
   , ds_complete_matches :: CompleteMatches

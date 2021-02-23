@@ -215,20 +215,20 @@ defaultLogAction :: LogAction
 defaultLogAction dflags msg_class srcSpan msg
   | dopt Opt_D_dump_json dflags = jsonLogAction dflags msg_class srcSpan msg
   | otherwise = case msg_class of
-      MCOutput         -> printOut msg
-      MCDump           -> printOut (msg $$ blankLine)
-      MCInteractive    -> putStrSDoc msg
-      MCInfo           -> printErrs msg
-      MCFatal          -> printErrs msg
-      MCDiagnostic rea -> printDiagnostics rea
+      MCOutput             -> printOut msg
+      MCDump               -> printOut (msg $$ blankLine)
+      MCInteractive        -> putStrSDoc msg
+      MCInfo               -> printErrs msg
+      MCFatal              -> printErrs msg
+      MCDiagnostic sev rea -> printDiagnostics sev rea
     where
       printOut   = defaultLogActionHPrintDoc  dflags False stdout
       printErrs  = defaultLogActionHPrintDoc  dflags False stderr
       putStrSDoc = defaultLogActionHPutStrDoc dflags False stdout
       -- Pretty print the warning flag, if any (#10752)
-      message rea = mkLocMessageAnn (flagMsg rea) msg_class srcSpan msg
+      message sev rea = mkLocMessageAnn (flagMsg sev rea) msg_class srcSpan msg
 
-      printDiagnostics severity = do
+      printDiagnostics severity reason = do
         hPutChar stderr '\n'
         caretDiagnostic <-
             if gopt Opt_DiagnosticsShowCaret dflags
@@ -236,24 +236,26 @@ defaultLogAction dflags msg_class srcSpan msg
             else pure empty
         printErrs $ getPprStyle $ \style ->
           withPprStyle (setStyleColoured True style)
-            (message severity $+$ caretDiagnostic)
+            (message severity reason $+$ caretDiagnostic)
         -- careful (#2302): printErrs prints in UTF-8,
         -- whereas converting to string first and using
         -- hPutStr would just emit the low 8 bits of
         -- each unicode char.
 
-      flagMsg = \case
-          GHC.Types.Error.WarnReason -> Nothing
-          (WarnReasonWithFlag wflag) -> do
-            spec <- flagSpecOf wflag
-            return ("-W" ++ flagSpecName spec ++ warnFlagGrp wflag)
-          ErrReason     -> Nothing
-          (ErrReasonPromotedFromWarning wflag) -> do
-              spec <- flagSpecOf wflag
-              return $
-                "-W" ++ flagSpecName spec ++ warnFlagGrp wflag ++
-                ", -Werror=" ++ flagSpecName spec
-          ErrReasonPromotedWithWError -> return "-Werror"
+      flagMsg :: Severity -> DiagnosticReason -> Maybe String
+      flagMsg SevError WarningWithoutFlag =  Just "-Werror"
+      flagMsg SevError (WarningWithFlag wflag) = do
+        spec <- flagSpecOf wflag
+        return $
+          "-W" ++ flagSpecName spec ++ warnFlagGrp wflag ++
+          ", -Werror=" ++ flagSpecName spec
+      flagMsg SevError ErrorWithoutFlag = Nothing
+      flagMsg SevWarning WarningWithoutFlag = Nothing
+      flagMsg SevWarning (WarningWithFlag wflag) = do
+        spec <- flagSpecOf wflag
+        return ("-W" ++ flagSpecName spec ++ warnFlagGrp wflag)
+      flagMsg SevWarning ErrorWithoutFlag =
+        panic "SevWarning with ErrorWithoutFlag"
 
       warnFlagGrp flag
           | gopt Opt_ShowWarnGroups dflags =
