@@ -601,7 +601,9 @@ coreToStgArgs (arg : args) = do         -- Non-type argument
     arg' <- coreToStgExpr arg
     let
         (aticks, arg'') = stripStgTicksTop tickishFloatable arg'
-        stg_arg = case arg'' of
+        -- Force this now, as otherwise the returned [StgArg]s contains
+        -- thunks which we will eventually force anyway.
+        !stg_arg = case arg'' of
                        StgApp v []        -> StgVarArg v
                        StgConApp con _ [] _ -> StgVarArg (dataConWorkId con)
                        StgLit lit         -> StgLitArg lit
