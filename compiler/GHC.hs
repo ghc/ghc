@@ -392,7 +392,7 @@ import GHC.Types.Name.Env
 import GHC.Types.Name.Ppr
 import GHC.Types.TypeEnv
 import GHC.Types.SourceFile
-import GHC.Types.Error ( DecoratedMessage )
+import GHC.Types.Error ( DiagnosticMessage )
 
 import GHC.Unit
 import GHC.Unit.Env
@@ -899,7 +899,7 @@ checkNewInteractiveDynFlags logger dflags0 = do
   -- the REPL. See #12356.
   if xopt LangExt.StaticPointers dflags0
   then do liftIO $ printOrThrowWarnings logger dflags0 $ listToBag
-            [mkPlainMsgEnvelope Session.WarnReason interactiveSrcSpan
+            [mkPlainMsgEnvelope Session.WarningWithoutFlag interactiveSrcSpan
              $ text "StaticPointers is not supported in GHCi interactive expressions."]
           return $ xopt_unset dflags0 LangExt.StaticPointers
   else return dflags0
@@ -1483,7 +1483,7 @@ getNameToInstancesIndex :: GhcMonad m
                      -- if it is visible from at least one module in the list.
   -> Maybe [Module]  -- ^ modules to load. If this is not specified, we load
                      -- modules for everything that is in scope unqualified.
-  -> m (Messages DecoratedMessage, Maybe (NameEnv ([ClsInst], [FamInst])))
+  -> m (Messages DiagnosticMessage, Maybe (NameEnv ([ClsInst], [FamInst])))
 getNameToInstancesIndex visible_mods mods_to_load = do
   hsc_env <- getSession
   liftIO $ runTcInteractive hsc_env $

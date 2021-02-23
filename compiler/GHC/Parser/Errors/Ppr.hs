@@ -24,21 +24,23 @@ import GHC.Hs.Type (pprLHsContext)
 import GHC.Builtin.Names (allNameStrings)
 import GHC.Builtin.Types (filterCTuple)
 
-mkParserErr :: SrcSpan -> SDoc -> MsgEnvelope DecoratedMessage
+mkParserErr :: SrcSpan -> SDoc -> MsgEnvelope DiagnosticMessage
 mkParserErr span doc = MsgEnvelope
    { errMsgSpan        = span
    , errMsgContext     = alwaysQualify
-   , errMsgDiagnostic  = DiagnosticMessage (mkDecorated [doc]) ErrReason
+   , errMsgDiagnostic  = DiagnosticMessage (mkDecorated [doc]) ErrorWithoutFlag
+   , errMsgSeverity    = SevError
    }
 
-mkParserWarn :: WarningFlag -> SrcSpan -> SDoc -> MsgEnvelope DecoratedMessage
+mkParserWarn :: WarningFlag -> SrcSpan -> SDoc -> MsgEnvelope DiagnosticMessage
 mkParserWarn flag span doc = MsgEnvelope
    { errMsgSpan        = span
    , errMsgContext     = alwaysQualify
-   , errMsgDiagnostic  = DiagnosticMessage (mkDecorated [doc]) (WarnReasonWithFlag flag)
+   , errMsgDiagnostic  = DiagnosticMessage (mkDecorated [doc]) (WarningWithFlag flag)
+   , errMsgSeverity    = SevWarning
    }
 
-pprWarning :: PsWarning -> MsgEnvelope DecoratedMessage
+pprWarning :: PsWarning -> MsgEnvelope DiagnosticMessage
 pprWarning = \case
    PsWarnTab loc tc
       -> mkParserWarn Opt_WarnTabs loc $
@@ -124,7 +126,7 @@ pprWarning = \case
            OperatorWhitespaceOccurrence_Suffix -> mk_msg "suffix"
            OperatorWhitespaceOccurrence_TightInfix -> mk_msg "tight infix"
 
-pprError :: PsError -> MsgEnvelope DecoratedMessage
+pprError :: PsError -> MsgEnvelope DiagnosticMessage
 pprError err = mkParserErr (errLoc err) $ vcat
    (pp_err (errDesc err) : map pp_hint (errHints err))
 

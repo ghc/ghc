@@ -239,7 +239,7 @@ import GHC.Driver.Backend
 import GHC.Settings.Config
 import GHC.Utils.CliOption
 import {-# SOURCE #-} GHC.Core.Unfold
-import GHC.Driver.CmdLine hiding (WarnReason(..))
+import GHC.Driver.CmdLine
 import qualified GHC.Driver.CmdLine as Cmd
 import GHC.Settings.Constants
 import GHC.Utils.Panic

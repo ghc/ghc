@@ -62,11 +62,10 @@ import GHC.Types.Var
 import GHC.Types.Unique.Supply
 import GHC.Types.Name.Env
 import GHC.Types.SrcLoc
+import GHC.Types.Error
 
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Logger ( HasLogger (..), DumpFormat (..), putLogMsg, putDumpMsg, Logger )
-import GHC.Utils.Error ( MessageClass(..)
-                       )
 import GHC.Utils.Monad
 
 import GHC.Data.FastString
@@ -799,9 +798,9 @@ msg msg_class doc = do
     loc    <- getSrcSpanM
     unqual <- getPrintUnqualified
     let sty = case msg_class of
-                MCDiagnostic _ -> err_sty
-                MCDump         -> dump_sty
-                _              -> user_sty
+                MCDiagnostic _ _ -> err_sty
+                MCDump           -> dump_sty
+                _                -> user_sty
         err_sty  = mkErrStyle unqual
         user_sty = mkUserStyle unqual AllTheWay
         dump_sty = mkDumpStyle unqual
@@ -821,10 +820,10 @@ errorMsgS = errorMsg . text
 
 -- | Output an error to the screen. Does not cause the compiler to die.
 errorMsg :: SDoc -> CoreM ()
-errorMsg = msg (MCDiagnostic ErrReason)
+errorMsg = msg (MCDiagnostic SevError ErrorWithoutFlag)
 
-diagnosticMsg :: DiagnosticReason -> SDoc -> CoreM ()
-diagnosticMsg reason = msg (MCDiagnostic reason)
+diagnosticMsg :: Severity -> DiagnosticReason -> SDoc -> CoreM ()
+diagnosticMsg sev reason = msg (MCDiagnostic sev reason)
 
 -- | Output a fatal error to the screen. Does not cause the compiler to die.
 fatalErrorMsgS :: String -> CoreM ()
