@@ -1783,7 +1783,15 @@ check_main hsc_env tcg_env explicit_mod_hdr export_ies
                 -- error message in certain cases, as described in
                 -- Note [Main module without a main function in the export spec].
         _ -> do    -- The module has one or more main functions in the export spec
-          let mains = filterInsMains exportedMains mains_all
+          let mains = if any isUnqual exportedMains
+                      then mains_all
+                      else filterInsMains (mapMaybe rdrModName exportedMains) mains_all
+                where
+                  rdrModName (Qual mn _) = Just mn
+                  rdrModName _           = Nothing
+                  -- as the name of the main function is fixed, and we have at most
+                  -- only one main function per module. We only need the module names
+                  -- with main functions for further checking
           case mains of
             [] -> do  --
               traceTc "checkMain fail" ppr_mod_mainfn
@@ -1861,15 +1869,18 @@ check_main hsc_env tcg_env explicit_mod_hdr export_ies
     pp_main_fn = ppMainFn main_fn
 
     -- Select the main functions from the export list.
-    -- Only the module name is needed, the function name is fixed.
-    selExportMains :: Maybe (Located [LIE GhcPs]) -> [ModuleName]    -- #16453
-    selExportMains Nothing = [main_mod_nm]
-        -- no main specified, but there is a header.
-    selExportMains (Just exps) = fmap fst $
-        filter (\(_,n) -> n == occ_main_fn ) texp
+    selExportMains ::  Maybe (Located [LIE GhcPs]) -> [RdrName] -- #16453/#17397
+    selExportMains Nothing
+      | explicit_mod_hdr = [mkRdrQual main_mod_nm occ_main_fn]
+          -- The module has a header but no export list: `module Main where`
+          -- Export only a non imported main function (Main.main).
+      | otherwise = [mkRdrUnqual occ_main_fn]
+          -- The module has no header: simulate a `module Main (Main.main) where`
+          -- Export every main module in scope.
+    selExportMains (Just exps) = filter isMain $ mapMaybe transExportIE ies
       where
         ies = fmap unLoc $ unLoc exps
-        texp = mapMaybe transExportIE ies
+        isMain rdr = rdrNameOcc rdr == occ_main_fn
 
     -- Filter all main functions in scope that match the export specs
     filterInsMains :: [ModuleName] -> [Name] -> [Name]               -- #16453
@@ -1877,18 +1888,16 @@ check_main hsc_env tcg_env explicit_mod_hdr export_ies
       [mod | mod <- inscope_mains,
           (moduleName . nameModule) mod `elem` export_mains]
 
-    -- Transform an export_ie to a (ModuleName, OccName) pair.
+    -- Transform an export_ie to a Maybe RdrName.
     -- 'IEVar' constructors contain exported values (functions), eg '(Main.main)'
     -- 'IEModuleContents' constructors contain fully exported modules, eg '(Main)'
     -- All other 'IE...' constructors are not used and transformed to Nothing.
-    transExportIE :: IE GhcPs -> Maybe (ModuleName, OccName)         -- #16453
-    transExportIE (IEVar _  var) = isQual_maybe $
-         upqual $ ieWrappedName $ unLoc var
-       where
-         -- A module name is always needed, so qualify 'UnQual' rdr names.
-         upqual (Unqual occ) = Qual main_mod_nm occ
-         upqual rdr = rdr
-    transExportIE (IEModuleContents _ mod) = Just (unLoc mod, occ_main_fn)
+    transExportIE :: IE GhcPs -> Maybe RdrName                -- #16453/#17397
+    transExportIE (IEVar _  var) = Just $ ieWrappedName $ unLoc var
+    transExportIE (IEModuleContents _ mod) =
+        Just $ mkRdrQual (unLoc mod) occ_main_fn
+          -- if `mod` doesn't contain, a `main`, we get a `not defined` error,
+          -- which is correct.
     transExportIE _ = Nothing
 
     -- Get a main function that is in scope.
