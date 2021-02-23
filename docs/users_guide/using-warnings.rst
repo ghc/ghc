@@ -1235,6 +1235,34 @@ of ``-W(no-)*``.
     second pattern overlaps it. More often than not, redundant patterns
     is a programmer mistake/error, so this option is enabled by default.
 
+    If the programmer is dead set of keeping a redundant clause,
+    for example to prevent bitrot, they can make use of a guard
+    scrutinising ``GHC.Exts.considerAccessible`` to prevent the
+    checker from flagging the parent clause as redundant: ::
+
+        g :: String -> Int
+        g []                       = 0
+        g (_:xs)                   = 1
+        g "2" | considerAccessible = 2 -- No warning!
+
+    Note that ``considerAccessible`` should come as the last statement of
+    the guard in order not to impact the results of the checker. E.g., if
+    you write ::
+
+        h :: Bool -> Int
+        h x = case (x, x) of
+          (True,  True)  -> 1
+          (False, False) -> 2
+          (True,  False) | considerAccessible, False <- x -> 3
+
+    The pattern-match checker takes you by your word, will conclude
+    that ``False <- x`` might fail and warn that the pattern-match
+    is inexhaustive. Put ``considerAccessible`` last to avoid such
+    confusions.
+
+    Note that due to technical limitations, ``considerAccessible`` will not
+    suppress :ghc-flag:`-Winaccessible-code` warnings.
+
 .. ghc-flag:: -Winaccessible-code
     :shortdesc: warn about inaccessible code
     :type: dynamic

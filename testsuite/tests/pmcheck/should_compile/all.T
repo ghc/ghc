@@ -154,6 +154,8 @@ test('T18572', normal, compile,
      ['-fwarn-incomplete-patterns -fwarn-incomplete-uni-patterns -fwarn-overlapping-patterns'])
 test('T18609', normal, compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T18610', normal, compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T18670', normal, compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T18708', normal, compile,

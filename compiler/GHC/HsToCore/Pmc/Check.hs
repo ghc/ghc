@@ -26,6 +26,7 @@ module GHC.HsToCore.Pmc.Check (
 
 import GHC.Prelude
 
+import GHC.Builtin.Names ( hasKey, considerAccessibleIdKey, trueDataConKey )
 import GHC.HsToCore.Monad ( DsM )
 import GHC.HsToCore.Pmc.Types
 import GHC.HsToCore.Pmc.Utils
@@ -124,6 +125,13 @@ checkGrd grd = CA $ \inc -> case grd of
     pure CheckResult { cr_ret = RedSets { rs_cov = matched, rs_div = div, rs_bangs = bangs }
                      , cr_uncov = mempty
                      , cr_approx = Precise }
+  -- See point (3) of Note [considerAccessible]
+  PmCon x (PmAltConLike con) _ _ _
+    | x `hasKey` considerAccessibleIdKey
+    , con `hasKey` trueDataConKey
+    -> pure CheckResult { cr_ret = emptyRedSets { rs_cov = initNablas }
+                        , cr_uncov = mempty
+                        , cr_approx = Precise }
   -- Con: Fall through on x ≁ K and refine with x ~ K ys and type info
   PmCon x con tvs dicts args -> do
     !div <- if isPmAltConMatchStrict con
@@ -269,4 +277,77 @@ Guards are an extreme example in this regard, with #11195 being a particularly
 dreadful example: Since their RHS are often pretty much unique, we split on a
 variable (the one representing the RHS) that doesn't occur anywhere else in the
 program, so we don't actually get useful information out of that split!
+
+Note [considerAccessible]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider (T18610)
+
+  f :: Bool -> Int
+  f x = case (x, x) of
+    (True,  True)  -> 1
+    (False, False) -> 2
+    (True,  False) -> 3 -- Warning: Redundant
+
+The third case is detected as redundant. But it may be the intent of the
+programmer to keep the dead code, in order for it not to bitrot or to support
+debugging scenarios. But there is no way to communicate that to the
+pattern-match checker! The only way is to deactivate pattern-match checking
+whole-sale, which is quite annoying. Hence, we define in "GHC.Exts":
+
+  considerAccessible = True
+
+'considerAccessible' is treated specially by the pattern-match checker in that a
+guard with it as the scrutinee expression will keep its parent clause alive:
+
+  g :: Bool -> Int
+  g x = case (x, x) of
+    (True,  True)  -> 1
+    (False, False) -> 2
+    (True,  False) | GHC.Exts.considerAccessible -> 3 -- No warning
+
+The key bits of the implementation are:
+
+  1. Its definition is recognised as known-key (see "GHC.Builtin.Names").
+  2. After "GHC.HsToCore.Pmc.Desugar", the guard will end up as a 'PmCon', where
+     the match var is the known-key 'considerAccessible' and the constructor
+     against which it matches is 'True'.
+  3. We recognise the 'PmCon' in 'GHC.HsToCore.Check.checkGrd' and inflate the
+     incoming set of values for all guards downstream to the unconstrained
+     'initNablas' set, e.g. /all/ values.
+     (The set of values that falls through that particular guard is empty, as
+     matching 'considerAccessible' against 'True' can't fail.)
+
+Note that 'considerAccessible' breaks the invariant that incoming sets of values
+reaching syntactic children are subsets of that of the syntactic ancestor:
+A whole match, like that of the third clause of the example, might have no
+incoming value, but its single RHS has incoming values because of (3).
+
+That means the 'is_covered' flag computed in 'GHC.HsToCore.Pmc.cirbsMatch'
+is irrelevant and should not be used to flag all children as redundant (which is
+what we used to do).
+
+We achieve great benefits with a very simple implementation.
+There are caveats, though:
+
+  (A) Putting potentially failing guards /after/ the
+      'considerAccessible' guard might lead to weird check results, e.g.,
+
+        h :: Bool -> Int
+        h x = case (x, x) of
+          (True,  True)  -> 1
+          (False, False) -> 2
+          (True,  False) | GHC.Exts.considerAccessible, False <- x -> 3
+          -- Warning: Not matched: (_, _)
+
+      That *is* fixable, although we would pay with a much more complicated
+      implementation.
+  (B) If the programmer puts a 'considerAccessible' marker on an accessible
+      clause, the checker doesn't warn about it. E.g.,
+
+        f :: Bool -> Int
+        f True | considerAccessible = 0
+        f False = 1
+
+      will not emit any warning whatsoever. We could implement code that warns
+      here, but it wouldn't be as simple as it is now.
 -}
