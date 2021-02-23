@@ -176,6 +176,8 @@ stgArgType (StgLitArg lit) = literalType lit
 stripStgTicksTop :: (Tickish Id -> Bool) -> GenStgExpr p -> ([Tickish Id], GenStgExpr p)
 stripStgTicksTop p = go []
    where go ts (StgTick t e) | p t = go (t:ts) e
+         -- This special case avoid building a thunk for "reverse ts" when there are no ticks
+         go [] other               = ([], other)
          go ts other               = (reverse ts, other)
 
 -- | Strip ticks of a given type from an STG expression returning only the expression.
