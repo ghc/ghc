@@ -491,9 +491,10 @@ tcRnSrcDecls explicit_mod_hdr decls export_ies
       ; (bind_env_mf, ev_binds_mf, binds_mf, fords_mf, imp_specs_mf, rules_mf)
             <- zonkTcGblEnv emptyBag tcg_env_mf
 
-
-      ; let { final_type_env = plusTypeEnv (tcg_type_env tcg_env)
-                                (plusTypeEnv bind_env_mf bind_env)
+              -- Force this or we retain an old reference to the previous
+              -- tcg_env
+      ; let { !final_type_env = plusTypeEnv (tcg_type_env tcg_env)
+                                 (plusTypeEnv bind_env_mf bind_env)
             ; tcg_env' = tcg_env_mf
                           { tcg_binds    = binds' `unionBags` binds_mf,
                             tcg_ev_binds = ev_binds' `unionBags` ev_binds_mf ,
