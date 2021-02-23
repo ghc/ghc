@@ -221,8 +221,7 @@ import GHC.Types.Name as Name
 import GHC.Types.Name.Set
 import GHC.Types.Var.Env
 import GHC.Builtin.Names
-import GHC.Builtin.Types (cTupleTyCon, coercibleClass, constraintKind, eqClass, heqClass, listTyCon, unitTyCon,
-                          unitTyConKey)
+import GHC.Builtin.Types (coercibleClass, constraintKind, eqClass, heqClass, listTyCon, unitTyCon, unitTyConKey)
 import GHC.Types.Basic
 import GHC.Utils.Misc
 import GHC.Data.Maybe
@@ -1154,15 +1153,6 @@ mkSpecSigmaTy tyvars preds ty = mkSigmaTy (mkTyCoVarBinders Specified tyvars) pr
 
 mkPhiTy :: [PredType] -> Type -> Type
 mkPhiTy = mkInvisFunTysMany
-
--- | Make a phi type where all the empty-tuple constraints are filtered out
-mkPhiTy' :: [PredType] -> Type -> Type
-mkPhiTy' context ty = mkPhiTy (filter (not . isTupleEmpty) context) ty
-  where
-    isTupleEmpty :: PredType -> Bool
-    isTupleEmpty predTy = case splitTyConApp_maybe predTy of
-                              Just (tc, []) -> tc == cTupleTyCon 0
-                              _             -> False
 
 ---------------
 getDFunTyKey :: Type -> OccName -- Get some string from a type, to be used to
