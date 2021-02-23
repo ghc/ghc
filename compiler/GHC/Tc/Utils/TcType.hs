@@ -50,7 +50,7 @@ module GHC.Tc.Utils.TcType (
 
   --------------------------------
   -- Builders
-  mkPhiTy, mkPhiTy', mkInfSigmaTy, mkSpecSigmaTy, mkSigmaTy,
+  mkPhiTy, mkInfSigmaTy, mkSpecSigmaTy, mkSigmaTy,
   mkTcAppTy, mkTcAppTys, mkTcCastTy,
 
   --------------------------------
@@ -221,7 +221,8 @@ import GHC.Types.Name as Name
 import GHC.Types.Name.Set
 import GHC.Types.Var.Env
 import GHC.Builtin.Names
-import GHC.Builtin.Types (coercibleClass, constraintKind, eqClass, heqClass, listTyCon, unitTyCon, unitTyConKey)
+import GHC.Builtin.Types ( coercibleClass, eqClass, heqClass, unitTyCon, unitTyConKey
+                         , listTyCon, constraintKind )
 import GHC.Types.Basic
 import GHC.Utils.Misc
 import GHC.Data.Maybe
