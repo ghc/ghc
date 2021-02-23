@@ -1946,7 +1946,7 @@ completeCall env var cont
   -- Don't inline; instead rebuild the call
   = do { rule_base <- getSimplRules
        ; let rules = getRules rule_base var
-       ; let info = mkArgInfo env var rules
+             info = mkArgInfo env var rules
                               n_val_args call_cont
        ; rebuildCall env info cont }
 
