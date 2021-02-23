@@ -324,7 +324,7 @@ reaching syntactic children are subsets of that of the syntactic ancestor:
 A whole match, like that of the third clause of the example, might have no
 incoming value, but its single RHS has incoming values because of (3).
 
-That means the 'is_covered' flag computed in 'GHC.HsToCore.Pmc.chirbsMatch'
+That means the 'is_covered' flag computed in 'GHC.HsToCore.Pmc.cirbsMatch'
 is irrelevant and should not be used to flag all children as redundant (which is
 what we used to do).
 
