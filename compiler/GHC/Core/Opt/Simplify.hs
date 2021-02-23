@@ -183,7 +183,11 @@ it's worthwhile to force them early.
 The result sadly is that we end up with "random" bangs in the simplifier
 where we sometimes force e.g. the returned environment from a function and
 sometimes we don't for the same function. Depending on the context around
-the call.
+the call. The treatment is also not very consistent. I only added bangs
+where I saw it making a difference either in the core or benchmarks. Some
+patterns where it would be beneficial aren't convered as a consequence as
+I neither have the time to go through all of the core and some cases are
+too small to show up in benchmarks.
 
 ************************************************************************
 *                                                                      *
@@ -219,8 +223,7 @@ simplTopBinds env0 binds0
     simpl_bind env (Rec pairs)
       = simplRecBind env TopLevel Nothing pairs
     simpl_bind env (NonRec b r)
-      = do { let out_bndr = (lookupRecBndr env b)
-           ; (env', b') <- addBndrRules env b out_bndr Nothing
+      = do { (env', b') <- addBndrRules env b (lookupRecBndr env b) Nothing
            ; simplRecOrTopPair env' TopLevel NonRecursive Nothing b b' r }
 
 {-
@@ -245,8 +248,7 @@ simplRecBind env0 top_lvl mb_cont pairs0
     add_rules :: SimplEnv -> (InBndr,InExpr) -> SimplM (SimplEnv, (InBndr, OutBndr, InExpr))
         -- Add the (substituted) rules to the binder
     add_rules env (bndr, rhs)
-        = do { let out_bndr = (lookupRecBndr env bndr)
-             ; (env', bndr') <- addBndrRules env bndr out_bndr mb_cont
+        = do { (env', bndr') <- addBndrRules env bndr (lookupRecBndr env bndr) mb_cont
              ; return (env', (bndr, bndr', rhs)) }
 
     go env [] = return (emptyFloats env, env)
@@ -317,7 +319,7 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
   = ASSERT( isId bndr )
     ASSERT2( not (isJoinId bndr), ppr bndr )
     -- pprTrace "simplLazyBind" ((ppr bndr <+> ppr bndr1) $$ ppr rhs $$ ppr (seIdSubst rhs_se)) $
-    do  { let   !rhs_env     = rhs_se `setInScopeFromE` env
+    do  { let   !rhs_env     = rhs_se `setInScopeFromE` env -- See Note [Bangs in the Simplifier]
                 (tvs, body) = case collectTyAndValBinders rhs of
                                 (tvs, [], body)
                                   | surely_not_lam body -> (tvs, body)
