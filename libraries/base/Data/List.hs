@@ -19,7 +19,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Data.OldList
+module Data.List
    (
    -- * Basic functions
 
