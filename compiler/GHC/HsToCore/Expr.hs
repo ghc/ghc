@@ -1094,7 +1094,7 @@ warnDiscardedDoBindings rhs rhs_ty
 
            -- Warn about discarding non-() things in 'monadic' binding
        ; if warn_unused && not (isUnitTy norm_elt_ty)
-         then diagnosticDs (WarnReasonWithFlag Opt_WarnUnusedDoBind)
+         then diagnosticDs (WarningWithFlag Opt_WarnUnusedDoBind)
                            (badMonadBind rhs elt_ty)
          else
 
@@ -1104,7 +1104,7 @@ warnDiscardedDoBindings rhs rhs_ty
                 case tcSplitAppTy_maybe norm_elt_ty of
                       Just (elt_m_ty, _)
                          | m_ty `eqType` topNormaliseType fam_inst_envs elt_m_ty
-                         -> diagnosticDs (WarnReasonWithFlag Opt_WarnWrongDoBind)
+                         -> diagnosticDs (WarningWithFlag Opt_WarnWrongDoBind)
                                          (badMonadBind rhs elt_ty)
                       _ -> return () } }
 

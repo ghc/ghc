@@ -102,7 +102,7 @@ import GHC.Driver.Plugins ( LoadedPlugin(..) )
 -}
 
 -- | Main entry point to the desugarer.
-deSugar :: HscEnv -> ModLocation -> TcGblEnv -> IO (Messages DecoratedMessage, Maybe ModGuts)
+deSugar :: HscEnv -> ModLocation -> TcGblEnv -> IO (Messages DiagnosticMessage, Maybe ModGuts)
 -- Can modify PCS by faulting in more declarations
 
 deSugar hsc_env
@@ -286,7 +286,7 @@ So we pull out the type/coercion variables (which are in dependency order),
 and Rec the rest.
 -}
 
-deSugarExpr :: HscEnv -> LHsExpr GhcTc -> IO (Messages DecoratedMessage, Maybe CoreExpr)
+deSugarExpr :: HscEnv -> LHsExpr GhcTc -> IO (Messages DiagnosticMessage, Maybe CoreExpr)
 deSugarExpr hsc_env tc_expr = do
     let dflags = hsc_dflags hsc_env
     let logger = hsc_logger hsc_env
@@ -420,7 +420,7 @@ dsRule (L loc (HsRule { rd_name = name
         -- and take the body apart into a (f args) form
         ; dflags <- getDynFlags
         ; case decomposeRuleLhs dflags bndrs'' lhs'' of {
-                Left msg -> do { diagnosticDs WarnReason msg; return Nothing } ;
+                Left msg -> do { diagnosticDs WarningWithoutFlag msg; return Nothing } ;
                 Right (final_bndrs, fn_id, args) -> do
 
         { let is_local = isLocalId fn_id
@@ -456,7 +456,7 @@ warnRuleShadowing rule_name rule_act fn_id arg_ids
       | isLocalId lhs_id || canUnfold (idUnfolding lhs_id)
                        -- If imported with no unfolding, no worries
       , idInlineActivation lhs_id `competesWith` rule_act
-      = diagnosticDs (WarnReasonWithFlag Opt_WarnInlineRuleShadowing)
+      = diagnosticDs (WarningWithFlag Opt_WarnInlineRuleShadowing)
                      (vcat [ hang (text "Rule" <+> pprRuleName rule_name
                                      <+> text "may never fire")
                                   2 (text "because" <+> quotes (ppr lhs_id)
@@ -467,7 +467,7 @@ warnRuleShadowing rule_name rule_act fn_id arg_ids
 
       | check_rules_too
       , bad_rule : _ <- get_bad_rules lhs_id
-      = diagnosticDs (WarnReasonWithFlag Opt_WarnInlineRuleShadowing)
+      = diagnosticDs (WarningWithFlag Opt_WarnInlineRuleShadowing)
                      (vcat [ hang (text "Rule" <+> pprRuleName rule_name
                                      <+> text "may never fire")
                                   2 (text "because rule" <+> pprRuleName (ruleName bad_rule)
