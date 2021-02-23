@@ -2,6 +2,10 @@
 # See testsuite/driver/testlib.py.
 setTestOpts(no_lint)
 
+# The allocations of some tests seem to be remarkably sensitive to which Darwin
+# runner they run on (#19025). Disable them.
+fragile_on_darwin = when(opsys('darwin'), skip)
+
 test('T1969',
      [# expect_broken(12437),
       collect_compiler_residency(20),
@@ -112,7 +116,8 @@ test('T5837',
 
 test('T6048',
      [ only_ways(['optasm']),
-      collect_compiler_stats('bytes allocated',2)
+       fragile_on_darwin,
+       collect_compiler_stats('bytes allocated',2)
       ],
       compile,[''])
 
@@ -199,6 +204,7 @@ test('T12227',
 
 test('T12425',
      [ only_ways(['optasm']),
+       fragile_on_darwin,
        collect_compiler_stats('bytes allocated', 1)
      ],
      compile,
@@ -206,6 +212,7 @@ test('T12425',
 
 test('T12234',
      [ only_ways(['optasm']),
+       fragile_on_darwin,
        collect_compiler_stats('bytes allocated', 2),
      ],
      compile,
@@ -221,6 +228,7 @@ test('T12545',
 
 test('T13035',
      [ only_ways(['normal']),
+       fragile_on_darwin,
        collect_compiler_stats('bytes allocated', 1),
      ],
      compile,
@@ -246,6 +254,7 @@ test('T12707',
 # to avoid spurious errors.
 test('T12150',
      [ only_ways(['optasm']),
+       fragile_on_darwin,
        collect_compiler_stats('bytes allocated', 2)
      ],
     compile,
@@ -407,6 +416,7 @@ test ('T18140',
       ['-v0 -O'])
 test('T10421',
     [ only_ways(['normal']),
+       fragile_on_darwin,
       collect_compiler_stats('bytes allocated', 1)
     ],
     multimod_compile,
@@ -435,7 +445,9 @@ test ('T18223',
       compile,
       ['-v0 -O'])
 test ('T18923',
-      [ collect_compiler_stats('bytes allocated',2) ],
+      [ collect_compiler_stats('bytes allocated',2),
+        fragile_on_darwin,
+      ],
       compile,
       ['-v0 -O'])
 test ('T16577',
