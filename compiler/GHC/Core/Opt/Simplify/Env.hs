@@ -755,7 +755,7 @@ See also Note [Scaling join point arguments].
 -}
 
 simplBinders :: SimplEnv -> [InBndr] -> SimplM (SimplEnv, [OutBndr])
-simplBinders  env bndrs = mapAccumLM simplBinder  env bndrs
+simplBinders  !env bndrs = mapAccumLM simplBinder  env bndrs
 
 -------------
 simplBinder :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
@@ -764,7 +764,7 @@ simplBinder :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
 -- Return with IdInfo already substituted, but (fragile) occurrence info zapped
 -- The substitution is extended only if the variable is cloned, because
 -- we *don't* need to use it to track occurrence info.
-simplBinder env bndr
+simplBinder !env bndr
   | isTyVar bndr  = do  { let (env', tv) = substTyVarBndr env bndr
                         ; seqTyVar tv `seq` return (env', tv) }
   | otherwise     = do  { let (env', id) = substIdBndr env bndr
