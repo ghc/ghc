@@ -479,13 +479,13 @@ warnRedundantConstraints ctxt env info ev_vars
                     -- to the error context, which is a bit tiresome
    addErrCtxt (text "In" <+> ppr info) $
    do { env <- getLclEnv
-      ; msg <- mkErrorReport (WarningWithFlag Opt_WarnRedundantConstraints) ctxt env (important doc)
+      ; msg <- mkErrorReport SevWarning (WarningWithFlag Opt_WarnRedundantConstraints) ctxt env (important doc)
       ; reportDiagnostic msg }
 
  | otherwise  -- But for InstSkol there already *is* a surrounding
               -- "In the instance declaration for Eq [a]" context
               -- and we don't want to say it twice. Seems a bit ad-hoc
- = do { msg <- mkErrorReport (WarningWithFlag Opt_WarnRedundantConstraints) ctxt env (important doc)
+ = do { msg <- mkErrorReport SevWarning (WarningWithFlag Opt_WarnRedundantConstraints) ctxt env (important doc)
       ; reportDiagnostic msg }
  where
    doc = text "Redundant constraint" <> plural redundant_evs <> colon
@@ -505,7 +505,7 @@ warnRedundantConstraints ctxt env info ev_vars
 
 reportBadTelescope :: ReportErrCtxt -> TcLclEnv -> SkolemInfo -> [TcTyVar] -> TcM ()
 reportBadTelescope ctxt env (ForAllSkol telescope) skols
-  = do { msg <- mkErrorReport ErrorWithoutFlag ctxt env (important doc)
+  = do { msg <- mkErrorReport SevError ErrorWithoutFlag ctxt env (important doc)
        ; reportDiagnostic msg }
   where
     doc = hang (text "These kind and type variables:" <+> telescope $$
@@ -977,16 +977,17 @@ pprWithArising (ct:cts)
 
 mkErrorMsgFromCt :: ReportErrCtxt -> Ct -> Report -> TcM (MsgEnvelope DiagnosticMessage)
 mkErrorMsgFromCt ctxt ct report
-  = mkErrorReport ErrorWithoutFlag ctxt (ctLocEnv (ctLoc ct)) report
+  = mkErrorReport SevError ErrorWithoutFlag ctxt (ctLocEnv (ctLoc ct)) report
 
-mkErrorReport :: DiagnosticReason
+mkErrorReport :: Severity
+              -> DiagnosticReason
               -> ReportErrCtxt
               -> TcLclEnv
               -> Report
               -> TcM (MsgEnvelope DiagnosticMessage)
-mkErrorReport rea ctxt tcl_env (Report important relevant_bindings valid_subs)
+mkErrorReport sev rea ctxt tcl_env (Report important relevant_bindings valid_subs)
   = do { context <- mkErrInfo (cec_tidy ctxt) (tcl_ctxt tcl_env)
-       ; mkDecoratedSDocAt rea
+       ; mkDecoratedSDocAt sev rea
                            (RealSrcSpan (tcl_loc tcl_env) Nothing)
                            (vcat important)
                            context
@@ -1130,11 +1131,10 @@ mkHoleError _tidy_simples ctxt hole@(Hole { hole_occ = occ
        ; curr_mod <- getModule
        ; hpt <- getHpt
        ; let mk_err (sev, rea) = do
-               err <- mkDecoratedSDocAt rea (RealSrcSpan (tcl_loc lcl_env) Nothing)
-                                        out_of_scope_msg O.empty
-                                        (unknownNameSuggestions dflags hpt curr_mod rdr_env
-                                        (tcl_rdr lcl_env) imp_info (mkRdrUnqual occ))
-               pure $ reclassify sev rea err
+               mkDecoratedSDocAt sev rea (RealSrcSpan (tcl_loc lcl_env) Nothing)
+                                 out_of_scope_msg O.empty
+                                 (unknownNameSuggestions dflags hpt curr_mod rdr_env
+                                 (tcl_rdr lcl_env) imp_info (mkRdrUnqual occ))
 
        ; maybeAddDeferredBindings ctxt hole mk_err
        ; whenNotDeferring (cec_out_of_scope_holes ctxt) mk_err
@@ -1170,12 +1170,11 @@ mkHoleError tidy_simples ctxt hole@(Hole { hole_occ = occ
                             then validHoleFits ctxt tidy_simples hole
                             else return (ctxt, empty)
 
-       ; let mk_err (sev, rea) = do
-               err <- mkErrorReport rea ctxt lcl_env $
+       ; let mk_err (sev, rea) =
+               mkErrorReport sev rea ctxt lcl_env $
                                     important hole_msg `mappend`
                                     mk_relevant_bindings (binds_msg $$ constraints_msg) `mappend`
                                     valid_hole_fits sub_msg
-               pure $ reclassify sev rea err
 
        ; maybeAddDeferredBindings ctxt hole mk_err
        ; case sort of
@@ -3048,8 +3047,8 @@ reclassify :: Severity
            -> MsgEnvelope DiagnosticMessage
            -> MsgEnvelope DiagnosticMessage
 reclassify sev rea msg = (set_reason rea msg) { errMsgSeverity  = sev }
-
-set_reason :: DiagnosticReason
-           -> MsgEnvelope DiagnosticMessage
-           -> MsgEnvelope DiagnosticMessage
-set_reason rea msg = msg { errMsgDiagnostic = (errMsgDiagnostic msg) { diagReason = rea } }
+  where
+    set_reason :: DiagnosticReason
+               -> MsgEnvelope DiagnosticMessage
+               -> MsgEnvelope DiagnosticMessage
+    set_reason rea msg = msg { errMsgDiagnostic = (errMsgDiagnostic msg) { diagReason = rea } }
