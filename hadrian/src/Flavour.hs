@@ -156,12 +156,11 @@ enableDebugInfo = addArgs $ notStage0 ? mconcat
 -- | Enable the ticky-ticky profiler in stage2 GHC
 enableTickyGhc :: Flavour -> Flavour
 enableTickyGhc =
-    addArgs $ foldMap enableTickyFor [ghc, compiler, base]
-  where
-    enableTickyFor pkg = stage1 ? package pkg ? mconcat
+    addArgs $ stage1 ? mconcat
       [ builder (Ghc CompileHs) ? ticky
       , builder (Ghc LinkHs) ? ticky
       ]
+  where
     ticky = mconcat
       [ arg "-ticky"
       , arg "-ticky-allocd"
