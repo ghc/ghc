@@ -1,3 +1,5 @@
+{-# LANGUAGE TupleSections #-}
+
 module Settings (
     getArgs, getLibraryWays, getRtsWays, flavour, knownPackages,
     findPackageByName, unsafeFindPackageByName, unsafeFindPackageByPath,
@@ -68,7 +70,10 @@ flavour = do
     flavourName <- fromMaybe userDefaultFlavour <$> cmdFlavour
     kvs <- userSetting ([] :: [KeyVal])
     let flavours = hadrianFlavours ++ userFlavours
-        (_settingErrs, tweak) = applySettings kvs
+        (settingErrs, tweak) = applySettings kvs
+
+    when (not $ null settingErrs) $ fail
+      $ "failed to apply key-value settings:" ++ unlines (map (" - " ++) settingErrs)
 
     case parseFlavour flavours flavourTransformers flavourName of
       Left err -> fail err
@@ -190,7 +195,7 @@ applySettings kvs = case partitionEithers (map applySetting kvs) of
 applySetting :: KeyVal -> Either SettingError (Flavour -> Flavour)
 applySetting (KeyVal ks op v) = case runSettingsM ks builderPredicate of
   Left err -> throwError $
-      "error while setting " ++ show ks ++ ": " ++ err
+      "error while setting `" ++ intercalate "`." ks ++ ": " ++ err
   Right pred -> Right $ \flav -> flav
     { args = update (args flav) pred }
 
@@ -229,10 +234,12 @@ builderPredicate :: SettingsM Predicate
 builderPredicate = builderSetting <&> (\(wstg, wpkg, builderMode) ->
   wildcard (pure True) stage wstg <&&>
   wildcard (pure True) package wpkg <&&>
-  (case builderMode of
-     BM_Ghc ghcMode -> wildcard (builder Ghc) (builder . Ghc) ghcMode
-     BM_Cc  ccMode  -> wildcard (builder Cc) (builder . Cc) ccMode
-     BM_CabalConfigure -> builder (Cabal Setup) )
+    (case builderMode of
+       BM_Ghc ghcMode -> wildcard (builder Ghc) (builder . Ghc) ghcMode
+       BM_Cc  ccMode  -> wildcard (builder Cc) (builder . Cc) ccMode
+       BM_CabalConfigure -> builder (Cabal Setup)
+       BM_RunTest     -> builder RunTest
+    )
   )
 
   where (<&&>) = liftA2 (&&)
@@ -241,6 +248,7 @@ builderPredicate = builderSetting <&> (\(wstg, wpkg, builderMode) ->
 data BuilderMode = BM_Ghc (Wildcard GhcMode)
                  | BM_Cc  (Wildcard CcMode)
                  | BM_CabalConfigure
+                 | BM_RunTest
 
 -- | Interpretation-agnostic description of the builder settings
 --   supported by Hadrian.
@@ -250,6 +258,7 @@ data BuilderMode = BM_Ghc (Wildcard GhcMode)
 --   > (<stage> or *).(<package name> or *).ghc.(<ghc mode> or *).opts
 --   > (<stage> or *).(<package name> or *).cc.(<cc mode> or *).opts
 --   > (<stage> or *).(<package name> or *).cabal.configure.opts
+--   > runtest.opts
 --
 --   where:
 --     - @<stage>@ is one of @stage0@, @stage1@, @stage2@ or @stage3@;
@@ -269,15 +278,19 @@ data BuilderMode = BM_Ghc (Wildcard GhcMode)
 --       appropriate spot.
 builderSetting :: Match f
                => f (Wildcard Stage, Wildcard Package, BuilderMode)
-builderSetting = (,,)
-             <$> wild stages
-             <*> wild pkgs
-             <*> matchOneOf
-                   [ str "ghc" *> fmap BM_Ghc (wild ghcBuilder) <* str "opts"
-                   , str "cc" *> fmap BM_Cc (wild ccBuilder) <* str "opts"
-                   , BM_CabalConfigure <$ str "cabal" <* str "configure" <* str "opts"
-                   ]
-
+builderSetting =
+    matchOneOf
+    [ (,,)
+       <$> wild stages
+       <*> wild pkgs
+       <*> matchOneOf
+             [ str "ghc" *> fmap BM_Ghc (wild ghcBuilder) <* str "opts"
+             , str "cc" *> fmap BM_Cc (wild ccBuilder) <* str "opts"
+             , BM_CabalConfigure <$ str "cabal" <* str "configure" <* str "opts"
+             ]
+    , (Wildcard, Wildcard, BM_RunTest)
+      <$ str "runtest" <* str "opts"
+    ]
   where ghcBuilder =
           [ ("c", CompileCWithGhc)
           , ("cpp", CompileCppWithGhc)

@@ -31,6 +31,9 @@ class TestConfig:
         self.run_only_some_tests = False
         self.only = set()
 
+        # Don't fail on out-of-tolerance stat failures
+        self.ignore_perf_failures = False
+
         # Accept new output which differs from the sample?
         self.accept = False
         self.accept_platform = False

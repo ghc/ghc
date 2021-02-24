@@ -470,6 +470,8 @@ validate-x86_64-darwin:
     CONFIGURE_ARGS: "--with-intree-gmp"
     TEST_ENV: "x86_64-darwin"
     BUILD_FLAVOUR: "validate"
+    # Due to #19025
+    TEST_ARGS: "--ignore-perf-failures"
   after_script:
     - cp -Rf $HOME/.cabal cabal-cache
     - .gitlab/ci.sh clean
@@ -495,6 +497,8 @@ validate-x86_64-darwin:
     LANG: "en_US.UTF-8"
     CONFIGURE_ARGS: --with-intree-gmp
     TEST_ENV: "x86_64-darwin-hadrian"
+    # Due to #19025
+    TEST_ARGS: "--ignore-perf-failures"
     BIN_DIST_NAME: "ghc-x86_64-apple-darwin"
     BUILD_FLAVOUR: "validate"
   script:

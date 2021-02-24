@@ -411,6 +411,9 @@ the right names for them:
   * `cabal.configure.opts` refers to Cabal configure command line. Note that
     package flags can be given by adding `--flags=...` arguments.
 
+  * `runtest.opts` defines extra arguments passed to `runtest.py` when
+    invoked via the `hadrian test` target.
+
 - using a wildcard (`*`) ranges over all possible values for a given "slot";
 - `=` entirely overrides the arguments for a given builder in a given context,
   with the value specified on the right hand side of `=`, while `+=` merely
