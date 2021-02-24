@@ -70,7 +70,10 @@ flavour = do
     flavourName <- fromMaybe userDefaultFlavour <$> cmdFlavour
     kvs <- userSetting ([] :: [KeyVal])
     let flavours = hadrianFlavours ++ userFlavours
-        (_settingErrs, tweak) = applySettings kvs
+        (settingErrs, tweak) = applySettings kvs
+
+    when (not $ null settingErrs) $ fail
+      $ "failed to apply key-value settings:" ++ unlines (map (" - " ++) settingErrs)
 
     case parseFlavour flavours flavourTransformers flavourName of
       Left err -> fail err
@@ -192,7 +195,7 @@ applySettings kvs = case partitionEithers (map applySetting kvs) of
 applySetting :: KeyVal -> Either SettingError (Flavour -> Flavour)
 applySetting (KeyVal ks op v) = case runSettingsM ks builderPredicate of
   Left err -> throwError $
-      "error while setting " ++ show ks ++ ": " ++ err
+      "error while setting `" ++ intercalate "`." ks ++ ": " ++ err
   Right pred -> Right $ \flav -> flav
     { args = update (args flav) pred }
 
