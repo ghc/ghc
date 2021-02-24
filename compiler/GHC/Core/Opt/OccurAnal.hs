@@ -840,9 +840,7 @@ occAnalRec env lvl (CyclicSCC details_s) (body_uds, binds)
   = (body_uds, binds)                   -- See Note [Dead code]
 
   | otherwise   -- At this point we always build a single Rec
-  = -- pprTrace "occAnalRec" (vcat
-    --   [ text "weak_fvs" <+> ppr weak_fvs
-    --   , text "lb nodes" <+> ppr loop_breaker_nodes])
+  = -- pprTrace "occAnalRec" (ppr loop_breaker_nodes)
     (final_uds, Rec pairs : binds)
 
   where
@@ -1341,17 +1339,18 @@ makeNode env imp_rule_edges bndr_set (bndr, rhs)
                  , nd_rhs_bndrs       = bndrs'
                  , nd_uds             = all_uds
                  , nd_inl             = inl_fvs
-                 , nd_simple          = not has_stable_unf && null rules_w_uds
+                 , nd_simple          = null rules_w_uds
                  , nd_active_rule_fvs = active_rule_fvs
                  , nd_score           = pprPanic "makeNodeDetails" (ppr bndr) }
 
     bndr' = bndr `setIdUnfolding`      unf'
                  `setIdSpecialisation` mkRuleInfo rules'
 
-    all_uds = rhs_uds `andUDs` unf_uds `andUDs` rule_uds
+    inl_uds = rhs_uds `andUDs` unf_uds
+    all_uds = inl_uds `andUDs` rule_uds
                    -- Note [Rules are extra RHSs]
                    -- Note [Rule dependency info]
-    node_fvs   = udFreeVars bndr_set all_uds
+    node_fvs = udFreeVars bndr_set all_uds
 
     -- Get join point info from the *current* decision
     -- We don't know what the new decision will be!
@@ -1374,10 +1373,10 @@ makeNode env imp_rule_edges bndr_set (bndr, rhs)
     -- See Note [Unfoldings and join points]
     unf = realIdUnfolding bndr -- realIdUnfolding: Ignore loop-breaker-ness
                                -- here because that is what we are setting!
-    has_stable_unf = isStableUnfolding unf
+--    has_stable_unf = isStableUnfolding unf
     (unf_uds, unf') = occAnalUnfolding rhs_env Recursive mb_join_arity unf
-    inl_uds | has_stable_unf = unf_uds
-            | otherwise      = rhs_uds
+--    inl_uds | has_stable_unf = unf_uds
+--            | otherwise      = rhs_uds
     inl_fvs = udFreeVars bndr_set inl_uds
     -- inl_fvs: the vars that would become free if the function was inlined;
     -- usually that means the RHS, unless the unfolding is a stable one.

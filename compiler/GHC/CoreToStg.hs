@@ -949,7 +949,8 @@ myCollectArgs expr
   where
     go (Var v)          as ts = (v, as, ts)
     go (App f a)        as ts = go f (a:as) ts
-    go (Tick t e)       as ts = ASSERT( all isTypeArg as )
+    go (Tick t e)       as ts = ASSERT2( not (tickishIsCode t) || all isTypeArg as
+                                       , ppr e $$ ppr as $$ ppr ts )
                                 go e as (t:ts) -- ticks can appear in type apps
     go (Cast e _)       as ts = go e as ts
     go (Lam b e)        as ts

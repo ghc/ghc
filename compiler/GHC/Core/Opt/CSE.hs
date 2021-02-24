@@ -389,8 +389,8 @@ cse_bind toplevel env (in_id, in_rhs) out_id
   | otherwise
   = (env', (out_id'', out_rhs))
   where
-    (env', out_id') = addBinding env in_id out_id out_rhs
-    (cse_done, out_rhs) = try_for_cse env in_rhs
+    (env', out_id') = addBinding env in_id out_id out_rhs cse_done
+    (cse_done, out_rhs)  = try_for_cse env in_rhs
     out_id'' | cse_done  = delayInlining toplevel out_id'
              | otherwise = out_id'
 
@@ -409,16 +409,18 @@ delayInlining top_lvl bndr
   | otherwise
   = bndr
 
-addBinding :: CSEnv                      -- Includes InId->OutId cloning
-           -> InVar                      -- Could be a let-bound type
-           -> OutId -> OutExpr           -- Processed binding
-           -> (CSEnv, OutId)             -- Final env, final bndr
+addBinding :: CSEnv            -- Includes InId->OutId cloning
+           -> InVar            -- Could be a let-bound type
+           -> OutId -> OutExpr -- Processed binding
+           -> Bool             -- True <=> RHS was CSE'd and is a variable
+                               --          or maybe (Tick t variable)
+           -> (CSEnv, OutId)   -- Final env, final bndr
 -- Extend the CSE env with a mapping [rhs -> out-id]
 -- unless we can instead just substitute [in-id -> rhs]
 --
 -- It's possible for the binder to be a type variable (see
 -- Note [Type-let] in GHC.Core), in which case we can just substitute.
-addBinding env in_id out_id rhs'
+addBinding env in_id out_id rhs' cse_done
   | not (isId in_id) = (extendCSSubst env in_id rhs',     out_id)
   | noCSE in_id      = (env,                              out_id)
   | use_subst        = (extendCSSubst env in_id rhs',     out_id)
@@ -438,9 +440,9 @@ addBinding env in_id out_id rhs'
 
     -- Should we use SUBSTITUTE or EXTEND?
     -- See Note [CSE for bindings]
-    use_subst = case rhs' of
-                   Var {} -> True
-                   _      -> False
+    use_subst | cse_done       = True
+              | Var {} <- rhs' = True
+              | otherwise      = False
 
 -- | Given a binder `let x = e`, this function
 -- determines whether we should add `e -> x` to the cs_map
@@ -603,14 +605,14 @@ cseCase env scrut bndr ty alts
     combineAlts alt_env (map cse_alt alts)
   where
     ty' = substTy (csEnvSubst env) ty
-    scrut1 = tryForCSE env scrut
+    (cse_done, scrut1) = try_for_cse env scrut
 
     bndr1 = zapIdOccInfo bndr
       -- Zapping the OccInfo is needed because the extendCSEnv
       -- in cse_alt may mean that a dead case binder
       -- becomes alive, and Lint rejects that
     (env1, bndr2)    = addBinder env bndr1
-    (alt_env, bndr3) = addBinding env1 bndr bndr2 scrut1
+    (alt_env, bndr3) = addBinding env1 bndr bndr2 scrut1 cse_done
          -- addBinding: see Note [CSE for case expressions]
 
     con_target :: OutExpr
