@@ -44,6 +44,7 @@ Environment variables affecting both build systems:
 
   CROSS_TARGET      Triple of cross-compilation target.
   VERBOSE           Set to non-empty for verbose build output
+  TEST_ARGS         Arguments passed to runtest.py
   MSYSTEM           (Windows-only) Which platform to build form (MINGW64 or MINGW32).
 
 Environment variables determining build configuration of Make system:
@@ -443,7 +444,8 @@ function test_make() {
   run "$MAKE" test_bindist TEST_PREP=YES
   run "$MAKE" V=0 test \
     THREADS="$cores" \
-    JUNIT_FILE=../../junit.xml
+    JUNIT_FILE=../../junit.xml \
+    EXTRA_RUNTEST_OPTS="$RUNTEST_ARGS"
 }
 
 function build_hadrian() {
@@ -470,7 +472,8 @@ function test_hadrian() {
   run_hadrian \
     test \
     --summary-junit=./junit.xml \
-    --test-compiler="$TOP"/_build/install/bin/ghc
+    --test-compiler="$TOP"/_build/install/bin/ghc \
+    "runtest.opts+=$RUNTEST_ARGS"
 }
 
 function cabal_test() {
