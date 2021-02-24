@@ -1,1 +1,2 @@
-read = (_t1::Read a => String -> a)
+read = (_t1::forall a. Read a => String -> a)
+_t1 :: Read a => String -> a
