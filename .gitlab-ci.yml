@@ -455,8 +455,7 @@ release-x86_64-freebsd:
 
 validate-x86_64-darwin:
   extends: .validate
-  needs: [validate-x86_64-linux-deb9-hadrian]
-  stage: full-build
+  stage: quick-build
   tags:
     - x86_64-darwin
   variables:
