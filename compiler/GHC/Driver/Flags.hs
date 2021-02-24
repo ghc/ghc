@@ -112,6 +112,7 @@ data DumpFlag
    | Opt_D_dump_json
    | Opt_D_ppr_debug
    | Opt_D_no_debug_output
+   | Opt_D_dump_faststrings
    deriving (Eq, Show, Enum)
 
 -- | Enumerates the simple on-or-off dynamic flags

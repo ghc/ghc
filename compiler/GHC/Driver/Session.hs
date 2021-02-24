@@ -2522,6 +2522,9 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "dno-debug-output"
         (setDumpFlag Opt_D_no_debug_output)
 
+  , make_ord_flag defGhcFlag "ddump-faststrings"
+        (setDumpFlag Opt_D_dump_faststrings)
+
         ------ Machine dependent (-m<blah>) stuff ---------------------------
 
   , make_ord_flag defGhcFlag "msse"         (noArg (\d ->

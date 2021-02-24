@@ -68,6 +68,13 @@ Dumping out compiler intermediate structures
 
     Show statistics on the usage of fast strings by the compiler.
 
+.. ghc-flag:: -ddump-faststrings
+    :shortdesc: Dump the whole FastString table when finished
+    :type: dynamic
+
+    Dump the whole FastString table when finished. Consider using
+    :ghc-flag:`-ddump-file-prefix=⟨str⟩` to dump it into a file.
+
 .. ghc-flag:: -dppr-debug
     :shortdesc: Turn on debug printing (more verbose)
     :type: dynamic
