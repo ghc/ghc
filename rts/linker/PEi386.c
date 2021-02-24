@@ -1836,7 +1836,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
    /* ToDo: should be variable-sized?  But is at least safe in the
       sense of buffer-overrun-proof. */
    uint8_t symbol[1000];
-   /* debugBelch("resolving for %s\n", oc->fileName); */
+    /* debugBelch("resolving for %"PATH_FMT "\n", oc->fileName); */
 
    /* Such libraries have been partially freed and can't be resolved.  */
    if (oc->status == OBJECT_DONT_RESOLVE)
