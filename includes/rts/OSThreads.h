@@ -51,8 +51,8 @@ typedef pthread_key_t   ThreadLocalKey;
   }
 
 // Returns zero if the lock was acquired.
-EXTERN_INLINE int TRY_ACQUIRE_LOCK(pthread_mutex_t *mutex);
-EXTERN_INLINE int TRY_ACQUIRE_LOCK(pthread_mutex_t *mutex)
+EXTERN_INLINE int OS_TRY_ACQUIRE_LOCK(pthread_mutex_t *mutex);
+EXTERN_INLINE int OS_TRY_ACQUIRE_LOCK(pthread_mutex_t *mutex)
 {
     LOCK_DEBUG_BELCH("TRY_ACQUIRE_LOCK", mutex);
     return pthread_mutex_trylock(mutex);
@@ -133,7 +133,7 @@ typedef SRWLOCK Mutex;
 #else
 
 #define OS_ACQUIRE_LOCK(mutex)      AcquireSRWLockExclusive(mutex)
-#define TRY_ACQUIRE_LOCK(mutex)  (TryAcquireSRWLockExclusive(mutex) == 0)
+#define OS_TRY_ACQUIRE_LOCK(mutex)  (TryAcquireSRWLockExclusive(mutex) == 0)
 #define OS_RELEASE_LOCK(mutex)      ReleaseSRWLockExclusive(mutex)
 #define OS_INIT_LOCK(mutex)         InitializeSRWLock(mutex)
 #define OS_CLOSE_LOCK(mutex)
@@ -200,12 +200,14 @@ void releaseThreadNode (void);
 #if defined(THREADED_RTS)
 
 #define ACQUIRE_LOCK(l) OS_ACQUIRE_LOCK(l)
+#define TRY_ACQUIRE_LOCK(l) OS_TRY_ACQUIRE_LOCK(l)
 #define RELEASE_LOCK(l) OS_RELEASE_LOCK(l)
 #define ASSERT_LOCK_HELD(l) OS_ASSERT_LOCK_HELD(l)
 
 #else
 
 #define ACQUIRE_LOCK(l)
+#define TRY_ACQUIRE_LOCK(l) 0
 #define RELEASE_LOCK(l)
 #define ASSERT_LOCK_HELD(l)
 
