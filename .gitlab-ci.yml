@@ -478,11 +478,9 @@ release-x86_64-freebsd:
 
 validate-x86_64-darwin:
   extends: .validate
-  needs: [validate-x86_64-linux-deb9-hadrian]
   stage: full-build
   tags:
-    - x86_64-darwin
-    - m1
+    - x86_64-darwin-m1
 
   # for now make this non mandatory to pass.
   allow_failure: true
@@ -521,13 +519,14 @@ validate-x86_64-darwin:
     set -Eeuo pipefail
     function runInNixShell() {
       nix-shell .gitlab/shell.nix \
-        -I nixpkgs=https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz \
+        -I nixpkgs=https://github.com/angerman/nixpkgs/archive/75f7281738b.tar.gz \
         --argstr system "x86_64-darwin" \
         --pure \
         --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR \
         --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --keep PROJECT_DIR \
         --keep CI_PROJECT_DIR --keep MAKE_ARGS \
         --keep LANG --keep CONFIGURE_ARGS \
+        --keep MACOSX_DEPLOYMENT_TARGET --keep ac_cv_func_clock_gettime \
         --run "$1"
     }
     # fix up config.sub in libraries for the time.
@@ -551,8 +550,7 @@ validate-aarch64-darwin:
   extends: .validate
   stage: full-build
   tags:
-    - aarch64-darwin
-    - m1
+    - aarch64-darwin-m1
 
   # for now make this non mandatory to pass.
   allow_failure: true
@@ -579,7 +577,7 @@ validate-aarch64-darwin:
     set -Eeuo pipefail
     function runInNixShell() {
       nix-shell .gitlab/shell.nix \
-        -I nixpkgs=https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz \
+        -I nixpkgs=https://github.com/angerman/nixpkgs/archive/75f7281738b.tar.gz \
         --argstr system "aarch64-darwin" \
         --pure \
         --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR \
