@@ -1539,7 +1539,7 @@ def check_stats(name: TestName,
             # If any metric fails then the test fails.
             # Note, the remaining metrics are still run so that
             # a complete list of changes can be presented to the user.
-            if metric_result.passFail == 'fail':
+            if metric_result.passFail == 'fail' and not config.ignore_perf_failures:
                 result = metric_result
 
     return result
