@@ -76,6 +76,7 @@ parser.add_argument("--perf-baseline", type=GitRef, metavar='COMMIT', help="Base
 parser.add_argument("--test-package-db", dest="test_package_db", action="append", help="Package db providing optional packages used by the testsuite.")
 perf_group.add_argument("--skip-perf-tests", action="store_true", help="skip performance tests")
 perf_group.add_argument("--only-perf-tests", action="store_true", help="Only do performance tests")
+perf_group.add_argument("--ignore-perf-failures", action="store_true", help="Don't fail due to out-of-tolerance perf tests")
 
 args = parser.parse_args()
 
@@ -151,6 +152,7 @@ if args.verbose is not None:
 forceSkipPerfTests = not hasMetricsFile and not inside_git_repo()
 config.skip_perf_tests = args.skip_perf_tests or forceSkipPerfTests
 config.only_perf_tests = args.only_perf_tests
+config.ignore_perf_failures = args.ignore_perf_failures
 
 if args.test_env:
     config.test_env = args.test_env
