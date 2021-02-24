@@ -448,7 +448,7 @@ validate-aarch64-darwin:
     set -Eeuo pipefail
     function runInNixShell() {
       nix-shell .gitlab/shell.nix \
-        -I nixpkgs=https://github.com/angerman/nixpkgs/archive/257cb120334.tar.gz \
+        -I nixpkgs=https://github.com/angerman/nixpkgs/archive/75f7281738b.tar.gz \
         --argstr system "x86_64-darwin" \
         --pure \
         --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR \
