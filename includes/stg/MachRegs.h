@@ -717,7 +717,13 @@ the stack. See Note [Overlapping global registers] for implications.
 #endif
 
 #if !defined(MAX_REAL_FLOAT_REG)
-#  if   defined(REG_F4)
+#  if   defined(REG_F7)
+#  error Please manually define MAX_REAL_FLOAT_REG for this architecture
+#  elif defined(REG_F6)
+#  define MAX_REAL_FLOAT_REG 6
+#  elif defined(REG_F5)
+#  define MAX_REAL_FLOAT_REG 5
+#  elif defined(REG_F4)
 #  define MAX_REAL_FLOAT_REG 4
 #  elif defined(REG_F3)
 #  define MAX_REAL_FLOAT_REG 3
@@ -731,7 +737,17 @@ the stack. See Note [Overlapping global registers] for implications.
 #endif
 
 #if !defined(MAX_REAL_DOUBLE_REG)
-#  if   defined(REG_D2)
+#  if   defined(REG_D7)
+#  error Please manually define MAX_REAL_DOUBLE_REG for this architecture
+#  elif defined(REG_D6)
+#  define MAX_REAL_DOUBLE_REG 6
+#  elif defined(REG_D5)
+#  define MAX_REAL_DOUBLE_REG 5
+#  elif defined(REG_D4)
+#  define MAX_REAL_DOUBLE_REG 4
+#  elif defined(REG_D3)
+#  define MAX_REAL_DOUBLE_REG 3
+#  elif defined(REG_D2)
 #  define MAX_REAL_DOUBLE_REG 2
 #  elif defined(REG_D1)
 #  define MAX_REAL_DOUBLE_REG 1
