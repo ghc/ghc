@@ -44,7 +44,7 @@ Environment variables affecting both build systems:
 
   CROSS_TARGET      Triple of cross-compilation target.
   VERBOSE           Set to non-empty for verbose build output
-  TEST_ARGS         Arguments passed to runtest.py
+  RUNTEST_ARGS      Arguments passed to runtest.py
   MSYSTEM           (Windows-only) Which platform to build form (MINGW64 or MINGW32).
 
 Environment variables determining build configuration of Make system:
