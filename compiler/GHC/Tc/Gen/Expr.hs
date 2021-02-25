@@ -1367,7 +1367,7 @@ checkMissingFields con_like rbinds arg_tys
     else do
         warn <- woptM Opt_WarnMissingFields
         when (warn && notNull field_strs && null field_labels)
-             (warnTc (Reason Opt_WarnMissingFields) True
+             (warnTc (WarnReason Opt_WarnMissingFields) True
                  (missingFields con_like []))
 
   | otherwise = do              -- A record
@@ -1383,7 +1383,7 @@ checkMissingFields con_like rbinds arg_tys
         -- It is not an error (though we may want) to omit a
         -- lazy field, because we can always use
         -- (error "Missing field f") instead.
-        warnTc (Reason Opt_WarnMissingFields) True
+        warnTc (WarnReason Opt_WarnMissingFields) True
              (missingFields con_like fs)
 
   where

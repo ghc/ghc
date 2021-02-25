@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE LambdaCase #-}
 
 -------------------------------------------------------------------------------
 --
@@ -21,7 +22,7 @@ module GHC.Driver.Session (
         -- * Dynamic flags and associated configuration types
         DumpFlag(..),
         GeneralFlag(..),
-        WarningFlag(..), WarnReason(..),
+        WarningFlag(..), WarnReason(..), ErrReason(..),
         Language(..),
         PlatformConstants(..),
         FatalMessager, FlushOut(..), FlushErr(..),

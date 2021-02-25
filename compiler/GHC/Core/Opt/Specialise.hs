@@ -801,8 +801,8 @@ tryWarnMissingSpecs :: DynFlags -> [Id] -> Id -> [CallInfo] -> CoreM ()
 tryWarnMissingSpecs dflags callers fn calls_for_fn
   | wopt Opt_WarnMissedSpecs dflags
     && not (null callers)
-    && allCallersInlined                  = doWarn $ Reason Opt_WarnMissedSpecs
-  | wopt Opt_WarnAllMissedSpecs dflags    = doWarn $ Reason Opt_WarnAllMissedSpecs
+    && allCallersInlined                  = doWarn $ WarnReason Opt_WarnMissedSpecs
+  | wopt Opt_WarnAllMissedSpecs dflags    = doWarn $ WarnReason Opt_WarnAllMissedSpecs
   | otherwise                             = return ()
   where
     allCallersInlined = all (isAnyInlinePragma . idInlinePragma) callers

@@ -154,7 +154,7 @@ warnAboutIdentities dflags (Var conv_fn) type_of_conv
   , idName conv_fn `elem` conversionNames
   , Just (_, arg_ty, res_ty) <- splitFunTy_maybe type_of_conv
   , arg_ty `eqType` res_ty  -- So we are converting  ty -> ty
-  = warnDs (Reason Opt_WarnIdentities)
+  = warnDs (WarnReason Opt_WarnIdentities)
            (vcat [ text "Call of" <+> ppr conv_fn <+> dcolon <+> ppr type_of_conv
                  , nest 2 $ text "can probably be omitted"
            ])
@@ -238,7 +238,7 @@ warnAboutOverflowedLiterals dflags lit
     checkPositive :: Integer -> Name -> DsM ()
     checkPositive i tc
       = when (i < 0) $
-        warnDs (Reason Opt_WarnOverflowedLiterals)
+        warnDs (WarnReason Opt_WarnOverflowedLiterals)
                (vcat [ text "Literal" <+> integer i
                        <+> text "is negative but" <+> ppr tc
                        <+> ptext (sLit "only supports positive numbers")
@@ -246,7 +246,7 @@ warnAboutOverflowedLiterals dflags lit
 
     check i tc minB maxB
       = when (i < minB || i > maxB) $
-        warnDs (Reason Opt_WarnOverflowedLiterals)
+        warnDs (WarnReason Opt_WarnOverflowedLiterals)
                (vcat [ text "Literal" <+> integer i
                        <+> text "is out of the" <+> ppr tc <+> ptext (sLit "range")
                        <+> integer minB <> text ".." <> integer maxB
@@ -331,7 +331,7 @@ warnAboutEmptyEnumerations fam_envs dflags fromExpr mThnExpr toExpr
 
   | otherwise = return ()
   where
-    raiseWarning = warnDs (Reason Opt_WarnEmptyEnumerations) (text "Enumeration is empty")
+    raiseWarning = warnDs (WarnReason Opt_WarnEmptyEnumerations) (text "Enumeration is empty")
 
 getLHsIntegralLit :: LHsExpr GhcTc -> Maybe (Integer, Type)
 -- ^ See if the expression is an 'Integral' literal.
