@@ -1667,6 +1667,7 @@ void flushEventLog(Capability **cap USED_IF_THREADS)
     stopAllCapabilitiesWith(cap, task, SYNC_FLUSH_EVENT_LOG);
     releaseAllCapabilities(n_capabilities, cap ? *cap : NULL, task);
 #endif
+    flushLocalEventsBuf(capabilities[0]);
     flushEventLogWriter();
 }
 
