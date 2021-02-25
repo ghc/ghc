@@ -7,6 +7,8 @@
 #include <stdio.h>
 #if mingw32_HOST_OS
 #include <windows.h>
+#else
+#include <time.h> // nanosleep
 #endif
 
 void millisleep(int milliseconds);
