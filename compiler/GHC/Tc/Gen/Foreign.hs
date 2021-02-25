@@ -236,7 +236,7 @@ tcFImport :: LForeignDecl GhcRn
 tcFImport (L dloc fo@(ForeignImport { fd_name = L nloc nm, fd_sig_ty = hs_ty
                                     , fd_fi = imp_decl }))
   = setSrcSpanA dloc $ addErrCtxt (foreignDeclCtxt fo)  $
-    do { sig_ty <- tcHsSigType (ForSigCtxt nm) hs_ty
+    do { sig_ty <- hsttc_type . hsTypeTc . unLoc . sig_body . unLoc <$> tcHsSigType (ForSigCtxt nm) hs_ty
        ; (norm_co, norm_sig_ty, gres) <- normaliseFfiType sig_ty
        ; let
            -- Drop the foralls before inspecting the
@@ -384,7 +384,7 @@ tcFExport :: ForeignDecl GhcRn
 tcFExport fo@(ForeignExport { fd_name = L loc nm, fd_sig_ty = hs_ty, fd_fe = spec })
   = addErrCtxt (foreignDeclCtxt fo) $ do
 
-    sig_ty <- tcHsSigType (ForSigCtxt nm) hs_ty
+    sig_ty <- hsttc_type . hsTypeTc . unLoc . sig_body . unLoc <$> tcHsSigType (ForSigCtxt nm) hs_ty
     rhs <- tcCheckPolyExpr (nlHsVar nm) sig_ty
 
     (norm_co, norm_sig_ty, gres) <- normaliseFfiType sig_ty

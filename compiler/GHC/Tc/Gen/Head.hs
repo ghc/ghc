@@ -289,8 +289,8 @@ rebuildHsApps fun ctxt (arg : args)
   = case arg of
       EValArg { eva_arg = ValArg arg, eva_ctxt = ctxt' }
         -> rebuildHsApps (HsApp noAnn lfun arg) ctxt' args
-      ETypeArg { eva_hs_ty = hs_ty, eva_ty  = ty, eva_ctxt = ctxt' }
-        -> rebuildHsApps (HsAppType ty lfun hs_ty) ctxt' args
+      ETypeArg { eva_hs_ty = (HsWC names (L loc hs_ty)), eva_ty  = ty, eva_ctxt = ctxt' }
+        -> rebuildHsApps (HsAppType noExtField lfun . HsWC names . L loc . XHsType $ HsTypeTc ty hs_ty) ctxt' args
       EPrag ctxt' p
         -> rebuildHsApps (HsPragE noExtField p lfun) ctxt' args
       EWrap (EPar ctxt')
@@ -592,7 +592,9 @@ tcInferAmbiguousRecSelId lbl args mb_res_ty
   , EValArg { eva_arg = ValArg (L _ arg) } <- arg1
   , Just sig_ty <- obviousSig arg  -- A type sig on the arg disambiguates
   = do { sig_tc_ty <- tcHsSigWcType ExprSigCtxt sig_ty
-       ; finish_ambiguous_selector lbl sig_tc_ty }
+
+       ; finish_ambiguous_selector lbl .
+           hsttc_type . hsTypeTc . unLoc . sig_body . unLoc . hswc_body $ sig_tc_ty }
 
   | Just res_ty <- mb_res_ty
   , Just (arg_ty,_) <- tcSplitFunTy_maybe res_ty
@@ -713,33 +715,40 @@ naughtyRecordSel lbl
 *                                                                      *
 ********************************************************************* -}
 
-tcExprWithSig :: LHsExpr GhcRn -> LHsSigWcType (NoGhcTc GhcRn)
+tcExprWithSig :: LHsExpr GhcRn -> LHsSigWcType GhcRn
               -> TcM (HsExpr GhcTc, TcSigmaType)
 tcExprWithSig expr hs_ty
   = do { sig_info <- checkNoErrs $  -- Avoid error cascade
                      tcUserTypeSig loc hs_ty Nothing
-       ; (expr', poly_ty) <- tcExprSig expr sig_info
-       ; return (ExprWithTySig noExtField expr' hs_ty, poly_ty) }
+       ; (expr', poly_ty, sig_ty) <- tcExprSig expr sig_info
+       ; return (ExprWithTySig noExtField expr' sig_ty, poly_ty) }
   where
     loc = getLocA (dropWildCards hs_ty)
 
-tcExprSig :: LHsExpr GhcRn -> TcIdSigInfo -> TcM (LHsExpr GhcTc, TcType)
-tcExprSig expr (CompleteSig { sig_bndr = poly_id, sig_loc = loc })
+tcExprSig :: LHsExpr GhcRn -> (TcIdSigInfo, Maybe (LHsSigWcType GhcTc))
+          -> TcM (LHsExpr GhcTc, TcType, LHsSigWcType GhcTc)
+tcExprSig expr (sig@(CompleteSig { sig_bndr = poly_id, sig_loc = loc }), mty)
   = setSrcSpan loc $   -- Sets the location for the implication constraint
     do { let poly_ty = idType poly_id
+       ; ty <- case mty of
+          Just ty -> return ty
+          Nothing -> pprPanic "Got no HsSigWcType with CompleteSig" (ppr sig)
        ; (wrap, expr') <- tcSkolemiseScoped ExprSigCtxt poly_ty $ \rho_ty ->
                           tcCheckMonoExprNC expr rho_ty
-       ; return (mkLHsWrap wrap expr', poly_ty) }
+       ; return (mkLHsWrap wrap expr', poly_ty, ty) }
 
-tcExprSig expr sig@(PartialSig { psig_name = name, sig_loc = loc })
+tcExprSig expr (sig@(PartialSig { psig_name = name, sig_loc = loc }), _)
   = setSrcSpan loc $   -- Sets the location for the implication constraint
-    do { (tclvl, wanted, (expr', sig_inst))
+    do { (tclvl, wanted, (expr', sig_inst, mty))
              <- pushLevelAndCaptureConstraints  $
-                do { sig_inst <- tcInstSig sig
+                do { (sig_inst, ty) <- tcInstSig sig
                    ; expr' <- tcExtendNameTyVarEnv (mapSnd binderVar $ sig_inst_skols sig_inst) $
                               tcExtendNameTyVarEnv (sig_inst_wcs   sig_inst) $
                               tcCheckPolyExprNC expr (sig_inst_tau sig_inst)
-                   ; return (expr', sig_inst) }
+                   ; return (expr', sig_inst, ty) }
+       ; ty <- case mty of
+          Just ty -> return ty
+          Nothing -> pprPanic "tcInstSig returned Nothing for PartialSig" (ppr sig)
        -- See Note [Partial expression signatures]
        ; let tau = sig_inst_tau sig_inst
              infer_mode | null (sig_inst_theta sig_inst)
@@ -768,7 +777,7 @@ tcExprSig expr sig@(PartialSig { psig_name = name, sig_loc = loc })
                          <.> mkWpTyLams qtvs
                          <.> mkWpLams givens
                          <.> mkWpLet  ev_binds
-       ; return (mkLHsWrap poly_wrap expr', my_sigma) }
+       ; return (mkLHsWrap poly_wrap expr', my_sigma, ty) }
 
 
 {- Note [Partial expression signatures]

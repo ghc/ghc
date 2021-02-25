@@ -253,7 +253,7 @@ type instance XApp           (GhcPass _) = ApiAnnCO
 
 type instance XAppTypeE      GhcPs = SrcSpan -- Where the `@` lives
 type instance XAppTypeE      GhcRn = NoExtField
-type instance XAppTypeE      GhcTc = Type
+type instance XAppTypeE      GhcTc = NoExtField
 
 -- OpApp not present in GhcTc pass; see GHC.Rename.Expr
 -- Note [Handling overloaded and rebindable constructs]
@@ -661,7 +661,7 @@ ppr_infix_expr _ = Nothing
 
 ppr_apps :: (OutputableBndrId p)
          => HsExpr (GhcPass p)
-         -> [Either (LHsExpr (GhcPass p)) (LHsWcType (NoGhcTc (GhcPass p)))]
+         -> [Either (LHsExpr (GhcPass p)) (LHsWcType (GhcPass p))]
          -> SDoc
 ppr_apps (HsApp _ (L _ fun) arg)        args
   = ppr_apps fun (Left arg : args)

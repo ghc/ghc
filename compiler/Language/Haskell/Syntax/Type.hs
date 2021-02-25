@@ -23,7 +23,7 @@ module Language.Haskell.Syntax.Type (
         HsArrow(..),
         hsLinear, hsUnrestricted,
 
-        HsType(..), HsCoreTy, LHsType, HsKind, LHsKind,
+        HsType(..), HsTypeTc(..), HsCoreTy, LHsType, HsKind, LHsKind,
         HsForAllTelescope(..), HsTyVarBndr(..), LHsTyVarBndr,
         LHsQTyVars(..),
         HsOuterTyVarBndrs(..), HsOuterFamEqnTyVarBndrs, HsOuterSigTyVarBndrs,
@@ -61,6 +61,8 @@ import GHC.Prelude
 import {-# SOURCE #-} Language.Haskell.Syntax.Expr ( HsSplice )
 
 import Language.Haskell.Syntax.Extension
+
+import GHC.Hs.Extension
 
 import GHC.Types.SourceText
 import GHC.Types.Name( Name )
@@ -368,7 +370,7 @@ data HsOuterTyVarBndrs flag pass
   | HsOuterExplicit -- ^ Explicit forall, e.g.,
                     --    @f :: forall a b. a -> b -> b@
     { hso_xexplicit :: XHsOuterExplicit pass flag
-    , hso_bndrs     :: [LHsTyVarBndr flag (NoGhcTc pass)]
+    , hso_bndrs     :: [LHsTyVarBndr flag pass]
     }
   | XHsOuterTyVarBndrs !(XXHsOuterTyVarBndrs pass)
 
@@ -892,6 +894,14 @@ data HsType pass
   -- For adding new constructors via Trees that Grow
   | XHsType
       !(XXType pass)
+
+data HsTypeTc = HsTypeTc
+  { hsttc_type :: Type
+  , hsttc_rn :: HsType GhcRn
+  }
+
+instance Outputable HsTypeTc where
+  ppr (HsTypeTc p _) = ppr p
 
 -- An escape hatch for tunnelling a Core 'Type' through 'HsType'.
 -- For more details on how this works, see:

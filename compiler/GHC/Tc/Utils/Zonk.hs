@@ -131,7 +131,7 @@ hsPatType (ConPat { pat_con = lcon
                     }
                   })
                                         = conLikeResTy (unLoc lcon) tys
-hsPatType (SigPat ty _ _)               = ty
+hsPatType (SigPat _ _ (HsPS _ (L _ ty))) = hsttc_type . hsTypeTc $ ty
 hsPatType (NPat ty _ _ _)               = ty
 hsPatType (NPlusKPat ty _ _ _ _ _)      = ty
 hsPatType (XPat (CoPat _ _ ty))         = ty
@@ -841,10 +841,10 @@ zonkExpr env (HsApp x e1 e2)
        new_e2 <- zonkLExpr env e2
        return (HsApp x new_e1 new_e2)
 
-zonkExpr env (HsAppType ty e t)
+zonkExpr env (HsAppType _ e (HsWC field (L l (XHsType (HsTypeTc ty t)))))
   = do new_e <- zonkLExpr env e
        new_ty <- zonkTcTypeToTypeX env ty
-       return (HsAppType new_ty new_e t)
+       return (HsAppType noExtField new_e (HsWC field (L l (XHsType (HsTypeTc new_ty t)))))
        -- NB: the type is an HsType; can't zonk that!
 
 zonkExpr _ e@(HsRnBracketOut _ _ _)
@@ -1510,10 +1510,10 @@ zonk_pat env p@(ConPat { pat_con = L _ con
 
 zonk_pat env (LitPat x lit) = return (env, LitPat x lit)
 
-zonk_pat env (SigPat ty pat hs_ty)
+zonk_pat env (SigPat _ pat (HsPS ext (L l (XHsType (HsTypeTc ty hs_ty)))))
   = do  { ty' <- zonkTcTypeToTypeX env ty
         ; (env', pat') <- zonkPat env pat
-        ; return (env', SigPat ty' pat' hs_ty) }
+        ; return (env', SigPat noExtField pat' (HsPS ext (L l (XHsType (HsTypeTc ty' hs_ty))))) }
 
 zonk_pat env (NPat ty (L l lit) mb_neg eq_expr)
   = do  { (env1, eq_expr') <- zonkSyntaxExpr env eq_expr

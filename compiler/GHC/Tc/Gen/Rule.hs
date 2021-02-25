@@ -125,7 +125,7 @@ tcRule (HsRule { rd_ext  = ext
                             generateRuleConstraints ty_bndrs tm_bndrs lhs rhs
 
        ; let (id_bndrs, lhs', lhs_wanted
-                      , rhs', rhs_wanted, rule_ty) = stuff
+                      , rhs', rhs_wanted, rule_ty, ty_bndrs') = stuff
 
        ; traceTc "tcRule 1" (vcat [ pprFullRuleName rname
                                   , ppr lhs_wanted
@@ -174,7 +174,7 @@ tcRule (HsRule { rd_ext  = ext
        ; return $ HsRule { rd_ext = ext
                          , rd_name = rname
                          , rd_act = act
-                         , rd_tyvs = ty_bndrs -- preserved for ppr-ing
+                         , rd_tyvs = ty_bndrs' -- preserved for ppr-ing
                          , rd_tmvs = map (noLoc . RuleBndr noAnn . noLocA)
                                          (qtkvs ++ tpl_ids)
                          , rd_lhs  = mkHsDictLet lhs_binds lhs'
@@ -185,9 +185,10 @@ generateRuleConstraints :: Maybe [LHsTyVarBndr () GhcRn] -> [LRuleBndr GhcRn]
                         -> TcM ( [TcId]
                                , LHsExpr GhcTc, WantedConstraints
                                , LHsExpr GhcTc, WantedConstraints
-                               , TcType )
+                               , TcType
+                               , Maybe [LHsTyVarBndr () GhcTc])
 generateRuleConstraints ty_bndrs tm_bndrs lhs rhs
-  = do { ((tv_bndrs, id_bndrs), bndr_wanted) <- captureConstraints $
+  = do { ((ty_bndrs, tv_bndrs, id_bndrs), bndr_wanted) <- captureConstraints $
                                                 tcRuleBndrs ty_bndrs tm_bndrs
               -- bndr_wanted constraints can include wildcard hole
               -- constraints, which we should not forget about.
@@ -201,19 +202,21 @@ generateRuleConstraints ty_bndrs tm_bndrs lhs rhs
        ; (rhs',            rhs_wanted) <- captureConstraints $
                                           tcCheckMonoExpr rhs rule_ty
        ; let all_lhs_wanted = bndr_wanted `andWC` lhs_wanted
-       ; return (id_bndrs, lhs', all_lhs_wanted, rhs', rhs_wanted, rule_ty) } }
+       ; return (id_bndrs, lhs', all_lhs_wanted, rhs', rhs_wanted, rule_ty, ty_bndrs) } }
 
 -- See Note [TcLevel in type checking rules]
 tcRuleBndrs :: Maybe [LHsTyVarBndr () GhcRn] -> [LRuleBndr GhcRn]
-            -> TcM ([TcTyVar], [Id])
+            -> TcM (Maybe [LHsTyVarBndr () GhcTc], [TcTyVar], [Id])
 tcRuleBndrs (Just bndrs) xs
   = do { (tybndrs1,(tys2,tms)) <- bindExplicitTKBndrs_Skol bndrs $
                                   tcRuleTmBndrs xs
-       ; let tys1 = binderVars tybndrs1
-       ; return (tys1 ++ tys2, tms) }
+       ; let tys1 = binderVars' $ map unLoc tybndrs1
+       ; return (Just tybndrs1, tys1 ++ tys2, tms) }
 
 tcRuleBndrs Nothing xs
-  = tcRuleTmBndrs xs
+  = do { (tys, tms) <- tcRuleTmBndrs xs
+       ; return (Nothing, tys, tms)
+       }
 
 -- See Note [TcLevel in type checking rules]
 tcRuleTmBndrs :: [LRuleBndr GhcRn] -> TcM ([TcTyVar],[Id])

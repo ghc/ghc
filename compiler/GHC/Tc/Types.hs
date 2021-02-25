@@ -1491,7 +1491,6 @@ data TcIdSigInfo   -- See Note [Complete and partial type signatures]
       , sig_loc    :: SrcSpan            -- Location of the type signature
       }
 
-
 {- Note [Complete and partial type signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A type signature is partial when it contains one or more wildcards

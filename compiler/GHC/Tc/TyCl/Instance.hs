@@ -1889,30 +1889,31 @@ tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
   | Just hs_sig_ty <- hs_sig_fn sel_name
               -- There is a signature in the instance
               -- See Note [Instance method signatures]
-  = do { (sig_ty, hs_wrap)
+  = do { (ty, hs_wrap)
              <- setSrcSpan (getLocA hs_sig_ty) $
                 do { inst_sigs <- xoptM LangExt.InstanceSigs
                    ; checkTc inst_sigs (misplacedInstSig sel_name hs_sig_ty)
-                   ; sig_ty  <- tcHsSigType (FunSigCtxt sel_name False) hs_sig_ty
+                   ; sig_ty <- tcHsSigType (FunSigCtxt sel_name False) hs_sig_ty
                    ; let local_meth_ty = idType local_meth_id
+                         ty = hsttc_type . hsTypeTc . unLoc . sig_body . unLoc $ sig_ty
                          ctxt = FunSigCtxt sel_name False
                                 -- False <=> do not report redundant constraints when
                                 --           checking instance-sig <= class-meth-sig
                                 -- The instance-sig is the focus here; the class-meth-sig
                                 -- is fixed (#18036)
-                   ; hs_wrap <- addErrCtxtM (methSigCtxt sel_name sig_ty local_meth_ty) $
-                                tcSubTypeSigma ctxt sig_ty local_meth_ty
-                   ; return (sig_ty, hs_wrap) }
+                   ; hs_wrap <- addErrCtxtM (methSigCtxt sel_name ty local_meth_ty) $
+                                tcSubTypeSigma ctxt ty local_meth_ty
+                   ; return (ty, hs_wrap) }
 
        ; inner_meth_name <- newName (nameOccName sel_name)
        ; let ctxt = FunSigCtxt sel_name True
                     -- True <=> check for redundant constraints in the
                     --          user-specified instance signature
-             inner_meth_id  = mkLocalId inner_meth_name Many sig_ty
+             inner_meth_id  = mkLocalId inner_meth_name Many ty
              inner_meth_sig = CompleteSig { sig_bndr = inner_meth_id
                                           , sig_ctxt = ctxt
-                                          , sig_loc  = getLocA hs_sig_ty }
-
+                                          , sig_loc  = getLocA hs_sig_ty
+                                          }
 
        ; (tc_bind, [inner_id]) <- tcPolyCheck no_prag_fn inner_meth_sig meth_bind
 

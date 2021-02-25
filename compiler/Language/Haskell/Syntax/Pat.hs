@@ -205,7 +205,7 @@ data Pat p
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | SigPat          (XSigPat p)             -- After typechecker: Type
                     (LPat p)                -- Pattern with a type signature
-                    (HsPatSigType (NoGhcTc p)) --  Signature can bind both
+                    (HsPatSigType p)        --  Signature can bind both
                                                --  kind and type vars
 
     -- ^ Pattern with a type signature
@@ -221,7 +221,7 @@ type family ConLikeP x
 
 
 -- | Haskell Constructor Pattern Details
-type HsConPatDetails p = HsConDetails (HsPatSigType (NoGhcTc p)) (LPat p) (HsRecFields p (LPat p))
+type HsConPatDetails p = HsConDetails (HsPatSigType p) (LPat p) (HsRecFields p (LPat p))
 
 hsConPatArgs :: forall p . (UnXRec p) => HsConPatDetails p -> [LPat p]
 hsConPatArgs (PrefixCon _ ps) = ps

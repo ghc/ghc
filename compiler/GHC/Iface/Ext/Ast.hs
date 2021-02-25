@@ -802,8 +802,8 @@ class ( IsPass p
       , ToHie (Context (Located (IdGhcP p)))
       , ToHie (RFContext (Located (AmbiguousFieldOcc (GhcPass p))))
       , ToHie (RFContext (Located (FieldOcc (GhcPass p))))
-      , ToHie (TScoped (LHsWcType (GhcPass (NoGhcTcPass p))))
-      , ToHie (TScoped (LHsSigWcType (GhcPass (NoGhcTcPass p))))
+      , ToHie (TScoped (LHsWcType (GhcPass p)))
+      , ToHie (TScoped (LHsSigWcType (GhcPass p)))
       , Anno (IdGhcP p) ~ SrcSpanAnnN
       )
       => HiePass p where
@@ -1029,8 +1029,8 @@ instance HiePass p => ToHie (PScoped (LocatedA (Pat (GhcPass p)))) where
           HieRn -> []
 #endif
     where
-      contextify :: a ~ LPat (GhcPass p) => HsConDetails (HsPatSigType (NoGhcTc (GhcPass p))) a (HsRecFields (GhcPass p) a)
-                 -> HsConDetails (TScoped (HsPatSigType (NoGhcTc (GhcPass p)))) (PScoped a) (RContext (HsRecFields (GhcPass p) (PScoped a)))
+      contextify :: a ~ LPat (GhcPass p) => HsConDetails (HsPatSigType (GhcPass p)) a (HsRecFields (GhcPass p) a)
+                 -> HsConDetails (TScoped (HsPatSigType (GhcPass p))) (PScoped a) (RContext (HsRecFields (GhcPass p) (PScoped a)))
       contextify (PrefixCon tyargs args) = PrefixCon (tScopes scope argscope tyargs) (patScopes rsp scope pscope args)
         where argscope = foldr combineScopes NoScope $ map mkLScopeA args
       contextify (InfixCon a b) = InfixCon a' b'
@@ -1050,6 +1050,12 @@ instance ToHie (TScoped (HsPatSigType GhcRn)) where
       , toHie body
       ]
   -- See Note [Scoping Rules for SigPat]
+
+instance ToHie (TScoped (HsPatSigType GhcTc)) where
+  toHie (TS sc (HsPS (HsPSRn wcs tvs) body@(L span _))) = concatM $
+      [ bindingsOnly $ map (C $ TyVarBind (mkScopeA span) sc) (wcs++tvs)
+      , toHie body
+      ]
 
 instance ( ToHie (LocatedA (body (GhcPass p)))
          , HiePass p
@@ -1658,7 +1664,21 @@ instance ToHie (TScoped (HsWildCardBndrs GhcRn (LocatedA (HsSigType GhcRn)))) wh
       ]
     where span = loc a
 
+instance ToHie (TScoped (HsWildCardBndrs GhcTc (LocatedA (HsSigType GhcTc)))) where
+  toHie (TS sc (HsWC names a)) = concatM $
+      [ bindingsOnly $ map (C $ TyVarBind (mkScope span) sc) names
+      , toHie $ TS sc a
+      ]
+    where span = loc a
+
 instance ToHie (TScoped (HsWildCardBndrs GhcRn (LocatedA (HsType GhcRn)))) where
+  toHie (TS sc (HsWC names a)) = concatM $
+      [ bindingsOnly $ map (C $ TyVarBind (mkScope span) sc) names
+      , toHie a
+      ]
+    where span = loc a
+
+instance ToHie (TScoped (HsWildCardBndrs GhcTc (LocatedA (HsType GhcTc)))) where
   toHie (TS sc (HsWC names a)) = concatM $
       [ bindingsOnly $ map (C $ TyVarBind (mkScope span) sc) names
       , toHie a
@@ -1725,6 +1745,11 @@ instance ToHie (TScoped (LocatedA (HsSigType GhcRn))) where
   toHie (TS tsc (L span t@HsSig{sig_bndrs=bndrs,sig_body=body})) = concatM $ makeNodeA t span :
       [ toHie (TVS tsc (mkScopeA span) bndrs)
       , toHie body
+      ]
+
+instance ToHie (TScoped (LocatedA (HsSigType GhcTc))) where
+  toHie (TS _ (L span t@HsSig{sig_body=body})) = concatM $ makeNodeA t span :
+      [ toHie body
       ]
 
 -- Check this
@@ -1811,6 +1836,9 @@ instance ToHie (LocatedA (HsType GhcRn)) where
       HsWildCardTy _ -> []
       HsStarTy _ _ -> []
       XHsType _ -> []
+
+instance ToHie (LocatedA (HsType GhcTc)) where
+  toHie (L l t) = concatM $ [makeNode t (locA l), toHie (L l (hsttc_rn . hsTypeTc $ t))]
 
 instance (ToHie tm, ToHie ty) => ToHie (HsArg tm ty) where
   toHie (HsValArg tm) = toHie tm

@@ -1161,7 +1161,7 @@ dsHsWrapped orig_hs_expr
               go (wrap . wrap') hs_e }
     go wrap (HsConLikeOut _ (RealDataCon dc))
       = go_head wrap (dataConWrapId dc)
-    go wrap (HsAppType ty hs_e _) = go_l (wrap . (\e -> App e (Type ty))) hs_e
+    go wrap (HsAppType _ hs_e ty) = go_l (wrap . (\e -> App e . Type . hsttc_type . hsTypeTc . unLoc . hswc_body $ ty)) hs_e
     go wrap (HsPar _ hs_e)        = go_l wrap hs_e
     go wrap (HsVar _ (L _ var))   = go_head wrap var
     go wrap hs_e                  = do { e <- dsExpr hs_e; return (wrap e) }

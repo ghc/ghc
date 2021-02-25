@@ -481,7 +481,10 @@ Fortunately that's what matchExpectedFunTySigma returns anyway.
                          tcExtendNameTyVarEnv tv_binds $
                          tc_lpat (pat_ty `scaledSet` mkCheckExpType inner_ty) penv pat thing_inside
         ; pat_ty <- readExpType (scaledThing pat_ty)
-        ; return (mkHsWrapPat wrap (SigPat inner_ty pat' sig_ty) pat_ty, res) }
+        ; let
+            (L l hs_ty) = hsps_body sig_ty
+            inner_ty' = HsPS { hsps_ext = hsps_ext sig_ty, hsps_body = (L l (XHsType (HsTypeTc inner_ty hs_ty))) }
+        ; return (mkHsWrapPat wrap (SigPat noExtField pat' inner_ty') pat_ty, res) }
 
 ------------------------
 -- Lists, tuples, arrays
@@ -1223,8 +1226,9 @@ tcConArgs con_like arg_tys tenv penv con_args thing_inside = case con_args of
           -- OK to drop coercions here. These unifications are all about
           -- guiding inference based on a user-written type annotation
           -- See Note [Typechecking type applications in patterns]
-
-        ; return (PrefixCon type_args arg_pats', res) }
+        ; let tc_type_args
+                = zipWith (\a (HsPS ext (L l b))-> HsPS ext . L l . XHsType $ HsTypeTc a b) type_args' type_args
+        ; return (PrefixCon tc_type_args arg_pats', res) }
     where
       con_arity  = conLikeArity con_like
       no_of_args = length arg_pats

@@ -231,7 +231,8 @@ tcHsBootSigs binds sigs
       where
         f (L _ name)
           = do { sigma_ty <- tcHsSigWcType (FunSigCtxt name False) hs_ty
-               ; return (mkVanillaGlobal name sigma_ty) }
+               ; let ty = hsttc_type . hsTypeTc . unLoc . sig_body . unLoc . hswc_body $ sigma_ty
+               ; return (mkVanillaGlobal name ty) }
         -- Notice that we make GlobalIds, not LocalIds
     tc_boot_sig s = pprPanic "tcHsBootSigs/tc_boot_sig" (ppr s)
 
@@ -1436,7 +1437,7 @@ lookupMBI name
 -------------------
 tcLhsSigId :: LetBndrSpec -> (Name, TcIdSigInfo) -> TcM MonoBindInfo
 tcLhsSigId no_gen (name, sig)
-  = do { inst_sig <- tcInstSig sig
+  = do { inst_sig <- fst <$> tcInstSig sig
        ; mono_id <- newSigLetBndr no_gen name inst_sig
        ; return (MBI { mbi_poly_name = name
                      , mbi_sig       = Just inst_sig

@@ -163,7 +163,7 @@ tcClassSigs clas sigs def_methods
            -> TcM [TcMethInfo]
     tc_sig gen_dm_env (op_names, op_hs_ty)
       = do { traceTc "ClsSig 1" (ppr op_names)
-           ; op_ty <- tcClassSigType op_names op_hs_ty
+           ; op_ty <- hsttc_type . hsTypeTc . unLoc . sig_body . unLoc <$> tcClassSigType op_names op_hs_ty
                    -- Class tyvars already in scope
 
            ; traceTc "ClsSig 2" (ppr op_names $$ ppr op_ty)
@@ -176,9 +176,8 @@ tcClassSigs clas sigs def_methods
     tc_gen_sig :: ([LocatedN Name], LHsSigType GhcRn)
                       -> IOEnv (Env TcGblEnv TcLclEnv) [(Name, (SrcSpan, Type))] -- AZ temp
     tc_gen_sig (op_names, gen_hs_ty)
-      = do { gen_op_ty <- tcClassSigType op_names gen_hs_ty
-           ; return [ (op_name, (locA loc, gen_op_ty))
-                                                 | L loc op_name <- op_names ] }
+      = do { gen_op_ty <- hsttc_type . hsTypeTc . unLoc . sig_body . unLoc <$> tcClassSigType op_names gen_hs_ty
+           ; return [ (op_name, (locA loc, gen_op_ty)) | L loc op_name <- op_names ] }
 
 {-
 ************************************************************************

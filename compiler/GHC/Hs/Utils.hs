@@ -604,18 +604,28 @@ nlHsCase expr matches
   = noLocA (HsCase noAnn expr (mkMatchGroup Generated (noLocA matches)))
 nlList exprs          = noLocA (ExplicitList noAnn exprs)
 
-nlHsAppTy :: LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
-nlHsTyVar :: IsSrcSpanAnn p a
+nlHsAppTy :: (XAppTy (GhcPass p) ~ NoExtField, XParTy (GhcPass p) ~ ApiAnn' AnnParen, IsPass p)
+          => LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
+nlHsTyVar :: (XTyVar (GhcPass p) ~ ApiAnn, XParTy (GhcPass p) ~ ApiAnn' AnnParen, IsSrcSpanAnn p a)
           => IdP (GhcPass p)                            -> LHsType (GhcPass p)
-nlHsFunTy :: LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
-nlHsParTy :: LHsType (GhcPass p)                        -> LHsType (GhcPass p)
+nlHsFunTy :: (XFunTy (GhcPass p) ~ ApiAnn' TrailingAnn, XParTy (GhcPass p) ~ ApiAnn' AnnParen, IsPass p)
+          => LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
+nlHsParTy :: (XParTy (GhcPass p) ~ ApiAnn' AnnParen)
+          => LHsType (GhcPass p)                        -> LHsType (GhcPass p)
 
 nlHsAppTy f t = noLocA (HsAppTy noExtField f (parenthesizeHsType appPrec t))
 nlHsTyVar x   = noLocA (HsTyVar noAnn NotPromoted (noLocA x))
 nlHsFunTy a b = noLocA (HsFunTy noAnn (HsUnrestrictedArrow NormalSyntax) (parenthesizeHsType funPrec a) b)
 nlHsParTy t   = noLocA (HsParTy noAnn t)
 
-nlHsTyConApp :: IsSrcSpanAnn p a
+nlHsTyConApp :: ( IsSrcSpanAnn p a
+                , XAppTy (GhcPass p) ~ NoExtField
+                , XParTy (GhcPass p) ~ ApiAnn' AnnParen
+                , XOpTy  (GhcPass p) ~ NoExtField
+                , XTyVar (GhcPass p) ~ ApiAnn
+                , XAppKindTy (GhcPass p) ~ SrcSpan
+                , IsPass p
+                )
              => LexicalFixity -> IdP (GhcPass p)
              -> [LHsTypeArg (GhcPass p)] -> LHsType (GhcPass p)
 nlHsTyConApp fixity tycon tys
@@ -625,14 +635,19 @@ nlHsTyConApp fixity tycon tys
   | otherwise
   = foldl' mk_app (nlHsTyVar tycon) tys
   where
-    mk_app :: LHsType (GhcPass p) -> LHsTypeArg (GhcPass p) -> LHsType (GhcPass p)
+    mk_app :: ( XAppTy (GhcPass p) ~ NoExtField
+              , XParTy (GhcPass p) ~ ApiAnn' AnnParen
+              , XOpTy  (GhcPass p) ~ NoExtField
+              , XAppKindTy (GhcPass p) ~ SrcSpan
+              , IsPass p
+              ) => LHsType (GhcPass p) -> LHsTypeArg (GhcPass p) -> LHsType (GhcPass p)
     mk_app fun@(L _ (HsOpTy {})) arg = mk_app (noLocA $ HsParTy noAnn fun) arg
       -- parenthesize things like `(A + B) C`
     mk_app fun (HsValArg ty) = noLocA (HsAppTy noExtField fun (parenthesizeHsType appPrec ty))
     mk_app fun (HsTypeArg _ ki) = noLocA (HsAppKindTy noSrcSpan fun (parenthesizeHsType appPrec ki))
     mk_app fun (HsArgPar _) = noLocA (HsParTy noAnn fun)
 
-nlHsAppKindTy ::
+nlHsAppKindTy :: (XAppKindTy (GhcPass p) ~ SrcSpan, XParTy (GhcPass p) ~ ApiAnn' AnnParen, IsPass p) =>
   LHsType (GhcPass p) -> LHsKind (GhcPass p) -> LHsType (GhcPass p)
 nlHsAppKindTy f k
   = noLocA (HsAppKindTy noSrcSpan f (parenthesizeHsType appPrec k))

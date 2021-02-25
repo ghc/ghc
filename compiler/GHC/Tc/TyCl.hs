@@ -3364,7 +3364,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs res_kind tag_map
 
        ; traceTc "tcConDecl 1" (vcat [ ppr name, ppr explicit_tkv_nms ])
 
-       ; (tclvl, wanted, (exp_tvbndrs, (ctxt, arg_tys, field_lbls, stricts)))
+       ; (tclvl, wanted, (exp_tvbndrs', (ctxt, arg_tys, field_lbls, stricts)))
            <- pushLevelAndSolveEqualitiesX "tcConDecl:H98"  $
               tcExplicitTKBndrs explicit_tkv_nms            $
               do { ctxt <- tcHsContext hs_ctxt
@@ -3375,6 +3375,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs res_kind tag_map
                  ; return (ctxt, arg_tys, field_lbls, stricts)
                  }
 
+       ; let exp_tvbndrs = map binderVarWithF $ map unLoc exp_tvbndrs'
 
        ; let tc_tvs   = binderVars tc_bndrs
              fake_ty  = mkSpecForAllTys  tc_tvs      $

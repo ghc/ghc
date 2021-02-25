@@ -1655,7 +1655,7 @@ data RuleDecl pass
        , rd_name :: XRec pass (SourceText,RuleName)
            -- ^ Note [Pragma source text] in "GHC.Types.Basic"
        , rd_act  :: Activation
-       , rd_tyvs :: Maybe [LHsTyVarBndr () (NoGhcTc pass)]
+       , rd_tyvs :: Maybe [LHsTyVarBndr () pass]
            -- ^ Forall'd type vars
        , rd_tmvs :: [LRuleBndr pass]
            -- ^ Forall'd term vars, before typechecking; after typechecking
