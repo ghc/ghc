@@ -982,7 +982,7 @@ yieldCapability
                 break;
 
             case SYNC_FLUSH_EVENT_LOG:
-                flushLocalEventsBuf(cap);
+                /* N.B. the actual flushing is performed by flushEventLog */
                 break;
 
             default:
