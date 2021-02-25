@@ -258,8 +258,9 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
         th_state_var         <- newIORef Map.empty ;
         th_remote_state_var  <- newIORef Nothing ;
         let {
-             dflags = hsc_dflags hsc_env ;
-             home_unit = hsc_home_unit hsc_env ;
+             -- bangs to avoid leaking the env (#19356)
+             !dflags = hsc_dflags hsc_env ;
+             !home_unit = hsc_home_unit hsc_env ;
 
              maybe_rn_syntax :: forall a. a -> Maybe a ;
              maybe_rn_syntax empty_val
@@ -2021,8 +2022,9 @@ initIfaceTcRn :: IfG a -> TcRn a
 initIfaceTcRn thing_inside
   = do  { tcg_env <- getGblEnv
         ; hsc_env <- getTopEnv
+          -- bangs to avoid leaking the envs (#19356)
         ; let !mod = tcg_semantic_mod tcg_env
-              home_unit = hsc_home_unit hsc_env
+              !home_unit = hsc_home_unit hsc_env
               -- When we are instantiating a signature, we DEFINITELY
               -- do not want to knot tie.
               is_instantiate = isHomeUnitInstantiating home_unit
