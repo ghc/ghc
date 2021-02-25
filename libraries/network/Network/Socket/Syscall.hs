@@ -18,7 +18,7 @@ import Foreign.C.Error (getErrno, eINTR, eINPROGRESS)
 import GHC.Conc (threadWaitWrite)
 #endif
 
-#ifdef HAVE_ADVANCED_SOCKET_FLAGS
+#if defined(HAVE_ADVANCED_SOCKET_FLAGS)
 import Network.Socket.Cbits
 #else
 import Network.Socket.Fcntl
@@ -88,13 +88,13 @@ socket family stype protocol = E.bracketOnError create c_close $ \fd -> do
         throwSocketErrorIfMinus1Retry "Network.Socket.socket" $
             c_socket (packFamily family) c_stype protocol
 
-#ifdef HAVE_ADVANCED_SOCKET_FLAGS
+#if defined(HAVE_ADVANCED_SOCKET_FLAGS)
     modifyFlag c_stype = c_stype .|. sockNonBlock
 #else
     modifyFlag c_stype = c_stype
 #endif
 
-#ifdef HAVE_ADVANCED_SOCKET_FLAGS
+#if defined(HAVE_ADVANCED_SOCKET_FLAGS)
     setNonBlock _ = return ()
 #else
     setNonBlock fd = setNonBlockIfNeeded fd
@@ -210,7 +210,7 @@ accept listing_sock = withNewSocketAddress $ \new_sa sz ->
              return new_fd
 #else
      callAccept fd sa sz = with (fromIntegral sz) $ \ ptr_len -> do
-# ifdef HAVE_ADVANCED_SOCKET_FLAGS
+# if defined(HAVE_ADVANCED_SOCKET_FLAGS)
        throwSocketErrorWaitRead listing_sock "Network.Socket.accept"
                         (c_accept4 fd sa ptr_len (sockNonBlock .|. sockCloexec))
 # else
@@ -231,7 +231,7 @@ foreign import CALLCONV SAFE_ON_WIN "connect"
 foreign import CALLCONV unsafe "listen"
   c_listen :: CInt -> CInt -> IO CInt
 
-#ifdef HAVE_ADVANCED_SOCKET_FLAGS
+#if defined(HAVE_ADVANCED_SOCKET_FLAGS)
 foreign import CALLCONV unsafe "accept4"
   c_accept4 :: CInt -> Ptr sa -> Ptr CInt{-CSockLen???-} -> CInt -> IO CInt
 #else

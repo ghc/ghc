@@ -125,7 +125,7 @@ spec = do
                         addr `shouldBe` (SockAddrUnix "")
                 test . setClientAction client $ unixWithUnlink unixAddr server
 
-#ifdef linux_HOST_OS
+#if defined(linux_HOST_OS)
             it "can end-to-end with an abstract socket" $ do
                 let
                     abstractAddress = toEnum 0:"/haskell/network/abstract"
