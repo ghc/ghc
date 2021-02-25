@@ -53,8 +53,8 @@ module GHC.Driver.Session (
         Option(..), showOpt,
         DynLibLoader(..),
         fFlags, fLangFlags, xFlags,
-        flagSpecOf,
         wWarningFlags,
+        wWarningFlagMap,
         dynFlagDependencies,
         makeDynFlagsConsistent,
         positionIndependent,
@@ -1392,12 +1392,12 @@ defaultLogAction dflags reason severity srcSpan msg
         case reason of
           NoReason -> Nothing
           Reason wflag -> do
-            spec <- flagSpecOf wflag
+            spec <- wWarningFlagMap !? wflag
             return ("-W" ++ flagSpecName spec ++ warnFlagGrp wflag)
           ErrReason Nothing ->
             return "-Werror"
           ErrReason (Just wflag) -> do
-            spec <- flagSpecOf wflag
+            spec <- wWarningFlagMap !? wflag
             return $
               "-W" ++ flagSpecName spec ++ warnFlagGrp wflag ++
               ", -Werror=" ++ flagSpecName spec
@@ -3173,9 +3173,6 @@ nop :: TurnOnFlag -> DynP ()
 nop _ = return ()
 
 -- | Find the 'FlagSpec' for a 'WarningFlag'.
-flagSpecOf :: WarningFlag -> Maybe (FlagSpec WarningFlag)
-flagSpecOf flag = wWarningFlagMap !? flag
-
 wWarningFlagMap :: Map WarningFlag (FlagSpec WarningFlag)
 wWarningFlagMap = Map.fromList $ map (flagSpecFlag &&& id) wWarningFlags
 
