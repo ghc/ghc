@@ -7,6 +7,7 @@
 {-# LANGUAGE CPP #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates -Wno-incomplete-uni-patterns #-}
+{-# OPTIONS_GHC -ddump-to-file -ddump-simpl -ddump-stg-final #-}
 module GHC.Core.Opt.Simplify ( simplTopBinds, simplExpr, simplRules ) where
 
 #include "HsVersions.h"
