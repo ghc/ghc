@@ -134,7 +134,7 @@ type instance XNPlusKPat GhcTc = Type
 
 type instance XSigPat GhcPs = NoExtField
 type instance XSigPat GhcRn = NoExtField
-type instance XSigPat GhcTc = Type
+type instance XSigPat GhcTc = NoExtField
 
 type instance XXPat GhcPs = NoExtCon
 type instance XXPat GhcRn = NoExtCon

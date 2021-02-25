@@ -315,7 +315,7 @@ data HsExpr p
 
   | HsAppType (XAppTypeE p) -- After typechecking: the type argument
               (LHsExpr p)
-              (LHsWcType (NoGhcTc p))  -- ^ Visible type application
+              (LHsWcType p)  -- ^ Visible type application
        --
        -- Explicit type argument; e.g  f @Int x y
        -- NB: Has wildcards, but no implicit quantification
@@ -508,7 +508,7 @@ data HsExpr p
                 (XExprWithTySig p)
 
                 (LHsExpr p)
-                (LHsSigWcType (NoGhcTc p))
+                (LHsSigWcType p)
 
   -- | Arithmetic sequence
   --

@@ -333,7 +333,7 @@ dsExpr e@(HsApp _ fun arg)
        ; dsWhenNoErrs (dsLExprNoLP arg)
                       (\arg' -> mkCoreAppDs (text "HsApp" <+> ppr e) fun' arg') }
 
-dsExpr (HsAppType ty e _)
+dsExpr (HsAppType _ e (HsWC _ (L _ (XHsType (HsTypeTc ty _)))))
   = do { e' <- dsLExpr e
        ; return (App e' (Type ty)) }
 

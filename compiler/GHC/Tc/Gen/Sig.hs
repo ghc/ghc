@@ -217,16 +217,18 @@ tcUserTypeSig :: SrcSpan -> LHsSigWcType GhcRn -> Maybe Name
 tcUserTypeSig loc hs_sig_ty mb_name
   | isCompleteHsSig hs_sig_ty
   = do { sigma_ty <- tcHsSigWcType ctxt_F hs_sig_ty
+       ; let (HsWC _ (L _ (HsSig _ _ (L _ (XHsType (HsTypeTc ty _)))))) = sigma_ty
        ; traceTc "tcuser" (ppr sigma_ty)
        ; return $
-         CompleteSig { sig_bndr  = mkLocalId name Many sigma_ty
+         CompleteSig { sig_bndr  = mkLocalId name Many ty
                                    -- We use `Many' as the multiplicity here,
                                    -- as if this identifier corresponds to
                                    -- anything, it is a top-level
                                    -- definition. Which are all unrestricted in
                                    -- the current implementation.
                      , sig_ctxt  = ctxt_T
-                     , sig_loc   = loc } }
+                     , sig_loc   = loc
+                     , sig_ty    = sigma_ty } }
                        -- Location of the <type> in   f :: <type>
 
   -- Partial sig with wildcards
@@ -380,7 +382,7 @@ tcPatSynSig name sig_ty@(L _ (HsSig{sig_bndrs = hs_outer_bndrs, sig_body = hs_ty
   = do { traceTc "tcPatSynSig 1" (ppr sig_ty)
 
        ; let skol_info = DataConSkol name
-       ; (tclvl, wanted, (outer_bndrs, (ex_bndrs, (req, prov, body_ty))))
+       ; (tclvl, wanted, (outer_bndrs, (ex_bndrs', (req, prov, body_ty))))
            <- pushLevelAndSolveEqualitiesX "tcPatSynSig"           $
                      -- See Note [solveEqualities in tcPatSynSig]
               tcOuterTKBndrs skol_info hs_outer_bndrs $
@@ -392,11 +394,12 @@ tcPatSynSig name sig_ty@(L _ (HsSig{sig_bndrs = hs_outer_bndrs, sig_body = hs_ty
                      -- e.g. pattern Zero <- 0#   (#12094)
                  ; return (req, prov, body_ty) }
 
+       ; let ex_bndrs = map (hsBndrToBndr . unLoc) ex_bndrs'
        ; let implicit_tvs :: [TcTyVar]
              univ_bndrs   :: [TcInvisTVBinder]
              (implicit_tvs, univ_bndrs) = case outer_bndrs of
                HsOuterImplicit{hso_ximplicit = implicit_tvs} -> (implicit_tvs, [])
-               HsOuterExplicit{hso_xexplicit = univ_bndrs}   -> ([], univ_bndrs)
+               HsOuterExplicit{hso_bndrs = univ_bndrs}   -> ([], map (hsBndrToBndr . unLoc) univ_bndrs)
 
        ; implicit_tvs <- zonkAndScopedSort implicit_tvs
        ; let implicit_bndrs = mkTyVarBinders SpecifiedSpec implicit_tvs
@@ -468,9 +471,9 @@ ppr_tvs tvs = braces (vcat [ ppr tv <+> dcolon <+> ppr (tyVarKind tv)
 ********************************************************************* -}
 
 
-tcInstSig :: TcIdSigInfo -> TcM TcIdSigInst
+tcInstSig :: TcIdSigInfo -> TcM (TcIdSigInst, LHsSigWcType GhcTc)
 -- Instantiate a type signature; only used with plan InferGen
-tcInstSig sig@(CompleteSig { sig_bndr = poly_id, sig_loc = loc })
+tcInstSig sig@(CompleteSig { sig_bndr = poly_id, sig_loc = loc, sig_ty = ty })
   = setSrcSpan loc $  -- Set the binding site of the tyvars
     do { (tv_prs, theta, tau) <- tcInstTypeBndrs poly_id
               -- See Note [Pattern bindings and complete signatures]
@@ -480,14 +483,14 @@ tcInstSig sig@(CompleteSig { sig_bndr = poly_id, sig_loc = loc })
                       , sig_inst_wcs   = []
                       , sig_inst_wcx   = Nothing
                       , sig_inst_theta = theta
-                      , sig_inst_tau   = tau }) }
+                      , sig_inst_tau   = tau }, ty) }
 
 tcInstSig hs_sig@(PartialSig { psig_hs_ty = hs_ty
                              , sig_ctxt = ctxt
                              , sig_loc = loc })
   = setSrcSpan loc $  -- Set the binding site of the tyvars
     do { traceTc "Staring partial sig {" (ppr hs_sig)
-       ; (wcs, wcx, tv_prs, theta, tau) <- tcHsPartialSigType ctxt hs_ty
+       ; (wcs, wcx, tv_prs, theta, tau, ty) <- tcHsPartialSigType ctxt hs_ty
          -- See Note [Checking partial type signatures] in GHC.Tc.Gen.HsType
        ; let inst_sig = TISI { sig_inst_sig   = hs_sig
                              , sig_inst_skols = tv_prs
@@ -496,7 +499,7 @@ tcInstSig hs_sig@(PartialSig { psig_hs_ty = hs_ty
                              , sig_inst_theta = theta
                              , sig_inst_tau   = tau }
        ; traceTc "End partial sig }" (ppr inst_sig)
-       ; return inst_sig }
+       ; return (inst_sig, ty) }
 
 
 {- Note [Pattern bindings and complete signatures]
@@ -758,7 +761,8 @@ tcSpecPrag poly_id prag@(SpecSig _ fun_name hs_tys inl)
 
     tc_one hs_ty
       = do { spec_ty <- tcHsSigType   (FunSigCtxt name False) hs_ty
-           ; wrap    <- tcSpecWrapper (FunSigCtxt name True)  poly_ty spec_ty
+           ; let (HsSig _ _ (L _ (XHsType (HsTypeTc ty _)))) = unLoc spec_ty
+           ; wrap    <- tcSpecWrapper (FunSigCtxt name True)  poly_ty ty
            ; return (SpecPrag poly_id wrap inl) }
 
 tcSpecPrag _ prag = pprPanic "tcSpecPrag" (ppr prag)

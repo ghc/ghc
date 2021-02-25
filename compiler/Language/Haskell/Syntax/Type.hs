@@ -25,8 +25,8 @@ module Language.Haskell.Syntax.Type (
         HsArrow(..),
         hsLinear, hsUnrestricted,
 
-        HsType(..), HsCoreTy, LHsType, HsKind, LHsKind,
-        HsForAllTelescope(..), HsTyVarBndr(..), LHsTyVarBndr,
+        HsType(..), HsTypeTc(..), HsCoreTy, LHsType, HsKind, LHsKind,
+        HsForAllTelescope(..), HsTyVarBndr(..), LHsTyVarBndr, hsBndrToBndr,
         LHsQTyVars(..),
         HsOuterTyVarBndrs(..), HsOuterFamEqnTyVarBndrs, HsOuterSigTyVarBndrs,
         HsWildCardBndrs(..),
@@ -64,9 +64,12 @@ import {-# SOURCE #-} Language.Haskell.Syntax.Expr ( HsSplice )
 
 import Language.Haskell.Syntax.Extension
 
+import GHC.Hs.Extension
+
 import GHC.Types.SourceText
 import GHC.Types.Name( Name )
 import GHC.Types.Name.Reader ( RdrName )
+import GHC.Types.Var (VarBndr(..), TyVar)
 import GHC.Core.DataCon( HsSrcBang(..), HsImplBang(..),
                          SrcStrictness(..), SrcUnpackedness(..) )
 import GHC.Core.Type
@@ -370,7 +373,7 @@ data HsOuterTyVarBndrs flag pass
   | HsOuterExplicit -- ^ Explicit forall, e.g.,
                     --    @f :: forall a b. a -> b -> b@
     { hso_xexplicit :: XHsOuterExplicit pass flag
-    , hso_bndrs     :: [LHsTyVarBndr flag (NoGhcTc pass)]
+    , hso_bndrs     :: [LHsTyVarBndr flag pass]
     }
   | XHsOuterTyVarBndrs !(XXHsOuterTyVarBndrs pass)
 
@@ -722,6 +725,10 @@ isHsKindedTyVar (UserTyVar {})   = False
 isHsKindedTyVar (KindedTyVar {}) = True
 isHsKindedTyVar (XTyVarBndr {})  = False
 
+hsBndrToBndr :: HsTyVarBndr flag GhcTc -> VarBndr TyVar flag
+hsBndrToBndr (UserTyVar _ flag v) = Bndr (unLoc v) flag
+hsBndrToBndr (KindedTyVar _ flag v _) = Bndr (unLoc v) flag
+
 -- | Haskell Type
 data HsType pass
   = HsForAllTy   -- See Note [HsType binders]
@@ -894,6 +901,11 @@ data HsType pass
   -- For adding new constructors via Trees that Grow
   | XHsType
       (XXType pass)
+
+data HsTypeTc = HsTypeTc Type (HsType GhcRn)
+
+instance Outputable HsTypeTc where
+  ppr (HsTypeTc p _) = ppr p
 
 -- An escape hatch for tunnelling a Core 'Type' through 'HsType'.
 -- For more details on how this works, see:
