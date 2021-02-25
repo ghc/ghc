@@ -173,6 +173,7 @@ tryAllM (IOEnv thing) = IOEnv (\ env -> safeTry (thing env))
 safeTry :: IO a -> IO (Either SomeException a)
 safeTry act = do
   var <- newEmptyMVar
+  -- uninterruptible because we want to mask around 'killThread', which is interruptible.
   uninterruptibleMask $ \restore -> do
     -- Fork, so that 'act' is safe from all asynchronous exceptions other than the ones we send it
     t <- forkIO $ try (restore act) >>= putMVar var
