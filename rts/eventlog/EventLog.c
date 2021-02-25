@@ -1665,6 +1665,7 @@ void flushEventLog(Capability **cap USED_IF_THREADS)
 #if defined(THREADED_RTS)
     Task *task = getMyTask();
     stopAllCapabilitiesWith(cap, task, SYNC_FLUSH_EVENT_LOG);
+    flushAllCapsEventsBufs();
     releaseAllCapabilities(n_capabilities, cap ? *cap : NULL, task);
 #endif
     flushEventLogWriter();
