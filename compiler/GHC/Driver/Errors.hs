@@ -1,9 +1,11 @@
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE ViewPatterns #-}
+
 module GHC.Driver.Errors (
-    warningsToMessages
-  , printOrThrowWarnings
+    printOrThrowWarnings
   , printBagOfErrors
-  , isWarnMsgFatal
   , handleFlagWarnings
+  , partitionMessageBag
   ) where
 
 import GHC.Driver.Session
@@ -18,27 +20,19 @@ import GHC.Utils.Outputable ( text, withPprStyle, mkErrStyle )
 import GHC.Utils.Logger
 import qualified GHC.Driver.CmdLine as CmdLine
 
--- | Converts a list of 'WarningMessages' into a tuple where the second element contains only
--- error, i.e. warnings that are considered fatal by GHC based on the input 'DynFlags'.
-warningsToMessages :: DynFlags -> WarningMessages -> (WarningMessages, ErrorMessages)
-warningsToMessages dflags =
-  partitionBagWith $ \warn ->
-    case isWarnMsgFatal dflags warn of
-      Nothing -> Left warn
-      Just err_reason ->
-        Right warn{ errMsgSeverity = SevError
-                  , errMsgReason = ErrReason err_reason }
+-- | Partitions the messages and returns a tuple which first element are the warnings, and the
+-- second the errors.
+partitionMessageBag :: Diagnostic e => Bag (MsgEnvelope e) -> (Bag (MsgEnvelope e), Bag (MsgEnvelope e))
+partitionMessageBag = partitionBag isWarningMessage
 
-printBagOfErrors :: RenderableDiagnostic a => Logger -> DynFlags -> Bag (MsgEnvelope a) -> IO ()
+printBagOfErrors :: Diagnostic a => Logger -> DynFlags -> Bag (MsgEnvelope a) -> IO ()
 printBagOfErrors logger dflags bag_of_errors
   = sequence_ [ let style = mkErrStyle unqual
                     ctx   = initSDocContext dflags style
-                in putLogMsg logger dflags reason sev s $
-                   withPprStyle style (formatBulleted ctx (renderDiagnostic doc))
+                in putLogMsg logger dflags (MCDiagnostic . diagnosticReason $ dia) s $
+                   withPprStyle style (formatBulleted ctx (diagnosticMessage dia))
               | MsgEnvelope { errMsgSpan      = s,
-                              errMsgDiagnostic = doc,
-                              errMsgSeverity  = sev,
-                              errMsgReason    = reason,
+                              errMsgDiagnostic = dia,
                               errMsgContext   = unqual } <- sortMsgBag (Just dflags)
                                                                        bag_of_errors ]
 
@@ -48,21 +42,10 @@ handleFlagWarnings logger dflags warns = do
 
       -- It would be nicer if warns :: [Located SDoc], but that
       -- has circular import problems.
-      bag = listToBag [ mkPlainWarnMsg loc (text warn)
+      bag = listToBag [ mkPlainMsgEnvelope WarnReason loc (text warn)
                       | CmdLine.Warn _ (L loc warn) <- warns' ]
 
   printOrThrowWarnings logger dflags bag
-
--- | Checks if given 'WarnMsg' is a fatal warning.
-isWarnMsgFatal :: DynFlags -> WarnMsg -> Maybe (Maybe WarningFlag)
-isWarnMsgFatal dflags MsgEnvelope{errMsgReason = Reason wflag}
-  = if wopt_fatal wflag dflags
-      then Just (Just wflag)
-      else Nothing
-isWarnMsgFatal dflags _
-  = if gopt Opt_WarnIsError dflags
-      then Just Nothing
-      else Nothing
 
 -- Given a warn reason, check to see if it's associated -W opt is enabled
 shouldPrintWarning :: DynFlags -> CmdLine.WarnReason -> Bool
@@ -80,14 +63,37 @@ printOrThrowWarnings logger dflags warns = do
   let (make_error, warns') =
         mapAccumBagL
           (\make_err warn ->
-            case isWarnMsgFatal dflags warn of
+            case is_warn_msg_fatal dflags warn of
               Nothing ->
                 (make_err, warn)
               Just err_reason ->
-                (True, warn{ errMsgSeverity = SevError
-                           , errMsgReason = ErrReason err_reason
-                           }))
+                (True, promote_warning_to_error err_reason warn))
           False warns
   if make_error
     then throwIO (mkSrcErr warns')
     else printBagOfErrors logger dflags warns
+
+  where
+
+    -- | Checks if given 'WarnMsg' is a fatal warning.
+    is_warn_msg_fatal :: DynFlags -> WarnMsg -> Maybe DiagnosticReason
+    is_warn_msg_fatal dflags (diagnosticReason . errMsgDiagnostic -> reason) =
+      case reason of
+        ErrReason                           -> Nothing -- nothing to do, this is already an error.
+        ErrReasonPromotedWithWError         -> Nothing -- same as above.
+        ErrReasonPromotedFromWarning _wflag -> Nothing -- same as above.
+        WarnReason ->
+          if gopt Opt_WarnIsError dflags
+            then Just ErrReasonPromotedWithWError
+            else Nothing
+        WarnReasonWithFlag wflag ->
+          if wopt_fatal wflag dflags
+            then Just $ ErrReasonPromotedFromWarning wflag
+            else Nothing
+
+    -- | Promotes a 'WarnMsg' into an error.
+    promote_warning_to_error :: DiagnosticReason -> WarnMsg -> MsgEnvelope DecoratedMessage
+    promote_warning_to_error errReason msg =
+      let diag' = (errMsgDiagnostic msg) { diagReason = errReason }
+      in msg { errMsgDiagnostic = diag' }
+

@@ -190,7 +190,7 @@ tcRnModule :: HscEnv
            -> ModSummary
            -> Bool              -- True <=> save renamed syntax
            -> HsParsedModule
-           -> IO (Messages DecoratedSDoc, Maybe TcGblEnv)
+           -> IO (Messages DecoratedMessage, Maybe TcGblEnv)
 
 tcRnModule hsc_env mod_sum save_rn_syntax
    parsedModule@HsParsedModule {hpm_module= L loc this_module}
@@ -211,7 +211,7 @@ tcRnModule hsc_env mod_sum save_rn_syntax
     dflags  = hsc_dflags hsc_env
     logger  = hsc_logger hsc_env
     home_unit = hsc_home_unit hsc_env
-    err_msg = mkPlainMsgEnvelope loc $
+    err_msg = mkPlainMsgEnvelope ErrReason loc $
               text "Module does not have a RealSrcSpan:" <+> ppr this_mod
 
     pair :: (Module, SrcSpan)
@@ -259,7 +259,7 @@ tcRnModuleTcRnM hsc_env mod_sum
 
         ; whenWOptM Opt_WarnImplicitPrelude $
              when (notNull prel_imports) $
-                addWarn (Reason Opt_WarnImplicitPrelude) (implicitPreludeWarn)
+                addDiagnostic (WarnReasonWithFlag Opt_WarnImplicitPrelude) (implicitPreludeWarn)
 
         ; -- TODO This is a little skeevy; maybe handle a bit more directly
           let { simplifyImport (L _ idecl) =
@@ -1576,7 +1576,7 @@ tcPreludeClashWarn warnFlag name = do
     ; traceTc "tcPreludeClashWarn/prelude_functions"
                 (hang (ppr name) 4 (sep [ppr clashingElts]))
 
-    ; let warn_msg x = addWarnAt (Reason warnFlag) (nameSrcSpan (greMangledName x)) (hsep
+    ; let warn_msg x = addDiagnosticAt (WarnReasonWithFlag warnFlag) (nameSrcSpan (greMangledName x)) (hsep
               [ text "Local definition of"
               , (quotes . ppr . nameOccName . greMangledName) x
               , text "clashes with a future Prelude name." ]
@@ -1687,7 +1687,7 @@ tcMissingParentClassWarn warnFlag isName shouldName
            -- <should>" e.g. "Foo is an instance of Monad but not Applicative"
            ; let instLoc = srcLocSpan . nameSrcLoc $ getName isInst
                  warnMsg (KnownTc name:_) =
-                      addWarnAt (Reason warnFlag) instLoc $
+                      addDiagnosticAt (WarnReasonWithFlag warnFlag) instLoc $
                            hsep [ (quotes . ppr . nameOccName) name
                                 , text "is an instance of"
                                 , (ppr . nameOccName . className) isClass
@@ -1993,7 +1993,7 @@ this Note.
 *********************************************************
 -}
 
-runTcInteractive :: HscEnv -> TcRn a -> IO (Messages DecoratedSDoc, Maybe a)
+runTcInteractive :: HscEnv -> TcRn a -> IO (Messages DecoratedMessage, Maybe a)
 -- Initialise the tcg_inst_env with instances from all home modules.
 -- This mimics the more selective call to hptInstances in tcRnImports
 runTcInteractive hsc_env thing_inside
@@ -2109,7 +2109,7 @@ We don't bother with the tcl_th_bndrs environment either.
 -- The returned TypecheckedHsExpr is of type IO [ () ], a list of the bound
 -- values, coerced to ().
 tcRnStmt :: HscEnv -> GhciLStmt GhcPs
-         -> IO (Messages DecoratedSDoc, Maybe ([Id], LHsExpr GhcTc, FixityEnv))
+         -> IO (Messages DecoratedMessage, Maybe ([Id], LHsExpr GhcTc, FixityEnv))
 tcRnStmt hsc_env rdr_stmt
   = runTcInteractive hsc_env $ do {
 
@@ -2489,7 +2489,7 @@ getGhciStepIO = do
 
     return (noLoc $ ExprWithTySig noExtField (nlHsVar ghciStepIoMName) stepTy)
 
-isGHCiMonad :: HscEnv -> String -> IO (Messages DecoratedSDoc, Maybe Name)
+isGHCiMonad :: HscEnv -> String -> IO (Messages DecoratedMessage, Maybe Name)
 isGHCiMonad hsc_env ty
   = runTcInteractive hsc_env $ do
         rdrEnv <- getGlobalRdrEnv
@@ -2516,7 +2516,7 @@ data TcRnExprMode = TM_Inst     -- ^ Instantiate inferred quantifiers only (:typ
 tcRnExpr :: HscEnv
          -> TcRnExprMode
          -> LHsExpr GhcPs
-         -> IO (Messages DecoratedSDoc, Maybe Type)
+         -> IO (Messages DecoratedMessage, Maybe Type)
 tcRnExpr hsc_env mode rdr_expr
   = runTcInteractive hsc_env $
     do {
@@ -2585,7 +2585,7 @@ has a special case for application chains.
 --------------------------
 tcRnImportDecls :: HscEnv
                 -> [LImportDecl GhcPs]
-                -> IO (Messages DecoratedSDoc, Maybe GlobalRdrEnv)
+                -> IO (Messages DecoratedMessage, Maybe GlobalRdrEnv)
 -- Find the new chunk of GlobalRdrEnv created by this list of import
 -- decls.  In contract tcRnImports *extends* the TcGblEnv.
 tcRnImportDecls hsc_env import_decls
@@ -2601,7 +2601,7 @@ tcRnType :: HscEnv
          -> ZonkFlexi
          -> Bool        -- Normalise the returned type
          -> LHsType GhcPs
-         -> IO (Messages DecoratedSDoc, Maybe (Type, Kind))
+         -> IO (Messages DecoratedMessage, Maybe (Type, Kind))
 tcRnType hsc_env flexi normalise rdr_type
   = runTcInteractive hsc_env $
     setXOptM LangExt.PolyKinds $   -- See Note [Kind-generalise in tcRnType]
@@ -2735,7 +2735,7 @@ tcRnDeclsi exists to allow class, data, and other declarations in GHCi.
 
 tcRnDeclsi :: HscEnv
            -> [LHsDecl GhcPs]
-           -> IO (Messages DecoratedSDoc, Maybe TcGblEnv)
+           -> IO (Messages DecoratedMessage, Maybe TcGblEnv)
 tcRnDeclsi hsc_env local_decls
   = runTcInteractive hsc_env $
     tcRnSrcDecls False local_decls Nothing
@@ -2760,13 +2760,13 @@ externaliseAndTidyId this_mod id
 -- a package module with an interface on disk.  If neither of these is
 -- true, then the result will be an error indicating the interface
 -- could not be found.
-getModuleInterface :: HscEnv -> Module -> IO (Messages DecoratedSDoc, Maybe ModIface)
+getModuleInterface :: HscEnv -> Module -> IO (Messages DecoratedMessage, Maybe ModIface)
 getModuleInterface hsc_env mod
   = runTcInteractive hsc_env $
     loadModuleInterface (text "getModuleInterface") mod
 
 tcRnLookupRdrName :: HscEnv -> Located RdrName
-                  -> IO (Messages DecoratedSDoc, Maybe [Name])
+                  -> IO (Messages DecoratedMessage, Maybe [Name])
 -- ^ Find all the Names that this RdrName could mean, in GHCi
 tcRnLookupRdrName hsc_env (L loc rdr_name)
   = runTcInteractive hsc_env $
@@ -2780,7 +2780,7 @@ tcRnLookupRdrName hsc_env (L loc rdr_name)
        ; when (null names) (addErrTc (text "Not in scope:" <+> quotes (ppr rdr_name)))
        ; return names }
 
-tcRnLookupName :: HscEnv -> Name -> IO (Messages DecoratedSDoc, Maybe TyThing)
+tcRnLookupName :: HscEnv -> Name -> IO (Messages DecoratedMessage, Maybe TyThing)
 tcRnLookupName hsc_env name
   = runTcInteractive hsc_env $
     tcRnLookupName' name
@@ -2799,7 +2799,7 @@ tcRnLookupName' name = do
 
 tcRnGetInfo :: HscEnv
             -> Name
-            -> IO ( Messages DecoratedSDoc
+            -> IO ( Messages DecoratedMessage
                   , Maybe (TyThing, Fixity, [ClsInst], [FamInst], SDoc))
 
 -- Used to implement :info in GHCi
@@ -3129,5 +3129,5 @@ mark_plugin_unsafe dflags = unless (gopt Opt_PluginTrustworthy dflags) $
   recordUnsafeInfer pluginUnsafe
   where
     unsafeText = "Use of plugins makes the module unsafe"
-    pluginUnsafe = unitBag ( mkPlainWarnMsg noSrcSpan
+    pluginUnsafe = unitBag ( mkPlainMsgEnvelope WarnReason noSrcSpan
                                    (Outputable.text unsafeText) )
