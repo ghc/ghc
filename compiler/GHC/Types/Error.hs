@@ -39,6 +39,7 @@ module GHC.Types.Error
    , mkPlainMsgEnvelope
    , mkLongMsgEnvelope
    , mkShortMsgEnvelope
+   , defaultReasonSeverity
    -- * Queries
    , isErrorMessage
    , isWarningMessage
@@ -321,9 +322,9 @@ mkLocMessageAnn ann msg_class locn msg
         _                -> empty
 
 -- | Computes a severity from a reason in the absence of DynFlags. This will likely
--- be wrong in the presence of -Werror.
-default_reason_severity :: DiagnosticReason -> Severity
-default_reason_severity = \case
+-- be wrong in the presence of -Werror. It will be removed in the context of #18516.
+defaultReasonSeverity :: DiagnosticReason -> Severity
+defaultReasonSeverity = \case
   WarningWithoutFlag    -> SevWarning
   WarningWithFlag _flag -> SevWarning
   ErrorWithoutFlag      -> SevError
@@ -440,7 +441,7 @@ mkLongMsgEnvelope :: DiagnosticReason
                   -> SDoc
                   -> MsgEnvelope DiagnosticMessage
 mkLongMsgEnvelope rea locn unqual msg extra =
-  mkMsgEnvelope (default_reason_severity rea) -- wrong, but will be fixed in printOrThrowWarnings
+  mkMsgEnvelope (defaultReasonSeverity rea) -- wrong, but will be fixed in printOrThrowWarnings
                 locn unqual (DiagnosticMessage (mkDecorated [msg,extra]) rea)
 
 -- | A short (one-line) diagnostic message.
@@ -451,7 +452,7 @@ mkShortMsgEnvelope :: DiagnosticReason
                    -> SDoc
                    -> MsgEnvelope DiagnosticMessage
 mkShortMsgEnvelope rea locn unqual msg =
-  mkMsgEnvelope (default_reason_severity rea) -- wrong, but will be fixed in printOrThrowWarnings
+  mkMsgEnvelope (defaultReasonSeverity rea) -- wrong, but will be fixed in printOrThrowWarnings
                 locn unqual (DiagnosticMessage (mkDecorated [msg]) rea)
 
 -- | Variant that doesn't care about qualified/unqualified names.
@@ -461,7 +462,7 @@ mkPlainMsgEnvelope :: DiagnosticReason
                    -> SDoc
                    -> MsgEnvelope DiagnosticMessage
 mkPlainMsgEnvelope rea locn msg =
-  mkMsgEnvelope (default_reason_severity rea) -- wrong, but will be fixed in printOrThrowWarnings
+  mkMsgEnvelope (defaultReasonSeverity rea) -- wrong, but will be fixed in printOrThrowWarnings
                 locn alwaysQualify (DiagnosticMessage (mkDecorated [msg]) rea)
 
 --
