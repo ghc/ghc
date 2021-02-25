@@ -274,7 +274,7 @@ getWarnings = Hsc $ \_ w -> return (w, w)
 clearWarnings :: Hsc ()
 clearWarnings = Hsc $ \_ _ -> return ((), emptyBag)
 
-logDiagnostics :: WarningMessages -> Hsc ()
+logDiagnostics :: Bag (MsgEnvelope DiagnosticMessage) -> Hsc ()
 logDiagnostics w = Hsc $ \_ w0 -> return ((), w0 `unionBags` w)
 
 getHscEnv :: Hsc HscEnv
