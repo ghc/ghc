@@ -210,3 +210,10 @@ test('T16846', [only_ways(['optasm']), exit_code(1)], compile_and_run, [''])
 test('T17920', cmm_src, compile_and_run, [''])
 test('T18527', normal, compile_and_run, ['T18527FFI.c'])
 test('T19149', only_ways('sanity'), compile_and_run, ['T19149_c.c'])
+
+# Current GHC does not recognize .S files :(
+# test('CallConv', unless(arch('x86_64') or arch('aarch64'), skip), compile_and_run, ['CallConv_asm.S'])
+test('CallConv', [unless(arch('x86_64') or arch('aarch64'), skip),
+                  when(arch('x86_64'), extra_hc_opts('CallConv_x86_64.s')),
+                  when(arch('aarch64'), extra_hc_opts('CallConv_aarch64.s'))],
+     compile_and_run, [''])
