@@ -72,7 +72,8 @@ char *EventDesc[] = {
   [EVENT_MEM_RETURN]          = "Memory return statistics",
   [EVENT_HEAP_INFO_GHC]       = "Heap static parameters",
   [EVENT_HEAP_ALLOCATED]      = "Total heap mem ever allocated",
-  [EVENT_HEAP_SIZE]           = "Current heap size",
+  [EVENT_HEAP_SIZE]           = "Current heap size (size of allocated mblocks)",
+  [EVENT_BLOCKS_SIZE]         = "Current heap size (size of allocated blocks)",
   [EVENT_HEAP_LIVE]           = "Current heap live data",
   [EVENT_CREATE_SPARK_THREAD] = "Create spark thread",
   [EVENT_LOG_MSG]             = "Log message",
@@ -382,6 +383,7 @@ init_event_types(void)
 
         case EVENT_HEAP_ALLOCATED:    // (heap_capset, alloc_bytes)
         case EVENT_HEAP_SIZE:         // (heap_capset, size_bytes)
+        case EVENT_BLOCKS_SIZE:       // (heap_capset, size_bytes)
         case EVENT_HEAP_LIVE:         // (heap_capset, live_bytes)
             eventTypes[t].size = sizeof(EventCapsetID) + sizeof(StgWord64);
             break;
@@ -998,6 +1000,7 @@ void postHeapEvent (Capability    *cap,
     switch (tag) {
     case EVENT_HEAP_ALLOCATED:     // (heap_capset, alloc_bytes)
     case EVENT_HEAP_SIZE:          // (heap_capset, size_bytes)
+    case EVENT_BLOCKS_SIZE:        // (heap_capset, size_bytes)
     case EVENT_HEAP_LIVE:          // (heap_capset, live_bytes)
     {
         postCapsetID(eb, heap_capset);
