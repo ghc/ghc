@@ -2562,7 +2562,7 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
         -- Comparing multiplicities last because the test is usually true
     go env (TyConApp tc1 tys1) (TyConApp tc2 tys2)
       = liftOrdering (tc1 `nonDetCmpTc` tc2) `thenCmpTy` gos env tys1 tys2
-    go _   (LitTy l1)          (LitTy l2)          = liftOrdering (compare l1 l2)
+    go _   (LitTy l1)          (LitTy l2)          = liftOrdering (nonDetCmpTyLit l1 l2)
     go env (CastTy t1 _)       t2                  = hasCast $ go env t1 t2
     go env t1                  (CastTy t2 _)       = hasCast $ go env t1 t2
 
