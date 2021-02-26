@@ -73,8 +73,8 @@ html_use_smartypants = True
 html_use_opensearch = 'https://downloads.haskell.org/~ghc/master/users-guide'
 html_show_copyright = True
 
-# See GHC #15006
-mathjax_path = 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js'
+# See GHC #15006, #19423
+mathjax_path = 'https://cdn.jsdelivr.net/npm/mathjax@2/MathJax.js?config=TeX-AMS-MML_HTMLorMML '
 
 # If true, an OpenSearch description file will be output, and all pages will
 # contain a <link> tag referring to it.  The value of this option must be the
