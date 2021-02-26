@@ -2378,6 +2378,8 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_asm_liveness)
   , make_ord_flag defGhcFlag "ddump-asm-ssa"
         (setDumpFlag Opt_D_dump_asm_ssa)
+  , make_ord_flag defGhcFlag "ddump-asm-out-of-ssa"
+        (setDumpFlag Opt_D_dump_asm_out_of_ssa)
   , make_ord_flag defGhcFlag "ddump-asm-regalloc"
         (setDumpFlag Opt_D_dump_asm_regalloc)
   , make_ord_flag defGhcFlag "ddump-asm-conflicts"
@@ -3351,7 +3353,8 @@ fFlagsDeps = [
   flagSpec "show-loaded-modules"              Opt_ShowLoadedModules,
   flagSpec "whole-archive-hs-libs"            Opt_WholeArchiveHsLibs,
   flagSpec "keep-cafs"                        Opt_KeepCAFs,
-  flagSpec "link-rts"                         Opt_LinkRts
+  flagSpec "link-rts"                         Opt_LinkRts,
+  flagSpec "ssa-transform"                    Opt_SsaTransform
   ]
   ++ fHoleFlags
 
