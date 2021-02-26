@@ -134,6 +134,13 @@ void postEventGcStats  (Capability    *cap,
                         W_           par_tot_copied,
                         W_           par_balanced_copied);
 
+void postEventMemReturn (Capability *cap,
+                        EventCapsetID  heap_capset,
+                         uint32_t current_mblocks,
+                         uint32_t needed_mblocks,
+                         uint32_t returned_mblocks
+                        );
+
 void postTaskCreateEvent (EventTaskId taskId,
                           EventCapNo cap,
                           EventKernelThreadId tid);
