@@ -71,6 +71,7 @@ import GHC.Linker.Types
 
 import GHC.Utils.Outputable
 import GHC.Utils.Error
+import GHC.Utils.Fingerprint
 import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Utils.Monad
@@ -247,7 +248,9 @@ compileOne' m_tc_result mHscMessage
                               (output_fn,
                                Nothing,
                                Just (HscOut src_flavour
-                                            mod_name (HscUpdateSig iface hmi_details)))
+                                            mod_name
+                                            summary
+                                            (HscUpdateSig iface hmi_details)))
                               (Just basename)
                               Persistent
                               (Just location)
@@ -263,7 +266,7 @@ compileOne' m_tc_result mHscMessage
                    }, Interpreter) -> do
             -- In interpreted mode the regular codeGen backend is not run so we
             -- generate a interface without codeGen info.
-            final_iface <- mkFullIface hsc_env' partial_iface Nothing
+            final_iface <- mkFullIface hsc_env' summary partial_iface Nothing
             liftIO $ hscMaybeWriteIface logger dflags True final_iface mb_old_iface_hash (ms_location summary)
 
             (hasStub, comp_bc, spt_entries) <- hscInteractive hsc_env' cgguts mod_location
@@ -293,7 +296,7 @@ compileOne' m_tc_result mHscMessage
             (_, _, Just (iface, details)) <- runPipeline StopLn hsc_env'
                               (output_fn,
                                Nothing,
-                               Just (HscOut src_flavour mod_name status))
+                               Just (HscOut src_flavour mod_name summary status))
                               (Just basename)
                               Persistent
                               (Just location)
@@ -1259,6 +1262,12 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
   -- Setting source_unchanged to False tells the compiler that M.o is out of
   -- date wrt M.hs (or M.o doesn't exist) so we must recompile regardless.
         src_timestamp <- liftIO $ getModificationUTCTime (basename <.> suff)
+        mb_hi_timestamp <- liftIO $ do
+          hi_file_exists <- doesFileExist hi_file
+          if hi_file_exists
+            then Just <$> getModificationUTCTime hi_file
+            else return Nothing
+        src_hash <- liftIO $ getFileHash (basename <.> suff)
 
         source_unchanged <- liftIO $
           if not (isStopLn stop)
@@ -1266,11 +1275,11 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
                 --      (a) recompilation checker is off, or
                 --      (b) we aren't going all the way to .o file (e.g. ghc -S)
              then return SourceModified
-                -- Otherwise look at file modification dates
-             else do dest_file_mod <- sourceModified dest_file src_timestamp
+                -- Otherwise look at timestamps and hashes
+             else do dest_file_mod <- sourceModified dest_file mb_hi_timestamp
                      hie_file_mod <- if gopt Opt_WriteHie dflags
                                         then sourceModified hie_file
-                                                            src_timestamp
+                                                            mb_hi_timestamp
                                         else pure False
                      if dest_file_mod || hie_file_mod
                         then return SourceModified
@@ -1290,6 +1299,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
                                         ms_hspp_buf  = hspp_buf,
                                         ms_location  = location,
                                         ms_hs_date   = src_timestamp,
+                                        ms_hs_hash   = src_hash,
                                         ms_obj_date  = Nothing,
                                         ms_parsed_mod   = Nothing,
                                         ms_iface_date   = Nothing,
@@ -1309,10 +1319,10 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
         -- "driver" plugins may have modified the DynFlags so we update them
         setDynFlags (hsc_dflags plugin_hsc_env)
 
-        return (HscOut src_flavour mod_name result,
+        return (HscOut src_flavour mod_name mod_summary result,
                 panic "HscOut doesn't have an input filename")
 
-runPhase (HscOut src_flavour mod_name result) _ = do
+runPhase (HscOut src_flavour mod_name mod_summary result) _ = do
         dflags <- getDynFlags
         logger <- getLogger
         location <- getLocation src_flavour mod_name
@@ -1358,7 +1368,7 @@ runPhase (HscOut src_flavour mod_name result) _ = do
                       hscGenHardCode hsc_env' cgguts mod_location output_fn
 
                     let dflags = hsc_dflags hsc_env'
-                    final_iface <- liftIO (mkFullIface hsc_env' partial_iface (Just cg_infos))
+                    final_iface <- liftIO (mkFullIface hsc_env' mod_summary partial_iface (Just cg_infos))
                     let final_mod_details
                            | gopt Opt_OmitInterfacePragmas dflags
                            = mod_details
@@ -2074,17 +2084,22 @@ writeInterfaceOnlyMode dflags =
  gopt Opt_WriteInterface dflags &&
  NoBackend == backend dflags
 
--- | Figure out if a source file was modified after an output file (or if we
--- anyways need to consider the source file modified since the output is gone).
+-- | Figure out if the .hi file was modified after some other output file
+-- corresponding to that source file (or if we anyways need to consider the
+-- source file modified since the output is gone).
 sourceModified :: FilePath -- ^ destination file we are looking for
-               -> UTCTime  -- ^ last time of modification of source file
+               -> Maybe UTCTime  -- ^ last time of modification of corresponding .hi file, if it exists
                -> IO Bool  -- ^ do we need to regenerate the output?
-sourceModified dest_file src_timestamp = do
-  dest_file_exists <- doesFileExist dest_file
-  if not dest_file_exists
-    then return True       -- Need to recompile
-     else do t2 <- getModificationUTCTime dest_file
-             return (t2 <= src_timestamp)
+sourceModified dest_file mb_hi_timestamp =
+  case mb_hi_timestamp of
+    Just hi_timestamp -> do
+      dest_file_exists <- doesFileExist dest_file
+      if not dest_file_exists
+        then return True       -- Need to recompile
+         else do t2 <- getModificationUTCTime dest_file
+                 return (t2 <= hi_timestamp)
+    Nothing ->
+      return True
 
 -- | What phase to run after one of the backend code generators has run
 hscPostBackendPhase :: HscSource -> Backend -> Phase

@@ -83,6 +83,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Utils.Error
 import GHC.Utils.Logger
+import GHC.Utils.Fingerprint
 import GHC.SysTools.FileCleanup
 
 import GHC.Types.Basic
@@ -857,7 +858,7 @@ unload hsc_env stable_linkables -- Unload everything *except* 'stable_linkables'
      modules near the bottom of the tree have not changed.
 
    - to tell GHCi when it can load object code: we can only load object code
-     for a module when we also load object code fo  all of the imports of the
+     for a module when we also load object code for all of the imports of the
      module.  So we need to know that we will definitely not be recompiling
      any of these modules, and we can use the object code.
 
@@ -870,7 +871,9 @@ unload hsc_env stable_linkables -- Unload everything *except* 'stable_linkables'
   stableObject m =
         all stableObject (imports m)
         && old linkable does not exist, or is == on-disk .o
-        && date(on-disk .o) > date(.hs)
+        && (  date(on-disk .hs) == date recorded in .hi
+           || hash(on-disk .hs) == hash recorded in .hi
+           )
 
   stableBCO m =
         all stable (imports m)
@@ -2809,6 +2812,7 @@ makeNewModSummary hsc_env MakeNewModSummary{..} = do
 
   hi_timestamp <- maybeGetIfaceDate dflags nms_location
   hie_timestamp <- modificationTimeIfExists (ml_hie_file nms_location)
+  hs_hash <- liftIO $ getFileHash nms_src_fn
 
   extra_sig_imports <- findExtraSigImports hsc_env nms_hsc_src pi_mod_name
   (implicit_sigs, inst_deps) <- implicitRequirementsShallow hsc_env pi_theimps
@@ -2829,6 +2833,7 @@ makeNewModSummary hsc_env MakeNewModSummary{..} = do
             extra_sig_imports ++
             ((,) Nothing . noLoc <$> implicit_sigs)
         , ms_hs_date = nms_src_timestamp
+        , ms_hs_hash = hs_hash
         , ms_iface_date = hi_timestamp
         , ms_hie_date = hie_timestamp
         , ms_obj_date = obj_timestamp

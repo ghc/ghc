@@ -52,6 +52,7 @@ import GHC.Types.Unique.DFM
 import GHC.Types.Unique.DSet
 
 import GHC.Utils.Outputable
+import GHC.Utils.Fingerprint
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Error
@@ -744,6 +745,7 @@ summariseRequirement pn mod_name = do
 
     env <- getBkpEnv
     time <- liftIO $ getModificationUTCTime (bkp_filename env)
+    src_hash <- liftIO $ getFileHash (bkp_filename env)
     hi_timestamp <- liftIO $ modificationTimeIfExists (ml_hi_file location)
     hie_timestamp <- liftIO $ modificationTimeIfExists (ml_hie_file location)
     let loc = srcLocSpan (mkSrcLoc (mkFastString (bkp_filename env)) 1 1)
@@ -757,6 +759,7 @@ summariseRequirement pn mod_name = do
         ms_hsc_src = HsigFile,
         ms_location = location,
         ms_hs_date = time,
+        ms_hs_hash = src_hash,
         ms_obj_date = Nothing,
         ms_iface_date = hi_timestamp,
         ms_hie_date = hie_timestamp,
@@ -840,6 +843,7 @@ hsModuleToModSummary pn hsc_src modname
     -- This duplicates a pile of logic in GHC.Driver.Make
     env <- getBkpEnv
     time <- liftIO $ getModificationUTCTime (bkp_filename env)
+    src_hash <- liftIO $ getFileHash (bkp_filename env)
     hi_timestamp <- liftIO $ modificationTimeIfExists (ml_hi_file location)
     hie_timestamp <- liftIO $ modificationTimeIfExists (ml_hie_file location)
 
@@ -887,6 +891,7 @@ hsModuleToModSummary pn hsc_src modname
                     hpm_annotations = ApiAnns Map.empty Nothing Map.empty [] -- BOGUS
                 }),
             ms_hs_date = time,
+            ms_hs_hash = src_hash,
             ms_obj_date = Nothing, -- TODO do this, but problem: hi_timestamp is BOGUS
             ms_iface_date = hi_timestamp,
             ms_hie_date = hie_timestamp

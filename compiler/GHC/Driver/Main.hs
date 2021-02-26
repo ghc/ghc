@@ -552,7 +552,7 @@ hsc_typecheck keep_rn mod_summary mb_rdr_module = do
                     Nothing -> hscParse' mod_summary
             tc_result0 <- tcRnModule' mod_summary keep_rn' hpm
             if hsc_src == HsigFile
-                then do (iface, _, _) <- liftIO $ hscSimpleIface hsc_env tc_result0 Nothing
+                then do (iface, _, _) <- liftIO $ hscSimpleIface hsc_env tc_result0 mod_summary Nothing
                         ioMsgMaybe $
                             tcRnMergeSignatures hsc_env hpm tc_result0 iface
                 else return tc_result0
@@ -896,7 +896,7 @@ finish summary tc_result mb_old_hash = do
       -- and generate a simple interface.
       _ -> do
         (iface, mb_old_iface_hash, details) <- liftIO $
-          hscSimpleIface hsc_env tc_result mb_old_hash
+          hscSimpleIface hsc_env tc_result summary mb_old_hash
 
         liftIO $ hscMaybeWriteIface logger dflags True iface mb_old_iface_hash (ms_location summary)
 
@@ -1484,22 +1484,24 @@ hscSimplify' plugins ds_result = do
 -- generates interface files. See Note [simpleTidyPgm - mkBootModDetailsTc]
 hscSimpleIface :: HscEnv
                -> TcGblEnv
+               -> ModSummary
                -> Maybe Fingerprint
                -> IO (ModIface, Maybe Fingerprint, ModDetails)
-hscSimpleIface hsc_env tc_result mb_old_iface
-    = runHsc hsc_env $ hscSimpleIface' tc_result mb_old_iface
+hscSimpleIface hsc_env tc_result summary mb_old_iface
+    = runHsc hsc_env $ hscSimpleIface' tc_result summary mb_old_iface
 
 hscSimpleIface' :: TcGblEnv
+                -> ModSummary
                 -> Maybe Fingerprint
                 -> Hsc (ModIface, Maybe Fingerprint, ModDetails)
-hscSimpleIface' tc_result mb_old_iface = do
+hscSimpleIface' tc_result summary mb_old_iface = do
     hsc_env   <- getHscEnv
     details   <- liftIO $ mkBootModDetailsTc hsc_env tc_result
     safe_mode <- hscGetSafeMode tc_result
     new_iface
         <- {-# SCC "MkFinalIface" #-}
            liftIO $
-               mkIfaceTc hsc_env safe_mode details tc_result
+               mkIfaceTc hsc_env safe_mode details summary tc_result
     -- And the answer is ...
     liftIO $ dumpIfaceStats hsc_env
     return (new_iface, mb_old_iface, details)

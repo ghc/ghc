@@ -1,0 +1,74 @@
+thoughts
+
+- This is hard. Tempted to just unconditionally hash to start with.
+
+- I think checkStability *is* the one I want to modify; the one in Iface/Recomp
+  (checkVersions) says this, so I think it is irrelevant to what I'm doing:
+
+    -- This function is called in the recompilation checker after we have
+    -- determined that the module M being checked hasn't had any changes
+    -- to its source file since we last compiled M. So at this point in general
+
+- Where do SourceModified values come from? answer: stability check. yeah def
+  need to change stuff in there
+
+- The reason it was tempting to make changes in Iface/Recomp was that the old
+  iface had already been read by that point. But we only need to read a small
+  part of the iface to get the data we need for the stability check, so we
+  should just do that instead.
+
+- One problem with this is that checkStability is pure. This is potentially not
+  too big a problem, though, since checkStability is only ever called inside
+  load', which is in IO.
+
+- The information we need during checkStability is: *both* the hash stored in
+  the existing module iface, *and* the hash of the currently existing source
+  file. Perhaps checkStability can remain pure if we put both of these into the
+  ModSummary. The actual work to obtain these values can happen in
+  makeNewModSummary.
+
+- At what point do we write the hash into the .hi file? Passing the newly
+  computed hash out of the stability check is difficult unless we save it
+  inside the HscEnv somehow. The HscEnv already contains a ModSummary for each
+  module, perhaps it could go there? And then pull them back out of the HscEnv
+  and them to the ModIface in addFingerprints?
+
+=====
+
+- Note that I need to test "legacy" mode as well as normal mode.
+
+- What about other files (eg hie files)? Note that we need to recompile if an
+  hie file is desired but doesn' t exist, or if it is desired and the module is
+  up to date but the hie file isn't. Perhaps we can compare the timestamp of
+  the hie file to the timestamp of the hi file, since the latter ought to
+  always be written if anything is being written.
+
+- My original plan of getting the time and hash from the ModuleGraph in
+  addFingerprints is no good. I need to ideally get them before we lose the
+  ModSummary. Two options for this: either modify the value returned from
+  mkFullIface, or modify mkFullIface to accept the ModSummary. The former is
+  probably ideal since we ought to be updating these fields in every case.
+
+- Where is mkFullIface used?
+  GHC.Iface.Make:
+    mkIfaceTc ->
+      GHC.Driver.Main.hscSimpleIface' ->
+      hscSimpleIface ->
+      { finish, hsc_typecheck }
+  GHC.Driver.Pipeline:
+    compileOne'
+    runPhase (legacy mode)
+
+=====
+
+Plan:
+
+Phase 1: Write the source file hash into the interface file
+
+Phase 2: Update the stability check to use hashes rather than mtimes.
+
+Phase 3: Update so that we don't need to read the entire iface file while
+collecting info for the stability check
+
+Phase 4: Re-add mtimes into the stability check, so that we aren't required to
+collect hashes if mtimes haven't changed

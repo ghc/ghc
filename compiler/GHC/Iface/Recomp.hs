@@ -107,7 +107,7 @@ data RecompileRequired
   = UpToDate
        -- ^ everything is up to date, recompilation is not required
   | MustCompile
-       -- ^ The .hs file has been touched, or the .o/.hi file does not exist
+       -- ^ The .hs file has been modified, or the .o/.hi file does not exist
   | RecompBecause String
        -- ^ The .o/.hi files are up to date, but something else has changed
        -- to force recompilation; the String says what (one-line summary)
@@ -809,9 +809,10 @@ we use is:
 -- See Note [Fingerprinting IfaceDecls]
 addFingerprints
         :: HscEnv
+        -> ModSummary
         -> PartialModIface
         -> IO ModIface
-addFingerprints hsc_env iface0
+addFingerprints hsc_env ms iface0
  = do
    eps <- hscEPS hsc_env
    let
@@ -1109,6 +1110,8 @@ addFingerprints hsc_env iface0
       , mi_finsts      = not (null (mi_fam_insts iface0))
       , mi_exp_hash    = export_hash
       , mi_orphan_hash = orphan_hash
+      , mi_src_mtime   = ms_hs_date ms
+      , mi_src_hash    = ms_hs_hash ms
       , mi_warn_fn     = warn_fn
       , mi_fix_fn      = fix_fn
       , mi_hash_fn     = lookupOccEnv local_env
