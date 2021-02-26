@@ -516,23 +516,33 @@ cmmNativeGen logger dflags modLoc ncgImpl us fileIds dbgMap cmm count
                 FormatCMM
                 (vcat $ map (pprLiveCmmDecl platform) withLiveness)
 
-        let (ssaLive, usSsa) =
-                case livenessCfg of
-                        Just cfg -> {-# SCC "prunedSSA-Construction" #-}
-                                    initUs usLive
-                                    $ mapM (prunedSSAFromLiveCmmDecl platform cfg) withLiveness
-                        Nothing  -> ([], usLive)
+        -- Perform SSA construction & destruction to renumber disjoint webs
+        (renumberedCode, usSsa) <-
+         case (gopt Opt_SsaTransform dflags, livenessCfg) of
+                (True, Just cfg) -> do
+                        let (ssaLive, usSsa) = {-# SCC "prunedSSA-Construction" #-}
+                                               initUs usLive
+                                               $ mapM (prunedSSAFromLiveCmmDecl platform cfg) withLiveness
 
-        dumpIfSet_dyn logger dflags
-                Opt_D_dump_asm_ssa "Pruned SSA Constructed"
-                FormatCMM
-                (vcat $ map (pprSsaLiveCmmDecl platform) ssaLive)
+                        dumpIfSet_dyn logger dflags
+                                Opt_D_dump_asm_ssa "Pruned SSA Constructed"
+                                FormatCMM
+                                (vcat $ map (pprSsaLiveCmmDecl platform) ssaLive)
 
-        let renumberedCode =
-                if isJust livenessCfg
-                        then {-# SCC "ssa-destruction" #-}
-                             map (cssaToLiveCmmDecl platform) ssaLive
-                        else withLiveness
+                        let renumberedCode = {-# SCC "ssa-destruction" #-}
+                                             map (cssaToLiveCmmDecl platform) ssaLive
+
+                        dumpIfSet_dyn logger dflags
+                                Opt_D_dump_asm_out_of_ssa "After SSA Destruction"
+                                FormatCMM
+                                (vcat $ map (pprLiveCmmDecl platform) renumberedCode)
+
+                        let relive = initUs usSsa
+                                   $ mapM (regLiveness platform . reverseBlocksInTops) renumberedCode
+
+                        return relive
+
+                _                -> return (withLiveness, usLive)
 
         -- allocate registers
         (alloced, usAlloc, ppr_raStatsColor, ppr_raStatsLinear, raStats, stack_updt_blks) <-
