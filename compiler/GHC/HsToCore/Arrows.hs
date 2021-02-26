@@ -166,10 +166,6 @@ do_premap :: DsCmdEnv -> Type -> Type -> Type ->
 do_premap ids b_ty c_ty d_ty f g
    = do_compose ids b_ty c_ty d_ty (do_arr ids b_ty c_ty f) g
 
-mkFailExpr :: HsMatchContext GhcRn -> Type -> DsM CoreExpr
-mkFailExpr ctxt ty
-  = mkErrorAppDs pAT_ERROR_ID ty (matchContextErrString ctxt)
-
 -- construct CoreExpr for \ (a :: a_ty, b :: b_ty) -> a
 mkFstExpr :: Type -> Type -> DsM CoreExpr
 mkFstExpr a_ty b_ty = do

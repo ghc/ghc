@@ -45,10 +45,11 @@ lvl :: GHC.Prim.Addr#
 lvl = "spec-inline.hs:(19,5)-(29,25)|function go"#
 
 -- RHS size: {terms: 2, types: 2, coercions: 0, joins: 0/0}
-Roman.foo3 :: Int
+Roman.foo3 :: ()
 [GblId, Str=b, Cpr=b]
 Roman.foo3
-  = Control.Exception.Base.patError @'GHC.Types.LiftedRep @Int lvl
+  = Control.Exception.Base.patError
+      @'GHC.Types.LiftedRep @() lvl
 
 Rec {
 -- RHS size: {terms: 40, types: 5, coercions: 0, joins: 0/0}

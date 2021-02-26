@@ -30,6 +30,7 @@ module GHC.HsToCore.Utils (
         wrapBind, wrapBinds,
 
         mkErrorAppDs, mkCoreAppDs, mkCoreAppsDs, mkCastDs,
+        mkFailExpr,
 
         seqVar,
 
@@ -409,6 +410,57 @@ mkErrorAppDs err_id ty msg = do
         core_msg = Lit (mkLitString full_msg)
         -- mkLitString returns a result of type String#
     return (mkApps (Var err_id) [Type (getRuntimeRep ty), Type ty, core_msg])
+
+{-
+Note [Incompleteness and linearity]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The default branch of an incomplete pattern match is compiled to a call
+to 'error'.
+Because of linearity, we wrap it with an empty case. Example:
+
+f :: a %1 -> Bool -> a
+f x True = False
+
+Adding 'f x False = error "Non-exhaustive pattern..."' would violate
+the linearity of x.
+Instead, we use 'f x False = case error "Non-exhausive pattern..." :: () of {}'.
+This case expression accounts for linear variables by assigning bottom usage
+(See Note [Bottom as a usage] in GHC.Core.Multiplicity).
+This is done in mkFailExpr.
+We use '()' instead of the original return type ('a' in this case)
+because there might be levity polymorphism, e.g. in
+
+g :: forall (a :: TYPE r). (() -> a) %1 -> Bool -> a
+g x True = x ()
+
+adding 'g x False = case error "Non-exhaustive pattern" :: a of {}'
+would create an illegal levity-polymorphic case binder.
+This is important for pattern synonym matchers, which often look like this 'g'.
+
+Similarly, a hole
+h :: a %1 -> a
+h x = _
+is desugared to 'case error "Hole" :: () of {}'. Test: LinearHole.
+
+Instead of () we could use Data.Void.Void, but that would require
+moving Void to GHC.Types: partial pattern matching is used in modules
+that are compiled before Data.Void.
+We can use () even though it has a constructor, because
+Note [Case expression invariants] point 4 in GHC.Core is satisfied
+when the scrutinee is bottoming.
+
+You might wonder if this change slows down compilation, but the
+performance testsuite did not show up any regressions.
+
+For uniformity, calls to 'error' in both cases are wrapped even if -XLinearTypes
+is disabled.
+-}
+
+mkFailExpr :: HsMatchContext GhcRn -> Type -> DsM CoreExpr
+mkFailExpr ctxt ty
+  = do fail_expr <- mkErrorAppDs pAT_ERROR_ID unitTy (matchContextErrString ctxt)
+       return $ mkWildCase fail_expr (unrestricted unitTy) ty []
+       -- See Note [Incompleteness and linearity]
 
 {-
 'mkCoreAppDs' and 'mkCoreAppsDs' handle the special-case desugaring of 'seq'.
