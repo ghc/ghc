@@ -8,7 +8,8 @@ The simplifier utilities
 
 module GHC.Core.Opt.Simplify.Utils (
         -- Rebuilding
-        mkLam, mkCase, prepareAlts, tryEtaExpandRhs,
+        mkLam, mkCase, prepareAlts,
+        tryEtaExpandRhs, wantEtaExpansion,
 
         -- Inlining,
         preInlineUnconditionally, postInlineUnconditionally,
@@ -1576,15 +1577,16 @@ mkLam env bndrs body cont
 
     mkLam' dflags bndrs body
       | gopt Opt_DoEtaReduction dflags
-      , Just etad_lam <- tryEtaReduce bndrs body
+      , Just etad_lam <- tryEtaReduce True bndrs body
       = do { tick (EtaReduction (head bndrs))
            ; return etad_lam }
 
       | not (contIsRhs cont)   -- See Note [Eta-expanding lambdas]
       , sm_eta_expand (getMode env)
-      , any isRuntimeVar bndrs
+      , any isRuntimeVar bndrs  -- Only when there is at least one value lambda already
       , let body_arity = exprEtaExpandArity dflags body
-      , expandableArityType body_arity
+      , expandableArityType body_arity  -- This guard is only so that we only do
+                                        -- a tick if there so something to do
       = do { tick (EtaExpansion (head bndrs))
            ; let res = mkLams bndrs (etaExpandAT body_arity body)
            ; traceSmpl "eta expand" (vcat [text "before" <+> ppr (mkLams bndrs body)
@@ -1666,7 +1668,7 @@ tryEtaExpandRhs mode bndr rhs
   = do { let (join_bndrs, join_body) = collectNBinders join_arity rhs
              oss   = [idOneShotInfo id | id <- join_bndrs, isId id]
              arity_type | exprIsDeadEnd join_body = mkBotArityType oss
-                        | otherwise               = mkTopArityType oss
+                        | otherwise               = mkManifestArityType oss
        ; return (arity_type, rhs) }
          -- Note [Do not eta-expand join points]
          -- But do return the correct arity and bottom-ness, because
@@ -1675,7 +1677,7 @@ tryEtaExpandRhs mode bndr rhs
 
   | sm_eta_expand mode      -- Provided eta-expansion is on
   , new_arity > old_arity   -- And the current manifest arity isn't enough
-  , want_eta rhs
+  , wantEtaExpansion rhs
   = do { tick (EtaExpansion bndr)
        ; return (arity_type, etaExpandAT arity_type rhs) }
 
@@ -1687,23 +1689,18 @@ tryEtaExpandRhs mode bndr rhs
     old_arity = exprArity rhs
 
     arity_type = findRhsArity dflags bndr rhs old_arity
-                 `maxWithArity` idCallArity bndr
-    new_arity = arityTypeArity arity_type
+    new_arity  = arityTypeArity arity_type
 
-    -- See Note [Which RHSs do we eta-expand?]
-    want_eta (Cast e _)                  = want_eta e
-    want_eta (Tick _ e)                  = want_eta e
-    want_eta (Lam b e) | isTyVar b       = want_eta e
-    want_eta (App e a) | exprIsTrivial a = want_eta e
-    want_eta (Var {})                    = False
-    want_eta (Lit {})                    = False
-    want_eta _ = True
-{-
-    want_eta _ = case arity_type of
-                   ATop (os:_) -> isOneShotInfo os
-                   ATop []     -> False
-                   ABot {}     -> True
--}
+wantEtaExpansion :: CoreExpr -> Bool
+-- Mostly True; but False of PAPs which will immediately eta-reduce again
+-- See Note [Which RHSs do we eta-expand?]
+wantEtaExpansion (Cast e _)             = wantEtaExpansion e
+wantEtaExpansion (Tick _ e)             = wantEtaExpansion e
+wantEtaExpansion (Lam b e) | isTyVar b  = wantEtaExpansion e
+wantEtaExpansion (App e _)              = wantEtaExpansion e
+wantEtaExpansion (Var {})               = False
+wantEtaExpansion (Lit {})               = False
+wantEtaExpansion _                      = True
 
 {-
 Note [Eta-expanding at let bindings]

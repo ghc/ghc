@@ -297,8 +297,8 @@ simple_opt_expr env expr
        where
          (env', b') = subst_opt_bndr env b
     go_lam env bs' e
-       | Just etad_e <- tryEtaReduce bs e' = etad_e
-       | otherwise                         = mkLams bs e'
+       | Just etad_e <- tryEtaReduce True bs e' = etad_e
+       | otherwise                              = mkLams bs e'
        where
          bs = reverse bs'
          e' = simple_opt_expr env e
