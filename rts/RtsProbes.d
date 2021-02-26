@@ -75,6 +75,7 @@ provider HaskellEvent {
   probe heap__allocated (EventCapNo, EventCapsetID, StgWord64);
   probe heap__size (EventCapsetID, StgWord);
   probe heap__live (EventCapsetID, StgWord);
+  probe blocks__size (EventCapsetID, StgWord);
 
   /* capability events */
   probe startup (EventCapNo);

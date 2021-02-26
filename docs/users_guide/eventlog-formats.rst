@@ -242,23 +242,28 @@ A typical garbage collection will look something like the following:
 8. A :event-type:`GC_END` event will be emitted marking the end of the GC cycle.
 
 9. A :event-type:`HEAP_SIZE` event will be emitted giving the
-   cumulative heap allocations of the program until now.
+   current size of the heap, in bytes, calculated by how many megablocks
+   are allocated.
 
-10. A :event-type:`GC_STATS_GHC` event will be emitted
+10. A :event-type:`BLOCKS_SIZE` event will be emitted giving the
+   current size of the heap, in bytes, calculated by how many blocks
+   are allocated.
+
+11. A :event-type:`GC_STATS_GHC` event will be emitted
    containing various details of the collection and heap state.
 
-11. In the case of a major collection, a
+12. In the case of a major collection, a
     :event-type:`HEAP_LIVE` event will be emitted describing
     the current size of the live on-heap data.
 
-12. In the case of the :ghc-flag:`-threaded` RTS, a
+13. In the case of the :ghc-flag:`-threaded` RTS, a
     :event-type:`SPARK_COUNTERS` event will be emitted giving
     details on how many sparks have been created, evaluated, and GC'd.
 
-13. As mutator threads resume execution they will emit :event-type:`RUN_THREAD`
+14. As mutator threads resume execution they will emit :event-type:`RUN_THREAD`
     events.
 
-14. A :event-type:`MEM_RETURN` event will be emitted containing details about
+15. A :event-type:`MEM_RETURN` event will be emitted containing details about
     currently live mblocks, how many we think we need and whether we could return
     excess to the OS.
 
@@ -373,7 +378,16 @@ Heap events and statistics
    :field CapSetId: heap capability set
    :field Word64: heap size in bytes
 
-   Report the heap size.
+   Report the heap size, calculated by the number of megablocks currently allocated.
+
+.. event-type:: BLOCKS_SIZE
+
+   :tag: 91
+   :length: fixed
+   :field CapSetId: heap capability set
+   :field Word64: heap size in bytes
+
+   Report the heap size, calculated by the number of blocks currently allocated.
 
 .. event-type:: HEAP_LIVE
 
