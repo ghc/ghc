@@ -473,6 +473,8 @@ void dtraceUserMarkerWrapper(Capability *cap, char *msg);
                                 allocated)
 #define dtraceEventHeapSize(heap_capset, size)          \
     HASKELLEVENT_HEAP_SIZE(heap_capset, size)
+#define dtraceEventBlocksSize(heap_capset, size)        \
+    HASKELLEVENT_BLOCKS_SIZE(heap_capset, size)
 #define dtraceEventHeapLive(heap_capset, live)          \
     HASKELLEVENT_HEAP_LIVE(heap_capset, live)
 #define dtraceCapsetCreate(capset, capset_type)         \
@@ -539,6 +541,7 @@ void dtraceUserMarkerWrapper(Capability *cap, char *msg);
 #define dtraceEventHeapAllocated(cap, heap_capset,      \
                                  allocated)             /* nothing */
 #define dtraceEventHeapSize(heap_capset, size)          /* nothing */
+#define dtraceEventBlocksSize(heap_capset, size)        /* nothing */
 #define dtraceEventHeapLive(heap_capset, live)          /* nothing */
 #define dtraceCapCreate(cap)                            /* nothing */
 #define dtraceCapDelete(cap)                            /* nothing */
@@ -794,6 +797,14 @@ INLINE_HEADER void traceEventHeapSize(Capability *cap         STG_UNUSED,
 {
     traceHeapEvent(cap, EVENT_HEAP_SIZE, heap_capset, heap_size);
     dtraceEventHeapSize(heap_capset, heap_size);
+}
+
+INLINE_HEADER void traceEventBlocksSize(Capability *cap         STG_UNUSED,
+                                        CapsetID    heap_capset STG_UNUSED,
+                                        W_        heap_size   STG_UNUSED)
+{
+    traceHeapEvent(cap, EVENT_BLOCKS_SIZE, heap_capset, heap_size);
+    dtraceEventBlocksSize(heap_capset, heap_size);
 }
 
 INLINE_HEADER void traceEventHeapLive(Capability *cap         STG_UNUSED,

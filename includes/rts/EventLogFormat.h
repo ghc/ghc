@@ -128,6 +128,7 @@
  */
 
 #define EVENT_MEM_RETURN         90 /* (cap, current_mblocks, needed_mblocks, returned_mblocks) */
+#define EVENT_BLOCKS_SIZE        91 /* (heapcapset, size_bytes) */
 
 /* Range 100 - 139 is reserved for Mercury. */
 
