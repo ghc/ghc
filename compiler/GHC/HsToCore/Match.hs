@@ -812,11 +812,10 @@ matchEquations  :: HsMatchContext GhcRn
                 -> [MatchId] -> [EquationInfo] -> Type
                 -> DsM CoreExpr
 matchEquations ctxt vars eqns_info rhs_ty
-  = do  { let error_doc = matchContextErrString ctxt
+  = do  { match_result <- match vars rhs_ty eqns_info
 
-        ; match_result <- match vars rhs_ty eqns_info
+        ; fail_expr <- mkFailExpr ctxt rhs_ty
 
-        ; fail_expr <- mkErrorAppDs pAT_ERROR_ID rhs_ty error_doc
         ; extractMatchResult match_result fail_expr }
 
 -- | @matchSimply@ is a wrapper for 'match' which deals with the
