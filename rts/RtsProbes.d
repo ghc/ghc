@@ -70,6 +70,7 @@ provider HaskellEvent {
   probe gc__done (EventCapNo);
   probe gc__global__sync (EventCapNo);
   probe gc__stats (EventCapsetID, StgWord, StgWord, StgWord, StgWord, StgWord, StgWord, StgWord, StgWord);
+  probe mem__return (StgWord, StgWord, StgWord);
   probe heap__info (EventCapsetID, StgWord, StgWord, StgWord, StgWord, StgWord);
   probe heap__allocated (EventCapNo, EventCapsetID, StgWord64);
   probe heap__size (EventCapsetID, StgWord);

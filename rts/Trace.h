@@ -158,6 +158,11 @@ void traceEventGcStats_  (Capability *cap,
                           W_        par_tot_copied,
                           W_        par_balanced_copied);
 
+void traceEventMemReturn_  (Capability *cap,
+                          uint32_t    current_mblocks,
+                          uint32_t    needed_mblocks,
+                          uint32_t    returned_mblocks );
+
 /*
  * Record a spark event
  */
@@ -339,6 +344,7 @@ void flushTrace(void);
                            copied, slop, fragmentation, \
                            par_n_threads, par_max_copied, \
                            par_tot_copied, par_balanced_copied) /* nothing */
+#define traceEventMemReturn_(cap, current, needed, returned) /* nothing */
 #define traceHeapEvent(cap, tag, heap_capset, info1) /* nothing */
 #define traceEventHeapInfo_(heap_capset, gens, \
                             maxHeapSize, allocAreaSize, \
@@ -453,6 +459,8 @@ void dtraceUserMarkerWrapper(Capability *cap, char *msg);
                            par_max_copied,              \
                            par_balanced_copied,         \
                            par_tot_copied)
+#define dtraceEventMemReturn(current, needed, returned) \
+    HASKELLEVENT_MEM_RETURN(current, needed, returned)
 #define dtraceHeapInfo(heap_capset, gens,               \
                        maxHeapSize, allocAreaSize,      \
                        mblockSize, blockSize)           \
@@ -524,6 +532,7 @@ void dtraceUserMarkerWrapper(Capability *cap, char *msg);
                            par_max_copied,              \
                            par_tot_copied,              \
                            par_balanced_copied)         /* nothing */
+#define dtraceEventMemReturn(current, needed, returned) /* nothing */
 #define dtraceHeapInfo(heap_capset, gens,               \
                        maxHeapSize, allocAreaSize,      \
                        mblockSize, blockSize)           /* nothing */
@@ -741,6 +750,17 @@ INLINE_HEADER void traceEventGcStats(Capability *cap            STG_UNUSED,
                        copied, slop, fragmentation,
                        par_n_threads, par_max_copied,
                        par_tot_copied, par_balanced_copied);
+}
+
+INLINE_HEADER void traceEventMemReturn(Capability *cap            STG_UNUSED,
+                                     uint32_t    current_mblocks STG_UNUSED,
+                                     uint32_t    needed_mblocks  STG_UNUSED,
+                                     uint32_t    returned_mblocks STG_UNUSED)
+{
+    if (RTS_UNLIKELY(TRACE_gc)) {
+        traceEventMemReturn_(cap, current_mblocks, needed_mblocks, returned_mblocks);
+    }
+    dtraceEventMemReturn(current_mblocks, needed_mblocks, returned_mblocks);
 }
 
 INLINE_HEADER void traceEventHeapInfo(CapsetID    heap_capset   STG_UNUSED,
