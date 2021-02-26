@@ -1280,14 +1280,14 @@ That is, eliminate any empty constraint tuple.
   as `Foo` above
 
 * Do any users write such signatures?  Answer: yes, if they
-  use CPP.  See #19275 
+  use CPP.  See #19275
 
 * We must *only* do this tuple-elimination when desugaring a user-written
-  `HsType` into a `Type`.  It would be very wrong to do this 
+  `HsType` into a `Type`.  It would be very wrong to do this
   empty-tuple-elimination in general, because it affects the API of the
   function concerned.
 
-* It's slightly alarming changing the type that the user wrote.  
+* It's slightly alarming changing the type that the user wrote.
   For example, consider
      f :: forall a c. (c => a -> a) -> a -> a
   and the call
