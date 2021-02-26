@@ -173,6 +173,28 @@ static char *thread_stop_reasons[] = {
 #endif
 
 #if defined(DEBUG)
+static void vtraceCap_stderr(Capability *cap, char *msg, va_list ap)
+{
+    ACQUIRE_LOCK(&trace_utx);
+
+    tracePreface();
+    debugBelch("cap %d: ", cap->no);
+    vdebugBelch(msg,ap);
+    debugBelch("\n");
+
+    RELEASE_LOCK(&trace_utx);
+}
+
+static void traceCap_stderr(Capability *cap, char *msg, ...)
+{
+  va_list ap;
+  va_start(ap,msg);
+  vtraceCap_stderr(cap, msg, ap);
+  va_end(ap);
+}
+#endif
+
+#if defined(DEBUG)
 static void traceSchedEvent_stderr (Capability *cap, EventTypeNum tag,
                                     StgTSO *tso,
                                     StgWord info1 STG_UNUSED,
@@ -366,6 +388,23 @@ void traceEventGcStats_  (Capability *cap,
                          copied, slop, fragmentation,
                          par_n_threads, par_max_copied,
                          par_tot_copied, par_balanced_copied);
+    }
+}
+
+void traceEventMemReturn_ (Capability *cap,
+                          uint32_t    current_mblocks,
+                          uint32_t    needed_mblocks,
+                          uint32_t    returned_mblocks)
+{
+#if defined(DEBUG)
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
+        traceCap_stderr(cap, "Memory Return (Current: %u) (Needed: %u) (Returned: %u)"
+                       , current_mblocks, needed_mblocks, returned_mblocks);
+    } else
+#endif
+    {
+        postEventMemReturn( cap, CAPSET_HEAP_DEFAULT
+                          , current_mblocks, needed_mblocks, returned_mblocks);
     }
 }
 
@@ -675,27 +714,6 @@ void traceProfBegin(void)
 }
 #endif
 
-#if defined(DEBUG)
-static void vtraceCap_stderr(Capability *cap, char *msg, va_list ap)
-{
-    ACQUIRE_LOCK(&trace_utx);
-
-    tracePreface();
-    debugBelch("cap %d: ", cap->no);
-    vdebugBelch(msg,ap);
-    debugBelch("\n");
-
-    RELEASE_LOCK(&trace_utx);
-}
-
-static void traceCap_stderr(Capability *cap, char *msg, ...)
-{
-  va_list ap;
-  va_start(ap,msg);
-  vtraceCap_stderr(cap, msg, ap);
-  va_end(ap);
-}
-#endif
 
 void traceCap_(Capability *cap, char *msg, ...)
 {

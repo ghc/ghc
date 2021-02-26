@@ -127,6 +127,8 @@
  * see http://www.mathematik.uni-marburg.de/~eden/
  */
 
+#define EVENT_MEM_RETURN         90 /* (cap, current_mblocks, needed_mblocks, returned_mblocks) */
+
 /* Range 100 - 139 is reserved for Mercury. */
 
 /* Range 140 - 159 is reserved for Perf events. */
