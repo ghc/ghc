@@ -488,7 +488,8 @@ lintCoreBindings dflags pass local_in_scope binds
     flags = (defaultLintFlags dflags)
                { lf_check_global_ids = check_globals
                , lf_check_inline_loop_breakers = check_lbs
-               , lf_check_static_ptrs = check_static_ptrs }
+               , lf_check_static_ptrs = check_static_ptrs
+               , lf_check_linearity = check_linearity }
 
     -- See Note [Checking for global Ids]
     check_globals = case pass of
@@ -509,6 +510,12 @@ lintCoreBindings dflags pass local_in_scope binds
                           CoreTidy              -> RejectEverywhere
                           CorePrep              -> AllowAtTopLevel
                           _                     -> AllowAnywhere
+
+    -- See Note [Linting linearity]
+    check_linearity = gopt Opt_DoLinearCoreLinting dflags || (
+                        case pass of
+                          CoreDesugar -> True
+                          _ -> False)
 
     (_, dups) = removeDups compare binders
 
@@ -2641,11 +2648,12 @@ to work with Linear Lint:
     in f True
   uses 'x' linearly, but this is not seen by the linter.
   Plan: make let-bound variables remember the usage environment.
-  See test LinearLetRec and https://github.com/tweag/ghc/issues/405.
+  See ticket #18694.
 
 We plan to fix both of the issues in the very near future.
-For now, linear Lint is disabled by default and
-has to be enabled manually with -dlinear-core-lint.
+For now, -dcore-lint enables only linting output of the desugarer,
+and full Linear Lint has to be enabled separately with -dlinear-core-lint.
+Ticket #19165 concerns enabling Linear Lint with -dcore-lint.
 -}
 
 instance Applicative LintM where
