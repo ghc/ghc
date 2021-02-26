@@ -870,8 +870,7 @@ cmpLit (LitFloat     a)     (LitFloat      b)     = a `compare` b
 cmpLit (LitDouble    a)     (LitDouble     b)     = a `compare` b
 cmpLit (LitLabel     a _ _) (LitLabel      b _ _) = a `lexicalCompareFS` b
 cmpLit (LitNumber nt1 a)    (LitNumber nt2  b)
-  | nt1 == nt2 = a   `compare` b
-  | otherwise  = nt1 `compare` nt2
+  = (nt1 `compare` nt2) `mappend` (a `compare` b)
 cmpLit (LitRubbish b1)      (LitRubbish b2)       = b1 `compare` b2
 cmpLit lit1 lit2
   | litTag lit1 < litTag lit2 = LT
