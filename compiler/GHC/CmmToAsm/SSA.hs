@@ -29,7 +29,7 @@ import qualified Data.IntMap as IM
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IS
 import Data.List (intersect)
-import Data.Maybe (fromMaybe, mapMaybe)
+import Data.Maybe
 import Data.Tree (Tree)
 import qualified Data.Tree as T
 import Data.Tuple (swap)
@@ -64,7 +64,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic (panic)
 
 -- Debugging only
--- import Debug.Trace
+-- import GHC.Driver.Ppr
 
 
 -- | Wrapping SSA-Blocks in Top Level CmmDecl
@@ -173,6 +173,7 @@ prunedSSAFromLiveCmmDecl platform cfg liveCmmDecl
 
         return (ssaCmmDecl)
 
+
 ------- SSA construction ----------------------------------
 
 constructPrunedSSA
@@ -195,6 +196,9 @@ constructPrunedSSA platform cfg (CmmProc liveInfo lbl live sccs)
                           then head entries
                           else panic "GHC.CmmToAsm.SSA.toPrunedSSA: No proc entry points!"
          let defsites   = calcDefSites platform sccs
+
+         -- -- DEBUG
+         -- (pprTraceIt "Defsites: " defsites) `seq` return ()
 
          -- Bring CFG in shape for dom. Taken from GHC.CmmToAsm.CFG.loopInfo
          -- TODO: Refactor - extract to Utils or something
@@ -225,7 +229,7 @@ toIntMap :: LabelMap a -> IntMap a
 toIntMap m     = IM.fromList $ map (\(x,y) -> (fromBlockId x,y)) $ mapToList m
 
 
--- Adapted from "Modern Compiler Implementation in ML" by A.W. Appel
+-- Adapted from "Engineering a Compiler" by Cooper, Torczon
 placePhis
         :: Instruction instr
         => CFG                  -- ^ Control Flow Graph
@@ -239,9 +243,6 @@ placePhis cfg idomList defsites liveIns sccs
  = map (fmap (mkSSABasicBlock allPhis)) sccs
  where
          -- 'Globals' as in alive outside of block with definition.
-         -- See Note [Unique Determinism and code generation]
-         -- Order of Phi-nodes not important, only order of copies inserted
-         -- in out-of-ssa transformation.
          globals = filterUniqSet isVirtualReg
                  $ unionManyUniqSets
                  $ mapElems liveIns
@@ -254,18 +255,21 @@ placePhis cfg idomList defsites liveIns sccs
               $ domFrontiers cfg idomList
 
          -- Map of Blocks to Phi-Funcs to insert
-         allPhis = foldl' overVar mapEmpty $ nonDetUFMToList globalDefs
+         allPhis = foldl' overVar mapEmpty $ nonDetUFMToList
+                 -- $ pprTraceIt "globalDefs: "
+                globalDefs
          -- ^ See Note [Unique Determinism and code generation]
 
          -- Top level fun for mkVarPhi
-         overVar !phis (u, defs) = mkVarPhi phis setEmpty u $ nonDetEltsUniqSet defs
+         overVar !phis (u, defs) = mkVarPhi phis setEmpty u
+                                 $ nonDetEltsUniqSet defs
          -- ^ See Note [Unique Determinism and code generation]
 
          -- Makes all Phi-Funcs for a variable
          mkVarPhi :: BlockMap [PhiFun] -> LabelSet -> RegId -> [BlockId] -> BlockMap [PhiFun]
          mkVarPhi phis _ _ []           = phis
          mkVarPhi phis visited u (b:bs)
-                = let visited' = setInsert b visited
+                = let visited'    = setInsert b visited
                       (phis', wl) = overDF phis visited' u b
                   in  mkVarPhi phis' visited' u (wl ++ bs)
 
@@ -274,7 +278,7 @@ placePhis cfg idomList defsites liveIns sccs
          overDF phis visited u n =
                 foldl'
                 (\(ph, wl) x
-                        -> (if isLive u x          then mkBlockPhi ph u x else ph,
+                        -> (if isLive    u x       then mkBlockPhi ph u x else ph,
                             if setMember x visited then wl                else x:wl))
                 (phis, [])
                 $ df n
@@ -295,7 +299,7 @@ placePhis cfg idomList defsites liveIns sccs
          -- Check if Phi for this unique already present
          present u = any (\(PhiF oldId _ _) -> oldId == u)
 
-         -- Is vreg live in block b?
+         -- Is vreg live in block b? We don't want to insert dead Phi-nodes
          isLive u b = maybe False (elemUniqSet_Directly u) (mapLookup b liveIns)
 
 
@@ -316,7 +320,7 @@ adjustUDFM_M f tbl bid = sequence $ adjustUDFM (f =<<) (mapUDFM return tbl) bid
 --   but we have uniques, so we just generate new ones. The only downside is,
 --   that it's harder to debug just looking at the code.
 --
---   Adapted from "Modern Compiler Implementation in ML" by A.W. Appel
+--   Adapted from "Engineering a Compiler" by Cooper, Torczon
 renameVars
         :: Instruction instr
         => Platform
@@ -329,7 +333,15 @@ renameVars
 
 renameVars platform cfg blkTbl liveIns (T.Node n sub)
  = do
+        enterScope
+
         let bid = toBlockId n
+
+        -- Update Live_in set by applying renames
+        rd           <- gets stateReachingDef
+        let liveIns1 = mapAdjust (
+                mapUniqSet (replaceReg $ (peekDef rd) . getUnique))
+                bid liveIns
 
         blkTbl1 <- adjustUDFM_M
                         (renameVars_block platform)
@@ -338,13 +350,13 @@ renameVars platform cfg blkTbl liveIns (T.Node n sub)
 
         blkTbl2 <- addSuccessorPhiArgs cfg blkTbl1 bid
 
-        -- Update Live_in set
+        -- Update Live_in part 2: Now that defintion of Phi has been renamed.
         -- With "Phi functions are parallel copies"-semantics, given a_n = Phi(a_0,...),
         -- a_n is in Live_in of Block b_n and for k < n, a_k is in Live_out of Block b_k
-        let mBlk     = lookupUDFM blkTbl2 bid
+        let mBlk     = lookupUDFM blkTbl bid
         let mPhis    = fmap (ssaBBlockPhiFuns . sccBitBlock) mBlk
         let liveIns2 = maybe liveIns
-                        (\phis -> mapAdjust (\rs -> foldl' mergeMaybe rs phis) bid liveIns)
+                        (\phis -> mapAdjust (\rs -> foldl' mergeMaybe rs phis) bid liveIns1)
                         mPhis
 
         -- Recursing into successors in DomTree, i.e., DFS pre-order iteration
@@ -445,34 +457,36 @@ renameVars_instr
 
 renameVars_instr platform (LiveInstr instr mLiveness)
  = do
-        let RU rlRead rlWritten = regUsageOfInstr platform instr
-        let rsRead              = mkUniqSet rlRead
-        let rsWritten           = mkUniqSet rlWritten
-        let rsModified          = rsRead `intersectUniqSets` rsWritten
-        let rsUsed              = rsRead `unionUniqSets` rsWritten
+         let RU rlRead rlWritten = regUsageOfInstr platform instr
+         let rsRead              = filterUniqSet isVirtualReg $ mkUniqSet rlRead
+         let rsWritten           = filterUniqSet isVirtualReg $ mkUniqSet rlWritten
+         let rsModified          = rsRead `intersectUniqSets` rsWritten
+         let rsUsed              = rsRead `unionUniqSets` rsWritten
 
-        -- Excluding modified vregs from definitions, i.e., 2-Addr instructions
-        -- and things like `inc x`, bc. we can't use 2 separate names for these.
-        let defs                = maybe emptyUniqSet
+         -- Excluding modified vregs from definitions, i.e., 2-Addr instructions
+         -- and things like `inc x`, bc. we can't use 2 separate names for these.
+         let defs                = filterUniqSet isVirtualReg
+                                 $ maybe emptyUniqSet
                                         (\l -> liveBorn l `minusUniqSet` rsModified) mLiveness
 
-        -- Rename uses
-        -- No non-determinism, See Note [Unique Determinism and code generation]
-        renames         <- mapM getRenamePair $ nonDetEltsUniqSet (rsUsed `minusUniqSet` defs)
-        let instr_use   = foldl' (uncurry . patchInstr) instr renames
+         -- Rename uses
+         -- No non-determinism, See Note [Unique Determinism and code generation]
+         mRenames        <- mapM getRenamePair $ nonDetEltsUniqSet (rsUsed `minusUniqSet` defs)
+         let renames     = catMaybes mRenames
+         let instr_use   = foldl' (uncurry . patchInstr) instr renames
 
-        -- Introduce new names for definitions and save them to state
-        -- No non-determinism, See Note [Unique Determinism and code generation]
-        defRenames      <- mapM (newVregDef) $ nonDetEltsUniqSet defs
-        let instr_def   = foldl' (uncurry . patchInstr) instr_use defRenames
+         -- Introduce new names for definitions and save them to state
+         -- No non-determinism, See Note [Unique Determinism and code generation]
+         defRenames      <- mapM (newVregDef) $ nonDetEltsUniqSet defs
+         let instr_def   = foldl' (uncurry . patchInstr) instr_use defRenames
 
-        -- Update Liveness info
-        let allRenames     = (listToUFM renames) `addListToUFM` defRenames
-        let mLiveness'     = updateLiveness allRenames <$> mLiveness
+         -- Update Liveness info
+         s <- get
+         let mLiveness' = updateLiveness (\r -> evalState (reachingDef $ getUnique r) s) <$> mLiveness
 
-        return (LiveInstr instr_def mLiveness')
+         return (LiveInstr instr_def mLiveness')
  where
-         getRenamePair r = (r,) <$> (reachingDefOrDefault $ getUnique r)
+         getRenamePair r = fmap (r,) <$> (reachingDef $ getUnique r)
 
          newVregDef r
                 = let ru = getUnique r
@@ -483,9 +497,9 @@ renameVars_instr platform (LiveInstr instr mLiveness)
 
 -- | Update instructon liveness info
 --   No non-determinism, See Note [Unique Determinism and code generation]
-updateLiveness :: RegMap RegId -> Liveness -> Liveness
+updateLiveness :: (Reg -> Maybe RegId) -> Liveness -> Liveness
 updateLiveness renames (Liveness born dieRead dieWrite)
- = let upd = mkUniqSet . map (replaceReg (lookupUFM renames)) . nonDetEltsUniqSet
+ = let upd = mkUniqSet . map (replaceReg renames) . nonDetEltsUniqSet
    in  Liveness (upd born) (upd dieRead) (upd dieWrite)
 
 
@@ -501,6 +515,7 @@ patchInstr instr reg nu
 
         RegReal{}
                 -> instr
+
 
 -- Taken from Spill.hs, should also extract
 patchReg
@@ -554,7 +569,7 @@ cssaToLiveCmmDecl platform (CmmProc liveInfo lbl live blkTbl)
 --   build webs.
 discoverPhiWebs
         :: BlockLookupTable instr
-        -> UniqSDFM RegId RegId
+        -> UniqSDFM RegId RegId         -- ^ Disjoint-set: Names in web to new name
 
 discoverPhiWebs blkTbl
  = let bitPhis ssaBit = ssaBBlockPhiFuns $ sccBitBlock ssaBit
@@ -592,7 +607,7 @@ renamePhiWebs_instr platform dset (LiveInstr instr mLiveness)
         rsUsed     = nubOrd $ filter isVirtualReg (rlRead ++ rlWritten)
         rsRenames  = mapMaybe (\r -> (r,) <$> (lookupUSDFM dset $ getUnique r)) rsUsed
         instr'     = foldl' (uncurry . patchInstr) instr rsRenames
-        mLiveness' = updateLiveness (listToUFM rsRenames) <$> mLiveness
+        mLiveness' = updateLiveness (lookupUFM $ listToUFM rsRenames) <$> mLiveness
 
    in   LiveInstr instr' mLiveness'
 
@@ -647,6 +662,7 @@ calcDefSites platform sccs
 
         merge = plusUFM_C unionUniqSets
 
+
 -- | Slurp out value definitions from block, i.e., which vregs are born
 --   in this block. Note that modifying instructions are ignored, as we
 --   can't introduce a new name for them.
@@ -674,6 +690,7 @@ slurpDefs platfrom defs (BasicBlock bid instrs)
          addDefs oldDefs newDefs = plusUFM_C unionUniqSets oldDefs
                                  $ zipToUFM newDefs (repeat $ unitUniqSet bid)
 
+
 -- | Calculate dominance frontier for each node in graph.
 -- TODO: Maybe implement this internally in Dominators, s.t. we can reuse the internal state
 domFrontiers
@@ -688,7 +705,7 @@ domFrontiers cfg idomList
 
          df_inner n df r = if Just r == (IM.lookup n idoms)
                            then df
-                           else let df' = (IM.insertWith (++) n [r] df)
+                           else let df' = (IM.insertWith (++) r [n] df)
                                 in case IM.lookup r idoms of
                                         Nothing -> df'
                                         Just r' -> df_inner n df' r'
@@ -700,11 +717,10 @@ domFrontiers cfg idomList
                       then df
                       else foldl' (df_inner n) df preds
 
-
-
          dominanceFrontiers = foldl' df_preds IM.empty cfgNodeIds
 
    in    toBlockMap $ IM.toList dominanceFrontiers
+
 
 -- | Build the dominator tree from given list of immediate dominators
 --   (Adapted from GHC.CmmToAsm.CFG.Dominators.domTree)
@@ -716,16 +732,6 @@ domTreeFromList root idomList
    in asTree (r,tg)
 
 
--- | Count number of predessecors of nodes.
--- Is there a better way to do this?
--- numPred :: CFG -> BlockMap Int
--- numPred cfg = count mapEmpty $ edgeList cfg
---  where
---          count m [] = m
---          count m ((_, to):rem)
---                 = let m' = mapAlter (fmap succ) to m
---                   in  count m' rem
-
 getPredecessors :: CFG -> BlockId -> [BlockId]
 getPredecessors cfg n = let reverseCfg = reverseEdges cfg
                         in  getSuccessors reverseCfg n
@@ -734,7 +740,6 @@ getPredecessors cfg n = let reverseCfg = reverseEdges cfg
 fromBlockId :: BlockId -> Int
 fromBlockId= getKey . getUnique
 
-
 toBlockId :: Int -> BlockId
 toBlockId = mkBlockId . mkUniqueGrimily
 
@@ -742,7 +747,7 @@ toBlockMap :: [(Int, [Int])] -> BlockMap [BlockId]
 toBlockMap xs = mapFromList $ map (bimap toBlockId (map toBlockId)) xs
 
 -- Rename Monad -----------------------------------------------------
-
+-- TODO: add Stats
 type RenameM a
         = State RenameS a
 
@@ -756,7 +761,7 @@ data RenameS
         , stateReachingDef  :: UniqFM RegId [RegId]
 
           -- | New definitions in current scope. Used to pop defs in rename.
-        , stateScopedDefs   :: [RegId] }
+        , stateScopedDefs   :: [[RegId]] }
 
 
 -- | Create a new renamer state.
@@ -786,25 +791,34 @@ newDef old
          nUnique        <- newUnique
          modify $ \s -> s { stateReachingDef
                 = alterUFM_Directly (pushDef nUnique) (stateReachingDef s) old
-                , stateScopedDefs = (old:stateScopedDefs s) }
+                , stateScopedDefs = addTop (stateScopedDefs s) old }
          return (nUnique)
+ where
+         addTop (xs:xss) y = ((y:xs):xss)
+         addTop [] _       = panic "GHC.CmmToAsm.SSA.newDef: Error, no open scope!"
 
+
+-- | Entering a scope means adding a new scope stack
+enterScope :: RenameM ()
+enterScope = modify $ \s -> s {
+        stateScopedDefs = []:(stateScopedDefs s)
+}
 
 -- | Leaving a scope means popping all reaching definitions defined in this scope.
 leaveScope :: RenameM ()
 leaveScope = modify $ \s -> s {
-        stateReachingDef = foldl' popDef (stateReachingDef s) (stateScopedDefs s),
-        stateScopedDefs  = []
+        stateReachingDef = foldl' popDef (stateReachingDef s) $ head (stateScopedDefs s),
+        stateScopedDefs  = tail $ stateScopedDefs s
 }
 
 -- | Return current reaching definition of 'old' or Nothing.
--- reachingDef :: RegId -> RenameM (Maybe RegId)
--- reachingDef old
---  = do
---          rd             <- gets stateReachingDef
---          let mStack     = lookupUFM_Directly rd old
---          let res        = mStack >>= listToMaybe
---          return res
+reachingDef :: RegId -> RenameM (Maybe RegId)
+reachingDef old
+ = do
+         rd             <- gets stateReachingDef
+         let mStack     = lookupUFM_Directly rd old
+         let res        = mStack >>= listToMaybe
+         return res
 
 
 -- | Will return the current reaching name of 'old', or 'old'
