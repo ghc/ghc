@@ -984,11 +984,14 @@ countAllocdBlocks(bdescr *bd)
     return n;
 }
 
-void returnMemoryToOS(uint32_t n /* megablocks */)
+// Returns the number of blocks which were able to be freed
+uint32_t returnMemoryToOS(uint32_t n /* megablocks */)
 {
     bdescr *bd;
     uint32_t node;
     StgWord size;
+    uint32_t init_n;
+    init_n = n;
 
     // ToDo: not fair, we free all the memory starting with node 0.
     for (node = 0; n > 0 && node < n_numa_nodes; node++) {
@@ -1028,6 +1031,7 @@ void returnMemoryToOS(uint32_t n /* megablocks */)
                        n);
         }
     );
+    return (init_n - n);
 }
 
 /* -----------------------------------------------------------------------------

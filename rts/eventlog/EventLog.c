@@ -129,6 +129,7 @@ char *EventDesc[] = {
   [EVENT_REQUEST_PAR_GC]      = "Request parallel GC",
   [EVENT_GC_GLOBAL_SYNC]      = "Synchronise stop-the-world GC",
   [EVENT_GC_STATS_GHC]        = "GC statistics",
+  [EVENT_MEM_RETURN]          = "Memory return statistics",
   [EVENT_HEAP_INFO_GHC]       = "Heap static parameters",
   [EVENT_HEAP_ALLOCATED]      = "Total heap mem ever allocated",
   [EVENT_HEAP_SIZE]           = "Current heap size",
@@ -465,6 +466,11 @@ init_event_types(void)
                                + sizeof(StgWord64) * 3
                                + sizeof(StgWord32)
                                + sizeof(StgWord64) * 3;
+            break;
+        case EVENT_MEM_RETURN:        // (heap_capset, current_mblocks
+                                      // , needed_mblocks, returned_mblocks)
+            eventTypes[t].size = sizeof(EventCapsetID)
+                               + sizeof(StgWord32) * 3;
             break;
 
         case EVENT_TASK_CREATE:   // (taskId, cap, tid)
@@ -1157,6 +1163,22 @@ void postEventGcStats  (Capability    *cap,
     postWord64(eb, par_max_copied);
     postWord64(eb, par_tot_copied);
     postWord64(eb, par_balanced_copied);
+}
+
+void postEventMemReturn  (Capability    *cap,
+                          EventCapsetID heap_capset,
+                          uint32_t current_mblocks,
+                          uint32_t needed_mblocks,
+                          uint32_t returned_mblocks)
+{
+    EventsBuf *eb = &capEventBuf[cap->no];
+    ensureRoomForEvent(eb, EVENT_MEM_RETURN);
+
+    postEventHeader(eb, EVENT_MEM_RETURN);
+    postCapsetID(eb, heap_capset);
+    postWord32(eb, current_mblocks);
+    postWord32(eb, needed_mblocks);
+    postWord32(eb, returned_mblocks);
 }
 
 void postTaskCreateEvent (EventTaskId taskId,

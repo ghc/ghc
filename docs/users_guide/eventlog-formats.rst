@@ -258,6 +258,10 @@ A typical garbage collection will look something like the following:
 13. As mutator threads resume execution they will emit :event-type:`RUN_THREAD`
     events.
 
+14. A :event-type:`MEM_RETURN` event will be emitted containing details about
+    currently live mblocks, how many we think we need and whether we could return
+    excess to the OS.
+
 Note that in the case of the concurrent non-moving collector additional events
 will be emitted during the concurrent phase of collection. These are described
 in :ref:`nonmoving-gc-events`.
@@ -319,13 +323,14 @@ in :ref:`nonmoving-gc-events`.
    :field Word16: generation of collection
    :field Word64: bytes copied
    :field Word64: bytes of slop found
-   :field Word64: TODO
+   :field Word64: bytes of fragmentation, the difference between total mblock size
+                  and total block size. When all mblocks are full of full blocks,
+                  this number is 0.
    :field Word64: number of parallel garbage collection threads
    :field Word64: maximum number of bytes copied by any single collector thread
    :field Word64: total bytes copied by all collector threads
 
-   Report various information about the heap configuration. Typically produced
-   during RTS initialization..
+   Report various information about a major collection.
 
 .. event-type:: GC_GLOBAL_SYNC
 
@@ -333,6 +338,21 @@ in :ref:`nonmoving-gc-events`.
    :length: fixed
 
    TODO
+
+.. event-type:: MEM_RETURN
+
+   :tag: 90
+   :length: fixed
+   :field CapSetId: heap capability set
+   :field Word32: currently allocated mblocks
+   :field Word32: the number of mblocks we would like to retain
+   :field Word32: the number of mblocks which we returned to the OS
+
+   Report information about currently allocation megablocks and attempts
+   made to return them to the operating system. If your heap is fragmented
+   then the current value will be greater than needed value but returned will
+   be less than the difference between the two.
+
 
 Heap events and statistics
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
