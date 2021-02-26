@@ -542,7 +542,7 @@ coreToStgApp f args ticks = do
                 -- Some primitive operator that might be implemented as a library call.
                 -- As noted by Note [Eta expanding primops] in GHC.Builtin.PrimOps
                 -- we require that primop applications be saturated.
-                PrimOpId op      -> ASSERT( saturated )
+                PrimOpId op      -> ASSERT2( saturated, ppr f <+> ppr args )
                                     StgOpApp (StgPrimOp op) args' res_ty
 
                 -- A call to some primitive Cmm function.
