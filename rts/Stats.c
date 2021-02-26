@@ -633,6 +633,9 @@ stat_endGC (Capability *cap, gc_thread *initiating_gct, W_ live, W_ copied, W_ s
         traceEventHeapSize(cap,
                            CAPSET_HEAP_DEFAULT,
                            mblocks_allocated * MBLOCK_SIZE);
+        traceEventBlocksSize(cap,
+                           CAPSET_HEAP_DEFAULT,
+                           n_alloc_blocks * BLOCK_SIZE);
     }
     RELEASE_LOCK(&stats_mutex);
 }
