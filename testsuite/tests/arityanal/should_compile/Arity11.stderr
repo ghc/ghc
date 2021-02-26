@@ -1,6 +1,6 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 129, types: 94, coercions: 0, joins: 0/5}
+Result size of Tidy Core = {terms: 127, types: 93, coercions: 0, joins: 0/5}
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 F11.fib1 :: Integer
@@ -34,8 +34,8 @@ F11.f11_fib
 end Rec }
 
 -- RHS size: {terms: 52, types: 26, coercions: 0, joins: 0/5}
-F11.$wfib [InlPrag=[2]] :: forall {a1} {a2}. (a1 -> a1 -> Bool) -> (Num a1, Num a2) => a1 -> a2
-[GblId, Arity=4, Str=<SCS(C1(L))><LP(A,LCL(C1(L)),A,A,A,A,L)><LP(LCL(C1(L)),A,A,A,A,A,MCM(L))><L>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [60 150 60 0] 460 0}]
+F11.$wfib [InlPrag=[2]] :: forall {a} {p}. (a -> a -> Bool) -> (Num a, Num p) => a -> p
+[GblId, Arity=4, Str=<MCM(CS(U))><UP(A,UCU(CS(U)),A,A,A,A,U)><UP(UCU(CS(U)),A,A,A,A,A,1C1(U))><U>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [60 150 60 0] 460 0}]
 F11.$wfib
   = \ (@a) (@a1) (ww :: a -> a -> Bool) (w :: Num a) (w1 :: Num a1) (w2 :: a) ->
       let {
@@ -55,8 +55,8 @@ F11.$wfib
         [LclId]
         lvl3 = fromInteger @a w F11.fib1 } in
       letrec {
-        fib4 [Occ=LoopBreaker, Dmd=SCS(L)] :: a -> a1
-        [LclId, Arity=1, Str=<L>, Unf=OtherCon []]
+        fib4 [Occ=LoopBreaker, Dmd=MCM(U)] :: a -> p
+        [LclId, Arity=1, Str=<U>, Unf=OtherCon []]
         fib4
           = \ (ds :: a) ->
               case ww ds lvl3 of {
@@ -70,7 +70,7 @@ F11.$wfib
       fib4 w2
 
 -- RHS size: {terms: 14, types: 19, coercions: 0, joins: 0/0}
-fib [InlPrag=[2]] :: forall {a1} {a2}. (Eq a1, Num a1, Num a2) => a1 -> a2
+fib [InlPrag=[2]] :: forall {a} {p}. (Eq a, Num a, Num p) => a -> p
 [GblId,
  Arity=4,
  Str=<1P(SCS(C1(L)),A)><LP(A,LCL(C1(L)),A,A,A,A,L)><LP(LCL(C1(L)),A,A,A,A,A,L)><L>,
@@ -79,23 +79,35 @@ fib [InlPrag=[2]] :: forall {a1} {a2}. (Eq a1, Num a1, Num a2) => a1 -> a2
 fib = \ (@a) (@a1) (w :: Eq a) (w1 :: Num a) (w2 :: Num a1) (w3 :: a) -> case w of { GHC.Classes.C:Eq ww1 ww2 -> F11.$wfib @a @a1 ww1 w1 w2 w3 }
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-F11.f3 :: Integer
+F11.f4 :: Integer
 [GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
-F11.f3 = 1000
+F11.f4 = 1000
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-F11.f11_x :: Integer
+F11.f3 :: Integer
 [GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False, WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 20 0}]
-F11.f11_x = F11.f11_fib F11.f3
+F11.f3 = F11.f11_fib F11.f4
 
--- RHS size: {terms: 4, types: 1, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 F11.f11f1 :: Integer -> Integer
 [GblId,
  Arity=1,
+<<<<<<< HEAD
  Str=<SL>,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (y [Occ=Once1] :: Integer) -> GHC.Num.Integer.integerAdd F11.f11_x y}]
 F11.f11f1 = \ (y :: Integer) -> GHC.Num.Integer.integerAdd F11.f11_x y
+||||||| merged common ancestors
+ Str=<MU>,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (y [Occ=Once1] :: Integer) -> GHC.Num.Integer.integerAdd F11.f11_x y}]
+F11.f11f1 = \ (y :: Integer) -> GHC.Num.Integer.integerAdd F11.f11_x y
+=======
+ Str=<MU>,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=False)
+         Tmpl= GHC.Num.Integer.integerAdd F11.f3}]
+F11.f11f1 = GHC.Num.Integer.integerAdd F11.f3
+>>>>>>> Eta-reduce PAPs
 
 -- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
 f11f :: forall {p}. p -> Integer -> Integer
@@ -103,18 +115,18 @@ f11f :: forall {p}. p -> Integer -> Integer
  Arity=2,
  Str=<A><SL>,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)
-         Tmpl= \ (@p) _ [Occ=Dead] (eta [Occ=Once1] :: Integer) -> F11.f11f1 eta}]
+         Tmpl= \ (@p) _ [Occ=Dead] -> F11.f11f1}]
 f11f = \ (@p) _ [Occ=Dead] -> F11.f11f1
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-F11.f5 :: Integer
+F11.f6 :: Integer
 [GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
-F11.f5 = 6
+F11.f6 = 6
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-F11.f4 :: Integer
+F11.f5 :: Integer
 [GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False, WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 30 0}]
-F11.f4 = GHC.Num.Integer.integerAdd F11.f11_x F11.f5
+F11.f5 = GHC.Num.Integer.integerAdd F11.f3 F11.f6
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 F11.f2 :: Integer
@@ -124,12 +136,12 @@ F11.f2 = 8
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 F11.f1 :: Integer
 [GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False, WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 30 0}]
-F11.f1 = GHC.Num.Integer.integerAdd F11.f11_x F11.f2
+F11.f1 = GHC.Num.Integer.integerAdd F11.f3 F11.f2
 
 -- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
 f11 :: (Integer, Integer)
 [GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
-f11 = (F11.f4, F11.f1)
+f11 = (F11.f5, F11.f1)
 
 
 
