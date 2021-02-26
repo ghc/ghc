@@ -52,6 +52,7 @@ module GHC.Core.TyCo.Rep (
         mkScaledFunTy,
         mkVisFunTyMany, mkVisFunTysMany,
         mkInvisFunTyMany, mkInvisFunTysMany,
+        nonDetCmpTyLit, cmpTyLit,
 
         -- * Functions over binders
         TyCoBinder(..), TyCoVarBinder, TyBinder,
@@ -192,16 +193,25 @@ data TyLit
   | CharTyLit Char
   deriving (Eq, Data.Data)
 
-instance Ord TyLit where
-  compare (NumTyLit x) (NumTyLit y)   = compare x y
-  compare (StrTyLit x) (StrTyLit y)   = uniqCompareFS x y
-  compare (CharTyLit x) (CharTyLit y) = compare x y
-  compare a b = compare (tag a) (tag b)
-    where
-      tag :: TyLit -> Int
-      tag NumTyLit{}  = 0
-      tag StrTyLit{}  = 1
-      tag CharTyLit{} = 2
+-- Non-determinism arises due to uniqCompareFS
+nonDetCmpTyLit :: TyLit -> TyLit -> Ordering
+nonDetCmpTyLit = cmpTyLitWith NonDetFastString
+
+-- Slower than nonDetCmpTyLit but deterministic
+cmpTyLit :: TyLit -> TyLit -> Ordering
+cmpTyLit = cmpTyLitWith LexicalFastString
+
+{-# INLINE cmpTyLitWith #-}
+cmpTyLitWith :: Ord r => (FastString -> r) -> TyLit -> TyLit -> Ordering
+cmpTyLitWith _ (NumTyLit  x) (NumTyLit  y) = compare x y
+cmpTyLitWith w (StrTyLit  x) (StrTyLit  y) = compare (w x) (w y)
+cmpTyLitWith _ (CharTyLit x) (CharTyLit y) = compare x y
+cmpTyLitWith _ a b = compare (tag a) (tag b)
+  where
+    tag :: TyLit -> Int
+    tag NumTyLit{}  = 0
+    tag StrTyLit{}  = 1
+    tag CharTyLit{} = 2
 
 instance Outputable TyLit where
    ppr = pprTyLit
