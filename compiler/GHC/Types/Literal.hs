@@ -6,6 +6,7 @@
 
 {-# LANGUAGE CPP, DeriveDataTypeable, ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
@@ -87,6 +88,7 @@ import Data.Int
 import Data.Word
 import Data.Char
 import Data.Data ( Data )
+import GHC.Exts
 import Numeric ( fromRat )
 
 {-
@@ -871,22 +873,11 @@ cmpLit (LitFloat     a)     (LitFloat      b)     = a `compare` b
 cmpLit (LitDouble    a)     (LitDouble     b)     = a `compare` b
 cmpLit (LitLabel     a _ _) (LitLabel      b _ _) = a `lexicalCompareFS` b
 cmpLit (LitNumber nt1 a)    (LitNumber nt2  b)
-  | nt1 == nt2 = a   `compare` b
-  | otherwise  = nt1 `compare` nt2
+  = (nt1 `compare` nt2) `mappend` (a `compare` b)
 cmpLit (LitRubbish b1)      (LitRubbish b2)       = b1 `compare` b2
 cmpLit lit1 lit2
-  | litTag lit1 < litTag lit2 = LT
-  | otherwise                 = GT
-
-litTag :: Literal -> Int
-litTag (LitChar      _)   = 1
-litTag (LitString    _)   = 2
-litTag (LitNullAddr)      = 3
-litTag (LitFloat     _)   = 4
-litTag (LitDouble    _)   = 5
-litTag (LitLabel _ _ _)   = 6
-litTag (LitNumber  {})    = 7
-litTag (LitRubbish {})    = 8
+  | isTrue# (dataToTag# lit1 <# dataToTag# lit2) = LT
+  | otherwise                                    = GT
 
 {-
         Printing
