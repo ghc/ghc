@@ -3174,7 +3174,7 @@ nop _ = return ()
 
 -- | Find the 'FlagSpec' for a 'WarningFlag'.
 wWarningFlagMap :: Map WarningFlag (FlagSpec WarningFlag)
-wWarningFlagMap = Map.fromList $ map (flagSpecFlag &&& id) wWarningFlags
+wWarningFlagMap = Map.fromListWith const $ map (flagSpecFlag &&& id) wWarningFlags
 
 -- | These @-W\<blah\>@ flags can all be reversed with @-Wno-\<blah\>@
 wWarningFlags :: [FlagSpec WarningFlag]
