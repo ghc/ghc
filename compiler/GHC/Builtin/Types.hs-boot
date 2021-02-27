@@ -77,6 +77,7 @@ tupleDataCon :: Boxity -> Arity -> DataCon
 tupleTyCon   :: Boxity -> Arity -> TyCon
 
 cTupleDataCon :: Arity -> DataCon
+cTupleTyCon :: Arity -> TyCon
 cTupleDataConName :: Arity -> Name
 cTupleTyConName :: Arity -> Name
 cTupleSelIdName :: ConTag -> Arity -> Name

@@ -92,8 +92,8 @@ knownUniqueTyThing u =
       '7' -> Just $ getTupleDataConTyThing Boxed n
       '8' -> Just $ getTupleDataConTyThing Unboxed n
       'j' -> Just $ KnownUniqueWiredIn $ getCTupleSelId n
-      'k' -> Just $ KnownUniqueName $ getCTupleTyConName n
-      'm' -> Just $ KnownUniqueName $ getCTupleDataConName n
+      'k' -> Just $ getCTupleTyConTyThing n
+      'm' -> Just $ getCTupleDataConTyThing n
       _   -> Nothing
   where
     (tag, n) = unpkUnique u
@@ -253,19 +253,19 @@ mkCTupleSelIdUnique sc_pos arity
   | otherwise
   = mkUnique 'j' (arity `shiftL` cTupleSelIdArityBits + sc_pos)
 
-getCTupleTyConName :: Int -> Name
-getCTupleTyConName n =
+getCTupleTyConTyThing :: Int -> KnownUniqueLookup
+getCTupleTyConTyThing n =
     case n `divMod` 2 of
-      (arity, 0) -> cTupleTyConName arity
-      (arity, 1) -> mkPrelTyConRepName $ cTupleTyConName arity
+      (arity, 0) -> KnownUniqueWiredIn $ mkATyCon $ cTupleTyCon arity
+      (arity, 1) -> KnownUniqueName $ mkPrelTyConRepName $ cTupleTyConName arity
       _          -> panic "getCTupleTyConName: impossible"
 
-getCTupleDataConName :: Int -> Name
-getCTupleDataConName n =
+getCTupleDataConTyThing :: Int -> KnownUniqueLookup
+getCTupleDataConTyThing n =
     case n `divMod` 3 of
-      (arity,  0) -> cTupleDataConName arity
-      (arity,  1) -> getName $ dataConWrapId $ cTupleDataCon arity
-      (arity,  2) -> mkPrelTyConRepName $ cTupleDataConName arity
+      (arity,  0) -> KnownUniqueWiredIn $ mkADataCon (cTupleDataCon arity)
+      (arity,  1) -> KnownUniqueWiredIn  $ mkAnId $ dataConWrapId $ cTupleDataCon arity
+      (arity,  2) -> KnownUniqueName $ mkPrelTyConRepName $ cTupleDataConName arity
       _           -> panic "getCTupleDataConName: impossible"
 
 getCTupleSelId :: Int -> TyThing

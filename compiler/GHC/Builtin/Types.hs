@@ -316,8 +316,8 @@ wiredInTyCons = [ -- Units are not treated like other tuples, because they
                 , multiplicityTyCon
                 , naturalTyCon
                 , integerTyCon
-                , liftedRepTyCon
-                , unliftedRepTyCon
+                , unrestrictedFunTyCon
+                , multMulTyCon
                 ]
 
 mkWiredInTyConName :: BuiltInSyntax -> Module -> FastString -> Unique -> Name
