@@ -31,7 +31,7 @@ thoughts
   computed hash out of the stability check is difficult unless we save it
   inside the HscEnv somehow. The HscEnv already contains a ModSummary for each
   module, perhaps it could go there? And then pull them back out of the HscEnv
-  and them to the ModIface in addFingerprints?
+  and them to the ModIface in addFingerprints? Edit: This didn't work.
 
 =====
 
@@ -59,6 +59,9 @@ thoughts
     compileOne'
     runPhase (legacy mode)
 
+- Perhaps consider removing ms_hs_date entirely to be sure that we aren't using
+  the source timestamp at all
+
 =====
 
 Plan:
@@ -71,4 +74,4 @@ Phase 3: Update so that we don't need to read the entire iface file while
 collecting info for the stability check
 
 Phase 4: Re-add mtimes into the stability check, so that we aren't required to
-collect hashes if mtimes haven't changed
+collect hashes if mtimes haven't changed? Depends on how fast it is

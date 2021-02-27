@@ -45,7 +45,7 @@ module GHC.Driver.Make (
 import GHC.Prelude
 
 import GHC.Tc.Utils.Backpack
-import GHC.Tc.Utils.Monad  ( initIfaceCheck )
+import GHC.Tc.Utils.Monad  ( initIfaceCheck, initTcRnIf )
 
 import qualified GHC.Linker.Loader as Linker
 import GHC.Linker.Types
@@ -65,7 +65,7 @@ import GHC.Driver.Main
 import GHC.Parser.Header
 import GHC.Parser.Errors.Ppr
 
-import GHC.Iface.Load      ( cannotFindModule )
+import GHC.Iface.Load      ( cannotFindModule, readIface )
 import GHC.IfaceToCore     ( typecheckIface )
 import GHC.Iface.Recomp    ( RecompileRequired ( MustCompile ) )
 
@@ -73,6 +73,7 @@ import GHC.Data.Bag        ( unitBag, listToBag, unionManyBags, isEmptyBag )
 import GHC.Data.Graph.Directed
 import GHC.Data.FastString
 import GHC.Data.Maybe      ( expectJust )
+import qualified GHC.Data.Maybe as GHCMaybe
 import GHC.Data.StringBuffer
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -477,10 +478,12 @@ load' how_much mHscMessage mod_graph = do
     -- are definitely unnecessary, then emit a warning.
     warnUnnecessarySourceImports mg2_with_srcimps
 
+    mg2_with_srcimps_hashes <- traverse (traverse (liftIO . getHashes hsc_env)) mg2_with_srcimps
+    liftIO $ debugTraceMsg logger dflags 2 (text " mg2_with_srcimps_hashes:" <+> ppr mg2_with_srcimps_hashes)
     let
         -- check the stability property for each module.
         stable_mods@(stable_obj,stable_bco)
-            = checkStability hpt1 mg2_with_srcimps all_home_mods
+            = checkStability hpt1 mg2_with_srcimps_hashes all_home_mods
 
         -- prune bits of the HPT which are definitely redundant now,
         -- to save space.
@@ -913,25 +916,25 @@ type StableModules =
 
 checkStability
         :: HomePackageTable   -- HPT from last compilation
-        -> [SCC ModSummary]   -- current module graph (cyclic)
+        -> [SCC ModSummaryWithHashes]   -- current module graph (cyclic)
         -> UniqSet ModuleName -- all home modules
         -> StableModules
 
 checkStability hpt sccs all_home_mods =
   foldl' checkSCC (emptyUniqSet, emptyUniqSet) sccs
   where
-   checkSCC :: StableModules -> SCC ModSummary -> StableModules
+   checkSCC :: StableModules -> SCC ModSummaryWithHashes -> StableModules
    checkSCC (stable_obj, stable_bco) scc0
      | stableObjects = (addListToUniqSet stable_obj scc_mods, stable_bco)
      | stableBCOs    = (stable_obj, addListToUniqSet stable_bco scc_mods)
      | otherwise     = (stable_obj, stable_bco)
      where
         scc = flattenSCC scc0
-        scc_mods = map ms_mod_name scc
+        scc_mods = map (ms_mod_name . mswh_summary) scc
         home_module m =
           m `elementOfUniqSet` all_home_mods && m `notElem` scc_mods
 
-        scc_allimps = nub (filter home_module (concatMap ms_home_allimps scc))
+        scc_allimps = nub (filter home_module (concatMap (ms_home_allimps . mswh_summary) scc))
             -- all imports outside the current SCC, but in the home pkg
 
         stable_obj_imps = map (`elementOfUniqSet` stable_obj) scc_allimps
@@ -945,33 +948,60 @@ checkStability hpt sccs all_home_mods =
            and (zipWith (||) stable_obj_imps stable_bco_imps)
            && all bco_ok scc
 
-        object_ok ms
+        object_ok mswh
           | gopt Opt_ForceRecomp (ms_hspp_opts ms) = False
-          | Just t <- ms_obj_date ms  =  t >= ms_hs_date ms
+          | Just t <- ms_obj_date ms  =  Just (mswh_current_hash mswh) == mswh_prev_hash mswh
                                          && same_as_prev t
           | otherwise = False
           where
+             ms = mswh_summary mswh
              same_as_prev t = case lookupHpt hpt (ms_mod_name ms) of
                                 Just hmi  | Just l <- hm_linkable hmi
                                  -> isObjectLinkable l && t == linkableTime l
                                 _other  -> True
-                -- why '>=' rather than '>' above?  If the filesystem stores
-                -- times to the nearest second, we may occasionally find that
-                -- the object & source have the same modification time,
-                -- especially if the source was automatically generated
-                -- and compiled.  Using >= is slightly unsafe, but it matches
-                -- make's behaviour.
-                --
-                -- But see #5527, where someone ran into this and it caused
-                -- a problem.
 
-        bco_ok ms
+        bco_ok mswh
           | gopt Opt_ForceRecomp (ms_hspp_opts ms) = False
           | otherwise = case lookupHpt hpt (ms_mod_name ms) of
                 Just hmi  | Just l <- hm_linkable hmi ->
                         not (isObjectLinkable l) &&
-                        linkableTime l >= ms_hs_date ms
+                        Just (mswh_current_hash mswh) == mswh_prev_hash mswh
                 _other  -> False
+          where
+             ms = mswh_summary mswh
+
+-- | A module summary, together with the hashes we need to be able to determine
+-- whether the module in question is stable.
+data ModSummaryWithHashes = ModSummaryWithHashes
+  { mswh_summary :: !ModSummary
+  , mswh_prev_hash :: !(Maybe Fingerprint) -- ^ Content hash stored in the existing .hi file, if any.
+  , mswh_current_hash :: !Fingerprint -- ^ Content hash of the source file
+  }
+
+instance Outputable ModSummaryWithHashes where
+  ppr mswh = vcat
+    [ text "mod:" <+> ppr (ms_mod (mswh_summary mswh))
+    , text "prev_hash:" <+> ppr (mswh_prev_hash mswh)
+    , text "current_hash:" <+> ppr (mswh_current_hash mswh)
+    ]
+
+getHashes :: HscEnv -> ModSummary -> IO ModSummaryWithHashes
+getHashes hsc_env ms = do
+  let loc = ms_location ms
+  prev_hash <- initTcRnIf 's' hsc_env () () $ do
+    mb_iface <- readIface (ms_mod ms) (ml_hi_file loc)
+    case mb_iface of
+      GHCMaybe.Succeeded iface ->
+        return $ Just $ mi_src_hash $ mi_final_exts iface
+      GHCMaybe.Failed _ ->
+        return Nothing
+  current_hash <- getFileHash (fromJust (ml_hs_file loc))
+
+  return ModSummaryWithHashes
+    { mswh_summary = ms
+    , mswh_prev_hash = prev_hash
+    , mswh_current_hash = current_hash
+    }
 
 {- Parallel Upsweep
  -
