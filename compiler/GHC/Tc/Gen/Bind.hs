@@ -221,7 +221,7 @@ tcCompleteSigs sigs =
                  failWithTc orphanError
                -- Look up the ConLikes mentioned
                conlikes <- mkUniqDSet <$> mapM (addLocM tcLookupConLike) ns
-               return (CompleteMatch { cmConLikes = conlikes, cmScrutineeType = mt })
+               return (CompleteMatch { cmConLikes = conlikes, cmResultType = mt })
       doOne _ = return Nothing
 
   -- For some reason I haven't investigated further, the signatures come in
