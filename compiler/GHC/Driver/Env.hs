@@ -7,6 +7,7 @@ module GHC.Driver.Env
    , hsc_units
    , hsc_HPT
    , hscUpdateHPT
+   , hscUpdateHPTM
    , runHsc
    , mkInteractiveHscEnv
    , runInteractiveHsc
@@ -98,6 +99,10 @@ hsc_HPT = ue_hpt . hsc_unit_env
 hscUpdateHPT :: (HomePackageTable -> HomePackageTable) -> HscEnv -> HscEnv
 hscUpdateHPT f hsc_env = hsc_env { hsc_unit_env = updateHpt f (hsc_unit_env hsc_env) }
 
+hscUpdateHPTM :: Monad m => (HomePackageTable -> m HomePackageTable ) -> HscEnv -> m HscEnv
+hscUpdateHPTM f hsc_env = do
+  hpt' <- f . ue_hpt . hsc_unit_env $ hsc_env
+  return $ hsc_env { hsc_unit_env = updateHpt (const hpt') (hsc_unit_env hsc_env) }
 {-
 
 Note [Target code interpreter]

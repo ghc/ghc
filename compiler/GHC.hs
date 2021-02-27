@@ -1216,7 +1216,8 @@ loadModule tcm = do
                                     hsc_env ms 1 1 Nothing mb_linkable
                                     source_modified
 
-   modifySession $ hscUpdateHPT (\hpt -> addToHpt hpt mod mod_info)
+   withSession $ \e -> do
+    setSession =<< hscUpdateHPTM (\hpt -> liftIO $ addToHpt hpt mod mod_info) e
    return tcm
 
 

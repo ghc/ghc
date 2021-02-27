@@ -367,7 +367,7 @@ importSuggestions where_look global_env hpt currMod imports rdr_name
       | is_last_loaded_mod modnam hpt_uniques = False                  -- 2.2
       | otherwise                             = True
     where
-      hpt_uniques = map fst (udfmToList hpt)
+      hpt_uniques = map fst (udfmToList (hptModules hpt))
       is_last_loaded_mod _ []         = False
       is_last_loaded_mod modnam uniqs = last uniqs == getUnique modnam
       globMods = nub [ mod

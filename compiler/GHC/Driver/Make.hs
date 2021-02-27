@@ -669,7 +669,7 @@ load' how_much mHscMessage mod_graph = do
           liftIO $ changeTempFilesLifetime tmpfs TFL_CurrentModule unneeded_temps
           liftIO $ cleanCurrentModuleTempFiles logger tmpfs dflags
 
-          let hpt5 = retainInTopLevelEnvs (map ms_mod_name mods_to_keep)
+          hpt5 <- liftIO $ retainInTopLevelEnvs (map ms_mod_name mods_to_keep)
                                           hpt4
 
           -- Clean up after ourselves
@@ -1462,7 +1462,7 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_logger lcl_tmpfs lcl_dflags
 
                 -- Update and fetch the global HscEnv.
                 lcl_hsc_env' <- modifyMVar hsc_env_var $ \hsc_env -> do
-                    let hsc_env' = hscUpdateHPT (\hpt -> addToHpt hpt this_mod mod_info)
+                    hsc_env' <- hscUpdateHPTM (\hpt -> addToHpt hpt this_mod mod_info)
                                                 hsc_env
 
                     -- We've finished typechecking the module, now we must
@@ -1613,9 +1613,9 @@ upsweep mHscMessage old_hpt stable_mods sccs = do
           Just mod_info -> do
                 let this_mod = ms_mod_name mod
 
+                    reset_type_env_var hsc = hsc { hsc_type_env_var = Nothing }
                         -- Add new info to hsc_env
-                    hsc_env3 = (hscUpdateHPT (\hpt -> addToHpt hpt this_mod mod_info) hsc_env2)
-                                { hsc_type_env_var = Nothing }
+                hsc_env3 <- reset_type_env_var <$> (hscUpdateHPTM (\hpt -> liftIO $ addToHpt hpt this_mod mod_info) hsc_env2)
 
                         -- Space-saving: delete the old HPT entry
                         -- for mod BUT if mod is a hs-boot
@@ -1624,7 +1624,7 @@ upsweep mHscMessage old_hpt stable_mods sccs = do
                         -- main Haskell source file.  Deleting it
                         -- would force the real module to be recompiled
                         -- every time.
-                    old_hpt1 = case isBootSummary mod of
+                let old_hpt1 = case isBootSummary mod of
                       IsBoot -> old_hpt
                       NotBoot -> delFromHpt old_hpt this_mod
 
@@ -1911,7 +1911,7 @@ Potential TODOS:
 -- file.  See also #9243.
 
 -- Filter modules in the HPT
-retainInTopLevelEnvs :: [ModuleName] -> HomePackageTable -> HomePackageTable
+retainInTopLevelEnvs :: [ModuleName] -> HomePackageTable -> IO HomePackageTable
 retainInTopLevelEnvs keep_these hpt
    = listToHpt   [ (mod, expectJust "retain" mb_mod_info)
                  | mod <- keep_these
@@ -2028,7 +2028,7 @@ typecheckLoop dflags hsc_env mods = do
       let new_hsc_env = hscUpdateHPT (const new_hpt) hsc_env
       mds <- initIfaceCheck (text "typecheckLoop") new_hsc_env $
                 mapM (typecheckIface . hm_iface) hmis
-      let new_hpt = addListToHpt old_hpt
+      new_hpt <- liftIO $ addListToHpt old_hpt
                         (zip mods [ hmi{ hm_details = details }
                                   | (hmi,details) <- zip hmis mds ])
       return new_hpt

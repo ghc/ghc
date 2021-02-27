@@ -40,7 +40,11 @@ data LeakModIndicators = LeakModIndicators
 getLeakIndicators :: HscEnv -> IO LeakIndicators
 getLeakIndicators hsc_env =
   fmap LeakIndicators $
+<<<<<<< HEAD
     forM (eltsUDFM (hsc_HPT hsc_env)) $ \hmi@HomeModInfo{..} -> do
+=======
+    forM (eltsHpt hsc_HPT) $ \hmi@HomeModInfo{..} -> do
+>>>>>>> a31e41ac52... Experiment compacting HPT ModIface
       leakMod <- mkWeakPtr hmi Nothing
       leakIface <- mkWeakPtr hm_iface Nothing
       leakDetails <- mkWeakPtr hm_details Nothing
