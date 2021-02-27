@@ -814,10 +814,12 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
         Left iface -> do
             -- Knot tying!  See Note [Knot-tying typecheckIface]
             details <- liftIO . fixIO $ \details' -> do
+
+                hpt' <- addToHpt (hsc_HPT hsc_env)
+                          (ms_mod_name mod_summary) (HomeModInfo iface details' Nothing)
                 let hsc_env' =
                         hsc_env {
-                            hsc_HPT = addToHpt (hsc_HPT hsc_env)
-                                        (ms_mod_name mod_summary) (HomeModInfo iface details' Nothing)
+                            hsc_HPT = hpt'
                         }
                 -- NB: This result is actually not that useful
                 -- in one-shot mode, since we're not going to do

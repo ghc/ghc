@@ -1,7 +1,8 @@
+{-# LANGUAGE ExistentialQuantification #-}
 -- | Info about modules in the "home" unit
 module GHC.Unit.Home.ModInfo
    ( HomeModInfo (..)
-   , HomePackageTable
+   , HomePackageTable(..)
    , emptyHomePackageTable
    , lookupHpt
    , eltsHpt
@@ -30,6 +31,8 @@ import GHC.Types.Unique
 import GHC.Types.Unique.DFM
 
 import GHC.Utils.Outputable
+import GHC.Compact
+import Control.Monad
 
 -- | Information about modules in the package being compiled
 data HomeModInfo = HomeModInfo
@@ -60,45 +63,62 @@ data HomeModInfo = HomeModInfo
         -- 'ModIface' (only).
    }
 
+data CompactRegion = forall a . CompactRegion (Compact a) | EmptyRegion
 -- | Helps us find information about modules in the home package
-type HomePackageTable = DModuleNameEnv HomeModInfo
+data HomePackageTable = HomePackageTable {
+                            hptCompactRegion :: (Maybe CompactRegion)
+                            , hptModules :: (DModuleNameEnv HomeModInfo)
+                            }
    -- Domain = modules in the home unit that have been fully compiled
    -- "home" unit id cached (implicit) here for convenience
 
 -- | Constructs an empty HomePackageTable
 emptyHomePackageTable :: HomePackageTable
-emptyHomePackageTable  = emptyUDFM
+emptyHomePackageTable  = HomePackageTable (Just EmptyRegion) emptyUDFM
 
 lookupHpt :: HomePackageTable -> ModuleName -> Maybe HomeModInfo
-lookupHpt = lookupUDFM
+lookupHpt (HomePackageTable _ dm) mn = lookupUDFM dm mn
 
 lookupHptDirectly :: HomePackageTable -> Unique -> Maybe HomeModInfo
-lookupHptDirectly = lookupUDFM_Directly
+lookupHptDirectly (HomePackageTable _ dm) u = lookupUDFM_Directly dm u
 
 eltsHpt :: HomePackageTable -> [HomeModInfo]
-eltsHpt = eltsUDFM
+eltsHpt (HomePackageTable _ e) = eltsUDFM e
 
 filterHpt :: (HomeModInfo -> Bool) -> HomePackageTable -> HomePackageTable
-filterHpt = filterUDFM
+filterHpt f (HomePackageTable c e) = HomePackageTable c (filterUDFM f e)
 
 allHpt :: (HomeModInfo -> Bool) -> HomePackageTable -> Bool
-allHpt = allUDFM
+allHpt f hpt = allUDFM f (hptModules hpt)
 
 mapHpt :: (HomeModInfo -> HomeModInfo) -> HomePackageTable -> HomePackageTable
-mapHpt = mapUDFM
+mapHpt f hpt = hpt { hptModules = mapUDFM f (hptModules hpt) }
 
 delFromHpt :: HomePackageTable -> ModuleName -> HomePackageTable
-delFromHpt = delFromUDFM
+delFromHpt hpt mn = hpt { hptModules = delFromUDFM (hptModules hpt) mn }
 
-addToHpt :: HomePackageTable -> ModuleName -> HomeModInfo -> HomePackageTable
-addToHpt = addToUDFM
+addToHpt :: HomePackageTable -> ModuleName -> HomeModInfo -> IO HomePackageTable
+addToHpt hpt mn hmi = do
+  (hmi', new_c) <- case hptCompactRegion hpt of
+    Nothing -> return (hmi, Nothing)
+    Just r  -> do
+      let raw_iface = forgetModIfaceCaches (hm_iface hmi)
+      cr <- case r of
+        CompactRegion c -> do
+          compactAddWithSharing c raw_iface
+        EmptyRegion -> do
+          compactWithSharing raw_iface
+      let compacted_iface = initModIfaceCaches $ getCompact cr
+      return $ (hmi { hm_iface = compacted_iface }, Just $ CompactRegion cr)
+  return $ hpt { hptModules = addToUDFM (hptModules hpt) mn hmi'
+               , hptCompactRegion = new_c }
 
 addListToHpt
-  :: HomePackageTable -> [(ModuleName, HomeModInfo)] -> HomePackageTable
-addListToHpt = addListToUDFM
+  :: HomePackageTable -> [(ModuleName, HomeModInfo)] -> IO HomePackageTable
+addListToHpt hpt mods = foldM (\hpt (mn, hmi) -> addToHpt hpt mn hmi) hpt mods
 
-listToHpt :: [(ModuleName, HomeModInfo)] -> HomePackageTable
-listToHpt = listToUDFM
+listToHpt :: [(ModuleName, HomeModInfo)] -> IO HomePackageTable
+listToHpt = addListToHpt emptyHomePackageTable
 
 lookupHptByModule :: HomePackageTable -> Module -> Maybe HomeModInfo
 -- The HPT is indexed by ModuleName, not Module,
@@ -110,7 +130,7 @@ lookupHptByModule hpt mod
 
 pprHPT :: HomePackageTable -> SDoc
 -- A bit arbitrary for now
-pprHPT hpt = pprUDFM hpt $ \hms ->
+pprHPT (HomePackageTable _ hpt) = pprUDFM hpt $ \hms ->
     vcat [ hang (ppr (mi_module (hm_iface hm)))
               2 (ppr (md_types (hm_details hm)))
          | hm <- hms ]

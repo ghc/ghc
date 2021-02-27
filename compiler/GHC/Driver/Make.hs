@@ -669,7 +669,7 @@ load' how_much mHscMessage mod_graph = do
             changeTempFilesLifetime dflags TFL_CurrentModule unneeded_temps
           liftIO $ cleanCurrentModuleTempFiles logger dflags
 
-          let hpt5 = retainInTopLevelEnvs (map ms_mod_name mods_to_keep)
+          hpt5 <- liftIO $ retainInTopLevelEnvs (map ms_mod_name mods_to_keep)
                                           hpt4
 
           -- Clean up after ourselves
@@ -1469,9 +1469,9 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_logger lcl_dflags home_unit
 
                 -- Update and fetch the global HscEnv.
                 lcl_hsc_env' <- modifyMVar hsc_env_var $ \hsc_env -> do
+                    hpt' <- addToHpt (hsc_HPT hsc_env) this_mod mod_info
                     let hsc_env' = hsc_env
-                                     { hsc_HPT = addToHpt (hsc_HPT hsc_env)
-                                                           this_mod mod_info }
+                                     { hsc_HPT = hpt' }
                     -- We've finished typechecking the module, now we must
                     -- retypecheck the loop AGAIN to ensure unfoldings are
                     -- updated.  This time, however, we include the loop
@@ -1622,8 +1622,8 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
                 let this_mod = ms_mod_name mod
 
                         -- Add new info to hsc_env
-                    hpt1     = addToHpt (hsc_HPT hsc_env2) this_mod mod_info
-                    hsc_env3 = hsc_env2 { hsc_HPT = hpt1, hsc_type_env_var = Nothing }
+                hpt1     <- liftIO $ addToHpt (hsc_HPT hsc_env2) this_mod mod_info
+                let hsc_env3 = hsc_env2 { hsc_HPT = hpt1, hsc_type_env_var = Nothing }
 
                         -- Space-saving: delete the old HPT entry
                         -- for mod BUT if mod is a hs-boot
@@ -1919,7 +1919,7 @@ Potential TODOS:
 -- file.  See also #9243.
 
 -- Filter modules in the HPT
-retainInTopLevelEnvs :: [ModuleName] -> HomePackageTable -> HomePackageTable
+retainInTopLevelEnvs :: [ModuleName] -> HomePackageTable -> IO HomePackageTable
 retainInTopLevelEnvs keep_these hpt
    = listToHpt   [ (mod, expectJust "retain" mb_mod_info)
                  | mod <- keep_these
@@ -2036,7 +2036,7 @@ typecheckLoop dflags hsc_env mods = do
       let new_hsc_env = hsc_env{ hsc_HPT = new_hpt }
       mds <- initIfaceCheck (text "typecheckLoop") new_hsc_env $
                 mapM (typecheckIface . hm_iface) hmis
-      let new_hpt = addListToHpt old_hpt
+      new_hpt <- liftIO $ addListToHpt old_hpt
                         (zip mods [ hmi{ hm_details = details }
                                   | (hmi,details) <- zip hmis mds ])
       return new_hpt

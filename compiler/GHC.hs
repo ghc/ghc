@@ -1196,8 +1196,9 @@ loadModule tcm = do
    mod_info <- liftIO $ compileOne' (Just tcg) Nothing
                                     hsc_env ms 1 1 Nothing mb_linkable
                                     source_modified
-
-   modifySession $ \e -> e{ hsc_HPT = addToHpt (hsc_HPT e) mod mod_info }
+   withSession $ \e -> do
+    hpt' <- liftIO $ addToHpt (hsc_HPT e) mod mod_info
+    setSession $ e{ hsc_HPT = hpt' }
    return tcm
 
 

@@ -331,7 +331,7 @@ buildUnit session cid insts lunit = do
 
         -- Compile relevant only
         hsc_env <- getSession
-        let home_mod_infos = eltsUDFM (hsc_HPT hsc_env)
+        let home_mod_infos = eltsHpt (hsc_HPT hsc_env)
             linkables = map (expectJust "bkp link" . hm_linkable)
                       . filter ((==HsSrcFile) . mi_hsc_src . hm_iface)
                       $ home_mod_infos
