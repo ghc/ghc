@@ -406,7 +406,12 @@ genCall target res args = runStmtsDecls $ do
 
 
     let primRepToLlvmTy VoidRep     = (Unsigned, LMVoid)
-        primRepToLlvmTy IntRep      = (Signed, widthToLlvmInt (cIntWidth dflags))
+        -- GHC's IntRep is not the same as CIntRep, GHC's
+        -- IntRep is always Word Sized. This conversely also
+        -- means that any CInt needs to be mapped to Int32Rep
+        -- and any custom signature that expects to to C FFI
+        -- needs to also be Int32Rep.
+        primRepToLlvmTy IntRep      = (Signed, widthToLlvmInt (wordWidth dflags))
         primRepToLlvmTy Int8Rep     = (Signed, i8)
         primRepToLlvmTy Int16Rep    = (Signed, i16)
         primRepToLlvmTy Int32Rep    = (Signed, i32)

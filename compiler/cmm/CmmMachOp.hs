@@ -662,12 +662,16 @@ callishMachOpHints op = case op of
   _            -> ([],[])
   -- empty lists indicate NoHint
 
+-- be very careful when setting signatures.
+-- C int's need to be Int32Rep. Not IntRep, IntRep is
+-- GHC's always Word sized int. Ideally we'd have some
+-- CIntRep, but we don't.
 callishMachOpReps :: CallishMachOp -> (PrimRep, [PrimRep])
 callishMachOpReps op = case op of
-  MO_Memcpy _  -> (AddrRep, [AddrRep, AddrRep, WordRep])
-  MO_Memset _  -> (AddrRep, [AddrRep, IntRep,  WordRep])
-  MO_Memmove _ -> (AddrRep, [AddrRep, AddrRep, WordRep])
-  MO_Memcmp _  -> (IntRep, [AddrRep, AddrRep, WordRep])
+  MO_Memcpy _  -> (AddrRep,  [AddrRep, AddrRep,  WordRep])
+  MO_Memset _  -> (AddrRep,  [AddrRep, Int32Rep, WordRep])
+  MO_Memmove _ -> (AddrRep,  [AddrRep, AddrRep,  WordRep])
+  MO_Memcmp _  -> (Int32Rep, [AddrRep, AddrRep,  WordRep])
 
   MO_F64_Pwr   -> (DoubleRep, [DoubleRep, DoubleRep])
 
