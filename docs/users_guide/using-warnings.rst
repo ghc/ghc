@@ -1261,7 +1261,7 @@ of ``-W(no-)*``.
     confusions.
 
     Note that due to technical limitations, ``considerAccessible`` will not
-    suppress :ghc-flag:``-Winaccessible-code`` warnings.
+    suppress :ghc-flag:`-Winaccessible-code` warnings.
 
 .. ghc-flag:: -Winaccessible-code
     :shortdesc: warn about inaccessible code
