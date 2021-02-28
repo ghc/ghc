@@ -3,6 +3,8 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
+// stdlib is needed for exit()
+#include <stdlib.h>
 #if mingw32_HOST_OS
 #include <windows.h>
 #endif
