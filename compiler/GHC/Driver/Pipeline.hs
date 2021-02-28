@@ -76,7 +76,6 @@ import GHC.Utils.Error
 import GHC.Utils.Fingerprint
 import GHC.Utils.Panic
 import GHC.Utils.Misc
-import GHC.Utils.Monad
 import GHC.Utils.Exception as Exception
 import GHC.Utils.Logger
 
