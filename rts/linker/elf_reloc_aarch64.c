@@ -182,7 +182,7 @@ encodeAddendAarch64(Section * section, Elf_Rel * rel, int64_t addend) {
  * @return The new computed addend.
  */
 static int64_t
-computeAddend(Section * section, Elf_Rel * rel,
+computeAddend(ObjectCode * oc, Section * section, Elf_Rel * rel,
               ElfSymbol * symbol, int64_t addend) {
 
     /* Position where something is relocated */
@@ -266,11 +266,17 @@ computeAddend(Section * section, Elf_Rel * rel,
             // TODO: fix this story proper, so that the transformation
             //       makes sense without resorting to: everyone else
             //       does it like this as well.
+            if (0x0 == GOT_S) {
+                barf("PAGE: No GOT address for %s in %s for section type: %d and size: %lu.\n", symbol->name, OC_INFORMATIVE_FILENAME(oc), section->kind, section->size);
+            }
             assert(0x0 != GOT_S);
             return Page(GOT_S+A) - Page(P);
         }
         case COMPAT_R_AARCH64_LD64_GOT_LO12_NC: {
             // G(GDAT(S+A))
+            if (0x0 == GOT_S) {
+                barf("LO12_NC: No GOT address for %s in %s for section type: %d and size: %lu.\n", symbol->name, OC_INFORMATIVE_FILENAME(oc), section->kind, section->size);
+            }
             assert(0x0 != GOT_S);
             return (GOT_S + A) & 0xfff;
         }
@@ -302,7 +308,7 @@ relocateObjectCodeAarch64(ObjectCode * oc) {
             /* decode implicit addend */
             int64_t addend = decodeAddendAarch64(targetSection, rel);
 
-            addend = computeAddend(targetSection, rel, symbol, addend);
+            addend = computeAddend(oc, targetSection, rel, symbol, addend);
             encodeAddendAarch64(targetSection, rel, addend);
         }
     }
@@ -329,7 +335,7 @@ relocateObjectCodeAarch64(ObjectCode * oc) {
             /* take explicit addend */
             int64_t addend = rel->r_addend;
 
-            addend = computeAddend(targetSection, (Elf_Rel*)rel,
+            addend = computeAddend(oc, targetSection, (Elf_Rel*)rel,
                                    symbol, addend);
             encodeAddendAarch64(targetSection, (Elf_Rel*)rel, addend);
         }
