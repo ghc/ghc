@@ -11,6 +11,17 @@
  *
  * ---------------------------------------------------------------------------*/
 
+#include <ghcconfig.h>
+#ifdef RTS_LINKER_USE_MMAP
+/*
+ * On FreeBSD and Darwin, when _XOPEN_SOURCE is defined, MAP_ANONYMOUS is not
+ * exposed from <sys/mman.h>.  Include <sys/mman.h> before "PosixSource.h".
+ *
+ * Alternatively, we could drop "PosixSource.h" from this file, but for just
+ * one non-POSIX macro, that seems a needless price to pay.
+ */
+#include <sys/mman.h>
+#endif
 #include "PosixSource.h"
 #include "Rts.h"
 
