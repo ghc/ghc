@@ -1701,13 +1701,18 @@ fingerprintDataConName =
 All these are original names; hence mkOrig
 -}
 
+{-# INLINE varQual #-}
+{-# INLINE tcQual #-}
+{-# INLINE clsQual #-}
+{-# INLINE dcQual #-}
 varQual, tcQual, clsQual, dcQual :: Module -> FastString -> Unique -> Name
-varQual  = mk_known_key_name varName
-tcQual   = mk_known_key_name tcName
-clsQual  = mk_known_key_name clsName
-dcQual   = mk_known_key_name dataName
+varQual  modu str unique = mk_known_key_name varName modu str unique
+tcQual   modu str unique = mk_known_key_name tcName modu str unique
+clsQual  modu str unique = mk_known_key_name clsName modu str unique
+dcQual   modu str unique = mk_known_key_name dataName modu str unique
 
 mk_known_key_name :: NameSpace -> Module -> FastString -> Unique -> Name
+{-# INLINE mk_known_key_name #-}
 mk_known_key_name space modu str unique
   = mkExternalName unique modu (mkOccNameFS space str) noSrcSpan
 
