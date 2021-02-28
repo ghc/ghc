@@ -73,7 +73,6 @@ import GHC.Data.Bag        ( unitBag, listToBag, unionManyBags, isEmptyBag )
 import GHC.Data.Graph.Directed
 import GHC.Data.FastString
 import GHC.Data.Maybe      ( expectJust )
-import qualified GHC.Data.Maybe as GHCMaybe
 import GHC.Data.StringBuffer
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -478,7 +477,9 @@ load' how_much mHscMessage mod_graph = do
     -- are definitely unnecessary, then emit a warning.
     warnUnnecessarySourceImports mg2_with_srcimps
 
-    mg2_with_srcimps_hashes <- traverse (traverse (liftIO . getHashes hsc_env)) mg2_with_srcimps
+    mg2_with_srcimps_hashes <-
+      let go ms = liftIO $ fmap (\matches -> (ms, matches)) (doesIfaceHashMatch hsc_env ms)
+      in traverse (traverse go) mg2_with_srcimps
     liftIO $ debugTraceMsg logger dflags 2 (text " mg2_with_srcimps_hashes:" <+> ppr mg2_with_srcimps_hashes)
     let
         -- check the stability property for each module.
@@ -916,25 +917,25 @@ type StableModules =
 
 checkStability
         :: HomePackageTable   -- HPT from last compilation
-        -> [SCC ModSummaryWithHashes]   -- current module graph (cyclic)
+        -> [SCC (ModSummary, Bool)]   -- current module graph (cyclic)
         -> UniqSet ModuleName -- all home modules
         -> StableModules
 
 checkStability hpt sccs all_home_mods =
   foldl' checkSCC (emptyUniqSet, emptyUniqSet) sccs
   where
-   checkSCC :: StableModules -> SCC ModSummaryWithHashes -> StableModules
+   checkSCC :: StableModules -> SCC (ModSummary, Bool) -> StableModules
    checkSCC (stable_obj, stable_bco) scc0
      | stableObjects = (addListToUniqSet stable_obj scc_mods, stable_bco)
      | stableBCOs    = (stable_obj, addListToUniqSet stable_bco scc_mods)
      | otherwise     = (stable_obj, stable_bco)
      where
         scc = flattenSCC scc0
-        scc_mods = map (ms_mod_name . mswh_summary) scc
+        scc_mods = map (ms_mod_name . fst) scc
         home_module m =
           m `elementOfUniqSet` all_home_mods && m `notElem` scc_mods
 
-        scc_allimps = nub (filter home_module (concatMap (ms_home_allimps . mswh_summary) scc))
+        scc_allimps = nub (filter home_module (concatMap (ms_home_allimps . fst) scc))
             -- all imports outside the current SCC, but in the home pkg
 
         stable_obj_imps = map (`elementOfUniqSet` stable_obj) scc_allimps
@@ -948,60 +949,24 @@ checkStability hpt sccs all_home_mods =
            and (zipWith (||) stable_obj_imps stable_bco_imps)
            && all bco_ok scc
 
-        object_ok mswh
+        object_ok (ms, hash_matches)
           | gopt Opt_ForceRecomp (ms_hspp_opts ms) = False
-          | Just t <- ms_obj_date ms  =  Just (mswh_current_hash mswh) == mswh_prev_hash mswh
+          | Just t <- ms_obj_date ms  =  hash_matches
                                          && same_as_prev t
           | otherwise = False
           where
-             ms = mswh_summary mswh
              same_as_prev t = case lookupHpt hpt (ms_mod_name ms) of
                                 Just hmi  | Just l <- hm_linkable hmi
                                  -> isObjectLinkable l && t == linkableTime l
                                 _other  -> True
 
-        bco_ok mswh
+        bco_ok (ms, hash_matches)
           | gopt Opt_ForceRecomp (ms_hspp_opts ms) = False
           | otherwise = case lookupHpt hpt (ms_mod_name ms) of
                 Just hmi  | Just l <- hm_linkable hmi ->
                         not (isObjectLinkable l) &&
-                        Just (mswh_current_hash mswh) == mswh_prev_hash mswh
+                        hash_matches
                 _other  -> False
-          where
-             ms = mswh_summary mswh
-
--- | A module summary, together with the hashes we need to be able to determine
--- whether the module in question is stable.
-data ModSummaryWithHashes = ModSummaryWithHashes
-  { mswh_summary :: !ModSummary
-  , mswh_prev_hash :: !(Maybe Fingerprint) -- ^ Content hash stored in the existing .hi file, if any.
-  , mswh_current_hash :: !Fingerprint -- ^ Content hash of the source file
-  }
-
-instance Outputable ModSummaryWithHashes where
-  ppr mswh = vcat
-    [ text "mod:" <+> ppr (ms_mod (mswh_summary mswh))
-    , text "prev_hash:" <+> ppr (mswh_prev_hash mswh)
-    , text "current_hash:" <+> ppr (mswh_current_hash mswh)
-    ]
-
-getHashes :: HscEnv -> ModSummary -> IO ModSummaryWithHashes
-getHashes hsc_env ms = do
-  let loc = ms_location ms
-  prev_hash <- initTcRnIf 's' hsc_env () () $ do
-    mb_iface <- readIface (ms_mod ms) (ml_hi_file loc)
-    case mb_iface of
-      GHCMaybe.Succeeded iface ->
-        return $ Just $ mi_src_hash $ mi_final_exts iface
-      GHCMaybe.Failed _ ->
-        return Nothing
-  current_hash <- getFileHash (fromJust (ml_hs_file loc))
-
-  return ModSummaryWithHashes
-    { mswh_summary = ms
-    , mswh_prev_hash = prev_hash
-    , mswh_current_hash = current_hash
-    }
 
 {- Parallel Upsweep
  -

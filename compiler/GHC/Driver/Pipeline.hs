@@ -31,6 +31,7 @@ module GHC.Driver.Pipeline (
    phaseOutputFilename, getOutputFilename, getPipeState, getPipeEnv,
    hscPostBackendPhase, getLocation, setModLocation, setDynFlags,
    runPhase,
+   doesIfaceHashMatch,
    doCpp,
    linkingNeeded, checkLinkInfo, writeInterfaceOnlyMode
   ) where
@@ -43,6 +44,7 @@ import GHC.Prelude
 import GHC.Platform
 
 import GHC.Tc.Types
+import GHC.Tc.Utils.Monad hiding ( getImports )
 
 import GHC.Driver.Main
 import GHC.Driver.Env hiding ( Hsc )
@@ -86,9 +88,11 @@ import GHC.Data.Bag            ( unitBag )
 import GHC.Data.FastString     ( mkFastString )
 import GHC.Data.StringBuffer   ( hGetStringBuffer, hPutStringBuffer )
 import GHC.Data.Maybe          ( expectJust )
+import qualified GHC.Data.Maybe as GHCMaybe
 
 import GHC.Iface.Make          ( mkFullIface )
 import GHC.Iface.UpdateIdInfos ( updateModDetailsIdInfos )
+import GHC.Iface.Load
 
 import GHC.Types.Basic       ( SuccessFlag(..) )
 import GHC.Types.Target
@@ -1262,28 +1266,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
   -- Setting source_unchanged to False tells the compiler that M.o is out of
   -- date wrt M.hs (or M.o doesn't exist) so we must recompile regardless.
         src_timestamp <- liftIO $ getModificationUTCTime (basename <.> suff)
-        mb_hi_timestamp <- liftIO $ do
-          hi_file_exists <- doesFileExist hi_file
-          if hi_file_exists
-            then Just <$> getModificationUTCTime hi_file
-            else return Nothing
         src_hash <- liftIO $ getFileHash (basename <.> suff)
-
-        source_unchanged <- liftIO $
-          if not (isStopLn stop)
-                -- SourceModified unconditionally if
-                --      (a) recompilation checker is off, or
-                --      (b) we aren't going all the way to .o file (e.g. ghc -S)
-             then return SourceModified
-                -- Otherwise look at timestamps and hashes
-             else do dest_file_mod <- sourceModified dest_file mb_hi_timestamp
-                     hie_file_mod <- if gopt Opt_WriteHie dflags
-                                        then sourceModified hie_file
-                                                            mb_hi_timestamp
-                                        else pure False
-                     if dest_file_mod || hie_file_mod
-                        then return SourceModified
-                        else return SourceUnmodified
 
         PipeState{hsc_env=hsc_env'} <- getPipeState
 
@@ -1306,6 +1289,30 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
                                         ms_hie_date     = Nothing,
                                         ms_textual_imps = imps,
                                         ms_srcimps      = src_imps }
+
+        source_unchanged <- liftIO $
+          if not (isStopLn stop)
+                -- SourceModified unconditionally if
+                --      (a) recompilation checker is off, or
+                --      (b) we aren't going all the way to .o file (e.g. ghc -S)
+             then return SourceModified
+                -- Otherwise look at timestamps and hashes
+             else do
+                    mb_hi_timestamp <- liftIO $ do
+                      hi_file_exists <- doesFileExist hi_file
+                      if hi_file_exists
+                        then Just <$> getModificationUTCTime hi_file
+                        else return Nothing
+
+                    prev_hash_matches <- liftIO $ doesIfaceHashMatch hsc_env' mod_summary
+                    dest_file_mod <- sourceModified dest_file mb_hi_timestamp
+                    hie_file_mod <- if gopt Opt_WriteHie dflags
+                                        then sourceModified hie_file
+                                                            mb_hi_timestamp
+                                        else pure False
+                    if not prev_hash_matches || dest_file_mod || hie_file_mod
+                        then return SourceModified
+                        else return SourceUnmodified
 
   -- run the compiler!
         let msg hsc_env _ what _ = oneShotMsg hsc_env what
@@ -1763,6 +1770,21 @@ runPhase (RealPhase MergeForeign) input_fn = do
 -- warning suppression
 runPhase (RealPhase other) _input_fn =
    panic ("runPhase: don't know how to run phase " ++ show other)
+
+-- | Check whether a module's current hash matches the previously recorded hash
+-- in its .hi file, if any. If this function returns False then the module will
+-- need recompiling.
+doesIfaceHashMatch :: HscEnv -> ModSummary -> IO Bool
+doesIfaceHashMatch hsc_env ms = do
+  let loc = ms_location ms
+  -- TODO: Optimize?
+  initTcRnIf 's' hsc_env () () $ do
+    mb_iface <- readIface (ms_mod ms) (ml_hi_file loc)
+    case mb_iface of
+      GHCMaybe.Succeeded iface ->
+        return $ mi_src_hash (mi_final_exts iface) == ms_hs_hash ms
+      GHCMaybe.Failed _ ->
+        return False
 
 maybeMergeForeign :: CompPipeline Phase
 maybeMergeForeign

@@ -75,3 +75,8 @@ collecting info for the stability check
 
 Phase 4: Re-add mtimes into the stability check, so that we aren't required to
 collect hashes if mtimes haven't changed? Depends on how fast it is
+
+=====
+
+Want to rearrange things so that the new getHashes function can be used in both
+GHC.Driver.{Pipeline, Make}.
