@@ -71,7 +71,7 @@ module GHC.Exts
         breakpoint, breakpointCond,
 
         -- * Ids with special behaviour
-        inline, noinline, lazy, oneShot, SPEC (..),
+        inline, noinline, lazy, oneShot, considerAccessible, SPEC (..),
 
         -- * Running 'RealWorld' state thread
         runRW#,
@@ -213,8 +213,8 @@ class IsList l where
   fromList  :: [Item l] -> l
 
   -- | The 'fromListN' function takes the input list's length and potentially
-  --   uses it to construct the structure @l@ more efficiently compared to 
-  --   'fromList'. If the given number does not equal to the input list's length 
+  --   uses it to construct the structure @l@ more efficiently compared to
+  --   'fromList'. If the given number does not equal to the input list's length
   --   the behaviour of 'fromListN' is not specified.
   --
   --   prop> fromListN (length xs) xs == fromList xs
@@ -315,3 +315,27 @@ resizeSmallMutableArray# arr0 szNew a s0 =
           (# s2, arr1 #) -> case copySmallMutableArray# arr0 0# arr1 0# szOld s2 of
             s3 -> (# s3, arr1 #)
         else (# s1, arr0 #)
+
+-- | Semantically, @considerAccessible = True@. But it has special meaning
+-- to the pattern-match checker, which will never flag the clause in which
+-- 'considerAccessible' occurs as a guard as redundant or inaccessible.
+-- Example:
+--
+-- > case (x, x) of
+-- >   (True,  True)  -> 1
+-- >   (False, False) -> 2
+-- >   (True,  False) -> 3 -- Warning: redundant
+--
+-- The pattern-match checker will warn here that the third clause is redundant.
+-- It will stop doing so if the clause is adorned with 'considerAccessible':
+--
+-- > case (x, x) of
+-- >   (True,  True)  -> 1
+-- >   (False, False) -> 2
+-- >   (True,  False) | considerAccessible -> 3 -- No warning
+--
+-- Put 'considerAccessible' as the last statement of the guard to avoid get
+-- confusing results from the pattern-match checker, which takes \"consider
+-- accessible\" by word.
+considerAccessible :: Bool
+considerAccessible = True
