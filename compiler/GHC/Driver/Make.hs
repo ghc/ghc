@@ -45,6 +45,7 @@ module GHC.Driver.Make (
 import GHC.Prelude
 
 import GHC.Tc.Utils.Backpack
+import GHC.Tc.Utils.Monad ( initIfaceCheck )
 
 import qualified GHC.Linker.Loader as Linker
 import GHC.Linker.Types
