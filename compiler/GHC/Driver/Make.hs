@@ -45,7 +45,6 @@ module GHC.Driver.Make (
 import GHC.Prelude
 
 import GHC.Tc.Utils.Backpack
-import GHC.Tc.Utils.Monad  ( initIfaceCheck, initTcRnIf )
 
 import qualified GHC.Linker.Loader as Linker
 import GHC.Linker.Types
@@ -65,7 +64,7 @@ import GHC.Driver.Main
 import GHC.Parser.Header
 import GHC.Parser.Errors.Ppr
 
-import GHC.Iface.Load      ( cannotFindModule, readIface )
+import GHC.Iface.Load      ( cannotFindModule )
 import GHC.IfaceToCore     ( typecheckIface )
 import GHC.Iface.Recomp    ( RecompileRequired ( MustCompile ) )
 
