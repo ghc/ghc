@@ -10,7 +10,7 @@
 -----------------------------------------------------------------------------
 
 module GHC.StgToCmm.Utils (
-        cgLit, mkSimpleLit,
+        mkSimpleLit,
         emitDataLits, emitRODataLits,
         emitDataCon,
         emitRtsCall, emitRtsCallWithResult, emitRtsCallGen,
@@ -100,15 +100,9 @@ import Control.Monad
 
 -------------------------------------------------------------------------
 --
---      Literals
+--      Simple Literals
 --
 -------------------------------------------------------------------------
-
-cgLit :: Literal -> FCode CmmLit
-cgLit (LitString s) = newByteStringCLit s
- -- not unpackFS; we want the UTF-8 byte stream.
-cgLit other_lit     = do platform <- getPlatform
-                         return (mkSimpleLit platform other_lit)
 
 mkSimpleLit :: Platform -> Literal -> CmmLit
 mkSimpleLit platform = \case
@@ -131,7 +125,6 @@ mkSimpleLit platform = \case
      -> let -- TODO: Literal labels might not actually be in the current package...
             labelSrc = ForeignLabelInThisPackage
         in CmmLabel (mkForeignLabel fs ms labelSrc fod)
-   -- NB: LitRubbish should have been lowered in "CoreToStg"
    other -> pprPanic "mkSimpleLit" (ppr other)
 
 --------------------------------------------------------------------------

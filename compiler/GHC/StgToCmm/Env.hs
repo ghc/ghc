@@ -31,6 +31,7 @@ import GHC.Platform
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Utils
 import GHC.StgToCmm.Closure
+import {-# SOURCE #-} GHC.StgToCmm.Expr ( cgLit )
 
 import GHC.Cmm.CLabel
 
@@ -162,7 +163,7 @@ cgLookupPanic id
 --------------------
 getArgAmode :: NonVoid StgArg -> FCode CmmExpr
 getArgAmode (NonVoid (StgVarArg var)) = idInfoToAmode <$> getCgIdInfo var
-getArgAmode (NonVoid (StgLitArg lit)) = CmmLit <$> cgLit lit
+getArgAmode (NonVoid (StgLitArg lit)) = cgLit lit
 
 getNonVoidArgAmodes :: [StgArg] -> FCode [CmmExpr]
 -- NB: Filters out void args,
