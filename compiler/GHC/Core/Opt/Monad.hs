@@ -64,6 +64,7 @@ import GHC.Types.Name.Env
 import GHC.Types.SrcLoc
 import GHC.Types.Error
 
+import GHC.Utils.Error ( mkMCDiagnostic )
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Logger ( HasLogger (..), DumpFormat (..), putLogMsg, putDumpMsg, Logger )
 import GHC.Utils.Monad
@@ -820,7 +821,7 @@ errorMsgS = errorMsg . text
 
 -- | Output an error to the screen. Does not cause the compiler to die.
 errorMsg :: SDoc -> CoreM ()
-errorMsg = msg (mkMCDiagnostic ErrorWithoutFlag)
+errorMsg doc = getDynFlags >>= \df -> msg (mkMCDiagnostic df ErrorWithoutFlag) doc
 
 -- | Output a fatal error to the screen. Does not cause the compiler to die.
 fatalErrorMsgS :: String -> CoreM ()

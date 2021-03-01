@@ -100,14 +100,14 @@ doBackpack [src_filename] = do
     (dflags, unhandled_flags, warns) <- liftIO $ parseDynamicFilePragma dflags1 src_opts
     modifySession (\hsc_env -> hsc_env {hsc_dflags = dflags})
     -- Cribbed from: preprocessFile / GHC.Driver.Pipeline
-    liftIO $ checkProcessArgsResult unhandled_flags
+    liftIO $ checkProcessArgsResult dflags unhandled_flags
     liftIO $ handleFlagWarnings logger dflags warns
     -- TODO: Preprocessing not implemented
 
     buf <- liftIO $ hGetStringBuffer src_filename
     let loc = mkRealSrcLoc (mkFastString src_filename) 1 1 -- TODO: not great
     case unP parseBackpack (initParserState (initParserOpts dflags) buf loc) of
-        PFailed pst -> throwErrors (fmap pprError (getErrorMessages pst))
+        PFailed pst -> throwErrors (fmap mkParserErr (getErrorMessages pst))
         POk _ pkgname_bkp -> do
             -- OK, so we have an LHsUnit PackageName, but we want an
             -- LHsUnit HsComponentId.  So let's rename it.
@@ -798,7 +798,7 @@ summariseDecl _pn hsc_src lmodname@(L loc modname) Nothing
                          Nothing -- GHC API buffer support not supported
                          [] -- No exclusions
          case r of
-            Nothing -> throwOneError (mkPlainMsgEnvelope ErrorWithoutFlag
+            Nothing -> throwOneError (mkPlainMsgEnvelope (hsc_dflags hsc_env) ErrorWithoutFlag
                                         loc (text "module" <+> ppr modname <+> text "was not found"))
             Just (Left err) -> throwErrors err
             Just (Right summary) -> return summary
