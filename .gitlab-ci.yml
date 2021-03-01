@@ -61,6 +61,8 @@ workflow:
 .release: &release
   variables:
     BUILD_FLAVOUR: "perf"
+    XZ_OPT: "-9"
+    HADDOCK_HYPERLINKED_SOURCES: "YES"
   artifacts:
     when: always
     expire_in: 1 year
@@ -279,11 +281,6 @@ hadrian-ghc-in-ghci:
     TEST_TYPE: test
     MAKE_ARGS: "-Werror"
   script:
-      # Build hyperlinked sources for documentation when building releases
-    - |
-      if [[ "$RELEASE_JOB" = "yes" ]]; then
-        HADDOCK_HYPERLINKED_SOURCES=1
-      fi
     - .gitlab/ci.sh setup
     - .gitlab/ci.sh configure
     - .gitlab/ci.sh build_make
@@ -950,11 +947,13 @@ release-x86_64-windows:
   extends: .build-x86_64-windows-hadrian
   variables:
     BUILD_FLAVOUR: "perf"
+    HADDOCK_HYPERLINKED_SOURCES: "yes"
 
 release-x86_64-windows-integer-simple:
   <<: *release
   extends: .build-x86_64-windows-hadrian
   variables:
+    HADDOCK_HYPERLINKED_SOURCES: "yes"
     BIGNUM_BACKEND: native
     BUILD_FLAVOUR: "perf"
 
