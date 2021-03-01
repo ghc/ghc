@@ -83,6 +83,7 @@ workflow:
   variables:
     BUILD_FLAVOUR: "perf"
     XZ_OPT: "-9"
+    HADDOCK_HYPERLINKED_SOURCES: "YES"
   artifacts:
     when: always
     expire_in: 1 year
@@ -547,12 +548,6 @@ validate-x86_64-darwin:
   variables:
     BUILD_FLAVOUR: "validate"
   before_script:
-      # Build hyperlinked sources for documentation when building releases
-    - |
-      if [[ -n "$CI_COMMIT_TAG" ]]; then
-        HADDOCK_HYPERLINKED_SOURCES=1
-      fi
-
     # workaround for docker permissions
     - sudo chown ghc:ghc -R .
   after_script:
@@ -953,6 +948,7 @@ release-x86_64-linux-fedora27-dwarf:
   <<: *release
   extends: .build-x86_64-linux-fedora27
   variables:
+    HADDOCK_HYPERLINKED_SOURCES: "yes"
     CONFIGURE_ARGS: "--enable-dwarf-unwind"
     BUILD_FLAVOUR: dwarf
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-fedora27-linux-dwarf.tar.xz"
@@ -1069,11 +1065,13 @@ release-x86_64-windows:
   extends: .build-x86_64-windows-hadrian
   variables:
     BUILD_FLAVOUR: "perf"
+    HADDOCK_HYPERLINKED_SOURCES: "yes"
 
 release-x86_64-windows-integer-simple:
   <<: *release
   extends: .build-x86_64-windows-hadrian
   variables:
+    HADDOCK_HYPERLINKED_SOURCES: "yes"
     BIGNUM_BACKEND: native
     BUILD_FLAVOUR: "perf"
     BIN_DIST_NAME: "ghc-x86_64-mingw32-unknown-nogmp"
