@@ -8,7 +8,7 @@ The simplifier utilities
 
 module GHC.Core.Opt.Simplify.Utils (
         -- Rebuilding
-        mkLam, mkCase, prepareAlts,
+        rebuildLam, mkCase, prepareAlts,
         tryEtaExpandRhs, wantEtaExpansion,
 
         -- Inlining,
@@ -1545,56 +1545,77 @@ won't inline because 'e' is too big.
 ************************************************************************
 -}
 
-mkLam :: SimplEnv -> [OutBndr] -> OutExpr -> SimplCont -> SimplM OutExpr
--- mkLam tries three things
+rebuildLam :: SimplEnv
+           -> [OutBndr] -> SimplFloats -> OutExpr
+           -> SimplCont -> SimplM (SimplFloats, OutExpr)
+-- (rebuildLam env bndrs floats body cont)
+-- returns an expression that means the same as
+--      \bndrs. let floats in body
+-- But it tries
 --      a) eta reduction, if that gives a trivial expression
 --      b) eta expansion [only if there are some value lambdas]
+--
+-- Invariant: emptyFloats in => emptyFloats out
+rebuildLam _env [] floats body _cont
+  = return (floats, body)
 
-mkLam _env [] body _cont
-  = return body
-mkLam env bndrs body cont
+rebuildLam env bndrs floats body cont
   = do { dflags <- getDynFlags
        ; mkLam' dflags bndrs body }
   where
-    mkLam' :: DynFlags -> [OutBndr] -> OutExpr -> SimplM OutExpr
+    let_floats      = letFloatBinds (sfLetFloats floats)
+    let_float_bndrs = mkVarSet (bindersOfBinds let_floats)
+    let_float_fvs   = foldr (unionVarSet . bindFreeVars) emptyVarSet let_floats
+         -- This formulation may return a set that is slightly too large,
+         -- by not deleting variables bound by the let's, but that is rare
+         -- and at worst we miss an eta-reduction
+
+    mkLam' :: DynFlags -> [OutBndr] -> OutExpr -> SimplM (SimplFloats, OutExpr)
     mkLam' dflags bndrs (Cast body co)
       | not (any bad bndrs)
         -- Note [Casts and lambdas]
-      = do { lam <- mkLam' dflags bndrs body
-           ; return (mkCast lam (mkPiCos Representational bndrs co)) }
+      = do { (floats, lam) <- mkLam' dflags bndrs body
+           ; return (floats, mkCast lam (mkPiCos Representational bndrs co)) }
       where
         co_vars  = tyCoVarsOfCo co
         bad bndr = isCoVar bndr && bndr `elemVarSet` co_vars
 
     mkLam' dflags bndrs body@(Lam {})
+      | isEmptyFloats floats   -- \xs. let floats in \ys. blah
+                               -- Do not combine these lambdas
       = mkLam' dflags (bndrs ++ bndrs1) body1
       where
         (bndrs1, body1) = collectBinders body
 
     mkLam' dflags bndrs (Tick t expr)
       | tickishFloatable t
-      = mkTick t <$> mkLam' dflags bndrs expr
+      = do { (floats, expr') <- mkLam' dflags bndrs expr
+           ; return (floats, mkTick t expr') }
 
     mkLam' dflags bndrs body
       | gopt Opt_DoEtaReduction dflags
-      , Just etad_lam <- tryEtaReduce True bndrs body
+      , isEmptyJoinFloats (sfJoinFloats floats)
+      , Just etad_lam <- tryEtaReduce bndrs let_float_bndrs body
+      , not (any (`elemVarSet` let_float_fvs)   bndrs)
+      , not (any (`elemVarSet` let_float_bndrs) bndrs)
       = do { tick (EtaReduction (head bndrs))
-           ; return etad_lam }
+           ; return (floats, etad_lam) }
 
       | not (contIsRhs cont)   -- See Note [Eta-expanding lambdas]
       , sm_eta_expand (getMode env)
       , any isRuntimeVar bndrs  -- Only when there is at least one value lambda already
-      , let body_arity = exprEtaExpandArity dflags body
+      , let full_body  = wrapFloats floats body
+            body_arity = exprEtaExpandArity dflags full_body
       , expandableArityType body_arity  -- This guard is only so that we only do
                                         -- a tick if there so something to do
       = do { tick (EtaExpansion (head bndrs))
-           ; let res = mkLams bndrs (etaExpandAT body_arity body)
-           ; traceSmpl "eta expand" (vcat [text "before" <+> ppr (mkLams bndrs body)
+           ; let res = mkLams bndrs (etaExpandAT body_arity full_body)
+           ; traceSmpl "eta expand" (vcat [text "before" <+> ppr (mkLams bndrs full_body)
                                           , text "after" <+> ppr res])
-           ; return res }
+           ; return (emptyFloats env, res) }
 
       | otherwise
-      = return (mkLams bndrs body)
+      = return (emptyFloats env, mkLams bndrs (wrapFloats floats body))
 
 {-
 Note [Eta expanding lambdas]
