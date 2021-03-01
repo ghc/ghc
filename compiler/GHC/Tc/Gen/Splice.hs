@@ -109,6 +109,7 @@ import GHC.Types.Error
 import GHC.Types.Fixity as Hs
 import GHC.Types.Annotations
 import GHC.Types.Name
+import GHC.Types.TypeEnv
 import GHC.Serialized
 
 import GHC.Unit.Finder
@@ -1567,7 +1568,7 @@ tcLookupTh name
                 Just thing -> return thing;
                 Nothing    ->
 
-          case lookupNameEnv (tcg_type_env gbl_env) name of {
+          case lookupTypeEnv (tcg_type_env gbl_env) name of {
                 Just thing -> return (AGlobal thing);
                 Nothing    ->
 

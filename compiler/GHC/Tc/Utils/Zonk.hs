@@ -79,7 +79,6 @@ import GHC.Core
 import GHC.Core.Predicate
 
 import GHC.Types.Name
-import GHC.Types.Name.Env
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Id
@@ -408,7 +407,7 @@ setZonkType ze flexi = ze { ze_flexi = flexi }
 
 zonkEnvIds :: ZonkEnv -> TypeEnv
 zonkEnvIds (ZonkEnv { ze_id_env = id_env})
-  = mkNameEnv [(getName id, AnId id) | id <- nonDetEltsUFM id_env]
+  = mkTypeEnv [AnId id | id <- nonDetEltsUFM id_env]
   -- It's OK to use nonDetEltsUFM here because we forget the ordering
   -- immediately by creating a TypeEnv
 

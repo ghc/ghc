@@ -212,7 +212,7 @@ typecheckIface iface
                          -- we'll infinite loop with hs-boot.  See #10083 for
                          -- an example where this would cause non-termination.
                          text "Type envt:" <+> ppr (map fst names_w_things)])
-        ; return $ ModDetails { md_types     = type_env
+        ; return $ ModDetails { md_types     = TypeEnv type_env
                               , md_insts     = insts
                               , md_fam_insts = fam_insts
                               , md_rules     = rules
@@ -399,7 +399,7 @@ typecheckIfacesForMerging mod ifaces tc_env_var =
     -- TODO: change tcIfaceDecls to accept w/o Fingerprint
     names_w_things <- tcIfaceDecls ignore_prags (map (\x -> (fingerprint0, x))
                                                   (occEnvElts decl_env))
-    let global_type_env = mkNameEnv names_w_things
+    let global_type_env = TypeEnv (mkNameEnv names_w_things)
     writeMutVar tc_env_var global_type_env
 
     -- OK, now typecheck each ModIface using this environment
@@ -408,7 +408,7 @@ typecheckIfacesForMerging mod ifaces tc_env_var =
         type_env <- fixM $ \type_env ->
             setImplicitEnvM type_env $ do
                 decls <- tcIfaceDecls ignore_prags (mi_decls iface)
-                return (mkNameEnv decls)
+                return (TypeEnv $ mkNameEnv decls)
         -- But note that we use this type_env to typecheck references to DFun
         -- in 'IfaceInst'
         setImplicitEnvM type_env $ do
@@ -448,7 +448,7 @@ typecheckIfaceForInstantiate nsubst iface =
     type_env <- fixM $ \type_env ->
         setImplicitEnvM type_env $ do
             decls     <- tcIfaceDecls ignore_prags (mi_decls iface)
-            return (mkNameEnv decls)
+            return (TypeEnv $ mkNameEnv decls)
     -- See Note [rnIfaceNeverExported]
     setImplicitEnvM type_env $ do
     insts     <- mapM tcIfaceInst (mi_insts iface)
@@ -1790,7 +1790,7 @@ tcIfaceGlobal name
                 | nameIsLocalOrFrom mod name
                 -> do           -- It's defined in the module being compiled
                 { type_env <- setLclEnv () get_type_env         -- yuk
-                ; case lookupNameEnv type_env name of
+                ; case lookupTypeEnv type_env name of
                     Just thing -> return thing
                     -- See Note [Knot-tying fallback on boot]
                     Nothing   -> via_external

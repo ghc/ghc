@@ -44,8 +44,7 @@ updateModDetailsIdInfos cg_infos mod_details =
               , md_rules = rules
               } = mod_details
 
-    -- type TypeEnv = NameEnv TyThing
-    type_env' = mapNameEnv (updateTyThingIdInfos type_env' cg_infos) type_env
+    type_env' = mapTypeEnv (updateTyThingIdInfos type_env' cg_infos) type_env
     -- NB: Knot-tied! The result, type_env', is passed right back into into
     -- updateTyThingIdInfos, so that that occurrences of any Ids (e.g. in
     -- IdInfos, etc) can be looked up in the tidied env
@@ -115,17 +114,18 @@ updateIdInfo CgInfos{ cgNonCafs = NonCaffySet non_cafs, cgLFInfos = lf_infos } i
     in
       id2
 
+
 --------------------------------------------------------------------------------
 
-updateGlobalIds :: NameEnv TyThing -> CoreExpr -> CoreExpr
+updateGlobalIds :: TypeEnv -> CoreExpr -> CoreExpr
 -- Update occurrences of GlobalIds as directed by 'env'
 -- The 'env' maps a GlobalId to a version with accurate CAF info
 -- (and in due course perhaps other back-end-related info)
 updateGlobalIds env e = go env e
   where
-    go_id :: NameEnv TyThing -> Id -> Id
+    go_id :: TypeEnv -> Id -> Id
     go_id env var =
-      case lookupNameEnv env (varName var) of
+      case lookupTypeEnv env (varName var) of
         Nothing -> var
         Just (AnId id) -> id
         Just other -> pprPanic "UpdateIdInfos.updateGlobalIds" $
@@ -133,7 +133,7 @@ updateGlobalIds env e = go env e
           nest 4 (text "Id:" <+> ppr var $$
                   text "TyThing:" <+> ppr other)
 
-    go :: NameEnv TyThing -> CoreExpr -> CoreExpr
+    go :: TypeEnv -> CoreExpr -> CoreExpr
     go env (Var v) = Var (go_id env v)
     go _ e@Lit{} = e
     go env (App e1 e2) = App (go env e1) (go env e2)
@@ -148,7 +148,7 @@ updateGlobalIds env e = go env e
     go _ e@Type{} = e
     go _ e@Coercion{} = e
 
-    go_binds :: NameEnv TyThing -> CoreBind -> CoreBind
+    go_binds :: TypeEnv -> CoreBind -> CoreBind
     go_binds env (NonRec b e) =
       assertNotInNameEnv env [b] (NonRec b (go env e))
     go_binds env (Rec prs) =
@@ -156,5 +156,5 @@ updateGlobalIds env e = go env e
 
 -- In `updateGlobaLIds` Names of local binders should not shadow Name of
 -- globals. This assertion is to check that.
-assertNotInNameEnv :: NameEnv a -> [Id] -> b -> b
-assertNotInNameEnv env ids x = ASSERT(not (any (\id -> elemNameEnv (idName id) env) ids)) x
+assertNotInNameEnv :: TypeEnv -> [Id] -> b -> b
+assertNotInNameEnv env ids x = ASSERT(not (any (\id -> elemTypeEnv (idName id) env) ids)) x

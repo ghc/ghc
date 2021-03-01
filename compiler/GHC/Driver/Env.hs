@@ -49,7 +49,7 @@ import GHC.Core.InstEnv ( ClsInst )
 import GHC.Types.Annotations ( Annotation, AnnEnv, mkAnnEnv, plusAnnEnv )
 import GHC.Types.CompleteMatch
 import GHC.Types.Name
-import GHC.Types.Name.Env
+import GHC.Types.TypeEnv
 import GHC.Types.TyThing
 
 import GHC.Builtin.Names ( gHC_PRIM )
@@ -259,10 +259,10 @@ lookupType hsc_env name = do
 
        !ty = if isOneShot (ghcMode (hsc_dflags hsc_env))
                -- in one-shot, we don't use the HPT
-               then lookupNameEnv pte name
+               then lookupTypeEnv pte name
                else case lookupHptByModule hpt mod of
-                Just hm -> lookupNameEnv (md_types (hm_details hm)) name
-                Nothing -> lookupNameEnv pte name
+                Just hm -> lookupTypeEnv (md_types (hm_details hm)) name
+                Nothing -> lookupTypeEnv pte name
    pure ty
 
 -- | Find the 'ModIface' for a 'Module', searching in both the loaded home

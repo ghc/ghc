@@ -94,7 +94,7 @@ import GHC.Types.Unique.FM
 import GHC.Types.Unique.DSet
 import GHC.Types.Unique.Set
 import GHC.Types.Name
-import GHC.Types.Name.Env
+import GHC.Types.TypeEnv
 
 import GHC.Unit
 import GHC.Unit.External
@@ -1438,7 +1438,7 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_logger lcl_dflags home_unit
                 -- Re-typecheck the loop
                 -- This is necessary to make sure the knot is tied when
                 -- we close a recursive module loop, see bug #12035.
-                type_env_var <- liftIO $ newIORef emptyNameEnv
+                type_env_var <- liftIO $ newIORef emptyTypeEnv
                 let lcl_hsc_env' = lcl_hsc_env { hsc_type_env_var =
                                     Just (ms_mod lcl_mod, type_env_var) }
                 lcl_hsc_env'' <- case finish_loop of
@@ -1591,7 +1591,7 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
         liftIO (cleanup hsc_env)
 
         -- Get ready to tie the knot
-        type_env_var <- liftIO $ newIORef emptyNameEnv
+        type_env_var <- liftIO $ newIORef emptyTypeEnv
         let hsc_env1 = hsc_env { hsc_type_env_var =
                                     Just (ms_mod mod, type_env_var) }
         setSession hsc_env1

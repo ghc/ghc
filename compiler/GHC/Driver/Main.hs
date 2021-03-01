@@ -193,12 +193,12 @@ import GHC.Types.Unique.Supply
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
 import GHC.Types.Name
-import GHC.Types.Name.Env
 import GHC.Types.Name.Cache ( initNameCache )
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Ppr
 import GHC.Types.TyThing
 import GHC.Types.HpcInfo
+import GHC.Types.TypeEnv
 
 import GHC.Utils.Fingerprint ( Fingerprint )
 import GHC.Utils.Panic
@@ -798,7 +798,7 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
     -- One-shot mode needs a knot-tying mutable variable for interface
     -- files. See GHC.Tc.Utils.TcGblEnv.tcg_type_env_var.
     -- See also Note [hsc_type_env_var hack]
-    type_env_var <- newIORef emptyNameEnv
+    type_env_var <- newIORef emptyTypeEnv
     let mod = ms_mod mod_summary
         hsc_env | isOneShot (ghcMode (hsc_dflags hsc_env''))
                 = hsc_env'' { hsc_type_env_var = Just (mod, type_env_var) }

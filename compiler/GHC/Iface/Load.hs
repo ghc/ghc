@@ -191,7 +191,7 @@ importDecl name
                                 text "Use -ddump-if-trace to get an idea of which file caused the error"])
     found_things_msg eps =
         hang (text "Found the following declarations in" <+> ppr (nameModule name) <> colon)
-           2 (vcat (map ppr $ filter is_interesting $ nameEnvElts $ eps_PTE eps))
+           2 (vcat (map ppr $ filter is_interesting $ typeEnvElts $ eps_PTE eps))
       where
         is_interesting thing = nameModule name == nameModule (getName thing)
 
@@ -781,7 +781,7 @@ badSourceImport mod
 -----------------------------------------------------
 
 addDeclsToPTE :: PackageTypeEnv -> [(Name,TyThing)] -> PackageTypeEnv
-addDeclsToPTE pte things = extendNameEnvList pte things
+addDeclsToPTE (TypeEnv pte) things = TypeEnv (extendNameEnvList pte things)
 
 {-
 *********************************************************

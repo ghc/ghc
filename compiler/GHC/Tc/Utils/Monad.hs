@@ -245,7 +245,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
         dfun_n_var   <- newIORef emptyOccSet ;
         type_env_var <- case hsc_type_env_var hsc_env of {
                            Just (_mod, te_var) -> return te_var ;
-                           Nothing             -> newIORef emptyNameEnv } ;
+                           Nothing             -> newIORef emptyTypeEnv } ;
 
         dependent_files_var <- newIORef [] ;
         static_wc_var       <- newIORef emptyWC ;
@@ -295,7 +295,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                                      || moduleUnit mod == bignumUnit
                                      then Just []  -- See Note [Default types]
                                      else Nothing,
-                tcg_type_env       = emptyNameEnv,
+                tcg_type_env       = emptyTypeEnv,
                 tcg_type_env_var   = type_env_var,
                 tcg_inst_env       = emptyInstEnv,
                 tcg_fam_inst_env   = emptyFamInstEnv,
