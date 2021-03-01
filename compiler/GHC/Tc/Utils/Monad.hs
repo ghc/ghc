@@ -1007,8 +1007,7 @@ mkLongErrAt loc msg extra
          let msg' = pprWithUnitState unit_state msg in
          return $ mkLongMsgEnvelope ErrorWithoutFlag loc printer msg' extra }
 
-mkDecoratedSDocAt :: Severity
-                  -> DiagnosticReason
+mkDecoratedSDocAt :: DiagnosticReason
                   -> SrcSpan
                   -> SDoc
                   -- ^ The important part of the message
@@ -1017,14 +1016,14 @@ mkDecoratedSDocAt :: Severity
                   -> SDoc
                   -- ^ Any supplementary information.
                   -> TcRn (MsgEnvelope DiagnosticMessage)
-mkDecoratedSDocAt sev reason loc important context extra
+mkDecoratedSDocAt reason loc important context extra
   = do { printer <- getPrintUnqualified ;
          unit_state <- hsc_units <$> getTopEnv ;
          let f = pprWithUnitState unit_state
              errDoc  = [important, context, extra]
              errDoc' = DiagnosticMessage (mkDecorated $ map f errDoc) reason
          in
-         return $ mkMsgEnvelope sev loc printer errDoc' }
+         return $ mkMsgEnvelope (defaultReasonSeverity reason) loc printer errDoc' }
 
 addLongErrAt :: SrcSpan -> SDoc -> SDoc -> TcRn ()
 addLongErrAt loc msg extra = mkLongErrAt loc msg extra >>= reportDiagnostic
