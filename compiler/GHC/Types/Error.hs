@@ -1,3 +1,4 @@
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
@@ -18,9 +19,10 @@ module GHC.Types.Error
    -- * Classifying Messages
 
    , MessageClass (..)
+   , pattern MCDiagnostic
    , Severity (..)
-   , sevError
-   , sevWarn
+   , mcDiagnosticError
+   , mkMCDiagnostic
    , Diagnostic (..)
    , DiagnosticMessage (..)
    , DiagnosticReason (..)
@@ -72,8 +74,10 @@ We represent the 'Messages' as a single bag of warnings and errors.
 
 The reason behind that is that there is a fluid relationship between errors and warnings and we want to
 be able to promote or demote errors and warnings based on certain flags (e.g. -Werror, -fdefer-type-errors
-or -XPartialTypeSignatures). We rely on the 'Severity' to distinguish between a warning and an
-error.
+or -XPartialTypeSignatures). More specifically, every diagnostic has a 'DiagnosticReason', but a warning
+'DiagnosticReason' might be associated with 'SevError', in the case of -Werror.
+
+We rely on the 'Severity' to distinguish between a warning and an error.
 
 'WarningMessages' and 'ErrorMessages' are for now simple type aliases to retain backward compatibility, but
 in future iterations these can be either parameterised over an 'e' message type (to make type signatures
@@ -225,9 +229,31 @@ data MessageClass
     -- ^ Log messages intended for end users.
     -- No file\/line\/column stuff.
 
-  | MCDiagnostic Severity DiagnosticReason
+  | UnsafeMCDiagnostic Severity DiagnosticReason
+    -- ^ Diagnostics from the compiler. This constructor
+    -- is prefixed with \"unsafe\" because it allows the construction
+    -- of a 'MessageClass' with a completely arbitrary
+    -- permutation of 'Severity' and 'DiagnosticReason'. As such,
+    -- as users are expected to use the 'mkMCDiagnostic' smart constructor instead.
   deriving (Eq, Show)
 
+
+-- | A pattern synonym to still be able to pattern match on a 'MessageClass',
+-- without being able to freely construct diagnostics.
+pattern MCDiagnostic :: Severity -> DiagnosticReason -> MessageClass
+pattern MCDiagnostic sev reason <- UnsafeMCDiagnostic sev reason
+
+{-# COMPLETE MCOutput, MCFatal, MCInteractive, MCDump, MCInfo, MCDiagnostic #-}
+
+-- | A 'MessageClass' for always-fatal errors.
+mcDiagnosticError :: MessageClass
+mcDiagnosticError = mkMCDiagnostic ErrorWithoutFlag
+
+-- | Make a 'MessageClass' for a given 'DiagnosticReason', without consulting the 'DynFlags'.
+-- This will not respect -Werror or warning suppression and so is probably wrong
+-- for any warning.
+mkMCDiagnostic :: DiagnosticReason -> MessageClass
+mkMCDiagnostic reason = UnsafeMCDiagnostic (defaultReasonSeverity reason) reason
 
 -- | Used to describe warnings and errors
 --   o The message has a file\/line\/column heading,
@@ -238,14 +264,6 @@ data Severity
   = SevWarning
   | SevError
   deriving (Eq, Show)
-
--- | The 'Severity' for an error.
-sevError :: Severity
-sevError = SevError
-
--- | The 'Severity' for a warning.
-sevWarn :: Severity
-sevWarn = SevWarning
 
 instance Outputable Severity where
   ppr = \case
@@ -261,7 +279,7 @@ instance ToJson MessageClass where
   json MCInteractive = JSString "MCInteractive"
   json MCDump = JSString "MCDump"
   json MCInfo = JSString "MCInfo"
-  json (MCDiagnostic sev reason) =
+  json (UnsafeMCDiagnostic sev reason) =
     JSString $ renderWithContext defaultSDocContext (ppr $ text "MCDiagnostic" <+> ppr sev <+> ppr reason)
 
 instance Show (MsgEnvelope DiagnosticMessage) where
@@ -314,12 +332,10 @@ mkLocMessageAnn ann msg_class locn msg
   where
     msgText =
       case msg_class of
-        MCDiagnostic sev _reason ->
-          case sev of
-            SevError   -> text "error:"
-            SevWarning -> text "warning:"
-        MCFatal          -> text "fatal:"
-        _                -> empty
+        MCDiagnostic SevError _reason   -> text "error:"
+        MCDiagnostic SevWarning _reason -> text "warning:"
+        MCFatal                         -> text "fatal:"
+        _                               -> empty
 
 -- | Computes a severity from a reason in the absence of DynFlags. This will likely
 -- be wrong in the presence of -Werror. It will be removed in the context of #18516.
@@ -330,12 +346,10 @@ defaultReasonSeverity = \case
   ErrorWithoutFlag      -> SevError
 
 getMessageClassColour :: MessageClass -> Col.Scheme -> Col.PprColour
-getMessageClassColour (MCDiagnostic sev _reason) =
-  case sev of
-    SevError   -> Col.sError
-    SevWarning -> Col.sWarning
-getMessageClassColour MCFatal                        = Col.sFatal
-getMessageClassColour _                              = const mempty
+getMessageClassColour (MCDiagnostic SevError _reason)   = Col.sError
+getMessageClassColour (MCDiagnostic SevWarning _reason) = Col.sWarning
+getMessageClassColour MCFatal                           = Col.sFatal
+getMessageClassColour _                                 = const mempty
 
 getCaretDiagnostic :: MessageClass -> SrcSpan -> IO SDoc
 getCaretDiagnostic _ (UnhelpfulSpan _) = pure empty

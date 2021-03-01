@@ -42,7 +42,7 @@ module GHC.Core.Opt.Monad (
     getAnnotations, getFirstAnnotations,
 
     -- ** Screen output
-    putMsg, putMsgS, errorMsg, errorMsgS, diagnosticMsg,
+    putMsg, putMsgS, errorMsg, errorMsgS, msg,
     fatalErrorMsg, fatalErrorMsgS,
     debugTraceMsg, debugTraceMsgS,
     dumpIfSet_dyn
@@ -820,10 +820,7 @@ errorMsgS = errorMsg . text
 
 -- | Output an error to the screen. Does not cause the compiler to die.
 errorMsg :: SDoc -> CoreM ()
-errorMsg = msg (MCDiagnostic SevError ErrorWithoutFlag)
-
-diagnosticMsg :: Severity -> DiagnosticReason -> SDoc -> CoreM ()
-diagnosticMsg sev reason = msg (MCDiagnostic sev reason)
+errorMsg = msg (mkMCDiagnostic ErrorWithoutFlag)
 
 -- | Output a fatal error to the screen. Does not cause the compiler to die.
 fatalErrorMsgS :: String -> CoreM ()

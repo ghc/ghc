@@ -12,12 +12,12 @@
 module GHC.Utils.Error (
         -- * Basic types
         Validity(..), andValid, allValid, isValid, getInvalids, orValid,
-        Severity(..), sevWarn, sevError,
+        Severity(..),
 
         -- * Messages
         WarnMsg,
         MsgEnvelope(..),
-        MessageClass(..),
+        MessageClass(..), mcDiagnosticError,
         SDoc,
         DecoratedSDoc(unDecorated),
         Messages, ErrorMessages, WarningMessages,
@@ -32,6 +32,7 @@ module GHC.Utils.Error (
         -- ** Construction
         emptyMessages, mkDecorated, mkLocMessage, mkLocMessageAnn,
         mkMsgEnvelope, mkPlainMsgEnvelope, mkLongMsgEnvelope,
+        mkMCDiagnostic,
 
         -- * Utilities
         doIfSet, doIfSet_dyn,
@@ -129,7 +130,7 @@ pprLocMsgEnvelope (MsgEnvelope { errMsgSpan      = s
                                , errMsgContext   = unqual })
   = sdocWithContext $ \ctx ->
     withErrStyle unqual $
-      mkLocMessage (MCDiagnostic sev (diagnosticReason e)) s (formatBulleted ctx $ diagnosticMessage e)
+      mkLocMessage (UnsafeMCDiagnostic sev (diagnosticReason e)) s (formatBulleted ctx $ diagnosticMessage e)
 
 sortMsgBag :: Maybe DynFlags -> Bag (MsgEnvelope e) -> [MsgEnvelope e]
 sortMsgBag dflags = maybeLimit . sortBy (cmp `on` errMsgSpan) . bagToList
@@ -170,12 +171,12 @@ ifVerbose dflags val act
 
 errorMsg :: Logger -> DynFlags -> SDoc -> IO ()
 errorMsg logger dflags msg
-   = putLogMsg logger dflags (MCDiagnostic SevError ErrorWithoutFlag) noSrcSpan $
+   = putLogMsg logger dflags (mkMCDiagnostic ErrorWithoutFlag) noSrcSpan $
      withPprStyle defaultErrStyle msg
 
 warningMsg :: Logger -> DynFlags -> SDoc -> IO ()
 warningMsg logger dflags msg
-   = putLogMsg logger dflags (MCDiagnostic SevWarning WarningWithoutFlag) noSrcSpan $
+   = putLogMsg logger dflags (mkMCDiagnostic WarningWithoutFlag) noSrcSpan $
      withPprStyle defaultErrStyle msg
 
 fatalErrorMsg :: Logger -> DynFlags -> SDoc -> IO ()

@@ -86,7 +86,7 @@ import GHC.Utils.Logger
 import GHC.SysTools.FileCleanup
 
 import GHC.Types.Basic
-import GHC.Types.Error ( DiagnosticMessage )
+import GHC.Types.Error
 import GHC.Types.Target
 import GHC.Types.SourceFile
 import GHC.Types.SourceError
@@ -2894,14 +2894,13 @@ withDeferredDiagnostics f = do
     let deferDiagnostics _dflags !msgClass !srcSpan !msg = do
           let action = putLogMsg logger dflags msgClass srcSpan msg
           case msgClass of
-            MCDiagnostic severity _reason
-                    -> case severity of
-                         SevWarning
-                           -> atomicModifyIORef' warnings $ \i -> (action: i, ())
-                         SevError
-                           -> atomicModifyIORef' errors   $ \i -> (action: i, ())
-            MCFatal -> atomicModifyIORef' fatals   $ \i -> (action: i, ())
-            _       -> action
+            MCDiagnostic SevWarning _reason
+              -> atomicModifyIORef' warnings $ \i -> (action: i, ())
+            MCDiagnostic SevError _reason
+              -> atomicModifyIORef' errors   $ \i -> (action: i, ())
+            MCFatal
+              -> atomicModifyIORef' fatals   $ \i -> (action: i, ())
+            _ -> action
 
         printDeferredDiagnostics = liftIO $
           forM_ [warnings, errors, fatals] $ \ref -> do
