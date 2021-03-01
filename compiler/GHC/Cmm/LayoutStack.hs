@@ -8,7 +8,8 @@ import GHC.Prelude hiding ((<*>))
 import GHC.Platform
 import GHC.Platform.Profile
 
-import GHC.StgToCmm.Utils      ( callerSaveVolatileRegs, newTemp  ) -- XXX layering violation
+import GHC.StgToCmm.Monad      ( newTemp  ) -- XXX layering violation
+import GHC.StgToCmm.Utils      ( callerSaveVolatileRegs  ) -- XXX layering violation
 import GHC.StgToCmm.Foreign    ( saveThreadState, loadThreadState ) -- XXX layering violation
 
 import GHC.Types.Basic
