@@ -1,6 +1,7 @@
-{-# LANGUAGE CPP               #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE CPP                #-}
+{-# LANGUAGE FlexibleInstances  #-}
+{-# LANGUAGE LambdaCase         #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 {-
 (c) The University of Glasgow 2006
@@ -121,6 +122,7 @@ module GHC.Core.TyCon(
 
         -- * Primitive representations of Types
         PrimRep(..), PrimElemRep(..),
+        primElemRepToPrimRep,
         isVoidRep, isGcPtrRep,
         primRepSizeB,
         primElemRepSizeB,
@@ -1480,7 +1482,7 @@ data PrimRep
   | FloatRep
   | DoubleRep
   | VecRep Int PrimElemRep  -- ^ A vector
-  deriving( Eq, Show )
+  deriving( Data.Data, Eq, Ord, Show )
 
 data PrimElemRep
   = Int8ElemRep
@@ -1493,13 +1495,57 @@ data PrimElemRep
   | Word64ElemRep
   | FloatElemRep
   | DoubleElemRep
-   deriving( Eq, Show )
+   deriving( Data.Data, Eq, Ord, Show, Enum )
 
 instance Outputable PrimRep where
   ppr r = text (show r)
 
 instance Outputable PrimElemRep where
   ppr r = text (show r)
+
+instance Binary PrimRep where
+  put_ bh VoidRep        = putByte bh 0
+  put_ bh LiftedRep      = putByte bh 1
+  put_ bh UnliftedRep    = putByte bh 2
+  put_ bh Int8Rep        = putByte bh 3
+  put_ bh Int16Rep       = putByte bh 4
+  put_ bh Int32Rep       = putByte bh 5
+  put_ bh Int64Rep       = putByte bh 6
+  put_ bh IntRep         = putByte bh 7
+  put_ bh Word8Rep       = putByte bh 8
+  put_ bh Word16Rep      = putByte bh 9
+  put_ bh Word32Rep      = putByte bh 10
+  put_ bh Word64Rep      = putByte bh 11
+  put_ bh WordRep        = putByte bh 12
+  put_ bh AddrRep        = putByte bh 13
+  put_ bh FloatRep       = putByte bh 14
+  put_ bh DoubleRep      = putByte bh 15
+  put_ bh (VecRep n per) = putByte bh 16 *> put_ bh n *> put_ bh per
+  get  bh = do
+    h <- getByte bh
+    case h of
+      0  -> pure VoidRep
+      1  -> pure LiftedRep
+      2  -> pure UnliftedRep
+      3  -> pure Int8Rep
+      4  -> pure Int16Rep
+      5  -> pure Int32Rep
+      6  -> pure Int64Rep
+      7  -> pure IntRep
+      8  -> pure Word8Rep
+      9  -> pure Word16Rep
+      10 -> pure Word32Rep
+      11 -> pure Word64Rep
+      12 -> pure WordRep
+      13 -> pure AddrRep
+      14 -> pure FloatRep
+      15 -> pure DoubleRep
+      16 -> VecRep <$> get bh <*> get bh
+      _  -> pprPanic "Binary:PrimRep" (int (fromIntegral h))
+
+instance Binary PrimElemRep where
+  put_ bh per = putByte bh (fromIntegral (fromEnum per))
+  get  bh = toEnum . fromIntegral <$> getByte bh
 
 isVoidRep :: PrimRep -> Bool
 isVoidRep VoidRep = True
@@ -1552,19 +1598,22 @@ primRepSizeB platform = \case
    LiftedRep        -> platformWordSizeInBytes platform
    UnliftedRep      -> platformWordSizeInBytes platform
    VoidRep          -> 0
-   (VecRep len rep) -> len * primElemRepSizeB rep
+   (VecRep len rep) -> len * primElemRepSizeB platform rep
 
-primElemRepSizeB :: PrimElemRep -> Int
-primElemRepSizeB Int8ElemRep   = 1
-primElemRepSizeB Int16ElemRep  = 2
-primElemRepSizeB Int32ElemRep  = 4
-primElemRepSizeB Int64ElemRep  = 8
-primElemRepSizeB Word8ElemRep  = 1
-primElemRepSizeB Word16ElemRep = 2
-primElemRepSizeB Word32ElemRep = 4
-primElemRepSizeB Word64ElemRep = 8
-primElemRepSizeB FloatElemRep  = 4
-primElemRepSizeB DoubleElemRep = 8
+primElemRepSizeB :: Platform -> PrimElemRep -> Int
+primElemRepSizeB platform = primRepSizeB platform . primElemRepToPrimRep
+
+primElemRepToPrimRep :: PrimElemRep -> PrimRep
+primElemRepToPrimRep Int8ElemRep   = Int8Rep
+primElemRepToPrimRep Int16ElemRep  = Int16Rep
+primElemRepToPrimRep Int32ElemRep  = Int32Rep
+primElemRepToPrimRep Int64ElemRep  = Int64Rep
+primElemRepToPrimRep Word8ElemRep  = Word8Rep
+primElemRepToPrimRep Word16ElemRep = Word16Rep
+primElemRepToPrimRep Word32ElemRep = Word32Rep
+primElemRepToPrimRep Word64ElemRep = Word64Rep
+primElemRepToPrimRep FloatElemRep  = FloatRep
+primElemRepToPrimRep DoubleElemRep = DoubleRep
 
 -- | Return if Rep stands for floating type,
 -- returns Nothing for vector types.
@@ -1573,7 +1622,6 @@ primRepIsFloat  FloatRep     = Just True
 primRepIsFloat  DoubleRep    = Just True
 primRepIsFloat  (VecRep _ _) = Nothing
 primRepIsFloat  _            = Just False
-
 
 {-
 ************************************************************************

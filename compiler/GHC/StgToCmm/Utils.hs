@@ -1,5 +1,4 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE LambdaCase #-}
 
 -----------------------------------------------------------------------------
 --
@@ -10,11 +9,10 @@
 -----------------------------------------------------------------------------
 
 module GHC.StgToCmm.Utils (
-        cgLit, mkSimpleLit,
         emitDataLits, emitRODataLits,
         emitDataCon,
         emitRtsCall, emitRtsCallWithResult, emitRtsCallGen,
-        assignTemp, newTemp,
+        assignTemp,
 
         newUnboxedTupleRegs,
 
@@ -38,7 +36,6 @@ module GHC.StgToCmm.Utils (
         cmmUntag, cmmIsTagged,
 
         addToMem, addToMemE, addToMemLblE, addToMemLbl,
-        newStringCLit, newByteStringCLit,
 
         -- * Update remembered set operations
         whenUpdRemSetEnabled,
@@ -55,6 +52,7 @@ import GHC.Prelude
 import GHC.Platform
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Closure
+import GHC.StgToCmm.Lit (mkSimpleLit)
 import GHC.Cmm
 import GHC.Cmm.BlockId
 import GHC.Cmm.Graph as CmmGraph
@@ -74,7 +72,6 @@ import GHC.Types.Literal
 import GHC.Data.Graph.Directed
 import GHC.Utils.Misc
 import GHC.Types.Unique
-import GHC.Types.Unique.Supply (MonadUnique(..))
 import GHC.Driver.Session
 import GHC.Data.FastString
 import GHC.Utils.Outputable
@@ -83,10 +80,7 @@ import GHC.Types.RepType
 import GHC.Types.CostCentre
 import GHC.Types.IPE
 
-import Data.ByteString (ByteString)
-import qualified Data.ByteString.Char8 as BS8
 import qualified Data.Map as M
-import Data.Char
 import Data.List (sortBy)
 import Data.Ord
 import GHC.Types.Unique.Map
@@ -97,42 +91,6 @@ import GHC.Core.DataCon
 import GHC.Types.Unique.FM
 import GHC.Data.Maybe
 import Control.Monad
-
--------------------------------------------------------------------------
---
---      Literals
---
--------------------------------------------------------------------------
-
-cgLit :: Literal -> FCode CmmLit
-cgLit (LitString s) = newByteStringCLit s
- -- not unpackFS; we want the UTF-8 byte stream.
-cgLit other_lit     = do platform <- getPlatform
-                         return (mkSimpleLit platform other_lit)
-
-mkSimpleLit :: Platform -> Literal -> CmmLit
-mkSimpleLit platform = \case
-   (LitChar   c)                -> CmmInt (fromIntegral (ord c))
-                                          (wordWidth platform)
-   LitNullAddr                  -> zeroCLit platform
-   (LitNumber LitNumInt i)      -> CmmInt i (wordWidth platform)
-   (LitNumber LitNumInt8 i)     -> CmmInt i W8
-   (LitNumber LitNumInt16 i)    -> CmmInt i W16
-   (LitNumber LitNumInt32 i)    -> CmmInt i W32
-   (LitNumber LitNumInt64 i)    -> CmmInt i W64
-   (LitNumber LitNumWord i)     -> CmmInt i (wordWidth platform)
-   (LitNumber LitNumWord8 i)    -> CmmInt i W8
-   (LitNumber LitNumWord16 i)   -> CmmInt i W16
-   (LitNumber LitNumWord32 i)   -> CmmInt i W32
-   (LitNumber LitNumWord64 i)   -> CmmInt i W64
-   (LitFloat r)                 -> CmmFloat r W32
-   (LitDouble r)                -> CmmFloat r W64
-   (LitLabel fs ms fod)
-     -> let -- TODO: Literal labels might not actually be in the current package...
-            labelSrc = ForeignLabelInThisPackage
-        in CmmLabel (mkForeignLabel fs ms labelSrc fod)
-   -- NB: LitRubbish should have been lowered in "CoreToStg"
-   other -> pprPanic "mkSimpleLit" (ppr other)
 
 --------------------------------------------------------------------------
 --
@@ -302,18 +260,6 @@ emitDataCon :: CLabel -> CmmInfoTable -> CostCentreStack -> [CmmLit] -> FCode ()
 emitDataCon lbl itbl ccs payload =
   emitDecl (CmmData (Section Data lbl) (CmmStatics lbl itbl ccs payload))
 
-newStringCLit :: String -> FCode CmmLit
--- Make a global definition for the string,
--- and return its label
-newStringCLit str = newByteStringCLit (BS8.pack str)
-
-newByteStringCLit :: ByteString -> FCode CmmLit
-newByteStringCLit bytes
-  = do  { uniq <- newUnique
-        ; let (lit, decl) = mkByteStringCLit (mkStringLitLabel uniq) bytes
-        ; emitDecl decl
-        ; return lit }
-
 -------------------------------------------------------------------------
 --
 --      Assigning expressions to temporaries
@@ -334,10 +280,6 @@ assignTemp e = do { platform <- getPlatform
                   ; let reg = LocalReg uniq (cmmExprType platform e)
                   ; emitAssign (CmmLocal reg) e
                   ; return reg }
-
-newTemp :: MonadUnique m => CmmType -> m LocalReg
-newTemp rep = do { uniq <- getUniqueM
-                 ; return (LocalReg uniq rep) }
 
 newUnboxedTupleRegs :: Type -> FCode ([LocalReg], [ForeignHint])
 -- Choose suitable local regs to use for the components
@@ -604,7 +546,6 @@ assignTemp' e
        let reg = CmmLocal lreg
        emitAssign reg e
        return (CmmReg reg)
-
 
 ---------------------------------------------------------------------------
 -- Pushing to the update remembered set

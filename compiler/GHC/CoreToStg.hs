@@ -39,7 +39,7 @@ import GHC.Types.Var.Env
 import GHC.Unit.Module
 import GHC.Types.Name   ( isExternalName, nameModule_maybe )
 import GHC.Types.Basic  ( Arity )
-import GHC.Builtin.Types ( unboxedUnitDataCon, unitDataConId )
+import GHC.Builtin.Types ( unboxedUnitDataCon )
 import GHC.Types.Literal
 import GHC.Utils.Outputable
 import GHC.Utils.Monad
@@ -388,12 +388,8 @@ coreToStgExpr
 -- CorePrep should have converted them all to a real core representation.
 coreToStgExpr (Lit (LitNumber LitNumInteger _)) = panic "coreToStgExpr: LitInteger"
 coreToStgExpr (Lit (LitNumber LitNumNatural _)) = panic "coreToStgExpr: LitNatural"
-coreToStgExpr (Lit l)      = return (StgLit l)
-coreToStgExpr (App (Lit lit) _some_boxed_type)
-  | isRubbishLit lit
-  -- We lower 'LitRubbish' to @()@ here, which is much easier than doing it in
-  -- a STG to Cmm pass. Doesn't matter whether it is lifted or unlifted
-  = coreToStgExpr (Var unitDataConId)
+coreToStgExpr (Lit l)                           = return (StgLit l)
+coreToStgExpr (App l@(Lit LitRubbish{}) Type{}) = coreToStgExpr l
 coreToStgExpr (Var v) = coreToStgApp v [] []
 coreToStgExpr (Coercion _)
   -- See Note [Coercion tokens]

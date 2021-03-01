@@ -1024,7 +1024,7 @@ aBSENT_ERROR_ID
  where
    absent_ty = mkSpecForAllTys [alphaTyVar] (mkVisFunTyMany addrPrimTy alphaTy)
    -- Not runtime-rep polymorphic. aBSENT_ERROR_ID is only used for
-   -- lifted-type things; see Note [Absent errors] in GHC.Core.Opt.WorkWrap.Utils
+   -- lifted-type things; see Note [Absent fillers] in GHC.Core.Opt.WorkWrap.Utils
    arity_info = vanillaIdInfo `setArityInfo` 1
    -- NB: no bottoming strictness info, unlike other error-ids.
    -- See Note [aBSENT_ERROR_ID]

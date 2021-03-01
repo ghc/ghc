@@ -17,7 +17,6 @@ module GHC.StgToCmm.Env (
 
         bindArgsToRegs, bindToReg, rebindToReg,
         bindArgToReg, idToReg,
-        getArgAmode, getNonVoidArgAmodes,
         getCgIdInfo,
         maybeLetNoEscape,
     ) where
@@ -26,10 +25,8 @@ module GHC.StgToCmm.Env (
 
 import GHC.Prelude
 
-import GHC.Core.TyCon
 import GHC.Platform
 import GHC.StgToCmm.Monad
-import GHC.StgToCmm.Utils
 import GHC.StgToCmm.Closure
 
 import GHC.Cmm.CLabel
@@ -40,7 +37,6 @@ import GHC.Cmm.Utils
 import GHC.Types.Id
 import GHC.Cmm.Graph
 import GHC.Types.Name
-import GHC.Stg.Syntax
 import GHC.Core.Type
 import GHC.Builtin.Types.Prim
 import GHC.Types.Unique.FM
@@ -160,22 +156,6 @@ cgLookupPanic id
                 pprUFM local_binds $ \infos ->
                   vcat [ ppr (cg_id info) | info <- infos ]
               ])
-
-
---------------------
-getArgAmode :: NonVoid StgArg -> FCode CmmExpr
-getArgAmode (NonVoid (StgVarArg var)) = idInfoToAmode <$> getCgIdInfo var
-getArgAmode (NonVoid (StgLitArg lit)) = CmmLit <$> cgLit lit
-
-getNonVoidArgAmodes :: [StgArg] -> FCode [CmmExpr]
--- NB: Filters out void args,
---     so the result list may be shorter than the argument list
-getNonVoidArgAmodes [] = return []
-getNonVoidArgAmodes (arg:args)
-  | isVoidRep (argPrimRep arg) = getNonVoidArgAmodes args
-  | otherwise = do { amode  <- getArgAmode (NonVoid arg)
-                   ; amodes <- getNonVoidArgAmodes args
-                   ; return ( amode : amodes ) }
 
 
 ------------------------------------------------------------------------
