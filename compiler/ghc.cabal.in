@@ -549,6 +549,7 @@ Library
         GHC.StgToCmm.Heap
         GHC.StgToCmm.Hpc
         GHC.StgToCmm.Layout
+        GHC.StgToCmm.Lit
         GHC.StgToCmm.Monad
         GHC.StgToCmm.Prim
         GHC.StgToCmm.Prof
