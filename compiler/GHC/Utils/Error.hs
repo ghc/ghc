@@ -12,12 +12,12 @@
 module GHC.Utils.Error (
         -- * Basic types
         Validity(..), andValid, allValid, isValid, getInvalids, orValid,
-        Severity(..), sevWarn, sevError,
+        Severity(..),
 
         -- * Messages
         WarnMsg,
         MsgEnvelope(..),
-        MessageClass(..),
+        MessageClass(..), mcDiagnosticError,
         SDoc,
         DecoratedSDoc(unDecorated),
         Messages, ErrorMessages, WarningMessages,
@@ -32,6 +32,7 @@ module GHC.Utils.Error (
         -- ** Construction
         emptyMessages, mkDecorated, mkLocMessage, mkLocMessageAnn,
         mkMsgEnvelope, mkPlainMsgEnvelope, mkLongMsgEnvelope,
+        mkMCDiagnostic,
 
         -- * Utilities
         doIfSet, doIfSet_dyn,
