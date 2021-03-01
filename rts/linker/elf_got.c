@@ -19,7 +19,11 @@ needGotSlot(Elf_Sym * symbol) {
      * in a smaller GOT, which is preferrable.
      */
     return ELF_ST_BIND(symbol->st_info) == STB_GLOBAL
-        || ELF_ST_BIND(symbol->st_info) == STB_WEAK;
+        || ELF_ST_BIND(symbol->st_info) == STB_WEAK
+        // Section symbols exist primarily for relocation
+        // and as such may need a GOT slot.
+        || ELF_ST_TYPE(symbol->st_info) == STT_SECTION;
+
 }
 
 bool
@@ -85,6 +89,8 @@ fillGot(ObjectCode * oc) {
             if(needGotSlot(symbol->elf_sym)) {
 
                 /* no type are undefined symbols */
+                // Note STT_SECTION symbols should have their addres
+                // set prior to the fillGot call in ocResolve_ELF.
                 if(   STT_NOTYPE == ELF_ST_TYPE(symbol->elf_sym->st_info)
                    || STB_WEAK   == ELF_ST_BIND(symbol->elf_sym->st_info)) {
                     if(0x0 == symbol->addr) {
