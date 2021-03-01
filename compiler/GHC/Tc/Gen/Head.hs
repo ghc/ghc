@@ -16,9 +16,10 @@
 -}
 
 module GHC.Tc.Gen.Head
-       ( HsExprArg(..), EValArg(..), TcPass(..), AppCtxt(..), appCtxtLoc
+       ( HsExprArg(..), EValArg(..), TcPass(..)
+       , AppCtxt(..), appCtxtLoc, insideExpansion
        , splitHsApps, rebuildHsApps
-       , addArgWrap, isHsValArg, insideExpansion
+       , addArgWrap, isHsValArg
        , countLeadingValArgs, isVisibleArg, pprHsExprArgTc
 
        , tcInferAppHead, tcInferAppHead_maybe
@@ -204,6 +205,10 @@ appCtxtLoc :: AppCtxt -> SrcSpan
 appCtxtLoc (VAExpansion _ l) = l
 appCtxtLoc (VACall _ _ l)    = l
 
+insideExpansion :: AppCtxt -> Bool
+insideExpansion (VAExpansion {}) = True
+insideExpansion (VACall {})      = False
+
 instance Outputable AppCtxt where
   ppr (VAExpansion e _) = text "VAExpansion" <+> ppr e
   ppr (VACall f n _)    = text "VACall" <+> int n <+> ppr f
@@ -316,12 +321,6 @@ isVisibleArg :: HsExprArg id -> Bool
 isVisibleArg (EValArg {})  = True
 isVisibleArg (ETypeArg {}) = True
 isVisibleArg _             = False
-
-insideExpansion :: [HsExprArg p] -> Bool
-insideExpansion args = any is_expansion args
-  where
-    is_expansion (EWrap (EExpand {})) = True
-    is_expansion _                    = False
 
 instance OutputableBndrId (XPass p) => Outputable (HsExprArg p) where
   ppr (EValArg { eva_arg = arg })      = text "EValArg" <+> ppr arg
@@ -850,9 +849,10 @@ tcCheckId :: Name -> ExpRhoType -> TcM (HsExpr GhcTc)
 tcCheckId name res_ty
   = do { (expr, actual_res_ty) <- tcInferId name
        ; traceTc "tcCheckId" (vcat [ppr name, ppr actual_res_ty, ppr res_ty])
-       ; addFunResCtxt expr [] actual_res_ty res_ty $
-         tcWrapResultO (OccurrenceOf name) (HsVar noExtField (noLoc name)) expr
-                                           actual_res_ty res_ty }
+       ; addFunResCtxt rn_fun [] actual_res_ty res_ty $
+         tcWrapResultO (OccurrenceOf name) rn_fun expr actual_res_ty res_ty }
+  where
+    rn_fun = HsVar noExtField (noLoc name)
 
 ------------------------
 tcInferId :: Name -> TcM (HsExpr GhcTc, TcSigmaType)
@@ -1157,13 +1157,15 @@ naughtiness in both branches.  c.f. TcTyClsBindings.mkAuxBinds.
 *                                                                      *
 ********************************************************************* -}
 
-addFunResCtxt :: HsExpr GhcTc -> [HsExprArg 'TcpTc]
+addFunResCtxt :: HsExpr GhcRn -> [HsExprArg 'TcpRn]
               -> TcType -> ExpRhoType
               -> TcM a -> TcM a
 -- When we have a mis-match in the return type of a function
 -- try to give a helpful message about too many/few arguments
-addFunResCtxt fun args fun_res_ty env_ty
-  = addLandmarkErrCtxtM (\env -> (env, ) <$> mk_msg)
+-- But not in generated code, where we don't want
+-- to mention internal (rebindable syntax) function names
+addFunResCtxt fun args fun_res_ty env_ty thing_inside
+  = addLandmarkErrCtxtM (\env -> (env, ) <$> mk_msg) thing_inside
       -- NB: use a landmark error context, so that an empty context
       -- doesn't suppress some more useful context
   where

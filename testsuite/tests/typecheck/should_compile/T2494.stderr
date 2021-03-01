@@ -21,7 +21,7 @@ T2494.hs:15:14: error:
 
 T2494.hs:15:30: error:
     • Couldn't match type ‘b’ with ‘a’
-      Expected: Maybe (m b) -> Maybe (m a)
+      Expected: Maybe (m a) -> Maybe (m a)
         Actual: Maybe (m b) -> Maybe (m b)
       ‘b’ is a rigid type variable bound by
         the RULE "foo/foo"

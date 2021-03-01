@@ -1,10 +1,8 @@
 {-# LANGUAGE CPP                  #-}
 {-# LANGUAGE ConstraintKinds      #-}
-{-# LANGUAGE DeriveDataTypeable   #-}
 {-# LANGUAGE FlexibleContexts     #-}
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
-{-# LANGUAGE StandaloneDeriving   #-}
 {-# LANGUAGE TypeApplications     #-}
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE ViewPatterns         #-}
@@ -35,7 +33,7 @@ module GHC.Hs.Type (
         HsPatSigType(..), HsPSRn(..),
         HsSigType(..), LHsSigType, LHsSigWcType, LHsWcType,
         HsTupleSort(..),
-        HsContext, LHsContext, noLHsContext,
+        HsContext, LHsContext, fromMaybeContext,
         HsTyLit(..),
         HsIPName(..), hsIPNameFS,
         HsArg(..), numVisibleArgs,
@@ -140,13 +138,8 @@ getBangStrictness _ = (HsSrcBang NoSourceText NoSrcUnpack NoSrcStrict)
 ************************************************************************
 -}
 
-noLHsContext :: LHsContext (GhcPass p)
--- Use this when there is no context in the original program
--- It would really be more kosher to use a Maybe, to distinguish
---     class () => C a where ...
--- from
---     class C a where ...
-noLHsContext = noLoc []
+fromMaybeContext :: Maybe (LHsContext (GhcPass p)) -> HsContext (GhcPass p)
+fromMaybeContext mctxt = unLoc $ fromMaybe (noLoc []) mctxt
 
 type instance XHsForAllVis   (GhcPass _) = NoExtField
 type instance XHsForAllInvis (GhcPass _) = NoExtField
@@ -514,9 +507,9 @@ lhsTypeArgSrcSpan arg = case arg of
 splitLHsPatSynTy ::
      LHsSigType (GhcPass p)
   -> ( [LHsTyVarBndr Specificity (NoGhcTc (GhcPass p))] -- universals
-     , LHsContext (GhcPass p)                           -- required constraints
+     , Maybe (LHsContext (GhcPass p))                   -- required constraints
      , [LHsTyVarBndr Specificity (GhcPass p)]           -- existentials
-     , LHsContext (GhcPass p)                           -- provided constraints
+     , Maybe (LHsContext (GhcPass p))                   -- provided constraints
      , LHsType (GhcPass p))                             -- body type
 splitLHsPatSynTy ty = (univs, reqs, exis, provs, ty4)
   where
@@ -550,7 +543,8 @@ splitLHsPatSynTy ty = (univs, reqs, exis, provs, ty4)
 -- generally possible to take the returned types and reconstruct the original
 -- type (parentheses and all) from them.
 splitLHsSigmaTyInvis :: LHsType (GhcPass p)
-                     -> ([LHsTyVarBndr Specificity (GhcPass p)], LHsContext (GhcPass p), LHsType (GhcPass p))
+                     -> ([LHsTyVarBndr Specificity (GhcPass p)]
+                        , Maybe (LHsContext (GhcPass p)), LHsType (GhcPass p))
 splitLHsSigmaTyInvis ty
   | (tvs,  ty1) <- splitLHsForAllTyInvis ty
   , (ctxt, ty2) <- splitLHsQualTy ty1
@@ -629,10 +623,11 @@ splitLHsForAllTyInvis_KP lty@(L _ ty) =
 -- such as @(context => <...>)@. The downside to this is that it is not
 -- generally possible to take the returned types and reconstruct the original
 -- type (parentheses and all) from them.
-splitLHsQualTy :: LHsType (GhcPass pass) -> (LHsContext (GhcPass pass), LHsType (GhcPass pass))
+splitLHsQualTy :: LHsType (GhcPass pass)
+               -> (Maybe (LHsContext (GhcPass pass)), LHsType (GhcPass pass))
 splitLHsQualTy ty
   | (mb_ctxt, body) <- splitLHsQualTy_KP (ignoreParens ty)
-  = (fromMaybe noLHsContext mb_ctxt, body)
+  = (mb_ctxt, body)
 
 -- | Decompose a type of the form @context => body@ into its constituent parts.
 --
@@ -640,7 +635,7 @@ splitLHsQualTy ty
 -- parentheses, hence the suffix @_KP@ (short for \"Keep Parentheses\").
 splitLHsQualTy_KP :: LHsType (GhcPass pass) -> (Maybe (LHsContext (GhcPass pass)), LHsType (GhcPass pass))
 splitLHsQualTy_KP (L _ (HsQualTy { hst_ctxt = ctxt, hst_body = body }))
-                       = (Just ctxt, body)
+                       = (ctxt, body)
 splitLHsQualTy_KP body = (Nothing, body)
 
 -- | Decompose a type class instance type (of the form
@@ -657,12 +652,11 @@ splitLHsQualTy_KP body = (Nothing, body)
 -- See @Note [No nested foralls or contexts in instance types]@
 -- for why this is important.
 splitLHsInstDeclTy :: LHsSigType GhcRn
-                   -> ([Name], LHsContext GhcRn, LHsType GhcRn)
+                   -> ([Name], Maybe (LHsContext GhcRn), LHsType GhcRn)
 splitLHsInstDeclTy (L _ (HsSig{sig_bndrs = outer_bndrs, sig_body = inst_ty})) =
-  (hsOuterTyVarNames outer_bndrs, ctxt, body_ty)
+  (hsOuterTyVarNames outer_bndrs, mb_cxt, body_ty)
   where
     (mb_cxt, body_ty) = splitLHsQualTy_KP inst_ty
-    ctxt = fromMaybe noLHsContext mb_cxt
 
 -- | Decompose a type class instance type (of the form
 -- @forall <tvs>. context => instance_head@) into the @instance_head@.
@@ -897,13 +891,13 @@ pprHsOuterSigTyVarBndrs :: OutputableBndrId p
                         => HsOuterSigTyVarBndrs (GhcPass p) -> SDoc
 pprHsOuterSigTyVarBndrs (HsOuterImplicit{}) = empty
 pprHsOuterSigTyVarBndrs (HsOuterExplicit{hso_bndrs = bndrs}) =
-  pprHsForAll (mkHsForAllInvisTele bndrs) noLHsContext
+  pprHsForAll (mkHsForAllInvisTele bndrs) Nothing
 
 -- | Prints a forall; When passed an empty list, prints @forall .@/@forall ->@
 -- only when @-dppr-debug@ is enabled.
 pprHsForAll :: forall p. OutputableBndrId p
             => HsForAllTelescope (GhcPass p)
-            -> LHsContext (GhcPass p) -> SDoc
+            -> Maybe (LHsContext (GhcPass p)) -> SDoc
 pprHsForAll tele cxt
   = pp_tele tele <+> pprLHsContext cxt
   where
@@ -919,15 +913,17 @@ pprHsForAll tele cxt
       | otherwise = forAllLit <+> interppSP qtvs <> separator
 
 pprLHsContext :: (OutputableBndrId p)
-              => LHsContext (GhcPass p) -> SDoc
-pprLHsContext lctxt
+              => Maybe (LHsContext (GhcPass p)) -> SDoc
+pprLHsContext Nothing = empty
+pprLHsContext (Just lctxt)
   | null (unLoc lctxt) = empty
-  | otherwise          = pprLHsContextAlways lctxt
+  | otherwise          = pprLHsContextAlways (Just lctxt)
 
 -- For use in a HsQualTy, which always gets printed if it exists.
 pprLHsContextAlways :: (OutputableBndrId p)
-                    => LHsContext (GhcPass p) -> SDoc
-pprLHsContextAlways (L _ ctxt)
+                    => Maybe (LHsContext (GhcPass p)) -> SDoc
+pprLHsContextAlways Nothing = parens empty <+> darrow
+pprLHsContextAlways (Just (L _ ctxt))
   = case ctxt of
       []       -> parens empty             <+> darrow
       [L _ ty] -> ppr_mono_ty ty           <+> darrow
@@ -967,7 +963,7 @@ ppr_mono_lty ty = ppr_mono_ty (unLoc ty)
 
 ppr_mono_ty :: (OutputableBndrId p) => HsType (GhcPass p) -> SDoc
 ppr_mono_ty (HsForAllTy { hst_tele = tele, hst_body = ty })
-  = sep [pprHsForAll tele noLHsContext, ppr_mono_lty ty]
+  = sep [pprHsForAll tele Nothing, ppr_mono_lty ty]
 
 ppr_mono_ty (HsQualTy { hst_ctxt = ctxt, hst_body = ty })
   = sep [pprLHsContextAlways ctxt, ppr_mono_lty ty]
@@ -1113,7 +1109,7 @@ lhsTypeHasLeadingPromotionQuote ty
 
     go (HsForAllTy{})        = False
     go (HsQualTy{ hst_ctxt = ctxt, hst_body = body})
-      | L _ (c:_) <- ctxt    = goL c
+      | Just (L _ (c:_)) <- ctxt = goL c
       | otherwise            = goL body
     go (HsBangTy{})          = False
     go (HsRecTy{})           = False
