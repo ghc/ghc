@@ -87,7 +87,7 @@ toArgRep platform rep = case rep of
                            PW8 -> N
    FloatRep          -> F
    DoubleRep         -> D
-   (VecRep len elem) -> case len*primElemRepSizeB elem of
+   (VecRep len elem) -> case len*primElemRepSizeB platform elem of
                            16 -> V16
                            32 -> V32
                            64 -> V64

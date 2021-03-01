@@ -110,6 +110,7 @@ import GHC.StgToCmm.Closure
 import GHC.StgToCmm.Utils
 import GHC.StgToCmm.Monad
 import {-# SOURCE #-} GHC.StgToCmm.Foreign   ( emitPrimCall )
+import GHC.StgToCmm.Lit       ( newStringCLit )
 
 import GHC.Stg.Syntax
 import GHC.Cmm.Expr

@@ -26,7 +26,8 @@ module GHC.StgToCmm.Layout (
         mkVirtConstrSizes,
         getHpRelOffset,
 
-        ArgRep(..), toArgRep, argRepSizeW -- re-exported from GHC.StgToCmm.ArgRep
+        ArgRep(..), toArgRep, argRepSizeW, -- re-exported from GHC.StgToCmm.ArgRep
+        getArgAmode, getNonVoidArgAmodes
   ) where
 
 
@@ -42,6 +43,7 @@ import GHC.StgToCmm.Env
 import GHC.StgToCmm.ArgRep -- notably: ( slowCallPattern )
 import GHC.StgToCmm.Ticky
 import GHC.StgToCmm.Monad
+import GHC.StgToCmm.Lit
 import GHC.StgToCmm.Utils
 
 import GHC.Cmm.Graph
@@ -589,6 +591,24 @@ stdPattern reps
         [P,P,P,P,P,P] -> Just ARG_PPPPPP
 
         _ -> Nothing
+
+-------------------------------------------------------------------------
+--        Amodes for arguments
+-------------------------------------------------------------------------
+
+getArgAmode :: NonVoid StgArg -> FCode CmmExpr
+getArgAmode (NonVoid (StgVarArg var)) = idInfoToAmode <$> getCgIdInfo var
+getArgAmode (NonVoid (StgLitArg lit)) = cgLit lit
+
+getNonVoidArgAmodes :: [StgArg] -> FCode [CmmExpr]
+-- NB: Filters out void args,
+--     so the result list may be shorter than the argument list
+getNonVoidArgAmodes [] = return []
+getNonVoidArgAmodes (arg:args)
+  | isVoidRep (argPrimRep arg) = getNonVoidArgAmodes args
+  | otherwise = do { amode  <- getArgAmode (NonVoid arg)
+                   ; amodes <- getNonVoidArgAmodes args
+                   ; return ( amode : amodes ) }
 
 -------------------------------------------------------------------------
 --

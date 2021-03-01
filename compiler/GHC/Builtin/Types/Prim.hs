@@ -35,7 +35,7 @@ module GHC.Builtin.Types.Prim(
         tYPETyCon, tYPETyConName,
 
         -- Kinds
-        tYPE, primRepToRuntimeRep,
+        tYPE, primRepToRuntimeRep, primRepsToRuntimeRep,
 
         functionWithMultiplicity,
         funTyCon, funTyConName,
@@ -587,7 +587,7 @@ pcPrimTyCon name roles rep
 -- Defined here to avoid (more) module loops
 primRepToRuntimeRep :: PrimRep -> Type
 primRepToRuntimeRep rep = case rep of
-  VoidRep       -> TyConApp tupleRepDataConTyCon [mkPromotedListTy runtimeRepTy []]
+  VoidRep       -> mkTupleRep []
   LiftedRep     -> liftedRepTy
   UnliftedRep   -> unliftedRepTy
   IntRep        -> intRepDataConTy
@@ -625,6 +625,17 @@ primRepToRuntimeRep rep = case rep of
         Word64ElemRep -> word64ElemRepDataConTy
         FloatElemRep  -> floatElemRepDataConTy
         DoubleElemRep -> doubleElemRepDataConTy
+
+-- | Given a list of types representing 'RuntimeRep's @reps@, construct
+-- @'TupleRep' reps@.
+mkTupleRep :: [Type] -> Type
+mkTupleRep reps = TyConApp tupleRepDataConTyCon [mkPromotedListTy runtimeRepTy reps]
+
+-- | Convert a list of 'PrimRep's to a 'Type' of kind RuntimeRep
+-- Defined here to avoid (more) module loops
+primRepsToRuntimeRep :: [PrimRep] -> Type
+primRepsToRuntimeRep [rep] = primRepToRuntimeRep rep
+primRepsToRuntimeRep reps  = mkTupleRep $ map primRepToRuntimeRep reps
 
 pcPrimTyCon0 :: Name -> PrimRep -> TyCon
 pcPrimTyCon0 name rep
