@@ -105,9 +105,9 @@ import GHC.Types.CostCentre.State
 import GHC.Types.TyThing
 import GHC.Types.Error
 
+import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Error
 
 import Data.IORef
 
@@ -460,7 +460,8 @@ diagnosticDs :: DiagnosticReason -> SDoc -> DsM ()
 diagnosticDs reason warn
   = do { env <- getGblEnv
        ; loc <- getSrcSpanDs
-       ; let msg = mkShortMsgEnvelope reason loc (ds_unqual env) warn
+       ; dflags <- getDynFlags
+       ; let msg = mkShortMsgEnvelope dflags reason loc (ds_unqual env) warn
        ; updMutVar (ds_msgs env) (\ msgs -> msg `addMessage` msgs) }
 
 -- | Emit a warning only if the correct WarningWithoutFlag is set in the DynFlags
@@ -473,7 +474,8 @@ errDs :: SDoc -> DsM ()
 errDs err
   = do  { env <- getGblEnv
         ; loc <- getSrcSpanDs
-        ; let msg = mkShortMsgEnvelope ErrorWithoutFlag loc (ds_unqual env) err
+        ; dflags <- getDynFlags
+        ; let msg = mkShortMsgEnvelope dflags ErrorWithoutFlag loc (ds_unqual env) err
         ; updMutVar (ds_msgs env) (\ msgs -> msg `addMessage` msgs) }
 
 -- | Issue an error, but return the expression for (), so that we can continue
