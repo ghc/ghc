@@ -10,7 +10,7 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.StgToCmm.Expr ( cgExpr ) where
+module GHC.StgToCmm.Expr ( cgExpr, cgLit ) where
 
 #include "HsVersions.h"
 
@@ -24,6 +24,7 @@ import GHC.StgToCmm.Env
 import GHC.StgToCmm.DataCon
 import GHC.StgToCmm.Prof (saveCurrentCostCentre, restoreCurrentCostCentre, emitSetCCC)
 import GHC.StgToCmm.Layout
+import GHC.StgToCmm.Lit
 import GHC.StgToCmm.Prim
 import GHC.StgToCmm.Hpc
 import GHC.StgToCmm.Ticky
@@ -115,8 +116,8 @@ cgExpr (StgOpApp (StgPrimOp DataToTagOp) [StgVarArg a] _res_ty) = do
 cgExpr (StgOpApp op args ty) = cgOpApp op args ty
 cgExpr (StgConApp con mn args _) = cgConApp con mn args
 cgExpr (StgTick t e)         = cgTick t >> cgExpr e
-cgExpr (StgLit lit)       = do cmm_lit <- cgLit lit
-                               emitReturn [CmmLit cmm_lit]
+cgExpr (StgLit lit)          = do cmm_expr <- cgLit lit
+                                  emitReturn [cmm_expr]
 
 cgExpr (StgLet _ binds expr) = do { cgBind binds;     cgExpr expr }
 cgExpr (StgLetNoEscape _ binds expr) =
