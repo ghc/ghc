@@ -19,6 +19,7 @@ module GHC.Iface.Rename (
 import GHC.Prelude
 
 import GHC.Driver.Env
+import GHC.Driver.Session
 
 import GHC.Tc.Utils.Monad
 
@@ -43,6 +44,7 @@ import GHC.Types.Name.Shape
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
+import GHC.Utils.Error
 import GHC.Utils.Fingerprint
 import GHC.Utils.Panic
 
@@ -75,8 +77,9 @@ failWithRn :: SDoc -> ShIfM a
 failWithRn doc = do
     errs_var <- fmap sh_if_errs getGblEnv
     errs <- readTcRef errs_var
+    dflags <- getDynFlags
     -- TODO: maybe associate this with a source location?
-    writeTcRef errs_var (errs `snocBag` mkPlainMsgEnvelope ErrorWithoutFlag noSrcSpan doc)
+    writeTcRef errs_var (errs `snocBag` mkPlainMsgEnvelope dflags ErrorWithoutFlag noSrcSpan doc)
     failM
 
 -- | What we have is a generalized ModIface, which corresponds to

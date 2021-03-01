@@ -50,7 +50,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Name.Set
 import GHC.Data.Bag
-import GHC.Utils.Error  ( pprLocMsgEnvelope )
+import GHC.Utils.Error  ( diagReasonSeverity,  pprLocMsgEnvelope )
 import GHC.Types.Basic
 import GHC.Types.Error
 import GHC.Core.ConLike ( ConLike(..))
@@ -872,7 +872,7 @@ maybeReportError ctxt msg
   = return ()            -- so suppress this error/warning
 
   | Just reason <- cec_defer_type_errors ctxt
-  = reportDiagnostic (reclassify reason msg)
+  = getDynFlags >>= \df -> reportDiagnostic (reclassify df reason msg)
   | otherwise
   = return ()
   where
@@ -884,13 +884,14 @@ maybeReportError ctxt msg
     -- 'DynFlags' in scope at the time of construction. However, due to the intricacies of
     -- the current error-deferring logic, we are not always able to enforce this invariant
     -- and we rather have to change one or the other /a posteriori/.
-    reclassify :: DiagnosticReason
+    reclassify :: DynFlags
+               -> DiagnosticReason
                -> MsgEnvelope DiagnosticMessage
                -> MsgEnvelope DiagnosticMessage
-    reclassify rea msg =
+    reclassify dflags rea msg =
       let set_reason   r m = m { errMsgDiagnostic = (errMsgDiagnostic m) { diagReason = r } }
           set_severity s m = m { errMsgSeverity = s }
-      in set_severity (defaultReasonSeverity rea) . set_reason rea $ msg
+      in set_severity (diagReasonSeverity dflags rea) . set_reason rea $ msg
 
 addDeferredBinding :: ReportErrCtxt -> MsgEnvelope DiagnosticMessage -> Ct -> TcM ()
 -- See Note [Deferring coercion errors to runtime]
@@ -990,9 +991,10 @@ pprWithArising (ct:cts)
     ppr_one ct' = hang (parens (pprType (ctPred ct')))
                      2 (pprCtLoc (ctLoc ct'))
 
-mkErrorMsgFromCt :: DiagnosticReason -> ReportErrCtxt -> Ct -> Report -> TcM (MsgEnvelope DiagnosticMessage)
-mkErrorMsgFromCt rea ctxt ct report
-  = mkErrorReport rea ctxt (ctLocEnv (ctLoc ct)) report
+mkErrorMsgFromCt :: DiagnosticReason
+                 -> ReportErrCtxt -> Ct -> Report -> TcM (MsgEnvelope DiagnosticMessage)
+mkErrorMsgFromCt reason ctxt ct report
+  = mkErrorReport reason ctxt (ctLocEnv (ctLoc ct)) report
 
 mkErrorReport :: DiagnosticReason
               -> ReportErrCtxt
@@ -1284,6 +1286,18 @@ so that the correct 'Severity' can be computed out of that later on.
 -}
 
 
+{- Note [Adding deferred bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When working with typed holes we have to deal with the case where
+we want holes to be reported as warnings to users during compile time but
+as errors during runtime. Therefore, we have to call 'maybeAddDeferredBindings'
+with a function which is able to override the 'DiagnosticReason' of a 'DiagnosticMessage',
+so that the correct 'Severity' can be computed out of that later on.
+
+-}
+
+
 -- | Adds deferred bindings (as errors).
 -- See Note [Adding deferred bindings].
 maybeAddDeferredBindings :: ReportErrCtxt
@@ -1485,22 +1499,23 @@ mkCoercibleExplanation rdr_env fam_envs ty1 ty2
       | otherwise
       = False
 
-mkEqErr_help :: DiagnosticReason -> DynFlags -> ReportErrCtxt -> Report
+mkEqErr_help :: DiagnosticReason
+             -> DynFlags -> ReportErrCtxt -> Report
              -> Ct
              -> TcType -> TcType -> TcM (MsgEnvelope DiagnosticMessage)
-mkEqErr_help rea dflags ctxt report ct ty1 ty2
+mkEqErr_help reason dflags ctxt report ct ty1 ty2
   | Just (tv1, _) <- tcGetCastedTyVar_maybe ty1
-  = mkTyVarEqErr rea dflags ctxt report ct tv1 ty2
+  = mkTyVarEqErr reason dflags ctxt report ct tv1 ty2
   | Just (tv2, _) <- tcGetCastedTyVar_maybe ty2
-  = mkTyVarEqErr rea dflags ctxt report ct tv2 ty1
+  = mkTyVarEqErr reason dflags ctxt report ct tv2 ty1
   | otherwise
-  = reportEqErr rea ctxt report ct ty1 ty2
+  = reportEqErr reason ctxt report ct ty1 ty2
 
 reportEqErr :: DiagnosticReason -> ReportErrCtxt -> Report
             -> Ct
             -> TcType -> TcType -> TcM (MsgEnvelope DiagnosticMessage)
-reportEqErr rea ctxt report ct ty1 ty2
-  = mkErrorMsgFromCt rea ctxt ct (mconcat [misMatch, report, eqInfo])
+reportEqErr reason ctxt report ct ty1 ty2
+  = mkErrorMsgFromCt reason ctxt ct (mconcat [misMatch, report, eqInfo])
   where
     misMatch = misMatchOrCND False ctxt ct ty1 ty2
     eqInfo   = mkEqInfoMsg ct ty1 ty2
