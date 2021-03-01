@@ -19,8 +19,7 @@ module GHC.Types.Error
 
    , MessageClass (..)
    , Severity (..)
-   , sevError
-   , sevWarn
+   , mkMCDiagnostic
    , Diagnostic (..)
    , DiagnosticMessage (..)
    , DiagnosticReason (..)
@@ -72,8 +71,10 @@ We represent the 'Messages' as a single bag of warnings and errors.
 
 The reason behind that is that there is a fluid relationship between errors and warnings and we want to
 be able to promote or demote errors and warnings based on certain flags (e.g. -Werror, -fdefer-type-errors
-or -XPartialTypeSignatures). We rely on the 'Severity' to distinguish between a warning and an
-error.
+or -XPartialTypeSignatures). More specifically, every diagnostic has a 'DiagnosticReason', but a warning
+'DiagnosticReason' might be associated with 'SevError', in the case of -Werror.
+
+We rely on the 'Severity' to distinguish between a warning and an error.
 
 'WarningMessages' and 'ErrorMessages' are for now simple type aliases to retain backward compatibility, but
 in future iterations these can be either parameterised over an 'e' message type (to make type signatures
@@ -226,8 +227,21 @@ data MessageClass
     -- No file\/line\/column stuff.
 
   | MCDiagnostic Severity DiagnosticReason
+    -- ^ Diagnostics from the compiler. This constructor
+    -- is very powerful as it allows the construction
+    -- of a 'MessageClass' with a completely arbitrary
+    -- permutation of 'Severity' and 'DiagnosticReason'. As such,
+    -- users are encouraged to use the 'mkMCDiagnostic' smart constructor instead.
+    -- Use this constructor directly only if you need to construct and manipulate diagnostic
+    -- messages directly, for example inside 'GHC.Utils.Error'. In all the other circumstances,
+    -- /especially/ when emitting compiler diagnostics, use the smart constructor.
   deriving (Eq, Show)
 
+-- | Make a 'MessageClass' for a given 'DiagnosticReason', without consulting the 'DynFlags'.
+-- This will not respect -Werror or warning suppression and so is probably wrong
+-- for any warning.
+mkMCDiagnostic :: DiagnosticReason -> MessageClass
+mkMCDiagnostic reason = MCDiagnostic (defaultReasonSeverity reason) reason
 
 -- | Used to describe warnings and errors
 --   o The message has a file\/line\/column heading,
@@ -238,14 +252,6 @@ data Severity
   = SevWarning
   | SevError
   deriving (Eq, Show)
-
--- | The 'Severity' for an error.
-sevError :: Severity
-sevError = SevError
-
--- | The 'Severity' for a warning.
-sevWarn :: Severity
-sevWarn = SevWarning
 
 instance Outputable Severity where
   ppr = \case
@@ -314,12 +320,10 @@ mkLocMessageAnn ann msg_class locn msg
   where
     msgText =
       case msg_class of
-        MCDiagnostic sev _reason ->
-          case sev of
-            SevError   -> text "error:"
-            SevWarning -> text "warning:"
-        MCFatal          -> text "fatal:"
-        _                -> empty
+        MCDiagnostic SevError _reason   -> text "error:"
+        MCDiagnostic SevWarning _reason -> text "warning:"
+        MCFatal                         -> text "fatal:"
+        _                               -> empty
 
 -- | Computes a severity from a reason in the absence of DynFlags. This will likely
 -- be wrong in the presence of -Werror. It will be removed in the context of #18516.
@@ -330,12 +334,10 @@ defaultReasonSeverity = \case
   ErrorWithoutFlag      -> SevError
 
 getMessageClassColour :: MessageClass -> Col.Scheme -> Col.PprColour
-getMessageClassColour (MCDiagnostic sev _reason) =
-  case sev of
-    SevError   -> Col.sError
-    SevWarning -> Col.sWarning
-getMessageClassColour MCFatal                        = Col.sFatal
-getMessageClassColour _                              = const mempty
+getMessageClassColour (MCDiagnostic SevError _reason)   = Col.sError
+getMessageClassColour (MCDiagnostic SevWarning _reason) = Col.sWarning
+getMessageClassColour MCFatal                           = Col.sFatal
+getMessageClassColour _                                 = const mempty
 
 getCaretDiagnostic :: MessageClass -> SrcSpan -> IO SDoc
 getCaretDiagnostic _ (UnhelpfulSpan _) = pure empty

@@ -12,7 +12,7 @@
 module GHC.Utils.Error (
         -- * Basic types
         Validity(..), andValid, allValid, isValid, getInvalids, orValid,
-        Severity(..), sevWarn, sevError,
+        Severity(..),
 
         -- * Messages
         WarnMsg,
@@ -32,6 +32,7 @@ module GHC.Utils.Error (
         -- ** Construction
         emptyMessages, mkDecorated, mkLocMessage, mkLocMessageAnn,
         mkMsgEnvelope, mkPlainMsgEnvelope, mkLongMsgEnvelope,
+        mkMCDiagnostic,
 
         -- * Utilities
         doIfSet, doIfSet_dyn,
@@ -170,12 +171,12 @@ ifVerbose dflags val act
 
 errorMsg :: Logger -> DynFlags -> SDoc -> IO ()
 errorMsg logger dflags msg
-   = putLogMsg logger dflags (MCDiagnostic SevError ErrorWithoutFlag) noSrcSpan $
+   = putLogMsg logger dflags (mkMCDiagnostic ErrorWithoutFlag) noSrcSpan $
      withPprStyle defaultErrStyle msg
 
 warningMsg :: Logger -> DynFlags -> SDoc -> IO ()
 warningMsg logger dflags msg
-   = putLogMsg logger dflags (MCDiagnostic SevWarning WarningWithoutFlag) noSrcSpan $
+   = putLogMsg logger dflags (mkMCDiagnostic WarningWithoutFlag) noSrcSpan $
      withPprStyle defaultErrStyle msg
 
 fatalErrorMsg :: Logger -> DynFlags -> SDoc -> IO ()

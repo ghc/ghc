@@ -1248,11 +1248,20 @@ whenNotDeferring :: Monad m => Maybe a -> (a -> m b) -> m (Maybe b)
 whenNotDeferring Nothing _  = pure Nothing
 whenNotDeferring (Just a) f = Just <$> f a
 
+{- Note [Adding deferred bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When working with typed holes we have to deal with the case where
+we want holes to be reported as warnings to users during compile time but
+as errors during runtime. Therefore, we have to call 'maybeAddDeferredBindings'
+with a function which is able to override the 'DiagnosticReason' of a 'DiagnosticMessage',
+so that the correct 'Severity' can be computed out of that later on.
+
+-}
+
+
 -- | Adds deferred bindings (as errors).
--- We take as input a function from a 'Severity' to a message because we
--- want to call this function as part of 'mkHoleError' even if the latter
--- won't return a 'MsgEnvelope' (because deferred). In that case we still
--- want to reuse the /same/ diagnostic message, just with a different 'Severity'.
+-- See Note [Adding deferred bindings].
 maybeAddDeferredBindings :: ReportErrCtxt
                          -> Hole
                          -> (DiagnosticReason -> TcM (MsgEnvelope DiagnosticMessage))
