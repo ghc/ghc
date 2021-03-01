@@ -1289,29 +1289,25 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
                                         ms_textual_imps = imps,
                                         ms_srcimps      = src_imps }
 
-        source_unchanged <- liftIO $
-          if not (isStopLn stop)
-                -- SourceModified unconditionally if
-                --      (a) recompilation checker is off, or
-                --      (b) we aren't going all the way to .o file (e.g. ghc -S)
-             then return SourceModified
-                -- Otherwise look at timestamps and hashes
-             else do
-                    mb_hi_timestamp <- liftIO $ do
-                      hi_file_exists <- doesFileExist hi_file
-                      if hi_file_exists
-                        then Just <$> getModificationUTCTime hi_file
-                        else return Nothing
-
-                    prev_hash_matches <- liftIO $ doesIfaceHashMatch hsc_env' mod_summary
-                    dest_file_mod <- sourceModified dest_file mb_hi_timestamp
-                    hie_file_mod <- if gopt Opt_WriteHie dflags
-                                        then sourceModified hie_file
-                                                            mb_hi_timestamp
-                                        else pure False
-                    if not prev_hash_matches || dest_file_mod || hie_file_mod
-                        then return SourceModified
-                        else return SourceUnmodified
+        source_unchanged <- liftIO $ do {
+          -- SourceModified unconditionally if
+          --      (a) recompilation checker is off, or
+          --      (b) we aren't going all the way to .o file (e.g. ghc -S)
+          ; if not (isStopLn stop) then return SourceModified else do {
+          -- Otherwise look at timestamps and hashes
+          ; hi_exists <- doesFileExist hi_file
+          ; if not hi_exists then return SourceModified else do {
+          ; hi_timestamp <- getModificationUTCTime hi_file
+          ; prev_hash_matches <- doesIfaceHashMatch hsc_env' mod_summary
+          ; if not prev_hash_matches then return SourceModified else do {
+          ; dest_file_mod <- sourceModified dest_file hi_timestamp
+          ; if dest_file_mod then return SourceModified else do {
+          ; hie_file_mod <- if gopt Opt_WriteHie dflags
+                              then sourceModified hie_file hi_timestamp
+                              else pure False
+          ; if hie_file_mod then return SourceModified else do {
+          ; return SourceUnmodified
+          }}}}}}
 
   -- run the compiler!
         let msg hsc_env _ what _ = oneShotMsg hsc_env what
@@ -2109,18 +2105,14 @@ writeInterfaceOnlyMode dflags =
 -- corresponding to that source file (or if we anyways need to consider the
 -- source file modified since the output is gone).
 sourceModified :: FilePath -- ^ destination file we are looking for
-               -> Maybe UTCTime  -- ^ last time of modification of corresponding .hi file, if it exists
+               -> UTCTime  -- ^ last time of modification of corresponding .hi file
                -> IO Bool  -- ^ do we need to regenerate the output?
-sourceModified dest_file mb_hi_timestamp =
-  case mb_hi_timestamp of
-    Just hi_timestamp -> do
-      dest_file_exists <- doesFileExist dest_file
-      if not dest_file_exists
-        then return True       -- Need to recompile
-         else do t2 <- getModificationUTCTime dest_file
-                 return (t2 <= hi_timestamp)
-    Nothing ->
-      return True
+sourceModified dest_file hi_timestamp = do
+  dest_file_exists <- doesFileExist dest_file
+  if not dest_file_exists
+    then return True       -- Need to recompile
+     else do t2 <- getModificationUTCTime dest_file
+             return (t2 <= hi_timestamp)
 
 -- | What phase to run after one of the backend code generators has run
 hscPostBackendPhase :: HscSource -> Backend -> Phase
