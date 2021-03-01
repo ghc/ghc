@@ -1,5 +1,3 @@
-{-# LANGUAGE ViewPatterns #-}
-
 module GHC.Driver.Errors (
     printOrThrowWarnings
   , printBagOfErrors
@@ -63,11 +61,11 @@ printOrThrowWarnings logger dflags warns = do
   let (make_error, warns') =
         mapAccumBagL
           (\make_err warn ->
-            case is_warn_msg_fatal dflags warn of
-              Nothing ->
+            case warn_msg_severity dflags warn of
+              SevWarning ->
                 (make_err, warn)
-              Just new_severity ->
-                (True, set_severity new_severity warn))
+              SevError ->
+                (True, set_severity SevError warn))
           False warns
   if make_error
     then throwIO (mkSrcErr warns')
@@ -75,19 +73,19 @@ printOrThrowWarnings logger dflags warns = do
 
   where
 
-    -- | Checks if given 'WarnMsg' is a fatal warning.
-    is_warn_msg_fatal :: DynFlags -> WarnMsg -> Maybe Severity
-    is_warn_msg_fatal dflags (diagnosticReason . errMsgDiagnostic -> reason) =
-      case reason of
-        ErrorWithoutFlag   -> Nothing -- nothing to do, this is already an error.
+    -- | Sets the 'Severity' of the input 'WarnMsg' according to the 'DynFlags'.
+    warn_msg_severity :: DynFlags -> WarnMsg -> Severity
+    warn_msg_severity dflags msg =
+      case diagnosticReason (errMsgDiagnostic msg) of
+        ErrorWithoutFlag   -> SevError
         WarningWithoutFlag ->
           if gopt Opt_WarnIsError dflags
-            then Just SevError
-            else Nothing
+            then SevError
+            else SevWarning
         WarningWithFlag wflag ->
           if wopt_fatal wflag dflags
-            then Just SevError
-            else Nothing
+            then SevError
+            else SevWarning
 
     -- | Adjust the 'Severity' of the input 'WarnMsg'.
     set_severity :: Severity -> WarnMsg -> MsgEnvelope DiagnosticMessage
