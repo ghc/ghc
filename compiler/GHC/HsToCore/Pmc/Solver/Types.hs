@@ -46,7 +46,6 @@ import GHC.Types.Unique.SDFM
 import GHC.Types.Name
 import GHC.Core.DataCon
 import GHC.Core.ConLike
-import GHC.Core.Unify
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Data.List.SetOps (unionLists)
@@ -364,28 +363,28 @@ eqConLike _                 _                 = PossiblyOverlap
 data PmAltCon = PmAltConLike ConLike
               | PmAltLit     PmLit
 
-data PmAltConSet = PACS !CompleteMatch ![PmLit]
+data PmAltConSet = PACS !(UniqDSet ConLike) ![PmLit]
 
 emptyPmAltConSet :: PmAltConSet
-emptyPmAltConSet = PACS (CompleteMatch emptyUniqDSet Nothing) []
+emptyPmAltConSet = PACS emptyUniqDSet []
 
 isEmptyPmAltConSet :: PmAltConSet -> Bool
-isEmptyPmAltConSet (PACS (CompleteMatch cls _ty) lits) = isEmptyUniqDSet cls && null lits
+isEmptyPmAltConSet (PACS cls lits) = isEmptyUniqDSet cls && null lits
 
 -- | Whether there is a 'PmAltCon' in the 'PmAltConSet' that compares 'Equal' to
 -- the given 'PmAltCon' according to 'eqPmAltCon'.
-elemPmAltConSet :: Type -> PmAltCon -> PmAltConSet -> Bool
-elemPmAltConSet ty (PmAltConLike cl) (PACS (CompleteMatch cls mty) _) = all (\ty' -> isJust (tcUnifyTyKi ty ty')) mty && elementOfUniqDSet cl cls
-elemPmAltConSet _ (PmAltLit lit) (PACS _ lits) = elem lit lits
+elemPmAltConSet :: PmAltCon -> PmAltConSet -> Bool
+elemPmAltConSet (PmAltConLike cl) (PACS cls _) = elementOfUniqDSet cl cls
+elemPmAltConSet (PmAltLit lit) (PACS _ lits) = elem lit lits
 
 extendPmAltConSet :: PmAltConSet -> PmAltCon -> PmAltConSet
-extendPmAltConSet (PACS (CompleteMatch cls mty) lits) (PmAltConLike cl)
-  = PACS (CompleteMatch (addOneToUniqDSet cls cl) mty) lits
+extendPmAltConSet (PACS cls lits) (PmAltConLike cl)
+  = PACS (addOneToUniqDSet cls cl) lits
 extendPmAltConSet (PACS cls lits) (PmAltLit lit)
   = PACS cls (unionLists lits [lit])
 
 pmAltConSetElems :: PmAltConSet -> [PmAltCon]
-pmAltConSetElems (PACS (CompleteMatch cls _) lits)
+pmAltConSetElems (PACS cls lits)
   = map PmAltConLike (uniqDSetToList cls) ++ map PmAltLit lits
 
 instance Outputable PmAltConSet where

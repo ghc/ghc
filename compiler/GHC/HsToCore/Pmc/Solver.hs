@@ -814,7 +814,7 @@ addConCt :: Nabla -> Id -> PmAltCon -> [TyVar] -> [Id] -> MaybeT DsM Nabla
 addConCt nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_facts=env } } x alt tvs args = do
   let vi@(VI _ pos neg bot _) = lookupVarInfo ts x
   -- First try to refute with a negative fact
-  guard (not (elemPmAltConSet (varType x) alt neg))
+  guard (not (elemPmAltConSet alt neg))
   -- Then see if any of the other solutions (remember: each of them is an
   -- additional refinement of the possible values x could take) indicate a
   -- contradiction
