@@ -333,8 +333,7 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
             <-  if not (doFloatFromRhs top_lvl is_rec False body_floats2 body2)
                 then                    -- No floating, revert to body1
                      {-#SCC "simplLazyBind-no-floating" #-}
-                     do { rhs' <- mkLam env tvs' (wrapFloats body_floats2 body1) rhs_cont
-                        ; return (emptyFloats env, rhs') }
+                     rebuildLam env tvs' (emptyFloats rhs_env) (wrapFloats body_floats1 body1) rhs_cont
 
                 else if null tvs then   -- Simple floating
                      {-#SCC "simplLazyBind-simple-floating" #-}
@@ -346,9 +345,10 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
                      do { tick LetFloatFromLet
                         ; (poly_binds, body3) <- abstractFloats (seUnfoldingOpts env) top_lvl
                                                                 tvs' body_floats2 body2
-                        ; let floats = foldl' extendFloats (emptyFloats env) poly_binds
-                        ; rhs' <- mkLam env tvs' body3 rhs_cont
-                        ; return (floats, rhs') }
+                        ; let poly_floats = foldl' extendFloats (emptyFloats env) poly_binds
+                        ; (_empty_floats, rhs') <- rebuildLam env tvs' (emptyFloats body_env) body3 rhs_cont
+                        ; ASSERT( isEmptyFloats _empty_floats )  -- rebuildLam returns emptyFloats
+                          return (poly_floats, rhs') }           -- if given emptyFloats
 
         ; (bind_float, env2) <- completeBind (env `setInScopeFromF` rhs_floats)
                                              top_lvl Nothing bndr bndr2 rhs'
@@ -1506,10 +1506,12 @@ simplLam env bndrs body (TickIt tickish cont)
 
         -- Not enough args, so there are real lambdas left to put in the result
 simplLam env bndrs body cont
-  = do  { (env', bndrs') <- simplLamBndrs env bndrs
-        ; body' <- simplExpr env' body
-        ; new_lam <- mkLam env bndrs' body' cont
-        ; rebuild env' new_lam cont }
+  = do  { (env', bndrs')  <- simplLamBndrs env bndrs
+        ; let body_ty' = substTy env' (exprType body)
+        ; (floats, body') <- simplExprF env' body (mkBoringStop body_ty')
+        ; (floats1, new_lam) <- rebuildLam env bndrs' floats body' cont
+        ; (floats2, expr')   <- rebuild (env `setInScopeFromF` floats1) new_lam cont
+        ; return (floats1 `addFloats` floats2, expr') }
 
 -------------
 simplLamBndr :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)

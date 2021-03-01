@@ -1757,8 +1757,7 @@ There are some particularly delicate points here:
   Which might change a terminating program (think (f `seq` e)) to a
   non-terminating one.  So we check for being a loop breaker first.
 
-  However for GlobalIds we can look at the arity; and for primops we
-  must, since they have no unfolding.
+  However for GlobalIds we can look at the arity.
 
 * Type and dictionary abstraction.
   Regardless of whether 'f' is a value, we always want to reduce
@@ -1832,10 +1831,11 @@ we can eta-reduce    \x. f x  ===>  f
 This turned up in #7542.
 -}
 
-tryEtaReduce :: Bool -> [Var] -> CoreExpr -> Maybe CoreExpr
-tryEtaReduce unsat_primops_ok bndrs body
-  = go (reverse bndrs) body (mkRepReflCo (exprType body))
+tryEtaReduce :: [Var] -> VarSet -> CoreExpr -> Maybe CoreExpr
+tryEtaReduce bndrs let_float_bndrs body
+  = go (reverse bndrs) body refl_co
   where
+    refl_co = mkRepReflCo (exprType body)
     incoming_arity = count isId bndrs
 
     go :: [Var]            -- Binders, innermost first, types [a3,a2,a1]
@@ -1845,13 +1845,13 @@ tryEtaReduce unsat_primops_ok bndrs body
     -- See Note [Eta reduction with casted arguments]
     -- for why we have an accumulating coercion
     go [] fun co
-      | ok_fun incoming_arity fun
-      , let used_vars = exprFreeVars fun `unionVarSet` tyCoVarsOfCo co
+      | all ok_lam bndrs || ok_fun incoming_arity fun
+      , let etad_expr = mkCast fun co
+            used_vars = exprFreeVars etad_expr
       , not (any (`elemVarSet` used_vars) bndrs)
-      = Just (mkCast fun co)   -- Check for any of the binders free in the result
-                               -- including the accumulated coercion
+      = Just etad_expr
 
-    go bs (Tick t e) co
+    go bs@(_ : _) (Tick t e) co
       | tickishFloatable t
       = fmap (Tick t) $ go bs e co
       -- Float app ticks: \x -> Tick t (e x) ==> Tick t e
@@ -1867,20 +1867,21 @@ tryEtaReduce unsat_primops_ok bndrs body
     -- Note [Eta reduction conditions]
     ok_fun :: Arity -> CoreExpr -> Bool
     ok_fun n (App fun arg)
-      | isTypeArg arg      = ok_fun n fun
-      | otherwise          = ok_fun (n+1) fun
+      | isTypeArg arg         = ok_fun n fun
+      | otherwise           = False
+--      | otherwise             = ok_fun (n+1) fun
     ok_fun n (Cast fun _)  = ok_fun n fun
     ok_fun n (Tick _ expr) = ok_fun n expr
-    ok_fun n (Var fun_id)  = ok_fun_id n fun_id || all ok_lam bndrs
-    ok_fun _ _fun          = False
+    ok_fun n (Var fun_id)  = ok_fun_id n fun_id
+    ok_fun _ _ = False
 
     ---------------
     ok_fun_id n fun = fun_arity fun >= n
-                      && (unsat_primops_ok || not (hasNoBinding fun))
 
     ---------------
     fun_arity fun             -- See Note [Arity care]
        | isLocalId fun
+       , not (fun `elemVarSet` let_float_bndrs)
        , isStrongLoopBreaker (idOccInfo fun) = 0
        | arity > 0                           = arity
        | isEvaldUnfolding (idUnfolding fun)  = 1
