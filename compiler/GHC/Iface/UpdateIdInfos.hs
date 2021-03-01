@@ -62,9 +62,13 @@ updateModDetailsIdInfos cg_infos mod_details =
 -- Rules
 --------------------------------------------------------------------------------
 
+-- N.B. we do this strictly to avoid building thunks which will later
+-- keep TypeEnvs around (see #19464).
 updateRuleIdInfos :: TypeEnv -> CoreRule -> CoreRule
 updateRuleIdInfos _ rule@BuiltinRule{} = rule
-updateRuleIdInfos type_env Rule{ .. } = Rule { ru_rhs = updateGlobalIds type_env ru_rhs, .. }
+updateRuleIdInfos type_env Rule{ .. } =
+  let !rhs = updateGlobalIds type_env ru_rhs
+  in Rule { ru_rhs = rhs, .. }
 
 --------------------------------------------------------------------------------
 -- Instances
