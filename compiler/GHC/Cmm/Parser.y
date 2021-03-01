@@ -218,6 +218,7 @@ import qualified GHC.StgToCmm.Monad as F
 import GHC.StgToCmm.Utils
 import GHC.StgToCmm.Foreign
 import GHC.StgToCmm.Expr
+import GHC.StgToCmm.Lit
 import GHC.StgToCmm.Closure
 import GHC.StgToCmm.Layout     hiding (ArgRep(..))
 import GHC.StgToCmm.Ticky

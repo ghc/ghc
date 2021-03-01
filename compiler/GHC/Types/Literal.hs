@@ -20,23 +20,23 @@ module GHC.Types.Literal
 
         -- ** Creating Literals
         , mkLitInt, mkLitIntWrap, mkLitIntWrapC, mkLitIntUnchecked
-        , mkLitWord, mkLitWordWrap, mkLitWordWrapC
-        , mkLitInt8, mkLitInt8Wrap
-        , mkLitWord8, mkLitWord8Wrap
-        , mkLitInt16, mkLitInt16Wrap
-        , mkLitWord16, mkLitWord16Wrap
-        , mkLitInt32, mkLitInt32Wrap
-        , mkLitWord32, mkLitWord32Wrap
-        , mkLitInt64, mkLitInt64Wrap
-        , mkLitWord64, mkLitWord64Wrap
+        , mkLitWord, mkLitWordWrap, mkLitWordWrapC, mkLitWordUnchecked
+        , mkLitInt8, mkLitInt8Wrap, mkLitInt8Unchecked
+        , mkLitWord8, mkLitWord8Wrap, mkLitWord8Unchecked
+        , mkLitInt16, mkLitInt16Wrap, mkLitInt16Unchecked
+        , mkLitWord16, mkLitWord16Wrap, mkLitWord16Unchecked
+        , mkLitInt32, mkLitInt32Wrap, mkLitInt32Unchecked
+        , mkLitWord32, mkLitWord32Wrap, mkLitWord32Unchecked
+        , mkLitInt64, mkLitInt64Wrap, mkLitInt64Unchecked
+        , mkLitWord64, mkLitWord64Wrap, mkLitWord64Unchecked
         , mkLitFloat, mkLitDouble
         , mkLitChar, mkLitString
         , mkLitInteger, mkLitNatural
         , mkLitNumber, mkLitNumberWrap
+        , mkLitRubbish
 
         -- ** Operations on Literals
         , literalType
-        , absentLiteralOf
         , pprLiteral
         , litNumIsSigned
         , litNumCheckRange
@@ -61,7 +61,6 @@ module GHC.Types.Literal
         , charToIntLit, intToCharLit
         , floatToIntLit, intToFloatLit, doubleToIntLit, intToDoubleLit
         , nullAddrLit, floatToDoubleLit, doubleToFloatLit
-        , rubbishLit, isRubbishLit
         ) where
 
 #include "HsVersions.h"
@@ -70,7 +69,6 @@ import GHC.Prelude
 
 import GHC.Builtin.Types.Prim
 import {-# SOURCE #-} GHC.Builtin.Types
-import GHC.Builtin.Names
 import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Utils.Outputable
@@ -79,7 +77,6 @@ import GHC.Types.Basic
 import GHC.Utils.Binary
 import GHC.Settings.Constants
 import GHC.Platform
-import GHC.Types.Unique.FM
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 
@@ -114,8 +111,7 @@ import Numeric ( fromRat )
 -- * The literal derived from the label mentioned in a \"foreign label\"
 --   declaration ('LitLabel')
 --
--- * A 'LitRubbish' to be used in place of values of 'UnliftedRep'
---   (i.e. 'MutVar#') when the value is never used.
+-- * A 'LitRubbish' to be used in place of values that are never used.
 --
 -- * A character
 -- * A string
@@ -138,10 +134,13 @@ data Literal
                                 -- that can be represented as a Literal. Create
                                 -- with 'nullAddrLit'
 
-  | LitRubbish Bool             -- ^ A nonsense value; always boxed, but
-                                --      True <=> lifted, False <=> unlifted
-                                -- Used when a binding is absent.
-                                -- See Note [Rubbish literals]
+  | LitRubbish [PrimRep]        -- ^ A nonsense value of the given
+                                -- representation. See Note [Rubbish values].
+                                --
+                                -- The @[PrimRep]@ of a 'Type' can be obtained
+                                -- from 'typeMonoPrimRep_maybe'. The field
+                                -- becomes empty or singleton post-unarisation,
+                                -- see Note [Post-unarisation invariants].
 
   | LitFloat   Rational         -- ^ @Float#@. Create with 'mkLitFloat'
   | LitDouble  Rational         -- ^ @Double#@. Create with 'mkLitDouble'
@@ -194,6 +193,12 @@ litNumIsSigned nt = case nt of
   LitNumWord32  -> False
   LitNumWord64  -> False
 
+instance Binary LitNumType where
+   put_ bh numTyp = putByte bh (fromIntegral (fromEnum numTyp))
+   get bh = do
+      h <- getByte bh
+      return (toEnum (fromIntegral h))
+
 {-
 Note [BigNum literals]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -224,12 +229,6 @@ to embed the UTF-8 encoded binary blob. See Note [Embedding large binary blobs]
 for more details.
 
 -}
-
-instance Binary LitNumType where
-   put_ bh numTyp = putByte bh (fromIntegral (fromEnum numTyp))
-   get bh = do
-      h <- getByte bh
-      return (toEnum (fromIntegral h))
 
 instance Binary Literal where
     put_ bh (LitChar aa)     = do putByte bh 0; put_ bh aa
@@ -272,9 +271,10 @@ instance Binary Literal where
                     nt <- get bh
                     i  <- get bh
                     return (LitNumber nt i)
-              _ -> do
+              7 -> do
                     b <- get bh
                     return (LitRubbish b)
+              _ -> pprPanic "Binary:Literal" (int (fromIntegral h))
 
 instance Outputable Literal where
     ppr = pprLiteral id
@@ -555,6 +555,12 @@ mkLitNatural :: Integer -> Literal
 mkLitNatural x = ASSERT2( inNaturalRange x,  integer x )
                     (LitNumber LitNumNatural x)
 
+-- | Create a rubbish literal of the given representation.
+-- The representation of a 'Type' can be obtained via 'typeMonoPrimRep_maybe'.
+-- See Note [Rubbish values].
+mkLitRubbish :: [PrimRep] -> Literal
+mkLitRubbish = LitRubbish
+
 inNaturalRange :: Integer -> Bool
 inNaturalRange x = x >= 0
 
@@ -694,14 +700,6 @@ doubleToFloatLit l             = pprPanic "doubleToFloatLit" (ppr l)
 nullAddrLit :: Literal
 nullAddrLit = LitNullAddr
 
--- | A rubbish literal; see Note [Rubbish literals]
-rubbishLit :: Bool -> Literal
-rubbishLit is_lifted = LitRubbish is_lifted
-
-isRubbishLit :: Literal -> Bool
-isRubbishLit (LitRubbish {}) = True
-isRubbishLit _               = False
-
 {-
         Predicates
         ~~~~~~~~~~
@@ -797,7 +795,8 @@ litIsLifted (LitNumber nt _) = case nt of
   LitNumWord16  -> False
   LitNumWord32  -> False
   LitNumWord64  -> False
-litIsLifted _                  = False
+litIsLifted _                        = False
+  -- Even RUBBISH[LiftedRep] is unlifted, as rubbish values are always evaluated.
 
 {-
         Types
@@ -825,40 +824,10 @@ literalType (LitNumber lt _)  = case lt of
    LitNumWord16  -> word16PrimTy
    LitNumWord32  -> word32PrimTy
    LitNumWord64  -> word64PrimTy
-literalType (LitRubbish is_lifted) = mkForAllTy a Inferred (mkTyVarTy a)
+literalType (LitRubbish preps) = mkForAllTy a Inferred (mkTyVarTy a)
   where
-    -- See Note [Rubbish literals]
-    a | is_lifted = alphaTyVar
-      | otherwise = alphaTyVarUnliftedRep
-
-absentLiteralOf :: TyCon -> Maybe Literal
--- Return a literal of the appropriate primitive
--- TyCon, to use as a placeholder when it doesn't matter
--- Rubbish literals are handled in GHC.Core.Opt.WorkWrap.Utils, because
---  1. Looking at the TyCon is not enough, we need the actual type
---  2. This would need to return a type application to a literal
-absentLiteralOf tc = lookupUFM absent_lits tc
-
--- We do not use TyConEnv here to avoid import cycles.
-absent_lits :: UniqFM TyCon Literal
-absent_lits = listToUFM_Directly
-                        -- Explicitly construct the mape from the known
-                        -- keys of these tyCons.
-                        [ (addrPrimTyConKey,    LitNullAddr)
-                        , (charPrimTyConKey,    LitChar 'x')
-                        , (intPrimTyConKey,     mkLitIntUnchecked 0)
-                        , (int8PrimTyConKey,    mkLitInt8Unchecked 0)
-                        , (int16PrimTyConKey,   mkLitInt16Unchecked 0)
-                        , (int32PrimTyConKey,   mkLitInt32Unchecked 0)
-                        , (int64PrimTyConKey,   mkLitInt64Unchecked 0)
-                        , (wordPrimTyConKey,    mkLitWordUnchecked 0)
-                        , (word8PrimTyConKey,   mkLitWord8Unchecked 0)
-                        , (word16PrimTyConKey,  mkLitWord16Unchecked 0)
-                        , (word32PrimTyConKey,  mkLitWord32Unchecked 0)
-                        , (word64PrimTyConKey,  mkLitWord64Unchecked 0)
-                        , (floatPrimTyConKey,   LitFloat 0)
-                        , (doublePrimTyConKey,  LitDouble 0)
-                        ]
+    -- See Note [Rubbish values]
+    a = head $ mkTemplateTyVars [tYPE (primRepsToRuntimeRep preps)]
 
 {-
         Comparison
@@ -910,9 +879,8 @@ pprLiteral add_par (LitLabel l mb fod) =
     where b = case mb of
               Nothing -> pprHsString l
               Just x  -> doubleQuotes (text (unpackFS l ++ '@':show x))
-pprLiteral _       (LitRubbish is_lifted)
-  = text "__RUBBISH"
-    <> parens (if is_lifted then text "lifted" else text "unlifted")
+pprLiteral _       (LitRubbish reps)
+  = text "RUBBISH" <> ppr reps
 
 pprIntegerVal :: (SDoc -> SDoc) -> Integer -> SDoc
 -- See Note [Printing of literals in Core].
@@ -954,61 +922,77 @@ LitFloat        -1.0#
 LitDouble       -1.0##
 LitInteger      -1                 (-1)
 LitLabel        "__label" ...      ("__label" ...)
-LitRubbish      "__RUBBISH"
+LitRubbish      "RUBBISH[...]"
 
-Note [Rubbish literals]
-~~~~~~~~~~~~~~~~~~~~~~~
-During worker/wrapper after demand analysis, where an argument
-is unused (absent) we do the following w/w split (supposing that
-y is absent):
+Note [Rubbish values]
+~~~~~~~~~~~~~~~~~~~~~
+Sometimes, we need to cough up a rubbish value of a certain type that is used
+in place of dead code we thus aim to eliminate. The value of a dead occurrence
+has no effect on the dynamic semantics of the program, so we can pick any value
+of the same representation.
+Exploiting the results of absence analysis in worker/wrapper is a scenario where
+we need such a rubbish value, see Note [Absent fillers] for examples.
 
-  f x y z = e
-===>
-  f x y z = $wf x z
-  $wf x z = let y = <absent value>
-            in e
+It's completely undefined what the *value* of a rubbish value is, e.g., we could
+pick @0#@ for @Int#@ or @42#@; it mustn't matter where it's inserted into a Core
+program. We embed these rubbish values in the 'LitRubbish' case of the 'Literal'
+data type. Here are the moving parts:
 
-Usually the binding for y is ultimately optimised away, and
-even if not it should never be evaluated -- but that's the
-way the w/w split starts off.
+  1. Source Haskell: No way to produce rubbish lits in source syntax. Purely
+     an IR feature.
 
-What is <absent value>?
-* For lifted values <absent value> can be a call to 'error'.
-* For primitive types like Int# or Word# we can use any random
-  value of that type.
-* But what about /unlifted/ but /boxed/ types like MutVar# or
-  Array#?  Or /lifted/ but /strict/ values, such as a field of
-  a strict data constructor.  For these we use LitRubbish.
-  See Note [Absent errors] in GHC.Core.Opt.WorkWrap.Utils.hs
+  2. Core: 'LitRubbish' carries a @[PrimRep]@ which represents the monomorphic
+     'RuntimeRep' of the type it is substituting for.
+     We have it that @RUBBISH[IntRep]@ has type @forall (a :: TYPE IntRep). a@,
+     and the type application @RUBBISH[IntRep] \@Int# :: Int#@ represents
+     a rubbish value of type @Int#@. Rubbish lits are completely opaque in Core.
+     In general, @RUBBISH[preps] :: forall (a :: TYPE rep). a@, where @rep@
+     is the 'RuntimeRep' corresponding to @preps :: [PrimRep]@
+     (via 'primRepsToRuntimeRep'). See 'literalType'.
+     Why not encode a 'RuntimeRep' via a @Type@? Thus
+     > data Literal = ... | LitRubbish Type | ...
+     Because
+       * We have to provide an Eq and Ord instance and @Type@ has none
+       * The encoded @Type@ might be polymorphic and we can only emit code for
+         monomorphic 'RuntimeRep's anyway.
 
-The literal (LitRubbish is_lifted)
-has type
-  LitRubbish :: forall (a :: TYPE LiftedRep). a     if is_lifted
-  LitRubbish :: forall (a :: TYPE UnliftedRep). a   otherwise
+  3. STG: The type app in @RUBBISH[IntRep] \@Int# :: Int#@ is erased and we get
+     the (untyped) 'StgLit' @RUBBISH[IntRep] :: Int#@ in STG.
+     It's treated mostly opaque, with the exception of the Unariser, where we
+     take apart a case scrutinisation on, or arg occurrence of, e.g.,
+     @RUBBISH[IntRep,DoubleRep]@ (which may stand in for @(# Int#, Double# #)@)
+     into its sub-parts @RUBBISH[IntRep]@ and @RUBBISH[DoubleRep]@, similar to
+     unboxed tuples. @RUBBISH[VoidRep]@ is erased.
+     See 'unariseRubbish_maybe' and also Note [Post-unarisation invariants].
 
-So we might see a w/w split like
-  $wf x z = let y :: Array# Int = (LitRubbish False) @(Array# Int)
-            in e
+  4. Cmm: We translate 'LitRubbish' to their actual rubbish value in 'cgLit'.
+     The particulars are boring, and only matter when debugging illicit use of
+     a rubbish value; see Modes of failure below.
 
-Here are the moving parts, but see also Note [Absent errors] in
-GHC.Core.Opt.WorkWrap.Utils
+  5. Bytecode: In GHC.ByteCode.Asm we just lower it as a 0 literal, because it's
+     all boxed to the host GC anyway.
 
-* We define LitRubbish as a constructor in GHC.Types.Literal.Literal
+Why not lower LitRubbish in CoreToStg? Because it enables us to use RubbishLit
+when unarising unboxed sums in the future, and it allows rubbish values of e.g.
+VecRep, for which we can't cough up dummy values in STG.
 
-* It is given its polymorphic type by Literal.literalType
+Modes of failure
+----------------
+Suppose there is a bug in GHC, and a rubbish value is used after all. That is
+undefined behavior, of course, but let us list a few examples for failure modes:
 
-* GHC.Core.Opt.WorkWrap.Utils.mk_absent_let introduces a LitRubbish for absent
-  arguments of boxed, unlifted type; or boxed, lifted arguments of strict data
-  constructors.
-
-* In CoreToSTG we convert (RubishLit @t) to just ().  STG is untyped, so this
-  will work OK for both lifted and unlifted (but boxed) values. The important
-  thing is that it is a heap pointer, which the garbage collector can follow if
-  it encounters it.
-
-  We considered maintaining LitRubbish in STG, and lowering it in the code
-  generators, but it seems simpler to do it once and for all in CoreToSTG.
-
-  In GHC.ByteCode.Asm we just lower it as a 0 literal, because it's all boxed to
-  the host GC anyway.
--}
+ a) For an value of unboxed numeric type like @Int#@, we just use a silly
+    value like 42#. The error might propoagate indefinitely, hence we better
+    pick a rather unique literal. Same for Word, Floats, Char and VecRep.
+ b) For AddrRep (like String lits), we mit a null pointer, resulting in a
+    definitive segfault when accessed.
+ c) For boxed values, unlifted or not, we use a pointer to a fixed closure,
+    like @()@, so that the GC has a pointer to follow.
+    If we use that pointer as an 'Array#', we will likely access fields of the
+    array that don't exist, and a seg-fault is likely, but not guaranteed.
+    If we use that pointer as @Either Int Bool@, we might try to access the
+    'Int' field of the 'Left' constructor (which has the same ConTag as '()'),
+    which doesn't exists. In the best case, we'll find an invalid pointer in its
+    position and get a seg-fault, in the worst case the error manifests only one
+    or two indirections later.
+ -}

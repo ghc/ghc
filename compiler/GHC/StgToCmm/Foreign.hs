@@ -27,7 +27,6 @@ import GHC.Platform.Profile
 
 import GHC.Stg.Syntax
 import GHC.StgToCmm.Prof (storeCurCCS, ccsType)
-import GHC.StgToCmm.Env
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Utils
 import GHC.StgToCmm.Closure
