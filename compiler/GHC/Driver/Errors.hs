@@ -8,7 +8,7 @@ module GHC.Driver.Errors (
 import GHC.Driver.Session
 import GHC.Data.Bag
 import GHC.Utils.Exception
-import GHC.Utils.Error ( formatBulleted, sortMsgBag )
+import GHC.Utils.Error ( formatBulleted, sortMsgBag, mkPlainMsgEnvelope )
 import GHC.Types.SourceError ( mkSrcErr )
 import GHC.Prelude
 import GHC.Types.SrcLoc
@@ -40,7 +40,7 @@ handleFlagWarnings logger dflags warns = do
 
       -- It would be nicer if warns :: [Located SDoc], but that
       -- has circular import problems.
-      bag = listToBag [ mkPlainMsgEnvelope WarningWithoutFlag loc (text warn)
+      bag = listToBag [ mkPlainMsgEnvelope dflags WarningWithoutFlag loc (text warn)
                       | CmdLine.Warn _ (L loc warn) <- warns' ]
 
   printOrThrowWarnings logger dflags bag
@@ -55,39 +55,10 @@ shouldPrintWarning _ _
   = True
 
 -- | Given a bag of warnings, turn them into an exception if
--- -Werror is enabled, or print them out otherwise.
+-- any has 'SevError', or print them out otherwise.
 printOrThrowWarnings :: Logger -> DynFlags -> Bag WarnMsg -> IO ()
-printOrThrowWarnings logger dflags warns = do
-  let (make_error, warns') =
-        mapAccumBagL
-          (\make_err warn ->
-            case warn_msg_severity dflags warn of
-              SevWarning ->
-                (make_err, warn)
-              SevError ->
-                (True, set_severity SevError warn))
-          False warns
-  if make_error
-    then throwIO (mkSrcErr warns')
-    else printBagOfErrors logger dflags warns
-
-  where
-
-    -- | Sets the 'Severity' of the input 'WarnMsg' according to the 'DynFlags'.
-    warn_msg_severity :: DynFlags -> WarnMsg -> Severity
-    warn_msg_severity dflags msg =
-      case diagnosticReason (errMsgDiagnostic msg) of
-        ErrorWithoutFlag   -> SevError
-        WarningWithoutFlag ->
-          if gopt Opt_WarnIsError dflags
-            then SevError
-            else SevWarning
-        WarningWithFlag wflag ->
-          if wopt_fatal wflag dflags
-            then SevError
-            else SevWarning
-
-    -- | Adjust the 'Severity' of the input 'WarnMsg'.
-    set_severity :: Severity -> WarnMsg -> MsgEnvelope DiagnosticMessage
-    set_severity newSeverity msg = msg { errMsgSeverity = newSeverity }
-
+printOrThrowWarnings logger dflags warns
+  | any ((==) SevError . errMsgSeverity) warns
+  = throwIO (mkSrcErr warns)
+  | otherwise
+  = printBagOfErrors logger dflags warns
