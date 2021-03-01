@@ -479,13 +479,13 @@ warnRedundantConstraints ctxt env info ev_vars
                     -- to the error context, which is a bit tiresome
    addErrCtxt (text "In" <+> ppr info) $
    do { env <- getLclEnv
-      ; msg <- mkErrorReport SevWarning (WarningWithFlag Opt_WarnRedundantConstraints) ctxt env (important doc)
+      ; msg <- mkErrorReport (WarningWithFlag Opt_WarnRedundantConstraints) ctxt env (important doc)
       ; reportDiagnostic msg }
 
  | otherwise  -- But for InstSkol there already *is* a surrounding
               -- "In the instance declaration for Eq [a]" context
               -- and we don't want to say it twice. Seems a bit ad-hoc
- = do { msg <- mkErrorReport SevWarning (WarningWithFlag Opt_WarnRedundantConstraints) ctxt env (important doc)
+ = do { msg <- mkErrorReport (WarningWithFlag Opt_WarnRedundantConstraints) ctxt env (important doc)
       ; reportDiagnostic msg }
  where
    doc = text "Redundant constraint" <> plural redundant_evs <> colon
@@ -505,7 +505,7 @@ warnRedundantConstraints ctxt env info ev_vars
 
 reportBadTelescope :: ReportErrCtxt -> TcLclEnv -> SkolemInfo -> [TcTyVar] -> TcM ()
 reportBadTelescope ctxt env (ForAllSkol telescope) skols
-  = do { msg <- mkErrorReport SevError ErrorWithoutFlag ctxt env (important doc)
+  = do { msg <- mkErrorReport ErrorWithoutFlag ctxt env (important doc)
        ; reportDiagnostic msg }
   where
     doc = hang (text "These kind and type variables:" <+> telescope $$
@@ -977,17 +977,16 @@ pprWithArising (ct:cts)
 
 mkErrorMsgFromCt :: ReportErrCtxt -> Ct -> Report -> TcM (MsgEnvelope DiagnosticMessage)
 mkErrorMsgFromCt ctxt ct report
-  = mkErrorReport SevError ErrorWithoutFlag ctxt (ctLocEnv (ctLoc ct)) report
+  = mkErrorReport ErrorWithoutFlag ctxt (ctLocEnv (ctLoc ct)) report
 
-mkErrorReport :: Severity
-              -> DiagnosticReason
+mkErrorReport :: DiagnosticReason
               -> ReportErrCtxt
               -> TcLclEnv
               -> Report
               -> TcM (MsgEnvelope DiagnosticMessage)
-mkErrorReport sev rea ctxt tcl_env (Report important relevant_bindings valid_subs)
+mkErrorReport rea ctxt tcl_env (Report important relevant_bindings valid_subs)
   = do { context <- mkErrInfo (cec_tidy ctxt) (tcl_ctxt tcl_env)
-       ; mkDecoratedSDocAt sev rea
+       ; mkDecoratedSDocAt rea
                            (RealSrcSpan (tcl_loc tcl_env) Nothing)
                            (vcat important)
                            context
@@ -1131,7 +1130,7 @@ mkHoleError _tidy_simples ctxt hole@(Hole { hole_occ = occ
        ; curr_mod <- getModule
        ; hpt <- getHpt
        ; let mk_err rea = do
-               mkDecoratedSDocAt (defaultReasonSeverity rea) rea (RealSrcSpan (tcl_loc lcl_env) Nothing)
+               mkDecoratedSDocAt rea (RealSrcSpan (tcl_loc lcl_env) Nothing)
                                  out_of_scope_msg O.empty
                                  (unknownNameSuggestions dflags hpt curr_mod rdr_env
                                  (tcl_rdr lcl_env) imp_info (mkRdrUnqual occ))
@@ -1171,19 +1170,16 @@ mkHoleError tidy_simples ctxt hole@(Hole { hole_occ = occ
                             else return (ctxt, empty)
 
        ; let mk_err rea =
-               mkErrorReport (defaultReasonSeverity rea) rea ctxt lcl_env $
+               mkErrorReport rea ctxt lcl_env $
                              important hole_msg `mappend`
                              mk_relevant_bindings (binds_msg $$ constraints_msg) `mappend`
                              valid_hole_fits sub_msg
 
        ; maybeAddDeferredBindings ctxt hole mk_err
-       ; case sort of
-           TypeHole
-             -> whenNotDeferring (cec_type_holes ctxt) mk_err
-           ConstraintHole
-             -> whenNotDeferring (cec_type_holes ctxt) mk_err
-           ExprHole _
-             -> whenNotDeferring (cec_expr_holes ctxt) mk_err
+
+       ; let holes | ExprHole _ <- sort = cec_expr_holes ctxt
+                   | otherwise          = cec_type_holes ctxt
+       ; whenNotDeferring holes mk_err
 
        }
 
@@ -1243,10 +1239,9 @@ mkHoleError tidy_simples ctxt hole@(Hole { hole_occ = occ
            quotes (ppr tv) <+> text "is a coercion variable"
 
 
--- | Similar in spirit to 'whenIsJust', but the action returns a value 'b'.
+-- | Similar in spirit to 'whenIsJust', but the action returns a value of type @Maybe b@.
 whenNotDeferring :: Monad m => Maybe a -> (a -> m b) -> m (Maybe b)
-whenNotDeferring Nothing _  = pure Nothing
-whenNotDeferring (Just a) f = Just <$> f a
+whenNotDeferring = flip traverse
 
 {- Note [Adding deferred bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
