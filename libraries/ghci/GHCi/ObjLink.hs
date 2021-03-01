@@ -99,6 +99,7 @@ loadDLL str0 = do
      -- layers above, loadDLL always takes a filename with an extension, and
      -- we drop it here on Windows only.
      str | isWindowsHost = dropExtension str0
+         | isDarwinHost && str == "libstdc++.dylib" = "libc++.dylib"
          | otherwise     = str0
   --
   maybe_errmsg <- withFilePath (normalise str) $ \dll -> c_addDLL dll
