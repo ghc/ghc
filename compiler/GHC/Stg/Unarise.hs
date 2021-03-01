@@ -193,6 +193,9 @@ STG programs after unarisation have these invariants:
     This means that it's safe to wrap `StgArg`s of DataCon applications with
     `GHC.StgToCmm.Env.NonVoid`, for example.
 
+  * Similar to unboxed tuples, Note [Rubbish values] of TupleRep may only
+    appear in return position.
+
   * Alt binders (binders in patterns) are always non-void.
 
   * Binders always have zero (for void arguments) or one PrimRep.
@@ -207,6 +210,7 @@ import GHC.Prelude
 import GHC.Types.Basic
 import GHC.Core
 import GHC.Core.DataCon
+import GHC.Core.TyCon ( isVoidRep )
 import GHC.Data.FastString (FastString, mkFastString)
 import GHC.Types.Id
 import GHC.Types.Literal
@@ -349,6 +353,11 @@ unariseExpr rho (StgCase scrut bndr alt_ty alts)
   , Just args' <- unariseMulti_maybe rho dc args ty_args
   = elimCase rho args' bndr alt_ty alts
 
+  -- See (3) of Note [Rubbish values] in GHC.Types.Literal
+  | StgLit lit <- scrut
+  , Just args' <- unariseRubbish_maybe lit
+  = elimCase rho args' bndr alt_ty alts
+
   -- general case
   | otherwise
   = do scrut' <- unariseExpr rho scrut
@@ -375,6 +384,22 @@ unariseMulti_maybe rho dc args ty_args
   | isUnboxedSumDataCon dc
   , let args1 = ASSERT(isSingleton args) (unariseConArgs rho args)
   = Just (mkUbxSum dc ty_args args1)
+
+  | otherwise
+  = Nothing
+
+-- Doesn't return void args.
+unariseRubbish_maybe :: Literal -> Maybe [OutStgArg]
+unariseRubbish_maybe lit
+  | LitRubbish preps <- lit
+  , [prep] <- preps
+  , not (isVoidRep prep)
+  -- Single, non-void PrimRep. Nothing to do!
+  = Nothing
+
+  | LitRubbish preps <- lit
+  -- Multiple reps, possibly with VoidRep. Eliminate!
+  = Just [ StgLitArg (LitRubbish [prep]) | prep <- preps, not (isVoidRep prep) ]
 
   | otherwise
   = Nothing
@@ -719,8 +744,11 @@ unariseConArg rho (StgVarArg x) =
                                   -- Here realWorld# is not in the envt, but
                                   -- is a void, and so should be eliminated
       | otherwise -> [StgVarArg x]
-unariseConArg _ arg@(StgLitArg lit) =
-    ASSERT(not (isVoidTy (literalType lit)))  -- We have no void literals
+unariseConArg _ arg@(StgLitArg lit)
+  | Just as <- unariseRubbish_maybe lit
+  = as
+  | otherwise
+  = ASSERT(not (isVoidTy (literalType lit))) -- We have no non-rubbish void literals
     [arg]
 
 unariseConArgs :: UnariseEnv -> [InStgArg] -> [OutStgArg]
