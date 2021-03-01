@@ -1901,7 +1901,7 @@ tk_eq_msg ctxt ct ty1 ty2 orig@(TypeEqOrigin { uo_actual = act
     count_args ty = count isVisibleBinder $ fst $ splitPiTys ty
 
 tk_eq_msg ctxt ct ty1 ty2
-          (KindEqOrigin cty1 mb_cty2 sub_o mb_sub_t_or_k)
+          (KindEqOrigin cty1 cty2 sub_o mb_sub_t_or_k)
   = vcat [ headline_eq_msg False ct ty1 ty2
          , supplementary_msg ]
   where
@@ -1911,17 +1911,15 @@ tk_eq_msg ctxt ct ty1 ty2
 
     supplementary_msg
       = sdocOption sdocPrintExplicitCoercions $ \printExplicitCoercions ->
-        case mb_cty2 of
-          Just cty2
-            |  printExplicitCoercions
-            || not (cty1 `pickyEqType` cty2)
-            -> vcat [ hang (text "When matching" <+> sub_whats)
-                         2 (vcat [ ppr cty1 <+> dcolon <+>
+        if printExplicitCoercions
+           || not (cty1 `pickyEqType` cty2)
+          then vcat [ hang (text "When matching" <+> sub_whats)
+                          2 (vcat [ ppr cty1 <+> dcolon <+>
                                    ppr (tcTypeKind cty1)
                                  , ppr cty2 <+> dcolon <+>
                                    ppr (tcTypeKind cty2) ])
                     , mk_supplementary_ea_msg ctxt sub_t_or_k cty1 cty2 sub_o ]
-          _ -> text "When matching the kind of" <+> quotes (ppr cty1)
+          else text "When matching the kind of" <+> quotes (ppr cty1)
 
 tk_eq_msg _ _ _ _ _ = panic "typeeq_mismatch_msg"
 
@@ -2873,8 +2871,7 @@ relevantBindings want_filtering ctxt ct
              -- For *kind* errors, report the relevant bindings of the
              -- enclosing *type* equality, because that's more useful for the programmer
        ; let extra_tvs = case tidy_orig of
-                             KindEqOrigin t1 m_t2 _ _ -> tyCoVarsOfTypes $
-                                                         t1 : maybeToList m_t2
+                             KindEqOrigin t1 t2 _ _ -> tyCoVarsOfTypes [t1,t2]
                              _                        -> emptyVarSet
              ct_fvs = tyCoVarsOfCt ct `unionVarSet` extra_tvs
 

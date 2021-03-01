@@ -22,10 +22,10 @@ tcfail068.hs:14:9: error:
         itgen :: (Int, Int) -> a -> IndTree s a
           (bound at tcfail068.hs:12:1)
 
-tcfail068.hs:19:9: error:
+tcfail068.hs:19:21: error:
     • Couldn't match type ‘s1’ with ‘s’
-      Expected: GHC.ST.ST s1 (IndTree s a)
-        Actual: GHC.ST.ST s (IndTree s a)
+      Expected: STArray s1 (Int, Int) a
+        Actual: IndTree s a
       ‘s1’ is a rigid type variable bound by
         a type expected by the context:
           forall s1. GHC.ST.ST s1 (IndTree s a)
@@ -36,18 +36,11 @@ tcfail068.hs:19:9: error:
                    Constructed a =>
                    (Int, Int) -> (a -> a) -> IndTree s a -> IndTree s a
         at tcfail068.hs:16:1-75
-    • In the first argument of ‘runST’, namely
+    • In the first argument of ‘readSTArray’, namely ‘arr’
+      In the first argument of ‘(>>=)’, namely ‘readSTArray arr i’
+      In the first argument of ‘runST’, namely
         ‘(readSTArray arr i
             >>= \ val -> writeSTArray arr i (f val) >> return arr)’
-      In the expression:
-        runST
-          (readSTArray arr i
-             >>= \ val -> writeSTArray arr i (f val) >> return arr)
-      In an equation for ‘itiap’:
-          itiap i f arr
-            = runST
-                (readSTArray arr i
-                   >>= \ val -> writeSTArray arr i (f val) >> return arr)
     • Relevant bindings include
         arr :: IndTree s a (bound at tcfail068.hs:17:11)
         itiap :: (Int, Int) -> (a -> a) -> IndTree s a -> IndTree s a

@@ -372,9 +372,7 @@ tcExpr (HsCase x scrut matches) res_ty
            --
            -- But now, in the GADT world, we need to typecheck the scrutinee
            -- first, to get type info that may be refined in the case alternatives
-          let mult = Many
-            -- There is not yet syntax or inference mechanism for case
-            -- expressions to be anything else than unrestricted.
+          mult <- newFlexiTyVarTy multiplicityTy
 
           -- Typecheck the scrutinee.  We use tcInferRho but tcInferSigma
           -- would also be possible (tcMatchesCase accepts sigma-types)
