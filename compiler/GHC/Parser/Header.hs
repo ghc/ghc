@@ -48,6 +48,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Monad
+import GHC.Utils.Error
 import GHC.Utils.Exception as Exception
 
 import GHC.Data.StringBuffer
@@ -90,7 +91,7 @@ getImports popts implicit_prelude buf filename source_filename = do
       -- don't log warnings: they'll be reported when we parse the file
       -- for real.  See #2500.
       if not (isEmptyBag errs)
-        then throwIO $ mkSrcErr (fmap pprError errs)
+        then throwIO $ mkSrcErr (fmap mkParserErr errs)
         else
           let   hsmod = unLoc rdr_module
                 mb_mod = hsmodName hsmod
@@ -314,7 +315,7 @@ checkProcessArgsResult flags
   = when (notNull flags) $
       liftIO $ throwIO $ mkSrcErr $ listToBag $ map mkMsg flags
     where mkMsg (L loc flag)
-              = mkPlainMsgEnvelope ErrorWithoutFlag loc $
+              = mkPlainErrorMsgEnvelope loc $
                   (text "unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+>
                    text flag)
 
@@ -358,7 +359,7 @@ optionsErrorMsgs unhandled_flags flags_lines _filename
                                 , L l f' <- flags_lines
                                 , f == f' ]
         mkMsg (L flagSpan flag) =
-            mkPlainMsgEnvelope ErrorWithoutFlag flagSpan $
+            mkPlainErrorMsgEnvelope flagSpan $
                     text "unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+> text flag
 
 optionsParseError :: String -> SrcSpan -> a     -- #15053
@@ -371,4 +372,4 @@ optionsParseError str loc =
 
 throwErr :: SrcSpan -> SDoc -> a                -- #15053
 throwErr loc doc =
-  throw $ mkSrcErr $ unitBag $ mkPlainMsgEnvelope ErrorWithoutFlag loc doc
+  throw $ mkSrcErr $ unitBag $ mkPlainErrorMsgEnvelope loc doc

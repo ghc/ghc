@@ -36,7 +36,7 @@ import GHC.Prelude
 
 import GHC.Driver.Session
 import GHC.Driver.Env
-import GHC.Driver.Errors ( printOrThrowWarnings, printBagOfErrors )
+import GHC.Driver.Errors ( printOrThrowDiagnostics, printBagOfErrors )
 
 import GHC.Utils.Monad
 import GHC.Utils.Exception
@@ -147,7 +147,7 @@ logWarnings :: GhcMonad m => WarningMessages -> m ()
 logWarnings warns = do
   dflags <- getSessionDynFlags
   logger <- getLogger
-  liftIO $ printOrThrowWarnings logger dflags warns
+  liftIO $ printOrThrowDiagnostics logger dflags warns
 
 -- -----------------------------------------------------------------------------
 -- | A minimal implementation of a 'GhcMonad'.  If you need a custom monad,
