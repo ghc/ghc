@@ -940,9 +940,11 @@ release-x86_64-linux-ubuntu2004:
     CONFIGURE_ARGS: "--disable-ld-override"
     INSTALL_CONFIGURE_ARGS: "--disable-ld-override"
     HADRIAN_ARGS: "--docs=no-sphinx"
-    # encoding004 due to lack of locale support
-    # T10458 due to fact that dynamic linker tries to reload libAS
-    BROKEN_TESTS: "encoding004 T10458"
+    # encoding004: due to lack of locale support
+    # T10458, ghcilink002: due to #17869
+    # linker_unload_native: due to musl not supporting any means of probing dynlib dependencies
+    #   (see Note [Object unloading]).
+    BROKEN_TESTS: "encoding004 T10458 ghcilink002 linker_unload_native"
   cache:
     key: linux-x86_64-alpine-$CACHE_REV
   artifacts:
