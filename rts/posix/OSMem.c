@@ -60,10 +60,12 @@
 # endif
 #endif
 
+#if defined(HAVE_LINUX_MMAN_H)
+#include <linux/mman.h>
+
 #define HUGEPAGE_SIZE (2*1024*1024)
-// This constant is from linux/mman.h
-#define MAP_HUGE_2MB (21 << MAP_HUGE_SHIFT)
-#define HUGEPAGE_FLAGS MAP_HUGETLB
+#define HUGEPAGE_FLAGS (MAP_HUGETLB | MAP_HUGE_2MB)
+#endif
 
 #if !defined(darwin_HOST_OS)
 # undef RESERVE_FLAGS
@@ -242,16 +244,19 @@ my_mmap (void *addr, W_ size, int operation)
 # endif
     } else if (operation == MEM_COMMIT) {
         flags = MAP_FIXED | MAP_ANONYMOUS | MAP_PRIVATE;
+#if defined(HUGEPAGE_SIZE)
         if ( RtsFlags.GcFlags.hugepages &&
             (size & (HUGEPAGE_SIZE - 1)) == 0) {
           huge_tried += 1;
           flags |= HUGEPAGE_FLAGS;
         }
+#endif /* defined(HUGEPAGE_SIZE) */
     } else {
         flags = MAP_ANON | MAP_PRIVATE;
     }
 
     ret = mmap(addr, size, prot, flags, -1, 0);
+#if defined(HUGEPAGE_SIZE)
     // If the mmap failed, and we tried with HUGEPAGE_FLAGS
     // then retry without.
     if (ret == MAP_FAILED && flags & HUGEPAGE_FLAGS){
@@ -259,6 +264,7 @@ my_mmap (void *addr, W_ size, int operation)
       flags &= ~HUGEPAGE_FLAGS;
       ret = mmap(addr, size, prot, flags, -1, 0);
     }
+#endif
 # if defined(linux_HOST_OS)
     if (ret == MAP_FAILED && errno == EPERM) {
         // Linux may return EPERM if it tried to give us
