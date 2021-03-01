@@ -3,8 +3,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 
 module GHC.Parser.Errors.Ppr
-   ( pprWarning
-   , pprError
+   ( mkParserWarn
+   , mkParserErr
    )
 where
 
@@ -24,27 +24,32 @@ import GHC.Hs.Expr (prependQualified,HsExpr(..))
 import GHC.Hs.Type (pprLHsContext)
 import GHC.Builtin.Names (allNameStrings)
 import GHC.Builtin.Types (filterCTuple)
+import GHC.Driver.Session (DynFlags)
+import GHC.Utils.Error (diagReasonSeverity)
 
-mkParserErr :: SrcSpan -> SDoc -> MsgEnvelope DiagnosticMessage
-mkParserErr span doc = MsgEnvelope
+mk_parser_err :: SrcSpan -> SDoc -> MsgEnvelope DiagnosticMessage
+mk_parser_err span doc = MsgEnvelope
    { errMsgSpan        = span
    , errMsgContext     = alwaysQualify
    , errMsgDiagnostic  = DiagnosticMessage (mkDecorated [doc]) ErrorWithoutFlag
    , errMsgSeverity    = SevError
    }
 
-mkParserWarn :: WarningFlag -> SrcSpan -> SDoc -> MsgEnvelope DiagnosticMessage
-mkParserWarn flag span doc = MsgEnvelope
+mk_parser_warn :: DynFlags -> WarningFlag -> SrcSpan -> SDoc -> MsgEnvelope DiagnosticMessage
+mk_parser_warn df flag span doc = MsgEnvelope
    { errMsgSpan        = span
    , errMsgContext     = alwaysQualify
-   , errMsgDiagnostic  = DiagnosticMessage (mkDecorated [doc]) (WarningWithFlag flag)
-   , errMsgSeverity    = SevWarning
+   , errMsgDiagnostic  = DiagnosticMessage (mkDecorated [doc]) reason
+   , errMsgSeverity    = diagReasonSeverity df reason
    }
+  where
+    reason :: DiagnosticReason
+    reason = WarningWithFlag flag
 
-pprWarning :: PsWarning -> MsgEnvelope DiagnosticMessage
-pprWarning = \case
+mkParserWarn :: DynFlags -> PsWarning -> MsgEnvelope DiagnosticMessage
+mkParserWarn df = \case
    PsWarnTab loc tc
-      -> mkParserWarn Opt_WarnTabs loc $
+      -> mk_parser_warn df Opt_WarnTabs loc $
           text "Tab character found here"
             <> (if tc == 1
                 then text ""
@@ -53,7 +58,7 @@ pprWarning = \case
             $+$ text "Please use spaces instead."
 
    PsWarnTransitionalLayout loc reason
-      -> mkParserWarn Opt_WarnAlternativeLayoutRuleTransitional loc $
+      -> mk_parser_warn df Opt_WarnAlternativeLayoutRuleTransitional loc $
             text "transitional layout will not be accepted in the future:"
             $$ text (case reason of
                TransLayout_Where -> "`where' clause at the same depth as implicit layout block"
@@ -61,20 +66,20 @@ pprWarning = \case
             )
 
    PsWarnUnrecognisedPragma loc
-      -> mkParserWarn Opt_WarnUnrecognisedPragmas loc $
+      -> mk_parser_warn df Opt_WarnUnrecognisedPragmas loc $
             text "Unrecognised pragma"
 
    PsWarnHaddockInvalidPos loc
-      -> mkParserWarn Opt_WarnInvalidHaddock loc $
+      -> mk_parser_warn df Opt_WarnInvalidHaddock loc $
             text "A Haddock comment cannot appear in this position and will be ignored."
 
    PsWarnHaddockIgnoreMulti loc
-      -> mkParserWarn Opt_WarnInvalidHaddock loc $
+      -> mk_parser_warn df Opt_WarnInvalidHaddock loc $
             text "Multiple Haddock comments for a single entity are not allowed." $$
             text "The extraneous comment will be ignored."
 
    PsWarnStarBinder loc
-      -> mkParserWarn Opt_WarnStarBinder loc $
+      -> mk_parser_warn df Opt_WarnStarBinder loc $
             text "Found binding occurrence of" <+> quotes (text "*")
             <+> text "yet StarIsType is enabled."
          $$ text "NB. To use (or export) this operator in"
@@ -82,7 +87,7 @@ pprWarning = \case
          $$ text "    including the definition module, you must qualify it."
 
    PsWarnStarIsType loc
-      -> mkParserWarn Opt_WarnStarIsType loc $
+      -> mk_parser_warn df Opt_WarnStarIsType loc $
              text "Using" <+> quotes (text "*")
              <+> text "(or its Unicode variant) to mean"
              <+> quotes (text "Data.Kind.Type")
@@ -92,7 +97,7 @@ pprWarning = \case
            <+> text "from" <+> quotes (text "Data.Kind") <+> text "instead."
 
    PsWarnImportPreQualified loc
-      -> mkParserWarn Opt_WarnPrepositiveQualifiedModule loc $
+      -> mk_parser_warn df Opt_WarnPrepositiveQualifiedModule loc $
             text "Found" <+> quotes (text "qualified")
              <+> text "in prepositive position"
          $$ text "Suggested fix: place " <+> quotes (text "qualified")
@@ -100,7 +105,7 @@ pprWarning = \case
          $$ text "To allow this, enable language extension 'ImportQualifiedPost'"
 
    PsWarnOperatorWhitespaceExtConflict loc sym
-      -> mkParserWarn Opt_WarnOperatorWhitespaceExtConflict loc $
+      -> mk_parser_warn df Opt_WarnOperatorWhitespaceExtConflict loc $
          let mk_prefix_msg operator_symbol extension_name syntax_meaning =
                   text "The prefix use of a" <+> quotes (text operator_symbol)
                     <+> text "would denote" <+> text syntax_meaning
@@ -115,7 +120,7 @@ pprWarning = \case
 
 
    PsWarnOperatorWhitespace loc sym occ_type
-      -> mkParserWarn Opt_WarnOperatorWhitespace loc $
+      -> mk_parser_warn df Opt_WarnOperatorWhitespace loc $
          let mk_msg occ_type_str =
                   text "The" <+> text occ_type_str <+> text "use of a" <+> quotes (ftext sym)
                     <+> text "might be repurposed as special syntax"
@@ -127,8 +132,8 @@ pprWarning = \case
            OperatorWhitespaceOccurrence_Suffix -> mk_msg "suffix"
            OperatorWhitespaceOccurrence_TightInfix -> mk_msg "tight infix"
 
-pprError :: PsError -> MsgEnvelope DiagnosticMessage
-pprError err = mkParserErr (errLoc err) $ vcat
+mkParserErr :: PsError -> MsgEnvelope DiagnosticMessage
+mkParserErr err = mk_parser_err (errLoc err) $ vcat
    (pp_err (errDesc err) : map pp_hint (errHints err))
 
 pp_err :: PsErrorDesc -> SDoc
