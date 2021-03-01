@@ -19,10 +19,10 @@ module GHC.Types.Error
 
    , MessageClass (..)
    , Severity (..)
-   , mkMCDiagnostic
    , Diagnostic (..)
    , DiagnosticMessage (..)
    , DiagnosticReason (..)
+   , DeferStatus (..)
 
     -- * Rendering Messages
 
@@ -33,12 +33,6 @@ module GHC.Types.Error
    , mkLocMessage
    , mkLocMessageAnn
    , getCaretDiagnostic
-   -- * Constructing individual diagnostic messages
-   , mkMsgEnvelope
-   , mkPlainMsgEnvelope
-   , mkLongMsgEnvelope
-   , mkShortMsgEnvelope
-   , defaultReasonSeverity
    -- * Queries
    , isErrorMessage
    , isWarningMessage
@@ -191,11 +185,21 @@ data DiagnosticReason
   -- ^ Born as an error.
   deriving (Eq, Show)
 
+data DeferStatus
+  = ReportError
+  | DeferError
+  deriving (Eq, Show)
+
+instance Outputable DeferStatus where
+  ppr = \case
+    ReportError -> text "ReportError"
+    DeferError  -> text "DeferError"
+
 instance Outputable DiagnosticReason where
   ppr = \case
-    WarningWithoutFlag              -> text "WarningWithoutFlag"
-    WarningWithFlag wf              -> text ("WarningWithFlag " ++ show wf)
-    ErrorWithoutFlag                -> text "ErrorWithoutFlag"
+    WarningWithoutFlag  -> text "WarningWithoutFlag"
+    WarningWithFlag wf  -> text ("WarningWithFlag " ++ show wf)
+    ErrorWithoutFlag    -> text "ErrorWithoutFlag"
 
 -- | An envelope for GHC's facts about a running program, parameterised over the
 -- /domain-specific/ (i.e. parsing, typecheck-renaming, etc) diagnostics.
@@ -237,11 +241,6 @@ data MessageClass
     -- /especially/ when emitting compiler diagnostics, use the smart constructor.
   deriving (Eq, Show)
 
--- | Make a 'MessageClass' for a given 'DiagnosticReason', without consulting the 'DynFlags'.
--- This will not respect -Werror or warning suppression and so is probably wrong
--- for any warning.
-mkMCDiagnostic :: DiagnosticReason -> MessageClass
-mkMCDiagnostic reason = MCDiagnostic (defaultReasonSeverity reason) reason
 
 -- | Used to describe warnings and errors
 --   o The message has a file\/line\/column heading,
@@ -324,14 +323,6 @@ mkLocMessageAnn ann msg_class locn msg
         MCDiagnostic SevWarning _reason -> text "warning:"
         MCFatal                         -> text "fatal:"
         _                               -> empty
-
--- | Computes a severity from a reason in the absence of DynFlags. This will likely
--- be wrong in the presence of -Werror. It will be removed in the context of #18516.
-defaultReasonSeverity :: DiagnosticReason -> Severity
-defaultReasonSeverity = \case
-  WarningWithoutFlag    -> SevWarning
-  WarningWithFlag _flag -> SevWarning
-  ErrorWithoutFlag      -> SevError
 
 getMessageClassColour :: MessageClass -> Col.Scheme -> Col.PprColour
 getMessageClassColour (MCDiagnostic SevError _reason)   = Col.sError
@@ -416,64 +407,11 @@ getCaretDiagnostic msg_class (RealSrcSpan span _) =
         caretLine = replicate start ' ' ++ replicate width '^' ++ caretEllipsis
 
 --
--- Creating MsgEnvelope(s)
---
-
-mkMsgEnvelope
-  :: Diagnostic e
-  => Severity
-  -> SrcSpan
-  -> PrintUnqualified
-  -> e
-  -> MsgEnvelope e
-mkMsgEnvelope sev locn print_unqual err
- = MsgEnvelope { errMsgSpan = locn
-               , errMsgContext = print_unqual
-               , errMsgDiagnostic = err
-               , errMsgSeverity = sev
-               }
-
--- | A long (multi-line) diagnostic message.
--- The 'Severity' will be calculated out of the 'DiagnosticReason', and will likely be
--- incorrect in the presence of '-Werror'.
-mkLongMsgEnvelope :: DiagnosticReason
-                  -> SrcSpan
-                  -> PrintUnqualified
-                  -> SDoc
-                  -> SDoc
-                  -> MsgEnvelope DiagnosticMessage
-mkLongMsgEnvelope rea locn unqual msg extra =
-  mkMsgEnvelope (defaultReasonSeverity rea) -- wrong, but will be fixed in printOrThrowWarnings
-                locn unqual (DiagnosticMessage (mkDecorated [msg,extra]) rea)
-
--- | A short (one-line) diagnostic message.
--- Same 'Severity' considerations as for 'mkLongMsgEnvelope'.
-mkShortMsgEnvelope :: DiagnosticReason
-                   -> SrcSpan
-                   -> PrintUnqualified
-                   -> SDoc
-                   -> MsgEnvelope DiagnosticMessage
-mkShortMsgEnvelope rea locn unqual msg =
-  mkMsgEnvelope (defaultReasonSeverity rea) -- wrong, but will be fixed in printOrThrowWarnings
-                locn unqual (DiagnosticMessage (mkDecorated [msg]) rea)
-
--- | Variant that doesn't care about qualified/unqualified names.
--- Same 'Severity' considerations as for 'mkLongMsgEnvelope'.
-mkPlainMsgEnvelope :: DiagnosticReason
-                   -> SrcSpan
-                   -> SDoc
-                   -> MsgEnvelope DiagnosticMessage
-mkPlainMsgEnvelope rea locn msg =
-  mkMsgEnvelope (defaultReasonSeverity rea) -- wrong, but will be fixed in printOrThrowWarnings
-                locn alwaysQualify (DiagnosticMessage (mkDecorated [msg]) rea)
-
---
 -- Queries
 --
 
 isErrorMessage :: Diagnostic e => MsgEnvelope e -> Bool
-isErrorMessage MsgEnvelope { errMsgSeverity = SevError } = True
-isErrorMessage _ = False
+isErrorMessage = (==) ErrorWithoutFlag . diagnosticReason . errMsgDiagnostic
 
 isWarningMessage :: Diagnostic e => MsgEnvelope e -> Bool
 isWarningMessage = not . isErrorMessage
