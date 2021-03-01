@@ -10,7 +10,7 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.StgToCmm.Expr ( cgExpr ) where
+module GHC.StgToCmm.Expr ( cgExpr, cgLit ) where
 
 #include "HsVersions.h"
 
@@ -40,8 +40,10 @@ import GHC.Cmm.Utils ( zeroExpr, cmmTagMask, mkWordCLit, mAX_PTR_TAG )
 import GHC.Core
 import GHC.Core.DataCon
 import GHC.Types.ForeignCall
+import GHC.Types.Literal
 import GHC.Types.Id
 import GHC.Builtin.PrimOps
+import GHC.Builtin.Types ( unitDataConId )
 import GHC.Core.TyCon
 import GHC.Core.Type        ( isUnliftedType )
 import GHC.Types.RepType    ( isVoidTy, countConRepArgs )
@@ -114,8 +116,7 @@ cgExpr (StgOpApp (StgPrimOp DataToTagOp) [StgVarArg a] _res_ty) = do
 cgExpr (StgOpApp op args ty) = cgOpApp op args ty
 cgExpr (StgConApp con args _)= cgConApp con args
 cgExpr (StgTick t e)         = cgTick t >> cgExpr e
-cgExpr (StgLit lit)       = do cmm_lit <- cgLit lit
-                               emitReturn [CmmLit cmm_lit]
+cgExpr (StgLit lit)          = cgLit lit >>= emitReturn . (:[])
 
 cgExpr (StgLet _ binds expr) = do { cgBind binds;     cgExpr expr }
 cgExpr (StgLetNoEscape _ binds expr) =
@@ -1122,3 +1123,40 @@ cgTick tick
            SourceNote s n    -> emitTick $ SourceNote s n
            _other            -> return () -- ignore
        }
+
+------------------------------------------------------------------------
+--              Literals
+------------------------------------------------------------------------
+
+cgLit :: Literal -> FCode CmmExpr
+cgLit (LitString s) =
+  CmmLit <$> newByteStringCLit s
+ -- not unpackFS; we want the UTF-8 byte stream.
+cgLit (LitRubbish preps) =
+  case expectOnly "cgLit:Rubbish" preps of -- Note [Post-unarisation invariants]
+    VoidRep     -> panic "cgLit:VoidRep"   -- dito
+    LiftedRep   -> idInfoToAmode <$> getCgIdInfo unitDataConId
+    UnliftedRep -> idInfoToAmode <$> getCgIdInfo unitDataConId
+    AddrRep     -> cgLit LitNullAddr
+    VecRep n elem -> do
+      platform <- getPlatform
+      let elem_lit = mkSimpleLit platform (num_rep_lit (primElemRepToPrimRep elem))
+      pure (CmmLit (CmmVec (replicate n elem_lit)))
+    prep        -> cgLit (num_rep_lit prep)
+    where
+      num_rep_lit IntRep    = mkLitIntUnchecked 0
+      num_rep_lit Int8Rep   = mkLitInt8Unchecked 0
+      num_rep_lit Int16Rep  = mkLitInt16Unchecked 0
+      num_rep_lit Int32Rep  = mkLitInt32Unchecked 0
+      num_rep_lit Int64Rep  = mkLitInt64Unchecked 0
+      num_rep_lit WordRep   = mkLitWordUnchecked 0
+      num_rep_lit Word8Rep  = mkLitWord8Unchecked 0
+      num_rep_lit Word16Rep = mkLitWord16Unchecked 0
+      num_rep_lit Word32Rep = mkLitWord32Unchecked 0
+      num_rep_lit Word64Rep = mkLitWord64Unchecked 0
+      num_rep_lit FloatRep  = LitFloat 0
+      num_rep_lit DoubleRep = LitDouble 0
+      num_rep_lit other     = pprPanic "num_rep_lit: Not a num lit" (ppr other)
+cgLit other_lit = do
+  platform <- getPlatform
+  pure (CmmLit (mkSimpleLit platform other_lit))
