@@ -352,7 +352,7 @@ addErr errs_so_far msg locs
   = errs_so_far `snocBag` mk_msg locs
   where
     mk_msg (loc:_) = let (l,hdr) = dumpLoc loc
-                     in  mkLocMessage (Err.MCDiagnostic Err.SevError WarningWithoutFlag)
+                     in  mkLocMessage (Err.mkMCDiagnostic WarningWithoutFlag)
                                       l (hdr $$ msg)
     mk_msg []      = msg
 

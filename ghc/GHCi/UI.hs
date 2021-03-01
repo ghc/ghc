@@ -65,6 +65,7 @@ import GHC.Hs.ImpExp
 import GHC.Hs
 import GHC.Driver.Env
 import GHC.Runtime.Context
+import GHC.Types.Error
 import GHC.Types.TyThing
 import GHC.Types.TyThing.Ppr
 import GHC.Types.SafeHaskell ( getSafeMode )

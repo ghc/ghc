@@ -820,10 +820,10 @@ errorMsgS = errorMsg . text
 
 -- | Output an error to the screen. Does not cause the compiler to die.
 errorMsg :: SDoc -> CoreM ()
-errorMsg = msg (MCDiagnostic SevError ErrorWithoutFlag)
+errorMsg = msg (mkMCDiagnostic ErrorWithoutFlag)
 
 diagnosticMsg :: Severity -> DiagnosticReason -> SDoc -> CoreM ()
-diagnosticMsg sev reason = msg (MCDiagnostic sev reason)
+diagnosticMsg sev reason = msg (UnsafeMCDiagnostic sev reason)
 
 -- | Output a fatal error to the screen. Does not cause the compiler to die.
 fatalErrorMsgS :: String -> CoreM ()

@@ -1,3 +1,4 @@
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
@@ -18,9 +19,10 @@ module GHC.Types.Error
    -- * Classifying Messages
 
    , MessageClass (..)
+   , pattern MCDiagnostic
    , Severity (..)
-   , sevError
-   , sevWarn
+   , mcDiagnosticError
+   , mkMCDiagnostic
    , Diagnostic (..)
    , DiagnosticMessage (..)
    , DiagnosticReason (..)
@@ -225,9 +227,31 @@ data MessageClass
     -- ^ Log messages intended for end users.
     -- No file\/line\/column stuff.
 
-  | MCDiagnostic Severity DiagnosticReason
+  | UnsafeMCDiagnostic Severity DiagnosticReason
+    -- ^ Diagnostics from the compiler. This constructor
+    -- is prefixed with \"unsafe\" because it allows the construction
+    -- of a 'MessageClass' with a completely arbitrary
+    -- permutation of 'Severity' and 'DiagnosticReason'. As such,
+    -- as users are expected to use the 'mkMCDiagnostic' smart constructor instead.
   deriving (Eq, Show)
 
+
+-- | A pattern synonym to still be able to pattern match on a 'MessageClass',
+-- without being able to freely construct diagnostics.
+pattern MCDiagnostic :: Severity -> DiagnosticReason -> MessageClass
+pattern MCDiagnostic sev reason <- UnsafeMCDiagnostic sev reason
+
+{-# COMPLETE MCOutput, MCFatal, MCInteractive, MCDump, MCInfo, MCDiagnostic #-}
+
+-- | A 'MessageClass' for always-fatal errors.
+mcDiagnosticError :: MessageClass
+mcDiagnosticError = mkMCDiagnostic ErrorWithoutFlag
+
+-- | Make a 'MessageClass' for a given 'DiagnosticReason', without consulting the 'DynFlags'.
+-- This will not respect -Werror or warning suppression and so is probably wrong
+-- for any warning.
+mkMCDiagnostic :: DiagnosticReason -> MessageClass
+mkMCDiagnostic reason = UnsafeMCDiagnostic (defaultReasonSeverity reason) reason
 
 -- | Used to describe warnings and errors
 --   o The message has a file\/line\/column heading,
@@ -238,14 +262,6 @@ data Severity
   = SevWarning
   | SevError
   deriving (Eq, Show)
-
--- | The 'Severity' for an error.
-sevError :: Severity
-sevError = SevError
-
--- | The 'Severity' for a warning.
-sevWarn :: Severity
-sevWarn = SevWarning
 
 instance Outputable Severity where
   ppr = \case
@@ -261,7 +277,7 @@ instance ToJson MessageClass where
   json MCInteractive = JSString "MCInteractive"
   json MCDump = JSString "MCDump"
   json MCInfo = JSString "MCInfo"
-  json (MCDiagnostic sev reason) =
+  json (UnsafeMCDiagnostic sev reason) =
     JSString $ renderWithContext defaultSDocContext (ppr $ text "MCDiagnostic" <+> ppr sev <+> ppr reason)
 
 instance Show (MsgEnvelope DiagnosticMessage) where
