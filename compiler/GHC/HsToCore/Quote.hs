@@ -1133,13 +1133,13 @@ repPhases (ActiveAfter _ i)  = do { MkC arg <- coreIntLit i
 repPhases _                  = dataCon allPhasesDataConName
 
 rep_complete_sig :: Located [Located Name]
-                 -> Maybe (HsPatSigType GhcRn)
+                 -> Maybe (LHsSigType GhcRn)
                  -> SrcSpan
                  -> MetaM [(SrcSpan, Core (M TH.Dec))]
 rep_complete_sig (L _ cls) mty loc
   = do { qTyCon <- lift $ dsLookupTyCon qTyConName
        ; typeTy <- lookupType typeTyConName
-       ; mty' <- repMaybeT (mkTyConApp qTyCon [typeTy]) (repLTy . hsPatSigType) mty
+       ; mty' <- repMaybeT (mkTyConApp qTyCon [typeTy]) rep_ty_sig' mty
        ; cls' <- repList nameTyConName lookupLOcc cls
        ; sig <- repPragComplete cls' mty'
        ; return [(loc, sig)] }

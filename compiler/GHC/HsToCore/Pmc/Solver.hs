@@ -48,6 +48,9 @@ import GHC.Utils.Error ( pprMsgEnvelopeBagWithLoc )
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Data.Bag
+import GHC.Data.IOEnv (failM)
+import GHC.Tc.Types.Origin
+import GHC.Tc.Utils.TcType
 import GHC.Types.CompleteMatch
 import GHC.Types.Error
 import GHC.Types.Unique.Set
@@ -77,15 +80,20 @@ import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim (tYPETyCon)
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type
-import GHC.Tc.Solver   (tcNormalise, tcCheckSatisfiability)
+import GHC.Tc.Solver   (tcNormalise, tcCheckSatisfiability, tcCheckWanteds)
+import GHC.Tc.Types.Constraint (isEmptyWC)
+import GHC.Tc.Utils.Instantiate (topInstantiate)
+import GHC.Tc.Utils.Monad (traceTc, getConstraintVar)
+import GHC.Tc.Utils.Unify (unifyType)
 import GHC.Core.Unify    (tcMatchTy)
 import GHC.Core.Coercion
 import GHC.HsToCore.Monad hiding (foldlM)
 import GHC.Tc.Instance.Family
 import GHC.Core.FamInstEnv
+import GHC.Utils.Monad (MonadIO(..))
 
 import Control.Applicative ((<|>))
-import Control.Monad (foldM, forM, guard, mzero, when)
+import Control.Monad (foldM, forM, guard, mzero, when, filterM)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State.Strict
 import Data.Coerce
@@ -95,7 +103,7 @@ import Data.Monoid   (Any(..))
 import Data.List     (sortBy, find)
 import qualified Data.List.NonEmpty as NE
 import Data.Ord      (comparing)
-
+import Data.IORef    (readIORef)
 --
 -- * Main exports
 --
@@ -152,35 +160,38 @@ vanillaCompleteMatchTC tc =
 
 -- | Initialise from 'dsGetCompleteMatches' (containing all COMPLETE pragmas)
 -- if the given 'ResidualCompleteMatches' were empty.
-addCompleteMatches :: ResidualCompleteMatches -> DsM ResidualCompleteMatches
-addCompleteMatches (RCM v Nothing) = RCM v . Just <$> dsGetCompleteMatches
-addCompleteMatches rcm             = pure rcm
+addCompleteMatches :: Id -> Nabla -> ResidualCompleteMatches -> DsM ResidualCompleteMatches
+addCompleteMatches x nabla (RCM v Nothing) = do
+  cms <- dsGetCompleteMatches
+  cms' <- filterM (completeMatchTypeApplies x nabla) cms
+  return $ RCM v (Just cms')
+addCompleteMatches _ _     rcm             = pure rcm
 
 -- | Adds the declared 'CompleteMatches' from COMPLETE pragmas, as well as the
 -- vanilla data defn if it is a 'DataCon'.
-addConLikeMatches :: ConLike -> ResidualCompleteMatches -> DsM ResidualCompleteMatches
-addConLikeMatches (RealDataCon dc) rcm = addTyConMatches (dataConTyCon dc) rcm
-addConLikeMatches (PatSynCon _)    rcm = addCompleteMatches rcm
+addConLikeMatches :: Id -> Nabla -> ConLike -> ResidualCompleteMatches -> DsM ResidualCompleteMatches
+addConLikeMatches x nabla (RealDataCon dc) rcm = addTyConMatches x nabla (dataConTyCon dc) rcm
+addConLikeMatches x nabla (PatSynCon _)    rcm = addCompleteMatches x nabla rcm
 
 -- | Adds
 --    * the 'CompleteMatches' from COMPLETE pragmas
 --    * and the /vanilla/ 'CompleteMatch' from the data 'TyCon'
 -- to the 'ResidualCompleteMatches', if not already present.
-addTyConMatches :: TyCon -> ResidualCompleteMatches -> DsM ResidualCompleteMatches
-addTyConMatches tc rcm = add_tc_match <$> addCompleteMatches rcm
+addTyConMatches :: Id -> Nabla -> TyCon -> ResidualCompleteMatches -> DsM ResidualCompleteMatches
+addTyConMatches x nabla tc rcm = add_tc_match <$> addCompleteMatches x nabla rcm
   where
     -- | Add the vanilla COMPLETE set from the data defn, if any. But only if
     -- it's not already present.
     add_tc_match rcm
       = rcm{rcm_vanilla = rcm_vanilla rcm <|> vanillaCompleteMatchTC tc}
 
-markMatched :: PmAltCon -> ResidualCompleteMatches -> DsM (Maybe ResidualCompleteMatches)
+markMatched :: Id -> Nabla -> PmAltCon -> ResidualCompleteMatches -> DsM (Maybe ResidualCompleteMatches)
 -- Nothing means the PmAltCon didn't occur in any COMPLETE set.
 -- See Note [Shortcutting the inhabitation test] for how this is useful for
 -- performance on T17836.
-markMatched (PmAltLit _)      _   = pure Nothing -- lits are never part of a COMPLETE set
-markMatched (PmAltConLike cl) rcm = do
-  rcm' <- addConLikeMatches cl rcm
+markMatched _ _     (PmAltLit _)      _   = pure Nothing -- lits are never part of a COMPLETE set
+markMatched x nabla (PmAltConLike cl) rcm = do
+  rcm' <- addConLikeMatches x nabla cl rcm
   let go cm = case lookupUniqDSet (cmConLikes cm) cl of
         Nothing -> (False, cm)
         Just _  -> (True,  cm { cmConLikes = delOneFromUniqDSet (cmConLikes cm) cl })
@@ -688,7 +699,7 @@ tyOracle ty_st@(TySt n inert) cts
             Nothing           -> pprPanic "tyOracle" (vcat $ pprMsgEnvelopeBagWithLoc (getErrorMessages msgs)) }
 
 -- | Allocates a fresh 'EvVar' name for 'PredTy's.
-nameTyCt :: PredType -> DsM EvVar
+nameTyCt :: (MonadUnique m) => PredType -> m EvVar
 nameTyCt pred_ty = do
   unique <- getUniqueM
   let occname = mkVarOccFS (fsLit ("pm_"++show unique))
@@ -787,7 +798,7 @@ addNotConCt nabla x nalt = do
       MASSERT( isPmAltConMatchStrict nalt )
       let vi' = vi{ vi_neg = neg', vi_bot = IsNotBot }
       -- 3. Make sure there's at least one other possible constructor
-      mb_rcm' <- lift (markMatched nalt rcm)
+      mb_rcm' <- lift (markMatched x nabla nalt rcm)
       pure $ case mb_rcm' of
         -- If nalt could be removed from a COMPLETE set, we'll get back Just and
         -- have to mark x dirty, by returning Just x'.
@@ -1308,8 +1319,8 @@ addNormalisedTypeMatches nabla@MkNabla{ nabla_ty_st = ty_st } x
       norm_res_ty <- normaliseSourceTypeWHNF ty_st (idType x)
       env <- dsGetFamInstEnvs
       rcm' <- case splitReprTyConApp_maybe env norm_res_ty of
-        Just (rep_tc, _args, _co)  -> addTyConMatches rep_tc rcm
-        Nothing                    -> addCompleteMatches rcm
+        Just (rep_tc, _args, _co)  -> addTyConMatches x nabla rep_tc rcm
+        Nothing                    -> addCompleteMatches x nabla rcm
       pure (rcm', vi{ vi_rcm = rcm' })
 
 -- | Does a 'splitTyConApp_maybe' and then tries to look through a data family
@@ -1339,6 +1350,45 @@ anyConLikeSolution p = any (go . paca_con)
     go (PmAltConLike cl) = p cl
     go _                 = False
 
+-- | Decides if the variable x has a type which, given the type state of nabla, would match the type ty,
+-- and whether the resulting wanted constraints are solvable.
+typeMatchesAtNabla :: Id
+                   -> Nabla
+                   -> Type
+                   -> DsM Bool
+typeMatchesAtNabla x nabla ty = do
+  (_, mr) <- initTcDsForSolver $ do
+    (_, phiTy) <- topInstantiate CompletePragmaOrigin ty
+    traceTc "typeMatchesAtNabla" (text "phiTy:" <+> ppr phiTy)
+    let (preds, rhoTy) = tcSplitPhiTy phiTy
+    traceTc "typeMatchesAtNabla" (text "preds:" <+> ppr preds)
+    traceTc "typeMatchesAtNabla" (text "rhoTy:" <+> ppr rhoTy)
+    traceTc "typeMatchesAtNabla" (text "varType x:" <+> ppr (varType x))
+    -- TODO: Use isTauTy to check if rhoTy is a tau and complain if not?
+    _ <- unifyType (Just (text "a COMPLETE pragma")) rhoTy (varType x)
+    --w <- tcSubType CompletePragmaOrigin CompletePragCtxt (varType x) (Check rhoTy)
+    res <- tcCheckWanteds CompletePragmaOrigin (ty_st_inert $ nabla_ty_st nabla) preds
+    traceTc "typeMatchesAtNabla" (text "res:" <+> ppr res)
+    wantedRef <- getConstraintVar
+    wanted <- liftIO (readIORef wantedRef)
+    traceTc "typeMatchesAtNabla" (text "wanted:" <+> ppr wanted)
+    if not (isEmptyWC wanted)
+      then do traceTc "typeMatchesAtNabla" (text "failing")
+              failM -- throw an exception to avoid a panic in initTc due to the unsolved constraints
+      else do traceTc "typeMatchesAtNabla" (text "succeeding")
+              return res
+  return $ case mr of
+    Just (Just _) -> True
+    _ -> False
+
+-- | Decides if the given CompleteMatch applies to the given variable's type, given the type state
+-- of the given nabla. Returns True unconditionally in the case that the CompleteMatch is not
+-- type-directed.
+completeMatchTypeApplies :: Id -> Nabla -> CompleteMatch -> DsM Bool
+completeMatchTypeApplies x nabla cm = case cmResultType cm of
+  Nothing -> return True
+  Just ty -> typeMatchesAtNabla x nabla ty
+
 -- | @instCompleteSet fuel nabla x cls@ iterates over @cls@ until it finds
 -- the first inhabited ConLike (as per 'instCon'). Any failed instantiation
 -- attempts of a ConLike are recorded as negative information in the returned
@@ -1355,8 +1405,11 @@ instCompleteSet fuel nabla x cs
   -- No need to instantiate a constructor of this COMPLETE set if we already
   -- have a solution!
   = pure nabla
-  | not (completeMatchAppliesAtType (varType x) cs)
-  = pure nabla
+  | Just ty <- cmResultType cs
+  = do check <- lift $ typeMatchesAtNabla x nabla ty
+       if check
+         then go nabla (sorted_candidates cs)
+         else pure nabla
   | otherwise
   = go nabla (sorted_candidates cs)
   where
@@ -1779,11 +1832,11 @@ generateInhabitingPatterns (x:xs) n nabla = do
           let vi = lookupVarInfo (nabla_tm_st newty_nabla) y
           env <- dsGetFamInstEnvs
           rcm <- case splitReprTyConApp_maybe env rep_ty of
-            Just (tc, _, _) -> addTyConMatches tc (vi_rcm vi)
-            Nothing         -> addCompleteMatches (vi_rcm vi)
+            Just (tc, _, _) -> addTyConMatches x nabla tc (vi_rcm vi)
+            Nothing         -> addCompleteMatches x nabla (vi_rcm vi)
 
           -- Test all COMPLETE sets for inhabitants (n inhs at max). Take care of ⊥.
-          clss <- pickApplicableCompleteSets rep_ty rcm
+          clss <- pickApplicableCompleteSets x nabla rep_ty rcm
           case NE.nonEmpty (uniqDSetToList . cmConLikes <$> clss) of
             Nothing ->
               -- No COMPLETE sets ==> inhabited
@@ -1834,23 +1887,23 @@ generateInhabitingPatterns (x:xs) n nabla = do
       other_cons_nablas <- instantiate_cons x ty xs (n - length con_nablas) nabla cls
       pure (con_nablas ++ other_cons_nablas)
 
-pickApplicableCompleteSets :: Type -> ResidualCompleteMatches -> DsM [CompleteMatch]
-pickApplicableCompleteSets ty rcm = do
+pickApplicableCompleteSets :: Id -> Nabla -> Type -> ResidualCompleteMatches -> DsM [CompleteMatch]
+pickApplicableCompleteSets x nabla rep_ty rcm = do
   env <- dsGetFamInstEnvs
   let applicable :: CompleteMatch -> Bool
       applicable cm = all (is_valid env) (uniqDSetToList (cmConLikes cm))
-                   && completeMatchAppliesAtType ty cm
       applicableMatches = filter applicable (getRcm rcm)
+  applicableMatches' <- filterM (completeMatchTypeApplies x nabla) applicableMatches
   tracePm "pickApplicableCompleteSets:" $
     vcat
-      [ ppr ty
+      [ ppr rep_ty
       , ppr rcm
-      , ppr applicableMatches
+      , ppr applicableMatches'
       ]
-  return applicableMatches
+  return applicableMatches'
   where
     is_valid :: FamInstEnvs -> ConLike -> Bool
-    is_valid env cl = isJust (guessConLikeUnivTyArgsFromResTy env ty cl)
+    is_valid env cl = isJust (guessConLikeUnivTyArgsFromResTy env rep_ty cl)
 
 {- Note [Why inhabitationTest doesn't call generateInhabitingPatterns]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

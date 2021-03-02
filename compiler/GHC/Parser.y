@@ -1993,9 +1993,9 @@ sigktype :: { LHsSigType GhcPs }
 sigtype :: { LHsSigType GhcPs }
         : ctype                            { hsTypeToHsSigType $1 }
 
-opt_patsigtype :: { ([AddAnn], Maybe (HsPatSigType GhcPs)) }
-  : {- empty -}   { ([], Nothing) }
-  | '::' type     { ([mu AnnDcolon $1], Just (mkHsPatSigType $2)) }
+opt_sigtype :: { ([AddAnn], Maybe (LHsSigType GhcPs)) }
+  : {- empty -}  { ([], Nothing) }
+  | '::' sigtype { ([mu AnnDcolon $1], Just $2) }
 
 sig_vars :: { Located [Located RdrName] }    -- Returned in reversed order
          : sig_vars ',' var           {% addAnnotation (gl $ head $ unLoc $1)
@@ -2521,7 +2521,7 @@ sigdecl :: { LHsDecl GhcPs }
 
         | pattern_synonym_sig   { sLL $1 $> . SigD noExtField . unLoc $ $1 }
 
-        | '{-# COMPLETE' con_list opt_patsigtype '#-}'
+        | '{-# COMPLETE' con_list opt_sigtype '#-}'
                 {% let (dcolon, tc) = $3
                    in ams
                        (sLL $1 $>

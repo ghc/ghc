@@ -827,9 +827,9 @@ cvtPragmaD (LineP line file)
        }
 cvtPragmaD (CompleteP cls mty)
   = do { cls' <- noLoc <$> mapM cNameL cls
-       ; mty' <- traverse cvtType mty
+       ; mty' <- traverse cvtSigType mty
        ; returnJustL $ Hs.SigD noExtField
-                   $ CompleteMatchSig noExtField NoSourceText cls' (fmap mkHsPatSigType mty') }
+                   $ CompleteMatchSig noExtField NoSourceText cls' mty' }
 
 dfltActivation :: TH.Inline -> Activation
 dfltActivation TH.NoInline = NeverActive

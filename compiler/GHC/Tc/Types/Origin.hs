@@ -446,6 +446,7 @@ data CtOrigin
         -- is solvable or not.
   | NonLinearPatternOrigin
   | UsageEnvironmentOf Name
+  | CompletePragmaOrigin
 
 -- An origin is visible if the place where the constraint arises is manifest
 -- in user code. Currently, all origins are visible except for invisible
@@ -653,4 +654,5 @@ pprCtO StaticOrigin          = text "a static form"
 pprCtO NonLinearPatternOrigin = text "a non-linear pattern"
 pprCtO (UsageEnvironmentOf x) = hsep [text "multiplicity of", quotes (ppr x)]
 pprCtO BracketOrigin         = text "a quotation bracket"
+pprCtO CompletePragmaOrigin  = text "a COMPLETE pragma"
 pprCtO _                     = panic "pprCtOrigin"

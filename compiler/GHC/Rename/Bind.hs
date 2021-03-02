@@ -1035,7 +1035,7 @@ renameSig ctxt sig@(SCCFunSig _ st v s)
 renameSig _ctxt (CompleteMatchSig _ s (L l bf) mty)
   = do new_bf <- traverse lookupLocatedOccRn bf
        let doc = GenericCtx (text "the scrutinee type signature of a COMPLETE pragma")
-       new_mty <- traverse (rnHsCompletePragType doc) mty
+       new_mty <- traverse (fmap fst . rnHsSigType doc TypeLevel) mty
        return (CompleteMatchSig noExtField s (L l new_bf) new_mty, emptyFVs)
 
 {-
