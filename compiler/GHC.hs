@@ -1184,9 +1184,11 @@ loadModule tcm = do
    let (tcg, _details) = tm_internals tcm
 
    mb_linkable <- case ms_obj_date ms of
+                     -- TODO: somewhat dubious; should we be checking hashes
+                     -- here instead?
                      Just t | t > ms_hs_date ms  -> do
-                         l <- liftIO $ findObjectLinkable (ms_mod ms)
-                                                  (ml_obj_file loc) t
+                         let l = mkObjectLinkable (ms_mod ms)
+                                                  (ml_obj_file loc) t (ms_hs_hash ms)
                          return (Just l)
                      _otherwise -> return Nothing
 

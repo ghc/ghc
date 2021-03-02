@@ -31,7 +31,7 @@ module GHC.Driver.Pipeline (
    phaseOutputFilename, getOutputFilename, getPipeState, getPipeEnv,
    hscPostBackendPhase, getLocation, setModLocation, setDynFlags,
    runPhase,
-   doesIfaceHashMatch,
+   readIfaceSourceHash', doesIfaceHashMatch,
    doCpp,
    linkingNeeded, checkLinkInfo, writeInterfaceOnlyMode
   ) where
@@ -87,7 +87,6 @@ import GHC.Data.Bag            ( unitBag )
 import GHC.Data.FastString     ( mkFastString )
 import GHC.Data.StringBuffer   ( hGetStringBuffer, hPutStringBuffer )
 import GHC.Data.Maybe          ( expectJust )
-import qualified GHC.Data.Maybe as GHCMaybe
 
 import GHC.Iface.Make          ( mkFullIface )
 import GHC.Iface.UpdateIdInfos ( updateModDetailsIdInfos )
@@ -120,7 +119,7 @@ import Data.Maybe
 import Data.Version
 import Data.Either      ( partitionEithers )
 
-import Data.Time        ( UTCTime )
+import Data.Time        ( UTCTime, getCurrentTime )
 
 -- ---------------------------------------------------------------------------
 -- Pre-process
@@ -218,17 +217,19 @@ compileOne' m_tc_result mHscMessage
                addFilesToClean flags TFL_GhcSession $
                    [ml_obj_file $ ms_location summary]
 
+   let mk_linkable time us = LM time (ms_hs_hash summary) this_mod us
+
    case (status, bcknd) of
         (HscUpToDate iface hmi_details, _) ->
             -- TODO recomp014 triggers this assert. What's going on?!
             -- ASSERT( isJust mb_old_linkable || isNoLink (ghcLink dflags) )
             return $! HomeModInfo iface hmi_details mb_old_linkable
-        (HscNotGeneratingCode iface hmi_details, NoBackend) ->
+        (HscNotGeneratingCode iface hmi_details, NoBackend) -> do
+            now <- getCurrentTime
             let mb_linkable = if isHsBootOrSig src_flavour
                                 then Nothing
-                                -- TODO: Questionable.
-                                else Just (LM (ms_hs_date summary) this_mod [])
-            in return $! HomeModInfo iface hmi_details mb_linkable
+                                else Just (mk_linkable now [])
+            return $! HomeModInfo iface hmi_details mb_linkable
         (HscNotGeneratingCode _ _, _) -> panic "compileOne HscNotGeneratingCode"
         (_, NoBackend) -> panic "compileOne NoBackend"
         (HscUpdateBoot iface hmi_details, Interpreter) ->
@@ -237,7 +238,8 @@ compileOne' m_tc_result mHscMessage
             touchObjectFile logger dflags object_filename
             return $! HomeModInfo iface hmi_details Nothing
         (HscUpdateSig iface hmi_details, Interpreter) -> do
-            let !linkable = LM (ms_hs_date summary) this_mod []
+            -- TODO: Use getCurrentTime rather than ms_hs_date?
+            let !linkable = mk_linkable (ms_hs_date summary) []
             return $! HomeModInfo iface hmi_details (Just linkable)
         (HscUpdateSig iface hmi_details, _) -> do
             output_fn <- getOutputFilename logger next_phase
@@ -259,7 +261,7 @@ compileOne' m_tc_result mHscMessage
                               (Just location)
                               []
             o_time <- getModificationUTCTime object_filename
-            let !linkable = LM o_time this_mod [DotO object_filename]
+            let !linkable = mk_linkable o_time [DotO object_filename]
             return $! HomeModInfo iface hmi_details (Just linkable)
         (HscRecomp { hscs_guts = cgguts,
                      hscs_mod_location = mod_location,
@@ -288,8 +290,7 @@ compileOne' m_tc_result mHscMessage
               -- with the filesystem's clock.  It's just as accurate:
               -- if the source is modified, then the linkable will
               -- be out of date.
-            let !linkable = LM unlinked_time (ms_mod summary)
-                           (hs_unlinked ++ stub_o)
+            let !linkable = mk_linkable unlinked_time (hs_unlinked ++ stub_o)
             return $! HomeModInfo final_iface hmi_details (Just linkable)
         (HscRecomp{}, _) -> do
             output_fn <- getOutputFilename logger next_phase
@@ -306,7 +307,7 @@ compileOne' m_tc_result mHscMessage
                               []
                   -- The object filename comes from the ModLocation
             o_time <- getModificationUTCTime object_filename
-            let !linkable = LM o_time this_mod [DotO object_filename]
+            let !linkable = mk_linkable o_time [DotO object_filename]
             return $! HomeModInfo iface details (Just linkable)
 
  where dflags0     = ms_hspp_opts summary
@@ -555,7 +556,7 @@ link' logger dflags unit_env batch_attempt_linking hpt
                   return Succeeded
           else do
 
-        let getOfiles (LM _ _ us) = map nameOfObject (filter isObject us)
+        let getOfiles LM{ linkableUnlinked } = map nameOfObject (filter isObject linkableUnlinked)
             obj_files = concatMap getOfiles linkables
             platform  = targetPlatform dflags
             exe_file  = exeFileName platform staticLink (outputFile dflags)
@@ -1766,20 +1767,22 @@ runPhase (RealPhase MergeForeign) input_fn = do
 runPhase (RealPhase other) _input_fn =
    panic ("runPhase: don't know how to run phase " ++ show other)
 
+-- | Read the previously recorded hash from a module's iface file, if any.
+readIfaceSourceHash' :: HscEnv -> ModSummary -> IO (Maybe Fingerprint)
+readIfaceSourceHash' hsc_env ms =
+    let loc = ms_location ms
+    in initTcRnIf 's' hsc_env () () $
+        readIfaceSourceHash (ms_mod ms) (ml_hi_file loc)
+
 -- | Check whether a module's current hash matches the previously recorded hash
 -- in its .hi file, if any. If this function returns False then the module will
 -- need recompiling.
 doesIfaceHashMatch :: HscEnv -> ModSummary -> IO Bool
 doesIfaceHashMatch hsc_env ms = do
-  let loc = ms_location ms
-  -- TODO: Optimize?
-  initTcRnIf 's' hsc_env () () $ do
-    mb_iface <- readIface (ms_mod ms) (ml_hi_file loc)
-    case mb_iface of
-      GHCMaybe.Succeeded iface ->
-        return $ mi_src_hash (mi_final_exts iface) == ms_hs_hash ms
-      GHCMaybe.Failed _ ->
-        return False
+    mb_iface_hash <- readIfaceSourceHash' hsc_env ms
+    case mb_iface_hash of
+        Just hash -> return $ hash == ms_hs_hash ms
+        Nothing -> return False
 
 maybeMergeForeign :: CompPipeline Phase
 maybeMergeForeign

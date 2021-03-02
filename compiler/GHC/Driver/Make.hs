@@ -478,7 +478,7 @@ load' how_much mHscMessage mod_graph = do
     warnUnnecessarySourceImports mg2_with_srcimps
 
     mg2_with_srcimps_hashes <-
-      let go ms = liftIO $ fmap (\matches -> (ms, matches)) (doesIfaceHashMatch hsc_env ms)
+      let go ms = liftIO $ fmap (\hash -> (ms, hash)) (readIfaceSourceHash' hsc_env ms)
       in traverse (traverse go) mg2_with_srcimps
     liftIO $ debugTraceMsg logger dflags 2 (text " mg2_with_srcimps_hashes:" <+> ppr mg2_with_srcimps_hashes)
     let
@@ -810,10 +810,10 @@ pruneHomePackageTable hpt summ (stable_obj, stable_bco)
   = mapHpt prune hpt
   where prune hmi
           | is_stable modl = hmi'
-          | otherwise      = hmi'{ hm_details = emptyModDetails }
+          | otherwise      = hmi'{ hm_details = emptyModDetails, hm_linkable = Nothing }
           where
            modl = moduleName (mi_module (hm_iface hmi))
-           hmi' | Just l <- hm_linkable hmi, linkableTime l < ms_hs_date ms
+           hmi' | Just l <- hm_linkable hmi, linkableHash l /= ms_hs_hash ms
                 = hmi{ hm_linkable = Nothing }
                 | otherwise
                 = hmi
@@ -917,14 +917,14 @@ type StableModules =
 
 checkStability
         :: HomePackageTable   -- HPT from last compilation
-        -> [SCC (ModSummary, Bool)]   -- current module graph (cyclic)
+        -> [SCC (ModSummary, Maybe Fingerprint)]   -- current module graph (cyclic)
         -> UniqSet ModuleName -- all home modules
         -> StableModules
 
 checkStability hpt sccs all_home_mods =
   foldl' checkSCC (emptyUniqSet, emptyUniqSet) sccs
   where
-   checkSCC :: StableModules -> SCC (ModSummary, Bool) -> StableModules
+   checkSCC :: StableModules -> SCC (ModSummary, Maybe Fingerprint) -> StableModules
    checkSCC (stable_obj, stable_bco) scc0
      | stableObjects = (addListToUniqSet stable_obj scc_mods, stable_bco)
      | stableBCOs    = (stable_obj, addListToUniqSet stable_bco scc_mods)
@@ -949,23 +949,27 @@ checkStability hpt sccs all_home_mods =
            and (zipWith (||) stable_obj_imps stable_bco_imps)
            && all bco_ok scc
 
-        object_ok (ms, hash_matches)
+        object_ok (ms, mb_hi_hash)
           | gopt Opt_ForceRecomp (ms_hspp_opts ms) = False
-          | Just t <- ms_obj_date ms  =  hash_matches
-                                         && same_as_prev t
+          -- TODO: Check obj_date >= hi_date?
+          | Just _ <- ms_obj_date ms
+          , Just hi_hash <- mb_hi_hash   = hi_hash == ms_hs_hash ms
+                                         && same_as_prev hi_hash
           | otherwise = False
           where
-             same_as_prev t = case lookupHpt hpt (ms_mod_name ms) of
-                                Just hmi  | Just l <- hm_linkable hmi
-                                 -> isObjectLinkable l && t == linkableTime l
-                                _other  -> True
+             same_as_prev hash = case lookupHpt hpt (ms_mod_name ms) of
+                                   Just hmi  | Just l <- hm_linkable hmi
+                                    -> isObjectLinkable l && hash == linkableHash l
+                                   _other  -> True
 
-        bco_ok (ms, hash_matches)
+        bco_ok (ms, mb_hi_hash)
           | gopt Opt_ForceRecomp (ms_hspp_opts ms) = False
           | otherwise = case lookupHpt hpt (ms_mod_name ms) of
-                Just hmi  | Just l <- hm_linkable hmi ->
-                        not (isObjectLinkable l) &&
-                        hash_matches
+                Just hmi  | Just l <- hm_linkable hmi
+                          , Just hi_hash <- mb_hi_hash ->
+                              not (isObjectLinkable l) &&
+                              hi_hash == ms_hs_hash ms &&
+                              hi_hash == linkableHash l
                 _other  -> False
 
 {- Parallel Upsweep
@@ -1785,8 +1789,9 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
 
           | is_stable_obj, isNothing old_hmi -> do
                 debug_trace 5 (text "compiling stable on-disk mod:" <+> ppr this_mod_name)
-                linkable <- liftIO $ findObjectLinkable this_mod obj_fn
-                              (expectJust "upsweep1" mb_obj_date)
+                let linkable = mkObjectLinkable this_mod obj_fn
+                                (expectJust "upsweep1" mb_obj_date)
+                                (ms_hs_hash summary)
                 compile_it (Just linkable) SourceUnmodifiedAndStable
                 -- object is stable, but we need to load the interface
                 -- off disk to make a HMI.
@@ -1804,7 +1809,7 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
             Just l <- hm_linkable hmi,
             not (isObjectLinkable l),
             (bcknd /= NoBackend) `implies` not is_fake_linkable,
-            linkableTime l >= ms_hs_date summary -> do
+            linkableHash l == ms_hs_hash summary -> do
                 debug_trace 5 (text "compiling non-stable BCO mod:" <+> ppr this_mod_name)
                 compile_it (Just l) SourceUnmodified
                 -- we have an old BCO that is up to date with respect
@@ -1830,7 +1835,7 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
                           compile_it (Just l) SourceUnmodified
                   _otherwise -> do
                           debug_trace 5 (text "compiling mod with new on-disk obj2:" <+> ppr this_mod_name)
-                          linkable <- liftIO $ findObjectLinkable this_mod obj_fn obj_date
+                          let linkable = mkObjectLinkable this_mod obj_fn obj_date (ms_hs_hash summary)
                           compile_it_discard_iface (Just linkable) SourceUnmodified
 
           -- See Note [Recompilation checking in -fno-code mode]

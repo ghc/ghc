@@ -336,7 +336,7 @@ buildUnit session cid insts lunit = do
             linkables = map (expectJust "bkp link" . hm_linkable)
                       . filter ((==HsSrcFile) . mi_hsc_src . hm_iface)
                       $ home_mod_infos
-            getOfiles (LM _ _ us) = map nameOfObject (filter isObject us)
+            getOfiles LM{ linkableUnlinked = us } = map nameOfObject (filter isObject us)
             obj_files = concatMap getOfiles linkables
             state     = hsc_units hsc_env
 

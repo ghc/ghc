@@ -80,3 +80,26 @@ collect hashes if mtimes haven't changed? Depends on how fast it is
 
 Want to rearrange things so that the new getHashes function can be used in both
 GHC.Driver.{Pipeline, Make}.
+
+=====
+
+How is linkableTime used?
+
+1. In Driver.Pipeline.linkingNeeded:
+		If an executable has an older modification time than any of the object
+		files, then it needs relinking. This seems correct.
+
+2. In Driver.Make.checkStability:
+		One of the conditions for an object (non-BCO) to be considered stable is if
+		the linkable time is the same as the obj date on the filesystem. This seems
+		correct.
+
+3. In Driver.Make.upsweep_mod: "compiling non-stable BCO mod" branch
+		Checks linkableTime against source modification time (>=). This might be
+		wrong now, I'm not sure.
+
+4. In Driver.Make.upsweep_mod: "compiling mod with new on-disk obj" branch
+		Check linkableTime against obj time (==). This seems correct.
+
+5. GHC.Linker.Loader.linkableInSet:
+		Checks linkableTimes against each other (==). This seems correct.
