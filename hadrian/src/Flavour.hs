@@ -208,7 +208,15 @@ viaLlvmBackend = addArgs $ notStage0 ? builder Ghc ? arg "-fllvm"
 -- that you use this with @'dynamicGhcPrograms' = False@ since GHC does not
 -- support loading of profiled libraries with the dynamically-linker.
 enableProfiledGhc :: Flavour -> Flavour
-enableProfiledGhc flavour = flavour { ghcProfiled = True }
+enableProfiledGhc flavour =
+    flavour { rtsWays = addWays [profiling, threadedProfiling, debugProfiling, threadedDebugProfiling] (rtsWays flavour)
+            , libraryWays = addWays [profiling] (libraryWays flavour)
+            , ghcProfiled = True
+            }
+  where
+    addWays :: [Way] -> Ways -> Ways
+    addWays ways =
+      fmap (++ ways)
 
 -- | Disable 'dynamicGhcPrograms'.
 disableDynamicGhcPrograms :: Flavour -> Flavour
