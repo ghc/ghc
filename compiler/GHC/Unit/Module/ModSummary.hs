@@ -18,6 +18,7 @@ module GHC.Unit.Module.ModSummary
    , msDynObjFilePath
    , isBootSummary
    , findTarget
+   , findTarget'
    )
 where
 
@@ -170,18 +171,23 @@ instance Outputable ModSummary where
              char '}'
             ]
 
+-- | Find the first target in the provided list which matches the specified
+-- 'ModSummary'.
 findTarget :: ModSummary -> [Target] -> Maybe Target
-findTarget ms ts =
-  case filter (matches ms) ts of
+findTarget ms = findTarget' (ms_mod_name ms) (ml_hs_file (ms_location ms))
+
+-- | Find the first target in the provided list which matches the specified
+-- module name (for module targets) or file path (for file targets).
+findTarget' :: ModuleName -> Maybe FilePath -> [Target] -> Maybe Target
+findTarget' mod_name loc_hs_file ts =
+  case filter matches ts of
         []    -> Nothing
         (t:_) -> Just t
   where
-    summary `matches` Target (TargetModule m) _ _
-        = ms_mod_name summary == m
-    summary `matches` Target (TargetFile f _) _ _
-        | Just f' <- ml_hs_file (ms_location summary)
+    matches (Target (TargetModule m) _ _)
+        = mod_name == m
+    matches (Target (TargetFile f _) _ _)
+        | Just f' <- loc_hs_file
         = f == f'
-    _ `matches` _
+    matches _
         = False
-
-

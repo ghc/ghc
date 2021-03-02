@@ -2807,7 +2807,14 @@ makeNewModSummary hsc_env MakeNewModSummary{..} = do
 
   hi_timestamp <- maybeGetIfaceDate dflags nms_location
   hie_timestamp <- modificationTimeIfExists (ml_hie_file nms_location)
-  hs_hash <- liftIO $ getFileHash nms_src_fn
+  hs_hash <-
+    -- nms_src_fn does not necessarily exist on the filesystem, so we need to
+    -- check what kind of target we are dealing with
+    case findTarget' (moduleName nms_mod) (ml_hs_file nms_location) (hsc_targets hsc_env) >>= targetContents of
+      Just (buf, _) ->
+        return $ fingerprintStringBuffer buf
+      Nothing ->
+        getFileHash nms_src_fn
 
   extra_sig_imports <- findExtraSigImports hsc_env nms_hsc_src pi_mod_name
   (implicit_sigs, inst_deps) <- implicitRequirementsShallow hsc_env pi_theimps
