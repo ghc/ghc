@@ -1235,7 +1235,7 @@ of ``-W(no-)*``.
     second pattern overlaps it. More often than not, redundant patterns
     is a programmer mistake/error, so this option is enabled by default.
 
-    If the programmer is dead set of keeping a redundant clause,
+    If the programmer is dead set on keeping a redundant clause,
     for example to prevent bitrot, they can make use of a guard
     scrutinising ``GHC.Exts.considerAccessible`` to prevent the
     checker from flagging the parent clause as redundant: ::
