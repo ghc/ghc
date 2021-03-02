@@ -738,7 +738,7 @@ mkUserTypeErrorReporter ctxt
                       ; addDeferredBinding ctxt err ct }
 
 mkUserTypeError :: ReportErrCtxt -> Ct -> TcM (MsgEnvelope DiagnosticMessage)
-mkUserTypeError ctxt ct = mkErrorMsgFromCt ctxt ct
+mkUserTypeError ctxt ct = mkErrorMsgFromCt ErrorWithoutFlag ctxt ct
                         $ important
                         $ pprUserTypeErrorTy
                         $ case getUserTypeErrorMsg ct of
@@ -763,11 +763,10 @@ mkGivenErrorReporter ctxt cts
              report = important inaccessible_msg `mappend`
                       mk_relevant_bindings binds_msg
 
-       ; err <- mkEqErr_help dflags ctxt report ct' ty1 ty2
-       ; let err' = reclassify SevWarning (WarningWithFlag Opt_WarnInaccessibleCode) err
+       ; err <- mkEqErr_help (WarningWithFlag Opt_WarnInaccessibleCode) dflags ctxt report ct' ty1 ty2
 
        ; traceTc "mkGivenErrorReporter" (ppr ct)
-       ; reportDiagnostic err' }
+       ; reportDiagnostic err }
   where
     (ct : _ )  = cts    -- Never empty
     (ty1, ty2) = getEqPredTys (ctPred ct)
@@ -873,9 +872,25 @@ maybeReportError ctxt msg
   = return ()            -- so suppress this error/warning
 
   | Just reason <- cec_defer_type_errors ctxt
-  = reportDiagnostic (reclassify (defaultReasonSeverity reason) reason msg)
+  = reportDiagnostic (reclassify reason msg)
   | otherwise
   = return ()
+  where
+    -- Reclassifies a 'DiagnosticMessage', by explicitly setting its 'Severity' and
+    -- 'DiagnosticReason'. This function has to be considered unsafe and local to this
+    -- module, and it's a temporary stop-gap in the context of #18516. In particular,
+    -- diagnostic messages should have both their 'DiagnosticReason' and 'Severity' computed
+    -- \"at birth\": the former is statically computer, the latter is computed using the
+    -- 'DynFlags' in scope at the time of construction. However, due to the intricacies of
+    -- the current error-deferring logic, we are not always able to enforce this invariant
+    -- and we rather have to change one or the other /a posteriori/.
+    reclassify :: DiagnosticReason
+               -> MsgEnvelope DiagnosticMessage
+               -> MsgEnvelope DiagnosticMessage
+    reclassify rea msg =
+      let set_reason   r m = m { errMsgDiagnostic = (errMsgDiagnostic m) { diagReason = r } }
+          set_severity s m = m { errMsgSeverity = s }
+      in set_severity (defaultReasonSeverity rea) . set_reason rea $ msg
 
 addDeferredBinding :: ReportErrCtxt -> MsgEnvelope DiagnosticMessage -> Ct -> TcM ()
 -- See Note [Deferring coercion errors to runtime]
@@ -975,9 +990,9 @@ pprWithArising (ct:cts)
     ppr_one ct' = hang (parens (pprType (ctPred ct')))
                      2 (pprCtLoc (ctLoc ct'))
 
-mkErrorMsgFromCt :: ReportErrCtxt -> Ct -> Report -> TcM (MsgEnvelope DiagnosticMessage)
-mkErrorMsgFromCt ctxt ct report
-  = mkErrorReport ErrorWithoutFlag ctxt (ctLocEnv (ctLoc ct)) report
+mkErrorMsgFromCt :: DiagnosticReason -> ReportErrCtxt -> Ct -> Report -> TcM (MsgEnvelope DiagnosticMessage)
+mkErrorMsgFromCt rea ctxt ct report
+  = mkErrorReport rea ctxt (ctLocEnv (ctLoc ct)) report
 
 mkErrorReport :: DiagnosticReason
               -> ReportErrCtxt
@@ -1092,7 +1107,7 @@ mkIrredErr ctxt cts
   = do { (ctxt, binds_msg, ct1) <- relevantBindings True ctxt ct1
        ; let orig = ctOrigin ct1
              msg  = couldNotDeduce (getUserGivens ctxt) (map ctPred cts, orig)
-       ; mkErrorMsgFromCt ctxt ct1 $
+       ; mkErrorMsgFromCt ErrorWithoutFlag ctxt ct1 $
          msg `mappend` mk_relevant_bindings binds_msg }
   where
     (ct1:_) = cts
@@ -1338,7 +1353,7 @@ mkIPErr ctxt cts
                  | otherwise
                  = couldNotDeduce givens (preds, orig)
 
-       ; mkErrorMsgFromCt ctxt ct1 $
+       ; mkErrorMsgFromCt ErrorWithoutFlag ctxt ct1 $
          msg `mappend` mk_relevant_bindings binds_msg }
   where
     (ct1:_) = cts
@@ -1419,7 +1434,7 @@ mkEqErr1 ctxt ct   -- Wanted or derived;
        ; traceTc "mkEqErr1" (ppr ct $$ pprCtOrigin (ctOrigin ct))
        ; let report = mconcat [ important coercible_msg
                               , mk_relevant_bindings binds_msg]
-       ; mkEqErr_help dflags ctxt report ct ty1 ty2 }
+       ; mkEqErr_help ErrorWithoutFlag dflags ctxt report ct ty1 ty2 }
   where
     (ty1, ty2) = getEqPredTys (ctPred ct)
 
@@ -1470,22 +1485,22 @@ mkCoercibleExplanation rdr_env fam_envs ty1 ty2
       | otherwise
       = False
 
-mkEqErr_help :: DynFlags -> ReportErrCtxt -> Report
+mkEqErr_help :: DiagnosticReason -> DynFlags -> ReportErrCtxt -> Report
              -> Ct
              -> TcType -> TcType -> TcM (MsgEnvelope DiagnosticMessage)
-mkEqErr_help dflags ctxt report ct ty1 ty2
+mkEqErr_help rea dflags ctxt report ct ty1 ty2
   | Just (tv1, _) <- tcGetCastedTyVar_maybe ty1
   = mkTyVarEqErr dflags ctxt report ct tv1 ty2
   | Just (tv2, _) <- tcGetCastedTyVar_maybe ty2
   = mkTyVarEqErr dflags ctxt report ct tv2 ty1
   | otherwise
-  = reportEqErr ctxt report ct ty1 ty2
+  = reportEqErr rea ctxt report ct ty1 ty2
 
-reportEqErr :: ReportErrCtxt -> Report
+reportEqErr :: DiagnosticReason -> ReportErrCtxt -> Report
             -> Ct
             -> TcType -> TcType -> TcM (MsgEnvelope DiagnosticMessage)
-reportEqErr ctxt report ct ty1 ty2
-  = mkErrorMsgFromCt ctxt ct (mconcat [misMatch, report, eqInfo])
+reportEqErr rea ctxt report ct ty1 ty2
+  = mkErrorMsgFromCt rea ctxt ct (mconcat [misMatch, report, eqInfo])
   where
     misMatch = misMatchOrCND False ctxt ct ty1 ty2
     eqInfo   = mkEqInfoMsg ct ty1 ty2
@@ -1504,7 +1519,7 @@ mkTyVarEqErr' dflags ctxt report ct tv1 ty2
     || isTyVarTyVar tv1 && not (isTyVarTy ty2)
     || ctEqRel ct == ReprEq
      -- The cases below don't really apply to ReprEq (except occurs check)
-  = mkErrorMsgFromCt ctxt ct $ mconcat
+  = mkErrorMsgFromCt ErrorWithoutFlag ctxt ct $ mconcat
         [ headline_msg
         , extraTyVarEqInfo ctxt tv1 ty2
         , suggestAddSig ctxt ty1 ty2
@@ -1529,7 +1544,7 @@ mkTyVarEqErr' dflags ctxt report ct tv1 ty2
                                 interesting_tyvars)
 
              tyvar_binding tv = ppr tv <+> dcolon <+> ppr (tyVarKind tv)
-       ; mkErrorMsgFromCt ctxt ct $
+       ; mkErrorMsgFromCt ErrorWithoutFlag ctxt ct $
          mconcat [headline_msg, extra2, extra3, report] }
 
   | CTE_Bad <- occ_check_expand
@@ -1539,7 +1554,7 @@ mkTyVarEqErr' dflags ctxt report ct tv1 ty2
        -- Unlike the other reports, this discards the old 'report_important'
        -- instead of augmenting it.  This is because the details are not likely
        -- to be helpful since this is just an unimplemented feature.
-       ; mkErrorMsgFromCt ctxt ct $ mconcat [ headline_msg, important msg, report ] }
+       ; mkErrorMsgFromCt ErrorWithoutFlag ctxt ct $ mconcat [ headline_msg, important msg, report ] }
 
   -- If the immediately-enclosing implication has 'tv' a skolem, and
   -- we know by now its an InferSkol kind of skolem, then presumably
@@ -1548,7 +1563,7 @@ mkTyVarEqErr' dflags ctxt report ct tv1 ty2
   | (implic:_) <- cec_encl ctxt
   , Implic { ic_skols = skols } <- implic
   , tv1 `elem` skols
-  = mkErrorMsgFromCt ctxt ct $ mconcat
+  = mkErrorMsgFromCt ErrorWithoutFlag ctxt ct $ mconcat
         [ misMatchMsg ctxt ct ty1 ty2
         , extraTyVarEqInfo ctxt tv1 ty2
         , report
@@ -1576,7 +1591,7 @@ mkTyVarEqErr' dflags ctxt report ct tv1 ty2
                              , nest 2 $ ppr skol_info
                              , nest 2 $ text "at" <+>
                                ppr (tcl_loc (ic_env implic)) ] ]
-       ; mkErrorMsgFromCt ctxt ct (mconcat [msg, tv_extra, report]) }
+       ; mkErrorMsgFromCt ErrorWithoutFlag ctxt ct (mconcat [msg, tv_extra, report]) }
 
   -- Nastiest case: attempt to unify an untouchable variable
   -- So tv is a meta tyvar (or started that way before we
@@ -1597,11 +1612,11 @@ mkTyVarEqErr' dflags ctxt report ct tv1 ty2
                         ppr (tcl_loc (ic_env implic)) ]
              tv_extra = extraTyVarEqInfo ctxt tv1 ty2
              add_sig  = suggestAddSig ctxt ty1 ty2
-       ; mkErrorMsgFromCt ctxt ct $ mconcat
+       ; mkErrorMsgFromCt ErrorWithoutFlag ctxt ct $ mconcat
             [msg, tclvl_extra, tv_extra, add_sig, report] }
 
   | otherwise
-  = reportEqErr ctxt report ct (mkTyVarTy tv1) ty2
+  = reportEqErr ErrorWithoutFlag ctxt report ct (mkTyVarTy tv1) ty2
         -- This *can* happen (#6123, and test T2627b)
         -- Consider an ambiguous top-level constraint (a ~ F a)
         -- Not an occurs check, because F is a type function.
@@ -1693,7 +1708,7 @@ pp_givens givens
 -- this message. But this can still be printed out with -fdefer-type-errors
 -- (sigh), so we must produce a message.
 mkBlockedEqErr :: ReportErrCtxt -> [Ct] -> TcM (MsgEnvelope DiagnosticMessage)
-mkBlockedEqErr ctxt (ct:_) = mkErrorMsgFromCt ctxt ct report
+mkBlockedEqErr ctxt (ct:_) = mkErrorMsgFromCt ErrorWithoutFlag ctxt ct report
   where
     report = important msg
     msg = vcat [ hang (text "Cannot use equality for substitution:")
@@ -2314,7 +2329,7 @@ mkDictErr ctxt cts
        -- have the same source-location origin, to try avoid a cascade
        -- of error from one location
        ; (ctxt, err) <- mk_dict_err ctxt (head (no_inst_cts ++ overlap_cts))
-       ; mkErrorMsgFromCt ctxt ct1 (important err) }
+       ; mkErrorMsgFromCt ErrorWithoutFlag ctxt ct1 (important err) }
   where
     no_givens = null (getUserGivens ctxt)
 
@@ -3059,22 +3074,3 @@ solverDepthErrorTcS loc ty
       , text "(any upper bound you could choose might fail unpredictably with"
       , text " minor updates to GHC, so disabling the check is recommended if"
       , text " you're sure that type checking should terminate)" ]
-
--- | Reclassifies a 'DiagnosticMessage', by explicitly setting its 'Severity' and
--- 'DiagnosticReason'. This function has to be considered unsafe and local to this
--- module, and it's a temporary stop-gap in the context of #18516. In particular,
--- diagnostic messages should have both their 'DiagnosticReason' and 'Severity' computed
--- \"at birth\": the former is statically computer, the latter is computed using the
--- 'DynFlags' in scope at the time of construction. However, due to the intricacies of
--- the current error-deferring logic, we are not always able to enforce this invariant
--- and we rather have to change one or the other /a posteriori/.
-reclassify :: Severity
-           -> DiagnosticReason
-           -> MsgEnvelope DiagnosticMessage
-           -> MsgEnvelope DiagnosticMessage
-reclassify sev rea msg = (set_reason rea msg) { errMsgSeverity  = sev }
-  where
-    set_reason :: DiagnosticReason
-               -> MsgEnvelope DiagnosticMessage
-               -> MsgEnvelope DiagnosticMessage
-    set_reason rea msg = msg { errMsgDiagnostic = (errMsgDiagnostic msg) { diagReason = rea } }
