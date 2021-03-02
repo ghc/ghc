@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-
 -----------------------------------------------------------------------------
 --
@@ -13,6 +14,9 @@ module Elf (
     readElfNoteAsString,
     makeElfNote
   ) where
+
+#include <ghcplatform.h>
+#include "HsVersions.h"
 
 import GhcPrelude
 
@@ -362,14 +366,22 @@ readElfNoteBS dflags bs sectionName noteId = action `catchIO`  \_ -> do
 
     -- read notes recursively until the one with a valid identifier is found
     findNote hdr = do
+#if defined(aarch64_HOST_ARCH)
+      align 8
+#else
       align 4
+#endif
       namesz <- gw32 hdr
       descsz <- gw32 hdr
       _      <- gw32 hdr -- we don't use the note type
       name   <- if namesz == 0
                   then return LBS.empty
                   else getLazyByteStringNul
+#if defined(aarch64_HOST_ARCH)
+      align 8
+#else
       align 4
+#endif
       desc  <- if descsz == 0
                   then return LBS.empty
                   else getLazyByteString (fromIntegral descsz)
