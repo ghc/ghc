@@ -962,14 +962,12 @@ checkStability hpt sccs all_home_mods =
                                     -> isObjectLinkable l && hash == linkableHash l
                                    _other  -> True
 
-        bco_ok (ms, mb_hi_hash)
+        bco_ok (ms, _)
           | gopt Opt_ForceRecomp (ms_hspp_opts ms) = False
           | otherwise = case lookupHpt hpt (ms_mod_name ms) of
-                Just hmi  | Just l <- hm_linkable hmi
-                          , Just hi_hash <- mb_hi_hash ->
+                Just hmi  | Just l <- hm_linkable hmi ->
                               not (isObjectLinkable l) &&
-                              hi_hash == ms_hs_hash ms &&
-                              hi_hash == linkableHash l
+                              linkableHash l == ms_hs_hash ms
                 _other  -> False
 
 {- Parallel Upsweep
