@@ -50,8 +50,10 @@ arFlagsCount = 2
 runAr :: FilePath -> [String] -> Action ()
 runAr arPath argList = withTempFile $ \tmp -> do
     writeFile' tmp $ unwords fileArgs
-    cmd [arPath] flagArgs ('@' : tmp)
+    cmd_ env [arPath] flagArgs ('@' : tmp)
   where
+    -- the following env avoids encoding issue when reading stdout. See #19469
+    env      = Env [("LANG","C.utf8")]
     flagArgs = take arFlagsCount argList
     fileArgs = drop arFlagsCount argList
 
@@ -62,7 +64,9 @@ runAr arPath argList = withTempFile $ \tmp -> do
 runArWithoutTempFile :: FilePath -> [String] -> Action ()
 runArWithoutTempFile arPath argList =
     forM_ (chunksOfSize cmdLineLengthLimit fileArgs) $ \argsChunk ->
-        unit . cmd [arPath] $ flagArgs ++ argsChunk
+        cmd_ env [arPath] flagArgs argsChunk
   where
+    -- the following env avoids encoding issue when reading stdout. See #19469
+    env      = Env [("LANG","C.utf8")]
     flagArgs = take arFlagsCount argList
     fileArgs = drop arFlagsCount argList
