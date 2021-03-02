@@ -1490,9 +1490,9 @@ mkEqErr_help :: DiagnosticReason -> DynFlags -> ReportErrCtxt -> Report
              -> TcType -> TcType -> TcM (MsgEnvelope DiagnosticMessage)
 mkEqErr_help rea dflags ctxt report ct ty1 ty2
   | Just (tv1, _) <- tcGetCastedTyVar_maybe ty1
-  = mkTyVarEqErr dflags ctxt report ct tv1 ty2
+  = mkTyVarEqErr rea dflags ctxt report ct tv1 ty2
   | Just (tv2, _) <- tcGetCastedTyVar_maybe ty2
-  = mkTyVarEqErr dflags ctxt report ct tv2 ty1
+  = mkTyVarEqErr rea dflags ctxt report ct tv2 ty1
   | otherwise
   = reportEqErr rea ctxt report ct ty1 ty2
 
@@ -1506,20 +1506,21 @@ reportEqErr rea ctxt report ct ty1 ty2
     eqInfo   = mkEqInfoMsg ct ty1 ty2
 
 mkTyVarEqErr, mkTyVarEqErr'
-  :: DynFlags -> ReportErrCtxt -> Report -> Ct
-             -> TcTyVar -> TcType -> TcM (MsgEnvelope DiagnosticMessage)
+  :: DiagnosticReason
+  -> DynFlags -> ReportErrCtxt -> Report -> Ct
+  -> TcTyVar -> TcType -> TcM (MsgEnvelope DiagnosticMessage)
 -- tv1 and ty2 are already tidied
-mkTyVarEqErr dflags ctxt report ct tv1 ty2
+mkTyVarEqErr reason dflags ctxt report ct tv1 ty2
   = do { traceTc "mkTyVarEqErr" (ppr ct $$ ppr tv1 $$ ppr ty2)
-       ; mkTyVarEqErr' dflags ctxt report ct tv1 ty2 }
+       ; mkTyVarEqErr' reason dflags ctxt report ct tv1 ty2 }
 
-mkTyVarEqErr' dflags ctxt report ct tv1 ty2
+mkTyVarEqErr' reason dflags ctxt report ct tv1 ty2
   | isSkolemTyVar tv1  -- ty2 won't be a meta-tyvar; we would have
                        -- swapped in Solver.Canonical.canEqTyVarHomo
     || isTyVarTyVar tv1 && not (isTyVarTy ty2)
     || ctEqRel ct == ReprEq
      -- The cases below don't really apply to ReprEq (except occurs check)
-  = mkErrorMsgFromCt ErrorWithoutFlag ctxt ct $ mconcat
+  = mkErrorMsgFromCt reason ctxt ct $ mconcat
         [ headline_msg
         , extraTyVarEqInfo ctxt tv1 ty2
         , suggestAddSig ctxt ty1 ty2
