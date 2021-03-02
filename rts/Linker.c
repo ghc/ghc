@@ -900,6 +900,10 @@ SymbolAddr* lookupDependentSymbol (SymbolName* lbl, ObjectCode *dependent)
 #       error No OBJFORMAT_* macro set
 #       endif
     } else {
+        static void *RTS_NO_FINI = NULL;
+        if (strcmp(lbl, "__fini_array_end") == 0) { return (SymbolAddr *) &RTS_NO_FINI; }
+        if (strcmp(lbl, "__fini_array_start") == 0) { return (SymbolAddr *) &RTS_NO_FINI; }
+
         if (dependent) {
             // Add dependent as symbol's owner's dependency
             ObjectCode *owner = pinfo->owner;
