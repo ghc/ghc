@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-
 -----------------------------------------------------------------------------
 --
@@ -13,6 +14,9 @@ module Elf (
     readElfNoteAsString,
     makeElfNote
   ) where
+
+#include <ghcplatform.h>
+#include "HsVersions.h"
 
 import GhcPrelude
 
