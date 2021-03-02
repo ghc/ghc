@@ -148,11 +148,62 @@ ssaBBlockLiveBB (SSABB _ li) = li
 {- Note [ASM-SSA construction]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+Transform the machine code into (pseudo) Single Static Assignment (SSA) form.
+Each definition introduces a new name and Phi nodes/functions merge multiple
+incoming names for the same "variable" at join points.
+
+While SSA enables many optimizations in an efficient manner,
+the main motivation to implement this was renaming disjoint webs.
+When lowering Cmm, the same virtual register name will be emitted for what
+ends up being disjoint def-use chains. This constrains them to be assigned
+the same CPU register by the graph coloring register allocator, for no reason.
+Constructing and then destructing SSA is one way to identify and rename webs,
+while enabling further optimizations.
+
+*) Pruned-SSA
+   "Pruned" refers to the fact, that we only insert Phi functions for live values.
+   This way we have to handle far fewer Phi functions and pruning them is necessary
+   anyway for a correct out-of-SSA transformation (destruction).
+
+   It is more expensive though, since we need liveness information and checks.
+
 *) Phi-Function representation
+
+   Phi functions are not represented in the instruction stream, but instead as
+   fields of the SSABasicBlock. This avoids having yet another IR or adding
+   pseudo-instructions and the need to scan the block for Phi functions.
+   Semantically, Phi functions are thought to be executed in parallel before
+   entering the block anyway.
 
 *) 2-Address and modifying instructions
 
+   The defining property of SSA is, that each assignment of a value creates a
+   new name and that each definition of a name dominates all its uses.
+   Modifying and 2-Address-Instructions present a problem here. Strictly speaking,
+   we would have to split them up and consider register constraints in destruction.
+
+   For simplicitly, modifications are not considered defintions and won't introduce
+   a new name. This is fine for the time being and the purpose of identifying webs
+   and will lead to correct code on destruction.
+   It will, most likely impede certain optimizations.
+
+   Bc. this uses the CFG, currently only x86_64 is supported. Other architectures
+   may pose further problems, e.g., ARM's conditional instructions.
+
 *) Liveness information
+
+   To avoid having to recompute liveness after SSA transformation, we'll try
+   to keep the liveness inforomation up-to-date.
+
+*) Algorithm
+
+   Currently, the implementation is simple and uses the classic algorithms
+   by Cytron et al. Of course there is lots of room for optimizations.
+
+   Destruction currently uses the most simple scheme, a union-find over
+   Phi nodes. This won't work unless the code is in conventional SSA
+   and a more complicated scheme inserting copies will be needed after
+   applying certain optimizations.
 
 -}
 
@@ -257,7 +308,7 @@ placePhis cfg idomList defsites liveIns sccs
          -- Map of Blocks to Phi-Funcs to insert
          allPhis = foldl' overVar mapEmpty $ nonDetUFMToList
                  -- $ pprTraceIt "globalDefs: "
-                globalDefs
+                   globalDefs
          -- ^ See Note [Unique Determinism and code generation]
 
          -- Top level fun for mkVarPhi
@@ -353,7 +404,7 @@ renameVars platform cfg blkTbl liveIns (T.Node n sub)
         -- Update Live_in part 2: Now that defintion of Phi has been renamed.
         -- With "Phi functions are parallel copies"-semantics, given a_n = Phi(a_0,...),
         -- a_n is in Live_in of Block b_n and for k < n, a_k is in Live_out of Block b_k
-        let mBlk     = lookupUDFM blkTbl bid
+        let mBlk     = lookupUDFM blkTbl2 bid
         let mPhis    = fmap (ssaBBlockPhiFuns . sccBitBlock) mBlk
         let liveIns2 = maybe liveIns
                         (\phis -> mapAdjust (\rs -> foldl' mergeMaybe rs phis) bid liveIns1)
@@ -607,7 +658,7 @@ renamePhiWebs_instr platform dset (LiveInstr instr mLiveness)
         rsUsed     = nubOrd $ filter isVirtualReg (rlRead ++ rlWritten)
         rsRenames  = mapMaybe (\r -> (r,) <$> (lookupUSDFM dset $ getUnique r)) rsUsed
         instr'     = foldl' (uncurry . patchInstr) instr rsRenames
-        mLiveness' = updateLiveness (lookupUFM $ listToUFM rsRenames) <$> mLiveness
+        mLiveness' = updateLiveness (lookupUSDFM dset . getUnique) <$> mLiveness
 
    in   LiveInstr instr' mLiveness'
 

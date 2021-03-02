@@ -537,10 +537,7 @@ cmmNativeGen logger dflags modLoc ncgImpl us fileIds dbgMap cmm count
                                 FormatCMM
                                 (vcat $ map (pprLiveCmmDecl platform) renumberedCode)
 
-                        let relive = initUs usSsa
-                                   $ mapM (regLiveness platform . reverseBlocksInTops) renumberedCode
-
-                        return relive
+                        return (renumberedCode, usSsa)
 
                 _                -> return (withLiveness, usLive)
 
