@@ -1084,12 +1084,14 @@ addFingerprints hsc_env ms iface0
 
    -- The interface hash depends on:
    --   - the ABI hash, plus
+   --   - the source file hash,
    --   - the module level annotations,
    --   - usages
    --   - deps (home and external packages, dependent files)
    --   - hpc
    iface_hash <- computeFingerprint putNameLiterally
                       (mod_hash,
+                       ms_hs_hash ms,
                        ann_fn (mkVarOcc "module"),  -- See mkIfaceAnnCache
                        mi_usages iface0,
                        sorted_deps,
