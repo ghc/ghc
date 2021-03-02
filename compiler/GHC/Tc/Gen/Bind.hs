@@ -210,18 +210,15 @@ tcCompleteSigs sigs =
       doOne :: LSig GhcRn -> TcM (Maybe CompleteMatch)
       doOne (L loc c@(CompleteMatchSig _ext _src_txt (L _ ns) mty))
         = do this_mod <- fmap tcg_mod getGblEnv
-             mt <- forM mty $ \ty -> do
-               (_,_,t) <- tcHsPatSigType CompletePragCtxt HM_FamPat ty OpenKind
-               return t
-
+             mty' <- traverse (tcHsSigType CompletePragCtxt) mty
              fmap Just $ setSrcSpan loc $ addErrCtxt (text "In" <+> ppr c) $ do
                -- Check if this COMPLETE pragma is an orphan.
-               unless (any (nameIsLocalOrFrom this_mod . unLoc) ns || any (nameSetAny (nameIsLocalOrFrom this_mod) . orphNamesOfType) mt) $
+               unless (any (nameIsLocalOrFrom this_mod . unLoc) ns || any (nameSetAny (nameIsLocalOrFrom this_mod) . orphNamesOfType) mty') $
                  -- Why 'any'? See Note [Orphan COMPLETE pragmas]
                  failWithTc orphanError
                -- Look up the ConLikes mentioned
                conlikes <- mkUniqDSet <$> mapM (addLocM tcLookupConLike) ns
-               return (CompleteMatch { cmConLikes = conlikes, cmResultType = mt })
+               return (CompleteMatch { cmConLikes = conlikes, cmResultType = mty' })
       doOne _ = return Nothing
 
   -- For some reason I haven't investigated further, the signatures come in

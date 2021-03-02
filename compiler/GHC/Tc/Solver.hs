@@ -12,6 +12,7 @@ module GHC.Tc.Solver(
        reportUnsolvedEqualities,
        simplifyWantedsTcM,
        tcCheckSatisfiability,
+       tcCheckWanteds,
        tcNormalise,
 
        captureTopConstraints,
@@ -833,6 +834,20 @@ tcCheckSatisfiability inerts given_ids = do
            ; new_given <- makeSuperClasses pending_given
            ; solveSimpleGivens new_given
            ; getInertInsols }
+
+tcCheckWanteds :: CtOrigin -> InertSet -> [PredType] -> TcM (Maybe InertSet)
+-- Return (Just new_inerts) if satisfiable, Nothing if definitely contradictory
+tcCheckWanteds ctorigin inerts wanted_preds = do
+  ctEvidences <- traverse (TcM.newWanted ctorigin Nothing) wanted_preds
+  (sat, new_inerts) <- runTcSInerts inerts $ do
+    traceTcS "tcCheckWanteds {" (ppr inerts <+> ppr wanted_preds)
+    lcl_env <- TcS.getLclEnv
+    solveWanteds (mkSimpleWC ctEvidences)
+    -- See Note [Superclasses and satisfiability]
+    insols <- getInertInsols
+    traceTcS "tcCheckWanteds }" (ppr insols)
+    return (isEmptyBag insols)
+  return $ if sat then Just new_inerts else Nothing
 
 -- | Normalise a type as much as possible using the given constraints.
 -- See @Note [tcNormalise]@.
