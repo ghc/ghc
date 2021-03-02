@@ -1,6 +1,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE TupleSections #-}
 
 --
@@ -91,7 +93,7 @@ type BlockLookupTable instr
 -- CyclicSCCs.
 data SccBits a
         = AcyclicBit a | CyclicBit Int a
-        deriving (Functor)
+        deriving (Functor, Traversable, Foldable)
 
 
 lookupCyclicBitNumber :: SccBits a -> Maybe Int
@@ -145,14 +147,74 @@ ssaBBlockLiveBB :: SSABasicBlock instr -> LiveBasicBlock instr
 ssaBBlockLiveBB (SSABB _ li) = li
 
 
+mapSsaBBlockPhiFunsM
+        :: Monad m
+        => (PhiFun -> m PhiFun)
+        -> SSABasicBlock instr
+        -> m (SSABasicBlock instr)
+mapSsaBBlockPhiFunsM f (SSABB phis ins)
+ = do
+         phis'   <- mapM f phis
+         return  $ SSABB phis' ins
+
+
 {- Note [ASM-SSA construction]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+Transform the machine code into (pseudo) Single Static Assignment (SSA) form.
+Each definition introduces a new name and Phi nodes/functions merge multiple
+incoming names for the same "variable" at join points.
+
+While SSA enables many optimizations in an efficient manner,
+the main motivation to implement this was renaming disjoint webs.
+When lowering Cmm, the same virtual register name will be emitted for what
+ends up being disjoint def-use chains. This constrains them to be assigned
+the same CPU register by the graph coloring register allocator, for no reason.
+Constructing and then destructing SSA is one way to identify and rename webs,
+while enabling further optimizations.
+
+*) Pruned-SSA
+   "Pruned" refers to the fact, that we only insert Phi functions for live values.
+   This way we have to handle far fewer Phi functions and pruning them is necessary
+   anyway for a correct out-of-SSA transformation (destruction).
+
+   It is more expensive though, since we need liveness information and checks.
+
 *) Phi-Function representation
 
-*) 2-Address and modifying instructions
+   Phi functions are not represented in the instruction stream, but instead as
+   fields of the SSABasicBlock. This avoids having yet another IR or adding
+   pseudo-instructions and the need to scan the block for Phi functions.
+   Semantically, Phi functions are thought to be executed in parallel before
+   entering the block anyway.
+
+*) 2-Address, modifying and conditional instructions
+
+   The defining property of SSA is, that each assignment of a value creates a
+   new name and that each definition of a name dominates all its uses.
+   Modifying and 2-Address-Instructions present a problem here. Strictly speaking,
+   we would have to split them up and consider register constraints in destruction.
+
+   For simplicitly, modifications are not considered defintions and won't introduce
+   a new name. This is fine for the time being and the purpose of identifying webs
+   and will lead to correct code on destruction.
+   It will, most likely impede certain optimizations, i.e., for any code motion
+   the relative location of these instructions must be pinned.
 
 *) Liveness information
+
+   To avoid having to recompute liveness after SSA transformation, we'll try
+   to keep the liveness inforomation up-to-date.
+
+*) Algorithm
+
+   Currently, the implementation is simple and uses the classic algorithms
+   by Cytron et al. Of course there is lots of room for optimizations.
+
+   Destruction currently uses the most simple scheme, a union-find over
+   Phi nodes. This won't work unless the code is in conventional SSA
+   and a more complicated scheme inserting copies will be needed after
+   applying certain optimizations.
 
 -}
 
@@ -256,8 +318,8 @@ placePhis cfg idomList defsites liveIns sccs
 
          -- Map of Blocks to Phi-Funcs to insert
          allPhis = foldl' overVar mapEmpty $ nonDetUFMToList
-                 -- $ pprTraceIt "globalDefs: "
-                globalDefs
+                 -- \$ pprTraceIt "globalDefs: "
+                   globalDefs
          -- ^ See Note [Unique Determinism and code generation]
 
          -- Top level fun for mkVarPhi
@@ -337,44 +399,53 @@ renameVars platform cfg blkTbl liveIns (T.Node n sub)
 
         let bid = toBlockId n
 
+        -- First, rename Phi definitions, as they are in Live_in
+        blkTbl1 <- adjustUDFM_M renameVars_phis blkTbl bid
+
         -- Update Live_in set by applying renames
         rd           <- gets stateReachingDef
         let liveIns1 = mapAdjust (
                 mapUniqSet (replaceReg $ (peekDef rd) . getUnique))
                 bid liveIns
 
-        blkTbl1 <- adjustUDFM_M
+        -- Rename instructions
+        blkTbl2 <- adjustUDFM_M
                         (renameVars_block platform)
-                        blkTbl
+                        blkTbl1
                         bid
 
-        blkTbl2 <- addSuccessorPhiArgs cfg blkTbl1 bid
-
-        -- Update Live_in part 2: Now that defintion of Phi has been renamed.
-        -- With "Phi functions are parallel copies"-semantics, given a_n = Phi(a_0,...),
-        -- a_n is in Live_in of Block b_n and for k < n, a_k is in Live_out of Block b_k
-        let mBlk     = lookupUDFM blkTbl bid
-        let mPhis    = fmap (ssaBBlockPhiFuns . sccBitBlock) mBlk
-        let liveIns2 = maybe liveIns
-                        (\phis -> mapAdjust (\rs -> foldl' mergeMaybe rs phis) bid liveIns1)
-                        mPhis
+        -- Fill in Phi arguments in successors
+        blkTbl3 <- addSuccessorPhiArgs cfg blkTbl2 bid
 
         -- Recursing into successors in DomTree, i.e., DFS pre-order iteration
         (blkTbl_updated, liveIns_updated)
                 <- if null sub
-                        then return (blkTbl2, liveIns2)
+                        then return (blkTbl3, liveIns1)
                         else foldM
                                 (\(bs, ls) tr -> renameVars platform cfg bs ls tr)
-                                (blkTbl2, liveIns2)
+                                (blkTbl3, liveIns1)
                                 sub
 
         leaveScope
 
         return (blkTbl_updated, liveIns_updated)
- where
-         mergeMaybe rs phi = fromMaybe rs (mergePhiToLiveSet rs phi)
 
 
+-- | Create new names for Phi definitions.
+renameVars_phis
+        :: Instruction instr
+        => SccBits (SSABasicBlock instr)        -- ^ Block to apply renames to
+        -> RenameM (SccBits (SSABasicBlock instr))
+
+renameVars_phis sccBit
+ = let
+        patchPhi (PhiF old _ args) nu    = PhiF old nu args
+        newPhiDef = \p -> (patchPhi p) <$> (newDef $ phiDef p)
+   in
+        mapM (mapSsaBBlockPhiFunsM newPhiDef) sccBit
+
+
+-- | Rename instructions in block
 renameVars_block
         :: Instruction instr
         => Platform
@@ -383,16 +454,10 @@ renameVars_block
 
 renameVars_block platform sccBit
  | (SSABB phis (BasicBlock bid ins))    <- sccBitBlock sccBit
- = let
-        patchPhi (PhiF old _ args) nu    = PhiF old nu args
-   in  do
-           -- Rename defs of phis and add to reaching definitions
-           phis'        <- mapM (\p -> (patchPhi p) <$> (newDef $ phiDef p)) phis
-
+ = do
            -- Rename instructions
            ins'         <- mapM (renameVars_instr platform) ins
-
-           return $ fmap (const (SSABB phis' (BasicBlock bid ins'))) sccBit
+           return $ fmap (const (SSABB phis (BasicBlock bid ins'))) sccBit
 
 
 -- | Fill in Phi arguments in successors
@@ -409,28 +474,6 @@ addSuccessorPhiArgs cfg blkTbl bid
          return blkTbl'
  where
          mapOverPhis f (SSABB phis blk) = SSABB (map f phis) blk
-
-
--- | Replace old definition with new def of Phi function in Live Set.
-mergePhiToLiveSet :: HasDebugCallStack => RegSet -> PhiFun -> Maybe (RegSet)
-mergePhiToLiveSet rsLive (PhiF old new _)
- = do
-         -- Get old entry
-         oldReg         <- lookupUniqSet_Directly rsLive old
-         let rsl1       = delOneFromUniqSet_Directly rsLive old
-         let newReg     = renameVirtualRegOrPanic oldReg new
-         let rsl2       = addOneToUniqSet rsl1 newReg
-
-         return rsl2
-
-
--- | Helper function to rename reg when we know it has to be a virtual reg.
-renameVirtualRegOrPanic :: HasDebugCallStack => Reg -> RegId -> Reg
-renameVirtualRegOrPanic reg nu = case reg of
-                 RegVirtual vr  -> RegVirtual (renameVirtualReg nu vr)
-                 RegReal{}      -> panic $ "GHC.CmmToAsm.SSA.renameVirtualRegOrPanic: \
-                                        \Expected virtual reg, got "
-                                        ++ show reg ++ ", new unique: "++ show nu
 
 
 -- | Insert argument def_(n-1) into phi function:
@@ -607,7 +650,7 @@ renamePhiWebs_instr platform dset (LiveInstr instr mLiveness)
         rsUsed     = nubOrd $ filter isVirtualReg (rlRead ++ rlWritten)
         rsRenames  = mapMaybe (\r -> (r,) <$> (lookupUSDFM dset $ getUnique r)) rsUsed
         instr'     = foldl' (uncurry . patchInstr) instr rsRenames
-        mLiveness' = updateLiveness (lookupUFM $ listToUFM rsRenames) <$> mLiveness
+        mLiveness' = updateLiveness (lookupUSDFM dset . getUnique) <$> mLiveness
 
    in   LiveInstr instr' mLiveness'
 
