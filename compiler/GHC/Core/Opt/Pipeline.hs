@@ -313,7 +313,7 @@ getCoreToDo logger dflags
            CoreDoFloatOutwards FloatOutSwitches {
                                  floatOutLambdas     = floatLamArgs dflags,
                                  floatOutConstants   = True,
-                                 floatOutOverSatApps = True,
+                                 floatOutOverSatApps = False,
                                  floatToTopLevelOnly = False },
                 -- nofib/spectral/hartel/wang doubles in speed if you
                 -- do full laziness late in the day.  It only happens

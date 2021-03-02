@@ -77,6 +77,8 @@ import GHC.Types.Unique.FM      ( pprUniqFM )
 
 import Data.List (mapAccumL)
 
+import GHC.Driver.Ppr (warnPprTrace)
+
 {-
 ************************************************************************
 *                                                                      *
@@ -704,7 +706,8 @@ refineFromInScope :: InScopeSet -> Var -> Var
 refineFromInScope in_scope v
   | isLocalId v = case lookupInScope in_scope v of
                   Just v' -> v'
-                  Nothing -> pprPanic "refineFromInScope" (ppr in_scope $$ ppr v)
+                  Nothing -> WARN( True, (ppr in_scope $$ ppr v) ) v
+                             -- pprPanic "refineFromInScope" (ppr in_scope $$ ppr v)
                              -- c.f #19074 for a subtle place where this went wrong
   | otherwise = v
 
@@ -788,7 +791,6 @@ simplRecBndrs env@(SimplEnv {}) ids
   = ASSERT(all (not . isJoinId) ids)
     do  { let (env1, ids1) = mapAccumL substIdBndr env ids
         ; seqIds ids1 `seq` return env1 }
-
 
 ---------------
 substIdBndr :: SimplEnv -> InBndr -> (SimplEnv, OutBndr)

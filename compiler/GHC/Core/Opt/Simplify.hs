@@ -315,7 +315,7 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
                 -- See Note [Floating and type abstraction] in GHC.Core.Opt.Simplify.Utils
 
         -- Simplify the RHS
-        ; let rhs_cont = mkRhsStop (substTy body_env (exprType body))
+        ; let rhs_cont = mkRhsStop (substTy body_env (exprType body)) is_rec
         ; (body_floats0, body0) <- {-#SCC "simplExprF" #-} simplExprF body_env body rhs_cont
 
               -- Never float join-floats out of a non-join let-binding (which this is)

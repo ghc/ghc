@@ -1831,8 +1831,8 @@ we can eta-reduce    \x. f x  ===>  f
 This turned up in #7542.
 -}
 
-tryEtaReduce :: [Var] -> VarSet -> CoreExpr -> Maybe CoreExpr
-tryEtaReduce bndrs let_float_bndrs body
+tryEtaReduce :: [Var] -> CoreExpr -> Maybe CoreExpr
+tryEtaReduce bndrs body
   = go (reverse bndrs) body refl_co
   where
     refl_co = mkRepReflCo (exprType body)
@@ -1880,9 +1880,8 @@ tryEtaReduce bndrs let_float_bndrs body
 
     ---------------
     fun_arity fun             -- See Note [Arity care]
-       | isLocalId fun
-       , not (fun `elemVarSet` let_float_bndrs)
-       , isStrongLoopBreaker (idOccInfo fun) = 0
+--       | isLocalId fun
+--       , isStrongLoopBreaker (idOccInfo fun) = 0
        | arity > 0                           = arity
        | isEvaldUnfolding (idUnfolding fun)  = 1
             -- See Note [Eta reduction of an eval'd function]
