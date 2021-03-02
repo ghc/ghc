@@ -361,6 +361,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Logger
+import GHC.Utils.Fingerprint
 
 import GHC.Core.Predicate
 import GHC.Core.Type  hiding( typeKind )
@@ -737,7 +738,7 @@ setProgramDynFlags_ invalidate_needed dflags = do
 -- old log_action.  This is definitely wrong (#7478).
 --
 -- Hence, we invalidate the ModSummary cache after changing the
--- DynFlags.  We do this by tweaking the date on each ModSummary, so
+-- DynFlags.  We do this by tweaking the hash on each ModSummary, so
 -- that the next downsweep will think that all the files have changed
 -- and preprocess them again.  This won't necessarily cause everything
 -- to be recompiled, because by the time we check whether we need to
@@ -748,7 +749,9 @@ invalidateModSummaryCache :: GhcMonad m => m ()
 invalidateModSummaryCache =
   modifySession $ \h -> h { hsc_mod_graph = mapMG inval (hsc_mod_graph h) }
  where
-  inval ms = ms { ms_hs_date = addUTCTime (-1) (ms_hs_date ms) }
+  inval ms = ms { ms_hs_date = addUTCTime (-1) (ms_hs_date ms)
+                , ms_hs_hash = fingerprint0
+                }
 
 -- | Returns the program 'DynFlags'.
 getProgramDynFlags :: GhcMonad m => m DynFlags
