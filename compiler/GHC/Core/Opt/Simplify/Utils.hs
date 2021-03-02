@@ -391,8 +391,8 @@ mkFunRules rs = Just (n_required, rs)
 mkBoringStop :: OutType -> SimplCont
 mkBoringStop ty = Stop ty BoringCtxt
 
-mkRhsStop :: OutType -> SimplCont       -- See Note [RHS of lets] in GHC.Core.Unfold
-mkRhsStop ty = Stop ty RhsCtxt
+mkRhsStop :: OutType -> RecFlag -> SimplCont       -- See Note [RHS of lets] in GHC.Core.Unfold
+mkRhsStop ty is_rec = Stop ty (RhsCtxt is_rec)
 
 mkLazyArgStop :: OutType -> CallCtxt -> SimplCont
 mkLazyArgStop ty cci = Stop ty cci
@@ -404,9 +404,9 @@ contIsRhsOrArg (StrictBind {}) = True
 contIsRhsOrArg (StrictArg {})  = True
 contIsRhsOrArg _               = False
 
-contIsRhs :: SimplCont -> Bool
-contIsRhs (Stop _ RhsCtxt) = True
-contIsRhs _                = False
+contIsRhs :: SimplCont -> Maybe RecFlag
+contIsRhs (Stop _ (RhsCtxt is_rec)) = Just is_rec
+contIsRhs _                         = Nothing
 
 -------------------
 contIsStop :: SimplCont -> Bool
@@ -693,7 +693,7 @@ strictArgContext (ArgInfo { ai_encl = encl_rules, ai_discs = discs })
 -- Use this for strict arguments
   | encl_rules                = RuleArgCtxt
   | disc:_ <- discs, disc > 0 = DiscArgCtxt  -- Be keener here
-  | otherwise                 = RhsCtxt
+  | otherwise                 = RhsCtxt NonRecursive
       -- Why RhsCtxt?  if we see f (g x) (h x), and f is strict, we
       -- want to be a bit more eager to inline g, because it may
       -- expose an eval (on x perhaps) that can be eliminated or
@@ -1562,12 +1562,16 @@ rebuildLam env bndrs floats body cont
   = do { dflags <- getDynFlags
        ; mkLam' dflags bndrs body }
   where
+    bndr_set        = mkVarSet bndrs
     let_floats      = letFloatBinds (sfLetFloats floats)
     let_float_bndrs = mkVarSet (bindersOfBinds let_floats)
     let_float_fvs   = foldr (unionVarSet . bindFreeVars) emptyVarSet let_floats
          -- This formulation may return a set that is slightly too large,
          -- by not deleting variables bound by the let's, but that is rare
          -- and at worst we miss an eta-reduction
+
+    mb_rhs :: Maybe RecFlag   -- Just => continuation is the RHS of a let
+    mb_rhs = contIsRhs cont
 
     mkLam' :: DynFlags -> [OutBndr] -> OutExpr -> SimplM (SimplFloats, OutExpr)
     mkLam' dflags bndrs (Cast body co)
@@ -1594,13 +1598,14 @@ rebuildLam env bndrs floats body cont
     mkLam' dflags bndrs body
       | gopt Opt_DoEtaReduction dflags
       , isEmptyJoinFloats (sfJoinFloats floats)
-      , Just etad_lam <- tryEtaReduce bndrs let_float_bndrs body
-      , not (any (`elemVarSet` let_float_fvs)   bndrs)
-      , not (any (`elemVarSet` let_float_bndrs) bndrs)
+      , bndr_set `disjointVarSet` let_float_fvs
+      , bndr_set `disjointVarSet` let_float_bndrs
+      , case mb_rhs of { Just Recursive -> False; _ -> True }
+      , Just etad_lam <- tryEtaReduce bndrs body
       = do { tick (EtaReduction (head bndrs))
            ; return (floats, etad_lam) }
 
-      | not (contIsRhs cont)   -- See Note [Eta-expanding lambdas]
+      | Nothing <- mb_rhs  -- See Note [Eta-expanding lambdas]
       , sm_eta_expand (getMode env)
       , any isRuntimeVar bndrs  -- Only when there is at least one value lambda already
       , let full_body  = wrapFloats floats body
