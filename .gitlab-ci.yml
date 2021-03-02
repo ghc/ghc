@@ -286,16 +286,42 @@ hadrian-ghc-in-ghci:
   variables:
     TEST_TYPE: test
     MAKE_ARGS: "-Werror"
-  script:
-      # Build hyperlinked sources for documentation when building releases
-    - |
-      if [[ "$RELEASE_JOB" = "yes" ]]; then
-        HADDOCK_HYPERLINKED_SOURCES=1
-      fi
-    - .gitlab/ci.sh setup
-    - .gitlab/ci.sh configure
-    - .gitlab/ci.sh build_make
-    - .gitlab/ci.sh test_make
+  script: |
+    # Build hyperlinked sources for documentation when building releases
+    if [[ "$RELEASE_JOB" = "yes" ]]; then
+      HADDOCK_HYPERLINKED_SOURCES=1
+    fi
+    TIME_START=$(date +%s)
+    time .gitlab/ci.sh setup 2>&1
+    TIME_SETUP=$(date +%s)
+    TIME_SETUP_DELTA=$(expr $TIME_SETUP - $TIME_START)
+    echo "Setup took $TIME_SETUP_DELTA seconds"
+
+    time .gitlab/ci.sh configure 2>&1
+    TIME_CONFIGURE=$(date +%s)
+    TIME_CONFIGURE_DELTA=$(expr $TIME_CONFIGURE - $TIME_SETUP)
+    echo "Configure took $TIME_CONFIGURE_DELTA seconds"
+
+    time .gitlab/ci.sh build_make 2>&1
+    TIME_BUILD=$(date +%s)
+    TIME_BUILD_DELTA=$(expr $TIME_BUILD - $TIME_CONFIGURE)
+    echo "Build took $TIME_BUILD_DELTA seconds"
+
+    set +e
+    time .gitlab/ci.sh test_make 2>&1
+    status=$?
+    set -e
+    TIME_TEST=$(date +%s)
+    TIME_TEST_DELTA=$(expr $TIME_TEST - $TIME_BUILD)
+    echo "Test took $TIME_TEST_DELTA seconds"
+
+    echo "=== TIMINGS ==="
+    echo "Setup      | $TIME_SETUP_DELTA"
+    echo "Configure  | $TIME_CONFIGURE_DELTA"
+    echo "Build      | $TIME_BUILD_DELTA"
+    echo "Test       | $TIME_TEST_DELTA"
+    exit $status
+
   dependencies: []
   artifacts:
     reports:
@@ -451,7 +477,7 @@ validate-x86_64-darwin:
   script: |
     set -Eeuo pipefail
     function runInNixShell() {
-      nix-shell .gitlab/shell.nix \
+      time nix-shell .gitlab/shell.nix \
         -I nixpkgs=https://github.com/angerman/nixpkgs/archive/75f7281738b.tar.gz \
         --argstr system "x86_64-darwin" \
         --pure \
@@ -460,15 +486,43 @@ validate-x86_64-darwin:
         --keep CI_PROJECT_DIR --keep MAKE_ARGS \
         --keep LANG --keep CONFIGURE_ARGS \
         --keep MACOSX_DEPLOYMENT_TARGET --keep ac_cv_func_clock_gettime \
-        --run "$1"
+        --run "$1" 2>&1
     }
     # fix up config.sub in libraries for the time.
     # aarch64-darwin is not supported in older config.sub's
+    TIME_START=$(date +%s)
     find libraries -name config.sub -exec cp config.sub {} \;
-    runInNixShell ".gitlab/ci.sh setup"
-    runInNixShell ".gitlab/ci.sh configure"
-    runInNixShell ".gitlab/ci.sh build_make"
-    runInNixShell ".gitlab/ci.sh test_make"
+
+    runInNixShell ".gitlab/ci.sh setup" 2>&1
+    TIME_SETUP=$(date +%s)
+    TIME_SETUP_DELTA=$(expr $TIME_SETUP - $TIME_START)
+    echo "Setup took $TIME_SETUP_DELTA seconds"
+
+    runInNixShell ".gitlab/ci.sh configure" 2>&1
+    TIME_CONFIGURE=$(date +%s)
+    TIME_CONFIGURE_DELTA=$(expr $TIME_CONFIGURE - $TIME_SETUP)
+    echo "Configure took $TIME_CONFIGURE_DELTA seconds"
+
+    runInNixShell ".gitlab/ci.sh build_make" 2>&1
+    TIME_BUILD=$(date +%s)
+    TIME_BUILD_DELTA=$(expr $TIME_BUILD - $TIME_CONFIGURE)
+    echo "Build took $TIME_BUILD_DELTA seconds"
+
+    set +e
+    runInNixShell ".gitlab/ci.sh test_make" 2>&1
+    status=$?
+    set -e
+
+    TIME_TEST=$(date +%s)
+    TIME_TEST_DELTA=$(expr $TIME_TEST - $TIME_BUILD)
+    echo "Test took $TIME_TEST_DELTA seconds"
+
+    echo "=== TIMINGS ==="
+    echo "Setup      | $TIME_SETUP_DELTA"
+    echo "Configure  | $TIME_CONFIGURE_DELTA"
+    echo "Build      | $TIME_BUILD_DELTA"
+    echo "Test       | $TIME_TEST_DELTA"
+    exit $status
 
   artifacts:
     reports:
@@ -509,7 +563,7 @@ validate-aarch64-darwin:
   script: |
     set -Eeuo pipefail
     function runInNixShell() {
-      nix-shell .gitlab/shell.nix \
+      time nix-shell .gitlab/shell.nix \
         -I nixpkgs=https://github.com/angerman/nixpkgs/archive/75f7281738b.tar.gz \
         --argstr system "aarch64-darwin" \
         --pure \
@@ -517,15 +571,42 @@ validate-aarch64-darwin:
         --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --keep PROJECT_DIR \
         --keep CI_PROJECT_DIR --keep MAKE_ARGS \
         --keep LANG --keep CONFIGURE_ARGS \
-        --run "$1"
+        --run "$1" 2>&1
     }
     # fix up config.sub in libraries for the time.
     # aarch64-darwin is not supported in older config.sub's
+    TIME_START=$(date +%s)
     find libraries -name config.sub -exec cp config.sub {} \;
-    runInNixShell ".gitlab/ci.sh setup"
-    runInNixShell ".gitlab/ci.sh configure"
-    runInNixShell ".gitlab/ci.sh build_make"
-    runInNixShell ".gitlab/ci.sh test_make"
+
+    time runInNixShell ".gitlab/ci.sh setup" 2>&1
+    TIME_SETUP=$(date +%s)
+    TIME_SETUP_DELTA=$(expr $TIME_SETUP - $TIME_START)
+    echo "Setup took $TIME_SETUP_DELTA seconds"
+
+    runInNixShell ".gitlab/ci.sh configure" 2>&1
+    TIME_CONFIGURE=$(date +%s)
+    TIME_CONFIGURE_DELTA=$(expr $TIME_CONFIGURE - $TIME_SETUP)
+    echo "Setup took $TIME_CONFIGURE_DELTA seconds"
+
+    runInNixShell ".gitlab/ci.sh build_make" 2>&1
+    TIME_BUILD=$(date +%s)
+    TIME_BUILD_DELTA=$(expr $TIME_BUILD - $TIME_CONFIGURE)
+    echo "Build took $TIME_BUILD_DELTA seconds"
+
+    set +e
+    runInNixShell ".gitlab/ci.sh test_make" 2>&1
+    status=$?
+    set -e
+    TIME_TEST=$(date +%s)
+    TIME_TEST_DELTA=$(expr $TIME_TEST - $TIME_BUILD)
+    echo "Test took $TIME_TEST_DELTA seconds"
+
+    echo "=== TIMINGS ==="
+    echo "Setup      | $TIME_SETUP_DELTA"
+    echo "Configure  | $TIME_CONFIGURE_DELTA"
+    echo "Build      | $TIME_BUILD_DELTA"
+    echo "Test       | $TIME_TEST_DELTA"
+    exit $status
 
   artifacts:
     reports:
