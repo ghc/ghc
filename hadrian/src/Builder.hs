@@ -406,4 +406,9 @@ applyPatch dir patch = do
 -- | Wrapper for 'cmd' that makes sure we include both stdout and stderr in
 --   Shake's output when any of our builder commands fail.
 cmd' :: (Partial, CmdArguments args) => args :-> Action r
-cmd' = cmd [WithStderr True, WithStdout True]
+cmd' = cmd [ WithStderr True
+           , WithStdout True
+             -- to avoid failing with locale/encoding issues,
+             -- retrieve the output as binary (cf #19469)
+           , BinaryPipes
+           ]

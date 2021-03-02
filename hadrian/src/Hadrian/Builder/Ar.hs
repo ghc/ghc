@@ -50,7 +50,7 @@ arFlagsCount = 2
 runAr :: FilePath -> [String] -> Action ()
 runAr arPath argList = withTempFile $ \tmp -> do
     writeFile' tmp $ unwords fileArgs
-    cmd [arPath] flagArgs ('@' : tmp)
+    unit $ cmd' [arPath] flagArgs ('@' : tmp)
   where
     flagArgs = take arFlagsCount argList
     fileArgs = drop arFlagsCount argList
@@ -62,7 +62,7 @@ runAr arPath argList = withTempFile $ \tmp -> do
 runArWithoutTempFile :: FilePath -> [String] -> Action ()
 runArWithoutTempFile arPath argList =
     forM_ (chunksOfSize cmdLineLengthLimit fileArgs) $ \argsChunk ->
-        unit . cmd [arPath] $ flagArgs ++ argsChunk
+        unit (cmd' env [arPath] flagArgs argsChunk)
   where
     flagArgs = take arFlagsCount argList
     fileArgs = drop arFlagsCount argList
