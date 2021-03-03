@@ -16,7 +16,7 @@ data TestInt8 = T8 Int8#
     deriving (Eq, Ord)
 
 mkT8 :: Int -> TestInt8
-mkT8 (I# a) = T8 (narrowInt8# a)
+mkT8 (I# a) = T8 (intToInt8# a)
 
 main :: IO ()
 main = do

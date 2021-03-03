@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, TypeOperators, TypeFamilies #-}
+{-# LANGUAGE DataKinds, TypeOperators, TypeFamilies, ExplicitForAll #-}
 module TcTypeNatSimple where
 import GHC.TypeLits as L
 import Data.Proxy
@@ -47,11 +47,8 @@ e13 = id
 e14 :: Proxy (2 <=? 1) -> Proxy False
 e14 = id
 
-e15 :: Proxy (x <=? x) -> Proxy True
+e15 :: forall (x :: Nat). Proxy (x <=? x) -> Proxy True
 e15 = id
-
-e16 :: Proxy (0 <=? x) -> Proxy True
-e16 = id
 
 e17 :: Proxy (3 - 2) -> Proxy 1
 e17 = id
