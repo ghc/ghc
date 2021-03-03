@@ -9,13 +9,14 @@
 -- Data types for storing basic Haskell package metadata, such as package name,
 -- version and dependencies, extracted from a Cabal file.
 -----------------------------------------------------------------------------
+
 module Hadrian.Haskell.Cabal.Type where
 
 import Development.Shake.Classes
 import Distribution.PackageDescription
 import GHC.Generics
 
-import Hadrian.Package
+import Hadrian.Package as Hadrian
 
 -- | Haskell package metadata extracted from a Cabal file without performing
 -- the resolution of package configuration flags and associated conditionals,
@@ -25,7 +26,7 @@ import Hadrian.Package
 -- target OS. See 'ContextData' for metadata obtained after resolving package
 -- configuration flags and conditionals according to the current build context.
 data PackageData = PackageData
-    { name                      :: PackageName
+    { name                      :: Hadrian.PackageName
     , version                   :: String
     , synopsis                  :: String
     , description               :: String
@@ -38,7 +39,7 @@ data PackageData = PackageData
 -- See 'PackageData' for metadata that can be obtained without resolving package
 -- configuration flags and conditionals.
 data ContextData = ContextData
-    { dependencies       :: [PackageName]
+    { dependencies       :: [Hadrian.PackageName]
     , componentId        :: String
     , mainIs             :: Maybe (String, FilePath)  -- ("Main", filepath)
     , modules            :: [String]
