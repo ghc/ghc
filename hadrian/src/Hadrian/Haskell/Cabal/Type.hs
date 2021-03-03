@@ -12,7 +12,7 @@
 module Hadrian.Haskell.Cabal.Type where
 
 import Development.Shake.Classes
-import Distribution.PackageDescription
+import Distribution.PackageDescription hiding (PackageName)
 import GHC.Generics
 
 import Hadrian.Package
