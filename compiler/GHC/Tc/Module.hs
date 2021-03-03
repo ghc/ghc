@@ -1817,7 +1817,7 @@ check_main hsc_env tcg_env explicit_mod_hdr export_ies
         ; ioTyCon <- tcLookupTyCon ioTyConName
         ; res_ty <- newFlexiTyVarTy liftedTypeKind
         ; let io_ty = mkTyConApp ioTyCon [res_ty]
-              skol_info = SigSkol (FunSigCtxt main_name False) io_ty []
+              skol_info = SigSkol (FunSigCtxt main_name Nothing) io_ty []
               main_expr_rn = L loc (HsVar noExtField (L loc main_name))
         ; (ev_binds, main_expr)
                <- checkConstraints skol_info [] [] $
