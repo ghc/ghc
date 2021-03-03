@@ -158,8 +158,9 @@ tidyTypes env tys = strictMap (tidyType env) tys
 --
 -- See Note [Strictness in tidyType and friends]
 tidyType :: TidyEnv -> Type -> Type
-tidyType _   (LitTy n)             = LitTy n
+tidyType _   t@(LitTy {})          = t -- Preserve sharing
 tidyType env (TyVarTy tv)          = TyVarTy $! tidyTyCoVarOcc env tv
+tidyType _   t@(TyConApp _ [])     = t -- Preserve sharing if possible
 tidyType env (TyConApp tycon tys)  = TyConApp tycon $! tidyTypes env tys
 tidyType env (AppTy fun arg)       = (AppTy $! (tidyType env fun)) $! (tidyType env arg)
 tidyType env ty@(FunTy _ w arg res)  = let { !w'   = tidyType env w
