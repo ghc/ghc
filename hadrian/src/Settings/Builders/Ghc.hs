@@ -125,6 +125,10 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
                       , isProgram pkg ? arg ("-optl-Wl,-rpath," ++ bindistRpath)
                       -- The darwin linker doesn't support/require the -zorigin option
                       , not osxHost ? arg "-optl-Wl,-zorigin"
+                      -- We set RPATH directly (relative to $ORIGIN). There's
+                      -- no reason for GHC to inject further RPATH entries.
+                      -- See #19485.
+                      , arg "-fno-use-rpaths"
                       ]
                 ]
             , arg "-no-auto-link-packages"
