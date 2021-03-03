@@ -164,6 +164,7 @@ enableTickyGhc =
     ticky = mconcat
       [ arg "-ticky"
       , arg "-ticky-allocd"
+      , arg "-ticky-dyn-thunk"
       -- You generally need STG dumps to interpret ticky profiles
       , arg "-ddump-to-file"
       , arg "-ddump-stg-final"
