@@ -14,9 +14,7 @@ Pragmas all take the form ``{-# word ... #-}`` where ⟨word⟩ indicates
 the type of pragma, and is followed optionally by information specific
 to that type of pragma. Case is ignored in ⟨word⟩. The various values
 for ⟨word⟩ that GHC understands are described in the following sections;
-any pragma encountered with an unrecognised ⟨word⟩ is ignored. The
-layout rule applies in pragmas, so the closing ``#-}`` should start in a
-column to the right of the opening ``{-#``.
+any pragma encountered with an unrecognised ⟨word⟩ is ignored.
 
 Certain pragmas are *file-header pragmas*:
 
