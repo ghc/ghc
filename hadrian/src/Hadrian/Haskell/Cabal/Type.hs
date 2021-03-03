@@ -9,10 +9,17 @@
 -- Data types for storing basic Haskell package metadata, such as package name,
 -- version and dependencies, extracted from a Cabal file.
 -----------------------------------------------------------------------------
+
+{-# LANGUAGE CPP #-}
+
 module Hadrian.Haskell.Cabal.Type where
 
 import Development.Shake.Classes
+#if MIN_VERSION_Cabal(3,4,0)
+import Distribution.PackageDescription hiding (PackageName)
+#else
 import Distribution.PackageDescription
+#endif
 import GHC.Generics
 
 import Hadrian.Package
