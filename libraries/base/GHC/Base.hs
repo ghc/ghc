@@ -1514,6 +1514,7 @@ f $ x =  f x
 -- the function with that value.
 
 ($!) :: forall r a (b :: TYPE r). (a -> b) -> a -> b
+{-# INLINE ($!) #-}
 f $! x = let !vx = x in f vx  -- see #2273
 
 -- | @'until' p f@ yields the result of applying @f@ until @p@ holds.

@@ -319,6 +319,7 @@ basicKnownKeyNames
 
         -- GHC Extensions
         groupWithName,
+        considerAccessibleName,
 
         -- Strings and lists
         unpackCStringName, unpackCStringUtf8Name,
@@ -554,7 +555,8 @@ gHC_PRIM, gHC_PRIM_PANIC, gHC_PRIM_EXCEPTION,
     tYPEABLE, tYPEABLE_INTERNAL, gENERICS,
     rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, mONAD_ZIP, mONAD_FAIL,
     aRROW, cONTROL_APPLICATIVE, gHC_DESUGAR, rANDOM, gHC_EXTS,
-    cONTROL_EXCEPTION_BASE, gHC_TYPELITS, gHC_TYPENATS, dATA_TYPE_EQUALITY,
+    cONTROL_EXCEPTION_BASE, gHC_TYPELITS, gHC_TYPELITS_INTERNAL,
+    gHC_TYPENATS, gHC_TYPENATS_INTERNAL, dATA_TYPE_EQUALITY,
     dATA_COERCE, dEBUG_TRACE, uNSAFE_COERCE :: Module
 
 gHC_PRIM        = mkPrimModule (fsLit "GHC.Prim")   -- Primitive types and values
@@ -617,7 +619,9 @@ gHC_EXTS        = mkBaseModule (fsLit "GHC.Exts")
 cONTROL_EXCEPTION_BASE = mkBaseModule (fsLit "Control.Exception.Base")
 gHC_GENERICS    = mkBaseModule (fsLit "GHC.Generics")
 gHC_TYPELITS    = mkBaseModule (fsLit "GHC.TypeLits")
+gHC_TYPELITS_INTERNAL = mkBaseModule (fsLit "GHC.TypeLits.Internal")
 gHC_TYPENATS    = mkBaseModule (fsLit "GHC.TypeNats")
+gHC_TYPENATS_INTERNAL = mkBaseModule (fsLit "GHC.TypeNats.Internal")
 dATA_TYPE_EQUALITY = mkBaseModule (fsLit "Data.Type.Equality")
 dATA_COERCE     = mkBaseModule (fsLit "Data.Coerce")
 dEBUG_TRACE     = mkBaseModule (fsLit "Debug.Trace")
@@ -1122,8 +1126,9 @@ alternativeClassKey = mkPreludeMiscIdUnique 754
 
 
 -- Functions for GHC extensions
-groupWithName :: Name
-groupWithName = varQual gHC_EXTS (fsLit "groupWith") groupWithIdKey
+groupWithName, considerAccessibleName :: Name
+groupWithName          = varQual gHC_EXTS (fsLit "groupWith")          groupWithIdKey
+considerAccessibleName = varQual gHC_EXTS (fsLit "considerAccessible") considerAccessibleIdKey
 
 -- Random PrelBase functions
 fromStringName, otherwiseIdName, foldrName, buildName, augmentName,
@@ -1989,7 +1994,7 @@ uWordTyConKey   = mkPreludeTyConUnique 163
 -- Type-level naturals
 typeSymbolKindConNameKey, typeCharKindConNameKey,
   typeNatAddTyFamNameKey, typeNatMulTyFamNameKey, typeNatExpTyFamNameKey,
-  typeNatLeqTyFamNameKey, typeNatSubTyFamNameKey
+  typeNatSubTyFamNameKey
   , typeSymbolCmpTyFamNameKey, typeNatCmpTyFamNameKey, typeCharCmpTyFamNameKey
   , typeLeqCharTyFamNameKey
   , typeNatDivTyFamNameKey
@@ -2002,7 +2007,6 @@ typeCharKindConNameKey    = mkPreludeTyConUnique 166
 typeNatAddTyFamNameKey    = mkPreludeTyConUnique 167
 typeNatMulTyFamNameKey    = mkPreludeTyConUnique 168
 typeNatExpTyFamNameKey    = mkPreludeTyConUnique 169
-typeNatLeqTyFamNameKey    = mkPreludeTyConUnique 170
 typeNatSubTyFamNameKey    = mkPreludeTyConUnique 171
 typeSymbolCmpTyFamNameKey = mkPreludeTyConUnique 172
 typeNatCmpTyFamNameKey    = mkPreludeTyConUnique 173
@@ -2362,15 +2366,13 @@ inlineIdKey, noinlineIdKey :: Unique
 inlineIdKey                   = mkPreludeMiscIdUnique 120
 -- see below
 
-mapIdKey, groupWithIdKey, dollarIdKey :: Unique
-mapIdKey              = mkPreludeMiscIdUnique 121
-groupWithIdKey        = mkPreludeMiscIdUnique 122
-dollarIdKey           = mkPreludeMiscIdUnique 123
-
-coercionTokenIdKey :: Unique
-coercionTokenIdKey    = mkPreludeMiscIdUnique 124
-
-noinlineIdKey                 = mkPreludeMiscIdUnique 125
+mapIdKey, groupWithIdKey, dollarIdKey, coercionTokenIdKey, considerAccessibleIdKey :: Unique
+mapIdKey                = mkPreludeMiscIdUnique 121
+groupWithIdKey          = mkPreludeMiscIdUnique 122
+dollarIdKey             = mkPreludeMiscIdUnique 123
+coercionTokenIdKey      = mkPreludeMiscIdUnique 124
+noinlineIdKey           = mkPreludeMiscIdUnique 125
+considerAccessibleIdKey = mkPreludeMiscIdUnique 126
 
 rationalToFloatIdKey, rationalToDoubleIdKey :: Unique
 rationalToFloatIdKey   = mkPreludeMiscIdUnique 130

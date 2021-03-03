@@ -180,7 +180,7 @@ mkClassDecl :: SrcSpan
 
 mkClassDecl loc (L _ (mcxt, tycl_hdr)) fds where_cls layoutInfo
   = do { (binds, sigs, ats, at_defs, _, docs) <- cvBindsAndSigs where_cls
-       ; let cxt = fromMaybe (noLoc []) mcxt
+       ; let cxt = mcxt
        ; (cls, tparams, fixity, ann) <- checkTyClHdr True tycl_hdr
        ; addAnnsAt loc ann -- Add any API Annotations to the top SrcSpan
        ; (tyvars,annst) <- checkTyVars (text "class") whereDots cls tparams
@@ -224,10 +224,9 @@ mkDataDefn :: NewOrData
            -> P (HsDataDefn GhcPs)
 mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
   = do { checkDatatypeContext mcxt
-       ; let cxt = fromMaybe (noLoc []) mcxt
        ; return (HsDataDefn { dd_ext = noExtField
                             , dd_ND = new_or_data, dd_cType = cType
-                            , dd_ctxt = cxt
+                            , dd_ctxt = mcxt
                             , dd_cons = data_cons
                             , dd_kindSig = ksig
                             , dd_derivs = maybe_deriv }) }

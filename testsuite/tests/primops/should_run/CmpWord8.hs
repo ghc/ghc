@@ -16,7 +16,7 @@ data TestWord8 = T8 Word8#
     deriving (Eq, Ord)
 
 mkT8 :: Word -> TestWord8
-mkT8 (W# a) = T8 (narrowWord8# a)
+mkT8 (W# a) = T8 (wordToWord8# a)
 
 main :: IO ()
 main = do
