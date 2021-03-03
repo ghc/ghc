@@ -6,16 +6,12 @@ AC_CONFIG_SRCDIR([include/HsBase.h])
 
 AC_CONFIG_HEADERS([include/HsBaseConfig.h include/EventConfig.h])
 
-AC_CANONICAL_BUILD
-AC_CANONICAL_HOST
-AC_CANONICAL_TARGET
-
 AC_PROG_CC
 dnl make extensions visible to allow feature-tests to detect them lateron
 AC_USE_SYSTEM_EXTENSIONS
 
 AC_MSG_CHECKING(for WINDOWS platform)
-case $host in
+case $host_alias in
     *mingw32*|*mingw64*|*cygwin*|*msys*)
         WINDOWS=YES;;
     *)
@@ -25,9 +21,6 @@ AC_MSG_RESULT($WINDOWS)
 
 # do we have long longs?
 AC_CHECK_TYPES([long long])
-
-dnl ** check for full ANSI header (.h) files
-AC_HEADER_STDC
 
 # check for specific header (.h) files that we are interested in
 AC_CHECK_HEADERS([ctype.h errno.h fcntl.h inttypes.h limits.h signal.h sys/file.h sys/resource.h sys/select.h sys/stat.h sys/syscall.h sys/time.h sys/timeb.h sys/timers.h sys/times.h sys/types.h sys/utsname.h sys/wait.h termios.h time.h unistd.h utime.h windows.h winsock.h langinfo.h poll.h sys/epoll.h sys/event.h sys/eventfd.h sys/socket.h])
@@ -104,13 +97,13 @@ dnl * Deal with arguments telling us iconv is somewhere odd
 dnl--------------------------------------------------------------------
 
 AC_ARG_WITH([iconv-includes],
-  [AC_HELP_STRING([--with-iconv-includes],
+  [AS_HELP_STRING([--with-iconv-includes],
     [directory containing iconv.h])],
     [ICONV_INCLUDE_DIRS=$withval; CPPFLAGS="-I$withval $CPPFLAGS"],
     [ICONV_INCLUDE_DIRS=])
 
 AC_ARG_WITH([iconv-libraries],
-  [AC_HELP_STRING([--with-iconv-libraries],
+  [AS_HELP_STRING([--with-iconv-libraries],
     [directory containing iconv library])],
     [ICONV_LIB_DIRS=$withval; LDFLAGS="-L$withval $LDFLAGS"],
     [ICONV_LIB_DIRS=])
