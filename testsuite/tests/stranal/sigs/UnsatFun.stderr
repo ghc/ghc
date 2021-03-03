@@ -1,13 +1,13 @@
 
 ==================== Strictness signatures ====================
 UnsatFun.$trModule:
-UnsatFun.f: <SP(M)><B>b
-UnsatFun.g: <SP(M)>b
-UnsatFun.g': <1P(U)>
+UnsatFun.f: <1P(S)><B>b
+UnsatFun.g: <1P(S)>b
+UnsatFun.g': <MP(L)>
 UnsatFun.g3: <A>
-UnsatFun.h: <SCS(U)>
-UnsatFun.h2: <SU><1C1(U)>
-UnsatFun.h3: <SCS(A)>
+UnsatFun.h: <1C1(L)>
+UnsatFun.h2: <1L><MCM(L)>
+UnsatFun.h3: <1C1(A)>
 
 
 
@@ -25,12 +25,12 @@ UnsatFun.h3: m1
 
 ==================== Strictness signatures ====================
 UnsatFun.$trModule:
-UnsatFun.f: <SP(M)><B>b
-UnsatFun.g: <SP(M)>b
-UnsatFun.g': <1P(U)>
+UnsatFun.f: <1P(S)><B>b
+UnsatFun.g: <1P(S)>b
+UnsatFun.g': <MP(L)>
 UnsatFun.g3: <A>
-UnsatFun.h: <SCS(U)>
-UnsatFun.h2: <SU><1C1(U)>
-UnsatFun.h3: <SCS(A)>
+UnsatFun.h: <1C1(L)>
+UnsatFun.h2: <1L><MCM(L)>
+UnsatFun.h3: <1C1(A)>
 
 

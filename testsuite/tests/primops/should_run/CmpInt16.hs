@@ -16,7 +16,7 @@ data TestInt16 = T16 Int16#
     deriving (Eq, Ord)
 
 mkT16 :: Int -> TestInt16
-mkT16 (I# a) = T16 (narrowInt16# a)
+mkT16 (I# a) = T16 (intToInt16# a)
 
 main :: IO ()
 main = do

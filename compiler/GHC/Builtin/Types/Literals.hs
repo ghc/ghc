@@ -11,7 +11,6 @@ module GHC.Builtin.Types.Literals
   , typeNatAddTyCon
   , typeNatMulTyCon
   , typeNatExpTyCon
-  , typeNatLeqTyCon
   , typeNatSubTyCon
   , typeNatDivTyCon
   , typeNatModTyCon
@@ -40,11 +39,12 @@ import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim  ( mkTemplateAnonTyConBinders )
 import GHC.Builtin.Names
                   ( gHC_TYPELITS
+                  , gHC_TYPELITS_INTERNAL
                   , gHC_TYPENATS
+                  , gHC_TYPENATS_INTERNAL
                   , typeNatAddTyFamNameKey
                   , typeNatMulTyFamNameKey
                   , typeNatExpTyFamNameKey
-                  , typeNatLeqTyFamNameKey
                   , typeNatSubTyFamNameKey
                   , typeNatDivTyFamNameKey
                   , typeNatModTyFamNameKey
@@ -57,7 +57,6 @@ import GHC.Builtin.Names
                   , typeUnconsSymbolTyFamNameKey
                   )
 import GHC.Data.FastString
-import Data.Maybe ( isJust )
 import Control.Monad ( guard )
 import Data.List  ( isPrefixOf, isSuffixOf )
 
@@ -146,7 +145,6 @@ typeNatTyCons =
   [ typeNatAddTyCon
   , typeNatMulTyCon
   , typeNatExpTyCon
-  , typeNatLeqTyCon
   , typeNatSubTyCon
   , typeNatDivTyCon
   , typeNatModTyCon
@@ -236,24 +234,7 @@ typeNatLogTyCon = mkTypeNatFunTyCon1 name
   name = mkWiredInTyConName UserSyntax gHC_TYPENATS (fsLit "Log2")
             typeNatLogTyFamNameKey typeNatLogTyCon
 
-typeNatLeqTyCon :: TyCon
-typeNatLeqTyCon =
-  mkFamilyTyCon name
-    (mkTemplateAnonTyConBinders [ naturalTy, naturalTy ])
-    boolTy
-    Nothing
-    (BuiltInSynFamTyCon ops)
-    Nothing
-    NotInjective
 
-  where
-  name = mkWiredInTyConName UserSyntax gHC_TYPENATS (fsLit "<=?")
-                typeNatLeqTyFamNameKey typeNatLeqTyCon
-  ops = BuiltInSynFamily
-    { sfMatchFam      = matchFamLeq
-    , sfInteractTop   = interactTopLeq
-    , sfInteractInert = interactInertLeq
-    }
 
 typeNatCmpTyCon :: TyCon
 typeNatCmpTyCon =
@@ -266,7 +247,7 @@ typeNatCmpTyCon =
     NotInjective
 
   where
-  name = mkWiredInTyConName UserSyntax gHC_TYPENATS (fsLit "CmpNat")
+  name = mkWiredInTyConName UserSyntax gHC_TYPENATS_INTERNAL (fsLit "CmpNat")
                 typeNatCmpTyFamNameKey typeNatCmpTyCon
   ops = BuiltInSynFamily
     { sfMatchFam      = matchFamCmpNat
@@ -285,7 +266,7 @@ typeSymbolCmpTyCon =
     NotInjective
 
   where
-  name = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "CmpSymbol")
+  name = mkWiredInTyConName UserSyntax gHC_TYPELITS_INTERNAL (fsLit "CmpSymbol")
                 typeSymbolCmpTyFamNameKey typeSymbolCmpTyCon
   ops = BuiltInSynFamily
     { sfMatchFam      = matchFamCmpSymbol
@@ -383,7 +364,6 @@ Built-in rules axioms
 axAddDef
   , axMulDef
   , axExpDef
-  , axLeqDef
   , axCmpNatDef
   , axCmpSymbolDef
   , axAppendSymbolDef
@@ -398,10 +378,8 @@ axAddDef
   , axExp1L
   , axExp0R
   , axExp1R
-  , axLeqRefl
   , axCmpNatRefl
   , axCmpSymbolRefl
-  , axLeq0L
   , axSubDef
   , axSub0R
   , axAppendSymbol0R
@@ -421,9 +399,6 @@ axMulDef = mkBinAxiom "MulDef" typeNatMulTyCon isNumLitTy isNumLitTy $
 
 axExpDef = mkBinAxiom "ExpDef" typeNatExpTyCon isNumLitTy isNumLitTy $
               \x y -> Just $ num (x ^ y)
-
-axLeqDef = mkBinAxiom "LeqDef" typeNatLeqTyCon isNumLitTy isNumLitTy $
-              \x y -> Just $ bool (x <= y)
 
 axCmpNatDef   = mkBinAxiom "CmpNatDef" typeNatCmpTyCon isNumLitTy isNumLitTy
               $ \x y -> Just $ ordering (compare x y)
@@ -489,12 +464,10 @@ axMod1      = mkAxiom1 "Mod1"     $ \(Pair s _) -> (tMod s (num 1) === num 0)
 axExp1L     = mkAxiom1 "Exp1L"    $ \(Pair s _) -> (num 1 .^. s) === num 1
 axExp0R     = mkAxiom1 "Exp0R"    $ \(Pair s _) -> (s .^. num 0) === num 1
 axExp1R     = mkAxiom1 "Exp1R"    $ \(Pair s t) -> (s .^. num 1) === t
-axLeqRefl   = mkAxiom1 "LeqRefl"  $ \(Pair s _) -> (s <== s) === bool True
 axCmpNatRefl    = mkAxiom1 "CmpNatRefl"
                 $ \(Pair s _) -> (cmpNat s s) === ordering EQ
 axCmpSymbolRefl = mkAxiom1 "CmpSymbolRefl"
                 $ \(Pair s _) -> (cmpSymbol s s) === ordering EQ
-axLeq0L     = mkAxiom1 "Leq0L"    $ \(Pair s _) -> (num 0 <== s) === bool True
 axAppendSymbol0R  = mkAxiom1 "Concat0R"
             $ \(Pair s t) -> (mkStrLitTy nilFS `appendSymbol` s) === t
 axAppendSymbol0L  = mkAxiom1 "Concat0L"
@@ -508,7 +481,6 @@ typeNatCoAxiomRules = listToUFM $ map (\x -> (coaxrName x, x))
   [ axAddDef
   , axMulDef
   , axExpDef
-  , axLeqDef
   , axCmpNatDef
   , axCmpSymbolDef
   , axCmpCharDef
@@ -524,11 +496,9 @@ typeNatCoAxiomRules = listToUFM $ map (\x -> (coaxrName x, x))
   , axExp1L
   , axExp0R
   , axExp1R
-  , axLeqRefl
   , axCmpNatRefl
   , axCmpSymbolRefl
   , axCmpCharRefl
-  , axLeq0L
   , axSubDef
   , axSub0R
   , axAppendSymbol0R
@@ -564,9 +534,6 @@ tMod s t = mkTyConApp typeNatModTyCon [s,t]
 (.^.) :: Type -> Type -> Type
 s .^. t = mkTyConApp typeNatExpTyCon [s,t]
 
-(<==) :: Type -> Type -> Type
-s <== t = mkTyConApp typeNatLeqTyCon [s,t]
-
 cmpNat :: Type -> Type -> Type
 cmpNat s t = mkTyConApp typeNatCmpTyCon [s,t]
 
@@ -582,23 +549,11 @@ x === y = Pair x y
 num :: Integer -> Type
 num = mkNumLitTy
 
-bool :: Bool -> Type
-bool b = if b then mkTyConApp promotedTrueDataCon []
-              else mkTyConApp promotedFalseDataCon []
-
 charSymbolPair :: Type -> Type -> Type
 charSymbolPair = mkPromotedPairTy charTy typeSymbolKind
 
 charSymbolPairKind :: Kind
 charSymbolPairKind = mkTyConApp pairTyCon [charTy, typeSymbolKind]
-
-isBoolLitTy :: Type -> Maybe Bool
-isBoolLitTy tc =
-  do (tc,[]) <- splitTyConApp_maybe tc
-     case () of
-       _ | tc == promotedFalseDataCon -> return False
-         | tc == promotedTrueDataCon  -> return True
-         | otherwise                   -> Nothing
 
 orderingKind :: Kind
 orderingKind = mkTyConApp orderingTyCon []
@@ -734,15 +689,6 @@ matchFamLog [s]
   where mbX = isNumLitTy s
 matchFamLog _ = Nothing
 
-matchFamLeq :: [Type] -> Maybe (CoAxiomRule, [Type], Type)
-matchFamLeq [s,t]
-  | Just 0 <- mbX = Just (axLeq0L, [t], bool True)
-  | Just x <- mbX, Just y <- mbY =
-    Just (axLeqDef, [s,t], bool (x <= y))
-  | tcEqType s t  = Just (axLeqRefl, [s], bool True)
-  where mbX = isNumLitTy s
-        mbY = isNumLitTy t
-matchFamLeq _ = Nothing
 
 matchFamCmpNat :: [Type] -> Maybe (CoAxiomRule, [Type], Type)
 matchFamCmpNat [s,t]
@@ -883,13 +829,6 @@ interactTopLog :: [Xi] -> Xi -> [Pair Type]
 interactTopLog _ _ = []   -- I can't think of anything...
 
 
-interactTopLeq :: [Xi] -> Xi -> [Pair Type]
-interactTopLeq [s,t] r
-  | Just 0 <- mbY, Just True <- mbZ = [ s === num 0 ]                     -- (s <= 0) => (s ~ 0)
-  where
-  mbY = isNumLitTy t
-  mbZ = isBoolLitTy r
-interactTopLeq _ _ = []
 
 interactTopCmpNat :: [Xi] -> Xi -> [Pair Type]
 interactTopCmpNat [s,t] r
@@ -991,18 +930,6 @@ interactInertExp _ _ _ _ = []
 
 interactInertLog :: [Xi] -> Xi -> [Xi] -> Xi -> [Pair Type]
 interactInertLog _ _ _ _ = []
-
-
-interactInertLeq :: [Xi] -> Xi -> [Xi] -> Xi -> [Pair Type]
-interactInertLeq [x1,y1] z1 [x2,y2] z2
-  | bothTrue && tcEqType x1 y2 && tcEqType y1 x2 = [ x1 === y1 ]
-  | bothTrue && tcEqType y1 x2                 = [ (x1 <== y2) === bool True ]
-  | bothTrue && tcEqType y2 x1                 = [ (x2 <== y1) === bool True ]
-  where bothTrue = isJust $ do True <- isBoolLitTy z1
-                               True <- isBoolLitTy z2
-                               return ()
-
-interactInertLeq _ _ _ _ = []
 
 
 interactInertAppendSymbol :: [Xi] -> Xi -> [Xi] -> Xi -> [Pair Type]
@@ -1110,7 +1037,7 @@ typeCharCmpTyCon =
     Nothing
     NotInjective
   where
-  name = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "CmpChar")
+  name = mkWiredInTyConName UserSyntax gHC_TYPELITS_INTERNAL (fsLit "CmpChar")
                   typeCharCmpTyFamNameKey typeCharCmpTyCon
   ops = BuiltInSynFamily
       { sfMatchFam      = matchFamCmpChar

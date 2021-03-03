@@ -1,8 +1,8 @@
 
 ==================== Strictness signatures ====================
 Foo.$trModule:
-Foo.f: <SP(SU)><SP(U)><SP(U)>
-Foo.g: <SP(SP(U),SP(U))>
+Foo.f: <1P(1L)><1P(L)><1P(L)>
+Foo.g: <1P(1P(L),1P(L))>
 
 
 
@@ -15,7 +15,7 @@ Foo.g: m1
 
 ==================== Strictness signatures ====================
 Foo.$trModule:
-Foo.f: <SP(SU)><SP(U)><SP(U)>
-Foo.g: <SP(SP(U),SP(U))>
+Foo.f: <1P(1L)><1P(L)><1P(L)>
+Foo.g: <1P(1P(L),1P(L))>
 
 

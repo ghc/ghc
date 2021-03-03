@@ -141,34 +141,34 @@ addMany (W# a) (W# b) (W# c) (W# d)
         (W# e) (W# f) (W# g) (W# h)
         (W# i) (W# j) (W# k) (W# l)
         (W# m) (W# n) (W# o) (W# p)
-            = W# (extendWord16# word16)
+            = W# (word16ToWord# word16)
   where
     !word16 =
         addMany#
-            (narrowWord16# a) (narrowWord16# b) (narrowWord16# c) (narrowWord16# d)
-            (narrowWord16# e) (narrowWord16# f) (narrowWord16# g) (narrowWord16# h)
-            (narrowWord16# i) (narrowWord16# j) (narrowWord16# k) (narrowWord16# l)
-            (narrowWord16# m) (narrowWord16# n) (narrowWord16# o) (narrowWord16# p)
+            (wordToWord16# a) (wordToWord16# b) (wordToWord16# c) (wordToWord16# d)
+            (wordToWord16# e) (wordToWord16# f) (wordToWord16# g) (wordToWord16# h)
+            (wordToWord16# i) (wordToWord16# j) (wordToWord16# k) (wordToWord16# l)
+            (wordToWord16# m) (wordToWord16# n) (wordToWord16# o) (wordToWord16# p)
 {-# NOINLINE addMany #-}
 
 -- Convenient and also tests higher order functions on Word16#
 apply1 :: (Word16# -> Word16#) -> Word -> Word
-apply1 opToTest (W# a) = W# (extendWord16# (opToTest (narrowWord16# a)))
+apply1 opToTest (W# a) = W# (word16ToWord# (opToTest (wordToWord16# a)))
 {-# NOINLINE apply1 #-}
 
 apply2 :: (Word16# -> Word16# -> Word16#) -> Word -> Word -> Word
 apply2 opToTest (W# a) (W# b) =
-    let (# sa, sb #) = (# narrowWord16# a, narrowWord16# b #)
+    let (# sa, sb #) = (# wordToWord16# a, wordToWord16# b #)
         r = opToTest sa sb
-    in W# (extendWord16# r)
+    in W# (word16ToWord# r)
 {-# NOINLINE apply2 #-}
 
 apply3
   :: (Word16# -> Word16# -> (# Word16#, Word16# #)) -> Word -> Word -> (Word, Word)
 apply3 opToTest (W# a) (W# b) =
-    let (# sa, sb #) = (# narrowWord16# a, narrowWord16# b #)
+    let (# sa, sb #) = (# wordToWord16# a, wordToWord16# b #)
         (# ra, rb #) = opToTest sa sb
-    in (W# (extendWord16# ra), W# (extendWord16# rb))
+    in (W# (word16ToWord# ra), W# (word16ToWord# rb))
 {-# NOINLINE apply3 #-}
 
 instance

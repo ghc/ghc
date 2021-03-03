@@ -757,8 +757,15 @@ showUsage ghci dflags = do
      dump (c:s)       = putChar c >> dump s
 
 dumpFinalStats :: Logger -> DynFlags -> IO ()
-dumpFinalStats logger dflags =
+dumpFinalStats logger dflags = do
   when (gopt Opt_D_faststring_stats dflags) $ dumpFastStringStats logger dflags
+
+  when (dopt Opt_D_dump_faststrings dflags) $ do
+    fss <- getFastStringTable
+    let ppr_table         = fmap ppr_segment (fss `zip` [0..])
+        ppr_segment (s,n) = hang (text "Segment" <+> int n) 2 (vcat (fmap ppr_bucket (s `zip` [0..])))
+        ppr_bucket  (b,n) = hang (text "Bucket" <+> int n) 2 (vcat (fmap ftext b))
+    dumpIfSet_dyn logger dflags Opt_D_dump_faststrings "FastStrings" FormatText (vcat ppr_table)
 
 dumpFastStringStats :: Logger -> DynFlags -> IO ()
 dumpFastStringStats logger dflags = do
