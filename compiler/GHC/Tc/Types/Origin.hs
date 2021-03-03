@@ -61,7 +61,7 @@ data UserTypeCtxt
   = FunSigCtxt      -- Function type signature, when checking the type
                     -- Also used for types in SPECIALISE pragmas
        Name              -- Name of the function
-       Bool              -- True <=> report redundant constraints
+       (Maybe SrcSpan)   -- True <=> report redundant constraints
                             -- This is usually True, but False for
                             --   * Record selectors (not important here)
                             --   * Class and instance methods.  Here

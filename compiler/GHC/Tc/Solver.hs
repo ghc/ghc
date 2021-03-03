@@ -2029,7 +2029,7 @@ checkBadTelescope (Implic { ic_info  = info
 warnRedundantGivens :: SkolemInfo -> Bool
 warnRedundantGivens (SigSkol ctxt _ _)
   = case ctxt of
-       FunSigCtxt _ warn_redundant -> warn_redundant
+       FunSigCtxt _ warn_redundant -> warn_redundant /= Nothing
        ExprSigCtxt                 -> True
        _                           -> False
 
