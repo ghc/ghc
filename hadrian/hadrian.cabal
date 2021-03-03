@@ -134,8 +134,8 @@ executable hadrian
                        , BangPatterns
     other-extensions:    MultiParamTypeClasses
                        , TypeFamilies
-    build-depends:       Cabal                >= 3.0     && < 3.3
-                       , QuickCheck           >= 2.6     && < 2.14
+    build-depends:       Cabal                >= 3.0     && < 3.5
+                       , QuickCheck           >= 2.6     && < 2.15
                        , base                 >= 4.8     && < 5
                        , bytestring           >= 0.10    && < 0.12
                        , containers           >= 0.5     && < 0.7
@@ -147,7 +147,7 @@ executable hadrian
                        , shake                >= 0.18.3  && < 0.20
                        , transformers         >= 0.4     && < 0.6
                        , unordered-containers >= 0.2.1   && < 0.3
-    build-tools:         alex  >= 3.2.6  && < 4
+    build-tools:         alex  >= 3.2.6  && < 3.3
                        , happy >= 1.20.0 && < 1.21
     ghc-options:       -Wall
                        -Wincomplete-record-updates
