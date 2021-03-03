@@ -147,6 +147,13 @@ Runtime system
 - ``Void#`` is now a type synonym for the unboxed tuple ``(# #)``.
   Code using ``Void#`` now has to enable :extension:`UnboxedTuples`.
 
+Eventlog
+~~~~~~~~
+
+- Two new events,  :event-type:`BLOCKS_SIZE` tells you about the total size of
+  all allocated blocks and :event-type:`MEM_RETURN` gives statistics about why
+  the OS is returning and retaining megablocks.
+
 ``ghc`` library
 ~~~~~~~~~~~~~~~
 
