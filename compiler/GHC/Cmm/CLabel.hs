@@ -18,6 +18,8 @@ module GHC.Cmm.CLabel (
         NeedExternDecl (..),
         ForeignLabelSource(..),
         DynamicLinkerLabelInfo(..),
+        ConInfoTableLocation(..),
+        getConInfoTableLocation,
 
         -- * Constructors
         mkClosureLabel,
@@ -83,6 +85,9 @@ module GHC.Cmm.CLabel (
         mkForeignLabel,
         mkCCLabel,
         mkCCSLabel,
+        mkIPELabel,
+        InfoProvEnt(..),
+
         mkDynamicLinkerLabel,
         mkPicBaseLabel,
         mkDeadStripPreventer,
@@ -104,6 +109,7 @@ module GHC.Cmm.CLabel (
         isIdLabel,
         isTickyLabel,
         hasHaskellName,
+        hasIdLabelInfo,
         isBytesLabel,
         isForeignLabel,
         isSomeRODataLabel,
@@ -148,6 +154,7 @@ import GHC.Types.Unique.Set
 import GHC.Utils.Misc
 import GHC.Core.Ppr ( {- instances -} )
 import GHC.CmmToAsm.Config
+import GHC.Types.SrcLoc
 
 -- -----------------------------------------------------------------------------
 -- The CLabel type
@@ -251,6 +258,7 @@ data CLabel
 
   | CC_Label  CostCentre
   | CCS_Label CostCentreStack
+  | IPE_Label InfoProvEnt
 
 
   -- | These labels are generated and used inside the NCG only.
@@ -342,6 +350,8 @@ instance Ord CLabel where
     compare a1 a2
   compare (CCS_Label a1) (CCS_Label a2) =
     compare a1 a2
+  compare (IPE_Label a1) (IPE_Label a2) =
+    compare a1 a2
   compare (DynamicLinkerLabel a1 b1) (DynamicLinkerLabel a2 b2) =
     compare a1 a2 `thenCmp`
     compare b1 b2
@@ -384,6 +394,8 @@ instance Ord CLabel where
   compare _ HpcTicksLabel{} = GT
   compare SRTLabel{} _ = LT
   compare _ SRTLabel{} = GT
+  compare (IPE_Label {}) _ = LT
+  compare  _ (IPE_Label{}) = GT
 
 -- | Record where a foreign label is stored.
 data ForeignLabelSource
@@ -416,7 +428,7 @@ pprDebugCLabel platform lbl = pprCLabel platform AsmStyle lbl <> parens extra
    where
       extra = case lbl of
          IdLabel _ _ info
-            -> text "IdLabel" <> whenPprDebug (text ":" <> text (show info))
+            -> text "IdLabel" <> whenPprDebug (text ":" <> ppr info)
 
          CmmLabel pkg _ext _name _info
             -> text "CmmLabel" <+> ppr pkg
@@ -441,8 +453,18 @@ data IdLabelInfo
 
   | RednCounts          -- ^ Label of place to keep Ticky-ticky  info for this Id
 
-  | ConEntry            -- ^ Constructor entry point
-  | ConInfoTable        -- ^ Corresponding info table
+  | ConEntry ConInfoTableLocation
+  -- ^ Constructor entry point, when `-fdistinct-info-tables` is enabled then
+  -- each usage of a constructor will be given a unique number and a fresh info
+  -- table will be created in the module where the constructor is used. The
+  -- argument is used to keep track of which info table a usage of a constructor
+  -- should use. When the argument is 'Nothing' then it uses the info table which
+  -- is defined in the module where the datatype is declared, this is the usual case.
+  -- When it is (Just (m, k)) it will use the kth info table defined in module m. The
+  -- point of this inefficiency is so that you can work out where allocations of data
+  -- constructors are coming from when you are debugging.
+
+  | ConInfoTable ConInfoTableLocation        -- ^ Corresponding info table
 
   | ClosureTable        -- ^ Table of closures for Enum tycons
 
@@ -452,7 +474,36 @@ data IdLabelInfo
                         -- instead of a closure entry-point.
                         -- See Note [Proc-point local block entry-point].
 
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord)
+
+-- | Which module is the info table from, and which number was it.
+data ConInfoTableLocation = UsageSite Module Int
+                          | DefinitionSite
+                              deriving (Eq, Ord)
+
+instance Outputable ConInfoTableLocation where
+  ppr (UsageSite m n) = text "Loc(" <> ppr n <> text "):" <+> ppr m
+  ppr DefinitionSite = empty
+
+getConInfoTableLocation :: IdLabelInfo -> Maybe ConInfoTableLocation
+getConInfoTableLocation (ConInfoTable ci) = Just ci
+getConInfoTableLocation _ = Nothing
+
+instance Outputable IdLabelInfo where
+  ppr Closure    = text "Closure"
+  ppr InfoTable  = text "InfoTable"
+  ppr Entry      = text "Entry"
+  ppr Slow       = text "Slow"
+
+  ppr LocalInfoTable  = text "LocalInfoTable"
+  ppr LocalEntry      = text "LocalEntry"
+
+  ppr RednCounts      = text "RednCounts"
+  ppr (ConEntry mn) = text "ConEntry" <+> ppr mn
+  ppr (ConInfoTable mn) = text "ConInfoTable" <+> ppr mn
+  ppr ClosureTable = text "ClosureTable"
+  ppr Bytes        = text "Bytes"
+  ppr BlockInfoTable  = text "BlockInfoTable"
 
 
 data RtsLabelInfo
@@ -517,13 +568,15 @@ mkClosureLabel              :: Name -> CafInfo -> CLabel
 mkInfoTableLabel            :: Name -> CafInfo -> CLabel
 mkEntryLabel                :: Name -> CafInfo -> CLabel
 mkClosureTableLabel         :: Name -> CafInfo -> CLabel
-mkConInfoTableLabel         :: Name -> CafInfo -> CLabel
+mkConInfoTableLabel         :: Name -> ConInfoTableLocation -> CLabel
 mkBytesLabel                :: Name -> CLabel
 mkClosureLabel name         c     = IdLabel name c Closure
 mkInfoTableLabel name       c     = IdLabel name c InfoTable
 mkEntryLabel name           c     = IdLabel name c Entry
 mkClosureTableLabel name    c     = IdLabel name c ClosureTable
-mkConInfoTableLabel name    c     = IdLabel name c ConInfoTable
+-- Special case for the normal 'DefinitionSite' case so that the 'ConInfoTable' application can be floated to a CAF.
+mkConInfoTableLabel name DefinitionSite = IdLabel name NoCafRefs (ConInfoTable DefinitionSite)
+mkConInfoTableLabel name k = IdLabel name NoCafRefs (ConInfoTable k)
 mkBytesLabel name                 = IdLabel name NoCafRefs Bytes
 
 mkBlockInfoTableLabel :: Name -> CafInfo -> CLabel
@@ -679,7 +732,7 @@ isStaticClosureLabel _lbl = False
 isSomeRODataLabel :: CLabel -> Bool
 -- info table defined in haskell (.hs)
 isSomeRODataLabel (IdLabel _ _ ClosureTable) = True
-isSomeRODataLabel (IdLabel _ _ ConInfoTable) = True
+isSomeRODataLabel (IdLabel _ _ ConInfoTable {}) = True
 isSomeRODataLabel (IdLabel _ _ InfoTable) = True
 isSomeRODataLabel (IdLabel _ _ LocalInfoTable) = True
 isSomeRODataLabel (IdLabel _ _ BlockInfoTable) = True
@@ -691,13 +744,13 @@ isSomeRODataLabel _lbl = False
 isInfoTableLabel :: CLabel -> Bool
 isInfoTableLabel (IdLabel _ _ InfoTable)      = True
 isInfoTableLabel (IdLabel _ _ LocalInfoTable) = True
-isInfoTableLabel (IdLabel _ _ ConInfoTable)   = True
+isInfoTableLabel (IdLabel _ _ ConInfoTable {})   = True
 isInfoTableLabel (IdLabel _ _ BlockInfoTable) = True
 isInfoTableLabel _                            = False
 
 -- | Whether label is points to constructor info table
 isConInfoTableLabel :: CLabel -> Bool
-isConInfoTableLabel (IdLabel _ _ ConInfoTable)   = True
+isConInfoTableLabel (IdLabel _ _ ConInfoTable {})   = True
 isConInfoTableLabel _                            = False
 
 -- | Get the label size field from a ForeignLabel
@@ -710,11 +763,28 @@ foreignLabelStdcallInfo _lbl = Nothing
 mkBitmapLabel   :: Unique -> CLabel
 mkBitmapLabel   uniq            = LargeBitmapLabel uniq
 
+-- | Info Table Provenance Entry
+-- See Note [Mapping Info Tables to Source Positions]
+data InfoProvEnt = InfoProvEnt
+                               { infoTablePtr :: !CLabel
+                               -- Address of the info table
+                               , infoProvEntClosureType :: !Int
+                               -- The closure type of the info table (from ClosureMacros.h)
+                               , infoTableType :: !String
+                               -- The rendered Haskell type of the closure the table represents
+                               , infoProvModule :: !Module
+                               -- Origin module
+                               , infoTableProv :: !(Maybe (RealSrcSpan, String)) }
+                               -- Position and information about the info table
+                               deriving (Eq, Ord)
+
 -- Constructing Cost Center Labels
 mkCCLabel  :: CostCentre      -> CLabel
 mkCCSLabel :: CostCentreStack -> CLabel
+mkIPELabel :: InfoProvEnt -> CLabel
 mkCCLabel           cc          = CC_Label cc
 mkCCSLabel          ccs         = CCS_Label ccs
+mkIPELabel          ipe         = IPE_Label ipe
 
 mkRtsApFastLabel :: FastString -> CLabel
 mkRtsApFastLabel str = RtsLabel (RtsApFast (NonDetFastString str))
@@ -783,7 +853,8 @@ toSlowEntryLbl platform lbl = case lbl of
 toEntryLbl :: Platform -> CLabel -> CLabel
 toEntryLbl platform lbl = case lbl of
    IdLabel n c LocalInfoTable    -> IdLabel n c LocalEntry
-   IdLabel n c ConInfoTable      -> IdLabel n c ConEntry
+   IdLabel n c (ConInfoTable k)  -> IdLabel n c (ConEntry k)
+
    IdLabel n _ BlockInfoTable    -> mkLocalBlockLabel (nameUnique n)
                    -- See Note [Proc-point local block entry-point].
    IdLabel n c _                 -> IdLabel n c Entry
@@ -794,7 +865,8 @@ toEntryLbl platform lbl = case lbl of
 toInfoLbl :: Platform -> CLabel -> CLabel
 toInfoLbl platform lbl = case lbl of
    IdLabel n c LocalEntry      -> IdLabel n c LocalInfoTable
-   IdLabel n c ConEntry        -> IdLabel n c ConInfoTable
+   IdLabel n c (ConEntry k)    -> IdLabel n c (ConInfoTable k)
+
    IdLabel n c _               -> IdLabel n c InfoTable
    CmmLabel m ext str CmmEntry -> CmmLabel m ext str CmmInfo
    CmmLabel m ext str CmmRet   -> CmmLabel m ext str CmmRetInfo
@@ -803,6 +875,10 @@ toInfoLbl platform lbl = case lbl of
 hasHaskellName :: CLabel -> Maybe Name
 hasHaskellName (IdLabel n _ _) = Just n
 hasHaskellName _               = Nothing
+
+hasIdLabelInfo :: CLabel -> Maybe IdLabelInfo
+hasIdLabelInfo (IdLabel _ _ l) = Just l
+hasIdLabelInfo _ = Nothing
 
 -- -----------------------------------------------------------------------------
 -- Does a CLabel's referent itself refer to a CAF?
@@ -863,6 +939,7 @@ needsCDecl (CmmLabel pkgId (NeedExternDecl external) _ _)
 needsCDecl l@(ForeignLabel{})           = not (isMathFun l)
 needsCDecl (CC_Label _)                 = True
 needsCDecl (CCS_Label _)                = True
+needsCDecl (IPE_Label {})               = True
 needsCDecl (HpcTicksLabel _)            = True
 needsCDecl (DynamicLinkerLabel {})      = panic "needsCDecl DynamicLinkerLabel"
 needsCDecl PicBaseLabel                 = panic "needsCDecl PicBaseLabel"
@@ -985,6 +1062,7 @@ externallyVisibleCLabel (ForeignLabel{})        = True
 externallyVisibleCLabel (IdLabel name _ info)   = isExternalName name && externallyVisibleIdLabel info
 externallyVisibleCLabel (CC_Label _)            = True
 externallyVisibleCLabel (CCS_Label _)           = True
+externallyVisibleCLabel (IPE_Label {})          = True
 externallyVisibleCLabel (DynamicLinkerLabel _ _)  = False
 externallyVisibleCLabel (HpcTicksLabel _)       = True
 externallyVisibleCLabel (LargeBitmapLabel _)    = False
@@ -1044,6 +1122,7 @@ labelType (AsmTempDerivedLabel _ _)             = panic "labelType(AsmTempDerive
 labelType (StringLitLabel _)                    = DataLabel
 labelType (CC_Label _)                          = DataLabel
 labelType (CCS_Label _)                         = DataLabel
+labelType (IPE_Label {})                        = DataLabel
 labelType (DynamicLinkerLabel _ _)              = DataLabel -- Is this right?
 labelType PicBaseLabel                          = DataLabel
 labelType (DeadStripPreventer _)                = DataLabel
@@ -1057,7 +1136,7 @@ idInfoLabelType info =
     LocalInfoTable -> DataLabel
     BlockInfoTable -> DataLabel
     Closure       -> GcPtrLabel
-    ConInfoTable  -> DataLabel
+    ConInfoTable {} -> DataLabel
     ClosureTable  -> DataLabel
     RednCounts    -> DataLabel
     Bytes         -> DataLabel
@@ -1132,6 +1211,7 @@ labelDynamic config lbl =
 
    -- CCS_Label always contains a CostCentre defined in the current module
    CCS_Label _ -> False
+   IPE_Label {} -> True
 
    HpcTicksLabel m ->
      externalDynamicRefs && this_mod /= m
@@ -1356,6 +1436,8 @@ pprCLabel platform sty lbl =
 
    CC_Label cc   -> maybe_underscore $ ppr cc
    CCS_Label ccs -> maybe_underscore $ ppr ccs
+   IPE_Label (InfoProvEnt l _ _ m _) -> maybe_underscore $ (pprCode CStyle (pdoc platform l) <> text "_" <> ppr m <> text "_ipe")
+
 
    CmmLabel _ _ fs CmmCode     -> maybe_underscore $ ftext fs
    CmmLabel _ _ fs CmmData     -> maybe_underscore $ ftext fs
@@ -1409,8 +1491,16 @@ ppIdFlavor x = pp_cSEP <> case x of
    LocalEntry       -> text "entry"
    Slow             -> text "slow"
    RednCounts       -> text "ct"
-   ConEntry         -> text "con_entry"
-   ConInfoTable     -> text "con_info"
+   ConEntry loc      ->
+      case loc of
+        DefinitionSite -> text "con_entry"
+        UsageSite m n ->
+          ppr m <> pp_cSEP <> ppr n <> pp_cSEP <> text "con_entry"
+   ConInfoTable k   ->
+    case k of
+      DefinitionSite -> text "con_info"
+      UsageSite m n ->
+        ppr m <> pp_cSEP <> ppr n <> pp_cSEP <> text "con_info"
    ClosureTable     -> text "closure_tbl"
    Bytes            -> text "bytes"
    BlockInfoTable   -> text "info"

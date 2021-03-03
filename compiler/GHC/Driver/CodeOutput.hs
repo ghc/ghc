@@ -10,6 +10,7 @@ module GHC.Driver.CodeOutput
    ( codeOutput
    , outputForeignStubs
    , profilingInitCode
+   , ipInitCode
    )
 where
 
@@ -36,6 +37,7 @@ import GHC.Data.Stream           ( Stream )
 import qualified GHC.Data.Stream as Stream
 
 import GHC.SysTools.FileCleanup
+
 
 import GHC.Utils.Error
 import GHC.Utils.Outputable
@@ -70,7 +72,7 @@ codeOutput :: Logger
            -> Module
            -> FilePath
            -> ModLocation
-           -> ForeignStubs
+           -> (a -> ForeignStubs)
            -> [(ForeignSrcLang, FilePath)]
            -- ^ additional files to be compiled with the C compiler
            -> [UnitId]
@@ -80,7 +82,7 @@ codeOutput :: Logger
                   [(ForeignSrcLang, FilePath)]{-foreign_fps-},
                   a)
 
-codeOutput logger dflags unit_state this_mod filenm location foreign_stubs foreign_fps pkg_deps
+codeOutput logger dflags unit_state this_mod filenm location genForeignStubs foreign_fps pkg_deps
   cmm_stream
   =
     do  {
@@ -107,7 +109,6 @@ codeOutput logger dflags unit_state this_mod filenm location foreign_stubs forei
                 ; return cmm
                 }
 
-        ; stubs_exist <- outputForeignStubs logger dflags unit_state this_mod location foreign_stubs
         ; a <- case backend dflags of
                  NCG         -> outputAsm logger dflags this_mod location filenm
                                           linted_cmm_stream
@@ -115,6 +116,8 @@ codeOutput logger dflags unit_state this_mod filenm location foreign_stubs forei
                  LLVM        -> outputLlvm logger dflags filenm linted_cmm_stream
                  Interpreter -> panic "codeOutput: Interpreter"
                  NoBackend   -> panic "codeOutput: NoBackend"
+        ; let stubs = genForeignStubs a
+        ; stubs_exist <- outputForeignStubs logger dflags unit_state this_mod location stubs
         ; return (filenm, stubs_exist, foreign_fps, a)
         }
 
@@ -207,7 +210,7 @@ outputForeignStubs logger dflags unit_state mod location stubs
      NoStubs ->
         return (False, Nothing)
 
-     ForeignStubs h_code c_code -> do
+     ForeignStubs (CHeader h_code) (CStub c_code) -> do
         let
             stub_c_output_d = pprCode CStyle c_code
             stub_c_output_w = showSDoc dflags stub_c_output_d
@@ -225,9 +228,14 @@ outputForeignStubs logger dflags unit_state mod location stubs
 
         -- we need the #includes from the rts package for the stub files
         let rts_includes =
-               let rts_pkg = unsafeLookupUnitId unit_state rtsUnitId in
-               concatMap mk_include (unitIncludes rts_pkg)
-            mk_include i = "#include \"" ++ ST.unpack i ++ "\"\n"
+               let mrts_pkg = lookupUnitId unit_state rtsUnitId
+                   mk_include i = "#include \"" ++ ST.unpack i ++ "\"\n"
+               in case mrts_pkg of
+                    Just rts_pkg -> concatMap mk_include (unitIncludes rts_pkg)
+                    -- This case only happens when compiling foreign stub for the rts
+                    -- library itself. The only time we do this at the moment is for
+                    -- IPE information for the RTS info tables
+                    Nothing -> ""
 
             -- wrapper code mentions the ffi_arg type, which comes from ffi.h
             ffi_includes
@@ -277,9 +285,9 @@ outputForeignStubs_help fname doc_str header footer
 -- module;
 
 -- | Generate code to initialise cost centres
-profilingInitCode :: Platform -> Module -> CollectedCCs -> SDoc
+profilingInitCode :: Platform -> Module -> CollectedCCs -> CStub
 profilingInitCode platform this_mod (local_CCs, singleton_CCSs)
- = vcat
+ = CStub $ vcat
     $  map emit_cc_decl local_CCs
     ++ map emit_ccs_decl singleton_CCSs
     ++ [emit_cc_list local_CCs]
@@ -314,3 +322,34 @@ profilingInitCode platform this_mod (local_CCs, singleton_CCSs)
                          | cc <- ccs
                          ] ++ [text "NULL"])
       <> semi
+
+-- | Generate code to initialise info pointer origin
+-- See note [Mapping Info Tables to Source Positions]
+ipInitCode :: DynFlags -> Module -> [InfoProvEnt] -> CStub
+ipInitCode dflags this_mod ents
+ = if not (gopt Opt_InfoTableMap dflags)
+    then mempty
+    else CStub $ vcat
+    $  map emit_ipe_decl ents
+    ++ [emit_ipe_list ents]
+    ++ [ text "static void ip_init_" <> ppr this_mod
+            <> text "(void) __attribute__((constructor));"
+       , text "static void ip_init_" <> ppr this_mod <> text "(void)"
+       , braces (vcat
+                 [ text "registerInfoProvList" <> parens local_ipe_list_label <> semi
+                 ])
+       ]
+ where
+   platform = targetPlatform dflags
+   emit_ipe_decl ipe =
+       text "extern InfoProvEnt" <+> ipe_lbl <> text "[];"
+     where ipe_lbl = pprCLabel platform CStyle (mkIPELabel ipe)
+   local_ipe_list_label = text "local_ipe_" <> ppr this_mod
+   emit_ipe_list ipes =
+      text "static InfoProvEnt *" <> local_ipe_list_label <> text "[] ="
+      <+> braces (vcat $ [ pprCLabel platform CStyle (mkIPELabel ipe) <> comma
+                         | ipe <- ipes
+                         ] ++ [text "NULL"])
+      <> semi
+
+
