@@ -37,10 +37,12 @@ import qualified Distribution.InstalledPackageInfo             as Installed
 import qualified Distribution.Simple.PackageIndex              as C
 import qualified Distribution.Text                             as C
 import qualified Distribution.Types.LocalBuildInfo             as C
-import qualified Distribution.Types.CondTree                   as C
 import qualified Distribution.Types.MungedPackageId            as C
 #if MIN_VERSION_Cabal(3,2,0)
 import qualified Distribution.Utils.ShortText                  as C
+#endif
+#if !MIN_VERSION_Cabal(3,4,0)
+import qualified Distribution.Types.CondTree                   as C
 #endif
 import qualified Distribution.Verbosity                        as C
 import Hadrian.Expression
