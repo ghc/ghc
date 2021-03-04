@@ -990,6 +990,7 @@ data DynFlags = DynFlags {
   parMakeCount          :: Maybe Int,   -- ^ The number of modules to compile in parallel
                                         --   in --make mode, where Nothing ==> compile as
                                         --   many in parallel as there are CPUs.
+  parMakeSemaphore      :: Maybe FilePath, -- ^ TODO
 
   enableTimeStats       :: Bool,        -- ^ Enable RTS timing statistics?
   ghcHeapSize           :: Maybe Int,   -- ^ The heap size to set.
@@ -1973,6 +1974,7 @@ defaultDynFlags mySettings llvmConfig =
         strictnessBefore        = [],
 
         parMakeCount            = Just 1,
+        parMakeSemaphore        = Nothing,
 
         enableTimeStats         = False,
         ghcHeapSize             = Nothing,
@@ -3013,6 +3015,7 @@ dynamic_flags_deps = [
                  -- result of getNumProcessors
   , make_ord_flag defFlag "instantiated-with"   (sepArg setUnitIdInsts)
   , make_ord_flag defFlag "this-component-id"   (sepArg setComponentId)
+  , make_ord_flag defGhcFlag "jsem" (sepArg $ \x d -> d { parMakeSemaphore = Just x })
 
     -- RTS options -------------------------------------------------------------
   , make_ord_flag defFlag "H"           (HasArg (\s -> upd (\d ->

@@ -521,6 +521,14 @@ search path (see :ref:`search-path`).
     number of processors. Note that compilation of a module may not begin
     until its dependencies have been built.
 
+.. ghc-flag:: -jsem ⟨sem⟩
+    :shortdesc: When compiling with :ghc-flag:`--make` and :ghc-flag:`-j[⟨n⟩]` limit
+        parallelism with the semaphore ⟨sem⟩ in parallel.
+    :type: dynamic
+    :category: misc
+
+    TODO Doug We will create the semaphore but we won't destory it.
+
 .. _eval-mode:
 
 Expression evaluation mode

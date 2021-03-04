@@ -1,0 +1,214 @@
+.. _release-9-2-1:
+
+Version 9.2.1
+==============
+
+Language
+~~~~~~~~
+
+* :extension:`ImpredicativeTypes`: Finally, polymorphic types have become first class!
+  GHC 9.2 includes a full implementation of the Quick Look approach to type inference for
+  impredicative types, as described in in the paper
+  `A quick look at impredicativity
+  <https://www.microsoft.com/en-us/research/publication/a-quick-look-at-impredicativity/>`__
+  (Serrano et al, ICFP 2020).  More information here: :ref:`impredicative-polymorphism`.
+  This replaces the old (undefined, flaky) behaviour of the :extension:`ImpredicativeTypes` extension.
+
+* Kind inference for data/newtype instance declarations is slightly
+  more restrictive than before.  See the user manual :ref:`kind-inference-data-family-instances`.
+  This is a breaking change, albeit a fairly obscure one that corrects a specification bug.
+
+* GHC is stricter about checking for out-of-scope type variables on the
+  right-hand sides of associated type family instances that are not bound on
+  the left-hand side. As a result, some programs that were accidentally
+  accepted in previous versions of GHC will now be rejected, such as this
+  example: ::
+
+      class Funct f where
+        type Codomain f
+      instance Funct ('KProxy :: KProxy o) where
+        type Codomain 'KProxy = NatTr (Proxy :: o -> Type)
+
+  Where: ::
+
+      data Proxy (a :: k) = Proxy
+      data KProxy (t :: Type) = KProxy
+      data NatTr (c :: o -> Type)
+
+  GHC will now reject the ``o`` on the right-hand side of the ``Codomain``
+  instance as being out of scope, as it does not meet the requirements for
+  being explicitly bound (as it is not mentioned on the left-hand side) nor
+  implicitly bound (as it is not mentioned in an *outermost* kind signature,
+  as required by :ref:`scoping-class-params`). This program can be repaired in
+  a backwards-compatible way by mentioning ``o`` on the left-hand side: ::
+
+      instance Funct ('KProxy :: KProxy o) where
+        type Codomain ('KProxy @o) = NatTr (Proxy :: o -> Type)
+        -- Alternatively,
+        -- type Codomain ('KProxy :: KProxy o) = NatTr (Proxy :: o -> Type)
+
+* Previously, ``-XUndecidableInstances`` accidentally implied ``-XFlexibleContexts``.
+  This is now fixed, but it means that some programs will newly require
+  ``-XFlexibleContexts``.
+
+* Various records-related extensions have been improved:
+
+  - A new extension :extension:`NoFieldSelectors` hides record field selector
+    functions, so it is possible to define top-level bindings with the same names.
+
+  - The :extension:`DisambiguateRecordFields` extension now works for updates.
+    An update ``expr { field = value }`` will be accepted if there is a single
+    field called ``field`` in scope, regardless of whether there are non-fields
+    in scope with the same name.
+
+  - The :extension:`DuplicateRecordFields` extension now applies to fields in
+    record pattern synonyms.  In particular, it is possible for a single module
+    to define multiple pattern synonyms using the same field names.
+
+Compiler
+~~~~~~~~
+
+- New :ghc-flag:`-Wredundant-bang-patterns` flag that enables checks for "dead" bangs.
+  For instance, given this program: ::
+
+      f :: Bool -> Bool
+      f True = False
+      f !x   = x
+
+  GHC would report that the bang on ``x`` is redundant and can be removed
+  since the argument was already forced in the first equation. For more
+  details see :ghc-flag:`-Wredundant-bang-patterns`.
+
+- New :ghc-flag:`-finline-generics` and
+  :ghc-flag:`-finline-generics-aggressively` flags for improving performance of
+  generics-based algorithms.
+
+  For more details see :ghc-flag:`-finline-generics` and
+  :ghc-flag:`-finline-generics-aggressively`.
+
+- GHCi's ``:kind!`` command now expands through type synonyms in addition to type
+  families. See :ghci-cmd:`:kind`.
+
+- GHC now supports a flag, :ghc-flag:`-fprof-callers=⟨name⟩`, for requesting
+  that the compiler automatically insert cost-centres on all call-sites of
+  the named function.
+
+GHCi
+~~~~
+
+- GHCi's :ghci-cmd:`:edit` command now looks for an editor in
+  the :envvar:`VISUAL` environment variable before
+  :envvar:`EDITOR`, following UNIX convention.
+  (:ghc-ticket:`19030`)
+
+- GHC now follows by default the XDG Base Directory Specification. If
+  ``$HOME/.ghc`` is found it will fallback to the old paths to give you
+  time to migrate. This fallback will be removed in three releases.
+
+Runtime system
+~~~~~~~~~~~~~~
+
+- The heap profiler now has proper treatment of pinned ``ByteArray#``\ s. Such
+  heap objects will now be correctly attributed to their appropriate cost
+  centre instead of merely being lumped into the ``PINNED`` category.
+  Moreover, we now correctly account for the size of the array, meaning that
+  space lost to fragmentation is no longer counted as live data.
+
+
+
+- The ``-xt`` RTS flag has been removed. Now STACK and TSO closures are always
+  included in heap profiles. Tooling can choose to filter out these closure types
+`  if necessary.
+
+
+- ``Void#`` is now a type synonym for the unboxed tuple ``(# #)``.
+  Code using ``Void#`` now has to enable :extension:`UnboxedTuples`.
+
+``ghc`` library
+~~~~~~~~~~~~~~~
+
+- There is a significant refactoring in the solver; any type-checker plugins
+  will have to be updated, as GHC no longer uses flattening skolems or
+  flattening metavariables.
+
+- Type checker plugins which work with the natural numbers now
+  should use ``naturalTy`` kind instead of ``typeNatKind``, which has been removed.
+
+- The ``con_args`` field of ``ConDeclGADT`` has been renamed to ``con_g_args``.
+  This is because the type of ``con_g_args`` is now different from the type of
+  the ``con_args`` field in ``ConDeclH98``: ::
+
+    data ConDecl pass
+      = ConDeclGADT
+          { ...
+          , con_g_args :: HsConDeclGADTDetails pass -- ^ Arguments; never infix
+          , ...
+          }
+
+      | ConDeclH98
+          { ...
+          , con_args :: HsConDeclH98Details pass -- ^ Arguments; can be infix
+          , ...
+          }
+
+  Where: ::
+
+    -- Introduced in GHC 9.2; was called `HsConDeclDetails` in previous versions of GHC
+    type HsConDeclH98Details pass
+       = HsConDetails (HsScaled pass (LBangType pass)) (XRec pass [LConDeclField pass])
+
+    -- Introduced in GHC 9.2
+    data HsConDeclGADTDetails pass
+       = PrefixConGADT [HsScaled pass (LBangType pass)]
+       | RecConGADT (XRec pass [LConDeclField pass])
+
+  Unlike Haskell98-style constructors, GADT constructors cannot be declared
+  using infix syntax, which is why ``HsConDeclGADTDetails`` lacks an
+  ``InfixConGADT`` constructor.
+
+  As a result of all this, the ``con_args`` field is now partial, so using
+  ``con_args`` as a top-level field selector is discouraged.
+
+``base`` library
+~~~~~~~~~~~~~~~~
+
+- It's possible now to promote the ``Natural`` type: ::
+
+    data Coordinate = Mk2D Natural Natural
+    type MyCoordinate = Mk2D 1 10
+
+  The separate kind ``Nat`` is removed and now it is just a type synonym for
+  ``Natural``. As a consequence, one must enable ``TypeSynonymInstances``
+  in order to define instances for ``Nat``.
+
+  The ``Numeric`` module receives ``showBin`` and ``readBin`` to show and
+  read integer numbers in binary.
+
+- ``Char`` gets type-level support by analogy with strings and natural numbers.
+  We extend the ``GHC.TypeLits`` module with these built-in type-families: ::
+
+    type family CmpChar (a :: Char) (b :: Char) :: Ordering
+    type family ConsSymbol (a :: Char) (b :: Symbol) :: Symbol
+    type family UnconsSymbol (a :: Symbol) :: Maybe (Char, Symbol)
+
+  and with the type class ``KnownChar`` (and such additional functions as ``charVal`` and ``charVal'``): ::
+
+    class KnownChar (n :: Char)
+
+    charVal :: forall n proxy. KnownChar n => proxy n -> Char
+    charVal' :: forall n. KnownChar n => Proxy# n -> Char
+
+- On POSIX, ``System.IO.openFile`` can no longer leak a file descriptor if it
+  is interrupted by an asynchronous exception (#19114, #19115).
+
+- There's a new binding ``GHC.Exts.considerAccessible``. It's equivalent to
+  ``True`` and allows the programmer to turn off pattern-match redundancy
+  warnings for particular clauses, like the third one here ::
+
+    g :: Bool -> Int
+    g x = case (x, x) of
+      (True,  True)  -> 1
+      (False, False) -> 2
+      (True,  False) | considerAccessible -> 3 -- No warning!
+
+- TODO Doug Add -jsem flag
