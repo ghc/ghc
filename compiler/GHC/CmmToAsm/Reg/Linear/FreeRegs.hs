@@ -83,5 +83,6 @@ maxSpillSlots config = case platformArch (ncgPlatform config) of
    ArchAlpha     -> panic "maxSpillSlots ArchAlpha"
    ArchMipseb    -> panic "maxSpillSlots ArchMipseb"
    ArchMipsel    -> panic "maxSpillSlots ArchMipsel"
+   ArchRISCV64   -> panic "maxSpillSlots ArchRISCV64"
    ArchJavaScript-> panic "maxSpillSlots ArchJavaScript"
    ArchUnknown   -> panic "maxSpillSlots ArchUnknown"
