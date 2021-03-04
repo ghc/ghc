@@ -19,7 +19,7 @@ import GHC.Prelude as Prelude
 import GHC.Driver.Backend
 import GHC.Driver.Session
 
-import GHC.StgToCmm.Prof (initCostCentres, ldvEnter)
+import GHC.StgToCmm.Prof (initInfoTableProv, initCostCentres, ldvEnter)
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Env
 import GHC.StgToCmm.Bind
@@ -39,6 +39,7 @@ import GHC.Cmm.Graph
 import GHC.Stg.Syntax
 
 import GHC.Types.CostCentre
+import GHC.Types.IPE
 import GHC.Types.HpcInfo
 import GHC.Types.Id
 import GHC.Types.Id.Info
@@ -47,6 +48,7 @@ import GHC.Types.Basic
 import GHC.Types.Var.Set ( isEmptyDVarSet )
 import GHC.Types.Unique.FM
 import GHC.Types.Name.Env
+import GHC.Types.ForeignStubs
 
 import GHC.Core.DataCon
 import GHC.Core.TyCon
@@ -63,42 +65,58 @@ import GHC.SysTools.FileCleanup
 
 import GHC.Data.Stream
 import GHC.Data.OrdList
+import GHC.Types.Unique.Map
 
-import Data.IORef
-import Control.Monad (when,void)
+import Control.Monad (when,void, forM_)
 import GHC.Utils.Misc
 import System.IO.Unsafe
 import qualified Data.ByteString as BS
+import Data.Maybe
+import Data.IORef
+
+data CodeGenState = CodeGenState { codegen_used_info :: !(OrdList CmmInfoTable)
+                                 , codegen_state :: !CgState }
+
 
 codeGen :: Logger
         -> DynFlags
         -> Module
+        -> InfoTableProvMap
         -> [TyCon]
         -> CollectedCCs                -- (Local/global) cost-centres needing declaring/registering.
         -> [CgStgTopBinding]           -- Bindings to convert
         -> HpcInfo
-        -> Stream IO CmmGroup ModuleLFInfos
-                                       -- Output as a stream, so codegen can
+        -> Stream IO CmmGroup (CStub, ModuleLFInfos)       -- Output as a stream, so codegen can
                                        -- be interleaved with output
 
-codeGen logger dflags this_mod data_tycons
+codeGen logger dflags this_mod ip_map@(InfoTableProvMap (UniqMap denv) _) data_tycons
         cost_centre_info stg_binds hpc_info
   = do  {     -- cg: run the code generator, and yield the resulting CmmGroup
               -- Using an IORef to store the state is a bit crude, but otherwise
-              -- we would need to add a state monad layer.
-        ; cgref <- liftIO $ newIORef =<< initC
-        ; let cg :: FCode () -> Stream IO CmmGroup ()
+              -- we would need to add a state monad layer which regresses
+              -- allocations by 0.5-2%.
+        ; cgref <- liftIO $ initC >>= \s -> newIORef (CodeGenState mempty s)
+        ; let cg :: FCode a -> Stream IO CmmGroup a
               cg fcode = do
-                cmm <- liftIO . withTimingSilent logger dflags (text "STG -> Cmm") (`seq` ()) $ do
-                         st <- readIORef cgref
+                (a, cmm) <- liftIO . withTimingSilent logger dflags (text "STG -> Cmm") (`seq` ()) $ do
+                         CodeGenState ts st <- readIORef cgref
                          let (a,st') = runC dflags this_mod st (getCmm fcode)
 
                          -- NB. stub-out cgs_tops and cgs_stmts.  This fixes
                          -- a big space leak.  DO NOT REMOVE!
-                         writeIORef cgref $! st'{ cgs_tops = nilOL,
-                                                  cgs_stmts = mkNop }
+                         -- This is observed by the #3294 test
+                         let !used_info
+                                | gopt Opt_InfoTableMap dflags = toOL (mapMaybe topInfoTable (snd a)) `mappend` ts
+                                | otherwise = mempty
+                         writeIORef cgref $!
+                                    CodeGenState used_info
+                                      (st'{ cgs_tops = nilOL,
+                                            cgs_stmts = mkNop
+                                          })
+
                          return a
                 yield cmm
+                return a
 
                -- Note [codegen-split-init] the cmm_init block must come
                -- FIRST.  This is because when -split-objs is on we need to
@@ -107,7 +125,6 @@ codeGen logger dflags this_mod data_tycons
         ; cg (mkModuleInit cost_centre_info this_mod hpc_info)
 
         ; mapM_ (cg . cgTopBinding logger dflags) stg_binds
-
                 -- Put datatype_stuff after code_stuff, because the
                 -- datatype closure table (for enumeration types) to
                 -- (say) PrelBase_True_closure, which is defined in
@@ -117,11 +134,20 @@ codeGen logger dflags this_mod data_tycons
                 -- enumeration type Note that the closure pointers are
                 -- tagged.
                  when (isEnumerationTyCon tycon) $ cg (cgEnumerationTyCon tycon)
-                 mapM_ (cg . cgDataCon) (tyConDataCons tycon)
+                 -- Emit normal info_tables, for data constructors defined in this module.
+                 mapM_ (cg . cgDataCon DefinitionSite) (tyConDataCons tycon)
 
         ; mapM_ do_tycon data_tycons
 
-        ; cg_id_infos <- cgs_binds <$> liftIO (readIORef cgref)
+        -- Emit special info tables for everything used in this module
+        -- This will only do something if  `-fdistinct-info-tables` is turned on.
+        ; mapM_ (\(dc, ns) -> forM_ ns $ \(k, _ss) -> cg (cgDataCon (UsageSite this_mod k) dc)) (nonDetEltsUFM denv)
+
+        ; final_state <- liftIO (readIORef cgref)
+        ; let cg_id_infos = cgs_binds . codegen_state $ final_state
+              used_info = fromOL . codegen_used_info $ final_state
+
+        ; !foreign_stub <- cg (initInfoTableProv used_info ip_map this_mod)
 
           -- See Note [Conveying CAF-info and LFInfo between modules] in
           -- GHC.StgToCmm.Types
@@ -136,7 +162,7 @@ codeGen logger dflags this_mod data_tycons
                 | otherwise
                 = mkNameEnv (Prelude.map extractInfo (eltsUFM cg_id_infos))
 
-        ; return generatedInfo
+        ; return (foreign_stub, generatedInfo)
         }
 
 ---------------------------------------------------------------
@@ -191,8 +217,8 @@ cgTopBinding logger dflags (StgTopStringLit id str) = do
 cgTopRhs :: DynFlags -> RecFlag -> Id -> CgStgRhs -> (CgIdInfo, FCode ())
         -- The Id is passed along for setting up a binding...
 
-cgTopRhs dflags _rec bndr (StgRhsCon _cc con args)
-  = cgTopRhsCon dflags bndr con (assertNonVoidStgArgs args)
+cgTopRhs dflags _rec bndr (StgRhsCon _cc con mn _ts args)
+  = cgTopRhsCon dflags bndr con mn (assertNonVoidStgArgs args)
       -- con args are always non-void,
       -- see Note [Post-unarisation invariants] in GHC.Stg.Unarise
 
@@ -231,11 +257,12 @@ cgEnumerationTyCon tycon
              | con <- tyConDataCons tycon]
 
 
--- | Generate the entry code, info tables, and (for niladic constructor)
+cgDataCon :: ConInfoTableLocation -> DataCon -> FCode ()
+-- Generate the entry code, info tables, and (for niladic constructor)
 -- the static closure, for a constructor.
-cgDataCon :: DataCon -> FCode ()
-cgDataCon data_con
-  = do  { profile <- getProfile
+cgDataCon mn data_con
+  = do  { MASSERT( not (isUnboxedTupleDataCon data_con || isUnboxedSumDataCon data_con) )
+        ; profile <- getProfile
         ; platform <- getPlatform
         ; let
             (tot_wds, --  #ptr_wds + #nonptr_wds
@@ -245,7 +272,7 @@ cgDataCon data_con
             nonptr_wds   = tot_wds - ptr_wds
 
             dyn_info_tbl =
-              mkDataConInfoTable profile data_con False ptr_wds nonptr_wds
+              mkDataConInfoTable profile data_con mn False ptr_wds nonptr_wds
 
             -- We're generating info tables, so we don't know and care about
             -- what the actual arguments are. Using () here as the place holder.

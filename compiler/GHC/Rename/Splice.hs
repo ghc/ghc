@@ -909,6 +909,12 @@ check_cross_stage_lifting top_lvl name ps_var
         ; let lift_expr   = nlHsApp (nlHsVar liftName) (nlHsVar name)
               pend_splice = PendingRnSplice UntypedExpSplice name lift_expr
 
+          -- Warning for implicit lift (#17804)
+        ; whenWOptM Opt_WarnImplicitLift $
+            addWarnTc (Reason Opt_WarnImplicitLift)
+                       (text "The variable" <+> quotes (ppr name) <+>
+                        text "is implicitly lifted in the TH quotation")
+
           -- Update the pending splices
         ; ps <- readMutVar ps_var
         ; writeMutVar ps_var (pend_splice : ps) }

@@ -221,6 +221,7 @@ import GHC.StgToCmm.Expr
 import GHC.StgToCmm.Closure
 import GHC.StgToCmm.Layout     hiding (ArgRep(..))
 import GHC.StgToCmm.Ticky
+import GHC.StgToCmm.Prof
 import GHC.StgToCmm.Bind  ( emitBlackHoleCode, emitUpdateFrame )
 
 import GHC.Core           ( Tickish(SourceNote) )
@@ -1448,8 +1449,9 @@ initEnv profile = listToUFM [
   ]
   where platform = profilePlatform profile
 
-parseCmmFile :: DynFlags -> HomeUnit -> FilePath -> IO (Bag PsWarning, Bag PsError, Maybe CmmGroup)
-parseCmmFile dflags home_unit filename = do
+
+parseCmmFile :: DynFlags -> Module -> HomeUnit -> FilePath -> IO (Bag PsWarning, Bag PsError, Maybe (CmmGroup, [InfoProvEnt]))
+parseCmmFile dflags this_mod home_unit filename = do
   buf <- hGetStringBuffer filename
   let
         init_loc = mkRealSrcLoc (mkFastString filename) 1 1
@@ -1463,8 +1465,13 @@ parseCmmFile dflags home_unit filename = do
         return (warnings, errors, Nothing)
     POk pst code -> do
         st <- initC
-        let fcode = getCmm $ unEC code "global" (initEnv (targetProfile dflags)) [] >> return ()
-            (cmm,_) = runC dflags no_module st fcode
+        let fcode = do
+              ((), cmm) <- getCmm $ unEC code "global" (initEnv (targetProfile dflags)) [] >> return ()
+              let used_info = map (cmmInfoTableToInfoProvEnt this_mod)
+                                              (mapMaybe topInfoTable cmm)
+              ((), cmm2) <- getCmm $ mapM_ emitInfoTableProv used_info
+              return (cmm ++ cmm2, used_info)
+            (cmm, _) = runC dflags no_module st fcode
             (warnings,errors) = getMessages pst
         if not (isEmptyBag errors)
          then return (warnings, errors, Nothing)

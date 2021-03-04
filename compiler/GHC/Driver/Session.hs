@@ -2775,7 +2775,10 @@ dynamic_flags_deps = [
         -- Caller-CC
   , make_ord_flag defGhcFlag "fprof-callers"
          (HasArg setCallerCcFilters)
-
+  , make_ord_flag defGhcFlag "fdistinct-constructor-tables"
+      (NoArg (setGeneralFlag Opt_DistinctConstructorTables))
+  , make_ord_flag defGhcFlag "finfo-table-map"
+      (NoArg (setGeneralFlag Opt_InfoTableMap))
         ------ Compiler flags -----------------------------------------------
 
   , make_ord_flag defGhcFlag "fasm"             (NoArg (setObjBackend NCG))
@@ -3164,7 +3167,8 @@ wWarningFlagsDeps = [
   flagSpec "compat-unqualified-imports"  Opt_WarnCompatUnqualifiedImports,
   flagSpec "invalid-haddock"             Opt_WarnInvalidHaddock,
   flagSpec "operator-whitespace-ext-conflict"  Opt_WarnOperatorWhitespaceExtConflict,
-  flagSpec "operator-whitespace"         Opt_WarnOperatorWhitespace
+  flagSpec "operator-whitespace"         Opt_WarnOperatorWhitespace,
+  flagSpec "implicit-lift"               Opt_WarnImplicitLift
  ]
 
 -- | These @-\<blah\>@ flags can all be reversed with @-no-\<blah\>@
