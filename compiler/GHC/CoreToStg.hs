@@ -22,6 +22,7 @@ import GHC.Core.Utils   ( exprType, findDefault, isJoinBind
                         , exprIsTickedString_maybe )
 import GHC.Core.Opt.Arity   ( manifestArity )
 import GHC.Stg.Syntax
+import GHC.Stg.Debug
 
 import GHC.Core.Type
 import GHC.Types.RepType
@@ -46,6 +47,7 @@ import GHC.Driver.Session
 import GHC.Platform.Ways
 import GHC.Driver.Ppr
 import GHC.Types.ForeignCall
+import GHC.Types.IPE
 import GHC.Types.Demand    ( isUsedOnceDmd )
 import GHC.Builtin.PrimOps ( PrimCall(..) )
 import GHC.Types.SrcLoc    ( mkGeneralSrcSpan )
@@ -226,13 +228,20 @@ import qualified Data.Set as Set
 -- Setting variable info: top-level, binds, RHSs
 -- --------------------------------------------------------------
 
-coreToStg :: DynFlags -> Module -> CoreProgram
-          -> ([StgTopBinding], CollectedCCs)
-coreToStg dflags this_mod pgm
-  = (pgm', final_ccs)
+
+coreToStg :: DynFlags -> Module -> ModLocation -> CoreProgram
+          -> ([StgTopBinding], InfoTableProvMap, CollectedCCs)
+coreToStg dflags this_mod ml pgm
+  = (pgm'', denv, final_ccs)
   where
     (_, (local_ccs, local_cc_stacks), pgm')
       = coreTopBindsToStg dflags this_mod emptyVarEnv emptyCollectedCCs pgm
+
+    -- See Note [Mapping Info Tables to Source Positions]
+    (!pgm'', !denv) =
+        if gopt Opt_InfoTableMap dflags
+          then collectDebugInformation dflags ml pgm'
+          else (pgm', emptyInfoTableProvMap)
 
     prof = WayProf `Set.member` ways dflags
 
@@ -536,7 +545,7 @@ coreToStgApp f args ticks = do
         res_ty = exprType (mkApps (Var f) args)
         app = case idDetails f of
                 DataConWorkId dc
-                  | saturated    -> StgConApp dc args'
+                  | saturated    -> StgConApp dc NoNumber args'
                                       (dropRuntimeRepArgs (fromMaybe [] (tyConAppArgs_maybe res_ty)))
 
                 -- Some primitive operator that might be implemented as a library call.
@@ -593,7 +602,7 @@ coreToStgArgs (arg : args) = do         -- Non-type argument
         (aticks, arg'') = stripStgTicksTop tickishFloatable arg'
         stg_arg = case arg'' of
                        StgApp v []        -> StgVarArg v
-                       StgConApp con [] _ -> StgVarArg (dataConWorkId con)
+                       StgConApp con _ [] _ -> StgVarArg (dataConWorkId con)
                        StgLit lit         -> StgLitArg lit
                        _                  -> pprPanic "coreToStgArgs" (ppr arg)
 
@@ -710,13 +719,13 @@ mkTopStgRhs dflags this_mod ccs bndr (PreStgRhs bndrs rhs)
 
   -- After this point we know that `bndrs` is empty,
   -- so this is not a function binding
-  | StgConApp con args _ <- unticked_rhs
+  | StgConApp con mn args _ <- unticked_rhs
   , -- Dynamic StgConApps are updatable
     not (isDllConApp dflags this_mod con args)
   = -- CorePrep does this right, but just to make sure
     ASSERT2( not (isUnboxedTupleDataCon con || isUnboxedSumDataCon con)
            , ppr bndr $$ ppr con $$ ppr args)
-    ( StgRhsCon dontCareCCS con args, ccs )
+    ( StgRhsCon dontCareCCS con mn ticks args, ccs )
 
   -- Otherwise it's a CAF, see Note [Cost-centre initialization plan].
   | gopt Opt_AutoSccsOnIndividualCafs dflags
@@ -732,7 +741,7 @@ mkTopStgRhs dflags this_mod ccs bndr (PreStgRhs bndrs rhs)
     , ccs )
 
   where
-    unticked_rhs = stripStgTicksTopE (not . tickishIsCode) rhs
+    (ticks, unticked_rhs) = stripStgTicksTop (not . tickishIsCode) rhs
 
     upd_flag | isUsedOnceDmd (idDemandInfo bndr) = SingleEntry
              | otherwise                         = Updatable
@@ -768,15 +777,15 @@ mkStgRhs bndr (PreStgRhs bndrs rhs)
                   ReEntrant -- ignored for LNE
                   [] rhs
 
-  | StgConApp con args _ <- unticked_rhs
-  = StgRhsCon currentCCS con args
+  | StgConApp con mn args _ <- unticked_rhs
+  = StgRhsCon currentCCS con mn ticks args
 
   | otherwise
   = StgRhsClosure noExtFieldSilent
                   currentCCS
                   upd_flag [] rhs
   where
-    unticked_rhs = stripStgTicksTopE (not . tickishIsCode) rhs
+    (ticks, unticked_rhs) = stripStgTicksTop (not . tickishIsCode) rhs
 
     upd_flag | isUsedOnceDmd (idDemandInfo bndr) = SingleEntry
              | otherwise                         = Updatable
