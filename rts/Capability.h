@@ -93,6 +93,8 @@ struct Capability_ {
     bdescr *pinned_object_block;
     // full pinned object blocks allocated since the last GC
     bdescr *pinned_object_blocks;
+    // empty pinned object blocks, to be allocated into
+    bdescr *pinned_object_empty;
 
     // per-capability weak pointer list associated with nursery (older
     // lists stored in generation object)

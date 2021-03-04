@@ -67,6 +67,16 @@ generation *oldest_gen  = NULL; /* oldest generation, for convenience */
 nursery *nurseries = NULL;
 uint32_t n_nurseries;
 
+/* Pinned Nursery Size, the number of blocks that we reserve for
+ * pinned data. The number chosen here decides whether pinned objects
+ * are allocated from the free_list (if n < BLOCKS_PER_MBLOCK) or whether
+ * a fresh mblock is allocated each time.
+ * See Note [Sources of Block Level Fragmentation]
+ * */
+
+#define PINNED_EMPTY_SIZE BLOCKS_PER_MBLOCK
+
+
 /*
  * When we are using nursery chunks, we need a separate next_nursery
  * pointer for each NUMA node.
@@ -353,6 +363,7 @@ void listAllBlocks (ListBlocksCb cb, void *user)
           cb(user, capabilities[i]->pinned_object_block);
       }
       cb(user, capabilities[i]->pinned_object_blocks);
+      cb(user, capabilities[i]->pinned_object_empty);
   }
 }
 
@@ -1257,25 +1268,47 @@ allocatePinned (Capability *cap, W_ n /*words*/, W_ alignment /*bytes*/, W_ alig
         // avoid that (benchmarks that allocate a lot of pinned
         // objects scale really badly if we do this).
         //
-        // So first, we try taking the next block from the nursery, in
-        // the same way as allocate().
-        bd = cap->r.rCurrentNursery->link;
+        // See Note [Sources of Block Level Fragmentation]
+        // for a more complete history of this section.
+        bd = cap->pinned_object_empty;
         if (bd == NULL) {
-            // The nursery is empty: allocate a fresh block (we can't fail
+            // The pinned block list is empty: allocate a fresh block (we can't fail
             // here).
             ACQUIRE_SM_LOCK;
-            bd = allocBlockOnNode(cap->node);
+            bd = allocNursery(cap->node, NULL, PINNED_EMPTY_SIZE);
             RELEASE_SM_LOCK;
-            initBdescr(bd, g0, g0);
-        } else {
-            newNurseryBlock(bd);
-            // we have a block in the nursery: steal it
-            cap->r.rCurrentNursery->link = bd->link;
-            if (bd->link != NULL) {
-                bd->link->u.back = cap->r.rCurrentNursery;
-            }
-            cap->r.rNursery->n_blocks -= bd->blocks;
         }
+
+        // Bump up the nursery pointer to avoid the pathological situation
+        // where a program is *only* allocating pinned objects.
+        // T4018 fails without this safety.
+        // This has the effect of counting a full pinned block in the same way
+        // as a full nursery block, so GCs will be triggered at the same interval
+        // if you are only allocating pinned data compared to normal allocations
+        // via allocate().
+        bdescr * nbd;
+        nbd = cap->r.rCurrentNursery->link;
+        if (nbd != NULL){
+          newNurseryBlock(nbd);
+          cap->r.rCurrentNursery->link = nbd->link;
+          if (nbd->link != NULL) {
+              nbd->link->u.back = cap->r.rCurrentNursery;
+            }
+          dbl_link_onto(nbd, &cap->r.rNursery->blocks);
+          // Important for accounting purposes
+          if (cap->r.rCurrentAlloc){
+            finishedNurseryBlock(cap, cap->r.rCurrentAlloc);
+          }
+          cap->r.rCurrentAlloc = nbd;
+        }
+
+
+        cap->pinned_object_empty = bd->link;
+        newNurseryBlock(bd);
+        if (bd->link != NULL) {
+          bd->link->u.back = cap->pinned_object_empty;
+        }
+        initBdescr(bd, g0, g0);
 
         cap->pinned_object_block = bd;
         bd->flags  = BF_PINNED | BF_LARGE | BF_EVACUATED;
@@ -1912,3 +1945,106 @@ _bdescr (StgPtr p)
 }
 
 #endif
+
+/*
+Note [Sources of Block Level Fragmentation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Block level fragmentation is when there is unused space in megablocks.
+The amount of fragmentation can be calculated as the difference between the
+total size of allocated blocks and the total size of allocated megablocks.
+
+The act of the copying collection naturally reduces fragmentation by moving
+data between megablocks. Over time, the effect is that most megablocks end up quite full because
+data will be copied out of fragmented megablocks. The new block is chosen from
+the free list where the aim is to choose a gap of approximately the right size for
+the copied block so the data will end up in a probably less fragmented block.
+There are two situations where we end up with block fragmentation.
+
+1. Fragmentation from pinned data
+2. Fragmentation from nursery allocated blocks
+
+# Pinned Data Fragmentation
+
+There are two sources of
+pinned data, large objects and pinned bytearrays. After one of these object
+types is allocated, it is never moved by the collector
+and therefore if all the other blocks are collected around it then you can end
+up with a megablock with one pinned block and no other blocks. No special
+effort is taken in the compiler
+to ensure that this kind of fragmentation doesn't happen in the first place and
+once the heap is fragmented in this way, there's nothing you can do about it
+beyond hoping that the pinned data is eventually freed.
+
+# Nursery Fragmentation
+
+The other reason that a block may not ever be moved or emptied is if it forms
+part of the nursery.  When the nursery is first allocated then it is made up of
+megablock sized chunks, so if the nursery is 4 megabytes then it will consist of
+blocks from about 4 megablocks.
+
+Over time, the nursery is resized (by resizeNurseries) under various conditions.
+It gets bigger when
+we are allocating more and then smaller when we are allocating less.
+When the nursery is resized
+blocks are added or removed to it at potentially smaller sizes than a complete
+megablock. For example, if the nursery size needs to increase by 1, then
+the free list is consulted for a block of size 1 (from a random block)
+and that's added to the nursery.
+
+Over time the make-up of the nursery changes from 4
+contiguous megablocks to a hodge-podge of blocks from different megablocks. In
+some programs (see #19481), the fragmentation is so bad that a program with
+only 4 MB of live data can retain over 500 megablocks because each of these
+megablocks contributed a small number of blocks to the nursery.
+
+In particular, and confusingly, this second form of fragmentation was caused
+by the act of allocating pinned objects. `allocPinned` was the primary
+reason that the nursery size decreases by small amounts.  When `allocPinned`
+needed a block then it took a block permanently out of
+the nursery which shrunk the size of the nursery by 1 block. Then next time the size
+of the nursery was checked, the `alloc_nurseries` found that the existing
+nursery was smaller than the desired size and a new blocked needed
+to be added. This allocation was serviced from an arbitrary megablock
+which had some free space. The effect over time as more allocation happened
+was the nursery became made up of blocks from many different megablocks.
+
+Instead now we maintain a separate small list of blocks in `pinned_object_empty`
+which fresh blocks are taken from when we need a new one for a pinned block rather
+than threatening the continuity of the nursery. The size of this list is controlled
+by the PINNED_EMPTY_SIZE macro.
+
+In theory, this kind of fragmentation due to the nursery could still happen
+but in practice removing the primary cause (allocatePinned) was sufficient to
+greatly improve the situation. Another way to "fix" fragmentation of the nursery
+would be to periodically reallocate it when it was fragmented across many megablocks.
+
+Ticket: #19481
+
+# When can fragmentation be observed?
+
+Fragmentation is observed when the live data in a program is low compared to
+the overall resident size of the heap. The block allocator can reuse unused
+space within a megablock and therefore as residency
+increases again, the fragmented blocks will get filled up. Having a block-level
+fragmented heap means your program will never go below a certain memory
+threshold but it doesn't "use" more memory during periods of high residency.
+To clarify, say you observe 100 MB of fragmentation when your live data is
+4 MB, if your live data rise to 200MB then you probably will not still observe 100 MB
+of fragmentation as the block allocate will use the space in fragmented megablocks.
+
+# How to observe fragmentation
+
+Your heap is probably fragmented when
+
+* Live bytes is low
+* Memory in use (number of megablocks) is comparatively high
+* The size of the free list dominates residency (this can be observed using the
+  debug RTS and the memory inventory produced by -Dg).
+
+# Compacting Collector
+
+The compacting collector does nothing to improve megablock
+level fragmentation. The role of the compacting GC is to remove object level
+fragmentation and to use less memory when collecting. - see #19248
+*/
