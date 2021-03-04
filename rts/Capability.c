@@ -314,6 +314,7 @@ initCapability (Capability *cap, uint32_t i)
     cap->interrupt = 0;
     cap->pinned_object_block = NULL;
     cap->pinned_object_blocks = NULL;
+    cap->pinned_object_empty = NULL;
 
 #if defined(PROFILING)
     cap->r.rCCCS = CCS_SYSTEM;
