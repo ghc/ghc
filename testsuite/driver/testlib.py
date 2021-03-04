@@ -2201,10 +2201,16 @@ def normalise_errmsg(s: str) -> str:
     # and not understood by older binutils (ar, ranlib, ...)
     s = modify_lines(s, lambda l: re.sub('^(.+)warning: (.+): unsupported GNU_PROPERTY_TYPE \(5\) type: 0xc000000(.*)$', '', l))
 
-    # filter out nix garbage, that just keeps on showing up as errors on darwin
-    s = modify_lines(s, lambda l: re.sub('^(.+)\.dylib, ignoring unexpected dylib file$','', l))
-    s = re.sub('ld: warning: passed two min versions \(10.16.0, 10.12\) for platform macOS. Using 10.12.','',s)
+    s = re.sub('ld: warning: passed .* min versions \(.*\) for platform macOS. Using [\.0-9]+.','',s)
     s = re.sub('ld: warning: -sdk_version and -platform_version are not compatible, ignoring -sdk_version','',s)
+    # ignore superfluous dylibs passed to the linker.
+    s = re.sub('ld: warning: .*, ignoring unexpected dylib file\n','',s)
+    # ignore LLVM Version mismatch garbage; this will just break tests.
+    s = re.sub('You are using an unsupported version of LLVM!.*\n','',s)
+    s = re.sub('Currently only [\.0-9]+ is supported. System LLVM version: [\.0-9]+.*\n','',s)
+    s = re.sub('We will try though\.\.\..*\n','',s)
+    # ignore warning about strip invalidating signatures
+    s = re.sub('.*strip: changes being made to the file will invalidate the code signature in.*\n','',s)
     return s
 
 # normalise a .prof file, so that we can reasonably compare it against
@@ -2280,6 +2286,15 @@ def normalise_output( s: str ) -> str:
     s = re.sub('  -fexternal-dynamic-refs\n','',s)
     s = re.sub('ld: warning: passed .* min versions \(.*\) for platform macOS. Using [\.0-9]+.','',s)
     s = re.sub('ld: warning: -sdk_version and -platform_version are not compatible, ignoring -sdk_version','',s)
+    # ignore superfluous dylibs passed to the linker.
+    s = re.sub('ld: warning: .*, ignoring unexpected dylib file\n','',s)
+    # ignore LLVM Version mismatch garbage; this will just break tests.
+    s = re.sub('You are using an unsupported version of LLVM!.*\n','',s)
+    s = re.sub('Currently only [\.0-9]+ is supported. System LLVM version: [\.0-9]+.*\n','',s)
+    s = re.sub('We will try though\.\.\..*\n','',s)
+    # ignore warning about strip invalidating signatures
+    s = re.sub('.*strip: changes being made to the file will invalidate the code signature in.*\n','',s)
+
     return s
 
 def normalise_asm( s: str ) -> str:
