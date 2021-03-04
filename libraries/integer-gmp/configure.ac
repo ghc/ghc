@@ -4,9 +4,6 @@ AC_INIT([Haskell integer (GMP)], [1.0], [libraries@haskell.org], [integer])
 # Safety check: Ensure that we are in the correct source directory.
 AC_CONFIG_SRCDIR([cbits/wrappers.c])
 
-AC_CANONICAL_TARGET
-
-AC_PROG_CC
 dnl make extensions visible to allow feature-tests to detect them lateron
 AC_USE_SYSTEM_EXTENSIONS
 
@@ -16,25 +13,25 @@ dnl * Deal with arguments telling us gmp is somewhere odd
 dnl--------------------------------------------------------------------
 
 AC_ARG_WITH([gmp-includes],
-  [AC_HELP_STRING([--with-gmp-includes],
+  [AS_HELP_STRING([--with-gmp-includes],
     [directory containing gmp.h])],
     [GMP_INCLUDE_DIRS=$withval; CPPFLAGS="-I$withval"],
     [GMP_INCLUDE_DIRS=])
 
 AC_ARG_WITH([gmp-libraries],
-  [AC_HELP_STRING([--with-gmp-libraries],
+  [AS_HELP_STRING([--with-gmp-libraries],
     [directory containing gmp library])],
     [GMP_LIB_DIRS=$withval; LDFLAGS="-L$withval"],
     [GMP_LIB_DIRS=])
 
 AC_ARG_WITH([gmp-framework-preferred],
-  [AC_HELP_STRING([--with-gmp-framework-preferred],
+  [AS_HELP_STRING([--with-gmp-framework-preferred],
     [on OSX, prefer the GMP framework to the gmp lib])],
     [GMP_PREFER_FRAMEWORK=YES],
     [GMP_PREFER_FRAMEWORK=NO])
 
 AC_ARG_WITH([intree-gmp],
-  [AC_HELP_STRING([--with-intree-gmp],
+  [AS_HELP_STRING([--with-intree-gmp],
     [force using the in-tree GMP])],
     [GMP_FORCE_INTREE=YES],
     [GMP_FORCE_INTREE=NO])
