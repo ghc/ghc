@@ -61,6 +61,7 @@ import GHC.Driver.Monad
 import GHC.Driver.Env
 import GHC.Driver.Errors
 import GHC.Driver.Main
+import GHC.Driver.MakeSem
 
 import GHC.Parser.Header
 import GHC.Parser.Errors.Ppr
@@ -115,7 +116,6 @@ import qualified GHC.Data.FiniteMap as Map ( insertListWith )
 import Control.Concurrent ( forkIOWithUnmask, killThread )
 import qualified GHC.Conc as CC
 import Control.Concurrent.MVar
-import Control.Concurrent.QSem
 import Control.Exception
 import Control.Monad
 import Control.Monad.Trans.Except ( ExceptT(..), runExceptT, throwE )
@@ -133,7 +133,7 @@ import System.FilePath
 import System.IO        ( fixIO )
 import System.IO.Error  ( isDoesNotExistError )
 
-import GHC.Conc ( getNumProcessors, getNumCapabilities, setNumCapabilities )
+import GHC.Conc ( getNumProcessors)
 
 label_self :: String -> IO ()
 label_self thread_name = do
@@ -987,7 +987,9 @@ checkStability hpt sccs all_home_mods =
  - IORef) to save space.
  -
  - Instead of immediately outputting messages to the standard handles, all
- - compilation output is deferred to a per-module TQueue. A QSem is used to
+ - compilation output is deferred to a per-module TQueue.
+TODO Doug update
+A QSem is used to
  - limit the number of workers that are compiling simultaneously.
  -
  - Meanwhile, the main thread sequentially loops over all the modules in the
@@ -1086,23 +1088,8 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods cleanup sccs = do
     -- module successfully gets compiled, its HMI is pruned from the old HPT.
     old_hpt_var <- liftIO $ newIORef old_hpt
 
-    -- What we use to limit parallelism with.
-    par_sem <- liftIO $ newQSem n_jobs
 
-
-    let updNumCapabilities = liftIO $ do
-            n_capabilities <- getNumCapabilities
-            n_cpus <- getNumProcessors
-            -- Setting number of capabilities more than
-            -- CPU count usually leads to high userspace
-            -- lock contention. #9221
-            let n_caps = min n_jobs n_cpus
-            unless (n_capabilities /= 1) $ setNumCapabilities n_caps
-            return n_capabilities
-    -- Reset the number of capabilities once the upsweep ends.
-    let resetNumCapabilities orig_n = liftIO $ setNumCapabilities orig_n
-
-    MC.bracket updNumCapabilities resetNumCapabilities $ \_ -> do
+    withMakeSem n_jobs (parMakeSemaphore dflags) $ \par_sem -> do
 
     -- Sync the global session with the latest HscEnv once the upsweep ends.
     let finallySyncSession io = io `MC.finally` do
@@ -1306,7 +1293,7 @@ parUpsweep_one
     -- ^ The messager
     -> (HscEnv -> IO ())
     -- ^ The callback for cleaning up intermediate files
-    -> QSem
+    -> MakeSem
     -- ^ The semaphore for limiting the number of simultaneous compiles
     -> MVar HscEnv
     -- ^ The MVar that synchronizes updates to the global HscEnv
@@ -1427,7 +1414,7 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_logger lcl_dflags home_unit
         let logg err = printBagOfErrors lcl_logger lcl_dflags (srcErrorMessages err)
 
         -- Limit the number of parallel compiles.
-        let withSem sem = MC.bracket_ (waitQSem sem) (signalQSem sem)
+        let withSem sem = MC.bracket_ (waitMakeSem sem) (signalMakeSem sem)
         mb_mod_info <- withSem par_sem $
             handleSourceError (\err -> do logg err; return Nothing) $ do
                 -- Have the ModSummary and HscEnv point to our local log_action
