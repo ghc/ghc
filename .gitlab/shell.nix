@@ -11,7 +11,7 @@
   # the real fix is to teach terminfo to use libcurses on macOS.
   CONFIGURE_ARGS = "--with-intree-gmp --with-curses-libraries=${pkgs.ncurses.out}/lib";
 
-  buildInputs = with pkgs; [
+  buildInputs = (with pkgs; [
     haskell.compiler.${compiler}
     haskell.packages.${compiler}.cabal-install
     haskell.packages.${compiler}.alex
@@ -47,6 +47,6 @@
     xz
     xlibs.lndir
 
-    cacert
-  ];
+    cacert ])
+  ++ (with pkgs.darwin.apple_sdk.frameworks; [ Foundation Security ]);
 }
