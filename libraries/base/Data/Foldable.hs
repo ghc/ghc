@@ -694,15 +694,18 @@ instance Foldable Maybe where
     foldl _ z Nothing = z
     foldl f z (Just x) = f z x
 
--- | @since 4.16
+-- | @since 2.01
 instance Foldable [] where
     elem    = List.elem
     foldl   = List.foldl
     foldl'  = List.foldl'
     foldl1  = List.foldl1
     foldr   = List.foldr
-    -- | @since 4.16
+    -- This, along with the fold definition below, allows specialized mconcat
+    -- implementations an opportunity to combine elements efficiently in a
+    -- single pass.
     foldMap = (mconcat .) . map
+    fold    = mconcat
     foldr1  = List.foldr1
     length  = List.length
     maximum = List.maximum
@@ -711,8 +714,6 @@ instance Foldable [] where
     product = List.product
     sum     = List.sum
     toList  = id
-    -- | @since 4.16
-    fold = mconcat
 
 -- | @since 4.9.0.0
 instance Foldable NonEmpty where

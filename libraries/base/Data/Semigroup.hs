@@ -490,8 +490,8 @@ instance Monoid m => Semigroup (WrappedMonoid m) where
 -- | @since 4.9.0.0
 instance Monoid m => Monoid (WrappedMonoid m) where
   mempty = WrapMonoid mempty
-  -- By default, we would get a lazy right fold. This forces the use of a strict
-  -- left fold instead.
+  -- This ensures that we use whatever mconcat is defined for the wrapped
+  -- Monoid.
   mconcat = coerce (mconcat :: [m] -> m)
 
 -- | @since 4.9.0.0
