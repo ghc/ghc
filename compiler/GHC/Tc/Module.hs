@@ -294,20 +294,22 @@ tcRnModuleTcRnM hsc_env mod_sum
           $ do { -- Rename and type check the declarations
                  traceRn "rn1a" empty
                ; tcg_env <- if isHsBootOrSig hsc_src
-                            then tcRnHsBootDecls hsc_src local_decls
+                            then do {
+                              ; tcg_env <- tcRnHsBootDecls hsc_src local_decls
+                              ; traceRn "rn4a: before exports" empty
+                              ; tcg_env <- setGblEnv tcg_env $
+                                           tcRnExports explicit_mod_hdr export_ies
+                              ; traceRn "rn4b: after exports" empty
+                              ; return tcg_env
+                              }
                             else {-# SCC "tcRnSrcDecls" #-}
-                                 tcRnSrcDecls explicit_mod_hdr local_decls export_ies
+                                 tcRnSrcDecls explicit_mod_hdr export_ies local_decls
 
                ; whenM (goptM Opt_DoCoreLinting) $
                  lintGblEnv (hsc_logger hsc_env) (hsc_dflags hsc_env) tcg_env
 
                ; setGblEnv tcg_env
-                 $ do { -- Process the export list
-                        traceRn "rn4a: before exports" empty
-                      ; tcg_env <- tcRnExports explicit_mod_hdr export_ies
-                                     tcg_env
-                      ; traceRn "rn4b: after exports" empty
-                      ; -- Compare hi-boot iface (if any) with the real thing
+                 $ do { -- Compare hi-boot iface (if any) with the real thing
                         -- Must be done after processing the exports
                         tcg_env <- checkHiBootIface tcg_env boot_info
                       ; -- The new type env is already available to stuff
@@ -431,12 +433,14 @@ tcRnImports hsc_env import_decls
 -}
 
 tcRnSrcDecls :: Bool  -- False => no 'module M(..) where' header at all
-             -> [LHsDecl GhcPs]               -- Declarations
              -> Maybe (Located [LIE GhcPs])
+             -> [LHsDecl GhcPs]               -- Declarations
              -> TcM TcGblEnv
-tcRnSrcDecls explicit_mod_hdr decls export_ies
+tcRnSrcDecls explicit_mod_hdr export_ies decls
  = do { -- Do all the declarations
       ; (tcg_env, tcl_env, lie) <- tc_rn_src_decls decls
+      ; tcg_env <- setEnvs (tcg_env, tcl_env) $
+                   tcRnExports explicit_mod_hdr export_ies
 
         -- Check for the 'main' declaration
         -- Must do this inside the captureTopConstraints
@@ -1756,7 +1760,8 @@ checkMain explicit_mod_hdr export_ies
         ; tcg_env <- getGblEnv
         ; check_main hsc_env tcg_env explicit_mod_hdr export_ies }
 
-check_main :: HscEnv -> TcGblEnv -> Bool -> Maybe (Located [LIE GhcPs])
+check_main :: HscEnv -> TcGblEnv
+           -> Bool -> Maybe (Located [LIE GhcPs])
            -> TcM TcGblEnv
 check_main hsc_env tcg_env explicit_mod_hdr export_ies
  | mod /= main_mod
@@ -1766,90 +1771,52 @@ check_main hsc_env tcg_env explicit_mod_hdr export_ies
  | otherwise
    -- Compare the list of main functions in scope with those
    --   specified in the export list.
- = do mains_all <- lookupInfoOccRn main_fn
-                    -- get all 'main' functions in scope
-                    -- They may also be imported from other modules!
+ = do
       case exportedMains of -- check the main(s) specified in the export list
+        [main_name] -> generateMainBinding tcg_env main_name
+                          -- The module has exactly one main
+                          -- function in the export spec
+
         [ ] -> do
           -- The module has no main functions in the export spec, so we must give
           -- some kind of error message. The tricky part is giving an error message
           -- that accurately characterizes what the problem is.
           -- See Note [Main module without a main function in the export spec]
-          traceTc "checkMain no main module exported" ppr_mod_mainfn
+          traceTc "checkMain no main module exported" (ppr main_mod <+> ppr main_occ)
           complain_no_main
+
           -- In order to reduce the number of potential error messages, we check
           -- to see if there are any main functions defined (but not exported)...
+          mains_all <- lookupInfoOccRn main_unqual
+
+            -- get all 'main' functions in scope
           case getSomeMain mains_all of
             Nothing -> return tcg_env
               -- ...if there are no such main functions, there is nothing we can do...
-            Just some_main -> use_as_main some_main
+
+            Just some_main -> generateMainBinding tcg_env some_main
                 -- ...if there is such a main function, then communicate this to the
                 -- typechecker. This can prevent a spurious "Ambiguous type variable"
                 -- error message in certain cases, as described in
                 -- Note [Main module without a main function in the export spec].
-        _ -> do    -- The module has one or more main functions in the export spec
-          let mains = filterInsMains exportedMains mains_all
-          case mains of
-            [] -> do  --
-              traceTc "checkMain fail" ppr_mod_mainfn
-              complain_no_main
-              return tcg_env
-            [main_name] -> use_as_main main_name
-            _ -> do           -- multiple main functions are exported
-              addAmbiguousNameErr main_fn          -- issue error msg
-              return tcg_env
+
+        _ -> do { -- Multiple main functions are exported
+                ; addAmbiguousNameErr main_unqual
+                ; return tcg_env }
   where
-    dflags      = hsc_dflags hsc_env
-    mod         = tcg_mod tcg_env
-    main_mod    = mainModIs hsc_env
-    main_mod_nm = moduleName main_mod
-    main_fn     = getMainFun dflags
-    occ_main_fn = occName main_fn
-    interactive = ghcLink dflags == LinkInMemory
-    exportedMains = selExportMains export_ies
-    ppr_mod_mainfn = ppr main_mod <+> ppr main_fn
+    dflags         = hsc_dflags hsc_env
+    mod            = tcg_mod tcg_env
+    exports        = tcg_exports tcg_env
+    main_mod       = mainModIs hsc_env
+    main_mod_nm    = moduleName main_mod
+    main_occ       = getMainOcc dflags
+    main_unqual    = mkRdrUnqual main_occ
+    interactive    = ghcLink dflags == LinkInMemory
 
-    -- There is a single exported 'main' function.
-    use_as_main :: Name -> TcM TcGblEnv
-    use_as_main main_name = do
-        { traceTc "checkMain found" (ppr main_mod <+> ppr main_fn)
-        ; let loc       = srcLocSpan (getSrcLoc main_name)
-        ; ioTyCon <- tcLookupTyCon ioTyConName
-        ; res_ty <- newFlexiTyVarTy liftedTypeKind
-        ; let io_ty = mkTyConApp ioTyCon [res_ty]
-              skol_info = SigSkol (FunSigCtxt main_name False) io_ty []
-              main_expr_rn = L loc (HsVar noExtField (L loc main_name))
-        ; (ev_binds, main_expr)
-               <- checkConstraints skol_info [] [] $
-                  addErrCtxt mainCtxt    $
-                  tcCheckMonoExpr main_expr_rn io_ty
-
-                -- See Note [Root-main Id]
-                -- Construct the binding
-                --      :Main.main :: IO res_ty = runMainIO res_ty main
-        ; run_main_id <- tcLookupId runMainIOName
-        ; let { root_main_name =  mkExternalName rootMainKey rOOT_MAIN
-                                   (mkVarOccFS (fsLit "main"))
-                                   (getSrcSpan main_name)
-              ; root_main_id = Id.mkExportedVanillaId root_main_name
-                                                      (mkTyConApp ioTyCon [res_ty])
-              ; co  = mkWpTyApps [res_ty]
-              -- The ev_binds of the `main` function may contain deferred
-              -- type error when type of `main` is not `IO a`. The `ev_binds`
-              -- must be put inside `runMainIO` to ensure the deferred type
-              -- error can be emitted correctly. See #13838.
-              ; rhs = nlHsApp (mkLHsWrap co (nlHsVar run_main_id)) $
-                        mkHsDictLet ev_binds main_expr
-              ; main_bind = mkVarBind root_main_id rhs }
-
-        ; return (tcg_env { tcg_main  = Just main_name,
-                            tcg_binds = tcg_binds tcg_env
-                                        `snocBag` main_bind,
-                            tcg_dus   = tcg_dus tcg_env
-                                        `plusDU` usesOnly (unitFV main_name)
-                        -- Record the use of 'main', so that we don't
-                        -- complain about it being defined but not used
-        })}
+    exportedMains :: [Name]
+    exportedMains  = [ name | avail <- exports
+                            , name  <- availNames avail
+                            , nameOccName name == main_occ ]
 
     complain_no_main = unless (interactive && not explicit_mod_hdr)
                               (addErrTc noMainMsg)                  -- #12906
@@ -1857,44 +1824,12 @@ check_main hsc_env tcg_env explicit_mod_hdr export_ies
           -- in interactive mode, don't worry about the absence of 'main'.
           -- in other modes, add error message and go on with typechecking.
 
-    mainCtxt  = text "When checking the type of the" <+> pp_main_fn
-    noMainMsg = text "The" <+> pp_main_fn
+    noMainMsg = text "The" <+> ppMainFn main_occ
                 <+> text "is not" <+> text defOrExp <+> text "module"
                 <+> quotes (ppr main_mod)
-    defOrExp  = if null exportedMains then "exported by" else "defined in"
-
-    pp_main_fn = ppMainFn main_fn
-
-    -- Select the main functions from the export list.
-    -- Only the module name is needed, the function name is fixed.
-    selExportMains :: Maybe (Located [LIE GhcPs]) -> [ModuleName]    -- #16453
-    selExportMains Nothing = [main_mod_nm]
-        -- no main specified, but there is a header.
-    selExportMains (Just exps) = fmap fst $
-        filter (\(_,n) -> n == occ_main_fn ) texp
-      where
-        ies = fmap unLoc $ unLoc exps
-        texp = mapMaybe transExportIE ies
-
-    -- Filter all main functions in scope that match the export specs
-    filterInsMains :: [ModuleName] -> [Name] -> [Name]               -- #16453
-    filterInsMains export_mains inscope_mains =
-      [mod | mod <- inscope_mains,
-          (moduleName . nameModule) mod `elem` export_mains]
-
-    -- Transform an export_ie to a (ModuleName, OccName) pair.
-    -- 'IEVar' constructors contain exported values (functions), eg '(Main.main)'
-    -- 'IEModuleContents' constructors contain fully exported modules, eg '(Main)'
-    -- All other 'IE...' constructors are not used and transformed to Nothing.
-    transExportIE :: IE GhcPs -> Maybe (ModuleName, OccName)         -- #16453
-    transExportIE (IEVar _  var) = isQual_maybe $
-         upqual $ ieWrappedName $ unLoc var
-       where
-         -- A module name is always needed, so qualify 'UnQual' rdr names.
-         upqual (Unqual occ) = Qual main_mod_nm occ
-         upqual rdr = rdr
-    transExportIE (IEModuleContents _ mod) = Just (unLoc mod, occ_main_fn)
-    transExportIE _ = Nothing
+    defOrExp | explicit_export_list = "exported by"
+             | otherwise            = "defined in"
+    explicit_export_list = explicit_mod_hdr && isJust export_ies
 
     -- Get a main function that is in scope.
     -- See Note [Main module without a main function in the export spec]
@@ -1911,20 +1846,70 @@ check_main hsc_env tcg_env explicit_mod_hdr export_ies
 
 -- | Get the unqualified name of the function to use as the \"main\" for the main module.
 -- Either returns the default name or the one configured on the command line with -main-is
-getMainFun :: DynFlags -> RdrName
-getMainFun dflags = case mainFunIs dflags of
-                      Just fn -> mkRdrUnqual (mkVarOccFS (mkFastString fn))
-                      Nothing -> main_RDR_Unqual
+getMainOcc :: DynFlags -> OccName
+getMainOcc dflags = case mainFunIs dflags of
+                      Just fn -> mkVarOccFS (mkFastString fn)
+                      Nothing -> mainOcc
 
-ppMainFn :: RdrName -> SDoc
-ppMainFn main_fn
-  | rdrNameOcc main_fn == mainOcc
-  = text "IO action" <+> quotes (ppr main_fn)
+ppMainFn :: OccName -> SDoc
+ppMainFn main_occ
+  | main_occ == mainOcc
+  = text "IO action" <+> quotes (ppr main_occ)
   | otherwise
-  = text "main IO action" <+> quotes (ppr main_fn)
+  = text "main IO action" <+> quotes (ppr main_occ)
 
 mainOcc :: OccName
 mainOcc = mkVarOccFS (fsLit "main")
+
+generateMainBinding :: TcGblEnv -> Name -> TcM TcGblEnv
+-- There is a single exported 'main' function, called 'foo' (say)
+-- Define and typecheck the binding
+--     :Main.main :: IO res_ty = runMainIO res_ty foo
+-- This wraps the user's main function in the top-level stuff
+-- defined in runMainIO (eg catching otherwise un-caught exceptions)
+generateMainBinding tcg_env main_name = do
+    { traceTc "checkMain found" (ppr main_name)
+    ; let loc = srcLocSpan (getSrcLoc main_name)
+    ; ioTyCon <- tcLookupTyCon ioTyConName
+    ; res_ty <- newFlexiTyVarTy liftedTypeKind
+    ; let io_ty = mkTyConApp ioTyCon [res_ty]
+          skol_info = SigSkol (FunSigCtxt main_name False) io_ty []
+          main_expr_rn = L loc (HsVar noExtField (L loc main_name))
+    ; (ev_binds, main_expr)
+           <- checkConstraints skol_info [] [] $
+              addErrCtxt mainCtxt    $
+              tcCheckMonoExpr main_expr_rn io_ty
+
+            -- See Note [Root-main Id]
+            -- Construct the binding
+            --      :Main.main :: IO res_ty = runMainIO res_ty main
+    ; run_main_id <- tcLookupId runMainIOName
+    ; let { root_main_name =  mkExternalName rootMainKey rOOT_MAIN
+                               (mkVarOccFS (fsLit "main"))
+                               (getSrcSpan main_name)
+          ; root_main_id = Id.mkExportedVanillaId root_main_name
+                                                  (mkTyConApp ioTyCon [res_ty])
+          ; co  = mkWpTyApps [res_ty]
+          -- The ev_binds of the `main` function may contain deferred
+          -- type error when type of `main` is not `IO a`. The `ev_binds`
+          -- must be put inside `runMainIO` to ensure the deferred type
+          -- error can be emitted correctly. See #13838.
+          ; rhs = nlHsApp (mkLHsWrap co (nlHsVar run_main_id)) $
+                    mkHsDictLet ev_binds main_expr
+          ; main_bind = mkVarBind root_main_id rhs }
+
+    ; return (tcg_env { tcg_main  = Just main_name,
+                        tcg_binds = tcg_binds tcg_env
+                                    `snocBag` main_bind,
+                        tcg_dus   = tcg_dus tcg_env
+                                    `plusDU` usesOnly (unitFV main_name) })
+                    -- Record the use of 'main', so that we don't
+                    -- complain about it being defined but not used
+    }
+  where
+    mainCtxt= text "When checking the type of the"
+              <+> ppMainFn (nameOccName main_name)
+
 
 {-
 Note [Root-main Id]
@@ -2739,7 +2724,7 @@ tcRnDeclsi :: HscEnv
            -> IO (Messages DecoratedSDoc, Maybe TcGblEnv)
 tcRnDeclsi hsc_env local_decls
   = runTcInteractive hsc_env $
-    tcRnSrcDecls False local_decls Nothing
+    tcRnSrcDecls False Nothing local_decls
 
 externaliseAndTidyId :: Module -> Id -> TcM Id
 externaliseAndTidyId this_mod id

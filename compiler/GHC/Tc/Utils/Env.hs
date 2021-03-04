@@ -435,9 +435,12 @@ tcLookupLcl_maybe name
 tcLookup :: Name -> TcM TcTyThing
 tcLookup name = do
     local_env <- getLclTypeEnv
+    traceRn "tcLookup" (ppr name $$ ppr local_env)
     case lookupNameEnv local_env name of
-        Just thing -> return thing
-        Nothing    -> AGlobal <$> tcLookupGlobal name
+        Just thing -> traceRn "tcLookup: found" (ppr name $$ ppr thing) >>
+                      return thing
+        Nothing    -> traceRn "tcLookup: not found" (ppr name) >>
+                      (AGlobal <$> tcLookupGlobal name)
 
 tcLookupTyVar :: Name -> TcM TcTyVar
 tcLookupTyVar name
