@@ -18,7 +18,7 @@ test('T10384', normal, compile_fail, [''])
 test('T16384', req_th, compile, [''])
 test('T17857', normal, compile, [''])
 test('T18103', normal, compile, [''])
-test('T18263', normal, compile_fail, [''])
+test('T18263', normal, compile, [''])
 test('T18521', normal, compile, [''])
 
 test('TH_tf2', normal, compile, ['-v0'])
