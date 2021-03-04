@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-module TH_finalizer2M where
+module TH_finalizer2M( f, g) where
 
 import Language.Haskell.TH.Syntax
 

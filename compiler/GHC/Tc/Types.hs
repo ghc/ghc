@@ -47,7 +47,9 @@ module GHC.Tc.Types(
         IdBindingInfo(..), ClosedTypeId, RhsNames,
         IsGroupClosed(..),
         SelfBootInfo(..),
-        pprTcTyThingCategory, pprPECategory, CompleteMatch, CompleteMatches,
+        tcTyThingCategory, pprTcTyThingCategory,
+        peCategory, pprPECategory,
+        CompleteMatch, CompleteMatches,
 
         -- Template Haskell
         ThStage(..), SpliceType(..), PendingStuff(..),
@@ -1269,22 +1271,30 @@ instance Outputable PromotionErr where
   ppr NoDataKindsTC               = text "NoDataKindsTC"
   ppr NoDataKindsDC               = text "NoDataKindsDC"
 
+--------------
 pprTcTyThingCategory :: TcTyThing -> SDoc
-pprTcTyThingCategory (AGlobal thing)    = pprTyThingCategory thing
-pprTcTyThingCategory (ATyVar {})        = text "Type variable"
-pprTcTyThingCategory (ATcId {})         = text "Local identifier"
-pprTcTyThingCategory (ATcTyCon {})     = text "Local tycon"
-pprTcTyThingCategory (APromotionErr pe) = pprPECategory pe
+pprTcTyThingCategory = text . capitalise . tcTyThingCategory
 
+tcTyThingCategory :: TcTyThing -> String
+tcTyThingCategory (AGlobal thing)    = tyThingCategory thing
+tcTyThingCategory (ATyVar {})        = "type variable"
+tcTyThingCategory (ATcId {})         = "local identifier"
+tcTyThingCategory (ATcTyCon {})      = "local tycon"
+tcTyThingCategory (APromotionErr pe) = peCategory pe
+
+--------------
 pprPECategory :: PromotionErr -> SDoc
-pprPECategory ClassPE                = text "Class"
-pprPECategory TyConPE                = text "Type constructor"
-pprPECategory PatSynPE               = text "Pattern synonym"
-pprPECategory FamDataConPE           = text "Data constructor"
-pprPECategory ConstrainedDataConPE{} = text "Data constructor"
-pprPECategory RecDataConPE           = text "Data constructor"
-pprPECategory NoDataKindsTC          = text "Type constructor"
-pprPECategory NoDataKindsDC          = text "Data constructor"
+pprPECategory = text . capitalise . peCategory
+
+peCategory :: PromotionErr -> String
+peCategory ClassPE                = "class"
+peCategory TyConPE                = "type constructor"
+peCategory PatSynPE               = "pattern synonym"
+peCategory FamDataConPE           = "data constructor"
+peCategory ConstrainedDataConPE{} = "data constructor"
+peCategory RecDataConPE           = "data constructor"
+peCategory NoDataKindsTC          = "type constructor"
+peCategory NoDataKindsDC          = "data constructor"
 
 {-
 ************************************************************************

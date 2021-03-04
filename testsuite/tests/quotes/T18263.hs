@@ -13,6 +13,12 @@ When looking up something with 'lookupGlobalOccRn_maybe', which is called by
 
 This should still fail to compile though, as reify should complain that "x"
 isn't in the type environment, albeit with one less error.
+
+Later (March 2021): actually this should really compile fine:
+  * The [d| ... |] splices in a top-level binding for x
+  * The reify looks for that binding
+It was really a bug that it didn't work, now fixed.
+
 -}
 
 module T18263 where
