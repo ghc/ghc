@@ -336,6 +336,9 @@ instance Semigroup b => Semigroup (a -> b) where
 -- | @since 2.01
 instance Monoid b => Monoid (a -> b) where
         mempty _ = mempty
+        -- By default, we would get a lazy right fold. This forces the use of a strict
+        -- left fold instead.
+        mconcat fs = \x -> mconcat . map (\f -> f x) $ fs
 
 -- | @since 4.9.0.0
 instance Semigroup () where
