@@ -604,7 +604,7 @@ ppr_sig (CompleteMatchSig _ src cs mty)
       ((hsep (punctuate comma (map ppr (unLoc cs))))
         <+> opt_sig)
   where
-    opt_sig = maybe empty ((\t -> dcolon <+> ppr t) . unLoc) mty
+    opt_sig = maybe empty (\t -> dcolon <+> ppr t) mty
 
 instance OutputableBndrId p
        => Outputable (FixitySig (GhcPass p)) where
