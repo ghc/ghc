@@ -606,7 +606,7 @@ lookupSubBndrOcc_helper must_have_parent warn_if_deprec parent rdr_name
   -- `checkPatSynParent`.
   traceRn "parent" (ppr parent)
   traceRn "lookupExportChild original_gres:" (ppr original_gres)
-  traceRn "lookupExportChild picked_gres:" (ppr $ picked_gres original_gres)
+  traceRn "lookupExportChild picked_gres:" (ppr (picked_gres original_gres) $$ ppr must_have_parent)
   case picked_gres original_gres of
     NoOccurrence ->
       noMatchingParentErr original_gres
@@ -647,6 +647,7 @@ lookupSubBndrOcc_helper must_have_parent warn_if_deprec parent rdr_name
         --     constructors, neither of which is the parent.
         noMatchingParentErr :: [GlobalRdrElt] -> RnM ChildLookupResult
         noMatchingParentErr original_gres = do
+          traceRn "npe" (ppr original_gres)
           overload_ok <- xoptM LangExt.DuplicateRecordFields
           case original_gres of
             [] ->  return NameNotFound

@@ -578,3 +578,11 @@ test('T18357', normal, compile_fail, [''])
 test('T18357a', normal, compile_fail, [''])
 test('T18357b', normal, compile_fail, [''])
 test('T18455', normal, compile_fail, [''])
+test('T19397E1', extra_files(['T19397S.hs']), multimod_compile_fail,
+    ['T19397E1.hs', '-v0'])
+test('T19397E2', extra_files(['T19397S.hs']), multimod_compile_fail,
+    ['T19397E2.hs', '-v0'])
+test('T19397E3', extra_files(['T19397S.hs']), multimod_compile_fail,
+    ['T19397E3.hs', '-v0 -main-is foo'])
+test('T19397E4', extra_files(['T19397S.hs']), multimod_compile_fail,
+    ['T19397E4.hs', '-v0 -main-is foo'])
