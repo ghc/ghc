@@ -1,5 +1,5 @@
 module T11970B ( A(f) ) where
 
-data A = A
+data A = MkA
 
-f = A
+f = MkA
