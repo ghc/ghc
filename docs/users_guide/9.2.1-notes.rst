@@ -210,3 +210,5 @@ Runtime system
       (True,  True)  -> 1
       (False, False) -> 2
       (True,  False) | considerAccessible -> 3 -- No warning!
+
+- TODO Doug Add -jsem flag
