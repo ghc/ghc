@@ -900,10 +900,17 @@ nlHsCompose x y = compose_RDR `nlHsApps` [x, y]
 
 -- | Variant of foldr for producing balanced lists
 foldBal :: (a -> a -> a) -> a -> [a] -> a
-foldBal _  x []  = x
-foldBal _  _ [y] = y
-foldBal op x l   = let (a,b) = splitAt (length l `div` 2) l
-                   in foldBal op x a `op` foldBal op x b
+{-# INLINE foldBal #-} -- inlined to produce specialised code for each op
+foldBal op0 x0 xs0 = fold_bal op0 x0 (length xs0) xs0
+  where
+    fold_bal op x !n xs = case xs of
+      []  -> x
+      [a] -> a
+      _   -> let !nl = n `div` 2
+                 !nr = n - nl
+                 (l,r) = splitAt nl xs
+             in fold_bal op x nl l
+                `op` fold_bal op x nr r
 
 {-
 Note [Generics and unlifted types]
