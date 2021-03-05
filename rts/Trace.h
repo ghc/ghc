@@ -108,6 +108,8 @@ void traceEnd (void);
 void traceSchedEvent_ (Capability *cap, EventTypeNum tag,
                        StgTSO *tso, StgWord info1, StgWord info2);
 
+#define traceInitEvent(event) postInitEvent(event)
+
 /*
  * Record a GC event
  */
@@ -332,6 +334,7 @@ void flushTrace(void);
 #else /* !TRACING */
 
 #define traceSchedEvent(cap, tag, tso, other) /* nothing */
+#define traceInitEvent(event) /* nothing */
 #define traceSchedEvent2(cap, tag, tso, other, info) /* nothing */
 #define traceGcEvent(cap, tag) /* nothing */
 #define traceGcEventAtT(cap, ts, tag) /* nothing */
@@ -354,7 +357,7 @@ void flushTrace(void);
 #define traceCapEvent(cap, tag) /* nothing */
 #define traceCapsetEvent(tag, capset, info) /* nothing */
 #define traceWallClockTime_() /* nothing */
-#define traceOSProcessInfo_() /* nothing */
+#define traceOSProcessInfo_()  /* nothing */
 #define traceSparkCounters_(cap, counters, remaining) /* nothing */
 #define traceTaskCreate_(taskID, cap) /* nothing */
 #define traceTaskMigrate_(taskID, cap, new_cap) /* nothing */
