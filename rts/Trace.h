@@ -336,7 +336,7 @@ void flushTrace(void);
                            copied, slop, fragmentation, \
                            par_n_threads, par_max_copied, \
                            par_tot_copied, par_balanced_copied) /* nothing */
-#define traceEventMemReturn_(cap, current, needed, returned);
+#define traceEventMemReturn_(cap, current, needed, returned)
 #define traceHeapEvent(cap, tag, heap_capset, info1) /* nothing */
 #define traceEventHeapInfo_(heap_capset, gens, \
                             maxHeapSize, allocAreaSize, \
