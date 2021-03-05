@@ -300,8 +300,8 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     initScheduler();
 
     /* Trace some basic information about the process */
-    traceWallClockTime();
-    traceOSProcessInfo();
+    traceInitEvent(traceWallClockTime);
+    traceInitEvent(traceOSProcessInfo);
     flushTrace();
 
     /* initialize the storage manager */
@@ -370,7 +370,7 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
 #if defined(PROFILING)
     initProfiling();
 #endif
-    dumpIPEToEventLog();
+    traceInitEvent(dumpIPEToEventLog);
     initHeapProfiling();
 
     /* start the virtual timer 'subsystem'. */

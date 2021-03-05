@@ -89,6 +89,10 @@ bool eventlog_enabled; // protected by state_change_mutex to ensure
 
 static const EventLogWriter *event_log_writer = NULL;
 
+// List of initialisation functions which are called each time the
+// eventlog is restarted
+static eventlog_init_func_t *eventlog_header_funcs = NULL;
+
 #define EVENT_LOG_SIZE 2 * (1024 * 1024) // 2MB
 
 static int flushCount;
@@ -210,6 +214,8 @@ static void closeBlockMarker(EventsBuf *ebuf);
 
 static StgBool hasRoomForEvent(EventsBuf *eb, EventTypeNum eNum);
 static StgBool hasRoomForVariableEvent(EventsBuf *eb, uint32_t payload_bytes);
+
+static void freeEventLoggingBuffer(void);
 
 static void ensureRoomForEvent(EventsBuf *eb, EventTypeNum tag);
 static int ensureRoomForVariableEvent(EventsBuf *eb, StgWord16 size);
@@ -602,6 +608,50 @@ postHeaderEvents(void)
     postInt32(&eventBuf, EVENT_DATA_BEGIN);
 }
 
+// These events will be reposted everytime we restart the eventlog
+void
+postInitEvent(EventlogInitPost post_init){
+    ACQUIRE_LOCK(&state_change_mutex);
+
+    // Add the event to the global list of events that will be rerun when
+    // the eventlog is restarted.
+    eventlog_init_func_t * new_func;
+    new_func = stgMallocBytes(sizeof(eventlog_init_func_t),"eventlog_init_func");
+    new_func->init_func = post_init;
+    new_func->next = eventlog_header_funcs;
+    eventlog_header_funcs = new_func;
+
+    RELEASE_LOCK(&state_change_mutex);
+    // Actually post it
+    (*post_init)();
+    return;
+}
+
+// Post events again which happened at the start of the eventlog, added by
+// postInitEvent.
+static void repostInitEvents(void){
+    eventlog_init_func_t * current_event = eventlog_header_funcs;
+    for (; current_event != NULL; current_event = current_event->next) {
+      (*(current_event->init_func))();
+    }
+    return;
+}
+
+// Clear the eventlog_header_funcs list and free the memory
+void resetInitEvents(void){
+    eventlog_init_func_t * tmp;
+    eventlog_init_func_t * current_event = eventlog_header_funcs;
+    for (; current_event != NULL; ) {
+      tmp = current_event;
+      current_event = current_event->next;
+      stgFree(tmp);
+    }
+    eventlog_header_funcs = NULL;
+    return;
+
+}
+
+
 static uint32_t
 get_n_capabilities(void)
 {
@@ -689,6 +739,7 @@ startEventLogging(const EventLogWriter *ev_writer)
     event_log_writer = ev_writer;
     bool ret = startEventLogging_();
     eventlog_enabled = true;
+    repostInitEvents();
     RELEASE_LOCK(&state_change_mutex);
     return ret;
 }
@@ -697,11 +748,12 @@ startEventLogging(const EventLogWriter *ev_writer)
 void
 restartEventLogging(void)
 {
-    freeEventLogging();
+    freeEventLoggingBuffer();
     stopEventLogWriter();
     initEventLogging();  // allocate new per-capability buffers
     if (event_log_writer != NULL) {
         startEventLogging_(); // child starts its own eventlog
+        repostInitEvents();   // Repost the initialisation events
     }
 }
 
@@ -782,13 +834,19 @@ moreCapEventBufs (uint32_t from, uint32_t to)
     }
 }
 
-
-void
-freeEventLogging(void)
+static void
+freeEventLoggingBuffer(void)
 {
     if (capEventBuf != NULL)  {
         stgFree(capEventBuf);
     }
+}
+
+void
+freeEventLogging(void)
+{
+    freeEventLoggingBuffer();
+    resetInitEvents();
 }
 
 /*

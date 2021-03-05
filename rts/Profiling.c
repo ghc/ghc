@@ -201,7 +201,7 @@ void initProfiling (void)
         initTimeProfiling();
     }
 
-    dumpCostCentresToEventLog();
+    traceInitEvent(dumpCostCentresToEventLog);
 }
 
 
