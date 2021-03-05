@@ -411,7 +411,6 @@ import Data.Set (Set)
 import qualified Data.Set as S
 import qualified Data.Sequence as Seq
 import Data.Maybe
-import Data.Time
 import Data.Typeable    ( Typeable )
 import Data.Word        ( Word8 )
 import Control.Monad
