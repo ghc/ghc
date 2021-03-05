@@ -11,7 +11,8 @@ module GHC.Tc.Solver(
        pushLevelAndSolveEqualities, pushLevelAndSolveEqualitiesX,
        reportUnsolvedEqualities,
        simplifyWantedsTcM,
-       tcCheckSatisfiability,
+       tcCheckGivens,
+       tcCheckWanteds,
        tcNormalise,
 
        captureTopConstraints,
@@ -805,11 +806,12 @@ simplifyDefault theta
        ; return (isEmptyWC unsolved) }
 
 ------------------
-tcCheckSatisfiability :: InertSet -> Bag EvVar -> TcM (Maybe InertSet)
--- Return (Just new_inerts) if satisfiable, Nothing if definitely contradictory
-tcCheckSatisfiability inerts given_ids = do
+tcCheckGivens :: InertSet -> Bag EvVar -> TcM (Maybe InertSet)
+-- ^ Return (Just new_inerts) if the Givens are satisfiable, Nothing if definitely
+-- contradictory
+tcCheckGivens inerts given_ids = do
   (sat, new_inerts) <- runTcSInerts inerts $ do
-    traceTcS "checkSatisfiability {" (ppr inerts <+> ppr given_ids)
+    traceTcS "checkGivens {" (ppr inerts <+> ppr given_ids)
     lcl_env <- TcS.getLclEnv
     let given_loc = mkGivenLoc topTcLevel UnkSkol lcl_env
     let given_cts = mkGivens given_loc (bagToList given_ids)
@@ -817,7 +819,7 @@ tcCheckSatisfiability inerts given_ids = do
     solveSimpleGivens given_cts
     insols <- getInertInsols
     insols <- try_harder insols
-    traceTcS "checkSatisfiability }" (ppr insols)
+    traceTcS "checkGivens }" (ppr insols)
     return (isEmptyBag insols)
   return $ if sat then Just new_inerts else Nothing
   where
@@ -833,6 +835,18 @@ tcCheckSatisfiability inerts given_ids = do
            ; new_given <- makeSuperClasses pending_given
            ; solveSimpleGivens new_given
            ; getInertInsols }
+
+tcCheckWanteds :: InertSet -> ThetaType -> TcM Bool
+-- ^ Return True if the Wanteds are soluble, False if not
+tcCheckWanteds inerts wanteds = do
+  cts <- newWanteds PatCheckOrigin wanteds
+  (sat, _new_inerts) <- runTcSInerts inerts $ do
+    traceTcS "checkWanteds {" (ppr inerts <+> ppr wanteds)
+    -- See Note [Superclasses and satisfiability]
+    wcs <- solveWantedsAndDrop (mkSimpleWC cts)
+    traceTcS "checkWanteds }" (ppr wcs)
+    return (isSolvedWC wcs)
+  return sat
 
 -- | Normalise a type as much as possible using the given constraints.
 -- See @Note [tcNormalise]@.
