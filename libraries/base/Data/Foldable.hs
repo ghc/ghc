@@ -181,7 +181,6 @@ class Foldable t where
     -- 2666668666666
     --
     fold :: Monoid m => t m -> m
-    {-# INLINE fold #-}
     fold = foldMap id
 
     -- | Map each element of the structure into a monoid, and combine the
