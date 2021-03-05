@@ -54,7 +54,6 @@ import GHC.Utils.Fingerprint
 import GHC.Utils.Binary
 
 import Control.DeepSeq
-import Data.Time
 
 {- Note [Interface file stages]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -500,8 +499,6 @@ emptyFullModIface mod =
           mi_warn_fn = emptyIfaceWarnCache,
           mi_fix_fn = emptyIfaceFixCache,
           mi_hash_fn = emptyIfaceHashCache } }
-
-utcTime0 = UTCTime (toEnum 0) 0
 
 -- | Constructs cache for the 'mi_hash_fn' field of a 'ModIface'
 mkIfaceHashCache :: [(Fingerprint,IfaceDecl)]
