@@ -7,6 +7,9 @@
   # we can't really, as NIX_BUILD_TOP/env-vars is not set.
   noDumpEnvVars=1;
 
+  # stop polluting LDFLAGS with -liconv
+  dontAddExtraLibs = true;
+
   # we need to inject ncurses into --with-curses-libraries.
   # the real fix is to teach terminfo to use libcurses on macOS.
   CONFIGURE_ARGS = "--with-intree-gmp --with-curses-libraries=${pkgs.ncurses.out}/lib";
