@@ -91,6 +91,7 @@ import GHC.Unit.Module.Warnings
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.ModGuts
+import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.Deps
 
 import Data.Function
@@ -135,8 +136,8 @@ mkPartialIface hsc_env mod_details
 -- CgInfos is not available when not generating code (-fno-code), or when not
 -- generating interface pragmas (-fomit-interface-pragmas). See also
 -- Note [Conveying CAF-info and LFInfo between modules] in GHC.StgToCmm.Types.
-mkFullIface :: HscEnv -> PartialModIface -> Maybe CgInfos -> IO ModIface
-mkFullIface hsc_env partial_iface mb_cg_infos = do
+mkFullIface :: HscEnv -> ModSummary -> PartialModIface -> Maybe CgInfos -> IO ModIface
+mkFullIface hsc_env ms partial_iface mb_cg_infos = do
     let decls
           | gopt Opt_OmitInterfacePragmas (hsc_dflags hsc_env)
           = mi_decls partial_iface
@@ -145,7 +146,7 @@ mkFullIface hsc_env partial_iface mb_cg_infos = do
 
     full_iface <-
       {-# SCC "addFingerprints" #-}
-      addFingerprints hsc_env partial_iface{ mi_decls = decls }
+      addFingerprints hsc_env ms partial_iface{ mi_decls = decls }
 
     -- Debug printing
     let unit_state = hsc_units hsc_env
@@ -179,9 +180,10 @@ updateDecl decls (Just CgInfos{ cgNonCafs = NonCaffySet non_cafs, cgLFInfos = lf
 mkIfaceTc :: HscEnv
           -> SafeHaskellMode    -- The safe haskell mode
           -> ModDetails         -- gotten from mkBootModDetails, probably
+          -> ModSummary
           -> TcGblEnv           -- Usages, deprecations, etc
           -> IO ModIface
-mkIfaceTc hsc_env safe_mode mod_details
+mkIfaceTc hsc_env safe_mode mod_details mod_summary
   tc_result@TcGblEnv{ tcg_mod = this_mod,
                       tcg_src = hsc_src,
                       tcg_imports = imports,
@@ -222,7 +224,7 @@ mkIfaceTc hsc_env safe_mode mod_details
                    doc_hdr' doc_map arg_map
                    mod_details
 
-          mkFullIface hsc_env partial_iface Nothing
+          mkFullIface hsc_env mod_summary partial_iface Nothing
 
 mkIface_ :: HscEnv -> Module -> HscSource
          -> Bool -> Dependencies -> GlobalRdrEnv

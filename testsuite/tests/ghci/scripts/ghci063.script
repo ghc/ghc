@@ -16,8 +16,8 @@
 :load B
 
 -- We're going to replace B.hs with an invalid module but without
--- changing its timestamp.  A :reload should *not* look at the
--- contents of the file, because the timestamp hasn't changed.
+-- changing its timestamp.  A :reload should look at the contents of the
+-- file, because the hash has changed.
 :! cp B.hs B.hs-copy
 :! touch -r B.hs B.hs-copy
 :! echo "*** INVALID ***" >B.hs

@@ -107,7 +107,7 @@ data RecompileRequired
   = UpToDate
        -- ^ everything is up to date, recompilation is not required
   | MustCompile
-       -- ^ The .hs file has been touched, or the .o/.hi file does not exist
+       -- ^ The .hs file has been modified, or the .o/.hi file does not exist
   | RecompBecause String
        -- ^ The .o/.hi files are up to date, but something else has changed
        -- to force recompilation; the String says what (one-line summary)
@@ -363,15 +363,15 @@ checkHie :: ModSummary -> IfG RecompileRequired
 checkHie mod_summary = do
     dflags <- getDynFlags
     let hie_date_opt = ms_hie_date mod_summary
-        hs_date = ms_hs_date mod_summary
+        hi_date = ms_iface_date mod_summary
     pure $ case gopt Opt_WriteHie dflags of
                False -> UpToDate
-               True -> case hie_date_opt of
-                           Nothing -> RecompBecause "HIE file is missing"
-                           Just hie_date
-                               | hie_date < hs_date
+               True -> case (hie_date_opt, hi_date) of
+                           (Nothing, _)
+                               -> RecompBecause "HIE file is missing"
+                           (Just hie_date, Just hi_date) | hie_date < hi_date
                                -> RecompBecause "HIE file is out of date"
-                               | otherwise
+                           _
                                -> UpToDate
 
 -- | Check the flags haven't changed
@@ -809,9 +809,10 @@ we use is:
 -- See Note [Fingerprinting IfaceDecls]
 addFingerprints
         :: HscEnv
+        -> ModSummary
         -> PartialModIface
         -> IO ModIface
-addFingerprints hsc_env iface0
+addFingerprints hsc_env ms iface0
  = do
    eps <- hscEPS hsc_env
    let
@@ -1083,12 +1084,14 @@ addFingerprints hsc_env iface0
 
    -- The interface hash depends on:
    --   - the ABI hash, plus
+   --   - the source file hash,
    --   - the module level annotations,
    --   - usages
    --   - deps (home and external packages, dependent files)
    --   - hpc
    iface_hash <- computeFingerprint putNameLiterally
                       (mod_hash,
+                       ms_hs_hash ms,
                        ann_fn (mkVarOcc "module"),  -- See mkIfaceAnnCache
                        mi_usages iface0,
                        sorted_deps,
@@ -1109,6 +1112,7 @@ addFingerprints hsc_env iface0
       , mi_finsts      = not (null (mi_fam_insts iface0))
       , mi_exp_hash    = export_hash
       , mi_orphan_hash = orphan_hash
+      , mi_src_hash    = ms_hs_hash ms
       , mi_warn_fn     = warn_fn
       , mi_fix_fn      = fix_fn
       , mi_hash_fn     = lookupOccEnv local_env

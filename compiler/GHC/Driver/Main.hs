@@ -213,6 +213,7 @@ import GHC.Data.Bag
 import GHC.Data.StringBuffer
 import qualified GHC.Data.Stream as Stream
 import GHC.Data.Stream (Stream)
+import qualified GHC.SysTools
 
 import Data.Data hiding (Fixity, TyCon)
 import Data.Maybe       ( fromJust )
@@ -555,7 +556,7 @@ hsc_typecheck keep_rn mod_summary mb_rdr_module = do
                     Nothing -> hscParse' mod_summary
             tc_result0 <- tcRnModule' mod_summary keep_rn' hpm
             if hsc_src == HsigFile
-                then do (iface, _, _) <- liftIO $ hscSimpleIface hsc_env tc_result0 Nothing
+                then do (iface, _, _) <- liftIO $ hscSimpleIface hsc_env tc_result0 mod_summary Nothing
                         ioMsgMaybe $
                             tcRnMergeSignatures hsc_env hpm tc_result0 iface
                 else return tc_result0
@@ -899,7 +900,7 @@ finish summary tc_result mb_old_hash = do
       -- and generate a simple interface.
       _ -> do
         (iface, mb_old_iface_hash, details) <- liftIO $
-          hscSimpleIface hsc_env tc_result mb_old_hash
+          hscSimpleIface hsc_env tc_result summary mb_old_hash
 
         liftIO $ hscMaybeWriteIface logger dflags True iface mb_old_iface_hash (ms_location summary)
 
@@ -1018,6 +1019,22 @@ hscMaybeWriteIface logger dflags is_simple iface old_iface mod_location = do
                DT_Dyn                              -> write_iface dflags iface
                DT_Failed | not (dynamicNow dflags) -> write_iface dflags iface
                _                                   -> return ()
+
+      when (gopt Opt_WriteHie dflags) $ do
+          -- This is slightly hacky. A hie file is considered to be up to date
+          -- if its modification time on disk is greater than or equal to that
+          -- of the .hi file (since we should always write a .hi file if we are
+          -- writing a .hie file). However, with the way this code is
+          -- structured at the moment, the .hie file is often written before
+          -- the .hi file; by touching the file here, we ensure that it is
+          -- correctly considered up-to-date.
+          --
+          -- The file should exist by the time we get here, but we check for
+          -- existence just in case, so that we don't accidentally create empty
+          -- .hie files.
+          let hie_file = ml_hie_file mod_location
+          whenM (doesFileExist hie_file) $
+            GHC.SysTools.touch logger dflags "Touching hie file" hie_file
 
 --------------------------------------------------------------
 -- NoRecomp handlers
@@ -1487,22 +1504,24 @@ hscSimplify' plugins ds_result = do
 -- generates interface files. See Note [simpleTidyPgm - mkBootModDetailsTc]
 hscSimpleIface :: HscEnv
                -> TcGblEnv
+               -> ModSummary
                -> Maybe Fingerprint
                -> IO (ModIface, Maybe Fingerprint, ModDetails)
-hscSimpleIface hsc_env tc_result mb_old_iface
-    = runHsc hsc_env $ hscSimpleIface' tc_result mb_old_iface
+hscSimpleIface hsc_env tc_result summary mb_old_iface
+    = runHsc hsc_env $ hscSimpleIface' tc_result summary mb_old_iface
 
 hscSimpleIface' :: TcGblEnv
+                -> ModSummary
                 -> Maybe Fingerprint
                 -> Hsc (ModIface, Maybe Fingerprint, ModDetails)
-hscSimpleIface' tc_result mb_old_iface = do
+hscSimpleIface' tc_result summary mb_old_iface = do
     hsc_env   <- getHscEnv
     details   <- liftIO $ mkBootModDetailsTc hsc_env tc_result
     safe_mode <- hscGetSafeMode tc_result
     new_iface
         <- {-# SCC "MkFinalIface" #-}
            liftIO $
-               mkIfaceTc hsc_env safe_mode details tc_result
+               mkIfaceTc hsc_env safe_mode details summary tc_result
     -- And the answer is ...
     liftIO $ dumpIfaceStats hsc_env
     return (new_iface, mb_old_iface, details)
