@@ -422,7 +422,7 @@ important):
         DataCon         -- Constructor. Never an unboxed tuple or sum, as those
                         -- are not allocated.
         ConstructorNumber
-        [Tickish Id]
+        [StgTickish]
         [StgArg]        -- Args
 
 {-
