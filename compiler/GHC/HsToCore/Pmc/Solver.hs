@@ -39,17 +39,16 @@ module GHC.HsToCore.Pmc.Solver (
 import GHC.Prelude
 
 import GHC.HsToCore.Pmc.Types
-import GHC.HsToCore.Pmc.Utils ( tracePm, mkPmId )
+import GHC.HsToCore.Pmc.Utils (tracePm, mkPmId)
 
 import GHC.Driver.Session
 import GHC.Driver.Config
 import GHC.Utils.Outputable
-import GHC.Utils.Error ( pprMsgEnvelopeBagWithLoc )
 import GHC.Utils.Misc
+import GHC.Utils.Monad (allM)
 import GHC.Utils.Panic
 import GHC.Data.Bag
 import GHC.Types.CompleteMatch
-import GHC.Types.Error
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.DSet
 import GHC.Types.Unique.SDFM
@@ -77,7 +76,7 @@ import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim (tYPETyCon)
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type
-import GHC.Tc.Solver   (tcNormalise, tcCheckSatisfiability)
+import GHC.Tc.Solver   (tcNormalise, tcCheckGivens, tcCheckWanteds)
 import GHC.Core.Unify    (tcMatchTy)
 import GHC.Core.Coercion
 import GHC.HsToCore.Monad hiding (foldlM)
@@ -85,7 +84,7 @@ import GHC.Tc.Instance.Family
 import GHC.Core.FamInstEnv
 
 import Control.Applicative ((<|>))
-import Control.Monad (foldM, forM, guard, mzero, when)
+import Control.Monad (foldM, forM, guard, mzero, when, filterM)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State.Strict
 import Data.Coerce
@@ -275,11 +274,7 @@ applies due to refined type information.
 
 -- | The return value of 'pmTopNormaliseType'
 data TopNormaliseTypeResult
-  = NoChange Type
-  -- ^ 'tcNormalise' failed to simplify the type and 'topNormaliseTypeX' was
-  -- unable to reduce the outermost type application, so the type came out
-  -- unchanged.
-  | NormalisedByConstraints Type
+  = NormalisedByConstraints Type
   -- ^ 'tcNormalise' was able to simplify the type with some local constraint
   -- from the type oracle, but 'topNormaliseTypeX' couldn't identify a type
   -- redex.
@@ -303,12 +298,10 @@ data TopNormaliseTypeResult
 -- | Return the fields of 'HadRedexes'. Returns appropriate defaults in the
 -- other cases.
 tntrGuts :: TopNormaliseTypeResult -> (Type, [(Type, DataCon, Type)], Type)
-tntrGuts (NoChange ty)                  = (ty,     [],      ty)
 tntrGuts (NormalisedByConstraints ty)   = (ty,     [],      ty)
 tntrGuts (HadRedexes src_ty ds core_ty) = (src_ty, ds, core_ty)
 
 instance Outputable TopNormaliseTypeResult where
-  ppr (NoChange ty)                  = text "NoChange" <+> ppr ty
   ppr (NormalisedByConstraints ty)   = text "NormalisedByConstraints" <+> ppr ty
   ppr (HadRedexes src_ty ds core_ty) = text "HadRedexes" <+> braces fields
     where
@@ -338,17 +331,12 @@ pmTopNormaliseType (TySt _ inert) typ
        -- Before proceeding, we chuck typ into the constraint solver, in case
        -- solving for given equalities may reduce typ some. See
        -- "Wrinkle: local equalities" in Note [Type normalisation].
-       (_, mb_typ') <- initTcDsForSolver $ tcNormalise inert typ
-       -- If tcNormalise didn't manage to simplify the type, continue anyway.
-       -- We might be able to reduce type applications nonetheless!
-       let typ' = fromMaybe typ mb_typ'
+       typ' <- initTcDsForSolver $ tcNormalise inert typ
        -- Now we look with topNormaliseTypeX through type and data family
        -- applications and newtypes, which tcNormalise does not do.
        -- See also 'TopNormaliseTypeResult'.
        pure $ case topNormaliseTypeX (stepper env) comb typ' of
-         Nothing
-           | Nothing <- mb_typ' -> NoChange typ
-           | otherwise          -> NormalisedByConstraints typ'
+         Nothing                -> NormalisedByConstraints typ'
          Just ((ty_f,tm_f), ty) -> HadRedexes src_ty newtype_dcs core_ty
            where
              src_ty = eq_src_ty ty (typ' : ty_f [ty])
@@ -437,7 +425,6 @@ normaliseSourceTypeWHNF :: TyState -> Type -> DsM Type
 normaliseSourceTypeWHNF _     ty | isSourceTypeInWHNF ty = pure ty
 normaliseSourceTypeWHNF ty_st ty =
   pmTopNormaliseType ty_st ty >>= \case
-    NoChange ty                -> pure ty
     NormalisedByConstraints ty -> pure ty
     HadRedexes ty _ _          -> pure ty
 
@@ -451,7 +438,7 @@ isSourceTypeInWHNF ty
   | otherwise                              = False
 
 {- Note [Type normalisation]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Constructs like -XEmptyCase or a previous unsuccessful pattern match on a data
 constructor place a non-void constraint on the matched thing. This means that it
 boils down to checking whether the type of the scrutinee is inhabited. Function
@@ -707,11 +694,9 @@ tyOracle ty_st@(TySt n inert) cts
   | otherwise
   = do { evs <- traverse nameTyCt cts
        ; tracePm "tyOracle" (ppr cts $$ ppr inert)
-       ; (msgs, res) <- initTcDsForSolver $ tcCheckSatisfiability inert evs
-       ; case res of
-            -- return the new inert set and increment the sequence number n
-            Just mb_new_inert -> return (TySt (n+1) <$> mb_new_inert)
-            Nothing           -> pprPanic "tyOracle" (vcat $ pprMsgEnvelopeBagWithLoc (getErrorMessages msgs)) }
+       ; mb_new_inert <- initTcDsForSolver $ tcCheckGivens inert evs
+         -- return the new inert set and increment the sequence number n
+       ; return (TySt (n+1) <$> mb_new_inert) }
 
 -- | Allocates a fresh 'EvVar' name for 'PredTy's.
 nameTyCt :: PredType -> DsM EvVar
@@ -1500,11 +1485,12 @@ instCon fuel nabla@MkNabla{nabla_ty_st = ty_st} x con = MaybeT $ do
   env <- dsGetFamInstEnvs
   let res_ty = idType x
   norm_res_ty <- normaliseSourceTypeWHNF ty_st res_ty
-  let mb_arg_tys = guessConLikeUnivTyArgsFromResTy env norm_res_ty con
+  mb_arg_tys <- guessConLikeUnivTyArgsFromResTy env ty_st norm_res_ty con
   case mb_arg_tys of
     Just arg_tys -> do
       let (univ_tvs, ex_tvs, eq_spec, thetas, _req_theta, field_tys, _con_res_ty)
             = conLikeFullSig con
+      -- (0) _req_theta has been tested in 'guessConLikeUnivTyArgsFromResTy'
       -- (1) Substitute universals for type arguments
       let subst_univ = zipTvSubst univ_tvs arg_tys
       -- (2) Instantiate fresh existentials as arguments to the constructor.
@@ -1541,33 +1527,43 @@ instCon fuel nabla@MkNabla{nabla_ty_st = ty_st} x con = MaybeT $ do
 -- | Guess the universal argument types of a ConLike from an instantiation of
 -- its (normalised!) result type. So, given
 --
---   K :: forall us. forall es. Q => t1 -> ... -> tn -> con_res_ty
+-- > K :: forall us. forall es. Q => t1 -> ... -> tn -> con_res_ty
 --
 -- It tries to guess @arg_tys@ by matching @norm_res_ty@ and @con_res_ty@, such that
 --
---   K @arg_tys :: forall es. Q' => t1' -> ... -> tn' -> norm_res_ty
+-- > K @arg_tys :: forall es. Q' => t1' -> ... -> tn' -> norm_res_ty
 --
--- Rather easy for DataCons, but not so much for PatSynCons. See Note [Pattern
--- synonym result type] in "GHC.Core.PatSyn".
-guessConLikeUnivTyArgsFromResTy :: FamInstEnvs -> Type -> ConLike -> Maybe [Type]
-guessConLikeUnivTyArgsFromResTy env norm_res_ty (RealDataCon dc) = do
-  -- splitReprTyConApp_maybe rather than splitTyConApp_maybe because of data families.
-  (rep_tc, tc_args, _co) <- splitReprTyConApp_maybe env norm_res_ty
-  if rep_tc == dataConTyCon dc
-    then Just tc_args
-    else Nothing
-guessConLikeUnivTyArgsFromResTy _   norm_res_ty (PatSynCon ps)  = do
-  -- We are successful if we managed to instantiate *every* univ_tv of con.
-  -- This is difficult and bound to fail in some cases, see
-  -- Note [Pattern synonym result type] in GHC.Core.PatSyn. So we just try our best
-  -- here and be sure to return an instantiation when we can substitute every
-  -- universally quantified type variable.
-  -- We *could* instantiate all the other univ_tvs just to fresh variables, I
-  -- suppose, but that means we get weird field types for which we don't know
-  -- anything. So we prefer to keep it simple here.
-  let (univ_tvs,_,_,_,_,con_res_ty) = patSynSig ps
-  subst <- tcMatchTy con_res_ty norm_res_ty
-  traverse (lookupTyVar subst) univ_tvs
+-- Rather easy for DataCons, but not so much for PatSynCons.
+-- See Note [Pattern synonym result type] in "GHC.Core.PatSyn".
+-- Additionally, for PatSynCons, we need to consider the required constraints.
+guessConLikeUnivTyArgsFromResTy :: FamInstEnvs -> TyState -> Type -> ConLike -> DsM (Maybe [Type])
+guessConLikeUnivTyArgsFromResTy env (TySt _ inert) norm_res_ty cl =
+  case cl of
+    RealDataCon dc -> pure $ do
+      -- splitReprTyConApp_maybe rather than splitTyConApp_maybe because of data families.
+      (rep_tc, tc_args, _co) <- splitReprTyConApp_maybe env norm_res_ty
+      if rep_tc == dataConTyCon dc
+        then Just tc_args
+        else Nothing
+    PatSynCon ps   -> runMaybeT $ do
+      let hoist = MaybeT . pure
+      -- We are successful if we managed to instantiate *every* univ_tv of con.
+      -- This is difficult and bound to fail in some cases, see
+      -- Note [Pattern synonym result type] in GHC.Core.PatSyn. So we just try our best
+      -- here and be sure to return an instantiation when we can substitute every
+      -- universally quantified type variable.
+      -- We *could* instantiate all the other univ_tvs just to fresh variables, I
+      -- suppose, but that means we get weird field types for which we don't know
+      -- anything. So we prefer to keep it simple here.
+      let (univ_tvs,req_theta,_,_,_,con_res_ty) = patSynSig ps
+      subst <- hoist $ tcMatchTy con_res_ty norm_res_ty
+      arg_tys <- hoist $ traverse (lookupTyVar subst) univ_tvs
+      let req_theta' = substTys subst req_theta
+      if null req_theta' then pure arg_tys else do
+        sat <- lift $ initTcDsForSolver $ tcCheckWanteds inert req_theta'
+        if sat
+          then pure arg_tys
+          else mzero
 
 {- Note [Soundness and completeness]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1809,7 +1805,7 @@ generateInhabitingPatterns (x:xs) n nabla = do
             Nothing         -> addCompleteMatches (vi_rcm vi)
 
           -- Test all COMPLETE sets for inhabitants (n inhs at max). Take care of ⊥.
-          clss <- pickApplicableCompleteSets rep_ty rcm
+          clss <- pickApplicableCompleteSets (nabla_ty_st nabla) rep_ty rcm
           case NE.nonEmpty (uniqDSetToList . cmConLikes <$> clss) of
             Nothing ->
               -- No COMPLETE sets ==> inhabited
@@ -1860,24 +1856,26 @@ generateInhabitingPatterns (x:xs) n nabla = do
       other_cons_nablas <- instantiate_cons x ty xs (n - length con_nablas) nabla cls
       pure (con_nablas ++ other_cons_nablas)
 
-pickApplicableCompleteSets :: Type -> ResidualCompleteMatches -> DsM [CompleteMatch]
+pickApplicableCompleteSets :: TyState -> Type -> ResidualCompleteMatches -> DsM [CompleteMatch]
 -- See Note [Implementation of COMPLETE pragmas] on what "applicable" means
-pickApplicableCompleteSets ty rcm = do
-  env <- dsGetFamInstEnvs
-  let applicable :: CompleteMatch -> Bool
-      applicable cm = all (is_valid env) (uniqDSetToList (cmConLikes cm))
-                   && completeMatchAppliesAtType ty cm
-      applicableMatches = filter applicable (getRcm rcm)
+pickApplicableCompleteSets ty_st ty rcm = do
+  let cl_res_ty_ok :: ConLike -> DsM Bool
+      cl_res_ty_ok cl = do
+        env <- dsGetFamInstEnvs
+        isJust <$> guessConLikeUnivTyArgsFromResTy env ty_st ty cl
+  let cm_applicable :: CompleteMatch -> DsM Bool
+      cm_applicable cm = do
+        cls_ok <- allM cl_res_ty_ok (uniqDSetToList (cmConLikes cm))
+        let match_ty_ok = completeMatchAppliesAtType ty cm
+        pure (cls_ok && match_ty_ok)
+  applicable_cms <- filterM cm_applicable (getRcm rcm)
   tracePm "pickApplicableCompleteSets:" $
     vcat
       [ ppr ty
       , ppr rcm
-      , ppr applicableMatches
+      , ppr applicable_cms
       ]
-  return applicableMatches
-  where
-    is_valid :: FamInstEnvs -> ConLike -> Bool
-    is_valid env cl = isJust (guessConLikeUnivTyArgsFromResTy env ty cl)
+  return applicable_cms
 
 {- Note [Why inhabitationTest doesn't call generateInhabitingPatterns]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
