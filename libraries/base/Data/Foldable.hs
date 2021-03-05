@@ -182,6 +182,7 @@ class Foldable t where
     --
     fold :: Monoid m => t m -> m
     fold = foldMap id
+    {-# INLINE fold #-}
 
     -- | Map each element of the structure into a monoid, and combine the
     -- results with @('<>')@.  This fold is right-associative and lazy in the
