@@ -259,6 +259,7 @@ rtsPackageArgs = package rts ? do
     let ghcArgs = mconcat
           [ arg "-Irts"
           , arg $ "-I" ++ path
+          , flag WithDtrace ? arg "-DDTRACE"
           , arg $ "-DRtsWay=\"rts_" ++ show way ++ "\""
           -- Set the namespace for the rts fs functions
           , arg $ "-DFS_NAMESPACE=rts"
@@ -275,6 +276,7 @@ rtsPackageArgs = package rts ? do
     let cArgs = mconcat
           [ rtsWarnings
           , flag UseSystemFfi ? arg ("-I" ++ ffiIncludeDir)
+          , flag WithDtrace ? arg "-DDTRACE"
           , flag WithLibdw ? arg ("-I" ++ libdwIncludeDir)
           , arg "-fomit-frame-pointer"
           -- RTS *must* be compiled with optimisations. The INLINE_HEADER macro
@@ -317,7 +319,7 @@ rtsPackageArgs = package rts ? do
             , "-DTablesNextToCode="          ++ show ghcEnableTNC
             ]
 
-          -- We're after pur performance here. So make sure fast math and
+          -- We're after pure performance here. So make sure fast math and
           -- vectorization is enabled.
           , input "**/xxhash.c" ? pure
             [ "-O3"
@@ -377,6 +379,9 @@ rtsPackageArgs = package rts ? do
         , builder (Cc FindCDependencies) ? cArgs
         , builder (Ghc CompileCWithGhc) ? map ("-optc" ++) <$> cArgs
         , builder (Ghc CompileCppWithGhc) ? map ("-optcxx" ++) <$> cArgs
+        , builder Dtrace ?
+          arg "-C" <>
+          (filter ("-I" `isPrefixOf`) <$> cArgs <> arg "-Iincludes")
         , builder Ghc ? ghcArgs
 
         , builder HsCpp ? pure
