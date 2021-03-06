@@ -307,7 +307,10 @@ hadrian-ghc-in-ghci:
     TIME_BUILD_DELTA=$(expr $TIME_BUILD - $TIME_CONFIGURE)
     echo "Build took $TIME_BUILD_DELTA seconds"
 
+    set +e
     time .gitlab/ci.sh test_make 2>&1
+    status=$?
+    set -e
     TIME_TEST=$(date +%s)
     TIME_TEST_DELTA=$(expr $TIME_TEST - $TIME_BUILD)
     echo "Test took $TIME_TEST_DELTA seconds"
@@ -317,6 +320,7 @@ hadrian-ghc-in-ghci:
     echo "Configure  | $TIME_CONFIGURE_DELTA"
     echo "Build      | $TIME_BUILD_DELTA"
     echo "Test       | $TIME_TEST_DELTA"
+    exit $status
 
   dependencies: []
   artifacts:
@@ -489,22 +493,26 @@ validate-x86_64-darwin:
     TIME_START=$(date +%s)
     find libraries -name config.sub -exec cp config.sub {} \;
 
-    runInNixShell ".gitlab/ci.sh setup"
+    time runInNixShell ".gitlab/ci.sh setup" 2>&1
     TIME_SETUP=$(date +%s)
     TIME_SETUP_DELTA=$(expr $TIME_SETUP - $TIME_START)
     echo "Setup took $TIME_SETUP_DELTA seconds"
 
-    runInNixShell ".gitlab/ci.sh configure"
+    time runInNixShell ".gitlab/ci.sh configure" 2>&1
     TIME_CONFIGURE=$(date +%s)
     TIME_CONFIGURE_DELTA=$(expr $TIME_CONFIGURE - $TIME_SETUP)
     echo "Configure took $TIME_CONFIGURE_DELTA seconds"
 
-    runInNixShell ".gitlab/ci.sh build_make"
+    time runInNixShell ".gitlab/ci.sh build_make" 2>&1
     TIME_BUILD=$(date +%s)
     TIME_BUILD_DELTA=$(expr $TIME_BUILD - $TIME_CONFIGURE)
     echo "Build took $TIME_BUILD_DELTA seconds"
 
-    runInNixShell ".gitlab/ci.sh test_make"
+    set +e
+    time runInNixShell ".gitlab/ci.sh test_make" 2>&1
+    status=$?
+    set -e
+
     TIME_TEST=$(date +%s)
     TIME_TEST_DELTA=$(expr $TIME_TEST - $TIME_BUILD)
     echo "Test took $TIME_TEST_DELTA seconds"
@@ -514,6 +522,7 @@ validate-x86_64-darwin:
     echo "Configure  | $TIME_CONFIGURE_DELTA"
     echo "Build      | $TIME_BUILD_DELTA"
     echo "Test       | $TIME_TEST_DELTA"
+    exit $status
 
   artifacts:
     reports:
@@ -569,22 +578,25 @@ validate-aarch64-darwin:
     TIME_START=$(date +%s)
     find libraries -name config.sub -exec cp config.sub {} \;
 
-    runInNixShell ".gitlab/ci.sh setup"
+    time runInNixShell ".gitlab/ci.sh setup" 2>&1
     TIME_SETUP=$(date +%s)
     TIME_SETUP_DELTA=$(expr $TIME_SETUP - $TIME_START)
     echo "Setup took $TIME_SETUP_DELTA seconds"
 
-    runInNixShell ".gitlab/ci.sh configure"
+    time runInNixShell ".gitlab/ci.sh configure" 2>&1
     TIME_CONFIGURE=$(date +%s)
     TIME_CONFIGURE_DELTA=$(expr $TIME_CONFIGURE - $TIME_SETUP)
     echo "Setup took $TIME_CONFIGURE_DELTA seconds"
 
-    runInNixShell ".gitlab/ci.sh build_make"
+    time runInNixShell ".gitlab/ci.sh build_make" 2>&1
     TIME_BUILD=$(date +%s)
     TIME_BUILD_DELTA=$(expr $TIME_BUILD - $TIME_CONFIGURE)
     echo "Build took $TIME_BUILD_DELTA seconds"
 
-    runInNixShell ".gitlab/ci.sh test_make"
+    set +e
+    time runInNixShell ".gitlab/ci.sh test_make" 2>&1
+    status=$?
+    set -e
     TIME_TEST=$(date +%s)
     TIME_TEST_DELTA=$(expr $TIME_TEST - $TIME_BUILD)
     echo "Test took $TIME_TEST_DELTA seconds"
@@ -594,6 +606,7 @@ validate-aarch64-darwin:
     echo "Configure  | $TIME_CONFIGURE_DELTA"
     echo "Build      | $TIME_BUILD_DELTA"
     echo "Test       | $TIME_TEST_DELTA"
+    exit $status
 
   artifacts:
     reports:
