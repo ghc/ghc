@@ -199,6 +199,8 @@ libdw-lib-dir       = @LibdwLibDir@
 libnuma-include-dir   = @LibNumaIncludeDir@
 libnuma-lib-dir       = @LibNumaLibDir@
 
+libsystemtap-include-dir = @LibsystemtapIncludeDir@
+
 # Optional Dependencies:
 #=======================
 

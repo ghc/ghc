@@ -873,7 +873,7 @@ AC_PATH_PROGS(PatchCmd,gpatch patch, patch)
 dnl ** check for autoreconf
 AC_PATH_PROG(AutoreconfCmd, autoreconf, autoreconf)
 
-dnl ** check for dtrace (currently only implemented for Mac OS X)
+dnl ** check for dtrace
 AC_ARG_ENABLE(dtrace,
     [AS_HELP_STRING([--enable-dtrace],
         [Enable DTrace])],
@@ -884,16 +884,41 @@ AC_ARG_ENABLE(dtrace,
 HaveDtrace=NO
 
 AC_PATH_PROG(DtraceCmd,dtrace)
+
 if test "x$EnableDtrace" = "xyes"; then
   if test -n "$DtraceCmd"; then
     if test "x$TargetOS_CPP-$TargetVendor_CPP" = "xdarwin-apple" \
       -o "x$TargetOS_CPP-$TargetVendor_CPP" = "xfreebsd-portbld" \
+      -o "x$TargetOS_CPP-$TargetVendor_CPP" = "xlinux-unknown" \
       -o "x$TargetOS_CPP-$TargetVendor_CPP" = "xsolaris2-unknown"; then
       HaveDtrace=YES
     fi
   fi
 fi
+
 AC_SUBST(HaveDtrace)
+
+dnl ** check for libsystemtap
+
+AC_ARG_WITH([libsystemtap-includes],
+  [AC_HELP_STRING([--with-libsystemtap-includes=ARG],
+  [Find includes for libsystemtap in ARG (for DTrace probes on linux) [default=system default]])],
+  [LibsystemtapIncludeDir="$withval"; LIBSYSTEMTAP_CFLAGS="-I$withval"])
+
+AC_SUBST(LibsystemtapIncludeDir)
+
+if test "x$HaveDtrace" = "xYES" \
+  -a "x$TargetOS_CPP-$TargetVendor_CPP" = "xlinux-unknown"; then
+  CFLAGS2="$CFLAGS"
+  CFLAGS="$LIBSYSTEMTAP_CFLAGS $CFLAGS"
+
+  AC_CHECK_HEADER([sys/sdt.h],
+    [],
+    [AC_MSG_ERROR([DTrace support on Linux needs sys/sdt.h header])])
+
+  CFLAGS="$CFLAGS2"
+fi
+
 
 AC_PATH_PROG(HSCOLOUR,HsColour)
 # HsColour is passed to Cabal, so we need a native path

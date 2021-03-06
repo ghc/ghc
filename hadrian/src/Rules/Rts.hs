@@ -51,7 +51,7 @@ buildRtsDtraceProbes stage what out =
 rtsDtraceProbes :: Stage -> Action [FilePath]
 rtsDtraceProbes stage = do
     withDtrace <- flag WithDtrace
-    osRequiresStub <- anyTargetOs ["solaris2", "freebsd"]
+    osRequiresStub <- anyTargetOs ["linux", "solaris2", "freebsd"]
     buildPath <- rtsBuildPath stage
 
     need (map

@@ -56,6 +56,7 @@ data Setting = BuildArch
              | HostOsHaskell
              | IconvIncludeDir
              | IconvLibDir
+             | LibsystemtapIncludeDir
              | LibdwIncludeDir
              | LibdwLibDir
              | LibnumaIncludeDir
@@ -154,6 +155,7 @@ setting key = lookupValueOrError configFile $ case key of
     HostOsHaskell      -> "host-os-haskell"
     IconvIncludeDir    -> "iconv-include-dir"
     IconvLibDir        -> "iconv-lib-dir"
+    LibsystemtapIncludeDir  -> "libsystemtap-include-dir"
     LibdwIncludeDir    -> "libdw-include-dir"
     LibdwLibDir        -> "libdw-lib-dir"
     LibnumaIncludeDir  -> "libnuma-include-dir"

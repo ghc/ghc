@@ -567,6 +567,15 @@ rts_PACKAGE_CPP_OPTS += -DLIBDW_LIB_DIR=
 endif
 
 # -----------------------------------------------------------------------------
+# libsystemtap for Dtrace on linux
+
+ifeq "$(USE_DTRACE)" "YES"
+rts_PACKAGE_CPP_OPTS += -DLIBSYSTEMTAP_INCLUDE_DIR=$(LibsystemptapIncludeDir)
+else
+rts_PACKAGE_CPP_OPTS += -DLIBSYSTEMTAP_INCLUDE_DIR=
+endif
+
+# -----------------------------------------------------------------------------
 # dependencies
 
 rts_WAYS_DASHED = $(subst $(space),,$(patsubst %,-%,$(strip $(rts_WAYS))))

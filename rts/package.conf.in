@@ -74,6 +74,9 @@ include-dirs:           TOP"/rts/include"
                         TOP"/rts/dist-install/build/include"
                         FFI_INCLUDE_DIR
                         LIBDW_INCLUDE_DIR
+#if defined(LIBSYSTEMPTAP_INCLUDE_DIR)
+                        LIBSYSTEMPTAP_INCLUDE_DIR
+#endif
 #endif
 
 includes:               Stg.h
