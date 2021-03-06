@@ -16,12 +16,7 @@ module GHC.Exts.Heap.Closures (
     , WhyBlocked(..)
     , TsoFlags(..)
     , allClosures
-#if __GLASGOW_HASKELL__ >= 809
-    -- The closureSize# primop is unsupported on earlier GHC releases but we
-    -- build ghc-heap as a boot library so it must be buildable. Drop this once
-    -- we are guaranteed to bootstsrap with GHC >= 8.9.
     , closureSize
-#endif
 
     -- * Boxes
     , Box(..)
@@ -430,11 +425,9 @@ allClosures (WeakClosure {..}) = [cfinalizers, key, value, finalizer, link]
 allClosures (OtherClosure {..}) = hvalues
 allClosures _ = []
 
-#if __GLASGOW_HASKELL__ >= 809
 -- | Get the size of the top-level closure in words.
 -- Includes header and payload. Does not follow pointers.
 --
 -- @since 8.10.1
 closureSize :: Box -> Int
 closureSize (Box x) = I# (closureSize# x)
-#endif

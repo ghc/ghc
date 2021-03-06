@@ -1,4 +1,5 @@
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE Trustworthy #-}
 
 -- |
@@ -29,17 +30,12 @@ import Prelude
 -- * Type synonyms
 ----------------------------------------------------------
 
--- Since GHC 8.8 is currently the minimum boot compiler version that we must
--- support, we must use inline kind signatures to make TExpQ and CodeQ
--- levity polymorphic. When we drop support for GHC 8.8, we can instead use
--- standalone kind signatures, which are provided as comments.
-
 -- | Levity-polymorphic since /template-haskell-2.17.0.0/.
--- type TExpQ :: TYPE r -> Kind.Type
-type TExpQ (a :: TYPE r) = Q (TExp a)
+type TExpQ :: TYPE r -> Kind.Type
+type TExpQ a = Q (TExp a)
 
--- type CodeQ :: TYPE r -> Kind.Type
-type CodeQ = Code Q :: (TYPE r -> Kind.Type)
+type CodeQ :: TYPE r -> Kind.Type
+type CodeQ = Code Q
 
 type InfoQ               = Q Info
 type PatQ                = Q Pat
