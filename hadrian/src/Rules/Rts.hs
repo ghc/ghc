@@ -1,9 +1,11 @@
-module Rules.Rts (rtsRules, needRtsLibffiTargets, needRtsSymLinks) where
+module Rules.Rts (rtsRules, needRtsLibffiTargets, needRtsSymLinks, rtsProbesStub) where
 
 import Packages (rts, rtsBuildPath, libffiBuildPath, libffiLibraryName, rtsContext)
 import Rules.Libffi
 import Hadrian.Utilities
 import Settings.Builders.Common
+import Utilities
+import Target
 
 -- | This rule has priority 3 to override the general rule for generating shared
 -- library files (see Rules.Library.libraryRules).
@@ -21,10 +23,14 @@ rtsRules = priority 3 $ do
             (addRtsDummyVersion $ takeFileName rtsLibFilePath')
             rtsLibFilePath'
 
-    -- Libffi
     forM_ [Stage1 ..] $ \ stage -> do
         let buildPath = root -/- buildDir (rtsContext stage)
 
+        -- Dtrace
+        buildPath -/- "RtsProbes.h" %> buildRtsProbes stage DtraceHeader
+        buildPath -/- "RtsProbes.o" %> buildRtsProbes stage DtraceStub
+
+        -- Libffi
         -- Header files
         (fmap (buildPath -/-) libffiHeaderFiles) &%> const (copyLibffiHeaders stage)
 
@@ -35,6 +41,38 @@ rtsRules = priority 3 $ do
         buildPath -/- "libffi*.dylib*" %> copyLibffiDynamicUnix stage ".dylib"
         buildPath -/- "libffi*.so*"    %> copyLibffiDynamicUnix stage ".so"
         buildPath -/- "libffi*.dll*"   %> copyLibffiDynamicWin  stage
+
+buildRtsProbes :: Stage -> DtraceMode -> FilePath -> Action ()
+buildRtsProbes stage what out =
+    build (target (rtsContext stage) (Dtrace what) ["rts/RtsProbes.d"] [out])
+
+rtsProbesStub :: Stage -> Action [FilePath]
+rtsProbesStub stage = do
+    withDtrace <- flag WithDtrace
+    osRequiresStub <- anyTargetOs ["solaris2", "freebsd"]
+    buildPath <- rtsBuildPath stage
+
+    need (map
+      (buildPath -/-)
+      ["ghcautoconf.h", "ghcplatform.h", "ghcversion.h"])
+
+    header <-
+      if withDtrace
+      then do
+        let out = buildPath -/- "RtsProbes.h"
+        need [out]
+        return [out]
+      else return []
+
+    obj <-
+      if withDtrace && osRequiresStub
+      then do
+        let obj = buildPath -/- "RtsProbes.o"
+        need [obj]
+        return [obj]
+      else return []
+
+    return (header ++ obj)
 
 withLibffi :: Stage -> (FilePath -> FilePath -> Action a) -> Action a
 withLibffi stage action = needLibffi stage
