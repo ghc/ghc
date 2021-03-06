@@ -145,14 +145,7 @@ getClosureDataFromHeapObject
     -- ^ Heap representation of the closure.
 getClosureDataFromHeapObject x = do
     case unpackClosure# x of
-#if MIN_VERSION_ghc_prim(0,5,3)
         (# infoTableAddr, heapRep, pointersArray #) -> do
-#else
-        -- This is a hack to cover the bootstrap compiler using the old version
-        -- of 'unpackClosure'. The new 'unpackClosure' return values are not
-        -- merely a reordering, so using the old version would not work.
-        (# infoTableAddr, pointersArray, heapRep #) -> do
-#endif
             let infoTablePtr = Ptr infoTableAddr
                 ptrList = [case indexArray# pointersArray i of
                                 (# ptr #) -> Box ptr

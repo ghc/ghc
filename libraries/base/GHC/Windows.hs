@@ -74,7 +74,7 @@ module GHC.Windows (
         nullHANDLE,
     ) where
 
-import Data.Bits (shiftL, shiftR, (.|.), (.&.))
+import Data.Bits (finiteBitSize, shiftL, shiftR, (.|.), (.&.))
 import Data.Char
 import Data.OldList
 import Data.Maybe
@@ -92,15 +92,6 @@ import GHC.Real (fromIntegral)
 import System.IO.Error
 
 import qualified Numeric
-
-#if MIN_VERSION_base(4,7,0)
-import Data.Bits (finiteBitSize)
-#else
-import Data.Bits (Bits, bitSize)
-
-finiteBitSize :: (Bits a) => a -> Int
-finiteBitSize = bitSize
-#endif
 
 #include "windows_cconv.h"
 

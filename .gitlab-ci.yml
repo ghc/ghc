@@ -485,8 +485,8 @@ validate-x86_64-darwin:
   tags:
     - x86_64-darwin
   variables:
-    GHC_VERSION: 8.8.4
-    CABAL_INSTALL_VERSION: 3.0.0.0
+    GHC_VERSION: 8.10.4
+    CABAL_INSTALL_VERSION: 3.2.0.0
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-apple-darwin.tar.xz"
     MACOSX_DEPLOYMENT_TARGET: "10.7"
     # Only Sierra and onwards supports clock_gettime. See #12858
@@ -518,7 +518,7 @@ validate-x86_64-darwin:
   tags:
     - x86_64-darwin
   variables:
-    GHC_VERSION: 8.8.4
+    GHC_VERSION: 8.10.4
     MACOSX_DEPLOYMENT_TARGET: "10.7"
     ac_cv_func_clock_gettime: "no"
     LANG: "en_US.UTF-8"
@@ -979,8 +979,8 @@ release-x86_64-linux-fedora27-dwarf:
     #FORCE_SYMLINKS: 1
     LANG: "en_US.UTF-8"
     SPHINXBUILD: "/mingw64/bin/sphinx-build.exe"
-    CABAL_INSTALL_VERSION: "3.0.0.0"
-    GHC_VERSION: "8.8.4"
+    CABAL_INSTALL_VERSION: "3.2.0.0"
+    GHC_VERSION: "8.10.4"
   cache:
     paths:
       - cabal-cache
