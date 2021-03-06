@@ -1764,6 +1764,7 @@ check_main hsc_env tcg_env explicit_mod_hdr export_ies
    return tcg_env
 
  | otherwise
+   -- See Note [Checking the export of the main function]
    -- Compare the list of main functions in scope with those
    --   specified in the export list.
  = do mains_all <- lookupInfoOccRn main_fn
@@ -1788,7 +1789,15 @@ check_main hsc_env tcg_env explicit_mod_hdr export_ies
                 -- error message in certain cases, as described in
                 -- Note [Main module without a main function in the export spec].
         _ -> do    -- The module has one or more main functions in the export spec
-          let mains = filterInsMains exportedMains mains_all
+          let mains = if any isUnqual exportedMains
+                      then mains_all
+                      else filterInsMains (mapMaybe rdrModName exportedMains) mains_all
+                where
+                  rdrModName (Qual mn _) = Just mn
+                  rdrModName _           = Nothing
+                  -- as the name of the main function is fixed, and we have at most
+                  -- only one main function per module. We only need the module names
+                  -- with main functions for further checking
           case mains of
             [] -> do  --
               traceTc "checkMain fail" ppr_mod_mainfn
@@ -1866,15 +1875,18 @@ check_main hsc_env tcg_env explicit_mod_hdr export_ies
     pp_main_fn = ppMainFn main_fn
 
     -- Select the main functions from the export list.
-    -- Only the module name is needed, the function name is fixed.
-    selExportMains :: Maybe (Located [LIE GhcPs]) -> [ModuleName]    -- #16453
-    selExportMains Nothing = [main_mod_nm]
-        -- no main specified, but there is a header.
-    selExportMains (Just exps) = fmap fst $
-        filter (\(_,n) -> n == occ_main_fn ) texp
+    selExportMains ::  Maybe (Located [LIE GhcPs]) -> [RdrName] -- #16453/#17397
+    selExportMains Nothing
+      | explicit_mod_hdr = [mkRdrQual main_mod_nm occ_main_fn]
+          -- The module has a header but no export list: `module Main where`
+          -- Export only a non imported main function (Main.main).
+      | otherwise = [mkRdrUnqual occ_main_fn]
+          -- The module has no header: simulate a `module Main (main) where`.
+          -- Export every `main` function in scope.
+    selExportMains (Just exps) = filter isMain $ mapMaybe transExportIE ies
       where
         ies = fmap unLoc $ unLoc exps
-        texp = mapMaybe transExportIE ies
+        isMain rdr = rdrNameOcc rdr == occ_main_fn
 
     -- Filter all main functions in scope that match the export specs
     filterInsMains :: [ModuleName] -> [Name] -> [Name]               -- #16453
@@ -1882,18 +1894,16 @@ check_main hsc_env tcg_env explicit_mod_hdr export_ies
       [mod | mod <- inscope_mains,
           (moduleName . nameModule) mod `elem` export_mains]
 
-    -- Transform an export_ie to a (ModuleName, OccName) pair.
+    -- Transform an export_ie to a Maybe RdrName.
     -- 'IEVar' constructors contain exported values (functions), eg '(Main.main)'
     -- 'IEModuleContents' constructors contain fully exported modules, eg '(Main)'
     -- All other 'IE...' constructors are not used and transformed to Nothing.
-    transExportIE :: IE GhcPs -> Maybe (ModuleName, OccName)         -- #16453
-    transExportIE (IEVar _  var) = isQual_maybe $
-         upqual $ ieWrappedName $ unLoc var
-       where
-         -- A module name is always needed, so qualify 'UnQual' rdr names.
-         upqual (Unqual occ) = Qual main_mod_nm occ
-         upqual rdr = rdr
-    transExportIE (IEModuleContents _ mod) = Just (unLoc mod, occ_main_fn)
+    transExportIE :: IE GhcPs -> Maybe RdrName                -- #16453/#17397
+    transExportIE (IEVar _  var) = Just $ ieWrappedName $ unLoc var
+    transExportIE (IEModuleContents _ mod) =
+        Just $ mkRdrQual (unLoc mod) occ_main_fn
+          -- if `mod` doesn't contain a `main` function, we get a `not defined`
+          -- error, which is correct.
     transExportIE _ = Nothing
 
     -- Get a main function that is in scope.
@@ -1938,6 +1948,89 @@ being called "Main.main".  That's why root_main_id has a fixed module
 This is unusual: it's a LocalId whose Name has a Module from another
 module. Tiresomely, we must filter it out again in GHC.Iface.Make, less we
 get two defns for 'main' in the interface file!
+
+
+Note [Checking the export of the main function]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The Haskell 2010 Language Report has the following 2 statements about
+the export of the `main` function:
+
+Statement 1:
+> An abbreviated form of module, consisting only of the module body,
+> is permitted. If this is used, the header is assumed to be
+> ‘module Main(main) where’.
+
+Statement 2:
+> If the export list is omitted, all values, types and classes defined
+> in the module are exported, but not those that are imported.
+
+In addition if the user specify the `main` function in the export list,
+they can specify it qualified (eg `Main.main`) or unqualified (`main`).
+
+Other rule:
+* A `Main` module must export exactly one `main` function.
+
+This gives the following processing rules for the different types
+of module headers:
+
+module Main(main)    : The value `main` is unqualified. Export all `main` functions
+                       in scope.
+                       See also Note [Main module without a main function in the export spec]
+
+module Main          : Use Statement 2: The header is `module Main (Main.main)`.
+                       Export only the `Main.main` function.
+
+<No module header>   : Use Statement 1: `main` is unqualified. Export all
+                       `main` functions in scope.
+
+module Main ()       : The export list is empty. Don't export any `main`
+                       function. This results always in an error!
+
+module Main(module X): Export only the main function from module X.
+
+module Main (X.main) : Export only the main function from module X.
+
+In all cases, check that the `Main` module exports exactly one `main` function.
+
+
+The table gives examples and refers to the test cases:
+----------------+----------------------------------------------------------------------------------+
+                |                                  Module Header:                                  |
+                +-------------+-------------+-------------+-------------+-------------+------------+
+                | module      | module Main | <No Header> | module Main |module       |module Main |
+                |  Main(main) |             |             |   (module X)|   Main ()   |  (Sub.main)|
+----------------+==================================================================================+
+`main` function | ERROR:      | Main.main   | ERROR:      | Main.main   | ERROR:      | Sub.main   |
+in Main module  |  Ambiguous  |             |  Ambiguous  |             |  `main` not |            |
+and in imported |             |             |             |             |  exported   |            |
+module Sub.     | T19397E1    | T16453M0    | T19397E2    | T16453M3    |             | T16453M1   |
+                |             |             |             | X = Main    | Remark 2)   |            |
+----------------+-------------+-------------+-------------+-------------+-------------+------------+
+`main`function  | Sub.main    | ERROR:      | Sub.main    | Sub.main    | ERROR:      | Sub.main   |
+only in imported|             | No `main` in|             |             |  `main` not |            |
+submodule Sub.  |             |   `Main`    |             |             |  exported   |            |
+                | T19397M0    | T16453E1    | T19397M1    | T16453M4    |             | T16453M5   |
+                |             |             |             | X = Sub     | Remark 2)   |            |
+----------------+-------------+-------------+-------------+-------------+-------------+------------+
+`foo` function  | Sub.foo     | ERROR:      | Sub.foo     | Sub.foo     | ERROR:      | Sub.foo    |
+in submodule    |             | No `foo` in |             |             |  `foo` not  |            |
+Sub.            |             |   `Main`    |             |             |  exported   |            |
+GHC option:     |             |             |             |             |             |            |
+  -main-is foo  | T19397M2    | T19397E3    | T19397M3    | T19397M4    | T19397E4    | T16453M6   |
+                | Remark 1)   |             |             | X = Sub     |             | Remark 3)  |
+----------------+-------------+-------------+-------------+-------------+-------------+------------+
+
+Remarks:
+* The first line shows the exported `main` function or the error.
+* The second line shows the coresponding test case.
+* The module `Sub` contains the following functions:
+     main :: IO ()
+     foo :: IO ()
+* Remark 1) Here the header is `Main (foo)`.
+* Remark 2) Here we have no extra test case. It would exercise the same code path as `T19397E4`.
+* Remark 3) Here the header is `Main (Sub.foo)`.
+
 
 
 Note [Main module without a main function in the export spec]
