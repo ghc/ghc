@@ -71,6 +71,21 @@ Language
     record pattern synonyms.  In particular, it is possible for a single module
     to define multiple pattern synonyms using the same field names.
 
+* Because of simplifications to the way that GHC typechecks operator sections,
+  operators with nested ``forall``\ s or contexts in their type signatures might
+  not typecheck when used in a section. For instance, the ``g`` function below,
+  which was accepted in previous GHC releases, will no longer typecheck: ::
+
+      f :: a -> forall b. b -> a
+      f x _ = x
+
+      g :: a -> a
+      g = (`f` "hello")
+
+  ``g`` can be made to typecheck once more by eta expanding it to
+  ``\x -> x \`f\` "hello"``. For more information, see
+  :ref:`simple-subsumption`.
+
 Compiler
 ~~~~~~~~
 
