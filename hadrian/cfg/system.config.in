@@ -29,6 +29,7 @@ xelatex        = @XELATEX@
 makeindex      = @MAKEINDEX@
 makeinfo       = @MAKEINFO@
 bourne-shell   = @SH@
+dtrace         = @DtraceCmd@
 
 # Python 3 is required to run test driver.
 # See: https://github.com/ghc/ghc/blob/master/testsuite/mk/boilerplate.mk#L220
@@ -204,3 +205,4 @@ libnuma-lib-dir       = @LibNumaLibDir@
 with-libdw = @UseLibdw@
 with-libnuma = @UseLibNuma@
 have-lib-mingw-ex = @HaveLibMingwEx@
+with-dtrace = @HaveDtrace@

@@ -93,6 +93,13 @@ instance BuilderPredicate a => BuilderPredicate (TestMode -> a) where
             Testsuite mode -> builder (f mode)
             _              -> return False
 
+instance BuilderPredicate a => BuilderPredicate (DtraceMode -> a) where
+    builder f = do
+        b <- getBuilder
+        case b of
+            Dtrace mode    -> builder (f mode)
+            _              -> return False
+
 -- | Is the current build 'Way' equal to a certain value?
 way :: Way -> Predicate
 way w = (w ==) <$> getWay
