@@ -248,7 +248,7 @@ def format_path(path):
 
 # On Windows we need to set $PATH to include the paths to all the DLLs
 # in order for the dynamic library tests to work.
-if windows or darwin:
+if windows:
     pkginfo = getStdout([config.ghc_pkg, 'dump'])
     topdir = config.libdir
     if windows:
@@ -266,12 +266,9 @@ if windows or darwin:
             if path.startswith('"'):
                 path = re.sub('^"(.*)"$', '\\1', path)
                 path = re.sub('\\\\(.)', '\\1', path)
-            if windows:
+
                 path = format_path(path)
                 ghc_env['PATH'] = os.pathsep.join([path, ghc_env.get("PATH", "")])
-            else:
-                # darwin
-                ghc_env['DYLD_LIBRARY_PATH'] = os.pathsep.join([path, ghc_env.get("DYLD_LIBRARY_PATH", "")])
 
 testopts_local.x = TestOptions()
 
