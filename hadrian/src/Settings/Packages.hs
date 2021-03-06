@@ -254,6 +254,7 @@ rtsPackageArgs = package rts ? do
     libdwLibraryDir   <- getSetting LibdwLibDir
     libnumaIncludeDir <- getSetting LibnumaIncludeDir
     libnumaLibraryDir <- getSetting LibnumaLibDir
+    libsystemtapIncludeDir <- getSetting LibsystemtapIncludeDir
 
     -- Arguments passed to GHC when compiling C and .cmm sources.
     let ghcArgs = mconcat
@@ -277,6 +278,7 @@ rtsPackageArgs = package rts ? do
           [ rtsWarnings
           , flag UseSystemFfi ? arg ("-I" ++ ffiIncludeDir)
           , flag WithDtrace ? arg "-DDTRACE"
+          , if not (null libsystemtapIncludeDir) then arg ("-I" ++ libsystemtapIncludeDir) else mempty
           , flag WithLibdw ? arg ("-I" ++ libdwIncludeDir)
           , arg "-fomit-frame-pointer"
           -- RTS *must* be compiled with optimisations. The INLINE_HEADER macro
