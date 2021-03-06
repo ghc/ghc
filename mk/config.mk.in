@@ -727,6 +727,7 @@ SHELL			= @SHELL@
 HaveDtrace		= @HaveDtrace@
 USE_DTRACE = $(HaveDtrace)
 DTRACE			= @DtraceCmd@
+LibsystemptapIncludeDir = @LibsystemptapIncludeDir@
 
 LD = @LdCmd@
 NM = @NmCmd@
