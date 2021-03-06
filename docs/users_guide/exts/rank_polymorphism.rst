@@ -195,6 +195,10 @@ Similarly ``f4 g4`` is not well typed, because the constraints appear in a diffe
 These examples can be made to typecheck by eta-expansion. For example ``f3 (\x -> g3b x)``
 is well typed, and similarly ``f3 (\x -> g3c x)`` and ``f4 (\x -> g4 x)``.
 
+A similar phenomenon occurs for operator sections. For example,
+``(\`g3a\` "hello")`` is not well typed, but it can be made to typecheck by eta
+expanding it to ``\x -> x \`g3a\` "hello"``.
+
 Historical note.  Earlier versions of GHC allowed these now-rejected applications, by inserting
 automatic eta-expansions, as described in Section 4.6 of `Practical type inference for arbitrary-aank types <https://www.microsoft.com/en-us/research/publication/practical-type-inference-for-arbitrary-rank-types/>`__, where it is
 called "deep skolemisation".
