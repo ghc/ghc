@@ -254,6 +254,7 @@ rtsPackageArgs = package rts ? do
     libdwLibraryDir   <- getSetting LibdwLibDir
     libnumaIncludeDir <- getSetting LibnumaIncludeDir
     libnumaLibraryDir <- getSetting LibnumaLibDir
+    libsystemtapIncludeDir <- getSetting LibsystemtapIncludeDir
 
     -- Arguments passed to GHC when compiling C and .cmm sources.
     let ghcArgs = mconcat
@@ -278,6 +279,7 @@ rtsPackageArgs = package rts ? do
           , flag WithLibdw ? arg libdwIncludeDir
           , arg "rts"
           , arg path
+          , if not (null libsystemtapIncludeDir) then arg libsystemtapIncludeDir else mempty
           ]
 
     let dtraceArgs = mconcat
