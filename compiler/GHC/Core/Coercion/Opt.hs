@@ -570,7 +570,7 @@ opt_univ env sym prov role oty1 oty2
 
   where
     prov' = case prov of
-#if __GLASGOW_HASKELL__ <= 810
+#if __GLASGOW_HASKELL__ < 901
 -- This alt is redundant with the first match of the FunDef
       PhantomProv kco    -> PhantomProv $ opt_co4_wrap env sym False Nominal kco
 #endif
