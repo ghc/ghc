@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 -- We introduced a regression in 2.14.x where we don't consider
 -- identifiers with ^ as valid. We test that the regression goes away
 -- here. It's a silly typo in the parser, really. Same with ★ which is a valid

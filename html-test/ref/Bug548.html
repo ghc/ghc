@@ -38,6 +38,12 @@
 	    ><td
 	    >Safe-Inferred</td
 	    ></tr
+	  ><tr
+	  ><th
+	    >Language</th
+	    ><td
+	    >Haskell2010</td
+	    ></tr
 	  ></table
 	><p class="caption"
 	>Bug548</p
@@ -180,12 +186,14 @@
 		><tr
 		><td class="src clearfix"
 		  ><span class="inst-left"
-		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:WrappedArrow:Functor:2"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:WrappedArrow:Alternative:2"
 		      ></span
-		      > <a href="#" title="Control.Arrow"
-		      >Arrow</a
-		      > a =&gt; <a href="#" title="Data.Functor"
-		      >Functor</a
+		      > (<a href="#" title="Control.Arrow"
+		      >ArrowZero</a
+		      > a, <a href="#" title="Control.Arrow"
+		      >ArrowPlus</a
+		      > a) =&gt; <a href="#" title="Control.Applicative"
+		      >Alternative</a
 		      > (<a href="#" title="Bug548"
 		      >WrappedArrow</a
 		      > a b)</span
@@ -199,7 +207,7 @@
 		  ></tr
 		><tr
 		><td colspan="2"
-		  ><details id="i:id:WrappedArrow:Functor:2"
+		  ><details id="i:id:WrappedArrow:Alternative:2"
 		    ><summary class="hide-when-js-enabled"
 		      >Instance details</summary
 		      ><p
@@ -211,22 +219,42 @@
 			>Methods</p
 			><p class="src"
 			><a href="#"
-			  >fmap</a
-			  > :: (a0 -&gt; b0) -&gt; <a href="#" title="Bug548"
+			  >empty</a
+			  > :: <a href="#" title="Bug548"
 			  >WrappedArrow</a
-			  > a b a0 -&gt; <a href="#" title="Bug548"
-			  >WrappedArrow</a
-			  > a b b0 <a href="#" class="selflink"
+			  > a b a0 <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			><p class="src"
 			><a href="#"
-			  >(&lt;$)</a
-			  > :: a0 -&gt; <a href="#" title="Bug548"
+			  >(&lt;|&gt;)</a
+			  > :: <a href="#" title="Bug548"
 			  >WrappedArrow</a
-			  > a b b0 -&gt; <a href="#" title="Bug548"
+			  > a b a0 -&gt; <a href="#" title="Bug548"
+			  >WrappedArrow</a
+			  > a b a0 -&gt; <a href="#" title="Bug548"
 			  >WrappedArrow</a
 			  > a b a0 <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			><p class="src"
+			><a href="#"
+			  >some</a
+			  > :: <a href="#" title="Bug548"
+			  >WrappedArrow</a
+			  > a b a0 -&gt; <a href="#" title="Bug548"
+			  >WrappedArrow</a
+			  > a b [a0] <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			><p class="src"
+			><a href="#"
+			  >many</a
+			  > :: <a href="#" title="Bug548"
+			  >WrappedArrow</a
+			  > a b a0 -&gt; <a href="#" title="Bug548"
+			  >WrappedArrow</a
+			  > a b [a0] <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			></div
@@ -328,14 +356,12 @@
 		><tr
 		><td class="src clearfix"
 		  ><span class="inst-left"
-		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:WrappedArrow:Alternative:4"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:WrappedArrow:Functor:4"
 		      ></span
-		      > (<a href="#" title="Control.Arrow"
-		      >ArrowZero</a
-		      > a, <a href="#" title="Control.Arrow"
-		      >ArrowPlus</a
-		      > a) =&gt; <a href="#" title="Control.Applicative"
-		      >Alternative</a
+		      > <a href="#" title="Control.Arrow"
+		      >Arrow</a
+		      > a =&gt; <a href="#" title="Data.Functor"
+		      >Functor</a
 		      > (<a href="#" title="Bug548"
 		      >WrappedArrow</a
 		      > a b)</span
@@ -349,7 +375,7 @@
 		  ></tr
 		><tr
 		><td colspan="2"
-		  ><details id="i:id:WrappedArrow:Alternative:4"
+		  ><details id="i:id:WrappedArrow:Functor:4"
 		    ><summary class="hide-when-js-enabled"
 		      >Instance details</summary
 		      ><p
@@ -361,42 +387,22 @@
 			>Methods</p
 			><p class="src"
 			><a href="#"
-			  >empty</a
-			  > :: <a href="#" title="Bug548"
+			  >fmap</a
+			  > :: (a0 -&gt; b0) -&gt; <a href="#" title="Bug548"
+			  >WrappedArrow</a
+			  > a b a0 -&gt; <a href="#" title="Bug548"
+			  >WrappedArrow</a
+			  > a b b0 <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			><p class="src"
+			><a href="#"
+			  >(&lt;$)</a
+			  > :: a0 -&gt; <a href="#" title="Bug548"
+			  >WrappedArrow</a
+			  > a b b0 -&gt; <a href="#" title="Bug548"
 			  >WrappedArrow</a
 			  > a b a0 <a href="#" class="selflink"
-			  >#</a
-			  ></p
-			><p class="src"
-			><a href="#"
-			  >(&lt;|&gt;)</a
-			  > :: <a href="#" title="Bug548"
-			  >WrappedArrow</a
-			  > a b a0 -&gt; <a href="#" title="Bug548"
-			  >WrappedArrow</a
-			  > a b a0 -&gt; <a href="#" title="Bug548"
-			  >WrappedArrow</a
-			  > a b a0 <a href="#" class="selflink"
-			  >#</a
-			  ></p
-			><p class="src"
-			><a href="#"
-			  >some</a
-			  > :: <a href="#" title="Bug548"
-			  >WrappedArrow</a
-			  > a b a0 -&gt; <a href="#" title="Bug548"
-			  >WrappedArrow</a
-			  > a b [a0] <a href="#" class="selflink"
-			  >#</a
-			  ></p
-			><p class="src"
-			><a href="#"
-			  >many</a
-			  > :: <a href="#" title="Bug548"
-			  >WrappedArrow</a
-			  > a b a0 -&gt; <a href="#" title="Bug548"
-			  >WrappedArrow</a
-			  > a b [a0] <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			></div

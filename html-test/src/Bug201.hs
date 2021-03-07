@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 -- We test that leading whitespace gets properly dropped (or not!)
 -- from codeblocks
 module Bug201 where

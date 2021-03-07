@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE TemplateHaskell, QuasiQuotes #-}
 
 module Bug574 where

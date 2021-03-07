@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE LinearTypes #-}
 module LinearTypes where
 

@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 module Bug613  where
 
 import Prelude (Either(Left, Right))

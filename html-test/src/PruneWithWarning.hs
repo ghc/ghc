@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# OPTIONS_HADDOCK prune #-}
 -- |
 -- What is tested here:

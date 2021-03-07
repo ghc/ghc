@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 module Bug3 where
 
 -- | /multi-line

@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 -- | This module tests the ‘@since …’ annotation.
 --
 -- @since 1.2.3

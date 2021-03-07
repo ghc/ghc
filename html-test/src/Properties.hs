@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 module Properties where
 
 -- | Fibonacci number of given 'Integer'.

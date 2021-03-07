@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE TypeOperators, GADTs, MultiParamTypeClasses, FlexibleContexts #-}
 module TypeOperators where
 

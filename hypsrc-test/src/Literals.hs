@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 module Literals where
 
 

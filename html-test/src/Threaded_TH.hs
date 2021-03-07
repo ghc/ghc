@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 -- | Imported by 'Threaded', since a TH splice can't be used in the
 -- module where it is defined.
 module Threaded_TH where

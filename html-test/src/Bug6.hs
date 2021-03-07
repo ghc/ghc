@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 -- | Exporting records.
 module Bug6( A(A), B(B), b, C(C,c1,c2), D(D,d1), E(E) ) where
 

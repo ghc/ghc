@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {- |
   Implementation of fixed-size hash tables, with a type
   class for constructing hash values for structured types.

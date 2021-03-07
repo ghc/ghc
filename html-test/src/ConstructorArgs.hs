@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE GADTs, PatternSynonyms #-}
 
 module ConstructorArgs (Foo(..), Boo(Foo, Foa, Fo, Fo'), pattern Bo, pattern Bo') where

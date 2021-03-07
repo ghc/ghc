@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE RankNTypes, DataKinds, TypeFamilies #-}
 module FunArgs where
 

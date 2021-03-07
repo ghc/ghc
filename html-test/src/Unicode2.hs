@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 module Unicode2 where
 
 -- | All of the following work with a unicode character ü:

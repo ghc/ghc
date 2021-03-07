@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 -- | This tests the table markup
 module Table
   ( tableWithHeader

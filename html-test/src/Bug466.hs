@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE DataKinds, TypeFamilies, StarIsType #-}
 module Bug466 where
 

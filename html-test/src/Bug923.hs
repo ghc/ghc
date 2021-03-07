@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE KindSignatures, FlexibleInstances, GADTs, DataKinds #-}
 module Bug923 where
 

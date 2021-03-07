@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 module NamespacedIdentifiers where
 
 -- | A link to:

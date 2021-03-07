@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 -- http://trac.haskell.org/haddock/ticket/37
 module HiddenInstances (VisibleClass, VisibleData) where
 

@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE ExistentialQuantification, PatternSynonyms, PolyKinds, TypeOperators #-}
 
 -- | Testing some pattern synonyms

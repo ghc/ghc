@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 module TitledPicture where
 
 -- | Picture for 'foo' without a title <<bar>>
