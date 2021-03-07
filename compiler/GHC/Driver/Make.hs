@@ -869,13 +869,13 @@ unload hsc_env stable_linkables -- Unload everything *except* 'stable_linkables'
   stableObject m =
         all stableObject (imports m)
         && old linkable does not exist, or is == on-disk .o
+        && date(on-disk .o) >= date(on-disk .hi)
         && hash(on-disk .hs) == hash recorded in .hi
 
   stableBCO m =
         all stable (imports m)
         && hash(on-disk .hs) == hash recorded alongside BCO
 @
-
   These properties embody the following ideas:
 
     - if a module is stable, then:
@@ -899,6 +899,8 @@ unload hsc_env stable_linkables -- Unload everything *except* 'stable_linkables'
       if the interface is out of date because an *external* interface
       has changed.  The current code in GHC.Driver.Make handles this case
       fairly poorly, so be careful.
+
+  See also Note [When source is considered modified]
 -}
 
 type StableModules =
@@ -1817,8 +1819,7 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
           -- must discard any in-memory interface, because this
           -- means the user has compiled the source file
           -- separately and generated a new interface, that we must
-          -- read from the disk.
-          --
+          -- read from the disk. See Note [When source is considered modified]
           | backendProducesObject bcknd,
             Just obj_date <- mb_obj_date,
             Just if_date <- mb_if_date,
@@ -1837,7 +1838,7 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
                                 compile_it_discard_iface (Just linkable) SourceUnmodified
                     else compile_it Nothing SourceModified
 
-          -- See Note [Recompilation checking in -fno-code mode]
+          -- See Note [When source is considered modified]
           | writeInterfaceOnlyMode lcl_dflags -> do
                 prev_hash_matches <- doesIfaceHashMatch hsc_env summary
                 if prev_hash_matches
@@ -1916,13 +1917,47 @@ Potential TODOS:
   generating temporary ones.
 -}
 
--- Note [Recompilation checking in -fno-code mode]
+-- Note [When source is considered modified]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- If we are compiling with -fno-code -fwrite-interface, there won't
--- be any object code that we can compare against, nor should there
--- be: we're *just* generating interface files.  In this case, we
--- want to check if the interface file is new, in lieu of the object
--- file.  See also #9243.
+-- A number of functions in GHC.Driver accept a SourceModified argument, which
+-- is part of how GHC determines whether recompilation may be avoided (see the
+-- definition of the SourceModified data type for details).
+--
+-- Determining whether or not a source file is considered modified depends not
+-- only on the source file itself, but also on the output files which compiling
+-- that module would produce. This is done because GHC supports a number of
+-- flags which control which output files should be produced, e.g. -fno-code
+-- -fwrite-interface and -fwrite-ide-file; we must check not only whether the
+-- source file has been modified since the last compile, but also whether the
+-- source file has been modified since the last compile which produced all of
+-- the output files which have been requested.
+--
+-- Specifically, a source file is considered unmodified if it is up-to-date
+-- relative to all of the output files which have been requested. Whether or
+-- not an output file is up-to-date depends on what kind of file it is:
+--
+-- * iface (.hi) files are considered up-to-date if (and only if) their
+--   mi_src_hash field matches the hash of the source file,
+--
+-- * all other output files (.o, .dyn_o, .hie, etc) are considered up-to-date
+--   if (and only if) their modification times on the filesystem are greater
+--   than or equal to the modification time of the corresponding .hi file.
+--
+-- This strategy allows us to do the minimum work necessary in order to ensure
+-- that all the files the user cares about are up-to-date; e.g. we should not
+-- worry about .o files if the user has indicated that they are not interested
+-- in them via -fno-code. See also #9243.
+--
+-- The correctness of this strategy depends on a couple of assumptions.
+--
+-- 1. Whenever we are producing any output files, we are always producing .hi
+--    files. This is important: if we ever skip writing a .hi file, then we
+--    can never avoid unnecessarily recompilation on subsequent invocations of
+--    the compiler.
+--
+-- 2. Whenever we are producing multiple output files, the .hi file is always
+--    written first. If this assumption is violated, we risk recompiling
+--    unnecessarily by incorrectly regarding non-.hi files as outdated.
 
 -- Filter modules in the HPT
 retainInTopLevelEnvs :: [ModuleName] -> HomePackageTable -> HomePackageTable

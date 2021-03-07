@@ -80,7 +80,7 @@ data ModSummary
           -- ^ Timestamp of object, if we have one
         ms_iface_date   :: Maybe UTCTime,
           -- ^ Timestamp of hi file, if we have one
-          -- See Note [Recompilation checking in -fno-code mode] and #9243
+          -- See Note [When source is considered modified] and #9243
         ms_hie_date   :: Maybe UTCTime,
           -- ^ Timestamp of hie file, if we have one
         ms_srcimps      :: [(Maybe FastString, Located ModuleName)],

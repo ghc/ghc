@@ -1284,7 +1284,8 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
           --      (a) recompilation checker is off, or
           --      (b) we aren't going all the way to .o file (e.g. ghc -S)
           ; if not (isStopLn stop) then return SourceModified else do {
-          -- Otherwise look at timestamps and hashes
+          -- Otherwise look at timestamps and hashes. See
+          -- Note [When source is considered modified]
           ; if isNothing hi_date then return SourceModified else do {
           ; hi_timestamp <- getModificationUTCTime hi_file
           ; prev_hash_matches <- doesIfaceHashMatch hsc_env' mod_summary
