@@ -41,6 +41,10 @@ int TRACE_cap;
 static Mutex trace_utx;
 #endif
 
+#if defined(DEBUG)
+static void traceCap_stderr(Capability *cap, char *msg, ...);
+#endif
+
 /* ---------------------------------------------------------------------------
    Starting up / shutting down the tracing facilities
  --------------------------------------------------------------------------- */
@@ -171,6 +175,7 @@ static char *thread_stop_reasons[] = {
     [6 + ThreadMigrating]       =  "migrating"
 };
 #endif
+
 
 #if defined(DEBUG)
 static void traceSchedEvent_stderr (Capability *cap, EventTypeNum tag,
@@ -366,6 +371,23 @@ void traceEventGcStats_  (Capability *cap,
                          copied, slop, fragmentation,
                          par_n_threads, par_max_copied,
                          par_tot_copied, par_balanced_copied);
+    }
+}
+
+void traceEventMemReturn_ (Capability *cap,
+                          uint32_t    current_mblocks,
+                          uint32_t    needed_mblocks,
+                          uint32_t    returned_mblocks)
+{
+#if defined(DEBUG)
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
+        traceCap_stderr(cap, "Memory Return (Current: %u) (Needed: %u) (Returned: %u)"
+                       , current_mblocks, needed_mblocks, returned_mblocks);
+    } else
+#endif
+    {
+        postEventMemReturn( cap, CAPSET_HEAP_DEFAULT
+                          , current_mblocks, needed_mblocks, returned_mblocks);
     }
 }
 
