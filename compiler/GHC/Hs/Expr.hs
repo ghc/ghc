@@ -580,7 +580,7 @@ ppr_infix_expr (HsConLikeOut _ c)   = Just (pprInfixOcc (conLikeName c))
 ppr_infix_expr (HsRecFld _ f)       = Just (pprInfixOcc f)
 ppr_infix_expr (HsUnboundVar _ occ) = Just (pprInfixOcc occ)
 ppr_infix_expr (XExpr x)            = case (ghcPass @p, x) of
-#if __GLASGOW_HASKELL__ <= 810
+#if __GLASGOW_HASKELL__ < 901
   (GhcPs, _)                              -> Nothing
 #endif
   (GhcRn, HsExpanded a _)                 -> ppr_infix_expr a
