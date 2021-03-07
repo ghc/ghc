@@ -7,11 +7,24 @@
   # we can't really, as NIX_BUILD_TOP/env-vars is not set.
   noDumpEnvVars=1;
 
+  # stop polluting LDFLAGS with -liconv
+  dontAddExtraLibs = true;
+
   # we need to inject ncurses into --with-curses-libraries.
   # the real fix is to teach terminfo to use libcurses on macOS.
   CONFIGURE_ARGS = "--with-intree-gmp --with-curses-libraries=${pkgs.ncurses.out}/lib";
 
-  buildInputs = with pkgs; [
+  # magic speedup pony :facepalm:
+  #
+  # nix has the ugly habbit of duplicating ld flags more than necessary.  This
+  # somewhat consolidates this.
+  shellHook = ''
+  export NIX_LDFLAGS=$(for a in $NIX_LDFLAGS; do echo $a; done |sort|uniq|xargs)
+  export NIX_LDFLAGS_FOR_TARGET=$(for a in $NIX_LDFLAGS_FOR_TARGET; do echo $a; done |sort|uniq|xargs)
+  export NIX_LDFLAGS_FOR_TARGET=$(comm -3 <(for l in $NIX_LDFLAGS_FOR_TARGET; do echo $l; done) <(for l in $NIX_LDFLAGS; do echo $l; done))
+  '';
+
+  nativeBuildInputs = (with pkgs; [
     haskell.compiler.${compiler}
     haskell.packages.${compiler}.cabal-install
     haskell.packages.${compiler}.alex
@@ -47,6 +60,6 @@
     xz
     xlibs.lndir
 
-    cacert
-  ];
+    cacert ])
+  ++ (with pkgs.darwin.apple_sdk.frameworks; [ Foundation Security ]);
 }

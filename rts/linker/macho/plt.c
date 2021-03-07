@@ -1,5 +1,6 @@
 #include "Rts.h"
 #include "plt.h"
+#include "RtsUtils.h"
 
 #if defined(aarch64_HOST_ARCH)
 
@@ -50,7 +51,7 @@ makeStub(Section * section,
           void* * addr,
           uint8_t flags) {
 
-    Stub * s = stgCallocBytes(1, sizeof(Stub), "makeStub");
+    Stub * s = (Stub *)stgCallocBytes(sizeof(Stub), 1, "makeStub");
     CHECK(s != NULL);
     s->target = *addr;
     s->flags  = flags;

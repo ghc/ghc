@@ -300,6 +300,7 @@ class Semigroup a => Monoid a where
         -- >>> mconcat ["Hello", " ", "Haskell", "!"]
         -- "Hello Haskell!"
         mconcat :: [a] -> a
+        {-# INLINE mconcat #-}
         mconcat = foldr mappend mempty
 
 -- | @since 4.9.0.0

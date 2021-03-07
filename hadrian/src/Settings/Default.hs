@@ -77,6 +77,7 @@ stage0Packages = do
              , transformers
              , unlit                         ]
           ++ [ terminfo | not windowsHost, not cross ]
+          ++ [ timeout  | windowsHost                ]
           ++ [ touchy   | windowsHost                ]
 
 -- | Packages built in 'Stage1' by default. You can change this in "UserSettings".
@@ -112,8 +113,8 @@ stage1Packages = do
              ]
           ++ [ haddock  | not cross                  ]
           ++ [ hpcBin   | not cross                  ]
-          ++ [ iserv    | not windowsHost, not cross ]
-          ++ [ libiserv | not windowsHost, not cross ]
+          ++ [ iserv    | not cross ]
+          ++ [ libiserv | not cross ]
           ++ [ runGhc   | not cross                  ]
           ++ [ touchy   | windowsHost                ]
           ++ [ unix     | not windowsHost            ]

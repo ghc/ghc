@@ -136,10 +136,11 @@ bindistRules = do
           -- shipping it
           removeFile (bindistFilesDir -/- mingwStamp)
 
-        -- We copy the binary (<build root>/stage1/bin/haddock) to
+        -- We copy the binary (<build root>/stage1/bin/haddock[.exe]) to
         -- the bindist's bindir (<build root>/bindist/ghc-.../bin/).
         haddockPath <- programPath (vanillaContext Stage1 haddock)
-        copyFile haddockPath (bindistFilesDir -/- "bin" -/- "haddock")
+        copyFile haddockPath
+                 (bindistFilesDir -/- "bin" -/- takeFileName haddockPath)
 
         -- We then 'need' all the files necessary to configure and install
         -- (as in, './configure [...] && make install') this build on some
@@ -303,10 +304,9 @@ ghciScriptWrapper = unlines
 --   explicitly and 'need' the result of building them.
 needIservBins :: Action ()
 needIservBins = do
-    when (not windowsHost) $ do
-        rtsways <- interpretInContext (vanillaContext Stage1 ghc) getRtsWays
-        need =<< traverse programPath
-                   [ Context Stage1 iserv w
-                   | w <- [vanilla, profiling, dynamic]
-                   , w `elem` rtsways
-                   ]
+  rtsways <- interpretInContext (vanillaContext Stage1 ghc) getRtsWays
+  need =<< traverse programPath
+      [ Context Stage1 iserv w
+      | w <- [vanilla, profiling, dynamic]
+      , w `elem` rtsways
+      ]

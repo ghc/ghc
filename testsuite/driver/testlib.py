@@ -1771,7 +1771,11 @@ def stdout_ok(name: TestName, way: WayName) -> bool:
                           expected_stdout_file, actual_stdout_file)
 
 def read_stdout( name: TestName ) -> str:
-    return in_testdir(name, 'run.stdout').read_text(encoding='UTF-8')
+    path = in_testdir(name, 'run.stdout')
+    if path.exists():
+        return path.read_text(encoding='UTF-8')
+    else:
+        return ''
 
 def dump_stdout( name: TestName ) -> None:
     str = read_stdout(name).strip()
@@ -1789,7 +1793,11 @@ def stderr_ok(name: TestName, way: WayName) -> bool:
                           whitespace_normaliser=normalise_whitespace)
 
 def read_stderr( name: TestName ) -> str:
-    return in_testdir(name, 'run.stderr').read_text(encoding='UTF-8')
+    path = in_testdir(name, 'run.stderr')
+    if path.exists():
+        return path.read_text(encoding='UTF-8')
+    else:
+        return ''
 
 def dump_stderr( name: TestName ) -> None:
     str = read_stderr(name).strip()
@@ -2125,10 +2133,11 @@ def normalise_errmsg(s: str) -> str:
     # and not understood by older binutils (ar, ranlib, ...)
     s = modify_lines(s, lambda l: re.sub('^(.+)warning: (.+): unsupported GNU_PROPERTY_TYPE \(5\) type: 0xc000000(.*)$', '', l))
 
-    # filter out nix garbage, that just keeps on showing up as errors on darwin
-    s = modify_lines(s, lambda l: re.sub('^(.+)\.dylib, ignoring unexpected dylib file$','', l))
     s = re.sub('ld: warning: passed .* min versions \(.*\) for platform macOS. Using [\.0-9]+.','',s)
     s = re.sub('ld: warning: -sdk_version and -platform_version are not compatible, ignoring -sdk_version','',s)
+    # ignore superfluous dylibs passed to the linker.
+    s = re.sub('ld: warning: .*, ignoring unexpected dylib file\n','',s)
+    # ignore LLVM Version mismatch garbage; this will just break tests.
     s = re.sub('You are using an unsupported version of LLVM!.*\n','',s)
     s = re.sub('Currently only [\.0-9]+ is supported. System LLVM version: [\.0-9]+.*\n','',s)
     s = re.sub('We will try though\.\.\..*\n','',s)
@@ -2207,6 +2216,9 @@ def normalise_output( s: str ) -> str:
     s = re.sub('  -fexternal-dynamic-refs\n','',s)
     s = re.sub('ld: warning: passed .* min versions \(.*\) for platform macOS. Using [\.0-9]+.','',s)
     s = re.sub('ld: warning: -sdk_version and -platform_version are not compatible, ignoring -sdk_version','',s)
+    # ignore superfluous dylibs passed to the linker.
+    s = re.sub('ld: warning: .*, ignoring unexpected dylib file\n','',s)
+    # ignore LLVM Version mismatch garbage; this will just break tests.
     s = re.sub('You are using an unsupported version of LLVM!.*\n','',s)
     s = re.sub('Currently only [\.0-9]+ is supported. System LLVM version: [\.0-9]+.*\n','',s)
     s = re.sub('We will try though\.\.\..*\n','',s)
