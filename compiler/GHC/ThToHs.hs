@@ -210,6 +210,10 @@ cvtDec (TH.InfixD fx nm)
        ; returnJustL (Hs.SigD noExtField (FixSig noExtField
                                       (FixitySig noExtField [nm'] (cvtFixity fx)))) }
 
+cvtDec (TH.DefaultD tys)
+  = do  { tys' <- traverse cvtType tys
+        ; returnJustL (Hs.DefD noExtField $ DefaultDecl noExtField tys') }
+
 cvtDec (PragmaD prag)
   = cvtPragmaD prag
 

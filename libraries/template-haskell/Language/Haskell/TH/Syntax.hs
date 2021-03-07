@@ -2183,6 +2183,7 @@ data Dec
                                   --{ foreign export ... }@
 
   | InfixD Fixity Name            -- ^ @{ infix 3 foo }@
+  | DefaultD [Type]               -- ^ @{ default (Integer, Double) }@
 
   -- | pragmas
   | PragmaD Pragma                -- ^ @{ {\-\# INLINE [1] foo \#-\} }@
