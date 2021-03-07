@@ -221,6 +221,13 @@ Runtime system
     charVal :: forall n proxy. KnownChar n => proxy n -> Char
     charVal' :: forall n. KnownChar n => Proxy# n -> Char
 
+- A new kind-polymorphic `Compare` type family was added, which has type
+  instances for `Nat`, `Symbol`, and `Char`.  Furthermore, the `<=?` type (and
+  `<=`) is now governed by this type family (as well as other comparison type
+  operators that are exported by `Data.Type.Ord`).  This has two important
+  repercussions.  First, GHC can no longer deduce, e.g., `0 <= n` for all `n`,
+  and second, when `<=` is used very generically, a kind may need to be provided.
+
 - On POSIX, ``System.IO.openFile`` can no longer leak a file descriptor if it
   is interrupted by an asynchronous exception (#19114, #19115).
 
