@@ -1962,13 +1962,14 @@ and therefore if all the other blocks are collected around it then you can end
 up with a megablock with one pinned block and no other blocks. No special
 effort is taken in the compiler
 to ensure that this kind of fragmentation doesn't happen in the first place and
-once the heap is fragmented in this way, there's nothing you can do about it.
+once the heap is fragmented in this way, there's nothing you can do about it
+beyond hoping that the pinned data is eventually freed.
 
 # Nursery Fragmentation
 
 The other reason that a block may not ever be moved or emptied is if it forms
 part of the nursery.  When the nursery is first allocated then it is made up of
-megablock sized chunks, so if the nursery is 4mb then it will consistent of
+megablock sized chunks, so if the nursery is 4 megabytes then it will consist of
 blocks from about 4 megablocks.
 
 Over time, the nursery is resized under various conditions. It gets bigger when
@@ -1982,7 +1983,7 @@ and that's added to the nursery.
 Over time the make-up of the nursery changes from 4
 contiguous megablocks to a hodge-podge of blocks from different megablocks. In
 some programs (see #19481), the fragmentation is so bad that a program with
-only 4mb of live data can retain over 500 megablocks because each of these
+only 4 MB of live data can retain over 500 megablocks because each of these
 megablocks contributed a small number of blocks to the nursery.
 
 In particular, and confusingly, this second form of fragmentation was caused
@@ -2003,13 +2004,13 @@ by the PINNED_EMPTY_SIZE macro.
 In theory, this kind of fragmentation due to the nursery could still happen
 but in practice removing the primary cause (allocatePinned) was sufficient to
 greatly improve the situation. Another way to "fix" fragmentation of the nursery
-would be to periodically reallocate it when it was fragmented.
+would be to periodically reallocate it when it was fragmented across many megablocks.
 
 Ticket: #19481
 
 # When can fragmentation be observed?
 
-Fragmentation is observed when the live data in a program is low. The block
+Fragmentation is observed when the live data in a program is low compared to the overall resident size of the heap. The block
 allocator can reuse unused space within a megablock and therefore as residency
 increases again, the fragmented blocks will get filled up. Having a block-level
 fragmented heap means your program will never go below a certain memory
@@ -2020,7 +2021,7 @@ threshold but it doesn't "use" more memory.
 Your heap is probably fragmented when
 
 * Live bytes is low
-* Mem in use (number of megablocks) is high
+* Memory in use (number of megablocks) is comparatively high
 * The size of the free list dominates residency
 
 # Compacting Collector
