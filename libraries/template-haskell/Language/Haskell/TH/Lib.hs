@@ -103,6 +103,9 @@ module Language.Haskell.TH.Lib (
     -- **** Fixity
     infixLD, infixRD, infixND,
 
+    -- **** Default declaration
+    defaultD,
+
     -- **** Foreign Function Interface (FFI)
     cCall, stdCall, cApi, prim, javaScript,
     unsafe, safe, interruptible, forImpD,

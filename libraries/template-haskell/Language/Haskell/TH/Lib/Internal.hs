@@ -468,6 +468,9 @@ infixRD prec nm = pure (InfixD (Fixity prec InfixR) nm)
 infixND :: Quote m => Int -> Name -> m Dec
 infixND prec nm = pure (InfixD (Fixity prec InfixN) nm)
 
+defaultD :: Quote m => [m Type] -> m Dec
+defaultD tys = DefaultD <$> sequenceA tys
+
 pragInlD :: Quote m => Name -> Inline -> RuleMatch -> Phases -> m Dec
 pragInlD name inline rm phases
   = pure $ PragmaD $ InlineP name inline rm phases
@@ -1030,6 +1033,7 @@ withDecDoc doc dec = do
     doc_loc (StandaloneDerivD _ _ _) = Nothing
     doc_loc (DefaultSigD _ _)        = Nothing
     doc_loc (ImplicitParamBindD _ _) = Nothing
+    doc_loc (DefaultD _)             = Nothing
 
 -- | Variant of 'withDecDoc' that applies the same documentation to
 -- multiple declarations. Useful for documenting quoted declarations.
