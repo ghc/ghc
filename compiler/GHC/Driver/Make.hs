@@ -45,7 +45,7 @@ module GHC.Driver.Make (
 import GHC.Prelude
 
 import GHC.Tc.Utils.Backpack
-import GHC.Tc.Utils.Monad ( initIfaceCheck )
+import GHC.Tc.Utils.Monad  ( initIfaceCheck )
 
 import qualified GHC.Linker.Loader as Linker
 import GHC.Linker.Types
@@ -1943,6 +1943,12 @@ Potential TODOS:
 -- * all other output files (.o, .dyn_o, .hie, etc) are considered up-to-date
 --   if (and only if) their modification times on the filesystem are greater
 --   than or equal to the modification time of the corresponding .hi file.
+--
+-- Why do we use '>=' rather than '>' for output files other than the .hi file?
+-- If the filesystem has poor resolution for timestamps (e.g. FAT32 has a
+-- resolution of 2 seconds), we may often find that the .hi and .o files have
+-- the same modification time. Using >= is slightly unsafe, but it matches
+-- make's behaviour.
 --
 -- This strategy allows us to do the minimum work necessary in order to ensure
 -- that all the files the user cares about are up-to-date; e.g. we should not

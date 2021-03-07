@@ -1183,6 +1183,7 @@ loadModule tcm = do
    hsc_env <- getSession
    mb_linkable <-
       case (ms_iface_date ms, ms_obj_date ms) of
+          -- See Note [When source is considered modified]
           (Just hi_date, Just obj_date) | obj_date >= hi_date -> do
               prev_hash_matches <- liftIO $ doesIfaceHashMatch hsc_env ms
               return $ if prev_hash_matches
