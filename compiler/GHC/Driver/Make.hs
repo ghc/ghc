@@ -876,6 +876,7 @@ unload hsc_env stable_linkables -- Unload everything *except* 'stable_linkables'
         all stable (imports m)
         && hash(on-disk .hs) == hash recorded alongside BCO
 @
+
   These properties embody the following ideas:
 
     - if a module is stable, then:
