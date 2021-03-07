@@ -8,6 +8,14 @@
     in order to define instances for `Nat`. Also, different instances for `Nat` and `Natural`
     won't typecheck anymore.
 
+  * Add `Data.Type.Ord` as a module for type-level comparison operations.  The
+    `(<=?)` type operator from `GHC.TypeNats`, previously kind-specific to
+    `Nat`, is now kind-polymorphic and governed by the `Compare` type family in
+    `Data.Type.Ord`.  Note that this means GHC will no longer deduce `0 <= n`
+    for all `n` any more.
+
+  * Add `cmpNat`, `cmpSymbol`, and `cmpChar` to `GHC.TypeNats` and `GHC.TypeLits`.
+
   * Add `Semigroup` and `Monoid` instances for `Data.Functor.Product` and
     `Data.Functor.Compose`.
 
