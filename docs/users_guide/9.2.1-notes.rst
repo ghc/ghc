@@ -234,6 +234,30 @@ Eventlog
     charVal :: forall n proxy. KnownChar n => proxy n -> Char
     charVal' :: forall n. KnownChar n => Proxy# n -> Char
 
+- A new kind-polymorphic ``Compare`` type family was added in ``Data.Type.Ord``
+  and has type instances for ``Nat``, ``Symbol``, and ``Char``.  Furthermore,
+  the ``(<=?)`` type (and ``(<=)``) from ``GHC.TypeNats`` is now governed by
+  this type family (as well as new comparison type operators that are exported
+  by ``Data.Type.Ord``). This has two important repercussions.  First, GHC can
+  no longer deduce that all natural numbers are greater than or equal to zero.
+  For instance, ::
+
+    test1 :: Proxy (0 <=? x) -> Proxy True
+    test1 = id
+
+  which previously type checked will now result in a type error.  Second, when
+  these comparison type operators are used very generically, a kind may need to
+  be provided.  For example, ::
+
+    test2 :: Proxy (x <=? x) -> Proxy True
+    test2 = id
+
+  will now generate a type error because GHC does not know the kind of ``x``.
+  To fix this, one must provide an explicit kind, perhaps by changing the type
+  to: ::
+
+    test2 :: forall (x :: Nat). Proxy (x <=? x) -> Proxy True
+
 - On POSIX, ``System.IO.openFile`` can no longer leak a file descriptor if it
   is interrupted by an asynchronous exception (#19114, #19115).
 
