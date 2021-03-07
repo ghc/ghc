@@ -242,21 +242,30 @@ A typical garbage collection will look something like the following:
 8. A :event-type:`GC_END` event will be emitted marking the end of the GC cycle.
 
 9. A :event-type:`HEAP_SIZE` event will be emitted giving the
-   cumulative heap allocations of the program until now.
+   current size of the heap, in bytes, calculated by how many megablocks
+   are allocated.
 
-10. A :event-type:`GC_STATS_GHC` event will be emitted
+10. A :event-type:`BLOCKS_SIZE` event will be emitted giving the
+   current size of the heap, in bytes, calculated by how many blocks
+   are allocated.
+
+11. A :event-type:`GC_STATS_GHC` event will be emitted
    containing various details of the collection and heap state.
 
-11. In the case of a major collection, a
+12. In the case of a major collection, a
     :event-type:`HEAP_LIVE` event will be emitted describing
     the current size of the live on-heap data.
 
-12. In the case of the :ghc-flag:`-threaded` RTS, a
+13. In the case of the :ghc-flag:`-threaded` RTS, a
     :event-type:`SPARK_COUNTERS` event will be emitted giving
     details on how many sparks have been created, evaluated, and GC'd.
 
-13. As mutator threads resume execution they will emit :event-type:`RUN_THREAD`
+14. As mutator threads resume execution they will emit :event-type:`RUN_THREAD`
     events.
+
+15. A :event-type:`MEM_RETURN` event will be emitted containing details about
+    currently live mblocks, how many we think we need and whether we could return
+    excess to the OS.
 
 Note that in the case of the concurrent non-moving collector additional events
 will be emitted during the concurrent phase of collection. These are described
@@ -319,13 +328,14 @@ in :ref:`nonmoving-gc-events`.
    :field Word16: generation of collection
    :field Word64: bytes copied
    :field Word64: bytes of slop found
-   :field Word64: TODO
+   :field Word64: bytes of fragmentation, the difference between total mblock size
+                  and total block size. When all mblocks are full of full blocks,
+                  this number is 0.
    :field Word64: number of parallel garbage collection threads
    :field Word64: maximum number of bytes copied by any single collector thread
    :field Word64: total bytes copied by all collector threads
 
-   Report various information about the heap configuration. Typically produced
-   during RTS initialization..
+   Report various information about a major collection.
 
 .. event-type:: GC_GLOBAL_SYNC
 
@@ -333,6 +343,21 @@ in :ref:`nonmoving-gc-events`.
    :length: fixed
 
    TODO
+
+.. event-type:: MEM_RETURN
+
+   :tag: 90
+   :length: fixed
+   :field CapSetId: heap capability set
+   :field Word32: currently allocated mblocks
+   :field Word32: the number of mblocks we would like to retain
+   :field Word32: the number of mblocks which we returned to the OS
+
+   Report information about currently allocation megablocks and attempts
+   made to return them to the operating system. If your heap is fragmented
+   then the current value will be greater than needed value but returned will
+   be less than the difference between the two.
+
 
 Heap events and statistics
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -353,7 +378,16 @@ Heap events and statistics
    :field CapSetId: heap capability set
    :field Word64: heap size in bytes
 
-   Report the heap size.
+   Report the heap size, calculated by the number of megablocks currently allocated.
+
+.. event-type:: BLOCKS_SIZE
+
+   :tag: 91
+   :length: fixed
+   :field CapSetId: heap capability set
+   :field Word64: heap size in bytes
+
+   Report the heap size, calculated by the number of blocks currently allocated.
 
 .. event-type:: HEAP_LIVE
 
