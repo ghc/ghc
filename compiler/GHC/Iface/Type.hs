@@ -21,7 +21,9 @@ module GHC.Iface.Type (
         IfaceMCoercion(..),
         IfaceUnivCoProv(..),
         IfaceMult,
-        IfaceTyCon(..), IfaceTyConInfo(..), IfaceTyConSort(..),
+        IfaceTyCon(..),
+        IfaceTyConInfo(..), mkIfaceTyConInfo,
+        IfaceTyConSort(..),
         IfaceTyLit(..), IfaceAppArgs(..),
         IfaceContext, IfaceBndr(..), IfaceOneShot(..), IfaceLamBndr,
         IfaceTvBndr, IfaceIdBndr, IfaceTyConBinder,
@@ -354,6 +356,13 @@ data IfaceTyConInfo   -- Used to guide pretty-printing
   = IfaceTyConInfo { ifaceTyConIsPromoted :: PromotionFlag
                    , ifaceTyConSort       :: IfaceTyConSort }
     deriving (Eq)
+
+-- This smart constructor allows sharing of the two most common
+-- cases. See #19194
+mkIfaceTyConInfo :: PromotionFlag -> IfaceTyConSort -> IfaceTyConInfo
+mkIfaceTyConInfo IsPromoted  IfaceNormalTyCon = IfaceTyConInfo IsPromoted  IfaceNormalTyCon
+mkIfaceTyConInfo NotPromoted IfaceNormalTyCon = IfaceTyConInfo NotPromoted IfaceNormalTyCon
+mkIfaceTyConInfo prom        sort             = IfaceTyConInfo prom        sort
 
 data IfaceMCoercion
   = IfaceMRefl
@@ -1102,12 +1111,12 @@ liftedRep_ty =
   IfaceTyConApp liftedRep IA_Nil
   where
     liftedRep :: IfaceTyCon
-    liftedRep = IfaceTyCon tc_name (IfaceTyConInfo NotPromoted IfaceNormalTyCon)
+    liftedRep = IfaceTyCon tc_name (mkIfaceTyConInfo NotPromoted IfaceNormalTyCon)
       where tc_name = getName liftedRepTyCon
 
 many_ty :: IfaceType
 many_ty =
-    IfaceTyConApp (IfaceTyCon dc_name (IfaceTyConInfo IsPromoted IfaceNormalTyCon))
+    IfaceTyConApp (IfaceTyCon dc_name (mkIfaceTyConInfo IsPromoted IfaceNormalTyCon))
                   IA_Nil
   where dc_name = getName manyDataConTyCon
 
@@ -1629,7 +1638,7 @@ pprTuple ctxt_prec sort promoted args =
         -- `Solo x`, not `(x)`
       | [_] <- args_wo_runtime_reps
       , BoxedTuple <- sort
-      = let unit_tc_info = IfaceTyConInfo promoted IfaceNormalTyCon
+      = let unit_tc_info = mkIfaceTyConInfo promoted IfaceNormalTyCon
             unit_tc = IfaceTyCon (tupleTyConName sort 1) unit_tc_info in
         pprPrecIfaceType ctxt_prec $ IfaceTyConApp unit_tc args
       | otherwise
@@ -1780,7 +1789,7 @@ instance Binary IfaceTyConSort where
 instance Binary IfaceTyConInfo where
    put_ bh (IfaceTyConInfo i s) = put_ bh i >> put_ bh s
 
-   get bh = IfaceTyConInfo <$> get bh <*> get bh
+   get bh = mkIfaceTyConInfo <$> get bh <*> get bh
 
 instance Outputable IfaceTyLit where
   ppr = pprIfaceTyLit
