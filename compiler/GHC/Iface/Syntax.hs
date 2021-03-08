@@ -802,7 +802,7 @@ pprClassStandaloneKindSig ss clas =
 
 constraintIfaceKind :: IfaceKind
 constraintIfaceKind =
-  IfaceTyConApp (IfaceTyCon constraintKindTyConName (IfaceTyConInfo NotPromoted IfaceNormalTyCon)) IA_Nil
+  IfaceTyConApp (IfaceTyCon constraintKindTyConName (mkIfaceTyConInfo NotPromoted IfaceNormalTyCon)) IA_Nil
 
 pprIfaceDecl :: ShowSub -> IfaceDecl -> SDoc
 -- NB: pprIfaceDecl is also used for pretty-printing TyThings in GHCi
