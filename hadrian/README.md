@@ -210,6 +210,9 @@ is close to zero (see [#197][test-issue]).
 
 * `build clean` removes all build artefacts.
 
+* `build distclean` additionally remove the mingw tarballs and fs* files created
+  by configure.
+
 * `build -B` forces Shake to rerun all rules, even if the previous build results
 are still up-to-date.
 
