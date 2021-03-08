@@ -2670,7 +2670,7 @@ mkSumOrTuplePat l boxity (Tuple ps) = do
   return $ L l (PatBuilderPat (TuplePat noExtField ps' boxity))
   where
     toTupPat :: Located (Maybe (Located (PatBuilder GhcPs))) -> PV (LPat GhcPs)
-    toTupPat (L l p) = case p of
+    toTupPat (L _ p) = case p of
       Nothing -> addFatalError $ PsError PsErrTupleSectionInPat [] l
       Just p' -> checkLPat p'
 
