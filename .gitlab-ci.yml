@@ -868,6 +868,39 @@ release-x86_64-linux-deb8:
   extends: .build-x86_64-linux-deb8
 
 #################################
+# i386-linux-alpine
+#################################
+
+.build-i386-linux-alpine-hadrian:
+  extends: .validate-linux-hadrian
+  stage: full-build
+  image: "registry.gitlab.haskell.org/ghc/ci-images/i386-linux-alpine3_12:$DOCKER_REV"
+  # There are currently a few failing tests
+  allow_failure: true
+  variables:
+    TEST_ENV: "i386-linux-alpine"
+    BIN_DIST_NAME: "ghc-i386-alpine-linux"
+    # Can't use ld.gold due to #13958.
+    CONFIGURE_ARGS: "--disable-ld-override"
+    HADRIAN_ARGS: "--docs=no-sphinx"
+    # encoding004 due to lack of locale support
+    # T10458 due to fact that dynamic linker tries to reload libAS
+    BROKEN_TESTS: "encoding004 T10458"
+  cache:
+    key: linux-i386-alpine
+  artifacts:
+    when: always
+    expire_in: 2 week
+
+release-i386-linux-alpine:
+  <<: *release
+  extends: .build-i386-linux-alpine-hadrian
+
+nightly-x86_64-linux-alpine:
+  <<: *nightly
+  extends: .build-i386-linux-alpine-hadrian
+
+#################################
 # x86_64-linux-alpine
 #################################
 
