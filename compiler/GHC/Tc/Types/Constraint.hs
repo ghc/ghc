@@ -42,7 +42,7 @@ module GHC.Tc.Types.Constraint (
         Implication(..), implicationPrototype, checkTelescopeSkol,
         ImplicStatus(..), isInsolubleStatus, isSolvedStatus,
         HasGivenEqs(..),
-        SubGoalDepth, initialSubGoalDepth, maxSubGoalDepth,
+        SubGoalDepth, initialSubGoalDepth, mkSubGoalDepth, maxSubGoalDepth,
         bumpSubGoalDepth, subGoalDepthExceeded,
         CtLoc(..), ctLocSpan, ctLocEnv, ctLocLevel, ctLocOrigin,
         ctLocTypeOrKind_maybe,
@@ -1884,6 +1884,9 @@ newtype SubGoalDepth = SubGoalDepth Int
 
 initialSubGoalDepth :: SubGoalDepth
 initialSubGoalDepth = SubGoalDepth 0
+
+mkSubGoalDepth :: Int -> SubGoalDepth
+mkSubGoalDepth = SubGoalDepth
 
 bumpSubGoalDepth :: SubGoalDepth -> SubGoalDepth
 bumpSubGoalDepth (SubGoalDepth n) = SubGoalDepth (n + 1)

@@ -29,7 +29,9 @@ import GHC.Driver.Session
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Tc.Solver.Monad as TcS
+import GHC.Tc.Errors
 
+import GHC.Types.Basic
 import GHC.Utils.Misc
 import GHC.Data.Maybe
 import GHC.Exts (oneShot)
@@ -526,7 +528,7 @@ rewrite_one (AppTy ty1 ty2)
 rewrite_one (TyConApp tc tys)
   -- If it's a type family application, try to reduce it
   | isTypeFamilyTyCon tc
-  = rewrite_fam_app tc tys
+  = rewrite_fam_app False tc tys
 
   -- For * a normal data type application
   --     * data family application
@@ -762,13 +764,22 @@ FINISH is naturally implemented in `finish`. But, Note [rewrite_exact_fam_app pe
 tells us that we should not add to the famapp-cache after STEP 1/2. So `finish`
 is inlined in that case, and only FINISH 1 is performed.
 
+TODO: update and extend the above Note to describe the adjusted algorithm
+
+TODO: write a Note about stuckness tracking; saves 7%-10% allocations on T9872{a,b,c}.
+The key idea is that when try_to_reduce returns a type family application as the
+reduced type, it guarantees that there are no further top-level reduction steps
+possible. Thus when we rewrite the new type in FINISH 1 we needn't bother
+checking for top-level reductions again, but instead we can jump straight to
+STEP 3.
+
 -}
 
-rewrite_fam_app :: TyCon -> [TcType] -> RewriteM (Xi, Coercion)
+rewrite_fam_app :: Bool -> TyCon -> [TcType] -> RewriteM (Xi, Coercion)
   --   rewrite_fam_app            can be over-saturated
   --   rewrite_exact_fam_app      lifts out the application to top level
   -- Postcondition: Coercion :: Xi ~ F tys
-rewrite_fam_app tc tys  -- Can be over-saturated
+rewrite_fam_app is_stuck tc tys  -- Can be over-saturated
     = ASSERT2( tys `lengthAtLeast` tyConArity tc
              , ppr tc $$ ppr (tyConArity tc) $$ ppr tys)
 
@@ -777,23 +788,23 @@ rewrite_fam_app tc tys  -- Can be over-saturated
                  -- in which case the remaining arguments should
                  -- be dealt with by AppTys
       do { let (tys1, tys_rest) = splitAt (tyConArity tc) tys
-         ; (xi1, co1) <- rewrite_exact_fam_app tc tys1
+         ; (xi1, co1) <- rewrite_exact_fam_app is_stuck tc tys1
                -- co1 :: xi1 ~ F tys1
 
          ; rewrite_app_ty_args xi1 co1 tys_rest }
 
 -- the [TcType] exactly saturate the TyCon
 -- See Note [How to normalise a family application]
-rewrite_exact_fam_app :: TyCon -> [TcType] -> RewriteM (Xi, Coercion)
-rewrite_exact_fam_app tc tys
+rewrite_exact_fam_app :: Bool -> TyCon -> [TcType] -> RewriteM (Xi, Coercion)
+rewrite_exact_fam_app is_stuck tc tys
   = do { checkStackDepth (mkTyConApp tc tys)
 
        -- STEP 1/2. Try to reduce without reducing arguments first.
-       ; result1 <- try_to_reduce tc tys
+       ; result1 <- if is_stuck then pure Nothing else try_to_reduce tc tys
        ; case result1 of
-             -- Don't use the cache;
+             -- Use the cache only if we took more than one step.
              -- See Note [rewrite_exact_fam_app performance]
-         { Just (co, xi) -> finish False (xi, co)
+         { Just (co, ty, use_cache) -> finish use_cache True (ty, co)
          ; Nothing ->
 
         -- That didn't work. So reduce the arguments, in STEP 3.
@@ -826,7 +837,7 @@ rewrite_exact_fam_app tc tys
              | fr `eqCanRewriteFR` (flavour, eq_rel) ->
                  do { traceRewriteM "rewrite family application with inert"
                                 (ppr tc <+> ppr xis $$ ppr xi)
-                    ; finish True (homogenise xi downgraded_co) }
+                    ; finish True False (homogenise xi downgraded_co) }
                -- this will sometimes duplicate an inert in the cache,
                -- but avoiding doing so had no impact on performance, and
                -- it seems easier not to weed out that special case
@@ -841,7 +852,7 @@ rewrite_exact_fam_app tc tys
          -- inert didn't work. Try to reduce again, in STEP 5/6.
     do { result3 <- try_to_reduce tc xis
        ; case result3 of
-           Just (co, xi) -> finish True (homogenise xi co)
+           Just (co, xi, _) -> finish True True (homogenise xi co)
            Nothing       -> -- we have made no progress at all: STEP 7.
                             return (homogenise reduced (mkTcReflCo role reduced))
              where
@@ -850,10 +861,13 @@ rewrite_exact_fam_app tc tys
       -- call this if the above attempts made progress.
       -- This recursively rewrites the result and then adds to the cache
     finish :: Bool  -- add to the cache?
+           -> Bool  -- known to be stuck?
            -> (Xi, Coercion) -> RewriteM (Xi, Coercion)
-    finish use_cache (xi, co)
+    finish use_cache is_stuck (xi, co)
       = do { -- rewrite the result: FINISH 1
-             (fully, fully_co) <- bumpDepth $ rewrite_one xi
+             (fully, fully_co) <- bumpDepth $ case xi of
+               TyConApp tc args | isTypeFamilyTyCon tc -> rewrite_fam_app is_stuck tc args
+               _ -> rewrite_one xi
            ; let final_co = fully_co `mkTcTransCo` co
            ; eq_rel <- getEqRel
            ; flavour <- getFlavour
@@ -869,19 +883,27 @@ rewrite_exact_fam_app tc tys
 
 -- Returned coercion is output ~r input, where r is the role in the RewriteM monad
 -- See Note [How to normalise a family application]
-try_to_reduce :: TyCon -> [TcType] -> RewriteM (Maybe (TcCoercion, TcType))
+try_to_reduce :: TyCon -> [TcType] -> RewriteM (Maybe (TcCoercion, TcType, Bool))
 try_to_reduce tc tys
-  = do { result <- liftTcS $ firstJustsM [ lookupFamAppCache tc tys  -- STEP 5
-                                         , matchFam tc tys ]         -- STEP 6
-       ; downgrade result }
+  = do { loc <- getLoc
+       ; limit <- reductionDepth <$> getDynFlags
+       -- TODO: treatment of the limit is deeply fishy here
+       ; let limit' = limit -- + mkIntWithInf (negate (ctLocDepth loc))
+       ; mb <- liftTcS (stepFam limit' tc tys)
+       ; case mb of
+           Just (co, ty, n)
+             | intGtLimit n limit'
+                         -> liftTcS $ wrapErrTcS $ solverDepthErrorTcS (loc { ctl_depth = mkSubGoalDepth n }) ty
+             | otherwise -> Just <$> downgrade (co, ty, n > 1)
+           _ -> return Nothing
+       }
   where
     -- The result above is always Nominal. We might want a Representational
     -- coercion; this downgrades (and prints, out of convenience).
-    downgrade :: Maybe (TcCoercionN, TcType) -> RewriteM (Maybe (TcCoercion, TcType))
-    downgrade Nothing = return Nothing
-    downgrade result@(Just (co, xi))
+    downgrade :: (TcCoercionN, TcType, Bool) -> RewriteM (TcCoercion, TcType, Bool)
+    downgrade result@(co, ty, n)
       = do { traceRewriteM "Eager T.F. reduction success" $
-             vcat [ ppr tc, ppr tys, ppr xi
+             vcat [ ppr tc, ppr tys, ppr ty
                   , ppr co <+> dcolon <+> ppr (coercionKind co)
                   ]
            ; eq_rel <- getEqRel
@@ -889,7 +911,7 @@ try_to_reduce tc tys
               -- common NomEq case
            ; case eq_rel of
                NomEq  -> return result
-               ReprEq -> return (Just (mkSubCo co, xi)) }
+               ReprEq -> return (mkSubCo co, ty, n) }
 
 {-
 ************************************************************************
