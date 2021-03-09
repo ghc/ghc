@@ -3145,8 +3145,8 @@ runTypecheckerPlugin sum gbl_env = do
 
 mark_plugin_unsafe :: DynFlags -> TcM ()
 mark_plugin_unsafe dflags = unless (gopt Opt_PluginTrustworthy dflags) $
-  recordUnsafeInfer pluginUnsafe
+  whenIsJust pluginUnsafe (recordUnsafeInfer . unitBag)
   where
     unsafeText = "Use of plugins makes the module unsafe"
-    pluginUnsafe = unitBag ( mkPlainMsgEnvelope dflags WarningWithoutFlag noSrcSpan
-                                   (Outputable.text unsafeText) )
+    pluginUnsafe =
+      mkPlainMsgEnvelope dflags WarningWithoutFlag noSrcSpan (Outputable.text unsafeText)

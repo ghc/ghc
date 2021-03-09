@@ -1033,7 +1033,7 @@ discardWarnings thing_inside
 ************************************************************************
 -}
 
-mkLongErrAt :: SrcSpan -> SDoc -> SDoc -> TcRn (MsgEnvelope DiagnosticMessage)
+mkLongErrAt :: SrcSpan -> SDoc -> SDoc -> TcRn (Maybe (MsgEnvelope DiagnosticMessage))
 mkLongErrAt loc msg extra
   = do { printer <- getPrintUnqualified ;
          unit_state <- hsc_units <$> getTopEnv ;
@@ -1049,7 +1049,7 @@ mkDecoratedSDocAt :: DiagnosticReason
                   -- ^ The context of the message
                   -> SDoc
                   -- ^ Any supplementary information.
-                  -> TcRn (MsgEnvelope DiagnosticMessage)
+                  -> TcRn (Maybe (MsgEnvelope DiagnosticMessage))
 mkDecoratedSDocAt reason loc important context extra
   = do { printer <- getPrintUnqualified ;
          unit_state <- hsc_units <$> getTopEnv ;
@@ -1061,7 +1061,9 @@ mkDecoratedSDocAt reason loc important context extra
          return $ mkMsgEnvelope dflags loc printer errDoc' }
 
 addLongErrAt :: SrcSpan -> SDoc -> SDoc -> TcRn ()
-addLongErrAt loc msg extra = mkLongErrAt loc msg extra >>= reportDiagnostic
+addLongErrAt loc msg extra = do
+  diag <- mkLongErrAt loc msg extra
+  whenIsJust diag reportDiagnostic
 
 reportDiagnostics :: [MsgEnvelope DiagnosticMessage] -> TcM ()
 reportDiagnostics = mapM_ reportDiagnostic
@@ -1568,7 +1570,7 @@ add_diagnostic_at reason loc msg extra_info
          let { dia = mkLongMsgEnvelope dflags reason
                                        loc printer
                                        msg extra_info } ;
-         reportDiagnostic dia }
+         whenIsJust dia reportDiagnostic }
 
 
 {-

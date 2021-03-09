@@ -48,6 +48,7 @@ import GHC.Utils.Outputable
 import GHC.Types.Basic
 import GHC.Unit.Home
 
+import GHC.Data.Bag
 import GHC.Data.Stream as Stream (collect, yield)
 
 import Data.Typeable
@@ -117,7 +118,7 @@ compileCmmForRegAllocStats logger dflags' cmmFile ncgImplF us = do
     -- parse the cmm file and output any warnings or errors
     let fake_mod = mkHomeModule (hsc_home_unit hscEnv) (mkModuleName "fake")
     (warnings, errors, parsedCmm) <- parseCmmFile dflags fake_mod (hsc_home_unit hscEnv) cmmFile
-    let warningMsgs = fmap (mkParserWarn dflags') warnings
+    let warningMsgs = mapMaybeBag (mkParserWarn dflags') warnings
         errorMsgs   = fmap mkParserErr errors
 
     -- print parser errors or warnings
