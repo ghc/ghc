@@ -144,20 +144,38 @@ class  (Num a, Ord a) => Real a  where
 -- 'abs'.
 class  (Real a, Enum a) => Integral a  where
     -- | integer division truncated toward zero
+    --
+    -- WARNING: This function is partial (because it throws when 0 is passed as
+    -- the divisor) for all the integer types in @base@.
     quot                :: a -> a -> a
     -- | integer remainder, satisfying
     --
     -- > (x `quot` y)*y + (x `rem` y) == x
+    --
+    -- WARNING: This function is partial (because it throws when 0 is passed as
+    -- the divisor) for all the integer types in @base@.
     rem                 :: a -> a -> a
     -- | integer division truncated toward negative infinity
+    --
+    -- WARNING: This function is partial (because it throws when 0 is passed as
+    -- the divisor) for all the integer types in @base@.
     div                 :: a -> a -> a
     -- | integer modulus, satisfying
     --
     -- > (x `div` y)*y + (x `mod` y) == x
+    --
+    -- WARNING: This function is partial (because it throws when 0 is passed as
+    -- the divisor) for all the integer types in @base@.
     mod                 :: a -> a -> a
     -- | simultaneous 'quot' and 'rem'
+    --
+    -- WARNING: This function is partial (because it throws when 0 is passed as
+    -- the divisor) for all the integer types in @base@.
     quotRem             :: a -> a -> (a,a)
     -- | simultaneous 'div' and 'mod'
+    --
+    -- WARNING: This function is partial (because it throws when 0 is passed as
+    -- the divisor) for all the integer types in @base@.
     divMod              :: a -> a -> (a,a)
     -- | conversion to 'Integer'
     toInteger           :: a -> Integer
@@ -575,7 +593,10 @@ instance  (Integral a)  => Enum (Ratio a)  where
 -- Coercions
 --------------------------------------------------------------
 
--- | general coercion from integral types
+-- | General coercion from 'Integral' types.
+--
+-- WARNING: This function performs silent truncation if the result type is not
+-- at least as big as the argument's type.
 {-# INLINE fromIntegral #-}
   -- Inlined to allow built-in rules to match.
   -- See Note [Optimising conversions between numeric types]
@@ -583,7 +604,17 @@ instance  (Integral a)  => Enum (Ratio a)  where
 fromIntegral :: (Integral a, Num b) => a -> b
 fromIntegral = fromInteger . toInteger
 
--- | general coercion to fractional types
+-- | General coercion to 'Fractional' types.
+--
+-- WARNING: This function goes through the 'Rational' type, which does not have values for 'NaN' for example.
+-- This means it does not round-trip.
+--
+-- For 'Double' it also behaves differently with or without -O0:
+--
+-- > Prelude> realToFrac nan -- With -O0
+-- > -Infinity
+-- > Prelude> realToFrac nan
+-- > NaN
 realToFrac :: (Real a, Fractional b) => a -> b
 {-# NOINLINE [1] realToFrac #-}
 realToFrac = fromRational . toRational
