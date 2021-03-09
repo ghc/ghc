@@ -324,13 +324,13 @@ type instance XRecordUpd     GhcPs = ApiAnn
 type instance XRecordUpd     GhcRn = NoExtField
 type instance XRecordUpd     GhcTc = RecordUpdTc
 
-type instance XGetField     GhcPs = NoExtField
+type instance XGetField     GhcPs = ApiAnnCO
 type instance XGetField     GhcRn = NoExtField
 type instance XGetField     GhcTc = Void
 -- HsGetField is eliminated by the renamer. See [Handling overloaded
 -- and rebindable constructs].
 
-type instance XProjection     GhcPs = NoExtField
+type instance XProjection     GhcPs = ApiAnn' AnnProjection
 type instance XProjection     GhcRn = NoExtField
 type instance XProjection     GhcTc = Void
 -- HsProjection is eliminated by the renamer. See [Handling overloaded
@@ -390,10 +390,24 @@ data AnnsLet
       alIn :: AnnAnchor
       } deriving Data
 
+data AnnFieldLabel
+  = AnnFieldLabel {
+      afDot :: Maybe AnnAnchor
+      } deriving Data
+
+data AnnProjection
+  = AnnProjection {
+      apOpen  :: AnnAnchor, -- ^ '('
+      apClose :: AnnAnchor  -- ^ ')'
+      } deriving Data
+
 -- ---------------------------------------------------------------------
 
 type instance XSCC           (GhcPass _) = ApiAnn' AnnPragma
 type instance XXPragE        (GhcPass _) = NoExtCon
+
+type instance XCHsFieldLabel (GhcPass _) = ApiAnn' AnnFieldLabel
+type instance XXHsFieldLabel (GhcPass _) = NoExtCon
 
 type instance XPresent         (GhcPass _) = ApiAnn
 

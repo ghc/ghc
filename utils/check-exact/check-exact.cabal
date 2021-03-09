@@ -30,3 +30,4 @@ Executable check-exact
                    directory,
                    filepath,
                    ghc
+                   mtl
