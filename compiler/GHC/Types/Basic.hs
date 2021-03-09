@@ -93,6 +93,7 @@ module GHC.Types.Basic (
         SuccessFlag(..), succeeded, failed, successIf,
 
         IntWithInf, infinity, treatZeroAsInf, mkIntWithInf, intGtLimit,
+        minusWithInf,
 
         SpliceExplicitFlag(..),
 
@@ -1647,6 +1648,11 @@ plusWithInf :: IntWithInf -> IntWithInf -> IntWithInf
 plusWithInf Infinity _        = Infinity
 plusWithInf _        Infinity = Infinity
 plusWithInf (Int a)  (Int b)  = Int (a + b)
+
+-- | Subtract a finite 'Int' from an 'IntWithInf'
+minusWithInf :: IntWithInf -> Int -> IntWithInf
+minusWithInf Infinity _ = Infinity
+minusWithInf (Int m) n  = Int (m - n)
 
 -- | Multiply two 'IntWithInf's
 mulWithInf :: IntWithInf -> IntWithInf -> IntWithInf

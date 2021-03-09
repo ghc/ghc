@@ -29,7 +29,9 @@ import GHC.Driver.Session
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Tc.Solver.Monad as TcS
+import GHC.Tc.Errors
 
+import GHC.Types.Basic
 import GHC.Utils.Misc
 import GHC.Data.Maybe
 import GHC.Exts (oneShot)
@@ -785,13 +787,22 @@ rewrite_exact_fam_app :: TyCon -> [TcType] -> RewriteM (Xi, Coercion)
 rewrite_exact_fam_app tc tys
   = do { checkStackDepth (mkTyConApp tc tys)
 
-       -- STEP 1/2. Try to reduce without reducing arguments first.
-       ; result1 <- try_to_reduce tc tys
-       ; case result1 of
+       -- STEP 1. Try the famapp-cache, without reducing arguments.
+       ; result1 <- liftTcS (lookupFamAppCache tc tys)
+       ; result1' <- downgrade tc tys result1
+       ; case result1' of
              -- Don't use the cache;
              -- See Note [rewrite_exact_fam_app performance]
          { Just (co, xi) -> finish False (xi, co)
          ; Nothing ->
+
+       -- STEP 2. Try to reduce without reducing arguments first.
+    do { (result1b, use_cache) <- try_to_step tc tys
+       ; result1b' <- downgrade tc tys result1b
+       ; case result1b' of
+             -- Use the cache only if we took more than one step.
+           { Just (co, xi) -> finish use_cache (xi, co)
+           ; Nothing ->
 
         -- That didn't work. So reduce the arguments, in STEP 3.
     do { eq_rel <- getEqRel
@@ -842,7 +853,7 @@ rewrite_exact_fam_app tc tys
            Nothing       -> -- we have made no progress at all: STEP 7.
                             return (homogenise reduced (mkTcReflCo role reduced))
              where
-               reduced = mkTyConApp tc xis }}}}}
+               reduced = mkTyConApp tc xis }}}}}}}
   where
       -- call this if the above attempts made progress.
       -- This recursively rewrites the result and then adds to the cache
@@ -868,25 +879,37 @@ rewrite_exact_fam_app tc tys
 -- See Note [How to normalise a family application]
 try_to_reduce :: TyCon -> [TcType] -> RewriteM (Maybe (TcCoercion, TcType))
 try_to_reduce tc tys
-  = do { result <- liftTcS $ firstJustsM [ lookupFamAppCache tc tys  -- STEP 5
-                                         , matchFam tc tys ]         -- STEP 6
-       ; downgrade result }
-  where
-    -- The result above is always Nominal. We might want a Representational
-    -- coercion; this downgrades (and prints, out of convenience).
-    downgrade :: Maybe (TcCoercionN, TcType) -> RewriteM (Maybe (TcCoercion, TcType))
-    downgrade Nothing = return Nothing
-    downgrade result@(Just (co, xi))
-      = do { traceRewriteM "Eager T.F. reduction success" $
-             vcat [ ppr tc, ppr tys, ppr xi
-                  , ppr co <+> dcolon <+> ppr (coercionKind co)
-                  ]
-           ; eq_rel <- getEqRel
-              -- manually doing it this way avoids allocation in the vastly
-              -- common NomEq case
-           ; case eq_rel of
-               NomEq  -> return result
-               ReprEq -> return (Just (mkSubCo co, xi)) }
+  = do { result <-firstJustsM [ liftTcS (lookupFamAppCache tc tys)  -- STEP 5
+                              , fst <$> try_to_step tc tys ]        -- STEP 6
+       ; downgrade tc tys result }
+
+try_to_step :: TyCon -> [TcType] -> RewriteM (Maybe (TcCoercion, TcType), Bool)
+try_to_step tc tys
+  = do { loc <- getLoc
+       ; limit <- reductionDepth <$> getDynFlags
+       ; let limit' = limit -- + mkIntWithInf (negate (ctLocDepth loc))
+       ; (mb, n) <- liftTcS (stepFam limit' tc tys)
+       ; case mb of
+           Just (_, ty) | intGtLimit n limit'
+            -> liftTcS $ wrapErrTcS $ solverDepthErrorTcS (loc { ctl_depth = mkSubGoalDepth n }) ty
+           _ -> return (mb, n > 1)
+       }
+
+-- The result above is always Nominal. We might want a Representational
+-- coercion; this downgrades (and prints, out of convenience).
+downgrade :: TyCon -> [TcType] -> Maybe (TcCoercionN, TcType) -> RewriteM (Maybe (TcCoercion, TcType))
+downgrade _ _ Nothing = return Nothing
+downgrade tc tys result@(Just (co, xi))
+  = do { traceRewriteM "Eager T.F. reduction success" $
+         vcat [ ppr tc, ppr tys, ppr xi
+              , ppr co <+> dcolon <+> ppr (coercionKind co)
+              ]
+       ; eq_rel <- getEqRel
+          -- manually doing it this way avoids allocation in the vastly
+          -- common NomEq case
+       ; case eq_rel of
+           NomEq  -> return result
+           ReprEq -> return (Just (mkSubCo co, xi)) }
 
 {-
 ************************************************************************
