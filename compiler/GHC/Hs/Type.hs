@@ -973,6 +973,9 @@ pprHsForAll tele cxt
               => SDoc -> [LHsTyVarBndr flag (GhcPass p)] -> SDoc
     pp_forall separator qtvs
       | null qtvs = whenPprDebug (forAllLit <> separator)
+  -- Note: to fix the PprRecordDotSyntax1 ppr roundtrip test, the <>
+  -- below needs to be <+>. But it means 94 other test results need to
+  -- be updated to match.
       | otherwise = forAllLit <+> interppSP qtvs <> separator
 
 pprLHsContext :: (OutputableBndrId p)
@@ -999,9 +1002,10 @@ pprConDeclFields fields = braces (sep (punctuate comma (map ppr_fld fields)))
     ppr_fld (L _ (ConDeclField { cd_fld_names = ns, cd_fld_type = ty,
                                  cd_fld_doc = doc }))
         = ppr_names ns <+> dcolon <+> ppr ty <+> ppr_mbDoc doc
-    ppr_fld (L _ (XConDeclField x)) = ppr x
-    ppr_names [n] = ppr n
-    ppr_names ns = sep (punctuate comma (map ppr ns))
+
+    ppr_names :: [LFieldOcc (GhcPass p)] -> SDoc
+    ppr_names [n] = pprPrefixOcc n
+    ppr_names ns = sep (punctuate comma (map pprPrefixOcc ns))
 
 {-
 Note [Printing KindedTyVars]

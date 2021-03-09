@@ -274,6 +274,14 @@ deriving instance Data (RoleAnnotDecl GhcTc)
 -- ---------------------------------------------------------------------
 -- Data derivations from GHC.Hs.Expr -----------------------------------
 
+deriving instance Data (FieldLabelStrings GhcPs)
+deriving instance Data (FieldLabelStrings GhcRn)
+deriving instance Data (FieldLabelStrings GhcTc)
+
+deriving instance Data (HsFieldLabel GhcPs)
+deriving instance Data (HsFieldLabel GhcRn)
+deriving instance Data (HsFieldLabel GhcTc)
+
 -- deriving instance (DataIdLR p p) => Data (HsPragE p)
 deriving instance Data (HsPragE GhcPs)
 deriving instance Data (HsPragE GhcRn)

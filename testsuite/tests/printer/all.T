@@ -109,3 +109,11 @@ test('BundleExport', ignore_stderr, makefile_test, ['BundleExport'])
 test('AnnotationTuple', ignore_stderr, makefile_test, ['AnnotationTuple'])
 test('ListComprehensions', ignore_stderr, makefile_test, ['ListComprehensions'])
 test('load-main', ignore_stderr, makefile_test, ['load-main'])
+
+# PPR of explicit foralls needs the "." to have an extra space. See note in pprHsForAll
+test('PprRecordDotSyntax1', [ignore_stderr, expect_fail], makefile_test, ['PprRecordDotSyntax1'])
+
+test('PprRecordDotSyntax2', ignore_stderr, makefile_test, ['PprRecordDotSyntax2'])
+test('PprRecordDotSyntax3', ignore_stderr, makefile_test, ['PprRecordDotSyntax3'])
+test('PprRecordDotSyntax4', ignore_stderr, makefile_test, ['PprRecordDotSyntax4'])
+test('PprRecordDotSyntaxA', ignore_stderr, makefile_test, ['PprRecordDotSyntaxA'])

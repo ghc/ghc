@@ -39,8 +39,8 @@ import GHC
 
 tt :: IO ()
 -- tt = testOneFile "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/lib"
-tt = testOneFile "/home/alanz/mysrc/git.haskell.org/worktree/exactprint/_build/stage1/lib"
--- tt = testOneFile "/home/alanz/mysrc/git.haskell.org/worktree/epw/_build/stage1/lib"
+-- tt = testOneFile "/home/alanz/mysrc/git.haskell.org/worktree/exactprint/_build/stage1/lib"
+tt = testOneFile "/home/alanz/mysrc/git.haskell.org/worktree/epw/_build/stage1/lib"
  -- "cases/RenameCase1.hs" changeRenameCase1
  -- "cases/LayoutLet2.hs" changeLayoutLet2
  -- "cases/LayoutLet3.hs" changeLayoutLet3

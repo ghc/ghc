@@ -143,26 +143,37 @@ values (see function @mkRdrRecordUpd@ in 'GHC.Parser.PostProcess').
 
 -- | RecordDotSyntax field updates
 
-newtype FieldLabelStrings =
-  FieldLabelStrings [Located FieldLabelString]
-                               deriving (Data)
+newtype FieldLabelStrings p =
+  FieldLabelStrings [Located (HsFieldLabel p)]
 
-instance Outputable FieldLabelStrings where
+instance Outputable (FieldLabelStrings p) where
   ppr (FieldLabelStrings flds) =
     hcat (punctuate dot (map (ppr . unLoc) flds))
 
+instance OutputableBndr (FieldLabelStrings p) where
+  pprInfixOcc = pprFieldLabelStrings
+  pprPrefixOcc = pprFieldLabelStrings
+
+pprFieldLabelStrings :: FieldLabelStrings p -> SDoc
+pprFieldLabelStrings (FieldLabelStrings flds) =
+    hcat (punctuate dot (map (ppr . unLoc) flds))
+
+instance Outputable (HsFieldLabel p) where
+  ppr (HsFieldLabel _ s) = ppr s
+  ppr XHsFieldLabel{} = text "XHsFieldLabel"
+
 -- Field projection updates (e.g. @foo.bar.baz = 1@). See Note
 -- [RecordDotSyntax field updates].
-type RecProj arg = HsRecField' FieldLabelStrings arg
+type RecProj p arg = HsRecField' (FieldLabelStrings p) arg
 
 -- The phantom type parameter @p@ is for symmetry with @LHsRecField p
 -- arg@ in the definition of @data Fbind@ (see GHC.Parser.Process).
-type LHsRecProj p arg = Located (RecProj arg)
+type LHsRecProj p arg = XRec p (RecProj p arg)
 
 -- These two synonyms are used in the definition of syntax @RecordUpd@
 -- below.
-type RecUpdProj p = RecProj (LHsExpr p)
-type LHsRecUpdProj p = Located (RecUpdProj p)
+type RecUpdProj p = RecProj p (LHsExpr p)
+type LHsRecUpdProj p = XRec p (RecUpdProj p)
 
 {-
 ************************************************************************
@@ -483,7 +494,7 @@ data HsExpr p
   | HsGetField {
         gf_ext :: XGetField p
       , gf_expr :: LHsExpr p
-      , gf_field :: Located FieldLabelString
+      , gf_field :: Located (HsFieldLabel p)
       }
 
   -- | Record field selector. e.g. @(.x)@ or @(.x.y)@
@@ -496,7 +507,7 @@ data HsExpr p
 
   | HsProjection {
         proj_ext :: XProjection p
-      , proj_flds :: [Located FieldLabelString]
+      , proj_flds :: [Located (HsFieldLabel p)]
       }
 
   -- | Expression with an explicit type signature. @e :: type@
@@ -608,6 +619,15 @@ type family HsDoRn p
 type family HsBracketRn p
 type family PendingRnSplice' p
 type family PendingTcSplice' p
+
+-- ---------------------------------------------------------------------
+
+data HsFieldLabel p
+  = HsFieldLabel
+    { hflExt   :: XCHsFieldLabel p
+    , hflLabel :: Located FieldLabelString
+    }
+  | XHsFieldLabel !(XXHsFieldLabel p)
 
 -- ---------------------------------------------------------------------
 

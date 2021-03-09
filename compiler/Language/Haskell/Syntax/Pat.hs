@@ -368,8 +368,8 @@ instance (Outputable arg, Outputable (XRec p (HsRecField p arg)))
         where
           dotdot = text ".." <+> whenPprDebug (ppr (drop n flds))
 
-instance (Outputable p, Outputable arg)
+instance (Outputable p, OutputableBndr p, Outputable arg)
       => Outputable (HsRecField' p arg) where
-  ppr (HsRecField { hsRecFieldLbl = f, hsRecFieldArg = arg,
+  ppr (HsRecField { hsRecFieldLbl = L _ f, hsRecFieldArg = arg,
                     hsRecPun = pun })
-    = ppr f <+> (ppUnless pun $ equals <+> ppr arg)
+    = pprPrefixOcc f <+> (ppUnless pun $ equals <+> ppr arg)

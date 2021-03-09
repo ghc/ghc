@@ -312,17 +312,19 @@ rnExpr (NegApp _ e _)
 rnExpr (HsGetField _ e f)
  = do { (getField, fv_getField) <- lookupSyntaxName getFieldName
       ; (e, fv_e) <- rnLExpr e
+      ; let f' = rnHsFieldLabel f
       ; return ( mkExpandedExpr
-                   (HsGetField noExtField e f)
-                   (mkGetField getField e f)
+                   (HsGetField noExtField e f')
+                   (mkGetField getField e (fmap (unLoc . hflLabel) f'))
                , fv_e `plusFV` fv_getField ) }
 
 rnExpr (HsProjection _ fs)
   = do { (getField, fv_getField) <- lookupSyntaxName getFieldName
        ; circ <- lookupOccRn compose_RDR
+       ; let fs' = fmap rnHsFieldLabel fs
        ; return ( mkExpandedExpr
-                    (HsProjection noExtField fs)
-                    (mkProjection getField circ fs)
+                    (HsProjection noExtField fs')
+                    (mkProjection getField circ (map (fmap (unLoc . hflLabel)) fs'))
                 , unitFV circ `plusFV` fv_getField) }
 
 ------------------------------------------
@@ -543,7 +545,6 @@ rnExpr (HsProc x pat body)
 rnExpr other = pprPanic "rnExpr: unexpected expression" (ppr other)
         -- HsWrap
 
-
 {- *********************************************************************
 *                                                                      *
         Operator sections
@@ -696,6 +697,19 @@ bindNonRec will automatically do the right thing, giving us:
 See #18151.
 -}
 
+{-
+************************************************************************
+*                                                                      *
+        Field Labels
+*                                                                      *
+************************************************************************
+-}
+
+rnHsFieldLabel :: Located (HsFieldLabel GhcPs) -> Located (HsFieldLabel GhcRn)
+rnHsFieldLabel (L l (HsFieldLabel x label)) = L l (HsFieldLabel x label)
+
+rnFieldLabelStrings :: FieldLabelStrings GhcPs -> FieldLabelStrings GhcRn
+rnFieldLabelStrings (FieldLabelStrings fls) = FieldLabelStrings (map rnHsFieldLabel fls)
 
 {-
 ************************************************************************
@@ -2605,8 +2619,9 @@ mkProjection _ _ [] = panic "mkProjection: The impossible happened"
 -- e.g. Suppose an update like foo.bar = 1.
 --      We calculate the function \a -> setField @"foo" a (setField @"bar" (getField @"foo" a) 1).
 mkProjUpdateSetField :: Name -> Name -> LHsRecProj GhcRn (LHsExpr GhcRn) -> (LHsExpr GhcRn -> LHsExpr GhcRn)
-mkProjUpdateSetField get_field set_field (L _ (HsRecField { hsRecFieldLbl = (L _ (FieldLabelStrings flds)), hsRecFieldArg = arg } ))
+mkProjUpdateSetField get_field set_field (L _ (HsRecField { hsRecFieldLbl = (L _ (FieldLabelStrings flds')), hsRecFieldArg = arg } ))
   = let {
+      ; flds = map (fmap (unLoc . hflLabel)) flds'
       ; final = last flds  -- quux
       ; fields = init flds   -- [foo, bar, baz]
       ; getters = \a -> foldl' (mkGet get_field) [a] fields  -- Ordered from deep to shallow.
@@ -2629,6 +2644,9 @@ rnHsUpdProjs us = do
   pure (u, plusFVs fvs)
   where
     rnRecUpdProj :: LHsRecUpdProj GhcPs -> RnM (LHsRecUpdProj GhcRn, FreeVars)
-    rnRecUpdProj (L l (HsRecField fs arg pun))
+    rnRecUpdProj (L l (HsRecField _ fs arg pun))
       = do { (arg, fv) <- rnLExpr arg
-           ; return $ (L l (HsRecField { hsRecFieldLbl = fs, hsRecFieldArg = arg, hsRecPun = pun}), fv) }
+           ; return $ (L l (HsRecField { hsRecFieldAnn = noAnn
+                                       , hsRecFieldLbl = fmap rnFieldLabelStrings fs
+                                       , hsRecFieldArg = arg
+                                       , hsRecPun = pun}), fv) }

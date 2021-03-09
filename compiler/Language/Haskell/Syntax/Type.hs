@@ -1270,6 +1270,13 @@ deriving instance (Eq (XCFieldOcc pass), Eq (XXFieldOcc pass)) => Eq (FieldOcc p
 instance Outputable (FieldOcc pass) where
   ppr = ppr . rdrNameFieldOcc
 
+instance OutputableBndr (FieldOcc pass) where
+  pprInfixOcc  = pprInfixOcc . unLoc . rdrNameFieldOcc
+  pprPrefixOcc = pprPrefixOcc . unLoc . rdrNameFieldOcc
+
+instance OutputableBndr (GenLocated SrcSpan (FieldOcc pass)) where
+  pprInfixOcc  = pprInfixOcc . unLoc
+  pprPrefixOcc = pprPrefixOcc . unLoc
 
 -- | Ambiguous Field Occurrence
 --

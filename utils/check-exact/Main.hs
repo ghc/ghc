@@ -21,7 +21,8 @@ import ExactPrint
 
 tt :: IO ()
 -- tt = testOneFile "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/lib"
-tt = testOneFile "/home/alanz/mysrc/git.haskell.org/worktree/exactprint/_build/stage1/lib"
+-- tt = testOneFile "/home/alanz/mysrc/git.haskell.org/worktree/exactprint/_build/stage1/lib"
+tt = testOneFile "/home/alanz/mysrc/git.haskell.org/worktree/epw/_build/stage1/lib"
  -- "../../testsuite/tests/printer/Ppr001.hs"
  -- "../../testsuite/tests/printer/Ppr002.hs"
  -- "../../testsuite/tests/printer/Ppr002a.hs"
@@ -30,7 +31,6 @@ tt = testOneFile "/home/alanz/mysrc/git.haskell.org/worktree/exactprint/_build/s
  -- "../../testsuite/tests/printer/Ppr005.hs"
  -- "../../testsuite/tests/qualifieddo/should_compile/qdocompile001.hs"
  -- "../../testsuite/tests/printer/Ppr006.hs"
- -- "../../testsuite/tests/printer/Ppr006a.hs"
  -- "../../testsuite/tests/printer/Ppr007.hs"
  -- "../../testsuite/tests/printer/Ppr008.hs"
  -- "../../testsuite/tests/hiefile/should_compile/hie008.hs"
@@ -104,7 +104,7 @@ tt = testOneFile "/home/alanz/mysrc/git.haskell.org/worktree/exactprint/_build/s
  -- "../../testsuite/tests/printer/Test10354.hs"
  -- "../../testsuite/tests/printer/Test10357.hs"
  -- "../../testsuite/tests/printer/Test10399.hs"
- "../../testsuite/tests/printer/Test11018.hs"
+ -- "../../testsuite/tests/printer/Test11018.hs"
  -- "../../testsuite/tests/printer/Test11332.hs"
  -- "../../testsuite/tests/printer/Test16230.hs"
  -- "../../testsuite/tests/printer/Test16236.hs"
@@ -121,6 +121,11 @@ tt = testOneFile "/home/alanz/mysrc/git.haskell.org/worktree/exactprint/_build/s
  -- "./cases/AddLocalDecl1.hs"
  -- "./cases/LayoutIn1.hs"
  -- "./cases/EmptyWheres.hs"
+ -- "../../testsuite/tests/printer/PprRecordDotSyntax1.hs"
+ -- "../../testsuite/tests/printer/PprRecordDotSyntax2.hs"
+ -- "../../testsuite/tests/printer/PprRecordDotSyntax3.hs"
+ -- "../../testsuite/tests/printer/PprRecordDotSyntax4.hs"
+ "../../testsuite/tests/printer/PprRecordDotSyntaxA.hs"
 
 -- exact = ppr
 

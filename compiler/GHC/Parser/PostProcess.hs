@@ -111,7 +111,7 @@ module GHC.Parser.PostProcess (
 import GHC.Prelude
 import GHC.Hs           -- Lots of it
 import GHC.Core.TyCon          ( TyCon, isTupleTyCon, tyConSingleDataCon_maybe )
-import GHC.Core.DataCon        ( DataCon, dataConTyCon, FieldLabelString )
+import GHC.Core.DataCon        ( DataCon, dataConTyCon )
 import GHC.Core.ConLike        ( ConLike(..) )
 import GHC.Core.Coercion.Axiom ( Role, fsFromRole )
 import GHC.Types.Name.Reader
@@ -138,7 +138,6 @@ import GHC.Data.FastString
 import GHC.Data.Maybe
 import GHC.Data.Bag
 import GHC.Utils.Misc
-import GHC.Parser.Annotation
 import Data.Either
 import Data.List
 import Data.Foldable
@@ -1376,7 +1375,7 @@ ecpFromCmd a = ECP (ecpFromCmd' a)
 
 -- The 'fbinds' parser rule produces values of this type. See Note
 -- [RecordDotSyntax field updates].
-type Fbind b = Either (LHsRecField GhcPs (Located b)) (LHsRecProj GhcPs (Located b))
+type Fbind b = Either (LHsRecField GhcPs (LocatedA b)) (LHsRecProj GhcPs (LocatedA b))
 
 -- | Disambiguate infix operators.
 -- See Note [Ambiguous syntactic categories]
@@ -1416,7 +1415,8 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
   ecpFromCmd' :: LHsCmd GhcPs -> PV (LocatedA b)
   -- | Return an expression without ambiguity, or fail in a non-expression context.
   ecpFromExp' :: LHsExpr GhcPs -> PV (LocatedA b)
-  mkHsProjUpdatePV :: SrcSpan -> Located [Located FieldLabelString] -> Located b -> Bool -> PV (LHsRecProj GhcPs (Located b))
+  mkHsProjUpdatePV :: SrcSpan -> Located [Located (HsFieldLabel GhcPs)]
+    -> LocatedA b -> Bool -> [AddApiAnn] -> PV (LHsRecProj GhcPs (LocatedA b))
   -- | Disambiguate "\... -> ..." (lambda)
   mkHsLamPV
     :: SrcSpan -> (ApiAnnComments -> MatchGroup GhcPs (LocatedA b)) -> PV (LocatedA b)
@@ -1558,7 +1558,7 @@ instance DisambECP (HsCmd GhcPs) where
   type Body (HsCmd GhcPs) = HsCmd
   ecpFromCmd' = return
   ecpFromExp' (L l e) = cmdFail (locA l) (ppr e)
-  mkHsProjUpdatePV l _ _ _ = addFatalError $ PsError PsErrOverloadedRecordDotInvalid [] l
+  mkHsProjUpdatePV l _ _ _ _ = addFatalError $ PsError PsErrOverloadedRecordDotInvalid [] l
   mkHsLamPV l mg = do
     cs <- getCommentsFor l
     return $ L (noAnnSrcSpan l) (HsCmdLam NoExtField (mg cs))
@@ -1606,7 +1606,7 @@ instance DisambECP (HsCmd GhcPs) where
   mkHsExplicitListPV l xs _ = cmdFail l $
     brackets (fsep (punctuate comma (map ppr xs)))
   mkHsSplicePV (L l sp) = cmdFail l (ppr sp)
-  mkHsRecordPV _ l _ a (fbinds, ddLoc) = do
+  mkHsRecordPV _ l _ a (fbinds, ddLoc) _ = do
     let (fs, ps) = partitionEithers fbinds
     if not (null ps)
       then addFatalError $ PsError PsErrOverloadedRecordDotInvalid [] l
@@ -1636,7 +1636,9 @@ instance DisambECP (HsExpr GhcPs) where
     addError $ PsError (PsErrArrowCmdInExpr c) [] (locA l)
     return (L l (hsHoleExpr noAnn))
   ecpFromExp' = return
-  mkHsProjUpdatePV l fields arg isPun = return $ mkRdrProjUpdate l fields arg isPun
+  mkHsProjUpdatePV l fields arg isPun anns = do
+    cs <- getCommentsFor l
+    return $ mkRdrProjUpdate (noAnnSrcSpan l) fields arg isPun (ApiAnn (spanAsAnchor l) anns cs)
   mkHsLamPV l mg = do
     cs <- getCommentsFor l
     return $ L (noAnnSrcSpan l) (HsLam NoExtField (mg cs))
@@ -1732,7 +1734,7 @@ instance DisambECP (PatBuilder GhcPs) where
   ecpFromExp' (L l e)    = addFatalError $ PsError (PsErrArrowExprInPat e) [] (locA l)
   mkHsLamPV l _          = addFatalError $ PsError PsErrLambdaInPat [] l
   mkHsLetPV l _ _ _      = addFatalError $ PsError PsErrLetInPat [] l
-  mkHsProjUpdatePV l _ _ _ = addFatalError $ PsError PsErrOverloadedRecordDotInvalid [] l
+  mkHsProjUpdatePV l _ _ _ _ = addFatalError $ PsError PsErrOverloadedRecordDotInvalid [] l
   type InfixOp (PatBuilder GhcPs) = RdrName
   superInfixOp m = m
   mkHsOpAppPV l p1 op p2 = do
@@ -1769,7 +1771,7 @@ instance DisambECP (PatBuilder GhcPs) where
      then addFatalError $ PsError PsErrOverloadedRecordDotInvalid [] l
      else do
        cs <- getCommentsFor l
-       r <- mkPatRec a (mk_rec_fields fbinds ddLoc) (ApiAnn (spanAsAnchor l) anns cs)
+       r <- mkPatRec a (mk_rec_fields fs ddLoc) (ApiAnn (spanAsAnchor l) anns cs)
        checkRecordSyntax (L (noAnnSrcSpan l) r)
   mkHsNegAppPV l (L lp p) anns = do
     lit <- case p of
@@ -2378,19 +2380,19 @@ mkRecConstrOrUpdate
         -> ([Fbind (HsExpr GhcPs)], Maybe SrcSpan)
         -> ApiAnn
         -> PV (HsExpr GhcPs)
-mkRecConstrOrUpdate _ (L l (HsVar _ (L _ c))) _lrec (fbinds,dd) anns
+mkRecConstrOrUpdate _ (L _ (HsVar _ (L l c))) _lrec (fbinds,dd) anns
   | isRdrDataCon c
   = do
       let (fs, ps) = partitionEithers fbinds
       if not (null ps)
-        then addFatalError $ PsError PsErrOverloadedRecordDotInvalid [] (getLoc (head ps))
+        then addFatalError $ PsError PsErrOverloadedRecordDotInvalid [] (getLocA (head ps))
         else return (mkRdrRecordCon (L l c) (mk_rec_fields fs dd) anns)
-mkRecConstrOrUpdate overloaded_update exp _ (fs,dd)
+mkRecConstrOrUpdate overloaded_update exp _ (fs,dd) anns
   | Just dd_loc <- dd = addFatalError $ PsError PsErrDotsInRecordUpdate [] dd_loc
   | otherwise = mkRdrRecordUpd overloaded_update exp fs anns
 
-mkRdrRecordUpd :: Bool -> LHsExpr GhcPs -> [Fbind (HsExpr GhcPs)] -> PV (HsExpr GhcPs)
-mkRdrRecordUpd overloaded_on exp@(L loc _) fbinds = do
+mkRdrRecordUpd :: Bool -> LHsExpr GhcPs -> [Fbind (HsExpr GhcPs)] -> ApiAnn -> PV (HsExpr GhcPs)
+mkRdrRecordUpd overloaded_on exp@(L loc _) fbinds anns = do
   -- We do not need to know if OverloadedRecordDot is in effect. We do
   -- however need to know if OverloadedRecordUpdate (passed in
   -- overloaded_on) is in effect because it affects the Left/Right nature
@@ -2400,16 +2402,16 @@ mkRdrRecordUpd overloaded_on exp@(L loc _) fbinds = do
   case overloaded_on of
     False | not $ null ps ->
       -- A '.' was found in an update and OverloadedRecordUpdate isn't on.
-      addFatalError $ PsError PsErrOverloadedRecordUpdateNotEnabled [] loc
+      addFatalError $ PsError PsErrOverloadedRecordUpdateNotEnabled [] (locA loc)
     False ->
       -- This is just a regular record update.
       return RecordUpd {
-        rupd_ext = noExtField
+        rupd_ext = anns
       , rupd_expr = exp
       , rupd_flds = Left fs' }
     True -> do
       let qualifiedFields =
-            [ L l lbl | L _ (HsRecField (L l lbl) _ _) <- fs'
+            [ L l lbl | L _ (HsRecField _ (L l lbl) _ _) <- fs'
                       , isQual . rdrNameAmbiguousFieldOcc $ lbl
             ]
       if not $ null qualifiedFields
@@ -2417,7 +2419,7 @@ mkRdrRecordUpd overloaded_on exp@(L loc _) fbinds = do
           addFatalError $ PsError PsErrOverloadedRecordUpdateNoQualifiedFields [] (getLoc (head qualifiedFields))
         else -- This is a RecordDotSyntax update.
           return RecordUpd {
-            rupd_ext = noExtField
+            rupd_ext = anns
            , rupd_expr = exp
            , rupd_flds = Right (toProjUpdates fbinds) }
   where
@@ -2427,17 +2429,19 @@ mkRdrRecordUpd overloaded_on exp@(L loc _) fbinds = do
     -- Convert a top-level field update like {foo=2} or {bar} (punned)
     -- to a projection update.
     recFieldToProjUpdate :: LHsRecField GhcPs  (LHsExpr GhcPs) -> LHsRecUpdProj GhcPs
-    recFieldToProjUpdate (L l (HsRecField (L _ (FieldOcc _ (L loc rdr))) arg pun)) =
+    recFieldToProjUpdate (L l (HsRecField anns (L _ (FieldOcc _ (L loc rdr))) arg pun)) =
         -- The idea here is to convert the label to a singleton [FastString].
         let f = occNameFS . rdrNameOcc $ rdr
-        in mkRdrProjUpdate l (L loc [L loc f]) (punnedVar f) pun
+            fl = HsFieldLabel noAnn (L lf f) -- AZ: what about the ann?
+            lf = locA loc
+        in mkRdrProjUpdate l (L lf [L lf fl]) (punnedVar f) pun anns
         where
           -- If punning, compute HsVar "f" otherwise just arg. This
           -- has the effect that sentinel HsVar "pun-rhs" is replaced
           -- by HsVar "f" here, before the update is written to a
           -- setField expressions.
           punnedVar :: FastString -> LHsExpr GhcPs
-          punnedVar f  = if not pun then arg else noLoc . HsVar noExtField . noLoc . mkRdrUnqual . mkVarOccFS $ f
+          punnedVar f  = if not pun then arg else noLocA . HsVar noExtField . noLocA . mkRdrUnqual . mkVarOccFS $ f
 
 mkRdrRecordCon
   :: LocatedN RdrName -> HsRecordBinds GhcPs -> ApiAnn -> HsExpr GhcPs
@@ -2949,27 +2953,31 @@ isGetField :: LHsExpr GhcPs -> Bool
 isGetField (L _ HsGetField{}) = True
 isGetField _ = False
 
-mkRdrGetField :: SrcSpan -> LHsExpr GhcPs -> Located FieldLabelString -> LHsExpr GhcPs
-mkRdrGetField loc arg field =
+mkRdrGetField :: SrcSpanAnnA -> LHsExpr GhcPs -> Located (HsFieldLabel GhcPs)
+  -> ApiAnnCO -> LHsExpr GhcPs
+mkRdrGetField loc arg field anns =
   L loc HsGetField {
-      gf_ext = noExtField
+      gf_ext = anns
     , gf_expr = arg
     , gf_field = field
     }
 
-mkRdrProjection :: SrcSpan -> [Located FieldLabelString] -> LHsExpr GhcPs
-mkRdrProjection _ [] = panic "mkRdrProjection: The impossible has happened!"
-mkRdrProjection loc flds =
-  L loc HsProjection {
-      proj_ext = noExtField
+mkRdrProjection :: [Located (HsFieldLabel GhcPs)] -> ApiAnn' AnnProjection -> HsExpr GhcPs
+mkRdrProjection [] _ = panic "mkRdrProjection: The impossible has happened!"
+mkRdrProjection flds anns =
+  HsProjection {
+      proj_ext = anns
     , proj_flds = flds
     }
 
-mkRdrProjUpdate :: SrcSpan -> Located [Located FieldLabelString] -> LHsExpr GhcPs -> Bool -> LHsRecProj GhcPs (LHsExpr GhcPs)
-mkRdrProjUpdate _ (L _ []) _ _ = panic "mkRdrProjUpdate: The impossible has happened!"
-mkRdrProjUpdate loc (L l flds) arg isPun =
+mkRdrProjUpdate :: SrcSpanAnnA -> Located [Located (HsFieldLabel GhcPs)]
+                -> LHsExpr GhcPs -> Bool -> ApiAnn
+                -> LHsRecProj GhcPs (LHsExpr GhcPs)
+mkRdrProjUpdate _ (L _ []) _ _ _ = panic "mkRdrProjUpdate: The impossible has happened!"
+mkRdrProjUpdate loc (L l flds) arg isPun anns =
   L loc HsRecField {
-      hsRecFieldLbl = L l (FieldLabelStrings flds)
+      hsRecFieldAnn = anns
+    , hsRecFieldLbl = L l (FieldLabelStrings flds)
     , hsRecFieldArg = arg
     , hsRecPun = isPun
   }
