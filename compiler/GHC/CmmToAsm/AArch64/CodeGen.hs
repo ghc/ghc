@@ -780,9 +780,6 @@ getRegister' config plat expr
       -> pprPanic "getRegister' (variadic CmmMachOp): " (pdoc plat expr)
 
   where
-    unsupported :: Outputable a => a -> b
-    unsupported op = pprPanic "Unsupported op:" (ppr op)
-
     unsupportedP :: OutputableP env a => env -> a -> b
     unsupportedP platform op = pprPanic "Unsupported op:" (pdoc platform op)
 
@@ -1310,7 +1307,7 @@ genCCall target dest_regs arg_regs bid = do
       passArguments pack gpRegs fpRegs args stackSpace (fpReg:accumRegs) (accumCode `appOL` code_r `snocOL` (ANN (text $ "Pass fp argument: " ++ show r) $ MOV (OpReg w fpReg) (OpReg w r)))
 
     -- No mor regs left to pass. Must pass on stack.
-    passArguments pack [] [] ((r, format, hint, code_r):args) stackSpace accumRegs accumCode = do
+    passArguments pack [] [] ((r, format, _hint, code_r):args) stackSpace accumRegs accumCode = do
       let w = formatToWidth format
           bytes = widthInBits w `div` 8
           space = if pack then bytes else 8
@@ -1318,7 +1315,7 @@ genCCall target dest_regs arg_regs bid = do
       passArguments pack [] [] args (stackSpace+space) accumRegs (stackCode `appOL` accumCode)
 
     -- Still have fpRegs left, but want to pass a GP argument. Must be passed on the stack then.
-    passArguments pack [] fpRegs ((r, format, hint, code_r):args) stackSpace accumRegs accumCode | isIntFormat format = do
+    passArguments pack [] fpRegs ((r, format, _hint, code_r):args) stackSpace accumRegs accumCode | isIntFormat format = do
       let w = formatToWidth format
           bytes = widthInBits w `div` 8
           space = if pack then bytes else 8
@@ -1326,7 +1323,7 @@ genCCall target dest_regs arg_regs bid = do
       passArguments pack [] fpRegs args (stackSpace+space) accumRegs (stackCode `appOL` accumCode)
 
     -- Still have gpRegs left, but want to pass a FP argument. Must be passed on the stack then.
-    passArguments pack gpRegs [] ((r, format, hint, code_r):args) stackSpace accumRegs accumCode | isFloatFormat format = do
+    passArguments pack gpRegs [] ((r, format, _hint, code_r):args) stackSpace accumRegs accumCode | isFloatFormat format = do
       let w = formatToWidth format
           bytes = widthInBits w `div` 8
           space = if pack then bytes else 8
