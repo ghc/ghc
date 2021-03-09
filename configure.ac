@@ -719,10 +719,14 @@ AC_SUBST(InstallNameToolCmd)
 # tools we are looking for. In the past, GHC supported a number of
 # versions of LLVM simultaneously, but that stopped working around
 # 3.5/3.6 release of LLVM.
-LlvmVersion=10
-AC_SUBST([LlvmVersion])
-sUPPORTED_LLVM_VERSION=$(echo \($LlvmVersion\) | sed 's/\./,/')
-AC_DEFINE_UNQUOTED([sUPPORTED_LLVM_VERSION], ${sUPPORTED_LLVM_VERSION}, [The supported LLVM version number])
+LlvmMinVersion=10
+LlvmMaxVersion=12 # inclusive
+AC_SUBST([LlvmMinVersion])
+AC_SUBST([LlvmMaxVersion])
+sUPPORTED_LLVM_VERSION_MIN=$(echo \($LlvmMinVersion\) | sed 's/\./,/')
+sUPPORTED_LLVM_VERSION_MAX=$(echo \($LlvmMaxVersion\) | sed 's/\./,/')
+AC_DEFINE_UNQUOTED([sUPPORTED_LLVM_VERSION_MIN], ${sUPPORTED_LLVM_VERSION_MIN}, [The minimum supported LLVM version number])
+AC_DEFINE_UNQUOTED([sUPPORTED_LLVM_VERSION_MAX], ${sUPPORTED_LLVM_VERSION_MAX}, [The maximum supported LLVM version number])
 
 dnl ** Which LLVM clang to use?
 dnl --------------------------------------------------------------
@@ -734,14 +738,14 @@ AC_SUBST([ClangCmd])
 dnl ** Which LLVM llc to use?
 dnl --------------------------------------------------------------
 AC_ARG_VAR(LLC,[Use as the path to LLVM's llc [default=autodetect]])
-FIND_LLVM_PROG([LLC], [llc], [$LlvmVersion])
+FIND_LLVM_PROG([LLC], [llc], [$LlvmMinVersion], [$LlvmMaxVersion])
 LlcCmd="$LLC"
 AC_SUBST([LlcCmd])
 
 dnl ** Which LLVM opt to use?
 dnl --------------------------------------------------------------
 AC_ARG_VAR(OPT,[Use as the path to LLVM's opt [default=autodetect]])
-FIND_LLVM_PROG([OPT], [opt], [$LlvmVersion])
+FIND_LLVM_PROG([OPT], [opt], [$LlvmMinVersion], [$LlvmMaxVersion])
 OptCmd="$OPT"
 AC_SUBST([OptCmd])
 
