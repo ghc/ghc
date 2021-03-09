@@ -75,9 +75,15 @@ llvmCodeGen logger dflags h cmm_stream
            "Warning: For s390x the GHC calling convention is only supported since LLVM version 10." <+>
            "You are using LLVM version: " <> text (llvmVersionStr ver)
 
+       -- HACK: the Nothing case here is potentially wrong here but we
+       -- currently don't use the LLVM version to guide code generation
+       -- so this is okay.
+       let llvm_ver :: LlvmVersion
+           llvm_ver = fromMaybe supportedLlvmVersionMin mb_ver
+
        -- run code generation
-       a <- runLlvm logger dflags (fromMaybe supportedLlvmVersion mb_ver) bufh $
-         llvmCodeGen' dflags cmm_stream
+       a <- runLlvm logger dflags llvm_ver bufh $
+         llvmCodeGen' dflags (liftStream cmm_stream)
 
        bFlush bufh
 
