@@ -83,7 +83,6 @@ import GHC.Utils.Misc
 import GHC.Utils.Error
 import GHC.Utils.Logger
 import GHC.Utils.Fingerprint
-import GHC.SysTools.FileCleanup
 import GHC.Utils.TmpFs
 
 import GHC.Types.Basic
