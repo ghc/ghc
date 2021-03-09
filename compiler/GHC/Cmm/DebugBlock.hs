@@ -118,7 +118,7 @@ cmmDebugGen modLoc decls = map (blocksForScope Nothing) topScopes
               -- recover by copying ticks below.
               scp' | SubScope _ scp' <- scp      = scp'
                    | CombinedScope scp' _ <- scp = scp'
-#if __GLASGOW_HASKELL__ <= 810
+#if __GLASGOW_HASKELL__ < 901
                    | otherwise                   = panic "findP impossible"
 #endif
 
