@@ -92,8 +92,8 @@ lintStgTopBindings hsc_env this_mod unarised whodunnit binds
     opts = initStgPprOpts dflags
     -- Bring all top-level binds into scope because CoreToStg does not generate
     -- bindings in dependency order (so we may see a use before its definition).
-    top_level_binds = mkVarSet (bindersOfTopBinds binds ++
-                                interactiveInScope hsc_env
+    top_level_binds = mkVarSet (interactiveInScope hsc_env ++
+                                bindersOfTopBinds binds
                                )
 
     lint_binds :: [GenStgTopBinding a] -> LintM ()

@@ -2082,8 +2082,8 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr
            {- Lint if necessary -}
          ; lintInteractiveExpr (text "hscCompileExpr") hsc_env prepd_expr
 
-           {- Create a temporary binding and convert to STG -}
-           {- XXX docs! -}
+           {- Create a temporary binding (just because coreToStg needs a
+              binding for the stg2stg step) and convert to STG -}
          ; let bco_tmp_id = mkSysLocal (fsLit "BCO_toplevel")
                                        (mkPseudoUniqueE 0)
                                        Many

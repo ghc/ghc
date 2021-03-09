@@ -89,7 +89,7 @@ data BCInstr
    -- Push an alt continuation
    | PUSH_ALTS          (ProtoBCO Name)
    | PUSH_ALTS_UNLIFTED (ProtoBCO Name) ArgRep
-   | PUSH_ALTS_T        (ProtoBCO Name) -- continuation
+   | PUSH_ALTS_TUPLE    (ProtoBCO Name) -- continuation
                         !TupleInfo
                         (ProtoBCO Name) -- tuple return BCO
 
@@ -176,7 +176,7 @@ data BCInstr
    | ENTER
    | RETURN            -- return a lifted value
    | RETURN_UBX ArgRep -- return an unlifted value, here's its rep
-   | RETURN_T          -- return an unboxed tuple (info already on stack)
+   | RETURN_TUPLE      -- return an unboxed tuple (info already on stack)
 
    -- Breakpoints
    | BRK_FUN          Word16 Unique (RemotePtr CostCentre)
@@ -253,8 +253,8 @@ instance Outputable BCInstr where
 
    ppr (PUSH_ALTS bco)       = hang (text "PUSH_ALTS") 2 (ppr bco)
    ppr (PUSH_ALTS_UNLIFTED bco pk) = hang (text "PUSH_ALTS_UNLIFTED" <+> ppr pk) 2 (ppr bco)
-   ppr (PUSH_ALTS_T bco tuple_info tuple_bco) =
-                               hang (text "PUSH_ALTS_T" <+> ppr tuple_info)
+   ppr (PUSH_ALTS_TUPLE bco tuple_info tuple_bco) =
+                               hang (text "PUSH_ALTS_TUPLE" <+> ppr tuple_info)
                                     2
                                     (ppr tuple_bco $+$ ppr bco)
 
@@ -313,7 +313,7 @@ instance Outputable BCInstr where
    ppr ENTER                 = text "ENTER"
    ppr RETURN                = text "RETURN"
    ppr (RETURN_UBX pk)       = text "RETURN_UBX  " <+> ppr pk
-   ppr (RETURN_T)            = text "RETURN_T"
+   ppr (RETURN_TUPLE)        = text "RETURN_TUPLE"
    ppr (BRK_FUN index uniq _cc) = text "BRK_FUN" <+> ppr index <+> ppr uniq <+> text "<cc>"
 
 
@@ -348,7 +348,7 @@ bciStackUse PUSH_BCO{}            = 1
 -- XXX these don't take stack space for restoring the CCCS into account!
 bciStackUse (PUSH_ALTS bco)       = 3 + protoBCOStackUse bco
 bciStackUse (PUSH_ALTS_UNLIFTED bco _) = 4 + protoBCOStackUse bco
-bciStackUse (PUSH_ALTS_T bco info _) =
+bciStackUse (PUSH_ALTS_TUPLE bco info _) =
    -- (tuple_bco, tuple_info word, cont_bco, stg_ctoi_t)
    -- tuple
    -- (tuple_info, tuple_bco, stg_ret_t)
@@ -391,7 +391,7 @@ bciStackUse JMP{}                 = 0
 bciStackUse ENTER{}               = 0
 bciStackUse RETURN{}              = 0
 bciStackUse RETURN_UBX{}          = 1
-bciStackUse RETURN_T{}            = 1
+bciStackUse RETURN_TUPLE{}        = 1
 bciStackUse CCALL{}               = 0
 bciStackUse SWIZZLE{}             = 0
 bciStackUse BRK_FUN{}             = 0

@@ -599,14 +599,14 @@ returnUnboxedReps d s szb reps = do
              -- use RETURN_UBX for unary representations
              []    -> return (unitOL $ RETURN_UBX V)
              [rep] -> return (unitOL $ RETURN_UBX (toArgRep platform rep))
-             -- otherwise use RETURN_T with a tuple descriptor
+             -- otherwise use RETURN_TUPLE with a tuple descriptor
              nv_reps -> do
                let (tuple_info, args_offsets) = layoutTuple profile 0 (primRepCmmType platform) nv_reps
                    args_ptrs = map (\(rep, off) -> (isFollowableArg (toArgRep platform rep), off)) args_offsets
                tuple_bco <- emitBc (tupleBCO platform tuple_info args_ptrs)
                return $ PUSH_UBX (mkTupleInfoLit platform tuple_info) 1 `consOL`
                         PUSH_BCO tuple_bco `consOL`
-                        unitOL RETURN_T
+                        unitOL RETURN_TUPLE
     return ( mkSlideB platform szb (d - s) -- clear to sequel
              `appOL`  ret)                 -- go
 
@@ -1211,7 +1211,7 @@ doCase d s p scrut bndr alts
                     map (\(rep, off) -> (isFollowableArg (toArgRep platform rep), off))
                         args_offsets
               tuple_bco <- emitBc (tupleBCO platform tuple_info args_ptrs)
-              return (PUSH_ALTS_T alt_bco' tuple_info tuple_bco
+              return (PUSH_ALTS_TUPLE alt_bco' tuple_info tuple_bco
                       `consOL` scrut_code)
        else let push_alts
                   | isAlgCase
@@ -1312,8 +1312,8 @@ tupleBCO platform info pointers =
     bitmap      = intsToReverseBitmap platform (fromIntegral bitmap_size) $
                   map ((+1) . fromIntegral . bytesToWords platform . snd)
                       (filter fst pointers)
-    body_code = mkSlideW 0 1      -- pop frame header
-                `snocOL` RETURN_T -- and add it again
+    body_code = mkSlideW 0 1          -- pop frame header
+                `snocOL` RETURN_TUPLE -- and add it again
 
 -- -----------------------------------------------------------------------------
 -- Deal with a CCall.

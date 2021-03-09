@@ -381,7 +381,7 @@ assembleI platform i = case i of
                            -> do let ul_bco = assembleBCO platform proto
                                  p <- ioptr (liftM BCOPtrBCO ul_bco)
                                  emit (push_alts pk) [Op p]
-  PUSH_ALTS_T proto tuple_info tuple_proto
+  PUSH_ALTS_TUPLE proto tuple_info tuple_proto
                            -> do let ul_bco = assembleBCO platform proto
                                      ul_tuple_bco = assembleBCO platform
                                                                 tuple_proto
@@ -449,7 +449,7 @@ assembleI platform i = case i of
   ENTER                    -> emit bci_ENTER []
   RETURN                   -> emit bci_RETURN []
   RETURN_UBX rep           -> emit (return_ubx rep) []
-  RETURN_T                 -> emit bci_RETURN_T []
+  RETURN_TUPLE             -> emit bci_RETURN_T []
   CCALL off m_addr i       -> do np <- addr m_addr
                                  emit bci_CCALL [SmallOp off, Op np, SmallOp i]
   BRK_FUN index uniq cc    -> do p1 <- ptr BCOPtrBreakArray
