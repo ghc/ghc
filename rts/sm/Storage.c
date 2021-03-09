@@ -134,6 +134,22 @@ initGeneration (generation *gen, int g)
     gen->old_weak_ptr_list = NULL;
 }
 
+
+#if defined(TRACING)
+// Defined as it's own top-level function so it can be passed to traceInitEvent
+static void
+traceHeapInfo (void){
+  traceEventHeapInfo(CAPSET_HEAP_DEFAULT,
+                     RtsFlags.GcFlags.generations,
+                     RtsFlags.GcFlags.maxHeapSize * BLOCK_SIZE,
+                     RtsFlags.GcFlags.minAllocAreaSize * BLOCK_SIZE,
+                     MBLOCK_SIZE,
+                     BLOCK_SIZE);
+}
+#else
+#define traceHeapInfo
+#endif
+
 void
 initStorage (void)
 {
@@ -230,12 +246,8 @@ initStorage (void)
 
   RELEASE_SM_LOCK;
 
-  traceEventHeapInfo(CAPSET_HEAP_DEFAULT,
-                     RtsFlags.GcFlags.generations,
-                     RtsFlags.GcFlags.maxHeapSize * BLOCK_SIZE,
-                     RtsFlags.GcFlags.minAllocAreaSize * BLOCK_SIZE,
-                     MBLOCK_SIZE,
-                     BLOCK_SIZE);
+  traceInitEvent(traceHeapInfo);
+
 }
 
 void storageAddCapabilities (uint32_t from, uint32_t to)
