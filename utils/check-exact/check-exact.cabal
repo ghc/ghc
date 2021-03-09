@@ -29,4 +29,5 @@ Executable check-exact
                    Cabal      >= 3.0 && < 3.6,
                    directory,
                    filepath,
-                   ghc
+                   ghc,
+                   mtl

@@ -1039,7 +1039,7 @@ cvtl e = wrapLA (cvt e)
                               ; flds'
                                   <- mapM (cvtFld (mkAmbiguousFieldOcc . noLocA))
                                            flds
-                              ; return $ RecordUpd noExtField e' (Left flds') }
+                              ; return $ RecordUpd noAnn e' (Left flds') }
     cvt (StaticE e)      = fmap (HsStatic noAnn) $ cvtl e
     cvt (UnboundVarE s)  = do -- Use of 'vcName' here instead of 'vName' is
                               -- important, because UnboundVarE may contain

@@ -425,6 +425,11 @@ type family XPragE          x
 type family XXExpr          x
 
 -- -------------------------------------
+-- FieldLabel type families
+type family XCHsFieldLabel  x
+type family XXHsFieldLabel  x
+
+-- -------------------------------------
 -- HsPragE type families
 type family XSCC            x
 type family XXPragE         x
