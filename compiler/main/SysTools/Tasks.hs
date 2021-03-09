@@ -23,7 +23,7 @@ import System.IO
 import System.Process
 import GhcPrelude
 
-import LlvmCodeGen.Base (LlvmVersion, llvmVersionStr, supportedLlvmVersion, parseLlvmVersion)
+import LlvmCodeGen.Base (LlvmVersion, llvmVersionStr, supportedLlvmVersionMin, supportedLlvmVersionMax, llvmVersionStr, parseLlvmVersion)
 
 import SysTools.Process
 import SysTools.Info
@@ -236,8 +236,10 @@ figureLlvmVersion dflags = traceToolCommand dflags "llc" $ do
                 errorMsg dflags $ vcat
                     [ text "Warning:", nest 9 $
                           text "Couldn't figure out LLVM version!" $$
-                          text ("Make sure you have installed LLVM " ++
-                                llvmVersionStr supportedLlvmVersion) ]
+                          text ("Make sure you have installed LLVM between "
+                                ++ llvmVersionStr supportedLlvmVersionMin
+                                ++ " and "
+                                ++ llvmVersionStr supportedLlvmVersionMax) ]
                 return Nothing)
 
 
