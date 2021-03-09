@@ -66,7 +66,7 @@ import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Utils.FV ( fvVarList, unionFV )
 
-import Control.Monad    ( unless,  when )
+import Control.Monad    ( (>=>),  unless,  when )
 import Data.Foldable    ( toList )
 import Data.List        ( partition, mapAccumL, sortBy, unfoldr )
 
@@ -715,20 +715,15 @@ mkSkolReporter ctxt cts
 reportHoles :: [Ct]  -- other (tidied) constraints
             -> ReportErrCtxt -> [Hole] -> TcM ()
 reportHoles tidy_cts ctxt
-  = mapM_ $ \hole -> do
-     msg <- mkHoleError tidy_cts ctxt hole
-     reportDiagnostic msg
+  = mapM_ (mkHoleError tidy_cts ctxt >=> reportDiagnostic)
 
 mkUserTypeErrorReporter :: Reporter
 mkUserTypeErrorReporter ctxt
   = mapM_ $ \ct -> do
       let mk_msg rea = mkUserTypeError rea ctxt ct
-
-      msg <- mk_msg (cec_defer_type_errors ctxt)
-      maybeReportError ctxt msg
-
+      mk_msg (cec_defer_type_errors ctxt) >>= maybeReportError ctxt
       -- No matter what, add the deferred bindings.
-      mk_msg ErrorWithoutFlag >>= \msg -> addDeferredBinding ctxt msg ct
+      mk_msg ErrorWithoutFlag >>= flip (addDeferredBinding ctxt) ct
 
 mkUserTypeError :: DiagnosticReason -> ReportErrCtxt -> Ct -> TcM (MsgEnvelope DiagnosticMessage)
 mkUserTypeError reason ctxt ct = mkErrorMsgFromCt reason ctxt ct
