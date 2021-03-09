@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE TupleSections #-}
 
@@ -10,6 +12,8 @@ module GHC.CmmToAsm.SSA (
 
         fromBlockLookupTable,
         SSABasicBlock(..), PhiFun(..),
+
+        pprSsaLiveCmmDecl
 ) where
 
 import GHC.Prelude
@@ -52,6 +56,7 @@ import GHC.Types.Unique.Supply (UniqSM, UniqSupply, takeUniqFromSupply, getUniqu
 
 import GHC.Utils.Misc (HasDebugCallStack)
 import GHC.Utils.Monad.State
+import GHC.Utils.Outputable
 import GHC.Utils.Panic (panic)
 
 -- Debugging only
@@ -740,3 +745,30 @@ popDef mp x = adjustUFM_Directly (drop 1) mp x
 peekDef :: UniqFM RegId [RegId] -> RegId -> Maybe RegId
 peekDef mp k = let mStack = lookupUFM_Directly mp k
                in  mStack >>= (\s -> if null s then Nothing else Just $ head s)
+
+
+-- Pretty printing machinery
+
+instance Outputable PhiFun where
+        ppr (PhiF old new args)
+                = hsep [(ppr new), equals, phi
+                       , parens $ hcat (punctuate comma $ map ppr args)
+                       , space, brackets (text "old: " <> ppr old)]
+                where phi = unicodeSyntax (char 'φ') (text "Phi")
+
+
+instance (Instruction instr) => OutputableP Platform (SSABasicBlock instr) where
+        pdoc platform (SSABB phis liveBB)
+            = vcat (map ppr phis)
+              $$ ppr (fmap (fmap (pprInstr platform)) liveBB)
+
+
+pprSsaLiveCmmDecl
+    :: (OutputableP Platform statics, Instruction instr)
+    => Platform
+    -> SsaLiveCmmDecl statics instr
+    -> SDoc
+
+pprSsaLiveCmmDecl platform ssaThing
+    = let pprSsaBBs = fmap (eltsUDFM . mapUDFM (sccBitBlock . fmap (pdoc platform)))
+      in  pdoc platform (pprSsaBBs ssaThing)
