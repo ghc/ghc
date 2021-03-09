@@ -55,10 +55,6 @@ import GHC.Utils.Misc (zipEqual)
 
 import Control.Monad
 
-import Debug.Trace
-import GHC.Utils.Outputable (ppr)
-import GHC.Driver.Ppr (showPprUnsafe)
-
 -----------------------------------------------------------------------------
 -- Code generation for Foreign Calls
 -----------------------------------------------------------------------------
