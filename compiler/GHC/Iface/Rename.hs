@@ -49,6 +49,7 @@ import GHC.Utils.Fingerprint
 import GHC.Utils.Panic
 
 import GHC.Data.Bag
+import GHC.Data.Maybe
 
 import qualified Data.Traversable as T
 
@@ -79,7 +80,8 @@ failWithRn doc = do
     errs <- readTcRef errs_var
     dflags <- getDynFlags
     -- TODO: maybe associate this with a source location?
-    writeTcRef errs_var (errs `snocBag` mkPlainMsgEnvelope dflags ErrorWithoutFlag noSrcSpan doc)
+    whenIsJust (mkPlainMsgEnvelope dflags ErrorWithoutFlag noSrcSpan doc) $ \msg ->
+       writeTcRef errs_var (errs `snocBag` msg)
     failM
 
 -- | What we have is a generalized ModIface, which corresponds to

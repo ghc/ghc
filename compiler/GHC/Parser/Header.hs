@@ -312,7 +312,7 @@ getOptions' dflags toks
 checkProcessArgsResult :: MonadIO m => DynFlags -> [Located String] -> m ()
 checkProcessArgsResult dflags flags
   = when (notNull flags) $
-      liftIO $ throwIO $ mkSrcErr $ listToBag $ map mkMsg flags
+      liftIO $ throwIO $ mkSrcErr $ listToBag $ mapMaybe mkMsg flags
     where mkMsg (L loc flag)
               = mkPlainMsgEnvelope dflags ErrorWithoutFlag loc $
                   (text "unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+>
@@ -351,7 +351,7 @@ unsupportedExtnError dflags loc unsup =
 
 optionsErrorMsgs :: DynFlags -> [String] -> [Located String] -> FilePath -> Messages DiagnosticMessage
 optionsErrorMsgs dflags unhandled_flags flags_lines _filename
-  = mkMessages $ listToBag (map mkMsg unhandled_flags_lines)
+  = mkMessages $ listToBag (mapMaybe mkMsg unhandled_flags_lines)
   where unhandled_flags_lines :: [Located String]
         unhandled_flags_lines = [ L l f
                                 | f <- unhandled_flags
@@ -371,4 +371,4 @@ optionsParseError df str loc =
 
 throwErr :: DynFlags -> SrcSpan -> SDoc -> a                -- #15053
 throwErr df loc doc =
-  throw $ mkSrcErr $ unitBag $ mkPlainMsgEnvelope df ErrorWithoutFlag loc doc
+  throw $ mkSrcErr $ unitBag $ mkPlainMsgEnvelopeUnavoidable df ErrorWithoutFlag loc doc

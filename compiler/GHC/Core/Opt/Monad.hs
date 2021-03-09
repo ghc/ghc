@@ -70,6 +70,7 @@ import GHC.Utils.Logger ( HasLogger (..), DumpFormat (..), putLogMsg, putDumpMsg
 import GHC.Utils.Monad
 
 import GHC.Data.FastString
+import GHC.Data.Maybe
 import GHC.Data.IOEnv hiding     ( liftIO, failM, failWithM )
 import qualified GHC.Data.IOEnv  as IOEnv
 
@@ -821,7 +822,9 @@ errorMsgS = errorMsg . text
 
 -- | Output an error to the screen. Does not cause the compiler to die.
 errorMsg :: SDoc -> CoreM ()
-errorMsg doc = getDynFlags >>= \df -> msg (mkMCDiagnostic df ErrorWithoutFlag) doc
+errorMsg doc = do
+  df <- getDynFlags
+  whenIsJust (mkMCDiagnostic df ErrorWithoutFlag) (`msg` doc)
 
 -- | Output a fatal error to the screen. Does not cause the compiler to die.
 fatalErrorMsgS :: String -> CoreM ()

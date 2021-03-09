@@ -72,7 +72,7 @@ import GHC.Iface.Recomp    ( RecompileRequired ( MustCompile ) )
 import GHC.Data.Bag        ( unitBag, listToBag, unionManyBags, isEmptyBag )
 import GHC.Data.Graph.Directed
 import GHC.Data.FastString
-import GHC.Data.Maybe      ( expectJust )
+import GHC.Data.Maybe      (whenIsJust,  expectJust )
 import GHC.Data.StringBuffer
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -270,7 +270,7 @@ instantiationNodes unit_state = InstantiationNode <$> iuids_to_check
 warnMissingHomeModules :: GhcMonad m => HscEnv -> ModuleGraph -> m ()
 warnMissingHomeModules hsc_env mod_graph =
     when (wopt Opt_WarnMissingHomeModules dflags && not (null missing)) $
-        logWarnings (listToBag [warn])
+        whenIsJust warn $ logWarnings . unitBag
   where
     dflags = hsc_dflags hsc_env
     targets = map targetId (hsc_targets hsc_env)
@@ -391,7 +391,7 @@ warnUnusedPackages = do
                    , nest 2 (vcat (map (withDash . pprUnusedArg) unusedArgs)) ]
 
     when (wopt Opt_WarnUnusedPackages dflags && not (null unusedArgs)) $
-      logWarnings (listToBag [warn])
+      whenIsJust warn $ logWarnings . unitBag
 
     where
         packageArg (ExposePackage _ arg _) = Just arg
@@ -2210,13 +2210,13 @@ warnUnnecessarySourceImports :: GhcMonad m => [SCC ModSummary] -> m ()
 warnUnnecessarySourceImports sccs = do
   dflags <- getDynFlags
   when (wopt Opt_WarnUnusedImports dflags)
-    (logWarnings (listToBag (concatMap (check dflags . flattenSCC) sccs)))
+    (logWarnings (listToBag (catMaybes $ concatMap (check dflags . flattenSCC) sccs)))
   where check dflags ms =
            let mods_in_this_cycle = map ms_mod_name ms in
            [ warn dflags i | m <- ms, i <- ms_home_srcimps m,
                              unLoc i `notElem`  mods_in_this_cycle ]
 
-        warn :: DynFlags -> Located ModuleName -> WarnMsg
+        warn :: DynFlags -> Located ModuleName -> Maybe WarnMsg
         warn dflags (L loc mod) =
            mkPlainMsgEnvelope dflags WarningWithoutFlag loc
                 (text "{-# SOURCE #-} unnecessary in import of "
@@ -2289,7 +2289,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
                 if exists || isJust maybe_buf
                     then summariseFile hsc_env old_summaries file mb_phase
                                        obj_allowed maybe_buf
-                    else return $ Left $ unitBag $ mkPlainMsgEnvelope dflags ErrorWithoutFlag noSrcSpan $
+                    else return $ Left $ unitBag $ mkPlainMsgEnvelopeUnavoidable dflags ErrorWithoutFlag noSrcSpan $
                            text "can't find file:" <+> text file
         getRootSummary (Target (TargetModule modl) obj_allowed maybe_buf)
            = do maybe_summary <- summariseModule hsc_env old_summary_map NotBoot
@@ -2738,7 +2738,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
               | otherwise = HsSrcFile
 
         when (pi_mod_name /= wanted_mod) $
-                throwE $ unitBag $ mkPlainMsgEnvelope dflags ErrorWithoutFlag pi_mod_name_loc $
+                throwE $ unitBag $ mkPlainMsgEnvelopeUnavoidable dflags ErrorWithoutFlag pi_mod_name_loc $
                               text "File name does not match module name:"
                               $$ text "Saw:" <+> quotes (ppr pi_mod_name)
                               $$ text "Expected:" <+> quotes (ppr wanted_mod)
@@ -2750,7 +2750,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
                         | (k,v) <- ((pi_mod_name, mkHoleModule pi_mod_name)
                                 : homeUnitInstantiations home_unit)
                         ])
-            in throwE $ unitBag $ mkPlainMsgEnvelope dflags ErrorWithoutFlag pi_mod_name_loc $
+            in throwE $ unitBag $ mkPlainMsgEnvelopeUnavoidable dflags ErrorWithoutFlag pi_mod_name_loc $
                 text "Unexpected signature:" <+> quotes (ppr pi_mod_name)
                 $$ if gopt Opt_BuildingCabalPackage dflags
                     then parens (text "Try adding" <+> quotes (ppr pi_mod_name)
@@ -2910,21 +2910,22 @@ withDeferredDiagnostics f = do
 noModError :: HscEnv -> SrcSpan -> ModuleName -> FindResult -> MsgEnvelope DiagnosticMessage
 -- ToDo: we don't have a proper line number for this error
 noModError hsc_env loc wanted_mod err
-  = mkPlainMsgEnvelope (hsc_dflags hsc_env) ErrorWithoutFlag loc $ cannotFindModule hsc_env wanted_mod err
+  = mkPlainMsgEnvelopeUnavoidable (hsc_dflags hsc_env) ErrorWithoutFlag loc
+  $ cannotFindModule hsc_env wanted_mod err
 
 noHsFileErr :: DynFlags -> SrcSpan -> String -> ErrorMessages
 noHsFileErr dflags loc path
-  = unitBag $ mkPlainMsgEnvelope dflags ErrorWithoutFlag loc $ text "Can't find" <+> text path
+  = unitBag $ mkPlainMsgEnvelopeUnavoidable dflags ErrorWithoutFlag loc $ text "Can't find" <+> text path
 
 moduleNotFoundErr :: DynFlags -> ModuleName -> ErrorMessages
 moduleNotFoundErr dflags mod
-  = unitBag $ mkPlainMsgEnvelope dflags ErrorWithoutFlag noSrcSpan $
+  = unitBag $ mkPlainMsgEnvelopeUnavoidable dflags ErrorWithoutFlag noSrcSpan $
         text "module" <+> quotes (ppr mod) <+> text "cannot be found locally"
 
 multiRootsErr :: DynFlags -> [ModSummary] -> IO ()
 multiRootsErr _ [] = panic "multiRootsErr"
 multiRootsErr dflags summs@(summ1:_)
-  = throwOneError $ mkPlainMsgEnvelope dflags ErrorWithoutFlag noSrcSpan $
+  = throwOneError $ mkPlainMsgEnvelopeUnavoidable dflags ErrorWithoutFlag noSrcSpan $
         text "module" <+> quotes (ppr mod) <+>
         text "is defined in multiple files:" <+>
         sep (map text files)

@@ -16,6 +16,7 @@ import GHC.Driver.Session
 
 import GHC.Utils.Exception
 import GHC.Utils.Error
+import GHC.Data.Maybe
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
@@ -310,8 +311,9 @@ builderMainLoop logger dflags filter_fn pgm real_args mb_cwd mb_env = do
           logInfo logger dflags $ withPprStyle defaultUserStyle msg
           log_loop chan t
         BuildError loc msg -> do
-          putLogMsg logger dflags (mkMCDiagnostic dflags ErrorWithoutFlag) (mkSrcSpan loc loc)
-              $ withPprStyle defaultUserStyle msg
+          whenIsJust (mkMCDiagnostic dflags ErrorWithoutFlag) $ \diag ->
+            putLogMsg logger dflags diag (mkSrcSpan loc loc)
+                $ withPprStyle defaultUserStyle msg
           log_loop chan t
         EOF ->
           log_loop chan  (t-1)

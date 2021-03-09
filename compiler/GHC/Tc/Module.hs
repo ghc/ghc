@@ -205,7 +205,7 @@ tcRnModule hsc_env mod_sum save_rn_syntax
           tcRnModuleTcRnM hsc_env mod_sum parsedModule pair
 
   | otherwise
-  = return (err_msg `addMessage` emptyMessages, Nothing)
+  = return (maybe emptyMessages (`addMessage` emptyMessages) err_msg, Nothing)
 
   where
     hsc_src = ms_hsc_src mod_sum
@@ -3144,8 +3144,8 @@ runTypecheckerPlugin sum gbl_env = do
 
 mark_plugin_unsafe :: DynFlags -> TcM ()
 mark_plugin_unsafe dflags = unless (gopt Opt_PluginTrustworthy dflags) $
-  recordUnsafeInfer pluginUnsafe
+  whenIsJust pluginUnsafe (recordUnsafeInfer . unitBag)
   where
     unsafeText = "Use of plugins makes the module unsafe"
-    pluginUnsafe = unitBag ( mkPlainMsgEnvelope dflags WarningWithoutFlag noSrcSpan
-                                   (Outputable.text unsafeText) )
+    pluginUnsafe =
+      mkPlainMsgEnvelope dflags WarningWithoutFlag noSrcSpan (Outputable.text unsafeText)

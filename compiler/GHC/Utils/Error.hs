@@ -31,7 +31,8 @@ module GHC.Utils.Error (
 
         -- ** Construction
         emptyMessages, mkDecorated, mkLocMessage, mkLocMessageAnn,
-        mkMsgEnvelope, mkPlainMsgEnvelope, mkShortMsgEnvelope, mkLongMsgEnvelope,
+        mkMsgEnvelope, mkPlainMsgEnvelope, mkPlainMsgEnvelopeUnavoidable,
+        mkShortMsgEnvelope, mkLongMsgEnvelope,
         mkMCDiagnostic, diagReasonSeverity,
 
         -- * Utilities
@@ -71,13 +72,13 @@ import GHC.Types.SrcLoc as SrcLoc
 
 import System.Exit      ( ExitCode(..), exitWith )
 import Data.List        ( sortBy )
-import Data.Maybe       ( fromMaybe )
 import Data.Function
 import Debug.Trace
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Catch as MC (handle)
 import GHC.Conc         ( getAllocationCounter )
+import GHC.Data.Maybe
 import System.CPUTime
 
 -- | Computes the /right/ 'Severity' for the input 'DiagnosticReason' out of
@@ -85,12 +86,15 @@ import System.CPUTime
 -- i.e. with a 'DynFlags' \"snapshot\" taken as close as possible to where a
 -- particular diagnostic message is built, otherwise the computed 'Severity' might
 -- not be correct, due to the mutable nature of the 'DynFlags' in GHC.
-diagReasonSeverity :: DynFlags -> DiagnosticReason -> Severity
-diagReasonSeverity dflags (WarningWithFlag wflag) | wopt_fatal wflag dflags     = SevError
-                                                  | otherwise                   = SevWarning
-diagReasonSeverity dflags WarningWithoutFlag      | gopt Opt_WarnIsError dflags = SevError
-                                                  | otherwise                   = SevWarning
-diagReasonSeverity _      ErrorWithoutFlag                                      = SevError
+-- Returns 'Nothing' in case there is no 'Severity' i.e. the relevant diagnostic
+-- needs to be suppressed as users are not meant to see it.
+diagReasonSeverity :: DynFlags -> DiagnosticReason -> Maybe Severity
+diagReasonSeverity dflags (WarningWithFlag wflag) | not (wopt wflag dflags)     = Nothing
+                                                  | wopt_fatal wflag dflags     = Just SevError
+                                                  | otherwise                   = Just SevWarning
+diagReasonSeverity dflags WarningWithoutFlag      | gopt Opt_WarnIsError dflags = Just SevError
+                                                  | otherwise                   = Just SevWarning
+diagReasonSeverity _      ErrorWithoutFlag                                      = Just SevError
 
 
 
@@ -104,17 +108,20 @@ mkMsgEnvelope
   -> SrcSpan
   -> PrintUnqualified
   -> e
-  -> MsgEnvelope e
-mkMsgEnvelope dflags locn print_unqual err
- = MsgEnvelope { errMsgSpan = locn
-               , errMsgContext = print_unqual
-               , errMsgDiagnostic = err
-               , errMsgSeverity = diagReasonSeverity dflags (diagnosticReason err)
-               }
+  -> Maybe (MsgEnvelope e)
+mkMsgEnvelope dflags locn print_unqual msg
+ = do sev <- diagReasonSeverity dflags (diagnosticReason msg)
+      pure MsgEnvelope { errMsgSpan = locn
+                       , errMsgContext = print_unqual
+                       , errMsgDiagnostic = msg
+                       , errMsgSeverity = sev
+                       }
 
 -- | Make a 'MessageClass' for a given 'DiagnosticReason', consulting the 'DynFlags'.
-mkMCDiagnostic :: DynFlags -> DiagnosticReason -> MessageClass
-mkMCDiagnostic dflags reason = MCDiagnostic (diagReasonSeverity dflags reason) reason
+mkMCDiagnostic :: DynFlags -> DiagnosticReason -> Maybe MessageClass
+mkMCDiagnostic dflags reason = do
+  sev <- diagReasonSeverity dflags reason
+  pure $ MCDiagnostic sev reason
 
 -- | A long (multi-line) diagnostic message.
 -- The 'Severity' will be calculated out of the 'DiagnosticReason', and will likely be
@@ -125,7 +132,7 @@ mkLongMsgEnvelope :: DynFlags
                   -> PrintUnqualified
                   -> SDoc
                   -> SDoc
-                  -> MsgEnvelope DiagnosticMessage
+                  -> Maybe (MsgEnvelope DiagnosticMessage)
 mkLongMsgEnvelope dflags rea locn unqual msg extra =
   mkMsgEnvelope dflags locn unqual (DiagnosticMessage (mkDecorated [msg,extra]) rea)
 
@@ -136,7 +143,7 @@ mkShortMsgEnvelope :: DynFlags
                    -> SrcSpan
                    -> PrintUnqualified
                    -> SDoc
-                   -> MsgEnvelope DiagnosticMessage
+                   -> Maybe (MsgEnvelope DiagnosticMessage)
 mkShortMsgEnvelope dflags rea locn unqual msg =
   mkMsgEnvelope dflags locn unqual (DiagnosticMessage (mkDecorated [msg]) rea)
 
@@ -146,9 +153,22 @@ mkPlainMsgEnvelope :: DynFlags
                    -> DiagnosticReason
                    -> SrcSpan
                    -> SDoc
-                   -> MsgEnvelope DiagnosticMessage
+                   -> Maybe (MsgEnvelope DiagnosticMessage)
 mkPlainMsgEnvelope dflags rea locn msg =
   mkMsgEnvelope dflags locn alwaysQualify (DiagnosticMessage (mkDecorated [msg]) rea)
+
+-- | An usafe variant of 'mkPlainMsgEnvelope' that panics if the generated error is 'Nothing'.
+-- This is useful to use when we are /sure/ we are generating an error and we immediately throw it.
+mkPlainMsgEnvelopeUnavoidable
+  :: DynFlags
+  -> DiagnosticReason
+  -> SrcSpan
+  -> SDoc
+  -> MsgEnvelope DiagnosticMessage
+mkPlainMsgEnvelopeUnavoidable dflags rea locn msg =
+  case mkPlainMsgEnvelope dflags rea locn msg of
+    Nothing -> panic "mkPlainMsgEnvelopeUnavoidable: invariant violated!"
+    Just e  -> e
 
 -------------------------
 data Validity
@@ -241,13 +261,15 @@ ifVerbose dflags val act
 
 errorMsg :: Logger -> DynFlags -> SDoc -> IO ()
 errorMsg logger dflags msg
-   = putLogMsg logger dflags (mkMCDiagnostic dflags ErrorWithoutFlag) noSrcSpan $
-     withPprStyle defaultErrStyle msg
+   = whenIsJust (mkMCDiagnostic dflags ErrorWithoutFlag) $ \diag ->
+       putLogMsg logger dflags diag noSrcSpan $
+       withPprStyle defaultErrStyle msg
 
 warningMsg :: Logger -> DynFlags -> SDoc -> IO ()
 warningMsg logger dflags msg
-   = putLogMsg logger dflags (mkMCDiagnostic dflags WarningWithoutFlag) noSrcSpan $
-     withPprStyle defaultErrStyle msg
+   = whenIsJust (mkMCDiagnostic dflags WarningWithoutFlag) $ \diag ->
+       putLogMsg logger dflags diag noSrcSpan $
+         withPprStyle defaultErrStyle msg
 
 fatalErrorMsg :: Logger -> DynFlags -> SDoc -> IO ()
 fatalErrorMsg logger dflags msg =
