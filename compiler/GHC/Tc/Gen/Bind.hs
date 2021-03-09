@@ -801,9 +801,7 @@ mkExport prag_fn insoluble qtvs theta
                   else addErrCtxtM (mk_impedance_match_msg mono_info sel_poly_ty poly_ty) $
                        tcSubTypeSigma sig_ctxt sel_poly_ty poly_ty
 
-        ; warn_missing_sigs <- woptM Opt_WarnMissingLocalSignatures
-        ; when warn_missing_sigs $
-              localSigWarn Opt_WarnMissingLocalSignatures poly_id mb_sig
+        ; localSigWarn Opt_WarnMissingLocalSignatures poly_id mb_sig
 
         ; return (ABE { abe_ext = noExtField
                       , abe_wrap = wrap

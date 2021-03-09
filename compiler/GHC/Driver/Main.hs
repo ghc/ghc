@@ -574,8 +574,7 @@ tcRnModule' sum save_rn_syntax mod = do
 
     let reason = WarningWithFlag Opt_WarnMissingSafeHaskellMode
     -- -Wmissing-safe-haskell-mode
-    when (not (safeHaskellModeEnabled dflags)
-          && wopt Opt_WarnMissingSafeHaskellMode dflags) $
+    when (not (safeHaskellModeEnabled dflags)) $
         logDiagnostics $ unitBag $
         mkPlainMsgEnvelope dflags reason (getLoc (hpm_module mod)) $
         warnMissingSafeHaskellMode
@@ -1313,11 +1312,10 @@ hscCheckSafe' m l = do
                     -- pkg trust reqs
                     pkgRs = S.fromList . map fst $ filter snd $ dep_pkgs $ mi_deps iface'
                     -- warn if Safe module imports Safe-Inferred module.
-                    warns = if wopt Opt_WarnInferredSafeImports dflags
-                                && safeLanguageOn dflags
-                                && trust == Sf_SafeInferred
-                                then inferredImportWarn dflags
-                                else emptyBag
+                    warns = if safeLanguageOn dflags
+                               && trust == Sf_SafeInferred
+                               then inferredImportWarn dflags
+                               else emptyBag
                     -- General errors we throw but Safe errors we log
                     errs = case (safeM, safeP) of
                         (True, True ) -> emptyBag
@@ -1417,9 +1415,8 @@ markUnsafeInfer tcg_env whyUnsafe = do
     dflags <- getDynFlags
 
     let reason = WarningWithFlag Opt_WarnUnsafe
-    when (wopt Opt_WarnUnsafe dflags)
-         (logDiagnostics $ unitBag $
-             mkPlainMsgEnvelope dflags reason (warnUnsafeOnLoc dflags) (whyUnsafe' dflags))
+    logDiagnostics $ unitBag $
+       mkPlainMsgEnvelope dflags reason (warnUnsafeOnLoc dflags) (whyUnsafe' dflags)
 
     liftIO $ writeIORef (tcg_safeInfer tcg_env) (False, whyUnsafe)
     -- NOTE: Only wipe trust when not in an explicitly safe haskell mode. Other

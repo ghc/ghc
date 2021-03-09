@@ -324,7 +324,7 @@ tcCheckFIType arg_tys res_ty idecl@(CImport (L lc cconv) (L ls safety) mh
       dflags <- getDynFlags
       checkForeignArgs (isFFIArgumentTy dflags safety) arg_tys
       checkForeignRes nonIOok checkSafe (isFFIImportResultTy dflags) res_ty
-      checkMissingAmpersand dflags (map scaledThing arg_tys) res_ty
+      checkMissingAmpersand (map scaledThing arg_tys) res_ty
       case target of
           StaticTarget _ _ _ False
            | not (null arg_tys) ->
@@ -343,10 +343,9 @@ checkCTarget (StaticTarget _ str _ _) = do
 checkCTarget DynamicTarget = panic "checkCTarget DynamicTarget"
 
 
-checkMissingAmpersand :: DynFlags -> [Type] -> Type -> TcM ()
-checkMissingAmpersand dflags arg_tys res_ty
-  | null arg_tys && isFunPtrTy res_ty &&
-    wopt Opt_WarnDodgyForeignImports dflags
+checkMissingAmpersand :: [Type] -> Type -> TcM ()
+checkMissingAmpersand arg_tys res_ty
+  | null arg_tys && isFunPtrTy res_ty
   = addDiagnosticTc (WarningWithFlag Opt_WarnDodgyForeignImports)
                     (text "possible missing & in foreign import of FunPtr")
   | otherwise
@@ -534,9 +533,8 @@ checkCConv StdCallConv  = do dflags <- getDynFlags
                              if platformArch platform == ArchX86
                                  then return StdCallConv
                                  else do -- This is a warning, not an error. see #3336
-                                         when (wopt Opt_WarnUnsupportedCallingConventions dflags) $
-                                             addDiagnosticTc (WarningWithFlag Opt_WarnUnsupportedCallingConventions)
-                                                 (text "the 'stdcall' calling convention is unsupported on this platform," $$ text "treating as ccall")
+                                         addDiagnosticTc (WarningWithFlag Opt_WarnUnsupportedCallingConventions)
+                                           (text "the 'stdcall' calling convention is unsupported on this platform," $$ text "treating as ccall")
                                          return CCallConv
 checkCConv PrimCallConv = do addErrTc (text "The `prim' calling convention can only be used with `foreign import'")
                              return PrimCallConv
