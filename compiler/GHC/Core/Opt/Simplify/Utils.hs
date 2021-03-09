@@ -1563,13 +1563,6 @@ rebuildLam env bndrs floats body cont
   = do { dflags <- getDynFlags
        ; mkLam' dflags bndrs body }
   where
-    bndr_set        = mkVarSet bndrs
-    let_floats      = letFloatBinds (sfLetFloats floats)
-    let_float_bndrs = mkVarSet (bindersOfBinds let_floats)
-    let_float_fvs   = foldr (unionVarSet . bindFreeVars) emptyVarSet let_floats
-         -- This formulation may return a set that is slightly too large,
-         -- by not deleting variables bound by the let's, but that is rare
-         -- and at worst we miss an eta-reduction
 
     mb_rhs :: Maybe RecFlag   -- Just => continuation is the RHS of a let
     mb_rhs = contIsRhs cont
@@ -1598,9 +1591,8 @@ rebuildLam env bndrs floats body cont
 
     mkLam' dflags bndrs body
       | gopt Opt_DoEtaReduction dflags
-      , isEmptyJoinFloats (sfJoinFloats floats)
-      , bndr_set `disjointVarSet` let_float_fvs
-      , bndr_set `disjointVarSet` let_float_bndrs
+--      , isEmptyFloats floats
+      , etaFloatOk bndrs floats
       , case mb_rhs of { Just Recursive -> False; _ -> True }
       , Just etad_lam <- tryEtaReduce bndrs body
       = do { tick (EtaReduction (head bndrs))
@@ -1683,13 +1675,13 @@ because the latter is not well-kinded.
 ************************************************************************
 -}
 
-tryEtaExpandRhs :: SimplMode -> OutId -> OutExpr
+tryEtaExpandRhs :: SimplMode -> RecFlag -> OutId -> OutExpr
                 -> SimplM (ArityType, OutExpr)
 -- See Note [Eta-expanding at let bindings]
 -- If tryEtaExpandRhs rhs = (n, is_bot, rhs') then
 --   (a) rhs' has manifest arity n
 --   (b) if is_bot is True then rhs' applied to n args is guaranteed bottom
-tryEtaExpandRhs mode bndr rhs
+tryEtaExpandRhs mode is_rec bndr rhs
   | Just join_arity <- isJoinId_maybe bndr
   = do { let (join_bndrs, join_body) = collectNBinders join_arity rhs
              oss   = [idOneShotInfo id | id <- join_bndrs, isId id]
@@ -1714,7 +1706,7 @@ tryEtaExpandRhs mode bndr rhs
     dflags    = sm_dflags mode
     old_arity = exprArity rhs
 
-    arity_type = findRhsArity dflags bndr rhs old_arity
+    arity_type = findRhsArity dflags is_rec bndr rhs old_arity
     new_arity  = arityTypeArity arity_type
 
 wantEtaExpansion :: CoreExpr -> Bool
