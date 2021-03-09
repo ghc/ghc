@@ -520,3 +520,28 @@ ListComprehensions:
 load-main:
 	$(CHECK_PPR)   "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" load-main.hs
 	$(CHECK_EXACT) "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" load-main.hs
+
+.PHONY: PprRecordDotSyntax1
+PprRecordDotSyntax1:
+	$(CHECK_PPR)   "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" PprRecordDotSyntax1.hs
+	$(CHECK_EXACT) "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" PprRecordDotSyntax1.hs
+
+.PHONY: PprRecordDotSyntax2
+PprRecordDotSyntax2:
+	$(CHECK_PPR)   "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" PprRecordDotSyntax2.hs
+	$(CHECK_EXACT) "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" PprRecordDotSyntax2.hs
+
+.PHONY: PprRecordDotSyntax3
+PprRecordDotSyntax3:
+	$(CHECK_PPR)   "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" PprRecordDotSyntax3.hs
+	$(CHECK_EXACT) "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" PprRecordDotSyntax3.hs
+
+.PHONY: PprRecordDotSyntax4
+PprRecordDotSyntax4:
+	$(CHECK_PPR)   "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" PprRecordDotSyntax4.hs
+	$(CHECK_EXACT) "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" PprRecordDotSyntax4.hs
+
+.PHONY: PprRecordDotSyntaxA
+PprRecordDotSyntaxA:
+	$(CHECK_PPR)   "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" PprRecordDotSyntaxA.hs
+	$(CHECK_EXACT) "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" PprRecordDotSyntaxA.hs

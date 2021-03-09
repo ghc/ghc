@@ -2756,7 +2756,7 @@ fexp    :: { ECP }
                                         acsA (\cs -> sLL $1 (reLoc $>) $ HsStatic (ApiAnn (glR $1) [mj AnnStatic $1] cs) $2) }
 
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
-        -- AZ: check, this whole production is new
+        -- AZ: check, this whole production is new. And add round-trip tests
         | fexp TIGHT_INFIX_PROJ field
             {% runPV (unECP $1) >>= \ $1 ->
                -- Suppose lhs is an application term e.g. 'f a'
@@ -2764,12 +2764,14 @@ fexp    :: { ECP }
                -- (a.b)' rather than '(f a).b.'. However, if lhs
                -- is a projection 'r.a' (say) then we want the
                -- parse '(r.a).b'.
-               fmap ecpFromExp $ ams (case $1 of
+               fmap ecpFromExp $ acsa (\cs ->
+                let fl = L (getLoc $3) (HsFieldLabel ((ApiAnn (glR $2) (AnnFieldLabel (Just $ glAA $2)) noCom)) (unLoc $3)) in
+                 (case $1 of
                    L _ (HsApp _ f arg) | not $ isGetField f ->
-                     let l = comb2 arg $3 in
-                     L (getLoc f `combineSrcSpans` l)
-                       (HsApp noExtField f (mkRdrGetField l arg $3))
-                   _ -> mkRdrGetField (comb2 $1 $>) $1 $3) [mj AnnDot $2] }
+                     let l = comb2 (reLoc arg) $3 in
+                     L (noAnnSrcSpan $ comb2 $2 $>)
+                       (HsApp noAnn f (mkRdrGetField l arg fl (ApiAnn (glR $2) NoApiAnns cs)))
+                   _ -> mkRdrGetField (comb2 (reLoc $1) $>) $1 fl (ApiAnn (glR $2) NoApiAnns cs))) }
 
         | aexp                       { $1 }
 
@@ -2890,10 +2892,8 @@ aexp2   :: { ECP }
 
         -- This case is only possible when 'OverloadedRecordDotBit' is enabled.
         | '(' projection ')'            { ECP $
-                                            let (loc, (anns, fIELDS)) = $2
-                                                span = combineSrcSpans (combineSrcSpans (getLoc $1) loc) (getLoc $3)
-                                                expr = mkRdrProjection span (reverse fIELDS)
-                                            in amms (ecpFromExp' expr) ([mop $1] ++ reverse anns ++ [mcp $3])
+                                            acsA (\cs -> sLL $1 $> $ mkRdrProjection (reverse (unLoc $2)) (ApiAnn (glR $1) (AnnProjection (glAA $1) (glAA $3)) cs))
+                                            >>= ecpFromExp'
                                         }
 
         | '(#' texp '#)'                { ECP $
@@ -2940,13 +2940,12 @@ aexp2   :: { ECP }
                                       acsA (\cs -> sLL $1 $> $ HsCmdArrForm (ApiAnn (glR $1) (AnnList (Just $ glR $1) (Just $ mu AnnOpenB $1) (Just $ mu AnnCloseB $4) [] []) cs) $2 Prefix
                                                            Nothing (reverse $3)) }
 
-projection :: { (SrcSpan, ([AddAnn], [Located FastString])) }
+projection :: { Located [Located (HsFieldLabel GhcPs)] }
 projection
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parsing.Lexer
         : projection TIGHT_INFIX_PROJ field
-             { let (loc, (anns, fs)) = $1 in
-               (combineSrcSpans (combineSrcSpans loc (gl $2)) (gl $3), (mj AnnDot $2 : anns, $3 : fs)) }
-        | PREFIX_PROJ field { (comb2 $1 $2, ([mj AnnDot $1], [$2])) }
+                             {% acs (\cs -> sLL $1 $> ((sLL $2 $> $ HsFieldLabel (ApiAnn (glR $2) (AnnFieldLabel (Just $ glAA $2)) cs) (unLoc $3)) : unLoc $1)) }
+        | PREFIX_PROJ field  {% acs (\cs -> sLL $1 $>  [sLL $1 $> $ HsFieldLabel (ApiAnn (glR $1) (AnnFieldLabel (Just $ glAA $1)) cs) (unLoc $2)]) }
 
 splice_exp :: { LHsExpr GhcPs }
         : splice_untyped { mapLoc (HsSpliceE noAnn) (reLocA $1) }
@@ -3364,8 +3363,7 @@ fbinds1 :: { forall b. DisambECP b => PV ([Fbind b], Maybe SrcSpan) }
         : fbind ',' fbinds1
                  { $1 >>= \ $1 ->
                    $3 >>= \ $3 -> do
-                   let gl' = \case { Left (L l _) -> l;  Right (L l _) -> l } in
-                   h <- addTrailingCommaA (gl' $1) (gl $2)
+                   h <- addTrailingCommaFBind $1 (gl $2)
                    return (case $3 of (flds, dd) -> (h : flds, dd)) }
         | fbind                         { $1 >>= \ $1 ->
                                           return ([$1], Nothing) }
@@ -3384,34 +3382,39 @@ fbind   :: { forall b. DisambECP b => PV (Fbind b) }
                         -- The renamer fills in the final value
 
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
+        -- AZ: need an AnnDot here
         | field TIGHT_INFIX_PROJ fieldToUpdate '=' texp
                         { do
-                            let top = $1
+                            let top = sL1 $1 $ HsFieldLabel noAnn (unLoc $1)
                                 fields = top : reverse $3
                                 final = last fields
                                 l = comb2 top final
                                 isPun = False
                             $5 <- unECP $5
-                            fmap Right $ mkHsProjUpdatePV (comb2 $1 $5) (L l fields) $5 isPun
+                            fmap Right $ mkHsProjUpdatePV (comb2 $1 (reLoc $5)) (L l fields) $5 isPun
+                                            [mj AnnDot $2, mj AnnEqual $4]
                         }
 
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
+        -- AZ: need an AnnDot here
         | field TIGHT_INFIX_PROJ fieldToUpdate
                         { do
-                            let top = $1
+                            let top =  sL1 $1 $ HsFieldLabel noAnn (unLoc $1)
                                 fields = top : reverse $3
                                 final = last fields
                                 l = comb2 top final
                                 isPun = True
-                            var <- mkHsVarPV (noLoc (mkRdrUnqual . mkVarOcc . unpackFS . unLoc $ final))
-                            fmap Right $ mkHsProjUpdatePV l (L l fields) var isPun
+                            var <- mkHsVarPV (L (noAnnSrcSpan $ getLoc final) (mkRdrUnqual . mkVarOcc . unpackFS . hflLabel . unLoc $ final))
+                            fmap Right $ mkHsProjUpdatePV l (L l fields) var isPun [mj AnnDot $2]
                         }
 
-fieldToUpdate :: { [Located FastString] }
+fieldToUpdate :: { [Located (HsFieldLabel GhcPs)] }
 fieldToUpdate
         -- See Note [Whitespace-sensitive operator parsing] in Lexer.x
-        : fieldToUpdate TIGHT_INFIX_PROJ field { $3 : $1 }
-        | field { [$1] }
+        : fieldToUpdate TIGHT_INFIX_PROJ field   {% getPriorCommentsFor (getLoc $3) >>= \cs ->
+                                                     return ((sLL $2 $> (HsFieldLabel (ApiAnn (glR $2) (AnnFieldLabel $ Just $ glAA $2) cs) (unLoc $3))) : $1) }
+        | field       {% getPriorCommentsFor (getLoc $1) >>= \cs ->
+                        return [sL1 $1 (HsFieldLabel (ApiAnn (glR $1) (AnnFieldLabel Nothing) cs) (unLoc $1))] }
 
 -----------------------------------------------------------------------------
 -- Implicit Parameter Bindings
@@ -4335,6 +4338,10 @@ listAsAnchor [] = spanAsAnchor noSrcSpan
 listAsAnchor (L l _:_) = spanAsAnchor (locA l)
 
 -- -------------------------------------
+
+addTrailingCommaFBind :: MonadP m => Fbind b -> SrcSpan -> m (Fbind b)
+addTrailingCommaFBind (Left b)  l = fmap Left  (addTrailingCommaA b l)
+addTrailingCommaFBind (Right b) l = fmap Right (addTrailingCommaA b l)
 
 addTrailingVbarA :: MonadP m => LocatedA a -> SrcSpan -> m (LocatedA a)
 addTrailingVbarA  la span = addTrailingAnnA la span AddVbarAnn

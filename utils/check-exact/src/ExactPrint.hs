@@ -1969,6 +1969,8 @@ instance ExactPrint (HsExpr GhcPs) where
   getAnnotationEntry (ExplicitList an _)          = fromAnn an
   getAnnotationEntry (RecordCon an _ _)           = fromAnn an
   getAnnotationEntry (RecordUpd an _ _)           = fromAnn an
+  getAnnotationEntry (HsGetField an _ _)          = fromAnn an
+  getAnnotationEntry (HsProjection an _)          = fromAnn an
   getAnnotationEntry (ExprWithTySig an _ _)       = fromAnn an
   getAnnotationEntry (ArithSeq an _ _)            = fromAnn an
   getAnnotationEntry (HsBracket an _)             = fromAnn an
@@ -2125,6 +2127,14 @@ instance ExactPrint (HsExpr GhcPs) where
     markApiAnn an AnnOpenC
     markAnnotated fields
     markApiAnn an AnnCloseC
+  exact x@(HsGetField an expr field) = do
+    -- error $ "HsGetField:" ++ showAst x
+    markAnnotated expr
+    -- markKwM an xxx AnnDot
+    markAnnotated field
+  exact x@(HsProjection an flds) = do
+    -- error $ "HsProjection:" ++ showAst x
+    markAnnotated flds
   exact (ExprWithTySig an expr sig) = do
     markAnnotated expr
     markApiAnn an AnnDcolon
@@ -2354,6 +2364,19 @@ instance (ExactPrint body)
 
 -- ---------------------------------------------------------------------
 
+instance (ExactPrint body)
+    => ExactPrint (HsRecField' (FieldLabelStrings GhcPs) body) where
+  getAnnotationEntry x = fromAnn (hsRecFieldAnn x)
+  exact (HsRecField an f arg isPun) = do
+    debugM $ "HsRecField FieldLabelStrings"
+    markAnnotated f
+    if isPun then return ()
+             else do
+      markApiAnn an AnnEqual
+      markAnnotated arg
+
+-- ---------------------------------------------------------------------
+
 -- instance ExactPrint (HsRecUpdField GhcPs ) where
 instance (ExactPrint body)
     => ExactPrint (HsRecField' (AmbiguousFieldOcc GhcPs) body) where
@@ -2366,6 +2389,49 @@ instance (ExactPrint body)
     if isPun then return ()
              else markApiAnn an AnnEqual
     markAnnotated arg
+
+-- ---------------------------------------------------------------------
+-- instance (ExactPrint body)
+--     => ExactPrint (Either (HsRecField' (AmbiguousFieldOcc GhcPs) body)
+--                           (HsRecField' (FieldOcc GhcPs) body)) where
+--   getAnnotationEntry = const NoEntryVal
+--   exact (Left rbinds) = markAnnotated rbinds
+--   exact (Right pbinds) = markAnnotated pbinds
+
+-- ---------------------------------------------------------------------
+-- instance (ExactPrint body)
+--     => ExactPrint
+--          (Either [LocatedA (HsRecField' (AmbiguousFieldOcc GhcPs) body)]
+--                  [LocatedA (HsRecField' (FieldOcc GhcPs) body)]) where
+--   getAnnotationEntry = const NoEntryVal
+--   exact (Left rbinds) = markAnnotated rbinds
+--   exact (Right pbinds) = markAnnotated pbinds
+
+-- ---------------------------------------------------------------------
+instance -- (ExactPrint body)
+    (ExactPrint (HsRecField' (a GhcPs) body),
+     ExactPrint (HsRecField' (b GhcPs) body))
+    => ExactPrint
+         (Either [LocatedA (HsRecField' (a GhcPs) body)]
+                 [LocatedA (HsRecField' (b GhcPs) body)]) where
+  getAnnotationEntry = const NoEntryVal
+  exact (Left rbinds) = markAnnotated rbinds
+  exact (Right pbinds) = markAnnotated pbinds
+
+-- ---------------------------------------------------------------------
+
+instance ExactPrint (FieldLabelStrings GhcPs) where
+  getAnnotationEntry = const NoEntryVal
+  exact (FieldLabelStrings fs) = markAnnotated fs
+
+-- ---------------------------------------------------------------------
+
+instance ExactPrint (HsFieldLabel GhcPs) where
+  getAnnotationEntry (HsFieldLabel an _) = fromAnn an
+
+  exact (HsFieldLabel an fs) = do
+    markAnnKwM an afDot  AnnDot
+    markAnnotated fs
 
 -- ---------------------------------------------------------------------
 
