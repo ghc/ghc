@@ -89,6 +89,10 @@ bool eventlog_enabled; // protected by state_change_mutex to ensure
 
 static const EventLogWriter *event_log_writer = NULL;
 
+// List of initialisation functions which are called each time the
+// eventlog is restarted
+static eventlog_init_func_t *eventlog_header_funcs = NULL;
+
 #define EVENT_LOG_SIZE 2 * (1024 * 1024) // 2MB
 
 static int flushCount;
@@ -129,9 +133,11 @@ char *EventDesc[] = {
   [EVENT_REQUEST_PAR_GC]      = "Request parallel GC",
   [EVENT_GC_GLOBAL_SYNC]      = "Synchronise stop-the-world GC",
   [EVENT_GC_STATS_GHC]        = "GC statistics",
+  [EVENT_MEM_RETURN]          = "Memory return statistics",
   [EVENT_HEAP_INFO_GHC]       = "Heap static parameters",
   [EVENT_HEAP_ALLOCATED]      = "Total heap mem ever allocated",
-  [EVENT_HEAP_SIZE]           = "Current heap size",
+  [EVENT_HEAP_SIZE]           = "Current heap size (size of allocated mblocks)",
+  [EVENT_BLOCKS_SIZE]         = "Current heap size (size of allocated blocks)",
   [EVENT_HEAP_LIVE]           = "Current heap live data",
   [EVENT_CREATE_SPARK_THREAD] = "Create spark thread",
   [EVENT_LOG_MSG]             = "Log message",
@@ -210,6 +216,8 @@ static void closeBlockMarker(EventsBuf *ebuf);
 
 static StgBool hasRoomForEvent(EventsBuf *eb, EventTypeNum eNum);
 static StgBool hasRoomForVariableEvent(EventsBuf *eb, uint32_t payload_bytes);
+
+static void freeEventLoggingBuffer(void);
 
 static void ensureRoomForEvent(EventsBuf *eb, EventTypeNum tag);
 static int ensureRoomForVariableEvent(EventsBuf *eb, StgWord16 size);
@@ -442,6 +450,7 @@ init_event_types(void)
 
         case EVENT_HEAP_ALLOCATED:    // (heap_capset, alloc_bytes)
         case EVENT_HEAP_SIZE:         // (heap_capset, size_bytes)
+        case EVENT_BLOCKS_SIZE:       // (heap_capset, size_bytes)
         case EVENT_HEAP_LIVE:         // (heap_capset, live_bytes)
             eventTypes[t].size = sizeof(EventCapsetID) + sizeof(StgWord64);
             break;
@@ -465,6 +474,11 @@ init_event_types(void)
                                + sizeof(StgWord64) * 3
                                + sizeof(StgWord32)
                                + sizeof(StgWord64) * 3;
+            break;
+        case EVENT_MEM_RETURN:        // (heap_capset, current_mblocks
+                                      // , needed_mblocks, returned_mblocks)
+            eventTypes[t].size = sizeof(EventCapsetID)
+                               + sizeof(StgWord32) * 3;
             break;
 
         case EVENT_TASK_CREATE:   // (taskId, cap, tid)
@@ -602,6 +616,50 @@ postHeaderEvents(void)
     postInt32(&eventBuf, EVENT_DATA_BEGIN);
 }
 
+// These events will be reposted everytime we restart the eventlog
+void
+postInitEvent(EventlogInitPost post_init){
+    ACQUIRE_LOCK(&state_change_mutex);
+
+    // Add the event to the global list of events that will be rerun when
+    // the eventlog is restarted.
+    eventlog_init_func_t * new_func;
+    new_func = stgMallocBytes(sizeof(eventlog_init_func_t),"eventlog_init_func");
+    new_func->init_func = post_init;
+    new_func->next = eventlog_header_funcs;
+    eventlog_header_funcs = new_func;
+
+    RELEASE_LOCK(&state_change_mutex);
+    // Actually post it
+    (*post_init)();
+    return;
+}
+
+// Post events again which happened at the start of the eventlog, added by
+// postInitEvent.
+static void repostInitEvents(void){
+    eventlog_init_func_t * current_event = eventlog_header_funcs;
+    for (; current_event != NULL; current_event = current_event->next) {
+      (*(current_event->init_func))();
+    }
+    return;
+}
+
+// Clear the eventlog_header_funcs list and free the memory
+void resetInitEvents(void){
+    eventlog_init_func_t * tmp;
+    eventlog_init_func_t * current_event = eventlog_header_funcs;
+    for (; current_event != NULL; ) {
+      tmp = current_event;
+      current_event = current_event->next;
+      stgFree(tmp);
+    }
+    eventlog_header_funcs = NULL;
+    return;
+
+}
+
+
 static uint32_t
 get_n_capabilities(void)
 {
@@ -689,6 +747,7 @@ startEventLogging(const EventLogWriter *ev_writer)
     event_log_writer = ev_writer;
     bool ret = startEventLogging_();
     eventlog_enabled = true;
+    repostInitEvents();
     RELEASE_LOCK(&state_change_mutex);
     return ret;
 }
@@ -697,11 +756,12 @@ startEventLogging(const EventLogWriter *ev_writer)
 void
 restartEventLogging(void)
 {
-    freeEventLogging();
+    freeEventLoggingBuffer();
     stopEventLogWriter();
     initEventLogging();  // allocate new per-capability buffers
     if (event_log_writer != NULL) {
         startEventLogging_(); // child starts its own eventlog
+        repostInitEvents();   // Repost the initialisation events
     }
 }
 
@@ -782,13 +842,19 @@ moreCapEventBufs (uint32_t from, uint32_t to)
     }
 }
 
-
-void
-freeEventLogging(void)
+static void
+freeEventLoggingBuffer(void)
 {
     if (capEventBuf != NULL)  {
         stgFree(capEventBuf);
     }
+}
+
+void
+freeEventLogging(void)
+{
+    freeEventLoggingBuffer();
+    resetInitEvents();
 }
 
 /*
@@ -1093,6 +1159,7 @@ void postHeapEvent (Capability    *cap,
     switch (tag) {
     case EVENT_HEAP_ALLOCATED:     // (heap_capset, alloc_bytes)
     case EVENT_HEAP_SIZE:          // (heap_capset, size_bytes)
+    case EVENT_BLOCKS_SIZE:        // (heap_capset, size_bytes)
     case EVENT_HEAP_LIVE:          // (heap_capset, live_bytes)
     {
         postCapsetID(eb, heap_capset);
@@ -1157,6 +1224,22 @@ void postEventGcStats  (Capability    *cap,
     postWord64(eb, par_max_copied);
     postWord64(eb, par_tot_copied);
     postWord64(eb, par_balanced_copied);
+}
+
+void postEventMemReturn  (Capability    *cap,
+                          EventCapsetID heap_capset,
+                          uint32_t current_mblocks,
+                          uint32_t needed_mblocks,
+                          uint32_t returned_mblocks)
+{
+    EventsBuf *eb = &capEventBuf[cap->no];
+    ensureRoomForEvent(eb, EVENT_MEM_RETURN);
+
+    postEventHeader(eb, EVENT_MEM_RETURN);
+    postCapsetID(eb, heap_capset);
+    postWord32(eb, current_mblocks);
+    postWord32(eb, needed_mblocks);
+    postWord32(eb, returned_mblocks);
 }
 
 void postTaskCreateEvent (EventTaskId taskId,

@@ -209,9 +209,6 @@ module GHC.Driver.Session (
         LinkerInfo(..),
         CompilerInfo(..),
 
-        -- * File cleanup
-        FilesToClean(..), emptyFilesToClean,
-
         -- * Include specifications
         IncludeSpecs(..), addGlobalInclude, addQuoteInclude, flattenIncludes,
 
@@ -271,9 +268,6 @@ import Control.Monad.Trans.Except
 import Data.Ord
 import Data.Char
 import Data.List (intercalate, delete, sortBy)
-import Data.Map (Map)
-import qualified Data.Map as Map
-import Data.Set (Set)
 import qualified Data.Set as Set
 import System.FilePath
 import System.Directory
@@ -580,13 +574,6 @@ data DynFlags = DynFlags {
   packageEnv            :: Maybe FilePath,
         -- ^ Filepath to the package environment file (if overriding default)
 
-  -- Temporary files
-  -- These have to be IORefs, because the defaultCleanupHandler needs to
-  -- know what to clean when an exception happens
-  filesToClean          :: IORef FilesToClean,
-  dirsToClean           :: IORef (Map FilePath FilePath),
-  -- The next available suffix to uniquely name a temp file, updated atomically
-  nextTempSuffix        :: IORef Int,
 
   -- hsc dynamic flags
   dumpFlags             :: EnumSet DumpFlag,
@@ -1061,9 +1048,6 @@ initDynFlags dflags = do
      platformCanGenerateDynamicToo
          = platformOS (targetPlatform dflags) /= OSMinGW32
  refDynamicTooFailed <- newIORef (not platformCanGenerateDynamicToo)
- refNextTempSuffix <- newIORef 0
- refFilesToClean <- newIORef emptyFilesToClean
- refDirsToClean <- newIORef Map.empty
  refRtldInfo <- newIORef Nothing
  refRtccInfo <- newIORef Nothing
  wrapperNum <- newIORef emptyModuleEnv
@@ -1084,9 +1068,6 @@ initDynFlags dflags = do
        (useColor dflags, colScheme dflags)
  return dflags{
         dynamicTooFailed = refDynamicTooFailed,
-        nextTempSuffix = refNextTempSuffix,
-        filesToClean   = refFilesToClean,
-        dirsToClean    = refDirsToClean,
         nextWrapperNum = wrapperNum,
         useUnicode    = useUnicode',
         useColor      = useColor',
@@ -1212,9 +1193,6 @@ defaultDynFlags mySettings llvmConfig =
         depExcludeMods    = [],
         depSuffixes       = [],
         -- end of ghc -M values
-        nextTempSuffix = panic "defaultDynFlags: No nextTempSuffix",
-        filesToClean   = panic "defaultDynFlags: No filesToClean",
-        dirsToClean    = panic "defaultDynFlags: No dirsToClean",
         ghcVersionFile = Nothing,
         haddockOptions = Nothing,
         dumpFlags = EnumSet.empty,
@@ -3554,6 +3532,8 @@ xFlagsDeps = [
   flagSpec "Rank2Types"                       LangExt.RankNTypes,
   flagSpec "RankNTypes"                       LangExt.RankNTypes,
   flagSpec "RebindableSyntax"                 LangExt.RebindableSyntax,
+  flagSpec "OverloadedRecordDot"              LangExt.OverloadedRecordDot,
+  flagSpec "OverloadedRecordUpdate"           LangExt.OverloadedRecordUpdate,
   depFlagSpec' "RecordPuns"                   LangExt.RecordPuns
     (deprecatedForExtension "NamedFieldPuns"),
   flagSpec "RecordWildCards"                  LangExt.RecordWildCards,
@@ -4881,26 +4861,6 @@ decodeSize str
 foreign import ccall unsafe "setHeapSize"       setHeapSize       :: Int -> IO ()
 foreign import ccall unsafe "enableTimingStats" enableTimingStats :: IO ()
 
--- -----------------------------------------------------------------------------
--- Types for managing temporary files.
---
--- these are here because FilesToClean is used in DynFlags
-
--- | A collection of files that must be deleted before ghc exits.
--- The current collection
--- is stored in an IORef in DynFlags, 'filesToClean'.
-data FilesToClean = FilesToClean {
-  ftcGhcSession :: !(Set FilePath),
-  -- ^ Files that will be deleted at the end of runGhc(T)
-  ftcCurrentModule :: !(Set FilePath)
-  -- ^ Files that will be deleted the next time
-  -- 'FileCleanup.cleanCurrentModuleTempFiles' is called, or otherwise at the
-  -- end of the session.
-  }
-
--- | An empty FilesToClean
-emptyFilesToClean :: FilesToClean
-emptyFilesToClean = FilesToClean Set.empty Set.empty
 
 -- | Initialize the pretty-printing options
 initSDocContext :: DynFlags -> PprStyle -> SDocContext

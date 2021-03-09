@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP                #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE MultiWayIf         #-}
 
 {-# OPTIONS_HADDOCK not-home #-}
 
@@ -51,7 +52,6 @@ module GHC.Core.TyCo.Rep (
         mkScaledFunTy,
         mkVisFunTyMany, mkVisFunTysMany,
         mkInvisFunTyMany, mkInvisFunTysMany,
-        tYPE,
 
         -- * Functions over binders
         TyCoBinder(..), TyCoVarBinder, TyBinder,
@@ -90,11 +90,9 @@ import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 
 -- others
-import GHC.Builtin.Names ( liftedRepDataConKey )
-import {-# SOURCE #-} GHC.Builtin.Types ( liftedTypeKind, manyDataConTy )
-import {-# SOURCE #-} GHC.Builtin.Types.Prim ( tYPETyCon )
+import {-# SOURCE #-} GHC.Builtin.Types ( manyDataConTy )
 import GHC.Types.Basic ( LeftOrRight(..), pickLR )
-import GHC.Types.Unique ( hasKey, Uniquable(..) )
+import GHC.Types.Unique ( Uniquable(..) )
 import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Utils.Misc
@@ -1008,66 +1006,6 @@ mkPiTys tbs ty = foldr mkPiTy ty tbs
 -- between 'GHC.Core.TyCon' and this module.
 mkTyConTy_ :: TyCon -> Type
 mkTyConTy_ tycon = TyConApp tycon []
-
-{-
-Note [Prefer Type over TYPE 'LiftedRep]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The Core of nearly any program will have numerous occurrences of
-@TYPE 'LiftedRep@ (and, equivalently, 'Type') floating about. Concretely, while
-investigating #17292 we found that these constituting a majority of TyConApp
-constructors on the heap:
-
-```
-(From a sample of 100000 TyConApp closures)
-0x45f3523    - 28732 - `Type`
-0x420b840702 - 9629  - generic type constructors
-0x42055b7e46 - 9596
-0x420559b582 - 9511
-0x420bb15a1e - 9509
-0x420b86c6ba - 9501
-0x42055bac1e - 9496
-0x45e68fd    - 538 - `TYPE ...`
-```
-
-Consequently, we try hard to ensure that operations on such types are
-efficient. Specifically, we strive to
-
- a. Avoid heap allocation of such types
- b. Use a small (shallow in the tree-depth sense) representation
-    for such types
-
-Goal (b) is particularly useful as it makes traversals (e.g. free variable
-traversal, substitution, and comparison) more efficient.
-Comparison in particular takes special advantage of nullary type synonym
-applications (e.g. things like @TyConApp typeTyCon []@), Note [Comparing
-nullary type synonyms] in "GHC.Core.Type".
-
-To accomplish these we use a number of tricks:
-
- 1. Instead of representing the lifted kind as
-    @TyConApp tYPETyCon [liftedRepDataCon]@ we rather prefer to
-    use the 'GHC.Types.Type' type synonym (represented as a nullary TyConApp).
-    This serves goal (b) since there are no applied type arguments to traverse,
-    e.g., during comparison.
-
- 2. We have a top-level binding to represent `TyConApp GHC.Types.Type []`
-    (namely 'GHC.Builtin.Types.Prim.liftedTypeKind'), ensuring that we
-    don't need to allocate such types (goal (a)).
-
- 3. We use the sharing mechanism described in Note [Sharing nullary TyConApps]
-    in GHC.Core.TyCon to ensure that we never need to allocate such
-    nullary applications (goal (a)).
-
-See #17958.
--}
-
--- | Given a RuntimeRep, applies TYPE to it.
--- See Note [TYPE and RuntimeRep] in GHC.Builtin.Types.Prim.
-tYPE :: Type -> Type
-tYPE (TyConApp tc [])
-  -- See Note [Prefer Type of TYPE 'LiftedRep]
-  | tc `hasKey` liftedRepDataConKey = liftedTypeKind  -- TYPE 'LiftedRep
-tYPE rr = TyConApp tYPETyCon [rr]
 
 {-
 %************************************************************************

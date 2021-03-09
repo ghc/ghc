@@ -23,12 +23,13 @@ import GHC.Linker.MacOS
 import GHC.Linker.Unit
 import GHC.SysTools.Tasks
 import GHC.Utils.Logger
+import GHC.Utils.TmpFs
 
 import qualified Data.Set as Set
 import System.FilePath
 
-linkDynLib :: Logger -> DynFlags -> UnitEnv -> [String] -> [UnitId] -> IO ()
-linkDynLib logger dflags0 unit_env o_files dep_packages
+linkDynLib :: Logger -> TmpFs -> DynFlags -> UnitEnv -> [String] -> [UnitId] -> IO ()
+linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
  = do
     let platform   = ue_platform unit_env
         os         = platformOS platform
@@ -104,7 +105,7 @@ linkDynLib logger dflags0 unit_env o_files dep_packages
                             Just s -> s
                             Nothing -> "HSdll.dll"
 
-            runLink logger dflags (
+            runLink logger tmpfs dflags (
                     map Option verbFlags
                  ++ [ Option "-o"
                     , FileOption "" output_fn
@@ -164,7 +165,7 @@ linkDynLib logger dflags0 unit_env o_files dep_packages
             instName <- case dylibInstallName dflags of
                 Just n -> return n
                 Nothing -> return $ "@rpath" `combine` (takeFileName output_fn)
-            runLink logger dflags (
+            runLink logger tmpfs dflags (
                     map Option verbFlags
                  ++ [ Option "-dynamiclib"
                     , Option "-o"
@@ -206,7 +207,7 @@ linkDynLib logger dflags0 unit_env o_files dep_packages
                                 -- See Note [-Bsymbolic assumptions by GHC]
                                 ["-Wl,-Bsymbolic" | not unregisterised]
 
-            runLink logger dflags (
+            runLink logger tmpfs dflags (
                     map Option verbFlags
                  ++ libmLinkOpts
                  ++ [ Option "-o"

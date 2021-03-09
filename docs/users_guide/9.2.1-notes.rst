@@ -13,6 +13,12 @@ Language
   <https://www.microsoft.com/en-us/research/publication/a-quick-look-at-impredicativity/>`__
   (Serrano et al, ICFP 2020).  More information here: :ref:`impredicative-polymorphism`.
   This replaces the old (undefined, flaky) behaviour of the :extension:`ImpredicativeTypes` extension.
+* The first stage of the `Pointer Rep Proposal`_ has been implemented. All
+  boxed types, both lifted and unlifted, now have representation kinds of
+  the shape ``BoxedRep r``. Code that references ``LiftedRep`` and ``UnliftedRep``
+  will need to be updated.
+
+.. _Pointer Rep Proposal: https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0203-pointer-rep.rst
 
 * Kind inference for data/newtype instance declarations is slightly
   more restrictive than before.  See the user manual :ref:`kind-inference-data-family-instances`.
@@ -147,6 +153,13 @@ Runtime system
 - ``Void#`` is now a type synonym for the unboxed tuple ``(# #)``.
   Code using ``Void#`` now has to enable :extension:`UnboxedTuples`.
 
+Eventlog
+~~~~~~~~
+
+- Two new events,  :event-type:`BLOCKS_SIZE` tells you about the total size of
+  all allocated blocks and :event-type:`MEM_RETURN` gives statistics about why
+  the OS is returning and retaining megablocks.
+
 ``ghc`` library
 ~~~~~~~~~~~~~~~
 
@@ -220,6 +233,30 @@ Runtime system
 
     charVal :: forall n proxy. KnownChar n => proxy n -> Char
     charVal' :: forall n. KnownChar n => Proxy# n -> Char
+
+- A new kind-polymorphic ``Compare`` type family was added in ``Data.Type.Ord``
+  and has type instances for ``Nat``, ``Symbol``, and ``Char``.  Furthermore,
+  the ``(<=?)`` type (and ``(<=)``) from ``GHC.TypeNats`` is now governed by
+  this type family (as well as new comparison type operators that are exported
+  by ``Data.Type.Ord``). This has two important repercussions.  First, GHC can
+  no longer deduce that all natural numbers are greater than or equal to zero.
+  For instance, ::
+
+    test1 :: Proxy (0 <=? x) -> Proxy True
+    test1 = id
+
+  which previously type checked will now result in a type error.  Second, when
+  these comparison type operators are used very generically, a kind may need to
+  be provided.  For example, ::
+
+    test2 :: Proxy (x <=? x) -> Proxy True
+    test2 = id
+
+  will now generate a type error because GHC does not know the kind of ``x``.
+  To fix this, one must provide an explicit kind, perhaps by changing the type
+  to: ::
+
+    test2 :: forall (x :: Nat). Proxy (x <=? x) -> Proxy True
 
 - On POSIX, ``System.IO.openFile`` can no longer leak a file descriptor if it
   is interrupted by an asynchronous exception (#19114, #19115).

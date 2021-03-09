@@ -6,7 +6,7 @@ where
 import GHC.Prelude
 import GHC.SysTools
 import GHC.Driver.Session
-import GHC.SysTools.FileCleanup
+import GHC.Utils.TmpFs
 import GHC.Utils.Logger
 
 import System.FilePath
@@ -14,10 +14,11 @@ import System.Directory
 
 maybeCreateManifest
    :: Logger
+   -> TmpFs
    -> DynFlags
    -> FilePath      -- ^ filename of executable
    -> IO [FilePath] -- ^ extra objects to embed, maybe
-maybeCreateManifest logger dflags exe_filename = do
+maybeCreateManifest logger tmpfs dflags exe_filename = do
    let manifest_filename = exe_filename <.> "manifest"
        manifest =
          "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n\
@@ -44,9 +45,9 @@ maybeCreateManifest logger dflags exe_filename = do
    if not (gopt Opt_EmbedManifest dflags)
       then return []
       else do
-         rc_filename <- newTempName logger dflags TFL_CurrentModule "rc"
+         rc_filename <- newTempName logger tmpfs dflags TFL_CurrentModule "rc"
          rc_obj_filename <-
-           newTempName logger dflags TFL_GhcSession (objectSuf dflags)
+           newTempName logger tmpfs dflags TFL_GhcSession (objectSuf dflags)
 
          writeFile rc_filename $
              "1 24 MOVEABLE PURE " ++ show manifest_filename ++ "\n"

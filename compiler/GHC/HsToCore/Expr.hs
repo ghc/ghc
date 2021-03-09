@@ -276,6 +276,9 @@ dsExpr (ExprWithTySig _ e _)  = dsLExpr e
 dsExpr (HsConLikeOut _ con)   = dsConLike con
 dsExpr (HsIPVar {})           = panic "dsExpr: HsIPVar"
 
+dsExpr (HsGetField x _ _)     = absurd x
+dsExpr (HsProjection x _)     = absurd x
+
 dsExpr (HsLit _ lit)
   = do { warnAboutOverflowedLit lit
        ; dsLit (convertLit lit) }
@@ -603,7 +606,11 @@ we want, namely
 
 -}
 
-dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
+dsExpr RecordUpd { rupd_flds = Right _} =
+  -- Not possible due to elimination in the renamer. See Note
+  -- [Handling overloaded and rebindable constructs]
+  panic "The impossible happened"
+dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = Left fields
                        , rupd_ext = RecordUpdTc
                            { rupd_cons = cons_to_upd
                            , rupd_in_tys = in_inst_tys

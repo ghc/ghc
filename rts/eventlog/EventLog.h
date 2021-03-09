@@ -34,6 +34,22 @@ void flushLocalEventsBuf(Capability *cap);
 void flushAllCapsEventsBufs(void);
 void flushAllEventsBufs(Capability *cap);
 
+typedef void (*EventlogInitPost)(void);
+
+// Events which are emitted during program start-up should be wrapped with
+// postInitEvent so that when the eventlog is restarted (possibly by an external
+// writer) then these events appear again at the start of the log.
+void postInitEvent(EventlogInitPost post_init);
+
+// Clear the init events buffer on program exit
+void resetInitEvents(void);
+
+typedef struct eventlog_init_func {
+    EventlogInitPost init_func;
+    struct eventlog_init_func * next;
+} eventlog_init_func_t;
+
+
 /*
  * Post a scheduler event to the capability's event buffer (an event
  * that has an associated thread).
@@ -134,6 +150,13 @@ void postEventGcStats  (Capability    *cap,
                         W_           par_tot_copied,
                         W_           par_balanced_copied);
 
+void postEventMemReturn (Capability *cap,
+                        EventCapsetID  heap_capset,
+                         uint32_t current_mblocks,
+                         uint32_t needed_mblocks,
+                         uint32_t returned_mblocks
+                        );
+
 void postTaskCreateEvent (EventTaskId taskId,
                           EventCapNo cap,
                           EventKernelThreadId tid);
@@ -206,6 +229,13 @@ INLINE_HEADER void postSchedEvent (Capability *cap  STG_UNUSED,
 INLINE_HEADER void postEvent (Capability *cap  STG_UNUSED,
                               EventTypeNum tag STG_UNUSED)
 { /* nothing */ }
+
+typedef void (*EventlogInitPost)(void);
+
+INLINE_HEADER void postInitEvent(EventlogInitPost f STG_UNUSED)
+{ /* nothing */ } ;
+
+
 
 INLINE_HEADER void postEventNoCap (EventTypeNum tag STG_UNUSED)
 { /* nothing */ }

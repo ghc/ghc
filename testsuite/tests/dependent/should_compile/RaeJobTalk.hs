@@ -14,11 +14,13 @@ import Data.Type.Bool
 import Data.Type.Equality hiding ((:~~:)(..))
 import GHC.TypeLits
 import Data.Proxy
-import GHC.Exts
+import GHC.Exts hiding (Lifted, BoxedRep)
 import Data.Kind
 import Unsafe.Coerce
 import Data.Char
 import Data.Maybe
+
+import qualified GHC.Exts as Exts
 
 -------------------------------
 -- Utilities
@@ -82,7 +84,9 @@ data TyCon (a :: k) where
   Arrow :: TyCon (->)
   TYPE  :: TyCon TYPE
   RuntimeRep :: TyCon RuntimeRep
-  LiftedRep' :: TyCon 'LiftedRep
+  Levity :: TyCon Levity
+  BoxedRep :: TyCon 'Exts.BoxedRep
+  Lifted :: TyCon 'Exts.Lifted
   -- If extending, add to eqTyCon too
 
 eqTyCon :: TyCon a -> TyCon b -> Maybe (a :~~: b)
@@ -94,7 +98,9 @@ eqTyCon Maybe Maybe = Just HRefl
 eqTyCon Arrow Arrow = Just HRefl
 eqTyCon TYPE TYPE = Just HRefl
 eqTyCon RuntimeRep RuntimeRep = Just HRefl
-eqTyCon LiftedRep' LiftedRep' = Just HRefl
+eqTyCon Levity Levity = Just HRefl
+eqTyCon BoxedRep BoxedRep = Just HRefl
+eqTyCon Lifted Lifted = Just HRefl
 eqTyCon _ _ = Nothing
 
 -- Check whether or not a type is really a plain old tycon;
@@ -212,8 +218,10 @@ instance TyConAble []        where tyCon = List
 instance TyConAble Maybe     where tyCon = Maybe
 instance TyConAble (->)      where tyCon = Arrow
 instance TyConAble TYPE      where tyCon = TYPE
-instance TyConAble 'LiftedRep   where tyCon = LiftedRep'
-instance TyConAble RuntimeRep    where tyCon = RuntimeRep
+instance TyConAble 'Exts.Lifted    where tyCon = Lifted
+instance TyConAble 'Exts.BoxedRep  where tyCon = BoxedRep
+instance TyConAble RuntimeRep      where tyCon = RuntimeRep
+instance TyConAble Levity          where tyCon = Levity
 
 -- Can't just define Typeable the way we want, because the instances
 -- overlap. So we have to mock up instance chains via closed type families.

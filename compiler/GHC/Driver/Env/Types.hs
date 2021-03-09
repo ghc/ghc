@@ -22,6 +22,7 @@ import GHC.Unit.Env
 import GHC.Unit.State
 import GHC.Unit.Types
 import GHC.Utils.Logger
+import GHC.Utils.TmpFs
 import {-# SOURCE #-} GHC.Driver.Plugins
 
 import Control.Monad ( ap )
@@ -159,5 +160,8 @@ data HscEnv
 
         , hsc_hooks :: !Hooks
                 -- ^ Hooks
+
+        , hsc_tmpfs :: !TmpFs
+                -- ^ Temporary files
  }
 

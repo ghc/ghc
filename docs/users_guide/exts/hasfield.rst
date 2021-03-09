@@ -102,6 +102,8 @@ are generated for each datatype definition:
 
      instance (Eq a, a ~ b) => HasField "unSilly" (Silly a) b
 
+See :ref:`overloaded-record-dot` for an application of solving ``HasField`` constraints to implementing "record dot syntax".
+
 .. _virtual-record-fields:
 
 Virtual record fields
@@ -172,6 +174,3 @@ constraint will not be solved automatically (as described above), but in the
 interests of simplicity we do not permit users to define their own instances
 either.  If a field is not in scope, the corresponding instance is still
 prohibited, to avoid conflicts in downstream modules.
-
-
-

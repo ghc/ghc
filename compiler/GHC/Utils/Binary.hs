@@ -876,7 +876,6 @@ instance Binary (Bin a) where
   get bh = do i <- getWord32 bh; return (BinPtr (fromIntegral (i :: Word32)))
 
 
-
 -- -----------------------------------------------------------------------------
 -- Lazy reading/writing
 

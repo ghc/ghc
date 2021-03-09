@@ -3,7 +3,7 @@
 --
 -- Type - public interface
 
-{-# LANGUAGE CPP, FlexibleContexts, PatternSynonyms, ViewPatterns #-}
+{-# LANGUAGE CPP, FlexibleContexts, PatternSynonyms, ViewPatterns, MultiWayIf #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -36,7 +36,7 @@ module GHC.Core.Type (
         splitFunTy, splitFunTy_maybe,
         splitFunTys, funResultTy, funArgTy,
 
-        mkTyConApp, mkTyConTy,
+        mkTyConApp, mkTyConTy, tYPE,
         tyConAppTyCon_maybe, tyConAppTyConPicky_maybe,
         tyConAppArgs_maybe, tyConAppTyCon, tyConAppArgs,
         splitTyConApp_maybe, splitTyConApp, tyConAppArgN,
@@ -122,9 +122,11 @@ module GHC.Core.Type (
         isLiftedType_maybe,
         isLiftedTypeKind, isUnliftedTypeKind, pickyIsLiftedTypeKind,
         isLiftedRuntimeRep, isUnliftedRuntimeRep,
+        isLiftedLevity, isUnliftedLevity,
         isUnliftedType, mightBeUnliftedType, isUnboxedTupleType, isUnboxedSumType,
         isAlgType, isDataFamilyAppType,
         isPrimitiveType, isStrictType,
+        isLevityTy, isLevityVar,
         isRuntimeRepTy, isRuntimeRepVar, isRuntimeRepKindedTy,
         dropRuntimeRepArgs,
         getRuntimeRep,
@@ -257,7 +259,8 @@ import GHC.Core.TyCon
 import GHC.Builtin.Types.Prim
 import {-# SOURCE #-} GHC.Builtin.Types
                                  ( charTy, naturalTy, listTyCon
-                                 , typeSymbolKind, liftedTypeKind
+                                 , typeSymbolKind, liftedTypeKind, unliftedTypeKind
+                                 , liftedRepTyCon, unliftedRepTyCon
                                  , constraintKind
                                  , unrestrictedFunTyCon
                                  , manyDataConTy, oneDataConTy )
@@ -613,6 +616,7 @@ isLiftedTypeKind kind
 pickyIsLiftedTypeKind :: Kind -> Bool
 -- Checks whether the kind is literally
 --      TYPE LiftedRep
+-- or   TYPE ('BoxedRep 'Lifted)
 -- or   Type
 -- without expanding type synonyms or anything
 -- Used only when deciding whether to suppress the ":: *" in
@@ -621,8 +625,13 @@ pickyIsLiftedTypeKind :: Kind -> Bool
 pickyIsLiftedTypeKind kind
   | TyConApp tc [arg] <- kind
   , tc `hasKey` tYPETyConKey
-  , TyConApp rr_tc [] <- arg
-  , rr_tc `hasKey` liftedRepDataConKey = True
+  , TyConApp rr_tc rr_args <- arg = case rr_args of
+      [] -> rr_tc `hasKey` liftedRepTyConKey
+      [rr_arg]
+        | rr_tc `hasKey` boxedRepDataConKey
+        , TyConApp lev [] <- rr_arg
+        , lev `hasKey` liftedDataConKey -> True
+      _ -> False
   | TyConApp tc [] <- kind
   , tc `hasKey` liftedTypeKindTyConKey = True
   | otherwise                          = False
@@ -632,8 +641,28 @@ isLiftedRuntimeRep :: Type -> Bool
 -- False of type variables (a :: RuntimeRep)
 --   and of other reps e.g. (IntRep :: RuntimeRep)
 isLiftedRuntimeRep rep
-  | TyConApp rr_tc args <- coreFullView rep
-  , rr_tc `hasKey` liftedRepDataConKey = ASSERT( null args ) True
+  | Just rep' <- coreView rep
+  = isLiftedRuntimeRep rep'
+  | TyConApp rr_tc [rr_arg] <- rep
+  , rr_tc `hasKey` boxedRepDataConKey
+  = isLiftedLevity rr_arg
+  | otherwise
+  = False
+
+isLiftedLevity :: Type -> Bool
+isLiftedLevity lev
+  | Just lev' <- coreView lev          = isLiftedLevity lev'
+  | TyConApp lev_tc lev_args <- lev
+  , lev_tc `hasKey` liftedDataConKey
+  = ASSERT( null lev_args ) True
+  | otherwise                          = False
+
+isUnliftedLevity :: Type -> Bool
+isUnliftedLevity lev
+  | Just lev' <- coreView lev          = isUnliftedLevity lev'
+  | TyConApp lev_tc lev_args <- lev
+  , lev_tc `hasKey` unliftedDataConKey
+  = ASSERT( null lev_args ) True
   | otherwise                          = False
 
 -- | Returns True if the kind classifies unlifted types and False otherwise.
@@ -650,26 +679,46 @@ isUnliftedRuntimeRep :: Type -> Bool
 -- False of           (LiftedRep :: RuntimeRep)
 --   and of variables (a :: RuntimeRep)
 isUnliftedRuntimeRep rep
-  | TyConApp rr_tc _ <- coreFullView rep   -- NB: args might be non-empty
-                                           --     e.g. TupleRep [r1, .., rn]
-  = isPromotedDataCon rr_tc && not (rr_tc `hasKey` liftedRepDataConKey)
+  | Just rep' <- coreView rep   -- NB: args might be non-empty
+                                --     e.g. TupleRep [r1, .., rn]
+  = isUnliftedRuntimeRep rep'
+isUnliftedRuntimeRep (TyConApp rr_tc args)
+  | isPromotedDataCon rr_tc =
+      -- NB: args might be non-empty e.g. TupleRep [r1, .., rn]
+      if (rr_tc `hasKey` boxedRepDataConKey)
+        then case args of
+          [lev] -> isUnliftedLevity lev
+          _     -> False
+        else True
         -- Avoid searching all the unlifted RuntimeRep type cons
         -- In the RuntimeRep data type, only LiftedRep is lifted
-        -- But be careful of type families (F tys) :: RuntimeRep
-  | otherwise {- Variables, applications -}
-  = False
+        -- But be careful of type families (F tys) :: RuntimeRep,
+        -- hence the isPromotedDataCon rr_tc
+isUnliftedRuntimeRep _ = False
 
 -- | Is this the type 'RuntimeRep'?
 isRuntimeRepTy :: Type -> Bool
 isRuntimeRepTy ty
-  | TyConApp tc args <- coreFullView ty
+  | Just ty' <- coreView ty        = isRuntimeRepTy ty'
+  | TyConApp tc args <- ty
   , tc `hasKey` runtimeRepTyConKey = ASSERT( null args ) True
+  | otherwise                      = False
 
-  | otherwise = False
+-- | Is this the type 'Levity'?
+isLevityTy :: Type -> Bool
+isLevityTy lev
+  | Just lev' <- coreView lev      = isLevityTy lev'
+  | TyConApp tc args <- coreFullView lev
+  , tc `hasKey` levityTyConKey     = ASSERT( null args ) True
+  | otherwise                      = False
 
 -- | Is a tyvar of type 'RuntimeRep'?
 isRuntimeRepVar :: TyVar -> Bool
 isRuntimeRepVar = isRuntimeRepTy . tyVarKind
+
+-- | Is a tyvar of type 'Levity'?
+isLevityVar :: TyVar -> Bool
+isLevityVar = isLevityTy . tyVarKind
 
 -- | Is this the type 'Multiplicity'?
 isMultiplicityTy :: Type -> Bool
@@ -1499,7 +1548,7 @@ mkTyConTy tycon = tyConNullaryTy tycon
 -- its arguments.  Applies its arguments to the constructor from left to right.
 mkTyConApp :: TyCon -> [Type] -> Type
 mkTyConApp tycon tys
-  | [] <- tys
+  | null tys
   = mkTyConTy tycon
 
   | isFunTyCon tycon
@@ -1514,6 +1563,75 @@ mkTyConApp tycon tys
   -- The catch-all case
   | otherwise
   = TyConApp tycon tys
+
+{-
+Note [Prefer Type over TYPE 'LiftedRep]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The Core of nearly any program will have numerous occurrences of
+@TYPE 'LiftedRep@ (and, equivalently, 'Type') floating about. Concretely, while
+investigating #17292 we found that these constituting a majority of TyConApp
+constructors on the heap:
+
+```
+(From a sample of 100000 TyConApp closures)
+0x45f3523    - 28732 - `Type`
+0x420b840702 - 9629  - generic type constructors
+0x42055b7e46 - 9596
+0x420559b582 - 9511
+0x420bb15a1e - 9509
+0x420b86c6ba - 9501
+0x42055bac1e - 9496
+0x45e68fd    - 538 - `TYPE ...`
+```
+
+Consequently, we try hard to ensure that operations on such types are
+efficient. Specifically, we strive to
+
+ a. Avoid heap allocation of such types
+ b. Use a small (shallow in the tree-depth sense) representation
+    for such types
+
+Goal (b) is particularly useful as it makes traversals (e.g. free variable
+traversal, substitution, and comparison) more efficient.
+Comparison in particular takes special advantage of nullary type synonym
+applications (e.g. things like @TyConApp typeTyCon []@), Note [Comparing
+nullary type synonyms] in "GHC.Core.Type".
+
+To accomplish these we use a number of tricks:
+
+ 1. Instead of representing the lifted kind as
+    @TyConApp tYPETyCon [liftedRepDataCon]@ we rather prefer to
+    use the 'GHC.Types.Type' type synonym (represented as a nullary TyConApp).
+    This serves goal (b) since there are no applied type arguments to traverse,
+    e.g., during comparison.
+
+ 2. We have a top-level binding to represent `TyConApp GHC.Types.Type []`
+    (namely 'GHC.Builtin.Types.Prim.liftedTypeKind'), ensuring that we
+    don't need to allocate such types (goal (a)).
+
+ 3. We use the sharing mechanism described in Note [Sharing nullary TyConApps]
+    in GHC.Core.TyCon to ensure that we never need to allocate such
+    nullary applications (goal (a)).
+
+See #17958.
+-}
+
+
+-- | Given a @RuntimeRep@, applies @TYPE@ to it.
+-- See Note [TYPE and RuntimeRep] in GHC.Builtin.Types.Prim.
+tYPE :: Type -> Type
+tYPE rr@(TyConApp tc [arg])
+  -- See Note [Prefer Type of TYPE 'LiftedRep]
+  | tc `hasKey` boxedRepDataConKey
+  , TyConApp tc' [] <- arg
+  = if | tc' `hasKey` liftedDataConKey   -> liftedTypeKind   -- TYPE (BoxedRep 'Lifted)
+       | tc' `hasKey` unliftedDataConKey -> unliftedTypeKind -- TYPE (BoxedRep 'Unlifted)
+       | otherwise                       -> TyConApp tYPETyCon [rr]
+  | tc == liftedRepTyCon                               -- TYPE LiftedRep
+  = liftedTypeKind
+  | tc == unliftedRepTyCon                             -- TYPE UnliftedRep
+  = unliftedTypeKind
+tYPE rr = TyConApp tYPETyCon [rr]
 
 
 {-

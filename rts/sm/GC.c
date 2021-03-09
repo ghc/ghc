@@ -1004,9 +1004,11 @@ GarbageCollect (uint32_t collect_gen,
 
       got = mblocks_allocated;
 
+      uint32_t returned = 0;
       if (got > need) {
-          returnMemoryToOS(got - need);
+          returned = returnMemoryToOS(got - need);
       }
+      traceEventMemReturn(cap, got, need, returned);
   }
 
   // extra GC trace info
