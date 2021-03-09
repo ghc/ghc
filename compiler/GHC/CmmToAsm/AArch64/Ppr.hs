@@ -33,7 +33,6 @@ import GHC.Types.Unique ( pprUniqueAlways, getUnique )
 import GHC.Platform
 import GHC.Data.FastString
 import GHC.Utils.Outputable
-import GHC.Driver.Session (targetPlatform)
 
 import GHC.Utils.Panic
 
