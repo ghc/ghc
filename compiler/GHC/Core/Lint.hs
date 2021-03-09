@@ -476,14 +476,13 @@ lintCoreBindings dflags pass local_in_scope binds
     addLoc TopLevelBindings           $
     do { checkL (null dups) (dupVars dups)
        ; checkL (null ext_dups) (dupExtVars ext_dups)
-       ; lintRecBindings TopLevel all_pairs $ \_ ->
+       ; lintBindings TopLevel binds $ \_ ->
          return () }
   where
-    all_pairs = flattenBinds binds
      -- Put all the top-level binders in scope at the start
      -- This is because rewrite rules can bring something
      -- into use 'unexpectedly'; see Note [Glomming] in "GHC.Core.Opt.OccurAnal"
-    binders = map fst all_pairs
+    binders = bindersOfBinds binds
 
     flags = (defaultLintFlags dflags)
                { lf_check_global_ids = check_globals
@@ -596,19 +595,23 @@ Check a core binding, returning the list of variables bound.
 -- Returns a UsageEnv because this function is called in lintCoreExpr for
 -- Let
 
-lintRecBindings :: TopLevelFlag -> [(Id, CoreExpr)]
+lintBindings :: TopLevelFlag -> [CoreBind]
                 -> ([LintedId] -> LintM a) -> LintM (a, [UsageEnv])
-lintRecBindings top_lvl pairs thing_inside
-  = lintIdBndrs top_lvl bndrs $ \ bndrs' ->
-    do { ues <- zipWithM lint_pair bndrs' rhss
-       ; a <- thing_inside bndrs'
-       ; return (a, ues) }
+lintBindings top_lvl binds thing_inside = lint_binds [] [] binds
   where
-    (bndrs, rhss) = unzip pairs
-    lint_pair bndr' rhs
+    lint_binds lbndrs ues binds = case binds of
+      []          -> do { a <- thing_inside lbndrs
+                        ; return (a, ues) }
+      bind:binds' -> do { let (rec_flag, pairs) = decomposeBind bind
+                        ; let (bndrs, rhss)     = unzip pairs
+                        ; lintIdBndrs top_lvl bndrs $ \lbndrs' -> do
+                          do { ues' <- zipWithM (lint_pair rec_flag) lbndrs' rhss
+                             ; lint_binds (lbndrs'++lbndrs) (ues'++ues) binds' } }
+    lint_pair :: RecFlag -> LintedId -> CoreExpr -> LintM UsageEnv
+    lint_pair rec_flag bndr' rhs
       = addLoc (RhsOf bndr') $
         do { (rhs_ty, ue) <- lintRhs bndr' rhs         -- Check the rhs
-           ; lintLetBind top_lvl Recursive bndr' rhs rhs_ty
+           ; lintLetBind top_lvl rec_flag bndr' rhs rhs_ty
            ; return ue }
 
 lintLetBody :: [LintedId] -> CoreExpr -> LintM (LintedType, UsageEnv)
@@ -634,7 +637,7 @@ lintLetBind top_lvl rec_flag binder rhs rhs_ty
         -- See Note [Core let/app invariant] in GHC.Core
        ; checkL ( isJoinId binder
                || not (isUnliftedType binder_ty)
-               || (isNonRec rec_flag && exprOkForSpeculation rhs)
+               || (isNotTopLevel top_lvl && isNonRec rec_flag && exprOkForSpeculation rhs)
                || exprIsTickedString rhs)
            (badBndrTyMsg binder (text "unlifted"))
 
@@ -909,7 +912,7 @@ lintCoreExpr e@(Let (Rec pairs) body)
 
           -- See Note [Multiplicity of let binders] in Var
         ; ((body_type, body_ue), ues) <-
-            lintRecBindings NotTopLevel pairs $ \ bndrs' ->
+            lintBindings NotTopLevel [Rec pairs] $ \ bndrs' ->
             lintLetBody bndrs' body
         ; return (body_type, body_ue  `addUE` scaleUE Many (foldr1 addUE ues)) }
   where
