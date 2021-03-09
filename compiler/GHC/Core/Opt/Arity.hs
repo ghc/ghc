@@ -674,14 +674,14 @@ getBotArity (AT oss div)
 *                                                                      *
 ********************************************************************* -}
 
-findRhsArity :: DynFlags -> Id -> CoreExpr -> Arity -> ArityType
+findRhsArity :: DynFlags -> RecFlag -> Id -> CoreExpr -> Arity -> ArityType
 -- This implements the fixpoint loop for arity analysis
 -- See Note [Arity analysis]
 -- If findRhsArity e = (n, is_bot) then
 --  (a) any application of e to <n arguments will not do much work,
 --      so it is safe to expand e  ==>  (\x1..xn. e x1 .. xn)
 --  (b) if is_bot=True, then e applied to n args is guaranteed bottom
-findRhsArity dflags bndr rhs old_arity
+findRhsArity dflags is_rec bndr rhs old_arity
   = rhs_arity_type `combineWithDemandOneShots` idDemandOneShots bndr
        -- combineWithDemandOneShots: take account of the demand on the
        -- binder.  Perhaps it is always called with 2 args
@@ -689,11 +689,17 @@ findRhsArity dflags bndr rhs old_arity
        -- f's demand-info says how many args it is called with
 
   where
-    rhs_arity_type = go 0 botArityType
-      -- We always do one step, but usually that produces a result equal to
-      -- old_arity, and then we stop right away, because old_arity is assumed
-      -- to be sound. In other words, arities should never decrease.
-      -- Result: the common case is that there is just one iteration
+    init_env :: ArityEnv
+    init_env = findRhsArityEnv dflags
+
+    rhs_arity_type = case is_rec of
+                        Recursive    -> go 0 botArityType
+                        NonRecursive -> arityType init_env rhs
+      -- In the recursive case we always do one step, but usually that
+      -- produces a result equal to old_arity, and then we stop right
+      -- away, because old_arity is assumed to be sound. In other
+      -- words, arities should never decrease.  Result: the common
+      -- case is that there is just one iteration
 
     go :: Int -> ArityType -> ArityType
     go !n cur_at@(AT oss div)
@@ -713,7 +719,7 @@ findRhsArity dflags bndr rhs old_arity
     step :: ArityType -> ArityType
     step cur_at = arityType env rhs
       where
-        env = extendSigEnv (findRhsArityEnv dflags) bndr cur_at
+        env = extendSigEnv init_env bndr cur_at
 
 combineWithDemandOneShots :: ArityType -> [OneShotInfo] -> ArityType
 -- See Note [Combining arity type with demand info]
@@ -1023,9 +1029,22 @@ extendJoinEnv env@(AE { ae_joins = joins }) join_ids
   = env { ae_joins = joins `extendVarSetList` join_ids }
 
 extendSigEnv :: ArityEnv -> Id -> ArityType -> ArityEnv
-extendSigEnv env@AE { ae_mode = am@FindRhsArity{am_sigs = sigs} } id ar_ty =
-  env { ae_mode = am { am_sigs = extendVarEnv sigs id ar_ty } }
-extendSigEnv env _ _ = env
+extendSigEnv (AE { ae_mode = am@FindRhsArity{am_sigs = sigs}, ae_joins = joins })
+             id ar_ty
+  = AE { ae_joins = joins `delVarSet` id
+       , ae_mode = am { am_sigs = extendVarEnv sigs id ar_ty } }
+extendSigEnv env@(AE { ae_joins = joins }) id _
+  = env { ae_joins = joins `delVarSet` id }
+
+zapSigEnv :: ArityEnv -> [Var] -> ArityEnv
+zapSigEnv (AE { ae_joins = joins, ae_mode = mode }) bndrs
+  = AE { ae_joins = joins `delVarSetList` bndrs
+       , ae_mode  = mode' }
+  where
+    mode' = case mode of
+              BotStrictness    -> mode
+              EtaExpandArity{} -> mode
+              FindRhsArity { am_sigs = sigs } -> mode { am_sigs = sigs `delVarEnvList` bndrs }
 
 lookupSigEnv :: ArityEnv -> Id -> Maybe ArityType
 lookupSigEnv AE{ ae_mode = mode } id = case mode of
@@ -1098,7 +1117,7 @@ arityType env (Var v)
 
         -- Lambdas; increase arity
 arityType env (Lam x e)
-  | isId x    = arityLam x (arityType env e)
+  | isId x    = arityLam x (arityType (zapSigEnv env [x]) e)
   | otherwise = arityType env e
 
         -- Applications; decrease arity, except for types
@@ -1132,7 +1151,10 @@ arityType env (Case scrut bndr _ alts)
   | otherwise            -- In the remaining cases we may not push
   = addWork alts_type -- evaluation of the scrutinee in
   where
-    alts_type = foldr1 andArityType [arityType env rhs | Alt _ _ rhs <- alts]
+    env1 = zapSigEnv env [bndr]
+    alts_type = foldr1 andArityType $
+                [ arityType env' rhs | Alt _ bndrs rhs <- alts
+                                     , let env' = zapSigEnv env1 bndrs ]
 
 arityType env (Let (NonRec j rhs) body)
   | Just join_arity <- isJoinId_maybe j
@@ -1163,9 +1185,10 @@ arityType env (Let (NonRec b r) e)
     env'      = extendSigEnv env b (arityType env r)
 
 arityType env (Let (Rec prs) e)
-  = floatIn (all is_cheap prs) (arityType env e)
+  = floatIn (all is_cheap prs) (arityType env' e)
   where
-    is_cheap (b,e) = myExprIsCheap env e (Just (idType b))
+    is_cheap (b,e) = myExprIsCheap env' e (Just (idType b))
+    env' = zapSigEnv env (map fst prs)
 
 arityType env (Tick t e)
   | not (tickishIsCode t)     = arityType env e

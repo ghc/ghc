@@ -33,7 +33,7 @@ module GHC.Core.Opt.Simplify.Env (
         mkFloatBind, addLetFloats, addJoinFloats, addFloats,
         extendFloats, wrapFloats,
         isEmptyFloats, isEmptyJoinFloats, isEmptyLetFloats,
-        doFloatFromRhs, getTopFloatBinds,
+        doFloatFromRhs, getTopFloatBinds, etaFloatOk,
 
         -- * LetFloats
         LetFloats, letFloatBinds, emptyLetFloats, unitLetFloat,
@@ -52,6 +52,7 @@ import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Opt.Monad        ( SimplMode(..) )
 import GHC.Core
 import GHC.Core.Utils
+import GHC.Core.FVs
 import GHC.Core.Multiplicity     ( scaleScaled )
 import GHC.Core.Unfold
 import GHC.Types.Var
@@ -495,6 +496,23 @@ doFloatFromRhs lvl rec str (SimplFloats { sfLetFloats = LetFloats fs ff }) rhs
                    FltLifted  -> True
                    FltOkSpec  -> isNotTopLevel lvl && isNonRec rec
                    FltCareful -> isNotTopLevel lvl && isNonRec rec && str
+
+etaFloatOk :: [Id] -> SimplFloats -> Bool
+etaFloatOk bndrs (SimplFloats { sfLetFloats = LetFloats let_floats float_flag
+                              , sfJoinFloats = join_floats })
+  =  isEmptyJoinFloats join_floats
+  && case float_flag of { FltCareful -> False; _ -> True }
+  && bndr_set `disjointVarSet` let_float_fvs
+  && bndr_set `disjointVarSet` let_float_bndrs
+  where
+    bndr_set        = mkVarSet bndrs
+    let_float_bndrs = foldr (unionVarSet . mkVarSet . bindersOf) emptyVarSet let_floats
+    let_float_fvs   = foldr (unionVarSet . bindFreeVars) emptyVarSet let_floats
+         -- This formulation may return a set that is slightly too large,
+         -- by not deleting variables bound by the let's, but that is rare
+         -- and at worst we miss an eta-reduction
+
+
 
 {-
 Note [Float when cheap or expandable]

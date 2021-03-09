@@ -258,7 +258,7 @@ simplRecOrTopPair env top_lvl is_rec mb_cont old_bndr new_bndr rhs
   = {-#SCC "simplRecOrTopPair-join" #-}
     ASSERT( isNotTopLevel top_lvl && isJoinId new_bndr )
     trace_bind "join" $
-    simplJoinBind env cont old_bndr new_bndr rhs env
+    simplJoinBind env is_rec cont old_bndr new_bndr rhs env
 
   | otherwise
   = {-#SCC "simplRecOrTopPair-normal" #-}
@@ -351,21 +351,21 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
                           return (poly_floats, rhs') }           -- if given emptyFloats
 
         ; (bind_float, env2) <- completeBind (env `setInScopeFromF` rhs_floats)
-                                             top_lvl Nothing bndr bndr2 rhs'
+                                             top_lvl is_rec Nothing bndr bndr2 rhs'
         ; return (rhs_floats `addFloats` bind_float, env2) }
 
 --------------------------
-simplJoinBind :: SimplEnv
+simplJoinBind :: SimplEnv -> RecFlag
               -> SimplCont
               -> InId -> OutId          -- Binder, both pre-and post simpl
                                         -- The OutId has IdInfo, except arity,
                                         --   unfolding
               -> InExpr -> SimplEnv     -- The right hand side and its env
               -> SimplM (SimplFloats, SimplEnv)
-simplJoinBind env cont old_bndr new_bndr rhs rhs_se
+simplJoinBind env is_rec cont old_bndr new_bndr rhs rhs_se
   = do  { let rhs_env = rhs_se `setInScopeFromE` env
         ; rhs' <- simplJoinRhs rhs_env old_bndr rhs cont
-        ; completeBind env NotTopLevel (Just cont) old_bndr new_bndr rhs' }
+        ; completeBind env NotTopLevel is_rec (Just cont) old_bndr new_bndr rhs' }
 
 --------------------------
 simplNonRecX :: SimplEnv
@@ -420,7 +420,7 @@ completeNonRecX top_lvl env is_strict old_bndr new_bndr new_rhs
                      return (emptyFloats env, wrapFloats floats new_rhs)
 
         ; (bind_float, env2) <- completeBind (env `setInScopeFromF` rhs_floats)
-                                             NotTopLevel Nothing
+                                             NotTopLevel NonRecursive Nothing
                                              old_bndr new_bndr rhs2
         ; return (rhs_floats `addFloats` bind_float, env2) }
 
@@ -682,7 +682,7 @@ makeTrivialBinding mode top_lvl occ_fs info expr expr_ty
 
         -- Now something very like completeBind,
         -- but without the postInlineUnconditionally part
-        ; (arity_type, expr2) <- tryEtaExpandRhs mode var expr1
+        ; (arity_type, expr2) <- tryEtaExpandRhs mode NonRecursive var expr1
         ; unf <- mkLetUnfolding (sm_uf_opts mode) top_lvl InlineRhs var expr2
 
         ; let final_id = addLetBndrInfo var arity_type unf
@@ -751,6 +751,7 @@ Nor does it do the atomic-argument thing
 
 completeBind :: SimplEnv
              -> TopLevelFlag            -- Flag stuck into unfolding
+             -> RecFlag
              -> MaybeJoinCont           -- Required only for join point
              -> InId                    -- Old binder
              -> OutId -> OutExpr        -- New binder and RHS
@@ -761,7 +762,7 @@ completeBind :: SimplEnv
 --
 -- Binder /can/ be a JoinId
 -- Precondition: rhs obeys the let/app invariant
-completeBind env top_lvl mb_cont old_bndr new_bndr new_rhs
+completeBind env top_lvl is_rec mb_cont old_bndr new_bndr new_rhs
  | isCoVar old_bndr
  = case new_rhs of
      Coercion co -> return (emptyFloats env, extendCvSubst env old_bndr co)
@@ -775,7 +776,7 @@ completeBind env top_lvl mb_cont old_bndr new_bndr new_rhs
 
          -- Do eta-expansion on the RHS of the binding
          -- See Note [Eta-expanding at let bindings] in GHC.Core.Opt.Simplify.Utils
-      ; (new_arity, final_rhs) <- tryEtaExpandRhs (getMode env) new_bndr new_rhs
+      ; (new_arity, final_rhs) <- tryEtaExpandRhs (getMode env) is_rec new_bndr new_rhs
 
         -- Simplify the unfolding
       ; new_unfolding <- simplLetUnfolding env top_lvl mb_cont old_bndr
@@ -1720,7 +1721,7 @@ simplNonRecJoinPoint env bndr rhs body cont
               res_ty = contResultType cont
         ; (env1, bndr1)    <- simplNonRecJoinBndr env bndr mult res_ty
         ; (env2, bndr2)    <- addBndrRules env1 bndr bndr1 (Just cont)
-        ; (floats1, env3)  <- simplJoinBind env2 cont bndr bndr2 rhs env
+        ; (floats1, env3)  <- simplJoinBind env2 NonRecursive cont bndr bndr2 rhs env
         ; (floats2, body') <- simplExprF env3 body cont
         ; return (floats1 `addFloats` floats2, body') }
 
