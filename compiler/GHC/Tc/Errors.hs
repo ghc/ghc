@@ -66,7 +66,7 @@ import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Utils.FV ( fvVarList, unionFV )
 
-import Control.Monad    ( unless,  when )
+import Control.Monad    ( (>=>),  unless,  when )
 import Data.Foldable    ( toList )
 import Data.List        ( partition, mapAccumL, sortBy, unfoldr )
 
@@ -715,9 +715,7 @@ mkSkolReporter ctxt cts
 reportHoles :: [Ct]  -- other (tidied) constraints
             -> ReportErrCtxt -> [Hole] -> TcM ()
 reportHoles tidy_cts ctxt
-  = mapM_ $ \hole -> do
-     msg <- mkHoleError tidy_cts ctxt hole
-     reportDiagnostic msg
+  = mapM_ (mkHoleError tidy_cts ctxt >=> reportDiagnostic)
 
 mkUserTypeErrorReporter :: Reporter
 mkUserTypeErrorReporter ctxt
