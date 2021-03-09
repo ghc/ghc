@@ -131,34 +131,24 @@ reportUnsolved :: WantedConstraints -> TcM (Bag EvBind)
 reportUnsolved wanted
   = do { binds_var <- newTcEvBinds
        ; defer_errors <- goptM Opt_DeferTypeErrors
-       ; warn_errors <- woptM Opt_WarnDeferredTypeErrors -- implement #10283
-       ; let type_errors | not defer_errors = Just ErrorWithoutFlag
-                         | warn_errors      = Just (WarningWithFlag Opt_WarnDeferredTypeErrors)
-                         | otherwise        = Nothing
+       ; let type_errors | not defer_errors = ErrorWithoutFlag
+                         | otherwise        = WarningWithFlag Opt_WarnDeferredTypeErrors
 
        ; defer_holes <- goptM Opt_DeferTypedHoles
-       ; warn_holes  <- woptM Opt_WarnTypedHoles
-       ; let expr_holes | not defer_holes = Just ErrorWithoutFlag
-                        | warn_holes      = Just (WarningWithFlag Opt_WarnTypedHoles)
-                        | otherwise       = Nothing
+       ; let expr_holes | not defer_holes = ErrorWithoutFlag
+                        | otherwise       = WarningWithFlag Opt_WarnTypedHoles
 
        ; partial_sigs      <- xoptM LangExt.PartialTypeSignatures
-       ; warn_partial_sigs <- woptM Opt_WarnPartialTypeSignatures
        ; let type_holes | not partial_sigs
-                        = Just ErrorWithoutFlag
-                        | warn_partial_sigs
-                        = Just (WarningWithFlag Opt_WarnPartialTypeSignatures)
+                        = ErrorWithoutFlag
                         | otherwise
-                        = Nothing
+                        = WarningWithFlag Opt_WarnPartialTypeSignatures
 
        ; defer_out_of_scope <- goptM Opt_DeferOutOfScopeVariables
-       ; warn_out_of_scope <- woptM Opt_WarnDeferredOutOfScopeVariables
        ; let out_of_scope_holes | not defer_out_of_scope
-                                = Just ErrorWithoutFlag
-                                | warn_out_of_scope
-                                = Just (WarningWithFlag Opt_WarnDeferredOutOfScopeVariables)
+                                = ErrorWithoutFlag
                                 | otherwise
-                                = Nothing
+                                = WarningWithFlag Opt_WarnDeferredOutOfScopeVariables
 
        ; report_unsolved type_errors expr_holes
                          type_holes out_of_scope_holes
@@ -179,13 +169,11 @@ reportAllUnsolved wanted
   = do { ev_binds <- newNoTcEvBinds
 
        ; partial_sigs      <- xoptM LangExt.PartialTypeSignatures
-       ; warn_partial_sigs <- woptM Opt_WarnPartialTypeSignatures
-       ; let type_holes | not partial_sigs  = Just ErrorWithoutFlag
-                        | warn_partial_sigs = Just (WarningWithFlag Opt_WarnPartialTypeSignatures)
-                        | otherwise         = Nothing
+       ; let type_holes | not partial_sigs  = ErrorWithoutFlag
+                        | otherwise         = WarningWithFlag Opt_WarnPartialTypeSignatures
 
-       ; report_unsolved (Just ErrorWithoutFlag)
-                         (Just ErrorWithoutFlag) type_holes (Just ErrorWithoutFlag)
+       ; report_unsolved ErrorWithoutFlag
+                         ErrorWithoutFlag type_holes ErrorWithoutFlag
                          ev_binds wanted }
 
 -- | Report all unsolved goals as warnings (but without deferring any errors to
@@ -194,17 +182,17 @@ reportAllUnsolved wanted
 warnAllUnsolved :: WantedConstraints -> TcM ()
 warnAllUnsolved wanted
   = do { ev_binds <- newTcEvBinds
-       ; report_unsolved (Just WarningWithoutFlag)
-                         (Just WarningWithoutFlag)
-                         (Just WarningWithoutFlag)
-                         (Just WarningWithoutFlag)
+       ; report_unsolved WarningWithoutFlag
+                         WarningWithoutFlag
+                         WarningWithoutFlag
+                         WarningWithoutFlag
                          ev_binds wanted }
 
 -- | Report unsolved goals as errors or warnings.
-report_unsolved :: Maybe DiagnosticReason -- Deferred type errors
-                -> Maybe DiagnosticReason -- Expression holes
-                -> Maybe DiagnosticReason -- Type holes
-                -> Maybe DiagnosticReason -- Out of scope holes
+report_unsolved :: DiagnosticReason -- Deferred type errors
+                -> DiagnosticReason -- Expression holes
+                -> DiagnosticReason -- Type holes
+                -> DiagnosticReason -- Out of scope holes
                 -> EvBindsVar        -- cec_binds
                 -> WantedConstraints -> TcM ()
 report_unsolved type_errors expr_holes
@@ -319,15 +307,15 @@ data ReportErrCtxt
                                        -- into warnings, and emit evidence bindings
                                        -- into 'cec_binds' for unsolved constraints
 
-          , cec_defer_type_errors :: Maybe DiagnosticReason -- Nothing: Defer type errors until runtime
+          , cec_defer_type_errors :: DiagnosticReason -- Defer type errors until runtime
 
           -- cec_expr_holes is a union of:
           --   cec_type_holes - a set of typed holes: '_', '_a', '_foo'
           --   cec_out_of_scope_holes - a set of variables which are
           --                            out of scope: 'x', 'y', 'bar'
-          , cec_expr_holes :: Maybe DiagnosticReason -- Holes in expressions. Nothing: defer/suppress errors.
-          , cec_type_holes :: Maybe DiagnosticReason -- Holes in types. Nothing: defer/suppress errors.
-          , cec_out_of_scope_holes :: Maybe DiagnosticReason -- Out of scope holes. Nothing: defer/suppress errors.
+          , cec_expr_holes :: DiagnosticReason -- Holes in expressions.
+          , cec_type_holes :: DiagnosticReason -- Holes in types.
+          , cec_out_of_scope_holes :: DiagnosticReason -- Out of scope holes.
 
           , cec_warn_redundant :: Bool    -- True <=> -Wredundant-constraints
           , cec_expand_syns    :: Bool    -- True <=> -fprint-expanded-synonyms
@@ -360,19 +348,19 @@ instance Outputable ReportErrCtxt where
 -- | Returns True <=> the ReportErrCtxt indicates that something is deferred
 deferringAnyBindings :: ReportErrCtxt -> Bool
   -- Don't check cec_type_holes, as these don't cause bindings to be deferred
-deferringAnyBindings (CEC { cec_defer_type_errors  = Just ErrorWithoutFlag
-                          , cec_expr_holes         = Just ErrorWithoutFlag
-                          , cec_out_of_scope_holes = Just ErrorWithoutFlag }) = False
-deferringAnyBindings _                                                 = True
+deferringAnyBindings (CEC { cec_defer_type_errors  = ErrorWithoutFlag
+                          , cec_expr_holes         = ErrorWithoutFlag
+                          , cec_out_of_scope_holes = ErrorWithoutFlag }) = False
+deferringAnyBindings _                                                   = True
 
 maybeSwitchOffDefer :: EvBindsVar -> ReportErrCtxt -> ReportErrCtxt
 -- Switch off defer-type-errors inside CoEvBindsVar
 -- See Note [Failing equalities with no evidence bindings]
 maybeSwitchOffDefer evb ctxt
  | CoEvBindsVar{} <- evb
- = ctxt { cec_defer_type_errors  = Just ErrorWithoutFlag
-        , cec_expr_holes         = Just ErrorWithoutFlag
-        , cec_out_of_scope_holes = Just ErrorWithoutFlag }
+ = ctxt { cec_defer_type_errors  = ErrorWithoutFlag
+        , cec_expr_holes         = ErrorWithoutFlag
+        , cec_out_of_scope_holes = ErrorWithoutFlag }
  | otherwise
  = ctxt
 
@@ -728,17 +716,16 @@ reportHoles :: [Ct]  -- other (tidied) constraints
             -> ReportErrCtxt -> [Hole] -> TcM ()
 reportHoles tidy_cts ctxt
   = mapM_ $ \hole -> do
-     msg_mb <- mkHoleError tidy_cts ctxt hole
-     whenIsJust msg_mb reportDiagnostic
+     msg <- mkHoleError tidy_cts ctxt hole
+     reportDiagnostic msg
 
 mkUserTypeErrorReporter :: Reporter
 mkUserTypeErrorReporter ctxt
   = mapM_ $ \ct -> do
       let mk_msg rea = mkUserTypeError rea ctxt ct
 
-      whenIsJust (cec_defer_type_errors ctxt) $ \deferReason -> do
-        msg <- mk_msg deferReason
-        maybeReportError ctxt msg
+      msg <- mk_msg (cec_defer_type_errors ctxt)
+      maybeReportError ctxt msg
 
       -- No matter what, add the deferred bindings.
       mk_msg ErrorWithoutFlag >>= \msg -> addDeferredBinding ctxt msg ct
@@ -852,10 +839,9 @@ reportGroup :: (DiagnosticReason -> ReportErrCtxt -> [Ct] -> TcM (MsgEnvelope Di
 reportGroup mk_err ctxt cts =
   ASSERT( not (null cts))
   do { let mk_msg rea = mk_err rea ctxt cts
-     ; whenIsJust (cec_defer_type_errors ctxt) $ \deferReason -> do
-         msg <- mk_msg deferReason
-         maybeReportError ctxt msg
-         -- But see Note [Always warn with -fdefer-type-errors]
+     ; msg <- mk_msg (cec_defer_type_errors ctxt)
+     ; maybeReportError ctxt msg
+       -- But see Note [Always warn with -fdefer-type-errors]
      ; traceTc "reportGroup" (ppr cts)
      ; mapM_ (\ct -> mk_msg ErrorWithoutFlag >>= \e -> addDeferredBinding ctxt e ct) cts }
          -- Add deferred bindings for all
@@ -1130,7 +1116,7 @@ See also 'reportUnsolved'.
 
 ----------------
 -- | Constructs a new hole error, unless this is deferred. See Note [Constructing Hole Errors].
-mkHoleError :: [Ct] -> ReportErrCtxt -> Hole -> TcM (Maybe (MsgEnvelope DiagnosticMessage))
+mkHoleError :: [Ct] -> ReportErrCtxt -> Hole -> TcM (MsgEnvelope DiagnosticMessage)
 mkHoleError _tidy_simples ctxt hole@(Hole { hole_occ = occ
                                            , hole_ty = hole_ty
                                            , hole_loc = ct_loc })
@@ -1147,7 +1133,7 @@ mkHoleError _tidy_simples ctxt hole@(Hole { hole_occ = occ
                                  (tcl_rdr lcl_env) imp_info (mkRdrUnqual occ))
 
        ; maybeAddDeferredBindings ctxt hole mk_err
-       ; whenNotDeferring (cec_out_of_scope_holes ctxt) mk_err
+       ; mk_err (cec_out_of_scope_holes ctxt)
        }
   where
     herald | isDataOcc occ = text "Data constructor not in scope:"
@@ -1190,7 +1176,7 @@ mkHoleError tidy_simples ctxt hole@(Hole { hole_occ = occ
 
        ; let holes | ExprHole _ <- sort = cec_expr_holes ctxt
                    | otherwise          = cec_type_holes ctxt
-       ; whenNotDeferring holes mk_err
+       ; mk_err holes
 
        }
 
@@ -1228,7 +1214,7 @@ mkHoleError tidy_simples ctxt hole@(Hole { hole_occ = occ
                       -- hole, via kind casts
 
     type_hole_hint
-         | Just ErrorWithoutFlag <- cec_type_holes ctxt
+         | ErrorWithoutFlag <- cec_type_holes ctxt
          = text "To use the inferred type, enable PartialTypeSignatures"
          | otherwise
          = empty
@@ -1248,22 +1234,6 @@ mkHoleError tidy_simples ctxt hole@(Hole { hole_occ = occ
        | otherwise  -- A coercion variable can be free in the hole type
        = ppWhenOption sdocPrintExplicitCoercions $
            quotes (ppr tv) <+> text "is a coercion variable"
-
-
--- | Similar in spirit to 'whenIsJust', but the action returns a value of type @Maybe b@.
-whenNotDeferring :: Monad m => Maybe a -> (a -> m b) -> m (Maybe b)
-whenNotDeferring = flip traverse
-
-{- Note [Adding deferred bindings]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-When working with typed holes we have to deal with the case where
-we want holes to be reported as warnings to users during compile time but
-as errors during runtime. Therefore, we have to call 'maybeAddDeferredBindings'
-with a function which is able to override the 'DiagnosticReason' of a 'DiagnosticMessage',
-so that the correct 'Severity' can be computed out of that later on.
-
--}
 
 
 {- Note [Adding deferred bindings]
