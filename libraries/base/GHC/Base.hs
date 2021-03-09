@@ -1363,6 +1363,9 @@ The rules for map work like this.
 -- > [x1, ..., xm] ++ [y1, ...] == [x1, ..., xm, y1, ...]
 --
 -- If the first list is not finite, the result is the first list.
+--
+-- WARNING: This function takes linear time in the number of arguments of the
+-- first list.
 
 (++) :: [a] -> [a] -> [a]
 {-# NOINLINE [1] (++) #-}    -- We want the RULE to fire first.
