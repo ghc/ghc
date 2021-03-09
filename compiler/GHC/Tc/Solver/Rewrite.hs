@@ -5,7 +5,7 @@
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 module GHC.Tc.Solver.Rewrite(
-   rewrite, rewriteKind, rewriteArgsNom,
+   rewrite, rewrite_shallow, rewriteArgsNom,
    rewriteType
  ) where
 
@@ -18,10 +18,14 @@ import GHC.Tc.Types.Constraint
 import GHC.Core.Predicate
 import GHC.Tc.Utils.TcType
 import GHC.Core.Type
+import GHC.Core.FamInstEnv (FamInst(..), lookupFamInstEnvByTyCon, apartnessCheck)
 import GHC.Tc.Types.Evidence
 import GHC.Core.TyCon
+import GHC.Core.TyCon.Env
 import GHC.Core.TyCo.Rep   -- performs delicate algorithm on types
 import GHC.Core.Coercion
+import GHC.Core.Coercion.Axiom
+import qualified GHC.Core.Unify as Unify
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
@@ -38,6 +42,7 @@ import GHC.Utils.Monad ( zipWith3M )
 import Data.List.NonEmpty ( NonEmpty(..) )
 
 import Control.Arrow ( first )
+import Data.Array
 
 {-
 ************************************************************************
@@ -228,6 +233,19 @@ rewrite ev ty
        ; traceTcS "rewrite }" (ppr ty')
        ; return (ty', co) }
 
+rewrite_shallow :: CtEvidence -> TcType
+        -> TcS (TcType, TcCoercion)
+rewrite_shallow ev ty
+  = do { traceTcS "rewrite_shallow {" (ppr ty)
+       ; r <- runRewriteCtEv ev (rewrite_one_shallow (mkRedRefl ty))
+       ; let (ty', co) = splitReduction r
+       ; traceTcS "rewrite_shallow }" (ppr ty')
+       ; return (ty', co) }
+
+
+{-
+-- TODO: this isn't actually used anywhere?
+
 -- specialized to rewriting kinds: never Derived, always Nominal
 -- See Note [No derived kind equalities]
 -- See Note [Rewriting]
@@ -240,6 +258,7 @@ rewriteKind loc flav ty
        ; (ty', co) <- runRewrite loc flav' NomEq (rewrite_one ty)
        ; traceTcS "rewriteKind }" (ppr ty' $$ ppr co) -- co is never a panic
        ; return (ty', co) }
+-}
 
 -- See Note [Rewriting]
 rewriteArgsNom :: CtEvidence -> TyCon -> [TcType] -> TcS ([Xi], [TcCoercion])
@@ -265,6 +284,9 @@ rewriteArgsNom ev tc tys
 -- a type w.r.t. any givens. It does not do type-family reduction. This
 -- will never emit new constraints. Call this when the inert set contains
 -- only givens.
+--
+-- TODO: comments here claim it does not do any TF reduction, but that seems
+-- wrong? Do we need a shallow variant?
 rewriteType :: CtLoc -> TcType -> TcS TcType
 rewriteType loc ty
   = do { (xi, _) <- runRewrite loc Given NomEq $
@@ -510,6 +532,8 @@ rewrite_one :: TcType -> RewriteM (Xi, Coercion)
 -- The role on the result coercion matches the EqRel in the RewriteEnv
 
 rewrite_one ty
+--  | pprTrace "rewrite_one" (ppr ty) False = undefined
+
   | Just ty' <- rewriterView ty  -- See Note [Rewriting synonyms]
   = rewrite_one ty'
 
@@ -564,6 +588,49 @@ rewrite_one (CastTy ty g)
          -- See Note [castCoercionKind1] in GHC.Core.Coercion
 
 rewrite_one (CoercionTy co) = first mkCoercionTy <$> rewrite_co co
+
+
+-- | Given a (ty, co :: ty ~r ty0) pair, produce (ty1, co1 :: ty1 ~r ty0)
+-- where r is the ambient role in the monad.
+rewrite_one_shallow :: Reduction -> RewriteM Reduction
+rewrite_one_shallow r0
+--  | pprTrace "rewrite_one_shallow" (ppr ty $$ ppr co) False = undefined
+
+  | Just r <- rewriterViewReduction r0  -- See Note [Rewriting synonyms]
+  = rewrite_one_shallow r
+
+  | TyVarTy tv <- ty0 = rewriteTyVar_shallow r0 tv
+
+  | TyConApp tc tys <- ty0
+  -- If it's a type family application, try to reduce it
+  = if isTypeFamilyTyCon tc then rewrite_fam_app_shallow r0 tc tys
+                            else pure r0
+
+  | CastTy ty g <- ty0
+ = do { role <- getRole
+      ; r <- rewrite_one_shallow (mkRedRefl ty)
+      ; let ty' = reductionType r
+      ; let mco' = reductionMCoercion r
+      ; let mco'' = case mco' of
+                      MRefl -> MRefl
+                      MCo co' -> MCo (castCoercionKind1 co' role ty' ty g)
+      ; return (mkReduction (mkCastTy ty' g) (mco'' `transMCo` reductionMCoercion r0))
+        -- TODO: is this right? Should we  rewrite_co g?
+      }
+
+-- TODO: think about the following; in some cases (e.g. if we have
+-- classifyPredType later) we need the head to be rewritten in case it turns out
+-- to be a TyCon and hence the whole thing is a TyConApp; but this might force
+-- too much in the case of strange type families.
+  | AppTy ty1 ty2 <- ty0
+  = do r_ty1 <- rewrite_one_shallow (mkRedRefl ty1)
+       return (mkRedAppTrans r_ty1 (mkRedRefl ty2) r0)
+
+-- One of LitTy, FunTy or ForAllTy, all of which are already in WHNF
+ | otherwise = ASSERT(isWHNF ty0) pure r0
+  where
+    ty0 = reductionType r0
+
 
 -- | "Rewrite" a coercion. Really, just zonk it so we can uphold
 -- (F1) of Note [Rewriting]
@@ -764,6 +831,7 @@ is inlined in that case, and only FINISH 1 is performed.
 
 -}
 
+
 rewrite_fam_app :: TyCon -> [TcType] -> RewriteM (Xi, Coercion)
   --   rewrite_fam_app            can be over-saturated
   --   rewrite_exact_fam_app      lifts out the application to top level
@@ -784,8 +852,8 @@ rewrite_fam_app tc tys  -- Can be over-saturated
 
 -- the [TcType] exactly saturate the TyCon
 -- See Note [How to normalise a family application]
-rewrite_exact_fam_app :: TyCon -> [TcType] -> RewriteM (Xi, Coercion)
-rewrite_exact_fam_app tc tys
+rewrite_exact_fam_app_old :: TyCon -> [TcType] -> RewriteM (Xi, Coercion)
+rewrite_exact_fam_app_old tc tys
   = do { checkStackDepth (mkTyConApp tc tys)
 
        -- STEP 1/2. Try to reduce without reducing arguments first.
@@ -817,7 +885,7 @@ rewrite_exact_fam_app tc tys
              homogenise xi co = homogenise_result xi (co `mkTcTransCo` args_co) role kind_co
 
          -- STEP 4: try the inerts
-       ; result2 <- liftTcS $ lookupFamAppInert tc xis
+       ; result2 <- liftTcS $ lookupFamAppInert_hacked tc xis
        ; flavour <- getFlavour
        ; case result2 of
          { Just (co, xi, fr@(_, inert_eq_rel))
@@ -891,6 +959,69 @@ try_to_reduce tc tys
                NomEq  -> return result
                ReprEq -> return (Just (mkSubCo co, xi)) }
 
+
+-- the [TcType] exactly saturate the TyCon
+-- See Note [How to normalise a family application]
+--
+-- Careful here: we call rewrite_exact_fam_app_shallow, which guarantees to
+-- expose a head constructor if possible, but doesn't recursively rewrite the
+-- arguments.  If we want a xi we have to rewrite again, but we mustn't call
+-- rewrite_one/rewrite_fam_app if we had a stuck type family.
+rewrite_exact_fam_app :: TyCon -> [TcType] -> RewriteM (Xi, Coercion)
+rewrite_exact_fam_app tc tys
+  | can't_cope_with tc = rewrite_exact_fam_app_old tc tys
+  | otherwise
+  = do { let ty0 = mkTyConApp tc tys
+       ; r <- rewrite_exact_fam_app_shallow (mkRedRefl ty0) tc tys
+       ; let (ty, co) = splitReduction r
+       ; case tcSplitTyConApp_maybe ty of
+           Just (new_tc, new_tys)
+             | isTypeFamilyTyCon new_tc
+                         -> do { (xi, co') <- rewrite_ty_con_app new_tc new_tys
+                               ; pure (xi, co' `transCo` co) }
+           _             -> do { (xi, co') <- rewrite_one ty
+                               ; pure (xi, co' `transCo` co) }
+       }
+
+
+-- TODO: we don't yet support dependently-kinded TyCons so for now just fall
+-- back on the old code path
+can't_cope_with :: TyCon -> Bool
+can't_cope_with tc = snd (ty_con_binders_ty_binders' (tyConBinders tc))
+
+rewrite_fam_app_shallow :: Reduction -> TyCon -> [TcType] -> RewriteM Reduction
+  --   rewrite_fam_app_shallow    can be over-saturated
+  --   rewrite_exact_fam_app_shallow lifts out the application to top level
+  -- Postcondition: Coercion :: result_ty ~ F tys
+rewrite_fam_app_shallow r0 tc tys  -- Can be over-saturated
+    | can't_cope_with tc = do traceRewriteM "rewrite_fam_app_shallow: can't cope" (ppr (mkTyConApp tc tys))
+                              (xi, co') <- rewrite_fam_app tc tys
+                              -- TODO: don't need to guarantee use of MRefl where there is no progress, any more?
+                              -- pure (xi, if isReflCo co' && (xi `eqType` ty0) then co else MCo co' `transMCo` co)
+                              pure (mkReductionCo xi co' `mkRedTrans` r0)
+
+    | ASSERT2( tys `lengthAtLeast` arity
+             , ppr tc $$ ppr arity $$ ppr tys)
+
+                 -- Type functions are saturated
+                 -- The type function might be *over* saturated
+                 -- in which case the remaining arguments should
+                 -- be dealt with by AppTys
+
+      -- TODO: is this shortcut case worthwhile?
+      tys `lengthIs` arity
+       = rewrite_exact_fam_app_shallow r0 tc tys
+
+    | otherwise =
+      do { r1 <- rewrite_exact_fam_app_shallow (mkRedRefl (mkTyConApp tc tys1)) tc tys1
+         ; pure (mkRedAppsTrans r1 (mkRedsRefl tys_rest) r0) }
+           -- TODO: can we avoid the call stack here and make this tail-recursive?
+           -- TODO: perhaps just allow rewrite_exact_fam_app_shallow to be called with extra arguments?
+  where
+    arity = tyConArity tc
+    (tys1, tys_rest) = splitAt arity tys
+
+
 {-
 ************************************************************************
 *                                                                      *
@@ -912,6 +1043,14 @@ data RewriteTvResult
       -- that is, in the constraint solver, a unification variable
       -- can contain a polytype.  See GHC.Tc.Gen.App
       -- Note [Instantiation variables are short lived]
+
+rewriteTyVar_shallow :: Reduction -> TyVar -> RewriteM Reduction
+rewriteTyVar_shallow r0 tv
+ = do { mb_yes <- rewrite_tyvar1 tv
+      ; case mb_yes of
+          RTRFollowed ty1 co1 -> rewrite_one_shallow (mkReductionCo ty1 (co1 `transCo` reductionCoercion r0))
+          RTRNotFollowed      -> pure r0
+      }
 
 rewriteTyVar :: TyVar -> RewriteM (Xi, Coercion)
 rewriteTyVar tv
@@ -966,7 +1105,9 @@ rewrite_tyvar2 tv fr@(_, eq_rel)
                         (ppr tv <+>
                          equals <+>
                          ppr rhs_ty $$ ppr ctev)
-                    ; let rewrite_co1 = mkSymCo (ctEvCoercion ctev)
+                      -- TODO: hack for the ctEvCoercion issue
+                    ; let rewrite_co1 | isDerived ctev  = Refl (LitTy (NumTyLit 42))
+                                      | otherwise       = mkSymCo (ctEvCoercion ctev)
                           rewrite_co  = case (ct_eq_rel, eq_rel) of
                             (ReprEq, _rel)  -> ASSERT( _rel == ReprEq )
                                     -- if this ASSERT fails, then
@@ -1044,3 +1185,1499 @@ ty_con_binders_ty_binders' = foldr go ([], False)
       = (Anon af (tymult (tyVarKind tv)) : bndrs, n)
     {-# INLINE go #-}
 {-# INLINE ty_con_binders_ty_binders' #-}
+
+
+
+
+
+
+
+
+{-
+
+The plan:
+ - rewrite_exact_fam_app_shallow tries to rewrite an (exactly saturated) type family application `F args` to WHNF (if possible)
+ - if it makes some progress (even if not all the way to WHNF) it returns `(new_ty, co :: new_ty ~ F args)`
+ - if the result ty is a family application, it must be stuck (i.e. we can't make more progress by rewriting it)
+
+We take a (ty, co :: ty ~ ty0) as input and produce (ty1, co2 :: ty1 ~ ty0) as output
+so that we can be called tail-recursively when we get a long sequence of top-level reduction steps.
+
+We use an MCoercion so it is possible to tell whether we made progress e.g. by
+following a filled metavariable, which results in a MCo Refl.  TODO: maybe we
+should return a (Coercion, Bool) pair instead?  Maybe this is pointless?
+
+-}
+
+rewrite_exact_fam_app_shallow :: Reduction -> TyCon -> [Type] -> RewriteM Reduction
+rewrite_exact_fam_app_shallow r0 tc tys
+  = do { checkStackDepth (reductionType r0)
+       -- TODO: setEqRel here is wrong: we might have [G] F waffle ~R Int, [W] F waffle ~R Int.
+       -- Instead we need to make the called functions handle roles properly.
+       ; eq_rel <- getEqRel
+       ; r <- setEqRel NomEq $ do_it
+       ; pure $ downgradeReduction eq_rel r
+       }
+  where
+    do_it = case famTyConFlav_maybe tc of
+              Just OpenSynFamilyTyCon                  -> rewrite_exact_fam_app_open    r0 tc tys
+              Just (ClosedSynFamilyTyCon (Just axiom)) -> rewrite_exact_fam_app_closed  r0 tc tys axiom
+              Just (BuiltInSynFamTyCon builtin_family) -> rewrite_exact_fam_app_builtin r0 tc tys builtin_family
+              Just (ClosedSynFamilyTyCon Nothing)      -> rewrite_exact_fam_app_inerts  r0 tc tys
+              Just AbstractClosedSynFamilyTyCon        -> rewrite_exact_fam_app_inerts  r0 tc tys
+              Just DataFamilyTyCon{}                   -> pprPanic "rewrite_exact_fam_app_shallow: data family" (ppr tc)
+              Nothing                                  -> pprPanic "rewrite_exact_fam_app_shallow: not  family" (ppr tc)
+
+
+-- If we can make no progress using the type family definition, we fall back on
+-- trying the inert set in case we have a Given like `F blah ~ t`.
+-- See Note [Shallow rewriting: using the inerts]
+rewrite_exact_fam_app_inerts :: Reduction -> TyCon -> [Type] -> RewriteM Reduction
+rewrite_exact_fam_app_inerts r0 tc tys =
+    do { traceRewriteM "rewrite_exact_fam_app_inerts" (ppr (mkTyConApp tc tys))
+       ; flavour <- getFlavour
+       ; eq_rel <- getEqRel
+       ; let role = eqRelRole eq_rel
+       ; (r, result2) <- lookupFamAppInert_shallow r0 tc tys
+
+       ; case result2 of
+         { Just (co, xi, fr@(_, inert_eq_rel))
+             -- co :: F xis ~ir xi
+
+             | fr `eqCanRewriteFR` (flavour, eq_rel) ->
+                 do { traceRewriteM "rewrite family application with inert"
+                                (ppr r)
+                    ; bumpDepth $ rewrite_one_shallow (mkReductionCo xi downgraded_co `mkRedTrans` r) }
+             where
+               -- TODO: need to pay attention to roles here!
+               inert_role    = eqRelRole inert_eq_rel
+               downgraded_co = tcDowngradeRole role inert_role (mkTcSymCo co)
+                 -- downgraded_co :: xi ~r F xis
+         ; _ -> do { traceRewriteM "no matching inerts" (ppr r $$ ppr result2)
+                   ; pure r } }
+        }
+
+lookupFamAppInert_shallow :: Reduction -> TyCon -> [Type]
+                          -> RewriteM (Reduction, Maybe (TcCoercion, TcType, CtFlavourRole))
+lookupFamAppInert_shallow r0 tc tys0
+  = do { IS { inert_cans = IC { inert_funeqs = inert_funeqs } } <- liftTcS getTcSInerts
+       -- inert_funeqs :: FunEqMap EqualCtList = DTyConEnv (ListMap LooseTypeMap EqualCtList)
+       ; case lookupDTyConEnv inert_funeqs tc of
+           Just _tys_map ->
+             -- TODO: tys_map is a trie (ListMap LooseTypeMap EqualCtList)
+             -- need to lookup in it while shallow-rewriting...
+             -- for now we just deeply rewrite, but only when we know the TyCon
+             -- appears in at least one inert_funeq
+             -- TODO: is this heuristic worthwhile?
+             lookupFamAppInert_deep r0 tc tys0
+           Nothing -> pure (r0, Nothing)
+       }
+
+lookupFamAppInert_deep :: Reduction -> TyCon -> [Type]
+                          -> RewriteM (Reduction, Maybe (TcCoercion, TcType, CtFlavourRole))
+lookupFamAppInert_deep r0 tc tys0
+  = do { rs <- rewrite_args_deep (mkRedsRefl tys0)
+       ; result2 <- liftTcS $ lookupFamAppInert_hacked tc (reductionsTypes rs)
+       ; role <- getRole
+       ; pure (mkRedTyConAppTrans role tc rs r0, result2)
+       }
+
+rewrite_args_deep :: Reductions -> RewriteM Reductions
+rewrite_args_deep rs0
+ = do { (xis, cos, _mco) <- rewrite_args_fast (reductionsTypes rs0)  -- TODO: need to handle dependency
+      ; pure (listToReductions (zipWith mkReductionCo xis cos) `mkRedsTrans` rs0)
+      }
+
+-- TODO: lookupFamAppInert can yield a bottom constraint in the derived case
+-- (because of calling ctEvCoercion), so with our additional strictness we have
+-- to hack around it.
+lookupFamAppInert_hacked :: TyCon -> [Type] -> TcS (Maybe (TcCoercion, TcType, CtFlavourRole))
+lookupFamAppInert_hacked tc tys = do
+  mb <- lookupFamAppInert tc tys
+  pure $ case mb of
+           Just (_, ty, fr@(Derived, _)) -> Just (Refl (LitTy (NumTyLit 42)), ty, fr)
+           _                             -> mb
+
+
+
+-- TODO: not clear exactly what to do here. This currently tries to reduce the
+-- built-in family once, but if that fails, it reduces all the arguments to WHNF
+-- before trying again.  Is that enough? Do we have any lazy built-in families,
+-- or any that require their arguments to be evaluated beyond WHNF?
+rewrite_exact_fam_app_builtin :: Reduction -> TyCon -> [Type] -> BuiltInSynFamily
+                              -> RewriteM Reduction
+rewrite_exact_fam_app_builtin r0 tc tys0 builtin_family =
+    case sfMatchFam builtin_family tys0 of
+        Just x  -> hit x r0
+        Nothing -> do rs <- listToReductions <$> mapM (rewrite_one_shallow . mkRedRefl) tys0 -- TODO: dependency not handled properly here
+                      role <- getRole
+                      let tys = reductionsTypes rs
+                      let r1 = mkRedTyConAppTrans role tc rs r0
+                      case sfMatchFam builtin_family tys of
+                        Just r  -> hit r r1
+                        Nothing -> rewrite_exact_fam_app_inerts r1 tc tys
+
+  where
+    hit :: (CoAxiomRule, [Type], Type) -> Reduction -> RewriteM Reduction
+    hit (coax,ts,new_ty) r = do
+        -- TODO: settle whether to use StepsProv
+        let !co = mkTcSymCo (mkAxiomRuleCo coax (zipWith mkReflCo (coaxrAsmpRoles coax) ts))
+        -- let !co = UnivCo (StepsProv 0 1) Nominal new_ty $! reductionType r
+        bumpDepth $ rewrite_one_shallow (mkReductionCo new_ty co `mkRedTrans` r)
+
+
+rewrite_exact_fam_app_open :: Reduction -> TyCon -> [Type] -> RewriteM Reduction
+rewrite_exact_fam_app_open r0 tc tys0
+  = do { fam_insts <- liftTcS getFamInstEnvs
+       ; let fis = lookupFamInstEnvByTyCon fam_insts tc
+       ; go fis (mkRedsRefl tys0)
+       }
+  where
+    -- TODO: would be nice to use a trie here rather than a list? #19703
+    go :: [FamInst] -> Reductions -> RewriteM Reduction
+    go []       tycos = stuck_fam_app r0 tc tycos
+    go (fi:fis) tycos = do
+      let tys = reductionsTypes tycos
+      -- TODO: avoid re-calculating this InScopeSet
+      let in_scope = mkInScopeSet (unionVarSets [mkVarSet (fi_tvs fi), mkVarSet (fi_cvs fi), tyCoVarsOfTypes tys])
+      let subst0 = mkEmptyTCvSubst in_scope
+      (rs, res) <- match_list subst0 (fi_tys fi) tys
+      let tycos' = rs `mkRedsTrans` tycos
+      case res of
+        MatchingSuccess subst -> hit fi subst tycos'
+        MatchingApart         -> go fis tycos'
+        MatchingStuck _       -> go fis tycos'
+
+    hit fi subst tycos' = do
+          let new_ty = substTy subst (fi_rhs fi)
+          -- TODO: looks like we can end up retaining lots of thunks here...
+          -- but may not want to force all the work if we're just going to throw away the coercion?
+          let co = mkSymCo $ mkUnbranchedAxInstCo Nominal (fi_axiom fi) (substTyVars subst (fi_tvs fi)) (substCoVars subst (fi_cvs fi))
+          -- TODO: using a StepsProv avoids the thunk leak, but (a) isn't linted properly
+          -- and (b) seemingly leads to more Core Lint errors?
+          -- let co = UnivCo (StepsProv 0 1) Nominal new_ty $! mkTyConApp tc (reductionsTypes tycos')
+          let !r = mkReductionCo new_ty co `mkRedTrans` mkRedTyConAppTrans Nominal tc tycos' r0
+          bumpDepth $ rewrite_one_shallow r
+
+stuck_fam_app :: Reduction -> TyCon -> Reductions -> RewriteM Reduction
+stuck_fam_app r0 tc tycos = rewrite_exact_fam_app_inerts r tc (reductionsTypes tycos)
+  where
+    r = mkRedTyConAppTrans Nominal tc tycos r0
+
+rewrite_exact_fam_app_closed :: Reduction -> TyCon -> [Type] -> CoAxiom Branched -> RewriteM Reduction
+rewrite_exact_fam_app_closed r0 tc tys0 axiom
+  = go (assocs (unMkBranches (coAxiomBranches axiom))) (mkRedsRefl tys0) []
+  where
+    go :: [(BranchIndex, CoAxBranch)] -> Reductions -> [CoAxBranch] -> RewriteM Reduction
+    go [] tycos _ = stuck_fam_app r0 tc tycos
+    go ((index, branch) : branches) tycos stuck_branches = do
+        let tys = reductionsTypes tycos
+        let in_scope = mkInScopeSet (unionVarSets [mkVarSet (cab_tvs branch), mkVarSet (cab_cvs branch), tyCoVarsOfTypes tys])
+        let subst0 = mkEmptyTCvSubst in_scope
+        (r, res) <- match_list subst0 (cab_lhs branch) tys
+        let tycos' = r `mkRedsTrans` tycos
+        case res of
+            MatchingSuccess subst -> candidate_match index branch branches tycos' stuck_branches subst
+            MatchingApart         -> go branches tycos' stuck_branches
+            MatchingStuck _       -> go branches tycos' (branch:stuck_branches)
+
+    -- We have found a match with one of the branches, but we have to check it
+    -- is apart from any preceding stuck branches.
+    -- TODO: this is awkward...  if we make more progress, it changes the subst!
+    -- e.g. we see K a G matches K x y = y with [y := G] but then we need to
+    -- reduce G to see it is apart from the first equation, so we need the
+    -- substitution [y := Int]!  At the moment we just re-run the match, which
+    -- should succeed without further reductions, but might do unnecessary
+    -- (equalise) work.
+    candidate_match index branch branches tycos' stuck_branches subst = do
+        (mb, apart) <- apartness_check tycos' branch stuck_branches
+        let tycos'' = fromMaybe tycos' mb
+        if apart then (if isJust mb
+                       then do let tys = reductionsTypes tycos''
+                               let in_scope = mkInScopeSet (unionVarSets [mkVarSet (cab_tvs branch), mkVarSet (cab_cvs branch), tyCoVarsOfTypes tys])
+                               let subst0 = mkEmptyTCvSubst in_scope
+                               (_, res) <- match_list subst0 (cab_lhs branch) tys
+                               case res of
+                                 MatchingSuccess subst' -> hit index branch subst' tycos''
+                                 _ -> pprPanic "oh dear" (ppr res)
+                       else hit index branch subst tycos''
+                      )
+                 else go branches tycos'' (branch:stuck_branches)
+          -- See Note [Look past successful-but-stuck matches]
+
+    hit index branch subst tycos' = do
+        let new_ty = substTy subst (cab_rhs branch)
+        -- TODO: again there is a risk of a thunk leak in the AxiomInstCo
+        -- TODO: not clear if these args are correct, or if we can use a smart constructor of AxiomInstCo
+        let args = map mkNomReflCo $ substTyVars subst (cab_tvs branch) ++ substTyVars subst (cab_cvs branch)
+        let co = mkTcSymCo (AxiomInstCo axiom index args)
+        -- let co = UnivCo (StepsProv 0 1) Nominal new_ty $! mkTyConApp tc tys
+        let r = mkReductionCo new_ty co `mkRedTrans` mkRedTyConAppTrans Nominal tc tycos' r0
+        bumpDepth $ rewrite_one_shallow r
+
+
+-- | Given the current arguments, a matching branch, and a list of preceding
+-- stuck branches, test whether the arguments are definitely apart from all the
+-- preceding branches.  This may need to do further rewriting of the arguments.
+--
+-- See Note [Shallow rewriting: getting stuck] and
+-- Note [Shallow rewriting: getting unstuck]
+--
+-- TODO: we currently deeply rewrite the arguments, then do the core-flattened
+-- apartness check.  It would be nicer if we had a unifier capable of rewriting,
+-- that could test apartness while doing rewriting on the fly as needed.
+--
+-- TODO: perhaps we should first try using match_list with a flag indicating it
+-- should try hard to discover apartness? Then only if it is still stuck do we
+-- need to fall back on the old check.
+--
+-- TODO: Once we have deeply rewritten, it would be nice to remember this fact
+-- so we don't try to rewrite any more until there is new information?
+--
+apartness_check :: Reductions -> CoAxBranch -> [CoAxBranch] -> RewriteM (Maybe Reductions, Bool)
+apartness_check tycos branch stuck_branches
+  | not any_stuck_incomps = pure (Nothing, True)
+  | otherwise
+  = do { tycos' <- rewrite_args_deep tycos
+       ; let flattened_target = Unify.flattenTys in_scope (reductionsTypes tycos')
+       ; let ok = apartnessCheck flattened_target branch
+       ; traceRewriteM "apartness_check"
+           (ppr tycos' $$ ppr flattened_target $$ ppr ok $$ ppr branch $$ ppr stuck_branches)
+       ; pure (Just tycos', ok)
+       }
+  where
+    -- TODO: change CoAxBranch/cab_incomps to contain branch indices, so we can test this more easily;
+    -- this may be wrong if there are any UnhelpfulSpans
+    any_stuck_incomps = any (`elem` map cab_loc stuck_branches) (map cab_loc (cab_incomps branch))
+    incomps  = cab_incomps branch
+    in_scope = mkInScopeSet (unionVarSets $ map (tyCoVarsOfTypes . coAxBranchLHS) incomps)
+
+
+
+symMCo :: MCoercion -> MCoercion
+symMCo MRefl = MRefl
+symMCo (MCo co) = MCo (mkSymCo co)
+
+transMCo :: MCoercion -> MCoercion -> MCoercion
+transMCo MRefl !co = co
+transMCo co MRefl = co
+transMCo (MCo co1) (MCo co2) = MCo (co1 `transCo` co2)
+
+-- | Create a new 'Coercion' by composing the two given 'Coercion's transitively.
+--   (co1 ; co2)
+transCo :: Coercion -> Coercion -> Coercion
+transCo !co1 !co2 = mkTcTransCo co1 co2
+
+{-
+-- Like mkTcTransCo, but tries to be clever about squashing UnivCo.
+-- This means we can avoid accumulating big structures when we get
+-- lots of top-level type family reductions.
+-- Currently disabled because StepsProv isn't properly linted.
+transCo co1 co2 | isReflCo co1 = co2
+                | isReflCo co2 = co1
+transCo co1 co2
+  | Just (Pair m1 n1) <- isSteps_maybe co1
+  , Just (Pair m2 n2) <- isSteps_maybe co2
+  , let !prov | n1 > m2   = StepsProv m1 (n2 + (n1 - m2))  -- TODO: check arithmetic
+              | otherwise = StepsProv (m1 + (m2 - n1)) n2
+        !lty = coercionLKind co1
+        !rty = coercionRKind co2
+  = UnivCo prov Nominal lty rty
+transCo (GRefl r t1 (MCo co1)) (GRefl _ _ (MCo co2))
+  = GRefl r t1 (MCo $ transCo co1 co2)
+transCo co1 co2  = TransCo co1 co2
+
+isSteps_maybe :: Coercion -> Maybe (Pair Int)
+isSteps_maybe (SymCo co) = swap <$> isSteps_maybe co
+isSteps_maybe (AxiomInstCo{}) = Just (Pair 1 0)
+isSteps_maybe (AxiomRuleCo{}) = Just (Pair 1 0)
+isSteps_maybe (UnivCo (StepsProv m n) _ _ _) = Just (Pair m n)
+isSteps_maybe _ = Nothing
+-}
+
+
+{-
+
+if match_type subst0 pat_ty target_ty = (Just (target_ty', co), res)
+then co :: target_ty' ~ target_ty
+
+if match_type subst0 pat_ty target_ty = (Nothing, res)
+then take target_ty' = target_ty, co = Refl in the following.
+
+
+if res is MatchingSuccess subst1, then subst1 is a most general substitution
+extending subst0 such that subst1(pat_ty) `eqType` target_ty'.
+
+if res is MatchingStuck subst1, then subst1 is a substitution extending subst0
+such that: if unif_subst is a unifying substitution extending subst0
+(i.e. unif_subst pat_ty ~ unif_subst target_ty') then unif_subst must factor
+through subst1.
+
+if res is MatchingApart, then there is no unifying substitution unif_subst such
+that unif_subst pat_ty ~ unif_subst target_ty'.
+
+
+match_type tries to match (or unify) a pattern against a target.  If the target
+is not in WHNF and the pattern forces it, it will try to rewrite the target.
+Alongside the result of matching, returns a (rewritten target, co :: rewritten
+target ~ original target) pair if it made any progress with rewriting.
+
+If this gets stuck, we know that rewriting the target further can't help.
+
+When matching a list of arguments, if we get stuck in one argument, we check the
+other arguments just in case one of them is obviously apart.  For example given
+
+type family F x y where
+  F True False = True
+  F _    True  = False
+
+If we see `F alpha True` we want to observe that the first equation is apart, so
+that we go on to try the second equation.
+
+-}
+
+
+data Reduction = Reduction { reductionType :: !Type, reductionMCoercion :: !MCoercion }
+
+instance Outputable Reduction where
+  ppr r = ppr (reductionType r) $$ ppr (reductionMCoercion r)
+
+mkReduction :: Type -> MCoercion -> Reduction
+mkReduction = Reduction
+
+mkReductionCo :: Type -> Coercion -> Reduction
+mkReductionCo ty !co = Reduction ty (MCo co)
+
+mkRedRefl :: Type -> Reduction
+mkRedRefl ty = mkReduction ty MRefl
+
+mkRedTrans :: Reduction -> Reduction -> Reduction
+mkRedTrans r1 r2 = mkReduction (reductionType r1) (reductionMCoercion r1 `transMCo` reductionMCoercion r2)
+
+mkRedApp :: Type -> Reduction -> Reduction -> Reduction
+mkRedApp ty0 r1 r2
+  | isReduced r1 || isReduced r2 = mkReductionCo (mkAppTy (reductionType r1) (reductionType r2))
+                                                 (mkAppCo (reductionCoercion r1) (reductionCoercion r2))
+  | otherwise                    = mkRedRefl ty0
+
+mkRedApps :: Type -> Reduction -> Reductions -> Reduction
+mkRedApps ty0 r1 rs
+  | isReduced r1 || anyReduced rs = mkReductionCo (mkAppTys (reductionType r1) tys)
+                                                  (mkAppCos (reductionCoercion r1) cos)
+  | otherwise = mkRedRefl ty0
+  where
+    (tys, cos) = splitReductions rs
+
+-- | mkRedAppTrans co1 co2 co0 = (co1 co2 ; co0)
+mkRedAppTrans :: Reduction -> Reduction -> Reduction -> Reduction
+mkRedAppTrans r1 r2 r0 = mkRedApp (reductionType r0) r1 r2 `mkRedTrans` r0
+
+mkRedAppsTrans :: Reduction -> Reductions -> Reduction -> Reduction
+mkRedAppsTrans r1 rs r0 = mkRedApps (reductionType r0) r1 rs `mkRedTrans` r0
+
+
+mkRedTyConApp :: Type -> Role -> TyCon -> Reductions -> Reduction
+mkRedTyConApp ty0 role tc reds
+  | anyReduced reds = mkReductionCo (mkTyConApp tc tys) (mkTyConAppCo role tc cos)
+  | otherwise       = mkRedRefl ty0
+  where
+    (tys, cos) = splitReductions reds
+
+-- | mkRedTyConAppTrans role TC cos co0 = (TC cos ; co0)
+mkRedTyConAppTrans :: Role -> TyCon -> Reductions -> Reduction -> Reduction
+mkRedTyConAppTrans role tc rs r0 = mkRedTyConApp (reductionType r0) role tc rs `mkRedTrans` r0
+
+isReduced :: Reduction -> Bool
+isReduced r = case reductionMCoercion r of
+                MRefl -> False
+                MCo{} -> True
+
+reductionCoercion :: Reduction -> Coercion
+reductionCoercion (Reduction ty MRefl)   = mkNomReflCo ty
+reductionCoercion (Reduction _ (MCo co)) = co
+
+splitReduction :: Reduction -> (Type, Coercion)
+splitReduction r = (reductionType r, reductionCoercion r)
+
+rewriterViewReduction :: Reduction -> Maybe Reduction
+rewriterViewReduction (Reduction ty mco) = (\ty' -> Reduction ty' mco) <$> rewriterView ty
+
+-- | Given a reduction that uses nominal equality, downgrade it if necessary to
+-- match the provided equality relation.
+downgradeReduction :: EqRel -> Reduction -> Reduction
+downgradeReduction _      r@(Reduction _ MRefl)   = r
+downgradeReduction eq_rel (Reduction ty (MCo co)) = Reduction ty (MCo co')
+  where
+    co' = case eq_rel of
+            NomEq  -> co
+            ReprEq -> mkSubCo co
+
+
+-- | A 'Reductions' is morally isomorphic to a list of 'Reduction', but with
+-- special case treatment when we know there has been no progress so all the
+-- types are reflexive.
+--
+-- We do *not* currently maintain the invariant that in the case where we
+-- actually store a list of 'Reduction' values, at least one is irreflexive.
+data Reductions = Reductions [Reduction]
+                | ReductionsRefl [Type]
+
+instance Outputable Reductions where
+  ppr (Reductions rs)      = text "Reductions" <+> ppr rs
+  ppr (ReductionsRefl tys) = text "ReductionsRefl" <+> ppr tys
+
+emptyReductions :: Reductions
+emptyReductions = ReductionsRefl []
+
+reductionsList :: Reductions -> [Reduction]
+reductionsList (Reductions rs) = rs
+reductionsList (ReductionsRefl tys) = map mkRedRefl tys
+
+listToReductions :: [Reduction] -> Reductions
+listToReductions = Reductions -- TODO: should we check invariant that there is some progress?
+
+anyReduced :: Reductions -> Bool
+anyReduced ReductionsRefl{} = False
+anyReduced (Reductions rs) = any isReduced rs -- TODO: maintain invariant that something is reduced?
+
+reductionsTypes :: Reductions -> [Type]
+reductionsTypes (ReductionsRefl tys) = tys
+reductionsTypes (Reductions rs)      = map reductionType rs
+
+splitReductions :: Reductions -> ([Type], [Coercion])
+splitReductions (ReductionsRefl tys) = (tys, map mkNomReflCo tys)
+splitReductions (Reductions rs)      = unzip (map splitReduction rs)
+
+mkRedsRefl :: [Type] -> Reductions
+mkRedsRefl = ReductionsRefl
+
+mkRedsTrans :: Reductions -> Reductions -> Reductions
+mkRedsTrans ReductionsRefl{} rs = rs
+mkRedsTrans rs ReductionsRefl{} = rs
+mkRedsTrans (Reductions rs1) (Reductions rs2) = Reductions (zipWith mkRedTrans rs1 rs2)
+
+type ReversedReductions = Reductions
+
+revApp :: [a] -> [a] -> [a]
+revApp []     ys = ys
+revApp (x:xs) ys = revApp xs (x:ys)
+
+consReductions :: Reduction -> Reductions -> Reductions
+consReductions (Reduction ty MRefl) (ReductionsRefl tys) = ReductionsRefl (ty:tys)
+consReductions r rs = Reductions (r : reductionsList rs)
+
+revAppConsReductions :: ReversedReductions -> Reduction -> [Type] -> Reductions
+revAppConsReductions (ReductionsRefl tys0) (Reduction ty MRefl) tys = ReductionsRefl (tys0 `revApp` (ty:tys))
+revAppConsReductions rs r tys = Reductions ((r : reductionsList rs) `revApp` map mkRedRefl tys)
+
+reverseReductions :: ReversedReductions -> Reductions
+reverseReductions (ReductionsRefl tys) = ReductionsRefl (reverse tys)
+reverseReductions (Reductions rs) = Reductions (reverse rs)
+
+
+data MatchingResult = MatchingSuccess !TCvSubst
+                    | MatchingStuck !TCvSubst
+                    | MatchingApart
+
+instance Outputable MatchingResult where
+  ppr (MatchingSuccess subst) = text "MatchingSuccess" <+> ppr subst
+  ppr (MatchingStuck subst)   = text "MatchingStuck" <+> ppr subst
+  ppr MatchingApart           = text "MatchingApart"
+
+
+-- TODO: consider using (Type, MCoercion) instead of Maybe (Type, Coercion)
+-- here... but what would that look like for match_list?
+match_type :: TCvSubst -> Type -> Type -> RewriteM (Reduction, MatchingResult)
+match_type subst pat_ty target_ty
+--  | pprTrace "match_type" (ppr pat_ty $$ ppr target_ty $$ ppr subst) False = undefined
+
+  | Just pat_ty' <- tcView pat_ty
+  = match_type subst pat_ty' target_ty
+
+  -- binding a variable in a pattern, no need to reduce the target
+  | TyVarTy v <- pat_ty
+  , Nothing <- lookupTyVar subst v
+  = pure (mkRedRefl target_ty, MatchingSuccess (extendTvSubst subst v target_ty))
+
+  -- binding a non-linear occurrence of a variable in a pattern, need to
+  -- equalise both sides
+  | TyVarTy v <- pat_ty
+  , Just x_ty <- lookupTyVar subst v
+  = do (p1, p2, res) <- equalise_type (mkRedRefl x_ty) (mkRedRefl target_ty)
+       -- See Note [Shallow rewriting: non-linear patterns: forgetting work]
+       -- for why this is a bit unsatisfactory
+       pure $ case res of
+         EqualiseSuccess -> let co = mkReduction x_ty (symMCo (reductionMCoercion p1) `transMCo` reductionMCoercion p2)
+                            in (co, MatchingSuccess subst)
+         EqualiseApart   -> (p2, MatchingApart)
+         EqualiseStuck   -> (p2, MatchingStuck subst)
+
+  | CastTy pat_ty' g <- pat_ty
+  = do traceRewriteM "dodgy matching CastTy" (ppr pat_ty' $$ ppr target_ty)
+       (r, res) <- match_type subst pat_ty' target_ty -- TODO: ignoring co can't be right! Do we need to pass it around?
+       let r' | isReduced r = mkReductionCo (mkCastTy (reductionType r) g)
+                                            (castCoercionKind1 (reductionCoercion r) Nominal (reductionType r) pat_ty' g)
+                              -- TODO: needs thinking
+              | otherwise   = mkRedRefl target_ty
+       pure (r', res)
+
+   -- pattern is not a variable, so rewrite the target to WHNF and continue
+  | otherwise
+  = do r <- rewrite_one_shallow (mkRedRefl target_ty)
+       match_type_2 subst pat_ty r
+
+-- pat_ty is not a type variable or synonym;
+-- target_ty has been rewritten to WHNF
+match_type_2 :: TCvSubst -> Type -> Reduction -> RewriteM (Reduction, MatchingResult)
+match_type_2 subst pat_ty target_r
+  | Just target_ty' <- tcView target_ty
+  = match_type_2 subst pat_ty (mkReduction target_ty' (reductionMCoercion target_r))
+
+  | LitTy x <- pat_ty
+  , LitTy y <- target_ty
+  = pure (target_r, if x == y then MatchingSuccess subst else MatchingApart)
+
+  -- TODO: TyConApp vs AppTy handle better?
+  -- Do we need that at least one is an AppTy?
+  | AppTy p_head p_arg <- pat_ty
+  , Just (a_head, a_arg) <- tcRepSplitAppTy_maybe target_ty
+  = match_app subst target_r p_head p_arg a_head a_arg
+
+  | Just (p_head, p_arg) <- tcRepSplitAppTy_maybe pat_ty
+  , AppTy a_head a_arg <- target_ty
+  = match_app subst target_r p_head p_arg a_head a_arg
+
+  -- pattern and target have the same head constructor, match the sub-patterns
+  | Just (p_tc, p_args) <- tcSplitTyConApp_maybe pat_ty
+  , Just (a_tc, a_args) <- tcSplitTyConApp_maybe target_ty
+  , p_tc == a_tc
+  = ASSERT( not (isTypeFamilyTyCon p_tc) )
+    do (rs, res) <- match_list subst p_args a_args
+       pure (mkRedTyConAppTrans Nominal a_tc rs target_r, res)
+
+  -- pattern and target have disjoint head constructors, we are surely apart!
+  | isWHNF pat_ty, isWHNF target_ty
+  = pure (target_r, MatchingApart)
+
+  -- target has already been rewritten, so if it doesn't have the same shape as
+  -- the pattern, we are stuck.
+  | otherwise = pure (target_r, MatchingStuck subst)
+  where
+    target_ty = reductionType target_r
+
+
+match_app :: TCvSubst -> Reduction -> Type -> Type -> Type -> Type -> RewriteM (Reduction, MatchingResult)
+match_app subst target_r p_head p_arg a_head a_arg
+  = do (rs, res) <- match_list subst [p_head,p_arg] [a_head,a_arg]
+       case reductionsList rs of
+         [r1,r2] -> pure (mkRedAppTrans r1 r2 target_r, res)
+         _       -> pprPanic "match_app" (ppr rs)
+
+
+match_list :: TCvSubst -> [Type] -> [Type] -> RewriteM (Reductions, MatchingResult)
+match_list = go emptyReductions
+  where
+    go :: ReversedReductions -> TCvSubst -> [Type] -> [Type]
+       -> RewriteM (Reductions, MatchingResult)
+    go acc subst [] [] = pure (reverseReductions acc, MatchingSuccess subst)
+    go acc subst (pat_ty:pat_tys) (target_ty:target_tys)
+      = do (target_ty', res) <- match_type subst pat_ty target_ty
+           case res of
+              MatchingSuccess subst' -> go (consReductions target_ty' acc) subst' pat_tys target_tys
+              MatchingApart          -> pure (revAppConsReductions acc target_ty' target_tys, res)
+              MatchingStuck _subst   -> pure (revAppConsReductions acc target_ty' target_tys, res)
+                -- See Note [Shallow rewriting: getting stuck] for why we stop here
+
+    -- TODO: I think mismatched list lengths can happen only if two earlier
+    -- arguments were apart?
+    go acc subst pat_tys target_tys
+      = pprPanic "match_list: mismatched lengths"
+                 (ppr acc $$ ppr subst $$ ppr pat_tys $$ ppr target_tys)
+
+
+data EqualiseResult = EqualiseSuccess  -- Rewritten types must be eqType
+                    | EqualiseStuck
+                    | EqualiseApart
+
+
+equalise_AppTy :: Reduction
+               -> Type
+               -> Type
+               -> Reduction
+               -> Type
+               -> Type
+               -> RewriteM (Reduction, Reduction, EqualiseResult)
+equalise_AppTy p1 h1 a1 p2 h2 a2
+  = do (xs, ys, res) <- equalise_list [h1,a1] [h2,a2]
+       case (reductionsList xs, reductionsList ys) of
+         ([rh1,ra1], [rh2,ra2]) -> pure ( mkRedAppTrans rh1 ra1 p1
+                                        , mkRedAppTrans rh2 ra2 p2
+                                        , res
+                                        )
+         _ -> pprPanic "equalise_type:AppTy" (ppr xs $$ ppr ys)
+
+
+
+-- See Note [equalise_type]
+-- TODO: not clear there is any point taking Reductions as input.
+equalise_type :: Reduction -> Reduction -> RewriteM (Reduction, Reduction, EqualiseResult)
+equalise_type r1 r2
+--  | pprTrace "equalise_type" (ppr r1 $$ ppr r2) False = undefined
+
+  | reductionType r1 `eqType` reductionType r2 = pure (r1, r2, EqualiseSuccess)
+
+  | otherwise = do { r1' <- rewrite_one_shallow r1
+                   ; r2' <- rewrite_one_shallow r2
+                   ; equalise_type_2 r1' r2'
+                   }
+
+equalise_type_2 :: Reduction -> Reduction -> RewriteM (Reduction, Reduction, EqualiseResult)
+equalise_type_2 p1 p2
+  -- equalising two literals, they are either identical or apart
+  | LitTy x <- ty1
+  , LitTy y <- ty2
+  = pure (p1, p2, if x == y then EqualiseSuccess else EqualiseApart)
+
+  -- TODO: TyConApp vs AppTy handle better?
+  -- Do we need that at least one is an AppTy?
+  | AppTy h1 a1 <- ty1
+  , Just (h2, a2) <- tcRepSplitAppTy_maybe ty2
+  = equalise_AppTy p1 h1 a1 p2 h2 a2
+
+  | AppTy h2 a2 <- ty2
+  , Just (h1, a1) <- tcRepSplitAppTy_maybe ty1
+  = equalise_AppTy p1 h1 a1 p2 h2 a2
+
+  -- both sides have the same head constructor, match the sub-patterns
+  | Just (tc1, args1) <- tcSplitTyConApp_maybe ty1
+  , Just (tc2, args2) <- tcSplitTyConApp_maybe ty2
+  , tc1 == tc2
+  , not (isTypeFamilyTyCon tc1)
+  = do (mb1, mb2, res) <- equalise_list args1 args2
+       pure ( mkRedTyConAppTrans Nominal tc1 mb1 p1
+            , mkRedTyConAppTrans Nominal tc2 mb2 p2
+            , res )
+
+  -- both sides are headed by the same type family, and we have already
+  -- rewritten, so the applications must be stuck: if the arguments are equal we
+  -- are done, but if they are apart the type families may still reduce to equal
+  -- results...
+  | Just (tc1, args1) <- tcSplitTyConApp_maybe ty1
+  , Just (tc2, args2) <- tcSplitTyConApp_maybe ty2
+  , tc1 == tc2
+  , isTypeFamilyTyCon tc1
+  = do { (rs1, rs2, res) <- equalise_list args1 args2
+       -- TODO: in this case can we rely on the fact that if rewriting
+       -- produces a stuck type family application, it will be deeply
+       -- rewritten?  If so we could just check eqTypes rather than
+       -- calling equalise_list.
+       ; let res' = case res of
+                      EqualiseSuccess -> EqualiseSuccess
+                      EqualiseApart   -> EqualiseStuck
+                      EqualiseStuck   -> EqualiseStuck
+       ; pure ( mkRedTyConAppTrans Nominal tc1 rs1 p1
+              , mkRedTyConAppTrans Nominal tc2 rs2 p2
+              , res' )
+       }
+
+  -- equalising two equal variables, nothing to do
+  | TyVarTy x <- ty1
+  , TyVarTy y <- ty2
+  , x == y
+  = pure (p1, p2, EqualiseSuccess)
+
+  | isWHNF ty1 && isWHNF ty2
+  = pure (p1, p2, EqualiseApart)
+
+  | otherwise = pure (p1, p2, EqualiseStuck)
+  where
+    ty1 = reductionType p1
+    ty2 = reductionType p2
+
+equalise_list :: [Type] -> [Type] -> RewriteM (Reductions, Reductions, EqualiseResult)
+equalise_list = go emptyReductions emptyReductions
+  where
+    go :: ReversedReductions -> ReversedReductions -> [Type] -> [Type]
+       -> RewriteM (Reductions, Reductions, EqualiseResult)
+    go acc1 acc2 [] [] = pure (reverseReductions acc1, reverseReductions acc2, EqualiseSuccess)
+    go acc1 acc2 (ty1:tys1) (ty2:tys2)
+      = do (p1, p2, res) <- equalise_type (mkRedRefl ty1) (mkRedRefl ty2)
+           case res of
+              EqualiseSuccess -> go (consReductions p1 acc1) (consReductions p2 acc2) tys1 tys2
+              EqualiseApart   -> pure ( revAppConsReductions acc1 p1 tys1
+                                      , revAppConsReductions acc2 p2 tys2
+                                      , EqualiseApart)
+              EqualiseStuck   -> pure ( revAppConsReductions acc1 p1 tys1
+                                      , revAppConsReductions acc2 p2 tys2
+                                      , EqualiseStuck )
+              -- See Note [Shallow rewriting: getting stuck] for why we don't continue here
+
+    -- TODO: I think mismatched list lengths can happen only if two earlier
+    -- arguments were apart?
+    go acc1 acc2 tys1 tys2
+      = pprPanic "equalise_list: mismatched lengths"
+                 (ppr acc1 $$ ppr acc2 $$ ppr tys1 $$ ppr tys2)
+
+
+
+isWHNF :: TcType -> Bool
+isWHNF t | Just t' <- tcView t = isWHNF t'
+isWHNF TyVarTy{}       = False
+isWHNF AppTy{}         = True
+isWHNF (TyConApp tc _) = not (isTypeFamilyTyCon tc)
+isWHNF ForAllTy{}      = True
+isWHNF FunTy{}         = True
+isWHNF LitTy{}         = True
+isWHNF (CastTy ty _)   = isWHNF ty -- TODO ??
+isWHNF (CoercionTy _)  = True
+
+
+{-
+
+Note [Shallow rewriting]
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+Previously the rewriter satisfied the following specification:
+
+  rewrite ty  ==>   (xi, co)
+    where
+      xi has no reducible type functions
+         has no skolems that are mapped in the inert set
+         has no filled-in metavariables
+      co :: xi ~ ty
+
+Crucially, xi has been rewritten as much as possible, i.e. it contains no type
+family applications that can be reduced. We call this "deep rewriting".
+
+However, in most contexts where we use rewriting it is enough to do less work,
+merely making sure that the head of the type is fully rewritten.  Thus we aim to
+define:
+
+  rewrite_shallow ty ==> (ty', co)
+    where
+      ty' is not headed by a reducible type function
+                        or a skolem that is mapped in the inert set
+                        or a filled-in metavariable
+      co :: ty' ~ ty
+
+Shallow rewriting produces a WHNF if possible, but it may also result in a type
+family application that cannot be further reduced, or in a skolem or
+metavariable about which we have no information.
+
+TODO: need to specify what a WHNF is. In particular, is an AppTy in WHNF?
+Arguably yes (at least for type family reduction purposes), but perhaps
+rewriting the function will produce a TyConApp, which might make a difference to
+code that analyses the result of rewriting.
+
+In particular, we try to rewrite arguments to type function applications only if
+they are needed in order to reduce the type function.  Unfortunately defining
+when precisely an argument is demanded is a bit subtle.
+
+For example, suppose we have the following definitions:
+
+  type family F a where
+    F Int = Char
+    F a   = a
+
+  type family G b
+
+Then we have the following examples:
+
+     input type         rewrite         rewrite_shallow
+   ------------------|---------------|--------------------
+     F Int           |  Char         |  Char
+     G (F Int)       |  G Char       |  G (F Int)
+     F (Int, F Int)  |  (Int, Char)  |  (Int, F Int)
+
+Why do this? Because deep rewriting can end up doing (perhaps infinitely) more
+work than shallow rewriting.  For example:
+
+  type family If b then_ else_ where
+    If True then_ else_ = then_
+    If False then_ else_ = else_
+
+  type family x == y where
+    x == x = True
+    _ == _ = False
+
+  type family Loop where
+    Loop = Loop
+
+  foo :: proxy x -> If x () Loop
+  foo _ = undefined
+
+  bar :: proxy x -> If x () Loop
+  bar _ = () -- type error
+
+If we try to deeply rewrite the type `If x () Loop`, we will end up rewriting
+`Loop` and hence failing to terminate (or, in practice, running into the
+`-freduction-depth` bound).  In contrast, shallow rewriting gives `If x () Loop`
+so the definition of `foo` is accepted, while the definition of `bar` is
+correctly rejected because `If x () Loop` does not match `()`.
+
+(TODO: currently we get a loop in this case because we try deeply rewriting
+stuck applications in case there is a useful Given. Probably we need to check
+for matching Givens more lazily.)
+
+From an implementation of rewrite_shallow, it is easy to implement (deep)
+rewrite on top of it: call rewrite_shallow on the type, then recursively call it
+on the subterms of the result.  (Although currently rewrite_one and
+rewrite_one_shallow are independent.)
+
+
+Note [Shallow rewriting for type families]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The interesting case of shallow rewriting is for type family applications,
+implemented by rewrite_exact_fam_app_shallow.  This performs the stack depth
+check (see Note [Shallow rewriting: stack depth check]) then calls a suitable
+implementation depending on whether the family is closed, open or built-in.  We
+will discuss closed families here.
+
+For example:
+
+  type family F a b where
+    F Int Bool = Char
+    F a   b    = b
+
+How do we rewrite `F (F Int Int) Bool`?  For the outermost type family
+application, rewrite_exact_fam_app_closed needs to decide which of the branches
+of the type family matches.  Thus match_list considers each branch in turn and
+tries to match the list of patterns (here [Int,Bool]) against the list of
+targets (here [F Int Int,Bool]).  Crucially, matching can directly call back
+into (shallow) rewriting, so it will call rewrite_one_shallow on `F Int Int` and
+get back Int, at which point the first branch matches and the outermost type
+family application reduces to Char.
+
+
+Note [Shallow rewriting: using the inerts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider:
+
+  type family F a
+
+  foo :: (F Int ~ Char) => F Int
+  foo = 'x'
+
+Type-checking the body of `foo` invokes the rewriter on `F Int`, which needs to
+make use of the given constraint `F Int ~ Char` in the inert set.
+
+In general, once we have tried rewriting a type family application using the
+top-level instances/branches, and established that it is stuck, we must check to
+see if any constraints in the inert set allow further rewrites.  This is
+implemented in rewrite_exact_fam_app_inerts.
+
+TODO: Currently, the inert_funeqs are stored deeply rewritten, and we deeply
+rewrite before carrying out this check.  We should do this more lazily.  (We
+could also establish an invariant that if shallow-rewriting a type family
+application gets stuck, the arguments will be deeply rewritten, which might be
+useful when handling non-linear patterns.  But it means we can't handle the
+example in Note [Shallow rewriting].)
+
+
+Note [Shallow rewriting: stack depth check]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In order to avoid infinite loops, we call checkStackDepth on each call to
+rewrite_exact_fam_app_shallow, and when we find a type family application that
+can be reduced (either via an axiom or using an inert) we call bumpDepth.  Note
+that we do not bump the depth when rewriting arguments of the original type
+family application to see if it can reduce; doing so seems unnecessary and led
+to T13386 requiring a yet higher stack depth to typecheck.
+
+In general rewrite_shallow should do fewer type family reductions than rewrite,
+and hence trigger the stack depth limit less often.  But because we may end up
+reducing in a different order, we may report slightly different errors when the
+depth limit is reached.
+
+TODO: think further about this.  Are there any cases where the old code would
+succeed but the new code will hit the limit?
+
+
+Note [Shallow rewriting and zonking]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Shallow rewriting is monadic, so it can zonk metavariables as it encounters them
+at the head. In general it will not produce a fully-zonked result.
+
+
+Note [Shallow rewriting: getting stuck]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A type family application may be stuck either because it involves a
+(meta)variable for which no further information is available, or because it
+doesn't match any of the (visible) branches.  For example:
+
+  type family F a b where
+    F Int Bool = Char
+    F a   b    = b
+
+  type family G b -- no equations
+
+If we see `F alpha beta` or `F (G Int) (G Bool)` we can't make any progress.
+
+However, if we see `F alpha Int` we know that the first branch cannot possibly
+match regardless of alpha, so it is safe to choose the second branch.
+
+We could have match_list and equalise_list continue looking past stuck matches,
+but set a flag so that if there are no further conflicts, the final result will
+be stuck rather than a definite match. But sometimes we do not care about the
+difference between stuck and surely apart results, so this seems like it could
+lead to unnecessary reductions, for example:
+
+  type family L a b where
+    L Char Int = True
+    L Bool z   = False
+
+  L Stuck Expensive  -- no point reducing Expensive here!
+
+Thus at the moment, we report stuck matches quickly (albeit imprecisely, because
+a "stuck" match might turn out to be surely apart), and we then do an apartness
+check subsequently.  The apartness check may need to do further reduction, for
+example if we have:
+
+  type family F a b where
+    F Int Bool = Char
+    F a   b    = b
+
+  type family Id x where
+    Id x = x
+
+  F Stuck (Id Int) -- second branch matches, then need to reduce second argument
+                   -- to see it is apart from first branch
+
+TODO: a difficulty with this is that if we rewrite the arguments further after
+matching produced a substitution, we need to replace occurrences in the matching
+substitution itself!  We currently hackily do this by invoking matching again,
+which should not need to do any rewriting and should simply produce a
+substitution.
+
+TODO: do we even need to distinguish MatchingApart from MatchingStuck?
+
+
+
+Note [Look past successful-but-stuck matches]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose a branch successfully matches, but there is a preceding incompatible
+branch that is not surely apart (but not a match either). Thus we cannot yet
+commit to the branch.  Do we need to consider subsequent branches, or is the
+entire application necessarily stuck?
+
+Consider:
+
+  type family F a b c d where
+    F () b c d = c
+    F a () c d = d
+    F a b  c c = c
+
+Suppose we are rewriting `F alpha () () ()`. Here the first branch is stuck,
+because `alpha` is not yet known to be equal to or apart from ().  The second
+branch matches, but it is incompatible with the first branch, so it is stuck
+too.  (Even though the first two branches would actually reduce to the same RHS,
+the compatibility check is static, so it does not take advantage of this fact.)
+However, the third branch matches *and* is compatible with both the preceding
+branches, so we are allowed to reduce using it.
+
+Thus we cannot give up after the second branch!
+
+
+Note [Shallow rewriting: getting unstuck]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The scheme described in Note [Shallow rewriting: getting stuck] doesn't quite
+deal with `F alpha alpha` or `F (G Int) (G Int)` which cannot possibly match the
+first equation, because we need to be rather clever to see that. See T8020 for
+an example.
+
+The old implementation of type family matching succeeds in this case by trying
+the second branch, discovering that it matches, then checking apartness from the
+first branch using core flattening. But that's a big hammer.
+
+At the moment, apartness_check deeply rewrites and then uses the core flattened
+apartness check, but we need a better approach.
+
+
+Note [Generalised substitutions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+TODO: we haven't yet tried out the following.  It seems like it will amount to
+implementing fine-grained unification/matching modulo rewriting?  We may want to
+do this in the future.
+
+See Definition [Generalised substitution] in GHC.Tc.Solver.Monad.
+
+Idea: what if matching accumulates a "generalised substitution" or (another way
+of describing the same thing) some "stuck constraints"?  (It will still reduce
+type families as it goes, but if it gets stuck, it will return the set of stuck
+constraints that are preventing progress.)
+
+  match_list () () [alpha, alpha] [Int, Bool]
+     match_type () () alpha Int  -- returns alpha ~?~ Int in the stuck constraints
+     match_type () (alpha ~?~ Int) alpha Bool -- tries to add alpha ~?~ Bool to stuck constraints,
+                                              -- but that is impossible so we get MatchingApart
+
+  match_list () () [alpha, alpha] [G Int, G Int]
+    ditto
+
+The matching substitution maps tyvars in the pattern to types from the target.
+
+The stuck constraints map stuck types (tyvars or tyfam apps) in the target to
+types which may bind variables from the pattern or the target (the latter
+arising from non-linear patterns).  I write `ty1 ~?~ ty2` for a stuck constraint
+that says `ty1` must be equal to `ty2` for the match to succeed.
+
+What about non-linearity?
+
+  type family F a b where
+    F [a] a = Int
+
+  F (G w) w
+
+  match_type () () [a] (G w)  -- returns (G w ~?~ [a]) stuck; doesn't bind a in subst?
+  match_type () (G w ~?~ [a]) a w -- returns a := w in subst
+  -- apply subst to stucks to get G w ~?~ [w]
+
+I don't think we can ever learn more about the stuck tyfam to make it reduce,
+because the subst never tells us about variables in the target, only in the
+pattern.  The stuck constraints say "these things need to hold for the matching
+to succeed" but we can't make them hold directly; they just might let us learn
+that the match cannot possibly work.
+
+What about equalising?
+
+  type family F a b c where
+    F [a] a a = Int
+
+  F (G w) Int w
+
+  match_type () () [a] (G w)  -- returns (G w ~?~ [a]) stuck; doesn't bind a in subst?
+  match_type () (G w ~?~ [a]) a Int -- returns a := Int in subst
+  -- apply subst to stuck constraints to get G w ~?~ [Int]
+  match_type (a := Int) (G w ~?~ [Int]) a w
+    -- calls equalise_type Int w
+    -- gets stuck with w ~?~ Int
+    -- conclusion: (a := Int) would be a matching substitution if we had (w ~?~ Int, G w ~?~ [Int])
+       but we can't fill in w here, because we haven't committed to this branch.
+    -- If we had some reason to commit to the branch, we could perhaps get more inference?
+    -- Or perhaps we might be able to see that G Int is apart from [Int] and hence
+    -- it can't possibly match?  GHC doesn't currently do this, but could it?
+
+So equalising also has to return stuck constraints, but that's okay.
+
+Here's an awkward example:
+
+  type family F a where
+    F Int = Char
+
+  type family K a b where
+    K Int Char = Bool
+    K x y = x
+
+  -- rewriting: K (F (F Int)) (F Char)
+
+Here we need to rewrite the nested `F Int` to see that both arguments are the
+same type family application, and hence the first branch cannot match.
+
+Here's a yet more twisted variant of the previous example:
+
+  {-# LANGUAGE TypeFamilyDependencies #-}
+
+  type family Inj a = r | r -> a
+
+  type family L a b where
+    L Bool Bool = Bool
+    L x y = x
+
+  -- rewriting: L (Inj Char) (Inj Bool)
+
+This will get stuck on `Inj Char ~?~ Bool, Inj Bool ~?~ Bool`.  But from the
+injectivity annotation, we know that these constraints can never be mutually
+satisfied.  So in principle it would be safe to report the first branch as apart
+and choose the second branch.  This isn't currently supported by GHC, however.
+
+Consider:
+
+  type family F a b where
+    F Int Char = Bool
+    F x y = y
+
+  type family H x where
+    H x = x
+
+  F (G x) (G (H x))
+
+ - The first branch gets stuck matching G x against Int.
+
+ - The second branch is a match, so we have to go back and check the preceding
+   branch is apart (after establishing that it is incompatible).
+
+ - The apartness check needs to construct a generalised substitution
+       G x     ~?~ Int
+       G (H x) ~?~ Char
+
+   When putting a stuck application in the generalised substitution, we need to
+   try to equalise it with the existing bindings (which might involve rewriting
+   either side).  If it is present already, we need to equalise the RHSs.
+
+
+Note [Unification modulo rewriting]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The "big hammer" we really want to solve the above problems is unification
+modulo rewriting.  That is, rewrite GHC.Core.Unify so that:
+
+ * It takes as input a function
+     rewrite_shallow :: CanEqLHS -> m (Maybe Reduction)
+   built from the FamInstEnv and the inert set.  This abstractly describes an input
+   generalised substitution.
+
+ * It carries around a generalised substitution (something like a [(CanEqLHS, Type)]).
+
+ * In the type family application cases, rather than returning `maybeApart
+   MARTypeFamily` it can try to rewrite the application and if it gets stuck,
+   extend the generalised substitution.  Thus it can report apartness more
+   precisely.
+
+ * It will need to be parameterised over a monad, so we can instantiate it to
+   something based on IO in order to zonk metavariables on the fly.
+
+ * Since it may rewrite the input types, it will need to return the rewritten
+   types and the coercions witnessing their equality to the inputs.
+
+TODO: explore the above further!
+
+
+
+Note [Shallow rewriting: problem with reducing type families during matching]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This is a problem with the idea of having matching reduce type families
+directly, potentially returning a generalised substitution (or set of stuck
+constraints), as described above. Consider:
+
+  type family F a b where
+    F Int Char = Double
+    F x y = Bool
+
+  type family Expensive a
+
+Suppose we are rewriting `F (Expensive ()) (Expensive ())`.  With existing GHC,
+we can see that the first branch doesn't match without doing *any* type family
+reductions. Thus reduceTyFamApp_maybe succeeds immediately, without ever needing
+to reduce `Expensive ()`.
+
+This case is bad with the new approach, however. We first try to match
+`Expensive ()` against Int and hence try to reduce `Expensive ()` to
+WHNF. Unless it reduces to something apart from Int, we then reduce the second
+occurrence of `Expensive ()` in order to match it against Char. Finally we
+discover (either directly or via the stuck constraints) that `Expensive ()`
+cannot be both Int and Char, so we fall through to the second branch.
+
+In the worst case, where `Expensive ()` hits the stack depth limit, this could
+make a program that type-checked under the old approach fail to type-check under
+the new approach.
+
+Perhaps matching should not immediately rewrite subterms, but should produce a
+generalised substitution after all? Then if the final result is stuck on a type
+family redex, we should try to reduce it?
+
+Overall we're not too worried about this. It is better to be simple and
+predictable than try to cleverly avoid doing any rewriting in some cases. After
+all, if we had something like `F (Id (Expensive ())) (Expensive ())` or, worse,
+`F (Expensive ()) (Id (Expensive ()))`, it would be rather hard not to rewrite
+both arguments.
+
+
+Note [Shallow rewriting: non-linear patterns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the following type family definition with a non-linear pattern match:
+
+  type family H x y where
+    H x x = True
+    H _ _ = False
+
+Now suppose we are rewriting `H (F Int) (G Bool)`.  Trying the first branch
+calls
+
+  match_list () [x,x] [F Int, G Bool]
+
+which will trivially bind x := F Int (without reducing F) and end up calling
+
+  match_type (x := F Int) x (G Bool)
+
+But now match_type cannot bind x again! Instead, it must "equalise" F Int with G
+Bool by calling
+
+  equalise_type (F Int) (G Bool)
+
+This will first check if the types are equal, and if not, (shallowly) rewrite
+both sides in an attempt to uncover common structure, then compare the
+structures.
+
+TODO: This is named "equalise" rather than "unify" because we don't produce a
+unifying substitution. But in fact I now think we will need to yield a
+(generalised) substitution in order to handle non-linear patterns correctly, per
+Note [Shallow rewriting: getting unstuck]. So it should perhaps be renamed?
+
+What about the cases?
+
+  equalise_type (F Int) (F Int)
+  equalise_type (F alpha) (F b)
+  equalise_type (F (G Int)) (F Char)
+
+In the first case, we can simply check eqType and we are done.  In the second,
+zonking the arguments might reveal they are equal if we happen to have already
+solved alpha with b. In the third case, it is possible that rewriting the
+arguments to F will allow us to prove that they are equal, without reducing F
+itself. We prefer to be simple and predictable, however, so we don't try to
+discover this.
+
+Since equalise_type always shallow-rewrites first, the equalise_type_2 case for
+two type family applications headed by the same family can assume that both are
+stuck.  Correspondingly, it simply tries to equalise their arguments.  If this
+succeeds, we know the applications are equal.  But if the arguments are apart,
+we are stuck, because the applications might still end up being equal (unless
+the type family is injective).
+
+TODO: could we take advantage of injectivity here? Presumably we'd need some
+kind of evidence of injectivity, though.
+
+
+Note [equalise_type]
+~~~~~~~~~~~~~~~~~~~~
+
+equalise_type (ty1, co1) (ty2, co2)
+requires
+  co1 :: ty1 ~ ty1_orig
+  co2 :: ty2 ~ ty2_orig
+
+returns ((ty1', co1'), (ty2', co2'), eres)
+  where
+    co1' :: ty1' ~ ty1_orig
+    co2' :: ty2' ~ ty2_orig
+
+    eres == EqualiseSuccess  =>  ty1' `eqType` ty2'
+    eres == EqualiseStuck    =>  we can't determine if ty1 and ty2 are equal
+    eres == EqualiseApart    =>  there is no unifying substitution making ty1 equal to ty2
+
+
+Note [Shallow rewriting: non-linear patterns: forgetting work]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+
+  type family F a where
+    F Int = Char
+    F a   = a
+
+  type family H x y where
+    H x x = x
+    H _ _ = Int
+
+If we are matching `H Char (F Int)` against the first branch of H, we first bind
+[x := Char] then call `equalise_type Char (F Int)`, which rewrites F Int to Char
+and succeeds, reducing the whole application of H to just Char.
+
+However, suppose we are matching `H (F Int) Char` against the first branch.
+This time we bind [x := F Int], call `equalise_type (F Int) Char` and succeed
+again, but this time the resulting substitution has [x := F Int] and hence we
+reduce the whole application to F Int, which we then have to rewrite again to
+reach WHNF.
+
+There is nothing unsound here, but we can end up doing more work than should in
+principle be necessary.  The difficulty is seeing how to represent the fact that
+the types in the substitution might be further rewritten before the match is
+complete.
+
+I think it might be possible to write a circular program for this (passing the
+lazily-computed result substitution as an argument to matching, so we can use it
+in the case for matching pattern variables).  I haven't yet tried, however.
+
+TODO: think further about how to avoid unnecessary rewriting in the case of
+non-linear patterns.
+
+
+Note [Shallow rewriting: use of MCoercion]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  MRefl    ==> no rewriting has been done,
+               output type is eqType to input
+
+  MCo Refl ==> input type has been rewritten solely by following meta-tyvars
+
+  MCo co   ==> input type has been rewritten using type family reductions or inerts
+
+rewrite_one_shallow and related functions use MCoercion to represent the
+resulting coercions, where MRefl means that no progress has been made (i.e. the
+returned type is eqType to the input type) while MCo means that some rewriting
+has been done.
+
+In particular, MCo Refl means that rewriting made progress (by zonking). This
+matters in match_type. Suppose we are matching the pattern () against some
+meta-tyvar alpha. If alpha is unfilled, then rewriting it produces MRefl so
+match_type will get stuck.  But if alpha is filled with () already, then
+rewriting it produces MCo Refl and match_type will succeed.
+
+TODO: perhaps we should use a (Coercion, Bool) pair instead of
+MCoercion. Sometimes we may have accumulated progress (and hence could pass in a
+MCoercion) but need to know if the call being made makes more progress (and
+hence have to pass in MRefl instead).
+
+TODO: is it worthwhile having the MCoercion distinction? Or can we just use
+Coercion? I don't think we need to track progress any more?
+
+
+Note [Reduction]
+~~~~~~~~~~~~~~~~
+The abstract type Reduction represents a pair (ty, co) where ty is a Type and
+
+  co :: ty ~ original_ty
+
+for some other type original_ty.  We then define combinators on such pairs,
+rather than working with the type and coercion separately, which is more verbose
+and harder to get right.
+
+The type Reductions represents a list of Reduction values, but keeps track of
+the possibility that none of them have made any progress, which admits a more
+compact representation.
+
+TODO: use Reduction in the definition of rewrite_one?
+
+
+Note [Shallow rewriting: coercion accumulator]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+rewrite_one_shallow takes as input a type ty and a coercion co :: ty ~r ty0; it
+returns a rewritten type ty1 and a coercion co1 :: ty1 ~r ty0.
+
+This means that when a type family application reduces, the subsequent call to
+rewrite_one_shallow is a tail call, and we can avoid growing the stack for each
+type family reduction step.  In particular, when the rewriter takes many
+top-level reduction steps, the coercion merely consists of 'StepsProv'
+containing a count of the number of steps.
+
+TODO: this isn't really true, yet.
+
+
+Note [Shallow rewriting: dependent quantification]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+TODO: this is not yet supported at all, we just fall back on the old behaviour.
+
+
+Note [Shallow rewriting: call-by-name rather than call-by-need]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider:
+
+  type family Dup x where
+    Dup x = (x, x)
+
+  type family Expensive y where
+    ...
+
+Rewriting `Dup (Expensive y)` yields `(Expensive y, Expensive y)` thereby
+duplicating the computation.  It would be preferable to use call-by-need
+evaluation instead, i.e. evaluate `Expensive y` once and share the result.
+
+(Perhaps we could arrange to rewrite `Dup (Expensive y)` to `(alpha, alpha)`
+where `alpha` is a metavariable already filled with `Expensive y`.  Then when we
+come to rewrite `alpha`, we would rewrite `Expensive y` and store the result so
+that subsequently rewriting `alpha` again yields the result directly.  However
+this needs care because the result of rewriting may depend on the inert set
+which is not necessarily the same across multiple occurrences.)
+
+
+Note [Shallow rewriting: avoiding building evidence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There are some cases where we won't need the coercion:
+
+ * Derived constraints
+
+ * If we are just normalising a type using :kind!  (currently this doesn't use
+   the rewriter, but if we were to make topNormalisetype use the same code path,
+   it would)
+
+ * TODO: are there any others?
+
+In such cases it would be nice to avoid ever constructing coercions.  In
+particular, evidence for Derived coercions is sometimes bottom (see
+lookupFamAppInert_hacked) and if we want more strictness to avoid thunk leaks
+this is problematic.
+
+Idea: we could make rewriting polymorphic in an `Applicative box`, and construct
+`box Coercion` rather than plain `Coercion`s. Then we can specialise `box ~
+Identity` for the normal case and `box ~ Const ()` for the no-evidence case.  A
+downside is we'll have to identify Deriveds early and send them to a different
+function.
+
+
+
+Note [Shallow rewriting: alternative approaches]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The approach taken here involves making matching/unification directly call
+rewriting, so that their results refer to potentially-rewritten versions of the
+inputs.  This means rewriting and matching/unification are somewhat intertwined.
+
+An alternative possibility would be to define them without reference to
+rewriting, and have them return some kind of partial result including a subterm
+that needs to be rewritten in order to make progress (possibly even with a
+continuation to call once progress has been made).  However, this partial result
+is in itself quite complex to represent, so the gain in simplicity is limited.
+Moreover, it seems likely this will incur a performance penatly compared to just
+doing the rewriting immediately we discover it is necessary.
+
+(A plausible intermediate position here would be to have matching/unification
+defined with reference to an abstract rewriting function, then specialised to
+the actual rewriter.  This might also allow us to use the same code in
+topNormaliseType, with a "rewriter" that merely does type family reduction.  I'd
+like to get everything working with the current approach first though.)
+
+
+Note [Calling the shallow rewriter]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+TODO
+
+
+Note [Shallow rewriting: unresolved issues]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+ * As discussed above in Note [Shallow rewriting: getting unstuck] and Note
+   [Shallow rewriting: problem with reducing type families during matching],
+   rewrite_exact_fam_app_closed currently relies on the core-flattened apartness
+   check and can in some cases do too much reduction. We may need some kind of
+   generalised substitution approach to solve this.
+
+ * How to handle matching Givens? Currently we deeply rewrite first, but that is
+   bad.
+
+ * If we need to deeply rewrite, probably want a version that tells if progress
+   has been made.
+
+ * Dependently-kinded TyCons or coercions in types are not currently handled
+   correctly.
+
+ * Roles are not handled correctly. Currently rewrite_exact_fam_app_shallow sets
+   the ambient role to Nominal, and downgrades the result if necessary.  But
+   this fails to account for Given Representational equalities on type families.
+   This manifests as a failure of (at least) T3423.
+
+ * rewrite_shallow is currently not called anywhere, instead we hit the new code
+   paths only when reducing a type family application.  This needs further work
+   to figure out when it is safe to use rewrite_shallow in place of rewrite.  In
+   particular, canIrred or can_eq_nc' look like good points to call
+   rewrite_shallow, but:
+
+    - the interact-with-inerts stage relies on the type being deeply rewritten
+      (e.g. so that findMatchingIrreds can check for equality with the inerts);
+
+    - there may be other places where the type need to be zonked, or even deeply
+      rewritten.
+
+ * Building Coercions leaks lots of thunks. We can avoid this to some extent
+   using StepsProv, but this is currently disabled because StepsProv isn't
+   correctly linted. It's not entirely clear how best to address this, though,
+   especially if we want to continue using AxiomInstCo for single steps and
+   StepsProv for two or more steps.
+
+ * zonk_eq_types is essentially a partial implementation of equalise that is
+   allowed to get stuck. Perhaps it can be subsumed by this approach?
+
+     - zonk_eq_types zonks under type synonyms / type families, but does not
+       expand families; maybe have equalise do the same?
+
+ * Note [Canonicalising equalities] suggests we might want to more
+   systematically track whether a type is rewritten; this could be helpful here
+   too. Perhaps have an IsRewritten flag (not at all, shallow, deep) and a
+   RewrittenType abstraction which is a (Type, IsRewritten) pair?
+
+-}
