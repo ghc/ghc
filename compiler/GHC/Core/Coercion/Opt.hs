@@ -502,6 +502,23 @@ of arguments in a `CoTyConApp` can differ. Consider
   Any (*->*) Maybe Int  :: *
 
 Hence the need to compare argument lengths; see #13658
+
+Note [opt_univ needs injectivity]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If opt_univ sees a coercion between `T a1 a2` and `T b1 b2` it will optimize it
+by producing a TyConAppCo for T, and pushing the UnivCo into the arguments.  But
+this works only if T is injective. Otherwise we can have something like
+
+  type family F x where
+    F Int  = Int
+    F Bool = Int
+
+where `UnivCo :: F Int ~ F Bool` is reasonable (it is effectively just an
+alternative representation for a couple of uses of AxiomInstCos) but we do not
+want to produce `F (UnivCo :: Int ~ Bool)` where the inner coercion is clearly
+inconsistent.  Hence the opt_univ case for TyConApps checks isInjectiveTyCon.
+See #19509.
+
  -}
 
 opt_univ :: LiftingContext -> SymFlag -> UnivCoProvenance -> Role
@@ -518,6 +535,7 @@ opt_univ env sym prov role oty1 oty2
   | Just (tc1, tys1) <- splitTyConApp_maybe oty1
   , Just (tc2, tys2) <- splitTyConApp_maybe oty2
   , tc1 == tc2
+  , isInjectiveTyCon tc1 role  -- see Note [opt_univ needs injectivity]
   , equalLength tys1 tys2 -- see Note [Differing kinds]
       -- NB: prov must not be the two interesting ones (ProofIrrel & Phantom);
       -- Phantom is already taken care of, and ProofIrrel doesn't relate tyconapps
