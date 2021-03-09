@@ -258,9 +258,8 @@ tcRnModuleTcRnM hsc_env mod_sum
         ; let { prel_imports = mkPrelImports (moduleName this_mod) prel_imp_loc
                                implicit_prelude import_decls }
 
-        ; whenWOptM Opt_WarnImplicitPrelude $
-             when (notNull prel_imports) $
-                addDiagnostic (WarningWithFlag Opt_WarnImplicitPrelude) (implicitPreludeWarn)
+        ; when (notNull prel_imports) $
+            addDiagnostic (WarningWithFlag Opt_WarnImplicitPrelude) (implicitPreludeWarn)
 
         ; -- TODO This is a little skeevy; maybe handle a bit more directly
           let { simplifyImport (L _ idecl) =

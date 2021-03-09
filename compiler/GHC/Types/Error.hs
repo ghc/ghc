@@ -90,12 +90,30 @@ mkMessages = Messages
 isEmptyMessages :: Messages e -> Bool
 isEmptyMessages (Messages msgs) = isEmptyBag msgs
 
+{- Note [Discarding Messages]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Discarding a 'SevIgnore' message from 'addMessage' and 'unionMessages' is
+just an optimisation, as GHC would /also/ suppress any diagnostic which severity is
+'SevIgnore' before printing the message: See for example 'putLogMsg' and 'defaultLogAction'.
+
+-}
+
+-- | Adds a 'Message' to the input collection of messages.
+-- See Note [Discarding Messages].
 addMessage :: MsgEnvelope e -> Messages e -> Messages e
-addMessage x (Messages xs) = Messages (x `consBag` xs)
+addMessage x (Messages xs)
+  | SevIgnore <- errMsgSeverity x = Messages xs
+  | otherwise                     = Messages (x `consBag` xs)
 
 -- | Joins two collections of messages together.
+-- See Note [Discarding Messages].
 unionMessages :: Messages e -> Messages e -> Messages e
-unionMessages (Messages msgs1) (Messages msgs2) = Messages (msgs1 `unionBags` msgs2)
+unionMessages (Messages msgs1) (Messages msgs2) =
+  Messages (filterBag interesting $ msgs1 `unionBags` msgs2)
+  where
+    interesting :: MsgEnvelope e -> Bool
+    interesting = (/=) SevIgnore . errMsgSeverity
 
 type WarningMessages = Bag (MsgEnvelope DiagnosticMessage)
 type ErrorMessages   = Bag (MsgEnvelope DiagnosticMessage)
@@ -230,19 +248,45 @@ data MessageClass
     -- /especially/ when emitting compiler diagnostics, use the smart constructor.
   deriving (Eq, Show)
 
+{- Note [Suppressing Messages]
+
+The 'SevIgnore' constructor is used to generate messages for diagnostics which are
+meant to be suppressed and not reported to the user: the classic example are warnings
+for which the user didn't enable the corresponding 'WarningFlag', so GHC shouldn't print them.
+
+A different approach would be to extend the zoo of 'mkMsgEnvelope' functions to return
+a 'Maybe (MsgEnvelope e)', so that we won't need to even create the message to begin with.
+Both approaches have been evaluated, but we settled on the "SevIgnore one" for a number of reasons:
+
+* It's less invasive to deal with;
+* It plays slightly better with deferred diagnostics (see 'GHC.Tc.Errors') as for those we need
+  to be able to /always/ produce a message (so that is reported at runtime);
+* It gives us more freedom: we can still decide to drop a 'SevIgnore' message at leisure, or we can
+  decide to keep it around until the last moment. Maybe in the future we would need to
+  turn a 'SevIgnore' into something else, for example to "unsuppress" diagnostics if a flag is
+  set: with this approach, we have more leeway to accommodate new features.
+
+-}
+
 
 -- | Used to describe warnings and errors
 --   o The message has a file\/line\/column heading,
 --     plus "warning:" or "error:",
 --     added by mkLocMessage
+--   o With 'SevIgnore' the message is suppressed
 --   o Output is intended for end users
 data Severity
-  = SevWarning
+  = SevIgnore
+  -- ^ Ignore this message, for example in
+  -- case of suppression of warnings users
+  -- don't want to see. See Note [Suppressing Messages]
+  | SevWarning
   | SevError
   deriving (Eq, Show)
 
 instance Outputable Severity where
   ppr = \case
+    SevIgnore  -> text "SevIgnore"
     SevWarning -> text "SevWarning"
     SevError   -> text "SevError"
 

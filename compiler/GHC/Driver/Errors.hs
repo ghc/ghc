@@ -36,23 +36,12 @@ printBagOfErrors logger dflags bag_of_errors
 
 handleFlagWarnings :: Logger -> DynFlags -> [CmdLine.Warn] -> IO ()
 handleFlagWarnings logger dflags warns = do
-  let warns' = filter (shouldPrintWarning dflags . CmdLine.warnReason)  warns
-
-      -- It would be nicer if warns :: [Located SDoc], but that
+  let -- It would be nicer if warns :: [Located SDoc], but that
       -- has circular import problems.
-      bag = listToBag [ mkPlainMsgEnvelope dflags WarningWithoutFlag loc (text warn)
-                      | CmdLine.Warn _ (L loc warn) <- warns' ]
+      bag = listToBag [ mkPlainMsgEnvelope dflags reason loc (text warn)
+                      | CmdLine.Warn reason (L loc warn) <- warns ]
 
   printOrThrowDiagnostics logger dflags bag
-
--- Given a warn reason, check to see if it's associated -W opt is enabled
-shouldPrintWarning :: DynFlags -> CmdLine.WarnReason -> Bool
-shouldPrintWarning dflags CmdLine.ReasonDeprecatedFlag
-  = wopt Opt_WarnDeprecatedFlags dflags
-shouldPrintWarning dflags CmdLine.ReasonUnrecognisedFlag
-  = wopt Opt_WarnUnrecognisedWarningFlags dflags
-shouldPrintWarning _ _
-  = True
 
 -- | Given a bag of diagnostics, turn them into an exception if
 -- any has 'SevError', or print them out otherwise.

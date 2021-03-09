@@ -1504,9 +1504,8 @@ failIfTcM True  err = failWithTcM err
 --   and the warning is enabled
 warnIfFlag :: WarningFlag -> Bool -> SDoc -> TcRn ()
 warnIfFlag warn_flag is_bad msg
-  = do { warn_on <- woptM warn_flag
-       ; when (warn_on && is_bad) $
-         addDiagnostic (WarningWithFlag warn_flag) msg }
+  = do { -- No need to check the flag here, it will be done in 'diagReasonSeverity'.
+       ; when is_bad $ addDiagnostic (WarningWithFlag warn_flag) msg }
 
 -- | Display a warning if a condition is met.
 warnIf :: Bool -> SDoc -> TcRn ()
