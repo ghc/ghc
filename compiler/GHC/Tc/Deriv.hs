@@ -738,10 +738,9 @@ tcStandaloneDerivInstType ctxt
 
 warnUselessTypeable :: TcM ()
 warnUselessTypeable
-  = do { warn <- woptM Opt_WarnDerivingTypeable
-       ; when warn $ addDiagnosticTc (WarningWithFlag Opt_WarnDerivingTypeable)
-                   $ text "Deriving" <+> quotes (ppr typeableClassName) <+>
-                     text "has no effect: all types now auto-derive Typeable" }
+  = do { addDiagnosticTc (WarningWithFlag Opt_WarnDerivingTypeable)
+       $ text "Deriving" <+> quotes (ppr typeableClassName) <+>
+         text "has no effect: all types now auto-derive Typeable" }
 
 ------------------------------------------------------------------
 deriveTyData :: TyCon -> [Type] -- LHS of data or data instance
@@ -1610,8 +1609,7 @@ mkNewTypeEqn newtype_strat dit@(DerivInstTys { dit_cls_tys     = cls_tys
                  -- DeriveAnyClass, but emitting a warning about the choice.
                  -- See Note [Deriving strategies]
                  when (newtype_deriving && deriveAnyClass) $
-                   lift $ whenWOptM Opt_WarnDerivingDefaults $
-                     addDiagnosticTc (WarningWithFlag Opt_WarnDerivingDefaults) $ sep
+                   lift $ addDiagnosticTc (WarningWithFlag Opt_WarnDerivingDefaults) $ sep
                      [ text "Both DeriveAnyClass and"
                        <+> text "GeneralizedNewtypeDeriving are enabled"
                      , text "Defaulting to the DeriveAnyClass strategy"

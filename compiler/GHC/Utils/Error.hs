@@ -87,7 +87,8 @@ import System.CPUTime
 -- particular diagnostic message is built, otherwise the computed 'Severity' might
 -- not be correct, due to the mutable nature of the 'DynFlags' in GHC.
 diagReasonSeverity :: DynFlags -> DiagnosticReason -> Severity
-diagReasonSeverity dflags (WarningWithFlag wflag) | wopt_fatal wflag dflags     = SevError
+diagReasonSeverity dflags (WarningWithFlag wflag) | not (wopt wflag dflags)     = SevIgnore
+                                                  | wopt_fatal wflag dflags     = SevError
                                                   | otherwise                   = SevWarning
 diagReasonSeverity dflags WarningWithoutFlag      | gopt Opt_WarnIsError dflags = SevError
                                                   | otherwise                   = SevWarning

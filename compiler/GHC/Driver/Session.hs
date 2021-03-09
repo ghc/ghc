@@ -235,7 +235,6 @@ import GHC.Settings.Config
 import GHC.Utils.CliOption
 import {-# SOURCE #-} GHC.Core.Unfold
 import GHC.Driver.CmdLine
-import qualified GHC.Driver.CmdLine as Cmd
 import GHC.Settings.Constants
 import GHC.Utils.Panic
 import qualified GHC.Utils.Ppr.Colour as Col
@@ -1869,7 +1868,7 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
 
   liftIO $ setUnsafeGlobalDynFlags dflags4
 
-  let warns' = map (Warn Cmd.NoReason) (consistency_warnings ++ sh_warns)
+  let warns' = map (Warn WarningWithoutFlag) (consistency_warnings ++ sh_warns)
 
   return (dflags4, leftover, warns' ++ warns)
 
@@ -2889,7 +2888,7 @@ unrecognisedWarning prefix = defHiddenFlag prefix (Prefix action)
     action :: String -> EwM (CmdLineP DynFlags) ()
     action flag = do
       f <- wopt Opt_WarnUnrecognisedWarningFlags <$> liftEwM getCmdLineState
-      when f $ addFlagWarn Cmd.ReasonUnrecognisedFlag $
+      when f $ addFlagWarn (WarningWithFlag Opt_WarnUnrecognisedWarningFlags) $
         "unrecognised warning flag: -" ++ prefix ++ flag
 
 -- See Note [Supporting CLI completion]
@@ -3049,6 +3048,12 @@ mkFlag :: TurnOnFlag            -- ^ True <=> it should be turned on
 mkFlag turn_on flagPrefix f (dep, (FlagSpec name flag extra_action mode))
     = (dep,
        Flag (flagPrefix ++ name) (NoArg (f flag >> extra_action turn_on)) mode)
+
+-- here to avoid module cycle with GHC.Driver.CmdLine
+deprecate :: Monad m => String -> EwM m ()
+deprecate s = do
+    arg <- getArg
+    addFlagWarn (WarningWithFlag Opt_WarnDeprecatedFlags) (arg ++ " is deprecated: " ++ s)
 
 deprecatedForExtension :: String -> TurnOnFlag -> String
 deprecatedForExtension lang turn_on

@@ -198,6 +198,7 @@ makeThreadSafe logger = do
 -- See Note [JSON Error Messages]
 --
 jsonLogAction :: LogAction
+jsonLogAction _ (MCDiagnostic SevIgnore _) _ _ = return () -- suppress the message
 jsonLogAction dflags msg_class srcSpan msg
   =
     defaultLogActionHPutStrDoc dflags True stdout
@@ -214,12 +215,13 @@ defaultLogAction :: LogAction
 defaultLogAction dflags msg_class srcSpan msg
   | dopt Opt_D_dump_json dflags = jsonLogAction dflags msg_class srcSpan msg
   | otherwise = case msg_class of
-      MCOutput             -> printOut msg
-      MCDump               -> printOut (msg $$ blankLine)
-      MCInteractive        -> putStrSDoc msg
-      MCInfo               -> printErrs msg
-      MCFatal              -> printErrs msg
-      MCDiagnostic sev rea -> printDiagnostics sev rea
+      MCOutput                 -> printOut msg
+      MCDump                   -> printOut (msg $$ blankLine)
+      MCInteractive            -> putStrSDoc msg
+      MCInfo                   -> printErrs msg
+      MCFatal                  -> printErrs msg
+      MCDiagnostic SevIgnore _ -> pure () -- suppress the message
+      MCDiagnostic sev rea     -> printDiagnostics sev rea
     where
       printOut   = defaultLogActionHPrintDoc  dflags False stdout
       printErrs  = defaultLogActionHPrintDoc  dflags False stderr
@@ -242,6 +244,7 @@ defaultLogAction dflags msg_class srcSpan msg
         -- each unicode char.
 
       flagMsg :: Severity -> DiagnosticReason -> Maybe String
+      flagMsg SevIgnore _                 =  panic "Called flagMsg with SevIgnore"
       flagMsg SevError WarningWithoutFlag =  Just "-Werror"
       flagMsg SevError (WarningWithFlag wflag) = do
         spec <- flagSpecOf wflag

@@ -20,8 +20,7 @@ module GHC.Driver.CmdLine
 
       Err(..), Warn(..), WarnReason(..),
 
-      EwM, runEwM, addErr, addWarn, addFlagWarn, getArg, getCurLoc, liftEwM,
-      deprecate
+      EwM, runEwM, addErr, addWarn, addFlagWarn, getArg, getCurLoc, liftEwM
     ) where
 
 #include "HsVersions.h"
@@ -34,6 +33,8 @@ import GHC.Utils.Panic
 import GHC.Data.Bag
 import GHC.Types.SrcLoc
 import GHC.Utils.Json
+
+import GHC.Types.Error ( DiagnosticReason(..) )
 
 import Data.Function
 import Data.List (sortBy, intercalate, stripPrefix)
@@ -107,7 +108,7 @@ newtype Err  = Err { errMsg :: Located String }
 
 -- | A command-line warning message and the reason it arose
 data Warn = Warn
-  {   warnReason :: WarnReason,
+  {   warnReason :: DiagnosticReason,
       warnMsg    :: Located String
   }
 
@@ -141,16 +142,11 @@ addErr :: Monad m => String -> EwM m ()
 addErr e = EwM (\(L loc _) es ws -> return (es `snocBag` Err (L loc e), ws, ()))
 
 addWarn :: Monad m => String -> EwM m ()
-addWarn = addFlagWarn NoReason
+addWarn = addFlagWarn WarningWithoutFlag
 
-addFlagWarn :: Monad m => WarnReason -> String -> EwM m ()
+addFlagWarn :: Monad m => DiagnosticReason -> String -> EwM m ()
 addFlagWarn reason msg = EwM $
   (\(L loc _) es ws -> return (es, ws `snocBag` Warn reason (L loc msg), ()))
-
-deprecate :: Monad m => String -> EwM m ()
-deprecate s = do
-    arg <- getArg
-    addFlagWarn ReasonDeprecatedFlag (arg ++ " is deprecated: " ++ s)
 
 getArg :: Monad m => EwM m String
 getArg = EwM (\(L _ arg) es ws -> return (es, ws, arg))
