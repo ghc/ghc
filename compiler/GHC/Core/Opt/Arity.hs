@@ -727,7 +727,7 @@ combineWithDemandOneShots (AT prs div) oss
   = AT (zip_prs prs oss) div
   where
     zip_prs prs [] = prs
-    zip_prs [] oss = [(True,os) | os <- oss]
+    zip_prs [] oss = [(False,os) | os <- oss]   -- False <=> expensive
     zip_prs ((ch,os1):prs) (os2:oss)
       = (ch, os1 `bestOneShot` os2) : zip_prs prs oss
 
