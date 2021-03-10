@@ -552,7 +552,7 @@
 #define RTS_LINKER_USE_MMAP_SYMBOLS \
       SymI_HasProto(allocateWrite)                                      \
       SymI_HasProto(markExec)                                           \
-      SymI_HasProto(freeWrite)                                          \
+      SymI_HasProto(freeWrite)
 #else
 #define RTS_LINKER_USE_MMAP_SYMBOLS /* empty */
 #endif
