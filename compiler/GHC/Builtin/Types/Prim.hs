@@ -611,7 +611,7 @@ pcPrimTyConLev1 name
   where
     binders = mkTemplateTyConBinders [levityTy]
       (\[v] -> [TyCoRep.TyConApp tYPETyCon [mkTyConApp boxedRepDataConTyCon [v]]])
-    result_kind = tYPE (primRepToRuntimeRep UnliftedRep)
+    result_kind = unliftedTypeKind
 
 -- | Convert a 'PrimRep' to a 'Type' of kind RuntimeRep
 -- Defined here to avoid (more) module loops
