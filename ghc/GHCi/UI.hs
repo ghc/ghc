@@ -3348,10 +3348,10 @@ showLanguages' :: Bool -> DynFlags -> IO ()
 showLanguages' show_all dflags =
   putStrLn $ showSDoc dflags $ vcat
      [ text "base language is: " <>
-         case language dflags of
-           Nothing          -> text "Haskell2010"
-           Just Haskell98   -> text "Haskell98"
-           Just Haskell2010 -> text "Haskell2010"
+         case lang of
+           Haskell98   -> text "Haskell98"
+           Haskell2010 -> text "Haskell2010"
+           GHC2021     -> text "GHC2021"
      , (if show_all then text "all active language options:"
                     else text "with the following modifiers:") $$
           nest 2 (vcat (map (setting xopt) DynFlags.xFlags))
