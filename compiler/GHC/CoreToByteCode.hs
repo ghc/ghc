@@ -59,7 +59,7 @@ import GHC.Data.FastString
 import GHC.Utils.Panic
 import GHC.StgToCmm.Closure ( NonVoid(..), fromNonVoid, nonVoidIds )
 import GHC.StgToCmm.Layout
-import GHC.Runtime.Heap.Layout hiding (WordOff, ByteOff, wordsToBytes)
+import GHC.Runtime.Heap.Layout hiding (WordOff, ByteOff, wordsToBytes, roundUpToWords)
 import GHC.Data.Bitmap
 import GHC.Data.OrdList
 import GHC.Data.Maybe
@@ -225,7 +225,14 @@ bytesToWords platform (ByteOff bytes) =
     let (q, r) = bytes `quotRem` (platformWordSizeInBytes platform)
     in if r == 0
            then fromIntegral q
-           else panic $ "GHC.CoreToByteCode.bytesToWords: bytes=" ++ show bytes
+           else pprPanic "GHC.CoreToByteCode.bytesToWords"
+                         (text "bytes=" <> ppr bytes)
+
+roundUpToWords :: Platform -> ByteOff -> WordOff
+roundUpToWords platform (ByteOff bytes) =
+    let (q, r) = bytes `quotRem` (platformWordSizeInBytes platform)
+    in  if r == 0 then fromIntegral q
+                  else fromIntegral (q + 1)
 
 wordSize :: Platform -> ByteOff
 wordSize platform = ByteOff (platformWordSizeInBytes platform)
@@ -910,7 +917,7 @@ mkConAppCode orig_d _ p con args_r_to_l =
 
             do_pushery !d (arg : args) = do
                 (push, arg_bytes) <- case arg of
-                    (Padding l _) -> return $! pushPadding l
+                    (Padding l _) -> return $! pushPadding (ByteOff l)
                     (FieldOff a _) -> pushConstrAtom d p (fromNonVoid a)
                 more_push_code <- do_pushery (d + arg_bytes) args
                 return (push `appOL` more_push_code)
@@ -1622,7 +1629,8 @@ pushAtom d p (AnnVar var)
             _ -> do
                 let !szw = bytesToWords platform szb
                     !off_w = trunc16W $ bytesToWords platform (d - d_v) + szw - 1
-                return (toOL (genericReplicate szw (PUSH_L off_w)), szb)
+                return (toOL (genericReplicate szw (PUSH_L off_w)),
+                              wordsToBytes platform szw)
         -- d - d_v           offset from TOS to the first slot of the object
         --
         -- d - d_v + sz - 1  offset from the TOS of the last slot of the object
@@ -1642,15 +1650,31 @@ pushAtom d p (AnnVar var)
                 return (unitOL (PUSH_G (getName var)), sz)
 
 
-pushAtom _ _ (AnnLit lit) = do
+pushAtom _ _ (AnnLit lit) = pushLiteral True lit
+
+pushAtom _ _ expr
+   = pprPanic "GHC.CoreToByteCode.pushAtom"
+              (pprCoreExpr (deAnnotate' expr))
+
+pushLiteral :: Bool -> Literal -> BcM (BCInstrList, ByteOff)
+pushLiteral padded lit =
+  do
      platform <- targetPlatform <$> getDynFlags
      let code :: PrimRep -> BcM (BCInstrList, ByteOff)
          code rep =
-            return (unitOL instr, size_bytes)
+            return (padding_instr `snocOL` instr, size_bytes + padding_bytes)
           where
             size_bytes = ByteOff $ primRepSizeB platform rep
             -- Here we handle the non-word-width cases specifically since we
             -- must emit different bytecode for them.
+
+            padding_bytes
+                | padded = wordsToBytes platform
+                              (roundUpToWords platform size_bytes) - size_bytes
+                | otherwise = 0
+
+            (padding_instr, _) = pushPadding padding_bytes
+
             instr =
               case size_bytes of
                 1  -> PUSH_UBX8 lit
@@ -1683,19 +1707,13 @@ pushAtom _ _ (AnnLit lit) = do
           LitNumInteger -> panic "pushAtom: LitInteger"
           LitNumNatural -> panic "pushAtom: LitNatural"
 
-pushAtom _ _ expr
-   = pprPanic "GHC.CoreToByteCode.pushAtom"
-              (pprCoreExpr (deAnnotate' expr))
-
-
 -- | Push an atom for constructor (i.e., PACK instruction) onto the stack.
 -- This is slightly different to @pushAtom@ due to the fact that we allow
 -- packing constructor fields. See also @mkConAppCode@ and @pushPadding@.
 pushConstrAtom
     :: StackDepth -> BCEnv -> AnnExpr' Id DVarSet -> BcM (BCInstrList, ByteOff)
 
-pushConstrAtom _ _ (AnnLit lit@(LitFloat _)) =
-    return (unitOL (PUSH_UBX32 lit), 4)
+pushConstrAtom _ _ (AnnLit lit) = pushLiteral False lit
 
 pushConstrAtom d p (AnnVar v)
     | Just d_v <- lookupBCEnv_maybe v p = do  -- v is a local variable
@@ -1712,8 +1730,8 @@ pushConstrAtom d p (AnnVar v)
 
 pushConstrAtom d p expr = pushAtom d p expr
 
-pushPadding :: Int -> (BCInstrList, ByteOff)
-pushPadding !n = go n (nilOL, 0)
+pushPadding :: ByteOff -> (BCInstrList, ByteOff)
+pushPadding (ByteOff n) = go n (nilOL, 0)
   where
     go n acc@(!instrs, !off) = case n of
         0 -> acc

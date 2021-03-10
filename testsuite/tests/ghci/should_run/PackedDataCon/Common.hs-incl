@@ -1,0 +1,56 @@
+
+
+d1w8 :: Word8 -> D1
+d1w8 (W8# x) = D1w8 x
+
+d1i8 :: Int8 -> D1
+d1i8 (I8# x) = D1i8 x
+
+d1w16 :: Word16 -> D1
+d1w16 (W16# x) = D1w16 x
+
+d1i16 :: Int16 -> D1
+d1i16 (I16# x) = D1i16 x
+
+d1w32 :: Word32 -> D1
+d1w32 (W32# x) = D1w32 x
+
+d1i32 :: Int32 -> D1
+d1i32 (I32# x) = D1i32 x
+
+showD1 :: D1 -> String
+showD1 (D1w8 x) = show (W8# x)
+showD1 (D1i8 x) = show (I8# x)
+showD1 (D1w16 x) = show (W16# x)
+showD1 (D1i16 x) = show (I16# x)
+showD1 (D1w32 x) = show (W32# x)
+showD1 (D1i32 x) = show (I32# x)
+
+d2a :: Word8 -> Word8 -> D2
+d2a (W8# x1) (W8# x2) = D2a x1 x2
+
+d2b :: Word8 -> Word16 -> D2
+d2b (W8# x1) (W16# x2) = D2b x1 x2
+
+d2c :: Word8 -> Word16 -> Word8 -> D2
+d2c (W8# x1) (W16# x2) (W8# x3)= D2c x1 x2 x3
+
+d2d :: Word -> Word8 -> Word -> D2
+d2d (W# x1) (W8# x2) (W# x3) = D2d x1 x2 x3
+
+d2e :: Word -> Int8 -> Double -> Float -> Word8 -> D2
+d2e (W# x1) (I8# x2) (D# x3) (F# x4) (W8# x5) = D2e x1 x2 x3 x4 x5
+
+d2l :: Int -> D2
+d2l 0 = D2a (wordToWord8# 44##) (wordToWord8# 55##)
+d2l 1 = D2b (wordToWord8# 44##) (wordToWord16# 55##)
+d2l 2 = D2c (wordToWord8# 44##) (wordToWord16# 5555##) (wordToWord8# 66##)
+d2l 3 = D2d 5555## (wordToWord8# 66##) 7777##
+d2l _ = D2e 7777## (intToInt8# 66#) 55.55## 44.44# (wordToWord8# 33##)
+
+showD2 :: D2 -> String
+showD2 (D2a x1 x2) = show (W8# x1, W8# x2)
+showD2 (D2b x1 x2) = show (W8# x1, W16# x2)
+showD2 (D2c x1 x2 x3) = show (W8# x1, W16# x2, W8# x3)
+showD2 (D2d x1 x2 x3) = show (W# x1, W8# x2, W# x3)
+showD2 (D2e x1 x2 x3 x4 x5) = show (W# x1, I8# x2, D# x3, F# x4, W8# x5)
