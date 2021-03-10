@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE PolyKinds #-}

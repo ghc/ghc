@@ -1,5 +1,5 @@
 
-<interactive>:3:5: error:
+<interactive>:4:5: error:
     • Non type-variable argument in the constraint: HasField "name" r a
       (Use FlexibleContexts to permit this)
     • When checking the inferred type

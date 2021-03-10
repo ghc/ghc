@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 module T10997_1 where
 
 import T10997_1a

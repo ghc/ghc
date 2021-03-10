@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE Safe #-}
 -- | Import unsafe module Control.ST to make sure it fails
 module Main where

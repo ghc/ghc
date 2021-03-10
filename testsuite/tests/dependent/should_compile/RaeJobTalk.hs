@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {- Copyright (c) 2016 Richard Eisenberg
  -}
 

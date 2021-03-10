@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE DataKinds, PolyKinds, GADTs, TypeOperators, TypeFamilies #-}
 {-# OPTIONS_GHC -fwarn-unticked-promoted-constructors #-}
 

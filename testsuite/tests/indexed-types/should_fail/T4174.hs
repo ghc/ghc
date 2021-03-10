@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE TypeFamilies, TypeOperators, EmptyDataDecls #-}
 
 module T4174 where

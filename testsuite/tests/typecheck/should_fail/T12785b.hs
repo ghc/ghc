@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE RankNTypes, TypeOperators, ViewPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DataKinds, PolyKinds, GADTs #-}

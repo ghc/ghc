@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE Unsafe #-}
 -- | Should fail compilation because we import Data.Word as safe and unsafe
 module Mixed02 where

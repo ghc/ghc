@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE ExistentialQuantification #-}
 
 module T3468 where

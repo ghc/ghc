@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# OPTIONS_GHC -fpackage-trust #-}
 {-# LANGUAGE Unsafe #-}
 module Check01 ( main' ) where

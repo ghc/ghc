@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE StandaloneDeriving #-}
 
 module ShouldFail1_0 where

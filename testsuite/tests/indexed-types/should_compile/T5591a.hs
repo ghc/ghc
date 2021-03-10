@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE GADTs, TypeOperators, TypeFamilies, ScopedTypeVariables #-}
 module T5591a where
 

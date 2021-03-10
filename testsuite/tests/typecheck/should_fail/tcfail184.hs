@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 
 {-# OPTIONS_GHC -XScopedTypeVariables #-}
 -- We don't actually want scoped type variables, but this flag makes the

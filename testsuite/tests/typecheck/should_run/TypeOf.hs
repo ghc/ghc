@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE DataKinds, UnicodeSyntax #-}
 {-# OPTIONS -Wno-star-is-type #-}
 

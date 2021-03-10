@@ -1,5 +1,5 @@
 
-T3950.hs:15:13: error:
+T3950.hs:16:13: error:
     • Couldn't match kind ‘*’ with ‘* -> *’
       When matching types
         w :: (* -> * -> *) -> *
@@ -15,4 +15,4 @@ T3950.hs:15:13: error:
                 rp' :: Sealed (Id p x)
                 rp' = undefined
     • Relevant bindings include
-        rp :: Bool -> Maybe (w (Id p)) (bound at T3950.hs:15:1)
+        rp :: Bool -> Maybe (w (Id p)) (bound at T3950.hs:16:1)

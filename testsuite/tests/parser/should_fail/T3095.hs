@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE KindSignatures #-}
 -- #3095
 module T3095 where

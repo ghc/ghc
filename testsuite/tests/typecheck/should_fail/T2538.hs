@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 
 -- #2538
 module ShouldFail where

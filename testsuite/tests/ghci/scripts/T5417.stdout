@@ -12,4 +12,4 @@ class C.C1 a where
   type C.F :: * -> *
   data family C.F a
   	-- Defined at T5417a.hs:7:5
-data instance C.F (B1 a) = B2 a 	-- Defined at T5417.hs:8:10
+data instance C.F (B1 a) = B2 a 	-- Defined at T5417.hs:9:10

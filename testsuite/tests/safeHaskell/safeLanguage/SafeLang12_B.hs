@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE Safe #-}
 {-# LANGUAGE TemplateHaskell #-}
 module SafeLang12_B ( Class(..), mkSimpleClass ) where

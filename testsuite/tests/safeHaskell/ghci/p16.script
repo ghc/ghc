@@ -1,3 +1,4 @@
+:set -XHaskell2010
 -- Test restricted functionality: GeneralizedNewtypeDeriving
 :unset +s
 :set -XSafe

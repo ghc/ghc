@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 module Tc271a where
 import {-# SOURCE #-} Tc271
 

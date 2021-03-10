@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE ScopedTypeVariables, TypeOperators, DataKinds, PolyKinds,
              TypeFamilies, GADTs, StandaloneDeriving #-}
 

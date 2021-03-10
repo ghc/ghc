@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 -- Should fail without GeneralizedNewtypeDeriving
 -- Succeeds with GeneralizedNewtypeDeriving
 

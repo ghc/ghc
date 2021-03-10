@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE DataKinds, RankNTypes, TypeFamilies #-}
 module T7805 where
 

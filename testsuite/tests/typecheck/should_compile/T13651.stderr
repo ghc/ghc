@@ -1,5 +1,5 @@
 
-T13651.hs:11:8: error:
+T13651.hs:12:8: error:
     • Could not deduce: F cr (Bar h (Foo u)) ~ Bar h (Bar r u)
       from the context: (F cr cu ~ Bar h (Bar r u),
                          F cu cs ~ Bar (Foo h) (Bar u s))
@@ -7,7 +7,7 @@ T13651.hs:11:8: error:
                    foo :: forall cr cu h r u cs s.
                           (F cr cu ~ Bar h (Bar r u), F cu cs ~ Bar (Foo h) (Bar u s)) =>
                           Bar h (Bar r u) -> Bar (Foo h) (Bar u s) -> Foo (cr -> cs)
-        at T13651.hs:(11,8)-(13,65)
+        at T13651.hs:(12,8)-(14,65)
       Expected: forall cr cu h r u cs s.
                 (F cr cu ~ Bar h (Bar r u), F cu cs ~ Bar (Foo h) (Bar u s)) =>
                 Bar h (Bar r u) -> Bar (Foo h) (Bar u s) -> Foo (cr -> cs)

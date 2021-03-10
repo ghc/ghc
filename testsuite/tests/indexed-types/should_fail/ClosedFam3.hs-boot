@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE TypeFamilies, PolyKinds #-}
 
 module ClosedFam3 where

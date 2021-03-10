@@ -1,5 +1,6 @@
-{-# LANGUAGE CPP, MagicHash, BlockArguments, UnboxedTuples #-}
-{-# LANGUAGE CPP, MagicHash, BlockArguments, ScopedTypeVariables #-}
+{-# LANGUAGE Haskell2010 #-}
+{-# LANGUAGE NondecreasingIndentation #-}
+{-# LANGUAGE CPP, MagicHash, BlockArguments, UnboxedTuples, ScopedTypeVariables #-}
 
 -- Test the atomic exchange primop.
 

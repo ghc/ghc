@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE DeriveAnyClass #-}
 module T12144_2 where
 

@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE AllowAmbiguousTypes, FunctionalDependencies, ScopedTypeVariables, PolyKinds, TypeApplications, DataKinds #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedRecordDot, OverloadedRecordUpdate #-}

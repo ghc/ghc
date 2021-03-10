@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE ExistentialQuantification, DataKinds, PolyKinds, KindSignatures, GADTs #-}
 module T7503a where
     import Data.Kind

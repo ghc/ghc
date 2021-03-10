@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE TypeFamilies #-}
 module AssocTyDef02 where
 

@@ -19,6 +19,6 @@ copyFile h1 h2 = do
   if eof
         then return ()
         else do
-  c <- hGetChar h1
-  c <- hPutChar h2 (toUpper c)
-  copyFile h1 h2
+    c <- hGetChar h1
+    c <- hPutChar h2 (toUpper c)
+    copyFile h1 h2

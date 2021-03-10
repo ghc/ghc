@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE GADTs, RankNTypes, ImpredicativeTypes #-}
 
 -- Test #3163

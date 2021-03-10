@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 module FancyContextsWithoutExtension1 where
 
 type Showish = Show

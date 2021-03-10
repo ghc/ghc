@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE MultiParamTypeClasses, PolyKinds #-}
 {-# OPTIONS_GHC -fprint-explicit-kinds #-}
 

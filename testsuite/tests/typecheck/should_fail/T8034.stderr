@@ -1,5 +1,5 @@
 
-T8034.hs:6:3: error:
+T8034.hs:7:3: error:
     • Couldn't match type: F a0
                      with: F a
       Expected: F a -> F a

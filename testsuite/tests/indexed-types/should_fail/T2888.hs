@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE TypeFamilies #-}
 -- Test for no type indices
 

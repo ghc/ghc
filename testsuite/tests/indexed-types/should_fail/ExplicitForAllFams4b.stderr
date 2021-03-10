@@ -1,82 +1,82 @@
 
-ExplicitForAllFams4b.hs:7:24: error:
+ExplicitForAllFams4b.hs:8:24: error:
     • Type variable ‘b’ is bound by a forall,
         but not used in the family instance
     • In the type instance declaration for ‘J’
 
-ExplicitForAllFams4b.hs:7:27: error:
+ExplicitForAllFams4b.hs:8:27: error:
     Conflicting family instance declarations:
-      J [a] = Float -- Defined at ExplicitForAllFams4b.hs:7:27
-      J _ = Maybe b -- Defined at ExplicitForAllFams4b.hs:8:27
+      J [a] = Float -- Defined at ExplicitForAllFams4b.hs:8:27
+      J _ = Maybe b -- Defined at ExplicitForAllFams4b.hs:9:27
 
-ExplicitForAllFams4b.hs:8:22: error:
+ExplicitForAllFams4b.hs:9:22: error:
     • Type variable ‘b’ is mentioned in the RHS,
         but not bound on the LHS of the family instance
     • In the type instance declaration for ‘J’
 
-ExplicitForAllFams4b.hs:11:24: error:
+ExplicitForAllFams4b.hs:12:24: error:
     • Type variable ‘b’ is mentioned in the RHS,
         but not bound on the LHS of the family instance
     • In the data instance declaration for ‘K’
 
-ExplicitForAllFams4b.hs:11:27: error:
+ExplicitForAllFams4b.hs:12:27: error:
     Conflicting family instance declarations:
-      K (a, Bool) -- Defined at ExplicitForAllFams4b.hs:11:27
-      K _ -- Defined at ExplicitForAllFams4b.hs:12:27
+      K (a, Bool) -- Defined at ExplicitForAllFams4b.hs:12:27
+      K _ -- Defined at ExplicitForAllFams4b.hs:13:27
 
-ExplicitForAllFams4b.hs:12:22: error:
+ExplicitForAllFams4b.hs:13:22: error:
     • Type variable ‘b’ is mentioned in the RHS,
         but not bound on the LHS of the family instance
     • In the data instance declaration for ‘K’
 
-ExplicitForAllFams4b.hs:15:27: error:
+ExplicitForAllFams4b.hs:16:27: error:
     • Type variable ‘b’ is mentioned in the RHS,
         but not bound on the LHS of the family instance
     • In the newtype instance declaration for ‘L’
 
-ExplicitForAllFams4b.hs:15:30: error:
+ExplicitForAllFams4b.hs:16:30: error:
     Conflicting family instance declarations:
-      L (a, Bool) -- Defined at ExplicitForAllFams4b.hs:15:30
-      L _ -- Defined at ExplicitForAllFams4b.hs:16:30
+      L (a, Bool) -- Defined at ExplicitForAllFams4b.hs:16:30
+      L _ -- Defined at ExplicitForAllFams4b.hs:17:30
 
-ExplicitForAllFams4b.hs:16:25: error:
+ExplicitForAllFams4b.hs:17:25: error:
     • Type variable ‘b’ is mentioned in the RHS,
         but not bound on the LHS of the family instance
     • In the newtype instance declaration for ‘L’
 
-ExplicitForAllFams4b.hs:23:3: error:
+ExplicitForAllFams4b.hs:24:3: error:
     • Type indexes must match class instance head
       Expected: CT Int _
         Actual: CT [a] (a, a)
     • In the type instance declaration for ‘CT’
       In the instance declaration for ‘C Int’
 
-ExplicitForAllFams4b.hs:23:17: error:
+ExplicitForAllFams4b.hs:24:17: error:
     • Type variable ‘b’ is bound by a forall,
         but not used in the family instance
     • In the type instance declaration for ‘CT’
       In the instance declaration for ‘C Int’
 
-ExplicitForAllFams4b.hs:24:15: error:
+ExplicitForAllFams4b.hs:25:15: error:
     • Type variable ‘b’ is mentioned in the RHS,
         but not bound on the LHS of the family instance
     • In the type instance declaration for ‘CT’
       In the instance declaration for ‘C Int’
 
-ExplicitForAllFams4b.hs:26:3: error:
+ExplicitForAllFams4b.hs:27:3: error:
     • Type indexes must match class instance head
       Expected: CD Int _
         Actual: CD [a] (a, a)
     • In the data instance declaration for ‘CD’
       In the instance declaration for ‘C Int’
 
-ExplicitForAllFams4b.hs:26:17: error:
+ExplicitForAllFams4b.hs:27:17: error:
     • Type variable ‘b’ is mentioned in the RHS,
         but not bound on the LHS of the family instance
     • In the data instance declaration for ‘CD’
       In the instance declaration for ‘C Int’
 
-ExplicitForAllFams4b.hs:27:15: error:
+ExplicitForAllFams4b.hs:28:15: error:
     • Type variable ‘b’ is mentioned in the RHS,
         but not bound on the LHS of the family instance
     • In the data instance declaration for ‘CD’

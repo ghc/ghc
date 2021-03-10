@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE UnicodeSyntax #-}
 {-# LANGUAGE EmptyDataDecls #-}
 {-# LANGUAGE TypeOperators #-}

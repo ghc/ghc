@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 module B where
 
 import {-# SOURCE #-} A (HsExpr)

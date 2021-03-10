@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 -- safe inferred, with requirement base is trusted
 module Check08_B where
 

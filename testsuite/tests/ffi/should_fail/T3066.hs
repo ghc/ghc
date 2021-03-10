@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE ForeignFunctionInterface, RankNTypes #-}
 module Foo where
 

@@ -1,7 +1,6 @@
 
-T12811.hs:4:15: error:
+T12811.hs:5:15: error:
     Illegal operator ‘.’ in type ‘foral a . a’
       Use TypeOperators to allow operators in types
 
-T12811.hs:4:15: error: Not in scope: type constructor or class ‘.’
-
+T12811.hs:5:15: error: Not in scope: type constructor or class ‘.’

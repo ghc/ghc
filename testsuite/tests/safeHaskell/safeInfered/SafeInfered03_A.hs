@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE ForeignFunctionInterface #-}
 -- | FFI but in IO monad so safe
 module SafeInfered03_A where

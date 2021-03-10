@@ -1,5 +1,5 @@
 
-T9167.hs:5:1: error:
+T9167.hs:6:1: error:
     • The associated type ‘F b’
       mentions none of the type or kind variables of the class ‘C a’
     • In the class declaration for ‘C’

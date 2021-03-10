@@ -1,3 +1,4 @@
+:set -XHaskell2010
 :set -XTypeFamilies
 type family E a b where E a a = (); E a b = Bool
 :info E

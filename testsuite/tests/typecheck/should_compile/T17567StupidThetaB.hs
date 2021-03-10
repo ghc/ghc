@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE QuantifiedConstraints, DatatypeContexts, TypeFamilies #-}
 -- NB: -XNoPolyKinds, to get defaulting.
 

@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 module T4003A where
 
 import Data.Data

@@ -267,7 +267,7 @@ import Control.Monad.Trans.Except
 
 import Data.Ord
 import Data.Char
-import Data.List (intercalate, delete, sortBy)
+import Data.List (intercalate, sortBy)
 import qualified Data.Set as Set
 import System.FilePath
 import System.Directory
@@ -1309,14 +1309,8 @@ flattenExtensionFlags ml = foldr f defaultExtensionFlags
 -- @docs/users_guide/exts@.
 languageExtensions :: Maybe Language -> [LangExt.Extension]
 
-languageExtensions Nothing
-    -- Nothing => the default case
-    = LangExt.NondecreasingIndentation -- This has been on by default for some time
-    : delete LangExt.DatatypeContexts  -- The Haskell' committee decided to
-                                       -- remove datatype contexts from the
-                                       -- language:
-   -- http://www.haskell.org/pipermail/haskell-prime/2011-January/003335.html
-      (languageExtensions (Just Haskell2010))
+-- Nothing: the default case
+languageExtensions Nothing = languageExtensions (Just GHC2021)
 
 languageExtensions (Just Haskell98)
     = [LangExt.ImplicitPrelude,

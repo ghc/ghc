@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE Safe #-}
 -- | Import SYB stuff that should be safe
 module Main where

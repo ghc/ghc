@@ -1,5 +1,5 @@
 
-T9858a.hs:20:18: error:
+T9858a.hs:21:18: error:
     • Illegal qualified type:
         (() :: Constraint, () :: Constraint) => ()
     • In the expansion of type synonym ‘PX’

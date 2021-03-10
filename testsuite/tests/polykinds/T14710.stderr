@@ -1,30 +1,30 @@
 
-T14710.hs:9:21: error:
+T14710.hs:10:21: error:
     Unexpected kind variable ‘a’
     Perhaps you intended to use PolyKinds
     In a class method signature for ‘c1’
 
-T14710.hs:10:22: error:
+T14710.hs:11:22: error:
     Unexpected kind variable ‘a’
     Perhaps you intended to use PolyKinds
     In a class method signature for ‘c2’
 
-T14710.hs:15:23: error:
+T14710.hs:16:23: error:
     Unexpected kind variable ‘a’
     Perhaps you intended to use PolyKinds
     In the type signature for ‘g1’
 
-T14710.hs:18:24: error:
+T14710.hs:19:24: error:
     Unexpected kind variable ‘a’
     Perhaps you intended to use PolyKinds
     In the type signature for ‘g2’
 
-T14710.hs:21:31: error:
+T14710.hs:22:31: error:
     Unexpected kind variable ‘k’
     Perhaps you intended to use PolyKinds
     In the type signature for ‘h1’
 
-T14710.hs:24:22: error:
+T14710.hs:25:22: error:
     Unexpected kind variable ‘k’
     Perhaps you intended to use PolyKinds
     In the type signature for ‘h2’

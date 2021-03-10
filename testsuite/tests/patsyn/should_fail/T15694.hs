@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# Language RankNTypes, PatternSynonyms, TypeOperators, DataKinds, PolyKinds, KindSignatures, GADTs #-}
 
 module T15694 where

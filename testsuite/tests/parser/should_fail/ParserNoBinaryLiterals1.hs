@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 module ParserNoBinaryLiterals1 where
 
 f :: Int -> ()

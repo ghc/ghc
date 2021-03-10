@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE PatternSynonyms, ViewPatterns, ConstraintKinds, TypeFamilies, PolyKinds, KindSignatures #-}
 module T10997_1a where
 

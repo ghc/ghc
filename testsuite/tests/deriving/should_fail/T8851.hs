@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving, ConstrainedClassMethods #-}
 
 module T8851 where

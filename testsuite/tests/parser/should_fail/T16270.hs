@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE NoTraditionalRecordSyntax, NoDoAndIfThenElse, NoMultiWayIf, NoLambdaCase, NoNumericUnderscores, MagicHash #-}
 {-# OPTIONS -Werror=missing-space-after-bang #-}
 

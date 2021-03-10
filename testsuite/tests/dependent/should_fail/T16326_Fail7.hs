@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE PolyKinds #-}
 module T16326_Fail7 where
 

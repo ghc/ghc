@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 -- Fails with a kind error.
 -- The current error message was rather horrible (trac bug #312):
 --

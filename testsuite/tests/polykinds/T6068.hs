@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 {-# LANGUAGE PolyKinds, DataKinds, TypeFamilies, GADTs, MultiParamTypeClasses, KindSignatures,
              FunctionalDependencies, FlexibleInstances, UndecidableInstances, ExistentialQuantification #-}

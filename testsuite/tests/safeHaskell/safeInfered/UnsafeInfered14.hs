@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# OPTIONS_GHC -fwarn-unsafe -Werror #-}
 {-# LANGUAGE FlexibleInstances #-}
 module UnsafeInfered14 where

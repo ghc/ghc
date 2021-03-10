@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE PolyKinds, FunctionalDependencies, MultiParamTypeClasses #-}
 
 module T9201 where

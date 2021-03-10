@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# Language RankNTypes, PatternSynonyms, DataKinds, PolyKinds, GADTs,
              TypeOperators, MultiParamTypeClasses, TypeFamilies,
              TypeSynonymInstances, FlexibleInstances, InstanceSigs, FlexibleContexts #-}

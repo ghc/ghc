@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE EmptyDataDecls, TypeFamilies, UndecidableInstances,
              ScopedTypeVariables, TypeOperators,
              FlexibleInstances, NoMonomorphismRestriction,

@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE Trustworthy #-}
 {-# OPTIONS_GHC -fenable-rewrite-rules #-}
 {-# OPTIONS_GHC -fwarn-safe #-}

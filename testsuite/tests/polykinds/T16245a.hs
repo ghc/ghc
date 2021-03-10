@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeInType #-}
 module Bug where
