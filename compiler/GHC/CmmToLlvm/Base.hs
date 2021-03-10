@@ -287,7 +287,7 @@ supportedLlvmVersionMin = LlvmVersion (sUPPORTED_LLVM_VERSION_MIN NE.:| [])
 supportedLlvmVersionMax = LlvmVersion (sUPPORTED_LLVM_VERSION_MAX NE.:| [])
 
 llvmVersionSupported :: LlvmVersion -> Bool
-llvmVersionSupported (LlvmVersion v) =
+llvmVersionSupported v =
   v > supportedLlvmVersionMin && v <= supportedLlvmVersionMax
 
 llvmVersionStr :: LlvmVersion -> String
