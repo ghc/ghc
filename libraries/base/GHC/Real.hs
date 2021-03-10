@@ -629,10 +629,10 @@ fromIntegral = fromInteger . toInteger
 --
 -- For 'Double' it also behaves differently with or without -O0:
 --
--- >>> realToFrac nan -- With -O0
--- Infinity
--- >>> realToFrac nan
--- NaN
+-- > Prelude> realToFrac nan -- With -O0
+-- > -Infinity
+-- > Prelude> realToFrac nan
+-- > NaN
 realToFrac :: (Real a, Fractional b) => a -> b
 {-# NOINLINE [1] realToFrac #-}
 realToFrac = fromRational . toRational
