@@ -2254,12 +2254,16 @@ AC_DEFUN([XCODE_VERSION],[
 #
 AC_DEFUN([FIND_LLVM_PROG],[
     # Test that $1 is a particular version (given by the $version variable)
-    test_version() {
+    # Sequentially look for all versions in the supported range, starting with
+    # the newest.
+    for version in `seq $4 -1 $3`; do
+        # Look for program with version suffix.
+        AC_CHECK_TOOLS([$1], [$2-$version $2-$version.0], [:])
         if test "$$1" != ":"; then
-            AC_MSG_CHECKING([$$1 is version $3])
+            AC_MSG_CHECKING([$$1 is version $version])
             if test `$$1 --version | grep -c "version $version"` -gt 0 ; then
                 AC_MSG_RESULT(yes)
-                return 0
+                retrun 0
             else
                 AC_MSG_RESULT(no)
                 $1=""
@@ -2267,20 +2271,8 @@ AC_DEFUN([FIND_LLVM_PROG],[
             fi
         else
             $1=""
-            return 1
         fi
-    }
-
-    # Sequentially look for all versions in the supported range, starting with
-    # the newest.
-    for version in `seq $4 -1 $3`; do
-        # Look for program with version suffix.
-        AC_CHECK_TOOLS([$1], [$2-$version $2-$version.0], [:])
-        test_version && break
     done
-
-    # None of the above worked; try looking for a non-suffixed executable
-    AC_CHECK_TOOLS([$1], [$2], [:])
 ])
 
 # CHECK_LD_COPY_BUG()
