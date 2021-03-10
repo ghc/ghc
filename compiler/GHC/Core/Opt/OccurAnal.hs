@@ -2121,7 +2121,7 @@ occAnalApp env (fun, args, ticks)
         -- often leaves behind beta redexs like
         --      (\x y -> e) a1 a2
         -- Here we would like to mark x,y as one-shot, and treat the whole
-        -- thing much like a let.  We do this by pushing some True items
+        -- thing much like a let.  We do this by pushing some OneShotLam items
         -- onto the context stack.
     !(args_uds, args') = occAnalArgs env args []
 
@@ -2403,7 +2403,13 @@ markJoinOneShots mb_join_arity bndrs
 
 addAppCtxt :: OccEnv -> [Arg CoreBndr] -> OccEnv
 addAppCtxt env@(OccEnv { occ_one_shots = ctxt }) args
-  = env { occ_one_shots = replicate (valArgCount args) OneShotLam ++ ctxt }
+  | n_val_args > 0
+  = env { occ_one_shots = replicate n_val_args OneShotLam ++ ctxt
+        , occ_encl = OccVanilla }
+  | otherwise
+  = env
+  where
+    n_val_args = valArgCount args
 
 --------------------
 transClosureFV :: VarEnv VarSet -> VarEnv VarSet
