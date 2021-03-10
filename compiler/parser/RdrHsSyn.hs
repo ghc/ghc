@@ -3241,7 +3241,9 @@ mkSumOrTuplePat l boxity (Tuple ps) = do
   return $ cL l (PatBuilderPat (TuplePat noExtField ps' boxity))
   where
     toTupPat :: Located (Maybe (Located (PatBuilder GhcPs))) -> PV (LPat GhcPs)
-    toTupPat (dL -> L l p) = case p of
+    -- Ignore the element location so that the error message refers to the
+    -- entire tuple. See #19504 (and the discussion) for details.
+    toTupPat (dL -> L _ p) = case p of
       Nothing -> addFatalError l (text "Tuple section in pattern context")
       Just p' -> checkLPat p'
 
