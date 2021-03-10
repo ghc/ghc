@@ -365,8 +365,7 @@ class Foldable t where
     -- >>> foldl (\a _ -> a) 0 $ repeat 1
     -- * Hangs forever *
     --
-    -- WARNING: I have never seen a case where you want to use 'foldl' rather
-    -- than 'foldl'' in practice.
+    -- WARNING: When it comes to lists, you always want to use 'foldl'' instead.
     foldl :: (b -> a -> b) -> b -> t a -> b
     foldl f z t = appEndo (getDual (foldMap (Dual . Endo . flip f) t)) z
     -- There's no point mucking around with coercions here,
