@@ -506,9 +506,13 @@ renameVars_instr platform (LiveInstr instr mLiveness)
          let rsModified          = rsRead `intersectUniqSets` rsWritten
          let rsUsed              = rsRead `unionUniqSets` rsWritten
 
+         -- Exclude conditionally executed instructions - can't rename dest operand.
          -- Excluding modified vregs from definitions, i.e., 2-Addr instructions
          -- and things like `inc x`, bc. we can't use 2 separate names for these.
-         let defs                = filterUniqSet isVirtualReg
+         let defs
+                = if isConditionalInstr instr
+                  then emptyUniqSet
+                  else filterUniqSet isVirtualReg
                                  $ maybe emptyUniqSet
                                         (\l -> liveBorn l `minusUniqSet` rsModified) mLiveness
 
