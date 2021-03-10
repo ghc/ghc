@@ -134,10 +134,8 @@ instance Binary BinData where
 
 dataHandle :: BinData -> IO BinHandle
 dataHandle (BinData size bin) = do
-  ixr <- newFastMutInt
-  szr <- newFastMutInt
-  writeFastMutInt ixr 0
-  writeFastMutInt szr size
+  ixr <- newFastMutInt 0
+  szr <- newFastMutInt size
   binr <- newIORef bin
   return (BinMem noUserData ixr szr binr)
 
@@ -215,10 +213,8 @@ openBinMem size
  | otherwise = do
    arr <- mallocForeignPtrBytes size
    arr_r <- newIORef arr
-   ix_r <- newFastMutInt
-   writeFastMutInt ix_r 0
-   sz_r <- newFastMutInt
-   writeFastMutInt sz_r size
+   ix_r <- newFastMutInt 0
+   sz_r <- newFastMutInt size
    return (BinMem noUserData ix_r sz_r arr_r)
 
 tellBin :: BinHandle -> IO (Bin a)
@@ -251,10 +247,8 @@ readBinMem filename = do
        error ("Binary.readBinMem: only read " ++ show count ++ " bytes")
   hClose h
   arr_r <- newIORef arr
-  ix_r <- newFastMutInt
-  writeFastMutInt ix_r 0
-  sz_r <- newFastMutInt
-  writeFastMutInt sz_r filesize
+  ix_r <- newFastMutInt 0
+  sz_r <- newFastMutInt filesize
   return (BinMem noUserData ix_r sz_r arr_r)
 
 -- expand the size of the array to include a specified offset
@@ -896,7 +890,7 @@ lazyGet bh = do
     a <- unsafeInterleaveIO $ do
         -- NB: Use a fresh off_r variable in the child thread, for thread
         -- safety.
-        off_r <- newFastMutInt
+        off_r <- newFastMutInt 0
         getAt bh { _off_r = off_r } p_a
     seekBin bh p -- skip over the object for now
     return a

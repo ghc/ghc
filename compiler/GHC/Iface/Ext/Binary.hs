@@ -98,14 +98,12 @@ writeHieFile hie_file_path hiefile = do
   put_ bh0 symtab_p_p
 
   -- Make some initial state
-  symtab_next <- newFastMutInt
-  writeFastMutInt symtab_next 0
+  symtab_next <- newFastMutInt 0
   symtab_map <- newIORef emptyUFM :: IO (IORef (UniqFM Name (Int, HieName)))
   let hie_symtab = HieSymbolTable {
                       hie_symtab_next = symtab_next,
                       hie_symtab_map  = symtab_map }
-  dict_next_ref <- newFastMutInt
-  writeFastMutInt dict_next_ref 0
+  dict_next_ref <- newFastMutInt 0
   dict_map_ref <- newIORef emptyUFM
   let hie_dict = HieDictionary {
                       hie_dict_next = dict_next_ref,
