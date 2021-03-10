@@ -15,7 +15,8 @@ module GHC.CmmToLlvm.Base (
         LiveGlobalRegs,
         LlvmUnresData, LlvmData, UnresLabel, UnresStatic,
 
-        LlvmVersion, supportedLlvmVersion, llvmVersionSupported, parseLlvmVersion,
+        LlvmVersion, supportedLlvmVersionMin, supportedLlvmVersionMax,
+        llvmVersionSupported, parseLlvmVersion,
         llvmVersionStr, llvmVersionList,
 
         LlvmM,
