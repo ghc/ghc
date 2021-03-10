@@ -31,6 +31,7 @@ import GHC.Core.Type
 
 import GHC.Types.Avail
 import GHC.Types.Fixity.Env
+import GHC.Types.Id ( isRecordSelector )
 import GHC.Types.Id.Info ( IdDetails(..) )
 import GHC.Types.Name
 import GHC.Types.Name.Env
@@ -342,7 +343,9 @@ extendInteractiveContextWithIds ictxt new_ids
 shadowed_by :: [Id] -> TyThing -> Bool
 shadowed_by ids = shadowed
   where
-    shadowed id = getOccName id `elemOccSet` new_occs
+    -- Keep record selectors because they might be needed by HasField (#19322)
+    shadowed (AnId id) | isRecordSelector id = False
+    shadowed tything = getOccName tything `elemOccSet` new_occs
     new_occs = mkOccSet (map getOccName ids)
 
 setInteractivePrintName :: InteractiveContext -> Name -> InteractiveContext
@@ -364,7 +367,7 @@ icExtendGblRdrEnv env tythings
        | otherwise
        = foldl' extendGlobalRdrEnv env1 (concatMap localGREsFromAvail avail)
        where
-          env1  = shadowNames env (concatMap availNames avail)
+          env1  = shadowNames env (concatMap availGreNames avail)
           avail = tyThingAvailInfo thing
 
     -- Ugh! The new_tythings may include record selectors, since they

@@ -261,7 +261,7 @@ tyThingAvailInfo (ATyCon t)
                    dcs  = tyConDataCons t
                    flds = tyConFieldLabels t
 tyThingAvailInfo (AConLike (PatSynCon p))
-  = map avail ((getName p) : map flSelector (patSynFieldLabels p))
+  = avail (getName p) : map availField (patSynFieldLabels p)
 tyThingAvailInfo t
    = [avail (getName t)]
 

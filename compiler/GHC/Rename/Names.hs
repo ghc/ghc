@@ -624,7 +624,8 @@ extendGlobalRdrEnvRn avails new_fixities
                        | otherwise      = rdr_env
 
               lcl_env3 = lcl_env2 { tcl_th_bndrs = extendNameEnvList th_bndrs
-                                                       [ (n, (TopLevel, th_lvl))
+                                                       [ ( greNameMangledName n
+                                                         , (TopLevel, th_lvl) )
                                                        | n <- new_names ] }
 
         ; rdr_env2 <- foldlM add_gre rdr_env1 new_gres
@@ -635,8 +636,8 @@ extendGlobalRdrEnvRn avails new_fixities
         ; traceRn "extendGlobalRdrEnvRn 2" (pprGlobalRdrEnv True rdr_env2)
         ; return (gbl_env', lcl_env3) }
   where
-    new_names = concatMap availNames avails
-    new_occs  = map nameOccName new_names
+    new_names = concatMap availGreNames avails
+    new_occs  = map occName new_names
 
     -- If there is a fixity decl for the gre, add it to the fixity env
     extend_fix_env fix_env gre

@@ -50,6 +50,7 @@ typedef struct _GC_FLAGS {
     uint32_t     heapSizeSuggestion; /* in *blocks* */
     bool heapSizeSuggestionAuto;
     double  oldGenFactor;
+    double  returnDecayFactor;
     double  pcFreeHeap;
 
     bool         useNonmoving; // default = false

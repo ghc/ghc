@@ -1068,7 +1068,7 @@ extendGlobalRdrEnv env gre
   = extendOccEnv_Acc insertGRE Utils.singleton env
                      (greOccName gre) gre
 
-shadowNames :: GlobalRdrEnv -> [Name] -> GlobalRdrEnv
+shadowNames :: GlobalRdrEnv -> [GreName] -> GlobalRdrEnv
 shadowNames = foldl' shadowName
 
 {- Note [GlobalRdrEnv shadowing]
@@ -1144,22 +1144,21 @@ There are two reasons for shadowing:
       At that stage, the class op 'f' will have an Internal name.
 -}
 
-shadowName :: GlobalRdrEnv -> Name -> GlobalRdrEnv
+shadowName :: GlobalRdrEnv -> GreName -> GlobalRdrEnv
 -- Remove certain old GREs that share the same OccName as this new Name.
 -- See Note [GlobalRdrEnv shadowing] for details
-shadowName env name
-  = alterOccEnv (fmap alter_fn) env (nameOccName name)
+shadowName env new_name
+  = alterOccEnv (fmap (mapMaybe shadow)) env (occName new_name)
   where
-    alter_fn :: [GlobalRdrElt] -> [GlobalRdrElt]
-    alter_fn gres = mapMaybe (shadow_with name) gres
+    maybe_new_mod = nameModule_maybe (greNameMangledName new_name)
 
-    shadow_with :: Name -> GlobalRdrElt -> Maybe GlobalRdrElt
-    shadow_with new_name
+    shadow :: GlobalRdrElt -> Maybe GlobalRdrElt
+    shadow
        old_gre@(GRE { gre_lcl = lcl, gre_imp = iss })
        = case greDefinitionModule old_gre of
            Nothing -> Just old_gre   -- Old name is Internal; do not shadow
            Just old_mod
-              | Just new_mod <- nameModule_maybe new_name
+              | Just new_mod <- maybe_new_mod
               , new_mod == old_mod   -- Old name same as new name; shadow completely
               -> Nothing
 
@@ -1170,7 +1169,7 @@ shadowName env name
               -> Just (old_gre { gre_lcl = False, gre_imp = iss' })
 
               where
-                iss' = lcl_imp ++ mapMaybe (shadow_is new_name) iss
+                iss' = lcl_imp ++ mapMaybe shadow_is iss
                 lcl_imp | lcl       = [mk_fake_imp_spec old_gre old_mod]
                         | otherwise = []
 
@@ -1183,9 +1182,9 @@ shadowName env name
                                    , is_qual = True
                                    , is_dloc = greDefinitionSrcSpan old_gre }
 
-    shadow_is :: Name -> ImportSpec -> Maybe ImportSpec
-    shadow_is new_name is@(ImpSpec { is_decl = id_spec })
-       | Just new_mod <- nameModule_maybe new_name
+    shadow_is :: ImportSpec -> Maybe ImportSpec
+    shadow_is is@(ImpSpec { is_decl = id_spec })
+       | Just new_mod <- maybe_new_mod
        , is_as id_spec == moduleName new_mod
        = Nothing   -- Shadow both qualified and unqualified
        | otherwise -- Shadow unqualified only
