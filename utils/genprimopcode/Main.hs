@@ -901,7 +901,10 @@ ppType (TyApp (TyCon "SmallMutableArray#") [x,y]) = "mkSmallMutableArrayPrimTy "
                                                     ++ " " ++ ppType y
 ppType (TyApp (TyCon "MutableByteArray#") [x])  = "mkMutableByteArrayPrimTy "
                                                    ++ ppType x
-ppType (TyApp (TyCon "Array#") [x])             = "mkArrayPrimTy " ++ ppType x
+ppType (TyApp (TyCon "Array#") [x])             = case x of
+  TyVar "v" -> "mkArrayPrimTy levity1Ty levPolyAlphaTy"
+  _ -> "mkArrayPrimTy liftedRepTy " ++ ppType x
+ppType (TyApp (TyCon "Array#") [x])             = "mkArrayPrimTy levPolyAlphaTy " ++ ppType x
 ppType (TyApp (TyCon "ArrayArray#") [])         = "mkArrayArrayPrimTy"
 ppType (TyApp (TyCon "SmallArray#") [x])        = "mkSmallArrayPrimTy " ++ ppType x
 

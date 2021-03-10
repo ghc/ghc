@@ -29,7 +29,7 @@ module GHC.Builtin.Types.Prim(
         openAlphaTyVar, openBetaTyVar, openGammaTyVar,
         openAlphaTy, openBetaTy, openGammaTy,
 
-        levPolyAlphaTyVar, levPolyAlphaTy, levity1TyVar,
+        levPolyAlphaTyVar, levPolyAlphaTy, levity1TyVar, levity1Ty,
 
         multiplicityTyVar1, multiplicityTyVar2,
 
@@ -102,7 +102,7 @@ import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Builtin.Types
   ( runtimeRepTy, levityTy, unboxedTupleKind, liftedTypeKind
-  , boxedRepDataConTyCon
+  , boxedRepDataConTyCon, unliftedTypeKind
   , vecRepDataConTyCon, tupleRepDataConTyCon
   , liftedRepTy, unliftedRepTy
   , intRepDataConTy
@@ -1009,8 +1009,8 @@ mutableArrayArrayPrimTyCon = pcPrimTyCon mutableArrayArrayPrimTyConName [Nominal
 smallArrayPrimTyCon        = pcPrimTyCon smallArrayPrimTyConName        [Representational] UnliftedRep
 smallMutableArrayPrimTyCon = pcPrimTyCon smallMutableArrayPrimTyConName [Nominal, Representational] UnliftedRep
 
-mkArrayPrimTy :: Type -> Type
-mkArrayPrimTy elt           = TyConApp arrayPrimTyCon [elt]
+mkArrayPrimTy :: Type -> Type -> Type
+mkArrayPrimTy v elt         = TyConApp arrayPrimTyCon [v,elt]
 byteArrayPrimTy :: Type
 byteArrayPrimTy             = mkTyConTy byteArrayPrimTyCon
 mkArrayArrayPrimTy :: Type
