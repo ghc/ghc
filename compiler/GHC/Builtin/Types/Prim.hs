@@ -604,7 +604,7 @@ pcPrimTyCon name roles rep
     result_kind = tYPE (primRepToRuntimeRep rep)
 
 -- Types whose kinds look like this:
---   forall {v :: Levity}. TYPE (BoxedRep v) -> UnliftedRep
+--   forall {v :: Levity}. TYPE (BoxedRep v) -> UnliftedType
 pcPrimTyConLev1 :: Name -> TyCon
 pcPrimTyConLev1 name
   = mkPrimTyCon name binders result_kind [Nominal,Representational]
