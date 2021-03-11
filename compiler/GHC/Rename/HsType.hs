@@ -68,7 +68,6 @@ import GHC.Types.Fixity ( compareFixity, negateFixity
 import GHC.Types.Basic  ( TypeOrKind(..) )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Data.FastString
 import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -831,7 +830,7 @@ rnHsTyOp env overall_ty (L loc op)
 --------------
 notAllowed :: SDoc -> SDoc
 notAllowed doc
-  = text "Wildcard" <+> quotes doc <+> ptext (sLit "not allowed")
+  = text "Wildcard" <+> quotes doc <+> text "not allowed"
 
 checkWildCard :: RnTyKiEnv -> Maybe SDoc -> RnM ()
 checkWildCard env (Just doc)
@@ -1593,7 +1592,7 @@ precParseErr op1@(n1,_) op2@(n2,_)
   = return ()     -- Avoid error cascade
   | otherwise
   = addErr $ hang (text "Precedence parsing error")
-      4 (hsep [text "cannot mix", ppr_opfix op1, ptext (sLit "and"),
+      4 (hsep [text "cannot mix", ppr_opfix op1, text "and",
                ppr_opfix op2,
                text "in the same infix expression"])
 
@@ -1602,7 +1601,7 @@ sectionPrecErr op@(n1,_) arg_op@(n2,_) section
   | is_unbound n1 || is_unbound n2
   = return ()     -- Avoid error cascade
   | otherwise
-  = addErr $ vcat [text "The operator" <+> ppr_opfix op <+> ptext (sLit "of a section"),
+  = addErr $ vcat [text "The operator" <+> ppr_opfix op <+> text "of a section",
          nest 4 (sep [text "must have lower precedence than that of the operand,",
                       nest 2 (text "namely" <+> ppr_opfix arg_op)]),
          nest 4 (text "in the section:" <+> quotes (ppr section))]
@@ -1655,7 +1654,7 @@ warnUnusedForAll doc (L loc tv) used_names
 
 opTyErr :: Outputable a => RdrName -> a -> SDoc
 opTyErr op overall_ty
-  = hang (text "Illegal operator" <+> quotes (ppr op) <+> ptext (sLit "in type") <+> quotes (ppr overall_ty))
+  = hang (text "Illegal operator" <+> quotes (ppr op) <+> text "in type" <+> quotes (ppr overall_ty))
          2 (text "Use TypeOperators to allow operators in types")
 
 {-

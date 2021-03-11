@@ -65,7 +65,6 @@ import GHC.Core.TyCon
 import GHC.Data.Maybe
 import GHC.Types.Basic
 import GHC.Data.Bag
-import GHC.Data.FastString
 import GHC.Data.BooleanFormula
 import GHC.Utils.Misc
 
@@ -469,7 +468,7 @@ dupGenericInsts tc_inst_infos
 -}
 badDmPrag :: TcId -> Sig GhcRn -> TcM ()
 badDmPrag sel_id prag
-  = addErrTc (text "The" <+> hsSigDoc prag <+> ptext (sLit "for default method")
+  = addErrTc (text "The" <+> hsSigDoc prag <+> text "for default method"
               <+> quotes (ppr sel_id)
               <+> text "lacks an accompanying binding")
 
