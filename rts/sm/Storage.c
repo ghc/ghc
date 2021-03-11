@@ -1980,20 +1980,6 @@ void freeExec (void *addr)
 
 #endif /* switch(HOST_OS) */
 
-#if RTS_LINKER_USE_MMAP
-AdjustorWritable allocateWrite(W_ bytes) {
-    return mmapForLinker(bytes, PROT_READ | PROT_WRITE, MAP_ANONYMOUS, -1, 0);
-}
-
-void markExec(W_ bytes, AdjustorWritable writ) {
-    mmapForLinkerMarkExecutable(writ, bytes);
-}
-
-void freeWrite(W_ bytes, AdjustorWritable writ) {
-    munmap(writ, bytes);
-}
-#endif
-
 #if defined(DEBUG)
 
 // handy function for use in gdb, because Bdescr() is inlined.
