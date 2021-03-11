@@ -1548,7 +1548,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
         -----------------  Convert to STG ------------------
         (stg_binds, denv, (caf_ccs, caf_cc_stacks))
             <- {-# SCC "CoreToStg" #-}
-               myCoreToStg hsc_env this_mod location prepd_binds
+               myCoreToStg logger dflags (hsc_IC hsc_env) this_mod location prepd_binds
 
         let cost_centre_info =
               (S.toList local_ccs ++ caf_ccs, caf_cc_stacks)
@@ -1622,7 +1622,7 @@ hscInteractive hsc_env cgguts location = do
 
     (stg_binds, _infotable_prov, _caf_ccs__caf_cc_stacks)
       <- {-# SCC "CoreToStg" #-}
-          myCoreToStg hsc_env this_mod location prepd_binds
+          myCoreToStg logger dflags (hsc_IC hsc_env) this_mod location prepd_binds
     -----------------  Generate byte code ------------------
     comp_bc <- byteCodeGen hsc_env this_mod stg_binds data_tycons mod_breaks
     ------------------ Create f-x-dynamic C-side stuff -----
@@ -1761,18 +1761,19 @@ doCodeGen hsc_env this_mod denv data_tycons
 
     return (Stream.mapM dump2 pipeline_stream)
 
-myCoreToStg :: HscEnv -> Module -> ModLocation -> CoreProgram
+myCoreToStg :: Logger -> DynFlags -> InteractiveContext
+            -> Module -> ModLocation -> CoreProgram
             -> IO ( [StgTopBinding] -- output program
                   , InfoTableProvMap
                   , CollectedCCs )  -- CAF cost centre info (declared and used)
-myCoreToStg hsc_env this_mod ml prepd_binds = do
+myCoreToStg logger dflags ictxt this_mod ml prepd_binds = do
     let (stg_binds, denv, cost_centre_info)
          = {-# SCC "Core2Stg" #-}
-           coreToStg (hsc_dflags hsc_env) this_mod ml prepd_binds
+           coreToStg dflags this_mod ml prepd_binds
 
     stg_binds2
         <- {-# SCC "Stg2Stg" #-}
-           stg2stg hsc_env this_mod stg_binds
+           stg2stg logger dflags ictxt this_mod stg_binds
 
     return (stg_binds2, denv, cost_centre_info)
 
@@ -1913,7 +1914,12 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
 
     (stg_binds, _infotable_prov, _caf_ccs__caf_cc_stacks)
         <- {-# SCC "CoreToStg" #-}
-           liftIO $ myCoreToStg hsc_env this_mod iNTERACTIVELoc prepd_binds
+           liftIO $ myCoreToStg (hsc_logger hsc_env)
+                                (hsc_dflags hsc_env)
+                                (hsc_IC hsc_env)
+                                this_mod
+                                iNTERACTIVELoc
+                                prepd_binds
 
     {- Generate byte code -}
     cbc <- liftIO $ byteCodeGen hsc_env this_mod
@@ -2093,15 +2099,18 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr
                                       ml_obj_file  = panic "hscCompileCoreExpr':ml_obj_file",
                                       ml_hie_file  = panic "hscCompileCoreExpr':ml_hie_file" }
 
+         ; let ictxt = hsc_IC hsc_env
          ; ([StgTopLifted (StgNonRec _ stg_expr)], _, _) <-
-             myCoreToStg hsc_env
-                         (icInteractiveModule (hsc_IC hsc_env))
+             myCoreToStg (hsc_logger hsc_env)
+                         (hsc_dflags hsc_env)
+                         ictxt
+                         (icInteractiveModule ictxt)
                          iNTERACTIVELoc
                          [NonRec bco_tmp_id prepd_expr]
 
            {- Convert to BCOs -}
          ; bcos <- stgExprToBCOs hsc_env
-                     (icInteractiveModule (hsc_IC hsc_env))
+                     (icInteractiveModule ictxt)
                      bco_tmp_id
                      stg_expr
 
