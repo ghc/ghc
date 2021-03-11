@@ -1949,6 +1949,15 @@ unrestrictedFunTyConKey = mkPreludeTyConUnique 193
 multMulTyConKey :: Unique
 multMulTyConKey = mkPreludeTyConUnique 194
 
+-- CallingConv
+runtimeInfoTyConKey, runtimeInfoDataConKey, callingConvTyConKey,
+   convEvalDataConKey, convCallDataConKey :: Unique
+runtimeInfoTyConKey    = mkPreludeTyConUnique 195
+runtimeInfoDataConKey  = mkPreludeDataConUnique 196
+callingConvTyConKey    = mkPreludeTyConUnique 197
+convEvalDataConKey     = mkPreludeDataConUnique 198
+convCallDataConKey     = mkPreludeDataConUnique 199
+
 ---------------- Template Haskell -------------------
 --      GHC.Builtin.Names.TH: USES TyConUniques 200-299
 -----------------------------------------------------

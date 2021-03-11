@@ -120,6 +120,7 @@ module GHC.Core.TyCon(
 
         -- * Primitive representations of Types
         PrimRep(..), PrimElemRep(..),
+        PrimConv (..), PrimInfo (..),
         isVoidRep, isGcPtrRep,
         primRepSizeB,
         primElemRepSizeB,
@@ -1073,6 +1074,8 @@ data RuntimeRepInfo
       -- be the list of arguments to the promoted datacon.
   | VecCount Int         -- ^ A constructor of @VecCount@
   | VecElem PrimElemRep  -- ^ A constructor of @VecElem@
+  | RuntimeInfo ([Type] -> [PrimInfo])
+  | CallingConvInfo ([Type] -> [PrimConv])
 
 -- | Extract those 'DataCon's that we are able to learn about.  Note
 -- that visibility in this sense does not correspond to visibility in
@@ -1549,6 +1552,26 @@ primRepIsFloat  FloatRep     = Just True
 primRepIsFloat  DoubleRep    = Just True
 primRepIsFloat  (VecRep _ _) = Nothing
 primRepIsFloat  _            = Just False
+
+{-
+************************************************************************
+*                                                                      *
+                             PrimConv
+*                                                                      *
+************************************************************************
+
+Note [PrimConv]
+
+A type for representing the calling convention of a type. Either the arity
+for extensional functions or the levity for data terms.
+-}
+
+data PrimConv =  
+    ConvEval 
+  -- | ConvCall [PrimRep] 
+  deriving (Show)
+
+data PrimInfo = RInfo {rep :: PrimRep, conv :: PrimConv}  
 
 
 {-

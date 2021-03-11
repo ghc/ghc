@@ -131,6 +131,8 @@ module GHC.Builtin.Types (
 
         doubleElemRepDataConTy,
 
+        callingConvTy,
+
         -- * Multiplicity and friends
         multiplicityTyConName, oneDataConName, manyDataConName, multiplicityTy,
         multiplicityTyCon, oneDataCon, manyDataCon, oneDataConTy, manyDataConTy,
@@ -1400,7 +1402,7 @@ unrestrictedFunTyConName = mkWiredInTyConName BuiltInSyntax gHC_TYPES (fsLit "->
 
 {- *********************************************************************
 *                                                                      *
-                Kinds and RuntimeRep
+                Kinds, RuntimeRep and CallingConv
 *                                                                      *
 ********************************************************************* -}
 
@@ -1557,6 +1559,66 @@ liftedRepDataConTyCon = promoteDataCon liftedRepDataCon
 -- The type ('LiftedRep)
 liftedRepTy :: Type
 liftedRepTy = liftedRepDataConTy
+
+
+callingConvTyConName, convEvalDataConName, convCallDataConName :: Name
+callingConvTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "CallingConv") callingConvTyConKey callingConvTyCon
+convEvalDataConName  = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "ConvEval") convEvalDataConKey convEvalDataCon
+-- convCallDataConName  = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "ConvCall") convCallDataConKey convCallDataCon
+convCallDataConName = undefined
+
+convEvalDataCon = pcSpecialDataCon convEvalDataConName [] callingConvTyCon (CallingConvInfo $ \_ -> [ConvEval])
+
+convEvalDataConTyCon :: TyCon
+convEvalDataConTyCon = promoteDataCon convEvalDataCon
+
+convEvalDataConTy :: Type
+convEvalDataConTy = mkTyConTy convEvalDataConTyCon
+
+
+callingConvTyCon :: TyCon
+callingConvTyCon = pcTyCon callingConvTyConName Nothing []
+    [convEvalDataCon]
+
+callingConvTy :: Type
+callingConvTy = mkTyConTy callingConvTyCon 
+
+{- *********************************************************************
+*                                                                      *
+     RuntimeInfo Types
+*                                                                      *
+********************************************************************* -}
+
+runtimeInfoTyConName, runtimeInfoDataConName :: Name
+runtimeInfoTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "RuntimeInfo") runtimeInfoTyConKey runtimeInfoTyCon
+runtimeInfoDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "RInfo") runtimeInfoDataConKey runtimeInfoDataCon
+
+runtimeInfoTyCon :: TyCon
+runtimeInfoTyCon = pcTyCon runtimeInfoTyConName Nothing []
+    [runtimeInfoDataCon]
+
+runtimeInfoDataCon :: DataCon
+runtimeInfoDataCon = pcSpecialDataCon runtimeInfoDataConName [ runtimeRepTy
+                                                   , mkTyConTy callingConvTyCon ]
+                                 runtimeInfoTyCon
+                                 (RuntimeInfo prim_info_fun)
+  where
+    -- See Note [Getting from RuntimeRep to PrimRep] in GHC.Types.RepType
+    prim_info_fun tys@[rep, conv]
+      = [RInfo (head $ runtimeRepPrimRep doc rep)  ConvEval]
+        where doc = text "runtimeInfoDataCon" <+> ppr tys
+    prim_info_fun args
+      = pprPanic "runtimeInfoDataCon" (ppr args)
+
+runtimeInfoDataConTyCon :: TyCon
+runtimeInfoDataConTyCon = promoteDataCon runtimeInfoDataCon
+
+runtimeInfoDataConTy :: Type
+runtimeInfoDataConTy = mkTyConTy runtimeInfoDataConTyCon
+
+runtimeInfoTy :: Type
+runtimeInfoTy = mkTyConTy runtimeInfoTyCon
+
 
 {- *********************************************************************
 *                                                                      *
