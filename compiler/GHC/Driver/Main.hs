@@ -1761,6 +1761,27 @@ doCodeGen hsc_env this_mod denv data_tycons
 
     return (Stream.mapM dump2 pipeline_stream)
 
+myCoreToStgExpr :: Logger -> DynFlags -> InteractiveContext
+                -> Module -> ModLocation -> CoreExpr
+                -> IO ( StgRhs
+                      , InfoTableProvMap
+                      , CollectedCCs )
+myCoreToStgExpr logger dflags ictxt this_mod ml prepd_expr = do
+    {- Create a temporary binding (just because myCoreToStg needs a
+       binding for the stg2stg step) -}
+    let bco_tmp_id = mkSysLocal (fsLit "BCO_toplevel")
+                                (mkPseudoUniqueE 0)
+                                Many
+                                (exprType prepd_expr)
+    ([StgTopLifted (StgNonRec _ stg_expr)], prov_map, collected_ccs) <-
+       myCoreToStg logger
+                   dflags
+                   ictxt
+                   this_mod
+                   ml
+                   [NonRec bco_tmp_id prepd_expr]
+    return (stg_expr, prov_map, collected_ccs)
+
 myCoreToStg :: Logger -> DynFlags -> InteractiveContext
             -> Module -> ModLocation -> CoreProgram
             -> IO ( [StgTopBinding] -- output program
@@ -2087,31 +2108,24 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr
 
            {- Lint if necessary -}
          ; lintInteractiveExpr (text "hscCompileExpr") hsc_env prepd_expr
-
-           {- Create a temporary binding (just because coreToStg needs a
-              binding for the stg2stg step) and convert to STG -}
-         ; let bco_tmp_id = mkSysLocal (fsLit "BCO_toplevel")
-                                       (mkPseudoUniqueE 0)
-                                       Many
-                                       (exprType prepd_expr)
          ; let iNTERACTIVELoc = ModLocation{ ml_hs_file   = Nothing,
                                       ml_hi_file   = panic "hscCompileCoreExpr':ml_hi_file",
                                       ml_obj_file  = panic "hscCompileCoreExpr':ml_obj_file",
                                       ml_hie_file  = panic "hscCompileCoreExpr':ml_hie_file" }
 
          ; let ictxt = hsc_IC hsc_env
-         ; ([StgTopLifted (StgNonRec _ stg_expr)], _, _) <-
-             myCoreToStg (hsc_logger hsc_env)
-                         (hsc_dflags hsc_env)
-                         ictxt
-                         (icInteractiveModule ictxt)
-                         iNTERACTIVELoc
-                         [NonRec bco_tmp_id prepd_expr]
+         ; (stg_expr, _, _) <-
+             myCoreToStgExpr (hsc_logger hsc_env)
+                             (hsc_dflags hsc_env)
+                             ictxt
+                             (icInteractiveModule ictxt)
+                             iNTERACTIVELoc
+                             prepd_expr
 
            {- Convert to BCOs -}
          ; bcos <- stgExprToBCOs hsc_env
                      (icInteractiveModule ictxt)
-                     bco_tmp_id
+                     (exprType prepd_expr)
                      stg_expr
 
            {- load it -}
