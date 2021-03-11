@@ -541,10 +541,21 @@ mkTupleInfoSig ti@TupleInfo{..}
     because we need a stg_ctoi_tN stack frame for each size N
 
     If needed, you can support larger tuples by adding more in
-    StgMiscClosures.cmm and MiscClosures.h and raising this limit.
+    StgMiscClosures.cmm, Interpreter.c and MiscClosures.h and
+    raising this limit.
+
+    Note that the limit is the number of words passed on the stack.
+    If the calling convention passes part of the tuple in registers, the
+    maximum number of tuple elements may be larger. Elements can also
+    take multiple words on the stack (for example Double# on a 32 bit
+    platform).
+
    -}
-  | tupleNativeStackSize > 32 =
-    pprPanic "mkTupleInfoSig: tuple too big" (ppr tupleNativeStackSize)
+  | tupleNativeStackSize > 62 =
+    pprPanic "mkTupleInfoSig: tuple too big for the bytecode compiler"
+             (ppr tupleNativeStackSize <+> text "stack words" $+$
+              text "use -fobject-code to get around this limit"
+             )
   {-
     Check that we aren't using too many registers for argument passing.
     If this panic is triggered, the calling convention uses more.
