@@ -39,7 +39,6 @@ import Language.Haskell.Syntax.Binds
 
 -- others:
 import GHC.Tc.Types.Evidence
-import GHC.Core
 import GHC.Core.DataCon (FieldLabelString)
 import GHC.Types.Name
 import GHC.Types.Basic
