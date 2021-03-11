@@ -660,25 +660,25 @@ outOfLineMachOp_table mop
         MO_F64_Acosh  -> fsLit "acosh"
         MO_F64_Atanh  -> fsLit "atanh"
 
-        MO_UF_Conv w -> fsLit $ word2FloatLabel w
+        MO_UF_Conv w -> word2FloatLabel w
 
         MO_Memcpy _  -> fsLit "memcpy"
         MO_Memset _  -> fsLit "memset"
         MO_Memmove _ -> fsLit "memmove"
         MO_Memcmp _  -> fsLit "memcmp"
 
-        MO_BSwap w   -> fsLit $ bSwapLabel w
-        MO_BRev w    -> fsLit $ bRevLabel w
-        MO_PopCnt w  -> fsLit $ popCntLabel w
-        MO_Pdep w    -> fsLit $ pdepLabel w
-        MO_Pext w    -> fsLit $ pextLabel w
-        MO_Clz w     -> fsLit $ clzLabel w
-        MO_Ctz w     -> fsLit $ ctzLabel w
-        MO_AtomicRMW w amop -> fsLit $ atomicRMWLabel w amop
-        MO_Cmpxchg w -> fsLit $ cmpxchgLabel w
-        MO_Xchg w -> fsLit $ xchgLabel w
-        MO_AtomicRead w -> fsLit $ atomicReadLabel w
-        MO_AtomicWrite w -> fsLit $ atomicWriteLabel w
+        MO_BSwap w          -> bSwapLabel w
+        MO_BRev w           -> bRevLabel w
+        MO_PopCnt w         -> popCntLabel w
+        MO_Pdep w           -> pdepLabel w
+        MO_Pext w           -> pextLabel w
+        MO_Clz w            -> clzLabel w
+        MO_Ctz w            -> ctzLabel w
+        MO_AtomicRMW w amop -> atomicRMWLabel w amop
+        MO_Cmpxchg w        -> cmpxchgLabel w
+        MO_Xchg w           -> xchgLabel w
+        MO_AtomicRead w     -> atomicReadLabel w
+        MO_AtomicWrite w    -> atomicWriteLabel w
 
         MO_S_Mul2    {}  -> unsupported
         MO_S_QuotRem {}  -> unsupported

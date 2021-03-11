@@ -537,9 +537,9 @@ pp_err = \case
    PsErrUnexpectedTypeInDecl t what tc tparms equals_or_where
       -> vcat [ text "Unexpected type" <+> quotes (ppr t)
               , text "In the" <+> what
-                <+> ptext (sLit "declaration for") <+> quotes tc'
+                <+> text "declaration for" <+> quotes tc'
               , vcat[ (text "A" <+> what
-                       <+> ptext (sLit "declaration should have form"))
+                       <+> text "declaration should have form")
               , nest 2
                 (what
                  <+> tc'
