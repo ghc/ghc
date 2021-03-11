@@ -43,7 +43,6 @@ import GHC.Types.Basic
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Data.Bag
-import GHC.Data.FastString
 import GHC.Data.BooleanFormula (LBooleanFormula)
 import GHC.Types.Name.Reader
 import GHC.Types.Name
@@ -515,7 +514,7 @@ instance (OutputableBndrId l, OutputableBndrId r)
       ppr_rhs = case dir of
           Unidirectional           -> ppr_simple (text "<-")
           ImplicitBidirectional    -> ppr_simple equals
-          ExplicitBidirectional mg -> ppr_simple (text "<-") <+> ptext (sLit "where") $$
+          ExplicitBidirectional mg -> ppr_simple (text "<-") <+> text "where" $$
                                       (nest 2 $ pprFunBind mg)
 
 pprTicks :: SDoc -> SDoc -> SDoc

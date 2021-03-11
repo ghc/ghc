@@ -88,12 +88,12 @@ ppType t = case t of
 ppParams :: LlvmParameterListType -> [LlvmParameter] -> SDoc
 ppParams varg p
   = let varg' = case varg of
-          VarArgs | null args -> sLit "..."
-                  | otherwise -> sLit ", ..."
-          _otherwise          -> sLit ""
+          VarArgs | null args -> text "..."
+                  | otherwise -> text ", ..."
+          _otherwise          -> text ""
         -- by default we don't print param attributes
         args = map fst p
-    in ppCommaJoin args <> ptext varg'
+    in ppCommaJoin args <> varg'
 
 -- | An LLVM section definition. If Nothing then let LLVM decide the section
 type LMSection = Maybe LMString

@@ -25,7 +25,6 @@ import GHC.Builtin.Names
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Data.FastString
 import qualified GHC.LanguageExtensions as LangExt
 
 tcDefaults :: [LDefaultDecl GhcRn]
@@ -114,5 +113,5 @@ dupDefaultDeclErr [] = panic "dupDefaultDeclErr []"
 
 badDefaultTy :: Type -> [Class] -> SDoc
 badDefaultTy ty deflt_clss
-  = hang (text "The default type" <+> quotes (ppr ty) <+> ptext (sLit "is not an instance of"))
+  = hang (text "The default type" <+> quotes (ppr ty) <+> text "is not an instance of")
        2 (foldr1 (\a b -> a <+> text "or" <+> b) (map (quotes. ppr) deflt_clss))

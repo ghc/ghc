@@ -545,14 +545,14 @@ ppr_expr (HsLamCase _ matches)
           nest 2 (pprMatches matches) ]
 
 ppr_expr (HsCase _ expr matches@(MG { mg_alts = L _ alts }))
-  = sep [ sep [text "case", nest 4 (ppr expr), ptext (sLit "of")],
+  = sep [ sep [text "case", nest 4 (ppr expr), text "of"],
           pp_alts ]
   where
     pp_alts | null alts = text "{}"
             | otherwise = nest 2 (pprMatches matches)
 
 ppr_expr (HsIf _ e1 e2 e3)
-  = sep [hsep [text "if", nest 2 (ppr e1), ptext (sLit "then")],
+  = sep [hsep [text "if", nest 2 (ppr e1), text "then"],
          nest 4 (ppr e2),
          text "else",
          nest 4 (ppr e3)]
@@ -570,7 +570,7 @@ ppr_expr (HsMultiIf _ alts)
 
 -- special case: let ... in let ...
 ppr_expr (HsLet _ binds expr@(L _ (HsLet _ _ _)))
-  = sep [hang (text "let") 2 (hsep [pprBinds binds, ptext (sLit "in")]),
+  = sep [hang (text "let") 2 (hsep [pprBinds binds, text "in"]),
          ppr_lexpr expr]
 
 ppr_expr (HsLet _ binds expr)
@@ -616,7 +616,7 @@ ppr_expr (HsTcBracketOut _ _wrap e []) = ppr e
 ppr_expr (HsTcBracketOut _ _wrap e ps) = ppr e $$ text "pending(tc)" <+> pprIfTc @p (ppr ps)
 
 ppr_expr (HsProc _ pat (L _ (HsCmdTop _ cmd)))
-  = hsep [text "proc", ppr pat, ptext (sLit "->"), ppr cmd]
+  = hsep [text "proc", ppr pat, text "->", ppr cmd]
 
 ppr_expr (HsStatic _ e)
   = hsep [text "static", ppr e]
@@ -1076,21 +1076,21 @@ ppr_cmd (HsCmdLam _ matches)
   = pprMatches matches
 
 ppr_cmd (HsCmdCase _ expr matches)
-  = sep [ sep [text "case", nest 4 (ppr expr), ptext (sLit "of")],
+  = sep [ sep [text "case", nest 4 (ppr expr), text "of"],
           nest 2 (pprMatches matches) ]
 
 ppr_cmd (HsCmdLamCase _ matches)
   = sep [ text "\\case", nest 2 (pprMatches matches) ]
 
 ppr_cmd (HsCmdIf _ _ e ct ce)
-  = sep [hsep [text "if", nest 2 (ppr e), ptext (sLit "then")],
+  = sep [hsep [text "if", nest 2 (ppr e), text "then"],
          nest 4 (ppr ct),
          text "else",
          nest 4 (ppr ce)]
 
 -- special case: let ... in let ...
 ppr_cmd (HsCmdLet _ binds cmd@(L _ (HsCmdLet {})))
-  = sep [hang (text "let") 2 (hsep [pprBinds binds, ptext (sLit "in")]),
+  = sep [hang (text "let") 2 (hsep [pprBinds binds, text "in"]),
          ppr_lcmd cmd]
 
 ppr_cmd (HsCmdLet _ binds cmd)
@@ -1459,7 +1459,7 @@ pprTransStmt :: Outputable body => Maybe body -> body -> TransForm -> SDoc
 pprTransStmt by using ThenForm
   = sep [ text "then", nest 2 (ppr using), nest 2 (pprBy by)]
 pprTransStmt by using GroupForm
-  = sep [ text "then group", nest 2 (pprBy by), nest 2 (ptext (sLit "using") <+> ppr using)]
+  = sep [ text "then group", nest 2 (pprBy by), nest 2 (text "using" <+> ppr using)]
 
 pprBy :: Outputable body => Maybe body -> SDoc
 pprBy Nothing  = empty
@@ -1702,7 +1702,7 @@ thBrackets pp_kind pp_body = char '[' <> pp_kind <> vbar <+>
                              pp_body <+> text "|]"
 
 thTyBrackets :: SDoc -> SDoc
-thTyBrackets pp_body = text "[||" <+> pp_body <+> ptext (sLit "||]")
+thTyBrackets pp_body = text "[||" <+> pp_body <+> text "||]"
 
 instance Outputable PendingRnSplice where
   ppr (PendingRnSplice _ n e) = pprPendingSplice n e

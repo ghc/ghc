@@ -351,14 +351,14 @@ warnAboutOverflowedLiterals dflags lit
         diagnosticDs (WarningWithFlag Opt_WarnOverflowedLiterals)
                      (vcat [ text "Literal" <+> integer i
                              <+> text "is negative but" <+> ppr tc
-                             <+> ptext (sLit "only supports positive numbers")
+                             <+> text "only supports positive numbers"
                            ])
 
     check i tc minB maxB
       = when (i < minB || i > maxB) $
         diagnosticDs (WarningWithFlag Opt_WarnOverflowedLiterals)
                      (vcat [ text "Literal" <+> integer i
-                             <+> text "is out of the" <+> ppr tc <+> ptext (sLit "range")
+                             <+> text "is out of the" <+> ppr tc <+> text "range"
                              <+> integer minB <> text ".." <> integer maxB
                            , sug ])
       where

@@ -76,7 +76,6 @@ import GHC.Data.List.SetOps
 import GHC.Builtin.Names
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
-import GHC.Data.FastString
 import GHC.Utils.Misc
 import GHC.Core.InstEnv      ( instanceDFunId )
 import GHC.Core.Coercion.Opt ( checkAxInstCo )
@@ -1324,9 +1323,7 @@ lintCaseExpr scrut var alt_ty alts =
      ; let isLitPat (Alt (LitAlt _) _  _) = True
            isLitPat _                     = False
      ; checkL (not $ isFloatingTy scrut_ty && any isLitPat alts)
-         (ptext (sLit $ "Lint warning: Scrutinising floating-point " ++
-                        "expression with literal pattern in case " ++
-                        "analysis (see #9238).")
+         (text "Lint warning: Scrutinising floating-point expression with literal pattern in case analysis (see #9238)."
           $$ text "scrut" <+> ppr scrut)
 
      ; case tyConAppTyCon_maybe (idType var) of

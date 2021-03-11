@@ -1242,7 +1242,7 @@ instance TH.Quasi TcM where
 
       bindName name =
           addErr $
-          hang (text "The binder" <+> quotes (ppr name) <+> ptext (sLit "is not a NameU."))
+          hang (text "The binder" <+> quotes (ppr name) <+> text "is not a NameU.")
              2 (text "Probable cause: you used mkName instead of newName to generate a binding.")
 
   qAddForeignFilePath lang fp = do
@@ -2358,11 +2358,11 @@ reifyType ty@(FunTy { ft_af = af, ft_mult = Many, ft_arg = t1, ft_res = t2 })
   | otherwise      = do { [r1,r2] <- reifyTypes [t1,t2]
                         ; return (TH.ArrowT `TH.AppT` r1 `TH.AppT` r2) }
 reifyType ty@(FunTy { ft_af = af, ft_mult = tm, ft_arg = t1, ft_res = t2 })
-  | InvisArg <- af = noTH (sLit "linear invisible argument") (ppr ty)
+  | InvisArg <- af = noTH (text "linear invisible argument") (ppr ty)
   | otherwise      = do { [rm,r1,r2] <- reifyTypes [tm,t1,t2]
                         ; return (TH.MulArrowT `TH.AppT` rm `TH.AppT` r1 `TH.AppT` r2) }
 reifyType (CastTy t _)      = reifyType t -- Casts are ignored in TH
-reifyType ty@(CoercionTy {})= noTH (sLit "coercions in types") (ppr ty)
+reifyType ty@(CoercionTy {})= noTH (text "coercions in types") (ppr ty)
 
 reify_for_all :: TyCoRep.ArgFlag -> TyCoRep.Type -> TcM TH.Type
 -- Arg of reify_for_all is always ForAllTy or a predicate FunTy
@@ -2617,8 +2617,8 @@ reifyModule (TH.Module (TH.PkgName pkgString) (TH.ModName mString)) = do
 mkThAppTs :: TH.Type -> [TH.Type] -> TH.Type
 mkThAppTs fun_ty arg_tys = foldl' TH.AppT fun_ty arg_tys
 
-noTH :: PtrString -> SDoc -> TcM a
-noTH s d = failWithTc (hsep [text "Can't represent" <+> ptext s <+>
+noTH :: SDoc -> SDoc -> TcM a
+noTH s d = failWithTc (hsep [text "Can't represent" <+> s <+>
                                 text "in Template Haskell:",
                              nest 2 d])
 

@@ -1531,7 +1531,7 @@ warnIfDeprecated gre@(GRE { gre_imp = iss })
     occ = greOccName gre
     name = greMangledName gre
     name_mod = ASSERT2( isExternalName name, ppr name ) nameModule name
-    doc = text "The name" <+> quotes (ppr occ) <+> ptext (sLit "is mentioned explicitly")
+    doc = text "The name" <+> quotes (ppr occ) <+> text "is mentioned explicitly"
 
     mk_msg imp_spec txt
       = sep [ sep [ text "In the use of"
@@ -1845,7 +1845,7 @@ lookupBindGroupOcc ctxt what rdr_name
                            , nest 2 $ text "lacks an accompanying binding"]
                        $$ nest 2 msg))
 
-    local_msg = parens $ text "The"  <+> what <+> ptext (sLit "must be given where")
+    local_msg = parens $ text "The"  <+> what <+> text "must be given where"
                            <+> quotes (ppr rdr_name) <+> text "is declared"
 
     -- Identify all similar names and produce a message listing them

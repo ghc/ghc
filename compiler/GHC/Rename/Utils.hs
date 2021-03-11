@@ -451,7 +451,7 @@ warnUnusedGRE gre@(GRE { gre_lcl = lcl, gre_imp = is })
         where
            span = importSpecLoc spec
            pp_mod = quotes (ppr (importSpecModule spec))
-           msg = text "Imported from" <+> pp_mod <+> ptext (sLit "but not used")
+           msg = text "Imported from" <+> pp_mod <+> text "but not used"
 
 -- | Make a map from selector names to field labels and parent tycon
 -- names, to be used when reporting unused record fields.
@@ -618,7 +618,7 @@ checkTupSize tup_size
   | tup_size <= mAX_TUPLE_SIZE
   = return ()
   | otherwise
-  = addErr (sep [text "A" <+> int tup_size <> ptext (sLit "-tuple is too large for GHC"),
+  = addErr (sep [text "A" <+> int tup_size <> text "-tuple is too large for GHC",
                  nest 2 (parens (text "max size is" <+> int mAX_TUPLE_SIZE)),
                  nest 2 (text "Workaround: use nested tuples or define a data type")])
 

@@ -840,9 +840,9 @@ boxityTupleSort Unboxed = UnboxedTuple
 
 tupleParens :: TupleSort -> SDoc -> SDoc
 tupleParens BoxedTuple      p = parens p
-tupleParens UnboxedTuple    p = text "(#" <+> p <+> ptext (sLit "#)")
+tupleParens UnboxedTuple    p = text "(#" <+> p <+> text "#)"
 tupleParens ConstraintTuple p   -- In debug-style write (% Eq a, Ord b %)
-  = ifPprDebug (text "(%" <+> p <+> ptext (sLit "%)"))
+  = ifPprDebug (text "(%" <+> p <+> text "%)")
                (parens p)
 
 {-
@@ -854,7 +854,7 @@ tupleParens ConstraintTuple p   -- In debug-style write (% Eq a, Ord b %)
 -}
 
 sumParens :: SDoc -> SDoc
-sumParens p = ptext (sLit "(#") <+> p <+> ptext (sLit "#)")
+sumParens p = text "(#" <+> p <+> text "#)"
 
 -- | Pretty print an alternative in an unboxed sum e.g. "| a | |".
 pprAlternative :: (a -> SDoc) -- ^ The pretty printing function to use

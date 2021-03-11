@@ -33,7 +33,6 @@ where
 import GHC.Prelude
 
 import GHC.Platform
-import GHC.Data.FastString
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
@@ -172,18 +171,18 @@ isFloat64 _other                 = False
 --              Width
 -----------------------------------------------------------------------------
 
-data Width   = W8 | W16 | W32 | W64
-             | W128
-             | W256
-             | W512
-             deriving (Eq, Ord, Show)
+data Width
+  = W8
+  | W16
+  | W32
+  | W64
+  | W128
+  | W256
+  | W512
+  deriving (Eq, Ord, Show)
 
 instance Outputable Width where
-   ppr rep = ptext (mrStr rep)
-
-mrStr :: Width -> PtrString
-mrStr = sLit . show
-
+   ppr rep = text (show rep)
 
 -------- Common Widths  ------------
 wordWidth :: Platform -> Width

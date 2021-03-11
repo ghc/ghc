@@ -1669,7 +1669,7 @@ cvtTypeKind ty_str ty
                    ; returnLA (HsIParamTy noAnn n' t')
                    }
 
-           _ -> failWith (ptext (sLit ("Malformed " ++ ty_str)) <+> text (show ty))
+           _ -> failWith (text "Malformed " <> text ty_str <+> text (show ty))
     }
 
 hsTypeToArrow :: LHsType GhcPs -> HsArrow GhcPs

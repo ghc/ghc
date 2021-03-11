@@ -570,7 +570,7 @@ pprImportedSymbol config importedLbl = case (arch,os) of
              then
               vcat [
                   text ".symbol_stub",
-                  text "L" <> ppr_lbl lbl <> ptext (sLit "$stub:"),
+                  text "L" <> ppr_lbl lbl <> text "$stub:",
                       text "\t.indirect_symbol" <+> ppr_lbl lbl,
                       text "\tjmp *L" <> ppr_lbl lbl
                           <> text "$lazy_ptr",
@@ -584,7 +584,7 @@ pprImportedSymbol config importedLbl = case (arch,os) of
               vcat [
                   text ".section __TEXT,__picsymbolstub2,"
                       <> text "symbol_stubs,pure_instructions,25",
-                  text "L" <> ppr_lbl lbl <> ptext (sLit "$stub:"),
+                  text "L" <> ppr_lbl lbl <> text "$stub:",
                       text "\t.indirect_symbol" <+> ppr_lbl lbl,
                       text "\tcall ___i686.get_pc_thunk.ax",
                   text "1:",
@@ -601,7 +601,7 @@ pprImportedSymbol config importedLbl = case (arch,os) of
            $+$ vcat [        text ".section __DATA, __la_sym_ptr"
                     <> (if pic then int 2 else int 3)
                     <> text ",lazy_symbol_pointers",
-                text "L" <> ppr_lbl lbl <> ptext (sLit "$lazy_ptr:"),
+                text "L" <> ppr_lbl lbl <> text "$lazy_ptr:",
                     text "\t.indirect_symbol" <+> ppr_lbl lbl,
                     text "\t.long L" <> ppr_lbl lbl
                     <> text "$stub_binder"]
@@ -679,14 +679,14 @@ pprImportedSymbol config importedLbl = case (arch,os) of
      -> case dynamicLinkerLabelInfo importedLbl of
             Just (SymbolPtr, lbl)
               -> let symbolSize = case ncgWordWidth config of
-                         W32 -> sLit "\t.long"
-                         W64 -> sLit "\t.quad"
+                         W32 -> text "\t.long"
+                         W64 -> text "\t.quad"
                          _ -> panic "Unknown wordRep in pprImportedSymbol"
 
                  in vcat [
                       text ".section \".got2\", \"aw\"",
                       text ".LC_" <> ppr_lbl lbl <> char ':',
-                      ptext symbolSize <+> ppr_lbl lbl ]
+                      symbolSize <+> ppr_lbl lbl ]
 
             -- PLT code stubs are generated automatically by the dynamic linker.
             _ -> empty

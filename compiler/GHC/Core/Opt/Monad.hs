@@ -193,12 +193,12 @@ instance Outputable SimplMode where
        = text "SimplMode" <+> braces (
          sep [ text "Phase =" <+> ppr p <+>
                brackets (text (concat $ intersperse "," ss)) <> comma
-             , pp_flag i   (sLit "inline") <> comma
-             , pp_flag r   (sLit "rules") <> comma
-             , pp_flag eta (sLit "eta-expand") <> comma
-             , pp_flag cc  (sLit "case-of-case") ])
+             , pp_flag i   (text "inline") <> comma
+             , pp_flag r   (text "rules") <> comma
+             , pp_flag eta (text "eta-expand") <> comma
+             , pp_flag cc  (text "case-of-case") ])
          where
-           pp_flag f s = ppUnless f (text "no") <+> ptext s
+           pp_flag f s = ppUnless f (text "no") <+> s
 
 data FloatOutSwitches = FloatOutSwitches {
   floatOutLambdas   :: Maybe Int,  -- ^ Just n <=> float lambdas to top level, if

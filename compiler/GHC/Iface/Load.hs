@@ -800,7 +800,7 @@ wantHiBootFile home_unit eps mod from
 badSourceImport :: Module -> SDoc
 badSourceImport mod
   = hang (text "You cannot {-# SOURCE #-} import a module from another package")
-       2 (text "but" <+> quotes (ppr mod) <+> ptext (sLit "is from package")
+       2 (text "but" <+> quotes (ppr mod) <+> text "is from package"
           <+> quotes (ppr (moduleUnit mod)))
 
 -----------------------------------------------------

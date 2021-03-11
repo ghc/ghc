@@ -356,8 +356,7 @@ rnImportDecl this_mod
            (warnRedundantSourceImport imp_mod_name)
     when (mod_safe && not (safeImportsOn dflags)) $
         addErr (text "safe import can't be used as Safe Haskell isn't on!"
-                $+$ ptext (sLit $ "please enable Safe Haskell through either "
-                                   ++ "Safe, Trustworthy or Unsafe"))
+                $+$ text ("please enable Safe Haskell through either Safe, Trustworthy or Unsafe"))
 
     let
         qual_mod_name = fmap unLoc as_mod `orElse` imp_mod_name
@@ -2012,7 +2011,7 @@ dodgyImportWarn item
 
 dodgyMsg :: (Outputable a, Outputable b) => SDoc -> a -> b -> SDoc
 dodgyMsg kind tc ie
-  = sep [ text "The" <+> kind <+> ptext (sLit "item")
+  = sep [ text "The" <+> kind <+> text "item"
                     -- <+> quotes (ppr (IEThingAll (noLoc (IEName $ noLoc tc))))
                      <+> quotes (ppr ie)
                 <+> text "suggests that",
@@ -2047,15 +2046,15 @@ addDupDeclErr gres@(gre : _)
 
 missingImportListWarn :: ModuleName -> SDoc
 missingImportListWarn mod
-  = text "The module" <+> quotes (ppr mod) <+> ptext (sLit "does not have an explicit import list")
+  = text "The module" <+> quotes (ppr mod) <+> text "does not have an explicit import list"
 
 missingImportListItem :: IE GhcPs -> SDoc
 missingImportListItem ie
-  = text "The import item" <+> quotes (ppr ie) <+> ptext (sLit "does not have an explicit import list")
+  = text "The import item" <+> quotes (ppr ie) <+> text "does not have an explicit import list"
 
 moduleWarn :: ModuleName -> WarningTxt -> SDoc
 moduleWarn mod (WarningTxt _ txt)
-  = sep [ text "Module" <+> quotes (ppr mod) <> ptext (sLit ":"),
+  = sep [ text "Module" <+> quotes (ppr mod) <> colon,
           nest 2 (vcat (map (ppr . sl_fs . unLoc) txt)) ]
 moduleWarn mod (DeprecatedTxt _ txt)
   = sep [ text "Module" <+> quotes (ppr mod)

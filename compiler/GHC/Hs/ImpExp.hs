@@ -25,7 +25,6 @@ import GHC.Types.FieldLabel   ( FieldLabel )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Data.FastString
 import GHC.Types.SrcLoc
 import Language.Haskell.Syntax.Extension
 import GHC.Hs.Extension
@@ -164,7 +163,7 @@ instance (OutputableBndrId p
              4 (pp_spec spec)
       where
         pp_implicit False = empty
-        pp_implicit True = ptext (sLit ("(implicit)"))
+        pp_implicit True = text "(implicit)"
 
         pp_pkg Nothing                    = empty
         pp_pkg (Just (StringLiteral st p _))

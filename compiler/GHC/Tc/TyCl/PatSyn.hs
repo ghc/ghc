@@ -648,7 +648,7 @@ addPatSynCtxt (L loc name) thing_inside
 wrongNumberOfParmsErr :: Name -> Arity -> Arity -> TcM a
 wrongNumberOfParmsErr name decl_arity missing
   = failWithTc $
-    hang (text "Pattern synonym" <+> quotes (ppr name) <+> ptext (sLit "has")
+    hang (text "Pattern synonym" <+> quotes (ppr name) <+> text "has"
           <+> speakNOf decl_arity (text "argument"))
        2 (text "but its type signature has" <+> int missing <+> text "fewer arrows")
 

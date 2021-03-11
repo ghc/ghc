@@ -44,7 +44,6 @@ import GHC.Types.Basic
 import GHC.Data.Maybe
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
-import GHC.Data.FastString
 import GHC.Types.SrcLoc ( pprUserRealSpan )
 import GHC.Types.Tickish
 
@@ -599,7 +598,7 @@ instance Outputable Unfolding where
   ppr BootUnfolding              = text "No unfolding (from boot)"
   ppr (OtherCon cs)              = text "OtherCon" <+> ppr cs
   ppr (DFunUnfolding { df_bndrs = bndrs, df_con = con, df_args = args })
-       = hang (text "DFun:" <+> ptext (sLit "\\")
+       = hang (text "DFun:" <+> char '\\'
                 <+> sep (map (pprBndr LambdaBind) bndrs) <+> arrow)
             2 (ppr con <+> sep (map ppr args))
   ppr (CoreUnfolding { uf_src = src

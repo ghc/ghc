@@ -405,7 +405,7 @@ dumpModCycles logger dflags module_graph
     cycles =
       [ c | CyclicSCC c <- topoSort ]
 
-    pp_cycles = vcat [ (text "---------- Cycle" <+> int n <+> ptext (sLit "----------"))
+    pp_cycles = vcat [ (text "---------- Cycle" <+> int n <+> text "----------")
                         $$ pprCycle c $$ blankLine
                      | (n,c) <- [1..] `zip` cycles ]
 

@@ -50,7 +50,6 @@ import GHC.Types.Basic( ConTagZ )
 import GHC.Driver.Session
 import GHC.Platform
 import GHC.Platform.Profile
-import GHC.Data.FastString
 import GHC.StgToCmm.Types
 
 import GHC.Utils.Outputable
@@ -534,8 +533,8 @@ pprTypeInfo (Constr tag descr)
 
 pprTypeInfo (Fun arity args)
   = text "Fun" <+>
-    braces (sep [ text "arity:" <+> ppr arity
-                , ptext (sLit ("fun_type:")) <+> ppr args ])
+    braces (sep [ text "arity:"    <+> ppr arity
+                , text "fun_type:" <+> ppr args ])
 
 pprTypeInfo (ThunkSelector offset)
   = text "ThunkSel" <+> ppr offset

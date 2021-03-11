@@ -2465,7 +2465,7 @@ genCCall' config is32Bit (PrimTarget (MO_PopCnt width)) dest_regs@[dst]
             genCCall' config is32Bit target dest_regs args bid
   where
     format = intFormat width
-    lbl = mkCmmCodeLabel primUnitId (fsLit (popCntLabel width))
+    lbl = mkCmmCodeLabel primUnitId (popCntLabel width)
 
 genCCall' config is32Bit (PrimTarget (MO_Pdep width)) dest_regs@[dst]
          args@[src, mask] bid = do
@@ -2498,7 +2498,7 @@ genCCall' config is32Bit (PrimTarget (MO_Pdep width)) dest_regs@[dst]
             genCCall' config is32Bit target dest_regs args bid
   where
     format = intFormat width
-    lbl = mkCmmCodeLabel primUnitId (fsLit (pdepLabel width))
+    lbl = mkCmmCodeLabel primUnitId (pdepLabel width)
 
 genCCall' config is32Bit (PrimTarget (MO_Pext width)) dest_regs@[dst]
          args@[src, mask] bid = do
@@ -2531,7 +2531,7 @@ genCCall' config is32Bit (PrimTarget (MO_Pext width)) dest_regs@[dst]
             genCCall' config is32Bit target dest_regs args bid
   where
     format = intFormat width
-    lbl = mkCmmCodeLabel primUnitId (fsLit (pextLabel width))
+    lbl = mkCmmCodeLabel primUnitId (pextLabel width)
 
 genCCall' config is32Bit (PrimTarget (MO_Clz width)) dest_regs@[dst] args@[src] bid
   | is32Bit && width == W64 = do
@@ -2576,7 +2576,7 @@ genCCall' config is32Bit (PrimTarget (MO_Clz width)) dest_regs@[dst] args@[src] 
                          -- took care of implicitly clearing the upper bits
   where
     bw = widthInBits width
-    lbl = mkCmmCodeLabel primUnitId (fsLit (clzLabel width))
+    lbl = mkCmmCodeLabel primUnitId (clzLabel width)
 
 genCCall' config is32Bit (PrimTarget (MO_UF_Conv width)) dest_regs args bid = do
     targetExpr <- cmmMakeDynamicReference config
@@ -2586,7 +2586,7 @@ genCCall' config is32Bit (PrimTarget (MO_UF_Conv width)) dest_regs args bid = do
                                            CmmMayReturn)
     genCCall' config is32Bit target dest_regs args bid
   where
-    lbl = mkCmmCodeLabel primUnitId (fsLit (word2FloatLabel width))
+    lbl = mkCmmCodeLabel primUnitId (word2FloatLabel width)
 
 genCCall' _ _ (PrimTarget (MO_AtomicRead width)) [dst] [addr] _ = do
   load_code <- intLoadCode (MOV (intFormat width)) addr
@@ -3401,12 +3401,12 @@ outOfLineCmmOp bid mop res args
               {- Here the C implementation is used as there is no x86
               instruction to reverse a word's bit order.
               -}
-              MO_BRev w    -> fsLit $ bRevLabel w
-              MO_Clz w     -> fsLit $ clzLabel w
+              MO_BRev w    -> bRevLabel w
+              MO_Clz w     -> clzLabel w
               MO_Ctz _     -> unsupported
 
-              MO_Pdep w    -> fsLit $ pdepLabel w
-              MO_Pext w    -> fsLit $ pextLabel w
+              MO_Pdep w    -> pdepLabel w
+              MO_Pext w    -> pextLabel w
 
               MO_AtomicRMW _ _ -> fsLit "atomicrmw"
               MO_AtomicRead _  -> fsLit "atomicread"

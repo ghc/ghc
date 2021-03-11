@@ -16,7 +16,6 @@ module GHC.Iface.Errors
 import GHC.Platform.Profile
 import GHC.Platform.Ways
 import GHC.Utils.Panic.Plain
-import GHC.Data.FastString
 import GHC.Driver.Session
 import GHC.Driver.Env.Types
 import GHC.Data.Maybe
@@ -69,12 +68,12 @@ homeModError mod location
 -- Error messages
 
 cannotFindInterface :: UnitState -> HomeUnit -> Profile -> ([FilePath] -> SDoc) -> ModuleName -> InstalledFindResult -> SDoc
-cannotFindInterface = cantFindInstalledErr (sLit "Failed to load interface for")
-                                           (sLit "Ambiguous interface for")
+cannotFindInterface = cantFindInstalledErr (text "Failed to load interface for")
+                                           (text "Ambiguous interface for")
 
 cantFindInstalledErr
-    :: PtrString
-    -> PtrString
+    :: SDoc
+    -> SDoc
     -> UnitState
     -> HomeUnit
     -> Profile
@@ -83,7 +82,7 @@ cantFindInstalledErr
     -> InstalledFindResult
     -> SDoc
 cantFindInstalledErr cannot_find _ unit_state home_unit profile tried_these mod_name find_result
-  = ptext cannot_find <+> quotes (ppr mod_name)
+  = cannot_find <+> quotes (ppr mod_name)
     $$ more_info
   where
     build_tag  = waysBuildTag (profileWays profile)
@@ -153,8 +152,8 @@ cannotFindModule hsc_env = cannotFindModule'
 cannotFindModule' :: DynFlags -> UnitEnv -> Profile -> ModuleName -> FindResult -> SDoc
 cannotFindModule' dflags unit_env profile mod res = pprWithUnitState (ue_units unit_env) $
   cantFindErr (gopt Opt_BuildingCabalPackage dflags)
-              (sLit cannotFindMsg)
-              (sLit "Ambiguous module name")
+              cannotFindMsg
+              (text "Ambiguous module name")
               unit_env
               profile
               (mayShowLocations dflags)
@@ -167,13 +166,13 @@ cannotFindModule' dflags unit_env profile mod res = pprWithUnitState (ue_units u
                  , fr_pkgs_hidden = hidden_pkgs
                  , fr_unusables = unusables }
           | not (null hidden_mods && null hidden_pkgs && null unusables)
-          -> "Could not load module"
-        _ -> "Could not find module"
+          -> text "Could not load module"
+        _ -> text "Could not find module"
 
 cantFindErr
     :: Bool -- ^ Using Cabal?
-    -> PtrString
-    -> PtrString
+    -> SDoc
+    -> SDoc
     -> UnitEnv
     -> Profile
     -> ([FilePath] -> SDoc)
@@ -182,12 +181,12 @@ cantFindErr
     -> SDoc
 cantFindErr _ _ multiple_found _ _ _ mod_name (FoundMultiple mods)
   | Just pkgs <- unambiguousPackages
-  = hang (ptext multiple_found <+> quotes (ppr mod_name) <> colon) 2 (
+  = hang (multiple_found <+> quotes (ppr mod_name) <> colon) 2 (
        sep [text "it was found in multiple packages:",
                 hsep (map ppr pkgs) ]
     )
   | otherwise
-  = hang (ptext multiple_found <+> quotes (ppr mod_name) <> colon) 2 (
+  = hang (multiple_found <+> quotes (ppr mod_name) <> colon) 2 (
        vcat (map pprMod mods)
     )
   where
@@ -210,7 +209,7 @@ cantFindErr _ _ multiple_found _ _ _ mod_name (FoundMultiple mods)
       )
 
 cantFindErr using_cabal cannot_find _ unit_env profile tried_these mod_name find_result
-  = ptext cannot_find <+> quotes (ppr mod_name)
+  = cannot_find <+> quotes (ppr mod_name)
     $$ more_info
   where
     mhome_unit = ue_home_unit unit_env

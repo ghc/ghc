@@ -43,7 +43,6 @@ import Data.List ( intersperse )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Types.Unique
-import GHC.Data.FastString
 
 --------------------------------------------------------------------------------
 -- * Top Level Print functions
@@ -151,9 +150,9 @@ ppLlvmFunction opts fun =
 ppLlvmFunctionHeader :: LlvmFunctionDecl -> [LMString] -> SDoc
 ppLlvmFunctionHeader (LlvmFunctionDecl n l c r varg p a) args
   = let varg' = case varg of
-                      VarArgs | null p    -> sLit "..."
-                              | otherwise -> sLit ", ..."
-                      _otherwise          -> sLit ""
+                      VarArgs | null p    -> text "..."
+                              | otherwise -> text ", ..."
+                      _otherwise          -> text ""
         align = case a of
                      Just a' -> text " align " <> ppr a'
                      Nothing -> empty
@@ -161,7 +160,7 @@ ppLlvmFunctionHeader (LlvmFunctionDecl n l c r varg p a) args
                                     <> ftext n)
                     (zip p args)
     in ppr l <+> ppr c <+> ppr r <+> char '@' <> ftext n <> lparen <>
-        (hsep $ punctuate comma args') <> ptext varg' <> rparen <> align
+        (hsep $ punctuate comma args') <> varg' <> rparen <> align
 
 -- | Print out a list of function declaration.
 ppLlvmFunctionDecls :: LlvmFunctionDecls -> SDoc
@@ -173,16 +172,16 @@ ppLlvmFunctionDecls decs = vcat $ map ppLlvmFunctionDecl decs
 ppLlvmFunctionDecl :: LlvmFunctionDecl -> SDoc
 ppLlvmFunctionDecl (LlvmFunctionDecl n l c r varg p a)
   = let varg' = case varg of
-                      VarArgs | null p    -> sLit "..."
-                              | otherwise -> sLit ", ..."
-                      _otherwise          -> sLit ""
+                      VarArgs | null p    -> text "..."
+                              | otherwise -> text ", ..."
+                      _otherwise          -> text ""
         align = case a of
                      Just a' -> text " align" <+> ppr a'
                      Nothing -> empty
         args = hcat $ intersperse (comma <> space) $
                   map (\(t,a) -> ppr t <+> ppSpaceJoin a) p
     in text "declare" <+> ppr l <+> ppr c <+> ppr r <+> char '@' <>
-        ftext n <> lparen <> args <> ptext varg' <> rparen <> align $+$ newLine
+        ftext n <> lparen <> args <> varg' <> rparen <> align $+$ newLine
 
 
 -- | Print out a list of LLVM blocks.
@@ -577,8 +576,8 @@ ppStatic opts st = case st of
   LMTrunc v t       -> ppr t <> text " trunc (" <> ppStatic opts v <> text " to " <> ppr t <> char ')'
   LMBitc v t        -> ppr t <> text " bitcast (" <> ppStatic opts v <> text " to " <> ppr t <> char ')'
   LMPtoI v t        -> ppr t <> text " ptrtoint (" <> ppStatic opts v <> text " to " <> ppr t <> char ')'
-  LMAdd s1 s2       -> pprStaticArith opts s1 s2 (sLit "add") (sLit "fadd") "LMAdd"
-  LMSub s1 s2       -> pprStaticArith opts s1 s2 (sLit "sub") (sLit "fsub") "LMSub"
+  LMAdd s1 s2       -> pprStaticArith opts s1 s2 (text "add") (text "fadd") (text "LMAdd")
+  LMSub s1 s2       -> pprStaticArith opts s1 s2 (text "sub") (text "fsub") (text "LMSub")
 
 
 pprSpecialStatic :: LlvmOpts -> LlvmStatic -> SDoc
@@ -592,15 +591,15 @@ pprSpecialStatic opts stat = case stat of
    _                 -> ppStatic opts stat
 
 
-pprStaticArith :: LlvmOpts -> LlvmStatic -> LlvmStatic -> PtrString -> PtrString
-                  -> String -> SDoc
+pprStaticArith :: LlvmOpts -> LlvmStatic -> LlvmStatic -> SDoc -> SDoc
+                  -> SDoc -> SDoc
 pprStaticArith opts s1 s2 int_op float_op op_name =
   let ty1 = getStatType s1
       op  = if isFloat ty1 then float_op else int_op
   in if ty1 == getStatType s2
-     then ppr ty1 <+> ptext op <+> lparen <> ppStatic opts s1 <> comma <> ppStatic opts s2 <> rparen
+     then ppr ty1 <+> op <+> lparen <> ppStatic opts s1 <> comma <> ppStatic opts s2 <> rparen
      else pprPanic "pprStaticArith" $
-            text op_name <> text " with different types! s1: " <> ppStatic opts s1
+                 op_name <> text " with different types! s1: " <> ppStatic opts s1
                          <> text", s2: " <> ppStatic opts s2
 
 

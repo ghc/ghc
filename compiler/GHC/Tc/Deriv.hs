@@ -62,7 +62,6 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Logger
-import GHC.Data.FastString
 import GHC.Data.Bag
 import GHC.Utils.FV as FV (fvVarList, unionFV, mkFVs)
 import qualified GHC.LanguageExtensions as LangExt
@@ -251,10 +250,10 @@ tcDeriving deriv_infos deriv_decls
       =    hang (text "Derived class instances:")
               2 (vcat (map (\i -> pprInstInfoDetails i $$ text "") (bagToList inst_infos))
                  $$ ppr extra_binds)
-        $$ hangP "Derived type family instances:"
+        $$ hangP (text "Derived type family instances:")
              (vcat (map pprRepTy (bagToList repFamInsts)))
 
-    hangP s x = text "" $$ hang (ptext (sLit s)) 2 x
+    hangP s x = text "" $$ hang s 2 x
 
     -- Apply the suspended computations given by genInst calls.
     -- See Note [Staging of tcDeriving]
@@ -2293,7 +2292,7 @@ derivingThingErr' newtype_deriving cls cls_args mb_strat strat_msg why
 
 derivingHiddenErr :: TyCon -> SDoc
 derivingHiddenErr tc
-  = hang (text "The data constructors of" <+> quotes (ppr tc) <+> ptext (sLit "are not all in scope"))
+  = hang (text "The data constructors of" <+> quotes (ppr tc) <+> text "are not all in scope")
        2 (text "so you cannot derive an instance for it")
 
 standaloneCtxt :: LHsSigWcType GhcRn -> SDoc

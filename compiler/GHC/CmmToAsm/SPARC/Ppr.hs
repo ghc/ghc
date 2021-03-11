@@ -141,7 +141,7 @@ pprGloblDecl platform lbl
 pprTypeAndSizeDecl :: Platform -> CLabel -> SDoc
 pprTypeAndSizeDecl platform lbl
     = if platformOS platform == OSLinux && externallyVisibleCLabel lbl
-      then text ".type " <> pdoc platform lbl <> ptext (sLit ", @object")
+      then text ".type " <> pdoc platform lbl <> text ", @object"
       else empty
 
 pprLabel :: Platform -> CLabel -> SDoc
@@ -188,92 +188,88 @@ pprReg reg
 --
 pprReg_ofRegNo :: Int -> SDoc
 pprReg_ofRegNo i
- = ptext
-    (case i of {
-         0 -> sLit "%g0";   1 -> sLit "%g1";
-         2 -> sLit "%g2";   3 -> sLit "%g3";
-         4 -> sLit "%g4";   5 -> sLit "%g5";
-         6 -> sLit "%g6";   7 -> sLit "%g7";
-         8 -> sLit "%o0";   9 -> sLit "%o1";
-        10 -> sLit "%o2";  11 -> sLit "%o3";
-        12 -> sLit "%o4";  13 -> sLit "%o5";
-        14 -> sLit "%o6";  15 -> sLit "%o7";
-        16 -> sLit "%l0";  17 -> sLit "%l1";
-        18 -> sLit "%l2";  19 -> sLit "%l3";
-        20 -> sLit "%l4";  21 -> sLit "%l5";
-        22 -> sLit "%l6";  23 -> sLit "%l7";
-        24 -> sLit "%i0";  25 -> sLit "%i1";
-        26 -> sLit "%i2";  27 -> sLit "%i3";
-        28 -> sLit "%i4";  29 -> sLit "%i5";
-        30 -> sLit "%i6";  31 -> sLit "%i7";
-        32 -> sLit "%f0";  33 -> sLit "%f1";
-        34 -> sLit "%f2";  35 -> sLit "%f3";
-        36 -> sLit "%f4";  37 -> sLit "%f5";
-        38 -> sLit "%f6";  39 -> sLit "%f7";
-        40 -> sLit "%f8";  41 -> sLit "%f9";
-        42 -> sLit "%f10"; 43 -> sLit "%f11";
-        44 -> sLit "%f12"; 45 -> sLit "%f13";
-        46 -> sLit "%f14"; 47 -> sLit "%f15";
-        48 -> sLit "%f16"; 49 -> sLit "%f17";
-        50 -> sLit "%f18"; 51 -> sLit "%f19";
-        52 -> sLit "%f20"; 53 -> sLit "%f21";
-        54 -> sLit "%f22"; 55 -> sLit "%f23";
-        56 -> sLit "%f24"; 57 -> sLit "%f25";
-        58 -> sLit "%f26"; 59 -> sLit "%f27";
-        60 -> sLit "%f28"; 61 -> sLit "%f29";
-        62 -> sLit "%f30"; 63 -> sLit "%f31";
-        _  -> sLit "very naughty sparc register" })
+ = case i of {
+         0 -> text "%g0";   1 -> text "%g1";
+         2 -> text "%g2";   3 -> text "%g3";
+         4 -> text "%g4";   5 -> text "%g5";
+         6 -> text "%g6";   7 -> text "%g7";
+         8 -> text "%o0";   9 -> text "%o1";
+        10 -> text "%o2";  11 -> text "%o3";
+        12 -> text "%o4";  13 -> text "%o5";
+        14 -> text "%o6";  15 -> text "%o7";
+        16 -> text "%l0";  17 -> text "%l1";
+        18 -> text "%l2";  19 -> text "%l3";
+        20 -> text "%l4";  21 -> text "%l5";
+        22 -> text "%l6";  23 -> text "%l7";
+        24 -> text "%i0";  25 -> text "%i1";
+        26 -> text "%i2";  27 -> text "%i3";
+        28 -> text "%i4";  29 -> text "%i5";
+        30 -> text "%i6";  31 -> text "%i7";
+        32 -> text "%f0";  33 -> text "%f1";
+        34 -> text "%f2";  35 -> text "%f3";
+        36 -> text "%f4";  37 -> text "%f5";
+        38 -> text "%f6";  39 -> text "%f7";
+        40 -> text "%f8";  41 -> text "%f9";
+        42 -> text "%f10"; 43 -> text "%f11";
+        44 -> text "%f12"; 45 -> text "%f13";
+        46 -> text "%f14"; 47 -> text "%f15";
+        48 -> text "%f16"; 49 -> text "%f17";
+        50 -> text "%f18"; 51 -> text "%f19";
+        52 -> text "%f20"; 53 -> text "%f21";
+        54 -> text "%f22"; 55 -> text "%f23";
+        56 -> text "%f24"; 57 -> text "%f25";
+        58 -> text "%f26"; 59 -> text "%f27";
+        60 -> text "%f28"; 61 -> text "%f29";
+        62 -> text "%f30"; 63 -> text "%f31";
+        _  -> text "very naughty sparc register" }
 
 
 -- | Pretty print a format for an instruction suffix.
 pprFormat :: Format -> SDoc
 pprFormat x
- = ptext
-    (case x of
-        II8     -> sLit "ub"
-        II16    -> sLit "uh"
-        II32    -> sLit ""
-        II64    -> sLit "d"
-        FF32    -> sLit ""
-        FF64    -> sLit "d")
+ = case x of
+        II8     -> text "ub"
+        II16    -> text "uh"
+        II32    -> text ""
+        II64    -> text "d"
+        FF32    -> text ""
+        FF64    -> text "d"
 
 
 -- | Pretty print a format for an instruction suffix.
 --      eg LD is 32bit on sparc, but LDD is 64 bit.
 pprStFormat :: Format -> SDoc
 pprStFormat x
- = ptext
-    (case x of
-        II8   -> sLit "b"
-        II16  -> sLit "h"
-        II32  -> sLit ""
-        II64  -> sLit "x"
-        FF32  -> sLit ""
-        FF64  -> sLit "d")
+ = case x of
+        II8   -> text "b"
+        II16  -> text "h"
+        II32  -> text ""
+        II64  -> text "x"
+        FF32  -> text ""
+        FF64  -> text "d"
 
 
 
 -- | Pretty print a condition code.
 pprCond :: Cond -> SDoc
 pprCond c
- = ptext
-    (case c of
-        ALWAYS  -> sLit ""
-        NEVER   -> sLit "n"
-        GEU     -> sLit "geu"
-        LU      -> sLit "lu"
-        EQQ     -> sLit "e"
-        GTT     -> sLit "g"
-        GE      -> sLit "ge"
-        GU      -> sLit "gu"
-        LTT     -> sLit "l"
-        LE      -> sLit "le"
-        LEU     -> sLit "leu"
-        NE      -> sLit "ne"
-        NEG     -> sLit "neg"
-        POS     -> sLit "pos"
-        VC      -> sLit "vc"
-        VS      -> sLit "vs")
+ = case c of
+        ALWAYS  -> text ""
+        NEVER   -> text "n"
+        GEU     -> text "geu"
+        LU      -> text "lu"
+        EQQ     -> text "e"
+        GTT     -> text "g"
+        GE      -> text "ge"
+        GU      -> text "gu"
+        LTT     -> text "l"
+        LE      -> text "le"
+        LEU     -> text "leu"
+        NE      -> text "ne"
+        NEG     -> text "neg"
+        POS     -> text "pos"
+        VC      -> text "vc"
+        VS      -> text "vs"
 
 
 -- | Pretty print an address mode.
@@ -344,18 +340,17 @@ pprSectionAlign config sec@(Section seg _) =
 -- | Print appropriate alignment for the given section type.
 pprAlignForSection :: SectionType -> SDoc
 pprAlignForSection seg =
-    ptext (case seg of
-      Text              -> sLit ".align 4"
-      Data              -> sLit ".align 8"
-      ReadOnlyData      -> sLit ".align 8"
-      RelocatableReadOnlyData
-                        -> sLit ".align 8"
-      UninitialisedData -> sLit ".align 8"
-      ReadOnlyData16    -> sLit ".align 16"
+    case seg of
+      Text                    -> text ".align 4"
+      Data                    -> text ".align 8"
+      ReadOnlyData            -> text ".align 8"
+      RelocatableReadOnlyData -> text ".align 8"
+      UninitialisedData       -> text ".align 8"
+      ReadOnlyData16          -> text ".align 16"
       -- TODO: This is copied from the ReadOnlyData case, but it can likely be
       -- made more efficient.
-      CString           -> sLit ".align 8"
-      OtherSection _    -> panic "PprMach.pprSectionHeader: unknown section")
+      CString                 -> text ".align 8"
+      OtherSection _          -> panic "PprMach.pprSectionHeader: unknown section"
 
 -- | Pretty print a data item.
 pprDataItem :: Platform -> CmmLit -> SDoc
@@ -447,7 +442,7 @@ pprInstr platform = \case
         -> hcat [ text "\tmov\t", pprReg reg1, comma, pprReg reg2 ]
 
         | otherwise
-        -> pprRegRIReg platform (if x then sLit "addx" else sLit "add") cc reg1 ri reg2
+        -> pprRegRIReg platform (if x then text "addx" else text "add") cc reg1 ri reg2
 
 
    SUB x cc reg1 ri reg2
@@ -458,11 +453,11 @@ pprInstr platform = \case
         -> hcat [ text "\tmov\t", pprReg reg1, comma, pprReg reg2 ]
 
         | otherwise
-        -> pprRegRIReg platform (if x then sLit "subx" else sLit "sub") cc reg1 ri reg2
+        -> pprRegRIReg platform (if x then text "subx" else text "sub") cc reg1 ri reg2
 
-   AND  b reg1 ri reg2 -> pprRegRIReg platform (sLit "and")  b reg1 ri reg2
+   AND  b reg1 ri reg2 -> pprRegRIReg platform (text "and")  b reg1 ri reg2
 
-   ANDN b reg1 ri reg2 -> pprRegRIReg platform (sLit "andn") b reg1 ri reg2
+   ANDN b reg1 ri reg2 -> pprRegRIReg platform (text "andn") b reg1 ri reg2
 
    OR b reg1 ri reg2
         | not b && reg1 == g0
@@ -472,16 +467,16 @@ pprInstr platform = \case
                    _                       -> doit
 
         | otherwise
-        -> pprRegRIReg platform (sLit "or") b reg1 ri reg2
+        -> pprRegRIReg platform (text "or") b reg1 ri reg2
 
-   ORN b reg1 ri reg2 -> pprRegRIReg platform (sLit "orn") b reg1 ri reg2
+   ORN b reg1 ri reg2 -> pprRegRIReg platform (text "orn") b reg1 ri reg2
 
-   XOR  b reg1 ri reg2 -> pprRegRIReg platform (sLit "xor")  b reg1 ri reg2
-   XNOR b reg1 ri reg2 -> pprRegRIReg platform (sLit "xnor") b reg1 ri reg2
+   XOR  b reg1 ri reg2 -> pprRegRIReg platform (text "xor")  b reg1 ri reg2
+   XNOR b reg1 ri reg2 -> pprRegRIReg platform (text "xnor") b reg1 ri reg2
 
-   SLL reg1 ri reg2 -> pprRegRIReg platform (sLit "sll") False reg1 ri reg2
-   SRL reg1 ri reg2 -> pprRegRIReg platform (sLit "srl") False reg1 ri reg2
-   SRA reg1 ri reg2 -> pprRegRIReg platform (sLit "sra") False reg1 ri reg2
+   SLL reg1 ri reg2 -> pprRegRIReg platform (text "sll") False reg1 ri reg2
+   SRL reg1 ri reg2 -> pprRegRIReg platform (text "srl") False reg1 ri reg2
+   SRA reg1 ri reg2 -> pprRegRIReg platform (text "sra") False reg1 ri reg2
 
    RDY rd -> text "\trd\t%y," <> pprReg rd
    WRY reg1 reg2
@@ -492,10 +487,10 @@ pprInstr platform = \case
                 <> char ','
                 <> text "%y"
 
-   SMUL b reg1 ri reg2 -> pprRegRIReg platform (sLit "smul")  b reg1 ri reg2
-   UMUL b reg1 ri reg2 -> pprRegRIReg platform (sLit "umul")  b reg1 ri reg2
-   SDIV b reg1 ri reg2 -> pprRegRIReg platform (sLit "sdiv")  b reg1 ri reg2
-   UDIV b reg1 ri reg2 -> pprRegRIReg platform (sLit "udiv")  b reg1 ri reg2
+   SMUL b reg1 ri reg2 -> pprRegRIReg platform (text "smul")  b reg1 ri reg2
+   UMUL b reg1 ri reg2 -> pprRegRIReg platform (text "umul")  b reg1 ri reg2
+   SDIV b reg1 ri reg2 -> pprRegRIReg platform (text "sdiv")  b reg1 ri reg2
+   UDIV b reg1 ri reg2 -> pprRegRIReg platform (text "udiv")  b reg1 ri reg2
 
    SETHI imm reg
       -> hcat [
@@ -508,48 +503,46 @@ pprInstr platform = \case
    NOP -> text "\tnop"
 
    FABS format reg1 reg2
-        -> pprFormatRegReg (sLit "fabs") format reg1 reg2
+        -> pprFormatRegReg (text "fabs") format reg1 reg2
 
    FADD format reg1 reg2 reg3
-        -> pprFormatRegRegReg (sLit "fadd") format reg1 reg2 reg3
+        -> pprFormatRegRegReg (text "fadd") format reg1 reg2 reg3
 
    FCMP e format reg1 reg2
-        -> pprFormatRegReg (if e then sLit "fcmpe" else sLit "fcmp")
+        -> pprFormatRegReg (if e then text "fcmpe" else text "fcmp")
                            format reg1 reg2
 
    FDIV format reg1 reg2 reg3
-        -> pprFormatRegRegReg (sLit "fdiv") format reg1 reg2 reg3
+        -> pprFormatRegRegReg (text "fdiv") format reg1 reg2 reg3
 
    FMOV format reg1 reg2
-        -> pprFormatRegReg (sLit "fmov") format reg1 reg2
+        -> pprFormatRegReg (text "fmov") format reg1 reg2
 
    FMUL format reg1 reg2 reg3
-        -> pprFormatRegRegReg (sLit "fmul") format reg1 reg2 reg3
+        -> pprFormatRegRegReg (text "fmul") format reg1 reg2 reg3
 
    FNEG format reg1 reg2
-        -> pprFormatRegReg (sLit "fneg") format reg1 reg2
+        -> pprFormatRegReg (text "fneg") format reg1 reg2
 
    FSQRT format reg1 reg2
-        -> pprFormatRegReg (sLit "fsqrt") format reg1 reg2
+        -> pprFormatRegReg (text "fsqrt") format reg1 reg2
 
    FSUB format reg1 reg2 reg3
-        -> pprFormatRegRegReg (sLit "fsub") format reg1 reg2 reg3
+        -> pprFormatRegRegReg (text "fsub") format reg1 reg2 reg3
 
    FxTOy format1 format2 reg1 reg2
       -> hcat [
             text "\tf",
-            ptext
             (case format1 of
-                II32  -> sLit "ito"
-                FF32  -> sLit "sto"
-                FF64  -> sLit "dto"
+                II32  -> text "ito"
+                FF32  -> text "sto"
+                FF64  -> text "dto"
                 _     -> panic "SPARC.Ppr.pprInstr.FxToY: no match"),
-            ptext
             (case format2 of
-                II32  -> sLit "i\t"
-                II64  -> sLit "x\t"
-                FF32  -> sLit "s\t"
-                FF64  -> sLit "d\t"
+                II32  -> text "i\t"
+                II64  -> text "x\t"
+                FF32  -> text "s\t"
+                FF64  -> text "d\t"
                 _     -> panic "SPARC.Ppr.pprInstr.FxToY: no match"),
             pprReg reg1, comma, pprReg reg2
          ]
@@ -589,11 +582,11 @@ pprRI platform = \case
 
 
 -- | Pretty print a two reg instruction.
-pprFormatRegReg :: PtrString -> Format -> Reg -> Reg -> SDoc
+pprFormatRegReg :: SDoc -> Format -> Reg -> Reg -> SDoc
 pprFormatRegReg name format reg1 reg2
   = hcat [
         char '\t',
-        ptext name,
+        name,
         (case format of
             FF32 -> text "s\t"
             FF64 -> text "d\t"
@@ -606,11 +599,11 @@ pprFormatRegReg name format reg1 reg2
 
 
 -- | Pretty print a three reg instruction.
-pprFormatRegRegReg :: PtrString -> Format -> Reg -> Reg -> Reg -> SDoc
+pprFormatRegRegReg :: SDoc -> Format -> Reg -> Reg -> Reg -> SDoc
 pprFormatRegRegReg name format reg1 reg2 reg3
   = hcat [
         char '\t',
-        ptext name,
+        name,
         (case format of
             FF32  -> text "s\t"
             FF64  -> text "d\t"
@@ -624,11 +617,11 @@ pprFormatRegRegReg name format reg1 reg2 reg3
 
 
 -- | Pretty print an instruction of two regs and a ri.
-pprRegRIReg :: Platform -> PtrString -> Bool -> Reg -> RI -> Reg -> SDoc
+pprRegRIReg :: Platform -> SDoc -> Bool -> Reg -> RI -> Reg -> SDoc
 pprRegRIReg platform name b reg1 ri reg2
   = hcat [
         char '\t',
-        ptext name,
+        name,
         if b then text "cc\t" else char '\t',
         pprReg reg1,
         comma,
@@ -638,11 +631,11 @@ pprRegRIReg platform name b reg1 ri reg2
     ]
 
 {-
-pprRIReg :: PtrString -> Bool -> RI -> Reg -> SDoc
+pprRIReg :: SDoc -> Bool -> RI -> Reg -> SDoc
 pprRIReg name b ri reg1
   = hcat [
         char '\t',
-        ptext name,
+        name,
         if b then text "cc\t" else char '\t',
         pprRI ri,
         comma,
