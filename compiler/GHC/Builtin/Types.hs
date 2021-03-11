@@ -268,6 +268,10 @@ wiredInTyCons = [ -- Units are not treated like other tuples, because they
                 , multiplicityTyCon
                 , naturalTyCon
                 , integerTyCon
+                , runtimeInfoTyCon
+                , runtimeInfoDataConTyCon
+                , convEvalDataConTyCon
+                , callingConvTyCon
                 ]
 
 mkWiredInTyConName :: BuiltInSyntax -> Module -> FastString -> Unique -> TyCon -> Name
