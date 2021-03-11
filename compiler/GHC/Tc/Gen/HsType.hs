@@ -4279,7 +4279,7 @@ promotionErr name err
 -- Used for both expressions and types.
 funAppCtxt :: (Outputable fun, Outputable arg) => fun -> arg -> Int -> SDoc
 funAppCtxt fun arg arg_no
-  = hang (hsep [ text "In the", speakNth arg_no, ptext (sLit "argument of"),
+  = hang (hsep [ text "In the", speakNth arg_no, text "argument of",
                     quotes (ppr fun) <> text ", namely"])
        2 (quotes (ppr arg))
 

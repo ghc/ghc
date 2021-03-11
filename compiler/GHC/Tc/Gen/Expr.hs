@@ -77,7 +77,6 @@ import GHC.Data.List.SetOps
 import GHC.Data.Maybe
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
-import GHC.Data.FastString
 import Control.Monad
 import GHC.Core.Class(classTyCon)
 import GHC.Types.Unique.Set ( UniqSet, mkUniqSet, elementOfUniqSet, nonDetEltsUniqSet )
@@ -1466,7 +1465,7 @@ Boring and alphabetical:
 
 fieldCtxt :: FieldLabelString -> SDoc
 fieldCtxt field_name
-  = text "In the" <+> quotes (ppr field_name) <+> ptext (sLit "field of a record")
+  = text "In the" <+> quotes (ppr field_name) <+> text "field of a record"
 
 badFieldTypes :: [(FieldLabelString,TcType)] -> SDoc
 badFieldTypes prs
@@ -1552,15 +1551,14 @@ a decent stab, no more.  See #7989.
 
 mixedSelectors :: [Id] -> [Id] -> SDoc
 mixedSelectors data_sels@(dc_rep_id:_) pat_syn_sels@(ps_rep_id:_)
-  = ptext
-      (sLit "Cannot use a mixture of pattern synonym and record selectors") $$
+  = text "Cannot use a mixture of pattern synonym and record selectors" $$
     text "Record selectors defined by"
       <+> quotes (ppr (tyConName rep_dc))
-      <> text ":"
+      <> colon
       <+> pprWithCommas ppr data_sels $$
     text "Pattern synonym selectors defined by"
       <+> quotes (ppr (patSynName rep_ps))
-      <> text ":"
+      <> colon
       <+> pprWithCommas ppr pat_syn_sels
   where
     RecSelPatSyn rep_ps = recordSelectorTyCon ps_rep_id
