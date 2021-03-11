@@ -33,7 +33,7 @@ module GHC.Types (
         Symbol,
         Any,
         type (~~), Coercible,
-        TYPE, RuntimeRep(..), Type, Constraint,
+        TYPE, RuntimeRep(..), RuntimeInfo(..), Type, Constraint,
           -- The historical type * should ideally be written as
           -- `type *`, without the parentheses. But that's a true
           -- pain to parse, and for little gain.
@@ -86,7 +86,7 @@ type (->) = FUN 'Many
 data Constraint
 
 -- | The kind of types with lifted values. For example @Int :: Type@.
-type Type = TYPE 'LiftedRep
+type Type = TYPE ('RInfo LiftedRep 'ConvEval)
 
 data Multiplicity = Many | One
 
@@ -410,6 +410,11 @@ data SPEC = SPEC | SPEC2
 *                                                                      *
 ********************************************************************* -}
 
+data Levity = Lifted | Unlifted
+
+data CallingConv = ConvEval 
+-- | ConvCall [RuntimeRep]
+data RuntimeInfo = RInfo {rep :: RuntimeRep, conv :: CallingConv}           
 
 -- | GHC maintains a property that the kind of all inhabited types
 -- (as distinct from type constructors or type-level data) tells us

@@ -96,7 +96,7 @@ module GHC.Builtin.Types.Prim(
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Builtin.Types
-  ( runtimeRepTy, unboxedTupleKind, liftedTypeKind
+  ( runtimeRepTy, runtimeInfoTy, unboxedTupleKind, liftedTypeKind
   , vecRepDataConTyCon, tupleRepDataConTyCon
   , liftedRepDataConTy, unliftedRepDataConTy
   , intRepDataConTy
@@ -529,7 +529,7 @@ tYPETyCon :: TyCon
 tYPETyConName :: Name
 
 tYPETyCon = mkKindTyCon tYPETyConName
-                        (mkTemplateAnonTyConBinders [runtimeRepTy])
+                        (mkTemplateAnonTyConBinders [runtimeInfoTy])
                         liftedTypeKind
                         [Nominal]
                         (mkPrelTyConRepName tYPETyConName)

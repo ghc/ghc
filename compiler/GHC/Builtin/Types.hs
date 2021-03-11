@@ -131,7 +131,7 @@ module GHC.Builtin.Types (
 
         doubleElemRepDataConTy,
 
-        callingConvTy,
+        runtimeInfoTy, callingConvTy,
 
         -- * Multiplicity and friends
         multiplicityTyConName, oneDataConName, manyDataConName, multiplicityTy,
@@ -191,6 +191,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 
+import qualified GHC.Core.TyCo.Rep as TyCoRep (Type(TyConApp))
 import qualified Data.ByteString.Char8 as BS
 
 import Data.List        ( elemIndex )
@@ -695,7 +696,7 @@ constraintKindTyCon :: TyCon
 constraintKindTyCon = pcTyCon constraintKindTyConName Nothing [] []
 
 liftedTypeKind, typeToTypeKind, constraintKind :: Kind
-liftedTypeKind   = tYPE liftedRepTy
+liftedTypeKind   = TyCoRep.TyConApp liftedTypeKindTyCon []
 typeToTypeKind   = liftedTypeKind `mkVisFunTyMany` liftedTypeKind
 constraintKind   = mkTyConApp constraintKindTyCon []
 
@@ -1419,8 +1420,8 @@ runtimeRepTy = mkTyConTy runtimeRepTyCon
 -- type Type = tYPE 'LiftedRep
 liftedTypeKindTyCon :: TyCon
 liftedTypeKindTyCon   = buildSynTyCon liftedTypeKindTyConName
-                                       [] liftedTypeKind []
-                                       (tYPE liftedRepTy)
+                                       [] liftedTypeKind [] rhs
+  where rhs = TyCoRep.TyConApp tYPETyCon [mkTyConApp  runtimeInfoDataConTyCon [liftedRepTy, convEvalDataConTy]]
 
 runtimeRepTyCon :: TyCon
 runtimeRepTyCon = pcTyCon runtimeRepTyConName Nothing []
