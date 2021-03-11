@@ -2008,23 +2008,23 @@ genCCall' config gcp target dest_regs args
                     MO_F64_Acosh -> (fsLit "acosh", False)
                     MO_F64_Atanh -> (fsLit "atanh", False)
 
-                    MO_UF_Conv w -> (fsLit $ word2FloatLabel w, False)
+                    MO_UF_Conv w -> (word2FloatLabel w, False)
 
                     MO_Memcpy _  -> (fsLit "memcpy", False)
                     MO_Memset _  -> (fsLit "memset", False)
                     MO_Memmove _ -> (fsLit "memmove", False)
                     MO_Memcmp _  -> (fsLit "memcmp", False)
 
-                    MO_BSwap w   -> (fsLit $ bSwapLabel w, False)
-                    MO_BRev w    -> (fsLit $ bRevLabel w, False)
-                    MO_PopCnt w  -> (fsLit $ popCntLabel w, False)
-                    MO_Pdep w    -> (fsLit $ pdepLabel w, False)
-                    MO_Pext w    -> (fsLit $ pextLabel w, False)
+                    MO_BSwap w   -> (bSwapLabel w, False)
+                    MO_BRev w    -> (bRevLabel w, False)
+                    MO_PopCnt w  -> (popCntLabel w, False)
+                    MO_Pdep w    -> (pdepLabel w, False)
+                    MO_Pext w    -> (pextLabel w, False)
                     MO_Clz _     -> unsupported
                     MO_Ctz _     -> unsupported
                     MO_AtomicRMW {} -> unsupported
-                    MO_Cmpxchg w -> (fsLit $ cmpxchgLabel w, False)
-                    MO_Xchg w    -> (fsLit $ xchgLabel w, False)
+                    MO_Cmpxchg w -> (cmpxchgLabel w, False)
+                    MO_Xchg w    -> (xchgLabel w, False)
                     MO_AtomicRead _  -> unsupported
                     MO_AtomicWrite _ -> unsupported
 

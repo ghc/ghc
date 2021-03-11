@@ -664,9 +664,9 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
                 text "rts_apply" <> parens (
                     cap <>
                     text "(HaskellObj)"
-                 <> ptext (if is_IO_res_ty
-                                then (sLit "runIO_closure")
-                                else (sLit "runNonIO_closure"))
+                 <> (if is_IO_res_ty
+                      then text "runIO_closure"
+                      else text "runNonIO_closure")
                  <> comma
                  <> expr_to_run
                 ) <+> comma

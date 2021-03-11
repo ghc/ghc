@@ -1508,7 +1508,7 @@ withSandboxOnly cmd this = do
    dflags <- getDynFlags
    if not (gopt Opt_GhciSandbox dflags)
       then printForUser (text cmd <+>
-                         ptext (sLit "is not supported with -fno-ghci-sandbox"))
+                         text "is not supported with -fno-ghci-sandbox")
       else this
 
 -----------------------------------------------------------------------------
@@ -3344,12 +3344,12 @@ showContext = do
    printForUser $ vcat (map pp_resume (reverse resumes))
   where
    pp_resume res =
-        ptext (sLit "--> ") <> text (GHC.resumeStmt res)
+        text "--> " <> text (GHC.resumeStmt res)
         $$ nest 2 (pprStopped res)
 
 pprStopped :: GHC.Resume -> SDoc
 pprStopped res =
-  ptext (sLit "Stopped in")
+  text "Stopped in"
     <+> ((case mb_mod_name of
            Nothing -> empty
            Just mod_name -> text (moduleNameString mod_name) <> char '.')
@@ -3957,7 +3957,7 @@ backCmd arg
   where
   back num = withSandboxOnly ":back" $ do
       (names, _, pan, _) <- GHC.back num
-      printForUser $ ptext (sLit "Logged breakpoint at") <+> ppr pan
+      printForUser $ text "Logged breakpoint at" <+> ppr pan
       printTypeOfNames names
        -- run the command set with ":set stop <cmd>"
       st <- getGHCiState
@@ -3972,8 +3972,8 @@ forwardCmd arg
   forward num = withSandboxOnly ":forward" $ do
       (names, ix, pan, _) <- GHC.forward num
       printForUser $ (if (ix == 0)
-                        then ptext (sLit "Stopped at")
-                        else ptext (sLit "Logged breakpoint at")) <+> ppr pan
+                        then text "Stopped at"
+                        else text "Logged breakpoint at") <+> ppr pan
       printTypeOfNames names
        -- run the command set with ":set stop <cmd>"
       st <- getGHCiState
