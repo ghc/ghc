@@ -316,13 +316,14 @@ sizeOfEntryCode tables_next_to_code
        Right xs -> sizeOf (head xs) * length xs
 
 -- Note: Must return proper pointer for use in a closure
-newExecConItbl :: StgInfoTable -> ByteString -> IO (FunPtr ())
-newExecConItbl obj con_desc
+newExecConItbl :: Bool -> StgInfoTable -> ByteString -> IO (FunPtr ())
+newExecConItbl tables_next_to_code obj con_desc
 #if RTS_LINKER_USE_MMAP && MIN_VERSION_rts(1,0,1)
    = do
 #else
    = alloca $ \pcode -> do
 #endif
+        sz0 <- sizeOfEntryCode tables_next_to_code
         let lcon_desc = BS.length con_desc + 1{- null terminator -}
             -- SCARY
             -- This size represents the number of bytes in an StgConInfoTable.
@@ -349,11 +350,9 @@ newExecConItbl obj con_desc
 #if RTS_LINKER_USE_MMAP && MIN_VERSION_rts(1,0,1)
         _markExec (sz + fromIntegral lcon_desc) ex_ptr
 #endif
-#if defined(TABLES_NEXT_TO_CODE)
-        return (castPtrToFunPtr (ex_ptr `plusPtr` conInfoTableSizeB))
-#else
-        return (castPtrToFunPtr ex_ptr)
-#endif
+        pure $ if tables_next_to_code
+          then castPtrToFunPtr $ ex_ptr `plusPtr` conInfoTableSizeB
+          else castPtrToFunPtr ex_ptr
 
 foreign import ccall unsafe "allocateExec"
   _allocateExec :: CUInt -> Ptr (Ptr a) -> IO (Ptr a)
