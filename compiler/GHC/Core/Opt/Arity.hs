@@ -515,9 +515,9 @@ Note [ArityType]
 ~~~~~~~~~~~~~~~~
 ArityType can be thought of as an abstraction of an expression.
 The ArityType
-   AT [ (True, NoOneShotInfo)
-      , (False, OneShotLam)
-      , (True,  OneShotLam) ] Dunno)
+   AT [ (IsCheap,     NoOneShotInfo)
+      , (IsExpensive, OneShotLam)
+      , (IsCheap,     OneShotLam) ] Dunno)
 
 abstracts an expression like
    \x. let <expensive> in
@@ -525,8 +525,8 @@ abstracts an expression like
        \z{os}. blah
 
 In general we have (AT prs div).  Then
-* In prs :: [(IsCheap,OneShotInfo)]
-  * The IsCheap flag describes the part of the expression down
+* In prs :: [(Cost,OneShotInfo)]
+  * The Cost flag describes the part of the expression down
     to the first (value) lambda.
   * The OneShotInfo flag gives the one-shot info on that lambda.
 
@@ -566,7 +566,7 @@ In general we have (AT prs div).  Then
 -- We rely on this lattice structure for fixed-point iteration in
 -- 'findRhsArity'. For the semantics of 'ArityType', see Note [ArityType].
 data ArityType  -- See Note [ArityType]
-  = AT ![(IsCheap,OneShotInfo)] !Divergence
+  = AT ![(Cost,OneShotInfo)] !Divergence
   -- ^ @AT oss div@ means this value can safely be eta-expanded @length oss@
   -- times, provided use sites respect the 'OneShotInfo's in @oss@.
   -- A 'OneShotLam' annotation can come from two sources:
@@ -581,7 +581,16 @@ data ArityType  -- See Note [ArityType]
   -- with 'DmdType'.
   deriving Eq
 
-type IsCheap = Bool
+data Cost = IsCheap | IsExpensive
+          deriving( Eq )
+
+isCheap :: Cost -> Bool
+isCheap IsCheap     = True
+isCheap IsExpensive = False
+
+addCost :: Cost -> Cost -> Cost
+addCost IsCheap IsCheap = IsCheap
+addCost _       _       = IsExpensive
 
 -- | This is the BNF of the generated output:
 --
@@ -601,19 +610,19 @@ instance Outputable ArityType where
       pp_div Diverges = char '⊥'
       pp_div ExnOrDiv = char 'x'
       pp_div Dunno    = char 'T'
-      pp_os (True, OneShotLam)    = text "(C1)"   -- "C" for "cheap"
-      pp_os (False,OneShotLam)    = text "(X1)"   -- "X" for "expensive"
-      pp_os (True, NoOneShotInfo) = text "(C?)"
-      pp_os (False,NoOneShotInfo) = text "(X?)"
+      pp_os (IsCheap,     OneShotLam)    = text "(C1)"
+      pp_os (IsExpensive, OneShotLam)    = text "(X1)"
+      pp_os (IsCheap,     NoOneShotInfo) = text "(C?)"
+      pp_os (IsExpensive, NoOneShotInfo) = text "(X?)"
 
 mkBotArityType :: [OneShotInfo] -> ArityType
-mkBotArityType oss = AT [(True,os) | os <- oss] botDiv
+mkBotArityType oss = AT [(IsCheap,os) | os <- oss] botDiv
 
 botArityType :: ArityType
 botArityType = mkBotArityType []
 
 mkManifestArityType :: [OneShotInfo] -> ArityType
-mkManifestArityType oss = AT [(True,os) | os <- oss] topDiv
+mkManifestArityType oss = AT [(IsCheap,os) | os <- oss] topDiv
 
 topArityType :: ArityType
 topArityType = AT [] topDiv
@@ -633,14 +642,14 @@ arityTypeArityDiv at@(AT oss div)
 arityTypeOneShots :: ArityType -> [OneShotInfo]
 -- Returns a list only as long as the arity should be
 arityTypeOneShots (AT prs _)
-  = go True prs
+  = go IsCheap prs
   where
-    go :: IsCheap -> [(IsCheap,OneShotInfo)] -> [OneShotInfo]
+    go :: Cost -> [(Cost,OneShotInfo)] -> [OneShotInfo]
     go _ [] = []
     go ch1 ((ch2,os):prs)
-       = case (ch1 && ch2, os) of
-           (False, NoOneShotInfo) -> []
-           (ch,    _)             -> os : go ch prs
+       = case (ch1 `addCost` ch2, os) of
+           (IsExpensive, NoOneShotInfo) -> []
+           (ch,          _)             -> os : go ch prs
 
 -- | True <=> eta-expansion will add at least one lambda
 expandableArityType :: ArityType -> Bool
@@ -727,7 +736,7 @@ combineWithDemandOneShots (AT prs div) oss
   = AT (zip_prs prs oss) div
   where
     zip_prs prs [] = prs
-    zip_prs [] oss = [(False,os) | os <- oss]   -- False <=> expensive
+    zip_prs [] oss = [(IsExpensive,os) | os <- oss]   -- False <=> expensive
     zip_prs ((ch,os1):prs) (os2:oss)
       = (ch, os1 `bestOneShot` os2) : zip_prs prs oss
 
@@ -846,7 +855,7 @@ The "combining" part is done by combineWithDemandOneShots.
 
 arityLam :: Id -> ArityType -> ArityType
 arityLam id (AT oss div)
-  = AT ((True, idStateHackOneShotInfo id) : oss) div
+  = AT ((IsCheap, idStateHackOneShotInfo id) : oss) div
 
 floatIn :: Bool -> ArityType -> ArityType
 -- We have something like (let x = E in b),
@@ -860,12 +869,12 @@ addWork at@(AT prs div)
       []      -> at
       pr:prs' -> AT (add_work pr : prs') div
   where
-    add_work (_,os) = (False,os)
+    add_work (_,os) = (IsExpensive,os)
 
 arityApp :: ArityType -> Bool -> ArityType
 -- Processing (fun arg) where at is the ArityType of fun,
 -- Knock off an argument and behave like 'let'
-arityApp (AT ((ch1,_):oss) div) ch2 = floatIn (ch1 && ch2) (AT oss div)
+arityApp (AT ((ch1,_):oss) div) ch2 = floatIn (isCheap ch1 && ch2) (AT oss div)
 arityApp at                     _   = at
 
 -- | Least upper bound in the 'ArityType' lattice.
@@ -878,7 +887,7 @@ andArityType (AT (pr1:prs1) div1) (AT (pr2:prs2) div2)
   = AT ((pr1 `and_pr` pr2) : prs') div' -- See Note [Combining case branches]
   where
     (ch1,os1) `and_pr` (ch2,os2)
-      = ( ch1 && ch2, os1 `bestOneShot` os2)
+      = ( ch1 `addCost` ch2, os1 `bestOneShot` os2)
 
 andArityType (AT [] div1) at2 = andWithTail div1 at2
 andArityType at1 (AT [] div2) = andWithTail div2 at1
@@ -1259,8 +1268,8 @@ idArityType v
   | otherwise
   = AT (take (idArity v) one_shots) topDiv
   where
-    one_shots :: [(IsCheap,OneShotInfo)]  -- One-shot-ness derived from the type
-    one_shots = repeat True `zip` typeArity (idType v)
+    one_shots :: [(Cost,OneShotInfo)]  -- One-shot-ness derived from the type
+    one_shots = repeat IsCheap `zip` typeArity (idType v)
 
 {-
 %************************************************************************
