@@ -53,7 +53,7 @@ import GHC.Core.Predicate
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType
 import GHC.Core.Type
-import GHC.Builtin.Types ( liftedRepTy, manyDataConTy )
+import GHC.Builtin.Types ( liftedRepEvalTy, manyDataConTy )
 import GHC.Core.Unify    ( tcMatchTyKi )
 import GHC.Utils.Misc
 import GHC.Utils.Panic
@@ -2289,7 +2289,7 @@ defaultTyVarTcS the_tv
     -- never with a type; c.f. GHC.Tc.Utils.TcMType.defaultTyVar
     -- and Note [Inferring kinds for type declarations] in GHC.Tc.TyCl
   = do { traceTcS "defaultTyVarTcS RuntimeRep" (ppr the_tv)
-       ; unifyTyVar the_tv liftedRepTy
+       ; unifyTyVar the_tv liftedRepEvalTy
        ; return True }
   | isMultiplicityVar the_tv
   , not (isTyVarTyVar the_tv)  -- TyVarTvs should only be unified with a tyvar

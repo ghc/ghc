@@ -125,6 +125,7 @@ module GHC.Core.Type (
         isAlgType, isDataFamilyAppType,
         isPrimitiveType, isStrictType,
         isRuntimeRepTy, isRuntimeRepVar, isRuntimeRepKindedTy,
+        isRuntimeInfoTy, isRuntimeInfoVar,
         dropRuntimeRepArgs,
         getRuntimeRep,
 
@@ -561,7 +562,10 @@ kindRep k = case kindRep_maybe k of
 kindRep_maybe :: HasDebugCallStack => Kind -> Maybe Type
 kindRep_maybe kind
   | TyConApp tc [arg] <- coreFullView kind
-  , tc `hasKey` tYPETyConKey    = Just arg
+  , tc `hasKey` tYPETyConKey    
+  -- , (rinfo, [rep, conv]) <-splitTyConApp arg
+  -- , rinfo `hasKey` runtimeInfoDataConKey
+                                = pprPanic "here" (ppr arg)
   | otherwise                   = Nothing
 
 -- | This version considers Constraint to be the same as *. Returns True
@@ -643,6 +647,17 @@ isMultiplicityTy ty
 -- | Is a tyvar of type 'Multiplicity'?
 isMultiplicityVar :: TyVar -> Bool
 isMultiplicityVar = isMultiplicityTy . tyVarKind
+
+-- | Is this the type 'RuntimeInfo'?
+isRuntimeInfoTy :: Type -> Bool
+isRuntimeInfoTy ty
+  | TyConApp tc args <- coreFullView ty
+  , tc `hasKey` runtimeInfoTyConKey = True
+  | otherwise = False
+
+-- | Is a tyvar of type 'RuntimeInfo'?
+isRuntimeInfoVar :: TyVar -> Bool
+isRuntimeInfoVar = isRuntimeInfoTy . tyVarKind
 
 {- *********************************************************************
 *                                                                      *

@@ -1048,7 +1048,7 @@ newFlexiTyVarTys n kind = replicateM n (newFlexiTyVarTy kind)
 
 newOpenTypeKind :: TcM TcKind
 newOpenTypeKind
-  = do { rr <- newFlexiTyVarTy runtimeRepTy
+  = do { rr <- newFlexiTyVarTy runtimeInfoTy
        ; return (tYPE rr) }
 
 -- | Create a tyvar that can be a lifted or unlifted type.
@@ -1765,11 +1765,16 @@ defaultTyVar default_kind tv
     -- See Note [Inferring kinds for type declarations] in GHC.Tc.TyCl
   = return False
 
+  | isRuntimeInfoVar tv  -- Do not quantify over a RuntimeRep var
+                        -- unless it is a TyVarTv, handled earlier
+  = do { traceTc "Defaulting a RuntimeRep var to LiftedRep" (ppr tv)
+       ; writeMetaTyVar tv liftedRepEvalTy
+       ; return True }
 
   | isRuntimeRepVar tv  -- Do not quantify over a RuntimeRep var
                         -- unless it is a TyVarTv, handled earlier
   = do { traceTc "Defaulting a RuntimeRep var to LiftedRep" (ppr tv)
-       ; writeMetaTyVar tv liftedRepTy
+       ; writeMetaTyVar tv liftedRepEvalTy
        ; return True }
   | isMultiplicityVar tv
   = do { traceTc "Defaulting a Multiplicty var to Many" (ppr tv)

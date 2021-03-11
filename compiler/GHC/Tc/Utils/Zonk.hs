@@ -1818,9 +1818,9 @@ commitFlexi flexi tv zonked_kind
       SkolemiseFlexi  -> return (mkTyVarTy (mkTyVar name zonked_kind))
 
       DefaultFlexi
-        | isRuntimeRepTy zonked_kind
+        | isRuntimeInfoTy zonked_kind
         -> do { traceTc "Defaulting flexi tyvar to LiftedRep:" (pprTyVar tv)
-              ; return liftedRepTy }
+              ; return liftedRepEvalTy }
         | isMultiplicityTy zonked_kind
         -> do { traceTc "Defaulting flexi tyvar to Many:" (pprTyVar tv)
               ; return manyDataConTy }

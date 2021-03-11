@@ -131,7 +131,8 @@ module GHC.Builtin.Types (
 
         doubleElemRepDataConTy,
 
-        runtimeInfoTy, callingConvTy,
+        runtimeInfoTy, runtimeInfoDataConTyCon, callingConvTy, liftedRepEvalTy,
+        convEvalDataConTy,
 
         -- * Multiplicity and friends
         multiplicityTyConName, oneDataConName, manyDataConName, multiplicityTy,
@@ -1565,6 +1566,15 @@ liftedRepDataConTyCon = promoteDataCon liftedRepDataCon
 liftedRepTy :: Type
 liftedRepTy = liftedRepDataConTy
 
+-- The type ('BoxedRep 'UnliftedRep)
+unliftedRepTy :: Type
+unliftedRepTy = unliftedRepDataConTy
+
+unliftedRepEvalTy :: Type
+unliftedRepEvalTy = mkTyConApp runtimeInfoDataConTyCon [unliftedRepTy, convEvalDataConTy]
+
+liftedRepEvalTy :: Type
+liftedRepEvalTy = mkTyConApp runtimeInfoDataConTyCon [liftedRepTy, convEvalDataConTy]
 
 callingConvTyConName, convEvalDataConName, convCallDataConName :: Name
 callingConvTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "CallingConv") callingConvTyConKey callingConvTyCon

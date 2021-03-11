@@ -96,7 +96,8 @@ module GHC.Builtin.Types.Prim(
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Builtin.Types
-  ( runtimeRepTy, runtimeInfoTy, unboxedTupleKind, liftedTypeKind
+  ( runtimeRepTy, unboxedTupleKind, liftedTypeKind
+  , runtimeInfoTy, runtimeInfoDataConTyCon, convEvalDataConTy
   , vecRepDataConTyCon, tupleRepDataConTyCon
   , liftedRepDataConTy, unliftedRepDataConTy
   , intRepDataConTy
@@ -382,11 +383,19 @@ runtimeRep1Ty, runtimeRep2Ty :: Type
 runtimeRep1Ty = mkTyVarTy runtimeRep1TyVar
 runtimeRep2Ty = mkTyVarTy runtimeRep2TyVar
 
+runtimeInfo1TyVar, runtimeInfo2TyVar :: TyVar
+(runtimeInfo1TyVar : runtimeInfo2TyVar : _)
+  = drop 16 (mkTemplateTyVars (repeat runtimeInfoTy))  -- selects 'q','r'  
+
+runtimeInfo1Ty, runtimeInfo2Ty :: Type
+runtimeInfo1Ty = mkTyVarTy runtimeInfo1TyVar
+runtimeInfo2Ty = mkTyVarTy runtimeInfo2TyVar
+
 openAlphaTyVar, openBetaTyVar :: TyVar
 -- alpha :: TYPE r1
 -- beta  :: TYPE r2
 [openAlphaTyVar,openBetaTyVar]
-  = mkTemplateTyVars [tYPE runtimeRep1Ty, tYPE runtimeRep2Ty]
+  = mkTemplateTyVars [tYPE runtimeInfo1Ty, tYPE runtimeInfo2Ty]
 
 openAlphaTy, openBetaTy :: Type
 openAlphaTy = mkTyVarTy openAlphaTyVar
@@ -432,10 +441,10 @@ funTyCon = mkFunTyCon funTyConName tc_bndrs tc_rep_nm
   where
     -- See also unrestrictedFunTyCon
     tc_bndrs = [ mkNamedTyConBinder Required multiplicityTyVar
-               , mkNamedTyConBinder Inferred runtimeRep1TyVar
-               , mkNamedTyConBinder Inferred runtimeRep2TyVar ]
-               ++ mkTemplateAnonTyConBinders [ tYPE runtimeRep1Ty
-                                             , tYPE runtimeRep2Ty
+               , mkNamedTyConBinder Inferred runtimeInfo1TyVar
+               , mkNamedTyConBinder Inferred runtimeInfo2TyVar ]
+               ++ mkTemplateAnonTyConBinders [ tYPE runtimeInfo1Ty
+                                             , tYPE runtimeInfo2Ty
                                              ]
     tc_rep_nm = mkPrelTyConRepName funTyConName
 
@@ -574,7 +583,7 @@ pcPrimTyCon name roles rep
   = mkPrimTyCon name binders result_kind roles
   where
     binders     = mkTemplateAnonTyConBinders (map (const liftedTypeKind) roles)
-    result_kind = tYPE (primRepToRuntimeRep rep)
+    result_kind = tYPE $ TyConApp runtimeInfoDataConTyCon [(primRepToRuntimeRep rep), convEvalDataConTy]
 
 -- | Convert a 'PrimRep' to a 'Type' of kind RuntimeRep
 -- Defined here to avoid (more) module loops

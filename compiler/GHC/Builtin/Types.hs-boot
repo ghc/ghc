@@ -23,7 +23,9 @@ constraintKind :: Kind
 runtimeRepTyCon, vecCountTyCon, vecElemTyCon :: TyCon
 runtimeRepTy :: Type
 
-runtimeInfoTy, callingConvTy :: Type
+runtimeInfoTy, callingConvTy, convEvalDataConTy :: Type
+
+runtimeInfoDataConTyCon :: TyCon
 
 liftedRepDataConTyCon, vecRepDataConTyCon, tupleRepDataConTyCon :: TyCon
 
