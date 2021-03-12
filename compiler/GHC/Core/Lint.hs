@@ -2149,6 +2149,8 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
 
      lint_prov _ _ prov@(PluginProv _) = return prov
 
+     lint_prov _ _ prov@(StepsProv _ _) = return prov -- AMG TODO: actually lint this
+
      check_kinds kco k1 k2
        = do { let Pair k1' k2' = coercionKind kco
             ; ensureEqTys k1 k1' (mkBadUnivCoMsg CLeft  co)
