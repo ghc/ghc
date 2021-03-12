@@ -437,6 +437,37 @@ parameters::
 Note that ``F0``, ``F1``, ``F2``, ``FD1``, and ``FD2`` all have identical
 standalone kind signatures. The arity is inferred from the type family header.
 
+The kind variables bound by an outermost ``forall`` in a standalone kind
+signature scope only over the kind in that signature. Unlike term-level type
+signatures (see :ref:`decl-type-sigs`), the outermost kind variables do *not*
+scope over the corresponding declaration. For example, given this class
+declaration: ::
+
+    class C (a :: k) where
+      m :: Proxy k -> Proxy a -> String
+
+The following would *not* be an equivalent definition of ``C``: ::
+
+    type C :: forall k. k -> Constraint
+    class C a where
+      m :: Proxy k -> Proxy a -> String
+
+Because the ``k`` from the standalone kind signature does not scope over
+``C``'s definition, the ``k`` in ``m``'s type signature is no longer the kind
+of ``a``, but rather a completely distinct kind. It's as if you had written
+this: ::
+
+    type C :: forall k. k -> Constraint
+    class C (a :: kindOfA) where
+      m :: forall k. Proxy k -> Proxy (a :: kindOfA) -> String
+
+To avoid this issue, ``C``'s definition must be given an inline kind annotation
+like so: ::
+
+    type C :: forall k. k -> Constraint
+    class C (a :: k) where
+      m :: Proxy k -> Proxy a -> String
+
 Standalone kind signatures and declaration headers
 --------------------------------------------------
 
