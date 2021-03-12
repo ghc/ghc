@@ -532,6 +532,13 @@ opt_univ env sym (PhantomProv h) _r ty1 ty2
     ty2' = substTy (lcSubstRight env) ty2
 
 opt_univ env sym prov role oty1 oty2
+  | StepsProv m n <- prov
+  = let ty1 = substTyUnchecked (lcSubstLeft  env) oty1
+        ty2 = substTyUnchecked (lcSubstRight env) oty2
+        (a, b, prov') | sym       = (ty2, ty1, StepsProv n m)
+                      | otherwise = (ty1, ty2, prov)
+    in mkUnivCo prov' role a b
+
   | Just (tc1, tys1) <- splitTyConApp_maybe oty1
   , Just (tc2, tys2) <- splitTyConApp_maybe oty2
   , tc1 == tc2
@@ -594,6 +601,7 @@ opt_univ env sym prov role oty1 oty2
 #endif
       ProofIrrelProv kco -> ProofIrrelProv $ opt_co4_wrap env sym False Nominal kco
       PluginProv _       -> prov
+      StepsProv _ _      -> prov
 
 -------------
 opt_transList :: HasDebugCallStack => InScopeSet -> [NormalCo] -> [NormalCo] -> [NormalCo]

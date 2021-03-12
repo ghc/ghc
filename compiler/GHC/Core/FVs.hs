@@ -404,6 +404,7 @@ orphNamesOfProv :: UnivCoProvenance -> NameSet
 orphNamesOfProv (PhantomProv co)    = orphNamesOfCo co
 orphNamesOfProv (ProofIrrelProv co) = orphNamesOfCo co
 orphNamesOfProv (PluginProv _)      = emptyNameSet
+orphNamesOfProv (StepsProv _ _)     = emptyNameSet
 
 orphNamesOfCos :: [Coercion] -> NameSet
 orphNamesOfCos = orphNamesOfThings orphNamesOfCo
