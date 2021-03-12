@@ -1211,13 +1211,16 @@ tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bnd
                    ; rhs'   <- tcIfaceExpr rhs
                    ; whenGOptM Opt_DoCoreLinting $ do
                       { dflags <- getDynFlags
-                      ; (_, lcl_env) <- getEnvs
+                      ; (gbl_env, lcl_env) <- getEnvs
                       ; let in_scope :: [Var]
                             in_scope = ((nonDetEltsUFM $ if_tv_env lcl_env) ++
                                         (nonDetEltsUFM $ if_id_env lcl_env) ++
                                         bndrs' ++
                                         exprsFreeIdsList args')
-                      ; case lintExpr dflags in_scope rhs' of
+                      ; let fam_envs = case if_fam_insts gbl_env of -- AMG TODO: clean up
+                                         Just xs -> xs
+                                         Nothing -> panic "tcIfaceRule: missing if_fam_insts"
+                      ; case lintExpr dflags fam_envs in_scope rhs' of
                           Nothing   -> return ()
                           Just errs -> do
                             logger <- getLogger
@@ -1747,7 +1750,8 @@ tcPragExpr is_compulsory toplvl name expr
         in_scope <- get_in_scope
         dflags   <- getDynFlags
         logger   <- getLogger
-        case lintUnfolding is_compulsory dflags noSrcLoc in_scope core_expr' of
+        fam_envs <- fromJust . if_fam_insts <$> getGblEnv -- AMG TODO
+        case lintUnfolding is_compulsory dflags fam_envs noSrcLoc in_scope core_expr' of
           Nothing   -> return ()
           Just errs -> liftIO $
             displayLintResults logger dflags False doc

@@ -53,7 +53,6 @@ import GHC.Tc.Utils.Zonk
 import GHC.Tc.Solver
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Gen.HsType
-import GHC.Tc.Instance.Family
 import GHC.Tc.Utils.Instantiate
 
 import GHC.Core.Multiplicity

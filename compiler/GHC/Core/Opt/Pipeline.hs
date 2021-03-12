@@ -472,7 +472,7 @@ runCorePasses passes guts
       withTiming logger dflags (ppr pass <+> brackets (ppr mod))
                    (const ()) $ do
             guts' <- lintAnnots (ppr pass) (doCorePass pass) guts
-            endPass pass (mg_binds guts') (mg_rules guts')
+            endPass pass (mg_binds guts') (mg_rules guts') (mg_fam_insts guts')
             return guts'
 
     mod = mg_module guts
@@ -817,7 +817,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
 
                 -- Dump the result of this iteration
            dump_end_iteration logger dflags print_unqual iteration_no counts1 binds2 rules1 ;
-           lintPassResult hsc_env pass binds2 ;
+           lintPassResult hsc_env fam_envs pass binds2 ;
 
                 -- Loop
            do_iteration (iteration_no + 1) (counts1:counts_so_far) binds2 rules1

@@ -98,6 +98,7 @@ import GHC.Unit
 import GHC.Unit.Env
 import GHC.Unit.State
 import GHC.Unit.Finder
+import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.Graph (needsTemplateHaskellOrQQ)
@@ -267,7 +268,7 @@ compileOne' m_tc_result mHscMessage
             hmi_details <- liftIO $ initModDetails hsc_env' summary final_iface
             liftIO $ hscMaybeWriteIface logger dflags True final_iface mb_old_iface_hash (ms_location summary)
 
-            (hasStub, comp_bc, spt_entries) <- hscInteractive hsc_env' cgguts mod_location
+            (hasStub, comp_bc, spt_entries) <- hscInteractive hsc_env' cgguts mod_location (md_fam_insts hmi_details)
 
             stub_o <- case hasStub of
                       Nothing -> return []
@@ -1384,7 +1385,7 @@ runPhase (HscOut src_flavour mod_name result) _ = do
                     PipeState{hsc_env=hsc_env'} <- getPipeState
 
                     (outputFilename, mStub, foreign_files, cg_infos) <- liftIO $
-                      hscGenHardCode hsc_env' cgguts mod_location output_fn
+                      hscGenHardCode hsc_env' cgguts mod_location output_fn [] {-(md_fam_insts mod_details)-} -- TODO
 
                     let dflags = hsc_dflags hsc_env'
                     final_iface <- liftIO (mkFullIface hsc_env' partial_iface (Just cg_infos))

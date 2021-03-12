@@ -27,7 +27,7 @@ import GHC.Hs
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Instantiate
-import GHC.Tc.Instance.Family ( tcGetFamInstEnvs, tcLookupDataFamInst_maybe )
+import GHC.Tc.Instance.Family ( tcLookupDataFamInst_maybe )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Types.Origin

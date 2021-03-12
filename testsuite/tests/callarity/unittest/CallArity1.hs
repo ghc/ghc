@@ -172,7 +172,7 @@ main = do
         dflags <- getSessionDynFlags
         logger <- getLogger
         liftIO $ forM_ exprs $ \(n,e) -> do
-            case lintExpr dflags [f,scrutf,scruta] e of
+            case lintExpr dflags mempty [f,scrutf,scruta] e of
                 Just errs -> putMsg logger dflags (pprMessageBag errs $$ text "in" <+> text n)
                 Nothing -> return ()
             putMsg logger dflags (text n Outputable.<> char ':')

@@ -115,6 +115,7 @@ import GHC.Core.DataCon
 import GHC.Core.Type
 import GHC.Core.Class
 import GHC.Core.Coercion.Axiom
+import GHC.Core.Lint
 import GHC.Core.Unify( RoughMatchTc(..) )
 import GHC.Core.FamInstEnv
    ( FamInst, pprFamInst, famInstsRepTyCons
@@ -3149,3 +3150,19 @@ mark_plugin_unsafe dflags = unless (gopt Opt_PluginTrustworthy dflags) $
     unsafeText = "Use of plugins makes the module unsafe"
     pluginUnsafe = unitBag ( mkPlainMsgEnvelope dflags WarningWithoutFlag noSrcSpan
                                    (Outputable.text unsafeText) )
+
+{- *********************************************************************
+*                                                                      *
+                  Linting a TcGblEnv
+*                                                                      *
+********************************************************************* -}
+
+-- | Check the 'TcGblEnv' for consistency. Currently, only checks
+-- axioms, but should check other aspects, too.
+lintGblEnv :: Logger -> DynFlags -> TcGblEnv -> TcM ()
+lintGblEnv logger dflags tcg_env
+  = do { fam_envs <- tcGetFamInstEnvs
+       ; liftIO $ lintAxioms logger dflags fam_envs (text "TcGblEnv axioms") axioms
+       }
+  where
+    axioms = typeEnvCoAxioms (tcg_type_env tcg_env)

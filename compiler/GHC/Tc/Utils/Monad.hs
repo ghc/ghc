@@ -143,6 +143,8 @@ module GHC.Tc.Utils.Monad(
   -- * Stuff for cost centres.
   getCCIndexM, getCCIndexTcM,
 
+  tcGetFamInstEnvs,
+
   -- * Types etc.
   module GHC.Tc.Types,
   module GHC.Data.IOEnv
@@ -2046,12 +2048,14 @@ initIfaceTcRn thing_inside
               -- When we are instantiating a signature, we DEFINITELY
               -- do not want to knot tie.
               is_instantiate = isHomeUnitInstantiating home_unit
+        ; fam_insts <- tcGetFamInstEnvs
         ; let { if_env = IfGblEnv {
                             if_doc = text "initIfaceTcRn",
                             if_rec_types =
                                 if is_instantiate
                                     then Nothing
-                                    else Just (mod, get_type_env)
+                                    else Just (mod, get_type_env),
+                        if_fam_insts = Just fam_insts
                          }
               ; get_type_env = readTcRef (tcg_type_env_var tcg_env) }
         ; setEnvs (if_env, ()) thing_inside }
@@ -2064,7 +2068,8 @@ initIfaceLoad :: HscEnv -> IfG a -> IO a
 initIfaceLoad hsc_env do_this
  = do let gbl_env = IfGblEnv {
                         if_doc = text "initIfaceLoad",
-                        if_rec_types = Nothing
+                        if_rec_types = Nothing,
+                        if_fam_insts = Nothing
                     }
       initTcRnIf 'i' hsc_env gbl_env () do_this
 
@@ -2077,7 +2082,8 @@ initIfaceCheck doc hsc_env do_this
                          Nothing        -> Nothing
           gbl_env = IfGblEnv {
                         if_doc = text "initIfaceCheck" <+> doc,
-                        if_rec_types = rec_types
+                        if_rec_types = rec_types,
+                        if_fam_insts = Nothing
                     }
       initTcRnIf 'i' hsc_env gbl_env () do_this
 
@@ -2191,3 +2197,12 @@ getCCIndexM get_ccs nm = do
 -- | See 'getCCIndexM'.
 getCCIndexTcM :: FastString -> TcM CostCentreIndex
 getCCIndexTcM = getCCIndexM tcg_cc_st
+
+
+
+tcGetFamInstEnvs :: TcM FamInstEnvs
+-- Gets both the external-package inst-env
+-- and the home-pkg inst env (includes module being compiled)
+tcGetFamInstEnvs
+  = do { eps <- getEps; env <- getGblEnv
+       ; return (eps_fam_inst_env eps, tcg_fam_inst_env env) }

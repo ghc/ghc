@@ -45,7 +45,6 @@ import GHC.Tc.Gen.Pat
 import GHC.Tc.Utils.TcMType
 import GHC.Core.Multiplicity
 import GHC.Core.FamInstEnv( normaliseType )
-import GHC.Tc.Instance.Family( tcGetFamInstEnvs )
 import GHC.Tc.Utils.TcType
 import GHC.Core.Type (mkStrLitTy, tidyOpenType, mkCastTy)
 import GHC.Builtin.Types ( mkBoxedTupleTy )

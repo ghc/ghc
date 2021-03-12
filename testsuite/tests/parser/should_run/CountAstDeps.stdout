@@ -1,4 +1,4 @@
-Found 245 Language.Haskell.Syntax module dependencies
+Found 244 Language.Haskell.Syntax module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.Types
@@ -29,7 +29,6 @@ GHC.Core.DataCon
 GHC.Core.FVs
 GHC.Core.FamInstEnv
 GHC.Core.InstEnv
-GHC.Core.Lint
 GHC.Core.Make
 GHC.Core.Map.Type
 GHC.Core.Multiplicity

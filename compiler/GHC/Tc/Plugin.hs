@@ -56,7 +56,6 @@ import qualified GHC.Tc.Utils.Monad     as TcM
 import qualified GHC.Tc.Solver.Monad    as TcS
 import qualified GHC.Tc.Utils.Env       as TcM
 import qualified GHC.Tc.Utils.TcMType   as TcM
-import qualified GHC.Tc.Instance.Family as TcM
 import qualified GHC.Iface.Env          as IfaceEnv
 import qualified GHC.Unit.Finder        as Finder
 

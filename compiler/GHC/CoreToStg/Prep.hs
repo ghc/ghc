@@ -37,6 +37,7 @@ import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
 import GHC.Types.Id.Make ( realWorldPrimId, mkPrimOpId )
 
+import GHC.Core.FamInstEnv
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity
 import GHC.Core.FVs
@@ -187,9 +188,9 @@ type CpeRhs  = CoreExpr    -- Non-terminal 'rhs'
 ************************************************************************
 -}
 
-corePrepPgm :: HscEnv -> Module -> ModLocation -> CoreProgram -> [TyCon]
+corePrepPgm :: HscEnv -> Module -> ModLocation -> CoreProgram -> [TyCon] -> [FamInst]
             -> IO (CoreProgram, S.Set CostCentre)
-corePrepPgm hsc_env this_mod mod_loc binds data_tycons =
+corePrepPgm hsc_env this_mod mod_loc binds data_tycons fam_insts =
     withTiming logger dflags
                (text "CorePrep"<+>brackets (ppr this_mod))
                (\(a,b) -> a `seqList` b `seq` ()) $ do
@@ -211,7 +212,7 @@ corePrepPgm hsc_env this_mod mod_loc binds data_tycons =
                       floats2 <- corePrepTopBinds initialCorePrepEnv implicit_binds
                       return (deFloatTop (floats1 `appendFloats` floats2))
 
-    endPassIO hsc_env alwaysQualify CorePrep binds_out []
+    endPassIO hsc_env alwaysQualify CorePrep binds_out [] fam_insts
     return (binds_out, cost_centres)
   where
     dflags = hsc_dflags hsc_env

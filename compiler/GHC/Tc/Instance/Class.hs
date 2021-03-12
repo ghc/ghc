@@ -23,7 +23,7 @@ import GHC.Tc.Utils.Instantiate(instDFunType, tcInstType)
 import GHC.Tc.Instance.Typeable
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Types.Evidence
-import GHC.Tc.Instance.Family( tcGetFamInstEnvs, tcInstNewTyCon_maybe, tcLookupDataFamInst )
+import GHC.Tc.Instance.Family( tcInstNewTyCon_maybe, tcLookupDataFamInst )
 import GHC.Rename.Env( addUsedGRE )
 
 import GHC.Builtin.Types
