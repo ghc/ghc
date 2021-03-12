@@ -32,6 +32,7 @@ import GHC.Driver.Ppr
 import GHC.Driver.Env
 
 import GHC.Core
+import GHC.Core.FamInstEnv
 import GHC.Core.FVs
 import GHC.Core.Utils
 import GHC.Core.Stats ( coreBindsStats )
@@ -292,7 +293,7 @@ endPassIO :: HscEnv -> PrintUnqualified
 endPassIO hsc_env print_unqual pass binds rules
   = do { dumpPassResult logger dflags print_unqual mb_flag
                         (ppr pass) (pprPassDetails pass) binds rules
-       ; lintPassResult hsc_env pass binds }
+       ; lintPassResult hsc_env (error "AMG TODO: fam_envs") pass binds }
   where
     logger  = hsc_logger hsc_env
     dflags  = hsc_dflags hsc_env
@@ -373,12 +374,12 @@ coreDumpFlag (CoreDoPasses {})        = Nothing
 ************************************************************************
 -}
 
-lintPassResult :: HscEnv -> CoreToDo -> CoreProgram -> IO ()
-lintPassResult hsc_env pass binds
+lintPassResult :: HscEnv -> FamInstEnvs -> CoreToDo -> CoreProgram -> IO ()
+lintPassResult hsc_env fam_envs pass binds
   | not (gopt Opt_DoCoreLinting dflags)
   = return ()
   | otherwise
-  = do { let warns_and_errs = lintCoreBindings dflags pass (interactiveInScope hsc_env) binds
+  = do { let warns_and_errs = lintCoreBindings dflags fam_envs pass (interactiveInScope hsc_env) binds
        ; Err.showPass logger dflags ("Core Linted result of " ++ showPpr dflags pass)
        ; displayLintResults logger dflags (showLintWarnings pass) (ppr pass)
                             (pprCoreBindings binds) warns_and_errs }
@@ -431,7 +432,7 @@ lintInteractiveExpr :: SDoc -- ^ The source of the linted expression
 lintInteractiveExpr what hsc_env expr
   | not (gopt Opt_DoCoreLinting dflags)
   = return ()
-  | Just err <- lintExpr dflags (interactiveInScope hsc_env) expr
+  | Just err <- lintExpr dflags (error "AMG TODO: fam_envs") (interactiveInScope hsc_env) expr
   = displayLintResults logger dflags False what (pprCoreExpr expr) (emptyBag, err)
   | otherwise
   = return ()
@@ -467,12 +468,12 @@ interactiveInScope hsc_env
               -- where t is a RuntimeUnk (see TcType)
 
 -- | Type-check a 'CoreProgram'. See Note [Core Lint guarantee].
-lintCoreBindings :: DynFlags -> CoreToDo -> [Var] -> CoreProgram -> WarnsAndErrs
+lintCoreBindings :: DynFlags -> FamInstEnvs -> CoreToDo -> [Var] -> CoreProgram -> WarnsAndErrs
 --   Returns (warnings, errors)
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
-lintCoreBindings dflags pass local_in_scope binds
-  = initL dflags flags local_in_scope $
+lintCoreBindings dflags fam_envs pass local_in_scope binds
+  = initL dflags flags fam_envs local_in_scope $
     addLoc TopLevelBindings           $
     do { checkL (null dups) (dupVars dups)
        ; checkL (null ext_dups) (dupExtVars ext_dups)
@@ -545,17 +546,18 @@ hence the `TopLevelFlag` on `tcPragExpr` in GHC.IfaceToCore.
 
 lintUnfolding :: Bool               -- True <=> is a compulsory unfolding
               -> DynFlags
+              -> FamInstEnvs
               -> SrcLoc
               -> VarSet             -- Treat these as in scope
               -> CoreExpr
               -> Maybe (Bag SDoc) -- Nothing => OK
 
-lintUnfolding is_compulsory dflags locn var_set expr
+lintUnfolding is_compulsory dflags fam_envs locn var_set expr
   | isEmptyBag errs = Nothing
   | otherwise       = Just errs
   where
     vars = nonDetEltsUniqSet var_set
-    (_warns, errs) = initL dflags (defaultLintFlags dflags) vars $
+    (_warns, errs) = initL dflags (defaultLintFlags dflags) fam_envs vars $
                      if is_compulsory
                        -- See Note [Checking for levity polymorphism]
                      then noLPChecks linter
@@ -564,15 +566,16 @@ lintUnfolding is_compulsory dflags locn var_set expr
              lintCoreExpr expr
 
 lintExpr :: DynFlags
+         -> FamInstEnvs
          -> [Var]               -- Treat these as in scope
          -> CoreExpr
          -> Maybe (Bag SDoc)  -- Nothing => OK
 
-lintExpr dflags vars expr
+lintExpr dflags fam_envs vars expr
   | isEmptyBag errs = Nothing
   | otherwise       = Just errs
   where
-    (_warns, errs) = initL dflags (defaultLintFlags dflags) vars linter
+    (_warns, errs) = initL dflags (defaultLintFlags dflags) fam_envs vars linter
     linter = addLoc TopLevelBindings $
              lintCoreExpr expr
 
@@ -2085,7 +2088,7 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
        ; ty2' <- lintType ty2
        ; let k1 = typeKind ty1'
              k2 = typeKind ty2'
-       ; prov' <- lint_prov k1 k2 prov
+       ; prov' <- lint_prov k1 ty1' k2 ty2' prov
 
        ; when (r /= Phantom && classifiesTypeWithValues k1
                             && classifiesTypeWithValues k2)
@@ -2134,22 +2137,38 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
                 _          -> return ()
             }
 
-     lint_prov k1 k2 (PhantomProv kco)
+     lint_prov k1 _ k2 _ (PhantomProv kco)
        = do { kco' <- lintStarCoercion kco
             ; lintRole co Phantom r
             ; check_kinds kco' k1 k2
             ; return (PhantomProv kco') }
 
-     lint_prov k1 k2 (ProofIrrelProv kco)
+     lint_prov k1 _ k2 _ (ProofIrrelProv kco)
        = do { lintL (isCoercionTy ty1) (mkBadProofIrrelMsg ty1 co)
             ; lintL (isCoercionTy ty2) (mkBadProofIrrelMsg ty2 co)
             ; kco' <- lintStarCoercion kco
             ; check_kinds kco k1 k2
             ; return (ProofIrrelProv kco') }
 
-     lint_prov _ _ prov@(PluginProv _) = return prov
+     lint_prov _ _ _ _ prov@(PluginProv _) = return prov
 
-     lint_prov _ _ prov@(StepsProv _ _) = return prov -- AMG TODO: actually lint this
+     lint_prov _ ty1' _ ty2' prov@(StepsProv m n)
+       = do { fam_envs <- getFamInstEnvs
+            ; let mb_u = stepsUntil fam_envs m ty1'
+            ; let mb_v = stepsUntil fam_envs n ty2'
+            ; case (mb_u, mb_v) of
+                (Just u, Just v) -> do checkL (u `eqType` v) (report mb_u mb_v "inputs do not reduce to equal types")
+                                       return prov
+                _ -> failWithL (report mb_u mb_v "inputs do not reduce by the given step counts")
+            }
+       where
+         report mb_u mb_v s =
+             hang (text $ "Invalid steps coercion: " ++ s)
+                     2 (vcat [ text "From:" <+> ppr ty1'
+                             , if m > 0 then text "after" <+> ppr m <+> text "steps:" <+> ppr mb_u else empty
+                             , text "  To:" <+> ppr ty2'
+                             , if n > 0 then text "after" <+> ppr n <+> text "steps:" <+> ppr mb_v else empty
+                             ])
 
      check_kinds kco k1 k2
        = do { let Pair k1' k2' = coercionKind kco
@@ -2325,12 +2344,13 @@ lintCoercion (HoleCo h)
 
 lintAxioms :: Logger
            -> DynFlags
+           -> FamInstEnvs
            -> SDoc -- ^ The source of the linted axioms
            -> [CoAxiom Branched]
            -> IO ()
-lintAxioms logger dflags what axioms =
+lintAxioms logger dflags fam_envs what axioms =
   displayLintResults logger dflags True what (vcat $ map pprCoAxiom axioms) $
-  initL dflags (defaultLintFlags dflags) [] $
+  initL dflags (defaultLintFlags dflags) fam_envs [] $
   do { mapM_ lint_axiom axioms
      ; let axiom_groups = groupWith coAxiomTyCon axioms
      ; mapM_ lint_axiom_group axiom_groups }
@@ -2488,6 +2508,18 @@ compatible_branches (CoAxBranch { cab_tvs = tvs1
                              substTy unifying_subst rhs2'
       Nothing             -> True
 
+
+stepsUntil :: FamInstEnvs -> Int -> Type -> Maybe Type
+stepsUntil fam_envs = go
+  where
+    go :: Int -> Type -> Maybe Type
+    go 0 ty = Just ty
+    go !i (TyConApp tycon args)
+            | Just (_, ty) <- reduceTyFamApp_maybe fam_envs Nominal tycon args = go (i-1) ty
+            | Just ty      <- expandSynTyConApp_maybe tycon args               = go i ty
+    go _ _ = Nothing
+
+
 {-
 ************************************************************************
 *                                                                      *
@@ -2522,6 +2554,7 @@ data LintEnv
                                -- See Note [Join points]
 
        , le_dynflags :: DynFlags     -- DynamicFlags
+       , le_fam_envs :: FamInstEnvs
        , le_ue_aliases :: NameEnv UsageEnv -- Assigns usage environments to the
                                            -- alias-like binders, as found in
                                            -- non-recursive lets.
@@ -2686,9 +2719,9 @@ data LintLocInfo
   | InCo   Coercion     -- Inside a coercion
   | InAxiom (CoAxiom Branched)   -- Inside a CoAxiom
 
-initL :: DynFlags -> LintFlags -> [Var]
+initL :: DynFlags -> LintFlags -> FamInstEnvs -> [Var]
        -> LintM a -> WarnsAndErrs    -- Warnings and errors
-initL dflags flags vars m
+initL dflags flags fam_envs vars m
   = case unLintM m env (emptyBag, emptyBag) of
       (Just _, errs) -> errs
       (Nothing, errs@(_, e)) | not (isEmptyBag e) -> errs
@@ -2702,6 +2735,7 @@ initL dflags flags vars m
              , le_joins = emptyVarSet
              , le_loc = []
              , le_dynflags = dflags
+             , le_fam_envs = fam_envs
              , le_ue_aliases = emptyNameEnv }
 
 setReportUnsat :: Bool -> LintM a -> LintM a
@@ -2814,6 +2848,9 @@ getValidJoins = LintM (\ env errs -> (Just (le_joins env), errs))
 
 getTCvSubst :: LintM TCvSubst
 getTCvSubst = LintM (\ env errs -> (Just (le_subst env), errs))
+
+getFamInstEnvs :: LintM FamInstEnvs
+getFamInstEnvs = LintM (\ env errs -> (Just (le_fam_envs env), errs))
 
 getUEAliases :: LintM (NameEnv UsageEnv)
 getUEAliases = LintM (\ env errs -> (Just (le_ue_aliases env), errs))

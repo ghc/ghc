@@ -77,9 +77,6 @@ module GHC.Tc.Types(
         -- Role annotations
         RoleAnnotEnv, emptyRoleAnnotEnv, mkRoleAnnotEnv,
         lookupRoleAnnot, getRoleAnnots,
-
-        -- Linting
-        lintGblEnv
   ) where
 
 #include "HsVersions.h"
@@ -102,7 +99,6 @@ import {-# SOURCE #-} GHC.Tc.Errors.Hole.FitTypes ( HoleFitPlugin )
 import GHC.Core.Type
 import GHC.Core.TyCon  ( TyCon, tyConKind )
 import GHC.Core.PatSyn ( PatSyn )
-import GHC.Core.Lint   ( lintAxioms )
 import GHC.Core.UsageEnv
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
@@ -1714,17 +1710,3 @@ lookupRoleAnnot = lookupNameEnv
 getRoleAnnots :: [Name] -> RoleAnnotEnv -> [LRoleAnnotDecl GhcRn]
 getRoleAnnots bndrs role_env
   = mapMaybe (lookupRoleAnnot role_env) bndrs
-
-{- *********************************************************************
-*                                                                      *
-                  Linting a TcGblEnv
-*                                                                      *
-********************************************************************* -}
-
--- | Check the 'TcGblEnv' for consistency. Currently, only checks
--- axioms, but should check other aspects, too.
-lintGblEnv :: Logger -> DynFlags -> TcGblEnv -> TcM ()
-lintGblEnv logger dflags tcg_env =
-  liftIO $ lintAxioms logger dflags (text "TcGblEnv axioms") axioms
-  where
-    axioms = typeEnvCoAxioms (tcg_type_env tcg_env)

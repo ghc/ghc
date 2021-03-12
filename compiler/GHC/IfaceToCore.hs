@@ -1206,7 +1206,7 @@ tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bnd
                                         (nonDetEltsUFM $ if_id_env lcl_env) ++
                                         bndrs' ++
                                         exprsFreeIdsList args')
-                      ; case lintExpr dflags in_scope rhs' of
+                      ; case lintExpr dflags (error "AMG TODO: fam_envs")  in_scope rhs' of
                           Nothing   -> return ()
                           Just errs -> do
                             logger <- getLogger
@@ -1734,7 +1734,7 @@ tcPragExpr is_compulsory toplvl name expr
         in_scope <- get_in_scope
         dflags   <- getDynFlags
         logger   <- getLogger
-        case lintUnfolding is_compulsory dflags noSrcLoc in_scope core_expr' of
+        case lintUnfolding is_compulsory dflags (error "AMG TODO: fam_envs")  noSrcLoc in_scope core_expr' of
           Nothing   -> return ()
           Just errs -> liftIO $
             displayLintResults logger dflags False doc

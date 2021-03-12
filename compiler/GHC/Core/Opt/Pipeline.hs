@@ -816,7 +816,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
 
                 -- Dump the result of this iteration
            dump_end_iteration logger dflags print_unqual iteration_no counts1 binds2 rules1 ;
-           lintPassResult hsc_env pass binds2 ;
+           lintPassResult hsc_env fam_envs pass binds2 ;
 
                 -- Loop
            do_iteration (iteration_no + 1) (counts1:counts_so_far) binds2 rules1
