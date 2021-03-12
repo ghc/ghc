@@ -16,7 +16,7 @@
 -- Functions over HsSyn specialised to RdrName.
 
 module GHC.Parser.PostProcess (
-        mkRdrGetField, mkRdrProjection, isGetField, Fbind, -- RecordDot
+        mkRdrGetField, mkRdrProjection, Fbind, -- RecordDot
         mkHsOpApp,
         mkHsIntegral, mkHsFractional, mkHsIsString,
         mkHsDo, mkSpliceDecl,
@@ -2703,11 +2703,6 @@ starSym False = "*"
 
 -----------------------------------------
 -- Bits and pieces for RecordDotSyntax.
-
--- Test if the expression is a 'getField @"..."' expression.
-isGetField :: LHsExpr GhcPs -> Bool
-isGetField (L _ HsGetField{}) = True
-isGetField _ = False
 
 mkRdrGetField :: SrcSpan -> LHsExpr GhcPs -> Located FieldLabelString -> LHsExpr GhcPs
 mkRdrGetField loc arg field =

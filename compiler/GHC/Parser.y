@@ -2740,21 +2740,6 @@ fexp    :: { ECP }
                                         ams (sLL $1 $> $ HsStatic noExtField $2)
                                             [mj AnnStatic $1] }
 
-        -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
-        | fexp TIGHT_INFIX_PROJ field
-            {% runPV (unECP $1) >>= \ $1 ->
-               -- Suppose lhs is an application term e.g. 'f a'
-               -- and rhs is '.b'. Usually we want the parse 'f
-               -- (a.b)' rather than '(f a).b.'. However, if lhs
-               -- is a projection 'r.a' (say) then we want the
-               -- parse '(r.a).b'.
-               fmap ecpFromExp $ ams (case $1 of
-                   L _ (HsApp _ f arg) | not $ isGetField f ->
-                     let l = comb2 arg $3 in
-                     L (getLoc f `combineSrcSpans` l)
-                       (HsApp noExtField f (mkRdrGetField l arg $3))
-                   _ -> mkRdrGetField (comb2 $1 $>) $1 $3) [mj AnnDot $2] }
-
         | aexp                       { $1 }
 
 aexp    :: { ECP }
@@ -2850,6 +2835,12 @@ aexp1   :: { ECP }
                                    amms (mkHsRecordPV overloaded (comb2 $1 $>) (comb2 $2 $4) $1 (snd $3))
                                         (moc $2:mcc $4:(fst $3))
                                }
+
+        -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
+        | aexp1 TIGHT_INFIX_PROJ field
+            {% runPV (unECP $1) >>= \ $1 ->
+               fmap ecpFromExp $ ams (mkRdrGetField (comb2 $1 $>) $1 $3) [mj AnnDot $2] }
+
         | aexp2                { $1 }
 
 aexp2   :: { ECP }
