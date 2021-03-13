@@ -1998,6 +1998,7 @@ doNotQuantifyTyVars :: CandidatesQTvs
                     -> (TidyEnv -> TcM (TidyEnv, SDoc))
                             -- ^ like "the class context (D a b, E foogle)"
                     -> TcM ()
+-- See Note [Error on unconstrained meta-variables]
 doNotQuantifyTyVars dvs where_found
   | isEmptyCandidates dvs
   = traceTc "doNotQuantifyTyVars has nothing to error on" empty
