@@ -445,17 +445,22 @@ tc_lhs_sig_type :: SkolemInfo -> LHsSigType GhcRn
 -- This will never emit constraints, as it uses solveEqualities internally.
 -- No validity checking or zonking
 -- Returns also an implication for the unsolved constraints
-tc_lhs_sig_type skol_info (L loc (HsSig { sig_bndrs = hs_outer_bndrs
-                                       , sig_body = hs_ty })) ctxt_kind
+tc_lhs_sig_type skol_info full_hs_ty@(L loc (HsSig { sig_bndrs = hs_outer_bndrs
+                                                   , sig_body = hs_ty })) ctxt_kind
   = setSrcSpanA loc $
-    do { (tc_lvl, wanted, (outer_bndrs, ty))
+    do { (tc_lvl, wanted, (exp_kind, (outer_bndrs, ty)))
               <- pushLevelAndSolveEqualitiesX "tc_lhs_sig_type" $
                  -- See Note [Failure in local type signatures]
-                 tcOuterTKBndrs skol_info hs_outer_bndrs $
-                 do { kind <- newExpectedKind ctxt_kind
-                    ; tcLHsType hs_ty kind }
-       -- Any remaining variables (unsolved in the solveEqualities)
-       -- should be in the global tyvars, and therefore won't be quantified
+                 do { exp_kind <- newExpectedKind ctxt_kind
+                          -- See Note [Escaping kind in type signatures]
+                    ; stuff <- tcOuterTKBndrs skol_info hs_outer_bndrs $
+                               tcLHsType hs_ty exp_kind
+                    ; return (exp_kind, stuff) }
+
+       -- Default any unconstrained variables free in the kind
+       -- See Note [Escaping kind in type signatures]
+       ; exp_kind_dvs <- candidateQTyVarsOfType exp_kind
+       ; doNotQuantifyTyVars exp_kind_dvs (mk_doc exp_kind)
 
        ; traceTc "tc_lhs_sig_type" (ppr hs_outer_bndrs $$ ppr outer_bndrs)
        ; (outer_tv_bndrs :: [InvisTVBinder]) <- scopedSortOuter outer_bndrs
@@ -469,9 +474,68 @@ tc_lhs_sig_type skol_info (L loc (HsSig { sig_bndrs = hs_outer_bndrs
        ; implic <- buildTvImplication skol_info kvs tc_lvl wanted
 
        ; return (implic, mkInfForAllTys kvs ty1) }
+  where
+    mk_doc exp_kind tidy_env
+      = do { (tidy_env2, exp_kind) <- zonkTidyTcType tidy_env exp_kind
+           ; return (tidy_env2, hang (text "The kind" <+> ppr exp_kind)
+                                   2 (text "of type signature:" <+> ppr full_hs_ty)) }
 
-{- Note [Skolem escape in type signatures]
+
+
+{- Note [Escaping kind in type signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider kind-checking the signature for `foo` (#19495):
+  type family T (r :: RuntimeRep) :: TYPE r
+
+  foo :: forall (r :: RuntimeRep). T r
+  foo = ...
+
+We kind-check the type with expected kind `TYPE delta` (see newExpectedKind),
+where `delta :: RuntimeRep` is as-yet unknown. (We can't use `TYPE LiftedRep`
+because we allow signatures like `foo :: Int#`.)
+
+Suppose we are at level L currently.  We do this
+  * pushLevelAndSolveEqualitiesX: moves to level L+1
+  * newExpectedKind: allocates delta{L+1}
+  * tcOuterTKBndrs: pushes the level again to L+2, binds skolem r{L+2}
+  * kind-check the body (T r) :: TYPE delta{L+1}
+
+Then
+* We can't unify delta{L+1} with r{L+2}.
+  And rightly so: skolem would escape.
+
+* If delta{L+1} is unified with some-kind{L}, that is fine.
+  This can happen
+      \(x::a) -> let y :: a; y = x in ...(x :: Int#)...
+  Here (x :: a :: TYPE gamma) is in the environment when we check
+  the signature y::a.  We unify delta := gamma, and all is well.
+
+* If delta{L+1} is unconstrained, we /must not/ quantify over it!
+  E.g. Consider f :: Any   where Any :: forall k. k
+  We kind-check this with expected kind TYPE kappa. We get
+      Any @(TYPE kappa) :: TYPE kappa
+  We don't want to generalise to     forall k. Any @k
+  because that is ill-kinded: the kind of the body of the forall,
+  (Any @k :: k) mentions the bound variable k.
+
+  Instead we want to default it to LiftedRep.
+
+  An alternative would be to promote it, similar to the monomorphism
+  restriction, but the MR is pretty confusing.  Defaulting seems better
+
+How does that defaulting happen?  Well, since we /currently/ default
+RuntimeRep variables during generalisation, it'll happen in
+kindGeneralize. But in principle we might allow generalisation over
+RuntimeRep variables in future.  Moreover, what if we had
+   kappa{L+1} := F alpha{L+1}
+where F :: Type -> RuntimeRep.   Now it's alpha that is free in the kind
+and it /won't/ be defaulted.
+
+So we use doNotQuantifyTyVars to either default the free vars of
+exp_kind (if possible), or error (if not).
+
+Note [Skolem escape in type signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 tcHsSigType is tricky.  Consider (T11142)
   foo :: forall b. (forall k (a :: k). SameKind a b) -> ()
 This is ill-kinded because of a nested skolem-escape.
@@ -3210,6 +3274,12 @@ tcImplicitTKBndrsX :: SkolemMode -> SkolemInfo
 --    and emit an implication constraint with a ForAllSkol ic_info,
 --    so that it is subject to a telescope test.
 tcImplicitTKBndrsX skol_mode skol_info bndrs thing_inside
+  | null bndrs  -- Short-cut the common case with no quantifiers
+                -- E.g. f :: Int -> Int
+                --      makes a HsOuterImplicit with empty bndrs,
+                --      and tcOuterTKBndrsX goes via here
+  = do { res <- thing_inside; return ([], res) }
+  | otherwise
   = do { (tclvl, wanted, (skol_tvs, res))
              <- pushLevelAndCaptureConstraints       $
                 bindImplicitTKBndrsX skol_mode bndrs $

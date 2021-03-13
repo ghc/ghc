@@ -53,7 +53,14 @@ test('T16326_Fail9', normal, compile_fail, [''])
 test('T16326_Fail10', normal, compile_fail, [''])
 test('T16326_Fail11', normal, compile_fail, [''])
 test('T16326_Fail12', normal, compile_fail, [''])
+
 test('T16391b', normal, compile_fail, ['-fprint-explicit-runtime-reps'])
+
+# T16391b got an ASSERT error during -ddump-tc-trace (#19495)
+# So we run it again with -ddump-tc-trace and a new name
+# Little changes in the trace output don't matter; just search for "panic!"
+test('T19495', [ grep_errmsg(r'panic!') ], compile_fail, ['-dsuppress-uniques -ddump-tc-trace'])
+
 test('T16344', normal, compile_fail, [''])
 test('T16344a', normal, compile_fail, [''])
 test('T16418', normal, compile_fail, [''])
