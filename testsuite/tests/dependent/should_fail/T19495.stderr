@@ -1,0 +1,2724 @@
+checkFamInstConsistency [GHC.Exts, Prelude]
+Tc2 (src)
+Tc3
+tcExtendKindEnvList []
+tcExtendKindEnvList []
+---- tcTyClGroup ---- {
+Decls for [T]
+tcExtendKindEnv [rij :-> APromotionErr TyConPE]
+---- kcTyClGroup ---- {
+  module T16391b
+  type family T (r :: RuntimeRep) :: TYPE r
+checkInitialKinds { []
+checkInitialKinds done }
+tcExtendKindEnvList []
+pushLevelAndSolveEqualitiesX {
+  Called from pushLevelAndSolveEqualities
+inferInitialKinds { [T]
+bindImplicitTKBndrsX
+  []
+  []
+tc_extend_local_env []
+tcExtendBinderStack []
+bindExplicitTKBndrs [(r :: RuntimeRep)]
+solveEqualities { Called from tcLHsKindSig
+lk1 RuntimeRep
+tcInferTyApps {
+  RuntimeRep
+  []
+tcInferTyApps } RuntimeRep :: *
+checkExpectedKind
+  RuntimeRep
+  *
+checkExpectedKindX
+  RuntimeRep
+  act_kind': *
+  exp_kind: *
+newNoTcEvBinds unique = awa
+solveWanteds {
+  Level = 1
+  WC {}
+simplify_loop iteration=0 (definitely_redo = True, 0 simples to solve)
+simplify_loop: wc = WC {}
+solveSimpleWanteds { {}
+solveSimpleWanteds end }
+  iterations = 1
+  residual = WC {}
+resetUnificationFlag
+  ambient: 1
+  unif_lvl: Nothing
+solveWanteds }
+  final wc = WC {}
+  current evbinds  = {}
+zonkSimples done: {}
+emitFlatConstraints { WC {}
+emitFlatConstraints }
+  simples: {}
+  holes:   {}
+emitHoles {}
+solveEqualities }
+tcLHsKindSig
+  RuntimeRep
+  RuntimeRep
+kindGeneralizeNone RuntimeRep
+checkValidType RuntimeRep :: *
+done ct RuntimeRep
+Ambiguity check for RuntimeRep
+tc_sub_type (general case)
+  ty_actual   = RuntimeRep
+  ty_expected = RuntimeRep
+u_tys
+  tclvl 1
+  RuntimeRep ~ RuntimeRep
+  a type equality[True] RuntimeRep ~ RuntimeRep
+u_tys yields no coercion
+simplifyAmbiguityCheck {
+  type =  RuntimeRep
+  wanted =  WC {}
+newTcEvBinds unique = awb
+solveWanteds {
+  Level = 1
+  WC {}
+simplify_loop iteration=0 (definitely_redo = True, 0 simples to solve)
+simplify_loop: wc = WC {}
+solveSimpleWanteds { {}
+solveSimpleWanteds end }
+  iterations = 1
+  residual = WC {}
+resetUnificationFlag
+  ambient: 1
+  unif_lvl: Nothing
+solveWanteds }
+  final wc = WC {}
+  current evbinds  = {}
+End simplifyAmbiguityCheck }
+reportUnsolved(ambig) {
+newTcEvBinds unique = awc
+reportUnsolved(ambig) }
+Done ambiguity check for RuntimeRep
+checkValidType done RuntimeRep :: *
+tcLHsKindSig2 RuntimeRep
+tc_extend_local_env
+  [(r, Type variable ‘r’ = r[tyv:1] :: RuntimeRep)]
+tcExtendBinderStack [r r[tyv:1]]
+solveEqualities { Called from tcLHsKindSig
+lk1 TYPE
+tcInferTyApps {
+  TYPE
+  [r]
+tcInferTyApps (vis normal app)
+  [vis] RuntimeRep
+  r
+  RuntimeRep
+  [TCvSubst In scope: InScope {} Type env: [] Co env: []]
+lk1 r
+tcInferTyApps {
+  r
+  []
+tcInferTyApps } r[tyv:1] :: RuntimeRep
+checkExpectedKind
+  r[tyv:1]
+  RuntimeRep
+checkExpectedKindX
+  r
+  act_kind': RuntimeRep
+  exp_kind: RuntimeRep
+tcInferTyApps (vis normal app) 2 RuntimeRep
+tcInferTyApps } TYPE r[tyv:1] :: *
+checkExpectedKind
+  TYPE r[tyv:1]
+  *
+checkExpectedKindX
+  TYPE r
+  act_kind': *
+  exp_kind: *
+newNoTcEvBinds unique = awd
+solveWanteds {
+  Level = 1
+  WC {}
+simplify_loop iteration=0 (definitely_redo = True, 0 simples to solve)
+simplify_loop: wc = WC {}
+solveSimpleWanteds { {}
+solveSimpleWanteds end }
+  iterations = 1
+  residual = WC {}
+resetUnificationFlag
+  ambient: 1
+  unif_lvl: Nothing
+solveWanteds }
+  final wc = WC {}
+  current evbinds  = {}
+zonkSimples done: {}
+emitFlatConstraints { WC {}
+emitFlatConstraints }
+  simples: {}
+  holes:   {}
+emitHoles {}
+solveEqualities }
+tcLHsKindSig
+  TYPE r
+  TYPE r[tyv:1]
+kindGeneralizeNone TYPE r[tyv:1]
+checkValidType TYPE r[tyv:1] :: *
+done ct TYPE r[tyv:1]
+Ambiguity check for TYPE r[tyv:1]
+tc_sub_type (general case)
+  ty_actual   = TYPE r[tyv:1]
+  ty_expected = TYPE r[tyv:1]
+u_tys
+  tclvl 1
+  TYPE r[tyv:1] ~ TYPE r[tyv:1]
+  a type equality[True] TYPE r[tyv:1] ~ TYPE r[tyv:1]
+u_tys
+  tclvl 1
+  r[tyv:1] ~ r[tyv:1]
+  a type equality[True] TYPE r[tyv:1] ~ TYPE r[tyv:1]
+u_tys yields no coercion
+u_tys yields no coercion
+simplifyAmbiguityCheck {
+  type =  TYPE r[tyv:1]
+  wanted =  WC {}
+newTcEvBinds unique = awe
+solveWanteds {
+  Level = 1
+  WC {}
+simplify_loop iteration=0 (definitely_redo = True, 0 simples to solve)
+simplify_loop: wc = WC {}
+solveSimpleWanteds { {}
+solveSimpleWanteds end }
+  iterations = 1
+  residual = WC {}
+resetUnificationFlag
+  ambient: 1
+  unif_lvl: Nothing
+solveWanteds }
+  final wc = WC {}
+  current evbinds  = {}
+End simplifyAmbiguityCheck }
+reportUnsolved(ambig) {
+newTcEvBinds unique = awf
+reportUnsolved(ambig) }
+Done ambiguity check for TYPE r[tyv:1]
+checkValidType done TYPE r[tyv:1] :: *
+tcLHsKindSig2 TYPE r[tyv:1]
+kcInferDeclHeader: not-cusk
+  T
+  []
+  [(r :: RuntimeRep)]
+  []
+  [r[tyv:1]]
+  RuntimeRep -> TYPE r[tyv:1]
+inferInitialKinds done }
+kcTyClGroup: initial kinds T :: RuntimeRep -> TYPE r[tyv:1]
+tcExtendKindEnvList
+  [(T, ATcTyCon T[tc] :: RuntimeRep -> TYPE r[tyv:1])]
+kcTyClDecl { T
+kcTyClDecl done } T
+newNoTcEvBinds unique = awg
+solveWanteds {
+  Level = 1
+  WC {}
+simplify_loop iteration=0 (definitely_redo = True, 0 simples to solve)
+simplify_loop: wc = WC {}
+solveSimpleWanteds { {}
+solveSimpleWanteds end }
+  iterations = 1
+  residual = WC {}
+resetUnificationFlag
+  ambient: 1
+  unif_lvl: Nothing
+solveWanteds }
+  final wc = WC {}
+  current evbinds  = {}
+pushLevelAndSolveEqualities }
+  Residual: WC {}
+  Level: 1
+Skolemising r[tyv:1] := r[sk:1]
+writeMetaTyVar r[tyv:1] :: RuntimeRep := r[sk:1]
+Skipping swizzleTcTyConBndrs for [T[tc]]
+quantifyTyVars has nothing to quantify
+generaliseTcTyCon: pre zonk
+  tycon = T[tc]
+  spec_req_tvs = (r[sk:1] :: RuntimeRep)
+  tc_res_kind = TYPE r[sk:1]
+  dvs1 = DV {dv_kvs = {r[sk:1]}, dv_tvs = {}, dv_cvs = {}}
+  inferred =
+generaliseTcTyCon: post zonk
+  tycon = T[tc]
+  inferred =
+  spec_req_tvs = (r[sk:1] :: RuntimeRep)
+  sorted_spec_tvs =
+  req_tvs = [r]
+  zonk-env = ZE {ze_tv_env = [aw8 :-> r]
+                 ze_id_env = []}
+generaliseTcTyCon done
+  tycon = T[tc]
+  tc_res_kind = TYPE r
+  dep_fv_set = {r[sk:1]}
+  inferred_tcbs = []
+  specified_tcbs = []
+  required_tcbs = [req (@(r :: RuntimeRep))]
+  final_tcbs = [req (@(r :: RuntimeRep))]
+---- kcTyClGroup end ---- } T :: forall (r :: RuntimeRep) -> TYPE r
+tcTyAndCl generalized kinds
+  (T, [req (@(r :: RuntimeRep))], TYPE r True)
+tcExtendKindEnvList
+  [(T, ATcTyCon T[tc] :: forall (r :: RuntimeRep) -> TYPE r)]
+---- tcTyClDecl ---- { type family T (r :: RuntimeRep) :: TYPE r
+bindTyClTyVars
+  T [req (@(r :: RuntimeRep))]
+  [(r, r)]
+tc_extend_local_env [(r, Type variable ‘r’ = r :: RuntimeRep)]
+tcExtendBinderStack [r r]
+open type family: T
+---- tcTyClDecl end ---- } T
+Starting synonym cycle check [T]
+Done synonym cycle check [T]
+Starting validity check [T]
+Starting validity for tycon T
+checkValidTyCon
+  T
+  Nothing
+Done validity for tycon T
+Done validity check [T]
+---- end tcTyClGroup ---- }
+tcAddTyCons
+  tycons [T]
+  implicits []
+tcExtendKindEnvList []
+tc_extend_local_env []
+Adding instances:
+addFamInsts
+tcAddTyCons
+  tycons []
+  implicits []
+tcExtendKindEnvList []
+tc_extend_local_env []
+tcDeriving []
+rnd
+Adding instances:
+Tc3b
+Tc3c
+tcSemigroupWarnings
+tcPreludeClashWarn/wouldBeImported
+tcPreludeClashWarn/prelude_functions <> []
+tcMissingParentClassWarn
+tcMissingParentClassWarn/isInsts []
+Tc4
+Tc4a
+Tc5
+tcExtendKindEnvList []
+tcHsSigType { T r
+pushLevelAndSolveEqualitiesX { Called from tc_lhs_sig_type
+newAnonMetaTyVar t[tau:1]
+pushLevelAndCaptureConstraints { 2
+newMetaKindVar k[tau:2]
+bindImplicitTKBndrsX
+  [r]
+  [r[sk:2]]
+tc_extend_local_env [(r, Type variable ‘r’ = r[sk:2] :: k[tau:2])]
+tcExtendBinderStack [r r[sk:2]]
+lk1 T
+tcInferTyApps {
+  T
+  [r]
+tcInferTyApps (vis normal app)
+  r
+  r
+  RuntimeRep
+  [TCvSubst In scope: InScope {} Type env: [] Co env: []]
+lk1 r
+tcInferTyApps {
+  r
+  []
+tcInferTyApps } r[sk:2] :: k[tau:2]
+checkExpectedKind
+  r[sk:2]
+  k[tau:2]
+checkExpectedKindX
+  r
+  act_kind': k[tau:2]
+  exp_kind: RuntimeRep
+u_tys
+  tclvl 2
+  k[tau:2] ~ RuntimeRep
+  a type equality[True] k[tau:2] ~ RuntimeRep
+u_tys
+  tclvl 2
+  * ~ *
+  arising from a kind equality arising from k[tau:2] ~ RuntimeRep
+u_tys yields no coercion
+uUnfilledVar2 ok
+  k[tau:2] :: *
+  RuntimeRep :: *
+  True
+  <*>_N
+writeMetaTyVar k[tau:2] :: * := RuntimeRep
+u_tys yields no coercion
+checkExpectedKind
+  k[tau:2]
+  RuntimeRep
+  <RuntimeRep>_N
+tcInferTyApps (vis normal app) 2 RuntimeRep
+tcInferTyApps } T r[sk:2] :: TYPE r[sk:2]
+checkExpectedKind
+  T r[sk:2]
+  TYPE r[sk:2]
+checkExpectedKindX
+  T r
+  act_kind': TYPE r[sk:2]
+  exp_kind: TYPE t[tau:1]
+u_tys
+  tclvl 2
+  TYPE r[sk:2] ~ TYPE t[tau:1]
+  a type equality[True] TYPE r[sk:2] ~ TYPE t[tau:1]
+u_tys
+  tclvl 2
+  r[sk:2] ~ t[tau:1]
+  a type equality[True] TYPE r[sk:2] ~ TYPE t[tau:1]
+uUnfilledVar2 not ok
+  t[tau:1]
+  r[sk:2]
+New coercion hole: co
+utype_defer
+  r[sk:2]
+  t[tau:1]
+  a type equality[True] TYPE r[sk:2] ~ TYPE t[tau:1]
+  In the type signature: foo :: T r
+utype_defer2 {co}
+u_tys yields coercion: {co}
+u_tys yields coercion: (TYPE {co})_N
+checkExpectedKind
+  TYPE r[sk:2]
+  TYPE t[tau:1]
+  (TYPE {co})_N
+pushLevelAndCaptureConstraints } 2
+newNoTcEvBinds unique = awp
+newNoTcEvBinds unique = awq
+solveWanteds {
+  Level = 1
+  WC {wc_impl =
+        Implic {
+          TcLevel = 2
+          Skolems = (r[sk:2] :: k[tau:2])
+          Given-eqs = NoGivenEqs
+          Status = Unsolved
+          Given =
+          Wanted =
+            WC {wc_simple =
+                  [WD] hole{co} {0}:: r[sk:2] GHC.Prim.~# t[tau:1] (CNonCanonical)}
+          Binds = CoEvBindsVar<awp>
+          the type signature for ‘foo’ }}
+simplify_loop iteration=0 (definitely_redo = True, 0 simples to solve)
+simplify_loop: wc =
+  WC {wc_impl =
+        Implic {
+          TcLevel = 2
+          Skolems = (r[sk:2] :: k[tau:2])
+          Given-eqs = NoGivenEqs
+          Status = Unsolved
+          Given =
+          Wanted =
+            WC {wc_simple =
+                  [WD] hole{co} {0}:: r[sk:2] GHC.Prim.~# t[tau:1] (CNonCanonical)}
+          Binds = CoEvBindsVar<awp>
+          the type signature for ‘foo’ }}
+solveSimpleWanteds { {}
+solveSimpleWanteds end }
+  iterations = 1
+  residual = WC {}
+solveNestedImplications starting {
+solveImplication {
+  Implic {
+    TcLevel = 2
+    Skolems = (r[sk:2] :: k[tau:2])
+    Given-eqs = NoGivenEqs
+    Status = Unsolved
+    Given =
+    Wanted =
+      WC {wc_simple =
+            [WD] hole{co} {0}:: r[sk:2] GHC.Prim.~# t[tau:1] (CNonCanonical)}
+    Binds = CoEvBindsVar<awp>
+    the type signature for ‘foo’ }
+  Inerts {Innermost given equalities = 0
+          Given eqs at this level = False}
+solveWanteds {
+  Level = 2
+  WC {wc_simple =
+        [WD] hole{co} {0}:: r[sk:2] GHC.Prim.~# t[tau:1] (CNonCanonical)}
+simplify_loop iteration=0 (definitely_redo = True, 1 simples to solve)
+simplify_loop: wc =
+  WC {wc_simple =
+        [WD] hole{co} {0}:: r[sk:2] GHC.Prim.~# t[tau:1] (CNonCanonical)}
+solveSimpleWanteds {
+  {[WD] hole{co} {0}:: r[sk:2] GHC.Prim.~# t[tau:1] (CNonCanonical)}
+----------------------------- 
+Start solver pipeline {
+  tclevel = 2
+  work item = [WD] hole{co} {0}:: r[sk:2]
+                                  GHC.Prim.~# t[tau:1] (CNonCanonical)
+  inerts = {Innermost given equalities = 0
+            Given eqs at this level = False}
+  rest of worklist = WL {}
+runStage canonicalization {
+  workitem   =  [WD] hole{co} {0}:: r[sk:2]
+                                    GHC.Prim.~# t[tau:1] (CNonCanonical)
+canEvNC:eq
+  r[sk:2]
+  t[tau:1]
+can_eq_nc
+  False
+  [WD] hole{co} {0}:: r[sk:2] GHC.Prim.~# t[tau:1]
+  nominal equality
+  r[sk:2]
+  r[sk:2]
+  t[tau:1]
+  t[tau:1]
+rewrite { r[sk:2]
+Unfilled tyvar (r[sk:2] :: RuntimeRep)
+rewrite } r[sk:2]
+rewrite { t[tau:1]
+Unfilled tyvar (t[tau:1] :: RuntimeRep)
+rewrite } t[tau:1]
+canEqLHS2 swapOver
+  r[sk:2]
+  t[tau:1]
+  Not-swapped
+New coercion hole: co
+Emitting new coercion hole {co} :: t[tau:1] GHC.Prim.~# r[sk:2]
+Filling coercion hole co := Sym {co}
+rewriteEqEvidence
+  [WD] hole{co} {0}:: r[sk:2] GHC.Prim.~# t[tau:1]
+  t[tau:1]
+  r[sk:2]
+  Sym {co}
+canEqOK
+  t[tau:1]
+  r[sk:2]
+end stage canonicalization }
+runStage interact with inerts {
+  workitem   =  [WD] hole{co} {1}:: t[tau:1]
+                                    GHC.Prim.~# r[sk:2] (CEqCan)
+tryToSolveByUnification
+  t[tau:1] ~ r[sk:2]
+  NoUnify
+end stage interact with inerts }
+runStage top-level reactions {
+  workitem   =  [WD] hole{co} {1}:: t[tau:1]
+                                    GHC.Prim.~# r[sk:2] (CEqCan)
+doTopReact
+  [WD] hole{co} {1}:: t[tau:1] GHC.Prim.~# r[sk:2] (CEqCan)
+No local instance for t[tau:1] ~ r[sk:2]
+end stage top-level reactions }
+addInertCan {
+  Trying to insert new inert item: [WD] hole{co} {1}:: t[tau:1]
+                                                       GHC.Prim.~# r[sk:2] (CEqCan)
+addInertCan }
+Step 1[l:2,d:1] Kept as inert:
+    [WD] hole{co} {1}:: t[tau:1] GHC.Prim.~# r[sk:2]
+End solver pipeline (kept as inert) }
+  final_item = [WD] hole{co} {1}:: t[tau:1]
+                                   GHC.Prim.~# r[sk:2] (CEqCan)
+getUnsolvedInerts
+   tv eqs = {[WD] hole{co} {1}:: t[tau:1]
+                                 GHC.Prim.~# r[sk:2] (CEqCan)}
+  fun eqs = {}
+  others = {}
+  implics = {}
+solveSimpleWanteds end }
+  iterations = 1
+  residual = WC {wc_simple =
+                   [WD] hole{co} {1}:: t[tau:1] GHC.Prim.~# r[sk:2] (CEqCan)}
+resetUnificationFlag
+  ambient: 2
+  unif_lvl: Nothing
+solveWanteds }
+  final wc = WC {wc_simple =
+                   [WD] hole{co} {1}:: t[tau:1] GHC.Prim.~# r[sk:2] (CEqCan)}
+  current evbinds  = {}
+getHasGivenEqs
+  given_eqs: False
+  ge_lvl: 0
+  ambient level: 2
+  Inerts: {Innermost given equalities = 0
+           Given eqs at this level = False}
+  Insols: {}
+solveImplication 2
+  {}
+  WC {wc_simple =
+        [WD] hole{co} {1}:: t[tau:1] GHC.Prim.~# r[sk:2] (CEqCan)}
+setImplicationStatus(not-all-solved) {
+  Implic {
+    TcLevel = 2
+    Skolems = (r[sk:2] :: k[tau:2])
+    Given-eqs = NoGivenEqs
+    Status = Unsolved
+    Given =
+    Wanted =
+      WC {wc_simple =
+            [WD] hole{co} {1}:: t[tau:1] GHC.Prim.~# r[sk:2] (CEqCan)}
+    Binds = CoEvBindsVar<awp>
+    the type signature for ‘foo’ }
+neededEvVars
+  old_needs: {}
+  seeds3: {co}
+  tcvs: {co}
+  ev_binds: []
+  live_ev_binds: []
+setImplicationStatus(not-all-solved) }
+  Implic {
+    TcLevel = 2
+    Skolems = (r[sk:2] :: k[tau:2])
+    Given-eqs = NoGivenEqs
+    Status = Unsolved
+    Given =
+    Wanted =
+      WC {wc_simple =
+            [WD] hole{co} {1}:: t[tau:1] GHC.Prim.~# r[sk:2] (CEqCan)}
+    Binds = CoEvBindsVar<awp>
+    the type signature for ‘foo’ }
+solveImplication end }
+  has_given_eqs = NoGivenEqs
+  res_implic = Just Implic {
+                      TcLevel = 2
+                      Skolems = (r[sk:2] :: k[tau:2])
+                      Given-eqs = NoGivenEqs
+                      Status = Unsolved
+                      Given =
+                      Wanted =
+                        WC {wc_simple =
+                              [WD] hole{co} {1}:: t[tau:1] GHC.Prim.~# r[sk:2] (CEqCan)}
+                      Binds = CoEvBindsVar<awp>
+                      the type signature for ‘foo’ }
+  implication evbinds = {}
+  implication tvcs = {co}
+solveNestedImplications end }
+  unsolved_implics = {Just Implic {
+                             TcLevel = 2
+                             Skolems = (r[sk:2] :: k[tau:2])
+                             Given-eqs = NoGivenEqs
+                             Status = Unsolved
+                             Given =
+                             Wanted =
+                               WC {wc_simple =
+                                     [WD] hole{co} {1}:: t[tau:1] GHC.Prim.~# r[sk:2] (CEqCan)}
+                             Binds = CoEvBindsVar<awp>
+                             the type signature for ‘foo’ }}
+resetUnificationFlag
+  ambient: 1
+  unif_lvl: Nothing
+solveWanteds }
+  final wc = WC {wc_impl =
+                   Implic {
+                     TcLevel = 2
+                     Skolems = (r[sk:2] :: k[tau:2])
+                     Given-eqs = NoGivenEqs
+                     Status = Unsolved
+                     Given =
+                     Wanted =
+                       WC {wc_simple =
+                             [WD] hole{co} {1}:: t[tau:1] GHC.Prim.~# r[sk:2] (CEqCan)}
+                     Binds = CoEvBindsVar<awp>
+                     the type signature for ‘foo’ }}
+  current evbinds  = {}
+defaultTyVarTcS RuntimeRep t[tau:1]
+unifyTyVar t[tau:1] := 'BoxedRep 'Lifted
+writeMetaTyVar t[tau:1] :: RuntimeRep := 'BoxedRep 'Lifted
+solveWanteds {
+  Level = 1
+  WC {wc_impl =
+        Implic {
+          TcLevel = 2
+          Skolems = (r[sk:2] :: k[tau:2])
+          Given-eqs = NoGivenEqs
+          Status = Unsolved
+          Given =
+          Wanted =
+            WC {wc_simple =
+                  [WD] hole{co} {1}:: t[tau:1] GHC.Prim.~# r[sk:2] (CEqCan)}
+          Binds = CoEvBindsVar<awp>
+          the type signature for ‘foo’ }}
+simplify_loop iteration=0 (definitely_redo = True, 0 simples to solve)
+simplify_loop: wc =
+  WC {wc_impl =
+        Implic {
+          TcLevel = 2
+          Skolems = (r[sk:2] :: k[tau:2])
+          Given-eqs = NoGivenEqs
+          Status = Unsolved
+          Given =
+          Wanted =
+            WC {wc_simple =
+                  [WD] hole{co} {1}:: t[tau:1] GHC.Prim.~# r[sk:2] (CEqCan)}
+          Binds = CoEvBindsVar<awp>
+          the type signature for ‘foo’ }}
+solveSimpleWanteds { {}
+solveSimpleWanteds end }
+  iterations = 1
+  residual = WC {}
+solveNestedImplications starting {
+solveImplication {
+  Implic {
+    TcLevel = 2
+    Skolems = (r[sk:2] :: k[tau:2])
+    Given-eqs = NoGivenEqs
+    Status = Unsolved
+    Given =
+    Wanted =
+      WC {wc_simple =
+            [WD] hole{co} {1}:: t[tau:1] GHC.Prim.~# r[sk:2] (CEqCan)}
+    Binds = CoEvBindsVar<awp>
+    the type signature for ‘foo’ }
+  Inerts {Innermost given equalities = 0
+          Given eqs at this level = False}
+solveWanteds {
+  Level = 2
+  WC {wc_simple =
+        [WD] hole{co} {1}:: t[tau:1] GHC.Prim.~# r[sk:2] (CEqCan)}
+simplify_loop iteration=0 (definitely_redo = True, 1 simples to solve)
+simplify_loop: wc =
+  WC {wc_simple =
+        [WD] hole{co} {1}:: t[tau:1] GHC.Prim.~# r[sk:2] (CEqCan)}
+solveSimpleWanteds {
+  {[WD] hole{co} {1}:: t[tau:1] GHC.Prim.~# r[sk:2] (CEqCan)}
+----------------------------- 
+Start solver pipeline {
+  tclevel = 2
+  work item = [WD] hole{co} {1}:: t[tau:1]
+                                  GHC.Prim.~# r[sk:2] (CEqCan)
+  inerts = {Innermost given equalities = 0
+            Given eqs at this level = False}
+  rest of worklist = WL {}
+runStage canonicalization {
+  workitem   =  [WD] hole{co} {1}:: t[tau:1]
+                                    GHC.Prim.~# r[sk:2] (CEqCan)
+Following filled tyvar (zonk_eq_types) t[tau:1] = 'BoxedRep 'Lifted
+can_eq_nc
+  False
+  [WD] hole{co} {1}:: t[tau:1] GHC.Prim.~# r[sk:2]
+  nominal equality
+  'BoxedRep 'Lifted
+  t[tau:1]
+  r[sk:2]
+  r[sk:2]
+rewrite { t[tau:1]
+Following filled tyvar t[tau:1] = 'BoxedRep 'Lifted
+rewrite } 'BoxedRep 'Lifted
+rewrite { r[sk:2]
+Unfilled tyvar (r[sk:2] :: RuntimeRep)
+rewrite } r[sk:2]
+New coercion hole: co
+Emitting new coercion hole
+  {co} :: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted
+Filling coercion hole co := Sym {co}
+rewriteEqEvidence
+  [WD] hole{co} {1}:: 'BoxedRep 'Lifted GHC.Prim.~# r[sk:2]
+  r[sk:2]
+  'BoxedRep 'Lifted
+  Sym {co}
+canEqOK
+  r[sk:2]
+  'BoxedRep 'Lifted
+end stage canonicalization }
+runStage interact with inerts {
+  workitem   =  [WD] hole{co} {2}:: r[sk:2]
+                                    GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)
+tryToSolveByUnification
+  r[sk:2] ~ 'BoxedRep 'Lifted
+  NoUnify
+end stage interact with inerts }
+runStage top-level reactions {
+  workitem   =  [WD] hole{co} {2}:: r[sk:2]
+                                    GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)
+doTopReact
+  [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)
+No local instance for r[sk:2] ~ 'BoxedRep 'Lifted
+end stage top-level reactions }
+addInertCan {
+  Trying to insert new inert item: [WD] hole{co} {2}:: r[sk:2]
+                                                       GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)
+addInertCan }
+Step 2[l:2,d:2] Kept as inert:
+    [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted
+End solver pipeline (kept as inert) }
+  final_item = [WD] hole{co} {2}:: r[sk:2]
+                                   GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)
+getUnsolvedInerts
+   tv eqs = {[WD] hole{co} {2}:: r[sk:2]
+                                 GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+  fun eqs = {}
+  others = {}
+  implics = {}
+solveSimpleWanteds end }
+  iterations = 1
+  residual = WC {wc_simple =
+                   [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+resetUnificationFlag
+  ambient: 2
+  unif_lvl: Nothing
+solveWanteds }
+  final wc = WC {wc_simple =
+                   [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+  current evbinds  = {}
+getHasGivenEqs
+  given_eqs: False
+  ge_lvl: 0
+  ambient level: 2
+  Inerts: {Innermost given equalities = 0
+           Given eqs at this level = False}
+  Insols: {}
+solveImplication 2
+  {}
+  WC {wc_simple =
+        [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+setImplicationStatus(not-all-solved) {
+  Implic {
+    TcLevel = 2
+    Skolems = (r[sk:2] :: k[tau:2])
+    Given-eqs = NoGivenEqs
+    Status = Unsolved
+    Given =
+    Wanted =
+      WC {wc_simple =
+            [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+    Binds = CoEvBindsVar<awp>
+    the type signature for ‘foo’ }
+neededEvVars
+  old_needs: {co}
+  seeds3: {co, co}
+  tcvs: {co, co}
+  ev_binds: []
+  live_ev_binds: []
+setImplicationStatus(not-all-solved) }
+  Implic {
+    TcLevel = 2
+    Skolems = (r[sk:2] :: k[tau:2])
+    Given-eqs = NoGivenEqs
+    Status = Unsolved
+    Given =
+    Wanted =
+      WC {wc_simple =
+            [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+    Binds = CoEvBindsVar<awp>
+    the type signature for ‘foo’ }
+solveImplication end }
+  has_given_eqs = NoGivenEqs
+  res_implic = Just Implic {
+                      TcLevel = 2
+                      Skolems = (r[sk:2] :: k[tau:2])
+                      Given-eqs = NoGivenEqs
+                      Status = Unsolved
+                      Given =
+                      Wanted =
+                        WC {wc_simple =
+                              [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+                      Binds = CoEvBindsVar<awp>
+                      the type signature for ‘foo’ }
+  implication evbinds = {}
+  implication tvcs = {co, co}
+solveNestedImplications end }
+  unsolved_implics = {Just Implic {
+                             TcLevel = 2
+                             Skolems = (r[sk:2] :: k[tau:2])
+                             Given-eqs = NoGivenEqs
+                             Status = Unsolved
+                             Given =
+                             Wanted =
+                               WC {wc_simple =
+                                     [WD] hole{co} {2}:: r[sk:2]
+                                                         GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+                             Binds = CoEvBindsVar<awp>
+                             the type signature for ‘foo’ }}
+resetUnificationFlag
+  ambient: 1
+  unif_lvl: Nothing
+solveWanteds }
+  final wc = WC {wc_impl =
+                   Implic {
+                     TcLevel = 2
+                     Skolems = (r[sk:2] :: k[tau:2])
+                     Given-eqs = NoGivenEqs
+                     Status = Unsolved
+                     Given =
+                     Wanted =
+                       WC {wc_simple =
+                             [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+                     Binds = CoEvBindsVar<awp>
+                     the type signature for ‘foo’ }}
+  current evbinds  = {}
+zonkSimples done: {}
+zonkSimples done:
+  {[WD] hole{co} {2}:: r[sk:2]
+                       GHC.Prim.~# 'BoxedRep 'Lifted (CNonCanonical)}
+applyDefaultingRules {
+  wanteds = WC {wc_impl =
+                  Implic {
+                    TcLevel = 2
+                    Skolems = (r[sk:2] :: RuntimeRep)
+                    Given-eqs = NoGivenEqs
+                    Status = Unsolved
+                    Given =
+                    Wanted =
+                      WC {wc_simple =
+                            [WD] hole{co} {2}:: r[sk:2]
+                                                GHC.Prim.~# 'BoxedRep 'Lifted (CNonCanonical)}
+                    Binds = CoEvBindsVar<awp>
+                    the type signature for ‘foo’ }}
+  groups  = []
+  info    = ([Integer, Double], (False, False))
+applyDefaultingRules } []
+setImplicationStatus(not-all-solved) {
+  Implic {
+    TcLevel = 2
+    Skolems = (r[sk:2] :: k[tau:2])
+    Given-eqs = NoGivenEqs
+    Status = Unsolved
+    Given =
+    Wanted =
+      WC {wc_simple =
+            [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+    Binds = CoEvBindsVar<awp>
+    the type signature for ‘foo’ }
+neededEvVars
+  old_needs: {co, co}
+  seeds3: {co, co}
+  tcvs: {co, co}
+  ev_binds: []
+  live_ev_binds: []
+setImplicationStatus(not-all-solved) }
+  Implic {
+    TcLevel = 2
+    Skolems = (r[sk:2] :: k[tau:2])
+    Given-eqs = NoGivenEqs
+    Status = Unsolved
+    Given =
+    Wanted =
+      WC {wc_simple =
+            [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+    Binds = CoEvBindsVar<awp>
+    the type signature for ‘foo’ }
+Constraint solver steps = 2
+pushLevelAndSolveEqualities }
+  Residual: WC {wc_impl =
+                  Implic {
+                    TcLevel = 2
+                    Skolems = (r[sk:2] :: k[tau:2])
+                    Given-eqs = NoGivenEqs
+                    Status = Unsolved
+                    Given =
+                    Wanted =
+                      WC {wc_simple =
+                            [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+                    Binds = CoEvBindsVar<awp>
+                    the type signature for ‘foo’ }}
+  Level: 1
+doNotQuantifyTyVars has nothing to error on
+tc_lhs_sig_type
+  HsOuterImplicit: [r]
+  HsOuterImplicit: [r[sk:2]]
+quantifyTyVars has nothing to quantify
+newNoTcEvBinds unique = ay8
+tcHsSigType 2
+  Implic {
+    TcLevel = 1
+    Skolems =
+    Given-eqs = NoGivenEqs
+    Status = Unsolved
+    Given =
+    Wanted =
+      WC {wc_impl =
+            Implic {
+              TcLevel = 2
+              Skolems = (r[sk:2] :: k[tau:2])
+              Given-eqs = NoGivenEqs
+              Status = Unsolved
+              Given =
+              Wanted =
+                WC {wc_simple =
+                      [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+              Binds = CoEvBindsVar<awp>
+              the type signature for ‘foo’ }}
+    Binds = CoEvBindsVar<ay8>
+    the type signature for ‘foo’ }
+newNoTcEvBinds unique = ay9
+solveWanteds {
+  Level = 0
+  WC {wc_impl =
+        Implic {
+          TcLevel = 1
+          Skolems =
+          Given-eqs = NoGivenEqs
+          Status = Unsolved
+          Given =
+          Wanted =
+            WC {wc_impl =
+                  Implic {
+                    TcLevel = 2
+                    Skolems = (r[sk:2] :: k[tau:2])
+                    Given-eqs = NoGivenEqs
+                    Status = Unsolved
+                    Given =
+                    Wanted =
+                      WC {wc_simple =
+                            [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+                    Binds = CoEvBindsVar<awp>
+                    the type signature for ‘foo’ }}
+          Binds = CoEvBindsVar<ay8>
+          the type signature for ‘foo’ }}
+simplify_loop iteration=0 (definitely_redo = True, 0 simples to solve)
+simplify_loop: wc =
+  WC {wc_impl =
+        Implic {
+          TcLevel = 1
+          Skolems =
+          Given-eqs = NoGivenEqs
+          Status = Unsolved
+          Given =
+          Wanted =
+            WC {wc_impl =
+                  Implic {
+                    TcLevel = 2
+                    Skolems = (r[sk:2] :: k[tau:2])
+                    Given-eqs = NoGivenEqs
+                    Status = Unsolved
+                    Given =
+                    Wanted =
+                      WC {wc_simple =
+                            [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+                    Binds = CoEvBindsVar<awp>
+                    the type signature for ‘foo’ }}
+          Binds = CoEvBindsVar<ay8>
+          the type signature for ‘foo’ }}
+solveSimpleWanteds { {}
+solveSimpleWanteds end }
+  iterations = 1
+  residual = WC {}
+solveNestedImplications starting {
+solveImplication {
+  Implic {
+    TcLevel = 1
+    Skolems =
+    Given-eqs = NoGivenEqs
+    Status = Unsolved
+    Given =
+    Wanted =
+      WC {wc_impl =
+            Implic {
+              TcLevel = 2
+              Skolems = (r[sk:2] :: k[tau:2])
+              Given-eqs = NoGivenEqs
+              Status = Unsolved
+              Given =
+              Wanted =
+                WC {wc_simple =
+                      [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+              Binds = CoEvBindsVar<awp>
+              the type signature for ‘foo’ }}
+    Binds = CoEvBindsVar<ay8>
+    the type signature for ‘foo’ }
+  Inerts {Innermost given equalities = 0
+          Given eqs at this level = False}
+solveWanteds {
+  Level = 1
+  WC {wc_impl =
+        Implic {
+          TcLevel = 2
+          Skolems = (r[sk:2] :: k[tau:2])
+          Given-eqs = NoGivenEqs
+          Status = Unsolved
+          Given =
+          Wanted =
+            WC {wc_simple =
+                  [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+          Binds = CoEvBindsVar<awp>
+          the type signature for ‘foo’ }}
+simplify_loop iteration=0 (definitely_redo = True, 0 simples to solve)
+simplify_loop: wc =
+  WC {wc_impl =
+        Implic {
+          TcLevel = 2
+          Skolems = (r[sk:2] :: k[tau:2])
+          Given-eqs = NoGivenEqs
+          Status = Unsolved
+          Given =
+          Wanted =
+            WC {wc_simple =
+                  [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+          Binds = CoEvBindsVar<awp>
+          the type signature for ‘foo’ }}
+solveSimpleWanteds { {}
+solveSimpleWanteds end }
+  iterations = 1
+  residual = WC {}
+solveNestedImplications starting {
+solveImplication {
+  Implic {
+    TcLevel = 2
+    Skolems = (r[sk:2] :: k[tau:2])
+    Given-eqs = NoGivenEqs
+    Status = Unsolved
+    Given =
+    Wanted =
+      WC {wc_simple =
+            [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+    Binds = CoEvBindsVar<awp>
+    the type signature for ‘foo’ }
+  Inerts {Innermost given equalities = 0
+          Given eqs at this level = False}
+solveWanteds {
+  Level = 2
+  WC {wc_simple =
+        [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+simplify_loop iteration=0 (definitely_redo = True, 1 simples to solve)
+simplify_loop: wc =
+  WC {wc_simple =
+        [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+solveSimpleWanteds {
+  {[WD] hole{co} {2}:: r[sk:2]
+                       GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+----------------------------- 
+Start solver pipeline {
+  tclevel = 2
+  work item = [WD] hole{co} {2}:: r[sk:2]
+                                  GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)
+  inerts = {Innermost given equalities = 0
+            Given eqs at this level = False}
+  rest of worklist = WL {}
+runStage canonicalization {
+  workitem   =  [WD] hole{co} {2}:: r[sk:2]
+                                    GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)
+can_eq_nc
+  False
+  [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted
+  nominal equality
+  r[sk:2]
+  r[sk:2]
+  'BoxedRep 'Lifted
+  'BoxedRep 'Lifted
+rewrite { r[sk:2]
+Unfilled tyvar (r[sk:2] :: RuntimeRep)
+rewrite } r[sk:2]
+rewrite { 'BoxedRep 'Lifted
+rewrite } 'BoxedRep 'Lifted
+canEqOK
+  r[sk:2]
+  'BoxedRep 'Lifted
+end stage canonicalization }
+runStage interact with inerts {
+  workitem   =  [WD] hole{co} {2}:: r[sk:2]
+                                    GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)
+tryToSolveByUnification
+  r[sk:2] ~ 'BoxedRep 'Lifted
+  NoUnify
+end stage interact with inerts }
+runStage top-level reactions {
+  workitem   =  [WD] hole{co} {2}:: r[sk:2]
+                                    GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)
+doTopReact
+  [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)
+No local instance for r[sk:2] ~ 'BoxedRep 'Lifted
+end stage top-level reactions }
+addInertCan {
+  Trying to insert new inert item: [WD] hole{co} {2}:: r[sk:2]
+                                                       GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)
+addInertCan }
+Step 1[l:2,d:2] Kept as inert:
+    [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted
+End solver pipeline (kept as inert) }
+  final_item = [WD] hole{co} {2}:: r[sk:2]
+                                   GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)
+getUnsolvedInerts
+   tv eqs = {[WD] hole{co} {2}:: r[sk:2]
+                                 GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+  fun eqs = {}
+  others = {}
+  implics = {}
+solveSimpleWanteds end }
+  iterations = 1
+  residual = WC {wc_simple =
+                   [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+resetUnificationFlag
+  ambient: 2
+  unif_lvl: Nothing
+solveWanteds }
+  final wc = WC {wc_simple =
+                   [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+  current evbinds  = {}
+getHasGivenEqs
+  given_eqs: False
+  ge_lvl: 0
+  ambient level: 2
+  Inerts: {Innermost given equalities = 0
+           Given eqs at this level = False}
+  Insols: {}
+solveImplication 2
+  {}
+  WC {wc_simple =
+        [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+setImplicationStatus(not-all-solved) {
+  Implic {
+    TcLevel = 2
+    Skolems = (r[sk:2] :: k[tau:2])
+    Given-eqs = NoGivenEqs
+    Status = Unsolved
+    Given =
+    Wanted =
+      WC {wc_simple =
+            [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+    Binds = CoEvBindsVar<awp>
+    the type signature for ‘foo’ }
+neededEvVars
+  old_needs: {co, co}
+  seeds3: {co, co}
+  tcvs: {co, co}
+  ev_binds: []
+  live_ev_binds: []
+setImplicationStatus(not-all-solved) }
+  Implic {
+    TcLevel = 2
+    Skolems = (r[sk:2] :: k[tau:2])
+    Given-eqs = NoGivenEqs
+    Status = Unsolved
+    Given =
+    Wanted =
+      WC {wc_simple =
+            [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+    Binds = CoEvBindsVar<awp>
+    the type signature for ‘foo’ }
+solveImplication end }
+  has_given_eqs = NoGivenEqs
+  res_implic = Just Implic {
+                      TcLevel = 2
+                      Skolems = (r[sk:2] :: k[tau:2])
+                      Given-eqs = NoGivenEqs
+                      Status = Unsolved
+                      Given =
+                      Wanted =
+                        WC {wc_simple =
+                              [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+                      Binds = CoEvBindsVar<awp>
+                      the type signature for ‘foo’ }
+  implication evbinds = {}
+  implication tvcs = {co, co}
+solveNestedImplications end }
+  unsolved_implics = {Just Implic {
+                             TcLevel = 2
+                             Skolems = (r[sk:2] :: k[tau:2])
+                             Given-eqs = NoGivenEqs
+                             Status = Unsolved
+                             Given =
+                             Wanted =
+                               WC {wc_simple =
+                                     [WD] hole{co} {2}:: r[sk:2]
+                                                         GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+                             Binds = CoEvBindsVar<awp>
+                             the type signature for ‘foo’ }}
+resetUnificationFlag
+  ambient: 1
+  unif_lvl: Nothing
+solveWanteds }
+  final wc = WC {wc_impl =
+                   Implic {
+                     TcLevel = 2
+                     Skolems = (r[sk:2] :: k[tau:2])
+                     Given-eqs = NoGivenEqs
+                     Status = Unsolved
+                     Given =
+                     Wanted =
+                       WC {wc_simple =
+                             [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+                     Binds = CoEvBindsVar<awp>
+                     the type signature for ‘foo’ }}
+  current evbinds  = {}
+getHasGivenEqs
+  given_eqs: False
+  ge_lvl: 0
+  ambient level: 1
+  Inerts: {Innermost given equalities = 0
+           Given eqs at this level = False}
+  Insols: {}
+solveImplication 2
+  {}
+  WC {wc_impl =
+        Implic {
+          TcLevel = 2
+          Skolems = (r[sk:2] :: k[tau:2])
+          Given-eqs = NoGivenEqs
+          Status = Unsolved
+          Given =
+          Wanted =
+            WC {wc_simple =
+                  [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+          Binds = CoEvBindsVar<awp>
+          the type signature for ‘foo’ }}
+setImplicationStatus(not-all-solved) {
+  Implic {
+    TcLevel = 1
+    Skolems =
+    Given-eqs = NoGivenEqs
+    Status = Unsolved
+    Given =
+    Wanted =
+      WC {wc_impl =
+            Implic {
+              TcLevel = 2
+              Skolems = (r[sk:2] :: k[tau:2])
+              Given-eqs = NoGivenEqs
+              Status = Unsolved
+              Given =
+              Wanted =
+                WC {wc_simple =
+                      [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+              Binds = CoEvBindsVar<awp>
+              the type signature for ‘foo’ }}
+    Binds = CoEvBindsVar<ay8>
+    the type signature for ‘foo’ }
+neededEvVars
+  old_needs: {}
+  seeds3: {co, co}
+  tcvs: {}
+  ev_binds: []
+  live_ev_binds: []
+setImplicationStatus(not-all-solved) }
+  Implic {
+    TcLevel = 1
+    Skolems =
+    Given-eqs = NoGivenEqs
+    Status = Unsolved
+    Given =
+    Wanted =
+      WC {wc_impl =
+            Implic {
+              TcLevel = 2
+              Skolems = (r[sk:2] :: k[tau:2])
+              Given-eqs = NoGivenEqs
+              Status = Unsolved
+              Given =
+              Wanted =
+                WC {wc_simple =
+                      [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+              Binds = CoEvBindsVar<awp>
+              the type signature for ‘foo’ }}
+    Binds = CoEvBindsVar<ay8>
+    the type signature for ‘foo’ }
+solveImplication end }
+  has_given_eqs = NoGivenEqs
+  res_implic = Just Implic {
+                      TcLevel = 1
+                      Skolems =
+                      Given-eqs = NoGivenEqs
+                      Status = Unsolved
+                      Given =
+                      Wanted =
+                        WC {wc_impl =
+                              Implic {
+                                TcLevel = 2
+                                Skolems = (r[sk:2] :: k[tau:2])
+                                Given-eqs = NoGivenEqs
+                                Status = Unsolved
+                                Given =
+                                Wanted =
+                                  WC {wc_simple =
+                                        [WD] hole{co} {2}:: r[sk:2]
+                                                            GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+                                Binds = CoEvBindsVar<awp>
+                                the type signature for ‘foo’ }}
+                      Binds = CoEvBindsVar<ay8>
+                      the type signature for ‘foo’ }
+  implication evbinds = {}
+  implication tvcs = {}
+solveNestedImplications end }
+  unsolved_implics = {Just Implic {
+                             TcLevel = 1
+                             Skolems =
+                             Given-eqs = NoGivenEqs
+                             Status = Unsolved
+                             Given =
+                             Wanted =
+                               WC {wc_impl =
+                                     Implic {
+                                       TcLevel = 2
+                                       Skolems = (r[sk:2] :: k[tau:2])
+                                       Given-eqs = NoGivenEqs
+                                       Status = Unsolved
+                                       Given =
+                                       Wanted =
+                                         WC {wc_simple =
+                                               [WD] hole{co} {2}:: r[sk:2]
+                                                                   GHC.Prim.~# 'BoxedRep
+                                                                                 'Lifted (CEqCan)}
+                                       Binds = CoEvBindsVar<awp>
+                                       the type signature for ‘foo’ }}
+                             Binds = CoEvBindsVar<ay8>
+                             the type signature for ‘foo’ }}
+resetUnificationFlag
+  ambient: 0
+  unif_lvl: Nothing
+solveWanteds }
+  final wc = WC {wc_impl =
+                   Implic {
+                     TcLevel = 1
+                     Skolems =
+                     Given-eqs = NoGivenEqs
+                     Status = Unsolved
+                     Given =
+                     Wanted =
+                       WC {wc_impl =
+                             Implic {
+                               TcLevel = 2
+                               Skolems = (r[sk:2] :: k[tau:2])
+                               Given-eqs = NoGivenEqs
+                               Status = Unsolved
+                               Given =
+                               Wanted =
+                                 WC {wc_simple =
+                                       [WD] hole{co} {2}:: r[sk:2]
+                                                           GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+                               Binds = CoEvBindsVar<awp>
+                               the type signature for ‘foo’ }}
+                     Binds = CoEvBindsVar<ay8>
+                     the type signature for ‘foo’ }}
+  current evbinds  = {}
+Constraint solver steps = 1
+zonkSimples done: {}
+zonkSimples done: {}
+zonkSimples done:
+  {[WD] hole{co} {2}:: r[sk:2]
+                       GHC.Prim.~# 'BoxedRep 'Lifted (CNonCanonical)}
+emitFlatConstraints {
+  WC {wc_impl =
+        Implic {
+          TcLevel = 1
+          Skolems =
+          Given-eqs = NoGivenEqs
+          Status = Unsolved
+          Given =
+          Wanted =
+            WC {wc_impl =
+                  Implic {
+                    TcLevel = 2
+                    Skolems = (r[sk:2] :: RuntimeRep)
+                    Given-eqs = NoGivenEqs
+                    Status = Unsolved
+                    Given =
+                    Wanted =
+                      WC {wc_simple =
+                            [WD] hole{co} {2}:: r[sk:2]
+                                                GHC.Prim.~# 'BoxedRep 'Lifted (CNonCanonical)}
+                    Binds = CoEvBindsVar<awp>
+                    the type signature for ‘foo’ }}
+          Binds = CoEvBindsVar<ay8>
+          the type signature for ‘foo’ }}
+emitFlatConstraints } failing
+  WC {wc_impl =
+        Implic {
+          TcLevel = 1
+          Skolems =
+          Given-eqs = NoGivenEqs
+          Status = Unsolved
+          Given =
+          Wanted =
+            WC {wc_impl =
+                  Implic {
+                    TcLevel = 2
+                    Skolems = (r[sk:2] :: RuntimeRep)
+                    Given-eqs = NoGivenEqs
+                    Status = Unsolved
+                    Given =
+                    Wanted =
+                      WC {wc_simple =
+                            [WD] hole{co} {2}:: r[sk:2]
+                                                GHC.Prim.~# 'BoxedRep 'Lifted (CNonCanonical)}
+                    Binds = CoEvBindsVar<awp>
+                    the type signature for ‘foo’ }}
+          Binds = CoEvBindsVar<ay8>
+          the type signature for ‘foo’ }}
+newNoTcEvBinds unique = aya
+attemptM recovering with insoluble constraints
+  WC {wc_impl =
+        Implic {
+          TcLevel = 0
+          Skolems =
+          Given-eqs = NoGivenEqs
+          Status = Unsolved
+          Given =
+          Wanted =
+            WC {wc_impl =
+                  Implic {
+                    TcLevel = 1
+                    Skolems =
+                    Given-eqs = NoGivenEqs
+                    Status = Unsolved
+                    Given =
+                    Wanted =
+                      WC {wc_impl =
+                            Implic {
+                              TcLevel = 2
+                              Skolems = (r[sk:2] :: RuntimeRep)
+                              Given-eqs = NoGivenEqs
+                              Status = Unsolved
+                              Given =
+                              Wanted =
+                                WC {wc_simple =
+                                      [WD] hole{co} {2}:: r[sk:2]
+                                                          GHC.Prim.~# 'BoxedRep
+                                                                        'Lifted (CNonCanonical)}
+                              Binds = CoEvBindsVar<awp>
+                              the type signature for ‘foo’ }}
+                    Binds = CoEvBindsVar<ay8>
+                    the type signature for ‘foo’ }}
+          Binds = CoEvBindsVar<aya>
+          UnkSkol }}
+simplifyTop {
+  wanted =  WC {wc_impl =
+                  Implic {
+                    TcLevel = 0
+                    Skolems =
+                    Given-eqs = NoGivenEqs
+                    Status = Unsolved
+                    Given =
+                    Wanted =
+                      WC {wc_impl =
+                            Implic {
+                              TcLevel = 1
+                              Skolems =
+                              Given-eqs = NoGivenEqs
+                              Status = Unsolved
+                              Given =
+                              Wanted =
+                                WC {wc_impl =
+                                      Implic {
+                                        TcLevel = 2
+                                        Skolems = (r[sk:2] :: RuntimeRep)
+                                        Given-eqs = NoGivenEqs
+                                        Status = Unsolved
+                                        Given =
+                                        Wanted =
+                                          WC {wc_simple =
+                                                [WD] hole{co} {2}:: r[sk:2]
+                                                                    GHC.Prim.~# 'BoxedRep
+                                                                                  'Lifted (CNonCanonical)}
+                                        Binds = CoEvBindsVar<awp>
+                                        the type signature for ‘foo’ }}
+                              Binds = CoEvBindsVar<ay8>
+                              the type signature for ‘foo’ }}
+                    Binds = CoEvBindsVar<aya>
+                    UnkSkol }}
+newTcEvBinds unique = ayb
+solveWanteds {
+  Level = 0
+  WC {wc_impl =
+        Implic {
+          TcLevel = 0
+          Skolems =
+          Given-eqs = NoGivenEqs
+          Status = Unsolved
+          Given =
+          Wanted =
+            WC {wc_impl =
+                  Implic {
+                    TcLevel = 1
+                    Skolems =
+                    Given-eqs = NoGivenEqs
+                    Status = Unsolved
+                    Given =
+                    Wanted =
+                      WC {wc_impl =
+                            Implic {
+                              TcLevel = 2
+                              Skolems = (r[sk:2] :: RuntimeRep)
+                              Given-eqs = NoGivenEqs
+                              Status = Unsolved
+                              Given =
+                              Wanted =
+                                WC {wc_simple =
+                                      [WD] hole{co} {2}:: r[sk:2]
+                                                          GHC.Prim.~# 'BoxedRep
+                                                                        'Lifted (CNonCanonical)}
+                              Binds = CoEvBindsVar<awp>
+                              the type signature for ‘foo’ }}
+                    Binds = CoEvBindsVar<ay8>
+                    the type signature for ‘foo’ }}
+          Binds = CoEvBindsVar<aya>
+          UnkSkol }}
+simplify_loop iteration=0 (definitely_redo = True, 0 simples to solve)
+simplify_loop: wc =
+  WC {wc_impl =
+        Implic {
+          TcLevel = 0
+          Skolems =
+          Given-eqs = NoGivenEqs
+          Status = Unsolved
+          Given =
+          Wanted =
+            WC {wc_impl =
+                  Implic {
+                    TcLevel = 1
+                    Skolems =
+                    Given-eqs = NoGivenEqs
+                    Status = Unsolved
+                    Given =
+                    Wanted =
+                      WC {wc_impl =
+                            Implic {
+                              TcLevel = 2
+                              Skolems = (r[sk:2] :: RuntimeRep)
+                              Given-eqs = NoGivenEqs
+                              Status = Unsolved
+                              Given =
+                              Wanted =
+                                WC {wc_simple =
+                                      [WD] hole{co} {2}:: r[sk:2]
+                                                          GHC.Prim.~# 'BoxedRep
+                                                                        'Lifted (CNonCanonical)}
+                              Binds = CoEvBindsVar<awp>
+                              the type signature for ‘foo’ }}
+                    Binds = CoEvBindsVar<ay8>
+                    the type signature for ‘foo’ }}
+          Binds = CoEvBindsVar<aya>
+          UnkSkol }}
+solveSimpleWanteds { {}
+solveSimpleWanteds end }
+  iterations = 1
+  residual = WC {}
+solveNestedImplications starting {
+solveImplication {
+  Implic {
+    TcLevel = 0
+    Skolems =
+    Given-eqs = NoGivenEqs
+    Status = Unsolved
+    Given =
+    Wanted =
+      WC {wc_impl =
+            Implic {
+              TcLevel = 1
+              Skolems =
+              Given-eqs = NoGivenEqs
+              Status = Unsolved
+              Given =
+              Wanted =
+                WC {wc_impl =
+                      Implic {
+                        TcLevel = 2
+                        Skolems = (r[sk:2] :: RuntimeRep)
+                        Given-eqs = NoGivenEqs
+                        Status = Unsolved
+                        Given =
+                        Wanted =
+                          WC {wc_simple =
+                                [WD] hole{co} {2}:: r[sk:2]
+                                                    GHC.Prim.~# 'BoxedRep 'Lifted (CNonCanonical)}
+                        Binds = CoEvBindsVar<awp>
+                        the type signature for ‘foo’ }}
+              Binds = CoEvBindsVar<ay8>
+              the type signature for ‘foo’ }}
+    Binds = CoEvBindsVar<aya>
+    UnkSkol }
+  Inerts {Innermost given equalities = 0
+          Given eqs at this level = False}
+solveWanteds {
+  Level = 0
+  WC {wc_impl =
+        Implic {
+          TcLevel = 1
+          Skolems =
+          Given-eqs = NoGivenEqs
+          Status = Unsolved
+          Given =
+          Wanted =
+            WC {wc_impl =
+                  Implic {
+                    TcLevel = 2
+                    Skolems = (r[sk:2] :: RuntimeRep)
+                    Given-eqs = NoGivenEqs
+                    Status = Unsolved
+                    Given =
+                    Wanted =
+                      WC {wc_simple =
+                            [WD] hole{co} {2}:: r[sk:2]
+                                                GHC.Prim.~# 'BoxedRep 'Lifted (CNonCanonical)}
+                    Binds = CoEvBindsVar<awp>
+                    the type signature for ‘foo’ }}
+          Binds = CoEvBindsVar<ay8>
+          the type signature for ‘foo’ }}
+simplify_loop iteration=0 (definitely_redo = True, 0 simples to solve)
+simplify_loop: wc =
+  WC {wc_impl =
+        Implic {
+          TcLevel = 1
+          Skolems =
+          Given-eqs = NoGivenEqs
+          Status = Unsolved
+          Given =
+          Wanted =
+            WC {wc_impl =
+                  Implic {
+                    TcLevel = 2
+                    Skolems = (r[sk:2] :: RuntimeRep)
+                    Given-eqs = NoGivenEqs
+                    Status = Unsolved
+                    Given =
+                    Wanted =
+                      WC {wc_simple =
+                            [WD] hole{co} {2}:: r[sk:2]
+                                                GHC.Prim.~# 'BoxedRep 'Lifted (CNonCanonical)}
+                    Binds = CoEvBindsVar<awp>
+                    the type signature for ‘foo’ }}
+          Binds = CoEvBindsVar<ay8>
+          the type signature for ‘foo’ }}
+solveSimpleWanteds { {}
+solveSimpleWanteds end }
+  iterations = 1
+  residual = WC {}
+solveNestedImplications starting {
+solveImplication {
+  Implic {
+    TcLevel = 1
+    Skolems =
+    Given-eqs = NoGivenEqs
+    Status = Unsolved
+    Given =
+    Wanted =
+      WC {wc_impl =
+            Implic {
+              TcLevel = 2
+              Skolems = (r[sk:2] :: RuntimeRep)
+              Given-eqs = NoGivenEqs
+              Status = Unsolved
+              Given =
+              Wanted =
+                WC {wc_simple =
+                      [WD] hole{co} {2}:: r[sk:2]
+                                          GHC.Prim.~# 'BoxedRep 'Lifted (CNonCanonical)}
+              Binds = CoEvBindsVar<awp>
+              the type signature for ‘foo’ }}
+    Binds = CoEvBindsVar<ay8>
+    the type signature for ‘foo’ }
+  Inerts {Innermost given equalities = 0
+          Given eqs at this level = False}
+solveWanteds {
+  Level = 1
+  WC {wc_impl =
+        Implic {
+          TcLevel = 2
+          Skolems = (r[sk:2] :: RuntimeRep)
+          Given-eqs = NoGivenEqs
+          Status = Unsolved
+          Given =
+          Wanted =
+            WC {wc_simple =
+                  [WD] hole{co} {2}:: r[sk:2]
+                                      GHC.Prim.~# 'BoxedRep 'Lifted (CNonCanonical)}
+          Binds = CoEvBindsVar<awp>
+          the type signature for ‘foo’ }}
+simplify_loop iteration=0 (definitely_redo = True, 0 simples to solve)
+simplify_loop: wc =
+  WC {wc_impl =
+        Implic {
+          TcLevel = 2
+          Skolems = (r[sk:2] :: RuntimeRep)
+          Given-eqs = NoGivenEqs
+          Status = Unsolved
+          Given =
+          Wanted =
+            WC {wc_simple =
+                  [WD] hole{co} {2}:: r[sk:2]
+                                      GHC.Prim.~# 'BoxedRep 'Lifted (CNonCanonical)}
+          Binds = CoEvBindsVar<awp>
+          the type signature for ‘foo’ }}
+solveSimpleWanteds { {}
+solveSimpleWanteds end }
+  iterations = 1
+  residual = WC {}
+solveNestedImplications starting {
+solveImplication {
+  Implic {
+    TcLevel = 2
+    Skolems = (r[sk:2] :: RuntimeRep)
+    Given-eqs = NoGivenEqs
+    Status = Unsolved
+    Given =
+    Wanted =
+      WC {wc_simple =
+            [WD] hole{co} {2}:: r[sk:2]
+                                GHC.Prim.~# 'BoxedRep 'Lifted (CNonCanonical)}
+    Binds = CoEvBindsVar<awp>
+    the type signature for ‘foo’ }
+  Inerts {Innermost given equalities = 0
+          Given eqs at this level = False}
+solveWanteds {
+  Level = 2
+  WC {wc_simple =
+        [WD] hole{co} {2}:: r[sk:2]
+                            GHC.Prim.~# 'BoxedRep 'Lifted (CNonCanonical)}
+simplify_loop iteration=0 (definitely_redo = True, 1 simples to solve)
+simplify_loop: wc =
+  WC {wc_simple =
+        [WD] hole{co} {2}:: r[sk:2]
+                            GHC.Prim.~# 'BoxedRep 'Lifted (CNonCanonical)}
+solveSimpleWanteds {
+  {[WD] hole{co} {2}:: r[sk:2]
+                       GHC.Prim.~# 'BoxedRep 'Lifted (CNonCanonical)}
+----------------------------- 
+Start solver pipeline {
+  tclevel = 2
+  work item = [WD] hole{co} {2}:: r[sk:2]
+                                  GHC.Prim.~# 'BoxedRep 'Lifted (CNonCanonical)
+  inerts = {Innermost given equalities = 0
+            Given eqs at this level = False}
+  rest of worklist = WL {}
+runStage canonicalization {
+  workitem   =  [WD] hole{co} {2}:: r[sk:2]
+                                    GHC.Prim.~# 'BoxedRep 'Lifted (CNonCanonical)
+canEvNC:eq
+  r[sk:2]
+  'BoxedRep 'Lifted
+can_eq_nc
+  False
+  [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted
+  nominal equality
+  r[sk:2]
+  r[sk:2]
+  'BoxedRep 'Lifted
+  'BoxedRep 'Lifted
+rewrite { r[sk:2]
+Unfilled tyvar (r[sk:2] :: RuntimeRep)
+rewrite } r[sk:2]
+rewrite { 'BoxedRep 'Lifted
+rewrite } 'BoxedRep 'Lifted
+canEqOK
+  r[sk:2]
+  'BoxedRep 'Lifted
+end stage canonicalization }
+runStage interact with inerts {
+  workitem   =  [WD] hole{co} {2}:: r[sk:2]
+                                    GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)
+tryToSolveByUnification
+  r[sk:2] ~ 'BoxedRep 'Lifted
+  NoUnify
+end stage interact with inerts }
+runStage top-level reactions {
+  workitem   =  [WD] hole{co} {2}:: r[sk:2]
+                                    GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)
+doTopReact
+  [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)
+No local instance for r[sk:2] ~ 'BoxedRep 'Lifted
+end stage top-level reactions }
+addInertCan {
+  Trying to insert new inert item: [WD] hole{co} {2}:: r[sk:2]
+                                                       GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)
+addInertCan }
+Step 1[l:2,d:2] Kept as inert:
+    [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted
+End solver pipeline (kept as inert) }
+  final_item = [WD] hole{co} {2}:: r[sk:2]
+                                   GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)
+getUnsolvedInerts
+   tv eqs = {[WD] hole{co} {2}:: r[sk:2]
+                                 GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+  fun eqs = {}
+  others = {}
+  implics = {}
+solveSimpleWanteds end }
+  iterations = 1
+  residual = WC {wc_simple =
+                   [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+resetUnificationFlag
+  ambient: 2
+  unif_lvl: Nothing
+solveWanteds }
+  final wc = WC {wc_simple =
+                   [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+  current evbinds  = {}
+getHasGivenEqs
+  given_eqs: False
+  ge_lvl: 0
+  ambient level: 2
+  Inerts: {Innermost given equalities = 0
+           Given eqs at this level = False}
+  Insols: {}
+solveImplication 2
+  {}
+  WC {wc_simple =
+        [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+setImplicationStatus(not-all-solved) {
+  Implic {
+    TcLevel = 2
+    Skolems = (r[sk:2] :: RuntimeRep)
+    Given-eqs = NoGivenEqs
+    Status = Unsolved
+    Given =
+    Wanted =
+      WC {wc_simple =
+            [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+    Binds = CoEvBindsVar<awp>
+    the type signature for ‘foo’ }
+neededEvVars
+  old_needs: {co, co}
+  seeds3: {co, co}
+  tcvs: {co, co}
+  ev_binds: []
+  live_ev_binds: []
+setImplicationStatus(not-all-solved) }
+  Implic {
+    TcLevel = 2
+    Skolems = (r[sk:2] :: RuntimeRep)
+    Given-eqs = NoGivenEqs
+    Status = Unsolved
+    Given =
+    Wanted =
+      WC {wc_simple =
+            [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+    Binds = CoEvBindsVar<awp>
+    the type signature for ‘foo’ }
+solveImplication end }
+  has_given_eqs = NoGivenEqs
+  res_implic = Just Implic {
+                      TcLevel = 2
+                      Skolems = (r[sk:2] :: RuntimeRep)
+                      Given-eqs = NoGivenEqs
+                      Status = Unsolved
+                      Given =
+                      Wanted =
+                        WC {wc_simple =
+                              [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+                      Binds = CoEvBindsVar<awp>
+                      the type signature for ‘foo’ }
+  implication evbinds = {}
+  implication tvcs = {co, co}
+solveNestedImplications end }
+  unsolved_implics = {Just Implic {
+                             TcLevel = 2
+                             Skolems = (r[sk:2] :: RuntimeRep)
+                             Given-eqs = NoGivenEqs
+                             Status = Unsolved
+                             Given =
+                             Wanted =
+                               WC {wc_simple =
+                                     [WD] hole{co} {2}:: r[sk:2]
+                                                         GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+                             Binds = CoEvBindsVar<awp>
+                             the type signature for ‘foo’ }}
+resetUnificationFlag
+  ambient: 1
+  unif_lvl: Nothing
+solveWanteds }
+  final wc = WC {wc_impl =
+                   Implic {
+                     TcLevel = 2
+                     Skolems = (r[sk:2] :: RuntimeRep)
+                     Given-eqs = NoGivenEqs
+                     Status = Unsolved
+                     Given =
+                     Wanted =
+                       WC {wc_simple =
+                             [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+                     Binds = CoEvBindsVar<awp>
+                     the type signature for ‘foo’ }}
+  current evbinds  = {}
+getHasGivenEqs
+  given_eqs: False
+  ge_lvl: 0
+  ambient level: 1
+  Inerts: {Innermost given equalities = 0
+           Given eqs at this level = False}
+  Insols: {}
+solveImplication 2
+  {}
+  WC {wc_impl =
+        Implic {
+          TcLevel = 2
+          Skolems = (r[sk:2] :: RuntimeRep)
+          Given-eqs = NoGivenEqs
+          Status = Unsolved
+          Given =
+          Wanted =
+            WC {wc_simple =
+                  [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+          Binds = CoEvBindsVar<awp>
+          the type signature for ‘foo’ }}
+setImplicationStatus(not-all-solved) {
+  Implic {
+    TcLevel = 1
+    Skolems =
+    Given-eqs = NoGivenEqs
+    Status = Unsolved
+    Given =
+    Wanted =
+      WC {wc_impl =
+            Implic {
+              TcLevel = 2
+              Skolems = (r[sk:2] :: RuntimeRep)
+              Given-eqs = NoGivenEqs
+              Status = Unsolved
+              Given =
+              Wanted =
+                WC {wc_simple =
+                      [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+              Binds = CoEvBindsVar<awp>
+              the type signature for ‘foo’ }}
+    Binds = CoEvBindsVar<ay8>
+    the type signature for ‘foo’ }
+neededEvVars
+  old_needs: {co, co}
+  seeds3: {co, co}
+  tcvs: {}
+  ev_binds: []
+  live_ev_binds: []
+setImplicationStatus(not-all-solved) }
+  Implic {
+    TcLevel = 1
+    Skolems =
+    Given-eqs = NoGivenEqs
+    Status = Unsolved
+    Given =
+    Wanted =
+      WC {wc_impl =
+            Implic {
+              TcLevel = 2
+              Skolems = (r[sk:2] :: RuntimeRep)
+              Given-eqs = NoGivenEqs
+              Status = Unsolved
+              Given =
+              Wanted =
+                WC {wc_simple =
+                      [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+              Binds = CoEvBindsVar<awp>
+              the type signature for ‘foo’ }}
+    Binds = CoEvBindsVar<ay8>
+    the type signature for ‘foo’ }
+solveImplication end }
+  has_given_eqs = NoGivenEqs
+  res_implic = Just Implic {
+                      TcLevel = 1
+                      Skolems =
+                      Given-eqs = NoGivenEqs
+                      Status = Unsolved
+                      Given =
+                      Wanted =
+                        WC {wc_impl =
+                              Implic {
+                                TcLevel = 2
+                                Skolems = (r[sk:2] :: RuntimeRep)
+                                Given-eqs = NoGivenEqs
+                                Status = Unsolved
+                                Given =
+                                Wanted =
+                                  WC {wc_simple =
+                                        [WD] hole{co} {2}:: r[sk:2]
+                                                            GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+                                Binds = CoEvBindsVar<awp>
+                                the type signature for ‘foo’ }}
+                      Binds = CoEvBindsVar<ay8>
+                      the type signature for ‘foo’ }
+  implication evbinds = {}
+  implication tvcs = {}
+solveNestedImplications end }
+  unsolved_implics = {Just Implic {
+                             TcLevel = 1
+                             Skolems =
+                             Given-eqs = NoGivenEqs
+                             Status = Unsolved
+                             Given =
+                             Wanted =
+                               WC {wc_impl =
+                                     Implic {
+                                       TcLevel = 2
+                                       Skolems = (r[sk:2] :: RuntimeRep)
+                                       Given-eqs = NoGivenEqs
+                                       Status = Unsolved
+                                       Given =
+                                       Wanted =
+                                         WC {wc_simple =
+                                               [WD] hole{co} {2}:: r[sk:2]
+                                                                   GHC.Prim.~# 'BoxedRep
+                                                                                 'Lifted (CEqCan)}
+                                       Binds = CoEvBindsVar<awp>
+                                       the type signature for ‘foo’ }}
+                             Binds = CoEvBindsVar<ay8>
+                             the type signature for ‘foo’ }}
+resetUnificationFlag
+  ambient: 0
+  unif_lvl: Nothing
+solveWanteds }
+  final wc = WC {wc_impl =
+                   Implic {
+                     TcLevel = 1
+                     Skolems =
+                     Given-eqs = NoGivenEqs
+                     Status = Unsolved
+                     Given =
+                     Wanted =
+                       WC {wc_impl =
+                             Implic {
+                               TcLevel = 2
+                               Skolems = (r[sk:2] :: RuntimeRep)
+                               Given-eqs = NoGivenEqs
+                               Status = Unsolved
+                               Given =
+                               Wanted =
+                                 WC {wc_simple =
+                                       [WD] hole{co} {2}:: r[sk:2]
+                                                           GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+                               Binds = CoEvBindsVar<awp>
+                               the type signature for ‘foo’ }}
+                     Binds = CoEvBindsVar<ay8>
+                     the type signature for ‘foo’ }}
+  current evbinds  = {}
+getHasGivenEqs
+  given_eqs: False
+  ge_lvl: 0
+  ambient level: 0
+  Inerts: {Innermost given equalities = 0
+           Given eqs at this level = False}
+  Insols: {}
+solveImplication 2
+  {}
+  WC {wc_impl =
+        Implic {
+          TcLevel = 1
+          Skolems =
+          Given-eqs = NoGivenEqs
+          Status = Unsolved
+          Given =
+          Wanted =
+            WC {wc_impl =
+                  Implic {
+                    TcLevel = 2
+                    Skolems = (r[sk:2] :: RuntimeRep)
+                    Given-eqs = NoGivenEqs
+                    Status = Unsolved
+                    Given =
+                    Wanted =
+                      WC {wc_simple =
+                            [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+                    Binds = CoEvBindsVar<awp>
+                    the type signature for ‘foo’ }}
+          Binds = CoEvBindsVar<ay8>
+          the type signature for ‘foo’ }}
+setImplicationStatus(not-all-solved) {
+  Implic {
+    TcLevel = 0
+    Skolems =
+    Given-eqs = MaybeGivenEqs
+    Status = Unsolved
+    Given =
+    Wanted =
+      WC {wc_impl =
+            Implic {
+              TcLevel = 1
+              Skolems =
+              Given-eqs = NoGivenEqs
+              Status = Unsolved
+              Given =
+              Wanted =
+                WC {wc_impl =
+                      Implic {
+                        TcLevel = 2
+                        Skolems = (r[sk:2] :: RuntimeRep)
+                        Given-eqs = NoGivenEqs
+                        Status = Unsolved
+                        Given =
+                        Wanted =
+                          WC {wc_simple =
+                                [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+                        Binds = CoEvBindsVar<awp>
+                        the type signature for ‘foo’ }}
+              Binds = CoEvBindsVar<ay8>
+              the type signature for ‘foo’ }}
+    Binds = CoEvBindsVar<aya>
+    UnkSkol }
+neededEvVars
+  old_needs: {}
+  seeds3: {co, co}
+  tcvs: {}
+  ev_binds: []
+  live_ev_binds: []
+setImplicationStatus(not-all-solved) }
+  Implic {
+    TcLevel = 0
+    Skolems =
+    Given-eqs = MaybeGivenEqs
+    Status = Unsolved
+    Given =
+    Wanted =
+      WC {wc_impl =
+            Implic {
+              TcLevel = 1
+              Skolems =
+              Given-eqs = NoGivenEqs
+              Status = Unsolved
+              Given =
+              Wanted =
+                WC {wc_impl =
+                      Implic {
+                        TcLevel = 2
+                        Skolems = (r[sk:2] :: RuntimeRep)
+                        Given-eqs = NoGivenEqs
+                        Status = Unsolved
+                        Given =
+                        Wanted =
+                          WC {wc_simple =
+                                [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+                        Binds = CoEvBindsVar<awp>
+                        the type signature for ‘foo’ }}
+              Binds = CoEvBindsVar<ay8>
+              the type signature for ‘foo’ }}
+    Binds = CoEvBindsVar<aya>
+    UnkSkol }
+solveImplication end }
+  has_given_eqs = MaybeGivenEqs
+  res_implic = Just Implic {
+                      TcLevel = 0
+                      Skolems =
+                      Given-eqs = MaybeGivenEqs
+                      Status = Unsolved
+                      Given =
+                      Wanted =
+                        WC {wc_impl =
+                              Implic {
+                                TcLevel = 1
+                                Skolems =
+                                Given-eqs = NoGivenEqs
+                                Status = Unsolved
+                                Given =
+                                Wanted =
+                                  WC {wc_impl =
+                                        Implic {
+                                          TcLevel = 2
+                                          Skolems = (r[sk:2] :: RuntimeRep)
+                                          Given-eqs = NoGivenEqs
+                                          Status = Unsolved
+                                          Given =
+                                          Wanted =
+                                            WC {wc_simple =
+                                                  [WD] hole{co} {2}:: r[sk:2]
+                                                                      GHC.Prim.~# 'BoxedRep
+                                                                                    'Lifted (CEqCan)}
+                                          Binds = CoEvBindsVar<awp>
+                                          the type signature for ‘foo’ }}
+                                Binds = CoEvBindsVar<ay8>
+                                the type signature for ‘foo’ }}
+                      Binds = CoEvBindsVar<aya>
+                      UnkSkol }
+  implication evbinds = {}
+  implication tvcs = {}
+solveNestedImplications end }
+  unsolved_implics = {Just Implic {
+                             TcLevel = 0
+                             Skolems =
+                             Given-eqs = MaybeGivenEqs
+                             Status = Unsolved
+                             Given =
+                             Wanted =
+                               WC {wc_impl =
+                                     Implic {
+                                       TcLevel = 1
+                                       Skolems =
+                                       Given-eqs = NoGivenEqs
+                                       Status = Unsolved
+                                       Given =
+                                       Wanted =
+                                         WC {wc_impl =
+                                               Implic {
+                                                 TcLevel = 2
+                                                 Skolems = (r[sk:2] :: RuntimeRep)
+                                                 Given-eqs = NoGivenEqs
+                                                 Status = Unsolved
+                                                 Given =
+                                                 Wanted =
+                                                   WC {wc_simple =
+                                                         [WD] hole{co} {2}:: r[sk:2]
+                                                                             GHC.Prim.~# 'BoxedRep
+                                                                                           'Lifted (CEqCan)}
+                                                 Binds = CoEvBindsVar<awp>
+                                                 the type signature for ‘foo’ }}
+                                       Binds = CoEvBindsVar<ay8>
+                                       the type signature for ‘foo’ }}
+                             Binds = CoEvBindsVar<aya>
+                             UnkSkol }}
+resetUnificationFlag
+  ambient: 0
+  unif_lvl: Nothing
+solveWanteds }
+  final wc = WC {wc_impl =
+                   Implic {
+                     TcLevel = 0
+                     Skolems =
+                     Given-eqs = MaybeGivenEqs
+                     Status = Unsolved
+                     Given =
+                     Wanted =
+                       WC {wc_impl =
+                             Implic {
+                               TcLevel = 1
+                               Skolems =
+                               Given-eqs = NoGivenEqs
+                               Status = Unsolved
+                               Given =
+                               Wanted =
+                                 WC {wc_impl =
+                                       Implic {
+                                         TcLevel = 2
+                                         Skolems = (r[sk:2] :: RuntimeRep)
+                                         Given-eqs = NoGivenEqs
+                                         Status = Unsolved
+                                         Given =
+                                         Wanted =
+                                           WC {wc_simple =
+                                                 [WD] hole{co} {2}:: r[sk:2]
+                                                                     GHC.Prim.~# 'BoxedRep
+                                                                                   'Lifted (CEqCan)}
+                                         Binds = CoEvBindsVar<awp>
+                                         the type signature for ‘foo’ }}
+                               Binds = CoEvBindsVar<ay8>
+                               the type signature for ‘foo’ }}
+                     Binds = CoEvBindsVar<aya>
+                     UnkSkol }}
+  current evbinds  = {}
+zonkSimples done: {}
+zonkSimples done: {}
+zonkSimples done: {}
+zonkSimples done:
+  {[WD] hole{co} {2}:: r[sk:2]
+                       GHC.Prim.~# 'BoxedRep 'Lifted (CNonCanonical)}
+applyDefaultingRules {
+  wanteds = WC {wc_impl =
+                  Implic {
+                    TcLevel = 0
+                    Skolems =
+                    Given-eqs = MaybeGivenEqs
+                    Status = Unsolved
+                    Given =
+                    Wanted =
+                      WC {wc_impl =
+                            Implic {
+                              TcLevel = 1
+                              Skolems =
+                              Given-eqs = NoGivenEqs
+                              Status = Unsolved
+                              Given =
+                              Wanted =
+                                WC {wc_impl =
+                                      Implic {
+                                        TcLevel = 2
+                                        Skolems = (r[sk:2] :: RuntimeRep)
+                                        Given-eqs = NoGivenEqs
+                                        Status = Unsolved
+                                        Given =
+                                        Wanted =
+                                          WC {wc_simple =
+                                                [WD] hole{co} {2}:: r[sk:2]
+                                                                    GHC.Prim.~# 'BoxedRep
+                                                                                  'Lifted (CNonCanonical)}
+                                        Binds = CoEvBindsVar<awp>
+                                        the type signature for ‘foo’ }}
+                              Binds = CoEvBindsVar<ay8>
+                              the type signature for ‘foo’ }}
+                    Binds = CoEvBindsVar<aya>
+                    UnkSkol }}
+  groups  = []
+  info    = ([Integer, Double], (False, False))
+applyDefaultingRules } []
+setImplicationStatus(not-all-solved) {
+  Implic {
+    TcLevel = 2
+    Skolems = (r[sk:2] :: RuntimeRep)
+    Given-eqs = NoGivenEqs
+    Status = Unsolved
+    Given =
+    Wanted =
+      WC {wc_simple =
+            [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+    Binds = CoEvBindsVar<awp>
+    the type signature for ‘foo’ }
+neededEvVars
+  old_needs: {co, co}
+  seeds3: {co, co}
+  tcvs: {co, co}
+  ev_binds: []
+  live_ev_binds: []
+setImplicationStatus(not-all-solved) }
+  Implic {
+    TcLevel = 2
+    Skolems = (r[sk:2] :: RuntimeRep)
+    Given-eqs = NoGivenEqs
+    Status = Unsolved
+    Given =
+    Wanted =
+      WC {wc_simple =
+            [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+    Binds = CoEvBindsVar<awp>
+    the type signature for ‘foo’ }
+setImplicationStatus(not-all-solved) {
+  Implic {
+    TcLevel = 1
+    Skolems =
+    Given-eqs = NoGivenEqs
+    Status = Unsolved
+    Given =
+    Wanted =
+      WC {wc_impl =
+            Implic {
+              TcLevel = 2
+              Skolems = (r[sk:2] :: RuntimeRep)
+              Given-eqs = NoGivenEqs
+              Status = Unsolved
+              Given =
+              Wanted =
+                WC {wc_simple =
+                      [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+              Binds = CoEvBindsVar<awp>
+              the type signature for ‘foo’ }}
+    Binds = CoEvBindsVar<ay8>
+    the type signature for ‘foo’ }
+neededEvVars
+  old_needs: {co, co}
+  seeds3: {co, co}
+  tcvs: {}
+  ev_binds: []
+  live_ev_binds: []
+setImplicationStatus(not-all-solved) }
+  Implic {
+    TcLevel = 1
+    Skolems =
+    Given-eqs = NoGivenEqs
+    Status = Unsolved
+    Given =
+    Wanted =
+      WC {wc_impl =
+            Implic {
+              TcLevel = 2
+              Skolems = (r[sk:2] :: RuntimeRep)
+              Given-eqs = NoGivenEqs
+              Status = Unsolved
+              Given =
+              Wanted =
+                WC {wc_simple =
+                      [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+              Binds = CoEvBindsVar<awp>
+              the type signature for ‘foo’ }}
+    Binds = CoEvBindsVar<ay8>
+    the type signature for ‘foo’ }
+setImplicationStatus(not-all-solved) {
+  Implic {
+    TcLevel = 0
+    Skolems =
+    Given-eqs = MaybeGivenEqs
+    Status = Unsolved
+    Given =
+    Wanted =
+      WC {wc_impl =
+            Implic {
+              TcLevel = 1
+              Skolems =
+              Given-eqs = NoGivenEqs
+              Status = Unsolved
+              Given =
+              Wanted =
+                WC {wc_impl =
+                      Implic {
+                        TcLevel = 2
+                        Skolems = (r[sk:2] :: RuntimeRep)
+                        Given-eqs = NoGivenEqs
+                        Status = Unsolved
+                        Given =
+                        Wanted =
+                          WC {wc_simple =
+                                [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+                        Binds = CoEvBindsVar<awp>
+                        the type signature for ‘foo’ }}
+              Binds = CoEvBindsVar<ay8>
+              the type signature for ‘foo’ }}
+    Binds = CoEvBindsVar<aya>
+    UnkSkol }
+neededEvVars
+  old_needs: {co, co}
+  seeds3: {co, co}
+  tcvs: {}
+  ev_binds: []
+  live_ev_binds: []
+setImplicationStatus(not-all-solved) }
+  Implic {
+    TcLevel = 0
+    Skolems =
+    Given-eqs = MaybeGivenEqs
+    Status = Unsolved
+    Given =
+    Wanted =
+      WC {wc_impl =
+            Implic {
+              TcLevel = 1
+              Skolems =
+              Given-eqs = NoGivenEqs
+              Status = Unsolved
+              Given =
+              Wanted =
+                WC {wc_impl =
+                      Implic {
+                        TcLevel = 2
+                        Skolems = (r[sk:2] :: RuntimeRep)
+                        Given-eqs = NoGivenEqs
+                        Status = Unsolved
+                        Given =
+                        Wanted =
+                          WC {wc_simple =
+                                [WD] hole{co} {2}:: r[sk:2] GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+                        Binds = CoEvBindsVar<awp>
+                        the type signature for ‘foo’ }}
+              Binds = CoEvBindsVar<ay8>
+              the type signature for ‘foo’ }}
+    Binds = CoEvBindsVar<aya>
+    UnkSkol }
+Constraint solver steps = 1
+End simplifyTop }
+newTcEvBinds unique = ayc
+reportUnsolved {
+  type errors: TypeError
+  expr holes: HoleError
+  type holes: HoleError
+  scope holes: HoleError
+reportUnsolved (before zonking and tidying)
+  WC {wc_impl =
+        Implic {
+          TcLevel = 0
+          Skolems =
+          Given-eqs = MaybeGivenEqs
+          Status = Unsolved
+          Given =
+          Wanted =
+            WC {wc_impl =
+                  Implic {
+                    TcLevel = 1
+                    Skolems =
+                    Given-eqs = NoGivenEqs
+                    Status = Unsolved
+                    Given =
+                    Wanted =
+                      WC {wc_impl =
+                            Implic {
+                              TcLevel = 2
+                              Skolems = (r[sk:2] :: RuntimeRep)
+                              Given-eqs = NoGivenEqs
+                              Status = Unsolved
+                              Given =
+                              Wanted =
+                                WC {wc_simple =
+                                      [WD] hole{co} {2}:: r[sk:2]
+                                                          GHC.Prim.~# 'BoxedRep 'Lifted (CEqCan)}
+                              Binds = CoEvBindsVar<awp>
+                              the type signature for ‘foo’ }}
+                    Binds = CoEvBindsVar<ay8>
+                    the type signature for ‘foo’ }}
+          Binds = CoEvBindsVar<aya>
+          UnkSkol }}
+zonkSimples done: {}
+zonkSimples done: {}
+zonkSimples done: {}
+zonkSimples done:
+  {[WD] hole{co} {2}:: r[sk:2]
+                       GHC.Prim.~# 'BoxedRep 'Lifted (CNonCanonical)}
+reportUnsolved (after zonking):
+  Free tyvars:
+  Tidy env: ([], [])
+  Wanted: WC {wc_impl =
+                Implic {
+                  TcLevel = 0
+                  Skolems =
+                  Given-eqs = MaybeGivenEqs
+                  Status = Unsolved
+                  Given =
+                  Wanted =
+                    WC {wc_impl =
+                          Implic {
+                            TcLevel = 1
+                            Skolems =
+                            Given-eqs = NoGivenEqs
+                            Status = Unsolved
+                            Given =
+                            Wanted =
+                              WC {wc_impl =
+                                    Implic {
+                                      TcLevel = 2
+                                      Skolems = (r[sk:2] :: RuntimeRep)
+                                      Given-eqs = NoGivenEqs
+                                      Status = Unsolved
+                                      Given =
+                                      Wanted =
+                                        WC {wc_simple =
+                                              [WD] hole{co} {2}:: r[sk:2]
+                                                                  GHC.Prim.~# 'BoxedRep
+                                                                                'Lifted (CNonCanonical)}
+                                      Binds = CoEvBindsVar<awp>
+                                      the type signature for ‘foo’ }}
+                            Binds = CoEvBindsVar<ay8>
+                            the type signature for ‘foo’ }}
+                  Binds = CoEvBindsVar<aya>
+                  UnkSkol }}
+reportWanteds
+  Simples = {}
+  Suppress = False
+  tidy_cts = []
+  tidy_holes =  []
+tryReporters {
+  []
+  []
+tryReporters } []
+tryReporters {
+  []
+  []
+tryReporters } []
+reportImplic
+  Implic {
+    TcLevel = 0
+    Skolems =
+    Given-eqs = MaybeGivenEqs
+    Status = Unsolved
+    Given =
+    Wanted =
+      WC {wc_impl =
+            Implic {
+              TcLevel = 1
+              Skolems =
+              Given-eqs = NoGivenEqs
+              Status = Unsolved
+              Given =
+              Wanted =
+                WC {wc_impl =
+                      Implic {
+                        TcLevel = 2
+                        Skolems = (r[sk:2] :: RuntimeRep)
+                        Given-eqs = NoGivenEqs
+                        Status = Unsolved
+                        Given =
+                        Wanted =
+                          WC {wc_simple =
+                                [WD] hole{co} {2}:: r[sk:2]
+                                                    GHC.Prim.~# 'BoxedRep 'Lifted (CNonCanonical)}
+                        Binds = CoEvBindsVar<awp>
+                        the type signature for ‘foo’ }}
+              Binds = CoEvBindsVar<ay8>
+              the type signature for ‘foo’ }}
+    Binds = CoEvBindsVar<aya>
+    UnkSkol }
+reportWanteds
+  Simples = {}
+  Suppress = False
+  tidy_cts = []
+  tidy_holes =  []
+tryReporters {
+  []
+  []
+tryReporters } []
+tryReporters {
+  []
+  []
+tryReporters } []
+reportImplic
+  Implic {
+    TcLevel = 1
+    Skolems =
+    Given-eqs = NoGivenEqs
+    Status = Unsolved
+    Given =
+    Wanted =
+      WC {wc_impl =
+            Implic {
+              TcLevel = 2
+              Skolems = (r[sk:2] :: RuntimeRep)
+              Given-eqs = NoGivenEqs
+              Status = Unsolved
+              Given =
+              Wanted =
+                WC {wc_simple =
+                      [WD] hole{co} {2}:: r[sk:2]
+                                          GHC.Prim.~# 'BoxedRep 'Lifted (CNonCanonical)}
+              Binds = CoEvBindsVar<awp>
+              the type signature for ‘foo’ }}
+    Binds = CoEvBindsVar<ay8>
+    the type signature for ‘foo’ }
+reportWanteds
+  Simples = {}
+  Suppress = False
+  tidy_cts = []
+  tidy_holes =  []
+tryReporters {
+  []
+  []
+tryReporters } []
+tryReporters {
+  []
+  []
+tryReporters } []
+reportImplic
+  Implic {
+    TcLevel = 2
+    Skolems = (r[sk:2] :: RuntimeRep)
+    Given-eqs = NoGivenEqs
+    Status = Unsolved
+    Given =
+    Wanted =
+      WC {wc_simple =
+            [WD] hole{co} {2}:: r[sk:2]
+                                GHC.Prim.~# 'BoxedRep 'Lifted (CNonCanonical)}
+    Binds = CoEvBindsVar<awp>
+    the type signature for ‘foo’ }
+reportWanteds
+  Simples = {[WD] hole{co} {2}:: r[sk:2]
+                                 GHC.Prim.~# 'BoxedRep 'Lifted (CNonCanonical)}
+  Suppress = False
+  tidy_cts = [[WD] hole{co} {2}:: r[sk:2]
+                                  GHC.Prim.~# 'BoxedRep 'Lifted (CNonCanonical)]
+  tidy_holes =  []
+tryReporters {
+  [[WD] hole{co} {2}:: r[sk:2]
+                       GHC.Prim.~# 'BoxedRep 'Lifted (CNonCanonical)]
+  []
+tryReporter{ 
+  skolem eq1 [[WD] hole{co} {2}:: r[sk:2]
+                                  GHC.Prim.~# 'BoxedRep 'Lifted (CNonCanonical)]
+relevantBindings
+  [WD] hole{co} {2}:: r[sk:2]
+                      GHC.Prim.~# 'BoxedRep 'Lifted (CNonCanonical)
+relevant_bindings {r[sk:2]}
+mkEqErr1
+  [WD] hole{co} {2}:: r[sk:2]
+                      GHC.Prim.~# 'BoxedRep 'Lifted (CNonCanonical)
+  a type equality[True] TYPE r[sk:2] ~ *
+mkTyVarEqErr
+  [WD] hole{co} {2}:: r[sk:2]
+                      GHC.Prim.~# 'BoxedRep 'Lifted (CNonCanonical)
+  r[sk:2]
+  'BoxedRep 'Lifted
+About to maybeReportErr
+  Constraint: [[WD] hole{co} {2}:: r[sk:2]
+                                   GHC.Prim.~# 'BoxedRep 'Lifted (CNonCanonical)]
+  cec_suppress = False
+  cec_defer_type_errors = TypeError
+Adding error:
+  T19495.hs:10:8: error:
+      • Expected a type, but ‘T r’ has kind ‘TYPE r’
+        ‘r’ is a rigid type variable bound by
+          the type signature for ‘foo’
+          at T19495.hs:10:1-10
+      • In the type signature: foo :: T r
+reportGroup
+  [[WD] hole{co} {2}:: r[sk:2]
+                       GHC.Prim.~# 'BoxedRep 'Lifted (CNonCanonical)]
+tryReporter end } skolem eq1 False True
+tryReporters } []
+tryReporters {
+  []
+  []
+tryReporters } []
+reportUnsolved }
+reportUnsolved (unsafe overlapping) {
+reportUnsolved (unsafe overlapping) }
+
+T19495.hs:10:8: error:
+    • Expected a type, but ‘T r’ has kind ‘TYPE r’
+      ‘r’ is a rigid type variable bound by
+        the type signature for ‘foo’
+        at T19495.hs:10:1-10
+    • In the type signature: foo :: T r

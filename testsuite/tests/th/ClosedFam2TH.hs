@@ -23,7 +23,7 @@ $( return [ ClosedTypeFamilyD
 
 a :: Equals b b
 a = (5 :: Int)
-
+{-
 b :: Equals Int Bool
 b = False
 
@@ -48,3 +48,4 @@ d = 6
 
 e :: Foo Maybe
 e = False
+-}
