@@ -447,12 +447,17 @@ tc_lhs_sig_type :: SkolemInfo -> LHsSigType GhcRn
 tc_lhs_sig_type skol_info (L loc (HsSig { sig_bndrs = hs_outer_bndrs
                                        , sig_body = hs_ty })) ctxt_kind
   = setSrcSpan loc $
-    do { (tc_lvl, wanted, (outer_bndrs, ty))
+    do { exp_kind <- newExpectedKind ctxt_kind
+                 -- Make the expected kind /outside/ the pushLevel
+                 -- so that we fail if the kind of the type mentions
+                 -- the forall'd variables (#19495)
+
+       ; (tc_lvl, wanted, (outer_bndrs, ty))
               <- pushLevelAndSolveEqualitiesX "tc_lhs_sig_type" $
                  -- See Note [Failure in local type signatures]
                  tcOuterTKBndrs skol_info hs_outer_bndrs $
-                 do { kind <- newExpectedKind ctxt_kind
-                    ; tcLHsType hs_ty kind }
+                 tcLHsType hs_ty exp_kind
+
        -- Any remaining variables (unsolved in the solveEqualities)
        -- should be in the global tyvars, and therefore won't be quantified
 

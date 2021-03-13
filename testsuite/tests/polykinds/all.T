@@ -235,3 +235,6 @@ test('T19092', normal, compile, [''])
 test('T19093', normal, compile, [''])
 test('T19094', normal, compile, [''])
 test('T19250', normal, compile, [''])
+
+# This one got an ASSERT error during -ddump-tc
+test('T19495', normal, compile, ['-dsuppress-uniques -ddump-tc-trace'])
