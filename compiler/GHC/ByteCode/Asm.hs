@@ -27,7 +27,7 @@ import GHC.ByteCode.InfoTable
 import GHC.ByteCode.Types
 import GHCi.RemoteTypes
 import GHC.Runtime.Interpreter
-import GHC.Runtime.Heap.Layout
+import GHC.Runtime.Heap.Layout hiding ( WordOff )
 
 import GHC.Types.Name
 import GHC.Types.Name.Set
@@ -528,69 +528,84 @@ return_ubx V32 = error "return_ubx: vector"
 return_ubx V64 = error "return_ubx: vector"
 
 {-
+  we can only handle up to a fixed number of words on the stack,
+  because we need a stg_ctoi_tN stack frame for each size N. See
+  Note [unboxed tuple bytecodes and tuple_BCO].
+
+  If needed, you can support larger tuples by adding more in
+  StgMiscClosures.cmm, Interpreter.c and MiscClosures.h and
+  raising this limit.
+
+  Note that the limit is the number of words passed on the stack.
+  If the calling convention passes part of the tuple in registers, the
+  maximum number of tuple elements may be larger. Elements can also
+  take multiple words on the stack (for example Double# on a 32 bit
+  platform).
+
+ -}
+maxTupleNativeStackSize :: WordOff
+maxTupleNativeStackSize = 62
+
+{-
+  Maximum number of supported registers for returning tuples.
+
+  If GHC uses more more than these (because of a change in the calling
+  convention or a new platform) mkTupleInfoSig will panic.
+
+  You can raise the limits after modifying stg_ctoi_t and stg_ret_t
+  (StgMiscClosures.cmm) to save and restore the additional registers.
+ -}
+maxTupleVanillaRegs, maxTupleFloatRegs, maxTupleDoubleRegs,
+    maxTupleLongRegs :: Int
+maxTupleVanillaRegs = 6
+maxTupleFloatRegs = 6
+maxTupleDoubleRegs = 6
+maxTupleLongRegs = 1
+
+{-
   Construct the tuple_info word that stg_ctoi_t and stg_ret_t use
   to convert a tuple between the native calling convention and the
   interpreter.
 
-  See StgMiscClosures.cmm for more information.
+  See Note [GHCi tuple layout] for more information.
  -}
 mkTupleInfoSig :: TupleInfo -> Word32
 mkTupleInfoSig ti@TupleInfo{..}
-  {-
-    we can only handle up to a fixed number of words on the stack,
-    because we need a stg_ctoi_tN stack frame for each size N
-
-    If needed, you can support larger tuples by adding more in
-    StgMiscClosures.cmm, Interpreter.c and MiscClosures.h and
-    raising this limit.
-
-    Note that the limit is the number of words passed on the stack.
-    If the calling convention passes part of the tuple in registers, the
-    maximum number of tuple elements may be larger. Elements can also
-    take multiple words on the stack (for example Double# on a 32 bit
-    platform).
-
-   -}
-  | tupleNativeStackSize > 62 =
+  | tupleNativeStackSize > maxTupleNativeStackSize =
     pprPanic "mkTupleInfoSig: tuple too big for the bytecode compiler"
-             (ppr tupleNativeStackSize <+> text "stack words" $+$
-              text "use -fobject-code to get around this limit"
+             (ppr tupleNativeStackSize <+> text "stack words." <+>
+              text "Use -fobject-code to get around this limit"
              )
-  {-
-    Check that we aren't using too many registers for argument passing.
-    If this panic is triggered, the calling convention uses more.
-
-    You can raise the limits after modifying stg_ctoi_t and stg_ret_t
-    (StgMiscClosures.cmm) to save and restore the additional registers.
-   -}
-  | tupleVanillaRegs >= 64 = -- at most 6 vanilla registers
+  | tupleVanillaRegs `shiftR` maxTupleVanillaRegs /= 0 =
     pprPanic "mkTupleInfoSig: too many vanilla registers" (ppr tupleVanillaRegs)
-  | tupleLongRegs >= 2 = -- at most 1 long register
+  | tupleLongRegs `shiftR` maxTupleLongRegs /= 0 =
     pprPanic "mkTupleInfoSig: too many long registers" (ppr tupleLongRegs)
-  | tupleFloatRegs >= 64 = -- at most 6 float registers
+  | tupleFloatRegs `shiftR` maxTupleFloatRegs /= 0 =
     pprPanic "mkTupleInfoSig: too many float registers" (ppr tupleFloatRegs)
-  | tupleDoubleRegs >= 64 = -- at most 6 double registers
+  | tupleDoubleRegs `shiftR` maxTupleDoubleRegs /= 0 =
     pprPanic "mkTupleInfoSig: too many double registers" (ppr tupleDoubleRegs)
   {-
     Check that we can pack the register counts/bitmaps and stack size
-    in the information word.
+    in the information word. In particular we check that each component
+    fits in the bits we have reserved for it.
+
+    This overlaps with some of the above checks. It's likely that if the
+    number of registers changes, the number of bits will also need to be
+    updated.
    -}
-  | tupleNativeStackSize < 16384 &&
+  | tupleNativeStackSize < 16384 && -- 14 bits stack usage
     tupleDoubleRegs < 64 && -- 6 bit bitmap (these can be shared with float)
     tupleFloatRegs < 64 && -- 6 bit bitmap (these can be shared with double)
     tupleLongRegs < 4 && -- 2 bit bitmap
-    tupleVanillaRegs < 65536 && -- 4 bit count
+    tupleVanillaRegs < 65536 && -- 4 bit count (tupleVanillaRegs is still a bitmap)
     -- check that there are no "holes", i.e. that R1..Rn are all in use
     tupleVanillaRegs .&. (tupleVanillaRegs + 1) == 0
     = fromIntegral tupleNativeStackSize .|.
-      w (tupleLongRegs `shiftL` 14) .|.
-      w (tupleDoubleRegs `shiftL` 16) .|.
-      w (tupleFloatRegs `shiftL` 22) .|.
-      w (countTrailingZeros (1 + tupleVanillaRegs) `shiftL` 28)
+      unRegBitmap (tupleLongRegs `shiftL` 14) .|.
+      unRegBitmap (tupleDoubleRegs `shiftL` 16) .|.
+      unRegBitmap (tupleFloatRegs `shiftL` 22) .|.
+      fromIntegral (countTrailingZeros (1 + tupleVanillaRegs) `shiftL` 28)
   | otherwise = pprPanic "mkTupleInfoSig: unsupported tuple shape" (ppr ti)
-  where
-    w :: Int -> Word32
-    w = fromIntegral
 
 mkTupleInfoLit :: Platform -> TupleInfo -> Literal
 mkTupleInfoLit platform tuple_info =

@@ -92,9 +92,8 @@ lintStgTopBindings logger dflags ictxt this_mod unarised whodunnit binds
     opts = initStgPprOpts dflags
     -- Bring all top-level binds into scope because CoreToStg does not generate
     -- bindings in dependency order (so we may see a use before its definition).
-    top_level_binds = mkVarSet (interactiveInScope ictxt ++
-                                bindersOfTopBinds binds
-                               )
+    top_level_binds = extendVarSetList (mkVarSet (bindersOfTopBinds binds))
+                                       (interactiveInScope ictxt)
 
     lint_binds :: [GenStgTopBinding a] -> LintM ()
 

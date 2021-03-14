@@ -795,7 +795,7 @@ isUnliftedType check in the AnnVar case of schemeE.) Here is the strategy:
    type to tack on a `(# #) ->`.
    Note that functions are never levity-polymorphic, so this transformation
    changes an NNLJP to a non-levity-polymorphic join point. This is done
-   in protectNNLJoinPointBind, called from the AnnLet case of schemeE.
+   in bcPrepSingleBind.
 
 3. At an occurrence of an NNLJP, add an application to void# (called voidPrimId),
    being careful to note the new type of the NNLJP. This is done in the AnnVar
@@ -867,7 +867,7 @@ schemeT d s p (StgOpApp (StgFCallOp (CCall ccall_spec) _ty) args result_ty)
 schemeT d s p (StgOpApp (StgPrimOp op) args _ty)
    = doTailCall d s p (primOpId op) (reverse args)
 
-schemeT _d _s _p (StgOpApp (StgPrimCallOp {}) _args _ty)
+schemeT _d _s _p (StgOpApp StgPrimCallOp{} _args _ty)
    = unsupportedCConvException
 
    -- Case 2: Unboxed tuple
@@ -1014,7 +1014,10 @@ doCase d s p scrut bndr alts
         --
         -- 'Simple' tuples with at most one non-void component,
         -- like (# Word# #) or (# Int#, State# RealWorld# #) do not have a
-        -- tuple return frame
+        -- tuple return frame. This is because (# foo #) and (# foo, Void# #)
+        -- have the same runtime rep. We have more efficient specialized
+        -- return frames for the situations with one non-void element.
+
         ubx_tuple_frame =
           (isUnboxedTupleType bndr_ty || isUnboxedSumType bndr_ty) &&
           length non_void_arg_reps > 1
@@ -1240,7 +1243,7 @@ layoutTuple :: Profile
             -> ByteOff
             -> (a -> CmmType)
             -> [a]
-            -> ( TupleInfo
+            -> ( TupleInfo      -- See Note [GHCi TupleInfo]
                , [(a, ByteOff)] -- argument, offset on stack
                )
 layoutTuple profile start_off arg_ty reps =
@@ -1295,6 +1298,103 @@ layoutTuple profile start_off arg_ty reps =
               map (\(x, o) -> (x, o + start_off))
                   (orig_stk_params ++ map get_byte_off new_stk_params)
      )
+
+{- Note [unboxed tuple bytecodes and tuple_BCO]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  We have the bytecode instructions RETURN_TUPLE and PUSH_ALTS_TUPLE to
+  return and receive arbitrary unboxed tuples, respectively. These
+  instructions use the helper data tuple_BCO and tuple_info.
+
+  The helper data is used to convert tuples between GHCs native calling
+  convention (object code), which uses stack and registers, and the bytecode
+  calling convention, which only uses the stack. See Note [GHCi TupleInfo]
+  for more details.
+
+
+  Returning a tuple
+  =================
+
+  Bytecode that returns a tuple first pushes all the tuple fields followed
+  by the appropriate tuple_info and tuple_BCO onto the stack. It then
+  executes the RETURN_TUPLE instruction, which causes the interpreter
+  to push stg_ret_t_info to the top of the stack. The stack (growing down)
+  then looks as follows:
+
+      ...
+      next_frame
+      tuple_field_1
+      tuple_field_2
+      ...
+      tuple_field_n
+      tuple_info
+      tuple_BCO
+      stg_ret_t_info <- Sp
+
+  If next_frame is bytecode, the interpreter will start executing it. If
+  it's object code, the interpreter jumps back to the scheduler, which in
+  turn jumps to stg_ret_t. stg_ret_t converts the tuple to the native
+  calling convention using the description in tuple_info, and then jumps
+  to next_frame.
+
+
+  Receiving a tuple
+  =================
+
+  Bytecode that receives a tuple uses the PUSH_ALTS_TUPLE instruction to
+  push a continuation, followed by jumping to the code that produces the
+  tuple. The PUSH_ALTS_TUPLE instuction contains three pieces of data:
+
+     * cont_BCO: the continuation that receives the tuple
+     * tuple_info: see below
+     * tuple_BCO: see below
+
+  The interpreter pushes these onto the stack when the PUSH_ALTS_TUPLE
+  instruction is executed, followed by stg_ctoi_tN_info, with N depending
+  on the number of stack words used by the tuple in the GHC native calling
+  convention. N is derived from tuple_info.
+
+  For example if we expect a tuple with three words on the stack, the stack
+  looks as follows after PUSH_ALTS_TUPLE:
+
+      ...
+      next_frame
+      cont_free_var_1
+      cont_free_var_2
+      ...
+      cont_free_var_n
+      tuple_info
+      tuple_BCO
+      cont_BCO
+      stg_ctoi_t3_info <- Sp
+
+  If the tuple is returned by object code, stg_ctoi_t3 will deal with
+  adjusting the stack pointer and converting the tuple to the bytecode
+  calling convention. See Note [GHCi unboxed tuples stack spills] for more
+  details.
+
+
+  The tuple_BCO
+  =============
+
+  The tuple_BCO is a helper bytecode object. Its main purpose is describing
+  the contents of the stack frame containing the tuple for the storage
+  manager. It contains only instructions to immediately return the tuple
+  that is already on the stack.
+
+
+  The tuple_info word
+  ===================
+
+  The tuple_info word describes the stack and STG register (e.g. R1..R6,
+  D1..D6) usage for the tuple. tuple_info contains enough information to
+  convert the tuple between the stack-only bytecode and stack+registers
+  GHC native calling conventions.
+
+  See Note [GHCi tuple layout] for more details of how the data is packed
+  in a single word.
+
+ -}
 
 tupleBCO :: Platform -> TupleInfo -> [(Bool, ByteOff)] -> [FFIInfo] -> ProtoBCO Name
 tupleBCO platform info pointers =

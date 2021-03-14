@@ -345,13 +345,15 @@ bciStackUse PUSH32_W{}            = 1  -- takes exactly 1 word
 bciStackUse PUSH_G{}              = 1
 bciStackUse PUSH_PRIMOP{}         = 1
 bciStackUse PUSH_BCO{}            = 1
--- XXX these don't take stack space for restoring the CCCS into account!
-bciStackUse (PUSH_ALTS bco)       = 3 + protoBCOStackUse bco
-bciStackUse (PUSH_ALTS_UNLIFTED bco _) = 4 + protoBCOStackUse bco
+bciStackUse (PUSH_ALTS bco)       = 2 {- profiling only, restore CCCS -} +
+                                    3 + protoBCOStackUse bco
+bciStackUse (PUSH_ALTS_UNLIFTED bco _) = 2 {- profiling only, restore CCCS -} +
+                                         4 + protoBCOStackUse bco
 bciStackUse (PUSH_ALTS_TUPLE bco info _) =
    -- (tuple_bco, tuple_info word, cont_bco, stg_ctoi_t)
    -- tuple
    -- (tuple_info, tuple_bco, stg_ret_t)
+   1 {- profiling only -} +
    7 + fromIntegral (tupleSize info) + protoBCOStackUse bco
 bciStackUse (PUSH_PAD8)           = 1  -- overapproximation
 bciStackUse (PUSH_PAD16)          = 1  -- overapproximation
@@ -390,8 +392,8 @@ bciStackUse CASEFAIL{}            = 0
 bciStackUse JMP{}                 = 0
 bciStackUse ENTER{}               = 0
 bciStackUse RETURN{}              = 0
-bciStackUse RETURN_UBX{}          = 1
-bciStackUse RETURN_TUPLE{}        = 1
+bciStackUse RETURN_UBX{}          = 1 -- pushes stg_ret_X for some X
+bciStackUse RETURN_TUPLE{}        = 1 -- pushes stg_ret_t header
 bciStackUse CCALL{}               = 0
 bciStackUse SWIZZLE{}             = 0
 bciStackUse BRK_FUN{}             = 0

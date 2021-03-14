@@ -195,7 +195,9 @@ INFO_TABLE_RET( stg_ctoi_V, RET_BCO )
     jump stg_yield_to_interpreter [];
 }
 
-/* In the calling convention for compiled code, a tuple is returned
+/*   Note [GHCi unboxed tuples stack spills]
+
+   In the calling convention for compiled code, a tuple is returned
    in registers, with everything that doesn't fit spilled onto the STG
    stack.
 
@@ -334,6 +336,8 @@ MK_STG_CTOI_T(61)
 MK_STG_CTOI_T(62)
 
 /*
+  Note [GHCi tuple layout]
+
   the tuple_info word describes the register and stack usage of the tuple:
 
   [ rrrr ffff ffdd dddd llss ssss ssss ssss ]
@@ -342,10 +346,11 @@ MK_STG_CTOI_T(62)
   - f: bitmap of float registers F1..F6
   - d: bitmap of double registers D1..D6
   - l: bitmap of long registers L1..Ln
-  - s: size of tuple in words on stack
+  - s: number of words on stack (in addition to registers)
 
-  the order in which the registers are pushed on the stack is determined by
-  the Ord instance of GHC.Cmm.Expr.GlobalReg
+  The order in which the registers are pushed on the stack is determined by
+  the Ord instance of GHC.Cmm.Expr.GlobalReg. If you change the Ord instance,
+  the order in stg_ctoi_t and stg_ret_t needs to be adjusted accordingly.
 
  */
 
@@ -423,13 +428,6 @@ INFO_TABLE_RET( stg_ret_t, RET_BCO )
     tuple_regs_F = (tuple_info >> 22) & 0x3f; /* 6 bits bitmap */
     tuple_regs_D = (tuple_info >> 16) & 0x3f; /* 6 bits bitmap */
     tuple_regs_L = (tuple_info >> 14) & 0x3;  /* 2 bits bitmap */
-
-    /* ccall debugBelch("stg_ret_t: stack%d R%d F%d D%d L%d\n",
-                         tuple_stack,
-                         tuple_regs_R,
-                         tuple_regs_F,
-                         tuple_regs_D,
-                         tuple_regs_L); */
 
     /* restore everything in the reverse order of stg_ctoi_t */
 

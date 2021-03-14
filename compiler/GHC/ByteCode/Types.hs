@@ -7,7 +7,9 @@
 -- | Bytecode assembler types
 module GHC.ByteCode.Types
   ( CompiledByteCode(..), seqCompiledByteCode
-  , FFIInfo(..), TupleInfo(..), voidTupleInfo
+  , FFIInfo(..)
+  , RegBitmap(..)
+  , TupleInfo(..), voidTupleInfo
   , ByteOff(..), WordOff(..)
   , UnlinkedBCO(..), BCOPtr(..), BCONPtr(..)
   , ItblEnv, ItblPtr(..)
@@ -76,7 +78,12 @@ newtype ByteOff = ByteOff Int
 newtype WordOff = WordOff Int
     deriving (Enum, Eq, Show, Integral, Num, Ord, Real, Outputable)
 
-{-
+newtype RegBitmap = RegBitmap { unRegBitmap :: Word32 }
+    deriving (Enum, Eq, Show, Integral, Num, Ord, Real, Bits, FiniteBits, Outputable)
+
+{- Note [GHCi TupleInfo]
+~~~~~~~~~~~~~~~~~~~~~~~~
+
    This contains the data we need for passing unboxed tuples between
    bytecode and native code
 
@@ -98,11 +105,11 @@ newtype WordOff = WordOff Int
    See GHC.StgToByteCode.layoutTuple for more details.
 -}
 data TupleInfo = TupleInfo
-  { tupleSize            :: !WordOff -- total size of tuple in words
-  , tupleVanillaRegs     :: !Int     -- vanilla registers used (bitmap)
-  , tupleLongRegs        :: !Int     -- long registers used (bitmap)
-  , tupleFloatRegs       :: !Int     -- float registers used (bitmap)
-  , tupleDoubleRegs      :: !Int     -- double registers used (bitmap)
+  { tupleSize            :: !WordOff   -- total size of tuple in words
+  , tupleVanillaRegs     :: !RegBitmap -- vanilla registers used
+  , tupleLongRegs        :: !RegBitmap -- long registers used
+  , tupleFloatRegs       :: !RegBitmap -- float registers used
+  , tupleDoubleRegs      :: !RegBitmap -- double registers used
   , tupleNativeStackSize :: !WordOff {- words spilled on the stack by
                                         GHCs native calling convention -}
   } deriving (Show)
