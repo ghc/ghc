@@ -24,6 +24,7 @@ module GHC.Builtin.Types.Prim(
         alphaTyVarsUnliftedRep, alphaTyVarUnliftedRep,
         alphaTysUnliftedRep, alphaTyUnliftedRep,
         runtimeRep1TyVar, runtimeRep2TyVar, runtimeRep1Ty, runtimeRep2Ty,
+        runtimeInfo1TyVar, runtimeInfo2TyVar, runtimeInfo1Ty, runtimeInfo2Ty,
         openAlphaTy, openBetaTy, openAlphaTyVar, openBetaTyVar,
 
         multiplicityTyVar,

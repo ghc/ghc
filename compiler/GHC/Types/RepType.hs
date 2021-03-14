@@ -13,6 +13,7 @@ module GHC.Types.RepType
     -- * Type representation for the code generator
     typePrimRep, typePrimRep1,
     runtimeRepPrimRep, typePrimRepArgs,
+    runtimeInfoPrimRep, 
     PrimRep(..), primRepToType,
     countFunRepArgs, countConRepArgs, tyConPrimRep, tyConPrimRep1,
 
@@ -528,6 +529,17 @@ runtimeRepPrimRep doc rr_ty
   = fun args
   | otherwise
   = pprPanic "runtimeRepPrimRep" (doc $$ ppr rr_ty)
+
+runtimeInfoPrimRep :: HasDebugCallStack => SDoc -> Type -> [PrimRep]
+runtimeInfoPrimRep doc rr_ty
+  | Just rr_ty' <- coreView rr_ty
+  = runtimeInfoPrimRep doc rr_ty'
+  | TyConApp rinfo [rr_dc, cc_dc] <- rr_ty
+  , TyConApp rr_dc' args <- rr_dc
+  , RuntimeRep fun <- tyConRuntimeRepInfo rr_dc'
+  = fun args
+  | otherwise
+  = pprPanic "runtimeInfoPrimRep" (doc $$ ppr rr_ty)  
 
 -- | Convert a PrimRep back to a Type. Used only in the unariser to give types
 -- to fresh Ids. Really, only the type's representation matters.

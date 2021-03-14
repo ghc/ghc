@@ -1035,7 +1035,7 @@ cTupleArr = listArray (0,mAX_CTUPLE_SIZE) [mk_ctuple i | i <- [0..mAX_CTUPLE_SIZ
 -- [IntRep, LiftedRep])@
 unboxedTupleSumKind :: TyCon -> [Type] -> Kind
 unboxedTupleSumKind tc rr_tys
-  = tYPE (mkTyConApp tc [mkPromotedListTy runtimeRepTy rr_tys])
+  = tYPE $ mkTyConApp runtimeInfoDataConTyCon [(mkTyConApp tc [mkPromotedListTy runtimeRepTy rr_tys]), convEvalDataConTy]
 
 -- | Specialization of 'unboxedTupleSumKind' for tuples
 unboxedTupleKind :: [Type] -> Kind
@@ -1396,11 +1396,11 @@ unrestrictedFunTyCon :: TyCon
 unrestrictedFunTyCon = buildSynTyCon unrestrictedFunTyConName [] arrowKind [] unrestrictedFunTy
   where arrowKind = mkTyConKind binders liftedTypeKind
         -- See also funTyCon
-        binders = [ Bndr runtimeRep1TyVar (NamedTCB Inferred)
-                  , Bndr runtimeRep2TyVar (NamedTCB Inferred)
+        binders = [ Bndr runtimeInfo1TyVar (NamedTCB Inferred)
+                  , Bndr runtimeInfo2TyVar (NamedTCB Inferred)
                   ]
-                  ++ mkTemplateAnonTyConBinders [ tYPE runtimeRep1Ty
-                                                , tYPE runtimeRep2Ty
+                  ++ mkTemplateAnonTyConBinders [ tYPE runtimeInfo1Ty
+                                                , tYPE runtimeInfo2Ty
                                                 ]
 
 unrestrictedFunTyConName :: Name
