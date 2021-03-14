@@ -241,12 +241,13 @@ type family ConsSymbol (a :: Char) (b :: Symbol) :: Symbol
 -- @since 4.16.0.0
 type family UnconsSymbol (a :: Symbol) :: Maybe (Char, Symbol)
 
--- | Convert a charecter to its Unicode code point (cf. `Data.Char.ord`)
+-- | Convert a character to its Unicode code point (cf. `Data.Char.ord`)
 --
 -- @since 4.16.0.0
 type family CharToNat (a :: Char) :: N.Nat
 
 -- | Convert a Unicode code point to a character (cf. `Data.Char.chr`)
+--
 -- @since 4.16.0.0
 type family NatToChar (n :: N.Nat) :: Char
 
