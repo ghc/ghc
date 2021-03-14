@@ -316,8 +316,9 @@ class Foldable t where
     --
     -- @since 4.6.0.0
     foldr' :: (a -> b -> b) -> b -> t a -> b
-    foldr' f z0 xs = foldl f' id xs z0
-      where f' k x z = k $! f x z
+    foldr' f z0 = \ xs ->
+        foldl (\ k x -> oneShot (\ z -> z `seq` k (f x z))) id xs z0
+    -- Mirror image of 'foldl''.
 
     -- | Left-associative fold of a structure, lazy in the accumulator.  This
     -- is rarely what you want, but can work well for structures with efficient
@@ -388,8 +389,16 @@ class Foldable t where
     --
     -- @since 4.6.0.0
     foldl' :: (b -> a -> b) -> b -> t a -> b
-    foldl' f z0 xs = foldr f' id xs z0
-      where f' x k z = k $! f z x
+    {-# INLINE foldl' #-}
+    foldl' f z0 = \ xs ->
+        foldr (\ (x::a) (k::b->b) -> oneShot (\ (z::b) -> z `seq` k (f z x)))
+              (id::b->b) xs z0
+    --
+    -- We now force the accumulator `z` rather than the value computed by the
+    -- operator `k`, this matches the documented strictness.
+    --
+    -- For the rationale for the arity reduction from 3 to 2, inlining, etc.
+    -- see Note [Definition of foldl'] in GHC.List.
 
     -- | A variant of 'foldr' that has no base case,
     -- and thus may only be applied to non-empty structures.
@@ -2071,25 +2080,25 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 --    where g = flip f
 -- @
 --
--- In which to maintain the expected strictness we need to perform function
--- application eagerly, and composition lazily.  To that end we introduce a new
--- function @f'@ which maps each element @x@ to an eager application of @g x@
--- to its argument, followed by an application of a lazily computed composition
--- (@k@) of the @g e@ functions for the remaining elements @e@:
+-- In which to ensure the correct strictness we must evaluate the accumulator
+-- before applying the next function.  We therefore introduce a helper function
+-- @f'@ which maps each element @x@ to an application of @g x@ to its eagerly
+-- evaluated argument, followed by similar application of the @g e@ functions
+-- for the remaining elements @e@:
 --
--- > f' x k z = k $! (g x) z = k $! f z x
+-- > f' x k = \ z -> z `seq` k (f z x)
 --
 -- We see that a lazy 'foldr' of the @g e@ endomorphisms, with @f'@ as as the
 -- operator, in fact yields a strict left fold, that avoids building a
 -- deep chain of intermediate thunks:
 --
 -- > foldl' f z0 xs = foldr f' id xs z0
--- >   where f' x k z = k $! f z x
+-- >   where f' x k = \ z -> z `seq` k (f z x)
 --
 -- The function applied to @z0@ is built corecursively, and its terms are
--- applied eagerly to the accumulator before further terms are applied to
--- the result.  So, as promised, this will run in constant space, and GHC
--- is able to optimise this to an efficient loop.
+-- applied to an eagerly evaluated accumulator before further terms are applied
+-- to the result.  As promised, this runs in constant space, and can be
+-- optimised to an efficient loop.
 
 --------------
 
