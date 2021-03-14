@@ -68,6 +68,7 @@ module GHC.Core.Type (
         isPredTy,
 
         getRuntimeRep_maybe, kindRep_maybe, kindRep,
+        kindInfo,
 
         mkCastTy, mkCoercionTy, splitCastTy_maybe,
 
