@@ -555,6 +555,11 @@ kindRep k = case kindRep_maybe k of
               Just r  -> r
               Nothing -> pprPanic "kindRep" (ppr k)
 
+kindInfo :: HasDebugCallStack => Kind -> Type
+kindInfo k = case kindInfo_maybe k of
+              Just r  -> r
+              Nothing -> pprPanic "kindInfo" (ppr k)              
+
 -- | Given a kind (TYPE rr), extract its RuntimeRep classifier rr.
 -- For example, @kindRep_maybe * = Just LiftedRep@
 -- Returns 'Nothing' if the kind is not of form (TYPE rr)
@@ -562,20 +567,30 @@ kindRep k = case kindRep_maybe k of
 kindRep_maybe :: HasDebugCallStack => Kind -> Maybe Type
 kindRep_maybe kind
   | TyConApp tc [arg] <- coreFullView kind
-  , tc `hasKey` tYPETyConKey    
-  -- , (rinfo, [rep, conv]) <-splitTyConApp arg
-  -- , rinfo `hasKey` runtimeInfoDataConKey
-                                = pprPanic "here" (ppr arg)
-  | otherwise                   = Nothing
+  , tc `hasKey` tYPETyConKey
+  , TyConApp rinfo [rep, conv] <- coreFullView arg
+  , rinfo `hasKey` runtimeInfoDataConKey    = Just rep
+  | otherwise                               = Nothing
+
+kindInfo_maybe :: HasDebugCallStack => Kind -> Maybe Type
+kindInfo_maybe kind
+  | TyConApp tc [arg] <- coreFullView kind
+  , tc `hasKey` tYPETyConKey
+  , TyConApp rinfo [rep, conv] <- coreFullView arg
+  , rinfo `hasKey` runtimeInfoDataConKey    = Just arg
+  | TyConApp tc [arg] <- coreFullView kind
+  , tc `hasKey` tYPETyConKey                = Just arg
+  | otherwise                               = Nothing
 
 -- | This version considers Constraint to be the same as *. Returns True
 -- if the argument is equivalent to Type/Constraint and False otherwise.
 -- See Note [Kind Constraint and kind Type]
 isLiftedTypeKind :: Kind -> Bool
 isLiftedTypeKind kind
-  = case kindRep_maybe kind of
-      Just rep -> isLiftedRuntimeRep rep
+  = case kindInfo_maybe kind of
+      Just rinfo -> isLiftedRuntimeInfo rinfo
       Nothing  -> False
+
 
 pickyIsLiftedTypeKind :: Kind -> Bool
 -- Checks whether the kind is literally
@@ -603,13 +618,23 @@ isLiftedRuntimeRep rep
   , rr_tc `hasKey` liftedRepDataConKey = ASSERT( null args ) True
   | otherwise                          = False
 
+isLiftedRuntimeInfo :: Type -> Bool
+-- isLiftedRuntimeRep is true of LiftedRep :: RuntimeRep
+-- False of type variables (a :: RuntimeRep)
+--   and of other reps e.g. (IntRep :: RuntimeRep)
+isLiftedRuntimeInfo rep
+  | TyConApp rr_tc [rep,conv] <- coreFullView rep
+  , rr_tc `hasKey` runtimeInfoDataConKey = isLiftedRuntimeRep rep
+  | otherwise
+  = False
+
 -- | Returns True if the kind classifies unlifted types and False otherwise.
 -- Note that this returns False for levity-polymorphic kinds, which may
 -- be specialized to a kind that classifies unlifted types.
 isUnliftedTypeKind :: Kind -> Bool
 isUnliftedTypeKind kind
-  = case kindRep_maybe kind of
-      Just rep -> isUnliftedRuntimeRep rep
+  = case kindInfo_maybe kind of
+      Just rep -> isUnliftedRuntimeInfo rep
       Nothing  -> False
 
 isUnliftedRuntimeRep :: Type -> Bool
@@ -625,6 +650,17 @@ isUnliftedRuntimeRep rep
         -- But be careful of type families (F tys) :: RuntimeRep
   | otherwise {- Variables, applications -}
   = False
+
+isUnliftedRuntimeInfo rep
+  | TyConApp rinfo [rep, conv] <- coreFullView rep   -- NB: args might be non-empty
+  , rinfo `hasKey` runtimeInfoDataConKey
+  = isUnliftedRuntimeRep rep
+        -- Avoid searching all the unlifted RuntimeRep type cons
+        -- In the RuntimeRep data type, only LiftedRep is lifted
+        -- But be careful of type families (F tys) :: RuntimeRep
+  | otherwise {- Variables, applications -}
+  = False
+
 
 -- | Is this the type 'RuntimeRep'?
 isRuntimeRepTy :: Type -> Bool
@@ -2064,6 +2100,10 @@ getRuntimeRep_maybe :: HasDebugCallStack
                     => Type -> Maybe Type
 getRuntimeRep_maybe = kindRep_maybe . typeKind
 
+getRuntimeInfo_maybe :: HasDebugCallStack
+                    => Type -> Maybe Type
+getRuntimeInfo_maybe = kindInfo_maybe . typeKind
+
 -- | Extract the RuntimeRep classifier of a type. For instance,
 -- @getRuntimeRep_maybe Int = LiftedRep@. Panics if this is not possible.
 getRuntimeRep :: HasDebugCallStack => Type -> Type
@@ -2071,6 +2111,12 @@ getRuntimeRep ty
   = case getRuntimeRep_maybe ty of
       Just r  -> r
       Nothing -> pprPanic "getRuntimeRep" (ppr ty <+> dcolon <+> ppr (typeKind ty))
+
+getRuntimeInfo :: HasDebugCallStack => Type -> Type
+getRuntimeInfo ty
+  = case getRuntimeInfo_maybe ty of
+      Just r  -> r
+      Nothing -> pprPanic "getRuntimeInfo" (ppr ty <+> dcolon <+> ppr (typeKind ty))      
 
 isUnboxedTupleType :: Type -> Bool
 isUnboxedTupleType ty
@@ -2599,7 +2645,9 @@ tcIsLiftedTypeKind :: Kind -> Bool
 tcIsLiftedTypeKind ty
   | Just (tc, [arg]) <- tcSplitTyConApp_maybe ty    -- Note: tcSplit here
   , tc `hasKey` tYPETyConKey
-  = isLiftedRuntimeRep arg
+  , Just (rinfo, [rep, conv]) <- tcSplitTyConApp_maybe arg
+  , rinfo `hasKey` runtimeInfoDataConKey
+  = isLiftedRuntimeRep rep
   | otherwise
   = False
 
