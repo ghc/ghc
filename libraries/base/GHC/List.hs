@@ -306,9 +306,16 @@ allocation-free. Also see #13001.
 -- | A strict version of 'foldl'.
 foldl'           :: forall a b . (b -> a -> b) -> b -> [a] -> b
 {-# INLINE foldl' #-}
-foldl' k z0 xs =
+foldl' k z0 = \xs ->
   foldr (\(v::a) (fn::b->b) -> oneShot (\(z::b) -> z `seq` fn (k z v))) (id :: b -> b) xs z0
   -- See Note [Left folds via right fold]
+  -- The arity of the function is reduced from 3 to 2 in order to support
+  -- inlining and fusion in common idiomatic usage where some helper function
+  -- is defined as @foldl' f z@.  See !5259 for much discussion.  This may
+  -- result in partial applications of 'foldl'' inlining in some functions
+  -- where they previously did not.  Some call sites may now need explicit
+  -- INLINE or INLINABLE pragmaes, so that accidental list fusion is made
+  -- robust.
 
 -- | 'foldl1' is a variant of 'foldl' that has no starting value argument,
 -- and thus must be applied to non-empty lists. Note that unlike 'foldl', the accumulated value must be of the same type as the list elements.
