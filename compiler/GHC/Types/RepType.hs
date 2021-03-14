@@ -512,9 +512,10 @@ kindPrimRep :: HasDebugCallStack => SDoc -> Kind -> [PrimRep]
 kindPrimRep doc ki
   | Just ki' <- coreView ki
   = kindPrimRep doc ki'
-kindPrimRep doc (TyConApp typ [runtime_rep])
+kindPrimRep doc (TyConApp typ [arg])
+  | Just (rinfo, [rep, conv]) <- splitTyConApp_maybe arg
   = ASSERT( typ `hasKey` tYPETyConKey )
-    runtimeRepPrimRep doc runtime_rep
+    runtimeRepPrimRep doc rep
 kindPrimRep doc ki
   = pprPanic "kindPrimRep" (ppr ki $$ doc)
 

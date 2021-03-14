@@ -68,7 +68,7 @@ module GHC.Core.Type (
         isPredTy,
 
         getRuntimeRep_maybe, kindRep_maybe, kindRep,
-        kindInfo,
+        getRuntimeInfo_maybe, kindInfo,
 
         mkCastTy, mkCoercionTy, splitCastTy_maybe,
 
@@ -571,6 +571,8 @@ kindRep_maybe kind
   , tc `hasKey` tYPETyConKey
   , TyConApp rinfo [rep, conv] <- coreFullView arg
   , rinfo `hasKey` runtimeInfoDataConKey    = Just rep
+  | TyConApp tc [arg] <- coreFullView kind
+  , tc `hasKey` tYPETyConKey                = Just arg
   | otherwise                               = Nothing
 
 kindInfo_maybe :: HasDebugCallStack => Kind -> Maybe Type
