@@ -44,7 +44,6 @@ import GHC.Cmm.Switch
 
 -- Utils
 import GHC.CmmToAsm.CPrim
-import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Data.FastString
 import GHC.Utils.Outputable
@@ -345,11 +344,11 @@ pprSwitch platform e ids
     caseify (ix:ixs, ident) = vcat (map do_fallthrough ixs) $$ final_branch ix
         where
         do_fallthrough ix =
-                 hsep [ text "case" , pprHexVal platform ix (wordWidth platform) <> colon ,
+                 hsep [ text "case" , pprHexVal ix (wordWidth platform) <> colon ,
                         text "/* fall through */" ]
 
         final_branch ix =
-                hsep [ text "case" , pprHexVal platform ix (wordWidth platform) <> colon ,
+                hsep [ text "case" , pprHexVal ix (wordWidth platform) <> colon ,
                        text "goto" , (pprBlockId ident) <> semi ]
 
     caseify (_     , _    ) = panic "pprSwitch: switch with no cases!"
@@ -380,7 +379,7 @@ pprExpr platform e = case e of
 
     -- CmmRegOff is an alias of MO_Add
     CmmRegOff reg i -> pprCastReg reg <> char '+' <>
-                       pprHexVal platform (fromIntegral i) (wordWidth platform)
+                       pprHexVal (fromIntegral i) (wordWidth platform)
 
     CmmMachOp mop args -> pprMachOpApp platform mop args
 
@@ -471,7 +470,7 @@ pprMachOpApp' platform mop args
 
 pprLit :: Platform -> CmmLit -> SDoc
 pprLit platform lit = case lit of
-    CmmInt i rep      -> pprHexVal platform i rep
+    CmmInt i rep      -> pprHexVal i rep
 
     CmmFloat f w       -> parens (machRep_F_CType w) <> str
         where d = fromRational f :: Double
@@ -564,7 +563,7 @@ staticLitsToWords platform = go . foldMap decomposeMultiWord
     wordWidthBytes = widthInBytes $ wordWidth platform
 
     pprWord :: Integer -> SDoc
-    pprWord n = pprHexVal platform n (wordWidth platform)
+    pprWord n = pprHexVal n (wordWidth platform)
 
 byteSwap :: Width -> Integer -> Integer
 byteSwap width n = foldl' f 0 bytes
@@ -1304,27 +1303,33 @@ wordShift platform = widthInLog (wordWidth platform)
 commafy :: [SDoc] -> SDoc
 commafy xs = hsep $ punctuate comma xs
 
--- Print in C hex format: 0x13fa
-pprHexVal :: Platform -> Integer -> Width -> SDoc
-pprHexVal platform w rep
-  | w < 0     = parens (char '-' <>
-                    text "0x" <> intToDoc (-w) <> repsuffix rep)
-  | otherwise =     text "0x" <> intToDoc   w  <> repsuffix rep
+-- | Print in C hex format
+--
+-- Examples:
+--
+--   5114    :: W32  ===>  ((StgWord32)0x13fa)
+--   (-5114) :: W32  ===>  ((StgWord32)(-0x13fa))
+--
+-- We use casts to support types smaller than `unsigned int`; C literal
+-- suffixes support longer but not shorter types.
+pprHexVal :: Integer -> Width -> SDoc
+pprHexVal w rep = parens $ parens cType <> rawLit
   where
-        -- type suffix for literals:
-        -- Integer literals are unsigned in Cmm/C.  We explicitly cast to
-        -- signed values for doing signed operations, but at all other
-        -- times values are unsigned.  This also helps eliminate occasional
-        -- warnings about integer overflow from gcc.
+      cType = case rep of
+          W8   -> text "StgWord8"
+          W16  -> text "StgWord16"
+          W32  -> text "StgWord32"
+          W64  -> text "StgWord64"
+          -- structs not actual numeric types, so not actually supported yet,
+          -- but put here so we can think ahead.
+          W128 -> text "StgWord128"
+          W256 -> text "StgWord256"
+          W512 -> text "StgWord512"
 
-      constants = platformConstants platform
-
-      repsuffix W64 =
-               if pc_CINT_SIZE       constants == 8 then char 'U'
-          else if pc_CLONG_SIZE      constants == 8 then text "UL"
-          else if pc_CLONG_LONG_SIZE constants == 8 then text "ULL"
-          else panic "pprHexVal: Can't find a 64-bit type"
-      repsuffix _ = char 'U'
+      rawLit
+          | w < 0     = parens $ char '-' <>
+                            text "0x" <> intToDoc (-w)
+          | otherwise =     text "0x" <> intToDoc   w
 
       intToDoc :: Integer -> SDoc
       intToDoc i = case truncInt i of
