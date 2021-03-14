@@ -298,6 +298,8 @@ Eventlog
     type family CmpChar (a :: Char) (b :: Char) :: Ordering
     type family ConsSymbol (a :: Char) (b :: Symbol) :: Symbol
     type family UnconsSymbol (a :: Symbol) :: Maybe (Char, Symbol)
+    type family CharToNat (c :: Char) :: Natural
+    type family NatToChar (n :: Natural) :: Char
 
   and with the type class ``KnownChar`` (and such additional functions as ``charVal`` and ``charVal'``): ::
 
