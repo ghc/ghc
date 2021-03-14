@@ -777,3 +777,5 @@ test('InlinePatSyn_ExplicitBidiMatcher', [], makefile_test, [])
 test('T18467', normal, compile, [''])
 
 test('T19315', normal, compile, [''])
+
+test('T19535', normal, compile, [''])
