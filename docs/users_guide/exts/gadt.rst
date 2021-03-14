@@ -138,4 +138,90 @@ also sets :extension:`GADTSyntax` and :extension:`MonoLocalBinds`.
    GADTs <http://research.microsoft.com/%7Esimonpj/papers/gadt/>`__. The
    criteria implemented by GHC are given in the Appendix.
 
+-  When GHC typechecks multiple patterns in a function clause, it typechecks
+   each pattern in order from left to right. This has consequences for patterns
+   that match on GADTs, such as in this example: ::
 
+       data U a where
+         MkU :: U ()
+
+       v1 :: U a -> a -> a
+       v1 MkU () = ()
+
+       v2 :: a -> U a -> a
+       v2 () MkU = ()
+
+   Although ``v1`` and ``v2`` may appear to be the same function but with
+   differently ordered arguments, GHC will only typecheck ``v1``. This is
+   because in ``v1``, GHC will first typecheck the ``MkU`` pattern, which
+   causes ``a`` to be refined to ``()``. This refinement is what allows the
+   subsequent ``()`` pattern to typecheck at type ``a``. In ``v2``, however,
+   GHC first tries to typecheck the ``()`` pattern, and because ``a`` has not
+   been refined to ``()`` yet, GHC concludes that ``()`` is not of type ``a``.
+   ``v2`` can be made to typecheck by matching on ``MkU`` before ``()``, like
+   so: ::
+
+       v2 :: a -> U a -> a
+       v2 x MkU = case x of () -> ()
+
+-  Not only does GHC typecheck patterns from left to right, it also typechecks
+   them from the outside in. This can be seen in this example: ::
+
+       data F x y where
+         MkF :: y -> F (Maybe z) y
+
+       g' :: F a a -> a
+       g' (MkF Nothing) = Nothing
+
+   In the function clause for ``g``, GHC first checks ``MkF``, the outermost
+   pattern, followed by the inner ``Nothing`` pattern. The fact that GHC checks
+   the patterns in this order is crucial for ``g`` to typecheck, as checking
+   ``MkF`` first causes ``a`` to be refined to ``Maybe z``. If GHC had checked
+   the patterns in the opposite order, then GHC would not have been able to
+   check ``Nothing`` at type ``a``.
+
+   This outside-in order can interact somewhat counterintuitively with
+   :ref:`pattern-type-sigs`. Consider the following variation of ``g``: ::
+
+       g' :: F a a -> a
+       g' (MkF Nothing :: F (Maybe z) (Maybe z)) = Nothing @z
+
+   The ``g'`` function attempts to use the pattern type signature
+   ``F (Maybe z) (Maybe z)`` to bring the type variable ``z`` into scope so
+   that it can be used on the right-hand side of the definition with
+   :ref:`visible-type-application`. However, GHC will reject the pattern type
+   signature in ``g'``: ::
+
+       • Couldn't match type ‘a’ with ‘Maybe z’
+         Expected: F a a
+           Actual: F (Maybe z) (Maybe z)
+
+   Again, this is because of the outside-in order GHC uses when typechecking
+   patterns. GHC first tries to check the pattern type signature
+   ``F (Maybe z) (Maybe z)``, but at that point, GHC has not refined ``a`` to
+   be ``Maybe z``, so GHC is unable to conclude that ``F a a`` is equal to
+   ``F (Maybe z) (Maybe z)``. Here, the ``MkF`` pattern is considered to be
+   inside of the pattern type signature, so GHC cannot use the type refinement
+   from the ``MkF`` pattern when typechecking the pattern type signature.
+
+   There are two possible ways to repair ``g'``. One way is to use a ``case``
+   expression to write a pattern signature *after* matching on ``MkF``, like
+   so: ::
+
+       g' :: F a a -> a
+       g' f@(MkF Nothing) =
+         case f of
+           (_ :: F (Maybe z) (Maybe z)) -> Nothing @z
+
+   Another way is to use :ref:`type-applications-in-patterns` instead of a
+   pattern type signature: ::
+
+       g' :: F a a -> a
+       g' (MkF @(Maybe z) Nothing) = Nothing @z
+
+   Here, the visible type argument ``@(Maybe z)`` indicates that the ``y``
+   in the type of ``MkF :: y -> F (Maybe z) y`` should be instantiated to
+   ``Maybe z``. In addition, ``@(Maybe z)`` also brings ``z`` into scope.
+   Although this version of ``g'`` no longer uses a pattern type signature, it
+   accomplishes the same end result, as the right-hand side ``Nothing @z`` will
+   typecheck successfully.
