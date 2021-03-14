@@ -1,6 +1,8 @@
 type GHC.TypeLits.AppendSymbol :: GHC.Types.Symbol
                                   -> GHC.Types.Symbol -> GHC.Types.Symbol
 type family GHC.TypeLits.AppendSymbol a b
+type GHC.TypeLits.CharToNat :: Char -> GHC.Num.Natural.Natural
+type family GHC.TypeLits.CharToNat a
 type GHC.TypeLits.ConsSymbol :: Char
                                 -> GHC.Types.Symbol -> GHC.Types.Symbol
 type family GHC.TypeLits.ConsSymbol a b
@@ -22,6 +24,8 @@ type GHC.TypeLits.KnownSymbol :: GHC.Types.Symbol -> Constraint
 class GHC.TypeLits.KnownSymbol n where
   GHC.TypeLits.symbolSing :: GHC.TypeLits.SSymbol n
   {-# MINIMAL symbolSing #-}
+type GHC.TypeLits.NatToChar :: GHC.Num.Natural.Natural -> Char
+type family GHC.TypeLits.NatToChar a
 type GHC.TypeLits.SomeChar :: *
 data GHC.TypeLits.SomeChar
   = forall (n :: Char).
