@@ -2002,41 +2002,10 @@ uFloatTyConKey  = mkPreludeTyConUnique 161
 uIntTyConKey    = mkPreludeTyConUnique 162
 uWordTyConKey   = mkPreludeTyConUnique 163
 
--- Type-level naturals
-typeSymbolKindConNameKey, typeCharKindConNameKey,
-  typeNatAddTyFamNameKey, typeNatMulTyFamNameKey, typeNatExpTyFamNameKey,
-  typeNatSubTyFamNameKey
-  , typeSymbolCmpTyFamNameKey, typeNatCmpTyFamNameKey, typeCharCmpTyFamNameKey
-  , typeLeqCharTyFamNameKey
-  , typeNatDivTyFamNameKey
-  , typeNatModTyFamNameKey
-  , typeNatLogTyFamNameKey
-  , typeConsSymbolTyFamNameKey, typeUnconsSymbolTyFamNameKey
-  :: Unique
-typeSymbolKindConNameKey  = mkPreludeTyConUnique 165
-typeCharKindConNameKey    = mkPreludeTyConUnique 166
-typeNatAddTyFamNameKey    = mkPreludeTyConUnique 167
-typeNatMulTyFamNameKey    = mkPreludeTyConUnique 168
-typeNatExpTyFamNameKey    = mkPreludeTyConUnique 169
-typeNatSubTyFamNameKey    = mkPreludeTyConUnique 171
-typeSymbolCmpTyFamNameKey = mkPreludeTyConUnique 172
-typeNatCmpTyFamNameKey    = mkPreludeTyConUnique 173
-typeCharCmpTyFamNameKey   = mkPreludeTyConUnique 174
-typeLeqCharTyFamNameKey   = mkPreludeTyConUnique 175
-typeNatDivTyFamNameKey  = mkPreludeTyConUnique 176
-typeNatModTyFamNameKey  = mkPreludeTyConUnique 177
-typeNatLogTyFamNameKey  = mkPreludeTyConUnique 178
-typeConsSymbolTyFamNameKey = mkPreludeTyConUnique 179
-typeUnconsSymbolTyFamNameKey = mkPreludeTyConUnique 180
-
 -- Custom user type-errors
 errorMessageTypeErrorFamKey :: Unique
 errorMessageTypeErrorFamKey =  mkPreludeTyConUnique 181
 
-
-
-ntTyConKey:: Unique
-ntTyConKey = mkPreludeTyConUnique 182
 coercibleTyConKey :: Unique
 coercibleTyConKey = mkPreludeTyConUnique 183
 
@@ -2094,6 +2063,38 @@ multMulTyConKey = mkPreludeTyConUnique 199
 -----------------------------------------------------
 
 #include "primop-vector-uniques.hs-incl"
+
+------------- Type-level Symbol, Nat, Char ----------
+--      USES TyConUniques 400-499
+-----------------------------------------------------
+typeSymbolKindConNameKey, typeCharKindConNameKey,
+  typeNatAddTyFamNameKey, typeNatMulTyFamNameKey, typeNatExpTyFamNameKey,
+  typeNatSubTyFamNameKey
+  , typeSymbolCmpTyFamNameKey, typeNatCmpTyFamNameKey, typeCharCmpTyFamNameKey
+  , typeLeqCharTyFamNameKey
+  , typeNatDivTyFamNameKey
+  , typeNatModTyFamNameKey
+  , typeNatLogTyFamNameKey
+  , typeConsSymbolTyFamNameKey, typeUnconsSymbolTyFamNameKey
+  , typeCharToNatTyFamNameKey, typeNatToCharTyFamNameKey
+  :: Unique
+typeSymbolKindConNameKey  = mkPreludeTyConUnique 400
+typeCharKindConNameKey    = mkPreludeTyConUnique 401
+typeNatAddTyFamNameKey    = mkPreludeTyConUnique 402
+typeNatMulTyFamNameKey    = mkPreludeTyConUnique 403
+typeNatExpTyFamNameKey    = mkPreludeTyConUnique 404
+typeNatSubTyFamNameKey    = mkPreludeTyConUnique 405
+typeSymbolCmpTyFamNameKey = mkPreludeTyConUnique 406
+typeNatCmpTyFamNameKey    = mkPreludeTyConUnique 407
+typeCharCmpTyFamNameKey   = mkPreludeTyConUnique 408
+typeLeqCharTyFamNameKey   = mkPreludeTyConUnique 409
+typeNatDivTyFamNameKey  = mkPreludeTyConUnique 410
+typeNatModTyFamNameKey  = mkPreludeTyConUnique 411
+typeNatLogTyFamNameKey  = mkPreludeTyConUnique 412
+typeConsSymbolTyFamNameKey = mkPreludeTyConUnique 413
+typeUnconsSymbolTyFamNameKey = mkPreludeTyConUnique 414
+typeCharToNatTyFamNameKey = mkPreludeTyConUnique 415
+typeNatToCharTyFamNameKey = mkPreludeTyConUnique 416
 
 {-
 ************************************************************************
