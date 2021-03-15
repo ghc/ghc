@@ -21,8 +21,6 @@
 #include <io.h>
 #include <fcntl.h>
 #include <wchar.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #include <share.h>
 #include <errno.h>
 

@@ -25,6 +25,12 @@
 
 #if defined(_WIN32)
 #include <wchar.h>
+// N.B. <sys/stat.h> defines some macro rewrites to, e.g., turn _wstat into
+// _wstat64i32. We must include it here to ensure tat this rewrite applies to
+// both the definition and use sites.
+#include <sys/types.h>
+#include <sys/stat.h>
+
 wchar_t* FS(create_device_name) (const wchar_t*);
 int FS(translate_mode) (const wchar_t*);
 int FS(swopen) (const wchar_t* filename, int oflag,
