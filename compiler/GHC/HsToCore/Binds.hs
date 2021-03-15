@@ -767,8 +767,7 @@ dsMkUserRule :: Module -> Bool -> RuleName -> Activation
        -> Name -> [CoreBndr] -> [CoreExpr] -> CoreExpr -> DsM CoreRule
 dsMkUserRule this_mod is_local name act fn bndrs args rhs = do
     let rule = mkRule this_mod False is_local name act fn bndrs args rhs
-    dflags <- getDynFlags
-    when (isOrphan (ru_orphan rule) && wopt Opt_WarnOrphans dflags) $
+    when (isOrphan (ru_orphan rule)) $
         diagnosticDs (WarningWithFlag Opt_WarnOrphans) (ruleOrphWarn rule)
     return rule
 
