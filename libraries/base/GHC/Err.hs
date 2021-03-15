@@ -26,7 +26,6 @@ module GHC.Err( absentErr, error, errorWithoutStackTrace, undefined ) where
 import GHC.Types (Char, RuntimeRep)
 import GHC.Stack.Types
 import GHC.Prim
-import GHC.Num.Integer ()   -- See Note [Depend on GHC.Num.Integer] in GHC.Base
 import {-# SOURCE #-} GHC.Exception
   ( errorCallWithCallStackException
   , errorCallException )
