@@ -77,7 +77,6 @@ import GHC.Iface.Load
 import GHCi.Message
 import GHCi.RemoteTypes
 import GHC.Runtime.Interpreter
-import GHC.Runtime.Interpreter.Types
 
 import GHC.Rename.Splice( traceSplice, SpliceInfo(..))
 import GHC.Rename.Expr
@@ -797,11 +796,11 @@ runAnnotation target expr = do
 convertAnnotationWrapper :: ForeignHValue -> TcM (Either SDoc Serialized)
 convertAnnotationWrapper fhv = do
   interp <- tcGetInterp
-  case interp of
+  case interpInstance interp of
     ExternalInterp {} -> Right <$> runTH THAnnWrapper fhv
 #if defined(HAVE_INTERNAL_INTERPRETER)
     InternalInterp    -> do
-      annotation_wrapper <- liftIO $ wormhole InternalInterp fhv
+      annotation_wrapper <- liftIO $ wormhole interp fhv
       return $ Right $
         case unsafeCoerce annotation_wrapper of
            AnnotationWrapper value | let serialized = toSerialized serializeWithData value ->
@@ -836,7 +835,7 @@ runRemoteModFinalizers (ThModFinalizers finRefs) = do
       withForeignRefs (x : xs) f = withForeignRef x $ \r ->
         withForeignRefs xs $ \rs -> f (r : rs)
   interp <- tcGetInterp
-  case interp of
+  case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
     InternalInterp -> do
       qs <- liftIO (withForeignRefs finRefs $ mapM localRef)
@@ -1382,7 +1381,7 @@ addModFinalizerRef finRef = do
 finishTH :: TcM ()
 finishTH = do
   hsc_env <- getTopEnv
-  case hsc_interp hsc_env of
+  case interpInstance <$> hsc_interp hsc_env of
     Nothing                  -> pure ()
 #if defined(HAVE_INTERNAL_INTERPRETER)
     Just InternalInterp      -> pure ()
@@ -1407,11 +1406,11 @@ runTHDec = runTH THDec
 runTH :: Binary a => THResultType -> ForeignHValue -> TcM a
 runTH ty fhv = do
   interp <- tcGetInterp
-  case interp of
+  case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
     InternalInterp -> do
        -- Run it in the local TcM
-      hv <- liftIO $ wormhole InternalInterp fhv
+      hv <- liftIO $ wormhole interp fhv
       r <- runQuasi (unsafeCoerce hv :: TH.Q a)
       return r
 #endif
@@ -1520,8 +1519,8 @@ getTHState i = do
   case th_state of
     Just rhv -> return rhv
     Nothing -> do
-      hsc_env <- getTopEnv
-      fhv <- liftIO $ mkFinalizedHValue hsc_env =<< iservCall i StartTH
+      interp <- tcGetInterp
+      fhv <- liftIO $ mkFinalizedHValue interp =<< iservCall i StartTH
       writeTcRef (tcg_th_remote_state tcg) (Just fhv)
       return fhv
 
@@ -1549,8 +1548,8 @@ handleTHMessage msg = case msg of
   AddDependentFile f -> wrapTHResult $ TH.qAddDependentFile f
   AddTempFile s -> wrapTHResult $ TH.qAddTempFile s
   AddModFinalizer r -> do
-    hsc_env <- getTopEnv
-    wrapTHResult $ liftIO (mkFinalizedHValue hsc_env r) >>= addModFinalizerRef
+    interp <- hscInterp <$> getTopEnv
+    wrapTHResult $ liftIO (mkFinalizedHValue interp r) >>= addModFinalizerRef
   AddCorePlugin str -> wrapTHResult $ TH.qAddCorePlugin str
   AddTopDecls decs -> wrapTHResult $ TH.qAddTopDecls decs
   AddForeignFilePath lang str -> wrapTHResult $ TH.qAddForeignFilePath lang str
