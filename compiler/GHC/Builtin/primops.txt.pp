@@ -1655,6 +1655,10 @@ primop  ByteArrayContents_Char "byteArrayContents#" GenPrimOp
    ByteArray# -> Addr#
    {Intended for use with pinned arrays; otherwise very unsafe!}
 
+primop  MutableByteArrayContents_Char "mutableByteArrayContents#" GenPrimOp
+   MutableByteArray# s -> Addr#
+   {Intended for use with pinned arrays; otherwise very unsafe!}
+
 primop  SameMutableByteArrayOp "sameMutableByteArray#" GenPrimOp
    MutableByteArray# s -> MutableByteArray# s -> Int#
 
