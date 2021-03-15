@@ -146,8 +146,9 @@ guessSourceFile binds orig_file =
 
 mkModBreaks :: HscEnv -> Module -> Int -> [MixEntry_] -> IO (Maybe ModBreaks)
 mkModBreaks hsc_env mod count entries
-  | breakpointsEnabled (hsc_dflags hsc_env) = do
-    breakArray <- GHCi.newBreakArray hsc_env (length entries)
+  | Just interp <- hsc_interp hsc_env
+  , breakpointsEnabled (hsc_dflags hsc_env) = do
+    breakArray <- GHCi.newBreakArray interp (length entries)
     ccs <- mkCCSArray hsc_env mod count entries
     let
            locsTicks  = listArray (0,count-1) [ span  | (span,_,_,_)  <- entries ]
@@ -169,7 +170,7 @@ mkCCSArray hsc_env modul count entries =
   case hsc_interp hsc_env of
     Just interp | GHCi.interpreterProfiled interp -> do
       let module_str = moduleNameString (moduleName modul)
-      costcentres <- GHCi.mkCostCentres hsc_env module_str (map mk_one entries)
+      costcentres <- GHCi.mkCostCentres interp module_str (map mk_one entries)
       return (listArray (0,count-1) costcentres)
 
     _ -> return (listArray (0,-1) [])

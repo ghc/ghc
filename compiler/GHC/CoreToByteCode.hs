@@ -108,7 +108,7 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
                 return $ case exprIsTickedString_maybe rhs of
                     Just str -> Left (bndr, str)
                     _ -> Right (bndr, simpleFreeVars rhs)
-        stringPtrs <- allocateTopStrings hsc_env strings
+        stringPtrs <- allocateTopStrings interp strings
 
         us <- mkSplitUniqSupply 'y'
         (BcM_State{..}, proto_bcos) <-
@@ -122,7 +122,7 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
            "Proto-BCOs" FormatByteCode
            (vcat (intersperse (char ' ') (map ppr proto_bcos)))
 
-        cbc <- assembleBCOs hsc_env proto_bcos tycs (map snd stringPtrs)
+        cbc <- assembleBCOs interp profile proto_bcos tycs (map snd stringPtrs)
           (case modBreaks of
              Nothing -> Nothing
              Just mb -> Just mb{ modBreaks_breakInfo = breakInfo })
@@ -139,14 +139,16 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
 
   where dflags = hsc_dflags hsc_env
         logger = hsc_logger hsc_env
+        interp  = hscInterp hsc_env
+        profile = targetProfile dflags 
 
 allocateTopStrings
-  :: HscEnv
+  :: Interp
   -> [(Id, ByteString)]
   -> IO [(Var, RemotePtr ())]
-allocateTopStrings hsc_env topStrings = do
+allocateTopStrings interp topStrings = do
   let !(bndrs, strings) = unzip topStrings
-  ptrs <- iservCmd hsc_env $ MallocStrings strings
+  ptrs <- interpCmd interp $ MallocStrings strings
   return $ zip bndrs ptrs
 
 {-
@@ -157,7 +159,7 @@ literals:
 
 1. Top-level string literal bindings are separated from the rest of the module.
 
-2. The strings are allocated via iservCmd, in allocateTopStrings
+2. The strings are allocated via interpCmd, in allocateTopStrings
 
 3. The mapping from binders to allocated strings (topStrings) are maintained in
    BcM and used when generating code for variable references.
@@ -192,9 +194,11 @@ coreExprToBCOs hsc_env this_mod expr
       dumpIfSet_dyn logger dflags Opt_D_dump_BCOs "Proto-BCOs" FormatByteCode
          (ppr proto_bco)
 
-      assembleOneBCO hsc_env proto_bco
+      assembleOneBCO interp profile proto_bco
   where dflags = hsc_dflags hsc_env
         logger = hsc_logger hsc_env
+        profile = targetProfile dflags
+        interp  = hscInterp hsc_env
 
 -- The regular freeVars function gives more information than is useful to
 -- us here. We need only the free variables, not everything in an FVAnn.
@@ -1370,8 +1374,8 @@ generateCCall d0 s p (CCallSpec target cconv safety) fn args_r_to_l
 
      let ffires = primRepToFFIType platform r_rep
          ffiargs = map (primRepToFFIType platform) a_reps
-     hsc_env <- getHscEnv
-     token <- ioToBc $ iservCmd hsc_env (PrepFFI conv ffiargs ffires)
+     interp <- hscInterp <$> getHscEnv
+     token <- ioToBc $ interpCmd interp (PrepFFI conv ffiargs ffires)
      recordFFIBc token
 
      let
