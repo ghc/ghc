@@ -199,6 +199,7 @@ makeThreadSafe logger = do
 -- See Note [JSON Error Messages]
 --
 jsonLogAction :: LogAction
+jsonLogAction _ (MCDiagnostic SevIgnore _) _ _ = return () -- suppress the message
 jsonLogAction dflags msg_class srcSpan msg
   =
     defaultLogActionHPutStrDoc dflags True stdout
