@@ -423,7 +423,7 @@ function fetch_perf_notes() {
 }
 
 function push_perf_notes() {
-  if [ -n "$CROSS_TARGET" ]; then
+  if [ -n "${CROSS_TARGET:-}" ]; then
     info "Can't test cross-compiled build."
     return
   fi
@@ -440,7 +440,7 @@ function determine_metric_baseline() {
 }
 
 function test_make() {
-  if [ -n "$CROSS_TARGET" ]; then
+  if [ -n "${CROSS_TARGET:-}" ]; then
     info "Can't test cross-compiled build."
     return
   fi
@@ -463,7 +463,7 @@ function build_hadrian() {
 }
 
 function test_hadrian() {
-  if [ -n "$CROSS_TARGET" ]; then
+  if [ -n "${CROSS_TARGET:-}" ]; then
     info "Can't test cross-compiled build."
     return
   fi
@@ -561,7 +561,7 @@ case "$(uname)" in
   *) fail "uname $(uname) is not supported" ;;
 esac
 
-if [ -n "$CROSS_TARGET" ]; then
+if [ -n "${CROSS_TARGET:-}" ]; then
   info "Cross-compiling for $CROSS_TARGET..."
   target_triple="$CROSS_TARGET"
 fi
