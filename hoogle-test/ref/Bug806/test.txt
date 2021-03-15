@@ -20,6 +20,6 @@ v :: Int
 class C a where {
     
     -- | <a>AT</a> docs
-    type family AT a;
+    type AT a;
     type AT a = Proxy (Proxy (Proxy (Proxy (Proxy (Proxy (Proxy (Proxy (Proxy (Proxy)))))))));
 }
