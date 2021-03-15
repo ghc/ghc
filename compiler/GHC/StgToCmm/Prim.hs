@@ -335,6 +335,10 @@ emitPrimOp dflags primop = case primop of
   ByteArrayContents_Char -> \[arg] -> opIntoRegs $ \[res] ->
     emitAssign (CmmLocal res) (cmmOffsetB platform arg (arrWordsHdrSize profile))
 
+--  #define mutableByteArrayContentszh(r,a) r = BYTE_ARR_CTS(a)
+  MutableByteArrayContents_Char -> \[arg] -> opIntoRegs $ \[res] ->
+    emitAssign (CmmLocal res) (cmmOffsetB platform arg (arrWordsHdrSize profile))
+
 --  #define stableNameToIntzh(r,s)   (r = ((StgStableName *)s)->sn)
   StableNameToIntOp -> \[arg] -> opIntoRegs $ \[res] ->
     emitAssign (CmmLocal res) (cmmLoadIndexW platform arg (fixedHdrSizeW profile) (bWord platform))
