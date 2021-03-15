@@ -28,7 +28,7 @@ import GHC.Driver.Hooks
 import GHC.Driver.Plugins
 
 import GHC.Linker.Loader       ( loadModule, loadName )
-import GHC.Runtime.Interpreter ( wormhole, withInterp )
+import GHC.Runtime.Interpreter ( wormhole, hscInterp )
 import GHC.Runtime.Interpreter.Types
 
 import GHC.Tc.Utils.Monad      ( initTcInteractive, initIfaceTcRn )
@@ -113,11 +113,10 @@ loadFrontendPlugin hsc_env mod_name = do
 
 -- #14335
 checkExternalInterpreter :: HscEnv -> IO ()
-checkExternalInterpreter hsc_env
-  | Just (ExternalInterp {}) <- hsc_interp hsc_env
-  = throwIO (InstallationError "Plugins require -fno-external-interpreter")
-  | otherwise
-  = pure ()
+checkExternalInterpreter hsc_env = case interpInstance <$> hsc_interp hsc_env of
+  Just (ExternalInterp {})
+    -> throwIO (InstallationError "Plugins require -fno-external-interpreter")
+  _ -> pure ()
 
 loadPlugin' :: OccName -> Name -> HscEnv -> ModuleName -> IO (a, ModIface)
 loadPlugin' occ_name plugin_name hsc_env mod_name
@@ -189,20 +188,21 @@ forceLoadTyCon hsc_env con_name = do
 getValueSafely :: HscEnv -> Name -> Type -> IO (Maybe a)
 getValueSafely hsc_env val_name expected_type = do
   mb_hval <- case getValueSafelyHook hooks of
-    Nothing -> getHValueSafely hsc_env val_name expected_type
-    Just h  -> h               hsc_env val_name expected_type
+    Nothing -> getHValueSafely interp hsc_env val_name expected_type
+    Just h  -> h                      hsc_env val_name expected_type
   case mb_hval of
     Nothing   -> return Nothing
     Just hval -> do
       value <- lessUnsafeCoerce logger dflags "getValueSafely" hval
       return (Just value)
   where
+    interp = hscInterp hsc_env
     dflags = hsc_dflags hsc_env
     logger = hsc_logger hsc_env
     hooks  = hsc_hooks hsc_env
 
-getHValueSafely :: HscEnv -> Name -> Type -> IO (Maybe HValue)
-getHValueSafely hsc_env val_name expected_type = do
+getHValueSafely :: Interp -> HscEnv -> Name -> Type -> IO (Maybe HValue)
+getHValueSafely interp hsc_env val_name expected_type = do
     forceLoadNameModuleInterface hsc_env (text "contains a name used in an invocation of getHValueSafely") val_name
     -- Now look up the names for the value and type constructor in the type environment
     mb_val_thing <- lookupType hsc_env val_name
@@ -215,11 +215,13 @@ getHValueSafely hsc_env val_name expected_type = do
              then do
                 -- Link in the module that contains the value, if it has such a module
                 case nameModule_maybe val_name of
-                    Just mod -> do loadModule hsc_env mod
+                    Just mod -> do loadModule interp hsc_env mod
                                    return ()
                     Nothing ->  return ()
                 -- Find the value that we just linked in and cast it given that we have proved it's type
-                hval <- withInterp hsc_env $ \interp -> loadName hsc_env val_name >>= wormhole interp
+                hval <- do
+                  v <- loadName interp hsc_env val_name
+                  wormhole interp v
                 return (Just hval)
              else return Nothing
         Just val_thing -> throwCmdLineErrorS dflags $ wrongTyThingError val_name val_thing

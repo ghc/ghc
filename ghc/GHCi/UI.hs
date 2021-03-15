@@ -41,7 +41,6 @@ import GHC.Runtime.Debugger
 
 -- The GHC interface
 import GHC.Runtime.Interpreter
-import GHC.Runtime.Interpreter.Types
 import GHCi.RemoteTypes
 import GHCi.BreakArray( breakOn, breakOff )
 import GHC.ByteCode.Types
@@ -1476,8 +1475,8 @@ getCallStackAtCurrentBreakpoint = do
   case resumes of
     [] -> return Nothing
     (r:_) -> do
-       hsc_env <- GHC.getSession
-       Just <$> liftIO (costCentreStackInfo hsc_env (GHC.resumeCCS r))
+       interp <- hscInterp <$> GHC.getSession
+       Just <$> liftIO (costCentreStackInfo interp (GHC.resumeCCS r))
 
 getCurrentBreakModule :: GHC.GhcMonad m => m (Maybe Module)
 getCurrentBreakModule = do
@@ -1605,12 +1604,12 @@ changeDirectory dir = do
   liftIO $ setCurrentDirectory dir'
   -- With -fexternal-interpreter, we have to change the directory of the subprocess too.
   -- (this gives consistent behaviour with and without -fexternal-interpreter)
-  hsc_env <- GHC.getSession
-  case hsc_interp hsc_env of
-    Just (ExternalInterp {}) -> do
+  interp <- hscInterp <$> GHC.getSession
+  case interpInstance interp of
+    ExternalInterp {} -> do
       fhv <- compileGHCiExpr $
         "System.Directory.setCurrentDirectory " ++ show dir'
-      liftIO $ evalIO hsc_env fhv
+      liftIO $ evalIO interp fhv
     _ -> pure ()
 
 trySuccess :: GHC.GhcMonad m => m SuccessFlag -> m SuccessFlag
@@ -1741,8 +1740,8 @@ runMacro
   -> String
   -> m Bool
 runMacro fun s = do
-  hsc_env <- GHC.getSession
-  str <- liftIO $ evalStringToIOString hsc_env fun s
+  interp <- hscInterp <$> GHC.getSession
+  str <- liftIO $ evalStringToIOString interp fun s
   enqueueCommands (lines str)
   return False
 
@@ -1775,8 +1774,8 @@ cmdCmd str = handleSourceError GHC.printException $ do
     let new_expr = step `mkHsApp` expr
     hv <- GHC.compileParsedExprRemote new_expr
 
-    hsc_env <- GHC.getSession
-    cmds <- liftIO $ evalString hsc_env hv
+    interp <- hscInterp <$> GHC.getSession
+    cmds <- liftIO $ evalString interp hv
     enqueueCommands (lines cmds)
 
 -- | Generate a typed ghciStepIO expression
@@ -3054,6 +3053,7 @@ newDynFlags interactive_only minus_opts = do
         -- the new packages.
         hsc_env <- GHC.getSession
         let dflags2 = hsc_dflags hsc_env
+        let interp  = hscInterp hsc_env
         when (packageFlagsChanged dflags2 dflags0) $ do
           when (verbosity dflags2 > 0) $
             liftIO . putStrLn $
@@ -3062,7 +3062,7 @@ newDynFlags interactive_only minus_opts = do
           clearAllTargets
           when must_reload $ do
             let units = preloadUnits (hsc_units hsc_env)
-            liftIO $ Loader.loadPackages hsc_env units
+            liftIO $ Loader.loadPackages interp hsc_env units
           -- package flags changed, we can't re-use any of the old context
           setContextAfterLoad False []
           -- and copy the package flags to the interactive DynFlags
@@ -3081,7 +3081,7 @@ newDynFlags interactive_only minus_opts = do
                                  , cmdlineFrameworks = newCLFrameworks } }
 
         when (not (null newLdInputs && null newCLFrameworks)) $
-          liftIO $ Loader.loadCmdLineLibs hsc_env'
+          liftIO $ Loader.loadCmdLineLibs (hscInterp hsc_env') hsc_env'
 
       return ()
 
@@ -3183,7 +3183,7 @@ showCmd str = do
             , action "modules"    $ showModules
             , action "bindings"   $ showBindings
             , action "linker"     $ do
-               msg <- liftIO $ Loader.showLoaderState (hsc_loader hsc_env)
+               msg <- liftIO $ Loader.showLoaderState (hscInterp hsc_env)
                putLogMsgM NoReason SevDump noSrcSpan msg
             , action "breaks"     $ showBkptTable
             , action "context"    $ showContext

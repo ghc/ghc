@@ -319,11 +319,11 @@ import GHC.Driver.Monad
 import GHC.Driver.Ppr
 
 import GHC.ByteCode.Types
+import qualified GHC.Linker.Loader as Loader
 import GHC.Runtime.Loader
 import GHC.Runtime.Eval
 import GHC.Runtime.Eval.Types
 import GHC.Runtime.Interpreter
-import GHC.Runtime.Interpreter.Types
 import GHC.Runtime.Context
 import GHCi.RemoteTypes
 
@@ -535,7 +535,7 @@ withCleanupSession ghc = ghc `MC.finally` cleanup
       liftIO $ do
           cleanTempFiles logger tmpfs dflags
           cleanTempDirs logger tmpfs dflags
-          stopInterp hsc_env -- shut down the IServ
+          traverse_ stopInterp (hsc_interp hsc_env)
           --  exceptions will be blocked while we clean the temporary files,
           -- so there shouldn't be any difficulty if we receive further
           -- signals.
@@ -642,7 +642,7 @@ setSessionDynFlags dflags0 = do
   (dbs,unit_state,home_unit) <- liftIO $ initUnits logger dflags (hsc_unit_dbs hsc_env)
 
   -- Interpreter
-  interp  <- if gopt Opt_ExternalInterpreter dflags
+  interp <- if gopt Opt_ExternalInterpreter dflags
     then do
          let
            prog = pgm_i dflags ++ flavour
@@ -666,10 +666,13 @@ setSessionDynFlags dflags0 = do
             , iservConfTrace    = tr
             }
          s <- liftIO $ newMVar IServPending
-         return (Just (ExternalInterp conf (IServ s)))
+         loader <- liftIO Loader.uninitializedLoader
+         return (Just (Interp (ExternalInterp conf (IServ s)) loader))
     else
 #if defined(HAVE_INTERNAL_INTERPRETER)
-      return (Just InternalInterp)
+     do
+      loader <- liftIO Loader.uninitializedLoader
+      return (Just (Interp InternalInterp loader))
 #else
       return Nothing
 #endif

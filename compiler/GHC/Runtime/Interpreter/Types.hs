@@ -3,6 +3,7 @@
 -- | Types used by the runtime interpreter
 module GHC.Runtime.Interpreter.Types
    ( Interp(..)
+   , InterpInstance(..)
    , IServ(..)
    , IServInstance(..)
    , IServConfig(..)
@@ -11,6 +12,7 @@ module GHC.Runtime.Interpreter.Types
 where
 
 import GHC.Prelude
+import GHC.Linker.Types
 
 import GHCi.RemoteTypes
 import GHCi.Message         ( Pipe )
@@ -21,8 +23,17 @@ import Foreign
 import Control.Concurrent
 import System.Process   ( ProcessHandle, CreateProcess )
 
--- | Runtime interpreter
-data Interp
+-- | Interpreter
+data Interp = Interp
+  { interpInstance :: !InterpInstance
+      -- ^ Interpreter instance (internal, external)
+
+  , interpLoader   :: !Loader
+      -- ^ Interpreter loader
+  }
+
+
+data InterpInstance
    = ExternalInterp !IServConfig !IServ -- ^ External interpreter
 #if defined(HAVE_INTERNAL_INTERPRETER)
    | InternalInterp                     -- ^ Internal interpreter

@@ -47,6 +47,7 @@ import GHC.Prelude
 import GHC.Tc.Utils.Backpack
 import GHC.Tc.Utils.Monad  ( initIfaceCheck )
 
+import GHC.Runtime.Interpreter
 import qualified GHC.Linker.Loader as Linker
 import GHC.Linker.Types
 
@@ -433,6 +434,7 @@ load' how_much mHscMessage mod_graph = do
     let hpt1   = hsc_HPT hsc_env
     let dflags = hsc_dflags hsc_env
     let logger = hsc_logger hsc_env
+    let interp = hscInterp hsc_env
 
     -- The "bad" boot modules are the ones for which we have
     -- B.hs-boot in the module graph, but no B.hs
@@ -506,7 +508,7 @@ load' how_much mHscMessage mod_graph = do
                              -- this list only serves as a poor man's set.
                              Just hmi <- [lookupHpt pruned_hpt m],
                              Just linkable <- [hm_linkable hmi] ]
-    liftIO $ unload hsc_env stable_linkables
+    liftIO $ unload interp hsc_env stable_linkables
 
     -- We could at this point detect cycles which aren't broken by
     -- a source-import, and complain immediately, but it seems better
@@ -710,7 +712,8 @@ loadFinish :: GhcMonad m => SuccessFlag -> SuccessFlag -> m SuccessFlag
 -- If the link failed, unload everything and return.
 loadFinish _all_ok Failed
   = do hsc_env <- getSession
-       liftIO $ unload hsc_env []
+       let interp = hscInterp hsc_env
+       liftIO $ unload interp hsc_env []
        modifySession discardProg
        return Failed
 
@@ -841,10 +844,10 @@ findPartiallyCompletedCycles modsDone theGraph
 -- ---------------------------------------------------------------------------
 --
 -- | Unloading
-unload :: HscEnv -> [Linkable] -> IO ()
-unload hsc_env stable_linkables -- Unload everything *except* 'stable_linkables'
+unload :: Interp -> HscEnv -> [Linkable] -> IO ()
+unload interp hsc_env stable_linkables -- Unload everything *except* 'stable_linkables'
   = case ghcLink (hsc_dflags hsc_env) of
-        LinkInMemory -> Linker.unload hsc_env stable_linkables
+        LinkInMemory -> Linker.unload interp hsc_env stable_linkables
         _other -> return ()
 
 -- -----------------------------------------------------------------------------

@@ -19,9 +19,6 @@ module GHC.ByteCode.Asm (
 
 import GHC.Prelude
 
-import GHC.Driver.Env
-import GHC.Driver.Session
-
 import GHC.ByteCode.Instr
 import GHC.ByteCode.InfoTable
 import GHC.ByteCode.Types
@@ -45,6 +42,7 @@ import GHC.Data.SizedSeq
 
 import GHC.StgToCmm.Layout     ( ArgRep(..) )
 import GHC.Platform
+import GHC.Platform.Profile
 
 import Control.Monad
 import Control.Monad.ST ( runST )
@@ -96,13 +94,19 @@ bcoFreeNames bco
 
 -- Top level assembler fn.
 assembleBCOs
-  :: HscEnv -> [ProtoBCO Name] -> [TyCon] -> [RemotePtr ()]
+  :: Interp
+  -> Profile
+  -> [ProtoBCO Name]
+  -> [TyCon]
+  -> [RemotePtr ()]
   -> Maybe ModBreaks
   -> IO CompiledByteCode
-assembleBCOs hsc_env proto_bcos tycons top_strs modbreaks = do
-  itblenv <- mkITbls hsc_env tycons
-  bcos    <- mapM (assembleBCO (targetPlatform (hsc_dflags hsc_env))) proto_bcos
-  (bcos',ptrs) <- mallocStrings hsc_env bcos
+assembleBCOs interp profile proto_bcos tycons top_strs modbreaks = do
+  -- TODO: the profile should be bundled with the interpreter: the rts ways are
+  -- fixed for an interpreter
+  itblenv <- mkITbls interp profile tycons
+  bcos    <- mapM (assembleBCO (profilePlatform profile)) proto_bcos
+  (bcos',ptrs) <- mallocStrings interp bcos
   return CompiledByteCode
     { bc_bcos = bcos'
     , bc_itbls =  itblenv
@@ -118,10 +122,10 @@ assembleBCOs hsc_env proto_bcos tycons top_strs modbreaks = do
 --  b) For -fexternal-interpreter It's more efficient to malloc the strings
 --     as a single batch message, especially when compiling in parallel.
 --
-mallocStrings :: HscEnv -> [UnlinkedBCO] -> IO ([UnlinkedBCO], [RemotePtr ()])
-mallocStrings hsc_env ulbcos = do
+mallocStrings :: Interp -> [UnlinkedBCO] -> IO ([UnlinkedBCO], [RemotePtr ()])
+mallocStrings interp ulbcos = do
   let bytestrings = reverse (execState (mapM_ collect ulbcos) [])
-  ptrs <- iservCmd hsc_env (MallocStrings bytestrings)
+  ptrs <- interpCmd interp (MallocStrings bytestrings)
   return (evalState (mapM splice ulbcos) ptrs, ptrs)
  where
   splice bco@UnlinkedBCO{..} = do
@@ -154,10 +158,12 @@ mallocStrings hsc_env ulbcos = do
   collectPtr _ = return ()
 
 
-assembleOneBCO :: HscEnv -> ProtoBCO Name -> IO UnlinkedBCO
-assembleOneBCO hsc_env pbco = do
-  ubco <- assembleBCO (targetPlatform (hsc_dflags hsc_env)) pbco
-  ([ubco'], _ptrs) <- mallocStrings hsc_env [ubco]
+assembleOneBCO :: Interp -> Profile -> ProtoBCO Name -> IO UnlinkedBCO
+assembleOneBCO interp profile pbco = do
+  -- TODO: the profile should be bundled with the interpreter: the rts ways are
+  -- fixed for an interpreter
+  ubco <- assembleBCO (profilePlatform profile) pbco
+  ([ubco'], _ptrs) <- mallocStrings interp [ubco]
   return ubco'
 
 assembleBCO :: Platform -> ProtoBCO Name -> IO UnlinkedBCO

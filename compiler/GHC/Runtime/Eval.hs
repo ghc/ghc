@@ -57,7 +57,6 @@ import GHC.Driver.Ppr
 
 import GHC.Runtime.Eval.Types
 import GHC.Runtime.Interpreter as GHCi
-import GHC.Runtime.Interpreter.Types
 import GHC.Runtime.Heap.Inspect
 import GHC.Runtime.Context
 import GHCi.Message
@@ -210,6 +209,7 @@ execStmt input exec_opts@ExecOptions{..} = do
 execStmt' :: GhcMonad m => GhciLStmt GhcPs -> String -> ExecOptions -> m ExecResult
 execStmt' stmt stmt_text ExecOptions{..} = do
     hsc_env <- getSession
+    let interp = hscInterp hsc_env
 
     -- Turn off -fwarn-unused-local-binds when running a statement, to hide
     -- warnings about the implicit bindings we introduce.
@@ -229,7 +229,7 @@ execStmt' stmt stmt_text ExecOptions{..} = do
         status <-
           withVirtualCWD $
             liftIO $
-              evalStmt hsc_env' (isStep execSingleStep) (execWrap hval)
+              evalStmt interp idflags' (isStep execSingleStep) (execWrap hval)
 
         let ic = hsc_IC hsc_env
             bindings = (ic_tythings ic, ic_rn_gbl_env ic)
@@ -282,7 +282,7 @@ withVirtualCWD m = do
 
     -- a virtual CWD is only necessary when we're running interpreted code in
     -- the same process as the compiler.
-  case hsc_interp hsc_env of
+  case interpInstance <$> hsc_interp hsc_env of
     Just (ExternalInterp {}) -> m
     _ -> do
       let ic = hsc_IC hsc_env
@@ -323,6 +323,8 @@ handleRunStatus step expr bindings final_ids status history
     , not is_exception
     = do
        hsc_env <- getSession
+       let interp = hscInterp hsc_env
+       let dflags = hsc_dflags hsc_env
        let hmi = expectJust "handleRunStatus" $
                    lookupHptDirectly (hsc_HPT hsc_env)
                                      (mkUniqueGrimily mod_uniq)
@@ -330,18 +332,18 @@ handleRunStatus step expr bindings final_ids status history
            breaks = getModBreaks hmi
 
        b <- liftIO $
-              breakpointStatus hsc_env (modBreaks_flags breaks) ix
+              breakpointStatus interp (modBreaks_flags breaks) ix
        if b
          then not_tracing
            -- This breakpoint is explicitly enabled; we want to stop
            -- instead of just logging it.
          else do
-           apStack_fhv <- liftIO $ mkFinalizedHValue hsc_env apStack_ref
+           apStack_fhv <- liftIO $ mkFinalizedHValue interp apStack_ref
            let bi = BreakInfo modl ix
                !history' = mkHistory hsc_env apStack_fhv bi `consBL` history
                  -- history is strict, otherwise our BoundedList is pointless.
-           fhv <- liftIO $ mkFinalizedHValue hsc_env resume_ctxt
-           status <- liftIO $ GHCi.resumeStmt hsc_env True fhv
+           fhv <- liftIO $ mkFinalizedHValue interp resume_ctxt
+           status <- liftIO $ GHCi.resumeStmt interp dflags True fhv
            handleRunStatus RunAndLogSteps expr bindings final_ids
                            status history'
     | otherwise
@@ -352,8 +354,9 @@ handleRunStatus step expr bindings final_ids status history
     | EvalBreak is_exception apStack_ref ix mod_uniq resume_ctxt ccs <- status
     = do
          hsc_env <- getSession
-         resume_ctxt_fhv <- liftIO $ mkFinalizedHValue hsc_env resume_ctxt
-         apStack_fhv <- liftIO $ mkFinalizedHValue hsc_env apStack_ref
+         let interp = hscInterp hsc_env
+         resume_ctxt_fhv <- liftIO $ mkFinalizedHValue interp resume_ctxt
+         apStack_fhv <- liftIO $ mkFinalizedHValue interp apStack_ref
          let hmi = expectJust "handleRunStatus" $
                      lookupHptDirectly (hsc_HPT hsc_env)
                                        (mkUniqueGrimily mod_uniq)
@@ -382,8 +385,8 @@ handleRunStatus step expr bindings final_ids status history
     = do hsc_env <- getSession
          let final_ic = extendInteractiveContextWithIds (hsc_IC hsc_env) final_ids
              final_names = map getName final_ids
-             dl = hsc_loader hsc_env
-         liftIO $ Loader.extendLoadedEnv dl (zip final_names hvals)
+             interp = hscInterp hsc_env
+         liftIO $ Loader.extendLoadedEnv interp (zip final_names hvals)
          hsc_env' <- liftIO $ rttiEnvironment hsc_env{hsc_IC=final_ic}
          setSession hsc_env'
          return (ExecComplete (Right final_names) allocs)
@@ -425,8 +428,9 @@ resumeExec canLogSpan step mbCnt
             new_names = [ n | thing <- ic_tythings ic
                             , let n = getName thing
                             , not (n `elem` old_names) ]
-            dl        = hsc_loader hsc_env
-        liftIO $ Loader.deleteFromLoadedEnv dl new_names
+            interp    = hscInterp hsc_env
+            dflags    = hsc_dflags hsc_env
+        liftIO $ Loader.deleteFromLoadedEnv interp new_names
 
         case r of
           Resume { resumeStmt = expr, resumeContext = fhv
@@ -439,7 +443,7 @@ resumeExec canLogSpan step mbCnt
                   setupBreakpoint hsc_env (fromJust mb_brkpt) (fromJust mbCnt)
                     -- When the user specified a break ignore count, set it
                     -- in the interpreter
-                status <- liftIO $ GHCi.resumeStmt hsc_env (isStep step) fhv
+                status <- liftIO $ GHCi.resumeStmt interp dflags (isStep step) fhv
                 let prevHistoryLst = fromListBL 50 hist
                     hist' = case mb_brkpt of
                        Nothing -> prevHistoryLst
@@ -457,7 +461,8 @@ setupBreakpoint hsc_env brkInfo cnt = do
       ix = breakInfo_number brkInfo
       modBreaks  = breaks hsc_env modl
       breakarray = modBreaks_flags modBreaks
-  _ <- liftIO $ GHCi.storeBreakpoint hsc_env breakarray ix cnt
+      interp = hscInterp hsc_env
+  _ <- liftIO $ GHCi.storeBreakpoint interp breakarray ix cnt
   pure ()
 
 back :: GhcMonad m => Int -> m ([Name], Int, SrcSpan, String)
@@ -535,9 +540,9 @@ bindLocalsAtBreakpoint hsc_env apStack Nothing = do
 
        ictxt0 = hsc_IC hsc_env
        ictxt1 = extendInteractiveContextWithIds ictxt0 [exn_id]
-       dl     = hsc_loader hsc_env
+       interp = hscInterp hsc_env
    --
-   Loader.extendLoadedEnv dl [(exn_name, apStack)]
+   Loader.extendLoadedEnv interp [(exn_name, apStack)]
    return (hsc_env{ hsc_IC = ictxt1 }, [exn_name], span, "<exception thrown>")
 
 -- Just case: we stopped at a breakpoint, we have information about the location
@@ -546,6 +551,7 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv (Just BreakInfo{..}) = do
    let
        hmi       = expectJust "bindLocalsAtBreakpoint" $
                      lookupHpt (hsc_HPT hsc_env) (moduleName breakInfo_module)
+       interp    = hscInterp hsc_env
        breaks    = getModBreaks hmi
        info      = expectJust "bindLocalsAtBreakpoint2" $
                      IntMap.lookup breakInfo_number (modBreaks_breakInfo breaks)
@@ -568,7 +574,7 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv (Just BreakInfo{..}) = do
    -- So that we don't fall over in a heap when this happens, just don't
    -- bind any free variables instead, and we emit a warning.
    mb_hValues <-
-      mapM (getBreakpointVar hsc_env apStack_fhv . fromIntegral) offsets
+      mapM (getBreakpointVar interp apStack_fhv . fromIntegral) offsets
    when (any isNothing mb_hValues) $
       debugTraceMsg (hsc_logger hsc_env) (hsc_dflags hsc_env) 1 $
           text "Warning: _result has been evaluated, some bindings have been lost"
@@ -592,11 +598,10 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv (Just BreakInfo{..}) = do
        ictxt0 = hsc_IC hsc_env
        ictxt1 = extendInteractiveContextWithIds ictxt0 final_ids
        names  = map idName new_ids
-       dl     = hsc_loader hsc_env
 
    let fhvs = catMaybes mb_hValues
-   Loader.extendLoadedEnv dl (zip names fhvs)
-   when result_ok $ Loader.extendLoadedEnv dl [(result_name, apStack_fhv)]
+   Loader.extendLoadedEnv interp (zip names fhvs)
+   when result_ok $ Loader.extendLoadedEnv interp [(result_name, apStack_fhv)]
    hsc_env1 <- rttiEnvironment hsc_env{ hsc_IC = ictxt1 }
    return (hsc_env1, if result_ok then result_name:names else names, span, decl)
   where
@@ -714,11 +719,12 @@ abandon = do
    hsc_env <- getSession
    let ic = hsc_IC hsc_env
        resume = ic_resume ic
+       interp = hscInterp hsc_env
    case resume of
       []    -> return False
       r:rs  -> do
          setSession hsc_env{ hsc_IC = ic { ic_resume = rs } }
-         liftIO $ abandonStmt hsc_env (resumeContext r)
+         liftIO $ abandonStmt interp (resumeContext r)
          return True
 
 abandonAll :: GhcMonad m => m Bool
@@ -726,11 +732,12 @@ abandonAll = do
    hsc_env <- getSession
    let ic = hsc_IC hsc_env
        resume = ic_resume ic
+       interp = hscInterp hsc_env
    case resume of
       []  -> return False
       rs  -> do
          setSession hsc_env{ hsc_IC = ic { ic_resume = [] } }
-         liftIO $ mapM_ (abandonStmt hsc_env. resumeContext) rs
+         liftIO $ mapM_ (abandonStmt interp. resumeContext) rs
          return True
 
 -- -----------------------------------------------------------------------------
@@ -1185,6 +1192,9 @@ compileExprRemote expr = do
 -- the resulting HValue.
 compileParsedExprRemote :: GhcMonad m => LHsExpr GhcPs -> m ForeignHValue
 compileParsedExprRemote expr@(L loc _) = withSession $ \hsc_env -> do
+  let dflags = hsc_dflags hsc_env
+  let interp = hscInterp hsc_env
+
   -- > let _compileParsedExpr = expr
   -- Create let stmt from expr to make hscParsedStmt happy.
   -- We will ignore the returned [Id], namely [expr_id], and not really
@@ -1202,7 +1212,7 @@ compileParsedExprRemote expr@(L loc _) = withSession $ \hsc_env -> do
         _ -> panic "compileParsedExprRemote"
 
   updateFixityEnv fix_env
-  status <- liftIO $ evalStmt hsc_env False (EvalThis hvals_io)
+  status <- liftIO $ evalStmt interp dflags False (EvalThis hvals_io)
   case status of
     EvalComplete _ (EvalSuccess [hval]) -> return hval
     EvalComplete _ (EvalException e) ->
@@ -1212,9 +1222,8 @@ compileParsedExprRemote expr@(L loc _) = withSession $ \hsc_env -> do
 compileParsedExpr :: GhcMonad m => LHsExpr GhcPs -> m HValue
 compileParsedExpr expr = do
    fhv <- compileParsedExprRemote expr
-   hsc_env <- getSession
-   liftIO $ withInterp hsc_env $ \interp ->
-      wormhole interp fhv
+   interp <- hscInterp <$> getSession
+   liftIO $ wormhole interp fhv
 
 -- | Compile an expression, run it and return the result as a Dynamic.
 dynCompileExpr :: GhcMonad m => String -> m Dynamic
@@ -1251,23 +1260,25 @@ moduleIsBootOrNotObjectLinkable mod_summary = withSession $ \hsc_env ->
 
 obtainTermFromVal :: HscEnv -> Int -> Bool -> Type -> a -> IO Term
 #if defined(HAVE_INTERNAL_INTERPRETER)
-obtainTermFromVal hsc_env bound force ty x = withInterp hsc_env $ \case
+obtainTermFromVal hsc_env bound force ty x = case interpInstance interp of
   InternalInterp    -> cvObtainTerm hsc_env bound force ty (unsafeCoerce x)
 #else
-obtainTermFromVal hsc_env _bound _force _ty _x = withInterp hsc_env $ \case
+obtainTermFromVal hsc_env _bound _force _ty _x = case interpInstance interp of
 #endif
   ExternalInterp {} -> throwIO (InstallationError
                         "this operation requires -fno-external-interpreter")
+  where
+    interp = hscInterp hsc_env
 
 obtainTermFromId :: HscEnv -> Int -> Bool -> Id -> IO Term
 obtainTermFromId hsc_env bound force id =  do
-  hv <- Loader.loadName hsc_env (varName id)
+  hv <- Loader.loadName (hscInterp hsc_env) hsc_env (varName id)
   cvObtainTerm hsc_env bound force (idType id) hv
 
 -- Uses RTTI to reconstruct the type of an Id, making it less polymorphic
 reconstructType :: HscEnv -> Int -> Id -> IO (Maybe Type)
 reconstructType hsc_env bound id = do
-  hv <- Loader.loadName hsc_env (varName id)
+  hv <- Loader.loadName (hscInterp hsc_env) hsc_env (varName id)
   cvReconstructType hsc_env bound (idType id) hv
 
 mkRuntimeUnkTyVar :: Name -> Kind -> TyVar
