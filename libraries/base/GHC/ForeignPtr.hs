@@ -64,7 +64,7 @@ import GHC.IORef
 import GHC.STRef        ( STRef(..) )
 import GHC.Ptr          ( Ptr(..), FunPtr(..) )
 
-import Unsafe.Coerce    ( unsafeCoerce, unsafeCoerceUnlifted )
+import Unsafe.Coerce    ( unsafeCoerce )
 
 -- |The type 'ForeignPtr' represents references to objects that are
 -- maintained in a foreign language, i.e., that are not part of the
@@ -282,7 +282,7 @@ mallocForeignPtr = doMalloc undefined
           r <- newIORef NoFinalizers
           IO $ \s ->
             case newAlignedPinnedByteArray# size align s of { (# s', mbarr# #) ->
-             (# s', ForeignPtr (byteArrayContents# (unsafeCoerceUnlifted mbarr#))
+             (# s', ForeignPtr (mutableByteArrayContents# mbarr#)
                                (MallocPtr mbarr# r) #)
             }
             where !(I# size)  = sizeOf a
@@ -297,7 +297,7 @@ mallocForeignPtrBytes (I# size) = do
   r <- newIORef NoFinalizers
   IO $ \s ->
      case newPinnedByteArray# size s      of { (# s', mbarr# #) ->
-       (# s', ForeignPtr (byteArrayContents# (unsafeCoerceUnlifted mbarr#))
+       (# s', ForeignPtr (mutableByteArrayContents# mbarr#)
                          (MallocPtr mbarr# r) #)
      }
 
@@ -311,7 +311,7 @@ mallocForeignPtrAlignedBytes (I# size) (I# align) = do
   r <- newIORef NoFinalizers
   IO $ \s ->
      case newAlignedPinnedByteArray# size align s of { (# s', mbarr# #) ->
-       (# s', ForeignPtr (byteArrayContents# (unsafeCoerceUnlifted mbarr#))
+       (# s', ForeignPtr (mutableByteArrayContents# mbarr#)
                          (MallocPtr mbarr# r) #)
      }
 
@@ -335,7 +335,7 @@ mallocPlainForeignPtr = doMalloc undefined
           | I# size < 0 = errorWithoutStackTrace "mallocForeignPtr: size must be >= 0"
           | otherwise = IO $ \s ->
             case newAlignedPinnedByteArray# size align s of { (# s', mbarr# #) ->
-             (# s', ForeignPtr (byteArrayContents# (unsafeCoerceUnlifted mbarr#))
+             (# s', ForeignPtr (mutableByteArrayContents# mbarr#)
                                (PlainPtr mbarr#) #)
             }
             where !(I# size)  = sizeOf a
@@ -350,7 +350,7 @@ mallocPlainForeignPtrBytes size | size < 0 =
   errorWithoutStackTrace "mallocPlainForeignPtrBytes: size must be >= 0"
 mallocPlainForeignPtrBytes (I# size) = IO $ \s ->
     case newPinnedByteArray# size s      of { (# s', mbarr# #) ->
-       (# s', ForeignPtr (byteArrayContents# (unsafeCoerceUnlifted mbarr#))
+       (# s', ForeignPtr (mutableByteArrayContents# mbarr#)
                          (PlainPtr mbarr#) #)
      }
 
@@ -363,7 +363,7 @@ mallocPlainForeignPtrAlignedBytes size _align | size < 0 =
   errorWithoutStackTrace "mallocPlainForeignPtrAlignedBytes: size must be >= 0"
 mallocPlainForeignPtrAlignedBytes (I# size) (I# align) = IO $ \s ->
     case newAlignedPinnedByteArray# size align s of { (# s', mbarr# #) ->
-       (# s', ForeignPtr (byteArrayContents# (unsafeCoerceUnlifted mbarr#))
+       (# s', ForeignPtr (mutableByteArrayContents# mbarr#)
                          (PlainPtr mbarr#) #)
      }
 
