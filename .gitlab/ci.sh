@@ -523,7 +523,7 @@ function run_hadrian() {
   run hadrian/build-cabal \
     --flavour="$BUILD_FLAVOUR" \
     -j"$cores" \
-    --broken-test="$BROKEN_TESTS" \
+    --broken-test="${BROKEN_TESTS:-}" \
     --bignum=$BIGNUM_BACKEND \
     ${HADRIAN_ARGS:-} \
     $@
