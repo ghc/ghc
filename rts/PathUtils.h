@@ -12,10 +12,13 @@
 
 // Use wchar_t for pathnames on Windows (#5697)
 #if defined(mingw32_HOST_OS)
+#include "fs_rts.h"
+
 #define pathcmp wcscmp
 #define pathlen wcslen
-#define pathopen __rts_fwopen
-#define pathstat _wstat
+// N.B. Use the Win32-based file routines from utils/fs.
+#define pathopen FS(fwopen)
+#define pathstat FS(_wstat)
 #define struct_stat struct _stat
 #define open wopen
 #define WSTR(s) L##s
