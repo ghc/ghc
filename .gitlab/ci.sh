@@ -518,8 +518,8 @@ function run_hadrian() {
   if [ -z "$BUILD_FLAVOUR" ]; then
     fail "BUILD_FLAVOUR not set"
   fi
-  if [ -z "$BIGNUM_BACKEND" ]; then BIGNUM_BACKEND="gmp"; fi
-  if [ -n "$VERBOSE" ]; then HADRIAN_ARGS="${HADRIAN_ARGS:-} -V"; fi
+  if [ -z "${BIGNUM_BACKEND:-}" ]; then BIGNUM_BACKEND="gmp"; fi
+  if [ -n "${VERBOSE:-}" ]; then HADRIAN_ARGS="${HADRIAN_ARGS:-} -V"; fi
   run hadrian/build-cabal \
     --flavour="$BUILD_FLAVOUR" \
     -j"$cores" \
