@@ -119,7 +119,6 @@ import GHC.Maybe
 import {-# SOURCE #-} GHC.IO (mkUserError, mplusIO)
 
 import GHC.Tuple (Solo (..))     -- Note [Depend on GHC.Tuple]
-import GHC.Num.Integer ()        -- Note [Depend on GHC.Num.Integer]
 
 -- for 'class Semigroup'
 import {-# SOURCE #-} GHC.Real (Integral)
@@ -147,13 +146,13 @@ default ()              -- Double isn't available yet
 Note [Depend on GHC.Num.Integer]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The Integer type is special because GHC.Iface.Tidy uses constructors in
+The Integer type is special because GHC.CoreToStg.Prep lookups names in
 GHC.Num.Integer to construct Integer literal values. Currently it reads the
 interface file whether or not the current module *has* any Integer literals, so
 it's important that GHC.Num.Integer is compiled before any other module.
 
-(There's a hack in GHC to disable this for packages ghc-prim and ghc-bignum
-which aren't allowed to contain any Integer literals.)
+(The lookup is disabled for packages ghc-prim and ghc-bignum which aren't
+allowed to contain any Integer literal)
 
 Likewise we implicitly need Integer when deriving things like Eq instances.
 
@@ -175,7 +174,7 @@ Note [Depend on GHC.Tuple]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 Similarly, tuple syntax (or ()) creates an implicit dependency on
 GHC.Tuple, so we use the same rule as for Integer --- see Note [Depend on
-GHC.Integer] --- to explain this to the build system.  We make GHC.Base
+GHC.Num.Integer] --- to explain this to the build system.  We make GHC.Base
 depend on GHC.Tuple, and everything else depends on GHC.Base or Prelude.
 
 -}
