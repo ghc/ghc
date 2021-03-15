@@ -269,7 +269,7 @@ instantiationNodes unit_state = InstantiationNode <$> iuids_to_check
 -- The warning in enabled by `-Wmissing-home-modules`. See #13129
 warnMissingHomeModules :: GhcMonad m => HscEnv -> ModuleGraph -> m ()
 warnMissingHomeModules hsc_env mod_graph =
-    when (wopt Opt_WarnMissingHomeModules dflags && not (null missing)) $
+    when (not (null missing)) $
         logWarnings (listToBag [warn])
   where
     dflags = hsc_dflags hsc_env
@@ -390,7 +390,7 @@ warnUnusedPackages = do
                    , text "but were not needed for compilation:"
                    , nest 2 (vcat (map (withDash . pprUnusedArg) unusedArgs)) ]
 
-    when (wopt Opt_WarnUnusedPackages dflags && not (null unusedArgs)) $
+    when (not (null unusedArgs)) $
       logWarnings (listToBag [warn])
 
     where
@@ -2209,8 +2209,7 @@ mkNodeMap summaries = ModNodeMap $ Map.fromList
 warnUnnecessarySourceImports :: GhcMonad m => [SCC ModSummary] -> m ()
 warnUnnecessarySourceImports sccs = do
   dflags <- getDynFlags
-  when (wopt Opt_WarnUnusedImports dflags)
-    (logWarnings (listToBag (concatMap (check dflags . flattenSCC) sccs)))
+  logWarnings (listToBag (concatMap (check dflags . flattenSCC) sccs))
   where check dflags ms =
            let mods_in_this_cycle = map ms_mod_name ms in
            [ warn dflags i | m <- ms, i <- ms_home_srcimps m,
