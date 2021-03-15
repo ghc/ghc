@@ -449,7 +449,7 @@ function test_make() {
   run "$MAKE" V=0 VERBOSE=1 test \
     THREADS="$cores" \
     JUNIT_FILE=../../junit.xml \
-    EXTRA_RUNTEST_OPTS="$RUNTEST_ARGS"
+    EXTRA_RUNTEST_OPTS="${RUNTEST_ARGS:-}"
 }
 
 function build_hadrian() {
@@ -477,7 +477,7 @@ function test_hadrian() {
     test \
     --summary-junit=./junit.xml \
     --test-compiler="$TOP"/_build/install/bin/ghc \
-    "runtest.opts+=$RUNTEST_ARGS"
+    "runtest.opts+=${RUNTEST_ARGS:-}"
 }
 
 function cabal_test() {
