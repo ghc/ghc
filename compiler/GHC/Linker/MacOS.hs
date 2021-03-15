@@ -10,7 +10,6 @@ import GHC.Prelude
 import GHC.Platform
 
 import GHC.Driver.Session
-import GHC.Driver.Env
 
 import GHC.Unit.Types
 import GHC.Unit.State
@@ -18,7 +17,7 @@ import GHC.Unit.Env
 
 import GHC.SysTools.Tasks
 
-import GHC.Runtime.Interpreter (loadDLL)
+import GHC.Runtime.Interpreter
 
 import GHC.Utils.Exception
 import GHC.Utils.Logger
@@ -123,8 +122,8 @@ addresses.
 -- Darwin / MacOS X only: load a framework
 -- a framework is a dynamic library packaged inside a directory of the same
 -- name. They are searched for in different paths than normal libraries.
-loadFramework :: HscEnv -> [FilePath] -> FilePath -> IO (Maybe String)
-loadFramework hsc_env extraPaths rootname
+loadFramework :: Interp -> [FilePath] -> FilePath -> IO (Maybe String)
+loadFramework interp extraPaths rootname
    = do { either_dir <- tryIO getHomeDirectory
         ; let homeFrameworkPath = case either_dir of
                                   Left _ -> []
@@ -147,7 +146,7 @@ loadFramework hsc_env extraPaths rootname
        -- has no built-in paths for frameworks: give up
        return $ Just errs
      findLoadDLL (p:ps) errs =
-       do { dll <- loadDLL hsc_env (p </> fwk_file)
+       do { dll <- loadDLL interp (p </> fwk_file)
           ; case dll of
               Nothing  -> return Nothing
               Just err -> findLoadDLL ps ((p ++ ": " ++ err):errs)

@@ -135,8 +135,8 @@ bindSuspensions t = do
       let ids = [ mkVanillaGlobal name ty
                 | (name,ty) <- zip names tys]
           new_ic = extendInteractiveContextWithIds ictxt ids
-          dl = hsc_loader hsc_env
-      liftIO $ extendLoadedEnv dl (zip names fhvs)
+          interp = hscInterp hsc_env
+      liftIO $ extendLoadedEnv interp (zip names fhvs)
       setSession hsc_env {hsc_IC = new_ic }
       return t'
      where
@@ -197,12 +197,12 @@ showTerm term = do
            let expr = "Prelude.return (Prelude.show " ++
                          showPpr dflags bname ++
                       ") :: Prelude.IO Prelude.String"
-               dl   = hsc_loader hsc_env
-           txt_ <- withExtendedLoadedEnv dl
+               interp = hscInterp hsc_env
+           txt_ <- withExtendedLoadedEnv interp
                                        [(bname, fhv)]
                                        (GHC.compileExprRemote expr)
            let myprec = 10 -- application precedence. TODO Infix constructors
-           txt <- liftIO $ evalString hsc_env txt_
+           txt <- liftIO $ evalString interp txt_
            if not (null txt) then
              return $ Just $ cparen (prec >= myprec && needsParens txt)
                                     (text txt)
