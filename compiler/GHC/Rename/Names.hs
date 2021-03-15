@@ -393,12 +393,10 @@ rnImportDecl this_mod
         imports = calculateAvails home_unit iface mod_safe' want_boot (ImportedByUser imv)
 
     -- Complain if we import a deprecated module
-    whenWOptM Opt_WarnWarningsDeprecations (
-       case (mi_warns iface) of
-          WarnAll txt -> addDiagnostic (WarningWithFlag Opt_WarnWarningsDeprecations)
-                                       (moduleWarn imp_mod_name txt)
-          _           -> return ()
-     )
+    case (mi_warns iface) of
+       WarnAll txt -> addDiagnostic (WarningWithFlag Opt_WarnWarningsDeprecations)
+                                    (moduleWarn imp_mod_name txt)
+       _           -> return ()
 
     -- Complain about -Wcompat-unqualified-imports violations.
     warnUnqualifiedImport decl iface
@@ -519,8 +517,7 @@ calculateAvails home_unit iface mod_safe' want_boot imported_by =
 -- `Data.List.singleton` proposal. See #17244.
 warnUnqualifiedImport :: ImportDecl GhcPs -> ModIface -> RnM ()
 warnUnqualifiedImport decl iface =
-    whenWOptM Opt_WarnCompatUnqualifiedImports
-    $ when bad_import
+    when bad_import
     $ addDiagnosticAt (WarningWithFlag Opt_WarnCompatUnqualifiedImports) loc warning
   where
     mod = mi_module iface
@@ -1558,8 +1555,7 @@ warnUnusedImportDecls gbl_env hsc_src
                        (vcat [ text "Uses:" <+> ppr uses
                              , text "Import usage" <+> ppr usage])
 
-       ; whenWOptM Opt_WarnUnusedImports $
-         mapM_ (warnUnusedImport Opt_WarnUnusedImports fld_env) usage
+       ; mapM_ (warnUnusedImport Opt_WarnUnusedImports fld_env) usage
 
        ; whenGOptM Opt_D_dump_minimal_imports $
          printMinimalImports hsc_src usage }
