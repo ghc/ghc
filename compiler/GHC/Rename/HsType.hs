@@ -1638,8 +1638,7 @@ dataKindsErr env thing
 warnUnusedForAll :: OutputableBndrFlag flag
                  => HsDocContext -> LHsTyVarBndr flag GhcRn -> FreeVars -> TcM ()
 warnUnusedForAll doc (L loc tv) used_names
-  = whenWOptM Opt_WarnUnusedForalls $
-    unless (hsTyVarName tv `elemNameSet` used_names) $
+  = unless (hsTyVarName tv `elemNameSet` used_names) $
     addDiagnosticAt (WarningWithFlag Opt_WarnUnusedForalls) loc $
     vcat [ text "Unused quantified type variable" <+> quotes (ppr tv)
          , inHsDocContext doc ]

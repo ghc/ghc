@@ -429,13 +429,11 @@ rnSrcInstDecl (ClsInstD { cid_inst = cid })
 -- 'checkCanonicalMonoidInstances'
 checkCanonicalInstances :: Name -> LHsSigType GhcRn -> LHsBinds GhcRn -> RnM ()
 checkCanonicalInstances cls poly_ty mbinds = do
-    whenWOptM Opt_WarnNonCanonicalMonadInstances
-        $ checkCanonicalMonadInstances
-        "https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/monad-of-no-return"
+  checkCanonicalMonadInstances
+    "https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/monad-of-no-return"
 
-    whenWOptM Opt_WarnNonCanonicalMonoidInstances
-        $ checkCanonicalMonoidInstances
-        "https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/semigroup-monoid"
+  checkCanonicalMonoidInstances
+    "https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/semigroup-monoid"
 
   where
     -- | Warn about unsound/non-canonical 'Applicative'/'Monad' instance
@@ -1942,16 +1940,15 @@ warnNoDerivStrat :: Maybe (LDerivStrategy GhcRn)
                  -> RnM ()
 warnNoDerivStrat mds loc
   = do { dyn_flags <- getDynFlags
-       ; when (wopt Opt_WarnMissingDerivingStrategies dyn_flags) $
-           case mds of
-             Nothing -> addDiagnosticAt
-               (WarningWithFlag Opt_WarnMissingDerivingStrategies)
-               loc
-               (if xopt LangExt.DerivingStrategies dyn_flags
-                 then no_strat_warning
-                 else no_strat_warning $+$ deriv_strat_nenabled
-               )
-             _ -> pure ()
+       ; case mds of
+           Nothing -> addDiagnosticAt
+             (WarningWithFlag Opt_WarnMissingDerivingStrategies)
+             loc
+             (if xopt LangExt.DerivingStrategies dyn_flags
+               then no_strat_warning
+               else no_strat_warning $+$ deriv_strat_nenabled
+             )
+           _ -> pure ()
        }
   where
     no_strat_warning :: SDoc
