@@ -100,7 +100,7 @@ import GHC.Driver.Config
 import GHC.Driver.Hooks
 
 import GHC.Runtime.Context
-import GHC.Runtime.Interpreter ( addSptEntry )
+import GHC.Runtime.Interpreter ( addSptEntry, hscInterp )
 import GHC.Runtime.Loader      ( initializePlugins )
 import GHCi.RemoteTypes        ( ForeignHValue )
 import GHC.ByteCode.Types
@@ -247,7 +247,6 @@ newHscEnv dflags = do
     us      <- mkSplitUniqSupply 'r'
     nc_var  <- newIORef (initNameCache us knownKeyNames)
     fc_var  <- newIORef emptyInstalledModuleEnv
-    emptyLoader <- uninitializedLoader
     logger  <- initLogger
     tmpfs   <- initTmpFs
     -- FIXME: it's sad that we have so many "unitialized" fields filled with
@@ -264,7 +263,6 @@ newHscEnv dflags = do
                   ,  hsc_FC             = fc_var
                   ,  hsc_type_env_var   = Nothing
                   ,  hsc_interp         = Nothing
-                  ,  hsc_loader         = emptyLoader
                   ,  hsc_unit_env       = panic "hsc_unit_env not initialized"
                   ,  hsc_plugins        = []
                   ,  hsc_static_plugins = []
@@ -1863,8 +1861,10 @@ hscDeclsWithLocation hsc_env str source linenumber = do
 
 hscParsedDecls :: HscEnv -> [LHsDecl GhcPs] -> IO ([TyThing], InteractiveContext)
 hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
-    {- Rename and typecheck it -}
     hsc_env <- getHscEnv
+    let interp = hscInterp hsc_env
+
+    {- Rename and typecheck it -}
     tc_gblenv <- ioMsgMaybe $ tcRnDeclsi hsc_env decls
 
     {- Grab the new instances -}
@@ -1910,7 +1910,7 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
                                 prepd_binds data_tycons mod_breaks
 
     let src_span = srcLocSpan interactiveSrcLoc
-    liftIO $ loadDecls hsc_env src_span cbc
+    liftIO $ loadDecls interp hsc_env src_span cbc
 
     {- Load static pointer table entries -}
     liftIO $ hscAddSptEntries hsc_env (cg_spt_entries tidy_cg)
@@ -1940,10 +1940,11 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
 -- See Note [Grand plan for static forms] in "GHC.Iface.Tidy.StaticPtrTable".
 hscAddSptEntries :: HscEnv -> [SptEntry] -> IO ()
 hscAddSptEntries hsc_env entries = do
+    let interp = hscInterp hsc_env
     let add_spt_entry :: SptEntry -> IO ()
         add_spt_entry (SptEntry i fpr) = do
-            val <- loadName hsc_env (idName i)
-            addSptEntry hsc_env fpr val
+            val <- loadName interp hsc_env (idName i)
+            addSptEntry interp fpr val
     mapM_ add_spt_entry entries
 
 {-
@@ -2077,7 +2078,7 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr
                      (icInteractiveModule (hsc_IC hsc_env)) prepd_expr
 
            {- load it -}
-         ; loadExpr hsc_env srcspan bcos }
+         ; loadExpr (hscInterp hsc_env) hsc_env srcspan bcos }
 
 
 {- **********************************************************************
