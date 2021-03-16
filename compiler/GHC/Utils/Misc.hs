@@ -1069,14 +1069,44 @@ seqList :: [a] -> b -> b
 seqList [] b = b
 seqList (x:xs) b = x `seq` seqList xs b
 
+-- | Strict version of `map`
+--
+-- This function is inlined with SAT (static argument transformation) manually
+-- applied to the first argument to avoid indirect calls to the mapping function
+-- and also to remove the need to allocate it.
+--
+-- For example, the following code:
+--
+--    tidyTypes :: TidyEnv -> [Type] -> [Type]
+--    tidyTypes env tys = strictMap (tidyType env) tys
+--
+-- is transformed into something like this without proper inlining/SAT:
+--
+--    tidyTypes :: TidyEnv -> [Type] -> [Type]
+--    tidyTypes env tys = let f = tidyEnv env
+--                        in strictMap f tys
+--
+-- But with the current definition we get something like this:
+--
+--    tidyTypes :: TidyEnv -> [Type] -> [Type]
+--    tidyTypes env tys = case tys of
+--      []   -> []
+--      x:xs -> case tidyTypes env xs of
+--        !xs' -> case tidyType env x of
+--          !x' -> x':xs'
+--
+-- Which is what we would have written by hand to fix the allocation issue.
+-- See !4762 for the context in which this came up.
+--
 strictMap :: (a -> b) -> [a] -> [b]
-strictMap _ [] = []
-strictMap f (x : xs) =
-  let
-    !x' = f x
-    !xs' = strictMap f xs
-  in
-    x' : xs'
+{-# INLINE strictMap #-}
+strictMap f = strict_map
+  where
+    strict_map []       = []
+    strict_map (x : xs) = x' : xs'
+      where
+        !x'  = f x
+        !xs' = strict_map xs
 
 strictZipWith :: (a -> b -> c) -> [a] -> [b] -> [c]
 strictZipWith _ [] _ = []
