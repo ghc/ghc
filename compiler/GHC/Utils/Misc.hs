@@ -1058,14 +1058,14 @@ seqList [] b = b
 seqList (x:xs) b = x `seq` seqList xs b
 
 strictMap :: (a -> b) -> [a] -> [b]
-strictMap _ [] = []
-strictMap f (x : xs) =
-  let
-    !x' = f x
-    !xs' = strictMap f xs
-  in
-    x' : xs'
-
+{-# INLINE strictMap #-}
+strictMap = strict_map
+  where
+    strict_map _ []       = []
+    strict_map f (x : xs) = x' : xs'
+      where
+        !x'  = f x
+        !xs' = strict_map f xs
 
 -- Module names:
 
