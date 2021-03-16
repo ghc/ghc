@@ -1038,10 +1038,14 @@ reportDiagnostics = mapM_ reportDiagnostic
 
 reportDiagnostic :: MsgEnvelope DiagnosticMessage -> TcRn ()
 reportDiagnostic msg
-  = do { traceTc "Adding diagnostic:" (pprLocMsgEnvelope msg) ;
-         errs_var <- getErrsVar ;
-         msgs     <- readTcRef errs_var ;
-         writeTcRef errs_var (msg `addMessage` msgs) }
+  = do { unless (notRelevant msg) $ do
+           traceTc "Adding diagnostic:" (pprLocMsgEnvelope msg) ;
+           errs_var <- getErrsVar ;
+           msgs     <- readTcRef errs_var ;
+           writeTcRef errs_var (msg `addMessage` msgs) }
+  where
+    notRelevant :: MsgEnvelope DiagnosticMessage -> Bool
+    notRelevant = (==) SevIgnore . errMsgSeverity
 
 -----------------------
 checkNoErrs :: TcM r -> TcM r

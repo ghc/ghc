@@ -109,6 +109,7 @@ import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
+import Control.Monad (unless)
 import Data.IORef
 
 {-
@@ -459,7 +460,10 @@ diagnosticDs reason warn
        ; loc <- getSrcSpanDs
        ; dflags <- getDynFlags
        ; let msg = mkShortMsgEnvelope dflags reason loc (ds_unqual env) warn
-       ; updMutVar (ds_msgs env) (\ msgs -> msg `addMessage` msgs) }
+       ; unless (notRelevant msg) $ updMutVar (ds_msgs env) (\ msgs -> msg `addMessage` msgs) }
+  where
+    notRelevant :: MsgEnvelope DiagnosticMessage -> Bool
+    notRelevant = (==) SevIgnore . errMsgSeverity
 
 -- | Emit a warning only if the correct WarningWithoutFlag is set in the DynFlags
 warnIfSetDs :: WarningFlag -> SDoc -> DsM ()
