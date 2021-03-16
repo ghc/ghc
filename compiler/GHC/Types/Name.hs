@@ -52,7 +52,7 @@ module GHC.Types.Name (
         nameUnique, setNameUnique,
         nameOccName, nameNameSpace, nameModule, nameModule_maybe,
         setNameLoc,
-        tidyNameOcc,
+        tidyNameOcc, tidyNameOcc_upd,
         localiseName,
 
         nameSrcLoc, nameSrcSpan, pprNameDefnLoc, pprDefinedAt,
@@ -95,6 +95,7 @@ import GHC.Utils.Binary
 import GHC.Data.FastString
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Update
 
 import Control.DeepSeq
 import Data.Data
@@ -493,6 +494,16 @@ tidyNameOcc :: Name -> OccName -> Name
 -- it we don't get the unique by default.  It's tidy now!
 tidyNameOcc name@(Name { n_sort = System }) occ = name { n_occ = occ, n_sort = Internal}
 tidyNameOcc name                            occ = name { n_occ = occ }
+
+tidyNameOcc_upd :: Name -> Upd OccName -> Upd Name
+tidyNameOcc_upd name upd_occ
+  = name <~~ (\s occ -> name { n_occ = occ, n_sort = s})
+         <~$ upd_sort
+         <~* upd_occ
+  where
+    upd_sort = case n_sort name of
+      System -> Update Internal
+      s      -> NoUpdate s
 
 -- | Make the 'Name' into an internal name, regardless of what it was to begin with
 localiseName :: Name -> Name
