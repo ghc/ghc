@@ -44,6 +44,7 @@ import GHC.Cmm.Switch
 
 -- Utils
 import GHC.CmmToAsm.CPrim
+import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Data.FastString
 import GHC.Utils.Outputable
@@ -1313,15 +1314,54 @@ commafy xs = hsep $ punctuate comma xs
 -- We use casts to support types smaller than `unsigned int`; C literal
 -- suffixes support longer but not shorter types.
 pprHexVal :: Platform -> Integer -> Width -> SDoc
-pprHexVal platform w rep = parens $ parens cType <> rawLit
+pprHexVal platform w rep
+  | w < 0     = parens ctype <>
+                parens (char '-' <>
+                    text "0x" <> intToDoc (-w) <> repsuffix rep)
+  | otherwise =     text "0x" <> intToDoc   w  <> repsuffix rep
   where
-      cType = machRep_U_CType platform rep
+        -- type suffix for literals:
+        -- Integer literals are unsigned in Cmm/C.  We explicitly cast to
+        -- signed values for doing signed operations, but at all other
+        -- times values are unsigned.  This also helps eliminate occasional
+        -- warnings about integer overflow from gcc.
 
-      rawLit
-          | w == 0    =     text "0x0"
-          | w < 0     = parens $ char '-' <>
-                            text "0x" <> go (-w)
-          | otherwise =     text "0x" <> go   w
+      constants = platformConstants platform
+
+      repsuffix W64 =
+               if pc_CINT_SIZE       constants == 8 then char 'U'
+          else if pc_CLONG_SIZE      constants == 8 then text "UL"
+          else if pc_CLONG_LONG_SIZE constants == 8 then text "ULL"
+          else panic "pprHexVal: Can't find a 64-bit type"
+      repsuffix _ = char 'U'
+
+      ctype = machRep_U_CType platform rep
+
+      intToDoc :: Integer -> SDoc
+      intToDoc i = case truncInt i of
+                       0 -> char '0'
+                       v -> go v
+
+      -- We need to truncate value as Cmm backend does not drop
+      -- redundant bits to ease handling of negative values.
+      -- Thus the following Cmm code on 64-bit arch, like amd64:
+      --     CInt v;
+      --     v = {something};
+      --     if (v == %lobits32(-1)) { ...
+      -- leads to the following C code:
+      --     StgWord64 v = (StgWord32)({something});
+      --     if (v == 0xFFFFffffFFFFffffU) { ...
+      -- Such code is incorrect as it promotes both operands to StgWord64
+      -- and the whole condition is always false.
+      truncInt :: Integer -> Integer
+      truncInt i =
+          case rep of
+              W8  -> i `rem` (2^(8 :: Int))
+              W16 -> i `rem` (2^(16 :: Int))
+              W32 -> i `rem` (2^(32 :: Int))
+              W64 -> i `rem` (2^(64 :: Int))
+              _   -> panic ("pprHexVal/truncInt: C backend can't encode "
+                            ++ show rep ++ " literals")
 
       go 0 = empty
       go w' = go q <> dig
