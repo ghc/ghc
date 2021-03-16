@@ -3,6 +3,8 @@
 # To be a good autoconf citizen, names of local macros have prefixed with FP_ to
 # ensure we don't clash with any pre-supplied autoconf ones.
 
+m4_include([m4/ax_compare_version.m4])
+
 # FPTOOLS_WRITE_FILE
 # ------------------
 # Write $2 to the file named $1.
@@ -2249,22 +2251,29 @@ AC_DEFUN([XCODE_VERSION],[
 #
 # $1 = the variable to set
 # $2 = the command to look for
-# $3 = the version of the command to look for
+# $3 = the lower bound version of the command to look for
+# $4 = the upper bound version of the command to look for.
 #
 AC_DEFUN([FIND_LLVM_PROG],[
     # Test for program with and without version name.
-    AC_CHECK_TOOLS([$1], [$2-$3 $2-$3.0 $2], [:])
-    if test "$$1" != ":"; then
-        AC_MSG_CHECKING([$$1 is version $3])
-        if test `$$1 --version | grep -c "version $3"` -gt 0 ; then
-            AC_MSG_RESULT(yes)
-        else
-            AC_MSG_RESULT(no)
-            $1=""
-        fi
-    else
-        $1=""
-    fi
+    PROG_VERSION_CANDIDATES=$(for llvmVersion in `seq $4 -1 $3`; do echo "$2-$llvmVersion $2-$llvmVersion.0"; done)
+    AC_CHECK_TOOLS([$1], [$PROG_VERSION_CANDIDATES $2], [])
+    AS_IF([test x"$$1" != x],[
+        PROG_VERSION=`$$1 --version | awk '/.*version [[0-9\.]]+/{for(i=1;i<=NF;i++){ if(\$i ~ /^[[0-9\.]]+$/){print \$i}}}'`
+        AS_IF([test x"$PROG_VERSION" == x],
+          [AC_MSG_RESULT(no)
+           $1=""
+           AC_MSG_NOTICE([We only support llvm $3 to $4 (no version found).])],
+          [AC_MSG_CHECKING([$$1 version ($PROG_VERSION) is between $3 and $4])
+           AX_COMPARE_VERSION([$PROG_VERSION], [lt], [$3],
+            [AC_MSG_RESULT(no)
+             $1=""
+             AC_MSG_NOTICE([We only support llvm $3 to $4 (found $PROG_VERSION).])],
+            [AX_COMPARE_VERSION([$PROG_VERSION], [gt], [$4],
+             [AC_MSG_RESULT(no)
+              $1=""
+              AC_MSG_NOTICE([We only support llvm $3 to $4 (found $PROG_VERSION).])],
+             [AC_MSG_RESULT(yes)])])])])
 ])
 
 # CHECK_LD_COPY_BUG()
