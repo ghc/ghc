@@ -7,6 +7,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE UnboxedTuples #-}
 
 -- |
 -- #name_types#
@@ -97,6 +98,7 @@ module GHC.Types.Name.Occurrence (
         -- * Tidying up
         TidyOccEnv, emptyTidyOccEnv, initTidyOccEnv,
         tidyOccName, avoidClashesOccEnv, delTidyOccEnvList,
+        tidy_OccName_upd,
 
         -- FsEnv
         FastStringEnv, emptyFsEnv, lookupFsEnv, extendFsEnv, mkFsEnv
@@ -114,6 +116,7 @@ import GHC.Data.FastString.Env
 import GHC.Utils.Outputable
 import GHC.Utils.Lexeme
 import GHC.Utils.Binary
+import GHC.Utils.Update as Upd
 import Control.DeepSeq
 import Data.Char
 import Data.Data
@@ -864,15 +867,19 @@ avoidClashesOccEnv env occs = go env emptyUFM occs
       | otherwise             = go env (addToUFM seenOnce fs ()) occs
 
 tidyOccName :: TidyOccEnv -> OccName -> (TidyOccEnv, OccName)
-tidyOccName env occ@(OccName occ_sp fs)
+tidyOccName env occ = case tidy_OccName_upd env occ of
+  (# env', occ' #) -> (env', runUpd occ')
+
+tidy_OccName_upd :: TidyOccEnv -> OccName -> (# TidyOccEnv, Upd OccName #)
+tidy_OccName_upd env occ@(OccName occ_sp fs)
   | not (fs `elemUFM` env)
   = -- Desired OccName is free, so use it,
     -- and record in 'env' that it's no longer available
-    (addToUFM env fs 1, occ)
+    (# addToUFM env fs 1, NoUpdate occ #)
 
   | otherwise
   = case lookupUFM env base1 of
-       Nothing -> (addToUFM env base1 2, OccName occ_sp base1)
+       Nothing -> (# addToUFM env base1 2, Update (OccName occ_sp base1) #)
        Just n  -> find 1 n
   where
     base :: String  -- Drop trailing digits (see Note [TidyOccEnv])
@@ -886,7 +893,7 @@ tidyOccName env occ@(OccName occ_sp fs)
                        --    1, add 1, add 2, add 3, etc which
                        -- moves at quadratic speed through a dense patch
 
-          Nothing -> (new_env, OccName occ_sp new_fs)
+          Nothing -> (# new_env, Update (OccName occ_sp new_fs) #)
        where
          new_fs = mkFastString (base ++ show n)
          new_env = addToUFM (addToUFM env new_fs 1) base1 (n+1)
