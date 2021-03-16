@@ -76,7 +76,14 @@ test('divbyzero',
       when(opsys('mingw32'), omit_ways(prof_ways))],
      compile_and_run, ['-with-rtsopts="--generate-stack-traces=no"'])
 
-test('outofmem', when(opsys('darwin'), skip),
+test('outofmem', [ when(opsys('darwin'), skip),
+                   # this is believed to cause other processes to die
+                   # that happen concurrently while the outofmem test
+                   # runs in CI. As such we'll need to disable it on
+                   # windows, to prevent absolute exhaustion of memory
+                   # and subsequent termination (and failure) of unrelated
+                   # tests.
+                   when(opsys('mingw32'), skip) ],
                  makefile_test, ['outofmem'])
 test('outofmem2', normal, makefile_test, ['outofmem2'])
 
