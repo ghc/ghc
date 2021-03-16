@@ -109,6 +109,7 @@ module GHC.Builtin.Types (
 
         -- * RuntimeRep and friends
         runtimeRepTyCon, vecCountTyCon, vecElemTyCon,
+        runtimeInfoTyCon,
 
         runtimeRepTy, liftedRepTy, liftedRepDataCon, liftedRepDataConTyCon,
 
@@ -1072,7 +1073,7 @@ mk_tuple Unboxed arity = (tycon, tuple_con)
 
     -- See Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
     -- Kind:  forall (k1:RuntimeRep) (k2:RuntimeRep). TYPE k1 -> TYPE k2 -> #
-    tc_binders = mkTemplateTyConBinders (replicate arity runtimeRepTy)
+    tc_binders = mkTemplateTyConBinders (replicate arity runtimeInfoTy)
                                         (\ks -> map tYPE ks)
 
     tc_res_kind = unboxedTupleKind rr_tys

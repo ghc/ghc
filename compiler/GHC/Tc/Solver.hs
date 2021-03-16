@@ -2283,12 +2283,12 @@ promoteTyVarTcS tv
 -- | Like 'defaultTyVar', but in the TcS monad.
 defaultTyVarTcS :: TcTyVar -> TcS Bool
 defaultTyVarTcS the_tv
-  | isRuntimeRepVar the_tv
+  | isRuntimeInfoVar the_tv
   , not (isTyVarTyVar the_tv)
     -- TyVarTvs should only be unified with a tyvar
     -- never with a type; c.f. GHC.Tc.Utils.TcMType.defaultTyVar
     -- and Note [Inferring kinds for type declarations] in GHC.Tc.TyCl
-  = do { traceTcS "defaultTyVarTcS RuntimeRep" (ppr the_tv)
+  = do { traceTcS "defaultTyVarTcS RuntimeInfo" (ppr the_tv)
        ; unifyTyVar the_tv liftedRepEvalTy
        ; return True }
   | isMultiplicityVar the_tv

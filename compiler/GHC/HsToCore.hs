@@ -714,7 +714,7 @@ mkUnsafeCoercePrimPair _old_id old_expr
 
        ; let [unsafe_refl_data_con] = tyConDataCons unsafe_equality_tc
 
-             rhs = mkLams [ runtimeRep1TyVar, runtimeRep2TyVar
+             rhs = mkLams [ runtimeInfo1TyVar, runtimeInfo2TyVar
                           , openAlphaTyVar, openBetaTyVar
                           , x ] $
                    mkSingleAltCase scrut1
@@ -742,10 +742,10 @@ mkUnsafeCoercePrimPair _old_id old_expr
              -- NB: UnsafeRefl :: (b ~# a) -> UnsafeEquality a b, so we have to
              -- carefully swap the arguments above
 
-             (scrut1, scrut1_ty, rr_cv_ty) = unsafe_equality runtimeRepTy
-                                                             runtimeRep1Ty
-                                                             runtimeRep2Ty
-             (scrut2, scrut2_ty, ab_cv_ty) = unsafe_equality (tYPE runtimeRep2Ty)
+             (scrut1, scrut1_ty, rr_cv_ty) = unsafe_equality runtimeInfoTy
+                                                             runtimeInfo1Ty
+                                                             runtimeInfo2Ty
+             (scrut2, scrut2_ty, ab_cv_ty) = unsafe_equality (tYPE runtimeInfo2Ty)
                                                              (openAlphaTy `mkCastTy` alpha_co)
                                                              openBetaTy
 
@@ -761,7 +761,7 @@ mkUnsafeCoercePrimPair _old_id old_expr
              info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
                                 `setUnfoldingInfo` mkCompulsoryUnfolding' rhs
 
-             ty = mkSpecForAllTys [ runtimeRep1TyVar, runtimeRep2TyVar
+             ty = mkSpecForAllTys [ runtimeInfo1TyVar, runtimeInfo2TyVar
                                   , openAlphaTyVar, openBetaTyVar ] $
                   mkVisFunTyMany openAlphaTy openBetaTy
 

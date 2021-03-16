@@ -1513,13 +1513,13 @@ oneShotId = pcMiscPrelId oneShotName ty info
   where
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
                        `setUnfoldingInfo`  mkCompulsoryUnfolding defaultSimpleOpts rhs
-    ty  = mkSpecForAllTys [ runtimeRep1TyVar, runtimeRep2TyVar
+    ty  = mkSpecForAllTys [ runtimeInfo1TyVar, runtimeInfo2TyVar
                           , openAlphaTyVar, openBetaTyVar ]
                           (mkVisFunTyMany fun_ty fun_ty)
     fun_ty = mkVisFunTyMany openAlphaTy openBetaTy
     [body, x] = mkTemplateLocals [fun_ty, openAlphaTy]
     x' = setOneShotLambda x  -- Here is the magic bit!
-    rhs = mkLams [ runtimeRep1TyVar, runtimeRep2TyVar
+    rhs = mkLams [ runtimeInfo1TyVar, runtimeInfo2TyVar
                  , openAlphaTyVar, openBetaTyVar
                  , body, x'] $
           Var body `App` Var x
@@ -1548,7 +1548,7 @@ coerceId = pcMiscPrelId coerceName ty info
                 mkInvisFunTyMany eqRTy $
                 mkVisFunTyMany a b
 
-    bndrs@[rv,av,bv] = mkTemplateKiTyVar runtimeRepTy
+    bndrs@[rv,av,bv] = mkTemplateKiTyVar runtimeInfoTy
                         (\r -> [tYPE r, tYPE r])
 
     [r, a, b] = mkTyVarTys bndrs

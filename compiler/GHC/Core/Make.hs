@@ -913,7 +913,7 @@ mkRuntimeErrorId name
 runtimeErrorTy :: Type
 -- forall (rr :: RuntimeRep) (a :: rr). Addr# -> a
 --   See Note [Error and friends have an "open-tyvar" forall]
-runtimeErrorTy = mkSpecForAllTys [runtimeRep1TyVar, openAlphaTyVar]
+runtimeErrorTy = mkSpecForAllTys [runtimeInfo1TyVar, openAlphaTyVar]
                                  (mkVisFunTyMany addrPrimTy openAlphaTy)
 
 {- Note [Error and friends have an "open-tyvar" forall]

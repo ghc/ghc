@@ -140,7 +140,7 @@ import {-# SOURCE #-} GHC.Core.TyCo.Rep
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr
    ( pprType )
 import {-# SOURCE #-} GHC.Builtin.Types
-   ( runtimeRepTyCon, constraintKind
+   ( runtimeRepTyCon, runtimeInfoTyCon, constraintKind
    , multiplicityTyCon
    , vecCountTyCon, vecElemTyCon, liftedTypeKind )
 import {-# SOURCE #-} GHC.Core.DataCon
@@ -2260,6 +2260,7 @@ kindTyConKeys :: UniqSet Unique
 kindTyConKeys = unionManyUniqSets
   ( mkUniqSet [ liftedTypeKindTyConKey, constraintKindTyConKey, tYPETyConKey ]
   : map (mkUniqSet . tycon_with_datacons) [ runtimeRepTyCon
+                                          , runtimeInfoTyCon
                                           , multiplicityTyCon
                                           , vecCountTyCon, vecElemTyCon ] )
   where

@@ -756,7 +756,7 @@ tcPatSynMatcher (L loc name) lpat
                 (args, arg_tys) pat_ty
   = do { rr_name <- newNameAt (mkTyVarOcc "rep") loc
        ; tv_name <- newNameAt (mkTyVarOcc "r")   loc
-       ; let rr_tv  = mkTyVar rr_name runtimeRepTy
+       ; let rr_tv  = mkTyVar rr_name runtimeInfoTy
              rr     = mkTyVarTy rr_tv
              res_tv = mkTyVar tv_name (tYPE rr)
              res_ty = mkTyVarTy res_tv

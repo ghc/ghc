@@ -492,7 +492,7 @@ inferResultToType (IR { ir_uniq = u, ir_lvl = tc_lvl
             Just ty -> do { ensureMonoType ty
                             -- See Note [inferResultToType]
                           ; return ty }
-            Nothing -> do { rr  <- newMetaTyVarTyAtLevel tc_lvl runtimeRepTy
+            Nothing -> do { rr  <- newMetaTyVarTyAtLevel tc_lvl runtimeInfoTy
                           ; tau <- newMetaTyVarTyAtLevel tc_lvl (tYPE rr)
                             -- See Note [TcLevel of ExpType]
                           ; writeMutVar ref (Just tau)
@@ -667,10 +667,10 @@ promoteTcType dest_lvl ty
          else promote_it }
   where
     promote_it :: TcM (TcCoercion, TcType)
-    promote_it  -- Emit a constraint  (alpha :: TYPE rr) ~ ty
+    promote_it  -- Emit a constraint  (alpha :: TYPE ri) ~ ty
                 -- where alpha and rr are fresh and from level dest_lvl
-      = do { rr      <- newMetaTyVarTyAtLevel dest_lvl runtimeRepTy
-           ; prom_ty <- newMetaTyVarTyAtLevel dest_lvl (tYPE rr)
+      = do { ri      <- newMetaTyVarTyAtLevel dest_lvl runtimeInfoTy
+           ; prom_ty <- newMetaTyVarTyAtLevel dest_lvl (tYPE ri)
            ; let eq_orig = TypeEqOrigin { uo_actual   = ty
                                         , uo_expected = prom_ty
                                         , uo_thing    = Nothing
