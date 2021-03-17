@@ -9,7 +9,7 @@ module GHC.Exception.Type
   , underflowException
   ) where
 
-import GHC.Types ()
+import GHC.Num.Integer ()   -- See Note [Depend on GHC.Num.Integer] in GHC.Base
 
 data SomeException
 divZeroException, overflowException,
