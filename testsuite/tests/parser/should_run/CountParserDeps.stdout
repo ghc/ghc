@@ -1,4 +1,4 @@
-Found 250 GHC.Parser module dependencies
+Found 251 GHC.Parser module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.Types
@@ -184,6 +184,7 @@ GHC.Types.SourceFile
 GHC.Types.SourceText
 GHC.Types.SrcLoc
 GHC.Types.Target
+GHC.Types.Tickish
 GHC.Types.TyThing
 GHC.Types.TypeEnv
 GHC.Types.Unique

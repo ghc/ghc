@@ -32,6 +32,7 @@ import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Core.DataCon
 import GHC.Types.CostCentre
+import GHC.Types.Tickish
 import GHC.Types.Var.Env
 import GHC.Unit.Module
 import GHC.Types.Name   ( isExternalName, nameModule_maybe )
@@ -413,13 +414,14 @@ coreToStgExpr expr@(Lam _ _)
         text "Unexpected value lambda:" $$ ppr expr
 
 coreToStgExpr (Tick tick expr)
-  = do case tick of
-         HpcTick{}    -> return ()
-         ProfNote{}   -> return ()
-         SourceNote{} -> return ()
-         Breakpoint{} -> panic "coreToStgExpr: breakpoint should not happen"
+  = do stg_tick <- case tick of
+                     HpcTick m i        -> return (HpcTick m i)
+                     ProfNote cc cnt sc -> return (ProfNote cc cnt sc)
+                     SourceNote span nm -> return (SourceNote span nm)
+                     Breakpoint{} ->
+                       panic "coreToStgExpr: breakpoint should not happen"
        expr2 <- coreToStgExpr expr
-       return (StgTick tick expr2)
+       return (StgTick stg_tick expr2)
 
 coreToStgExpr (Cast expr _)
   = coreToStgExpr expr
@@ -524,7 +526,7 @@ mkStgAltType bndr alts
 
 coreToStgApp :: Id            -- Function
              -> [CoreArg]     -- Arguments
-             -> [Tickish Id]  -- Debug ticks
+             -> [CoreTickish] -- Debug ticks
              -> CtsM StgExpr
 coreToStgApp f args ticks = do
     (args', ticks') <- coreToStgArgs args
@@ -568,7 +570,12 @@ coreToStgApp f args ticks = do
                 TickBoxOpId {}   -> pprPanic "coreToStg TickBox" $ ppr (f,args')
                 _other           -> StgApp f args'
 
-        tapp = foldr StgTick app (ticks ++ ticks')
+        convert_tick (Breakpoint _ bid fvs)  = res_ty `seq` Breakpoint res_ty bid fvs
+        convert_tick (HpcTick m i)           = HpcTick m i
+        convert_tick (SourceNote span nm)    = SourceNote span nm
+        convert_tick (ProfNote cc cnt scope) = ProfNote cc cnt scope
+        add_tick !t !e = StgTick t e
+        tapp = foldr add_tick app (map convert_tick ticks ++ ticks')
 
     -- Forcing these fixes a leak in the code generator, noticed while
     -- profiling for trac #4367
@@ -579,7 +586,7 @@ coreToStgApp f args ticks = do
 -- This is the guy that turns applications into A-normal form
 -- ---------------------------------------------------------------------------
 
-coreToStgArgs :: [CoreArg] -> CtsM ([StgArg], [Tickish Id])
+coreToStgArgs :: [CoreArg] -> CtsM ([StgArg], [StgTickish])
 coreToStgArgs []
   = return ([], [])
 
@@ -594,7 +601,13 @@ coreToStgArgs (Coercion _ : args) -- Coercion argument; See Note [Coercion token
 coreToStgArgs (Tick t e : args)
   = ASSERT( not (tickishIsCode t) )
     do { (args', ts) <- coreToStgArgs (e : args)
-       ; return (args', t:ts) }
+       ; let convert_tick (Breakpoint _ bid fvs) =
+               let !ty = exprType e in Breakpoint ty bid fvs
+             convert_tick (HpcTick m i)           = HpcTick m i
+             convert_tick (SourceNote span nm)    = SourceNote span nm
+             convert_tick (ProfNote cc cnt scope) = ProfNote cc cnt scope
+             !t' = convert_tick t
+       ; return (args', t':ts) }
 
 coreToStgArgs (arg : args) = do         -- Non-type argument
     (stg_args, ticks) <- coreToStgArgs args
@@ -953,7 +966,7 @@ myCollectBinders expr
 
 -- | Precondition: argument expression is an 'App', and there is a 'Var' at the
 -- head of the 'App' chain.
-myCollectArgs :: CoreExpr -> (Id, [CoreArg], [Tickish Id])
+myCollectArgs :: CoreExpr -> (Id, [CoreArg], [CoreTickish])
 myCollectArgs expr
   = go expr [] []
   where

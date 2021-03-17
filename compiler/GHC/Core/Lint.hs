@@ -53,6 +53,7 @@ import GHC.Types.Id.Info
 import GHC.Core.Ppr
 import GHC.Core.Coercion
 import GHC.Types.SrcLoc
+import GHC.Types.Tickish
 import GHC.Core.Type as Type
 import GHC.Core.Multiplicity
 import GHC.Core.UsageEnv
@@ -857,10 +858,10 @@ lintCoreExpr (Cast expr co)
 
 lintCoreExpr (Tick tickish expr)
   = do case tickish of
-         Breakpoint _ ids -> forM_ ids $ \id -> do
-                               checkDeadIdOcc id
-                               lookupIdInScope id
-         _                -> return ()
+         Breakpoint _ _ ids -> forM_ ids $ \id -> do
+                                 checkDeadIdOcc id
+                                 lookupIdInScope id
+         _                  -> return ()
        markAllJoinsBadIf block_joins $ lintCoreExpr expr
   where
     block_joins = not (tickish `tickishScopesLike` SoftScope)
