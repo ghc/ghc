@@ -827,7 +827,7 @@ data RenameS
         , stateReachingDef  :: UniqFM RegId [RegId]
 
           -- | New definitions in current scope. Used to pop defs in rename.
-        , stateScopedDefs   :: [[RegId]] }
+        , stateScopedDefs   :: [UniqSet RegId] }
 
 
 -- | Create a new renamer state.
@@ -855,25 +855,39 @@ newDef :: RegId -> RenameM (RegId)
 newDef old
  = do
          nUnique        <- newUnique
-         modify $ \s -> s { stateReachingDef
-                = alterUFM_Directly (pushDef nUnique) (stateReachingDef s) old
-                , stateScopedDefs = addTop (stateScopedDefs s) old }
+         modify $ \s ->
+                 let    scopes = stateScopedDefs s
+                        reachingDefs = stateReachingDef s
+
+                 in     s { stateReachingDef
+                          = alterUFM_Directly (updateDef scopes old nUnique) reachingDefs old
+                          , stateScopedDefs = addTop scopes old }
          return (nUnique)
  where
-         addTop (xs:xss) y = ((y:xs):xss)
+         addTop (xs:xss) y = (addOneToUniqSet xs y):xss
          addTop [] _       = panic "GHC.CmmToAsm.SSA.newDef: Error, no open scope!"
+
+         updateDef (scope:_) old new
+          = if elementOfUniqSet old scope
+            then replaceDef new
+            else pushDef new
+
+         updateDef [] _ _
+          = panic "GHC.CmmToAsm.SSA.newDef: Error, no open scope!"
 
 
 -- | Entering a scope means adding a new scope stack
 enterScope :: RenameM ()
 enterScope = modify $ \s -> s {
-        stateScopedDefs = []:(stateScopedDefs s)
+        stateScopedDefs = (emptyUniqSet):(stateScopedDefs s)
 }
 
 -- | Leaving a scope means popping all reaching definitions defined in this scope.
 leaveScope :: RenameM ()
 leaveScope = modify $ \s -> s {
-        stateReachingDef = foldl' popDef (stateReachingDef s) $ head (stateScopedDefs s),
+        stateReachingDef = foldl' popDef (stateReachingDef s)
+                                (nonDetEltsUniqSet $ head (stateScopedDefs s)),
+                                -- ^ Order of pops not relevant. See Note [Unique Determinism and code generation]
         stateScopedDefs  = tail $ stateScopedDefs s
 }
 
@@ -887,21 +901,19 @@ reachingDef old
          return res
 
 
--- | Will return the current reaching name of 'old', or 'old'
-reachingDefOrDefault :: RegId -> RenameM RegId
-reachingDefOrDefault old
- = do
-         rd             <- gets stateReachingDef
-         let stack      = lookupWithDefaultUFM_Directly rd [] old
-         let res        = if null stack then old else head stack
-         return res
-
-
 -- | Push new definition onto name stack if exists, or create new one.
 pushDef :: RegId -> Maybe [RegId] -> Maybe [RegId]
 pushDef x mXs = case mXs of
         Just xs -> Just $ x:xs
         Nothing -> Just [x]
+
+
+-- | If there is already a new, purely local name, just replace it.
+--   This keeps the stack size bounded by the depth of the dominator tree.
+replaceDef :: RegId -> Maybe [RegId] -> Maybe [RegId]
+replaceDef y mXs = case mXs of
+        Just (_:xs) -> Just $ y:xs
+        _           -> Just [y]
 
 
 -- | Remove top definition for given name from name stack.
