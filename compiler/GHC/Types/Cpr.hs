@@ -1,9 +1,10 @@
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
+{-# LANGUAGE PatternSynonyms #-}
 -- | Types for the Constructed Product Result lattice.
 -- "GHC.Core.Opt.CprAnal" and "GHC.Core.Opt.WorkWrap.Utils"
 -- are its primary customers via 'GHC.Types.Id.idCprInfo'.
 module GHC.Types.Cpr (
-    Cpr (ConCpr), topCpr, botCpr, flatConCpr, asConCpr,
+    Cpr (pattern ConCpr), topCpr, botCpr, flatConCpr, asConCpr,
     CprType (..), topCprType, botCprType, flatConCprType,
     lubCprType, applyCprTy, abstractCprTy, trimCprTy,
     unpackConFieldsCpr,
@@ -25,12 +26,19 @@ import GHC.Utils.Panic
 
 data Cpr
   = BotCpr
-  | ConCpr !ConTag ![Cpr]
-  -- ^ Either
-  --     * the number of field Cprs equals 'dataConRepArity'
-  --     * Or the field Cprs is an empty list, meaning TopCpr everywhere
+  | ConCpr_ !ConTag ![Cpr]
+  -- ^ The number of field Cprs equals 'dataConRepArity'.
+  -- If all of them are top, better use 'FlatConCpr', as ensured by the pattern
+  -- synonym 'ConCpr'.
+  | FlatConCpr !ConTag
   | TopCpr
   deriving Eq
+
+pattern ConCpr :: ConTag -> [Cpr] -> Cpr
+pattern ConCpr t cs <- ConCpr_ t cs where
+  ConCpr t cs
+    | all (== TopCpr) cs = FlatConCpr t
+    | otherwise          = ConCpr_ t cs
 
 lubCpr :: Cpr -> Cpr -> Cpr
 lubCpr BotCpr      cpr     = cpr
