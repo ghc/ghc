@@ -1,6 +1,12 @@
 # Changelog for [`template-haskell` package](http://hackage.haskell.org/package/template-haskell)
 
 ## 2.18.0.0
+  * The types of `ConP` and `conP` have been changed to allow for an additional list
+    of type applications preceding the argument patterns.
+
+  * Add support for the `Char` kind (#11342): we extend the `TyLit` data type with
+    the constructor `CharTyLit` that reflects type-level characters.
+
   * Add `putDoc` and `getDoc` which allow Haddock documentation to be attached
     to module headers, declarations, function arguments and instances, as well
     as queried. These are quite low level operations, so for convenience there
@@ -41,12 +47,6 @@
     `Maybe ModName` argument to describe the qualifier of do blocks.
 
   * The argument to `TExpQ` can now be levity polymorphic.
-
-  * The types of `ConP` and `conP` have been changed to allow for an additional list
-    of type applications preceding the argument patterns.
-
-  * Add support for the `Char` kind (#11342): we extend the `TyLit` data type with
-    the constructor `CharTyLit` that reflects type-level characters.
 
 ## 2.16.0.0 *Jan 2020*
 
