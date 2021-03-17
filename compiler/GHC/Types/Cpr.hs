@@ -1,4 +1,7 @@
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
+{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE PatternSynonyms #-}
+
 -- | Types for the Constructed Product Result lattice.
 -- "GHC.Core.Opt.CprAnal" and "GHC.Core.Opt.WorkWrap.Utils"
 -- are its primary customers via 'GHC.Types.Id.idCprInfo'.
@@ -25,16 +28,34 @@ import GHC.Utils.Panic
 
 data Cpr
   = BotCpr
-  | ConCpr !ConTag ![Cpr]
-  -- ^ Either
-  --     * the number of field Cprs equals 'dataConRepArity'
-  --     * Or the field Cprs is an empty list, meaning TopCpr everywhere
+  | ConCpr_ !ConTag ![Cpr]
+  -- ^ The number of field Cprs equals 'dataConRepArity'.
+  -- If all of them are top, better use 'FlatConCpr', as ensured by the pattern
+  -- synonym 'ConCpr'.
+  | FlatConCpr !ConTag
   | TopCpr
   deriving Eq
+
+pattern ConCpr :: ConTag -> [Cpr] -> Cpr
+pattern ConCpr t cs <- ConCpr_ t cs where
+  ConCpr t cs
+    | all (== TopCpr) cs = FlatConCpr t
+    | otherwise          = ConCpr_ t cs
+{-# COMPLETE BotCpr, TopCpr, FlatConCpr, ConCpr #-}
+
+viewConTag :: Cpr -> Maybe ConTag
+viewConTag (FlatConCpr t) = Just t
+viewConTag (ConCpr t _)   = Just t
+viewConTag _              = Nothing
+{-# INLINE viewConTag #-}
 
 lubCpr :: Cpr -> Cpr -> Cpr
 lubCpr BotCpr      cpr     = cpr
 lubCpr cpr         BotCpr  = cpr
+lubCpr (FlatConCpr t1) (viewConTag -> Just t2)
+  | t1 == t2 = FlatConCpr t1
+lubCpr (viewConTag -> Just t1) (FlatConCpr t2)
+  | t1 == t2  = FlatConCpr t1
 lubCpr (ConCpr t1 cs1) (ConCpr t2 cs2)
   | t1 == t2 = ConCpr t1 (lubFieldCprs cs1 cs2)
 lubCpr _           _       = TopCpr
@@ -51,16 +72,18 @@ botCpr :: Cpr
 botCpr = BotCpr
 
 flatConCpr :: ConTag -> Cpr
-flatConCpr t = ConCpr t []
+flatConCpr t = FlatConCpr t
 
 trimCpr :: Cpr -> Cpr
-trimCpr ConCpr{} = TopCpr
-trimCpr cpr      = cpr
+trimCpr ConCpr{}     = TopCpr
+trimCpr FlatConCpr{} = TopCpr
+trimCpr cpr          = cpr
 
 asConCpr :: Cpr -> Maybe (ConTag, [Cpr])
-asConCpr (ConCpr t cs) = Just (t, cs)
-asConCpr TopCpr        = Nothing
-asConCpr BotCpr        = Nothing
+asConCpr (ConCpr t cs)  = Just (t, cs)
+asConCpr (FlatConCpr t) = Just (t, [])
+asConCpr TopCpr         = Nothing
+asConCpr BotCpr         = Nothing
 
 seqCpr :: Cpr -> ()
 seqCpr (ConCpr _ cs) = foldr (seq . seqCpr) () cs
@@ -155,19 +178,18 @@ seqCprSig (CprSig ty) = seqCprTy ty
 -- | BNF:
 -- ```
 --   cpr ::= ''                               -- TopCpr
+--        |  n                                -- FlatConCpr n
 --        |  n '(' cpr1 ',' cpr2 ',' ... ')'  -- ConCpr n [cpr1,cpr2,...]
---        |  n                                -- ConCpr n [TopCpr,TopCpr...]
 --        |  'b'                              -- BotCpr
 -- ```
 -- Examples:
 --   * `f x = f x` has denotation `b`
 --   * `1(1,)` is a valid (nested) 'Cpr' denotation for `(I# 42#, f 42)`.
 instance Outputable Cpr where
-  ppr TopCpr             = empty
-  ppr (ConCpr n cs)
-    | all (== topCpr) cs = int n
-    | otherwise          = int n <> parens (pprWithCommas ppr cs)
-  ppr BotCpr             = char 'b'
+  ppr TopCpr         = empty
+  ppr (FlatConCpr n) = int n
+  ppr (ConCpr n cs)  = int n <> parens (pprWithCommas ppr cs)
+  ppr BotCpr         = char 'b'
 
 instance Outputable CprType where
   ppr (CprType arty res) = ppr arty <> ppr res
@@ -177,17 +199,16 @@ instance Outputable CprSig where
   ppr (CprSig ty) = ppr (ct_cpr ty)
 
 instance Binary Cpr where
-  put_ bh TopCpr        = putByte bh 0
-  put_ bh BotCpr        = putByte bh 1
-  put_ bh (ConCpr n cs)
-    | all (== TopCpr) cs = putByte bh 2 *> put_ bh n -- cs = [], saves a lot of space and time!
-    | otherwise          = putByte bh 3 *> put_ bh n *> put_ bh cs
+  put_ bh TopCpr         = putByte bh 0
+  put_ bh BotCpr         = putByte bh 1
+  put_ bh (FlatConCpr n) = putByte bh 2 *> put_ bh n
+  put_ bh (ConCpr n cs)  = putByte bh 3 *> put_ bh n *> put_ bh cs
   get  bh = do
     h <- getByte bh
     case h of
       0 -> return TopCpr
       1 -> return BotCpr
-      2 -> ConCpr <$> get bh <*> pure []
+      2 -> FlatConCpr <$> get bh
       3 -> ConCpr <$> get bh <*> get bh
       _ -> pprPanic "Binary Cpr: Invalid tag" (int (fromIntegral h))
 
