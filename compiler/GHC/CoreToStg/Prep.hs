@@ -192,7 +192,7 @@ corePrepPgm :: HscEnv -> Module -> ModLocation -> CoreProgram -> [TyCon]
 corePrepPgm hsc_env this_mod mod_loc binds data_tycons =
     withTiming logger dflags
                (text "CorePrep"<+>brackets (ppr this_mod))
-               (const ()) $ do
+               (\(a,b) -> a `seqList` b `seq` ()) $ do
     us <- mkSplitUniqSupply 's'
     initialCorePrepEnv <- mkInitialCorePrepEnv hsc_env
 
@@ -221,7 +221,7 @@ corePrepExpr :: HscEnv -> CoreExpr -> IO CoreExpr
 corePrepExpr hsc_env expr = do
     let dflags = hsc_dflags hsc_env
     let logger = hsc_logger hsc_env
-    withTiming logger dflags (text "CorePrep [expr]") (const ()) $ do
+    withTiming logger dflags (text "CorePrep [expr]") (\e -> e `seq` ()) $ do
       us <- mkSplitUniqSupply 's'
       initialCorePrepEnv <- mkInitialCorePrepEnv hsc_env
       let new_expr = initUs_ us (cpeBodyNF initialCorePrepEnv expr)
@@ -1407,8 +1407,21 @@ mkFloat dmd is_unlifted bndr rhs
     -- Don't make a case for a HNF binding, even if it's strict
     -- Otherwise we get  case (\x -> e) of ...!
 
-  | is_unlifted = ASSERT2( ok_for_spec, ppr rhs )
-                  FloatCase rhs bndr DEFAULT [] True
+  | is_unlifted = FloatCase rhs bndr DEFAULT [] True
+      -- we used to ASSERT2(ok_for_spec, ppr rhs) here, but it is now disabled
+      -- because exprOkForSpeculation isn't stable under ANF-ing. See for
+      -- example #19489 where the following unlifted expression:
+      --
+      --    GHC.Prim.(#|_#) @LiftedRep @LiftedRep @[a_ax0] @[a_ax0]
+      --                    (GHC.Types.: @a_ax0 a2_agq a3_agl)
+      --
+      -- is ok-for-spec but is ANF-ised into:
+      --
+      --    let sat = GHC.Types.: @a_ax0 a2_agq a3_agl
+      --    in GHC.Prim.(#|_#) @LiftedRep @LiftedRep @[a_ax0] @[a_ax0] sat
+      --
+      -- which isn't ok-for-spec because of the let-expression.
+
   | is_hnf      = FloatLet (NonRec bndr                       rhs)
   | otherwise   = FloatLet (NonRec (setIdDemandInfo bndr dmd) rhs)
                    -- See Note [Pin demand info on floats]

@@ -384,8 +384,6 @@ basicKnownKeyNames
         integerModName,
         integerDivModName,
         integerQuotRemName,
-        integerToFloatName,
-        integerToDoubleName,
         integerEncodeFloatName,
         integerEncodeDoubleName,
         integerGcdName,
@@ -438,6 +436,8 @@ basicKnownKeyNames
         bignatFromWordListName,
 
         -- Float/Double
+        integerToFloatName,
+        integerToDoubleName,
         rationalToFloatName,
         rationalToDoubleName,
 
@@ -1197,8 +1197,6 @@ integerFromNaturalName
    , integerModName
    , integerDivModName
    , integerQuotRemName
-   , integerToFloatName
-   , integerToDoubleName
    , integerEncodeFloatName
    , integerEncodeDoubleName
    , integerGcdName
@@ -1324,8 +1322,6 @@ integerDivName            = bniVarQual "integerDiv"                integerDivIdK
 integerModName            = bniVarQual "integerMod"                integerModIdKey
 integerDivModName         = bniVarQual "integerDivMod#"            integerDivModIdKey
 integerQuotRemName        = bniVarQual "integerQuotRem#"           integerQuotRemIdKey
-integerToFloatName        = bniVarQual "integerToFloat#"           integerToFloatIdKey
-integerToDoubleName       = bniVarQual "integerToDouble#"          integerToDoubleIdKey
 integerEncodeFloatName    = bniVarQual "integerEncodeFloat#"       integerEncodeFloatIdKey
 integerEncodeDoubleName   = bniVarQual "integerEncodeDouble#"      integerEncodeDoubleIdKey
 integerGcdName            = bniVarQual "integerGcd"                integerGcdIdKey
@@ -1370,7 +1366,9 @@ floatingClassName  = clsQual gHC_FLOAT (fsLit "Floating")  floatingClassKey
 realFloatClassName = clsQual gHC_FLOAT (fsLit "RealFloat") realFloatClassKey
 
 -- other GHC.Float functions
-rationalToFloatName, rationalToDoubleName :: Name
+integerToFloatName, integerToDoubleName, rationalToFloatName, rationalToDoubleName :: Name
+integerToFloatName   = varQual gHC_FLOAT (fsLit "integerToFloat#") integerToFloatIdKey
+integerToDoubleName  = varQual gHC_FLOAT (fsLit "integerToDouble#") integerToDoubleIdKey
 rationalToFloatName  = varQual gHC_FLOAT (fsLit "rationalToFloat") rationalToFloatIdKey
 rationalToDoubleName = varQual gHC_FLOAT (fsLit "rationalToDouble") rationalToDoubleIdKey
 
@@ -2002,41 +2000,10 @@ uFloatTyConKey  = mkPreludeTyConUnique 161
 uIntTyConKey    = mkPreludeTyConUnique 162
 uWordTyConKey   = mkPreludeTyConUnique 163
 
--- Type-level naturals
-typeSymbolKindConNameKey, typeCharKindConNameKey,
-  typeNatAddTyFamNameKey, typeNatMulTyFamNameKey, typeNatExpTyFamNameKey,
-  typeNatSubTyFamNameKey
-  , typeSymbolCmpTyFamNameKey, typeNatCmpTyFamNameKey, typeCharCmpTyFamNameKey
-  , typeLeqCharTyFamNameKey
-  , typeNatDivTyFamNameKey
-  , typeNatModTyFamNameKey
-  , typeNatLogTyFamNameKey
-  , typeConsSymbolTyFamNameKey, typeUnconsSymbolTyFamNameKey
-  :: Unique
-typeSymbolKindConNameKey  = mkPreludeTyConUnique 165
-typeCharKindConNameKey    = mkPreludeTyConUnique 166
-typeNatAddTyFamNameKey    = mkPreludeTyConUnique 167
-typeNatMulTyFamNameKey    = mkPreludeTyConUnique 168
-typeNatExpTyFamNameKey    = mkPreludeTyConUnique 169
-typeNatSubTyFamNameKey    = mkPreludeTyConUnique 171
-typeSymbolCmpTyFamNameKey = mkPreludeTyConUnique 172
-typeNatCmpTyFamNameKey    = mkPreludeTyConUnique 173
-typeCharCmpTyFamNameKey   = mkPreludeTyConUnique 174
-typeLeqCharTyFamNameKey   = mkPreludeTyConUnique 175
-typeNatDivTyFamNameKey  = mkPreludeTyConUnique 176
-typeNatModTyFamNameKey  = mkPreludeTyConUnique 177
-typeNatLogTyFamNameKey  = mkPreludeTyConUnique 178
-typeConsSymbolTyFamNameKey = mkPreludeTyConUnique 179
-typeUnconsSymbolTyFamNameKey = mkPreludeTyConUnique 180
-
 -- Custom user type-errors
 errorMessageTypeErrorFamKey :: Unique
 errorMessageTypeErrorFamKey =  mkPreludeTyConUnique 181
 
-
-
-ntTyConKey:: Unique
-ntTyConKey = mkPreludeTyConUnique 182
 coercibleTyConKey :: Unique
 coercibleTyConKey = mkPreludeTyConUnique 183
 
@@ -2094,6 +2061,38 @@ multMulTyConKey = mkPreludeTyConUnique 199
 -----------------------------------------------------
 
 #include "primop-vector-uniques.hs-incl"
+
+------------- Type-level Symbol, Nat, Char ----------
+--      USES TyConUniques 400-499
+-----------------------------------------------------
+typeSymbolKindConNameKey, typeCharKindConNameKey,
+  typeNatAddTyFamNameKey, typeNatMulTyFamNameKey, typeNatExpTyFamNameKey,
+  typeNatSubTyFamNameKey
+  , typeSymbolCmpTyFamNameKey, typeNatCmpTyFamNameKey, typeCharCmpTyFamNameKey
+  , typeLeqCharTyFamNameKey
+  , typeNatDivTyFamNameKey
+  , typeNatModTyFamNameKey
+  , typeNatLogTyFamNameKey
+  , typeConsSymbolTyFamNameKey, typeUnconsSymbolTyFamNameKey
+  , typeCharToNatTyFamNameKey, typeNatToCharTyFamNameKey
+  :: Unique
+typeSymbolKindConNameKey  = mkPreludeTyConUnique 400
+typeCharKindConNameKey    = mkPreludeTyConUnique 401
+typeNatAddTyFamNameKey    = mkPreludeTyConUnique 402
+typeNatMulTyFamNameKey    = mkPreludeTyConUnique 403
+typeNatExpTyFamNameKey    = mkPreludeTyConUnique 404
+typeNatSubTyFamNameKey    = mkPreludeTyConUnique 405
+typeSymbolCmpTyFamNameKey = mkPreludeTyConUnique 406
+typeNatCmpTyFamNameKey    = mkPreludeTyConUnique 407
+typeCharCmpTyFamNameKey   = mkPreludeTyConUnique 408
+typeLeqCharTyFamNameKey   = mkPreludeTyConUnique 409
+typeNatDivTyFamNameKey  = mkPreludeTyConUnique 410
+typeNatModTyFamNameKey  = mkPreludeTyConUnique 411
+typeNatLogTyFamNameKey  = mkPreludeTyConUnique 412
+typeConsSymbolTyFamNameKey = mkPreludeTyConUnique 413
+typeUnconsSymbolTyFamNameKey = mkPreludeTyConUnique 414
+typeCharToNatTyFamNameKey = mkPreludeTyConUnique 415
+typeNatToCharTyFamNameKey = mkPreludeTyConUnique 416
 
 {-
 ************************************************************************
@@ -2387,6 +2386,10 @@ coercionTokenIdKey      = mkPreludeMiscIdUnique 124
 noinlineIdKey           = mkPreludeMiscIdUnique 125
 considerAccessibleIdKey = mkPreludeMiscIdUnique 126
 
+integerToFloatIdKey, integerToDoubleIdKey :: Unique
+integerToFloatIdKey    = mkPreludeMiscIdUnique 128
+integerToDoubleIdKey   = mkPreludeMiscIdUnique 129
+
 rationalToFloatIdKey, rationalToDoubleIdKey :: Unique
 rationalToFloatIdKey   = mkPreludeMiscIdUnique 130
 rationalToDoubleIdKey  = mkPreludeMiscIdUnique 131
@@ -2600,8 +2603,6 @@ integerFromNaturalIdKey
    , integerModIdKey
    , integerDivModIdKey
    , integerQuotRemIdKey
-   , integerToFloatIdKey
-   , integerToDoubleIdKey
    , integerEncodeFloatIdKey
    , integerEncodeDoubleIdKey
    , integerGcdIdKey
@@ -2683,8 +2684,6 @@ integerDivIdKey            = mkPreludeMiscIdUnique 624
 integerModIdKey            = mkPreludeMiscIdUnique 625
 integerDivModIdKey         = mkPreludeMiscIdUnique 626
 integerQuotRemIdKey        = mkPreludeMiscIdUnique 627
-integerToFloatIdKey        = mkPreludeMiscIdUnique 628
-integerToDoubleIdKey       = mkPreludeMiscIdUnique 629
 integerEncodeFloatIdKey    = mkPreludeMiscIdUnique 630
 integerEncodeDoubleIdKey   = mkPreludeMiscIdUnique 631
 integerGcdIdKey            = mkPreludeMiscIdUnique 632

@@ -16,6 +16,11 @@
 
   * Add `cmpNat`, `cmpSymbol`, and `cmpChar` to `GHC.TypeNats` and `GHC.TypeLits`.
 
+  * Add `CmpChar`, `ConsSymbol`, `UnconsSymbol`, `CharToNat`, and `NatToChar`
+    type families to `GHC.TypeLits`.
+
+  * Add the `KnownChar` class, `charVal` and `charVal'` to `GHC.TypeLits`.
+
   * Add `Semigroup` and `Monoid` instances for `Data.Functor.Product` and
     `Data.Functor.Compose`.
 
@@ -37,6 +42,9 @@
 
   * Under POSIX, `System.IO.openFile` will no longer leak a file descriptor if it
     is interrupted by an asynchronous exception (#19114, #19115).
+
+  * `fromInteger :: Integer -> Float/Double` now consistently round to the
+    nearest value, with ties to even.
 
 ## 4.15.0.0 *TBA*
 
