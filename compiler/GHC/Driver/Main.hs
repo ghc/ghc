@@ -977,8 +977,13 @@ hscMaybeWriteIface logger dflags is_simple iface old_iface mod_location = do
             in  addBootSuffix_maybe (mi_boot iface) with_hi
 
         write_iface dflags' iface =
+          let !iface_name = buildIfName (hiSuf dflags')
+          in
           {-# SCC "writeIface" #-}
-          writeIface logger dflags' (buildIfName (hiSuf dflags')) iface
+          withTiming logger dflags'
+              (text "WriteIface"<+>brackets (text iface_name))
+              (const ())
+              (writeIface logger dflags' iface_name iface)
 
     when (write_interface || force_write_interface) $ do
 
@@ -1542,10 +1547,14 @@ hscGenHardCode hsc_env cgguts location output_filename = do
         (prepd_binds, local_ccs) <- {-# SCC "CorePrep" #-}
                        corePrepPgm hsc_env this_mod location
                                    core_binds data_tycons
+
         -----------------  Convert to STG ------------------
         (stg_binds, denv, (caf_ccs, caf_cc_stacks))
             <- {-# SCC "CoreToStg" #-}
-               myCoreToStg logger dflags this_mod location prepd_binds
+               withTiming logger dflags
+                   (text "CoreToStg"<+>brackets (ppr this_mod))
+                   (\(a, b, (c,d)) -> a `seqList` b `seq` c `seqList` d `seqList` ())
+                   (myCoreToStg logger dflags this_mod location prepd_binds)
 
         let cost_centre_info =
               (S.toList local_ccs ++ caf_ccs, caf_cc_stacks)
