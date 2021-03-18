@@ -474,7 +474,7 @@ void osCommitMemory (void *at, W_ size)
     void *temp;
     temp = VirtualAlloc(at, size, MEM_COMMIT, PAGE_READWRITE);
     if (temp == NULL) {
-        sysErrorBelch("osCommitMemory: VirtualAlloc MEM_COMMIT failed");
+        sysErrorBelch("osCommitMemory: VirtualAlloc MEM_COMMIT failed to commit %" FMT_Word " bytes of memory  (error code: %lu)", size, GetLastError());
         stg_exit(EXIT_HEAPOVERFLOW);
     }
 }
