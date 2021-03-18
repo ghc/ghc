@@ -47,6 +47,7 @@ import GHC.CmmToAsm.CFG.Dominators
     ( Node, idom, fromEdges, asTree )
 import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.Reg.Liveness
+import GHC.CmmToAsm.SSA.Stats
 
 import GHC.Data.Graph.Directed (SCC(..))
 
@@ -223,17 +224,19 @@ prunedSSAFromLiveCmmDecl
         => Platform
         -> CFG
         -> LiveCmmDecl statics instr
-        -> UniqSM (SsaLiveCmmDecl statics instr)
+        -> UniqSM (SsaLiveCmmDecl statics instr,
+                   SsaStats)
 
 prunedSSAFromLiveCmmDecl platform cfg liveCmmDecl
  = do
         -- Grab the unique supply from the monad.
         us              <- getUniqueSupplyM
-        let ssaCmmDecl  =
-                evalState (constructPrunedSSA platform cfg liveCmmDecl)
+        let (ssaCmmDecl, state)  =
+                runState (constructPrunedSSA platform cfg liveCmmDecl)
                          (initRenameS us)
+        let stats = SsaStats (stateOriginalNames state) 0
 
-        return (ssaCmmDecl)
+        return (ssaCmmDecl, stats)
 
 
 ------- SSA construction ----------------------------------
@@ -258,6 +261,9 @@ constructPrunedSSA platform cfg (CmmProc liveInfo lbl live sccs)
                           then head entries
                           else panic "GHC.CmmToAsm.SSA.toPrunedSSA: No proc entry points!"
          let defsites   = calcDefSites platform sccs
+
+         -- Store number of names in original program for stats
+         modify $ \s -> s { stateOriginalNames = sizeUFM defsites }
 
          -- -- DEBUG
          -- (pprTraceIt "Defsites: " defsites) `seq` return ()
@@ -802,22 +808,26 @@ type RenameM a
 data RenameS
         = RenameS
         { -- | Unique supply for generating fresh vregs.
-          stateUS           :: UniqSupply
+          stateUS            :: UniqSupply
 
           -- | Current new name for original vreg
-        , stateReachingDef  :: UniqFM RegId [RegId]
+        , stateReachingDef   :: UniqFM RegId [RegId]
 
           -- | New definitions in current scope. Used to pop defs in rename.
-        , stateScopedDefs   :: [UniqSet RegId] }
+        , stateScopedDefs    :: [UniqSet RegId]
+
+          -- | Stats: Count of unique names starting out.
+        , stateOriginalNames :: Int }
 
 
 -- | Create a new renamer state.
 initRenameS :: UniqSupply -> RenameS
 initRenameS uniqueSupply
         = RenameS
-        { stateUS           = uniqueSupply
-        , stateReachingDef  = emptyUFM
-        , stateScopedDefs   = [] }
+        { stateUS            = uniqueSupply
+        , stateReachingDef   = emptyUFM
+        , stateScopedDefs    = []
+        , stateOriginalNames = 0 }
 
 
 -- | Allocate a new unique in the renamer monad.
@@ -868,7 +878,7 @@ leaveScope :: RenameM ()
 leaveScope = modify $ \s -> s {
         stateReachingDef = foldl' popDef (stateReachingDef s)
                                 (nonDetEltsUniqSet $ head (stateScopedDefs s)),
-                                -- ^ Order of pops not relevant. See Note [Unique Determinism and code generation]
+                                -- Order of pops not relevant. See Note [Unique Determinism and code generation]
         stateScopedDefs  = tail $ stateScopedDefs s
 }
 
