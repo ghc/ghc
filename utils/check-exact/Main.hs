@@ -13,6 +13,7 @@ import GHC.Hs.Dump
 import System.Environment( getArgs )
 import System.Exit
 import System.FilePath
+import System.IO
 import ExactPrint
 -- exactPrint = undefined
 -- showPprUnsafe = undefined
@@ -148,6 +149,9 @@ main = do
    [libdir,fileName] -> testOneFile libdir fileName
    _ -> putStrLn usage
 
+writeBinFile :: FilePath -> String -> IO()
+writeBinFile fpath x = withBinaryFile fpath WriteMode (`hPutStr` x)
+
 testOneFile :: FilePath -> String -> IO ()
 testOneFile libdir fileName = do
        p <- parseOneFile libdir fileName
@@ -166,9 +170,9 @@ testOneFile libdir fileName = do
          newAstFile = fileName <.> "ast.new"
 
        -- putStrLn $ "\n\nabout to writeFile"
-       writeFile astFile origAst
+       writeBinFile astFile origAst
        -- putStrLn $ "\n\nabout to pp"
-       writeFile newFile pped
+       writeBinFile newFile pped
 
        -- putStrLn $ "anns':" ++ showPprUnsafe (apiAnnRogueComments anns')
 
@@ -178,7 +182,7 @@ testOneFile libdir fileName = do
            newAstStr = showSDocUnsafe
                          $ showAstData BlankSrcSpanFile NoBlankApiAnnotations
                                                          (pm_parsed_source p')
-       writeFile newAstFile newAstStr
+       writeBinFile newAstFile newAstStr
 
        -- putStrLn $ "\n\nanns':" ++ showPprUnsafe (apiAnnRogueComments anns')
 
