@@ -217,9 +217,13 @@ cprAnalAlt env scrut_ty (Alt con bndrs rhs)
       , let ids = filter isId bndrs
       , CprType arity cpr <- scrut_ty
       , ASSERT( arity == 0 ) True
-      , let field_cprs = unpackConFieldsCpr dc cpr
-      , let sigs = zipWith (mkCprSig . idArity) ids field_cprs
-      = extendSigEnvList env (zipEqual "cprAnalAlt" ids sigs)
+      = case unpackConFieldsCpr dc cpr of
+          AllFieldsSame field_cpr
+            | let sig = mkCprSig 0 field_cpr
+            -> extendSigEnvAllSame env ids sig
+          ForeachField field_cprs
+            | let sigs = zipWith (mkCprSig . idArity) ids field_cprs
+            -> extendSigEnvList env (zipEqual "cprAnalAlt" ids sigs)
       | otherwise
       = env
     (rhs_ty, rhs') = cprAnal env_alt rhs
@@ -245,6 +249,8 @@ cprTransform env id
       -- Imported function or data con worker
       | isGlobalId id
       = getCprSig (idCprInfo id)
+      -- A local binding, not present in the SigEnv => Top
+      -- See Note [No Top CprSig in SigEnv]
       | otherwise
       = topCprType
 
@@ -408,18 +414,31 @@ lookupSigEnv :: AnalEnv -> Id -> Maybe CprSig
 lookupSigEnv env id = lookupVarEnv (ae_sigs env) id
 
 extendSigEnv :: AnalEnv -> Id -> CprSig -> AnalEnv
+-- See Note [No Top CprSig in SigEnv]
 extendSigEnv env id sig
-  = env { ae_sigs = extendVarEnv (ae_sigs env) id sig }
+  | isTopCprSig sig = env
+  | otherwise       = env { ae_sigs = extendVarEnv (ae_sigs env) id sig }
 
 -- | Extend an environment with the CPR sigs attached to the id
 extendSigEnvList :: AnalEnv -> [(Id, CprSig)] -> AnalEnv
+-- See Note [No Top CprSig in SigEnv]
 extendSigEnvList env ids_cprs
-  = env { ae_sigs = extendVarEnvList (ae_sigs env) ids_cprs }
+  = env { ae_sigs = extendVarEnvList (ae_sigs env)
+                                     (filter (isTopCprSig . snd) ids_cprs) }
 
 -- | Extend an environment with the CPR sigs attached to the ids
 extendSigEnvFromIds :: AnalEnv -> [Id] -> AnalEnv
+-- See Note [No Top CprSig in SigEnv]
 extendSigEnvFromIds env ids
-  = extendSigEnvList env [ (id, idCprInfo id) | id <- ids ]
+  = extendSigEnvList env -- See Note [No Top CprSig in SigEnv]:
+      [ (id, idCprInfo id) | id <- ids, not (isTopCprSig (idCprInfo id)) ]
+
+-- | Extend an environment with the same CPR sig for all ids
+extendSigEnvAllSame :: AnalEnv -> [Id] -> CprSig -> AnalEnv
+-- See Note [No Top CprSig in SigEnv]
+extendSigEnvAllSame env ids sig
+  | isTopCprSig sig = env
+  | otherwise       = foldl' (\env id -> extendSigEnv env id sig) env ids
 
 nonVirgin :: AnalEnv -> AnalEnv
 nonVirgin env = env { ae_virgin = False }
@@ -467,6 +486,13 @@ Fixed-point iteration may fail to terminate. But we cannot simply give up and
 return the environment and code unchanged! We still need to do one additional
 round, to ensure that all expressions have been traversed at least once, and any
 unsound CPR annotations have been updated.
+
+Note [No Top CprSig in SigEnv]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If 'cprTransform' encounters a locally-bound Id without an entry in the
+SigEnv, it behaves as if that binder has a Top signature. So we don't
+even bother storing Top signatures in the SigEnv! It's a pretty common
+case and we save quite some allocations in doing so.
 
 Note [CPR for binders that will be unboxed]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

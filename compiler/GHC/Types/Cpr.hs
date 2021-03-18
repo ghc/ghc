@@ -9,8 +9,8 @@ module GHC.Types.Cpr (
     Cpr (ConCpr), topCpr, botCpr, flatConCpr, asConCpr,
     CprType (..), topCprType, botCprType, flatConCprType,
     lubCprType, applyCprTy, abstractCprTy, trimCprTy,
-    unpackConFieldsCpr,
-    CprSig (..), topCprSig, mkCprSigForArity, mkCprSig, seqCprSig
+    UnpackConFieldsResult (..), unpackConFieldsCpr,
+    CprSig (..), topCprSig, isTopCprSig, mkCprSigForArity, mkCprSig, seqCprSig
   ) where
 
 import GHC.Prelude
@@ -139,13 +139,24 @@ abstractCprTy (CprType n res)
 trimCprTy :: CprType -> CprType
 trimCprTy (CprType arty res) = CprType arty (trimCpr res)
 
--- | Unpacks a 'ConCpr'-shaped 'Cpr' and returns the field 'Cpr's.
--- The length of the returned list matches the arity of the 'DataCon'.
-unpackConFieldsCpr :: DataCon -> Cpr -> [Cpr]
-unpackConFieldsCpr dc BotCpr = replicate (dataConRepArity dc) botCpr
+-- | The result of 'unpackConFieldsCpr'.
+data UnpackConFieldsResult
+  = AllFieldsSame !Cpr
+  | ForeachField ![Cpr]
+
+-- | Unpacks a 'ConCpr'-shaped 'Cpr' and returns the field 'Cpr's wrapped in a
+-- 'ForeachField'. Otherwise, it returns 'AllFieldsSame' with the appropriate
+-- 'Cpr' to assume for each field.
+--
+-- The use of 'UnpackConFieldsResult' allows O(1) space for the common,
+-- non-'ConCpr' case.
+unpackConFieldsCpr :: DataCon -> Cpr -> UnpackConFieldsResult
 unpackConFieldsCpr dc (ConCpr t cs)
-  | t == dataConTag dc, cs `lengthIs` dataConRepArity dc = cs
-unpackConFieldsCpr dc _      = replicate (dataConRepArity dc) topCpr
+  | t == dataConTag dc, cs `lengthIs` dataConRepArity dc
+  = ForeachField cs
+unpackConFieldsCpr _  BotCpr = AllFieldsSame BotCpr
+unpackConFieldsCpr _  _      = AllFieldsSame TopCpr
+{-# INLINE unpackConFieldsCpr #-}
 
 seqCprTy :: CprType -> ()
 seqCprTy (CprType _ cpr) = seqCpr cpr
@@ -168,6 +179,9 @@ mkCprSigForArity arty ty@(CprType n cpr)
 
 topCprSig :: CprSig
 topCprSig = CprSig topCprType
+
+isTopCprSig :: CprSig -> Bool
+isTopCprSig (CprSig ty) = ct_cpr ty == TopCpr
 
 mkCprSig :: Arity -> Cpr -> CprSig
 mkCprSig arty cpr = CprSig (CprType arty cpr)
