@@ -144,6 +144,13 @@ endif
 # cabal-install's that are in the wild don't handle it properly.
 DYNAMIC_BY_DEFAULT = NO
 
+# Try enabling on ARM to work around persistent linking issues.
+ifeq "$(TargetArch_CPP)" "aarch64"
+DYNAMIC_BY_DEFAULT = YES
+else ifeq "$(TargetArch_CPP)" "arm"
+DYNAMIC_BY_DEFAULT = YES
+endif
+
 # If building both v and dyn ways, then use -dynamic-too to build them.
 # This makes the build faster.
 DYNAMIC_TOO = YES
