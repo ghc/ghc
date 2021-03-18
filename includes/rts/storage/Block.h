@@ -107,6 +107,11 @@ typedef struct bdescr_ {
                                    // value (StgPtr)(-1) is used to
                                    // indicate that a block is unallocated.
                                    //
+                                   // Also note that this field is only set lazily
+                                   // (e.g. when the mutator starts and stops
+                                   // allocating in the nursery stg_gc_noregs) in
+                                   // the case of a nursery block.
+                                   //
                                    // Unused by the non-moving allocator.
         struct NonmovingSegmentInfo nonmoving_segment;
     };
