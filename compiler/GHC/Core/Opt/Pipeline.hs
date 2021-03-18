@@ -471,7 +471,7 @@ runCorePasses passes guts
       withTiming logger dflags (ppr pass <+> brackets (ppr mod))
                    (const ()) $ do
             guts' <- lintAnnots (ppr pass) (doCorePass pass) guts
-            endPass pass (mg_binds guts') (mg_rules guts')
+            endPass pass (mg_binds guts') (mg_rules guts') (mg_fam_insts guts')
             return guts'
 
     mod = mg_module guts

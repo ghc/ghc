@@ -81,12 +81,17 @@ import GHC.Core.Coercion.Opt ( checkAxInstCo )
 import GHC.Core.Opt.Arity    ( typeArity )
 import GHC.Types.Demand      ( splitStrictSig, isDeadEndDiv )
 import GHC.Types.TypeEnv
+import GHC.Tc.Solver.Monad ( steps )
+import GHC.Unit.Home.ModInfo
+import GHC.Unit.External
+import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.ModGuts
 import GHC.Runtime.Context
 
 import Control.Monad
 import GHC.Utils.Monad
 import Data.Foldable      ( toList )
+import Data.IORef
 import Data.List.NonEmpty ( NonEmpty(..), groupWith )
 import Data.List          ( partition )
 import Data.Maybe
@@ -281,19 +286,20 @@ be, and it makes a convenient place for them.  They print out stuff
 before and after core passes, and do Core Lint when necessary.
 -}
 
-endPass :: CoreToDo -> CoreProgram -> [CoreRule] -> CoreM ()
-endPass pass binds rules
+endPass :: CoreToDo -> CoreProgram -> [CoreRule] -> [FamInst] -> CoreM ()
+endPass pass binds rules fam_insts
   = do { hsc_env <- getHscEnv
        ; print_unqual <- getPrintUnqualified
-       ; liftIO $ endPassIO hsc_env print_unqual pass binds rules }
+       ; liftIO $ endPassIO hsc_env print_unqual pass binds rules fam_insts }
 
 endPassIO :: HscEnv -> PrintUnqualified
-          -> CoreToDo -> CoreProgram -> [CoreRule] -> IO ()
+          -> CoreToDo -> CoreProgram -> [CoreRule] -> [FamInst] -> IO ()
 -- Used by the IO-is CorePrep too
-endPassIO hsc_env print_unqual pass binds rules
+endPassIO hsc_env print_unqual pass binds rules fam_insts
   = do { dumpPassResult logger dflags print_unqual mb_flag
                         (ppr pass) (pprPassDetails pass) binds rules
-       ; lintPassResult hsc_env (error "AMG TODO: fam_envs") pass binds }
+       ; fam_envs <- getFamInstEnvsIO hsc_env fam_insts
+       ; lintPassResult hsc_env fam_envs pass binds }
   where
     logger  = hsc_logger hsc_env
     dflags  = hsc_dflags hsc_env
@@ -301,6 +307,17 @@ endPassIO hsc_env print_unqual pass binds rules
                 Just flag | dopt flag dflags                    -> Just flag
                           | dopt Opt_D_verbose_core2core dflags -> Just flag
                 _ -> Nothing
+
+-- AMG TODO: it's far from clear this is right
+getFamInstEnvsIO :: HscEnv -> [FamInst] -> IO FamInstEnvs
+getFamInstEnvsIO hsc_env this_module_fam_insts
+  = do { let (_home_insts, home_fam_inst_list) = hptInstances hsc_env (\_ -> True)
+       ; let home_fam_insts = extendFamInstEnvList emptyFamInstEnv home_fam_inst_list
+       ; let (_, ic_fam_insts) = ic_instances (hsc_IC hsc_env)
+       ; let all_home_fam_insts = extendFamInstEnvList home_fam_insts (this_module_fam_insts ++ ic_fam_insts)
+       ; eps_fam_insts <- eps_fam_inst_env <$> readIORef (hsc_EPS hsc_env)
+       ; return (eps_fam_insts, all_home_fam_insts)
+       }
 
 dumpIfSet :: Logger -> DynFlags -> Bool -> CoreToDo -> SDoc -> SDoc -> IO ()
 dumpIfSet logger dflags dump_me pass extra_info doc
@@ -432,10 +449,12 @@ lintInteractiveExpr :: SDoc -- ^ The source of the linted expression
 lintInteractiveExpr what hsc_env expr
   | not (gopt Opt_DoCoreLinting dflags)
   = return ()
-  | Just err <- lintExpr dflags (error "AMG TODO: fam_envs") (interactiveInScope hsc_env) expr
-  = displayLintResults logger dflags False what (pprCoreExpr expr) (emptyBag, err)
   | otherwise
-  = return ()
+  = do { fam_envs <- getFamInstEnvsIO hsc_env [] -- AMG TODO: is empty list right?
+       ; case lintExpr dflags fam_envs (interactiveInScope hsc_env) expr of
+           Just err -> displayLintResults logger dflags False what (pprCoreExpr expr) (emptyBag, err)
+           Nothing   -> return ()
+       }
   where
     dflags = hsc_dflags hsc_env
     logger = hsc_logger hsc_env
@@ -2153,21 +2172,23 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
      lint_prov _ _ _ _ prov@(PluginProv _) = return prov
 
      lint_prov _ ty1' _ ty2' prov@(StepsProv m n)
+       | 1 == 1 = return prov -- AMG TODO: fix lint
+       | otherwise
        = do { fam_envs <- getFamInstEnvs
-            ; let mb_u = stepsUntil fam_envs m ty1'
-            ; let mb_v = stepsUntil fam_envs n ty2'
-            ; case (mb_u, mb_v) of
-                (Just u, Just v) -> do checkL (u `eqType` v) (report mb_u mb_v "inputs do not reduce to equal types")
-                                       return prov
-                _ -> failWithL (report mb_u mb_v "inputs do not reduce by the given step counts")
+            ; let (u, m') = steps (mkIntWithInf m) fam_envs ty1'
+            ; let (v, n') = steps (mkIntWithInf n) fam_envs ty2'
+            ; checkL (u `eqType` v) (report u m' v n' "inputs do not reduce to equal types")
+            ; return prov
             }
        where
-         report mb_u mb_v s =
+         report u m' v n' s =
              hang (text $ "Invalid steps coercion: " ++ s)
-                     2 (vcat [ text "From:" <+> ppr ty1'
-                             , if m > 0 then text "after" <+> ppr m <+> text "steps:" <+> ppr mb_u else empty
-                             , text "  To:" <+> ppr ty2'
-                             , if n > 0 then text "after" <+> ppr n <+> text "steps:" <+> ppr mb_v else empty
+                     2 (vcat [ text "LHS:" <+> ppr ty1'
+                             , text "Expected" <+> ppr m <+> text "steps, got" <+> ppr m'
+                             , if m' > 0 then text "Reduced LHS:" <+> ppr u else empty
+                             , text "RHS:" <+> ppr ty2'
+                             , text "Expected" <+> ppr n <+> text "steps, got" <+> ppr n'
+                             , if n' > 0 then text "Reduced RHS:" <+> ppr v else empty
                              ])
 
      check_kinds kco k1 k2
@@ -2507,17 +2528,6 @@ compatible_branches (CoAxBranch { cab_tvs = tvs1
       Just unifying_subst -> substTy unifying_subst rhs1  `eqType`
                              substTy unifying_subst rhs2'
       Nothing             -> True
-
-
-stepsUntil :: FamInstEnvs -> Int -> Type -> Maybe Type
-stepsUntil fam_envs = go
-  where
-    go :: Int -> Type -> Maybe Type
-    go 0 ty = Just ty
-    go !i (TyConApp tycon args)
-            | Just (_, ty) <- reduceTyFamApp_maybe fam_envs Nominal tycon args = go (i-1) ty
-            | Just ty      <- expandSynTyConApp_maybe tycon args               = go i ty
-    go _ _ = Nothing
 
 
 {-

@@ -117,7 +117,7 @@ module GHC.Tc.Solver.Monad (
 
     -- Misc
     getDefaultInfo, getDynFlags, getGlobalRdrEnvTcS,
-    matchFam, matchFamTcM, stepFam,
+    matchFam, matchFamTcM, stepFam, steps,
     checkWellStagedDFun,
     pprEq,                                   -- Smaller utils, re-exported from TcM
                                              -- TODO (DV): these are only really used in the
@@ -3830,8 +3830,8 @@ stepFamTcM limit tycon args
            Just (co, ty) -> do { let ty0 = mkTyConApp tycon args
                                ; let (ty', n) = steps (limit `minusWithInf` 1) fam_envs ty
                                ; let co' = Rep.UnivCo (Rep.StepsProv 0 (n+1)) Nominal ty' ty0
-                               ; let r | n > 0     = (co', ty')
-                                       | otherwise = (mkTcSymCo co, ty')
+                               ; let r | n > 1     = (co', ty')  -- AMG TODO: testing not n > 0
+                                       | otherwise = (mkTcSymCo co, ty)
                                ; return (Just r, n+1)
                                }
        }

@@ -1509,10 +1509,10 @@ hscSimpleIface' tc_result mb_old_iface = do
 --------------------------------------------------------------
 
 -- | Compile to hard-code.
-hscGenHardCode :: HscEnv -> CgGuts -> ModLocation -> FilePath
+hscGenHardCode :: HscEnv -> CgGuts -> ModLocation -> FilePath -> [FamInst]
                -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)], CgInfos)
                -- ^ @Just f@ <=> _stub.c is f
-hscGenHardCode hsc_env cgguts location output_filename = do
+hscGenHardCode hsc_env cgguts location output_filename fam_insts = do
         let CgGuts{ -- This is the last use of the ModGuts in a compilation.
                     -- From now on, we just use the bits we need.
                     cg_module   = this_mod,
@@ -1534,7 +1534,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
         -- Do saturation and convert to A-normal form
         (prepd_binds, local_ccs) <- {-# SCC "CorePrep" #-}
                        corePrepPgm hsc_env this_mod location
-                                   core_binds data_tycons
+                                   core_binds data_tycons fam_insts
         -----------------  Convert to STG ------------------
         (stg_binds, (caf_ccs, caf_cc_stacks))
             <- {-# SCC "CoreToStg" #-}
@@ -1584,8 +1584,9 @@ hscGenHardCode hsc_env cgguts location output_filename = do
 hscInteractive :: HscEnv
                -> CgGuts
                -> ModLocation
+               -> [FamInst]
                -> IO (Maybe FilePath, CompiledByteCode, [SptEntry])
-hscInteractive hsc_env cgguts location = do
+hscInteractive hsc_env cgguts location fam_insts = do
     let dflags = hsc_dflags hsc_env
     let logger = hsc_logger hsc_env
     let CgGuts{ -- This is the last use of the ModGuts in a compilation.
@@ -1605,7 +1606,7 @@ hscInteractive hsc_env cgguts location = do
     -- PREPARE FOR CODE GENERATION
     -- Do saturation and convert to A-normal form
     (prepd_binds, _) <- {-# SCC "CorePrep" #-}
-                   corePrepPgm hsc_env this_mod location core_binds data_tycons
+                   corePrepPgm hsc_env this_mod location core_binds data_tycons fam_insts
     -----------------  Generate byte code ------------------
     comp_bc <- byteCodeGen hsc_env this_mod prepd_binds data_tycons mod_breaks
     ------------------ Create f-x-dynamic C-side stuff -----
@@ -1885,7 +1886,7 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
     {- Prepare For Code Generation -}
     -- Do saturation and convert to A-normal form
     (prepd_binds, _) <- {-# SCC "CorePrep" #-}
-      liftIO $ corePrepPgm hsc_env this_mod iNTERACTIVELoc core_binds data_tycons
+      liftIO $ corePrepPgm hsc_env this_mod iNTERACTIVELoc core_binds data_tycons fam_insts
 
     {- Generate byte code -}
     cbc <- liftIO $ byteCodeGen hsc_env this_mod

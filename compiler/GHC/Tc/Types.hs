@@ -268,6 +268,7 @@ data IfGblEnv
                 -- Allows a read effect, so it can be in a mutable
                 -- variable; c.f. handling the external package type env
                 -- Nothing => interactive stuff, no loops possible
+      , if_fam_insts :: Maybe FamInstEnvs
     }
 
 data IfLclEnv
