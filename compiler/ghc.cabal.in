@@ -268,6 +268,7 @@ Library
         GHC.CmmToAsm.SPARC.ShortcutJump
         GHC.CmmToAsm.SPARC.Stack
         GHC.CmmToAsm.SSA
+        GHC.CmmToAsm.SSA.Stats
         GHC.CmmToAsm.Types
         GHC.CmmToAsm.Utils
         GHC.CmmToAsm.X86
