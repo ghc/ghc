@@ -307,7 +307,7 @@ instance Ord TyCon where
 -- 'Ordering' datatype allows a single comparison to determine the precise
 -- ordering of two objects.
 --
--- 'Ord' is expected to implement a non-strict total order and have the
+-- 'Ord' is expected to implement a total order and have the
 -- following properties:
 --
 -- [__Comparability__]: @x <= y || y <= x@ = 'True'
@@ -315,7 +315,7 @@ instance Ord TyCon where
 -- [__Reflexivity__]: @x <= x@ = 'True'
 -- [__Antisymmetry__]: if @x <= y && y <= x@ = 'True', then @x == y@ = 'True'
 --
--- Note that the following operator interactions are expected to hold:
+-- The following operator interactions are expected to hold:
 --
 -- 1. @x >= y@ = @y <= x@
 -- 2. @x < y@ = @x <= y && x /= y@
