@@ -307,10 +307,10 @@ instance Ord TyCon where
 -- 'Ordering' datatype allows a single comparison to determine the precise
 -- ordering of two objects.
 --
--- The Haskell Report defines no laws for 'Ord'. However, '<=' is customarily
--- expected to implement a non-strict partial order and have the following
--- properties:
+-- 'Ord' is expected to implement a non-strict total order and have the
+-- following properties:
 --
+-- [__Comparability__]: @x <= y || y <= x@ = 'True'
 -- [__Transitivity__]: if @x <= y && y <= z@ = 'True', then @x <= z@ = 'True'
 -- [__Reflexivity__]: @x <= x@ = 'True'
 -- [__Antisymmetry__]: if @x <= y && y <= x@ = 'True', then @x == y@ = 'True'
