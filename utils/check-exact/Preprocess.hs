@@ -35,7 +35,7 @@ import qualified GHC.Utils.Fingerprint as GHC
 import GHC.Types.SrcLoc (mkSrcSpan, mkSrcLoc)
 import GHC.Data.FastString (mkFastString)
 
-import Data.List hiding (find)
+import Data.List (isPrefixOf, intercalate)
 import Data.Maybe
 import Types
 import Utils
