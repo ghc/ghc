@@ -62,7 +62,7 @@ _tt = testOneFile "/home/alanz/mysrc/git.haskell.org/worktree/exactprint/_build/
  -- "../../testsuite/tests/printer/Ppr033.hs"
  -- "../../testsuite/tests/printer/Ppr034.hs"
  -- "../../testsuite/tests/printer/Ppr035.hs"
- -- "../../testsuite/tests/printer/Ppr036.hs"
+ "../../testsuite/tests/printer/Ppr036.hs"
  -- "../../testsuite/tests/printer/Ppr037.hs"
  -- "../../testsuite/tests/printer/Ppr038.hs"
  -- "../../testsuite/tests/printer/Ppr039.hs"
@@ -127,7 +127,7 @@ _tt = testOneFile "/home/alanz/mysrc/git.haskell.org/worktree/exactprint/_build/
  -- "../../testsuite/tests/printer/PprRecordDotSyntax2.hs"
  -- "../../testsuite/tests/printer/PprRecordDotSyntax3.hs"
  -- "../../testsuite/tests/printer/PprRecordDotSyntax4.hs"
- "../../testsuite/tests/printer/PprRecordDotSyntaxA.hs"
+ -- "../../testsuite/tests/printer/PprRecordDotSyntaxA.hs"
  -- "./cases/Windows.hs"
 
 -- exact = ppr
@@ -150,7 +150,7 @@ main = do
    _ -> putStrLn usage
 
 writeBinFile :: FilePath -> String -> IO()
-writeBinFile fpath x = withBinaryFile fpath WriteMode (`hPutStr` x)
+writeBinFile fpath x = withBinaryFile fpath WriteMode (\h -> hSetEncoding h utf8 >> hPutStr h x)
 
 testOneFile :: FilePath -> String -> IO ()
 testOneFile libdir fileName = do

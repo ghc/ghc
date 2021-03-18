@@ -35,7 +35,7 @@ main = do
 -- change our LF line endings to CRLF, which will show up in the AST when we
 -- re-parse.
 writeBinFile :: FilePath -> String -> IO()
-writeBinFile fpath x = withBinaryFile fpath WriteMode (`hPutStr` x)
+writeBinFile fpath x = withBinaryFile fpath WriteMode (\h -> hSetEncoding h utf8 >> hPutStr h x)
 
 testOneFile :: FilePath -> String -> IO ()
 testOneFile libdir fileName = do
