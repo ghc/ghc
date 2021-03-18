@@ -32,10 +32,14 @@ import GHC.Core.Opt.WorkWrap.Utils
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Logger  ( Logger, dumpIfSet_dyn, DumpFormat (..) )
+import GHC.Data.Graph.UnVar -- for UnVarSet
 import GHC.Data.Maybe   ( isNothing )
 
 import Control.Monad ( guard )
 import Data.List ( mapAccumL )
+
+import GHC.Driver.Ppr
+_ = pprTrace -- Tired of commenting out the import all the time
 
 {- Note [Constructed Product Result]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -217,9 +221,13 @@ cprAnalAlt env scrut_ty (Alt con bndrs rhs)
       , let ids = filter isId bndrs
       , CprType arity cpr <- scrut_ty
       , ASSERT( arity == 0 ) True
-      , let field_cprs = unpackConFieldsCpr dc cpr
-      , let sigs = zipWith (mkCprSig . idArity) ids field_cprs
-      = extendSigEnvList env (zipEqual "cprAnalAlt" ids sigs)
+      = case unpackConFieldsCpr dc cpr of
+          AllFieldsSame field_cpr
+            | let sig = mkCprSig 0 field_cpr
+            -> extendSigEnvAllSame env ids sig
+          ForeachField field_cprs
+            | let sigs = zipWith (mkCprSig . idArity) ids field_cprs
+            -> extendSigEnvList env (zipEqual "cprAnalAlt" ids sigs)
       | otherwise
       = env
     (rhs_ty, rhs') = cprAnal env_alt rhs
@@ -232,7 +240,7 @@ cprTransform :: AnalEnv         -- ^ The analysis environment
              -> Id              -- ^ The function
              -> CprType         -- ^ The demand type of the function
 cprTransform env id
-  = -- pprTrace "cprTransform" (vcat [ppr id, ppr sig])
+  = pprTrace "cprTransform" (vcat [ppr id, ppr sig])
     sig
   where
     sig
@@ -245,6 +253,8 @@ cprTransform env id
       -- Imported function or data con worker
       | isGlobalId id
       = getCprSig (idCprInfo id)
+      -- A local binding, not present in the SigEnv => Top
+      -- See Note [No Top CprSig in SigEnv]
       | otherwise
       = topCprType
 
@@ -388,38 +398,68 @@ data AnalEnv
   -- ^ Needed when expanding type families and synonyms of product types.
   }
 
-type SigEnv = VarEnv CprSig
-
 instance Outputable AnalEnv where
   ppr (AE { ae_sigs = env, ae_virgin = virgin })
     = text "AE" <+> braces (vcat
          [ text "ae_virgin =" <+> ppr virgin
          , text "ae_sigs =" <+> ppr env ])
 
+-- | An environment storing 'CprSig's for local Ids.
+-- Puts binders with 'topCprSig' in a space-saving 'IntSet'.
+-- See Note [Efficient Top sigs in SigEnv].
+data SigEnv
+  = SE
+  { se_tops :: !UnVarSet
+  -- ^ All these Ids have 'topCprSig'. Like a 'VarSet', but more efficient.
+  , se_sigs :: !(VarEnv CprSig)
+  -- ^ Ids that have something other than 'topCprSig'.
+  }
+
+instance Outputable SigEnv where
+  ppr (SE { se_tops = tops, se_sigs = sigs })
+    = text "SE" <+> braces (vcat
+         [ text "se_tops =" <+> ppr tops
+         , text "se_sigs =" <+> ppr sigs ])
+
 emptyAnalEnv :: FamInstEnvs -> AnalEnv
 emptyAnalEnv fam_envs
   = AE
-  { ae_sigs = emptyVarEnv
+  { ae_sigs = SE emptyUnVarSet emptyVarEnv
   , ae_virgin = True
   , ae_fam_envs = fam_envs
   }
 
+modifySigEnv :: (SigEnv -> SigEnv) -> AnalEnv -> AnalEnv
+modifySigEnv f env = env { ae_sigs = f (ae_sigs env) }
+
 lookupSigEnv :: AnalEnv -> Id -> Maybe CprSig
-lookupSigEnv env id = lookupVarEnv (ae_sigs env) id
+-- See Note [Efficient Top sigs in SigEnv]
+lookupSigEnv AE{ae_sigs = SE tops sigs} id
+  | id `elemUnVarSet` tops = Just topCprSig
+  | otherwise              = lookupVarEnv sigs id
 
 extendSigEnv :: AnalEnv -> Id -> CprSig -> AnalEnv
+-- See Note [Efficient Top sigs in SigEnv]
 extendSigEnv env id sig
-  = env { ae_sigs = extendVarEnv (ae_sigs env) id sig }
+  | isTopCprSig sig
+  = modifySigEnv (\se -> se{se_tops = extendUnVarSet id (se_tops se)}) env
+  | otherwise
+  = modifySigEnv (\se -> se{se_sigs = extendVarEnv (se_sigs se) id sig}) env
 
--- | Extend an environment with the CPR sigs attached to the id
+-- | Extend an environment with the (Id, CPR sig) pairs
 extendSigEnvList :: AnalEnv -> [(Id, CprSig)] -> AnalEnv
 extendSigEnvList env ids_cprs
-  = env { ae_sigs = extendVarEnvList (ae_sigs env) ids_cprs }
+  = foldl' (\env (id, sig) -> extendSigEnv env id sig) env ids_cprs
 
 -- | Extend an environment with the CPR sigs attached to the ids
 extendSigEnvFromIds :: AnalEnv -> [Id] -> AnalEnv
 extendSigEnvFromIds env ids
-  = extendSigEnvList env [ (id, idCprInfo id) | id <- ids ]
+  = foldl' (\env id -> extendSigEnv env id (idCprInfo id)) env ids
+
+-- | Extend an environment with the same CPR sig for all ids
+extendSigEnvAllSame :: AnalEnv -> [Id] -> CprSig -> AnalEnv
+extendSigEnvAllSame env ids sig
+  = foldl' (\env id -> extendSigEnv env id sig) env ids
 
 nonVirgin :: AnalEnv -> AnalEnv
 nonVirgin env = env { ae_virgin = False }
@@ -467,6 +507,24 @@ Fixed-point iteration may fail to terminate. But we cannot simply give up and
 return the environment and code unchanged! We still need to do one additional
 round, to ensure that all expressions have been traversed at least once, and any
 unsound CPR annotations have been updated.
+
+Note [Efficient Top sigs in SigEnv]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It's pretty common for binders in the SigEnv to have a 'topCprSig'.
+Wide records with 100 fields like in T9675 even will generate code where the
+majority of binders has Top signature. To save some allocations, we store
+those binders with a Top signature in a separate UnVarSet (which is an IntSet
+with a convenient Var-tailored API).
+
+Why store top signatures at all in the SigEnv? After all, when 'cprTransform'
+encounters a locally-bound Id without an entry in the SigEnv, it should behave
+as if that binder has a Top signature!
+Well, the problem is when case binders should have a Top signatures. They always
+have an unfolding and thus look to 'cprTransform' as if they bind a data
+structure, Note [CPR for data structures], and thus would always have the CPR
+property. So we need some mechanism to separate data structures from case
+binders with a Top signature, and the UnVarSet provides that in the least
+convoluted way I can think of.
 
 Note [CPR for binders that will be unboxed]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

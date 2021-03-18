@@ -9,8 +9,8 @@ module GHC.Types.Cpr (
     Cpr (ConCpr), topCpr, botCpr, flatConCpr, asConCpr,
     CprType (..), topCprType, botCprType, flatConCprType,
     lubCprType, applyCprTy, abstractCprTy, trimCprTy,
-    unpackConFieldsCpr,
-    CprSig (..), topCprSig, mkCprSigForArity, mkCprSig, seqCprSig
+    UnpackConFieldsResult (..), unpackConFieldsCpr,
+    CprSig (..), topCprSig, isTopCprSig, mkCprSigForArity, mkCprSig, seqCprSig
   ) where
 
 import GHC.Prelude
@@ -55,7 +55,7 @@ lubCpr cpr         BotCpr  = cpr
 lubCpr (FlatConCpr t1) (viewConTag -> Just t2)
   | t1 == t2 = FlatConCpr t1
 lubCpr (viewConTag -> Just t1) (FlatConCpr t2)
-  | t1 == t2  = FlatConCpr t1
+  | t1 == t2 = FlatConCpr t2
 lubCpr (ConCpr t1 cs1) (ConCpr t2 cs2)
   | t1 == t2 = ConCpr t1 (lubFieldCprs cs1 cs2)
 lubCpr _           _       = TopCpr
@@ -75,9 +75,8 @@ flatConCpr :: ConTag -> Cpr
 flatConCpr t = FlatConCpr t
 
 trimCpr :: Cpr -> Cpr
-trimCpr ConCpr{}     = TopCpr
-trimCpr FlatConCpr{} = TopCpr
-trimCpr cpr          = cpr
+trimCpr BotCpr = botCpr
+trimCpr _      = topCpr
 
 asConCpr :: Cpr -> Maybe (ConTag, [Cpr])
 asConCpr (ConCpr t cs)  = Just (t, cs)
@@ -139,13 +138,24 @@ abstractCprTy (CprType n res)
 trimCprTy :: CprType -> CprType
 trimCprTy (CprType arty res) = CprType arty (trimCpr res)
 
--- | Unpacks a 'ConCpr'-shaped 'Cpr' and returns the field 'Cpr's.
--- The length of the returned list matches the arity of the 'DataCon'.
-unpackConFieldsCpr :: DataCon -> Cpr -> [Cpr]
-unpackConFieldsCpr dc BotCpr = replicate (dataConRepArity dc) botCpr
+-- | The result of 'unpackConFieldsCpr'.
+data UnpackConFieldsResult
+  = AllFieldsSame !Cpr
+  | ForeachField ![Cpr]
+
+-- | Unpacks a 'ConCpr'-shaped 'Cpr' and returns the field 'Cpr's wrapped in a
+-- 'ForeachField'. Otherwise, it returns 'AllFieldsSame' with the appropriate
+-- 'Cpr' to assume for each field.
+--
+-- The use of 'UnpackConFieldsResult' allows O(1) space for the common,
+-- non-'ConCpr' case.
+unpackConFieldsCpr :: DataCon -> Cpr -> UnpackConFieldsResult
 unpackConFieldsCpr dc (ConCpr t cs)
-  | t == dataConTag dc, cs `lengthIs` dataConRepArity dc = cs
-unpackConFieldsCpr dc _      = replicate (dataConRepArity dc) topCpr
+  | t == dataConTag dc, cs `lengthIs` dataConRepArity dc
+  = ForeachField cs
+unpackConFieldsCpr _  BotCpr = AllFieldsSame BotCpr
+unpackConFieldsCpr _  _      = AllFieldsSame TopCpr
+{-# INLINE unpackConFieldsCpr #-}
 
 seqCprTy :: CprType -> ()
 seqCprTy (CprType _ cpr) = seqCpr cpr
@@ -160,14 +170,17 @@ newtype CprSig = CprSig { getCprSig :: CprType }
 -- "GHC.Types.Demand"
 mkCprSigForArity :: Arity -> CprType -> CprSig
 mkCprSigForArity arty ty@(CprType n cpr)
-  | arty /= n                          = topCprSig
+  | arty /= n         = topCprSig
       -- Trim on arity mismatch
-  | ConCpr t cprs <- cpr, notNull cprs = CprSig (CprType n (flatConCpr t))
+  | ConCpr t _ <- cpr = CprSig (CprType n (flatConCpr t))
       -- Flatten nested CPR info, we don't exploit it (yet)
-  | otherwise                          = CprSig ty
+  | otherwise         = CprSig ty
 
 topCprSig :: CprSig
 topCprSig = CprSig topCprType
+
+isTopCprSig :: CprSig -> Bool
+isTopCprSig (CprSig ty) = ct_cpr ty == topCpr
 
 mkCprSig :: Arity -> Cpr -> CprSig
 mkCprSig arty cpr = CprSig (CprType arty cpr)
