@@ -14,6 +14,7 @@ import GHC.Utils.Outputable hiding (space)
 import System.Environment( getArgs )
 import System.Exit
 import System.FilePath
+import System.IO
 
 usage :: String
 usage = unlines
@@ -30,6 +31,12 @@ main = do
    [libdir,fileName] -> testOneFile libdir fileName
    _ -> putStrLn usage
 
+-- | N.B. It's important that we write our output as binary lest Windows will
+-- change our LF line endings to CRLF, which will show up in the AST when we
+-- re-parse.
+writeBinFile :: FilePath -> String -> IO()
+writeBinFile fpath x = withBinaryFile fpath WriteMode (\h -> hSetEncoding h utf8 >> hPutStr h x)
+
 testOneFile :: FilePath -> String -> IO ()
 testOneFile libdir fileName = do
        p <- parseOneFile libdir fileName
@@ -45,8 +52,8 @@ testOneFile libdir fileName = do
          astFile = fileName <.> "ast"
          newAstFile = fileName <.> "ast.new"
 
-       writeFile astFile origAst
-       writeFile newFile pped
+       writeBinFile astFile origAst
+       writeBinFile newFile pped
 
        p' <- parseOneFile libdir newFile
 
@@ -54,7 +61,7 @@ testOneFile libdir fileName = do
            newAstStr = showPprUnsafe
                          $ showAstData BlankSrcSpan BlankApiAnnotations
                          $ eraseLayoutInfo (pm_parsed_source p')
-       writeFile newAstFile newAstStr
+       writeBinFile newAstFile newAstStr
 
        if origAst == newAstStr
          then do
