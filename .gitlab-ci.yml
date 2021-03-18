@@ -42,6 +42,7 @@ default:
   interruptible: true
 
 stages:
+  - not-interruptible
   - tool-lint      # Source linting of the tools
   - quick-build    # A very quick smoke-test to weed out broken commits
   - full-build     # Build all the things
@@ -105,6 +106,49 @@ workflow:
 # * lint: Any Docker-capable x86_64 Linux machine; distinct from
 #         x86_64-linux to ensure low-latency availability.
 #
+
+####
+# HACK
+###
+#
+# Since 58cfcc65 the default for jobs has been "interruptible", this means
+# that when new commits are pushed to a branch which already has a running
+# pipeline then the old pipelines for this branch are cancelled.
+#
+# This includes the master branch, and in particular, new commits merged
+# to the master branch will cancel the nightly job.
+#
+# The semantics of pipeline cancelling are actually a bit more complicated
+# though. The interruptible flag is *per job*, but once a pipeline has run
+# *any* non-interruptible job, then the whole pipeline is considered
+# non-interruptible (ref
+# https://gitlab.com/gitlab-org/gitlab/-/issues/32837). This leads to the
+# hack in this MR where by default all jobs are `interruptible: True`, but
+# for pipelines we definitely want to run, there is a dummy job which
+# happens first, which is `interreuptible: False`. This has the effect of
+# dirtying the whole pipeline and
+#
+# For now, this patch solves the immediate problem of making sure nightly
+# jobs are not cancelled.
+# In the future, we may want to enable this job also for the master
+# branch, making that change might mean we need more CI capacity than
+# currently available.
+
+
+not-interruptible:
+  stage: not-interruptible
+  script: "true"
+  interruptible: false
+  image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
+  tags:
+    - lint
+  rules:
+#   - if: '$CI_COMMIT_BRANCH == "master"'
+#      when: always
+    - if: $NIGHTLY
+      when: always
+
+
 
 
 ############################################################
