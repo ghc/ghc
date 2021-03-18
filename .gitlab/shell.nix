@@ -28,7 +28,7 @@
     haskell.compiler.${compiler}
     haskell.packages.${compiler}.cabal-install
     haskell.packages.${compiler}.alex
-    haskell.packages.${compiler}.happy_1_19_12
+    haskell.packages.${compiler}.happy # _1_19_12 is needed for older GHCs.
 
     clang_11
     llvm_11
