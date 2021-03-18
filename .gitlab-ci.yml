@@ -39,6 +39,7 @@ default:
   interruptible: true
 
 stages:
+  - master-not-interruptible
   - tool-lint      # Source linting of the tools
   - quick-build    # A very quick smoke-test to weed out broken commits
   - full-build     # Build all the things
@@ -101,6 +102,20 @@ workflow:
 # * lint: Any Docker-capable x86_64 Linux machine; distinct from
 #         x86_64-linux to ensure low-latency availability.
 #
+
+####
+# HACK
+###
+
+master-not-interruptible:
+  stage: master-not-interruptible
+  script: "true"
+  interruptible: false
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master" || $CI_COMMIT_BRANCH == "wip/ci-master-not-interruptible"'
+      when: always
+
+
 
 
 ############################################################
