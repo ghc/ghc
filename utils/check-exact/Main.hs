@@ -6,7 +6,7 @@
 {-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
-import Data.List
+import Data.List (intercalate)
 import Data.Data
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name.Reader

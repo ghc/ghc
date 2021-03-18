@@ -121,7 +121,7 @@ import GHC.Data.FastString
 -- import qualified Data.Generics as SYB
 
 import Data.Data
-import Data.List
+import Data.List (sort, sortBy, find)
 import Data.Maybe
 
 import qualified Data.Map as Map
