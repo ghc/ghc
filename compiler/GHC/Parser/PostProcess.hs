@@ -139,7 +139,7 @@ import GHC.Data.Maybe
 import GHC.Data.Bag
 import GHC.Utils.Misc
 import Data.Either
-import Data.List
+import Data.List        ( findIndex )
 import Data.Foldable
 import GHC.Driver.Flags ( WarningFlag(..) )
 import qualified Data.Semigroup as Semi

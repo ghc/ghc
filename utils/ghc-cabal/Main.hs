@@ -34,7 +34,7 @@ import Distribution.Utils.Path (getSymbolicPath)
 import Control.Exception (bracket)
 import Control.Monad
 import Control.Applicative ((<|>))
-import Data.List
+import Data.List (nub, intercalate, isPrefixOf, isSuffixOf)
 import Data.Maybe
 import System.IO
 import System.Directory (setCurrentDirectory, getCurrentDirectory, doesFileExist)
