@@ -255,7 +255,6 @@ Library
         GHC.MVar
         GHC.Natural
         GHC.Num
-        GHC.OldList
         GHC.OverloadedLabels
         GHC.Pack
         GHC.Profiling
