@@ -31,6 +31,7 @@ import GHC.Driver.Ppr
 import GHC.Types.CostCentre
 import GHC.Types.CostCentre.State
 import GHC.Types.Name hiding (varName)
+import GHC.Types.Tickish
 import GHC.Unit.Module.Name
 import GHC.Unit.Module.ModGuts
 import GHC.Types.SrcLoc
@@ -82,7 +83,7 @@ doExpr env e@(Var v)
           top:_ -> nameSrcSpan $ varName top
           _     -> noSrcSpan
         cc = NormalCC (ExprCC ccIdx) ccName (thisModule env) span
-        tick :: Tickish Id
+        tick :: CoreTickish
         tick = ProfNote cc True True
     pure $ Tick tick e
   | otherwise = pure e
