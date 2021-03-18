@@ -24,7 +24,7 @@
 module GHCi.BreakArray
     (
       BreakArray
-          (BA) -- constructor is exported only for GHC.CoreToByteCode
+          (BA) -- constructor is exported only for GHC.StgToByteCode
     , newBreakArray
     , getBreak
     , setupBreakpoint
