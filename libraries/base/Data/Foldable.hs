@@ -52,6 +52,9 @@ module Data.Foldable (
     -- * Overview
     -- $overview
 
+    -- ** Chirality
+    -- $chirality
+
     -- ** Recursive and corecursive reduction
     -- $reduction
 
@@ -1461,9 +1464,9 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 -- #leftright#
 -- Merging the contribution of the current element with an accumulator value
 -- from a partial result is performed by an /operator/ function, either
--- explicitly provided by the caller as in `foldr`, implicit as in `length`, or
--- partly implicit as in `foldMap` (where each element is mapped into a
--- 'Monoid', and the monoid's `mappend` operator performs the merge).
+-- explicitly provided by the caller as in `foldr`, implicit count as in
+-- `length`, or partly implicit as in `foldMap` (where each element is mapped
+-- into a 'Monoid', and the monoid's `mappend` operator performs the merge).
 --
 -- A key distinction is between left-associative and right-associative
 -- folds:
@@ -1559,12 +1562,43 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 --     reached, by which point a deep stack of pending function applications
 --     may have been built up in memory.
 --
+
+-- $chirality
+--
+-- #chirality#
+-- Foldable structures are generally expected to be efficiently iterable from
+-- left to right. Right-to-left iteration may be substantially more costly,
+-- or even impossible (as with, for example, infinite lists).  The text in
+-- the sections below that describes performance differences between
+-- left-associative right-associative folds pessimistically assumes such
+-- /left-handed/ structures.
+--
 -- In finite structures for which right-to-left sequencing no less efficient
 -- than left-to-right sequencing, there is no inherent performance distinction
 -- between left-associative and right-associative folds.  If the structure's
 -- @Foldable@ instance takes advantage of this symmetry to also make strict
 -- right folds space-efficient and lazy left folds corecursive, one need only
 -- take care to choose either a strict or lazy method for the task at hand.
+--
+-- Foldable instances for symmetric structures should strive to provide equally
+-- performant left-associative and right-associative interfaces. The main
+-- limitations are:
+--
+-- * The lazy 'fold', 'foldMap' and 'toList' methods have no right-associative
+--   counterparts.
+-- * The strict 'foldMap'' method has no left-associative counterpart.
+--
+-- Thus, for some foldable structures 'foldr'' is just as efficient as 'foldl''
+-- for strict reduction, and 'foldl' may be just as appropriate for corecursive
+-- folds as 'foldr'.
+--
+-- Finally, in some less common structures (e.g. /snoc/ lists) right to left
+-- iterations are cheaper than left to right.  For these, you may need to flip
+-- left and right in the descriptions below.  When using such a structure, you
+-- may also need to pay careful attention to the chirality of the fold's
+-- /operator/ function, it may need to be flipped when its strictness is
+-- different between its first and second argument (it will of course need to
+-- be flipped when its argument types are different).
 
 --------------
 
