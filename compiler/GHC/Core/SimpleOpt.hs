@@ -41,6 +41,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Core.DataCon
 import GHC.Types.Demand( etaConvertStrictSig )
+import GHC.Types.Tickish
 import GHC.Core.Coercion.Opt ( optCoercion, OptCoercionOpts (..) )
 import GHC.Core.Type hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
                             , isInScope, substTyVarBndr, cloneTyVarBndr )
@@ -1322,7 +1323,7 @@ Currently, it is used in GHC.Core.Rules.match, and is required to make
 -}
 
 exprIsLambda_maybe :: InScopeEnv -> CoreExpr
-                      -> Maybe (Var, CoreExpr,[Tickish Id])
+                      -> Maybe (Var, CoreExpr,[CoreTickish])
     -- See Note [exprIsLambda_maybe]
 
 -- The simple case: It is a lambda already
