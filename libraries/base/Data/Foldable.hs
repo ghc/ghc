@@ -52,6 +52,9 @@ module Data.Foldable (
     -- * Overview
     -- $overview
 
+    -- ** Chirality
+    -- $chirality
+
     -- ** Recursive and corecursive reduction
     -- $reduction
 
@@ -1461,9 +1464,9 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 -- #leftright#
 -- Merging the contribution of the current element with an accumulator value
 -- from a partial result is performed by an /operator/ function, either
--- explicitly provided by the caller as in `foldr`, implicit as in `length`, or
--- partly implicit as in `foldMap` (where each element is mapped into a
--- 'Monoid', and the monoid's `mappend` operator performs the merge).
+-- explicitly provided by the caller as in `foldr`, implicit count as in
+-- `length`, or partly implicit as in `foldMap` (where each element is mapped
+-- into a 'Monoid', and the monoid's `mappend` operator performs the merge).
 --
 -- A key distinction is between left-associative and right-associative
 -- folds:
@@ -1559,12 +1562,63 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 --     reached, by which point a deep stack of pending function applications
 --     may have been built up in memory.
 --
+
+-- $chirality
+--
+-- #chirality#
+-- Foldable structures are generally expected to be efficiently iterable from
+-- left to right. Right-to-left iteration may be substantially more costly, or
+-- even impossible (as with, for example, infinite lists).  The text in the
+-- sections that follow that suggests performance differences between
+-- left-associative and right-associative folds assumes /left-handed/
+-- structures in which left-to-right iteration is cheaper than right-to-left
+-- iteration.
+--
 -- In finite structures for which right-to-left sequencing no less efficient
 -- than left-to-right sequencing, there is no inherent performance distinction
 -- between left-associative and right-associative folds.  If the structure's
 -- @Foldable@ instance takes advantage of this symmetry to also make strict
 -- right folds space-efficient and lazy left folds corecursive, one need only
 -- take care to choose either a strict or lazy method for the task at hand.
+--
+-- Foldable instances for symmetric structures should strive to provide equally
+-- performant left-associative and right-associative interfaces. The main
+-- limitations are:
+--
+-- * The lazy 'fold', 'foldMap' and 'toList' methods have no right-associative
+--   counterparts.
+-- * The strict 'foldMap'' method has no left-associative counterpart.
+--
+-- Thus, for some foldable structures 'foldr'' is just as efficient as 'foldl''
+-- for strict reduction, and 'foldl' may be just as appropriate for corecursive
+-- folds as 'foldr'.
+--
+-- Finally, in some less common structures (e.g. /snoc/ lists) right to left
+-- iterations are cheaper than left to right.  Such structures are poor
+-- candidates for a @Foldable@ instance, and are perhaps best handled via their
+-- type-specific interfaces.  If nevertheless a @Foldable@ instance is
+-- provided, the material in the sections that follow applies to these also, by
+-- replacing each method with one with the opposite associativity (when
+-- available) and switching the order of arguments in the /operator/ function.
+--
+-- You may need to pay careful attention to strictness of the fold's /operator/
+-- when its strictness is different between its first and second argument.
+-- For example, while @('+')@ is expected to be commutative and strict in both
+-- arguments, the list concatenation operator @('++')@ is not commutative and
+-- is only strict in the initial constructor of its first argument.  The fold:
+--
+-- > myconcat xs = foldr (\a b -> a ++ b) [] xs
+--
+-- is subtantially cheaper (linear in the length of the consumed portion of the
+-- final list, thus e.g. constant time/space for just the first element) than:
+--
+-- > revconcat xs = foldr (\a b -> b ++ a) [] xs
+--
+-- In which the total cost scales up with both the number of lists combined and
+-- the number of elements ultimately consumed.  A more efficient way to combine
+-- lists in reverse order, is to use:
+--
+-- > revconcat = foldr (++) [] . reverse
 
 --------------
 
@@ -1697,6 +1751,20 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 -- container types.
 --
 -- > toList = foldr (:) []
+--
+-- A more complex example is concatenation of a list of lists expressed as a
+-- nested right fold (bypassing @('++')@).  We can check that the definition is
+-- indeed lazy by folding an infinite list of lists, and taking an initial
+-- segment.
+--
+-- >>> myconcat = foldr (\x z -> foldr (:) z x) []
+-- >>> take 15 $ myconcat $ map (\i -> [0..i]) [0..]
+-- [0,0,1,0,1,2,0,1,2,3,0,1,2,3,4]
+--
+-- Of course in this case another way to achieve the same result is via a
+-- list comprehension:
+--
+-- > myconcat xss = [x | xs <- xss, x <- xs]
 
 --------------
 
