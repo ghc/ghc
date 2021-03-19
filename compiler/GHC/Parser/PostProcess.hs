@@ -138,7 +138,7 @@ import GHC.Data.Bag
 import GHC.Utils.Misc
 import GHC.Parser.Annotation
 import Data.Either
-import Data.List
+import Data.List        ( findIndex )
 import Data.Foldable
 import GHC.Driver.Flags ( WarningFlag(..) )
 import GHC.Utils.Panic
