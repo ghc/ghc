@@ -2598,7 +2598,7 @@ isEmptyTy ty
     = False
 
 -- | If @normSplitTyConApp_maybe _ ty = Just (tc, tys, co)@
--- then @ty |> co = tc tys@. It's 'splitArgType_maybe', but looks through
+-- then @ty |> co = tc tys@. It's 'splitTyConApp_maybe', but looks through
 -- coercions via 'topNormaliseType_maybe'. Hence the \"norm\" prefix.
 normSplitTyConApp_maybe :: FamInstEnvs -> Type -> Maybe (TyCon, [Type], Coercion)
 normSplitTyConApp_maybe fam_envs ty
