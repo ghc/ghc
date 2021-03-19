@@ -1192,7 +1192,10 @@ instance TH.Quasi TcM where
 
   qAddCorePlugin plugin = do
       hsc_env <- getTopEnv
-      r <- liftIO $ findHomeModule hsc_env (mkModuleName plugin)
+      let fc        = hsc_FC hsc_env
+      let home_unit = hsc_home_unit hsc_env
+      let dflags    = hsc_dflags hsc_env
+      r <- liftIO $ findHomeModule fc home_unit dflags (mkModuleName plugin)
       let err = hang
             (text "addCorePlugin: invalid plugin module "
                <+> text (show plugin)

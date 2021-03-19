@@ -3,12 +3,19 @@
 
 -- | The Name Cache
 module GHC.Types.Name.Cache
-    ( lookupOrigNameCache
-    , extendOrigNameCache
-    , extendNameCache
-    , initNameCache
-    , NameCache(..), OrigNameCache
-    ) where
+  ( NameCache (..)
+  , initNameCache
+  , takeUniqFromNameCache
+  , updateNameCache'
+  , updateNameCache
+
+  -- * OrigNameCache
+  , OrigNameCache
+  , lookupOrigNameCache
+  , extendOrigNameCache'
+  , extendOrigNameCache
+  )
+where
 
 import GHC.Prelude
 
@@ -21,6 +28,9 @@ import GHC.Builtin.Names
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+
+import Control.Concurrent.MVar
+import Control.Monad
 
 #include "HsVersions.h"
 
@@ -40,6 +50,12 @@ External Name "M.x" has one, and only one globally-agreed Unique.
 The functions newGlobalBinder, allocateGlobalBinder do the main work.
 When you make an External name, you should probably be calling one
 of them.
+
+Names in a NameCache are always stored as a Global, and have the SrcLoc of their
+binding locations.  Actually that's not quite right.  When we first encounter
+the original name, we might not be at its binding site (e.g. we are reading an
+interface file); so we give it 'noSrcLoc' then.  Later, when we find its binding
+site, we fix it up.
 
 
 Note [Built-in syntax and the OrigNameCache]
@@ -73,9 +89,19 @@ are two reasons why we might look up an Orig RdrName for built-in syntax,
     go this route (#8954).
 
 -}
+-- | The NameCache makes sure that there is just one Unique assigned for
+-- each original name; i.e. (module-name, occ-name) pair and provides
+-- something of a lookup mechanism for those names.
+data NameCache = NameCache
+  { nsUniqChar :: {-# UNPACK #-} !Char
+  , nsNames    :: {-# UNPACK #-} !(MVar OrigNameCache)
+  }
 
 -- | Per-module cache of original 'OccName's given 'Name's
 type OrigNameCache   = ModuleEnv (OccEnv Name)
+
+takeUniqFromNameCache :: NameCache -> IO Unique
+takeUniqFromNameCache (NameCache c _) = uniqFromMask c
 
 lookupOrigNameCache :: OrigNameCache -> Module -> OccName -> Maybe Name
 lookupOrigNameCache nc mod occ
@@ -91,32 +117,47 @@ lookupOrigNameCache nc mod occ
         Nothing      -> Nothing
         Just occ_env -> lookupOccEnv occ_env occ
 
-extendOrigNameCache :: OrigNameCache -> Name -> OrigNameCache
-extendOrigNameCache nc name
+extendOrigNameCache' :: OrigNameCache -> Name -> OrigNameCache
+extendOrigNameCache' nc name
   = ASSERT2( isExternalName name, ppr name )
-    extendNameCache nc (nameModule name) (nameOccName name) name
+    extendOrigNameCache nc (nameModule name) (nameOccName name) name
 
-extendNameCache :: OrigNameCache -> Module -> OccName -> Name -> OrigNameCache
-extendNameCache nc mod occ name
+extendOrigNameCache :: OrigNameCache -> Module -> OccName -> Name -> OrigNameCache
+extendOrigNameCache nc mod occ name
   = extendModuleEnvWith combine nc mod (unitOccEnv occ name)
   where
     combine _ occ_env = extendOccEnv occ_env occ name
 
--- | The NameCache makes sure that there is just one Unique assigned for
--- each original name; i.e. (module-name, occ-name) pair and provides
--- something of a lookup mechanism for those names.
-data NameCache
- = NameCache {  nsUniqs :: !UniqSupply,
-                -- ^ Supply of uniques
-                nsNames :: !OrigNameCache
-                -- ^ Ensures that one original name gets one unique
-   }
-
--- | Return a function to atomically update the name cache.
-initNameCache :: UniqSupply -> [Name] -> NameCache
-initNameCache us names
-  = NameCache { nsUniqs = us,
-                nsNames = initOrigNames names }
+initNameCache :: Char -> [Name] -> IO NameCache
+initNameCache c names = NameCache c <$> newMVar (initOrigNames names)
 
 initOrigNames :: [Name] -> OrigNameCache
-initOrigNames names = foldl' extendOrigNameCache emptyModuleEnv names
+initOrigNames names = foldl' extendOrigNameCache' emptyModuleEnv names
+
+-- | Update the name cache with the given function
+updateNameCache'
+  :: NameCache
+  -> (OrigNameCache -> IO (OrigNameCache, c))  -- The updating function
+  -> IO c
+updateNameCache' (NameCache _c nc) upd_fn = modifyMVar' nc upd_fn
+
+-- this should be in `base`
+modifyMVar' :: MVar a -> (a -> IO (a,b)) -> IO b
+modifyMVar' m f = modifyMVar m $ f >=> \c -> fst c `seq` pure c
+
+-- | Update the name cache with the given function
+--
+-- Additionally, it ensures that the given Module and OccName are evaluated.
+-- If not, chaos can ensue:
+--      we read the name-cache
+--      then pull on mod (say)
+--      which does some stuff that modifies the name cache
+-- This did happen, with tycon_mod in GHC.IfaceToCore.tcIfaceAlt (DataAlt..)
+updateNameCache
+  :: NameCache
+  -> Module
+  -> OccName
+  -> (OrigNameCache -> IO (OrigNameCache, c))
+  -> IO c
+updateNameCache name_cache !_mod !_occ upd_fn
+  = updateNameCache' name_cache upd_fn
