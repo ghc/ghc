@@ -17,7 +17,7 @@ equal to g, but twice as expensive and large.
 module GHC.Data.Graph.UnVar
     ( UnVarSet
     , emptyUnVarSet, mkUnVarSet, varEnvDom, unionUnVarSet, unionUnVarSets
-    , delUnVarSet
+    , extendUnVarSet, delUnVarSet
     , elemUnVarSet, isEmptyUnVarSet
     , UnVarGraph
     , emptyUnVarGraph
