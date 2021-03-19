@@ -30,6 +30,7 @@ import GHC.Types.Unique (getUnique)
 import GHC.Types.Unique.FM
 import GHC.Types.Name hiding (tidyNameOcc)
 import GHC.Types.SrcLoc
+import GHC.Types.Tickish
 import GHC.Data.Maybe
 import Data.List (mapAccumL)
 
@@ -88,8 +89,9 @@ tidyAlt env (Alt con vs rhs)
     (Alt con vs (tidyExpr env' rhs))
 
 ------------  Tickish  --------------
-tidyTickish :: TidyEnv -> Tickish Id -> Tickish Id
-tidyTickish env (Breakpoint ix ids) = Breakpoint ix (map (tidyVarOcc env) ids)
+tidyTickish :: TidyEnv -> CoreTickish -> CoreTickish
+tidyTickish env (Breakpoint ext ix ids)
+  = Breakpoint ext ix (map (tidyVarOcc env) ids)
 tidyTickish _   other_tickish       = other_tickish
 
 ------------  Rules  --------------

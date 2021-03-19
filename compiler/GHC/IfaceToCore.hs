@@ -100,12 +100,14 @@ import GHC.Types.Name.Set
 import GHC.Types.Id
 import GHC.Types.Id.Make
 import GHC.Types.Id.Info
+import GHC.Types.Tickish
 import GHC.Types.TyThing
 
 import GHC.Fingerprint
 import qualified GHC.Data.BooleanFormula as BF
 
 import Control.Monad
+import GHC.Parser.Annotation
 
 {-
 This module takes
@@ -258,7 +260,7 @@ mergeIfaceDecl d1 d2
                     (mkNameEnv [ (n, op) | op@(IfaceClassOp n _ _) <- ops2 ])
       in d1 { ifBody = (ifBody d1) {
                 ifSigs  = ops,
-                ifMinDef = BF.mkOr [noLoc bf1, noLoc bf2]
+                ifMinDef = BF.mkOr [noLocA bf1, noLocA bf2]
                 }
             } `withRolesFrom` d2
     -- It doesn't matter; we'll check for consistency later when
@@ -1532,7 +1534,7 @@ tcIfaceExpr (IfaceTick tickish expr) = do
         return (Tick tickish' expr')
 
 -------------------------
-tcIfaceTickish :: IfaceTickish -> IfM lcl (Tickish Id)
+tcIfaceTickish :: IfaceTickish -> IfM lcl CoreTickish
 tcIfaceTickish (IfaceHpcTick modl ix)   = return (HpcTick modl ix)
 tcIfaceTickish (IfaceSCC  cc tick push) = return (ProfNote cc tick push)
 tcIfaceTickish (IfaceSource src name)   = return (SourceNote src name)
