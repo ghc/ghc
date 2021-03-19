@@ -40,7 +40,7 @@ import GHC.Rename.Pat
 import GHC.Rename.Names
 import GHC.Rename.Env
 import GHC.Rename.Fixity
-import GHC.Rename.Utils ( HsDocContext(..), mapFvRn, extendTyVarEnvFVRn
+import GHC.Rename.Utils ( HsDocContext(..), mapFvRn
                         , checkDupRdrNames, warnUnusedLocalBinds
                         , checkUnusedRecordWildcard
                         , checkDupAndShadowedNames, bindLocalNamesFV
@@ -868,7 +868,7 @@ rnMethodBinds is_cls_decl cls ktv_names binds sigs
              sig_ctxt | is_cls_decl = ClsDeclCtxt cls
                       | otherwise   = InstDeclCtxt bound_nms
        ; (spec_inst_prags', sip_fvs) <- renameSigs sig_ctxt spec_inst_prags
-       ; (other_sigs',      sig_fvs) <- extendTyVarEnvFVRn ktv_names $
+       ; (other_sigs',      sig_fvs) <- bindLocalNamesFV ktv_names $
                                         renameSigs sig_ctxt other_sigs
 
        -- Rename the bindings RHSs.  Again there's an issue about whether the
