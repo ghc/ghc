@@ -258,8 +258,8 @@ between one type and another when the to- and from- types are the
 same.  Then it's probably (albeit not definitely) the identity
 -}
 
-warnAboutIdentities :: DynFlags -> CoreExpr -> Type -> DsM ()
-warnAboutIdentities dflags (Var conv_fn) type_of_conv
+warnAboutIdentities :: DynFlags -> Id -> Type -> DsM ()
+warnAboutIdentities dflags conv_fn type_of_conv
   | wopt Opt_WarnIdentities dflags
   , idName conv_fn `elem` conversionNames
   , Just (_, arg_ty, res_ty) <- splitFunTy_maybe type_of_conv
@@ -575,7 +575,7 @@ tidyNPat (OverLit (OverLitTc False ty) val _) mb_neg _eq outer_ty
 
     mk_con_pat :: DataCon -> HsLit GhcTc -> Pat GhcTc
     mk_con_pat con lit
-      = unLoc (mkPrefixConPat con [noLoc $ LitPat noExtField lit] [])
+      = unLoc (mkPrefixConPat con [noLocA $ LitPat noExtField lit] [])
 
     mb_int_lit :: Maybe Integer
     mb_int_lit = case (mb_neg, val) of
