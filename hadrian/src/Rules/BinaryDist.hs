@@ -293,7 +293,7 @@ commonWrapper = "exec \"$executablename\" ${1+\"$@\"}\n"
 
 hsc2hsWrapper :: String
 hsc2hsWrapper = unlines
-    [ "HSC2HS_EXTRA=\"--cflag=-fno-stack-protector --lflag=-fuse-ld=gold\""
+    [ "HSC2HS_EXTRA=\"--cflag=-fno-stack-protector\""
     , "tflag=\"--template=$libdir/template-hsc.h\""
     , "Iflag=\"-I$includedir/\""
     , "for arg do"
