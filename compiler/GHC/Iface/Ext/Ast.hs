@@ -778,8 +778,8 @@ class ( IsPass p
       , ToHie (Context (Located (IdGhcP p)))
       , ToHie (RFContext (Located (AmbiguousFieldOcc (GhcPass p))))
       , ToHie (RFContext (Located (FieldOcc (GhcPass p))))
-      , ToHie (TScoped (LHsWcType (GhcPass (NoGhcTcPass p))))
-      , ToHie (TScoped (LHsSigWcType (GhcPass (NoGhcTcPass p))))
+      , ToHie (TScoped (LHsWcType (GhcPass p)))
+      , ToHie (TScoped (LHsSigWcType (GhcPass p)))
       )
       => HiePass p where
   hiePass :: HiePassEv p
@@ -986,8 +986,8 @@ instance HiePass p => ToHie (PScoped (Located (Pat (GhcPass p)))) where
           HieRn -> []
 #endif
     where
-      contextify :: a ~ LPat (GhcPass p) => HsConDetails (HsPatSigType (NoGhcTc (GhcPass p))) a (HsRecFields (GhcPass p) a)
-                 -> HsConDetails (TScoped (HsPatSigType (NoGhcTc (GhcPass p)))) (PScoped a) (RContext (HsRecFields (GhcPass p) (PScoped a)))
+      contextify :: a ~ LPat (GhcPass p) => HsConDetails (HsPatSigType (GhcPass p)) a (HsRecFields (GhcPass p) a)
+                 -> HsConDetails (TScoped (HsPatSigType (GhcPass p))) (PScoped a) (RContext (HsRecFields (GhcPass p) (PScoped a)))
       contextify (PrefixCon tyargs args) = PrefixCon (tScopes scope argscope tyargs) (patScopes rsp scope pscope args)
         where argscope = foldr combineScopes NoScope $ map mkLScope args
       contextify (InfixCon a b) = InfixCon a' b'
@@ -1005,6 +1005,12 @@ instance ToHie (TScoped (HsPatSigType GhcRn)) where
       , toHie body
       ]
   -- See Note [Scoping Rules for SigPat]
+
+instance ToHie (TScoped (HsPatSigType GhcTc)) where
+  toHie (TS sc (HsPS (HsPSRn wcs tvs) body@(L span _))) = concatM $
+      [ bindingsOnly $ map (C $ TyVarBind (mkScope span) sc) (wcs++tvs)
+      , toHie body
+      ]
 
 instance ( ToHie (Located body)
          , HiePass p
@@ -1583,7 +1589,21 @@ instance ToHie (TScoped (HsWildCardBndrs GhcRn (Located (HsSigType GhcRn)))) whe
       ]
     where span = loc a
 
+instance ToHie (TScoped (HsWildCardBndrs GhcTc (Located (HsSigType GhcTc)))) where
+  toHie (TS sc (HsWC names a)) = concatM $
+      [ bindingsOnly $ map (C $ TyVarBind (mkScope span) sc) names
+      , toHie $ TS sc a
+      ]
+    where span = loc a
+
 instance ToHie (TScoped (HsWildCardBndrs GhcRn (Located (HsType GhcRn)))) where
+  toHie (TS sc (HsWC names a)) = concatM $
+      [ bindingsOnly $ map (C $ TyVarBind (mkScope span) sc) names
+      , toHie a
+      ]
+    where span = loc a
+
+instance ToHie (TScoped (HsWildCardBndrs GhcTc (Located (HsType GhcTc)))) where
   toHie (TS sc (HsWC names a)) = concatM $
       [ bindingsOnly $ map (C $ TyVarBind (mkScope span) sc) names
       , toHie a
@@ -1650,6 +1670,11 @@ instance ToHie (TScoped (Located (HsSigType GhcRn))) where
   toHie (TS tsc (L span t@HsSig{sig_bndrs=bndrs,sig_body=body})) = concatM $ makeNode t span :
       [ toHie (TVS tsc (mkScope span) bndrs)
       , toHie body
+      ]
+
+instance ToHie (TScoped (Located (HsSigType GhcTc))) where
+  toHie (TS tsc (L span t@HsSig{sig_body=body})) = concatM $ makeNode t span :
+      [ toHie body
       ]
 
 instance Data flag => ToHie (TVScoped (HsOuterTyVarBndrs flag GhcRn)) where
@@ -1735,6 +1760,34 @@ instance ToHie (Located (HsType GhcRn)) where
       HsWildCardTy _ -> []
       HsStarTy _ _ -> []
       XHsType _ -> []
+
+instance ToHie (Located (HsType GhcTc)) where
+  toHie (L l t) = concatM $ makeNode t l : case t of
+        HsForAllTy v _ _ -> absurd v
+        HsQualTy v _ _-> absurd v
+        HsTyVar v _ _ -> absurd v
+        HsAppTy v _ _ -> absurd v
+        HsAppKindTy v _ _ -> absurd v
+        HsFunTy v _ _ _ -> absurd v
+        HsListTy v _ -> absurd v
+        HsTupleTy v _ _ -> absurd v
+        HsSumTy v _ -> absurd v
+        HsOpTy v _ _ _ -> absurd v
+        HsParTy v _ -> absurd v
+        HsIParamTy v _ _ -> absurd v
+        HsKindSig v _ _ -> absurd v
+        HsSpliceTy v _ -> absurd v
+        HsDocTy v _ _ -> absurd v
+        HsBangTy v _ _ -> absurd v
+        HsRecTy v _ -> absurd v
+        HsExplicitListTy v _ _ -> absurd v
+        HsExplicitTupleTy v _ -> absurd v
+        HsTyLit v _ -> absurd v
+        HsWildCardTy v -> absurd v
+        HsStarTy v _ -> absurd v
+        XHsType (HsTypeTc _ hs_ty) -> [toHie (L l hs_ty)]
+
+
 
 instance (ToHie tm, ToHie ty) => ToHie (HsArg tm ty) where
   toHie (HsValArg tm) = toHie tm

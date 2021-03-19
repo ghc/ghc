@@ -161,7 +161,7 @@ tcClassSigs clas sigs def_methods
            -> TcM [TcMethInfo]
     tc_sig gen_dm_env (op_names, op_hs_ty)
       = do { traceTc "ClsSig 1" (ppr op_names)
-           ; op_ty <- tcClassSigType op_names op_hs_ty
+           ; (L _ (HsSig _ _ (L _ (XHsType (HsTypeTc op_ty _))))) <- tcClassSigType op_names op_hs_ty
                    -- Class tyvars already in scope
 
            ; traceTc "ClsSig 2" (ppr op_names $$ ppr op_ty)
@@ -172,7 +172,7 @@ tcClassSigs clas sigs def_methods
                   | otherwise                               = Nothing
 
     tc_gen_sig (op_names, gen_hs_ty)
-      = do { gen_op_ty <- tcClassSigType op_names gen_hs_ty
+      = do { (L _ (HsSig _ _ (L _ (XHsType (HsTypeTc gen_op_ty _))))) <- tcClassSigType op_names gen_hs_ty
            ; return [ (op_name, (loc, gen_op_ty)) | L loc op_name <- op_names ] }
 
 {-

@@ -1477,6 +1477,7 @@ data TcIdSigInfo   -- See Note [Complete and partial type signatures]
                                   -- latter is '$dmop' or some such
 
       , sig_loc  :: SrcSpan       -- Location of the type signature
+      , sig_ty :: LHsSigWcType GhcTc
       }
 
   | PartialSig     -- A partial type signature (i.e. includes one or more
