@@ -73,6 +73,7 @@ import GHC.Utils.Misc
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
+import GHC.Types.Tickish
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Tidy ( tidyCo )
 import GHC.Types.Demand ( isTopSig )
@@ -561,7 +562,7 @@ toIfaceOneShot id | isId id
                   = IfaceNoOneShot
 
 ---------------------
-toIfaceTickish :: Tickish Id -> Maybe IfaceTickish
+toIfaceTickish :: CoreTickish -> Maybe IfaceTickish
 toIfaceTickish (ProfNote cc tick push) = Just (IfaceSCC cc tick push)
 toIfaceTickish (HpcTick modl ix)       = Just (IfaceHpcTick modl ix)
 toIfaceTickish (SourceNote src names)  = Just (IfaceSource src names)
