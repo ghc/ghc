@@ -38,6 +38,7 @@ data TestSetting = TestHostOS
                  | TestGhcPackageDbFlag
                  | TestMinGhcVersion711
                  | TestMinGhcVersion801
+                 | TestMinGhcVersion811
                  deriving (Show)
 
 -- | Lookup a test setting in @ghcconfig@ file.
@@ -67,6 +68,7 @@ testSetting key = do
         TestGhcPackageDbFlag      -> "GhcPackageDbFlag"
         TestMinGhcVersion711      -> "MinGhcVersion711"
         TestMinGhcVersion801      -> "MinGhcVersion801"
+        TestMinGhcVersion811      -> "MinGhcVersion811"
 
 -- | Get the RTS ways of the test compiler
 testRTSSettings :: Action [String]
