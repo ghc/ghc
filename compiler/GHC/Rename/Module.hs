@@ -32,7 +32,7 @@ import GHC.Rename.Env
 import GHC.Rename.Utils ( HsDocContext(..), mapFvRn, bindLocalNames
                         , checkDupRdrNamesN, bindLocalNamesFV
                         , checkShadowedRdrNames, warnUnusedTypePatterns
-                        , extendTyVarEnvFVRn, newLocalBndrsRn
+                        , newLocalBndrsRn
                         , withHsDocContext, noNestedForallsContextsErr
                         , addNoNestedForallsContextsErr, checkInferredVars )
 import GHC.Rename.Unbound ( mkUnboundName, notInScopeErr )
@@ -628,7 +628,7 @@ rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
        -- Both need to have the instance type variables in scope
        ; traceRn "rnSrcInstDecl" (ppr inst_ty' $$ ppr ktv_names)
        ; ((ats', adts'), more_fvs)
-             <- extendTyVarEnvFVRn ktv_names $
+             <- bindLocalNamesFV ktv_names $
                 do { (ats',  at_fvs)  <- rnATInstDecls rnTyFamInstDecl cls ktv_names ats
                    ; (adts', adt_fvs) <- rnATInstDecls rnDataFamInstDecl cls ktv_names adts
                    ; return ( (ats', adts'), at_fvs `plusFV` adt_fvs) }
@@ -2043,7 +2043,7 @@ rnLDerivStrategy doc mds thing_inside
              -- (Wrinkle: Derived instances) in GHC.Hs.Type.
              addNoNestedForallsContextsErr doc
                (quotes (text "via") <+> text "type") via_body
-             (thing, fvs2) <- extendTyVarEnvFVRn via_tvs thing_inside
+             (thing, fvs2) <- bindLocalNamesFV via_tvs thing_inside
              pure (ViaStrategy via_ty', thing, fvs1 `plusFV` fvs2)
 
     inf_err = Just (text "Inferred type variables are not allowed")
