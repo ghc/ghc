@@ -46,6 +46,9 @@ Environment variables affecting both build systems:
   VERBOSE           Set to non-empty for verbose build output
   RUNTEST_ARGS      Arguments passed to runtest.py
   MSYSTEM           (Windows-only) Which platform to build form (MINGW64 or MINGW32).
+  IGNORE_PERF_FAILURES
+                    Whether to ignore perf failures (one of "increases",
+                    "decreases", or "all")
 
 Environment variables determining build configuration of Make system:
 
@@ -560,6 +563,17 @@ esac
 if [ -n "$CROSS_TARGET" ]; then
   info "Cross-compiling for $CROSS_TARGET..."
   target_triple="$CROSS_TARGET"
+fi
+
+# Ignore performance improvements in @marge-bot batches.
+# See #19562.
+if [ "$GITLAB_CI_BRANCH" == "wip/marge_bot_batch_merge_job" ]; then
+  if [ -z "$IGNORE_PERF_FAILURES" ]; then
+    IGNORE_PERF_FAILURES="decreases"
+  fi
+fi
+if [ -n "$IGNORE_PERF_FAILURES" ]; then
+  RUNTEST_ARGS="--ignore-perf-failures=$IGNORE_PERF_FAILURES"
 fi
 
 set_toolchain_paths
