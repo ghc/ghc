@@ -540,6 +540,7 @@ data TcGblEnv
         tcg_warns     :: Warnings,           -- ...Warnings and deprecations
         tcg_anns      :: [Annotation],       -- ...Annotations
         tcg_tcs       :: [TyCon],            -- ...TyCons and Classes
+        tcg_ksigs     :: NameSet,            -- ...Top-level TyCon names that *lack* a signature
         tcg_insts     :: [ClsInst],          -- ...Instances
         tcg_fam_insts :: [FamInst],          -- ...Family instances
         tcg_rules     :: [LRuleDecl GhcTc],  -- ...Rules
