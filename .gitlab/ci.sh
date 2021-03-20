@@ -571,12 +571,12 @@ fi
 
 # Ignore performance improvements in @marge-bot batches.
 # See #19562.
-if [ "$GITLAB_CI_BRANCH" == "wip/marge_bot_batch_merge_job" ]; then
-  if [ -z "$IGNORE_PERF_FAILURES" ]; then
+if [ "${GITLAB_CI_BRANCH:-}" == "wip/marge_bot_batch_merge_job" ]; then
+  if [ -z "${IGNORE_PERF_FAILURES:-}" ]; then
     IGNORE_PERF_FAILURES="decreases"
   fi
 fi
-if [ -n "$IGNORE_PERF_FAILURES" ]; then
+if [ -n "${IGNORE_PERF_FAILURES:-}" ]; then
   RUNTEST_ARGS="--ignore-perf-failures=$IGNORE_PERF_FAILURES"
 fi
 
