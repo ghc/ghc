@@ -93,7 +93,7 @@ dnl --------------------------------------------------------------
 AC_ARG_VAR(GHC,[Use as the full path to GHC. [default=autodetect]])
 AC_PATH_PROG([GHC], [ghc])
 AC_ARG_WITH([ghc],
-        AS_HELP_STRING([--with-ghc=ARG], [Use ARG as the full path to ghc (obsolete, use GHC=ARG instead) [default=autodetect]]),
+        AS_HELP_STRING([--with-ghc=PATH], [Use PATH as the full path to ghc (obsolete, use GHC=PATH instead) [default=autodetect]]),
         AC_MSG_ERROR([--with-ghc=$withval is obsolete (use './configure GHC=$withval' or 'GHC=$withval ./configure' instead)]))
 AC_SUBST(WithGhc,$GHC)
 
