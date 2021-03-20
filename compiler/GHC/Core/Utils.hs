@@ -83,6 +83,7 @@ import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Name
 import GHC.Types.Literal
+import GHC.Types.Tickish
 import GHC.Core.DataCon
 import GHC.Builtin.PrimOps
 import GHC.Types.Id
@@ -339,7 +340,7 @@ mkCast expr co
 
 -- | Wraps the given expression in the source annotation, dropping the
 -- annotation if possible.
-mkTick :: Tickish Id -> CoreExpr -> CoreExpr
+mkTick :: CoreTickish -> CoreExpr -> CoreExpr
 mkTick t orig_expr = mkTick' id id orig_expr
  where
   -- Some ticks (cost-centres) can be split in two, with the
@@ -424,7 +425,7 @@ mkTick t orig_expr = mkTick' id id orig_expr
     -- Catch-all: Annotate where we stand
     _any -> top $ Tick t $ rest expr
 
-mkTicks :: [Tickish Id] -> CoreExpr -> CoreExpr
+mkTicks :: [CoreTickish] -> CoreExpr -> CoreExpr
 mkTicks ticks expr = foldr mkTick expr ticks
 
 isSaturatedConApp :: CoreExpr -> Bool
@@ -435,13 +436,13 @@ isSaturatedConApp e = go e []
         go (Cast f _) as = go f as
         go _ _ = False
 
-mkTickNoHNF :: Tickish Id -> CoreExpr -> CoreExpr
+mkTickNoHNF :: CoreTickish -> CoreExpr -> CoreExpr
 mkTickNoHNF t e
   | exprIsHNF e = tickHNFArgs t e
   | otherwise   = mkTick t e
 
 -- push a tick into the arguments of a HNF (call or constructor app)
-tickHNFArgs :: Tickish Id -> CoreExpr -> CoreExpr
+tickHNFArgs :: CoreTickish -> CoreExpr -> CoreExpr
 tickHNFArgs t e = push t e
  where
   push t (App f (Type u)) = App (push t f) (Type u)
@@ -449,28 +450,28 @@ tickHNFArgs t e = push t e
   push _t e = e
 
 -- | Strip ticks satisfying a predicate from top of an expression
-stripTicksTop :: (Tickish Id -> Bool) -> Expr b -> ([Tickish Id], Expr b)
+stripTicksTop :: (CoreTickish -> Bool) -> Expr b -> ([CoreTickish], Expr b)
 stripTicksTop p = go []
   where go ts (Tick t e) | p t = go (t:ts) e
         go ts other            = (reverse ts, other)
 
 -- | Strip ticks satisfying a predicate from top of an expression,
 -- returning the remaining expression
-stripTicksTopE :: (Tickish Id -> Bool) -> Expr b -> Expr b
+stripTicksTopE :: (CoreTickish -> Bool) -> Expr b -> Expr b
 stripTicksTopE p = go
   where go (Tick t e) | p t = go e
         go other            = other
 
 -- | Strip ticks satisfying a predicate from top of an expression,
 -- returning the ticks
-stripTicksTopT :: (Tickish Id -> Bool) -> Expr b -> [Tickish Id]
+stripTicksTopT :: (CoreTickish -> Bool) -> Expr b -> [CoreTickish]
 stripTicksTopT p = go []
   where go ts (Tick t e) | p t = go (t:ts) e
         go ts _                = ts
 
 -- | Completely strip ticks satisfying a predicate from an
 -- expression. Note this is O(n) in the size of the expression!
-stripTicksE :: (Tickish Id -> Bool) -> Expr b -> Expr b
+stripTicksE :: (CoreTickish -> Bool) -> Expr b -> Expr b
 stripTicksE p expr = go expr
   where go (App e a)        = App (go e) (go a)
         go (Lam b e)        = Lam b (go e)
@@ -486,7 +487,7 @@ stripTicksE p expr = go expr
         go_b (b, e)         = (b, go e)
         go_a (Alt c bs e)   = Alt c bs (go e)
 
-stripTicksT :: (Tickish Id -> Bool) -> Expr b -> [Tickish Id]
+stripTicksT :: (CoreTickish -> Bool) -> Expr b -> [CoreTickish]
 stripTicksT p expr = fromOL $ go expr
   where go (App e a)        = go e `appOL` go a
         go (Lam _ e)        = go e
@@ -2103,7 +2104,7 @@ cheapEqExpr :: Expr b -> Expr b -> Bool
 cheapEqExpr = cheapEqExpr' (const False)
 
 -- | Cheap expression equality test, can ignore ticks by type.
-cheapEqExpr' :: (Tickish Id -> Bool) -> Expr b -> Expr b -> Bool
+cheapEqExpr' :: (CoreTickish -> Bool) -> Expr b -> Expr b -> Bool
 {-# INLINE cheapEqExpr' #-}
 cheapEqExpr' ignoreTick e1 e2
   = go e1 e2
@@ -2167,9 +2168,11 @@ eqExpr in_scope e1 e2
     go_alt env (Alt c1 bs1 e1) (Alt c2 bs2 e2)
       = c1 == c2 && go (rnBndrs2 env bs1 bs2) e1 e2
 
-eqTickish :: RnEnv2 -> Tickish Id -> Tickish Id -> Bool
-eqTickish env (Breakpoint lid lids) (Breakpoint rid rids)
-      = lid == rid  &&  map (rnOccL env) lids == map (rnOccR env) rids
+eqTickish :: RnEnv2 -> CoreTickish -> CoreTickish -> Bool
+eqTickish env (Breakpoint lext lid lids) (Breakpoint rext rid rids)
+      = lid == rid &&
+        map (rnOccL env) lids == map (rnOccR env) rids &&
+        lext == rext
 eqTickish _ l r = l == r
 
 -- | Finds differences between core expressions, modulo alpha and
@@ -2483,7 +2486,7 @@ tryEtaReduce bndrs body
            -> Type             -- Type of the function to which the argument is applied
            -> Maybe (Coercion  -- Of type (arg_t -> t1 ~  bndr_t -> t2)
                                --   (and similarly for tyvars, coercion args)
-                    , [Tickish Var])
+                    , [CoreTickish])
     -- See Note [Eta reduction with casted arguments]
     ok_arg bndr (Type ty) co _
        | Just tv <- getTyVar_maybe ty

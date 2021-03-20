@@ -7,7 +7,7 @@ import GHC.Prelude
 import GHC.Cmm.CLabel
 import GHC.Cmm.Expr        ( GlobalReg(..) )
 import GHC.Settings.Config ( cProjectName, cProjectVersion )
-import GHC.Core            ( Tickish(..) )
+import GHC.Types.Tickish   ( CmmTickish, GenTickish(..) )
 import GHC.Cmm.DebugBlock
 import GHC.Unit.Module
 import GHC.Utils.Outputable
@@ -210,7 +210,7 @@ blockToDwarf config blk
       | Just _ <- dblPosition blk = Just $ mkAsmTempLabel $ dblLabel blk
       | otherwise                 = Nothing   -- block was optimized out
 
-tickToDwarf :: Tickish () -> [DwarfInfo]
+tickToDwarf :: CmmTickish -> [DwarfInfo]
 tickToDwarf  (SourceNote ss _) = [DwarfSrcNote ss]
 tickToDwarf _ = []
 
