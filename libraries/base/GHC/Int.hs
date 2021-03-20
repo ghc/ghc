@@ -136,6 +136,11 @@ instance Integral Int8 where
         | otherwise                  = I8# (intToInt8# ((int8ToInt# x#) `quotInt#` (int8ToInt# y#)))
     rem     (I8# x#) y@(I8# y#)
         | y == 0                     = divZeroError
+          -- The quotRem CPU instruction might fail for 'minBound
+          -- `quotRem` -1' if it is an instruction for exactly this
+          -- width of signed integer. But, 'minBound `rem` -1' is
+          -- well-defined (0). We therefore special-case it.
+        | y == (-1)                  = 0
         | otherwise                  = I8# (intToInt8# ((int8ToInt# x#) `remInt#` (int8ToInt# y#)))
     div     x@(I8# x#) y@(I8# y#)
         | y == 0                     = divZeroError
@@ -143,6 +148,11 @@ instance Integral Int8 where
         | otherwise                  = I8# (intToInt8# ((int8ToInt# x#) `divInt#` (int8ToInt# y#)))
     mod       (I8# x#) y@(I8# y#)
         | y == 0                     = divZeroError
+          -- The divMod CPU instruction might fail for 'minBound
+          -- `divMod` -1' if it is an instruction for exactly this
+          -- width of signed integer. But, 'minBound `mod` -1' is
+          -- well-defined (0). We therefore special-case it.
+        | y == (-1)                  = 0
         | otherwise                  = I8# (intToInt8# ((int8ToInt# x#) `modInt#` (int8ToInt# y#)))
     quotRem x@(I8# x#) y@(I8# y#)
         | y == 0                     = divZeroError
@@ -343,6 +353,11 @@ instance Integral Int16 where
         | otherwise                  = I16# (intToInt16# ((int16ToInt# x#) `quotInt#` (int16ToInt# y#)))
     rem       (I16# x#) y@(I16# y#)
         | y == 0                     = divZeroError
+          -- The quotRem CPU instruction might fail for 'minBound
+          -- `quotRem` -1' if it is an instruction for exactly this
+          -- width of signed integer. But, 'minBound `rem` -1' is
+          -- well-defined (0). We therefore special-case it.
+        | y == (-1)                  = 0
         | otherwise                  = I16# (intToInt16# ((int16ToInt# x#) `remInt#` (int16ToInt# y#)))
     div     x@(I16# x#) y@(I16# y#)
         | y == 0                     = divZeroError
@@ -350,6 +365,11 @@ instance Integral Int16 where
         | otherwise                  = I16# (intToInt16# ((int16ToInt# x#) `divInt#` (int16ToInt# y#)))
     mod       (I16# x#) y@(I16# y#)
         | y == 0                     = divZeroError
+          -- The divMod CPU instruction might fail for 'minBound
+          -- `divMod` -1' if it is an instruction for exactly this
+          -- width of signed integer. But, 'minBound `mod` -1' is
+          -- well-defined (0). We therefore special-case it.
+        | y == (-1)                  = 0
         | otherwise                  = I16# (intToInt16# ((int16ToInt# x#) `modInt#` (int16ToInt# y#)))
     quotRem x@(I16# x#) y@(I16# y#)
         | y == 0                     = divZeroError
@@ -555,9 +575,10 @@ instance Integral Int32 where
         | otherwise                  = I32# (intToInt32# ((int32ToInt# x#) `quotInt#` (int32ToInt# y#)))
     rem       (I32# x#) y@(I32# y#)
         | y == 0                     = divZeroError
-          -- The quotRem CPU instruction fails for minBound `quotRem` -1,
-          -- but minBound `rem` -1 is well-defined (0). We therefore
-          -- special-case it.
+          -- The quotRem CPU instruction might fail for 'minBound
+          -- `quotRem` -1' if it is an instruction for exactly this
+          -- width of signed integer. But, 'minBound `rem` -1' is
+          -- well-defined (0). We therefore special-case it.
         | y == (-1)                  = 0
         | otherwise                  = I32# (intToInt32# ((int32ToInt# x#) `remInt#` (int32ToInt# y#)))
     div     x@(I32# x#) y@(I32# y#)
@@ -566,9 +587,10 @@ instance Integral Int32 where
         | otherwise                  = I32# (intToInt32# ((int32ToInt# x#) `divInt#` (int32ToInt# y#)))
     mod       (I32# x#) y@(I32# y#)
         | y == 0                     = divZeroError
-          -- The divMod CPU instruction fails for minBound `divMod` -1,
-          -- but minBound `mod` -1 is well-defined (0). We therefore
-          -- special-case it.
+          -- The divMod CPU instruction might fail for 'minBound
+          -- `divMod` -1' if it is an instruction for exactly this
+          -- width of signed integer. But, 'minBound `mod` -1' is
+          -- well-defined (0). We therefore special-case it.
         | y == (-1)                  = 0
         | otherwise                  = I32# (intToInt32# ((int32ToInt# x#) `modInt#` (int32ToInt# y#)))
     quotRem x@(I32# x#) y@(I32# y#)
@@ -776,9 +798,10 @@ instance Integral Int64 where
         | otherwise                  = I64# (x# `quotInt64#` y#)
     rem       (I64# x#) y@(I64# y#)
         | y == 0                     = divZeroError
-          -- The quotRem CPU instruction fails for minBound `quotRem` -1,
-          -- but minBound `rem` -1 is well-defined (0). We therefore
-          -- special-case it.
+          -- The quotRem CPU instruction might fail for 'minBound
+          -- `quotRem` -1' if it is an instruction for exactly this
+          -- width of signed integer. But, 'minBound `rem` -1' is
+          -- well-defined (0). We therefore special-case it.
         | y == (-1)                  = 0
         | otherwise                  = I64# (x# `remInt64#` y#)
     div     x@(I64# x#) y@(I64# y#)
@@ -787,9 +810,10 @@ instance Integral Int64 where
         | otherwise                  = I64# (x# `divInt64#` y#)
     mod       (I64# x#) y@(I64# y#)
         | y == 0                     = divZeroError
-          -- The divMod CPU instruction fails for minBound `divMod` -1,
-          -- but minBound `mod` -1 is well-defined (0). We therefore
-          -- special-case it.
+          -- The divMod CPU instruction might fail for 'minBound
+          -- `divMod` -1' if it is an instruction for exactly this
+          -- width of signed integer. But, 'minBound `mod` -1' is
+          -- well-defined (0). We therefore special-case it.
         | y == (-1)                  = 0
         | otherwise                  = I64# (x# `modInt64#` y#)
     quotRem x@(I64# x#) y@(I64# y#)
@@ -976,9 +1000,10 @@ instance Integral Int64 where
         | otherwise                  = I64# (x# `quotInt#` y#)
     rem       (I64# x#) y@(I64# y#)
         | y == 0                     = divZeroError
-          -- The quotRem CPU instruction fails for minBound `quotRem` -1,
-          -- but minBound `rem` -1 is well-defined (0). We therefore
-          -- special-case it.
+          -- The quotRem CPU instruction might fail for 'minBound
+          -- `quotRem` -1' if it is an instruction for exactly this
+          -- width of signed integer. But, 'minBound `rem` -1' is
+          -- well-defined (0). We therefore special-case it.
         | y == (-1)                  = 0
         | otherwise                  = I64# (x# `remInt#` y#)
     div     x@(I64# x#) y@(I64# y#)
@@ -987,9 +1012,10 @@ instance Integral Int64 where
         | otherwise                  = I64# (x# `divInt#` y#)
     mod       (I64# x#) y@(I64# y#)
         | y == 0                     = divZeroError
-          -- The divMod CPU instruction fails for minBound `divMod` -1,
-          -- but minBound `mod` -1 is well-defined (0). We therefore
-          -- special-case it.
+          -- The divMod CPU instruction might fail for 'minBound
+          -- `divMod` -1' if it is an instruction for exactly this
+          -- width of signed integer. But, 'minBound `mod` -1' is
+          -- well-defined (0). We therefore special-case it.
         | y == (-1)                  = 0
         | otherwise                  = I64# (x# `modInt#` y#)
     quotRem x@(I64# x#) y@(I64# y#)
