@@ -32,6 +32,7 @@ import GHC.Data.TrieMap
 import GHC.Core.Map.Type
 import GHC.Core
 import GHC.Core.Type
+import GHC.Types.Tickish
 import GHC.Types.Var
 
 import GHC.Utils.Misc
@@ -324,11 +325,11 @@ xtE (D env (Case e b ty as))     f m
                                                      in xtList (xtA env1) as f }
 
 -- TODO: this seems a bit dodgy, see 'eqTickish'
-type TickishMap a = Map.Map (Tickish Id) a
-lkTickish :: Tickish Id -> TickishMap a -> Maybe a
+type TickishMap a = Map.Map CoreTickish a
+lkTickish :: CoreTickish -> TickishMap a -> Maybe a
 lkTickish = lookupTM
 
-xtTickish :: Tickish Id -> XT a -> TickishMap a -> TickishMap a
+xtTickish :: CoreTickish -> XT a -> TickishMap a -> TickishMap a
 xtTickish = alterTM
 
 ------------------------

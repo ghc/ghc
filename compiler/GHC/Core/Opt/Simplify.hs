@@ -5,6 +5,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TypeFamilies #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates -Wno-incomplete-uni-patterns #-}
 module GHC.Core.Opt.Simplify ( simplTopBinds, simplExpr, simplRules ) where
@@ -58,6 +59,7 @@ import GHC.Core.Rules   ( lookupRule, getRules, initRuleOpts )
 import GHC.Types.Basic
 import GHC.Utils.Monad  ( mapAccumLM, liftIO )
 import GHC.Utils.Logger
+import GHC.Types.Tickish
 import GHC.Types.Var    ( isTyCoVar )
 import GHC.Data.Maybe   ( orElse )
 import Control.Monad
@@ -1160,7 +1162,7 @@ simplCoercion env co
 -- long as this is a non-scoping tick, to let case and application
 -- optimisations apply.
 
-simplTick :: SimplEnv -> Tickish Id -> InExpr -> SimplCont
+simplTick :: SimplEnv -> CoreTickish -> InExpr -> SimplCont
           -> SimplM (SimplFloats, OutExpr)
 simplTick env tickish expr cont
   -- A scoped tick turns into a continuation, so that we can spot
@@ -1254,8 +1256,8 @@ simplTick env tickish expr cont
 
 
   simplTickish env tickish
-    | Breakpoint n ids <- tickish
-          = Breakpoint n (map (getDoneId . substId env) ids)
+    | Breakpoint ext n ids <- tickish
+          = Breakpoint ext n (map (getDoneId . substId env) ids)
     | otherwise = tickish
 
   -- Push type application and coercion inside a tick
