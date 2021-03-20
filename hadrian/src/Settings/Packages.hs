@@ -254,11 +254,13 @@ rtsPackageArgs = package rts ? do
     libdwLibraryDir   <- getSetting LibdwLibDir
     libnumaIncludeDir <- getSetting LibnumaIncludeDir
     libnumaLibraryDir <- getSetting LibnumaLibDir
+    libsystemtapIncludeDir <- getSetting LibsystemtapIncludeDir
 
     -- Arguments passed to GHC when compiling C and .cmm sources.
     let ghcArgs = mconcat
           [ arg "-Irts"
           , arg $ "-I" ++ path
+          , flag WithDtrace ? arg "-DDTRACE"
           , arg $ "-DRtsWay=\"rts_" ++ show way ++ "\""
           -- Set the namespace for the rts fs functions
           , arg $ "-DFS_NAMESPACE=rts"
@@ -272,10 +274,24 @@ rtsPackageArgs = package rts ? do
                                                     , "-optc-DNOSMP" ]
           ]
 
+    let includes = fmap (fmap ("-I" ++)) $ mconcat
+          [ flag UseSystemFfi ? arg ffiIncludeDir
+          , flag WithLibdw ? arg libdwIncludeDir
+          , arg "rts"
+          , arg path
+          , if not (null libsystemtapIncludeDir) then arg libsystemtapIncludeDir else mempty
+          ]
+
+    let dtraceArgs = mconcat
+          [ arg "-C" -- runs the preprocessor
+          , arg "-Iincludes"
+          , includes
+          ]
+
     let cArgs = mconcat
           [ rtsWarnings
-          , flag UseSystemFfi ? arg ("-I" ++ ffiIncludeDir)
-          , flag WithLibdw ? arg ("-I" ++ libdwIncludeDir)
+          , includes
+          , flag WithDtrace ? arg "-DDTRACE"
           , arg "-fomit-frame-pointer"
           -- RTS *must* be compiled with optimisations. The INLINE_HEADER macro
           -- requires that functions are inlined to work as expected. Inlining
@@ -285,9 +301,6 @@ rtsPackageArgs = package rts ? do
           -- be inlined. See https://github.com/snowleopard/hadrian/issues/90.
           , arg "-O2"
           , arg "-g"
-
-          , arg "-Irts"
-          , arg $ "-I" ++ path
 
           , Debug     `wayUnit` way          ? pure [ "-DDEBUG"
                                                     , "-fno-omit-frame-pointer"
@@ -317,7 +330,7 @@ rtsPackageArgs = package rts ? do
             , "-DTablesNextToCode="          ++ show ghcEnableTNC
             ]
 
-          -- We're after pur performance here. So make sure fast math and
+          -- We're after pure performance here. So make sure fast math and
           -- vectorization is enabled.
           , input "**/xxhash.c" ? pure
             [ "-O3"
@@ -377,6 +390,7 @@ rtsPackageArgs = package rts ? do
         , builder (Cc FindCDependencies) ? cArgs
         , builder (Ghc CompileCWithGhc) ? map ("-optc" ++) <$> cArgs
         , builder (Ghc CompileCppWithGhc) ? map ("-optcxx" ++) <$> cArgs
+        , builder Dtrace ? dtraceArgs
         , builder Ghc ? ghcArgs
 
         , builder HsCpp ? pure
