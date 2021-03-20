@@ -25,13 +25,13 @@ validateBuilderArgs = builder (Make "testsuite/tests") ? do
     top                 <- expr topDirectory
     compiler            <- expr $ fullpath ghc
     checkPpr            <- expr $ fullpath checkPpr
-    checkApiAnnotations <- expr $ fullpath checkApiAnnotations
+    checkExact          <- expr $ fullpath checkExact
     args                <- expr $ userSetting defaultTestArgs
     return [ setTestSpeed $ testSpeed args
            , "THREADS=" ++ show threads
            , "TEST_HC=" ++ (top -/- compiler)
            , "CHECK_PPR=" ++ (top -/- checkPpr)
-           , "CHECK_API_ANNOTATIONS=" ++ (top -/- checkApiAnnotations)
+           , "CHECK_EXACT=" ++ (top -/- checkExact)
            ]
   where
     fullpath :: Package -> Action FilePath

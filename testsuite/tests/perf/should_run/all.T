@@ -372,6 +372,11 @@ test('T15185',
     compile_and_run,
     ['-O'])
 
+test('T17123',
+    [collect_stats('bytes allocated', 20), only_ways(['normal'])],
+    compile_and_run,
+    ['-O'])
+
 # Test performance of creating Uniques.
 test('UniqLoop',
      [collect_stats('bytes allocated',5),

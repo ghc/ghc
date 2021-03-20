@@ -138,7 +138,7 @@ tcInferSigma :: Bool -> LHsExpr GhcRn -> TcM TcSigmaType
 tcInferSigma inst (L loc rn_expr)
   | (fun@(rn_fun,_), rn_args) <- splitHsApps rn_expr
   = addExprCtxt rn_expr $
-    setSrcSpan loc      $
+    setSrcSpanA loc     $
     do { do_ql <- wantQuickLook rn_fun
        ; (_tc_fun, fun_sigma) <- tcInferAppHead fun rn_args Nothing
        ; (_delta, inst_args, app_res_sigma) <- tcInstFun do_ql inst fun fun_sigma rn_args
@@ -650,12 +650,12 @@ addArgCtxt :: AppCtxt -> LHsExpr GhcRn
 -- use "In the expression: arg"
 ---See Note [Rebindable syntax and HsExpansion] in GHC.Hs.Expr
 addArgCtxt (VACall fun arg_no _) (L arg_loc arg) thing_inside
-  = setSrcSpan arg_loc $
+  = setSrcSpanA arg_loc $
     addErrCtxt (funAppCtxt fun arg arg_no) $
     thing_inside
 
 addArgCtxt (VAExpansion {}) (L arg_loc arg) thing_inside
-  = setSrcSpan arg_loc $
+  = setSrcSpanA arg_loc $
     addExprCtxt arg    $  -- Auto-suppressed if arg_loc is generated
     thing_inside
 
