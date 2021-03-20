@@ -1,0 +1,6 @@
+
+T19564d.hs:17:1: warning: [-Wmissing-kind-signatures]
+    Top-level tycon with no kind signature: type Arr :: * -> * -> *
+
+T19564d.hs:18:1: warning: [-Wmissing-kind-signatures]
+    Top-level tycon with no kind signature: type B :: *
