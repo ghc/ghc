@@ -11,6 +11,9 @@ variables:
   # Disable shallow clones; they break our linting rules
   GIT_DEPTH: 0
 
+  # Always start with a fresh clone to avoid non-hermetic builds
+  GIT_STRATEGY: clone
+
   # Overridden by individual jobs
   CONFIGURE_ARGS: ""
 
