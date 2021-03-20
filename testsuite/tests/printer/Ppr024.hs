@@ -13,6 +13,12 @@ x `f` y = x
 (\\\) :: (Eq a) => [a] -> [a] -> [a]
 (\\\) xs ys =  xs
 
+(\\\) :: ((Eq a)) => [a] -> [a] -> [a]
+(\\\) xs ys =  xs
+
+(\\\) :: Eq a => [a] -> [a] -> [a]
+(\\\) xs ys =  xs
+
 g x = x + if True then 1 else 2
 h x = x + 1::Int
 
