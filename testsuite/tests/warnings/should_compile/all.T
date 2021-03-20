@@ -38,3 +38,8 @@ test('UnusedPackages', normal, multimod_compile,
     ['UnusedPackages.hs', '-package=bytestring -package=base -package=process -package=ghc -Wunused-packages'])
 
 test('T18402', normal, compile, [''])
+
+test('T19564a', normal, compile, [''])
+test('T19564b', normal, compile, [''])
+test('T19564c', normal, compile, [''])
+test('T19564d', normal, compile, [''])
