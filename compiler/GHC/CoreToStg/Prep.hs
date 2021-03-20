@@ -72,6 +72,7 @@ import GHC.Types.Basic
 import GHC.Types.Name   ( NamedThing(..), nameSrcSpan, isInternalName )
 import GHC.Types.SrcLoc ( SrcSpan(..), realSrcLocSpan, mkRealSrcLoc )
 import GHC.Types.Literal
+import GHC.Types.Tickish
 import GHC.Types.TyThing
 import GHC.Types.CostCentre ( CostCentre, ccFromThisModule )
 import GHC.Types.Unique.Supply
@@ -610,9 +611,9 @@ cpeRhsE env (Tick tickish expr)
   = do { body <- cpeBodyNF env expr
        ; return (emptyFloats, mkTick tickish' body) }
   where
-    tickish' | Breakpoint n fvs <- tickish
+    tickish' | Breakpoint ext n fvs <- tickish
              -- See also 'substTickish'
-             = Breakpoint n (map (getIdFromTrivialExpr . lookupCorePrepEnv env) fvs)
+             = Breakpoint ext n (map (getIdFromTrivialExpr . lookupCorePrepEnv env) fvs)
              | otherwise
              = tickish
 
@@ -731,7 +732,7 @@ rhsToBody expr = return (emptyFloats, expr)
 
 data ArgInfo = CpeApp  CoreArg
              | CpeCast Coercion
-             | CpeTick (Tickish Id)
+             | CpeTick CoreTickish
 
 instance Outputable ArgInfo where
   ppr (CpeApp arg) = text "app" <+> ppr arg
@@ -963,7 +964,7 @@ no further floating will occur. This allows us to safely inline things like
    GHC.Magic. This definition is used in cases where runRW is curried.
 
  * In addition to its normal Haskell definition in GHC.Magic, we give it
-   a special late inlining here in CorePrep and GHC.CoreToByteCode, avoiding
+   a special late inlining here in CorePrep and GHC.StgToByteCode, avoiding
    the incorrect sharing due to float-out noted above.
 
  * It is levity-polymorphic:
@@ -1369,7 +1370,7 @@ data FloatingBind
                       -- but lifted binding
 
  -- | See Note [Floating Ticks in CorePrep]
- | FloatTick (Tickish Id)
+ | FloatTick CoreTickish
 
 data Floats = Floats OkToSpec (OrdList FloatingBind)
 

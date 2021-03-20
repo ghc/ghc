@@ -26,8 +26,6 @@ module Ppr008
     , setNonBlockingFD
     ) where
 
-#include "EventConfig.h"
-
 import Foreign.ForeignPtr (ForeignPtr)
 import GHC.Base
 import GHC.Conc.Signal (Signal)
@@ -45,12 +43,8 @@ import System.Posix.Internals (c_close, c_pipe, c_read, c_write,
                                setCloseOnExec, setNonBlockingFD)
 import System.Posix.Types (Fd)
 
-#if defined(HAVE_EVENTFD)
 import Foreign.C.Error (throwErrnoIfMinus1)
 import Foreign.C.Types (CULLong(..))
-#else
-import Foreign.C.Error (eAGAIN, eWOULDBLOCK, getErrno, throwErrno)
-#endif
 
 data ControlMessage = CMsgWakeup
                     | CMsgDie
@@ -62,20 +56,13 @@ data ControlMessage = CMsgWakeup
 data Control = W {
       controlReadFd  :: {-# UNPACK #-} !Fd
     , controlWriteFd :: {-# UNPACK #-} !Fd
-#if defined(HAVE_EVENTFD)
     , controlEventFd :: {-# UNPACK #-} !Fd
-#else
-    , wakeupReadFd   :: {-# UNPACK #-} !Fd
-    , wakeupWriteFd  :: {-# UNPACK #-} !Fd
-#endif
     , didRegisterWakeupFd :: !Bool
     } deriving (Show)
 
-#if defined(HAVE_EVENTFD)
 wakeupReadFd :: Control -> Fd
 wakeupReadFd = controlEventFd
-{-# INLINE wakeupReadFd #-}
-#endif
+{-#  INLINE  wakeupReadFd #-}
 
 -- | Create the structure (usually a pipe) used for waking up the IO
 -- manager thread from another thread.
@@ -92,23 +79,14 @@ newControl shouldRegister = allocaArray 2 $ \fds -> do
         setCloseOnExec wr
         return (rd, wr)
   (ctrl_rd, ctrl_wr) <- createPipe
-#if defined(HAVE_EVENTFD)
   ev <- throwErrnoIfMinus1 "eventfd" $ c_eventfd 0 0
   setNonBlockingFD ev True
   setCloseOnExec ev
   when shouldRegister $ c_setIOManagerWakeupFd ev
-#else
-  (wake_rd, wake_wr) <- createPipe
-  when shouldRegister $ c_setIOManagerWakeupFd wake_wr
-#endif
   return W { controlReadFd  = fromIntegral ctrl_rd
            , controlWriteFd = fromIntegral ctrl_wr
-#if defined(HAVE_EVENTFD)
-           , controlEventFd = fromIntegral ev
-#else
            , wakeupReadFd   = fromIntegral wake_rd
            , wakeupWriteFd  = fromIntegral wake_wr
-#endif
            , didRegisterWakeupFd = shouldRegister
            }
 
@@ -122,12 +100,8 @@ closeControl w = do
   _ <- c_close . fromIntegral . controlReadFd $ w
   _ <- c_close . fromIntegral . controlWriteFd $ w
   when (didRegisterWakeupFd w) $ c_setIOManagerWakeupFd (-1)
-#if defined(HAVE_EVENTFD)
-  _ <- c_close . fromIntegral . controlEventFd $ w
-#else
   _ <- c_close . fromIntegral . wakeupReadFd $ w
   _ <- c_close . fromIntegral . wakeupWriteFd $ w
-#endif
   return ()
 
 io_MANAGER_WAKEUP, io_MANAGER_DIE :: Word8
@@ -164,18 +138,9 @@ readControlMessage ctrl fd
                         return $ CMsgSignal fp s'
 
   where wakeupBufferSize =
-#if defined(HAVE_EVENTFD)
-            8
-#else
             4096
-#endif
 
 sendWakeup :: Control -> IO ()
-#if defined(HAVE_EVENTFD)
-sendWakeup c =
-  throwErrnoIfMinus1_ "sendWakeup" $
-  c_eventfd_write (fromIntegral (controlEventFd c)) 1
-#else
 sendWakeup c = do
   n <- sendMessage (wakeupWriteFd c) CMsgWakeup
   case n of
@@ -184,7 +149,6 @@ sendWakeup c = do
                    errno <- getErrno
                    when (errno /= eAGAIN && errno /= eWOULDBLOCK) $
                      throwErrno "sendWakeup"
-#endif
 
 sendDie :: Control -> IO ()
 sendDie c = throwErrnoIfMinus1_ "sendDie" $
@@ -197,14 +161,6 @@ sendMessage fd msg = alloca $ \p -> do
     CMsgDie           -> poke p io_MANAGER_DIE
     CMsgSignal _fp _s -> error "Signals can only be sent from within the RTS"
   fromIntegral `fmap` c_write (fromIntegral fd) p 1
-
-#if defined(HAVE_EVENTFD)
-foreign import ccall unsafe "sys/eventfd.h eventfd"
-   c_eventfd :: CInt -> CInt -> IO CInt
-
-foreign import ccall unsafe "sys/eventfd.h eventfd_write"
-   c_eventfd_write :: CInt -> CULLong -> IO CInt
-#endif
 
 foreign import ccall unsafe "setIOManagerWakeupFd"
    c_setIOManagerWakeupFd :: CInt -> IO ()
