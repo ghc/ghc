@@ -1506,11 +1506,12 @@ def check_stats(name: TestName,
         for (metric, baseline_and_dev) in range_fields.items():
             # Remove any metric prefix e.g. "runtime/" and "compile_time/"
             stat_file_metric = metric.split("/")[-1]
+            perf_change = None
 
             field_match = re.search('\\("' + stat_file_metric + '", "([0-9]+)"\\)', stats_file_contents)
             if field_match is None:
                 print('Failed to find metric: ', stat_file_metric)
-                metric_result = failBecause('no such stats metric')
+                result = failBecause('no such stats metric')
             else:
                 val = field_match.group(1)
                 assert val is not None
@@ -1518,29 +1519,34 @@ def check_stats(name: TestName,
 
                 # Store the metric so it can later be stored in a git note.
                 perf_stat = metric_dict(name, way, metric, actual_val)
-                change = None
 
                 # If this is the first time running the benchmark, then pass.
                 baseline = baseline_and_dev.baseline(way, head_commit) \
                     if Perf.inside_git_repo() else None
                 if baseline is None:
                     metric_result = passed()
-                    change = MetricChange.NewMetric
+                    perf_change = MetricChange.NewMetric
                 else:
                     tolerance_dev = baseline_and_dev.deviation
-                    (change, metric_result) = Perf.check_stats_change(
+                    (perf_change, metric_result) = Perf.check_stats_change(
                         perf_stat,
                         baseline,
                         tolerance_dev,
                         config.allowed_perf_changes,
                         config.verbose >= 4)
-                t.metrics.append(PerfMetric(change=change, stat=perf_stat, baseline=baseline))
 
-            # If any metric fails then the test fails.
-            # Note, the remaining metrics are still run so that
-            # a complete list of changes can be presented to the user.
-            if metric_result.passFail == 'fail' and not config.ignore_perf_failures:
-                result = metric_result
+                t.metrics.append(PerfMetric(change=perf_change, stat=perf_stat, baseline=baseline))
+
+                # If any metric fails then the test fails.
+                # Note, the remaining metrics are still run so that
+                # a complete list of changes can be presented to the user.
+                if metric_result.passFail == 'fail':
+                    if config.ignore_perf_increases and perf_change == MetricChange.Increase:
+                        metric_result = passed()
+                    elif config.ignore_perf_decreases and perf_change == MetricChange.Decrease:
+                        metric_result = passed()
+
+                    result = metric_result
 
     return result
 
