@@ -117,7 +117,7 @@ module GHC.Tc.Solver.Monad (
 
     -- Misc
     getDefaultInfo, getDynFlags, getGlobalRdrEnvTcS,
-    matchFam, matchFamTcM,
+    matchFam, matchFamTcM, stepFam,
     checkWellStagedDFun,
     pprEq,                                   -- Smaller utils, re-exported from TcM
                                              -- TODO (DV): these are only really used in the
@@ -176,6 +176,7 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Constraint
 import GHC.Core.Predicate
 
+import GHC.Types.Basic
 import GHC.Types.Unique.Set
 import GHC.Core.TyCon.Env
 import GHC.Data.Maybe
@@ -3813,6 +3814,48 @@ matchFamTcM tycon args
     ppr_res (Just (co,ty)) = hang (text "Match succeeded:")
                                 2 (vcat [ text "Rewrites to:" <+> ppr ty
                                         , text "Coercion:" <+> ppr co ])
+
+stepFam :: IntWithInf -> TyCon -> [Type] -> TcS (Maybe (CoercionN, TcType), Int)
+-- ^ Given (F tys) return (co, ty), where co :: ty ~N F tys
+stepFam limit tycon args = wrapTcS $ stepFamTcM limit tycon args
+
+stepFamTcM :: IntWithInf -> TyCon -> [Type] -> TcM (Maybe (CoercionN, TcType), Int)
+-- ^ Given (F tys) return (co, ty), where co :: ty ~ N F tys
+stepFamTcM limit tycon args
+  = do { fam_envs <- FamInst.tcGetFamInstEnvs
+       ; let match_fam_result
+              = reduceTyFamApp_maybe fam_envs Nominal tycon args
+       ; case match_fam_result of
+           Nothing       -> return (match_fam_result, 0)
+           Just (co, ty) -> do { let ty0 = mkTyConApp tycon args
+                               ; let (ty', n) = steps (limit `minusWithInf` 1) fam_envs ty
+                               ; let co' = Rep.UnivCo (Rep.StepsProv 0 (n+1)) Nominal ty' ty0
+                               ; let r | n > 0     = (co', ty')
+                                       | otherwise = (mkTcSymCo co, ty')
+                               ; return (Just r, n+1)
+                               }
+       }
+
+steps :: IntWithInf -> FamInstEnvs -> Type -> (Type, Int)
+-- ^ Given a type, perform as many type family reduction steps as possible, then
+-- return the resulting type and the number of steps.  Look through type
+-- synonyms but do not count them as steps.
+steps limit fam_envs ty = go 0 ty ty
+  where
+    -- Accumulate the step count, the current type (without type synonyms
+    -- expanded), and the current type with synonyms expanded.  Thus when we
+    -- stop, we can avoid expanding type synonyms on the final step.  This is
+    -- needed for the ExpandTFs test, which defines
+    --   type family Foo a where Foo Int = String
+    -- and when stepping Foo Int we want to return String rather than [Char].
+    go :: Int -> TcType -> TcType -> (TcType, Int)
+    go !i ty ty_expanded
+      | intGtLimit i limit = (ty, i)
+      | Just ty_expanded' <- tcView ty_expanded = go i ty ty_expanded'
+      | Rep.TyConApp tycon args <- ty_expanded
+      , Just (_, ty') <- reduceTyFamApp_maybe fam_envs Nominal tycon args = go (i+1) ty' ty'
+      | otherwise = (ty, i)
+
 
 {-
 Note [Residual implications]
