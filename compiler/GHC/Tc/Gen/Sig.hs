@@ -180,7 +180,7 @@ tcTySigs hs_sigs
 
 tcTySig :: LSig GhcRn -> TcM [TcSigInfo]
 tcTySig (L _ (IdSig _ id))
-  = do { let ctxt = FunSigCtxt (idName id) False
+  = do { let ctxt = FunSigCtxt (idName id) Nothing
                     -- False: do not report redundant constraints
                     -- The user has no control over the signature!
              sig = completeSigFromId ctxt id
@@ -238,10 +238,10 @@ tcUserTypeSig loc hs_sig_ty mb_name
                Just n  -> n
                Nothing -> mkUnboundName (mkVarOcc "<expression>")
     ctxt_F = case mb_name of
-               Just n  -> FunSigCtxt n False
+               Just n  -> FunSigCtxt n Nothing
                Nothing -> ExprSigCtxt
     ctxt_T = case mb_name of
-               Just n  -> FunSigCtxt n True
+               Just n  -> FunSigCtxt n (Just loc)
                Nothing -> ExprSigCtxt
 
 
@@ -757,8 +757,8 @@ tcSpecPrag poly_id prag@(SpecSig _ fun_name hs_tys inl)
     spec_ctxt prag = hang (text "In the pragma:") 2 (ppr prag)
 
     tc_one hs_ty
-      = do { spec_ty <- tcHsSigType   (FunSigCtxt name False) hs_ty
-           ; wrap    <- tcSpecWrapper (FunSigCtxt name True)  poly_ty spec_ty
+      = do { spec_ty <- tcHsSigType   (FunSigCtxt name Nothing) hs_ty
+           ; wrap    <- tcSpecWrapper (FunSigCtxt name (Just $ getSrcSpan name))  poly_ty spec_ty
            ; return (SpecPrag poly_id wrap inl) }
 
 tcSpecPrag _ prag = pprPanic "tcSpecPrag" (ppr prag)
