@@ -101,6 +101,8 @@ import Data.List.NonEmpty ( NonEmpty(..) )
 import qualified Data.Set as Set
 import Data.Tuple( swap )
 
+import GHC.Driver.Ppr (pprTraceM)
+
 {-
 ************************************************************************
 *                                                                      *
@@ -180,10 +182,12 @@ tcTyClGroup (TyClGroup { group_tyclds = tyclds
            -- Step 1: Typecheck the standalone kind signatures and type/class declarations
        ; traceTc "---- tcTyClGroup ---- {" empty
        ; traceTc "Decls for" (ppr (map (tcdName . unLoc) tyclds))
-       ; (tyclss, data_deriv_info) <-
+       ; (tyclss, data_deriv_info, kindless) <-
            tcExtendKindEnv (mkPromotionErrorEnv tyclds) $ -- See Note [Type environment evolution]
            do { kisig_env <- mkNameEnv <$> traverse tcStandaloneKindSig kisigs
               ; tcTyClDecls tyclds kisig_env role_annots }
+
+       ; pprTraceM "kindless" (ppr kindless)
 
            -- Step 1.5: Make sure we don't have any type synonym cycles
        ; traceTc "Starting synonym cycle check" (ppr tyclss)
@@ -214,7 +218,9 @@ tcTyClGroup (TyClGroup { group_tyclds = tyclds
          tcInstDecls1 instds
 
        ; let deriv_info = datafam_deriv_info ++ data_deriv_info
-       ; return (gbl_env', inst_info, deriv_info) }
+       ; let gbl_env'' = gbl_env'
+                { tcg_ksigs = tcg_ksigs gbl_env' `unionNameSet` kindless }
+       ; return (gbl_env'', inst_info, deriv_info) }
 
 -- Gives the kind for every TyCon that has a standalone kind signature
 type KindSigEnv = NameEnv Kind
@@ -223,12 +229,12 @@ tcTyClDecls
   :: [LTyClDecl GhcRn]
   -> KindSigEnv
   -> RoleAnnotEnv
-  -> TcM ([TyCon], [DerivInfo])
+  -> TcM ([TyCon], [DerivInfo], NameSet)
 tcTyClDecls tyclds kisig_env role_annots
   = do {    -- Step 1: kind-check this group and returns the final
             -- (possibly-polymorphic) kind of each TyCon and Class
             -- See Note [Kind checking for type and class decls]
-         tc_tycons <- kcTyClGroup kisig_env tyclds
+         (kindless, tc_tycons) <- kcTyClGroup kisig_env tyclds
        ; traceTc "tcTyAndCl generalized kinds" (vcat (map ppr_tc_tycon tc_tycons))
 
             -- Step 2: type-check all groups together, returning
@@ -237,7 +243,7 @@ tcTyClDecls tyclds kisig_env role_annots
             -- NB: We have to be careful here to NOT eagerly unfold
             -- type synonyms, as we have not tested for type synonym
             -- loops yet and could fall into a black hole.
-       ; fixM $ \ ~(rec_tyclss, _) -> do
+       ; (tycons, deriv_info) <- fixM $ \ ~(rec_tyclss, _) -> do
            { tcg_env <- getGblEnv
                  -- Forced so we don't retain a reference to the TcGblEnv
            ; let !src  = tcg_src tcg_env
@@ -259,7 +265,8 @@ tcTyClDecls tyclds kisig_env role_annots
                  -- Kind and type check declarations for this group
                mapAndUnzipM (tcTyClDecl roles) tyclds
            ; return (tycons, concat data_deriv_infos)
-           } }
+           }
+       ; return (tycons, deriv_info, kindless) }
   where
     ppr_tc_tycon tc = parens (sep [ ppr (tyConName tc) <> comma
                                   , ppr (tyConBinders tc) <> comma
@@ -631,7 +638,7 @@ been generalized.
 
 -}
 
-kcTyClGroup :: KindSigEnv -> [LTyClDecl GhcRn] -> TcM [TcTyCon]
+kcTyClGroup :: KindSigEnv -> [LTyClDecl GhcRn] -> TcM (NameSet, [TcTyCon])
 
 -- Kind check this group, kind generalize, and return the resulting local env
 -- This binds the TyCons and Classes of the group, but not the DataCons
@@ -651,9 +658,12 @@ kcTyClGroup kisig_env decls
         ; cusks_enabled <- xoptM LangExt.CUSKs <&&> xoptM LangExt.PolyKinds
                     -- See Note [CUSKs and PolyKinds]
         ; let (kindless_decls, kinded_decls) = partitionWith get_kind decls
+              kindless_names = mkNameSet $ map get_name kindless_decls
+
+              get_name d = tcdName (unLoc d)
 
               get_kind d
-                | Just ki <- lookupNameEnv kisig_env (tcdName (unLoc d))
+                | Just ki <- lookupNameEnv kisig_env (get_name d)
                 = Right (d, SAKS ki)
 
                 | cusks_enabled && hsDeclHasCusk (unLoc d)
@@ -700,7 +710,7 @@ kcTyClGroup kisig_env decls
 
         ; let poly_tcs = checked_tcs ++ generalized_tcs
         ; traceTc "---- kcTyClGroup end ---- }" (ppr_tc_kinds poly_tcs)
-        ; return poly_tcs }
+        ; return (kindless_names, poly_tcs) }
   where
     ppr_tc_kinds tcs = vcat (map pp_tc tcs)
     pp_tc tc = ppr (tyConName tc) <+> dcolon <+> ppr (tyConKind tc)
