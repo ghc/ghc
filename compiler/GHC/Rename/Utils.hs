@@ -25,7 +25,7 @@ module GHC.Rename.Utils (
 
         bindLocalNames, bindLocalNamesFV,
 
-        addNameClashErrRn, extendTyVarEnvFVRn,
+        addNameClashErrRn,
 
         checkInferredVars,
         noNestedForallsContextsErr, addNoNestedForallsContextsErr
@@ -100,11 +100,6 @@ bindLocalNamesFV :: [Name] -> RnM (a, FreeVars) -> RnM (a, FreeVars)
 bindLocalNamesFV names enclosed_scope
   = do  { (result, fvs) <- bindLocalNames names enclosed_scope
         ; return (result, delFVs names fvs) }
-
--------------------------------------
-
-extendTyVarEnvFVRn :: [Name] -> RnM (a, FreeVars) -> RnM (a, FreeVars)
-extendTyVarEnvFVRn tyvars thing_inside = bindLocalNamesFV tyvars thing_inside
 
 -------------------------------------
 checkDupRdrNames :: [LocatedN RdrName] -> RnM ()
