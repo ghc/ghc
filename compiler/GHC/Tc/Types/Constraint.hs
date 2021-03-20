@@ -1699,6 +1699,55 @@ I thought maybe we could never get Derived ReprEq constraints, but
 we can; straight from the Wanteds during improvement. And from a Derived
 ReprEq we could conceivably get a Derived NomEq improvement (by decomposing
 a type constructor with Nomninal role), and hence unify.
+
+This restriction bites, in an obscure scenario:
+
+  data T a
+  type role T nominal
+
+  type family F a
+
+  g :: forall b a. (F a ~ T a, Coercible (F a) (T b)) => ()
+  g = ()
+
+  f :: forall a. (F a ~ T a) => ()
+  f = g @a
+
+The problem is in the body of f. We have
+
+  [G]  F a ~N T a
+  [WD] F alpha ~N T alpha
+  [WD] F alpha ~R T a
+
+The Wanteds aren't of use, so let's just look at Deriveds:
+
+  [G] F a ~N T a
+  [D] F alpha ~N T alpha
+  [D] F alpha ~R T a
+
+As written, this makes no progress, and GHC errors. But, if we
+allowed D/N to rewrite D/R, the first D could rewrite the second:
+
+  [G] F a ~N T a
+  [D] F alpha ~N T alpha
+  [D] T alpha ~R T a
+
+Now we decompose the second D to get
+
+  [D] alpha ~N a
+
+noting the role annotation on T. This causes (alpha := a), and then
+everything else unlocks.
+
+What to do? We could "decompose" nominal equalities into nominal-only
+("NO") equalities and representational ones, where a NO equality rewrites
+only nominals. That is, when considering whether [D] F alpha ~N T alpha
+should rewrite [D] F alpha ~R T a, we could require splitting the first D
+into [D] F alpha ~NO T alpha, [D] F alpha ~R T alpha. Then, we use the R
+half of the split to rewrite the second D, and off we go. This splitting
+would allow the split-off R equality to be rewritten by other equalities,
+thus avoiding the problem in Note [Why R2?] in GHC.Tc.Solver.Monad.
+
 -}
 
 eqCanRewrite :: EqRel -> EqRel -> Bool
