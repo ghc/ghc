@@ -14,8 +14,9 @@
 #if defined(mingw32_HOST_OS)
 #define pathcmp wcscmp
 #define pathlen wcslen
+// N.B. Use the Win32-based file routines from utils/fs.
 #define pathopen __rts_fwopen
-#define pathstat _wstat
+#define pathstat __rts__wstat
 #define struct_stat struct _stat
 #define open wopen
 #define WSTR(s) L##s
