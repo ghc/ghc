@@ -3124,6 +3124,7 @@ wWarningFlagsDeps = [
   flagSpec "missing-monadfail-instances" Opt_WarnMissingMonadFailInstances,
   flagSpec "semigroup"                   Opt_WarnSemigroup,
   flagSpec "missing-signatures"          Opt_WarnMissingSignatures,
+  flagSpec "missing-kind-signatures"     Opt_WarnMissingKindSignatures,
   depFlagSpec "missing-exported-sigs"    Opt_WarnMissingExportedSignatures
     "it is replaced by -Wmissing-exported-signatures",
   flagSpec "missing-exported-signatures" Opt_WarnMissingExportedSignatures,

@@ -52,6 +52,7 @@ import GHC.Parser.PostProcess ( setRdrNameSpace )
 import GHC.Core.Type
 import GHC.Core.PatSyn
 import GHC.Core.TyCo.Ppr
+import GHC.Core.TyCon ( TyCon, tyConName, tyConKind )
 import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Utils.Outputable as Outputable
@@ -1417,7 +1418,8 @@ reportUnusedNames gbl_env hsc_src
         ; traceRn "RUN" (ppr (tcg_dus gbl_env))
         ; warnUnusedImportDecls gbl_env hsc_src
         ; warnUnusedTopBinds $ unused_locals keep
-        ; warnMissingSignatures gbl_env }
+        ; warnMissingSignatures gbl_env
+        ; warnMissingKindSignatures gbl_env }
   where
     used_names :: NameSet -> NameSet
     used_names keep = findUses (tcg_dus gbl_env) emptyNameSet `unionNameSet` keep
@@ -1519,6 +1521,30 @@ warnMissingSignatures gbl_env
 
        ; add_sig_warns }
 
+-- | Warn the user about tycons that lack kind signatures.
+-- Called /after/ type (and kind) inference, so that we can report the
+-- inferred kinds.
+warnMissingKindSignatures :: TcGblEnv -> RnM ()
+warnMissingKindSignatures gbl_env
+  = do { warn_missing_kind_sigs  <- woptM Opt_WarnMissingKindSignatures
+       ; cusks_enabled <- xoptM LangExt.CUSKs
+       ; when (warn_missing_kind_sigs) (mapM_ (add_ty_warn cusks_enabled) tcs)
+       }
+  where
+    tcs = tcg_tcs gbl_env
+    ksig_ns = tcg_ksigs gbl_env
+
+    add_ty_warn :: Bool -> TyCon -> IOEnv (Env TcGblEnv TcLclEnv) ()
+    add_ty_warn cusks_enabled tyCon = when (name `elemNameSet` ksig_ns) $
+        addWarnAt (Reason Opt_WarnMissingKindSignatures) (getSrcSpan name) $
+            hang msg 2 (text "type" <+> pprPrefixName name <+> dcolon <+> ki_msg)
+      where
+        msg | cusks_enabled = text "Top-level type constructor with no standalone kind signature or CUSK:"
+            | otherwise     = text "Top-level type constructor with no standalone kind signature:"
+        name = tyConName tyCon
+        ki = tyConKind tyCon
+        ki_msg :: SDoc
+        ki_msg = pprKind ki
 
 {-
 *********************************************************
