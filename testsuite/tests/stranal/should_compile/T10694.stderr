@@ -30,7 +30,7 @@ pm [InlPrag=[final]] :: Int -> Int -> (Int, Int)
 [GblId,
  Arity=2,
  Str=<LP(L)><LP(L)>,
- Cpr=m1,
+ Cpr=1,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
          Tmpl= \ (w [Occ=Once1] :: Int) (w1 [Occ=Once1] :: Int) ->
