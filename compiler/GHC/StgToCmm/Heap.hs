@@ -32,7 +32,6 @@ import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Prof (profDynAlloc, dynProfHdr, staticProfHdr)
 import GHC.StgToCmm.Ticky
 import GHC.StgToCmm.Closure
-import GHC.StgToCmm.Env
 
 import GHC.Cmm.Graph
 
