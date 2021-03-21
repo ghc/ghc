@@ -23,13 +23,13 @@ import GHC.Stg.DepAnal  ( depSortStgPgm )
 import GHC.Stg.Unarise  ( unarise )
 import GHC.Stg.CSE      ( stgCse )
 import GHC.Stg.Lift     ( stgLiftLams )
+import GHC.Stg.InferTags( inferTags )
 import GHC.Unit.Module ( Module )
 import GHC.Runtime.Context ( InteractiveContext )
 
 import GHC.Driver.Session
 import GHC.Utils.Error
 import GHC.Types.Unique.Supply
-import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Logger
 import Control.Monad
@@ -99,6 +99,12 @@ stg2stg logger dflags ictxt this_mod binds
             let binds' = {-# SCC "StgLiftLams" #-} stgLiftLams dflags us binds
             end_pass "StgLiftLams" binds'
 
+          StgInferTags -> do
+            let binds' = inferTags binds
+            liftIO $ dumpIfSet_dyn logger dflags Opt_D_verbose_stg2stg "StgInferTags"
+              FormatSTG (pprGenStgTopBindings opts binds')
+            return binds   -- For now, discard result
+
           StgUnarise -> do
             us <- getUniqueSupplyM
             liftIO (stg_linter False "Pre-unarise" binds)
@@ -111,10 +117,11 @@ stg2stg logger dflags ictxt this_mod binds
     dump_when flag header binds
       = dumpIfSet_dyn logger dflags flag header FormatSTG (pprStgTopBindings opts binds)
 
+    end_pass :: String -> [StgTopBinding] -> StgM [StgTopBinding]
     end_pass what binds2
       = liftIO $ do -- report verbosely, if required
           dumpIfSet_dyn logger dflags Opt_D_verbose_stg2stg what
-            FormatSTG (vcat (map (pprStgTopBinding opts) binds2))
+            FormatSTG (pprStgTopBindings opts binds2)
           stg_linter False what binds2
           return binds2
 
@@ -131,6 +138,9 @@ data StgToDo
   | StgStats
   | StgUnarise
   -- ^ Mandatory unarise pass, desugaring unboxed tuple and sum binders
+
+  | StgInferTags
+
   | StgDoNothing
   -- ^ Useful for building up 'getStgToDo'
   deriving Eq
@@ -144,6 +154,7 @@ getStgToDo dflags =
     -- See Note [StgCse after unarisation] in GHC.Stg.CSE
     , optional Opt_StgCSE StgCSE
     , optional Opt_StgLiftLams StgLiftLams
+    , mandatory StgInferTags
     , optional Opt_StgStats StgStats
     ] where
       optional opt = runWhen (gopt opt dflags)

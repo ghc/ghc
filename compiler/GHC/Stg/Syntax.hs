@@ -453,6 +453,7 @@ StgPass data type indexes:
 data StgPass
   = Vanilla
   | LiftLams
+  | Tagged
   | CodeGen
 
 -- | Like 'GHC.Hs.Extension.NoExtField', but with an 'Outputable' instance that
