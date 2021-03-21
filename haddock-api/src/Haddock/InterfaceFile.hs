@@ -85,11 +85,11 @@ binaryInterfaceMagic = 0xD0Cface
 -- (2) set `binaryInterfaceVersionCompatibility` to [binaryInterfaceVersion]
 --
 binaryInterfaceVersion :: Word16
-#if MIN_VERSION_ghc(9,1,0) && !MIN_VERSION_ghc(9,2,0)
-binaryInterfaceVersion = 38
+#if MIN_VERSION_ghc(9,3,0) && !MIN_VERSION_ghc(9,4,0)
+binaryInterfaceVersion = 39
 
 binaryInterfaceVersionCompatibility :: [Word16]
-binaryInterfaceVersionCompatibility = [37, binaryInterfaceVersion]
+binaryInterfaceVersionCompatibility = [binaryInterfaceVersion]
 #else
 #error Unsupported GHC version
 #endif
