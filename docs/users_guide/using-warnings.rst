@@ -1195,7 +1195,7 @@ of ``-W(no-)*``.
          single: kind signatures, missing
 
     If you would like GHC to check that every data, type family,
-    type-class definition has a kind signature or is CUSK, use the
+    type-class definition has a :ref:`standalone kind signature <standalone-kind-signatures>` or a :ref:`CUSK <complete-kind-signatures>`, use the
     :ghc-flag:`-Wmissing-kind-signatures` option.
     You can specify the kind via :extension:`StandaloneKindSignatures`
     or :extension:`CUSKs`.
