@@ -2446,10 +2446,10 @@ section "Exceptions"
 -- head-strict in 'ma': GHC.IO.catchException.
 
 primop  CatchOp "catch#" GenPrimOp
-          (State# RealWorld -> (# State# RealWorld, a #) )
-       -> (b -> State# RealWorld -> (# State# RealWorld, a #) )
+          (State# RealWorld -> (# State# RealWorld, o #) )
+       -> (b -> State# RealWorld -> (# State# RealWorld, o #) )
        -> State# RealWorld
-       -> (# State# RealWorld, a #)
+       -> (# State# RealWorld, o #)
    with
    strictness  = { \ _arity -> mkClosedStrictSig [ lazyApply1Dmd
                                                  , lazyApply2Dmd
@@ -2474,7 +2474,7 @@ primop  RaiseOp "raise#" GenPrimOp
    can_fail = True
 
 primop  RaiseIOOp "raiseIO#" GenPrimOp
-   a -> State# RealWorld -> (# State# RealWorld, b #)
+   b -> State# RealWorld -> (# State# RealWorld, o #)
    with
    -- See Note [Precise exceptions and strictness analysis] in "GHC.Types.Demand"
    -- for why this is the *only* primop that has 'exnDiv'
@@ -2483,8 +2483,8 @@ primop  RaiseIOOp "raiseIO#" GenPrimOp
    has_side_effects = True
 
 primop  MaskAsyncExceptionsOp "maskAsyncExceptions#" GenPrimOp
-        (State# RealWorld -> (# State# RealWorld, a #))
-     -> (State# RealWorld -> (# State# RealWorld, a #))
+        (State# RealWorld -> (# State# RealWorld, o #))
+     -> (State# RealWorld -> (# State# RealWorld, o #))
    with
    strictness  = { \ _arity -> mkClosedStrictSig [strictOnceApply1Dmd,topDmd] topDiv }
                  -- See Note [Strictness for mask/unmask/catch]
@@ -2492,16 +2492,16 @@ primop  MaskAsyncExceptionsOp "maskAsyncExceptions#" GenPrimOp
    has_side_effects = True
 
 primop  MaskUninterruptibleOp "maskUninterruptible#" GenPrimOp
-        (State# RealWorld -> (# State# RealWorld, a #))
-     -> (State# RealWorld -> (# State# RealWorld, a #))
+        (State# RealWorld -> (# State# RealWorld, o #))
+     -> (State# RealWorld -> (# State# RealWorld, o #))
    with
    strictness  = { \ _arity -> mkClosedStrictSig [strictOnceApply1Dmd,topDmd] topDiv }
    out_of_line = True
    has_side_effects = True
 
 primop  UnmaskAsyncExceptionsOp "unmaskAsyncExceptions#" GenPrimOp
-        (State# RealWorld -> (# State# RealWorld, a #))
-     -> (State# RealWorld -> (# State# RealWorld, a #))
+        (State# RealWorld -> (# State# RealWorld, o #))
+     -> (State# RealWorld -> (# State# RealWorld, o #))
    with
    strictness  = { \ _arity -> mkClosedStrictSig [strictOnceApply1Dmd,topDmd] topDiv }
                  -- See Note [Strictness for mask/unmask/catch]
