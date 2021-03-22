@@ -261,7 +261,7 @@ getOptions' dflags toks
               | IToptions_prag str <- unLoc open
               , ITclose_prag       <- unLoc close
               = case toArgs str of
-                  Left _err -> optionsParseError dflags str $   -- #15053
+                  Left _err -> optionsParseError str $   -- #15053
                                  combineSrcSpans (getLoc open) (getLoc close)
                   Right args -> map (L (getLoc open)) args ++ parseToks xs
           parseToks (open:close:xs)
@@ -286,10 +286,10 @@ getOptions' dflags toks
                 case rest of
                   (L _loc ITcomma):more -> parseLanguage more
                   (L _loc ITclose_prag):more -> parseToks more
-                  (L loc _):_ -> languagePragParseError dflags loc
+                  (L loc _):_ -> languagePragParseError loc
                   [] -> panic "getOptions'.parseLanguage(1) went past eof token"
           parseLanguage (tok:_)
-              = languagePragParseError dflags (getLoc tok)
+              = languagePragParseError (getLoc tok)
           parseLanguage []
               = panic "getOptions'.parseLanguage(2) went past eof token"
 
@@ -310,12 +310,12 @@ getOptions' dflags toks
 --
 -- Throws a 'SourceError' if the input list is non-empty claiming that the
 -- input flags are unknown.
-checkProcessArgsResult :: MonadIO m => DynFlags -> [Located String] -> m ()
-checkProcessArgsResult dflags flags
+checkProcessArgsResult :: MonadIO m => [Located String] -> m ()
+checkProcessArgsResult flags
   = when (notNull flags) $
       liftIO $ throwIO $ mkSrcErr $ listToBag $ map mkMsg flags
     where mkMsg (L loc flag)
-              = mkPlainMsgEnvelope dflags ErrorWithoutFlag loc $
+              = mkPlainErrorMsgEnvelope loc $
                   (text "unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+>
                    text flag)
 
@@ -332,9 +332,9 @@ checkExtension dflags (L l ext)
     ext' = unpackFS ext
     supported = supportedLanguagesAndExtensions $ platformArchOS $ targetPlatform dflags
 
-languagePragParseError :: DynFlags -> SrcSpan -> a
-languagePragParseError df loc =
-    throwErr df loc $
+languagePragParseError :: SrcSpan -> a
+languagePragParseError loc =
+    throwErr loc $
        vcat [ text "Cannot parse LANGUAGE pragma"
             , text "Expecting comma-separated list of language options,"
             , text "each starting with a capital letter"
@@ -342,7 +342,7 @@ languagePragParseError df loc =
 
 unsupportedExtnError :: DynFlags -> SrcSpan -> String -> a
 unsupportedExtnError dflags loc unsup =
-    throwErr dflags loc $
+    throwErr loc $
         text "Unsupported extension: " <> text unsup $$
         if null suggestions then Outputable.empty else text "Perhaps you meant" <+> quotedListWithOr (map text suggestions)
   where
@@ -350,8 +350,8 @@ unsupportedExtnError dflags loc unsup =
      suggestions = fuzzyMatch unsup supported
 
 
-optionsErrorMsgs :: DynFlags -> [String] -> [Located String] -> FilePath -> Messages DiagnosticMessage
-optionsErrorMsgs dflags unhandled_flags flags_lines _filename
+optionsErrorMsgs :: [String] -> [Located String] -> FilePath -> Messages DiagnosticMessage
+optionsErrorMsgs unhandled_flags flags_lines _filename
   = mkMessages $ listToBag (map mkMsg unhandled_flags_lines)
   where unhandled_flags_lines :: [Located String]
         unhandled_flags_lines = [ L l f
@@ -359,17 +359,17 @@ optionsErrorMsgs dflags unhandled_flags flags_lines _filename
                                 , L l f' <- flags_lines
                                 , f == f' ]
         mkMsg (L flagSpan flag) =
-            mkPlainMsgEnvelope dflags ErrorWithoutFlag flagSpan $
+            mkPlainErrorMsgEnvelope flagSpan $
                     text "unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+> text flag
 
-optionsParseError :: DynFlags -> String -> SrcSpan -> a     -- #15053
-optionsParseError df str loc =
-  throwErr df loc $
+optionsParseError :: String -> SrcSpan -> a     -- #15053
+optionsParseError str loc =
+  throwErr loc $
       vcat [ text "Error while parsing OPTIONS_GHC pragma."
            , text "Expecting whitespace-separated list of GHC options."
            , text "  E.g. {-# OPTIONS_GHC -Wall -O2 #-}"
            , text ("Input was: " ++ show str) ]
 
-throwErr :: DynFlags -> SrcSpan -> SDoc -> a                -- #15053
-throwErr df loc doc =
-  throw $ mkSrcErr $ unitBag $ mkPlainMsgEnvelope df ErrorWithoutFlag loc doc
+throwErr :: SrcSpan -> SDoc -> a                -- #15053
+throwErr loc doc =
+  throw $ mkSrcErr $ unitBag $ mkPlainErrorMsgEnvelope loc doc

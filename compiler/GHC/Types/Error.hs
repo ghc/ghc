@@ -239,6 +239,10 @@ data MessageClass
     -- Use this constructor directly only if you need to construct and manipulate diagnostic
     -- messages directly, for example inside 'GHC.Utils.Error'. In all the other circumstances,
     -- /especially/ when emitting compiler diagnostics, use the smart constructor.
+  | MCDiagnosticError
+    -- ^ Used to construct an \"unavoidable\" /error/ diagnostic. This can be used when the
+    -- 'DiagnosticReason' is sure to be 'ErrorWithoutFlag' and as such we don't need to compute
+    -- the 'Severity' by consulting the 'DynFlags'.
   deriving (Eq, Show)
 
 
@@ -268,6 +272,7 @@ instance ToJson MessageClass where
   json MCInfo = JSString "MCInfo"
   json (MCDiagnostic sev reason) =
     JSString $ renderWithContext defaultSDocContext (ppr $ text "MCDiagnostic" <+> ppr sev <+> ppr reason)
+  json MCDiagnosticError = json $ MCDiagnostic SevError ErrorWithoutFlag
 
 instance Show (MsgEnvelope DiagnosticMessage) where
     show = showMsgEnvelope

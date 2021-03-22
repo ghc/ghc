@@ -100,7 +100,7 @@ doBackpack [src_filename] = do
     (dflags, unhandled_flags, warns) <- liftIO $ parseDynamicFilePragma dflags1 src_opts
     modifySession (\hsc_env -> hsc_env {hsc_dflags = dflags})
     -- Cribbed from: preprocessFile / GHC.Driver.Pipeline
-    liftIO $ checkProcessArgsResult dflags unhandled_flags
+    liftIO $ checkProcessArgsResult unhandled_flags
     liftIO $ handleFlagWarnings logger dflags warns
     -- TODO: Preprocessing not implemented
 
@@ -798,8 +798,8 @@ summariseDecl _pn hsc_src lmodname@(L loc modname) Nothing
                          Nothing -- GHC API buffer support not supported
                          [] -- No exclusions
          case r of
-            Nothing -> throwOneError (mkPlainMsgEnvelope (hsc_dflags hsc_env) ErrorWithoutFlag
-                                        loc (text "module" <+> ppr modname <+> text "was not found"))
+            Nothing -> throwOneError (mkPlainErrorMsgEnvelope loc
+                                     (text "module" <+> ppr modname <+> text "was not found"))
             Just (Left err) -> throwErrors err
             Just (Right summary) -> return summary
 

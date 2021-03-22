@@ -1237,10 +1237,9 @@ checkSafeImports tcg_env
     cond' :: ImportedModsVal -> ImportedModsVal -> Hsc ImportedModsVal
     cond' v1 v2
         | imv_is_safe v1 /= imv_is_safe v2
-        = do dflags <- getDynFlags
-             throwOneError $ mkPlainMsgEnvelope dflags ErrorWithoutFlag (imv_span v1)
-                 (text "Module" <+> ppr (imv_name v1) <+>
-                 (text $ "is imported both as a safe and unsafe import!"))
+        = throwOneError $ mkPlainErrorMsgEnvelope (imv_span v1)
+            (text "Module" <+> ppr (imv_name v1) <+>
+            (text $ "is imported both as a safe and unsafe import!"))
         | otherwise
         = return v1
 
@@ -1306,7 +1305,7 @@ hscCheckSafe' m l = do
         iface <- lookup' m
         case iface of
             -- can't load iface to check trust!
-            Nothing -> throwOneError $ mkPlainMsgEnvelope dflags ErrorWithoutFlag l
+            Nothing -> throwOneError $ mkPlainErrorMsgEnvelope l
                          $ text "Can't load the interface file for" <+> ppr m
                            <> text ", to check that it can be safely imported"
 
@@ -2017,7 +2016,7 @@ hscImport hsc_env str = runInteractiveHsc hsc_env $ do
     case is of
         [L _ i] -> return i
         _ -> liftIO $ throwOneError $
-                 mkPlainMsgEnvelope (hsc_dflags hsc_env) ErrorWithoutFlag noSrcSpan $
+                 mkPlainErrorMsgEnvelope noSrcSpan $
                      text "parse error in import declaration"
 
 -- | Typecheck an expression (but don't run it)
@@ -2044,10 +2043,9 @@ hscKcType hsc_env0 normalise str = runInteractiveHsc hsc_env0 $ do
 hscParseExpr :: String -> Hsc (LHsExpr GhcPs)
 hscParseExpr expr = do
   maybe_stmt <- hscParseStmt expr
-  hsc_env <- getHscEnv
   case maybe_stmt of
     Just (L _ (BodyStmt _ expr _ _)) -> return expr
-    _ -> throwOneError $ mkPlainMsgEnvelope (hsc_dflags hsc_env) ErrorWithoutFlag noSrcSpan
+    _ -> throwOneError $ mkPlainErrorMsgEnvelope noSrcSpan
       (text "not an expression:" <+> quotes (text expr))
 
 hscParseStmt :: String -> Hsc (Maybe (GhciLStmt GhcPs))
