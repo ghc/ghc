@@ -1,36 +1,33 @@
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE FlexibleInstances #-}
 
 -- This program must be called with GHC's libdir as the single command line
 -- argument.
 module Main where
 
 -- import Data.Generics
-import Data.Data hiding (Fixity)
+import Data.Data
 import Data.List (intercalate)
 import System.IO
 import GHC
 import GHC.Types.Basic
-import GHC.Types.SourceText
-import GHC.Types.Fixity
 import GHC.Driver.Session
 import GHC.Driver.Ppr
-import GHC.Data.FastString
-import GHC.Types.ForeignCall
 import GHC.Utils.Monad
 import GHC.Utils.Outputable
-import GHC.Hs.Decls
+import GHC.Parser.Annotation
 import GHC.Data.Bag (filterBag,isEmptyBag)
 import System.Directory (removeFile)
 import System.Environment( getArgs )
+import System.Exit
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import Data.Dynamic ( fromDynamic,Dynamic )
 
 main::IO()
 main = do
-        [libdir,fileName] <- getArgs
-        testOneFile libdir fileName
+        [libdir] <- getArgs
+        testOneFile libdir "ListComprehensions"
+        exitSuccess
 
 testOneFile libdir fileName = do
        p <- runGhc (Just libdir) $ do
@@ -44,40 +41,30 @@ testOneFile libdir fileName = do
                         load LoadAllTargets
                         modSum <- getModSummary mn
                         p <- parseModule modSum
+                        t <- typecheckModule p
+                        d <- desugarModule t
+                        l <- loadModule d
                         return p
 
-       let tupArgs = gq (pm_parsed_source p)
+       let anns = pm_annotations p
+           ann_items = apiAnnItems anns
+           ann_eof = apiAnnEofPos anns
+       let spans = Set.fromList $ getAllSrcSpans (pm_parsed_source p)
 
-       putStrLn (intercalate "\n" $ map show tupArgs)
-       -- putStrLn (pp tupArgs)
-       -- putStrLn (intercalate "\n" [showAnns anns])
+       putStrLn (pp spans)
+       putStrLn "--------------------------------"
+       putStrLn (intercalate "\n" [showAnns ann_items,"EOF: " ++ show ann_eof])
 
     where
-     gq ast = everything (++) ([] `mkQ` doFixity
-                               `extQ` doRuleDecl
-                               `extQ` doHsExpr
-                               `extQ` doInline
-                              ) ast
+      getAnnSrcSpans :: ApiAnns -> [(RealSrcSpan,(ApiAnnKey,[RealSrcSpan]))]
+      getAnnSrcSpans anns = map (\a@((ss,_),_) -> (ss,a)) $ Map.toList (apiAnnItems anns)
 
-     doFixity :: Fixity -> [(String,[String])]
-     doFixity (Fixity (SourceText ss) _ _) = [("f",[ss])]
-
-     doRuleDecl :: RuleDecl GhcPs
-                -> [(String,[String])]
-     doRuleDecl (HsRule _ _ (ActiveBefore (SourceText ss) _) _ _ _ _)
-       = [("rb",[ss])]
-     doRuleDecl (HsRule _ _ (ActiveAfter (SourceText ss) _) _ _ _ _)
-       = [("ra",[ss])]
-     doRuleDecl (HsRule _ _ _ _ _ _ _) = []
-
-     doHsExpr :: HsExpr GhcPs -> [(String,[String])]
-     doHsExpr _ = []
-
-     doInline (InlinePragma _ _ _ (ActiveBefore (SourceText ss) _) _)
-         = [("ib",[ss])]
-     doInline (InlinePragma _ _ _ (ActiveAfter (SourceText ss) _) _)
-         = [("ia",[ss])]
-     doInline (InlinePragma _ _ _ _ _ ) = []
+      getAllSrcSpans :: (Data t) => t -> [RealSrcSpan]
+      getAllSrcSpans ast = everything (++) ([] `mkQ` getSrcSpan) ast
+        where
+          getSrcSpan :: SrcSpan -> [RealSrcSpan]
+          getSrcSpan (RealSrcSpan ss _) = [ss]
+          getSrcSpan (UnhelpfulSpan _) = []
 
 showAnns anns = "[\n" ++ (intercalate "\n"
    $ map (\((s,k),v)
@@ -86,6 +73,7 @@ showAnns anns = "[\n" ++ (intercalate "\n"
     ++ "]\n"
 
 pp a = showPprUnsafe a
+
 
 -- ---------------------------------------------------------------------
 
@@ -113,15 +101,6 @@ mkQ :: ( Typeable a
                         Just b  -> br b
                         Nothing -> r
 
--- | Extend a generic query by a type-specific case
-extQ :: ( Typeable a
-        , Typeable b
-        )
-     => (a -> q)
-     -> (b -> q)
-     -> a
-     -> q
-extQ f g a = maybe (f a) g (cast a)
 
 
 -- | Summarise all nodes in top-down, left-to-right order
