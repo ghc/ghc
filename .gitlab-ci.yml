@@ -384,6 +384,11 @@ lint-base:
     TEST_TYPE: test
     MAKE_ARGS: "-Werror"
   script:
+      # Build hyperlinked sources for documentation when building releases
+    - |
+      if [[ "$RELEASE_JOB" = "yes" ]]; then
+        HADDOCK_HYPERLINKED_SOURCES=1
+      fi
     - .gitlab/ci.sh setup
     - .gitlab/ci.sh configure
     - .gitlab/ci.sh build_make
@@ -795,6 +800,9 @@ release-x86_64-linux-deb10-dwarf:
     BUILD_FLAVOUR: dwarf
     TEST_ENV: "x86_64-linux-deb10-dwarf"
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-deb10-linux-dwarf.tar.xz"
+  artifacts:
+    when: always
+    expire_in: 1 year
 
 validate-x86_64-linux-deb10-llvm:
   extends: .build-x86_64-linux-deb10
