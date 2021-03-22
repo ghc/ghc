@@ -6,7 +6,6 @@ module GHC.Driver.Env.Types
 
 import {-# SOURCE #-} GHC.Driver.Hooks
 import GHC.Driver.Session ( DynFlags, HasDynFlags(..) )
-import GHC.Linker.Types ( Loader )
 import GHC.Prelude
 import GHC.Runtime.Context
 import GHC.Runtime.Interpreter.Types ( Interp )
@@ -119,9 +118,6 @@ data HscEnv
         , hsc_interp :: Maybe Interp
                 -- ^ target code interpreter (if any) to use for TH and GHCi.
                 -- See Note [Target code interpreter]
-
-        , hsc_loader :: Loader
-                -- ^ Loader (dynamic linker)
 
         , hsc_plugins :: ![LoadedPlugin]
                 -- ^ plugins dynamically loaded after processing arguments. What
