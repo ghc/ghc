@@ -93,6 +93,27 @@ Lexical syntax
    See `GHC Proposal #229 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0229-whitespace-bang-patterns.rst>`__
    for the precise rules.
 
+- Haskell Report allows any Unicode Decimal Number in decimal literals.
+  However, GHC accepts only ASCII numbers::
+
+     ascDigit    →   0 | 1 | … | 9
+     decimal     →   ascDigit {ascDigit}
+
+- GHC is more lenient in which characters are allowed in the identifiers.
+  Unicode Other Letters are considered to be small letters,
+  therefore variable identifiers can begin with them.
+  Digit class contains all Unicode numbers instead of just Decimal Numbers.
+  Modifier Letters and Non-Spacing Marks can appear in the tail
+  of the identifiers.::
+
+     uniSmall    →   any Unicode Lowercase Letter or Other Letter
+     uniDigit    →   any Unicode Decimal Number, Letter Number or Other Number
+
+     uniIdchar   →   any Unicode Modifier Letter or Non-Spacing Mark
+     idchar      →   small | large | digit | uniIdchar | '
+
+     varid       →   small {idchar} ⟨reservedid⟩
+     conid       →   large {idchar}
 
 .. _infelicities-syntax:
 
