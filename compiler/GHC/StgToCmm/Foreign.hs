@@ -83,6 +83,7 @@ cgForeignCall (CCall (CCallSpec target cconv safety)) typ stg_args res_ty
             arg_size (arg, _) = max (widthInBytes $ typeWidth $ cmmExprType platform arg)
                                      (platformWordSizeInBytes platform)
         ; cmm_args <- getFCallArgs stg_args typ
+        -- ; traceM $ show cmm_args
         ; (res_regs, res_hints) <- newUnboxedTupleRegs res_ty
         ; let ((call_args, arg_hints), cmm_target)
                 = case target of
@@ -103,7 +104,20 @@ cgForeignCall (CCall (CCallSpec target cconv safety)) typ stg_args res_ty
                                            [] -> panic "cgForeignCall []"
               fc = ForeignConvention cconv arg_hints res_hints CmmMayReturn
               call_target = ForeignTarget cmm_target fc
-
+        {-
+        ; forM cmm_args $ \arg -> case arg of
+            (CmmLit _, AddrHint) -> pure ()
+            (CmmReg _, AddrHint) -> pure ()
+            (CmmRegOff _ _, AddrHint) -> pure ()
+            (CmmLit (CmmFloat _ w), SignedHint w')            | w == w' -> pure ()
+            (CmmLit (CmmFloat _ w), NoHint w')                | w == w' -> pure ()
+            (CmmLit (CmmInt _ w), SignedHint w')              | w == w' -> pure ()
+            (CmmLit (CmmInt _ w), NoHint w')                  | w == w' -> pure ()
+            (CmmReg (CmmLocal (LocalReg _ ty)), _)            | isFloatType ty -> pure ()
+            (CmmReg (CmmLocal (LocalReg _ ty)), SignedHint w) | isBitsType ty && typeWidth ty == w -> pure ()
+            (CmmReg (CmmLocal (LocalReg _ ty)), NoHint w)     | isBitsType ty && typeWidth ty == w -> pure ()
+            arg -> traceM $ show cmm_args ++ "\n\t" ++ show arg ++ "; sized don't match! in" ++ "\n\t" ++ showPprUnsafe (ppr cmm_target)
+        -}
         -- we want to emit code for the call, and then emitReturn.
         -- However, if the sequel is AssignTo, we shortcut a little
         -- and generate a foreign call that assigns the results
