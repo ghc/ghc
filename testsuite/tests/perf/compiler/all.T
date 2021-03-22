@@ -585,6 +585,13 @@ test ('T13253-spj',
       ],
       compile,
       ['-v0 -O'])
+test ('T14766',
+      [ collect_compiler_stats('bytes allocated',2),
+        pre_cmd('python3 genT14766.py > T14766.hs'),
+        extra_files(['genT14766.py']),
+      ],
+      compile,
+      ['-v0'])
 test ('T18223',
       [ collect_compiler_stats('bytes allocated',2)
       , compile_timeout_multiplier(2)
