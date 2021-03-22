@@ -1,5 +1,5 @@
 module GHC.Driver.Errors (
-    printOrThrowWarnings
+    printOrThrowDiagnostics
   , printBagOfErrors
   , handleFlagWarnings
   , partitionMessageBag
@@ -43,7 +43,7 @@ handleFlagWarnings logger dflags warns = do
       bag = listToBag [ mkPlainMsgEnvelope dflags WarningWithoutFlag loc (text warn)
                       | CmdLine.Warn _ (L loc warn) <- warns' ]
 
-  printOrThrowWarnings logger dflags bag
+  printOrThrowDiagnostics logger dflags bag
 
 -- Given a warn reason, check to see if it's associated -W opt is enabled
 shouldPrintWarning :: DynFlags -> CmdLine.WarnReason -> Bool
@@ -54,10 +54,10 @@ shouldPrintWarning dflags CmdLine.ReasonUnrecognisedFlag
 shouldPrintWarning _ _
   = True
 
--- | Given a bag of warnings, turn them into an exception if
+-- | Given a bag of diagnostics, turn them into an exception if
 -- any has 'SevError', or print them out otherwise.
-printOrThrowWarnings :: Logger -> DynFlags -> Bag WarnMsg -> IO ()
-printOrThrowWarnings logger dflags warns
+printOrThrowDiagnostics :: Logger -> DynFlags -> Bag WarnMsg -> IO ()
+printOrThrowDiagnostics logger dflags warns
   | any ((==) SevError . errMsgSeverity) warns
   = throwIO (mkSrcErr warns)
   | otherwise

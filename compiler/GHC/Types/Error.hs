@@ -22,7 +22,6 @@ module GHC.Types.Error
    , Diagnostic (..)
    , DiagnosticMessage (..)
    , DiagnosticReason (..)
-   , DeferStatus (..)
 
     -- * Rendering Messages
 
@@ -185,16 +184,6 @@ data DiagnosticReason
   -- ^ Born as an error.
   deriving (Eq, Show)
 
-data DeferStatus
-  = ReportError
-  | DeferError
-  deriving (Eq, Show)
-
-instance Outputable DeferStatus where
-  ppr = \case
-    ReportError -> text "ReportError"
-    DeferError  -> text "DeferError"
-
 instance Outputable DiagnosticReason where
   ppr = \case
     WarningWithoutFlag  -> text "WarningWithoutFlag"
@@ -239,10 +228,6 @@ data MessageClass
     -- Use this constructor directly only if you need to construct and manipulate diagnostic
     -- messages directly, for example inside 'GHC.Utils.Error'. In all the other circumstances,
     -- /especially/ when emitting compiler diagnostics, use the smart constructor.
-  | MCDiagnosticError
-    -- ^ Used to construct an \"unavoidable\" /error/ diagnostic. This can be used when the
-    -- 'DiagnosticReason' is sure to be 'ErrorWithoutFlag' and as such we don't need to compute
-    -- the 'Severity' by consulting the 'DynFlags'.
   deriving (Eq, Show)
 
 
@@ -272,7 +257,6 @@ instance ToJson MessageClass where
   json MCInfo = JSString "MCInfo"
   json (MCDiagnostic sev reason) =
     JSString $ renderWithContext defaultSDocContext (ppr $ text "MCDiagnostic" <+> ppr sev <+> ppr reason)
-  json MCDiagnosticError = json $ MCDiagnostic SevError ErrorWithoutFlag
 
 instance Show (MsgEnvelope DiagnosticMessage) where
     show = showMsgEnvelope
@@ -415,6 +399,23 @@ getCaretDiagnostic msg_class (RealSrcSpan span _) =
 -- Queries
 --
 
+{- Note [Intrinsic And Extrinsic Failures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+We distinguish between /intrinsic/ and /extrinsic/ failures. We classify in the former category
+those diagnostics which are /essentially/ failures, and their nature can't be changed. This is typically
+the case for 'ErrorWithoutFlag'. We classify as /extrinsic/ all those diagnostics (like fatal warnings)
+which are born as warnings but which are still failures under particular 'DynFlags' settings. It's important
+to be aware of such logic distinction, because when we are inside the typechecker or the desugarer, we are
+interested about intrinsic errors, and to bail out as soon as we find one of them. Conversely, if we find
+an /extrinsic/ one, for example because a particular 'WarningFlag' makes a warning and error, we /don't/
+want to bail out, that's still not the right time to do so: Rather, we want to first collect all the
+diagnostics, and later classify and report them appropriately (in the driver).
+
+-}
+
+
+-- | Returns 'True' if this is, unconditionally, a failure. See Note [Intrinsic And Extrinsic Failures].
 isErrorMessage :: Diagnostic e => MsgEnvelope e -> Bool
 isErrorMessage = (==) ErrorWithoutFlag . diagnosticReason . errMsgDiagnostic
 

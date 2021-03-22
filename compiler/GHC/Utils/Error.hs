@@ -130,7 +130,7 @@ mkMCDiagnostic dflags reason = MCDiagnostic (diagReasonSeverity dflags reason) r
 -- | Varation of 'mkMCDiagnostic' which can be used when we are /sure/ the
 -- input 'DiagnosticReason' /is/ 'ErrorWithoutFlag'.
 mkErrorDiagnostic :: MessageClass
-mkErrorDiagnostic = MCDiagnosticError
+mkErrorDiagnostic = MCDiagnostic SevError ErrorWithoutFlag
 
 -- | A long (multi-line) diagnostic message.
 -- The 'Severity' will be calculated out of the 'DiagnosticReason', and will likely be
