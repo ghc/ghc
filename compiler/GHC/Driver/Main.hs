@@ -719,16 +719,44 @@ hscIncrementalFrontend
           Just hscMessage -> hscMessage hsc_env mod_index what (ModuleNode (extendModSummaryNoDeps mod_summary))
           Nothing -> return ()
 
-        skip iface = do
-            liftIO $ msg UpToDate
-            return $ Left iface
-
         compile mb_old_hash reason = do
             liftIO $ msg reason
             tc_result <- case hscFrontendHook (hsc_hooks hsc_env) of
               Nothing -> FrontendTypecheck . fst <$> hsc_typecheck False mod_summary Nothing
               Just h  -> h mod_summary
             return $ Right (tc_result, mb_old_hash)
+
+    res <- hscIncrementalFrontendCheck
+      always_do_basic_recompilation_check m_tc_result
+      mHscMessage mod_summary source_modified mb_old_iface mod_index
+    case res of
+        Left iface -> return (Left iface)
+        Right (Left res', mb_old_hash) -> return (Right (res', mb_old_hash))
+        Right (Right reason, mb_old_hash) -> compile mb_old_hash reason
+
+hscIncrementalFrontendCheck :: Bool -- always do basic recompilation check?
+                       -> Maybe TcGblEnv
+                       -> Maybe Messager
+                       -> ModSummary
+                       -> SourceModified
+                       -> Maybe ModIface  -- Old interface, if available
+                       -> (Int,Int)       -- (i,n) = module i of n (for msgs)
+                       -> Hsc (Either ModIface (Either FrontendResult RecompileRequired, Maybe Fingerprint))
+
+hscIncrementalFrontendCheck
+  always_do_basic_recompilation_check m_tc_result
+  mHscMessage mod_summary source_modified mb_old_iface mod_index
+    = do
+    hsc_env <- getHscEnv
+
+    let msg what = case mHscMessage of
+          -- We use extendModSummaryNoDeps because extra backpack deps are only needed for batch mode
+          Just hscMessage -> hscMessage hsc_env mod_index what (ModuleNode (extendModSummaryNoDeps mod_summary))
+          Nothing -> return ()
+
+        skip iface = do
+            liftIO $ msg UpToDate
+            return $ Left iface
 
         stable = case source_modified of
                      SourceUnmodifiedAndStable -> True
@@ -737,7 +765,7 @@ hscIncrementalFrontend
     case m_tc_result of
          Just tc_result
           | not always_do_basic_recompilation_check ->
-             return $ Right (FrontendTypecheck tc_result, Nothing)
+             return $ Right (Left $ FrontendTypecheck tc_result, Nothing)
          _ -> do
             (recomp_reqd, mb_checked_iface)
                 <- {-# SCC "checkOldIface" #-}
@@ -766,14 +794,14 @@ hscIncrementalFrontend
                     case m_tc_result of
                     Nothing
                      | mi_used_th iface && not stable ->
-                        compile mb_old_hash (RecompBecause "TH")
+                        return $ Right (Right (RecompBecause "TH"), mb_old_hash)
                     _ ->
                         skip iface
                 _ ->
                     case m_tc_result of
-                    Nothing -> compile mb_old_hash recomp_reqd
+                    Nothing -> return $ Right (Right recomp_reqd, mb_old_hash)
                     Just tc_result ->
-                        return $ Right (FrontendTypecheck tc_result, mb_old_hash)
+                        return $ Right (Left $ FrontendTypecheck tc_result, mb_old_hash)
 
 --------------------------------------------------------------
 -- Compilers
