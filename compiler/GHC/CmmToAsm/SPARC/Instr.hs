@@ -29,6 +29,7 @@ module GHC.CmmToAsm.SPARC.Instr
    , jumpDestsOfInstr
    , takeRegRegMoveInstr
    , regUsageOfInstr
+   , isConditionalInstr
    )
 where
 
@@ -421,6 +422,15 @@ isMetaInstr instr
         NEWBLOCK{}      -> True
         DELTA{}         -> True
         _               -> False
+
+
+-- | Is this instruction conditionally executed?
+--   We currently don't support MOVcc and FMOVcc
+isConditionalInstr
+    :: Instr
+    -> Bool
+
+isConditionalInstr _ = False
 
 
 -- | Make a reg-reg move instruction.
