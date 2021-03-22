@@ -1,0 +1,6 @@
+
+MissingExportedSignatures.hs:6:1: warning: [-Wmissing-pattern-synonym-signatures (in -Wall)]
+    Pattern synonym with no type signature: pattern Yes :: Bool
+
+MissingExportedSignatures.hs:10:1: warning: [-Wmissing-exported-signatures]
+    Top-level binding with no type signature: foo :: Bool
