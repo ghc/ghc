@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 
@@ -21,12 +22,11 @@ module GHC.Core.TyCo.Tidy
 import GHC.Prelude
 
 import GHC.Core.TyCo.Rep
-import GHC.Core.TyCo.FVs (tyCoVarsOfTypesWellScoped, tyCoVarsOfTypeList)
+import GHC.Core.TyCo.FVs (tyCoVarsOfTypesWellScoped, tyCoVarsOfTypeWellScoped, tyCoVarsOfTypeList)
 
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Var
 import GHC.Types.Var.Env
-import GHC.Utils.Misc (strictMap)
 
 import Data.List (mapAccumL)
 
@@ -43,11 +43,11 @@ import Data.List (mapAccumL)
 --
 -- It doesn't change the uniques at all, just the print names.
 tidyVarBndrs :: TidyEnv -> [TyCoVar] -> (TidyEnv, [TyCoVar])
-tidyVarBndrs tidy_env tvs
+tidyVarBndrs !tidy_env tvs
   = mapAccumL tidyVarBndr (avoidNameClashes tvs tidy_env) tvs
 
 tidyVarBndr :: TidyEnv -> TyCoVar -> (TidyEnv, TyCoVar)
-tidyVarBndr tidy_env@(occ_env, subst) var
+tidyVarBndr !tidy_env@(occ_env, subst) var
   = case tidyOccName occ_env (getHelpfulOccName var) of
       (occ_env', occ') -> ((occ_env', subst'), var')
         where
@@ -81,14 +81,14 @@ getHelpfulOccName tv
 
 tidyTyCoVarBinder :: TidyEnv -> VarBndr TyCoVar vis
                   -> (TidyEnv, VarBndr TyCoVar vis)
-tidyTyCoVarBinder tidy_env (Bndr tv vis)
+tidyTyCoVarBinder !tidy_env (Bndr tv vis)
   = (tidy_env', Bndr tv' vis)
   where
     (tidy_env', tv') = tidyVarBndr tidy_env tv
 
 tidyTyCoVarBinders :: TidyEnv -> [VarBndr TyCoVar vis]
                    -> (TidyEnv, [VarBndr TyCoVar vis])
-tidyTyCoVarBinders tidy_env tvbs
+tidyTyCoVarBinders !tidy_env tvbs
   = mapAccumL tidyTyCoVarBinder
               (avoidNameClashes (binderVars tvbs) tidy_env) tvbs
 
@@ -96,19 +96,19 @@ tidyTyCoVarBinders tidy_env tvbs
 tidyFreeTyCoVars :: TidyEnv -> [TyCoVar] -> TidyEnv
 -- ^ Add the free 'TyVar's to the env in tidy form,
 -- so that we can tidy the type they are free in
-tidyFreeTyCoVars tidy_env tyvars
+tidyFreeTyCoVars !tidy_env tyvars
   = fst (tidyOpenTyCoVars tidy_env tyvars)
 
 ---------------
 tidyOpenTyCoVars :: TidyEnv -> [TyCoVar] -> (TidyEnv, [TyCoVar])
-tidyOpenTyCoVars env tyvars = mapAccumL tidyOpenTyCoVar env tyvars
+tidyOpenTyCoVars !env tyvars = mapAccumL tidyOpenTyCoVar env tyvars
 
 ---------------
 tidyOpenTyCoVar :: TidyEnv -> TyCoVar -> (TidyEnv, TyCoVar)
 -- ^ Treat a new 'TyCoVar' as a binder, and give it a fresh tidy name
 -- using the environment if one has not already been allocated. See
 -- also 'tidyVarBndr'
-tidyOpenTyCoVar env@(_, subst) tyvar
+tidyOpenTyCoVar !env@(_, subst) tyvar
   = case lookupVarEnv subst tyvar of
         Just tyvar' -> (env, tyvar')              -- Already substituted
         Nothing     ->
@@ -117,7 +117,7 @@ tidyOpenTyCoVar env@(_, subst) tyvar
 
 ---------------
 tidyTyCoVarOcc :: TidyEnv -> TyCoVar -> TyCoVar
-tidyTyCoVarOcc env@(_, subst) tv
+tidyTyCoVarOcc !env@(_, subst) tv
   = case lookupVarEnv subst tv of
         Nothing  -> updateVarType (tidyType env) tv
         Just tv' -> tv'
@@ -127,19 +127,32 @@ tidyTyCoVarOcc env@(_, subst) tv
 {-
 Note [Strictness in tidyType and friends]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Perhaps surprisingly, making `tidyType` strict has a rather large effect on
-performance: see #14738.  So you will see lots of strict applications ($!)
-and uses of `strictMap` in `tidyType`, `tidyTypes` and `tidyCo`.
 
-See #14738 for the performance impact -- sometimes as much as a 5%
-reduction in allocation.
+Since the result of tidying will be inserted into the HPT, a potentially
+long-lived structure, we generally want to avoid pieces of the old AST
+being retained by the thunks produced by tidying.
+
+For this reason we take great care to ensure that all pieces of the tidied AST
+are evaluated strictly.  So you will see lots of strict applications ($!) and
+bang patterns in `tidyType`, `tidyTypes`, `tidyCo`, etc..
+
+Making `tidyType` strict has a rather large effect on performance: see #14738.
+Sometimes as much as a 5% reduction in allocation.
+
+We make the TidyEnv parameter strict to let the worker/wrapper transformation
+unbox it (it's just a tuple) but its contents is still lazy.
+
 -}
 
 -- | Tidy a list of Types
 --
 -- See Note [Strictness in tidyType and friends]
 tidyTypes :: TidyEnv -> [Type] -> [Type]
-tidyTypes env tys = strictMap (tidyType env) tys
+tidyTypes !_env []       = []
+tidyTypes !env  (ty:tys) = ty':tys'
+  where
+    !ty'  = tidyType env ty
+    !tys' = tidyTypes env tys
 
 ---------------
 
@@ -148,8 +161,9 @@ tidyTypes env tys = strictMap (tidyType env) tys
 --
 -- See Note [Strictness in tidyType and friends]
 tidyType :: TidyEnv -> Type -> Type
-tidyType _   (LitTy n)             = LitTy n
+tidyType !_  (LitTy n)             = LitTy n
 tidyType env (TyVarTy tv)          = TyVarTy $! tidyTyCoVarOcc env tv
+tidyType _   t@(TyConApp _ [])     = t
 tidyType env (TyConApp tycon tys)  = TyConApp tycon $! tidyTypes env tys
 tidyType env (AppTy fun arg)       = (AppTy $! (tidyType env fun)) $! (tidyType env arg)
 tidyType env ty@(FunTy _ w arg res)  = let { !w'   = tidyType env w
@@ -159,7 +173,7 @@ tidyType env ty@(FunTy _ w arg res)  = let { !w'   = tidyType env w
 tidyType env (ty@(ForAllTy{}))     = (mkForAllTys' $! (zip tvs' vis)) $! tidyType env' body_ty
   where
     (tvs, vis, body_ty) = splitForAllTyCoVars' ty
-    (env', tvs') = tidyVarBndrs env tvs
+    !(!env', tvs')      = tidyVarBndrs env tvs
 tidyType env (CastTy ty co)       = (CastTy $! tidyType env ty) $! (tidyCo env co)
 tidyType env (CoercionTy co)      = CoercionTy $! (tidyCo env co)
 
@@ -183,11 +197,11 @@ splitForAllTyCoVars' ty = go ty [] []
 -- | Grabs the free type variables, tidies them
 -- and then uses 'tidyType' to work over the type itself
 tidyOpenTypes :: TidyEnv -> [Type] -> (TidyEnv, [Type])
-tidyOpenTypes env tys
+tidyOpenTypes !env tys
   = (env', tidyTypes (trimmed_occ_env, var_env) tys)
   where
-    (env'@(_, var_env), tvs') = tidyOpenTyCoVars env $
-                                tyCoVarsOfTypesWellScoped tys
+    !(!env'@(_, var_env), tvs') = tidyOpenTyCoVars env $
+                                    tyCoVarsOfTypesWellScoped tys
     trimmed_occ_env = initTidyOccEnv (map getOccName tvs')
       -- The idea here was that we restrict the new TidyEnv to the
       -- _free_ vars of the types, so that we don't gratuitously rename
@@ -195,8 +209,12 @@ tidyOpenTypes env tys
 
 ---------------
 tidyOpenType :: TidyEnv -> Type -> (TidyEnv, Type)
-tidyOpenType env ty = let (env', [ty']) = tidyOpenTypes env [ty] in
-                      (env', ty')
+tidyOpenType !env ty
+  = (env', tidyType (trimmed_occ_env, var_env) ty)
+  where
+    !(!env'@(_, var_env), tvs') = tidyOpenTyCoVars env $
+                                    tyCoVarsOfTypeWellScoped ty
+    trimmed_occ_env = initTidyOccEnv (map getOccName tvs')
 
 ---------------
 -- | Calls 'tidyType' on a top-level type (i.e. with an empty tidying environment)
@@ -216,40 +234,42 @@ tidyKind = tidyType
 --
 -- See Note [Strictness in tidyType and friends]
 tidyCo :: TidyEnv -> Coercion -> Coercion
-tidyCo env@(_, subst) co
-  = go co
-  where
-    go_mco MRefl    = MRefl
-    go_mco (MCo co) = MCo $! go co
-
-    go (Refl ty)             = Refl $! tidyType env ty
-    go (GRefl r ty mco)      = (GRefl r $! tidyType env ty) $! go_mco mco
-    go (TyConAppCo r tc cos) = TyConAppCo r tc $! strictMap go cos
-    go (AppCo co1 co2)       = (AppCo $! go co1) $! go co2
-    go (ForAllCo tv h co)    = ((ForAllCo $! tvp) $! (go h)) $! (tidyCo envp co)
-                               where (envp, tvp) = tidyVarBndr env tv
-            -- the case above duplicates a bit of work in tidying h and the kind
-            -- of tv. But the alternative is to use coercionKind, which seems worse.
-    go (FunCo r w co1 co2)   = ((FunCo r $! go w) $! go co1) $! go co2
-    go (CoVarCo cv)          = case lookupVarEnv subst cv of
-                                 Nothing  -> CoVarCo cv
-                                 Just cv' -> CoVarCo cv'
-    go (HoleCo h)            = HoleCo h
-    go (AxiomInstCo con ind cos) = AxiomInstCo con ind $! strictMap go cos
-    go (UnivCo p r t1 t2)    = (((UnivCo $! (go_prov p)) $! r) $!
+tidyCo !env@(_, subst) = \case
+    Refl ty                 -> Refl $! tidyType env ty
+    GRefl r ty mco          -> (GRefl r $! tidyType env ty) $! go_mco env mco
+    TyConAppCo r tc cos     -> TyConAppCo r tc $! tidyCos env cos
+    AppCo co1 co2           -> (AppCo $! tidyCo env co1) $! tidyCo env co2
+    ForAllCo tv h co        -> ((ForAllCo $! tvp) $! (tidyCo env h)) $! (tidyCo envp co)
+                                  where (envp, tvp) = tidyVarBndr env tv
+        -- the case above duplicates a bit of work in tidying h and the kind
+        -- of tv. But the alternative is to use coercionKind, which seems worse.
+    FunCo r w co1 co2       -> ((FunCo r $! tidyCo env w) $! tidyCo env co1) $! tidyCo env co2
+    CoVarCo cv              -> case lookupVarEnv subst cv of
+                                Nothing  -> CoVarCo cv
+                                Just cv' -> CoVarCo cv'
+    HoleCo h                -> HoleCo h
+    AxiomInstCo con ind cos -> AxiomInstCo con ind $! tidyCos env cos
+    UnivCo p r t1 t2        -> (((UnivCo $! (go_prov env p)) $! r) $!
                                 tidyType env t1) $! tidyType env t2
-    go (SymCo co)            = SymCo $! go co
-    go (TransCo co1 co2)     = (TransCo $! go co1) $! go co2
-    go (NthCo r d co)        = NthCo r d $! go co
-    go (LRCo lr co)          = LRCo lr $! go co
-    go (InstCo co ty)        = (InstCo $! go co) $! go ty
-    go (KindCo co)           = KindCo $! go co
-    go (SubCo co)            = SubCo $! go co
-    go (AxiomRuleCo ax cos)  = AxiomRuleCo ax $ strictMap go cos
+    SymCo co                -> SymCo $! tidyCo env co
+    TransCo co1 co2         -> (TransCo $! tidyCo env co1) $! tidyCo env co2
+    NthCo r d co            -> NthCo r d $! tidyCo env co
+    LRCo lr co              -> LRCo lr $! tidyCo env co
+    InstCo co ty            -> (InstCo $! tidyCo env co) $! tidyCo env ty
+    KindCo co               -> KindCo $! tidyCo env co
+    SubCo co                -> SubCo $! tidyCo env co
+    AxiomRuleCo ax cos      -> AxiomRuleCo ax $! tidyCos env cos
+  where
+    go_mco !_   MRefl    = MRefl
+    go_mco env  (MCo co) = MCo $! tidyCo env co
 
-    go_prov (PhantomProv co)    = PhantomProv $! go co
-    go_prov (ProofIrrelProv co) = ProofIrrelProv $! go co
-    go_prov p@(PluginProv _)    = p
+    go_prov !env (PhantomProv co)    = PhantomProv $! tidyCo env co
+    go_prov env  (ProofIrrelProv co) = ProofIrrelProv $! tidyCo env co
+    go_prov _    p@(PluginProv _)    = p
 
 tidyCos :: TidyEnv -> [Coercion] -> [Coercion]
-tidyCos env = strictMap (tidyCo env)
+tidyCos !_env []       = []
+tidyCos !env  (co:cos) = co':cos'
+  where
+    !co'  = tidyCo env co
+    !cos' = tidyCos env cos
