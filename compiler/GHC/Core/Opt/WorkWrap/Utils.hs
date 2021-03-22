@@ -720,7 +720,7 @@ If we have
    f :: Ord a => [a] -> Int -> a
    {-# INLINABLE f #-}
 and we worker/wrapper f, we'll get a worker with an INLINABLE pragma
-(see Note [Worker-wrapper for INLINABLE functions] in GHC.Core.Opt.WorkWrap),
+(see Note [Worker/wrapper for INLINABLE functions] in GHC.Core.Opt.WorkWrap),
 which can still be specialised by the type-class specialiser, something like
    fw :: Ord a => [a] -> Int# -> a
 
@@ -1023,7 +1023,7 @@ splitting:
    like U(AAAA) for suitable number of absent demands. So we have
    a special case for it, with arity coming from the data constructor.
 
-Note [Worker-wrapper for bottoming functions]
+Note [Worker/wrapper for bottoming functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We used not to split if the result is bottom.
 [Justification:  there's no efficiency to be gained.]

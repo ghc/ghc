@@ -1319,7 +1319,7 @@ useful semantic strictness information, so now we analyse them like
 any other function, and pin strictness information on them.
 
 That in turn forces us to worker/wrapper them; see
-Note [Worker-wrapper for NOINLINE functions] in GHC.Core.Opt.WorkWrap.
+Note [Worker/wrapper for NOINLINE functions] in GHC.Core.Opt.WorkWrap.
 
 
 Note [Lazy and unleashable free variables]
