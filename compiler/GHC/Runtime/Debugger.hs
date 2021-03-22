@@ -184,7 +184,7 @@ showTerm term = do
                 setSession new_env
 
                 -- this disables logging of errors
-                let noop_log _ _ _ _ _ = return ()
+                let noop_log _ _ _ _ = return ()
                 pushLogHookM (const noop_log)
 
                 return (hsc_env, bname)

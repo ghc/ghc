@@ -4372,7 +4372,7 @@ checkValidDataCon dflags existential_ok tc con
 
                | HsSrcBang _ want_unpack strict_mark <- bang
                , isSrcUnpacked want_unpack, not (is_strict strict_mark)
-               = addWarnTc NoReason (bad_bang n (text "UNPACK pragma lacks '!'"))
+               = addDiagnosticTc WarningWithoutFlag (bad_bang n (text "UNPACK pragma lacks '!'"))
 
                | HsSrcBang _ want_unpack _ <- bang
                , isSrcUnpacked want_unpack
@@ -4388,7 +4388,7 @@ checkValidDataCon dflags existential_ok tc con
                -- warn in this case (it gives users the wrong idea about whether
                -- or not UNPACK on abstract types is supported; it is!)
                , isHomeUnitDefinite (hsc_home_unit hsc_env)
-               = addWarnTc NoReason (bad_bang n (text "Ignoring unusable UNPACK pragma"))
+               = addDiagnosticTc WarningWithoutFlag (bad_bang n (text "Ignoring unusable UNPACK pragma"))
 
                | otherwise
                = return ()
