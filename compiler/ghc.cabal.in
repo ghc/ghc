@@ -527,6 +527,7 @@ Library
         GHC.Stg.Debug
         GHC.Stg.DepAnal
         GHC.Stg.FVs
+        GHC.Stg.InferTags
         GHC.Stg.Lift
         GHC.Stg.Lift.Analysis
         GHC.Stg.Lift.Monad
