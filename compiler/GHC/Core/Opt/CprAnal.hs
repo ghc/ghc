@@ -24,11 +24,12 @@ import GHC.Types.Basic
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Core.DataCon
-import GHC.Core.Multiplicity
-import GHC.Core.Utils   ( exprIsHNF, dumpIdInfoOfProgram, normSplitTyConApp_maybe )
-import GHC.Core.Type
 import GHC.Core.FamInstEnv
+import GHC.Core.Multiplicity
 import GHC.Core.Opt.WorkWrap.Utils
+import GHC.Core.TyCon
+import GHC.Core.Type
+import GHC.Core.Utils   ( exprIsHNF, dumpIdInfoOfProgram, normSplitTyConApp_maybe )
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Logger  ( Logger, dumpIfSet_dyn, DumpFormat (..) )
