@@ -1681,7 +1681,45 @@ upsweep_mod :: HscEnv
             -> Int  -- index of module
             -> Int  -- total number of modules
             -> IO HomeModInfo
-upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_index nmods
+upsweep_mod hsc_env mHscMessage old_hpt stable_mods summary mod_index nmods
+  = do
+    res <- recomp_avoidance_checks hsc_env old_hpt stable_mods summary
+    case res of
+        Left hmi -> return hmi
+        Right (mb_linkable, src_modified, discard_iface) ->
+
+            -- The old interface is ok if
+            --  a) we're compiling a source file, and the old HPT
+            --     entry is for a source file
+            --  b) we're compiling a hs-boot file
+            -- Case (b) allows an hs-boot file to get the interface of its
+            -- real source file on the second iteration of the compilation
+            -- manager, but that does no harm.  Otherwise the hs-boot file
+            -- will always be recompiled
+
+            let mb_old_iface = if discard_iface then Nothing else
+                  case lookupHpt old_hpt (ms_mod_name summary) of
+                     Nothing                                        -> Nothing
+                     Just hm_info | isBootSummary summary == IsBoot -> Just iface
+                                  | mi_boot iface == NotBoot        -> Just iface
+                                  | otherwise                       -> Nothing
+                                   where
+                                     iface = hm_iface hm_info
+
+                -- store the corrected backend into the summary
+                bcknd = getBackend hsc_env summary
+                summary' = summary{ ms_hspp_opts = (ms_hspp_opts summary) { backend = bcknd } }
+            in compileOne' Nothing mHscMessage hsc_env summary' mod_index nmods
+               mb_old_iface mb_linkable src_modified
+
+type RecompAvoidCheckResult = (Either HomeModInfo (Maybe Linkable, SourceModified, Bool))
+
+recomp_avoidance_checks :: HscEnv
+            -> HomePackageTable
+            -> StableModules
+            -> ModSummary
+            -> IO RecompAvoidCheckResult
+recomp_avoidance_checks hsc_env old_hpt (stable_obj, stable_bco) summary
    =    let
             this_mod_name = ms_mod_name summary
             this_mod    = ms_mod summary
@@ -1698,54 +1736,15 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
             -- We're using the dflags for this module now, obtained by
             -- applying any options in its LANGUAGE & OPTIONS_GHC pragmas.
             lcl_dflags = ms_hspp_opts summary
-            prevailing_backend = backend (hsc_dflags hsc_env)
-            local_backend      = backend lcl_dflags
 
-            -- If OPTIONS_GHC contains -fasm or -fllvm, be careful that
-            -- we don't do anything dodgy: these should only work to change
-            -- from -fllvm to -fasm and vice-versa, or away from -fno-code,
-            -- otherwise we could end up trying to link object code to byte
-            -- code.
-            bcknd = case (prevailing_backend,local_backend) of
-               (LLVM,NCG) -> NCG
-               (NCG,LLVM) -> LLVM
-               (NoBackend,b)
-                  | backendProducesObject b -> b
-               (Interpreter,b)
-                  | backendProducesObject b -> b
-               _ -> prevailing_backend
+            bcknd = getBackend hsc_env summary
 
-            -- store the corrected backend into the summary
-            summary' = summary{ ms_hspp_opts = lcl_dflags { backend = bcknd } }
-
-            -- The old interface is ok if
-            --  a) we're compiling a source file, and the old HPT
-            --     entry is for a source file
-            --  b) we're compiling a hs-boot file
-            -- Case (b) allows an hs-boot file to get the interface of its
-            -- real source file on the second iteration of the compilation
-            -- manager, but that does no harm.  Otherwise the hs-boot file
-            -- will always be recompiled
-
-            mb_old_iface
-                = case old_hmi of
-                     Nothing                                        -> Nothing
-                     Just hm_info | isBootSummary summary == IsBoot -> Just iface
-                                  | mi_boot iface == NotBoot        -> Just iface
-                                  | otherwise                       -> Nothing
-                                   where
-                                     iface = hm_iface hm_info
-
-            compile_it :: Maybe Linkable -> SourceModified -> IO HomeModInfo
-            compile_it  mb_linkable src_modified =
-                  compileOne' Nothing mHscMessage hsc_env summary' mod_index nmods
-                             mb_old_iface mb_linkable src_modified
+            compile_it :: Maybe Linkable -> SourceModified -> IO RecompAvoidCheckResult
+            compile_it  mb_linkable src_modified = pure $ Right (mb_linkable, src_modified, False)
 
             compile_it_discard_iface :: Maybe Linkable -> SourceModified
-                                     -> IO HomeModInfo
-            compile_it_discard_iface mb_linkable  src_modified =
-                  compileOne' Nothing mHscMessage hsc_env summary' mod_index nmods
-                             Nothing mb_linkable src_modified
+                                     -> IO RecompAvoidCheckResult
+            compile_it_discard_iface mb_linkable  src_modified = pure $ Right (mb_linkable, src_modified, True)
 
             -- With NoBackend we create empty linkables to avoid recompilation.
             -- We have to detect these to recompile anyway if the backend changed
@@ -1770,7 +1769,7 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
                 -- if it is *stable* (see checkStability).
           | is_stable_obj, Just hmi <- old_hmi -> do
                 debug_trace 5 (text "skipping stable obj mod:" <+> ppr this_mod_name)
-                return hmi
+                return $ Left hmi
                 -- object is stable, and we have an entry in the
                 -- old HPT: nothing to do
 
@@ -1787,7 +1786,7 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
                 ASSERT(isJust old_hmi) -- must be in the old_hpt
                 let Just hmi = old_hmi in do
                 debug_trace 5 (text "skipping stable BCO mod:" <+> ppr this_mod_name)
-                return hmi
+                return $ Left hmi
                 -- BCO is stable: nothing to do
 
           | not (backendProducesObject bcknd),
@@ -1834,6 +1833,28 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
          _otherwise -> do
                 debug_trace 5 (text "compiling mod:" <+> ppr this_mod_name)
                 compile_it Nothing SourceModified
+
+-- If OPTIONS_GHC contains -fasm or -fllvm, be careful that
+-- we don't do anything dodgy: these should only work to change
+-- from -fllvm to -fasm and vice-versa, or away from -fno-code,
+-- otherwise we could end up trying to link object code to byte
+-- code.
+getBackend :: HscEnv -> ModSummary -> Backend
+getBackend hsc_env summary = case (prevailing_backend,local_backend) of
+    (LLVM,NCG) -> NCG
+    (NCG,LLVM) -> LLVM
+    (NoBackend,b)
+       | backendProducesObject b -> b
+    (Interpreter,b)
+       | backendProducesObject b -> b
+    _ -> prevailing_backend
+  where
+      -- We're using the dflags for this module now, obtained by
+      -- applying any options in its LANGUAGE & OPTIONS_GHC pragmas.
+      lcl_dflags = ms_hspp_opts summary
+      prevailing_backend = backend (hsc_dflags hsc_env)
+      local_backend      = backend lcl_dflags
+
 
 
 {- Note [-fno-code mode]
