@@ -43,7 +43,7 @@ import GHC.Cmm.Switch
 import GHC.Cmm.CLabel
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
-import GHC.Core              ( Tickish(..) )
+import GHC.Types             ( Tickish(..) )
 import GHC.Types.SrcLoc      ( srcSpanFile, srcSpanStartLine, srcSpanStartCol )
 
 -- The rest:
