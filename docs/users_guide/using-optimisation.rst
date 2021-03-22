@@ -488,7 +488,7 @@ by saying ``-fno-wombat``.
 
     :default: off
 
-    Worker-wrapper removes unused arguments, but usually we do not
+    Worker/wrapper removes unused arguments, but usually we do not
     remove them all, lest it turn a function closure into a thunk,
     thereby perhaps creating a space leak and/or disrupting inlining.
     This flag allows worker/wrapper to remove *all* value lambdas.

@@ -88,7 +88,7 @@ mkWwInlineRule opts expr arity
                             , ug_boring_ok = boringCxtNotOk })
 
 mkWorkerUnfolding :: SimpleOpts -> (CoreExpr -> CoreExpr) -> Unfolding -> Unfolding
--- See Note [Worker-wrapper for INLINABLE functions] in GHC.Core.Opt.WorkWrap
+-- See Note [Worker/wrapper for INLINABLE functions] in GHC.Core.Opt.WorkWrap
 mkWorkerUnfolding opts work_fn
                   (CoreUnfolding { uf_src = src, uf_tmpl = tmpl
                                  , uf_is_top = top_lvl })

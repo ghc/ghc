@@ -831,7 +831,7 @@ An imported Id may or may not have an unfolding.  If not, we obviously
 can't specialise it here; indeed the desugar falls over (#18118).
 
 We used to test whether it had a user-specified INLINABLE pragma but,
-because of Note [Worker-wrapper for INLINABLE functions] in
+because of Note [Worker/wrapper for INLINABLE functions] in
 GHC.Core.Opt.WorkWrap, even an INLINABLE function may end up with
 a wrapper that has no pragma, just an unfolding (#19246).  So now
 we just test whether the function has an unfolding.

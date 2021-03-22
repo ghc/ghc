@@ -517,7 +517,7 @@ cast!  We want to transfer the pagma to $wf:
 It's exactly like worker/wrapper for strictness analysis:
   f is the wrapper and must inline like crazy
   $wf is the worker and must carry f's original pragma
-See Note [Worker-wrapper for NOINLINE functions] in
+See Note [Worker/wrapper for NOINLINE functions] in
 GHC.Core.Opt.WorkWrap.
 
 See #17673, #18093, #18078.
