@@ -897,7 +897,7 @@ checkNewInteractiveDynFlags logger dflags0 = do
   -- We currently don't support use of StaticPointers in expressions entered on
   -- the REPL. See #12356.
   if xopt LangExt.StaticPointers dflags0
-  then do liftIO $ printOrThrowWarnings logger dflags0 $ listToBag
+  then do liftIO $ printOrThrowDiagnostics logger dflags0 $ listToBag
             [mkPlainMsgEnvelope dflags0 Session.WarningWithoutFlag interactiveSrcSpan
              $ text "StaticPointers is not supported in GHCi interactive expressions."]
           return $ xopt_unset dflags0 LangExt.StaticPointers

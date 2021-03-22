@@ -221,7 +221,6 @@ defaultLogAction dflags msg_class srcSpan msg
       MCInfo               -> printErrs msg
       MCFatal              -> printErrs msg
       MCDiagnostic sev rea -> printDiagnostics sev rea
-      MCDiagnosticError    -> printDiagnostics SevError ErrorWithoutFlag
     where
       printOut   = defaultLogActionHPrintDoc  dflags False stdout
       printErrs  = defaultLogActionHPrintDoc  dflags False stderr

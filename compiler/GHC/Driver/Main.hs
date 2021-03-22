@@ -293,7 +293,7 @@ handleWarnings = do
     dflags <- getDynFlags
     logger <- getLogger
     w <- getWarnings
-    liftIO $ printOrThrowWarnings logger dflags w
+    liftIO $ printOrThrowDiagnostics logger dflags w
     clearWarnings
 
 -- | log warning in the monad, and if there are errors then
