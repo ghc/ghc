@@ -805,25 +805,28 @@ instance Integral Int64 where
         | y == 0                     = divZeroError
           -- Note [Order of tests]
         | y == (-1) && x == minBound = (overflowError, 0)
-#if WORD_SIZE_IN_BITS < 64
-        -- we don't have quotRemInt64# primop yet
-        | otherwise                  = (I64# (x# `quotInt64#` y#), I64# (x# `remInt64#` y#))
-#else
-        | otherwise                  = case quotRemInt# (int64ToInt# x#) (int64ToInt# y#) of
-                                        (# q, r #) -> (I64# (intToInt64# q), I64# (intToInt64# r))
-#endif
+        | otherwise                  = case x# `divModInt64#` y# of
+                                       (# d, m #) -> (I64# d, I64# m)
     divMod  x@(I64# x#) y@(I64# y#)
         | y == 0                     = divZeroError
           -- Note [Order of tests]
         | y == (-1) && x == minBound = (overflowError, 0)
-#if WORD_SIZE_IN_BITS < 64
-        -- we don't have divModInt64# primop yet
-        | otherwise                  = (I64# (x# `divInt64#` y#), I64# (x# `modInt64#` y#))
-#else
-        | otherwise                  = case divModInt# (int64ToInt# x#) (int64ToInt# y#) of
-                                        (# q, r #) -> (I64# (intToInt64# q), I64# (intToInt64# r))
-#endif
+        | otherwise                  = case x# `divModInt64#` y# of
+                                       (# d, m #) -> (I64# d, I64# m)
     toInteger (I64# x)               = integerFromInt64# x
+
+divModInt64# :: Int64# -> Int64# -> (# Int64#, Int64# #)
+x# `divModInt64#` y#
+  | isTrue# (x# `gtInt64#` zero#) && isTrue# (y# `ltInt64#` zero#) =
+      case (x# `subInt64#` one#) `quotRemInt64#` y# of
+        (# q, r #) -> (# q `subInt64#` one#, r `plusInt64#` y# `plusInt64#` one# #)
+  | isTrue# (x# `ltInt64#` zero#) && isTrue# (y# `gtInt64#` zero#) =
+      case (x# `plusInt64#` one#) `quotRemInt64#` y# of
+        (# q, r #) -> (# q `subInt64#` one#, r `plusInt64#` y# `subInt64#` one# #)
+  | otherwise =
+      x# `quotRemInt64#` y#
+  where zero# = intToInt64# 0#
+        one# = intToInt64# 1#
 
 -- | @since 2.01
 instance Read Int64 where
