@@ -1339,14 +1339,14 @@ source-tarball:
 .hackage:
   stage: testing
   needs: [doc-tarball]
-  image: ghcci/x86_64-linux-deb9:0.2
-  tags:
-    - x86_64-linux
-  dependencies: []
   variables:
-    HEAD_HACKAGE_PROJECT_ID: "78"
-  script:
-    - bash .gitlab/start-head.hackage.sh
+    UPSTREAM_PROJECT_PATH: "$CI_PROJECT_PATH"
+    UPSTREAM_COMMIT_SHA: "$CI_COMMIT_SHA"
+    EXTRA_HC_OPTS: "-dcore-lint"
+  trigger:
+    project: "ghc/head.hackage"
+    branch: "master"
+    strategy: "depend"
 
 hackage:
   extends: .hackage
@@ -1358,7 +1358,8 @@ hackage-label:
     - if: '$CI_MERGE_REQUEST_LABELS =~ /.*user-facing.*/'
 
 nightly-hackage:
-  <<: *nightly
+  rules:
+    - if: $NIGHTLY
   extends: .hackage
 
 ############################################################
