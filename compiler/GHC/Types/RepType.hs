@@ -35,7 +35,7 @@ import GHC.Core.TyCon.RecWalk
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type
 import GHC.Builtin.Types.Prim
-import {-# SOURCE #-} GHC.Builtin.Types ( anyTypeOfKind )
+import {-# SOURCE #-} GHC.Builtin.Types ( anyTypeOfKind, rInfo, convEvalDataConTy )
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -546,4 +546,5 @@ runtimeInfoPrimRep doc rr_ty
 -- to fresh Ids. Really, only the type's representation matters.
 -- See also Note [RuntimeRep and PrimRep]
 primRepToType :: PrimRep -> Type
-primRepToType = anyTypeOfKind . tYPE . primRepToRuntimeRep
+primRepToType p = anyTypeOfKind . tYPE $ rinfo
+  where rinfo = rInfo (primRepToRuntimeRep p) convEvalDataConTy

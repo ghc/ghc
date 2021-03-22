@@ -109,7 +109,7 @@ module GHC.Builtin.Types (
 
         -- * RuntimeRep and friends
         runtimeRepTyCon, vecCountTyCon, vecElemTyCon,
-        runtimeInfoTyCon,
+        runtimeInfoTyCon, rInfo,
 
         runtimeRepTy, liftedRepTy, liftedRepDataCon, liftedRepDataConTyCon,
 
@@ -272,8 +272,6 @@ wiredInTyCons = [ -- Units are not treated like other tuples, because they
                 , naturalTyCon
                 , integerTyCon
                 , runtimeInfoTyCon
-                , runtimeInfoDataConTyCon
-                , convEvalDataConTyCon
                 , callingConvTyCon
                 ]
 
@@ -1634,6 +1632,9 @@ runtimeInfoDataConTy = mkTyConTy runtimeInfoDataConTyCon
 
 runtimeInfoTy :: Type
 runtimeInfoTy = mkTyConTy runtimeInfoTyCon
+
+rInfo :: Type -> Type -> Type
+rInfo rep conv = TyCoRep.TyConApp runtimeInfoTyCon [rep, conv]
 
 
 {- *********************************************************************

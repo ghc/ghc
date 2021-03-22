@@ -28,6 +28,8 @@ runtimeInfoTy, callingConvTy, convEvalDataConTy :: Type
 
 runtimeInfoTyCon, runtimeInfoDataConTyCon :: TyCon
 
+rInfo :: Type -> Type -> Type
+
 liftedRepDataConTyCon, vecRepDataConTyCon, tupleRepDataConTyCon :: TyCon
 
 liftedRepDataConTy, unliftedRepDataConTy,
