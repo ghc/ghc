@@ -1,0 +1,4 @@
+*.hi
+*.o
+*.run.*
+*.normalised
