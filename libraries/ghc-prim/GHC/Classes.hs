@@ -179,6 +179,357 @@ deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g,
 deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g,
                    Eq h, Eq i, Eq j, Eq k, Eq l, Eq m, Eq n, Eq o)
                => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h,
+                   Eq i, Eq j, Eq k, Eq l, Eq m, Eq n, Eq o, Eq p)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i,
+                   Eq j, Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i,
+                   Eq j, Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t)
+               => Eq (a, b, c, d, e, f, g, h, i, j,
+                      k, l, m, n, o, p, q, r, s, t)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u)
+               => Eq (a, b, c, d, e, f, g, h, i, j,
+                      k, l, m, n, o, p, q, r, s, t, u)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k,
+                      l, m, n, o, p, q, r, s, t, u, v)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v, Eq w)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l,
+                      m, n, o, p, q, r, s, t, u, v, w)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v, Eq w, Eq x)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l,
+                      m, n, o, p, q, r, s, t, u, v, w, x)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v, Eq w, Eq x, Eq y)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                      t, u, v, w, x, y)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v, Eq w, Eq x, Eq y, Eq z)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m,
+                      n, o, p, q, r, s, t, u, v, w, x, y, z)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v, Eq w, Eq x, Eq y, Eq z, Eq a2)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n,
+                      o, p, q, r, s, t, u, v, w, x, y, z, a2)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v, Eq w, Eq x, Eq y, Eq z, Eq a2, Eq b2)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o,
+                      p, q, r, s, t, u, v, w, x, y, z, a2, b2)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v, Eq w, Eq x, Eq y, Eq z, Eq a2, Eq b2, Eq c2)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p,
+                      q, r, s, t, u, v, w, x, y, z, a2, b2, c2)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v, Eq w, Eq x, Eq y, Eq z, Eq a2, Eq b2, Eq c2,
+                   Eq d2)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                      t, u, v, w, x, y, z, a2, b2, c2, d2)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v, Eq w, Eq x, Eq y, Eq z, Eq a2, Eq b2, Eq c2,
+                   Eq d2, Eq e2)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                      t, u, v, w, x, y, z, a2, b2, c2, d2, e2)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v, Eq w, Eq x, Eq y, Eq z, Eq a2, Eq b2, Eq c2,
+                   Eq d2, Eq e2, Eq f2)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                      t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v, Eq w, Eq x, Eq y, Eq z, Eq a2, Eq b2, Eq c2,
+                   Eq d2, Eq e2, Eq f2, Eq g2)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                      t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v, Eq w, Eq x, Eq y, Eq z, Eq a2, Eq b2, Eq c2,
+                   Eq d2, Eq e2, Eq f2, Eq g2, Eq h2)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                      t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v, Eq w, Eq x, Eq y, Eq z, Eq a2, Eq b2, Eq c2,
+                   Eq d2, Eq e2, Eq f2, Eq g2, Eq h2, Eq i2)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                      t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v, Eq w, Eq x, Eq y, Eq z, Eq a2, Eq b2, Eq c2,
+                   Eq d2, Eq e2, Eq f2, Eq g2, Eq h2, Eq i2, Eq j2)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                      t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                      j2)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v, Eq w, Eq x, Eq y, Eq z, Eq a2, Eq b2, Eq c2,
+                   Eq d2, Eq e2, Eq f2, Eq g2, Eq h2, Eq i2, Eq j2, Eq k2)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                      t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                      j2, k2)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v, Eq w, Eq x, Eq y, Eq z, Eq a2, Eq b2, Eq c2,
+                   Eq d2, Eq e2, Eq f2, Eq g2, Eq h2, Eq i2, Eq j2, Eq k2,
+                   Eq l2)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                      t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                      j2, k2, l2)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v, Eq w, Eq x, Eq y, Eq z, Eq a2, Eq b2, Eq c2,
+                   Eq d2, Eq e2, Eq f2, Eq g2, Eq h2, Eq i2, Eq j2, Eq k2,
+                   Eq l2, Eq m2)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                      t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                      j2, k2, l2, m2)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v, Eq w, Eq x, Eq y, Eq z, Eq a2, Eq b2, Eq c2,
+                   Eq d2, Eq e2, Eq f2, Eq g2, Eq h2, Eq i2, Eq j2, Eq k2,
+                   Eq l2, Eq m2, Eq n2)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                      t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                      j2, k2, l2, m2, n2)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v, Eq w, Eq x, Eq y, Eq z, Eq a2, Eq b2, Eq c2,
+                   Eq d2, Eq e2, Eq f2, Eq g2, Eq h2, Eq i2, Eq j2, Eq k2,
+                   Eq l2, Eq m2, Eq n2, Eq o2)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                      t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                      j2, k2, l2, m2, n2, o2)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v, Eq w, Eq x, Eq y, Eq z, Eq a2, Eq b2, Eq c2,
+                   Eq d2, Eq e2, Eq f2, Eq g2, Eq h2, Eq i2, Eq j2, Eq k2,
+                   Eq l2, Eq m2, Eq n2, Eq o2, Eq p2)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                      t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                      j2, k2, l2, m2, n2, o2, p2)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v, Eq w, Eq x, Eq y, Eq z, Eq a2, Eq b2, Eq c2,
+                   Eq d2, Eq e2, Eq f2, Eq g2, Eq h2, Eq i2, Eq j2, Eq k2,
+                   Eq l2, Eq m2, Eq n2, Eq o2, Eq p2, Eq q2)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                      t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                      j2, k2, l2, m2, n2, o2, p2, q2)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v, Eq w, Eq x, Eq y, Eq z, Eq a2, Eq b2, Eq c2,
+                   Eq d2, Eq e2, Eq f2, Eq g2, Eq h2, Eq i2, Eq j2, Eq k2,
+                   Eq l2, Eq m2, Eq n2, Eq o2, Eq p2, Eq q2, Eq r2)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                      t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                      j2, k2, l2, m2, n2, o2, p2, q2, r2)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v, Eq w, Eq x, Eq y, Eq z, Eq a2, Eq b2, Eq c2,
+                   Eq d2, Eq e2, Eq f2, Eq g2, Eq h2, Eq i2, Eq j2, Eq k2,
+                   Eq l2, Eq m2, Eq n2, Eq o2, Eq p2, Eq q2, Eq r2, Eq s2)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                      t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                      j2, k2, l2, m2, n2, o2, p2, q2, r2, s2)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v, Eq w, Eq x, Eq y, Eq z, Eq a2, Eq b2, Eq c2,
+                   Eq d2, Eq e2, Eq f2, Eq g2, Eq h2, Eq i2, Eq j2, Eq k2,
+                   Eq l2, Eq m2, Eq n2, Eq o2, Eq p2, Eq q2, Eq r2, Eq s2,
+                   Eq t2)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                      t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                      j2, k2, l2, m2, n2, o2, p2, q2, r2, s2, t2)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v, Eq w, Eq x, Eq y, Eq z, Eq a2, Eq b2, Eq c2,
+                   Eq d2, Eq e2, Eq f2, Eq g2, Eq h2, Eq i2, Eq j2, Eq k2,
+                   Eq l2, Eq m2, Eq n2, Eq o2, Eq p2, Eq q2, Eq r2, Eq s2,
+                   Eq t2, Eq u2)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                      t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                      j2, k2, l2, m2, n2, o2, p2, q2, r2, s2, t2, u2)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v, Eq w, Eq x, Eq y, Eq z, Eq a2, Eq b2, Eq c2,
+                   Eq d2, Eq e2, Eq f2, Eq g2, Eq h2, Eq i2, Eq j2, Eq k2,
+                   Eq l2, Eq m2, Eq n2, Eq o2, Eq p2, Eq q2, Eq r2, Eq s2,
+                   Eq t2, Eq u2, Eq v2)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                      t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                      j2, k2, l2, m2, n2, o2, p2, q2, r2, s2, t2, u2, v2)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v, Eq w, Eq x, Eq y, Eq z, Eq a2, Eq b2, Eq c2,
+                   Eq d2, Eq e2, Eq f2, Eq g2, Eq h2, Eq i2, Eq j2, Eq k2,
+                   Eq l2, Eq m2, Eq n2, Eq o2, Eq p2, Eq q2, Eq r2, Eq s2,
+                   Eq t2, Eq u2, Eq v2, Eq w2)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                      t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                      j2, k2, l2, m2, n2, o2, p2, q2, r2, s2, t2, u2, v2, w2)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v, Eq w, Eq x, Eq y, Eq z, Eq a2, Eq b2, Eq c2,
+                   Eq d2, Eq e2, Eq f2, Eq g2, Eq h2, Eq i2, Eq j2, Eq k2,
+                   Eq l2, Eq m2, Eq n2, Eq o2, Eq p2, Eq q2, Eq r2, Eq s2,
+                   Eq t2, Eq u2, Eq v2, Eq w2, Eq x2)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                      t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                      j2, k2, l2, m2, n2, o2, p2, q2, r2, s2, t2, u2, v2, w2,
+                      x2)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v, Eq w, Eq x, Eq y, Eq z, Eq a2, Eq b2, Eq c2,
+                   Eq d2, Eq e2, Eq f2, Eq g2, Eq h2, Eq i2, Eq j2, Eq k2,
+                   Eq l2, Eq m2, Eq n2, Eq o2, Eq p2, Eq q2, Eq r2, Eq s2,
+                   Eq t2, Eq u2, Eq v2, Eq w2, Eq x2, Eq y2)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                      t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                      j2, k2, l2, m2, n2, o2, p2, q2, r2, s2, t2, u2, v2, w2,
+                      x2, y2)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v, Eq w, Eq x, Eq y, Eq z, Eq a2, Eq b2, Eq c2,
+                   Eq d2, Eq e2, Eq f2, Eq g2, Eq h2, Eq i2, Eq j2, Eq k2,
+                   Eq l2, Eq m2, Eq n2, Eq o2, Eq p2, Eq q2, Eq r2, Eq s2,
+                   Eq t2, Eq u2, Eq v2, Eq w2, Eq x2, Eq y2, Eq z2)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                      t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                      j2, k2, l2, m2, n2, o2, p2, q2, r2, s2, t2, u2, v2, w2,
+                      x2, y2, z2)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v, Eq w, Eq x, Eq y, Eq z, Eq a2, Eq b2, Eq c2,
+                   Eq d2, Eq e2, Eq f2, Eq g2, Eq h2, Eq i2, Eq j2, Eq k2,
+                   Eq l2, Eq m2, Eq n2, Eq o2, Eq p2, Eq q2, Eq r2, Eq s2,
+                   Eq t2, Eq u2, Eq v2, Eq w2, Eq x2, Eq y2, Eq z2, Eq a3)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                      t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                      j2, k2, l2, m2, n2, o2, p2, q2, r2, s2, t2, u2, v2, w2,
+                      x2, y2, z2, a3)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v, Eq w, Eq x, Eq y, Eq z, Eq a2, Eq b2, Eq c2,
+                   Eq d2, Eq e2, Eq f2, Eq g2, Eq h2, Eq i2, Eq j2, Eq k2,
+                   Eq l2, Eq m2, Eq n2, Eq o2, Eq p2, Eq q2, Eq r2, Eq s2,
+                   Eq t2, Eq u2, Eq v2, Eq w2, Eq x2, Eq y2, Eq z2, Eq a3,
+                   Eq b3)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                      t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                      j2, k2, l2, m2, n2, o2, p2, q2, r2, s2, t2, u2, v2, w2,
+                      x2, y2, z2, a3, b3)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v, Eq w, Eq x, Eq y, Eq z, Eq a2, Eq b2, Eq c2,
+                   Eq d2, Eq e2, Eq f2, Eq g2, Eq h2, Eq i2, Eq j2, Eq k2,
+                   Eq l2, Eq m2, Eq n2, Eq o2, Eq p2, Eq q2, Eq r2, Eq s2,
+                   Eq t2, Eq u2, Eq v2, Eq w2, Eq x2, Eq y2, Eq z2, Eq a3,
+                   Eq b3, Eq c3)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                      t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                      j2, k2, l2, m2, n2, o2, p2, q2, r2, s2, t2, u2, v2, w2,
+                      x2, y2, z2, a3, b3, c3)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v, Eq w, Eq x, Eq y, Eq z, Eq a2, Eq b2, Eq c2,
+                   Eq d2, Eq e2, Eq f2, Eq g2, Eq h2, Eq i2, Eq j2, Eq k2,
+                   Eq l2, Eq m2, Eq n2, Eq o2, Eq p2, Eq q2, Eq r2, Eq s2,
+                   Eq t2, Eq u2, Eq v2, Eq w2, Eq x2, Eq y2, Eq z2, Eq a3,
+                   Eq b3, Eq c3, Eq d3)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                      t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                      j2, k2, l2, m2, n2, o2, p2, q2, r2, s2, t2, u2, v2, w2,
+                      x2, y2, z2, a3, b3, c3, d3)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v, Eq w, Eq x, Eq y, Eq z, Eq a2, Eq b2, Eq c2,
+                   Eq d2, Eq e2, Eq f2, Eq g2, Eq h2, Eq i2, Eq j2, Eq k2,
+                   Eq l2, Eq m2, Eq n2, Eq o2, Eq p2, Eq q2, Eq r2, Eq s2,
+                   Eq t2, Eq u2, Eq v2, Eq w2, Eq x2, Eq y2, Eq z2, Eq a3,
+                   Eq b3, Eq c3, Eq d3, Eq e3)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                      t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                      j2, k2, l2, m2, n2, o2, p2, q2, r2, s2, t2, u2, v2, w2,
+                      x2, y2, z2, a3, b3, c3, d3, e3)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v, Eq w, Eq x, Eq y, Eq z, Eq a2, Eq b2, Eq c2,
+                   Eq d2, Eq e2, Eq f2, Eq g2, Eq h2, Eq i2, Eq j2, Eq k2,
+                   Eq l2, Eq m2, Eq n2, Eq o2, Eq p2, Eq q2, Eq r2, Eq s2,
+                   Eq t2, Eq u2, Eq v2, Eq w2, Eq x2, Eq y2, Eq z2, Eq a3,
+                   Eq b3, Eq c3, Eq d3, Eq e3, Eq f3)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                      t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                      j2, k2, l2, m2, n2, o2, p2, q2, r2, s2, t2, u2, v2, w2,
+                      x2, y2, z2, a3, b3, c3, d3, e3, f3)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v, Eq w, Eq x, Eq y, Eq z, Eq a2, Eq b2, Eq c2,
+                   Eq d2, Eq e2, Eq f2, Eq g2, Eq h2, Eq i2, Eq j2, Eq k2,
+                   Eq l2, Eq m2, Eq n2, Eq o2, Eq p2, Eq q2, Eq r2, Eq s2,
+                   Eq t2, Eq u2, Eq v2, Eq w2, Eq x2, Eq y2, Eq z2, Eq a3,
+                   Eq b3, Eq c3, Eq d3, Eq e3, Eq f3, Eq g3)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                      t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                      j2, k2, l2, m2, n2, o2, p2, q2, r2, s2, t2, u2, v2, w2,
+                      x2, y2, z2, a3, b3, c3, d3, e3, f3, g3)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v, Eq w, Eq x, Eq y, Eq z, Eq a2, Eq b2, Eq c2,
+                   Eq d2, Eq e2, Eq f2, Eq g2, Eq h2, Eq i2, Eq j2, Eq k2,
+                   Eq l2, Eq m2, Eq n2, Eq o2, Eq p2, Eq q2, Eq r2, Eq s2,
+                   Eq t2, Eq u2, Eq v2, Eq w2, Eq x2, Eq y2, Eq z2, Eq a3,
+                   Eq b3, Eq c3, Eq d3, Eq e3, Eq f3, Eq g3, Eq h3)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                      t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                      j2, k2, l2, m2, n2, o2, p2, q2, r2, s2, t2, u2, v2, w2,
+                      x2, y2, z2, a3, b3, c3, d3, e3, f3, g3, h3)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v, Eq w, Eq x, Eq y, Eq z, Eq a2, Eq b2, Eq c2,
+                   Eq d2, Eq e2, Eq f2, Eq g2, Eq h2, Eq i2, Eq j2, Eq k2,
+                   Eq l2, Eq m2, Eq n2, Eq o2, Eq p2, Eq q2, Eq r2, Eq s2,
+                   Eq t2, Eq u2, Eq v2, Eq w2, Eq x2, Eq y2, Eq z2, Eq a3,
+                   Eq b3, Eq c3, Eq d3, Eq e3, Eq f3, Eq g3, Eq h3, Eq i3)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                      t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                      j2, k2, l2, m2, n2, o2, p2, q2, r2, s2, t2, u2, v2, w2,
+                      x2, y2, z2, a3, b3, c3, d3, e3, f3, g3, h3, i3)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
+                   Eq k, Eq l, Eq m, Eq n, Eq o, Eq p, Eq q, Eq r, Eq s, Eq t,
+                   Eq u, Eq v, Eq w, Eq x, Eq y, Eq z, Eq a2, Eq b2, Eq c2,
+                   Eq d2, Eq e2, Eq f2, Eq g2, Eq h2, Eq i2, Eq j2, Eq k2,
+                   Eq l2, Eq m2, Eq n2, Eq o2, Eq p2, Eq q2, Eq r2, Eq s2,
+                   Eq t2, Eq u2, Eq v2, Eq w2, Eq x2, Eq y2, Eq z2, Eq a3,
+                   Eq b3, Eq c3, Eq d3, Eq e3, Eq f3, Eq g3, Eq h3, Eq i3,
+                   Eq j3)
+               => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                      t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                      j2, k2, l2, m2, n2, o2, p2, q2, r2, s2, t2, u2, v2, w2,
+                      x2, y2, z2, a3, b3, c3, d3, e3, f3, g3, h3, i3, j3)
 
 instance (Eq a) => Eq [a] where
     {-# SPECIALISE instance Eq [[Char]] #-}
@@ -389,6 +740,394 @@ deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g,
 deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g,
                    Ord h, Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o)
                => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v, Ord w)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v, w)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v, Ord w, Ord x)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v, w, x)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v, Ord w, Ord x,
+                   Ord y)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v, w, x, y)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v, Ord w, Ord x,
+                   Ord y, Ord z)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v, w, x, y, z)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v, Ord w, Ord x,
+                   Ord y, Ord z, Ord a2)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v, w, x, y, z, a2)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v, Ord w, Ord x,
+                   Ord y, Ord z, Ord a2, Ord b2)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v, w, x, y, z, a2, b2)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v, Ord w, Ord x,
+                   Ord y, Ord z, Ord a2, Ord b2, Ord c2)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v, w, x, y, z, a2, b2, c2)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v, Ord w, Ord x,
+                   Ord y, Ord z, Ord a2, Ord b2, Ord c2, Ord d2)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v, w, x, y, z, a2, b2, c2, d2)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v, Ord w, Ord x,
+                   Ord y, Ord z, Ord a2, Ord b2, Ord c2, Ord d2, Ord e2)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v, w, x, y, z, a2, b2, c2, d2, e2)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v, Ord w, Ord x,
+                   Ord y, Ord z, Ord a2, Ord b2, Ord c2, Ord d2, Ord e2, Ord f2)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v, Ord w, Ord x,
+                   Ord y, Ord z, Ord a2, Ord b2, Ord c2, Ord d2, Ord e2, Ord f2,
+                   Ord g2)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v, Ord w, Ord x,
+                   Ord y, Ord z, Ord a2, Ord b2, Ord c2, Ord d2, Ord e2, Ord f2,
+                   Ord g2, Ord h2)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v, Ord w, Ord x,
+                   Ord y, Ord z, Ord a2, Ord b2, Ord c2, Ord d2, Ord e2, Ord f2,
+                   Ord g2, Ord h2, Ord i2)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v, Ord w, Ord x,
+                   Ord y, Ord z, Ord a2, Ord b2, Ord c2, Ord d2, Ord e2, Ord f2,
+                   Ord g2, Ord h2, Ord i2, Ord j2)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                       j2)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v, Ord w, Ord x,
+                   Ord y, Ord z, Ord a2, Ord b2, Ord c2, Ord d2, Ord e2, Ord f2,
+                   Ord g2, Ord h2, Ord i2, Ord j2, Ord k2)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                       j2, k2)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v, Ord w, Ord x,
+                   Ord y, Ord z, Ord a2, Ord b2, Ord c2, Ord d2, Ord e2, Ord f2,
+                   Ord g2, Ord h2, Ord i2, Ord j2, Ord k2, Ord l2)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                       j2, k2, l2)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v, Ord w, Ord x,
+                   Ord y, Ord z, Ord a2, Ord b2, Ord c2, Ord d2, Ord e2, Ord f2,
+                   Ord g2, Ord h2, Ord i2, Ord j2, Ord k2, Ord l2, Ord m2)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                       j2, k2, l2, m2)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v, Ord w, Ord x,
+                   Ord y, Ord z, Ord a2, Ord b2, Ord c2, Ord d2, Ord e2, Ord f2,
+                   Ord g2, Ord h2, Ord i2, Ord j2, Ord k2, Ord l2, Ord m2,
+                   Ord n2)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                       j2, k2, l2, m2, n2)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v, Ord w, Ord x,
+                   Ord y, Ord z, Ord a2, Ord b2, Ord c2, Ord d2, Ord e2, Ord f2,
+                   Ord g2, Ord h2, Ord i2, Ord j2, Ord k2, Ord l2, Ord m2,
+                   Ord n2, Ord o2)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                       j2, k2, l2, m2, n2, o2)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v, Ord w, Ord x,
+                   Ord y, Ord z, Ord a2, Ord b2, Ord c2, Ord d2, Ord e2, Ord f2,
+                   Ord g2, Ord h2, Ord i2, Ord j2, Ord k2, Ord l2, Ord m2,
+                   Ord n2, Ord o2, Ord p2)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                       j2, k2, l2, m2, n2, o2, p2)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v, Ord w, Ord x,
+                   Ord y, Ord z, Ord a2, Ord b2, Ord c2, Ord d2, Ord e2, Ord f2,
+                   Ord g2, Ord h2, Ord i2, Ord j2, Ord k2, Ord l2, Ord m2,
+                   Ord n2, Ord o2, Ord p2, Ord q2)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                       j2, k2, l2, m2, n2, o2, p2, q2)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v, Ord w, Ord x,
+                   Ord y, Ord z, Ord a2, Ord b2, Ord c2, Ord d2, Ord e2, Ord f2,
+                   Ord g2, Ord h2, Ord i2, Ord j2, Ord k2, Ord l2, Ord m2,
+                   Ord n2, Ord o2, Ord p2, Ord q2, Ord r2)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                       j2, k2, l2, m2, n2, o2, p2, q2, r2)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v, Ord w, Ord x,
+                   Ord y, Ord z, Ord a2, Ord b2, Ord c2, Ord d2, Ord e2, Ord f2,
+                   Ord g2, Ord h2, Ord i2, Ord j2, Ord k2, Ord l2, Ord m2,
+                   Ord n2, Ord o2, Ord p2, Ord q2, Ord r2, Ord s2)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                       j2, k2, l2, m2, n2, o2, p2, q2, r2, s2)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v, Ord w, Ord x,
+                   Ord y, Ord z, Ord a2, Ord b2, Ord c2, Ord d2, Ord e2, Ord f2,
+                   Ord g2, Ord h2, Ord i2, Ord j2, Ord k2, Ord l2, Ord m2,
+                   Ord n2, Ord o2, Ord p2, Ord q2, Ord r2, Ord s2, Ord t2)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                       j2, k2, l2, m2, n2, o2, p2, q2, r2, s2, t2)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v, Ord w, Ord x,
+                   Ord y, Ord z, Ord a2, Ord b2, Ord c2, Ord d2, Ord e2,
+                   Ord f2, Ord g2, Ord h2, Ord i2, Ord j2, Ord k2, Ord l2,
+                   Ord m2, Ord n2, Ord o2, Ord p2, Ord q2, Ord r2, Ord s2,
+                   Ord t2, Ord u2)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                       j2, k2, l2, m2, n2, o2, p2, q2, r2, s2, t2, u2)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v, Ord w, Ord x,
+                   Ord y, Ord z, Ord a2, Ord b2, Ord c2, Ord d2, Ord e2, Ord f2,
+                   Ord g2, Ord h2, Ord i2, Ord j2, Ord k2, Ord l2, Ord m2,
+                   Ord n2, Ord o2, Ord p2, Ord q2, Ord r2, Ord s2, Ord t2,
+                   Ord u2, Ord v2)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                       j2, k2, l2, m2, n2, o2, p2, q2, r2, s2, t2, u2, v2)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v, Ord w, Ord x,
+                   Ord y, Ord z, Ord a2, Ord b2, Ord c2, Ord d2, Ord e2, Ord f2,
+                   Ord g2, Ord h2, Ord i2, Ord j2, Ord k2, Ord l2, Ord m2,
+                   Ord n2, Ord o2, Ord p2, Ord q2, Ord r2, Ord s2, Ord t2,
+                   Ord u2, Ord v2, Ord w2)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                       j2, k2, l2, m2, n2, o2, p2, q2, r2, s2, t2, u2, v2, w2)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v, Ord w, Ord x,
+                   Ord y, Ord z, Ord a2, Ord b2, Ord c2, Ord d2, Ord e2, Ord f2,
+                   Ord g2, Ord h2, Ord i2, Ord j2, Ord k2, Ord l2, Ord m2,
+                   Ord n2, Ord o2, Ord p2, Ord q2, Ord r2, Ord s2, Ord t2,
+                   Ord u2, Ord v2, Ord w2, Ord x2)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                       j2, k2, l2, m2, n2, o2, p2, q2, r2, s2, t2, u2, v2, w2,
+                       x2)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v, Ord w, Ord x,
+                   Ord y, Ord z, Ord a2, Ord b2, Ord c2, Ord d2, Ord e2, Ord f2,
+                   Ord g2, Ord h2, Ord i2, Ord j2, Ord k2, Ord l2, Ord m2,
+                   Ord n2, Ord o2, Ord p2, Ord q2, Ord r2, Ord s2, Ord t2,
+                   Ord u2, Ord v2, Ord w2, Ord x2, Ord y2)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                       j2, k2, l2, m2, n2, o2, p2, q2, r2, s2, t2, u2, v2, w2,
+                       x2, y2)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v, Ord w, Ord x,
+                   Ord y, Ord z, Ord a2, Ord b2, Ord c2, Ord d2, Ord e2, Ord f2,
+                   Ord g2, Ord h2, Ord i2, Ord j2, Ord k2, Ord l2, Ord m2,
+                   Ord n2, Ord o2, Ord p2, Ord q2, Ord r2, Ord s2, Ord t2,
+                   Ord u2, Ord v2, Ord w2, Ord x2, Ord y2, Ord z2)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                       j2, k2, l2, m2, n2, o2, p2, q2, r2, s2, t2, u2, v2, w2,
+                       x2, y2, z2)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v, Ord w, Ord x,
+                   Ord y, Ord z, Ord a2, Ord b2, Ord c2, Ord d2, Ord e2, Ord f2,
+                   Ord g2, Ord h2, Ord i2, Ord j2, Ord k2, Ord l2, Ord m2,
+                   Ord n2, Ord o2, Ord p2, Ord q2, Ord r2, Ord s2, Ord t2,
+                   Ord u2, Ord v2, Ord w2, Ord x2, Ord y2, Ord z2, Ord a3)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                       j2, k2, l2, m2, n2, o2, p2, q2, r2, s2, t2, u2, v2, w2,
+                       x2, y2, z2, a3)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v, Ord w, Ord x,
+                   Ord y, Ord z, Ord a2, Ord b2, Ord c2, Ord d2, Ord e2, Ord f2,
+                   Ord g2, Ord h2, Ord i2, Ord j2, Ord k2, Ord l2, Ord m2,
+                   Ord n2, Ord o2, Ord p2, Ord q2, Ord r2, Ord s2, Ord t2,
+                   Ord u2, Ord v2, Ord w2, Ord x2, Ord y2, Ord z2, Ord a3,
+                   Ord b3)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                       j2, k2, l2, m2, n2, o2, p2, q2, r2, s2, t2, u2, v2, w2,
+                       x2, y2, z2, a3, b3)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v, Ord w, Ord x,
+                   Ord y, Ord z, Ord a2, Ord b2, Ord c2, Ord d2, Ord e2, Ord f2,
+                   Ord g2, Ord h2, Ord i2, Ord j2, Ord k2, Ord l2, Ord m2,
+                   Ord n2, Ord o2, Ord p2, Ord q2, Ord r2, Ord s2, Ord t2,
+                   Ord u2, Ord v2, Ord w2, Ord x2, Ord y2, Ord z2, Ord a3,
+                   Ord b3, Ord c3)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                       j2, k2, l2, m2, n2, o2, p2, q2, r2, s2, t2, u2, v2, w2,
+                       x2, y2, z2, a3, b3, c3)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v, Ord w, Ord x,
+                   Ord y, Ord z, Ord a2, Ord b2, Ord c2, Ord d2, Ord e2, Ord f2,
+                   Ord g2, Ord h2, Ord i2, Ord j2, Ord k2, Ord l2, Ord m2,
+                   Ord n2, Ord o2, Ord p2, Ord q2, Ord r2, Ord s2, Ord t2,
+                   Ord u2, Ord v2, Ord w2, Ord x2, Ord y2, Ord z2, Ord a3,
+                   Ord b3, Ord c3, Ord d3)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                       j2, k2, l2, m2, n2, o2, p2, q2, r2, s2, t2, u2, v2, w2,
+                       x2, y2, z2, a3, b3, c3, d3)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v, Ord w, Ord x,
+                   Ord y, Ord z, Ord a2, Ord b2, Ord c2, Ord d2, Ord e2, Ord f2,
+                   Ord g2, Ord h2, Ord i2, Ord j2, Ord k2, Ord l2, Ord m2,
+                   Ord n2, Ord o2, Ord p2, Ord q2, Ord r2, Ord s2, Ord t2,
+                   Ord u2, Ord v2, Ord w2, Ord x2, Ord y2, Ord z2, Ord a3,
+                   Ord b3, Ord c3, Ord d3, Ord e3)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                       j2, k2, l2, m2, n2, o2, p2, q2, r2, s2, t2, u2, v2, w2,
+                       x2, y2, z2, a3, b3, c3, d3, e3)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v, Ord w, Ord x,
+                   Ord y, Ord z, Ord a2, Ord b2, Ord c2, Ord d2, Ord e2, Ord f2,
+                   Ord g2, Ord h2, Ord i2, Ord j2, Ord k2, Ord l2, Ord m2,
+                   Ord n2, Ord o2, Ord p2, Ord q2, Ord r2, Ord s2, Ord t2,
+                   Ord u2, Ord v2, Ord w2, Ord x2, Ord y2, Ord z2, Ord a3,
+                   Ord b3, Ord c3, Ord d3, Ord e3, Ord f3)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                       j2, k2, l2, m2, n2, o2, p2, q2, r2, s2, t2, u2, v2, w2,
+                       x2, y2, z2, a3, b3, c3, d3, e3, f3)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v, Ord w, Ord x,
+                   Ord y, Ord z, Ord a2, Ord b2, Ord c2, Ord d2, Ord e2, Ord f2,
+                   Ord g2, Ord h2, Ord i2, Ord j2, Ord k2, Ord l2, Ord m2,
+                   Ord n2, Ord o2, Ord p2, Ord q2, Ord r2, Ord s2, Ord t2,
+                   Ord u2, Ord v2, Ord w2, Ord x2, Ord y2, Ord z2, Ord a3,
+                   Ord b3, Ord c3, Ord d3, Ord e3, Ord f3, Ord g3)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                       j2, k2, l2, m2, n2, o2, p2, q2, r2, s2, t2, u2, v2, w2,
+                       x2, y2, z2, a3, b3, c3, d3, e3, f3, g3)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v, Ord w, Ord x,
+                   Ord y, Ord z, Ord a2, Ord b2, Ord c2, Ord d2, Ord e2, Ord f2,
+                   Ord g2, Ord h2, Ord i2, Ord j2, Ord k2, Ord l2, Ord m2,
+                   Ord n2, Ord o2, Ord p2, Ord q2, Ord r2, Ord s2, Ord t2,
+                   Ord u2, Ord v2, Ord w2, Ord x2, Ord y2, Ord z2, Ord a3,
+                   Ord b3, Ord c3, Ord d3, Ord e3, Ord f3, Ord g3, Ord h3)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                       j2, k2, l2, m2, n2, o2, p2, q2, r2, s2, t2, u2, v2, w2,
+                       x2, y2, z2, a3, b3, c3, d3, e3, f3, g3, h3)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v, Ord w, Ord x,
+                   Ord y, Ord z, Ord a2, Ord b2, Ord c2, Ord d2, Ord e2, Ord f2,
+                   Ord g2, Ord h2, Ord i2, Ord j2, Ord k2, Ord l2, Ord m2,
+                   Ord n2, Ord o2, Ord p2, Ord q2, Ord r2, Ord s2, Ord t2,
+                   Ord u2, Ord v2, Ord w2, Ord x2, Ord y2, Ord z2, Ord a3,
+                   Ord b3, Ord c3, Ord d3, Ord e3, Ord f3, Ord g3, Ord h3,
+                   Ord i3)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                       j2, k2, l2, m2, n2, o2, p2, q2, r2, s2, t2, u2, v2, w2,
+                       x2, y2, z2, a3, b3, c3, d3, e3, f3, g3, h3, i3)
+deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g, Ord h,
+                   Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o, Ord p,
+                   Ord q, Ord r, Ord s, Ord t, Ord u, Ord v, Ord w, Ord x,
+                   Ord y, Ord z, Ord a2, Ord b2, Ord c2, Ord d2, Ord e2, Ord f2,
+                   Ord g2, Ord h2, Ord i2, Ord j2, Ord k2, Ord l2, Ord m2,
+                   Ord n2, Ord o2, Ord p2, Ord q2, Ord r2, Ord s2, Ord t2,
+                   Ord u2, Ord v2, Ord w2, Ord x2, Ord y2, Ord z2, Ord a3,
+                   Ord b3, Ord c3, Ord d3, Ord e3, Ord f3, Ord g3, Ord h3,
+                   Ord i3, Ord j3)
+               => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
+                       t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
+                       j2, k2, l2, m2, n2, o2, p2, q2, r2, s2, t2, u2, v2, w2,
+                       x2, y2, z2, a3, b3, c3, d3, e3, f3, g3, h3, i3, j3)
 
 instance (Ord a) => Ord [a] where
     {-# SPECIALISE instance Ord [[Char]] #-}
