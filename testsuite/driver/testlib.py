@@ -1626,11 +1626,6 @@ def simple_build(name: Union[TestName, str],
 
     # ToDo: if the sub-shell was killed by ^C, then exit
 
-    if isCompilerStatsTest():
-        statsResult = check_stats(TestName(name), way, in_testdir(stats_file), opts.stats_range_fields)
-        if badResult(statsResult):
-            return statsResult
-
     if should_fail:
         if exit_code == 0:
             stderr_contents = actual_stderr_path.read_text(encoding='UTF-8', errors='replace')
@@ -1639,6 +1634,11 @@ def simple_build(name: Union[TestName, str],
         if exit_code != 0:
             stderr_contents = actual_stderr_path.read_text(encoding='UTF-8', errors='replace')
             return failBecause('exit code non-0', stderr=stderr_contents)
+
+    if isCompilerStatsTest():
+        statsResult = check_stats(TestName(name), way, in_testdir(stats_file), opts.stats_range_fields)
+        if badResult(statsResult):
+            return statsResult
 
     return passed()
 
