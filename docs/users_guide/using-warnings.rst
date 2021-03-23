@@ -114,6 +114,7 @@ The following flags are simple ways to select standard "packages" of warnings:
         * :ghc-flag:`-Wunused-type-patterns`
         * :ghc-flag:`-Wsafe`
         * :ghc-flag:`-Wimplicit-lift`
+        * :ghc-flag:`-Wmissing-kind-signatures`
 
 .. ghc-flag:: -Weverything
     :shortdesc: enable all warnings supported by GHC
@@ -1181,6 +1182,32 @@ of ``-W(no-)*``.
     :ghc-flag:`-Wmissing-exported-signatures` then only exported pattern
     synonyms must have a type signature. GHC also reports the inferred
     type. This option is off by default.
+
+.. ghc-flag:: -Wmissing-kind-signatures
+    :shortdesc: warn when type declarations don't have kind signatures nor CUSKs
+    :type: dynamic
+    :reverse: -Wno-missing-kind-signatures
+    :category:
+
+    :since: 9.2
+
+    .. index::
+         single: kind signatures, missing
+
+    If you would like GHC to check that every data, type family,
+    type-class definition has a :ref:`standalone kind signature <standalone-kind-signatures>` or a :ref:`CUSK <complete-kind-signatures>`, use the
+    :ghc-flag:`-Wmissing-kind-signatures` option.
+    You can specify the kind via :extension:`StandaloneKindSignatures`
+    or :extension:`CUSKs`.
+
+    Note that :ghc-flag:`-Wmissing-kind-signatures` does not warn about
+    associated type families, as GHC considers an associated type family
+    declaration to have a CUSK if its enclosing class has a CUSK. (See
+    :ref:`complete-kind-signatures` for more on this point.) Therefore, giving
+    the parent class a standalone kind signature or CUSK is sufficient to fix
+    the warning for the class's associated type families as well.
+
+    This option is off by default.
 
 .. ghc-flag:: -Wname-shadowing
     :shortdesc: warn when names are shadowed
