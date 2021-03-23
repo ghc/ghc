@@ -1420,7 +1420,8 @@ checkMissingFields con_like rbinds arg_tys
         -- we can't substitute it with (error "Missing field f")
         addErrTc (missingStrictFields con_like fs)
 
-    when (notNull missing_ns_fields) $ do
+    warn <- woptM Opt_WarnMissingFields
+    when (warn && notNull missing_ns_fields) $ do
         fs <- zonk_fields missing_ns_fields
         -- It is not an error (though we may want) to omit a
         -- lazy field, because we can always use

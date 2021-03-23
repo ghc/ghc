@@ -1517,8 +1517,10 @@ addUsedGREs gres
 warnIfDeprecated :: GlobalRdrElt -> RnM ()
 warnIfDeprecated gre@(GRE { gre_imp = iss })
   | (imp_spec : _) <- iss
-  = do { this_mod <- getModule
-       ; when (not (nameIsLocalOrFrom this_mod name)) $
+  = do { dflags <- getDynFlags
+       ; this_mod <- getModule
+       ; when (wopt Opt_WarnWarningsDeprecations dflags &&
+               not (nameIsLocalOrFrom this_mod name)) $
                    -- See Note [Handling of deprecations]
          do { iface <- loadInterfaceForName doc name
             ; case lookupImpDeprec iface gre of

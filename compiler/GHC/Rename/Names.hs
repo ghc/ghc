@@ -1555,7 +1555,8 @@ warnUnusedImportDecls gbl_env hsc_src
                        (vcat [ text "Uses:" <+> ppr uses
                              , text "Import usage" <+> ppr usage])
 
-       ; mapM_ (warnUnusedImport Opt_WarnUnusedImports fld_env) usage
+       ; whenWOptM Opt_WarnUnusedImports $
+         mapM_ (warnUnusedImport Opt_WarnUnusedImports fld_env) usage
 
        ; whenGOptM Opt_D_dump_minimal_imports $
          printMinimalImports hsc_src usage }

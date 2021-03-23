@@ -432,11 +432,13 @@ rnSrcInstDecl (ClsInstD { cid_inst = cid })
 -- 'checkCanonicalMonoidInstances'
 checkCanonicalInstances :: Name -> LHsSigType GhcRn -> LHsBinds GhcRn -> RnM ()
 checkCanonicalInstances cls poly_ty mbinds = do
-  checkCanonicalMonadInstances
-    "https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/monad-of-no-return"
+    whenWOptM Opt_WarnNonCanonicalMonadInstances
+        $ checkCanonicalMonadInstances
+        "https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/monad-of-no-return"
 
-  checkCanonicalMonoidInstances
-    "https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/semigroup-monoid"
+    whenWOptM Opt_WarnNonCanonicalMonoidInstances
+        $ checkCanonicalMonoidInstances
+        "https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/semigroup-monoid"
 
   where
     -- | Warn about unsound/non-canonical 'Applicative'/'Monad' instance
