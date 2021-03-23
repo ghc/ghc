@@ -2932,7 +2932,7 @@ instance MonadP P where
       POk s {
          header_comments = header_comments',
          comment_q = comment_q'
-       } (AnnCommentsBalanced [] (reverse newAnns))
+       } (AnnCommentsBalanced (fromMaybe [] header_comments') (reverse newAnns))
 
 getCommentsFor :: (MonadP m) => SrcSpan -> m ApiAnnComments
 getCommentsFor (RealSrcSpan l _) = allocateCommentsP l
@@ -3496,8 +3496,8 @@ allocateFinalComments ss comment_q mheader_comments =
     comment_q'= before
   in
     case mheader_comments of
-      Nothing -> (Just newAnns, comment_q', [])
-      Just _ -> (mheader_comments, comment_q', newAnns)
+      Nothing -> (Just newAnns,    [], comment_q')
+      Just _ -> (mheader_comments, [], comment_q' ++ newAnns)
 
 commentToAnnotation :: RealLocated Token -> LAnnotationComment
 commentToAnnotation (L l (ITdocCommentNext s ll))  = mkLAnnotationComment l ll (AnnDocCommentNext s)

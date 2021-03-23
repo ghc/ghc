@@ -166,13 +166,10 @@ pp_nonnull xs = vcat (map ppr xs)
 
 data HsParsedModule = HsParsedModule {
     hpm_module    :: Located HsModule,
-    hpm_src_files :: [FilePath],
+    hpm_src_files :: [FilePath]
        -- ^ extra source files (e.g. from #includes).  The lexer collects
        -- these from '# <file> <line>' pragmas, which the C preprocessor
        -- leaves behind.  These files and their timestamps are stored in
        -- the .hi file, so that we can force recompilation if any of
        -- them change (#3589)
-    hpm_annotations :: ApiAnns
-    -- See note [Api annotations] in GHC.Parser.Annotation
   }
-
