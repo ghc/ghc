@@ -35,7 +35,13 @@ module GHC.Core.FamInstEnv (
         -- Normalisation
         topNormaliseType, topNormaliseType_maybe,
         normaliseType, normaliseTcApp,
-        topReduceTyFamApp_maybe, reduceTyFamApp_maybe
+        topReduceTyFamApp_maybe, reduceTyFamApp_maybe,
+
+        ReduceResult(..),
+        reduceTyFamApp_clever,
+
+        ChooseBranchResult(..),
+        chooseBranch_clever
     ) where
 
 #include "HsVersions.h"
@@ -821,6 +827,7 @@ lookupFamInstEnvConflicts envs fam_inst@(FamInst { fi_axiom = new_axiom })
     noSubst = panic "lookupFamInstEnvConflicts noSubst"
     new_branch = coAxiomSingleBranch new_axiom
 
+
 --------------------------------------------------------------------------------
 --                 Type family injectivity checking bits                      --
 --------------------------------------------------------------------------------
@@ -1098,6 +1105,45 @@ The lookupFamInstEnv function does a nice job for *open* type families,
 but we also need to handle closed ones when normalising a type:
 -}
 
+data ReduceResult = Reduce Coercion Type  -- ^ Family application reduces to
+                                          -- this type, witnessed by this
+                                          -- coercion
+                  | StuckOn Type -- ^ Family application is stuck, and needs to
+                                 -- make progress on this family
+                  | Stuck -- ^ Family application cannot reduce, and reducing
+                          -- its arguments won't help
+
+reduceTyFamApp_clever :: FamInstEnvs
+                     -- Role is always nominal
+                     -> TyCon -> [Type]
+                     -> ReduceResult
+reduceTyFamApp_clever envs tc tys
+  | isOpenTypeFamilyTyCon tc
+  , FamInstMatch { fim_instance = FamInst { fi_axiom = ax }
+                 , fim_tys      = inst_tys
+                 , fim_cos      = inst_cos } : _ <- lookupFamInstEnv envs tc tys
+      -- NB: Allow multiple matches because of compatible overlap
+
+  = let co = mkUnbranchedAxInstCo Nominal ax inst_tys inst_cos
+        ty = coercionRKind co
+    in Reduce co ty
+
+  | Just ax <- isClosedSynFamilyTyConWithAxiom_maybe tc
+  , Just (ind, inst_tys, inst_cos) <- chooseBranch ax tys
+  = let co = mkAxInstCo Nominal ax ind inst_tys inst_cos
+        ty = coercionRKind co
+    in Reduce co ty
+
+  | Just ax           <- isBuiltInSynFamTyCon_maybe tc
+  , Just (coax,ts,ty) <- sfMatchFam ax tys
+  , Nominal == coaxrRole coax
+  = let co = mkAxiomRuleCo coax (zipWith mkReflCo (coaxrAsmpRoles coax) ts)
+    in Reduce co ty
+
+  | otherwise
+  = Stuck
+
+
 reduceTyFamApp_maybe :: FamInstEnvs
                      -> Role              -- Desired role of result coercion
                      -> TyCon -> [Type]
@@ -1149,6 +1195,123 @@ reduceTyFamApp_maybe envs role tc tys
 
   | otherwise
   = Nothing
+
+data ChooseBranchResult = NoMatchingBranches -- type family is eternally stuck
+                        | MatchingBranch BranchIndex CoAxBranch TCvSubst
+                        | StuckBranch -- we can't make progress because there is a variable where a branch wants a constructor
+                        | TryToReduce Int TyCon [Type] (Type -> Type) -- a type family application in argument N is blocking reduction,
+                                                                      -- if we can reduce it to a constructor we might learn more;
+                                                                      -- applying the function to the reduced type family application
+                                                                      -- produces the full Nth argument
+
+chooseBranch_clever :: CoAxiom Branched -> [Type] -> (ChooseBranchResult, [Type])
+chooseBranch_clever axiom tys
+  = do { let num_pats = coAxiomNumPats axiom
+             (target_tys, extra_tys) = splitAt num_pats tys
+             branches = coAxiomBranches axiom
+       ; let r = findBranch_clever (unMkBranches branches) target_tys
+       ; case r of
+           -- MatchingBranch ind branch inst_tys inst_cos -> MatchingBranch ind branch (inst_tys `chkAppend` extra_tys) inst_cos
+           _ -> (r, extra_tys)
+       }
+
+-- AMG TODO: the following is vaguely plausible, but there are bugs, and it
+-- remains to debug or see if there is something fundamentally wrong...
+
+findBranch_clever :: Array BranchIndex CoAxBranch
+           -> [Type]
+           -> ChooseBranchResult
+findBranch_clever branches target_tys
+  = go True (assocs branches)
+  where
+    go :: Bool
+       -> [(BranchIndex, CoAxBranch)]
+       -> ChooseBranchResult
+    go _ [] = NoMatchingBranches
+    go happy ((index, branch):rest)
+      = let (CoAxBranch { cab_tvs = tpl_tvs, cab_cvs = tpl_cvs
+                        , cab_lhs = tpl_lhs }) = branch
+            in_scope = mkInScopeSet (unionVarSets [mkVarSet tpl_tvs, mkVarSet tpl_cvs, tyCoVarsOfTypes target_tys])
+            -- in_scope = mkInScopeSet (tyCoVarsOfTypes tpl_lhs `unionVarSet` tyCoVarsOfTypes target_tys)
+
+            -- See Note [Flattening type-family applications when matching instances]
+            -- in GHC.Core.Unify
+            flattened_target = flattenTys in_scope target_tys
+
+        in case tcMatchTysFG in_scope tpl_lhs target_tys of
+        Unifiable subst
+          | happy || apartnessCheck flattened_target branch -- matching worked. no need to check for apartness, because we bail early if we got stuck
+          ->
+             ASSERT( all (isJust . lookupCoVar subst) tpl_cvs )
+             MatchingBranch index branch subst -- TODO: could just apply the subst to the RHS here!
+          | otherwise -> go False rest -- TODO: could this be better?
+        SurelyApart -> {-case tcUnifyTysFG alwaysBindFun tpl_lhs flattened_target of
+                         SurelyApart -> -} go happy rest  -- AMG TODO: adding this extra check (rather than just matching)
+                                               -- makes most tests pass, except T11068. But calling
+                                               -- flattenTys like this destroys performance.
+                                               -- (Or perhaps just not reducing as often...)
+                                               -- Need to investigate why this extra check is needed
+                                               -- See also https://gitlab.haskell.org/ghc/ghc/-/issues/18825
+                                               -- Perhaps Overlap11 says matching (F a a, F a' Int) => SurelyApart?
+                                               -- it did, that's fixed
+                                               -- but moreover, Overlap6 says
+                                               -- matching (And True x, And x True) should be MaybeApart
+                                               -- but is currently SurelyApart
+--                         _ -> StuckBranch
+        -- MaybeApart{} -> go False rest
+        MaybeApart MARInfinite _ -> StuckBranch -- TODO??
+        MaybeApart _ subst -> seek 0 tpl_lhs target_tys subst
+
+
+    -- AMG TODO: here we should be more clever:
+    -- look for a reducible argument and reduce it
+    seek :: Int -> [Type] -> [Type] -> a -> ChooseBranchResult
+    seek !i (tpl_ty:tpl_lhs) (target_ty:target_tys) subst
+      | TyVarTy v <- tpl_ty
+      -- , not (v `elemVarSet` tyCoVarsOfTypes tpl_lhs)
+          = seek (i+1) tpl_lhs target_tys subst
+      | TyConApp p p_args <- tpl_ty
+      , TyConApp f f_args <- target_ty
+          -- TODO: assert that p is generative(?) and f is a type family
+          = TryToReduce i f f_args id
+      | otherwise = StuckBranch
+      --where
+--        tpl_ty' = substTy subst tpl_ty
+  --      target_ty' = substTy subst target_ty
+    -- seek _ [] [] _ = StuckBranch
+
+
+{-
+
+-- TODO: test if we could possibly match!
+                       -- if yes, and there is a leftmost tyfam-app, return TryToReduce
+                       -- if yes, but there is a variable, return StuckBranch
+                       -- if no (apart), return other
+               -- TODO: flattening here seems to be expensive?
+                    -- we don't need to be complete here, so can optimize?
+             if or (zipWith obviously_apart tpl_lhs target_tys) then other else StuckBranch
+-}
+
+{-
+           case tcUnifyTysFG alwaysBindFun flattened_target tpl_lhs of
+             SurelyApart -> other
+             _ -> StuckBranch
+-}
+
+{-
+    -- AMG TODO: the idea here is that we detect obviously-incompatible branches
+    -- cheaply, and if we see an obvious incompatibility, we can look at the
+    -- next branch.  Needs refinement to which TyCons we consider.
+    -- Probably buggy, and not good enough on T9872*.
+    obviously_apart (TyConApp tc1 args1) (TyConApp tc2 args2)
+      | isAlgTyCon tc1, isAlgTyCon tc2
+      , tc1 == tc2 = or (zipWith obviously_apart args1 args2)
+      | isAlgTyCon tc1, isAlgTyCon tc2 = True
+      | otherwise = False
+    obviously_apart _ _ = False
+-}
+
+
 
 -- The axiom can be oversaturated. (Closed families only.)
 chooseBranch :: CoAxiom Branched -> [Type]

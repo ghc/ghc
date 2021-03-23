@@ -9,6 +9,7 @@ module GHC.Core.Unify (
         tcMatchTys, tcMatchTyKis,
         tcMatchTyX, tcMatchTysX, tcMatchTyKisX,
         tcMatchTyX_BM, ruleMatchTyKiX,
+        tcMatchTysFG,
 
         -- * Rough matching
         RoughMatchTc(..), roughMatchTcs, instanceCantMatch,
@@ -52,6 +53,8 @@ import GHC.Types.Unique.Set
 import GHC.Exts( oneShot )
 import GHC.Utils.Panic
 import GHC.Data.FastString
+
+import GHC.Driver.Ppr
 
 import Data.Data ( Data )
 import Data.List ( mapAccumL )
@@ -157,7 +160,7 @@ tcMatchTyX subst ty1 ty2
   = tc_match_tys_x alwaysBindFun False subst [ty1] [ty2]
 
 -- | Like 'tcMatchTy' but over a list of types.
--- See also Note [tcMatchTy vs tcMatchTyKi]
+-- See also Note [tcMatchTy vs tcMatchTyKi]t
 tcMatchTys :: [Type]         -- ^ Template
            -> [Type]         -- ^ Target
            -> Maybe TCvSubst -- ^ One-shot; in principle the template
@@ -218,6 +221,20 @@ tc_match_tys_x bind_me match_kis (TCvSubst in_scope tv_env cv_env) tys1 tys2
       Unifiable (tv_env', cv_env')
         -> Just $ TCvSubst in_scope tv_env' cv_env'
       _ -> Nothing
+
+tcMatchTysFG :: InScopeSet -> [Type] -> [Type] -> UnifyResult
+tcMatchTysFG in_scope tys1 tys2
+   = case tc_unify_tys alwaysBindFun
+                 False -- Matching, not unifying
+                 False -- Not an injectivity check
+                 False -- Not matching kinds
+                 (mkRnEnv2 in_scope)
+                 emptyTvSubstEnv
+                 emptyCvSubstEnv
+                 tys1 tys2 of
+         Unifiable (tv_env', cv_env') -> Unifiable (TCvSubst in_scope tv_env' cv_env')
+         SurelyApart -> SurelyApart
+         MaybeApart r (tv_env', cv_env') -> MaybeApart r (TCvSubst in_scope tv_env' cv_env')
 
 -- | This one is called from the expression matcher,
 -- which already has a MatchEnv in hand
@@ -414,8 +431,8 @@ complete. This means that, sometimes, a closed type family does not reduce
 when it should. See test case indexed-types/should_fail/Overlap15 for an
 example.
 
-Note [Unificiation result]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Unification result]
+~~~~~~~~~~~~~~~~~~~~~~~~~
 When unifying t1 ~ t2, we return
 * Unifiable s, if s is a substitution such that s(t1) is syntactically the
   same as s(t2), modulo type-synonym expansion.
@@ -1091,6 +1108,11 @@ unify_ty env (TyVarTy tv1) ty2 kco
 unify_ty env ty1 (TyVarTy tv2) kco
   | um_unif env  -- If unifying, can swap args
   = uVar (umSwapRn env) tv2 ty1 (mkSymCo kco)
+  | otherwise -- If matching a non-var to a var, we are stuck
+              -- but not SurelyApart (AMG TODO: new reason)
+              -- e.g. from Overlap6
+              -- matching (And True x, And x True) should be MaybeApart
+  = maybeApart MARTypeFamily
 
 unify_ty env ty1 ty2 _kco
  -- NB: This keeps Constraint and Type distinct, as it should for use in the
@@ -1112,6 +1134,7 @@ unify_ty env ty1 ty2 _kco
 
             ; unify_tys env inj_tys1 inj_tys2
             ; unless (um_inj_tf env) $ -- See (end of) Note [Specification of unification]
+              pprTrace "AMG-unifyTcApps" (ppr noninj_tys1 <+> ppr noninj_tys2) $
               don'tBeSoSure MARTypeFamily $ unify_tys env noninj_tys1 noninj_tys2 }
 
   | Just (tc1, _) <- mb_tc_app1
@@ -1124,7 +1147,10 @@ unify_ty env ty1 ty2 _kco
 
   | Just (tc2, _) <- mb_tc_app2
   , not (isGenerativeTyCon tc2 Nominal)
-  , um_unif env
+  , um_unif env || not (um_inj_tf env) -- AMG TODO??? cf Overlap6
+  -- , um_unif env -- AMG TODO: skipping this case for matching means we get SurelyApart in
+                -- some matching cases where we should get MaybeApart (breaking T11068)...
+                -- but switching to the alternative destroys perf on T9872{b,c}
     -- E.g.   unify_ty [a] (F ty2) =  MaybeApart, when unifying (only)
     --        because the (F ty2) behaves like a variable
     --        NB: we have already dealt with the 'ty1 = variable' case
@@ -1238,7 +1264,11 @@ uVar env tv1 ty kco
                       -- type, not the template type. So, just check for
                       -- normal type equality.
                       unless ((ty' `mkCastTy` kco) `eqType` ty) $
-                      surelyApart
+                      -- maybeApart because we might be matching [a,a] to [b,Int]
+                      -- so we have a|-> b  and we want matching the second a with Int
+                      -- to fail with less certainty!
+                      -- AMG TODO: better reason:
+                      maybeApart MARTypeFamily
           Nothing  -> uUnrefined env tv1' ty ty kco } -- No, continue
 
 uUnrefined :: UMEnv

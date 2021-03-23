@@ -175,6 +175,7 @@ import GHC.Tc.Types
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Constraint
 import GHC.Core.Predicate
+import GHC.Core.Coercion.Axiom
 
 import GHC.Types.Basic
 import GHC.Types.Unique.Set
@@ -188,10 +189,13 @@ import Control.Monad
 import GHC.Utils.Monad
 import Data.IORef
 import GHC.Exts (oneShot)
+import Data.Array( Array, assocs )
 import Data.List ( partition, mapAccumL )
 import Data.List.NonEmpty ( NonEmpty(..), cons, toList, nonEmpty )
 import qualified Data.List.NonEmpty as NE
 import Control.Arrow ( first )
+
+import GHC.Driver.Ppr (pprTrace)
 
 #if defined(DEBUG)
 import GHC.Data.Graph.Directed
@@ -3823,38 +3827,289 @@ stepFamTcM :: IntWithInf -> TyCon -> [Type] -> TcM (Maybe (CoercionN, TcType), I
 -- ^ Given (F tys) return (co, ty), where co :: ty ~ N F tys
 stepFamTcM limit tycon args
   = do { fam_envs <- FamInst.tcGetFamInstEnvs
+
+{-
+       ; case topNormaliseType_maybe fam_envs (mkTyConApp tycon args) of
+           Just (co, ty') -> return (Just (mkTcSymCo co, ty'), 1)
+           Nothing -> return (Nothing, 0)
+-}
+
+       ; let ty0 = mkTyConApp tycon args
+
+       ; let (ty', n) = steps limit fam_envs ty0
+       ; let co' = Rep.UnivCo (Rep.StepsProv 0 n) Nominal ty' ty0
+       -- TODO: explore using AxiomInstCo if n=1
+       ; return $ if n > 0 then (Just (co', ty'), n)
+                           else (Nothing, 0)
+       }
+
+{-
+
        ; let match_fam_result
               = reduceTyFamApp_maybe fam_envs Nominal tycon args
        ; case match_fam_result of
-           Nothing       -> return (match_fam_result, 0)
-           Just (co, ty) -> do { let ty0 = mkTyConApp tycon args
-                               ; let (ty', n) = steps (limit `minusWithInf` 1) fam_envs ty
+           Nothing       -> do { let (ty', n) = steps limit fam_envs ty0
+                               ; let co' = Rep.UnivCo (Rep.StepsProv 0 n) Nominal ty' ty0
+                               ; return $ if n > 0 then (Just (co', ty'), n)
+                                                   else (match_fam_result, 0) -- AMG TODO: look at args in this case too!
+                               }
+           Just (co, ty) -> do { let (ty', n) = steps (limit `minusWithInf` 1) fam_envs ty
                                ; let co' = Rep.UnivCo (Rep.StepsProv 0 (n+1)) Nominal ty' ty0
-                               ; let r | n > 1     = (co', ty')  -- AMG TODO: testing not n > 0
+                               ; let r | n > 0     = (co', ty')
                                        | otherwise = (mkTcSymCo co, ty)
                                ; return (Just r, n+1)
                                }
        }
+-}
+
+
+data EvaluationContext
+  = TryingToReduce { reducing_type :: Type
+                   , maybe_focus :: Maybe EvaluationContext
+                   }
+
+    -- | Trying to find a branch that matches the list of argument types
+    -- TODO: maybe just retain the CoAxiom and the index number of the current branch? Drop the list?
+  | InBranches { previous_branches :: [(BranchIndex, CoAxBranch)]  -- ^ Previously-tried branches that do not match
+               , focus :: EvaluationContext  -- ^ Focus
+               , current_tycon :: TyCon -- ^ Type family being matched (TODO: remove?)
+               , current_branch :: (BranchIndex, CoAxBranch)  -- ^ Branch under consideration
+               , target_types :: [Type]  -- ^ Arguments
+               , next_branches :: [(BranchIndex, CoAxBranch)]  -- ^ Branches yet to try
+               , leftover_types :: [Type] -- ^ Leftover arguments, not used in matching, but applied to result
+               }
+
+  | InFamily { focus :: EvaluationContext
+             , current_tycon :: TyCon
+             , current_fam_inst :: FamInst
+             , target_types :: [Type]
+             , next_fam_insts :: [FamInst]
+             , leftover_types :: [Type]
+             }
+
+  | Matching { subst_so_far :: TCvSubst  -- ^ Substitution from patterns matched so far
+             , matched_args :: [(Type,Type)]  -- ^ (Pattern, argument) pairs that match when applying the substitution to the pattern
+             , focus :: EvaluationContext -- ^ Focus
+             , current_tycon :: TyCon  -- ^ Constructor under which the pattern and arguments appear
+             , current_pattern :: Type  -- ^ Pattern being matched
+             , current_target :: Type   -- ^ Argument to match
+             , next_patterns :: [Type]  -- ^ Patterns yet to match
+             , next_targets :: [Type]  -- ^ Arguments yet to match
+             }
+
+-- TODO: can we merge InBranches and Matching somehow? At the moment invariants
+-- aren't captured anywhere:
+--
+--  * every InBranches has a parent TryingToReduce
+--  * every InBranches has a child Matching
+
+instance Outputable EvaluationContext where
+  ppr (TryingToReduce ty cx)
+      = text "TryingToReduce" <+> ppr ty $$ ppr cx
+  ppr (InBranches _ cx tc branch _ _ _)
+      = text "InBranches" <+> ppr tc <+> ppr branch $$ ppr cx
+  ppr (InFamily cx tc fi _ _ _)
+      = text "InFamily" <+> ppr tc <+> ppr fi $$ ppr cx
+  ppr (Matching subst matched_args cx tc p a ps as)
+      = text "Matching" <+> ppr subst <+> ppr matched_args <+> ppr tc <+> ppr p <+> ppr a <+> ppr ps <+> ppr as $$ ppr cx
+
+focussedType :: EvaluationContext -> Type
+focussedType (TryingToReduce{reducing_type=ty}) = ty
+focussedType (InBranches{current_tycon=tc, target_types=tys}) = mkTyConApp tc tys
+focussedType (InFamily{current_tycon=tc, target_types=tys}) = mkTyConApp tc tys
+focussedType (Matching{current_tycon=tc, matched_args=pas, current_target=a, next_targets=as}) = mkTyConApp tc (collapse pas (a:as))
+
+-- TODO: use revApp here
+collapse :: [(a1, a2)] -> [a2] -> [a2]
+collapse prev_pas as = reverse (map snd prev_pas) ++ as
+
+tcFullView :: Type -> Type
+tcFullView ty
+  | Just ty' <- tcView ty = tcFullView ty'
+  | otherwise = ty
 
 steps :: IntWithInf -> FamInstEnvs -> Type -> (Type, Int)
 -- ^ Given a type, perform as many type family reduction steps as possible, then
 -- return the resulting type and the number of steps.  Look through type
 -- synonyms but do not count them as steps.
-steps limit fam_envs ty = go 0 ty ty
+steps limit fam_envs ty = go 0 (TryingToReduce ty Nothing)
   where
+    go_matching i subst prev_pas cx tc pat_tys arg_tys
+      | [] <- pat_tys  -- hit! the pattern matched (TODO: assert arg_tys is empty)
+      = matched subst i cx
+
+      | [] <- arg_tys -- TODO: should this be a panic?
+      = apart i cx tc (collapse prev_pas arg_tys)
+
+      | (p:ps) <- pat_tys
+      , (a:as) <- arg_tys
+      = go i (Matching subst prev_pas cx tc p a ps as)
+
     -- Accumulate the step count, the current type (without type synonyms
     -- expanded), and the current type with synonyms expanded.  Thus when we
     -- stop, we can avoid expanding type synonyms on the final step.  This is
     -- needed for the ExpandTFs test, which defines
     --   type family Foo a where Foo Int = String
     -- and when stepping Foo Int we want to return String rather than [Char].
-    go :: Int -> TcType -> TcType -> (TcType, Int)
-    go !i ty ty_expanded
-      | intGtLimit i limit = (ty, i)
-      | Just ty_expanded' <- tcView ty_expanded = go i ty ty_expanded'
-      | Rep.TyConApp tycon args <- ty_expanded
-      , Just (_, ty') <- reduceTyFamApp_maybe fam_envs Nominal tycon args = go (i+1) ty' ty'
-      | otherwise = (ty, i)
+    go :: Int -> EvaluationContext -> (Type, Int)
+    go i cx | pprTrace "AMG:cx" (ppr cx) False = undefined
+    go !i cx@(TryingToReduce ty cx0)
+      | intGtLimit i limit = (ty, i) -- TODO: can't just return pair here!!!
+
+      | Rep.TyConApp tycon args <- tcFullView ty
+      , not (isTypeFamilyTyCon tycon)
+      = done i cx ty
+
+      | Rep.TyConApp tycon args <- tcFullView ty
+      , Just axiom <- isClosedSynFamilyTyConWithAxiom_maybe tycon
+      , let all_branches = assocs (unMkBranches (coAxiomBranches axiom))
+      , branch:branches <- all_branches
+      , let num_pats = coAxiomNumPats axiom
+      , let (target_tys, extra_tys) = splitAt num_pats args
+      = go i (InBranches [] cx tycon branch target_tys branches extra_tys)
+
+
+      | Rep.TyConApp tycon args <- tcFullView ty
+      , isOpenTypeFamilyTyCon tycon
+      , fi:fis <- lookupFamInstEnvByTyCon fam_envs tycon
+      , let (target_tys, extra_tys) = splitAt (coAxiomNumPats (fi_axiom fi)) args
+      = go i (InFamily cx tycon fi target_tys fis extra_tys)
+
+      | otherwise = stuck i cx
+
+    go i cx@(InBranches missed cx0 tc (_, branch) target_tys branches extra_tys)
+     | let in_scope = mkInScopeSet (unionVarSets [mkVarSet (cab_tvs branch), mkVarSet (cab_cvs branch), tyCoVarsOfTypes target_tys])
+       -- TODO: is there a problem here: cab_tvs are not fresh?
+     = go_matching i (mkEmptyTCvSubst in_scope) [] cx tc (cab_lhs branch) target_tys
+
+    go i cx@(InFamily cx0 tc fi target_tys fis extra_tys)
+     | let in_scope = mkInScopeSet (unionVarSets [mkVarSet (fi_tvs fi), mkVarSet (fi_cvs fi), tyCoVarsOfTypes target_tys])
+     = go_matching i (mkEmptyTCvSubst in_scope) [] cx tc (fi_tys fi) target_tys
+
+    go i cx@(Matching subst prev_pas cx0 tc p a ps as)
+      = case (tcFullView p, tcFullView a) of
+          (Rep.TyVarTy v, a') -> case lookupTyVar subst v of
+                                   Just ty | eqType ty a' -> go_matching i subst ((p,a):prev_pas) cx0 tc ps as
+                                           | typesCantMatch [(ty,a')] -> apart i cx0 tc (collapse prev_pas (a:as))
+                                           | otherwise    -> stuck i cx  -- TODO: need a bit more subtlety here
+                                   Nothing -> go_matching i (extendTvSubst subst v a) ((p,a):prev_pas) cx0 tc ps as
+
+          (Rep.TyConApp p_tc p_args, a'@(Rep.TyConApp a_tc a_args))
+
+            -- pattern and target have the same head constructor, match the sub-patterns
+            | p_tc == a_tc, isInjectiveTyCon p_tc Nominal
+                -> go_matching i subst [] cx p_tc p_args a_args
+
+            -- pattern and target have disjoint head constructors, we are surely apart!
+            | p_tc /= a_tc
+            , isInjectiveTyCon p_tc Nominal
+            , isInjectiveTyCon a_tc Nominal  -- TODO think about injective/generative
+                 -> apart i cx0 tc (collapse prev_pas (a:as))
+
+            -- pattern forces the argument
+            | p_tc /= a_tc
+            , isInjectiveTyCon p_tc Nominal
+            , not (isInjectiveTyCon a_tc Nominal)
+                 -> go i (TryingToReduce a' (Just cx))
+
+          (Rep.FunTy VisArg m1 a1 r1, Rep.FunTy VisArg m2 a2 r2)
+            -> go_matching i subst [] cx funTyCon [m1,a1,r1] [m2,a2,r2]
+
+          (Rep.LitTy l1, Rep.LitTy l2)
+            | l1 == l2  -> go_matching i subst ((p,a):prev_pas) cx0 tc ps as
+            | otherwise -> apart i cx0 tc (collapse prev_pas (a:as))
+
+          _ -> stuck i cx -- TODO: this is too limited?
+                          -- Still need to handle AppTy, possibly CastTy/CoercionTy
+
+    reduce :: Int -> EvaluationContext -> Type -> (Type, Int)
+    reduce i (TryingToReduce _ cx) ty = go (i+1) (TryingToReduce ty cx)
+    reduce _ cx ty = pprPanic "reduce in unexpected context" (ppr cx <> ppr ty)
+
+    matched :: TCvSubst -> Int -> EvaluationContext -> (Type, Int)
+    matched subst i (Matching subst' prev_pas cx0 tc p a ps as)
+        = go_matching i subst ((p,a):prev_pas) cx0 tc ps as -- TODO: think about substs ((composeTCvSubst subst subst'))
+    matched subst i (InBranches _missed cx0 tc (_, branch) _target_tys _branches extra_tys)
+        = reduce i cx0 (mkAppTys (substTy subst (cab_rhs branch)) extra_tys)
+    matched subst i (InFamily cx0 tc fi _target_tys _fis extra_tys)
+        = reduce i cx0 (mkAppTys (substTy subst (fi_rhs fi)) extra_tys)
+    matched _ _ cx = pprPanic "matched in unexpected context" (ppr cx)
+
+    apart :: Int -> EvaluationContext -> TyCon -> [Type] -> (Type, Int)
+    apart i (Matching subst prev_pas cx0 next_tc p a ps as) tc new_args
+      = apart i cx0 next_tc (collapse prev_pas (mkTyConApp tc new_args:as))
+    apart i cx@(InBranches missed cx0 tc branch _args branches extras) _tc2 new_args = case branches of
+       new_branch:more_branches -> go i (InBranches (branch:missed) cx0 tc new_branch new_args more_branches extras)
+       [] -> stuck i cx
+    apart i cx@(InFamily cx0 tc fi target_tys fis extra_tys) _tc2 new_args = case fis of
+       new_fi:more_fis -> go i (InFamily cx0 tc new_fi new_args more_fis extra_tys)
+       [] -> stuck i cx
+    apart i cx _ _ = pprPanic "apart in unexpected context" (ppr cx)
+
+    stuck :: Int -> EvaluationContext -> (Type, Int)
+    stuck i (TryingToReduce ty Nothing)   = (ty, i)
+    stuck i (TryingToReduce ty (Just cx)) = stuck_up i cx ty
+    stuck i cx@(Matching{focus=cx0})      = stuck_up i cx0 (focussedType cx)
+    stuck i cx@(InBranches{focus=cx0})    = stuck_up i cx0 (focussedType cx)
+    stuck i cx@(InFamily{focus=cx0})      = stuck_up i cx0 (focussedType cx)
+--    stuck i cx = pprPanic "stuck in unexpected context" (ppr cx)
+
+    stuck_up :: Int -> EvaluationContext -> Type -> (Type, Int)
+    stuck_up i (TryingToReduce _ Nothing)   ty' = (ty', i)
+    stuck_up i (TryingToReduce _ (Just cx)) ty' = stuck_up i cx ty'
+    stuck_up i cx@(Matching{focus=cx0})     ty' = stuck_up i cx0 (focussedType (cx { current_target = ty'}))
+    stuck_up i cx@(InBranches{focus=cx0})   ty' = stuck_up i cx0 ty'
+    stuck_up i cx@(InFamily{focus=cx0})     ty' = stuck_up i cx0 ty'
+
+    -- We have successfully reduced the type under evaluation to WHNF.
+    -- Propagate up the stack until we reach the root (in which case we are
+    -- done) or if we reach a 'Matching' node (in which case we continue
+    -- matching now that the type at the focus is in WHNF).
+    done :: Int -> EvaluationContext -> Type -> (Type, Int)
+    done i (TryingToReduce _ Nothing) ty = (ty, i)
+    done i (TryingToReduce _ (Just cx)) ty = done i cx ty
+    done i (Matching subst prev_pas cx0 tc p _a ps as) ty
+      = go i (Matching subst prev_pas cx0 tc p ty ps as)
+
+{-
+
+given F a b c to reduce
+
+if F is a closed type family:
+ - look up its branches
+ - for each branch F x y z = t:
+     - if F a b c matches F x y z, substitute in t, add to step count, succeed
+     - if F a b c is apart from F x y z, continue to next branch
+     - otherwise, find the subterms of F a b c that do not (yet) match the pattern in F x y z
+         - choose the leftmost outermost one (we can't step others because the order might change later)
+         - if it is a variable, cannot step (but perhaps try to rewrite it?)
+         - if it is a type family application, try to reduce it
+
+     - NB "compatible RHSs" complicate this picture, because formally we can get some kind of parallel-or semantics
+        - possibly: ignore them, don't optimize this case
+          - but then we aren't total and need a separate check to see if we can make progress?
+        - another possibility: if we get stuck, continue checking subsequent branches to see if they are compatible and can step
+           - can't use a step coercion for this
+           - not really different
+
+if F is an open type family:
+ - look up its equations
+ - if F a b c matches an equation F x y z = t, substitute in t, add to step count, succeed
+ - if F a b c is apart from all equations, cannot step
+ - if F a b c unifies with at least one equation F x y z = t
+     - if the first argument does not (yet) match
+         - if it is a variable, cannot step (but perhaps try to rewrite it?)
+         - if it is a type family application, try to reduce it
+     - cannot step in later arguments because a later equation may be added that makes the family strict in that position
+     - or we could decide to make open type families strict in all arguments? but not clear that is a good idea
+     - could do more or less reasoning here
+
+if F is a builtin family
+ - presumably need to do special magic, but perhaps they are e.g. always strict in all their arguments?
+ - e.g. (+) forces its first arg, then when that is a literal, its second arg
+
+-}
+
 
 
 {-
