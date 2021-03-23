@@ -1257,7 +1257,7 @@ defaultDynFlags mySettings llvmConfig =
       }
 
 defaultWays :: Settings -> Ways
-defaultWays settings = if pc_DYNAMIC_BY_DEFAULT (sPlatformConstants settings)
+defaultWays settings = if pc_HS_DYNAMIC_BY_DEFAULT (sPlatformConstants settings)
                        then Set.singleton WayDyn
                        else Set.empty
 
@@ -4673,7 +4673,7 @@ compilerInfo dflags
        -- Whether or not we support the @-this-unit-id@ flag
        ("Uses unit IDs",               "YES"),
        -- Whether or not GHC compiles libraries as dynamic by default
-       ("Dynamic by default",          showBool $ pc_DYNAMIC_BY_DEFAULT constants),
+       ("Dynamic by default",          showBool $ pc_HS_DYNAMIC_BY_DEFAULT constants),
        -- Whether or not GHC was compiled using -dynamic
        ("GHC Dynamic",                 showBool hostIsDynamic),
        -- Whether or not GHC was compiled using -prof
