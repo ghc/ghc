@@ -240,8 +240,8 @@ data MessageClass
 data Severity
   = SevIgnore
   -- ^ Ignore this message, for example in
-  -- case of deferred errors, or suppression
-  -- of warnings user don't want to see.
+  -- case of suppression of warnings users
+  -- don't want to see.
   | SevWarning
   | SevError
   deriving (Eq, Show)
