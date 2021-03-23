@@ -88,7 +88,7 @@ parseWith :: GHC.DynFlags
 parseWith dflags fileName parser s =
   case runParser parser dflags fileName s of
     GHC.PFailed pst                     -> Left (fmap GHC.pprError $ GHC.getErrorMessages pst)
-    GHC.POk (mkApiAnns -> apianns) pmod -> Right (apianns, pmod)
+    GHC.POk _ pmod -> Right pmod
 
 
 parseWithECP :: (GHC.DisambECP w)
@@ -102,7 +102,7 @@ parseWithECP dflags fileName parser s =
     -- case runParser (parser >>= \p -> GHC.runECP_P p) dflags fileName s of
     case runParser (parser >>= \p -> GHC.runPV $ GHC.unECP p) dflags fileName s of
       GHC.PFailed pst                     -> Left (fmap GHC.pprError $ GHC.getErrorMessages pst)
-      GHC.POk (mkApiAnns -> apianns) pmod -> Right (apianns, pmod)
+      GHC.POk _ pmod -> Right pmod
 
 -- ---------------------------------------------------------------------
 
@@ -134,7 +134,7 @@ parseFile = runParser GHC.parseModule
 
 -- ---------------------------------------------------------------------
 
-type ParseResult a = Either GHC.ErrorMessages (GHC.ApiAnns, a)
+type ParseResult a = Either GHC.ErrorMessages a
 
 type Parser a = GHC.DynFlags -> FilePath -> String
                 -> ParseResult a
@@ -193,7 +193,7 @@ parseModuleFromStringInternal dflags fileName str =
   let (str1, lp) = stripLinePragmas str
       res        = case runParser GHC.parseModule dflags fileName str1 of
         GHC.PFailed pst     -> Left (fmap GHC.pprError $ GHC.getErrorMessages pst)
-        GHC.POk     x  pmod -> Right (mkApiAnns x, lp, dflags, pmod)
+        GHC.POk     _  pmod -> Right (lp, dflags, pmod)
   in  postParseTransform res
 
 parseModuleWithOptions :: FilePath -- ^ GHC libdir
@@ -225,7 +225,7 @@ parseModuleApiAnnsWithCpp
   -> IO
        ( Either
            GHC.ErrorMessages
-           (GHC.ApiAnns, [Comment], GHC.DynFlags, GHC.ParsedSource)
+           ([Comment], GHC.DynFlags, GHC.ParsedSource)
        )
 parseModuleApiAnnsWithCpp libdir cppOptions file = ghcWrapper libdir $ do
   dflags <- initDynFlags file
@@ -247,7 +247,7 @@ parseModuleApiAnnsWithCppInternal
   -> m
        ( Either
            GHC.ErrorMessages
-           (GHC.ApiAnns, [Comment], GHC.DynFlags, GHC.ParsedSource)
+           ([Comment], GHC.DynFlags, GHC.ParsedSource)
        )
 parseModuleApiAnnsWithCppInternal cppOptions dflags file = do
   let useCpp = GHC.xopt LangExt.Cpp dflags
@@ -264,17 +264,17 @@ parseModuleApiAnnsWithCppInternal cppOptions dflags file = do
   return $
     case parseFile dflags' file fileContents of
       GHC.PFailed pst -> Left (fmap GHC.pprError $ GHC.getErrorMessages pst)
-      GHC.POk (mkApiAnns -> apianns) pmod  ->
-        Right $ (apianns, injectedComments, dflags', pmod)
+      GHC.POk _ pmod  ->
+        Right $ (injectedComments, dflags', pmod)
 
 -- | Internal function. Exposed if you want to muck with DynFlags
 -- before parsing. Or after parsing.
 postParseTransform
-  :: Either a (GHC.ApiAnns, [Comment], GHC.DynFlags, GHC.ParsedSource)
-  -> Either a (GHC.ApiAnns, GHC.ParsedSource)
+  :: Either a ([Comment], GHC.DynFlags, GHC.ParsedSource)
+  -> Either a (GHC.ParsedSource)
 postParseTransform parseRes = fmap mkAnns parseRes
   where
-    mkAnns (apianns, _cs, _, m) = (apianns, m)
+    mkAnns (_cs, _, m) = m
       -- (relativiseApiAnnsWithOptions opts cs m apianns, m)
 
 -- | Internal function. Initializes DynFlags value for parsing.
@@ -324,9 +324,3 @@ initDynFlagsPure fp s = do
   return dflags3
 
 -- ---------------------------------------------------------------------
-
-mkApiAnns :: GHC.PState -> GHC.ApiAnns
-mkApiAnns pstate
-  = GHC.ApiAnns {
-        GHC.apiAnnRogueComments = GHC.comment_q pstate
-     }

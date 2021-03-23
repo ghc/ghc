@@ -36,47 +36,48 @@ _tt :: IO ()
 -- _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/lib"
 _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/exactprint/_build/stage1/lib"
 -- _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/epw/_build/stage1/lib"
- -- "../../testsuite/tests/ghc-api/exactprint/RenameCase1.hs" changeRenameCase1
- -- "../../testsuite/tests/ghc-api/exactprint/LayoutLet2.hs" changeLayoutLet2
- -- "../../testsuite/tests/ghc-api/exactprint/LayoutLet3.hs" changeLayoutLet3
- -- "../../testsuite/tests/ghc-api/exactprint/LayoutLet4.hs" changeLayoutLet3
- -- "../../testsuite/tests/ghc-api/exactprint/Rename1.hs" changeRename1
- -- "../../testsuite/tests/ghc-api/exactprint/Rename2.hs" changeRename2
- -- "../../testsuite/tests/ghc-api/exactprint/LayoutIn1.hs" changeLayoutIn1
- -- "../../testsuite/tests/ghc-api/exactprint/LayoutIn3.hs" changeLayoutIn3
- -- "../../testsuite/tests/ghc-api/exactprint/LayoutIn3a.hs" changeLayoutIn3
- -- "../../testsuite/tests/ghc-api/exactprint/LayoutIn3b.hs" changeLayoutIn3
- -- "../../testsuite/tests/ghc-api/exactprint/LayoutIn4.hs" changeLayoutIn4
- -- "../../testsuite/tests/ghc-api/exactprint/LocToName.hs" changeLocToName
- -- "../../testsuite/tests/ghc-api/exactprint/LetIn1.hs" changeLetIn1
- -- "../../testsuite/tests/ghc-api/exactprint/WhereIn4.hs" changeWhereIn4
- -- "../../testsuite/tests/ghc-api/exactprint/AddDecl1.hs" changeAddDecl1
- -- "../../testsuite/tests/ghc-api/exactprint/AddDecl2.hs" changeAddDecl2
- -- "../../testsuite/tests/ghc-api/exactprint/AddDecl3.hs" changeAddDecl3
- -- "../../testsuite/tests/ghc-api/exactprint/LocalDecls.hs" changeLocalDecls
- -- "../../testsuite/tests/ghc-api/exactprint/LocalDecls2.hs" changeLocalDecls2
- -- "../../testsuite/tests/ghc-api/exactprint/WhereIn3a.hs" changeWhereIn3a
- -- "../../testsuite/tests/ghc-api/exactprint/WhereIn3b.hs" changeWhereIn3b
- -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl1.hs" addLocaLDecl1
- -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl2.hs" addLocaLDecl2
- -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl3.hs" addLocaLDecl3
- -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl4.hs" addLocaLDecl4
- -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl5.hs" addLocaLDecl5
- -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl6.hs" (Just addLocaLDecl6)
- -- "../../testsuite/tests/ghc-api/exactprint/RmDecl1.hs" rmDecl1
- -- "../../testsuite/tests/ghc-api/exactprint/RmDecl2.hs" rmDecl2
- -- "../../testsuite/tests/ghc-api/exactprint/RmDecl3.hs" rmDecl3
- -- "../../testsuite/tests/ghc-api/exactprint/RmDecl4.hs" rmDecl4
- -- "../../testsuite/tests/ghc-api/exactprint/RmDecl5.hs" rmDecl5
- -- "../../testsuite/tests/ghc-api/exactprint/RmDecl6.hs" rmDecl6
- -- "../../testsuite/tests/ghc-api/exactprint/RmDecl7.hs" rmDecl7
- -- "../../testsuite/tests/ghc-api/exactprint/RmTypeSig1.hs" rmTypeSig1
- -- "../../testsuite/tests/ghc-api/exactprint/RmTypeSig2.hs" rmTypeSig2
- -- "../../testsuite/tests/ghc-api/exactprint/AddHiding1.hs" addHiding1
- -- "../../testsuite/tests/ghc-api/exactprint/AddHiding2.hs" addHiding2
+
+ -- "../../testsuite/tests/ghc-api/exactprint/RenameCase1.hs" (Just changeRenameCase1)
+ -- "../../testsuite/tests/ghc-api/exactprint/LayoutLet2.hs" (Just changeLayoutLet2)
+ -- "../../testsuite/tests/ghc-api/exactprint/LayoutLet3.hs" (Just changeLayoutLet3)
+ -- "../../testsuite/tests/ghc-api/exactprint/LayoutLet4.hs" (Just changeLayoutLet3)
+ -- "../../testsuite/tests/ghc-api/exactprint/Rename1.hs" (Just changeRename1)
+ -- "../../testsuite/tests/ghc-api/exactprint/Rename2.hs" (Just changeRename2)
+ -- "../../testsuite/tests/ghc-api/exactprint/LayoutIn1.hs" (Just changeLayoutIn1)
+ -- "../../testsuite/tests/ghc-api/exactprint/LayoutIn3.hs" (Just changeLayoutIn3)
+ -- "../../testsuite/tests/ghc-api/exactprint/LayoutIn3a.hs" (Just changeLayoutIn3)
+ -- "../../testsuite/tests/ghc-api/exactprint/LayoutIn3b.hs" (Just changeLayoutIn3)
+ -- "../../testsuite/tests/ghc-api/exactprint/LayoutIn4.hs" (Just changeLayoutIn4)
+ -- "../../testsuite/tests/ghc-api/exactprint/LocToName.hs" (Just changeLocToName)
+ -- "../../testsuite/tests/ghc-api/exactprint/LetIn1.hs" (Just changeLetIn1)
+ -- "../../testsuite/tests/ghc-api/exactprint/WhereIn4.hs" (Just changeWhereIn4)
+ -- "../../testsuite/tests/ghc-api/exactprint/AddDecl1.hs" (Just changeAddDecl1)
+ -- "../../testsuite/tests/ghc-api/exactprint/AddDecl2.hs" (Just changeAddDecl2)
+ -- "../../testsuite/tests/ghc-api/exactprint/AddDecl3.hs" (Just changeAddDecl3)
+ -- "../../testsuite/tests/ghc-api/exactprint/LocalDecls.hs" (Just changeLocalDecls)
+ -- "../../testsuite/tests/ghc-api/exactprint/LocalDecls2.hs" (Just changeLocalDecls2)
+ -- "../../testsuite/tests/ghc-api/exactprint/WhereIn3a.hs" (Just changeWhereIn3a)
+ -- "../../testsuite/tests/ghc-api/exactprint/WhereIn3b.hs" (Just changeWhereIn3b)
+ -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl1.hs" (Just addLocaLDecl1)
+ -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl2.hs" (Just addLocaLDecl2)
+ -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl3.hs" (Just addLocaLDecl3)
+ -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl4.hs" (Just addLocaLDecl4)
+ -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl5.hs" (Just addLocaLDecl5)
+ -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl6.hs" (Just (Just addLocaLDecl6))
+ -- "../../testsuite/tests/ghc-api/exactprint/RmDecl1.hs" (Just rmDecl1)
+ -- "../../testsuite/tests/ghc-api/exactprint/RmDecl2.hs" (Just rmDecl2)
+ -- "../../testsuite/tests/ghc-api/exactprint/RmDecl3.hs" (Just rmDecl3)
+ -- "../../testsuite/tests/ghc-api/exactprint/RmDecl4.hs" (Just rmDecl4)
+ -- "../../testsuite/tests/ghc-api/exactprint/RmDecl5.hs" (Just rmDecl5)
+ -- "../../testsuite/tests/ghc-api/exactprint/RmDecl6.hs" (Just rmDecl6)
+ -- "../../testsuite/tests/ghc-api/exactprint/RmDecl7.hs" (Just rmDecl7)
+ -- "../../testsuite/tests/ghc-api/exactprint/RmTypeSig1.hs" (Just rmTypeSig1)
+ -- "../../testsuite/tests/ghc-api/exactprint/RmTypeSig2.hs" (Just rmTypeSig2)
+ -- "../../testsuite/tests/ghc-api/exactprint/AddHiding1.hs" (Just addHiding1)
+ -- "../../testsuite/tests/ghc-api/exactprint/AddHiding2.hs" (Just addHiding2)
  -- "../../testsuite/tests/printer/Ppr001.hs" Nothing
 
- "../../testsuite/tests/ghc-api/annotations/CommentsTest.hs" Nothing
+ -- "../../testsuite/tests/ghc-api/annotations/CommentsTest.hs" Nothing
  -- "../../testsuite/tests/hiefile/should_compile/Constructors.hs" Nothing
  -- "../../testsuite/tests/hiefile/should_compile/Scopes.hs" Nothing
  -- "../../testsuite/tests/hiefile/should_compile/hie008.hs" Nothing
@@ -171,6 +172,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/exactprin
  -- "../../testsuite/tests/printer/Test16230.hs" Nothing
  -- "../../testsuite/tests/printer/Test16236.hs" Nothing
  -- "../../testsuite/tests/printer/Test17519.hs" Nothing
+ "../../testsuite/tests/printer/InTreeAnnotations1.hs" Nothing
 
  -- "../../testsuite/tests/qualifieddo/should_compile/qdocompile001.hs" Nothing
  -- "../../testsuite/tests/typecheck/should_fail/StrictBinds.hs" Nothing
@@ -232,8 +234,8 @@ changers =
 
 usage :: String
 usage = unlines
-    [ "usage: check-ppr (libdir) (file)"
-    , "       check-ppr (libdir) (changer) (file)"
+    [ "usage: check-exact (libdir) (file)"
+    , "       check-exact (libdir) (file) (changer)"
     , ""
     , "where libdir is the GHC library directory (e.g. the output of"
     , "ghc --print-libdir), file is the file to parse"
@@ -246,13 +248,14 @@ main = do
   args <- getArgs
   case args of
    [libdir,fileName] -> testOneFile changers libdir fileName Nothing
-   [libdir,fileName,changerStr] -> case lookup changerStr changers of
-     Just doChange -> testOneFile changers libdir fileName (Just doChange)
-     Nothing -> do
-       putStrLn $ "exactprint: could not find changer for [" ++ changerStr ++ "]"
-       putStrLn $ "valid changers are:\n" ++ unlines (map fst changers)
-       putStrLn $ "(see utils/check-exact/Main.hs)"
-       exitFailure
+   [libdir,fileName,changerStr] -> do
+     case lookup changerStr changers of
+       Just doChange -> testOneFile changers libdir fileName (Just doChange)
+       Nothing -> do
+         putStrLn $ "exactprint: could not find changer for [" ++ changerStr ++ "]"
+         putStrLn $ "valid changers are:\n" ++ unlines (map fst changers)
+         putStrLn $ "(see utils/check-exact/Main.hs)"
+         exitFailure
    _ -> putStrLn usage
 
 deriving instance Data Token
@@ -266,11 +269,10 @@ writeBinFile fpath x = withBinaryFile fpath WriteMode (\h -> hSetEncoding h utf8
 testOneFile :: [(String, Changer)] -> FilePath -> String -> Maybe Changer -> IO ()
 testOneFile _ libdir fileName mchanger = do
        (p,_toks) <- parseOneFile libdir fileName
-       -- putStrLn $ "\n\ngot p" ++ showAst (take 4 $ reverse toks)
+       -- putStrLn $ "\n\ngot p" ++ showAst (take 4 $ reverse _toks)
        let
          origAst = ppAst (pm_parsed_source p)
-         anns'   = pm_annotations p
-         pped    = exactPrint (pm_parsed_source p) anns'
+         pped    = exactPrint (pm_parsed_source p)
 
          newFile         = dropExtension fileName <.> "ppr"      <.> takeExtension fileName
          newFileChanged  = dropExtension fileName <.> "changed"  <.> takeExtension fileName
@@ -284,7 +286,7 @@ testOneFile _ libdir fileName mchanger = do
 
        (changedSourceOk, expectedSource, changedSource) <- case mchanger of
          Just changer -> do
-           (pped', ast') <- exactprintWithChange libdir changer (pm_parsed_source p) anns'
+           (pped', ast') <- exactprintWithChange libdir changer (pm_parsed_source p)
            writeBinFile changedAstFile (ppAst ast')
            writeBinFile newFileChanged pped'
 
@@ -299,9 +301,8 @@ testOneFile _ libdir fileName mchanger = do
            newAstStr = ppAst (pm_parsed_source p')
        writeBinFile newAstFile newAstStr
 
+       let origAstOk = origAst == newAstStr
 
-       let
-         origAstOk       = origAst == newAstStr
        if origAstOk && changedSourceOk
          then do
            exitSuccess
@@ -350,63 +351,47 @@ parseOneFile libdir fileName = do
          toks <- getTokenStream (ms_mod modSum)
          return (pm, toks)
 
-         -- getTokenStream :: GhcMonad m => Module -> m [Located Token]
-
--- getPragmas :: ApiAnns -> String
--- getPragmas anns' = pragmaStr
---   where
---     tokComment (L _ (AnnBlockComment s)) = s
---     tokComment (L _ (AnnLineComment  s)) = s
---     tokComment _ = ""
-
---     comments' = map tokComment $ sortRealLocated $ apiAnnRogueComments anns'
---     pragmas = filter (\c -> isPrefixOf "{-#" c ) comments'
---     pragmaStr = intercalate "\n" pragmas
-
--- pp :: (Outputable a) => a -> String
--- pp a = showPpr unsafeGlobalDynFlags a
 
 -- ---------------------------------------------------------------------
 
-exactprintWithChange :: FilePath -> Changer -> ParsedSource -> ApiAnns -> IO (String, ParsedSource)
-exactprintWithChange libdir f p apiAnns = do
-  debugM $ "exactprintWithChange:apiAnns=" ++ showGhc (apiAnnRogueComments apiAnns)
-  (apiAnns',p') <- f libdir apiAnns p
-  return (exactPrint p' apiAnns', p')
+exactprintWithChange :: FilePath -> Changer -> ParsedSource -> IO (String, ParsedSource)
+exactprintWithChange libdir f p = do
+  p' <- f libdir p
+  return (exactPrint p', p')
 
 -- First param is libdir
-type Changer = FilePath -> (ApiAnns -> ParsedSource -> IO (ApiAnns,ParsedSource))
+type Changer = FilePath -> (ParsedSource -> IO ParsedSource)
 
 noChange :: Changer
-noChange _libdir ans parsed = return (ans,parsed)
+noChange _libdir parsed = return parsed
 
 changeRenameCase1 :: Changer
-changeRenameCase1 _libdir ans parsed = return (ans,rename "bazLonger" [((3,15),(3,18))] parsed)
+changeRenameCase1 _libdir parsed = return (rename "bazLonger" [((3,15),(3,18))] parsed)
 
 changeLayoutLet2 :: Changer
-changeLayoutLet2 _libdir ans parsed = return (ans,rename "xxxlonger" [((7,5),(7,8)),((8,24),(8,27))] parsed)
+changeLayoutLet2 _libdir parsed = return (rename "xxxlonger" [((7,5),(7,8)),((8,24),(8,27))] parsed)
 
 changeLayoutLet3 :: Changer
-changeLayoutLet3 _libdir ans parsed = return (ans,rename "xxxlonger" [((7,5),(7,8)),((9,14),(9,17))] parsed)
+changeLayoutLet3 _libdir parsed = return (rename "xxxlonger" [((7,5),(7,8)),((9,14),(9,17))] parsed)
 
 changeLayoutIn1 :: Changer
-changeLayoutIn1 _libdir ans parsed = return (ans,rename "square" [((7,17),(7,19)),((7,24),(7,26))] parsed)
+changeLayoutIn1 _libdir parsed = return (rename "square" [((7,17),(7,19)),((7,24),(7,26))] parsed)
 
 changeLayoutIn3 :: Changer
-changeLayoutIn3 _libdir ans parsed = return (ans,rename "anotherX" [((7,13),(7,14)),((7,37),(7,38)),((8,37),(8,38))] parsed)
+changeLayoutIn3 _libdir parsed = return (rename "anotherX" [((7,13),(7,14)),((7,37),(7,38)),((8,37),(8,38))] parsed)
 
 changeLayoutIn4 :: Changer
-changeLayoutIn4 _libdir ans parsed = return (ans,rename "io" [((7,8),(7,13)),((7,28),(7,33))] parsed)
+changeLayoutIn4 _libdir parsed = return (rename "io" [((7,8),(7,13)),((7,28),(7,33))] parsed)
 
 changeLocToName :: Changer
-changeLocToName _libdir ans parsed = return (ans,rename "LocToName.newPoint" [((20,1),(20,11)),((20,28),(20,38)),((24,1),(24,11))] parsed)
+changeLocToName _libdir parsed = return (rename "LocToName.newPoint" [((20,1),(20,11)),((20,28),(20,38)),((24,1),(24,11))] parsed)
 
 
 changeRename1 :: Changer
-changeRename1 _libdir ans parsed = return (ans,rename "bar2" [((3,1),(3,4))] parsed)
+changeRename1 _libdir parsed = return (rename "bar2" [((3,1),(3,4))] parsed)
 
 changeRename2 :: Changer
-changeRename2 _libdir ans parsed = return (ans,rename "joe" [((2,1),(2,5))] parsed)
+changeRename2 _libdir parsed = return (rename "joe" [((2,1),(2,5))] parsed)
 
 rename :: (Data a) => String -> [(Pos, Pos)] -> a -> a
 rename newNameStr spans' a
@@ -425,8 +410,8 @@ rename newNameStr spans' a
 -- ---------------------------------------------------------------------
 
 changeWhereIn4 :: Changer
-changeWhereIn4 _libdir ans parsed
-  = return (ans,everywhere (mkT replace) parsed)
+changeWhereIn4 _libdir parsed
+  = return (everywhere (mkT replace) parsed)
   where
     replace :: LocatedN RdrName -> LocatedN RdrName
     replace (L ln _n)
@@ -436,8 +421,8 @@ changeWhereIn4 _libdir ans parsed
 -- ---------------------------------------------------------------------
 
 changeLetIn1 :: Changer
-changeLetIn1 _libdir ans parsed
-  = return (ans,everywhere (mkT replace) parsed)
+changeLetIn1 _libdir parsed
+  = return (everywhere (mkT replace) parsed)
   where
     replace :: HsExpr GhcPs -> HsExpr GhcPs
     replace (HsLet (ApiAnn anc (AnnsLet l _i) cs) localDecls expr)
@@ -448,27 +433,29 @@ changeLetIn1 _libdir ans parsed
              (L (SrcSpanAnn _ le) e) = expr
              a = (SrcSpanAnn (ApiAnn (Anchor (realSrcSpan le) (MovedAnchor (DP 0 1))) mempty noCom) le)
              expr' = L a e
-         in (HsLet (ApiAnn anc (AnnsLet l (AD (DP 1 0))) cs) (HsValBinds x (ValBinds xv bagDecls' sigs)) expr')
+         in (HsLet (ApiAnn anc (AnnsLet l (AD (DP 1 0))) cs)
+                (HsValBinds x (ValBinds xv bagDecls' sigs)) expr')
 
     replace x = x
+
 -- ---------------------------------------------------------------------
 
 -- | Add a declaration to AddDecl
 changeAddDecl1 :: Changer
-changeAddDecl1 libdir ans top = do
-  Right (_, decl) <- withDynFlags libdir (\df -> parseDecl df "<interactive>" "nn = n2")
+changeAddDecl1 libdir top = do
+  Right decl <- withDynFlags libdir (\df -> parseDecl df "<interactive>" "nn = n2")
   let decl' = setEntryDP' decl (DP 2 0)
 
   let (p',(_,_),_) = runTransform mempty doAddDecl
       doAddDecl = everywhereM (mkM replaceTopLevelDecls) top
       replaceTopLevelDecls :: ParsedSource -> Transform ParsedSource
       replaceTopLevelDecls m = insertAtStart m decl'
-  return (ans,p')
+  return p'
 
 -- ---------------------------------------------------------------------
 changeAddDecl2 :: Changer
-changeAddDecl2 libdir ans top = do
-  Right (_, decl) <- withDynFlags libdir (\df -> parseDecl df "<interactive>" "nn = n2")
+changeAddDecl2 libdir top = do
+  Right decl <- withDynFlags libdir (\df -> parseDecl df "<interactive>" "nn = n2")
   let decl' = setEntryDP' decl (DP 2 0)
   let top' = anchorEof top
 
@@ -476,12 +463,13 @@ changeAddDecl2 libdir ans top = do
       doAddDecl = everywhereM (mkM replaceTopLevelDecls) top'
       replaceTopLevelDecls :: ParsedSource -> Transform ParsedSource
       replaceTopLevelDecls m = insertAtEnd m decl'
-  return (ans,p')
+  return p'
 
 -- ---------------------------------------------------------------------
+
 changeAddDecl3 :: Changer
-changeAddDecl3 libdir ans top = do
-  Right (_, decl) <- withDynFlags libdir (\df -> parseDecl df "<interactive>" "nn = n2")
+changeAddDecl3 libdir top = do
+  Right decl <- withDynFlags libdir (\df -> parseDecl df "<interactive>" "nn = n2")
   let decl' = setEntryDP' decl (DP 2 0)
 
   let (p',(_,_),_) = runTransform mempty doAddDecl
@@ -491,15 +479,15 @@ changeAddDecl3 libdir ans top = do
           l2' = setEntryDP' l2 (DP 2 0)
       replaceTopLevelDecls :: ParsedSource -> Transform ParsedSource
       replaceTopLevelDecls m = insertAt f m decl'
-  return (ans,p')
+  return p'
 
 -- ---------------------------------------------------------------------
 
 -- | Add a local declaration with signature to LocalDecl
 changeLocalDecls :: Changer
-changeLocalDecls libdir ans (L l p) = do
-  Right (_, s@(L ls (SigD _ sig)))  <- withDynFlags libdir (\df -> parseDecl df "sig"  "nn :: Int")
-  Right (_, d@(L ld (ValD _ decl))) <- withDynFlags libdir (\df -> parseDecl df "decl" "nn = 2")
+changeLocalDecls libdir (L l p) = do
+  Right s@(L ls (SigD _ sig))  <- withDynFlags libdir (\df -> parseDecl df "sig"  "nn :: Int")
+  Right d@(L ld (ValD _ decl)) <- withDynFlags libdir (\df -> parseDecl df "decl" "nn = 2")
   let decl' = setEntryDP' (L ld decl) (DP 1 0)
   let  sig' = setEntryDP' (L ls sig)  (DP 0 0)
   let (p',(_,_),_w) = runTransform mempty doAddLocal
@@ -521,16 +509,16 @@ changeLocalDecls libdir ans (L l p) = do
                                           (sig':os':oldSigs)))
         return (L lm (Match an mln pats (GRHSs noExtField rhs binds')))
       replaceLocalBinds x = return x
-  return (ans,L l p')
+  return (L l p')
 
 -- ---------------------------------------------------------------------
 
 -- | Add a local declaration with signature to LocalDecl, where there was no
 -- prior local decl. So it adds a "where" annotation.
 changeLocalDecls2 :: Changer
-changeLocalDecls2 libdir ans (L l p) = do
-  Right (_, d@(L ld (ValD _ decl))) <- withDynFlags libdir (\df -> parseDecl df "decl" "nn = 2")
-  Right (_, s@(L ls (SigD _ sig)))  <- withDynFlags libdir (\df -> parseDecl df "sig"  "nn :: Int")
+changeLocalDecls2 libdir (L l p) = do
+  Right d@(L ld (ValD _ decl)) <- withDynFlags libdir (\df -> parseDecl df "decl" "nn = 2")
+  Right s@(L ls (SigD _ sig))  <- withDynFlags libdir (\df -> parseDecl df "sig"  "nn :: Int")
   let decl' = setEntryDP' (L ld decl) (DP 1 0)
   let  sig' = setEntryDP' (L ls  sig) (DP 0 2)
   let (p',(_,_),_w) = runTransform mempty doAddLocal
@@ -551,25 +539,25 @@ changeLocalDecls2 libdir ans (L l p) = do
                                     [sig']))
         return (L lm (Match ma mln pats (GRHSs noExtField rhs binds)))
       replaceLocalBinds x = return x
-  return (ans,L l p')
+  return (L l p')
 
 -- ---------------------------------------------------------------------
 
 -- | Check that balanceCommentsList is idempotent
 changeWhereIn3a :: Changer
-changeWhereIn3a _libdir ans (L l p) = do
+changeWhereIn3a _libdir (L l p) = do
   let decls0 = hsmodDecls p
       (decls,(_,_),w) = runTransform mempty (balanceCommentsList decls0)
       (_de0:_:de1:_d2:_) = decls
   debugM $ unlines w
   debugM $ "changeWhereIn3a:de1:" ++ showAst de1
   let p2 = p { hsmodDecls = decls}
-  return (ans,L l p2)
+  return (L l p2)
 
 -- ---------------------------------------------------------------------
 
 changeWhereIn3b :: Changer
-changeWhereIn3b _libdir ans (L l p) = do
+changeWhereIn3b _libdir (L l p) = do
   let decls0 = hsmodDecls p
       (decls,(_,_),w) = runTransform mempty (balanceCommentsList decls0)
       (de0:_:de1:d2:_) = decls
@@ -580,13 +568,13 @@ changeWhereIn3b _libdir ans (L l p) = do
   debugM $ unlines w
   debugM $ "changeWhereIn3b:de1':" ++ showAst de1'
   let p2 = p { hsmodDecls = decls'}
-  return (ans,L l p2)
+  return (L l p2)
 
 -- ---------------------------------------------------------------------
 
 addLocaLDecl1 :: Changer
-addLocaLDecl1 libdir ans lp = do
-  Right (_, (L ld (ValD _ decl))) <- withDynFlags libdir (\df -> parseDecl df "decl" "nn = 2")
+addLocaLDecl1 libdir lp = do
+  Right (L ld (ValD _ decl)) <- withDynFlags libdir (\df -> parseDecl df "decl" "nn = 2")
   let decl' = setEntryDP' (L ld decl) (DP 1 4)
       doAddLocal = do
         (de1:d2:d3:_) <- hsDecls lp
@@ -597,13 +585,13 @@ addLocaLDecl1 libdir ans lp = do
 
   (lp',(_,_),w) <- runTransformT mempty doAddLocal
   debugM $ "addLocaLDecl1:" ++ intercalate "\n" w
-  return (ans,lp')
+  return lp'
 
 -- ---------------------------------------------------------------------
 
 addLocaLDecl2 :: Changer
-addLocaLDecl2 libdir ans lp = do
-  Right (_, newDecl) <- withDynFlags libdir (\df -> parseDecl df "decl" "nn = 2")
+addLocaLDecl2 libdir lp = do
+  Right newDecl <- withDynFlags libdir (\df -> parseDecl df "decl" "nn = 2")
   let
       doAddLocal = do
          (de1:d2:_) <- hsDecls lp
@@ -618,14 +606,13 @@ addLocaLDecl2 libdir ans lp = do
 
   (lp',(_,_),_w) <- runTransformT mempty doAddLocal
   debugM $ "log:[\n" ++ intercalate "\n" _w ++ "]log end\n"
-  return (ans,lp')
+  return lp'
 
 -- ---------------------------------------------------------------------
 
 addLocaLDecl3 :: Changer
-addLocaLDecl3 libdir ans lp = do
-  Right (_, newDecl) <- withDynFlags libdir (\df -> parseDecl df "decl" "nn = 2")
-  -- Right (_, newDecl@(L ld (ValD _ decl))) <- withDynFlags libdir (\df -> parseDecl df "decl" "jj = 2")
+addLocaLDecl3 libdir lp = do
+  Right newDecl <- withDynFlags libdir (\df -> parseDecl df "decl" "nn = 2")
   let
       doAddLocal = do
          (de1:d2:_) <- hsDecls lp
@@ -639,15 +626,14 @@ addLocaLDecl3 libdir ans lp = do
 
   (lp',(_,_),_w) <- runTransformT mempty doAddLocal
   debugM $ "log:[\n" ++ intercalate "\n" _w ++ "]log end\n"
-  return (ans,lp')
+  return lp'
 
 -- ---------------------------------------------------------------------
 
 addLocaLDecl4 :: Changer
-addLocaLDecl4 libdir ans lp = do
-  Right (_, newDecl) <- withDynFlags libdir (\df -> parseDecl df "decl" "nn = 2")
-  Right (_, newSig)  <- withDynFlags libdir (\df -> parseDecl df "sig"  "nn :: Int")
-  -- putStrLn $ "addLocaLDecl4:lp=" ++ showGhc lp
+addLocaLDecl4 libdir lp = do
+  Right newDecl <- withDynFlags libdir (\df -> parseDecl df "decl" "nn = 2")
+  Right newSig  <- withDynFlags libdir (\df -> parseDecl df "sig"  "nn :: Int")
   let
       doAddLocal = do
          (parent:ds) <- hsDecls lp
@@ -662,13 +648,13 @@ addLocaLDecl4 libdir ans lp = do
 
   (lp',(_,_),_w) <- runTransformT mempty doAddLocal
   debugM $ "log:[\n" ++ intercalate "\n" _w ++ "]log end\n"
-  return (ans,lp')
+  return lp'
 
 
 -- ---------------------------------------------------------------------
 
 addLocaLDecl5 :: Changer
-addLocaLDecl5 _libdir ans lp = do
+addLocaLDecl5 _libdir lp = do
   let
       doAddLocal = do
          decls <- hsDecls lp
@@ -683,13 +669,13 @@ addLocaLDecl5 _libdir ans lp = do
 
   (lp',(_,_),_w) <- runTransformT mempty doAddLocal
   debugM $ "log:[\n" ++ intercalate "\n" _w ++ "]log end\n"
-  return (ans,lp')
+  return lp'
 
 -- ---------------------------------------------------------------------
 
 addLocaLDecl6 :: Changer
-addLocaLDecl6 libdir ans lp = do
-  Right (_, newDecl) <- withDynFlags libdir (\df -> parseDecl df "decl" "x = 3")
+addLocaLDecl6 libdir lp = do
+  Right newDecl <- withDynFlags libdir (\df -> parseDecl df "decl" "x = 3")
   let
       newDecl' = setEntryDP' newDecl (DP 1 4)
       doAddLocal = do
@@ -706,12 +692,12 @@ addLocaLDecl6 libdir ans lp = do
 
   (lp',(_,_),_w) <- runTransformT mempty doAddLocal
   debugM $ "log:[\n" ++ intercalate "\n" _w ++ "]log end\n"
-  return (ans,lp')
+  return lp'
 
 -- ---------------------------------------------------------------------
 
 rmDecl1 :: Changer
-rmDecl1 _libdir ans lp = do
+rmDecl1 _libdir lp = do
   let doRmDecl = do
          tlDecs0 <- hsDecls lp
          tlDecs <- balanceCommentsList $ captureLineSpacing tlDecs0
@@ -721,12 +707,12 @@ rmDecl1 _libdir ans lp = do
 
   (lp',(_,_),_w) <- runTransformT mempty doRmDecl
   debugM $ "log:[\n" ++ intercalate "\n" _w ++ "]log end\n"
-  return (ans,lp')
+  return lp'
 
 -- ---------------------------------------------------------------------
 
 rmDecl2 :: Changer
-rmDecl2 _libdir ans lp = do
+rmDecl2 _libdir lp = do
   let
       doRmDecl = do
         let
@@ -742,12 +728,12 @@ rmDecl2 _libdir ans lp = do
 
   let (lp',(_,_),_w) = runTransform mempty doRmDecl
   debugM $ "log:[\n" ++ intercalate "\n" _w ++ "]log end\n"
-  return (ans,lp')
+  return lp'
 
 -- ---------------------------------------------------------------------
 
 rmDecl3 :: Changer
-rmDecl3 _libdir ans lp = do
+rmDecl3 _libdir lp = do
   let
       doRmDecl = do
          [de1,d2] <- hsDecls lp
@@ -760,12 +746,12 @@ rmDecl3 _libdir ans lp = do
 
   (lp',(_,_),_w) <- runTransformT mempty doRmDecl
   debugM $ "log:[\n" ++ intercalate "\n" _w ++ "]log end\n"
-  return (ans,lp')
+  return lp'
 
 -- ---------------------------------------------------------------------
 
 rmDecl4 :: Changer
-rmDecl4 _libdir ans lp = do
+rmDecl4 _libdir lp = do
   let
       doRmDecl = do
          [de1] <- hsDecls lp
@@ -780,12 +766,12 @@ rmDecl4 _libdir ans lp = do
 
   (lp',(_,_),_w) <- runTransformT mempty doRmDecl
   debugM $ "log:[\n" ++ intercalate "\n" _w ++ "]log end\n"
-  return (ans,lp')
+  return lp'
 
 -- ---------------------------------------------------------------------
 
 rmDecl5 :: Changer
-rmDecl5 _libdir ans lp = do
+rmDecl5 _libdir lp = do
   let
       doRmDecl = do
         let
@@ -802,12 +788,12 @@ rmDecl5 _libdir ans lp = do
 
   let (lp',(_,_),_w) = runTransform mempty doRmDecl
   debugM $ "log:[\n" ++ intercalate "\n" _w ++ "]log end\n"
-  return (ans,lp')
+  return lp'
 
 -- ---------------------------------------------------------------------
 
 rmDecl6 :: Changer
-rmDecl6 _libdir ans lp = do
+rmDecl6 _libdir lp = do
   let
       doRmDecl = do
          [de1] <- hsDecls lp
@@ -822,12 +808,12 @@ rmDecl6 _libdir ans lp = do
 
   (lp',(_,_),_w) <- runTransformT mempty doRmDecl
   debugM $ "log:[\n" ++ intercalate "\n" _w ++ "]log end\n"
-  return (ans,lp')
+  return lp'
 
 -- ---------------------------------------------------------------------
 
 rmDecl7 :: Changer
-rmDecl7 _libdir ans lp = do
+rmDecl7 _libdir lp = do
   let
       doRmDecl = do
          tlDecs <- hsDecls lp
@@ -839,12 +825,12 @@ rmDecl7 _libdir ans lp = do
 
   (lp',(_,_),_w) <- runTransformT mempty doRmDecl
   debugM $ "log:[\n" ++ intercalate "\n" _w ++ "]log end\n"
-  return (ans,lp')
+  return lp'
 
 -- ---------------------------------------------------------------------
 
 rmTypeSig1 :: Changer
-rmTypeSig1 _libdir ans lp = do
+rmTypeSig1 _libdir lp = do
   let doRmDecl = do
          tlDecs <- hsDecls lp
          let (s0:de1:d2) = tlDecs
@@ -856,12 +842,12 @@ rmTypeSig1 _libdir ans lp = do
 
   let (lp',(_,_),_w) = runTransform mempty doRmDecl
   debugM $ "log:[\n" ++ intercalate "\n" _w ++ "]log end\n"
-  return (ans,lp')
+  return lp'
 
 -- ---------------------------------------------------------------------
 
 rmTypeSig2 :: Changer
-rmTypeSig2 _libdir ans lp = do
+rmTypeSig2 _libdir lp = do
   let doRmDecl = do
          tlDecs <- hsDecls lp
          let [de1] = tlDecs
@@ -873,12 +859,12 @@ rmTypeSig2 _libdir ans lp = do
 
   let (lp',(_,_),_w) = runTransform mempty doRmDecl
   debugM $ "log:[\n" ++ intercalate "\n" _w ++ "]log end\n"
-  return (ans,lp')
+  return lp'
 
 -- ---------------------------------------------------------------------
 
 addHiding1 :: Changer
-addHiding1 _libdir ans (L l p) = do
+addHiding1 _libdir (L l p) = do
   let doTransform = do
         l0 <- uniqueSrcSpanT
         l1 <- uniqueSrcSpanT
@@ -902,12 +888,12 @@ addHiding1 _libdir ans (L l p) = do
 
   let (lp',(_ans',_),_w) = runTransform mempty doTransform
   debugM $ "log:[\n" ++ intercalate "\n" _w ++ "]log end\n"
-  return (ans,lp')
+  return lp'
 
 -- ---------------------------------------------------------------------
 
 addHiding2 :: Changer
-addHiding2 _libdir ans (L l p) = do
+addHiding2 _libdir (L l p) = do
   let doTransform = do
         l1 <- uniqueSrcSpanT
         l2 <- uniqueSrcSpanT
@@ -933,7 +919,7 @@ addHiding2 _libdir ans (L l p) = do
 
   let (lp',(_ans',_),_w) = runTransform mempty doTransform
   debugM $ "log:[\n" ++ intercalate "\n" _w ++ "]log end\n"
-  return (ans,lp')
+  return lp'
 
 
 -- ---------------------------------------------------------------------

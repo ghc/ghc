@@ -4,10 +4,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 
 module GHC.Parser.Annotation (
-  -- * Out-of-tree API Annotations. Exist for the duration of !5158,
-  -- * will be removed by !2418
-  ApiAnns(..),
-
   -- * Core API Annotation types
   AnnKeywordId(..),
   AnnotationComment(..), AnnotationCommentTok(..),
@@ -162,12 +158,6 @@ The wiki page describing this feature is
 https://gitlab.haskell.org/ghc/ghc/wikis/api-annotations
 
 -}
--- ---------------------------------------------------------------------
-
-data ApiAnns =
-  ApiAnns
-    { apiAnnRogueComments :: [LAnnotationComment]
-    }
 
 -- --------------------------------------------------------------------
 
