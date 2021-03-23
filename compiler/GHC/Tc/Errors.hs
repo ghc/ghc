@@ -902,6 +902,7 @@ mkErrorTerm :: ReportErrCtxt -> CtLoc -> Type  -- of the error term
             -> Report -> TcM EvTerm
 mkErrorTerm ctxt ct_loc ty report
   = do { msg <- mkErrorReport ErrorWithoutFlag ctxt (ctLocEnv ct_loc) report
+         -- This will be reported at runtime, so we always want "error:" in the report, never "warning:"
        ; dflags <- getDynFlags
        ; let err_msg = pprLocMsgEnvelope msg
              err_fs  = mkFastString $ showSDoc dflags $

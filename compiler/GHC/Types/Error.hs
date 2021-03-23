@@ -33,7 +33,7 @@ module GHC.Types.Error
    , mkLocMessageAnn
    , getCaretDiagnostic
    -- * Queries
-   , isErrorMessage
+   , isIntrinsicErrorMessage
    , isWarningMessage
    , getErrorMessages
    , getWarningMessages
@@ -403,7 +403,7 @@ getCaretDiagnostic msg_class (RealSrcSpan span _) =
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 We distinguish between /intrinsic/ and /extrinsic/ failures. We classify in the former category
-those diagnostics which are /essentially/ failures, and their nature can't be changed. This is typically
+those diagnostics which are /essentially/ failures, and their nature can't be changed. This is
 the case for 'ErrorWithoutFlag'. We classify as /extrinsic/ all those diagnostics (like fatal warnings)
 which are born as warnings but which are still failures under particular 'DynFlags' settings. It's important
 to be aware of such logic distinction, because when we are inside the typechecker or the desugarer, we are
@@ -415,21 +415,21 @@ diagnostics, and later classify and report them appropriately (in the driver).
 -}
 
 
--- | Returns 'True' if this is, unconditionally, a failure. See Note [Intrinsic And Extrinsic Failures].
-isErrorMessage :: Diagnostic e => MsgEnvelope e -> Bool
-isErrorMessage = (==) ErrorWithoutFlag . diagnosticReason . errMsgDiagnostic
+-- | Returns 'True' if this is, intrinsically, a failure. See Note [Intrinsic And Extrinsic Failures].
+isIntrinsicErrorMessage :: Diagnostic e => MsgEnvelope e -> Bool
+isIntrinsicErrorMessage = (==) ErrorWithoutFlag . diagnosticReason . errMsgDiagnostic
 
 isWarningMessage :: Diagnostic e => MsgEnvelope e -> Bool
-isWarningMessage = not . isErrorMessage
+isWarningMessage = not . isIntrinsicErrorMessage
 
 errorsFound :: Diagnostic e => Messages e -> Bool
-errorsFound (Messages msgs) = any isErrorMessage msgs
+errorsFound (Messages msgs) = any isIntrinsicErrorMessage msgs
 
 getWarningMessages :: Diagnostic e => Messages e -> Bag (MsgEnvelope e)
 getWarningMessages (Messages xs) = fst $ partitionBag isWarningMessage xs
 
 getErrorMessages :: Diagnostic e => Messages e -> Bag (MsgEnvelope e)
-getErrorMessages (Messages xs) = fst $ partitionBag isErrorMessage xs
+getErrorMessages (Messages xs) = fst $ partitionBag isIntrinsicErrorMessage xs
 
 -- | Partitions the 'Messages' and returns a tuple which first element are the warnings, and the
 -- second the errors.

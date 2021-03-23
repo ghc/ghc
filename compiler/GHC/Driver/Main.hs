@@ -1328,8 +1328,8 @@ hscCheckSafe' m l = do
                     -- General errors we throw but Safe errors we log
                     errs = case (safeM, safeP) of
                         (True, True ) -> emptyBag
-                        (True, False) -> pkgTrustErr dflags
-                        (False, _   ) -> modTrustErr dflags
+                        (True, False) -> pkgTrustErr
+                        (False, _   ) -> modTrustErr
                 in do
                     logDiagnostics warns
                     logDiagnostics errs
@@ -1345,16 +1345,16 @@ hscCheckSafe' m l = do
                                 <> ppr (moduleName m)
                                 <> text " from explicitly Safe module"
                             ]
-                    pkgTrustErr dflags = unitBag
-                      $ mkShortMsgEnvelope dflags ErrorWithoutFlag l (pkgQual state)
+                    pkgTrustErr = unitBag
+                      $ mkShortErrorMsgEnvelope l (pkgQual state)
                       $ sep [ ppr (moduleName m)
                                 <> text ": Can't be safely imported!"
                             , text "The package ("
                                 <> (pprWithUnitState state $ ppr (moduleUnit m))
                                 <> text ") the module resides in isn't trusted."
                             ]
-                    modTrustErr dflags = unitBag
-                      $ mkShortMsgEnvelope dflags ErrorWithoutFlag l (pkgQual state)
+                    modTrustErr = unitBag
+                      $ mkShortErrorMsgEnvelope l (pkgQual state)
                       $ sep [ ppr (moduleName m)
                                 <> text ": Can't be safely imported!"
                             , text "The module itself isn't safe." ]
@@ -1400,7 +1400,7 @@ checkPkgTrust pkgs = do
             | unitIsTrusted $ unsafeLookupUnitId state pkg
             = acc
             | otherwise
-            = (:acc) $ mkShortMsgEnvelope (hsc_dflags hsc_env) ErrorWithoutFlag noSrcSpan (pkgQual state)
+            = (:acc) $ mkShortErrorMsgEnvelope noSrcSpan (pkgQual state)
                      $ pprWithUnitState state
                      $ text "The package ("
                         <> ppr pkg

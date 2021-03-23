@@ -32,8 +32,8 @@ module GHC.Utils.Error (
         -- ** Construction
         emptyMessages, mkDecorated, mkLocMessage, mkLocMessageAnn,
         mkMsgEnvelope, mkPlainMsgEnvelope, mkPlainErrorMsgEnvelope,
-        mkShortMsgEnvelope, mkLongMsgEnvelope,
-        mkMCDiagnostic, mkErrorDiagnostic, diagReasonSeverity,
+        mkShortMsgEnvelope, mkShortErrorMsgEnvelope, mkLongMsgEnvelope,
+        mkMCDiagnostic, errorDiagnostic, diagReasonSeverity,
 
         -- * Utilities
         doIfSet, doIfSet_dyn,
@@ -129,8 +129,8 @@ mkMCDiagnostic dflags reason = MCDiagnostic (diagReasonSeverity dflags reason) r
 
 -- | Varation of 'mkMCDiagnostic' which can be used when we are /sure/ the
 -- input 'DiagnosticReason' /is/ 'ErrorWithoutFlag'.
-mkErrorDiagnostic :: MessageClass
-mkErrorDiagnostic = MCDiagnostic SevError ErrorWithoutFlag
+errorDiagnostic :: MessageClass
+errorDiagnostic = MCDiagnostic SevError ErrorWithoutFlag
 
 -- | A long (multi-line) diagnostic message.
 -- The 'Severity' will be calculated out of the 'DiagnosticReason', and will likely be
@@ -155,6 +155,13 @@ mkShortMsgEnvelope :: DynFlags
                    -> MsgEnvelope DiagnosticMessage
 mkShortMsgEnvelope dflags rea locn unqual msg =
   mkMsgEnvelope dflags locn unqual (DiagnosticMessage (mkDecorated [msg]) rea)
+
+mkShortErrorMsgEnvelope :: SrcSpan
+                        -> PrintUnqualified
+                        -> SDoc
+                        -> MsgEnvelope DiagnosticMessage
+mkShortErrorMsgEnvelope locn unqual msg =
+  mk_msg_envelope SevError locn unqual (DiagnosticMessage (mkDecorated [msg]) ErrorWithoutFlag)
 
 -- | Variant that doesn't care about qualified/unqualified names.
 -- Same 'Severity' considerations as for 'mkLongMsgEnvelope'.
@@ -265,7 +272,7 @@ ifVerbose dflags val act
 
 errorMsg :: Logger -> DynFlags -> SDoc -> IO ()
 errorMsg logger dflags msg
-   = putLogMsg logger dflags mkErrorDiagnostic noSrcSpan $
+   = putLogMsg logger dflags errorDiagnostic noSrcSpan $
      withPprStyle defaultErrStyle msg
 
 warningMsg :: Logger -> DynFlags -> SDoc -> IO ()

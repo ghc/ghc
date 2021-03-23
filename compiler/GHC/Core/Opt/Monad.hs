@@ -64,7 +64,7 @@ import GHC.Types.Name.Env
 import GHC.Types.SrcLoc
 import GHC.Types.Error
 
-import GHC.Utils.Error ( mkErrorDiagnostic )
+import GHC.Utils.Error ( errorDiagnostic )
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Logger ( HasLogger (..), DumpFormat (..), putLogMsg, putDumpMsg, Logger )
 import GHC.Utils.Monad
@@ -821,7 +821,7 @@ errorMsgS = errorMsg . text
 
 -- | Output an error to the screen. Does not cause the compiler to die.
 errorMsg :: SDoc -> CoreM ()
-errorMsg doc = msg mkErrorDiagnostic doc
+errorMsg doc = msg errorDiagnostic doc
 
 -- | Output a fatal error to the screen. Does not cause the compiler to die.
 fatalErrorMsgS :: String -> CoreM ()

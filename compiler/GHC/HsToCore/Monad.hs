@@ -474,8 +474,7 @@ errDs :: SDoc -> DsM ()
 errDs err
   = do  { env <- getGblEnv
         ; loc <- getSrcSpanDs
-        ; dflags <- getDynFlags
-        ; let msg = mkShortMsgEnvelope dflags ErrorWithoutFlag loc (ds_unqual env) err
+        ; let msg = mkShortErrorMsgEnvelope loc (ds_unqual env) err
         ; updMutVar (ds_msgs env) (\ msgs -> msg `addMessage` msgs) }
 
 -- | Issue an error, but return the expression for (), so that we can continue
