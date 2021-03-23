@@ -50,17 +50,17 @@ import Types
 
 -- ---------------------------------------------------------------------
 
-exactPrint :: ExactPrint ast => Located ast -> ApiAnns -> String
-exactPrint ast anns = runIdentity (runEP anns stringOptions (markAnnotated ast))
+exactPrint :: ExactPrint ast => Located ast -> String
+exactPrint ast = runIdentity (runEP stringOptions (markAnnotated ast))
 
 type EP w m a = RWST (PrintOptions m w) (EPWriter w) EPState m a
 type EPP a = EP String Identity a
 
-runEP :: ApiAnns -> PrintOptions Identity String
+runEP :: PrintOptions Identity String
       -> Annotated () -> Identity String
-runEP anns epReader action =
+runEP epReader action =
   fmap (output . snd) .
-    (\next -> execRWST next epReader (defaultEPState anns))
+    (\next -> execRWST next epReader defaultEPState)
     . xx $ action
 
 xx :: Annotated () -> EP String Identity ()
@@ -69,10 +69,9 @@ xx = id
 
 -- ---------------------------------------------------------------------
 
-defaultEPState :: ApiAnns -> EPState
-defaultEPState as = EPState
+defaultEPState :: EPState
+defaultEPState = EPState
              { epPos       = (1,1)
-             , epApiAnns   = as
              , dLHS       = 1
              , pMarkLayout = False
              , pLHS = 1
@@ -80,7 +79,7 @@ defaultEPState as = EPState
              , dPriorEndPosition = (1,1)
              , uAnchorSpan = badRealSrcSpan
              , uExtraDP = Nothing
-             , epComments = rogueComments as
+             , epComments = []
              }
 
 
@@ -130,9 +129,7 @@ instance Monoid w => Monoid (EPWriter w) where
   mempty = EPWriter mempty
 
 data EPState = EPState
-             { epApiAnns    :: !ApiAnns
-
-             , uAnchorSpan :: !RealSrcSpan -- ^ in pre-changed AST
+             { uAnchorSpan :: !RealSrcSpan -- ^ in pre-changed AST
                                           -- reference frame, from
                                           -- Annotation
              , uExtraDP :: !(Maybe Anchor) -- ^ Used to anchor a
