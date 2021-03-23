@@ -7,7 +7,7 @@ module GHC.Rename.Splice (
         rnTopSpliceDecls,
         rnSpliceType, rnSpliceExpr, rnSplicePat, rnSpliceDecl,
         rnBracket,
-        checkThLocalName
+        checkThLocalName, checkSpliceImports
         , traceSplice, SpliceInfo(..)
   ) where
 
@@ -24,7 +24,7 @@ import GHC.Driver.Env.Types
 
 import GHC.Rename.Env
 import GHC.Rename.Utils   ( HsDocContext(..), newLocalBndrRn )
-import GHC.Rename.Unbound ( isUnboundName )
+import GHC.Rename.Unbound ( isUnboundName, unboundNameX, WhereLooking (..) )
 import GHC.Rename.Module  ( rnSrcDecls, findSplice )
 import GHC.Rename.Pat     ( rnPat )
 import GHC.Types.Basic    ( TopLevelFlag, isTopLevel )
@@ -845,6 +845,29 @@ illegalTypedSplice = text "Typed splices may not appear in untyped brackets"
 
 illegalUntypedSplice :: SDoc
 illegalUntypedSplice = text "Untyped splices may not appear in typed brackets"
+
+-- | When 'ExplicitSpliceImports' is enabled, check that a name appearing inside
+-- a splice is splice imported
+checkSpliceImports :: RdrName -> Name -> RnM Name
+checkSpliceImports orig_rdrname name = do
+  rdr_env <- getGlobalRdrEnv
+  st <- getStage
+  let in_splice = is_splice_stage st
+  case lookupGRE_Name rdr_env name of
+    Just gre ->
+      if pick_splice in_splice gre
+        then return name
+        else unboundNameX (if in_splice then WL_SpliceImport else WL_NonSpliceImport) orig_rdrname (error_text in_splice)
+    Nothing -> return name
+  where
+    error_text False = text "is splice imported but used outside a splice."
+    error_text True  = text "is used inside a splice but not splice imported."
+
+    pick_splice :: Bool -> GlobalRdrElt -> Bool
+    pick_splice in_splice = any ((in_splice ==) . is_splice . is_decl) . gre_imp
+
+    is_splice_stage (Splice {}) = True
+    is_splice_stage _ = False
 
 checkThLocalName :: Name -> RnM ()
 checkThLocalName name

@@ -679,7 +679,7 @@ lookupParents is_selector rdr
         -- Filter by isRecFldGRE because otherwise a non-selector variable with
         -- an overlapping name can get through when NoFieldSelectors is enabled.
         -- See Note [NoFieldSelectors] in GHC.Rename.Env.
-       ; let all_gres = lookupGRE_RdrName' rdr env
+       ; let all_gres = lookupGRE_RdrName' rdr env --TODO MP
        ; let gres | is_selector = filter isFieldSelectorGRE all_gres
                   | otherwise   = filter isRecFldGRE all_gres
        ; mapM lookupParent gres }

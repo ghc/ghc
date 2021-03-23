@@ -1634,7 +1634,7 @@ lookupOneQualifiedNameGHCi fos rdr_name = do
     -- field name multiple times (see
     -- Note [DuplicateRecordFields and -fimplicit-import-qualified]).
     toGRE gname = GRE { gre_name = gname, gre_par = NoParent, gre_lcl = False, gre_imp = [is] }
-    is = ImpSpec { is_decl = ImpDeclSpec { is_mod = mod, is_as = mod, is_qual = True, is_dloc = noSrcSpan }
+    is = ImpSpec { is_decl = ImpDeclSpec { is_mod = mod, is_as = mod, is_qual = True, is_splice = False, is_dloc = noSrcSpan }
                  , is_item = ImpAll }
     -- If -fimplicit-import-qualified succeeded, the name must be qualified.
     (mod, _) = fromMaybe (pprPanic "lookupOneQualifiedNameGHCi" (ppr rdr_name)) (isQual_maybe rdr_name)

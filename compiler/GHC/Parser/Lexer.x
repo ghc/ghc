@@ -712,6 +712,7 @@ data Token
   | ITnewtype
   | ITof
   | ITqualified
+  | ITsplice
   | ITthen
   | ITtype
   | ITwhere
@@ -968,6 +969,7 @@ reservedWordsFM = listToUFM $
          ( "newtype",        ITnewtype,       0 ),
          ( "of",             ITof,            0 ),
          ( "qualified",      ITqualified,     0 ),
+         ( "splice",         ITsplice,        xbit ExplicitSpliceImportsBit ),
          ( "then",           ITthen,          0 ),
          ( "type",           ITtype,          0 ),
          ( "where",          ITwhere,         0 ),
@@ -2728,6 +2730,7 @@ data ExtBits
   | NoLexicalNegationBit   -- See Note [Why not LexicalNegationBit]
   | OverloadedRecordDotBit
   | OverloadedRecordUpdateBit
+  | ExplicitSpliceImportsBit
 
   -- Flags that are updated once parsing starts
   | InRulePragBit
@@ -2806,6 +2809,7 @@ mkParserOpts warningFlags extensionFlags
       .|. NoLexicalNegationBit        `xoptNotBit` LangExt.LexicalNegation -- See Note [Why not LexicalNegationBit]
       .|. OverloadedRecordDotBit      `xoptBit` LangExt.OverloadedRecordDot
       .|. OverloadedRecordUpdateBit   `xoptBit` LangExt.OverloadedRecordUpdate  -- Enable testing via 'getBit OverloadedRecordUpdateBit' in the parser (RecordDotSyntax parsing uses that information).
+      .|. ExplicitSpliceImportsBit    `xoptBit` LangExt.ExplicitSpliceImports
     optBits =
           HaddockBit        `setBitIf` isHaddock
       .|. RawTokenStreamBit `setBitIf` rawTokStream

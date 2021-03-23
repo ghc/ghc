@@ -127,7 +127,7 @@ mkPrelImports this_mod loc implicit_prelude import_decls
    || explicit_prelude_import
    || not implicit_prelude
   = []
-  | otherwise = [preludeImportDecl]
+  | otherwise = [preludeImportDecl sp_import | sp_import <- [NormalImport, SpliceImport]]
   where
       explicit_prelude_import = any is_prelude_import import_decls
 
@@ -140,8 +140,8 @@ mkPrelImports this_mod loc implicit_prelude import_decls
 
 
       loc' = noAnnSrcSpan loc
-      preludeImportDecl :: LImportDecl GhcPs
-      preludeImportDecl
+      preludeImportDecl :: IsSpliceImport -> LImportDecl GhcPs
+      preludeImportDecl sp_import
         = L loc' $ ImportDecl { ideclExt       = noAnn,
                                 ideclSourceSrc = NoSourceText,
                                 ideclName      = L loc pRELUDE_NAME,
@@ -150,6 +150,7 @@ mkPrelImports this_mod loc implicit_prelude import_decls
                                 ideclSafe      = False,  -- Not a safe import
                                 ideclQualified = NotQualified,
                                 ideclImplicit  = True,   -- Implicit!
+                                ideclSplice    = sp_import,
                                 ideclAs        = Nothing,
                                 ideclHiding    = Nothing  }
 

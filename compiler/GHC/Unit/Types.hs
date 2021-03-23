@@ -83,6 +83,8 @@ module GHC.Unit.Types
    , GenWithIsBoot (..)
    , ModuleNameWithIsBoot
    , ModuleWithIsBoot
+
+   , IsNeededCompiled(..)
    )
 where
 
@@ -641,6 +643,7 @@ wiredInUnitIds =
 data IsBootInterface = NotBoot | IsBoot
   deriving (Eq, Ord, Show, Data)
 
+
 instance Binary IsBootInterface where
   put_ bh ib = put_ bh $
     case ib of
@@ -651,6 +654,13 @@ instance Binary IsBootInterface where
     return $ case b of
       False -> NotBoot
       True -> IsBoot
+
+data IsNeededCompiled = NeededCompiled | NotNeededCompiled
+  deriving (Eq, Ord, Show, Data, Enum)
+
+instance Binary IsNeededCompiled where
+  put_ bh ic = put_ bh (fromEnum ic)
+  get bh = toEnum <$> get bh
 
 -- | This data type just pairs a value 'mod' with an IsBootInterface flag. In
 -- practice, 'mod' is usually a @Module@ or @ModuleName@'.
@@ -666,7 +676,7 @@ type ModuleNameWithIsBoot = GenWithIsBoot ModuleName
 type ModuleWithIsBoot = GenWithIsBoot Module
 
 instance Binary a => Binary (GenWithIsBoot a) where
-  put_ bh (GWIB { gwib_mod, gwib_isBoot }) = do
+  put_ bh (GWIB { gwib_mod, gwib_isBoot}) = do
     put_ bh gwib_mod
     put_ bh gwib_isBoot
   get bh = do

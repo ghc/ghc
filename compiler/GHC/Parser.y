@@ -58,7 +58,7 @@ import GHC.Unit.Module.Warnings
 import GHC.Data.OrdList
 import GHC.Data.BooleanFormula ( BooleanFormula(..), LBooleanFormula, mkTrue )
 import GHC.Data.FastString
-import GHC.Data.Maybe          ( orElse )
+import GHC.Data.Maybe          ( orElse, isJust )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc          ( looksLikePackageName, fstOf3, sndOf3, thdOf3 )
@@ -582,6 +582,7 @@ are the most common patterns, rewritten as regular expressions for clarity:
  'newtype'      { L _ ITnewtype }
  'of'           { L _ ITof }
  'qualified'    { L _ ITqualified }
+ 'splice'       { L _ ITsplice }
  'then'         { L _ ITthen }
  'type'         { L _ ITtype }
  'where'        { L _ ITwhere }
@@ -1085,10 +1086,10 @@ importdecls_semi
         | {- empty -}           { [] }
 
 importdecl :: { LImportDecl GhcPs }
-        : 'import' maybe_src maybe_safe optqualified maybe_pkg modid optqualified maybeas maybeimpspec
+        : 'import' maybe_src maybe_safe optsplice optqualified maybe_pkg modid optqualified maybeas maybeimpspec
                 {% do {
-                  ; let { ; mPreQual = unLoc $4
-                          ; mPostQual = unLoc $7 }
+                  ; let { ; mPreQual = unLoc $5
+                          ; mPostQual = unLoc $8 }
                   ; checkImportDecl mPreQual mPostQual
                   ; let anns
                          = ApiAnnImportDecl
@@ -1096,18 +1097,19 @@ importdecl :: { LImportDecl GhcPs }
                              , importDeclAnnPragma    = fst $ fst $2
                              , importDeclAnnSafe      = fst $3
                              , importDeclAnnQualified = fst $ importDeclQualifiedStyle mPreQual mPostQual
-                             , importDeclAnnPackage   = fst $5
-                             , importDeclAnnAs        = fst $8
+                             , importDeclAnnPackage   = fst $6
+                             , importDeclAnnAs        = fst $9
                              }
-                  ; fmap reLocA $ acs (\cs -> L (comb5 $1 $6 $7 (snd $8) $9) $
+                  ; fmap reLocA $ acs (\cs -> L (comb5 $1 $7 $8 (snd $9) $10) $
                       ImportDecl { ideclExt = ApiAnn (glR $1) anns cs
                                   , ideclSourceSrc = snd $ fst $2
-                                  , ideclName = $6, ideclPkgQual = snd $5
+                                  , ideclName = $7, ideclPkgQual = snd $6
                                   , ideclSource = snd $2, ideclSafe = snd $3
                                   , ideclQualified = snd $ importDeclQualifiedStyle mPreQual mPostQual
+                                  , ideclSplice = if isJust (unLoc $4) then SpliceImport else NormalImport
                                   , ideclImplicit = False
-                                  , ideclAs = unLoc (snd $8)
-                                  , ideclHiding = unLoc $9 })
+                                  , ideclAs = unLoc (snd $9)
+                                  , ideclHiding = unLoc $10 })
                   }
                 }
 
@@ -1130,6 +1132,10 @@ maybe_pkg :: { (Maybe AnnAnchor,Maybe StringLiteral) }
 
 optqualified :: { Located (Maybe AnnAnchor) }
         : 'qualified'                           { sL1 $1 (Just (glAA $1)) }
+        | {- empty -}                           { noLoc Nothing }
+
+optsplice :: { Located (Maybe AnnAnchor) }
+        : 'splice'                              { sL1 $1 (Just (glAA $1)) }
         | {- empty -}                           { noLoc Nothing }
 
 maybeas :: { (Maybe AnnAnchor,Located (Maybe (Located ModuleName))) }
@@ -3761,6 +3767,7 @@ special_id :: { Located FastString }
 special_id
         : 'as'                  { sL1 $1 (fsLit "as") }
         | 'qualified'           { sL1 $1 (fsLit "qualified") }
+        | 'splice'              { sL1 $1 (fsLit "splice") }
         | 'hiding'              { sL1 $1 (fsLit "hiding") }
         | 'export'              { sL1 $1 (fsLit "export") }
         | 'label'               { sL1 $1 (fsLit "label")  }

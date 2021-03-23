@@ -52,6 +52,8 @@ import Data.Function ( on )
 -}
 
 data WhereLooking = WL_Any        -- Any binding
+                  | WL_SpliceImport
+                  | WL_NonSpliceImport
                   | WL_Global     -- Any top-level binding (local or imported)
                   | WL_LocalTop   -- Any top-level binding in this module
                   | WL_LocalOnly
@@ -130,7 +132,7 @@ fieldSelectorSuggestions global_env tried_rdr_name
       $$ text "that has been suppressed by NoFieldSelectors"
   where
     gres = filter isNoFieldSelectorGRE $
-               lookupGRE_RdrName' tried_rdr_name global_env
+               lookupGRE_RdrName' tried_rdr_name global_env -- TODO MP
     parents = [ parent | ParentIs parent <- map gre_par gres ]
 
     -- parents may be empty if this is a pattern synonym field without a selector
@@ -352,7 +354,14 @@ importSuggestions where_look global_env hpt currMod imports rdr_name
   -- wouldn't have an out-of-scope error in the first place)
   helpful_imports = filter helpful interesting_imports
     where helpful (_,imv)
-            = not . null $ lookupGlobalRdrEnv (imv_all_exports imv) occ_name
+            = not . null . splice_selector $ lookupGlobalRdrEnv (imv_all_exports imv) occ_name
+
+          -- Need to only suggest splice imported modules for things which are out
+          -- of scope because
+          splice_selector = case where_look of
+                              WL_SpliceImport -> filter isSpliceImportedGRE
+                              WL_NonSpliceImport -> filter isNonSpliceImportedGRE
+                              _ -> id
 
   -- Which of these do that because of an explicit hiding list resp. an
   -- explicit import list
@@ -396,6 +405,8 @@ isGreOk :: WhereLooking -> GlobalRdrElt -> Bool
 isGreOk where_look = case where_look of
                          WL_LocalTop  -> isLocalGRE
                          WL_LocalOnly -> const False
+                         WL_SpliceImport ->  isSpliceImportedGRE
+                         WL_NonSpliceImport -> isNonSpliceImportedGRE
                          _            -> const True
 
 {- Note [When to show/hide the module-not-imported line]           -- #15611

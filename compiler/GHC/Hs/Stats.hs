@@ -36,6 +36,7 @@ ppSourceStats short (L _ (HsModule{ hsmodExports = exports, hsmodImports = impor
              ("  ImpAll         ", imp_all),
              ("  ImpPartial     ", imp_partial),
              ("  ImpHiding      ", imp_hiding),
+             ("  ImpSplices     ", imp_splices),
              ("FixityDecls      ", fixity_sigs),
              ("DefaultDecls     ", default_ds),
              ("TypeDecls        ", type_ds),
@@ -96,8 +97,8 @@ ppSourceStats short (L _ (HsModule{ hsmodExports = exports, hsmodImports = impor
     (val_bind_ds, fn_bind_ds, patsyn_ds)
         = sum3 (map count_bind val_decls)
 
-    (imp_no, imp_safe, imp_qual, imp_as, imp_all, imp_partial, imp_hiding)
-        = sum7 (map import_info imports)
+    (imp_no, imp_safe, imp_qual, imp_as, imp_all, imp_partial, imp_hiding, imp_splices)
+        = sum8 (map import_info imports)
     (data_constrs, data_derivs)
         = sum2 (map data_info tycl_decls)
     (class_method_ds, default_method_ds)
@@ -120,10 +121,11 @@ ppSourceStats short (L _ (HsModule{ hsmodExports = exports, hsmodImports = impor
     sig_info (ClassOpSig {}) = (0,0,0,0,1)
     sig_info _               = (0,0,0,0,0)
 
-    import_info :: LImportDecl GhcPs -> (Int, Int, Int, Int, Int, Int, Int)
+    import_info :: LImportDecl GhcPs -> (Int, Int, Int, Int, Int, Int, Int, Int)
     import_info (L _ (ImportDecl { ideclSafe = safe, ideclQualified = qual
-                                 , ideclAs = as, ideclHiding = spec }))
-        = add7 (1, safe_info safe, qual_info qual, as_info as, 0,0,0) (spec_info spec)
+                                 , ideclAs = as, ideclHiding = spec
+                                 , ideclSplice = sp }))
+        = add8 (1, safe_info safe, qual_info qual, as_info as, 0,0,0, sp_info sp) (spec_info spec)
 
     safe_info False = 0
     safe_info True = 1
@@ -131,9 +133,11 @@ ppSourceStats short (L _ (HsModule{ hsmodExports = exports, hsmodImports = impor
     qual_info _  = 1
     as_info Nothing  = 0
     as_info (Just _) = 1
-    spec_info Nothing           = (0,0,0,0,1,0,0)
-    spec_info (Just (False, _)) = (0,0,0,0,0,1,0)
-    spec_info (Just (True, _))  = (0,0,0,0,0,0,1)
+    spec_info Nothing           = (0,0,0,0,1,0,0,0)
+    spec_info (Just (False, _)) = (0,0,0,0,0,1,0,0)
+    spec_info (Just (True, _))  = (0,0,0,0,0,0,1,0)
+    sp_info SpliceImport = 1
+    sp_info NormalImport = 0
 
     data_info (DataDecl { tcdDataDefn = HsDataDefn
                                           { dd_cons = cs
@@ -169,9 +173,9 @@ ppSourceStats short (L _ (HsModule{ hsmodExports = exports, hsmodImports = impor
     sum2 :: [(Int, Int)] -> (Int, Int)
     sum3 :: [(Int, Int, Int)] -> (Int, Int, Int)
     sum5 :: [(Int, Int, Int, Int, Int)] -> (Int, Int, Int, Int, Int)
-    sum7 :: [(Int, Int, Int, Int, Int, Int, Int)] -> (Int, Int, Int, Int, Int, Int, Int)
-    add7 :: (Int, Int, Int, Int, Int, Int, Int) -> (Int, Int, Int, Int, Int, Int, Int)
-         -> (Int, Int, Int, Int, Int, Int, Int)
+    sum8 :: [(Int, Int, Int, Int, Int, Int, Int, Int)] -> (Int, Int, Int, Int, Int, Int, Int, Int)
+    add8 :: (Int, Int, Int, Int, Int, Int, Int, Int) -> (Int, Int, Int, Int, Int, Int, Int, Int)
+         -> (Int, Int, Int, Int, Int, Int, Int, Int)
 
     addpr (x,y,z) = x+y+z
     sum2 = foldr add2 (0,0)
@@ -183,6 +187,6 @@ ppSourceStats short (L _ (HsModule{ hsmodExports = exports, hsmodImports = impor
     sum5 = foldr add5 (0,0,0,0,0)
       where
         add5 (x1,x2,x3,x4,x5) (y1,y2,y3,y4,y5) = (x1+y1,x2+y2,x3+y3,x4+y4,x5+y5)
-    sum7 = foldr add7 (0,0,0,0,0,0,0)
+    sum8 = foldr add8 (0,0,0,0,0,0,0,0)
 
-    add7 (x1,x2,x3,x4,x5,x6,x7) (y1,y2,y3,y4,y5,y6,y7) = (x1+y1,x2+y2,x3+y3,x4+y4,x5+y5,x6+y6,x7+y7)
+    add8 (x1,x2,x3,x4,x5,x6,x7, x8) (y1,y2,y3,y4,y5,y6,y7,y8) = (x1+y1,x2+y2,x3+y3,x4+y4,x5+y5,x6+y6,x7+y7,x8+y8)

@@ -77,6 +77,8 @@ isImportDeclQualified :: ImportDeclQualifiedStyle -> Bool
 isImportDeclQualified NotQualified = False
 isImportDeclQualified _ = True
 
+data IsSpliceImport = SpliceImport | NormalImport deriving (Data, Show, Eq, Ord)
+
 -- | Import Declaration
 --
 -- A single Haskell @import@ declaration.
@@ -90,6 +92,7 @@ data ImportDecl pass
       ideclSource    :: IsBootInterface,      -- ^ IsBoot <=> {-\# SOURCE \#-} import
       ideclSafe      :: Bool,          -- ^ True => safe import
       ideclQualified :: ImportDeclQualifiedStyle, -- ^ If/how the import is qualified.
+      ideclSplice    :: IsSpliceImport, -- ^ Whether the import is a splice import
       ideclImplicit  :: Bool,          -- ^ True => implicit import (of Prelude)
       ideclAs        :: Maybe (XRec pass ModuleName),  -- ^ as Module
       ideclHiding    :: Maybe (Bool, XRec pass [LIE pass])
@@ -147,6 +150,7 @@ simpleImportDecl mn = ImportDecl {
       ideclSafe      = False,
       ideclImplicit  = False,
       ideclQualified = NotQualified,
+      ideclSplice    = NormalImport,
       ideclAs        = Nothing,
       ideclHiding    = Nothing
     }

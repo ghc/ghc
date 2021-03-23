@@ -43,7 +43,7 @@ import GHC.Rename.Utils ( HsDocContext(..), bindLocalNamesFV, checkDupNames
                         , warnUnusedLocalBinds, typeAppErr
                         , checkUnusedRecordWildcard )
 import GHC.Rename.Unbound ( reportUnboundName )
-import GHC.Rename.Splice  ( rnBracket, rnSpliceExpr, checkThLocalName )
+import GHC.Rename.Splice  ( rnBracket, rnSpliceExpr, checkThLocalName, checkSpliceImports )
 import GHC.Rename.HsType
 import GHC.Rename.Pat
 import GHC.Driver.Session
@@ -189,14 +189,17 @@ rnLExpr = wrapLocFstMA rnExpr
 
 rnExpr :: HsExpr GhcPs -> RnM (HsExpr GhcRn, FreeVars)
 
-finishHsVar :: LocatedA Name -> RnM (HsExpr GhcRn, FreeVars)
+finishHsVar :: RdrName -> LocatedA Name -> RnM (HsExpr GhcRn, FreeVars)
 -- Separated from rnExpr because it's also used
 -- when renaming infix expressions
-finishHsVar (L l name)
+finishHsVar orig_rdrname (L l name)
  = do { this_mod <- getModule
-      ; when (nameIsLocalOrFrom this_mod name) $
-        checkThLocalName name
-      ; return (HsVar noExtField (L (la2na l) name), unitFV name) }
+      ; splice_import <- xoptM LangExt.ExplicitSpliceImports
+      ; name' <- if (not (nameIsLocalOrFrom this_mod name) && splice_import)
+                  then checkSpliceImports orig_rdrname name
+                  else return name
+      ; when (nameIsLocalOrFrom this_mod name') $ checkThLocalName name'
+      ; return (HsVar noExtField (L (la2na l) name'), unitFV name') }
 
 rnUnboundVar :: RdrName -> RnM (HsExpr GhcRn, FreeVars)
 rnUnboundVar v =
@@ -225,7 +228,7 @@ rnExpr (HsVar _ (L l v))
               -> rnExpr (ExplicitList noAnn [])
 
               | otherwise
-              -> finishHsVar (L (na2la l) name) ;
+              -> finishHsVar v (L (na2la l) name) ;
             Just (UnambiguousGre (FieldGreName fl)) ->
               let sel_name = flSelector fl in
               return ( HsRecFld noExtField (Unambiguous sel_name (L l v) ), unitFV sel_name) ;

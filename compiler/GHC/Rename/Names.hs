@@ -290,7 +290,8 @@ rnImportDecl this_mod
                                      , ideclPkgQual = mb_pkg
                                      , ideclSource = want_boot, ideclSafe = mod_safe
                                      , ideclQualified = qual_style, ideclImplicit = implicit
-                                     , ideclAs = as_mod, ideclHiding = imp_details }))
+                                     , ideclAs = as_mod, ideclHiding = imp_details
+                                     , ideclSplice = sp_style }))
   = setSrcSpanA loc $ do
 
     when (isJust mb_pkg) $ do
@@ -298,6 +299,10 @@ rnImportDecl this_mod
         when (not pkg_imports) $ addErr packageImportErr
 
     let qual_only = isImportDeclQualified qual_style
+        splice_only = case sp_style of
+                        SpliceImport -> True
+                        NormalImport  -> False
+        want_compiled = if splice_only then NeededCompiled else NotNeededCompiled
 
     -- If there's an error in loadInterface, (e.g. interface
     -- file not found) we get lots of spurious errors from 'filterImports'
@@ -361,7 +366,8 @@ rnImportDecl this_mod
     let
         qual_mod_name = fmap unLoc as_mod `orElse` imp_mod_name
         imp_spec  = ImpDeclSpec { is_mod = imp_mod_name, is_qual = qual_only,
-                                  is_dloc = locA loc, is_as = qual_mod_name }
+                                  is_dloc = locA loc, is_as = qual_mod_name,
+                                  is_splice = splice_only }
 
     -- filter the imports according to the import declaration
     (new_imp_details, gres) <- filterImports iface imp_spec imp_details
@@ -390,7 +396,7 @@ rnImportDecl this_mod
             , imv_all_exports = potential_gres
             , imv_qualified   = qual_only
             }
-        imports = calculateAvails home_unit iface mod_safe' want_boot (ImportedByUser imv)
+        imports = calculateAvails home_unit iface mod_safe' want_boot want_compiled (ImportedByUser imv)
 
     -- Complain if we import a deprecated module
     whenWOptM Opt_WarnWarningsDeprecations (
@@ -416,9 +422,10 @@ calculateAvails :: HomeUnit
                 -> ModIface
                 -> IsSafeImport
                 -> IsBootInterface
+                -> IsNeededCompiled
                 -> ImportedBy
                 -> ImportAvails
-calculateAvails home_unit iface mod_safe' want_boot imported_by =
+calculateAvails home_unit iface mod_safe' want_boot want_compiled imported_by =
   let imp_mod    = mi_module iface
       imp_sem_mod= mi_semantic_module iface
       orph_iface = mi_orphan (mi_final_exts iface)
@@ -481,7 +488,9 @@ calculateAvails home_unit iface mod_safe' want_boot imported_by =
             -- know if any of them depended on CM.hi-boot, in
             -- which case we should do the hi-boot consistency
             -- check.  See GHC.Iface.Load.loadHiBootInterface
-            ( GWIB { gwib_mod = moduleName imp_mod, gwib_isBoot = want_boot } : dep_mods deps
+            ( GWIB { gwib_mod = moduleName imp_mod
+                   , gwib_isBoot = want_boot
+                   } : dep_mods deps
             , dep_pkgs deps
             , ptrust
             )

@@ -665,6 +665,7 @@ mergeSignatures
                                             is_mod  = mod_name,
                                             is_as   = mod_name,
                                             is_qual = False,
+                                            is_splice = False,
                                             is_dloc = locA loc
                                           } ImpAll
                                 rdr_env = mkGlobalRdrEnv (gresFromAvails (Just ispec) as1)
@@ -872,7 +873,7 @@ mergeSignatures
             iface' = iface { mi_final_exts = (mi_final_exts iface){ mi_orphan = False, mi_finsts = False } }
             home_unit = hsc_home_unit hsc_env
             avails = plusImportAvails (tcg_imports tcg_env) $
-                        calculateAvails home_unit iface' False NotBoot ImportedBySystem
+                        calculateAvails home_unit iface' False NotBoot NotNeededCompiled ImportedBySystem
         return tcg_env {
             tcg_inst_env = inst_env,
             tcg_insts    = insts,
@@ -963,7 +964,7 @@ checkImplements impl_mod req_mod@(Module uid mod_name) = do
                          (dep_orphs (mi_deps impl_iface))
 
     let avails = calculateAvails home_unit
-                    impl_iface False{- safe -} NotBoot ImportedBySystem
+                    impl_iface False{- safe -} NotBoot NotNeededCompiled ImportedBySystem
         fix_env = mkNameEnv [ (greMangledName rdr_elt, FixItem occ f)
                             | (occ, f) <- mi_fixities impl_iface
                             , rdr_elt <- lookupGlobalRdrEnv impl_gr occ ]

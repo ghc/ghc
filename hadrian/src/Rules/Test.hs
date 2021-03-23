@@ -214,11 +214,11 @@ needIservBins = do
   rtsways <- interpretInContext (vanillaContext stg ghc) getRtsWays
   need =<< traverse programPath
       [ Context stg iserv w
-      | w <- [vanilla, profiling, dynamic]
+      | w <- [vanilla, dynamic]
       , w `elem` rtsways
       ]
 
 pkgFile :: Stage -> Package -> Action FilePath
 pkgFile stage pkg
-    | isLibrary pkg = pkgConfFile (Context stage pkg profilingDynamic)
+    | isLibrary pkg = pkgConfFile (Context stage pkg dynamic)
     | otherwise     = programPath =<< programContext stage pkg

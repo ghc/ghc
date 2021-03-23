@@ -3510,6 +3510,7 @@ xFlagsDeps = [
   flagSpec "ExistentialQuantification"        LangExt.ExistentialQuantification,
   flagSpec "ExplicitForAll"                   LangExt.ExplicitForAll,
   flagSpec "ExplicitNamespaces"               LangExt.ExplicitNamespaces,
+  flagSpec "ExplicitSpliceImports"            LangExt.ExplicitSpliceImports,
   flagSpec "ExtendedDefaultRules"             LangExt.ExtendedDefaultRules,
   flagSpec "FlexibleContexts"                 LangExt.FlexibleContexts,
   flagSpec "FlexibleInstances"                LangExt.FlexibleInstances,

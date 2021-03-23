@@ -63,6 +63,7 @@ module GHC.Types.Name.Reader (
         -- ** Global 'RdrName' mapping elements: 'GlobalRdrElt', 'Provenance', 'ImportSpec'
         GlobalRdrElt(..), isLocalGRE, isRecFldGRE,
         isDuplicateRecFldGRE, isNoFieldSelectorGRE, isFieldSelectorGRE,
+        isSpliceImportedGRE, isNonSpliceImportedGRE, distinguishSpliceImports,
         unQualOK, qualSpecOK, unQualSpecOK,
         pprNameProvenance,
         GreName(..), greNameSrcSpan,
@@ -843,13 +844,14 @@ lookupGRE_RdrName :: RdrName -> GlobalRdrEnv -> [GlobalRdrElt]
 lookupGRE_RdrName rdr_name env =
     filter (not . isNoFieldSelectorGRE) (lookupGRE_RdrName' rdr_name env)
 
-lookupGRE_RdrName' :: RdrName -> GlobalRdrEnv -> [GlobalRdrElt]
+lookupGRE_RdrName' :: RdrName -> GlobalRdrEnv ->  [GlobalRdrElt]
 -- ^ Look for this 'RdrName' in the global environment.  Includes record fields
 -- without selector functions (see Note [NoFieldSelectors] in GHC.Rename.Env).
 lookupGRE_RdrName' rdr_name env
   = case lookupOccEnv env (rdrNameOcc rdr_name) of
     Nothing   -> []
     Just gres -> pickGREs rdr_name gres
+
 
 lookupGRE_Name :: GlobalRdrEnv -> Name -> Maybe GlobalRdrElt
 -- ^ Look for precisely this 'Name' in the environment.  This tests
@@ -901,6 +903,15 @@ getGRE_NameQualifier_maybes env name
 
 isLocalGRE :: GlobalRdrElt -> Bool
 isLocalGRE (GRE {gre_lcl = lcl }) = lcl
+
+isSpliceImportedGRE :: GlobalRdrElt -> Bool
+isSpliceImportedGRE = distinguishSpliceImports True
+
+isNonSpliceImportedGRE :: GlobalRdrElt -> Bool
+isNonSpliceImportedGRE = distinguishSpliceImports False
+
+distinguishSpliceImports :: Bool -> GlobalRdrElt -> Bool
+distinguishSpliceImports in_splice = any ((in_splice ==) . is_splice . is_decl) . gre_imp
 
 isRecFldGRE :: GlobalRdrElt -> Bool
 isRecFldGRE = isJust . greFieldLabel
@@ -1180,6 +1191,7 @@ shadowName env new_name
         id_spec      = ImpDeclSpec { is_mod = old_mod_name
                                    , is_as = old_mod_name
                                    , is_qual = True
+                                   , is_splice = undefined -- TODO MP
                                    , is_dloc = greDefinitionSrcSpan old_gre }
 
     shadow_is :: ImportSpec -> Maybe ImportSpec
@@ -1221,6 +1233,7 @@ data ImpDeclSpec
                                    -- should be a Maybe UnitId here too.
         is_as       :: ModuleName, -- ^ Import alias, e.g. from @as M@ (or @Muggle@ if there is no @as@ clause)
         is_qual     :: Bool,       -- ^ Was this import qualified?
+        is_splice   :: Bool,       -- ^ Was this a splice import
         is_dloc     :: SrcSpan     -- ^ The location of the entire import declaration
     } deriving (Eq, Data)
 
