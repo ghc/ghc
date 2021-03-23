@@ -730,6 +730,8 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
             text "Type obtained: " <> ppr (termType term))
    return term
     where
+  interp = hscInterp hsc_env
+
   go :: Int -> Type -> Type -> ForeignHValue -> TcM Term
    -- I believe that my_ty should not have any enclosing
    -- foralls, nor any free RuntimeUnk skolems;
@@ -740,18 +742,18 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
   go 0 my_ty _old_ty a = do
     traceTR (text "Gave up reconstructing a term after" <>
                   int max_depth <> text " steps")
-    clos <- trIO $ GHCi.getClosure hsc_env a
+    clos <- trIO $ GHCi.getClosure interp a
     return (Suspension (tipe (info clos)) my_ty a Nothing)
   go !max_depth my_ty old_ty a = do
     let monomorphic = not(isTyVarTy my_ty)
     -- This ^^^ is a convention. The ancestor tests for
     -- monomorphism and passes a type instead of a tv
-    clos <- trIO $ GHCi.getClosure hsc_env a
+    clos <- trIO $ GHCi.getClosure interp a
     case clos of
 -- Thunks we may want to force
       t | isThunk t && force -> do
          traceTR (text "Forcing a " <> text (show (fmap (const ()) t)))
-         evalRslt <- liftIO $ GHCi.seqHValue hsc_env a
+         evalRslt <- liftIO $ GHCi.seqHValue interp hsc_env a
          case evalRslt of                                            -- #2950
            EvalSuccess _ -> go (pred max_depth) my_ty old_ty a
            EvalException ex -> do
@@ -764,7 +766,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
 -- of entering the TSO or BLOCKING_QUEUE (which leads to runtime panic).
       BlackholeClosure{indirectee=ind} -> do
          traceTR (text "Following a BLACKHOLE")
-         ind_clos <- trIO (GHCi.getClosure hsc_env ind)
+         ind_clos <- trIO (GHCi.getClosure interp ind)
          let return_bh_value = return (Suspension BLACKHOLE my_ty a Nothing)
          case ind_clos of
            -- TSO and BLOCKING_QUEUE cases
@@ -995,6 +997,8 @@ cvReconstructType hsc_env max_depth old_ty hval = runTR_maybe hsc_env $ do
    traceTR (text "RTTI completed. Type obtained:" <+> ppr new_ty)
    return new_ty
     where
+  interp = hscInterp hsc_env
+
 --  search :: m Bool -> ([a] -> [a] -> [a]) -> [a] -> m ()
   search _ _ _ 0 = traceTR (text "Failed to reconstruct a type after " <>
                                 int max_depth <> text " steps")
@@ -1009,7 +1013,7 @@ cvReconstructType hsc_env max_depth old_ty hval = runTR_maybe hsc_env $ do
   go :: Type -> ForeignHValue -> TR [(Type, ForeignHValue)]
   go my_ty a = do
     traceTR (text "go" <+> ppr my_ty)
-    clos <- trIO $ GHCi.getClosure hsc_env a
+    clos <- trIO $ GHCi.getClosure interp a
     case clos of
       BlackholeClosure{indirectee=ind} -> go my_ty ind
       IndClosure{indirectee=ind} -> go my_ty ind
