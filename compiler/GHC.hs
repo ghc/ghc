@@ -338,7 +338,7 @@ import GHC.Iface.Load        ( loadSysInterface )
 import GHC.Hs
 import GHC.Builtin.Types.Prim ( alphaTyVars )
 import GHC.Iface.Tidy
-import GHC.Data.Bag        ( listToBag )
+import GHC.Data.Bag        (mapMaybeBag,  listToBag )
 import GHC.Data.StringBuffer
 import GHC.Data.FastString
 import qualified GHC.LanguageExtensions as LangExt
@@ -897,7 +897,7 @@ checkNewInteractiveDynFlags logger dflags0 = do
   -- We currently don't support use of StaticPointers in expressions entered on
   -- the REPL. See #12356.
   if xopt LangExt.StaticPointers dflags0
-  then do liftIO $ printOrThrowDiagnostics logger dflags0 $ listToBag
+  then do liftIO $ printOrThrowDiagnostics logger dflags0 $ listToBag $ catMaybes
             [mkPlainMsgEnvelope dflags0 Session.WarningWithoutFlag interactiveSrcSpan
              $ text "StaticPointers is not supported in GHCi interactive expressions."]
           return $ xopt_unset dflags0 LangExt.StaticPointers
@@ -1773,11 +1773,11 @@ parser str dflags filename =
 
      PFailed pst ->
          let (warns,errs) = getMessages pst in
-         (fmap (mkParserWarn dflags) warns, Left (fmap mkParserErr errs))
+         (mapMaybeBag (mkParserWarn dflags) warns, Left (fmap mkParserErr errs))
 
      POk pst rdr_module ->
          let (warns,_) = getMessages pst in
-         (fmap (mkParserWarn dflags) warns, Right rdr_module)
+         (mapMaybeBag (mkParserWarn dflags) warns, Right rdr_module)
 
 -- -----------------------------------------------------------------------------
 -- | Find the package environment (if one exists)

@@ -809,13 +809,15 @@ tryWarnMissingSpecs dflags callers fn calls_for_fn
   | otherwise                             = return ()
   where
     allCallersInlined = all (isAnyInlinePragma . idInlinePragma) callers
-    doWarn reason =
-      msg (mkMCDiagnostic dflags reason)
-        (vcat [ hang (text ("Could not specialise imported function") <+> quotes (ppr fn))
-                2 (vcat [ text "when specialising" <+> quotes (ppr caller)
-                        | caller <- callers])
-          , whenPprDebug (text "calls:" <+> vcat (map (pprCallInfo fn) calls_for_fn))
-          , text "Probable fix: add INLINABLE pragma on" <+> quotes (ppr fn) ])
+    doWarn reason
+      | Just diag <- mkMCDiagnostic dflags reason
+      = msg diag
+          (vcat [ hang (text ("Could not specialise imported function") <+> quotes (ppr fn))
+                  2 (vcat [ text "when specialising" <+> quotes (ppr caller)
+                          | caller <- callers])
+            , whenPprDebug (text "calls:" <+> vcat (map (pprCallInfo fn) calls_for_fn))
+            , text "Probable fix: add INLINABLE pragma on" <+> quotes (ppr fn) ])
+      | otherwise = pure ()
 
 
 
