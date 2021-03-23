@@ -146,9 +146,9 @@ numberDataCon dc ts = do
   if not (gopt Opt_DistinctConstructorTables dflags) then return NoNumber else do
     env <- lift get
     mcc <- asks rSpan
-    let mbest_span = (\(SpanWithLabel rss l) -> (rss, l)) <$> (selectTick ts <|> mcc)
-    let dcMap' = alterUniqMap (maybe (Just ((0, mbest_span) :| [] ))
-                        (\xs@((k, _):|_) -> Just ((k + 1, mbest_span) `NE.cons` xs))) (provDC env) dc
+    let !mbest_span = (\(SpanWithLabel rss l) -> (rss, l)) <$> (selectTick ts <|> mcc)
+    let !dcMap' = alterUniqMap (maybe (Just ((0, mbest_span) :| [] ))
+                        (\xs@((k, _):|_) -> Just $! ((k + 1, mbest_span) `NE.cons` xs))) (provDC env) dc
     lift $ put (env { provDC = dcMap' })
     let r = lookupUniqMap dcMap' dc
     return $ case r of
