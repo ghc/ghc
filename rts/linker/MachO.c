@@ -422,67 +422,6 @@ isGotLoad(struct relocation_info * ri) {
     ||  ri->r_type == ARM64_RELOC_GOT_LOAD_PAGEOFF12;
 }
 
-/* This is very similar to makeSymbolExtra
- * However, as we load sections into different
- * pages, that may be further apart than
- * branching allows, we'll use some extra
- * space at the end of each section allocated
- * for stubs.
- */
-bool
-findStub(Section * section, void ** addr) {
-
-    for(Stub * s = section->info->stubs; s != NULL; s = s->next) {
-        if(s->target == *addr) {
-            *addr = s->addr;
-            return EXIT_SUCCESS;
-        }
-    }
-    return EXIT_FAILURE;
-}
-
-bool
-makeStub(Section * section, void ** addr) {
-
-    Stub * s = stgCallocBytes(1, sizeof(Stub), "makeStub(Stub)");
-    s->target = *addr;
-    s->addr = (uint8_t*)section->info->stub_offset
-            + ((8+8)*section->info->nstubs) + 8;
-    s->next = NULL;
-
-     /* target address */
-    *(uint64_t*)((uint8_t*)s->addr - 8) = (uint64_t)s->target;
-    /* ldr x16, - (8 bytes) */
-    *(uint32_t*)(s->addr)               = (uint32_t)0x58ffffd0;
-    /* br x16 */
-    *(uint32_t*)((uint8_t*)s->addr + 4) = (uint32_t)0xd61f0200;
-
-    if(section->info->nstubs == 0) {
-        /* no stubs yet, let's just create this one */
-        section->info->stubs = s;
-    } else {
-        Stub * tail = section->info->stubs;
-        while(tail->next != NULL) tail = tail->next;
-        tail->next = s;
-    }
-    section->info->nstubs += 1;
-    *addr = s->addr;
-    return EXIT_SUCCESS;
-}
-void
-freeStubs(Section * section) {
-    if(section->info->nstubs == 0)
-        return;
-    Stub * last = section->info->stubs;
-    while(last->next != NULL) {
-        Stub * t = last;
-        last = last->next;
-        stgFree(t);
-    }
-    section->info->stubs = NULL;
-    section->info->nstubs = 0;
-}
-
 /*
  * Check if we need a global offset table slot for a
  * given symbol
