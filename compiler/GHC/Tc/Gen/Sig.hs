@@ -180,7 +180,7 @@ tcTySigs hs_sigs
 
 tcTySig :: LSig GhcRn -> TcM [TcSigInfo]
 tcTySig (L _ (IdSig _ id))
-  = do { let ctxt = FunSigCtxt (idName id) False
+  = do { let ctxt = FunSigCtxt (idName id) Nothing
                     -- False: do not report redundant constraints
                     -- The user has no control over the signature!
              sig = completeSigFromId ctxt id
@@ -238,13 +238,30 @@ tcUserTypeSig loc hs_sig_ty mb_name
                Just n  -> n
                Nothing -> mkUnboundName (mkVarOcc "<expression>")
     ctxt_F = case mb_name of
-               Just n  -> FunSigCtxt n False
+               Just n  -> FunSigCtxt n Nothing
                Nothing -> ExprSigCtxt
     ctxt_T = case mb_name of
-               Just n  -> FunSigCtxt n True
+               Just n  -> FunSigCtxt n (lhsSigWcTypeContextSpan hs_sig_ty)
                Nothing -> ExprSigCtxt
 
+lhsSigWcTypeContextSpan :: LHsSigWcType GhcRn -> Maybe SrcSpan
+-- | Find the location of the top-level context of a HsType.  For example:
+--
+-- @
+--   forall a b. (Eq a, Ord b) => blah
+--               ^^^^^^^^^^^^^
+-- @
+-- If there is none, return Nothing
+lhsSigWcTypeContextSpan (HsWC { hswc_body = sigType }) = lhsSigTypeContextSpan sigType
 
+lhsSigTypeContextSpan :: LHsSigType GhcRn -> Maybe SrcSpan
+lhsSigTypeContextSpan (L _ HsSig { sig_body = sig_ty }) = go sig_ty
+  where
+    go :: LHsType GhcRn -> Maybe SrcSpan
+    go (L _ (HsQualTy { hst_ctxt = Just (L span _) })) = Just $ locA span -- Found it!
+    go (L _ (HsForAllTy { hst_body = hs_ty })) = go hs_ty  -- Look under foralls
+    go (L _ (HsParTy _ hs_ty)) = go hs_ty  -- Look under parens
+    go _ = Nothing  -- Did not find it
 
 completeSigFromId :: UserTypeCtxt -> Id -> TcIdSigInfo
 -- Used for instance methods and record selectors
@@ -757,11 +774,29 @@ tcSpecPrag poly_id prag@(SpecSig _ fun_name hs_tys inl)
     spec_ctxt prag = hang (text "In the pragma:") 2 (ppr prag)
 
     tc_one hs_ty
-      = do { spec_ty <- tcHsSigType   (FunSigCtxt name False) hs_ty
-           ; wrap    <- tcSpecWrapper (FunSigCtxt name True)  poly_ty spec_ty
+      = do { spec_ty <- tcHsSigType   (FunSigCtxt name Nothing) hs_ty
+           ; wrap    <- tcSpecWrapper (FunSigCtxt name (lhsSigContextSpan prag)) poly_ty spec_ty
            ; return (SpecPrag poly_id wrap inl) }
 
 tcSpecPrag _ prag = pprPanic "tcSpecPrag" (ppr prag)
+
+lhsSigContextSpan :: Sig GhcRn -> Maybe SrcSpan
+-- | Find the location of the top-level context of a Sig.  For example:
+--
+-- @
+--   forall a b. (Eq a, Ord b) => blah
+--               ^^^^^^^^^^^^^
+-- @
+-- If there is none, return Nothing
+lhsSigContextSpan (TypeSig _ _ sigWcType) = lhsSigWcTypeContextSpan sigWcType
+lhsSigContextSpan (PatSynSig _ _ sigType) = lhsSigTypeContextSpan sigType
+lhsSigContextSpan (ClassOpSig _ _  _ sigType) = lhsSigTypeContextSpan sigType
+-- Since SpecSig contains code, should it contain
+lhsSigContextSpan (SpecSig _ _ sigTypes _) =
+  case mapMaybe lhsSigTypeContextSpan sigTypes of
+    [] -> Nothing
+    (x:xs) -> Just $! foldr combineSrcSpans x xs
+lhsSigContextSpan _ = Nothing
 
 --------------
 tcSpecWrapper :: UserTypeCtxt -> TcType -> TcType -> TcM HsWrapper

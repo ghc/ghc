@@ -1,0 +1,8 @@
+
+T19296.hs:3:1: warning: [-Wredundant-constraints]
+    Redundant constraint: Eq a
+    In the type signature for:
+           f :: forall a. Eq a => a -> ()
+  |
+3 | f :: Eq a => a -> ()
+  |      ^^^^
