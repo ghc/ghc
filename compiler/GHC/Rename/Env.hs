@@ -1049,8 +1049,7 @@ lookup_demoted rdr_name
                     ; case mb_demoted_name of
                         Nothing -> unboundNameX WL_Any rdr_name star_info
                         Just demoted_name ->
-                          do { whenWOptM Opt_WarnUntickedPromotedConstructors $
-                               addDiagnostic
+                          do { addDiagnostic
                                  (WarningWithFlag Opt_WarnUntickedPromotedConstructors)
                                  (untickedPromConstrWarn demoted_name)
                              ; return demoted_name } }
