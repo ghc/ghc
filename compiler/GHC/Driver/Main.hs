@@ -43,6 +43,7 @@ module GHC.Driver.Main
     , Messager, batchMsg
     , HscStatus (..)
     , hscIncrementalCompile
+    , postTcFrontend
     , hscMaybeWriteIface
     , hscCompileCmmFile
 
@@ -831,7 +832,7 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
                 -- to retypecheck but the resulting interface is exactly
                 -- the same.)
                 Left (FrontendTypecheck tc_result) -> return tc_result
-            status <- finish mod_summary tc_result mb_old_hash
+            status <- postTcFrontend mod_summary tc_result mb_old_hash
             return (status, hsc_env)
 
 -- Runs the post-typechecking frontend (desugar and simplify). We want to
@@ -846,11 +847,11 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
 -- HscRecomp in turn will carry the information required to compute a interface
 -- when passed the result of the code generator. So all this can and is done at
 -- the call site of the backend code gen if it is run.
-finish :: ModSummary
+postTcFrontend :: ModSummary
        -> TcGblEnv
        -> Maybe Fingerprint
        -> Hsc HscStatus
-finish summary tc_result mb_old_hash = do
+postTcFrontend summary tc_result mb_old_hash = do
   hsc_env <- getHscEnv
   dflags <- getDynFlags
   logger <- getLogger
