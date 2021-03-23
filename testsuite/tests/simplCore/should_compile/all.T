@@ -347,3 +347,6 @@ test('T18995', [ grep_errmsg(r'print') ], compile, ['-O -ddump-simpl -dsuppress-
 test('T19168', normal, compile, [''])
 test('T19246', only_ways(['optasm']), multimod_compile, ['T19246', '-v0 -ddump-rules'])
 test('T19360', only_ways(['optasm']), compile, [''])
+
+# If the test goes wrong we'll get more case expressions in the output
+test('T19581', [ grep_errmsg(r'case') ], compile, ['-O -ddump-simpl -dsuppress-uniques'])
