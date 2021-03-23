@@ -197,7 +197,7 @@ halfWordMask platform = case platformWordSize platform of
 
 -- cIntRep is the Width for a C-language 'int'
 cIntWidth :: Platform -> Width
-cIntWidth platform = case pc_CINT_SIZE (platformConstants platform) of
+cIntWidth platform = case pc_HS_CINT_SIZE (platformConstants platform) of
                    4 -> W32
                    8 -> W64
                    s -> panic ("cIntWidth: Unknown cINT_SIZE: " ++ show s)

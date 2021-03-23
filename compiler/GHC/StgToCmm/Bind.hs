@@ -284,7 +284,7 @@ mkRhsClosure    profile bndr _cc
 
   , let offset_into_int = bytesToWordsRoundUp (profilePlatform profile) the_offset
                           - fixedHdrSizeW profile
-  , offset_into_int <= pc_MAX_SPEC_SELECTEE_SIZE (profileConstants profile) -- Offset is small enough
+  , offset_into_int <= pc_HS_MAX_SPEC_SELECTEE_SIZE (profileConstants profile) -- Offset is small enough
   = -- NOT TRUE: ASSERT(is_single_constructor)
     -- The simplifier may have statically determined that the single alternative
     -- is the only possible case and eliminated the others, even if there are
@@ -312,7 +312,7 @@ mkRhsClosure    profile bndr _cc
     -- Missed opportunity:   (f x x) is not detected
   , all (isGcPtrRep . idPrimRep . fromNonVoid) fvs
   , isUpdatable upd_flag
-  , n_fvs <= pc_MAX_SPEC_AP_SIZE (profileConstants profile)
+  , n_fvs <= pc_HS_MAX_SPEC_AP_SIZE (profileConstants profile)
   , not (profileIsProfiling profile)
                          -- not when profiling: we don't want to
                          -- lose information about this particular

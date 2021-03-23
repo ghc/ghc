@@ -371,7 +371,7 @@ mkLivenessBits dflags liveness
                      [b] -> b
                      _   -> panic "mkLiveness"
     bitmap_word = toStgWord platform (fromIntegral n_bits)
-              .|. (small_bitmap `shiftL` pc_BITMAP_BITS_SHIFT (platformConstants platform))
+              .|. (small_bitmap `shiftL` pc_HS_BITMAP_BITS_SHIFT (platformConstants platform))
 
     lits = mkWordCLit platform (fromIntegral n_bits)
          : map (mkStgWordCLit platform) bitmap
