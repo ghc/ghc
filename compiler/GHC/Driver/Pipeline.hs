@@ -195,9 +195,7 @@ compileOne' m_tc_result mHscMessage
             source_modified0
  = do
 
-   let logger = hsc_logger hsc_env0
-   let tmpfs  = hsc_tmpfs hsc_env0
-   debugTraceMsg logger dflags1 2 (text "compile: input file" <+> text input_fnpp)
+   debugTraceMsg logger dflags 2 (text "compile: input file" <+> text input_fnpp)
 
    -- Run the pipeline up to codeGen (so everything up to, but not including, STG)
    (status, plugin_hsc_env) <- hscIncrementalCompile
@@ -207,13 +205,12 @@ compileOne' m_tc_result mHscMessage
    -- Use an HscEnv updated with the plugin info
    let hsc_env' = plugin_hsc_env
 
-   let flags = hsc_dflags hsc_env0
-     in do unless (gopt Opt_KeepHiFiles flags) $
-               addFilesToClean tmpfs TFL_CurrentModule $
-                   [ml_hi_file $ ms_location summary]
-           unless (gopt Opt_KeepOFiles flags) $
-               addFilesToClean tmpfs TFL_GhcSession $
-                   [ml_obj_file $ ms_location summary]
+   unless (gopt Opt_KeepHiFiles dflags) $
+        addFilesToClean tmpfs TFL_CurrentModule $
+            [ml_hi_file $ ms_location summary]
+   unless (gopt Opt_KeepOFiles dflags) $
+        addFilesToClean tmpfs TFL_GhcSession $
+            [ml_obj_file $ ms_location summary]
 
    case (status, bcknd) of
         (HscUpToDate iface hmi_details, _) ->
@@ -356,9 +353,12 @@ compileOne' m_tc_result mHscMessage
          | loadAsByteCode
          = (Interpreter, dflags2 { backend = Interpreter })
          | otherwise
-         = (backend dflags, dflags2)
+         = (backend dflags2, dflags2)
        dflags  = dflags3 { includePaths = addQuoteInclude old_paths [current_dir] }
        hsc_env = hsc_env0 {hsc_dflags = dflags}
+
+       logger = hsc_logger hsc_env
+       tmpfs  = hsc_tmpfs hsc_env
 
        -- -fforce-recomp should also work with --make
        force_recomp = gopt Opt_ForceRecomp dflags
