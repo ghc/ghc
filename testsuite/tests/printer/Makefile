@@ -547,3 +547,13 @@ PprRecordDotSyntax4:
 PprRecordDotSyntaxA:
 	$(CHECK_PPR)   $(LIBDIR) PprRecordDotSyntaxA.hs
 	$(CHECK_EXACT) $(LIBDIR) PprRecordDotSyntaxA.hs
+
+.PHONY: CommentsTest
+CommentsTest:
+	$(CHECK_PPR)   $(LIBDIR) CommentsTest.hs
+	$(CHECK_EXACT) $(LIBDIR) CommentsTest.hs
+
+.PHONY: InTreeAnnotations1
+InTreeAnnotations1:
+	$(CHECK_PPR)   $(LIBDIR) InTreeAnnotations1.hs
+	$(CHECK_EXACT) $(LIBDIR) InTreeAnnotations1.hs
