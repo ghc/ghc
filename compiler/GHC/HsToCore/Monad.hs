@@ -109,7 +109,6 @@ import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
-import Control.Monad ( when )
 import Data.IORef
 
 {-
@@ -463,10 +462,7 @@ diagnosticDs reason warn
        ; loc <- getSrcSpanDs
        ; dflags <- getDynFlags
        ; let msg = mkShortMsgEnvelope dflags reason loc (ds_unqual env) warn
-       ; when (should_report msg) $ updMutVar (ds_msgs env) (\ msgs -> msg `addMessage` msgs) }
-  where
-    should_report :: MsgEnvelope DiagnosticMessage -> Bool
-    should_report = (/=) SevIgnore . errMsgSeverity
+       ; updMutVar (ds_msgs env) (\ msgs -> msg `addMessage` msgs) }
 
 -- | Emit a warning only if the correct WarningWithoutFlag is set in the DynFlags
 warnIfSetDs :: WarningFlag -> SDoc -> DsM ()

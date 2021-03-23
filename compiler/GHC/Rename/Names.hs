@@ -393,7 +393,7 @@ rnImportDecl this_mod
         imports = calculateAvails home_unit iface mod_safe' want_boot (ImportedByUser imv)
 
     -- Complain if we import a deprecated module
-    case (mi_warns iface) of
+    case mi_warns iface of
        WarnAll txt -> addDiagnostic (WarningWithFlag Opt_WarnWarningsDeprecations)
                                     (moduleWarn imp_mod_name txt)
        _           -> return ()
