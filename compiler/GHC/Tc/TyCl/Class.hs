@@ -282,8 +282,8 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
                              -- NB: the binding is always a FunBind
 
              warn_redundant = case dm_spec of
-                                GenericDM {} -> True
-                                VanillaDM    -> False
+                                GenericDM {} -> lhsSigTypeContextSpan hs_ty
+                                VanillaDM    -> Nothing
                 -- For GenericDM, warn if the user specifies a signature
                 -- with redundant constraints; but not for VanillaDM, where
                 -- the default method may well be 'error' or something
@@ -321,6 +321,22 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
     sel_name = idName sel_id
     no_prag_fn = emptyPragEnv   -- No pragmas for local_meth_id;
                                 -- they are all for meth_id
+
+lhsSigTypeContextSpan :: LHsSigType GhcRn -> Maybe SrcSpan
+-- | Find the location of the top-level context of a HsType.  For example:
+--
+-- @
+--   forall a b. (Eq a, Ord b) => blah
+--               ^^^^^^^^^^^^^
+-- @
+-- If there is none, return Nothing
+lhsSigTypeContextSpan (L _ (HsSig { sig_body = hs_ty })) = go hs_ty
+  where
+    go :: LHsType GhcRn -> Maybe SrcSpan
+    go (L _ (HsQualTy { hst_ctxt = Just (L span _) })) = Just $ locA span -- Found it!
+    go (L _ (HsForAllTy { hst_body = hs_ty })) = go hs_ty  -- Look under foralls
+    go (L _ (HsParTy _ hs_ty)) = go hs_ty  -- Look under parens
+    go _ = Nothing  -- Did not find it
 
 ---------------
 tcClassMinimalDef :: Name -> [LSig GhcRn] -> [TcMethInfo] -> TcM ClassMinimalDef

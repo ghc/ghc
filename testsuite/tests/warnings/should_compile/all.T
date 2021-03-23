@@ -38,3 +38,6 @@ test('UnusedPackages', normal, multimod_compile,
     ['UnusedPackages.hs', '-package=bytestring -package=base -package=process -package=ghc -Wunused-packages'])
 
 test('T18402', normal, compile, [''])
+
+# When warning about redundant constraints, test only Function context is highlighted by caret diagnostics
+test('T19296', normal, compile, ['-fdiagnostics-show-caret -Wredundant-constraints'])
