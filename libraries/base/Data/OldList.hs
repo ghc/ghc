@@ -722,6 +722,12 @@ minimumBy cmp xs        =  foldl1 minBy xs
 -- 3
 -- >>> genericLength [1, 2, 3] :: Float
 -- 3.0
+--
+-- The overflow behaviour depends on the @(+)@ implementation in the selected
+-- 'Num' instance:
+--
+-- >>> genericLength [1..200] :: Int8
+-- -56
 genericLength           :: (Num i) => [a] -> i
 {-# NOINLINE [1] genericLength #-}
 genericLength []        =  0
