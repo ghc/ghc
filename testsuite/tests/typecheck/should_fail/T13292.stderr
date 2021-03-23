@@ -19,5 +19,11 @@ T13292.hs:6:1: warning: [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match type ‘GHC.Types.Any’ with ‘IO’
       Expected: IO ()
         Actual: GHC.Types.Any ()
+    • When checking the type of the IO action ‘main’
+
+T13292.hs:6:1: warning: [-Wdeferred-type-errors (in -Wdefault)]
+    • Couldn't match type ‘GHC.Types.Any’ with ‘IO’
+      Expected: IO ()
+        Actual: GHC.Types.Any ()
     • In the expression: main
       When checking the type of the IO action ‘main’
