@@ -42,6 +42,9 @@
   *) add still more sanity checks.
 */
 #if defined(aarch64_HOST_ARCH)
+#  define  NEED_PLT
+#  include "macho/plt.h"
+
 /* aarch64 linker by moritz angermann <moritz@lichtzwerge.de> */
 
 /* often times we need to extend some value of certain number of bits
@@ -49,7 +52,7 @@
  */
 int64_t signExtend(uint64_t val, uint8_t bits);
 /* Helper functions to check some instruction properties */
-bool isVectorPp(uint32_t *p);
+bool isVectorOp(uint32_t *p);
 bool isLoadStore(uint32_t *p);
 
 /* aarch64 relocations may contain an addend already in the position
@@ -61,13 +64,6 @@ int64_t decodeAddend(ObjectCode * oc, Section * section,
                      MachORelocationInfo * ri);
 void encodeAddend(ObjectCode * oc, Section * section,
                   MachORelocationInfo * ri, int64_t addend);
-
-/* finding and making stubs. We don't need to care about the symbol they
- * represent. As long as two stubs point to the same address, they are identical
- */
-bool findStub(Section * section, void ** addr);
-bool makeStub(Section * section, void ** addr);
-void freeStubs(Section * section);
 
 /* Global Offset Table logic */
 bool isGotLoad(MachORelocationInfo * ri);
@@ -154,8 +150,10 @@ ocDeinit_MachO(ObjectCode * oc) {
         }
 #if defined(aarch64_HOST_ARCH)
         freeGot(oc);
-        for(int i = 0; i < oc->n_sections; i++) {
-            freeStubs(&oc->sections[i]);
+        if(oc->sections != NULL) {
+            for(int i = 0; i < oc->n_sections; i++) {
+                freeStubs(&oc->sections[i]);
+            }
         }
 #endif
         stgFree(oc->info);
@@ -271,12 +269,12 @@ signExtend(uint64_t val, uint8_t bits) {
     return (int64_t)(val << (64-bits)) >> (64-bits);
 }
 
-bool
+static bool
 isVectorOp(uint32_t *p) {
     return (*p & 0x04800000) == 0x04800000;
 }
 
-bool
+static bool
 isLoadStore(uint32_t *p) {
     return (*p & 0x3B000000) == 0x39000000;
 }
@@ -344,7 +342,7 @@ decodeAddend(ObjectCode * oc, Section * section, MachORelocationInfo * ri) {
 inline bool
 fitsBits(size_t bits, int64_t value) {
     if(bits == 64) return true;
-    if(bits > 64) barf("fits_bits with %d bits and an 64bit integer!", bits);
+    if(bits > 64) barf("fits_bits with %zu bits and an 64bit integer!", bits);
     return  0 == (value >> bits)   // All bits off: 0
         || -1 == (value >> bits);  // All bits on: -1
 }
@@ -614,9 +612,9 @@ relocateSectionAarch64(ObjectCode * oc, Section * section)
                 if((value - pc + addend) >> (2 + 26)) {
                     /* we need a stub */
                     /* check if we already have that stub */
-                    if(findStub(section, (void**)&value)) {
+                    if(findStub(section, (void**)&value, 0)) {
                         /* did not find it. Crete a new stub. */
-                        if(makeStub(section, (void**)&value)) {
+                        if(makeStub(section, (void**)&value, 0)) {
                             barf("could not find or make stub");
                         }
                     }
@@ -1227,8 +1225,14 @@ ocGetNames_MachO(ObjectCode* oc)
 
             size_t alignment = 1 << section->align;
             SectionKind kind = getSectionKind_MachO(section);
+            SectionAlloc alloc = SECTION_NOMEM;
+            void *start = NULL, *mapped_start = NULL;
+            StgWord mapped_size = 0, mapped_offset = 0;
+            StgWord size = section->size;
 
             void *secMem = (void *)roundUpToAlign((size_t)curMem, alignment);
+
+            start = secMem;
 
             IF_DEBUG(linker,
                      debugBelch("ocGetNames_MachO: loading section %d in segment %d "
@@ -1242,28 +1246,56 @@ ocGetNames_MachO(ObjectCode* oc)
             case S_GB_ZEROFILL:
                 IF_DEBUG(linker, debugBelch("ocGetNames_MachO: memset to 0 a ZEROFILL section\n"));
                 memset(secMem, 0, section->size);
+                addSection(&secArray[sec_idx], kind, alloc, start, size,
+                            mapped_offset, mapped_start, mapped_size);
                 break;
             default:
                 IF_DEBUG(linker,
                          debugBelch("ocGetNames_MachO: copying from %p to %p"
                                     " a block of %" PRIu64 " bytes\n",
                                     (void *) (oc->image + section->offset), secMem, section->size));
+#if defined(NEED_PLT)
+                unsigned nstubs = numberOfStubsForSection(oc, sec_idx);
+                unsigned stub_space = STUB_SIZE * nstubs;
 
+                void * mem = mmapForLinker(section->size+stub_space, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0);
+
+                if( mem == MAP_FAILED ) {
+                    sysErrorBelch("failed to mmap allocated memory to load section %d. "
+                                  "errno = %d", sec_idx, errno);
+                }
+                /* copy only the image part over; we don't want to copy data
+                * into the stub part.
+                */
+                memcpy( mem, oc->image + section->offset, size );
+
+                alloc = SECTION_MMAP;
+                mapped_offset = 0;
+                mapped_size = roundUpToPage(size+stub_space);
+                start = mem;
+                mapped_start = mem;
+#else
                 memcpy(secMem, oc->image + section->offset, section->size);
+#endif
+                addSection(&secArray[sec_idx], kind, alloc, start, size,
+                            mapped_offset, mapped_start, mapped_size);
+            /* SECTION_NOMEM since memory is already allocated in segments */
+
+#if defined(NEED_PLT)
+                secArray[sec_idx].info->nstubs = 0;
+                secArray[sec_idx].info->stub_offset = (uint8_t*)mem + size;
+                secArray[sec_idx].info->stub_size = stub_space;
+                secArray[sec_idx].info->stubs = NULL;
+#else
+                secArray[sec_idx].info->nstubs = 0;
+                secArray[sec_idx].info->stub_offset = NULL;
+                secArray[sec_idx].info->stub_size = 0;
+                secArray[sec_idx].info->stubs = NULL;
+#endif
+                addProddableBlock(oc, start, section->size);
             }
 
-            /* SECTION_NOMEM since memory is already allocated in segments */
-            addSection(&secArray[sec_idx], kind, SECTION_NOMEM,
-                       secMem, section->size,
-                       0, 0, 0);
-            addProddableBlock(oc, secMem, section->size);
-
             curMem = (char*) secMem + section->size;
-
-            secArray[sec_idx].info->nstubs = 0;
-            secArray[sec_idx].info->stub_offset = NULL;
-            secArray[sec_idx].info->stub_size = 0;
-            secArray[sec_idx].info->stubs = NULL;
 
             secArray[sec_idx].info->macho_section = section;
             secArray[sec_idx].info->relocation_info
@@ -1447,6 +1479,26 @@ ocMprotect_MachO( ObjectCode *oc )
             mmapForLinkerMarkExecutable(segment->start, segment->size);
         }
     }
+
+    // Also mark mmaped, sections executable. Those are not part of the
+    // segments anymore and have been mapped separately.
+    for(int i=0; i < oc->n_sections; i++) {
+        Section *section = &oc->sections[i];
+        if(section->size == 0) continue;
+        if(section->alloc != SECTION_MMAP) continue;
+        // N.B. m32 handles protection of its allocations during
+        // flushing.
+        if(section->alloc == SECTION_M32) continue;
+        switch (section->kind) {
+        case SECTIONKIND_CODE_OR_RODATA: {
+            mmapForLinkerMarkExecutable(section->mapped_start, section->mapped_size);
+            break;
+        }
+        default:
+            break;
+        }
+    }
+
     return true;
 }
 
@@ -1505,8 +1557,10 @@ ocResolve_MachO(ObjectCode* oc)
                  */
                 if(NULL == symbol->addr) {
                     symbol->addr = lookupDependentSymbol((char*)symbol->name, oc);
-                    if(NULL == symbol->addr)
-                        barf("Failed to lookup symbol: %s", symbol->name);
+                    if(NULL == symbol->addr) {
+                        errorBelch("Failed to lookup symbol: %s", symbol->name);
+                        return 0;
+                    }
                 } else {
                     // we already have the address.
                 }
@@ -1515,10 +1569,12 @@ ocResolve_MachO(ObjectCode* oc)
                * the address as well already
                */
             if(NULL == symbol->addr) {
-                barf("Something went wrong!");
+                errorBelch("Symbol %s has no address!\n", (char*)symbol->name);
+                return 0;
             }
             if(NULL == symbol->got_addr) {
-                barf("Not good either!");
+                errorBelch("Symbol %s has no Global Offset Table address!\n", (char*)symbol->name);
+                return 0;
             }
             *(uint64_t*)symbol->got_addr = (uint64_t)symbol->addr;
         }
