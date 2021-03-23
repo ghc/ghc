@@ -235,14 +235,20 @@ data MessageClass
 --   o The message has a file\/line\/column heading,
 --     plus "warning:" or "error:",
 --     added by mkLocMessage
+--   o With 'SevIgnore' the message is suppressed
 --   o Output is intended for end users
 data Severity
-  = SevWarning
+  = SevIgnore
+  -- ^ Ignore this message, for example in
+  -- case of suppression of warnings users
+  -- don't want to see.
+  | SevWarning
   | SevError
   deriving (Eq, Show)
 
 instance Outputable Severity where
   ppr = \case
+    SevIgnore  -> text "SevIgnore"
     SevWarning -> text "SevWarning"
     SevError   -> text "SevError"
 

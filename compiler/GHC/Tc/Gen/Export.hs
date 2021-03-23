@@ -236,9 +236,8 @@ exports_from_avail Nothing rdr_env _imports _this_mod
    -- so that's how we handle it, except we also export the data family
    -- when a data instance is exported.
   = do {
-    ; warnMissingExportList <- woptM Opt_WarnMissingExportList
     ; warnIfFlag Opt_WarnMissingExportList
-        warnMissingExportList
+        True
         (missingModuleExportWarn $ moduleName _this_mod)
     ; let avails =
             map fix_faminst . gresToAvailInfo
@@ -393,12 +392,10 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
              let gres = findChildren kids_env name
                  (non_flds, flds) = classifyGREs gres
              addUsedKids (ieWrappedName rdr) gres
-             warnDodgyExports <- woptM Opt_WarnDodgyExports
              when (null gres) $
                   if isTyConName name
-                  then when warnDodgyExports $
-                           addDiagnostic (WarningWithFlag Opt_WarnDodgyExports)
-                                         (dodgyExportWarn name)
+                  then addDiagnostic (WarningWithFlag Opt_WarnDodgyExports)
+                                     (dodgyExportWarn name)
                   else -- This occurs when you export T(..), but
                        -- only import T abstractly, or T is a synonym.
                        addErr (exportItemErr ie)

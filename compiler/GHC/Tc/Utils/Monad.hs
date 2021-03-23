@@ -1068,10 +1068,14 @@ reportDiagnostics = mapM_ reportDiagnostic
 
 reportDiagnostic :: MsgEnvelope DiagnosticMessage -> TcRn ()
 reportDiagnostic msg
-  = do { traceTc "Adding diagnostic:" (pprLocMsgEnvelope msg) ;
-         errs_var <- getErrsVar ;
-         msgs     <- readTcRef errs_var ;
-         writeTcRef errs_var (msg `addMessage` msgs) }
+  = do { unless (notRelevant msg) $ do
+           traceTc "Adding diagnostic:" (pprLocMsgEnvelope msg) ;
+           errs_var <- getErrsVar ;
+           msgs     <- readTcRef errs_var ;
+           writeTcRef errs_var (msg `addMessage` msgs) }
+  where
+    notRelevant :: MsgEnvelope DiagnosticMessage -> Bool
+    notRelevant = (==) SevIgnore . errMsgSeverity
 
 -----------------------
 checkNoErrs :: TcM r -> TcM r
@@ -1511,9 +1515,8 @@ failIfTcM True  err = failWithTcM err
 --   and the warning is enabled
 warnIfFlag :: WarningFlag -> Bool -> SDoc -> TcRn ()
 warnIfFlag warn_flag is_bad msg
-  = do { warn_on <- woptM warn_flag
-       ; when (warn_on && is_bad) $
-         addDiagnostic (WarningWithFlag warn_flag) msg }
+  = do { -- No need to check the flag here, it will be done in 'diagReasonSeverity'.
+       ; when is_bad $ addDiagnostic (WarningWithFlag warn_flag) msg }
 
 -- | Display a warning if a condition is met.
 warnIf :: Bool -> SDoc -> TcRn ()
