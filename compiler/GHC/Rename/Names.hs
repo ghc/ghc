@@ -1463,6 +1463,29 @@ reportUnusedNames gbl_env hsc_src
 *                                                                      *
 ********************************************************************* -}
 
+{-
+Note [Missing signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+There are three warning flags in play at the top-level:
+
+  * -Wmissing-signatures
+
+    Warn about any top-level function/value without a type signature. Does *not*
+    include pattern synonyms.
+
+  * -Wmissing-pattern-synonym-signatures
+
+    Warn about any pattern synonym without a type signature.
+
+  * -Wmissing-exported-signatures
+
+    Only warn about exported top-level functions/values without a type
+    signature. This takes precedence over -Wmissing-signatures. When used in
+    combination with -Wmissing-pattern-synonym-signatures, only warn about
+    exported pattern synonyms without a type signature.
+
+-}
+
 -- | Warn the user about top level binders that lack type signatures.
 -- Called /after/ type inference, so that we can report the
 -- inferred type of the function
@@ -1480,42 +1503,47 @@ warnMissingSignatures gbl_env
        ; warn_only_exported <- woptM Opt_WarnMissingExportedSignatures
        ; warn_pat_syns      <- woptM Opt_WarnMissingPatternSynonymSignatures
 
+         -- See Note [Missing signatures]
        ; let add_sig_warns
-               | warn_missing_sigs  = add_warns Opt_WarnMissingSignatures
-               | warn_only_exported = add_warns Opt_WarnMissingExportedSignatures
-               | warn_pat_syns      = add_warns Opt_WarnMissingPatternSynonymSignatures
-               | otherwise          = return ()
+               = when (warn_missing_sigs || warn_pat_syns)
+                      (mapM_ add_pat_syn_warn pat_syns) >>
+                 when (warn_missing_sigs || warn_only_exported)
+                      (mapM_ add_bind_warn binds)
 
-             add_warns flag
-                = when (warn_missing_sigs || warn_only_exported)
-                       (mapM_ add_bind_warn binds) >>
-                  when (warn_missing_sigs || warn_pat_syns)
-                       (mapM_ add_pat_syn_warn pat_syns)
-                where
-                  add_pat_syn_warn p
-                    = add_warn name $
-                      hang (text "Pattern synonym with no type signature:")
-                         2 (text "pattern" <+> pprPrefixName name <+> dcolon <+> pp_ty)
-                    where
-                      name  = patSynName p
-                      pp_ty = pprPatSynType p
+             add_pat_syn_warn p
+               = add_warn name Opt_WarnMissingPatternSynonymSignatures $
+                 hang (text "Pattern synonym with no type signature:")
+                    2 (text "pattern" <+> pprPrefixName name <+> dcolon <+> pp_ty)
+               where
+                 name  = patSynName p
+                 pp_ty = pprPatSynType p
 
-                  add_bind_warn :: Id -> IOEnv (Env TcGblEnv TcLclEnv) ()
-                  add_bind_warn id
-                    = do { env <- tcInitTidyEnv     -- Why not use emptyTidyEnv?
-                         ; let name    = idName id
-                               (_, ty) = tidyOpenType env (idType id)
-                               ty_msg  = pprSigmaType ty
-                         ; add_warn name $
-                           hang (text "Top-level binding with no type signature:")
-                              2 (pprPrefixName name <+> dcolon <+> ty_msg) }
+             add_bind_warn :: Id -> IOEnv (Env TcGblEnv TcLclEnv) ()
+             add_bind_warn id
+               = do { env <- tcInitTidyEnv     -- Why not use emptyTidyEnv?
+                    ; let name    = idName id
+                          (_, ty) = tidyOpenType env (idType id)
+                          ty_msg  = pprSigmaType ty
+                          -- At least one of them will be true,
+                          -- -Wmissing-signatures takes precedence over
+                          -- the other
+                          flag    | warn_missing_sigs
+                                  = Opt_WarnMissingSignatures
+                                  | otherwise
+                                  = Opt_WarnMissingExportedSignatures
+                    ; add_warn name flag $
+                      hang (text "Top-level binding with no type signature:")
+                         2 (pprPrefixName name <+> dcolon <+> ty_msg) }
 
-                  add_warn name msg
-                    = when (name `elemNameSet` sig_ns && export_check name)
-                           (addWarnAt (Reason flag) (getSrcSpan name) msg)
+             add_warn name flag msg
+               = when (not_ghc_generated && export_check name)
+                      (addWarnAt (Reason flag) (getSrcSpan name) msg)
+               where
+                 not_ghc_generated
+                   = name `elemNameSet` sig_ns
 
-                  export_check name
-                    = warn_missing_sigs || not warn_only_exported || name `elemNameSet` exports
+                 export_check name
+                   = warn_missing_sigs || not warn_only_exported || name `elemNameSet` exports
 
        ; add_sig_warns }
 
