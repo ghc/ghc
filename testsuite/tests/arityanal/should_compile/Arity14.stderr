@@ -1,26 +1,26 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 56, types: 87, coercions: 0, joins: 0/3}
+Result size of Tidy Core = {terms: 57, types: 87, coercions: 0, joins: 0/3}
 
 -- RHS size: {terms: 3, types: 3, coercions: 0, joins: 0/0}
 F14.f1 :: forall {t}. t -> t
 [GblId, Arity=1, Str=<1L>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)}]
 F14.f1 = \ (@t) (y :: t) -> y
 
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 F14.f2 :: Integer
-[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
-F14.f2 = 1
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+F14.f2 = GHC.Num.Integer.IS 1#
 
 -- RHS size: {terms: 35, types: 24, coercions: 0, joins: 0/3}
 F14.$wf14 [InlPrag=[2]] :: forall {t}. (t -> t -> Bool) -> Num t => t -> t -> t -> t
-[GblId, Arity=4, Str=<SCS(C1(L))><LP(LCL(C1(L)),A,A,A,A,A,MCM(L))><L><L>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [60 90 0 0] 300 0}]
+[GblId, Arity=4, Str=<SCS(C1(A))><LP(LCL(C1(L)),A,A,A,A,A,MCM(L))><L><L>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [60 90 0 0] 300 0}]
 F14.$wf14
-  = \ (@t) (ww :: t -> t -> Bool) (w :: Num t) (w1 :: t) (w2 :: t) ->
+  = \ (@t) (ww :: t -> t -> Bool) ($dNum :: Num t) (eta :: t) (eta1 :: t) ->
       let {
         lvl :: t
         [LclId]
-        lvl = fromInteger @t w F14.f2 } in
+        lvl = fromInteger @t $dNum F14.f2 } in
       letrec {
         f3 [Occ=LoopBreaker, Dmd=SCS(C1(L))] :: t -> t -> t -> t
         [LclId, Arity=2, Str=<L><L>, Unf=OtherCon []]
@@ -32,19 +32,19 @@ F14.$wf14
                   let {
                     v :: t -> t
                     [LclId]
-                    v = f3 n (+ @t w x lvl) } in
-                  \ (y :: t) -> v (+ @t w x y)
+                    v = f3 n (+ @t $dNum x lvl) } in
+                  \ (y :: t) -> v (+ @t $dNum x y)
               }; } in
-      f3 w1 w2
+      f3 eta eta1
 
 -- RHS size: {terms: 13, types: 34, coercions: 0, joins: 0/0}
 f14 [InlPrag=[2]] :: forall {t}. (Ord t, Num t) => t -> t -> t -> t
 [GblId,
  Arity=4,
- Str=<1!P(A,A,SCS(C1(L)),A,A,A,A,A)><LP(LCL(C1(L)),A,A,A,A,A,L)><L><L>,
+ Str=<1P(A,A,SCS(C1(A)),A,A,A,A,A)><LP(LCL(C1(L)),A,A,A,A,A,L)><L><L>,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=4,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (@t) (w [Occ=Once1!] :: Ord t) (w1 [Occ=Once1] :: Num t) (w2 [Occ=Once1] :: t) (w3 [Occ=Once1] :: t) -> case w of { GHC.Classes.C:Ord _ [Occ=Dead] _ [Occ=Dead] ww2 [Occ=Once1] _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] -> F14.$wf14 @t ww2 w1 w2 w3 }}]
-f14 = \ (@t) (w :: Ord t) (w1 :: Num t) (w2 :: t) (w3 :: t) -> case w of { GHC.Classes.C:Ord ww ww1 ww2 ww3 ww4 ww5 ww6 ww7 -> F14.$wf14 @t ww2 w1 w2 w3 }
+         Tmpl= \ (@t) ($dOrd [Occ=Once1!] :: Ord t) ($dNum [Occ=Once1] :: Num t) (eta [Occ=Once1] :: t) (eta1 [Occ=Once1] :: t) -> case $dOrd of { GHC.Classes.C:Ord _ [Occ=Dead] _ [Occ=Dead] ww2 [Occ=Once1] _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] -> F14.$wf14 @t ww2 $dNum eta eta1 }}]
+f14 = \ (@t) ($dOrd :: Ord t) ($dNum :: Num t) (eta :: t) (eta1 :: t) -> case $dOrd of { GHC.Classes.C:Ord ww ww1 ww2 ww3 ww4 ww5 ww6 ww7 -> F14.$wf14 @t ww2 $dNum eta eta1 }
 
 
 

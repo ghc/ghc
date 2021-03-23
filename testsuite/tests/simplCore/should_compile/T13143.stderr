@@ -68,7 +68,7 @@ Rec {
 -- RHS size: {terms: 28, types: 7, coercions: 0, joins: 0/0}
 T13143.$wg [InlPrag=[2], Occ=LoopBreaker]
   :: Bool -> Bool -> GHC.Prim.Int# -> GHC.Prim.Int#
-[GblId, Arity=3, Str=<1L><1L><L>, Unf=OtherCon []]
+[GblId, Arity=3, Str=<1A><1A><L>, Unf=OtherCon []]
 T13143.$wg
   = \ (ds :: Bool) (ds1 :: Bool) (ww :: GHC.Prim.Int#) ->
       case ds of {
@@ -89,7 +89,7 @@ end Rec }
 g [InlPrag=[2]] :: Bool -> Bool -> Int -> Int
 [GblId,
  Arity=3,
- Str=<1L><1L><1!L>,
+ Str=<1A><1A><1!L>,
  Cpr=1,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,

@@ -19,6 +19,9 @@ test('T1988', normal, compile, [''])
 test('T8467', normal, compile, [''])
 test('T8037', normal, compile, [''])
 test('T8743', [], multimod_compile, ['T8743', '-v0'])
+# We care about the demand annotations and strictness signatures.
+# They must not be suspiciously absent for 'y', 'z', 'g' and 'h'!
+test('DmdAnalRulesUnfoldings', [ grep_errmsg(r'(Str=|Dmd=)') ], compile, ['-ddump-dmdanal -dsuppress-uniques'])
 
 # T10482
 #   The intent here is to check that $wfoo has type

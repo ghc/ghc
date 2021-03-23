@@ -19,9 +19,9 @@ module GHC.Types.Demand (
     Boxity(..),
     Card(C_00, C_01, C_0N, C_10, C_11, C_1N), CardNonAbs, CardNonOnce,
     Demand(AbsDmd, BotDmd, (:*)),
-    SubDemand(Prod, Poly), mkProd, viewProd, unboxSubDemand,
+    SubDemand(Prod, Poly), viewCall, mkProd, viewProd, unboxSubDemand,
     -- ** Algebra
-    absDmd, topDmd, botDmd, seqDmd, topSubDmd,
+    absDmd, topDmd, botDmd, seqDmd, topSubDmd, botSubDmd,
     -- *** Least upper bound
     lubCard, lubDmd, lubSubDmd,
     -- *** Plus
@@ -38,13 +38,14 @@ module GHC.Types.Demand (
     lazyApply1Dmd, lazyApply2Dmd, strictOnceApply1Dmd, strictManyApply1Dmd,
     -- ** Other @Demand@ operations
     oneifyCard, oneifyDmd, strictifyDmd, strictifyDictDmd, mkWorkerDemand,
-    peelCallDmd, peelManyCalls, mkCalledOnceDmd, mkCalledOnceDmds,
+    peelCallDmd, peelManyCalls, modifyCallDmdBodyN, mkCalledOnceDmd, mkCalledOnceDmds,
+    stripBoxitySubDmd,
     -- ** Extracting one-shot information
     argOneShots, argsOneShots, saturatedByOneShots,
 
     -- * Demand environments
     DmdEnv, emptyDmdEnv,
-    keepAliveDmdEnv, reuseEnv,
+    keepAliveDmdEnv, multDmdEnv, reuseBndrs, stripBoxityDmdType,
 
     -- * Divergence
     Divergence(..), topDiv, botDiv, exnDiv, lubDivergence, isDeadEndDiv,
@@ -53,15 +54,15 @@ module GHC.Types.Demand (
     DmdType(..), dmdTypeDepth,
     -- ** Algebra
     nopDmdType, botDmdType,
-    lubDmdType, plusDmdType, multDmdType,
+    lubDmdType, plusDmdType, plusVarDmd, multDmdType,
     -- *** PlusDmdArg
-    PlusDmdArg, mkPlusDmdArg, toPlusDmdArg,
+    PlusDmdArg, mkPlusDmdArg, toPlusDmdArg, plusDmdArg,
     -- ** Other operations
     peelFV, findIdDemand, addDemand, splitDmdTy, deferAfterPreciseException,
     keepAliveDmdType,
 
     -- * Demand signatures
-    DmdSig(..), mkDmdSigForArity, mkClosedDmdSig,
+    DmdSig(DmdSig), mkDmdSigForArity, mkClosedDmdSig,
     splitDmdSig, dmdSigDmdEnv, hasDemandEnvSig,
     nopSig, botSig, isTopSig, isDeadEndSig, appIsDeadEnd,
     -- ** Handling arity adjustments
@@ -86,8 +87,10 @@ import GHC.Types.Var ( Var, Id )
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Unique.FM
+import GHC.Types.Unique.Set
 import GHC.Types.Basic
 import GHC.Data.Maybe   ( orElse )
+import GHC.Data.STuple
 
 import GHC.Core.Type    ( Type )
 import GHC.Core.TyCon   ( isNewTyCon, isClassTyCon )
@@ -887,8 +890,8 @@ isWeakDmd dmd@(n :* _) = not (isStrict n) && is_plus_idem_dmd dmd
     -- is_plus_idem_card n = plusCard n n == n
     is_plus_idem_card = isCardNonOnce
     -- is_plus_idem_dmd dmd = plusDmd dmd dmd == dmd
-    is_plus_idem_dmd AbsDmd    = True
-    is_plus_idem_dmd BotDmd    = True
+    is_plus_idem_dmd AbsDmd    = False -- Unfortunately, in case of foldl' an absent dmd can be become non-weak again... TODO Note
+    is_plus_idem_dmd BotDmd    = False -- Unfortunately, in case of foldl' an absent dmd can be become non-weak again...
     is_plus_idem_dmd (n :* sd) = is_plus_idem_card n && is_plus_idem_sub_dmd sd
     -- is_plus_idem_sub_dmd sd = plusSubDmd sd sd == sd
     is_plus_idem_sub_dmd (Poly _ n)  = assert (isCardNonOnce n) True
@@ -946,7 +949,7 @@ strictifyDictDmd ty (n :* Prod b ds)
     as_non_newtype_dict ty
       | Just (tycon, _arg_tys, _data_con, map scaledThing -> inst_con_arg_tys)
           <- splitDataProductType_maybe ty
-      , not (isNewTyCon tycon)
+      , not (isNewTyCon tycon) -- We might accidentally force a knot here and diverge
       , isClassTyCon tycon
       = Just inst_con_arg_tys
       | otherwise
@@ -970,11 +973,32 @@ peelCallDmd sd = viewCall sd `orElse` (topCard, topSubDmd)
 -- whether it was unsaturated in the form of a 'Card'inality, denoting
 -- how many times the lambda body was entered.
 -- See Note [Demands from unsaturated function calls].
-peelManyCalls :: Int -> SubDemand -> Card
-peelManyCalls 0 _                          = C_11
+peelManyCalls :: Int -> SubDemand -> SPair Card SubDemand
+peelManyCalls 0 sd                         = S2 C_11 sd
 -- See Note [Call demands are relative]
-peelManyCalls n (viewCall -> Just (m, sd)) = m `multCard` peelManyCalls (n-1) sd
-peelManyCalls _ _                          = C_0N
+peelManyCalls n (viewCall -> Just (c1, sd))
+  | S2 c2 body_sd <- peelManyCalls (n-1) sd
+  = S2 (c1 `multCard` c2) body_sd
+peelManyCalls _ _                          = S2 C_0N topSubDmd
+
+-- | Modifies the 'SubDemand' on the body of an n-ary 'Call' sub-demand and
+-- reapplies all n 'Call's afterwards. If there are less than n 'Call's,
+-- it depends on whether the body sub-demand is absent or not:
+-- If it is not absent, then the body sub-demand is replaced by 'topSubDmd'.
+-- If it is absent, then the demand is left untouched.
+-- Examples:
+--
+-- > modifyCallDmdBodyN 2 (const "M") "C1(CL(CS(L)))" == "C1(CL(M))" -- modified
+-- > modifyCallDmdBodyN 2 (const "M") "C1(S)" == "C1(L)" -- replaced
+-- > modifyCallDmdBodyN 2 (const "M") "C1(A)" == "C1(A)" -- untouched
+--
+modifyCallDmdBodyN :: Int -> (SubDemand -> SubDemand) -> SubDemand -> SubDemand
+modifyCallDmdBodyN 0 f sd                         = f sd
+modifyCallDmdBodyN n f sd
+  | Just (c, body_sd) <- viewCall sd
+  = if isAbs c then sd else mkCall c $ modifyCallDmdBodyN (n-1) f body_sd
+  | otherwise
+  = topSubDmd
 
 -- See Note [Demand on the worker] in GHC.Core.Opt.WorkWrap
 mkWorkerDemand :: Int -> Demand
@@ -1018,7 +1042,17 @@ argOneShots (_ :* sd) = go sd -- See Note [Call demands are relative]
 saturatedByOneShots :: Int -> Demand -> Bool
 saturatedByOneShots _ AbsDmd    = True
 saturatedByOneShots _ BotDmd    = True
-saturatedByOneShots n (_ :* sd) = isUsedOnce (peelManyCalls n sd)
+saturatedByOneShots n (_ :* sd) = isUsedOnce $ sFst $ peelManyCalls n sd
+
+stripBoxityDmd :: Demand -> Demand
+stripBoxityDmd AbsDmd = AbsDmd
+stripBoxityDmd BotDmd = BotDmd
+stripBoxityDmd (n :* sd) = n :* stripBoxitySubDmd sd
+
+stripBoxitySubDmd :: SubDemand -> SubDemand
+stripBoxitySubDmd (Poly _ n) = Poly Boxed n
+stripBoxitySubDmd (Prod _ ds) = mkProd Boxed $! map stripBoxityDmd ds
+stripBoxitySubDmd (Call n sd) = mkCall n (stripBoxitySubDmd sd)
 
 {- Note [Strict demands]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1469,15 +1503,20 @@ multDmdEnv C_11 env = env
 multDmdEnv C_00 _   = emptyDmdEnv
 multDmdEnv n    env = mapVarEnv (multDmd n) env
 
-reuseEnv :: DmdEnv -> DmdEnv
-reuseEnv = multDmdEnv C_1N
+-- | Re-uses the given set of bndrs with their demand as given in the 'DmdEnv'.
+-- Ex.: @reuseBndrs [x] [x:->MCM(C1(L)), y:->MP(L)] === [x:->LCL(C1(L)), y:->MP(L)]@.
+-- It's like doing @multDmd C_1N@ on the demands in the set.
+reuseBndrs :: VarSet -> DmdEnv -> DmdEnv
+reuseBndrs bndrs env = adjustManyUFM reuse_bndr env (getUniqSet bndrs)
+  where
+    reuse_bndr dmd = multDmd C_1N dmd
 
 -- | @keepAliveDmdType dt vs@ makes sure that the Ids in @vs@ have
 -- /some/ usage in the returned demand types -- they are not Absent.
 -- See Note [Absence analysis for stable unfoldings and RULES]
 --     in "GHC.Core.Opt.DmdAnal".
-keepAliveDmdEnv :: DmdEnv -> IdSet -> DmdEnv
-keepAliveDmdEnv env vs
+keepAliveDmdEnv :: IdSet -> DmdEnv -> DmdEnv
+keepAliveDmdEnv vs env
   = nonDetStrictFoldVarSet add env vs
   where
     add :: Id -> DmdEnv -> DmdEnv
@@ -1502,7 +1541,7 @@ data DmdType
   { dt_env  :: !DmdEnv     -- ^ Demand on explicitly-mentioned free variables
   , dt_args :: ![Demand]   -- ^ Demand on arguments
   , dt_div  :: !Divergence -- ^ Whether evaluation diverges.
-                          -- See Note [Demand type Divergence]
+                           -- See Note [Demand type Divergence]
   }
 
 -- | See Note [Demand type Equality].
@@ -1536,6 +1575,11 @@ mkPlusDmdArg env = (env, topDiv)
 toPlusDmdArg :: DmdType -> PlusDmdArg
 toPlusDmdArg (DmdType fv _ r) = (fv, r)
 
+-- | `plusDmdType` on two `PlusDmdArg`s, so that we can combine them first
+-- before doing `plusDmdType` with a `DmdType`.
+plusDmdArg :: PlusDmdArg -> PlusDmdArg -> PlusDmdArg
+plusDmdArg (fv, r) arg2 = toPlusDmdArg $ plusDmdType (DmdType fv [] r) arg2
+
 plusDmdType :: DmdType -> PlusDmdArg -> DmdType
 plusDmdType (DmdType fv1 ds1 r1) (fv2, t2)
     -- See Note [Asymmetry of 'plus*']
@@ -1547,6 +1591,16 @@ plusDmdType (DmdType fv1 ds1 r1) (fv2, t2)
   = DmdType (plusVarEnv_CD plusDmd fv1 (defaultFvDmd r1) fv2 (defaultFvDmd t2))
             ds1
             (r1 `plusDivergence` t2)
+
+-- | The same as `plusDmdType` with a unit `DmdType` for the `(Var,Demand)` pair
+plusVarDmd :: DmdType -> Var -> Demand -> DmdType
+plusVarDmd (DmdType fv ds div) var dmd
+  -- In this (quite common, with Absent demand) case we don't need to extend the
+  -- map, but still have to make sure that we `plusDmd` existing entries
+  | defaultFvDmd div == dmd
+  = DmdType (adjustUFM (dmd `plusDmd`) fv var) ds div
+  | otherwise
+  = DmdType (extendVarEnv_C plusDmd fv var dmd) ds div
 
 botDmdType :: DmdType
 botDmdType = DmdType emptyDmdEnv [] botDiv
@@ -1600,11 +1654,14 @@ splitDmdTy ty@DmdType{dt_args=dmd:args} = (dmd, ty{dt_args=args})
 splitDmdTy ty@DmdType{dt_div=div}       = (defaultArgDmd div, ty)
 
 multDmdType :: Card -> DmdType -> DmdType
-multDmdType n (DmdType fv args res_ty)
-  = -- pprTrace "multDmdType" (ppr n $$ ppr fv $$ ppr (multDmdEnv n fv)) $
-    DmdType (multDmdEnv n fv)
-            (map (multDmd n) args)
-            (multDivergence n res_ty)
+multDmdType C_11 ty                    = ty
+multDmdType C_00 _                     = nopDmdType
+multDmdType C_10 _                     = botDmdType -- We may pick any 'DmdType', really
+multDmdType n    (DmdType fv args div) =
+  -- pprTrace "multDmdType" (ppr n $$ ppr fv $$ ppr div $$ ppr (multDmdEnv n fv)) $
+  DmdType (multDmdEnv n fv)
+          (map (multDmd n) args)
+          (multDivergence n div)
 
 peelFV :: DmdType -> Var -> (DmdType, Demand)
 peelFV (DmdType fv ds res) id = -- pprTrace "rfv" (ppr id <+> ppr dmd $$ ppr fv)
@@ -1636,9 +1693,13 @@ deferAfterPreciseException :: DmdType -> DmdType
 deferAfterPreciseException = lubDmdType exnDmdType
 
 -- | See 'keepAliveDmdEnv'.
-keepAliveDmdType :: DmdType -> VarSet -> DmdType
-keepAliveDmdType (DmdType fvs ds res) vars =
-  DmdType (fvs `keepAliveDmdEnv` vars) ds res
+keepAliveDmdType :: VarSet -> DmdType -> DmdType
+keepAliveDmdType vars (DmdType fvs ds res) =
+  DmdType (keepAliveDmdEnv vars fvs) ds res
+
+stripBoxityDmdType :: DmdType -> DmdType
+stripBoxityDmdType (DmdType fvs ds res) =
+  DmdType (mapVarEnv stripBoxityDmd fvs) (map stripBoxityDmd ds) res
 
 {-
 Note [Demand type Divergence]
@@ -1839,11 +1900,12 @@ demand type. See also Note [What are demand signatures?].
 -}
 
 -- | The depth of the wrapped 'DmdType' encodes the arity at which it is safe
--- to unleash. Better construct this through 'mkDmdSigForArity'.
+-- to unleash. Construct this through 'mkDmdSigForArity'.
 -- See Note [Understanding DmdType and DmdSig]
-newtype DmdSig
-  = DmdSig DmdType
-  deriving Eq
+newtype DmdSig = DmdSig DmdType
+
+instance Eq DmdSig where
+  (DmdSig a) == (DmdSig b) = a == b
 
 -- | Turns a 'DmdType' computed for the particular 'Arity' into a 'DmdSig'
 -- unleashable at that arity. See Note [Understanding DmdType and DmdSig].
@@ -1853,7 +1915,8 @@ mkDmdSigForArity arity dmd_ty@(DmdType fvs args div)
   | otherwise                   = DmdSig (etaExpandDmdType arity dmd_ty)
 
 mkClosedDmdSig :: [Demand] -> Divergence -> DmdSig
-mkClosedDmdSig ds res = mkDmdSigForArity (length ds) (DmdType emptyDmdEnv ds res)
+mkClosedDmdSig ds res
+  = mkDmdSigForArity (length ds) (DmdType emptyDmdEnv ds res)
 
 splitDmdSig :: DmdSig -> ([Demand], Divergence)
 splitDmdSig (DmdSig (DmdType _ dmds res)) = (dmds, res)
@@ -1940,7 +2003,7 @@ type DmdTransformer = SubDemand -> DmdType
 -- return how the function evaluates its free variables and arguments.
 dmdTransformSig :: DmdSig -> DmdTransformer
 dmdTransformSig (DmdSig dmd_ty@(DmdType _ arg_ds _)) sd
-  = multDmdType (peelManyCalls (length arg_ds) sd) dmd_ty
+  = multDmdType (sFst $ peelManyCalls (length arg_ds) sd) dmd_ty
     -- see Note [Demands from unsaturated function calls]
     -- and Note [What are demand signatures?]
 
@@ -2151,15 +2214,15 @@ data TypeShape -- See Note [Trimming a demand to a type]
   | TsProd [TypeShape]
   | TsUnk
 
-trimToType :: Demand -> TypeShape -> Demand
+trimToType :: TypeShape -> Demand -> Demand
 -- See Note [Trimming a demand to a type] in GHC.Core.Opt.DmdAnal
-trimToType AbsDmd    _  = AbsDmd
-trimToType BotDmd    _  = BotDmd
-trimToType (n :* sd) ts
+trimToType _  AbsDmd    = AbsDmd
+trimToType _  BotDmd    = BotDmd
+trimToType ts (n :* sd)
   = n :* go sd ts
   where
     go (Prod b ds) (TsProd tss)
-      | equalLength ds tss    = mkProd b (zipWith trimToType ds tss)
+      | equalLength ds tss    = mkProd b (zipWith trimToType tss ds)
     go (Call n sd) (TsFun ts) = mkCall n (go sd ts)
     go sd@Poly{}   _          = sd
     go _           _          = topSubDmd

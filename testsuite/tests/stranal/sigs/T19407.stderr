@@ -5,8 +5,8 @@ T19407.$tc'T:
 T19407.$tcHuge:
 T19407.$tcT:
 T19407.$trModule:
-T19407.f: <SP(1P(1L,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A),ML)>
-T19407.g: <1!P(1L,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A)><MP(A,ML)>
+T19407.f: <SP(1P(1A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A),ML)>
+T19407.g: <1!P(1A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A)><MP(A,ML)>
 T19407.h: <1!P(1L,A)>
 T19407.n: <1!P(A,1!L)>
 
@@ -31,8 +31,8 @@ T19407.$tc'T:
 T19407.$tcHuge:
 T19407.$tcT:
 T19407.$trModule:
-T19407.f: <1P(1P(1L,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A),ML)>
-T19407.g: <1!P(1L,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A)><MP(A,ML)>
+T19407.f: <1P(1P(1A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A),ML)>
+T19407.g: <1!P(1A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A,A)><MP(A,ML)>
 T19407.h: <1!P(1L,A)>
 T19407.n: <1!P(A,1!L)>
 

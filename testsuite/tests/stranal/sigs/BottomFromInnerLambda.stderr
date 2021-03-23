@@ -1,8 +1,8 @@
 
 ==================== Demand signatures ====================
 BottomFromInnerLambda.$trModule:
-BottomFromInnerLambda.expensive: <1!P(SL)>
-BottomFromInnerLambda.f: <1!P(SL)>
+BottomFromInnerLambda.expensive: <1!P(SA)>
+BottomFromInnerLambda.f: <1!P(SA)>
 
 
 
@@ -15,7 +15,7 @@ BottomFromInnerLambda.f:
 
 ==================== Demand signatures ====================
 BottomFromInnerLambda.$trModule:
-BottomFromInnerLambda.expensive: <1!P(1L)>
-BottomFromInnerLambda.f: <1!P(1L)>
+BottomFromInnerLambda.expensive: <1!P(1A)>
+BottomFromInnerLambda.f: <1!P(1A)>
 
 

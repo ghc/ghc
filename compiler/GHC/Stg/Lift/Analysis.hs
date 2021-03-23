@@ -36,6 +36,7 @@ import qualified GHC.StgToCmm.Layout  as StgToCmm.Layout
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Types.Var.Set
+import GHC.Data.STuple
 
 import Data.Maybe ( mapMaybe )
 
@@ -326,7 +327,7 @@ tagSkeletonRhs bndr (StgRhsClosure fvs ccs upd bndrs body)
 rhsCard :: Id -> Card
 rhsCard bndr
   | is_thunk  = oneifyCard n
-  | otherwise = peelManyCalls (idArity bndr) cd
+  | otherwise = sFst $ peelManyCalls (idArity bndr) cd
   where
     is_thunk = idArity bndr == 0
     -- Let's pray idDemandInfo is still OK after unarise...

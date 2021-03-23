@@ -28,7 +28,7 @@ module GHC.Core.FVs (
         varTypeTyCoFVs,
         idUnfoldingVars, idFreeVars, dIdFreeVars,
         bndrRuleAndUnfoldingVarsDSet,
-        bndrRuleAndUnfoldingIds,
+        bndrRuleAndUnfoldingIdsList,
         idFVs,
         idRuleVars, stableUnfoldingVars,
         ruleFreeVars, rulesFreeVars,
@@ -639,8 +639,8 @@ idFVs id = assert (isId id) $
 bndrRuleAndUnfoldingVarsDSet :: Id -> DVarSet
 bndrRuleAndUnfoldingVarsDSet id = fvDVarSet $ bndrRuleAndUnfoldingFVs id
 
-bndrRuleAndUnfoldingIds :: Id -> IdSet
-bndrRuleAndUnfoldingIds id = fvVarSet $ filterFV isId $ bndrRuleAndUnfoldingFVs id
+bndrRuleAndUnfoldingIdsList :: Id -> [Id]
+bndrRuleAndUnfoldingIdsList id = fvVarList $ filterFV isId $ bndrRuleAndUnfoldingFVs id
 
 bndrRuleAndUnfoldingFVs :: Id -> FV
 bndrRuleAndUnfoldingFVs id

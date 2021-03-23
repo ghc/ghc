@@ -24,7 +24,7 @@ import GHC.Core.Ppr     ( pprCoreBindings, pprCoreExpr )
 import GHC.Core.FreshenUniques ( freshenUniques )
 import GHC.Core.Opt.OccurAnal ( occurAnalysePgm, occurAnalyseExpr )
 import GHC.Core.Stats   ( coreBindsSize, coreBindsStats, exprSize )
-import GHC.Core.Utils   ( mkTicks, stripTicksTop, dumpIdInfoOfProgram )
+import GHC.Core.Utils   ( mkTicks, stripTicksTop )
 import GHC.Core.Lint    ( endPass, lintPassResult, dumpPassResult,
                           lintAnnots )
 import GHC.Core.Opt.Simplify       ( simplTopBinds, simplExpr, simplRules )
@@ -44,7 +44,6 @@ import GHC.Core.Opt.CallArity    ( callArityAnalProgram )
 import GHC.Core.Opt.Exitify      ( exitifyProgram )
 import GHC.Core.Opt.WorkWrap     ( wwTopBinds )
 import GHC.Core.Opt.CallerCC     ( addCallerCostCentres )
-import GHC.Core.Seq (seqBinds)
 import GHC.Core.FamInstEnv
 
 import GHC.Utils.Error  ( withTiming )
@@ -64,7 +63,6 @@ import GHC.Runtime.Context
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Basic
-import GHC.Types.Demand ( zapDmdEnvSig )
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Tickish
@@ -508,7 +506,7 @@ doCorePass pass guts = do
                                  updateBinds exitifyProgram
 
     CoreDoDemand              -> {-# SCC "DmdAnal" #-}
-                                 updateBindsM (liftIO . dmdAnal logger dflags fam_envs (mg_rules guts))
+                                 updateBindsM (liftIO . dmdAnalProgramIO logger dflags fam_envs (mg_rules guts))
 
     CoreDoCpr                 -> {-# SCC "CprAnal" #-}
                                  updateBindsM (liftIO . cprAnalProgram logger fam_envs)
@@ -1064,16 +1062,3 @@ transferIdInfo exported_id local_id
 
     zap_info lcl_info = lcl_info `setInlinePragInfo` defaultInlinePragma
                                  `setUnfoldingInfo`  noUnfolding
-
-
-dmdAnal :: Logger -> DynFlags -> FamInstEnvs -> [CoreRule] -> CoreProgram -> IO CoreProgram
-dmdAnal logger dflags fam_envs rules binds = do
-  let !opts = DmdAnalOpts
-               { dmd_strict_dicts = gopt Opt_DictsStrict dflags
-               , dmd_unbox_width  = dmdUnboxWidth dflags
-               }
-      binds_plus_dmds = dmdAnalProgram opts fam_envs rules binds
-  Logger.putDumpFileMaybe logger Opt_D_dump_dmd_signatures "Demand signatures" FormatText $
-    dumpIdInfoOfProgram (ppr . zapDmdEnvSig . dmdSigInfo) binds_plus_dmds
-  -- See Note [Stamp out space leaks in demand analysis] in GHC.Core.Opt.DmdAnal
-  seqBinds binds_plus_dmds `seq` return binds_plus_dmds

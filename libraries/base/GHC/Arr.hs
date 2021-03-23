@@ -27,8 +27,8 @@ module GHC.Arr (
         amap, ixmap,
         eqArray, cmpArray, cmpIntArray,
         newSTArray, boundsSTArray,
-        readSTArray, writeSTArray,
-        freezeSTArray, thawSTArray,
+        readSTArray, writeSTArray, copySTArray,
+        freezeSTArray, shrinkFreezeSTArrayInt, thawSTArray,
         foldlElems, foldlElems', foldl1Elems,
         foldrElems, foldrElems', foldr1Elems,
 
@@ -608,6 +608,12 @@ unsafeWriteSTArray (STArray _ _ _ marr#) (I# i#) e = ST $ \s1# ->
     case writeArray# marr# i# e s1# of
         s2# -> (# s2#, () #)
 
+{-# INLINE copySTArray #-}
+copySTArray :: STArray s i e -> Int -> STArray s i e -> Int -> Int -> ST s ()
+copySTArray (STArray _ _ _ src#) (I# src_offs#) (STArray _ _ _ dst#) (I# dst_offs#) (I# n#) = ST $ \s1# ->
+    case copyMutableArray# src# src_offs# dst# dst_offs# n# s1# of
+        s2# -> (# s2#, () #)
+
 ----------------------------------------------------------------------
 -- Moving between mutable and immutable
 
@@ -622,6 +628,14 @@ freezeSTArray (STArray l u n@(I# n#) marr#) = ST $ \s1# ->
     case copy 0# s2#                    of { s3# ->
     case unsafeFreezeArray# marr'# s3#  of { (# s4#, arr# #) ->
     (# s4#, Array l u n arr# #) }}}
+
+{-# INLINE shrinkFreezeSTArrayInt #-}
+shrinkFreezeSTArrayInt :: STArray s Int e -> (Int, Int) -> ST s (Array Int e)
+shrinkFreezeSTArrayInt (STArray l u _ marr#) (l', u') = ST $ \s1# ->
+    let !(I# offs#)   = index (l, u) l'
+        !n'@(I# len#) = rangeSize (l', u') in
+    case freezeArray# marr# offs# len# s1#   of { (# s2#, arr# #) ->
+    (# s2#, Array l' u' n' arr# #) }
 
 {-# INLINE unsafeFreezeSTArray #-}
 unsafeFreezeSTArray :: STArray s i e -> ST s (Array i e)

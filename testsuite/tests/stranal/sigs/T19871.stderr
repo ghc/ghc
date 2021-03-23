@@ -3,7 +3,7 @@
 T19871.$tc'Huge:
 T19871.$tcHuge:
 T19871.$trModule:
-T19871.absent: <1!P(1L,ML,A,A,A,A,A,A,A,A,A,A)>
+T19871.absent: <1!P(1A,MA,A,A,A,A,A,A,A,A,A,A)>
 T19871.ann: <1P(SL,L,L,L,L,L,L,L,L,L,L,L)>
 T19871.f1: <1!P(1L,A,A,A,A,A,A,A,A,A,A,A)>
 T19871.f10: <1!P(A,A,A,A,A,A,A,A,A,1L,A,A)>
@@ -51,7 +51,7 @@ T19871.update: 1
 T19871.$tc'Huge:
 T19871.$tcHuge:
 T19871.$trModule:
-T19871.absent: <1!P(1L,ML,A,A,A,A,A,A,A,A,A,A)>
+T19871.absent: <1!P(1A,MA,A,A,A,A,A,A,A,A,A,A)>
 T19871.ann: <1P(SL,L,L,L,L,L,L,L,L,L,L,L)>
 T19871.f1: <1!P(1L,A,A,A,A,A,A,A,A,A,A,A)>
 T19871.f10: <1!P(A,A,A,A,A,A,A,A,A,1L,A,A)>

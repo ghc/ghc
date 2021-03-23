@@ -312,6 +312,8 @@ Library
         GHC.Core.Opt.CprAnal
         GHC.Core.Opt.CSE
         GHC.Core.Opt.DmdAnal
+        GHC.Core.Opt.DmdAnal.Framework
+        GHC.Core.Opt.DmdAnal.Denot
         GHC.Core.Opt.Exitify
         GHC.Core.Opt.FloatIn
         GHC.Core.Opt.FloatOut
@@ -382,6 +384,7 @@ Library
         GHC.Data.Stream
         GHC.Data.Strict
         GHC.Data.StringBuffer
+        GHC.Data.STuple
         GHC.Data.TrieMap
         GHC.Data.UnionFind
         GHC.Driver.Backend
@@ -734,6 +737,7 @@ Library
         GHC.Unit.Ppr
         GHC.Unit.State
         GHC.Unit.Types
+        GHC.Utils.ArrayList
         GHC.Utils.Asm
         GHC.Utils.Binary
         GHC.Utils.Binary.Typeable

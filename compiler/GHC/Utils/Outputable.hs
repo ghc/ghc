@@ -110,6 +110,7 @@ import {-# SOURCE #-}   GHC.Types.Name.Occurrence( OccName )
 
 import GHC.Utils.BufHandle (BufHandle)
 import GHC.Data.FastString
+import GHC.Data.STuple
 import qualified GHC.Utils.Ppr as Pretty
 import qualified GHC.Utils.Ppr.Colour as Col
 import GHC.Utils.Ppr       ( Doc, Mode(..) )
@@ -946,6 +947,9 @@ instance Outputable IntSet.IntSet where
 instance (Outputable a, Outputable b) => Outputable (a, b) where
     ppr (x,y) = parens (sep [ppr x <> comma, ppr y])
 
+instance (Outputable a, Outputable b) => Outputable (SPair a b) where
+    ppr = ppr . toPair
+
 instance Outputable a => Outputable (Maybe a) where
     ppr Nothing  = text "Nothing"
     ppr (Just x) = text "Just" <+> ppr x
@@ -961,6 +965,9 @@ instance (Outputable a, Outputable b, Outputable c) => Outputable (a, b, c) wher
                    ppr y <> comma,
                    ppr z ])
 
+instance (Outputable a, Outputable b, Outputable c) => Outputable (STriple a b c) where
+    ppr = ppr . toTriple
+
 instance (Outputable a, Outputable b, Outputable c, Outputable d) =>
          Outputable (a, b, c, d) where
     ppr (a,b,c,d) =
@@ -968,6 +975,9 @@ instance (Outputable a, Outputable b, Outputable c, Outputable d) =>
                    ppr b <> comma,
                    ppr c <> comma,
                    ppr d])
+
+instance (Outputable a, Outputable b, Outputable c, Outputable d) => Outputable (SQuad a b c d) where
+    ppr = ppr . toQuad
 
 instance (Outputable a, Outputable b, Outputable c, Outputable d, Outputable e) =>
          Outputable (a, b, c, d, e) where

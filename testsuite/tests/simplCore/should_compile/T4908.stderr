@@ -42,7 +42,7 @@ T4908.$trModule
 Rec {
 -- RHS size: {terms: 19, types: 5, coercions: 0, joins: 0/0}
 T4908.f_$s$wf [Occ=LoopBreaker] :: Int -> Int# -> Int# -> (# #)
-[GblId, Arity=3, Str=<A><ML><1L>, Unf=OtherCon []]
+[GblId, Arity=3, Str=<A><MA><1L>, Unf=OtherCon []]
 T4908.f_$s$wf
   = \ (sc :: Int) (sc1 :: Int#) (sc2 :: Int#) ->
       case sc2 of ds {
@@ -59,7 +59,7 @@ end Rec }
 f [InlPrag=[2]] :: Int -> (Int, Int) -> Bool
 [GblId,
  Arity=2,
- Str=<1!P(1L)><MP(A,MP(ML))>,
+ Str=<1!P(1L)><MP(A,MP(MA))>,
  Cpr=2,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,

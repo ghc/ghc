@@ -14,6 +14,9 @@ m = do
   error "bar"
 
 -- Ditto, just in a more complex scenario (the original reproducer of #18086)
+-- NB: This depends on the strictness signature of GHC.Magic.runRW#, which will
+-- be topSig if compiled with optimisation as in the quick flavour. In this case
+-- we'll see <L>, without x.
 panic :: String -> a
 panic x = unsafeDupablePerformIO $ do
   stack <- ccsToStrings =<< getCurrentCCS x
