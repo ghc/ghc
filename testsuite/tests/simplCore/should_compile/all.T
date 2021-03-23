@@ -343,3 +343,6 @@ test('T18649', normal, compile, ['-O -ddump-rules -Wno-simplifiable-class-constr
 test('T19168', normal, compile, [''])
 
 test('T18668', normal, compile, ['-dsuppress-uniques'])
+
+# If the test goes wrong we'll get more case expressions in the output
+test('T19581', [ grep_errmsg(r'case') ], compile, ['-O -ddump-simpl -dsuppress-uniques'])
