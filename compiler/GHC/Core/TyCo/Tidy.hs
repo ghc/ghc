@@ -26,7 +26,6 @@ import GHC.Core.TyCo.FVs (tyCoVarsOfTypesWellScoped, tyCoVarsOfTypeList)
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Var
 import GHC.Types.Var.Env
-import GHC.Utils.Misc (strictMap)
 
 import Data.List (mapAccumL)
 
@@ -129,7 +128,12 @@ Note [Strictness in tidyType and friends]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Perhaps surprisingly, making `tidyType` strict has a rather large effect on
 performance: see #14738.  So you will see lots of strict applications ($!)
-and uses of `strictMap` in `tidyType`, `tidyTypes` and `tidyCo`.
+in `tidyType`, `tidyTypes` and `tidyCo`.
+
+We used `strictMap` for some time in functions operating on lists (tidyTypes,
+tidyCos) but we get some speedup by specialising these functions explicitly as
+if `strictMap` was inlined (we can't rely on the simplifier inlining `strictMap`
+because it's a recursive function).
 
 See #14738 for the performance impact -- sometimes as much as a 5%
 reduction in allocation.
@@ -139,7 +143,11 @@ reduction in allocation.
 --
 -- See Note [Strictness in tidyType and friends]
 tidyTypes :: TidyEnv -> [Type] -> [Type]
-tidyTypes env tys = strictMap (tidyType env) tys
+tidyTypes _env []     = []
+tidyTypes env  (t:ts) = (t':ts')
+  where
+    !t'  = tidyType env t
+    !ts' = tidyTypes env ts
 
 ---------------
 
@@ -224,7 +232,7 @@ tidyCo env@(_, subst) co
 
     go (Refl ty)             = Refl $! tidyType env ty
     go (GRefl r ty mco)      = (GRefl r $! tidyType env ty) $! go_mco mco
-    go (TyConAppCo r tc cos) = TyConAppCo r tc $! strictMap go cos
+    go (TyConAppCo r tc cos) = TyConAppCo r tc $! tidyCos env cos
     go (AppCo co1 co2)       = (AppCo $! go co1) $! go co2
     go (ForAllCo tv h co)    = ((ForAllCo $! tvp) $! (go h)) $! (tidyCo envp co)
                                where (envp, tvp) = tidyVarBndr env tv
@@ -235,7 +243,7 @@ tidyCo env@(_, subst) co
                                  Nothing  -> CoVarCo cv
                                  Just cv' -> CoVarCo cv'
     go (HoleCo h)            = HoleCo h
-    go (AxiomInstCo con ind cos) = AxiomInstCo con ind $! strictMap go cos
+    go (AxiomInstCo con ind cos) = AxiomInstCo con ind $! tidyCos env cos
     go (UnivCo p r t1 t2)    = (((UnivCo $! (go_prov p)) $! r) $!
                                 tidyType env t1) $! tidyType env t2
     go (SymCo co)            = SymCo $! go co
@@ -245,11 +253,15 @@ tidyCo env@(_, subst) co
     go (InstCo co ty)        = (InstCo $! go co) $! go ty
     go (KindCo co)           = KindCo $! go co
     go (SubCo co)            = SubCo $! go co
-    go (AxiomRuleCo ax cos)  = AxiomRuleCo ax $ strictMap go cos
+    go (AxiomRuleCo ax cos)  = AxiomRuleCo ax $ tidyCos env cos
 
     go_prov (PhantomProv co)    = PhantomProv $! go co
     go_prov (ProofIrrelProv co) = ProofIrrelProv $! go co
     go_prov p@(PluginProv _)    = p
 
 tidyCos :: TidyEnv -> [Coercion] -> [Coercion]
-tidyCos env = strictMap (tidyCo env)
+tidyCos _env []       = []
+tidyCos env  (co:cos) = (co':cos')
+  where
+    !co'  = tidyCo env co
+    !cos' = tidyCos env cos
