@@ -1711,7 +1711,8 @@ we can; straight from the Wanteds during improvement. And from a Derived
 ReprEq we could conceivably get a Derived NomEq improvement (by decomposing
 a type constructor with Nomninal role), and hence unify.
 
-This restriction bites, in an obscure scenario:
+This restriction that (Derived, NomEq) cannot rewrite (Derived, ReprEq) bites,
+in an obscure scenario:
 
   data T a
   type role T nominal
