@@ -25,7 +25,7 @@ module GHC.Stg.Syntax (
         GenStgTopBinding(..), GenStgBinding(..), GenStgExpr(..), GenStgRhs(..),
         GenStgAlt, AltType(..),
 
-        StgPass(..), BinderP, XRhsClosure, XLet, XLetNoEscape, XConApp,
+        StgPass(..), BinderP, XRhsClosure, XLet, XLetNoEscape,
         NoExtFieldSilent, noExtFieldSilent,
         OutputablePass,
 
@@ -246,7 +246,7 @@ literals.
         -- StgConApp is vital for returning unboxed tuples or sums
         -- which can't be let-bound
   | StgConApp   DataCon
-                (XConApp pass)
+                ConstructorNumber
                 [StgArg] -- Saturated
                 [Type]   -- See Note [Types in StgConApp] in GHC.Stg.Unarise
 
@@ -485,10 +485,6 @@ type family XLet (pass :: StgPass)
 type instance XLet 'Vanilla = NoExtFieldSilent
 type instance XLet 'CodeGen = NoExtFieldSilent
 
-type family XConApp (pass :: StgPass)
-type instance XConApp 'Vanilla =  ConstructorNumber
-type instance XConApp 'CodeGen = ConstructorNumber
-
 -- | When `-fdistinct-constructor-tables` is turned on then
 -- each usage of a constructor is given an unique number and
 -- an info table is generated for each different constructor.
@@ -669,7 +665,6 @@ likes terminators instead...  Ditto for case alternatives.
 
 type OutputablePass pass =
   ( Outputable (XLet pass)
-  , Outputable (XConApp pass)
   , Outputable (XLetNoEscape pass)
   , Outputable (XRhsClosure pass)
   , OutputableBndr (BinderP pass)
