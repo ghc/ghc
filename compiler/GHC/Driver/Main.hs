@@ -607,19 +607,17 @@ tcRnModule' sum save_rn_syntax mod = do
           safe <- liftIO $ fst <$> readIORef (tcg_safeInfer tcg_res')
           when safe $
             case wopt Opt_WarnSafe dflags of
-              True
-                | safeHaskell dflags == Sf_Safe -> return ()
-                | otherwise ->
-                    let msg = maybeToBag
-                            $ mkPlainMsgEnvelope dflags (WarningWithFlag Opt_WarnSafe)
-                                                 (warnSafeOnLoc dflags) $ errSafe tcg_res'
-                    in logDiagnostics msg
+              True | safeHaskell dflags == Sf_Safe
+                   -> return ()
+                   | Just msg <- mkPlainMsgEnvelope dflags (WarningWithFlag Opt_WarnSafe)
+                                              (warnSafeOnLoc dflags) $ errSafe tcg_res'
+                   -> logDiagnostics (unitBag msg)
+              True -> return ()
               False | safeHaskell dflags == Sf_Trustworthy &&
-                      wopt Opt_WarnTrustworthySafe dflags ->
-                      let msg = maybeToBag
-                              $ mkPlainMsgEnvelope dflags (WarningWithFlag Opt_WarnTrustworthySafe)
-                                                   (trustworthyOnLoc dflags) $ errTwthySafe tcg_res'
-                      in logDiagnostics msg
+                      wopt Opt_WarnTrustworthySafe dflags
+                    , Just msg <- mkPlainMsgEnvelope dflags (WarningWithFlag Opt_WarnTrustworthySafe)
+                                    (trustworthyOnLoc dflags) $ errTwthySafe tcg_res'
+                    -> logDiagnostics (unitBag msg)
               False -> return ()
           return tcg_res'
   where
