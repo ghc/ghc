@@ -306,24 +306,6 @@ mkKWComment kw (AD dp)
 comment2dp :: (Comment,  DeltaPos) -> (KeywordId, DeltaPos)
 comment2dp = first AnnComment
 
-
-rogueComments :: ApiAnns -> [Comment]
-rogueComments as = extractRogueComments as
-  -- where
-  --   go :: Comment -> (Comment, DeltaPos)
-  --   go c@(Comment _str loc _mo) = (c, ss2delta (1,1) loc)
-
--- extractComments :: ApiAnns -> [Comment]
--- extractComments anns
---   -- cm has type :: Map RealSrcSpan [LAnnotationComment]
---   -- = map tokComment . sortRealLocated . concat $ Map.elems (apiAnnComments anns)
---   = []
-
-extractRogueComments :: ApiAnns -> [Comment]
-extractRogueComments anns
-  -- cm has type :: Map RealSrcSpan [LAnnotationComment]
-  = map tokComment $ sortAnchorLocated  (apiAnnRogueComments anns)
-
 sortAnchorLocated :: [GenLocated Anchor a] -> [GenLocated Anchor a]
 sortAnchorLocated = sortBy (compare `on` (anchor . getLoc))
 
