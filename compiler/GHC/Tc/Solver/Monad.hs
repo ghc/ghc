@@ -1005,14 +1005,14 @@ Main Theorem [Stability under extension]
 
                 AND (K2): guarantees inertness of the new substitution
                     {  (K2a) not (fs >= fs)
-                    OR (K2b) lhs1 is a tyvar AND fs >= fw
-                    OR (K2c) lhs not in s }
+                    OR (K2b) lhs not in s }
 
                 AND (K3) See Note [K3: completeness of solving]
                     { (K3a) If the role of fs is nominal: s /= lhs
                       (K3b) If the role of fs is representational:
                             s is not of form (lhs t1 .. tn) } }
 
+           OR (K4) lhs1 is a tyvar AND fs >= fw
 
 Conditions (T1-T3) are established by the canonicaliser
 Conditions (K1-K3) are established by GHC.Tc.Solver.Monad.kickOutRewritable
@@ -1068,12 +1068,14 @@ The idea is that
 
     (NB: we could strengten K1) in this way too, but see K3.
 
-  - (K2b): See Note [K2b].
-
-  - (K2c): if a not in s, we have no further opportunity to apply the
-    work item, similar to (K2b)
+  - (K2b): if lhs not in s, we have no further opportunity to apply the
+    work item
 
   NB: Dimitrios has a PDF that does this in more detail
+
+* Lemma (L3). Suppose we have f* such that, for all f, f* >= f. Then
+  if we are adding lhs -fw-> t (where T1, T2, and T3 hold), we will keep a -f*-> s.
+  Proof. K4 holds; thus, we keep.
 
 Key lemma to make it watertight.
   Under the conditions of the Main Theorem,
@@ -1081,9 +1083,9 @@ Key lemma to make it watertight.
 
 Also, consider roles more carefully. See Note [Flavours with roles]
 
-Note [K2b]
-~~~~~~~~~~
-K2b is a "keep" condition of Note [Extending the inert equalities].
+Note [K4]
+~~~~~~~~~
+K4 is a "keep" condition of Note [Extending the inert equalities].
 Here is the scenario:
 
 * We are considering adding (lhs -fw-> t) to the inert set S.
@@ -1091,19 +1093,16 @@ Here is the scenario:
 * We know S(fw, lhs) = lhs, S(fw, t) = t, and lhs is not rewritable in t. These
   are (T1), (T2), and (T3).
 * We further know fw >= fs. (If not, then we short-circuit via (K0).)
-* lhs is not rewritable in lhs1. That is (lhs -fw-> t)(fs, lhs1) = lhs1, where
-  we are applying (lhs -fw-> t) as a generalised substitution.
-  (Definition [Generalised substitution])
 
-K2b says that we may keep lhs1 -fs-> s in S if:
+K4 says that we may keep lhs1 -fs-> s in S if:
   lhs1 is a tyvar AND fs >= fw
 
 Let's consider the two possible shapes of lhs1 (which, recall, is a CanEqLHS:
 either a tyvar or an exactly-saturated type family application).
 
 + lhs1 is a tyvar a:
-  * We know lhs /= a, because we said that lhs is not rewritable in lhs1 (= a).
   * If fs >= fw, we know a is not rewritable in t, because of (T2).
+  * We further know lhs /= a, because of (T1).
   * Accordingly, a use of the new inert item lhs -fw-> t cannot create the conditions
     for a use of a -fs-> s (precisely because t does not mention a).
 
@@ -1135,12 +1134,25 @@ either a tyvar or an exactly-saturated type family application).
     cannot allow an equality with an LHS of a to fire. This is not the case for
     type family applications.
 
-Bottom line: K2b can keep only inerts with tyvars on the left. Put differently,
-K2b will never prevent an inert with a type family on the left from being kicked
+Bottom line: K4 can keep only inerts with tyvars on the left. Put differently,
+K4 will never prevent an inert with a type family on the left from being kicked
 out.
 
-Getting this wrong (that is, allowing K2b to apply to situations with the type
-family on the left) led to #19042.
+Consequence: We never kick out a Given/Nominal equality with a tyvar on the left.
+This is Lemma (L3) of Note [Extending the inert equalities]. It is good because
+it means we can effectively model the mutable filling of metavariables with
+Given/Nominal equalities. That is: it should be the case that we could rewrite
+our solver never to fill in a metavariable; instead, it would "solve" a wanted
+like alpha ~ Int by turning it into a Given, allowing it to be used in rewriting.
+We would want the solver to behave the same whether it uses metavariables or
+Givens. And (L3) says that no Given/Nominals over tyvars are ever kicked out,
+just like we never unfill a metavariable. Nice.
+
+Getting this wrong (that is, allowing K4 to apply to situations with the type
+family on the left) led to #19042. (At that point, K4 was known as K2b.)
+
+Originally, this condition was part of K2, but #17672 suggests it should be
+a top-level K condition.
 
 Note [K3: completeness of solving]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1195,8 +1207,8 @@ representational inert out. And then, we'd miss solving the inert, which
 now reduced to reflexivity.
 
 The solution here is to kick out representational inerts whenever the
-tyvar of a work item is "exposed", where exposed means being at the
-head of the top-level application chain (a t1 .. tn).  See
+lhs of a work item is "exposed", where exposed means being at the
+head of the top-level application chain (lhs t1 .. tn).  See
 is_can_eq_lhs_head. This is encoded in (K3b).
 
 Beware: if we make this test succeed too often, we kick out too much,
@@ -1979,10 +1991,16 @@ kick_out_rewritable new_fr new_lhs
     kick_out_eq (CEqCan { cc_lhs = lhs, cc_rhs = rhs_ty
                         , cc_ev = ev, cc_eq_rel = eq_rel })
       | not (fr_may_rewrite fs)
-      = False  -- Keep it in the inert set if the new thing can't rewrite it
+      = False  -- (K0) Keep it in the inert set if the new thing can't rewrite it
+
+      | TyVarLHS _ <- lhs
+      , fs `eqMayRewriteFR` new_fr
+      = False  -- (K4) Keep it in the inert set if the LHS is a tyvar and
+               -- it can rewrite the work item. See Note [K4]
 
       -- Below here (fr_may_rewrite fs) is True
-      | fr_can_rewrite_ty eq_rel (canEqLHSType lhs) = True   -- (K1)
+      | fr_can_rewrite_ty eq_rel (canEqLHSType lhs)
+      = True   -- (K1)
          -- The above check redundantly checks the role & flavour,
          -- but it's very convenient
 
@@ -1993,10 +2011,8 @@ kick_out_rewritable new_fr new_lhs
       where
         fs = (ctEvFlavour ev, eq_rel)
         kick_out_for_inertness
-          =        (fs `eqMayRewriteFR` fs)       -- (K2a)
-            && (case lhs of TyVarLHS _ -> not (fs `eqMayRewriteFR` new_fr)
-                            _          -> True)   -- (K2b) See Note [K2b].
-            && fr_can_rewrite_ty eq_rel rhs_ty    -- (K2c)
+          =    (fs `eqMayRewriteFR` fs)           -- (K2a)
+            && fr_can_rewrite_ty eq_rel rhs_ty    -- (K2b)
 
         kick_out_for_completeness  -- (K3) and Note [K3: completeness of solving]
           = case eq_rel of
