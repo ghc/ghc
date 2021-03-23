@@ -114,7 +114,6 @@ type instance BinderP      'LiftLams = BinderInfo
 type instance XRhsClosure  'LiftLams = DIdSet
 type instance XLet         'LiftLams = Skeleton
 type instance XLetNoEscape 'LiftLams = Skeleton
-type instance XConApp      'LiftLams = ConstructorNumber
 
 freeVarsOfRhs :: (XRhsClosure pass ~ DIdSet) => GenStgRhs pass -> DIdSet
 freeVarsOfRhs (StgRhsCon _ _ _ _ args) = mkDVarSet [ id | StgVarArg id <- args ]
