@@ -72,7 +72,7 @@ import GHC.Iface.Recomp    ( RecompileRequired ( MustCompile ) )
 import GHC.Data.Bag        ( unitBag, listToBag, unionManyBags, isEmptyBag )
 import GHC.Data.Graph.Directed
 import GHC.Data.FastString
-import GHC.Data.Maybe      ( expectJust )
+import GHC.Data.Maybe      (whenIsJust,  expectJust )
 import GHC.Data.StringBuffer
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -269,8 +269,8 @@ instantiationNodes unit_state = InstantiationNode <$> iuids_to_check
 -- The warning in enabled by `-Wmissing-home-modules`. See #13129
 warnMissingHomeModules :: GhcMonad m => HscEnv -> ModuleGraph -> m ()
 warnMissingHomeModules hsc_env mod_graph =
-    when (wopt Opt_WarnMissingHomeModules dflags && not (null missing)) $
-        logWarnings (listToBag [warn])
+    when (not (null missing)) $
+        whenIsJust warn $ logWarnings . unitBag
   where
     dflags = hsc_dflags hsc_env
     targets = map targetId (hsc_targets hsc_env)
@@ -390,8 +390,8 @@ warnUnusedPackages = do
                    , text "but were not needed for compilation:"
                    , nest 2 (vcat (map (withDash . pprUnusedArg) unusedArgs)) ]
 
-    when (wopt Opt_WarnUnusedPackages dflags && not (null unusedArgs)) $
-      logWarnings (listToBag [warn])
+    when (not (null unusedArgs)) $
+      whenIsJust warn $ logWarnings . unitBag
 
     where
         packageArg (ExposePackage _ arg _) = Just arg
@@ -2210,13 +2210,13 @@ warnUnnecessarySourceImports :: GhcMonad m => [SCC ModSummary] -> m ()
 warnUnnecessarySourceImports sccs = do
   dflags <- getDynFlags
   when (wopt Opt_WarnUnusedImports dflags)
-    (logWarnings (listToBag (concatMap (check dflags . flattenSCC) sccs)))
+    (logWarnings (listToBag (catMaybes $ concatMap (check dflags . flattenSCC) sccs)))
   where check dflags ms =
            let mods_in_this_cycle = map ms_mod_name ms in
            [ warn dflags i | m <- ms, i <- ms_home_srcimps m,
                              unLoc i `notElem`  mods_in_this_cycle ]
 
-        warn :: DynFlags -> Located ModuleName -> WarnMsg
+        warn :: DynFlags -> Located ModuleName -> Maybe WarnMsg
         warn dflags (L loc mod) =
            mkPlainMsgEnvelope dflags WarningWithoutFlag loc
                 (text "{-# SOURCE #-} unnecessary in import of "

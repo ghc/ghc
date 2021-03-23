@@ -39,7 +39,7 @@ import GHC.Core.Opt.Arity     ( collectBindersPushingCo
 
 import GHC.Builtin.Types  ( unboxedUnitTy )
 
-import GHC.Data.Maybe     ( mapMaybe, maybeToList, isJust )
+import GHC.Data.Maybe     ( whenIsJust,  mapMaybe, maybeToList, isJust )
 import GHC.Data.Bag
 import GHC.Data.FastString
 
@@ -810,12 +810,13 @@ tryWarnMissingSpecs dflags callers fn calls_for_fn
   where
     allCallersInlined = all (isAnyInlinePragma . idInlinePragma) callers
     doWarn reason =
-      msg (mkMCDiagnostic dflags reason)
-        (vcat [ hang (text ("Could not specialise imported function") <+> quotes (ppr fn))
-                2 (vcat [ text "when specialising" <+> quotes (ppr caller)
-                        | caller <- callers])
-          , whenPprDebug (text "calls:" <+> vcat (map (pprCallInfo fn) calls_for_fn))
-          , text "Probable fix: add INLINABLE pragma on" <+> quotes (ppr fn) ])
+      whenIsJust (mkMCDiagnostic dflags reason) $ \diag ->
+        msg diag
+          (vcat [ hang (text ("Could not specialise imported function") <+> quotes (ppr fn))
+                  2 (vcat [ text "when specialising" <+> quotes (ppr caller)
+                          | caller <- callers])
+            , whenPprDebug (text "calls:" <+> vcat (map (pprCallInfo fn) calls_for_fn))
+            , text "Probable fix: add INLINABLE pragma on" <+> quotes (ppr fn) ])
 
 
 

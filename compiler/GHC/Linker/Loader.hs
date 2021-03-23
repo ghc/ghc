@@ -112,6 +112,7 @@ import System.Win32.Info (getSystemDirectory)
 #endif
 
 import GHC.Utils.Exception
+import GHC.Data.Maybe ( whenIsJust )
 
 uninitialised :: a
 uninitialised = panic "Loader not initialised"
@@ -1424,9 +1425,9 @@ load_dyn hsc_env crash_early dll = do
         then cmdLineErrorIO err
         else
           when (wopt Opt_WarnMissedExtraSharedLib dflags)
-            $ putLogMsg logger dflags
-                (mkMCDiagnostic dflags $ WarningWithFlag Opt_WarnMissedExtraSharedLib)
-                  noSrcSpan $ withPprStyle defaultUserStyle (note err)
+            $ whenIsJust (mkMCDiagnostic dflags $ WarningWithFlag Opt_WarnMissedExtraSharedLib)
+            $ \diag -> putLogMsg logger dflags diag noSrcSpan
+                     $ withPprStyle defaultUserStyle (note err)
   where
     dflags = hsc_dflags hsc_env
     logger = hsc_logger hsc_env

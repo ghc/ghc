@@ -258,9 +258,8 @@ tcRnModuleTcRnM hsc_env mod_sum
         ; let { prel_imports = mkPrelImports (moduleName this_mod) prel_imp_loc
                                implicit_prelude import_decls }
 
-        ; whenWOptM Opt_WarnImplicitPrelude $
-             when (notNull prel_imports) $
-                addDiagnostic (WarningWithFlag Opt_WarnImplicitPrelude) (implicitPreludeWarn)
+        ; when (notNull prel_imports) $
+            addDiagnostic (WarningWithFlag Opt_WarnImplicitPrelude) (implicitPreludeWarn)
 
         ; -- TODO This is a little skeevy; maybe handle a bit more directly
           let { simplifyImport (L _ idecl) =
@@ -3145,8 +3144,8 @@ runTypecheckerPlugin sum gbl_env = do
 
 mark_plugin_unsafe :: DynFlags -> TcM ()
 mark_plugin_unsafe dflags = unless (gopt Opt_PluginTrustworthy dflags) $
-  recordUnsafeInfer pluginUnsafe
+  whenIsJust pluginUnsafe (recordUnsafeInfer . unitBag)
   where
     unsafeText = "Use of plugins makes the module unsafe"
-    pluginUnsafe = unitBag ( mkPlainMsgEnvelope dflags WarningWithoutFlag noSrcSpan
-                                   (Outputable.text unsafeText) )
+    pluginUnsafe =
+      mkPlainMsgEnvelope dflags WarningWithoutFlag noSrcSpan (Outputable.text unsafeText)

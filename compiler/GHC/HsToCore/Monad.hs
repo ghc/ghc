@@ -84,6 +84,7 @@ import GHC.Tc.Utils.TcMType ( checkForLevPolyX, formatLevPolyErr )
 import GHC.Builtin.Names
 
 import GHC.Data.FastString
+import GHC.Data.Maybe (whenIsJust)
 
 import GHC.Unit.Env
 import GHC.Unit.External
@@ -462,7 +463,7 @@ diagnosticDs reason warn
        ; loc <- getSrcSpanDs
        ; dflags <- getDynFlags
        ; let msg = mkShortMsgEnvelope dflags reason loc (ds_unqual env) warn
-       ; updMutVar (ds_msgs env) (\ msgs -> msg `addMessage` msgs) }
+       ; whenIsJust msg $ \m -> updMutVar (ds_msgs env) (\ msgs -> m `addMessage` msgs) }
 
 -- | Emit a warning only if the correct WarningWithoutFlag is set in the DynFlags
 warnIfSetDs :: WarningFlag -> SDoc -> DsM ()
@@ -476,7 +477,7 @@ errDs err
         ; loc <- getSrcSpanDs
         ; dflags <- getDynFlags
         ; let msg = mkShortMsgEnvelope dflags ErrorWithoutFlag loc (ds_unqual env) err
-        ; updMutVar (ds_msgs env) (\ msgs -> msg `addMessage` msgs) }
+        ; whenIsJust msg $ \m -> updMutVar (ds_msgs env) (\ msgs -> m `addMessage` msgs) }
 
 -- | Issue an error, but return the expression for (), so that we can continue
 -- reporting errors.
