@@ -36,6 +36,7 @@ module GHC.Platform
    , platformSOName
    , platformHsSOName
    , platformSOExt
+   , genericPlatform
    )
 where
 
@@ -67,10 +68,25 @@ data Platform = Platform
       -- ^ Determines whether we will be compiling info tables that reside just
       --   before the entry code, or with an indirection to the entry code. See
       --   TABLES_NEXT_TO_CODE in includes/rts/storage/InfoTables.h.
-   , platformConstants                :: !PlatformConstants
+   , platformConstants                :: PlatformConstants
       -- ^ Constants such as structure offsets, type sizes, etc.
    }
    deriving (Read, Show, Eq)
+
+genericPlatform :: Platform
+genericPlatform = Platform
+   { platformArchOS                  = ArchOS ArchX86_64 OSLinux
+   , platformWordSize                = PW8
+   , platformByteOrder               = LittleEndian
+   , platformUnregisterised          = False
+   , platformHasGnuNonexecStack      = False
+   , platformHasIdentDirective       = False
+   , platformHasSubsectionsViaSymbols= False
+   , platformIsCrossCompiling        = False
+   , platformLeadingUnderscore       = False
+   , platformTablesNextToCode        = True
+   , platformConstants               = error "No PlatformConstants"
+   }
 
 data PlatformWordSize
   = PW4 -- ^ A 32-bit platform
@@ -211,7 +227,6 @@ data BmiVersion
    = BMI1
    | BMI2
    deriving (Eq, Ord)
-
 
 -- | Platform-specific settings formerly hard-coded in Config.hs.
 --
