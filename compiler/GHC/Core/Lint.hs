@@ -2756,8 +2756,11 @@ addWarnL msg = LintM $ \ env (warns,errs) ->
 
 addMsg :: Bool -> LintEnv ->  Bag SDoc -> SDoc -> Bag SDoc
 addMsg is_error env msgs msg
+  | Just msg_class <- mkMCDiagnostic (le_dynflags env) WarningWithoutFlag
   = ASSERT2( notNull loc_msgs, msg )
-    maybe msgs (\m -> msgs `snocBag` m) (mk_msg msg)
+    msgs `snocBag` mk_msg msg_class
+  | otherwise
+  = msgs
   where
    loc_msgs :: [(SrcLoc, SDoc)]  -- Innermost first
    loc_msgs = map dumpLoc (le_loc env)
@@ -2774,8 +2777,7 @@ addMsg is_error env msgs msg
                           , isGoodSrcSpan span ] of
                []    -> noSrcSpan
                (s:_) -> s
-   mk_msg msg = fmap (\diag -> mkLocMessage diag msg_span (msg $$ context))
-              $ (mkMCDiagnostic (le_dynflags env) WarningWithoutFlag)
+   mk_msg diag = mkLocMessage diag msg_span (msg $$ context)
 
 addLoc :: LintLocInfo -> LintM a -> LintM a
 addLoc extra_loc m

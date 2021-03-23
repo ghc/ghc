@@ -216,7 +216,6 @@ import GHC.Data.Bag
 import GHC.Data.StringBuffer
 import qualified GHC.Data.Stream as Stream
 import GHC.Data.Stream (Stream)
-import GHC.Data.Maybe (whenIsJust)
 
 import Data.Data hiding (Fixity, TyCon)
 import Data.Maybe       ( fromJust, fromMaybe )
@@ -579,11 +578,12 @@ tcRnModule' sum save_rn_syntax mod = do
 
     let reason = WarningWithFlag Opt_WarnMissingSafeHaskellMode
     -- -Wmissing-safe-haskell-mode
-    let msg = mkPlainMsgEnvelope dflags reason (getLoc (hpm_module mod))
+    let msg = maybeToBag
+            $ mkPlainMsgEnvelope dflags reason (getLoc (hpm_module mod))
             $ warnMissingSafeHaskellMode
     when (not (safeHaskellModeEnabled dflags)
           && wopt Opt_WarnMissingSafeHaskellMode dflags) $
-        whenIsJust msg $ logDiagnostics . unitBag
+        logDiagnostics msg
 
     tcg_res <- {-# SCC "Typecheck-Rename" #-}
                ioMsgMaybe $
@@ -610,14 +610,16 @@ tcRnModule' sum save_rn_syntax mod = do
               True
                 | safeHaskell dflags == Sf_Safe -> return ()
                 | otherwise ->
-                    let msg = mkPlainMsgEnvelope dflags (WarningWithFlag Opt_WarnSafe)
-                                          (warnSafeOnLoc dflags) $ errSafe tcg_res'
-                    in whenIsJust msg $ logDiagnostics . unitBag
+                    let msg = maybeToBag
+                            $ mkPlainMsgEnvelope dflags (WarningWithFlag Opt_WarnSafe)
+                                                 (warnSafeOnLoc dflags) $ errSafe tcg_res'
+                    in logDiagnostics msg
               False | safeHaskell dflags == Sf_Trustworthy &&
                       wopt Opt_WarnTrustworthySafe dflags ->
-                      let msg = mkPlainMsgEnvelope dflags (WarningWithFlag Opt_WarnTrustworthySafe)
-                                          (trustworthyOnLoc dflags) $ errTwthySafe tcg_res'
-                      in whenIsJust msg $ logDiagnostics . unitBag
+                      let msg = maybeToBag
+                              $ mkPlainMsgEnvelope dflags (WarningWithFlag Opt_WarnTrustworthySafe)
+                                                   (trustworthyOnLoc dflags) $ errTwthySafe tcg_res'
+                      in logDiagnostics msg
               False -> return ()
           return tcg_res'
   where
@@ -1426,8 +1428,9 @@ markUnsafeInfer tcg_env whyUnsafe = do
 
     let reason = WarningWithFlag Opt_WarnUnsafe
     when (wopt Opt_WarnUnsafe dflags) $
-      let msg = mkPlainMsgEnvelope dflags reason (warnUnsafeOnLoc dflags) (whyUnsafe' dflags)
-      in whenIsJust msg $ logDiagnostics . unitBag
+      let msg = maybeToBag
+              $ mkPlainMsgEnvelope dflags reason (warnUnsafeOnLoc dflags) (whyUnsafe' dflags)
+      in logDiagnostics msg
 
     liftIO $ writeIORef (tcg_safeInfer tcg_env) (False, whyUnsafe)
     -- NOTE: Only wipe trust when not in an explicitly safe haskell mode. Other
