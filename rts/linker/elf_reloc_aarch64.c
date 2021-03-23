@@ -71,12 +71,14 @@ encodeAddendAarch64(Section * section, Elf_Rel * rel, int64_t addend) {
             break;
         case COMPAT_R_AARCH64_ABS32:
             CHECK(isInt64(32, addend));
+            FALLTHROUGH;
         case COMPAT_R_AARCH64_PREL32:
             CHECK(isInt64(32, addend));
             *(uint32_t*)P = (uint32_t)addend;
             break;
         case COMPAT_R_AARCH64_ABS16:
             CHECK(isInt64(16, addend));
+            FALLTHROUGH;
         case COMPAT_R_AARCH64_PREL16:
             CHECK(isInt64(16, addend));
             *(uint16_t*)P = (uint16_t)addend;
