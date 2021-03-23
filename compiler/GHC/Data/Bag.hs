@@ -13,7 +13,7 @@ module GHC.Data.Bag (
 
         emptyBag, unitBag, unionBags, unionManyBags,
         mapBag,
-        elemBag, lengthBag,
+        elemBag, lengthBag, maybeToBag,
         filterBag, partitionBag, partitionBagWith,
         concatBag, catBagMaybes, foldBag,
         isEmptyBag, isSingletonBag, consBag, snocBag, anyBag, allBag,
@@ -59,6 +59,10 @@ lengthBag EmptyBag        = 0
 lengthBag (UnitBag {})    = 1
 lengthBag (TwoBags b1 b2) = lengthBag b1 + lengthBag b2
 lengthBag (ListBag xs)    = length xs
+
+maybeToBag :: Maybe a -> Bag a
+maybeToBag Nothing  = emptyBag
+maybeToBag (Just x) = unitBag x
 
 elemBag :: Eq a => a -> Bag a -> Bool
 elemBag _ EmptyBag        = False

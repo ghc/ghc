@@ -7,6 +7,7 @@ module GHC.Driver.Errors (
 
 import GHC.Driver.Session
 import GHC.Data.Bag
+import GHC.Data.Maybe
 import GHC.Utils.Exception
 import GHC.Utils.Error ( formatBulleted, sortMsgBag, mkPlainMsgEnvelope )
 import GHC.Types.SourceError ( mkSrcErr )
@@ -40,8 +41,8 @@ handleFlagWarnings logger dflags warns = do
 
       -- It would be nicer if warns :: [Located SDoc], but that
       -- has circular import problems.
-      bag = listToBag [ mkPlainMsgEnvelope dflags WarningWithoutFlag loc (text warn)
-                      | CmdLine.Warn _ (L loc warn) <- warns' ]
+      bag = listToBag $ catMaybes [ mkPlainMsgEnvelope dflags WarningWithoutFlag loc (text warn)
+                                  | CmdLine.Warn _ (L loc warn) <- warns' ]
 
   printOrThrowDiagnostics logger dflags bag
 

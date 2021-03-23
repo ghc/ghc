@@ -35,18 +35,20 @@ mk_parser_err span doc = MsgEnvelope
    , errMsgSeverity    = SevError
    }
 
-mk_parser_warn :: DynFlags -> WarningFlag -> SrcSpan -> SDoc -> MsgEnvelope DiagnosticMessage
-mk_parser_warn df flag span doc = MsgEnvelope
-   { errMsgSpan        = span
-   , errMsgContext     = alwaysQualify
-   , errMsgDiagnostic  = DiagnosticMessage (mkDecorated [doc]) reason
-   , errMsgSeverity    = diagReasonSeverity df reason
-   }
+mk_parser_warn :: DynFlags -> WarningFlag -> SrcSpan -> SDoc -> Maybe (MsgEnvelope DiagnosticMessage)
+mk_parser_warn df flag span doc = do
+  sev <- diagReasonSeverity df reason
+  pure MsgEnvelope
+       { errMsgSpan        = span
+       , errMsgContext     = alwaysQualify
+       , errMsgDiagnostic  = DiagnosticMessage (mkDecorated [doc]) reason
+       , errMsgSeverity    = sev
+       }
   where
     reason :: DiagnosticReason
     reason = WarningWithFlag flag
 
-mkParserWarn :: DynFlags -> PsWarning -> MsgEnvelope DiagnosticMessage
+mkParserWarn :: DynFlags -> PsWarning -> Maybe (MsgEnvelope DiagnosticMessage)
 mkParserWarn df = \case
    PsWarnTab loc tc
       -> mk_parser_warn df Opt_WarnTabs loc $

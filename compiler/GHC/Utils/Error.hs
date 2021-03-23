@@ -72,13 +72,13 @@ import GHC.Types.SrcLoc as SrcLoc
 
 import System.Exit      ( ExitCode(..), exitWith )
 import Data.List        ( sortBy )
-import Data.Maybe       ( fromMaybe )
 import Data.Function
 import Debug.Trace
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Catch as MC (handle)
 import GHC.Conc         ( getAllocationCounter )
+import GHC.Data.Maybe
 import System.CPUTime
 
 -- | Computes the /right/ 'Severity' for the input 'DiagnosticReason' out of
@@ -86,12 +86,15 @@ import System.CPUTime
 -- i.e. with a 'DynFlags' \"snapshot\" taken as close as possible to where a
 -- particular diagnostic message is built, otherwise the computed 'Severity' might
 -- not be correct, due to the mutable nature of the 'DynFlags' in GHC.
-diagReasonSeverity :: DynFlags -> DiagnosticReason -> Severity
-diagReasonSeverity dflags (WarningWithFlag wflag) | wopt_fatal wflag dflags     = SevError
-                                                  | otherwise                   = SevWarning
-diagReasonSeverity dflags WarningWithoutFlag      | gopt Opt_WarnIsError dflags = SevError
-                                                  | otherwise                   = SevWarning
-diagReasonSeverity _      ErrorWithoutFlag                                      = SevError
+-- Returns 'Nothing' in case there is no 'Severity' i.e. the relevant diagnostic
+-- needs to be suppressed as users are not meant to see it.
+diagReasonSeverity :: DynFlags -> DiagnosticReason -> Maybe Severity
+diagReasonSeverity dflags (WarningWithFlag wflag) | not (wopt wflag dflags)     = Nothing
+                                                  | wopt_fatal wflag dflags     = Just SevError
+                                                  | otherwise                   = Just SevWarning
+diagReasonSeverity dflags WarningWithoutFlag      | gopt Opt_WarnIsError dflags = Just SevError
+                                                  | otherwise                   = Just SevWarning
+diagReasonSeverity _      ErrorWithoutFlag                                      = Just SevError
 
 
 
@@ -119,13 +122,16 @@ mkMsgEnvelope
   -> SrcSpan
   -> PrintUnqualified
   -> e
-  -> MsgEnvelope e
+  -> Maybe (MsgEnvelope e)
 mkMsgEnvelope dflags locn print_unqual err
- = mk_msg_envelope (diagReasonSeverity dflags (diagnosticReason err)) locn print_unqual err
+ = do sev <- diagReasonSeverity dflags (diagnosticReason err)
+      pure $ mk_msg_envelope sev locn print_unqual err
 
 -- | Make a 'MessageClass' for a given 'DiagnosticReason', consulting the 'DynFlags'.
-mkMCDiagnostic :: DynFlags -> DiagnosticReason -> MessageClass
-mkMCDiagnostic dflags reason = MCDiagnostic (diagReasonSeverity dflags reason) reason
+mkMCDiagnostic :: DynFlags -> DiagnosticReason -> Maybe MessageClass
+mkMCDiagnostic dflags reason = do
+  sev <- diagReasonSeverity dflags reason
+  pure $ MCDiagnostic sev reason
 
 -- | Varation of 'mkMCDiagnostic' which can be used when we are /sure/ the
 -- input 'DiagnosticReason' /is/ 'ErrorWithoutFlag'.
@@ -141,7 +147,7 @@ mkLongMsgEnvelope :: DynFlags
                   -> PrintUnqualified
                   -> SDoc
                   -> SDoc
-                  -> MsgEnvelope DiagnosticMessage
+                  -> Maybe (MsgEnvelope DiagnosticMessage)
 mkLongMsgEnvelope dflags rea locn unqual msg extra =
   mkMsgEnvelope dflags locn unqual (DiagnosticMessage (mkDecorated [msg,extra]) rea)
 
@@ -152,7 +158,7 @@ mkShortMsgEnvelope :: DynFlags
                    -> SrcSpan
                    -> PrintUnqualified
                    -> SDoc
-                   -> MsgEnvelope DiagnosticMessage
+                   -> Maybe (MsgEnvelope DiagnosticMessage)
 mkShortMsgEnvelope dflags rea locn unqual msg =
   mkMsgEnvelope dflags locn unqual (DiagnosticMessage (mkDecorated [msg]) rea)
 
@@ -162,7 +168,7 @@ mkPlainMsgEnvelope :: DynFlags
                    -> DiagnosticReason
                    -> SrcSpan
                    -> SDoc
-                   -> MsgEnvelope DiagnosticMessage
+                   -> Maybe (MsgEnvelope DiagnosticMessage)
 mkPlainMsgEnvelope dflags rea locn msg =
   mkMsgEnvelope dflags locn alwaysQualify (DiagnosticMessage (mkDecorated [msg]) rea)
 
@@ -270,8 +276,9 @@ errorMsg logger dflags msg
 
 warningMsg :: Logger -> DynFlags -> SDoc -> IO ()
 warningMsg logger dflags msg
-   = putLogMsg logger dflags (mkMCDiagnostic dflags WarningWithoutFlag) noSrcSpan $
-     withPprStyle defaultErrStyle msg
+   = whenIsJust (mkMCDiagnostic dflags WarningWithoutFlag) $ \diag ->
+       putLogMsg logger dflags diag noSrcSpan $
+         withPprStyle defaultErrStyle msg
 
 fatalErrorMsg :: Logger -> DynFlags -> SDoc -> IO ()
 fatalErrorMsg logger dflags msg =
