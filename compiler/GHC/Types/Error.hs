@@ -91,11 +91,17 @@ isEmptyMessages :: Messages e -> Bool
 isEmptyMessages (Messages msgs) = isEmptyBag msgs
 
 addMessage :: MsgEnvelope e -> Messages e -> Messages e
-addMessage x (Messages xs) = Messages (x `consBag` xs)
+addMessage x (Messages xs)
+  | SevIgnore <- errMsgSeverity x = Messages xs
+  | otherwise                     = Messages (x `consBag` xs)
 
 -- | Joins two collections of messages together.
 unionMessages :: Messages e -> Messages e -> Messages e
-unionMessages (Messages msgs1) (Messages msgs2) = Messages (msgs1 `unionBags` msgs2)
+unionMessages (Messages msgs1) (Messages msgs2) =
+  Messages (filterBag interesting $ msgs1 `unionBags` msgs2)
+  where
+    interesting :: MsgEnvelope e -> Bool
+    interesting = (/=) SevIgnore . errMsgSeverity
 
 type WarningMessages = Bag (MsgEnvelope DiagnosticMessage)
 type ErrorMessages   = Bag (MsgEnvelope DiagnosticMessage)
@@ -235,14 +241,20 @@ data MessageClass
 --   o The message has a file\/line\/column heading,
 --     plus "warning:" or "error:",
 --     added by mkLocMessage
+--   o With 'SevIgnore' the message is suppressed
 --   o Output is intended for end users
 data Severity
-  = SevWarning
+  = SevIgnore
+  -- ^ Ignore this message, for example in
+  -- case of suppression of warnings users
+  -- don't want to see.
+  | SevWarning
   | SevError
   deriving (Eq, Show)
 
 instance Outputable Severity where
   ppr = \case
+    SevIgnore  -> text "SevIgnore"
     SevWarning -> text "SevWarning"
     SevError   -> text "SevError"
 
