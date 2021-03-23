@@ -789,7 +789,7 @@ dmdAnalRhsSig top_lvl rec_flag env let_dmd id rhs
     --        we'd have to do an additional iteration. reuseEnv makes sure that
     --        we never get used-once info for FVs of recursive functions.
     rhs_fv1 = case rec_flag of
-                Recursive    -> reuseEnv rhs_fv
+                Recursive    -> rhs_fv
                 NonRecursive -> rhs_fv
 
     -- See Note [Absence analysis for stable unfoldings and RULES]
