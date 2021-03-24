@@ -521,17 +521,82 @@ primOpRules nm = \case
                                              , semiInversePrimOp DoubleNegOp ]
    DoubleDecode_Int64Op -> mkPrimOpRule nm 1 [ unaryLit doubleDecodeOp ]
 
-   -- Relational operators
+   -- Relational operators, equality
+
+   Int8EqOp   -> mkRelOpRule nm (==) [ litEq True ]
+   Int8NeOp   -> mkRelOpRule nm (/=) [ litEq False ]
+
+   Int16EqOp  -> mkRelOpRule nm (==) [ litEq True ]
+   Int16NeOp  -> mkRelOpRule nm (/=) [ litEq False ]
+
+   Int32EqOp  -> mkRelOpRule nm (==) [ litEq True ]
+   Int32NeOp  -> mkRelOpRule nm (/=) [ litEq False ]
 
    IntEqOp    -> mkRelOpRule nm (==) [ litEq True ]
    IntNeOp    -> mkRelOpRule nm (/=) [ litEq False ]
+
+   Word8EqOp  -> mkRelOpRule nm (==) [ litEq True ]
+   Word8NeOp  -> mkRelOpRule nm (/=) [ litEq False ]
+
+   Word16EqOp -> mkRelOpRule nm (==) [ litEq True ]
+   Word16NeOp -> mkRelOpRule nm (/=) [ litEq False ]
+
+   Word32EqOp -> mkRelOpRule nm (==) [ litEq True ]
+   Word32NeOp -> mkRelOpRule nm (/=) [ litEq False ]
+
+   WordEqOp   -> mkRelOpRule nm (==) [ litEq True ]
+   WordNeOp   -> mkRelOpRule nm (/=) [ litEq False ]
+
    CharEqOp   -> mkRelOpRule nm (==) [ litEq True ]
    CharNeOp   -> mkRelOpRule nm (/=) [ litEq False ]
+
+   FloatEqOp  -> mkFloatingRelOpRule nm (==)
+   FloatNeOp  -> mkFloatingRelOpRule nm (/=)
+
+   DoubleEqOp -> mkFloatingRelOpRule nm (==)
+   DoubleNeOp -> mkFloatingRelOpRule nm (/=)
+
+   -- Relational operators, ordering
+
+   Int8GtOp   -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
+   Int8GeOp   -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
+   Int8LeOp   -> mkRelOpRule nm (<=) [ boundsCmp Le ]
+   Int8LtOp   -> mkRelOpRule nm (<)  [ boundsCmp Lt ]
+
+   Int16GtOp  -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
+   Int16GeOp  -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
+   Int16LeOp  -> mkRelOpRule nm (<=) [ boundsCmp Le ]
+   Int16LtOp  -> mkRelOpRule nm (<)  [ boundsCmp Lt ]
+
+   Int32GtOp  -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
+   Int32GeOp  -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
+   Int32LeOp  -> mkRelOpRule nm (<=) [ boundsCmp Le ]
+   Int32LtOp  -> mkRelOpRule nm (<)  [ boundsCmp Lt ]
 
    IntGtOp    -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
    IntGeOp    -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
    IntLeOp    -> mkRelOpRule nm (<=) [ boundsCmp Le ]
    IntLtOp    -> mkRelOpRule nm (<)  [ boundsCmp Lt ]
+
+   Word8GtOp  -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
+   Word8GeOp  -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
+   Word8LeOp  -> mkRelOpRule nm (<=) [ boundsCmp Le ]
+   Word8LtOp  -> mkRelOpRule nm (<)  [ boundsCmp Lt ]
+
+   Word16GtOp -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
+   Word16GeOp -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
+   Word16LeOp -> mkRelOpRule nm (<=) [ boundsCmp Le ]
+   Word16LtOp -> mkRelOpRule nm (<)  [ boundsCmp Lt ]
+
+   Word32GtOp -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
+   Word32GeOp -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
+   Word32LeOp -> mkRelOpRule nm (<=) [ boundsCmp Le ]
+   Word32LtOp -> mkRelOpRule nm (<)  [ boundsCmp Lt ]
+
+   WordGtOp   -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
+   WordGeOp   -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
+   WordLeOp   -> mkRelOpRule nm (<=) [ boundsCmp Le ]
+   WordLtOp   -> mkRelOpRule nm (<)  [ boundsCmp Lt ]
 
    CharGtOp   -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
    CharGeOp   -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
@@ -542,22 +607,13 @@ primOpRules nm = \case
    FloatGeOp  -> mkFloatingRelOpRule nm (>=)
    FloatLeOp  -> mkFloatingRelOpRule nm (<=)
    FloatLtOp  -> mkFloatingRelOpRule nm (<)
-   FloatEqOp  -> mkFloatingRelOpRule nm (==)
-   FloatNeOp  -> mkFloatingRelOpRule nm (/=)
 
    DoubleGtOp -> mkFloatingRelOpRule nm (>)
    DoubleGeOp -> mkFloatingRelOpRule nm (>=)
    DoubleLeOp -> mkFloatingRelOpRule nm (<=)
    DoubleLtOp -> mkFloatingRelOpRule nm (<)
-   DoubleEqOp -> mkFloatingRelOpRule nm (==)
-   DoubleNeOp -> mkFloatingRelOpRule nm (/=)
 
-   WordGtOp   -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
-   WordGeOp   -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
-   WordLeOp   -> mkRelOpRule nm (<=) [ boundsCmp Le ]
-   WordLtOp   -> mkRelOpRule nm (<)  [ boundsCmp Lt ]
-   WordEqOp   -> mkRelOpRule nm (==) [ litEq True ]
-   WordNeOp   -> mkRelOpRule nm (/=) [ litEq False ]
+   -- Misc
 
    AddrAddOp  -> mkPrimOpRule nm 2 [ rightIdentityPlatform zeroi ]
 
