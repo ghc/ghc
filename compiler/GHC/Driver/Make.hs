@@ -98,6 +98,7 @@ import GHC.Types.Unique.DSet
 import GHC.Types.Unique.Set
 import GHC.Types.Name
 import GHC.Types.Name.Env
+import GHC.Types.Unique.DFM (insertUDFMIntoLeft)
 
 import GHC.Unit
 import GHC.Unit.External
@@ -128,7 +129,6 @@ import Data.List (nub, sort, sortBy, partition)
 import qualified Data.List as List
 import Data.Foldable (toList)
 import Data.Maybe
-import qualified Data.Monoid as Monoid
 import Data.Ord ( comparing )
 import Data.Time
 import Data.Bifunctor (first)
@@ -1444,7 +1444,7 @@ parUpsweep_one mod home_mod_map mid_comp_mvar end_comp_mvar comp_graph_loops lcl
           else do
             hsc_env1 <- do
               let f hpt h = h {
-                        hsc_HPT = (hsc_HPT h) Monoid.<> hpt
+                        hsc_HPT = insertUDFMIntoLeft (hsc_HPT h) hpt
                         }
               -- i <- readMVar hsc_env_var
                   i = hsc_env0
@@ -1463,7 +1463,7 @@ parUpsweep_one mod home_mod_map mid_comp_mvar end_comp_mvar comp_graph_loops lcl
                 putStrLn $ "Unblocked(2): " ++ (show mod_index)
                 hsc_env5 <- do
                   let f hpt h = h {
-                            hsc_HPT = (hsc_HPT h) Monoid.<> hpt
+                            hsc_HPT = insertUDFMIntoLeft (hsc_HPT h) hpt
                             }
                       i = hsc_env4
                   pure $ foldr f i hpts
