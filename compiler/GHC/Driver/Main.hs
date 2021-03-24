@@ -87,6 +87,9 @@ module GHC.Driver.Main
     , ioMsgMaybe
     , showModuleIndex
     , hscAddSptEntries
+    , genModDetails
+    , hscIncrementalCheck
+    , hsc_typecheck
     ) where
 
 import GHC.Prelude

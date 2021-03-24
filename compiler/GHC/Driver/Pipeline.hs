@@ -23,7 +23,7 @@ module GHC.Driver.Pipeline (
 
         -- Interfaces for the compilation manager (interpreted/batch-mode)
    preprocess,
-   compileOne, compileOne',
+   compileOne, compileOne', compileOneBackend,
    link,
 
         -- Exports for hooks to override runPhase and link
