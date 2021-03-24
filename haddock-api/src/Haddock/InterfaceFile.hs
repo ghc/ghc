@@ -16,34 +16,25 @@
 -----------------------------------------------------------------------------
 module Haddock.InterfaceFile (
   InterfaceFile(..), ifUnitId, ifModule,
-  readInterfaceFile, nameCacheFromGhc, freshNameCache, NameCacheAccessor,
+  readInterfaceFile, freshNameCache,
   writeInterfaceFile, binaryInterfaceVersion, binaryInterfaceVersionCompatibility
 ) where
 
 
 import Haddock.Types
 
-import Control.Monad
-import Control.Monad.IO.Class ( MonadIO(..) )
-import Data.Array
 import Data.IORef
-import Data.List (mapAccumR)
 import qualified Data.Map as Map
 import Data.Map (Map)
 import Data.Word
 
-import GHC.Iface.Binary (getSymtabName, getDictFastString)
+import GHC.Iface.Binary (getWithUserData, putSymbolTable)
 import GHC.Utils.Binary
 import GHC.Data.FastMutInt
 import GHC.Data.FastString
 import GHC hiding (NoLink)
-import GHC.Driver.Monad (withSession)
-import GHC.Driver.Env
 import GHC.Types.Name.Cache
-import GHC.Iface.Env
-import GHC.Types.Name
 import GHC.Types.Unique.FM
-import GHC.Types.Unique.Supply
 import GHC.Types.Unique
 
 data InterfaceFile = InterfaceFile {
@@ -165,103 +156,31 @@ writeInterfaceFile filename iface = do
   return ()
 
 
-type NameCacheAccessor m = (m NameCache, NameCache -> m ())
-
-
-nameCacheFromGhc :: forall m. GhcMonad m => NameCacheAccessor m
-nameCacheFromGhc = ( read_from_session , write_to_session )
-  where
-    read_from_session = do
-       ref <- withSession (return . hsc_NC)
-       liftIO $ readIORef ref
-    write_to_session nc' = do
-       ref <- withSession (return . hsc_NC)
-       liftIO $ writeIORef ref nc'
-
-
-freshNameCache :: NameCacheAccessor IO
-freshNameCache = ( create_fresh_nc , \_ -> return () )
-  where
-    create_fresh_nc = do
-       u  <- mkSplitUniqSupply 'a' -- ??
-       return (initNameCache u [])
-
+freshNameCache :: IO NameCache
+freshNameCache = initNameCache 'a' -- ??
+                               []
 
 -- | Read a Haddock (@.haddock@) interface file. Return either an
 -- 'InterfaceFile' or an error message.
 --
 -- This function can be called in two ways.  Within a GHC session it will
 -- update the use and update the session's name cache.  Outside a GHC session
--- a new empty name cache is used.  The function is therefore generic in the
--- monad being used.  The exact monad is whichever monad the first
--- argument, the getter and setter of the name cache, requires.
---
-readInterfaceFile :: forall m.
-                     MonadIO m
-                  => NameCacheAccessor m
+-- a new empty name cache is used.
+readInterfaceFile :: NameCache
                   -> FilePath
                   -> Bool  -- ^ Disable version check. Can cause runtime crash.
-                  -> m (Either String InterfaceFile)
-readInterfaceFile (get_name_cache, set_name_cache) filename bypass_checks = do
-  bh0 <- liftIO $ readBinMem filename
+                  -> IO (Either String InterfaceFile)
+readInterfaceFile name_cache filename bypass_checks = do
+  bh <- readBinMem filename
 
-  magic   <- liftIO $ get bh0
-  version <- liftIO $ get bh0
-
-  case () of
-    _ | magic /= binaryInterfaceMagic -> return . Left $
-      "Magic number mismatch: couldn't load interface file: " ++ filename
-      | not bypass_checks
-      , (version `notElem` binaryInterfaceVersionCompatibility) -> return . Left $
-      "Interface file is of wrong version: " ++ filename
-      | otherwise -> with_name_cache $ \update_nc -> do
-
-      dict  <- get_dictionary bh0
-
-      -- read the symbol table so we are capable of reading the actual data
-      bh1 <- do
-          let bh1 = setUserData bh0 $ newReadState (error "getSymtabName")
-                                                   (getDictFastString dict)
-          symtab <- update_nc (get_symbol_table bh1)
-          return $ setUserData bh1 $ newReadState (getSymtabName (NCU (\f -> update_nc (return . f))) dict symtab)
-                                                  (getDictFastString dict)
-
-      -- load the actual data
-      iface <- liftIO $ get bh1
-      return (Right iface)
- where
-   with_name_cache :: forall a.
-                      ((forall n b. MonadIO n
-                                => (NameCache -> n (NameCache, b))
-                                -> n b)
-                       -> m a)
-                   -> m a
-   with_name_cache act = do
-      nc_var <-  get_name_cache >>= (liftIO . newIORef)
-      x <- act $ \f -> do
-              nc <- liftIO $ readIORef nc_var
-              (nc', x) <- f nc
-              liftIO $ writeIORef nc_var nc'
-              return x
-      liftIO (readIORef nc_var) >>= set_name_cache
-      return x
-
-   get_dictionary bin_handle = liftIO $ do
-      dict_p <- get bin_handle
-      data_p <- tellBin bin_handle
-      seekBin bin_handle dict_p
-      dict <- getDictionary bin_handle
-      seekBin bin_handle data_p
-      return dict
-
-   get_symbol_table bh1 theNC = liftIO $ do
-      symtab_p <- get bh1
-      data_p'  <- tellBin bh1
-      seekBin bh1 symtab_p
-      (nc', symtab) <- getSymbolTable bh1 theNC
-      seekBin bh1 data_p'
-      return (nc', symtab)
-
+  magic   <- get bh
+  if magic /= binaryInterfaceMagic
+    then return . Left $ "Magic number mismatch: couldn't load interface file: " ++ filename
+    else do
+      version <- get bh
+      if not bypass_checks && (version `notElem` binaryInterfaceVersionCompatibility)
+        then return . Left $ "Interface file is of wrong version: " ++ filename
+        else Right <$> getWithUserData name_cache bh
 
 -------------------------------------------------------------------------------
 -- * Symbol table
@@ -311,56 +230,6 @@ data BinDictionary = BinDictionary {
         bin_dict_map  :: !(IORef (UniqFM FastString (Int,FastString)))
                                 -- indexed by FastString
   }
-
-
-putSymbolTable :: BinHandle -> Int -> UniqFM Name (Int,Name) -> IO ()
-putSymbolTable bh next_off symtab = do
-  put_ bh next_off
-  let names = elems (array (0,next_off-1) (eltsUFM symtab))
-  mapM_ (\n -> serialiseName bh n symtab) names
-
-
-getSymbolTable :: BinHandle -> NameCache -> IO (NameCache, Array Int Name)
-getSymbolTable bh namecache = do
-  sz <- get bh
-  od_names <- replicateM sz (get bh)
-  let arr = listArray (0,sz-1) names
-      (namecache', names) = mapAccumR (fromOnDiskName arr) namecache od_names
-  return (namecache', arr)
-
-
-type OnDiskName = (Unit, ModuleName, OccName)
-
-
-fromOnDiskName
-   :: Array Int Name
-   -> NameCache
-   -> OnDiskName
-   -> (NameCache, Name)
-fromOnDiskName _ nc (pid, mod_name, occ) =
-  let
-        modu  = mkModule pid mod_name
-        cache = nsNames nc
-  in
-  case lookupOrigNameCache cache modu occ of
-     Just name -> (nc, name)
-     Nothing   ->
-        let
-                us        = nsUniqs nc
-                u         = uniqFromSupply us
-                name      = mkExternalName u modu occ noSrcSpan
-                new_cache = extendNameCache cache modu occ name
-        in
-        case splitUniqSupply us of { (us',_) ->
-        ( nc{ nsUniqs = us', nsNames = new_cache }, name )
-        }
-
-
-serialiseName :: BinHandle -> Name -> UniqFM Name (Int,Name) -> IO ()
-serialiseName bh name _ = do
-  let modu = nameModule name
-  put_ bh (moduleUnit modu, moduleName modu, nameOccName name)
-
 
 -------------------------------------------------------------------------------
 -- * GhcBinary instances

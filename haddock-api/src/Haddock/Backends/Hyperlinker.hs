@@ -9,6 +9,7 @@ module Haddock.Backends.Hyperlinker
 
 import Haddock.Types
 import Haddock.Utils (writeUtf8File, out, verbose, Verbosity)
+import Haddock.InterfaceFile
 import Haddock.Backends.Hyperlinker.Renderer
 import Haddock.Backends.Hyperlinker.Parser
 import Haddock.Backends.Hyperlinker.Types
@@ -20,7 +21,7 @@ import System.Directory
 import System.FilePath
 
 import GHC.Iface.Ext.Types  ( pattern HiePath, HieFile(..), HieASTs(..), HieAST(..), SourcedNodeInfo(..) )
-import GHC.Iface.Ext.Binary ( readHieFile, hie_file_result, NameCacheUpdater(..))
+import GHC.Iface.Ext.Binary ( readHieFile, hie_file_result )
 import GHC.Types.SrcLoc     ( realSrcLocSpan, mkRealSrcLoc )
 import Data.Map as M
 import GHC.Data.FastString     ( mkFastString )
@@ -58,15 +59,13 @@ ppHyperlinkedModuleSource :: Verbosity -> FilePath -> Bool -> SrcMaps -> Interfa
 ppHyperlinkedModuleSource verbosity srcdir pretty srcs iface = case ifaceHieFile iface of
     Just hfp -> do
         -- Parse the GHC-produced HIE file
-        u <- mkSplitUniqSupply 'a'
-        let nc = (initNameCache u [])
-            ncu = NCU $ \f -> pure $ snd $ f nc
+        nc <- freshNameCache
         HieFile { hie_hs_file = file
                 , hie_asts = HieASTs asts
                 , hie_types = types
                 , hie_hs_src = rawSrc
                 } <- hie_file_result
-                 <$> (readHieFile ncu hfp)
+                 <$> (readHieFile nc hfp)
 
         -- Get the AST and tokens corresponding to the source file we want
         let fileFs = mkFastString file
