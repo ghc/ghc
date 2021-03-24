@@ -322,6 +322,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_binds          = emptyLHsBinds,
                 tcg_imp_specs      = [],
                 tcg_sigs           = emptyNameSet,
+                tcg_ksigs          = emptyNameSet,
                 tcg_ev_binds       = emptyBag,
                 tcg_warns          = NoWarnings,
                 tcg_anns           = [],
