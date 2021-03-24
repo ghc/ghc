@@ -45,6 +45,7 @@ module Control.Applicative (
     (<$>), (<$), (<**>),
     liftA, liftA3,
     optional,
+    asum,
     ) where
 
 import Control.Category hiding ((.), id)
@@ -53,7 +54,7 @@ import Data.Maybe
 import Data.Tuple
 import Data.Eq
 import Data.Ord
-import Data.Foldable (Foldable(..))
+import Data.Foldable (Foldable(..), asum)
 import Data.Functor ((<$>))
 import Data.Functor.Const (Const(..))
 
