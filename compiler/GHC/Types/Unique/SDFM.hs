@@ -1,5 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ApplicativeDo #-}
+{-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -Wall #-}
 
 -- | Like a 'UniqDFM', but maintains equivalence classes of keys sharing the
@@ -11,7 +12,9 @@ module GHC.Types.Unique.SDFM (
         emptyUSDFM,
         lookupUSDFM,
         equateUSDFM, addToUSDFM,
-        traverseUSDFM
+        traverseUSDFM,
+
+        pprDebugUSDFM
     ) where
 
 import GHC.Prelude
@@ -19,6 +22,7 @@ import GHC.Prelude
 import GHC.Types.Unique
 import GHC.Types.Unique.DFM
 import GHC.Utils.Outputable
+import Data.Maybe (mapMaybe)
 
 -- | Either @Indirect x@, meaning the value is represented by that of @x@, or
 -- an @Entry@ containing containing the actual value it represents.
@@ -60,6 +64,14 @@ lookupReprAndEntryUSDFM (USDFM env) = go
     go x = case lookupUDFM env x of
       Nothing           -> (x, Nothing)
       Just (Indirect y) -> go y
+      Just (Entry ele)  -> (x, Just ele)
+
+lookupReprAndEntryUSDFM_Directly :: Uniquable key => UniqSDFM key ele -> Unique -> (Unique, Maybe ele)
+lookupReprAndEntryUSDFM_Directly (USDFM env) = go
+  where
+    go x = case lookupUDFM_Directly env x of
+      Nothing           -> (x, Nothing)
+      Just (Indirect y) -> go $ getUnique y
       Just (Entry ele)  -> (x, Just ele)
 
 -- | @lookupSUDFM env x@ looks up an entry for @x@, looking through all
@@ -119,3 +131,20 @@ instance (Outputable key, Outputable ele) => Outputable (Shared key ele) where
 
 instance (Outputable key, Outputable ele) => Outputable (UniqSDFM key ele) where
   ppr (USDFM env) = ppr env
+
+-- | Pretty print for debugging, showing all set members and their element:
+-- >>> [{u1,u2,u3} -> ele1,..]
+pprDebugUSDFM :: (Eq a, Uniquable key, Outputable a) => UniqSDFM key a -> SDoc
+pprDebugUSDFM usdfm@(USDFM env) = go
+  where
+    udfmLst = udfmToList env
+    keys = map fst udfmLst
+    elts = mapMaybe (\case
+                  (_, Entry e) -> Just e
+                  _            -> Nothing) udfmLst
+    sameElt e = filter (\k -> snd (lookupReprAndEntryUSDFM_Directly usdfm k) == Just e) keys
+    pprKeys ks = braces $ hcat $ punctuate comma (map ppr ks)
+    go = brackets
+        $ vcat
+        $ punctuate comma
+        $ map (\e -> hsep [pprKeys $ sameElt e, arrow, ppr e]) elts
