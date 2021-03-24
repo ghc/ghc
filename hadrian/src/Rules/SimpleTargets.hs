@@ -29,10 +29,16 @@ simplePackageTargets = traverse_ simpleTarget targets
 
 simpleTarget :: (Stage, Package) -> Rules ()
 simpleTarget (stage, target) = do
+  root <- buildRootRules
+
   let tgt = intercalate ":" [stagestr, typ, pkgname]
   tgt ~> do
     p <- getTargetPath stage target
     need [ p ]
+    -- build the _build/ghc-stageN wrappers if this is the ghc package
+    if target == Packages.ghc
+      then need [ root -/- ("ghc-" <> stagestr) ]
+      else pure ()
 
   where typ = if isLibrary target then "lib" else "exe"
         stagestr = stageString stage
