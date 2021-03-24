@@ -1,0 +1,6 @@
+
+MissingSignatures.hs:6:1: warning: [-Wmissing-pattern-synonym-signatures (in -Wall)]
+    Pattern synonym with no type signature: pattern Yes :: Bool
+
+MissingSignatures.hs:8:1: warning: [-Wmissing-signatures (in -Wall)]
+    Top-level binding with no type signature: foo :: Bool
