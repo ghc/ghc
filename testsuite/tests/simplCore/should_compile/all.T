@@ -347,3 +347,4 @@ test('T18995', [ grep_errmsg(r'print') ], compile, ['-O -ddump-simpl -dsuppress-
 test('T19168', normal, compile, [''])
 test('T19246', only_ways(['optasm']), multimod_compile, ['T19246', '-v0 -ddump-rules'])
 test('T19360', only_ways(['optasm']), compile, [''])
+test('T19586', normal, compile, [''])
