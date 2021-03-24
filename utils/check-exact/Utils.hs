@@ -51,7 +51,7 @@ import Control.Arrow
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Data.Data hiding ( Fixity )
-import Data.List
+import Data.List (foldl', sortBy, elemIndex)
 
 import Debug.Trace
 import Types
