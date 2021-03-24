@@ -3,10 +3,9 @@ Generating GHC's Unicode table
 
 WCsubst.c is generated with:
 
+    version=13.0.0
+    url=https://www.unicode.org/Public/$version/ucd/UnicodeData.txt
+    curl -L $url > UnicodeData.txt
     sh ubconfc 12.0.0 < UnicodeData.txt > WCsubst.c
-
-where UnicodeData.txt came from
-
-    https://www.unicode.org/Public/12.0.0/ucd/UnicodeData.txt
 
 Don't forget to mention the update in the User's Guide.
