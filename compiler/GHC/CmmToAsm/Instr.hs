@@ -117,7 +117,14 @@ class Instruction instr where
                 :: instr
                 -> Bool
 
-
+        -- | Check whether this instruction is conditionally executed.
+        --      This relates to predicated and conditional execution,
+        --      e.g., CMOV on x86, or most ARM instructions (CSET, ADDLT)...
+        --
+        --      Note: This explicitly excludes branch instructions.
+        isConditionalInstr
+                :: instr
+                -> Bool
 
         -- | Copy the value in a register to another one.
         --      Must work for all register classes.
