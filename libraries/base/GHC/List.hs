@@ -306,7 +306,7 @@ allocation-free. Also see #13001.
 -- | A strict version of 'foldl'.
 foldl'           :: forall a b . (b -> a -> b) -> b -> [a] -> b
 {-# INLINE foldl' #-}
-foldl' k z0 xs =
+foldl' k z0 = \xs ->
   foldr (\(v::a) (fn::b->b) -> oneShot (\(z::b) -> z `seq` fn (k z v))) (id :: b -> b) xs z0
   -- See Note [Left folds via right fold]
 
