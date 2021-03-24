@@ -241,7 +241,7 @@ tcLookupGlobal :: Name -> TcM TyThing
 tcLookupGlobal name
   = do  {    -- Try local envt
           env <- getGblEnv
-        ; case lookupNameEnv (tcg_type_env env) name of {
+        ; case lookupTypeEnv (tcg_type_env env) name of {
                 Just thing -> return thing ;
                 Nothing    ->
 
@@ -264,7 +264,7 @@ tcLookupGlobal name
 tcLookupGlobalOnly :: Name -> TcM TyThing
 tcLookupGlobalOnly name
   = do { env <- getGblEnv
-       ; return $ case lookupNameEnv (tcg_type_env env) name of
+       ; return $ case lookupTypeEnv (tcg_type_env env) name of
                     Just thing -> thing
                     Nothing    -> pprPanic "tcLookupGlobalOnly" (ppr name) }
 
@@ -407,8 +407,9 @@ tcExtendRecEnv :: [(Name,TyThing)] -> TcM r -> TcM r
 -- Just like tcExtendGlobalEnv, except the argument is a list of pairs
 tcExtendRecEnv gbl_stuff thing_inside
  = do  { tcg_env <- getGblEnv
-       ; let ge'      = extendNameEnvList (tcg_type_env tcg_env) gbl_stuff
-             tcg_env' = tcg_env { tcg_type_env = ge' }
+       ; let (TypeEnv te) = (tcg_type_env tcg_env)
+       ; let ge'      = extendNameEnvList te gbl_stuff
+             tcg_env' = tcg_env { tcg_type_env = TypeEnv ge' }
          -- No need for setGlobalTypeEnv (which side-effects the
          -- tcg_type_env_var); tcExtendRecEnv is used just
          -- when kind-check a group of type/class decls. It would
