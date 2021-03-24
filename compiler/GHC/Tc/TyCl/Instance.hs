@@ -1893,9 +1893,9 @@ tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
              <- setSrcSpan (getLocA hs_sig_ty) $
                 do { inst_sigs <- xoptM LangExt.InstanceSigs
                    ; checkTc inst_sigs (misplacedInstSig sel_name hs_sig_ty)
-                   ; sig_ty  <- tcHsSigType (FunSigCtxt sel_name False) hs_sig_ty
+                   ; sig_ty  <- tcHsSigType (FunSigCtxt sel_name Nothing) hs_sig_ty
                    ; let local_meth_ty = idType local_meth_id
-                         ctxt = FunSigCtxt sel_name False
+                         ctxt = FunSigCtxt sel_name Nothing
                                 -- False <=> do not report redundant constraints when
                                 --           checking instance-sig <= class-meth-sig
                                 -- The instance-sig is the focus here; the class-meth-sig
@@ -1905,7 +1905,7 @@ tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
                    ; return (sig_ty, hs_wrap) }
 
        ; inner_meth_name <- newName (nameOccName sel_name)
-       ; let ctxt = FunSigCtxt sel_name True
+       ; let ctxt = FunSigCtxt sel_name (lhsSigTypeContextSpan hs_sig_ty)
                     -- True <=> check for redundant constraints in the
                     --          user-specified instance signature
              inner_meth_id  = mkLocalId inner_meth_name Many sig_ty
@@ -1929,7 +1929,7 @@ tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
                           , abs_sig = True }) }
 
   | otherwise  -- No instance signature
-  = do { let ctxt = FunSigCtxt sel_name False
+  = do { let ctxt = FunSigCtxt sel_name Nothing
                     -- False <=> don't report redundant constraints
                     -- The signature is not under the users control!
              tc_sig = completeSigFromId ctxt local_meth_id
@@ -1947,6 +1947,22 @@ tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
     sel_name   = idName sel_id
     no_prag_fn = emptyPragEnv   -- No pragmas for local_meth_id;
                                 -- they are all for meth_id
+
+lhsSigTypeContextSpan :: LHsSigType GhcRn -> Maybe SrcSpan
+-- | Find the location of the top-level context of a HsType.  For example:
+--
+-- @
+--   forall a b. (Eq a, Ord b) => blah
+--               ^^^^^^^^^^^^^
+-- @
+-- If there is none, return Nothing
+lhsSigTypeContextSpan (L _ (HsSig { sig_body = hs_ty })) = go hs_ty
+  where
+    go :: LHsType GhcRn -> Maybe SrcSpan
+    go (L _ (HsQualTy { hst_ctxt = Just (L span _) })) = Just $ locA span -- Found it!
+    go (L _ (HsForAllTy { hst_body = hs_ty })) = go hs_ty  -- Look under foralls
+    go (L _ (HsParTy _ hs_ty)) = go hs_ty  -- Look under parens
+    go _ = Nothing  -- Did not find it
 
 
 ------------------------
