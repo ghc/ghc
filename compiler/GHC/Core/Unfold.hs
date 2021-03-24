@@ -960,7 +960,7 @@ certainlyWillInline opts fn_info
   = case fn_unf of
       CoreUnfolding { uf_tmpl = expr, uf_guidance = guidance, uf_src = src }
         | loop_breaker -> Nothing       -- Won't inline, so try w/w
-        | noinline     -> Nothing       -- See Note [Worker-wrapper for NOINLINE functions]
+        | noinline     -> Nothing       -- See Note [Worker/wrapper for NOINLINE functions]
         | otherwise
         -> case guidance of
              UnfNever  -> Nothing
@@ -1033,7 +1033,7 @@ certainlyWillInline /must/ return Nothing for a large INLINABLE thing,
 even though we have a stable inlining, so that strictness w/w takes
 place.  It makes a big difference to efficiency, and the w/w pass knows
 how to transfer the INLINABLE info to the worker; see WorkWrap
-Note [Worker-wrapper for INLINABLE functions]
+Note [Worker/wrapper for INLINABLE functions]
 
 ************************************************************************
 *                                                                      *

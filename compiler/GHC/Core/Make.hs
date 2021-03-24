@@ -978,7 +978,7 @@ It turned out that g didn't use the second component, and hence f doesn't use
 the first.  But the stable-unfolding for f looks like
    \x. case x of MkT a b -> g ($WMkT b a)
 where $WMkT is the wrapper for MkT that evaluates its arguments.  We
-apply the same w/w split to this unfolding (see Note [Worker-wrapper
+apply the same w/w split to this unfolding (see Note [Worker/wrapper
 for INLINEABLE functions] in GHC.Core.Opt.WorkWrap) so the template ends up like
    \b. let a = absentError "blah"
            x = MkT a b
