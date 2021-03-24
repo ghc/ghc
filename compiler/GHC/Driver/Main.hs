@@ -1,8 +1,9 @@
-{-# LANGUAGE CPP                      #-}
-{-# LANGUAGE BangPatterns             #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NondecreasingIndentation #-}
-{-# LANGUAGE LambdaCase               #-}
-{-# LANGUAGE ViewPatterns             #-}
+{-# LANGUAGE ViewPatterns #-}
+
 {-# OPTIONS_GHC -fprof-auto-top #-}
 
 -------------------------------------------------------------------------------
