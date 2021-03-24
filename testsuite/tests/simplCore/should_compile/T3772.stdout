@@ -70,9 +70,9 @@ foo [InlPrag=[final]] :: Int -> ()
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (w [Occ=Once1!] :: Int) ->
-                 case w of { GHC.Types.I# ww1 [Occ=Once1] -> T3772.$wfoo ww1 }}]
+                 case w of { GHC.Types.I# ww [Occ=Once1] -> T3772.$wfoo ww }}]
 foo
-  = \ (w :: Int) -> case w of { GHC.Types.I# ww1 -> T3772.$wfoo ww1 }
+  = \ (w :: Int) -> case w of { GHC.Types.I# ww -> T3772.$wfoo ww }
 
 
 
