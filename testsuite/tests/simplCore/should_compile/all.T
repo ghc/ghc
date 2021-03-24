@@ -352,6 +352,9 @@ test('T19360', only_ways(['optasm']), compile, [''])
 # If the test goes wrong we'll get more case expressions in the output
 test('T19581', [ grep_errmsg(r'case') ], compile, ['-O -ddump-simpl -dsuppress-uniques'])
 
+# T19586 should not generate missed specialisation warnings
+test('T19586', normal, compile, [''])
+
 test('T19599', normal, compile, ['-O -ddump-rules'])
 test('T19599a', normal, compile, ['-O -ddump-rules'])
 test('T13873',  [ grep_errmsg(r'SPEC') ], compile, ['-O -ddump-rules'])
