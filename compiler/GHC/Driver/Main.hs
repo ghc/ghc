@@ -284,7 +284,9 @@ clearWarnings :: Hsc ()
 clearWarnings = Hsc $ \_ _ -> return ((), emptyBag)
 
 logDiagnostics :: Bag (MsgEnvelope DiagnosticMessage) -> Hsc ()
-logDiagnostics w = Hsc $ \_ w0 -> return ((), w0 `unionBags` w)
+logDiagnostics w
+  | isEmptyBag w = pure ()
+  | otherwise    = Hsc $ \_ w0 -> return ((), w0 `unionBags` w)
 
 getHscEnv :: Hsc HscEnv
 getHscEnv = Hsc $ \e w -> return (e, w)
@@ -1338,7 +1340,7 @@ hscCheckSafe' m l = do
 
                 where
                     state = hsc_units hsc_env
-                    inferredImportWarn dflags = catBagMaybes $ unitBag
+                    inferredImportWarn dflags = maybeToBag
                         $ mkShortMsgEnvelope dflags (WarningWithFlag Opt_WarnInferredSafeImports)
                                              l (pkgQual state)
                         $ sep

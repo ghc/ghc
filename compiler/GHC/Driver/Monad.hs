@@ -33,6 +33,7 @@ module GHC.Driver.Monad (
   ) where
 
 import GHC.Prelude
+import GHC.Data.Bag ( isEmptyBag )
 
 import GHC.Driver.Session
 import GHC.Driver.Env
@@ -144,10 +145,12 @@ withTimingM doc force action = do
 -- | A monad that allows logging of warnings.
 
 logWarnings :: GhcMonad m => WarningMessages -> m ()
-logWarnings warns = do
-  dflags <- getSessionDynFlags
-  logger <- getLogger
-  liftIO $ printOrThrowDiagnostics logger dflags warns
+logWarnings warns
+  | isEmptyBag warns = pure ()
+  | otherwise = do
+      dflags <- getSessionDynFlags
+      logger <- getLogger
+      liftIO $ printOrThrowDiagnostics logger dflags warns
 
 -- -----------------------------------------------------------------------------
 -- | A minimal implementation of a 'GhcMonad'.  If you need a custom monad,

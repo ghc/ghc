@@ -1945,15 +1945,16 @@ warnNoDerivStrat :: Maybe (LDerivStrategy GhcRn)
                  -> RnM ()
 warnNoDerivStrat mds loc
   = do { dyn_flags <- getDynFlags
-       ; case mds of
-           Nothing -> addDiagnosticAt
-             (WarningWithFlag Opt_WarnMissingDerivingStrategies)
-             loc
-             (if xopt LangExt.DerivingStrategies dyn_flags
-               then no_strat_warning
-               else no_strat_warning $+$ deriv_strat_nenabled
-             )
-           _ -> pure ()
+       ; when (wopt Opt_WarnMissingDerivingStrategies dyn_flags) $
+           case mds of
+             Nothing -> addDiagnosticAt
+               (WarningWithFlag Opt_WarnMissingDerivingStrategies)
+               loc
+               (if xopt LangExt.DerivingStrategies dyn_flags
+                 then no_strat_warning
+                 else no_strat_warning $+$ deriv_strat_nenabled
+               )
+             _ -> pure ()
        }
   where
     no_strat_warning :: SDoc
