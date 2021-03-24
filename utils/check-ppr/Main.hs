@@ -45,8 +45,7 @@ testOneFile libdir fileName = do
                      $ showAstData BlankSrcSpan BlankApiAnnotations
                      $ eraseLayoutInfo (pm_parsed_source p)
          pped    = pragmas ++ "\n" ++ pp (pm_parsed_source p)
-         anns'   = pm_annotations p
-         pragmas = getPragmas anns'
+         pragmas = getPragmas (pm_parsed_source p)
 
          newFile = dropExtension fileName <.> "ppr" <.> takeExtension fileName
          astFile = fileName <.> "ast"
@@ -98,15 +97,15 @@ parseOneFile libdir fileName = do
                               ++ show (map (ml_hs_file . ms_location) xs)
          parseModule modSum
 
-getPragmas :: ApiAnns -> String
-getPragmas anns' = pragmaStr
+getPragmas :: Located HsModule -> String
+getPragmas (L _ (HsModule { hsmodAnn = anns'})) = pragmaStr
   where
     tokComment (L _ (AnnComment (AnnBlockComment s) _)) = s
     tokComment (L _ (AnnComment (AnnLineComment  s) _)) = s
     tokComment _ = ""
 
     cmp (L l1 _) (L l2 _) = compare (anchor l1) (anchor l2)
-    comments' = map tokComment $ sortBy cmp $ apiAnnRogueComments anns'
+    comments' = map tokComment $ sortBy cmp $ priorComments $ apiAnnComments anns'
     pragmas = filter (\c -> isPrefixOf "{-#" c ) comments'
     pragmaStr = intercalate "\n" pragmas
 
