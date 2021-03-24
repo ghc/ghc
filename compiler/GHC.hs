@@ -338,7 +338,7 @@ import GHC.Iface.Load        ( loadSysInterface )
 import GHC.Hs
 import GHC.Builtin.Types.Prim ( alphaTyVars )
 import GHC.Iface.Tidy
-import GHC.Data.Bag        (mapMaybeBag,  listToBag )
+import GHC.Data.Bag        ( maybeToBag, mapMaybeBag )
 import GHC.Data.StringBuffer
 import GHC.Data.FastString
 import qualified GHC.LanguageExtensions as LangExt
@@ -897,9 +897,10 @@ checkNewInteractiveDynFlags logger dflags0 = do
   -- We currently don't support use of StaticPointers in expressions entered on
   -- the REPL. See #12356.
   if xopt LangExt.StaticPointers dflags0
-  then do liftIO $ printOrThrowDiagnostics logger dflags0 $ listToBag $ catMaybes
-            [mkPlainMsgEnvelope dflags0 Session.WarningWithoutFlag interactiveSrcSpan
-             $ text "StaticPointers is not supported in GHCi interactive expressions."]
+  then do liftIO $ printOrThrowDiagnostics logger dflags0
+                 $ maybeToBag
+                 $ mkPlainMsgEnvelope dflags0 Session.WarningWithoutFlag interactiveSrcSpan
+                 $ text "StaticPointers is not supported in GHCi interactive expressions."
           return $ xopt_unset dflags0 LangExt.StaticPointers
   else return dflags0
 

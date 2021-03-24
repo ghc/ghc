@@ -72,9 +72,7 @@ import Data.List        ( partition, mapAccumL, sortBy, unfoldr )
 
 import {-# SOURCE #-} GHC.Tc.Errors.Hole ( findValidHoleFits )
 
--- import Data.Semigroup   ( Semigroup )
 import qualified Data.Semigroup as Semigroup
-import Data.Traversable (for)
 
 
 {-
@@ -810,7 +808,7 @@ mkGroupReporter mk_err ctxt cts
   = mapM_ (reportGroup mk_err ctxt . toList) (equivClasses cmp_loc cts)
 
 -- Like mkGroupReporter, but doesn't actually print error messages
-mkSuppressReporter :: (ReportErrCtxt -> [Ct] -> TcM (Maybe Report))
+mkSuppressReporter :: (ReportErrCtxt -> [Ct] -> TcM Report)
                    -> Reporter
 mkSuppressReporter mk_err ctxt cts
   = mapM_ (suppressGroup mk_err ctxt . toList) (equivClasses cmp_loc cts)
@@ -849,11 +847,11 @@ reportGroup mk_err ctxt cts
 
 -- like reportGroup, but does not actually report messages. It still adds
 -- -fdefer-type-errors bindings, though.
-suppressGroup :: (ReportErrCtxt -> [Ct] -> TcM (Maybe Report)) -> Reporter
+suppressGroup :: (ReportErrCtxt -> [Ct] -> TcM Report) -> Reporter
 suppressGroup mk_err ctxt cts
- = do { mb_err <- mk_err ctxt cts
+ = do { err <- mk_err ctxt cts
       ; traceTc "Suppressing errors for" (ppr cts)
-      ; whenIsJust mb_err $ \err -> mapM_ (addDeferredBinding ctxt err) cts }
+      ; mapM_ (addDeferredBinding ctxt err) cts }
 
 maybeReportError :: ReportErrCtxt -> Ct -> Report -> TcM ()
 maybeReportError ctxt ct report
@@ -868,33 +866,33 @@ addDeferredBinding ctxt err ct
   | deferringAnyBindings ctxt
   , CtWanted { ctev_pred = pred, ctev_dest = dest } <- ctEvidence ct
     -- Only add deferred bindings for Wanted constraints
-  = do { mb_err_tm <- mkErrorTerm ctxt (ctLoc ct) pred err
-       ; whenIsJust mb_err_tm $ \err_tm -> do
-           let ev_binds_var = cec_binds ctxt
+  = do { err_tm <- mkErrorTerm ctxt (ctLoc ct) pred err
+       ; let ev_binds_var = cec_binds ctxt
 
-           case dest of
-             EvVarDest evar
-               -> addTcEvBind ev_binds_var $ mkWantedEvBind evar err_tm
-             HoleDest hole
-               -> do { -- See Note [Deferred errors for coercion holes]
-                       let co_var = coHoleCoVar hole
-                     ; addTcEvBind ev_binds_var $ mkWantedEvBind co_var err_tm
-                     ; fillCoercionHole hole (mkTcCoVarCo co_var) }}
+       ; case dest of
+           EvVarDest evar
+             -> addTcEvBind ev_binds_var $ mkWantedEvBind evar err_tm
+           HoleDest hole
+             -> do { -- See Note [Deferred errors for coercion holes]
+                     let co_var = coHoleCoVar hole
+                   ; addTcEvBind ev_binds_var $ mkWantedEvBind co_var err_tm
+                   ; fillCoercionHole hole (mkTcCoVarCo co_var) }}
 
   | otherwise   -- Do not set any evidence for Given/Derived
   = return ()
 
 mkErrorTerm :: ReportErrCtxt -> CtLoc -> Type  -- of the error term
-            -> Report -> TcM (Maybe EvTerm)
+            -> Report -> TcM EvTerm
 mkErrorTerm ctxt ct_loc ty report
   = do { mb_msg <- mkErrorReport ErrorWithoutFlag ctxt (ctLocEnv ct_loc) report
-       ; for mb_msg $ \msg -> do
-           dflags <- getDynFlags
-           let err_msg = pprLocMsgEnvelope msg
-               err_fs  = mkFastString $ showSDoc dflags $
-                         err_msg $$ text "(deferred type error)"
+       ; case mb_msg of
+           Nothing -> panic "mkErrorReport ErrorWithoutFlag failed"
+           Just msg -> do { dflags <- getDynFlags
+                          ; let err_msg = pprLocMsgEnvelope msg
+                                err_fs  = mkFastString $ showSDoc dflags $
+                                          err_msg $$ text "(deferred type error)"
 
-           return $ evDelayedError ty err_fs }
+                          ; return $ evDelayedError ty err_fs }}
 
 tryReporters :: ReportErrCtxt -> [ReporterSpec] -> [Ct] -> TcM (ReportErrCtxt, [Ct])
 -- Use the first reporter in the list whose predicate says True
@@ -1267,10 +1265,10 @@ maybeAddDeferredBindings ctxt hole report = do
       -- not for holes in partial type signatures
       -- cf. addDeferredBinding
       when (deferringAnyBindings ctxt) $ do
-        mb_err_tm <- mkErrorTerm ctxt (hole_loc hole) ref_ty report
+        err_tm <- mkErrorTerm ctxt (hole_loc hole) ref_ty report
           -- NB: ref_ty, not hole_ty. hole_ty might be rewritten.
           -- See Note [Holes] in GHC.Tc.Types.Constraint
-        whenIsJust mb_err_tm $ writeMutVar ref
+        writeMutVar ref err_tm
     _ -> pure ()
 
 pp_occ_with_type :: OccName -> Type -> SDoc
@@ -1675,8 +1673,8 @@ pp_givens givens
 -- always be another unsolved wanted around, which will ordinarily suppress
 -- this message. But this can still be printed out with -fdefer-type-errors
 -- (sigh), so we must produce a message.
-mkBlockedEqErr :: ReportErrCtxt -> [Ct] -> TcM (Maybe Report)
-mkBlockedEqErr _ (ct:_) = return . Just $ important msg
+mkBlockedEqErr :: ReportErrCtxt -> [Ct] -> TcM Report
+mkBlockedEqErr _ (ct:_) = return $ important msg
   where
     msg = vcat [ hang (text "Cannot use equality for substitution:")
                    2 (ppr (ctPred ct))

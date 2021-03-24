@@ -356,11 +356,13 @@ addErrL msg = LintM $ \_mod _lf df _opts loc _scope errs -> ((), addErr df errs 
 
 addErr :: DynFlags -> Bag SDoc -> SDoc -> [LintLocInfo] -> Bag SDoc
 addErr dflags errs_so_far msg locs
-  = maybe errs_so_far (\m -> errs_so_far `snocBag` m) (mk_msg locs)
+  | Just msg_class <- Err.mkMCDiagnostic dflags WarningWithoutFlag
+  = errs_so_far `snocBag` (mk_msg locs msg_class)
+  | otherwise
+  = errs_so_far
   where
-    mk_msg (loc:_) = let (l,hdr) = dumpLoc loc
-                     in  (\m -> mkLocMessage m l (hdr $$ msg)) <$> Err.mkMCDiagnostic dflags WarningWithoutFlag
-    mk_msg []      = Just msg
+    mk_msg (loc:_) cls = let (l,hdr) = dumpLoc loc in mkLocMessage cls l (hdr $$ msg)
+    mk_msg [] _        = msg
 
 addLoc :: LintLocInfo -> LintM a -> LintM a
 addLoc extra_loc m = LintM $ \mod lf dflags opts loc scope errs
