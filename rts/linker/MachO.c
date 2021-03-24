@@ -52,8 +52,8 @@
  */
 int64_t signExtend(uint64_t val, uint8_t bits);
 /* Helper functions to check some instruction properties */
-bool isVectorOp(uint32_t *p);
-bool isLoadStore(uint32_t *p);
+static bool isVectorOp(uint32_t *p);
+static bool isLoadStore(uint32_t *p);
 
 /* aarch64 relocations may contain an addend already in the position
  * where we want to write the address offset to. Thus decoding as well
