@@ -1,6 +1,7 @@
-{-# LANGUAGE CPP                #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE MultiWayIf         #-}
+stylish-haskell: 0:0:Language.Haskell.Stylish.Config.loadConfig: fromJSON: expected Bool, but encountered String
+
+CallStack (from HasCallStack):
+  error, called at lib/Language/Haskell/Stylish/Config.hs:107:32 in stylish-haskell-0.11.0.0-8UlJa2UluVj5zyfhUBOANB:Language.Haskell.Stylish.Config
 
 {-# OPTIONS_HADDOCK not-home #-}
 
