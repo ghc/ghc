@@ -291,6 +291,7 @@ class Semigroup a => Monoid a where
         -- "Hello Haskell!"
         mconcat :: [a] -> a
         mconcat = foldr mappend mempty
+        {-# INLINE mconcat #-}
 
 -- | @since 4.9.0.0
 instance Semigroup [a] where
@@ -338,6 +339,8 @@ instance Semigroup b => Semigroup (a -> b) where
 -- | @since 2.01
 instance Monoid b => Monoid (a -> b) where
         mempty _ = mempty
+        -- This ensures that we use the mconcat defined for b.
+        mconcat fs = \x -> mconcat . map (\f -> f x) $ fs
 
 -- | @since 4.9.0.0
 instance Semigroup () where
