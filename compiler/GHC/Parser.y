@@ -1197,6 +1197,8 @@ topdecls_cs_semi :: { OrdList (LHsDecl GhcPs) }
         : topdecls_cs_semi topdecl_cs semis1 {% do { t <- amsA $2 $3
                                                    ; return ($1 `snocOL` t) }}
         | {- empty -}                  { nilOL }
+
+-- Each topdecl accumulates prior comments
 topdecl_cs :: { LHsDecl GhcPs }
 topdecl_cs : topdecl {% commentsPA $1 }
 

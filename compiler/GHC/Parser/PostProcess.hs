@@ -2826,7 +2826,7 @@ instance MonadP PV where
       PV_Ok s {
          pv_header_comments = header_comments',
          pv_comment_q = comment_q'
-       } (AnnCommentsBalanced [] (reverse newAnns))
+       } (AnnCommentsBalanced (fromMaybe [] header_comments') (reverse newAnns))
 
 {- Note [Parser-Validator Hint]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
