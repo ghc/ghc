@@ -286,6 +286,8 @@ Eventlog
 ``base`` library
 ~~~~~~~~~~~~~~~~
 
+- Character set metadata bumped to Unicode 13.0.0.
+
 - It's possible now to promote the ``Natural`` type: ::
 
     data Coordinate = Mk2D Natural Natural
