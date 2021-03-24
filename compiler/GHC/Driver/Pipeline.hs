@@ -202,8 +202,80 @@ compileOne' m_tc_result mHscMessage
                         always_do_basic_recompilation_check
                         m_tc_result mHscMessage
                         hsc_env summary source_modified mb_old_iface (mod_index, nmods)
+
    -- Use an HscEnv updated with the plugin info
-   let hsc_env' = plugin_hsc_env
+   compileOneBackend summary mb_old_linkable (status, plugin_hsc_env)
+
+ where dflags0     = ms_hspp_opts summary
+       location    = ms_location summary
+       input_fn    = expectJust "compile:hs" (ml_hs_file location)
+       input_fnpp  = ms_hspp_file summary
+       mod_graph   = hsc_mod_graph hsc_env0
+       needsLinker = needsTemplateHaskellOrQQ mod_graph
+       isDynWay    = any (== WayDyn) (ways dflags0)
+       isProfWay   = any (== WayProf) (ways dflags0)
+       internalInterpreter = not (gopt Opt_ExternalInterpreter dflags0)
+
+       -- #8180 - when using TemplateHaskell, switch on -dynamic-too so
+       -- the linker can correctly load the object files.  This isn't necessary
+       -- when using -fexternal-interpreter.
+       dflags1 = if hostIsDynamic && internalInterpreter &&
+                    not isDynWay && not isProfWay && needsLinker
+                  then gopt_set dflags0 Opt_BuildDynamicToo
+                  else dflags0
+
+       -- #16331 - when no "internal interpreter" is available but we
+       -- need to process some TemplateHaskell or QuasiQuotes, we automatically
+       -- turn on -fexternal-interpreter.
+       dflags2 = if not internalInterpreter && needsLinker
+                 then gopt_set dflags1 Opt_ExternalInterpreter
+                 else dflags1
+
+       -- We add the directory in which the .hs files resides) to the import
+       -- path.  This is needed when we try to compile the .hc file later, if it
+       -- imports a _stub.h file that we created here.
+       current_dir = takeDirectory input_fn
+       old_paths   = includePaths dflags2
+       loadAsByteCode
+         | Just (Target _ obj _) <- findTarget summary (hsc_targets hsc_env0)
+         , not obj
+         = True
+         | otherwise = False
+       -- Figure out which backend we're using
+       (bcknd, dflags3)
+         -- #8042: When module was loaded with `*` prefix in ghci, but DynFlags
+         -- suggest to generate object code (which may happen in case -fobject-code
+         -- was set), force it to generate byte-code. This is NOT transitive and
+         -- only applies to direct targets.
+         | loadAsByteCode
+         = (Interpreter, dflags2 { backend = Interpreter })
+         | otherwise
+         = (backend dflags2, dflags2)
+       dflags  = dflags3 { includePaths = addQuoteInclude old_paths [current_dir] }
+       hsc_env = hsc_env0 {hsc_dflags = dflags}
+
+       logger = hsc_logger hsc_env
+
+       -- -fforce-recomp should also work with --make
+       force_recomp = gopt Opt_ForceRecomp dflags
+       source_modified
+         -- #8042: Usually pre-compiled code is preferred to be loaded in ghci
+         -- if available. So, if the "*" prefix was used, force recompilation
+         -- to make sure byte-code is loaded.
+         | force_recomp || loadAsByteCode = SourceModified
+         | otherwise = source_modified0
+
+       always_do_basic_recompilation_check = case bcknd of
+                                             Interpreter -> True
+                                             _ -> False
+
+compileOneBackend
+  :: ModSummary
+  -> Maybe Linkable  -- ^ old linkable, if we have one
+  -> (HscStatus, HscEnv)
+  -> IO HomeModInfo
+compileOneBackend summary mb_old_linkable (status, hsc_env)
+ = do
 
    unless (gopt Opt_KeepHiFiles dflags) $
         addFilesToClean tmpfs TFL_CurrentModule $
@@ -241,7 +313,7 @@ compileOne' m_tc_result mHscMessage
             -- #10660: Use the pipeline instead of calling
             -- compileEmptyStub directly, so -dynamic-too gets
             -- handled properly
-            _ <- runPipeline StopLn hsc_env'
+            _ <- runPipeline StopLn hsc_env
                               (output_fn,
                                Nothing,
                                Just (HscOut src_flavour
@@ -261,15 +333,15 @@ compileOne' m_tc_result mHscMessage
                    }, Interpreter) -> do
             -- In interpreted mode the regular codeGen backend is not run so we
             -- generate a interface without codeGen info.
-            final_iface <- mkFullIface hsc_env' partial_iface Nothing
+            final_iface <- mkFullIface hsc_env partial_iface Nothing
             liftIO $ hscMaybeWriteIface logger dflags True final_iface mb_old_iface_hash (ms_location summary)
 
-            (hasStub, comp_bc, spt_entries) <- hscInteractive hsc_env' cgguts mod_location
+            (hasStub, comp_bc, spt_entries) <- hscInteractive hsc_env cgguts mod_location
 
             stub_o <- case hasStub of
                       Nothing -> return []
                       Just stub_c -> do
-                          stub_o <- compileStub hsc_env' stub_c
+                          stub_o <- compileStub hsc_env stub_c
                           return [DotO stub_o]
 
             let hs_unlinked = [BCOs comp_bc spt_entries]
@@ -288,7 +360,7 @@ compileOne' m_tc_result mHscMessage
                             (Temporary TFL_CurrentModule)
                             basename dflags next_phase (Just location)
             -- We're in --make mode: finish the compilation pipeline.
-            (_, _, Just (iface, details)) <- runPipeline StopLn hsc_env'
+            (_, _, Just (iface, details)) <- runPipeline StopLn hsc_env
                               (output_fn,
                                Nothing,
                                Just (HscOut src_flavour mod_name status))
@@ -301,77 +373,21 @@ compileOne' m_tc_result mHscMessage
             let !linkable = LM o_time this_mod [DotO object_filename]
             return $! HomeModInfo iface details (Just linkable)
 
- where dflags0     = ms_hspp_opts summary
-       this_mod    = ms_mod summary
+ where this_mod    = ms_mod summary
        location    = ms_location summary
        input_fn    = expectJust "compile:hs" (ml_hs_file location)
-       input_fnpp  = ms_hspp_file summary
-       mod_graph   = hsc_mod_graph hsc_env0
-       needsLinker = needsTemplateHaskellOrQQ mod_graph
-       isDynWay    = any (== WayDyn) (ways dflags0)
-       isProfWay   = any (== WayProf) (ways dflags0)
-       internalInterpreter = not (gopt Opt_ExternalInterpreter dflags0)
+       basename = dropExtension input_fn
 
        src_flavour = ms_hsc_src summary
        mod_name = ms_mod_name summary
        next_phase = hscPostBackendPhase src_flavour bcknd
        object_filename = ml_obj_file location
 
-       -- #8180 - when using TemplateHaskell, switch on -dynamic-too so
-       -- the linker can correctly load the object files.  This isn't necessary
-       -- when using -fexternal-interpreter.
-       dflags1 = if hostIsDynamic && internalInterpreter &&
-                    not isDynWay && not isProfWay && needsLinker
-                  then gopt_set dflags0 Opt_BuildDynamicToo
-                  else dflags0
-
-       -- #16331 - when no "internal interpreter" is available but we
-       -- need to process some TemplateHaskell or QuasiQuotes, we automatically
-       -- turn on -fexternal-interpreter.
-       dflags2 = if not internalInterpreter && needsLinker
-                 then gopt_set dflags1 Opt_ExternalInterpreter
-                 else dflags1
-
-       basename = dropExtension input_fn
-
-       -- We add the directory in which the .hs files resides) to the import
-       -- path.  This is needed when we try to compile the .hc file later, if it
-       -- imports a _stub.h file that we created here.
-       current_dir = takeDirectory basename
-       old_paths   = includePaths dflags2
-       loadAsByteCode
-         | Just (Target _ obj _) <- findTarget summary (hsc_targets hsc_env0)
-         , not obj
-         = True
-         | otherwise = False
-       -- Figure out which backend we're using
-       (bcknd, dflags3)
-         -- #8042: When module was loaded with `*` prefix in ghci, but DynFlags
-         -- suggest to generate object code (which may happen in case -fobject-code
-         -- was set), force it to generate byte-code. This is NOT transitive and
-         -- only applies to direct targets.
-         | loadAsByteCode
-         = (Interpreter, dflags2 { backend = Interpreter })
-         | otherwise
-         = (backend dflags2, dflags2)
-       dflags  = dflags3 { includePaths = addQuoteInclude old_paths [current_dir] }
-       hsc_env = hsc_env0 {hsc_dflags = dflags}
+       dflags = hsc_dflags hsc_env
+       bcknd = backend dflags
 
        logger = hsc_logger hsc_env
        tmpfs  = hsc_tmpfs hsc_env
-
-       -- -fforce-recomp should also work with --make
-       force_recomp = gopt Opt_ForceRecomp dflags
-       source_modified
-         -- #8042: Usually pre-compiled code is preferred to be loaded in ghci
-         -- if available. So, if the "*" prefix was used, force recompilation
-         -- to make sure byte-code is loaded.
-         | force_recomp || loadAsByteCode = SourceModified
-         | otherwise = source_modified0
-
-       always_do_basic_recompilation_check = case bcknd of
-                                             Interpreter -> True
-                                             _ -> False
 
 -----------------------------------------------------------------------------
 -- stub .h and .c files (for foreign export support), and cc files.
