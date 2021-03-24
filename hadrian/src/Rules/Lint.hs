@@ -3,8 +3,11 @@ module Rules.Lint
   ) where
 
 import Base
-import Settings.Builders.Common
+import Context.Path (buildPath)
+import qualified Packages as P
+import Settings.Builders.Common (Setting (..), setting, topDirectory, vanillaContext)
 import System.Directory (findExecutable)
+
 
 lintRules :: Rules ()
 lintRules = do
@@ -13,7 +16,7 @@ lintRules = do
 
 lint :: Action () -> Action ()
 lint lintAction = do
-  isHlintPresent <- isJust <$> (liftIO $ findExecutable "hlint")
+  isHlintPresent <- isJust <$> liftIO (findExecutable "hlint")
   if isHlintPresent
   then do
     putBuild "| Running the linter…"
@@ -25,23 +28,22 @@ lint lintAction = do
 base :: Action ()
 base = do
   topDir   <- topDirectory
-  buildDir <- buildRoot
-  let stage1Lib    = topDir </> buildDir </> "stage1/lib"
-  let machDeps     = topDir </> "includes/MachDeps.h"
-  let hsBaseConfig = topDir </> buildDir </> "stage1/libraries/base/build/include/HsBaseConfig.h"
-  let ghcautoconf  = stage1Lib </> "ghcautoconf.h"
-  let ghcplatform  = stage1Lib </> "ghcplatform.h"
-  need [ghcautoconf, ghcplatform, machDeps, hsBaseConfig]
-  let include0  = topDir </> "includes"
-  let include1  = topDir </> "libraries/base/include"
-  let include2  = stage1Lib
-  let include3  = topDir </> buildDir </> "stage1/libraries/base/build/include"
+  let context = vanillaContext Stage1 P.base
+  stage1Lib <- stageLibPath Stage1
+  let basePath = topDir </> pkgPath P.base
+  let topIncludes = topDir </> "includes"
+  includeDeps' <- includesDependencies Stage1
+  buildPath' <- buildPath context
+  let buildIncludes = topDir </> buildPath' </> "include"
+  let includeDeps = fmap (topDir </>) includeDeps'
+  need includeDeps
+  let baseIncludes  = topDir </> basePath </> "include"
   let hlintYaml = topDir </> "libraries/base/.hlint.yaml"
   hostArch <- (<> "_HOST_ARCH") <$> setting HostArch
-  let cmdLine = "hlint -j --cpp-define " <> hostArch <> " --cpp-include=" <> include0 <>
-                " --cpp-include=" <> include1 <>
-                " --cpp-include=" <> include2 <>
-                " --cpp-include=" <> include3 <>
+  let cmdLine = "hlint -j --cpp-define " <> hostArch <> " --cpp-include=" <> topIncludes <>
+                " --cpp-include=" <> buildIncludes <>
+                " --cpp-include=" <> stage1Lib <>
+                " --cpp-include=" <> baseIncludes <>
                 " -h " <> hlintYaml <> " libraries/base"
   putBuild $ "| " <> cmdLine
   cmd_ cmdLine
