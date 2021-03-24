@@ -97,6 +97,8 @@ import Data.IORef( IORef )
 import GHC.Types.Unique.Set
 import GHC.Core.Multiplicity
 
+import qualified Data.Semigroup as S
+
 {-
 Note [TcCoercions]
 ~~~~~~~~~~~~~~~~~~
@@ -293,6 +295,25 @@ instance Data.Data HsWrapper where
   toConstr (WpMultCoercion _) = wpMultCoercion_constr
 
   dataTypeOf _ = hsWrapper_dataType
+
+-- | The Semigroup instance is a bit fishy, since @WpCompose@, as a data
+-- constructor, is "syntactic" and not associative. Concretely, if @a@, @b@,
+-- and @c@ aren't @WpHole@:
+--
+-- > (a <> b) <> c ?= a <> (b <> c)
+--
+-- ==>
+--
+-- > (a `WpCompose` b) `WpCompose` c /= @ a `WpCompose` (b `WpCompose` c)
+--
+-- However these two associations are are "semantically equal" in the sense
+-- that they produce equal functions when passed to
+-- @GHC.HsToCore.Binds.dsHsWrapper@.
+instance S.Semigroup HsWrapper where
+  (<>) = (<.>)
+
+instance Monoid HsWrapper where
+  mempty = WpHole
 
 hsWrapper_dataType :: Data.DataType
 hsWrapper_dataType
