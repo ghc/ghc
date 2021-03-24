@@ -152,7 +152,7 @@ void ocProtectExtras(ObjectCode* oc)
 }
 
 
-#if !defined(arm_HOST_ARCH)
+#if defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH)
 SymbolExtra* makeSymbolExtra( ObjectCode const* oc,
                               unsigned long symbolNumber,
                               unsigned long target )
@@ -189,6 +189,6 @@ SymbolExtra* makeSymbolExtra( ObjectCode const* oc,
 
     return extra;
 }
-#endif /* !arm_HOST_ARCH */
+#endif /* powerpc_HOST_ARCH || x86_64_HOST_ARCH */
 #endif /* !x86_64_HOST_ARCH) || !mingw32_HOST_OS */
 #endif // NEED_SYMBOL_EXTRAS
