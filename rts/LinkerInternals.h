@@ -171,7 +171,7 @@ typedef struct _Segment {
     int n_sections;
 } Segment;
 
-#if defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH) || defined(aarch64_HOST_ARCH)
+#if defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH) || defined(arm_HOST_ARCH) || defined(aarch64_HOST_ARCH)
 #define NEED_SYMBOL_EXTRAS 1
 #endif
 

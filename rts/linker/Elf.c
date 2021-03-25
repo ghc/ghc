@@ -706,12 +706,13 @@ ocGetNames_ELF ( ObjectCode* oc )
 #if defined(NEED_GOT) || RTS_LINKER_USE_MMAP
           if (USE_CONTIGUOUS_MMAP || RtsFlags.MiscFlags.linkerAlwaysPic) {
               /* The space for bss sections is already preallocated */
-              ASSERT(oc->bssBegin != NULL);
+              CHECK(oc->bssBegin != NULL);
               alloc = SECTION_NOMEM;
+              CHECK(oc->image != 0x0);
               start =
                 oc->image + roundUpToAlign(oc->bssBegin - oc->image, align);
               oc->bssBegin = (char*)start + size;
-              ASSERT(oc->bssBegin <= oc->bssEnd);
+              CHECK(oc->bssBegin <= oc->bssEnd);
           } else {
               /* Use mmapForLinker to allocate .bss, otherwise the malloced
                * address might be out of range for sections that are mmaped.
@@ -726,6 +727,7 @@ ocGetNames_ELF ( ObjectCode* oc )
               mapped_offset = 0;
               mapped_size = roundUpToPage(size);
           }
+          CHECK(start != 0x0);
 #else
           alloc = SECTION_MALLOC;
           start = stgCallocBytes(1, size, "ocGetNames_ELF(BSS)");
