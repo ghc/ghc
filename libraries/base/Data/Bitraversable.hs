@@ -16,7 +16,6 @@
 module Data.Bitraversable
   ( Bitraversable(..)
   , bisequenceA
-  , bisequence
   , bimapM
   , bifor
   , biforM
@@ -129,11 +128,29 @@ class (Bifunctor t, Bifoldable t) => Bitraversable t where
   bitraverse :: Applicative f => (a -> f c) -> (b -> f d) -> t a b -> f (t c d)
   bitraverse f g = bisequenceA . bimap f g
 
--- | Alias for 'bisequence'.
---
--- @since 4.10.0.0
-bisequenceA :: (Bitraversable t, Applicative f) => t (f a) (f b) -> f (t a b)
-bisequenceA = bisequence
+  -- | Sequences all the actions in a structure, building a new structure with
+  -- the same shape using the results of the actions. For a version that ignores
+  -- the results, see 'bisequence_'.
+  --
+  -- @'bisequence' ≡ 'bitraverse' 'id' 'id'@
+  --
+  -- ==== __Examples__
+  --
+  -- Basic usage:
+  --
+  -- >>> bisequence (Just 4, Nothing)
+  -- Nothing
+  --
+  -- >>> bisequence (Just 4, Just 5)
+  -- Just (4,5)
+  --
+  -- >>> bisequence ([1, 2, 3], [4, 5])
+  -- [(1,4),(1,5),(2,4),(2,5),(3,4),(3,5)]
+  --
+  -- @since 4.10.0.0
+  bisequence :: Applicative f => t (f a) (f b) -> f (t a b)
+  bisequence = bitraverse id id
+  {-# MINIMAL bisequence | bitraverse #-}
 
 -- | Alias for 'bitraverse'.
 --
@@ -142,28 +159,11 @@ bimapM :: (Bitraversable t, Applicative f)
        => (a -> f c) -> (b -> f d) -> t a b -> f (t c d)
 bimapM = bitraverse
 
--- | Sequences all the actions in a structure, building a new structure with
--- the same shape using the results of the actions. For a version that ignores
--- the results, see 'bisequence_'.
---
--- @'bisequence' ≡ 'bitraverse' 'id' 'id'@
---
--- ==== __Examples__
---
--- Basic usage:
---
--- >>> bisequence (Just 4, Nothing)
--- Nothing
---
--- >>> bisequence (Just 4, Just 5)
--- Just (4,5)
---
--- >>> bisequence ([1, 2, 3], [4, 5])
--- [(1,4),(1,5),(2,4),(2,5),(3,4),(3,5)]
+-- | Alias for 'bisequenceA'.
 --
 -- @since 4.10.0.0
-bisequence :: (Bitraversable t, Applicative f) => t (f a) (f b) -> f (t a b)
-bisequence = bitraverse id id
+bisequenceA :: (Bitraversable t, Applicative f) => t (f a) (f b) -> f (t a b)
+bisequenceA = bisequence
 
 -- | @since 4.10.0.0
 instance Bitraversable (,) where
