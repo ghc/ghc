@@ -1128,7 +1128,7 @@ parseModule ms = do
    let hsc_env_tmp = hsc_env { hsc_dflags = ms_hspp_opts ms }
    hpm <- liftIO $ hscParse hsc_env_tmp ms
    return (ParsedModule ms (hpm_module hpm) (hpm_src_files hpm))
-               -- See Note [Api annotations] in GHC.Parser.Annotation
+               -- See Note [exact print annotations] in GHC.Parser.Annotation
 
 -- | Typecheck and rename a parsed module.
 --

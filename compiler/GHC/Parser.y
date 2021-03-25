@@ -4140,7 +4140,7 @@ reportEmptyDoubleQuotes span = do
 %*                                                                      *
 %************************************************************************
 
-For the general principles of the following routines, see Note [Api annotations]
+For the general principles of the following routines, see Note [exact print annotations]
 in GHC.Parser.Annotation
 
 -}
