@@ -163,7 +163,7 @@ type instance XHsRecField _ = ApiAnn
 -- API Annotations types
 
 data ApiAnnSumPat = ApiAnnSumPat
-      { sumPatParens      :: [AddApiAnn]
+      { sumPatParens      :: [AddEpAnn]
       , sumPatVbarsBefore :: [AnnAnchor]
       , sumPatVbarsAfter  :: [AnnAnchor]
       } deriving Data

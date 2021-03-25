@@ -151,7 +151,7 @@ type instance XHsForAllInvis (GhcPass _) = ApiAnnForallTy
 
 type instance XXHsForAllTelescope (GhcPass _) = NoExtCon
 
-type ApiAnnForallTy = ApiAnn' (AddApiAnn, AddApiAnn)
+type ApiAnnForallTy = ApiAnn' (AddEpAnn, AddEpAnn)
   -- ^ Location of 'forall' and '->' for HsForAllVis
   -- Location of 'forall' and '.' for HsForAllInvis
 
@@ -474,15 +474,15 @@ mkHsAppKindTy ext ty k
 -- It returns API Annotations for any parens removed
 splitHsFunType ::
      LHsType (GhcPass p)
-  -> ( [AddApiAnn], ApiAnnComments -- The locations of any parens and
-                                   -- comments discarded
+  -> ( [AddEpAnn], ApiAnnComments -- The locations of any parens and
+                                  -- comments discarded
      , [HsScaled (GhcPass p) (LHsType (GhcPass p))], LHsType (GhcPass p))
 splitHsFunType ty = go ty
   where
     go (L l (HsParTy an ty))
       = let
           (anns, cs, args, res) = splitHsFunType ty
-          anns' = anns ++ annParen2AddApiAnn an
+          anns' = anns ++ annParen2AddEpAnn an
           cs' = cs S.<> apiAnnComments (ann l) S.<> apiAnnComments an
         in (anns', cs', args, res)
 
