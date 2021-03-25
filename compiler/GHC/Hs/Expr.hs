@@ -207,14 +207,14 @@ could only do that if the extension field was strict (#18764)
 -- API Annotations types
 
 data EpAnnHsCase = EpAnnHsCase
-      { hsCaseAnnCase :: AnnAnchor
-      , hsCaseAnnOf   :: AnnAnchor
+      { hsCaseAnnCase :: EpaAnchor
+      , hsCaseAnnOf   :: EpaAnchor
       , hsCaseAnnsRest :: [AddEpAnn]
       } deriving Data
 
 data EpAnnUnboundVar = EpAnnUnboundVar
-     { hsUnboundBackquotes :: (AnnAnchor, AnnAnchor)
-     , hsUnboundHole       :: AnnAnchor
+     { hsUnboundBackquotes :: (EpaAnchor, EpaAnchor)
+     , hsUnboundHole       :: EpaAnchor
      } deriving Data
 
 type instance XVar           (GhcPass _) = NoExtField
@@ -378,27 +378,27 @@ data XXExprGhcTc
 
 data AnnExplicitSum
   = AnnExplicitSum {
-      aesOpen       :: AnnAnchor,
-      aesBarsBefore :: [AnnAnchor],
-      aesBarsAfter  :: [AnnAnchor],
-      aesClose      :: AnnAnchor
+      aesOpen       :: EpaAnchor,
+      aesBarsBefore :: [EpaAnchor],
+      aesBarsAfter  :: [EpaAnchor],
+      aesClose      :: EpaAnchor
       } deriving Data
 
 data AnnsLet
   = AnnsLet {
-      alLet :: AnnAnchor,
-      alIn :: AnnAnchor
+      alLet :: EpaAnchor,
+      alIn :: EpaAnchor
       } deriving Data
 
 data AnnFieldLabel
   = AnnFieldLabel {
-      afDot :: Maybe AnnAnchor
+      afDot :: Maybe EpaAnchor
       } deriving Data
 
 data AnnProjection
   = AnnProjection {
-      apOpen  :: AnnAnchor, -- ^ '('
-      apClose :: AnnAnchor  -- ^ ')'
+      apOpen  :: EpaAnchor, -- ^ '('
+      apClose :: EpaAnchor  -- ^ ')'
       } deriving Data
 
 -- ---------------------------------------------------------------------
@@ -411,7 +411,7 @@ type instance XXHsFieldLabel (GhcPass _) = NoExtCon
 
 type instance XPresent         (GhcPass _) = EpAnn
 
-type instance XMissing         GhcPs = EpAnn' AnnAnchor
+type instance XMissing         GhcPs = EpAnn' EpaAnchor
 type instance XMissing         GhcRn = NoExtField
 type instance XMissing         GhcTc = Scaled Type
 
@@ -1186,7 +1186,7 @@ type instance XXGRHSs (GhcPass _) _ = NoExtCon
 
 data GrhsAnn
   = GrhsAnn {
-      ga_vbar :: Maybe AnnAnchor, -- TODO:AZ do we need this?
+      ga_vbar :: Maybe EpaAnchor, -- TODO:AZ do we need this?
       ga_sep  :: AddEpAnn -- ^ Match separator location
       } deriving (Data)
 
