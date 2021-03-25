@@ -126,7 +126,7 @@ deriving instance Data HsModule
 
 data AnnsModule
   = AnnsModule {
-    am_main :: [AddApiAnn],
+    am_main :: [AddEpAnn],
     am_decls :: AnnList
     } deriving (Data, Eq)
 
