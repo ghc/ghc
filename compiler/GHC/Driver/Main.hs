@@ -431,7 +431,7 @@ hscParse' mod_summary
                         FormatHaskell (ppr rdr_module)
             liftIO $ dumpIfSet_dyn logger dflags Opt_D_dump_parsed_ast "Parser AST"
                         FormatHaskell (showAstData NoBlankSrcSpan
-                                                   NoBlankApiAnnotations
+                                                   NoBlankEpAnnotations
                                                    rdr_module)
             liftIO $ dumpIfSet_dyn logger dflags Opt_D_source_stats "Source Statistics"
                         FormatText (ppSourceStats False rdr_module)
@@ -484,7 +484,7 @@ extract_renamed_stuff mod_summary tc_result = do
     dflags <- getDynFlags
     logger <- getLogger
     liftIO $ dumpIfSet_dyn logger dflags Opt_D_dump_rn_ast "Renamer"
-                FormatHaskell (showAstData NoBlankSrcSpan NoBlankApiAnnotations rn_info)
+                FormatHaskell (showAstData NoBlankSrcSpan NoBlankEpAnnotations rn_info)
 
     -- Create HIE files
     when (gopt Opt_WriteHie dflags) $ do
@@ -2080,7 +2080,7 @@ hscParseThingWithLocation source linenumber parser str = do
                 liftIO $ dumpIfSet_dyn logger dflags Opt_D_dump_parsed "Parser"
                             FormatHaskell (ppr thing)
                 liftIO $ dumpIfSet_dyn logger dflags Opt_D_dump_parsed_ast "Parser AST"
-                            FormatHaskell (showAstData NoBlankSrcSpan NoBlankApiAnnotations thing)
+                            FormatHaskell (showAstData NoBlankSrcSpan NoBlankEpAnnotations thing)
                 return thing
 
 

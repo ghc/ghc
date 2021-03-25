@@ -65,7 +65,7 @@ module GHC.Parser.Lexer (
    ExtBits(..),
    xtest, xunset, xset,
    lexTokenStream,
-   mkParensApiAnn,
+   mkParensEpAnn,
    getCommentsFor, getPriorCommentsFor, getFinalCommentsFor,
    getEofPos,
    commentToAnnotation,
@@ -2892,13 +2892,13 @@ class Monad m => MonadP m where
   getBit :: ExtBits -> m Bool
   -- | Go through the @comment_q@ in @PState@ and remove all comments
   -- that belong within the given span
-  allocateCommentsP :: RealSrcSpan -> m ApiAnnComments
+  allocateCommentsP :: RealSrcSpan -> m EpAnnComments
   -- | Go through the @comment_q@ in @PState@ and remove all comments
   -- that come before or within the given span
-  allocatePriorCommentsP :: RealSrcSpan -> m ApiAnnComments
+  allocatePriorCommentsP :: RealSrcSpan -> m EpAnnComments
   -- | Go through the @comment_q@ in @PState@ and remove all comments
   -- that come after the given span
-  allocateFinalCommentsP :: RealSrcSpan -> m ApiAnnComments
+  allocateFinalCommentsP :: RealSrcSpan -> m EpAnnComments
 
 instance MonadP P where
   addError err
@@ -2934,15 +2934,15 @@ instance MonadP P where
          comment_q = comment_q'
        } (AnnCommentsBalanced (fromMaybe [] header_comments') (reverse newAnns))
 
-getCommentsFor :: (MonadP m) => SrcSpan -> m ApiAnnComments
+getCommentsFor :: (MonadP m) => SrcSpan -> m EpAnnComments
 getCommentsFor (RealSrcSpan l _) = allocateCommentsP l
 getCommentsFor _ = return noCom
 
-getPriorCommentsFor :: (MonadP m) => SrcSpan -> m ApiAnnComments
+getPriorCommentsFor :: (MonadP m) => SrcSpan -> m EpAnnComments
 getPriorCommentsFor (RealSrcSpan l _) = allocatePriorCommentsP l
 getPriorCommentsFor _ = return noCom
 
-getFinalCommentsFor :: (MonadP m) => SrcSpan -> m ApiAnnComments
+getFinalCommentsFor :: (MonadP m) => SrcSpan -> m EpAnnComments
 getFinalCommentsFor (RealSrcSpan l _) = allocateFinalCommentsP l
 getFinalCommentsFor _ = return noCom
 
@@ -3437,9 +3437,9 @@ clean_pragma prag = canon_ws (map toLower (unprefix prag))
 -- |Given a 'SrcSpan' that surrounds a 'HsPar' or 'HsParTy', generate
 -- 'AddEpAnn' values for the opening and closing bordering on the start
 -- and end of the span
-mkParensApiAnn :: SrcSpan -> [AddEpAnn]
-mkParensApiAnn (UnhelpfulSpan _)  = []
-mkParensApiAnn (RealSrcSpan ss _) = [AddEpAnn AnnOpenP (AR lo),AddEpAnn AnnCloseP (AR lc)]
+mkParensEpAnn :: SrcSpan -> [AddEpAnn]
+mkParensEpAnn (UnhelpfulSpan _)  = []
+mkParensEpAnn (RealSrcSpan ss _) = [AddEpAnn AnnOpenP (AR lo),AddEpAnn AnnCloseP (AR lc)]
   where
     f = srcSpanFile ss
     sl = srcSpanStartLine ss
