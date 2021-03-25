@@ -101,8 +101,8 @@ parseOneFile libdir fileName = do
 getPragmas :: Located HsModule -> String
 getPragmas (L _ (HsModule { hsmodAnn = anns'})) = pragmaStr
   where
-    tokComment (L _ (AnnComment (AnnBlockComment s) _)) = s
-    tokComment (L _ (AnnComment (AnnLineComment  s) _)) = s
+    tokComment (L _ (EpaComment (EpaBlockComment s) _)) = s
+    tokComment (L _ (EpaComment (EpaLineComment  s) _)) = s
     tokComment _ = ""
 
     cmp (L l1 _) (L l2 _) = compare (anchor l1) (anchor l2)

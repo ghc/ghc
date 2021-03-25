@@ -11,7 +11,7 @@
 module Types
   where
 
-import GHC hiding (AnnComment)
+import GHC hiding (EpaComment)
 import GHC.Utils.Outputable hiding ( (<>) )
 import GHC.Driver.Ppr
 import Data.Data (Data, toConstr,cast)
