@@ -86,9 +86,9 @@ f [InlPrag=[2]] :: Int -> (Int, Int) -> Bool
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
          Tmpl= \ (w [Occ=Once1!] :: Int) (w1 [Occ=Once1] :: (Int, Int)) ->
-                 case w of { I# ww1 [Occ=Once1] -> T4908.$wf ww1 w1 }}]
+                 case w of { I# ww [Occ=Once1] -> T4908.$wf ww w1 }}]
 f = \ (w :: Int) (w1 :: (Int, Int)) ->
-      case w of { I# ww1 -> T4908.$wf ww1 w1 }
+      case w of { I# ww -> T4908.$wf ww w1 }
 
 
 ------ Local rules for imported ids --------
