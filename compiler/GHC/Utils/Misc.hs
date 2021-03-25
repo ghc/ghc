@@ -43,7 +43,7 @@ module GHC.Utils.Misc (
         listLengthCmp, atLength,
         equalLength, compareLength, leLength, ltLength,
 
-        isSingleton, only, GHC.Utils.Misc.singleton,
+        isSingleton, only, expectOnly, GHC.Utils.Misc.singleton,
         notNull, snocView,
 
         isIn, isn'tIn,
@@ -562,6 +562,18 @@ only [a] = a
 only (a:_) = a
 #endif
 only _ = panic "Util: only"
+
+-- | Extract the single element of a list and panic with the given message if
+-- there are more elements or the list was empty.
+-- Like 'expectJust', but for lists.
+expectOnly :: HasCallStack => String -> [a] -> a
+{-# INLINE expectOnly #-}
+#if defined(DEBUG)
+expectOnly _   [a]   = a
+#else
+expectOnly _   (a:_) = a
+#endif
+expectOnly msg _     = panic ("expectOnly: " ++ msg)
 
 -- Debugging/specialising versions of \tr{elem} and \tr{notElem}
 
