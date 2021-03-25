@@ -45,7 +45,7 @@ module GHC.Driver.Make (
 import GHC.Prelude
 
 import GHC.Tc.Utils.Backpack
-import GHC.Tc.Utils.Monad  ( initIfaceCheck )
+import GHC.Tc.Utils.Monad  ( initIfaceCheck, FrontendResult (..) )
 
 import GHC.Runtime.Interpreter
 import qualified GHC.Linker.Loader as Linker
@@ -61,6 +61,7 @@ import GHC.Driver.Backend
 import GHC.Driver.Monad
 import GHC.Driver.Env
 import GHC.Driver.Errors
+import GHC.Driver.Hooks
 import GHC.Driver.Main
 
 import GHC.Parser.Header
@@ -76,6 +77,8 @@ import GHC.Data.FastString
 import GHC.Data.Maybe      ( expectJust )
 import GHC.Data.StringBuffer
 import qualified GHC.LanguageExtensions as LangExt
+
+import GHC.Runtime.Loader      ( initializePlugins )
 
 import GHC.Utils.Exception ( tryIO )
 import GHC.Utils.Monad     ( allM )
@@ -96,6 +99,7 @@ import GHC.Types.Unique.DSet
 import GHC.Types.Unique.Set
 import GHC.Types.Name
 import GHC.Types.Name.Env
+import GHC.Types.Unique.DFM (insertUDFMIntoLeft)
 
 import GHC.Unit
 import GHC.Unit.External
@@ -576,7 +580,8 @@ load' how_much mHscMessage mod_graph = do
     n_jobs <- case parMakeCount dflags of
                     Nothing -> liftIO getNumProcessors
                     Just n  -> return n
-    let upsweep_fn | n_jobs > 1 = parUpsweep n_jobs
+    let upsweep_fn | n_jobs == 99 = parUpsweep 1
+                   | n_jobs > 1  = parUpsweep n_jobs
                    | otherwise  = upsweep
 
     setSession hsc_env{ hsc_HPT = emptyHomePackageTable }
@@ -1117,7 +1122,12 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods sccs = do
     -- Build the compilation graph out of the list of SCCs. Module cycles are
     -- handled at the very end, after some useful work gets done. Note that
     -- this list is topologically sorted (by virtue of 'sccs' being sorted so).
-    (comp_graph,cycle) <- liftIO $ buildCompGraph sccs
+    (comp_graph',cycle) <- liftIO $ buildCompGraph sccs
+    comp_graph <- liftIO $ mapM (\(a, b, c) -> do
+                                    v <- newEmptyMVar
+                                    w <- newEmptyMVar
+                                    pure (a, (v,w,b), c)
+                                    ) comp_graph'
     let comp_graph_w_idx = zip comp_graph [1..]
 
     -- The list of all loops in the compilation graph.
@@ -1142,7 +1152,7 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods sccs = do
 
     -- Build a Map out of the compilation graph with which we can efficiently
     -- look up the result MVar associated with a particular home module.
-    let home_mod_map :: Map BuildModule (MVar SuccessFlag, Int)
+    let home_mod_map :: Map BuildModule ((MVar (Either () HomePackageTable), MVar HomePackageTable, MVar SuccessFlag), Int)
         home_mod_map =
             Map.fromList [ (mkBuildModule ms, (mvar, idx))
                          | ((ms,mvar,_),idx) <- comp_graph_w_idx ]
@@ -1157,7 +1167,7 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods sccs = do
 
     -- For each module in the module graph, spawn a worker thread that will
     -- compile this module.
-    let { spawnWorkers = forM comp_graph_w_idx $ \((mod,!mvar,!log_queue),!mod_idx) ->
+    let { spawnWorkers = forM comp_graph_w_idx $ \((mod,(mid_comp_mvar,end_comp_mvar,!mvar),!log_queue),!mod_idx) ->
             forkIOWithUnmask $ \unmask -> do
                 liftIO $ label_self $ unwords $ concat
                     [ [ "worker --make thread" ]
@@ -1194,7 +1204,7 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods sccs = do
                       liftIO $ upsweep_inst hsc_env mHscMessage mod_idx (length sccs) iuid
                       pure Succeeded
                     ModuleNode ems ->
-                      parUpsweep_one (emsModSummary ems) home_mod_map comp_graph_loops
+                      parUpsweep_one (emsModSummary ems) home_mod_map mid_comp_mvar end_comp_mvar comp_graph_loops
                                      lcl_logger lcl_tmpfs dflags (hsc_home_unit hsc_env)
                                      mHscMessage
                                      par_sem hsc_env_var old_hpt_var
@@ -1233,7 +1243,7 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods sccs = do
     results <- liftIO $ MC.bracket spawnWorkers killWorkers $ \_ ->
         -- Loop over each module in the compilation graph in order, printing
         -- each message from its log_queue.
-        forM comp_graph $ \(mod,mvar,log_queue) -> do
+        forM comp_graph $ \(mod,(_,_,mvar),log_queue) -> do
             printLogs logger dflags log_queue
             result <- readMVar mvar
             if succeeded result then return (Just mod) else return Nothing
@@ -1287,7 +1297,10 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods sccs = do
 parUpsweep_one
     :: ModSummary
     -- ^ The module we wish to compile
-    -> Map BuildModule (MVar SuccessFlag, Int)
+    -> Map BuildModule ((MVar (Either () HomePackageTable), MVar HomePackageTable, MVar SuccessFlag), Int)
+    -- ^ The map of home modules and their result MVar
+    -> MVar (Either () HomePackageTable)
+    -> MVar (HomePackageTable)
     -- ^ The map of home modules and their result MVar
     -> [[BuildModule]]
     -- ^ The list of all module loops within the compilation graph.
@@ -1315,10 +1328,8 @@ parUpsweep_one
     -- ^ The total number of modules
     -> IO SuccessFlag
     -- ^ The result of this compile
-parUpsweep_one mod home_mod_map comp_graph_loops lcl_logger lcl_tmpfs lcl_dflags home_unit mHscMessage par_sem
+parUpsweep_one mod home_mod_map mid_comp_mvar end_comp_mvar comp_graph_loops lcl_logger lcl_tmpfs dflags home_unit mHscMessage par_sem
                hsc_env_var old_hpt_var stable_mods mod_index num_mods = do
-
-    let this_build_mod = mkBuildModule0 mod
 
     let home_imps     = map unLoc $ ms_home_imps mod
     let home_src_imps = map unLoc $ ms_home_srcimps mod
@@ -1405,87 +1416,269 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_logger lcl_tmpfs lcl_dflags
     -- the time we get woken up by the result of an earlier dependency,
     -- subsequent dependencies are more likely to have finished. This step
     -- effectively reduces the number of MVars that each thread blocks on.
-    let home_deps = map fst $ sortBy (flip (comparing snd)) home_deps_with_idx
+    let home_deps = map (fstOf3 . fst) $ sortBy (flip (comparing snd)) home_deps_with_idx
+        home_deps_end = map (sndOf3 . fst) $ sortBy (flip (comparing snd)) home_deps_with_idx
+        home_deps_idxs = map snd $ sortBy (flip (comparing snd)) home_deps_with_idx
+
+
+    hsc_env0 <- localize_hsc_env <$> readMVar hsc_env_var
+    old_hpt <- readIORef old_hpt_var
+    -- Recompilation avoidance checks
+    res <- doRecompAvoidChecks hsc_env0 old_hpt
+
+    case res of
+      Left mod_info -> do
+        -- retypecheck
+        let hpt = addToHpt (hsc_HPT hsc_env0)
+                  this_mod mod_info
+        tryPutMVar mid_comp_mvar (Right hpt)
+        return Succeeded
+      Right (_, mb_old_hash) -> do
+        -- Wait for the all the module's dependencies to finish Tc.
+        (errs, deps_ok) <- partitionEithers <$> mapM readMVar home_deps
+        putStrLn $ "Unblocked: " ++ (show mod_index) ++ " : by " ++ (show home_deps_idxs)
+
+        -- We can't build this module if any of its dependencies failed to build.
+        let exitFailed = do
+              tryPutMVar mid_comp_mvar (Left ())
+              return Failed
+        if not (null errs)
+          then exitFailed
+          else do
+            hsc_env1 <- do
+              let f hpt h = h {
+                        hsc_HPT = insertUDFMIntoLeft (hsc_HPT h) hpt
+                        }
+              -- i <- readMVar hsc_env_var
+                  i = hsc_env0
+              pure $ foldr f i deps_ok
+
+            m_hmi <- doTypecheck hsc_env1 finish_loop
+            case m_hmi of
+              Left _ -> exitFailed
+              Right (hmi, tc_result, hsc_env4) -> do
+                tryPutMVar mid_comp_mvar (Right $ hsc_HPT hsc_env4)
+                putStrLn $ "Tc Done: " ++ (show mod_index)
+
+                --
+                hpts <- mapM readMVar home_deps_end
+
+                putStrLn $ "Unblocked(2): " ++ (show mod_index)
+                hsc_env5 <- do
+                  let f hpt h = h {
+                            hsc_HPT = insertUDFMIntoLeft (hsc_HPT h) hpt
+                            }
+                      i = hsc_env4
+                  pure $ foldr f i hpts
+
+                m_mod_info <- doDesugarAndBackend hsc_env5 tc_result mb_old_hash
+                case m_mod_info of
+                  Left _ -> exitFailed
+                  Right mod_info -> do
+
+                    tryPutMVar end_comp_mvar $ addToHpt (hsc_HPT hsc_env5)
+                      this_mod mod_info
+
+                    putStrLn $ "Done: " ++ (show mod_index)
+                    -- Prune the old HPT unless this is an hs-boot module.
+                    unless (isBootSummary mod == IsBoot) $
+                        atomicModifyIORef' old_hpt_var $ \old_hpt ->
+                            (delFromHpt old_hpt this_mod, ())
+
+                    modifyMVar_ hsc_env_var $ \hsc_env -> do
+                        let hsc_env' = hsc_env
+                                         { hsc_HPT = addToHpt (hsc_HPT hsc_env)
+                                                               this_mod mod_info }
+                        return (hsc_env')
+
+                    -- Clean up any intermediate files.
+                    cleanCurrentModuleTempFiles (hsc_logger hsc_env5)
+                                                (hsc_tmpfs  hsc_env5)
+                                                (hsc_dflags hsc_env5)
+
+                    return Succeeded
 
     -- Wait for the all the module's dependencies to finish building.
-    deps_ok <- allM (fmap succeeded . readMVar) home_deps
+    -- deps_ok <- allM (fmap succeeded . readMVar) home_deps
 
     -- We can't build this module if any of its dependencies failed to build.
-    if not deps_ok
-      then return Failed
-      else do
-        -- Any hsc_env at this point is OK to use since we only really require
-        -- that the HPT contains the HMIs of our dependencies.
-        hsc_env <- readMVar hsc_env_var
-        old_hpt <- readIORef old_hpt_var
+    -- if not deps_ok
+    --   then return Failed
+    --   else do
+    --     -- Any hsc_env at this point is OK to use since we only really require
+    --     -- that the HPT contains the HMIs of our dependencies.
+    --     hsc_env <- readMVar hsc_env_var
+    --     old_hpt <- readIORef old_hpt_var
 
-        let logg err = printBagOfErrors lcl_logger lcl_dflags (srcErrorMessages err)
+    --     let logg err = printBagOfErrors lcl_logger lcl_dflags (srcErrorMessages err)
 
-        -- Limit the number of parallel compiles.
-        let withSem sem = MC.bracket_ (waitQSem sem) (signalQSem sem)
-        mb_mod_info <- withSem par_sem $
-            handleSourceError (\err -> do logg err; return Nothing) $ do
-                -- Have the HscEnv point to our local logger and tmpfs.
-                let lcl_hsc_env = localize_hsc_env hsc_env
+    --     -- Limit the number of parallel compiles.
+    --     let withSem sem = MC.bracket_ (waitQSem sem) (signalQSem sem)
+    --     mb_mod_info <- withSem par_sem $
+    --         handleSourceError (\err -> do logg err; return Nothing) $ do
+    --             -- Have the HscEnv point to our local logger and tmpfs.
+    --             let lcl_hsc_env = localize_hsc_env hsc_env
 
-                -- Re-typecheck the loop
-                -- This is necessary to make sure the knot is tied when
-                -- we close a recursive module loop, see bug #12035.
-                type_env_var <- liftIO $ newIORef emptyNameEnv
-                let lcl_hsc_env' = lcl_hsc_env { hsc_type_env_var =
-                                    Just (ms_mod mod, type_env_var) }
-                lcl_hsc_env'' <- case finish_loop of
-                    Nothing   -> return lcl_hsc_env'
-                    -- In the non-parallel case, the retypecheck prior to
-                    -- typechecking the loop closer includes all modules
-                    -- EXCEPT the loop closer.  However, our precomputed
-                    -- SCCs include the loop closer, so we have to filter
-                    -- it out.
-                    Just loop -> typecheckLoop lcl_dflags lcl_hsc_env' $
-                                 filter (/= moduleName (gwib_mod this_build_mod)) $
-                                 map (moduleName . gwib_mod) loop
+    --             -- Re-typecheck the loop
+    --             -- This is necessary to make sure the knot is tied when
+    --             -- we close a recursive module loop, see bug #12035.
+    --             type_env_var <- liftIO $ newIORef emptyNameEnv
+    --             let lcl_hsc_env' = lcl_hsc_env { hsc_type_env_var =
+    --                                 Just (ms_mod mod, type_env_var) }
+    --             lcl_hsc_env'' <- case finish_loop of
+    --                 Nothing   -> return lcl_hsc_env'
+    --                 -- In the non-parallel case, the retypecheck prior to
+    --                 -- typechecking the loop closer includes all modules
+    --                 -- EXCEPT the loop closer.  However, our precomputed
+    --                 -- SCCs include the loop closer, so we have to filter
+    --                 -- it out.
+    --                 Just loop -> typecheckLoop lcl_dflags lcl_hsc_env' $
+    --                              filter (/= moduleName (gwib_mod this_build_mod)) $
+    --                              map (moduleName . gwib_mod) loop
 
-                -- Compile the module.
-                mod_info <- upsweep_mod lcl_hsc_env'' mHscMessage old_hpt stable_mods
-                                        mod mod_index num_mods
-                return (Just mod_info)
+    --             -- Compile the module.
+    --             mod_info <- upsweep_mod lcl_hsc_env'' mHscMessage old_hpt stable_mods
+    --                                     mod mod_index num_mods
+    --             return (Just mod_info)
 
-        case mb_mod_info of
-            Nothing -> return Failed
-            Just mod_info -> do
-                let this_mod = ms_mod_name mod
+    --     case mb_mod_info of
+    --         Nothing -> return Failed
+    --         Just mod_info -> do
+    --             let this_mod = ms_mod_name mod
 
-                -- Prune the old HPT unless this is an hs-boot module.
-                unless (isBootSummary mod == IsBoot) $
-                    atomicModifyIORef' old_hpt_var $ \old_hpt ->
-                        (delFromHpt old_hpt this_mod, ())
+    --             -- Prune the old HPT unless this is an hs-boot module.
+    --             unless (isBootSummary mod == IsBoot) $
+    --                 atomicModifyIORef' old_hpt_var $ \old_hpt ->
+    --                     (delFromHpt old_hpt this_mod, ())
 
-                -- Update and fetch the global HscEnv.
-                lcl_hsc_env' <- modifyMVar hsc_env_var $ \hsc_env -> do
-                    let hsc_env' = hsc_env
-                                     { hsc_HPT = addToHpt (hsc_HPT hsc_env)
-                                                           this_mod mod_info }
-                    -- We've finished typechecking the module, now we must
-                    -- retypecheck the loop AGAIN to ensure unfoldings are
-                    -- updated.  This time, however, we include the loop
-                    -- closer!
-                    hsc_env'' <- case finish_loop of
-                        Nothing   -> return hsc_env'
-                        Just loop -> typecheckLoop lcl_dflags hsc_env' $
-                                     map (moduleName . gwib_mod) loop
-                    return (hsc_env'', localize_hsc_env hsc_env'')
+    --             -- Update and fetch the global HscEnv.
+    --             lcl_hsc_env' <- modifyMVar hsc_env_var $ \hsc_env -> do
+    --                 let hsc_env' = hsc_env
+    --                                  { hsc_HPT = addToHpt (hsc_HPT hsc_env)
+    --                                                        this_mod mod_info }
+    --                 -- We've finished typechecking the module, now we must
+    --                 -- retypecheck the loop AGAIN to ensure unfoldings are
+    --                 -- updated.  This time, however, we include the loop
+    --                 -- closer!
+    --                 hsc_env'' <- case finish_loop of
+    --                     Nothing   -> return hsc_env'
+    --                     Just loop -> typecheckLoop lcl_dflags hsc_env' $
+    --                                  map (moduleName . gwib_mod) loop
+    --                 return (hsc_env'', localize_hsc_env hsc_env'')
 
-                -- Clean up any intermediate files.
-                cleanCurrentModuleTempFiles (hsc_logger lcl_hsc_env')
-                                            (hsc_tmpfs  lcl_hsc_env')
-                                            (hsc_dflags lcl_hsc_env')
-                return Succeeded
+    --             -- Clean up any intermediate files.
+    --             cleanCurrentModuleTempFiles (hsc_logger lcl_hsc_env')
+    --                                         (hsc_tmpfs  lcl_hsc_env')
+    --                                         (hsc_dflags lcl_hsc_env')
+    --             return Succeeded
 
   where
     localize_hsc_env hsc_env
         = hsc_env { hsc_logger = lcl_logger
                   , hsc_tmpfs  = lcl_tmpfs
+                  , hsc_dflags = lcl_dflags
                   }
+
+    lcl_dflags = ms_hspp_opts mod
+    this_mod = ms_mod_name mod
+    this_build_mod = mkBuildModule0 mod
+
+    withSem :: IO a ->  IO a
+    withSem = MC.bracket_ (waitQSem par_sem) (signalQSem par_sem)
+    logg err = printBagOfErrors lcl_logger dflags (srcErrorMessages err)
+
+    doTypecheck hsc_env1 finish_loop = withSem $ do
+      putStrLn $ "Began: " ++ (show mod_index) ++ " : " ++ (moduleNameString this_mod)
+      hsc_env2 <- case finish_loop of
+          Nothing   -> return hsc_env1
+          -- In the non-parallel case, the retypecheck prior to
+          -- typechecking the loop closer includes all modules
+          -- EXCEPT the loop closer.  However, our precomputed
+          -- SCCs include the loop closer, so we have to filter
+          -- it out.
+          Just loop -> typecheckLoop lcl_dflags hsc_env1 $
+                       filter (/= moduleName (gwib_mod this_build_mod)) $
+                       map (moduleName . gwib_mod) loop
+
+      hsc_env3 <- initializePlugins hsc_env2
+      handleSourceError (\err -> do logg err; return (Left err)) $ runHsc hsc_env3 $ do
+      FrontendTypecheck tc_result <- case hscFrontendHook (hsc_hooks hsc_env3) of
+        Nothing -> FrontendTypecheck . fst <$> hsc_typecheck False mod Nothing
+        Just h  -> h mod
+      (iface, _, details) <- hscSimpleIface' tc_result Nothing
+
+      let hsc_env4 = hsc_env3 { hsc_HPT = addToHpt (hsc_HPT hsc_env3)
+                                          this_mod hmi}
+          hmi = HomeModInfo iface details Nothing
+      -- We've finished typechecking the module, now we must
+      -- retypecheck the loop AGAIN to ensure unfoldings are
+      -- updated.  This time, however, we include the loop
+      -- closer!
+      hsc_env5 <- case finish_loop of
+          Nothing   -> return hsc_env4
+          Just loop -> liftIO $ typecheckLoop lcl_dflags hsc_env4 $
+                       map (moduleName . gwib_mod) loop
+      pure $ Right (hmi, tc_result, hsc_env5)
+
+    doDesugarAndBackend hsc_env tc_result mb_old_hash = withSem $
+      handleSourceError (\err -> do logg err; return (Left err)) $ do
+      putStrLn $ "Began(2): " ++ (show mod_index)
+      status <- runHsc hsc_env $ postTcFrontend mod tc_result mb_old_hash
+      (Right <$>) $ compileOneBackend mod Nothing (status, hsc_env)
+
+    doRecompAvoidChecks hsc_env old_hpt = do
+      res <- recomp_avoidance_checks hsc_env old_hpt stable_mods mod
+
+      case res of
+        Left hmi -> return $ Left hmi
+        Right (mb_linkable, src_modified, discard_iface) -> do
+          -- hsc_env'' <- initializePlugins hsc_env'
+
+          -- The old interface is ok if
+          --  a) we're compiling a source file, and the old HPT
+          --     entry is for a source file
+          --  b) we're compiling a hs-boot file
+          -- Case (b) allows an hs-boot file to get the interface of its
+          -- real source file on the second iteration of the compilation
+          -- manager, but that does no harm.  Otherwise the hs-boot file
+          -- will always be recompiled
+
+          let mb_old_iface = if discard_iface then Nothing else
+                case lookupHpt old_hpt this_mod of
+                   Nothing                                        -> Nothing
+                   Just hm_info | isBootSummary mod == IsBoot -> Just iface
+                                | mi_boot iface == NotBoot        -> Just iface
+                                | otherwise                       -> Nothing
+                                 where
+                                   iface = hm_iface hm_info
+
+          e <- hscIncrementalCheck hsc_env True Nothing
+                  mod src_modified mb_old_iface
+          case e of
+            -- We didn't need to do any typechecking; the old interface
+            -- file on disk was good enough.
+            Left iface -> do
+              let hsc_env = hsc_env
+              -- msg UpToDate
+              -- Knot tying!  See Note [Knot-tying typecheckIface]
+              details <- fixIO $ \details' -> do
+                  let hsc_env' =
+                          hsc_env {
+                              hsc_HPT = addToHpt (hsc_HPT hsc_env)
+                                          this_mod (HomeModInfo iface details' Nothing)
+                          }
+                  -- NB: This result is actually not that useful
+                  -- in one-shot mode, since we're not going to do
+                  -- any further typechecking.  It's much more useful
+                  -- in make mode, since this HMI will go into the HPT.
+                  genModDetails hsc_env' iface
+              return $ Left (HomeModInfo iface details mb_linkable)
+            -- NB: enter Hsc monad here so that we don't bail out early with
+            -- -Werror on typechecker warnings; we also want to run the desugarer
+            -- to get those warnings too. (But we'll always exit at that point
+            -- because the desugarer runs ioMsgMaybe.)
+            Right (Right reason, mb_old_hash) -> return $ Right (reason, mb_old_hash)
+            Right (Left _, _) -> panic "parUpsweep_one doRecompAvoidChecks"
 
 -- -----------------------------------------------------------------------------
 --
@@ -1684,7 +1877,45 @@ upsweep_mod :: HscEnv
             -> Int  -- index of module
             -> Int  -- total number of modules
             -> IO HomeModInfo
-upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_index nmods
+upsweep_mod hsc_env mHscMessage old_hpt stable_mods summary mod_index nmods
+  = do
+    res <- recomp_avoidance_checks hsc_env old_hpt stable_mods summary
+    case res of
+        Left hmi -> return hmi
+        Right (mb_linkable, src_modified, discard_iface) ->
+
+            -- The old interface is ok if
+            --  a) we're compiling a source file, and the old HPT
+            --     entry is for a source file
+            --  b) we're compiling a hs-boot file
+            -- Case (b) allows an hs-boot file to get the interface of its
+            -- real source file on the second iteration of the compilation
+            -- manager, but that does no harm.  Otherwise the hs-boot file
+            -- will always be recompiled
+
+            let mb_old_iface = if discard_iface then Nothing else
+                  case lookupHpt old_hpt (ms_mod_name summary) of
+                     Nothing                                        -> Nothing
+                     Just hm_info | isBootSummary summary == IsBoot -> Just iface
+                                  | mi_boot iface == NotBoot        -> Just iface
+                                  | otherwise                       -> Nothing
+                                   where
+                                     iface = hm_iface hm_info
+
+                -- store the corrected backend into the summary
+                bcknd = getBackend hsc_env summary
+                summary' = summary{ ms_hspp_opts = (ms_hspp_opts summary) { backend = bcknd } }
+            in compileOne' Nothing mHscMessage hsc_env summary' mod_index nmods
+               mb_old_iface mb_linkable src_modified
+
+type RecompAvoidCheckResult = (Either HomeModInfo (Maybe Linkable, SourceModified, Bool))
+
+recomp_avoidance_checks :: HscEnv
+            -> HomePackageTable
+            -> StableModules
+            -> ModSummary
+            -> IO RecompAvoidCheckResult
+recomp_avoidance_checks hsc_env old_hpt (stable_obj, stable_bco) summary
    =    let
             this_mod_name = ms_mod_name summary
             this_mod    = ms_mod summary
@@ -1701,54 +1932,15 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
             -- We're using the dflags for this module now, obtained by
             -- applying any options in its LANGUAGE & OPTIONS_GHC pragmas.
             lcl_dflags = ms_hspp_opts summary
-            prevailing_backend = backend (hsc_dflags hsc_env)
-            local_backend      = backend lcl_dflags
 
-            -- If OPTIONS_GHC contains -fasm or -fllvm, be careful that
-            -- we don't do anything dodgy: these should only work to change
-            -- from -fllvm to -fasm and vice-versa, or away from -fno-code,
-            -- otherwise we could end up trying to link object code to byte
-            -- code.
-            bcknd = case (prevailing_backend,local_backend) of
-               (LLVM,NCG) -> NCG
-               (NCG,LLVM) -> LLVM
-               (NoBackend,b)
-                  | backendProducesObject b -> b
-               (Interpreter,b)
-                  | backendProducesObject b -> b
-               _ -> prevailing_backend
+            bcknd = getBackend hsc_env summary
 
-            -- store the corrected backend into the summary
-            summary' = summary{ ms_hspp_opts = lcl_dflags { backend = bcknd } }
-
-            -- The old interface is ok if
-            --  a) we're compiling a source file, and the old HPT
-            --     entry is for a source file
-            --  b) we're compiling a hs-boot file
-            -- Case (b) allows an hs-boot file to get the interface of its
-            -- real source file on the second iteration of the compilation
-            -- manager, but that does no harm.  Otherwise the hs-boot file
-            -- will always be recompiled
-
-            mb_old_iface
-                = case old_hmi of
-                     Nothing                                        -> Nothing
-                     Just hm_info | isBootSummary summary == IsBoot -> Just iface
-                                  | mi_boot iface == NotBoot        -> Just iface
-                                  | otherwise                       -> Nothing
-                                   where
-                                     iface = hm_iface hm_info
-
-            compile_it :: Maybe Linkable -> SourceModified -> IO HomeModInfo
-            compile_it  mb_linkable src_modified =
-                  compileOne' Nothing mHscMessage hsc_env summary' mod_index nmods
-                             mb_old_iface mb_linkable src_modified
+            compile_it :: Maybe Linkable -> SourceModified -> IO RecompAvoidCheckResult
+            compile_it  mb_linkable src_modified = pure $ Right (mb_linkable, src_modified, False)
 
             compile_it_discard_iface :: Maybe Linkable -> SourceModified
-                                     -> IO HomeModInfo
-            compile_it_discard_iface mb_linkable  src_modified =
-                  compileOne' Nothing mHscMessage hsc_env summary' mod_index nmods
-                             Nothing mb_linkable src_modified
+                                     -> IO RecompAvoidCheckResult
+            compile_it_discard_iface mb_linkable  src_modified = pure $ Right (mb_linkable, src_modified, True)
 
             -- With NoBackend we create empty linkables to avoid recompilation.
             -- We have to detect these to recompile anyway if the backend changed
@@ -1773,7 +1965,7 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
                 -- if it is *stable* (see checkStability).
           | is_stable_obj, Just hmi <- old_hmi -> do
                 debug_trace 5 (text "skipping stable obj mod:" <+> ppr this_mod_name)
-                return hmi
+                return $ Left hmi
                 -- object is stable, and we have an entry in the
                 -- old HPT: nothing to do
 
@@ -1790,7 +1982,7 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
                 ASSERT(isJust old_hmi) -- must be in the old_hpt
                 let Just hmi = old_hmi in do
                 debug_trace 5 (text "skipping stable BCO mod:" <+> ppr this_mod_name)
-                return hmi
+                return $ Left hmi
                 -- BCO is stable: nothing to do
 
           | not (backendProducesObject bcknd),
@@ -1837,6 +2029,28 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
          _otherwise -> do
                 debug_trace 5 (text "compiling mod:" <+> ppr this_mod_name)
                 compile_it Nothing SourceModified
+
+-- If OPTIONS_GHC contains -fasm or -fllvm, be careful that
+-- we don't do anything dodgy: these should only work to change
+-- from -fllvm to -fasm and vice-versa, or away from -fno-code,
+-- otherwise we could end up trying to link object code to byte
+-- code.
+getBackend :: HscEnv -> ModSummary -> Backend
+getBackend hsc_env summary = case (prevailing_backend,local_backend) of
+    (LLVM,NCG) -> NCG
+    (NCG,LLVM) -> LLVM
+    (NoBackend,b)
+       | backendProducesObject b -> b
+    (Interpreter,b)
+       | backendProducesObject b -> b
+    _ -> prevailing_backend
+  where
+      -- We're using the dflags for this module now, obtained by
+      -- applying any options in its LANGUAGE & OPTIONS_GHC pragmas.
+      lcl_dflags = ms_hspp_opts summary
+      prevailing_backend = backend (hsc_dflags hsc_env)
+      local_backend      = backend lcl_dflags
+
 
 
 {- Note [-fno-code mode]
