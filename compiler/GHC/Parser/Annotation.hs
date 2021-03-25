@@ -12,7 +12,7 @@ module GHC.Parser.Annotation (
   HasE(..),
 
   -- * In-tree Api Annotations
-  AddApiAnn(..),
+  AddEpAnn(..),
   AnnAnchor(..), annAnchorRealSrcSpan,
   DeltaPos(..),
 
@@ -58,7 +58,7 @@ module GHC.Parser.Annotation (
   -- ** Querying annotations
   getLocAnn,
   apiAnnAnns, apiAnnAnnsL,
-  annParen2AddApiAnn,
+  annParen2AddEpAnn,
   apiAnnComments,
 
   -- ** Working with locations of annotations
@@ -383,10 +383,10 @@ data HasE = HasE | NoE
 -- source file.
 -- The @'AnnAnchor'@ can also store a delta position if the AST has been
 -- modified and needs to be pretty printed again.
--- The usual way an 'AddApiAnn' is created is using the 'mj' ("make
+-- The usual way an 'AddEpAnn' is created is using the 'mj' ("make
 -- jump") function, and then it can be inserted into the appropriate
 -- annotation.
-data AddApiAnn = AddApiAnn AnnKeywordId AnnAnchor deriving (Data,Show,Eq,Ord)
+data AddEpAnn = AddEpAnn AnnKeywordId AnnAnchor deriving (Data,Show,Eq,Ord)
 
 -- | The anchor for an @'AnnKeywordId'@. The Parser inserts the @'AR'@
 -- variant, giving the exact location of the original item in the
@@ -419,8 +419,8 @@ instance Outputable AnnAnchor where
   ppr (AR r) = text "AR" <+> ppr r
   ppr (AD d) = text "AD" <+> ppr d
 
-instance Outputable AddApiAnn where
-  ppr (AddApiAnn kw ss) = text "AddApiAnn" <+> ppr kw <+> ppr ss
+instance Outputable AddEpAnn where
+  ppr (AddEpAnn kw ss) = text "AddEpAnn" <+> ppr kw <+> ppr ss
 
 -- ---------------------------------------------------------------------
 
@@ -555,9 +555,9 @@ com cs = AnnComments cs
 
 -- | This type is the most direct mapping of the previous API
 -- Annotations model. It captures the containing `SrcSpan' in its
--- `entry` `Anchor`, has a list of `AddApiAnn` as before, and keeps
+-- `entry` `Anchor`, has a list of `AddEpAnn` as before, and keeps
 -- track of the comments associated with the anchor.
-type ApiAnn = ApiAnn' [AddApiAnn]
+type ApiAnn = ApiAnn' [AddEpAnn]
 
 -- ---------------------------------------------------------------------
 -- Annotations attached to a 'SrcSpan'.
@@ -671,9 +671,9 @@ data AnnList
       -- TODO:AZ: should we distinguish AnnList variants for lists
       -- with layout and without?
       al_anchor    :: Maybe Anchor, -- ^ start point of a list having layout
-      al_open      :: Maybe AddApiAnn,
-      al_close     :: Maybe AddApiAnn,
-      al_rest      :: [AddApiAnn], -- ^ context, such as 'where' keyword
+      al_open      :: Maybe AddEpAnn,
+      al_close     :: Maybe AddEpAnn,
+      al_rest      :: [AddEpAnn], -- ^ context, such as 'where' keyword
       al_trailing  :: [TrailingAnn]
       } deriving (Data,Eq)
 
@@ -782,9 +782,9 @@ data NameAdornment
 -- pragmas.
 data AnnPragma
   = AnnPragma {
-      apr_open      :: AddApiAnn,
-      apr_close     :: AddApiAnn,
-      apr_rest      :: [AddApiAnn]
+      apr_open      :: AddEpAnn,
+      apr_close     :: AddEpAnn,
+      apr_rest      :: [AddEpAnn]
       } deriving (Data,Eq)
 
 -- ---------------------------------------------------------------------
@@ -889,7 +889,7 @@ realSrcSpan _ = mkRealSrcSpan l l -- AZ temporary
 la2r :: SrcSpanAnn' a -> RealSrcSpan
 la2r l = realSrcSpan (locA l)
 
-extraToAnnList :: AnnList -> [AddApiAnn] -> AnnList
+extraToAnnList :: AnnList -> [AddEpAnn] -> AnnList
 extraToAnnList (AnnList a o c e t) as = AnnList a o c (e++as) t
 
 reAnn :: [TrailingAnn] -> ApiAnnComments -> Located a -> LocatedA a
@@ -922,7 +922,7 @@ noAnn :: ApiAnn' a
 noAnn = ApiAnnNotUsed
 
 
-addAnns :: ApiAnn -> [AddApiAnn] -> ApiAnnComments -> ApiAnn
+addAnns :: ApiAnn -> [AddEpAnn] -> ApiAnnComments -> ApiAnn
 addAnns (ApiAnn l as1 cs) as2 cs2
   = ApiAnn (widenAnchor l (as1 ++ as2)) (as1 ++ as2) (cs <> cs2)
 addAnns ApiAnnNotUsed [] (AnnComments []) = ApiAnnNotUsed
@@ -942,43 +942,43 @@ addAnnsA (SrcSpanAnn ApiAnnNotUsed loc) as cs
 
 -- | The annotations need to all come after the anchor.  Make sure
 -- this is the case.
-widenSpan :: SrcSpan -> [AddApiAnn] -> SrcSpan
+widenSpan :: SrcSpan -> [AddEpAnn] -> SrcSpan
 widenSpan s as = foldl combineSrcSpans s (go as)
   where
     go [] = []
-    go (AddApiAnn _ (AR s):rest) = RealSrcSpan s Nothing : go rest
-    go (AddApiAnn _ (AD _):rest) = go rest
+    go (AddEpAnn _ (AR s):rest) = RealSrcSpan s Nothing : go rest
+    go (AddEpAnn _ (AD _):rest) = go rest
 
 -- | The annotations need to all come after the anchor.  Make sure
 -- this is the case.
-widenRealSpan :: RealSrcSpan -> [AddApiAnn] -> RealSrcSpan
+widenRealSpan :: RealSrcSpan -> [AddEpAnn] -> RealSrcSpan
 widenRealSpan s as = foldl combineRealSrcSpans s (go as)
   where
     go [] = []
-    go (AddApiAnn _ (AR s):rest) = s : go rest
-    go (AddApiAnn _ (AD _):rest) =     go rest
+    go (AddEpAnn _ (AR s):rest) = s : go rest
+    go (AddEpAnn _ (AD _):rest) =     go rest
 
-widenAnchor :: Anchor -> [AddApiAnn] -> Anchor
+widenAnchor :: Anchor -> [AddEpAnn] -> Anchor
 widenAnchor (Anchor s op) as = Anchor (widenRealSpan s as) op
 
 widenAnchorR :: Anchor -> RealSrcSpan -> Anchor
 widenAnchorR (Anchor s op) r = Anchor (combineRealSrcSpans s r) op
 
-widenLocatedAn :: SrcSpanAnn' an -> [AddApiAnn] -> SrcSpanAnn' an
+widenLocatedAn :: SrcSpanAnn' an -> [AddEpAnn] -> SrcSpanAnn' an
 widenLocatedAn (SrcSpanAnn a l) as = SrcSpanAnn a (widenSpan l as)
 
 apiAnnAnnsL :: ApiAnn' a -> [a]
 apiAnnAnnsL ApiAnnNotUsed = []
 apiAnnAnnsL (ApiAnn _ anns _) = [anns]
 
-apiAnnAnns :: ApiAnn -> [AddApiAnn]
+apiAnnAnns :: ApiAnn -> [AddEpAnn]
 apiAnnAnns ApiAnnNotUsed = []
 apiAnnAnns (ApiAnn _ anns _) = anns
 
-annParen2AddApiAnn :: ApiAnn' AnnParen -> [AddApiAnn]
-annParen2AddApiAnn ApiAnnNotUsed = []
-annParen2AddApiAnn (ApiAnn _ (AnnParen pt o c) _)
-  = [AddApiAnn ai o, AddApiAnn ac c]
+annParen2AddEpAnn :: ApiAnn' AnnParen -> [AddEpAnn]
+annParen2AddEpAnn ApiAnnNotUsed = []
+annParen2AddEpAnn (ApiAnn _ (AnnParen pt o c) _)
+  = [AddEpAnn ai o, AddEpAnn ac c]
   where
     (ai,ac) = parenTypeKws pt
 

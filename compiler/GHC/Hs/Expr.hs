@@ -209,7 +209,7 @@ could only do that if the extension field was strict (#18764)
 data ApiAnnHsCase = ApiAnnHsCase
       { hsCaseAnnCase :: AnnAnchor
       , hsCaseAnnOf   :: AnnAnchor
-      , hsCaseAnnsRest :: [AddApiAnn]
+      , hsCaseAnnsRest :: [AddEpAnn]
       } deriving Data
 
 data ApiAnnUnboundVar = ApiAnnUnboundVar
@@ -981,7 +981,7 @@ instance (Outputable a, Outputable b) => Outputable (HsExpansion a b) where
 ************************************************************************
 -}
 
-type instance XCmdArrApp  GhcPs = ApiAnn' AddApiAnn
+type instance XCmdArrApp  GhcPs = ApiAnn' AddEpAnn
 type instance XCmdArrApp  GhcRn = NoExtField
 type instance XCmdArrApp  GhcTc = Type
 
@@ -1187,7 +1187,7 @@ type instance XXGRHSs (GhcPass _) _ = NoExtCon
 data GrhsAnn
   = GrhsAnn {
       ga_vbar :: Maybe AnnAnchor, -- TODO:AZ do we need this?
-      ga_sep  :: AddApiAnn -- ^ Match separator location
+      ga_sep  :: AddEpAnn -- ^ Match separator location
       } deriving (Data)
 
 type instance XCGRHS (GhcPass _) _ = ApiAnn' GrhsAnn

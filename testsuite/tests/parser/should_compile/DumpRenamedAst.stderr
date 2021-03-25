@@ -293,9 +293,9 @@
               (Anchor
                { DumpRenamedAst.hs:12:20-30 }
                (UnchangedAnchor))
-              [(AddApiAnn AnnDcolon (AR { DumpRenamedAst.hs:12:24-25 }))
-              ,(AddApiAnn AnnOpenP (AR { DumpRenamedAst.hs:12:20 }))
-              ,(AddApiAnn AnnCloseP (AR { DumpRenamedAst.hs:12:30 }))]
+              [(AddEpAnn AnnDcolon (AR { DumpRenamedAst.hs:12:24-25 }))
+              ,(AddEpAnn AnnOpenP (AR { DumpRenamedAst.hs:12:20 }))
+              ,(AddEpAnn AnnCloseP (AR { DumpRenamedAst.hs:12:30 }))]
               (AnnComments
                []))
              (())
@@ -453,7 +453,7 @@
                  (Anchor
                   { DumpRenamedAst.hs:19:23 }
                   (UnchangedAnchor))
-                 [(AddApiAnn AnnDcolon (AR { DumpRenamedAst.hs:19:25-26 }))]
+                 [(AddEpAnn AnnDcolon (AR { DumpRenamedAst.hs:19:25-26 }))]
                  (AnnComments
                   []))
                 (L
@@ -733,9 +733,9 @@
              (Anchor
               { DumpRenamedAst.hs:22:10-17 }
               (UnchangedAnchor))
-             [(AddApiAnn AnnDcolon (AR { DumpRenamedAst.hs:22:13-14 }))
-             ,(AddApiAnn AnnOpenP (AR { DumpRenamedAst.hs:22:10 }))
-             ,(AddApiAnn AnnCloseP (AR { DumpRenamedAst.hs:22:17 }))]
+             [(AddEpAnn AnnDcolon (AR { DumpRenamedAst.hs:22:13-14 }))
+             ,(AddEpAnn AnnOpenP (AR { DumpRenamedAst.hs:22:10 }))
+             ,(AddEpAnn AnnCloseP (AR { DumpRenamedAst.hs:22:17 }))]
              (AnnComments
               []))
             (())
@@ -915,9 +915,9 @@
               (Anchor
                { DumpRenamedAst.hs:24:16-23 }
                (UnchangedAnchor))
-              [(AddApiAnn AnnDcolon (AR { DumpRenamedAst.hs:24:19-20 }))
-              ,(AddApiAnn AnnOpenP (AR { DumpRenamedAst.hs:24:16 }))
-              ,(AddApiAnn AnnCloseP (AR { DumpRenamedAst.hs:24:23 }))]
+              [(AddEpAnn AnnDcolon (AR { DumpRenamedAst.hs:24:19-20 }))
+              ,(AddEpAnn AnnOpenP (AR { DumpRenamedAst.hs:24:16 }))
+              ,(AddEpAnn AnnCloseP (AR { DumpRenamedAst.hs:24:23 }))]
               (AnnComments
                []))
              (())
@@ -939,9 +939,9 @@
               (Anchor
                { DumpRenamedAst.hs:24:25-40 }
                (UnchangedAnchor))
-              [(AddApiAnn AnnDcolon (AR { DumpRenamedAst.hs:24:28-29 }))
-              ,(AddApiAnn AnnOpenP (AR { DumpRenamedAst.hs:24:25 }))
-              ,(AddApiAnn AnnCloseP (AR { DumpRenamedAst.hs:24:40 }))]
+              [(AddEpAnn AnnDcolon (AR { DumpRenamedAst.hs:24:28-29 }))
+              ,(AddEpAnn AnnOpenP (AR { DumpRenamedAst.hs:24:25 }))
+              ,(AddEpAnn AnnCloseP (AR { DumpRenamedAst.hs:24:40 }))]
               (AnnComments
                []))
              (())
@@ -1057,9 +1057,9 @@
                      (AnnList
                       (Nothing)
                       (Just
-                       (AddApiAnn AnnOpenP (AR { DumpRenamedAst.hs:8:18 })))
+                       (AddEpAnn AnnOpenP (AR { DumpRenamedAst.hs:8:18 })))
                       (Just
-                       (AddApiAnn AnnCloseP (AR { DumpRenamedAst.hs:8:23 })))
+                       (AddEpAnn AnnCloseP (AR { DumpRenamedAst.hs:8:23 })))
                       []
                       [])
                      (AnnComments
