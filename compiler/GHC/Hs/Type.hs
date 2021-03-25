@@ -485,12 +485,12 @@ splitHsFunType ty = go ty
       = let
           (anns, cs, args, res) = splitHsFunType ty
           anns' = anns ++ annParen2AddEpAnn an
-          cs' = cs S.<> apiAnnComments (ann l) S.<> apiAnnComments an
+          cs' = cs S.<> epAnnComments (ann l) S.<> epAnnComments an
         in (anns', cs', args, res)
 
     go (L ll (HsFunTy (EpAnn _ an cs) mult x y))
       | (anns, csy, args, res) <- splitHsFunType y
-      = (anns, csy S.<> apiAnnComments (ann ll), HsScaled mult x':args, res)
+      = (anns, csy S.<> epAnnComments (ann ll), HsScaled mult x':args, res)
       where
         (L (SrcSpanAnn a l) t) = x
         an' = addTrailingAnnToA l an cs a
