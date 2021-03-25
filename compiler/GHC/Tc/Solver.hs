@@ -66,6 +66,7 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 import Data.Foldable      ( toList )
+import Data.Maybe         ( isJust )
 import Data.List          ( partition )
 import Data.List.NonEmpty ( NonEmpty(..) )
 
@@ -2043,7 +2044,7 @@ checkBadTelescope (Implic { ic_info  = info
 warnRedundantGivens :: SkolemInfo -> Bool
 warnRedundantGivens (SigSkol ctxt _ _)
   = case ctxt of
-       FunSigCtxt _ warn_redundant -> warn_redundant
+       FunSigCtxt _ warn_redundant -> isJust warn_redundant
        ExprSigCtxt                 -> True
        _                           -> False
 
