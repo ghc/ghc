@@ -28,7 +28,7 @@ import Language.Haskell.Syntax
 data SumOrTuple b
   = Sum ConTag Arity (LocatedA b) [AnnAnchor] [AnnAnchor]
   -- ^ Last two are the locations of the '|' before and after the payload
-  | Tuple [Either (ApiAnn' AnnAnchor) (LocatedA b)]
+  | Tuple [Either (EpAnn' AnnAnchor) (LocatedA b)]
 
 pprSumOrTuple :: Outputable b => Boxity -> SumOrTuple b -> SDoc
 pprSumOrTuple boxity = \case
@@ -56,7 +56,7 @@ data PatBuilder p
   | PatBuilderApp (LocatedA (PatBuilder p)) (LocatedA (PatBuilder p))
   | PatBuilderAppType (LocatedA (PatBuilder p)) SrcSpan (HsPatSigType GhcPs)
   | PatBuilderOpApp (LocatedA (PatBuilder p)) (LocatedN RdrName)
-                    (LocatedA (PatBuilder p)) ApiAnn
+                    (LocatedA (PatBuilder p)) EpAnn
   | PatBuilderVar (LocatedN RdrName)
   | PatBuilderOverLit (HsOverLit GhcPs)
 

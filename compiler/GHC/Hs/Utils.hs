@@ -190,14 +190,14 @@ mkSimpleMatch ctxt pats rhs
 
 unguardedGRHSs :: Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
                      ~ SrcSpan
-               => SrcSpan -> LocatedA (body (GhcPass p)) -> ApiAnn' GrhsAnn
+               => SrcSpan -> LocatedA (body (GhcPass p)) -> EpAnn' GrhsAnn
                -> GRHSs (GhcPass p) (LocatedA (body (GhcPass p)))
 unguardedGRHSs loc rhs an
   = GRHSs noExtField (unguardedRHS an loc rhs) emptyLocalBinds
 
 unguardedRHS :: Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
                      ~ SrcSpan
-             => ApiAnn' GrhsAnn -> SrcSpan -> LocatedA (body (GhcPass p))
+             => EpAnn' GrhsAnn -> SrcSpan -> LocatedA (body (GhcPass p))
              -> [LGRHS (GhcPass p) (LocatedA (body (GhcPass p)))]
 unguardedRHS an loc rhs = [L loc (GRHS an [] rhs)]
 
@@ -305,16 +305,16 @@ mkHsIntegral   :: IntegralLit -> HsOverLit GhcPs
 mkHsFractional :: FractionalLit -> HsOverLit GhcPs
 mkHsIsString   :: SourceText -> FastString -> HsOverLit GhcPs
 mkHsDo         :: HsStmtContext GhcRn -> LocatedL [ExprLStmt GhcPs] -> HsExpr GhcPs
-mkHsDoAnns     :: HsStmtContext GhcRn -> LocatedL [ExprLStmt GhcPs] -> ApiAnn' AnnList -> HsExpr GhcPs
+mkHsDoAnns     :: HsStmtContext GhcRn -> LocatedL [ExprLStmt GhcPs] -> EpAnn' AnnList -> HsExpr GhcPs
 mkHsComp       :: HsStmtContext GhcRn -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
                -> HsExpr GhcPs
 mkHsCompAnns   :: HsStmtContext GhcRn -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
-               -> ApiAnn' AnnList
+               -> EpAnn' AnnList
                -> HsExpr GhcPs
 
-mkNPat      :: Located (HsOverLit GhcPs) -> Maybe (SyntaxExpr GhcPs) -> ApiAnn
+mkNPat      :: Located (HsOverLit GhcPs) -> Maybe (SyntaxExpr GhcPs) -> EpAnn
             -> Pat GhcPs
-mkNPlusKPat :: LocatedN RdrName -> Located (HsOverLit GhcPs) -> ApiAnn
+mkNPlusKPat :: LocatedN RdrName -> Located (HsOverLit GhcPs) -> EpAnn
             -> Pat GhcPs
 
 -- NB: The following functions all use noSyntaxExpr: the generated expressions
@@ -323,7 +323,7 @@ mkLastStmt :: IsPass idR => LocatedA (bodyR (GhcPass idR))
            -> StmtLR (GhcPass idL) (GhcPass idR) (LocatedA (bodyR (GhcPass idR)))
 mkBodyStmt :: LocatedA (bodyR GhcPs)
            -> StmtLR (GhcPass idL) GhcPs (LocatedA (bodyR GhcPs))
-mkPsBindStmt :: ApiAnn -> LPat GhcPs -> LocatedA (bodyR GhcPs)
+mkPsBindStmt :: EpAnn -> LPat GhcPs -> LocatedA (bodyR GhcPs)
              -> StmtLR GhcPs GhcPs (LocatedA (bodyR GhcPs))
 mkRnBindStmt :: LPat GhcRn -> LocatedA (bodyR GhcRn)
              -> StmtLR GhcRn GhcRn (LocatedA (bodyR GhcRn))
@@ -345,7 +345,7 @@ mkRecStmt        :: (Anno [GenLocated
                              (Anno (StmtLR (GhcPass idL) GhcPs bodyR))
                              (StmtLR (GhcPass idL) GhcPs bodyR)]
                         ~ SrcSpanAnnL)
-                 => ApiAnn' AnnList
+                 => EpAnn' AnnList
                  -> LocatedL [LStmtLR (GhcPass idL) GhcPs bodyR]
                  -> StmtLR (GhcPass idL) GhcPs bodyR
 
@@ -363,12 +363,12 @@ mkHsCompAnns ctxt stmts expr anns = mkHsDoAnns ctxt (mkLocatedList (stmts ++ [la
     last_stmt = L (noAnnSrcSpan $ getLocA expr) $ mkLastStmt expr
 
 -- restricted to GhcPs because other phases might need a SyntaxExpr
-mkHsIf :: LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs -> ApiAnn
+mkHsIf :: LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs -> EpAnn
        -> HsExpr GhcPs
 mkHsIf c a b anns = HsIf anns c a b
 
 -- restricted to GhcPs because other phases might need a SyntaxExpr
-mkHsCmdIf :: LHsExpr GhcPs -> LHsCmd GhcPs -> LHsCmd GhcPs -> ApiAnn
+mkHsCmdIf :: LHsExpr GhcPs -> LHsCmd GhcPs -> LHsCmd GhcPs -> EpAnn
        -> HsCmd GhcPs
 mkHsCmdIf c a b anns = HsCmdIf anns noSyntaxExpr c a b
 
@@ -376,17 +376,17 @@ mkNPat lit neg anns  = NPat anns lit neg noSyntaxExpr
 mkNPlusKPat id lit anns
   = NPlusKPat anns id lit (unLoc lit) noSyntaxExpr noSyntaxExpr
 
-mkTransformStmt    :: ApiAnn -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
+mkTransformStmt    :: EpAnn -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
                    -> StmtLR GhcPs GhcPs (LHsExpr GhcPs)
-mkTransformByStmt  :: ApiAnn -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
+mkTransformByStmt  :: EpAnn -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
                    -> LHsExpr GhcPs -> StmtLR GhcPs GhcPs (LHsExpr GhcPs)
-mkGroupUsingStmt   :: ApiAnn -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
+mkGroupUsingStmt   :: EpAnn -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
                    -> StmtLR GhcPs GhcPs (LHsExpr GhcPs)
-mkGroupByUsingStmt :: ApiAnn -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
+mkGroupByUsingStmt :: EpAnn -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
                    -> LHsExpr GhcPs
                    -> StmtLR GhcPs GhcPs (LHsExpr GhcPs)
 
-emptyTransStmt :: ApiAnn -> StmtLR GhcPs GhcPs (LHsExpr GhcPs)
+emptyTransStmt :: EpAnn -> StmtLR GhcPs GhcPs (LHsExpr GhcPs)
 emptyTransStmt anns = TransStmt { trS_ext = anns
                                 , trS_form = panic "emptyTransStmt: form"
                                 , trS_stmts = [], trS_bndrs = []
@@ -436,7 +436,7 @@ emptyRecStmtId   = emptyRecStmt' unitRecStmtTc
                                         -- a panic might trigger during zonking
 mkRecStmt anns stmts  = (emptyRecStmt' anns) { recS_stmts = stmts }
 
-mkLetStmt :: ApiAnn -> HsLocalBinds GhcPs -> StmtLR GhcPs GhcPs (LocatedA b)
+mkLetStmt :: EpAnn -> HsLocalBinds GhcPs -> StmtLR GhcPs GhcPs (LocatedA b)
 mkLetStmt anns binds = LetStmt anns binds
 
 -------------------------------
@@ -448,10 +448,10 @@ mkHsOpApp e1 op e2 = OpApp noAnn e1 (noLocA (HsVar noExtField (noLocA op))) e2
 unqualSplice :: RdrName
 unqualSplice = mkRdrUnqual (mkVarOccFS (fsLit "splice"))
 
-mkUntypedSplice :: ApiAnn -> SpliceDecoration -> LHsExpr GhcPs -> HsSplice GhcPs
+mkUntypedSplice :: EpAnn -> SpliceDecoration -> LHsExpr GhcPs -> HsSplice GhcPs
 mkUntypedSplice ann hasParen e = HsUntypedSplice ann hasParen unqualSplice e
 
-mkTypedSplice :: ApiAnn -> SpliceDecoration -> LHsExpr GhcPs -> HsSplice GhcPs
+mkTypedSplice :: EpAnn -> SpliceDecoration -> LHsExpr GhcPs -> HsSplice GhcPs
 mkTypedSplice ann hasParen e = HsTypedSplice ann hasParen unqualSplice e
 
 mkHsQuasiQuote :: RdrName -> SrcSpan -> FastString -> HsSplice GhcPs
@@ -657,7 +657,7 @@ mkLHsVarTuple ids ext = mkLHsTupleExpr (map nlHsVar ids) ext
 nlTuplePat :: [LPat GhcPs] -> Boxity -> LPat GhcPs
 nlTuplePat pats box = noLocA (TuplePat noAnn pats box)
 
-missingTupArg :: ApiAnn' AnnAnchor -> HsTupArg GhcPs
+missingTupArg :: EpAnn' AnnAnchor -> HsTupArg GhcPs
 missingTupArg ann = Missing ann
 
 mkLHsPatTup :: [LPat GhcRn] -> LPat GhcRn
@@ -862,7 +862,7 @@ mkVarBind var rhs = L (getLoc rhs) $
                               var_id = var, var_rhs = rhs }
 
 mkPatSynBind :: LocatedN RdrName -> HsPatSynDetails GhcPs
-             -> LPat GhcPs -> HsPatSynDir GhcPs -> ApiAnn -> HsBind GhcPs
+             -> LPat GhcPs -> HsPatSynDir GhcPs -> EpAnn -> HsBind GhcPs
 mkPatSynBind name details lpat dir anns = PatSynBind noExtField psb
   where
     psb = PSB{ psb_ext = anns
