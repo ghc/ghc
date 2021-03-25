@@ -6,7 +6,7 @@
 module GHC.Parser.Annotation (
   -- * Core Exact Print Annotation types
   AnnKeywordId(..),
-  AnnotationComment(..), AnnotationCommentTok(..),
+  EpaComment(..), EpaCommentTok(..),
   IsUnicodeSyntax(..),
   unicodeAnn,
   HasE(..),
@@ -22,7 +22,7 @@ module GHC.Parser.Annotation (
 
   -- ** Comments in Annotations
 
-  EpAnnComments(..), LAnnotationComment, com, noCom,
+  EpAnnComments(..), LEpaComment, com, noCom,
   getFollowingComments, setFollowingComments, setPriorComments,
   EpAnnCO,
 
@@ -103,7 +103,7 @@ source code comments?  We need to track the locations of all
 elements from the original source: this includes keywords such as
 'let' / 'in' / 'do' etc as well as punctuation such as commas and
 braces, and also comments.  We collectively refer to this
-metadata as the "API annotations".
+metadata as the "exact print annotations".
 
 NON-COMMENT ELEMENTS
 
@@ -132,8 +132,8 @@ PARSER STATE
 There are three fields in PState (the parser state) which play a role
 with annotation comments.
 
->  comment_q :: [LAnnotationComment],
->  header_comments :: Maybe [LAnnotationComment],
+>  comment_q :: [LEpaComment],
+>  header_comments :: Maybe [LEpaComment],
 >  eof_pos :: Maybe (RealSrcSpan, RealSrcSpan), -- pos, gap to prior token
 
 The 'comment_q' field captures comments as they are seen in the token stream,
@@ -181,10 +181,10 @@ https://gitlab.haskell.org/ghc/ghc/wikis/api-annotations
 
 -- --------------------------------------------------------------------
 
--- | API Annotations exist so that tools can perform source to source
--- conversions of Haskell code. They are used to keep track of the
--- various syntactic keywords that are not captured in the existing
--- AST.
+-- | Exact print annotations exist so that tools can perform source to
+-- source conversions of Haskell code. They are used to keep track of
+-- the various syntactic keywords that are not captured in the
+-- existing AST.
 --
 -- The annotations, together with original source comments are made available in
 -- the @'pm_parsed_source@ field of @'GHC.Driver.Env.HsParsedModule'@.
@@ -255,7 +255,10 @@ data AnnKeywordId
     | AnnNewtype
     | AnnName -- ^ where a name loses its location in the AST, this carries it
     | AnnOf
-    | AnnOpen    -- ^ '{-\# LANGUAGE' etc
+    | AnnOpen    -- ^ '{-\# DEPRECATED' etc. Opening of pragmas where
+                 -- the capitalisation of the string can be changed by
+                 -- the user. The actual text used is stored in a
+                 -- 'SourceText' on the relevant pragma item.
     | AnnOpenB   -- ^ '(|'
     | AnnOpenBU  -- ^ '(|', unicode variant
     | AnnOpenC   -- ^ '{'
@@ -309,29 +312,31 @@ instance Outputable AnnKeywordId where
 
 -- ---------------------------------------------------------------------
 
-data AnnotationComment = AnnComment { ac_tok :: AnnotationCommentTok
-                                    , ac_prior_tok :: RealSrcSpan
-                                    -- ^ The location of the prior
-                                    -- token, used for exact printing
-                                    }
+data EpaComment =
+  EpaComment
+    { ac_tok :: EpaCommentTok
+    , ac_prior_tok :: RealSrcSpan
+    -- ^ The location of the prior
+    -- token, used for exact printing
+    }
     deriving (Eq, Ord, Data, Show)
 
-data AnnotationCommentTok =
+data EpaCommentTok =
   -- Documentation annotations
-    AnnDocCommentNext  String     -- ^ something beginning '-- |'
-  | AnnDocCommentPrev  String     -- ^ something beginning '-- ^'
-  | AnnDocCommentNamed String     -- ^ something beginning '-- $'
-  | AnnDocSection      Int String -- ^ a section heading
-  | AnnDocOptions      String     -- ^ doc options (prune, ignore-exports, etc)
-  | AnnLineComment     String     -- ^ comment starting by "--"
-  | AnnBlockComment    String     -- ^ comment in {- -}
-  | AnnEofComment                 -- ^ empty comment, capturing
+    EpaDocCommentNext  String     -- ^ something beginning '-- |'
+  | EpaDocCommentPrev  String     -- ^ something beginning '-- ^'
+  | EpaDocCommentNamed String     -- ^ something beginning '-- $'
+  | EpaDocSection      Int String -- ^ a section heading
+  | EpaDocOptions      String     -- ^ doc options (prune, ignore-exports, etc)
+  | EpaLineComment     String     -- ^ comment starting by "--"
+  | EpaBlockComment    String     -- ^ comment in {- -}
+  | EpaEofComment                 -- ^ empty comment, capturing
                                   -- location of EOF
     deriving (Eq, Ord, Data, Show)
 -- Note: these are based on the Token versions, but the Token type is
 -- defined in GHC.Parser.Lexer and bringing it in here would create a loop
 
-instance Outputable AnnotationComment where
+instance Outputable EpaComment where
   ppr x = text (show x)
 
 -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
@@ -534,22 +539,22 @@ realSpanAsAnchor s  = Anchor s UnchangedAnchor
 -- them into the output stream.  But when editin the AST, to move
 -- fragments around, it is useful to be able to first separate the
 -- comments into those occuring before the AST element and those
--- following it.  The 'AnnCommentsBalanced' constructor is used to do
--- this. The GHC parser will only insert the 'AnnComments' form.
-data EpAnnComments = AnnComments
-                        { priorComments :: ![LAnnotationComment] }
-                    | AnnCommentsBalanced
-                        { priorComments :: ![LAnnotationComment]
-                        , followingComments :: ![LAnnotationComment] }
+-- following it.  The 'EpaCommentsBalanced' constructor is used to do
+-- this. The GHC parser will only insert the 'EpaComments' form.
+data EpAnnComments = EpaComments
+                        { priorComments :: ![LEpaComment] }
+                    | EpaCommentsBalanced
+                        { priorComments :: ![LEpaComment]
+                        , followingComments :: ![LEpaComment] }
         deriving (Data, Eq)
 
-type LAnnotationComment = GenLocated Anchor AnnotationComment
+type LEpaComment = GenLocated Anchor EpaComment
 
 noCom :: EpAnnComments
-noCom = AnnComments []
+noCom = EpaComments []
 
-com :: [LAnnotationComment] -> EpAnnComments
-com cs = AnnComments cs
+com :: [LEpaComment] -> EpAnnComments
+com cs = EpaComments cs
 
 -- ---------------------------------------------------------------------
 
@@ -925,17 +930,17 @@ noAnn = EpAnnNotUsed
 addAnns :: EpAnn -> [AddEpAnn] -> EpAnnComments -> EpAnn
 addAnns (EpAnn l as1 cs) as2 cs2
   = EpAnn (widenAnchor l (as1 ++ as2)) (as1 ++ as2) (cs <> cs2)
-addAnns EpAnnNotUsed [] (AnnComments []) = EpAnnNotUsed
-addAnns EpAnnNotUsed [] (AnnCommentsBalanced [] []) = EpAnnNotUsed
+addAnns EpAnnNotUsed [] (EpaComments []) = EpAnnNotUsed
+addAnns EpAnnNotUsed [] (EpaCommentsBalanced [] []) = EpAnnNotUsed
 addAnns EpAnnNotUsed as cs = EpAnn (Anchor placeholderRealSpan UnchangedAnchor) as cs
 
 -- AZ:TODO use widenSpan here too
 addAnnsA :: SrcSpanAnnA -> [TrailingAnn] -> EpAnnComments -> SrcSpanAnnA
 addAnnsA (SrcSpanAnn (EpAnn l as1 cs) loc) as2 cs2
   = SrcSpanAnn (EpAnn l (AnnListItem (lann_trailing as1 ++ as2)) (cs <> cs2)) loc
-addAnnsA (SrcSpanAnn EpAnnNotUsed loc) [] (AnnComments [])
+addAnnsA (SrcSpanAnn EpAnnNotUsed loc) [] (EpaComments [])
   = SrcSpanAnn EpAnnNotUsed loc
-addAnnsA (SrcSpanAnn EpAnnNotUsed loc) [] (AnnCommentsBalanced [] [])
+addAnnsA (SrcSpanAnn EpAnnNotUsed loc) [] (EpaCommentsBalanced [] [])
   = SrcSpanAnn EpAnnNotUsed loc
 addAnnsA (SrcSpanAnn EpAnnNotUsed loc) as cs
   = SrcSpanAnn (EpAnn (spanAsAnchor loc) (AnnListItem as) cs) loc
@@ -983,7 +988,7 @@ annParen2AddEpAnn (EpAnn _ (AnnParen pt o c) _)
     (ai,ac) = parenTypeKws pt
 
 epAnnComments :: EpAnn' an -> EpAnnComments
-epAnnComments EpAnnNotUsed = AnnComments []
+epAnnComments EpAnnNotUsed = EpaComments []
 epAnnComments (EpAnn _ _ cs) = cs
 
 -- ---------------------------------------------------------------------
@@ -1014,17 +1019,17 @@ addCLocAA a b c = L (noAnnSrcSpan $ combineSrcSpans (locA $ getLoc a) (locA $ ge
 -- Utilities for manipulating EpAnnComments
 -- ---------------------------------------------------------------------
 
-getFollowingComments :: EpAnnComments -> [LAnnotationComment]
-getFollowingComments (AnnComments _) = []
-getFollowingComments (AnnCommentsBalanced _ cs) = cs
+getFollowingComments :: EpAnnComments -> [LEpaComment]
+getFollowingComments (EpaComments _) = []
+getFollowingComments (EpaCommentsBalanced _ cs) = cs
 
-setFollowingComments :: EpAnnComments -> [LAnnotationComment] -> EpAnnComments
-setFollowingComments (AnnComments ls) cs           = AnnCommentsBalanced ls cs
-setFollowingComments (AnnCommentsBalanced ls _) cs = AnnCommentsBalanced ls cs
+setFollowingComments :: EpAnnComments -> [LEpaComment] -> EpAnnComments
+setFollowingComments (EpaComments ls) cs           = EpaCommentsBalanced ls cs
+setFollowingComments (EpaCommentsBalanced ls _) cs = EpaCommentsBalanced ls cs
 
-setPriorComments :: EpAnnComments -> [LAnnotationComment] -> EpAnnComments
-setPriorComments (AnnComments _) cs            = AnnComments cs
-setPriorComments (AnnCommentsBalanced _ ts) cs = AnnCommentsBalanced cs ts
+setPriorComments :: EpAnnComments -> [LEpaComment] -> EpAnnComments
+setPriorComments (EpaComments _) cs            = EpaComments cs
+setPriorComments (EpaCommentsBalanced _ ts) cs = EpaCommentsBalanced cs ts
 
 -- ---------------------------------------------------------------------
 -- Comment-only annotations
@@ -1116,10 +1121,10 @@ instance Semigroup Anchor where
   Anchor r1 o1 <> Anchor r2 _ = Anchor (combineRealSrcSpans r1 r2) o1
 
 instance Semigroup EpAnnComments where
-  AnnComments cs1 <> AnnComments cs2 = AnnComments (cs1 ++ cs2)
-  AnnComments cs1 <> AnnCommentsBalanced cs2 as2 = AnnCommentsBalanced (cs1 ++ cs2) as2
-  AnnCommentsBalanced cs1 as1 <> AnnComments cs2 = AnnCommentsBalanced (cs1 ++ cs2) as1
-  AnnCommentsBalanced cs1 as1 <> AnnCommentsBalanced cs2 as2 = AnnCommentsBalanced (cs1 ++ cs2) (as1++as2)
+  EpaComments cs1 <> EpaComments cs2 = EpaComments (cs1 ++ cs2)
+  EpaComments cs1 <> EpaCommentsBalanced cs2 as2 = EpaCommentsBalanced (cs1 ++ cs2) as2
+  EpaCommentsBalanced cs1 as1 <> EpaComments cs2 = EpaCommentsBalanced (cs1 ++ cs2) as1
+  EpaCommentsBalanced cs1 as1 <> EpaCommentsBalanced cs2 as2 = EpaCommentsBalanced (cs1 ++ cs2) (as1++as2)
 
 
 instance (Monoid a) => Monoid (EpAnn' a) where
@@ -1173,12 +1178,12 @@ instance Outputable AnchorOperation where
 instance Outputable DeltaPos where
   ppr (DP l c) = text "DP" <+> ppr l <+> ppr c
 
-instance Outputable (GenLocated Anchor AnnotationComment) where
+instance Outputable (GenLocated Anchor EpaComment) where
   ppr (L l c) = text "L" <+> ppr l <+> ppr c
 
 instance Outputable EpAnnComments where
-  ppr (AnnComments cs) = text "AnnComments" <+> ppr cs
-  ppr (AnnCommentsBalanced cs ts) = text "AnnCommentsBalanced" <+> ppr cs <+> ppr ts
+  ppr (EpaComments cs) = text "EpaComments" <+> ppr cs
+  ppr (EpaCommentsBalanced cs ts) = text "EpaCommentsBalanced" <+> ppr cs <+> ppr ts
 
 instance (NamedThing (Located a)) => NamedThing (LocatedAn an a) where
   getName (L l a) = getName (L (locA l) a)
