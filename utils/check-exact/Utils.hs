@@ -283,7 +283,7 @@ normaliseCommentText ('\r':xs) = normaliseCommentText xs
 normaliseCommentText (x:xs) = x:normaliseCommentText xs
 
 -- | Makes a comment which originates from a specific keyword.
-mkKWComment :: AnnKeywordId -> AnnAnchor -> Comment
+mkKWComment :: AnnKeywordId -> EpaAnchor -> Comment
 mkKWComment kw (AR ss)
   = Comment (keywordToString $ G kw) (Anchor ss UnchangedAnchor) (Just kw)
 mkKWComment kw (AD dp)
