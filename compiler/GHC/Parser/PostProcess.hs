@@ -1019,7 +1019,7 @@ checkContext :: LHsType GhcPs -> P (LHsContext GhcPs)
 checkContext orig_t@(L (SrcSpanAnn _ l) _orig_t) =
   check ([],[],noCom) orig_t
  where
-  check :: ([AnnAnchor],[AnnAnchor],EpAnnComments)
+  check :: ([EpaAnchor],[EpaAnchor],EpAnnComments)
         -> LHsType GhcPs -> P (LHsContext GhcPs)
   check (oparens,cparens,cs) (L _l (HsTupleTy ann' HsBoxedOrConstraintTuple ts))
     -- (Eq a, Ord b) shows up as a tuple type. Only boxed tuples can
@@ -1044,8 +1044,8 @@ checkContext orig_t@(L (SrcSpanAnn _ l) _orig_t) =
   check (_opi,_cpi,_csi) _t =
                  return (L (SrcSpanAnn (EpAnn (spanAsAnchor l) (AnnContext Nothing [] []) noCom) l) [orig_t])
 
-checkImportDecl :: Maybe AnnAnchor
-                -> Maybe AnnAnchor
+checkImportDecl :: Maybe EpaAnchor
+                -> Maybe EpaAnchor
                 -> P ()
 checkImportDecl mPre mPost = do
   let whenJust mg f = maybe (pure ()) f mg
@@ -1056,18 +1056,18 @@ checkImportDecl mPre mPost = do
   -- 'ImportQualifiedPost' is not in effect.
   whenJust mPost $ \post ->
     when (not importQualifiedPostEnabled) $
-      failOpNotEnabledImportQualifiedPost (RealSrcSpan (annAnchorRealSrcSpan post) Nothing)
+      failOpNotEnabledImportQualifiedPost (RealSrcSpan (epaAnchorRealSrcSpan post) Nothing)
 
   -- Error if 'qualified' occurs in both pre and postpositive
   -- positions.
   whenJust mPost $ \post ->
     when (isJust mPre) $
-      failOpImportQualifiedTwice (RealSrcSpan (annAnchorRealSrcSpan post) Nothing)
+      failOpImportQualifiedTwice (RealSrcSpan (epaAnchorRealSrcSpan post) Nothing)
 
   -- Warn if 'qualified' found in prepositive position and
   -- 'Opt_WarnPrepositiveQualifiedModule' is enabled.
   whenJust mPre $ \pre ->
-    warnPrepositiveQualifiedModule (RealSrcSpan (annAnchorRealSrcSpan pre) Nothing)
+    warnPrepositiveQualifiedModule (RealSrcSpan (epaAnchorRealSrcSpan pre) Nothing)
 
 -- -------------------------------------------------------------------------
 -- Checking Patterns.
@@ -2611,7 +2611,7 @@ data ImpExpSubSpec = ImpExpAbs
                    | ImpExpAllWith [LocatedA ImpExpQcSpec]
 
 data ImpExpQcSpec = ImpExpQcName (LocatedN RdrName)
-                  | ImpExpQcType AnnAnchor (LocatedN RdrName)
+                  | ImpExpQcType EpaAnchor (LocatedN RdrName)
                   | ImpExpQcWildcard
 
 mkModuleImpExp :: [AddEpAnn] -> LocatedA ImpExpQcSpec -> ImpExpSubSpec -> P (IE GhcPs)
@@ -2885,7 +2885,7 @@ mkSumOrTupleExpr l boxity (Tuple es) anns = do
     cs <- getCommentsFor (locA l)
     return $ L l (ExplicitTuple (EpAnn (spanAsAnchor $ locA l) anns cs) (map toTupArg es) boxity)
   where
-    toTupArg :: Either (EpAnn' AnnAnchor) (LHsExpr GhcPs) -> HsTupArg GhcPs
+    toTupArg :: Either (EpAnn' EpaAnchor) (LHsExpr GhcPs) -> HsTupArg GhcPs
     toTupArg (Left ann) = missingTupArg ann
     toTupArg (Right a)  = Present noAnn a
 
@@ -2912,7 +2912,7 @@ mkSumOrTuplePat l boxity (Tuple ps) anns = do
   cs <- getCommentsFor (locA l)
   return $ L l (PatBuilderPat (TuplePat (EpAnn (spanAsAnchor $ locA l) anns cs) ps' boxity))
   where
-    toTupPat :: Either (EpAnn' AnnAnchor) (LocatedA (PatBuilder GhcPs)) -> PV (LPat GhcPs)
+    toTupPat :: Either (EpAnn' EpaAnchor) (LocatedA (PatBuilder GhcPs)) -> PV (LPat GhcPs)
     -- Ignore the element location so that the error message refers to the
     -- entire tuple. See #19504 (and the discussion) for details.
     toTupPat p = case p of
