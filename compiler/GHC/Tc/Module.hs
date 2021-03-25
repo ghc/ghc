@@ -1781,7 +1781,7 @@ checkMainType tcg_env
             [main_gre] ->
 
     do { let main_name = greMangledName main_gre
-             ctxt      = FunSigCtxt main_name False
+             ctxt      = FunSigCtxt main_name NoRRC
        ; main_id   <- tcLookupId main_name
        ; (io_ty,_) <- getIOType
        ; (_, lie)  <- captureTopConstraints       $
@@ -1914,7 +1914,7 @@ setMainCtxt main_name io_ty thing_inside
     checkConstraints skol_info [] []  $  -- Builds an implication if necessary
     thing_inside                         -- e.g. with -fdefer-type-errors
   where
-    skol_info = SigSkol (FunSigCtxt main_name False) io_ty []
+    skol_info = SigSkol (FunSigCtxt main_name NoRRC) io_ty []
     main_ctxt = text "When checking the type of the"
                 <+> ppMainFn (nameOccName main_name)
 

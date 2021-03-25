@@ -463,9 +463,10 @@ warnRedundantConstraints ctxt env info ev_vars
  | null redundant_evs
  = return ()
 
- | SigSkol {} <- info
+ | SigSkol user_ctxt _ _  <- info
  = setLclEnv env $  -- We want to add "In the type signature for f"
                     -- to the error context, which is a bit tiresome
+   setSrcSpan (redundantConstraintsSpan user_ctxt) $
    addErrCtxt (text "In" <+> ppr info) $
    do { env <- getLclEnv
       ; msg <- mkErrorReport (WarningWithFlag Opt_WarnRedundantConstraints) ctxt env (important doc)
