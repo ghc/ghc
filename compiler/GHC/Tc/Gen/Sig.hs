@@ -15,6 +15,7 @@ module GHC.Tc.Gen.Sig(
 
        isPartialSig, hasCompleteSig, tcIdSigName, tcSigInfoName,
        completeSigPolyId_maybe, isCompleteHsSig,
+       lhsSigWcTypeContextSpan, lhsSigTypeContextSpan,
 
        tcTySigs, tcUserTypeSig, completeSigFromId,
        tcInstSig,
@@ -180,8 +181,8 @@ tcTySigs hs_sigs
 
 tcTySig :: LSig GhcRn -> TcM [TcSigInfo]
 tcTySig (L _ (IdSig _ id))
-  = do { let ctxt = FunSigCtxt (idName id) False
-                    -- False: do not report redundant constraints
+  = do { let ctxt = FunSigCtxt (idName id) NoRRC
+                    -- NoRRC: do not report redundant constraints
                     -- The user has no control over the signature!
              sig = completeSigFromId ctxt id
        ; return [TcIdSig sig] }
@@ -216,7 +217,7 @@ tcUserTypeSig :: SrcSpan -> LHsSigWcType GhcRn -> Maybe Name
 -- Nothing => Expression type signature   <expr> :: type
 tcUserTypeSig loc hs_sig_ty mb_name
   | isCompleteHsSig hs_sig_ty
-  = do { sigma_ty <- tcHsSigWcType ctxt_F hs_sig_ty
+  = do { sigma_ty <- tcHsSigWcType ctxt_no_rrc hs_sig_ty
        ; traceTc "tcuser" (ppr sigma_ty)
        ; return $
          CompleteSig { sig_bndr  = mkLocalId name Many sigma_ty
@@ -225,26 +226,44 @@ tcUserTypeSig loc hs_sig_ty mb_name
                                    -- anything, it is a top-level
                                    -- definition. Which are all unrestricted in
                                    -- the current implementation.
-                     , sig_ctxt  = ctxt_T
+                     , sig_ctxt  = ctxt_rrc  -- Report redundant constraints
                      , sig_loc   = loc } }
                        -- Location of the <type> in   f :: <type>
 
   -- Partial sig with wildcards
   | otherwise
   = return (PartialSig { psig_name = name, psig_hs_ty = hs_sig_ty
-                       , sig_ctxt = ctxt_F, sig_loc = loc })
+                       , sig_ctxt = ctxt_no_rrc, sig_loc = loc })
   where
     name   = case mb_name of
                Just n  -> n
                Nothing -> mkUnboundName (mkVarOcc "<expression>")
-    ctxt_F = case mb_name of
-               Just n  -> FunSigCtxt n False
-               Nothing -> ExprSigCtxt
-    ctxt_T = case mb_name of
-               Just n  -> FunSigCtxt n True
-               Nothing -> ExprSigCtxt
 
+    ctxt_rrc    = ctxt_fn (lhsSigWcTypeContextSpan hs_sig_ty)
+    ctxt_no_rrc = ctxt_fn NoRRC
 
+    ctxt_fn :: ReportRedundantConstraints -> UserTypeCtxt
+    ctxt_fn rcc = case mb_name of
+               Just n  -> FunSigCtxt n rcc
+               Nothing -> ExprSigCtxt rcc
+
+lhsSigWcTypeContextSpan :: LHsSigWcType GhcRn -> ReportRedundantConstraints
+-- | Find the location of the top-level context of a HsType.  For example:
+--
+-- @
+--   forall a b. (Eq a, Ord b) => blah
+--               ^^^^^^^^^^^^^
+-- @
+-- If there is none, return Nothing
+lhsSigWcTypeContextSpan (HsWC { hswc_body = sigType }) = lhsSigTypeContextSpan sigType
+
+lhsSigTypeContextSpan :: LHsSigType GhcRn -> ReportRedundantConstraints
+lhsSigTypeContextSpan (L _ HsSig { sig_body = sig_ty }) = go sig_ty
+  where
+    go (L _ (HsQualTy { hst_ctxt = Just (L span _) })) = WantRRC $ locA span -- Found it!
+    go (L _ (HsForAllTy { hst_body = hs_ty })) = go hs_ty  -- Look under foralls
+    go (L _ (HsParTy _ hs_ty)) = go hs_ty  -- Look under parens
+    go _ = NoRRC  -- Did not find it
 
 completeSigFromId :: UserTypeCtxt -> Id -> TcIdSigInfo
 -- Used for instance methods and record selectors
@@ -757,8 +776,8 @@ tcSpecPrag poly_id prag@(SpecSig _ fun_name hs_tys inl)
     spec_ctxt prag = hang (text "In the pragma:") 2 (ppr prag)
 
     tc_one hs_ty
-      = do { spec_ty <- tcHsSigType   (FunSigCtxt name False) hs_ty
-           ; wrap    <- tcSpecWrapper (FunSigCtxt name True)  poly_ty spec_ty
+      = do { spec_ty <- tcHsSigType   (FunSigCtxt name NoRRC) hs_ty
+           ; wrap    <- tcSpecWrapper (FunSigCtxt name (lhsSigTypeContextSpan hs_ty)) poly_ty spec_ty
            ; return (SpecPrag poly_id wrap inl) }
 
 tcSpecPrag _ prag = pprPanic "tcSpecPrag" (ppr prag)
