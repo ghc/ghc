@@ -9,8 +9,8 @@
     { T17544_kw.hs:1:1 }
     (UnchangedAnchor))
    (AnnsModule
-    [(AddApiAnn AnnModule (AR { T17544_kw.hs:11:1-6 }))
-    ,(AddApiAnn AnnWhere (AR { T17544_kw.hs:13:13-17 }))]
+    [(AddEpAnn AnnModule (AR { T17544_kw.hs:11:1-6 }))
+    ,(AddEpAnn AnnWhere (AR { T17544_kw.hs:13:13-17 }))]
     (AnnList
      (Nothing)
      (Nothing)
@@ -50,8 +50,8 @@
        (Anchor
         { T17544_kw.hs:(15,1)-(16,20) }
         (UnchangedAnchor))
-       [(AddApiAnn AnnData (AR { T17544_kw.hs:15:1-4 }))
-       ,(AddApiAnn AnnWhere (AR { T17544_kw.hs:16:3-7 }))]
+       [(AddEpAnn AnnData (AR { T17544_kw.hs:15:1-4 }))
+       ,(AddEpAnn AnnWhere (AR { T17544_kw.hs:16:3-7 }))]
        (AnnComments
         []))
       (L
@@ -67,8 +67,8 @@
         (Anchor
          { T17544_kw.hs:(15,1)-(16,20) }
          (UnchangedAnchor))
-        [(AddApiAnn AnnData (AR { T17544_kw.hs:15:1-4 }))
-        ,(AddApiAnn AnnWhere (AR { T17544_kw.hs:16:3-7 }))]
+        [(AddEpAnn AnnData (AR { T17544_kw.hs:15:1-4 }))
+        ,(AddEpAnn AnnWhere (AR { T17544_kw.hs:16:3-7 }))]
         (AnnComments
          []))
        (DataType)
@@ -82,7 +82,7 @@
            (Anchor
             { T17544_kw.hs:16:9-20 }
             (UnchangedAnchor))
-           [(AddApiAnn AnnDcolon (AR { T17544_kw.hs:16:15-16 }))]
+           [(AddEpAnn AnnDcolon (AR { T17544_kw.hs:16:15-16 }))]
            (AnnComments
             []))
           [(L
@@ -133,8 +133,8 @@
        (Anchor
         { T17544_kw.hs:(18,1)-(19,26) }
         (UnchangedAnchor))
-       [(AddApiAnn AnnNewtype (AR { T17544_kw.hs:18:1-7 }))
-       ,(AddApiAnn AnnWhere (AR { T17544_kw.hs:19:3-7 }))]
+       [(AddEpAnn AnnNewtype (AR { T17544_kw.hs:18:1-7 }))
+       ,(AddEpAnn AnnWhere (AR { T17544_kw.hs:19:3-7 }))]
        (AnnComments
         []))
       (L
@@ -150,8 +150,8 @@
         (Anchor
          { T17544_kw.hs:(18,1)-(19,26) }
          (UnchangedAnchor))
-        [(AddApiAnn AnnNewtype (AR { T17544_kw.hs:18:1-7 }))
-        ,(AddApiAnn AnnWhere (AR { T17544_kw.hs:19:3-7 }))]
+        [(AddEpAnn AnnNewtype (AR { T17544_kw.hs:18:1-7 }))
+        ,(AddEpAnn AnnWhere (AR { T17544_kw.hs:19:3-7 }))]
         (AnnComments
          []))
        (NewType)
@@ -165,7 +165,7 @@
            (Anchor
             { T17544_kw.hs:19:9-26 }
             (UnchangedAnchor))
-           [(AddApiAnn AnnDcolon (AR { T17544_kw.hs:19:15-16 }))]
+           [(AddEpAnn AnnDcolon (AR { T17544_kw.hs:19:15-16 }))]
            (AnnComments
             []))
           [(L
@@ -242,8 +242,8 @@
         (Anchor
          { T17544_kw.hs:(21,1)-(24,18) }
          (UnchangedAnchor))
-        [(AddApiAnn AnnClass (AR { T17544_kw.hs:21:1-5 }))
-        ,(AddApiAnn AnnWhere (AR { T17544_kw.hs:23:3-7 }))]
+        [(AddEpAnn AnnClass (AR { T17544_kw.hs:21:1-5 }))
+        ,(AddEpAnn AnnWhere (AR { T17544_kw.hs:23:3-7 }))]
         (AnnComments
          []))
        (NoAnnSortKey)
@@ -281,7 +281,7 @@
            { T17544_kw.hs:24:5-13 }
            (UnchangedAnchor))
           (AnnSig
-           (AddApiAnn AnnDcolon (AR { T17544_kw.hs:24:15-16 }))
+           (AddEpAnn AnnDcolon (AR { T17544_kw.hs:24:15-16 }))
            [])
           (AnnComments
            []))
