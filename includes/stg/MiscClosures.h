@@ -220,6 +220,7 @@ RTS_ENTRY(stg_END_STM_CHUNK_LIST);
 RTS_ENTRY(stg_NO_TREC);
 RTS_ENTRY(stg_COMPACT_NFDATA_CLEAN);
 RTS_ENTRY(stg_COMPACT_NFDATA_DIRTY);
+RTS_ENTRY(stg_TIMEOUT_QUEUE);
 RTS_ENTRY(stg_SRT_1);
 RTS_ENTRY(stg_SRT_2);
 RTS_ENTRY(stg_SRT_3);
@@ -482,6 +483,7 @@ RTS_FUN_DECL(stg_tryReadMVarzh);
 RTS_FUN_DECL(stg_waitReadzh);
 RTS_FUN_DECL(stg_waitWritezh);
 RTS_FUN_DECL(stg_delayzh);
+RTS_FUN_DECL(stg_registerDelayzh);
 #if defined(mingw32_HOST_OS)
 RTS_FUN_DECL(stg_asyncReadzh);
 RTS_FUN_DECL(stg_asyncWritezh);
