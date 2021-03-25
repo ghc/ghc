@@ -291,14 +291,14 @@ captureTypeSigSpacing (L l (SigD x (TypeSig (ApiAnn anc (AnnSig dc rs') cs) ns (
   where
     -- we want DPs for the distance from the end of the ns to the
     -- AnnDColon, and to the start of the ty
-    AddApiAnn kw dca = dc
+    AddEpAnn kw dca = dc
     rd = case last ns of
       L (SrcSpanAnn ApiAnnNotUsed   ll) _ -> realSrcSpan ll
       L (SrcSpanAnn (ApiAnn anc' _ _) _) _ -> anchor anc' -- TODO MovedAnchor?
     -- DP (line, col) = ss2delta (ss2pos $ anchor $ getLoc lc) r
     dc' = case dca of
-      AR r -> AddApiAnn kw (AD $ ss2delta (ss2posEnd rd) r)
-      AD _ -> AddApiAnn kw dca
+      AR r -> AddEpAnn kw (AD $ ss2delta (ss2posEnd rd) r)
+      AD _ -> AddEpAnn kw dca
 
     -- ---------------------------------
 
@@ -1414,7 +1414,7 @@ oldWhereAnnotation :: (Monad m)
 oldWhereAnnotation ApiAnnNotUsed ww _oldSpan = do
   newSpan <- uniqueSrcSpanT
   let w = case ww of
-        WithWhere -> [AddApiAnn AnnWhere (AD (DP 0 0))]
+        WithWhere -> [AddEpAnn AnnWhere (AD (DP 0 0))]
         WithoutWhere -> []
   let anc2' = Anchor (rs newSpan) (MovedAnchor (DP 0 1))
   (anc, anc2) <- do
@@ -1429,7 +1429,7 @@ oldWhereAnnotation (ApiAnn anc an cs) ww _oldSpan = do
   -- TODO: when we set DP (0,0) for the HsValBinds ApiAnnAnchor, change the AnnList anchor to have the correct DP too
   let (AnnList ancl o c _r t) = an
   let w = case ww of
-        WithWhere -> [AddApiAnn AnnWhere (AD (DP 0 0))]
+        WithWhere -> [AddEpAnn AnnWhere (AD (DP 0 0))]
         WithoutWhere -> []
   (anc', ancl') <- do
         case ww of
@@ -1446,7 +1446,7 @@ newWhereAnnotation ww = do
   let anc  = Anchor (rs newSpan) (MovedAnchor (DP 1 2))
   let anc2 = Anchor (rs newSpan) (MovedAnchor (DP 1 4))
   let w = case ww of
-        WithWhere -> [AddApiAnn AnnWhere (AD (DP 0 0))]
+        WithWhere -> [AddEpAnn AnnWhere (AD (DP 0 0))]
         WithoutWhere -> []
   let an = ApiAnn anc
                   (AnnList (Just anc2) Nothing Nothing w [])

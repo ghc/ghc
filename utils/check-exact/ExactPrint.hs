@@ -293,11 +293,11 @@ addComments csNew = do
 
 -- |In order to interleave annotations into the stream, we turn them into
 -- comments.
-annotationsToComments :: [AddApiAnn] -> [AnnKeywordId] -> EPP ()
+annotationsToComments :: [AddEpAnn] -> [AnnKeywordId] -> EPP ()
 annotationsToComments ans kws = do
   let
     getSpans _ [] = []
-    getSpans k1 (AddApiAnn k2 ss:as)
+    getSpans k1 (AddEpAnn k2 ss:as)
       | k1 == k2 = ss : getSpans k1 as
       | otherwise = getSpans k1 as
     doOne :: AnnKeywordId -> EPP [Comment]
@@ -382,7 +382,7 @@ instance ExactPrint HsModule where
         debugM $ "HsModule.AnnWhere coming"
         setLayoutTopLevelP $ markApiAnn' an am_main AnnWhere
 
-    setLayoutTopLevelP $ mapM_ markAddApiAnn (al_open $ am_decls $ anns an)
+    setLayoutTopLevelP $ mapM_ markAddEpAnn (al_open $ am_decls $ anns an)
 
     -- markOptional GHC.AnnOpenC -- Possible '{'
     -- markManyOptional GHC.AnnSemi -- possible leading semis
@@ -395,7 +395,7 @@ instance ExactPrint HsModule where
     -- setLayoutTopLevelP $ markAnnotated decls
     markTopLevelList decls
 
-    setLayoutTopLevelP $ mapM_ markAddApiAnn (al_close $ am_decls $ anns an)
+    setLayoutTopLevelP $ mapM_ markAddEpAnn (al_close $ am_decls $ anns an)
     -- markOptional GHC.AnnCloseC -- Possible '}'
 
     -- markEOF
@@ -473,36 +473,36 @@ markExternalSourceText l (SourceText txt) _ = printStringAtKw' (realSrcSpan l) t
 
 -- ---------------------------------------------------------------------
 
-markAddApiAnn :: AddApiAnn -> EPP ()
-markAddApiAnn a@(AddApiAnn kw _) = mark [a] kw
+markAddEpAnn :: AddEpAnn -> EPP ()
+markAddEpAnn a@(AddEpAnn kw _) = mark [a] kw
 
-markLocatedMAA :: ApiAnn' a -> (a -> Maybe AddApiAnn) -> EPP ()
+markLocatedMAA :: ApiAnn' a -> (a -> Maybe AddEpAnn) -> EPP ()
 markLocatedMAA ApiAnnNotUsed  _  = return ()
 markLocatedMAA (ApiAnn _ a _) f =
   case f a of
     Nothing -> return ()
-    Just aa -> markAddApiAnn aa
+    Just aa -> markAddEpAnn aa
 
-markLocatedAA :: ApiAnn' a -> (a -> AddApiAnn) -> EPP ()
+markLocatedAA :: ApiAnn' a -> (a -> AddEpAnn) -> EPP ()
 markLocatedAA ApiAnnNotUsed  _  = return ()
 markLocatedAA (ApiAnn _ a _) f = markKw (f a)
 
-markLocatedAAL :: ApiAnn' a -> (a -> [AddApiAnn]) -> AnnKeywordId -> EPP ()
+markLocatedAAL :: ApiAnn' a -> (a -> [AddEpAnn]) -> AnnKeywordId -> EPP ()
 markLocatedAAL ApiAnnNotUsed  _ _ = return ()
 markLocatedAAL (ApiAnn _ a _) f kw = go (f a)
   where
     go [] = return ()
-    go (aa@(AddApiAnn kw' _):as)
+    go (aa@(AddEpAnn kw' _):as)
       | kw' == kw = mark [aa] kw
       | otherwise = go as
 
-markLocatedAALS :: ApiAnn' a -> (a -> [AddApiAnn]) -> AnnKeywordId -> Maybe String -> EPP ()
+markLocatedAALS :: ApiAnn' a -> (a -> [AddEpAnn]) -> AnnKeywordId -> Maybe String -> EPP ()
 markLocatedAALS an f kw Nothing = markLocatedAAL an f kw
 markLocatedAALS ApiAnnNotUsed  _ _ _ = return ()
 markLocatedAALS (ApiAnn _ a _) f kw (Just str) = go (f a)
   where
     go [] = return ()
-    go (AddApiAnn kw' r:as)
+    go (AddEpAnn kw' r:as)
       | kw' == kw = printStringAtAA r str
       | otherwise = go as
 
@@ -567,21 +567,21 @@ markApiAnn :: ApiAnn -> AnnKeywordId -> EPP ()
 markApiAnn ApiAnnNotUsed _ = return ()
 markApiAnn (ApiAnn _ a _) kw = mark a kw
 
-markApiAnn' :: ApiAnn' ann -> (ann -> [AddApiAnn]) -> AnnKeywordId -> EPP ()
+markApiAnn' :: ApiAnn' ann -> (ann -> [AddEpAnn]) -> AnnKeywordId -> EPP ()
 markApiAnn' ApiAnnNotUsed _ _ = return ()
 markApiAnn' (ApiAnn _ a _) f kw = mark (f a) kw
 
-markApiAnnAll :: ApiAnn' ann -> (ann -> [AddApiAnn]) -> AnnKeywordId -> EPP ()
+markApiAnnAll :: ApiAnn' ann -> (ann -> [AddEpAnn]) -> AnnKeywordId -> EPP ()
 markApiAnnAll ApiAnnNotUsed _ _ = return ()
 markApiAnnAll (ApiAnn _ a _) f kw = mapM_ markKw (sort anns)
   where
-    anns = filter (\(AddApiAnn ka _) -> ka == kw) (f a)
+    anns = filter (\(AddEpAnn ka _) -> ka == kw) (f a)
 
-mark :: [AddApiAnn] -> AnnKeywordId -> EPP ()
+mark :: [AddEpAnn] -> AnnKeywordId -> EPP ()
 mark anns kw = do
-  case find (\(AddApiAnn k _) -> k == kw) anns of
+  case find (\(AddEpAnn k _) -> k == kw) anns of
     Just aa -> markKw aa
-    Nothing -> case find (\(AddApiAnn k _) -> k == (unicodeAnn kw)) anns of
+    Nothing -> case find (\(AddEpAnn k _) -> k == (unicodeAnn kw)) anns of
       Just aau -> markKw aau
       Nothing -> return ()
 
@@ -594,8 +594,8 @@ markKwT (AddRarrowAnnU ss) = markKwA AnnRarrowU ss
 -- markKwT (AddLollyAnn ss)   = markKwA AnnLolly ss
 -- markKwT (AddLollyAnnU ss)  = markKwA AnnLollyU ss
 
-markKw :: AddApiAnn -> EPP ()
-markKw (AddApiAnn kw ss) = markKwA kw ss
+markKw :: AddEpAnn -> EPP ()
+markKw (AddEpAnn kw ss) = markKwA kw ss
 
 -- | This should be the main driver of the process, managing comments
 markKwA :: AnnKeywordId -> AnnAnchor -> EPP ()
@@ -1005,7 +1005,7 @@ instance ExactPrint (RuleDecl GhcPs) where
   --   inContext (Set.singleton Intercalate) $ mark GHC.AnnSemi
   --   markTrailingSemi
 
-markActivation :: ApiAnn' a -> (a -> [AddApiAnn]) -> Activation -> Annotated ()
+markActivation :: ApiAnn' a -> (a -> [AddEpAnn]) -> Activation -> Annotated ()
 markActivation an fn act = do
   case act of
     ActiveBefore src phase -> do
@@ -3164,19 +3164,19 @@ instance ExactPrint (LocatedN RdrName) where
         markTrailing t
       NameAnnCommas a o cs c t -> do
         let (kwo,kwc) = adornments a
-        markKw (AddApiAnn kwo o)
-        forM_ cs (\loc -> markKw (AddApiAnn AnnComma loc))
-        markKw (AddApiAnn kwc c)
+        markKw (AddEpAnn kwo o)
+        forM_ cs (\loc -> markKw (AddEpAnn AnnComma loc))
+        markKw (AddEpAnn kwc c)
         markTrailing t
       NameAnnOnly a o c t -> do
         markName a o Nothing c
         markTrailing t
       NameAnnRArrow nl t -> do
-        markKw (AddApiAnn AnnRarrow nl)
+        markKw (AddEpAnn AnnRarrow nl)
         markTrailing t
       NameAnnQuote q name t -> do
         debugM $ "NameAnnQuote"
-        markKw (AddApiAnn AnnSimpleQuote q)
+        markKw (AddEpAnn AnnSimpleQuote q)
         markAnnotated (L name n)
         markTrailing t
       NameAnnTrailing t -> do
@@ -3187,11 +3187,11 @@ markName :: NameAdornment
          -> AnnAnchor -> Maybe (AnnAnchor,RdrName) -> AnnAnchor -> EPP ()
 markName adorn open mname close = do
   let (kwo,kwc) = adornments adorn
-  markKw (AddApiAnn kwo open)
+  markKw (AddEpAnn kwo open)
   case mname of
     Nothing -> return ()
     Just (name, a) -> printStringAtAA name (showPprUnsafe a)
-  markKw (AddApiAnn kwc close)
+  markKw (AddEpAnn kwc close)
 
 adornments :: NameAdornment -> (AnnKeywordId, AnnKeywordId)
 adornments NameParens     = (AnnOpenP, AnnCloseP)
