@@ -25,7 +25,7 @@ module GHC.Iface.Load (
         -- IfM functions
         loadInterface,
         loadSysInterface, loadUserInterface, loadPluginInterface,
-        findAndReadIface, readIface, writeIface,
+        findAndReadIface, readIface, readIfaceSourceHash, writeIface,
         initExternalPackageState,
         moduleFreeHolesPrecise,
         needWiredInHomeIface, loadWiredInHomeIface,
@@ -66,6 +66,7 @@ import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Utils.Logger
+import GHC.Utils.Fingerprint
 
 import GHC.Settings.Constants
 
@@ -954,6 +955,19 @@ readIface wanted_mod file_path
             Left exn    -> return (Failed (text (showException exn)))
     }
 
+-- | Like @readIface@, but just get the source file hash out of it if it
+-- exists, and don't bother returning the error otherwise.
+-- TODO: Optimize?
+readIfaceSourceHash :: Module -> FilePath
+              -> TcRnIf gbl lcl (Maybe Fingerprint)
+readIfaceSourceHash wanted_mod file_path
+  = do mb_iface <- readIface wanted_mod file_path
+       case mb_iface of
+         Succeeded iface ->
+           return $ Just $ mi_src_hash (mi_final_exts iface)
+         Failed _ ->
+           return Nothing
+
 {-
 *********************************************************
 *                                                       *
@@ -1099,6 +1113,7 @@ pprModIface unit_state iface@ModIface{ mi_final_exts = exts }
         , nest 2 (text "opt_hash:" <+> ppr (mi_opt_hash exts))
         , nest 2 (text "hpc_hash:" <+> ppr (mi_hpc_hash exts))
         , nest 2 (text "plugin_hash:" <+> ppr (mi_plugin_hash exts))
+        , nest 2 (text "src_hash:" <+> ppr (mi_src_hash exts))
         , nest 2 (text "sig of:" <+> ppr (mi_sig_of iface))
         , nest 2 (text "used TH splices:" <+> ppr (mi_used_th iface))
         , nest 2 (text "where")
