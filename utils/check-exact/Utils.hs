@@ -24,7 +24,7 @@ import Data.Ord (comparing)
 import GHC.Hs.Dump
 import Lookup
 
-import GHC hiding (AnnComment)
+import GHC hiding (EpaComment)
 import qualified GHC
 import GHC.Types.Name
 import GHC.Types.Name.Reader
@@ -260,17 +260,17 @@ isExactName = False `mkQ` isExact
 
 -- ---------------------------------------------------------------------
 
-ghcCommentText :: LAnnotationComment -> String
-ghcCommentText (L _ (GHC.AnnComment (AnnDocCommentNext s) _))  = s
-ghcCommentText (L _ (GHC.AnnComment (AnnDocCommentPrev s) _))  = s
-ghcCommentText (L _ (GHC.AnnComment (AnnDocCommentNamed s) _)) = s
-ghcCommentText (L _ (GHC.AnnComment (AnnDocSection _ s) _))    = s
-ghcCommentText (L _ (GHC.AnnComment (AnnDocOptions s) _))      = s
-ghcCommentText (L _ (GHC.AnnComment (AnnLineComment s) _))     = s
-ghcCommentText (L _ (GHC.AnnComment (AnnBlockComment s) _))    = s
-ghcCommentText (L _ (GHC.AnnComment (AnnEofComment) _))        = ""
+ghcCommentText :: LEpaComment -> String
+ghcCommentText (L _ (GHC.EpaComment (EpaDocCommentNext s) _))  = s
+ghcCommentText (L _ (GHC.EpaComment (EpaDocCommentPrev s) _))  = s
+ghcCommentText (L _ (GHC.EpaComment (EpaDocCommentNamed s) _)) = s
+ghcCommentText (L _ (GHC.EpaComment (EpaDocSection _ s) _))    = s
+ghcCommentText (L _ (GHC.EpaComment (EpaDocOptions s) _))      = s
+ghcCommentText (L _ (GHC.EpaComment (EpaLineComment s) _))     = s
+ghcCommentText (L _ (GHC.EpaComment (EpaBlockComment s) _))    = s
+ghcCommentText (L _ (GHC.EpaComment (EpaEofComment) _))        = ""
 
-tokComment :: LAnnotationComment -> Comment
+tokComment :: LEpaComment -> Comment
 tokComment t@(L lt _) = mkComment (normaliseCommentText $ ghcCommentText t) lt
 
 mkComment :: String -> Anchor -> Comment

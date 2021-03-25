@@ -470,9 +470,9 @@ setEntryDP' (L (SrcSpanAnn EpAnnNotUsed l) a) dp
   = L (SrcSpanAnn
            (EpAnn (Anchor (realSrcSpan l) (MovedAnchor dp)) mempty noCom)
            l) a
-setEntryDP' (L (SrcSpanAnn (EpAnn (Anchor r _) an (AnnComments [])) l) a) dp
+setEntryDP' (L (SrcSpanAnn (EpAnn (Anchor r _) an (EpaComments [])) l) a) dp
   = L (SrcSpanAnn
-           (EpAnn (Anchor r (MovedAnchor dp)) an (AnnComments []))
+           (EpAnn (Anchor r (MovedAnchor dp)) an (EpaComments []))
            l) a
 setEntryDP' (L (SrcSpanAnn (EpAnn (Anchor r _) an cs) l) a) dp
   = case sort (priorComments cs) of
@@ -671,22 +671,22 @@ balanceCommentsMatch (L l (Match am mctxt pats (GRHSs xg grhss binds))) = do
     stay = map snd stay'
     (l'', grhss', binds', logInfo)
       = case reverse grhss of
-          [] -> (l, [], binds, (AnnComments [], SrcSpanAnn EpAnnNotUsed noSrcSpan))
-          (L lg g@(GRHS EpAnnNotUsed _grs _rhs):gs) -> (l, reverse (L lg g:gs), binds, (AnnComments [], SrcSpanAnn EpAnnNotUsed noSrcSpan))
+          [] -> (l, [], binds, (EpaComments [], SrcSpanAnn EpAnnNotUsed noSrcSpan))
+          (L lg g@(GRHS EpAnnNotUsed _grs _rhs):gs) -> (l, reverse (L lg g:gs), binds, (EpaComments [], SrcSpanAnn EpAnnNotUsed noSrcSpan))
           (L lg (GRHS ag grs rhs):gs) ->
             let
               anc1' = setFollowingComments anc1 stay
               an1' = setCommentsSrcAnn l anc1'
 
               -- ---------------------------------
-              (moved,bindsm) = pushTrailingComments WithWhere (AnnCommentsBalanced [] move) binds
+              (moved,bindsm) = pushTrailingComments WithWhere (EpaCommentsBalanced [] move) binds
               -- ---------------------------------
 
               (EpAnn anc an lgc) = ag
               lgc' = splitComments (realSrcSpan lg) $ addCommentOrigDeltas lgc
               ag' = if moved
                       then EpAnn anc an lgc'
-                      else EpAnn anc an (lgc' <> (AnnCommentsBalanced [] move))
+                      else EpAnn anc an (lgc' <> (EpaCommentsBalanced [] move))
               -- ag' = EpAnn anc an lgc'
 
             in (an1', (reverse $ (L lg (GRHS ag' grs rhs):gs)), bindsm, (anc1',an1'))
@@ -753,8 +753,8 @@ balanceComments' la1 la2 = do
     la2' = L an2' s
 
 -- | Like commentsDeltas, but calculates the delta from the end of the anchor, not the start
-trailingCommentsDeltas :: RealSrcSpan -> [LAnnotationComment]
-               -> [(Int, LAnnotationComment)]
+trailingCommentsDeltas :: RealSrcSpan -> [LEpaComment]
+               -> [(Int, LEpaComment)]
 trailingCommentsDeltas _ [] = []
 trailingCommentsDeltas anc (la@(L l _):las)
   = deltaComment anc la : trailingCommentsDeltas (anchor l) las
@@ -765,15 +765,15 @@ trailingCommentsDeltas anc (la@(L l _):las)
         (ll,_) = ss2pos (anchor loc)
 
 -- AZ:TODO: this is identical to commentsDeltas
-priorCommentsDeltas :: RealSrcSpan -> [LAnnotationComment]
-                    -> [(Int, LAnnotationComment)]
+priorCommentsDeltas :: RealSrcSpan -> [LEpaComment]
+                    -> [(Int, LEpaComment)]
 priorCommentsDeltas anc cs = go anc (reverse $ sort cs)
   where
-    go :: RealSrcSpan -> [LAnnotationComment] -> [(Int, LAnnotationComment)]
+    go :: RealSrcSpan -> [LEpaComment] -> [(Int, LEpaComment)]
     go _ [] = []
     go anc' (la@(L l _):las) = deltaComment anc' la : go (anchor l) las
 
-    deltaComment :: RealSrcSpan -> LAnnotationComment -> (Int, LAnnotationComment)
+    deltaComment :: RealSrcSpan -> LEpaComment -> (Int, LEpaComment)
     deltaComment anc' (L loc c) = (abs(ll - al), L loc c)
       where
         (al,_) = ss2pos anc'
@@ -783,14 +783,14 @@ priorCommentsDeltas anc cs = go anc (reverse $ sort cs)
 -- | Split comments into ones occuring before the end of the reference
 -- span, and those after it.
 splitComments :: RealSrcSpan -> EpAnnComments -> EpAnnComments
-splitComments p (AnnComments cs) = cs'
+splitComments p (EpaComments cs) = cs'
   where
     cmp (L (Anchor l _) _) = ss2pos l < ss2posEnd p
     (before, after) = break cmp cs
     cs' = case after of
-      [] -> AnnComments cs
-      _ -> AnnCommentsBalanced before after
-splitComments p (AnnCommentsBalanced cs ts) = AnnCommentsBalanced cs' ts'
+      [] -> EpaComments cs
+      _ -> EpaCommentsBalanced before after
+splitComments p (EpaCommentsBalanced cs ts) = EpaCommentsBalanced cs' ts'
   where
     cmp (L (Anchor l _) _) = ss2pos l < ss2posEnd p
     (before, after) = break cmp cs
@@ -801,30 +801,30 @@ splitComments p (AnnCommentsBalanced cs ts) = AnnCommentsBalanced cs' ts'
 -- token.  Takes an original list of comments, and converts the
 -- 'Anchor's to have a have a `MovedAnchor` operation based on the
 -- original locations.
-commentOrigDeltas :: [LAnnotationComment] -> [LAnnotationComment]
+commentOrigDeltas :: [LEpaComment] -> [LEpaComment]
 commentOrigDeltas [] = []
-commentOrigDeltas lcs@(L _ (GHC.AnnComment _ pt):_) = go pt lcs
+commentOrigDeltas lcs@(L _ (GHC.EpaComment _ pt):_) = go pt lcs
   -- TODO:AZ: we now have deltas wrt *all* tokens, not just preceding
   -- non-comment. Simplify this.
   where
-    go :: RealSrcSpan -> [LAnnotationComment] -> [LAnnotationComment]
+    go :: RealSrcSpan -> [LEpaComment] -> [LEpaComment]
     go _ [] = []
-    go p (L (Anchor la _) (GHC.AnnComment t pp):ls)
-      = L (Anchor la op) (GHC.AnnComment t pp) : go p' ls
+    go p (L (Anchor la _) (GHC.EpaComment t pp):ls)
+      = L (Anchor la op) (GHC.EpaComment t pp) : go p' ls
       where
         p' = p
         (r,c) = ss2posEnd pp
         op' = if r == 0
                then MovedAnchor (ss2delta (r,c+1) la)
                else MovedAnchor (ss2delta (r,c)   la)
-        op = if t == AnnEofComment && op' == MovedAnchor (DP 0 0)
+        op = if t == EpaEofComment && op' == MovedAnchor (DP 0 0)
                then MovedAnchor (DP 1 0)
                else op'
 
 addCommentOrigDeltas :: EpAnnComments -> EpAnnComments
-addCommentOrigDeltas (AnnComments cs) = AnnComments (commentOrigDeltas cs)
-addCommentOrigDeltas (AnnCommentsBalanced pcs fcs)
-  = AnnCommentsBalanced (commentOrigDeltas pcs) (commentOrigDeltas fcs)
+addCommentOrigDeltas (EpaComments cs) = EpaComments (commentOrigDeltas cs)
+addCommentOrigDeltas (EpaCommentsBalanced pcs fcs)
+  = EpaCommentsBalanced (commentOrigDeltas pcs) (commentOrigDeltas fcs)
 
 addCommentOrigDeltasAnn :: (EpAnn' a) -> (EpAnn' a)
 addCommentOrigDeltasAnn EpAnnNotUsed   = EpAnnNotUsed
@@ -857,12 +857,12 @@ balanceSameLineComments (L la (Match anm mctxt pats (GRHSs x grhss lb))) = do
           anc1 = addCommentOrigDeltas $ epAnnComments an1
           (EpAnn anc an _) = ga :: EpAnn' GrhsAnn
           (csp,csf) = case anc1 of
-            AnnComments cs -> ([],cs)
-            AnnCommentsBalanced p f -> (p,f)
+            EpaComments cs -> ([],cs)
+            EpaCommentsBalanced p f -> (p,f)
           (move',stay') = break (simpleBreak 0) (trailingCommentsDeltas (anchor anc) csf)
           move = map snd move'
           stay = map snd stay'
-          cs1 = AnnCommentsBalanced csp stay
+          cs1 = EpaCommentsBalanced csp stay
 
           gac = addCommentOrigDeltas $ epAnnComments ga
           gfc = getFollowingComments gac
