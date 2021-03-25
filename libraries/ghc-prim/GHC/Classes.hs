@@ -340,6 +340,13 @@ class  (Eq a) => Ord a  where
     compare              :: a -> a -> Ordering
     (<), (<=), (>), (>=) :: a -> a -> Bool
     max, min             :: a -> a -> a
+    {-# INLINE compare #-}
+    {-# INLINE (<) #-}
+    {-# INLINE (<=) #-}
+    {-# INLINE (>) #-}
+    {-# INLINE (>=) #-}
+    {-# INLINE max #-}
+    {-# INLINE min #-}
 
     compare x y = if x == y then EQ
                   -- NB: must be '<=' not '<' to validate the
