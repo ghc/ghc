@@ -271,7 +271,9 @@ coreTopBindsToStg _      _        env ccs []
 coreTopBindsToStg dflags this_mod env ccs (b:bs)
   = (env2, ccs2, b':bs')
   where
-        (env1, ccs1, b' ) =
+        -- Force this, otherwise you end up not evaluating the thunk until
+        -- the function returns.
+        !(!env1, !ccs1, b' ) =
           coreTopBindToStg dflags this_mod env ccs b
         (env2, ccs2, bs') =
           coreTopBindsToStg dflags this_mod env1 ccs1 bs
@@ -603,7 +605,9 @@ coreToStgArgs (arg : args) = do         -- Non-type argument
     arg' <- coreToStgExpr arg
     let
         (aticks, arg'') = stripStgTicksTop tickishFloatable arg'
-        stg_arg = case arg'' of
+        -- Force this now, as otherwise the returned [StgArg]s contains
+        -- thunks which we will eventually force anyway.
+        !stg_arg = case arg'' of
                        StgApp v []        -> StgVarArg v
                        StgConApp con _ [] _ -> StgVarArg (dataConWorkId con)
                        StgLit lit         -> StgLitArg lit
