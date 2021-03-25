@@ -117,12 +117,15 @@ import qualified GHC.CmmToAsm.Reg.Linear.PPC    as PPC
 import qualified GHC.CmmToAsm.Reg.Linear.SPARC  as SPARC
 import qualified GHC.CmmToAsm.Reg.Linear.X86    as X86
 import qualified GHC.CmmToAsm.Reg.Linear.X86_64 as X86_64
+import GHC.CmmToAsm.X86 () -- for Instruction instance
+import qualified GHC.CmmToAsm.X86.Instr as X86_64
 import GHC.CmmToAsm.Reg.Target
 import GHC.CmmToAsm.Reg.Liveness
 import GHC.CmmToAsm.Reg.Utils
 import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.Config
 import GHC.CmmToAsm.Types
+import Unsafe.Coerce (unsafeCoerce)
 import GHC.Platform.Reg
 
 import GHC.Cmm.BlockId
@@ -234,8 +237,18 @@ linearRegAlloc config entry_ids block_live sccs
  where
   go :: (FR regs, Outputable regs)
      => regs -> UniqSM ([NatBasicBlock instr], RegAllocStats, Int)
-  go f = linearRegAlloc' config f entry_ids block_live sccs
+  go f = unsafeCoerce linearRegAlloc_X86_64 config f entry_ids block_live sccs
+         --linearRegAlloc' config f entry_ids block_live sccs
   platform = ncgPlatform config
+
+linearRegAlloc_X86_64
+    :: NCGConfig
+    -> X86_64.FreeRegs
+    -> [BlockId]
+    -> BlockMap RegSet
+    -> [SCC (LiveBasicBlock X86_64.Instr)]
+    -> UniqSM ([NatBasicBlock X86_64.Instr], RegAllocStats, Int)
+linearRegAlloc_X86_64 = linearRegAlloc'
 
 -- | Constraints on the instruction instances used by the
 -- linear allocator.
