@@ -17,14 +17,14 @@
      (Nothing)
      []
      []))
-   (AnnCommentsBalanced
+   (EpaCommentsBalanced
     []
     [(L
       (Anchor
        { T17544_kw.hs:25:1 }
        (UnchangedAnchor))
-      (AnnComment
-       (AnnEofComment)
+      (EpaComment
+       (EpaEofComment)
        { T17544_kw.hs:25:1 }))]))
   (VirtualBraces
    (1))
@@ -41,7 +41,7 @@
                   (UnchangedAnchor))
                  (AnnListItem
                   [])
-                 (AnnComments
+                 (EpaComments
                   [])) { T17544_kw.hs:(15,1)-(16,20) })
     (TyClD
      (NoExtField)
@@ -52,7 +52,7 @@
         (UnchangedAnchor))
        [(AddEpAnn AnnData (AR { T17544_kw.hs:15:1-4 }))
        ,(AddEpAnn AnnWhere (AR { T17544_kw.hs:16:3-7 }))]
-       (AnnComments
+       (EpaComments
         []))
       (L
        (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:15:6-8 })
@@ -69,7 +69,7 @@
          (UnchangedAnchor))
         [(AddEpAnn AnnData (AR { T17544_kw.hs:15:1-4 }))
         ,(AddEpAnn AnnWhere (AR { T17544_kw.hs:16:3-7 }))]
-        (AnnComments
+        (EpaComments
          []))
        (DataType)
        (Nothing)
@@ -83,7 +83,7 @@
             { T17544_kw.hs:16:9-20 }
             (UnchangedAnchor))
            [(AddEpAnn AnnDcolon (AR { T17544_kw.hs:16:15-16 }))]
-           (AnnComments
+           (EpaComments
             []))
           [(L
             (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:16:9-13 })
@@ -104,7 +104,7 @@
               { T17544_kw.hs:16:18-20 }
               (UnchangedAnchor))
              []
-             (AnnComments
+             (EpaComments
               []))
             (NotPromoted)
             (L
@@ -124,7 +124,7 @@
                   (UnchangedAnchor))
                  (AnnListItem
                   [])
-                 (AnnComments
+                 (EpaComments
                   [])) { T17544_kw.hs:(18,1)-(19,26) })
     (TyClD
      (NoExtField)
@@ -135,7 +135,7 @@
         (UnchangedAnchor))
        [(AddEpAnn AnnNewtype (AR { T17544_kw.hs:18:1-7 }))
        ,(AddEpAnn AnnWhere (AR { T17544_kw.hs:19:3-7 }))]
-       (AnnComments
+       (EpaComments
         []))
       (L
        (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:18:9-11 })
@@ -152,7 +152,7 @@
          (UnchangedAnchor))
         [(AddEpAnn AnnNewtype (AR { T17544_kw.hs:18:1-7 }))
         ,(AddEpAnn AnnWhere (AR { T17544_kw.hs:19:3-7 }))]
-        (AnnComments
+        (EpaComments
          []))
        (NewType)
        (Nothing)
@@ -166,7 +166,7 @@
             { T17544_kw.hs:19:9-26 }
             (UnchangedAnchor))
            [(AddEpAnn AnnDcolon (AR { T17544_kw.hs:19:15-16 }))]
-           (AnnComments
+           (EpaComments
             []))
           [(L
             (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:19:9-13 })
@@ -189,7 +189,7 @@
                            (AnnListItem
                             [(AddRarrowAnn
                               (AR { T17544_kw.hs:19:21-22 }))])
-                           (AnnComments
+                           (EpaComments
                             [])) { T17544_kw.hs:19:18-19 })
               (HsTupleTy
                (EpAnn
@@ -200,7 +200,7 @@
                  (AnnParens)
                  (AR { T17544_kw.hs:19:18 })
                  (AR { T17544_kw.hs:19:19 }))
-                (AnnComments
+                (EpaComments
                  []))
                (HsBoxedOrConstraintTuple)
                [])))])
@@ -212,7 +212,7 @@
               { T17544_kw.hs:19:24-26 }
               (UnchangedAnchor))
              []
-             (AnnComments
+             (EpaComments
               []))
             (NotPromoted)
             (L
@@ -232,7 +232,7 @@
                   (UnchangedAnchor))
                  (AnnListItem
                   [])
-                 (AnnComments
+                 (EpaComments
                   [])) { T17544_kw.hs:(21,1)-(24,18) })
     (TyClD
      (NoExtField)
@@ -244,7 +244,7 @@
          (UnchangedAnchor))
         [(AddEpAnn AnnClass (AR { T17544_kw.hs:21:1-5 }))
         ,(AddEpAnn AnnWhere (AR { T17544_kw.hs:23:3-7 }))]
-        (AnnComments
+        (EpaComments
          []))
        (NoAnnSortKey)
        (VirtualBraces
@@ -264,7 +264,7 @@
             { T17544_kw.hs:21:11 }
             (UnchangedAnchor))
            []
-           (AnnComments
+           (EpaComments
             []))
           (())
           (L
@@ -283,7 +283,7 @@
           (AnnSig
            (AddEpAnn AnnDcolon (AR { T17544_kw.hs:24:15-16 }))
            [])
-          (AnnComments
+          (EpaComments
            []))
          (False)
          [(L
@@ -304,7 +304,7 @@
                { T17544_kw.hs:24:18 }
                (UnchangedAnchor))
               []
-              (AnnComments
+              (EpaComments
                []))
              (NotPromoted)
              (L

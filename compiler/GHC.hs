@@ -283,7 +283,7 @@ module GHC (
         parser,
 
         -- * API Annotations
-        AnnKeywordId(..),AnnotationComment(..),
+        AnnKeywordId(..),EpaComment(..),
 
         -- * Miscellaneous
         --sessionHscEnv,
