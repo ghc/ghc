@@ -64,7 +64,10 @@ main = do
 
     --get a GHC context and run the tests
     runGhc (Just libdir) $ do
-        dflags <- fmap setOptions getDynFlags
+        dflags0 <- fmap setOptions getDynFlags
+        setSessionDynFlags dflags0
+
+        dflags <- getDynFlags
         logger <- getLogger
         reifyGhc $ \_ -> do
             us <- unitTestUniqSupply
