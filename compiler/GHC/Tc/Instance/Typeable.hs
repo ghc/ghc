@@ -28,7 +28,7 @@ import GHC.Builtin.Names
 import GHC.Builtin.Types.Prim ( primTyCons )
 import GHC.Builtin.Types
                   ( tupleTyCon, sumTyCon, runtimeRepTyCon
-                  , vecCountTyCon, vecElemTyCon
+                  , runtimeInfoTyCon, vecCountTyCon, vecElemTyCon
                   , nilDataCon, consDataCon )
 import GHC.Types.Name
 import GHC.Types.Id
