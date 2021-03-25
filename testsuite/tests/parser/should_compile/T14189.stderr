@@ -19,7 +19,7 @@
                      (UnchangedAnchor))
                     (AnnListItem
                      [])
-                    (AnnComments
+                    (EpaComments
                      [])) { T14189.hs:6:1-42 })
        (DataDecl
         (DataDeclRn
@@ -47,7 +47,7 @@
                         (AnnListItem
                          [(AddVbarAnn
                            (AR { T14189.hs:6:22 }))])
-                        (AnnComments
+                        (EpaComments
                          [])) { T14189.hs:6:15-20 })
            (ConDeclH98
             (EpAnnNotUsed)
@@ -80,7 +80,7 @@
                         (AnnListItem
                          [(AddVbarAnn
                            (AR { T14189.hs:6:27 }))])
-                        (AnnComments
+                        (EpaComments
                          [])) { T14189.hs:6:24-25 })
            (ConDeclH98
             (EpAnnNotUsed)
@@ -121,7 +121,7 @@
                              (AddEpAnn AnnCloseC (AR { T14189.hs:6:42 })))
                             []
                             [])
-                           (AnnComments
+                           (EpaComments
                             [])) { T14189.hs:6:31-42 })
               [(L
                 (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:6:33-40 })

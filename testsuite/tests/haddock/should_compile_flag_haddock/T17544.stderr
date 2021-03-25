@@ -17,14 +17,14 @@
      (Nothing)
      []
      []))
-   (AnnCommentsBalanced
+   (EpaCommentsBalanced
     []
     [(L
       (Anchor
        { T17544.hs:57:1 }
        (UnchangedAnchor))
-      (AnnComment
-       (AnnEofComment)
+      (EpaComment
+       (EpaEofComment)
        { T17544.hs:57:1 }))]))
   (VirtualBraces
    (1))
@@ -41,7 +41,7 @@
                   (UnchangedAnchor))
                  (AnnListItem
                   [])
-                 (AnnComments
+                 (EpaComments
                   [])) { T17544.hs:(5,1)-(6,16) })
     (TyClD
      (NoExtField)
@@ -53,7 +53,7 @@
          (UnchangedAnchor))
         [(AddEpAnn AnnClass (AR { T17544.hs:5:1-5 }))
         ,(AddEpAnn AnnWhere (AR { T17544.hs:5:12-16 }))]
-        (AnnComments
+        (EpaComments
          []))
        (NoAnnSortKey)
        (VirtualBraces
@@ -73,7 +73,7 @@
             { T17544.hs:5:10 }
             (UnchangedAnchor))
            []
-           (AnnComments
+           (EpaComments
             []))
           (())
           (L
@@ -92,7 +92,7 @@
           (AnnSig
            (AddEpAnn AnnDcolon (AR { T17544.hs:6:6-7 }))
            [])
-          (AnnComments
+          (EpaComments
            []))
          (False)
          [(L
@@ -114,7 +114,7 @@
                (UnchangedAnchor))
               (AddRarrowAnn
                (AR { T17544.hs:6:11-12 }))
-              (AnnComments
+              (EpaComments
                []))
              (HsUnrestrictedArrow
               (NormalSyntax))
@@ -126,7 +126,7 @@
                  { T17544.hs:6:9 }
                  (UnchangedAnchor))
                 []
-                (AnnComments
+                (EpaComments
                  []))
                (NotPromoted)
                (L
@@ -145,7 +145,7 @@
                    { T17544.hs:6:14-16 }
                    (UnchangedAnchor))
                   []
-                  (AnnComments
+                  (EpaComments
                    []))
                  (NotPromoted)
                  (L
@@ -168,7 +168,7 @@
                   (UnchangedAnchor))
                  (AnnListItem
                   [])
-                 (AnnComments
+                 (EpaComments
                   [])) { T17544.hs:(9,1)-(10,16) })
     (TyClD
      (NoExtField)
@@ -180,7 +180,7 @@
          (UnchangedAnchor))
         [(AddEpAnn AnnClass (AR { T17544.hs:9:1-5 }))
         ,(AddEpAnn AnnWhere (AR { T17544.hs:9:12-16 }))]
-        (AnnComments
+        (EpaComments
          []))
        (NoAnnSortKey)
        (VirtualBraces
@@ -200,7 +200,7 @@
             { T17544.hs:9:10 }
             (UnchangedAnchor))
            []
-           (AnnComments
+           (EpaComments
             []))
           (())
           (L
@@ -219,7 +219,7 @@
           (AnnSig
            (AddEpAnn AnnDcolon (AR { T17544.hs:10:6-7 }))
            [])
-          (AnnComments
+          (EpaComments
            []))
          (False)
          [(L
@@ -241,7 +241,7 @@
                (UnchangedAnchor))
               (AddRarrowAnn
                (AR { T17544.hs:10:11-12 }))
-              (AnnComments
+              (EpaComments
                []))
              (HsUnrestrictedArrow
               (NormalSyntax))
@@ -253,7 +253,7 @@
                  { T17544.hs:10:9 }
                  (UnchangedAnchor))
                 []
-                (AnnComments
+                (EpaComments
                  []))
                (NotPromoted)
                (L
@@ -268,7 +268,7 @@
                  { T17544.hs:10:14-16 }
                  (UnchangedAnchor))
                 []
-                (AnnComments
+                (EpaComments
                  []))
                (NotPromoted)
                (L
@@ -291,7 +291,7 @@
                   (UnchangedAnchor))
                  (AnnListItem
                   [])
-                 (AnnComments
+                 (EpaComments
                   [])) { T17544.hs:(13,1)-(14,16) })
     (TyClD
      (NoExtField)
@@ -303,7 +303,7 @@
          (UnchangedAnchor))
         [(AddEpAnn AnnClass (AR { T17544.hs:13:1-5 }))
         ,(AddEpAnn AnnWhere (AR { T17544.hs:13:12-16 }))]
-        (AnnComments
+        (EpaComments
          []))
        (NoAnnSortKey)
        (VirtualBraces
@@ -323,7 +323,7 @@
             { T17544.hs:13:10 }
             (UnchangedAnchor))
            []
-           (AnnComments
+           (EpaComments
             []))
           (())
           (L
@@ -342,7 +342,7 @@
           (AnnSig
            (AddEpAnn AnnDcolon (AR { T17544.hs:14:6-7 }))
            [])
-          (AnnComments
+          (EpaComments
            []))
          (False)
          [(L
@@ -364,7 +364,7 @@
                (UnchangedAnchor))
               (AddRarrowAnn
                (AR { T17544.hs:14:11-12 }))
-              (AnnComments
+              (EpaComments
                []))
              (HsUnrestrictedArrow
               (NormalSyntax))
@@ -376,7 +376,7 @@
                  { T17544.hs:14:9 }
                  (UnchangedAnchor))
                 []
-                (AnnComments
+                (EpaComments
                  []))
                (NotPromoted)
                (L
@@ -391,7 +391,7 @@
                  { T17544.hs:14:14-16 }
                  (UnchangedAnchor))
                 []
-                (AnnComments
+                (EpaComments
                  []))
                (NotPromoted)
                (L
@@ -417,7 +417,7 @@
                   (UnchangedAnchor))
                  (AnnListItem
                   [])
-                 (AnnComments
+                 (EpaComments
                   [])) { T17544.hs:(17,1)-(20,16) })
     (TyClD
      (NoExtField)
@@ -429,7 +429,7 @@
          (UnchangedAnchor))
         [(AddEpAnn AnnClass (AR { T17544.hs:17:1-5 }))
         ,(AddEpAnn AnnWhere (AR { T17544.hs:17:12-16 }))]
-        (AnnComments
+        (EpaComments
          []))
        (NoAnnSortKey)
        (VirtualBraces
@@ -449,7 +449,7 @@
             { T17544.hs:17:10 }
             (UnchangedAnchor))
            []
-           (AnnComments
+           (EpaComments
             []))
           (())
           (L
@@ -468,7 +468,7 @@
           (AnnSig
            (AddEpAnn AnnDcolon (AR { T17544.hs:18:6-7 }))
            [])
-          (AnnComments
+          (EpaComments
            []))
          (False)
          [(L
@@ -490,7 +490,7 @@
                (UnchangedAnchor))
               (AddRarrowAnn
                (AR { T17544.hs:18:11-12 }))
-              (AnnComments
+              (EpaComments
                []))
              (HsUnrestrictedArrow
               (NormalSyntax))
@@ -502,7 +502,7 @@
                  { T17544.hs:18:9 }
                  (UnchangedAnchor))
                 []
-                (AnnComments
+                (EpaComments
                  []))
                (NotPromoted)
                (L
@@ -517,7 +517,7 @@
                  { T17544.hs:18:14-16 }
                  (UnchangedAnchor))
                 []
-                (AnnComments
+                (EpaComments
                  []))
                (NotPromoted)
                (L
@@ -534,7 +534,7 @@
           (AnnSig
            (AddEpAnn AnnDcolon (AR { T17544.hs:20:6-7 }))
            [])
-          (AnnComments
+          (EpaComments
            []))
          (False)
          [(L
@@ -556,7 +556,7 @@
                (UnchangedAnchor))
               (AddRarrowAnn
                (AR { T17544.hs:20:11-12 }))
-              (AnnComments
+              (EpaComments
                []))
              (HsUnrestrictedArrow
               (NormalSyntax))
@@ -568,7 +568,7 @@
                  { T17544.hs:20:9 }
                  (UnchangedAnchor))
                 []
-                (AnnComments
+                (EpaComments
                  []))
                (NotPromoted)
                (L
@@ -583,7 +583,7 @@
                  { T17544.hs:20:14-16 }
                  (UnchangedAnchor))
                 []
-                (AnnComments
+                (EpaComments
                  []))
                (NotPromoted)
                (L
@@ -602,7 +602,7 @@
                   (UnchangedAnchor))
                  (AnnListItem
                   [])
-                 (AnnComments
+                 (EpaComments
                   [])) { T17544.hs:22:1-30 })
     (TyClD
      (NoExtField)
@@ -616,7 +616,7 @@
         ,(AddEpAnn AnnWhere (AR { T17544.hs:22:12-16 }))
         ,(AddEpAnn AnnOpenC (AR { T17544.hs:22:18 }))
         ,(AddEpAnn AnnCloseC (AR { T17544.hs:22:30 }))]
-        (AnnComments
+        (EpaComments
          []))
        (NoAnnSortKey)
        (ExplicitBraces))
@@ -635,7 +635,7 @@
             { T17544.hs:22:10 }
             (UnchangedAnchor))
            []
-           (AnnComments
+           (EpaComments
             []))
           (())
           (L
@@ -655,7 +655,7 @@
            { T17544.hs:22:20-28 }
            (UnchangedAnchor))
           [(AddEpAnn AnnData (AR { T17544.hs:22:20-23 }))]
-          (AnnComments
+          (EpaComments
            []))
          (DataFamily)
          (NotTopLevel)
@@ -673,7 +673,7 @@
                { T17544.hs:22:28 }
                (UnchangedAnchor))
               []
-              (AnnComments
+              (EpaComments
                []))
              (())
              (L
@@ -695,7 +695,7 @@
                   (UnchangedAnchor))
                  (AnnListItem
                   [])
-                 (AnnComments
+                 (EpaComments
                   [])) { T17544.hs:(23,1)-(25,18) })
     (InstD
      (NoExtField)
@@ -709,7 +709,7 @@
           (UnchangedAnchor))
          [(AddEpAnn AnnInstance (AR { T17544.hs:23:1-8 }))
          ,(AddEpAnn AnnWhere (AR { T17544.hs:23:17-21 }))]
-         (AnnComments
+         (EpaComments
           []))
         (NoAnnSortKey))
        (L
@@ -730,7 +730,7 @@
                { T17544.hs:23:10-11 }
                (UnchangedAnchor))
               []
-              (AnnComments
+              (EpaComments
                []))
              (NotPromoted)
              (L
@@ -745,7 +745,7 @@
                { T17544.hs:23:13-15 }
                (UnchangedAnchor))
               []
-              (AnnComments
+              (EpaComments
                []))
              (NotPromoted)
              (L
@@ -776,7 +776,7 @@
                  { T17544.hs:24:11-13 }
                  (UnchangedAnchor))
                 []
-                (AnnComments
+                (EpaComments
                  []))
                (NotPromoted)
                (L
@@ -791,7 +791,7 @@
               (UnchangedAnchor))
              [(AddEpAnn AnnData (AR { T17544.hs:24:3-6 }))
              ,(AddEpAnn AnnWhere (AR { T17544.hs:24:15-19 }))]
-             (AnnComments
+             (EpaComments
               []))
             (DataType)
             (Nothing)
@@ -805,7 +805,7 @@
                  { T17544.hs:25:5-18 }
                  (UnchangedAnchor))
                 [(AddEpAnn AnnDcolon (AR { T17544.hs:25:10-11 }))]
-                (AnnComments
+                (EpaComments
                  []))
                [(L
                  (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:25:5-8 })
@@ -830,7 +830,7 @@
                      { T17544.hs:25:13-14 }
                      (UnchangedAnchor))
                     []
-                    (AnnComments
+                    (EpaComments
                      []))
                    (NotPromoted)
                    (L
@@ -845,7 +845,7 @@
                      { T17544.hs:25:16-18 }
                      (UnchangedAnchor))
                     []
-                    (AnnComments
+                    (EpaComments
                      []))
                    (NotPromoted)
                    (L
@@ -862,7 +862,7 @@
                   (UnchangedAnchor))
                  (AnnListItem
                   [])
-                 (AnnComments
+                 (EpaComments
                   [])) { T17544.hs:28:1-30 })
     (TyClD
      (NoExtField)
@@ -876,7 +876,7 @@
         ,(AddEpAnn AnnWhere (AR { T17544.hs:28:12-16 }))
         ,(AddEpAnn AnnOpenC (AR { T17544.hs:28:18 }))
         ,(AddEpAnn AnnCloseC (AR { T17544.hs:28:30 }))]
-        (AnnComments
+        (EpaComments
          []))
        (NoAnnSortKey)
        (ExplicitBraces))
@@ -895,7 +895,7 @@
             { T17544.hs:28:10 }
             (UnchangedAnchor))
            []
-           (AnnComments
+           (EpaComments
             []))
           (())
           (L
@@ -915,7 +915,7 @@
            { T17544.hs:28:20-28 }
            (UnchangedAnchor))
           [(AddEpAnn AnnData (AR { T17544.hs:28:20-23 }))]
-          (AnnComments
+          (EpaComments
            []))
          (DataFamily)
          (NotTopLevel)
@@ -933,7 +933,7 @@
                { T17544.hs:28:28 }
                (UnchangedAnchor))
               []
-              (AnnComments
+              (EpaComments
                []))
              (())
              (L
@@ -955,7 +955,7 @@
                   (UnchangedAnchor))
                  (AnnListItem
                   [])
-                 (AnnComments
+                 (EpaComments
                   [])) { T17544.hs:(29,1)-(31,18) })
     (InstD
      (NoExtField)
@@ -969,7 +969,7 @@
           (UnchangedAnchor))
          [(AddEpAnn AnnInstance (AR { T17544.hs:29:1-8 }))
          ,(AddEpAnn AnnWhere (AR { T17544.hs:29:17-21 }))]
-         (AnnComments
+         (EpaComments
           []))
         (NoAnnSortKey))
        (L
@@ -990,7 +990,7 @@
                { T17544.hs:29:10-11 }
                (UnchangedAnchor))
               []
-              (AnnComments
+              (EpaComments
                []))
              (NotPromoted)
              (L
@@ -1005,7 +1005,7 @@
                { T17544.hs:29:13-15 }
                (UnchangedAnchor))
               []
-              (AnnComments
+              (EpaComments
                []))
              (NotPromoted)
              (L
@@ -1036,7 +1036,7 @@
                  { T17544.hs:30:11-13 }
                  (UnchangedAnchor))
                 []
-                (AnnComments
+                (EpaComments
                  []))
                (NotPromoted)
                (L
@@ -1051,7 +1051,7 @@
               (UnchangedAnchor))
              [(AddEpAnn AnnData (AR { T17544.hs:30:3-6 }))
              ,(AddEpAnn AnnWhere (AR { T17544.hs:30:15-19 }))]
-             (AnnComments
+             (EpaComments
               []))
             (DataType)
             (Nothing)
@@ -1065,7 +1065,7 @@
                  { T17544.hs:31:5-18 }
                  (UnchangedAnchor))
                 [(AddEpAnn AnnDcolon (AR { T17544.hs:31:10-11 }))]
-                (AnnComments
+                (EpaComments
                  []))
                [(L
                  (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:31:5-8 })
@@ -1090,7 +1090,7 @@
                      { T17544.hs:31:13-14 }
                      (UnchangedAnchor))
                     []
-                    (AnnComments
+                    (EpaComments
                      []))
                    (NotPromoted)
                    (L
@@ -1105,7 +1105,7 @@
                      { T17544.hs:31:16-18 }
                      (UnchangedAnchor))
                     []
-                    (AnnComments
+                    (EpaComments
                      []))
                    (NotPromoted)
                    (L
@@ -1122,7 +1122,7 @@
                   (UnchangedAnchor))
                  (AnnListItem
                   [])
-                 (AnnComments
+                 (EpaComments
                   [])) { T17544.hs:34:1-30 })
     (TyClD
      (NoExtField)
@@ -1136,7 +1136,7 @@
         ,(AddEpAnn AnnWhere (AR { T17544.hs:34:12-16 }))
         ,(AddEpAnn AnnOpenC (AR { T17544.hs:34:18 }))
         ,(AddEpAnn AnnCloseC (AR { T17544.hs:34:30 }))]
-        (AnnComments
+        (EpaComments
          []))
        (NoAnnSortKey)
        (ExplicitBraces))
@@ -1155,7 +1155,7 @@
             { T17544.hs:34:10 }
             (UnchangedAnchor))
            []
-           (AnnComments
+           (EpaComments
             []))
           (())
           (L
@@ -1175,7 +1175,7 @@
            { T17544.hs:34:20-28 }
            (UnchangedAnchor))
           [(AddEpAnn AnnData (AR { T17544.hs:34:20-23 }))]
-          (AnnComments
+          (EpaComments
            []))
          (DataFamily)
          (NotTopLevel)
@@ -1193,7 +1193,7 @@
                { T17544.hs:34:28 }
                (UnchangedAnchor))
               []
-              (AnnComments
+              (EpaComments
                []))
              (())
              (L
@@ -1215,7 +1215,7 @@
                   (UnchangedAnchor))
                  (AnnListItem
                   [])
-                 (AnnComments
+                 (EpaComments
                   [])) { T17544.hs:(35,1)-(37,18) })
     (InstD
      (NoExtField)
@@ -1229,7 +1229,7 @@
           (UnchangedAnchor))
          [(AddEpAnn AnnInstance (AR { T17544.hs:35:1-8 }))
          ,(AddEpAnn AnnWhere (AR { T17544.hs:35:17-21 }))]
-         (AnnComments
+         (EpaComments
           []))
         (NoAnnSortKey))
        (L
@@ -1250,7 +1250,7 @@
                { T17544.hs:35:10-11 }
                (UnchangedAnchor))
               []
-              (AnnComments
+              (EpaComments
                []))
              (NotPromoted)
              (L
@@ -1265,7 +1265,7 @@
                { T17544.hs:35:13-15 }
                (UnchangedAnchor))
               []
-              (AnnComments
+              (EpaComments
                []))
              (NotPromoted)
              (L
@@ -1296,7 +1296,7 @@
                  { T17544.hs:36:11-13 }
                  (UnchangedAnchor))
                 []
-                (AnnComments
+                (EpaComments
                  []))
                (NotPromoted)
                (L
@@ -1311,7 +1311,7 @@
               (UnchangedAnchor))
              [(AddEpAnn AnnData (AR { T17544.hs:36:3-6 }))
              ,(AddEpAnn AnnWhere (AR { T17544.hs:36:15-19 }))]
-             (AnnComments
+             (EpaComments
               []))
             (DataType)
             (Nothing)
@@ -1325,7 +1325,7 @@
                  { T17544.hs:37:5-18 }
                  (UnchangedAnchor))
                 [(AddEpAnn AnnDcolon (AR { T17544.hs:37:10-11 }))]
-                (AnnComments
+                (EpaComments
                  []))
                [(L
                  (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:37:5-8 })
@@ -1350,7 +1350,7 @@
                      { T17544.hs:37:13-14 }
                      (UnchangedAnchor))
                     []
-                    (AnnComments
+                    (EpaComments
                      []))
                    (NotPromoted)
                    (L
@@ -1365,7 +1365,7 @@
                      { T17544.hs:37:16-18 }
                      (UnchangedAnchor))
                     []
-                    (AnnComments
+                    (EpaComments
                      []))
                    (NotPromoted)
                    (L
@@ -1382,7 +1382,7 @@
                   (UnchangedAnchor))
                  (AnnListItem
                   [])
-                 (AnnComments
+                 (EpaComments
                   [])) { T17544.hs:40:1-30 })
     (TyClD
      (NoExtField)
@@ -1396,7 +1396,7 @@
         ,(AddEpAnn AnnWhere (AR { T17544.hs:40:12-16 }))
         ,(AddEpAnn AnnOpenC (AR { T17544.hs:40:18 }))
         ,(AddEpAnn AnnCloseC (AR { T17544.hs:40:30 }))]
-        (AnnComments
+        (EpaComments
          []))
        (NoAnnSortKey)
        (ExplicitBraces))
@@ -1415,7 +1415,7 @@
             { T17544.hs:40:10 }
             (UnchangedAnchor))
            []
-           (AnnComments
+           (EpaComments
             []))
           (())
           (L
@@ -1435,7 +1435,7 @@
            { T17544.hs:40:20-28 }
            (UnchangedAnchor))
           [(AddEpAnn AnnData (AR { T17544.hs:40:20-23 }))]
-          (AnnComments
+          (EpaComments
            []))
          (DataFamily)
          (NotTopLevel)
@@ -1453,7 +1453,7 @@
                { T17544.hs:40:28 }
                (UnchangedAnchor))
               []
-              (AnnComments
+              (EpaComments
                []))
              (())
              (L
@@ -1475,7 +1475,7 @@
                   (UnchangedAnchor))
                  (AnnListItem
                   [])
-                 (AnnComments
+                 (EpaComments
                   [])) { T17544.hs:(41,1)-(43,18) })
     (InstD
      (NoExtField)
@@ -1489,7 +1489,7 @@
           (UnchangedAnchor))
          [(AddEpAnn AnnInstance (AR { T17544.hs:41:1-8 }))
          ,(AddEpAnn AnnWhere (AR { T17544.hs:41:17-21 }))]
-         (AnnComments
+         (EpaComments
           []))
         (NoAnnSortKey))
        (L
@@ -1510,7 +1510,7 @@
                { T17544.hs:41:10-11 }
                (UnchangedAnchor))
               []
-              (AnnComments
+              (EpaComments
                []))
              (NotPromoted)
              (L
@@ -1525,7 +1525,7 @@
                { T17544.hs:41:13-15 }
                (UnchangedAnchor))
               []
-              (AnnComments
+              (EpaComments
                []))
              (NotPromoted)
              (L
@@ -1556,7 +1556,7 @@
                  { T17544.hs:42:11-13 }
                  (UnchangedAnchor))
                 []
-                (AnnComments
+                (EpaComments
                  []))
                (NotPromoted)
                (L
@@ -1571,7 +1571,7 @@
               (UnchangedAnchor))
              [(AddEpAnn AnnData (AR { T17544.hs:42:3-6 }))
              ,(AddEpAnn AnnWhere (AR { T17544.hs:42:15-19 }))]
-             (AnnComments
+             (EpaComments
               []))
             (DataType)
             (Nothing)
@@ -1585,7 +1585,7 @@
                  { T17544.hs:43:5-18 }
                  (UnchangedAnchor))
                 [(AddEpAnn AnnDcolon (AR { T17544.hs:43:10-11 }))]
-                (AnnComments
+                (EpaComments
                  []))
                [(L
                  (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:43:5-8 })
@@ -1610,7 +1610,7 @@
                      { T17544.hs:43:13-14 }
                      (UnchangedAnchor))
                     []
-                    (AnnComments
+                    (EpaComments
                      []))
                    (NotPromoted)
                    (L
@@ -1625,7 +1625,7 @@
                      { T17544.hs:43:16-18 }
                      (UnchangedAnchor))
                     []
-                    (AnnComments
+                    (EpaComments
                      []))
                    (NotPromoted)
                    (L
@@ -1642,7 +1642,7 @@
                   (UnchangedAnchor))
                  (AnnListItem
                   [])
-                 (AnnComments
+                 (EpaComments
                   [])) { T17544.hs:46:1-30 })
     (TyClD
      (NoExtField)
@@ -1656,7 +1656,7 @@
         ,(AddEpAnn AnnWhere (AR { T17544.hs:46:12-16 }))
         ,(AddEpAnn AnnOpenC (AR { T17544.hs:46:18 }))
         ,(AddEpAnn AnnCloseC (AR { T17544.hs:46:30 }))]
-        (AnnComments
+        (EpaComments
          []))
        (NoAnnSortKey)
        (ExplicitBraces))
@@ -1675,7 +1675,7 @@
             { T17544.hs:46:10 }
             (UnchangedAnchor))
            []
-           (AnnComments
+           (EpaComments
             []))
           (())
           (L
@@ -1695,7 +1695,7 @@
            { T17544.hs:46:20-28 }
            (UnchangedAnchor))
           [(AddEpAnn AnnData (AR { T17544.hs:46:20-23 }))]
-          (AnnComments
+          (EpaComments
            []))
          (DataFamily)
          (NotTopLevel)
@@ -1713,7 +1713,7 @@
                { T17544.hs:46:28 }
                (UnchangedAnchor))
               []
-              (AnnComments
+              (EpaComments
                []))
              (())
              (L
@@ -1735,7 +1735,7 @@
                   (UnchangedAnchor))
                  (AnnListItem
                   [])
-                 (AnnComments
+                 (EpaComments
                   [])) { T17544.hs:(47,1)-(49,18) })
     (InstD
      (NoExtField)
@@ -1749,7 +1749,7 @@
           (UnchangedAnchor))
          [(AddEpAnn AnnInstance (AR { T17544.hs:47:1-8 }))
          ,(AddEpAnn AnnWhere (AR { T17544.hs:47:17-21 }))]
-         (AnnComments
+         (EpaComments
           []))
         (NoAnnSortKey))
        (L
@@ -1770,7 +1770,7 @@
                { T17544.hs:47:10-11 }
                (UnchangedAnchor))
               []
-              (AnnComments
+              (EpaComments
                []))
              (NotPromoted)
              (L
@@ -1785,7 +1785,7 @@
                { T17544.hs:47:13-15 }
                (UnchangedAnchor))
               []
-              (AnnComments
+              (EpaComments
                []))
              (NotPromoted)
              (L
@@ -1816,7 +1816,7 @@
                  { T17544.hs:48:11-13 }
                  (UnchangedAnchor))
                 []
-                (AnnComments
+                (EpaComments
                  []))
                (NotPromoted)
                (L
@@ -1831,7 +1831,7 @@
               (UnchangedAnchor))
              [(AddEpAnn AnnData (AR { T17544.hs:48:3-6 }))
              ,(AddEpAnn AnnWhere (AR { T17544.hs:48:15-19 }))]
-             (AnnComments
+             (EpaComments
               []))
             (DataType)
             (Nothing)
@@ -1845,7 +1845,7 @@
                  { T17544.hs:49:5-18 }
                  (UnchangedAnchor))
                 [(AddEpAnn AnnDcolon (AR { T17544.hs:49:10-11 }))]
-                (AnnComments
+                (EpaComments
                  []))
                [(L
                  (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:49:5-8 })
@@ -1870,7 +1870,7 @@
                      { T17544.hs:49:13-14 }
                      (UnchangedAnchor))
                     []
-                    (AnnComments
+                    (EpaComments
                      []))
                    (NotPromoted)
                    (L
@@ -1885,7 +1885,7 @@
                      { T17544.hs:49:16-18 }
                      (UnchangedAnchor))
                     []
-                    (AnnComments
+                    (EpaComments
                      []))
                    (NotPromoted)
                    (L
@@ -1902,7 +1902,7 @@
                   (UnchangedAnchor))
                  (AnnListItem
                   [])
-                 (AnnComments
+                 (EpaComments
                   [])) { T17544.hs:52:1-32 })
     (TyClD
      (NoExtField)
@@ -1916,7 +1916,7 @@
         ,(AddEpAnn AnnWhere (AR { T17544.hs:52:13-17 }))
         ,(AddEpAnn AnnOpenC (AR { T17544.hs:52:19 }))
         ,(AddEpAnn AnnCloseC (AR { T17544.hs:52:32 }))]
-        (AnnComments
+        (EpaComments
          []))
        (NoAnnSortKey)
        (ExplicitBraces))
@@ -1935,7 +1935,7 @@
             { T17544.hs:52:11 }
             (UnchangedAnchor))
            []
-           (AnnComments
+           (EpaComments
             []))
           (())
           (L
@@ -1955,7 +1955,7 @@
            { T17544.hs:52:21-30 }
            (UnchangedAnchor))
           [(AddEpAnn AnnData (AR { T17544.hs:52:21-24 }))]
-          (AnnComments
+          (EpaComments
            []))
          (DataFamily)
          (NotTopLevel)
@@ -1973,7 +1973,7 @@
                { T17544.hs:52:30 }
                (UnchangedAnchor))
               []
-              (AnnComments
+              (EpaComments
                []))
              (())
              (L
@@ -1995,7 +1995,7 @@
                   (UnchangedAnchor))
                  (AnnListItem
                   [])
-                 (AnnComments
+                 (EpaComments
                   [])) { T17544.hs:(53,1)-(55,20) })
     (InstD
      (NoExtField)
@@ -2009,7 +2009,7 @@
           (UnchangedAnchor))
          [(AddEpAnn AnnInstance (AR { T17544.hs:53:1-8 }))
          ,(AddEpAnn AnnWhere (AR { T17544.hs:53:18-22 }))]
-         (AnnComments
+         (EpaComments
           []))
         (NoAnnSortKey))
        (L
@@ -2030,7 +2030,7 @@
                { T17544.hs:53:10-12 }
                (UnchangedAnchor))
               []
-              (AnnComments
+              (EpaComments
                []))
              (NotPromoted)
              (L
@@ -2045,7 +2045,7 @@
                { T17544.hs:53:14-16 }
                (UnchangedAnchor))
               []
-              (AnnComments
+              (EpaComments
                []))
              (NotPromoted)
              (L
@@ -2076,7 +2076,7 @@
                  { T17544.hs:54:12-14 }
                  (UnchangedAnchor))
                 []
-                (AnnComments
+                (EpaComments
                  []))
                (NotPromoted)
                (L
@@ -2091,7 +2091,7 @@
               (UnchangedAnchor))
              [(AddEpAnn AnnData (AR { T17544.hs:54:3-6 }))
              ,(AddEpAnn AnnWhere (AR { T17544.hs:54:16-20 }))]
-             (AnnComments
+             (EpaComments
               []))
             (DataType)
             (Nothing)
@@ -2105,7 +2105,7 @@
                  { T17544.hs:55:5-20 }
                  (UnchangedAnchor))
                 [(AddEpAnn AnnDcolon (AR { T17544.hs:55:11-12 }))]
-                (AnnComments
+                (EpaComments
                  []))
                [(L
                  (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:55:5-9 })
@@ -2130,7 +2130,7 @@
                      { T17544.hs:55:14-16 }
                      (UnchangedAnchor))
                     []
-                    (AnnComments
+                    (EpaComments
                      []))
                    (NotPromoted)
                    (L
@@ -2145,7 +2145,7 @@
                      { T17544.hs:55:18-20 }
                      (UnchangedAnchor))
                     []
-                    (AnnComments
+                    (EpaComments
                      []))
                    (NotPromoted)
                    (L
