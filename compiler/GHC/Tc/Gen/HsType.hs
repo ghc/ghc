@@ -339,7 +339,7 @@ we promote the metavariable to level 1. This is all done in kindGeneralizeNone.
 funsSigCtxt :: [LocatedN Name] -> UserTypeCtxt
 -- Returns FunSigCtxt, with no redundant-context-reporting,
 -- form a list of located names
-funsSigCtxt (L _ name1 : _) = FunSigCtxt name1 False
+funsSigCtxt (L _ name1 : _) = FunSigCtxt name1 NoRRC
 funsSigCtxt []              = panic "funSigCtxt"
 
 addSigCtxt :: Outputable hs_ty => UserTypeCtxt -> LocatedA hs_ty -> TcM a -> TcM a
