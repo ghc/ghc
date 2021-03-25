@@ -1,12 +1,12 @@
-{-# LANGUAGE CPP               #-}
-{-# LANGUAGE ConstraintKinds   #-}
-{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs             #-}
-{-# LANGUAGE RankNTypes        #-}
-{-# LANGUAGE TypeFamilies      #-}
-{-# LANGUAGE ViewPatterns      #-}
-{-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ViewPatterns #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -2826,7 +2826,7 @@ instance MonadP PV where
       PV_Ok s {
          pv_header_comments = header_comments',
          pv_comment_q = comment_q'
-       } (AnnCommentsBalanced [] (reverse newAnns))
+       } (AnnCommentsBalanced (fromMaybe [] header_comments') (reverse newAnns))
 
 {- Note [Parser-Validator Hint]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
