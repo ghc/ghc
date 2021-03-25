@@ -61,6 +61,12 @@ tar_comp=gzip
 use_hadrian=YES
 use_stack=NO
 hadrian_build_root=_validatebuild
+basedir="$($(dirname $hadrian_build_root) 2>&1 /dev/null && pwd)"
+
+# Set config_args to empty string if not already set
+if [ "${config_args:-""}" ]; then
+    CONFIG_ARGS="$config_args"
+fi
 
 while [ $# -gt 0 ]
 do
@@ -107,20 +113,17 @@ do
 done
 
 check_packages () {
-    if [ "$bindistdir" = "" ]
-    then
-        if [ "$use_hadrian" = "YES" ]
-        then
-            ghc_pkg=$hadrian_build_root/stage1/bin/ghc-pkg
+    if [ "$bindistdir" = "" ]; then
+        if [ "$use_hadrian" = "YES" ]; then
+            ghc_pkg=$basedir/$hadrian_build_root/stage1/bin/ghc-pkg
         else
             ghc_pkg=inplace/bin/ghc-pkg
         fi
     else
-        ghc_pkg="$bindistdir"/bin/ghc-pkg
+        ghc_pkg=$basedir/$bindistdir/bin/ghc-pkg
     fi
 
-    if [ $be_quiet -eq 1 ]
-    then
+    if [ $be_quiet -eq 1 ]; then
         "$ghc_pkg" check
     else
         echo "== Start $1 package check"
@@ -129,29 +132,23 @@ check_packages () {
     fi
 }
 
-CPUS=`mk/detect-cpu-count.sh`
-
-if ! [ -d testsuite ]
-then
+if ! [ -d testsuite ]; then
     echo 'Could not find the testsuite for validation' >&2
     exit 1
 fi
 
-if [ "$THREADS" = "" ]; then
-    threads=$(($CPUS + 1)) # `expr $CPUS + 1`
-else
-    threads="$THREADS"
-fi
+CPUS=$(mk/detect-cpu-count.sh)
 
+# Use CPU cores + 1 if not already set
+threads=${THREADS:-$((CPUS + 1))}
 echo "using THREADS=${threads}" >&2
 
 configure_cmd="./configure"
 
-if [ "$use_hadrian" = "NO" ]
-then
+# Set up configuration, commands for building
+if [ "$use_hadrian" = "NO" ]; then
     make="gmake"
-    if type gmake > /dev/null 2> /dev/null
-    then
+    if type gmake > /dev/null 2> /dev/null ; then
         make="gmake"
     else
         make="make"
@@ -162,10 +159,10 @@ then
     fi
     $make -C utils/checkUniques
 else
-    # Just build hadrian.
-    if [ "$use_stack" = "NO" ]
-    then
+    # Just build using hadrian.
+    if [ "$use_stack" = "NO" ]; then
         hadrian/build --help > /dev/null
+        echo "Entering ./hadrian directory..."
         cd hadrian
         hadrian_cmd=$(cabal new-exec -- which hadrian | grep 'hadrian$')
     else
@@ -173,11 +170,14 @@ else
             rm -rf hadrian/.stack-work
         fi
         hadrian/build-stack --help > /dev/null
+        echo "Entering ./hadrian directory..."
         cd hadrian
         hadrian_cmd=$(stack exec -- which hadrian)
         configure_cmd="stack --stack-yaml hadrian/stack.yaml exec -- ./configure"
     fi
     cd ..
+    echo "Back to $basedir"
+    echo "Hadrian configure command: $configure_cmd"
     hadrian="$hadrian_cmd -j$threads --build-root=$hadrian_build_root"
     if [ $be_quiet -eq 0 ]; then
         hadrian="$hadrian -V"
@@ -185,25 +185,22 @@ else
     echo "Hadrian command: $hadrian"
 fi
 
-if [ $testsuite_only -eq 0 ]; then
-    thisdir=`pwd`
+if [ $build_only -eq 1 ] ||
+    { [ $build_only -eq 0 ] && [ $testsuite_only -eq 0 ]; }; then
 
     if [ $no_clean -eq 0 ]; then
-        if [ "$use_hadrian" = "NO" ]
-        then
+        if [ "$use_hadrian" = "NO" ]; then
             $make maintainer-clean
         else
             $hadrian clean && rm -rf $hadrian_build_root
         fi
 
-        INSTDIR="$thisdir/inst"
-
         python3 ./boot --validate
-        $configure_cmd --prefix="$INSTDIR" --enable-tarballs-autodownload $config_args
+        $configure_cmd --enable-tarballs-autodownload "$CONFIG_ARGS"
+
     fi
 
-    if [ "$use_hadrian" = "NO" ]
-    then
+    if [ "$use_hadrian" = "NO" ]; then
         echo "Validating=YES"       >  mk/are-validating.mk
         echo "ValidateSpeed=$speed" >> mk/are-validating.mk
         echo "ValidateHpc=$hpc"     >> mk/are-validating.mk
@@ -223,7 +220,7 @@ if [ $testsuite_only -eq 0 ]; then
             echo "V=0"                  >> mk/are-validating.mk # Less gunk
         fi
 
-        $make -j$threads
+        $make -j"$threads"
         # For a "debug make", add "--debug=b --debug=m"
     else
         case $speed in
@@ -234,88 +231,83 @@ if [ $testsuite_only -eq 0 ]; then
         FAST)
             flavour=validate ;;
         esac
+
         $hadrian --flavour=$flavour
     fi
 
     check_packages post-build
 
-    bindistdir="bindisttest/install   dir"
-    ghc="$bindistdir/bin/ghc"
-
-    # -----------------------------------------------------------------------------
-    # Build and test a binary distribution (not --fast)
+    # -------------------------------------------------------------------------
+    # Build a binary distribution (not --fast)
 
     if [ $speed != "FAST" ]; then
-        if [ "$use_hadrian" = "NO" ]
-        then
+        # Set bindistdir only when a binary distribution is built
+        bindistdir="bindisttest/install   dir"
+        ghc="$basedir/$bindistdir/bin/ghc"
+
+        if [ "$use_hadrian" = "NO" ]; then
             $make binary-dist-prep TAR_COMP=$tar_comp
             $make test_bindist TEST_PREP=YES TAR_COMP=$tar_comp
         else
             $hadrian binary-dist --docs=no-sphinx
-            cfgdir=$(find $hadrian_build_root/bindist/ -name 'configure' | head -1)
-            dir=$(dirname $cfgdir)
-            cd "$dir"
-            ./configure --prefix="$thisdir/$bindistdir" && make install
-            cd $thisdir
+            cfgdir="$(dirname "$(find $hadrian_build_root/bindist/ -name 'configure' | head -1)")"
+            cd "$cfgdir"
+            ./configure --prefix="$basedir/$bindistdir" && make install
+            cd "$basedir"
             "$ghc" -e 'Data.Text.IO.putStrLn (Data.Text.pack "bindist test: OK")'
         fi
 
         check_packages post-install
 
-        if [ "$use_hadrian" = "NO" ]
-        then
-            $make validate_build_xhtml BINDIST_PREFIX="$thisdir/$bindistdir"
+        if [ "$use_hadrian" = "NO" ]; then
+            $make validate_build_xhtml BINDIST_PREFIX="$basedir/$bindistdir"
         else
-            cd libraries/xhtml
-            dynamicGhc=$("../../$ghc" --info | grep "GHC Dynamic" | cut -d',' -f3 | cut -d'"' -f2)
-            if [ "$dynamicGhc" = "NO" ]
-            then
+            cd "$basedir/libraries/xhtml"
+            dynamicGhc=$("$ghc" --info | grep "GHC Dynamic" | cut -d',' -f3 | cut -d'"' -f2)
+            if [ "$dynamicGhc" = "NO" ]; then
                 libFlags="--disable-shared --enable-library-vanilla"
             else
                 libFlags="--enable-shared --disable-library-vanilla"
             fi
             libFlags="$libFlags --disable-library-prof"
 
-            "../../$ghc" --make Setup
+            "$ghc" --make Setup
+
+            # shellcheck disable=SC2086
             ./Setup configure \
-                --with-ghc="$thisdir/$ghc" \
-                --with-haddock="$thisdir/$bindistdir/bin/haddock" \
-                $libFlags \
+                --with-ghc="$ghc" \
+                --with-haddock="$basedir/$bindistdir/bin/haddock" $libFlags \
                 --global --builddir=dist-bindist \
-                --prefix="$thisdir/$bindistdir"
+                --prefix="$basedir/$bindistdir"
             ./Setup build --builddir=dist-bindist
             ./Setup haddock -v0 --ghc-options=-optP-P --builddir=dist-bindist
             ./Setup install --builddir=dist-bindist
             ./Setup clean --builddir=dist-bindist
             rm -f Setup Setup.exe Setup.hi Setup.o
-            cd ../../
+            cd "$basedir"
         fi
 
         check_packages post-xhtml
     fi
-fi # testsuite-only
 
-# -----------------------------------------------------------------------------
-# Run the testsuite
-
-if [ "$build_only" -eq 1 ]; then
-    cat <<EOF
+    if [ $build_only -eq 1 ]; then
+        cat <<EOF
 -------------------------------------------------------------------
 Congratulations!  This tree has compiled successfully.
 
 You can now test your new compiler using ./validate --testsuite-only.
 EOF
     exit 0
-fi
+    fi
+fi # Done with building the compiler and packages
 
-if [ "$hpc" = YES ]
-then
+if [ "$hpc" = YES ]; then
     # XXX With threads we'd need to give a different tix file to each thread
     #     and then sum them up at the end
     threads=1
-    HPCTIXFILE=$thisdir/testsuite/hpc_output/ghc.tix
+    HPCTIXFILE=$basedir/testsuite/hpc_output/ghc.tix
     export HPCTIXFILE
-    rm -f $HPCTIXFILE
+    rm -f "$HPCTIXFILE"
 fi
 
 case "$speed" in
@@ -325,6 +317,7 @@ SLOW)
     HADRIAN_TEST_SPEED=slow
     ;;
 NORMAL)
+    # shellcheck disable=2209
     MAKE_TEST_TARGET=test
     BINDIST="BINDIST=YES"
     HADRIAN_TEST_SPEED=normal
@@ -336,73 +329,101 @@ FAST)
     ;;
 esac
 
-if [ $be_quiet -eq 1 ] && [ -z $VERBOSE ]; then
+if [ $be_quiet -eq 1 ] && [ -z "${VERBOSE+ }" ]; then
     TEST_VERBOSITY="VERBOSE=1"
 fi
 
 # We need to be quite picky on Windows about which Python interpreter we use
 # (#12554, #12661). Allow the user to override it.
 if [ "z$PYTHON" != "z" ]; then
-    PYTHON_ARG="PYTHON=$PYTHON"
-fi
-
-rm -f testsuite_summary.txt testsuite_summary_stage1.txt
-
-if [ "$use_hadrian" = "NO" ]
-then
-    # Use LOCAL=0, see Note [Running tests in /tmp].
-    $make -C testsuite/tests $BINDIST $PYTHON_ARG \
-    $MAKE_TEST_TARGET stage=2 LOCAL=0 $TEST_VERBOSITY THREADS=$threads \
-    NO_PRINT_SUMMARY=YES SUMMARY_FILE=../../testsuite_summary.txt \
-    JUNIT_FILE=../../testsuite.xml \
-    2>&1 | tee testlog
-
-    # Run a few tests using the stage1 compiler.
-    # See Note [Why is there no stage1 setup function?].
-    # Don't use BINDIST=YES, as stage1 is not available in a bindist.
-    $make -C testsuite/tests/stage1 $PYTHON_ARG \
-    $MAKE_TEST_TARGET stage=1 LOCAL=0 $TEST_VERBOSITY THREADS=$threads \
-    NO_PRINT_SUMMARY=YES SUMMARY_FILE=../../../testsuite_summary_stage1.txt \
-    JUNIT_FILE=../../../testsuite_stage1.xml \
-    2>&1 | tee testlog-stage1
+    PYTHON_ARG="PYTHONPATH=$PYTHON"
 else
-    testghc="$thisdir/$ghc"
-    arg="test --test-speed=$HADRIAN_TEST_SPEED \
-              --test-compiler=\"$testghc\" \
-              --summary=$thisdir/testsuite_summary.txt \
-              --summary-junit=$thisdir/testsuite.xml"
-    sh -c "$hadrian $arg"
-    # TODO: Run testsuite/tests/stage1 using the stage 1 compiler when
-    # BINDIST=NO.
+    PYTHON_ARG="PYTHONPATH=$(which python)"
 fi
 
-echo
-echo '==== STAGE 1 TESTS ==== '
-cat testsuite_summary_stage1.txt
+# Run the testsuite
+if [ $testsuite_only -eq 1 ] ||
+    { [ $build_only -eq 0 ] && [ $testsuite_only -eq 0 ]; };  then
 
-echo '==== STAGE 2 TESTS ==== '
-cat testsuite_summary.txt
+    cd "$basedir"
+    rm -f testsuite_summary.txt testsuite_summary_stage1.txt testsuite.xml
 
-check_packages post-testsuite
+    if [ "$use_hadrian" = "NO" ] ; then
+        # Use LOCAL=0, see Note [Running tests in /tmp].
+        $make -C "$basedir"/testsuite/tests $BINDIST "$PYTHON_ARG" \
+        $MAKE_TEST_TARGET stage=2 LOCAL=0 $TEST_VERBOSITY THREADS=$threads \
+        SUMMARY_FILE="$basedir"/testsuite_summary.txt \
+        JUNIT_FILE="$basedir"/testsuite.xml \
+        2>&1 | tee testlog
+
+        # Run a few tests using the stage1 compiler.
+        # See Note [Why is there no stage1 setup function?].
+        # Don't use BINDIST=YES, as stage1 is not available in a bindist.
+        $make -C testsuite/tests/stage1 "$PYTHON_ARG" \
+        $MAKE_TEST_TARGET stage=1 LOCAL=0 $TEST_VERBOSITY THREADS=$threads \
+        SUMMARY_FILE="$basedir"/testsuite_summary_stage1.txt \
+        JUNIT_FILE="$basedir"/testsuite_stage1.xml \
+        2>&1 | tee testlog-stage1
+
+        echo '==== STAGE 1 TESTS ==== '
+        cat "$basedir"/testsuite_summary_stage1.txt
+
+        echo '==== STAGE 2 TESTS ==== '
+        cat "$basedir"/testsuite_summary.txt
+    else
+        testghc=$ghc
+        hadrian_test_with_args="test --test-speed=$HADRIAN_TEST_SPEED \
+            --test-compiler=\"$testghc\" \
+            --summary=$basedir/testsuite_summary.txt \
+            --summary-junit=$basedir/testsuite.xml"
+        sh -c "$hadrian $hadrian_args"
+        # TODO: Run testsuite/tests/stage1 using the stage 1 compiler when
+        # BINDIST=NO.
+
+        echo '==== STAGE 2 TESTS (using Hadrian) ==== '
+        cat testsuite_summary.txt
+    fi
+
+    echo "Checking packages after running the testsuite..."
+    check_packages post-testsuite
+
+fi # Test run is complete
 
 if [ "$hpc" = YES ]
 then
-    utils/hpc/hpc markup --hpcdir=. --srcdir=compiler --srcdir=testsuite/hpc_output --destdir=testsuite/hpc_output testsuite/hpc_output/ghc.tix
+    "$basedir"/utils/hpc/hpc markup --hpcdir=. --srcdir=compiler \
+    --srcdir=testsuite/hpc_output --destdir=testsuite/hpc_output testsuite/hpc_output/ghc.tix
 fi
 
-if
-    grep '\<0 caused framework failures' testsuite_summary.txt >/dev/null 2>/dev/null &&
-    grep '\<0 unexpected passes' testsuite_summary.txt >/dev/null 2>/dev/null &&
-    grep '\<0 unexpected failures' testsuite_summary.txt >/dev/null 2>/dev/null &&
-    grep '\<0 unexpected stat failures' testsuite_summary.txt >/dev/null 2>/dev/null &&
+if [ "$use_hadrian" = "YES" ]; then
+    if
+        grep '\<0 caused framework failures' testsuite_summary.txt >/dev/null 2>/dev/null &&
+        grep '\<0 unexpected passes' testsuite_summary.txt >/dev/null 2>/dev/null &&
+        grep '\<0 unexpected failures' testsuite_summary.txt >/dev/null 2>/dev/null &&
+        grep '\<0 unexpected stat failures' testsuite_summary.txt >/dev/null 2>/dev/null; then
 
-    grep '\<0 caused framework failures' testsuite_summary_stage1.txt >/dev/null 2>/dev/null &&
-    grep '\<0 unexpected passes' testsuite_summary_stage1.txt >/dev/null 2>/dev/null &&
-    grep '\<0 unexpected failures' testsuite_summary_stage1.txt >/dev/null 2>/dev/null &&
-    grep '\<0 unexpected stat failures' testsuite_summary_stage1.txt >/dev/null 2>/dev/null ; then
+        no_hadrian_test_failures=1
+    fi
+else
+    if
+        grep '\<0 caused framework failures' testsuite_summary.txt >/dev/null 2>/dev/null &&
+        grep '\<0 unexpected passes' testsuite_summary.txt >/dev/null 2>/dev/null &&
+        grep '\<0 unexpected failures' testsuite_summary.txt >/dev/null 2>/dev/null &&
+        grep '\<0 unexpected stat failures' testsuite_summary.txt >/dev/null 2>/dev/null &&
+        grep '\<0 caused framework failures' testsuite_summary_stage1.txt >/dev/null 2>/dev/null &&
+        grep '\<0 unexpected passes' testsuite_summary_stage1.txt >/dev/null 2>/dev/null &&
+        grep '\<0 unexpected failures' testsuite_summary_stage1.txt >/dev/null 2>/dev/null &&
+        grep '\<0 unexpected stat failures' testsuite_summary_stage1.txt >/dev/null 2>/dev/null; then
 
-    if [ $testsuite_only -eq 0 ] && [ $no_clean -eq 0 ]
-    then
+        no_make_test_failures=1
+        no_make_perf_test_failures=1
+    fi
+fi
+
+if { [ $no_hadrian_perf_test_failures = 1 ] && [ $no_hadrian_test_failures = 1 ]; } ||
+        [ $no_make_test_failures = 1 ]; then
+
+    if [ $testsuite_only -eq 0 ] && [ $no_clean -eq 0 ]; then
         cat <<EOF
 -------------------------------------------------------------------
 Congratulations!  This tree has passed minimal testing.
@@ -413,8 +434,7 @@ the minimal testing procedure, please do further testing as necessary.
 When you are satisfied that you haven't broken anything, go ahead and
 push/send your patches.
 EOF
-        if [ -f mk/validate.mk ] && grep -q "^[^#]" mk/validate.mk
-        then
+        if [ -f mk/validate.mk ] && grep -q "^[^#]" mk/validate.mk ; then
             cat <<EOF
 
 WARNING: You seem to have things set in mk/validate.mk. Please check
@@ -436,8 +456,7 @@ the minimal testing procedure, please do further testing as necessary.
 EOF
     fi
 else
-    if [ $be_quiet -eq 0 ]
-    then
+    if [ $be_quiet -eq 0 ]; then
        cat <<EOF
 -------------------------------------------------------------------
 Oops!  Looks like you have some unexpected test results or framework failures.
