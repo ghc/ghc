@@ -9,8 +9,8 @@
     { T15323.hs:1:1 }
     (UnchangedAnchor))
    (AnnsModule
-    [(AddApiAnn AnnModule (AR { T15323.hs:3:1-6 }))
-    ,(AddApiAnn AnnWhere (AR { T15323.hs:3:15-19 }))]
+    [(AddEpAnn AnnModule (AR { T15323.hs:3:1-6 }))
+    ,(AddEpAnn AnnWhere (AR { T15323.hs:3:15-19 }))]
     (AnnList
      (Nothing)
      (Nothing)
@@ -50,8 +50,8 @@
        (Anchor
         { T15323.hs:(5,1)-(6,54) }
         (UnchangedAnchor))
-       [(AddApiAnn AnnData (AR { T15323.hs:5:1-4 }))
-       ,(AddApiAnn AnnWhere (AR { T15323.hs:5:21-25 }))]
+       [(AddEpAnn AnnData (AR { T15323.hs:5:1-4 }))
+       ,(AddEpAnn AnnWhere (AR { T15323.hs:5:21-25 }))]
        (AnnComments
         []))
       (L
@@ -81,8 +81,8 @@
         (Anchor
          { T15323.hs:(5,1)-(6,54) }
          (UnchangedAnchor))
-        [(AddApiAnn AnnData (AR { T15323.hs:5:1-4 }))
-        ,(AddApiAnn AnnWhere (AR { T15323.hs:5:21-25 }))]
+        [(AddEpAnn AnnData (AR { T15323.hs:5:1-4 }))
+        ,(AddEpAnn AnnWhere (AR { T15323.hs:5:21-25 }))]
         (AnnComments
          []))
        (DataType)
@@ -96,7 +96,7 @@
            (Anchor
             { T15323.hs:6:5-54 }
             (UnchangedAnchor))
-           [(AddApiAnn AnnDcolon (AR { T15323.hs:6:17-18 }))]
+           [(AddEpAnn AnnDcolon (AR { T15323.hs:6:17-18 }))]
            (AnnComments
             []))
           [(L
@@ -111,8 +111,8 @@
               { T15323.hs:6:20-25 }
               (UnchangedAnchor))
              ((,)
-              (AddApiAnn AnnForall (AR { T15323.hs:6:20-25 }))
-              (AddApiAnn AnnDot (AR { T15323.hs:6:29 })))
+              (AddEpAnn AnnForall (AR { T15323.hs:6:20-25 }))
+              (AddEpAnn AnnDot (AR { T15323.hs:6:29 })))
              (AnnComments
               []))
             [(L

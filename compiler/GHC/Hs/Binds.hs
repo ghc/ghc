@@ -594,8 +594,8 @@ type instance XXFixitySig (GhcPass p) = NoExtCon
 
 data AnnSig
   = AnnSig {
-      asDcolon :: AddApiAnn, -- Not an AnnAnchor to capture unicode option
-      asRest   :: [AddApiAnn]
+      asDcolon :: AddEpAnn, -- Not an AnnAnchor to capture unicode option
+      asRest   :: [AddEpAnn]
       } deriving Data
 
 

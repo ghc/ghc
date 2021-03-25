@@ -917,9 +917,9 @@ data HsTyLit
 data HsArrow pass
   = HsUnrestrictedArrow IsUnicodeSyntax
     -- ^ a -> b or a → b
-  | HsLinearArrow IsUnicodeSyntax (Maybe AddApiAnn)
+  | HsLinearArrow IsUnicodeSyntax (Maybe AddEpAnn)
     -- ^ a %1 -> b or a %1 → b, or a ⊸ b
-  | HsExplicitMult IsUnicodeSyntax (Maybe AddApiAnn) (LHsType pass)
+  | HsExplicitMult IsUnicodeSyntax (Maybe AddEpAnn) (LHsType pass)
     -- ^ a %m -> b or a %m → b (very much including `a %Many -> b`!
     -- This is how the programmer wrote it). It is stored as an
     -- `HsType` so as to preserve the syntax as written in the

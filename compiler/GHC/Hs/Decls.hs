@@ -1030,13 +1030,13 @@ type instance Anno (SourceText, RuleName) = SrcSpan
 
 data HsRuleAnn
   = HsRuleAnn
-       { ra_tyanns :: Maybe (AddApiAnn, AddApiAnn)
+       { ra_tyanns :: Maybe (AddEpAnn, AddEpAnn)
                  -- ^ The locations of 'forall' and '.' for forall'd type vars
-                 -- Using AddApiAnn to capture possible unicode variants
-       , ra_tmanns :: Maybe (AddApiAnn, AddApiAnn)
+                 -- Using AddEpAnn to capture possible unicode variants
+       , ra_tmanns :: Maybe (AddEpAnn, AddEpAnn)
                  -- ^ The locations of 'forall' and '.' for forall'd term vars
-                 -- Using AddApiAnn to capture possible unicode variants
-       , ra_rest :: [AddApiAnn]
+                 -- Using AddEpAnn to capture possible unicode variants
+       , ra_rest :: [AddEpAnn]
        } deriving (Data, Eq)
 
 flattenRuleDecls :: [LRuleDecls (GhcPass p)] -> [LRuleDecl (GhcPass p)]
