@@ -13,7 +13,9 @@ import GHC.Platform
 main :: IO ()
 main = do
     [libdir] <- getArgs
-    runGhc (Just libdir) tests
+    runGhc (Just libdir) $ do
+      setSessionDynFlags =<< getDynFlags
+      tests
 
 
 -- How to read tests:

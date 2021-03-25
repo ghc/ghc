@@ -48,7 +48,6 @@ initSettings top_dir = do
       libexec :: FilePath -> FilePath
       libexec file = top_dir </> "bin" </> file
       settingsFile = installed "settings"
-      platformConstantsFile = installed "platformConstants"
 
       readFileSafe :: FilePath -> ExceptT SettingsError m String
       readFileSafe path = liftIO (doesFileExist path) >>= \case
@@ -56,16 +55,11 @@ initSettings top_dir = do
         False -> throwE $ SettingsError_MissingData $ "Missing file: " ++ path
 
   settingsStr <- readFileSafe settingsFile
-  platformConstantsStr <- readFileSafe platformConstantsFile
   settingsList <- case maybeReadFuzzy settingsStr of
     Just s -> pure s
     Nothing -> throwE $ SettingsError_BadData $
       "Can't parse " ++ show settingsFile
   let mySettings = Map.fromList settingsList
-  platformConstants <- case maybeReadFuzzy platformConstantsStr of
-    Just s -> pure s
-    Nothing -> throwE $ SettingsError_BadData $
-      "Can't parse " ++ show platformConstantsFile
   -- See Note [Settings file] for a little more about this file. We're
   -- just partially applying those functions and throwing 'Left's; they're
   -- written in a very portable style to keep ghc-boot light.
@@ -91,7 +85,7 @@ initSettings top_dir = do
   cpp_prog <- getToolSetting "Haskell CPP command"
   cpp_args_str <- getSetting "Haskell CPP flags"
 
-  platform <- either pgmError pure $ getTargetPlatform settingsFile mySettings platformConstants
+  platform <- either pgmError pure $ getTargetPlatform settingsFile mySettings
 
   let unreg_cc_args = if platformUnregisterised platform
                       then ["-DNO_REGS", "-DUSE_MINIINTERPRETER"]
@@ -227,17 +221,14 @@ initSettings top_dir = do
       , platformMisc_llvmTarget = llvmTarget
       }
 
-    , sPlatformConstants = platformConstants
-
     , sRawSettings    = settingsList
     }
 
 getTargetPlatform
   :: FilePath     -- ^ Settings filepath (for error messages)
   -> RawSettings  -- ^ Raw settings file contents
-  -> PlatformConstants -- ^ Platform constants
   -> Either String Platform
-getTargetPlatform settingsFile settings constants = do
+getTargetPlatform settingsFile settings = do
   let
     getBooleanSetting = getRawBooleanSetting settingsFile settings
     readSetting :: (Show a, Read a) => String -> Either String a
@@ -265,5 +256,5 @@ getTargetPlatform settingsFile settings constants = do
     , platformIsCrossCompiling = crossCompiling
     , platformLeadingUnderscore = targetLeadingUnderscore
     , platformTablesNextToCode  = tablesNextToCode
-    , platformConstants = constants
+    , platform_constants = Nothing -- will be filled later when loading (or building) the RTS unit
     }
