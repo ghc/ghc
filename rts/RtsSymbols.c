@@ -529,7 +529,8 @@
 #else
 #define RTS_INTCHAR_SYMBOLS                             \
       SymI_HasProto(stg_CHARLIKE_closure)               \
-      SymI_HasProto(stg_INTLIKE_closure)
+      SymI_HasProto(stg_INTLIKE_closure)                \
+      SymI_HasProto(stg_WORDLIKE_closure)
 #endif
 
 #if defined(PROFILING)

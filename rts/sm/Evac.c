@@ -868,6 +868,13 @@ loop:
                                     (StgClosure *)INTLIKE_CLOSURE((StgInt)w)
                                    ));
       }
+      else if (info == Wzh_con_info &&
+          // unsigned, so always true:  (StgWord)w >= MIN_WORDLIKE &&
+          (StgWord)w <= MAX_WORDLIKE) {
+          *p = TAG_CLOSURE(tag,
+                             (StgClosure *)WORDLIKE_CLOSURE((StgInt)w)
+                             );
+      }
       else {
           copy_tag_nolock(p,info,q,sizeofW(StgHeader)+1,gen_no,tag);
       }

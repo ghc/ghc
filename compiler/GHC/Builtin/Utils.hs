@@ -38,7 +38,7 @@ module GHC.Builtin.Utils (
         primOpId,
 
         -- * Random other things
-        maybeCharLikeCon, maybeIntLikeCon,
+        maybeCharLikeCon, maybeIntLikeCon, maybeWordLikeCon,
 
         -- * Class categories
         isNumericClass, isStandardClass
@@ -289,9 +289,10 @@ ghcPrimDeclDocs = DeclDocMap $ Map.fromList $ mapMaybe findName primOpDocs
 ToDo: make it do the ``like'' part properly (as in 0.26 and before).
 -}
 
-maybeCharLikeCon, maybeIntLikeCon :: DataCon -> Bool
+maybeCharLikeCon, maybeIntLikeCon, maybeWordLikeCon :: DataCon -> Bool
 maybeCharLikeCon con = con `hasKey` charDataConKey
 maybeIntLikeCon  con = con `hasKey` intDataConKey
+maybeWordLikeCon con = con `hasKey` wordDataConKey
 
 {-
 ************************************************************************
