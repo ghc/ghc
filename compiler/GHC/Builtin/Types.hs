@@ -1432,13 +1432,13 @@ vecRepDataCon :: DataCon
 vecRepDataCon = pcSpecialDataCon vecRepDataConName [ mkTyConTy vecCountTyCon
                                                    , mkTyConTy vecElemTyCon ]
                                  runtimeRepTyCon
-                                 (RuntimeRep prim_rep_fun)
+                                 (RuntimeInfo prim_rep_fun)
   where
     -- See Note [Getting from RuntimeRep to PrimRep] in GHC.Types.RepType
     prim_rep_fun [count, elem]
       | VecCount n <- tyConRuntimeRepInfo (tyConAppTyCon count)
       , VecElem  e <- tyConRuntimeRepInfo (tyConAppTyCon elem)
-      = [VecRep n e]
+      = [RInfo [(VecRep n e)] ConvEval]
     prim_rep_fun args
       = pprPanic "vecRepDataCon" (ppr args)
 
@@ -1447,11 +1447,11 @@ vecRepDataConTyCon = promoteDataCon vecRepDataCon
 
 tupleRepDataCon :: DataCon
 tupleRepDataCon = pcSpecialDataCon tupleRepDataConName [ mkListTy runtimeRepTy ]
-                                   runtimeRepTyCon (RuntimeRep prim_rep_fun)
+                                   runtimeRepTyCon (RuntimeInfo prim_rep_fun)
   where
     -- See Note [Getting from RuntimeRep to PrimRep] in GHC.Types.RepType
     prim_rep_fun [rr_ty_list]
-      = concatMap (runtimeRepPrimRep doc) rr_tys
+      = [RInfo (concatMap (runtimeRepPrimRep doc) rr_tys) ConvEval]
       where
         rr_tys = extractPromotedList rr_ty_list
         doc    = text "tupleRepDataCon" <+> ppr rr_tys
@@ -1463,11 +1463,11 @@ tupleRepDataConTyCon = promoteDataCon tupleRepDataCon
 
 sumRepDataCon :: DataCon
 sumRepDataCon = pcSpecialDataCon sumRepDataConName [ mkListTy runtimeRepTy ]
-                                 runtimeRepTyCon (RuntimeRep prim_rep_fun)
+                                 runtimeRepTyCon (RuntimeInfo prim_rep_fun)
   where
     -- See Note [Getting from RuntimeRep to PrimRep] in GHC.Types.RepType
     prim_rep_fun [rr_ty_list]
-      = map slotPrimRep (ubxSumRepType prim_repss)
+      = [RInfo (map slotPrimRep (ubxSumRepType prim_repss)) ConvEval]
       where
         rr_tys     = extractPromotedList rr_ty_list
         doc        = text "sumRepDataCon" <+> ppr rr_tys
@@ -1495,7 +1495,7 @@ runtimeRepSimpleDataCons@(liftedRepDataCon : _)
     runtimeRepSimpleDataConNames
   where
     mk_runtime_rep_dc primrep name
-      = pcSpecialDataCon name [] runtimeRepTyCon (RuntimeRep (\_ -> [primrep]))
+      = pcSpecialDataCon name [] runtimeRepTyCon (RuntimeInfo (\_ -> [RInfo [primrep] ConvEval]))
 
 -- See Note [Wiring in RuntimeRep]
 liftedRepDataConTy, unliftedRepDataConTy,
@@ -1619,7 +1619,8 @@ runtimeInfoDataCon = pcSpecialDataCon runtimeInfoDataConName [ runtimeRepTy
   where
     -- See Note [Getting from RuntimeRep to PrimRep] in GHC.Types.RepType
     prim_info_fun tys@[rep, conv]
-      = [RInfo (head $ runtimeRepPrimRep doc rep)  ConvEval]
+      = pprPanic "here" (ppr tys)
+        -- [RInfo (runtimeRepPrimRep doc rep)  ConvEval]
         where doc = text "runtimeInfoDataCon" <+> ppr tys
     prim_info_fun args
       = pprPanic "runtimeInfoDataCon" (ppr args)

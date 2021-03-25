@@ -1571,7 +1571,7 @@ data PrimConv =
   -- | ConvCall [PrimRep] 
   deriving (Show)
 
-data PrimInfo = RInfo {rep :: PrimRep, conv :: PrimConv}  
+data PrimInfo = RInfo {reps :: [PrimRep], conv :: PrimConv}  
 
 
 {-

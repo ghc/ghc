@@ -526,8 +526,8 @@ runtimeRepPrimRep doc rr_ty
   | Just rr_ty' <- coreView rr_ty
   = runtimeRepPrimRep doc rr_ty'
   | TyConApp rr_dc args <- rr_ty
-  , RuntimeRep fun <- tyConRuntimeRepInfo rr_dc
-  = fun args
+  , RuntimeInfo fun <- tyConRuntimeRepInfo rr_dc
+  = concatMap reps $ fun args
   | otherwise
   = pprPanic "runtimeRepPrimRep" (doc $$ ppr rr_ty)
 
