@@ -435,9 +435,9 @@ static  :: { CmmParse [CmmStatic] }
                      ; return $ map CmmStaticLit $
                         mkStaticClosure profile (mkForeignLabel $3 Nothing ForeignLabelInExternalPackage IsData)
                          -- mkForeignLabel because these are only used
-                         -- for CHARLIKE, INTLIKE and WORDLIKE closures in the RTS.
+                         -- for STATIC_* closure arrays in the RTS.
                         dontCareCCS (map getLit lits) [] [] [] } }
-        -- arrays of closures required for the CHARLIKE, INTLIKE and WORDLIKE arrays
+        -- arrays of closures required for the STATIC_* arrays
 
 lits    :: { [CmmParse CmmExpr] }
         : {- empty -}           { [] }

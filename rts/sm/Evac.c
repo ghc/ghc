@@ -854,24 +854,24 @@ loop:
 #else
       StgWord w = (StgWord)q->payload[0];
       if (info == Czh_con_info &&
-          // unsigned, so always true:  (StgChar)w >= MIN_CHARLIKE &&
-          (StgChar)w <= MAX_CHARLIKE) {
+          // unsigned, so always true:  (StgChar)w >= MIN_STATIC_CHAR &&
+          (StgChar)w <= MAX_STATIC_CHAR) {
           RELAXED_STORE(p, \
                         TAG_CLOSURE(tag, \
-                                    (StgClosure *)CHARLIKE_CLOSURE((StgChar)w)
+                                    (StgClosure *)STATIC_CHAR_CLOSURE((StgChar)w)
                                    ));
       }
       else if (info == Izh_con_info &&
-          (StgInt)w >= MIN_INTLIKE && (StgInt)w <= MAX_INTLIKE) {
+          (StgInt)w >= MIN_STATIC_INT && (StgInt)w <= MAX_STATIC_INT) {
           RELAXED_STORE(p, \
                         TAG_CLOSURE(tag, \
-                                    (StgClosure *)INTLIKE_CLOSURE((StgInt)w)
+                                    (StgClosure *)STATIC_INT_CLOSURE((StgInt)w)
                                    ));
       }
       else if (info == Wzh_con_info &&
-          (StgInt)w >= MIN_WORDLIKE && (StgInt)w <= MAX_WORDLIKE) {
+          (StgWord)w >= MIN_STATIC_WORD && (StgWord)w <= MAX_STATIC_WORD) {
           *p = TAG_CLOSURE(tag,
-                             (StgClosure *)WORDLIKE_CLOSURE((StgInt)w)
+                             (StgClosure *)STATIC_WORD_CLOSURE((StgWord)w)
                              );
       }
       else {

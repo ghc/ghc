@@ -183,17 +183,17 @@ STATIC_LINK(const StgInfoTable *info, StgClosure *p)
 }
 
 /* -----------------------------------------------------------------------------
-   INTLIKE, WORDLIKE and CHARLIKE closures.
+   STATIC_INT, STATIC_WORD and STATIC_CHAR closures.
    -------------------------------------------------------------------------- */
 
-INLINE_HEADER P_ CHARLIKE_CLOSURE(int n) {
-    return (P_)&stg_CHARLIKE_closure[(n)-MIN_CHARLIKE];
+INLINE_HEADER P_ STATIC_CHAR_CLOSURE(int n) {
+    return (P_)&stg_STATIC_CHAR_closure[(n)-MIN_STATIC_CHAR];
 }
-INLINE_HEADER P_ INTLIKE_CLOSURE(int n) {
-    return (P_)&stg_INTLIKE_closure[(n)-MIN_INTLIKE];
+INLINE_HEADER P_ STATIC_INT_CLOSURE(int n) {
+    return (P_)&stg_STATIC_INT_closure[(n)-MIN_STATIC_INT];
 }
-INLINE_HEADER P_ WORDLIKE_CLOSURE(int n) {
-    return (P_)&stg_WORDLIKE_closure[(n)-MIN_WORDLIKE];
+INLINE_HEADER P_ STATIC_WORD_CLOSURE(int n) {
+    return (P_)&stg_STATIC_WORD_closure[(n)-MIN_STATIC_WORD];
 }
 
 /* ----------------------------------------------------------------------------
