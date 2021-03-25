@@ -330,23 +330,24 @@ precomputedStaticConInfo_maybe dflags binder con []
   = Just $ litIdInfo (targetPlatform dflags) binder (mkConLFInfo con)
                 (CmmLabel (mkClosureLabel (dataConName con) NoCafRefs))
 precomputedStaticConInfo_maybe dflags binder con [arg]
-  -- Int/Char values with existing closures in the RTS
-  | intClosure || charClosure
+  -- Int/Char/Word values with existing closures in the RTS
+  | intClosure || charClosure || wordClosure
   , platformOS platform /= OSMinGW32 || not (positionIndependent dflags)
   , Just val <- getClosurePayload arg
   , inRange val
-  = let intlike_lbl   = mkCmmClosureLabel rtsUnitId (fsLit label)
+  = let closure_array = mkCmmClosureLabel rtsUnitId (fsLit label)
         val_int = fromIntegral val :: Int
         offsetW = (val_int - (fromIntegral min_static_range)) * (fixedHdrSizeW profile + 1)
-                -- INTLIKE/CHARLIKE closures consist of a header and one word payload
-        static_amode = cmmLabelOffW platform intlike_lbl offsetW
+                -- INTLIKE/CHARLIKE/WORDLIKE closures consist of a header and one word payload
+        static_amode = cmmLabelOffW platform closure_array offsetW
     in Just $ litIdInfo platform binder (mkConLFInfo con) static_amode
   where
     profile = targetProfile dflags
     platform = profilePlatform profile
     intClosure = maybeIntLikeCon con
     charClosure = maybeCharLikeCon con
-    getClosurePayload (NonVoid (StgLitArg (LitNumber LitNumInt val))) = Just val
+    wordClosure = maybeWordLikeCon con
+    getClosurePayload (NonVoid (StgLitArg (LitNumber _ val))) = Just val
     getClosurePayload (NonVoid (StgLitArg (LitChar val))) = Just $ (fromIntegral . ord $ val)
     getClosurePayload _ = Nothing
     -- Avoid over/underflow by comparisons at type Integer!
@@ -360,14 +361,17 @@ precomputedStaticConInfo_maybe dflags binder con [arg]
     min_static_range
       | intClosure = fromIntegral (pc_MIN_INTLIKE constants)
       | charClosure = fromIntegral (pc_MIN_CHARLIKE constants)
+      | wordClosure = fromIntegral (pc_MIN_WORDLIKE constants)
       | otherwise = panic "precomputedStaticConInfo_maybe: Unknown closure type"
     max_static_range
       | intClosure = fromIntegral (pc_MAX_INTLIKE constants)
       | charClosure = fromIntegral (pc_MAX_CHARLIKE constants)
+      | wordClosure = fromIntegral (pc_MAX_WORDLIKE constants)
       | otherwise = panic "precomputedStaticConInfo_maybe: Unknown closure type"
     label
       | intClosure = "stg_INTLIKE"
       | charClosure =  "stg_CHARLIKE"
+      | wordClosure =  "stg_WORDLIKE"
       | otherwise = panic "precomputedStaticConInfo_maybe: Unknown closure type"
 
 precomputedStaticConInfo_maybe _ _ _ _ = Nothing

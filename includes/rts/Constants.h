@@ -64,6 +64,9 @@
 #define MAX_INTLIKE             255
 #define MIN_INTLIKE             (-16)
 
+#define MAX_WORDLIKE            255
+#define MIN_WORDLIKE            0
+
 #define MAX_CHARLIKE            255
 #define MIN_CHARLIKE            0
 
