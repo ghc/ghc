@@ -4223,8 +4223,8 @@ acsFinal a = do
   csf <- getFinalCommentsFor l
   meof <- getEofPos
   let ce = case meof of
-             Nothing  -> AnnComments []
-             Just (pos, gap) -> AnnCommentsBalanced [] [L (realSpanAsAnchor pos) (AnnComment AnnEofComment gap)]
+             Nothing  -> EpaComments []
+             Just (pos, gap) -> EpaCommentsBalanced [] [L (realSpanAsAnchor pos) (EpaComment EpaEofComment gap)]
   return (a (cs Semi.<> csf Semi.<> ce))
 
 acsa :: MonadP m => (EpAnnComments -> LocatedAn t a) -> m (LocatedAn t a)

@@ -17,14 +17,14 @@
      (Nothing)
      []
      []))
-   (AnnCommentsBalanced
+   (EpaCommentsBalanced
     []
     [(L
       (Anchor
        { T15323.hs:7:1 }
        (UnchangedAnchor))
-      (AnnComment
-       (AnnEofComment)
+      (EpaComment
+       (EpaEofComment)
        { T15323.hs:7:1 }))]))
   (VirtualBraces
    (1))
@@ -41,7 +41,7 @@
                   (UnchangedAnchor))
                  (AnnListItem
                   [])
-                 (AnnComments
+                 (EpaComments
                   [])) { T15323.hs:(5,1)-(6,54) })
     (TyClD
      (NoExtField)
@@ -52,7 +52,7 @@
         (UnchangedAnchor))
        [(AddEpAnn AnnData (AR { T15323.hs:5:1-4 }))
        ,(AddEpAnn AnnWhere (AR { T15323.hs:5:21-25 }))]
-       (AnnComments
+       (EpaComments
         []))
       (L
        (SrcSpanAnn (EpAnnNotUsed) { T15323.hs:5:6-17 })
@@ -68,7 +68,7 @@
             { T15323.hs:5:19 }
             (UnchangedAnchor))
            []
-           (AnnComments
+           (EpaComments
             []))
           (())
           (L
@@ -83,7 +83,7 @@
          (UnchangedAnchor))
         [(AddEpAnn AnnData (AR { T15323.hs:5:1-4 }))
         ,(AddEpAnn AnnWhere (AR { T15323.hs:5:21-25 }))]
-        (AnnComments
+        (EpaComments
          []))
        (DataType)
        (Nothing)
@@ -97,7 +97,7 @@
             { T15323.hs:6:5-54 }
             (UnchangedAnchor))
            [(AddEpAnn AnnDcolon (AR { T15323.hs:6:17-18 }))]
-           (AnnComments
+           (EpaComments
             []))
           [(L
             (SrcSpanAnn (EpAnnNotUsed) { T15323.hs:6:5-14 })
@@ -113,7 +113,7 @@
              ((,)
               (AddEpAnn AnnForall (AR { T15323.hs:6:20-25 }))
               (AddEpAnn AnnDot (AR { T15323.hs:6:29 })))
-             (AnnComments
+             (EpaComments
               []))
             [(L
               (SrcSpanAnn (EpAnnNotUsed) { T15323.hs:6:27 })
@@ -123,7 +123,7 @@
                  { T15323.hs:6:27 }
                  (UnchangedAnchor))
                 []
-                (AnnComments
+                (EpaComments
                  []))
                (SpecifiedSpec)
                (L
@@ -143,7 +143,7 @@
                             (AR { T15323.hs:6:38-39 })))
                           []
                           [])
-                         (AnnComments
+                         (EpaComments
                           [])) { T15323.hs:6:31-36 })
             [(L
               (SrcSpanAnn (EpAnnNotUsed) { T15323.hs:6:31-36 })
@@ -156,7 +156,7 @@
                  (AnnParens)
                  (AR { T15323.hs:6:31 })
                  (AR { T15323.hs:6:36 }))
-                (AnnComments
+                (EpaComments
                  []))
                (L
                 (SrcSpanAnn (EpAnnNotUsed) { T15323.hs:6:32-35 })
@@ -170,7 +170,7 @@
                      { T15323.hs:6:32-33 }
                      (UnchangedAnchor))
                     []
-                    (AnnComments
+                    (EpaComments
                      []))
                    (NotPromoted)
                    (L
@@ -185,7 +185,7 @@
                      { T15323.hs:6:35 }
                      (UnchangedAnchor))
                     []
-                    (AnnComments
+                    (EpaComments
                      []))
                    (NotPromoted)
                    (L
@@ -206,7 +206,7 @@
                 { T15323.hs:6:41-52 }
                 (UnchangedAnchor))
                []
-               (AnnComments
+               (EpaComments
                 []))
               (NotPromoted)
               (L
@@ -221,7 +221,7 @@
                 { T15323.hs:6:54 }
                 (UnchangedAnchor))
                []
-               (AnnComments
+               (EpaComments
                 []))
               (NotPromoted)
               (L
