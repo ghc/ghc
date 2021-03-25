@@ -265,5 +265,5 @@ getTargetPlatform settingsFile settings constants = do
     , platformIsCrossCompiling = crossCompiling
     , platformLeadingUnderscore = targetLeadingUnderscore
     , platformTablesNextToCode  = tablesNextToCode
-    , platformConstants = constants
+    , platform_constants = Just constants
     }

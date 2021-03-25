@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE LambdaCase #-}
 
 -------------------------------------------------------------------------------
 --
@@ -144,6 +145,7 @@ module GHC.Driver.Session (
         opt_L, opt_P, opt_F, opt_c, opt_cxx, opt_a, opt_l, opt_lm, opt_i,
         opt_P_signature,
         opt_windres, opt_lo, opt_lc, opt_lcc,
+        updatePlatformConstants,
 
         -- ** Manipulating DynFlags
         addPluginModuleName,
@@ -223,6 +225,7 @@ import GHC.Prelude
 import GHC.Platform
 import GHC.Platform.Ways
 import GHC.Platform.Profile
+
 import GHC.UniqueSubdir (uniqueSubdir)
 import GHC.Unit.Types
 import GHC.Unit.Parser
@@ -4999,3 +5002,9 @@ pprDynFlagsDiff d1 d2 =
       , text "Removed extension flags:"
       , text $ show $ EnumSet.toList $ ext_removed
       ]
+
+updatePlatformConstants :: DynFlags -> Maybe PlatformConstants -> IO DynFlags
+updatePlatformConstants dflags mconstants = do
+  let platform1 = (targetPlatform dflags) { platform_constants = mconstants }
+  let dflags1   = dflags { targetPlatform = platform1 }
+  return dflags1
