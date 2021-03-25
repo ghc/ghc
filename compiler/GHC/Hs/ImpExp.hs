@@ -51,7 +51,7 @@ type LImportDecl pass = XRec pass (ImportDecl pass)
         --
         --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnSemi'
 
-        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
+        -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
 type instance Anno (ImportDecl (GhcPass p)) = SrcSpanAnnA
 
 -- | If/how an import is 'qualified'.
@@ -111,7 +111,7 @@ data ImportDecl pass
      --    'GHC.Parser.Annotation.AnnClose' attached
      --     to location in ideclHiding
 
-     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
+     -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
 
 type instance XCImportDecl  GhcPs = EpAnn' EpAnnImportDecl
 type instance XCImportDecl  GhcRn = NoExtField
@@ -217,7 +217,7 @@ data IEWrappedName name
 -- - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnType',
 --         'GHC.Parser.Annotation.AnnPattern'
 type LIEWrappedName name = LocatedA (IEWrappedName name)
--- For details on above see note [Api annotations] in GHC.Parser.Annotation
+-- For details on above see note [exact print annotations] in GHC.Parser.Annotation
 
 
 -- | Located Import or Export
@@ -226,7 +226,7 @@ type LIE pass = XRec pass (IE pass)
         --
         --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnComma'
 
-        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
+        -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
 type instance Anno (IE (GhcPass p)) = SrcSpanAnnA
 
 -- | Imported or exported entity.
@@ -241,7 +241,7 @@ data IE pass
         --  - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnPattern',
         --             'GHC.Parser.Annotation.AnnType','GHC.Parser.Annotation.AnnVal'
 
-        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
+        -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
         -- See Note [Located RdrNames] in GHC.Hs.Expr
   | IEThingAll  (XIEThingAll pass) (LIEWrappedName (IdP pass))
         -- ^ Imported or exported Thing with All imported or exported
@@ -252,7 +252,7 @@ data IE pass
         --       'GHC.Parser.Annotation.AnnDotdot','GHC.Parser.Annotation.AnnClose',
         --                                 'GHC.Parser.Annotation.AnnType'
 
-        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
+        -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
         -- See Note [Located RdrNames] in GHC.Hs.Expr
 
   | IEThingWith (XIEThingWith pass)
@@ -268,7 +268,7 @@ data IE pass
         --                                   'GHC.Parser.Annotation.AnnComma',
         --                                   'GHC.Parser.Annotation.AnnType'
 
-        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
+        -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
   | IEModuleContents  (XIEModuleContents pass) (XRec pass ModuleName)
         -- ^ Imported or exported module contents
         --
@@ -276,7 +276,7 @@ data IE pass
         --
         -- - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnModule'
 
-        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
+        -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
   | IEGroup             (XIEGroup pass) Int HsDocString -- ^ Doc section heading
   | IEDoc               (XIEDoc pass) HsDocString       -- ^ Some documentation
   | IEDocNamed          (XIEDocNamed pass) String    -- ^ Reference to named doc

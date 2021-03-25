@@ -713,7 +713,7 @@ mkGadtDecl loc names ty annsIn = do
         = let
             an' = addTrailingAnnToL (locA loc') (anns af) (comments af) an
           in ( RecConGADT (L (SrcSpanAnn an' (locA loc')) rf), res_ty
-             , [], apiAnnComments (ann ll))
+             , [], epAnnComments (ann ll))
         | otherwise
         = let (anns, cs, arg_types, res_type) = splitHsFunType body_ty
           in (PrefixConGADT arg_types, res_type, anns, cs)
@@ -839,7 +839,7 @@ checkTyVars pp_what equals_or_where tc tparms
     chkParens :: [AddEpAnn] -> EpAnnComments -> LHsType GhcPs
               -> P (LHsTyVarBndr () GhcPs, [AddEpAnn])
     chkParens acc cs (L l (HsParTy an ty))
-      = chkParens (mkParensEpAnn (locA l) ++ acc) (cs Semi.<> apiAnnComments an) ty
+      = chkParens (mkParensEpAnn (locA l) ++ acc) (cs Semi.<> epAnnComments an) ty
     chkParens acc cs ty = do
       tv <- chk acc cs ty
       return (tv, reverse acc)
@@ -1329,7 +1329,7 @@ addUnpackednessP (L lprag (UnpackednessPragma anns prag unpk)) ty = do
     -- Otherwise, wrap the type in a new HsBangTy constructor.
     addUnpackedness an (L _ (HsBangTy x bang t))
       | HsSrcBang NoSourceText NoSrcUnpack strictness <- bang
-      = HsBangTy (addAnns an (apiAnnAnns x) (apiAnnComments x)) (HsSrcBang prag unpk strictness) t
+      = HsBangTy (addAnns an (epAnnAnns x) (epAnnComments x)) (HsSrcBang prag unpk strictness) t
     addUnpackedness an t
       = HsBangTy an (HsSrcBang prag unpk NoSrcStrict) t
 

@@ -2346,7 +2346,7 @@ data PState = PState {
         -- The next three are used to implement Annotations giving the
         -- locations of 'noise' tokens in the source, so that users of
         -- the GHC API can do source to source conversions.
-        -- See note [Api annotations] in GHC.Parser.Annotation
+        -- See note [exact print annotations] in GHC.Parser.Annotation
         eof_pos :: Maybe (RealSrcSpan, RealSrcSpan), -- pos, gap to prior token
         header_comments :: Maybe [LAnnotationComment],
         comment_q :: [LAnnotationComment],

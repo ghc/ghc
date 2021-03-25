@@ -57,9 +57,9 @@ module GHC.Parser.Annotation (
 
   -- ** Querying annotations
   getLocAnn,
-  apiAnnAnns, apiAnnAnnsL,
+  epAnnAnns, epAnnAnnsL,
   annParen2AddEpAnn,
-  apiAnnComments,
+  epAnnComments,
 
   -- ** Working with locations of annotations
   sortLocatedA,
@@ -95,7 +95,7 @@ import GHC.Utils.Outputable hiding ( (<>) )
 import GHC.Utils.Panic
 
 {-
-Note [Api annotations]
+Note [exact print annotations]
 ~~~~~~~~~~~~~~~~~~~~~~
 Given a parse tree of a Haskell module, how can we reconstruct
 the original Haskell source code, retaining all whitespace and
@@ -195,7 +195,7 @@ https://gitlab.haskell.org/ghc/ghc/wikis/api-annotations
 --
 -- Note: in general the names of these are taken from the
 -- corresponding token, unless otherwise noted
--- See note [Api annotations] above for details of the usage
+-- See note [exact print annotations] above for details of the usage
 data AnnKeywordId
     = AnnAnyclass
     | AnnAs
@@ -967,13 +967,13 @@ widenAnchorR (Anchor s op) r = Anchor (combineRealSrcSpans s r) op
 widenLocatedAn :: SrcSpanAnn' an -> [AddEpAnn] -> SrcSpanAnn' an
 widenLocatedAn (SrcSpanAnn a l) as = SrcSpanAnn a (widenSpan l as)
 
-apiAnnAnnsL :: EpAnn' a -> [a]
-apiAnnAnnsL EpAnnNotUsed = []
-apiAnnAnnsL (EpAnn _ anns _) = [anns]
+epAnnAnnsL :: EpAnn' a -> [a]
+epAnnAnnsL EpAnnNotUsed = []
+epAnnAnnsL (EpAnn _ anns _) = [anns]
 
-apiAnnAnns :: EpAnn -> [AddEpAnn]
-apiAnnAnns EpAnnNotUsed = []
-apiAnnAnns (EpAnn _ anns _) = anns
+epAnnAnns :: EpAnn -> [AddEpAnn]
+epAnnAnns EpAnnNotUsed = []
+epAnnAnns (EpAnn _ anns _) = anns
 
 annParen2AddEpAnn :: EpAnn' AnnParen -> [AddEpAnn]
 annParen2AddEpAnn EpAnnNotUsed = []
@@ -982,9 +982,9 @@ annParen2AddEpAnn (EpAnn _ (AnnParen pt o c) _)
   where
     (ai,ac) = parenTypeKws pt
 
-apiAnnComments :: EpAnn' an -> EpAnnComments
-apiAnnComments EpAnnNotUsed = AnnComments []
-apiAnnComments (EpAnn _ _ cs) = cs
+epAnnComments :: EpAnn' an -> EpAnnComments
+epAnnComments EpAnnNotUsed = AnnComments []
+epAnnComments (EpAnn _ _ cs) = cs
 
 -- ---------------------------------------------------------------------
 -- sortLocatedA :: [LocatedA a] -> [LocatedA a]
