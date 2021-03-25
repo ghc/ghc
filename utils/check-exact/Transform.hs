@@ -502,13 +502,13 @@ setEntryDP _ast _dp anns = anns
 
 -- ---------------------------------------------------------------------
 
-addAnnAnchorDelta :: LayoutStartCol -> RealSrcSpan -> AnnAnchor -> AnnAnchor
-addAnnAnchorDelta _off _anc (AD d) = AD d
-addAnnAnchorDelta  off  anc (AR r)
+addEpaAnchorDelta :: LayoutStartCol -> RealSrcSpan -> EpaAnchor -> EpaAnchor
+addEpaAnchorDelta _off _anc (AD d) = AD d
+addEpaAnchorDelta  off  anc (AR r)
   = AD (adjustDeltaForOffset 0 off (ss2deltaEnd anc r))
 
 -- Set the entry DP for an element coming after an existing keyword annotation
-setEntryDPFromAnchor :: LayoutStartCol -> AnnAnchor -> LocatedA t -> LocatedA t
+setEntryDPFromAnchor :: LayoutStartCol -> EpaAnchor -> LocatedA t -> LocatedA t
 setEntryDPFromAnchor _off (AD _) (L la a) = L la a
 setEntryDPFromAnchor  off (AR anc) ll@(L la _) = setEntryDP' ll dp'
   where
@@ -957,13 +957,13 @@ noAnnSrcSpanDP1 l = noAnnSrcSpanDP l (DP 0 1)
 noAnnSrcSpanDPn :: (Monoid ann) => SrcSpan -> Int -> SrcSpanAnn' (EpAnn' ann)
 noAnnSrcSpanDPn l s = noAnnSrcSpanDP l (DP 0 s)
 
-d0 :: AnnAnchor
+d0 :: EpaAnchor
 d0 = AD $ DP 0 0
 
-d1 :: AnnAnchor
+d1 :: EpaAnchor
 d1 = AD $ DP 0 1
 
-dn :: Int -> AnnAnchor
+dn :: Int -> EpaAnchor
 dn n = AD $ DP 0 n
 
 m0 :: AnchorOperation
@@ -1131,7 +1131,7 @@ instance HasDecls (LocatedA (HsExpr GhcPs)) where
                   newDecls'' = case newDecls of
                     [] -> newDecls
                     (d:ds) -> setEntryDPDecl d (DP 0 0) : ds
-                in ( EpAnn a (AnnsLet l (addAnnAnchorDelta off lastAnc i)) cs
+                in ( EpAnn a (AnnsLet l (addEpaAnchorDelta off lastAnc i)) cs
                    , ex''
                    , newDecls'')
         binds' <- replaceDeclsValbinds WithoutWhere binds newDecls'
@@ -1414,7 +1414,7 @@ oldWhereAnnotation EpAnnNotUsed ww _oldSpan = do
                   noCom
   return an
 oldWhereAnnotation (EpAnn anc an cs) ww _oldSpan = do
-  -- TODO: when we set DP (0,0) for the HsValBinds EpAnnAnchor, change the AnnList anchor to have the correct DP too
+  -- TODO: when we set DP (0,0) for the HsValBinds EpEpaAnchor, change the AnnList anchor to have the correct DP too
   let (AnnList ancl o c _r t) = an
   let w = case ww of
         WithWhere -> [AddEpAnn AnnWhere (AD (DP 0 0))]

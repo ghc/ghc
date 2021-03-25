@@ -64,9 +64,9 @@ data ImportDeclQualifiedStyle
 -- | Given two possible located 'qualified' tokens, compute a style
 -- (in a conforming Haskell program only one of the two can be not
 -- 'Nothing'). This is called from "GHC.Parser".
-importDeclQualifiedStyle :: Maybe AnnAnchor
-                         -> Maybe AnnAnchor
-                         -> (Maybe AnnAnchor, ImportDeclQualifiedStyle)
+importDeclQualifiedStyle :: Maybe EpaAnchor
+                         -> Maybe EpaAnchor
+                         -> (Maybe EpaAnchor, ImportDeclQualifiedStyle)
 importDeclQualifiedStyle mPre mPost =
   if isJust mPre then (mPre, QualifiedPre)
   else if isJust mPost then (mPost,QualifiedPost) else (Nothing, NotQualified)
@@ -127,12 +127,12 @@ type instance Anno [LocatedA (IE (GhcPass p))] = SrcSpanAnnL
 -- API Annotations types
 
 data EpAnnImportDecl = EpAnnImportDecl
-  { importDeclAnnImport    :: AnnAnchor
-  , importDeclAnnPragma    :: Maybe (AnnAnchor, AnnAnchor)
-  , importDeclAnnSafe      :: Maybe AnnAnchor
-  , importDeclAnnQualified :: Maybe AnnAnchor
-  , importDeclAnnPackage   :: Maybe AnnAnchor
-  , importDeclAnnAs        :: Maybe AnnAnchor
+  { importDeclAnnImport    :: EpaAnchor
+  , importDeclAnnPragma    :: Maybe (EpaAnchor, EpaAnchor)
+  , importDeclAnnSafe      :: Maybe EpaAnchor
+  , importDeclAnnQualified :: Maybe EpaAnchor
+  , importDeclAnnPackage   :: Maybe EpaAnchor
+  , importDeclAnnAs        :: Maybe EpaAnchor
   } deriving (Data)
 
 -- ---------------------------------------------------------------------
@@ -209,8 +209,8 @@ instance (OutputableBndrId p
 -- the original source.
 data IEWrappedName name
   = IEName              (LocatedN name)  -- ^ no extra
-  | IEPattern AnnAnchor (LocatedN name)  -- ^ pattern X
-  | IEType    AnnAnchor (LocatedN name)  -- ^ type (:+:)
+  | IEPattern EpaAnchor (LocatedN name)  -- ^ pattern X
+  | IEType    EpaAnchor (LocatedN name)  -- ^ type (:+:)
   deriving (Eq,Data)
 
 -- | Located name with possible adornment
