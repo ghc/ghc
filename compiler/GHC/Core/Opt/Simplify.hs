@@ -3088,7 +3088,9 @@ addAltUnfoldings env scrut case_bndr con_app
        ; traceSmpl "addAltUnf" (vcat [ppr case_bndr <+> ppr scrut, ppr con_app])
        ; return env2 }
   where
-    mk_simple_unf = mkSimpleUnfolding (seUnfoldingOpts env)
+    -- Force the opts, so that the whole SimplEnv isn't retained
+    !opts = seUnfoldingOpts env
+    mk_simple_unf = mkSimpleUnfolding opts
 
 addBinderUnfolding :: SimplEnv -> Id -> Unfolding -> SimplEnv
 addBinderUnfolding env bndr unf
@@ -3926,12 +3928,14 @@ simplLetUnfolding env top_lvl cont_mb id new_rhs rhs_ty arity unf
   | isExitJoinId id
   = return noUnfolding -- See Note [Do not inline exit join points] in GHC.Core.Opt.Exitify
   | otherwise
-  = mkLetUnfolding (seUnfoldingOpts env) top_lvl InlineRhs id new_rhs
+  = -- Otherwise, we end up retaining all the SimpleEnv
+    let !opts = seUnfoldingOpts env
+    in mkLetUnfolding opts top_lvl InlineRhs id new_rhs
 
 -------------------
 mkLetUnfolding :: UnfoldingOpts -> TopLevelFlag -> UnfoldingSource
                -> InId -> OutExpr -> SimplM Unfolding
-mkLetUnfolding uf_opts top_lvl src id new_rhs
+mkLetUnfolding !uf_opts top_lvl src id new_rhs
   = is_bottoming `seq`  -- See Note [Force bottoming field]
     return (mkUnfolding uf_opts src is_top_lvl is_bottoming new_rhs)
             -- We make an  unfolding *even for loop-breakers*.
