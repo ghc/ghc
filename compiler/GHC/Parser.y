@@ -1112,27 +1112,27 @@ importdecl :: { LImportDecl GhcPs }
                 }
 
 
-maybe_src :: { ((Maybe (AnnAnchor,AnnAnchor),SourceText),IsBootInterface) }
+maybe_src :: { ((Maybe (EpaAnchor,EpaAnchor),SourceText),IsBootInterface) }
         : '{-# SOURCE' '#-}'        { ((Just (glAA $1,glAA $2),getSOURCE_PRAGs $1)
                                       , IsBoot) }
         | {- empty -}               { ((Nothing,NoSourceText),NotBoot) }
 
-maybe_safe :: { (Maybe AnnAnchor,Bool) }
+maybe_safe :: { (Maybe EpaAnchor,Bool) }
         : 'safe'                                { (Just (glAA $1),True) }
         | {- empty -}                           { (Nothing,      False) }
 
-maybe_pkg :: { (Maybe AnnAnchor,Maybe StringLiteral) }
+maybe_pkg :: { (Maybe EpaAnchor,Maybe StringLiteral) }
         : STRING  {% do { let { pkgFS = getSTRING $1 }
                         ; unless (looksLikePackageName (unpackFS pkgFS)) $
                              addError $ PsError (PsErrInvalidPackageName pkgFS) [] (getLoc $1)
                         ; return (Just (glAA $1), Just (StringLiteral (getSTRINGs $1) pkgFS Nothing)) } }
         | {- empty -}                           { (Nothing,Nothing) }
 
-optqualified :: { Located (Maybe AnnAnchor) }
+optqualified :: { Located (Maybe EpaAnchor) }
         : 'qualified'                           { sL1 $1 (Just (glAA $1)) }
         | {- empty -}                           { noLoc Nothing }
 
-maybeas :: { (Maybe AnnAnchor,Located (Maybe (Located ModuleName))) }
+maybeas :: { (Maybe EpaAnchor,Located (Maybe (Located ModuleName))) }
         : 'as' modid                           { (Just (glAA $1)
                                                  ,sLL $1 $> (Just $2)) }
         | {- empty -}                          { (Nothing,noLoc Nothing) }
@@ -3035,14 +3035,14 @@ tup_exprs :: { forall b. DisambECP b => PV (SumOrTuple b) }
                   (Sum (snd $1 + 1) (snd $1 + snd $3 + 1) $2 (fst $1) (fst $3)) }
 
 -- Always starts with commas; always follows an expr
-commas_tup_tail :: { forall b. DisambECP b => PV (SrcSpan,[Either (EpAnn' AnnAnchor) (LocatedA b)]) }
+commas_tup_tail :: { forall b. DisambECP b => PV (SrcSpan,[Either (EpAnn' EpaAnchor) (LocatedA b)]) }
 commas_tup_tail : commas tup_tail
         { $2 >>= \ $2 ->
           do { let {cos = map (\l -> (Left (EpAnn (anc $ rs l) (AR $ rs l) noCom))) (tail $ fst $1) }
              ; return ((head $ fst $1, cos ++ $2)) } }
 
 -- Always follows a comma
-tup_tail :: { forall b. DisambECP b => PV [Either (EpAnn' AnnAnchor) (LocatedA b)] }
+tup_tail :: { forall b. DisambECP b => PV [Either (EpAnn' EpaAnchor) (LocatedA b)] }
           : texp commas_tup_tail { unECP $1 >>= \ $1 ->
                                    $2 >>= \ $2 ->
                                    do { t <- amsA $1 [AddCommaAnn (AR $ rs $ fst $2)]
@@ -3846,11 +3846,11 @@ commas :: { ([SrcSpan],Int) }   -- One or more commas
         : commas ','             { ((fst $1)++[gl $2],snd $1 + 1) }
         | ','                    { ([gl $1],1) }
 
-bars0 :: { ([AnnAnchor],Int) }     -- Zero or more bars
+bars0 :: { ([EpaAnchor],Int) }     -- Zero or more bars
         : bars                   { $1 }
         |                        { ([], 0) }
 
-bars :: { ([AnnAnchor],Int) }     -- One or more bars
+bars :: { ([EpaAnchor],Int) }     -- One or more bars
         : bars '|'               { ((fst $1)++[glAA $2],snd $1 + 1) }
         | '|'                    { ([glAA $1],1) }
 
@@ -4191,7 +4191,7 @@ glN = getLocA
 glR :: Located a -> Anchor
 glR la = Anchor (realSrcSpan $ getLoc la) UnchangedAnchor
 
-glAA :: Located a -> AnnAnchor
+glAA :: Located a -> EpaAnchor
 glAA = AR <$> realSrcSpan . getLoc
 
 glRR :: Located a -> RealSrcSpan
@@ -4203,7 +4203,7 @@ glAR la = Anchor (realSrcSpan $ getLocA la) UnchangedAnchor
 glNR :: LocatedN a -> Anchor
 glNR ln = Anchor (realSrcSpan $ getLocA ln) UnchangedAnchor
 
-glNRR :: LocatedN a -> AnnAnchor
+glNRR :: LocatedN a -> EpaAnchor
 glNRR = AR <$> realSrcSpan . getLocA
 
 anc :: RealSrcSpan -> Anchor
@@ -4349,7 +4349,7 @@ addTrailingSemiA  la span = addTrailingAnnA la span AddSemiAnn
 addTrailingCommaA :: MonadP m => LocatedA a -> SrcSpan -> m (LocatedA a)
 addTrailingCommaA  la span = addTrailingAnnA la span AddCommaAnn
 
-addTrailingAnnA :: MonadP m => LocatedA a -> SrcSpan -> (AnnAnchor -> TrailingAnn) -> m (LocatedA a)
+addTrailingAnnA :: MonadP m => LocatedA a -> SrcSpan -> (EpaAnchor -> TrailingAnn) -> m (LocatedA a)
 addTrailingAnnA (L (SrcSpanAnn anns l) a) ss ta = do
   -- cs <- getCommentsFor l
   let cs = noCom
@@ -4387,8 +4387,8 @@ addTrailingCommaN (L (SrcSpanAnn anns l) a) span = do
                 else addTrailingCommaToN l anns (AR $ rs span)
   return (L (SrcSpanAnn anns' l) a)
 
-addTrailingCommaS :: Located StringLiteral -> AnnAnchor -> Located StringLiteral
-addTrailingCommaS (L l sl) span = L l (sl { sl_tc = Just (annAnchorRealSrcSpan span) })
+addTrailingCommaS :: Located StringLiteral -> EpaAnchor -> Located StringLiteral
+addTrailingCommaS (L l sl) span = L l (sl { sl_tc = Just (epaAnchorRealSrcSpan span) })
 
 -- -------------------------------------
 
