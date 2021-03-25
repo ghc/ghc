@@ -963,6 +963,11 @@ ocGetNames_ELF ( ObjectCode* oc )
                    symbol->addr = (SymbolAddr*)(
                            (intptr_t) oc->sections[secno].start +
                            (intptr_t) symbol->elf_sym->st_value);
+#if defined(arm_HOST_ARCH)
+                   if(symbol->addr == 0x0) {
+                        debugBelch("ocGetNames_ELF: %s in section %s (no %d, kind: %d; %p+%d), from %s has an empty address", nm, oc->sections[secno].info->name, secno, oc->sections[secno].kind, oc->sections[secno].start, oc->sections[secno].size, OC_INFORMATIVE_FILENAME(oc));
+                   }
+#endif
                    CHECK(symbol->addr != 0x0);
                    if (ELF_ST_BIND(symbol->elf_sym->st_info) == STB_LOCAL) {
                        isLocal = true;
