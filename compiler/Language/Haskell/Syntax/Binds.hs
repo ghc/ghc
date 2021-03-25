@@ -199,7 +199,7 @@ data HsBindLR idL idR
     --  - 'GHC.Parser.Annotation.AnnEqual','GHC.Parser.Annotation.AnnWhere',
     --    'GHC.Parser.Annotation.AnnOpen','GHC.Parser.Annotation.AnnClose',
 
-    -- For details on above see note [Api annotations] in GHC.Parser.Annotation
+    -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
     FunBind {
 
         fun_ext :: XFunBind idL idR,
@@ -240,7 +240,7 @@ data HsBindLR idL idR
   --       'GHC.Parser.Annotation.AnnEqual','GHC.Parser.Annotation.AnnWhere',
   --       'GHC.Parser.Annotation.AnnOpen','GHC.Parser.Annotation.AnnClose',
 
-  -- For details on above see note [Api annotations] in GHC.Parser.Annotation
+  -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
   | PatBind {
         pat_ext    :: XPatBind idL idR, -- ^ See Note [Bind free vars]
         pat_lhs    :: LPat idL,
@@ -291,7 +291,7 @@ data HsBindLR idL idR
         --          'GHC.Parser.Annotation.AnnWhere'
         --          'GHC.Parser.Annotation.AnnOpen' @'{'@,'GHC.Parser.Annotation.AnnClose' @'}'@
 
-        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
+        -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
 
   | XHsBindsLR !(XXHsBindsLR idL idR)
 
@@ -325,7 +325,7 @@ data ABExport p
 --             'GHC.Parser.Annotation.AnnWhere','GHC.Parser.Annotation.AnnOpen' @'{'@,
 --             'GHC.Parser.Annotation.AnnClose' @'}'@,
 
--- For details on above see note [Api annotations] in GHC.Parser.Annotation
+-- For details on above see note [exact print annotations] in GHC.Parser.Annotation
 
 -- | Pattern Synonym binding
 data PatSynBind idL idR
@@ -595,7 +595,7 @@ type LIPBind id = XRec id (IPBind id)
 -- ^ May have 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnSemi' when in a
 --   list
 
--- For details on above see note [Api annotations] in GHC.Parser.Annotation
+-- For details on above see note [exact print annotations] in GHC.Parser.Annotation
 
 -- | Implicit parameter bindings.
 --
@@ -606,7 +606,7 @@ type LIPBind id = XRec id (IPBind id)
 --
 -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnEqual'
 
--- For details on above see note [Api annotations] in GHC.Parser.Annotation
+-- For details on above see note [exact print annotations] in GHC.Parser.Annotation
 data IPBind id
   = IPBind
         (XCIPBind id)
@@ -647,7 +647,7 @@ data Sig pass
       --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDcolon',
       --          'GHC.Parser.Annotation.AnnComma'
 
-      -- For details on above see note [Api annotations] in GHC.Parser.Annotation
+      -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
     TypeSig
        (XTypeSig pass)
        [LIdP pass]           -- LHS of the signature; e.g.  f,g,h :: blah
@@ -661,7 +661,7 @@ data Sig pass
       --           'GHC.Parser.Annotation.AnnDcolon','GHC.Parser.Annotation.AnnForall'
       --           'GHC.Parser.Annotation.AnnDot','GHC.Parser.Annotation.AnnDarrow'
 
-      -- For details on above see note [Api annotations] in GHC.Parser.Annotation
+      -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
   | PatSynSig (XPatSynSig pass) [LIdP pass] (LHsSigType pass)
       -- P :: forall a b. Req => Prov => ty
 
@@ -692,7 +692,7 @@ data Sig pass
         --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnInfix',
         --           'GHC.Parser.Annotation.AnnVal'
 
-        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
+        -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
   | FixSig (XFixSig pass) (FixitySig pass)
 
         -- | An inline pragma
@@ -705,7 +705,7 @@ data Sig pass
         --       'GHC.Parser.Annotation.AnnVal','GHC.Parser.Annotation.AnnTilde',
         --       'GHC.Parser.Annotation.AnnClose'
 
-        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
+        -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
   | InlineSig   (XInlineSig pass)
                 (LIdP pass)        -- Function name
                 InlinePragma       -- Never defaultInlinePragma
@@ -721,7 +721,7 @@ data Sig pass
         --      'GHC.Parser.Annotation.AnnClose' @']'@ and @'\#-}'@,
         --      'GHC.Parser.Annotation.AnnDcolon'
 
-        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
+        -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
   | SpecSig     (XSpecSig pass)
                 (LIdP pass)        -- Specialise a function or datatype  ...
                 [LHsSigType pass]  -- ... to these types
@@ -739,7 +739,7 @@ data Sig pass
         --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
         --      'GHC.Parser.Annotation.AnnInstance','GHC.Parser.Annotation.AnnClose'
 
-        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
+        -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
   | SpecInstSig (XSpecInstSig pass) SourceText (LHsSigType pass)
                   -- Note [Pragma source text] in GHC.Types.SourceText
 
@@ -751,7 +751,7 @@ data Sig pass
         --      'GHC.Parser.Annotation.AnnVbar','GHC.Parser.Annotation.AnnComma',
         --      'GHC.Parser.Annotation.AnnClose'
 
-        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
+        -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
   | MinimalSig (XMinimalSig pass)
                SourceText (LBooleanFormula (LIdP pass))
                -- Note [Pragma source text] in GHC.Types.SourceText

@@ -663,7 +663,7 @@ balanceCommentsMatch (L l (Match am mctxt pats (GRHSs xg grhss binds))) = do
   where
     simpleBreak (r,_) = r /= 0
     (SrcSpanAnn an1 _loc1) = l
-    anc1 = addCommentOrigDeltas $ apiAnnComments an1
+    anc1 = addCommentOrigDeltas $ epAnnComments an1
     cs1f = getFollowingComments anc1
     -- (move',stay') = break simpleBreak (commentsDeltas (anchorFromLocatedA (L l ())) cs1f)
     (move',stay') = break simpleBreak (trailingCommentsDeltas (anchorFromLocatedA (L l ())) cs1f)
@@ -734,8 +734,8 @@ balanceComments' la1 la2 = do
     simpleBreak n (r,_) = r > n
     L (SrcSpanAnn an1 loc1) f = la1
     L (SrcSpanAnn an2 loc2) s = la2
-    anc1 = addCommentOrigDeltas $ apiAnnComments an1
-    anc2 = addCommentOrigDeltas $ apiAnnComments an2
+    anc1 = addCommentOrigDeltas $ epAnnComments an1
+    anc2 = addCommentOrigDeltas $ epAnnComments an2
     cs1f = getFollowingComments anc1
     cs2b = priorComments anc2
     (stay'',move') = break (simpleBreak 1) (priorCommentsDeltas (anchorFromLocatedA la2) cs2b)
@@ -854,7 +854,7 @@ balanceSameLineComments (L la (Match anm mctxt pats (GRHSs x grhss lb))) = do
       (L lg (GRHS ga gs rhs):grs) -> (la'',reverse $ (L lg (GRHS ga' gs rhs)):grs,[(gac,(csp,csf))])
         where
           (SrcSpanAnn an1 _loc1) = la
-          anc1 = addCommentOrigDeltas $ apiAnnComments an1
+          anc1 = addCommentOrigDeltas $ epAnnComments an1
           (EpAnn anc an _) = ga :: EpAnn' GrhsAnn
           (csp,csf) = case anc1 of
             AnnComments cs -> ([],cs)
@@ -864,7 +864,7 @@ balanceSameLineComments (L la (Match anm mctxt pats (GRHSs x grhss lb))) = do
           stay = map snd stay'
           cs1 = AnnCommentsBalanced csp stay
 
-          gac = addCommentOrigDeltas $ apiAnnComments ga
+          gac = addCommentOrigDeltas $ epAnnComments ga
           gfc = getFollowingComments gac
           gac' = setFollowingComments gac (sort $ gfc ++ move)
           ga' = (EpAnn anc an gac')

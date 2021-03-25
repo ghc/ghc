@@ -80,7 +80,7 @@ data Class
 --
 --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnRarrow'',
 
--- For details on above see note [Api annotations] in GHC.Parser.Annotation
+-- For details on above see note [exact print annotations] in GHC.Parser.Annotation
 type FunDep a = ([a],[a])
 
 type ClassOpItem = (Id, DefMethInfo)
