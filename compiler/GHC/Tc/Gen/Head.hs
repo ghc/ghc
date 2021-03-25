@@ -35,7 +35,7 @@ import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcExpr, tcCheckMonoExprNC, tcCheckPolyExp
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Gen.Pat
 import GHC.Tc.Gen.Bind( chooseInferredQuantifiers )
-import GHC.Tc.Gen.Sig( tcUserTypeSig, tcInstSig )
+import GHC.Tc.Gen.Sig( tcUserTypeSig, tcInstSig, lhsSigWcTypeContextSpan )
 import GHC.Tc.TyCl.PatSyn( patSynBuilderOcc )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Unify
@@ -591,7 +591,7 @@ tcInferAmbiguousRecSelId lbl args mb_res_ty
   | arg1 : _ <- dropWhile (not . isVisibleArg) args -- A value arg is first
   , EValArg { eva_arg = ValArg (L _ arg) } <- arg1
   , Just sig_ty <- obviousSig arg  -- A type sig on the arg disambiguates
-  = do { sig_tc_ty <- tcHsSigWcType ExprSigCtxt sig_ty
+  = do { sig_tc_ty <- tcHsSigWcType (ExprSigCtxt NoRRC) sig_ty
        ; finish_ambiguous_selector lbl sig_tc_ty }
 
   | Just res_ty <- mb_res_ty
@@ -718,20 +718,21 @@ tcExprWithSig :: LHsExpr GhcRn -> LHsSigWcType (NoGhcTc GhcRn)
 tcExprWithSig expr hs_ty
   = do { sig_info <- checkNoErrs $  -- Avoid error cascade
                      tcUserTypeSig loc hs_ty Nothing
-       ; (expr', poly_ty) <- tcExprSig expr sig_info
+       ; (expr', poly_ty) <- tcExprSig ctxt expr sig_info
        ; return (ExprWithTySig noExtField expr' hs_ty, poly_ty) }
   where
     loc = getLocA (dropWildCards hs_ty)
+    ctxt = ExprSigCtxt (lhsSigWcTypeContextSpan hs_ty)
 
-tcExprSig :: LHsExpr GhcRn -> TcIdSigInfo -> TcM (LHsExpr GhcTc, TcType)
-tcExprSig expr (CompleteSig { sig_bndr = poly_id, sig_loc = loc })
+tcExprSig :: UserTypeCtxt -> LHsExpr GhcRn -> TcIdSigInfo -> TcM (LHsExpr GhcTc, TcType)
+tcExprSig ctxt expr (CompleteSig { sig_bndr = poly_id, sig_loc = loc })
   = setSrcSpan loc $   -- Sets the location for the implication constraint
     do { let poly_ty = idType poly_id
-       ; (wrap, expr') <- tcSkolemiseScoped ExprSigCtxt poly_ty $ \rho_ty ->
+       ; (wrap, expr') <- tcSkolemiseScoped ctxt poly_ty $ \rho_ty ->
                           tcCheckMonoExprNC expr rho_ty
        ; return (mkLHsWrap wrap expr', poly_ty) }
 
-tcExprSig expr sig@(PartialSig { psig_name = name, sig_loc = loc })
+tcExprSig _ expr sig@(PartialSig { psig_name = name, sig_loc = loc })
   = setSrcSpan loc $   -- Sets the location for the implication constraint
     do { (tclvl, wanted, (expr', sig_inst))
              <- pushLevelAndCaptureConstraints  $
@@ -761,7 +762,7 @@ tcExprSig expr sig@(PartialSig { psig_name = name, sig_loc = loc })
                  then return idHsWrapper  -- Fast path; also avoids complaint when we infer
                                           -- an ambiguous type and have AllowAmbiguousType
                                           -- e..g infer  x :: forall a. F a -> Int
-                 else tcSubTypeSigma ExprSigCtxt inferred_sigma my_sigma
+                 else tcSubTypeSigma (ExprSigCtxt NoRRC) inferred_sigma my_sigma
 
        ; traceTc "tcExpSig" (ppr qtvs $$ ppr givens $$ ppr inferred_sigma $$ ppr my_sigma)
        ; let poly_wrap = wrap
