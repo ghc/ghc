@@ -659,14 +659,15 @@ jot. So now…
 GHC calculates a fingerprint (in fact an MD5 hash) of each interface
 file, and of each declaration within the interface file. It also keeps
 in every interface file a list of the fingerprints of everything it used
-when it last compiled the file. If the source file's modification date
-is earlier than the ``.o`` file's date (i.e. the source hasn't changed
-since the file was last compiled), and the recompilation checking is on,
-GHC will be clever. It compares the fingerprints on the things it needs
-this time with the fingerprints on the things it needed last time
-(gleaned from the interface file of the module being compiled); if they
-are all the same it stops compiling early in the process saying
-“Compilation IS NOT required”. What a beautiful sight!
+when it last compiled the file. If the MD5 hash of the source file
+stored in the ``.hi`` file hasn't changed, the ``.o`` file's
+modification date is greater than or equal to that of the ``.hi`` file,
+and the recompilation checking is on, GHC will be clever. It compares
+the fingerprints on the things it needs this time with the fingerprints
+on the things it needed last time (gleaned from the interface file of
+the module being compiled); if they are all the same it stops compiling
+early in the process saying “Compilation IS NOT required”. What a
+beautiful sight!
 
 You can read about :ghc-wiki:`how all this works <commentary/compiler/recompilation-avoidance>` in the GHC commentary.
 
