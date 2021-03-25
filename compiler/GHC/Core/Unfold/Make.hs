@@ -70,7 +70,7 @@ mkCompulsoryUnfolding' expr
 -- Simplify.simplUnfolding.
 
 mkSimpleUnfolding :: UnfoldingOpts -> CoreExpr -> Unfolding
-mkSimpleUnfolding opts rhs
+mkSimpleUnfolding !opts rhs
   = mkUnfolding opts InlineRhs False False rhs
 
 mkDFunUnfolding :: [Var] -> DataCon -> [CoreExpr] -> Unfolding
