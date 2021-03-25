@@ -56,19 +56,19 @@
 #define MAX_SPEC_FUN_SIZE      2
 #define MAX_SPEC_CONSTR_SIZE   2
 
-/* Range of built-in table of static small int-like and char-like closures.
+/* Range of built-in table of static closures.
  *
- *   NB. This corresponds with the number of actual INTLIKE/CHARLIKE
+ *   NB. This corresponds with the number of actual STATIC_INT/STATIC_CHAR
  *   closures defined in rts/StgMiscClosures.cmm.
  */
-#define MAX_INTLIKE             255
-#define MIN_INTLIKE             (-16)
+#define MAX_STATIC_INT             255
+#define MIN_STATIC_INT             (-16)
 
-#define MAX_WORDLIKE            255
-#define MIN_WORDLIKE            0
+#define MAX_STATIC_WORD            255
+#define MIN_STATIC_WORD            0
 
-#define MAX_CHARLIKE            255
-#define MIN_CHARLIKE            0
+#define MAX_STATIC_CHAR            255
+#define MIN_STATIC_CHAR            0
 
 /* Each byte in the card table for an StgMutaArrPtrs covers
  * (1<<MUT_ARR_PTRS_CARD_BITS) elements in the array.  To find a good

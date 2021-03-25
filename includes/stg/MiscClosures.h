@@ -252,13 +252,13 @@ RTS_CLOSURE(stg_NO_TREC_closure);
 RTS_ENTRY(stg_NO_FINALIZER);
 
 #if IN_STG_CODE
-extern DLL_IMPORT_RTS StgWordArray stg_CHARLIKE_closure;
-extern DLL_IMPORT_RTS StgWordArray stg_INTLIKE_closure;
-extern DLL_IMPORT_RTS StgWordArray stg_WORDLIKE_closure;
+extern DLL_IMPORT_RTS StgWordArray stg_STATIC_CHAR_closure;
+extern DLL_IMPORT_RTS StgWordArray stg_STATIC_INT_closure;
+extern DLL_IMPORT_RTS StgWordArray stg_STATIC_WORD_closure;
 #else
-extern DLL_IMPORT_RTS StgWordlikeClosure stg_CHARLIKE_closure[];
-extern DLL_IMPORT_RTS StgWordlikeClosure stg_INTLIKE_closure[];
-extern DLL_IMPORT_RTS StgWordlikeClosure stg_WORDLIKE_closure[];
+extern DLL_IMPORT_RTS StgWordlikeClosure stg_STATIC_CHAR_closure[];
+extern DLL_IMPORT_RTS StgWordlikeClosure stg_STATIC_INT_closure[];
+extern DLL_IMPORT_RTS StgWordlikeClosure stg_STATIC_WORD_closure[];
 #endif
 
 /* StgStartup */
