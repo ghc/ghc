@@ -123,9 +123,8 @@ import GHC.Iface.Recomp
 import GHC.Iface.Tidy
 import GHC.Iface.Ext.Ast    ( mkHieFile )
 import GHC.Iface.Ext.Types  ( getAsts, hie_asts, hie_module )
-import GHC.Iface.Ext.Binary ( readHieFile, writeHieFile , hie_file_result, NameCacheUpdater(..))
+import GHC.Iface.Ext.Binary ( readHieFile, writeHieFile , hie_file_result)
 import GHC.Iface.Ext.Debug  ( diffFile, validateScopes )
-import GHC.Iface.Env        ( updNameCache )
 
 import GHC.Core
 import GHC.Core.Tidy           ( tidyExpr )
@@ -169,6 +168,7 @@ import GHC.Cmm.Pipeline
 import GHC.Cmm.Info
 
 import GHC.Unit
+import GHC.Unit.Finder
 import GHC.Unit.External
 import GHC.Unit.State
 import GHC.Unit.Module.ModDetails
@@ -190,7 +190,6 @@ import GHC.Types.Error
 import GHC.Types.Fixity.Env
 import GHC.Types.CostCentre
 import GHC.Types.IPE
-import GHC.Types.Unique.Supply
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
 import GHC.Types.Name
@@ -244,9 +243,8 @@ newHscEnv dflags = do
     -- we don't store the unit databases and the unit state to still
     -- allow `setSessionDynFlags` to be used to set unit db flags.
     eps_var <- newIORef initExternalPackageState
-    us      <- mkSplitUniqSupply 'r'
-    nc_var  <- newIORef (initNameCache us knownKeyNames)
-    fc_var  <- newIORef emptyInstalledModuleEnv
+    nc_var  <- initNameCache 'r' knownKeyNames
+    fc_var  <- initFinderCache
     logger  <- initLogger
     tmpfs   <- initTmpFs
     -- FIXME: it's sad that we have so many "unitialized" fields filled with
@@ -505,7 +503,7 @@ extract_renamed_stuff mod_summary tc_result = do
                     putMsg logger dflags $ text "Got invalid scopes"
                     mapM_ (putMsg logger dflags) xs
               -- Roundtrip testing
-              file' <- readHieFile (NCU $ updNameCache $ hsc_NC hs_env) out_file
+              file' <- readHieFile (hsc_NC hs_env) out_file
               case diffFile hieFile (hie_file_result file') of
                 [] ->
                   putMsg logger dflags $ text "Got no roundtrip errors"
