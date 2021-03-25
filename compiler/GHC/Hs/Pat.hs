@@ -167,8 +167,8 @@ type instance XHsRecField _ = EpAnn
 
 data EpAnnSumPat = EpAnnSumPat
       { sumPatParens      :: [AddEpAnn]
-      , sumPatVbarsBefore :: [AnnAnchor]
-      , sumPatVbarsAfter  :: [AnnAnchor]
+      , sumPatVbarsBefore :: [EpaAnchor]
+      , sumPatVbarsAfter  :: [EpaAnchor]
       } deriving Data
 
 -- ---------------------------------------------------------------------

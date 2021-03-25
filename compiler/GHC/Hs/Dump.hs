@@ -66,7 +66,7 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
               `extQ` lit `extQ` litr `extQ` litt
               `extQ` sourceText
               `extQ` deltaPos
-              `extQ` annAnchor
+              `extQ` epaAnchor
               `extQ` bytestring
               `extQ` name `extQ` occName `extQ` moduleName `extQ` var
               `extQ` dataCon
@@ -136,9 +136,9 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
               BlankSrcSpanFile -> parens $ text "SourceText" <+> text src
               _                -> parens $ text "SourceText" <+> text "blanked"
 
-            annAnchor :: AnnAnchor -> SDoc
-            annAnchor (AR r) = parens $ text "AR" <+> realSrcSpan r
-            annAnchor (AD d) = parens $ text "AD" <+> deltaPos d
+            epaAnchor :: EpaAnchor -> SDoc
+            epaAnchor (AR r) = parens $ text "AR" <+> realSrcSpan r
+            epaAnchor (AD d) = parens $ text "AD" <+> deltaPos d
 
             deltaPos :: DeltaPos -> SDoc
             deltaPos (DP l c) = parens $ text "DP" <+> ppr l <+> ppr c
@@ -183,7 +183,7 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
              BlankEpAnnotations -> parens
                                       $ text "blanked:" <+> text "AddEpAnn"
              NoBlankEpAnnotations ->
-              parens $ text "AddEpAnn" <+> ppr a <+> annAnchor s
+              parens $ text "AddEpAnn" <+> ppr a <+> epaAnchor s
 
             var  :: Var -> SDoc
             var v      = braces $ text "Var:" <+> ppr v
