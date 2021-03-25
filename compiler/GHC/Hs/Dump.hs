@@ -54,7 +54,7 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
               `extQ` string `extQ` fastString `extQ` srcSpan `extQ` realSrcSpan
               `extQ` annotation
               `extQ` annotationModule
-              `extQ` annotationAddApiAnn
+              `extQ` annotationAddEpAnn
               `extQ` annotationGrhsAnn
               `extQ` annotationApiAnnHsCase
               `extQ` annotationApiAnnHsLet
@@ -178,12 +178,12 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
                                    (text ""))
 
 
-            addApiAnn :: AddApiAnn -> SDoc
-            addApiAnn (AddApiAnn a s) = case ba of
+            addApiAnn :: AddEpAnn -> SDoc
+            addApiAnn (AddEpAnn a s) = case ba of
              BlankApiAnnotations -> parens
-                                      $ text "blanked:" <+> text "AddApiAnn"
+                                      $ text "blanked:" <+> text "AddEpAnn"
              NoBlankApiAnnotations ->
-              parens $ text "AddApiAnn" <+> ppr a <+> annAnchor s
+              parens $ text "AddEpAnn" <+> ppr a <+> annAnchor s
 
             var  :: Var -> SDoc
             var v      = braces $ text "Var:" <+> ppr v
@@ -229,8 +229,8 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
             annotationModule :: ApiAnn' AnnsModule -> SDoc
             annotationModule = annotation' (text "ApiAnn' AnnsModule")
 
-            annotationAddApiAnn :: ApiAnn' AddApiAnn -> SDoc
-            annotationAddApiAnn = annotation' (text "ApiAnn' AddApiAnn")
+            annotationAddEpAnn :: ApiAnn' AddEpAnn -> SDoc
+            annotationAddEpAnn = annotation' (text "ApiAnn' AddEpAnn")
 
             annotationGrhsAnn :: ApiAnn' GrhsAnn -> SDoc
             annotationGrhsAnn = annotation' (text "ApiAnn' GrhsAnn")
