@@ -1893,9 +1893,9 @@ tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
              <- setSrcSpan (getLocA hs_sig_ty) $
                 do { inst_sigs <- xoptM LangExt.InstanceSigs
                    ; checkTc inst_sigs (misplacedInstSig sel_name hs_sig_ty)
-                   ; sig_ty  <- tcHsSigType (FunSigCtxt sel_name False) hs_sig_ty
+                   ; let ctxt = FunSigCtxt sel_name NoRRC
+                   ; sig_ty  <- tcHsSigType ctxt hs_sig_ty
                    ; let local_meth_ty = idType local_meth_id
-                         ctxt = FunSigCtxt sel_name False
                                 -- False <=> do not report redundant constraints when
                                 --           checking instance-sig <= class-meth-sig
                                 -- The instance-sig is the focus here; the class-meth-sig
@@ -1905,8 +1905,8 @@ tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
                    ; return (sig_ty, hs_wrap) }
 
        ; inner_meth_name <- newName (nameOccName sel_name)
-       ; let ctxt = FunSigCtxt sel_name True
-                    -- True <=> check for redundant constraints in the
+       ; let ctxt = FunSigCtxt sel_name (lhsSigTypeContextSpan hs_sig_ty)
+                    -- WantRCC <=> check for redundant constraints in the
                     --          user-specified instance signature
              inner_meth_id  = mkLocalId inner_meth_name Many sig_ty
              inner_meth_sig = CompleteSig { sig_bndr = inner_meth_id
@@ -1929,8 +1929,8 @@ tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
                           , abs_sig = True }) }
 
   | otherwise  -- No instance signature
-  = do { let ctxt = FunSigCtxt sel_name False
-                    -- False <=> don't report redundant constraints
+  = do { let ctxt = FunSigCtxt sel_name NoRRC
+                    -- NoRRC <=> don't report redundant constraints
                     -- The signature is not under the users control!
              tc_sig = completeSigFromId ctxt local_meth_id
               -- Absent a type sig, there are no new scoped type variables here
@@ -1947,7 +1947,6 @@ tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
     sel_name   = idName sel_id
     no_prag_fn = emptyPragEnv   -- No pragmas for local_meth_id;
                                 -- they are all for meth_id
-
 
 ------------------------
 mkMethIds :: Class -> [TcTyVar] -> [EvVar]

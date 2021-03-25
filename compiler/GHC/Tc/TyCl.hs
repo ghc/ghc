@@ -4560,7 +4560,7 @@ checkValidClass cls
         ; check_dm ctxt sel_id cls_pred tau2 dm
         }
         where
-          ctxt    = FunSigCtxt op_name True -- Report redundant class constraints
+          ctxt    = FunSigCtxt op_name (WantRRC (getSrcSpan cls)) -- Report redundant class constraints
           op_name = idName sel_id
           op_ty   = idType sel_id
           (_,cls_pred,tau1) = tcSplitMethodTy op_ty
