@@ -66,6 +66,7 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 import Data.Foldable      ( toList )
+import Data.Maybe         ( isJust )
 import Data.List          ( partition )
 import Data.List.NonEmpty ( NonEmpty(..) )
 
@@ -2043,9 +2044,9 @@ checkBadTelescope (Implic { ic_info  = info
 warnRedundantGivens :: SkolemInfo -> Bool
 warnRedundantGivens (SigSkol ctxt _ _)
   = case ctxt of
-       FunSigCtxt _ warn_redundant -> warn_redundant
-       ExprSigCtxt                 -> True
-       _                           -> False
+       FunSigCtxt _ rrc -> reportRedundantConstraints rrc
+       ExprSigCtxt rrc  -> reportRedundantConstraints rrc
+       _                -> False
 
   -- To think about: do we want to report redundant givens for
   -- pattern synonyms, PatSynSigSkol? c.f #9953, comment:21.
