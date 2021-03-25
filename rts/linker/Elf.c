@@ -742,6 +742,13 @@ ocGetNames_ELF ( ObjectCode* oc )
          debugBelch("BSS section at 0x%x, size %d\n",
                          zspace, shdr[i].sh_size);
          */
+#if defined(arm_HOST_ARCH)
+         if(start == 0x0) {
+            debugBelch("ocGetNames_ELF: section no %d, kind: %d, size: %d from %s has start %p",
+                       i, kind, size, OC_INFORMATIVE_FILENAME(oc), start);
+          }
+#endif
+          CHECK(start != 0x0);
           addSection(&sections[i], kind, alloc, start, size,
                      mapped_offset, mapped_start, mapped_size);
 
@@ -817,6 +824,14 @@ ocGetNames_ELF ( ObjectCode* oc )
               alloc = SECTION_MMAP;
           }
 #endif
+
+#if defined(arm_HOST_ARCH)
+         if(start == 0x0) {
+            debugBelch("ocGetNames_ELF: section no %d, kind: %d, size: %d from %s has start %p",
+                       i, kind, size, OC_INFORMATIVE_FILENAME(oc), start);
+          }
+#endif
+          CHECK(start != 0x0);
           addSection(&sections[i], kind, alloc, start, size,
                      mapped_offset, mapped_start, mapped_size);
 
@@ -834,6 +849,13 @@ ocGetNames_ELF ( ObjectCode* oc )
 
           addProddableBlock(oc, start, size);
       } else {
+#if defined(arm_HOST_ARCH)
+         if(oc->image+offset == 0x0) {
+            debugBelch("ocGetNames_ELF: section no %d, kind: %d, size: %d from %s has start %p",
+                       i, kind, size, OC_INFORMATIVE_FILENAME(oc), oc->image+offset);
+          }
+#endif
+          CHECK(oc->image+offset != 0x0);
           addSection(&oc->sections[i], kind, alloc, oc->image+offset, size,
                      0, 0, 0);
           oc->sections[i].info->nstubs = 0;
