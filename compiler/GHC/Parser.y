@@ -802,7 +802,7 @@ litpkgname_segment :: { Located FastString }
 
 -- Parse a minus sign regardless of whether -XLexicalNegation is turned on or off.
 -- See Note [Minus tokens] in GHC.Parser.Lexer
-HYPHEN :: { [AddApiAnn] }
+HYPHEN :: { [AddEpAnn] }
       : '-'          { [mj AnnMinus $1 ] }
       | PREFIX_MINUS { [mj AnnMinus $1 ] }
       | VARSYM  {% if (getVARSYM $1 == fsLit "-")
@@ -980,7 +980,7 @@ maybeexports :: { (Maybe (LocatedL [LIE GhcPs])) }
                                         (AnnList Nothing (Just $ mop $1) (Just $ mcp $3) (fst $2) []) }
         |  {- empty -}              { Nothing }
 
-exportlist :: { ([AddApiAnn], OrdList (LIE GhcPs)) }
+exportlist :: { ([AddEpAnn], OrdList (LIE GhcPs)) }
         : exportlist1     { ([], $1) }
         | {- empty -}     { ([], nilOL) }
 
@@ -1012,17 +1012,17 @@ export  :: { OrdList (LIE GhcPs) }
         |  'pattern' qcon            { unitOL (reLocA (sLL $1 (reLocN $>)
                                               (IEVar noExtField (sLLa $1 (reLocN $>) (IEPattern (glAA $1) $2))))) }
 
-export_subspec :: { Located ([AddApiAnn],ImpExpSubSpec) }
+export_subspec :: { Located ([AddEpAnn],ImpExpSubSpec) }
         : {- empty -}             { sL0 ([],ImpExpAbs) }
         | '(' qcnames ')'         {% mkImpExpSubSpec (reverse (snd $2))
                                       >>= \(as,ie) -> return $ sLL $1 $>
                                             (as ++ [mop $1,mcp $3] ++ fst $2, ie) }
 
-qcnames :: { ([AddApiAnn], [LocatedA ImpExpQcSpec]) }
+qcnames :: { ([AddEpAnn], [LocatedA ImpExpQcSpec]) }
   : {- empty -}                   { ([],[]) }
   | qcnames1                      { $1 }
 
-qcnames1 :: { ([AddApiAnn], [LocatedA ImpExpQcSpec]) }     -- A reversed list
+qcnames1 :: { ([AddEpAnn], [LocatedA ImpExpQcSpec]) }     -- A reversed list
         :  qcnames1 ',' qcname_ext_w_wildcard  {% case (snd $1) of
                                                     (l@(L la ImpExpQcWildcard):t) ->
                                                        do { l' <- addTrailingCommaA l (gl $2)
@@ -1039,7 +1039,7 @@ qcnames1 :: { ([AddApiAnn], [LocatedA ImpExpQcSpec]) }     -- A reversed list
 
 -- Variable, data constructor or wildcard
 -- or tagged type constructor
-qcname_ext_w_wildcard :: { Located ([AddApiAnn], LocatedA ImpExpQcSpec) }
+qcname_ext_w_wildcard :: { Located ([AddEpAnn], LocatedA ImpExpQcSpec) }
         :  qcname_ext               { sL1A $1 ([],$1) }
         |  '..'                     { sL1  $1 ([mj AnnDotdot $1], sL1a $1 ImpExpQcWildcard)  }
 
@@ -1366,7 +1366,7 @@ deriv_standalone_strategy :: { Maybe (LDerivStrategy GhcPs) }
 
 -- Injective type families
 
-opt_injective_info :: { Located ([AddApiAnn], Maybe (LInjectivityAnn GhcPs)) }
+opt_injective_info :: { Located ([AddEpAnn], Maybe (LInjectivityAnn GhcPs)) }
         : {- empty -}               { noLoc ([], Nothing) }
         | '|' injectivity_cond      { sLL $1 $> ([mj AnnVbar $1]
                                                 , Just ($2)) }
@@ -1381,13 +1381,13 @@ inj_varids :: { Located [LocatedN RdrName] }
 
 -- Closed type families
 
-where_type_family :: { Located ([AddApiAnn],FamilyInfo GhcPs) }
+where_type_family :: { Located ([AddEpAnn],FamilyInfo GhcPs) }
         : {- empty -}                      { noLoc ([],OpenTypeFamily) }
         | 'where' ty_fam_inst_eqn_list
                { sLL $1 $> (mj AnnWhere $1:(fst $ unLoc $2)
                     ,ClosedTypeFamily (fmap reverse $ snd $ unLoc $2)) }
 
-ty_fam_inst_eqn_list :: { Located ([AddApiAnn],Maybe [LTyFamInstEqn GhcPs]) }
+ty_fam_inst_eqn_list :: { Located ([AddEpAnn],Maybe [LTyFamInstEqn GhcPs]) }
         :     '{' ty_fam_inst_eqns '}'     { sLL $1 $> ([moc $1,mcc $3]
                                                 ,Just (unLoc $2)) }
         | vocurly ty_fam_inst_eqns close   { let (L loc _) = $2 in
@@ -1464,11 +1464,11 @@ at_decl_cls :: { LHsDecl GhcPs }
                 {% liftM mkInstD (mkTyFamInst (comb2A $1 $3) (unLoc $3)
                               (mj AnnType $1:mj AnnInstance $2:[]) )}
 
-opt_family   :: { [AddApiAnn] }
+opt_family   :: { [AddEpAnn] }
               : {- empty -}   { [] }
               | 'family'      { [mj AnnFamily $1] }
 
-opt_instance :: { [AddApiAnn] }
+opt_instance :: { [AddEpAnn] }
               : {- empty -} { [] }
               | 'instance'  { [mj AnnInstance $1] }
 
@@ -1498,27 +1498,27 @@ at_decl_inst :: { LInstDecl GhcPs }
                                 (fmap reverse $7)
                         ((fst $ unLoc $1):$2++(fst $ unLoc $5)++(fst $ unLoc $6)) }
 
-data_or_newtype :: { Located (AddApiAnn, NewOrData) }
+data_or_newtype :: { Located (AddEpAnn, NewOrData) }
         : 'data'        { sL1 $1 (mj AnnData    $1,DataType) }
         | 'newtype'     { sL1 $1 (mj AnnNewtype $1,NewType) }
 
 -- Family result/return kind signatures
 
-opt_kind_sig :: { Located ([AddApiAnn], Maybe (LHsKind GhcPs)) }
+opt_kind_sig :: { Located ([AddEpAnn], Maybe (LHsKind GhcPs)) }
         :               { noLoc     ([]               , Nothing) }
         | '::' kind     { sLL $1 (reLoc $>) ([mu AnnDcolon $1], Just $2) }
 
-opt_datafam_kind_sig :: { Located ([AddApiAnn], LFamilyResultSig GhcPs) }
+opt_datafam_kind_sig :: { Located ([AddEpAnn], LFamilyResultSig GhcPs) }
         :               { noLoc     ([]               , noLoc (NoSig noExtField)         )}
         | '::' kind     { sLL $1 (reLoc $>) ([mu AnnDcolon $1], sLL $1 (reLoc $>) (KindSig noExtField $2))}
 
-opt_tyfam_kind_sig :: { Located ([AddApiAnn], LFamilyResultSig GhcPs) }
+opt_tyfam_kind_sig :: { Located ([AddEpAnn], LFamilyResultSig GhcPs) }
         :              { noLoc     ([]               , noLoc     (NoSig    noExtField)   )}
         | '::' kind    { sLL $1 (reLoc $>) ([mu AnnDcolon $1], sLL $1 (reLoc $>) (KindSig  noExtField $2))}
         | '='  tv_bndr {% do { tvb <- fromSpecTyVarBndr $2
                              ; return $ sLL $1 (reLoc $>) ([mj AnnEqual $1], sLL $1 (reLoc $>) (TyVarSig noExtField tvb))} }
 
-opt_at_kind_inj_sig :: { Located ([AddApiAnn], ( LFamilyResultSig GhcPs
+opt_at_kind_inj_sig :: { Located ([AddEpAnn], ( LFamilyResultSig GhcPs
                                             , Maybe (LInjectivityAnn GhcPs)))}
         :            { noLoc ([], (noLoc (NoSig noExtField), Nothing)) }
         | '::' kind  { sLL $1 (reLoc $>) ( [mu AnnDcolon $1]
@@ -1625,7 +1625,7 @@ pattern_synonym_decl :: { LHsDecl GhcPs }
                             (ApiAnn (glR $1) (as ++ [mj AnnPattern $1,mu AnnLarrow $3]) cs))
                    }}
 
-pattern_synonym_lhs :: { (LocatedN RdrName, HsPatSynDetails GhcPs, [AddApiAnn]) }
+pattern_synonym_lhs :: { (LocatedN RdrName, HsPatSynDetails GhcPs, [AddEpAnn]) }
         : con vars0 { ($1, PrefixCon noTypeArgs $2, []) }
         | varid conop varid { ($2, InfixCon $1 $3, []) }
         | con '{' cvars1 '}' { ($1, RecCon $3, [moc $2, mcc $4] ) }
@@ -1672,7 +1672,7 @@ decl_cls  : at_decl_cls                 { $1 }
                                       quotes (ppr $2)
                           ; acsA (\cs -> sLL $1 (reLoc $>) $ SigD noExtField $ ClassOpSig (ApiAnn (glR $1) (AnnSig (mu AnnDcolon $3) [mj AnnDefault $1]) cs) True [v] $4) }}
 
-decls_cls :: { Located ([AddApiAnn],OrdList (LHsDecl GhcPs)) }  -- Reversed
+decls_cls :: { Located ([AddEpAnn],OrdList (LHsDecl GhcPs)) }  -- Reversed
           : decls_cls ';' decl_cls      {% if isNilOL (snd $ unLoc $1)
                                              then return (sLLlA $1 $> ((mz AnnSemi $2) ++ (fst $ unLoc $1)
                                                                     , unitOL $3))
@@ -1693,7 +1693,7 @@ decls_cls :: { Located ([AddApiAnn],OrdList (LHsDecl GhcPs)) }  -- Reversed
           | {- empty -}                 { noLoc ([],nilOL) }
 
 decllist_cls
-        :: { Located ([AddApiAnn]
+        :: { Located ([AddEpAnn]
                      , OrdList (LHsDecl GhcPs)
                      , LayoutInfo) }      -- Reversed
         : '{'         decls_cls '}'     { sLL $1 $> (moc $1:mcc $3:(fst $ unLoc $2)
@@ -1703,7 +1703,7 @@ decllist_cls
 
 -- Class body
 --
-where_cls :: { Located ([AddApiAnn]
+where_cls :: { Located ([AddEpAnn]
                        ,(OrdList (LHsDecl GhcPs))    -- Reversed
                        ,LayoutInfo) }
                                 -- No implicit parameters
@@ -1718,7 +1718,7 @@ decl_inst  :: { Located (OrdList (LHsDecl GhcPs)) }
 decl_inst  : at_decl_inst               { sL1A $1 (unitOL (sL1 $1 (InstD noExtField (unLoc $1)))) }
            | decl                       { sL1A $1 (unitOL $1) }
 
-decls_inst :: { Located ([AddApiAnn],OrdList (LHsDecl GhcPs)) }   -- Reversed
+decls_inst :: { Located ([AddEpAnn],OrdList (LHsDecl GhcPs)) }   -- Reversed
            : decls_inst ';' decl_inst   {% if isNilOL (snd $ unLoc $1)
                                              then return (sLL $1 $> ((mz AnnSemi $2) ++ (fst $ unLoc $1)
                                                                     , unLoc $3))
@@ -1739,14 +1739,14 @@ decls_inst :: { Located ([AddApiAnn],OrdList (LHsDecl GhcPs)) }   -- Reversed
            | {- empty -}                { noLoc ([],nilOL) }
 
 decllist_inst
-        :: { Located ([AddApiAnn]
+        :: { Located ([AddEpAnn]
                      , OrdList (LHsDecl GhcPs)) }      -- Reversed
         : '{'         decls_inst '}'    { sLL $1 $> (moc $1:mcc $3:(fst $ unLoc $2),snd $ unLoc $2) }
         |     vocurly decls_inst close  { L (gl $2) (unLoc $2) }
 
 -- Instance body
 --
-where_inst :: { Located ([AddApiAnn]
+where_inst :: { Located ([AddEpAnn]
                         , OrdList (LHsDecl GhcPs)) }   -- Reversed
                                 -- No implicit parameters
                                 -- May have type declarations
@@ -1838,7 +1838,7 @@ rule    :: { LRuleDecl GhcPs }
                                    , rd_lhs = $4, rd_rhs = $6 })) }
 
 -- Rules can be specified to be NeverActive, unlike inline/specialize pragmas
-rule_activation :: { ([AddApiAnn],Maybe Activation) }
+rule_activation :: { ([AddEpAnn],Maybe Activation) }
         -- See Note [%shift: rule_activation -> {- empty -}]
         : {- empty -} %shift                    { ([],Nothing) }
         | rule_explicit_activation              { (fst $1,Just (snd $1)) }
@@ -1851,14 +1851,14 @@ rule_activation :: { ([AddApiAnn],Maybe Activation) }
 --   without a space [~1]  (the PREFIX_TILDE case), or
 --   with    a space [~ 1] (the VARSYM case).
 -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
-rule_activation_marker :: { [AddApiAnn] }
+rule_activation_marker :: { [AddEpAnn] }
       : PREFIX_TILDE { [mj AnnTilde $1] }
       | VARSYM  {% if (getVARSYM $1 == fsLit "~")
                    then return [mj AnnTilde $1]
                    else do { addError $ PsError PsErrInvalidRuleActivationMarker [] (getLoc $1)
                            ; return [] } }
 
-rule_explicit_activation :: { ([AddApiAnn]
+rule_explicit_activation :: { ([AddEpAnn]
                               ,Activation) }  -- In brackets
         : '[' INTEGER ']'       { ([mos $1,mj AnnVal $2,mcs $3]
                                   ,ActiveAfter  (getINTEGERs $2) (fromInteger (il_value (getINTEGER $2)))) }
@@ -1869,7 +1869,7 @@ rule_explicit_activation :: { ([AddApiAnn]
                                 { ($2++[mos $1,mcs $3]
                                   ,NeverActive) }
 
-rule_foralls :: { ([AddApiAnn] -> HsRuleAnn, Maybe [LHsTyVarBndr () GhcPs], [LRuleBndr GhcPs]) }
+rule_foralls :: { ([AddEpAnn] -> HsRuleAnn, Maybe [LHsTyVarBndr () GhcPs], [LRuleBndr GhcPs]) }
         : 'forall' rule_vars '.' 'forall' rule_vars '.'    {% let tyvs = mkRuleTyVarBndrs $2
                                                               in hintExplicitForall $1
                                                               >> checkRuleTyVarBndrNames (mkRuleTyVarBndrs $2)
@@ -1965,7 +1965,7 @@ deprecation :: { OrdList (LWarnDecl GhcPs) }
              {% fmap unitOL $ acsA (\cs -> sLL $1 $> $ (Warning (ApiAnn (glR $1) (fst $ unLoc $2) cs) (unLoc $1)
                                           (DeprecatedTxt (noLoc NoSourceText) $ snd $ unLoc $2))) }
 
-strings :: { Located ([AddApiAnn],[Located StringLiteral]) }
+strings :: { Located ([AddEpAnn],[Located StringLiteral]) }
     : STRING { sL1 $1 ([],[L (gl $1) (getStringLiteral $1)]) }
     | '[' stringlist ']' { sLL $1 $> $ ([mos $1,mcs $3],fromOL (unLoc $2)) }
 
@@ -2007,7 +2007,7 @@ annotation :: { LHsDecl GhcPs }
 -----------------------------------------------------------------------------
 -- Foreign import and export declarations
 
-fdecl :: { Located ([AddApiAnn],ApiAnn -> HsDecl GhcPs) }
+fdecl :: { Located ([AddEpAnn],ApiAnn -> HsDecl GhcPs) }
 fdecl : 'import' callconv safety fspec
                {% mkImport $2 $3 (snd $ unLoc $4) >>= \i ->
                  return (sLL $1 $> (mj AnnImport $1 : (fst $ unLoc $4),i))  }
@@ -2030,7 +2030,7 @@ safety :: { Located Safety }
         | 'safe'                        { sLL $1 $> PlaySafe }
         | 'interruptible'               { sLL $1 $> PlayInterruptible }
 
-fspec :: { Located ([AddApiAnn]
+fspec :: { Located ([AddEpAnn]
                     ,(Located StringLiteral, LocatedN RdrName, LHsSigType GhcPs)) }
        : STRING var '::' sigtype        { sLL $1 (reLoc $>) ([mu AnnDcolon $3]
                                              ,(L (getLoc $1)
@@ -2044,11 +2044,11 @@ fspec :: { Located ([AddApiAnn]
 -----------------------------------------------------------------------------
 -- Type signatures
 
-opt_sig :: { Maybe (AddApiAnn, LHsType GhcPs) }
+opt_sig :: { Maybe (AddEpAnn, LHsType GhcPs) }
         : {- empty -}                   { Nothing }
         | '::' ctype                    { Just (mu AnnDcolon $1, $2) }
 
-opt_tyconsig :: { ([AddApiAnn], Maybe (LocatedN RdrName)) }
+opt_tyconsig :: { ([AddEpAnn], Maybe (LocatedN RdrName)) }
              : {- empty -}              { ([], Nothing) }
              | '::' gtycon              { ([mu AnnDcolon $1], Just $2) }
 
@@ -2279,7 +2279,7 @@ tv_bndr_no_braces :: { LHsTyVarBndr Specificity GhcPs }
         : tyvar                         {% acsA (\cs -> (sL1 (reLocN $1) (UserTyVar (ApiAnn (glNR $1) [] cs) SpecifiedSpec $1))) }
         | '(' tyvar '::' kind ')'       {% acsA (\cs -> (sLL $1 $> (KindedTyVar (ApiAnn (glR $1) [mop $1,mu AnnDcolon $3 ,mcp $5] cs) SpecifiedSpec $2 $4))) }
 
-fds :: { Located ([AddApiAnn],[LHsFunDep GhcPs]) }
+fds :: { Located ([AddEpAnn],[LHsFunDep GhcPs]) }
         : {- empty -}                   { noLoc ([],[]) }
         | '|' fds1                      { (sLL $1 $> ([mj AnnVbar $1]
                                                  ,reverse (unLoc $2))) }
@@ -2332,7 +2332,7 @@ And both become a HsTyVar ("Zero", DataName) after the renamer.
 -----------------------------------------------------------------------------
 -- Datatype declarations
 
-gadt_constrlist :: { Located ([AddApiAnn]
+gadt_constrlist :: { Located ([AddEpAnn]
                           ,[LConDecl GhcPs]) } -- Returned in order
 
         : 'where' '{'        gadt_constrs '}'    {% checkEmptyGADTs $
@@ -2379,7 +2379,7 @@ consequence, GADT constructor names are restricted (names like '(*)' are
 allowed in usual data constructors, but not in GADTs).
 -}
 
-constrs :: { Located ([AddApiAnn],[LConDecl GhcPs]) }
+constrs :: { Located ([AddEpAnn],[LConDecl GhcPs]) }
         : '=' constrs1    { sLL $1 $2 ([mj AnnEqual $1],unLoc $2)}
 
 constrs1 :: { Located [LConDecl GhcPs] }
@@ -2407,7 +2407,7 @@ constr :: { LConDecl GhcPs }
                                                       Nothing   -- No context
                                                       details))) }
 
-forall :: { Located ([AddApiAnn], Maybe [LHsTyVarBndr Specificity GhcPs]) }
+forall :: { Located ([AddEpAnn], Maybe [LHsTyVarBndr Specificity GhcPs]) }
         : 'forall' tv_bndrs '.'       { sLL $1 $> ([mu AnnForall $1,mj AnnDot $3], Just $2) }
         | {- empty -}                 { noLoc ([], Nothing) }
 
@@ -2592,12 +2592,12 @@ sigdecl :: { LHsDecl GhcPs }
         | '{-# MINIMAL' name_boolformula_opt '#-}'
             {% acsA (\cs -> sLL $1 $> $ SigD noExtField (MinimalSig (ApiAnn (glR $1) [mo $1,mc $3] cs) (getMINIMAL_PRAGs $1) $2)) }
 
-activation :: { ([AddApiAnn],Maybe Activation) }
+activation :: { ([AddEpAnn],Maybe Activation) }
         -- See Note [%shift: activation -> {- empty -}]
         : {- empty -} %shift                    { ([],Nothing) }
         | explicit_activation                   { (fst $1,Just (snd $1)) }
 
-explicit_activation :: { ([AddApiAnn],Activation) }  -- In brackets
+explicit_activation :: { ([AddEpAnn],Activation) }  -- In brackets
         : '[' INTEGER ']'       { ([mj AnnOpenS $1,mj AnnVal $2,mj AnnCloseS $3]
                                   ,ActiveAfter  (getINTEGERs $2) (fromInteger (il_value (getINTEGER $2)))) }
         | '[' rule_activation_marker INTEGER ']'
@@ -2965,7 +2965,7 @@ acmd    :: { LHsCmdTop GhcPs }
                                    runPV (checkCmdBlockArguments cmd) >>= \ _ ->
                                    return (sL1A cmd $ HsCmdTop noExtField cmd) }
 
-cvtopbody :: { ([AddApiAnn],[LHsDecl GhcPs]) }
+cvtopbody :: { ([AddEpAnn],[LHsDecl GhcPs]) }
         :  '{'            cvtopdecls0 '}'      { ([mj AnnOpenC $1
                                                   ,mj AnnCloseC $3],$2) }
         |      vocurly    cvtopdecls0 close    { ([],$2) }
@@ -3058,7 +3058,7 @@ tup_tail :: { forall b. DisambECP b => PV [Either (ApiAnn' AnnAnchor) (LocatedA 
 -- The rules below are little bit contorted to keep lexps left-recursive while
 -- avoiding another shift/reduce-conflict.
 -- Never empty.
-list :: { forall b. DisambECP b => SrcSpan -> (AddApiAnn, AddApiAnn) -> PV (LocatedA b) }
+list :: { forall b. DisambECP b => SrcSpan -> (AddEpAnn, AddEpAnn) -> PV (LocatedA b) }
         : texp    { \loc (ao,ac) -> unECP $1 >>= \ $1 ->
                             mkHsExplicitListPV loc [$1] (AnnList Nothing (Just ao) (Just ac) [] []) }
         | lexps   { \loc (ao,ac) -> $1 >>= \ $1 ->
@@ -3202,14 +3202,14 @@ altslist :: { forall b. DisambECP b => PV (LocatedL [LMatch GhcPs (LocatedA b)])
         | '{'                 '}'    { amsrl (sLL $1 $> []) (AnnList Nothing (Just $ moc $1) (Just $ mcc $2) [] []) }
         |     vocurly          close { return $ noLocA [] }
 
-alts    :: { forall b. DisambECP b => PV (Located ([AddApiAnn],[LMatch GhcPs (LocatedA b)])) }
+alts    :: { forall b. DisambECP b => PV (Located ([AddEpAnn],[LMatch GhcPs (LocatedA b)])) }
         : alts1                    { $1 >>= \ $1 -> return $
                                      sL1 $1 (fst $ unLoc $1,snd $ unLoc $1) }
         | ';' alts                 { $2 >>= \ $2 -> return $
                                      sLL $1 $> (((mz AnnSemi $1) ++ (fst $ unLoc $2))
                                                ,snd $ unLoc $2) }
 
-alts1   :: { forall b. DisambECP b => PV (Located ([AddApiAnn],[LMatch GhcPs (LocatedA b)])) }
+alts1   :: { forall b. DisambECP b => PV (Located ([AddEpAnn],[LMatch GhcPs (LocatedA b)])) }
         : alts1 ';' alt         { $1 >>= \ $1 ->
                                   $3 >>= \ $3 ->
                                      case snd $ unLoc $1 of
@@ -3254,7 +3254,7 @@ gdpats :: { forall b. DisambECP b => PV (Located [LGRHS GhcPs (LocatedA b)]) }
 -- layout for MultiWayIf doesn't begin with an open brace, because it's hard to
 -- generate the open brace in addition to the vertical bar in the lexer, and
 -- we don't need it.
-ifgdpats :: { Located ([AddApiAnn],[LGRHS GhcPs (LHsExpr GhcPs)]) }
+ifgdpats :: { Located ([AddEpAnn],[LGRHS GhcPs (LHsExpr GhcPs)]) }
          : '{' gdpats '}'                 {% runPV $2 >>= \ $2 ->
                                              return $ sLL $1 $> ([moc $1,mcc $3],unLoc $2)  }
          |     gdpats close               {% runPV $1 >>= \ $1 ->
@@ -4145,27 +4145,27 @@ in GHC.Parser.Annotation
 
 -}
 
--- |Construct an AddApiAnn from the annotation keyword and the location
+-- |Construct an AddEpAnn from the annotation keyword and the location
 -- of the keyword itself
-mj :: AnnKeywordId -> Located e -> AddApiAnn
-mj a l = AddApiAnn a (AR $ rs $ gl l)
+mj :: AnnKeywordId -> Located e -> AddEpAnn
+mj a l = AddEpAnn a (AR $ rs $ gl l)
 
-mjN :: AnnKeywordId -> LocatedN e -> AddApiAnn
-mjN a l = AddApiAnn a (AR $ rs $ glN l)
+mjN :: AnnKeywordId -> LocatedN e -> AddEpAnn
+mjN a l = AddEpAnn a (AR $ rs $ glN l)
 
--- |Construct an AddApiAnn from the annotation keyword and the location
+-- |Construct an AddEpAnn from the annotation keyword and the location
 -- of the keyword itself, provided the span is not zero width
-mz :: AnnKeywordId -> Located e -> [AddApiAnn]
-mz a l = if isZeroWidthSpan (gl l) then [] else [AddApiAnn a (AR $ rs $ gl l)]
+mz :: AnnKeywordId -> Located e -> [AddEpAnn]
+mz a l = if isZeroWidthSpan (gl l) then [] else [AddEpAnn a (AR $ rs $ gl l)]
 
 msemi :: Located e -> [TrailingAnn]
 msemi l = if isZeroWidthSpan (gl l) then [] else [AddSemiAnn (AR $ rs $ gl l)]
 
--- |Construct an AddApiAnn from the annotation keyword and the Located Token. If
+-- |Construct an AddEpAnn from the annotation keyword and the Located Token. If
 -- the token has a unicode equivalent and this has been used, provide the
 -- unicode variant of the annotation.
-mu :: AnnKeywordId -> Located Token -> AddApiAnn
-mu a lt@(L l t) = AddApiAnn (toUnicodeAnn a lt) (AR $ rs l)
+mu :: AnnKeywordId -> Located Token -> AddEpAnn
+mu a lt@(L l t) = AddEpAnn (toUnicodeAnn a lt) (AR $ rs l)
 
 mau :: Located Token -> TrailingAnn
 mau lt@(L l t) = if isUnicode lt then AddRarrowAnnU (AR $ rs l)
@@ -4266,24 +4266,24 @@ amsrn (L l a) an = do
   let ann = (ApiAnn (spanAsAnchor l) an cs)
   return (L (SrcSpanAnn ann l) a)
 
--- |Synonyms for AddApiAnn versions of AnnOpen and AnnClose
-mo,mc :: Located Token -> AddApiAnn
+-- |Synonyms for AddEpAnn versions of AnnOpen and AnnClose
+mo,mc :: Located Token -> AddEpAnn
 mo ll = mj AnnOpen ll
 mc ll = mj AnnClose ll
 
-moc,mcc :: Located Token -> AddApiAnn
+moc,mcc :: Located Token -> AddEpAnn
 moc ll = mj AnnOpenC ll
 mcc ll = mj AnnCloseC ll
 
-mop,mcp :: Located Token -> AddApiAnn
+mop,mcp :: Located Token -> AddEpAnn
 mop ll = mj AnnOpenP ll
 mcp ll = mj AnnCloseP ll
 
-moh,mch :: Located Token -> AddApiAnn
+moh,mch :: Located Token -> AddEpAnn
 moh ll = mj AnnOpenPH ll
 mch ll = mj AnnClosePH ll
 
-mos,mcs :: Located Token -> AddApiAnn
+mos,mcs :: Located Token -> AddEpAnn
 mos ll = mj AnnOpenS ll
 mcs ll = mj AnnCloseS ll
 
@@ -4328,7 +4328,7 @@ rs _ = panic "Parser should only have RealSrcSpan"
 
 hsDoAnn :: Located a -> LocatedAn t b -> AnnKeywordId -> AnnList
 hsDoAnn (L l _) (L ll _) kw
-  = AnnList (Just $ spanAsAnchor (locA ll)) Nothing Nothing [AddApiAnn kw (AR $ rs l)] []
+  = AnnList (Just $ spanAsAnchor (locA ll)) Nothing Nothing [AddEpAnn kw (AR $ rs l)] []
 
 listAsAnchor :: [LocatedAn t a] -> Anchor
 listAsAnchor [] = spanAsAnchor noSrcSpan

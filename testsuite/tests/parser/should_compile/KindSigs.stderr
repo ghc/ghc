@@ -9,8 +9,8 @@
     { KindSigs.hs:1:1 }
     (UnchangedAnchor))
    (AnnsModule
-    [(AddApiAnn AnnModule (AR { KindSigs.hs:6:1-6 }))
-    ,(AddApiAnn AnnWhere (AR { KindSigs.hs:6:17-21 }))]
+    [(AddEpAnn AnnModule (AR { KindSigs.hs:6:1-6 }))
+    ,(AddEpAnn AnnWhere (AR { KindSigs.hs:6:17-21 }))]
     (AnnList
      (Nothing)
      (Nothing)
@@ -78,9 +78,9 @@
         (Anchor
          { KindSigs.hs:11:1-23 }
          (UnchangedAnchor))
-        [(AddApiAnn AnnType (AR { KindSigs.hs:11:1-4 }))
-        ,(AddApiAnn AnnFamily (AR { KindSigs.hs:11:6-11 }))
-        ,(AddApiAnn AnnWhere (AR { KindSigs.hs:11:19-23 }))]
+        [(AddEpAnn AnnType (AR { KindSigs.hs:11:1-4 }))
+        ,(AddEpAnn AnnFamily (AR { KindSigs.hs:11:6-11 }))
+        ,(AddEpAnn AnnWhere (AR { KindSigs.hs:11:19-23 }))]
         (AnnComments
          []))
        (ClosedTypeFamily
@@ -92,7 +92,7 @@
              (Anchor
               { KindSigs.hs:12:3-21 }
               (UnchangedAnchor))
-             [(AddApiAnn AnnEqual (AR { KindSigs.hs:12:9 }))]
+             [(AddEpAnn AnnEqual (AR { KindSigs.hs:12:9 }))]
              (AnnComments
               []))
             (L
@@ -125,7 +125,7 @@
                (Anchor
                 { KindSigs.hs:12:11-13 }
                 (UnchangedAnchor))
-               [(AddApiAnn AnnDcolon (AR { KindSigs.hs:12:15-16 }))]
+               [(AddEpAnn AnnDcolon (AR { KindSigs.hs:12:15-16 }))]
                (AnnComments
                 []))
               (L
@@ -202,8 +202,8 @@
        (Anchor
         { KindSigs.hs:15:1-51 }
         (UnchangedAnchor))
-       [(AddApiAnn AnnType (AR { KindSigs.hs:15:1-4 }))
-       ,(AddApiAnn AnnEqual (AR { KindSigs.hs:15:12 }))]
+       [(AddEpAnn AnnType (AR { KindSigs.hs:15:1-4 }))
+       ,(AddEpAnn AnnEqual (AR { KindSigs.hs:15:12 }))]
        (AnnComments
         []))
       (L
@@ -257,7 +257,7 @@
             (Anchor
              { KindSigs.hs:15:16-18 }
              (UnchangedAnchor))
-            [(AddApiAnn AnnDcolon (AR { KindSigs.hs:15:20-21 }))]
+            [(AddEpAnn AnnDcolon (AR { KindSigs.hs:15:20-21 }))]
             (AnnComments
              []))
            (L
@@ -320,7 +320,7 @@
             (Anchor
              { KindSigs.hs:15:35-41 }
              (UnchangedAnchor))
-            [(AddApiAnn AnnDcolon (AR { KindSigs.hs:15:43-44 }))]
+            [(AddEpAnn AnnDcolon (AR { KindSigs.hs:15:43-44 }))]
             (AnnComments
              []))
            (L
@@ -388,8 +388,8 @@
        (Anchor
         { KindSigs.hs:16:1-54 }
         (UnchangedAnchor))
-       [(AddApiAnn AnnType (AR { KindSigs.hs:16:1-4 }))
-       ,(AddApiAnn AnnEqual (AR { KindSigs.hs:16:13 }))]
+       [(AddEpAnn AnnType (AR { KindSigs.hs:16:1-4 }))
+       ,(AddEpAnn AnnEqual (AR { KindSigs.hs:16:13 }))]
        (AnnComments
         []))
       (L
@@ -443,7 +443,7 @@
             (Anchor
              { KindSigs.hs:16:18-20 }
              (UnchangedAnchor))
-            [(AddApiAnn AnnDcolon (AR { KindSigs.hs:16:22-23 }))]
+            [(AddEpAnn AnnDcolon (AR { KindSigs.hs:16:22-23 }))]
             (AnnComments
              []))
            (L
@@ -506,7 +506,7 @@
             (Anchor
              { KindSigs.hs:16:37-43 }
              (UnchangedAnchor))
-            [(AddApiAnn AnnDcolon (AR { KindSigs.hs:16:45-46 }))]
+            [(AddEpAnn AnnDcolon (AR { KindSigs.hs:16:45-46 }))]
             (AnnComments
              []))
            (L
@@ -574,8 +574,8 @@
        (Anchor
         { KindSigs.hs:19:1-26 }
         (UnchangedAnchor))
-       [(AddApiAnn AnnType (AR { KindSigs.hs:19:1-4 }))
-       ,(AddApiAnn AnnEqual (AR { KindSigs.hs:19:10 }))]
+       [(AddEpAnn AnnType (AR { KindSigs.hs:19:1-4 }))
+       ,(AddEpAnn AnnEqual (AR { KindSigs.hs:19:10 }))]
        (AnnComments
         []))
       (L
@@ -606,7 +606,7 @@
            (Anchor
             { KindSigs.hs:19:14-16 }
             (UnchangedAnchor))
-           [(AddApiAnn AnnDcolon (AR { KindSigs.hs:19:18-19 }))]
+           [(AddEpAnn AnnDcolon (AR { KindSigs.hs:19:18-19 }))]
            (AnnComments
             []))
           (L
@@ -656,7 +656,7 @@
         { KindSigs.hs:22:1-3 }
         (UnchangedAnchor))
        (AnnSig
-        (AddApiAnn AnnDcolon (AR { KindSigs.hs:22:5-6 }))
+        (AddEpAnn AnnDcolon (AR { KindSigs.hs:22:5-6 }))
         [])
        (AnnComments
         []))
@@ -705,7 +705,7 @@
                 (Anchor
                  { KindSigs.hs:22:9-11 }
                  (UnchangedAnchor))
-                [(AddApiAnn AnnDcolon (AR { KindSigs.hs:22:13-14 }))]
+                [(AddEpAnn AnnDcolon (AR { KindSigs.hs:22:13-14 }))]
                 (AnnComments
                  []))
                (L
@@ -786,7 +786,7 @@
                   (Anchor
                    { KindSigs.hs:22:34-35 }
                    (UnchangedAnchor))
-                  [(AddApiAnn AnnDcolon (AR { KindSigs.hs:22:37-38 }))]
+                  [(AddEpAnn AnnDcolon (AR { KindSigs.hs:22:37-38 }))]
                   (AnnComments
                    []))
                  (L
@@ -876,7 +876,7 @@
                  (UnchangedAnchor))
                 (GrhsAnn
                  (Nothing)
-                 (AddApiAnn AnnEqual (AR { KindSigs.hs:23:9 })))
+                 (AddEpAnn AnnEqual (AR { KindSigs.hs:23:9 })))
                 (AnnComments
                  []))
                []
@@ -918,8 +918,8 @@
        (Anchor
         { KindSigs.hs:26:1-29 }
         (UnchangedAnchor))
-       [(AddApiAnn AnnType (AR { KindSigs.hs:26:1-4 }))
-       ,(AddApiAnn AnnEqual (AR { KindSigs.hs:26:11 }))]
+       [(AddEpAnn AnnType (AR { KindSigs.hs:26:1-4 }))
+       ,(AddEpAnn AnnEqual (AR { KindSigs.hs:26:11 }))]
        (AnnComments
         []))
       (L
@@ -937,9 +937,9 @@
          (Anchor
           { KindSigs.hs:26:13 }
           (UnchangedAnchor))
-         [(AddApiAnn AnnSimpleQuote (AR { KindSigs.hs:26:13 }))
-         ,(AddApiAnn AnnOpenS (AR { KindSigs.hs:26:14 }))
-         ,(AddApiAnn AnnCloseS (AR { KindSigs.hs:26:29 }))]
+         [(AddEpAnn AnnSimpleQuote (AR { KindSigs.hs:26:13 }))
+         ,(AddEpAnn AnnOpenS (AR { KindSigs.hs:26:14 }))
+         ,(AddEpAnn AnnCloseS (AR { KindSigs.hs:26:29 }))]
          (AnnComments
           []))
         (IsPromoted)
@@ -950,7 +950,7 @@
             (Anchor
              { KindSigs.hs:26:16-19 }
              (UnchangedAnchor))
-            [(AddApiAnn AnnDcolon (AR { KindSigs.hs:26:21-22 }))]
+            [(AddEpAnn AnnDcolon (AR { KindSigs.hs:26:21-22 }))]
             (AnnComments
              []))
            (L
@@ -999,8 +999,8 @@
        (Anchor
         { KindSigs.hs:27:1-45 }
         (UnchangedAnchor))
-       [(AddApiAnn AnnType (AR { KindSigs.hs:27:1-4 }))
-       ,(AddApiAnn AnnEqual (AR { KindSigs.hs:27:12 }))]
+       [(AddEpAnn AnnType (AR { KindSigs.hs:27:1-4 }))
+       ,(AddEpAnn AnnEqual (AR { KindSigs.hs:27:12 }))]
        (AnnComments
         []))
       (L
@@ -1018,8 +1018,8 @@
          (Anchor
           { KindSigs.hs:27:14 }
           (UnchangedAnchor))
-         [(AddApiAnn AnnOpenS (AR { KindSigs.hs:27:14 }))
-         ,(AddApiAnn AnnCloseS (AR { KindSigs.hs:27:45 }))]
+         [(AddEpAnn AnnOpenS (AR { KindSigs.hs:27:14 }))
+         ,(AddEpAnn AnnCloseS (AR { KindSigs.hs:27:45 }))]
          (AnnComments
           []))
         (NotPromoted)
@@ -1038,7 +1038,7 @@
             (Anchor
              { KindSigs.hs:27:16-19 }
              (UnchangedAnchor))
-            [(AddApiAnn AnnDcolon (AR { KindSigs.hs:27:21-22 }))]
+            [(AddEpAnn AnnDcolon (AR { KindSigs.hs:27:21-22 }))]
             (AnnComments
              []))
            (L
@@ -1078,7 +1078,7 @@
             (Anchor
              { KindSigs.hs:27:30-34 }
              (UnchangedAnchor))
-            [(AddApiAnn AnnDcolon (AR { KindSigs.hs:27:36-37 }))]
+            [(AddEpAnn AnnDcolon (AR { KindSigs.hs:27:36-37 }))]
             (AnnComments
              []))
            (L
@@ -1127,8 +1127,8 @@
        (Anchor
         { KindSigs.hs:28:1-44 }
         (UnchangedAnchor))
-       [(AddApiAnn AnnType (AR { KindSigs.hs:28:1-4 }))
-       ,(AddApiAnn AnnEqual (AR { KindSigs.hs:28:14 }))]
+       [(AddEpAnn AnnType (AR { KindSigs.hs:28:1-4 }))
+       ,(AddEpAnn AnnEqual (AR { KindSigs.hs:28:14 }))]
        (AnnComments
         []))
       (L
@@ -1160,9 +1160,9 @@
          (Anchor
           { KindSigs.hs:28:16 }
           (UnchangedAnchor))
-         [(AddApiAnn AnnSimpleQuote (AR { KindSigs.hs:28:16 }))
-         ,(AddApiAnn AnnOpenP (AR { KindSigs.hs:28:17 }))
-         ,(AddApiAnn AnnCloseP (AR { KindSigs.hs:28:44 }))]
+         [(AddEpAnn AnnSimpleQuote (AR { KindSigs.hs:28:16 }))
+         ,(AddEpAnn AnnOpenP (AR { KindSigs.hs:28:17 }))
+         ,(AddEpAnn AnnCloseP (AR { KindSigs.hs:28:44 }))]
          (AnnComments
           []))
         [(L
@@ -1180,7 +1180,7 @@
             (Anchor
              { KindSigs.hs:28:19-29 }
              (UnchangedAnchor))
-            [(AddApiAnn AnnDcolon (AR { KindSigs.hs:28:31-32 }))]
+            [(AddEpAnn AnnDcolon (AR { KindSigs.hs:28:31-32 }))]
             (AnnComments
              []))
            (L
@@ -1190,8 +1190,8 @@
               (Anchor
                { KindSigs.hs:28:19 }
                (UnchangedAnchor))
-              [(AddApiAnn AnnOpenS (AR { KindSigs.hs:28:19 }))
-              ,(AddApiAnn AnnCloseS (AR { KindSigs.hs:28:29 }))]
+              [(AddEpAnn AnnOpenS (AR { KindSigs.hs:28:19 }))
+              ,(AddEpAnn AnnCloseS (AR { KindSigs.hs:28:29 }))]
               (AnnComments
                []))
              (NotPromoted)
@@ -1292,8 +1292,8 @@
        (Anchor
         { KindSigs.hs:31:1-31 }
         (UnchangedAnchor))
-       [(AddApiAnn AnnType (AR { KindSigs.hs:31:1-4 }))
-       ,(AddApiAnn AnnEqual (AR { KindSigs.hs:31:19 }))]
+       [(AddEpAnn AnnType (AR { KindSigs.hs:31:1-4 }))
+       ,(AddEpAnn AnnEqual (AR { KindSigs.hs:31:19 }))]
        (AnnComments
         []))
       (L
@@ -1311,7 +1311,7 @@
          (Anchor
           { KindSigs.hs:31:21-23 }
           (UnchangedAnchor))
-         [(AddApiAnn AnnDcolon (AR { KindSigs.hs:31:25-26 }))]
+         [(AddEpAnn AnnDcolon (AR { KindSigs.hs:31:25-26 }))]
          (AnnComments
           []))
         (L
@@ -1361,7 +1361,7 @@
         { KindSigs.hs:34:1-4 }
         (UnchangedAnchor))
        (AnnSig
-        (AddApiAnn AnnDcolon (AR { KindSigs.hs:34:6-7 }))
+        (AddEpAnn AnnDcolon (AR { KindSigs.hs:34:6-7 }))
         [])
        (AnnComments
         []))
@@ -1397,7 +1397,7 @@
               (Anchor
                { KindSigs.hs:34:10-13 }
                (UnchangedAnchor))
-              [(AddApiAnn AnnDcolon (AR { KindSigs.hs:34:15-16 }))]
+              [(AddEpAnn AnnDcolon (AR { KindSigs.hs:34:15-16 }))]
               (AnnComments
                []))
              (L
@@ -1480,7 +1480,7 @@
                  (UnchangedAnchor))
                 (GrhsAnn
                  (Nothing)
-                 (AddApiAnn AnnEqual (AR { KindSigs.hs:35:6 })))
+                 (AddEpAnn AnnEqual (AR { KindSigs.hs:35:6 })))
                 (AnnComments
                  []))
                []

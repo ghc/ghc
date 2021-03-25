@@ -116,9 +116,9 @@
                               { T14189.hs:6:33-40 }
                               (UnchangedAnchor)))
                             (Just
-                             (AddApiAnn AnnOpenC (AR { T14189.hs:6:31 })))
+                             (AddEpAnn AnnOpenC (AR { T14189.hs:6:31 })))
                             (Just
-                             (AddApiAnn AnnCloseC (AR { T14189.hs:6:42 })))
+                             (AddEpAnn AnnCloseC (AR { T14189.hs:6:42 })))
                             []
                             [])
                            (AnnComments
