@@ -32,7 +32,7 @@ import Control.Monad.Trans.Maybe
 import Control.Exception (catch, SomeException(..))
 import Data.Maybe
 import Data.Foldable ( foldlM )
-import GHC.Utils.Misc (HasCallStack)
+import GHC.Utils.Misc (HasDebugCallStack)
 
 infixr 4 `orElse`
 
@@ -61,7 +61,7 @@ firstJustsM = foldlM go Nothing where
   go Nothing         action  = action
   go result@(Just _) _action = return result
 
-expectJust :: HasCallStack => String -> Maybe a -> a
+expectJust :: HasDebugCallStack => String -> Maybe a -> a
 {-# INLINE expectJust #-}
 expectJust _   (Just x) = x
 expectJust err Nothing  = error ("expectJust " ++ err)
