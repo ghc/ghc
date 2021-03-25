@@ -41,7 +41,7 @@ module GHC.Types.Demand (
 
     -- * Demand environments
     DmdEnv, emptyDmdEnv,
-    keepAliveDmdEnv, reuseEnv,
+    keepAliveDmdEnv, reuseBndrs,
 
     -- * Divergence
     Divergence(..), topDiv, botDiv, exnDiv, lubDivergence, isDeadEndDiv,
@@ -85,6 +85,7 @@ import GHC.Types.Var ( Var, Id )
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Unique.FM
+import GHC.Types.Unique.Set
 import GHC.Types.Basic
 import GHC.Data.Maybe   ( orElse )
 
@@ -1092,8 +1093,13 @@ multDmdEnv n env
   | Just env' <- multTrivial n emptyDmdEnv env = env'
   | otherwise                                  = mapVarEnv (multDmd n) env
 
-reuseEnv :: DmdEnv -> DmdEnv
-reuseEnv = multDmdEnv C_1N
+-- | Re-uses the given set of bndrs with their demand as given in the 'DmdEnv'.
+-- Ex.: @reuseBndrs [x] [x:->MCM(C1(L)), y:->MP(L)] === [x:->LCL(C1(L)), y:->MP(L)]@.
+-- It's like doing @multDmd C_1N@ on the demands in the set.
+reuseBndrs :: VarSet -> DmdEnv -> DmdEnv
+reuseBndrs bndrs env = adjustManyUFM reuse_bndr env (getUniqSet bndrs)
+  where
+    reuse_bndr dmd = multDmd C_1N dmd
 
 -- | @keepAliveDmdType dt vs@ makes sure that the Ids in @vs@ have
 -- /some/ usage in the returned demand types -- they are not Absent.
