@@ -275,7 +275,7 @@ enterAnn (Entry anchor' cs) a = do
 
 -- ---------------------------------------------------------------------
 
-addCommentsA :: [LAnnotationComment] -> EPP ()
+addCommentsA :: [LEpaComment] -> EPP ()
 addCommentsA csNew = addComments (map tokComment csNew)
   -- cs <- getUnallocatedComments
   -- -- AZ:TODO: sortedlist?
@@ -412,7 +412,7 @@ data AnnotatedList a = AnnotatedList (Maybe Anchor) a
                      deriving (Eq,Show)
 
 instance (ExactPrint a) => ExactPrint (AnnotatedList a) where
-  getAnnotationEntry (AnnotatedList (Just anc) _) = Entry anc (AnnComments [])
+  getAnnotationEntry (AnnotatedList (Just anc) _) = Entry anc (EpaComments [])
   getAnnotationEntry (AnnotatedList Nothing    _) = NoEntryVal
 
   exact (AnnotatedList an ls) = do
