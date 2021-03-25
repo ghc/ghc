@@ -24,6 +24,8 @@ import GHC.Types.Demand   -- All of it
 import GHC.Core
 import GHC.Core.Multiplicity ( scaledThing )
 import GHC.Utils.Outputable
+import GHC.Types.Unique.Set
+import GHC.Types.Unique.FM
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Basic
@@ -43,9 +45,9 @@ import GHC.Utils.Panic
 import GHC.Data.Maybe         ( isJust )
 import GHC.Builtin.PrimOps
 import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
-import GHC.Types.Unique.Set
 
--- import GHC.Driver.Ppr
+import GHC.Driver.Ppr
+_ = pprTrace
 
 {-
 ************************************************************************
@@ -286,7 +288,7 @@ dmdAnalBindLetDown :: TopLevelFlag -> AnalEnv -> SubDemand -> CoreBind -> (AnalE
 dmdAnalBindLetDown top_lvl env dmd bind anal_body = case bind of
   NonRec id rhs
     | (env', lazy_fv, id1, rhs1) <-
-        dmdAnalRhsSig top_lvl NonRecursive env dmd id rhs
+        dmdAnalRhsSig top_lvl emptyVarSet env dmd emptyDmdEnv id rhs
     -> do_rest env' lazy_fv [(id1, rhs1)] (uncurry NonRec . only)
   Rec pairs
     | (env', lazy_fv, pairs') <- dmdFix top_lvl env dmd pairs
@@ -661,7 +663,7 @@ so the resulting demand on |y| is U1.
 
 The situation is, however, different for strictness, where this
 aggregating approach exhibits worse results because of the nature of
-|both| operation for strictness. Consider the example:
+|lub| operation for strictness. Consider the example:
 
 f y c =
   let h x = y |seq| x
@@ -748,16 +750,17 @@ dmdTransform env var dmd
 -- applicable at any call site.
 dmdAnalRhsSig
   :: TopLevelFlag
-  -> RecFlag
+  -> IdSet                  -- ^ Binders of the recursive group. Empty if NonRec
   -> AnalEnv -> SubDemand
+  -> DmdEnv                 -- ^ Previous Lazy FVs of the recursive group
   -> Id -> CoreExpr
   -> (AnalEnv, DmdEnv, Id, CoreExpr)
 -- Process the RHS of the binding, add the strictness signature
 -- to the Id, and augment the environment with the signature as well.
 -- See Note [NOINLINE and strictness]
-dmdAnalRhsSig top_lvl rec_flag env let_dmd id rhs
-  = -- pprTrace "dmdAnalRhsSig" (ppr id $$ ppr let_dmd $$ ppr sig $$ ppr lazy_fv) $
-    (env', lazy_fv, id', rhs')
+dmdAnalRhsSig top_lvl rec_bndrs env let_dmd lazy_fv id rhs
+  = applyWhen (not $ isEmptyVarSet rec_bndrs) (pprTrace "dmdAnalRhsSig" (ppr id <+> ppr sig <+> ppr lazy_fv')) $
+    (env', lazy_fv', id', rhs')
   where
     rhs_arity = idArity id
     -- See Note [Demand signatures are computed for a threshold demand based on idArity]
@@ -778,25 +781,33 @@ dmdAnalRhsSig top_lvl rec_flag env let_dmd id rhs
     env' = extendAnalEnv top_lvl env id' sig
 
     -- See Note [Aggregated demand for cardinality]
-    -- FIXME: That Note doesn't explain the following lines at all. The reason
-    --        is really much different: When we have a recursive function, we'd
-    --        have to also consider the free vars of the strictness signature
-    --        when checking whether we found a fixed-point. That is expensive;
-    --        we only want to check whether argument demands of the sig changed.
-    --        reuseEnv makes it so that the FV results are stable as long as the
-    --        last argument demands were. Strictness won't change. But used-once
-    --        might turn into used-many even if the signature was stable and
-    --        we'd have to do an additional iteration. reuseEnv makes sure that
-    --        we never get used-once info for FVs of recursive functions.
-    rhs_fv1 = case rec_flag of
-                Recursive    -> rhs_fv
-                NonRecursive -> rhs_fv
+    ---  ^ TODO: That note is not relevant here
+    -- See Note [Lazy free variables and monotonicity]
+    rhs_fv1 = -- applyWhen (not $ isEmptyVarSet rec_bndrs)
+              --           (pprTrace "would reuse env" (ppr id)) $
+              reuseBndrs rec_bndrs rhs_fv
 
     -- See Note [Absence analysis for stable unfoldings and RULES]
     rhs_fv2 = rhs_fv1 `keepAliveDmdEnv` bndrRuleAndUnfoldingIds id
 
     -- See Note [Lazy and unleashable free variables]
-    (lazy_fv, sig_fv) = partitionVarEnv isWeakDmd rhs_fv2
+    -- and Note [Lazy free variables and monotonicity]
+    lazy_fv' = lazy_fv `addWeakDmds` rhs_fv2
+    sig_fv   = rhs_fv2 `minusUFM` lazy_fv'
+
+-- | @addWeakDmds lazy_fv rhs_fv@ lubs @lazy_fv@ with an entry @x->dmd@ from
+-- @rhs_fv@ if either
+--
+--    * @x->dmd2@ is in @lazy_fv@. Then it lubs @dmd@ with @dmd2@ and puts that
+--      in @lazy_fv@.
+--    * @x@ is not in @lazy_fv@ and @dmd@ is a weak demand ('isWeakDmd').
+--      Then it copies the entry to @lazy_fv@ (which amounts to pretending
+--      there was an entry @x->A@ in @lazy_fv@).
+--
+-- See Note [Lazy and unleashable free variables]
+-- and Note [Lazy free variables and monotonicity]
+addWeakDmds :: DmdEnv -> DmdEnv -> DmdEnv
+addWeakDmds lazy_fv rhs_fv = plusFilterUFM_C lubDmd isWeakDmd lazy_fv rhs_fv
 
 -- | If given the (local, non-recursive) let-bound 'Id', 'useLetUp' determines
 -- whether we should process the binding up (body before rhs) or down (rhs
@@ -883,7 +894,7 @@ look a little puzzling.  E.g.
     (in case v of              )
     (     A -> j 3             )  x
     (     B -> j 4             )
-    (     C -> \y. blah        )
+    (     C -> \y. blah        ')
 
 The entire thing is in a C1(L) context, so j's strictness signature
 will be    [A]b
@@ -1059,7 +1070,7 @@ dmdFix :: TopLevelFlag
        -> (AnalEnv, DmdEnv, [(Id,CoreExpr)]) -- Binders annotated with strictness info
 
 dmdFix top_lvl env let_dmd orig_pairs
-  = loop 1 initial_pairs
+  = loop 1 emptyDmdEnv initial_pairs
   where
     -- See Note [Initialising strictness]
     initial_pairs | ae_virgin env = [(setIdDmdSig id botSig, rhs) | (id, rhs) <- orig_pairs ]
@@ -1069,7 +1080,7 @@ dmdFix top_lvl env let_dmd orig_pairs
     -- See Note [Safe abortion in the fixed-point iteration]
     abort :: (AnalEnv, DmdEnv, [(Id,CoreExpr)])
     abort = (env, lazy_fv', zapped_pairs)
-      where (lazy_fv, pairs') = step True (zapIdDmdSig orig_pairs)
+      where (lazy_fv, pairs') = step True emptyDmdEnv (zapIdStrictness orig_pairs)
             -- Note [Lazy and unleashable free variables]
             non_lazy_fvs = plusVarEnvList $ map (dmdSigDmdEnv . idDmdSig . fst) pairs'
             lazy_fv'     = lazy_fv `plusVarEnv` mapVarEnv (const topDmd) non_lazy_fvs
@@ -1077,41 +1088,45 @@ dmdFix top_lvl env let_dmd orig_pairs
 
     -- The fixed-point varies the idDmdSig field of the binders, and terminates if that
     -- annotation does not change any more.
-    loop :: Int -> [(Id,CoreExpr)] -> (AnalEnv, DmdEnv, [(Id,CoreExpr)])
-    loop n pairs = -- pprTrace "dmdFix" (ppr n <+> vcat [ ppr id <+> ppr (idDmdSig id)
-                   --                                     | (id,_)<- pairs]) $
-                   loop' n pairs
+    loop :: Int -> DmdEnv -> [(Id,CoreExpr)] -> (AnalEnv, DmdEnv, [(Id,CoreExpr)])
+    loop n lazy_fv pairs = -- pprTrace "dmdFix" (ppr n <+> vcat [ ppr id <+> ppr (idDmdSig id)
+                           --                                     | (id,_)<- pairs]) $
+                           loop' n lazy_fv pairs
 
-    loop' n pairs
-      | found_fixpoint = (final_anal_env, lazy_fv, pairs')
+    loop' n lazy_fv pairs
+      | found_fixpoint = (final_anal_env, lazy_fv', pairs')
       | n == 10        = abort
-      | otherwise      = loop (n+1) pairs'
+      | otherwise      = loop (n+1) lazy_fv' pairs'
       where
-        found_fixpoint    = map (idDmdSig . fst) pairs' == map (idDmdSig . fst) pairs
-        first_round       = n == 1
-        (lazy_fv, pairs') = step first_round pairs
-        final_anal_env    = extendAnalEnvs top_lvl env (map fst pairs')
+        -- See Note [Lazy free variables are stable after signature is stable]
+        found_fixpoint     = map (idDmdSig . fst) pairs' == map (idDmdSig . fst) pairs
+        first_round        = n == 1
+        (lazy_fv', pairs') = step first_round lazy_fv pairs
+        final_anal_env     = extendAnalEnvs top_lvl env (map fst pairs')
 
-    step :: Bool -> [(Id, CoreExpr)] -> (DmdEnv, [(Id, CoreExpr)])
-    step first_round pairs = (lazy_fv, pairs')
+    step :: Bool -> DmdEnv -> [(Id, CoreExpr)] -> (DmdEnv, [(Id, CoreExpr)])
+    step first_round lazy_fv pairs = (lazy_fv', pairs')
       where
         -- In all but the first iteration, delete the virgin flag
         start_env | first_round = env
                   | otherwise   = nonVirgin env
 
-        start = (extendAnalEnvs top_lvl start_env (map fst pairs), emptyDmdEnv)
+        start = (extendAnalEnvs top_lvl start_env (map fst pairs), lazy_fv)
 
-        ((_,lazy_fv), pairs') = mapAccumL my_downRhs start pairs
+        ((_,lazy_fv'), pairs') = mapAccumL my_downRhs start pairs
                 -- mapAccumL: Use the new signature to do the next pair
                 -- The occurrence analyser has arranged them in a good order
                 -- so this can significantly reduce the number of iterations needed
 
         my_downRhs (env, lazy_fv) (id,rhs)
-          = -- pprTrace "my_downRhs" (ppr id $$ ppr (idDmdSig id) $$ ppr sig) $
+          = -- pprTrace "my_downRhs" (ppr id $$ ppr lazy_fv $$ ppr lazy_fv' $$ ppr (idDmdSig id)) $
             ((env', lazy_fv'), (id', rhs'))
           where
-            (env', lazy_fv1, id', rhs') = dmdAnalRhsSig top_lvl Recursive env let_dmd id rhs
-            lazy_fv'                    = plusVarEnv_C plusDmd lazy_fv lazy_fv1
+            (env', lazy_fv', id', rhs')
+              = dmdAnalRhsSig top_lvl rec_bndrs env let_dmd lazy_fv id rhs
+
+    rec_bndrs :: IdSet
+    rec_bndrs = mkVarSet (map fst orig_pairs)
 
     zapIdDmdSig :: [(Id, CoreExpr)] -> [(Id, CoreExpr)]
     zapIdDmdSig pairs = [(setIdDmdSig id nopSig, rhs) | (id, rhs) <- pairs ]
@@ -1286,39 +1301,55 @@ Note [Worker-wrapper for NOINLINE functions] in GHC.Core.Opt.WorkWrap.
 
 
 Note [Lazy and unleashable free variables]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We put the strict and once-used FVs in the DmdType of the Id, so
-that at its call sites we unleash demands on its strict fvs.
-An example is 'roll' in imaginary/wheel-sieve2
-Something like this:
-        roll x = letrec
-                     go y = if ... then roll (x-1) else x+1
-                 in
-                 go ms
-We want to see that roll is strict in x, which is because
-go is called.   So we put the DmdEnv for x in go's DmdType.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+LetDown generally unleashes demands on arguments and free variables at call
+sites, both of which are part of the demand signature. That is especially
+beneficial for strict and once-used FVs, as the following example inspired by
+'roll' in imaginary/wheel-sieve2 shows:
+```
+  roll x = letrec
+               go y = if ... then roll (x-1) else x+1
+           in
+           if ... then x+2 else go ms
+```
+We want to see that roll is strict in its arg x, which is because
+go is called, which in turn is strict in its free var x.
+We wouldn't see that go is strict if we used LetUp here.
 
-Another example:
+An example where we get better once-used info on free variables is inspired by
+simple's $wpolynomial (see #19001 for the original program):
+```
+  let x = expensive
+      f n = f (n-1)
+      f 0 = x
+  in f 200
+```
+Here, x is only used once. If we used LetUp, analysis of the recursive
+function f would have to conclude that it uses x multiple times, since
+its RHS may be entered multiple times. Not so with LetDown: We infer
+that x is used only once, because x occurs in a base case of f rather
+than in an inductive case. That in turn may lead to eta-expansion of x
+if it is has function type and is also called once.
 
-        f :: Int -> Int -> Int
-        f x y = let t = x+1
-            h z = if z==0 then t else
-                  if z==1 then x+1 else
-                  x + h (z-1)
-        in h y
-
-Calling h does indeed evaluate x, but we can only see
-that if we unleash a demand on x at the call site for t.
-
-Incidentally, here's a place where lambda-lifting h would
-lose the cigar --- we couldn't see the joint strictness in t/x
+Another example that is currently left on the table:
+```
+  f :: Int -> Int -> Int
+  f x y = let t = x+1
+      h z = if z==0 then t else
+            if z==1 then x+1 else
+            x + h (z-1)
+  in h y
+```
+Calling h does indeed evaluate x, but we can only see that if we unleash
+a demand on x at the call site for t. We use LetUp for thunks like t, so
+we won't catch that at the moment.
 
         ON THE OTHER HAND
 
 We don't want to put *all* the fv's from the RHS into the
 DmdType. Because
 
- * it makes the strictness signatures larger, and hence slows down fixpointing
+ * it makes the demand signatures larger, and hence slows down fixpointing
 
 and
 
@@ -1328,22 +1359,85 @@ and
    is (unless it is always absent, but then the whole binder is useless).
 
 Therefore we exclude lazy multiple-used fv's from the environment in the
-DmdType.
+demand signature's DmdType.
 
 But now the signature lies! (Missing variables are assumed to be absent.) To
 make up for this, the code that analyses the binding keeps the demand on those
 variable separate (usually called "lazy_fv") and adds it to the demand of the
-whole binding later.
+whole binding later, very much like the LetUp rule.
 
-What if we decide _not_ to store a strictness signature for a binding at all, as
-we do when aborting a fixed-point iteration? The we risk losing the information
-that the strict variables are being used. In that case, we take all free variables
-mentioned in the (unsound) strictness signature, conservatively approximate the
-demand put on them (topDmd), and add that to the "lazy_fv" returned by "dmdFix".
+What if we decide _not_ to store a strictness signature for a binding at
+all, as we do when aborting a fixed-point iteration? Then we risk losing
+the information that the strict variables are being used. In that case, we
+take all free variables mentioned in the (unsound) strictness signature,
+conservatively approximate the demand put on them (topDmd), and add that
+to the "lazy_fv" returned by "dmdFix".
 
+Note [Lazy free variables and monotonicity]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There is another pitfall with Note [Lazy and unleashable free variables].
+Consider the cartesian product of lists a and b:
+```
+cart a b =
+  let go1 xs = case xs of {
+        []    -> []
+        x:xs' ->
+           let z = go1 xs' in
+           let go2 ys = case ys of {
+             []    -> z
+             y:ys' -> (x,y):go2 ys'
+           in go2 b
+      }
+  in go1 a
+```
+Given the stable demand signature <1L>{z->ML} and lazy_fv {go2->L,x->L} for
+go2, these are the demand signatures and lazy_fv of go1 after each iteration:
+ 1. <1L>{b->ML, go1->MCM(L)}, {}
+ 2. <1L>{}, {b->L, go1->L}
+ 3. <1L>{b->ML, go1->MCM(L)}, {}
+ 4. <1L>{}, {b->L, go1->L}
+ 5. ...
+This stops after 10 iterations, but only because we abort fixed-point iteration
+in that case; otherwise we'd loop endlessly.
+
+First observation: go1 is part of the recursive group. It is extremely unlikely
+that go1 will ever have be called-once after fixed-point iteration, so by
+calling 'reuseBndrs' we immediately put go1->LCL(L) (which is just go1->L) in
+the lazy_fv. This can safe us an additional iteration over the RHS in some
+cases, for example when there is no used-once free variable like b that would
+otherwise force an additional iteration.
+
+Second observation: reusing the rec binders doesn't fix the problem we are
+seeing. 'dmdAnalRhsSig' should be monotonic in the signature it takes and
+produces, but the signature in the step from (1) to (2) clearly isn't.
+By pretending that lazy_fv is merged back into the signature, the step (1) to
+(2) becomes monotonic, but then (2) to (3) is non-monotonic. The reason is that
+while the previous signature is an implicit input (via the SigEnv) to
+'dmdAnalRhsSig', the previous lazy_fv are not! In fact, 'dmdAnalRhsSig' should
+simply *extend* the previous lazy_fv rather producing its own. Then we have
+one lazy_fv per recursive group that we continually extend. If a binder is in
+the domain of lazy_fv, it should not occur in the FVs of the demand signature.
+
+Note [Lazy free variables are stable after signature is stable]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We know that we find the fixed-point when the signature didn't change between
+fixed-point iterations. But why don't we need to test the lazy_fv?
+Because the lazy_fv won't have changed if the signatures didn't change.
+This is easy to see if you consider what would happen if we iterated an
+additional time with identical signatures. In 'dmdAnalRhsSig', there isn't
+even a data flow from lazy_fv into the function that analyses the RHS. Analysis
+being a pure function, it observes the same old signatures through the AnalEnv
+and will produce the exact same rhs_fv as in the previous iteration. Then the
+computed lazy_fv' resulting from a call to addWeakDmds will be identical to
+lazy_fv.
+
+Bottom line: If the demand signatures are the same after iteration n and n+1,
+then so will the lazy_fv of iteration n+1 and n+2. So we can just return the
+lazy_fv after iteration n+1, together with the analysed RHSs after iteration
+n+1.
 
 Note [Lambda-bound unfoldings]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We allow a lambda-bound variable to carry an unfolding, a facility that is used
 exclusively for join points; see Note [Case binders and join points].  If so,
 we must be careful to demand-analyse the RHS of the unfolding!  Example
