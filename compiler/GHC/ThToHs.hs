@@ -1,12 +1,12 @@
-{-# LANGUAGE BangPatterns            #-}
-{-# LANGUAGE DeriveFunctor           #-}
-{-# LANGUAGE FlexibleContexts        #-}
-{-# LANGUAGE FunctionalDependencies  #-}
-{-# LANGUAGE LambdaCase              #-}
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ConstrainedClassMethods #-}
-{-# LANGUAGE ScopedTypeVariables     #-}
-{-# LANGUAGE TypeFamilies            #-}
-{-# LANGUAGE ViewPatterns            #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ViewPatterns #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
@@ -702,8 +702,7 @@ cvt_id_arg (i, str, ty)
                           , cd_fld_doc = Nothing}) }
 
 cvtDerivs :: [TH.DerivClause] -> CvtM (HsDeriving GhcPs)
-cvtDerivs cs = do { cs' <- mapM cvtDerivClause cs
-                  ; return cs' }
+cvtDerivs cs = do { mapM cvtDerivClause cs }
 
 cvt_fundep :: TH.FunDep -> CvtM (LHsFunDep GhcPs)
 cvt_fundep (TH.FunDep xs ys) = do { xs' <- mapM tNameN xs
