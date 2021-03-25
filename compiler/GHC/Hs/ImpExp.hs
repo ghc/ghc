@@ -113,7 +113,7 @@ data ImportDecl pass
 
      -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
-type instance XCImportDecl  GhcPs = ApiAnn' ApiAnnImportDecl
+type instance XCImportDecl  GhcPs = EpAnn' EpAnnImportDecl
 type instance XCImportDecl  GhcRn = NoExtField
 type instance XCImportDecl  GhcTc = NoExtField
 
@@ -126,7 +126,7 @@ type instance Anno [LocatedA (IE (GhcPass p))] = SrcSpanAnnL
 
 -- API Annotations types
 
-data ApiAnnImportDecl = ApiAnnImportDecl
+data EpAnnImportDecl = EpAnnImportDecl
   { importDeclAnnImport    :: AnnAnchor
   , importDeclAnnPragma    :: Maybe (AnnAnchor, AnnAnchor)
   , importDeclAnnSafe      :: Maybe AnnAnchor
@@ -286,15 +286,15 @@ type instance XIEVar             GhcPs = NoExtField
 type instance XIEVar             GhcRn = NoExtField
 type instance XIEVar             GhcTc = NoExtField
 
-type instance XIEThingAbs        (GhcPass _) = ApiAnn
-type instance XIEThingAll        (GhcPass _) = ApiAnn
+type instance XIEThingAbs        (GhcPass _) = EpAnn
+type instance XIEThingAll        (GhcPass _) = EpAnn
 
 -- See Note [IEThingWith]
-type instance XIEThingWith       (GhcPass 'Parsed)      = ApiAnn
+type instance XIEThingWith       (GhcPass 'Parsed)      = EpAnn
 type instance XIEThingWith       (GhcPass 'Renamed)     = [Located FieldLabel]
 type instance XIEThingWith       (GhcPass 'Typechecked) = NoExtField
 
-type instance XIEModuleContents  GhcPs = ApiAnn
+type instance XIEModuleContents  GhcPs = EpAnn
 type instance XIEModuleContents  GhcRn = NoExtField
 type instance XIEModuleContents  GhcTc = NoExtField
 
