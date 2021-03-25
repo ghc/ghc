@@ -543,7 +543,7 @@ mkThetaOrigin origin t_or_k skols metas givens
 mkThetaOriginFromPreds :: [PredOrigin] -> ThetaOrigin
 mkThetaOriginFromPreds = ThetaOrigin [] [] []
 
-substPredOrigin :: HasCallStack => TCvSubst -> PredOrigin -> PredOrigin
+substPredOrigin :: HasDebugCallStack => TCvSubst -> PredOrigin -> PredOrigin
 substPredOrigin subst (PredOrigin pred origin t_or_k)
   = PredOrigin (substTy subst pred) origin t_or_k
 
