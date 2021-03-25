@@ -325,7 +325,7 @@ testOneFile _ libdir fileName mchanger = do
              exitFailure
 
 ppAst :: Data a => a -> String
-ppAst ast = showSDocUnsafe $ showAstData BlankSrcSpanFile NoBlankApiAnnotations ast
+ppAst ast = showSDocUnsafe $ showAstData BlankSrcSpanFile NoBlankEpAnnotations ast
 
 parseOneFile :: FilePath -> FilePath -> IO (ParsedModule, [Located Token])
 parseOneFile libdir fileName = do
@@ -426,15 +426,15 @@ changeLetIn1 _libdir parsed
   = return (everywhere (mkT replace) parsed)
   where
     replace :: HsExpr GhcPs -> HsExpr GhcPs
-    replace (HsLet (ApiAnn anc (AnnsLet l _i) cs) localDecls expr)
+    replace (HsLet (EpAnn anc (AnnsLet l _i) cs) localDecls expr)
       =
          let (HsValBinds x (ValBinds xv bagDecls sigs)) = localDecls
              [l2,_l1] = map wrapDecl $ bagToList bagDecls
              bagDecls' = listToBag $ concatMap decl2Bind [l2]
              (L (SrcSpanAnn _ le) e) = expr
-             a = (SrcSpanAnn (ApiAnn (Anchor (realSrcSpan le) (MovedAnchor (DP 0 1))) mempty noCom) le)
+             a = (SrcSpanAnn (EpAnn (Anchor (realSrcSpan le) (MovedAnchor (DP 0 1))) mempty noCom) le)
              expr' = L a e
-         in (HsLet (ApiAnn anc (AnnsLet l (AD (DP 1 0))) cs)
+         in (HsLet (EpAnn anc (AnnsLet l (AD (DP 1 0))) cs)
                 (HsValBinds x (ValBinds xv bagDecls' sigs)) expr')
 
     replace x = x
@@ -503,8 +503,8 @@ changeLocalDecls libdir (L l p) = do
             (os:oldSigs) = concatMap decl2Sig  oldDecls'
             os' = setEntryDP' os (DP 2 0)
         let sortKey = captureOrder decls
-        let (ApiAnn anc (AnnList (Just (Anchor anc2 _)) a b c dd) cs) = van
-        let van' = (ApiAnn anc (AnnList (Just (Anchor anc2 (MovedAnchor (DP 1 4)))) a b c dd) cs)
+        let (EpAnn anc (AnnList (Just (Anchor anc2 _)) a b c dd) cs) = van
+        let van' = (EpAnn anc (AnnList (Just (Anchor anc2 (MovedAnchor (DP 1 4)))) a b c dd) cs)
         let binds' = (HsValBinds van'
                           (ValBinds sortKey (listToBag $ decl':oldBinds)
                                           (sig':os':oldSigs)))
@@ -530,7 +530,7 @@ changeLocalDecls2 libdir (L l p) = do
         newSpan <- uniqueSrcSpanT
         let anc = (Anchor (rs newSpan) (MovedAnchor (DP 1 2)))
         let anc2 = (Anchor (rs newSpan) (MovedAnchor (DP 1 4)))
-        let an = ApiAnn anc
+        let an = EpAnn anc
                         (AnnList (Just anc2) Nothing Nothing
                                  [(undeltaSpan (rs newSpan) AnnWhere (DP 0 0))] [])
                         noCom
@@ -876,7 +876,7 @@ addHiding1 _libdir (L l p) = do
           n2 = L (noAnnSrcSpanDP0 l2) (mkVarUnqual (mkFastString "n2"))
           v1 = L (addComma $ noAnnSrcSpanDP0 l1) (IEVar noExtField (L (noAnnSrcSpanDP0 l1) (IEName n1)))
           v2 = L (           noAnnSrcSpanDP0 l2) (IEVar noExtField (L (noAnnSrcSpanDP0 l2) (IEName n2)))
-          impHiding = L (SrcSpanAnn (ApiAnn (Anchor (realSrcSpan l0) m0)
+          impHiding = L (SrcSpanAnn (EpAnn (Anchor (realSrcSpan l0) m0)
                                      (AnnList Nothing
                                               (Just (AddEpAnn AnnOpenP  d1))
                                               (Just (AddEpAnn AnnCloseP d0))
@@ -901,7 +901,7 @@ addHiding2 _libdir (L l p) = do
         let
           [L li imp1] = hsmodImports p
           Just (_,L lh ns) = ideclHiding imp1
-          lh' = (SrcSpanAnn (ApiAnn (Anchor (realSrcSpan (locA lh)) m0)
+          lh' = (SrcSpanAnn (EpAnn (Anchor (realSrcSpan (locA lh)) m0)
                                      (AnnList Nothing
                                               (Just (AddEpAnn AnnOpenP  d1))
                                               (Just (AddEpAnn AnnCloseP d0))
