@@ -145,8 +145,8 @@ undelta (l,c) (DP dl dc) (LayoutStartCol co) = (fl,fc)
     fc = if dl == 0 then c  + dc
                     else co + dc
 
-undeltaSpan :: RealSrcSpan -> AnnKeywordId -> DeltaPos -> AddApiAnn
-undeltaSpan anchor kw dp = AddApiAnn kw (AR sp)
+undeltaSpan :: RealSrcSpan -> AnnKeywordId -> DeltaPos -> AddEpAnn
+undeltaSpan anchor kw dp = AddEpAnn kw (AR sp)
   where
     (l,c) = undelta (ss2pos anchor) dp (LayoutStartCol 0)
     len = length (keywordToString (G kw))

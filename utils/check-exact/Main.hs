@@ -878,9 +878,9 @@ addHiding1 _libdir (L l p) = do
           v2 = L (           noAnnSrcSpanDP0 l2) (IEVar noExtField (L (noAnnSrcSpanDP0 l2) (IEName n2)))
           impHiding = L (SrcSpanAnn (ApiAnn (Anchor (realSrcSpan l0) m0)
                                      (AnnList Nothing
-                                              (Just (AddApiAnn AnnOpenP  d1))
-                                              (Just (AddApiAnn AnnCloseP d0))
-                                              [(AddApiAnn AnnHiding d1)]
+                                              (Just (AddEpAnn AnnOpenP  d1))
+                                              (Just (AddEpAnn AnnCloseP d0))
+                                              [(AddEpAnn AnnHiding d1)]
                                               [])
                                        noCom) l0) [v1,v2]
           imp1' = imp1 { ideclHiding = Just (True,impHiding)}
@@ -903,9 +903,9 @@ addHiding2 _libdir (L l p) = do
           Just (_,L lh ns) = ideclHiding imp1
           lh' = (SrcSpanAnn (ApiAnn (Anchor (realSrcSpan (locA lh)) m0)
                                      (AnnList Nothing
-                                              (Just (AddApiAnn AnnOpenP  d1))
-                                              (Just (AddApiAnn AnnCloseP d0))
-                                              [(AddApiAnn AnnHiding d1)]
+                                              (Just (AddEpAnn AnnOpenP  d1))
+                                              (Just (AddEpAnn AnnCloseP d0))
+                                              [(AddEpAnn AnnHiding d1)]
                                               [])
                                        noCom) (locA lh))
           n1 = L (noAnnSrcSpanDP0 l1) (mkVarUnqual (mkFastString "n1"))
