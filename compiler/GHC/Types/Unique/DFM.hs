@@ -59,7 +59,7 @@ module GHC.Types.Unique.DFM (
         partitionUDFM,
         anyUDFM, allUDFM,
         pprUniqDFM, pprUDFM,
-
+        insertUDFMIntoLeft,
         udfmToList,
         udfmToUfm,
         nonDetStrictFoldUDFM,
