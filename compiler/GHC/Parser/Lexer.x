@@ -2348,8 +2348,8 @@ data PState = PState {
         -- the GHC API can do source to source conversions.
         -- See note [exact print annotations] in GHC.Parser.Annotation
         eof_pos :: Maybe (RealSrcSpan, RealSrcSpan), -- pos, gap to prior token
-        header_comments :: Maybe [LAnnotationComment],
-        comment_q :: [LAnnotationComment],
+        header_comments :: Maybe [LEpaComment],
+        comment_q :: [LEpaComment],
 
         -- Haddock comments accumulated in ascending order of their location
         -- (BufPos). We use OrdList to get O(1) snoc.
@@ -2918,21 +2918,21 @@ instance MonadP P where
     let (comment_q', newAnns) = allocateComments ss (comment_q s) in
       POk s {
          comment_q = comment_q'
-       } (AnnComments newAnns)
+       } (EpaComments newAnns)
   allocatePriorCommentsP ss = P $ \s ->
     let (header_comments', comment_q', newAnns)
              = allocatePriorComments ss (comment_q s) (header_comments s) in
       POk s {
          header_comments = header_comments',
          comment_q = comment_q'
-       } (AnnComments newAnns)
+       } (EpaComments newAnns)
   allocateFinalCommentsP ss = P $ \s ->
     let (header_comments', comment_q', newAnns)
              = allocateFinalComments ss (comment_q s) (header_comments s) in
       POk s {
          header_comments = header_comments',
          comment_q = comment_q'
-       } (AnnCommentsBalanced (fromMaybe [] header_comments') (reverse newAnns))
+       } (EpaCommentsBalanced (fromMaybe [] header_comments') (reverse newAnns))
 
 getCommentsFor :: (MonadP m) => SrcSpan -> m EpAnnComments
 getCommentsFor (RealSrcSpan l _) = allocateCommentsP l
@@ -3456,8 +3456,8 @@ queueComment c = P $ \s -> POk s {
 
 allocateComments
   :: RealSrcSpan
-  -> [LAnnotationComment]
-  -> ([LAnnotationComment], [LAnnotationComment])
+  -> [LEpaComment]
+  -> ([LEpaComment], [LEpaComment])
 allocateComments ss comment_q =
   let
     (before,rest)  = break (\(L l _) -> isRealSubspanOf (anchor l) ss) comment_q
@@ -3469,9 +3469,9 @@ allocateComments ss comment_q =
 
 allocatePriorComments
   :: RealSrcSpan
-  -> [LAnnotationComment]
-  -> Maybe [LAnnotationComment]
-  -> (Maybe [LAnnotationComment], [LAnnotationComment], [LAnnotationComment])
+  -> [LEpaComment]
+  -> Maybe [LEpaComment]
+  -> (Maybe [LEpaComment], [LEpaComment], [LEpaComment])
 allocatePriorComments ss comment_q mheader_comments =
   let
     cmp (L l _) = anchor l <= ss
@@ -3485,9 +3485,9 @@ allocatePriorComments ss comment_q mheader_comments =
 
 allocateFinalComments
   :: RealSrcSpan
-  -> [LAnnotationComment]
-  -> Maybe [LAnnotationComment]
-  -> (Maybe [LAnnotationComment], [LAnnotationComment], [LAnnotationComment])
+  -> [LEpaComment]
+  -> Maybe [LEpaComment]
+  -> (Maybe [LEpaComment], [LEpaComment], [LEpaComment])
 allocateFinalComments ss comment_q mheader_comments =
   let
     cmp (L l _) = anchor l <= ss
@@ -3499,19 +3499,19 @@ allocateFinalComments ss comment_q mheader_comments =
       Nothing -> (Just newAnns,    [], comment_q')
       Just _ -> (mheader_comments, [], comment_q' ++ newAnns)
 
-commentToAnnotation :: RealLocated Token -> LAnnotationComment
-commentToAnnotation (L l (ITdocCommentNext s ll))  = mkLAnnotationComment l ll (AnnDocCommentNext s)
-commentToAnnotation (L l (ITdocCommentPrev s ll))  = mkLAnnotationComment l ll (AnnDocCommentPrev s)
-commentToAnnotation (L l (ITdocCommentNamed s ll)) = mkLAnnotationComment l ll (AnnDocCommentNamed s)
-commentToAnnotation (L l (ITdocSection n s ll))    = mkLAnnotationComment l ll (AnnDocSection n s)
-commentToAnnotation (L l (ITdocOptions s ll))      = mkLAnnotationComment l ll (AnnDocOptions s)
-commentToAnnotation (L l (ITlineComment s ll))     = mkLAnnotationComment l ll (AnnLineComment s)
-commentToAnnotation (L l (ITblockComment s ll))    = mkLAnnotationComment l ll (AnnBlockComment s)
+commentToAnnotation :: RealLocated Token -> LEpaComment
+commentToAnnotation (L l (ITdocCommentNext s ll))  = mkLEpaComment l ll (EpaDocCommentNext s)
+commentToAnnotation (L l (ITdocCommentPrev s ll))  = mkLEpaComment l ll (EpaDocCommentPrev s)
+commentToAnnotation (L l (ITdocCommentNamed s ll)) = mkLEpaComment l ll (EpaDocCommentNamed s)
+commentToAnnotation (L l (ITdocSection n s ll))    = mkLEpaComment l ll (EpaDocSection n s)
+commentToAnnotation (L l (ITdocOptions s ll))      = mkLEpaComment l ll (EpaDocOptions s)
+commentToAnnotation (L l (ITlineComment s ll))     = mkLEpaComment l ll (EpaLineComment s)
+commentToAnnotation (L l (ITblockComment s ll))    = mkLEpaComment l ll (EpaBlockComment s)
 commentToAnnotation _                           = panic "commentToAnnotation"
 
 -- see Note [PsSpan in Comments]
-mkLAnnotationComment :: RealSrcSpan -> PsSpan -> AnnotationCommentTok -> LAnnotationComment
-mkLAnnotationComment l ll tok = L (realSpanAsAnchor l) (AnnComment tok (psRealSpan ll))
+mkLEpaComment :: RealSrcSpan -> PsSpan -> EpaCommentTok -> LEpaComment
+mkLEpaComment l ll tok = L (realSpanAsAnchor l) (EpaComment tok (psRealSpan ll))
 
 -- ---------------------------------------------------------------------
 
