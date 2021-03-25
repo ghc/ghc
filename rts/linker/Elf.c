@@ -713,12 +713,13 @@ ocGetNames_ELF ( ObjectCode* oc )
 #if defined(NEED_GOT) || RTS_LINKER_USE_MMAP
           if (USE_CONTIGUOUS_MMAP || RtsFlags.MiscFlags.linkerAlwaysPic) {
               /* The space for bss sections is already preallocated */
-              ASSERT(oc->bssBegin != NULL);
+              CHECK(oc->bssBegin != NULL);
               alloc = SECTION_NOMEM;
+              CHECK(oc->image != 0x0);
               start =
                 oc->image + roundUpToAlign(oc->bssBegin - oc->image, align);
               oc->bssBegin = (char*)start + size;
-              ASSERT(oc->bssBegin <= oc->bssEnd);
+              CHECK(oc->bssBegin <= oc->bssEnd);
           } else {
               /* Use mmapForLinker to allocate .bss, otherwise the malloced
                * address might be out of range for sections that are mmaped.
@@ -733,6 +734,7 @@ ocGetNames_ELF ( ObjectCode* oc )
               mapped_offset = 0;
               mapped_size = roundUpToPage(size);
           }
+          CHECK(start != 0x0);
 #else
           alloc = SECTION_MALLOC;
           start = stgCallocBytes(1, size, "ocGetNames_ELF(BSS)");
@@ -742,6 +744,13 @@ ocGetNames_ELF ( ObjectCode* oc )
          debugBelch("BSS section at 0x%x, size %d\n",
                          zspace, shdr[i].sh_size);
          */
+#if defined(arm_HOST_ARCH)
+         if(start == 0x0) {
+            debugBelch("ocGetNames_ELF: section no %d, kind: %d, size: %d from %s has start %p",
+                       i, kind, size, OC_INFORMATIVE_FILENAME(oc), start);
+          }
+#endif
+          CHECK(start != 0x0);
           addSection(&sections[i], kind, alloc, start, size,
                      mapped_offset, mapped_start, mapped_size);
 
@@ -817,6 +826,14 @@ ocGetNames_ELF ( ObjectCode* oc )
               alloc = SECTION_MMAP;
           }
 #endif
+
+#if defined(arm_HOST_ARCH)
+         if(start == 0x0) {
+            debugBelch("ocGetNames_ELF: section no %d, kind: %d, size: %d from %s has start %p",
+                       i, kind, size, OC_INFORMATIVE_FILENAME(oc), start);
+          }
+#endif
+          CHECK(start != 0x0);
           addSection(&sections[i], kind, alloc, start, size,
                      mapped_offset, mapped_start, mapped_size);
 
@@ -834,6 +851,13 @@ ocGetNames_ELF ( ObjectCode* oc )
 
           addProddableBlock(oc, start, size);
       } else {
+#if defined(arm_HOST_ARCH)
+         if(oc->image+offset == 0x0) {
+            debugBelch("ocGetNames_ELF: section no %d, kind: %d, size: %d from %s has start %p",
+                       i, kind, size, OC_INFORMATIVE_FILENAME(oc), oc->image+offset);
+          }
+#endif
+          CHECK(oc->image+offset != 0x0);
           addSection(&oc->sections[i], kind, alloc, oc->image+offset, size,
                      0, 0, 0);
           oc->sections[i].info->nstubs = 0;
@@ -963,6 +987,11 @@ ocGetNames_ELF ( ObjectCode* oc )
                    symbol->addr = (SymbolAddr*)(
                            (intptr_t) oc->sections[secno].start +
                            (intptr_t) symbol->elf_sym->st_value);
+#if defined(arm_HOST_ARCH)
+                   if(symbol->addr == 0x0) {
+                        debugBelch("ocGetNames_ELF: %s in section %s (no %d, kind: %d; %p+%d), from %s has an empty address", nm, oc->sections[secno].info->name, secno, oc->sections[secno].kind, oc->sections[secno].start, oc->sections[secno].size, OC_INFORMATIVE_FILENAME(oc));
+                   }
+#endif
                    CHECK(symbol->addr != 0x0);
                    if (ELF_ST_BIND(symbol->elf_sym->st_info) == STB_LOCAL) {
                        isLocal = true;
