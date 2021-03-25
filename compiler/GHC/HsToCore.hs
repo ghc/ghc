@@ -90,7 +90,6 @@ import GHC.Unit.Module.ModIface
 
 import Data.List (partition)
 import Data.IORef
-import Control.Monad( when )
 import GHC.Driver.Plugins ( LoadedPlugin(..) )
 
 {-
@@ -438,8 +437,7 @@ dsRule (L loc (HsRule { rd_name = name
         ; rule <- dsMkUserRule this_mod is_local
                          rule_name rule_act fn_name final_bndrs args
                          final_rhs
-        ; when (wopt Opt_WarnInlineRuleShadowing dflags) $
-          warnRuleShadowing rule_name rule_act fn_id arg_ids
+        ; warnRuleShadowing rule_name rule_act fn_id arg_ids
 
         ; return (Just rule)
         } } }
