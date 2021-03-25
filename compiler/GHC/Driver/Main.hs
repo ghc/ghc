@@ -217,7 +217,7 @@ import qualified GHC.Data.Stream as Stream
 import GHC.Data.Stream (Stream)
 
 import Data.Data hiding (Fixity, TyCon)
-import Data.Maybe       ( fromJust, fromMaybe )
+import Data.Maybe       ( fromJust )
 import Data.List        ( nub, isPrefixOf, partition )
 import Control.Monad
 import Data.IORef
@@ -462,13 +462,9 @@ hscParse' mod_summary
             -- filter them out:
             srcs2 <- liftIO $ filterM doesFileExist srcs1
 
-            let api_anns = ApiAnns {
-                      apiAnnRogueComments = (fromMaybe [] (header_comments pst)) ++ comment_q pst
-                   }
-                res = HsParsedModule {
+            let res = HsParsedModule {
                       hpm_module    = rdr_module,
-                      hpm_src_files = srcs2,
-                      hpm_annotations = api_anns
+                      hpm_src_files = srcs2
                    }
 
             -- apply parse transformation of plugins
