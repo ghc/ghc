@@ -3,6 +3,7 @@
 -- | Platform description
 module GHC.Platform
    ( Platform (..)
+   , platformConstants
    , PlatformWordSize(..)
    , PlatformConstants(..)
    , platformArch
@@ -45,6 +46,7 @@ import GHC.Read
 import GHC.ByteOrder (ByteOrder(..))
 import GHC.Platform.Constants
 import GHC.Platform.ArchOS
+import GHC.Utils.Panic.Plain
 
 import Data.Word
 import Data.Int
@@ -67,10 +69,15 @@ data Platform = Platform
       -- ^ Determines whether we will be compiling info tables that reside just
       --   before the entry code, or with an indirection to the entry code. See
       --   TABLES_NEXT_TO_CODE in includes/rts/storage/InfoTables.h.
-   , platformConstants                :: !PlatformConstants
+   , platform_constants               :: !(Maybe PlatformConstants)
       -- ^ Constants such as structure offsets, type sizes, etc.
    }
    deriving (Read, Show, Eq)
+
+platformConstants :: Platform -> PlatformConstants
+platformConstants platform = case platform_constants platform of
+  Nothing -> panic "Platform constants not available!"
+  Just c  -> c
 
 data PlatformWordSize
   = PW4 -- ^ A 32-bit platform
