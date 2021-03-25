@@ -2688,7 +2688,7 @@ instance ExactPrint (TyClDecl GhcPs) where
           markEpAnn an AnnCloseC
       where
         top_matter = do
-          annotationsToComments (apiAnnAnns an)  [AnnOpenP, AnnCloseP]
+          annotationsToComments (epAnnAnns an)  [AnnOpenP, AnnCloseP]
           markEpAnn an AnnClass
           exactVanillaDeclHead an lclas tyvars fixity context
           unless (null fds) $ do
@@ -3282,7 +3282,7 @@ instance ExactPrint (ConDecl GhcPs) where
     mapM_ markAnnotated doc
     mapM_ markAnnotated cons
     markEpAnn an AnnDcolon
-    annotationsToComments (apiAnnAnns an)  [AnnOpenP, AnnCloseP]
+    annotationsToComments (epAnnAnns an)  [AnnOpenP, AnnCloseP]
     -- when has_forall $ markEpAnn an AnnForall
     markAnnotated bndrs
     -- mapM_ markAnnotated qvars
@@ -4011,12 +4011,6 @@ setLayoutOffsetP c = do
   debugM $ "setLayoutOffsetP:" ++ show c
   modify (\s -> s { pLHS = c })
 
--- getEofPos :: (Monad m, Monoid w) => EP w m RealSrcSpan
--- getEofPos = do
---   as <- gets epEpAnns
---   case apiAnnEofPos as of
---     Nothing -> return placeholderRealSpan
---     Just ss -> return ss
 
 -- ---------------------------------------------------------------------
 -------------------------------------------------------------------------

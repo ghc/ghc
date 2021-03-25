@@ -308,7 +308,7 @@ Note that (Foo a) might not be an instance of Ord.
 -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
 --             'GHC.Parser.Annotation.AnnClose','GHC.Parser.Annotation.AnnComma'
 
--- For details on above see note [Api annotations] in GHC.Parser.Annotation
+-- For details on above see note [exact print annotations] in GHC.Parser.Annotation
 data DataCon
   = MkData {
         dcName    :: Name,      -- This is the name of the *source data con*
