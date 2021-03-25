@@ -107,7 +107,7 @@
                  (UnchangedAnchor))
                 (GrhsAnn
                  (Nothing)
-                 (AddApiAnn AnnEqual (AR { mod185.hs:5:6 })))
+                 (AddEpAnn AnnEqual (AR { mod185.hs:5:6 })))
                 (AnnComments
                  []))
                []
