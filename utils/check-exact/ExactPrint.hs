@@ -439,12 +439,12 @@ printStringAtSs ss str = printStringAtKw' (realSrcSpan ss) str
 -- ---------------------------------------------------------------------
 
 -- AZ:TODO get rid of this
-printStringAtMkw :: Maybe AnnAnchor -> String -> EPP ()
+printStringAtMkw :: Maybe EpaAnchor -> String -> EPP ()
 printStringAtMkw (Just aa) s = printStringAtAA aa s
 printStringAtMkw Nothing s = printStringAtLsDelta (DP 0 1) s
 
 
-printStringAtAA :: AnnAnchor -> String -> EPP ()
+printStringAtAA :: EpaAnchor -> String -> EPP ()
 printStringAtAA (AR r) s = printStringAtKw' r s
 printStringAtAA (AD d) s = do
   pe <- getPriorEndD
@@ -525,7 +525,7 @@ markAnnOpen :: EpAnn -> SourceText -> String -> EPP ()
 markAnnOpen an NoSourceText txt   = markLocatedAALS an id AnnOpen (Just txt)
 markAnnOpen an (SourceText txt) _ = markLocatedAALS an id AnnOpen (Just txt)
 
-markAnnOpen' :: Maybe AnnAnchor -> SourceText -> String -> EPP ()
+markAnnOpen' :: Maybe EpaAnchor -> SourceText -> String -> EPP ()
 markAnnOpen' ms NoSourceText txt   = printStringAtMkw ms txt
 markAnnOpen' ms (SourceText txt) _ = printStringAtMkw ms txt
 
@@ -544,15 +544,15 @@ markParen (EpAnn _ (AnnParen pt o c) _) f = markKwA (f $ kw pt) (f (o, c))
     kw AnnParensSquare = (AnnOpenS, AnnCloseS)
 
 
-markAnnKw :: EpAnn' a -> (a -> AnnAnchor) -> AnnKeywordId -> EPP ()
+markAnnKw :: EpAnn' a -> (a -> EpaAnchor) -> AnnKeywordId -> EPP ()
 markAnnKw EpAnnNotUsed  _ _  = return ()
 markAnnKw (EpAnn _ a _) f kw = markKwA kw (f a)
 
-markAnnKwAll :: EpAnn' a -> (a -> [AnnAnchor]) -> AnnKeywordId -> EPP ()
+markAnnKwAll :: EpAnn' a -> (a -> [EpaAnchor]) -> AnnKeywordId -> EPP ()
 markAnnKwAll EpAnnNotUsed  _ _  = return ()
 markAnnKwAll (EpAnn _ a _) f kw = mapM_ (markKwA kw) (sort (f a))
 
-markAnnKwM :: EpAnn' a -> (a -> Maybe AnnAnchor) -> AnnKeywordId -> EPP ()
+markAnnKwM :: EpAnn' a -> (a -> Maybe EpaAnchor) -> AnnKeywordId -> EPP ()
 markAnnKwM EpAnnNotUsed  _ _ = return ()
 markAnnKwM (EpAnn _ a _) f kw = go (f a)
   where
@@ -598,7 +598,7 @@ markKw :: AddEpAnn -> EPP ()
 markKw (AddEpAnn kw ss) = markKwA kw ss
 
 -- | This should be the main driver of the process, managing comments
-markKwA :: AnnKeywordId -> AnnAnchor -> EPP ()
+markKwA :: AnnKeywordId -> EpaAnchor -> EPP ()
 markKwA kw aa = printStringAtAA aa (keywordToString (G kw))
 
 -- ---------------------------------------------------------------------
@@ -3184,7 +3184,7 @@ instance ExactPrint (LocatedN RdrName) where
         markTrailing t
 
 markName :: NameAdornment
-         -> AnnAnchor -> Maybe (AnnAnchor,RdrName) -> AnnAnchor -> EPP ()
+         -> EpaAnchor -> Maybe (EpaAnchor,RdrName) -> EpaAnchor -> EPP ()
 markName adorn open mname close = do
   let (kwo,kwc) = adornments adorn
   markKw (AddEpAnn kwo open)

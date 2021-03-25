@@ -13,7 +13,7 @@ module GHC.Parser.Annotation (
 
   -- * In-tree Exact Print Annotations
   AddEpAnn(..),
-  AnnAnchor(..), annAnchorRealSrcSpan,
+  EpaAnchor(..), epaAnchorRealSrcSpan,
   DeltaPos(..),
 
   EpAnn, EpAnn'(..), Anchor(..), AnchorOperation(..),
@@ -378,15 +378,15 @@ data HasE = HasE | NoE
 -- ---------------------------------------------------------------------
 
 -- | Captures an annotation, storing the @'AnnKeywordId'@ and its
--- location.  The parser only ever inserts @'AnnAnchor'@ fields with a
+-- location.  The parser only ever inserts @'EpaAnchor'@ fields with a
 -- RealSrcSpan being the original location of the annotation in the
 -- source file.
--- The @'AnnAnchor'@ can also store a delta position if the AST has been
+-- The @'EpaAnchor'@ can also store a delta position if the AST has been
 -- modified and needs to be pretty printed again.
 -- The usual way an 'AddEpAnn' is created is using the 'mj' ("make
 -- jump") function, and then it can be inserted into the appropriate
 -- annotation.
-data AddEpAnn = AddEpAnn AnnKeywordId AnnAnchor deriving (Data,Show,Eq,Ord)
+data AddEpAnn = AddEpAnn AnnKeywordId EpaAnchor deriving (Data,Show,Eq,Ord)
 
 -- | The anchor for an @'AnnKeywordId'@. The Parser inserts the @'AR'@
 -- variant, giving the exact location of the original item in the
@@ -394,7 +394,7 @@ data AddEpAnn = AddEpAnn AnnKeywordId AnnAnchor deriving (Data,Show,Eq,Ord)
 -- provide a position for the item relative to the end of the previous
 -- item in the source.  This is useful when editing an AST prior to
 -- exact printing the changed one.
-data AnnAnchor = AR RealSrcSpan
+data EpaAnchor = AR RealSrcSpan
                | AD DeltaPos
                deriving (Data,Show,Eq,Ord)
 
@@ -411,11 +411,11 @@ data DeltaPos =
     } deriving (Show,Eq,Ord,Data)
 
 
-annAnchorRealSrcSpan :: AnnAnchor -> RealSrcSpan
-annAnchorRealSrcSpan (AR r) = r
-annAnchorRealSrcSpan (AD _) = placeholderRealSpan
+epaAnchorRealSrcSpan :: EpaAnchor -> RealSrcSpan
+epaAnchorRealSrcSpan (AR r) = r
+epaAnchorRealSrcSpan (AD _) = placeholderRealSpan
 
-instance Outputable AnnAnchor where
+instance Outputable EpaAnchor where
   ppr (AR r) = text "AR" <+> ppr r
   ppr (AD d) = text "AD" <+> ppr d
 
@@ -476,8 +476,8 @@ See Note [XRec and Anno in the AST] for details of how this is done.
 --    type instance XLet GhcPs = EpAnn' AnnsLet
 --    data AnnsLet
 --      = AnnsLet {
---          alLet :: AnnAnchor,
---          alIn :: AnnAnchor
+--          alLet :: EpaAnchor,
+--          alIn :: EpaAnchor
 --          } deriving Data
 --
 -- The spacing between the items under the scope of a given EpAnn' is
@@ -637,11 +637,11 @@ meaning we can have type LocatedN RdrName
 -- | Captures the location of punctuation occuring between items,
 -- normally in a list.  It is captured as a trailing annotation.
 data TrailingAnn
-  = AddSemiAnn AnnAnchor    -- ^ Trailing ';'
-  | AddCommaAnn AnnAnchor   -- ^ Trailing ','
-  | AddVbarAnn AnnAnchor    -- ^ Trailing '|'
-  | AddRarrowAnn AnnAnchor  -- ^ Trailing '->'
-  | AddRarrowAnnU AnnAnchor -- ^ Trailing '->', unicode variant
+  = AddSemiAnn EpaAnchor    -- ^ Trailing ';'
+  | AddCommaAnn EpaAnchor   -- ^ Trailing ','
+  | AddVbarAnn EpaAnchor    -- ^ Trailing '|'
+  | AddRarrowAnn EpaAnchor  -- ^ Trailing '->'
+  | AddRarrowAnnU EpaAnchor -- ^ Trailing '->', unicode variant
   deriving (Data,Show,Eq, Ord)
 
 instance Outputable TrailingAnn where
@@ -686,8 +686,8 @@ data AnnList
 data AnnParen
   = AnnParen {
       ap_adornment :: ParenType,
-      ap_open      :: AnnAnchor,
-      ap_close     :: AnnAnchor
+      ap_open      :: EpaAnchor,
+      ap_close     :: EpaAnchor
       } deriving (Data)
 
 -- | Detail of the "brackets" used in an 'AnnParen' API Annotation.
@@ -709,10 +709,10 @@ parenTypeKws AnnParensSquare = (AnnOpenS, AnnCloseS)
 -- | API Annotation for the 'Context' data type.
 data AnnContext
   = AnnContext {
-      ac_darrow    :: Maybe (IsUnicodeSyntax, AnnAnchor),
+      ac_darrow    :: Maybe (IsUnicodeSyntax, EpaAnchor),
                       -- ^ location and encoding of the '=>', if present.
-      ac_open      :: [AnnAnchor], -- ^ zero or more opening parentheses.
-      ac_close     :: [AnnAnchor]  -- ^ zero or more closing parentheses.
+      ac_open      :: [EpaAnchor], -- ^ zero or more opening parentheses.
+      ac_close     :: [EpaAnchor]  -- ^ zero or more closing parentheses.
       } deriving (Data)
 
 
@@ -727,35 +727,35 @@ data NameAnn
   -- | Used for a name with an adornment, so '`foo`', '(bar)'
   = NameAnn {
       nann_adornment :: NameAdornment,
-      nann_open      :: AnnAnchor,
-      nann_name      :: AnnAnchor,
-      nann_close     :: AnnAnchor,
+      nann_open      :: EpaAnchor,
+      nann_name      :: EpaAnchor,
+      nann_close     :: EpaAnchor,
       nann_trailing  :: [TrailingAnn]
       }
   -- | Used for @(,,,)@, or @(#,,,#)#
   | NameAnnCommas {
       nann_adornment :: NameAdornment,
-      nann_open      :: AnnAnchor,
-      nann_commas    :: [AnnAnchor],
-      nann_close     :: AnnAnchor,
+      nann_open      :: EpaAnchor,
+      nann_commas    :: [EpaAnchor],
+      nann_close     :: EpaAnchor,
       nann_trailing  :: [TrailingAnn]
       }
   -- | Used for @()@, @(##)@, @[]@
   | NameAnnOnly {
       nann_adornment :: NameAdornment,
-      nann_open      :: AnnAnchor,
-      nann_close     :: AnnAnchor,
+      nann_open      :: EpaAnchor,
+      nann_close     :: EpaAnchor,
       nann_trailing  :: [TrailingAnn]
       }
   -- | Used for @->@, as an identifier
   | NameAnnRArrow {
-      nann_name      :: AnnAnchor,
+      nann_name      :: EpaAnchor,
       nann_trailing  :: [TrailingAnn]
       }
   -- | Used for an item with a leading @'@. The annotation for
   -- unquoted item is stored in 'nann_quoted'.
   | NameAnnQuote {
-      nann_quote     :: AnnAnchor,
+      nann_quote     :: EpaAnchor,
       nann_quoted    :: SrcSpanAnnN,
       nann_trailing  :: [TrailingAnn]
       }
@@ -827,12 +827,12 @@ addTrailingAnnToA _ t cs n = n { anns = addTrailing (anns n)
 
 -- | Helper function used in the parser to add a comma location to an
 -- existing annotation.
-addTrailingCommaToN :: SrcSpan -> EpAnn' NameAnn -> AnnAnchor -> EpAnn' NameAnn
+addTrailingCommaToN :: SrcSpan -> EpAnn' NameAnn -> EpaAnchor -> EpAnn' NameAnn
 addTrailingCommaToN s EpAnnNotUsed l
   = EpAnn (spanAsAnchor s) (NameAnnTrailing [AddCommaAnn l]) noCom
 addTrailingCommaToN _ n l = n { anns = addTrailing (anns n) l }
   where
-    addTrailing :: NameAnn -> AnnAnchor -> NameAnn
+    addTrailing :: NameAnn -> EpaAnchor -> NameAnn
     addTrailing n l = n { nann_trailing = AddCommaAnn l : nann_trailing n }
 
 -- ---------------------------------------------------------------------
