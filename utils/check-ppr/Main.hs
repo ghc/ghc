@@ -42,7 +42,7 @@ testOneFile libdir fileName = do
        p <- parseOneFile libdir fileName
        let
          origAst = showPprUnsafe
-                     $ showAstData BlankSrcSpan BlankApiAnnotations
+                     $ showAstData BlankSrcSpan BlankEpAnnotations
                      $ eraseLayoutInfo (pm_parsed_source p)
          pped    = pragmas ++ "\n" ++ pp (pm_parsed_source p)
          pragmas = getPragmas (pm_parsed_source p)
@@ -58,7 +58,7 @@ testOneFile libdir fileName = do
 
        let newAstStr :: String
            newAstStr = showPprUnsafe
-                         $ showAstData BlankSrcSpan BlankApiAnnotations
+                         $ showAstData BlankSrcSpan BlankEpAnnotations
                          $ eraseLayoutInfo (pm_parsed_source p')
        writeBinFile newAstFile newAstStr
 
