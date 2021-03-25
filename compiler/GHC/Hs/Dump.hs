@@ -57,6 +57,7 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
               `extQ` annotationAddApiAnn
               `extQ` annotationGrhsAnn
               `extQ` annotationApiAnnHsCase
+              `extQ` annotationApiAnnHsLet
               `extQ` annotationAnnList
               `extQ` annotationApiAnnImportDecl
               `extQ` annotationAnnParen
@@ -236,6 +237,9 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
 
             annotationApiAnnHsCase :: ApiAnn' ApiAnnHsCase -> SDoc
             annotationApiAnnHsCase = annotation' (text "ApiAnn' ApiAnnHsCase")
+
+            annotationApiAnnHsLet :: ApiAnn' AnnsLet -> SDoc
+            annotationApiAnnHsLet = annotation' (text "ApiAnn' AnnsLet")
 
             annotationAnnList :: ApiAnn' AnnList -> SDoc
             annotationAnnList = annotation' (text "ApiAnn' AnnList")
