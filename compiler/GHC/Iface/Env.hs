@@ -1,6 +1,6 @@
 -- (c) The University of Glasgow 2002-2006
 
-{-# LANGUAGE CPP, RankNTypes, BangPatterns #-}
+{-# LANGUAGE CPP, RankNTypes #-}
 
 module GHC.Iface.Env (
         newGlobalBinder, newInteractiveBinder,
