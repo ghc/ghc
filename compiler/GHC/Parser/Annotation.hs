@@ -129,30 +129,50 @@ enclosing them
 
 PARSER STATE
 
-There is one field in PState (the parser state) which play a role
-with annotations.
+There are three fields in PState (the parser state) which play a role
+with annotation comments.
 
 >  comment_q :: [LAnnotationComment],
+>  header_comments :: Maybe [LAnnotationComment],
+>  eof_pos :: Maybe (RealSrcSpan, RealSrcSpan), -- pos, gap to prior token
 
 The 'comment_q' field captures comments as they are seen in the token stream,
 so that when they are ready to be allocated via the parser they are
 available.
 
+The 'header_comments' capture the comments coming at the top of the
+source file.  They are moved there from the `comment_q` when comments
+are allocated for the first top-level declaration.
+
+The 'eof_pos' captures the final location in the file, and the
+location of the immediately preceding token to the last location, so
+that the exact-printer can work out how far to advance to add the
+trailing whitespace.
+
 PARSER EMISSION OF ANNOTATIONS
 
-The parser interacts with the lexer using the function
+The parser interacts with the lexer using the functions
 
-> addAnnotation :: RealSrcSpan -> AnnKeywordId -> RealSrcSpan -> P ()
+> getCommentsFor      :: (MonadP m) => SrcSpan -> m ApiAnnComments
+> getPriorCommentsFor :: (MonadP m) => SrcSpan -> m ApiAnnComments
+> getFinalCommentsFor :: (MonadP m) => SrcSpan -> m ApiAnnComments
 
-which takes the AST element RealSrcSpan, the annotation keyword and the
-target RealSrcSpan.
+The 'getCommentsFor' function is the one used most often.  It takes
+the AST element SrcSpan and removes and returns any comments in the
+'comment_q' that are inside the span. 'allocateComments' in 'Lexer' is
+responsible for making sure we only return comments that actually fit
+in the 'SrcSpan'.
 
-This adds the annotation to the `annotations` field of `PState` and
-transfers any comments in `comment_q` WHICH ARE ENCLOSED by the
-RealSrcSpan of this element to the `annotations_comments` field in
-`PState`.  (Comments which are outside of this annotation are deferred
-until later. 'allocateComments' in 'Lexer' is responsible for making
-sure we only attach comments that actually fit in the 'SrcSpan'.)
+The 'getPriorCommentsFor' function is used for top-level declarations,
+and removes and returns any comments in the 'comment_q' that either
+precede or are included in the given SrcSpan. This is to ensure that
+preceding documentation comments are kept together with the
+declaration they belong to.
+
+The 'getFinalCommentsFor' function is called right at the end when EOF
+is hit. This drains the 'comment_q' completely, and returns the
+'header_comments', remaining 'comment_q' entries and the
+'eof_pos'. These values are inserted into the 'HsModule' AST element.
 
 The wiki page describing this feature is
 https://gitlab.haskell.org/ghc/ghc/wikis/api-annotations
@@ -167,8 +187,7 @@ https://gitlab.haskell.org/ghc/ghc/wikis/api-annotations
 -- AST.
 --
 -- The annotations, together with original source comments are made available in
--- the @'pm_annotations'@ field of @'GHC.Driver.Env.HsParsedModule'@.
--- Comments are only retained if @'Opt_KeepRawTokenStream'@ is set.
+-- the @'pm_parsed_source@ field of @'GHC.Driver.Env.HsParsedModule'@.
 --
 -- The wiki page describing this feature is
 -- https://gitlab.haskell.org/ghc/ghc/wikis/api-annotations
