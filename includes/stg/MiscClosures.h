@@ -254,9 +254,11 @@ RTS_ENTRY(stg_NO_FINALIZER);
 #if IN_STG_CODE
 extern DLL_IMPORT_RTS StgWordArray stg_CHARLIKE_closure;
 extern DLL_IMPORT_RTS StgWordArray stg_INTLIKE_closure;
+extern DLL_IMPORT_RTS StgWordArray stg_WORDLIKE_closure;
 #else
-extern DLL_IMPORT_RTS StgIntCharlikeClosure stg_CHARLIKE_closure[];
-extern DLL_IMPORT_RTS StgIntCharlikeClosure stg_INTLIKE_closure[];
+extern DLL_IMPORT_RTS StgWordlikeClosure stg_CHARLIKE_closure[];
+extern DLL_IMPORT_RTS StgWordlikeClosure stg_INTLIKE_closure[];
+extern DLL_IMPORT_RTS StgWordlikeClosure stg_WORDLIKE_closure[];
 #endif
 
 /* StgStartup */

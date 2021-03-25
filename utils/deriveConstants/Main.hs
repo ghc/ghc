@@ -623,6 +623,9 @@ wanteds os = concat
           ,constantWord Haskell "MIN_CHARLIKE" "MIN_CHARLIKE"
           ,constantWord Haskell "MAX_CHARLIKE" "MAX_CHARLIKE"
 
+          ,constantWord Haskell "MIN_WORDLIKE" "MIN_WORDLIKE"
+          ,constantWord Haskell "MAX_WORDLIKE" "MAX_WORDLIKE"
+
           ,constantWord Haskell "MUT_ARR_PTRS_CARD_BITS" "MUT_ARR_PTRS_CARD_BITS"
 
           -- A section of code-generator-related MAGIC CONSTANTS.
