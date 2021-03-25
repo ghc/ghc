@@ -42,9 +42,7 @@ point' = (37,9)
 data A = A deriving Show
 
 makeNc :: IO NameCache
-makeNc = do
-  uniq_supply <- mkSplitUniqSupply 'z'
-  return $ initNameCache uniq_supply []
+makeNc = initNameCache 'z' []
 
 dynFlagsForPrinting :: String -> IO DynFlags
 dynFlagsForPrinting libdir = do
@@ -55,7 +53,7 @@ main = do
   libdir:_ <- getArgs
   df <- dynFlagsForPrinting libdir
   nc <- makeNc
-  hfr <- readHieFile (NCU (\f -> pure $ snd $ f nc)) "HieQueries.hie"
+  hfr <- readHieFile nc "HieQueries.hie"
   let hf = hie_file_result hfr
       refmap = generateReferencesMap $ getAsts $ hie_asts hf
   explainEv df hf refmap point
