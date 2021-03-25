@@ -657,7 +657,7 @@ mkLHsVarTuple ids ext = mkLHsTupleExpr (map nlHsVar ids) ext
 nlTuplePat :: [LPat GhcPs] -> Boxity -> LPat GhcPs
 nlTuplePat pats box = noLocA (TuplePat noAnn pats box)
 
-missingTupArg :: EpAnn' AnnAnchor -> HsTupArg GhcPs
+missingTupArg :: EpAnn' EpaAnchor -> HsTupArg GhcPs
 missingTupArg ann = Missing ann
 
 mkLHsPatTup :: [LPat GhcRn] -> LPat GhcRn
