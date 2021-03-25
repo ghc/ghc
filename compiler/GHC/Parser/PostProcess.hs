@@ -2721,8 +2721,8 @@ data PV_Accum =
   PV_Accum
     { pv_warnings        :: Bag PsWarning
     , pv_errors          :: Bag PsError
-    , pv_header_comments :: Maybe [LAnnotationComment]
-    , pv_comment_q       :: [LAnnotationComment]
+    , pv_header_comments :: Maybe [LEpaComment]
+    , pv_comment_q       :: [LEpaComment]
     }
 
 data PV_Result a = PV_Ok PV_Accum a | PV_Failed PV_Accum
@@ -2811,21 +2811,21 @@ instance MonadP PV where
     let (comment_q', newAnns) = allocateComments ss (pv_comment_q s) in
       PV_Ok s {
          pv_comment_q = comment_q'
-       } (AnnComments newAnns)
+       } (EpaComments newAnns)
   allocatePriorCommentsP ss = PV $ \_ s ->
     let (header_comments', comment_q', newAnns)
           = allocatePriorComments ss (pv_comment_q s) (pv_header_comments s) in
       PV_Ok s {
          pv_header_comments = header_comments',
          pv_comment_q = comment_q'
-       } (AnnComments newAnns)
+       } (EpaComments newAnns)
   allocateFinalCommentsP ss = PV $ \_ s ->
     let (header_comments', comment_q', newAnns)
           = allocateFinalComments ss (pv_comment_q s) (pv_header_comments s) in
       PV_Ok s {
          pv_header_comments = header_comments',
          pv_comment_q = comment_q'
-       } (AnnCommentsBalanced (fromMaybe [] header_comments') (reverse newAnns))
+       } (EpaCommentsBalanced (fromMaybe [] header_comments') (reverse newAnns))
 
 {- Note [Parser-Validator Hint]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

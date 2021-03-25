@@ -17,14 +17,14 @@
      (Nothing)
      []
      []))
-   (AnnCommentsBalanced
+   (EpaCommentsBalanced
     []
     [(L
       (Anchor
        { T18791.hs:6:1 }
        (UnchangedAnchor))
-      (AnnComment
-       (AnnEofComment)
+      (EpaComment
+       (EpaEofComment)
        { T18791.hs:6:1 }))]))
   (VirtualBraces
    (1))
@@ -41,7 +41,7 @@
                   (UnchangedAnchor))
                  (AnnListItem
                   [])
-                 (AnnComments
+                 (EpaComments
                   [])) { T18791.hs:(4,1)-(5,17) })
     (TyClD
      (NoExtField)
@@ -52,7 +52,7 @@
         (UnchangedAnchor))
        [(AddEpAnn AnnData (AR { T18791.hs:4:1-4 }))
        ,(AddEpAnn AnnWhere (AR { T18791.hs:4:8-12 }))]
-       (AnnComments
+       (EpaComments
         []))
       (L
        (SrcSpanAnn (EpAnnNotUsed) { T18791.hs:4:6 })
@@ -69,7 +69,7 @@
          (UnchangedAnchor))
         [(AddEpAnn AnnData (AR { T18791.hs:4:1-4 }))
         ,(AddEpAnn AnnWhere (AR { T18791.hs:4:8-12 }))]
-        (AnnComments
+        (EpaComments
          []))
        (DataType)
        (Nothing)
@@ -83,7 +83,7 @@
             { T18791.hs:5:3-17 }
             (UnchangedAnchor))
            [(AddEpAnn AnnDcolon (AR { T18791.hs:5:7-8 }))]
-           (AnnComments
+           (EpaComments
             []))
           [(L
             (SrcSpanAnn (EpAnnNotUsed) { T18791.hs:5:3-5 })
@@ -106,7 +106,7 @@
                            (AnnListItem
                             [(AddRarrowAnn
                               (AR { T18791.hs:5:14-15 }))])
-                           (AnnComments
+                           (EpaComments
                             [])) { T18791.hs:5:10-12 })
               (HsTyVar
                (EpAnn
@@ -114,7 +114,7 @@
                  { T18791.hs:5:10-12 }
                  (UnchangedAnchor))
                 []
-                (AnnComments
+                (EpaComments
                  []))
                (NotPromoted)
                (L
@@ -129,7 +129,7 @@
               { T18791.hs:5:17 }
               (UnchangedAnchor))
              []
-             (AnnComments
+             (EpaComments
               []))
             (NotPromoted)
             (L

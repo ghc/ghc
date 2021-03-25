@@ -16,14 +16,14 @@
      (Nothing)
      []
      []))
-   (AnnCommentsBalanced
+   (EpaCommentsBalanced
     []
     [(L
       (Anchor
        { mod185.hs:6:1 }
        (UnchangedAnchor))
-      (AnnComment
-       (AnnEofComment)
+      (EpaComment
+       (EpaEofComment)
        { mod185.hs:6:1 }))]))
   (VirtualBraces
    (1))
@@ -44,7 +44,7 @@
         (AR { mod185.hs:3:16-24 }))
        (Nothing)
        (Nothing))
-      (AnnComments
+      (EpaComments
        []))
      (NoSourceText)
      (L
@@ -64,7 +64,7 @@
                   (UnchangedAnchor))
                  (AnnListItem
                   [])
-                 (AnnComments
+                 (EpaComments
                   [])) { mod185.hs:5:1-24 })
     (ValD
      (NoExtField)
@@ -86,7 +86,7 @@
              { mod185.hs:5:1-24 }
              (UnchangedAnchor))
             []
-            (AnnComments
+            (EpaComments
              []))
            (FunRhs
             (L
@@ -108,7 +108,7 @@
                 (GrhsAnn
                  (Nothing)
                  (AddEpAnn AnnEqual (AR { mod185.hs:5:6 })))
-                (AnnComments
+                (EpaComments
                  []))
                []
                (L
