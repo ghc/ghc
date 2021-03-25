@@ -1,4 +1,4 @@
 (MG
 (NoExtField)
 (L
-(SrcSpanAnn (ApiAnnNotUsed) { <combineSrcSpans: files differ> })
+(SrcSpanAnn (EpAnnNotUsed) { <combineSrcSpans: files differ> })

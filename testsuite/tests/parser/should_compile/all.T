@@ -134,7 +134,7 @@ def only_MG_loc(x):
     (MG
       (NoExtField)
       (L
-       (SrcSpanAnn (ApiAnnNotUsed) { <location> })
+       (SrcSpanAnn (EpAnnNotUsed) { <location> })
     """
     ls = x.split("\n")
     mgLocs = (loc.strip() for (mg,loc) in zip(ls,ls[3:])

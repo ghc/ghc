@@ -18,32 +18,20 @@ module Utils
   -- ) where
   where
 import Control.Monad.State
--- import qualified Data.ByteString as B
--- import GHC.Generics hiding (Fixity)
 import Data.Function
 import Data.Ord (comparing)
 
 import GHC.Hs.Dump
--- import Language.Haskell.GHC.ExactPrint.Types
 import Lookup
 
--- import GHC.Data.Bag
--- import GHC.Driver.Session
--- import GHC.Data.FastString
 import GHC hiding (AnnComment)
 import qualified GHC
--- import qualified Name           as GHC
--- import qualified NameSet        as GHC
--- import GHC.Utils.Outputable
 import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
 import GHC.Driver.Ppr
 import GHC.Data.FastString
--- import GHC.Types.Var
--- import GHC.Types.Name.Occurrence
 
--- import qualified OccName(OccName(..),occNameString,pprNameSpaceBrief)
 import qualified GHC.Types.Name.Occurrence as OccName (OccName(..),pprNameSpaceBrief)
 
 import Control.Arrow
@@ -56,8 +44,6 @@ import Data.List (foldl', sortBy, elemIndex)
 import Debug.Trace
 import Types
 
--- ---------------------------------------------------------------------
--- ---------------------------------------------------------------------
 -- ---------------------------------------------------------------------
 
 -- |Global switch to enable debug tracing in ghc-exactprint Delta / Print
@@ -443,8 +429,8 @@ data NameSpace = VarName        -- Variables, including "real" data constructors
  -- ---------------------------------------------------------------------
 
 locatedAnAnchor :: LocatedAn a t -> RealSrcSpan
-locatedAnAnchor (L (SrcSpanAnn ApiAnnNotUsed l) _) = realSrcSpan l
-locatedAnAnchor (L (SrcSpanAnn (ApiAnn a _ _) _) _) = anchor a
+locatedAnAnchor (L (SrcSpanAnn EpAnnNotUsed l) _) = realSrcSpan l
+locatedAnAnchor (L (SrcSpanAnn (EpAnn a _ _) _) _) = anchor a
 
  -- ---------------------------------------------------------------------
 
@@ -460,7 +446,7 @@ locatedAnAnchor (L (SrcSpanAnn (ApiAnn a _ _) _) _) = anchor a
 showAst :: (Data a) => a -> String
 showAst ast
   = showSDocUnsafe
-    $ showAstData NoBlankSrcSpan NoBlankApiAnnotations ast
+    $ showAstData NoBlankSrcSpan NoBlankEpAnnotations ast
 
 -- ---------------------------------------------------------------------
 -- Putting these here for the time being, to avoid import loops
