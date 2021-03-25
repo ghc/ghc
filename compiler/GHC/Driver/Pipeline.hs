@@ -814,19 +814,21 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_input_buf, mb_phase)
                    | otherwise -> do
                        debugTraceMsg logger dflags 4
                            (text "Running the full pipeline again for -dynamic-too")
-                       let dflags' = flip gopt_unset Opt_BuildDynamicToo
+                       let dflags0 = flip gopt_unset Opt_BuildDynamicToo
                                       $ setDynamicNow
                                       $ dflags
-                       hsc_env' <- newHscEnv dflags'
-                       (dbs,unit_state,home_unit) <- initUnits logger dflags' Nothing
+                       hsc_env' <- newHscEnv dflags0
+                       (dbs,unit_state,home_unit,mconstants) <- initUnits logger dflags0 Nothing
+                       dflags1 <- updatePlatformConstants dflags0 mconstants
                        let unit_env = UnitEnv
-                             { ue_platform  = targetPlatform dflags'
-                             , ue_namever   = ghcNameVersion dflags'
+                             { ue_platform  = targetPlatform dflags1
+                             , ue_namever   = ghcNameVersion dflags1
                              , ue_home_unit = home_unit
                              , ue_units     = unit_state
                              }
                        let hsc_env'' = hsc_env'
-                            { hsc_unit_env = unit_env
+                            { hsc_dflags   = dflags1
+                            , hsc_unit_env = unit_env
                             , hsc_unit_dbs = Just dbs
                             }
                        _ <- runPipeline' start_phase hsc_env'' env input_fn'
