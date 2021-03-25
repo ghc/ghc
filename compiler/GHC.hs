@@ -637,9 +637,12 @@ checkBrokenTablesNextToCode' logger dflags
 setSessionDynFlags :: GhcMonad m => DynFlags -> m ()
 setSessionDynFlags dflags0 = do
   logger <- getLogger
-  dflags <- checkNewDynFlags logger dflags0
+  dflags1 <- checkNewDynFlags logger dflags0
   hsc_env <- getSession
-  (dbs,unit_state,home_unit) <- liftIO $ initUnits logger dflags (hsc_unit_dbs hsc_env)
+  let cached_unit_dbs = hsc_unit_dbs hsc_env
+  (dbs,unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags1 cached_unit_dbs
+
+  dflags <- liftIO $ updatePlatformConstants dflags1 mconstants
 
   -- Interpreter
   interp <- if gopt Opt_ExternalInterpreter dflags
@@ -705,24 +708,28 @@ setProgramDynFlags dflags = setProgramDynFlags_ True dflags
 setProgramDynFlags_ :: GhcMonad m => Bool -> DynFlags -> m Bool
 setProgramDynFlags_ invalidate_needed dflags = do
   logger <- getLogger
-  dflags' <- checkNewDynFlags logger dflags
+  dflags0 <- checkNewDynFlags logger dflags
   dflags_prev <- getProgramDynFlags
-  let changed = packageFlagsChanged dflags_prev dflags'
+  let changed = packageFlagsChanged dflags_prev dflags0
   if changed
     then do
         hsc_env <- getSession
-        (dbs,unit_state,home_unit) <- liftIO $ initUnits logger dflags' (hsc_unit_dbs hsc_env)
+        let cached_unit_dbs = hsc_unit_dbs hsc_env
+        (dbs,unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags0 cached_unit_dbs
+
+        dflags1 <- liftIO $ updatePlatformConstants dflags0 mconstants
+
         let unit_env = UnitEnv
-              { ue_platform  = targetPlatform dflags'
-              , ue_namever   = ghcNameVersion dflags'
+              { ue_platform  = targetPlatform dflags1
+              , ue_namever   = ghcNameVersion dflags1
               , ue_home_unit = home_unit
               , ue_units     = unit_state
               }
-        modifySession $ \h -> h{ hsc_dflags   = dflags'
+        modifySession $ \h -> h{ hsc_dflags   = dflags1
                                , hsc_unit_dbs = Just dbs
                                , hsc_unit_env = unit_env
                                }
-    else modifySession $ \h -> h{ hsc_dflags = dflags' }
+    else modifySession $ \h -> h{ hsc_dflags = dflags0 }
   when invalidate_needed $ invalidateModSummaryCache
   return changed
 

@@ -77,6 +77,7 @@ import GHC.Driver.Session
 
 import GHC.Platform
 import GHC.Platform.Ways
+import GHC.Platform.Constants
 
 import GHC.Unit.Database
 import GHC.Unit.Info
@@ -575,7 +576,7 @@ listUnitInfo state = Map.elems (unitInfoMap state)
 -- 'initUnits' can be called again subsequently after updating the
 -- 'packageFlags' field of the 'DynFlags', and it will update the
 -- 'unitState' in 'DynFlags'.
-initUnits :: Logger -> DynFlags -> Maybe [UnitDatabase UnitId] -> IO ([UnitDatabase UnitId], UnitState, HomeUnit)
+initUnits :: Logger -> DynFlags -> Maybe [UnitDatabase UnitId] -> IO ([UnitDatabase UnitId], UnitState, HomeUnit, Maybe PlatformConstants)
 initUnits logger dflags cached_dbs = do
 
   let forceUnitInfoMap (state, _) = unitInfoMap state `seq` ()
@@ -595,7 +596,31 @@ initUnits logger dflags cached_dbs = do
                              (homeUnitInstanceOf_ dflags)
                              (homeUnitInstantiations_ dflags)
 
-  return (dbs,unit_state,home_unit)
+  -- try to find platform constants
+  mconstants <- do
+    let
+      try_parse d = do
+          let p = d </> "DerivedConstants.h"
+          doesFileExist p >>= \case
+            True  -> Just <$> parseConstantsHeader p
+            False -> return Nothing
+
+      find_constants []     = return Nothing
+      find_constants (x:xs) = try_parse x >>= \case
+          Nothing -> find_constants xs
+          Just c  -> return (Just c)
+
+    if homeUnitId_ dflags == rtsUnitId
+      then do
+        -- we're building the RTS! Try to find the header in its includes
+        find_constants (includePathsGlobal (includePaths dflags))
+      else
+        -- try to find the platform constants in the RTS unit
+        case lookupUnitId unit_state rtsUnitId of
+          Nothing   -> return Nothing
+          Just info -> find_constants (fmap ST.unpack (unitIncludeDirs info))
+
+  return (dbs,unit_state,home_unit,mconstants)
 
 mkHomeUnit
     :: UnitState
