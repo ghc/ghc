@@ -918,11 +918,10 @@ checkStability
         -> IO StableModules
 
 checkStability hsc_env hpt sccs all_home_mods =
-  -- TODO: foldlM together with IO does not appear to run in constant space
   foldlM checkSCC (emptyUniqSet, emptyUniqSet) sccs
   where
    checkSCC :: StableModules -> SCC ModSummary -> IO StableModules
-   checkSCC (stable_obj, stable_bco) scc0 = do
+   checkSCC (!stable_obj, !stable_bco) scc0 = do
        stableObjects <- checkStableObjects
        return $ case () of
         _ | stableObjects -> (addListToUniqSet stable_obj scc_mods, stable_bco)
