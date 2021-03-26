@@ -58,7 +58,8 @@ llvmCodeGen dflags h cmm_stream
          let doWarn = wopt Opt_WarnUnsupportedLlvmVersion dflags
          when (not (llvmVersionSupported ver) && doWarn) $ putMsg dflags $
            "You are using an unsupported version of LLVM!" $$
-           "Currently only " <> text (llvmVersionStr supportedLlvmVersion) <> " is supported." <+>
+           "Currently only" <+> text (llvmVersionStr supportedLlvmVersionMin) <+>
+           "to" <+> text (llvmVersionStr supportedLlvmVersionMax) <+> "is supported." <+>
            "System LLVM version: " <> text (llvmVersionStr ver) $$
            "We will try though..."
          let isS390X = platformArch (targetPlatform dflags) == ArchS390X
@@ -67,8 +68,14 @@ llvmCodeGen dflags h cmm_stream
            "Warning: For s390x the GHC calling convention is only supported since LLVM version 10." <+>
            "You are using LLVM version: " <> text (llvmVersionStr ver)
 
+       -- HACK: the Nothing case here is potentially wrong here but we
+       -- currently don't use the LLVM version to guide code generation
+       -- so this is okay.
+       let llvm_ver :: LlvmVersion
+           llvm_ver = fromMaybe supportedLlvmVersionMin mb_ver
+
        -- run code generation
-       a <- runLlvm dflags (fromMaybe supportedLlvmVersion mb_ver) bufh $
+       a <- runLlvm dflags llvm_ver bufh $
          llvmCodeGen' (liftStream cmm_stream)
 
        bFlush bufh

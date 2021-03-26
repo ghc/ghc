@@ -111,7 +111,8 @@ prepareTree dest = do
         , "mk"
         , "rts"
         , "rules"
-        , "utils" ]
+        , "utils"
+        , "m4" ]
     srcFiles =
         [ "GIT_COMMIT_ID"
         , "HACKING.md"
