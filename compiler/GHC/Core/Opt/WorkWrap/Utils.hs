@@ -20,7 +20,7 @@ import GHC.Prelude
 
 import GHC.Core
 import GHC.Core.Utils   ( exprType, mkCast, mkDefaultCase, mkSingleAltCase
-                        , dataConRepFSInstPat )
+                        , bindNonRec, dataConRepFSInstPat )
 import GHC.Types.Id
 import GHC.Types.Id.Info ( JoinArity )
 import GHC.Core.DataCon
@@ -29,14 +29,14 @@ import GHC.Types.Cpr
 import GHC.Core.Make    ( mkAbsentErrorApp, mkCoreUbxTup
                         , mkCoreApp, mkCoreLet )
 import GHC.Types.Id.Make ( voidArgId, voidPrimId )
-import GHC.Builtin.Types      ( tupleDataCon, unboxedUnitTy )
-import GHC.Types.Literal ( absentLiteralOf, rubbishLit )
+import GHC.Builtin.Types      ( tupleDataCon )
+import GHC.Types.Literal ( mkLitRubbish )
 import GHC.Types.Var.Env ( mkInScopeSet )
 import GHC.Types.Var.Set ( VarSet )
 import GHC.Core.Type
 import GHC.Core.Multiplicity
 import GHC.Core.Predicate ( isClassPred )
-import GHC.Types.RepType  ( isVoidTy, typePrimRep )
+import GHC.Types.RepType  ( isVoidTy, typeMonoPrimRep_maybe )
 import GHC.Core.Coercion
 import GHC.Core.FamInstEnv
 import GHC.Types.Basic       ( Boxity(..) )
@@ -895,9 +895,9 @@ mkWWstr_one dflags fam_envs has_inlineable_prag arg
   = return (False, [arg],  nop_fn, nop_fn)
 
   | isAbsDmd dmd
-  , Just work_fn <- mk_absent_let dflags fam_envs arg dmd
-     -- Absent case.  We can't always handle absence for arbitrary
-     -- unlifted types, so we need to choose just the cases we can
+  , Just work_fn <- mk_absent_let dflags arg dmd
+     -- Absent case.  We can't always handle absence for rep-polymorphic
+     -- types, so we need to choose just the cases we can
      -- (that's what mk_absent_let does)
   = return (True, [], nop_fn, work_fn)
 
@@ -1281,70 +1281,74 @@ part of the function (post transformation) anyway.
 *                                                                      *
 ************************************************************************
 
-Note [Absent errors]
-~~~~~~~~~~~~~~~~~~~~
+Note [Absent fillers]
+~~~~~~~~~~~~~~~~~~~~~
 Consider
-  data T = MkT [Int] [Int] ![Int]
+
+  data T = MkT [Int] [Int] ![Int]  -- NB: last field is strict
   f :: T -> Int# -> blah
-  f ps w = case ps of MkT xs _ _ -> <body mentioning xs>
-Then f gets a strictness sig of <S(L,A,A)><A>. We make worker $wf thus:
+  f ps w = case ps of MkT xs ys zs -> <body mentioning xs>
 
-$wf :: [Int] -> blah
-$wf xs = case ps of MkT xs _ _ -> <body mentioning xs>
-  where
-    ys = absentError "ys :: [Int]"
-    zs = LitRubbish True
-    ps = MkT xs ys zs
-    w  = 0#
+Then f gets a strictness sig of <S(L,A,A)><A>. We make a worker $wf thus:
 
-We make a let-binding for Absent arguments, such as ys and w, that are not even
-passed to the worker. They should, of course, never be used. We distinguish four
-cases:
+  $wf :: [Int] -> blah
+  $wf xs = case ps of MkT xs _ _ -> <body mentioning xs>
+    where
+      ys = absentError "ys :: [Int]"
+      zs = RUBBISH[LiftedRep] @[Int]
+      ps = MkT xs ys zs
+      w  = RUBBISH[IntRep] @Int#
 
-1. Ordinary boxed, lifted arguments, like 'ys' We make a new binding for Ids
-   that are marked absent, thus
-      let ys = absentError "ys :: [Int]"
-   The idea is that this binding will never be used; but if it
-   buggily is used we'll get a runtime error message.
+The absent arguments 'ys', 'zs' and 'w' aren't even passed to the worker.
+And neither should they! They are never used, their value is irrelevant (hence
+they are *dead code*) and they are probably discarded after the next run of the
+Simplifier (when they are in fact *unreachable code*). Yet, we have to come up
+with "filler" values that we bind the absent arg Ids to.
 
-2. Boxed, lifted types, with a strict demand, like 'zs'.  You may ask: how the
-   demand be both absent and strict?  That's exactly what happens for 'zs': it
-   is not used, so its demand is Absent, but then during w/w, in
-   addDataConStrictness, we strictify the demand.  So it gets cardinality C_10,
-   the empty interval.
+That is exactly what Note [Rubbish values] are for: A convenient way to
+conjure filler values at any type (and any representation or levity!).
 
-   We don't want to use an error-thunk for 'zs' because MkT's third argument has
-   a bang, and hence should be always evaluated. This turned out to be
-   important when fixing #16970, which establishes the invariant that strict
-   constructor arguments are always evaluated. So we use LitRubbish instead
-   of an error thunk -- see #19133.
+Needless to say, there are some wrinkles:
 
-   These first two cases are distinguished by isStrictDmd in lifted_rhs.
+  1. In case we have a absent, /lazy/, and /lifted/ arg, we use an error-thunk
+     instead. If absence analysis was wrong (e.g., #11126) and the binding
+     in fact is used, then we get a nice panic message instead of undefined
+     runtime behavior (See Modes of failure from Note [Rubbish values]).
 
-3. Unboxed types, like 'w', with a type like Float#, Int#. Coping with absence
-   for unboxed types is important; see, for example, #4306 and #15627.  We
-   simply find a suitable literal, using Literal.absentLiteralOf.  We don't have
-   literals for every primitive type, so the function is partial.
+     Obviously, we can't use an error-thunk if the value is of unlifted rep
+     (like 'Int#' or 'MutVar#'), because we'd immediately evaluate the panic.
 
-4. Boxed, unlifted types, like (Array# t).  We can't use absentError because
-   unlifted bindings ares strict.  So we use LitRubbish, which we need to apply
-   to the required type.
+  2. We also mustn't put an error-thunk (that fills in for an absent value of
+     lifted rep) in a strict field, because #16970 establishes the invariant
+     that strict fields are always evaluated, by (re-)evaluating what is put in
+     a strict field. That's the reason why 'zs' binds a rubbish literal instead
+     of an error-thunk, see #19133.
 
-Case (2) and (4) crucially use LitRubbish as the placeholder: see Note [Rubbish
-literals] in GHC.Types.Literal.  We could do that in case (1) as well, but we
-get slightly better self-checking with an error thunk.
+     How do we detect when we are about to put an error-thunk in a strict field?
+     Ideally, we'd just look at the 'StrictnessMark' of the DataCon's field, but
+     it's quite nasty to thread the marks though 'mkWWstr' and 'mkWWstr_one'.
+     So we rather look out for a necessary condition for strict fields:
+     Note [Add demands for strict constructors] makes it so that the demand on
+     'zs' is absent and /strict/: It will get cardinality 'C_10', the empty
+     interval, rather than 'C_00'. Hence the 'isStrictDmd' check: It guarantees
+     we never fill in an error-thunk for an absent strict field.
+     But that also means we emit a rubbish lit for other args that have
+     cardinality 'C_10' (say, the arg to a bottoming function) where we could've
+     used an error-thunk, but that's a small price to pay for simplicity.
 
-Suppose we use LitRubbish and absence analysis is Wrong, so that the "absent"
-value is used after all.  Then in case (2) we could get a seg-fault, because we
-may have replaced, say, a [Either Int Bool] by (), and that will fail if we do
-case analysis on it.  Similarly with boxed unlifted types, case (4).
+  3. We can only emit a RubbishLit if the arg's type @arg_ty@ is mono-rep, e.g.
+     of the form @TYPE rep@ where @rep@ is not (and doesn't contain) a variable.
+     Why? Because if we don't know its representation (e.g. size in memory,
+     register class), we don't know what or how much rubbish to emit in codegen.
+     'typeMonoPrimRep_maybe' returns 'Nothing' in this case and we simply fall
+     back to passing the original parameter to the worker.
 
-In case (3), if absence analysis is wrong we could conceivably get an exception,
-from a divide-by-zero with the absent value.  But it's very unlikely.
+     Note that currently this case should not occur, because binders always
+     have to be representation monomorphic. But in the future, we might allow
+     levity polymorphism, e.g. a polymorphic levity variable in 'BoxedRep'.
 
-Only in case (1) can we guarantee a civilised runtime error.  Not much we can do
-about this; we really rely on absence analysis to be correct.
-
+While (1) and (2) are simply an optimisation in terms of compiler debugging
+experience, (3) should be irrelevant in most programs, if not all.
 
 Historical note: I did try the experiment of using an error thunk for unlifted
 things too, relying on the simplifier to drop it as dead code.  But this is
@@ -1368,66 +1372,46 @@ fragile
 --
 -- If @mk_absent_let _ id == Just wrap@, then @wrap e@ will wrap a let binding
 -- for @id@ with that RHS around @e@. Otherwise, there could no suitable RHS be
--- found (currently only happens for bindings of 'VecRep' representation).
-mk_absent_let :: DynFlags -> FamInstEnvs -> Id -> Demand -> Maybe (CoreExpr -> CoreExpr)
-mk_absent_let dflags fam_envs arg dmd
+-- found.
+mk_absent_let :: DynFlags -> Id -> Demand -> Maybe (CoreExpr -> CoreExpr)
+mk_absent_let dflags arg dmd
+  -- The lifted case: Bind 'absentError' for a nice panic message if we are
+  -- wrong (like we were in #11126). See (1) in Note [Absent fillers]
+  | Just [LiftedRep] <- mb_mono_prim_reps
+  , not (isStrictDmd dmd) -- See (2) in Note [Absent fillers]
+  = Just (Let (NonRec arg panic_rhs))
 
-  -- The lifted case: Bind 'absentError'
-  -- See Note [Absent errors]
-  | not (isUnliftedType arg_ty)
-  = Just (Let (NonRec lifted_arg lifted_rhs))
-  -- The 'UnliftedRep' (because polymorphic) case: Bind @__RUBBISH \@arg_ty@
-  -- See Note [Absent errors]
+  -- The default case for mono rep: Bind @RUBBISH[prim_reps] \@arg_ty@
+  -- See Note [Absent fillers], the main part
+  | Just prim_reps <- mb_mono_prim_reps
+  = Just (bindNonRec arg (mkTyApps (Lit (mkLitRubbish prim_reps)) [arg_ty]))
 
-  | [UnliftedRep] <- typePrimRep arg_ty
-  = Just (Let (NonRec arg unlifted_rhs))
-
-  -- The monomorphic unlifted cases: Bind to some literal, if possible
-  -- See Note [Absent errors]
-  | Just tc <- tyConAppTyCon_maybe nty
-  , Just lit <- absentLiteralOf tc
-  = Just (Let (NonRec arg (Lit lit `mkCast` mkSymCo co)))
-
-  | nty `eqType` unboxedUnitTy
-  = Just (Let (NonRec arg (Var voidPrimId `mkCast` mkSymCo co)))
-
-  | otherwise
+  -- Catch all: Either @arg_ty@ wasn't of form @TYPE rep@ or @rep@ wasn't mono rep.
+  -- See (3) in Note [Absent fillers]
+  | Nothing <- mb_mono_prim_reps
   = WARN( True, text "No absent value for" <+> ppr arg_ty )
-    Nothing -- Can happen for 'State#' and things of 'VecRep'
+    Nothing
   where
-    lifted_arg   = arg `setIdStrictness` botSig `setIdCprInfo` mkCprSig 0 botCpr
-              -- Note in strictness signature that this is bottoming
-              -- (for the sake of the "empty case scrutinee not known to
-              -- diverge for sure lint" warning)
+    arg_ty            = idType arg
+    mb_mono_prim_reps = typeMonoPrimRep_maybe arg_ty
 
-    lifted_rhs | isStrictDmd dmd = mkTyApps (Lit (rubbishLit True))  [arg_ty]
-               | otherwise       = mkAbsentErrorApp arg_ty msg
-    unlifted_rhs = mkTyApps (Lit (rubbishLit False)) [arg_ty]
+    panic_rhs = mkAbsentErrorApp arg_ty msg
 
-    arg_ty       = idType arg
-
-    -- Normalise the type to have best chance of finding an absent literal
-    -- e.g. (#17852)   data unlifted N = MkN Int#
-    --                 f :: N -> a -> a
-    --                 f _ x = x
-    (co, nty)    = topNormaliseType_maybe fam_envs arg_ty
-                   `orElse` (mkRepReflCo arg_ty, arg_ty)
-
-    msg          = showSDoc (gopt_set dflags Opt_SuppressUniques)
-                            (vcat
-                              [ text "Arg:" <+> ppr arg
-                              , text "Type:" <+> ppr arg_ty
-                              , file_msg
-                              ])
-    file_msg     = case outputFile dflags of
-                     Nothing -> empty
-                     Just f  -> text "In output file " <+> quotes (text f)
+    msg       = showSDoc (gopt_set dflags Opt_SuppressUniques)
+                         (vcat
+                           [ text "Arg:" <+> ppr arg
+                           , text "Type:" <+> ppr arg_ty
+                           , file_msg
+                           ])
               -- We need to suppress uniques here because otherwise they'd
               -- end up in the generated code as strings. This is bad for
               -- determinism, because with different uniques the strings
               -- will have different lengths and hence different costs for
               -- the inliner leading to different inlining.
               -- See also Note [Unique Determinism] in GHC.Types.Unique
+    file_msg  = case outputFile dflags of
+                  Nothing -> empty
+                  Just f  -> text "In output file " <+> quotes (text f)
 
 ww_prefix :: FastString
 ww_prefix = fsLit "ww"

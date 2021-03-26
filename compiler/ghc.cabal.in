@@ -77,7 +77,7 @@ Library
                    ghci == @ProjectVersionMunged@
 
     if os(windows)
-        Build-Depends: Win32  >= 2.3 && < 2.11
+        Build-Depends: Win32  >= 2.3 && < 2.13
     else
         if flag(terminfo)
             Build-Depends: terminfo == 0.4.*
@@ -549,6 +549,7 @@ Library
         GHC.StgToCmm.Heap
         GHC.StgToCmm.Hpc
         GHC.StgToCmm.Layout
+        GHC.StgToCmm.Lit
         GHC.StgToCmm.Monad
         GHC.StgToCmm.Prim
         GHC.StgToCmm.Prof
