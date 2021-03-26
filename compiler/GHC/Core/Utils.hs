@@ -1396,7 +1396,8 @@ isWorkFreeApp fn n_val_args
   | otherwise
   = case idDetails fn of
       DataConWorkId {} -> True
-      _                -> False
+      _                -> allTypeOrInvisArgs n_val_args (idType fn)
+                          -- Experimental: see #19569
 
 isCheapApp :: CheapAppFun
 isCheapApp fn n_val_args
