@@ -1,5 +1,5 @@
 module GHC.Types.TypeEnv
-   ( TypeEnv
+   ( TypeEnv(..)
    , emptyTypeEnv
    , lookupTypeEnv
    , mkTypeEnv
@@ -16,6 +16,8 @@ module GHC.Types.TypeEnv
    , typeEnvDataCons
    , typeEnvCoAxioms
    , typeEnvClasses
+   , elemTypeEnv
+   , mapTypeEnv
    )
 where
 
@@ -33,10 +35,11 @@ import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Var
 import GHC.Types.TyThing
+import GHC.Utils.Outputable
 
 -- | A map from 'Name's to 'TyThing's, constructed by typechecking
 -- local declarations or interface files
-type TypeEnv = NameEnv TyThing
+data TypeEnv = TypeEnv !(NameEnv TyThing)
 
 emptyTypeEnv    :: TypeEnv
 typeEnvElts     :: TypeEnv -> [TyThing]
@@ -48,8 +51,8 @@ typeEnvDataCons :: TypeEnv -> [DataCon]
 typeEnvClasses  :: TypeEnv -> [Class]
 lookupTypeEnv   :: TypeEnv -> Name -> Maybe TyThing
 
-emptyTypeEnv        = emptyNameEnv
-typeEnvElts     env = nameEnvElts env
+emptyTypeEnv        = TypeEnv emptyNameEnv
+typeEnvElts     (TypeEnv env) = nameEnvElts env
 typeEnvTyCons   env = [tc | ATyCon tc   <- typeEnvElts env]
 typeEnvCoAxioms env = [ax | ACoAxiom ax <- typeEnvElts env]
 typeEnvIds      env = [id | AnId id     <- typeEnvElts env]
@@ -61,11 +64,20 @@ typeEnvClasses  env = [cl | tc <- typeEnvTyCons env,
 mkTypeEnv :: [TyThing] -> TypeEnv
 mkTypeEnv things = extendTypeEnvList emptyTypeEnv things
 
+elemTypeEnv :: Name -> TypeEnv -> Bool
+elemTypeEnv n (TypeEnv env) = elemNameEnv n env
+
+mapTypeEnv :: (TyThing -> TyThing) -> TypeEnv -> TypeEnv
+mapTypeEnv f (TypeEnv env) = TypeEnv (mapNameEnv f env)
+
 mkTypeEnvWithImplicits :: [TyThing] -> TypeEnv
 mkTypeEnvWithImplicits things =
   mkTypeEnv things
-    `plusNameEnv`
+    `plusTypeEnv`
   mkTypeEnv (concatMap implicitTyThings things)
+
+plusTypeEnv :: TypeEnv -> TypeEnv -> TypeEnv
+plusTypeEnv (TypeEnv t1) (TypeEnv t2) = TypeEnv (t1 `plusNameEnv` t2)
 
 typeEnvFromEntities :: [Id] -> [TyCon] -> [PatSyn] -> [FamInst] -> TypeEnv
 typeEnvFromEntities ids tcs patsyns famInsts =
@@ -78,19 +90,19 @@ typeEnvFromEntities ids tcs patsyns famInsts =
  where
   all_tcs = tcs ++ famInstsRepTyCons famInsts
 
-lookupTypeEnv = lookupNameEnv
+lookupTypeEnv (TypeEnv t) = lookupNameEnv t
 
 -- Extend the type environment
 extendTypeEnv :: TypeEnv -> TyThing -> TypeEnv
-extendTypeEnv env thing = extendNameEnv env (getName thing) thing
+extendTypeEnv (TypeEnv env) thing = TypeEnv (extendNameEnv env (getName thing) thing)
 
 extendTypeEnvList :: TypeEnv -> [TyThing] -> TypeEnv
-extendTypeEnvList env things = foldl' extendTypeEnv env things
+extendTypeEnvList env things = (foldl' extendTypeEnv env things)
 
 extendTypeEnvWithIds :: TypeEnv -> [Id] -> TypeEnv
-extendTypeEnvWithIds env ids
-  = extendNameEnvList env [(getName id, AnId id) | id <- ids]
+extendTypeEnvWithIds (TypeEnv env) ids
+  = TypeEnv (extendNameEnvList env [(getName id, AnId id) | id <- ids])
 
-plusTypeEnv :: TypeEnv -> TypeEnv -> TypeEnv
-plusTypeEnv env1 env2 = plusNameEnv env1 env2
+instance Outputable TypeEnv where
+  ppr (TypeEnv t) = ppr t
 
