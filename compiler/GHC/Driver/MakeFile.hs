@@ -286,24 +286,27 @@ findDependency  :: HscEnv
                 -> IsBootInterface      -- Source import
                 -> Bool                 -- Record dependency on package modules
                 -> IO (Maybe FilePath)  -- Interface file
-findDependency hsc_env srcloc pkg imp is_boot include_pkg_deps
-  = do  {       -- Find the module; this will be fast because
-                -- we've done it once during downsweep
-          r <- findImportedModule hsc_env imp pkg
-        ; case r of
-            Found loc _
-                -- Home package: just depend on the .hi or hi-boot file
-                | isJust (ml_hs_file loc) || include_pkg_deps
-                -> return (Just (addBootSuffix_maybe is_boot (ml_hi_file loc)))
+findDependency hsc_env srcloc pkg imp is_boot include_pkg_deps = do
+  let fc        = hsc_FC hsc_env
+  let home_unit = hsc_home_unit hsc_env
+  let units     = hsc_units hsc_env
+  let dflags    = hsc_dflags hsc_env
+  -- Find the module; this will be fast because
+  -- we've done it once during downsweep
+  r <- findImportedModule fc units home_unit dflags imp pkg
+  case r of
+    Found loc _
+        -- Home package: just depend on the .hi or hi-boot file
+        | isJust (ml_hs_file loc) || include_pkg_deps
+        -> return (Just (addBootSuffix_maybe is_boot (ml_hi_file loc)))
 
-                -- Not in this package: we don't need a dependency
-                | otherwise
-                -> return Nothing
+        -- Not in this package: we don't need a dependency
+        | otherwise
+        -> return Nothing
 
-            fail ->
-                throwOneError $ mkPlainMsgEnvelope srcloc $
-                     cannotFindModule hsc_env imp fail
-        }
+    fail ->
+        throwOneError $ mkPlainMsgEnvelope srcloc $
+             cannotFindModule hsc_env imp fail
 
 -----------------------------
 writeDependency :: FilePath -> Handle -> [FilePath] -> FilePath -> IO ()
