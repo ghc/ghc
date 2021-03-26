@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE Safe #-}
 {-# LANGUAGE FlexibleInstances #-}
 module SH_Overlap1_A (

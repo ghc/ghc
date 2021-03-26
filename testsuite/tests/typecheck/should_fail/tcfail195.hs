@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE RankNTypes, GADTs #-}
 
 module ShouldFail where

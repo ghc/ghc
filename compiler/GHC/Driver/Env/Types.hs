@@ -6,7 +6,6 @@ module GHC.Driver.Env.Types
 
 import {-# SOURCE #-} GHC.Driver.Hooks
 import GHC.Driver.Session ( DynFlags, HasDynFlags(..) )
-import GHC.Linker.Types ( Loader )
 import GHC.Prelude
 import GHC.Runtime.Context
 import GHC.Runtime.Interpreter.Types ( Interp )
@@ -103,12 +102,11 @@ data HscEnv
                 -- This is mutable because packages will be demand-loaded during
                 -- a compilation run as required.
 
-        hsc_NC  :: {-# UNPACK #-} !(IORef NameCache),
-                -- ^ As with 'hsc_EPS', this is side-effected by compiling to
-                -- reflect sucking in interface files.  They cache the state of
-                -- external interface files, in effect.
+        hsc_NC  :: {-# UNPACK #-} !NameCache,
+                -- ^ Global Name cache so that each Name gets a single Unique.
+                -- Also track the origin of the Names.
 
-        hsc_FC   :: {-# UNPACK #-} !(IORef FinderCache),
+        hsc_FC   :: {-# UNPACK #-} !FinderCache,
                 -- ^ The cached result of performing finding in the file system
 
         hsc_type_env_var :: Maybe (Module, IORef TypeEnv)
@@ -119,9 +117,6 @@ data HscEnv
         , hsc_interp :: Maybe Interp
                 -- ^ target code interpreter (if any) to use for TH and GHCi.
                 -- See Note [Target code interpreter]
-
-        , hsc_loader :: Loader
-                -- ^ Loader (dynamic linker)
 
         , hsc_plugins :: ![LoadedPlugin]
                 -- ^ plugins dynamically loaded after processing arguments. What

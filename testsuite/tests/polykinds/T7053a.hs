@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE PolyKinds, GADTs #-}
 
 module T7053a where

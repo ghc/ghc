@@ -162,11 +162,13 @@ data Message a where
    :: Int                               -- size
    -> Message (RemoteRef BreakArray)
 
-  -- | Enable a breakpoint
-  EnableBreakpoint
+  -- | Set how many times a breakpoint should be ignored
+  --   also used for enable/disable
+  SetupBreakpoint
    :: RemoteRef BreakArray
-   -> Int                               -- index
-   -> Bool                              -- on or off
+   -> Int                           -- breakpoint index
+   -> Int                           -- ignore count to be stored in the BreakArray
+                                    -- -1 disable; 0 enable; >= 1 enable, ignore count.
    -> Message ()
 
   -- | Query the status of a breakpoint (True <=> enabled)
@@ -265,6 +267,8 @@ data THMessage a where
   AddForeignFilePath :: ForeignSrcLang -> FilePath -> THMessage (THResult ())
   IsExtEnabled :: Extension -> THMessage (THResult Bool)
   ExtsEnabled :: THMessage (THResult [Extension])
+  PutDoc :: TH.DocLoc -> String -> THMessage (THResult ())
+  GetDoc :: TH.DocLoc -> THMessage (THResult (Maybe String))
 
   StartRecover :: THMessage ()
   EndRecover :: Bool -> THMessage ()
@@ -305,6 +309,8 @@ getTHMessage = do
     20 -> THMsg <$> (AddForeignFilePath <$> get <*> get)
     21 -> THMsg <$> AddCorePlugin <$> get
     22 -> THMsg <$> ReifyType <$> get
+    23 -> THMsg <$> (PutDoc <$> get <*> get)
+    24 -> THMsg <$> GetDoc <$> get
     n -> error ("getTHMessage: unknown message " ++ show n)
 
 putTHMessage :: THMessage a -> Put
@@ -332,6 +338,8 @@ putTHMessage m = case m of
   AddForeignFilePath lang a   -> putWord8 20 >> put lang >> put a
   AddCorePlugin a             -> putWord8 21 >> put a
   ReifyType a                 -> putWord8 22 >> put a
+  PutDoc l s                  -> putWord8 23 >> put l >> put s
+  GetDoc l                    -> putWord8 24 >> put l
 
 
 data EvalOpts = EvalOpts
@@ -499,7 +507,7 @@ getMessage = do
       25 -> Msg <$> (MkCostCentres <$> get <*> get)
       26 -> Msg <$> (CostCentreStackInfo <$> get)
       27 -> Msg <$> (NewBreakArray <$> get)
-      28 -> Msg <$> (EnableBreakpoint <$> get <*> get <*> get)
+      28 -> Msg <$> (SetupBreakpoint <$> get <*> get <*> get)
       29 -> Msg <$> (BreakpointStatus <$> get <*> get)
       30 -> Msg <$> (GetBreakpointVar <$> get <*> get)
       31 -> Msg <$> return StartTH
@@ -542,7 +550,7 @@ putMessage m = case m of
   MkCostCentres mod ccs       -> putWord8 25 >> put mod >> put ccs
   CostCentreStackInfo ptr     -> putWord8 26 >> put ptr
   NewBreakArray sz            -> putWord8 27 >> put sz
-  EnableBreakpoint arr ix b   -> putWord8 28 >> put arr >> put ix >> put b
+  SetupBreakpoint arr ix cnt    -> putWord8 28 >> put arr >> put ix >> put cnt
   BreakpointStatus arr ix     -> putWord8 29 >> put arr >> put ix
   GetBreakpointVar a b        -> putWord8 30 >> put a >> put b
   StartTH                     -> putWord8 31

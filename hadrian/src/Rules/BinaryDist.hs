@@ -171,8 +171,8 @@ bindistRules = do
         -- other machine.
         need $ map (bindistFilesDir -/-)
                    (["configure", "Makefile"] ++ bindistInstallFiles)
-        need $ map ((bindistFilesDir -/- "wrappers") -/-) ["check-api-annotations"
-                   , "check-ppr", "ghc", "ghc-iserv", "ghc-pkg"
+        need $ map ((bindistFilesDir -/- "wrappers") -/-)
+                   [ "check-ppr", "check-exact", "ghc", "ghc-iserv", "ghc-pkg"
                    , "ghci-script", "haddock", "hpc", "hp2ps", "hsc2hs"
                    , "runghc"]
 
@@ -203,11 +203,14 @@ bindistRules = do
     root -/- "bindist" -/- "ghc-*" -/- "configure" %> \configurePath -> do
         ghcRoot <- topDirectory
         copyFile (ghcRoot -/- "aclocal.m4") (ghcRoot -/- "distrib" -/- "aclocal.m4")
+        copyDirectory (ghcRoot -/- "m4") (ghcRoot -/- "distrib")
         buildWithCmdOptions [] $
             target (vanillaContext Stage1 ghc) (Autoreconf $ ghcRoot -/- "distrib") [] []
         -- We clean after ourselves, moving the configure script we generated in
         -- our bindist dir
         removeFile (ghcRoot -/- "distrib" -/- "aclocal.m4")
+        removeDirectory (ghcRoot -/- "distrib" -/- "m4")
+
         moveFile (ghcRoot -/- "distrib" -/- "configure") configurePath
 
     -- Generate the Makefile that enables the "make install" part

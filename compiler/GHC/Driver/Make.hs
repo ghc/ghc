@@ -47,6 +47,7 @@ import GHC.Prelude
 import GHC.Tc.Utils.Backpack
 import GHC.Tc.Utils.Monad  ( initIfaceCheck )
 
+import GHC.Runtime.Interpreter
 import qualified GHC.Linker.Loader as Linker
 import GHC.Linker.Types
 
@@ -218,7 +219,7 @@ depanalPartial excluded_mods allow_dup_roots = do
     -- source files may have appeared in the home package that shadow
     -- external package modules, so we have to discard the existing
     -- cached finder data.
-    liftIO $ flushFinderCaches hsc_env
+    liftIO $ flushFinderCaches (hsc_FC hsc_env) (hsc_home_unit hsc_env)
 
     mod_summariesE <- liftIO $ downsweep
       hsc_env (mgExtendedModSummaries old_graph)
@@ -432,6 +433,7 @@ load' how_much mHscMessage mod_graph = do
     let hpt1   = hsc_HPT hsc_env
     let dflags = hsc_dflags hsc_env
     let logger = hsc_logger hsc_env
+    let interp = hscInterp hsc_env
 
     -- The "bad" boot modules are the ones for which we have
     -- B.hs-boot in the module graph, but no B.hs
@@ -505,7 +507,7 @@ load' how_much mHscMessage mod_graph = do
                              -- this list only serves as a poor man's set.
                              Just hmi <- [lookupHpt pruned_hpt m],
                              Just linkable <- [hm_linkable hmi] ]
-    liftIO $ unload hsc_env stable_linkables
+    liftIO $ unload interp hsc_env stable_linkables
 
     -- We could at this point detect cycles which aren't broken by
     -- a source-import, and complain immediately, but it seems better
@@ -709,7 +711,8 @@ loadFinish :: GhcMonad m => SuccessFlag -> SuccessFlag -> m SuccessFlag
 -- If the link failed, unload everything and return.
 loadFinish _all_ok Failed
   = do hsc_env <- getSession
-       liftIO $ unload hsc_env []
+       let interp = hscInterp hsc_env
+       liftIO $ unload interp hsc_env []
        modifySession discardProg
        return Failed
 
@@ -840,10 +843,10 @@ findPartiallyCompletedCycles modsDone theGraph
 -- ---------------------------------------------------------------------------
 --
 -- | Unloading
-unload :: HscEnv -> [Linkable] -> IO ()
-unload hsc_env stable_linkables -- Unload everything *except* 'stable_linkables'
+unload :: Interp -> HscEnv -> [Linkable] -> IO ()
+unload interp hsc_env stable_linkables -- Unload everything *except* 'stable_linkables'
   = case ghcLink (hsc_dflags hsc_env) of
-        LinkInMemory -> Linker.unload hsc_env stable_linkables
+        LinkInMemory -> Linker.unload interp hsc_env stable_linkables
         _other -> return ()
 
 -- -----------------------------------------------------------------------------
@@ -2314,7 +2317,6 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
        let tmpfs           = hsc_tmpfs     hsc_env
        map1 <- case backend dflags of
          NoBackend   -> enableCodeGenForTH logger tmpfs home_unit default_backend map0
-         Interpreter -> enableCodeGenForUnboxedTuplesOrSums logger tmpfs default_backend map0
          _           -> return map0
        if null errs
          then pure $ concat $ modNodeMapElems map1
@@ -2424,33 +2426,8 @@ enableCodeGenForTH logger tmpfs home_unit =
       -- can't compile anything anyway! See #16219.
       isHomeUnitDefinite home_unit
 
--- | Update the every ModSummary that is depended on
--- by a module that needs unboxed tuples. We enable codegen to
--- the specified target, disable optimization and change the .hi
--- and .o file locations to be temporary files.
---
--- This is used in order to load code that uses unboxed tuples
--- or sums into GHCi while still allowing some code to be interpreted.
-enableCodeGenForUnboxedTuplesOrSums
-  :: Logger
-  -> TmpFs
-  -> Backend
-  -> ModNodeMap [Either ErrorMessages ExtendedModSummary]
-  -> IO (ModNodeMap [Either ErrorMessages ExtendedModSummary])
-enableCodeGenForUnboxedTuplesOrSums logger tmpfs =
-  enableCodeGenWhen logger tmpfs condition should_modify TFL_GhcSession TFL_CurrentModule
-  where
-    condition ms =
-      unboxed_tuples_or_sums (ms_hspp_opts ms) &&
-      not (gopt Opt_ByteCode (ms_hspp_opts ms)) &&
-      (isBootSummary ms == NotBoot)
-    unboxed_tuples_or_sums d =
-      xopt LangExt.UnboxedTuples d || xopt LangExt.UnboxedSums d
-    should_modify (ModSummary { ms_hspp_opts = dflags }) =
-      backend dflags == Interpreter
-
--- | Helper used to implement 'enableCodeGenForTH' and
--- 'enableCodeGenForUnboxedTuples'. In particular, this enables
+-- | Helper used to implement 'enableCodeGenForTH'.
+-- In particular, this enables
 -- unoptimized code generation for all modules that meet some
 -- condition (first parameter), or are dependencies of those
 -- modules. The second parameter is a condition to check before
@@ -2619,7 +2596,10 @@ summariseFile hsc_env old_summaries src_fn mb_phase obj_allowed maybe_buf
 
         -- Tell the Finder cache where it is, so that subsequent calls
         -- to findModule will find it, even if it's not on any search path
-        mod <- liftIO $ addHomeModuleToFinder hsc_env pi_mod_name location
+        mod <- liftIO $ do
+          let home_unit = hsc_home_unit hsc_env
+          let fc        = hsc_FC hsc_env
+          addHomeModuleToFinder fc home_unit pi_mod_name location
 
         liftIO $ makeNewModSummary hsc_env $ MakeNewModSummary
             { nms_src_fn = src_fn
@@ -2670,7 +2650,10 @@ checkSummaryHash
            -- and it was likely flushed in depanal. This is not technically
            -- needed when we're called from sumariseModule but it shouldn't
            -- hurt.
-           _ <- addHomeModuleToFinder hsc_env
+           _ <- do
+              let home_unit = hsc_home_unit hsc_env
+              let fc        = hsc_FC hsc_env
+              addHomeModuleToFinder fc home_unit
                   (moduleName (ms_mod old_summary)) location
 
            hi_timestamp <- modificationTimeIfExists (ml_hi_file location)
@@ -2729,8 +2712,10 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
 
   | otherwise  = find_it
   where
-    dflags = hsc_dflags hsc_env
+    dflags    = hsc_dflags hsc_env
     home_unit = hsc_home_unit hsc_env
+    fc        = hsc_FC hsc_env
+    units     = hsc_units hsc_env
 
     check_hash old_summary location src_fn =
         checkSummaryHash
@@ -2739,7 +2724,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
           old_summary location
 
     find_it = do
-        found <- findImportedModule hsc_env wanted_mod Nothing
+        found <- findImportedModule fc units home_unit dflags wanted_mod Nothing
         case found of
              Found location mod
                 | isJust (ml_hs_file location) ->

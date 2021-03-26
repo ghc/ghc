@@ -132,11 +132,12 @@ def only_MG_loc(x):
     """
     Only compares the location embedded inside the MatchGroup, which has the form
     (MG
-      (NoExt)
-      ({ <location>
+      (NoExtField)
+      (L
+       (SrcSpanAnn (ApiAnnNotUsed) { <location> })
     """
     ls = x.split("\n")
-    mgLocs = (loc.strip() for (mg,loc) in zip(ls,ls[2:])
+    mgLocs = (loc.strip() for (mg,loc) in zip(ls,ls[3:])
                 if mg.strip().startswith("(MG"))
     return '\n'.join(mgLocs)
 test('T15279', normalise_errmsg_fun(only_MG_loc), compile, [''])
@@ -174,3 +175,4 @@ test('T18834a', normal, compile, [''])
 test('T18834b', normal, compile, [''])
 test('T12862', normal, compile, [''])
 test('T19082', normal, compile, [''])
+test('T19521', normal, compile, [''])

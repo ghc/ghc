@@ -42,6 +42,7 @@
 
 {
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
 
@@ -53,7 +54,7 @@ module GHC.Parser.Lexer (
    ParserOpts(..), mkParserOpts,
    PState (..), initParserState, initPragState,
    P(..), ParseResult(..),
-   allocateComments,
+   allocateComments, allocatePriorComments, allocateFinalComments,
    MonadP(..),
    getRealSrcLoc, getPState,
    failMsgP, failLocMsgP, srcParseFail,
@@ -64,7 +65,9 @@ module GHC.Parser.Lexer (
    ExtBits(..),
    xtest, xunset, xset,
    lexTokenStream,
-   addAnnsAt,
+   mkParensApiAnn,
+   getCommentsFor, getPriorCommentsFor, getFinalCommentsFor,
+   getEofPos,
    commentToAnnotation,
    HdkComment(..),
    warnopt,
@@ -76,7 +79,7 @@ import GHC.Prelude
 import Control.Monad
 import Data.Bits
 import Data.Char
-import Data.List (stripPrefix, isInfixOf)
+import Data.List (stripPrefix, isInfixOf, partition)
 import Data.Maybe
 import Data.Word
 
@@ -869,20 +872,37 @@ data Token
   | ITunknown String             -- ^ Used when the lexer can't make sense of it
   | ITeof                        -- ^ end of file token
 
-  -- Documentation annotations
-  | ITdocCommentNext  String     -- ^ something beginning @-- |@
-  | ITdocCommentPrev  String     -- ^ something beginning @-- ^@
-  | ITdocCommentNamed String     -- ^ something beginning @-- $@
-  | ITdocSection      Int String -- ^ a section heading
-  | ITdocOptions      String     -- ^ doc options (prune, ignore-exports, etc)
-  | ITlineComment     String     -- ^ comment starting by "--"
-  | ITblockComment    String     -- ^ comment in {- -}
+  -- Documentation annotations. See Note [PsSpan in Comments]
+  | ITdocCommentNext  String     PsSpan -- ^ something beginning @-- |@
+  | ITdocCommentPrev  String     PsSpan -- ^ something beginning @-- ^@
+  | ITdocCommentNamed String     PsSpan -- ^ something beginning @-- $@
+  | ITdocSection      Int String PsSpan -- ^ a section heading
+  | ITdocOptions      String     PsSpan -- ^ doc options (prune, ignore-exports, etc)
+  | ITlineComment     String     PsSpan -- ^ comment starting by "--"
+  | ITblockComment    String     PsSpan -- ^ comment in {- -}
 
   deriving Show
 
 instance Outputable Token where
   ppr x = text (show x)
 
+{- Note [PsSpan in Comments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When using the Api Annotations to exact print a modified AST, managing
+the space before a comment is important.  The PsSpan in the comment
+token allows this to happen.
+
+We also need to track the space before the end of file. The normal
+mechanism of using the previous token does not work, as the ITeof is
+synthesised to come at the same location of the last token, and the
+normal previous token updating has by then updated the required
+location.
+
+We track this using a 2-back location, prev_loc2. This adds extra
+processing to every single token, which is a performance hit for
+something needed only at the end of the file. This needs
+improving. Perhaps a backward scan on eof?
+-}
 
 {- Note [Minus tokens]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -1290,7 +1310,11 @@ multiline_doc_comment span buf _len = withLexedDocType (worker "")
 lineCommentToken :: Action
 lineCommentToken span buf len = do
   b <- getBit RawTokenStreamBit
-  if b then strtoken ITlineComment span buf len else lexToken
+  if b then do
+         lt <- getLastLocComment
+         strtoken (\s -> ITlineComment s lt) span buf len
+       else lexToken
+
 
 {-
   nested comments require traversing by hand, they can't be parsed
@@ -1302,7 +1326,8 @@ nested_comment cont span buf len = do
   go (reverse $ lexemeToString buf len) (1::Int) input
   where
     go commentAcc 0 input = do
-      let finalizeComment str = (Nothing, ITblockComment str)
+      l <- getLastLocComment
+      let finalizeComment str = (Nothing, ITblockComment str l)
       commentEnd cont input commentAcc finalizeComment buf span
     go commentAcc n input = case alexGetChar' input of
       Nothing -> errBrace input (psRealSpan span)
@@ -1397,32 +1422,33 @@ withLexedDocType :: (AlexInput -> (String -> (HdkComment, Token)) -> Bool -> P (
                  -> P (PsLocated Token)
 withLexedDocType lexDocComment = do
   input@(AI _ buf) <- getInput
+  l <- getLastLocComment
   case prevChar buf ' ' of
     -- The `Bool` argument to lexDocComment signals whether or not the next
     -- line of input might also belong to this doc comment.
-    '|' -> lexDocComment input mkHdkCommentNext True
-    '^' -> lexDocComment input mkHdkCommentPrev True
-    '$' -> lexDocComment input mkHdkCommentNamed True
-    '*' -> lexDocSection 1 input
+    '|' -> lexDocComment input (mkHdkCommentNext l) True
+    '^' -> lexDocComment input (mkHdkCommentPrev l) True
+    '$' -> lexDocComment input (mkHdkCommentNamed l) True
+    '*' -> lexDocSection l 1 input
     _ -> panic "withLexedDocType: Bad doc type"
  where
-    lexDocSection n input = case alexGetChar' input of
-      Just ('*', input) -> lexDocSection (n+1) input
-      Just (_,   _)     -> lexDocComment input (mkHdkCommentSection n) False
+    lexDocSection l n input = case alexGetChar' input of
+      Just ('*', input) -> lexDocSection l (n+1) input
+      Just (_,   _)     -> lexDocComment input (mkHdkCommentSection l n) False
       Nothing -> do setInput input; lexToken -- eof reached, lex it normally
 
-mkHdkCommentNext, mkHdkCommentPrev :: String -> (HdkComment, Token)
-mkHdkCommentNext str = (HdkCommentNext (mkHsDocString str), ITdocCommentNext str)
-mkHdkCommentPrev str = (HdkCommentPrev (mkHsDocString str), ITdocCommentPrev str)
+mkHdkCommentNext, mkHdkCommentPrev :: PsSpan -> String -> (HdkComment, Token)
+mkHdkCommentNext loc str = (HdkCommentNext (mkHsDocString str), ITdocCommentNext str loc)
+mkHdkCommentPrev loc str = (HdkCommentPrev (mkHsDocString str), ITdocCommentPrev str loc)
 
-mkHdkCommentNamed :: String -> (HdkComment, Token)
-mkHdkCommentNamed str =
+mkHdkCommentNamed :: PsSpan -> String -> (HdkComment, Token)
+mkHdkCommentNamed loc str =
   let (name, rest) = break isSpace str
-  in (HdkCommentNamed name (mkHsDocString rest), ITdocCommentNamed str)
+  in (HdkCommentNamed name (mkHsDocString rest), ITdocCommentNamed str loc)
 
-mkHdkCommentSection :: Int -> String -> (HdkComment, Token)
-mkHdkCommentSection n str =
-  (HdkCommentSection n (mkHsDocString str), ITdocSection n str)
+mkHdkCommentSection :: PsSpan -> Int -> String -> (HdkComment, Token)
+mkHdkCommentSection loc n str =
+  (HdkCommentSection n (mkHsDocString str), ITdocSection n str loc)
 
 -- RULES pragmas turn on the forall and '.' keywords, and we turn them
 -- off again at the end of the pragma.
@@ -1551,7 +1577,7 @@ varid span buf len =
     Just (ITcase, _) -> do
       lastTk <- getLastTk
       keyword <- case lastTk of
-        Just ITlam -> do
+        Just (L _ ITlam) -> do
           lambdaCase <- getBit LambdaCaseBit
           unless lambdaCase $ do
             pState <- getPState
@@ -1888,19 +1914,26 @@ alrInitialLoc file = mkRealSrcSpan loc loc
 -- -----------------------------------------------------------------------------
 -- Options, includes and language pragmas.
 
+
 lex_string_prag :: (String -> Token) -> Action
-lex_string_prag mkTok span _buf _len
+lex_string_prag mkTok = lex_string_prag_comment mkTok'
+  where
+    mkTok' s _ = mkTok s
+
+lex_string_prag_comment :: (String -> PsSpan -> Token) -> Action
+lex_string_prag_comment mkTok span _buf _len
     = do input <- getInput
          start <- getParsedLoc
-         tok <- go [] input
+         l <- getLastLocComment
+         tok <- go l [] input
          end <- getParsedLoc
          return (L (mkPsSpan start end) tok)
-    where go acc input
+    where go l acc input
               = if isString input "#-}"
                    then do setInput input
-                           return (mkTok (reverse acc))
+                           return (mkTok (reverse acc) l)
                    else case alexGetChar input of
-                          Just (c,i) -> go (c:acc) i
+                          Just (c,i) -> go l (c:acc) i
                           Nothing -> err input
           isString _ [] = True
           isString i (x:xs)
@@ -1908,7 +1941,6 @@ lex_string_prag mkTok span _buf _len
                   Just (c,i') | c == x    -> isString i' xs
                   _other -> False
           err (AI end _) = failLocMsgP (realSrcSpanStart (psRealSpan span)) (psRealLoc end) (PsError (PsErrLexer LexUnterminatedOptions LexErrKind_EOF) [])
-
 
 -- -----------------------------------------------------------------------------
 -- Strings & Chars
@@ -2282,9 +2314,12 @@ data PState = PState {
         errors     :: Bag PsError,
         tab_first  :: Maybe RealSrcSpan, -- pos of first tab warning in the file
         tab_count  :: !Word,             -- number of tab warnings in the file
-        last_tk    :: Maybe Token,
-        last_loc   :: PsSpan,      -- pos of previous token
-        last_len   :: !Int,        -- len of previous token
+        last_tk    :: Maybe (PsLocated Token), -- last non-comment token
+        prev_loc   :: PsSpan,      -- pos of previous token, including comments,
+        prev_loc2  :: PsSpan,      -- pos of two back token, including comments,
+                                   -- see Note [PsSpan in Comments]
+        last_loc   :: PsSpan,      -- pos of current token
+        last_len   :: !Int,        -- len of current token
         loc        :: PsLoc,       -- current loc (end of prev token + 1)
         context    :: [LayoutContext],
         lex_state  :: [Int],
@@ -2312,10 +2347,9 @@ data PState = PState {
         -- locations of 'noise' tokens in the source, so that users of
         -- the GHC API can do source to source conversions.
         -- See note [Api annotations] in GHC.Parser.Annotation
-        annotations :: [(ApiAnnKey,[RealSrcSpan])],
-        eof_pos :: Maybe RealSrcSpan,
-        comment_q :: [RealLocated AnnotationComment],
-        annotations_comments :: [(RealSrcSpan,[RealLocated AnnotationComment])],
+        eof_pos :: Maybe (RealSrcSpan, RealSrcSpan), -- pos, gap to prior token
+        header_comments :: Maybe [LAnnotationComment],
+        comment_q :: [LAnnotationComment],
 
         -- Haddock comments accumulated in ascending order of their location
         -- (BufPos). We use OrdList to get O(1) snoc.
@@ -2328,6 +2362,12 @@ data PState = PState {
         -- current token to happyError, we could at least get rid of last_len.
         -- Getting rid of last_loc would require finding another way to
         -- implement pushCurrentContext (which is only called from one place).
+
+        -- AZ question: setLastToken which sets last_loc and last_len
+        -- is called whan processing AlexToken, immediately prior to
+        -- calling the action in the token.  So from the perspective
+        -- of the action, it is the *current* token.  Do I understand
+        -- correctly?
 
 data ALRContext = ALRNoLayout Bool{- does it contain commas? -}
                               Bool{- is it a 'let' block? -}
@@ -2395,8 +2435,8 @@ getParsedLoc  = P $ \s@(PState{ loc=loc }) -> POk s loc
 addSrcFile :: FastString -> P ()
 addSrcFile f = P $ \s -> POk s{ srcfiles = f : srcfiles s } ()
 
-setEofPos :: RealSrcSpan -> P ()
-setEofPos span = P $ \s -> POk s{ eof_pos = Just span } ()
+setEofPos :: RealSrcSpan -> RealSrcSpan -> P ()
+setEofPos span gap = P $ \s -> POk s{ eof_pos = Just (span, gap) } ()
 
 setLastToken :: PsSpan -> Int -> P ()
 setLastToken loc len = P $ \s -> POk s {
@@ -2404,11 +2444,28 @@ setLastToken loc len = P $ \s -> POk s {
   last_len=len
   } ()
 
-setLastTk :: Token -> P ()
-setLastTk tk = P $ \s -> POk s { last_tk = Just tk } ()
+setLastTk :: PsLocated Token -> P ()
+setLastTk tk@(L l _) = P $ \s -> POk s { last_tk = Just tk
+                                       , prev_loc = l
+                                       , prev_loc2 = prev_loc s} ()
 
-getLastTk :: P (Maybe Token)
+setLastComment :: PsLocated Token -> P ()
+setLastComment (L l _) = P $ \s -> POk s { prev_loc = l
+                                         , prev_loc2 = prev_loc s} ()
+
+getLastTk :: P (Maybe (PsLocated Token))
 getLastTk = P $ \s@(PState { last_tk = last_tk }) -> POk s last_tk
+
+-- see Note [PsSpan in Comments]
+getLastLocComment :: P PsSpan
+getLastLocComment = P $ \s@(PState { prev_loc = prev_loc }) -> POk s prev_loc
+
+-- see Note [PsSpan in Comments]
+getLastLocEof :: P PsSpan
+getLastLocEof = P $ \s@(PState { prev_loc2 = prev_loc2 }) -> POk s prev_loc2
+
+getLastLoc :: P PsSpan
+getLastLoc = P $ \s@(PState { last_loc = last_loc }) -> POk s last_loc
 
 data AlexInput = AI !PsLoc !StringBuffer
 
@@ -2778,6 +2835,8 @@ initParserState options buf loc =
       tab_first     = Nothing,
       tab_count     = 0,
       last_tk       = Nothing,
+      prev_loc      = mkPsSpan init_loc init_loc,
+      prev_loc2     = mkPsSpan init_loc init_loc,
       last_loc      = mkPsSpan init_loc init_loc,
       last_len      = 0,
       loc           = init_loc,
@@ -2790,10 +2849,9 @@ initParserState options buf loc =
       alr_context = [],
       alr_expecting_ocurly = Nothing,
       alr_justClosedExplicitLetBlock = False,
-      annotations = [],
       eof_pos = Nothing,
+      header_comments = Nothing,
       comment_q = [],
-      annotations_comments = [],
       hdk_comments = nilOL
     }
   where init_loc = PsLoc loc (BufPos 0)
@@ -2832,12 +2890,15 @@ class Monad m => MonadP m where
 
   -- | Check if a given flag is currently set in the bitmap.
   getBit :: ExtBits -> m Bool
-
-  -- | Given a location and a list of AddAnn, apply them all to the location.
-  addAnnotation :: SrcSpan          -- SrcSpan of enclosing AST construct
-                -> AnnKeywordId     -- The first two parameters are the key
-                -> SrcSpan          -- The location of the keyword itself
-                -> m ()
+  -- | Go through the @comment_q@ in @PState@ and remove all comments
+  -- that belong within the given span
+  allocateCommentsP :: RealSrcSpan -> m ApiAnnComments
+  -- | Go through the @comment_q@ in @PState@ and remove all comments
+  -- that come before or within the given span
+  allocatePriorCommentsP :: RealSrcSpan -> m ApiAnnComments
+  -- | Go through the @comment_q@ in @PState@ and remove all comments
+  -- that come after the given span
+  allocateFinalCommentsP :: RealSrcSpan -> m ApiAnnComments
 
 instance MonadP P where
   addError err
@@ -2853,14 +2914,40 @@ instance MonadP P where
 
   getBit ext = P $ \s -> let b =  ext `xtest` pExtsBitmap (options s)
                          in b `seq` POk s b
+  allocateCommentsP ss = P $ \s ->
+    let (comment_q', newAnns) = allocateComments ss (comment_q s) in
+      POk s {
+         comment_q = comment_q'
+       } (AnnComments newAnns)
+  allocatePriorCommentsP ss = P $ \s ->
+    let (header_comments', comment_q', newAnns)
+             = allocatePriorComments ss (comment_q s) (header_comments s) in
+      POk s {
+         header_comments = header_comments',
+         comment_q = comment_q'
+       } (AnnComments newAnns)
+  allocateFinalCommentsP ss = P $ \s ->
+    let (header_comments', comment_q', newAnns)
+             = allocateFinalComments ss (comment_q s) (header_comments s) in
+      POk s {
+         header_comments = header_comments',
+         comment_q = comment_q'
+       } (AnnCommentsBalanced (fromMaybe [] header_comments') (reverse newAnns))
 
-  addAnnotation (RealSrcSpan l _) a (RealSrcSpan v _) = do
-    addAnnotationOnly l a v
-    allocateCommentsP l
-  addAnnotation _ _ _ = return ()
+getCommentsFor :: (MonadP m) => SrcSpan -> m ApiAnnComments
+getCommentsFor (RealSrcSpan l _) = allocateCommentsP l
+getCommentsFor _ = return noCom
 
-addAnnsAt :: MonadP m => SrcSpan -> [AddAnn] -> m ()
-addAnnsAt l = mapM_ (\(AddAnn a v) -> addAnnotation l a v)
+getPriorCommentsFor :: (MonadP m) => SrcSpan -> m ApiAnnComments
+getPriorCommentsFor (RealSrcSpan l _) = allocatePriorCommentsP l
+getPriorCommentsFor _ = return noCom
+
+getFinalCommentsFor :: (MonadP m) => SrcSpan -> m ApiAnnComments
+getFinalCommentsFor (RealSrcSpan l _) = allocateFinalCommentsP l
+getFinalCommentsFor _ = return noCom
+
+getEofPos :: P (Maybe (RealSrcSpan, RealSrcSpan))
+getEofPos = P $ \s@(PState { eof_pos = pos }) -> POk s pos
 
 addTabWarning :: RealSrcSpan -> P ()
 addTabWarning srcspan
@@ -3213,7 +3300,8 @@ lexToken = do
   case alexScanUser exts inp sc of
     AlexEOF -> do
         let span = mkPsSpan loc1 loc1
-        setEofPos (psRealSpan span)
+        lt <- getLastLocEof
+        setEofPos (psRealSpan span) (psRealSpan lt)
         setLastToken span 0
         return (L span ITeof)
     AlexError (AI loc2 buf) ->
@@ -3229,7 +3317,7 @@ lexToken = do
         span `seq` setLastToken span bytes
         lt <- t span buf bytes
         let lt' = unLoc lt
-        unless (isComment lt') (setLastTk lt')
+        if (isComment lt') then setLastComment lt else setLastTk lt
         return lt
 
 reportLexError :: RealSrcLoc -> RealSrcLoc -> StringBuffer -> (LexErrKind -> SrcSpan -> PsError) -> P a
@@ -3260,7 +3348,7 @@ linePrags = Map.singleton "line" linePrag
 
 fileHeaderPrags = Map.fromList([("options", lex_string_prag IToptions_prag),
                                  ("options_ghc", lex_string_prag IToptions_prag),
-                                 ("options_haddock", lex_string_prag ITdocOptions),
+                                 ("options_haddock", lex_string_prag_comment ITdocOptions),
                                  ("language", token ITlanguage_prag),
                                  ("include", lex_string_prag ITinclude_prag)])
 
@@ -3346,61 +3434,94 @@ clean_pragma prag = canon_ws (map toLower (unprefix prag))
 -}
 
 
-addAnnotationOnly :: RealSrcSpan -> AnnKeywordId -> RealSrcSpan -> P ()
-addAnnotationOnly l a v = P $ \s -> POk s {
-  annotations = ((l,a), [v]) : annotations s
-  } ()
-
+-- |Given a 'SrcSpan' that surrounds a 'HsPar' or 'HsParTy', generate
+-- 'AddApiAnn' values for the opening and closing bordering on the start
+-- and end of the span
+mkParensApiAnn :: SrcSpan -> [AddApiAnn]
+mkParensApiAnn (UnhelpfulSpan _)  = []
+mkParensApiAnn (RealSrcSpan ss _) = [AddApiAnn AnnOpenP (AR lo),AddApiAnn AnnCloseP (AR lc)]
+  where
+    f = srcSpanFile ss
+    sl = srcSpanStartLine ss
+    sc = srcSpanStartCol ss
+    el = srcSpanEndLine ss
+    ec = srcSpanEndCol ss
+    lo = mkRealSrcSpan (realSrcSpanStart ss)        (mkRealSrcLoc f sl (sc+1))
+    lc = mkRealSrcSpan (mkRealSrcLoc f el (ec - 1)) (realSrcSpanEnd ss)
 
 queueComment :: RealLocated Token -> P()
 queueComment c = P $ \s -> POk s {
   comment_q = commentToAnnotation c : comment_q s
   } ()
 
--- | Go through the @comment_q@ in @PState@ and remove all comments
--- that belong within the given span
-allocateCommentsP :: RealSrcSpan -> P ()
-allocateCommentsP ss = P $ \s ->
-  let (comment_q', newAnns) = allocateComments ss (comment_q s) in
-    POk s {
-       comment_q = comment_q'
-     , annotations_comments = newAnns ++ (annotations_comments s)
-     } ()
-
 allocateComments
   :: RealSrcSpan
-  -> [RealLocated AnnotationComment]
-  -> ([RealLocated AnnotationComment], [(RealSrcSpan,[RealLocated AnnotationComment])])
+  -> [LAnnotationComment]
+  -> ([LAnnotationComment], [LAnnotationComment])
 allocateComments ss comment_q =
   let
-    (before,rest)  = break (\(L l _) -> isRealSubspanOf l ss) comment_q
-    (middle,after) = break (\(L l _) -> not (isRealSubspanOf l ss)) rest
+    (before,rest)  = break (\(L l _) -> isRealSubspanOf (anchor l) ss) comment_q
+    (middle,after) = break (\(L l _) -> not (isRealSubspanOf (anchor l) ss)) rest
     comment_q' = before ++ after
-    newAnns = if null middle then []
-                             else [(ss,middle)]
+    newAnns = middle
   in
     (comment_q', newAnns)
 
+allocatePriorComments
+  :: RealSrcSpan
+  -> [LAnnotationComment]
+  -> Maybe [LAnnotationComment]
+  -> (Maybe [LAnnotationComment], [LAnnotationComment], [LAnnotationComment])
+allocatePriorComments ss comment_q mheader_comments =
+  let
+    cmp (L l _) = anchor l <= ss
+    (before,after) = partition cmp comment_q
+    newAnns = before
+    comment_q'= after
+  in
+    case mheader_comments of
+      Nothing -> (Just newAnns, comment_q', [])
+      Just _ -> (mheader_comments, comment_q', newAnns)
 
-commentToAnnotation :: RealLocated Token -> RealLocated AnnotationComment
-commentToAnnotation (L l (ITdocCommentNext s))  = L l (AnnDocCommentNext s)
-commentToAnnotation (L l (ITdocCommentPrev s))  = L l (AnnDocCommentPrev s)
-commentToAnnotation (L l (ITdocCommentNamed s)) = L l (AnnDocCommentNamed s)
-commentToAnnotation (L l (ITdocSection n s))    = L l (AnnDocSection n s)
-commentToAnnotation (L l (ITdocOptions s))      = L l (AnnDocOptions s)
-commentToAnnotation (L l (ITlineComment s))     = L l (AnnLineComment s)
-commentToAnnotation (L l (ITblockComment s))    = L l (AnnBlockComment s)
+allocateFinalComments
+  :: RealSrcSpan
+  -> [LAnnotationComment]
+  -> Maybe [LAnnotationComment]
+  -> (Maybe [LAnnotationComment], [LAnnotationComment], [LAnnotationComment])
+allocateFinalComments ss comment_q mheader_comments =
+  let
+    cmp (L l _) = anchor l <= ss
+    (before,after) = partition cmp comment_q
+    newAnns = after
+    comment_q'= before
+  in
+    case mheader_comments of
+      Nothing -> (Just newAnns,    [], comment_q')
+      Just _ -> (mheader_comments, [], comment_q' ++ newAnns)
+
+commentToAnnotation :: RealLocated Token -> LAnnotationComment
+commentToAnnotation (L l (ITdocCommentNext s ll))  = mkLAnnotationComment l ll (AnnDocCommentNext s)
+commentToAnnotation (L l (ITdocCommentPrev s ll))  = mkLAnnotationComment l ll (AnnDocCommentPrev s)
+commentToAnnotation (L l (ITdocCommentNamed s ll)) = mkLAnnotationComment l ll (AnnDocCommentNamed s)
+commentToAnnotation (L l (ITdocSection n s ll))    = mkLAnnotationComment l ll (AnnDocSection n s)
+commentToAnnotation (L l (ITdocOptions s ll))      = mkLAnnotationComment l ll (AnnDocOptions s)
+commentToAnnotation (L l (ITlineComment s ll))     = mkLAnnotationComment l ll (AnnLineComment s)
+commentToAnnotation (L l (ITblockComment s ll))    = mkLAnnotationComment l ll (AnnBlockComment s)
 commentToAnnotation _                           = panic "commentToAnnotation"
+
+-- see Note [PsSpan in Comments]
+mkLAnnotationComment :: RealSrcSpan -> PsSpan -> AnnotationCommentTok -> LAnnotationComment
+mkLAnnotationComment l ll tok = L (realSpanAsAnchor l) (AnnComment tok (psRealSpan ll))
 
 -- ---------------------------------------------------------------------
 
 isComment :: Token -> Bool
-isComment (ITlineComment     _)   = True
-isComment (ITblockComment    _)   = True
-isComment (ITdocCommentNext  _)   = True
-isComment (ITdocCommentPrev  _)   = True
-isComment (ITdocCommentNamed _)   = True
-isComment (ITdocSection      _ _) = True
-isComment (ITdocOptions      _)   = True
+isComment (ITlineComment     _ _)   = True
+isComment (ITblockComment    _ _)   = True
+isComment (ITdocCommentNext  _ _)   = True
+isComment (ITdocCommentPrev  _ _)   = True
+isComment (ITdocCommentNamed _ _)   = True
+isComment (ITdocSection      _ _ _) = True
+isComment (ITdocOptions      _ _)   = True
 isComment _ = False
 }

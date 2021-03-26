@@ -47,6 +47,7 @@ import GHC.Types.Basic
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique.DFM
 import GHC.Types.Name
+import GHC.Types.Tickish
 import GHC.Types.Id.Make  ( voidArgId, voidPrimId )
 import GHC.Types.Var      ( isLocalVar )
 import GHC.Types.Var.Set
@@ -1125,9 +1126,9 @@ specLam env bndrs body
        ; return (mkLams bndrs (wrapDictBindsE dumped_dbs body'), free_uds) }
 
 --------------
-specTickish :: SpecEnv -> Tickish Id -> Tickish Id
-specTickish env (Breakpoint ix ids)
-  = Breakpoint ix [ id' | id <- ids, Var id' <- [specVar env id]]
+specTickish :: SpecEnv -> CoreTickish -> CoreTickish
+specTickish env (Breakpoint ext ix ids)
+  = Breakpoint ext ix [ id' | id <- ids, Var id' <- [specVar env id]]
   -- drop vars from the list if they have a non-variable substitution.
   -- should never happen, but it's harmless to drop them anyway.
 specTickish _ other_tickish = other_tickish

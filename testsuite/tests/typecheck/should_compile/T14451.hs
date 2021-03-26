@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# Language KindSignatures, TypeOperators, PolyKinds, TypeOperators, ConstraintKinds, TypeFamilies, DataKinds, TypeInType, GADTs, AllowAmbiguousTypes, InstanceSigs, RankNTypes, UndecidableInstances #-}
 module T14451 where
 

@@ -213,7 +213,11 @@ mkPluginUsage hsc_env pluginModule
              (ppr pNm)
         _  -> mapM hashFile (nub files)
     _ -> do
-      foundM <- findPluginModule hsc_env pNm
+      let fc = hsc_FC hsc_env
+      let units = hsc_units hsc_env
+      let home_unit = hsc_home_unit hsc_env
+      let dflags = hsc_dflags hsc_env
+      foundM <- findPluginModule fc units home_unit dflags pNm
       case foundM of
       -- The plugin was built locally: look up the object file containing
       -- the `plugin` binder, and all object files belong to modules that are
@@ -225,6 +229,9 @@ mkPluginUsage hsc_env pluginModule
         _ -> pprPanic "mkPluginUsage: no object file found" (ppr pNm)
   where
     dflags   = hsc_dflags hsc_env
+    fc       = hsc_FC hsc_env
+    home_unit = hsc_home_unit hsc_env
+    units    = hsc_units hsc_env
     platform = targetPlatform dflags
     pkgs     = hsc_units hsc_env
     pNm      = moduleName $ mi_module pluginModule
@@ -235,7 +242,7 @@ mkPluginUsage hsc_env pluginModule
     -- Lookup object file for a plugin dependency,
     -- from the same package as the plugin.
     lookupObjectFile nm = do
-      foundM <- findImportedModule hsc_env nm Nothing
+      foundM <- findImportedModule fc units home_unit dflags nm Nothing
       case foundM of
         Found ml m
           | moduleUnit m == pPkg -> Just <$> hashFile (ml_obj_file ml)

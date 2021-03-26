@@ -158,7 +158,7 @@ gen_Functor_binds loc tycon _
   | Phantom <- last (tyConRoles tycon)
   = (unitBag fmap_bind, emptyBag)
   where
-    fmap_name = L loc fmap_RDR
+    fmap_name = L (noAnnSrcSpan loc) fmap_RDR
     fmap_bind = mkRdrFunBind fmap_name fmap_eqns
     fmap_eqns = [mkSimpleMatch fmap_match_ctxt
                                [nlWildPat]
@@ -169,7 +169,7 @@ gen_Functor_binds loc tycon tycon_args
   = (listToBag [fmap_bind, replace_bind], emptyBag)
   where
     data_cons = getPossibleDataCons tycon tycon_args
-    fmap_name = L loc fmap_RDR
+    fmap_name = L (noAnnSrcSpan loc) fmap_RDR
 
     -- See Note [EmptyDataDecls with Functor, Foldable, and Traversable]
     fmap_bind = mkRdrFunBindEC 2 id fmap_name fmap_eqns
@@ -208,7 +208,7 @@ gen_Functor_binds loc tycon tycon_args
                  , ft_co_var = panic "contravariant in ft_fmap" }
 
     -- See Note [Deriving <$]
-    replace_name = L loc replace_RDR
+    replace_name = L (noAnnSrcSpan loc) replace_RDR
 
     -- See Note [EmptyDataDecls with Functor, Foldable, and Traversable]
     replace_bind = mkRdrFunBindEC 2 id replace_name replace_eqns
@@ -617,8 +617,7 @@ mkSimpleConMatch ctxt fold extra_pats con insides = do
           else nlParPat bare_pat
     rhs <- fold con_name
                 (zipWith (\i v -> i $ nlHsVar v) insides vars_needed)
-    return $ mkMatch ctxt (extra_pats ++ [pat]) rhs
-                     (noLoc emptyLocalBinds)
+    return $ mkMatch ctxt (extra_pats ++ [pat]) rhs emptyLocalBinds
 
 -- "Con a1 a2 a3 -> fmap (\b2 -> Con a1 b2 a3) (traverse f a2)"
 --
@@ -668,8 +667,7 @@ mkSimpleConMatch2 ctxt fold extra_pats con insides = do
               in mkHsLam (map nlVarPat bs) (nlHsApps con_name vars)
 
     rhs <- fold con_expr exps
-    return $ mkMatch ctxt (extra_pats ++ [pat]) rhs
-                     (noLoc emptyLocalBinds)
+    return $ mkMatch ctxt (extra_pats ++ [pat]) rhs emptyLocalBinds
 
 -- "case x of (a1,a2,a3) -> fold [x1 a1, x2 a2, x3 a3]"
 mkSimpleTupleCase :: Monad m => ([LPat GhcPs] -> DataCon -> [a]
@@ -794,7 +792,7 @@ gen_Foldable_binds loc tycon _
   | Phantom <- last (tyConRoles tycon)
   = (unitBag foldMap_bind, emptyBag)
   where
-    foldMap_name = L loc foldMap_RDR
+    foldMap_name = L (noAnnSrcSpan loc) foldMap_RDR
     foldMap_bind = mkRdrFunBind foldMap_name foldMap_eqns
     foldMap_eqns = [mkSimpleMatch foldMap_match_ctxt
                                   [nlWildPat, nlWildPat]
@@ -811,14 +809,14 @@ gen_Foldable_binds loc tycon tycon_args
   where
     data_cons = getPossibleDataCons tycon tycon_args
 
-    foldr_bind = mkRdrFunBind (L loc foldable_foldr_RDR) eqns
+    foldr_bind = mkRdrFunBind (L (noAnnSrcSpan loc) foldable_foldr_RDR) eqns
     eqns = map foldr_eqn data_cons
     foldr_eqn con
       = evalState (match_foldr z_Expr [f_Pat,z_Pat] con =<< parts) bs_RDRs
       where
         parts = sequence $ foldDataConArgs ft_foldr con
 
-    foldMap_name = L loc foldMap_RDR
+    foldMap_name = L (noAnnSrcSpan loc) foldMap_RDR
 
     -- See Note [EmptyDataDecls with Functor, Foldable, and Traversable]
     foldMap_bind = mkRdrFunBindEC 2 (const mempty_Expr)
@@ -841,7 +839,7 @@ gen_Foldable_binds loc tycon tycon_args
       go NotNull = Nothing
       go (NullM a) = Just (Just a)
 
-    null_name = L loc null_RDR
+    null_name = L (noAnnSrcSpan loc) null_RDR
     null_match_ctxt = mkPrefixFunRhs null_name
     null_bind = mkRdrFunBind null_name null_eqns
     null_eqns = map null_eqn data_cons
@@ -851,7 +849,7 @@ gen_Foldable_binds loc tycon tycon_args
           case convert parts of
             Nothing -> return $
               mkMatch null_match_ctxt [nlParPat (nlWildConPat con)]
-                false_Expr (noLoc emptyLocalBinds)
+                false_Expr emptyLocalBinds
             Just cp -> match_null [] con cp
 
     -- Yields 'Just' an expression if we're folding over a type that mentions
@@ -1023,7 +1021,7 @@ gen_Traversable_binds loc tycon _
   | Phantom <- last (tyConRoles tycon)
   = (unitBag traverse_bind, emptyBag)
   where
-    traverse_name = L loc traverse_RDR
+    traverse_name = L (noAnnSrcSpan loc) traverse_RDR
     traverse_bind = mkRdrFunBind traverse_name traverse_eqns
     traverse_eqns =
         [mkSimpleMatch traverse_match_ctxt
@@ -1036,7 +1034,7 @@ gen_Traversable_binds loc tycon tycon_args
   where
     data_cons = getPossibleDataCons tycon tycon_args
 
-    traverse_name = L loc traverse_RDR
+    traverse_name = L (noAnnSrcSpan loc) traverse_RDR
 
     -- See Note [EmptyDataDecls with Functor, Foldable, and Traversable]
     traverse_bind = mkRdrFunBindEC 2 (nlHsApp pure_Expr)

@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 data Container
   = Container [Wibble Int]
   deriving (Eq, Show)

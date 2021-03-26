@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# language KindSignatures, PolyKinds, TypeFamilies,
   NoImplicitPrelude, FlexibleContexts,
   MultiParamTypeClasses, GADTs,

@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# OPTIONS_GHC -fno-warn-redundant-constraints -fno-warn-missing-methods #-}
 {-# LANGUAGE DeriveDataTypeable, ExistentialQuantification, RankNTypes, MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances, FlexibleContexts, PatternGuards, DatatypeContexts #-}
 

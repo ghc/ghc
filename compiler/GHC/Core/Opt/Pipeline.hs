@@ -70,6 +70,7 @@ import GHC.Types.Basic
 import GHC.Types.Demand ( zapDmdEnvSig )
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
+import GHC.Types.Tickish
 import GHC.Types.Unique.Supply ( UniqSupply )
 import GHC.Types.Unique.FM
 import GHC.Types.Name.Ppr
@@ -981,7 +982,7 @@ ticks. More often than not, other references will be unfoldings of
 x_exported, and therefore carry the tick anyway.
 -}
 
-type IndEnv = IdEnv (Id, [Tickish Var]) -- Maps local_id -> exported_id, ticks
+type IndEnv = IdEnv (Id, [CoreTickish]) -- Maps local_id -> exported_id, ticks
 
 shortOutIndirections :: CoreProgram -> CoreProgram
 shortOutIndirections binds

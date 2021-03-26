@@ -1,3 +1,5 @@
+:set -XHaskell2010
+
 -- Test load works
 :unset +s
 :set -XSafe

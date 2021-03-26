@@ -33,9 +33,11 @@ import GHC.Core.Opt.Arity   ( joinRhsArity )
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Basic
+import GHC.Types.Tickish
 import GHC.Unit.Module( Module )
 import GHC.Core.Coercion
 import GHC.Core.Type
+import GHC.Core.TyCo.FVs( tyCoVarsOfMCo )
 
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
@@ -49,7 +51,7 @@ import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
 import GHC.Utils.Misc
-import GHC.Data.Maybe( orElse, isJust )
+import GHC.Data.Maybe( isJust )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import Data.List (mapAccumL, mapAccumR)
@@ -1929,7 +1931,7 @@ occAnal env (Tick tickish body)
   | tickish `tickishScopesLike` SoftScope
   = (markAllNonTail usage, Tick tickish body')
 
-  | Breakpoint _ ids <- tickish
+  | Breakpoint _ _ ids <- tickish
   = (usage_lam `andUDs` foldr addManyOcc emptyDetails ids, Tick tickish body')
     -- never substitute for any of the Ids in a Breakpoint
 
@@ -2055,7 +2057,7 @@ Constructors are rather like lambdas in this way.
 -}
 
 occAnalApp :: OccEnv
-           -> (Expr CoreBndr, [Arg CoreBndr], [Tickish Id])
+           -> (Expr CoreBndr, [Arg CoreBndr], [CoreTickish])
            -> (UsageDetails, Expr CoreBndr)
 -- Naked variables (not applied) end up here too
 occAnalApp env (Var fun, args, ticks)
@@ -2072,14 +2074,15 @@ occAnalApp env (Var fun, args, ticks)
   , let (usage, arg') = occAnalRhs env NonRecursive (Just 1) arg
   = (usage, mkTicks ticks $ mkApps (Var fun) [t1, t2, arg'])
 
-occAnalApp env (Var fun, args, ticks)
+occAnalApp env (Var fun_id, args, ticks)
   = (all_uds, mkTicks ticks $ mkApps fun' args')
   where
-    (fun', fun_id') = lookupVarEnv (occ_bs_env env) fun
-                      `orElse` (Var fun, fun)
-                     -- See Note [The binder-swap substitution]
+    (fun', fun_id') = lookupBndrSwap env fun_id
 
     fun_uds = mkOneOcc fun_id' int_cxt n_args
+       -- NB: fun_uds is computed for fun_id', not fun_id
+       -- See (BS1) in Note [The binder-swap substitution]
+
     all_uds = fun_uds `andUDs` final_args_uds
 
     !(args_uds, args') = occAnalArgs env args one_shots
@@ -2103,11 +2106,11 @@ occAnalApp env (Var fun, args, ticks)
                    _other   | n_val_args > 0 -> IsInteresting
                             | otherwise      -> NotInteresting
 
-    is_exp     = isExpandableApp fun n_val_args
+    is_exp     = isExpandableApp fun_id n_val_args
         -- See Note [CONLIKE pragma] in GHC.Types.Basic
         -- The definition of is_exp should match that in GHC.Core.Opt.Simplify.prepareRhs
 
-    one_shots  = argsOneShots (idStrictness fun) guaranteed_val_args
+    one_shots  = argsOneShots (idStrictness fun_id) guaranteed_val_args
     guaranteed_val_args = n_val_args + length (takeWhile isOneShotInfo
                                                          (occ_one_shots env))
         -- See Note [Sources of one-shot information], bullet point A']
@@ -2266,7 +2269,10 @@ data OccEnv
              -- See Note [Finding rule RHS free vars]
 
            -- See Note [The binder-swap substitution]
-           , occ_bs_env  :: VarEnv (OutExpr, OutId)
+           -- If  x :-> (y, co)  is in the env,
+           -- then please replace x by (y |> sym mco)
+           -- Invariant of course: idType x = exprType (y |> sym mco)
+           , occ_bs_env  :: VarEnv (OutId, MCoercion)
            , occ_bs_rng  :: VarSet   -- Vars free in the range of occ_bs_env
                    -- Domain is Global and Local Ids
                    -- Range is just Local Ids
@@ -2514,46 +2520,76 @@ I think this is just too bad.  CSE will recover some of it.
 Note [The binder-swap substitution]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The binder-swap is implemented by the occ_bs_env field of OccEnv.
-Given    case x |> co of b { alts }
-we add [x :-> (b |> sym co)] to the occ_bs_env environment; this is
-done by addBndrSwap.  Then, at an occurrence of a variable, we look
-up in the occ_bs_env to perform the swap.  See occAnalApp.
+There are two main pieces:
+
+* Given    case x |> co of b { alts }
+  we add [x :-> (b, co)] to the occ_bs_env environment; this is
+  done by addBndrSwap.
+
+* Then, at an occurrence of a variable, we look up in the occ_bs_env
+  to perform the swap. This is done by lookupBndrSwap.
 
 Some tricky corners:
 
-* We do the substitution before gathering occurrence info. So in
-  the above example, an occurrence of x turns into an occurrence
-  of b, and that's what we gather in the UsageDetails.  It's as
-  if the binder-swap occurred before occurrence analysis.
+(BS1) We do the substitution before gathering occurrence info. So in
+      the above example, an occurrence of x turns into an occurrence
+      of b, and that's what we gather in the UsageDetails.  It's as
+      if the binder-swap occurred before occurrence analysis. See
+      the computation of fun_uds in occAnalApp.
 
-* We need care when shadowing.  Suppose [x :-> b] is in occ_bs_env,
-  and we encounter:
-     - \x. blah
-       Here we want to delete the x-binding from occ_bs_env
+(BS2) When doing a lookup in occ_bs_env, we may need to iterate,
+      as you can see implemented in lookupBndrSwap.  Why?
+      Consider   case x of a { 1# -> e1; DEFAULT ->
+                 case x of b { 2# -> e2; DEFAULT ->
+                 case x of c { 3# -> e3; DEFAULT -> ..x..a..b.. }}}
+      At the first case addBndrSwap will extend occ_bs_env with
+          [x :-> a]
+      At the second case we occ-anal the scrutinee 'x', which looks up
+        'x in occ_bs_env, returning 'a', as it should.
+      Then addBndrSwap will add [a :-> b] to occ_bs_env, yielding
+         occ_bs_env = [x :-> a, a :-> b]
+      At the third case we'll again look up 'x' which returns 'a'.
+      But we don't want to stop the lookup there, else we'll end up with
+                 case x of a { 1# -> e1; DEFAULT ->
+                 case a of b { 2# -> e2; DEFAULT ->
+                 case a of c { 3# -> e3; DEFAULT -> ..a..b..c.. }}}
+      Instead, we want iterate the lookup in addBndrSwap, to give
+                 case x of a { 1# -> e1; DEFAULT ->
+                 case a of b { 2# -> e2; DEFAULT ->
+                 case b of c { 3# -> e3; DEFAULT -> ..c..c..c.. }}}
+      This makes a particular difference for case-merge, which works
+      only if the scrutinee is the case-binder of the immediately enclosing
+      case (Note [Merge Nested Cases] in GHC.Core.Opt.Simplify.Utils
+      See #19581 for the bug report that showed this up.
 
-     - \b. blah
-       This is harder: we really want to delete all bindings that
-       have 'b' free in the range.  That is a bit tiresome to implement,
-       so we compromise.  We keep occ_bs_rng, which is the set of
-       free vars of rng(occc_bs_env).  If a binder shadows any of these
-       variables, we discard all of occ_bs_env.  Safe, if a bit
-       brutal.  NB, however: the simplifer de-shadows the code, so the
-       next time around this won't happen.
+(BS3) We need care when shadowing.  Suppose [x :-> b] is in occ_bs_env,
+      and we encounter:
+         - \x. blah
+           Here we want to delete the x-binding from occ_bs_env
 
-  These checks are implemented in addInScope.
+         - \b. blah
+           This is harder: we really want to delete all bindings that
+           have 'b' free in the range.  That is a bit tiresome to implement,
+           so we compromise.  We keep occ_bs_rng, which is the set of
+           free vars of rng(occc_bs_env).  If a binder shadows any of these
+           variables, we discard all of occ_bs_env.  Safe, if a bit
+           brutal.  NB, however: the simplifer de-shadows the code, so the
+           next time around this won't happen.
 
-* The occurrence analyser itself does /not/ do cloning. It could, in
-  principle, but it'd make it a bit more complicated and there is no
-  great benefit. The simplifer uses cloning to get a no-shadowing
-  situation, the care-when-shadowing behaviour above isn't needed for
-  long.
+      These checks are implemented in addInScope.
 
-* The domain of occ_bs_env can include GlobaIds.  Eg
-      case M.foo of b { alts }
-  We extend occ_bs_env with [M.foo :-> b].  That's fine.
+      The occurrence analyser itself does /not/ do cloning. It could, in
+      principle, but it'd make it a bit more complicated and there is no
+      great benefit. The simplifer uses cloning to get a no-shadowing
+      situation, the care-when-shadowing behaviour above isn't needed for
+      long.
 
-* We have to apply the substitution uniformly, including to rules and
-  unfoldings.
+(BS4) The domain of occ_bs_env can include GlobaIds.  Eg
+         case M.foo of b { alts }
+      We extend occ_bs_env with [M.foo :-> b].  That's fine.
+
+(BS5) We have to apply the occ_bs_env substitution uniformly,
+      including to (local) rules and unfoldings.
 
 Historical note
 ---------------
@@ -2668,21 +2704,45 @@ addBndrSwap :: OutExpr -> Id -> OccEnv -> OccEnv
 -- See Note [The binder-swap substitution]
 addBndrSwap scrut case_bndr
             env@(OccEnv { occ_bs_env = swap_env, occ_bs_rng = rng_vars })
-  | Just (v, rhs) <- try_swap (stripTicksTopE (const True) scrut)
-  = env { occ_bs_env = extendVarEnv swap_env v (rhs, case_bndr')
-        , occ_bs_rng = rng_vars `unionVarSet` exprFreeVars rhs }
+  | Just (scrut_var, mco) <- get_scrut_var (stripTicksTopE (const True) scrut)
+  , scrut_var /= case_bndr
+      -- Consider: case x of x { ... }
+      -- Do not add [x :-> x] to occ_bs_env, else lookupBndrSwap will loop
+  = env { occ_bs_env = extendVarEnv swap_env scrut_var (case_bndr', mco)
+        , occ_bs_rng = rng_vars `extendVarSet` case_bndr'
+                       `unionVarSet` tyCoVarsOfMCo mco }
 
   | otherwise
   = env
   where
-    try_swap :: OutExpr -> Maybe (OutVar, OutExpr)
-    try_swap (Var v)           = Just (v, Var case_bndr')
-    try_swap (Cast (Var v) co) = Just (v, Cast (Var case_bndr') (mkSymCo co))
-                        -- See Note [Case of cast]
-    try_swap _ = Nothing
+    get_scrut_var :: OutExpr -> Maybe (OutVar, MCoercion)
+    get_scrut_var (Var v)           = Just (v, MRefl)
+    get_scrut_var (Cast (Var v) co) = Just (v, MCo co) -- See Note [Case of cast]
+    get_scrut_var _                 = Nothing
 
     case_bndr' = zapIdOccInfo case_bndr
                  -- See Note [Zap case binders in proxy bindings]
+
+lookupBndrSwap :: OccEnv -> Id -> (CoreExpr, Id)
+-- See Note [The binder-swap substitution]
+-- Returns an expression of the same type as Id
+lookupBndrSwap env@(OccEnv { occ_bs_env = bs_env })  bndr
+  = case lookupVarEnv bs_env bndr of {
+       Nothing           -> (Var bndr, bndr) ;
+       Just (bndr1, mco) ->
+
+    -- Why do we iterate here?
+    -- See (BS2) in Note [The binder-swap substitution]
+    case lookupBndrSwap env bndr1 of
+      (fun, fun_id) -> (add_cast fun mco, fun_id) }
+
+  where
+    add_cast fun MRefl    = fun
+    add_cast fun (MCo co) = Cast fun (mkSymCo co)
+    -- We must switch that 'co' to 'sym co';
+    -- see the comment with occ_bs_env
+    -- No need to test for isReflCo, because 'co' came from
+    -- a (Cast e co) and hence is unlikely to be Refl
 
 {-
 ************************************************************************

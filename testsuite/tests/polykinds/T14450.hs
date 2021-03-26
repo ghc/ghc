@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# Language KindSignatures, TypeOperators, PolyKinds, TypeOperators,
              ConstraintKinds, TypeFamilies, DataKinds, GADTs,
              AllowAmbiguousTypes, InstanceSigs #-}

@@ -1,4 +1,5 @@
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE Trustworthy #-}
 
 -- |
@@ -29,17 +30,12 @@ import Prelude
 -- * Type synonyms
 ----------------------------------------------------------
 
--- Since GHC 8.8 is currently the minimum boot compiler version that we must
--- support, we must use inline kind signatures to make TExpQ and CodeQ
--- levity polymorphic. When we drop support for GHC 8.8, we can instead use
--- standalone kind signatures, which are provided as comments.
-
 -- | Levity-polymorphic since /template-haskell-2.17.0.0/.
--- type TExpQ :: TYPE r -> Kind.Type
-type TExpQ (a :: TYPE r) = Q (TExp a)
+type TExpQ :: TYPE r -> Kind.Type
+type TExpQ a = Q (TExp a)
 
--- type CodeQ :: TYPE r -> Kind.Type
-type CodeQ = Code Q :: (TYPE r -> Kind.Type)
+type CodeQ :: TYPE r -> Kind.Type
+type CodeQ = Code Q
 
 type InfoQ               = Q Info
 type PatQ                = Q Pat
@@ -985,3 +981,171 @@ thisModule :: Q Module
 thisModule = do
   loc <- location
   pure $ Module (mkPkgName $ loc_package loc) (mkModName $ loc_module loc)
+
+--------------------------------------------------------------
+-- * Documentation combinators
+
+-- | Attaches Haddock documentation to the declaration provided. Unlike
+-- 'putDoc', the names do not need to be in scope when calling this function so
+-- it can be used for quoted declarations and anything else currently being
+-- spliced.
+-- Not all declarations can have documentation attached to them. For those that
+-- can't, 'withDecDoc' will return it unchanged without any side effects.
+withDecDoc :: String -> Q Dec -> Q Dec
+withDecDoc doc dec = do
+  dec' <- dec
+  case doc_loc dec' of
+    Just loc -> qAddModFinalizer $ qPutDoc loc doc
+    Nothing  -> pure ()
+  pure dec'
+  where
+    doc_loc (FunD n _)                                     = Just $ DeclDoc n
+    doc_loc (ValD (VarP n) _ _)                            = Just $ DeclDoc n
+    doc_loc (DataD _ n _ _ _ _)                            = Just $ DeclDoc n
+    doc_loc (NewtypeD _ n _ _ _ _)                         = Just $ DeclDoc n
+    doc_loc (TySynD n _ _)                                 = Just $ DeclDoc n
+    doc_loc (ClassD _ n _ _ _)                             = Just $ DeclDoc n
+    doc_loc (SigD n _)                                     = Just $ DeclDoc n
+    doc_loc (ForeignD (ImportF _ _ _ n _))                 = Just $ DeclDoc n
+    doc_loc (ForeignD (ExportF _ _ n _))                   = Just $ DeclDoc n
+    doc_loc (InfixD _ n)                                   = Just $ DeclDoc n
+    doc_loc (DataFamilyD n _ _)                            = Just $ DeclDoc n
+    doc_loc (OpenTypeFamilyD (TypeFamilyHead n _ _ _))     = Just $ DeclDoc n
+    doc_loc (ClosedTypeFamilyD (TypeFamilyHead n _ _ _) _) = Just $ DeclDoc n
+    doc_loc (PatSynD n _ _ _)                              = Just $ DeclDoc n
+    doc_loc (PatSynSigD n _)                               = Just $ DeclDoc n
+
+    -- For instances we just pass along the full type
+    doc_loc (InstanceD _ _ t _)           = Just $ InstDoc t
+    doc_loc (DataInstD _ _ t _ _ _)       = Just $ InstDoc t
+    doc_loc (NewtypeInstD _ _ t _ _ _)    = Just $ InstDoc t
+    doc_loc (TySynInstD (TySynEqn _ t _)) = Just $ InstDoc t
+
+    -- Declarations that can't have documentation attached to
+    -- ValDs that aren't a simple variable pattern
+    doc_loc (ValD _ _ _)             = Nothing
+    doc_loc (KiSigD _ _)             = Nothing
+    doc_loc (PragmaD _)              = Nothing
+    doc_loc (RoleAnnotD _ _)         = Nothing
+    doc_loc (StandaloneDerivD _ _ _) = Nothing
+    doc_loc (DefaultSigD _ _)        = Nothing
+    doc_loc (ImplicitParamBindD _ _) = Nothing
+
+-- | Variant of 'withDecDoc' that applies the same documentation to
+-- multiple declarations. Useful for documenting quoted declarations.
+withDecsDoc :: String -> Q [Dec] -> Q [Dec]
+withDecsDoc doc decs = decs >>= mapM (withDecDoc doc . pure)
+
+-- | Variant of 'funD' that attaches Haddock documentation.
+funD_doc :: Name -> [Q Clause]
+         -> Maybe String -- ^ Documentation to attach to function
+         -> [Maybe String] -- ^ Documentation to attach to arguments
+         -> Q Dec
+funD_doc nm cs mfun_doc arg_docs = do
+  qAddModFinalizer $ sequence_
+    [putDoc (ArgDoc nm i) s | (i, Just s) <- zip [0..] arg_docs]
+  let dec = funD nm cs
+  case mfun_doc of
+    Just fun_doc -> withDecDoc fun_doc dec
+    Nothing -> funD nm cs
+
+-- | Variant of 'dataD' that attaches Haddock documentation.
+dataD_doc :: Q Cxt -> Name -> [Q (TyVarBndr ())] -> Maybe (Q Kind)
+          -> [(Q Con, Maybe String, [Maybe String])]
+          -- ^ List of constructors, documentation for the constructor, and
+          -- documentation for the arguments
+          -> [Q DerivClause]
+          -> Maybe String
+          -- ^ Documentation to attach to the data declaration
+          -> Q Dec
+dataD_doc ctxt tc tvs ksig cons_with_docs derivs mdoc = do
+  qAddModFinalizer $ mapM_ docCons cons_with_docs
+  let dec = dataD ctxt tc tvs ksig (map (\(con, _, _) -> con) cons_with_docs) derivs
+  maybe dec (flip withDecDoc dec) mdoc
+
+-- | Variant of 'newtypeD' that attaches Haddock documentation.
+newtypeD_doc :: Q Cxt -> Name -> [Q (TyVarBndr ())] -> Maybe (Q Kind)
+             -> (Q Con, Maybe String, [Maybe String])
+             -- ^ The constructor, documentation for the constructor, and
+             -- documentation for the arguments
+             -> [Q DerivClause]
+             -> Maybe String
+             -- ^ Documentation to attach to the newtype declaration
+             -> Q Dec
+newtypeD_doc ctxt tc tvs ksig con_with_docs@(con, _, _) derivs mdoc = do
+  qAddModFinalizer $ docCons con_with_docs
+  let dec = newtypeD ctxt tc tvs ksig con derivs
+  maybe dec (flip withDecDoc dec) mdoc
+
+-- | Variant of 'dataInstD' that attaches Haddock documentation.
+dataInstD_doc :: Q Cxt -> (Maybe [Q (TyVarBndr ())]) -> Q Type -> Maybe (Q Kind)
+              -> [(Q Con, Maybe String, [Maybe String])]
+              -- ^ List of constructors, documentation for the constructor, and
+              -- documentation for the arguments
+              -> [Q DerivClause]
+              -> Maybe String
+              -- ^ Documentation to attach to the instance declaration
+              -> Q Dec
+dataInstD_doc ctxt mb_bndrs ty ksig cons_with_docs derivs mdoc = do
+  qAddModFinalizer $ mapM_ docCons cons_with_docs
+  let dec = dataInstD ctxt mb_bndrs ty ksig (map (\(con, _, _) -> con) cons_with_docs)
+              derivs
+  maybe dec (flip withDecDoc dec) mdoc
+
+-- | Variant of 'newtypeInstD' that attaches Haddock documentation.
+newtypeInstD_doc :: Q Cxt -> (Maybe [Q (TyVarBndr ())]) -> Q Type
+                 -> Maybe (Q Kind)
+                 -> (Q Con, Maybe String, [Maybe String])
+                 -- ^ The constructor, documentation for the constructor, and
+                 -- documentation for the arguments
+                 -> [Q DerivClause]
+                 -> Maybe String
+                 -- ^ Documentation to attach to the instance declaration
+                 -> Q Dec
+newtypeInstD_doc ctxt mb_bndrs ty ksig con_with_docs@(con, _, _) derivs mdoc = do
+  qAddModFinalizer $ docCons con_with_docs
+  let dec = newtypeInstD ctxt mb_bndrs ty ksig con derivs
+  maybe dec (flip withDecDoc dec) mdoc
+
+-- | Variant of 'patSynD' that attaches Haddock documentation.
+patSynD_doc :: Name -> Q PatSynArgs -> Q PatSynDir -> Q Pat
+            -> Maybe String   -- ^ Documentation to attach to the pattern synonym
+            -> [Maybe String] -- ^ Documentation to attach to the pattern arguments
+            -> Q Dec
+patSynD_doc name args dir pat mdoc arg_docs = do
+  qAddModFinalizer $ sequence_
+    [putDoc (ArgDoc name i) s | (i, Just s) <- zip [0..] arg_docs]
+  let dec = patSynD name args dir pat
+  maybe dec (flip withDecDoc dec) mdoc
+
+-- | Document a data/newtype constructor with its arguments.
+docCons :: (Q Con, Maybe String, [Maybe String]) -> Q ()
+docCons (c, md, arg_docs) = do
+  c' <- c
+  -- Attach docs to the constructors
+  sequence_ [ putDoc (DeclDoc nm) d | Just d <- [md], nm <- get_cons_names c' ]
+  -- Attach docs to the arguments
+  case c' of
+    -- Record selector documentation isn't stored in the argument map,
+    -- but in the declaration map instead
+    RecC _ var_bang_types ->
+      sequence_ [ putDoc (DeclDoc nm) arg_doc
+                  | (Just arg_doc, (nm, _, _)) <- zip arg_docs var_bang_types
+                ]
+    _ ->
+      sequence_ [ putDoc (ArgDoc nm i) arg_doc
+                    | nm <- get_cons_names c'
+                    , (i, Just arg_doc) <- zip [0..] arg_docs
+                ]
+  where
+    get_cons_names :: Con -> [Name]
+    get_cons_names (NormalC n _) = [n]
+    get_cons_names (RecC n _) = [n]
+    get_cons_names (InfixC _ n _) = [n]
+    get_cons_names (ForallC _ _ cons) = get_cons_names cons
+    -- GadtC can have multiple names, e.g
+    -- > data Bar a where
+    -- >   MkBar1, MkBar2 :: a -> Bar a
+    -- Will have one GadtC with [MkBar1, MkBar2] as names
+    get_cons_names (GadtC ns _ _) = ns
+    get_cons_names (RecGadtC ns _ _) = ns

@@ -48,7 +48,6 @@ import qualified GHC.Conc.WinIO as WINIO
 import GHC.Event.Windows.ConsoleEvent
 import GHC.IO.SubSystem ((<!>))
 import GHC.Ptr
-import Unsafe.Coerce ( unsafeCoerceUnlifted )
 
 -- ----------------------------------------------------------------------------
 -- Thread waiting
@@ -80,11 +79,11 @@ asyncDoProc (FunPtr proc) (Ptr param) =
 -- this better be a pinned byte array!
 asyncReadBA :: Int -> Int -> Int -> Int -> MutableByteArray# RealWorld -> IO (Int,Int)
 asyncReadBA fd isSock len off bufB =
-  asyncRead fd isSock len ((Ptr (byteArrayContents# (unsafeCoerceUnlifted bufB))) `plusPtr` off)
+  asyncRead fd isSock len ((Ptr (mutableByteArrayContents# bufB)) `plusPtr` off)
 
 asyncWriteBA :: Int -> Int -> Int -> Int -> MutableByteArray# RealWorld -> IO (Int,Int)
 asyncWriteBA fd isSock len off bufB =
-  asyncWrite fd isSock len ((Ptr (byteArrayContents# (unsafeCoerceUnlifted bufB))) `plusPtr` off)
+  asyncWrite fd isSock len ((Ptr (mutableByteArrayContents# bufB)) `plusPtr` off)
 
 -- ----------------------------------------------------------------------------
 -- Threaded RTS implementation of threadDelay

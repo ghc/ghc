@@ -13,3 +13,7 @@ DocsInHiFile0:
 DocsInHiFile1:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -haddock DocsInHiFile.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) --show-iface DocsInHiFile.hi | grep -A 100 'module header:'
+
+DocsInHiFileTH:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -haddock DocsInHiFileTHExternal.hs DocsInHiFileTH.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) --show-iface DocsInHiFileTH.hi | grep -A 200 'module header:'

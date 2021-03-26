@@ -5,13 +5,16 @@
 --
 -- -----------------------------------------------------------------------------
 
-{-# LANGUAGE BangPatterns, CPP, GADTs, ScopedTypeVariables, PatternSynonyms,
-    DeriveFunctor #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE UnboxedTuples #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 

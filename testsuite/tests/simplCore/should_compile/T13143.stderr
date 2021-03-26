@@ -90,7 +90,7 @@ g [InlPrag=[2]] :: Bool -> Bool -> Int -> Int
 [GblId,
  Arity=3,
  Str=<1L><1L><1P(L)>,
- Cpr=m1,
+ Cpr=1,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=3,unsat_ok=True,boring_ok=False)

@@ -484,7 +484,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
                                   , cid_sigs = uprags, cid_tyfam_insts = ats
                                   , cid_overlap_mode = overlap_mode
                                   , cid_datafam_insts = adts }))
-  = setSrcSpan loc                      $
+  = setSrcSpanA loc                      $
     addErrCtxt (instDeclCtxt1 hs_ty)  $
     do  { dfun_ty <- tcHsClsInstType (InstDeclCtxt False) hs_ty
         ; let (tyvars, theta, clas, inst_tys) = tcSplitDFunTy dfun_ty
@@ -517,7 +517,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
                       -- from their defaults (if available)
                     ; is_boot <- tcIsHsBootOrSig
                     ; let atItems = classATItems clas
-                    ; tf_insts2 <- mapM (tcATDefault loc mini_subst defined_ats)
+                    ; tf_insts2 <- mapM (tcATDefault (locA loc) mini_subst defined_ats)
                                         (if is_boot then [] else atItems)
                       -- Don't default type family instances, but rather omit, in hsig/hs-boot.
                       -- Since hsig/hs-boot files are essentially large binders we want omission
@@ -532,7 +532,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
 
         -- Finally, construct the Core representation of the instance.
         -- (This no longer includes the associated types.)
-        ; dfun_name <- newDFunName clas inst_tys (getLoc hs_ty)
+        ; dfun_name <- newDFunName clas inst_tys (getLocA hs_ty)
                 -- Dfun location is that of instance *header*
 
         ; ispec <- newClsInst (fmap unLoc overlap_mode) dfun_name
@@ -581,7 +581,7 @@ tcTyFamInstDecl :: AssocInstInfo
   -- "type instance"
   -- See Note [Associated type instances]
 tcTyFamInstDecl mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_eqn = eqn }))
-  = setSrcSpan loc           $
+  = setSrcSpanA loc           $
     tcAddTyFamInstCtxt decl  $
     do { let fam_lname = feqn_tycon eqn
        ; fam_tc <- tcLookupLocatedTyCon fam_lname
@@ -595,7 +595,7 @@ tcTyFamInstDecl mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_eqn = eqn }))
          -- For some reason we don't have a location for the equation
          -- itself, so we make do with the location of family name
        ; co_ax_branch <- tcTyFamInstEqn fam_tc mb_clsinfo
-                                        (L (getLoc fam_lname) eqn)
+                                        (L (na2la $ getLoc fam_lname) eqn)
 
          -- (2) check for validity
        ; checkConsistentFamInst mb_clsinfo fam_tc co_ax_branch
@@ -677,7 +677,7 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
                                         , dd_cons    = hs_cons
                                         , dd_kindSig = m_ksig
                                         , dd_derivs  = derivs } }}))
-  = setSrcSpan loc             $
+  = setSrcSpanA loc            $
     tcAddDataFamInstCtxt decl  $
     do { fam_tc <- tcLookupLocatedTyCon lfam_name
 
@@ -727,7 +727,7 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
        ; traceTc "tcDataFamInstDecl" $
          vcat [ text "Fam tycon:" <+> ppr fam_tc
               , text "Pats:" <+> ppr pats
-              , text "visiblities:" <+> ppr (tcbVisibilities fam_tc pats)
+              , text "visibilities:" <+> ppr (tcbVisibilities fam_tc pats)
               , text "all_pats:" <+> ppr all_pats
               , text "ty_binders" <+> ppr ty_binders
               , text "fam_tc_binders:" <+> ppr (tyConBinders fam_tc)
@@ -781,8 +781,8 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
 
        ; let scoped_tvs = map mk_deriv_info_scoped_tv_pr (tyConTyVars rep_tc)
              m_deriv_info = case derivs of
-               L _ []    -> Nothing
-               L _ preds ->
+               []    -> Nothing
+               preds ->
                  Just $ DerivInfo { di_rep_tc  = rep_tc
                                   , di_scoped_tvs = scoped_tvs
                                   , di_clauses = preds
@@ -940,12 +940,15 @@ tcDataFamInstHeader mb_clsinfo fam_tc outer_bndrs fixity
     fam_name  = tyConName fam_tc
     data_ctxt = DataKindCtxt fam_name
 
-    -- See Note [Implementation of UnliftedNewtypes] in GHC.Tc.TyCl, wrinkle (2).
+    -- See Note [Implementation of UnliftedNewtypes] in GHC.Tc.TyCl, families (2),
+    -- and Note [Implementation of UnliftedDatatypes].
     tc_kind_sig Nothing
-      = do { unlifted_newtypes <- xoptM LangExt.UnliftedNewtypes
-           ; if unlifted_newtypes && new_or_data == NewType
-               then newOpenTypeKind
-               else pure liftedTypeKind
+      = do { unlifted_newtypes  <- xoptM LangExt.UnliftedNewtypes
+           ; unlifted_datatypes <- xoptM LangExt.UnliftedDatatypes
+           ; case new_or_data of
+               NewType  | unlifted_newtypes  -> newOpenTypeKind
+               DataType | unlifted_datatypes -> newOpenTypeKind
+               _                             -> pure liftedTypeKind
            }
 
     -- See Note [Result kind signature for a data family instance]
@@ -1234,8 +1237,9 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
        -- Create the result bindings
        ; self_dict <- newDict clas inst_tys
        ; let class_tc      = classTyCon clas
+             loc'          = noAnnSrcSpan loc
              [dict_constr] = tyConDataCons class_tc
-             dict_bind     = mkVarBind self_dict (L loc con_app_args)
+             dict_bind = mkVarBind self_dict (L loc' con_app_args)
 
                      -- We don't produce a binding for the dict_constr; instead we
                      -- rely on the simplifier to unfold this saturated application
@@ -1254,8 +1258,8 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
              con_app_args = foldl' app_to_meth con_app_tys sc_meth_ids
 
              app_to_meth :: HsExpr GhcTc -> Id -> HsExpr GhcTc
-             app_to_meth fun meth_id = HsApp noExtField (L loc fun)
-                                            (L loc (wrapId arg_wrapper meth_id))
+             app_to_meth fun meth_id = HsApp noComments (L loc' fun)
+                                            (L loc' (wrapId arg_wrapper meth_id))
 
              inst_tv_tys = mkTyVarTys inst_tyvars
              arg_wrapper = mkWpEvVarApps dfun_ev_vars <.> mkWpTyApps inst_tv_tys
@@ -1282,7 +1286,8 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                                   , abs_binds = unitBag dict_bind
                                   , abs_sig = True }
 
-       ; return (unitBag (L loc main_bind) `unionBags` sc_meth_binds)
+       ; return (unitBag (L loc' main_bind)
+                  `unionBags` sc_meth_binds)
        }
  where
    dfun_id = instanceDFunId ispec
@@ -1321,7 +1326,7 @@ addDFunPrags dfun_id sc_meth_ids
    is_newtype  = isNewTyCon clas_tc
 
 wrapId :: HsWrapper -> Id -> HsExpr GhcTc
-wrapId wrapper id = mkHsWrap wrapper (HsVar noExtField (noLoc id))
+wrapId wrapper id = mkHsWrap wrapper (HsVar noExtField (noLocA id))
 
 {- Note [Typechecking plan for instance declarations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1433,7 +1438,7 @@ tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds sc_theta
                                  , abs_ev_binds = [dfun_ev_binds, local_ev_binds]
                                  , abs_binds    = emptyBag
                                  , abs_sig      = False }
-           ; return (sc_top_id, L loc bind, sc_implic) }
+           ; return (sc_top_id, L (noAnnSrcSpan loc) bind, sc_implic) }
 
 -------------------
 checkInstConstraints :: TcM result
@@ -1652,7 +1657,7 @@ tcMethods :: DFunId -> Class
           -> [TcTyVar] -> [EvVar]
           -> [TcType]
           -> TcEvBinds
-          -> ([Located TcSpecPrag], TcPragEnv)
+          -> ([LTcSpecPrag], TcPragEnv)
           -> [ClassOpItem]
           -> InstBindings GhcRn
           -> TcM ([Id], LHsBinds GhcTc, Bag Implication)
@@ -1719,12 +1724,15 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
                              mkLHsWrap lam_wrapper (error_rhs dflags)
            ; return (meth_id, meth_bind, Nothing) }
       where
-        error_rhs dflags = L inst_loc $ HsApp noExtField error_fun (error_msg dflags)
-        error_fun    = L inst_loc $
+        inst_loc' = noAnnSrcSpan inst_loc
+        error_rhs dflags = L inst_loc'
+                                 $ HsApp noComments error_fun (error_msg dflags)
+        error_fun    = L inst_loc' $
                        wrapId (mkWpTyApps
                                 [ getRuntimeRep meth_tau, meth_tau])
                               nO_METHOD_BINDING_ERROR_ID
-        error_msg dflags = L inst_loc (HsLit noExtField (HsStringPrim NoSourceText
+        error_msg dflags = L inst_loc'
+                                    (HsLit noComments (HsStringPrim NoSourceText
                                               (unsafeMkByteString (error_string dflags))))
         meth_tau     = classMethodInstTy sel_id inst_tys
         error_string dflags = showSDoc dflags
@@ -1836,7 +1844,8 @@ tcMethodBody clas tyvars dfun_ev_vars inst_tys
                                             mkMethIds clas tyvars dfun_ev_vars
                                                       inst_tys sel_id
 
-       ; let lm_bind = meth_bind { fun_id = L bndr_loc (idName local_meth_id) }
+       ; let lm_bind = meth_bind { fun_id = L (noAnnSrcSpan bndr_loc)
+                                                        (idName local_meth_id) }
                        -- Substitute the local_meth_name for the binder
                        -- NB: the binding is always a FunBind
 
@@ -1881,7 +1890,7 @@ tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
               -- There is a signature in the instance
               -- See Note [Instance method signatures]
   = do { (sig_ty, hs_wrap)
-             <- setSrcSpan (getLoc hs_sig_ty) $
+             <- setSrcSpan (getLocA hs_sig_ty) $
                 do { inst_sigs <- xoptM LangExt.InstanceSigs
                    ; checkTc inst_sigs (misplacedInstSig sel_name hs_sig_ty)
                    ; sig_ty  <- tcHsSigType (FunSigCtxt sel_name False) hs_sig_ty
@@ -1902,7 +1911,7 @@ tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
              inner_meth_id  = mkLocalId inner_meth_name Many sig_ty
              inner_meth_sig = CompleteSig { sig_bndr = inner_meth_id
                                           , sig_ctxt = ctxt
-                                          , sig_loc  = getLoc hs_sig_ty }
+                                          , sig_loc  = getLocA hs_sig_ty }
 
 
        ; (tc_bind, [inner_id]) <- tcPolyCheck no_prag_fn inner_meth_sig meth_bind
@@ -2061,17 +2070,17 @@ mkDefMethBind dfun_id clas sel_id dm_name
         ; dm_id <- tcLookupId dm_name
         ; let inline_prag = idInlinePragma dm_id
               inline_prags | isAnyInlinePragma inline_prag
-                           = [noLoc (InlineSig noExtField fn inline_prag)]
+                           = [noLocA (InlineSig noAnn fn inline_prag)]
                            | otherwise
                            = []
                  -- Copy the inline pragma (if any) from the default method
                  -- to this version. Note [INLINE and default methods]
 
-              fn   = noLoc (idName sel_id)
+              fn   = noLocA (idName sel_id)
               visible_inst_tys = [ ty | (tcb, ty) <- tyConBinders (classTyCon clas) `zip` inst_tys
                                       , tyConBinderArgFlag tcb /= Inferred ]
               rhs  = foldl' mk_vta (nlHsVar dm_name) visible_inst_tys
-              bind = noLoc $ mkTopFunBind Generated fn $
+              bind = noLocA $ mkTopFunBind Generated fn $
                              [mkSimpleMatch (mkPrefixFunRhs fn) [] rhs]
 
         ; liftIO (dumpIfSet_dyn logger dflags Opt_D_dump_deriv "Filling in method body"
@@ -2084,8 +2093,8 @@ mkDefMethBind dfun_id clas sel_id dm_name
     (_, _, _, inst_tys) = tcSplitDFunTy (idType dfun_id)
 
     mk_vta :: LHsExpr GhcRn -> Type -> LHsExpr GhcRn
-    mk_vta fun ty = noLoc (HsAppType noExtField fun (mkEmptyWildCardBndrs $ nlHsParTy
-                                                $ noLoc $ XHsType ty))
+    mk_vta fun ty = noLocA (HsAppType noExtField fun (mkEmptyWildCardBndrs $ nlHsParTy
+                                                $ noLocA $ XHsType ty))
        -- NB: use visible type application
        -- See Note [Default methods in instances]
 
@@ -2278,9 +2287,9 @@ Note that
 -}
 
 tcSpecInstPrags :: DFunId -> InstBindings GhcRn
-                -> TcM ([Located TcSpecPrag], TcPragEnv)
+                -> TcM ([LTcSpecPrag], TcPragEnv)
 tcSpecInstPrags dfun_id (InstBindings { ib_binds = binds, ib_pragmas = uprags })
-  = do { spec_inst_prags <- mapM (wrapLocM (tcSpecInst dfun_id)) $
+  = do { spec_inst_prags <- mapM (wrapLocAM (tcSpecInst dfun_id)) $
                             filter isSpecInstLSig uprags
              -- The filter removes the pragmas for methods
        ; return (spec_inst_prags, mkPragEnv uprags binds) }

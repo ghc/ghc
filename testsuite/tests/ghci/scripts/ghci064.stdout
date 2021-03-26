@@ -25,12 +25,12 @@ instance Show w => Show [w] -- Defined in ‘GHC.Show’
 instance Read w => Read [w] -- Defined in ‘GHC.Read’
 instance GHC.Generics.Generic [w] -- Defined in ‘GHC.Generics’
 instance [safe] MyShow w => MyShow [w]
-  -- Defined at ghci064.hs:7:10
+  -- Defined at ghci064.hs:8:10
 instance Monoid [T] -- Defined in ‘GHC.Base’
 instance Semigroup [T] -- Defined in ‘GHC.Base’
 instance GHC.Generics.Generic [T] -- Defined in ‘GHC.Generics’
-instance [safe] MyShow [T] -- Defined at ghci064.hs:7:10
-instance [safe] MyShow [T] -- Defined at ghci064.hs:15:10
+instance [safe] MyShow [T] -- Defined at ghci064.hs:8:10
+instance [safe] MyShow [T] -- Defined at ghci064.hs:16:10
 instance Eq Bool -- Defined in ‘GHC.Classes’
 instance Ord Bool -- Defined in ‘GHC.Classes’
 instance Enum Bool -- Defined in ‘GHC.Enum’

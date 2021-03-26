@@ -22,6 +22,7 @@ import GHC.Driver.Session
 import GHC.Utils.Logger  ( dumpIfSet_dyn, DumpFormat (..), Logger )
 import GHC.Types.Id      ( Id, idArity, idType, isDeadEndId,
                            isJoinId, isJoinId_maybe )
+import GHC.Types.Tickish
 import GHC.Core.Opt.SetLevels
 import GHC.Types.Unique.Supply ( UniqSupply )
 import GHC.Data.Bag
@@ -738,7 +739,7 @@ atJoinCeiling (fs, floats, expr')
   where
     (floats', ceils) = partitionAtJoinCeiling floats
 
-wrapTick :: Tickish Id -> FloatBinds -> FloatBinds
+wrapTick :: CoreTickish -> FloatBinds -> FloatBinds
 wrapTick t (FB tops ceils defns)
   = FB (mapBag wrap_bind tops) (wrap_defns ceils)
        (M.map (M.map wrap_defns) defns)

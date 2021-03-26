@@ -419,7 +419,7 @@ addDocs :: [HoleFit] -> TcM [HoleFit]
 addDocs fits =
   do { showDocs <- goptM Opt_ShowDocsOfHoleFits
      ; if showDocs
-       then do { (_, DeclDocMap lclDocs, _) <- extractDocs <$> getGblEnv
+       then do { (_, DeclDocMap lclDocs, _) <- getGblEnv >>= extractDocs
                ; mapM (upd lclDocs) fits }
        else return fits }
   where
@@ -785,7 +785,7 @@ tcFilterHoleFits limit typed_hole ht@(hole_ty, _) candidates =
                                            Just (dataConWrapId con, dataConNonlinearType con)
                                        _ -> Nothing }
             where name = case hfc of
-#if __GLASGOW_HASKELL__ <= 810
+#if __GLASGOW_HASKELL__ < 901
                            IdHFCand id -> idName id
 #endif
                            GreHFCand gre -> greMangledName gre

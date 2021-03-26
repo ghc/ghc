@@ -602,7 +602,7 @@ See https://gitlab.haskell.org/ghc/ghc/merge_requests/312#note_192064.
 
 
 ---------------------
-splitFun :: DynFlags -> FamInstEnvs -> Id -> IdInfo -> [Demand] -> Divergence -> CprResult -> CoreExpr
+splitFun :: DynFlags -> FamInstEnvs -> Id -> IdInfo -> [Demand] -> Divergence -> Cpr -> CoreExpr
          -> UniqSM [(Id, CoreExpr)]
 splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
   | isRecordSelector fn_id  -- See Note [No worker/wrapper for record selectors]
@@ -638,7 +638,7 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
 
 
 mkWWBindPair :: DynFlags -> Id -> IdInfo -> Arity
-             -> CoreExpr -> Unique -> Divergence -> CprResult
+             -> CoreExpr -> Unique -> Divergence -> Cpr
              -> ([Demand], JoinArity, Id -> CoreExpr, Expr CoreBndr -> CoreExpr)
              -> [(Id, CoreExpr)]
 mkWWBindPair dflags fn_id fn_info arity rhs work_uniq div cpr

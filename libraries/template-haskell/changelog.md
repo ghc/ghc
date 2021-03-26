@@ -1,5 +1,19 @@
 # Changelog for [`template-haskell` package](http://hackage.haskell.org/package/template-haskell)
 
+## 2.18.0.0
+  * The types of `ConP` and `conP` have been changed to allow for an additional list
+    of type applications preceding the argument patterns.
+
+  * Add support for the `Char` kind (#11342): we extend the `TyLit` data type with
+    the constructor `CharTyLit` that reflects type-level characters.
+
+  * Add `putDoc` and `getDoc` which allow Haddock documentation to be attached
+    to module headers, declarations, function arguments and instances, as well
+    as queried. These are quite low level operations, so for convenience there
+    are several combinators that can be used with `Dec`s directly, including
+    `withDecDoc`/`withDecsDoc` as well as `_doc` counterparts to many of the
+    `Dec` helper functions.
+
 ## 2.17.0.0
   * Typed Quotations now return a value of type `Code m a` (GHC Proposal #195).
     The main motiviation is to make writing instances easier and make it easier to
@@ -34,13 +48,9 @@
 
   * The argument to `TExpQ` can now be levity polymorphic.
 
-  * The types of `ConP` and `conP` have been changed to allow for an additional list
-    of type applications preceding the argument patterns.
+## 2.16.0.0 *Jan 2020*
 
-  * Add support for the `Char` kind (#11342): we extend the `TyLit` data type with
-    the constructor `CharTyLit` that reflects type-level characters.
-
-## 2.16.0.0 *TBA*
+  * Bundled with GHC 8.10.1
 
   * Add support for tuple sections. (#15843) The type signatures of `TupE` and
     `UnboxedTupE` have changed from `[Exp] -> Exp` to `[Maybe Exp] -> Exp`.
@@ -64,6 +74,8 @@
 
 ## 2.15.0.0 *May 2019*
 
+  * Bundled with GHC 8.8.1
+
   * In `Language.Haskell.TH.Syntax`, `DataInstD`, `NewTypeInstD`, `TySynEqn`,
     and `RuleP` now all have a `Maybe [TyVarBndr]` argument, which contains a
     list of quantified type variables if an explicit `forall` is present, and
@@ -85,6 +97,8 @@
   * `addForeignFilePath` now support assembler sources (#16180).
 
 ## 2.14.0.0 *September 2018*
+
+  * Bundled with GHC 8.6.1
 
   * Introduce an `addForeignFilePath` function, as well as a corresponding
     `qAddForeignFile` class method to `Quasi`. Unlike `addForeignFile`, which

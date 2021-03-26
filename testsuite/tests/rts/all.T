@@ -53,6 +53,11 @@ test('divbyzero',
       # behavior on division-by-zero (#10332).
       omit_ways(llvm_ways),
       when(not(have_ncg()), skip),
+      # Aarch64 does not have div-by-zero exceptions for sdiv/udiv.
+      # The only option would be to implement this in assembly with checks for
+      # each devision. Neither gcc, nor llvm do this as of right now.  Microsoft
+      # apparently does so though?
+      when(arch('aarch64'), skip),
       # Apparently the output can be different on different
       # Linux setups, so just ignore it. As long as we get
       # the right exit code we're OK.
@@ -76,7 +81,14 @@ test('divbyzero',
       when(opsys('mingw32'), omit_ways(prof_ways))],
      compile_and_run, ['-with-rtsopts="--generate-stack-traces=no"'])
 
-test('outofmem', when(opsys('darwin'), skip),
+test('outofmem', [ when(opsys('darwin'), skip),
+                   # this is believed to cause other processes to die
+                   # that happen concurrently while the outofmem test
+                   # runs in CI. As such we'll need to disable it on
+                   # windows, to prevent absolute exhaustion of memory
+                   # and subsequent termination (and failure) of unrelated
+                   # tests.
+                   when(opsys('mingw32'), skip) ],
                  makefile_test, ['outofmem'])
 test('outofmem2', normal, makefile_test, ['outofmem2'])
 
@@ -425,3 +437,4 @@ test('T17088',
 test('T15427', normal, compile_and_run, [''])
 
 test('T19481', extra_run_opts('+RTS -T  -RTS'), compile_and_run, [''])
+test('T19381', extra_run_opts('+RTS -T -RTS'), compile_and_run, [''])

@@ -13,7 +13,6 @@ module GHC.ByteCode.InfoTable ( mkITbls ) where
 import GHC.Prelude
 
 import GHC.Driver.Session
-import GHC.Driver.Env
 
 import GHC.Platform
 import GHC.Platform.Profile
@@ -40,30 +39,30 @@ import GHC.Utils.Panic
 -}
 
 -- Make info tables for the data decls in this module
-mkITbls :: HscEnv -> [TyCon] -> IO ItblEnv
-mkITbls hsc_env tcs =
+mkITbls :: Interp -> Profile -> [TyCon] -> IO ItblEnv
+mkITbls interp profile tcs =
   foldr plusNameEnv emptyNameEnv <$>
-    mapM (mkITbl hsc_env) (filter isDataTyCon tcs)
+    mapM mkITbl (filter isDataTyCon tcs)
  where
-  mkITbl :: HscEnv -> TyCon -> IO ItblEnv
-  mkITbl hsc_env tc
+  mkITbl :: TyCon -> IO ItblEnv
+  mkITbl tc
     | dcs `lengthIs` n -- paranoia; this is an assertion.
-    = make_constr_itbls hsc_env dcs
+    = make_constr_itbls interp profile dcs
        where
           dcs = tyConDataCons tc
           n   = tyConFamilySize tc
-  mkITbl _ _ = panic "mkITbl"
+  mkITbl _ = panic "mkITbl"
 
 mkItblEnv :: [(Name,ItblPtr)] -> ItblEnv
 mkItblEnv pairs = mkNameEnv [(n, (n,p)) | (n,p) <- pairs]
 
 -- Assumes constructors are numbered from zero, not one
-make_constr_itbls :: HscEnv -> [DataCon] -> IO ItblEnv
-make_constr_itbls hsc_env cons =
+make_constr_itbls :: Interp -> Profile -> [DataCon] -> IO ItblEnv
+make_constr_itbls interp profile cons =
+  -- TODO: the profile should be bundled with the interpreter: the rts ways are
+  -- fixed for an interpreter
   mkItblEnv <$> mapM (uncurry mk_itbl) (zip cons [0..])
  where
-  profile = targetProfile (hsc_dflags hsc_env)
-
   mk_itbl :: DataCon -> Int -> IO (Name,ItblPtr)
   mk_itbl dcon conNo = do
      let rep_args = [ NonVoid prim_rep
@@ -85,6 +84,6 @@ make_constr_itbls hsc_env cons =
          constants = platformConstants platform
          tables_next_to_code = platformTablesNextToCode platform
 
-     r <- iservCmd hsc_env (MkConInfoTable tables_next_to_code ptrs' nptrs_really
+     r <- interpCmd interp (MkConInfoTable tables_next_to_code ptrs' nptrs_really
                               conNo (tagForCon platform dcon) descr)
      return (getName dcon, ItblPtr r)

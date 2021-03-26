@@ -1,26 +1,26 @@
 
-T14172.hs:6:46: error:
+T14172.hs:7:46: error:
     • Found type wildcard ‘_’ standing for ‘a'’
       Where: ‘a'’ is a rigid type variable bound by
                the inferred type of
                  traverseCompose :: (a -> f b) -> g a -> f (h a')
-               at T14172.hs:7:1-46
+               at T14172.hs:8:1-46
       To use the inferred type, enable PartialTypeSignatures
     • In the first argument of ‘h’, namely ‘_’
       In the first argument of ‘f’, namely ‘(h _)’
       In the type ‘(a -> f b) -> g a -> f (h _)’
 
-T14172.hs:7:19: error:
+T14172.hs:8:19: error:
     • Couldn't match type ‘h’ with ‘Compose f'0 g'0’
         arising from a use of ‘_Wrapping’
       ‘h’ is a rigid type variable bound by
         the inferred type of
           traverseCompose :: (a -> f b) -> g a -> f (h a')
-        at T14172.hs:6:1-47
+        at T14172.hs:7:1-47
     • In the first argument of ‘(.)’, namely ‘_Wrapping Compose’
       In the expression: _Wrapping Compose . traverse
       In an equation for ‘traverseCompose’:
           traverseCompose = _Wrapping Compose . traverse
     • Relevant bindings include
         traverseCompose :: (a -> f b) -> g a -> f (h a')
-          (bound at T14172.hs:7:1)
+          (bound at T14172.hs:8:1)

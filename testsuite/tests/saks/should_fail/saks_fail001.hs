@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 -- No -XStandaloneKindSignatures!
 
 module SAKS_Fail001 where

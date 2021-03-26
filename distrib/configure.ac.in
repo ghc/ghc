@@ -118,19 +118,20 @@ AC_SUBST([StripCmd])
 # tools we are looking for. In the past, GHC supported a number of
 # versions of LLVM simultaneously, but that stopped working around
 # 3.5/3.6 release of LLVM.
-LlvmVersion=@LlvmVersion@
+LlvmMinVersion=@LlvmMinVersion@
+LlvmMaxVersion=@LlvmMaxVersion@
 
 dnl ** Which LLVM llc to use?
 dnl --------------------------------------------------------------
 AC_ARG_VAR(LLC,[Use as the path to LLVM's llc [default=autodetect]])
-FIND_LLVM_PROG([LLC], [llc], [$LlvmVersion])
+FIND_LLVM_PROG([LLC], [llc], [$LlvmMinVersion], [$LlvmMaxVersion])
 LlcCmd="$LLC"
 AC_SUBST([LlcCmd])
 
 dnl ** Which LLVM opt to use?
 dnl --------------------------------------------------------------
 AC_ARG_VAR(OPT,[Use as the path to LLVM's opt [default=autodetect]])
-FIND_LLVM_PROG([OPT], [opt], [$LlvmVersion])
+FIND_LLVM_PROG([OPT], [opt], [$LlvmMinVersion], [$LlvmMaxVersion])
 OptCmd="$OPT"
 AC_SUBST([OptCmd])
 

@@ -1,0 +1,20 @@
+:l T19157
+:break mySum.go
+putStrLn "---------------------- Test 1"
+mySum [1,2,3,4,5,6]
+:cont 2
+:cont 1
+:cont
+:cont
+putStrLn "---------------------- Test 2"
+:ig 1 1000
+mySum [1..2000]
+putStrLn "---------------------- Test 3"
+:continue q
+:continue -1
+:cont 3 4
+:ig a 5
+:ignore 5 a
+:ignore 0
+:ignore 1 2 3 4
+:ignore 0 -1

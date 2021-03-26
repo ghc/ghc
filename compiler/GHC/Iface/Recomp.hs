@@ -24,6 +24,7 @@ import GHC.Iface.Syntax
 import GHC.Iface.Recomp.Binary
 import GHC.Iface.Load
 import GHC.Iface.Recomp.Flags
+import GHC.Iface.Env
 
 import GHC.Core
 import GHC.Tc.Utils.Monad
@@ -40,6 +41,7 @@ import GHC.Utils.Misc as Utils hiding ( eqListBy )
 import GHC.Utils.Binary
 import GHC.Utils.Fingerprint
 import GHC.Utils.Exception
+import GHC.Utils.Logger
 
 import GHC.Types.Annotations
 import GHC.Types.Name
@@ -156,33 +158,35 @@ check_old_iface
 
 check_old_iface hsc_env mod_summary src_modified maybe_iface
   = let dflags = hsc_dflags hsc_env
+        logger = hsc_logger hsc_env
         getIface =
             case maybe_iface of
                 Just _  -> do
-                    traceIf (text "We already have the old interface for" <+>
+                    trace_if logger dflags (text "We already have the old interface for" <+>
                       ppr (ms_mod mod_summary))
                     return maybe_iface
                 Nothing -> loadIface
 
         loadIface = do
              let iface_path = msHiFilePath mod_summary
-             read_result <- readIface (ms_mod mod_summary) iface_path
+             let ncu        = hsc_NC hsc_env
+             read_result <- readIface dflags ncu (ms_mod mod_summary) iface_path
              case read_result of
                  Failed err -> do
-                     traceIf (text "FYI: cannot read old interface file:" $$ nest 4 err)
-                     traceHiDiffs (text "Old interface file was invalid:" $$ nest 4 err)
+                     trace_if logger dflags (text "FYI: cannot read old interface file:" $$ nest 4 err)
+                     trace_hi_diffs logger dflags (text "Old interface file was invalid:" $$ nest 4 err)
                      return Nothing
                  Succeeded iface -> do
-                     traceIf (text "Read the interface file" <+> text iface_path)
+                     trace_if logger dflags (text "Read the interface file" <+> text iface_path)
                      return $ Just iface
 
         src_changed
-            | gopt Opt_ForceRecomp (hsc_dflags hsc_env) = True
+            | gopt Opt_ForceRecomp dflags    = True
             | SourceModified <- src_modified = True
             | otherwise = False
     in do
         when src_changed $
-            traceHiDiffs (nest 4 $ text "Source file changed or recompilation check turned off")
+            liftIO $ trace_hi_diffs logger dflags (nest 4 $ text "Source file changed or recompilation check turned off")
 
         case src_changed of
             -- If the source has changed and we're in interactive mode,
@@ -194,11 +198,11 @@ check_old_iface hsc_env mod_summary src_modified maybe_iface
             -- Try and read the old interface for the current module
             -- from the .hi file left from the last time we compiled it
             True -> do
-                maybe_iface' <- getIface
+                maybe_iface' <- liftIO $ getIface
                 return (MustCompile, maybe_iface')
 
             False -> do
-                maybe_iface' <- getIface
+                maybe_iface' <- liftIO $ getIface
                 case maybe_iface' of
                     -- We can't retrieve the iface
                     Nothing    -> return (MustCompile, Nothing)
@@ -225,25 +229,27 @@ checkVersions :: HscEnv
               -> ModIface       -- Old interface
               -> IfG (RecompileRequired, Maybe ModIface)
 checkVersions hsc_env mod_summary iface
-  = do { traceHiDiffs (text "Considering whether compilation is required for" <+>
+  = do { liftIO $ trace_hi_diffs logger dflags
+                        (text "Considering whether compilation is required for" <+>
                         ppr (mi_module iface) <> colon)
 
        -- readIface will have verified that the UnitId matches,
        -- but we ALSO must make sure the instantiation matches up.  See
        -- test case bkpcabal04!
+       ; hsc_env <- getTopEnv
        ; if not (isHomeModule home_unit (mi_module iface))
             then return (RecompBecause "-this-unit-id changed", Nothing) else do {
-       ; recomp <- checkFlagHash hsc_env iface
+       ; recomp <- liftIO $ checkFlagHash hsc_env iface
        ; if recompileRequired recomp then return (recomp, Nothing) else do {
-       ; recomp <- checkOptimHash hsc_env iface
+       ; recomp <- liftIO $ checkOptimHash hsc_env iface
        ; if recompileRequired recomp then return (recomp, Nothing) else do {
-       ; recomp <- checkHpcHash hsc_env iface
+       ; recomp <- liftIO $ checkHpcHash hsc_env iface
        ; if recompileRequired recomp then return (recomp, Nothing) else do {
-       ; recomp <- checkMergedSignatures mod_summary iface
+       ; recomp <- liftIO $ checkMergedSignatures hsc_env mod_summary iface
        ; if recompileRequired recomp then return (recomp, Nothing) else do {
-       ; recomp <- checkHsig mod_summary iface
+       ; recomp <- liftIO $ checkHsig logger home_unit dflags mod_summary iface
        ; if recompileRequired recomp then return (recomp, Nothing) else do {
-       ; recomp <- checkHie mod_summary
+       ; recomp <- pure (checkHie dflags mod_summary)
        ; if recompileRequired recomp then return (recomp, Nothing) else do {
        ; recomp <- checkDependencies hsc_env mod_summary iface
        ; if recompileRequired recomp then return (recomp, Just iface) else do {
@@ -270,6 +276,8 @@ checkVersions hsc_env mod_summary iface
        ; return (recomp, Just iface)
     }}}}}}}}}}
   where
+    logger = hsc_logger hsc_env
+    dflags = hsc_dflags hsc_env
     home_unit = hsc_home_unit hsc_env
     -- This is a bit of a hack really
     mod_deps :: ModuleNameEnv ModuleNameWithIsBoot
@@ -347,88 +355,90 @@ pluginRecompileToRecompileRequired old_fp new_fp pr
 
 -- | Check if an hsig file needs recompilation because its
 -- implementing module has changed.
-checkHsig :: ModSummary -> ModIface -> IfG RecompileRequired
-checkHsig mod_summary iface = do
-    hsc_env <- getTopEnv
-    let home_unit = hsc_home_unit hsc_env
-        outer_mod = ms_mod mod_summary
+checkHsig :: Logger -> HomeUnit -> DynFlags -> ModSummary -> ModIface -> IO RecompileRequired
+checkHsig logger home_unit dflags mod_summary iface = do
+    let outer_mod = ms_mod mod_summary
         inner_mod = homeModuleNameInstantiation home_unit (moduleName outer_mod)
     MASSERT( isHomeModule home_unit outer_mod )
     case inner_mod == mi_semantic_module iface of
-        True -> up_to_date (text "implementing module unchanged")
+        True -> up_to_date logger dflags (text "implementing module unchanged")
         False -> return (RecompBecause "implementing module changed")
 
 -- | Check if @.hie@ file is out of date or missing.
-checkHie :: ModSummary -> IfG RecompileRequired
-checkHie mod_summary = do
-    dflags <- getDynFlags
+checkHie :: DynFlags -> ModSummary -> RecompileRequired
+checkHie dflags mod_summary =
     let hie_date_opt = ms_hie_date mod_summary
         hi_date = ms_iface_date mod_summary
-    pure $ case gopt Opt_WriteHie dflags of
-               False -> UpToDate
-               True -> case (hie_date_opt, hi_date) of
-                           (Nothing, _)
-                               -> RecompBecause "HIE file is missing"
-                           (Just hie_date, Just hi_date) | hie_date < hi_date
-                               -> RecompBecause "HIE file is out of date"
-                           _
-                               -> UpToDate
+    in if not (gopt Opt_WriteHie dflags)
+      then UpToDate
+      else case (hie_date_opt, hi_date) of
+             (Nothing, _) -> RecompBecause "HIE file is missing"
+             (Just hie_date, Just hi_date)
+                 | hie_date < hi_date
+                 -> RecompBecause "HIE file is out of date"
+             _ -> UpToDate
 
 -- | Check the flags haven't changed
-checkFlagHash :: HscEnv -> ModIface -> IfG RecompileRequired
+checkFlagHash :: HscEnv -> ModIface -> IO RecompileRequired
 checkFlagHash hsc_env iface = do
+    let dflags   = hsc_dflags hsc_env
+    let logger   = hsc_logger hsc_env
     let old_hash = mi_flag_hash (mi_final_exts iface)
-    new_hash <- liftIO $ fingerprintDynFlags hsc_env
-                                             (mi_module iface)
-                                             putNameLiterally
+    new_hash <- fingerprintDynFlags hsc_env (mi_module iface) putNameLiterally
     case old_hash == new_hash of
-        True  -> up_to_date (text "Module flags unchanged")
-        False -> out_of_date_hash "flags changed"
+        True  -> up_to_date logger dflags (text "Module flags unchanged")
+        False -> out_of_date_hash logger dflags "flags changed"
                      (text "  Module flags have changed")
                      old_hash new_hash
 
 -- | Check the optimisation flags haven't changed
-checkOptimHash :: HscEnv -> ModIface -> IfG RecompileRequired
+checkOptimHash :: HscEnv -> ModIface -> IO RecompileRequired
 checkOptimHash hsc_env iface = do
+    let dflags   = hsc_dflags hsc_env
+    let logger   = hsc_logger hsc_env
     let old_hash = mi_opt_hash (mi_final_exts iface)
-    new_hash <- liftIO $ fingerprintOptFlags (hsc_dflags hsc_env)
+    new_hash <- fingerprintOptFlags (hsc_dflags hsc_env)
                                                putNameLiterally
     if | old_hash == new_hash
-         -> up_to_date (text "Optimisation flags unchanged")
+         -> up_to_date logger dflags (text "Optimisation flags unchanged")
        | gopt Opt_IgnoreOptimChanges (hsc_dflags hsc_env)
-         -> up_to_date (text "Optimisation flags changed; ignoring")
+         -> up_to_date logger dflags (text "Optimisation flags changed; ignoring")
        | otherwise
-         -> out_of_date_hash "Optimisation flags changed"
+         -> out_of_date_hash logger dflags "Optimisation flags changed"
                      (text "  Optimisation flags have changed")
                      old_hash new_hash
 
 -- | Check the HPC flags haven't changed
-checkHpcHash :: HscEnv -> ModIface -> IfG RecompileRequired
+checkHpcHash :: HscEnv -> ModIface -> IO RecompileRequired
 checkHpcHash hsc_env iface = do
+    let dflags   = hsc_dflags hsc_env
+    let logger   = hsc_logger hsc_env
     let old_hash = mi_hpc_hash (mi_final_exts iface)
-    new_hash <- liftIO $ fingerprintHpcFlags (hsc_dflags hsc_env)
+    new_hash <- fingerprintHpcFlags (hsc_dflags hsc_env)
                                                putNameLiterally
     if | old_hash == new_hash
-         -> up_to_date (text "HPC flags unchanged")
+         -> up_to_date logger dflags (text "HPC flags unchanged")
        | gopt Opt_IgnoreHpcChanges (hsc_dflags hsc_env)
-         -> up_to_date (text "HPC flags changed; ignoring")
+         -> up_to_date logger dflags (text "HPC flags changed; ignoring")
        | otherwise
-         -> out_of_date_hash "HPC flags changed"
+         -> out_of_date_hash logger dflags "HPC flags changed"
                      (text "  HPC flags have changed")
                      old_hash new_hash
 
 -- Check that the set of signatures we are merging in match.
 -- If the -unit-id flags change, this can change too.
-checkMergedSignatures :: ModSummary -> ModIface -> IfG RecompileRequired
-checkMergedSignatures mod_summary iface = do
-    unit_state <- hsc_units <$> getTopEnv
+checkMergedSignatures :: HscEnv -> ModSummary -> ModIface -> IO RecompileRequired
+checkMergedSignatures hsc_env mod_summary iface = do
+    let dflags     = hsc_dflags hsc_env
+    let logger     = hsc_logger hsc_env
+    let unit_state = hsc_units hsc_env
     let old_merged = sort [ mod | UsageMergedRequirement{ usg_mod = mod } <- mi_usages iface ]
         new_merged = case Map.lookup (ms_mod_name mod_summary)
                                      (requirementContext unit_state) of
                         Nothing -> []
                         Just r -> sort $ map (instModuleToModule unit_state) r
     if old_merged == new_merged
-        then up_to_date (text "signatures to merge in unchanged" $$ ppr new_merged)
+        then up_to_date logger dflags (text "signatures to merge in unchanged" $$ ppr new_merged)
         else return (RecompBecause "signatures to merge in changed")
 
 -- If the direct imports of this module are resolved to targets that
@@ -452,31 +462,35 @@ checkDependencies :: HscEnv -> ModSummary -> ModIface -> IfG RecompileRequired
 checkDependencies hsc_env summary iface
  =
    checkList $
-     [ checkList (map dep_missing (ms_imps summary ++ ms_srcimps summary))
+     [ liftIO $ checkList (map dep_missing (ms_imps summary ++ ms_srcimps summary))
      , do
          (recomp, mnames_seen) <- runUntilRecompRequired $ map
            checkForNewHomeDependency
            (ms_home_imps summary)
-         case recomp of
+         liftIO $ case recomp of
            UpToDate -> do
              let
                seen_home_deps = Set.unions $ map Set.fromList mnames_seen
              checkIfAllOldHomeDependenciesAreSeen seen_home_deps
            _ -> return recomp]
  where
+   dflags        = hsc_dflags hsc_env
+   logger        = hsc_logger hsc_env
+   fc            = hsc_FC hsc_env
+   home_unit     = hsc_home_unit hsc_env
+   units         = hsc_units hsc_env
    prev_dep_mods = dep_mods (mi_deps iface)
    prev_dep_plgn = dep_plgins (mi_deps iface)
    prev_dep_pkgs = dep_pkgs (mi_deps iface)
-   home_unit     = hsc_home_unit hsc_env
 
    dep_missing (mb_pkg, L _ mod) = do
-     find_res <- liftIO $ findImportedModule hsc_env mod (mb_pkg)
+     find_res <- findImportedModule fc units home_unit dflags mod (mb_pkg)
      let reason = moduleNameString mod ++ " changed"
      case find_res of
         Found _ mod
           | isHomeUnit home_unit pkg
            -> if moduleName mod `notElem` map gwib_mod prev_dep_mods ++ prev_dep_plgn
-                 then do traceHiDiffs $
+                 then do trace_hi_diffs logger dflags $
                            text "imported module " <> quotes (ppr mod) <>
                            text " not among previous dependencies"
                          return (RecompBecause reason)
@@ -484,7 +498,7 @@ checkDependencies hsc_env summary iface
                          return UpToDate
           | otherwise
            -> if toUnitId pkg `notElem` (map fst prev_dep_pkgs)
-                 then do traceHiDiffs $
+                 then do trace_hi_diffs logger dflags $
                            text "imported module " <> quotes (ppr mod) <>
                            text " is from package " <> quotes (ppr pkg) <>
                            text ", which is not among previous dependencies"
@@ -516,7 +530,7 @@ checkDependencies hsc_env summary iface
            case find (not . isOldHomeDeps) mnames of
              Nothing -> return (UpToDate, mnames)
              Just new_dep_mname -> do
-               traceHiDiffs $
+               trace_hi_diffs logger dflags $
                  text "imported home module " <> quotes (ppr mod) <>
                  text " has a new dependency " <> quotes (ppr new_dep_mname)
                return (RecompBecause reason, [])
@@ -541,12 +555,12 @@ checkDependencies hsc_env summary iface
      if not (null unseen_old_deps)
        then do
          let missing_dep = Set.elemAt 0 unseen_old_deps
-         traceHiDiffs $
+         trace_hi_diffs logger dflags $
            text "missing old home dependency " <> quotes (ppr missing_dep)
          return $ RecompBecause "missing old dependency"
        else return UpToDate
 
-needInterface :: Module -> (ModIface -> IfG RecompileRequired)
+needInterface :: Module -> (ModIface -> IO RecompileRequired)
              -> IfG RecompileRequired
 needInterface mod continue
   = do
@@ -558,12 +572,14 @@ needInterface mod continue
         Nothing -> return MustCompile
         Just recomp -> return recomp
 
-getFromModIface :: String -> Module -> (ModIface -> IfG a)
+getFromModIface :: String -> Module -> (ModIface -> IO a)
               -> IfG (Maybe a)
 getFromModIface doc_msg mod getter
   = do  -- Load the imported interface if possible
+    dflags <- getDynFlags
+    logger <- getLogger
     let doc_str = sep [text doc_msg, ppr mod]
-    traceHiDiffs (text "Checking innterface for module" <+> ppr mod)
+    liftIO $ trace_hi_diffs logger dflags (text "Checking interface for module" <+> ppr mod)
 
     mb_iface <- loadInterface doc_str mod ImportBySystem
         -- Load the interface, but don't complain on failure;
@@ -571,14 +587,13 @@ getFromModIface doc_msg mod getter
 
     case mb_iface of
       Failed _ -> do
-        traceHiDiffs (sep [text "Couldn't load interface for module",
-                           ppr mod])
+        liftIO $ trace_hi_diffs logger dflags (sep [text "Couldn't load interface for module", ppr mod])
         return Nothing
                   -- Couldn't find or parse a module mentioned in the
                   -- old interface file.  Don't complain: it might
                   -- just be that the current module doesn't need that
                   -- import and it's been deleted
-      Succeeded iface -> Just <$> getter iface
+      Succeeded iface -> Just <$> liftIO (getter iface)
 
 -- | Given the usage information extracted from the old
 -- M.hi file for the module being compiled, figure out
@@ -586,19 +601,23 @@ getFromModIface doc_msg mod getter
 checkModUsage :: Unit -> Usage -> IfG RecompileRequired
 checkModUsage _this_pkg UsagePackageModule{
                                 usg_mod = mod,
-                                usg_mod_hash = old_mod_hash }
-  = needInterface mod $ \iface -> do
+                                usg_mod_hash = old_mod_hash } = do
+  dflags <- getDynFlags
+  logger <- getLogger
+  needInterface mod $ \iface -> do
     let reason = moduleNameString (moduleName mod) ++ " changed"
-    checkModuleFingerprint reason old_mod_hash (mi_mod_hash (mi_final_exts iface))
+    checkModuleFingerprint logger dflags reason old_mod_hash (mi_mod_hash (mi_final_exts iface))
         -- We only track the ABI hash of package modules, rather than
         -- individual entity usages, so if the ABI hash changes we must
         -- recompile.  This is safe but may entail more recompilation when
         -- a dependent package has changed.
 
-checkModUsage _ UsageMergedRequirement{ usg_mod = mod, usg_mod_hash = old_mod_hash }
-  = needInterface mod $ \iface -> do
+checkModUsage _ UsageMergedRequirement{ usg_mod = mod, usg_mod_hash = old_mod_hash } = do
+  dflags <- getDynFlags
+  logger <- getLogger
+  needInterface mod $ \iface -> do
     let reason = moduleNameString (moduleName mod) ++ " changed (raw)"
-    checkModuleFingerprint reason old_mod_hash (mi_mod_hash (mi_final_exts iface))
+    checkModuleFingerprint logger dflags reason old_mod_hash (mi_mod_hash (mi_final_exts iface))
 
 checkModUsage this_pkg UsageHomeModule{
                                 usg_mod_name = mod_name,
@@ -607,30 +626,32 @@ checkModUsage this_pkg UsageHomeModule{
                                 usg_entities = old_decl_hash }
   = do
     let mod = mkModule this_pkg mod_name
+    dflags <- getDynFlags
+    logger <- getLogger
     needInterface mod $ \iface -> do
+     let
+         new_mod_hash    = mi_mod_hash (mi_final_exts iface)
+         new_decl_hash   = mi_hash_fn  (mi_final_exts iface)
+         new_export_hash = mi_exp_hash (mi_final_exts iface)
 
-       let
-           new_mod_hash    = mi_mod_hash (mi_final_exts iface)
-           new_decl_hash   = mi_hash_fn  (mi_final_exts iface)
-           new_export_hash = mi_exp_hash (mi_final_exts iface)
+         reason = moduleNameString mod_name ++ " changed"
 
-           reason = moduleNameString mod_name ++ " changed"
-
+     liftIO $ do
            -- CHECK MODULE
-       recompile <- checkModuleFingerprint reason old_mod_hash new_mod_hash
+       recompile <- checkModuleFingerprint logger dflags reason old_mod_hash new_mod_hash
        if not (recompileRequired recompile)
          then return UpToDate
          else
            -- CHECK EXPORT LIST
-           checkMaybeHash reason maybe_old_export_hash new_export_hash
+           checkMaybeHash logger dflags reason maybe_old_export_hash new_export_hash
                (text "  Export list changed") $ do
 
                  -- CHECK ITEMS ONE BY ONE
-                 recompile <- checkList [ checkEntityUsage reason new_decl_hash u
+                 recompile <- checkList [ checkEntityUsage logger dflags reason new_decl_hash u
                                         | u <- old_decl_hash]
                  if recompileRequired recompile
                    then return recompile     -- This one failed, so just bail out now
-                   else up_to_date (text "  Great!  The bits I use are up to date")
+                   else up_to_date logger dflags (text "  Great!  The bits I use are up to date")
 
 
 checkModUsage _this_pkg UsageFile{ usg_file_path = file,
@@ -651,54 +672,68 @@ checkModUsage _this_pkg UsageFile{ usg_file_path = file,
 #endif
 
 ------------------------
-checkModuleFingerprint :: String -> Fingerprint -> Fingerprint
-                       -> IfG RecompileRequired
-checkModuleFingerprint reason old_mod_hash new_mod_hash
+checkModuleFingerprint
+  :: Logger
+  -> DynFlags
+  -> String
+  -> Fingerprint
+  -> Fingerprint
+  -> IO RecompileRequired
+checkModuleFingerprint logger dflags reason old_mod_hash new_mod_hash
   | new_mod_hash == old_mod_hash
-  = up_to_date (text "Module fingerprint unchanged")
+  = up_to_date logger dflags (text "Module fingerprint unchanged")
 
   | otherwise
-  = out_of_date_hash reason (text "  Module fingerprint has changed")
+  = out_of_date_hash logger dflags reason (text "  Module fingerprint has changed")
                      old_mod_hash new_mod_hash
 
 ------------------------
-checkMaybeHash :: String -> Maybe Fingerprint -> Fingerprint -> SDoc
-               -> IfG RecompileRequired -> IfG RecompileRequired
-checkMaybeHash reason maybe_old_hash new_hash doc continue
+checkMaybeHash
+  :: Logger
+  -> DynFlags
+  -> String
+  -> Maybe Fingerprint
+  -> Fingerprint
+  -> SDoc
+  -> IO RecompileRequired
+  -> IO RecompileRequired
+checkMaybeHash logger dflags reason maybe_old_hash new_hash doc continue
   | Just hash <- maybe_old_hash, hash /= new_hash
-  = out_of_date_hash reason doc hash new_hash
+  = out_of_date_hash logger dflags reason doc hash new_hash
   | otherwise
   = continue
 
 ------------------------
-checkEntityUsage :: String
+checkEntityUsage :: Logger
+                 -> DynFlags
+                 -> String
                  -> (OccName -> Maybe (OccName, Fingerprint))
                  -> (OccName, Fingerprint)
-                 -> IfG RecompileRequired
-checkEntityUsage reason new_hash (name,old_hash)
-  = case new_hash name of
+                 -> IO RecompileRequired
+checkEntityUsage logger dflags reason new_hash (name,old_hash) = do
+  case new_hash name of
+    -- We used it before, but it ain't there now
+    Nothing       -> out_of_date logger dflags reason (sep [text "No longer exported:", ppr name])
+    -- It's there, but is it up to date?
+    Just (_, new_hash)
+      | new_hash == old_hash
+      -> do trace_hi_diffs logger dflags (text "  Up to date" <+> ppr name <+> parens (ppr new_hash))
+            return UpToDate
+      | otherwise
+      -> out_of_date_hash logger dflags reason (text "  Out of date:" <+> ppr name) old_hash new_hash
 
-        Nothing       ->        -- We used it before, but it ain't there now
-                          out_of_date reason (sep [text "No longer exported:", ppr name])
+up_to_date :: Logger -> DynFlags -> SDoc -> IO RecompileRequired
+up_to_date logger dflags msg = trace_hi_diffs logger dflags msg >> return UpToDate
 
-        Just (_, new_hash)      -- It's there, but is it up to date?
-          | new_hash == old_hash -> do traceHiDiffs (text "  Up to date" <+> ppr name <+> parens (ppr new_hash))
-                                       return UpToDate
-          | otherwise            -> out_of_date_hash reason (text "  Out of date:" <+> ppr name)
-                                                     old_hash new_hash
+out_of_date :: Logger -> DynFlags -> String -> SDoc -> IO RecompileRequired
+out_of_date logger dflags reason msg = trace_hi_diffs logger dflags msg >> return (RecompBecause reason)
 
-up_to_date :: SDoc -> IfG RecompileRequired
-up_to_date  msg = traceHiDiffs msg >> return UpToDate
-
-out_of_date :: String -> SDoc -> IfG RecompileRequired
-out_of_date reason msg = traceHiDiffs msg >> return (RecompBecause reason)
-
-out_of_date_hash :: String -> SDoc -> Fingerprint -> Fingerprint -> IfG RecompileRequired
-out_of_date_hash reason msg old_hash new_hash
-  = out_of_date reason (hsep [msg, ppr old_hash, text "->", ppr new_hash])
+out_of_date_hash :: Logger -> DynFlags -> String -> SDoc -> Fingerprint -> Fingerprint -> IO RecompileRequired
+out_of_date_hash logger dflags reason msg old_hash new_hash
+  = out_of_date logger dflags reason (hsep [msg, ppr old_hash, text "->", ppr new_hash])
 
 ----------------------
-checkList :: [IfG RecompileRequired] -> IfG RecompileRequired
+checkList :: Monad m => [m RecompileRequired] -> m RecompileRequired
 -- This helper is used in two places
 checkList []             = return UpToDate
 checkList (check:checks) = do recompile <- check
@@ -1165,12 +1200,13 @@ getOrphanHashes hsc_env mods = do
   eps <- hscEPS hsc_env
   let
     hpt        = hsc_HPT hsc_env
+    dflags     = hsc_dflags hsc_env
     pit        = eps_PIT eps
     get_orph_hash mod =
           case lookupIfaceByModule hpt pit mod of
             Just iface -> return (mi_orphan_hash (mi_final_exts iface))
             Nothing    -> do -- similar to 'mkHashFun'
-                iface <- initIfaceLoad hsc_env . withException
+                iface <- initIfaceLoad hsc_env . withException dflags
                             $ loadInterface (text "getOrphanHashes") mod ImportBySystem
                 return (mi_orphan_hash (mi_final_exts iface))
 
@@ -1458,6 +1494,7 @@ mkHashFun hsc_env eps name
   = lookup orig_mod
   where
       home_unit = hsc_home_unit hsc_env
+      dflags = hsc_dflags hsc_env
       hpt = hsc_HPT hsc_env
       pit = eps_PIT eps
       occ = nameOccName name
@@ -1471,7 +1508,7 @@ mkHashFun hsc_env eps name
                       -- requirements; we didn't do any /real/ typechecking
                       -- so there's no guarantee everything is loaded.
                       -- Kind of a heinous hack.
-                      initIfaceLoad hsc_env . withException
+                      initIfaceLoad hsc_env . withException dflags
                           $ withoutDynamicNow
                             -- For some unknown reason, we need to reset the
                             -- dynamicNow bit, otherwise only dynamic

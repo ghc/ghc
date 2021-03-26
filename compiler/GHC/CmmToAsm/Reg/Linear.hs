@@ -172,18 +172,18 @@ regAlloc config (CmmProc static lbl live sccs)
         | LiveInfo info entry_ids@(first_id:_) block_live _ <- static
         = do
                 -- do register allocation on each component.
-                (final_blocks, stats, stack_use)
+                !(!final_blocks, !stats, !stack_use)
                         <- linearRegAlloc config entry_ids block_live sccs
 
                 -- make sure the block that was first in the input list
                 --      stays at the front of the output
-                let ((first':_), rest')
+                let !(!(!first':_), !rest')
                                 = partition ((== first_id) . blockId) final_blocks
 
                 let max_spill_slots = maxSpillSlots config
                     extra_stack
                       | stack_use > max_spill_slots
-                      = Just (stack_use - max_spill_slots)
+                      = Just $! stack_use - max_spill_slots
                       | otherwise
                       = Nothing
 
@@ -253,7 +253,7 @@ linearRegAlloc'
 
 linearRegAlloc' config initFreeRegs entry_ids block_live sccs
  = do   us      <- getUniqueSupplyM
-        let (_, stack, stats, blocks) =
+        let !(_, !stack, !stats, !blocks) =
                 runR config mapEmpty initFreeRegs emptyRegMap emptyStackMap us
                     $ linearRA_SCCs entry_ids block_live [] sccs
         return  (blocks, stats, getStackUse stack)
@@ -277,7 +277,7 @@ linearRA_SCCs entry_ids block_live blocksAcc (AcyclicSCC block : sccs)
 
 linearRA_SCCs entry_ids block_live blocksAcc (CyclicSCC blocks : sccs)
  = do
-        blockss' <- process entry_ids block_live blocks [] (return []) False
+        blockss' <- process entry_ids block_live blocks
         linearRA_SCCs entry_ids block_live
                 (reverse (concat blockss') ++ blocksAcc)
                 sccs
@@ -294,45 +294,41 @@ linearRA_SCCs entry_ids block_live blocksAcc (CyclicSCC blocks : sccs)
    more sanity checking to guard against this eventuality.
 -}
 
-process :: OutputableRegConstraint freeRegs instr
+process :: forall freeRegs instr. (OutputableRegConstraint freeRegs instr)
         => [BlockId]
         -> BlockMap RegSet
         -> [GenBasicBlock (LiveInstr instr)]
-        -> [GenBasicBlock (LiveInstr instr)]
-        -> [[NatBasicBlock instr]]
-        -> Bool
         -> RegM freeRegs [[NatBasicBlock instr]]
+process entry_ids block_live =
+    \blocks -> go blocks [] (return []) False
+  where
+    go :: [GenBasicBlock (LiveInstr instr)]
+       -> [GenBasicBlock (LiveInstr instr)]
+       -> [[NatBasicBlock instr]]
+       -> Bool
+       -> RegM freeRegs [[NatBasicBlock instr]]
+    go [] []         accum _madeProgress
+      = return $ reverse accum
 
-process _ _ [] []         accum _
-        = return $ reverse accum
-
-process entry_ids block_live [] next_round accum madeProgress
-        | not madeProgress
-
+    go [] next_round accum madeProgress
+      | not madeProgress
           {- BUGS: There are so many unreachable blocks in the code the warnings are overwhelming.
              pprTrace "RegAlloc.Linear.Main.process: no progress made, bailing out."
                 (  text "Unreachable blocks:"
                 $$ vcat (map ppr next_round)) -}
-        = return $ reverse accum
+      = return $ reverse accum
 
-        | otherwise
-        = process entry_ids block_live
-                  next_round [] accum False
+      | otherwise
+      = go next_round [] accum False
 
-process entry_ids block_live (b@(BasicBlock id _) : blocks)
-        next_round accum madeProgress
- = do
-        block_assig <- getBlockAssigR
+    go (b@(BasicBlock id _) : blocks) next_round accum madeProgress
+      = do
+          block_assig <- getBlockAssigR
+          if isJust (mapLookup id block_assig) || id `elem` entry_ids
+            then do b' <- processBlock block_live b
+                    go blocks next_round (b' : accum) True
 
-        if isJust (mapLookup id block_assig)
-             || id `elem` entry_ids
-         then do
-                b'  <- processBlock block_live b
-                process entry_ids block_live blocks
-                        next_round (b' : accum) True
-
-         else   process entry_ids block_live blocks
-                        (b : next_round) accum madeProgress
+            else do go blocks (b : next_round) accum madeProgress
 
 
 -- | Do register allocation on this basic block
@@ -348,7 +344,7 @@ processBlock block_live (BasicBlock id instrs)
         initBlock id block_live
 
         (instrs', fixups)
-                <- linearRA block_live [] [] id instrs
+                <- linearRA block_live id instrs
         -- pprTraceM "blockResult" $ ppr (instrs', fixups)
         return  $ BasicBlock id instrs' : fixups
 
@@ -385,30 +381,28 @@ initBlock id block_live
 
 -- | Do allocation for a sequence of instructions.
 linearRA
-        :: OutputableRegConstraint freeRegs instr
+        :: forall freeRegs instr. (OutputableRegConstraint freeRegs instr)
         => BlockMap RegSet                      -- ^ map of what vregs are live on entry to each block.
-        -> [instr]                              -- ^ accumulator for instructions already processed.
-        -> [NatBasicBlock instr]                -- ^ accumulator for blocks of fixup code.
         -> BlockId                              -- ^ id of the current block, for debugging.
         -> [LiveInstr instr]                    -- ^ liveness annotated instructions in this block.
-
         -> RegM freeRegs
                 ( [instr]                       --   instructions after register allocation
                 , [NatBasicBlock instr])        --   fresh blocks of fixup code.
+linearRA block_live block_id = go [] []
+  where
+    go :: [instr]                              -- ^ accumulator for instructions already processed.
+       -> [NatBasicBlock instr]                -- ^ accumulator for blocks of fixup code.
+       -> [LiveInstr instr]                    -- ^ liveness annotated instructions in this block.
+       -> RegM freeRegs
+               ( [instr]                       --   instructions after register allocation
+               , [NatBasicBlock instr] )       --   fresh blocks of fixup code.
+    go !accInstr !accFixups [] = do
+        return ( reverse accInstr               -- instrs need to be returned in the correct order.
+               , accFixups )                    -- it doesn't matter what order the fixup blocks are returned in.
 
-
-linearRA _          accInstr accFixup _ []
-        = return
-                ( reverse accInstr              -- instrs need to be returned in the correct order.
-                , accFixup)                     -- it doesn't matter what order the fixup blocks are returned in.
-
-
-linearRA block_live accInstr accFixups id (instr:instrs)
- = do
-        (accInstr', new_fixups) <- raInsn block_live accInstr id instr
-
-        linearRA block_live accInstr' (new_fixups ++ accFixups) id instrs
-
+    go accInstr accFixups (instr:instrs) = do
+        (accInstr', new_fixups) <- raInsn block_live accInstr block_id instr
+        go accInstr' (new_fixups ++ accFixups) instrs
 
 -- | Do allocation for a single instruction.
 raInsn
@@ -601,8 +595,7 @@ genRaInsn block_live new_instrs block_id instr r_dying w_dying = do
                                  | src == dst   -> []
                                 _               -> [patched_instr]
 
-    let code = squashed_instr ++ w_spills ++ reverse r_spills
-                ++ clobber_saves ++ new_instrs
+    let code = concat [ squashed_instr, w_spills, reverse r_spills, clobber_saves, new_instrs ]
 
 --    pprTrace "patched-code" ((vcat $ map (docToSDoc . pprInstr) code)) $ do
 --    pprTrace "pached-fixup" ((ppr fixup_blocks)) $ do
@@ -858,7 +851,7 @@ allocRegsAndSpill_spill reading keep spills alloc r rs assig spill_loc
         case freeRegs_thisClass of
          -- case (2): we have a free register
          (first_free : _) ->
-           do   let final_reg
+           do   let !final_reg
                         | Just reg <- pref_reg
                         , reg `elem` freeRegs_thisClass
                         = reg

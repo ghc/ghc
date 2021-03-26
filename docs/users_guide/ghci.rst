@@ -2347,9 +2347,13 @@ commonly used commands.
         ghci> :complete repl 5-10 "map"
         0 3 ""
 
-.. ghci-cmd:: :continue
+.. ghci-cmd:: :continue; [⟨ignoreCount⟩]
 
     Continue the current evaluation, when stopped at a breakpoint.
+
+    If an ``⟨ignoreCount⟩`` is specified, the program will ignore
+    the current breakpoint for the next ``⟨ignoreCount⟩`` iterations.
+    See command :ghci-cmd:`:ignore`.
 
 .. ghci-cmd:: :ctags; [⟨filename⟩]
 
@@ -2459,7 +2463,8 @@ commonly used commands.
 
     Enable one or more disabled breakpoints by number (use :ghci-cmd:`:show breaks` to
     see the number and state of each breakpoint). The ``*`` form enables all the
-    disabled breakpoints.
+    disabled breakpoints. Enabling a break point will reset its ``ignore count``
+    to 0. (See :ghci-cmd:`:ignore`)
 
 .. ghci-cmd:: :etags
 
@@ -2576,6 +2581,20 @@ commonly used commands.
     Displays Safe Haskell information about the given module (or the
     current module if omitted). This includes the trust type of the
     module and its containing package.
+
+.. ghci-cmd:: :ignore; ⟨break⟩ ⟨ignoreCount⟩
+
+    Set the ignore count of the breakpoint with number ``⟨break⟩`` to
+    ``⟨ignoreCount⟩``.
+
+    The next ``⟨ignoreCount⟩`` times the program hits the breakpoint
+    ``⟨break⟩``, this breakpoint is ignored and the program doesn't
+    stop. Every time the breakpoint is ignored, the ``ignore count``
+    is decremented by 1. When the ``ignore count`` is zero, the program
+    again stops at the break point.
+
+    You can also specify an ``⟨ignoreCount⟩`` on a :ghci-cmd:`:continue`
+    command when you resume execution of your program.
 
 .. ghci-cmd:: :kind;[!] ⟨type⟩
 
@@ -2866,8 +2885,9 @@ commonly used commands.
         *ghci> :def cond \expr -> return (":cmd if (" ++ expr ++ ") then return \"\" else return \":continue\"")
         *ghci> :set stop 0 :cond (x < 3)
 
-    Ignoring breakpoints for a specified number of iterations is also
-    possible using similar techniques.
+    To ignore breakpoints for a specified number of iterations use
+    the :ghci-cmd:`:ignore` or the ``⟨ignoreCount⟩`` parameter of the
+    :ghci-cmd:`:continue` command.
 
 .. ghci-cmd:: :seti; [⟨option⟩ ...]
 
@@ -3204,14 +3224,15 @@ clean GHCi session we might see something like this:
 .. code-block:: none
 
     ghci> :seti
-    base language is: Haskell2010
+    base language is: GHC2021
     with the following modifiers:
-      -XNoMonomorphismRestriction
-      -XNoDatatypeContexts
-      -XNondecreasingIndentation
       -XExtendedDefaultRules
+      -XNoMonomorphismRestriction
     GHCi-specific dynamic flag settings:
     other dynamic, non-language, flag settings:
+      -fexternal-dynamic-refs
+      -fignore-optim-changes
+      -fignore-hpc-changes
       -fimplicit-import-qualified
     warning settings:
 

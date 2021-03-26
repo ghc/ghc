@@ -3,13 +3,11 @@
 -- GHC 6.10.1 and run with +RTS -hb. Most of the code is from the
 -- binary 0.4.4 package.
 
-{-# LANGUAGE CPP, FlexibleInstances, FlexibleContexts, MagicHash #-}
+{-# LANGUAGE CPP, FlexibleInstances, FlexibleContexts, MagicHash, UnboxedTuples #-}
 
 module Main (main) where
 
 import Data.Semigroup
-
-import Data.ByteString.Internal (inlinePerformIO)
 
 import qualified Data.ByteString      as S
 import qualified Data.ByteString.Internal      as S
@@ -17,6 +15,7 @@ import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString.Lazy.Internal as L
 
 import GHC.Exts
+import GHC.IO
 import GHC.Word
 
 import Control.Monad
@@ -27,6 +26,11 @@ import System.IO
 import Data.Char    (chr,ord)
 
 import Control.Applicative
+
+inlinePerformIO :: IO a -> a
+inlinePerformIO (IO m) = case m realWorld# of
+  (# _, r #) -> r
+{-# INLINE inlinePerformIO #-}
 
 main :: IO ()
 main = do
@@ -158,7 +162,7 @@ shiftl_w32 (W32# w) (I# i) = W32# (wordToWord32# ((word32ToWord# w) `uncheckedSh
 getPtr :: Storable a => Int -> Get a
 getPtr n = do
     (fp,o,_) <- readN n S.toForeignPtr
-    return . S.inlinePerformIO $ withForeignPtr fp $ \p -> peek (castPtr $ p `plusPtr` o)
+    return . inlinePerformIO $ withForeignPtr fp $ \p -> peek (castPtr $ p `plusPtr` o)
 
 getBytes :: Int -> Get S.ByteString
 getBytes n = do

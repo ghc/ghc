@@ -1,0 +1,77 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 60, types: 16, coercions: 0, joins: 0/0}
+
+-- RHS size: {terms: 4, types: 1, coercions: 0, joins: 0/0}
+g [InlPrag=NOINLINE] :: Int# -> Int#
+[GblId, Arity=1, Str=<L>, Unf=OtherCon []]
+g = \ (x :: Int#) -> +# x 1#
+
+-- RHS size: {terms: 40, types: 6, coercions: 0, joins: 0/0}
+f :: Int# -> Int#
+[GblId,
+ Arity=1,
+ Str=<L>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 192 0}]
+f = \ (x :: Int#) ->
+      case g x of ds {
+        __DEFAULT ->
+          case g (+# x 1#) of z { __DEFAULT ->
+          case ds of ds1 {
+            __DEFAULT ->
+              case g (+# x 2#) of { __DEFAULT ->
+              case ds1 of {
+                __DEFAULT -> 6#;
+                3# -> 4#;
+                4# -> z;
+                6# -> z;
+                7# -> 8#;
+                8# -> 9#;
+                9# -> 10#
+              }
+              };
+            2# -> z
+          }
+          };
+        1# -> 2#
+      }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+Foo.$trModule4 :: Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+Foo.$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+Foo.$trModule3 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+Foo.$trModule3 = GHC.Types.TrNameS Foo.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+Foo.$trModule2 :: Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+Foo.$trModule2 = "Foo"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+Foo.$trModule1 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+Foo.$trModule1 = GHC.Types.TrNameS Foo.$trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+Foo.$trModule :: GHC.Types.Module
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+Foo.$trModule = GHC.Types.Module Foo.$trModule3 Foo.$trModule1
+
+
+

@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE RankNTypes #-}
 {-# OPTIONS_GHC -ddump-simpl-stats #-}
 

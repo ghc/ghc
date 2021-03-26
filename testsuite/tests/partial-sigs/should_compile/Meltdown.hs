@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE PartialTypeSignatures, ScopedTypeVariables, NamedWildCards #-}
 module Meltdown where
 

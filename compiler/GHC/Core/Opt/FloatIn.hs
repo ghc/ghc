@@ -34,6 +34,7 @@ import GHC.Core.Type
 
 import GHC.Types.Basic      ( RecFlag(..), isRec )
 import GHC.Types.Id         ( isOneShotBndr, idType, isJoinId, isJoinId_maybe )
+import GHC.Types.Tickish
 import GHC.Types.Var
 import GHC.Types.Var.Set
 

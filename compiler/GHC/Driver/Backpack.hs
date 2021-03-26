@@ -738,6 +738,7 @@ summariseRequirement :: PackageName -> ModuleName -> BkpM ModSummary
 summariseRequirement pn mod_name = do
     hsc_env <- getSession
     let dflags = hsc_dflags hsc_env
+    let home_unit = hsc_home_unit hsc_env
 
     let PackageName pn_fs = pn
     location <- liftIO $ mkHomeModLocation2 dflags mod_name
@@ -749,7 +750,8 @@ summariseRequirement pn mod_name = do
     hie_timestamp <- liftIO $ modificationTimeIfExists (ml_hie_file location)
     let loc = srcLocSpan (mkSrcLoc (mkFastString (bkp_filename env)) 1 1)
 
-    mod <- liftIO $ addHomeModuleToFinder hsc_env mod_name location
+    let fc = hsc_FC hsc_env
+    mod <- liftIO $ addHomeModuleToFinder fc home_unit mod_name location
 
     extra_sig_imports <- liftIO $ findExtraSigImports hsc_env HsigFile mod_name
 
@@ -765,6 +767,7 @@ summariseRequirement pn mod_name = do
         ms_textual_imps = extra_sig_imports,
         ms_parsed_mod = Just (HsParsedModule {
                 hpm_module = L loc (HsModule {
+                        hsmodAnn = noAnn,
                         hsmodLayout = NoLayoutInfo,
                         hsmodName = Just (L loc mod_name),
                         hsmodExports = Nothing,
@@ -773,8 +776,7 @@ summariseRequirement pn mod_name = do
                         hsmodDeprecMessage = Nothing,
                         hsmodHaddockModHeader = Nothing
                     }),
-                hpm_src_files = [],
-                hpm_annotations = ApiAnns Map.empty Nothing Map.empty []
+                hpm_src_files = []
             }),
         ms_hspp_file = "", -- none, it came inline
         ms_hspp_opts = dflags,
@@ -862,7 +864,10 @@ hsModuleToModSummary pn hsc_src modname
     (implicit_sigs, inst_deps) <- liftIO $ implicitRequirementsShallow hsc_env normal_imports
 
     -- So that Finder can find it, even though it doesn't exist...
-    this_mod <- liftIO $ addHomeModuleToFinder hsc_env modname location
+    this_mod <- liftIO $ do
+      let home_unit = hsc_home_unit hsc_env
+      let fc        = hsc_FC hsc_env
+      addHomeModuleToFinder fc home_unit modname location
     return $ ExtendedModSummary
       { emsModSummary =
           ModSummary {
@@ -884,8 +889,7 @@ hsModuleToModSummary pn hsc_src modname
             -- This is our hack to get the parse tree to the right spot
             ms_parsed_mod = Just (HsParsedModule {
                     hpm_module = hsmod,
-                    hpm_src_files = [], -- TODO if we preprocessed it
-                    hpm_annotations = ApiAnns Map.empty Nothing Map.empty [] -- BOGUS
+                    hpm_src_files = [] -- TODO if we preprocessed it
                 }),
             ms_hs_hash = src_hash,
             ms_obj_date = Nothing, -- TODO do this, but problem: hi_timestamp is BOGUS

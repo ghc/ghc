@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE Safe #-}
 {-# OPTIONS_GHC -fno-warn-deprecations #-}
 -- | Import all modules from prelude that should be safe

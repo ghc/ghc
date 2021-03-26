@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 -- Based on https://github.com/idris-lang/Idris-dev/blob/v0.9.10/libs/effects/Effects.idr
 
 {-# LANGUAGE DataKinds, PolyKinds, ScopedTypeVariables, TypeOperators,

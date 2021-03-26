@@ -72,6 +72,7 @@ import GHC.Types.Basic
 import GHC.Types.Name   ( NamedThing(..), nameSrcSpan, isInternalName )
 import GHC.Types.SrcLoc ( SrcSpan(..), realSrcLocSpan, mkRealSrcLoc )
 import GHC.Types.Literal
+import GHC.Types.Tickish
 import GHC.Types.TyThing
 import GHC.Types.CostCentre ( CostCentre, ccFromThisModule )
 import GHC.Types.Unique.Supply
@@ -192,7 +193,7 @@ corePrepPgm :: HscEnv -> Module -> ModLocation -> CoreProgram -> [TyCon]
 corePrepPgm hsc_env this_mod mod_loc binds data_tycons =
     withTiming logger dflags
                (text "CorePrep"<+>brackets (ppr this_mod))
-               (const ()) $ do
+               (\(a,b) -> a `seqList` b `seq` ()) $ do
     us <- mkSplitUniqSupply 's'
     initialCorePrepEnv <- mkInitialCorePrepEnv hsc_env
 
@@ -221,7 +222,7 @@ corePrepExpr :: HscEnv -> CoreExpr -> IO CoreExpr
 corePrepExpr hsc_env expr = do
     let dflags = hsc_dflags hsc_env
     let logger = hsc_logger hsc_env
-    withTiming logger dflags (text "CorePrep [expr]") (const ()) $ do
+    withTiming logger dflags (text "CorePrep [expr]") (\e -> e `seq` ()) $ do
       us <- mkSplitUniqSupply 's'
       initialCorePrepEnv <- mkInitialCorePrepEnv hsc_env
       let new_expr = initUs_ us (cpeBodyNF initialCorePrepEnv expr)
@@ -610,9 +611,9 @@ cpeRhsE env (Tick tickish expr)
   = do { body <- cpeBodyNF env expr
        ; return (emptyFloats, mkTick tickish' body) }
   where
-    tickish' | Breakpoint n fvs <- tickish
+    tickish' | Breakpoint ext n fvs <- tickish
              -- See also 'substTickish'
-             = Breakpoint n (map (getIdFromTrivialExpr . lookupCorePrepEnv env) fvs)
+             = Breakpoint ext n (map (getIdFromTrivialExpr . lookupCorePrepEnv env) fvs)
              | otherwise
              = tickish
 
@@ -731,7 +732,7 @@ rhsToBody expr = return (emptyFloats, expr)
 
 data ArgInfo = CpeApp  CoreArg
              | CpeCast Coercion
-             | CpeTick (Tickish Id)
+             | CpeTick CoreTickish
 
 instance Outputable ArgInfo where
   ppr (CpeApp arg) = text "app" <+> ppr arg
@@ -963,7 +964,7 @@ no further floating will occur. This allows us to safely inline things like
    GHC.Magic. This definition is used in cases where runRW is curried.
 
  * In addition to its normal Haskell definition in GHC.Magic, we give it
-   a special late inlining here in CorePrep and GHC.CoreToByteCode, avoiding
+   a special late inlining here in CorePrep and GHC.StgToByteCode, avoiding
    the incorrect sharing due to float-out noted above.
 
  * It is levity-polymorphic:
@@ -1369,7 +1370,7 @@ data FloatingBind
                       -- but lifted binding
 
  -- | See Note [Floating Ticks in CorePrep]
- | FloatTick (Tickish Id)
+ | FloatTick CoreTickish
 
 data Floats = Floats OkToSpec (OrdList FloatingBind)
 
@@ -1407,8 +1408,21 @@ mkFloat dmd is_unlifted bndr rhs
     -- Don't make a case for a HNF binding, even if it's strict
     -- Otherwise we get  case (\x -> e) of ...!
 
-  | is_unlifted = ASSERT2( ok_for_spec, ppr rhs )
-                  FloatCase rhs bndr DEFAULT [] True
+  | is_unlifted = FloatCase rhs bndr DEFAULT [] True
+      -- we used to ASSERT2(ok_for_spec, ppr rhs) here, but it is now disabled
+      -- because exprOkForSpeculation isn't stable under ANF-ing. See for
+      -- example #19489 where the following unlifted expression:
+      --
+      --    GHC.Prim.(#|_#) @LiftedRep @LiftedRep @[a_ax0] @[a_ax0]
+      --                    (GHC.Types.: @a_ax0 a2_agq a3_agl)
+      --
+      -- is ok-for-spec but is ANF-ised into:
+      --
+      --    let sat = GHC.Types.: @a_ax0 a2_agq a3_agl
+      --    in GHC.Prim.(#|_#) @LiftedRep @LiftedRep @[a_ax0] @[a_ax0] sat
+      --
+      -- which isn't ok-for-spec because of the let-expression.
+
   | is_hnf      = FloatLet (NonRec bndr                       rhs)
   | otherwise   = FloatLet (NonRec (setIdDemandInfo bndr dmd) rhs)
                    -- See Note [Pin demand info on floats]

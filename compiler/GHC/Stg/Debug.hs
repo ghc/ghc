@@ -6,10 +6,10 @@ module GHC.Stg.Debug(collectDebugInformation) where
 
 import GHC.Prelude
 
-import GHC.Core
 import GHC.Stg.Syntax
 
 import GHC.Types.Id
+import GHC.Types.Tickish
 import GHC.Core.DataCon
 import GHC.Types.IPE
 import GHC.Unit.Module
@@ -136,7 +136,7 @@ recordStgIdPosition id best_span ss = do
     let mbspan = (\(SpanWithLabel rss d) -> (rss, d)) <$> (best_span <|> cc <|> ss)
     lift $ modify (\env -> env { provClosure = addToUniqMap (provClosure env) (idName id) (idType id, mbspan) })
 
-numberDataCon :: DataCon -> [Tickish Id] -> M ConstructorNumber
+numberDataCon :: DataCon -> [StgTickish] -> M ConstructorNumber
 -- Unboxed tuples and sums do not allocate so they
 -- have no info tables.
 numberDataCon dc _ | isUnboxedTupleDataCon dc = return NoNumber
@@ -146,16 +146,16 @@ numberDataCon dc ts = do
   if not (gopt Opt_DistinctConstructorTables dflags) then return NoNumber else do
     env <- lift get
     mcc <- asks rSpan
-    let mbest_span = (\(SpanWithLabel rss l) -> (rss, l)) <$> (selectTick ts <|> mcc)
-    let dcMap' = alterUniqMap (maybe (Just ((0, mbest_span) :| [] ))
-                        (\xs@((k, _):|_) -> Just ((k + 1, mbest_span) `NE.cons` xs))) (provDC env) dc
+    let !mbest_span = (\(SpanWithLabel rss l) -> (rss, l)) <$> (selectTick ts <|> mcc)
+    let !dcMap' = alterUniqMap (maybe (Just ((0, mbest_span) :| [] ))
+                        (\xs@((k, _):|_) -> Just $! ((k + 1, mbest_span) `NE.cons` xs))) (provDC env) dc
     lift $ put (env { provDC = dcMap' })
     let r = lookupUniqMap dcMap' dc
     return $ case r of
       Nothing -> NoNumber
       Just res -> Numbered (fst (NE.head res))
 
-selectTick :: [Tickish Id] -> Maybe SpanWithLabel
+selectTick :: [StgTickish] -> Maybe SpanWithLabel
 selectTick [] = Nothing
 selectTick (SourceNote rss d : ts ) = selectTick ts <|> Just (SpanWithLabel rss d)
 selectTick (_:ts) = selectTick ts

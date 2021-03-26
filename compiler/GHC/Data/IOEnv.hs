@@ -1,5 +1,4 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE PatternSynonyms #-}
 --
@@ -61,10 +60,16 @@ import Control.Concurrent (forkIO, killThread)
 
 
 newtype IOEnv env a = IOEnv' (env -> IO a)
-  deriving (Functor)
-  deriving (MonadThrow, MonadCatch, MonadMask, MonadIO) via (ReaderT env IO)
+  deriving (MonadThrow, MonadCatch, MonadMask) via (ReaderT env IO)
 
 -- See Note [The one-shot state monad trick] in GHC.Utils.Monad
+instance Functor (IOEnv env) where
+   fmap f (IOEnv g) = IOEnv $ \env -> fmap f (g env)
+   a <$ IOEnv g     = IOEnv $ \env -> g env >> pure a
+
+instance MonadIO (IOEnv env) where
+   liftIO f = IOEnv (\_ -> f)
+
 pattern IOEnv :: forall env a. (env -> IO a) -> IOEnv env a
 pattern IOEnv m <- IOEnv' m
   where

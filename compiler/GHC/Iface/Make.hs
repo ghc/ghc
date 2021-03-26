@@ -214,7 +214,7 @@ mkIfaceTc hsc_env safe_mode mod_details mod_summary
           usages <- mkUsageInfo hsc_env this_mod (imp_mods imports) used_names
                       dep_files merged pluginModules
 
-          let (doc_hdr', doc_map, arg_map) = extractDocs tc_result
+          (doc_hdr', doc_map, arg_map) <- extractDocs tc_result
 
           let partial_iface = mkIface_ hsc_env
                    this_mod hsc_src

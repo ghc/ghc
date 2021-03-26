@@ -340,9 +340,9 @@ gk2gkDC Gen1_{} d = Gen1_DC $ last $ dataConUnivTyVars d
 mkBindsRep :: DynFlags -> GenericKind -> TyCon -> (LHsBinds GhcPs, [LSig GhcPs])
 mkBindsRep dflags gk tycon = (binds, sigs)
       where
-        binds = unitBag (mkRdrFunBind (L loc from01_RDR) [from_eqn])
+        binds = unitBag (mkRdrFunBind (L loc' from01_RDR) [from_eqn])
               `unionBags`
-                unitBag (mkRdrFunBind (L loc to01_RDR) [to_eqn])
+                unitBag (mkRdrFunBind (L loc' to01_RDR) [to_eqn])
 
         -- See Note [Generics performance tricks]
         sigs = if     gopt Opt_InlineGenericsAggressively dflags
@@ -361,7 +361,7 @@ mkBindsRep dflags gk tycon = (binds, sigs)
                cons       = length datacons
                max_fields = maximum $ map dataConSourceArity datacons
 
-           inline1 f = L loc . InlineSig noExtField (L loc f)
+           inline1 f = L loc'' . InlineSig noAnn (L loc' f)
                      $ alwaysInlinePragma { inl_act = ActiveAfter NoSourceText 1 }
 
         -- The topmost M1 (the datatype metadata) has the exact same type
@@ -375,6 +375,8 @@ mkBindsRep dflags gk tycon = (binds, sigs)
         from_matches  = [mkHsCaseAlt pat rhs | (pat,rhs) <- from_alts]
         to_matches    = [mkHsCaseAlt pat rhs | (pat,rhs) <- to_alts  ]
         loc           = srcLocSpan (getSrcLoc tycon)
+        loc'          = noAnnSrcSpan loc
+        loc''         = noAnnSrcSpan loc
         datacons      = tyConDataCons tycon
 
         (from01_RDR, to01_RDR) = case gk of
@@ -900,10 +902,17 @@ nlHsCompose x y = compose_RDR `nlHsApps` [x, y]
 
 -- | Variant of foldr for producing balanced lists
 foldBal :: (a -> a -> a) -> a -> [a] -> a
-foldBal _  x []  = x
-foldBal _  _ [y] = y
-foldBal op x l   = let (a,b) = splitAt (length l `div` 2) l
-                   in foldBal op x a `op` foldBal op x b
+{-# INLINE foldBal #-} -- inlined to produce specialised code for each op
+foldBal op0 x0 xs0 = fold_bal op0 x0 (length xs0) xs0
+  where
+    fold_bal op x !n xs = case xs of
+      []  -> x
+      [a] -> a
+      _   -> let !nl = n `div` 2
+                 !nr = n - nl
+                 (l,r) = splitAt nl xs
+             in fold_bal op x nl l
+                `op` fold_bal op x nr r
 
 {-
 Note [Generics and unlifted types]

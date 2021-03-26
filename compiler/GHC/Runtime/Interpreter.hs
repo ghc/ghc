@@ -1,13 +1,17 @@
-{-# LANGUAGE RecordWildCards, ScopedTypeVariables, BangPatterns, CPP #-}
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 
 -- | Interacting with the iserv interpreter, whether it is running on an
 -- external process or in the current process.
 --
 module GHC.Runtime.Interpreter
-  ( -- * High-level interface to the interpreter
-    evalStmt, EvalStatus_(..), EvalStatus, EvalResult(..), EvalExpr(..)
+  ( module GHC.Runtime.Interpreter.Types
+
+  -- * High-level interface to the interpreter
+  , evalStmt, EvalStatus_(..), EvalStatus, EvalResult(..), EvalExpr(..)
   , resumeStmt
   , abandonStmt
   , evalIO
@@ -19,7 +23,7 @@ module GHC.Runtime.Interpreter
   , mkCostCentres
   , costCentreStackInfo
   , newBreakArray
-  , enableBreakpoint
+  , storeBreakpoint
   , breakpointStatus
   , getBreakpointVar
   , getClosure
@@ -42,8 +46,8 @@ module GHC.Runtime.Interpreter
   , findSystemLibrary
 
   -- * Lower-level API using messages
-  , iservCmd, Message(..), withIServ, withIServ_
-  , withInterp, hscInterp, stopInterp
+  , interpCmd, Message(..), withIServ, withIServ_
+  , hscInterp, stopInterp
   , iservCall, readIServ, writeIServ
   , purgeLookupSymbolCache
   , freeHValueRefs
@@ -186,23 +190,17 @@ Other Notes on Remote GHCi
 -- external iserv process, and the response is deserialized (hence the
 -- @Binary@ constraint).  With @-fno-external-interpreter@ we execute
 -- the command directly here.
-iservCmd :: Binary a => HscEnv -> Message a -> IO a
-iservCmd hsc_env msg = withInterp hsc_env $ \case
+interpCmd :: Binary a => Interp -> Message a -> IO a
+interpCmd interp msg = case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
   InternalInterp     -> run msg -- Just run it directly
 #endif
-  (ExternalInterp c i) -> withIServ_ c i $ \iserv ->
+  ExternalInterp c i -> withIServ_ c i $ \iserv ->
     uninterruptibleMask_ $ -- Note [uninterruptibleMask_]
       iservCall iserv msg
 
 
--- | Execute an action with the interpreter
---
--- Fails if no target code interpreter is available
-withInterp :: HscEnv -> (Interp -> IO a) -> IO a
-withInterp hsc_env action = action (hscInterp hsc_env)
-
--- | Retrieve the targe code interpreter
+-- | Retrieve the target code interpreter
 --
 -- Fails if no target code interpreter is available
 hscInterp :: HscEnv -> Interp
@@ -210,7 +208,7 @@ hscInterp hsc_env = case hsc_interp hsc_env of
    Nothing -> throw (InstallationError "Couldn't find a target code interpreter. Try with -fexternal-interpreter")
    Just i  -> i
 
--- Note [uninterruptibleMask_ and iservCmd]
+-- Note [uninterruptibleMask_ and interpCmd]
 --
 -- If we receive an async exception, such as ^C, while communicating
 -- with the iserv process then we will be out-of-sync and not be able
@@ -261,13 +259,15 @@ withIServ_ conf iserv action = withIServ conf iserv $ \inst ->
 -- | Execute an action of type @IO [a]@, returning 'ForeignHValue's for
 -- each of the results.
 evalStmt
-  :: HscEnv -> Bool -> EvalExpr ForeignHValue
+  :: Interp
+  -> DynFlags -- used by mkEvalOpts
+  -> Bool     -- "step" for mkEvalOpts
+  -> EvalExpr ForeignHValue
   -> IO (EvalStatus_ [ForeignHValue] [HValueRef])
-evalStmt hsc_env step foreign_expr = do
-  let dflags = hsc_dflags hsc_env
+evalStmt interp dflags step foreign_expr = do
   status <- withExpr foreign_expr $ \expr ->
-    iservCmd hsc_env (EvalStmt (mkEvalOpts dflags step) expr)
-  handleEvalStatus hsc_env status
+    interpCmd interp (EvalStmt (mkEvalOpts dflags step) expr)
+  handleEvalStatus interp status
  where
   withExpr :: EvalExpr ForeignHValue -> (EvalExpr HValueRef -> IO a) -> IO a
   withExpr (EvalThis fhv) cont =
@@ -278,23 +278,26 @@ evalStmt hsc_env step foreign_expr = do
     cont (EvalApp fl' fr')
 
 resumeStmt
-  :: HscEnv -> Bool -> ForeignRef (ResumeContext [HValueRef])
+  :: Interp
+  -> DynFlags -- used by mkEvalOpts
+  -> Bool     -- "step" for mkEvalOpts
+  -> ForeignRef (ResumeContext [HValueRef])
   -> IO (EvalStatus_ [ForeignHValue] [HValueRef])
-resumeStmt hsc_env step resume_ctxt = do
-  let dflags = hsc_dflags hsc_env
+resumeStmt interp dflags step resume_ctxt = do
   status <- withForeignRef resume_ctxt $ \rhv ->
-    iservCmd hsc_env (ResumeStmt (mkEvalOpts dflags step) rhv)
-  handleEvalStatus hsc_env status
+    interpCmd interp (ResumeStmt (mkEvalOpts dflags step) rhv)
+  handleEvalStatus interp status
 
-abandonStmt :: HscEnv -> ForeignRef (ResumeContext [HValueRef]) -> IO ()
-abandonStmt hsc_env resume_ctxt =
+abandonStmt :: Interp -> ForeignRef (ResumeContext [HValueRef]) -> IO ()
+abandonStmt interp resume_ctxt =
   withForeignRef resume_ctxt $ \rhv ->
-    iservCmd hsc_env (AbandonStmt rhv)
+    interpCmd interp (AbandonStmt rhv)
 
 handleEvalStatus
-  :: HscEnv -> EvalStatus [HValueRef]
+  :: Interp
+  -> EvalStatus [HValueRef]
   -> IO (EvalStatus_ [ForeignHValue] [HValueRef])
-handleEvalStatus hsc_env status =
+handleEvalStatus interp status =
   case status of
     EvalBreak a b c d e f -> return (EvalBreak a b c d e f)
     EvalComplete alloc res ->
@@ -302,48 +305,47 @@ handleEvalStatus hsc_env status =
  where
   addFinalizer (EvalException e) = return (EvalException e)
   addFinalizer (EvalSuccess rs)  =
-    EvalSuccess <$> mapM (mkFinalizedHValue hsc_env) rs
+    EvalSuccess <$> mapM (mkFinalizedHValue interp) rs
 
 -- | Execute an action of type @IO ()@
-evalIO :: HscEnv -> ForeignHValue -> IO ()
-evalIO hsc_env fhv =
+evalIO :: Interp -> ForeignHValue -> IO ()
+evalIO interp fhv =
   liftIO $ withForeignRef fhv $ \fhv ->
-    iservCmd hsc_env (EvalIO fhv) >>= fromEvalResult
+    interpCmd interp (EvalIO fhv) >>= fromEvalResult
 
 -- | Execute an action of type @IO String@
-evalString :: HscEnv -> ForeignHValue -> IO String
-evalString hsc_env fhv =
+evalString :: Interp -> ForeignHValue -> IO String
+evalString interp fhv =
   liftIO $ withForeignRef fhv $ \fhv ->
-    iservCmd hsc_env (EvalString fhv) >>= fromEvalResult
+    interpCmd interp (EvalString fhv) >>= fromEvalResult
 
 -- | Execute an action of type @String -> IO String@
-evalStringToIOString :: HscEnv -> ForeignHValue -> String -> IO String
-evalStringToIOString hsc_env fhv str =
+evalStringToIOString :: Interp -> ForeignHValue -> String -> IO String
+evalStringToIOString interp fhv str =
   liftIO $ withForeignRef fhv $ \fhv ->
-    iservCmd hsc_env (EvalStringToString fhv str) >>= fromEvalResult
+    interpCmd interp (EvalStringToString fhv str) >>= fromEvalResult
 
 
 -- | Allocate and store the given bytes in memory, returning a pointer
 -- to the memory in the remote process.
-mallocData :: HscEnv -> ByteString -> IO (RemotePtr ())
-mallocData hsc_env bs = iservCmd hsc_env (MallocData bs)
+mallocData :: Interp -> ByteString -> IO (RemotePtr ())
+mallocData interp bs = interpCmd interp (MallocData bs)
 
-mkCostCentres
-  :: HscEnv -> String -> [(String,String)] -> IO [RemotePtr CostCentre]
-mkCostCentres hsc_env mod ccs =
-  iservCmd hsc_env (MkCostCentres mod ccs)
+mkCostCentres :: Interp -> String -> [(String,String)] -> IO [RemotePtr CostCentre]
+mkCostCentres interp mod ccs =
+  interpCmd interp (MkCostCentres mod ccs)
 
 -- | Create a set of BCOs that may be mutually recursive.
-createBCOs :: HscEnv -> [ResolvedBCO] -> IO [HValueRef]
-createBCOs hsc_env rbcos = do
-  n_jobs <- case parMakeCount (hsc_dflags hsc_env) of
+createBCOs :: Interp -> DynFlags -> [ResolvedBCO] -> IO [HValueRef]
+createBCOs interp dflags rbcos = do
+  n_jobs <- case parMakeCount dflags of
               Nothing -> liftIO getNumProcessors
               Just n  -> return n
   -- Serializing ResolvedBCO is expensive, so if we're in parallel mode
   -- (-j<n>) parallelise the serialization.
   if (n_jobs == 1)
     then
-      iservCmd hsc_env (CreateBCOs [runPut (put rbcos)])
+      interpCmd interp (CreateBCOs [runPut (put rbcos)])
 
     else do
       old_caps <- getNumCapabilities
@@ -352,7 +354,7 @@ createBCOs hsc_env rbcos = do
          else bracket_ (setNumCapabilities n_jobs)
                        (setNumCapabilities old_caps)
                        (void $ evaluate puts)
-      iservCmd hsc_env (CreateBCOs puts)
+      interpCmd interp (CreateBCOs puts)
  where
   puts = parMap doChunk (chunkList 100 rbcos)
 
@@ -365,56 +367,57 @@ createBCOs hsc_env rbcos = do
   parMap f (x:xs) = fx `par` (fxs `pseq` (fx : fxs))
     where fx = f x; fxs = parMap f xs
 
-addSptEntry :: HscEnv -> Fingerprint -> ForeignHValue -> IO ()
-addSptEntry hsc_env fpr ref =
+addSptEntry :: Interp -> Fingerprint -> ForeignHValue -> IO ()
+addSptEntry interp fpr ref =
   withForeignRef ref $ \val ->
-    iservCmd hsc_env (AddSptEntry fpr val)
+    interpCmd interp (AddSptEntry fpr val)
 
-costCentreStackInfo :: HscEnv -> RemotePtr CostCentreStack -> IO [String]
-costCentreStackInfo hsc_env ccs =
-  iservCmd hsc_env (CostCentreStackInfo ccs)
+costCentreStackInfo :: Interp -> RemotePtr CostCentreStack -> IO [String]
+costCentreStackInfo interp ccs =
+  interpCmd interp (CostCentreStackInfo ccs)
 
-newBreakArray :: HscEnv -> Int -> IO (ForeignRef BreakArray)
-newBreakArray hsc_env size = do
-  breakArray <- iservCmd hsc_env (NewBreakArray size)
-  mkFinalizedHValue hsc_env breakArray
+newBreakArray :: Interp -> Int -> IO (ForeignRef BreakArray)
+newBreakArray interp size = do
+  breakArray <- interpCmd interp (NewBreakArray size)
+  mkFinalizedHValue interp breakArray
 
-enableBreakpoint :: HscEnv -> ForeignRef BreakArray -> Int -> Bool -> IO ()
-enableBreakpoint hsc_env ref ix b =
+storeBreakpoint :: Interp -> ForeignRef BreakArray -> Int -> Int -> IO ()
+storeBreakpoint interp ref ix cnt = do                               -- #19157
   withForeignRef ref $ \breakarray ->
-    iservCmd hsc_env (EnableBreakpoint breakarray ix b)
+    interpCmd interp (SetupBreakpoint breakarray ix cnt)
 
-breakpointStatus :: HscEnv -> ForeignRef BreakArray -> Int -> IO Bool
-breakpointStatus hsc_env ref ix =
+breakpointStatus :: Interp -> ForeignRef BreakArray -> Int -> IO Bool
+breakpointStatus interp ref ix =
   withForeignRef ref $ \breakarray ->
-    iservCmd hsc_env (BreakpointStatus breakarray ix)
+    interpCmd interp (BreakpointStatus breakarray ix)
 
-getBreakpointVar :: HscEnv -> ForeignHValue -> Int -> IO (Maybe ForeignHValue)
-getBreakpointVar hsc_env ref ix =
+getBreakpointVar :: Interp -> ForeignHValue -> Int -> IO (Maybe ForeignHValue)
+getBreakpointVar interp ref ix =
   withForeignRef ref $ \apStack -> do
-    mb <- iservCmd hsc_env (GetBreakpointVar apStack ix)
-    mapM (mkFinalizedHValue hsc_env) mb
+    mb <- interpCmd interp (GetBreakpointVar apStack ix)
+    mapM (mkFinalizedHValue interp) mb
 
-getClosure :: HscEnv -> ForeignHValue -> IO (Heap.GenClosure ForeignHValue)
-getClosure hsc_env ref =
+getClosure :: Interp -> ForeignHValue -> IO (Heap.GenClosure ForeignHValue)
+getClosure interp ref =
   withForeignRef ref $ \hval -> do
-    mb <- iservCmd hsc_env (GetClosure hval)
-    mapM (mkFinalizedHValue hsc_env) mb
+    mb <- interpCmd interp (GetClosure hval)
+    mapM (mkFinalizedHValue interp) mb
 
 -- | Send a Seq message to the iserv process to force a value      #2950
-seqHValue :: HscEnv -> ForeignHValue -> IO (EvalResult ())
-seqHValue hsc_env ref =
-  withForeignRef ref $ \hval ->
-    iservCmd hsc_env (Seq hval) >>= handleSeqHValueStatus hsc_env
+seqHValue :: Interp -> HscEnv -> ForeignHValue -> IO (EvalResult ())
+seqHValue interp hsc_env ref =
+  withForeignRef ref $ \hval -> do
+    status <- interpCmd interp (Seq hval)
+    handleSeqHValueStatus interp hsc_env status
 
 -- | Process the result of a Seq or ResumeSeq message.             #2950
-handleSeqHValueStatus :: HscEnv -> EvalStatus () -> IO (EvalResult ())
-handleSeqHValueStatus hsc_env eval_status =
+handleSeqHValueStatus :: Interp -> HscEnv -> EvalStatus () -> IO (EvalResult ())
+handleSeqHValueStatus interp hsc_env eval_status =
   case eval_status of
     (EvalBreak is_exception _ ix mod_uniq resume_ctxt _) -> do
       -- A breakpoint was hit; inform the user and tell them
       -- which breakpoint was hit.
-      resume_ctxt_fhv <- liftIO $ mkFinalizedHValue hsc_env resume_ctxt
+      resume_ctxt_fhv <- liftIO $ mkFinalizedHValue interp resume_ctxt
       let hmi = expectJust "handleRunStatus" $
                   lookupHptDirectly (hsc_HPT hsc_env)
                     (mkUniqueGrimily mod_uniq)
@@ -425,8 +428,9 @@ handleSeqHValueStatus hsc_env eval_status =
       putStrLn ("*** Ignoring breakpoint " ++
             (showSDoc (hsc_dflags hsc_env) $ sdocBpLoc bp))
       -- resume the seq (:force) processing in the iserv process
-      withForeignRef resume_ctxt_fhv $ \hval ->
-        iservCmd hsc_env (ResumeSeq hval) >>= handleSeqHValueStatus hsc_env
+      withForeignRef resume_ctxt_fhv $ \hval -> do
+        status <- interpCmd interp (ResumeSeq hval)
+        handleSeqHValueStatus interp hsc_env status
     (EvalComplete _ r) -> return r
   where
     getSeqBpSpan :: Maybe BreakInfo -> SrcSpan
@@ -444,11 +448,11 @@ handleSeqHValueStatus hsc_env eval_status =
 -- -----------------------------------------------------------------------------
 -- Interface to the object-code linker
 
-initObjLinker :: HscEnv -> IO ()
-initObjLinker hsc_env = iservCmd hsc_env InitLinker
+initObjLinker :: Interp -> IO ()
+initObjLinker interp = interpCmd interp InitLinker
 
-lookupSymbol :: HscEnv -> FastString -> IO (Maybe (Ptr ()))
-lookupSymbol hsc_env str = withInterp hsc_env $ \case
+lookupSymbol :: Interp -> FastString -> IO (Maybe (Ptr ()))
+lookupSymbol interp str = case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
   InternalInterp -> fmap fromRemotePtr <$> run (LookupSymbol (unpackFS str))
 #endif
@@ -472,17 +476,16 @@ lookupSymbol hsc_env str = withInterp hsc_env $ \case
                 iserv' = iserv {iservLookupSymbolCache = cache'}
             return (iserv', Just p)
 
-lookupClosure :: HscEnv -> String -> IO (Maybe HValueRef)
-lookupClosure hsc_env str =
-  iservCmd hsc_env (LookupClosure str)
+lookupClosure :: Interp -> String -> IO (Maybe HValueRef)
+lookupClosure interp str =
+  interpCmd interp (LookupClosure str)
 
-purgeLookupSymbolCache :: HscEnv -> IO ()
-purgeLookupSymbolCache hsc_env = case hsc_interp hsc_env of
-  Nothing             -> pure ()
+purgeLookupSymbolCache :: Interp -> IO ()
+purgeLookupSymbolCache interp = case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
-  Just InternalInterp -> pure ()
+  InternalInterp -> pure ()
 #endif
-  Just (ExternalInterp _ (IServ mstate)) ->
+  ExternalInterp _ (IServ mstate) ->
     modifyMVar_ mstate $ \state -> pure $ case state of
       IServPending       -> state
       IServRunning iserv -> IServRunning
@@ -499,42 +502,42 @@ purgeLookupSymbolCache hsc_env = case hsc_interp hsc_env of
 --
 -- Nothing      => success
 -- Just err_msg => failure
-loadDLL :: HscEnv -> String -> IO (Maybe String)
-loadDLL hsc_env str = iservCmd hsc_env (LoadDLL str)
+loadDLL :: Interp -> String -> IO (Maybe String)
+loadDLL interp str = interpCmd interp (LoadDLL str)
 
-loadArchive :: HscEnv -> String -> IO ()
-loadArchive hsc_env path = do
+loadArchive :: Interp -> String -> IO ()
+loadArchive interp path = do
   path' <- canonicalizePath path -- Note [loadObj and relative paths]
-  iservCmd hsc_env (LoadArchive path')
+  interpCmd interp (LoadArchive path')
 
-loadObj :: HscEnv -> String -> IO ()
-loadObj hsc_env path = do
+loadObj :: Interp -> String -> IO ()
+loadObj interp path = do
   path' <- canonicalizePath path -- Note [loadObj and relative paths]
-  iservCmd hsc_env (LoadObj path')
+  interpCmd interp (LoadObj path')
 
-unloadObj :: HscEnv -> String -> IO ()
-unloadObj hsc_env path = do
+unloadObj :: Interp -> String -> IO ()
+unloadObj interp path = do
   path' <- canonicalizePath path -- Note [loadObj and relative paths]
-  iservCmd hsc_env (UnloadObj path')
+  interpCmd interp (UnloadObj path')
 
 -- Note [loadObj and relative paths]
 -- the iserv process might have a different current directory from the
 -- GHC process, so we must make paths absolute before sending them
 -- over.
 
-addLibrarySearchPath :: HscEnv -> String -> IO (Ptr ())
-addLibrarySearchPath hsc_env str =
-  fromRemotePtr <$> iservCmd hsc_env (AddLibrarySearchPath str)
+addLibrarySearchPath :: Interp -> String -> IO (Ptr ())
+addLibrarySearchPath interp str =
+  fromRemotePtr <$> interpCmd interp (AddLibrarySearchPath str)
 
-removeLibrarySearchPath :: HscEnv -> Ptr () -> IO Bool
-removeLibrarySearchPath hsc_env p =
-  iservCmd hsc_env (RemoveLibrarySearchPath (toRemotePtr p))
+removeLibrarySearchPath :: Interp -> Ptr () -> IO Bool
+removeLibrarySearchPath interp p =
+  interpCmd interp (RemoveLibrarySearchPath (toRemotePtr p))
 
-resolveObjs :: HscEnv -> IO SuccessFlag
-resolveObjs hsc_env = successIf <$> iservCmd hsc_env ResolveObjs
+resolveObjs :: Interp -> IO SuccessFlag
+resolveObjs interp = successIf <$> interpCmd interp ResolveObjs
 
-findSystemLibrary :: HscEnv -> String -> IO (Maybe String)
-findSystemLibrary hsc_env str = iservCmd hsc_env (FindSystemLibrary str)
+findSystemLibrary :: Interp -> String -> IO (Maybe String)
+findSystemLibrary interp str = interpCmd interp (FindSystemLibrary str)
 
 
 -- -----------------------------------------------------------------------------
@@ -588,22 +591,21 @@ spawnIServ conf = do
     }
 
 -- | Stop the interpreter
-stopInterp :: HscEnv -> IO ()
-stopInterp hsc_env = case hsc_interp hsc_env of
-  Nothing             -> pure ()
+stopInterp :: Interp -> IO ()
+stopInterp interp = case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
-  Just InternalInterp -> pure ()
+    InternalInterp -> pure ()
 #endif
-  Just (ExternalInterp _ (IServ mstate)) ->
-    MC.mask $ \_restore -> modifyMVar_ mstate $ \state -> do
-      case state of
-        IServPending    -> pure state -- already stopped
-        IServRunning i  -> do
-          ex <- getProcessExitCode (iservProcess i)
-          if isJust ex
-             then pure ()
-             else iservCall i Shutdown
-          pure IServPending
+    ExternalInterp _ (IServ mstate) ->
+      MC.mask $ \_restore -> modifyMVar_ mstate $ \state -> do
+        case state of
+          IServPending    -> pure state -- already stopped
+          IServRunning i  -> do
+            ex <- getProcessExitCode (iservProcess i)
+            if isJust ex
+               then pure ()
+               else iservCall i Shutdown
+            pure IServPending
 
 runWithPipes :: (CreateProcess -> IO ProcessHandle)
              -> FilePath -> [String] -> IO (ProcessHandle, Handle, Handle)
@@ -676,24 +678,23 @@ A ForeignRef is a RemoteRef with a finalizer that will free the
 on the GHC side.
 
 The finalizer adds the RemoteRef to the iservPendingFrees list in the
-IServ record.  The next call to iservCmd will free any RemoteRefs in
-the list.  It was done this way rather than calling iservCmd directly,
-because I didn't want to have arbitrary threads calling iservCmd.  In
+IServ record.  The next call to interpCmd will free any RemoteRefs in
+the list.  It was done this way rather than calling interpCmd directly,
+because I didn't want to have arbitrary threads calling interpCmd.  In
 principle it would probably be ok, but it seems less hairy this way.
 -}
 
 -- | Creates a 'ForeignRef' that will automatically release the
 -- 'RemoteRef' when it is no longer referenced.
-mkFinalizedHValue :: HscEnv -> RemoteRef a -> IO (ForeignRef a)
-mkFinalizedHValue hsc_env rref = do
+mkFinalizedHValue :: Interp -> RemoteRef a -> IO (ForeignRef a)
+mkFinalizedHValue interp rref = do
    let hvref = toHValueRef rref
 
-   free <- case hsc_interp hsc_env of
-     Nothing                           -> return (pure ())
+   free <- case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
-     Just InternalInterp               -> return (freeRemoteRef hvref)
+      InternalInterp             -> return (freeRemoteRef hvref)
 #endif
-     Just (ExternalInterp _ (IServ i)) -> return $ modifyMVar_ i $ \state ->
+      ExternalInterp _ (IServ i) -> return $ modifyMVar_ i $ \state ->
        case state of
          IServPending {}   -> pure state -- already shut down
          IServRunning inst -> do
@@ -703,9 +704,9 @@ mkFinalizedHValue hsc_env rref = do
    mkForeignRef rref free
 
 
-freeHValueRefs :: HscEnv -> [HValueRef] -> IO ()
+freeHValueRefs :: Interp -> [HValueRef] -> IO ()
 freeHValueRefs _ [] = return ()
-freeHValueRefs hsc_env refs = iservCmd hsc_env (FreeHValueRefs refs)
+freeHValueRefs interp refs = interpCmd interp (FreeHValueRefs refs)
 
 -- | Convert a 'ForeignRef' to the value it references directly.  This
 -- only works when the interpreter is running in the same process as
@@ -717,12 +718,12 @@ wormhole interp r = wormholeRef interp (unsafeForeignRefToRemoteRef r)
 -- only works when the interpreter is running in the same process as
 -- the compiler, so it fails when @-fexternal-interpreter@ is on.
 wormholeRef :: Interp -> RemoteRef a -> IO a
+wormholeRef interp _r = case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
-wormholeRef InternalInterp      _r = localRef _r
+  InternalInterp -> localRef _r
 #endif
-wormholeRef (ExternalInterp {}) _r
-  = throwIO (InstallationError
-      "this operation requires -fno-external-interpreter")
+  ExternalInterp {}
+    -> throwIO (InstallationError "this operation requires -fno-external-interpreter")
 
 -- -----------------------------------------------------------------------------
 -- Misc utils
@@ -749,14 +750,16 @@ getModBreaks hmi
 
 -- | Interpreter uses Profiling way
 interpreterProfiled :: Interp -> Bool
+interpreterProfiled interp = case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
-interpreterProfiled InternalInterp       = hostIsProfiled
+  InternalInterp     -> hostIsProfiled
 #endif
-interpreterProfiled (ExternalInterp c _) = iservConfProfiled c
+  ExternalInterp c _ -> iservConfProfiled c
 
 -- | Interpreter uses Dynamic way
 interpreterDynamic :: Interp -> Bool
+interpreterDynamic interp = case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
-interpreterDynamic InternalInterp       = hostIsDynamic
+  InternalInterp     -> hostIsDynamic
 #endif
-interpreterDynamic (ExternalInterp c _) = iservConfDynamic c
+  ExternalInterp c _ -> iservConfDynamic c

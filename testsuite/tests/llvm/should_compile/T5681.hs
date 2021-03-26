@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE MagicHash, UnboxedTuples #-}
 -- Test case for #5681
 module Main where

@@ -1,15 +1,13 @@
-{-# LANGUAGE CPP                       #-}
-{-# LANGUAGE ConstraintKinds           #-}
-{-# LANGUAGE DataKinds                 #-}
-{-# LANGUAGE DeriveDataTypeable        #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE FlexibleContexts          #-}
-{-# LANGUAGE FlexibleInstances         #-}
-{-# LANGUAGE LambdaCase                #-}
-{-# LANGUAGE ScopedTypeVariables       #-}
-{-# LANGUAGE StandaloneDeriving        #-}
-{-# LANGUAGE TypeApplications          #-}
-{-# LANGUAGE TypeFamilyDependencies    #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
                                       -- in module Language.Haskell.Syntax.Extension
 
@@ -39,13 +37,13 @@ import Language.Haskell.Syntax.Binds
 
 -- others:
 import GHC.Tc.Types.Evidence
-import GHC.Core
 import GHC.Core.DataCon (FieldLabelString)
 import GHC.Types.Name
 import GHC.Types.Basic
 import GHC.Types.Fixity
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc
+import GHC.Types.Tickish
 import GHC.Core.ConLike
 import GHC.Unit.Module (ModuleName)
 import GHC.Utils.Outputable
@@ -143,26 +141,37 @@ values (see function @mkRdrRecordUpd@ in 'GHC.Parser.PostProcess').
 
 -- | RecordDotSyntax field updates
 
-newtype FieldLabelStrings =
-  FieldLabelStrings [Located FieldLabelString]
-                               deriving (Data)
+newtype FieldLabelStrings p =
+  FieldLabelStrings [Located (HsFieldLabel p)]
 
-instance Outputable FieldLabelStrings where
+instance Outputable (FieldLabelStrings p) where
   ppr (FieldLabelStrings flds) =
     hcat (punctuate dot (map (ppr . unLoc) flds))
 
+instance OutputableBndr (FieldLabelStrings p) where
+  pprInfixOcc = pprFieldLabelStrings
+  pprPrefixOcc = pprFieldLabelStrings
+
+pprFieldLabelStrings :: FieldLabelStrings p -> SDoc
+pprFieldLabelStrings (FieldLabelStrings flds) =
+    hcat (punctuate dot (map (ppr . unLoc) flds))
+
+instance Outputable (HsFieldLabel p) where
+  ppr (HsFieldLabel _ s) = ppr s
+  ppr XHsFieldLabel{} = text "XHsFieldLabel"
+
 -- Field projection updates (e.g. @foo.bar.baz = 1@). See Note
 -- [RecordDotSyntax field updates].
-type RecProj arg = HsRecField' FieldLabelStrings arg
+type RecProj p arg = HsRecField' (FieldLabelStrings p) arg
 
 -- The phantom type parameter @p@ is for symmetry with @LHsRecField p
 -- arg@ in the definition of @data Fbind@ (see GHC.Parser.Process).
-type LHsRecProj p arg = Located (RecProj arg)
+type LHsRecProj p arg = XRec p (RecProj p arg)
 
 -- These two synonyms are used in the definition of syntax @RecordUpd@
 -- below.
-type RecUpdProj p = RecProj (LHsExpr p)
-type LHsRecUpdProj p = Located (RecUpdProj p)
+type RecUpdProj p = RecProj p (LHsExpr p)
+type LHsRecUpdProj p = XRec p (RecUpdProj p)
 
 {-
 ************************************************************************
@@ -366,7 +375,7 @@ data HsExpr p
   -- Note [ExplicitTuple]
   | ExplicitTuple
         (XExplicitTuple p)
-        [LHsTupArg p]
+        [HsTupArg p]
         Boxity
 
   -- | Used for unboxed sum types
@@ -419,7 +428,7 @@ data HsExpr p
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | HsLet       (XLet p)
-                (LHsLocalBinds p)
+                (HsLocalBinds p)
                 (LHsExpr  p)
 
   -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDo',
@@ -483,7 +492,7 @@ data HsExpr p
   | HsGetField {
         gf_ext :: XGetField p
       , gf_expr :: LHsExpr p
-      , gf_field :: Located FieldLabelString
+      , gf_field :: Located (HsFieldLabel p)
       }
 
   -- | Record field selector. e.g. @(.x)@ or @(.x.y)@
@@ -496,7 +505,7 @@ data HsExpr p
 
   | HsProjection {
         proj_ext :: XProjection p
-      , proj_flds :: [Located FieldLabelString]
+      , proj_flds :: [Located (HsFieldLabel p)]
       }
 
   -- | Expression with an explicit type signature. @e :: type@
@@ -584,7 +593,7 @@ data HsExpr p
 
   | HsTick
      (XTick p)
-     (Tickish (IdP p))
+     CoreTickish
      (LHsExpr p)                       -- sub-expression
 
   | HsBinTick
@@ -608,6 +617,15 @@ type family HsDoRn p
 type family HsBracketRn p
 type family PendingRnSplice' p
 type family PendingTcSplice' p
+
+-- ---------------------------------------------------------------------
+
+data HsFieldLabel p
+  = HsFieldLabel
+    { hflExt   :: XCHsFieldLabel p
+    , hflLabel :: Located FieldLabelString
+    }
+  | XHsFieldLabel !(XXHsFieldLabel p)
 
 -- ---------------------------------------------------------------------
 
@@ -790,7 +808,7 @@ See also #13680, which requested [] @Int to work.
 
 -----------------------
 pprExternalSrcLoc :: (StringLiteral,(Int,Int),(Int,Int)) -> SDoc
-pprExternalSrcLoc (StringLiteral _ src,(n1,n2),(n3,n4))
+pprExternalSrcLoc (StringLiteral _ src _,(n1,n2),(n3,n4))
   = ppr (src,(n1,n2),(n3,n4))
 
 {-
@@ -897,7 +915,7 @@ data HsCmd id
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | HsCmdLet    (XCmdLet id)
-                (LHsLocalBinds id)      -- let(rec)
+                (HsLocalBinds id)      -- let(rec)
                 (LHsCmd  id)
     -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLet',
     --       'GHC.Parser.Annotation.AnnOpen' @'{'@,
@@ -1057,8 +1075,8 @@ isInfixMatch match = case m_ctxt match of
 data GRHSs p body
   = GRHSs {
       grhssExt :: XCGRHSs p body,
-      grhssGRHSs :: [LGRHS p body],      -- ^ Guarded RHSs
-      grhssLocalBinds :: LHsLocalBinds p -- ^ The where clause
+      grhssGRHSs :: [LGRHS p body],     -- ^ Guarded RHSs
+      grhssLocalBinds :: HsLocalBinds p -- ^ The where clause
     }
   | XGRHSs !(XXGRHSs p body)
 
@@ -1175,7 +1193,7 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
   --          'GHC.Parser.Annotation.AnnOpen' @'{'@,'GHC.Parser.Annotation.AnnClose' @'}'@,
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-  | LetStmt  (XLetStmt idL idR body) (LHsLocalBindsLR idL idR)
+  | LetStmt  (XLetStmt idL idR body) (HsLocalBindsLR idL idR)
 
   -- ParStmts only occur in a list/monad comprehension
   | ParStmt  (XParStmt idL idR body)    -- Post typecheck,
@@ -1215,7 +1233,8 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | RecStmt
      { recS_ext :: XRecStmt idL idR body
-     , recS_stmts :: [LStmtLR idL idR body]
+     , recS_stmts :: XRec idR [LStmtLR idL idR body]
+     -- Assume XRec is the same for idL and idR, pick one arbitrarily
 
         -- The next two fields are only valid after renaming
      , recS_later_ids :: [IdP idR]
@@ -1562,7 +1581,8 @@ data HsBracket p
   | DecBrL (XDecBrL p)  [LHsDecl p]   -- [d| decls |]; result of parser
   | DecBrG (XDecBrG p)  (HsGroup p)   -- [d| decls |]; result of renamer
   | TypBr  (XTypBr p)   (LHsType p)   -- [t| type  |]
-  | VarBr  (XVarBr p)   Bool (IdP p)  -- True: 'x, False: ''T
+  | VarBr  (XVarBr p)   Bool (LIdP p)
+                                -- True: 'x, False: ''T
                                 -- (The Bool flag is used only in pprHsBracket)
   | TExpBr (XTExpBr p) (LHsExpr p)    -- [||  expr  ||]
   | XBracket !(XXBracket p)           -- Note [Trees that Grow] extension point

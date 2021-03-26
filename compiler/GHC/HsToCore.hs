@@ -214,7 +214,7 @@ deSugar hsc_env
 
         ; foreign_files <- readIORef th_foreign_files_var
 
-        ; let (doc_hdr, decl_docs, arg_docs) = extractDocs tcg_env
+        ; (doc_hdr, decl_docs, arg_docs) <- extractDocs tcg_env
 
         ; let mod_guts = ModGuts {
                 mg_module       = mod,
@@ -403,7 +403,7 @@ dsRule (L loc (HsRule { rd_name = name
                       , rd_tmvs = vars
                       , rd_lhs  = lhs
                       , rd_rhs  = rhs }))
-  = putSrcSpanDs loc $
+  = putSrcSpanDs (locA loc) $
     do  { let bndrs' = [var | L _ (RuleBndr _ (L _ var)) <- vars]
 
         ; lhs' <- unsetGOptM Opt_EnableRewriteRules $

@@ -25,7 +25,7 @@ module GHC.Stg.Syntax (
         GenStgTopBinding(..), GenStgBinding(..), GenStgExpr(..), GenStgRhs(..),
         GenStgAlt, AltType(..),
 
-        StgPass(..), BinderP, XRhsClosure, XLet, XLetNoEscape, XConApp,
+        StgPass(..), BinderP, XRhsClosure, XLet, XLetNoEscape,
         NoExtFieldSilent, noExtFieldSilent,
         OutputablePass,
 
@@ -58,7 +58,8 @@ module GHC.Stg.Syntax (
         bindersOf, bindersOfTop, bindersOfTopBinds,
 
         -- ppr
-        StgPprOpts(..), initStgPprOpts, panicStgPprOpts,
+        StgPprOpts(..), initStgPprOpts,
+        panicStgPprOpts, shortStgPprOpts,
         pprStgArg, pprStgExpr, pprStgRhs, pprStgBinding,
         pprGenStgTopBinding, pprStgTopBinding,
         pprGenStgTopBindings, pprStgTopBindings
@@ -68,7 +69,7 @@ module GHC.Stg.Syntax (
 
 import GHC.Prelude
 
-import GHC.Core     ( AltCon, Tickish )
+import GHC.Core     ( AltCon )
 import GHC.Types.CostCentre ( CostCentreStack )
 import Data.ByteString ( ByteString )
 import Data.Data   ( Data )
@@ -78,6 +79,7 @@ import GHC.Driver.Session
 import GHC.Types.ForeignCall ( ForeignCall )
 import GHC.Types.Id
 import GHC.Types.Name        ( isDynLinkName )
+import GHC.Types.Tickish     ( StgTickish )
 import GHC.Types.Var.Set
 import GHC.Types.Literal     ( Literal, literalType )
 import GHC.Unit.Module       ( Module )
@@ -175,13 +177,13 @@ stgArgType (StgLitArg lit) = literalType lit
 
 
 -- | Strip ticks of a given type from an STG expression.
-stripStgTicksTop :: (Tickish Id -> Bool) -> GenStgExpr p -> ([Tickish Id], GenStgExpr p)
+stripStgTicksTop :: (StgTickish -> Bool) -> GenStgExpr p -> ([StgTickish], GenStgExpr p)
 stripStgTicksTop p = go []
    where go ts (StgTick t e) | p t = go (t:ts) e
          go ts other               = (reverse ts, other)
 
 -- | Strip ticks of a given type from an STG expression returning only the expression.
-stripStgTicksTopE :: (Tickish Id -> Bool) -> GenStgExpr p -> GenStgExpr p
+stripStgTicksTopE :: (StgTickish -> Bool) -> GenStgExpr p -> GenStgExpr p
 stripStgTicksTopE p = go
    where go (StgTick t e) | p t = go e
          go other               = other
@@ -244,7 +246,7 @@ literals.
         -- StgConApp is vital for returning unboxed tuples or sums
         -- which can't be let-bound
   | StgConApp   DataCon
-                (XConApp pass)
+                ConstructorNumber
                 [StgArg] -- Saturated
                 [Type]   -- See Note [Types in StgConApp] in GHC.Stg.Unarise
 
@@ -368,7 +370,7 @@ Finally for @hpc@ expressions we introduce a new STG construct.
 -}
 
   | StgTick
-    (Tickish Id)
+    StgTickish
     (GenStgExpr pass)       -- sub expression
 
 -- END of GenStgExpr
@@ -420,7 +422,7 @@ important):
         DataCon         -- Constructor. Never an unboxed tuple or sum, as those
                         -- are not allocated.
         ConstructorNumber
-        [Tickish Id]
+        [StgTickish]
         [StgArg]        -- Args
 
 {-
@@ -483,10 +485,6 @@ type family XLet (pass :: StgPass)
 type instance XLet 'Vanilla = NoExtFieldSilent
 type instance XLet 'CodeGen = NoExtFieldSilent
 
-type family XConApp (pass :: StgPass)
-type instance XConApp 'Vanilla =  ConstructorNumber
-type instance XConApp 'CodeGen = ConstructorNumber
-
 -- | When `-fdistinct-constructor-tables` is turned on then
 -- each usage of a constructor is given an unique number and
 -- an info table is generated for each different constructor.
@@ -531,7 +529,7 @@ type GenStgAlt pass
      GenStgExpr pass) -- ...right-hand side.
 
 data AltType
-  = PolyAlt             -- Polymorphic (a lifted type variable)
+  = PolyAlt             -- Polymorphic (a boxed type variable, lifted or unlifted)
   | MultiValAlt Int     -- Multi value of this arity (unboxed tuple or sum)
                         -- the arity could indeed be 1 for unary unboxed tuple
                         -- or enum-like unboxed sums
@@ -667,7 +665,6 @@ likes terminators instead...  Ditto for case alternatives.
 
 type OutputablePass pass =
   ( Outputable (XLet pass)
-  , Outputable (XConApp pass)
   , Outputable (XLetNoEscape pass)
   , Outputable (XRhsClosure pass)
   , OutputableBndr (BinderP pass)
@@ -689,6 +686,13 @@ panicStgPprOpts :: StgPprOpts
 panicStgPprOpts = StgPprOpts
    { stgSccEnabled = True
    }
+
+-- | STG pretty-printing options used for short messages
+shortStgPprOpts :: StgPprOpts
+shortStgPprOpts = StgPprOpts
+   { stgSccEnabled = False
+   }
+
 
 pprGenStgTopBinding
   :: OutputablePass pass => StgPprOpts -> GenStgTopBinding pass -> SDoc
@@ -777,9 +781,10 @@ pprStgExpr opts e = case e of
              , hang (text "} in ") 2 (pprStgExpr opts expr)
              ]
 
-   StgTick tickish expr -> sdocOption sdocSuppressTicks $ \case
+   StgTick _tickish expr -> sdocOption sdocSuppressTicks $ \case
       True  -> pprStgExpr opts expr
-      False -> sep [ ppr tickish, pprStgExpr opts expr ]
+      False -> pprStgExpr opts expr
+        -- XXX sep [ ppr tickish, pprStgExpr opts expr ]
 
    -- Don't indent for a single case alternative.
    StgCase expr bndr alt_type [alt]

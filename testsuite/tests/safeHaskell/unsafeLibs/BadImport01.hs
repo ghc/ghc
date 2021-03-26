@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE Safe #-}
 -- | Import unsafe module System.IO.Unsafe to make sure it fails
 module Main where

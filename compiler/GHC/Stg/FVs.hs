@@ -1,3 +1,5 @@
+{-# LANGUAGE TypeFamilies #-}
+
 {- |
 Non-global free variable analysis on STG terms. This pass annotates
 non-top-level closure bindings with captured variables. Global variables are not
@@ -47,7 +49,7 @@ import GHC.Prelude
 import GHC.Stg.Syntax
 import GHC.Types.Id
 import GHC.Types.Var.Set
-import GHC.Core    ( Tickish(Breakpoint) )
+import GHC.Types.Tickish ( GenTickish(Breakpoint) )
 import GHC.Utils.Misc
 
 import Data.Maybe ( mapMaybe )
@@ -139,8 +141,8 @@ expr env = go
       where
         (e', fvs) = go e
         fvs' = unionDVarSet (tickish tick) fvs
-        tickish (Breakpoint _ ids) = mkDVarSet ids
-        tickish _                  = emptyDVarSet
+        tickish (Breakpoint _ _ ids) = mkDVarSet ids
+        tickish _                    = emptyDVarSet
 
     go_bind dc bind body = (dc bind' body', fvs)
       where

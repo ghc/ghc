@@ -68,6 +68,7 @@ import GHC.Builtin.Names
 import GHC.Builtin.Types
 
 import GHC.ThToHs
+import GHC.HsToCore.Docs
 import GHC.HsToCore.Expr
 import GHC.HsToCore.Monad
 import GHC.IfaceToCore
@@ -76,7 +77,6 @@ import GHC.Iface.Load
 import GHCi.Message
 import GHCi.RemoteTypes
 import GHC.Runtime.Interpreter
-import GHC.Runtime.Interpreter.Types
 
 import GHC.Rename.Splice( traceSplice, SpliceInfo(..))
 import GHC.Rename.Expr
@@ -147,6 +147,7 @@ import Data.Maybe
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as LB
 import Data.Dynamic  ( fromDynamic, toDyn )
+import qualified Data.IntMap as IntMap
 import qualified Data.Map as Map
 import Data.Typeable ( typeOf, Typeable, TypeRep, typeRep )
 import Data.Data (Data)
@@ -213,7 +214,7 @@ tcTypedBracket rn_expr brack@(TExpBr _ expr) res_ty
                        rn_expr
                        (unLoc (mkHsApp (mkLHsWrap (applyQuoteWrapper wrapper)
                                                   (nlHsTyApp texpco [rep, expr_ty]))
-                                      (noLoc (HsTcBracketOut noExtField (Just wrapper) brack ps'))))
+                                      (noLocA (HsTcBracketOut noExtField (Just wrapper) brack ps'))))
                        meta_ty res_ty }
 tcTypedBracket _ other_brack _
   = pprPanic "tcTypedBracket" (ppr other_brack)
@@ -596,7 +597,7 @@ That effort is tracked in #14838.
 
 tcSpliceExpr splice@(HsTypedSplice _ _ name expr) res_ty
   = addErrCtxt (spliceCtxtDoc splice) $
-    setSrcSpan (getLoc expr)    $ do
+    setSrcSpan (getLocA expr)    $ do
     { stage <- getStage
     ; case stage of
           Splice {}            -> tcTopSplice expr res_ty
@@ -643,7 +644,7 @@ tcNestedSplice pop_stage (TcPending ps_var lie_var q@(QuoteWrapper _ m_var)) spl
        -- But we still return a plausible expression
        --   (a) in case we print it in debug messages, and
        --   (b) because we test whether it is tagToEnum in Tc.Gen.Expr.tcApp
-       ; return (HsSpliceE noExtField $
+       ; return (HsSpliceE noAnn $
                  HsSpliced noExtField (ThModFinalizers []) $
                  HsSplicedExpr (unLoc expr'')) }
 
@@ -664,7 +665,7 @@ tcTopSplice expr res_ty
        ; lcl_env <- getLclEnv
        ; let delayed_splice
               = DelayedSplice lcl_env expr res_ty q_expr
-       ; return (HsSpliceE noExtField (XSplice (HsSplicedT delayed_splice)))
+       ; return (HsSpliceE noAnn (XSplice (HsSplicedT delayed_splice)))
 
        }
 
@@ -774,10 +775,11 @@ runAnnotation target expr = do
                 -- LIE consulted by tcTopSpliceExpr
                 -- and hence ensures the appropriate dictionary is bound by const_binds
               ; wrapper <- instCall AnnOrigin [expr_ty] [mkClassPred data_class [expr_ty]]
+              ; let loc' = noAnnSrcSpan loc
               ; let specialised_to_annotation_wrapper_expr
-                      = L loc (mkHsWrap wrapper
-                                 (HsVar noExtField (L loc to_annotation_wrapper_id)))
-              ; return (L loc (HsApp noExtField
+                      = L loc' (mkHsWrap wrapper
+                                 (HsVar noExtField (L (noAnnSrcSpan loc) to_annotation_wrapper_id)))
+              ; return (L loc' (HsApp noComments
                                 specialised_to_annotation_wrapper_expr expr'))
                                 })
 
@@ -794,11 +796,11 @@ runAnnotation target expr = do
 convertAnnotationWrapper :: ForeignHValue -> TcM (Either SDoc Serialized)
 convertAnnotationWrapper fhv = do
   interp <- tcGetInterp
-  case interp of
+  case interpInstance interp of
     ExternalInterp {} -> Right <$> runTH THAnnWrapper fhv
 #if defined(HAVE_INTERNAL_INTERPRETER)
     InternalInterp    -> do
-      annotation_wrapper <- liftIO $ wormhole InternalInterp fhv
+      annotation_wrapper <- liftIO $ wormhole interp fhv
       return $ Right $
         case unsafeCoerce annotation_wrapper of
            AnnotationWrapper value | let serialized = toSerialized serializeWithData value ->
@@ -833,7 +835,7 @@ runRemoteModFinalizers (ThModFinalizers finRefs) = do
       withForeignRefs (x : xs) f = withForeignRef x $ \r ->
         withForeignRefs xs $ \rs -> f (r : rs)
   interp <- tcGetInterp
-  case interp of
+  case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
     InternalInterp -> do
       qs <- liftIO (withForeignRefs finRefs $ mapM localRef)
@@ -959,7 +961,7 @@ runMeta' show_code ppr_hs run_and_convert expr
                 -- encounter them inside the try
                 --
                 -- See Note [Exceptions in TH]
-          let expr_span = getLoc expr
+          let expr_span = getLocA expr
         ; either_tval <- tryAllM $
                          setSrcSpan expr_span $ -- Set the span so that qLocation can
                                                 -- see where this splice is
@@ -1190,7 +1192,10 @@ instance TH.Quasi TcM where
 
   qAddCorePlugin plugin = do
       hsc_env <- getTopEnv
-      r <- liftIO $ findHomeModule hsc_env (mkModuleName plugin)
+      let fc        = hsc_FC hsc_env
+      let home_unit = hsc_home_unit hsc_env
+      let dflags    = hsc_dflags hsc_env
+      r <- liftIO $ findHomeModule fc home_unit dflags (mkModuleName plugin)
       let err = hang
             (text "addCorePlugin: invalid plugin module "
                <+> text (show plugin)
@@ -1220,6 +1225,148 @@ instance TH.Quasi TcM where
   qExtsEnabled =
     EnumSet.toList . extensionFlags . hsc_dflags <$> getTopEnv
 
+  qPutDoc doc_loc s = do
+    th_doc_var <- tcg_th_docs <$> getGblEnv
+    resolved_doc_loc <- resolve_loc doc_loc
+    is_local <- checkLocalName resolved_doc_loc
+    unless is_local $ failWithTc $ text
+      "Can't add documentation to" <+> ppr_loc doc_loc <+>
+      text "as it isn't inside the current module"
+    updTcRef th_doc_var (Map.insert resolved_doc_loc s)
+    where
+      resolve_loc (TH.DeclDoc n) = DeclDoc <$> lookupThName n
+      resolve_loc (TH.ArgDoc n i) = ArgDoc <$> lookupThName n <*> pure i
+      resolve_loc (TH.InstDoc t) = InstDoc <$> fmap getName (lookupThInstName t)
+      resolve_loc TH.ModuleDoc = pure ModuleDoc
+
+      ppr_loc (TH.DeclDoc n) = ppr_th n
+      ppr_loc (TH.ArgDoc n _) = ppr_th n
+      ppr_loc (TH.InstDoc t) = ppr_th t
+      ppr_loc TH.ModuleDoc = text "the module header"
+
+      -- It doesn't make sense to add documentation to something not inside
+      -- the current module. So check for it!
+      checkLocalName (DeclDoc n) = nameIsLocalOrFrom <$> getModule <*> pure n
+      checkLocalName (ArgDoc n _) = nameIsLocalOrFrom <$> getModule <*> pure n
+      checkLocalName (InstDoc n) = nameIsLocalOrFrom <$> getModule <*> pure n
+      checkLocalName ModuleDoc = pure True
+
+
+  qGetDoc (TH.DeclDoc n) = lookupThName n >>= lookupDeclDoc
+  qGetDoc (TH.InstDoc t) = lookupThInstName t >>= lookupDeclDoc
+  qGetDoc (TH.ArgDoc n i) = lookupThName n >>= lookupArgDoc i
+  qGetDoc TH.ModuleDoc = do
+    (moduleDoc, _, _) <- getGblEnv >>= extractDocs
+    return (fmap unpackHDS moduleDoc)
+
+-- | Looks up documentation for a declaration in first the current module,
+-- otherwise tries to find it in another module via 'hscGetModuleInterface'.
+lookupDeclDoc :: Name -> TcM (Maybe String)
+lookupDeclDoc nm = do
+  (_, DeclDocMap declDocs, _) <- getGblEnv >>= extractDocs
+  fam_insts <- tcg_fam_insts <$> getGblEnv
+  traceTc "lookupDeclDoc" (ppr nm <+> ppr declDocs <+> ppr fam_insts)
+  case Map.lookup nm declDocs of
+    Just doc -> pure $ Just (unpackHDS doc)
+    Nothing -> do
+      -- Wasn't in the current module. Try searching other external ones!
+      mIface <- getExternalModIface nm
+      case mIface of
+        Nothing -> pure Nothing
+        Just ModIface { mi_decl_docs = DeclDocMap dmap } ->
+          pure $ unpackHDS <$> Map.lookup nm dmap
+
+-- | Like 'lookupDeclDoc', looks up documentation for a function argument. If
+-- it can't find any documentation for a function in this module, it tries to
+-- find it in another module.
+lookupArgDoc :: Int -> Name -> TcM (Maybe String)
+lookupArgDoc i nm = do
+  (_, _, ArgDocMap argDocs) <- getGblEnv >>= extractDocs
+  case Map.lookup nm argDocs of
+    Just m -> pure $ unpackHDS <$> IntMap.lookup i m
+    Nothing -> do
+      mIface <- getExternalModIface nm
+      case mIface of
+        Nothing -> pure Nothing
+        Just ModIface { mi_arg_docs = ArgDocMap amap } ->
+          pure $ unpackHDS <$> (Map.lookup nm amap >>= IntMap.lookup i)
+
+-- | Returns the module a Name belongs to, if it is isn't local.
+getExternalModIface :: Name -> TcM (Maybe ModIface)
+getExternalModIface nm = do
+  isLocal <- nameIsLocalOrFrom <$> getModule <*> pure nm
+  if isLocal
+    then pure Nothing
+    else case nameModule_maybe nm of
+          Nothing -> pure Nothing
+          Just modNm -> do
+            hsc_env <- getTopEnv
+            iface <- liftIO $ hscGetModuleInterface hsc_env modNm
+            pure (Just iface)
+
+-- | Find the GHC name of the first instance that matches the TH type
+lookupThInstName :: TH.Type -> TcM Name
+lookupThInstName th_type = do
+  cls_name <- inst_cls_name th_type
+  insts <- reifyInstances' cls_name (inst_arg_types th_type)
+  case insts of   -- This expands any type synonyms
+    Left  (_, (inst:_)) -> return $ getName inst
+    Left  (_, [])       -> noMatches
+    Right (_, (inst:_)) -> return $ getName inst
+    Right (_, [])       -> noMatches
+  where
+    noMatches = failWithTc $
+      text "Couldn't find any instances of"
+        <+> ppr_th th_type
+        <+> text "to add documentation to"
+
+    -- | Get the name of the class for the instance we are documenting
+    -- > inst_cls_name (Monad Maybe) == Monad
+    -- > inst_cls_name C = C
+    inst_cls_name :: TH.Type -> TcM TH.Name
+    inst_cls_name (TH.AppT t _)           = inst_cls_name t
+    inst_cls_name (TH.SigT n _)           = inst_cls_name n
+    inst_cls_name (TH.VarT n)             = pure n
+    inst_cls_name (TH.ConT n)             = pure n
+    inst_cls_name (TH.PromotedT n)        = pure n
+    inst_cls_name (TH.InfixT _ n _)       = pure n
+    inst_cls_name (TH.UInfixT _ n _)      = pure n
+    inst_cls_name (TH.ParensT t)          = inst_cls_name t
+
+    inst_cls_name (TH.ForallT _ _ _)      = inst_cls_name_err
+    inst_cls_name (TH.ForallVisT _ _)     = inst_cls_name_err
+    inst_cls_name (TH.AppKindT _ _)       = inst_cls_name_err
+    inst_cls_name (TH.TupleT _)           = inst_cls_name_err
+    inst_cls_name (TH.UnboxedTupleT _)    = inst_cls_name_err
+    inst_cls_name (TH.UnboxedSumT _)      = inst_cls_name_err
+    inst_cls_name TH.ArrowT               = inst_cls_name_err
+    inst_cls_name TH.MulArrowT            = inst_cls_name_err
+    inst_cls_name TH.EqualityT            = inst_cls_name_err
+    inst_cls_name TH.ListT                = inst_cls_name_err
+    inst_cls_name (TH.PromotedTupleT _)   = inst_cls_name_err
+    inst_cls_name TH.PromotedNilT         = inst_cls_name_err
+    inst_cls_name TH.PromotedConsT        = inst_cls_name_err
+    inst_cls_name TH.StarT                = inst_cls_name_err
+    inst_cls_name TH.ConstraintT          = inst_cls_name_err
+    inst_cls_name (TH.LitT _)             = inst_cls_name_err
+    inst_cls_name TH.WildCardT            = inst_cls_name_err
+    inst_cls_name (TH.ImplicitParamT _ _) = inst_cls_name_err
+
+    inst_cls_name_err = failWithTc $
+      text "Couldn't work out what instance"
+        <+> ppr_th th_type
+        <+> text "is supposed to be"
+
+    -- | Basically does the opposite of 'mkThAppTs'
+    -- > inst_arg_types (Monad Maybe) == [Maybe]
+    -- > inst_arg_types C == []
+    inst_arg_types :: TH.Type -> [TH.Type]
+    inst_arg_types (TH.AppT _ args) =
+      let go (TH.AppT t ts) = t:go ts
+          go t = [t]
+        in go args
+    inst_arg_types _ = []
+
 -- | Adds a mod finalizer reference to the local environment.
 addModFinalizerRef :: ForeignRef (TH.Q ()) -> TcM ()
 addModFinalizerRef finRef = do
@@ -1237,7 +1384,7 @@ addModFinalizerRef finRef = do
 finishTH :: TcM ()
 finishTH = do
   hsc_env <- getTopEnv
-  case hsc_interp hsc_env of
+  case interpInstance <$> hsc_interp hsc_env of
     Nothing                  -> pure ()
 #if defined(HAVE_INTERNAL_INTERPRETER)
     Just InternalInterp      -> pure ()
@@ -1262,11 +1409,11 @@ runTHDec = runTH THDec
 runTH :: Binary a => THResultType -> ForeignHValue -> TcM a
 runTH ty fhv = do
   interp <- tcGetInterp
-  case interp of
+  case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
     InternalInterp -> do
        -- Run it in the local TcM
-      hv <- liftIO $ wormhole InternalInterp fhv
+      hv <- liftIO $ wormhole interp fhv
       r <- runQuasi (unsafeCoerce hv :: TH.Q a)
       return r
 #endif
@@ -1375,8 +1522,8 @@ getTHState i = do
   case th_state of
     Just rhv -> return rhv
     Nothing -> do
-      hsc_env <- getTopEnv
-      fhv <- liftIO $ mkFinalizedHValue hsc_env =<< iservCall i StartTH
+      interp <- tcGetInterp
+      fhv <- liftIO $ mkFinalizedHValue interp =<< iservCall i StartTH
       writeTcRef (tcg_th_remote_state tcg) (Just fhv)
       return fhv
 
@@ -1404,13 +1551,15 @@ handleTHMessage msg = case msg of
   AddDependentFile f -> wrapTHResult $ TH.qAddDependentFile f
   AddTempFile s -> wrapTHResult $ TH.qAddTempFile s
   AddModFinalizer r -> do
-    hsc_env <- getTopEnv
-    wrapTHResult $ liftIO (mkFinalizedHValue hsc_env r) >>= addModFinalizerRef
+    interp <- hscInterp <$> getTopEnv
+    wrapTHResult $ liftIO (mkFinalizedHValue interp r) >>= addModFinalizerRef
   AddCorePlugin str -> wrapTHResult $ TH.qAddCorePlugin str
   AddTopDecls decs -> wrapTHResult $ TH.qAddTopDecls decs
   AddForeignFilePath lang str -> wrapTHResult $ TH.qAddForeignFilePath lang str
   IsExtEnabled ext -> wrapTHResult $ TH.qIsExtEnabled ext
   ExtsEnabled -> wrapTHResult $ TH.qExtsEnabled
+  PutDoc l s -> wrapTHResult $ TH.qPutDoc l s
+  GetDoc l -> wrapTHResult $ TH.qGetDoc l
   FailIfErrs -> wrapTHResult failIfErrsM
   _ -> panic ("handleTHMessage: unexpected message " ++ show msg)
 
@@ -1434,6 +1583,19 @@ getAnnotationsByTypeRep th_name tyrep
 
 reifyInstances :: TH.Name -> [TH.Type] -> TcM [TH.Dec]
 reifyInstances th_nm th_tys
+  = do { insts <- reifyInstances' th_nm th_tys
+       ; case insts of
+           Left (cls, cls_insts) ->
+             reifyClassInstances cls cls_insts
+           Right (tc, fam_insts) ->
+             reifyFamilyInstances tc fam_insts }
+
+reifyInstances' :: TH.Name
+                -> [TH.Type]
+                -> TcM (Either (Class, [ClsInst]) (TyCon, [FamInst]))
+                -- ^ Returns 'Left' in the case that the instances were found to
+                -- be class instances, or 'Right' if they are family instances.
+reifyInstances' th_nm th_tys
    = addErrCtxt (text "In the argument of reifyInstances:"
                  <+> ppr_th th_nm <+> sep (map ppr_th th_tys)) $
      do { loc <- getSrcSpanM
@@ -1467,19 +1629,19 @@ reifyInstances th_nm th_tys
                 -- In particular, the type might have kind
                 -- variables inside it (#7477)
 
-        ; traceTc "reifyInstances" (ppr ty $$ ppr (tcTypeKind ty))
+        ; traceTc "reifyInstances'" (ppr ty $$ ppr (tcTypeKind ty))
         ; case splitTyConApp_maybe ty of   -- This expands any type synonyms
             Just (tc, tys)                 -- See #7910
                | Just cls <- tyConClass_maybe tc
                -> do { inst_envs <- tcGetInstEnvs
                      ; let (matches, unifies, _) = lookupInstEnv False inst_envs cls tys
-                     ; traceTc "reifyInstances1" (ppr matches)
-                     ; reifyClassInstances cls (map fst matches ++ unifies) }
+                     ; traceTc "reifyInstances'1" (ppr matches)
+                     ; return $ Left (cls, map fst matches ++ unifies) }
                | isOpenFamilyTyCon tc
                -> do { inst_envs <- tcGetFamInstEnvs
                      ; let matches = lookupFamInstEnv inst_envs tc tys
-                     ; traceTc "reifyInstances2" (ppr matches)
-                     ; reifyFamilyInstances tc (map fim_instance matches) }
+                     ; traceTc "reifyInstances'2" (ppr matches)
+                     ; return $ Right (tc, map fim_instance matches) }
             _  -> bale_out (hang (text "reifyInstances:" <+> quotes (ppr ty))
                                2 (text "is not a class constraint or type family application")) }
   where

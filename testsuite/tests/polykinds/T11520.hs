@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE RankNTypes, PolyKinds, GADTs, UndecidableSuperClasses, UndecidableInstances #-}
 
 module T11520 where

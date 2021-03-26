@@ -12,8 +12,8 @@ Test.t2: <1P(L)><1P(L)>
 Test.$tc'MkT:
 Test.$tcT:
 Test.$trModule:
-Test.t: m1
-Test.t2: m1
+Test.t: 1
+Test.t2: 1
 
 
 

@@ -185,7 +185,7 @@ checkHsigIface tcg_env gr sig_iface
                          -- TODO: maybe we can be a little more
                          -- precise here and use the Located
                          -- info for the *specific* name we matched.
-                         -> getLoc e
+                         -> getLocA e
                        _ -> nameSrcSpan name
             addErrAt loc
                 (badReexportedBootThing False name name')
@@ -274,10 +274,11 @@ findExtraSigImports' :: HscEnv
 findExtraSigImports' hsc_env HsigFile modname =
     fmap unionManyUniqDSets (forM reqs $ \(Module iuid mod_name) ->
         (initIfaceLoad hsc_env
-            . withException
+            . withException dflags
             $ moduleFreeHolesPrecise (text "findExtraSigImports")
                 (mkModule (VirtUnit iuid) mod_name)))
   where
+    dflags = hsc_dflags hsc_env
     unit_state = hsc_units hsc_env
     reqs = requirementMerges unit_state modname
 
@@ -311,12 +312,16 @@ implicitRequirements' :: HscEnv
 implicitRequirements' hsc_env normal_imports
   = fmap concat $
     forM normal_imports $ \(mb_pkg, L _ imp) -> do
-        found <- findImportedModule hsc_env imp mb_pkg
+        found <- findImportedModule fc units home_unit dflags imp mb_pkg
         case found of
             Found _ mod | not (isHomeModule home_unit mod) ->
                 return (uniqDSetToList (moduleFreeHoles mod))
             _ -> return []
-  where home_unit = hsc_home_unit hsc_env
+  where
+    fc        = hsc_FC hsc_env
+    home_unit = hsc_home_unit hsc_env
+    units     = hsc_units hsc_env
+    dflags    = hsc_dflags hsc_env
 
 -- | Like @implicitRequirements'@, but returns either the module name, if it is
 -- a free hole, or the instantiated unit the imported module is from, so that
@@ -328,11 +333,16 @@ implicitRequirementsShallow
   -> IO ([ModuleName], [InstantiatedUnit])
 implicitRequirementsShallow hsc_env normal_imports = go ([], []) normal_imports
  where
+  fc        = hsc_FC hsc_env
+  home_unit = hsc_home_unit hsc_env
+  units     = hsc_units hsc_env
+  dflags    = hsc_dflags hsc_env
+
   go acc [] = pure acc
   go (accL, accR) ((mb_pkg, L _ imp):imports) = do
-    found <- findImportedModule hsc_env imp mb_pkg
+    found <- findImportedModule fc units home_unit dflags imp mb_pkg
     let acc' = case found of
-          Found _ mod | not (isHomeModule (hsc_home_unit hsc_env) mod) ->
+          Found _ mod | not (isHomeModule home_unit mod) ->
               case moduleUnit mod of
                   HoleUnit -> (moduleName mod : accL, accR)
                   RealUnit _ -> (accL, accR)
@@ -560,10 +570,15 @@ mergeSignatures
     tcg_env <- getGblEnv
 
     let outer_mod  = tcg_mod tcg_env
-        inner_mod  = tcg_semantic_mod tcg_env
-        mod_name   = moduleName (tcg_mod tcg_env)
-        unit_state = hsc_units hsc_env
-        home_unit  = hsc_home_unit hsc_env
+    let inner_mod  = tcg_semantic_mod tcg_env
+    let mod_name   = moduleName (tcg_mod tcg_env)
+    let unit_state = hsc_units hsc_env
+    let fc         = hsc_FC hsc_env
+    let nc         = hsc_NC hsc_env
+    let home_unit  = hsc_home_unit hsc_env
+    let dflags     = hsc_dflags hsc_env
+    let logger     = hsc_logger hsc_env
+    let hooks      = hsc_hooks hsc_env
 
     -- STEP 1: Figure out all of the external signature interfaces
     -- we are going to merge in.
@@ -572,12 +587,13 @@ mergeSignatures
     addErrCtxt (pprWithUnitState unit_state $ merge_msg mod_name reqs) $ do
 
     -- STEP 2: Read in the RAW forms of all of these interfaces
-    ireq_ifaces0 <- forM reqs $ \(Module iuid mod_name) ->
+    ireq_ifaces0 <- liftIO $ forM reqs $ \(Module iuid mod_name) -> do
         let m = mkModule (VirtUnit iuid) mod_name
             im = fst (getModuleInstantiation m)
-        in fmap fst
-         . withException
-         $ findAndReadIface (text "mergeSignatures") im m NotBoot
+        fmap fst
+         . withException dflags
+         $ findAndReadIface logger nc fc hooks unit_state home_unit dflags
+                            (text "mergeSignatures") im m NotBoot
 
     -- STEP 3: Get the unrenamed exports of all these interfaces,
     -- thin it according to the export list, and do shaping on them.
@@ -611,7 +627,7 @@ mergeSignatures
                       -- a signature package (i.e., does not expose any
                       -- modules.)  If so, we can thin it.
                       | isFromSignaturePackage
-                      -> setSrcSpan loc $ do
+                      -> setSrcSpanA loc $ do
                         -- Suppress missing errors; they might be used to refer
                         -- to entities from other signatures we are merging in.
                         -- If an identifier truly doesn't exist in any of the
@@ -665,7 +681,7 @@ mergeSignatures
                                             is_mod  = mod_name,
                                             is_as   = mod_name,
                                             is_qual = False,
-                                            is_dloc = loc
+                                            is_dloc = locA loc
                                           } ImpAll
                                 rdr_env = mkGlobalRdrEnv (gresFromAvails (Just ispec) as1)
                             setGblEnv tcg_env {
@@ -987,7 +1003,17 @@ checkImplements impl_mod req_mod@(Module uid mod_name) = do
     -- instantiation is correct.
     let sig_mod = mkModule (VirtUnit uid) mod_name
         isig_mod = fst (getModuleInstantiation sig_mod)
-    mb_isig_iface <- findAndReadIface (text "checkImplements 2") isig_mod sig_mod NotBoot
+    hsc_env <- getTopEnv
+    let nc        = hsc_NC hsc_env
+    let fc        = hsc_FC hsc_env
+    let home_unit = hsc_home_unit hsc_env
+    let units     = hsc_units hsc_env
+    let dflags    = hsc_dflags hsc_env
+    let logger    = hsc_logger hsc_env
+    let hooks     = hsc_hooks hsc_env
+    mb_isig_iface <- liftIO $ findAndReadIface logger nc fc hooks units home_unit dflags
+                                               (text "checkImplements 2")
+                                               isig_mod sig_mod NotBoot
     isig_iface <- case mb_isig_iface of
         Succeeded (iface, _) -> return iface
         Failed err -> failWithTc $

@@ -21,6 +21,8 @@ module GHC.Builtin.Types.Literals
   , typeCharCmpTyCon
   , typeConsSymbolTyCon
   , typeUnconsSymbolTyCon
+  , typeCharToNatTyCon
+  , typeNatToCharTyCon
   ) where
 
 import GHC.Prelude
@@ -55,10 +57,13 @@ import GHC.Builtin.Names
                   , typeCharCmpTyFamNameKey
                   , typeConsSymbolTyFamNameKey
                   , typeUnconsSymbolTyFamNameKey
+                  , typeCharToNatTyFamNameKey
+                  , typeNatToCharTyFamNameKey
                   )
 import GHC.Data.FastString
 import Control.Monad ( guard )
 import Data.List  ( isPrefixOf, isSuffixOf )
+import qualified Data.Char as Char
 
 {-
 Note [Type-level literals]
@@ -155,6 +160,8 @@ typeNatTyCons =
   , typeCharCmpTyCon
   , typeConsSymbolTyCon
   , typeUnconsSymbolTyCon
+  , typeCharToNatTyCon
+  , typeNatToCharTyCon
   ]
 
 typeNatAddTyCon :: TyCon
@@ -321,6 +328,43 @@ typeUnconsSymbolTyCon =
       , sfInteractInert = interactInertUnconsSymbol
       }
 
+typeCharToNatTyCon :: TyCon
+typeCharToNatTyCon =
+  mkFamilyTyCon name
+    (mkTemplateAnonTyConBinders [ charTy ])
+    naturalTy
+    Nothing
+    (BuiltInSynFamTyCon ops)
+    Nothing
+    (Injective [True])
+  where
+  name = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "CharToNat")
+                  typeCharToNatTyFamNameKey typeCharToNatTyCon
+  ops = BuiltInSynFamily
+      { sfMatchFam      = matchFamCharToNat
+      , sfInteractTop   = interactTopCharToNat
+      , sfInteractInert = \_ _ _ _ -> []
+      }
+
+
+typeNatToCharTyCon :: TyCon
+typeNatToCharTyCon =
+  mkFamilyTyCon name
+    (mkTemplateAnonTyConBinders [ naturalTy ])
+    charTy
+    Nothing
+    (BuiltInSynFamTyCon ops)
+    Nothing
+    (Injective [True])
+  where
+  name = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "NatToChar")
+                  typeNatToCharTyFamNameKey typeNatToCharTyCon
+  ops = BuiltInSynFamily
+      { sfMatchFam      = matchFamNatToChar
+      , sfInteractTop   = interactTopNatToChar
+      , sfInteractInert = \_ _ _ _ -> []
+      }
+
 -- Make a unary built-in constructor of kind: Nat -> Nat
 mkTypeNatFunTyCon1 :: Name -> BuiltInSynFamily -> TyCon
 mkTypeNatFunTyCon1 op tcb =
@@ -369,6 +413,8 @@ axAddDef
   , axAppendSymbolDef
   , axConsSymbolDef
   , axUnconsSymbolDef
+  , axCharToNatDef
+  , axNatToCharDef
   , axAdd0L
   , axAdd0R
   , axMul0L
@@ -435,6 +481,14 @@ axUnconsSymbolDef =
   mkUnAxiom "UnconsSymbolDef" typeUnconsSymbolTyCon isStrLitTy $
     \str -> Just $
       mkPromotedMaybeTy charSymbolPairKind (fmap reifyCharSymbolPairTy (unconsFS str))
+
+axCharToNatDef =
+  mkUnAxiom "CharToNatDef" typeCharToNatTyCon isCharLitTy $
+    \c -> Just $ num (charToInteger c)
+
+axNatToCharDef =
+  mkUnAxiom "NatToCharDef" typeNatToCharTyCon isNumLitTy $
+    \n -> fmap mkCharLitTy (integerToChar n)
 
 axSubDef = mkBinAxiom "SubDef" typeNatSubTyCon isNumLitTy isNumLitTy $
               \x y -> fmap num (minus x y)
@@ -740,6 +794,29 @@ matchFamUnconsSymbol [s]
   mbX = isStrLitTy s
 matchFamUnconsSymbol _ = Nothing
 
+matchFamCharToNat :: [Type] -> Maybe (CoAxiomRule, [Type], Type)
+matchFamCharToNat [c]
+  | Just c' <- isCharLitTy c, n <- charToInteger c'
+  = Just (axCharToNatDef, [c], mkNumLitTy n)
+  | otherwise = Nothing
+matchFamCharToNat _ = Nothing
+
+matchFamNatToChar :: [Type] -> Maybe (CoAxiomRule, [Type], Type)
+matchFamNatToChar [n]
+  | Just n' <- isNumLitTy n, Just c <- integerToChar n'
+  = Just (axNatToCharDef, [n], mkCharLitTy c)
+  | otherwise = Nothing
+matchFamNatToChar _ = Nothing
+
+charToInteger :: Char -> Integer
+charToInteger c = fromIntegral (Char.ord c)
+
+integerToChar :: Integer -> Maybe Char
+integerToChar n | inBounds = Just (Char.chr (fromInteger n))
+  where inBounds = n >= charToInteger minBound &&
+                   n <= charToInteger maxBound
+integerToChar _ = Nothing
+
 {-------------------------------------------------------------------------------
 Interact with axioms
 -------------------------------------------------------------------------------}
@@ -887,6 +964,20 @@ interactTopUnconsSymbol [s] r
 
 interactTopUnconsSymbol _ _ = []
 
+interactTopCharToNat :: [Xi] -> Xi -> [Pair Type]
+interactTopCharToNat [s] r
+  -- (CharToNat c ~ 122) => (c ~ 'z')
+  | Just n <- isNumLitTy r
+  , Just c <- integerToChar n
+  = [ s === mkCharLitTy c ]
+interactTopCharToNat _ _ = []
+
+interactTopNatToChar :: [Xi] -> Xi -> [Pair Type]
+interactTopNatToChar [s] r
+  -- (NatToChar n ~ 'z') => (n ~ 122)
+  | Just c <- isCharLitTy r
+  = [ s === mkNumLitTy (charToInteger c) ]
+interactTopNatToChar _ _ = []
 
 {-------------------------------------------------------------------------------
 Interaction with inerts

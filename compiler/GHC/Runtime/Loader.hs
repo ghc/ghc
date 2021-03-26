@@ -28,7 +28,7 @@ import GHC.Driver.Hooks
 import GHC.Driver.Plugins
 
 import GHC.Linker.Loader       ( loadModule, loadName )
-import GHC.Runtime.Interpreter ( wormhole, withInterp )
+import GHC.Runtime.Interpreter ( wormhole, hscInterp )
 import GHC.Runtime.Interpreter.Types
 
 import GHC.Tc.Utils.Monad      ( initTcInteractive, initIfaceTcRn )
@@ -113,11 +113,10 @@ loadFrontendPlugin hsc_env mod_name = do
 
 -- #14335
 checkExternalInterpreter :: HscEnv -> IO ()
-checkExternalInterpreter hsc_env
-  | Just (ExternalInterp {}) <- hsc_interp hsc_env
-  = throwIO (InstallationError "Plugins require -fno-external-interpreter")
-  | otherwise
-  = pure ()
+checkExternalInterpreter hsc_env = case interpInstance <$> hsc_interp hsc_env of
+  Just (ExternalInterp {})
+    -> throwIO (InstallationError "Plugins require -fno-external-interpreter")
+  _ -> pure ()
 
 loadPlugin' :: OccName -> Name -> HscEnv -> ModuleName -> IO (a, ModIface)
 loadPlugin' occ_name plugin_name hsc_env mod_name
@@ -189,20 +188,21 @@ forceLoadTyCon hsc_env con_name = do
 getValueSafely :: HscEnv -> Name -> Type -> IO (Maybe a)
 getValueSafely hsc_env val_name expected_type = do
   mb_hval <- case getValueSafelyHook hooks of
-    Nothing -> getHValueSafely hsc_env val_name expected_type
-    Just h  -> h               hsc_env val_name expected_type
+    Nothing -> getHValueSafely interp hsc_env val_name expected_type
+    Just h  -> h                      hsc_env val_name expected_type
   case mb_hval of
     Nothing   -> return Nothing
     Just hval -> do
       value <- lessUnsafeCoerce logger dflags "getValueSafely" hval
       return (Just value)
   where
+    interp = hscInterp hsc_env
     dflags = hsc_dflags hsc_env
     logger = hsc_logger hsc_env
     hooks  = hsc_hooks hsc_env
 
-getHValueSafely :: HscEnv -> Name -> Type -> IO (Maybe HValue)
-getHValueSafely hsc_env val_name expected_type = do
+getHValueSafely :: Interp -> HscEnv -> Name -> Type -> IO (Maybe HValue)
+getHValueSafely interp hsc_env val_name expected_type = do
     forceLoadNameModuleInterface hsc_env (text "contains a name used in an invocation of getHValueSafely") val_name
     -- Now look up the names for the value and type constructor in the type environment
     mb_val_thing <- lookupType hsc_env val_name
@@ -215,11 +215,13 @@ getHValueSafely hsc_env val_name expected_type = do
              then do
                 -- Link in the module that contains the value, if it has such a module
                 case nameModule_maybe val_name of
-                    Just mod -> do loadModule hsc_env mod
+                    Just mod -> do loadModule interp hsc_env mod
                                    return ()
                     Nothing ->  return ()
                 -- Find the value that we just linked in and cast it given that we have proved it's type
-                hval <- withInterp hsc_env $ \interp -> loadName hsc_env val_name >>= wormhole interp
+                hval <- do
+                  v <- loadName interp hsc_env val_name
+                  wormhole interp v
                 return (Just hval)
              else return Nothing
         Just val_thing -> throwCmdLineErrorS dflags $ wrongTyThingError val_name val_thing
@@ -257,8 +259,12 @@ lessUnsafeCoerce logger dflags context what = do
 lookupRdrNameInModuleForPlugins :: HscEnv -> ModuleName -> RdrName
                                 -> IO (Maybe (Name, ModIface))
 lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
+    let dflags    = hsc_dflags hsc_env
+    let fc        = hsc_FC hsc_env
+    let units     = hsc_units hsc_env
+    let home_unit = hsc_home_unit hsc_env
     -- First find the unit the module resides in by searching exposed units and home modules
-    found_module <- findPluginModule hsc_env mod_name
+    found_module <- findPluginModule fc units home_unit dflags mod_name
     case found_module of
         Found _ mod -> do
             -- Find the exports of the module
@@ -280,7 +286,6 @@ lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
                 Nothing -> throwCmdLineErrorS dflags $ hsep [text "Could not determine the exports of the module", ppr mod_name]
         err -> throwCmdLineErrorS dflags $ cannotFindModule hsc_env mod_name err
   where
-    dflags = hsc_dflags hsc_env
     doc = text "contains a name used in an invocation of lookupRdrNameInModule"
 
 wrongTyThingError :: Name -> TyThing -> SDoc

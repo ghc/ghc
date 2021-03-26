@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 -- Should be rejected by Haskell 98
 
 module Foo  where 

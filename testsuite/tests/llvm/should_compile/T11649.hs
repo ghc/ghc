@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 module Test where
 import GHC.Base

@@ -64,6 +64,7 @@ import GHC.Builtin.Names
 import GHC.Types.Basic
 import GHC.Data.Maybe
 import GHC.Types.SrcLoc
+import GHC.Types.Tickish
 import GHC.Utils.Misc
 import GHC.Data.Bag
 import GHC.Utils.Outputable as Outputable
@@ -80,11 +81,11 @@ import Data.Void( absurd )
 ************************************************************************
 -}
 
-dsLocalBinds :: LHsLocalBinds GhcTc -> CoreExpr -> DsM CoreExpr
-dsLocalBinds (L _   (EmptyLocalBinds _))  body = return body
-dsLocalBinds (L loc (HsValBinds _ binds)) body = putSrcSpanDs loc $
-                                                 dsValBinds binds body
-dsLocalBinds (L _ (HsIPBinds _ binds))    body = dsIPBinds  binds body
+dsLocalBinds :: HsLocalBinds GhcTc -> CoreExpr -> DsM CoreExpr
+dsLocalBinds (EmptyLocalBinds _)  body = return body
+dsLocalBinds b@(HsValBinds _ binds) body = putSrcSpanDs (spanHsLocaLBinds b) $
+                                           dsValBinds binds body
+dsLocalBinds (HsIPBinds _ binds)  body = dsIPBinds  binds body
 
 -------------------------
 -- caller sets location
@@ -121,7 +122,7 @@ ds_val_bind (NonRecursive, hsbinds) body
         --       could be dict binds in the 'binds'.  (See the notes
         --       below.  Then pattern-match would fail.  Urk.)
   , isUnliftedHsBind bind
-  = putSrcSpanDs loc $
+  = putSrcSpanDs (locA loc) $
      -- see Note [Strict binds checks] in GHC.HsToCore.Binds
     if is_polymorphic bind
     then errDsCoreExpr (poly_bind_err bind)
@@ -249,7 +250,7 @@ dsUnliftedBind bind body = pprPanic "dsLet: unlifted" (ppr bind $$ ppr body)
 --   ; return core_expr }
 dsLExpr :: LHsExpr GhcTc -> DsM CoreExpr
 dsLExpr (L loc e) =
-  putSrcSpanDs loc $ dsExpr e
+  putSrcSpanDsA loc $ dsExpr e
 
 -- | Variant of 'dsLExpr' that ensures that the result is not levity
 -- polymorphic. This should be used when the resulting expression will
@@ -258,7 +259,7 @@ dsLExpr (L loc e) =
 -- See Note [Levity polymorphism invariants] in "GHC.Core"
 dsLExprNoLP :: LHsExpr GhcTc -> DsM CoreExpr
 dsLExprNoLP (L loc e)
-  = putSrcSpanDs loc $
+  = putSrcSpanDsA loc $
     do { e' <- dsExpr e
        ; dsNoLevPolyExpr e' (text "In the type of expression:" <+> ppr e)
        ; return e' }
@@ -287,31 +288,15 @@ dsExpr (HsOverLit _ lit)
   = do { warnAboutOverflowedOverLit lit
        ; dsOverLit lit }
 
-dsExpr (XExpr (ExpansionExpr (HsExpanded _ b)))
-  = dsExpr b
-
-dsExpr hswrap@(XExpr (WrapExpr (HsWrap co_fn e)))
-  = do { e' <- case e of
-                 HsVar _ (L _ var) -> return $ varToCoreExpr var
-                 HsConLikeOut _ (RealDataCon dc) -> return $ varToCoreExpr (dataConWrapId dc)
-                 XExpr (WrapExpr (HsWrap _ _)) -> pprPanic "dsExpr: HsWrap inside HsWrap" (ppr hswrap)
-                 HsPar _ _ -> pprPanic "dsExpr: HsPar inside HsWrap" (ppr hswrap)
-                 _ -> addTyCs FromSource (hsWrapDictBinders co_fn) $
-                      dsExpr e
-               -- See Note [Detecting forced eta expansion]
-       ; wrap' <- dsHsWrapper co_fn
-       ; dflags <- getDynFlags
-       ; let wrapped_e = wrap' e'
-             wrapped_ty = exprType wrapped_e
-       ; checkForcedEtaExpansion e (ppr hswrap) wrapped_ty -- See Note [Detecting forced eta expansion]
-         -- Pass HsWrap, so that the user can see entire expression with -fprint-typechecker-elaboration
-       ; warnAboutIdentities dflags e' wrapped_ty
-       ; return wrapped_e }
+dsExpr e@(XExpr expansion)
+  = case expansion of
+      ExpansionExpr (HsExpanded _ b) -> dsExpr b
+      WrapExpr {}                    -> dsHsWrapped e
 
 dsExpr (NegApp _ (L loc
                     (HsOverLit _ lit@(OverLit { ol_val = HsIntegral i})))
                 neg_expr)
-  = do { expr' <- putSrcSpanDs loc $ do
+  = do { expr' <- putSrcSpanDsA loc $ do
           { warnAboutOverflowedOverLit
               (lit { ol_val = HsIntegral (negateIntegralLit i) })
           ; dsOverLit lit }
@@ -333,9 +318,7 @@ dsExpr e@(HsApp _ fun arg)
        ; dsWhenNoErrs (dsLExprNoLP arg)
                       (\arg' -> mkCoreAppDs (text "HsApp" <+> ppr e) fun' arg') }
 
-dsExpr (HsAppType ty e _)
-  = do { e' <- dsLExpr e
-       ; return (App e' (Type ty)) }
+dsExpr e@(HsAppType {}) = dsHsWrapped e
 
 {-
 Note [Desugaring vars]
@@ -356,12 +339,12 @@ converting to core it must become a CO.
 -}
 
 dsExpr (ExplicitTuple _ tup_args boxity)
-  = do { let go (lam_vars, args) (L _ (Missing (Scaled mult ty)))
+  = do { let go (lam_vars, args) (Missing (Scaled mult ty))
                     -- For every missing expression, we need
                     -- another lambda in the desugaring.
                = do { lam_var <- newSysLocalDsNoLP mult ty
                     ; return (lam_var : lam_vars, Var lam_var : args) }
-             go (lam_vars, args) (L _ (Present _ expr))
+             go (lam_vars, args) (Present _ expr)
                     -- Expressions that are present don't generate
                     -- lambdas, just arguments.
                = do { core_expr <- dsLExprNoLP expr
@@ -411,7 +394,7 @@ dsExpr (HsMultiIf res_ty alts)
   = mkErrorExpr
 
   | otherwise
-  = do { let grhss = GRHSs noExtField alts (noLoc emptyLocalBinds)
+  = do { let grhss = GRHSs noExtField alts emptyLocalBinds
        ; rhss_nablas  <- pmcGRHSs IfAlt grhss
        ; match_result <- dsGRHSs IfAlt grhss res_ty rhss_nablas
        ; error_expr   <- mkErrorExpr
@@ -452,7 +435,7 @@ dsExpr (HsStatic _ expr@(L loc _)) = do
 
     dflags <- getDynFlags
     let platform = targetPlatform dflags
-    let (line, col) = case loc of
+    let (line, col) = case locA loc of
            RealSrcSpan r _ ->
                             ( srcLocLine $ realSrcSpanStart r
                             , srcLocCol  $ realSrcSpanStart r
@@ -463,7 +446,7 @@ dsExpr (HsStatic _ expr@(L loc _)) = do
                      , mkIntExprInt platform line, mkIntExprInt platform col
                      ]
 
-    putSrcSpanDs loc $ return $
+    putSrcSpanDsA loc $ return $
       mkCoreApps (Var makeStaticId) [ Type ty, srcLoc, expr_ds ]
 
 {-
@@ -633,7 +616,7 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = Left fields
         ; alts <- mapM (mk_alt upd_fld_env) cons_to_upd
         ; ([discrim_var], matching_code)
                 <- matchWrapper RecUpd (Just record_expr) -- See Note [Scrutinee in Record updates]
-                                      (MG { mg_alts = noLoc alts
+                                      (MG { mg_alts = noLocA alts
                                           , mg_ext = MatchGroupTc [unrestricted in_ty] out_ty
                                           , mg_origin = FromSource
                                           })
@@ -687,7 +670,7 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = Left fields
                  mk_val_arg fl pat_arg_id
                      = nlHsVar (lookupNameEnv upd_fld_env (flSelector fl) `orElse` pat_arg_id)
 
-                 inst_con = noLoc $ mkHsWrap wrap (HsConLikeOut noExtField con)
+                 inst_con = noLocA $ mkHsWrap wrap (HsConLikeOut noExtField con)
                         -- Reconstruct with the WrapId so that unpacking happens
                  wrap = mkWpEvVarApps theta_vars                                <.>
                         dict_req_wrap                                           <.>
@@ -731,16 +714,16 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = Left fields
 
                  req_wrap = dict_req_wrap <.> mkWpTyApps in_inst_tys
 
-                 pat = noLoc $ ConPat { pat_con = noLoc con
-                                      , pat_args = PrefixCon [] $ map nlVarPat arg_ids
-                                      , pat_con_ext = ConPatTc
-                                        { cpt_tvs = ex_tvs
-                                        , cpt_dicts = eqs_vars ++ theta_vars
-                                        , cpt_binds = emptyTcEvBinds
-                                        , cpt_arg_tys = in_inst_tys
-                                        , cpt_wrap = req_wrap
-                                        }
-                                      }
+                 pat = noLocA $ ConPat { pat_con = noLocA con
+                                       , pat_args = PrefixCon [] $ map nlVarPat arg_ids
+                                       , pat_con_ext = ConPatTc
+                                         { cpt_tvs = ex_tvs
+                                         , cpt_dicts = eqs_vars ++ theta_vars
+                                         , cpt_binds = emptyTcEvBinds
+                                         , cpt_arg_tys = in_inst_tys
+                                         , cpt_wrap = req_wrap
+                                         }
+                                       }
            ; return (mkSimpleMatch RecUpd [pat] wrapped_rhs) }
 
 {- Note [Scrutinee in Record updates]
@@ -813,7 +796,7 @@ ds_prag_expr (HsPragSCC _ _ cc) expr = do
         count <- goptM Opt_ProfCountEntries
         let nm = sl_fs cc
         flavour <- ExprCC <$> getCCIndexDsM nm
-        Tick (ProfNote (mkUserCC nm mod_name (getLoc expr) flavour) count True)
+        Tick (ProfNote (mkUserCC nm mod_name (getLocA expr) flavour) count True)
                <$> dsLExpr expr
       else dsLExpr expr
 
@@ -951,7 +934,7 @@ dsDo ctx stmts
   = goL stmts
   where
     goL [] = panic "dsDo"
-    goL ((L loc stmt):lstmts) = putSrcSpanDs loc (go loc stmt lstmts)
+    goL ((L loc stmt):lstmts) = putSrcSpanDsA loc (go loc stmt lstmts)
 
     go _ (LastStmt _ body _ _) stmts
       = ASSERT( null stmts ) dsLExpr body
@@ -984,11 +967,11 @@ dsDo ctx stmts
                do_arg (ApplicativeArgOne fail_op pat expr _) =
                  ((pat, fail_op), dsLExpr expr)
                do_arg (ApplicativeArgMany _ stmts ret pat _) =
-                 ((pat, Nothing), dsDo ctx (stmts ++ [noLoc $ mkLastStmt (noLoc ret)]))
+                 ((pat, Nothing), dsDo ctx (stmts ++ [noLocA $ mkLastStmt (noLocA ret)]))
 
            ; rhss' <- sequence rhss
 
-           ; body' <- dsLExpr $ noLoc $ HsDo body_ty ctx (noLoc stmts)
+           ; body' <- dsLExpr $ noLocA $ HsDo body_ty ctx (noLocA stmts)
 
            ; let match_args (pat, fail_op) (vs,body)
                    = do { var   <- selectSimpleMatchVarL Many pat
@@ -1006,7 +989,7 @@ dsDo ctx stmts
                Nothing -> return expr
                Just join_op -> dsSyntaxExpr join_op [expr] }
 
-    go loc (RecStmt { recS_stmts = rec_stmts, recS_later_ids = later_ids
+    go loc (RecStmt { recS_stmts = L _ rec_stmts, recS_later_ids = later_ids
                     , recS_rec_ids = rec_ids, recS_ret_fn = return_op
                     , recS_mfix_fn = mfix_op, recS_bind_fn = bind_op
                     , recS_ext = RecStmtTc
@@ -1029,19 +1012,19 @@ dsDo ctx stmts
         tup_ty       = mkBigCoreTupTy (map idType tup_ids) -- Deals with singleton case
         rec_tup_pats = map nlVarPat tup_ids
         later_pats   = rec_tup_pats
-        rets         = map noLoc rec_rets
+        rets         = map noLocA rec_rets
         mfix_app     = nlHsSyntaxApps mfix_op [mfix_arg]
-        mfix_arg     = noLoc $ HsLam noExtField
-                           (MG { mg_alts = noLoc [mkSimpleMatch
+        mfix_arg     = noLocA $ HsLam noExtField
+                           (MG { mg_alts = noLocA [mkSimpleMatch
                                                     LambdaExpr
                                                     [mfix_pat] body]
                                , mg_ext = MatchGroupTc [unrestricted tup_ty] body_ty
                                , mg_origin = Generated })
-        mfix_pat     = noLoc $ LazyPat noExtField $ mkBigLHsPatTupId rec_tup_pats
-        body         = noLoc $ HsDo body_ty
-                                ctx (noLoc (rec_stmts ++ [ret_stmt]))
+        mfix_pat     = noLocA $ LazyPat noExtField $ mkBigLHsPatTupId rec_tup_pats
+        body         = noLocA $ HsDo body_ty
+                                ctx (noLocA (rec_stmts ++ [ret_stmt]))
         ret_app      = nlHsSyntaxApps return_op [mkBigLHsTupId rets]
-        ret_stmt     = noLoc $ mkLastStmt ret_app
+        ret_stmt     = noLocA $ mkLastStmt ret_app
                      -- This LastStmt will be desugared with dsDo,
                      -- which ignores the return_op in the LastStmt,
                      -- so we must apply the return_op explicitly
@@ -1059,15 +1042,8 @@ dsDo ctx stmts
 
 dsHsVar :: Id -> DsM CoreExpr
 dsHsVar var
-  | let bad_tys = badUseOfLevPolyPrimop var ty
-  , not (null bad_tys)
-  = do { levPolyPrimopErr (ppr var) ty bad_tys
-       ; return unitExpr }  -- return something eminently safe
-
-  | otherwise
-  = return (varToCoreExpr var)   -- See Note [Desugaring vars]
-  where
-    ty = idType var
+  = do { checkLevPolyFunction (ppr var) var (idType var)
+       ; return (varToCoreExpr var) }   -- See Note [Desugaring vars]
 
 dsConLike :: ConLike -> DsM CoreExpr
 dsConLike (RealDataCon dc) = dsHsVar (dataConWrapId dc)
@@ -1129,35 +1105,36 @@ badMonadBind rhs elt_ty
 {-
 ************************************************************************
 *                                                                      *
-   Forced eta expansion and levity polymorphism
+            Levity polymorphism checks
 *                                                                      *
 ************************************************************************
 
-Note [Detecting forced eta expansion]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Checking for levity-polymorphic functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We cannot have levity polymorphic function arguments. See
-Note [Levity polymorphism invariants] in GHC.Core. But we *can* have
-functions that take levity polymorphic arguments, as long as these
-functions are eta-reduced. (See #12708 for an example.)
+Note [Levity polymorphism invariants] in GHC.Core. That is
+checked by dsLExprNoLP.
 
-However, we absolutely cannot do this for functions that have no
-binding (i.e., say True to Id.hasNoBinding), like primops and unboxed
-tuple constructors. These get eta-expanded in CorePrep.maybeSaturate.
+But what about
+  const True (unsafeCoerce# :: forall r1 r2 (a :: TYPE r1) (b :: TYPE r2). a -> b)
 
-Detecting when this is about to happen is a bit tricky, though. When
-the desugarer is looking at the Id itself (let's be concrete and
-suppose we have (#,#)), we don't know whether it will be levity
-polymorphic. So the right spot seems to be to look after the Id has
-been applied to its type arguments. To make the algorithm efficient,
-it's important to be able to spot ((#,#) @a @b @c @d) without looking
-past all the type arguments. We thus require that
-  * The body of an HsWrap is not an HsWrap, nor an HsPar.
-This invariant is checked in dsExpr.
-With that representation invariant, we simply look inside every HsWrap
-to see if its body is an HsVar whose Id hasNoBinding. Then, we look
-at the wrapped type. If it has any levity polymorphic arguments, reject.
-Because we might have an HsVar without a wrapper, we check in dsHsVar
-as well. typecheck/should_fail/T17021 triggers this case.
+Since `unsafeCoerce#` has no binding, it has a compulsory unfolding.
+But that compulsory unfolding is a levity-polymorphic lambda, which
+is no good.  So we want to reject this.  On the other hand
+  const True (unsafeCoerce# @LiftedRep @UnliftedRep)
+is absolutely fine.
+
+We have to collect all the type-instantiation and *then* check.  That
+is what dsHsWrapped does.  Because we might have an HsVar without a
+wrapper, we check in dsHsVar as well. typecheck/should_fail/T17021
+triggers this case.
+
+Note that if `f :: forall r (a :: Type r). blah`, then
+   const True f
+is absolutely fine.  Here `f` is a function, represented by a
+pointer, and we can pass it to `const` (or anything else).  (See
+#12708 for an example.)  It's only the Id.hasNoBinding functions
+that are a problem.
 
 Interestingly, this approach does not look to see whether the Id in
 question will be eta expanded. The logic is this:
@@ -1170,39 +1147,53 @@ So, either way, we're good to reject.
 
 -}
 
--- | Takes an expression and its instantiated type. If the expression is an
--- HsVar with a hasNoBinding primop and the type has levity-polymorphic arguments,
--- issue an error. See Note [Detecting forced eta expansion]
-checkForcedEtaExpansion :: HsExpr GhcTc -> SDoc -> Type -> DsM ()
-checkForcedEtaExpansion expr expr_doc ty
-  | Just var <- case expr of
-                  HsVar _ (L _ var)               -> Just var
-                  HsConLikeOut _ (RealDataCon dc) -> Just (dataConWrapId dc)
-                  _                               -> Nothing
-  , let bad_tys = badUseOfLevPolyPrimop var ty
-  , not (null bad_tys)
-  = levPolyPrimopErr expr_doc ty bad_tys
-checkForcedEtaExpansion _ _ _ = return ()
-
--- | Is this a hasNoBinding Id with a levity-polymorphic type?
--- Returns the arguments that are levity polymorphic if they are bad;
--- or an empty list otherwise
--- See Note [Detecting forced eta expansion]
-badUseOfLevPolyPrimop :: Id -> Type -> [Type]
-badUseOfLevPolyPrimop id ty
-  | hasNoBinding id
-  = filter isTypeLevPoly arg_tys
-  | otherwise
-  = []
+------------------------------
+dsHsWrapped :: HsExpr GhcTc -> DsM CoreExpr
+-- Looks for a function 'f' wrapped in type applications (HsAppType)
+-- or wrappers (HsWrap), and checks that any hasNoBinding function
+-- is not levity polymorphic, *after* instantiation with those wrappers
+dsHsWrapped orig_hs_expr
+  = go id orig_hs_expr
   where
-    (binders, _) = splitPiTys ty
-    arg_tys      = mapMaybe binderRelevantType_maybe binders
+    go wrap (XExpr (WrapExpr (HsWrap co_fn hs_e)))
+       = do { wrap' <- dsHsWrapper co_fn
+            ; addTyCs FromSource (hsWrapDictBinders co_fn) $
+              go (wrap . wrap') hs_e }
+    go wrap (HsConLikeOut _ (RealDataCon dc))
+      = go_head wrap (dataConWrapId dc)
+    go wrap (HsAppType ty hs_e _) = go_l (wrap . (\e -> App e (Type ty))) hs_e
+    go wrap (HsPar _ hs_e)        = go_l wrap hs_e
+    go wrap (HsVar _ (L _ var))   = go_head wrap var
+    go wrap hs_e                  = do { e <- dsExpr hs_e; return (wrap e) }
 
-levPolyPrimopErr :: SDoc -> Type -> [Type] -> DsM ()
-levPolyPrimopErr expr_doc ty bad_tys
+    go_l wrap (L _ hs_e) = go wrap hs_e
+
+    go_head wrap var
+      = do { let wrapped_e  = wrap (Var var)
+                 wrapped_ty = exprType wrapped_e
+
+           ; checkLevPolyFunction (ppr orig_hs_expr) var wrapped_ty
+             -- See Note [Checking for levity-polymorphic functions]
+             -- Pass orig_hs_expr, so that the user can see entire
+             -- expression with -fprint-typechecker-elaboration
+
+           ; dflags <- getDynFlags
+           ; warnAboutIdentities dflags var wrapped_ty
+
+           ; return wrapped_e }
+
+
+-- | Takes a (pretty-printed) expression, a function, and its
+-- instantiated type.  If the function is a hasNoBinding op, and the
+-- type has levity-polymorphic arguments, issue an error.
+-- Note [Checking for levity-polymorphic functions]
+checkLevPolyFunction :: SDoc -> Id -> Type -> DsM ()
+checkLevPolyFunction pp_hs_expr var ty
+  | let bad_tys = isBadLevPolyFunction var ty
+  , not (null bad_tys)
   = errDs $ vcat
     [ hang (text "Cannot use function with levity-polymorphic arguments:")
-         2 (expr_doc <+> dcolon <+> pprWithTYPE ty)
+         2 (pp_hs_expr <+> dcolon <+> pprWithTYPE ty)
     , ppUnlessOption sdocPrintTypecheckerElaboration $ vcat
         [ text "(Note that levity-polymorphic primops such as 'coerce' and unboxed tuples"
         , text "are eta-expanded internally because they must occur fully saturated."
@@ -1213,3 +1204,19 @@ levPolyPrimopErr expr_doc ty bad_tys
            (\t -> pprWithTYPE t <+> dcolon <+> pprWithTYPE (typeKind t))
            bad_tys
     ]
+
+checkLevPolyFunction _ _ _ = return ()
+
+-- | Is this a hasNoBinding Id with a levity-polymorphic type?
+-- Returns the arguments that are levity polymorphic if they are bad;
+-- or an empty list otherwise
+-- Note [Checking for levity-polymorphic functions]
+isBadLevPolyFunction :: Id -> Type -> [Type]
+isBadLevPolyFunction id ty
+  | hasNoBinding id
+  = filter isTypeLevPoly arg_tys
+  | otherwise
+  = []
+  where
+    (binders, _) = splitPiTys ty
+    arg_tys      = mapMaybe binderRelevantType_maybe binders

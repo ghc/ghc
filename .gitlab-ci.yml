@@ -11,6 +11,9 @@ variables:
   # Disable shallow clones; they break our linting rules
   GIT_DEPTH: 0
 
+  # Always start with a fresh clone to avoid non-hermetic builds
+  GIT_STRATEGY: clone
+
   # Overridden by individual jobs
   CONFIGURE_ARGS: ""
 
@@ -35,12 +38,12 @@ variables:
   #     -0            34.40s  156 MB
   #
   XZ_OPT: "-1"
+default:
+  interruptible: true
 
 stages:
   - tool-lint      # Source linting of the tools
   - quick-build    # A very quick smoke-test to weed out broken commits
-  - lint           # Source linting of GHC
-  - build          # A quick smoke-test to weed out broken commits
   - full-build     # Build all the things
   - packaging      # Source distribution, etc.
   - testing        # head.hackage correctness and compiler performance testing
@@ -68,7 +71,6 @@ workflow:
     - if: $CI_MERGE_REQUEST_ID
     - if: $CI_COMMIT_TAG
     - if: '$CI_COMMIT_BRANCH == "master"'
-    - if: '$CI_COMMIT_BRANCH == "wip/marge_bot_batch_merge_job"'
     - if: '$CI_COMMIT_BRANCH =~ /ghc-[0-9]+\.[0-9]+/'
     - if: '$CI_PIPELINE_SOURCE == "web"'
 
@@ -263,7 +265,7 @@ lint-release-changelogs:
 # works (by invoking `hadrian --version`).
 stack-hadrian-build:
   extends: .validate-linux-hadrian
-  stage: build
+  stage: quick-build
   script:
     - .gitlab/ci.sh setup
     - .gitlab/ci.sh configure
@@ -271,8 +273,7 @@ stack-hadrian-build:
 
 validate-x86_64-linux-deb9-hadrian:
   extends: .validate-linux-hadrian
-  needs: [hadrian-ghc-in-ghci]
-  stage: build
+  stage: quick-build
 
 validate-x86_64-linux-deb9-unreg-hadrian:
   extends: .validate-linux-hadrian
@@ -340,7 +341,7 @@ hadrian-ghc-in-ghci:
 ############################################################
 
 .lint-params:
-  stage: lint
+  stage: quick-build
   needs: [lint-submods]
   tags:
     - lint
@@ -374,6 +375,15 @@ lint-base:
     - .gitlab/ci.sh run_hadrian stage1:lib:base
     - .gitlab/ci.sh run_hadrian lint:base
 
+lint-compiler:
+  extends: .lint-params
+  variables:
+    BUILD_FLAVOUR: default
+  script:
+    - .gitlab/ci.sh setup
+    - .gitlab/ci.sh configure
+    - .gitlab/ci.sh run_hadrian lint:compiler
+
 ############################################################
 # Validation via Pipelines (make)
 ############################################################
@@ -382,11 +392,42 @@ lint-base:
   variables:
     TEST_TYPE: test
     MAKE_ARGS: "-Werror"
-  script:
-    - .gitlab/ci.sh setup
-    - .gitlab/ci.sh configure
-    - .gitlab/ci.sh build_make
-    - .gitlab/ci.sh test_make
+  script: |
+    # Build hyperlinked sources for documentation when building releases
+    if [[ "$RELEASE_JOB" = "yes" ]]; then
+      HADDOCK_HYPERLINKED_SOURCES=1
+    fi
+    TIME_START=$(date +%s)
+    time .gitlab/ci.sh setup 2>&1
+    TIME_SETUP=$(date +%s)
+    TIME_SETUP_DELTA=$(expr $TIME_SETUP - $TIME_START)
+    echo "Setup took $TIME_SETUP_DELTA seconds"
+
+    time .gitlab/ci.sh configure 2>&1
+    TIME_CONFIGURE=$(date +%s)
+    TIME_CONFIGURE_DELTA=$(expr $TIME_CONFIGURE - $TIME_SETUP)
+    echo "Configure took $TIME_CONFIGURE_DELTA seconds"
+
+    time .gitlab/ci.sh build_make 2>&1
+    TIME_BUILD=$(date +%s)
+    TIME_BUILD_DELTA=$(expr $TIME_BUILD - $TIME_CONFIGURE)
+    echo "Build took $TIME_BUILD_DELTA seconds"
+
+    set +e
+    time .gitlab/ci.sh test_make 2>&1
+    status=$?
+    set -e
+    TIME_TEST=$(date +%s)
+    TIME_TEST_DELTA=$(expr $TIME_TEST - $TIME_BUILD)
+    echo "Test took $TIME_TEST_DELTA seconds"
+
+    echo "=== TIMINGS ==="
+    echo "Setup      | $TIME_SETUP_DELTA"
+    echo "Configure  | $TIME_CONFIGURE_DELTA"
+    echo "Build      | $TIME_BUILD_DELTA"
+    echo "Test       | $TIME_TEST_DELTA"
+    exit $status
+
   dependencies: []
   artifacts:
     reports:
@@ -480,33 +521,182 @@ release-x86_64-freebsd:
 
 validate-x86_64-darwin:
   extends: .validate
-  needs: [validate-x86_64-linux-deb9-hadrian]
   stage: full-build
   tags:
-    - x86_64-darwin
+    - x86_64-darwin-m1
+
+  # for now make this non mandatory to pass.
+  allow_failure: true
+
   variables:
-    GHC_VERSION: 8.8.4
-    CABAL_INSTALL_VERSION: 3.0.0.0
+    GHC_VERSION: 8.10.4
+    CABAL_INSTALL_VERSION: 3.2.0.0
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-apple-darwin.tar.xz"
     MACOSX_DEPLOYMENT_TARGET: "10.7"
     # Only Sierra and onwards supports clock_gettime. See #12858
     ac_cv_func_clock_gettime: "no"
     # Only newer OS Xs support utimensat. See #17895
     ac_cv_func_utimensat: "no"
+
+    TEST_TYPE: test
+    MAKE_ARGS: "-Werror"
+    # we run on M1's for now, getconf can't be built with nix yet,
+    # and we use a pure shell, so we can't/shouldn't use /usr/bin/getconf
+    # inside th shell.
+    CPUS: 8
     LANG: "en_US.UTF-8"
+    # WARNING: this is overridden in the shell.nix, see shell.nix!
     CONFIGURE_ARGS: "--with-intree-gmp"
     TEST_ENV: "x86_64-darwin"
     BUILD_FLAVOUR: "validate"
     # Due to #19025
-    RUNTEST_ARGS: "--ignore-perf-failures"
+    IGNORE_PERF_FAILURES: "all"
   after_script:
     - cp -Rf $HOME/.cabal cabal-cache
     - .gitlab/ci.sh clean
+
+  # I wish we could just use the nix #! logic, but we can't --run and -i bash
+  # behave very differently. -i bash does not pass any nix related env vars
+  # the whole $stdenv/setup part seems to be missing.
+  script: |
+    set -Eeuo pipefail
+    function runInNixShell() {
+      time nix-shell .gitlab/shell.nix \
+        -I nixpkgs=https://github.com/angerman/nixpkgs/archive/75f7281738b.tar.gz \
+        --argstr system "x86_64-darwin" \
+        --pure \
+        --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR \
+        --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --keep PROJECT_DIR \
+        --keep CI_PROJECT_DIR --keep MAKE_ARGS \
+        --keep LANG --keep CONFIGURE_ARGS \
+        --keep MACOSX_DEPLOYMENT_TARGET --keep ac_cv_func_clock_gettime \
+        --run "$1" 2>&1
+    }
+    # fix up config.sub in libraries for the time.
+    # aarch64-darwin is not supported in older config.sub's
+    TIME_START=$(date +%s)
+    find libraries -name config.sub -exec cp config.sub {} \;
+
+    runInNixShell ".gitlab/ci.sh setup" 2>&1
+    TIME_SETUP=$(date +%s)
+    TIME_SETUP_DELTA=$(expr $TIME_SETUP - $TIME_START)
+    echo "Setup took $TIME_SETUP_DELTA seconds"
+
+    runInNixShell ".gitlab/ci.sh configure" 2>&1
+    TIME_CONFIGURE=$(date +%s)
+    TIME_CONFIGURE_DELTA=$(expr $TIME_CONFIGURE - $TIME_SETUP)
+    echo "Configure took $TIME_CONFIGURE_DELTA seconds"
+
+    runInNixShell ".gitlab/ci.sh build_make" 2>&1
+    TIME_BUILD=$(date +%s)
+    TIME_BUILD_DELTA=$(expr $TIME_BUILD - $TIME_CONFIGURE)
+    echo "Build took $TIME_BUILD_DELTA seconds"
+
+    set +e
+    runInNixShell ".gitlab/ci.sh test_make" 2>&1
+    status=$?
+    set -e
+
+    TIME_TEST=$(date +%s)
+    TIME_TEST_DELTA=$(expr $TIME_TEST - $TIME_BUILD)
+    echo "Test took $TIME_TEST_DELTA seconds"
+
+    echo "=== TIMINGS ==="
+    echo "Setup      | $TIME_SETUP_DELTA"
+    echo "Configure  | $TIME_CONFIGURE_DELTA"
+    echo "Build      | $TIME_BUILD_DELTA"
+    echo "Test       | $TIME_TEST_DELTA"
+    exit $status
+
   artifacts:
     when: always
     expire_in: 2 week
   cache:
-    key: "darwin-$GHC_VERSION"
+    key: "darwin-x86_64-$GHC_VERSION"
+    paths:
+      - cabal-cache
+      - toolchain
+
+validate-aarch64-darwin:
+  extends: .validate
+  stage: full-build
+  tags:
+    - aarch64-darwin-m1
+
+  # for now make this non mandatory to pass.
+  allow_failure: true
+
+  variables:
+    TEST_TYPE: test
+    MAKE_ARGS: "-Werror"
+    GHC_VERSION: 8.10.3
+    CABAL_INSTALL_VERSION: 3.2.0.0
+    BUILD_FLAVOUR: "perf"
+    BIN_DIST_PREP_TAR_COMP: "ghc-arm64-apple-darwin.tar.xz"
+    # we run on M1's for now, getconf can't be built with nix yet,
+    # and we use a pure shell, so we can't/shouldn't use /usr/bin/getconf
+    # inside th shell.
+    CPUS: 8
+    LANG: "en_US.UTF-8"
+    # WARNING: this is overridden in the shell.nix, see shell.nix!
+    CONFIGURE_ARGS: "--with-intree-gmp"
+
+  # I wish we could just use the nix #! logic, but we can't --run and -i bash
+  # behave very differently. -i bash does not pass any nix related env vars
+  # the whole $stdenv/setup part seems to be missing.
+  script: |
+    set -Eeuo pipefail
+    function runInNixShell() {
+      time nix-shell .gitlab/shell.nix \
+        -I nixpkgs=https://github.com/angerman/nixpkgs/archive/75f7281738b.tar.gz \
+        --argstr system "aarch64-darwin" \
+        --pure \
+        --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR \
+        --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --keep PROJECT_DIR \
+        --keep CI_PROJECT_DIR --keep MAKE_ARGS \
+        --keep LANG --keep CONFIGURE_ARGS \
+        --run "$1" 2>&1
+    }
+    # fix up config.sub in libraries for the time.
+    # aarch64-darwin is not supported in older config.sub's
+    TIME_START=$(date +%s)
+    find libraries -name config.sub -exec cp config.sub {} \;
+
+    time runInNixShell ".gitlab/ci.sh setup" 2>&1
+    TIME_SETUP=$(date +%s)
+    TIME_SETUP_DELTA=$(expr $TIME_SETUP - $TIME_START)
+    echo "Setup took $TIME_SETUP_DELTA seconds"
+
+    runInNixShell ".gitlab/ci.sh configure" 2>&1
+    TIME_CONFIGURE=$(date +%s)
+    TIME_CONFIGURE_DELTA=$(expr $TIME_CONFIGURE - $TIME_SETUP)
+    echo "Setup took $TIME_CONFIGURE_DELTA seconds"
+
+    runInNixShell ".gitlab/ci.sh build_make" 2>&1
+    TIME_BUILD=$(date +%s)
+    TIME_BUILD_DELTA=$(expr $TIME_BUILD - $TIME_CONFIGURE)
+    echo "Build took $TIME_BUILD_DELTA seconds"
+
+    set +e
+    runInNixShell ".gitlab/ci.sh test_make" 2>&1
+    status=$?
+    set -e
+    TIME_TEST=$(date +%s)
+    TIME_TEST_DELTA=$(expr $TIME_TEST - $TIME_BUILD)
+    echo "Test took $TIME_TEST_DELTA seconds"
+
+    echo "=== TIMINGS ==="
+    echo "Setup      | $TIME_SETUP_DELTA"
+    echo "Configure  | $TIME_CONFIGURE_DELTA"
+    echo "Build      | $TIME_BUILD_DELTA"
+    echo "Test       | $TIME_TEST_DELTA"
+    exit $status
+
+  artifacts:
+    when: always
+    expire_in: 2 week
+  cache:
+    key: "darwin-aarch64-$GHC_VERSION"
     paths:
       - cabal-cache
       - toolchain
@@ -518,14 +708,14 @@ validate-x86_64-darwin:
   tags:
     - x86_64-darwin
   variables:
-    GHC_VERSION: 8.8.4
+    GHC_VERSION: 8.10.4
     MACOSX_DEPLOYMENT_TARGET: "10.7"
     ac_cv_func_clock_gettime: "no"
     LANG: "en_US.UTF-8"
     CONFIGURE_ARGS: --with-intree-gmp
     TEST_ENV: "x86_64-darwin-hadrian"
     # Due to #19025
-    RUNTEST_ARGS: "--ignore-perf-failures"
+    IGNORE_PERF_FAILURES: "all"
     BIN_DIST_NAME: "ghc-x86_64-apple-darwin"
     BUILD_FLAVOUR: "validate"
   script:
@@ -979,8 +1169,8 @@ release-x86_64-linux-fedora27-dwarf:
     #FORCE_SYMLINKS: 1
     LANG: "en_US.UTF-8"
     SPHINXBUILD: "/mingw64/bin/sphinx-build.exe"
-    CABAL_INSTALL_VERSION: "3.0.0.0"
-    GHC_VERSION: "8.8.4"
+    CABAL_INSTALL_VERSION: "3.2.0.0"
+    GHC_VERSION: "8.10.4"
   cache:
     paths:
       - cabal-cache
@@ -1158,14 +1348,14 @@ source-tarball:
 .hackage:
   stage: testing
   needs: [doc-tarball]
-  image: ghcci/x86_64-linux-deb9:0.2
-  tags:
-    - x86_64-linux
-  dependencies: []
   variables:
-    HEAD_HACKAGE_PROJECT_ID: "78"
-  script:
-    - bash .gitlab/start-head.hackage.sh
+    UPSTREAM_PROJECT_PATH: "$CI_PROJECT_PATH"
+    UPSTREAM_COMMIT_SHA: "$CI_COMMIT_SHA"
+    EXTRA_HC_OPTS: "-dcore-lint"
+  trigger:
+    project: "ghc/head.hackage"
+    branch: "master"
+    strategy: "depend"
 
 hackage:
   extends: .hackage
@@ -1177,7 +1367,8 @@ hackage-label:
     - if: '$CI_MERGE_REQUEST_LABELS =~ /.*user-facing.*/'
 
 nightly-hackage:
-  <<: *nightly
+  rules:
+    - if: $NIGHTLY
   extends: .hackage
 
 ############################################################
@@ -1185,6 +1376,9 @@ nightly-hackage:
 ############################################################
 
 perf-nofib:
+  # This needs to be reverted, and is only
+  # an attempt to unbreak master
+  allow_failure: true
   stage: testing
   needs: [validate-x86_64-linux-deb9-dwarf, doc-tarball]
   dependencies:

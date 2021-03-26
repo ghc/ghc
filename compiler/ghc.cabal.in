@@ -61,13 +61,13 @@ Library
                    deepseq    >= 1.4 && < 1.5,
                    directory  >= 1   && < 1.4,
                    process    >= 1   && < 1.7,
-                   bytestring >= 0.9 && < 0.11,
+                   bytestring >= 0.9 && < 0.12,
                    binary     == 0.8.*,
                    time       >= 1.4 && < 1.12,
                    containers >= 0.6.2.1 && < 0.7,
                    array      >= 0.1 && < 0.6,
                    filepath   >= 1   && < 1.5,
-                   template-haskell == 2.17.*,
+                   template-haskell == 2.18.*,
                    hpc        == 0.6.*,
                    transformers == 0.5.*,
                    exceptions == 0.10.*,
@@ -77,7 +77,7 @@ Library
                    ghci == @ProjectVersionMunged@
 
     if os(windows)
-        Build-Depends: Win32  >= 2.3 && < 2.11
+        Build-Depends: Win32  >= 2.3 && < 2.13
     else
         if flag(terminfo)
             Build-Depends: terminfo == 0.4.*
@@ -335,7 +335,6 @@ Library
         GHC.Core.Stats
         GHC.Core.Subst
         GHC.Core.Tidy
-        GHC.CoreToByteCode
         GHC.CoreToIface
         GHC.CoreToStg
         GHC.CoreToStg.Prep
@@ -536,6 +535,7 @@ Library
         GHC.Stg.Stats
         GHC.Stg.Subst
         GHC.Stg.Syntax
+        GHC.StgToByteCode
         GHC.StgToCmm
         GHC.StgToCmm.ArgRep
         GHC.StgToCmm.Bind
@@ -656,6 +656,7 @@ Library
         GHC.Types.SourceText
         GHC.Types.SrcLoc
         GHC.Types.Target
+        GHC.Types.Tickish
         GHC.Types.TypeEnv
         GHC.Types.TyThing
         GHC.Types.Unique

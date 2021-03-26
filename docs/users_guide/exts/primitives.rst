@@ -70,16 +70,16 @@ Unboxed type kinds
 ------------------
 
 Because unboxed types are represented without the use of pointers, we
-cannot store them in a polymorphic datatype.
+cannot store them in a polymorphic data type.
 For example, the ``Just`` node
 of ``Just 42#`` would have to be different from the ``Just`` node of
 ``Just 42``; the former stores an integer directly, while the latter
 stores a pointer. GHC currently does not support this variety of ``Just``
-nodes (nor for any other datatype). Accordingly, the *kind* of an unboxed
+nodes (nor for any other data type). Accordingly, the *kind* of an unboxed
 type is different from the kind of a boxed type.
 
 The Haskell Report describes that ``*`` (spelled ``Type`` and imported from
-``Data.Kind`` in the GHC dialect of Haskell) is the kind of ordinary datatypes,
+``Data.Kind`` in the GHC dialect of Haskell) is the kind of ordinary data types,
 such as ``Int``. Furthermore, type constructors can have kinds with arrows; for
 example, ``Maybe`` has kind ``Type -> Type``. Unboxed types have a kind that
 specifies their runtime representation. For example, the type ``Int#`` has kind
@@ -308,7 +308,7 @@ Unlifted Newtypes
 GHC implements an :extension:`UnliftedNewtypes` extension as specified in
 `this GHC proposal <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0013-unlifted-newtypes.rst>`_.
 :extension:`UnliftedNewtypes` relaxes the restrictions around what types can appear inside
-of a `newtype`. For example, the type ::
+of a ``newtype``. For example, the type ::
 
     newtype A = MkA Int#
 
@@ -368,3 +368,93 @@ This extension impacts the determination of whether or not a newtype has
 a Complete User-Specified Kind Signature (CUSK). The exact impact is specified
 `the section on CUSKs <#complete-kind-signatures>`__.
 
+Unlifted Datatypes
+------------------
+
+.. extension:: UnliftedDatatypes
+    :shortdesc: Enable unlifted data types.
+
+    :implies: :extension:`DataKinds`, :extension:`StandaloneKindSignatures`
+    :since: 9.2.1
+
+    Enable the declaration of data types with unlifted or levity-polymorphic
+    result kind.
+
+GHC implements the :extension:`UnliftedDatatypes` extension as specified in
+`this GHC proposal <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0265-unlifted-data types.rst>`_.
+:extension:`UnliftedDatatypes` relaxes the restrictions around what result kinds
+are allowed in data declarations. For example, the type ::
+
+  data UList a :: UnliftedType where
+    UCons :: a -> UList a -> UList a
+    UNil :: UList a
+
+defines a list type that lives in kind ``UnliftedType``
+(e.g., ``TYPE (BoxedRep Unlifted)``). As such, each occurrence of a term of that
+type is assumed to be evaluated (and the compiler makes sure that is indeed the
+case). In other words: Unlifted data types behave like data types in strict
+languages such as OCaml or Idris. However unlike :extension:`StrictData`,
+this extension will not change whether the fields of a (perhaps unlifted)
+data type are strict or lazy. For example, ``UCons`` is lazy in its first
+argument as its field has kind ``Type``.
+
+The fact that unlifted types are always evaluated allows GHC to elide
+evaluatedness checks at runtime. See the Motivation section of the proposal
+for how this can improve performance for some programs.
+
+The above data declaration in GADT syntax correctly suggests that unlifted
+data types are compatible with the full GADT feature set. Somewhat conversely,
+you can also declare unlifted data types in Haskell98 syntax, which requires you
+to specify the result kind via :extension:`StandaloneKindSignatures`: ::
+
+  type UList :: Type -> UnliftedType
+  data UList a = UCons a (UList a) | UNil
+
+You may even declare levity-polymorphic data types: ::
+
+  type PEither :: Type -> Type -> TYPE (BoxedRep l)
+  data PEither l r = PLeft l | PRight r
+
+  f :: PEither @Unlifted Int Bool -> Bool
+  f (PRight b) = b
+  f _          = False
+
+While ``f`` above could reasonably be levity-polymorphic (as it evaluates its
+argument either way), GHC currently disallows the more general type
+``PEither @l Int Bool -> Bool``. This is a consequence of the
+`levity-polymorphic binder restriction <#levity-polymorphic-restrictions>`__,
+
+Due to `ticket 19487 <https://gitlab.haskell.org/ghc/ghc/-/issues/19487>`, it's
+currently not possible to declare levity-polymorphic data types with nullary
+data constructors. There's a workaround, though: ::
+
+  type T :: TYPE (BoxedRep l)
+  data T where
+    MkT :: forall l. (() :: Constraint) => T @l
+
+The use of ``=>`` makes the type of ``MkT`` lifted.
+If you want a zero-runtime-cost alternative, use ``MkT :: Proxy# () -> T @l``
+instead and bear with the additional ``proxy#`` argument at construction sites.
+
+This extension also relaxes some of the restrictions around data family
+instances. In particular, :extension:`UnliftedDatatypes` permits a
+``data instance`` to be given a return kind that unifies with
+``TYPE (BoxedRep l)``, not just ``Type``. For example, the following ``data
+instance`` declarations would be permitted: ::
+
+  data family F a :: UnliftedType
+  data instance F Int = FInt
+
+  data family G a :: TYPE (BoxedRep l)
+  data instance G Int = GInt Int -- defaults to Type
+  data instance G Bool :: UnliftedType where
+    GBool :: Bool -> G Bool
+  data instance G Char :: Type where
+    GChar :: Char -> G Char
+  data instance G Double :: forall l. TYPE (BoxedRep l) where
+    GDouble :: Int -> G @l Double
+
+It is worth noting that :extension:`UnliftedDatatypes` is *not* required to give
+the data families themselves return kinds involving ``TYPE``, such as the
+``G`` example above. The extension is only required for ``data instance``
+declarations, such as ``FInt`` and ``GBool`` above.

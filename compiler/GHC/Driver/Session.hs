@@ -267,7 +267,7 @@ import Control.Monad.Trans.Except
 
 import Data.Ord
 import Data.Char
-import Data.List (intercalate, delete, sortBy)
+import Data.List (intercalate, sortBy)
 import qualified Data.Set as Set
 import System.FilePath
 import System.Directory
@@ -1309,14 +1309,8 @@ flattenExtensionFlags ml = foldr f defaultExtensionFlags
 -- @docs/users_guide/exts@.
 languageExtensions :: Maybe Language -> [LangExt.Extension]
 
-languageExtensions Nothing
-    -- Nothing => the default case
-    = LangExt.NondecreasingIndentation -- This has been on by default for some time
-    : delete LangExt.DatatypeContexts  -- The Haskell' committee decided to
-                                       -- remove datatype contexts from the
-                                       -- language:
-   -- http://www.haskell.org/pipermail/haskell-prime/2011-January/003335.html
-      (languageExtensions (Just Haskell2010))
+-- Nothing: the default case
+languageExtensions Nothing = languageExtensions (Just GHC2021)
 
 languageExtensions (Just Haskell98)
     = [LangExt.ImplicitPrelude,
@@ -1350,6 +1344,56 @@ languageExtensions (Just Haskell2010)
        LangExt.DoAndIfThenElse,
        LangExt.FieldSelectors,
        LangExt.RelaxedPolyRec]
+
+languageExtensions (Just GHC2021)
+    = [LangExt.ImplicitPrelude,
+       -- See Note [When is StarIsType enabled]
+       LangExt.StarIsType,
+       LangExt.MonomorphismRestriction,
+       LangExt.TraditionalRecordSyntax,
+       LangExt.EmptyDataDecls,
+       LangExt.ForeignFunctionInterface,
+       LangExt.PatternGuards,
+       LangExt.DoAndIfThenElse,
+       LangExt.FieldSelectors,
+       LangExt.RelaxedPolyRec,
+       -- Now the new extensions (not in Haskell2010)
+       LangExt.BangPatterns,
+       LangExt.BinaryLiterals,
+       LangExt.ConstrainedClassMethods,
+       LangExt.ConstraintKinds,
+       LangExt.DeriveDataTypeable,
+       LangExt.DeriveFoldable,
+       LangExt.DeriveFunctor,
+       LangExt.DeriveGeneric,
+       LangExt.DeriveLift,
+       LangExt.DeriveTraversable,
+       LangExt.EmptyCase,
+       LangExt.EmptyDataDeriving,
+       LangExt.ExistentialQuantification,
+       LangExt.ExplicitForAll,
+       LangExt.FlexibleContexts,
+       LangExt.FlexibleInstances,
+       LangExt.GADTSyntax,
+       LangExt.GeneralizedNewtypeDeriving,
+       LangExt.HexFloatLiterals,
+       LangExt.ImportQualifiedPost,
+       LangExt.InstanceSigs,
+       LangExt.KindSignatures,
+       LangExt.MultiParamTypeClasses,
+       LangExt.RecordPuns,
+       LangExt.NamedWildCards,
+       LangExt.NumericUnderscores,
+       LangExt.PolyKinds,
+       LangExt.PostfixOperators,
+       LangExt.RankNTypes,
+       LangExt.ScopedTypeVariables,
+       LangExt.StandaloneDeriving,
+       LangExt.StandaloneKindSignatures,
+       LangExt.TupleSections,
+       LangExt.TypeApplications,
+       LangExt.TypeOperators,
+       LangExt.TypeSynonymInstances]
 
 hasPprDebug :: DynFlags -> Bool
 hasPprDebug = dopt Opt_D_ppr_debug
@@ -3080,6 +3124,7 @@ wWarningFlagsDeps = [
   flagSpec "missing-monadfail-instances" Opt_WarnMissingMonadFailInstances,
   flagSpec "semigroup"                   Opt_WarnSemigroup,
   flagSpec "missing-signatures"          Opt_WarnMissingSignatures,
+  flagSpec "missing-kind-signatures"     Opt_WarnMissingKindSignatures,
   depFlagSpec "missing-exported-sigs"    Opt_WarnMissingExportedSignatures
     "it is replaced by -Wmissing-exported-signatures",
   flagSpec "missing-exported-signatures" Opt_WarnMissingExportedSignatures,
@@ -3401,7 +3446,8 @@ supportedLanguagesAndExtensions arch_os =
 languageFlagsDeps :: [(Deprecation, FlagSpec Language)]
 languageFlagsDeps = [
   flagSpec "Haskell98"   Haskell98,
-  flagSpec "Haskell2010" Haskell2010
+  flagSpec "Haskell2010" Haskell2010,
+  flagSpec "GHC2021"     GHC2021
   ]
 
 -- | These -X<blah> flags cannot be reversed with -XNo<blah>
@@ -3566,6 +3612,7 @@ xFlagsDeps = [
   flagSpec "UndecidableInstances"             LangExt.UndecidableInstances,
   flagSpec "UndecidableSuperClasses"          LangExt.UndecidableSuperClasses,
   flagSpec "UnicodeSyntax"                    LangExt.UnicodeSyntax,
+  flagSpec "UnliftedDatatypes"                LangExt.UnliftedDatatypes,
   flagSpec "UnliftedFFITypes"                 LangExt.UnliftedFFITypes,
   flagSpec "UnliftedNewtypes"                 LangExt.UnliftedNewtypes,
   flagSpec "ViewPatterns"                     LangExt.ViewPatterns
@@ -3749,6 +3796,10 @@ impliedXFlags
 
     , (LangExt.TemplateHaskell, turnOn, LangExt.TemplateHaskellQuotes)
     , (LangExt.Strict, turnOn, LangExt.StrictData)
+
+    -- The extensions needed to declare an H98 unlifted data type
+    , (LangExt.UnliftedDatatypes, turnOn, LangExt.DataKinds)
+    , (LangExt.UnliftedDatatypes, turnOn, LangExt.StandaloneKindSignatures)
   ]
 
 -- Note [When is StarIsType enabled]

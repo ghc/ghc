@@ -46,6 +46,7 @@ import GHC.Core.TyCon
 import GHC.Core.Type        ( isUnliftedType )
 import GHC.Types.RepType    ( isVoidTy, countConRepArgs )
 import GHC.Types.CostCentre ( CostCentreStack, currentCCS )
+import GHC.Types.Tickish
 import GHC.Data.Maybe
 import GHC.Utils.Misc
 import GHC.Data.FastString
@@ -1113,7 +1114,7 @@ emitEnter fun = do
 -- | Generate Cmm code for a tick. Depending on the type of Tickish,
 -- this will either generate actual Cmm instrumentation code, or
 -- simply pass on the annotation as a @CmmTickish@.
-cgTick :: Tickish Id -> FCode ()
+cgTick :: StgTickish -> FCode ()
 cgTick tick
   = do { platform <- getPlatform
        ; case tick of

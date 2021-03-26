@@ -42,10 +42,11 @@ import GHC.Prelude
 import GHC.Stg.Syntax
 
 import GHC.Driver.Session
+import GHC.Core.Lint        ( interactiveInScope )
 import GHC.Data.Bag         ( Bag, emptyBag, isEmptyBag, snocBag, bagToList )
 import GHC.Types.Basic      ( TopLevelFlag(..), isTopLevel )
 import GHC.Types.CostCentre ( isCurrentCCS )
-import GHC.Types.Id         ( Id, idType, isJoinId, idName )
+import GHC.Types.Id
 import GHC.Types.Var.Set
 import GHC.Core.DataCon
 import GHC.Core             ( AltCon(..) )
@@ -57,6 +58,7 @@ import GHC.Types.SrcLoc
 import GHC.Utils.Logger
 import GHC.Utils.Outputable
 import GHC.Unit.Module            ( Module )
+import GHC.Runtime.Context        ( InteractiveContext )
 import qualified GHC.Utils.Error as Err
 import Control.Applicative ((<|>))
 import Control.Monad
@@ -64,13 +66,14 @@ import Control.Monad
 lintStgTopBindings :: forall a . (OutputablePass a, BinderP a ~ Id)
                    => Logger
                    -> DynFlags
+                   -> InteractiveContext
                    -> Module -- ^ module being compiled
                    -> Bool   -- ^ have we run Unarise yet?
                    -> String -- ^ who produced the STG?
                    -> [GenStgTopBinding a]
                    -> IO ()
 
-lintStgTopBindings logger dflags this_mod unarised whodunnit binds
+lintStgTopBindings logger dflags ictxt this_mod unarised whodunnit binds
   = {-# SCC "StgLint" #-}
     case initL this_mod unarised opts top_level_binds (lint_binds binds) of
       Nothing  ->
@@ -89,7 +92,8 @@ lintStgTopBindings logger dflags this_mod unarised whodunnit binds
     opts = initStgPprOpts dflags
     -- Bring all top-level binds into scope because CoreToStg does not generate
     -- bindings in dependency order (so we may see a use before its definition).
-    top_level_binds = mkVarSet (bindersOfTopBinds binds)
+    top_level_binds = extendVarSetList (mkVarSet (bindersOfTopBinds binds))
+                                       (interactiveInScope ictxt)
 
     lint_binds :: [GenStgTopBinding a] -> LintM ()
 
@@ -134,8 +138,10 @@ lint_binds_help top_lvl (binder, rhs)
         lintStgRhs rhs
         opts <- getStgPprOpts
         -- Check binder doesn't have unlifted type or it's a join point
-        checkL (isJoinId binder || not (isUnliftedType (idType binder)))
-               (mkUnliftedTyMsg opts binder rhs)
+        checkL ( isJoinId binder
+              || not (isUnliftedType (idType binder))
+              || isDataConWorkId binder || isDataConWrapId binder) -- until #17521 is fixed
+          (mkUnliftedTyMsg opts binder rhs)
 
 -- | Top-level bindings can't inherit the cost centre stack from their
 -- (static) allocation site.

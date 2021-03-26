@@ -10,8 +10,8 @@ ToDo:
    (i1 + i2) only if it results in a valid Float.
 -}
 
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
@@ -22,13 +22,6 @@ ToDo:
 {-# LANGUAGE ViewPatterns #-}
 
 {-# OPTIONS_GHC -optc-DNON_POSIX_SOURCE -Wno-incomplete-uni-patterns #-}
-
-#if __GLASGOW_HASKELL__ <= 808
--- GHC 8.10 deprecates this flag, but GHC 8.8 needs it
--- The default iteration limit is a bit too low for the definitions
--- in this module.
-{-# OPTIONS_GHC -fmax-pmcheck-iterations=20000000 #-}
-#endif
 
 -- | Constant Folder
 module GHC.Core.Opt.ConstantFold
@@ -67,6 +60,7 @@ import GHC.Core.Type
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Name.Occurrence ( occNameFS )
+import GHC.Types.Tickish
 import GHC.Builtin.Names
 import GHC.Data.Maybe      ( orElse )
 import GHC.Types.Name ( Name, nameOccName )

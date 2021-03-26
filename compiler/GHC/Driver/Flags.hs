@@ -511,6 +511,7 @@ data WarningFlag =
    | Opt_WarnOperatorWhitespace             -- Since 9.2
    | Opt_WarnAmbiguousFields                -- Since 9.2
    | Opt_WarnImplicitLift                 -- Since 9.2
+   | Opt_WarnMissingKindSignatures        -- Since 9.2
    deriving (Eq, Show, Enum)
 
 -- | Used when outputting warnings: if a reason is given, it is
@@ -534,7 +535,7 @@ instance ToJson WarnReason where
   json (ErrReason (Just wf)) = JSString (show wf)
 
 
-data Language = Haskell98 | Haskell2010
+data Language = Haskell98 | Haskell2010 | GHC2021
    deriving (Eq, Enum, Show, Bounded)
 
 instance Outputable Language where

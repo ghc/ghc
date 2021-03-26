@@ -47,13 +47,15 @@ module GHC.Tc.Types(
         IdBindingInfo(..), ClosedTypeId, RhsNames,
         IsGroupClosed(..),
         SelfBootInfo(..),
-        pprTcTyThingCategory, pprPECategory, CompleteMatch, CompleteMatches,
+        tcTyThingCategory, pprTcTyThingCategory,
+        peCategory, pprPECategory,
+        CompleteMatch, CompleteMatches,
 
         -- Template Haskell
         ThStage(..), SpliceType(..), PendingStuff(..),
         topStage, topAnnStage, topSpliceStage,
         ThLevel, impLevel, outerLevel, thLevel,
-        ForeignSrcLang(..),
+        ForeignSrcLang(..), THDocs, DocLoc(..),
 
         -- Arrows
         ArrowCtxt(..),
@@ -482,7 +484,7 @@ data TcGblEnv
         -- The binds, rules and foreign-decl fields are collected
         -- initially in un-zonked form and are finally zonked in tcRnSrcDecls
 
-        tcg_rn_exports :: Maybe [(Located (IE GhcRn), Avails)],
+        tcg_rn_exports :: Maybe [(LIE GhcRn, Avails)],
                 -- Nothing <=> no explicit export list
                 -- Is always Nothing if we don't want to retain renamed
                 -- exports.
@@ -520,6 +522,9 @@ data TcGblEnv
         tcg_th_remote_state :: TcRef (Maybe (ForeignRef (IORef QState))),
         -- ^ Template Haskell state
 
+        tcg_th_docs   :: TcRef THDocs,
+        -- ^ Docs added in Template Haskell via @putDoc@.
+
         tcg_ev_binds  :: Bag EvBind,        -- Top-level evidence bindings
 
         -- Things defined in this module, or (in GHCi)
@@ -535,6 +540,7 @@ data TcGblEnv
         tcg_warns     :: Warnings,           -- ...Warnings and deprecations
         tcg_anns      :: [Annotation],       -- ...Annotations
         tcg_tcs       :: [TyCon],            -- ...TyCons and Classes
+        tcg_ksigs     :: NameSet,            -- ...Top-level TyCon names that *lack* a signature
         tcg_insts     :: [ClsInst],          -- ...Instances
         tcg_fam_insts :: [FamInst],          -- ...Family instances
         tcg_rules     :: [LRuleDecl GhcTc],  -- ...Rules
@@ -1269,22 +1275,30 @@ instance Outputable PromotionErr where
   ppr NoDataKindsTC               = text "NoDataKindsTC"
   ppr NoDataKindsDC               = text "NoDataKindsDC"
 
+--------------
 pprTcTyThingCategory :: TcTyThing -> SDoc
-pprTcTyThingCategory (AGlobal thing)    = pprTyThingCategory thing
-pprTcTyThingCategory (ATyVar {})        = text "Type variable"
-pprTcTyThingCategory (ATcId {})         = text "Local identifier"
-pprTcTyThingCategory (ATcTyCon {})     = text "Local tycon"
-pprTcTyThingCategory (APromotionErr pe) = pprPECategory pe
+pprTcTyThingCategory = text . capitalise . tcTyThingCategory
 
+tcTyThingCategory :: TcTyThing -> String
+tcTyThingCategory (AGlobal thing)    = tyThingCategory thing
+tcTyThingCategory (ATyVar {})        = "type variable"
+tcTyThingCategory (ATcId {})         = "local identifier"
+tcTyThingCategory (ATcTyCon {})      = "local tycon"
+tcTyThingCategory (APromotionErr pe) = peCategory pe
+
+--------------
 pprPECategory :: PromotionErr -> SDoc
-pprPECategory ClassPE                = text "Class"
-pprPECategory TyConPE                = text "Type constructor"
-pprPECategory PatSynPE               = text "Pattern synonym"
-pprPECategory FamDataConPE           = text "Data constructor"
-pprPECategory ConstrainedDataConPE{} = text "Data constructor"
-pprPECategory RecDataConPE           = text "Data constructor"
-pprPECategory NoDataKindsTC          = text "Type constructor"
-pprPECategory NoDataKindsDC          = text "Data constructor"
+pprPECategory = text . capitalise . peCategory
+
+peCategory :: PromotionErr -> String
+peCategory ClassPE                = "class"
+peCategory TyConPE                = "type constructor"
+peCategory PatSynPE               = "pattern synonym"
+peCategory FamDataConPE           = "data constructor"
+peCategory ConstrainedDataConPE{} = "data constructor"
+peCategory RecDataConPE           = "data constructor"
+peCategory NoDataKindsTC          = "type constructor"
+peCategory NoDataKindsDC          = "data constructor"
 
 {-
 ************************************************************************
@@ -1728,3 +1742,15 @@ lintGblEnv logger dflags tcg_env =
   liftIO $ lintAxioms logger dflags (text "TcGblEnv axioms") axioms
   where
     axioms = typeEnvCoAxioms (tcg_type_env tcg_env)
+
+-- | This is a mirror of Template Haskell's DocLoc, but the TH names are
+-- resolved to GHC names.
+data DocLoc = DeclDoc Name
+            | ArgDoc Name Int
+            | InstDoc Name
+            | ModuleDoc
+  deriving (Eq, Ord)
+
+-- | The current collection of docs that Template Haskell has built up via
+-- putDoc.
+type THDocs = Map DocLoc String

@@ -1,3 +1,4 @@
+{-# LANGUAGE NondecreasingIndentation #-}
 module FrontendPlugin where
 
 import GHC.Plugins

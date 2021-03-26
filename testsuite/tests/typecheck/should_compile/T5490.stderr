@@ -1,4 +1,4 @@
 
-T5490.hs:295:5: warning: [-Woverlapping-patterns (in -Wdefault)]
+T5490.hs:296:5: warning: [-Woverlapping-patterns (in -Wdefault)]
     Pattern match is redundant
     In a case alternative: _ -> ...

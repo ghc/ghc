@@ -1,3 +1,4 @@
+:set -XHaskell2010
 -- Test bad imports
 :unset +s
 :set -XSafe

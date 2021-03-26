@@ -21,19 +21,25 @@ import GHC.Core.Seq
 import GHC.Utils.Outputable
 import GHC.Types.Var.Env
 import GHC.Types.Basic
-import GHC.Core.DataCon
 import GHC.Types.Id
 import GHC.Types.Id.Info
+import GHC.Core.DataCon
+import GHC.Core.Multiplicity
 import GHC.Core.Utils   ( exprIsHNF, dumpIdInfoOfProgram )
 import GHC.Core.Type
 import GHC.Core.FamInstEnv
 import GHC.Core.Opt.WorkWrap.Utils
 import GHC.Utils.Misc
+import GHC.Utils.Panic
 import GHC.Utils.Logger  ( Logger, dumpIfSet_dyn, DumpFormat (..) )
-import GHC.Data.Maybe   ( isJust, isNothing )
+import GHC.Data.Graph.UnVar -- for UnVarSet
+import GHC.Data.Maybe   ( isNothing )
 
 import Control.Monad ( guard )
 import Data.List ( mapAccumL )
+
+import GHC.Driver.Ppr
+_ = pprTrace -- Tired of commenting out the import all the time
 
 {- Note [Constructed Product Result]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -177,7 +183,8 @@ cprAnal' env (Lam var body)
   | otherwise
   = (lam_ty, Lam var body')
   where
-    env'             = extendSigEnvForDemand env var (idDemandInfo var)
+    -- See Note [CPR for binders that will be unboxed]
+    env'             = extendSigEnvForArg env var
     (body_ty, body') = cprAnal env' body
     lam_ty           = abstractCprTy body_ty
 
@@ -185,11 +192,8 @@ cprAnal' env (Case scrut case_bndr ty alts)
   = (res_ty, Case scrut' case_bndr ty alts')
   where
     (scrut_ty, scrut') = cprAnal env scrut
-    -- We used to give the case binder the CPR property unconditionally.
-    -- See Historic Note [Optimistic case binder CPR]
     env'               = extendSigEnv env case_bndr (CprSig scrut_ty)
-    be_optimistic      = assumeOptimisticFieldCpr scrut scrut_ty
-    (alt_tys, alts')   = mapAndUnzip (cprAnalAlt env' be_optimistic) alts
+    (alt_tys, alts')   = mapAndUnzip (cprAnalAlt env' scrut_ty) alts
     res_ty             = foldl' lubCprType botCprType alt_tys
 
 cprAnal' env (Let (NonRec id rhs) body)
@@ -206,48 +210,27 @@ cprAnal' env (Let (Rec pairs) body)
 
 cprAnalAlt
   :: AnalEnv
-  -> Bool     -- ^ Does Note [Optimistic field binder CPR] apply?
-  -> Alt Var  -- ^ current alternative
+  -> CprType -- ^ CPR type of the scrutinee
+  -> Alt Var -- ^ current alternative
   -> (CprType, Alt Var)
-cprAnalAlt env be_optimistic (Alt con bndrs rhs)
+cprAnalAlt env scrut_ty (Alt con bndrs rhs)
   = (rhs_ty, Alt con bndrs rhs')
   where
     env_alt
-      | DataAlt dc <- con, be_optimistic
-      -- Optimistically give strictly used field binders the CPR property.
-      -- See Note [Optimistic field binder CPR].
-      -- What we actually want here is Nested CPR.
-      = giveStrictFieldsCpr env dc bndrs
+      | DataAlt dc <- con
+      , let ids = filter isId bndrs
+      , CprType arity cpr <- scrut_ty
+      , ASSERT( arity == 0 ) True
+      = case unpackConFieldsCpr dc cpr of
+          AllFieldsSame field_cpr
+            | let sig = mkCprSig 0 field_cpr
+            -> extendSigEnvAllSame env ids sig
+          ForeachField field_cprs
+            | let sigs = zipWith (mkCprSig . idArity) ids field_cprs
+            -> extendSigEnvList env (zipEqual "cprAnalAlt" ids sigs)
       | otherwise
       = env
     (rhs_ty, rhs') = cprAnal env_alt rhs
-
-giveStrictFieldsCpr :: AnalEnv -> DataCon -> [Id] -> AnalEnv
--- See Note [Optimistic field binder CPR]
-giveStrictFieldsCpr env dc bs = foldl' do_one_field env (fields_w_dmds dc bs)
-  where
-    -- 'extendSigEnvForDemand' gives 'id' the CPR property if 'dmd' is strict
-    do_one_field env (id, dmd) = extendSigEnvForDemand env id dmd
-    fields_w_dmds dc bndrs = -- returns the fields paired with their 'idDemandInfo'
-       -- See Note [Add demands for strict constructors] in GHC.Core.Opt.WorkWrap.Utils
-       [ (id, applyWhen (isMarkedStrict mark) strictifyDmd (idDemandInfo id))
-       | (id, mark) <- filter isId bndrs `zip` dataConRepStrictness dc
-       ]
-
--- | Decide whether to optimistically give 'DataAlt' field binders the CPR
--- property based on strictness.
--- Tests (A) and (B) of Note [Optimistic field binder CPR].
-assumeOptimisticFieldCpr :: CoreExpr -> CprType -> Bool
-assumeOptimisticFieldCpr scrut scrut_ty = is_var scrut && case_will_cancel
-  where
-    -- Test (A): The case will only cancel when 'scrut' has the CPR property.
-    case_will_cancel | CprType 0 cpr <- scrut_ty = isJust (asConCpr cpr)
-                     | otherwise                 = False
-    -- Test (B): Guess whether 'scrut' is a parameter. Surely not if it's not a
-    -- variable!
-    is_var (Cast e _) = is_var e
-    is_var (Var v)    = isLocalId v
-    is_var _          = False
 
 --
 -- * CPR transformer
@@ -293,7 +276,7 @@ cprFix top_lvl orig_env orig_pairs
     orig_virgin = ae_virgin orig_env
     init_pairs | orig_virgin  = [(setIdCprInfo id (init_sig id rhs), rhs) | (id, rhs) <- orig_pairs ]
                | otherwise    = orig_pairs
-    init_env = extendSigEnvList orig_env (map fst init_pairs)
+    init_env = extendSigEnvFromIds orig_env (map fst init_pairs)
 
     -- The fixed-point varies the idCprInfo field of the binders and and their
     -- entries in the AnalEnv, and terminates if that annotation does not change
@@ -413,35 +396,68 @@ data AnalEnv
   -- ^ Needed when expanding type families and synonyms of product types.
   }
 
-type SigEnv = VarEnv CprSig
-
 instance Outputable AnalEnv where
   ppr (AE { ae_sigs = env, ae_virgin = virgin })
     = text "AE" <+> braces (vcat
          [ text "ae_virgin =" <+> ppr virgin
          , text "ae_sigs =" <+> ppr env ])
 
+-- | An environment storing 'CprSig's for local Ids.
+-- Puts binders with 'topCprSig' in a space-saving 'IntSet'.
+-- See Note [Efficient Top sigs in SigEnv].
+data SigEnv
+  = SE
+  { se_tops :: !UnVarSet
+  -- ^ All these Ids have 'topCprSig'. Like a 'VarSet', but more efficient.
+  , se_sigs :: !(VarEnv CprSig)
+  -- ^ Ids that have something other than 'topCprSig'.
+  }
+
+instance Outputable SigEnv where
+  ppr (SE { se_tops = tops, se_sigs = sigs })
+    = text "SE" <+> braces (vcat
+         [ text "se_tops =" <+> ppr tops
+         , text "se_sigs =" <+> ppr sigs ])
+
 emptyAnalEnv :: FamInstEnvs -> AnalEnv
 emptyAnalEnv fam_envs
   = AE
-  { ae_sigs = emptyVarEnv
+  { ae_sigs = SE emptyUnVarSet emptyVarEnv
   , ae_virgin = True
   , ae_fam_envs = fam_envs
   }
 
--- | Extend an environment with the CPR sigs attached to the id
-extendSigEnvList :: AnalEnv -> [Id] -> AnalEnv
-extendSigEnvList env ids
-  = env { ae_sigs = sigs' }
-  where
-    sigs' = extendVarEnvList (ae_sigs env) [ (id, idCprInfo id) | id <- ids ]
-
-extendSigEnv :: AnalEnv -> Id -> CprSig -> AnalEnv
-extendSigEnv env id sig
-  = env { ae_sigs = extendVarEnv (ae_sigs env) id sig }
+modifySigEnv :: (SigEnv -> SigEnv) -> AnalEnv -> AnalEnv
+modifySigEnv f env = env { ae_sigs = f (ae_sigs env) }
 
 lookupSigEnv :: AnalEnv -> Id -> Maybe CprSig
-lookupSigEnv env id = lookupVarEnv (ae_sigs env) id
+-- See Note [Efficient Top sigs in SigEnv]
+lookupSigEnv AE{ae_sigs = SE tops sigs} id
+  | id `elemUnVarSet` tops = Just topCprSig
+  | otherwise              = lookupVarEnv sigs id
+
+extendSigEnv :: AnalEnv -> Id -> CprSig -> AnalEnv
+-- See Note [Efficient Top sigs in SigEnv]
+extendSigEnv env id sig
+  | isTopCprSig sig
+  = modifySigEnv (\se -> se{se_tops = extendUnVarSet id (se_tops se)}) env
+  | otherwise
+  = modifySigEnv (\se -> se{se_sigs = extendVarEnv (se_sigs se) id sig}) env
+
+-- | Extend an environment with the (Id, CPR sig) pairs
+extendSigEnvList :: AnalEnv -> [(Id, CprSig)] -> AnalEnv
+extendSigEnvList env ids_cprs
+  = foldl' (\env (id, sig) -> extendSigEnv env id sig) env ids_cprs
+
+-- | Extend an environment with the CPR sigs attached to the ids
+extendSigEnvFromIds :: AnalEnv -> [Id] -> AnalEnv
+extendSigEnvFromIds env ids
+  = foldl' (\env id -> extendSigEnv env id (idCprInfo id)) env ids
+
+-- | Extend an environment with the same CPR sig for all ids
+extendSigEnvAllSame :: AnalEnv -> [Id] -> CprSig -> AnalEnv
+extendSigEnvAllSame env ids sig
+  = foldl' (\env id -> extendSigEnv env id sig) env ids
 
 nonVirgin :: AnalEnv -> AnalEnv
 nonVirgin env = env { ae_virgin = False }
@@ -451,28 +467,62 @@ nonVirgin env = env { ae_virgin = False }
 -- In this case, we can still look at their demand to attach CPR signatures
 -- anticipating the unboxing done by worker/wrapper.
 -- See Note [CPR for binders that will be unboxed].
-extendSigEnvForDemand :: AnalEnv -> Id -> Demand -> AnalEnv
-extendSigEnvForDemand env id dmd
-  | isId id
-  , Just (_, DataConPatContext { dcpc_dc = dc })
-      <- wantToUnbox (ae_fam_envs env) has_inlineable_prag (idType id) dmd
-  = extendSigEnv env id (CprSig (conCprType (dataConTag dc)))
-  | otherwise
-  = env
+extendSigEnvForArg :: AnalEnv -> Id -> AnalEnv
+extendSigEnvForArg env id
+  = extendSigEnv env id (CprSig (argCprType env (idType id) (idDemandInfo id)))
+
+-- | Produces a 'CprType' according to how a strict argument will be unboxed.
+-- Examples:
+--
+--   * A head-strict demand @1L@ on @Int@ would translate to @1@
+--   * A product demand @1P(1L,L)@ on @(Int, Bool)@ would translate to @1(1,)@
+--   * A product demand @1P(1L,L)@ on @(a , Bool)@ would translate to @1(,)@,
+--     because the unboxing strategy would not unbox the @a@.
+argCprType :: AnalEnv -> Type -> Demand -> CprType
+argCprType env arg_ty dmd = CprType 0 (go arg_ty dmd)
   where
+    go ty dmd
+      | Unbox (DataConPatContext { dcpc_dc = dc, dcpc_tc_args = tc_args }) ds
+          <- wantToUnbox (ae_fam_envs env) no_inlineable_prag ty dmd
+      -- No existentials; see Note [Which types are unboxed?])
+      -- Otherwise we'd need to call dataConRepInstPat here and thread a
+      -- UniqSupply. So argCprType is a bit less aggressive than it could
+      -- be, for the sake of coding convenience.
+      , null (dataConExTyCoVars dc)
+      , let arg_tys = map scaledThing (dataConInstArgTys dc tc_args)
+      = ConCpr (dataConTag dc) (zipWith go arg_tys ds)
+      | otherwise
+      = topCpr
     -- Rather than maintaining in AnalEnv whether we are in an INLINEABLE
     -- function, we just assume that we aren't. That flag is only relevant
     -- to Note [Do not unpack class dictionaries], the few unboxing
     -- opportunities on dicts it prohibits are probably irrelevant to CPR.
-    has_inlineable_prag = False
+    no_inlineable_prag = False
 
 {- Note [Safe abortion in the fixed-point iteration]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 Fixed-point iteration may fail to terminate. But we cannot simply give up and
 return the environment and code unchanged! We still need to do one additional
 round, to ensure that all expressions have been traversed at least once, and any
 unsound CPR annotations have been updated.
+
+Note [Efficient Top sigs in SigEnv]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It's pretty common for binders in the SigEnv to have a 'topCprSig'.
+Wide records with 100 fields like in T9675 even will generate code where the
+majority of binders has Top signature. To save some allocations, we store
+those binders with a Top signature in a separate UnVarSet (which is an IntSet
+with a convenient Var-tailored API).
+
+Why store top signatures at all in the SigEnv? After all, when 'cprTransform'
+encounters a locally-bound Id without an entry in the SigEnv, it should behave
+as if that binder has a Top signature!
+Well, the problem is when case binders should have a Top signatures. They always
+have an unfolding and thus look to 'cprTransform' as if they bind a data
+structure, Note [CPR for data structures], and thus would always have the CPR
+property. So we need some mechanism to separate data structures from case
+binders with a Top signature, and the UnVarSet provides that in the least
+convoluted way I can think of.
 
 Note [CPR for binders that will be unboxed]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -496,21 +546,37 @@ Moreover, if f itself is strict in x, then we'll pass x unboxed to
 f1, and so the boxed version *won't* be available; in that case it's
 very helpful to give 'x' the CPR property.
 
-This is all done in 'extendSigEnvForDemand'.
+This is all done in 'extendSigEnvForArg'.
 
 Note that
 
-  * We only want to do this for something that definitely unboxes as per
-    'wantToUnbox', else we may get over-optimistic CPR results e.g.
-    (from \x -> x!).
+  * Whether or not something unboxes is decided by 'wantToUnbox', else we may
+    get over-optimistic CPR results (e.g., from \(x :: a) -> x!).
 
-  * This also (approximately) applies to DataAlt field binders;
-    See Note [Optimistic field binder CPR].
+  * If the demand unboxes deeply, we can give the binder a /nested/ CPR
+    property, e.g.
+
+      g :: (Int, Int) -> Int
+      g p = case p of
+        (x, y) | x < 0     -> 0
+               | otherwise -> x
+
+    `x` should have the CPR property because it will be unboxed. We do so
+    by giving `p` the Nested CPR property `1(1,)`, indicating that we not only
+    have `p` available unboxed, but also its field `x`. Analysis of the Case
+    will then transfer the CPR property to `x`.
+
+    Before we were able to express Nested CPR, we used to guess which field
+    binders should get the CPR property.
+    See Historic Note [Optimistic field binder CPR].
 
   * See Note [CPR examples]
 
-Note [Optimistic field binder CPR]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Historic Note [Optimistic field binder CPR]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This Note describes how we used to guess whether fields have the CPR property
+before we were able to express Nested CPR for arguments.
+
 Consider
 
   data T a = MkT a
@@ -530,9 +596,6 @@ Lacking Nested CPR, we have to guess a bit, by looking for
   (A) Flat CPR on the scrutinee
   (B) A variable scrutinee. Otherwise surely it can't be a parameter.
   (C) Strict demand on the field binder `y` (or it binds a strict field)
-
-(A) and (B) are tested in 'assumeOptimisticFieldCpr',
-(C) in 'giveStrictFieldsCpr' via 'extendSigEnvForDemand'.
 
 While (A) is a necessary condition to give a field the CPR property, there are
 ways in which (B) and (C) are too lax, leading to unsound analysis results and

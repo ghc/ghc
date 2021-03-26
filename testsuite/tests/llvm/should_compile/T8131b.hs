@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE MagicHash, UnboxedTuples #-}
 import GHC.Prim
 import GHC.IO

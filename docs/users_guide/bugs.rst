@@ -24,12 +24,11 @@ The limitations here are listed in Haskell Report order (roughly).
 Divergence from Haskell 98 and Haskell 2010
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-By default, GHC mainly aims to behave (mostly) like a Haskell 2010
-compiler, although you can tell it to try to behave like a particular
-version of the language with the :extension:`Haskell98` and
-:extension:`Haskell2010` flags. The known deviations from the standards are
-described below. Unless otherwise stated, the deviation applies in Haskell 98,
-Haskell 2010 and the default modes.
+GHC aims to be able to behave (mostly) like a Haskell 98 or Haskell 2010
+compiler, if you tell it to try to behave like that  with the
+:extension:`Haskell98` and :extension:`Haskell2010` flags. The known deviations
+from the standards are described below. Unless otherwise stated, the deviation
+applies in both Haskell 98 and Haskell 2010 mode.
 
 .. _infelicities-lexical:
 
@@ -100,7 +99,7 @@ Lexical syntax
 Context-free syntax
 ^^^^^^^^^^^^^^^^^^^
 
--  In Haskell 98 mode and by default (but not in Haskell 2010 mode), GHC
+-  In Haskell 98 mode (but not in Haskell 2010 mode), GHC
    is a little less strict about the layout rule when used in ``do``
    expressions. Specifically, the restriction that "a nested context
    must be indented further to the right than the enclosing context" is
@@ -150,8 +149,8 @@ Context-free syntax
 Expressions and patterns
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-In its default mode, GHC makes some programs slightly more defined than
-they should be. For example, consider ::
+By default, GHC makes some programs slightly more defined than they should be.
+For example, consider ::
 
     f :: [a] -> b -> b
     f [] = error "urk"
@@ -202,16 +201,6 @@ Will warn you with
 
 And indeed, since the `Monad <https://hackage.haskell.org/package/base-4.14.1.0/docs/Control-Monad.html#t:Monad>`__ class does not have the ``fail`` method anymore,
 we need to explicitly add ``(MonadFail m)`` to the constraints of the function.
-
-.. _infelicities-decls:
-
-Declarations and bindings
-^^^^^^^^^^^^^^^^^^^^^^^^^
-
-In its default mode, GHC does not accept datatype contexts, as it has
-been decided to remove them from the next version of the language
-standard. This behaviour can be controlled with the ``DatatypeContexts``
-extension. See :ref:`datatype-contexts`.
 
 .. _infelicities-recursive-groups:
 

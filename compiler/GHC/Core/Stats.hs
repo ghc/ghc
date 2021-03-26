@@ -17,6 +17,7 @@ import GHC.Types.Basic
 import GHC.Core
 import GHC.Utils.Outputable
 import GHC.Core.Coercion
+import GHC.Types.Tickish
 import GHC.Types.Var
 import GHC.Core.Type(Type, typeSize)
 import GHC.Types.Id (isJoinId)
@@ -116,7 +117,7 @@ exprSize (Tick n e)      = tickSize n + exprSize e
 exprSize (Type _)        = 1
 exprSize (Coercion _)    = 1
 
-tickSize :: Tickish Id -> Int
+tickSize :: CoreTickish -> Int
 tickSize (ProfNote _ _ _) = 1
 tickSize _ = 1
 

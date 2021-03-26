@@ -4,13 +4,6 @@
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE TupleSections #-}
 
-#if __GLASGOW_HASKELL__ <= 808
--- GHC 8.10 deprecates this flag, but GHC 8.8 needs it
--- The default iteration limit is a bit too low for the definitions
--- in this module.
-{-# OPTIONS_GHC -fmax-pmcheck-iterations=10000000 #-}
-#endif
-
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 -----------------------------------------------------------------------------
@@ -79,7 +72,7 @@ import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.CLabel
-import GHC.Core          ( Tickish(..) )
+import GHC.Types.Tickish ( GenTickish(..) )
 import GHC.Types.SrcLoc  ( srcSpanFile, srcSpanStartLine, srcSpanStartCol )
 
 -- The rest:

@@ -1,8 +1,7 @@
-{-# LANGUAGE CPP                      #-}
-{-# LANGUAGE BangPatterns             #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE NondecreasingIndentation #-}
-{-# LANGUAGE LambdaCase               #-}
-{-# LANGUAGE ViewPatterns             #-}
+
 {-# OPTIONS_GHC -fprof-auto-top #-}
 
 -------------------------------------------------------------------------------
@@ -100,7 +99,7 @@ import GHC.Driver.Config
 import GHC.Driver.Hooks
 
 import GHC.Runtime.Context
-import GHC.Runtime.Interpreter ( addSptEntry )
+import GHC.Runtime.Interpreter ( addSptEntry, hscInterp )
 import GHC.Runtime.Loader      ( initializePlugins )
 import GHCi.RemoteTypes        ( ForeignHValue )
 import GHC.ByteCode.Types
@@ -114,7 +113,7 @@ import GHC.Hs.Stats         ( ppSourceStats )
 
 import GHC.HsToCore
 
-import GHC.CoreToByteCode      ( byteCodeGen, coreExprToBCOs )
+import GHC.StgToByteCode    ( byteCodeGen, stgExprToBCOs )
 
 import GHC.IfaceToCore  ( typecheckIface )
 
@@ -124,14 +123,15 @@ import GHC.Iface.Recomp
 import GHC.Iface.Tidy
 import GHC.Iface.Ext.Ast    ( mkHieFile )
 import GHC.Iface.Ext.Types  ( getAsts, hie_asts, hie_module )
-import GHC.Iface.Ext.Binary ( readHieFile, writeHieFile , hie_file_result, NameCacheUpdater(..))
+import GHC.Iface.Ext.Binary ( readHieFile, writeHieFile , hie_file_result)
 import GHC.Iface.Ext.Debug  ( diffFile, validateScopes )
-import GHC.Iface.Env        ( updNameCache )
 
 import GHC.Core
 import GHC.Core.Tidy           ( tidyExpr )
 import GHC.Core.Type           ( Type, Kind )
 import GHC.Core.Lint           ( lintInteractiveExpr )
+import GHC.Core.Multiplicity
+import GHC.Core.Utils          ( exprType )
 import GHC.Core.ConLike
 import GHC.Core.Opt.Pipeline
 import GHC.Core.TyCon
@@ -141,7 +141,6 @@ import GHC.Core.FamInstEnv
 import GHC.CoreToStg.Prep
 import GHC.CoreToStg    ( coreToStg )
 
-import GHC.Parser.Annotation
 import GHC.Parser.Errors
 import GHC.Parser.Errors.Ppr
 import GHC.Parser
@@ -157,6 +156,7 @@ import GHC.Stg.Pipeline ( stg2stg )
 
 import GHC.Builtin.Utils
 import GHC.Builtin.Names
+import GHC.Builtin.Uniques ( mkPseudoUniqueE )
 
 import qualified GHC.StgToCmm as StgToCmm ( codeGen )
 import GHC.StgToCmm.Types (CgInfos (..), ModuleLFInfos)
@@ -168,6 +168,7 @@ import GHC.Cmm.Pipeline
 import GHC.Cmm.Info
 
 import GHC.Unit
+import GHC.Unit.Finder
 import GHC.Unit.External
 import GHC.Unit.State
 import GHC.Unit.Module.ModDetails
@@ -189,7 +190,6 @@ import GHC.Types.Error
 import GHC.Types.Fixity.Env
 import GHC.Types.CostCentre
 import GHC.Types.IPE
-import GHC.Types.Unique.Supply
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
 import GHC.Types.Name
@@ -224,7 +224,6 @@ import Data.IORef
 import System.FilePath as FilePath
 import System.Directory
 import System.IO (fixIO)
-import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Set (Set)
 import Data.Functor
@@ -245,10 +244,8 @@ newHscEnv dflags = do
     -- we don't store the unit databases and the unit state to still
     -- allow `setSessionDynFlags` to be used to set unit db flags.
     eps_var <- newIORef initExternalPackageState
-    us      <- mkSplitUniqSupply 'r'
-    nc_var  <- newIORef (initNameCache us knownKeyNames)
-    fc_var  <- newIORef emptyInstalledModuleEnv
-    emptyLoader <- uninitializedLoader
+    nc_var  <- initNameCache 'r' knownKeyNames
+    fc_var  <- initFinderCache
     logger  <- initLogger
     tmpfs   <- initTmpFs
     -- FIXME: it's sad that we have so many "unitialized" fields filled with
@@ -265,7 +262,6 @@ newHscEnv dflags = do
                   ,  hsc_FC             = fc_var
                   ,  hsc_type_env_var   = Nothing
                   ,  hsc_interp         = Nothing
-                  ,  hsc_loader         = emptyLoader
                   ,  hsc_unit_env       = panic "hsc_unit_env not initialized"
                   ,  hsc_plugins        = []
                   ,  hsc_static_plugins = []
@@ -354,7 +350,7 @@ ioMsgMaybe' ioA = do
 -- -----------------------------------------------------------------------------
 -- | Lookup things in the compiler's environment
 
-hscTcRnLookupRdrName :: HscEnv -> Located RdrName -> IO [Name]
+hscTcRnLookupRdrName :: HscEnv -> LocatedN RdrName -> IO [Name]
 hscTcRnLookupRdrName hsc_env0 rdr_name
   = runInteractiveHsc hsc_env0 $
     do { hsc_env <- getHscEnv
@@ -432,7 +428,9 @@ hscParse' mod_summary
             liftIO $ dumpIfSet_dyn logger dflags Opt_D_dump_parsed "Parser"
                         FormatHaskell (ppr rdr_module)
             liftIO $ dumpIfSet_dyn logger dflags Opt_D_dump_parsed_ast "Parser AST"
-                        FormatHaskell (showAstData NoBlankSrcSpan rdr_module)
+                        FormatHaskell (showAstData NoBlankSrcSpan
+                                                   NoBlankApiAnnotations
+                                                   rdr_module)
             liftIO $ dumpIfSet_dyn logger dflags Opt_D_source_stats "Source Statistics"
                         FormatText (ppSourceStats False rdr_module)
             when (not $ isEmptyBag errs) $ throwErrors errs
@@ -463,16 +461,9 @@ hscParse' mod_summary
             -- filter them out:
             srcs2 <- liftIO $ filterM doesFileExist srcs1
 
-            let api_anns = ApiAnns {
-                      apiAnnItems = M.fromListWith (++) $ annotations pst,
-                      apiAnnEofPos = eof_pos pst,
-                      apiAnnComments = M.fromList (annotations_comments pst),
-                      apiAnnRogueComments = comment_q pst
-                   }
-                res = HsParsedModule {
+            let res = HsParsedModule {
                       hpm_module    = rdr_module,
-                      hpm_src_files = srcs2,
-                      hpm_annotations = api_anns
+                      hpm_src_files = srcs2
                    }
 
             -- apply parse transformation of plugins
@@ -491,7 +482,7 @@ extract_renamed_stuff mod_summary tc_result = do
     dflags <- getDynFlags
     logger <- getLogger
     liftIO $ dumpIfSet_dyn logger dflags Opt_D_dump_rn_ast "Renamer"
-                FormatHaskell (showAstData NoBlankSrcSpan rn_info)
+                FormatHaskell (showAstData NoBlankSrcSpan NoBlankApiAnnotations rn_info)
 
     -- Create HIE files
     when (gopt Opt_WriteHie dflags) $ do
@@ -513,7 +504,7 @@ extract_renamed_stuff mod_summary tc_result = do
                     putMsg logger dflags $ text "Got invalid scopes"
                     mapM_ (putMsg logger dflags) xs
               -- Roundtrip testing
-              file' <- readHieFile (NCU $ updNameCache $ hsc_NC hs_env) out_file
+              file' <- readHieFile (hsc_NC hs_env) out_file
               case diffFile hieFile (hie_file_result file') of
                 [] ->
                   putMsg logger dflags $ text "Got no roundtrip errors"
@@ -978,8 +969,13 @@ hscMaybeWriteIface logger dflags is_simple iface old_iface mod_location = do
             in  addBootSuffix_maybe (mi_boot iface) with_hi
 
         write_iface dflags' iface =
+          let !iface_name = buildIfName (hiSuf dflags')
+          in
           {-# SCC "writeIface" #-}
-          writeIface logger dflags' (buildIfName (hiSuf dflags')) iface
+          withTiming logger dflags'
+              (text "WriteIface"<+>brackets (text iface_name))
+              (const ())
+              (writeIface logger dflags' iface_name iface)
 
     when (write_interface || force_write_interface) $ do
 
@@ -1170,9 +1166,9 @@ hscCheckSafeImports tcg_env = do
 
     warns rules = listToBag $ map warnRules rules
 
-    warnRules :: GenLocated SrcSpan (RuleDecl GhcTc) -> MsgEnvelope DecoratedSDoc
+    warnRules :: LRuleDecl GhcTc -> MsgEnvelope DecoratedSDoc
     warnRules (L loc (HsRule { rd_name = n })) =
-        mkPlainWarnMsg loc $
+        mkPlainWarnMsg (locA loc) $
             text "Rule \"" <> ftext (snd $ unLoc n) <> text "\" ignored" $+$
             text "User defined rules are disabled under Safe Haskell"
 
@@ -1561,10 +1557,14 @@ hscGenHardCode hsc_env cgguts location output_filename = do
         (prepd_binds, local_ccs) <- {-# SCC "CorePrep" #-}
                        corePrepPgm hsc_env this_mod location
                                    core_binds data_tycons
+
         -----------------  Convert to STG ------------------
         (stg_binds, denv, (caf_ccs, caf_cc_stacks))
             <- {-# SCC "CoreToStg" #-}
-               myCoreToStg logger dflags this_mod location prepd_binds
+               withTiming logger dflags
+                   (text "CoreToStg"<+>brackets (ppr this_mod))
+                   (\(a, b, (c,d)) -> a `seqList` b `seq` c `seqList` d `seqList` ())
+                   (myCoreToStg logger dflags (hsc_IC hsc_env) this_mod location prepd_binds)
 
         let cost_centre_info =
               (S.toList local_ccs ++ caf_ccs, caf_cc_stacks)
@@ -1635,8 +1635,12 @@ hscInteractive hsc_env cgguts location = do
     -- Do saturation and convert to A-normal form
     (prepd_binds, _) <- {-# SCC "CorePrep" #-}
                    corePrepPgm hsc_env this_mod location core_binds data_tycons
+
+    (stg_binds, _infotable_prov, _caf_ccs__caf_cc_stacks)
+      <- {-# SCC "CoreToStg" #-}
+          myCoreToStg logger dflags (hsc_IC hsc_env) this_mod location prepd_binds
     -----------------  Generate byte code ------------------
-    comp_bc <- byteCodeGen hsc_env this_mod prepd_binds data_tycons mod_breaks
+    comp_bc <- byteCodeGen hsc_env this_mod stg_binds data_tycons mod_breaks
     ------------------ Create f-x-dynamic C-side stuff -----
     (_istub_h_exists, istub_c_exists)
         <- outputForeignStubs logger tmpfs dflags (hsc_units hsc_env) this_mod location foreign_stubs
@@ -1773,21 +1777,42 @@ doCodeGen hsc_env this_mod denv data_tycons
 
     return (Stream.mapM dump2 pipeline_stream)
 
-myCoreToStg :: Logger -> DynFlags -> Module -> ModLocation -> CoreProgram
+myCoreToStgExpr :: Logger -> DynFlags -> InteractiveContext
+                -> Module -> ModLocation -> CoreExpr
+                -> IO ( StgRhs
+                      , InfoTableProvMap
+                      , CollectedCCs )
+myCoreToStgExpr logger dflags ictxt this_mod ml prepd_expr = do
+    {- Create a temporary binding (just because myCoreToStg needs a
+       binding for the stg2stg step) -}
+    let bco_tmp_id = mkSysLocal (fsLit "BCO_toplevel")
+                                (mkPseudoUniqueE 0)
+                                Many
+                                (exprType prepd_expr)
+    ([StgTopLifted (StgNonRec _ stg_expr)], prov_map, collected_ccs) <-
+       myCoreToStg logger
+                   dflags
+                   ictxt
+                   this_mod
+                   ml
+                   [NonRec bco_tmp_id prepd_expr]
+    return (stg_expr, prov_map, collected_ccs)
+
+myCoreToStg :: Logger -> DynFlags -> InteractiveContext
+            -> Module -> ModLocation -> CoreProgram
             -> IO ( [StgTopBinding] -- output program
                   , InfoTableProvMap
                   , CollectedCCs )  -- CAF cost centre info (declared and used)
-myCoreToStg logger dflags this_mod ml prepd_binds = do
+myCoreToStg logger dflags ictxt this_mod ml prepd_binds = do
     let (stg_binds, denv, cost_centre_info)
          = {-# SCC "Core2Stg" #-}
            coreToStg dflags this_mod ml prepd_binds
 
     stg_binds2
         <- {-# SCC "Stg2Stg" #-}
-           stg2stg logger dflags this_mod stg_binds
+           stg2stg logger dflags ictxt this_mod stg_binds
 
     return (stg_binds2, denv, cost_centre_info)
-
 
 {- **********************************************************************
 %*                                                                      *
@@ -1882,8 +1907,10 @@ hscDeclsWithLocation hsc_env str source linenumber = do
 
 hscParsedDecls :: HscEnv -> [LHsDecl GhcPs] -> IO ([TyThing], InteractiveContext)
 hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
-    {- Rename and typecheck it -}
     hsc_env <- getHscEnv
+    let interp = hscInterp hsc_env
+
+    {- Rename and typecheck it -}
     tc_gblenv <- ioMsgMaybe $ tcRnDeclsi hsc_env decls
 
     {- Grab the new instances -}
@@ -1924,12 +1951,21 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
     (prepd_binds, _) <- {-# SCC "CorePrep" #-}
       liftIO $ corePrepPgm hsc_env this_mod iNTERACTIVELoc core_binds data_tycons
 
+    (stg_binds, _infotable_prov, _caf_ccs__caf_cc_stacks)
+        <- {-# SCC "CoreToStg" #-}
+           liftIO $ myCoreToStg (hsc_logger hsc_env)
+                                (hsc_dflags hsc_env)
+                                (hsc_IC hsc_env)
+                                this_mod
+                                iNTERACTIVELoc
+                                prepd_binds
+
     {- Generate byte code -}
     cbc <- liftIO $ byteCodeGen hsc_env this_mod
-                                prepd_binds data_tycons mod_breaks
+                                stg_binds data_tycons mod_breaks
 
     let src_span = srcLocSpan interactiveSrcLoc
-    liftIO $ loadDecls hsc_env src_span cbc
+    liftIO $ loadDecls interp hsc_env src_span cbc
 
     {- Load static pointer table entries -}
     liftIO $ hscAddSptEntries hsc_env (cg_spt_entries tidy_cg)
@@ -1959,10 +1995,11 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
 -- See Note [Grand plan for static forms] in "GHC.Iface.Tidy.StaticPtrTable".
 hscAddSptEntries :: HscEnv -> [SptEntry] -> IO ()
 hscAddSptEntries hsc_env entries = do
+    let interp = hscInterp hsc_env
     let add_spt_entry :: SptEntry -> IO ()
         add_spt_entry (SptEntry i fpr) = do
-            val <- loadName hsc_env (idName i)
-            addSptEntry hsc_env fpr val
+            val <- loadName interp hsc_env (idName i)
+            addSptEntry interp fpr val
     mapM_ add_spt_entry entries
 
 {-
@@ -2031,7 +2068,7 @@ hscParseStmtWithLocation source linenumber stmt =
 hscParseType :: String -> Hsc (LHsType GhcPs)
 hscParseType = hscParseThing parseType
 
-hscParseIdentifier :: HscEnv -> String -> IO (Located RdrName)
+hscParseIdentifier :: HscEnv -> String -> IO (LocatedN RdrName)
 hscParseIdentifier hsc_env str =
     runInteractiveHsc hsc_env $ hscParseThing parseIdentifier str
 
@@ -2059,7 +2096,7 @@ hscParseThingWithLocation source linenumber parser str = do
                 liftIO $ dumpIfSet_dyn logger dflags Opt_D_dump_parsed "Parser"
                             FormatHaskell (ppr thing)
                 liftIO $ dumpIfSet_dyn logger dflags Opt_D_dump_parsed_ast "Parser AST"
-                            FormatHaskell (showAstData NoBlankSrcSpan thing)
+                            FormatHaskell (showAstData NoBlankSrcSpan NoBlankApiAnnotations thing)
                 return thing
 
 
@@ -2090,13 +2127,28 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr
 
            {- Lint if necessary -}
          ; lintInteractiveExpr (text "hscCompileExpr") hsc_env prepd_expr
+         ; let iNTERACTIVELoc = ModLocation{ ml_hs_file   = Nothing,
+                                      ml_hi_file   = panic "hscCompileCoreExpr':ml_hi_file",
+                                      ml_obj_file  = panic "hscCompileCoreExpr':ml_obj_file",
+                                      ml_hie_file  = panic "hscCompileCoreExpr':ml_hie_file" }
+
+         ; let ictxt = hsc_IC hsc_env
+         ; (stg_expr, _, _) <-
+             myCoreToStgExpr (hsc_logger hsc_env)
+                             (hsc_dflags hsc_env)
+                             ictxt
+                             (icInteractiveModule ictxt)
+                             iNTERACTIVELoc
+                             prepd_expr
 
            {- Convert to BCOs -}
-         ; bcos <- coreExprToBCOs hsc_env
-                     (icInteractiveModule (hsc_IC hsc_env)) prepd_expr
+         ; bcos <- stgExprToBCOs hsc_env
+                     (icInteractiveModule ictxt)
+                     (exprType prepd_expr)
+                     stg_expr
 
            {- load it -}
-         ; loadExpr hsc_env srcspan bcos }
+         ; loadExpr (hscInterp hsc_env) hsc_env srcspan bcos }
 
 
 {- **********************************************************************

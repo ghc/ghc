@@ -73,6 +73,7 @@ import GHC.Utils.Misc
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
+import GHC.Types.Tickish
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Tidy ( tidyCo )
 import GHC.Types.Demand ( isTopSig )
@@ -194,7 +195,7 @@ toIfaceTypeX fr (TyConApp tc tys)
 
   | tc `elem` [ eqPrimTyCon, eqReprPrimTyCon, heqTyCon ]
   , (k1:k2:_) <- tys
-  = let info = IfaceTyConInfo NotPromoted sort
+  = let info = mkIfaceTyConInfo NotPromoted sort
         sort | k1 `eqType` k2 = IfaceEqualityTyCon
              | otherwise      = IfaceNormalTyCon
     in IfaceTyConApp (IfaceTyCon (tyConName tc) info) (toIfaceTcArgsX fr tc tys)
@@ -224,7 +225,7 @@ toIfaceTyCon tc
   = IfaceTyCon tc_name info
   where
     tc_name = tyConName tc
-    info    = IfaceTyConInfo promoted sort
+    info    = mkIfaceTyConInfo promoted sort
     promoted | isPromotedDataCon tc = IsPromoted
              | otherwise            = NotPromoted
 
@@ -252,7 +253,7 @@ toIfaceTyCon tc
 
 toIfaceTyCon_name :: Name -> IfaceTyCon
 toIfaceTyCon_name n = IfaceTyCon n info
-  where info = IfaceTyConInfo NotPromoted IfaceNormalTyCon
+  where info = mkIfaceTyConInfo NotPromoted IfaceNormalTyCon
   -- Used for the "rough-match" tycon stuff,
   -- where pretty-printing is not an issue
 
@@ -561,7 +562,7 @@ toIfaceOneShot id | isId id
                   = IfaceNoOneShot
 
 ---------------------
-toIfaceTickish :: Tickish Id -> Maybe IfaceTickish
+toIfaceTickish :: CoreTickish -> Maybe IfaceTickish
 toIfaceTickish (ProfNote cc tick push) = Just (IfaceSCC cc tick push)
 toIfaceTickish (HpcTick modl ix)       = Just (IfaceHpcTick modl ix)
 toIfaceTickish (SourceNote src names)  = Just (IfaceSource src names)

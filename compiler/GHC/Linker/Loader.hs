@@ -48,7 +48,6 @@ import GHC.Driver.Ppr
 import GHC.Tc.Utils.Monad
 
 import GHC.Runtime.Interpreter
-import GHC.Runtime.Interpreter.Types
 import GHCi.RemoteTypes
 
 import GHC.Iface.Load
@@ -116,25 +115,19 @@ import GHC.Utils.Exception
 uninitialised :: a
 uninitialised = panic "Loader not initialised"
 
-modifyLS_ :: Loader -> (LoaderState -> IO LoaderState) -> IO ()
-modifyLS_ dl f =
-  modifyMVar_ (loader_state dl) (fmap pure . f . fromMaybe uninitialised)
+modifyLoaderState_ :: Interp -> (LoaderState -> IO LoaderState) -> IO ()
+modifyLoaderState_ interp f =
+  modifyMVar_ (loader_state (interpLoader interp))
+    (fmap pure . f . fromMaybe uninitialised)
 
-modifyLS :: Loader -> (LoaderState -> IO (LoaderState, a)) -> IO a
-modifyLS dl f =
-  modifyMVar (loader_state dl) (fmapFst pure . f . fromMaybe uninitialised)
+modifyLoaderState :: Interp -> (LoaderState -> IO (LoaderState, a)) -> IO a
+modifyLoaderState interp f =
+  modifyMVar (loader_state (interpLoader interp))
+    (fmapFst pure . f . fromMaybe uninitialised)
   where fmapFst f = fmap (\(x, y) -> (f x, y))
 
-readLS :: Loader -> IO LoaderState
-readLS dl =
-  (fmap (fromMaybe uninitialised) . readMVar) (loader_state dl)
-
-modifyMbLS_
-  :: Loader -> (Maybe LoaderState -> IO (Maybe LoaderState)) -> IO ()
-modifyMbLS_ dl f = modifyMVar_ (loader_state dl) f
-
-emptyLS :: LoaderState
-emptyLS = LoaderState
+emptyLoaderState :: LoaderState
+emptyLoaderState = LoaderState
    { closure_env = emptyNameEnv
    , itbl_env    = emptyNameEnv
    , pkgs_loaded = init_pkgs
@@ -149,21 +142,21 @@ emptyLS = LoaderState
   -- explicit list.  See rts/Linker.c for details.
   where init_pkgs = [rtsUnitId]
 
-extendLoadedPkgs :: Loader -> [UnitId] -> IO ()
-extendLoadedPkgs dl pkgs =
-  modifyLS_ dl $ \s ->
+extendLoadedPkgs :: Interp -> [UnitId] -> IO ()
+extendLoadedPkgs interp pkgs =
+  modifyLoaderState_ interp $ \s ->
       return s{ pkgs_loaded = pkgs ++ pkgs_loaded s }
 
-extendLoadedEnv :: Loader -> [(Name,ForeignHValue)] -> IO ()
-extendLoadedEnv dl new_bindings =
-  modifyLS_ dl $ \pls@LoaderState{..} -> do
+extendLoadedEnv :: Interp -> [(Name,ForeignHValue)] -> IO ()
+extendLoadedEnv interp new_bindings =
+  modifyLoaderState_ interp $ \pls@LoaderState{..} -> do
     let new_ce = extendClosureEnv closure_env new_bindings
     return $! pls{ closure_env = new_ce }
     -- strictness is important for not retaining old copies of the pls
 
-deleteFromLoadedEnv :: Loader -> [Name] -> IO ()
-deleteFromLoadedEnv dl to_remove =
-  modifyLS_ dl $ \pls -> do
+deleteFromLoadedEnv :: Interp -> [Name] -> IO ()
+deleteFromLoadedEnv interp to_remove =
+  modifyLoaderState_ interp $ \pls -> do
     let ce = closure_env pls
     let new_ce = delListFromNameEnv ce to_remove
     return pls{ closure_env = new_ce }
@@ -171,15 +164,14 @@ deleteFromLoadedEnv dl to_remove =
 -- | Load the module containing the given Name and get its associated 'HValue'.
 --
 -- Throws a 'ProgramError' if loading fails or the name cannot be found.
-loadName :: HscEnv -> Name -> IO ForeignHValue
-loadName hsc_env name = do
-  let dl = hsc_loader hsc_env
-  initLoaderState hsc_env
-  modifyLS dl $ \pls0 -> do
+loadName :: Interp -> HscEnv -> Name -> IO ForeignHValue
+loadName interp hsc_env name = do
+  initLoaderState interp hsc_env
+  modifyLoaderState interp $ \pls0 -> do
     pls <- if not (isExternalName name)
        then return pls0
        else do
-         (pls', ok) <- loadDependencies hsc_env pls0 noSrcSpan
+         (pls', ok) <- loadDependencies interp hsc_env pls0 noSrcSpan
                           [nameModule name]
          if failed ok
            then throwGhcExceptionIO (ProgramError "")
@@ -189,40 +181,47 @@ loadName hsc_env name = do
       Just (_,aa) -> return (pls,aa)
       Nothing     -> ASSERT2(isExternalName name, ppr name)
                      do let sym_to_find = nameToCLabel name "closure"
-                        m <- lookupClosure hsc_env (unpackFS sym_to_find)
+                        m <- lookupClosure interp (unpackFS sym_to_find)
                         r <- case m of
-                          Just hvref -> mkFinalizedHValue hsc_env hvref
+                          Just hvref -> mkFinalizedHValue interp hvref
                           Nothing -> linkFail "GHC.Linker.Loader.loadName"
                                        (unpackFS sym_to_find)
                         return (pls,r)
 
-loadDependencies :: HscEnv -> LoaderState
-                 -> SrcSpan -> [Module]
-                 -> IO (LoaderState, SuccessFlag)
-loadDependencies hsc_env pls span needed_mods = do
+loadDependencies
+  :: Interp
+  -> HscEnv
+  -> LoaderState
+  -> SrcSpan -> [Module]
+  -> IO (LoaderState, SuccessFlag)
+loadDependencies interp hsc_env pls span needed_mods = do
 --   initLoaderState (hsc_dflags hsc_env) dl
    let hpt = hsc_HPT hsc_env
+   let dflags = hsc_dflags hsc_env
    -- The interpreter and dynamic linker can only handle object code built
    -- the "normal" way, i.e. no non-std ways like profiling or ticky-ticky.
    -- So here we check the build tag: if we're building a non-standard way
    -- then we need to find & link object files built the "normal" way.
-   maybe_normal_osuf <- checkNonStdWay hsc_env span
+   maybe_normal_osuf <- checkNonStdWay dflags interp span
 
    -- Find what packages and linkables are required
    (lnks, pkgs) <- getLinkDeps hsc_env hpt pls
                                maybe_normal_osuf span needed_mods
 
    -- Link the packages and modules required
-   pls1 <- loadPackages' hsc_env pkgs pls
-   loadModules hsc_env pls1 lnks
+   pls1 <- loadPackages' interp hsc_env pkgs pls
+   loadModules interp hsc_env pls1 lnks
 
 
 -- | Temporarily extend the loaded env.
-
-withExtendedLoadedEnv :: (ExceptionMonad m) =>
-                       Loader -> [(Name,ForeignHValue)] -> m a -> m a
-withExtendedLoadedEnv dl new_env action
-    = MC.bracket (liftIO $ extendLoadedEnv dl new_env)
+withExtendedLoadedEnv
+  :: (ExceptionMonad m)
+  => Interp
+  -> [(Name,ForeignHValue)]
+  -> m a
+  -> m a
+withExtendedLoadedEnv interp new_env action
+    = MC.bracket (liftIO $ extendLoadedEnv interp new_env)
                (\_ -> reset_old_env)
                (\_ -> action)
     where
@@ -232,21 +231,25 @@ withExtendedLoadedEnv dl new_env action
         -- package), so the reset action only removes the names we
         -- added earlier.
           reset_old_env = liftIO $
-            modifyLS_ dl $ \pls ->
+            modifyLoaderState_ interp $ \pls ->
                 let cur = closure_env pls
                     new = delListFromNameEnv cur (map fst new_env)
                 in return pls{ closure_env = new }
 
 
--- | Display the persistent linker state.
-showLoaderState :: Loader -> IO SDoc
-showLoaderState dl
-  = do pls <- readLS dl
-       return $ withPprStyle defaultDumpStyle
-                 (vcat [text "----- Loader state -----",
-                        text "Pkgs:" <+> ppr (pkgs_loaded pls),
-                        text "Objs:" <+> ppr (objs_loaded pls),
-                        text "BCOs:" <+> ppr (bcos_loaded pls)])
+-- | Display the loader state.
+showLoaderState :: Interp -> IO SDoc
+showLoaderState interp = do
+  ls <- readMVar (loader_state (interpLoader interp))
+  let docs = case ls of
+        Nothing  -> [ text "Loader not initialised"]
+        Just pls -> [ text "Pkgs:" <+> ppr (pkgs_loaded pls)
+                    , text "Objs:" <+> ppr (objs_loaded pls)
+                    , text "BCOs:" <+> ppr (bcos_loaded pls)
+                    ]
+
+  return $ withPprStyle defaultDumpStyle
+         $ vcat (text "----- Loader state -----":docs)
 
 
 {- **********************************************************************
@@ -273,38 +276,40 @@ showLoaderState dl
 -- nothing.  This is useful in Template Haskell, where we call it before
 -- trying to link.
 --
-initLoaderState :: HscEnv -> IO ()
-initLoaderState hsc_env = do
-  let dl = hsc_loader hsc_env
-  modifyMbLS_ dl $ \pls -> do
+initLoaderState :: Interp -> HscEnv -> IO ()
+initLoaderState interp hsc_env = do
+  modifyMVar_ (loader_state (interpLoader interp)) $ \pls -> do
     case pls of
       Just  _ -> return pls
-      Nothing -> Just <$> reallyInitLoaderState hsc_env
+      Nothing -> Just <$> reallyInitLoaderState interp hsc_env
 
-reallyInitLoaderState :: HscEnv -> IO LoaderState
-reallyInitLoaderState hsc_env = do
+reallyInitLoaderState :: Interp -> HscEnv -> IO LoaderState
+reallyInitLoaderState interp hsc_env = do
   -- Initialise the linker state
-  let pls0 = emptyLS
+  let pls0 = emptyLoaderState
 
   -- (a) initialise the C dynamic linker
-  initObjLinker hsc_env
+  initObjLinker interp
 
   -- (b) Load packages from the command-line (Note [preload packages])
-  pls <- loadPackages' hsc_env (preloadUnits (hsc_units hsc_env)) pls0
+  pls <- loadPackages' interp hsc_env (preloadUnits (hsc_units hsc_env)) pls0
 
   -- steps (c), (d) and (e)
-  loadCmdLineLibs' hsc_env pls
+  loadCmdLineLibs' interp hsc_env pls
 
 
-loadCmdLineLibs :: HscEnv -> IO ()
-loadCmdLineLibs hsc_env = do
-  let dl = hsc_loader hsc_env
-  initLoaderState hsc_env
-  modifyLS_ dl $ \pls ->
-    loadCmdLineLibs' hsc_env pls
+loadCmdLineLibs :: Interp -> HscEnv -> IO ()
+loadCmdLineLibs interp hsc_env = do
+  initLoaderState interp hsc_env
+  modifyLoaderState_ interp $ \pls ->
+    loadCmdLineLibs' interp hsc_env pls
 
-loadCmdLineLibs' :: HscEnv -> LoaderState -> IO LoaderState
-loadCmdLineLibs' hsc_env pls =
+loadCmdLineLibs'
+  :: Interp
+  -> HscEnv
+  -> LoaderState
+  -> IO LoaderState
+loadCmdLineLibs' interp hsc_env pls =
   do
       let dflags@(DynFlags { ldInputs = cmdline_ld_inputs
                            , libraryPaths = lib_paths_base})
@@ -335,7 +340,7 @@ loadCmdLineLibs' hsc_env pls =
       maybePutStr logger dflags (unlines $ map ("  "++) gcc_paths)
 
       libspecs
-        <- mapM (locateLib hsc_env False lib_paths_env gcc_paths) minus_ls
+        <- mapM (locateLib interp hsc_env False lib_paths_env gcc_paths) minus_ls
 
       -- (d) Link .o files from the command-line
       classified_ld_inputs <- mapM (classifyLdInput logger dflags)
@@ -364,17 +369,17 @@ loadCmdLineLibs' hsc_env pls =
                            in nub $ map normalise paths
            let lib_paths = nub $ lib_paths_base ++ gcc_paths
            all_paths_env <- addEnvPaths "LD_LIBRARY_PATH" all_paths
-           pathCache <- mapM (addLibrarySearchPath hsc_env) all_paths_env
+           pathCache <- mapM (addLibrarySearchPath interp) all_paths_env
 
            let merged_specs = mergeStaticObjects cmdline_lib_specs
-           pls1 <- foldM (preloadLib hsc_env lib_paths framework_paths) pls
+           pls1 <- foldM (preloadLib interp hsc_env lib_paths framework_paths) pls
                          merged_specs
 
            maybePutStr logger dflags "final link ... "
-           ok <- resolveObjs hsc_env
+           ok <- resolveObjs interp
 
            -- DLLs are loaded, reset the search paths
-           mapM_ (removeLibrarySearchPath hsc_env) $ reverse pathCache
+           mapM_ (removeLibrarySearchPath interp) $ reverse pathCache
 
            if succeeded ok then maybePutStrLn logger dflags "done"
            else throwGhcExceptionIO (ProgramError "linking extra libraries/objects failed")
@@ -431,9 +436,14 @@ classifyLdInput logger dflags f
     where platform = targetPlatform dflags
 
 preloadLib
-  :: HscEnv -> [String] -> [String] -> LoaderState
-  -> LibrarySpec -> IO LoaderState
-preloadLib hsc_env lib_paths framework_paths pls lib_spec = do
+  :: Interp
+  -> HscEnv
+  -> [String]
+  -> [String]
+  -> LoaderState
+  -> LibrarySpec
+  -> IO LoaderState
+preloadLib interp hsc_env lib_paths framework_paths pls lib_spec = do
   maybePutStr logger dflags ("Loading object " ++ showLS lib_spec ++ " ... ")
   case lib_spec of
     Objects static_ishs -> do
@@ -447,7 +457,7 @@ preloadLib hsc_env lib_paths framework_paths pls lib_spec = do
       return pls
 
     DLL dll_unadorned -> do
-      maybe_errstr <- loadDLL hsc_env (platformSOName platform dll_unadorned)
+      maybe_errstr <- loadDLL interp (platformSOName platform dll_unadorned)
       case maybe_errstr of
          Nothing -> maybePutStrLn logger dflags "done"
          Just mm | platformOS platform /= OSDarwin ->
@@ -457,14 +467,14 @@ preloadLib hsc_env lib_paths framework_paths pls lib_spec = do
            -- since (apparently) some things install that way - see
            -- ticket #8770.
            let libfile = ("lib" ++ dll_unadorned) <.> "so"
-           err2 <- loadDLL hsc_env libfile
+           err2 <- loadDLL interp libfile
            case err2 of
              Nothing -> maybePutStrLn logger dflags "done"
              Just _  -> preloadFailed mm lib_paths lib_spec
       return pls
 
     DLLPath dll_path -> do
-      do maybe_errstr <- loadDLL hsc_env dll_path
+      do maybe_errstr <- loadDLL interp dll_path
          case maybe_errstr of
             Nothing -> maybePutStrLn logger dflags "done"
             Just mm -> preloadFailed mm lib_paths lib_spec
@@ -472,7 +482,7 @@ preloadLib hsc_env lib_paths framework_paths pls lib_spec = do
 
     Framework framework ->
       if platformUsesFrameworks (targetPlatform dflags)
-      then do maybe_errstr <- loadFramework hsc_env framework_paths framework
+      then do maybe_errstr <- loadFramework interp framework_paths framework
               case maybe_errstr of
                  Nothing -> maybePutStrLn logger dflags "done"
                  Just mm -> preloadFailed mm framework_paths lib_spec
@@ -501,9 +511,9 @@ preloadLib hsc_env lib_paths framework_paths pls lib_spec = do
        = do b <- or <$> mapM doesFileExist names
             if not b then return (False, pls)
                      else if hostIsDynamic
-                             then  do pls1 <- dynLoadObjs hsc_env pls names
+                             then  do pls1 <- dynLoadObjs interp hsc_env pls names
                                       return (True, pls1)
-                             else  do mapM_ (loadObj hsc_env) names
+                             else  do mapM_ (loadObj interp) names
                                       return (True, pls)
 
     preload_static_archive _paths name
@@ -512,7 +522,7 @@ preloadLib hsc_env lib_paths framework_paths pls lib_spec = do
                      else do if hostIsDynamic
                                  then throwGhcExceptionIO $
                                       CmdLineError dynamic_msg
-                                 else loadArchive hsc_env name
+                                 else loadArchive interp name
                              return True
       where
         dynamic_msg = unlines
@@ -535,38 +545,31 @@ preloadLib hsc_env lib_paths framework_paths pls lib_spec = do
 -- Raises an IO exception ('ProgramError') if it can't find a compiled
 -- version of the dependents to load.
 --
-loadExpr :: HscEnv -> SrcSpan -> UnlinkedBCO -> IO ForeignHValue
-loadExpr hsc_env span root_ul_bco
-  = do {
-     -- Initialise the linker (if it's not been done already)
-   ; initLoaderState hsc_env
+loadExpr :: Interp -> HscEnv -> SrcSpan -> UnlinkedBCO -> IO ForeignHValue
+loadExpr interp hsc_env span root_ul_bco = do
+  -- Initialise the linker (if it's not been done already)
+  initLoaderState interp hsc_env
 
-     -- Extract the Loader value for passing into required places
-   ; let dl = hsc_loader hsc_env
+  -- Take lock for the actual work.
+  modifyLoaderState interp $ \pls0 -> do
+    -- Load the packages and modules required
+    (pls, ok) <- loadDependencies interp hsc_env pls0 span needed_mods
+    if failed ok
+      then throwGhcExceptionIO (ProgramError "")
+      else do
+        -- Load the expression itself
+        let ie = itbl_env pls
+            ce = closure_env pls
 
-     -- Take lock for the actual work.
-   ; modifyLS dl $ \pls0 -> do {
-
-     -- Load the packages and modules required
-   ; (pls, ok) <- loadDependencies hsc_env pls0 span needed_mods
-   ; if failed ok then
-        throwGhcExceptionIO (ProgramError "")
-     else do {
-
-     -- Load the expression itself
-     let ie = itbl_env pls
-         ce = closure_env pls
-
-     -- Load the necessary packages and linkables
-
-   ; let nobreakarray = error "no break array"
-         bco_ix = mkNameEnv [(unlinkedBCOName root_ul_bco, 0)]
-   ; resolved <- linkBCO hsc_env ie ce bco_ix nobreakarray root_ul_bco
-   ; [root_hvref] <- createBCOs hsc_env [resolved]
-   ; fhv <- mkFinalizedHValue hsc_env root_hvref
-   ; return (pls, fhv)
-   }}}
-   where
+        -- Load the necessary packages and linkables
+        let nobreakarray = error "no break array"
+            bco_ix = mkNameEnv [(unlinkedBCOName root_ul_bco, 0)]
+        resolved <- linkBCO interp ie ce bco_ix nobreakarray root_ul_bco
+        [root_hvref] <- createBCOs interp dflags [resolved]
+        fhv <- mkFinalizedHValue interp root_hvref
+        return (pls, fhv)
+  where
+     dflags = hsc_dflags hsc_env
      free_names = uniqDSetToList (bcoFreeNames root_ul_bco)
 
      needed_mods :: [Module]
@@ -583,9 +586,9 @@ dieWith :: DynFlags -> SrcSpan -> SDoc -> IO a
 dieWith dflags span msg = throwGhcExceptionIO (ProgramError (showSDoc dflags (mkLocMessage SevFatal span msg)))
 
 
-checkNonStdWay :: HscEnv -> SrcSpan -> IO (Maybe FilePath)
-checkNonStdWay hsc_env srcspan
-  | Just (ExternalInterp {}) <- hsc_interp hsc_env = return Nothing
+checkNonStdWay :: DynFlags -> Interp -> SrcSpan -> IO (Maybe FilePath)
+checkNonStdWay dflags interp srcspan
+  | ExternalInterp {} <- interpInstance interp = return Nothing
     -- with -fexternal-interpreter we load the .o files, whatever way
     -- they were built.  If they were built for a non-std way, then
     -- we will use the appropriate variant of the iserv binary to load them.
@@ -594,12 +597,12 @@ checkNonStdWay hsc_env srcspan
     -- Only if we are compiling with the same ways as GHC is built
     -- with, can we dynamically load those object files. (see #3604)
 
-  | objectSuf (hsc_dflags hsc_env) == normalObjectSuffix && not (null targetFullWays)
-  = failNonStd (hsc_dflags hsc_env) srcspan
+  | objectSuf dflags == normalObjectSuffix && not (null targetFullWays)
+  = failNonStd dflags srcspan
 
   | otherwise = return (Just (hostWayTag ++ "o"))
   where
-    targetFullWays = fullWays (ways (hsc_dflags hsc_env))
+    targetFullWays = fullWays (ways dflags)
     hostWayTag = case waysTag hostFullWays of
                   "" -> ""
                   tag -> tag ++ "_"
@@ -728,7 +731,10 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
         | otherwise
         = do    -- It's not in the HPT because we are in one shot mode,
                 -- so use the Finder to get a ModLocation...
-             mb_stuff <- findHomeModule hsc_env mod_name
+             let fc = hsc_FC hsc_env
+             let home_unit = hsc_home_unit hsc_env
+             let dflags = hsc_dflags hsc_env
+             mb_stuff <- findHomeModule fc home_unit dflags mod_name
              case mb_stuff of
                   Found loc mod -> found loc mod
                   _ -> no_obj mod_name
@@ -771,18 +777,15 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
 
   ********************************************************************* -}
 
-loadDecls :: HscEnv -> SrcSpan -> CompiledByteCode -> IO ()
-loadDecls hsc_env span cbc@CompiledByteCode{..} = do
+loadDecls :: Interp -> HscEnv -> SrcSpan -> CompiledByteCode -> IO ()
+loadDecls interp hsc_env span cbc@CompiledByteCode{..} = do
     -- Initialise the linker (if it's not been done already)
-    initLoaderState hsc_env
-
-    -- Extract the Loader for passing into required places
-    let dl = hsc_loader hsc_env
+    initLoaderState interp hsc_env
 
     -- Take lock for the actual work.
-    modifyLS_ dl $ \pls0 -> do
+    modifyLoaderState_ interp $ \pls0 -> do
       -- Link the packages and modules required
-      (pls, ok) <- loadDependencies hsc_env pls0 span needed_mods
+      (pls, ok) <- loadDependencies interp hsc_env pls0 span needed_mods
       if failed ok
         then throwGhcExceptionIO (ProgramError "")
         else do
@@ -791,12 +794,13 @@ loadDecls hsc_env span cbc@CompiledByteCode{..} = do
               ce = closure_env pls
 
           -- Link the necessary packages and linkables
-          new_bindings <- linkSomeBCOs hsc_env ie ce [cbc]
-          nms_fhvs <- makeForeignNamedHValueRefs hsc_env new_bindings
+          new_bindings <- linkSomeBCOs dflags interp ie ce [cbc]
+          nms_fhvs <- makeForeignNamedHValueRefs interp new_bindings
           let pls2 = pls { closure_env = extendClosureEnv ce nms_fhvs
                          , itbl_env    = ie }
           return pls2
   where
+    dflags = hsc_dflags hsc_env
     free_names = uniqDSetToList $
       foldr (unionUniqDSets . bcoFreeNames) emptyUniqDSet bc_bcos
 
@@ -816,12 +820,11 @@ loadDecls hsc_env span cbc@CompiledByteCode{..} = do
 
   ********************************************************************* -}
 
-loadModule :: HscEnv -> Module -> IO ()
-loadModule hsc_env mod = do
-  initLoaderState hsc_env
-  let dl = hsc_loader hsc_env
-  modifyLS_ dl $ \pls -> do
-    (pls', ok) <- loadDependencies hsc_env pls noSrcSpan [mod]
+loadModule :: Interp -> HscEnv -> Module -> IO ()
+loadModule interp hsc_env mod = do
+  initLoaderState interp hsc_env
+  modifyLoaderState_ interp $ \pls -> do
+    (pls', ok) <- loadDependencies interp hsc_env pls noSrcSpan [mod]
     if failed ok
       then throwGhcExceptionIO (ProgramError "could not load module")
       else return pls'
@@ -834,20 +837,21 @@ loadModule hsc_env mod = do
 
   ********************************************************************* -}
 
-loadModules :: HscEnv -> LoaderState -> [Linkable] -> IO (LoaderState, SuccessFlag)
-loadModules hsc_env pls linkables
+loadModules :: Interp -> HscEnv -> LoaderState -> [Linkable] -> IO (LoaderState, SuccessFlag)
+loadModules interp hsc_env pls linkables
   = mask_ $ do  -- don't want to be interrupted by ^C in here
 
         let (objs, bcos) = partition isObjectLinkable
                               (concatMap partitionLinkable linkables)
+        let dflags = hsc_dflags hsc_env
 
                 -- Load objects first; they can't depend on BCOs
-        (pls1, ok_flag) <- loadObjects hsc_env pls objs
+        (pls1, ok_flag) <- loadObjects interp hsc_env pls objs
 
         if failed ok_flag then
                 return (pls1, Failed)
           else do
-                pls2 <- dynLinkBCOs hsc_env pls1 bcos
+                pls2 <- dynLinkBCOs dflags interp pls1 bcos
                 return (pls2, Succeeded)
 
 
@@ -887,35 +891,39 @@ linkableInSet l objs_loaded =
 --
 -- If the interpreter uses dynamic-linking, build a shared library and load it.
 -- Otherwise, use the RTS linker.
-loadObjects :: HscEnv -> LoaderState -> [Linkable]
-            -> IO (LoaderState, SuccessFlag)
-loadObjects hsc_env pls objs = do
+loadObjects
+  :: Interp
+  -> HscEnv
+  -> LoaderState
+  -> [Linkable]
+  -> IO (LoaderState, SuccessFlag)
+loadObjects interp hsc_env pls objs = do
         let (objs_loaded', new_objs) = rmDupLinkables (objs_loaded pls) objs
             pls1                     = pls { objs_loaded = objs_loaded' }
             unlinkeds                = concatMap linkableUnlinked new_objs
             wanted_objs              = map nameOfObject unlinkeds
 
-        if interpreterDynamic (hscInterp hsc_env)
-            then do pls2 <- dynLoadObjs hsc_env pls1 wanted_objs
+        if interpreterDynamic interp
+            then do pls2 <- dynLoadObjs interp hsc_env pls1 wanted_objs
                     return (pls2, Succeeded)
-            else do mapM_ (loadObj hsc_env) wanted_objs
+            else do mapM_ (loadObj interp) wanted_objs
 
                     -- Link them all together
-                    ok <- resolveObjs hsc_env
+                    ok <- resolveObjs interp
 
                     -- If resolving failed, unload all our
                     -- object modules and carry on
                     if succeeded ok then
                             return (pls1, Succeeded)
                       else do
-                            pls2 <- unload_wkr hsc_env [] pls1
+                            pls2 <- unload_wkr interp [] pls1
                             return (pls2, Failed)
 
 
 -- | Create a shared library containing the given object files and load it.
-dynLoadObjs :: HscEnv -> LoaderState -> [FilePath] -> IO LoaderState
-dynLoadObjs _       pls                           []   = return pls
-dynLoadObjs hsc_env pls@LoaderState{..} objs = do
+dynLoadObjs :: Interp -> HscEnv -> LoaderState -> [FilePath] -> IO LoaderState
+dynLoadObjs _      _       pls                           []   = return pls
+dynLoadObjs interp hsc_env pls@LoaderState{..} objs = do
     let unit_env = hsc_unit_env hsc_env
     let dflags   = hsc_dflags hsc_env
     let logger   = hsc_logger hsc_env
@@ -974,7 +982,7 @@ dynLoadObjs hsc_env pls@LoaderState{..} objs = do
 
     -- if we got this far, extend the lifetime of the library file
     changeTempFilesLifetime tmpfs TFL_GhcSession [soFile]
-    m <- loadDLL hsc_env soFile
+    m <- loadDLL interp soFile
     case m of
         Nothing -> return $! pls { temp_sos = (libPath, libName) : temp_sos }
         Just err -> linkFail msg err
@@ -1000,8 +1008,8 @@ rmDupLinkables already ls
   ********************************************************************* -}
 
 
-dynLinkBCOs :: HscEnv -> LoaderState -> [Linkable] -> IO LoaderState
-dynLinkBCOs hsc_env pls bcos = do
+dynLinkBCOs :: DynFlags -> Interp -> LoaderState -> [Linkable] -> IO LoaderState
+dynLinkBCOs dflags interp pls bcos = do
 
         let (bcos_loaded', new_bcos) = rmDupLinkables (bcos_loaded pls) bcos
             pls1                     = pls { bcos_loaded = bcos_loaded' }
@@ -1016,21 +1024,22 @@ dynLinkBCOs hsc_env pls bcos = do
             gce       = closure_env pls
             final_ie  = foldr plusNameEnv (itbl_env pls) ies
 
-        names_and_refs <- linkSomeBCOs hsc_env final_ie gce cbcs
+        names_and_refs <- linkSomeBCOs dflags interp final_ie gce cbcs
 
         -- We only want to add the external ones to the ClosureEnv
         let (to_add, to_drop) = partition (isExternalName.fst) names_and_refs
 
         -- Immediately release any HValueRefs we're not going to add
-        freeHValueRefs hsc_env (map snd to_drop)
+        freeHValueRefs interp (map snd to_drop)
         -- Wrap finalizers on the ones we want to keep
-        new_binds <- makeForeignNamedHValueRefs hsc_env to_add
+        new_binds <- makeForeignNamedHValueRefs interp to_add
 
         return pls1 { closure_env = extendClosureEnv gce new_binds,
                       itbl_env    = final_ie }
 
 -- Link a bunch of BCOs and return references to their values
-linkSomeBCOs :: HscEnv
+linkSomeBCOs :: DynFlags
+             -> Interp
              -> ItblEnv
              -> ClosureEnv
              -> [CompiledByteCode]
@@ -1039,7 +1048,7 @@ linkSomeBCOs :: HscEnv
                         -- the incoming unlinked BCOs.  Each gives the
                         -- value of the corresponding unlinked BCO
 
-linkSomeBCOs hsc_env ie ce mods = foldr fun do_link mods []
+linkSomeBCOs dflags interp ie ce mods = foldr fun do_link mods []
  where
   fun CompiledByteCode{..} inner accum =
     case bc_breaks of
@@ -1052,16 +1061,16 @@ linkSomeBCOs hsc_env ie ce mods = foldr fun do_link mods []
     let flat = [ (breakarray, bco) | (breakarray, bcos) <- mods, bco <- bcos ]
         names = map (unlinkedBCOName . snd) flat
         bco_ix = mkNameEnv (zip names [0..])
-    resolved <- sequence [ linkBCO hsc_env ie ce bco_ix breakarray bco
+    resolved <- sequence [ linkBCO interp ie ce bco_ix breakarray bco
                          | (breakarray, bco) <- flat ]
-    hvrefs <- createBCOs hsc_env resolved
+    hvrefs <- createBCOs interp dflags resolved
     return (zip names hvrefs)
 
 -- | Useful to apply to the result of 'linkSomeBCOs'
 makeForeignNamedHValueRefs
-  :: HscEnv -> [(Name,HValueRef)] -> IO [(Name,ForeignHValue)]
-makeForeignNamedHValueRefs hsc_env bindings =
-  mapM (\(n, hvref) -> (n,) <$> mkFinalizedHValue hsc_env hvref) bindings
+  :: Interp -> [(Name,HValueRef)] -> IO [(Name,ForeignHValue)]
+makeForeignNamedHValueRefs interp bindings =
+  mapM (\(n, hvref) -> (n,) <$> mkFinalizedHValue interp hvref) bindings
 
 {- **********************************************************************
 
@@ -1083,21 +1092,20 @@ makeForeignNamedHValueRefs hsc_env bindings =
 --
 --   * we also implicitly unload all temporary bindings at this point.
 --
-unload :: HscEnv
-       -> [Linkable] -- ^ The linkables to *keep*.
-       -> IO ()
-unload hsc_env linkables
+unload
+  :: Interp
+  -> HscEnv
+  -> [Linkable] -- ^ The linkables to *keep*.
+  -> IO ()
+unload interp hsc_env linkables
   = mask_ $ do -- mask, so we're safe from Ctrl-C in here
 
         -- Initialise the linker (if it's not been done already)
-        initLoaderState hsc_env
-
-        -- Extract Loader for passing into required places
-        let dl = hsc_loader hsc_env
+        initLoaderState interp hsc_env
 
         new_pls
-            <- modifyLS dl $ \pls -> do
-                 pls1 <- unload_wkr hsc_env linkables pls
+            <- modifyLoaderState interp $ \pls -> do
+                 pls1 <- unload_wkr interp linkables pls
                  return (pls1, pls1)
 
         let dflags = hsc_dflags hsc_env
@@ -1108,14 +1116,15 @@ unload hsc_env linkables
           text "unload: retaining bcos" <+> ppr (bcos_loaded new_pls)
         return ()
 
-unload_wkr :: HscEnv
-           -> [Linkable]                -- stable linkables
-           -> LoaderState
-           -> IO LoaderState
+unload_wkr
+  :: Interp
+  -> [Linkable]                -- stable linkables
+  -> LoaderState
+  -> IO LoaderState
 -- Does the core unload business
 -- (the wrapper blocks exceptions and deals with the LS get and put)
 
-unload_wkr hsc_env keep_linkables pls@LoaderState{..}  = do
+unload_wkr interp keep_linkables pls@LoaderState{..}  = do
   -- NB. careful strictness here to avoid keeping the old LS when
   -- we're unloading some code.  -fghci-leak-check with the tests in
   -- testsuite/ghci can detect space leaks here.
@@ -1136,7 +1145,7 @@ unload_wkr hsc_env keep_linkables pls@LoaderState{..}  = do
   -- of lookupSymbol results.
   when (not (null (objs_to_unload ++
                    filter (not . null . linkableObjs) bcos_to_unload))) $
-    purgeLookupSymbolCache hsc_env
+    purgeLookupSymbolCache interp
 
   let !bcos_retained = mkModuleSet $ map linkableModule remaining_bcos_loaded
 
@@ -1168,7 +1177,7 @@ unload_wkr hsc_env keep_linkables pls@LoaderState{..}  = do
         -- not much benefit.
 
       | otherwise
-      = mapM_ (unloadObj hsc_env) [f | DotO f <- linkableUnlinked lnk]
+      = mapM_ (unloadObj interp) [f | DotO f <- linkableUnlinked lnk]
                 -- The components of a BCO linkable may contain
                 -- dot-o files.  Which is very confusing.
                 --
@@ -1237,7 +1246,7 @@ showLS (Framework nm) = "(framework) " ++ nm
 -- automatically, and it doesn't matter what order you specify the input
 -- packages.
 --
-loadPackages :: HscEnv -> [UnitId] -> IO ()
+loadPackages :: Interp -> HscEnv -> [UnitId] -> IO ()
 -- NOTE: in fact, since each module tracks all the packages it depends on,
 --       we don't really need to use the package-config dependencies.
 --
@@ -1246,16 +1255,15 @@ loadPackages :: HscEnv -> [UnitId] -> IO ()
 -- perhaps makes the error message a bit more localised if we get a link
 -- failure.  So the dependency walking code is still here.
 
-loadPackages hsc_env new_pkgs = do
+loadPackages interp hsc_env new_pkgs = do
   -- It's probably not safe to try to load packages concurrently, so we take
   -- a lock.
-  initLoaderState hsc_env
-  let dl = hsc_loader hsc_env
-  modifyLS_ dl $ \pls ->
-    loadPackages' hsc_env new_pkgs pls
+  initLoaderState interp hsc_env
+  modifyLoaderState_ interp $ \pls ->
+    loadPackages' interp hsc_env new_pkgs pls
 
-loadPackages' :: HscEnv -> [UnitId] -> LoaderState -> IO LoaderState
-loadPackages' hsc_env new_pks pls = do
+loadPackages' :: Interp -> HscEnv -> [UnitId] -> LoaderState -> IO LoaderState
+loadPackages' interp hsc_env new_pks pls = do
     pkgs' <- link (pkgs_loaded pls) new_pks
     return $! pls { pkgs_loaded = pkgs' }
   where
@@ -1271,20 +1279,20 @@ loadPackages' hsc_env new_pks pls = do
         = do {  -- Link dependents first
                pkgs' <- link pkgs (unitDepends pkg_cfg)
                 -- Now link the package itself
-             ; loadPackage hsc_env pkg_cfg
+             ; loadPackage interp hsc_env pkg_cfg
              ; return (new_pkg : pkgs') }
 
         | otherwise
         = throwGhcExceptionIO (CmdLineError ("unknown package: " ++ unpackFS (unitIdFS new_pkg)))
 
 
-loadPackage :: HscEnv -> UnitInfo -> IO ()
-loadPackage hsc_env pkg
+loadPackage :: Interp -> HscEnv -> UnitInfo -> IO ()
+loadPackage interp hsc_env pkg
    = do
         let dflags    = hsc_dflags hsc_env
         let logger    = hsc_logger hsc_env
             platform  = targetPlatform dflags
-            is_dyn    = interpreterDynamic (hscInterp hsc_env)
+            is_dyn    = interpreterDynamic interp
             dirs | is_dyn    = map ST.unpack $ Packages.unitLibraryDynDirs pkg
                  | otherwise = map ST.unpack $ Packages.unitLibraryDirs pkg
 
@@ -1314,9 +1322,9 @@ loadPackage hsc_env pkg
         dirs_env <- addEnvPaths "LIBRARY_PATH" dirs
 
         hs_classifieds
-           <- mapM (locateLib hsc_env True  dirs_env gcc_paths) hs_libs'
+           <- mapM (locateLib interp hsc_env True  dirs_env gcc_paths) hs_libs'
         extra_classifieds
-           <- mapM (locateLib hsc_env False dirs_env gcc_paths) extra_libs
+           <- mapM (locateLib interp hsc_env False dirs_env gcc_paths) extra_libs
         let classifieds = hs_classifieds ++ extra_classifieds
 
         -- Complication: all the .so's must be loaded before any of the .o's.
@@ -1330,7 +1338,7 @@ loadPackage hsc_env pkg
         let dll_paths  = map takeDirectory known_dlls
             all_paths  = nub $ map normalise $ dll_paths ++ dirs
         all_paths_env <- addEnvPaths "LD_LIBRARY_PATH" all_paths
-        pathCache <- mapM (addLibrarySearchPath hsc_env) all_paths_env
+        pathCache <- mapM (addLibrarySearchPath interp) all_paths_env
 
         maybePutSDoc logger dflags
             (text "Loading unit " <> pprUnitInfoForUser pkg <> text " ... ")
@@ -1338,28 +1346,28 @@ loadPackage hsc_env pkg
         -- See comments with partOfGHCi
 #if defined(CAN_LOAD_DLL)
         when (unitPackageName pkg `notElem` partOfGHCi) $ do
-            loadFrameworks hsc_env platform pkg
+            loadFrameworks interp platform pkg
             -- See Note [Crash early load_dyn and locateLib]
             -- Crash early if can't load any of `known_dlls`
-            mapM_ (load_dyn hsc_env True) known_dlls
+            mapM_ (load_dyn interp hsc_env True) known_dlls
             -- For remaining `dlls` crash early only when there is surely
             -- no package's DLL around ... (not is_dyn)
-            mapM_ (load_dyn hsc_env (not is_dyn) . platformSOName platform) dlls
+            mapM_ (load_dyn interp hsc_env (not is_dyn) . platformSOName platform) dlls
 #endif
         -- After loading all the DLLs, we can load the static objects.
         -- Ordering isn't important here, because we do one final link
         -- step to resolve everything.
-        mapM_ (loadObj hsc_env) objs
-        mapM_ (loadArchive hsc_env) archs
+        mapM_ (loadObj interp) objs
+        mapM_ (loadArchive interp) archs
 
         maybePutStr logger dflags "linking ... "
-        ok <- resolveObjs hsc_env
+        ok <- resolveObjs interp
 
         -- DLLs are loaded, reset the search paths
         -- Import libraries will be loaded via loadArchive so only
         -- reset the DLL search path after all archives are loaded
         -- as well.
-        mapM_ (removeLibrarySearchPath hsc_env) $ reverse pathCache
+        mapM_ (removeLibrarySearchPath interp) $ reverse pathCache
 
         if succeeded ok
            then maybePutStrLn logger dflags "done."
@@ -1414,9 +1422,9 @@ restriction very easily.
 -- can be passed directly to loadDLL.  They are either fully-qualified
 -- ("/usr/lib/libfoo.so"), or unqualified ("libfoo.so").  In the latter case,
 -- loadDLL is going to search the system paths to find the library.
-load_dyn :: HscEnv -> Bool -> FilePath -> IO ()
-load_dyn hsc_env crash_early dll = do
-  r <- loadDLL hsc_env dll
+load_dyn :: Interp -> HscEnv -> Bool -> FilePath -> IO ()
+load_dyn interp hsc_env crash_early dll = do
+  r <- loadDLL interp dll
   case r of
     Nothing  -> return ()
     Just err ->
@@ -1436,14 +1444,14 @@ load_dyn hsc_env crash_early dll = do
       , "(the package DLL is loaded by the system linker"
       , " which manages dependencies by itself)." ]
 
-loadFrameworks :: HscEnv -> Platform -> UnitInfo -> IO ()
-loadFrameworks hsc_env platform pkg
+loadFrameworks :: Interp -> Platform -> UnitInfo -> IO ()
+loadFrameworks interp platform pkg
     = when (platformUsesFrameworks platform) $ mapM_ load frameworks
   where
     fw_dirs    = map ST.unpack $ Packages.unitExtDepFrameworkDirs pkg
     frameworks = map ST.unpack $ Packages.unitExtDepFrameworks pkg
 
-    load fw = do  r <- loadFramework hsc_env fw_dirs fw
+    load fw = do  r <- loadFramework interp fw_dirs fw
                   case r of
                     Nothing  -> return ()
                     Just err -> cmdLineErrorIO ("can't load framework: "
@@ -1455,9 +1463,15 @@ loadFrameworks hsc_env platform pkg
 -- standard system search path.
 -- For GHCi we tend to prefer dynamic libraries over static ones as
 -- they are easier to load and manage, have less overhead.
-locateLib :: HscEnv -> Bool -> [FilePath] -> [FilePath] -> String
-          -> IO LibrarySpec
-locateLib hsc_env is_hs lib_dirs gcc_dirs lib
+locateLib
+  :: Interp
+  -> HscEnv
+  -> Bool
+  -> [FilePath]
+  -> [FilePath]
+  -> String
+  -> IO LibrarySpec
+locateLib interp hsc_env is_hs lib_dirs gcc_dirs lib
   | not is_hs
     -- For non-Haskell libraries (e.g. gmp, iconv):
     --   first look in library-dirs for a dynamic library (on User paths only)
@@ -1510,7 +1524,6 @@ locateLib hsc_env is_hs lib_dirs gcc_dirs lib
    where
      dflags = hsc_dflags hsc_env
      logger = hsc_logger hsc_env
-     interp = hscInterp hsc_env
      dirs   = lib_dirs ++ gcc_dirs
      gcc    = False
      user   = True
@@ -1549,7 +1562,7 @@ locateLib hsc_env is_hs lib_dirs gcc_dirs lib
      findDll    re = let dirs' = if re == user then lib_dirs else gcc_dirs
                      in liftM (fmap DLLPath) $ findFile dirs' dyn_lib_file
      findSysDll    = fmap (fmap $ DLL . dropExtension . takeFileName) $
-                        findSystemLibrary hsc_env so_name
+                        findSystemLibrary interp so_name
      tryGcc        = let search   = searchForLibUsingGcc logger dflags
                          dllpath  = liftM (fmap DLLPath)
                          short    = dllpath $ search so_name lib_dirs

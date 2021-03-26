@@ -112,13 +112,13 @@ tcPolyLExpr, tcPolyLExprNC :: LHsExpr GhcRn -> ExpSigmaType
                            -> TcM (LHsExpr GhcTc)
 
 tcPolyLExpr (L loc expr) res_ty
-  = setSrcSpan loc   $  -- Set location /first/; see GHC.Tc.Utils.Monad
+  = setSrcSpanA loc   $  -- Set location /first/; see GHC.Tc.Utils.Monad
     addExprCtxt expr $  -- Note [Error contexts in generated code]
     do { expr' <- tcPolyExpr expr res_ty
        ; return (L loc expr') }
 
 tcPolyLExprNC (L loc expr) res_ty
-  = setSrcSpan loc    $
+  = setSrcSpanA loc    $
     do { expr' <- tcPolyExpr expr res_ty
        ; return (L loc expr') }
 
@@ -138,13 +138,13 @@ tcMonoExpr, tcMonoExprNC
     -> TcM (LHsExpr GhcTc)
 
 tcMonoExpr (L loc expr) res_ty
-  = setSrcSpan loc   $  -- Set location /first/; see GHC.Tc.Utils.Monad
+  = setSrcSpanA loc   $  -- Set location /first/; see GHC.Tc.Utils.Monad
     addExprCtxt expr $  -- Note [Error contexts in generated code]
     do  { expr' <- tcExpr expr res_ty
         ; return (L loc expr') }
 
 tcMonoExprNC (L loc expr) res_ty
-  = setSrcSpan loc $
+  = setSrcSpanA loc $
     do  { expr' <- tcExpr expr res_ty
         ; return (L loc expr') }
 
@@ -152,13 +152,13 @@ tcMonoExprNC (L loc expr) res_ty
 tcInferRho, tcInferRhoNC :: LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcRhoType)
 -- Infer a *rho*-type. The return type is always instantiated.
 tcInferRho (L loc expr)
-  = setSrcSpan loc   $  -- Set location /first/; see GHC.Tc.Utils.Monad
+  = setSrcSpanA loc   $  -- Set location /first/; see GHC.Tc.Utils.Monad
     addExprCtxt expr $  -- Note [Error contexts in generated code]
     do { (expr', rho) <- tcInfer (tcExpr expr)
        ; return (L loc expr', rho) }
 
 tcInferRhoNC (L loc expr)
-  = setSrcSpan loc $
+  = setSrcSpanA loc $
     do { (expr', rho) <- tcInfer (tcExpr expr)
        ; return (L loc expr', rho) }
 
@@ -206,7 +206,7 @@ tcExpr e@(HsOverLit _ lit) res_ty
   = do { mb_res <- tcShortCutLit lit res_ty
          -- See Note [Short cut for overloaded literals] in GHC.Tc.Utils.Zonk
        ; case mb_res of
-           Just lit' -> return (HsOverLit noExtField lit')
+           Just lit' -> return (HsOverLit noAnn lit')
            Nothing   -> tcApp e res_ty }
 
 -- Typecheck an occurrence of an unbound Id
@@ -249,7 +249,7 @@ tcExpr e@(HsIPVar _ x) res_ty
        ; ipClass <- tcLookupClass ipClassName
        ; ip_var <- emitWantedEvVar origin (mkClassPred ipClass [ip_name, ip_ty])
        ; tcWrapResult e
-                   (fromDict ipClass ip_name ip_ty (HsVar noExtField (noLoc ip_var)))
+                   (fromDict ipClass ip_name ip_ty (HsVar noExtField (noLocA ip_var)))
                    ip_ty res_ty }
   where
   -- Coerces a dictionary for `IP "x" t` into `t`.
@@ -257,9 +257,9 @@ tcExpr e@(HsIPVar _ x) res_ty
                           unwrapIP $ mkClassPred ipClass [x,ty]
   origin = IPOccOrigin x
 
-tcExpr (HsLam x match) res_ty
+tcExpr (HsLam _ match) res_ty
   = do  { (wrap, match') <- tcMatchLambda herald match_ctxt match res_ty
-        ; return (mkHsWrap wrap (HsLam x match')) }
+        ; return (mkHsWrap wrap (HsLam noExtField match')) }
   where
     match_ctxt = MC { mc_what = LambdaExpr, mc_body = tcBody }
     herald = sep [ text "The lambda expression" <+>
@@ -328,7 +328,7 @@ tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
        ; tup_args1 <- tcTupArgs tup_args arg_tys
 
        ; let expr'       = ExplicitTuple x tup_args1 boxity
-             missing_tys = [Scaled mult ty | (L _ (Missing (Scaled mult _)), ty) <- zip tup_args1 arg_tys]
+             missing_tys = [Scaled mult ty | (Missing (Scaled mult _), ty) <- zip tup_args1 arg_tys]
 
              -- See Note [Linear fields generalization] in GHC.Tc.Gen.App
              act_res_ty
@@ -357,10 +357,10 @@ tcExpr (ExplicitSum _ alt arity expr) res_ty
 ************************************************************************
 -}
 
-tcExpr (HsLet x (L l binds) expr) res_ty
+tcExpr (HsLet x binds expr) res_ty
   = do  { (binds', expr') <- tcLocalBinds binds $
                              tcMonoExpr expr res_ty
-        ; return (HsLet x (L l binds') expr') }
+        ; return (HsLet x binds' expr') }
 
 tcExpr (HsCase x scrut matches) res_ty
   = do  {  -- We used to typecheck the case alternatives first.
@@ -449,9 +449,9 @@ tcExpr (HsStatic fvs expr) res_ty
                                              [p_ty]
         ; let wrap = mkWpTyApps [expr_ty]
         ; loc <- getSrcSpanM
-        ; return $ mkHsWrapCo co $ HsApp noExtField
-                                         (L loc $ mkHsWrap wrap fromStaticPtr)
-                                         (L loc (HsStatic fvs expr'))
+        ; return $ mkHsWrapCo co $ HsApp noComments
+                            (L (noAnnSrcSpan loc) $ mkHsWrap wrap fromStaticPtr)
+                            (L (noAnnSrcSpan loc) (HsStatic fvs expr'))
         }
 
 {-
@@ -941,16 +941,16 @@ arithSeqEltType (Just fl) res_ty
        ; return (idHsWrapper, elt_mult, elt_ty, Just fl') }
 
 ----------------
-tcTupArgs :: [LHsTupArg GhcRn] -> [TcSigmaType] -> TcM [LHsTupArg GhcTc]
+tcTupArgs :: [HsTupArg GhcRn] -> [TcSigmaType] -> TcM [HsTupArg GhcTc]
 tcTupArgs args tys
   = do MASSERT( equalLength args tys )
        checkTupSize (length args)
        mapM go (args `zip` tys)
   where
-    go (L l (Missing {}),     arg_ty) = do { mult <- newFlexiTyVarTy multiplicityTy
-                                           ; return (L l (Missing (Scaled mult arg_ty))) }
-    go (L l (Present x expr), arg_ty) = do { expr' <- tcCheckPolyExpr expr arg_ty
-                                           ; return (L l (Present x expr')) }
+    go (Missing {},     arg_ty) = do { mult <- newFlexiTyVarTy multiplicityTy
+                                     ; return (Missing (Scaled mult arg_ty)) }
+    go (Present x expr, arg_ty) = do { expr' <- tcCheckPolyExpr expr arg_ty
+                                     ; return (Present x expr') }
 
 ---------------------------
 -- See TcType.SyntaxOpType also for commentary
@@ -1188,7 +1188,7 @@ getFixedTyVars upd_fld_occs univ_tvs cons
 -- See Note [Disambiguating record fields] in GHC.Tc.Gen.Head
 disambiguateRecordBinds :: LHsExpr GhcRn -> TcRhoType
                  -> [LHsRecUpdField GhcRn] -> ExpRhoType
-                 -> TcM [LHsRecField' (AmbiguousFieldOcc GhcTc) (LHsExpr GhcRn)]
+                 -> TcM [LHsRecField' GhcTc (AmbiguousFieldOcc GhcTc) (LHsExpr GhcRn)]
 disambiguateRecordBinds record_expr record_rho rbnds res_ty
     -- Are all the fields unambiguous?
   = case mapM isUnambiguous rbnds of
@@ -1253,7 +1253,7 @@ disambiguateRecordBinds record_expr record_rho rbnds res_ty
     -- where T does not have field x.
     pickParent :: RecSelParent
                -> (LHsRecUpdField GhcRn, [(RecSelParent, GlobalRdrElt)])
-               -> TcM (LHsRecField' (AmbiguousFieldOcc GhcTc) (LHsExpr GhcRn))
+               -> TcM (LHsRecField' GhcTc (AmbiguousFieldOcc GhcTc) (LHsExpr GhcRn))
     pickParent p (upd, xs)
       = case lookup p xs of
                       -- Phew! The parent is valid for this field.
@@ -1274,13 +1274,21 @@ disambiguateRecordBinds record_expr record_rho rbnds res_ty
     -- Given a (field update, selector name) pair, look up the
     -- selector to give a field update with an unambiguous Id
     lookupSelector :: (LHsRecUpdField GhcRn, Name)
-                 -> TcM (LHsRecField' (AmbiguousFieldOcc GhcTc) (LHsExpr GhcRn))
+                 -> TcM (LHsRecField' GhcRn (AmbiguousFieldOcc GhcTc) (LHsExpr GhcRn))
     lookupSelector (L l upd, n)
       = do { i <- tcLookupId n
            ; let L loc af = hsRecFieldLbl upd
                  lbl      = rdrNameAmbiguousFieldOcc af
-           ; return $ L l upd { hsRecFieldLbl
-                                  = L loc (Unambiguous i (L loc lbl)) } }
+           -- ; return $ L l upd { hsRecFieldLbl
+           --                = L loc (Unambiguous i (L (noAnnSrcSpan loc) lbl)) }
+           ; return $ L l HsRecField
+               { hsRecFieldAnn = hsRecFieldAnn upd
+               , hsRecFieldLbl
+                       = L loc (Unambiguous i (L (noAnnSrcSpan loc) lbl))
+               , hsRecFieldArg = hsRecFieldArg upd
+               , hsRecPun = hsRecPun upd
+               }
+           }
 
     -- See Note [Deprecating ambiguous fields] in GHC.Tc.Gen.Head
     reportAmbiguousField :: TyCon -> TcM ()
@@ -1293,7 +1301,7 @@ disambiguateRecordBinds record_expr record_rho rbnds res_ty
                ]
       where
         rupd = RecordUpd { rupd_expr = record_expr, rupd_flds = Left rbnds, rupd_ext = noExtField }
-        loc  = getLoc (head rbnds)
+        loc  = getLocA (head rbnds)
 
 {-
 Game plan for record bindings
@@ -1334,13 +1342,18 @@ tcRecordBinds con_like arg_tys (HsRecFields rbinds dd)
       = do { mb <- tcRecordField con_like flds_w_tys f rhs
            ; case mb of
                Nothing         -> return Nothing
-               Just (f', rhs') -> return (Just (L l (fld { hsRecFieldLbl = f'
-                                                          , hsRecFieldArg = rhs' }))) }
+               -- Just (f', rhs') -> return (Just (L l (fld { hsRecFieldLbl = f'
+               --                                            , hsRecFieldArg = rhs' }))) }
+               Just (f', rhs') -> return (Just (L l (HsRecField
+                                                     { hsRecFieldAnn = hsRecFieldAnn fld
+                                                     , hsRecFieldLbl = f'
+                                                     , hsRecFieldArg = rhs'
+                                                     , hsRecPun = hsRecPun fld}))) }
 
 tcRecordUpd
         :: ConLike
         -> [TcType]     -- Expected type for each field
-        -> [LHsRecField' (AmbiguousFieldOcc GhcTc) (LHsExpr GhcRn)]
+        -> [LHsRecField' GhcTc (AmbiguousFieldOcc GhcTc) (LHsExpr GhcRn)]
         -> TcM [LHsRecUpdField GhcTc]
 
 tcRecordUpd con_like arg_tys rbinds = fmap catMaybes $ mapM do_bind rbinds
@@ -1348,13 +1361,13 @@ tcRecordUpd con_like arg_tys rbinds = fmap catMaybes $ mapM do_bind rbinds
     fields = map flSelector $ conLikeFieldLabels con_like
     flds_w_tys = zipEqual "tcRecordUpd" fields arg_tys
 
-    do_bind :: LHsRecField' (AmbiguousFieldOcc GhcTc) (LHsExpr GhcRn)
+    do_bind :: LHsRecField' GhcTc (AmbiguousFieldOcc GhcTc) (LHsExpr GhcRn)
             -> TcM (Maybe (LHsRecUpdField GhcTc))
     do_bind (L l fld@(HsRecField { hsRecFieldLbl = L loc af
                                  , hsRecFieldArg = rhs }))
       = do { let lbl = rdrNameAmbiguousFieldOcc af
                  sel_id = selectorAmbiguousFieldOcc af
-                 f = L loc (FieldOcc (idName sel_id) (L loc lbl))
+                 f = L loc (FieldOcc (idName sel_id) (L (noAnnSrcSpan loc) lbl))
            ; mb <- tcRecordField con_like flds_w_tys f rhs
            ; case mb of
                Nothing         -> return Nothing
@@ -1363,7 +1376,7 @@ tcRecordUpd con_like arg_tys rbinds = fmap catMaybes $ mapM do_bind rbinds
                          (L l (fld { hsRecFieldLbl
                                       = L loc (Unambiguous
                                                (extFieldOcc (unLoc f'))
-                                               (L loc lbl))
+                                               (L (noAnnSrcSpan loc) lbl))
                                    , hsRecFieldArg = rhs' }))) }
 
 tcRecordField :: ConLike -> Assoc Name Type
@@ -1463,7 +1476,7 @@ badFieldTypes prs
        2 (vcat [ ppr f <+> dcolon <+> ppr ty | (f,ty) <- prs ])
 
 badFieldsUpd
-  :: [LHsRecField' (AmbiguousFieldOcc GhcTc) (LHsExpr GhcRn)]
+  :: [LHsRecField' GhcTc (AmbiguousFieldOcc GhcTc) (LHsExpr GhcRn)]
                -- Field names that don't belong to a single datacon
   -> [ConLike] -- Data cons of the type which the first field name belongs to
   -> SDoc

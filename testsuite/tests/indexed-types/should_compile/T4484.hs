@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE TypeFamilies, EmptyDataDecls, GADTs #-}
 
 module T4484 where

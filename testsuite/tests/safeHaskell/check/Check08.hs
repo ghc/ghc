@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE Trustworthy, NoImplicitPrelude #-}
 {-# OPTIONS_GHC -fpackage-trust #-}
 

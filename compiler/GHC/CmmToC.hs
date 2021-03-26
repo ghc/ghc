@@ -1304,13 +1304,24 @@ wordShift platform = widthInLog (wordWidth platform)
 commafy :: [SDoc] -> SDoc
 commafy xs = hsep $ punctuate comma xs
 
--- Print in C hex format: 0x13fa
+-- | Print in C hex format
+--
+-- Examples:
+--
+--   5114    :: W32  ===>  ((StgWord32)0x13faU)
+--   (-5114) :: W32  ===>  ((StgWord32)(-0x13faU))
+--
+-- We use casts to support types smaller than `unsigned int`; C literal
+-- suffixes support longer but not shorter types.
 pprHexVal :: Platform -> Integer -> Width -> SDoc
-pprHexVal platform w rep
-  | w < 0     = parens (char '-' <>
-                    text "0x" <> intToDoc (-w) <> repsuffix rep)
-  | otherwise =     text "0x" <> intToDoc   w  <> repsuffix rep
+pprHexVal platform w rep = parens ctype <> rawlit
   where
+      rawlit
+        | w < 0     = parens (char '-' <>
+                          text "0x" <> intToDoc (-w) <> repsuffix rep)
+        | otherwise =     text "0x" <> intToDoc   w  <> repsuffix rep
+      ctype = machRep_U_CType platform rep
+
         -- type suffix for literals:
         -- Integer literals are unsigned in Cmm/C.  We explicitly cast to
         -- signed values for doing signed operations, but at all other

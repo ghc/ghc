@@ -14,7 +14,6 @@ module GHC.Iface.Ext.Binary
    , HieFileResult(..)
    , hieMagic
    , hieNameOcc
-   , NameCacheUpdater(..)
    )
 where
 
@@ -31,19 +30,18 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Builtin.Utils
 import GHC.Types.SrcLoc as SrcLoc
-import GHC.Types.Unique.Supply    ( takeUniqFromSupply )
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
-import GHC.Iface.Env (NameCacheUpdater(..))
 
-import qualified Data.Array as A
+import qualified Data.Array        as A
+import qualified Data.Array.IO     as A
+import qualified Data.Array.Unsafe as A
 import Data.IORef
 import Data.ByteString            ( ByteString )
 import qualified Data.ByteString  as BS
 import qualified Data.ByteString.Char8 as BSC
-import Data.List                  ( mapAccumR )
 import Data.Word                  ( Word8, Word32 )
-import Control.Monad              ( replicateM, when )
+import Control.Monad              ( replicateM, when, forM_ )
 import System.Directory           ( createDirectoryIfMissing )
 import System.FilePath            ( takeDirectory )
 
@@ -98,14 +96,12 @@ writeHieFile hie_file_path hiefile = do
   put_ bh0 symtab_p_p
 
   -- Make some initial state
-  symtab_next <- newFastMutInt
-  writeFastMutInt symtab_next 0
+  symtab_next <- newFastMutInt 0
   symtab_map <- newIORef emptyUFM :: IO (IORef (UniqFM Name (Int, HieName)))
   let hie_symtab = HieSymbolTable {
                       hie_symtab_next = symtab_next,
                       hie_symtab_map  = symtab_map }
-  dict_next_ref <- newFastMutInt
-  writeFastMutInt dict_next_ref 0
+  dict_next_ref <- newFastMutInt 0
   dict_map_ref <- newIORef emptyUFM
   let hie_dict = HieDictionary {
                       hie_dict_next = dict_next_ref,
@@ -155,23 +151,23 @@ type HieHeader = (Integer, ByteString)
 -- an existing `NameCache`. Allows you to specify
 -- which versions of hieFile to attempt to read.
 -- `Left` case returns the failing header versions.
-readHieFileWithVersion :: (HieHeader -> Bool) -> NameCacheUpdater -> FilePath -> IO (Either HieHeader HieFileResult)
-readHieFileWithVersion readVersion ncu file = do
+readHieFileWithVersion :: (HieHeader -> Bool) -> NameCache -> FilePath -> IO (Either HieHeader HieFileResult)
+readHieFileWithVersion readVersion name_cache file = do
   bh0 <- readBinMem file
 
   (hieVersion, ghcVersion) <- readHieFileHeader file bh0
 
   if readVersion (hieVersion, ghcVersion)
   then do
-    hieFile <- readHieFileContents bh0 ncu
+    hieFile <- readHieFileContents bh0 name_cache
     return $ Right (HieFileResult hieVersion ghcVersion hieFile)
   else return $ Left (hieVersion, ghcVersion)
 
 
 -- | Read a `HieFile` from a `FilePath`. Can use
 -- an existing `NameCache`.
-readHieFile :: NameCacheUpdater -> FilePath -> IO HieFileResult
-readHieFile ncu file = do
+readHieFile :: NameCache -> FilePath -> IO HieFileResult
+readHieFile name_cache file = do
 
   bh0 <- readBinMem file
 
@@ -185,7 +181,7 @@ readHieFile ncu file = do
                     , show hieVersion
                     , "but got", show readHieVersion
                     ]
-  hieFile <- readHieFileContents bh0 ncu
+  hieFile <- readHieFileContents bh0 name_cache
   return $ HieFileResult hieVersion ghcVersion hieFile
 
 readBinLine :: BinHandle -> IO ByteString
@@ -220,8 +216,8 @@ readHieFileHeader file bh0 = do
                         ]
       return (readHieVersion, ghcVersion)
 
-readHieFileContents :: BinHandle -> NameCacheUpdater -> IO HieFile
-readHieFileContents bh0 ncu = do
+readHieFileContents :: BinHandle -> NameCache -> IO HieFile
+readHieFileContents bh0 name_cache = do
   dict <- get_dictionary bh0
   -- read the symbol table so we are capable of reading the actual data
   bh1 <- do
@@ -248,7 +244,7 @@ readHieFileContents bh0 ncu = do
       symtab_p <- get bh1
       data_p'  <- tellBin bh1
       seekBin bh1 symtab_p
-      symtab <- getSymbolTable bh1 ncu
+      symtab <- getSymbolTable bh1 name_cache
       seekBin bh1 data_p'
       return symtab
 
@@ -272,14 +268,15 @@ putSymbolTable bh next_off symtab = do
   let names = A.elems (A.array (0,next_off-1) (nonDetEltsUFM symtab))
   mapM_ (putHieName bh) names
 
-getSymbolTable :: BinHandle -> NameCacheUpdater -> IO SymbolTable
-getSymbolTable bh ncu = do
+getSymbolTable :: BinHandle -> NameCache -> IO SymbolTable
+getSymbolTable bh name_cache = do
   sz <- get bh
-  od_names <- replicateM sz (getHieName bh)
-  updateNameCache ncu $ \nc ->
-    let arr = A.listArray (0,sz-1) names
-        (nc', names) = mapAccumR fromHieName nc od_names
-        in (nc',arr)
+  mut_arr <- A.newArray_ (0, sz-1) :: IO (A.IOArray Int Name)
+  forM_ [0..(sz-1)] $ \i -> do
+    od_name <- getHieName bh
+    name <- fromHieName name_cache od_name
+    A.writeArray mut_arr i name
+  A.unsafeFreeze mut_arr
 
 getSymTabName :: SymbolTable -> BinHandle -> IO Name
 getSymTabName st bh = do
@@ -314,24 +311,28 @@ putName (HieSymbolTable next ref) bh name = do
 
 -- ** Converting to and from `HieName`'s
 
-fromHieName :: NameCache -> HieName -> (NameCache, Name)
-fromHieName nc (ExternalName mod occ span) =
-    let cache = nsNames nc
-    in case lookupOrigNameCache cache mod occ of
-         Just name -> (nc, name)
-         Nothing ->
-           let (uniq, us) = takeUniqFromSupply (nsUniqs nc)
-               name       = mkExternalName uniq mod occ span
-               new_cache  = extendNameCache cache mod occ name
-           in ( nc{ nsUniqs = us, nsNames = new_cache }, name )
-fromHieName nc (LocalName occ span) =
-    let (uniq, us) = takeUniqFromSupply (nsUniqs nc)
-        name       = mkInternalName uniq occ span
-    in ( nc{ nsUniqs = us }, name )
-fromHieName nc (KnownKeyName u) = case lookupKnownKeyName u of
-    Nothing -> pprPanic "fromHieName:unknown known-key unique"
-                        (ppr (unpkUnique u))
-    Just n -> (nc, n)
+fromHieName :: NameCache -> HieName -> IO Name
+fromHieName nc hie_name = do
+
+  case hie_name of
+    ExternalName mod occ span -> updateNameCache nc mod occ $ \cache -> do
+      case lookupOrigNameCache cache mod occ of
+        Just name -> pure (cache, name)
+        Nothing   -> do
+          uniq <- takeUniqFromNameCache nc
+          let name       = mkExternalName uniq mod occ span
+              new_cache  = extendOrigNameCache cache mod occ name
+          pure (new_cache, name)
+
+    LocalName occ span -> do
+      uniq <- takeUniqFromNameCache nc
+      -- don't update the NameCache for local names
+      pure $ mkInternalName uniq occ span
+
+    KnownKeyName u -> case lookupKnownKeyName u of
+      Nothing -> pprPanic "fromHieName:unknown known-key unique"
+                          (ppr (unpkUnique u))
+      Just n -> pure n
 
 -- ** Reading and writing `HieName`'s
 

@@ -2,14 +2,15 @@
 {-# LANGUAGE GADTs #-}
 
 -- From https://www.haskell.org/haskellwiki/GHC/Type_families#An_associated_data_type_example
+module Ppr004 where
 
 import qualified Data.IntMap
 import Prelude hiding (lookup)
 import Data.Char (ord)
 
 class GMapKey k where
-  data GMap k :: * -> *
-  empty       :: GMap k v
+  data  GMap  k  ::  *  ->  *
+  empty       ::  GMap   k  v
   lookup      :: k -> GMap k v -> Maybe v
   insert      :: k -> v -> GMap k v -> GMap k v
 

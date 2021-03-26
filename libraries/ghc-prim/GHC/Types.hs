@@ -96,7 +96,8 @@ type UnliftedRep = 'BoxedRep 'Unlifted
 -- | The kind of types with lifted values. For example @Int :: Type@.
 type Type = TYPE LiftedRep
 
--- | The kind of types with unlifted values. For example @Int# :: UnliftedType@.
+-- | The kind of boxed, unlifted values, for example @Array#@ or a user-defined
+-- unlifted data type, using @-XUnliftedDataTypes@.
 type UnliftedType = TYPE UnliftedRep
 
 data Multiplicity = Many | One

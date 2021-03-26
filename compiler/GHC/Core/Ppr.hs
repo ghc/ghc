@@ -1,4 +1,13 @@
 {-# LANGUAGE LambdaCase #-}
+
+{-
+   these are needed for the Outputable instance for GenTickish,
+   since we need XTickishId to be Outputable. This should immediately
+   resolve to something like Id.
+ -}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE UndecidableInstances #-}
+
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 {-
@@ -37,6 +46,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Types.SrcLoc ( pprUserRealSpan )
+import GHC.Types.Tickish
 
 {-
 ************************************************************************
@@ -645,13 +655,13 @@ pprRule (Rule { ru_name = name, ru_act = act, ru_fn = fn,
 -----------------------------------------------------
 -}
 
-instance Outputable id => Outputable (Tickish id) where
+instance Outputable (XTickishId pass) => Outputable (GenTickish pass) where
   ppr (HpcTick modl ix) =
       hcat [text "hpc<",
             ppr modl, comma,
             ppr ix,
             text ">"]
-  ppr (Breakpoint ix vars) =
+  ppr (Breakpoint _ext ix vars) =
       hcat [text "break<",
             ppr ix,
             text ">",

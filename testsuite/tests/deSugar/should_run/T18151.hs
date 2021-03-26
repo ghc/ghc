@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 -- According to the Report this should reduce to (). However, in #18151 it was
 -- reported that GHC bottoms.
 x :: ()

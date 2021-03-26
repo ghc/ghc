@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 -- test reification of explicit foralls in type families
 
 {-# LANGUAGE TypeFamilies, ExplicitForAll #-}

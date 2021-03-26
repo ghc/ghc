@@ -1,0 +1,24 @@
+
+This programme is intended to be used by any GHC developers working on
+the AST and/or pretty printer by providing a way to check that using
+exact print on the ParsedSource reproduces the original source.
+Except for stripping trailing whitespace on lines, and discarding
+tabs.
+
+This utility is also intended to be used in tests, so that when new features are
+added the ability to round-trip the AST via exact is tested.
+
+Usage
+
+In a test Makefile
+
+  $(CHECK_EXACT) "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" FileToParse.hs
+
+AZ: update the rest here
+See examples in (REPO_HOME)/testsuite/tests/printer/Makefile
+
+The utility generates the following files for ToBeTested.hs
+
+  - ToBeTested.ppr.hs      : the ppr result
+  - ToBeTested.hs.ast      : the AST of the original source
+  - ToBeTested.hs.ast.new  : the AST of the re-parsed ppr source

@@ -1,4 +1,6 @@
-{-# LANGUAGE CPP, DeriveFunctor #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE TypeFamilies #-}
 
 --
 -- (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
@@ -32,6 +34,7 @@ import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Core.DataCon
 import GHC.Types.CostCentre
+import GHC.Types.Tickish
 import GHC.Types.Var.Env
 import GHC.Unit.Module
 import GHC.Types.Name   ( isExternalName, nameModule_maybe )
@@ -413,13 +416,10 @@ coreToStgExpr expr@(Lam _ _)
         text "Unexpected value lambda:" $$ ppr expr
 
 coreToStgExpr (Tick tick expr)
-  = do case tick of
-         HpcTick{}    -> return ()
-         ProfNote{}   -> return ()
-         SourceNote{} -> return ()
-         Breakpoint{} -> panic "coreToStgExpr: breakpoint should not happen"
-       expr2 <- coreToStgExpr expr
-       return (StgTick tick expr2)
+  = do
+       let !stg_tick = coreToStgTick (exprType expr) tick
+       !expr2 <- coreToStgExpr expr
+       return (StgTick stg_tick expr2)
 
 coreToStgExpr (Cast expr _)
   = coreToStgExpr expr
@@ -484,15 +484,16 @@ mkStgAltType bndr alts
 
   | otherwise
   = case prim_reps of
-      [LiftedRep] -> case tyConAppTyCon_maybe (unwrapType bndr_ty) of
-        Just tc
-          | isAbstractTyCon tc -> look_for_better_tycon
-          | isAlgTyCon tc      -> AlgAlt tc
-          | otherwise          -> ASSERT2( _is_poly_alt_tycon tc, ppr tc )
-                                  PolyAlt
-        Nothing                -> PolyAlt
-      [unlifted] -> PrimAlt unlifted
-      not_unary  -> MultiValAlt (length not_unary)
+      [rep] | isGcPtrRep rep ->
+        case tyConAppTyCon_maybe (unwrapType bndr_ty) of
+          Just tc
+            | isAbstractTyCon tc -> look_for_better_tycon
+            | isAlgTyCon tc      -> AlgAlt tc
+            | otherwise          -> ASSERT2( _is_poly_alt_tycon tc, ppr tc )
+                                    PolyAlt
+          Nothing                -> PolyAlt
+      [non_gcd] -> PrimAlt non_gcd
+      not_unary -> MultiValAlt (length not_unary)
   where
    bndr_ty   = idType bndr
    prim_reps = typePrimRep bndr_ty
@@ -523,7 +524,7 @@ mkStgAltType bndr alts
 
 coreToStgApp :: Id            -- Function
              -> [CoreArg]     -- Arguments
-             -> [Tickish Id]  -- Debug ticks
+             -> [CoreTickish] -- Debug ticks
              -> CtsM StgExpr
 coreToStgApp f args ticks = do
     (args', ticks') <- coreToStgArgs args
@@ -567,7 +568,8 @@ coreToStgApp f args ticks = do
                 TickBoxOpId {}   -> pprPanic "coreToStg TickBox" $ ppr (f,args')
                 _other           -> StgApp f args'
 
-        tapp = foldr StgTick app (ticks ++ ticks')
+        add_tick !t !e = StgTick t e
+        tapp = foldr add_tick app (map (coreToStgTick res_ty) ticks ++ ticks')
 
     -- Forcing these fixes a leak in the code generator, noticed while
     -- profiling for trac #4367
@@ -578,7 +580,7 @@ coreToStgApp f args ticks = do
 -- This is the guy that turns applications into A-normal form
 -- ---------------------------------------------------------------------------
 
-coreToStgArgs :: [CoreArg] -> CtsM ([StgArg], [Tickish Id])
+coreToStgArgs :: [CoreArg] -> CtsM ([StgArg], [StgTickish])
 coreToStgArgs []
   = return ([], [])
 
@@ -593,7 +595,8 @@ coreToStgArgs (Coercion _ : args) -- Coercion argument; See Note [Coercion token
 coreToStgArgs (Tick t e : args)
   = ASSERT( not (tickishIsCode t) )
     do { (args', ts) <- coreToStgArgs (e : args)
-       ; return (args', t:ts) }
+       ; let !t' = coreToStgTick (exprType e) t
+       ; return (args', t':ts) }
 
 coreToStgArgs (arg : args) = do         -- Non-type argument
     (stg_args, ticks) <- coreToStgArgs args
@@ -625,6 +628,13 @@ coreToStgArgs (arg : args) = do         -- Non-type argument
     WARN( bad_args, text "Dangerous-looking argument. Probable cause: bad unsafeCoerce#" $$ ppr arg )
      return (stg_arg : stg_args, ticks ++ aticks)
 
+coreToStgTick :: Type -- type of the ticked expression
+              -> CoreTickish
+              -> StgTickish
+coreToStgTick _ty (HpcTick m i)           = HpcTick m i
+coreToStgTick _ty (SourceNote span nm)    = SourceNote span nm
+coreToStgTick _ty (ProfNote cc cnt scope) = ProfNote cc cnt scope
+coreToStgTick !ty (Breakpoint _ bid fvs)  = Breakpoint ty bid fvs
 
 -- ---------------------------------------------------------------------------
 -- The magic for lets:
@@ -952,7 +962,7 @@ myCollectBinders expr
 
 -- | Precondition: argument expression is an 'App', and there is a 'Var' at the
 -- head of the 'App' chain.
-myCollectArgs :: CoreExpr -> (Id, [CoreArg], [Tickish Id])
+myCollectArgs :: CoreExpr -> (Id, [CoreArg], [CoreTickish])
 myCollectArgs expr
   = go expr [] []
   where

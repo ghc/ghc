@@ -159,9 +159,10 @@ module GHC (
         GHC.obtainTermFromId, GHC.obtainTermFromVal, reconstructType,
         modInfoModBreaks,
         ModBreaks(..), BreakIndex,
-        BreakInfo(breakInfo_number, breakInfo_module),
+        BreakInfo(..),
         GHC.Runtime.Eval.back,
         GHC.Runtime.Eval.forward,
+        GHC.Runtime.Eval.setupBreakpoint,
 
         -- * Abstract syntax elements
 
@@ -282,10 +283,7 @@ module GHC (
         parser,
 
         -- * API Annotations
-        ApiAnns(..),AnnKeywordId(..),AnnotationComment(..), ApiAnnKey,
-        getAnnotation, getAndRemoveAnnotation,
-        getAnnotationComments, getAndRemoveAnnotationComments,
-        unicodeAnn,
+        AnnKeywordId(..),AnnotationComment(..),
 
         -- * Miscellaneous
         --sessionHscEnv,
@@ -321,11 +319,11 @@ import GHC.Driver.Monad
 import GHC.Driver.Ppr
 
 import GHC.ByteCode.Types
+import qualified GHC.Linker.Loader as Loader
 import GHC.Runtime.Loader
 import GHC.Runtime.Eval
 import GHC.Runtime.Eval.Types
 import GHC.Runtime.Interpreter
-import GHC.Runtime.Interpreter.Types
 import GHC.Runtime.Context
 import GHCi.RemoteTypes
 
@@ -537,7 +535,7 @@ withCleanupSession ghc = ghc `MC.finally` cleanup
       liftIO $ do
           cleanTempFiles logger tmpfs dflags
           cleanTempDirs logger tmpfs dflags
-          stopInterp hsc_env -- shut down the IServ
+          traverse_ stopInterp (hsc_interp hsc_env)
           --  exceptions will be blocked while we clean the temporary files,
           -- so there shouldn't be any difficulty if we receive further
           -- signals.
@@ -644,7 +642,7 @@ setSessionDynFlags dflags0 = do
   (dbs,unit_state,home_unit) <- liftIO $ initUnits logger dflags (hsc_unit_dbs hsc_env)
 
   -- Interpreter
-  interp  <- if gopt Opt_ExternalInterpreter dflags
+  interp <- if gopt Opt_ExternalInterpreter dflags
     then do
          let
            prog = pgm_i dflags ++ flavour
@@ -668,10 +666,13 @@ setSessionDynFlags dflags0 = do
             , iservConfTrace    = tr
             }
          s <- liftIO $ newMVar IServPending
-         return (Just (ExternalInterp conf (IServ s)))
+         loader <- liftIO Loader.uninitializedLoader
+         return (Just (Interp (ExternalInterp conf (IServ s)) loader))
     else
 #if defined(HAVE_INTERNAL_INTERPRETER)
-      return (Just InternalInterp)
+     do
+      loader <- liftIO Loader.uninitializedLoader
+      return (Just (Interp InternalInterp loader))
 #else
       return Nothing
 #endif
@@ -989,7 +990,9 @@ guessTarget str Nothing
 -- you should also unload the current program (set targets to empty,
 -- followed by load).
 workingDirectoryChanged :: GhcMonad m => m ()
-workingDirectoryChanged = withSession $ (liftIO . flushFinderCaches)
+workingDirectoryChanged = do
+  hsc_env <- getSession
+  liftIO $ flushFinderCaches (hsc_FC hsc_env) (hsc_home_unit hsc_env)
 
 
 -- %************************************************************************
@@ -1020,9 +1023,7 @@ class TypecheckedMod m => DesugaredMod m where
 data ParsedModule =
   ParsedModule { pm_mod_summary   :: ModSummary
                , pm_parsed_source :: ParsedSource
-               , pm_extra_src_files :: [FilePath]
-               , pm_annotations :: ApiAnns }
-               -- See Note [Api annotations] in GHC.Parser.Annotation
+               , pm_extra_src_files :: [FilePath] }
 
 instance ParsedMod ParsedModule where
   modSummary m    = pm_mod_summary m
@@ -1114,8 +1115,7 @@ parseModule ms = do
    hsc_env <- getSession
    let hsc_env_tmp = hsc_env { hsc_dflags = ms_hspp_opts ms }
    hpm <- liftIO $ hscParse hsc_env_tmp ms
-   return (ParsedModule ms (hpm_module hpm) (hpm_src_files hpm)
-                           (hpm_annotations hpm))
+   return (ParsedModule ms (hpm_module hpm) (hpm_src_files hpm))
                -- See Note [Api annotations] in GHC.Parser.Annotation
 
 -- | Typecheck and rename a parsed module.
@@ -1129,8 +1129,7 @@ typecheckModule pmod = do
  (tc_gbl_env, rn_info)
        <- liftIO $ hscTypecheckRename hsc_env_tmp ms $
                       HsParsedModule { hpm_module = parsedSource pmod,
-                                       hpm_src_files = pm_extra_src_files pmod,
-                                       hpm_annotations = pm_annotations pmod }
+                                       hpm_src_files = pm_extra_src_files pmod }
  details <- liftIO $ makeSimpleDetails hsc_env_tmp tc_gbl_env
  safe    <- liftIO $ finalSafeMode (ms_hspp_opts ms) tc_gbl_env
 
@@ -1661,11 +1660,13 @@ showRichTokenStream ts = go startLoc ts ""
 -- using the algorithm that is used for an @import@ declaration.
 findModule :: GhcMonad m => ModuleName -> Maybe FastString -> m Module
 findModule mod_name maybe_pkg = withSession $ \hsc_env -> do
-  let dflags     = hsc_dflags hsc_env
-      home_unit  = hsc_home_unit hsc_env
+  let fc        = hsc_FC hsc_env
+  let home_unit = hsc_home_unit hsc_env
+  let units     = hsc_units hsc_env
+  let dflags    = hsc_dflags hsc_env
   case maybe_pkg of
     Just pkg | not (isHomeUnit home_unit (fsToUnit pkg)) && pkg /= fsLit "this" -> liftIO $ do
-      res <- findImportedModule hsc_env mod_name maybe_pkg
+      res <- findImportedModule fc units home_unit dflags mod_name maybe_pkg
       case res of
         Found _ m -> return m
         err       -> throwOneError $ noModError hsc_env noSrcSpan mod_name err
@@ -1674,7 +1675,7 @@ findModule mod_name maybe_pkg = withSession $ \hsc_env -> do
       case home of
         Just m  -> return m
         Nothing -> liftIO $ do
-           res <- findImportedModule hsc_env mod_name maybe_pkg
+           res <- findImportedModule fc units home_unit dflags mod_name maybe_pkg
            case res of
              Found loc m | not (isHomeModule home_unit m) -> return m
                          | otherwise -> modNotLoadedError dflags m loc
@@ -1700,7 +1701,10 @@ lookupModule mod_name Nothing = withSession $ \hsc_env -> do
   case home of
     Just m  -> return m
     Nothing -> liftIO $ do
-      res <- findExposedPackageModule hsc_env mod_name Nothing
+      let fc     = hsc_FC hsc_env
+      let units  = hsc_units hsc_env
+      let dflags = hsc_dflags hsc_env
+      res <- findExposedPackageModule fc units dflags mod_name Nothing
       case res of
         Found _ m -> return m
         err       -> throwOneError $ noModError hsc_env noSrcSpan mod_name err

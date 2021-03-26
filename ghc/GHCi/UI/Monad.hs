@@ -404,14 +404,14 @@ runDecls' decls = do
                   return Nothing)
         (Just <$> GHC.runParsedDecls decls)
 
-resume :: GhciMonad m => (SrcSpan -> Bool) -> GHC.SingleStep -> m GHC.ExecResult
-resume canLogSpan step = do
+resume :: GhciMonad m => (SrcSpan -> Bool) -> GHC.SingleStep -> Maybe Int -> m GHC.ExecResult
+resume canLogSpan step mbIgnoreCnt = do
   st <- getGHCiState
   reifyGHCi $ \x ->
     withProgName (progname st) $
     withArgs (args st) $
       reflectGHCi x $ do
-        GHC.resumeExec canLogSpan step
+        GHC.resumeExec canLogSpan step mbIgnoreCnt
 
 -- --------------------------------------------------------------------------
 -- timing & statistics
@@ -468,8 +468,8 @@ printStats dflags ActionStats{actionAllocs = mallocs, actionElapsedTime = secs}
 
 revertCAFs :: GhciMonad m => m ()
 revertCAFs = do
-  hsc_env <- GHC.getSession
-  liftIO $ iservCmd hsc_env RtsRevertCAFs
+  interp <- hscInterp <$> GHC.getSession
+  liftIO $ interpCmd interp RtsRevertCAFs
   s <- getGHCiState
   when (not (ghc_e s)) turnOffBuffering
      -- Have to turn off buffering again, because we just
@@ -495,8 +495,8 @@ initInterpBuffering = do
 flushInterpBuffers :: GhciMonad m => m ()
 flushInterpBuffers = do
   st <- getGHCiState
-  hsc_env <- GHC.getSession
-  liftIO $ evalIO hsc_env (flushStdHandles st)
+  interp <- hscInterp <$> GHC.getSession
+  liftIO $ evalIO interp (flushStdHandles st)
 
 -- | Turn off buffering for stdin, stdout, and stderr in the interpreter
 turnOffBuffering :: GhciMonad m => m ()
@@ -506,8 +506,8 @@ turnOffBuffering = do
 
 turnOffBuffering_ :: GhcMonad m => ForeignHValue -> m ()
 turnOffBuffering_ fhv = do
-  hsc_env <- getSession
-  liftIO $ evalIO hsc_env fhv
+  interp <- hscInterp <$> getSession
+  liftIO $ evalIO interp fhv
 
 mkEvalWrapper :: GhcMonad m => String -> [String] ->  m ForeignHValue
 mkEvalWrapper progname args =

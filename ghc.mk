@@ -567,8 +567,8 @@ ghc/stage2/package-data.mk: compiler/stage2/package-data.mk
 # the ghc library's package-data.mk is sufficient, as that in turn depends on
 # all the other libraries' package-data.mk files.
 utils/haddock/dist/package-data.mk: compiler/stage2/package-data.mk
-utils/check-api-annotations/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/check-ppr/dist-install/package-data.mk: compiler/stage2/package-data.mk
+utils/check-exact/dist-install/package-data.mk: compiler/stage2/package-data.mk
 
 # add the final package.conf dependency: ghc-prim depends on RTS
 libraries/ghc-prim/dist-install/package-data.mk : rts/dist/package.conf.inplace
@@ -665,8 +665,8 @@ BUILD_DIRS += compiler
 BUILD_DIRS += utils/hsc2hs
 BUILD_DIRS += utils/ghc-pkg
 BUILD_DIRS += utils/testremove
-BUILD_DIRS += utils/check-api-annotations
 BUILD_DIRS += utils/check-ppr
+BUILD_DIRS += utils/check-exact
 BUILD_DIRS += utils/ghc-cabal
 BUILD_DIRS += utils/hpc
 BUILD_DIRS += utils/runghc
@@ -707,8 +707,8 @@ endif
 ifneq "$(CrossCompiling) $(Stage1Only)" "NO NO"
 # See Note [No stage2 packages when CrossCompiling or Stage1Only].
 # See Note [Stage1Only vs stage=1] in mk/config.mk.in.
-BUILD_DIRS := $(filter-out utils/check-api-annotations,$(BUILD_DIRS))
 BUILD_DIRS := $(filter-out utils/check-ppr,$(BUILD_DIRS))
+BUILD_DIRS := $(filter-out utils/check-exact,$(BUILD_DIRS))
 endif
 endif # CLEANING
 
@@ -1079,7 +1079,7 @@ BIN_DIST_MK = $(BIN_DIST_PREP_DIR)/bindist.mk
 unix-binary-dist-prep: $(includes_1_H_CONFIG) $(includes_1_H_PLATFORM) $(includes_1_H_VERSION)
 	$(call removeTrees,bindistprep/)
 	"$(MKDIRHIER)" $(BIN_DIST_PREP_DIR)
-	set -e; for i in packages LICENSE compiler ghc rts libraries utils docs libffi includes driver mk rules Makefile aclocal.m4 config.sub config.guess install-sh llvm-targets llvm-passes ghc.mk inplace distrib/configure.ac distrib/README distrib/INSTALL; do ln -s ../../$$i $(BIN_DIST_PREP_DIR)/; done
+	set -e; for i in packages LICENSE compiler ghc rts libraries utils docs libffi includes driver mk rules Makefile m4 aclocal.m4 config.sub config.guess install-sh llvm-targets llvm-passes ghc.mk inplace distrib/configure.ac distrib/README distrib/INSTALL; do ln -s ../../$$i $(BIN_DIST_PREP_DIR)/; done
 	echo "HADDOCK_DOCS       = $(HADDOCK_DOCS)"       >> $(BIN_DIST_MK)
 	echo "BUILD_SPHINX_HTML  = $(BUILD_SPHINX_HTML)"  >> $(BIN_DIST_MK)
 	echo "BUILD_SPHINX_PDF   = $(BUILD_SPHINX_PDF)"   >> $(BIN_DIST_MK)
@@ -1172,12 +1172,13 @@ SRC_DIST_TESTSUITE_TARBALL        = $(SRC_DIST_ROOT)/$(SRC_DIST_TESTSUITE_NAME).
 #
 # Files to include in source distributions
 #
-SRC_DIST_GHC_DIRS = mk rules docs distrib bindisttest libffi includes \
+SRC_DIST_GHC_DIRS = mk m4 rules docs distrib bindisttest libffi includes \
     utils docs rts compiler ghc driver libraries libffi-tarballs \
-		hadrian
+	hadrian
 SRC_DIST_GHC_FILES += \
     configure.ac config.guess config.sub configure \
-    aclocal.m4 README.md ANNOUNCE HACKING.md INSTALL.md LICENSE Makefile \
+    aclocal.m4 m4/ax_compare_version.m4 \
+	README.md ANNOUNCE HACKING.md INSTALL.md LICENSE Makefile \
     install-sh llvm-targets llvm-passes VERSION GIT_COMMIT_ID \
     boot packages ghc.mk MAKEHELP.md
 

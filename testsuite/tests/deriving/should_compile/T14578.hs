@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module T14578 where
 

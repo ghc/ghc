@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE DerivingStrategies #-}
 module T10598_fail2 where
 

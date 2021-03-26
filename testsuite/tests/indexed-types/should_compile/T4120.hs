@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE RankNTypes, TypeFamilies #-}
 
 -- Unification yielding a coercion under a forall

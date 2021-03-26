@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# OPTIONS_GHC -pgmdll pgmdll, -I., -L., -Uggg, -Dggg, -with-rtsopts full #-}
 
 -- | These are all flags that should be allowed

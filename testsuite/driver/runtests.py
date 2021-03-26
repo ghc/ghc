@@ -76,7 +76,8 @@ parser.add_argument("--perf-baseline", type=GitRef, metavar='COMMIT', help="Base
 parser.add_argument("--test-package-db", dest="test_package_db", action="append", help="Package db providing optional packages used by the testsuite.")
 perf_group.add_argument("--skip-perf-tests", action="store_true", help="skip performance tests")
 perf_group.add_argument("--only-perf-tests", action="store_true", help="Only do performance tests")
-perf_group.add_argument("--ignore-perf-failures", action="store_true", help="Don't fail due to out-of-tolerance perf tests")
+perf_group.add_argument("--ignore-perf-failures", choices=['increases','decreases','all'],
+                        help="Do not fail due to out-of-tolerance perf tests")
 
 args = parser.parse_args()
 
@@ -152,7 +153,13 @@ if args.verbose is not None:
 forceSkipPerfTests = not hasMetricsFile and not inside_git_repo()
 config.skip_perf_tests = args.skip_perf_tests or forceSkipPerfTests
 config.only_perf_tests = args.only_perf_tests
-config.ignore_perf_failures = args.ignore_perf_failures
+if args.ignore_perf_failures == 'all':
+    config.ignore_perf_decreases = True
+    config.ignore_perf_increases = True
+elif args.ignore_perf_failures == 'increases':
+    config.ignore_perf_increases = True
+elif args.ignore_perf_failures == 'decreases':
+    config.ignore_perf_decreases = True
 
 if args.test_env:
     config.test_env = args.test_env
@@ -259,7 +266,7 @@ def format_path(path):
 
 # On Windows we need to set $PATH to include the paths to all the DLLs
 # in order for the dynamic library tests to work.
-if windows or darwin:
+if windows:
     pkginfo = getStdout([config.ghc_pkg, 'dump'])
     topdir = config.libdir
     if windows:
@@ -277,12 +284,9 @@ if windows or darwin:
             if path.startswith('"'):
                 path = re.sub('^"(.*)"$', '\\1', path)
                 path = re.sub('\\\\(.)', '\\1', path)
-            if windows:
+
                 path = format_path(path)
                 ghc_env['PATH'] = os.pathsep.join([path, ghc_env.get("PATH", "")])
-            else:
-                # darwin
-                ghc_env['DYLD_LIBRARY_PATH'] = os.pathsep.join([path, ghc_env.get("DYLD_LIBRARY_PATH", "")])
 
 testopts_local.x = TestOptions()
 

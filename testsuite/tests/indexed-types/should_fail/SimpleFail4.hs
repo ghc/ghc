@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE TypeFamilies, MultiParamTypeClasses #-}
 
 module ShouldFail where

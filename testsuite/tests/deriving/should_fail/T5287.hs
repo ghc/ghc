@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE MultiParamTypeClasses, UndecidableInstances #-}
 module Bug where
 class A a oops

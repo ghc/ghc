@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# Language RankNTypes #-}
 {-# Language TypeApplications #-}
 {-# Language DataKinds        #-}

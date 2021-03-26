@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE Safe #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 module ImpSafe01 ( MyWord ) where

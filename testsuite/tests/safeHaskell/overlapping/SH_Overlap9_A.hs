@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# OPTIONS_GHC -fwarn-unsafe #-}
 {-# LANGUAGE FlexibleInstances #-}
 module SH_Overlap9_A (

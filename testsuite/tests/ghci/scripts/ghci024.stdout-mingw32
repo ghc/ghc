@@ -1,9 +1,7 @@
 ~~~~~~~~~~ Testing :set
 options currently set: none.
-base language is: Haskell2010
+base language is: GHC2021
 with the following modifiers:
-  -XNoDatatypeContexts
-  -XNondecreasingIndentation
 GHCi-specific dynamic flag settings:
 other dynamic, non-language, flag settings:
   -fno-diagnostics-show-caret
@@ -18,7 +16,7 @@ warning settings:
   -Wcompat-unqualified-imports
 ~~~~~~~~~~ Testing :set -a
 options currently set: none.
-base language is: Haskell2010
+base language is: GHC2021
 all active language options:
 GHCi-specific dynamic flag settings:
   -fno-print-explicit-foralls
@@ -26,16 +24,12 @@ other dynamic, non-language, flag settings:
 warning settings:
   -Wno-implicit-prelude
 ~~~~~~~~~~ Testing :show languages
-base language is: Haskell2010
+base language is: GHC2021
 with the following modifiers:
-  -XNoDatatypeContexts
-  -XNondecreasingIndentation
 ~~~~~~~~~~ Testing :show languages, with -XMagicHash
-base language is: Haskell2010
+base language is: GHC2021
 with the following modifiers:
-  -XNoDatatypeContexts
   -XMagicHash
-  -XNondecreasingIndentation
 ~~~~~~~~~~ Testing :show packages
 active package flags: none
 ~~~~~~~~~~ Testing :show packages, including the ghc package

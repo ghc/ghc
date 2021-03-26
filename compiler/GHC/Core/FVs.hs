@@ -6,6 +6,7 @@ Taken quite directly from the Peyton Jones/Lester paper.
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- | A module concerned with finding the free variables of an expression.
 module GHC.Core.FVs (
@@ -64,6 +65,7 @@ import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Name.Set
 import GHC.Types.Name
+import GHC.Types.Tickish
 import GHC.Types.Var.Set
 import GHC.Types.Var
 import GHC.Core.Type
@@ -289,8 +291,8 @@ rhs_fvs (bndr, rhs) = expr_fvs rhs `unionFV`
 exprs_fvs :: [CoreExpr] -> FV
 exprs_fvs exprs = mapUnionFV expr_fvs exprs
 
-tickish_fvs :: Tickish Id -> FV
-tickish_fvs (Breakpoint _ ids) = FV.mkFVs ids
+tickish_fvs :: CoreTickish -> FV
+tickish_fvs (Breakpoint _ _ ids) = FV.mkFVs ids
 tickish_fvs _ = emptyFV
 
 {-
@@ -779,8 +781,8 @@ freeVars = go
         , AnnTick tickish expr2 )
       where
         expr2 = go expr
-        tickishFVs (Breakpoint _ ids) = mkDVarSet ids
-        tickishFVs _                  = emptyDVarSet
+        tickishFVs (Breakpoint _ _ ids) = mkDVarSet ids
+        tickishFVs _                    = emptyDVarSet
 
     go (Type ty)     = (tyCoVarsOfTypeDSet ty, AnnType ty)
     go (Coercion co) = (tyCoVarsOfCoDSet co, AnnCoercion co)

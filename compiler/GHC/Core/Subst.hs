@@ -60,6 +60,7 @@ import GHC.Types.Var.Env
 import GHC.Types.Id
 import GHC.Types.Name     ( Name )
 import GHC.Types.Var
+import GHC.Types.Tickish
 import GHC.Types.Id.Info
 import GHC.Types.Unique.Supply
 import GHC.Data.Maybe
@@ -717,9 +718,9 @@ substDVarSet subst fvs
      | otherwise = tyCoFVsOfType (lookupTCvSubst subst fv) (const True) emptyVarSet $! acc
 
 ------------------
-substTickish :: Subst -> Tickish Id -> Tickish Id
-substTickish subst (Breakpoint n ids)
-   = Breakpoint n (map do_one ids)
+substTickish :: Subst -> CoreTickish -> CoreTickish
+substTickish subst (Breakpoint ext n ids)
+   = Breakpoint ext n (map do_one ids)
  where
     do_one = getIdFromTrivialExpr . lookupIdSubst subst
 substTickish _subst other = other

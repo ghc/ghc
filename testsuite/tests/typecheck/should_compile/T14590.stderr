@@ -1,5 +1,5 @@
 
-T14590.hs:4:13: warning: [-Wtyped-holes (in -Wdefault)]
+T14590.hs:4:11: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int -> Int -> Int
     • In the expression: (x `_`) y
       In an equation for ‘f1’: f1 x y = (x `_`) y
@@ -85,7 +85,7 @@ T14590.hs:4:13: warning: [-Wtyped-holes (in -Wdefault)]
           (imported from ‘Prelude’ at T14590.hs:1:8-13
            (and originally defined in ‘GHC.Base’))
 
-T14590.hs:5:13: warning: [-Wtyped-holes (in -Wdefault)]
+T14590.hs:5:11: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _a :: Int -> Int -> Int
       Or perhaps ‘_a’ is mis-spelled, or not in scope
     • In the expression: (x `_a`) y

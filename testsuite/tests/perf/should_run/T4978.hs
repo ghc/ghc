@@ -2,7 +2,6 @@ module Main (main) where
 
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Lazy as L
-import Data.ByteString.Internal (inlinePerformIO)
 import qualified Data.ByteString.Internal as S
 import Data.Semigroup
 import Data.Monoid
@@ -66,7 +65,7 @@ defaultSize = 32 * k - overhead
 
 -- | Sequence an IO operation on the buffer
 unsafeLiftIO :: (Buffer -> IO Buffer) -> Builder
-unsafeLiftIO f =  Builder $ \ k buf -> inlinePerformIO $ do
+unsafeLiftIO f =  Builder $ \ k buf -> unsafePerformIO $ do
     buf' <- f buf
     return (k buf')
 {-# INLINE unsafeLiftIO #-}

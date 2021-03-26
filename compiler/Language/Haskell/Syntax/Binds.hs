@@ -1,9 +1,7 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -35,12 +33,12 @@ import {-# SOURCE #-} Language.Haskell.Syntax.Pat
 
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Type
-import GHC.Core
 import GHC.Tc.Types.Evidence
 import GHC.Core.Type
 import GHC.Types.Basic
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc as SrcLoc
+import GHC.Types.Tickish
 import GHC.Types.Var
 import GHC.Types.Fixity
 import GHC.Data.Bag
@@ -227,7 +225,7 @@ data HsBindLR idL idR
 
         fun_matches :: MatchGroup idR (LHsExpr idR),  -- ^ The payload
 
-        fun_tick :: [Tickish Id] -- ^ Ticks to put on the rhs, if any
+        fun_tick :: [CoreTickish] -- ^ Ticks to put on the rhs, if any
     }
 
   -- | Pattern Binding
@@ -247,7 +245,7 @@ data HsBindLR idL idR
         pat_ext    :: XPatBind idL idR, -- ^ See Note [Bind free vars]
         pat_lhs    :: LPat idL,
         pat_rhs    :: GRHSs idR (LHsExpr idR),
-        pat_ticks  :: ([Tickish Id], [[Tickish Id]])
+        pat_ticks  :: ([CoreTickish], [[CoreTickish]])
                -- ^ Ticks to put on the rhs, if any, and ticks to put on
                -- the bound variables.
     }

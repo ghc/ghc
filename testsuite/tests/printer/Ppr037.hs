@@ -34,8 +34,9 @@ import Data.Type.Equality
 -- | The promoted analogue of 'Eq'. If you supply no definition for '(:==)',
 -- then it defaults to a use of '(==)', from @Data.Type.Equality@.
 class kproxy ~ 'KProxy => PEq (kproxy :: KProxy a) where
-  type (:==) (x :: a) (y :: a) :: Bool
-  type (:/=) (x :: a) (y :: a) :: Bool
+  type (:==)   (x :: a)   ( y :: a)  ::  Bool
+  type (:/=) ( (x :: a) )  (y :: a ) :: Bool
+  type {- a -} ({- b -}:/:{- c -}) {- d -} ({- e -}x {- f -} :: {- g -} a {- h -}) {- i -} ({- j -}y {- k -}::{- l -} a{- m -}){- n -} ::{- o -} Bool {- p -}
 
   type (x :: a) :== (y :: a) = x == y
   type (x :: a) :/= (y :: a) = Not (x :== y)

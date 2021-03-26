@@ -1,18 +1,18 @@
 
-RnFail055.hs:1:73: warning:
+RnFail055.hs:2:73: warning:
     -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
 
-RnFail055.hs-boot:1:73: warning:
+RnFail055.hs-boot:2:73: warning:
     -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
 
-RnFail055.hs-boot:4:1: error:
+RnFail055.hs-boot:5:1: error:
     Identifier ‘f1’ has conflicting definitions in the module
     and its hs-boot file
     Main module: f1 :: Int -> Float
     Boot file:   f1 :: Float -> Int
     The two types are different
 
-RnFail055.hs-boot:6:1: error:
+RnFail055.hs-boot:7:1: error:
     Type constructor ‘S1’ has conflicting definitions in the module
     and its hs-boot file
     Main module: type S1 :: * -> * -> *
@@ -21,7 +21,7 @@ RnFail055.hs-boot:6:1: error:
                  type S1 a b c = (a, b)
     The types have different kinds
 
-RnFail055.hs-boot:8:1: error:
+RnFail055.hs-boot:9:1: error:
     Type constructor ‘S2’ has conflicting definitions in the module
     and its hs-boot file
     Main module: type S2 :: * -> * -> *
@@ -31,7 +31,7 @@ RnFail055.hs-boot:8:1: error:
     The roles do not match.
     Roles on abstract types default to ‘representational’ in boot files.
 
-RnFail055.hs-boot:12:1: error:
+RnFail055.hs-boot:13:1: error:
     Type constructor ‘T1’ has conflicting definitions in the module
     and its hs-boot file
     Main module: type T1 :: * -> * -> *
@@ -40,7 +40,7 @@ RnFail055.hs-boot:12:1: error:
                  data T1 a b = T1 [a] [b]
     The constructors do not match: The types for ‘T1’ differ
 
-RnFail055.hs-boot:14:1: error:
+RnFail055.hs-boot:15:1: error:
     Type constructor ‘T2’ has conflicting definitions in the module
     and its hs-boot file
     Main module: type role T2 representational nominal
@@ -53,13 +53,13 @@ RnFail055.hs-boot:14:1: error:
     Roles on abstract types default to ‘representational’ in boot files.
     The datatype contexts do not match
 
-RnFail055.hs-boot:16:11: error:
+RnFail055.hs-boot:17:11: error:
     ‘T3’ is exported by the hs-boot file, but not exported by the module
 
-RnFail055.hs-boot:17:12: error:
+RnFail055.hs-boot:18:12: error:
     ‘T3'’ is exported by the hs-boot file, but not exported by the module
 
-RnFail055.hs-boot:21:1: error:
+RnFail055.hs-boot:22:1: error:
     Type constructor ‘T5’ has conflicting definitions in the module
     and its hs-boot file
     Main module: type T5 :: * -> *
@@ -69,7 +69,7 @@ RnFail055.hs-boot:21:1: error:
     The constructors do not match:
       The record label lists for ‘T5’ differ
 
-RnFail055.hs-boot:23:1: error:
+RnFail055.hs-boot:24:1: error:
     Type constructor ‘T6’ has conflicting definitions in the module
     and its hs-boot file
     Main module: type T6 :: *
@@ -79,7 +79,7 @@ RnFail055.hs-boot:23:1: error:
     The constructors do not match:
       The strictness annotations for ‘T6’ differ
 
-RnFail055.hs-boot:25:1: error:
+RnFail055.hs-boot:26:1: error:
     Type constructor ‘T7’ has conflicting definitions in the module
     and its hs-boot file
     Main module: type role T7 phantom
@@ -91,10 +91,10 @@ RnFail055.hs-boot:25:1: error:
     Roles on abstract types default to ‘representational’ in boot files.
     The constructors do not match: The types for ‘T7’ differ
 
-RnFail055.hs-boot:27:22: error:
+RnFail055.hs-boot:28:22: error:
     ‘RnFail055.m1’ is exported by the hs-boot file, but not exported by the module
 
-RnFail055.hs-boot:28:1: error:
+RnFail055.hs-boot:29:1: error:
     Class ‘C2’ has conflicting definitions in the module
     and its hs-boot file
     Main module: type C2 :: * -> * -> Constraint
@@ -109,7 +109,7 @@ RnFail055.hs-boot:28:1: error:
     The methods do not match: There are different numbers of methods
     The MINIMAL pragmas are not compatible
 
-RnFail055.hs-boot:29:1: error:
+RnFail055.hs-boot:30:1: error:
     Class ‘C3’ has conflicting definitions in the module
     and its hs-boot file
     Main module: type C3 :: * -> Constraint

@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 module T5957 where
 
 flex :: Int -> Show a => a -> String

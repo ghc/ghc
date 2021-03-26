@@ -18,7 +18,7 @@ module GHC.Core.TyCo.Subst
         mkTCvSubst, mkTvSubst, mkCvSubst,
         getTvSubstEnv,
         getCvSubstEnv, getTCvInScope, getTCvSubstRangeFVs,
-        isInScope, notElemTCvSubst,
+        isInScope, elemTCvSubst, notElemTCvSubst,
         setTvSubstEnv, setCvSubstEnv, zapTCvSubst,
         extendTCvInScope, extendTCvInScopeList, extendTCvInScopeSet,
         extendTCvSubst, extendTCvSubstWithClone,
@@ -293,12 +293,15 @@ getTCvSubstRangeFVs (TCvSubst _ tenv cenv)
 isInScope :: Var -> TCvSubst -> Bool
 isInScope v (TCvSubst in_scope _ _) = v `elemInScopeSet` in_scope
 
-notElemTCvSubst :: Var -> TCvSubst -> Bool
-notElemTCvSubst v (TCvSubst _ tenv cenv)
+elemTCvSubst :: Var -> TCvSubst -> Bool
+elemTCvSubst v (TCvSubst _ tenv cenv)
   | isTyVar v
-  = not (v `elemVarEnv` tenv)
+  = v `elemVarEnv` tenv
   | otherwise
-  = not (v `elemVarEnv` cenv)
+  = v `elemVarEnv` cenv
+
+notElemTCvSubst :: Var -> TCvSubst -> Bool
+notElemTCvSubst v = not . elemTCvSubst v
 
 setTvSubstEnv :: TCvSubst -> TvSubstEnv -> TCvSubst
 setTvSubstEnv (TCvSubst in_scope _ cenv) tenv = TCvSubst in_scope tenv cenv

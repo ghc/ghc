@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE TypeFamilies, DataKinds, PolyKinds #-}
 
 import GHC.Exts

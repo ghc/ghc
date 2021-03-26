@@ -13,12 +13,31 @@ Language
   <https://www.microsoft.com/en-us/research/publication/a-quick-look-at-impredicativity/>`__
   (Serrano et al, ICFP 2020).  More information here: :ref:`impredicative-polymorphism`.
   This replaces the old (undefined, flaky) behaviour of the :extension:`ImpredicativeTypes` extension.
+
 * The first stage of the `Pointer Rep Proposal`_ has been implemented. All
   boxed types, both lifted and unlifted, now have representation kinds of
   the shape ``BoxedRep r``. Code that references ``LiftedRep`` and ``UnliftedRep``
   will need to be updated.
 
 .. _Pointer Rep Proposal: https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0203-pointer-rep.rst
+
+* :extension:`UnliftedDatatypes`: The `Unlifted Datatypes Proposal`_ has been
+  implemented. That means GHC Haskell now offers a way to define algebraic
+  data types with strict semantics like in OCaml or Idris! The distinction to
+  ordinary lifted data types is made in the kind system: Unlifted data types
+  live in kind ``TYPE (BoxedRep Unlifted)``. :extension:`UnliftedDatatypes`
+  allows giving data declarations such result kinds, such as in the following
+  example with the help of :extension:`StandaloneKindSignatures`: ::
+
+    type IntSet :: UnliftedType -- type UnliftedType = TYPE (BoxedRep Unlifted)
+    data IntSet = Branch IntSet !Int IntSet | Leaf
+
+  See :extension:`UnliftedDatatypes` for what other declarations are
+  possible. Slight caveat: Most functions in ``base`` (including ``$``)
+  are not levity-polymorphic (yet) and hence won't work with unlifted
+  data types.
+
+.. _Unlifted Datatypes Proposal: https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0265-unlifted-datatypes.rst
 
 * Kind inference for data/newtype instance declarations is slightly
   more restrictive than before.  See the user manual :ref:`kind-inference-data-family-instances`.
@@ -57,6 +76,21 @@ Language
   This is now fixed, but it means that some programs will newly require
   ``-XFlexibleContexts``.
 
+* The :extension:`GHC2021` language is supported now. It builds on top of
+  Haskell2010, adding several stable and conservative extensions, and removing
+  deprecated ones. It is now also the “default” langauge set that is active
+  when no other language set, such as :extension:`Haskell98` or
+  :extension:`Haskell2010`,  is explicitly loaded (e.g via Cabal’s
+  ``default-language``).
+
+  Because :extension:`GHC2021` includes
+  :extension:`GeneralizedNewtypeDeriving`, which is not safe for Safe Haskell,
+  users of Safe Haskell are advised to use :extension:`Haskell2010` explicitly.
+
+  The default mode of GHC until 9.0 included
+  :extension:`NondecreasingIndentation`, but :extension:`GHC2021` does not.
+  This may break code implicitly using this extension.
+
 * Various records-related extensions have been improved:
 
   - A new extension :extension:`NoFieldSelectors` hides record field selector
@@ -70,6 +104,21 @@ Language
   - The :extension:`DuplicateRecordFields` extension now applies to fields in
     record pattern synonyms.  In particular, it is possible for a single module
     to define multiple pattern synonyms using the same field names.
+
+* Because of simplifications to the way that GHC typechecks operator sections,
+  operators with nested ``forall``\ s or contexts in their type signatures might
+  not typecheck when used in a section. For instance, the ``g`` function below,
+  which was accepted in previous GHC releases, will no longer typecheck: ::
+
+      f :: a -> forall b. b -> a
+      f x _ = x
+
+      g :: a -> a
+      g = (`f` "hello")
+
+  ``g`` can be made to typecheck once more by eta expanding it to
+  ``\x -> x \`f\` "hello"``. For more information, see
+  :ref:`simple-subsumption`.
 
 Compiler
 ~~~~~~~~
@@ -95,9 +144,6 @@ Compiler
   For more details see :ghc-flag:`-finline-generics` and
   :ghc-flag:`-finline-generics-aggressively`.
 
-- GHCi's ``:kind!`` command now expands through type synonyms in addition to type
-  families. See :ghci-cmd:`:kind`.
-
 - GHC now supports a flag, :ghc-flag:`-fprof-callers=⟨name⟩`, for requesting
   that the compiler automatically insert cost-centres on all call-sites of
   the named function.
@@ -117,6 +163,9 @@ Compiler
 GHCi
 ~~~~
 
+- GHCi's ``:kind!`` command now expands through type synonyms in addition to
+  type families. See :ghci-cmd:`:kind`.
+
 - GHCi's :ghci-cmd:`:edit` command now looks for an editor in
   the :envvar:`VISUAL` environment variable before
   :envvar:`EDITOR`, following UNIX convention.
@@ -125,6 +174,13 @@ GHCi
 - GHC now follows by default the XDG Base Directory Specification. If
   ``$HOME/.ghc`` is found it will fallback to the old paths to give you
   time to migrate. This fallback will be removed in three releases.
+
+- New debugger command :ghci-cmd:`:ignore` to set an ``ignore count`` for a
+  specified breakpoint.  The next ``ignore count`` times the program hits this
+  breakpoint, the breakpoint is ignored, and the program doesn't stop.
+
+- New optional parameter added to the command :ghci-cmd:`:continue` to set the
+  ``ignore count`` for the current breakpoint.
 
 Runtime system
 ~~~~~~~~~~~~~~
@@ -135,8 +191,6 @@ Runtime system
   Moreover, we now correctly account for the size of the array, meaning that
   space lost to fragmentation is no longer counted as live data.
 
-
-
 - The ``-xt`` RTS flag has been removed. Now STACK and TSO closures are always
   included in heap profiles. Tooling can choose to filter out these closure types
 `  if necessary.
@@ -146,6 +200,24 @@ Runtime system
   mode is intended to be used with :ghc-flag:`-finfo-table-map` and can best
   be consumed with ``eventlog2html``. This profiling mode does not require a
   profiling build.
+
+- The RTS will now gradually return unused memory back to the OS rather than
+  retaining a large amount (up to 4 * live) indefinitely. The rate at which memory
+  is returned is controlled by the :rts-flag:`-Fd ⟨factor⟩`. Memory return
+  is triggered by consecutive idle collections.
+
+Template Haskell
+~~~~~~~~~~~~~~~~
+
+- There are two new functions ``putDoc`` and ``getDoc``, which allow Haddock
+  documentation to be attached and read from module headers, declarations,
+  function arguments, class instances and family instances.
+  These functions are quite low level, so the ``withDecDoc`` function provides
+  a more ergonomic interface for this. Similarly ``funD_doc``, ``dataD_doc``
+  and friends provide an easy way to document functions and constructors
+  alongside their arguments simultaneously. ::
+
+    $(withDecsDoc "This does good things" [d| foo x = 42 |])
 
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
@@ -226,6 +298,8 @@ Eventlog
     type family CmpChar (a :: Char) (b :: Char) :: Ordering
     type family ConsSymbol (a :: Char) (b :: Symbol) :: Symbol
     type family UnconsSymbol (a :: Symbol) :: Maybe (Char, Symbol)
+    type family CharToNat (c :: Char) :: Natural
+    type family NatToChar (n :: Natural) :: Char
 
   and with the type class ``KnownChar`` (and such additional functions as ``charVal`` and ``charVal'``): ::
 

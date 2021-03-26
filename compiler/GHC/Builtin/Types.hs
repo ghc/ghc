@@ -1485,22 +1485,25 @@ runtimeRepTy = mkTyConTy runtimeRepTyCon
 
 -- Type synonyms; see Note [TYPE and RuntimeRep] in GHC.Builtin.Types.Prim
 -- and Note [Prefer Type over TYPE 'LiftedRep] in GHC.Core.TyCo.Rep.
--- type Type = TYPE ('BoxedRep 'Lifted)
--- type LiftedRep = 'BoxedRep 'Lifted
+--
+-- @type Type = TYPE ('BoxedRep 'Lifted)@
 liftedTypeKindTyCon :: TyCon
 liftedTypeKindTyCon =
     buildSynTyCon liftedTypeKindTyConName [] liftedTypeKind [] rhs
   where rhs = TyCoRep.TyConApp tYPETyCon [mkTyConApp liftedRepTyCon []]
 
+-- | @type UnliftedType = TYPE ('BoxedRep 'Unlifted)@
 unliftedTypeKindTyCon :: TyCon
 unliftedTypeKindTyCon =
     buildSynTyCon unliftedTypeKindTyConName [] liftedTypeKind [] rhs
   where rhs = TyCoRep.TyConApp tYPETyCon [mkTyConApp unliftedRepTyCon []]
 
+-- | @type LiftedRep = 'BoxedRep 'Lifted@
 liftedRepTyCon :: TyCon
 liftedRepTyCon = buildSynTyCon
   liftedRepTyConName [] runtimeRepTy [] liftedRepTy
 
+-- | @type UnliftedRep = 'BoxedRep 'Unlifted@
 unliftedRepTyCon :: TyCon
 unliftedRepTyCon = buildSynTyCon
   unliftedRepTyConName [] runtimeRepTy [] unliftedRepTy

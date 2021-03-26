@@ -1,6 +1,5 @@
 {-# LANGUAGE CPP                #-}
 {-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE MultiWayIf         #-}
 
 {-# OPTIONS_HADDOCK not-home #-}
 
@@ -52,6 +51,7 @@ module GHC.Core.TyCo.Rep (
         mkScaledFunTy,
         mkVisFunTyMany, mkVisFunTysMany,
         mkInvisFunTyMany, mkInvisFunTysMany,
+        nonDetCmpTyLit, cmpTyLit,
 
         -- * Functions over binders
         TyCoBinder(..), TyCoVarBinder, TyBinder,
@@ -192,16 +192,25 @@ data TyLit
   | CharTyLit Char
   deriving (Eq, Data.Data)
 
-instance Ord TyLit where
-  compare (NumTyLit x) (NumTyLit y)   = compare x y
-  compare (StrTyLit x) (StrTyLit y)   = uniqCompareFS x y
-  compare (CharTyLit x) (CharTyLit y) = compare x y
-  compare a b = compare (tag a) (tag b)
-    where
-      tag :: TyLit -> Int
-      tag NumTyLit{}  = 0
-      tag StrTyLit{}  = 1
-      tag CharTyLit{} = 2
+-- Non-determinism arises due to uniqCompareFS
+nonDetCmpTyLit :: TyLit -> TyLit -> Ordering
+nonDetCmpTyLit = cmpTyLitWith NonDetFastString
+
+-- Slower than nonDetCmpTyLit but deterministic
+cmpTyLit :: TyLit -> TyLit -> Ordering
+cmpTyLit = cmpTyLitWith LexicalFastString
+
+{-# INLINE cmpTyLitWith #-}
+cmpTyLitWith :: Ord r => (FastString -> r) -> TyLit -> TyLit -> Ordering
+cmpTyLitWith _ (NumTyLit  x) (NumTyLit  y) = compare x y
+cmpTyLitWith w (StrTyLit  x) (StrTyLit  y) = compare (w x) (w y)
+cmpTyLitWith _ (CharTyLit x) (CharTyLit y) = compare x y
+cmpTyLitWith _ a b = compare (tag a) (tag b)
+  where
+    tag :: TyLit -> Int
+    tag NumTyLit{}  = 0
+    tag StrTyLit{}  = 1
+    tag CharTyLit{} = 2
 
 instance Outputable TyLit where
    ppr = pprTyLit
@@ -1918,13 +1927,16 @@ GHC.Core.Multiplicity above this module.
 -}
 
 -- | A shorthand for data with an attached 'Mult' element (the multiplicity).
-data Scaled a = Scaled Mult a
+data Scaled a = Scaled !Mult a
   deriving (Data.Data)
   -- You might think that this would be a natural candidate for
   -- Functor, Traversable but Krzysztof says (!3674) "it was too easy
   -- to accidentally lift functions (substitutions, zonking etc.) from
   -- Type -> Type to Scaled Type -> Scaled Type, ignoring
   -- multiplicities and causing bugs".  So we don't.
+  --
+  -- Being strict in a is worse for performance, so we are only strict on the
+  -- Mult part of scaled.
 
 
 instance (Outputable a) => Outputable (Scaled a) where

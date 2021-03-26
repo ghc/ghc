@@ -19,6 +19,8 @@ module GHC.Hs.Doc
 
   , ArgDocMap(..)
   , emptyArgDocMap
+
+  , ExtractedTHDocs(..)
   ) where
 
 #include "HsVersions.h"
@@ -35,6 +37,8 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as C8
 import Data.Data
+import Data.IntMap (IntMap)
+import qualified Data.IntMap as IntMap
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Maybe
@@ -126,21 +130,34 @@ emptyDeclDocMap :: DeclDocMap
 emptyDeclDocMap = DeclDocMap Map.empty
 
 -- | Docs for arguments. E.g. function arguments, method arguments.
-newtype ArgDocMap = ArgDocMap (Map Name (Map Int HsDocString))
+newtype ArgDocMap = ArgDocMap (Map Name (IntMap HsDocString))
 
 instance Binary ArgDocMap where
-  put_ bh (ArgDocMap m) = put_ bh (Map.toList (Map.toAscList <$> m))
+  put_ bh (ArgDocMap m) = put_ bh (Map.toList (IntMap.toAscList <$> m))
   -- We can't rely on a deterministic ordering of the `Name`s here.
   -- See the comments on `Name`'s `Ord` instance for context.
-  get bh = ArgDocMap . fmap Map.fromDistinctAscList . Map.fromList <$> get bh
+  get bh = ArgDocMap . fmap IntMap.fromDistinctAscList . Map.fromList <$> get bh
 
 instance Outputable ArgDocMap where
   ppr (ArgDocMap m) = vcat (map pprPair (Map.toAscList m))
     where
       pprPair (name, int_map) =
         ppr name Outputable.<> colon $$ nest 2 (pprIntMap int_map)
-      pprIntMap im = vcat (map pprIPair (Map.toAscList im))
+      pprIntMap im = vcat (map pprIPair (IntMap.toAscList im))
       pprIPair (i, doc) = ppr i Outputable.<> colon $$ nest 2 (ppr doc)
 
 emptyArgDocMap :: ArgDocMap
 emptyArgDocMap = ArgDocMap Map.empty
+
+-- | Maps of docs that were added via Template Haskell's @putDoc@.
+data ExtractedTHDocs =
+  ExtractedTHDocs
+    { ethd_mod_header :: Maybe HsDocString
+      -- ^ The added module header documentation, if it exists.
+    , ethd_decl_docs  :: DeclDocMap
+      -- ^ The documentation added to declarations.
+    , ethd_arg_docs   :: ArgDocMap
+      -- ^ The documentation added to function arguments.
+    , ethd_inst_docs  :: DeclDocMap
+      -- ^ The documentation added to class and family instances.
+    }

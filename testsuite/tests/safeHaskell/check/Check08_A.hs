@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
 -- safe inferred, with no pkg trust reqs

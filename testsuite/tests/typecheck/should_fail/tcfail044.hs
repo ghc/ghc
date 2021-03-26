@@ -1,3 +1,4 @@
+{-# LANGUAGE Haskell2010 #-}
 -- !!! tcfail044: duplicated type variable in instance decls
 --
 module ShouldFail where

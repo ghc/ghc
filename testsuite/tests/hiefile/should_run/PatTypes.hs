@@ -33,9 +33,7 @@ p3 = (24,11)
 p4 = (26,5)
 
 makeNc :: IO NameCache
-makeNc = do
-  uniq_supply <- mkSplitUniqSupply 'z'
-  return $ initNameCache uniq_supply []
+makeNc = initNameCache 'z' []
 
 dynFlagsForPrinting :: String -> IO DynFlags
 dynFlagsForPrinting libdir = do
@@ -50,7 +48,7 @@ main = do
   libdir:_ <- getArgs
   df <- dynFlagsForPrinting libdir
   nc <- makeNc
-  hfr <- readHieFile (NCU (\f -> pure $ snd $ f nc)) "PatTypes.hie"
+  hfr <- readHieFile nc "PatTypes.hie"
   let hf = hie_file_result hfr
   forM_ [p1,p2,p3,p4] $ \point -> do
     putStr $ "At " ++ show point ++ ", got type: "

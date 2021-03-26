@@ -14,6 +14,7 @@ import GHC.Utils.Outputable hiding (space)
 import System.Environment( getArgs )
 import System.Exit
 import System.FilePath
+import System.IO
 
 usage :: String
 usage = unlines
@@ -30,38 +31,43 @@ main = do
    [libdir,fileName] -> testOneFile libdir fileName
    _ -> putStrLn usage
 
+-- | N.B. It's important that we write our output as binary lest Windows will
+-- change our LF line endings to CRLF, which will show up in the AST when we
+-- re-parse.
+writeBinFile :: FilePath -> String -> IO()
+writeBinFile fpath x = withBinaryFile fpath WriteMode (\h -> hSetEncoding h utf8 >> hPutStr h x)
+
 testOneFile :: FilePath -> String -> IO ()
 testOneFile libdir fileName = do
        p <- parseOneFile libdir fileName
        let
          origAst = showPprUnsafe
-                     $ showAstData BlankSrcSpan
+                     $ showAstData BlankSrcSpan BlankApiAnnotations
                      $ eraseLayoutInfo (pm_parsed_source p)
          pped    = pragmas ++ "\n" ++ pp (pm_parsed_source p)
-         anns    = pm_annotations p
-         pragmas = getPragmas anns
+         pragmas = getPragmas (pm_parsed_source p)
 
          newFile = dropExtension fileName <.> "ppr" <.> takeExtension fileName
          astFile = fileName <.> "ast"
          newAstFile = fileName <.> "ast.new"
 
-       writeFile astFile origAst
-       writeFile newFile pped
+       writeBinFile astFile origAst
+       writeBinFile newFile pped
 
        p' <- parseOneFile libdir newFile
 
        let newAstStr :: String
            newAstStr = showPprUnsafe
-                         $ showAstData BlankSrcSpan
+                         $ showAstData BlankSrcSpan BlankApiAnnotations
                          $ eraseLayoutInfo (pm_parsed_source p')
-       writeFile newAstFile newAstStr
+       writeBinFile newAstFile newAstStr
 
        if origAst == newAstStr
          then do
            -- putStrLn "ASTs matched"
            exitSuccess
          else do
-           putStrLn "AST Match Failed"
+           putStrLn "ppr AST Match Failed"
            putStrLn "\n===================================\nOrig\n\n"
            putStrLn origAst
            putStrLn "\n===================================\nNew\n\n"
@@ -91,15 +97,16 @@ parseOneFile libdir fileName = do
                               ++ show (map (ml_hs_file . ms_location) xs)
          parseModule modSum
 
-getPragmas :: ApiAnns -> String
-getPragmas anns = pragmaStr
+getPragmas :: Located HsModule -> String
+getPragmas (L _ (HsModule { hsmodAnn = anns'})) = pragmaStr
   where
-    tokComment (L _ (AnnBlockComment s)) = s
-    tokComment (L _ (AnnLineComment  s)) = s
+    tokComment (L _ (AnnComment (AnnBlockComment s) _)) = s
+    tokComment (L _ (AnnComment (AnnLineComment  s) _)) = s
     tokComment _ = ""
 
-    comments = map tokComment $ sortRealLocated $ apiAnnRogueComments anns
-    pragmas = filter (\c -> isPrefixOf "{-#" c ) comments
+    cmp (L l1 _) (L l2 _) = compare (anchor l1) (anchor l2)
+    comments' = map tokComment $ sortBy cmp $ priorComments $ apiAnnComments anns'
+    pragmas = filter (\c -> isPrefixOf "{-#" c ) comments'
     pragmaStr = intercalate "\n" pragmas
 
 pp :: (Outputable a) => a -> String

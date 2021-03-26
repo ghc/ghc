@@ -57,7 +57,7 @@ import GHC.Cmm.Switch
 import GHC.Cmm.CLabel
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
-import GHC.Core              ( Tickish(..) )
+import GHC.Types.Tickish     ( GenTickish(..) )
 import GHC.Types.SrcLoc      ( srcSpanFile, srcSpanStartLine, srcSpanStartCol )
 
 -- The rest:
@@ -2381,6 +2381,10 @@ coerceInt2FP' ArchPPC fromRep toRep x = do
 coerceInt2FP' (ArchPPC_64 _) fromRep toRep x = do
     (src, code) <- getSomeReg x
     platform <- getPlatform
+    upper <- getNewRegNat II64
+    lower <- getNewRegNat II64
+    l1 <- getBlockIdNat
+    l2 <- getBlockIdNat
     let
         code' dst = code `appOL` maybe_exts `appOL` toOL [
                 ST II64 src (spRel platform 3),
@@ -2388,12 +2392,28 @@ coerceInt2FP' (ArchPPC_64 _) fromRep toRep x = do
                 FCFID dst dst
             ] `appOL` maybe_frsp dst
 
-        maybe_exts = case fromRep of
-                        W8 ->  unitOL $ EXTS II8 src src
-                        W16 -> unitOL $ EXTS II16 src src
-                        W32 -> unitOL $ EXTS II32 src src
-                        W64 -> nilOL
-                        _       -> panic "PPC.CodeGen.coerceInt2FP: no match"
+        maybe_exts
+          = case fromRep of
+              W8 ->  unitOL $ EXTS II8 src src
+              W16 -> unitOL $ EXTS II16 src src
+              W32 -> unitOL $ EXTS II32 src src
+              W64 -> case toRep of
+                        W32 -> toOL [ SRA II64 upper src (RIImm (ImmInt 53))
+                                    , CLRLI II64 lower src 53
+                                    , ADD upper upper (RIImm (ImmInt 1))
+                                    , ADD lower lower (RIImm (ImmInt 2047))
+                                    , CMPL II64 upper (RIImm (ImmInt 2))
+                                    , OR lower lower (RIReg src)
+                                    , CLRRI II64 lower lower 11
+                                    , BCC LTT l2 Nothing
+                                    , BCC ALWAYS l1 Nothing
+                                    , NEWBLOCK l1
+                                    , MR src lower
+                                    , BCC ALWAYS l2 Nothing
+                                    , NEWBLOCK l2
+                                    ]
+                        _   -> nilOL
+              _       -> panic "PPC.CodeGen.coerceInt2FP: no match"
 
         maybe_frsp dst
                 = case toRep of

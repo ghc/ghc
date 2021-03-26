@@ -28,7 +28,7 @@ module GHC.Tc.Utils.Monad(
   whenDOptM, whenGOptM, whenWOptM,
   whenXOptM, unlessXOptM,
   getGhcMode,
-  withDynamicNow, withoutDynamicNow,
+  withoutDynamicNow,
   getEpsVar,
   getEps,
   updateEps, updateEps_,
@@ -49,7 +49,7 @@ module GHC.Tc.Utils.Monad(
   dumpTcRn,
   getPrintUnqualified,
   printForUserTcRn,
-  traceIf, traceHiDiffs, traceOptIf,
+  traceIf, traceOptIf,
   debugTc,
 
   -- * Typechecker global environment
@@ -61,8 +61,9 @@ module GHC.Tc.Utils.Monad(
   addDependentFiles,
 
   -- * Error management
-  getSrcSpanM, setSrcSpan, addLocM, inGeneratedCode,
-  wrapLocM, wrapLocFstM, wrapLocSndM,wrapLocM_,
+  getSrcSpanM, setSrcSpan, setSrcSpanA, addLocM, addLocMA, inGeneratedCode,
+  wrapLocM, wrapLocAM, wrapLocFstM, wrapLocFstMA, wrapLocSndM, wrapLocSndMA, wrapLocM_,
+  wrapLocMA_,wrapLocMA,
   getErrsVar, setErrsVar,
   addErr,
   failWith, failAt,
@@ -257,6 +258,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
         th_coreplugins_var <- newIORef [] ;
         th_state_var         <- newIORef Map.empty ;
         th_remote_state_var  <- newIORef Nothing ;
+        th_docs_var          <- newIORef Map.empty ;
         let {
              -- bangs to avoid leaking the env (#19356)
              !dflags = hsc_dflags hsc_env ;
@@ -284,6 +286,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_th_coreplugins = th_coreplugins_var,
                 tcg_th_state         = th_state_var,
                 tcg_th_remote_state  = th_remote_state_var,
+                tcg_th_docs          = th_docs_var,
 
                 tcg_mod            = mod,
                 tcg_semantic_mod   = homeModuleInstantiation home_unit mod,
@@ -319,6 +322,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_binds          = emptyLHsBinds,
                 tcg_imp_specs      = [],
                 tcg_sigs           = emptyNameSet,
+                tcg_ksigs          = emptyNameSet,
                 tcg_ev_binds       = emptyBag,
                 tcg_warns          = NoWarnings,
                 tcg_anns           = [],
@@ -547,11 +551,6 @@ unlessXOptM flag thing_inside = do b <- xoptM flag
 getGhcMode :: TcRnIf gbl lcl GhcMode
 getGhcMode = do { env <- getTopEnv; return (ghcMode (hsc_dflags env)) }
 
-withDynamicNow :: TcRnIf gbl lcl a -> TcRnIf gbl lcl a
-withDynamicNow =
-  updTopEnv (\top@(HscEnv { hsc_dflags = dflags }) ->
-              top { hsc_dflags = setDynamicNow dflags })
-
 withoutDynamicNow :: TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 withoutDynamicNow =
   updTopEnv (\top@(HscEnv { hsc_dflags = dflags }) ->
@@ -592,10 +591,9 @@ getEpsAndHpt = do { env <- getTopEnv; eps <- readMutVar (hsc_EPS env)
 
 -- | A convenient wrapper for taking a @MaybeErr SDoc a@ and throwing
 -- an exception if it is an error.
-withException :: TcRnIf gbl lcl (MaybeErr SDoc a) -> TcRnIf gbl lcl a
-withException do_this = do
+withException :: MonadIO m => DynFlags -> m (MaybeErr SDoc a) -> m a
+withException dflags do_this = do
     r <- do_this
-    dflags <- getDynFlags
     case r of
         Failed err -> liftIO $ throwGhcExceptionIO (ProgramError (showSDoc dflags err))
         Succeeded result -> return result
@@ -809,16 +807,14 @@ printForUserTcRn doc = do
     liftIO (printOutputForUser logger dflags printer doc)
 
 {-
-traceIf and traceHiDiffs work in the TcRnIf monad, where no RdrEnv is
+traceIf works in the TcRnIf monad, where no RdrEnv is
 available.  Alas, they behave inconsistently with the other stuff;
 e.g. are unaffected by -dump-to-file.
 -}
 
-traceIf, traceHiDiffs :: SDoc -> TcRnIf m n ()
-traceIf      = traceOptIf Opt_D_dump_if_trace
-traceHiDiffs = traceOptIf Opt_D_dump_hi_diffs
+traceIf :: SDoc -> TcRnIf m n ()
+traceIf = traceOptIf Opt_D_dump_if_trace
 {-# INLINE traceIf #-}
-{-# INLINE traceHiDiffs #-}
   -- see Note [INLINE conditional tracing utilities]
 
 traceOptIf :: DumpFlag -> SDoc -> TcRnIf m n ()
@@ -915,16 +911,36 @@ setSrcSpan loc@(UnhelpfulSpan _) thing_inside
   | otherwise
   = thing_inside
 
+setSrcSpanA :: SrcSpanAnn' ann -> TcRn a -> TcRn a
+setSrcSpanA l = setSrcSpan (locA l)
+
 addLocM :: (a -> TcM b) -> Located a -> TcM b
 addLocM fn (L loc a) = setSrcSpan loc $ fn a
+
+addLocMA :: (a -> TcM b) -> GenLocated (SrcSpanAnn' ann) a -> TcM b
+addLocMA fn (L loc a) = setSrcSpanA loc $ fn a
 
 wrapLocM :: (a -> TcM b) -> Located a -> TcM (Located b)
 wrapLocM fn (L loc a) = setSrcSpan loc $ do { b <- fn a
                                             ; return (L loc b) }
 
+wrapLocAM :: (a -> TcM b) -> LocatedAn an a -> TcM (Located b)
+wrapLocAM fn (L loc a) = setSrcSpanA loc $ do { b <- fn a
+                                              ; return (L (locA loc) b) }
+
+wrapLocMA :: (a -> TcM b) -> GenLocated (SrcSpanAnn' ann) a -> TcRn (GenLocated (SrcSpanAnn' ann) b)
+wrapLocMA fn (L loc a) = setSrcSpanA loc $ do { b <- fn a
+                                              ; return (L loc b) }
+
 wrapLocFstM :: (a -> TcM (b,c)) -> Located a -> TcM (Located b, c)
 wrapLocFstM fn (L loc a) =
   setSrcSpan loc $ do
+    (b,c) <- fn a
+    return (L loc b, c)
+
+wrapLocFstMA :: (a -> TcM (b,c)) -> LocatedA a -> TcM (LocatedA b, c)
+wrapLocFstMA fn (L loc a) =
+  setSrcSpanA loc $ do
     (b,c) <- fn a
     return (L loc b, c)
 
@@ -934,8 +950,17 @@ wrapLocSndM fn (L loc a) =
     (b,c) <- fn a
     return (b, L loc c)
 
+wrapLocSndMA :: (a -> TcM (b, c)) -> LocatedA a -> TcM (b, LocatedA c)
+wrapLocSndMA fn (L loc a) =
+  setSrcSpanA loc $ do
+    (b,c) <- fn a
+    return (b, L loc c)
+
 wrapLocM_ :: (a -> TcM ()) -> Located a -> TcM ()
 wrapLocM_ fn (L loc a) = setSrcSpan loc (fn a)
+
+wrapLocMA_ :: (a -> TcM ()) -> LocatedA a -> TcM ()
+wrapLocMA_ fn (L loc a) = setSrcSpan (locA loc) (fn a)
 
 -- Reporting errors
 

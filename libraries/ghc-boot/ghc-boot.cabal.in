@@ -22,7 +22,7 @@ description:    This library is shared between GHC, ghc-pkg, and other boot
                 The package database format and this library are constructed in
                 such a way that while ghc-pkg depends on Cabal, the GHC library
                 and program do not have to depend on Cabal.
-cabal-version:  >=1.22
+cabal-version:  1.22
 build-type:     Simple
 extra-source-files: changelog.md
 
@@ -67,7 +67,7 @@ Library
 
     build-depends: base       >= 4.7 && < 4.17,
                    binary     == 0.8.*,
-                   bytestring == 0.10.*,
+                   bytestring >= 0.10 && < 0.12,
                    containers >= 0.5 && < 0.7,
                    directory  >= 1.2 && < 1.4,
                    filepath   >= 1.3 && < 1.5,
