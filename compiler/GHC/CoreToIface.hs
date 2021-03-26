@@ -469,13 +469,13 @@ toIfaceIdInfo id_info
 
     ------------  Strictness  --------------
         -- No point in explicitly exporting TopSig
-    sig_info = strictnessInfo id_info
-    strict_hsinfo | not (isTopSig sig_info) = Just (HsStrictness sig_info)
+    sig_info = dmdSigInfo id_info
+    strict_hsinfo | not (isTopSig sig_info) = Just (HsDmdSig sig_info)
                   | otherwise               = Nothing
 
     ------------  CPR --------------
-    cpr_info = cprInfo id_info
-    cpr_hsinfo | cpr_info /= topCprSig = Just (HsCpr cpr_info)
+    cpr_info = cprSigInfo id_info
+    cpr_hsinfo | cpr_info /= topCprSig = Just (HsCprSig cpr_info)
                | otherwise             = Nothing
     ------------  Unfolding  --------------
     unfold_hsinfo = toIfUnfolding loop_breaker (unfoldingInfo id_info)

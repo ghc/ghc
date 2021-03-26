@@ -1096,8 +1096,8 @@ transferIdInfo exported_id local_id
     , local_id `setInlinePragma` defaultInlinePragma )
   where
     local_info = idInfo local_id
-    transfer exp_info = exp_info `setStrictnessInfo`    strictnessInfo local_info
-                                 `setCprInfo`           cprInfo local_info
+    transfer exp_info = exp_info `setDmdSigInfo`    dmdSigInfo local_info
+                                 `setCprSigInfo`           cprSigInfo local_info
                                  `setUnfoldingInfo`     unfoldingInfo local_info
                                  `setInlinePragInfo`    inlinePragInfo local_info
                                  `setRuleInfo`          addRuleInfo (ruleInfo exp_info) new_info
@@ -1115,6 +1115,6 @@ dmdAnal logger dflags fam_envs rules binds = do
                }
       binds_plus_dmds = dmdAnalProgram opts fam_envs rules binds
   Logger.dumpIfSet_dyn logger dflags Opt_D_dump_str_signatures "Strictness signatures" FormatText $
-    dumpIdInfoOfProgram (ppr . zapDmdEnvSig . strictnessInfo) binds_plus_dmds
+    dumpIdInfoOfProgram (ppr . zapDmdEnvSig . dmdSigInfo) binds_plus_dmds
   -- See Note [Stamp out space leaks in demand analysis] in GHC.Core.Opt.DmdAnal
   seqBinds binds_plus_dmds `seq` return binds_plus_dmds

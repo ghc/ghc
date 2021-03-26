@@ -508,7 +508,7 @@ instance Outputable IdInfo where
       caf_info = cafInfo info
       has_caf_info = not (mayHaveCafRefs caf_info)
 
-      str_info = strictnessInfo info
+      str_info = dmdSigInfo info
       has_str_info = not (isTopSig str_info)
 
       unf_info = unfoldingInfo info
@@ -552,10 +552,10 @@ ppIdInfo id info
     caf_info = cafInfo info
     has_caf_info = not (mayHaveCafRefs caf_info)
 
-    str_info = strictnessInfo info
+    str_info = dmdSigInfo info
     has_str_info = not (isTopSig str_info)
 
-    cpr_info = cprInfo info
+    cpr_info = cprSigInfo info
     has_cpr_info = cpr_info /= topCprSig
 
     unf_info = unfoldingInfo info

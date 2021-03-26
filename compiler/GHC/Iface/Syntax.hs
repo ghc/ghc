@@ -346,8 +346,8 @@ type IfaceIdInfo = [IfaceInfoItem]
 
 data IfaceInfoItem
   = HsArity         Arity
-  | HsStrictness    StrictSig
-  | HsCpr           CprSig
+  | HsDmdSig        DmdSig
+  | HsCprSig        CprSig
   | HsInline        InlinePragma
   | HsUnfold        Bool             -- True <=> isStrongLoopBreaker is true
                     IfaceUnfolding   -- See Note [Expose recursive functions]
@@ -1463,8 +1463,8 @@ instance Outputable IfaceInfoItem where
                               <> colon <+> ppr unf
   ppr (HsInline prag)       = text "Inline:" <+> ppr prag
   ppr (HsArity arity)       = text "Arity:" <+> int arity
-  ppr (HsStrictness str)    = text "Strictness:" <+> ppr str
-  ppr (HsCpr cpr)           = text "CPR:" <+> ppr cpr
+  ppr (HsDmdSig str)        = text "Strictness:" <+> ppr str
+  ppr (HsCprSig cpr)        = text "CPR:" <+> ppr cpr
   ppr HsNoCafRefs           = text "HasNoCafRefs"
   ppr HsLevity              = text "Never levity-polymorphic"
   ppr (HsLFInfo lf_info)    = text "LambdaFormInfo:" <+> ppr lf_info
@@ -2224,26 +2224,26 @@ instance Binary IfaceIdDetails where
 
 instance Binary IfaceInfoItem where
     put_ bh (HsArity aa)          = putByte bh 0 >> put_ bh aa
-    put_ bh (HsStrictness ab)     = putByte bh 1 >> put_ bh ab
+    put_ bh (HsDmdSig ab)         = putByte bh 1 >> put_ bh ab
     put_ bh (HsUnfold lb ad)      = putByte bh 2 >> put_ bh lb >> put_ bh ad
     put_ bh (HsInline ad)         = putByte bh 3 >> put_ bh ad
     put_ bh HsNoCafRefs           = putByte bh 4
     put_ bh HsLevity              = putByte bh 5
-    put_ bh (HsCpr cpr)           = putByte bh 6 >> put_ bh cpr
+    put_ bh (HsCprSig cpr)        = putByte bh 6 >> put_ bh cpr
     put_ bh (HsLFInfo lf_info)    = putByte bh 7 >> put_ bh lf_info
 
     get bh = do
         h <- getByte bh
         case h of
             0 -> liftM HsArity $ get bh
-            1 -> liftM HsStrictness $ get bh
+            1 -> liftM HsDmdSig $ get bh
             2 -> do lb <- get bh
                     ad <- get bh
                     return (HsUnfold lb ad)
             3 -> liftM HsInline $ get bh
             4 -> return HsNoCafRefs
             5 -> return HsLevity
-            6 -> HsCpr <$> get bh
+            6 -> HsCprSig <$> get bh
             _ -> HsLFInfo <$> get bh
 
 instance Binary IfaceUnfolding where
@@ -2579,12 +2579,12 @@ instance NFData IfaceIdDetails where
 instance NFData IfaceInfoItem where
   rnf = \case
     HsArity a -> rnf a
-    HsStrictness str -> seqStrictSig str
+    HsDmdSig str -> seqDmdSig str
     HsInline p -> p `seq` () -- TODO: seq further?
     HsUnfold b unf -> rnf b `seq` rnf unf
     HsNoCafRefs -> ()
     HsLevity -> ()
-    HsCpr cpr -> cpr `seq` ()
+    HsCprSig cpr -> cpr `seq` ()
     HsLFInfo lf_info -> lf_info `seq` () -- TODO: seq further?
 
 instance NFData IfaceUnfolding where
