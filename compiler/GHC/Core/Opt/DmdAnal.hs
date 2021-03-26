@@ -222,7 +222,7 @@ position.
 --
 -- It calls a function that knows how to analyse this \"body\" given
 -- an 'AnalEnv' with updated demand signatures for the binding group
--- (reflecting their 'idStrictnessInfo') and expects to receive a
+-- (reflecting their 'idDmdSigInfo') and expects to receive a
 -- 'DmdType' in return, which it uses to annotate the binding group with their
 -- 'idDemandInfo'.
 dmdAnalBind
@@ -703,11 +703,11 @@ dmdTransform env var dmd
   -- See #18429 for some perf measurements.
   | Just _ <- isClassOpId_maybe var
   = -- pprTrace "dmdTransform:DictSel" (ppr var $$ ppr dmd) $
-    dmdTransformDictSelSig (idStrictness var) dmd
+    dmdTransformDictSelSig (idDmdSig var) dmd
   -- Imported functions
   | isGlobalId var
-  , let res = dmdTransformSig (idStrictness var) dmd
-  = -- pprTrace "dmdTransform:import" (vcat [ppr var, ppr (idStrictness var), ppr dmd, ppr res])
+  , let res = dmdTransformSig (idDmdSig var) dmd
+  = -- pprTrace "dmdTransform:import" (vcat [ppr var, ppr (idDmdSig var), ppr dmd, ppr res])
     res
   -- Top-level or local let-bound thing for which we use LetDown ('useLetUp').
   -- In that case, we have a strictness signature to unleash in our AnalEnv.
@@ -775,9 +775,9 @@ dmdAnalRhsSig top_lvl rec_bndrs env let_dmd lazy_fv id rhs
     (rhs_dmd_ty, rhs') = dmdAnal env rhs_dmd rhs
     DmdType rhs_fv rhs_dmds rhs_div = rhs_dmd_ty
 
-    sig = mkStrictSigForArity rhs_arity (DmdType sig_fv rhs_dmds rhs_div)
+    sig = mkDmdSigForArity rhs_arity (DmdType sig_fv rhs_dmds rhs_div)
 
-    id' = id `setIdStrictness` sig
+    id' = id `setIdDmdSig` sig
     env' = extendAnalEnv top_lvl env id' sig
 
     -- See Note [Aggregated demand for cardinality]
@@ -912,7 +912,7 @@ trivial RHS (see Note [Demand analysis for trivial right-hand sides]).
 Because idArity of a function varies independently of its cardinality
 properties (cf. Note [idArity varies independently of dmdTypeDepth]), we
 implicitly encode the arity for when a demand signature is sound to unleash
-in its 'dmdTypeDepth' (cf. Note [Understanding DmdType and StrictSig] in
+in its 'dmdTypeDepth' (cf. Note [Understanding DmdType and DmdSig] in
 GHC.Types.Demand). It is unsound to unleash a demand signature when the
 incoming number of arguments is less than that.
 See Note [What are demand signatures?] in GHC.Types.Demand for more details
@@ -961,7 +961,7 @@ reset or decrease arity. That's an unnecessary dependency, because
   * idArity is analysis information itself, thus volatile
   * We already *have* dmdTypeDepth, wo why not just use it to encode the
     threshold for when to unleash the signature
-    (cf. Note [Understanding DmdType and StrictSig] in GHC.Types.Demand)
+    (cf. Note [Understanding DmdType and DmdSig] in GHC.Types.Demand)
 
 Consider the following expression, for example:
 
@@ -1073,23 +1073,23 @@ dmdFix top_lvl env let_dmd orig_pairs
   = loop 1 emptyDmdEnv initial_pairs
   where
     -- See Note [Initialising strictness]
-    initial_pairs | ae_virgin env = [(setIdStrictness id botSig, rhs) | (id, rhs) <- orig_pairs ]
+    initial_pairs | ae_virgin env = [(setIdDmdSig id botSig, rhs) | (id, rhs) <- orig_pairs ]
                   | otherwise     = orig_pairs
 
     -- If fixed-point iteration does not yield a result we use this instead
     -- See Note [Safe abortion in the fixed-point iteration]
     abort :: (AnalEnv, DmdEnv, [(Id,CoreExpr)])
     abort = (env, lazy_fv', zapped_pairs)
-      where (lazy_fv, pairs') = step True emptyDmdEnv (zapIdStrictness orig_pairs)
+      where (lazy_fv, pairs') = step True emptyDmdEnv (zapIdDmdSig orig_pairs)
             -- Note [Lazy and unleashable free variables]
-            non_lazy_fvs = plusVarEnvList $ map (strictSigDmdEnv . idStrictness . fst) pairs'
+            non_lazy_fvs = plusVarEnvList $ map (dmdSigDmdEnv . idDmdSig . fst) pairs'
             lazy_fv'     = lazy_fv `plusVarEnv` mapVarEnv (const topDmd) non_lazy_fvs
-            zapped_pairs = zapIdStrictness pairs'
+            zapped_pairs = zapIdDmdSig pairs'
 
-    -- The fixed-point varies the idStrictness field of the binders, and terminates if that
+    -- The fixed-point varies the idDmdSig field of the binders, and terminates if that
     -- annotation does not change any more.
     loop :: Int -> DmdEnv -> [(Id,CoreExpr)] -> (AnalEnv, DmdEnv, [(Id,CoreExpr)])
-    loop n lazy_fv pairs = -- pprTrace "dmdFix" (ppr n <+> vcat [ ppr id <+> ppr (idStrictness id)
+    loop n lazy_fv pairs = -- pprTrace "dmdFix" (ppr n <+> vcat [ ppr id <+> ppr (idDmdSig id)
                            --                                     | (id,_)<- pairs]) $
                            loop' n lazy_fv pairs
 
@@ -1099,7 +1099,7 @@ dmdFix top_lvl env let_dmd orig_pairs
       | otherwise      = loop (n+1) lazy_fv' pairs'
       where
         -- See Note [Lazy free variables are stable after signature is stable]
-        found_fixpoint     = map (idStrictness . fst) pairs' == map (idStrictness . fst) pairs
+        found_fixpoint     = map (idDmdSig . fst) pairs' == map (idDmdSig . fst) pairs
         first_round        = n == 1
         (lazy_fv', pairs') = step first_round lazy_fv pairs
         final_anal_env     = extendAnalEnvs top_lvl env (map fst pairs')
@@ -1119,7 +1119,7 @@ dmdFix top_lvl env let_dmd orig_pairs
                 -- so this can significantly reduce the number of iterations needed
 
         my_downRhs (env, lazy_fv) (id,rhs)
-          = -- pprTrace "my_downRhs" (ppr id $$ ppr lazy_fv $$ ppr lazy_fv' $$ ppr (idStrictness id)) $
+          = -- pprTrace "my_downRhs" (ppr id $$ ppr lazy_fv $$ ppr lazy_fv' $$ ppr (idDmdSig id)) $
             ((env', lazy_fv'), (id', rhs'))
           where
             (env', lazy_fv', id', rhs')
@@ -1128,8 +1128,8 @@ dmdFix top_lvl env let_dmd orig_pairs
     rec_bndrs :: IdSet
     rec_bndrs = mkVarSet (map fst orig_pairs)
 
-    zapIdStrictness :: [(Id, CoreExpr)] -> [(Id, CoreExpr)]
-    zapIdStrictness pairs = [(setIdStrictness id nopSig, rhs) | (id, rhs) <- pairs ]
+    zapIdDmdSig :: [(Id, CoreExpr)] -> [(Id, CoreExpr)]
+    zapIdDmdSig pairs = [(setIdDmdSig id nopSig, rhs) | (id, rhs) <- pairs ]
 
 {- Note [Safe abortion in the fixed-point iteration]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1473,7 +1473,7 @@ data AnalEnv = AE
         -- The DmdEnv gives the demand on the free vars of the function
         -- when it is given enough args to satisfy the strictness signature
 
-type SigEnv = VarEnv (StrictSig, TopLevelFlag)
+type SigEnv = VarEnv (DmdSig, TopLevelFlag)
 
 instance Outputable AnalEnv where
   ppr env = text "AE" <+> braces (vcat
@@ -1500,16 +1500,16 @@ extendAnalEnvs top_lvl env vars
 
 extendSigEnvs :: TopLevelFlag -> SigEnv -> [Id] -> SigEnv
 extendSigEnvs top_lvl sigs vars
-  = extendVarEnvList sigs [ (var, (idStrictness var, top_lvl)) | var <- vars]
+  = extendVarEnvList sigs [ (var, (idDmdSig var, top_lvl)) | var <- vars]
 
-extendAnalEnv :: TopLevelFlag -> AnalEnv -> Id -> StrictSig -> AnalEnv
+extendAnalEnv :: TopLevelFlag -> AnalEnv -> Id -> DmdSig -> AnalEnv
 extendAnalEnv top_lvl env var sig
   = env { ae_sigs = extendSigEnv top_lvl (ae_sigs env) var sig }
 
-extendSigEnv :: TopLevelFlag -> SigEnv -> Id -> StrictSig -> SigEnv
+extendSigEnv :: TopLevelFlag -> SigEnv -> Id -> DmdSig -> SigEnv
 extendSigEnv top_lvl sigs var sig = extendVarEnv sigs var (sig, top_lvl)
 
-lookupSigEnv :: AnalEnv -> Id -> Maybe (StrictSig, TopLevelFlag)
+lookupSigEnv :: AnalEnv -> Id -> Maybe (DmdSig, TopLevelFlag)
 lookupSigEnv env id = lookupVarEnv (ae_sigs env) id
 
 nonVirgin :: AnalEnv -> AnalEnv
