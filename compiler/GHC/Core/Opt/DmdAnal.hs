@@ -759,7 +759,7 @@ dmdAnalRhsSig
 -- to the Id, and augment the environment with the signature as well.
 -- See Note [NOINLINE and strictness]
 dmdAnalRhsSig top_lvl rec_bndrs env let_dmd lazy_fv id rhs
-  = applyWhen (not $ isEmptyVarSet rec_bndrs) (pprTrace "dmdAnalRhsSig" (ppr id <+> ppr sig <+> ppr lazy_fv')) $
+  = -- applyWhen (not $ isEmptyVarSet rec_bndrs) (pprTrace "dmdAnalRhsSig" (ppr id <+> ppr sig <+> ppr lazy_fv')) $
     (env', lazy_fv', id', rhs')
   where
     rhs_arity = idArity id
@@ -1070,31 +1070,24 @@ dmdFix :: TopLevelFlag
        -> (AnalEnv, DmdEnv, [(Id,CoreExpr)]) -- Binders annotated with strictness info
 
 dmdFix top_lvl env let_dmd orig_pairs
-  = loop 1 emptyDmdEnv initial_pairs
+  = loop 1 initial_lazy_fv initial_pairs
   where
     -- See Note [Initialising strictness]
     initial_pairs | ae_virgin env = [(setIdDmdSig id botSig, rhs) | (id, rhs) <- orig_pairs ]
                   | otherwise     = orig_pairs
-
-    -- If fixed-point iteration does not yield a result we use this instead
-    -- See Note [Safe abortion in the fixed-point iteration]
-    abort :: (AnalEnv, DmdEnv, [(Id,CoreExpr)])
-    abort = (env, lazy_fv', zapped_pairs)
-      where (lazy_fv, pairs') = step True emptyDmdEnv (zapIdStrictness orig_pairs)
-            -- Note [Lazy and unleashable free variables]
-            non_lazy_fvs = plusVarEnvList $ map (dmdSigDmdEnv . idDmdSig . fst) pairs'
-            lazy_fv'     = lazy_fv `plusVarEnv` mapVarEnv (const topDmd) non_lazy_fvs
-            zapped_pairs = zapIdDmdSig pairs'
+    -- See Note [Lazy free variables and Initialising strictness]
+    initial_lazy_fv | ae_virgin env = emptyDmdEnv
+                    | otherwise     = get_lazy_fv_cache orig_pairs
 
     -- The fixed-point varies the idDmdSig field of the binders, and terminates if that
     -- annotation does not change any more.
     loop :: Int -> DmdEnv -> [(Id,CoreExpr)] -> (AnalEnv, DmdEnv, [(Id,CoreExpr)])
     loop n lazy_fv pairs = -- pprTrace "dmdFix" (ppr n <+> vcat [ ppr id <+> ppr (idDmdSig id)
-                           --                                     | (id,_)<- pairs]) $
+                           --                                   | (id,_)<- pairs]) $
                            loop' n lazy_fv pairs
 
     loop' n lazy_fv pairs
-      | found_fixpoint = (final_anal_env, lazy_fv', pairs')
+      | found_fixpoint = (final_anal_env, lazy_fv', final_pairs)
       | n == 10        = abort
       | otherwise      = loop (n+1) lazy_fv' pairs'
       where
@@ -1102,6 +1095,8 @@ dmdFix top_lvl env let_dmd orig_pairs
         found_fixpoint     = map (idDmdSig . fst) pairs' == map (idDmdSig . fst) pairs
         first_round        = n == 1
         (lazy_fv', pairs') = step first_round lazy_fv pairs
+        -- See Note [Lazy free variables and Initialising strictness]
+        final_pairs        = set_lazy_fv_cache pairs' lazy_fv'
         final_anal_env     = extendAnalEnvs top_lvl env (map fst pairs')
 
     step :: Bool -> DmdEnv -> [(Id, CoreExpr)] -> (DmdEnv, [(Id, CoreExpr)])
@@ -1128,8 +1123,29 @@ dmdFix top_lvl env let_dmd orig_pairs
     rec_bndrs :: IdSet
     rec_bndrs = mkVarSet (map fst orig_pairs)
 
+    -- If fixed-point iteration does not yield a result we use this instead
+    -- See Note [Safe abortion in the fixed-point iteration]
+    abort :: (AnalEnv, DmdEnv, [(Id,CoreExpr)])
+    abort = (env, lazy_fv', zapped_pairs)
+      where (lazy_fv, pairs') = step True emptyDmdEnv (zapIdDmdSig orig_pairs)
+            -- Note [Lazy and unleashable free variables]
+            non_lazy_fvs = plusVarEnvList $ map (dmdSigDmdEnv . idDmdSig . fst) pairs'
+            lazy_fv'     = lazy_fv `plusVarEnv` mapVarEnv (const topDmd) non_lazy_fvs
+            zapped_pairs = zapIdDmdSig pairs'
+
     zapIdDmdSig :: [(Id, CoreExpr)] -> [(Id, CoreExpr)]
     zapIdDmdSig pairs = [(setIdDmdSig id nopSig, rhs) | (id, rhs) <- pairs ]
+
+    -- Accessing and setting the lazy FV cache between iterations.
+    -- See Note [Lazy free variables and Initialising strictness].
+    get_lazy_fv_cache :: [(Id, CoreExpr)] -> DmdEnv
+    get_lazy_fv_cache pairs = getDmdSigLazyFVCache (idDmdSig (fst (head pairs)))
+    set_lazy_fv_cache :: [(Id, CoreExpr)] -> DmdEnv -> [(Id, CoreExpr)]
+    set_lazy_fv_cache []               _       = [] -- impossible
+    set_lazy_fv_cache ((id,rhs):pairs) lazy_fv = (id', rhs):pairs
+      where
+        id'  = id `setIdDmdSig` sig'
+        sig' = setDmdSigLazyFVCache (idDmdSig id) lazy_fv
 
 {- Note [Safe abortion in the fixed-point iteration]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1413,10 +1429,24 @@ produces, but the signature in the step from (1) to (2) clearly isn't.
 By pretending that lazy_fv is merged back into the signature, the step (1) to
 (2) becomes monotonic, but then (2) to (3) is non-monotonic. The reason is that
 while the previous signature is an implicit input (via the SigEnv) to
-'dmdAnalRhsSig', the previous lazy_fv are not! In fact, 'dmdAnalRhsSig' should
-simply *extend* the previous lazy_fv rather producing its own. Then we have
-one lazy_fv per recursive group that we continually extend. If a binder is in
-the domain of lazy_fv, it should not occur in the FVs of the demand signature.
+'dmdAnalRhsSig', the previous lazy_fv are not!
+
+So 'dmdAnalRhsSig' should simply *extend* the previous lazy_fv rather producing
+its own. Then we have one lazy_fv per recursive group that we continually
+extend. If a binder is in the domain of lazy_fv, it should not occur in the FVs
+of the demand signature.
+
+Note [Lazy free variables and Initialising strictness]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In Note [Initialising strictness], we effectively use the annotated AST as state
+between fixed-point iteration to cache demand signatures.
+But unlike the demand type of the strictness signature, the lazy FVs
+from Note [Lazy free and unleashable variables] can't easily be persisted in the
+AST. Result, as described in Note [Initialising strictness]: Exponential runtime
+behavior.
+Our solution is an additional field in DmdSig to cache the lazy FVs between
+fixed-point iterations, so that it can take part in the mechanism described
+in Note [Initialising strictness].
 
 Note [Lazy free variables are stable after signature is stable]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

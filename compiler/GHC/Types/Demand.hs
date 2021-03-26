@@ -1,5 +1,6 @@
-{-# LANGUAGE CPP          #-}
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE CPP             #-}
+{-# LANGUAGE ViewPatterns    #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -58,9 +59,11 @@ module GHC.Types.Demand (
     keepAliveDmdType,
 
     -- * Demand signatures
-    DmdSig(..), mkDmdSigForArity, mkClosedDmdSig,
+    DmdSig(DmdSig), mkDmdSigForArity, mkClosedDmdSig,
     splitDmdSig, dmdSigDmdEnv, hasDemandEnvSig,
     nopSig, botSig, isTopSig, isDeadEndSig, appIsDeadEnd,
+    -- ** Accessing the lazy FV cache
+    getDmdSigLazyFVCache, setDmdSigLazyFVCache,
     -- ** Handling arity adjustments
     prependArgsDmdSig, etaConvertDmdSig,
 
@@ -1434,21 +1437,61 @@ demand type. See also Note [What are demand signatures?].
 -}
 
 -- | The depth of the wrapped 'DmdType' encodes the arity at which it is safe
--- to unleash. Better construct this through 'mkDmdSigForArity'.
+-- to unleash. Construct this through 'mkDmdSigForArity'.
 -- See Note [Understanding DmdType and DmdSig]
-newtype DmdSig
-  = DmdSig DmdType
-  deriving Eq
+data DmdSig
+  = DmdSig_ !DmdType
+  -- ^ Not exported. Instead, a unidirectional pattern synonym 'DmdSig' is
+  -- exported for use in pattern matches, so the only way to construct
+  -- signtures is through 'mkDmdSigForArity' and 'mkClosedDmdSig'.
+  | DmdSigWithLazyFVs !DmdType !DmdEnv
+  -- ^ Not exported.
+  -- Carries an additional 'DmdEnv' only used as a cache in fixed-point
+  -- iteration. No further semantic info, just pretend it is empty.
+  -- See Note [Lazy free variables and Initialising strictness].
+
+-- | See Note [Understanding DmdType and DmdSig]
+getDmdSig :: DmdSig -> DmdType
+getDmdSig (DmdSig_ ty)             = ty
+getDmdSig (DmdSigWithLazyFVs ty _) = ty
+
+-- | Match out the 'DmdType' stored in a 'DmdSig'.
+--
+-- Conveniently ignores whether or not the sig caches lazy FVs, which is what
+-- most code should do except fixed-point iteration.
+-- See Note [Lazy free variables and Initialising strictness].
+pattern DmdSig :: DmdType -> DmdSig
+pattern DmdSig x <- (getDmdSig -> x)
+{-# COMPLETE DmdSig #-}
+
+-- | Doesn't look at the cached lazy FVs.
+-- See Note [Lazy free variables and Initialising strictness].
+instance Eq DmdSig where
+  (DmdSig a) == (DmdSig b) = a == b
 
 -- | Turns a 'DmdType' computed for the particular 'Arity' into a 'DmdSig'
--- unleashable at that arity. See Note [Understanding DmdType and DmdSig]
+-- unleashable at that arity. See Note [Understanding DmdType and DmdSig].
 mkDmdSigForArity :: Arity -> DmdType -> DmdSig
 mkDmdSigForArity arity dmd_ty@(DmdType fvs args div)
-  | arity < dmdTypeDepth dmd_ty = DmdSig (DmdType fvs (take arity args) div)
-  | otherwise                   = DmdSig (etaExpandDmdType arity dmd_ty)
+  | arity < dmdTypeDepth dmd_ty = DmdSig_ (DmdType fvs (take arity args) div)
+  | otherwise                   = DmdSig_ (etaExpandDmdType arity dmd_ty)
 
 mkClosedDmdSig :: [Demand] -> Divergence -> DmdSig
-mkClosedDmdSig ds res = mkDmdSigForArity (length ds) (DmdType emptyDmdEnv ds res)
+mkClosedDmdSig ds res
+  = mkDmdSigForArity (length ds) (DmdType emptyDmdEnv ds res)
+
+-- | Get the cached lazy FVs of the 'DmdSig', used while doing fixed-point
+-- interation.
+-- See Note [Lazy free variables and Initialising strictness].
+getDmdSigLazyFVCache :: DmdSig -> DmdEnv
+getDmdSigLazyFVCache (DmdSigWithLazyFVs _ lazy_fvs) = lazy_fvs
+getDmdSigLazyFVCache _                              = emptyDmdEnv
+
+-- | Set the lazy FV cache of the 'DmdSig', used while doing fixed-point
+-- interation and accessed via 'getDmdSigLazyFVCache'.
+-- See Note [Lazy free variables and Initialising strictness].
+setDmdSigLazyFVCache :: DmdSig -> DmdEnv -> DmdSig
+setDmdSigLazyFVCache sig lazy_fvs = DmdSigWithLazyFVs (getDmdSig sig) lazy_fvs
 
 splitDmdSig :: DmdSig -> ([Demand], Divergence)
 splitDmdSig (DmdSig (DmdType _ dmds res)) = (dmds, res)
@@ -1460,10 +1503,10 @@ hasDemandEnvSig :: DmdSig -> Bool
 hasDemandEnvSig = not . isEmptyVarEnv . dmdSigDmdEnv
 
 botSig :: DmdSig
-botSig = DmdSig botDmdType
+botSig = DmdSig_ botDmdType
 
 nopSig :: DmdSig
-nopSig = DmdSig nopDmdType
+nopSig = DmdSig_ nopDmdType
 
 isTopSig :: DmdSig -> Bool
 isTopSig (DmdSig ty) = isTopDmdType ty
@@ -1493,7 +1536,7 @@ prependArgsDmdSig new_args sig@(DmdSig dmd_ty@(DmdType env dmds res))
   | isTopDmdType dmd_ty = sig
   | new_args < 0        = pprPanic "prependArgsDmdSig: negative new_args"
                                    (ppr new_args $$ ppr sig)
-  | otherwise           = DmdSig (DmdType env dmds' res)
+  | otherwise           = DmdSig_ (DmdType env dmds' res)
   where
     dmds' = replicate new_args topDmd ++ dmds
 
@@ -1509,8 +1552,8 @@ etaConvertDmdSig :: Arity -> DmdSig -> DmdSig
 -- of the info, while an arity decrease (a weakening of the incoming demand)
 -- must fall back to a conservative default.
 etaConvertDmdSig arity (DmdSig dmd_ty)
-  | arity < dmdTypeDepth dmd_ty = DmdSig $ decreaseArityDmdType dmd_ty
-  | otherwise                   = DmdSig $ etaExpandDmdType arity dmd_ty
+  | arity < dmdTypeDepth dmd_ty = DmdSig_ $ decreaseArityDmdType dmd_ty
+  | otherwise                   = DmdSig_ $ etaExpandDmdType arity dmd_ty
 
 {-
 ************************************************************************
@@ -1671,7 +1714,7 @@ zapUsedOnceDemand = kill_usage $ KillFlags
 --   signature
 zapUsedOnceSig :: DmdSig -> DmdSig
 zapUsedOnceSig (DmdSig (DmdType env ds r))
-    = DmdSig (DmdType env (map zapUsedOnceDemand ds) r)
+    = DmdSig_ (DmdType env (map zapUsedOnceDemand ds) r)
 
 data KillFlags = KillFlags
     { kf_abs         :: Bool
@@ -1849,7 +1892,8 @@ instance Outputable DmdType where
         -- pretty printing
 
 instance Outputable DmdSig where
-   ppr (DmdSig ty) = ppr ty
+   ppr (DmdSigWithLazyFVs ty fvs) = ppr ty <+> ppr fvs
+   ppr (DmdSig_ ty)               = ppr ty
 
 instance Outputable TypeShape where
   ppr TsUnk        = text "TsUnk"
@@ -1892,7 +1936,7 @@ instance Binary SubDemand where
 
 instance Binary DmdSig where
   put_ bh (DmdSig aa) = put_ bh aa
-  get bh = DmdSig <$> get bh
+  get bh = DmdSig_ <$> get bh
 
 instance Binary DmdType where
   -- Ignore DmdEnv when spitting out the DmdType
