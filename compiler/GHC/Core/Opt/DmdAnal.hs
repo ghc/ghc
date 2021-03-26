@@ -60,6 +60,15 @@ newtype DmdAnalOpts = DmdAnalOpts
    { dmd_strict_dicts :: Bool -- ^ Use strict dictionaries
    }
 
+-- This is a strict alternative to (,)
+-- See Note [Space Leaks in Demand Analysis]
+data WithDmdType a = WithDmdType !DmdType !a
+
+getAnnotated :: WithDmdType a -> a
+getAnnotated (WithDmdType _ a) = a
+
+data DmdResult a b = R !a !b
+
 -- | Outputs a new copy of the Core program in which binders have been annotated
 -- with demand and strictness information.
 --
@@ -67,19 +76,19 @@ newtype DmdAnalOpts = DmdAnalOpts
 -- [Stamp out space leaks in demand analysis])
 dmdAnalProgram :: DmdAnalOpts -> FamInstEnvs -> [CoreRule] -> CoreProgram -> CoreProgram
 dmdAnalProgram opts fam_envs rules binds
-  = snd $ go (emptyAnalEnv opts fam_envs) binds
+  = getAnnotated $ go (emptyAnalEnv opts fam_envs) binds
   where
     -- See Note [Analysing top-level bindings]
     -- and Note [Why care for top-level demand annotations?]
-    go _   []     = (nopDmdType, [])
+    go _   []     = WithDmdType nopDmdType []
     go env (b:bs) = cons_up $ dmdAnalBind TopLevel env topSubDmd b anal_body
       where
         anal_body env'
-          | (body_ty, bs') <- go env' bs
-          = (add_exported_uses env' body_ty (bindersOf b), bs')
+          | WithDmdType body_ty bs' <- go env' bs
+          = WithDmdType (add_exported_uses env' body_ty (bindersOf b)) bs'
 
-    cons_up :: (a, b, [b]) -> (a, [b])
-    cons_up (dmd_ty, b', bs') = (dmd_ty, b':bs')
+    cons_up :: WithDmdType (DmdResult b [b]) -> WithDmdType [b]
+    cons_up (WithDmdType dmd_ty (R b' bs')) = WithDmdType dmd_ty (b' : bs')
 
     add_exported_uses :: AnalEnv -> DmdType -> [Id] -> DmdType
     add_exported_uses env = foldl' (add_exported_use env)
@@ -229,9 +238,9 @@ dmdAnalBind
   -> SubDemand                 -- ^ Demand put on the "body"
                                --   (important for join points)
   -> CoreBind
-  -> (AnalEnv -> (DmdType, a)) -- ^ How to analyse the "body", e.g.
+  -> (AnalEnv -> WithDmdType a) -- ^ How to analyse the "body", e.g.
                                --   where the binding is in scope
-  -> (DmdType, CoreBind, a)
+  -> WithDmdType (DmdResult CoreBind a)
 dmdAnalBind top_lvl env dmd bind anal_body = case bind of
   NonRec id rhs
     | useLetUp top_lvl id
@@ -258,12 +267,17 @@ setBindIdDemandInfo top_lvl id dmd = setIdDemandInfo id $ case top_lvl of
 -- 'useLetUp').
 --
 -- This is the LetUp rule in the paper “Higher-Order Cardinality Analysis”.
-dmdAnalBindLetUp :: TopLevelFlag -> AnalEnv -> Id -> CoreExpr -> (AnalEnv -> (DmdType, a)) -> (DmdType, CoreBind, a)
-dmdAnalBindLetUp top_lvl env id rhs anal_body = (final_ty, NonRec id' rhs', body')
+dmdAnalBindLetUp :: TopLevelFlag
+                 -> AnalEnv
+                 -> Id
+                 -> CoreExpr
+                 -> (AnalEnv -> WithDmdType a)
+                 -> WithDmdType (DmdResult CoreBind a)
+dmdAnalBindLetUp top_lvl env id rhs anal_body = WithDmdType final_ty (R (NonRec id' rhs') (body'))
   where
-    (body_ty, body')   = anal_body env
-    (body_ty', id_dmd) = findBndrDmd env notArgOfDfun body_ty id
-    id'                = setBindIdDemandInfo top_lvl id id_dmd
+    WithDmdType body_ty body'   = anal_body env
+    WithDmdType body_ty' id_dmd = findBndrDmd env notArgOfDfun body_ty id
+    !id'                = setBindIdDemandInfo top_lvl id id_dmd
     (rhs_ty, rhs')     = dmdAnalStar env (dmdTransformThunkDmd rhs id_dmd) rhs
 
     -- See Note [Absence analysis for stable unfoldings and RULES]
@@ -282,7 +296,7 @@ dmdAnalBindLetUp top_lvl env id rhs anal_body = (final_ty, NonRec id' rhs', body
 -- Local non-recursive definitions without a lambda are handled with LetUp.
 --
 -- This is the LetDown rule in the paper “Higher-Order Cardinality Analysis”.
-dmdAnalBindLetDown :: TopLevelFlag -> AnalEnv -> SubDemand -> CoreBind -> (AnalEnv -> (DmdType, a)) -> (DmdType, CoreBind, a)
+dmdAnalBindLetDown :: TopLevelFlag -> AnalEnv -> SubDemand -> CoreBind -> (AnalEnv -> WithDmdType a) -> WithDmdType (DmdResult CoreBind a)
 dmdAnalBindLetDown top_lvl env dmd bind anal_body = case bind of
   NonRec id rhs
     | (env', lazy_fv, id1, rhs1) <-
@@ -292,14 +306,15 @@ dmdAnalBindLetDown top_lvl env dmd bind anal_body = case bind of
     | (env', lazy_fv, pairs') <- dmdFix top_lvl env dmd pairs
     -> do_rest env' lazy_fv pairs' Rec
   where
-    do_rest env' lazy_fv pairs1 build_bind = (final_ty, build_bind pairs2, body')
+    do_rest env' lazy_fv pairs1 build_bind = WithDmdType final_ty (R (build_bind pairs2) body')
       where
-        (body_ty, body')        = anal_body env'
+        WithDmdType body_ty body'        = anal_body env'
         -- see Note [Lazy and unleashable free variables]
-        dmd_ty                  = addLazyFVs body_ty lazy_fv
-        (!final_ty, id_dmds)    = findBndrsDmds env' dmd_ty (map fst pairs1)
-        pairs2                  = zipWith do_one pairs1 id_dmds
-        do_one (id', rhs') dmd  = (setBindIdDemandInfo top_lvl id' dmd, rhs')
+        dmd_ty                          = addLazyFVs body_ty lazy_fv
+        WithDmdType final_ty id_dmds    = findBndrsDmds env' dmd_ty (strictMap fst pairs1)
+        -- Important to force this as build_bind might not force it.
+        !pairs2                         = strictZipWith do_one pairs1 id_dmds
+        do_one (id', rhs') dmd          = ((,) $! setBindIdDemandInfo top_lvl id' dmd) $! rhs'
         -- If the actual demand is better than the vanilla call
         -- demand, you might think that we might do better to re-analyse
         -- the RHS with the stronger demand.
@@ -328,7 +343,7 @@ dmdAnalStar :: AnalEnv
             -> CoreExpr -- Should obey the let/app invariant
             -> (PlusDmdArg, CoreExpr)
 dmdAnalStar env (n :* cd) e
-  | (dmd_ty, e')    <- dmdAnal env cd e
+  | WithDmdType dmd_ty e'    <- dmdAnal env cd e
   = ASSERT2( not (isUnliftedType (exprType e)) || exprOkForSpeculation e, ppr e )
     -- The argument 'e' should satisfy the let/app invariant
     -- See Note [Analysing with absent demand] in GHC.Types.Demand
@@ -337,33 +352,33 @@ dmdAnalStar env (n :* cd) e
 -- Main Demand Analsysis machinery
 dmdAnal, dmdAnal' :: AnalEnv
         -> SubDemand         -- The main one takes a *SubDemand*
-        -> CoreExpr -> (DmdType, CoreExpr)
+        -> CoreExpr -> WithDmdType CoreExpr
 
 dmdAnal env d e = -- pprTrace "dmdAnal" (ppr d <+> ppr e) $
                   dmdAnal' env d e
 
-dmdAnal' _ _ (Lit lit)     = (nopDmdType, Lit lit)
-dmdAnal' _ _ (Type ty)     = (nopDmdType, Type ty) -- Doesn't happen, in fact
+dmdAnal' _ _ (Lit lit)     = WithDmdType nopDmdType (Lit lit)
+dmdAnal' _ _ (Type ty)     = WithDmdType nopDmdType (Type ty) -- Doesn't happen, in fact
 dmdAnal' _ _ (Coercion co)
-  = (unitDmdType (coercionDmdEnv co), Coercion co)
+  = WithDmdType (unitDmdType (coercionDmdEnv co)) (Coercion co)
 
 dmdAnal' env dmd (Var var)
-  = (dmdTransform env var dmd, Var var)
+  = WithDmdType (dmdTransform env var dmd) (Var var)
 
 dmdAnal' env dmd (Cast e co)
-  = (dmd_ty `plusDmdType` mkPlusDmdArg (coercionDmdEnv co), Cast e' co)
+  = WithDmdType (dmd_ty `plusDmdType` mkPlusDmdArg (coercionDmdEnv co)) (Cast e' co)
   where
-    (dmd_ty, e') = dmdAnal env dmd e
+    WithDmdType dmd_ty e' = dmdAnal env dmd e
 
 dmdAnal' env dmd (Tick t e)
-  = (dmd_ty, Tick t e')
+  = WithDmdType dmd_ty (Tick t e')
   where
-    (dmd_ty, e') = dmdAnal env dmd e
+    WithDmdType dmd_ty e' = dmdAnal env dmd e
 
 dmdAnal' env dmd (App fun (Type ty))
-  = (fun_ty, App fun' (Type ty))
+  = WithDmdType fun_ty (App fun' (Type ty))
   where
-    (fun_ty, fun') = dmdAnal env dmd fun
+    WithDmdType fun_ty fun' = dmdAnal env dmd fun
 
 -- Lots of the other code is there to make this
 -- beautiful, compositional, application rule :-)
@@ -373,7 +388,7 @@ dmdAnal' env dmd (App fun arg)
     -- value arguments (#10288)
     let
         call_dmd          = mkCalledOnceDmd dmd
-        (fun_ty, fun')    = dmdAnal env call_dmd fun
+        WithDmdType fun_ty fun' = dmdAnal env call_dmd fun
         (arg_dmd, res_ty) = splitDmdTy fun_ty
         (arg_ty, arg')    = dmdAnalStar env (dmdTransformThunkDmd arg arg_dmd) arg
     in
@@ -385,41 +400,46 @@ dmdAnal' env dmd (App fun arg)
 --         , text "arg dmd_ty =" <+> ppr arg_ty
 --         , text "res dmd_ty =" <+> ppr res_ty
 --         , text "overall res dmd_ty =" <+> ppr (res_ty `bothDmdType` arg_ty) ])
-    (res_ty `plusDmdType` arg_ty, App fun' arg')
+    WithDmdType (res_ty `plusDmdType` arg_ty) (App fun' arg')
 
 dmdAnal' env dmd (Lam var body)
   | isTyVar var
   = let
-        (body_ty, body') = dmdAnal env dmd body
+        WithDmdType body_ty body' = dmdAnal env dmd body
     in
-    (body_ty, Lam var body')
+    WithDmdType body_ty (Lam var body')
 
   | otherwise
   = let (n, body_dmd)    = peelCallDmd dmd
           -- body_dmd: a demand to analyze the body
 
-        (body_ty, body') = dmdAnal env body_dmd body
-        (lam_ty, var')   = annotateLamIdBndr env notArgOfDfun body_ty var
+        WithDmdType body_ty body' = dmdAnal env body_dmd body
+        WithDmdType lam_ty var'   = annotateLamIdBndr env notArgOfDfun body_ty var
+        new_dmd_type = multDmdType n lam_ty
     in
-    (multDmdType n lam_ty, Lam var' body')
+    WithDmdType new_dmd_type (Lam var' body')
 
 dmdAnal' env dmd (Case scrut case_bndr ty [Alt alt bndrs rhs])
   -- Only one alternative.
   -- If it's a DataAlt, it should be the only constructor of the type.
   | is_single_data_alt alt
   = let
-        (rhs_ty, rhs')           = dmdAnal env dmd rhs
-        (alt_ty1, dmds)          = findBndrsDmds env rhs_ty bndrs
-        (alt_ty2, case_bndr_dmd) = findBndrDmd env False alt_ty1 case_bndr
+        WithDmdType rhs_ty rhs'           = dmdAnal env dmd rhs
+        WithDmdType alt_ty1 dmds          = findBndrsDmds env rhs_ty bndrs
+        WithDmdType alt_ty2 case_bndr_dmd = findBndrDmd env False alt_ty1 case_bndr
         -- Evaluation cardinality on the case binder is irrelevant and a no-op.
         -- What matters is its nested sub-demand!
         (_ :* case_bndr_sd)      = case_bndr_dmd
         -- Compute demand on the scrutinee
-        (bndrs', scrut_sd)
+        -- FORCE the result, otherwise thunks will end up retaining the
+        -- whole DmdEnv
+        !(!bndrs', !scrut_sd)
           | DataAlt _ <- alt
           , id_dmds <- addCaseBndrDmd case_bndr_sd dmds
           -- See Note [Demand on scrutinee of a product case]
-          = (setBndrsDemandInfo bndrs id_dmds, mkProd id_dmds)
+          = let !new_info = setBndrsDemandInfo bndrs id_dmds
+                !new_prod = mkProd id_dmds
+            in (new_info, new_prod)
           | otherwise
           -- __DEFAULT and literal alts. Simply add demands and discard the
           -- evaluation cardinality, as we evaluate the scrutinee exactly once.
@@ -432,9 +452,9 @@ dmdAnal' env dmd (Case scrut case_bndr ty [Alt alt bndrs rhs])
           | otherwise
           = alt_ty2
 
-        (scrut_ty, scrut') = dmdAnal env scrut_sd scrut
+        WithDmdType scrut_ty scrut' = dmdAnal env scrut_sd scrut
         res_ty             = alt_ty3 `plusDmdType` toPlusDmdArg scrut_ty
-        case_bndr'         = setIdDemandInfo case_bndr case_bndr_dmd
+        !case_bndr'        = setIdDemandInfo case_bndr case_bndr_dmd
     in
 --    pprTrace "dmdAnal:Case1" (vcat [ text "scrut" <+> ppr scrut
 --                                   , text "dmd" <+> ppr dmd
@@ -443,16 +463,27 @@ dmdAnal' env dmd (Case scrut case_bndr ty [Alt alt bndrs rhs])
 --                                   , text "scrut_ty" <+> ppr scrut_ty
 --                                   , text "alt_ty" <+> ppr alt_ty2
 --                                   , text "res_ty" <+> ppr res_ty ]) $
-    (res_ty, Case scrut' case_bndr' ty [Alt alt bndrs' rhs'])
+    WithDmdType res_ty (Case scrut' case_bndr' ty [Alt alt bndrs' rhs'])
     where
       is_single_data_alt (DataAlt dc) = isJust $ tyConSingleAlgDataCon_maybe $ dataConTyCon dc
       is_single_data_alt _            = True
 
+
+
+
 dmdAnal' env dmd (Case scrut case_bndr ty alts)
   = let      -- Case expression with multiple alternatives
-        (alt_tys, alts')     = mapAndUnzip (dmdAnalSumAlt env dmd case_bndr) alts
-        (scrut_ty, scrut')   = dmdAnal env topSubDmd scrut
-        (alt_ty, case_bndr') = annotateBndr env (foldr lubDmdType botDmdType alt_tys) case_bndr
+        WithDmdType alt_ty alts'     = combineAltDmds alts
+
+        combineAltDmds [] = WithDmdType botDmdType []
+        combineAltDmds (a:as) =
+          let
+            WithDmdType cur_ty a' = dmdAnalSumAlt env dmd case_bndr a
+            WithDmdType rest_ty as' = combineAltDmds as
+          in WithDmdType (lubDmdType cur_ty rest_ty) (a':as')
+
+        WithDmdType scrut_ty scrut'   = dmdAnal env topSubDmd scrut
+        WithDmdType alt_ty1 case_bndr' = annotateBndr env alt_ty case_bndr
                                -- NB: Base case is botDmdType, for empty case alternatives
                                --     This is a unit for lubDmdType, and the right result
                                --     when there really are no alternatives
@@ -460,9 +491,9 @@ dmdAnal' env dmd (Case scrut case_bndr ty alts)
         alt_ty2
           -- See Note [Precise exceptions and strictness analysis] in "GHC.Types.Demand"
           | exprMayThrowPreciseException fam_envs scrut
-          = deferAfterPreciseException alt_ty
+          = deferAfterPreciseException alt_ty1
           | otherwise
-          = alt_ty
+          = alt_ty1
         res_ty               = alt_ty2 `plusDmdType` toPlusDmdArg scrut_ty
 
     in
@@ -471,13 +502,13 @@ dmdAnal' env dmd (Case scrut case_bndr ty alts)
 --                                   , text "alt_tys" <+> ppr alt_tys
 --                                   , text "alt_ty2" <+> ppr alt_ty2
 --                                   , text "res_ty" <+> ppr res_ty ]) $
-    (res_ty, Case scrut' case_bndr' ty alts')
+    WithDmdType res_ty (Case scrut' case_bndr' ty alts')
 
 dmdAnal' env dmd (Let bind body)
-  = (final_ty, Let bind' body')
+  = WithDmdType final_ty (Let bind' body')
   where
-    (final_ty, bind', body') = dmdAnalBind NotTopLevel env dmd bind go'
-    go' env'                 = dmdAnal env' dmd body
+    !(WithDmdType final_ty (R bind' body')) = dmdAnalBind NotTopLevel env dmd bind go'
+    go' !env'                 = dmdAnal env' dmd body
 
 -- | A simple, syntactic analysis of whether an expression MAY throw a precise
 -- exception when evaluated. It's always sound to return 'True'.
@@ -514,14 +545,16 @@ forcesRealWorld fam_envs ty
   | otherwise
   = False
 
-dmdAnalSumAlt :: AnalEnv -> SubDemand -> Id -> Alt Var -> (DmdType, Alt Var)
+dmdAnalSumAlt :: AnalEnv -> SubDemand -> Id -> Alt Var -> WithDmdType (Alt Var)
 dmdAnalSumAlt env dmd case_bndr (Alt con bndrs rhs)
-  | (rhs_ty, rhs') <- dmdAnal env dmd rhs
-  , (alt_ty, dmds) <- findBndrsDmds env rhs_ty bndrs
+  | WithDmdType rhs_ty rhs' <- dmdAnal env dmd rhs
+  , WithDmdType alt_ty dmds <- findBndrsDmds env rhs_ty bndrs
   , let (_ :* case_bndr_sd) = findIdDemand alt_ty case_bndr
         -- See Note [Demand on scrutinee of a product case]
         id_dmds             = addCaseBndrDmd case_bndr_sd dmds
-  = (alt_ty, Alt con (setBndrsDemandInfo bndrs id_dmds) rhs')
+        -- Do not put a thunk into the Alt
+        !new_ids  = setBndrsDemandInfo bndrs id_dmds
+  = WithDmdType alt_ty (Alt con new_ids rhs')
 
 {-
 Note [Analysing with absent demand]
@@ -769,13 +802,13 @@ dmdAnalRhsSig top_lvl rec_flag env let_dmd id rhs
             | otherwise
             = mkCalledOnceDmds rhs_arity topSubDmd
 
-    (rhs_dmd_ty, rhs') = dmdAnal env rhs_dmd rhs
+    WithDmdType rhs_dmd_ty rhs' = dmdAnal env rhs_dmd rhs
     DmdType rhs_fv rhs_dmds rhs_div = rhs_dmd_ty
 
     sig = mkStrictSigForArity rhs_arity (DmdType sig_fv rhs_dmds rhs_div)
 
     id' = id `setIdStrictness` sig
-    env' = extendAnalEnv top_lvl env id' sig
+    !env' = extendAnalEnv top_lvl env id' sig
 
     -- See Note [Aggregated demand for cardinality]
     -- FIXME: That Note doesn't explain the following lines at all. The reason
@@ -796,7 +829,7 @@ dmdAnalRhsSig top_lvl rec_flag env let_dmd id rhs
     rhs_fv2 = rhs_fv1 `keepAliveDmdEnv` bndrRuleAndUnfoldingIds id
 
     -- See Note [Lazy and unleashable free variables]
-    (lazy_fv, sig_fv) = partitionVarEnv isWeakDmd rhs_fv2
+    !(!lazy_fv, !sig_fv) = partitionVarEnv isWeakDmd rhs_fv2
 
 -- | If given the (local, non-recursive) let-bound 'Id', 'useLetUp' determines
 -- whether we should process the binding up (body before rhs) or down (rhs
@@ -1099,9 +1132,9 @@ dmdFix top_lvl env let_dmd orig_pairs
         start_env | first_round = env
                   | otherwise   = nonVirgin env
 
-        start = (extendAnalEnvs top_lvl start_env (map fst pairs), emptyDmdEnv)
+        start = (extendAnalEnvs top_lvl start_env (map fst pairs), emptyVarEnv)
 
-        ((_,lazy_fv), pairs') = mapAccumL my_downRhs start pairs
+        !((_,!lazy_fv), !pairs') = mapAccumL my_downRhs start pairs
                 -- mapAccumL: Use the new signature to do the next pair
                 -- The occurrence analyser has arranged them in a good order
                 -- so this can significantly reduce the number of iterations needed
@@ -1110,8 +1143,8 @@ dmdFix top_lvl env let_dmd orig_pairs
           = -- pprTrace "my_downRhs" (ppr id $$ ppr (idStrictness id) $$ ppr sig) $
             ((env', lazy_fv'), (id', rhs'))
           where
-            (env', lazy_fv1, id', rhs') = dmdAnalRhsSig top_lvl Recursive env let_dmd id rhs
-            lazy_fv'                    = plusVarEnv_C plusDmd lazy_fv lazy_fv1
+            !(!env', !lazy_fv1, !id', !rhs') = dmdAnalRhsSig top_lvl Recursive env let_dmd id rhs
+            !lazy_fv'                    = plusVarEnv_C plusDmd lazy_fv lazy_fv1
 
     zapIdStrictness :: [(Id, CoreExpr)] -> [(Id, CoreExpr)]
     zapIdStrictness pairs = [(setIdStrictness id nopSig, rhs) | (id, rhs) <- pairs ]
@@ -1235,35 +1268,40 @@ dictionaries.
 setBndrsDemandInfo :: [Var] -> [Demand] -> [Var]
 setBndrsDemandInfo (b:bs) ds
   | isTyVar b = b : setBndrsDemandInfo bs ds
-setBndrsDemandInfo (b:bs) (d:ds) = setIdDemandInfo b d : setBndrsDemandInfo bs ds
+setBndrsDemandInfo (b:bs) (d:ds) =
+    let !new_info = setIdDemandInfo b d
+        !vars = setBndrsDemandInfo bs ds
+    in new_info : vars
 setBndrsDemandInfo [] ds = ASSERT( null ds ) []
 setBndrsDemandInfo bs _  = pprPanic "setBndrsDemandInfo" (ppr bs)
 
-annotateBndr :: AnalEnv -> DmdType -> Var -> (DmdType, Var)
+annotateBndr :: AnalEnv -> DmdType -> Var -> WithDmdType Var
 -- The returned env has the var deleted
 -- The returned var is annotated with demand info
 -- according to the result demand of the provided demand type
 -- No effect on the argument demands
 annotateBndr env dmd_ty var
-  | isId var  = (dmd_ty', setIdDemandInfo var dmd)
-  | otherwise = (dmd_ty, var)
+  | isId var  = WithDmdType dmd_ty' new_id
+  | otherwise = WithDmdType dmd_ty  var
   where
-    (dmd_ty', dmd) = findBndrDmd env False dmd_ty var
+    new_id = setIdDemandInfo var dmd
+    WithDmdType dmd_ty' dmd = findBndrDmd env False dmd_ty var
 
 annotateLamIdBndr :: AnalEnv
                   -> DFunFlag   -- is this lambda at the top of the RHS of a dfun?
                   -> DmdType    -- Demand type of body
                   -> Id         -- Lambda binder
-                  -> (DmdType,  -- Demand type of lambda
-                      Id)       -- and binder annotated with demand
+                  -> WithDmdType Id  -- Demand type of lambda
+                                     -- and binder annotated with demand
 
 annotateLamIdBndr env arg_of_dfun dmd_ty id
 -- For lambdas we add the demand to the argument demands
 -- Only called for Ids
   = ASSERT( isId id )
     -- pprTrace "annLamBndr" (vcat [ppr id, ppr dmd_ty, ppr final_ty]) $
-    (final_ty, setIdDemandInfo id dmd)
+    WithDmdType final_ty new_id
   where
+    new_id = setIdDemandInfo id dmd
       -- Watch out!  See note [Lambda-bound unfoldings]
     final_ty = case maybeUnfoldingTemplate (idUnfolding id) of
                  Nothing  -> main_ty
@@ -1272,7 +1310,7 @@ annotateLamIdBndr env arg_of_dfun dmd_ty id
                              (unf_ty, _) = dmdAnalStar env dmd unf
 
     main_ty = addDemand dmd dmd_ty'
-    (dmd_ty', dmd) = findBndrDmd env arg_of_dfun dmd_ty id
+    WithDmdType dmd_ty' dmd = findBndrDmd env arg_of_dfun dmd_ty id
 
 {- Note [NOINLINE and strictness]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1421,23 +1459,23 @@ lookupSigEnv env id = lookupVarEnv (ae_sigs env) id
 nonVirgin :: AnalEnv -> AnalEnv
 nonVirgin env = env { ae_virgin = False }
 
-findBndrsDmds :: AnalEnv -> DmdType -> [Var] -> (DmdType, [Demand])
+findBndrsDmds :: AnalEnv -> DmdType -> [Var] -> WithDmdType [Demand]
 -- Return the demands on the Ids in the [Var]
 findBndrsDmds env dmd_ty bndrs
   = go dmd_ty bndrs
   where
-    go dmd_ty []  = (dmd_ty, [])
+    go dmd_ty []  = WithDmdType dmd_ty []
     go dmd_ty (b:bs)
-      | isId b    = let (dmd_ty1, dmds) = go dmd_ty bs
-                        (dmd_ty2, dmd)  = findBndrDmd env False dmd_ty1 b
-                    in (dmd_ty2, dmd : dmds)
+      | isId b    = let WithDmdType dmd_ty1 dmds = go dmd_ty bs
+                        WithDmdType dmd_ty2 dmd  = findBndrDmd env False dmd_ty1 b
+                    in WithDmdType dmd_ty2  (dmd : dmds)
       | otherwise = go dmd_ty bs
 
-findBndrDmd :: AnalEnv -> Bool -> DmdType -> Id -> (DmdType, Demand)
+findBndrDmd :: AnalEnv -> Bool -> DmdType -> Id -> WithDmdType Demand
 -- See Note [Trimming a demand to a type]
 findBndrDmd env arg_of_dfun dmd_ty id
   = -- pprTrace "findBndrDmd" (ppr id $$ ppr dmd_ty $$ ppr starting_dmd $$ ppr dmd') $
-    (dmd_ty', dmd')
+    WithDmdType dmd_ty' dmd'
   where
     dmd' = strictify $
            trimToType starting_dmd (findTypeShape fam_envs id_ty)
@@ -1525,4 +1563,36 @@ relied upon, as the simplifier tends to be very careful about not
 duplicating actual function calls.
 
 Also see #11731.
+
+Note [Space Leaks in Demand Analysis]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Ticket: #15455
+MR: !5399
+
+In the past the result of demand analysis was not forced until the whole module
+had finished being analysed. In big programs, this led to a big build up of thunks
+which were all ultimately forced at the end of the analysis.
+
+This was because the return type of the analysis was a lazy pair:
+  dmdAnal :: AnalEnv -> SubDemand -> CoreExpr -> (DmdType, CoreExpr)
+To avoid space leaks we added extra bangs to evaluate the DmdType component eagerly; but
+we were never sure we had added enough.
+The easiest way to systematically fix this was to use a strict pair type for the
+return value of the analysis so that we can be more confident that the result
+is incrementally computed rather than all at the end.
+
+A second, only loosely related point is that
+the updating of Ids was not forced because the result of updating
+an Id was placed into a lazy field in CoreExpr. This meant that until the end of
+demand analysis, the unforced Ids would retain the DmdEnv which the demand information
+was fetch from. Now we are quite careful to force Ids before putting them
+back into core expressions so that we can garbage-collect the environments more eagerly.
+For example see the `Case` branch of `dmdAnal'` where `case_bndr'` is forced
+or `dmdAnalSumAlt`.
+
+The net result of all these improvements is the peak live memory usage of compiling
+jsaddle-dom decreases about 4GB (from 6.5G to 2.5G). A bunch of bytes allocated benchmarks also
+decrease because we allocate a lot fewer thunks which we immediately overwrite and
+also runtime for the pass is faster! Overall, good wins.
+
 -}
