@@ -24,6 +24,8 @@ module GHC.StgToCmm.Monad (
         emitOutOfLine, emitAssign, emitStore,
         emitComment, emitTick, emitUnwind,
 
+        newTemp,
+
         getCmm, aGraphToGraph, getPlatform, getProfile,
         getCodeR, getCode, getCodeScoped, getHeapUsage,
         getCallOpts, getPtrOpts,
@@ -478,6 +480,10 @@ newUnique = do
         let (u,us') = takeUniqFromSupply (cgs_uniqs state)
         setState $ state { cgs_uniqs = us' }
         return u
+
+newTemp :: MonadUnique m => CmmType -> m LocalReg
+newTemp rep = do { uniq <- getUniqueM
+                 ; return (LocalReg uniq rep) }
 
 ------------------
 getInfoDown :: FCode CgInfoDownwards
