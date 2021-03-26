@@ -462,7 +462,6 @@ check_target:
 #if !defined(THREADED_RTS)
     case BlockedOnRead:
     case BlockedOnWrite:
-    case BlockedOnDelay:
 #if defined(mingw32_HOST_OS)
     case BlockedOnDoProc:
 #endif
@@ -710,7 +709,8 @@ removeFromQueues(Capability *cap, StgTSO *tso)
 #if defined(mingw32_HOST_OS)
   case BlockedOnDoProc:
 #endif
-      removeThreadFromDeQueue(cap, &blocked_queue_hd, &blocked_queue_tl, tso);
+      removeThreadFromDeQueue(cap, &cap->iomgr->blocked_queue_hd,
+                                   &cap->iomgr->blocked_queue_tl, tso);
 #if defined(mingw32_HOST_OS)
       /* (Cooperatively) signal that the worker thread should abort
        * the request.
@@ -718,10 +718,6 @@ removeFromQueues(Capability *cap, StgTSO *tso)
       abandonWorkRequest(tso->block_info.async_result->reqID);
 #endif
       goto done;
-
-  case BlockedOnDelay:
-        removeThreadFromQueue(cap, &sleeping_queue, tso);
-        goto done;
 #endif
 
   default:
