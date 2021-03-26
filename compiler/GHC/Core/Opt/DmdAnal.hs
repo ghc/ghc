@@ -1439,10 +1439,10 @@ findBndrDmd env arg_of_dfun dmd_ty id
   = -- pprTrace "findBndrDmd" (ppr id $$ ppr dmd_ty $$ ppr starting_dmd $$ ppr dmd') $
     (dmd_ty', dmd')
   where
-    dmd' = strictify $
+    !dmd' = strictify $
            trimToType starting_dmd (findTypeShape fam_envs id_ty)
 
-    (dmd_ty', starting_dmd) = peelFV dmd_ty id
+    (!dmd_ty', !starting_dmd) = peelFV dmd_ty id
 
     id_ty = idType id
 
