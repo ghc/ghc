@@ -13,7 +13,8 @@ module LlvmCodeGen.Base (
         LiveGlobalRegs,
         LlvmUnresData, LlvmData, UnresLabel, UnresStatic,
 
-        LlvmVersion, supportedLlvmVersion, llvmVersionSupported, parseLlvmVersion,
+        LlvmVersion, llvmVersionSupported, parseLlvmVersion,
+        supportedLlvmVersionMin, supportedLlvmVersionMax,
         llvmVersionStr, llvmVersionList,
 
         LlvmM,
