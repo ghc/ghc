@@ -163,10 +163,17 @@ data Ct
       cc_class  :: Class,
       cc_tyargs :: [Xi],   -- cc_tyargs are rewritten w.r.t. inerts, so Xi
 
-      cc_pend_sc :: Bool   -- See Note [The superclass story] in GHC.Tc.Solver.Canonical
-                           -- True <=> (a) cc_class has superclasses
-                           --          (b) we have not (yet) added those
-                           --              superclasses as Givens
+      cc_pend_sc :: Bool,
+          -- See Note [The superclass story] in GHC.Tc.Solver.Canonical
+          -- True <=> (a) cc_class has superclasses
+          --          (b) we have not (yet) added those
+          --              superclasses as Givens
+
+      cc_fundeps :: Bool
+          -- See Note [Fundeps with instances] in GHC.Tc.Solver.Interact
+          -- True <=> the class has fundeps, and we have not yet
+          --          compared this constraint with the global
+          --          instances for fundep improvement
     }
 
   | CIrredCan {  -- These stand for yet-unusable predicates
@@ -447,9 +454,11 @@ instance Outputable Ct where
       pp_sort = case ct of
          CEqCan {}        -> text "CEqCan"
          CNonCanonical {} -> text "CNonCanonical"
-         CDictCan { cc_pend_sc = pend_sc }
-            | pend_sc   -> text "CDictCan(psc)"
-            | otherwise -> text "CDictCan"
+         CDictCan { cc_pend_sc = psc, cc_fundeps = fds }
+            | psc, fds     -> text "CDictCan(psc,fds)"
+            | psc, not fds -> text "CDictCan(psc)"
+            | not psc, fds -> text "CDictCan(fds)"
+            | otherwise    -> text "CDictCan"
          CIrredCan { cc_status = status } -> text "CIrredCan" <> ppr status
          CQuantCan (QCI { qci_pend_sc = pend_sc })
             | pend_sc   -> text "CQuantCan(psc)"
