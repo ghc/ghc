@@ -4661,6 +4661,7 @@ default_PIC platform =
     -- See #15275, #18892
     (OSDarwin,  ArchAArch64) -> [Opt_PIC]
     (OSLinux,   ArchAArch64) -> [Opt_PIC, Opt_ExternalDynamicRefs]
+    (OSLinux,   ArchARM {})  -> [Opt_PIC, Opt_ExternalDynamicRefs]
     (OSOpenBSD, ArchX86_64)  -> [Opt_PIC] -- Due to PIE support in
                                           -- OpenBSD since 5.3 release
                                           -- (1 May 2013) we need to

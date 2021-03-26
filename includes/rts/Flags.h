@@ -202,7 +202,7 @@ typedef struct _CONCURRENT_FLAGS {
  * Note that there is no 32bit darwin system we can realistically expect to
  * run on or compile for.
  */
-#if defined(darwin_HOST_OS) || defined(aarch64_HOST_ARCH)
+#if defined(darwin_HOST_OS) || defined(aarch64_HOST_ARCH) || defined(arm_HOST_ARCH)
 #define DEFAULT_LINKER_ALWAYS_PIC true
 #else
 #define DEFAULT_LINKER_ALWAYS_PIC false
