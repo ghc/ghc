@@ -21,7 +21,7 @@ module GHC.Driver.Session (
         -- * Dynamic flags and associated configuration types
         DumpFlag(..),
         GeneralFlag(..),
-        WarningFlag(..), WarnReason(..),
+        WarningFlag(..), DiagnosticReason(..),
         Language(..),
         PlatformConstants(..),
         FatalMessager, FlushOut(..), FlushErr(..),
@@ -234,7 +234,7 @@ import GHC.Driver.Backend
 import GHC.Settings.Config
 import GHC.Utils.CliOption
 import {-# SOURCE #-} GHC.Core.Unfold
-import GHC.Driver.CmdLine hiding (WarnReason(..))
+import GHC.Driver.CmdLine
 import qualified GHC.Driver.CmdLine as Cmd
 import GHC.Settings.Constants
 import GHC.Utils.Panic
@@ -243,6 +243,7 @@ import GHC.Utils.Misc
 import GHC.Utils.GlobalVars
 import GHC.Data.Maybe
 import GHC.Utils.Monad
+import GHC.Types.Error (DiagnosticReason(..))
 import GHC.Types.SrcLoc
 import GHC.Types.SafeHaskell
 import GHC.Types.Basic ( Alignment, alignmentOf, IntWithInf, treatZeroAsInf )

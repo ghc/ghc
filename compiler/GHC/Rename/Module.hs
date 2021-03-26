@@ -538,7 +538,7 @@ checkCanonicalInstances cls poly_ty mbinds = do
 
     -- got "lhs = rhs" but expected something different
     addWarnNonCanonicalMethod1 refURL flag lhs rhs =
-        addWarn (Reason flag) $ vcat
+        addDiagnostic (WarningWithFlag flag) $ vcat
                        [ text "Noncanonical" <+>
                          quotes (text (lhs ++ " = " ++ rhs)) <+>
                          text "definition detected"
@@ -552,7 +552,7 @@ checkCanonicalInstances cls poly_ty mbinds = do
 
     -- expected "lhs = rhs" but got something else
     addWarnNonCanonicalMethod2 refURL flag lhs rhs =
-        addWarn (Reason flag) $ vcat
+        addDiagnostic (WarningWithFlag flag) $ vcat
                        [ text "Noncanonical" <+>
                          quotes (text lhs) <+>
                          text "definition detected"
@@ -1947,8 +1947,8 @@ warnNoDerivStrat mds loc
   = do { dyn_flags <- getDynFlags
        ; when (wopt Opt_WarnMissingDerivingStrategies dyn_flags) $
            case mds of
-             Nothing -> addWarnAt
-               (Reason Opt_WarnMissingDerivingStrategies)
+             Nothing -> addDiagnosticAt
+               (WarningWithFlag Opt_WarnMissingDerivingStrategies)
                loc
                (if xopt LangExt.DerivingStrategies dyn_flags
                  then no_strat_warning

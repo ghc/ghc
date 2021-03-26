@@ -577,10 +577,10 @@ resetLastErrorLocations = do
 
 ghciLogAction :: IORef [(FastString, Int)] -> LogAction -> LogAction
 ghciLogAction lastErrLocations old_log_action
-              dflags flag severity srcSpan msg = do
-    old_log_action dflags flag severity srcSpan msg
-    case severity of
-        SevError -> case srcSpan of
+              dflags msg_class srcSpan msg = do
+    old_log_action dflags msg_class srcSpan msg
+    case msg_class of
+        MCDiagnostic SevError _reason -> case srcSpan of
             RealSrcSpan rsp _ -> modifyIORef lastErrLocations
                 (++ [(srcLocFile (realSrcSpanStart rsp), srcLocLine (realSrcSpanStart rsp))])
             _ -> return ()
@@ -3188,7 +3188,7 @@ showCmd str = do
             , action "bindings"   $ showBindings
             , action "linker"     $ do
                msg <- liftIO $ Loader.showLoaderState (hscInterp hsc_env)
-               putLogMsgM NoReason SevDump noSrcSpan msg
+               putLogMsgM MCDump noSrcSpan msg
             , action "breaks"     $ showBkptTable
             , action "context"    $ showContext
             , action "packages"   $ showUnits

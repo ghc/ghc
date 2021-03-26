@@ -87,6 +87,7 @@ import GHC.Utils.Logger
 import GHC.Utils.TmpFs
 
 import GHC.Types.Basic
+import GHC.Types.Error
 import GHC.Types.Target
 import GHC.Types.SourceFile
 import GHC.Types.SourceError
@@ -317,9 +318,8 @@ warnMissingHomeModules hsc_env mod_graph =
           (text "Modules are not listed in command line but needed for compilation: ")
           4
           (sep (map ppr missing))
-    warn = makeIntoWarning
-      (Reason Opt_WarnMissingHomeModules)
-      (mkPlainMsgEnvelope noSrcSpan msg)
+    warn =
+      mkPlainMsgEnvelope (WarningWithFlag Opt_WarnMissingHomeModules) noSrcSpan msg
 
 -- | Describes which modules of the module graph need to be loaded.
 data LoadHowMuch
@@ -384,9 +384,8 @@ warnUnusedPackages = do
           = filter (\arg -> not $ any (matching state arg) loadedPackages)
                    requestedArgs
 
-    let warn = makeIntoWarning
-          (Reason Opt_WarnUnusedPackages)
-          (mkPlainMsgEnvelope noSrcSpan msg)
+    let warn =
+          mkPlainMsgEnvelope (WarningWithFlag Opt_WarnUnusedPackages) noSrcSpan msg
         msg = vcat [ text "The following packages were specified" <+>
                      text "via -package or -package-id flags,"
                    , text "but were not needed for compilation:"
@@ -1000,7 +999,7 @@ checkStability hpt sccs all_home_mods =
 -- | Each module is given a unique 'LogQueue' to redirect compilation messages
 -- to. A 'Nothing' value contains the result of compilation, and denotes the
 -- end of the message queue.
-data LogQueue = LogQueue !(IORef [Maybe (WarnReason, Severity, SrcSpan, SDoc)])
+data LogQueue = LogQueue !(IORef [Maybe (MessageClass, SrcSpan, SDoc)])
                          !(MVar ())
 
 -- | The graph of modules to compile and their corresponding result 'MVar' and
@@ -1254,7 +1253,7 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods sccs = do
             return (success_flag,ok_results)
 
   where
-    writeLogQueue :: LogQueue -> Maybe (WarnReason,Severity,SrcSpan,SDoc) -> IO ()
+    writeLogQueue :: LogQueue -> Maybe (MessageClass,SrcSpan,SDoc) -> IO ()
     writeLogQueue (LogQueue ref sem) msg = do
         atomicModifyIORef' ref $ \msgs -> (msg:msgs,())
         _ <- tryPutMVar sem ()
@@ -1263,8 +1262,8 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods sccs = do
     -- The log_action callback that is used to synchronize messages from a
     -- worker thread.
     parLogAction :: LogQueue -> LogAction
-    parLogAction log_queue _dflags !reason !severity !srcSpan !msg =
-        writeLogQueue log_queue (Just (reason,severity,srcSpan,msg))
+    parLogAction log_queue _dflags !msgClass !srcSpan !msg =
+        writeLogQueue log_queue (Just (msgClass,srcSpan,msg))
 
     -- Print each message from the log_queue using the log_action from the
     -- session's DynFlags.
@@ -1277,8 +1276,8 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods sccs = do
 
             print_loop [] = read_msgs
             print_loop (x:xs) = case x of
-                Just (reason,severity,srcSpan,msg) -> do
-                    putLogMsg logger dflags reason severity srcSpan msg
+                Just (msgClass,srcSpan,msg) -> do
+                    putLogMsg logger dflags msgClass srcSpan msg
                     print_loop xs
                 -- Exit the loop once we encounter the end marker.
                 Nothing -> return ()
@@ -2222,8 +2221,8 @@ warnUnnecessarySourceImports sccs = do
 
         warn :: Located ModuleName -> WarnMsg
         warn (L loc mod) =
-           mkPlainMsgEnvelope loc
-                (text "Warning: {-# SOURCE #-} unnecessary in import of "
+           mkPlainMsgEnvelope WarningWithoutFlag loc
+                (text "{-# SOURCE #-} unnecessary in import of "
                  <+> quotes (ppr mod))
 
 
@@ -2295,7 +2294,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
                 if exists || isJust maybe_buf
                     then summariseFile hsc_env old_summaries file mb_phase
                                        obj_allowed maybe_buf
-                    else return $ Left $ unitBag $ mkPlainMsgEnvelope noSrcSpan $
+                    else return $ Left $ unitBag $ mkPlainMsgEnvelope ErrorWithoutFlag noSrcSpan $
                            text "can't find file:" <+> text file
         getRootSummary Target { targetId = TargetModule modl
                               , targetAllowObjCode = obj_allowed
@@ -2730,7 +2729,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
               | otherwise = HsSrcFile
 
         when (pi_mod_name /= wanted_mod) $
-                throwE $ unitBag $ mkPlainMsgEnvelope pi_mod_name_loc $
+                throwE $ unitBag $ mkPlainMsgEnvelope ErrorWithoutFlag pi_mod_name_loc $
                               text "File name does not match module name:"
                               $$ text "Saw:" <+> quotes (ppr pi_mod_name)
                               $$ text "Expected:" <+> quotes (ppr wanted_mod)
@@ -2742,7 +2741,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
                         | (k,v) <- ((pi_mod_name, mkHoleModule pi_mod_name)
                                 : homeUnitInstantiations home_unit)
                         ])
-            in throwE $ unitBag $ mkPlainMsgEnvelope pi_mod_name_loc $
+            in throwE $ unitBag $ mkPlainMsgEnvelope ErrorWithoutFlag pi_mod_name_loc $
                 text "Unexpected signature:" <+> quotes (ppr pi_mod_name)
                 $$ if gopt Opt_BuildingCabalPackage dflags
                     then parens (text "Try adding" <+> quotes (ppr pi_mod_name)
@@ -2876,12 +2875,15 @@ withDeferredDiagnostics f = do
     fatals <- liftIO $ newIORef []
     logger <- getLogger
 
-    let deferDiagnostics _dflags !reason !severity !srcSpan !msg = do
-          let action = putLogMsg logger dflags reason severity srcSpan msg
-          case severity of
-            SevWarning -> atomicModifyIORef' warnings $ \i -> (action: i, ())
-            SevError -> atomicModifyIORef' errors $ \i -> (action: i, ())
-            SevFatal -> atomicModifyIORef' fatals $ \i -> (action: i, ())
+    let deferDiagnostics _dflags !msgClass !srcSpan !msg = do
+          let action = putLogMsg logger dflags msgClass srcSpan msg
+          case msgClass of
+            MCDiagnostic SevWarning _reason
+              -> atomicModifyIORef' warnings $ \i -> (action: i, ())
+            MCDiagnostic SevError _reason
+              -> atomicModifyIORef' errors   $ \i -> (action: i, ())
+            MCFatal
+              -> atomicModifyIORef' fatals   $ \i -> (action: i, ())
             _ -> action
 
         printDeferredDiagnostics = liftIO $
@@ -2896,24 +2898,24 @@ withDeferredDiagnostics f = do
       (\_ -> popLogHookM >> printDeferredDiagnostics)
       (\_ -> f)
 
-noModError :: HscEnv -> SrcSpan -> ModuleName -> FindResult -> MsgEnvelope DecoratedSDoc
+noModError :: HscEnv -> SrcSpan -> ModuleName -> FindResult -> MsgEnvelope DiagnosticMessage
 -- ToDo: we don't have a proper line number for this error
 noModError hsc_env loc wanted_mod err
-  = mkPlainMsgEnvelope loc $ cannotFindModule hsc_env wanted_mod err
+  = mkPlainMsgEnvelope ErrorWithoutFlag loc $ cannotFindModule hsc_env wanted_mod err
 
 noHsFileErr :: SrcSpan -> String -> ErrorMessages
 noHsFileErr loc path
-  = unitBag $ mkPlainMsgEnvelope loc $ text "Can't find" <+> text path
+  = unitBag $ mkPlainMsgEnvelope ErrorWithoutFlag loc $ text "Can't find" <+> text path
 
 moduleNotFoundErr :: ModuleName -> ErrorMessages
 moduleNotFoundErr mod
-  = unitBag $ mkPlainMsgEnvelope noSrcSpan $
+  = unitBag $ mkPlainMsgEnvelope ErrorWithoutFlag noSrcSpan $
         text "module" <+> quotes (ppr mod) <+> text "cannot be found locally"
 
 multiRootsErr :: [ModSummary] -> IO ()
 multiRootsErr [] = panic "multiRootsErr"
 multiRootsErr summs@(summ1:_)
-  = throwOneError $ mkPlainMsgEnvelope noSrcSpan $
+  = throwOneError $ mkPlainMsgEnvelope ErrorWithoutFlag noSrcSpan $
         text "module" <+> quotes (ppr mod) <+>
         text "is defined in multiple files:" <+>
         sep (map text files)

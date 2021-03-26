@@ -1115,9 +1115,9 @@ checkCrossStageLifting top_lvl id (Brack _ (TcPending ps_var lie_var q))
 
                    -- Warning for implicit lift (#17804)
         ; whenWOptM Opt_WarnImplicitLift $
-            addWarnTc (Reason Opt_WarnImplicitLift)
-                       (text "The variable" <+> quotes (ppr id) <+>
-                        text "is implicitly lifted in the TH quotation")
+            addDiagnosticTc (WarningWithFlag Opt_WarnImplicitLift)
+                            (text "The variable" <+> quotes (ppr id) <+>
+                             text "is implicitly lifted in the TH quotation")
 
                    -- Update the pending splices
         ; ps <- readMutVar ps_var

@@ -739,7 +739,7 @@ tcStandaloneDerivInstType ctxt
 warnUselessTypeable :: TcM ()
 warnUselessTypeable
   = do { warn <- woptM Opt_WarnDerivingTypeable
-       ; when warn $ addWarnTc (Reason Opt_WarnDerivingTypeable)
+       ; when warn $ addDiagnosticTc (WarningWithFlag Opt_WarnDerivingTypeable)
                    $ text "Deriving" <+> quotes (ppr typeableClassName) <+>
                      text "has no effect: all types now auto-derive Typeable" }
 
@@ -1611,7 +1611,7 @@ mkNewTypeEqn newtype_strat dit@(DerivInstTys { dit_cls_tys     = cls_tys
                  -- See Note [Deriving strategies]
                  when (newtype_deriving && deriveAnyClass) $
                    lift $ whenWOptM Opt_WarnDerivingDefaults $
-                     addWarnTc (Reason Opt_WarnDerivingDefaults) $ sep
+                     addDiagnosticTc (WarningWithFlag Opt_WarnDerivingDefaults) $ sep
                      [ text "Both DeriveAnyClass and"
                        <+> text "GeneralizedNewtypeDeriving are enabled"
                      , text "Defaulting to the DeriveAnyClass strategy"
@@ -2001,8 +2001,8 @@ doDerivInstErrorChecks2 clas clas_inst theta wildcard mechanism
            Nothing -> pure ()
            Just span -> setSrcSpan span $ do
              checkTc xpartial_sigs (hang partial_sig_msg 2 pts_suggestion)
-             warnTc (Reason Opt_WarnPartialTypeSignatures)
-                    wpartial_sigs partial_sig_msg
+             diagnosticTc (WarningWithFlag Opt_WarnPartialTypeSignatures)
+                          wpartial_sigs partial_sig_msg
 
          -- Check for Generic instances that are derived with an exotic
          -- deriving strategy like DAC

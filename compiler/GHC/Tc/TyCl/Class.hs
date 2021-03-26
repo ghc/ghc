@@ -258,10 +258,10 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
 
        ; spec_prags <- discardConstraints $
                        tcSpecPrags global_dm_id prags
-       ; warnTc NoReason
-                (not (null spec_prags))
-                (text "Ignoring SPECIALISE pragmas on default method"
-                 <+> quotes (ppr sel_name))
+       ; diagnosticTc WarningWithoutFlag
+                      (not (null spec_prags))
+                      (text "Ignoring SPECIALISE pragmas on default method"
+                       <+> quotes (ppr sel_name))
 
        ; let hs_ty = hs_sig_fn sel_name
                      `orElse` pprPanic "tc_dm" (ppr sel_name)
@@ -337,7 +337,7 @@ tcClassMinimalDef _clas sigs op_info
         -- since you can't write a default implementation.
         when (tcg_src tcg_env /= HsigFile) $
             whenIsJust (isUnsatisfied (mindef `impliesAtom`) defMindef) $
-                       (\bf -> addWarnTc NoReason (warningMinimalDefIncomplete bf))
+                       (\bf -> addDiagnosticTc WarningWithoutFlag (warningMinimalDefIncomplete bf))
         return mindef
   where
     -- By default require all methods without a default implementation
@@ -556,7 +556,7 @@ warnMissingAT name
        -- hs-boot and signatures never need to provide complete "definitions"
        -- of any sort, as they aren't really defining anything, but just
        -- constraining items which are defined elsewhere.
-       ; warnTc (Reason Opt_WarnMissingMethods) (warn && hsc_src == HsSrcFile)
-                (text "No explicit" <+> text "associated type"
-                    <+> text "or default declaration for"
-                    <+> quotes (ppr name)) }
+       ; diagnosticTc (WarningWithFlag Opt_WarnMissingMethods) (warn && hsc_src == HsSrcFile)
+                      (text "No explicit" <+> text "associated type"
+                          <+> text "or default declaration for"
+                          <+> quotes (ppr name)) }
