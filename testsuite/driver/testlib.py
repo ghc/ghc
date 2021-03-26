@@ -2245,6 +2245,8 @@ def normalise_errmsg(s: str) -> str:
     s = re.sub('You are using an unsupported version of LLVM!.*\n','',s)
     s = re.sub('Currently only [\.0-9]+ is supported. System LLVM version: [\.0-9]+.*\n','',s)
     s = re.sub('We will try though\.\.\..*\n','',s)
+    # ignore warning about strip invalidating signatures
+    s = re.sub('.*strip: changes being made to the file will invalidate the code signature in.*\n','',s)
     return s
 
 # normalise a .prof file, so that we can reasonably compare it against
@@ -2326,6 +2328,8 @@ def normalise_output( s: str ) -> str:
     s = re.sub('You are using an unsupported version of LLVM!.*\n','',s)
     s = re.sub('Currently only [\.0-9]+ is supported. System LLVM version: [\.0-9]+.*\n','',s)
     s = re.sub('We will try though\.\.\..*\n','',s)
+    # ignore warning about strip invalidating signatures
+    s = re.sub('.*strip: changes being made to the file will invalidate the code signature in.*\n','',s)
 
     return s
 
