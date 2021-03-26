@@ -2110,7 +2110,7 @@ occAnalApp env (Var fun_id, args, ticks)
         -- See Note [CONLIKE pragma] in GHC.Types.Basic
         -- The definition of is_exp should match that in GHC.Core.Opt.Simplify.prepareRhs
 
-    one_shots  = argsOneShots (idStrictness fun_id) guaranteed_val_args
+    one_shots  = argsOneShots (idDmdSig fun_id) guaranteed_val_args
     guaranteed_val_args = n_val_args + length (takeWhile isOneShotInfo
                                                          (occ_one_shots env))
         -- See Note [Sources of one-shot information], bullet point A']
