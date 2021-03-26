@@ -56,7 +56,7 @@ module GHC.Types.Id (
         setIdInfo, lazySetIdInfo, modifyIdInfo, maybeModifyIdInfo,
         zapLamIdInfo, zapIdDemandInfo, zapIdUsageInfo, zapIdUsageEnvInfo,
         zapIdUsedOnceInfo, zapIdTailCallInfo,
-        zapFragileIdInfo, zapIdStrictness, zapStableUnfolding,
+        zapFragileIdInfo, zapIdDmdSig, zapStableUnfolding,
         transferPolyIdInfo, scaleIdBy, scaleVarBy,
 
         -- ** Predicates on Ids
@@ -111,12 +111,12 @@ module GHC.Types.Id (
         setIdLFInfo,
 
         setIdDemandInfo,
-        setIdStrictness,
-        setIdCprInfo,
+        setIdDmdSig,
+        setIdCprSig,
 
         idDemandInfo,
-        idStrictness,
-        idCprInfo,
+        idDmdSig,
+        idCprSig,
 
     ) where
 
@@ -178,8 +178,8 @@ infixl  1 `setIdUnfolding`,
           `idCafInfo`,
 
           `setIdDemandInfo`,
-          `setIdStrictness`,
-          `setIdCprInfo`,
+          `setIdDmdSig`,
+          `setIdCprSig`,
 
           `asJoinId`,
           `asJoinId_maybe`
@@ -673,24 +673,24 @@ idFunRepArity x = countFunRepArgs (idArity x) (idType x)
 -- See Note [Dead ends] in "GHC.Types.Demand".
 isDeadEndId :: Var -> Bool
 isDeadEndId v
-  | isId v    = isDeadEndSig (idStrictness v)
+  | isId v    = isDeadEndSig (idDmdSig v)
   | otherwise = False
 
--- | Accesses the 'Id''s 'strictnessInfo'.
-idStrictness :: Id -> StrictSig
-idStrictness id = strictnessInfo (idInfo id)
+-- | Accesses the 'Id''s 'dmdSigInfo'.
+idDmdSig :: Id -> DmdSig
+idDmdSig id = dmdSigInfo (idInfo id)
 
-setIdStrictness :: Id -> StrictSig -> Id
-setIdStrictness id sig = modifyIdInfo (`setStrictnessInfo` sig) id
+setIdDmdSig :: Id -> DmdSig -> Id
+setIdDmdSig id sig = modifyIdInfo (`setDmdSigInfo` sig) id
 
-idCprInfo :: Id -> CprSig
-idCprInfo id = cprInfo (idInfo id)
+idCprSig :: Id -> CprSig
+idCprSig id = cprSigInfo (idInfo id)
 
-setIdCprInfo :: Id -> CprSig -> Id
-setIdCprInfo id sig = modifyIdInfo (\info -> setCprInfo info sig) id
+setIdCprSig :: Id -> CprSig -> Id
+setIdCprSig id sig = modifyIdInfo (\info -> setCprSigInfo info sig) id
 
-zapIdStrictness :: Id -> Id
-zapIdStrictness id = modifyIdInfo (`setStrictnessInfo` nopSig) id
+zapIdDmdSig :: Id -> Id
+zapIdDmdSig id = modifyIdInfo (`setDmdSigInfo` nopSig) id
 
 -- | This predicate says whether the 'Id' has a strict demand placed on it or
 -- has a type such that it can always be evaluated strictly (i.e an
@@ -998,15 +998,15 @@ transferPolyIdInfo old_id abstract_wrt new_id
     new_arity       = old_arity + arity_increase
     new_occ_info    = zapOccTailCallInfo old_occ_info
 
-    old_strictness  = strictnessInfo old_info
-    new_strictness  = prependArgsStrictSig arity_increase old_strictness
-    old_cpr         = cprInfo old_info
+    old_strictness  = dmdSigInfo old_info
+    new_strictness  = prependArgsDmdSig arity_increase old_strictness
+    old_cpr         = cprSigInfo old_info
 
     transfer new_info = new_info `setArityInfo` new_arity
                                  `setInlinePragInfo` old_inline_prag
                                  `setOccInfo` new_occ_info
-                                 `setStrictnessInfo` new_strictness
-                                 `setCprInfo` old_cpr
+                                 `setDmdSigInfo` new_strictness
+                                 `setCprSigInfo` old_cpr
 
 isNeverLevPolyId :: Id -> Bool
 isNeverLevPolyId = isNeverLevPolyIdInfo . idInfo

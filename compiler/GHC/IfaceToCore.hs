@@ -1637,8 +1637,8 @@ tcIdInfo ignore_prags toplvl name ty info = do
     tcPrag :: IdInfo -> IfaceInfoItem -> IfL IdInfo
     tcPrag info HsNoCafRefs        = return (info `setCafInfo`   NoCafRefs)
     tcPrag info (HsArity arity)    = return (info `setArityInfo` arity)
-    tcPrag info (HsStrictness str) = return (info `setStrictnessInfo` str)
-    tcPrag info (HsCpr cpr)        = return (info `setCprInfo` cpr)
+    tcPrag info (HsDmdSig str)     = return (info `setDmdSigInfo` str)
+    tcPrag info (HsCprSig cpr)     = return (info `setCprSigInfo` cpr)
     tcPrag info (HsInline prag)    = return (info `setInlinePragInfo` prag)
     tcPrag info HsLevity           = return (info `setNeverLevPoly` ty)
     tcPrag info (HsLFInfo lf_info) = do
@@ -1700,7 +1700,7 @@ tcUnfolding toplvl name _ info (IfCoreUnfold stable if_expr)
         }
   where
     -- Strictness should occur before unfolding!
-    strict_sig = strictnessInfo info
+    strict_sig = dmdSigInfo info
 
 tcUnfolding toplvl name _ _ (IfCompulsory if_expr)
   = do  { mb_expr <- tcPragExpr True toplvl name if_expr

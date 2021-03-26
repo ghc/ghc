@@ -897,8 +897,8 @@ mkExceptionId :: Name -> Id
 mkExceptionId name
   = mkVanillaGlobalWithInfo name
       (mkSpecForAllTys [alphaTyVar] (mkTyVarTy alphaTyVar)) -- forall a . a
-      (vanillaIdInfo `setStrictnessInfo` mkClosedStrictSig [] botDiv
-                     `setCprInfo` mkCprSig 0 botCpr
+      (vanillaIdInfo `setDmdSigInfo` mkClosedDmdSig [] botDiv
+                     `setCprSigInfo` mkCprSig 0 botCpr
                      `setArityInfo` 0
                      `setCafInfo` NoCafRefs) -- #15038
 
@@ -912,8 +912,8 @@ mkRuntimeErrorId :: Name -> Id
 mkRuntimeErrorId name
  = mkVanillaGlobalWithInfo name runtimeErrorTy bottoming_info
  where
-    bottoming_info = vanillaIdInfo `setStrictnessInfo`    strict_sig
-                                   `setCprInfo`           mkCprSig 1 botCpr
+    bottoming_info = vanillaIdInfo `setDmdSigInfo`    strict_sig
+                                   `setCprSigInfo`           mkCprSig 1 botCpr
                                    `setArityInfo`         1
                         -- Make arity and strictness agree
 
@@ -926,7 +926,7 @@ mkRuntimeErrorId name
         -- any pc_bottoming_Id will itself have CafRefs, which bloats
         -- SRTs.
 
-    strict_sig = mkClosedStrictSig [evalDmd] botDiv
+    strict_sig = mkClosedDmdSig [evalDmd] botDiv
 
 runtimeErrorTy :: Type
 -- forall (rr :: RuntimeRep) (a :: rr). Addr# -> a

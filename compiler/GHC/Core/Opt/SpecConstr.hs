@@ -1716,7 +1716,7 @@ spec_one env fn arg_bndrs body (call_pat@(qvars, pats), rule_number)
                 -- Usual w/w hack to avoid generating
                 -- a spec_rhs of unlifted type and no args
 
-              spec_lam_args_str = handOutStrictnessInformation (fst (splitStrictSig spec_str)) spec_lam_args
+              spec_lam_args_str = handOutStrictnessInformation (fst (splitDmdSig spec_str)) spec_lam_args
                 -- Annotate the variables with the strictness information from
                 -- the function (see Note [Strictness information in worker binders])
 
@@ -1725,8 +1725,8 @@ spec_one env fn arg_bndrs body (call_pat@(qvars, pats), rule_number)
               spec_id    = mkLocalId spec_name Many
                                      (mkLamTypes spec_lam_args body_ty)
                              -- See Note [Transfer strictness]
-                             `setIdStrictness` spec_str
-                             `setIdCprInfo` topCprSig
+                             `setIdDmdSig` spec_str
+                             `setIdCprSig` topCprSig
                              `setIdArity` count isId spec_lam_args
                              `asJoinId_maybe` spec_join_arity
               spec_str   = calcSpecStrictness fn spec_lam_args pats
@@ -1757,13 +1757,13 @@ handOutStrictnessInformation = go
 
 calcSpecStrictness :: Id                     -- The original function
                    -> [Var] -> [CoreExpr]    -- Call pattern
-                   -> StrictSig              -- Strictness of specialised thing
+                   -> DmdSig              -- Strictness of specialised thing
 -- See Note [Transfer strictness]
 calcSpecStrictness fn qvars pats
-  = mkClosedStrictSig spec_dmds div
+  = mkClosedDmdSig spec_dmds div
   where
     spec_dmds = [ lookupVarEnv dmd_env qv `orElse` topDmd | qv <- qvars, isId qv ]
-    StrictSig (DmdType _ dmds div) = idStrictness fn
+    DmdSig (DmdType _ dmds div) = idDmdSig fn
 
     dmd_env = go emptyVarEnv dmds pats
 

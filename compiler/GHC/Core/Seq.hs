@@ -14,7 +14,7 @@ import GHC.Prelude
 
 import GHC.Core
 import GHC.Types.Id.Info
-import GHC.Types.Demand( seqDemand, seqStrictSig )
+import GHC.Types.Demand( seqDemand, seqDmdSig )
 import GHC.Types.Cpr( seqCprSig )
 import GHC.Types.Basic( seqOccInfo )
 import GHC.Types.Tickish
@@ -35,8 +35,8 @@ megaSeqIdInfo info
 --    seqUnfolding (unfoldingInfo info)         `seq`
 
     seqDemand (demandInfo info)                 `seq`
-    seqStrictSig (strictnessInfo info)          `seq`
-    seqCprSig (cprInfo info)                    `seq`
+    seqDmdSig (dmdSigInfo info)          `seq`
+    seqCprSig (cprSigInfo info)                    `seq`
     seqCaf (cafInfo info)                       `seq`
     seqOneShot (oneShotInfo info)               `seq`
     seqOccInfo (occInfo info)
