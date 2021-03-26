@@ -727,7 +727,7 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
 
     get_linkable osuf mod_name      -- A home-package module
         | Just mod_info <- lookupHpt hpt mod_name
-        = adjust_linkable (Maybes.expectJust "getLinkDeps" (hm_linkable mod_info))
+        = adjust_linkable (Maybes.expectJust ("getLinkDeps: " ++ moduleNameString mod_name) (hm_linkable mod_info))
         | otherwise
         = do    -- It's not in the HPT because we are in one shot mode,
                 -- so use the Finder to get a ModLocation...
@@ -738,7 +738,7 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
         where
             found loc mod = do {
                 -- ...and then find the linkable for it
-               mb_lnk <- findObjectLinkableMaybe mod loc ;
+               mb_lnk <- findObjectLinkableMaybe hsc_env mod loc ;
                case mb_lnk of {
                   Nothing  -> no_obj mod ;
                   Just lnk -> adjust_linkable lnk
@@ -866,7 +866,7 @@ partitionLinkable li
 
 findModuleLinkable_maybe :: [Linkable] -> Module -> Maybe Linkable
 findModuleLinkable_maybe lis mod
-   = case [LM time nm us | LM time nm us <- lis, nm == mod] of
+   = case [ li | li <- lis, linkableModule li == mod] of
         []   -> Nothing
         [li] -> Just li
         _    -> pprPanic "findModuleLinkable" (ppr mod)
@@ -1738,3 +1738,16 @@ maybePutStr logger dflags s = maybePutSDoc logger dflags (text s)
 
 maybePutStrLn :: Logger -> DynFlags -> String -> IO ()
 maybePutStrLn logger dflags s = maybePutSDoc logger dflags (text s <> text "\n")
+
+findObjectLinkableMaybe :: HscEnv -> Module -> ModLocation -> IO (Maybe Linkable)
+findObjectLinkableMaybe hsc_env mod locn
+   = do let obj_fn = ml_obj_file locn
+        maybe_obj_time <- modificationTimeIfExists obj_fn
+        case maybe_obj_time of
+            Nothing -> return Nothing
+            Just obj_time -> do
+                mb_iface_hash <- initTcRnIf 's' hsc_env () () $
+                    readIfaceSourceHash mod (ml_hi_file locn)
+                case mb_iface_hash of
+                    Just src_hash -> return $ Just $ mkObjectLinkable mod obj_fn obj_time src_hash
+                    Nothing -> return Nothing
