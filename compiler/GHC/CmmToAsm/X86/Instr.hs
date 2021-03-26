@@ -34,6 +34,7 @@ module GHC.CmmToAsm.X86.Instr
    , patchJumpInstr
    , isMetaInstr
    , isJumpishInstr
+   , isConditionalInstr
    )
 where
 
@@ -755,13 +756,18 @@ isMetaInstr instr
         _               -> False
 
 
+-- | Is this instruction conditionally executed?
+isConditionalInstr
+    :: Instr
+    -> Bool
 
----  TODO: why is there
+isConditionalInstr instr
+ = case instr of
+        CMOV{}  -> True
+        _       -> False
+
+
 -- | Make a reg-reg move instruction.
---      On SPARC v8 there are no instructions to move directly between
---      floating point and integer regs. If we need to do that then we
---      have to go via memory.
---
 mkRegRegMoveInstr
     :: Platform
     -> Reg
