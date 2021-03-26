@@ -171,7 +171,7 @@ typeArity ty
       = []
 
 ---------------
-exprBotStrictness_maybe :: CoreExpr -> Maybe (Arity, StrictSig)
+exprBotStrictness_maybe :: CoreExpr -> Maybe (Arity, DmdSig)
 -- A cheap and cheerful function that identifies bottoming functions
 -- and gives them a suitable strictness signatures.  It's used during
 -- float-out
@@ -180,7 +180,7 @@ exprBotStrictness_maybe e
         Nothing -> Nothing
         Just ar -> Just (ar, sig ar)
   where
-    sig ar = mkClosedStrictSig (replicate ar topDmd) botDiv
+    sig ar = mkClosedDmdSig (replicate ar topDmd) botDiv
 
 {-
 Note [exprArity invariant]
@@ -1095,9 +1095,9 @@ environment mapping let-bound Ids to their ArityType.
 
 idArityType :: Id -> ArityType
 idArityType v
-  | strict_sig <- idStrictness v
+  | strict_sig <- idDmdSig v
   , not $ isTopSig strict_sig
-  , (ds, div) <- splitStrictSig strict_sig
+  , (ds, div) <- splitDmdSig strict_sig
   , let arity = length ds
   -- Every strictness signature admits an arity signature!
   = AT (take arity one_shots) div
