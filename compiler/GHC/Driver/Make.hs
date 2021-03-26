@@ -1943,16 +1943,16 @@ Potential TODOS:
 -- worry about .o files if the user has indicated that they are not interested
 -- in them via -fno-code. See also #9243.
 --
--- The correctness of this strategy depends on a couple of assumptions.
+-- Note that recompilation avoidance is dependent on .hi files being produced,
+-- which does not happen if -fno-write-interface -fno-code is passed. That is,
+-- passing -fno-write-interface -fno-code means that you cannot benefit from
+-- recompilation avoidance. See also Note [-fno-code mode].
 --
--- 1. Whenever we are producing any output files, we are always producing .hi
---    files. This is important: if we ever skip writing a .hi file, then we
---    can never avoid unnecessarily recompilation on subsequent invocations of
---    the compiler.
+-- The correctness of this strategy depends on an assumption that whenever we
+-- are producing multiple output files, the .hi file is always written first.
+-- If this assumption is violated, we risk recompiling unnecessarily by
+-- incorrectly regarding non-.hi files as outdated.
 --
--- 2. Whenever we are producing multiple output files, the .hi file is always
---    written first. If this assumption is violated, we risk recompiling
---    unnecessarily by incorrectly regarding non-.hi files as outdated.
 
 -- Filter modules in the HPT
 retainInTopLevelEnvs :: [ModuleName] -> HomePackageTable -> HomePackageTable
