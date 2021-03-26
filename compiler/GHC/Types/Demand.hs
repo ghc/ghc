@@ -1118,9 +1118,9 @@ keepAliveDmdEnv env vs
 --    * Diverges on every code path or not ('dt_div')
 data DmdType
   = DmdType
-  { dt_env  :: DmdEnv     -- ^ Demand on explicitly-mentioned free variables
-  , dt_args :: [Demand]   -- ^ Demand on arguments
-  , dt_div  :: Divergence -- ^ Whether evaluation diverges.
+  { dt_env  :: !DmdEnv     -- ^ Demand on explicitly-mentioned free variables
+  , dt_args :: ![Demand]   -- ^ Demand on arguments
+  , dt_div  :: !Divergence -- ^ Whether evaluation diverges.
                           -- See Note [Demand type Divergence]
   }
 
@@ -1225,9 +1225,10 @@ peelFV :: DmdType -> Var -> (DmdType, Demand)
 peelFV (DmdType fv ds res) id = -- pprTrace "rfv" (ppr id <+> ppr dmd $$ ppr fv)
                                (DmdType fv' ds res, dmd)
   where
-  fv' = fv `delVarEnv` id
+  -- Force these arguments so that old `Env` is not retained.
+  !fv' = fv `delVarEnv` id
   -- See Note [Default demand on free variables and arguments]
-  dmd  = lookupVarEnv fv id `orElse` defaultFvDmd res
+  !dmd  = lookupVarEnv fv id `orElse` defaultFvDmd res
 
 addDemand :: Demand -> DmdType -> DmdType
 addDemand dmd (DmdType fv ds res) = DmdType fv (dmd:ds) res
