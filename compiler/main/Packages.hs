@@ -429,8 +429,9 @@ extendPackageConfigMap (PackageConfigMap pkg_map closure) new_pkgs
 -- | Looks up the package with the given id in the package state, panicing if it is
 -- not found
 getPackageDetails :: DynFlags -> UnitId -> PackageConfig
-getPackageDetails dflags pid =
-    expectJust "getPackageDetails" (lookupPackage dflags pid)
+getPackageDetails dflags pid = case lookupPackage dflags pid of
+  Just c  -> c
+  Nothing -> pprPanic "getPackageDetails: couldn't find package" (ppr pid)
 
 lookupInstalledPackage :: DynFlags -> InstalledUnitId -> Maybe PackageConfig
 lookupInstalledPackage dflags uid = lookupInstalledPackage' (pkgIdMap (pkgState dflags)) uid
@@ -439,9 +440,9 @@ lookupInstalledPackage' :: PackageConfigMap -> InstalledUnitId -> Maybe PackageC
 lookupInstalledPackage' (PackageConfigMap db _) uid = lookupUDFM db uid
 
 getInstalledPackageDetails :: DynFlags -> InstalledUnitId -> PackageConfig
-getInstalledPackageDetails dflags uid =
-    expectJust "getInstalledPackageDetails" $
-        lookupInstalledPackage dflags uid
+getInstalledPackageDetails dflags uid = case lookupInstalledPackage dflags uid of
+  Just c  -> c
+  Nothing -> pprPanic "getInstalledPackageDetails: couldn't find package" (ppr uid)
 
 -- | Get a list of entries from the package database.  NB: be careful with
 -- this function, although all packages in this map are "visible", this
