@@ -142,7 +142,7 @@ defaults
    can_fail         = False   -- See Note [PrimOp can_fail and has_side_effects] in PrimOp
    commutable       = False
    code_size        = { primOpCodeSizeDefault }
-   strictness       = { \ arity -> mkClosedStrictSig (replicate arity topDmd) topDiv }
+   strictness       = { \ arity -> mkClosedDmdSig (replicate arity topDmd) topDiv }
    fixity           = Nothing
    llvm_only        = False
    vector           = []
@@ -2455,7 +2455,7 @@ primop  CatchOp "catch#" GenPrimOp
        -> State# RealWorld
        -> (# State# RealWorld, a #)
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [ lazyApply1Dmd
+   strictness  = { \ _arity -> mkClosedDmdSig [ lazyApply1Dmd
                                                  , lazyApply2Dmd
                                                  , topDmd] topDiv }
                  -- See Note [Strictness for mask/unmask/catch]
@@ -2473,7 +2473,7 @@ primop  RaiseOp "raise#" GenPrimOp
    -- For the same reasons, 'raise#' is marked as "can_fail" (which 'raiseIO#'
    -- is not), but not as "has_side_effects" (which 'raiseIO#' is).
    -- See Note [PrimOp can_fail and has_side_effects] in "GHC.Builtin.PrimOps".
-   strictness  = { \ _arity -> mkClosedStrictSig [topDmd] botDiv }
+   strictness  = { \ _arity -> mkClosedDmdSig [topDmd] botDiv }
    out_of_line = True
    can_fail = True
 
@@ -2482,7 +2482,7 @@ primop  RaiseIOOp "raiseIO#" GenPrimOp
    with
    -- See Note [Precise exceptions and strictness analysis] in "GHC.Types.Demand"
    -- for why this is the *only* primop that has 'exnDiv'
-   strictness  = { \ _arity -> mkClosedStrictSig [topDmd, topDmd] exnDiv }
+   strictness  = { \ _arity -> mkClosedDmdSig [topDmd, topDmd] exnDiv }
    out_of_line = True
    has_side_effects = True
 
@@ -2490,7 +2490,7 @@ primop  MaskAsyncExceptionsOp "maskAsyncExceptions#" GenPrimOp
         (State# RealWorld -> (# State# RealWorld, a #))
      -> (State# RealWorld -> (# State# RealWorld, a #))
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [strictOnceApply1Dmd,topDmd] topDiv }
+   strictness  = { \ _arity -> mkClosedDmdSig [strictOnceApply1Dmd,topDmd] topDiv }
                  -- See Note [Strictness for mask/unmask/catch]
    out_of_line = True
    has_side_effects = True
@@ -2499,7 +2499,7 @@ primop  MaskUninterruptibleOp "maskUninterruptible#" GenPrimOp
         (State# RealWorld -> (# State# RealWorld, a #))
      -> (State# RealWorld -> (# State# RealWorld, a #))
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [strictOnceApply1Dmd,topDmd] topDiv }
+   strictness  = { \ _arity -> mkClosedDmdSig [strictOnceApply1Dmd,topDmd] topDiv }
    out_of_line = True
    has_side_effects = True
 
@@ -2507,7 +2507,7 @@ primop  UnmaskAsyncExceptionsOp "unmaskAsyncExceptions#" GenPrimOp
         (State# RealWorld -> (# State# RealWorld, a #))
      -> (State# RealWorld -> (# State# RealWorld, a #))
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [strictOnceApply1Dmd,topDmd] topDiv }
+   strictness  = { \ _arity -> mkClosedDmdSig [strictOnceApply1Dmd,topDmd] topDiv }
                  -- See Note [Strictness for mask/unmask/catch]
    out_of_line = True
    has_side_effects = True
@@ -2528,7 +2528,7 @@ primop  AtomicallyOp "atomically#" GenPrimOp
       (State# RealWorld -> (# State# RealWorld, a #) )
    -> State# RealWorld -> (# State# RealWorld, a #)
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [strictManyApply1Dmd,topDmd] topDiv }
+   strictness  = { \ _arity -> mkClosedDmdSig [strictManyApply1Dmd,topDmd] topDiv }
                  -- See Note [Strictness for mask/unmask/catch]
    out_of_line = True
    has_side_effects = True
@@ -2546,7 +2546,7 @@ primop  AtomicallyOp "atomically#" GenPrimOp
 primop  RetryOp "retry#" GenPrimOp
    State# RealWorld -> (# State# RealWorld, a #)
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [topDmd] botDiv }
+   strictness  = { \ _arity -> mkClosedDmdSig [topDmd] botDiv }
    out_of_line = True
    has_side_effects = True
 
@@ -2555,7 +2555,7 @@ primop  CatchRetryOp "catchRetry#" GenPrimOp
    -> (State# RealWorld -> (# State# RealWorld, a #) )
    -> (State# RealWorld -> (# State# RealWorld, a #) )
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [ lazyApply1Dmd
+   strictness  = { \ _arity -> mkClosedDmdSig [ lazyApply1Dmd
                                                  , lazyApply1Dmd
                                                  , topDmd ] topDiv }
                  -- See Note [Strictness for mask/unmask/catch]
@@ -2567,7 +2567,7 @@ primop  CatchSTMOp "catchSTM#" GenPrimOp
    -> (b -> State# RealWorld -> (# State# RealWorld, a #) )
    -> (State# RealWorld -> (# State# RealWorld, a #) )
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [ lazyApply1Dmd
+   strictness  = { \ _arity -> mkClosedDmdSig [ lazyApply1Dmd
                                                  , lazyApply2Dmd
                                                  , topDmd ] topDiv }
                  -- See Note [Strictness for mask/unmask/catch]
@@ -3135,7 +3135,7 @@ primop KeepAliveOp "keepAlive#" GenPrimOp
    o -> State# RealWorld -> (State# RealWorld -> p) -> p
    { TODO. }
    with
-   strictness = { \ _arity -> mkClosedStrictSig [topDmd, topDmd, strictOnceApply1Dmd] topDiv }
+   strictness = { \ _arity -> mkClosedDmdSig [topDmd, topDmd, strictOnceApply1Dmd] topDiv }
 
 
 ------------------------------------------------------------------------
@@ -3147,7 +3147,7 @@ section "Tag to enum stuff"
 primop  DataToTagOp "dataToTag#" GenPrimOp
    a -> Int#  -- Zero-indexed; the first constructor has tag zero
    with
-   strictness = { \ _arity -> mkClosedStrictSig [evalDmd] topDiv }
+   strictness = { \ _arity -> mkClosedDmdSig [evalDmd] topDiv }
    -- See Note [dataToTag# magic] in GHC.Core.Op.ConstantFold
 
 primop  TagToEnumOp "tagToEnum#" GenPrimOp
