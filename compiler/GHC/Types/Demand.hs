@@ -1,5 +1,6 @@
-{-# LANGUAGE CPP          #-}
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE CPP             #-}
+{-# LANGUAGE ViewPatterns    #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -41,7 +42,7 @@ module GHC.Types.Demand (
 
     -- * Demand environments
     DmdEnv, emptyDmdEnv,
-    keepAliveDmdEnv, reuseEnv,
+    keepAliveDmdEnv, reuseBndrs,
 
     -- * Divergence
     Divergence(..), topDiv, botDiv, exnDiv, lubDivergence, isDeadEndDiv,
@@ -58,11 +59,13 @@ module GHC.Types.Demand (
     keepAliveDmdType,
 
     -- * Demand signatures
-    StrictSig(..), mkStrictSigForArity, mkClosedStrictSig,
-    splitStrictSig, strictSigDmdEnv, hasDemandEnvSig,
+    DmdSig(DmdSig), mkDmdSigForArity, mkClosedDmdSig,
+    splitDmdSig, dmdSigDmdEnv, hasDemandEnvSig,
     nopSig, botSig, isTopSig, isDeadEndSig, appIsDeadEnd,
+    -- ** Accessing the lazy FV cache
+    getDmdSigLazyFVCache, setDmdSigLazyFVCache,
     -- ** Handling arity adjustments
-    prependArgsStrictSig, etaConvertStrictSig,
+    prependArgsDmdSig, etaConvertDmdSig,
 
     -- * Demand transformers from demand signatures
     DmdTransformer, dmdTransformSig, dmdTransformDataConSig, dmdTransformDictSelSig,
@@ -71,7 +74,7 @@ module GHC.Types.Demand (
     TypeShape(..), trimToType,
 
     -- * @seq@ing stuff
-    seqDemand, seqDemandList, seqDmdType, seqStrictSig,
+    seqDemand, seqDemandList, seqDmdType, seqDmdSig,
 
     -- * Zapping usage information
     zapUsageDemand, zapDmdEnvSig, zapUsedOnceDemand, zapUsedOnceSig
@@ -85,6 +88,7 @@ import GHC.Types.Var ( Var, Id )
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Unique.FM
+import GHC.Types.Unique.Set
 import GHC.Types.Basic
 import GHC.Data.Maybe   ( orElse )
 
@@ -590,9 +594,9 @@ addCaseBndrDmd sd       alt_dmds = zipWith plusDmd ds alt_dmds -- fuse ds!
   where
     Just ds = viewProd (length alt_dmds) sd -- Guaranteed not to be a call
 
-argsOneShots :: StrictSig -> Arity -> [[OneShotInfo]]
+argsOneShots :: DmdSig -> Arity -> [[OneShotInfo]]
 -- ^ See Note [Computing one-shot info]
-argsOneShots (StrictSig (DmdType _ arg_ds _)) n_val_args
+argsOneShots (DmdSig (DmdType _ arg_ds _)) n_val_args
   | unsaturated_call = []
   | otherwise = go arg_ds
   where
@@ -1092,8 +1096,13 @@ multDmdEnv n env
   | Just env' <- multTrivial n emptyDmdEnv env = env'
   | otherwise                                  = mapVarEnv (multDmd n) env
 
-reuseEnv :: DmdEnv -> DmdEnv
-reuseEnv = multDmdEnv C_1N
+-- | Re-uses the given set of bndrs with their demand as given in the 'DmdEnv'.
+-- Ex.: @reuseBndrs [x] [x:->MCM(C1(L)), y:->MP(L)] === [x:->LCL(C1(L)), y:->MP(L)]@.
+-- It's like doing @multDmd C_1N@ on the demands in the set.
+reuseBndrs :: VarSet -> DmdEnv -> DmdEnv
+reuseBndrs bndrs env = adjustManyUFM reuse_bndr env (getUniqSet bndrs)
+  where
+    reuse_bndr dmd = multDmd C_1N dmd
 
 -- | @keepAliveDmdType dt vs@ makes sure that the Ids in @vs@ have
 -- /some/ usage in the returned demand types -- they are not Absent.
@@ -1257,8 +1266,8 @@ keepAliveDmdType (DmdType fvs ds res) vars =
 {-
 Note [Demand type Divergence]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In contrast to StrictSigs, DmdTypes are elicited under a specific incoming demand.
-This is described in detail in Note [Understanding DmdType and StrictSig].
+In contrast to DmdSigs, DmdTypes are elicited under a specific incoming demand.
+This is described in detail in Note [Understanding DmdType and DmdSig].
 Here, we'll focus on what that means for a DmdType's Divergence in a higher-order
 scenario.
 
@@ -1362,7 +1371,7 @@ However, in fact we store in the Id an extremely emascuated demand
 transfomer, namely
 
                 a single DmdType
-(Nevertheless we dignify StrictSig as a distinct type.)
+(Nevertheless we dignify DmdSig as a distinct type.)
 
 This DmdType gives the demands unleashed by the Id when it is applied
 to as many arguments as are given in by the arg demands in the DmdType.
@@ -1376,7 +1385,7 @@ demand on all arguments. Otherwise, the demand is specified by Id's
 signature.
 
 For example, the demand transformer described by the demand signature
-        StrictSig (DmdType {x -> <1L>} <A><1P(L,L)>)
+        DmdSig (DmdType {x -> <1L>} <A><1P(L,L)>)
 says that when the function is applied to two arguments, it
 unleashes demand 1L on the free var x, A on the first arg,
 and 1P(L,L) on the second.
@@ -1384,7 +1393,7 @@ and 1P(L,L) on the second.
 If this same function is applied to one arg, all we can say is that it
 uses x with 1L, and its arg with demand 1P(L,L).
 
-Note [Understanding DmdType and StrictSig]
+Note [Understanding DmdType and DmdSig]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Demand types are sound approximations of an expression's semantics relative to
 the incoming demand we put the expression under. Consider the following
@@ -1421,51 +1430,91 @@ being a newtype wrapper around DmdType, it actually encodes two things:
     met.
 
 Here comes the subtle part: The threshold is encoded in the wrapped demand
-type's depth! So in mkStrictSigForArity we make sure to trim the list of
+type's depth! So in mkDmdSigForArity we make sure to trim the list of
 argument demands to the given threshold arity. Call sites will make sure that
 this corresponds to the arity of the call demand that elicited the wrapped
 demand type. See also Note [What are demand signatures?].
 -}
 
 -- | The depth of the wrapped 'DmdType' encodes the arity at which it is safe
--- to unleash. Better construct this through 'mkStrictSigForArity'.
--- See Note [Understanding DmdType and StrictSig]
-newtype StrictSig
-  = StrictSig DmdType
-  deriving Eq
+-- to unleash. Construct this through 'mkDmdSigForArity'.
+-- See Note [Understanding DmdType and DmdSig]
+data DmdSig
+  = DmdSig_ !DmdType
+  -- ^ Not exported. Instead, a unidirectional pattern synonym 'DmdSig' is
+  -- exported for use in pattern matches, so the only way to construct
+  -- signtures is through 'mkDmdSigForArity' and 'mkClosedDmdSig'.
+  | DmdSigWithLazyFVs !DmdType !DmdEnv
+  -- ^ Not exported.
+  -- Carries an additional 'DmdEnv' only used as a cache in fixed-point
+  -- iteration. No further semantic info, just pretend it is empty.
+  -- See Note [Lazy free variables and Initialising strictness].
 
--- | Turns a 'DmdType' computed for the particular 'Arity' into a 'StrictSig'
--- unleashable at that arity. See Note [Understanding DmdType and StrictSig]
-mkStrictSigForArity :: Arity -> DmdType -> StrictSig
-mkStrictSigForArity arity dmd_ty@(DmdType fvs args div)
-  | arity < dmdTypeDepth dmd_ty = StrictSig (DmdType fvs (take arity args) div)
-  | otherwise                   = StrictSig (etaExpandDmdType arity dmd_ty)
+-- | See Note [Understanding DmdType and DmdSig]
+getDmdSig :: DmdSig -> DmdType
+getDmdSig (DmdSig_ ty)             = ty
+getDmdSig (DmdSigWithLazyFVs ty _) = ty
 
-mkClosedStrictSig :: [Demand] -> Divergence -> StrictSig
-mkClosedStrictSig ds res = mkStrictSigForArity (length ds) (DmdType emptyDmdEnv ds res)
+-- | Match out the 'DmdType' stored in a 'DmdSig'.
+--
+-- Conveniently ignores whether or not the sig caches lazy FVs, which is what
+-- most code should do except fixed-point iteration.
+-- See Note [Lazy free variables and Initialising strictness].
+pattern DmdSig :: DmdType -> DmdSig
+pattern DmdSig x <- (getDmdSig -> x)
+{-# COMPLETE DmdSig #-}
 
-splitStrictSig :: StrictSig -> ([Demand], Divergence)
-splitStrictSig (StrictSig (DmdType _ dmds res)) = (dmds, res)
+-- | Doesn't look at the cached lazy FVs.
+-- See Note [Lazy free variables and Initialising strictness].
+instance Eq DmdSig where
+  (DmdSig a) == (DmdSig b) = a == b
 
-strictSigDmdEnv :: StrictSig -> DmdEnv
-strictSigDmdEnv (StrictSig (DmdType env _ _)) = env
+-- | Turns a 'DmdType' computed for the particular 'Arity' into a 'DmdSig'
+-- unleashable at that arity. See Note [Understanding DmdType and DmdSig].
+mkDmdSigForArity :: Arity -> DmdType -> DmdSig
+mkDmdSigForArity arity dmd_ty@(DmdType fvs args div)
+  | arity < dmdTypeDepth dmd_ty = DmdSig_ (DmdType fvs (take arity args) div)
+  | otherwise                   = DmdSig_ (etaExpandDmdType arity dmd_ty)
 
-hasDemandEnvSig :: StrictSig -> Bool
-hasDemandEnvSig = not . isEmptyVarEnv . strictSigDmdEnv
+mkClosedDmdSig :: [Demand] -> Divergence -> DmdSig
+mkClosedDmdSig ds res
+  = mkDmdSigForArity (length ds) (DmdType emptyDmdEnv ds res)
 
-botSig :: StrictSig
-botSig = StrictSig botDmdType
+-- | Get the cached lazy FVs of the 'DmdSig', used while doing fixed-point
+-- interation.
+-- See Note [Lazy free variables and Initialising strictness].
+getDmdSigLazyFVCache :: DmdSig -> DmdEnv
+getDmdSigLazyFVCache (DmdSigWithLazyFVs _ lazy_fvs) = lazy_fvs
+getDmdSigLazyFVCache _                              = emptyDmdEnv
 
-nopSig :: StrictSig
-nopSig = StrictSig nopDmdType
+-- | Set the lazy FV cache of the 'DmdSig', used while doing fixed-point
+-- interation and accessed via 'getDmdSigLazyFVCache'.
+-- See Note [Lazy free variables and Initialising strictness].
+setDmdSigLazyFVCache :: DmdSig -> DmdEnv -> DmdSig
+setDmdSigLazyFVCache sig lazy_fvs = DmdSigWithLazyFVs (getDmdSig sig) lazy_fvs
 
-isTopSig :: StrictSig -> Bool
-isTopSig (StrictSig ty) = isTopDmdType ty
+splitDmdSig :: DmdSig -> ([Demand], Divergence)
+splitDmdSig (DmdSig (DmdType _ dmds res)) = (dmds, res)
+
+dmdSigDmdEnv :: DmdSig -> DmdEnv
+dmdSigDmdEnv (DmdSig (DmdType env _ _)) = env
+
+hasDemandEnvSig :: DmdSig -> Bool
+hasDemandEnvSig = not . isEmptyVarEnv . dmdSigDmdEnv
+
+botSig :: DmdSig
+botSig = DmdSig_ botDmdType
+
+nopSig :: DmdSig
+nopSig = DmdSig_ nopDmdType
+
+isTopSig :: DmdSig -> Bool
+isTopSig (DmdSig ty) = isTopDmdType ty
 
 -- | True if the signature diverges or throws an exception in a saturated call.
 -- See Note [Dead ends].
-isDeadEndSig :: StrictSig -> Bool
-isDeadEndSig (StrictSig (DmdType _ _ res)) = isDeadEndDiv res
+isDeadEndSig :: DmdSig -> Bool
+isDeadEndSig (DmdSig (DmdType _ _ res)) = isDeadEndDiv res
 
 -- | Returns true if an application to n args would diverge or throw an
 -- exception.
@@ -1474,27 +1523,27 @@ isDeadEndSig (StrictSig (DmdType _ _ res)) = isDeadEndDiv res
 -- its syntactic arity, we cannot say for sure that it is going to diverge.
 -- Hence this function conservatively returns False in that case.
 -- See Note [Dead ends].
-appIsDeadEnd :: StrictSig -> Int -> Bool
-appIsDeadEnd (StrictSig (DmdType _ ds res)) n
+appIsDeadEnd :: DmdSig -> Int -> Bool
+appIsDeadEnd (DmdSig (DmdType _ ds res)) n
   = isDeadEndDiv res && not (lengthExceeds ds n)
 
-prependArgsStrictSig :: Int -> StrictSig -> StrictSig
+prependArgsDmdSig :: Int -> DmdSig -> DmdSig
 -- ^ Add extra ('topDmd') arguments to a strictness signature.
--- In contrast to 'etaConvertStrictSig', this /prepends/ additional argument
+-- In contrast to 'etaConvertDmdSig', this /prepends/ additional argument
 -- demands. This is used by FloatOut.
-prependArgsStrictSig new_args sig@(StrictSig dmd_ty@(DmdType env dmds res))
+prependArgsDmdSig new_args sig@(DmdSig dmd_ty@(DmdType env dmds res))
   | new_args == 0       = sig
   | isTopDmdType dmd_ty = sig
-  | new_args < 0        = pprPanic "prependArgsStrictSig: negative new_args"
+  | new_args < 0        = pprPanic "prependArgsDmdSig: negative new_args"
                                    (ppr new_args $$ ppr sig)
-  | otherwise           = StrictSig (DmdType env dmds' res)
+  | otherwise           = DmdSig_ (DmdType env dmds' res)
   where
     dmds' = replicate new_args topDmd ++ dmds
 
-etaConvertStrictSig :: Arity -> StrictSig -> StrictSig
+etaConvertDmdSig :: Arity -> DmdSig -> DmdSig
 -- ^ We are expanding (\x y. e) to (\x y z. e z) or reducing from the latter to
 -- the former (when the Simplifier identifies a new join points, for example).
--- In contrast to 'prependArgsStrictSig', this /appends/ extra arg demands if
+-- In contrast to 'prependArgsDmdSig', this /appends/ extra arg demands if
 -- necessary.
 -- This works by looking at the 'DmdType' (which was produced under a call
 -- demand for the old arity) and trying to transfer as many facts as we can to
@@ -1502,9 +1551,9 @@ etaConvertStrictSig :: Arity -> StrictSig -> StrictSig
 -- An arity increase (resulting in a stronger incoming demand) can retain much
 -- of the info, while an arity decrease (a weakening of the incoming demand)
 -- must fall back to a conservative default.
-etaConvertStrictSig arity (StrictSig dmd_ty)
-  | arity < dmdTypeDepth dmd_ty = StrictSig $ decreaseArityDmdType dmd_ty
-  | otherwise                   = StrictSig $ etaExpandDmdType arity dmd_ty
+etaConvertDmdSig arity (DmdSig dmd_ty)
+  | arity < dmdTypeDepth dmd_ty = DmdSig_ $ decreaseArityDmdType dmd_ty
+  | otherwise                   = DmdSig_ $ etaExpandDmdType arity dmd_ty
 
 {-
 ************************************************************************
@@ -1519,16 +1568,16 @@ etaConvertStrictSig arity (StrictSig dmd_ty)
 -- (i.e. expression, function) uses its arguments and free variables, and
 -- whether it diverges.
 --
--- See Note [Understanding DmdType and StrictSig]
+-- See Note [Understanding DmdType and DmdSig]
 -- and Note [What are demand signatures?].
 type DmdTransformer = SubDemand -> DmdType
 
--- | Extrapolate a demand signature ('StrictSig') into a 'DmdTransformer'.
+-- | Extrapolate a demand signature ('DmdSig') into a 'DmdTransformer'.
 --
--- Given a function's 'StrictSig' and a 'SubDemand' for the evaluation context,
+-- Given a function's 'DmdSig' and a 'SubDemand' for the evaluation context,
 -- return how the function evaluates its free variables and arguments.
-dmdTransformSig :: StrictSig -> DmdTransformer
-dmdTransformSig (StrictSig dmd_ty@(DmdType _ arg_ds _)) sd
+dmdTransformSig :: DmdSig -> DmdTransformer
+dmdTransformSig (DmdSig dmd_ty@(DmdType _ arg_ds _)) sd
   = multDmdType (peelManyCalls (length arg_ds) sd) dmd_ty
     -- see Note [Demands from unsaturated function calls]
     -- and Note [What are demand signatures?]
@@ -1546,10 +1595,10 @@ dmdTransformDataConSig arity sd = case go arity sd of
 
 -- | A special 'DmdTransformer' for dictionary selectors that feeds the demand
 -- on the result into the indicated dictionary component (if saturated).
-dmdTransformDictSelSig :: StrictSig -> DmdTransformer
+dmdTransformDictSelSig :: DmdSig -> DmdTransformer
 -- NB: This currently doesn't handle newtype dictionaries and it's unclear how
 -- it could without additional parameters.
-dmdTransformDictSelSig (StrictSig (DmdType _ [(_ :* sig_sd)] _)) call_sd
+dmdTransformDictSelSig (DmdSig (DmdType _ [(_ :* sig_sd)] _)) call_sd
    | (n, sd') <- peelCallDmd call_sd
    , Prod sig_ds  <- sig_sd
    = multDmdType n $
@@ -1642,8 +1691,8 @@ it should not fall over.
 -}
 
 -- | Remove the demand environment from the signature.
-zapDmdEnvSig :: StrictSig -> StrictSig
-zapDmdEnvSig (StrictSig (DmdType _ ds r)) = mkClosedStrictSig ds r
+zapDmdEnvSig :: DmdSig -> DmdSig
+zapDmdEnvSig (DmdSig (DmdType _ ds r)) = mkClosedDmdSig ds r
 
 zapUsageDemand :: Demand -> Demand
 -- Remove the usage info, but not the strictness info, from the demand
@@ -1663,9 +1712,9 @@ zapUsedOnceDemand = kill_usage $ KillFlags
 
 -- | Remove all `C_01 :*` info (but not `CM` sub-demands) from the strictness
 --   signature
-zapUsedOnceSig :: StrictSig -> StrictSig
-zapUsedOnceSig (StrictSig (DmdType env ds r))
-    = StrictSig (DmdType env (map zapUsedOnceDemand ds) r)
+zapUsedOnceSig :: DmdSig -> DmdSig
+zapUsedOnceSig (DmdSig (DmdType env ds r))
+    = DmdSig_ (DmdType env (map zapUsedOnceDemand ds) r)
 
 data KillFlags = KillFlags
     { kf_abs         :: Bool
@@ -1740,8 +1789,8 @@ seqDmdType (DmdType env ds res) =
 seqDmdEnv :: DmdEnv -> ()
 seqDmdEnv env = seqEltsUFM seqDemandList env
 
-seqStrictSig :: StrictSig -> ()
-seqStrictSig (StrictSig ty) = seqDmdType ty
+seqDmdSig :: DmdSig -> ()
+seqDmdSig (DmdSig ty) = seqDmdType ty
 
 {-
 ************************************************************************
@@ -1842,8 +1891,9 @@ instance Outputable DmdType where
         -- It's OK to use nonDetUFMToList here because we only do it for
         -- pretty printing
 
-instance Outputable StrictSig where
-   ppr (StrictSig ty) = ppr ty
+instance Outputable DmdSig where
+   ppr (DmdSigWithLazyFVs ty fvs) = ppr ty <+> ppr fvs
+   ppr (DmdSig_ ty)               = ppr ty
 
 instance Outputable TypeShape where
   ppr TsUnk        = text "TsUnk"
@@ -1884,9 +1934,9 @@ instance Binary SubDemand where
       2 -> Prod <$> get bh
       _ -> pprPanic "Binary:SubDemand" (ppr (fromIntegral h :: Int))
 
-instance Binary StrictSig where
-  put_ bh (StrictSig aa) = put_ bh aa
-  get bh = StrictSig <$> get bh
+instance Binary DmdSig where
+  put_ bh (DmdSig aa) = put_ bh aa
+  get bh = DmdSig_ <$> get bh
 
 instance Binary DmdType where
   -- Ignore DmdEnv when spitting out the DmdType

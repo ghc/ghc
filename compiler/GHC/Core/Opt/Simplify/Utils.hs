@@ -547,7 +547,7 @@ mkArgInfo env fun rules n_val_args call_cont
       = vanilla_dmds -- See Note [Do not expose strictness if sm_inline=False]
       | otherwise
       = -- add_type_str fun_ty $
-        case splitStrictSig (idStrictness fun) of
+        case splitDmdSig (idDmdSig fun) of
           (demands, result_info)
                 | not (demands `lengthExceeds` n_val_args)
                 ->      -- Enough args, use the strictness given.
