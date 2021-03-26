@@ -109,9 +109,10 @@ canonicalize (CIrredCan { cc_ev = ev })
     --    e.g. a ~ [a], where [G] a ~ [Int], can decompose
 
 canonicalize (CDictCan { cc_ev = ev, cc_class  = cls
-                       , cc_tyargs = xis, cc_pend_sc = pend_sc })
+                       , cc_tyargs = xis, cc_pend_sc = pend_sc
+                       , cc_fundeps = fds })
   = {-# SCC "canClass" #-}
-    canClass ev cls xis pend_sc
+    canClass ev cls xis pend_sc fds
 
 canonicalize (CEqCan { cc_ev     = ev
                      , cc_lhs    = lhs
@@ -150,7 +151,7 @@ canClassNC ev cls tys
   | isGiven ev  -- See Note [Eagerly expand given superclasses]
   = do { sc_cts <- mkStrictSuperClasses ev [] [] cls tys
        ; emitWork sc_cts
-       ; canClass ev cls tys False }
+       ; canClass ev cls tys False fds }
 
   | isWanted ev
   , Just ip_name <- isCallStackPred cls tys
@@ -174,15 +175,19 @@ canClassNC ev cls tys
        ; let ev_cs = EvCsPushCall func (ctLocSpan loc) (ctEvExpr new_ev)
        ; solveCallStack ev ev_cs
 
-       ; canClass new_ev cls tys False }
+       ; canClass new_ev cls tys
+                  False -- No superclasses
+                  False -- No top level instances for fundeps
+       }
 
   | otherwise
-  = canClass ev cls tys (has_scs cls)
+  = canClass ev cls tys (has_scs cls) fds
 
   where
     has_scs cls = not (null (classSCTheta cls))
     loc  = ctEvLoc ev
     pred = ctEvPred ev
+    fds  = classHasFds cls
 
 solveCallStack :: CtEvidence -> EvCallStack -> TcS ()
 -- Also called from GHC.Tc.Solver when defaulting call stacks
@@ -197,10 +202,11 @@ solveCallStack ev ev_cs = do
 canClass :: CtEvidence
          -> Class -> [Type]
          -> Bool            -- True <=> un-explored superclasses
+         -> Bool            -- True <=> unexploited fundep(s)
          -> TcS (StopOrContinue Ct)
 -- Precondition: EvVar is class evidence
 
-canClass ev cls tys pend_sc
+canClass ev cls tys pend_sc fds
   =   -- all classes do *nominal* matching
     ASSERT2( ctEvRole ev == Nominal, ppr ev $$ ppr cls $$ ppr tys )
     do { (xis, cos) <- rewriteArgsNom ev cls_tc tys
@@ -209,7 +215,8 @@ canClass ev cls tys pend_sc
              mk_ct new_ev = CDictCan { cc_ev = new_ev
                                      , cc_tyargs = xis
                                      , cc_class = cls
-                                     , cc_pend_sc = pend_sc }
+                                     , cc_pend_sc = pend_sc
+                                     , cc_fundeps = fds }
        ; mb <- rewriteEvidence ev xi co
        ; traceTcS "canClass" (vcat [ ppr ev
                                    , ppr xi, ppr mb ])
@@ -644,7 +651,7 @@ mk_superclasses_of rec_clss ev tvs theta cls tys
 
     this_ct | null tvs, null theta
             = CDictCan { cc_ev = ev, cc_class = cls, cc_tyargs = tys
-                       , cc_pend_sc = loop_found }
+                       , cc_pend_sc = loop_found, cc_fundeps = classHasFds cls }
                  -- NB: If there is a loop, we cut off, so we have not
                  --     added the superclasses, hence cc_pend_sc = True
             | otherwise
