@@ -21,7 +21,8 @@
 
 -- We're going to replace B.hs with an invalid module but without
 -- changing its timestamp.  A :reload should look at the contents of the
--- file, because the hash has changed.
+-- file, because the hash has changed. Note that this test previously tested
+-- for the opposite behaviour, but was changed as a result of #19439 / #16495.
 :shell cp B.hs B.hs-copy
 :shell touch -r B.hs B.hs-copy
 :shell echo "*** INVALID ***" >B.hs
