@@ -1048,8 +1048,8 @@ lookup_demoted rdr_name
                         Nothing -> unboundNameX WL_Any rdr_name star_info
                         Just demoted_name ->
                           do { whenWOptM Opt_WarnUntickedPromotedConstructors $
-                               addWarn
-                                 (Reason Opt_WarnUntickedPromotedConstructors)
+                               addDiagnostic
+                                 (WarningWithFlag Opt_WarnUntickedPromotedConstructors)
                                  (untickedPromConstrWarn demoted_name)
                              ; return demoted_name } }
             else do { -- We need to check if a data constructor of this name is
@@ -1523,8 +1523,8 @@ warnIfDeprecated gre@(GRE { gre_imp = iss })
                    -- See Note [Handling of deprecations]
          do { iface <- loadInterfaceForName doc name
             ; case lookupImpDeprec iface gre of
-                Just txt -> addWarn (Reason Opt_WarnWarningsDeprecations)
-                                   (mk_msg imp_spec txt)
+                Just txt -> addDiagnostic (WarningWithFlag Opt_WarnWarningsDeprecations)
+                                          (mk_msg imp_spec txt)
                 Nothing  -> return () } }
   | otherwise
   = return ()

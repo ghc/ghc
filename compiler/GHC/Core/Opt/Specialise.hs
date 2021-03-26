@@ -53,6 +53,7 @@ import GHC.Types.Var      ( isLocalVar )
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Id
+import GHC.Types.Error
 
 import GHC.Utils.Monad    ( foldlM )
 import GHC.Utils.Misc
@@ -802,13 +803,13 @@ tryWarnMissingSpecs :: DynFlags -> [Id] -> Id -> [CallInfo] -> CoreM ()
 tryWarnMissingSpecs dflags callers fn calls_for_fn
   | wopt Opt_WarnMissedSpecs dflags
     && not (null callers)
-    && allCallersInlined                  = doWarn $ Reason Opt_WarnMissedSpecs
-  | wopt Opt_WarnAllMissedSpecs dflags    = doWarn $ Reason Opt_WarnAllMissedSpecs
+    && allCallersInlined                  = doWarn $ WarningWithFlag Opt_WarnMissedSpecs
+  | wopt Opt_WarnAllMissedSpecs dflags    = doWarn $ WarningWithFlag Opt_WarnAllMissedSpecs
   | otherwise                             = return ()
   where
     allCallersInlined = all (isAnyInlinePragma . idInlinePragma) callers
     doWarn reason =
-      warnMsg reason
+      msg (mkMCDiagnostic reason)
         (vcat [ hang (text ("Could not specialise imported function") <+> quotes (ppr fn))
                 2 (vcat [ text "when specialising" <+> quotes (ppr caller)
                         | caller <- callers])
