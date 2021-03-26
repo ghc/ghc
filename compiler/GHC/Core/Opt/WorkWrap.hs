@@ -511,9 +511,9 @@ tryWW dflags fam_envs is_rec fn_id rhs
   where
     uf_opts      = unfoldingOpts dflags
     fn_info      = idInfo fn_id
-    (wrap_dmds, div) = splitStrictSig (strictnessInfo fn_info)
+    (wrap_dmds, div) = splitDmdSig (dmdSigInfo fn_info)
 
-    cpr_ty       = getCprSig (cprInfo fn_info)
+    cpr_ty       = getCprSig (cprSigInfo fn_info)
     -- Arity of the CPR sig should match idArity when it's not a join point.
     -- See Note [Arity trimming for CPR signatures] in GHC.Core.Opt.CprAnal
     cpr          = ASSERT2( isJoinId fn_id || cpr_ty == topCprType || ct_arty cpr_ty == arityInfo fn_info
@@ -584,7 +584,7 @@ divergence, it's also broken for newtypes:
     where
       co :: (Int -> Int -> Char) ~ T
 
-Then idArity is 2 (despite the type T), and it can have a StrictSig based on a
+Then idArity is 2 (despite the type T), and it can have a DmdSig based on a
 threshold of 2. But we can't w/w it without a type error.
 
 The situation is less grave for PAPs, but the implicit eta expansion caused a
@@ -679,11 +679,11 @@ mkWWBindPair dflags fn_id fn_info arity rhs work_uniq div cpr
                 `setIdUnfolding` mkWorkerUnfolding simpl_opts work_fn fn_unfolding
                         -- See Note [Worker-wrapper for INLINABLE functions]
 
-                `setIdStrictness` mkClosedStrictSig work_demands div
+                `setIdDmdSig` mkClosedDmdSig work_demands div
                         -- Even though we may not be at top level,
                         -- it's ok to give it an empty DmdEnv
 
-                `setIdCprInfo` mkCprSig work_arity work_cpr_info
+                `setIdCprSig` mkCprSig work_arity work_cpr_info
 
                 `setIdDemandInfo` worker_demand
 
