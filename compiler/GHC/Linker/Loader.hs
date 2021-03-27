@@ -1749,8 +1749,9 @@ findObjectLinkableMaybe hsc_env mod locn
         case maybe_obj_time of
             Nothing -> return Nothing
             Just obj_time -> do
-                mb_iface_hash <- initTcRnIf 's' hsc_env () () $
-                    readIfaceSourceHash mod (ml_hi_file locn)
+                let dflags = hsc_dflags hsc_env
+                    name_cache = hsc_NC hsc_env
+                mb_iface_hash <- readIfaceSourceHash dflags name_cache mod (ml_hi_file locn)
                 case mb_iface_hash of
                     Just src_hash -> return $ Just $ mkObjectLinkable mod obj_fn obj_time src_hash
                     Nothing -> return Nothing

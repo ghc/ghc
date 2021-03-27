@@ -1795,9 +1795,11 @@ runPhase (RealPhase other) _input_fn =
 -- | Read the previously recorded hash from a module's iface file, if any.
 readIfaceSourceHash' :: HscEnv -> ModSummary -> IO (Maybe Fingerprint)
 readIfaceSourceHash' hsc_env ms =
-    let loc = ms_location ms
-    in initTcRnIf 's' hsc_env () () $
-        readIfaceSourceHash (ms_mod ms) (ml_hi_file loc)
+    readIfaceSourceHash
+        (hsc_dflags hsc_env)
+        (hsc_NC hsc_env)
+        (ms_mod ms)
+        (ml_hi_file (ms_location ms))
 
 -- | Check whether a module's current hash matches the previously recorded hash
 -- in its .hi file, if any. If this function returns False then the module will

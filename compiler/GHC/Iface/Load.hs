@@ -992,11 +992,14 @@ readIface dflags name_cache wanted_mod file_path = do
 
 -- | Like @readIface@, but just get the source file hash out of it if it
 -- exists, and don't bother returning the error otherwise.
--- TODO: Optimize?
-readIfaceSourceHash :: Module -> FilePath
-              -> TcRnIf gbl lcl (Maybe Fingerprint)
-readIfaceSourceHash wanted_mod file_path
-  = do mb_iface <- readIface wanted_mod file_path
+readIfaceSourceHash
+  :: DynFlags
+  -> NameCache
+  -> Module
+  -> FilePath
+  -> IO (Maybe Fingerprint)
+readIfaceSourceHash dflags name_cache wanted_mod file_path
+  = do mb_iface <- readIface dflags name_cache wanted_mod file_path
        case mb_iface of
          Succeeded iface ->
            return $ Just $ mi_src_hash (mi_final_exts iface)
