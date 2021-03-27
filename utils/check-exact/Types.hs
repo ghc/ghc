@@ -11,30 +11,13 @@
 module Types
   where
 
-import GHC hiding (AnnComment)
--- import GHC.Hs.Extension
--- import GHC.Parser.Lexer (AddApiAnn(..))
--- import GHC.Types.Basic hiding (EP)
--- import GHC.Types.Name.Reader
--- import GHC.Types.SrcLoc
+import GHC hiding (EpaComment)
 import GHC.Utils.Outputable hiding ( (<>) )
--- import GHC.Driver.Session
 import GHC.Driver.Ppr
--- import Control.Monad.Identity
--- import Control.Monad.RWS
 import Data.Data (Data, toConstr,cast)
--- import Data.Foldable
--- import Data.List (sortBy, elemIndex)
--- import Data.Maybe (fromMaybe)
--- import Data.Ord (comparing)
 
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-
--- import qualified GHC
--- import Lookup
-
--- ---------------------------------------------------------------------
 
 -- ---------------------------------------------------------------------
 -- | This structure holds a complete set of annotations for an AST
@@ -48,7 +31,6 @@ emptyAnns = Map.empty
 -- These are used to maintain context in the AP and EP monads
 data AnnKey   = AnnKey RealSrcSpan AnnConName
                   deriving (Eq, Data, Ord)
--- deriving instance Ord SrcSpan
 
 -- More compact Show instance
 instance Show AnnKey where
