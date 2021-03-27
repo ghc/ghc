@@ -1,0 +1,19 @@
+
+T19482.hs:19:25: error:
+    • Expected kind ‘[r]’, but ‘s’ has kind ‘r’
+      ‘r’ is a rigid type variable bound by
+        the instance declaration
+        at T19482.hs:18:10-35
+    • In the type ‘s’
+      In the expression: testF @r @s
+      In an equation for ‘bugList’: bugList = testF @r @s
+
+T19482.hs:23:17: error:
+    • Expected kind ‘[r]’, but ‘s’ has kind ‘r’
+      ‘r’ is a rigid type variable bound by
+        the type signature for:
+          foo :: forall r (s :: r). ()
+        at T19482.hs:22:1-26
+    • In the type ‘s’
+      In the expression: testF @r @s
+      In an equation for ‘foo’: foo = testF @r @s

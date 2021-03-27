@@ -710,6 +710,7 @@ findMatchingIrreds irreds ev
     match_non_eq ct
       | ctPred ct `tcEqTypeNoKindCheck` pred = Left (ct, NotSwapped)
       | otherwise                            = Right ct
+      -- NoKindCheck: pred has kind Constraint
 
     match_eq eq_rel1 lty1 rty1 ct
       | EqPred eq_rel2 lty2 rty2 <- classifyPredType (ctPred ct)
@@ -720,9 +721,10 @@ findMatchingIrreds irreds ev
       = Right ct
 
     match_eq_help lty1 rty1 lty2 rty2
-      | lty1 `tcEqTypeNoKindCheck` lty2, rty1 `tcEqTypeNoKindCheck` rty2
+      | lty1 `tcEqType` lty2, rty1 `tcEqTypeNoKindCheck` rty2
+        -- NoKindCheck: if LHSs have same kind, so have RHSs
       = Just NotSwapped
-      | lty1 `tcEqTypeNoKindCheck` rty2, rty1 `tcEqTypeNoKindCheck` lty2
+      | lty1 `tcEqType` rty2, rty1 `tcEqTypeNoKindCheck` lty2
       = Just IsSwapped
       | otherwise
       = Nothing

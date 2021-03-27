@@ -78,7 +78,7 @@ module GHC.Tc.Utils.Monad(
   -- * Shared error message stuff: renamer and typechecker
   mkLongErrAt, mkDecoratedSDocAt, addLongErrAt, reportErrors, reportError,
   reportWarning, recoverM, mapAndRecoverM, mapAndReportM, foldAndRecoverM,
-  attemptM, tryTc,
+  attemptM, tryTc, tcTryM,
   askNoErrs, discardErrs, tryTcDiscardingErrs,
   checkNoErrs, whenNoErrs,
   ifErrsM, failIfErrsM,
