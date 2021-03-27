@@ -1674,7 +1674,7 @@ chooseEditFile =
               Just file -> return file
               Nothing   -> throwGhcException (CmdLineError "No files to edit.")
 
-  where fromTarget (GHC.Target (GHC.TargetFile f _) _ _) = Just f
+  where fromTarget GHC.Target { targetId = GHC.TargetFile f _ } = Just f
         fromTarget _ = Nothing -- when would we get a module target?
 
 
@@ -1949,7 +1949,7 @@ loadModule' files = do
   let (filenames, phases) = unzip files
   exp_filenames <- mapM expandPath filenames
   let files' = zip exp_filenames phases
-  targets <- mapM (uncurry GHC.guessTarget) files'
+  targets <- mapM (\(file, phase) -> GHC.guessTarget file Nothing phase) files'
 
   -- NOTE: we used to do the dependency anal first, so that if it
   -- fails we didn't throw away the current set of modules.  This would
@@ -1983,17 +1983,17 @@ addModule :: GhciMonad m => [FilePath] -> m ()
 addModule files = do
   revertCAFs -- always revert CAFs on load/add.
   files' <- mapM expandPath files
-  targets <- mapM (\m -> GHC.guessTarget m Nothing) files'
+  targets <- mapM (\m -> GHC.guessTarget m Nothing Nothing) files'
   targets' <- filterM checkTarget targets
   -- remove old targets with the same id; e.g. for :add *M
-  mapM_ GHC.removeTarget [ tid | Target tid _ _ <- targets' ]
+  mapM_ GHC.removeTarget [ tid | Target { targetId = tid } <- targets' ]
   mapM_ GHC.addTarget targets'
   _ <- doLoadAndCollectInfo False LoadAllTargets
   return ()
   where
     checkTarget :: GHC.GhcMonad m => Target -> m Bool
-    checkTarget (Target (TargetModule m) _ _) = checkTargetModule m
-    checkTarget (Target (TargetFile f _) _ _) = liftIO $ checkTargetFile f
+    checkTarget Target { targetId = TargetModule m } = checkTargetModule m
+    checkTarget Target { targetId = TargetFile f _ } = liftIO $ checkTargetFile f
 
     checkTargetModule :: GHC.GhcMonad m => ModuleName -> m Bool
     checkTargetModule m = do
@@ -2019,8 +2019,8 @@ addModule files = do
 unAddModule :: GhciMonad m => [FilePath] -> m ()
 unAddModule files = do
   files' <- mapM expandPath files
-  targets <- mapM (\m -> GHC.guessTarget m Nothing) files'
-  mapM_ GHC.removeTarget [ tid | Target tid _ _ <- targets ]
+  targets <- mapM (\m -> GHC.guessTarget m Nothing Nothing) files'
+  mapM_ GHC.removeTarget [ tid | Target { targetId = tid } <- targets ]
   _ <- doLoadAndCollectInfo False LoadAllTargets
   return ()
 
@@ -2112,9 +2112,9 @@ setContextAfterLoad keep_ctxt ms = do
         []    -> Nothing
         (m:_) -> Just m
 
-   summary `matches` Target (TargetModule m) _ _
+   summary `matches` Target { targetId = TargetModule m }
         = GHC.ms_mod_name summary == m
-   summary `matches` Target (TargetFile f _) _ _
+   summary `matches` Target { targetId = TargetFile f _ }
         | Just f' <- GHC.ml_hs_file (GHC.ms_location summary)   = f == f'
    _ `matches` _
         = False
@@ -3384,8 +3384,8 @@ showTargets :: GHC.GhcMonad m => m ()
 showTargets = mapM_ showTarget =<< GHC.getTargets
   where
     showTarget :: GHC.GhcMonad m => Target -> m ()
-    showTarget (Target (TargetFile f _) _ _) = liftIO (putStrLn f)
-    showTarget (Target (TargetModule m) _ _) =
+    showTarget Target { targetId = TargetFile f _ } = liftIO (putStrLn f)
+    showTarget Target { targetId = TargetModule m } =
       liftIO (putStrLn $ moduleNameString m)
 
 -- -----------------------------------------------------------------------------
