@@ -109,6 +109,7 @@ import GHC.StgToCmm.ArgRep    ( slowCallPattern , toArgRep , argRepString )
 import GHC.StgToCmm.Closure
 import GHC.StgToCmm.Utils
 import GHC.StgToCmm.Monad
+import GHC.StgToCmm.Lit       ( newStringCLit )
 
 import GHC.Stg.Syntax
 import GHC.Cmm.Expr

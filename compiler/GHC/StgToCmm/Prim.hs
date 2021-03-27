@@ -25,7 +25,6 @@ import GHC.Platform.Profile
 
 import GHC.StgToCmm.Layout
 import GHC.StgToCmm.Foreign
-import GHC.StgToCmm.Env
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Utils
 import GHC.StgToCmm.Ticky
