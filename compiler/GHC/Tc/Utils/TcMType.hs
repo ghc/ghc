@@ -1252,6 +1252,9 @@ skolems are in scope within the type itself (e.g. that 'forall arg').
 This change is inspired by and described in Section 7.2 of "Kind Inference
 for Datatypes", POPL'20.
 
+NB: this is all rather similar to, but sadly not the same as
+    Note [Error on unconstrained meta-variables]
+
 Wrinkle:
 
 We must make absolutely sure that alpha indeed is not
@@ -1919,6 +1922,9 @@ on kappa. What to do?
 
 We choose (D), as described in #17567. Discussion of alternatives is below.
 
+NB: this is all rather similar to, but sadly not the same as
+    Note [Naughty quantification candidates]
+
 (One last example: type instance F Int = Proxy Any, where the unconstrained
 kind variable is the inferred kind of Any. The four examples here illustrate
 all cases in which this Note applies.)
@@ -1998,6 +2004,7 @@ doNotQuantifyTyVars :: CandidatesQTvs
                     -> (TidyEnv -> TcM (TidyEnv, SDoc))
                             -- ^ like "the class context (D a b, E foogle)"
                     -> TcM ()
+-- See Note [Error on unconstrained meta-variables]
 doNotQuantifyTyVars dvs where_found
   | isEmptyCandidates dvs
   = traceTc "doNotQuantifyTyVars has nothing to error on" empty
