@@ -1,0 +1,20 @@
+echo "Building libhello..."
+Building libhello...
+'/opt/exp/ghc/ghc-landing/_build/stage1/bin/ghc' -fPIC -c clib/lib.c -o clib/lib.o
+'/opt/exp/ghc/ghc-landing/_build/stage1/bin/ghc' -shared -no-hs-main clib/lib.o -o clib/libhello.so
+rm -Rf local.package.conf
+"/opt/exp/ghc/ghc-landing/_build/stage1/bin/ghc-pkg" init local.package.conf
+echo "Building T19350-lib..."
+Building T19350-lib...
+cd lib && '/opt/exp/ghc/ghc-landing/_build/stage1/bin/ghc' -package Cabal Setup.hs
+cd lib && ./Setup configure -v0 --extra-lib-dirs="$(pwd)/../clib" --with-compiler="/opt/exp/ghc/ghc-landing/_build/stage1/bin/ghc" --with-hc-pkg="/opt/exp/ghc/ghc-landing/_build/stage1/bin/ghc-pkg" --package-db=../local.package.conf --disable-library-vanilla --enable-shared
+cd lib && ./Setup build
+Preprocessing library for T19350-lib-1.0..
+Building library for T19350-lib-1.0..
+[1 of 1] Compiling Hello            ( Hello.hs, dist/build/Hello.dyn_o )
+cd lib && ./Setup register --inplace
+Registering library for T19350-lib-1.0..
+echo "Testing..."
+Testing...
+'/opt/exp/ghc/ghc-landing/_build/stage1/bin/ghc' -dcore-lint -dstg-lint -dcmm-lint -no-user-package-db -rtsopts  -fno-warn-missed-specialisations -fshow-warning-groups -fdiagnostics-color=never -fno-diagnostics-show-caret -Werror=compat -dno-debug-output --interactive -v0 -ignore-dot-ghci -fno-ghci-history -package-db 'local.package.conf' -package T19350-lib  -interactive < T19350.script
+hello world!
