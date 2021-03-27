@@ -59,14 +59,9 @@ import GHC.Word            (Word64(..))
 #include "MachDeps.h"
 
 -- | A reference to a value of type @a@.
-#if WORD_SIZE_IN_BITS < 64
 data StaticPtr a = StaticPtr Word64# Word64# -- The flattened Fingerprint is
                                              -- convenient in the compiler.
                              StaticPtrInfo a
-#else
-data StaticPtr a = StaticPtr Word# Word#
-                             StaticPtrInfo a
-#endif
 -- | Dereferences a static pointer.
 deRefStaticPtr :: StaticPtr a -> a
 deRefStaticPtr (StaticPtr _ _ _ v) = v
