@@ -42,8 +42,8 @@ import GHC.Core.Opt.Monad ( Tick(..), SimplMode(..) )
 import GHC.Core
 import GHC.Builtin.Types.Prim( realWorldStatePrimTy )
 import GHC.Builtin.Names( runRWKey )
-import GHC.Types.Demand ( StrictSig(..), Demand, dmdTypeDepth, isStrUsedDmd
-                        , mkClosedStrictSig, topDmd, seqDmd, isDeadEndDiv )
+import GHC.Types.Demand ( DmdSig(..), Demand, dmdTypeDepth, isStrUsedDmd
+                        , mkClosedDmdSig, topDmd, seqDmd, isDeadEndDiv )
 import GHC.Types.Cpr    ( mkCprSig, botCpr )
 import GHC.Core.Ppr     ( pprCoreExpr )
 import GHC.Types.Unique ( hasKey )
@@ -579,8 +579,8 @@ prepareBinding env top_lvl old_bndr bndr rhs
        ; return (floats, bndr, rhs') }
  where
    info = idInfo bndr
-   worker_info = vanillaIdInfo `setStrictnessInfo` strictnessInfo info
-                               `setCprInfo`        cprInfo info
+   worker_info = vanillaIdInfo `setDmdSigInfo` dmdSigInfo info
+                               `setCprSigInfo`        cprSigInfo info
                                `setDemandInfo`     demandInfo info
                                `setInlinePragInfo` inlinePragInfo info
                                `setArityInfo`      arityInfo info
@@ -852,18 +852,18 @@ addLetBndrInfo new_bndr new_arity_type new_unf
     -- eta-expansion *reduces* the arity of the binding to less
     -- than that of the strictness sig. This can happen: see Note [Arity decrease].
     info3 | isEvaldUnfolding new_unf
-            || (case strictnessInfo info2 of
-                  StrictSig dmd_ty -> new_arity < dmdTypeDepth dmd_ty)
+            || (case dmdSigInfo info2 of
+                  DmdSig dmd_ty -> new_arity < dmdTypeDepth dmd_ty)
           = zapDemandInfo info2 `orElse` info2
           | otherwise
           = info2
 
     -- Bottoming bindings: see Note [Bottoming bindings]
-    info4 | isDeadEndDiv div = info3 `setStrictnessInfo` bot_sig
-                                     `setCprInfo`        bot_cpr
+    info4 | isDeadEndDiv div = info3 `setDmdSigInfo` bot_sig
+                                     `setCprSigInfo`        bot_cpr
           | otherwise        = info3
 
-    bot_sig = mkClosedStrictSig (replicate new_arity topDmd) div
+    bot_sig = mkClosedDmdSig (replicate new_arity topDmd) div
     bot_cpr = mkCprSig new_arity botCpr
 
      -- Zap call arity info. We have used it by now (via
@@ -1281,7 +1281,7 @@ simplTick env tickish expr cont
 --    do { let (inc,outc) = splitCont cont
 --       ; (env', expr') <- simplExprF (zapFloats env) expr inc
 --       ; let tickish' = simplTickish env tickish
---       ; let wrap_float (b,rhs) = (zapIdStrictness (setIdArity b 0),
+--       ; let wrap_float (b,rhs) = (zapIdDmdSig (setIdArity b 0),
 --                                   mkTick (mkNoCount tickish') rhs)
 --              -- when wrapping a float with mkTick, we better zap the Id's
 --              -- strictness info and arity, because it might be wrong now.
