@@ -5,7 +5,7 @@
   * Make `bisequence` part of the `Bitraversable` class, and require that at
     least one of `bisequence` and `bitraverse` be implemented.
     Previously, we unwittingly provided a non-terminating default for
-    `bitraverse`.
+    `bitraverse`. (#18901)
 
   * Make it possible to promote `Natural`s and remove the separate `Nat` kind.
     For backwards compatibility, `Nat` is now a type synonym for `Natural`.
