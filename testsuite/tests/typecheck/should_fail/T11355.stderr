@@ -7,3 +7,13 @@ T11355.hs:5:7: error:
       In an equation for ‘foo’:
           foo
             = const @_ @((forall a. a) -> forall a. a) () (id @(forall a. a))
+
+T11355.hs:5:52: error:
+    • Illegal polymorphic type: forall a. a
+      Perhaps you intended to use ImpredicativeTypes
+    • In the fourth argument of ‘const’, namely ‘(id @(forall a. a))’
+      In the expression:
+        const @_ @((forall a. a) -> forall a. a) () (id @(forall a. a))
+      In an equation for ‘foo’:
+          foo
+            = const @_ @((forall a. a) -> forall a. a) () (id @(forall a. a))
