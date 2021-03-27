@@ -2,6 +2,9 @@
 {-# OPTIONS_GHC -Wno-compat-unqualified-imports #-}
 module Main where
 
+import Prelude (Int, String, print, putStr, error,
+                Eq (..), Ord (..), Num (..), Bool (..))
+
 import Data.List
 import Control.Exception
 
