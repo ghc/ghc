@@ -40,6 +40,7 @@ import GHC.Core.TyCo.FVs( shallowTyCoVarsOfType )
 import GHC.Core.Type
 import GHC.Tc.Types.Evidence
 import GHC.Types.Var.Set
+import GHC.Types.Error( errorsFound )
 import GHC.Builtin.PrimOps( tagToEnumKey )
 import GHC.Builtin.Names
 import GHC.Driver.Session
@@ -678,7 +679,16 @@ tcVTA fun_ty hs_ty
     -- See Note [Required quantifiers in the type of a term]
   = do { let tv   = binderVar tvb
              kind = tyVarKind tv
-       ; ty_arg <- tcHsTypeApp hs_ty kind
+
+       -- Kind-check the type argument
+       -- If that fails, use a fresh unification variable so we can carry on
+       -- This is tricky: see Note [VTA error recovery]
+       ; (mb_ty_arg, msgs) <- tryTc (tcHsTypeApp hs_ty kind)
+       ; addMessages msgs
+       ; when (errorsFound msgs) failM
+       ; ty_arg <- case mb_ty_arg of
+                     Just ty -> return ty
+                     Nothing -> newFlexiTyVarTy kind
 
        ; inner_ty <- zonkTcType inner_ty
              -- See Note [Visible type application zonk]
@@ -718,6 +728,30 @@ GHCs we had an ASSERT that Required could not occur here.
 
 The ice is thin; c.f. Note [No Required TyCoBinder in terms]
 in GHC.Core.TyCo.Rep.
+
+Note [VTA error recovery]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+An awkward case was shown in #19482.  Consider
+  testF :: forall a (b :: [a]). ()
+
+  foo :: forall r (s::r). ()
+  foo = testF @r @s
+
+The visible type args are ill-kinded: `a` is instantiated to `r`, and
+`b` to `s`.  But the kind of `s` doesn't match the kind of `b`.  This
+is detected tcHsTypeApp, which fails in the monad (in solveEqualities,
+which calls simplifyAndEmitFlatConstraints).  We don't want to propagate
+this failure outwards, because then we'll fail to wrap it in an implication
+that binds the skolems r and s and we get a "No skolem info" error.
+
+So we recover here, and treat an ill-kinded visible type arg as if it
+were `_`, a unification variable.  Unless there is a real life error message
+coming from the failure, in which case we *can* propagate because that
+message will "win".
+
+None of this is satisfying; it's very tricky having errors in the constraints
+that have to be wrapped by enclosing implications.  We may get a cascade
+of errors from an ill-kinded VTA argument.  But it does at least work.
 
 Note [VTA for out-of-scope functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
