@@ -130,8 +130,8 @@ mkGenPrimOp str tvs tys ty = GenPrimOp (mkVarOccFS str) tvs tys ty
 Not all primops are strict!
 -}
 
-primOpStrictness :: PrimOp -> Arity -> StrictSig
-        -- See Demand.StrictnessInfo for discussion of what the results
+primOpStrictness :: PrimOp -> Arity -> DmdSig
+        -- See Demand.DmdSig for discussion of what the results
         -- The arity should be the arity of the primop; that's why
         -- this function isn't exported.
 #include "primop-strictness.hs-incl"
@@ -678,7 +678,7 @@ isComparisonPrimOp op = case primOpInfo op of
 -- (type variables, argument types, result type)
 -- It also gives arity, strictness info
 
-primOpSig :: PrimOp -> ([TyVar], [Type], Type, Arity, StrictSig)
+primOpSig :: PrimOp -> ([TyVar], [Type], Type, Arity, DmdSig)
 primOpSig op
   = (tyvars, arg_tys, res_ty, arity, primOpStrictness op arity)
   where

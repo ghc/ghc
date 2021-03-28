@@ -348,32 +348,66 @@ rationalToFloat n d
         minEx       = FLT_MIN_EXP
         mantDigs    = FLT_MANT_DIG
 
--- RULES for Integer and Int
-{-# RULES
-"properFraction/Float->Integer"     properFraction = properFractionFloatInteger
-"truncate/Float->Integer"           truncate = truncateFloatInteger
-"floor/Float->Integer"              floor = floorFloatInteger
-"ceiling/Float->Integer"            ceiling = ceilingFloatInteger
-"round/Float->Integer"              round = roundFloatInteger
-"properFraction/Float->Int"         properFraction = properFractionFloatInt
-"truncate/Float->Int"               truncate = float2Int
-"floor/Float->Int"                  floor = floorFloatInt
-"ceiling/Float->Int"                ceiling = ceilingFloatInt
-"round/Float->Int"                  round = roundFloatInt
-  #-}
 -- | @since 2.01
 instance  RealFrac Float  where
 
-        -- ceiling, floor, and truncate are all small
-    {-# INLINE [1] ceiling #-}
-    {-# INLINE [1] floor #-}
-    {-# INLINE [1] truncate #-}
+   properFraction = properFractionFloat
+   truncate       = truncateFloat
+   round          = roundFloat
+   floor          = floorFloat
+   ceiling        = ceilingFloat
+
+-- RULES for Integer and Int
+-- Note [Rules for overloaded class methods]
+{-# RULES
+"properFraction/Float->Integer"     properFractionFloat = properFractionFloatInteger
+"truncate/Float->Integer"           truncateFloat = truncateFloatInteger
+"floor/Float->Integer"              floorFloat = floorFloatInteger
+"ceiling/Float->Integer"            ceilingFloat = ceilingFloatInteger
+"round/Float->Integer"              roundFloat = roundFloatInteger
+"properFraction/Float->Int"         properFractionFloat = properFractionFloatInt
+"truncate/Float->Int"               truncateFloat = float2Int
+"floor/Float->Int"                  floorFloat = floorFloatInt
+"ceiling/Float->Int"                ceilingFloat = ceilingFloatInt
+"round/Float->Int"                  roundFloat = roundFloatInt
+  #-}
+
+
+floorFloat :: Integral b => Float -> b
+{-# INLINE [1] floorFloat #-}
+floorFloat x = case properFractionFloat x of
+                    (n,r) -> if r < 0.0 then n - 1 else n
+
+ceilingFloat :: Integral b => Float -> b
+{-# INLINE [1] ceilingFloat #-}
+ceilingFloat x = case properFraction x of
+                    (n,r) -> if r > 0.0 then n + 1 else n
+
+truncateFloat :: Integral b => Float -> b
+{-# INLINE [1] truncateFloat #-}
+truncateFloat x = case properFractionFloat x of
+                     (n,_) -> n
+
+roundFloat :: Integral b => Float -> b
+{-# NOINLINE [1] roundFloat #-}
+roundFloat x = case properFractionFloat x of
+                     (n,r) -> let
+                                m         = if r < 0.0 then n - 1 else n + 1
+                                half_down = abs r - 0.5
+                              in
+                              case (compare half_down 0.0) of
+                                LT -> n
+                                EQ -> if even n then n else m
+                                GT -> m
+
+properFractionFloat :: Integral b => Float -> (b,Float)
+{-# NOINLINE [1] properFractionFloat #-}
 
 -- We assume that FLT_RADIX is 2 so that we can use more efficient code
 #if FLT_RADIX != 2
 #error FLT_RADIX must be 2
 #endif
-    properFraction (F# x#)
+properFractionFloat (F# x#)
       = case decodeFloat_Int# x# of
         (# m#, n# #) ->
             let m = I# m#
@@ -386,24 +420,7 @@ instance  RealFrac Float  where
                      f = m - (i `shiftL` negate n)
                  in (fromIntegral i, encodeFloat (fromIntegral f) n)
 
-    truncate x  = case properFraction x of
-                     (n,_) -> n
 
-    round x     = case properFraction x of
-                     (n,r) -> let
-                                m         = if r < 0.0 then n - 1 else n + 1
-                                half_down = abs r - 0.5
-                              in
-                              case (compare half_down 0.0) of
-                                LT -> n
-                                EQ -> if even n then n else m
-                                GT -> m
-
-    ceiling x   = case properFraction x of
-                    (n,r) -> if r > 0.0 then n + 1 else n
-
-    floor x     = case properFraction x of
-                    (n,r) -> if r < 0.0 then n - 1 else n
 
 -- | @since 2.01
 instance  Floating Float  where
@@ -585,55 +602,118 @@ instance  Floating Double  where
       | otherwise = a
     {-# INLINE log1pexp #-}
 
--- RULES for Integer and Int
-{-# RULES
-"properFraction/Double->Integer"    properFraction = properFractionDoubleInteger
-"truncate/Double->Integer"          truncate = truncateDoubleInteger
-"floor/Double->Integer"             floor = floorDoubleInteger
-"ceiling/Double->Integer"           ceiling = ceilingDoubleInteger
-"round/Double->Integer"             round = roundDoubleInteger
-"properFraction/Double->Int"        properFraction = properFractionDoubleInt
-"truncate/Double->Int"              truncate = double2Int
-"floor/Double->Int"                 floor = floorDoubleInt
-"ceiling/Double->Int"               ceiling = ceilingDoubleInt
-"round/Double->Int"                 round = roundDoubleInt
-  #-}
 -- | @since 2.01
 instance  RealFrac Double  where
+    properFraction = properFractionDouble
+    truncate       = truncateDouble
+    round          = roundDouble
+    ceiling        = ceilingDouble
+    floor          = floorDouble
 
-        -- ceiling, floor, and truncate are all small
-    {-# INLINE [1] ceiling #-}
-    {-# INLINE [1] floor #-}
-    {-# INLINE [1] truncate #-}
+-- RULES for Integer and Int
+-- Note [Rules for overloaded class methods]
+{-# RULES
+"properFraction/Double->Integer"    properFractionDouble = properFractionDoubleInteger
+"truncate/Double->Integer"          truncateDouble = truncateDoubleInteger
+"floor/Double->Integer"             floorDouble = floorDoubleInteger
+"ceiling/Double->Integer"           ceilingDouble = ceilingDoubleInteger
+"round/Double->Integer"             roundDouble = roundDoubleInteger
+"properFraction/Double->Int"        properFractionDouble = properFractionDoubleInt
+"truncate/Double->Int"              truncateDouble = double2Int
+"floor/Double->Int"                 floorDouble = floorDoubleInt
+"ceiling/Double->Int"               ceilingDouble = ceilingDoubleInt
+"round/Double->Int"                 roundDouble = roundDoubleInt
+  #-}
 
-    properFraction x
-      = case (decodeFloat x)      of { (m,n) ->
-        if n >= 0 then
-            (fromInteger m * 2 ^ n, 0.0)
-        else
-            case (quotRem m (2^(negate n))) of { (w,r) ->
-            (fromInteger w, encodeFloat r n)
-            }
-        }
+floorDouble :: Integral b => Double -> b
+{-# INLINE [1] floorDouble #-}
+floorDouble x = case properFractionDouble x of
+                    (n,r) -> if r < 0.0 then n - 1 else n
 
-    truncate x  = case properFraction x of
-                     (n,_) -> n
-
-    round x     = case properFraction x of
-                     (n,r) -> let
-                                m         = if r < 0.0 then n - 1 else n + 1
-                                half_down = abs r - 0.5
-                              in
-                              case (compare half_down 0.0) of
-                                LT -> n
-                                EQ -> if even n then n else m
-                                GT -> m
-
-    ceiling x   = case properFraction x of
+ceilingDouble :: Integral b => Double -> b
+{-# INLINE [1] ceilingDouble #-}
+ceilingDouble x = case properFractionDouble x of
                     (n,r) -> if r > 0.0 then n + 1 else n
 
-    floor x     = case properFraction x of
-                    (n,r) -> if r < 0.0 then n - 1 else n
+truncateDouble :: Integral b => Double -> b
+{-# INLINE [1] truncateDouble #-}
+truncateDouble x = case properFractionDouble x of
+                     (n,_) -> n
+
+roundDouble :: Integral b => Double -> b
+{-# NOINLINE [1] roundDouble #-}
+roundDouble x
+  = case properFractionDouble x of
+      (n,r) -> let
+                 m         = if r < 0.0 then n - 1 else n + 1
+                 half_down = abs r - 0.5
+               in
+               case (compare half_down 0.0) of
+                 LT -> n
+                 EQ -> if even n then n else m
+                 GT -> m
+
+properFractionDouble :: Integral b => Double -> (b,Double)
+{-# NOINLINE [1] properFractionDouble #-}
+properFractionDouble x
+  = case (decodeFloat x)      of { (m,n) ->
+    if n >= 0 then
+        (fromInteger m * 2 ^ n, 0.0)
+    else
+        case (quotRem m (2^(negate n))) of { (w,r) ->
+        (fromInteger w, encodeFloat r n)
+        }
+    }
+
+{- Note [Rules for overloaded class methods]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider a method like
+    class ... => RealFrac a where
+       floor :: Integral b => a -> b
+
+So floor :: forall a. RealFrac a => forall b. Integral b => a -> b
+
+Now suppose we want to hand-write specialised code for
+(floor @Double d1 @Int d2). We used to do this:
+   RULE "floor/Double->Int" floor = floorDoubleInt
+where GHC.Float.RealFracMethods defines
+   floorDoubleInt :: Double -> Int
+
+This RULE in full is
+   RULE "floor/Double->Int" forall d1 d2.
+         floor @Double d1 @Int d2 = floorDoubleInt
+
+But it's best not to write one rule for this entire step. I found cases
+(in nofib/real/gamteb/Utils.hs, function fiRem) where we floated
+out the (floor @Double d1) part, so the above two-argument rule didn't fire.
+Instead the class-op rule fired.  Boo!  See #19582.
+
+Best to define an instance
+   instance RealFrac Double where
+      floor = floorDouble
+
+   floorDouble :: Integral b => Double -> b
+   floorDouble = <code for floorDouble>
+   {-# RULE "floorDouble/Int" floorDouble @Int d = floorDoubleInt #-}
+
+Now we rewrite as follows
+   floor @Double d1 @Int d2
+   --> { ClassOp rule for floor }
+       floorDouble @Int d2
+   --> { Hand-written RULE "floorDouble/Int" }
+       floorDoubleInt
+
+More robust!  This pattern applies for any class method that
+has local overloading, in particular:
+  * properFraction
+  * truncate
+  * floor
+  * ceiling
+  * round
+
+All of this is really stated, in more general form, in the GHC
+user manual section "How rules interact with class methods".
+-}
 
 -- | @since 2.01
 instance  RealFloat Double  where
