@@ -381,7 +381,7 @@ rnExpr (HsLet _ binds expr)
 
 rnExpr (HsDo _ do_or_lc (L l stmts))
   = do  { ((stmts', _), fvs) <-
-           rnStmtsWithPostProcessing do_or_lc rnExpr
+           rnStmtsWithPostProcessing (PsStmt do_or_lc) rnExpr
              postProcessStmtsForApplicativeDo stmts
              (\ _ -> return ((), emptyFVs))
         ; return ( HsDo noExtField do_or_lc (L l stmts'), fvs ) }
@@ -1009,7 +1009,7 @@ postProcessStmtsForApplicativeDo ctxt stmts
        -- -XApplicativeDo is on.  Also strip out the FreeVars attached
        -- to each Stmt body.
          ado_is_on <- xoptM LangExt.ApplicativeDo
-       ; let is_do_expr | DoExpr{} <- ctxt = True
+       ; let is_do_expr | (PsStmt DoExpr{}) <- ctxt = True
                         | otherwise = False
        -- don't apply the transformation inside TH brackets, because
        -- GHC.HsToCore.Quote does not handle ApplicativeDo.
@@ -1045,7 +1045,7 @@ rnStmtsWithFreeVars ctxt _ [] thing_inside
        ; (thing, fvs) <- thing_inside []
        ; return (([], thing), fvs) }
 
-rnStmtsWithFreeVars mDoExpr@MDoExpr{} rnBody stmts thing_inside    -- Deal with mdo
+rnStmtsWithFreeVars mDoExpr@(PsStmt MDoExpr{}) rnBody stmts thing_inside    -- Deal with mdo
   = -- Behave like do { rec { ...all but last... }; last }
     do { ((stmts1, (stmts2, thing)), fvs)
            <- rnStmt mDoExpr rnBody (noLocA $ mkRecStmt noAnn (noLocA all_but_last)) $ \ _ ->
@@ -1301,14 +1301,14 @@ lookupStmtNamePoly ctxt name
 -- Neither is ArrowExpr, which has its own desugarer in GHC.HsToCore.Arrows
 rebindableContext :: HsStmtContext GhcRn -> Bool
 rebindableContext ctxt = case ctxt of
-  ListComp        -> False
+  (PsStmt ListComp) -> False
   ArrowExpr       -> False
   PatGuard {}     -> False
 
-  DoExpr m        -> isNothing m
-  MDoExpr m       -> isNothing m
-  MonadComp       -> True
-  GhciStmtCtxt    -> True   -- I suppose?
+  (PsStmt (DoExpr m)) -> isNothing m
+  (PsStmt (MDoExpr m)) -> isNothing m
+  (PsStmt MonadComp) -> True
+  (PsStmt GhciStmtCtxt)    -> True   -- I suppose?
 
   ParStmtCtxt   c -> rebindableContext c     -- Look inside to
   TransStmtCtxt c -> rebindableContext c     -- the parent context
@@ -1534,7 +1534,7 @@ segmentRecStmts loc ctxt empty_rec_stmt segs fvs_later
   | null segs
   = ([], fvs_later)
 
-  | MDoExpr _ <- ctxt
+  | (PsStmt (MDoExpr _)) <- ctxt
   = segsToStmts empty_rec_stmt grouped_segs fvs_later
                -- Step 4: Turn the segments into Stmts
                 --         Use RecStmt when and only when there are fwd refs
@@ -2326,11 +2326,11 @@ checkLastStmt :: AnnoBody body => HsStmtContext GhcRn
               -> RnM (LStmt GhcPs (LocatedA (body GhcPs)))
 checkLastStmt ctxt lstmt@(L loc stmt)
   = case ctxt of
-      ListComp  -> check_comp
-      MonadComp -> check_comp
+      (PsStmt ListComp)  -> check_comp
+      (PsStmt MonadComp) -> check_comp
       ArrowExpr -> check_do
-      DoExpr{}  -> check_do
-      MDoExpr{} -> check_do
+      (PsStmt DoExpr{})  -> check_do
+      (PsStmt MDoExpr{}) -> check_do
       _         -> check_other
   where
     check_do    -- Expect BodyStmt, and change it to LastStmt
@@ -2387,12 +2387,12 @@ okStmt dflags ctxt stmt
   = case ctxt of
       PatGuard {}        -> okPatGuardStmt stmt
       ParStmtCtxt ctxt   -> okParStmt  dflags ctxt stmt
-      DoExpr{}           -> okDoStmt   dflags ctxt stmt
-      MDoExpr{}          -> okDoStmt   dflags ctxt stmt
+      (PsStmt DoExpr{})  -> okDoStmt   dflags ctxt stmt
+      (PsStmt MDoExpr{}) -> okDoStmt   dflags ctxt stmt
       ArrowExpr          -> okDoStmt   dflags ctxt stmt
-      GhciStmtCtxt       -> okDoStmt   dflags ctxt stmt
-      ListComp           -> okCompStmt dflags ctxt stmt
-      MonadComp          -> okCompStmt dflags ctxt stmt
+      (PsStmt GhciStmtCtxt) -> okDoStmt   dflags ctxt stmt
+      (PsStmt ListComp)  -> okCompStmt dflags ctxt stmt
+      (PsStmt MonadComp) -> okCompStmt dflags ctxt stmt
       TransStmtCtxt ctxt -> okStmt dflags ctxt stmt
 
 -------------

@@ -210,13 +210,13 @@ orderByKey keys order
 
 isListComp :: HsStmtContext name -> Bool
 isListComp cts = case cts of
-          ListComp  -> True
-          MonadComp -> True
+          (PsStmt ListComp)  -> True
+          (PsStmt MonadComp) -> True
 
-          DoExpr {}    -> False
-          MDoExpr {}   -> False
-          ArrowExpr    -> False
-          GhciStmtCtxt -> False
+          (PsStmt (DoExpr {}))    -> False
+          (PsStmt (MDoExpr {}))   -> False
+          ArrowExpr             -> False
+          (PsStmt GhciStmtCtxt) -> False
 
           PatGuard {}      -> False
           ParStmtCtxt {}   -> False
