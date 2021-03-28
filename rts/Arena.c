@@ -118,13 +118,13 @@ arenaBlocks( void )
     return arena_blocks;
 }
 
-#if defined(DEBUG)
-void checkPtrInArena( StgPtr p, Arena *arena )
+bool
+inArena ( Arena *arena, StgPtr p )
 {
     // We don't update free pointers of arena blocks, so we have to check cached
     // free pointer for the first block.
     if (p >= arena->current->start && p < arena->free) {
-        return;
+        return true;
     }
 
     // Rest of the blocks should be full (except there may be a little bit of
@@ -132,10 +132,18 @@ void checkPtrInArena( StgPtr p, Arena *arena )
     // those.
     for (bdescr *bd = arena->current->link; bd; bd = bd->link) {
         if (p >= bd->start && p < bd->start + (bd->blocks*BLOCK_SIZE_W)) {
-            return;
+            return true;
         }
     }
 
-    barf("Location %p is not in arena %p", (void*)p, (void*)arena);
+    return false;
+}
+
+#if defined(DEBUG)
+void checkPtrInArena( StgPtr p, Arena *arena )
+{
+    if(!inArena(arena, p)) {
+        barf("Location %p is not in arena %p", (void*)p, (void*)arena);
+    }
 }
 #endif
