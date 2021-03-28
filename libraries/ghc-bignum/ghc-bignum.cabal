@@ -22,6 +22,8 @@ extra-source-files:
     configure
     configure.ac
     config.mk.in
+    include/WordSize.h
+    include/HsIntegerGmp.h.in
     install-sh
     ghc-bignum.buildinfo.in
 
