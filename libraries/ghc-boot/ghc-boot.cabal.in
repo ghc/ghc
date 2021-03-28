@@ -1,10 +1,12 @@
+cabal-version:  3.0
+
 -- WARNING: ghc-boot.cabal is automatically generated from ghc-boot.cabal.in by
 -- ../../configure.  Make sure you are editing ghc-boot.cabal.in, not
 -- ghc-boot.cabal.
 
 name:           ghc-boot
 version:        @ProjectVersionMunged@
-license:        BSD3
+license:        BSD-3-Clause
 license-file:   LICENSE
 category:       GHC
 maintainer:     ghc-devs@haskell.org
@@ -22,7 +24,6 @@ description:    This library is shared between GHC, ghc-pkg, and other boot
                 The package database format and this library are constructed in
                 such a way that while ghc-pkg depends on Cabal, the GHC library
                 and program do not have to depend on Cabal.
-cabal-version:  1.22
 build-type:     Simple
 extra-source-files: changelog.md
 
