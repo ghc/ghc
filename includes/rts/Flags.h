@@ -140,9 +140,9 @@ typedef struct _PROFILING_FLAGS {
 # define HEAP_BY_TYPE           5
 # define HEAP_BY_RETAINER       6
 # define HEAP_BY_LDV            7
-
 # define HEAP_BY_CLOSURE_TYPE   8
 # define HEAP_BY_INFO_TABLE     9
+# define HEAP_BY_ROOT           10
 
     Time        heapProfileInterval; /* time between samples */
     uint32_t    heapProfileIntervalTicks; /* ticks between samples (derived) */
@@ -162,6 +162,7 @@ typedef struct _PROFILING_FLAGS {
     const char*         ccsSelector;
     const char*         retainerSelector;
     const char*         bioSelector;
+    bool                rootSelector;
 
 } PROFILING_FLAGS;
 
