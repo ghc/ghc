@@ -2230,7 +2230,7 @@ tcUserStmt (L loc (BodyStmt _ expr _ _))
         ; let loc' = noAnnSrcSpan $ locA loc
         ; interPrintName <- getInteractivePrintName
         ; let fresh_it  = itName uniq (locA loc)
-              matches   = [mkMatch (mkPrefixFunRhs (L loc' fresh_it)) [] rn_expr
+              matches   = [mkMatch (mkPrefixFunRhs (L loc' (CtxIdName fresh_it))) [] rn_expr
                                    emptyLocalBinds]
               -- [it = expr]
               the_bind  = L loc $ (mkTopFunBind FromSource
@@ -2373,7 +2373,7 @@ But for naked expressions, you will have
 
 tcUserStmt rdr_stmt@(L loc _)
   = do { (([rn_stmt], fix_env), fvs) <- checkNoErrs $
-           rnStmts GhciStmtCtxt rnExpr [rdr_stmt] $ \_ -> do
+           rnStmts (HsDoStmt GhciStmtCtxt) rnExpr [rdr_stmt] $ \_ -> do
              fix_env <- getFixityEnv
              return (fix_env, emptyFVs)
             -- Don't try to typecheck if the renamer fails!
@@ -2438,7 +2438,7 @@ tcGhciStmts stmts
       ; ret_id  <- tcLookupId returnIOName             -- return @ IO
       ; let ret_ty      = mkListTy unitTy
             io_ret_ty   = mkTyConApp ioTyCon [ret_ty]
-            tc_io_stmts = tcStmtsAndThen GhciStmtCtxt tcDoStmt stmts
+            tc_io_stmts = tcStmtsAndThen (HsDoStmt GhciStmtCtxt) tcDoStmt stmts
                                          (mkCheckExpType io_ret_ty)
             names = collectLStmtsBinders CollNoDictBinders stmts
 

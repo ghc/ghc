@@ -938,8 +938,9 @@
            (FunRhs
             (L
              (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAst.hs:20:1-4 })
+             (CtxIdRdrName
              (Unqual
-              {OccName: main}))
+               {OccName: main})))
             (Prefix)
             (NoSrcStrict))
            []

@@ -36,7 +36,8 @@
                 (FunRhs
                  (L
                   (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:34:1-4 })
-                  {Name: DumpRenamedAst.main})
+                  (CtxIdName
+                   {Name: DumpRenamedAst.main}))
                  (Prefix)
                  (NoSrcStrict))
                 []

@@ -403,7 +403,7 @@ tcExpr (HsMultiIf _ alts) res_ty
   where match_ctxt = MC { mc_what = IfAlt, mc_body = tcBody }
 
 tcExpr (HsDo _ do_or_lc stmts) res_ty
-  = tcDoStmts do_or_lc stmts res_ty
+  = tcDoStmts (HsDoStmt do_or_lc) stmts res_ty
 
 tcExpr (HsProc x pat cmd) res_ty
   = do  { (pat', cmd', coi) <- tcProc pat cmd res_ty
