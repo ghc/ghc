@@ -734,7 +734,7 @@ addExternal omit_prags expose_all id
     show_unfold    = show_unfolding unfolding
     never_active   = isNeverActive (inlinePragmaActivation (inlinePragInfo idinfo))
     loop_breaker   = isStrongLoopBreaker (occInfo idinfo)
-    bottoming_fn   = isDeadEndSig (strictnessInfo idinfo)
+    bottoming_fn   = isDeadEndSig (dmdSigInfo idinfo)
 
         -- Stuff to do with the Id's unfolding
         -- We leave the unfolding there even if there is a worker
@@ -1190,16 +1190,16 @@ tidyTopIdInfo uf_opts rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold
                         -- Arity and strictness info are enough;
                         --      c.f. GHC.Core.Tidy.tidyLetBndr
         `setArityInfo`      arity
-        `setStrictnessInfo` final_sig
-        `setCprInfo`        final_cpr
+        `setDmdSigInfo` final_sig
+        `setCprSigInfo`        final_cpr
         `setUnfoldingInfo`  minimal_unfold_info  -- See note [Preserve evaluatedness]
                                                  -- in GHC.Core.Tidy
 
   | otherwise           -- Externally-visible Ids get the whole lot
   = vanillaIdInfo
         `setArityInfo`         arity
-        `setStrictnessInfo`    final_sig
-        `setCprInfo`           final_cpr
+        `setDmdSigInfo`    final_sig
+        `setCprSigInfo`           final_cpr
         `setOccInfo`           robust_occ_info
         `setInlinePragInfo`    (inlinePragInfo idinfo)
         `setUnfoldingInfo`     unfold_info
@@ -1216,14 +1216,14 @@ tidyTopIdInfo uf_opts rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold
     --------- Strictness ------------
     mb_bot_str = exprBotStrictness_maybe orig_rhs
 
-    sig = strictnessInfo idinfo
+    sig = dmdSigInfo idinfo
     final_sig | not $ isTopSig sig
               = WARN( _bottom_hidden sig , ppr name ) sig
               -- try a cheap-and-cheerful bottom analyser
               | Just (_, nsig) <- mb_bot_str = nsig
               | otherwise                    = sig
 
-    cpr = cprInfo idinfo
+    cpr = cprSigInfo idinfo
     final_cpr | Just _ <- mb_bot_str
               = mkCprSig arity botCpr
               | otherwise
