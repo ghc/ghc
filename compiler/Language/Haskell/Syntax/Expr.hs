@@ -438,7 +438,7 @@ data HsExpr p
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | HsDo        (XDo p)                  -- Type of the whole expression
-                (HsStmtContext (HsDoRn p))
+                (HsStmtContext p)
                 -- The parameterisation of the above is unimportant
                 -- because in this context we never use
                 -- the PatGuard or ParStmt variant
@@ -613,7 +613,6 @@ data HsExpr p
 
 -- | The AST used to hard-refer to GhcPass, which was a layer violation. For now,
 -- we paper it over with this new extension point.
-type family HsDoRn p
 type family HsBracketRn p
 type family PendingRnSplice' p
 type family PendingTcSplice' p
@@ -1624,7 +1623,7 @@ data ArithSeqInfo id
 -- Context of a pattern match. This is more subtle than it would seem. See Note
 -- [Varieties of pattern matches].
 data HsMatchContext p
-  = FunRhs { mc_fun        :: LIdP p    -- ^ function binder of @f@
+  = FunRhs { mc_fun        :: XRec p (CtxIdP p) -- ^ function binder of @f@
            , mc_fixity     :: LexicalFixity -- ^ fixing of @f@
            , mc_strictness :: SrcStrictness -- ^ was @f@ banged?
                                             -- See Note [FunBind vs PatBind]
@@ -1714,7 +1713,7 @@ matchSeparator ThPatSplice  = panic "unused"
 matchSeparator ThPatQuote   = panic "unused"
 matchSeparator PatSyn       = panic "unused"
 
-pprMatchContext :: (Outputable (IdP p), UnXRec p)
+pprMatchContext :: (Outputable (CtxIdP p), UnXRec p)
                 => HsMatchContext p -> SDoc
 pprMatchContext ctxt
   | want_an ctxt = text "an" <+> pprMatchContextNoun ctxt
@@ -1724,7 +1723,7 @@ pprMatchContext ctxt
     want_an ProcExpr    = True
     want_an _           = False
 
-pprMatchContextNoun :: forall p. (Outputable (IdP p), UnXRec p)
+pprMatchContextNoun :: forall p. (Outputable (CtxIdP p), UnXRec p)
                     => HsMatchContext p -> SDoc
 pprMatchContextNoun (FunRhs {mc_fun=fun})
                                     = text "equation for"
@@ -1743,7 +1742,7 @@ pprMatchContextNoun (StmtCtxt ctxt) = text "pattern binding in"
 pprMatchContextNoun PatSyn          = text "pattern synonym declaration"
 
 -----------------
-pprAStmtContext, pprStmtContext :: (Outputable (IdP p), UnXRec p)
+pprAStmtContext, pprStmtContext :: (Outputable (CtxIdP p), UnXRec p)
                                 => HsStmtContext p -> SDoc
 pprAStmtContext ctxt = article <+> pprStmtContext ctxt
   where

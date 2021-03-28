@@ -163,7 +163,7 @@ gen_Functor_binds loc tycon _
     fmap_eqns = [mkSimpleMatch fmap_match_ctxt
                                [nlWildPat]
                                coerce_Expr]
-    fmap_match_ctxt = mkPrefixFunRhs fmap_name
+    fmap_match_ctxt = mkPrefixFunRhs (mapLoc CtxIdRdrName fmap_name)
 
 gen_Functor_binds loc tycon tycon_args
   = (listToBag [fmap_bind, replace_bind], emptyBag)
@@ -173,7 +173,7 @@ gen_Functor_binds loc tycon tycon_args
 
     -- See Note [EmptyDataDecls with Functor, Foldable, and Traversable]
     fmap_bind = mkRdrFunBindEC 2 id fmap_name fmap_eqns
-    fmap_match_ctxt = mkPrefixFunRhs fmap_name
+    fmap_match_ctxt = mkPrefixFunRhs (mapLoc CtxIdRdrName fmap_name)
 
     fmap_eqn con = flip evalState bs_RDRs $
                      match_for_con fmap_match_ctxt [f_Pat] con parts
@@ -212,7 +212,7 @@ gen_Functor_binds loc tycon tycon_args
 
     -- See Note [EmptyDataDecls with Functor, Foldable, and Traversable]
     replace_bind = mkRdrFunBindEC 2 id replace_name replace_eqns
-    replace_match_ctxt = mkPrefixFunRhs replace_name
+    replace_match_ctxt = mkPrefixFunRhs (mapLoc CtxIdRdrName replace_name)
 
     replace_eqn con = flip evalState bs_RDRs $
         match_for_con replace_match_ctxt [z_Pat] con parts
@@ -797,7 +797,7 @@ gen_Foldable_binds loc tycon _
     foldMap_eqns = [mkSimpleMatch foldMap_match_ctxt
                                   [nlWildPat, nlWildPat]
                                   mempty_Expr]
-    foldMap_match_ctxt = mkPrefixFunRhs foldMap_name
+    foldMap_match_ctxt = mkPrefixFunRhs (mapLoc CtxIdRdrName foldMap_name)
 
 gen_Foldable_binds loc tycon tycon_args
   | null data_cons  -- There's no real point producing anything but
@@ -840,7 +840,7 @@ gen_Foldable_binds loc tycon tycon_args
       go (NullM a) = Just (Just a)
 
     null_name = L (noAnnSrcSpan loc) null_RDR
-    null_match_ctxt = mkPrefixFunRhs null_name
+    null_match_ctxt = mkPrefixFunRhs (mapLoc CtxIdRdrName null_name)
     null_bind = mkRdrFunBind null_name null_eqns
     null_eqns = map null_eqn data_cons
     null_eqn con
@@ -1027,7 +1027,7 @@ gen_Traversable_binds loc tycon _
         [mkSimpleMatch traverse_match_ctxt
                        [nlWildPat, z_Pat]
                        (nlHsApps pure_RDR [nlHsApp coerce_Expr z_Expr])]
-    traverse_match_ctxt = mkPrefixFunRhs traverse_name
+    traverse_match_ctxt = mkPrefixFunRhs (mapLoc CtxIdRdrName traverse_name)
 
 gen_Traversable_binds loc tycon tycon_args
   = (unitBag traverse_bind, emptyBag)

@@ -150,6 +150,9 @@ class WrapXRec p a where
 -- | Maps the "normal" id type for a given pass
 type family IdP p
 
+-- | Maps the context id type for a given pass
+type family CtxIdP p
+
 type LIdP p = XRec p (IdP p)
 
 -- =====================================================================

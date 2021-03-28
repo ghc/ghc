@@ -185,7 +185,6 @@ data HsWrap hs_syn = HsWrap HsWrapper      -- the wrapper
 
 deriving instance (Data (hs_syn GhcTc), Typeable hs_syn) => Data (HsWrap hs_syn)
 
-type instance HsDoRn (GhcPass _) = GhcRn
 type instance HsBracketRn (GhcPass _) = GhcRn
 type instance PendingRnSplice' (GhcPass _) = PendingRnSplice
 type instance PendingTcSplice' (GhcPass _) = PendingTcSplice

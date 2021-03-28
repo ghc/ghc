@@ -2082,7 +2082,7 @@ mkDefMethBind dfun_id clas sel_id dm_name
                                       , tyConBinderArgFlag tcb /= Inferred ]
               rhs  = foldl' mk_vta (nlHsVar dm_name) visible_inst_tys
               bind = noLocA $ mkTopFunBind Generated fn $
-                             [mkSimpleMatch (mkPrefixFunRhs fn) [] rhs]
+                             [mkSimpleMatch (mkPrefixFunRhs (mapLoc CtxIdName fn)) [] rhs]
 
         ; liftIO (dumpIfSet_dyn logger dflags Opt_D_dump_deriv "Filling in method body"
                    FormatHaskell

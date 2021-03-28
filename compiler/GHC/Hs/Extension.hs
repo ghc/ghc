@@ -63,6 +63,7 @@ type instance XRec (GhcPass p) a = GenLocated (Anno a) a
 type instance Anno RdrName = SrcSpanAnnN
 type instance Anno Name    = SrcSpanAnnN
 type instance Anno Id      = SrcSpanAnnN
+type instance Anno (CtxIdGhcP p) = SrcSpanAnnN
 
 type IsSrcSpanAnn p a = ( Anno (IdGhcP p) ~ SrcSpanAnn' (ApiAnn' a),
                           IsPass p)
@@ -150,15 +151,41 @@ instance IsPass 'Typechecked where
 
 type instance IdP (GhcPass p) = IdGhcP p
 
+type instance CtxIdP (GhcPass p) = CtxIdGhcP p
+
 -- | Maps the "normal" id type for a given GHC pass
 type family IdGhcP pass where
   IdGhcP 'Parsed      = RdrName
   IdGhcP 'Renamed     = Name
   IdGhcP 'Typechecked = Id
 
+data CtxIdGhcP pass where
+  CtxIdName :: Name -> CtxIdGhcP pass
+  CtxIdRdrName :: RdrName -> CtxIdGhcP 'Parsed
+
+instance Typeable pass => Data (CtxIdGhcP pass) where
+  gunfold _ _ _ = panic "instance Data CtxIdGhcP"
+  toConstr  _   = panic "instance Data CtxIdGhcP"
+  dataTypeOf _  = panic "instance Data CtxIdGhcP"
+
+instance Outputable (CtxIdGhcP pass) where
+  ppr (CtxIdName name) = ppr name
+  ppr (CtxIdRdrName name) = ppr name
+
+instance OutputableBndr (CtxIdGhcP pass) where
+  pprBndr b (CtxIdName name) = pprBndr b name
+  pprBndr b (CtxIdRdrName name) = pprBndr b name
+
+  pprInfixOcc (CtxIdName name) = pprInfixOcc name
+  pprInfixOcc (CtxIdRdrName name) = pprInfixOcc name
+
+  pprPrefixOcc (CtxIdName name) = pprPrefixOcc name
+  pprPrefixOcc (CtxIdRdrName name) = pprPrefixOcc name
+
 -- |Constraint type to bundle up the requirement for 'OutputableBndr'
 type OutputableBndrId pass =
   ( OutputableBndr (IdGhcP pass)
+  , Outputable (GenLocated (Anno (CtxIdGhcP pass)) (CtxIdGhcP pass))
   , Outputable (GenLocated (Anno (IdGhcP pass)) (IdGhcP pass))
   , IsPass pass
   )

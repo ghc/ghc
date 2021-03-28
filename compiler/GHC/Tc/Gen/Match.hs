@@ -123,7 +123,7 @@ tcMatchesFun fn@(L _ fun_name) matches exp_ty
              <+> quotes (ppr fun_name) <+> text "have"
     ctxt   = GenSigCtxt  -- Was: FunSigCtxt fun_name True
                          -- But that's wrong for f :: Int -> forall a. blah
-    what   = FunRhs { mc_fun = fn, mc_fixity = Prefix, mc_strictness = strictness }
+    what   = FunRhs { mc_fun = mapLoc CtxIdName fn, mc_fixity = Prefix, mc_strictness = strictness }
     match_ctxt = MC { mc_what = what, mc_body = tcBody }
     strictness
       | [L _ match] <- unLoc $ mg_alts matches
@@ -186,11 +186,41 @@ tcGRHSsPat grhss res_ty
 ********************************************************************* -}
 
 data TcMatchCtxt body   -- c.f. TcStmtCtxt, also in this module
-  = MC { mc_what :: HsMatchContext GhcRn,  -- What kind of thing this is
+  = MC { mc_what :: HsMatchContext GhcTc,  -- What kind of thing this is
          mc_body :: LocatedA (body GhcRn)  -- Type checker for a body of
                                            -- an alternative
                  -> ExpRhoType
                  -> TcM (LocatedA (body GhcTc)) }
+
+tcCtxId :: CtxIdP GhcRn -> CtxIdP GhcTc
+tcCtxId (CtxIdName name) = CtxIdName name
+
+tcMatchCtxt :: HsMatchContext GhcRn -> HsMatchContext GhcTc
+tcMatchCtxt ctx = case ctx of
+  FunRhs name fxt stx -> FunRhs (mapLoc tcCtxId name) fxt stx
+  LambdaExpr -> LambdaExpr
+  CaseAlt -> CaseAlt
+  IfAlt -> IfAlt
+  ProcExpr -> ProcExpr
+  PatBindRhs -> PatBindRhs
+  PatBindGuards -> PatBindGuards
+  RecUpd -> RecUpd
+  StmtCtxt sc -> StmtCtxt (tcStmtCtxt sc)
+  ThPatSplice -> ThPatSplice
+  ThPatQuote -> ThPatQuote
+  PatSyn -> PatSyn
+
+tcStmtCtxt :: HsStmtContext GhcRn -> HsStmtContext GhcTc
+tcStmtCtxt ctx = case ctx of
+  ListComp -> ListComp
+  MonadComp -> MonadComp
+  DoExpr mn -> DoExpr mn
+  MDoExpr mn -> MDoExpr mn
+  ArrowExpr -> ArrowExpr
+  GhciStmtCtxt -> GhciStmtCtxt
+  PatGuard mc -> PatGuard (tcMatchCtxt mc)
+  ParStmtCtxt sc -> ParStmtCtxt (tcStmtCtxt sc)
+  TransStmtCtxt sc -> TransStmtCtxt (tcStmtCtxt sc)
 
 type AnnoBody body
   = ( Outputable (body GhcRn)
@@ -299,7 +329,7 @@ tcGRHS ctxt res_ty (GRHS _ guards rhs)
 ************************************************************************
 -}
 
-tcDoStmts :: HsStmtContext GhcRn
+tcDoStmts :: HsStmtContext GhcTc
           -> LocatedL [LStmt GhcRn (LHsExpr GhcRn)]
           -> ExpRhoType
           -> TcM (HsExpr GhcTc)          -- Returns a HsDo
@@ -346,13 +376,13 @@ type TcExprStmtChecker = TcStmtChecker HsExpr ExpRhoType
 type TcCmdStmtChecker  = TcStmtChecker HsCmd  TcRhoType
 
 type TcStmtChecker body rho_type
-  =  forall thing. HsStmtContext GhcRn
+  =  forall thing. HsStmtContext GhcTc
                 -> Stmt GhcRn (LocatedA (body GhcRn))
                 -> rho_type                 -- Result type for comprehension
                 -> (rho_type -> TcM thing)  -- Checker for what follows the stmt
                 -> TcM (Stmt GhcTc (LocatedA (body GhcTc)), thing)
 
-tcStmts :: (AnnoBody body) => HsStmtContext GhcRn
+tcStmts :: (AnnoBody body) => HsStmtContext GhcTc
         -> TcStmtChecker body rho_type   -- NB: higher-rank type
         -> [LStmt GhcRn (LocatedA (body GhcRn))]
         -> rho_type
@@ -362,7 +392,7 @@ tcStmts ctxt stmt_chk stmts res_ty
                         const (return ())
        ; return stmts' }
 
-tcStmtsAndThen :: (AnnoBody body) => HsStmtContext GhcRn
+tcStmtsAndThen :: (AnnoBody body) => HsStmtContext GhcTc
                -> TcStmtChecker body rho_type    -- NB: higher-rank type
                -> [LStmt GhcRn (LocatedA (body GhcRn))]
                -> rho_type
@@ -1000,7 +1030,7 @@ join :: tn -> res_ty
 -}
 
 tcApplicativeStmts
-  :: HsStmtContext GhcRn
+  :: HsStmtContext GhcTc
   -> [(SyntaxExpr GhcRn, ApplicativeArg GhcRn)]
   -> ExpRhoType                         -- rhs_ty
   -> (TcRhoType -> TcM t)               -- thing_inside

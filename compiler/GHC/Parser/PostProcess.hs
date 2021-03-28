@@ -649,7 +649,7 @@ mkPatSynMatchGroup (L loc patsyn_name) (L ld decls) =
                                                   , m_ctxt = ctxt, m_pats = pats
                                                   , m_grhss = rhs }
                    where
-                     ctxt = FunRhs { mc_fun = ln
+                     ctxt = FunRhs { mc_fun = mapLoc CtxIdRdrName ln
                                    , mc_fixity = Prefix
                                    , mc_strictness = NoSrcStrict }
 
@@ -658,7 +658,7 @@ mkPatSynMatchGroup (L loc patsyn_name) (L ld decls) =
                                                 , m_pats = [p1, p2]
                                                 , m_grhss = rhs }
                    where
-                     ctxt = FunRhs { mc_fun = ln
+                     ctxt = FunRhs { mc_fun = mapLoc CtxIdRdrName ln
                                    , mc_fixity = Infix
                                    , mc_strictness = NoSrcStrict }
 
@@ -1214,7 +1214,7 @@ checkFunBind strictness locF ann lhs_loc fun is_infix pats (L rhs_span grhss)
         return (makeFunBind fun (L (noAnnSrcSpan $ locA match_span)
                  [L match_span (Match { m_ext = ApiAnn (spanAsAnchor locF) ann cs
                                       , m_ctxt = FunRhs
-                                          { mc_fun    = fun
+                                          { mc_fun    = mapLoc CtxIdRdrName fun
                                           , mc_fixity = is_infix
                                           , mc_strictness = strictness }
                                       , m_pats = ps
@@ -1247,7 +1247,7 @@ checkPatBind loc annsIn (L _ (BangPat (ApiAnn _ ans cs) (L _ (VarPat _ v))))
                 [L (noAnnSrcSpan loc) (m (ApiAnn (spanAsAnchor loc) (ans++annsIn) cs) v)]))
   where
     m a v = Match { m_ext = a
-                  , m_ctxt = FunRhs { mc_fun    = v
+                  , m_ctxt = FunRhs { mc_fun    = mapLoc CtxIdRdrName v
                                     , mc_fixity = Prefix
                                     , mc_strictness = SrcStrict }
                   , m_pats = []

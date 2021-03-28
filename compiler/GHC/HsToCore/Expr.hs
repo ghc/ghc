@@ -206,7 +206,7 @@ dsUnliftedBind (FunBind { fun_id = L l fun
                         , fun_tick = tick }) body
                -- Can't be a bang pattern (that looks like a PatBind)
                -- so must be simply unboxed
-  = do { (args, rhs) <- matchWrapper (mkPrefixFunRhs (L l $ idName fun))
+  = do { (args, rhs) <- matchWrapper (mkPrefixFunRhs (L l (CtxIdName (idName fun))))
                                      Nothing matches
        ; MASSERT( null args ) -- Functions aren't lifted
        ; MASSERT( isIdHsWrapper co_fn )

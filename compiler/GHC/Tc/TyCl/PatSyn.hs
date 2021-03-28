@@ -802,7 +802,7 @@ tcPatSynMatcher (L loc name) lpat prag_fn
                        , mg_ext = MatchGroupTc (map unrestricted [pat_ty, cont_ty, fail_ty]) res_ty
                        , mg_origin = Generated
                        }
-             match = mkMatch (mkPrefixFunRhs (L loc name)) []
+             match = mkMatch (mkPrefixFunRhs (L loc (CtxIdName name))) []
                              (mkHsLams (rr_tv:res_tv:univ_tvs)
                                        req_dicts body')
                              (EmptyLocalBinds noExtField)
@@ -939,7 +939,7 @@ tcPatSynBuilderBind prag_fn (PSB { psb_id = ps_lname@(L loc ps_name)
           where
             builder_args  = [L (na2la loc) (VarPat noExtField (L loc n))
                             | L loc n <- args]
-            builder_match = mkMatch (mkPrefixFunRhs ps_lname)
+            builder_match = mkMatch (mkPrefixFunRhs (mapLoc CtxIdName ps_lname))
                                     builder_args body
                                     (EmptyLocalBinds noExtField)
 
