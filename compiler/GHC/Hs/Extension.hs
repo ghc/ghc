@@ -197,6 +197,15 @@ type family IdGhcP pass where
   IdGhcP 'Renamed     = Name
   IdGhcP 'Typechecked = Id
 
+-- | Id for HsMatchContext and HsStmtContext
+
+type instance CtxIdP (GhcPass p) = CtxIdGhcP p
+
+type family CtxIdGhcP p where
+  CtxIdGhcP 'Parsed      = RdrName
+  CtxIdGhcP 'Renamed     = Name
+  CtxIdGhcP 'Typechecked = Name
+
 -- | Marks that a field uses the GhcRn variant even when the pass
 -- parameter is GhcTc. Useful for storing HsTypes in GHC.Hs.Exprs, say, because
 -- HsType GhcTc should never occur.
@@ -214,8 +223,12 @@ type family NoGhcTcPass (p :: Pass) :: Pass where
 type OutputableBndrId pass =
   ( OutputableBndr (IdGhcP pass)
   , OutputableBndr (IdGhcP (NoGhcTcPass pass))
+  , OutputableBndr (CtxIdGhcP pass)
+  , OutputableBndr (CtxIdGhcP (NoGhcTcPass pass))
   , Outputable (GenLocated (Anno (IdGhcP pass)) (IdGhcP pass))
+  , Outputable (GenLocated (Anno (CtxIdGhcP pass)) (CtxIdGhcP pass))
   , Outputable (GenLocated (Anno (IdGhcP (NoGhcTcPass pass))) (IdGhcP (NoGhcTcPass pass)))
+  , Outputable (GenLocated (Anno (CtxIdGhcP (NoGhcTcPass pass))) (CtxIdGhcP (NoGhcTcPass pass)))
   , IsPass pass
   )
 
