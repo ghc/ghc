@@ -896,7 +896,7 @@ cvtLocalDecs doc ds
       ((_:_), (_:_)) ->
         failWith (text "Implicit parameters mixed with other bindings")
 
-cvtClause :: HsMatchContext GhcPs
+cvtClause :: HsMatchContext (XRec GhcPs (CtxIdP GhcPs))
           -> TH.Clause -> CvtM (Hs.LMatch GhcPs (LHsExpr GhcPs))
 cvtClause ctxt (Clause ps body wheres)
   = do  { ps' <- cvtPats ps
@@ -1170,7 +1170,7 @@ cvtOpApp x op y
 --      Do notation and statements
 -------------------------------------
 
-cvtHsDo :: HsStmtContext GhcRn -> [TH.Stmt] -> CvtM (HsExpr GhcPs)
+cvtHsDo :: HsDoFlavour -> [TH.Stmt] -> CvtM (HsExpr GhcPs)
 cvtHsDo do_or_lc stmts
   | null stmts = failWith (text "Empty stmt list in do-block")
   | otherwise
@@ -1184,7 +1184,7 @@ cvtHsDo do_or_lc stmts
 
         ; return $ HsDo noAnn do_or_lc (noLocA (stmts'' ++ [last''])) }
   where
-    bad_last stmt = vcat [ text "Illegal last statement of" <+> pprAStmtContext do_or_lc <> colon
+    bad_last stmt = vcat [ text "Illegal last statement of" <+> pprAHsDoFlavour do_or_lc <> colon
                          , nest 2 $ Outputable.ppr stmt
                          , text "(It should be an expression.)" ]
 
@@ -1203,7 +1203,7 @@ cvtStmt (TH.ParS dss)  = do { dss' <- mapM cvt_one dss
                     ; return (ParStmtBlock noExtField ds' undefined noSyntaxExpr) }
 cvtStmt (TH.RecS ss) = do { ss' <- mapM cvtStmt ss; returnLA (mkRecStmt noAnn (noLocA ss')) }
 
-cvtMatch :: HsMatchContext GhcPs
+cvtMatch :: HsMatchContext (XRec GhcPs (CtxIdP GhcPs))
          -> TH.Match -> CvtM (Hs.LMatch GhcPs (LHsExpr GhcPs))
 cvtMatch ctxt (TH.Match p body decs)
   = do  { p' <- cvtPat p

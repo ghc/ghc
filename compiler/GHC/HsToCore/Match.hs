@@ -708,7 +708,7 @@ Call @match@ with all of this information!
 -}
 
 matchWrapper
-  :: HsMatchContext GhcRn              -- ^ For shadowing warning messages
+  :: HsMatchContext (XRec GhcRn (CtxIdP GhcRn))              -- ^ For shadowing warning messages
   -> Maybe (LHsExpr GhcTc)             -- ^ Scrutinee. (Just scrut) for a case expr
                                        --      case scrut of { p1 -> e1 ... }
                                        --   (and in this case the MatchGroup will
@@ -801,7 +801,7 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
                       $ replicate (length (grhssGRHSs m)) initNablas
 
 
-matchEquations  :: HsMatchContext GhcRn
+matchEquations  :: HsMatchContext (XRec GhcRn (CtxIdP GhcRn))
                 -> [MatchId] -> [EquationInfo] -> Type
                 -> DsM CoreExpr
 matchEquations ctxt vars eqns_info rhs_ty
@@ -815,7 +815,7 @@ matchEquations ctxt vars eqns_info rhs_ty
 -- situation where we want to match a single expression against a single
 -- pattern. It returns an expression.
 matchSimply :: CoreExpr                 -- ^ Scrutinee
-            -> HsMatchContext GhcRn     -- ^ Match kind
+            -> HsMatchContext (XRec GhcRn (CtxIdP GhcRn))     -- ^ Match kind
             -> LPat GhcTc               -- ^ Pattern it should match
             -> CoreExpr                 -- ^ Return this if it matches
             -> CoreExpr                 -- ^ Return this if it doesn't
@@ -837,7 +837,7 @@ matchSimply scrut hs_ctx pat result_expr fail_expr = do
     match_result' <- matchSinglePat scrut hs_ctx pat rhs_ty match_result
     extractMatchResult match_result' fail_expr
 
-matchSinglePat :: CoreExpr -> HsMatchContext GhcRn -> LPat GhcTc
+matchSinglePat :: CoreExpr -> HsMatchContext (XRec GhcRn (CtxIdP GhcRn)) -> LPat GhcTc
                -> Type -> MatchResult CoreExpr -> DsM (MatchResult CoreExpr)
 -- matchSinglePat ensures that the scrutinee is a variable
 -- and then calls matchSinglePatVar
@@ -863,7 +863,7 @@ matchSinglePat scrut hs_ctx pat ty match_result
 
 matchSinglePatVar :: Id   -- See Note [Match Ids]
                   -> Maybe CoreExpr -- ^ The scrutinee the match id is bound to
-                  -> HsMatchContext GhcRn -> LPat GhcTc
+                  -> HsMatchContext (XRec GhcRn (CtxIdP GhcRn)) -> LPat GhcTc
                   -> Type -> MatchResult CoreExpr -> DsM (MatchResult CoreExpr)
 matchSinglePatVar var mb_scrut ctx pat ty match_result
   = assertPpr (isInternalName (idName var)) (ppr var) $

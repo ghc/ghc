@@ -389,7 +389,7 @@ rnExpr (HsLet _ binds expr)
 
 rnExpr (HsDo _ do_or_lc (L l stmts))
   = do  { ((stmts', _), fvs) <-
-           rnStmtsWithPostProcessing do_or_lc rnExpr
+           rnStmtsWithPostProcessing (HsDoStmt do_or_lc) rnExpr
              postProcessStmtsForApplicativeDo stmts
              (\ _ -> return ((), emptyFVs))
         ; return ( HsDo noExtField do_or_lc (L l stmts'), fvs ) }
@@ -975,7 +975,7 @@ type AnnoBody body
 
 -- | Rename some Stmts
 rnStmts :: AnnoBody body
-        => HsStmtContext GhcRn
+        => HsStmtContext (XRec GhcRn (CtxIdP GhcRn))
         -> (body GhcPs -> RnM (body GhcRn, FreeVars))
            -- ^ How to rename the body of each statement (e.g. rnLExpr)
         -> [LStmt GhcPs (LocatedA (body GhcPs))]
@@ -989,10 +989,10 @@ rnStmts ctxt rnBody = rnStmtsWithPostProcessing ctxt rnBody noPostProcessStmts
 -- | like 'rnStmts' but applies a post-processing step to the renamed Stmts
 rnStmtsWithPostProcessing
         :: AnnoBody body
-        => HsStmtContext GhcRn
+        => HsStmtContext (XRec GhcRn (CtxIdP GhcRn))
         -> (body GhcPs -> RnM (body GhcRn, FreeVars))
            -- ^ How to rename the body of each statement (e.g. rnLExpr)
-        -> (HsStmtContext GhcRn
+        -> (HsStmtContext (XRec GhcRn (CtxIdP GhcRn))
               -> [(LStmt GhcRn (LocatedA (body GhcRn)), FreeVars)]
               -> RnM ([LStmt GhcRn (LocatedA (body GhcRn))], FreeVars))
            -- ^ postprocess the statements
@@ -1011,7 +1011,7 @@ rnStmtsWithPostProcessing ctxt rnBody ppStmts stmts thing_inside
 
 -- | maybe rearrange statements according to the ApplicativeDo transformation
 postProcessStmtsForApplicativeDo
-  :: HsStmtContext GhcRn
+  :: HsStmtContext (XRec GhcRn (CtxIdP GhcRn))
   -> [(ExprLStmt GhcRn, FreeVars)]
   -> RnM ([ExprLStmt GhcRn], FreeVars)
 postProcessStmtsForApplicativeDo ctxt stmts
@@ -1020,7 +1020,7 @@ postProcessStmtsForApplicativeDo ctxt stmts
        -- -XApplicativeDo is on.  Also strip out the FreeVars attached
        -- to each Stmt body.
          ado_is_on <- xoptM LangExt.ApplicativeDo
-       ; let is_do_expr | DoExpr{} <- ctxt = True
+       ; let is_do_expr | (HsDoStmt DoExpr{}) <- ctxt = True
                         | otherwise = False
        -- don't apply the transformation inside TH brackets, because
        -- GHC.HsToCore.Quote does not handle ApplicativeDo.
@@ -1032,14 +1032,14 @@ postProcessStmtsForApplicativeDo ctxt stmts
 
 -- | strip the FreeVars annotations from statements
 noPostProcessStmts
-  :: HsStmtContext GhcRn
+  :: HsStmtContext (XRec GhcRn (CtxIdP GhcRn))
   -> [(LStmt GhcRn (LocatedA (body GhcRn)), FreeVars)]
   -> RnM ([LStmt GhcRn (LocatedA (body GhcRn))], FreeVars)
 noPostProcessStmts _ stmts = return (map fst stmts, emptyNameSet)
 
 
 rnStmtsWithFreeVars :: AnnoBody body
-        => HsStmtContext GhcRn
+        => HsStmtContext (XRec GhcRn (CtxIdP GhcRn))
         -> ((body GhcPs) -> RnM ((body GhcRn), FreeVars))
         -> [LStmt GhcPs (LocatedA (body GhcPs))]
         -> ([Name] -> RnM (thing, FreeVars))
@@ -1056,7 +1056,7 @@ rnStmtsWithFreeVars ctxt _ [] thing_inside
        ; (thing, fvs) <- thing_inside []
        ; return (([], thing), fvs) }
 
-rnStmtsWithFreeVars mDoExpr@MDoExpr{} rnBody stmts thing_inside    -- Deal with mdo
+rnStmtsWithFreeVars mDoExpr@(HsDoStmt MDoExpr{}) rnBody stmts thing_inside    -- Deal with mdo
   = -- Behave like do { rec { ...all but last... }; last }
     do { ((stmts1, (stmts2, thing)), fvs)
            <- rnStmt mDoExpr rnBody (noLocA $ mkRecStmt noAnn (noLocA all_but_last)) $ \ _ ->
@@ -1104,7 +1104,7 @@ At one point we failed to make this distinction, leading to #11216.
 -}
 
 rnStmt :: AnnoBody body
-       => HsStmtContext GhcRn
+       => HsStmtContext (XRec GhcRn (CtxIdP GhcRn))
        -> (body GhcPs -> RnM (body GhcRn, FreeVars))
           -- ^ How to rename the body of the statement
        -> LStmt GhcPs (LocatedA (body GhcPs))
@@ -1244,7 +1244,7 @@ rnStmt ctxt _ (L loc (TransStmt { trS_stmts = stmts, trS_by = by, trS_form = for
 rnStmt _ _ (L _ ApplicativeStmt{}) _ =
   panic "rnStmt: ApplicativeStmt"
 
-rnParallelStmts :: forall thing. HsStmtContext GhcRn
+rnParallelStmts :: forall thing. HsStmtContext (XRec GhcRn (CtxIdP GhcRn))
                 -> SyntaxExpr GhcRn
                 -> [ParStmtBlock GhcPs GhcPs]
                 -> ([Name] -> RnM (thing, FreeVars))
@@ -1279,7 +1279,7 @@ rnParallelStmts ctxt return_op segs thing_inside
                   (text "Duplicate binding in parallel list comprehension for:"
                     <+> quotes (ppr (NE.head vs)))
 
-lookupQualifiedDoStmtName :: HsStmtContext GhcRn -> Name -> RnM (SyntaxExpr GhcRn, FreeVars)
+lookupQualifiedDoStmtName :: HsStmtContext (XRec GhcRn (CtxIdP GhcRn)) -> Name -> RnM (SyntaxExpr GhcRn, FreeVars)
 -- Like lookupStmtName, but respects QualifiedDo
 lookupQualifiedDoStmtName ctxt n
   = case qualifiedDoModuleName_maybe ctxt of
@@ -1287,7 +1287,7 @@ lookupQualifiedDoStmtName ctxt n
       Just modName ->
         first (mkSyntaxExpr . nl_HsVar) <$> lookupNameWithQualifier n modName
 
-lookupStmtName :: HsStmtContext GhcRn -> Name -> RnM (SyntaxExpr GhcRn, FreeVars)
+lookupStmtName :: HsStmtContext (XRec GhcRn (CtxIdP GhcRn)) -> Name -> RnM (SyntaxExpr GhcRn, FreeVars)
 -- Like lookupSyntax, but respects contexts
 lookupStmtName ctxt n
   | rebindableContext ctxt
@@ -1295,7 +1295,7 @@ lookupStmtName ctxt n
   | otherwise
   = return (mkRnSyntaxExpr n, emptyFVs)
 
-lookupStmtNamePoly :: HsStmtContext GhcRn -> Name -> RnM (HsExpr GhcRn, FreeVars)
+lookupStmtNamePoly :: HsStmtContext (XRec GhcRn (CtxIdP GhcRn)) -> Name -> RnM (HsExpr GhcRn, FreeVars)
 lookupStmtNamePoly ctxt name
   | rebindableContext ctxt
   = do { rebindable_on <- xoptM LangExt.RebindableSyntax
@@ -1311,16 +1311,16 @@ lookupStmtNamePoly ctxt name
 -- | Is this a context where we respect RebindableSyntax?
 -- but ListComp are never rebindable
 -- Neither is ArrowExpr, which has its own desugarer in GHC.HsToCore.Arrows
-rebindableContext :: HsStmtContext GhcRn -> Bool
+rebindableContext :: HsStmtContext (XRec GhcRn (CtxIdP GhcRn)) -> Bool
 rebindableContext ctxt = case ctxt of
-  ListComp        -> False
+  (HsDoStmt ListComp) -> False
   ArrowExpr       -> False
   PatGuard {}     -> False
 
-  DoExpr m        -> isNothing m
-  MDoExpr m       -> isNothing m
-  MonadComp       -> True
-  GhciStmtCtxt    -> True   -- I suppose?
+  (HsDoStmt (DoExpr m)) -> isNothing m
+  (HsDoStmt (MDoExpr m)) -> isNothing m
+  (HsDoStmt MonadComp) -> True
+  (HsDoStmt GhciStmtCtxt)    -> True   -- I suppose?
 
   ParStmtCtxt   c -> rebindableContext c     -- Look inside to
   TransStmtCtxt c -> rebindableContext c     -- the parent context
@@ -1363,7 +1363,7 @@ type Segment stmts = (Defs,
 
 -- wrapper that does both the left- and right-hand sides
 rnRecStmtsAndThen :: AnnoBody body =>
-                     HsStmtContext GhcRn
+                     HsStmtContext (XRec GhcRn (CtxIdP GhcRn))
                   -> (body GhcPs -> RnM (body GhcRn, FreeVars))
                   -> [LStmt GhcPs (LocatedA (body GhcPs))]
                          -- assumes that the FreeVars returned includes
@@ -1467,7 +1467,7 @@ rn_rec_stmts_lhs fix_env stmts
 -- right-hand-sides
 
 rn_rec_stmt :: AnnoBody body =>
-               HsStmtContext GhcRn
+               HsStmtContext (XRec GhcRn (CtxIdP GhcRn))
             -> (body GhcPs -> RnM (body GhcRn, FreeVars))
             -> [Name]
             -> (LStmtLR GhcRn GhcPs (LocatedA (body GhcPs)), FreeVars)
@@ -1526,7 +1526,7 @@ rn_rec_stmt _ _ _ stmt@(L _ (ApplicativeStmt {}), _)
   = pprPanic "rn_rec_stmt: ApplicativeStmt" (ppr stmt)
 
 rn_rec_stmts :: AnnoBody body =>
-                HsStmtContext GhcRn
+                HsStmtContext (XRec GhcRn (CtxIdP GhcRn))
              -> (body GhcPs -> RnM (body GhcRn, FreeVars))
              -> [Name]
              -> [(LStmtLR GhcRn GhcPs (LocatedA (body GhcPs)), FreeVars)]
@@ -1537,7 +1537,7 @@ rn_rec_stmts ctxt rnBody bndrs stmts
 
 ---------------------------------------------
 segmentRecStmts :: AnnoBody body
-                => SrcSpan -> HsStmtContext GhcRn
+                => SrcSpan -> HsStmtContext (XRec GhcRn (CtxIdP GhcRn))
                 -> Stmt GhcRn (LocatedA (body GhcRn))
                 -> [Segment (LStmt GhcRn (LocatedA (body GhcRn)))] -> FreeVars
                 -> ([LStmt GhcRn (LocatedA (body GhcRn))], FreeVars)
@@ -1546,7 +1546,7 @@ segmentRecStmts loc ctxt empty_rec_stmt segs fvs_later
   | null segs
   = ([], fvs_later)
 
-  | MDoExpr _ <- ctxt
+  | (HsDoStmt (MDoExpr _)) <- ctxt
   = segsToStmts empty_rec_stmt grouped_segs fvs_later
                -- Step 4: Turn the segments into Stmts
                 --         Use RecStmt when and only when there are fwd refs
@@ -1641,7 +1641,7 @@ glom it together with the first two groups
        r <- x }
 -}
 
-glomSegments :: HsStmtContext GhcRn
+glomSegments :: HsStmtContext (XRec GhcRn (CtxIdP GhcRn))
              -> [Segment (LStmt GhcRn body)]
              -> [Segment [LStmt GhcRn body]]
                                   -- Each segment has a non-empty list of Stmts
@@ -1852,7 +1852,7 @@ instance Outputable MonadNames where
 -- | rearrange a list of statements using ApplicativeDoStmt.  See
 -- Note [ApplicativeDo].
 rearrangeForApplicativeDo
-  :: HsStmtContext GhcRn
+  :: HsStmtContext (XRec GhcRn (CtxIdP GhcRn))
   -> [(ExprLStmt GhcRn, FreeVars)]
   -> RnM ([ExprLStmt GhcRn], FreeVars)
 
@@ -1978,7 +1978,7 @@ mkStmtTreeOptimal stmts =
 -- ApplicativeStmt where necessary.
 stmtTreeToStmts
   :: MonadNames
-  -> HsStmtContext GhcRn
+  -> HsStmtContext (XRec GhcRn (CtxIdP GhcRn))
   -> ExprStmtTree
   -> [ExprLStmt GhcRn]             -- ^ the "tail"
   -> FreeVars                     -- ^ free variables of the tail
@@ -2266,7 +2266,7 @@ slurpIndependentStmts stmts = go [] [] emptyNameSet stmts
 -- it this way rather than try to ignore the return later in both the
 -- typechecker and the desugarer (I tried it that way first!).
 mkApplicativeStmt
-  :: HsStmtContext GhcRn
+  :: HsStmtContext (XRec GhcRn (CtxIdP GhcRn))
   -> [ApplicativeArg GhcRn]             -- ^ The args
   -> Bool                               -- ^ True <=> need a join
   -> [ExprLStmt GhcRn]        -- ^ The body statements
@@ -2327,7 +2327,7 @@ isReturnApp monad_names (L _ e) = case e of
 ************************************************************************
 -}
 
-checkEmptyStmts :: HsStmtContext GhcRn -> RnM ()
+checkEmptyStmts :: HsStmtContext (XRec GhcRn (CtxIdP GhcRn)) -> RnM ()
 -- We've seen an empty sequence of Stmts... is that ok?
 checkEmptyStmts ctxt
   = unless (okEmpty ctxt) (addErr (emptyErr ctxt))
@@ -2336,7 +2336,7 @@ okEmpty :: HsStmtContext a -> Bool
 okEmpty (PatGuard {}) = True
 okEmpty _             = False
 
-emptyErr :: HsStmtContext GhcRn -> TcRnMessage
+emptyErr :: HsStmtContext (XRec GhcRn (CtxIdP GhcRn)) -> TcRnMessage
 emptyErr (ParStmtCtxt {})   = TcRnUnknownMessage $ mkPlainError noHints $
   text "Empty statement group in parallel comprehension"
 emptyErr (TransStmtCtxt {}) = TcRnUnknownMessage $ mkPlainError noHints $
@@ -2345,16 +2345,16 @@ emptyErr ctxt               = TcRnUnknownMessage $ mkPlainError noHints $
   text "Empty" <+> pprStmtContext ctxt
 
 ----------------------
-checkLastStmt :: AnnoBody body => HsStmtContext GhcRn
+checkLastStmt :: AnnoBody body => HsStmtContext (XRec GhcRn (CtxIdP GhcRn))
               -> LStmt GhcPs (LocatedA (body GhcPs))
               -> RnM (LStmt GhcPs (LocatedA (body GhcPs)))
 checkLastStmt ctxt lstmt@(L loc stmt)
   = case ctxt of
-      ListComp  -> check_comp
-      MonadComp -> check_comp
+      (HsDoStmt ListComp)  -> check_comp
+      (HsDoStmt MonadComp) -> check_comp
       ArrowExpr -> check_do
-      DoExpr{}  -> check_do
-      MDoExpr{} -> check_do
+      (HsDoStmt DoExpr{})  -> check_do
+      (HsDoStmt MDoExpr{}) -> check_do
       _         -> check_other
   where
     check_do    -- Expect BodyStmt, and change it to LastStmt
@@ -2377,7 +2377,7 @@ checkLastStmt ctxt lstmt@(L loc stmt)
       = do { checkStmt ctxt lstmt; return lstmt }
 
 -- Checking when a particular Stmt is ok
-checkStmt :: HsStmtContext GhcRn
+checkStmt :: HsStmtContext (XRec GhcRn (CtxIdP GhcRn))
           -> LStmt GhcPs (LocatedA (body GhcPs))
           -> RnM ()
 checkStmt ctxt (L _ stmt)
@@ -2404,7 +2404,7 @@ emptyInvalid :: Validity  -- Payload is the empty document
 emptyInvalid = NotValid Outputable.empty
 
 okStmt, okDoStmt, okCompStmt, okParStmt
-   :: DynFlags -> HsStmtContext GhcRn
+   :: DynFlags -> HsStmtContext (XRec GhcRn (CtxIdP GhcRn))
    -> Stmt GhcPs (LocatedA (body GhcPs)) -> Validity
 -- Return Nothing if OK, (Just extra) if not ok
 -- The "extra" is an SDoc that is appended to a generic error message
@@ -2413,12 +2413,12 @@ okStmt dflags ctxt stmt
   = case ctxt of
       PatGuard {}        -> okPatGuardStmt stmt
       ParStmtCtxt ctxt   -> okParStmt  dflags ctxt stmt
-      DoExpr{}           -> okDoStmt   dflags ctxt stmt
-      MDoExpr{}          -> okDoStmt   dflags ctxt stmt
+      (HsDoStmt DoExpr{})  -> okDoStmt   dflags ctxt stmt
+      (HsDoStmt MDoExpr{}) -> okDoStmt   dflags ctxt stmt
       ArrowExpr          -> okDoStmt   dflags ctxt stmt
-      GhciStmtCtxt       -> okDoStmt   dflags ctxt stmt
-      ListComp           -> okCompStmt dflags ctxt stmt
-      MonadComp          -> okCompStmt dflags ctxt stmt
+      (HsDoStmt GhciStmtCtxt) -> okDoStmt   dflags ctxt stmt
+      (HsDoStmt ListComp)  -> okCompStmt dflags ctxt stmt
+      (HsDoStmt MonadComp) -> okCompStmt dflags ctxt stmt
       TransStmtCtxt ctxt -> okStmt dflags ctxt stmt
 
 -------------
@@ -2490,7 +2490,7 @@ badIpBinds what binds
 ---------
 
 monadFailOp :: LPat GhcPs
-            -> HsStmtContext GhcRn
+            -> HsStmtContext (XRec GhcRn (CtxIdP GhcRn))
             -> RnM (FailOperator GhcRn, FreeVars)
 monadFailOp pat ctxt = do
     dflags <- getDynFlags
