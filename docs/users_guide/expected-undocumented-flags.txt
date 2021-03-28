@@ -23,6 +23,8 @@
 -copy-libs-when-linking
 -dannot-lint
 -ddump-asm-conflicts
+-ddump-asm-ssa
+-ddump-asm-out-of-ssa
 -ddump-call-arity
 -ddump-cs-trace
 -ddump-debug
@@ -80,6 +82,7 @@
 -fspec-constr-recursive
 -fspecialize
 -fspecialize-aggressively
+-fssa-transform
 -fth
 -ftype-function-depth
 -funfolding-keeness-factor
