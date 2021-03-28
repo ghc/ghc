@@ -782,7 +782,6 @@ data HiePassEv p where
   HieTc :: HiePassEv 'Typechecked
 
 class ( IsPass p
-      , HiePass (NoGhcTcPass p)
       , ModifyState (IdGhcP p)
       , Data (GRHS  (GhcPass p) (LocatedA (HsExpr (GhcPass p))))
       , Data (Match (GhcPass p) (LocatedA (HsExpr (GhcPass p))))

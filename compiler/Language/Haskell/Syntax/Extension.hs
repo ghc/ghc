@@ -56,7 +56,7 @@ both of these actions, we define OutputableBndrId, which gathers the necessary
 OutputableBndr and IsPass constraints. The use of this constraint in instances
 generally requires UndecidableInstances.
 
-See also Note [IsPass] and Note [NoGhcTc] in GHC.Hs.Extension.
+See also Note [IsPass] in GHC.Hs.Extension.
 
 -}
 
@@ -681,14 +681,6 @@ type family XIEDocNamed        x
 type family XXIE               x
 
 -- -------------------------------------
-
--- =====================================================================
--- Misc
-
--- | See Note [NoGhcTc] in GHC.Hs.Extension. It has to be in this
--- module because it is used like an extension point (in the data definitions
--- of types that should be parameter-agnostic.
-type family NoGhcTc (p :: Type)
 
 -- =====================================================================
 -- End of Type family definitions

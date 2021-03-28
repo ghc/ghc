@@ -974,7 +974,6 @@ instance OutputableBndrId p
     ppr (HsQTvs { hsq_explicit = tvs }) = interppSP tvs
 
 instance (OutputableBndrFlag flag p,
-          OutputableBndrFlag flag (NoGhcTcPass p),
           OutputableBndrId p)
        => Outputable (HsOuterTyVarBndrs flag (GhcPass p)) where
     ppr (HsOuterImplicit{hso_ximplicit = imp_tvs}) =
@@ -1311,13 +1310,7 @@ type instance Anno [LocatedA (HsType (GhcPass p))] = SrcSpanAnnC
 type instance Anno (HsType (GhcPass p)) = SrcSpanAnnA
 type instance Anno (HsSigType (GhcPass p)) = SrcSpanAnnA
 type instance Anno (HsKind (GhcPass p)) = SrcSpanAnnA
-
 type instance Anno (HsTyVarBndr _flag (GhcPass _)) = SrcSpanAnnA
-  -- Explicit pass Anno instances needed because of the NoGhcTc field
-type instance Anno (HsTyVarBndr _flag GhcPs) = SrcSpanAnnA
-type instance Anno (HsTyVarBndr _flag GhcRn) = SrcSpanAnnA
-type instance Anno (HsTyVarBndr _flag GhcTc) = SrcSpanAnnA
-
 type instance Anno (HsOuterTyVarBndrs _ (GhcPass _)) = SrcSpanAnnA
 type instance Anno HsIPName = SrcSpan
 type instance Anno (ConDeclField (GhcPass p)) = SrcSpanAnnA

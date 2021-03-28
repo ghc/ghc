@@ -11,7 +11,6 @@
 {-# LANGUAGE ScopedTypeVariables     #-}
 {-# LANGUAGE TypeApplications        #-}
 {-# LANGUAGE TypeFamilyDependencies  #-}
-{-# LANGUAGE UndecidableSuperClasses #-} -- for IsPass; see Note [NoGhcTc]
 {-# LANGUAGE UndecidableInstances    #-} -- Wrinkle in Note [Trees That Grow]
                                          -- in module Language.Haskell.Syntax.Extension
 
@@ -55,42 +54,6 @@ the definition of GhcPass and the functions isPass. These allow us to do away
 with big constraints, passing around all manner of dictionaries we might or
 might not use. It does mean that we have to manually use isPass when printing,
 but these places are few.
-
-See Note [NoGhcTc] about the superclass constraint to IsPass.
-
-Note [NoGhcTc]
-~~~~~~~~~~~~~~
-An expression is parsed into HsExpr GhcPs, renamed into HsExpr GhcRn, and
-then type-checked into HsExpr GhcTc. Not so for types! These get parsed
-into HsType GhcPs, renamed into HsType GhcRn, and then type-checked into
-Type. We never build an HsType GhcTc. Why do this? Because we need to be
-able to compare type-checked types for equality, and we don't want to do
-this with HsType.
-
-This causes wrinkles within the AST, where we normally think that the whole
-AST travels through the GhcPs --> GhcRn --> GhcTc pipeline as one. So we
-have the NoGhcTc type family, which just replaces GhcTc with GhcRn, so that
-user-written types can be preserved (as HsType GhcRn) even in e.g. HsExpr GhcTc.
-
-For example, this is used in ExprWithTySig:
-    | ExprWithTySig
-                (XExprWithTySig p)
-
-                (LHsExpr p)
-                (LHsSigWcType (NoGhcTc p))
-
-If we have (e :: ty), we still want to be able to print that (with the :: ty)
-after type-checking. So we retain the LHsSigWcType GhcRn, even in an
-HsExpr GhcTc. That's what NoGhcTc does.
-
-When we're printing the type annotation, we need to know
-(Outputable (LHsSigWcType GhcRn)), even though we've assumed only that
-(OutputableBndrId GhcTc). We thus must be able to prove OutputableBndrId (NoGhcTc p)
-from OutputableBndrId p. The extra constraints in OutputableBndrId and
-the superclass constraints of IsPass allow this. Note that the superclass
-constraint of IsPass is *recursive*: it asserts that IsPass (NoGhcTcPass p) holds.
-For this to make sense, we need -XUndecidableSuperClasses and the other constraint,
-saying that NoGhcTcPass is idempotent.
 
 -}
 
@@ -175,9 +138,7 @@ type GhcTc   = GhcPass 'Typechecked -- Output of typechecker
 -- >          GhcTc ->    ... in this RHS we have HsExpr GhcTc...
 -- which is very useful, for example, when pretty-printing.
 -- See Note [IsPass].
-class ( NoGhcTcPass (NoGhcTcPass p) ~ NoGhcTcPass p
-      , IsPass (NoGhcTcPass p)
-      ) => IsPass p where
+class IsPass p where
   ghcPass :: GhcPass p
 
 instance IsPass 'Parsed where
@@ -195,25 +156,10 @@ type family IdGhcP pass where
   IdGhcP 'Renamed     = Name
   IdGhcP 'Typechecked = Id
 
--- | Marks that a field uses the GhcRn variant even when the pass
--- parameter is GhcTc. Useful for storing HsTypes in GHC.Hs.Exprs, say, because
--- HsType GhcTc should never occur.
--- See Note [NoGhcTc]
-
--- Breaking it up this way, GHC can figure out that the result is a GhcPass
-type instance NoGhcTc (GhcPass pass) = GhcPass (NoGhcTcPass pass)
-
-type family NoGhcTcPass (p :: Pass) :: Pass where
-  NoGhcTcPass 'Typechecked = 'Renamed
-  NoGhcTcPass other        = other
-
--- |Constraint type to bundle up the requirement for 'OutputableBndr' on both
--- the @id@ and the 'NoGhcTc' of it. See Note [NoGhcTc].
+-- |Constraint type to bundle up the requirement for 'OutputableBndr'
 type OutputableBndrId pass =
   ( OutputableBndr (IdGhcP pass)
-  , OutputableBndr (IdGhcP (NoGhcTcPass pass))
   , Outputable (GenLocated (Anno (IdGhcP pass)) (IdGhcP pass))
-  , Outputable (GenLocated (Anno (IdGhcP (NoGhcTcPass pass))) (IdGhcP (NoGhcTcPass pass)))
   , IsPass pass
   )
 
