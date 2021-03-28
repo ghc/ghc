@@ -9,8 +9,8 @@ License: BSD3
 License-File: LICENSE
 Author: XXX
 Maintainer: XXX
-Synopsis: Provides shared functionality between iserv and iserv-proxy
-Description:
+Synopsis: Provides shared functionality between iserv and iserv-proxy.
+Description: Provides shared functionality between iserv and iserv-proxy.
 Category: Development
 build-type: Simple
 cabal-version: >=1.10
