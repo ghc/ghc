@@ -40,7 +40,7 @@ main = do
         ]
       ]
 
-    tgt <- guessTarget "A" Nothing
+    tgt <- guessTarget "A" Nothing Nothing
     setTargets [tgt]
     hsc_env <- getSession
 
