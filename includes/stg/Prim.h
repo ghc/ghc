@@ -68,8 +68,6 @@ StgWord16 hs_bitrev16(StgWord16 x);
 StgWord32 hs_bitrev32(StgWord32 x);
 StgWord64 hs_bitrev64(StgWord64 x);
 
-/* TODO: longlong.c */
-
 /* libraries/ghc-prim/cbits/pdep.c */
 StgWord64 hs_pdep64(StgWord64 src, StgWord64 mask);
 StgWord hs_pdep32(StgWord src, StgWord mask);
