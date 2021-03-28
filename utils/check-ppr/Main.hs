@@ -87,6 +87,7 @@ parseOneFile libdir fileName = do
          _ <- setSessionDynFlags dflags2
          addTarget Target { targetId = TargetFile fileName Nothing
                           , targetAllowObjCode = True
+                          , targetUnitId = homeUnitId_ dflags
                           , targetContents = Nothing }
          _ <- load LoadAllTargets
          graph <- getModuleGraph
