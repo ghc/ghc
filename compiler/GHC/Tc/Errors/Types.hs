@@ -7,8 +7,6 @@ module GHC.Tc.Errors.Types (
   , NameSuggestions(..)
   , ExtensionSuggestion(..)
   , OutOfScopeSuggestions(..)
-  -- * Constructing messages
-  -- , mkTcRnWarn
   -- * Constructing suggestions
   , noOutOfScopeSuggestions
   ) where
@@ -26,19 +24,14 @@ import GHC.Unit.State ( UnitState )
 import GHC.Unit.Types
 import Data.List.NonEmpty (NonEmpty)
 
--- | Creates a new 'ErrMsg' parameterised over the input 'Warning', attaching the
--- correct 'WarnReason' to it.
---mkTcRnWarn :: WarnReason -> SrcSpan -> PrintUnqualified -> TcRnMessage -> MsgEnvelope TcRnMessage
---mkTcRnWarn reason loc printer warn = makeIntoWarning reason (mkErr loc printer warn)
-
 -- | An error which might arise during typechecking/renaming.
 data TcRnMessage
-  = TcRnUnknownMessage !DecoratedSDoc
+  = TcRnUnknownMessage !DiagnosticMessage
 
   -- See 'mkDecoratedSDocAt' in 'GHC.Tc.Utils.Monad', where we need the 'UnitState'
   -- to render the 'Unit' properly. This is a type constructor to build an embellished
-  -- 'Error' which can be pretty-printed with the fully qualified 'UnitState'.
-  | TcRnMessageWithUnitState !UnitState !TcRnMessage
+  -- 'DiagnosticMessage' which can be pretty-printed with the fully qualified 'UnitState'.
+  | TcRnMessageWithUnitState !UnitState !DiagnosticMessage
 
   -- Errors thrown in GHC.Tc.Errors
   | TcRnBadTelescope
@@ -51,6 +44,7 @@ data TcRnMessage
       !SDoc -- extra contents (see 'unboundNameX'). TODO: Make it structured, eventually (#18516).
       !SDoc -- context lines. TODO: Make it structured, eventually (#18516).
   | TcRnOutOfScopeHole
+      !DiagnosticReason
       !OccName -- out of scope name
       !TcType  -- type of the hole
       !OutOfScopeSuggestions -- similar name, import, etc suggestions
