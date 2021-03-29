@@ -25,7 +25,22 @@ import qualified Data.List.NonEmpty as NE
 
 instance Diagnostic TcRnMessage where
   diagnosticMessage = pprTcRnMessage
-  diagnosticReason _ = ErrorWithoutFlag -- FIXME(adn)
+  diagnosticReason  = reasonTcRnMessage
+
+reasonTcRnMessage :: TcRnMessage -> DiagnosticReason
+reasonTcRnMessage = \case
+  TcRnUnknownMessage d ->
+    diagnosticReason d
+
+  TcRnMessageWithUnitState _ d ->
+    diagnosticReason d
+
+  TcRnBadTelescope{} ->
+    ErrorWithoutFlag -- a bad telescope is always an error.
+
+  TcRnOutOfScope{} -> error "todo"
+
+  TcRnOutOfScopeHole reason _ _ _ -> reason
 
 notInScopeErr :: RdrName -> SDoc
 notInScopeErr rdr_name
@@ -46,10 +61,10 @@ exactNameErr name =
 pprTcRnMessage :: TcRnMessage -> DecoratedSDoc
 pprTcRnMessage = \case
   TcRnUnknownMessage d ->
-    d
+    diagnosticMessage d
 
   TcRnMessageWithUnitState unit_state msg ->
-    mapDecorated (pprWithUnitState unit_state) $ pprTcRnMessage msg
+    mapDecorated (pprWithUnitState unit_state) (diagnosticMessage msg)
 
   TcRnBadTelescope telescope sorted_tvs context ->
     mkDecorated $ [m, context]
@@ -62,7 +77,7 @@ pprTcRnMessage = \case
     mkDecorated [notInScopeErr tried_rdr_name $$ suggestions $$ extra, contextlines]
       where suggestions = pprOutOfScopeSuggestions (rdrNameOcc tried_rdr_name) suggs
 
-  TcRnOutOfScopeHole occ ty suggs ->
+  TcRnOutOfScopeHole _reason occ ty suggs ->
     mkDecorated [m, suggestions]
       where herald | isDataOcc occ = text "Data constructor not in scope:"
                    | otherwise     = text "Variable not in scope:"
