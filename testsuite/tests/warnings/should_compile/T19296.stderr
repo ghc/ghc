@@ -1,0 +1,18 @@
+
+T19296.hs:5:6: warning: [-Wredundant-constraints]
+    • Redundant constraint: Eq a
+    • In the type signature for:
+           f :: forall a. Eq a => a -> ()
+  |
+5 | f :: Eq a => a -> ()
+  |      ^^^^
+
+T19296.hs:8:21: warning: [-Wredundant-constraints]
+    • Redundant constraint: Eq a
+    • In an expression type signature:
+           forall a1. Eq a1 => a1 -> ()
+      In the expression: (\ x -> ()) :: Eq a => a -> ()
+      In an equation for ‘g’: g _ = (\ x -> ()) :: Eq a => a -> ()
+  |
+8 | g _ = (\x -> ()) :: Eq a => a -> ()
+  |                     ^^^^
