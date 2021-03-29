@@ -131,7 +131,7 @@ returnL :: a -> CvtM (Located a)
 returnL x = CvtM (\_ loc -> Right (loc, L loc x))
 
 -- returnLA :: a -> CvtM (LocatedA a)
-returnLA :: e -> CvtM (GenLocated (SrcSpanAnn' (ApiAnn' ann)) e)
+returnLA :: e -> CvtM (GenLocated (SrcSpanAnn' (EpAnn' ann)) e)
 returnLA x = CvtM (\_ loc -> Right (loc, L (noAnnSrcSpan loc) x))
 
 returnJustLA :: a -> CvtM (Maybe (LocatedA a))
