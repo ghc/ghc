@@ -127,11 +127,11 @@ putMsgM doc = do
     liftIO $ putMsg logger dflags doc
 
 -- | Put a log message
-putLogMsgM :: GhcMonad m => WarnReason -> Severity -> SrcSpan -> SDoc -> m ()
-putLogMsgM reason sev loc doc = do
+putLogMsgM :: GhcMonad m => MessageClass -> SrcSpan -> SDoc -> m ()
+putLogMsgM msg_class loc doc = do
     dflags <- getDynFlags
     logger <- getLogger
-    liftIO $ putLogMsg logger dflags reason sev loc doc
+    liftIO $ putLogMsg logger dflags msg_class loc doc
 
 -- | Time an action
 withTimingM :: GhcMonad m => SDoc -> (b -> ()) -> m b -> m b
