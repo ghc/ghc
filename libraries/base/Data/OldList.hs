@@ -722,6 +722,15 @@ minimumBy cmp xs        =  foldl1 minBy xs
 -- 3
 -- >>> genericLength [1, 2, 3] :: Float
 -- 3.0
+--
+-- Users should take care to pick a return type that is wide enough to contain
+-- the full length of the list. If the width is insufficient, the overflow
+-- behaviour will depend on the @(+)@ implementation in the selected 'Num'
+-- instance. The following example overflows because the actual list length
+-- of 200 lies outside of the 'Int8' range of @-128..127@.
+--
+-- >>> genericLength [1..200] :: Int8
+-- -56
 genericLength           :: (Num i) => [a] -> i
 {-# NOINLINE [1] genericLength #-}
 genericLength []        =  0
