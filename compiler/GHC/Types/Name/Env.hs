@@ -134,6 +134,7 @@ mkNameEnvWith f       = mkNameEnv . map (\a -> (f a, a))
 elemNameEnv x y          = elemUFM x y
 plusNameEnv x y          = plusUFM x y
 plusNameEnv_C f x y      = plusUFM_C f x y
+{-# INLINE plusNameEnv_CD #-}
 plusNameEnv_CD f x d y b = plusUFM_CD f x d y b
 plusNameEnv_CD2 f x y    = plusUFM_CD2 f x y
 extendNameEnv_C f x y z  = addToUFM_C f x y z
