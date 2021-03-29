@@ -1,5 +1,6 @@
 module GHC.Unit.Env
     ( UnitEnv (..)
+    , initUnitEnv
     , preloadUnitsInfo
     , preloadUnitsInfo'
     )
@@ -14,12 +15,29 @@ import GHC.Unit.Types
 import GHC.Platform
 import GHC.Settings
 import GHC.Data.Maybe
+import GHC.Utils.Panic.Plain
 
 data UnitEnv = UnitEnv
-    { ue_units     :: !UnitState      -- ^ Units
-    , ue_home_unit :: !HomeUnit       -- ^ Home unit
-    , ue_platform  :: !Platform       -- ^ Platform
-    , ue_namever   :: !GhcNameVersion -- ^ GHC name/version (used for dynamic library suffix)
+    { ue_units     :: !UnitState
+        -- ^ External units
+
+    , ue_home_unit :: !HomeUnit
+        -- ^ Home unit
+
+    , ue_platform  :: !Platform
+        -- ^ Platform
+
+    , ue_namever   :: !GhcNameVersion
+        -- ^ GHC name/version (used for dynamic library suffix)
+    }
+
+initUnitEnv :: GhcNameVersion -> Platform -> IO UnitEnv
+initUnitEnv namever platform = do
+  return $ UnitEnv
+    { ue_units     = emptyUnitState
+    , ue_home_unit = panic "No home unit"
+    , ue_platform  = platform
+    , ue_namever   = namever
     }
 
 -- -----------------------------------------------------------------------------

@@ -168,6 +168,7 @@ import GHC.Cmm.Pipeline
 import GHC.Cmm.Info
 
 import GHC.Unit
+import GHC.Unit.Env
 import GHC.Unit.Finder
 import GHC.Unit.External
 import GHC.Unit.State
@@ -247,6 +248,7 @@ newHscEnv dflags = do
     fc_var  <- initFinderCache
     logger  <- initLogger
     tmpfs   <- initTmpFs
+    unit_env <- initUnitEnv (ghcNameVersion dflags) (targetPlatform dflags)
     -- FIXME: it's sad that we have so many "unitialized" fields filled with
     -- empty stuff or lazy panics. We should have two kinds of HscEnv
     -- (initialized or not) instead and less fields that are mutable over time.
@@ -261,7 +263,7 @@ newHscEnv dflags = do
                   ,  hsc_FC             = fc_var
                   ,  hsc_type_env_var   = Nothing
                   ,  hsc_interp         = Nothing
-                  ,  hsc_unit_env       = panic "hsc_unit_env not initialized"
+                  ,  hsc_unit_env       = unit_env
                   ,  hsc_plugins        = []
                   ,  hsc_static_plugins = []
                   ,  hsc_unit_dbs       = Nothing
