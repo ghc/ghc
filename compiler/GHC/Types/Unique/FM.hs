@@ -233,12 +233,16 @@ plusUFM_C f (UFM x) (UFM y) = UFM (M.unionWith f x y)
 -- there is no entry in `m1` reps. `m2`. The domain is the union of
 -- the domains of `m1` and `m2`.
 --
+-- IMPORTANT NOTE: This function strictly applies the modification function
+-- and forces the result unlike most the other functions in this module.
+--
 -- Representative example:
 --
 -- @
 -- plusUFM_CD f {A: 1, B: 2} 23 {B: 3, C: 4} 42
 --    == {A: f 1 42, B: f 2 3, C: f 23 4 }
 -- @
+{-# INLINE plusUFM_CD #-}
 plusUFM_CD
   :: (elta -> eltb -> eltc)
   -> UniqFM key elta  -- map X
@@ -247,16 +251,19 @@ plusUFM_CD
   -> eltb         -- default for Y
   -> UniqFM key eltc
 plusUFM_CD f (UFM xm) dx (UFM ym) dy
-  = UFM $ M.mergeWithKey
+  = UFM $ MS.mergeWithKey
       (\_ x y -> Just (x `f` y))
-      (M.map (\x -> x `f` dy))
-      (M.map (\y -> dx `f` y))
+      (MS.map (\x -> x `f` dy))
+      (MS.map (\y -> dx `f` y))
       xm ym
 
 -- | `plusUFM_CD2 f m1 m2` merges the maps using `f` as the combining
 -- function. Unlike `plusUFM_CD`, a missing value is not defaulted: it is
 -- instead passed as `Nothing` to `f`. `f` can never have both its arguments
 -- be `Nothing`.
+--
+-- IMPORTANT NOTE: This function strictly applies the modification function
+-- and forces the result.
 --
 -- `plusUFM_CD2 f m1 m2` is the same as `plusUFM_CD f (mapUFM Just m1) Nothing
 -- (mapUFM Just m2) Nothing`.
@@ -266,10 +273,10 @@ plusUFM_CD2
   -> UniqFM key eltb  -- map Y
   -> UniqFM key eltc
 plusUFM_CD2 f (UFM xm) (UFM ym)
-  = UFM $ M.mergeWithKey
+  = UFM $ MS.mergeWithKey
       (\_ x y -> Just (Just x `f` Just y))
-      (M.map (\x -> Just x `f` Nothing))
-      (M.map (\y -> Nothing `f` Just y))
+      (MS.map (\x -> Just x `f` Nothing))
+      (MS.map (\y -> Nothing `f` Just y))
       xm ym
 
 mergeUFM
