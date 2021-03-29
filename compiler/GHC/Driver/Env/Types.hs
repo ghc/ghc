@@ -15,7 +15,6 @@ import GHC.Types.Target
 import GHC.Types.TypeEnv
 import GHC.Unit.External
 import GHC.Unit.Finder.Types
-import GHC.Unit.Home.ModInfo
 import GHC.Unit.Module.Graph
 import GHC.Unit.Env
 import GHC.Unit.Types
@@ -75,26 +74,6 @@ data HscEnv
 
         hsc_IC :: InteractiveContext,
                 -- ^ The context for evaluating interactive statements
-
-        hsc_HPT    :: HomePackageTable,
-                -- ^ The home package table describes already-compiled
-                -- home-package modules, /excluding/ the module we
-                -- are compiling right now.
-                -- (In one-shot mode the current module is the only
-                -- home-package module, so hsc_HPT is empty.  All other
-                -- modules count as \"external-package\" modules.
-                -- However, even in GHCi mode, hi-boot interfaces are
-                -- demand-loaded into the external-package table.)
-                --
-                -- 'hsc_HPT' is not mutable because we only demand-load
-                -- external packages; the home package is eagerly
-                -- loaded, module by module, by the compilation manager.
-                --
-                -- The HPT may contain modules compiled earlier by @--make@
-                -- but not actually below the current module in the dependency
-                -- graph.
-                --
-                -- (This changes a previous invariant: changed Jan 05.)
 
         hsc_EPS :: {-# UNPACK #-} !ExternalUnitCache,
                 -- ^ Information about the currently loaded external packages.

@@ -249,15 +249,11 @@ newHscEnv dflags = do
     logger  <- initLogger
     tmpfs   <- initTmpFs
     unit_env <- initUnitEnv (ghcNameVersion dflags) (targetPlatform dflags)
-    -- FIXME: it's sad that we have so many "unitialized" fields filled with
-    -- empty stuff or lazy panics. We should have two kinds of HscEnv
-    -- (initialized or not) instead and less fields that are mutable over time.
     return HscEnv {  hsc_dflags         = dflags
                   ,  hsc_logger         = logger
                   ,  hsc_targets        = []
                   ,  hsc_mod_graph      = emptyMG
                   ,  hsc_IC             = emptyInteractiveContext dflags
-                  ,  hsc_HPT            = emptyHomePackageTable
                   ,  hsc_EPS            = eps_var
                   ,  hsc_NC             = nc_var
                   ,  hsc_FC             = fc_var
@@ -813,11 +809,9 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
         Left iface -> do
             -- Knot tying!  See Note [Knot-tying typecheckIface]
             details <- liftIO . fixIO $ \details' -> do
-                let hsc_env' =
-                        hsc_env {
-                            hsc_HPT = addToHpt (hsc_HPT hsc_env)
-                                        (ms_mod_name mod_summary) (HomeModInfo iface details' Nothing)
-                        }
+                let act hpt  = addToHpt hpt (ms_mod_name mod_summary)
+                                            (HomeModInfo iface details' Nothing)
+                let hsc_env' = hscUpdateHPT act hsc_env
                 -- NB: This result is actually not that useful
                 -- in one-shot mode, since we're not going to do
                 -- any further typechecking.  It's much more useful

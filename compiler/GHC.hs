@@ -641,7 +641,8 @@ setSessionDynFlags dflags0 = do
   logger <- getLogger
   dflags <- checkNewDynFlags logger dflags0
   hsc_env <- getSession
-  let cached_unit_dbs = ue_unit_dbs (hsc_unit_env hsc_env)
+  let old_unit_env    = hsc_unit_env hsc_env
+  let cached_unit_dbs = ue_unit_dbs old_unit_env
   (dbs,unit_state,home_unit) <- liftIO $ initUnits logger dflags cached_unit_dbs
 
   -- Interpreter
@@ -684,6 +685,7 @@ setSessionDynFlags dflags0 = do
         { ue_platform  = targetPlatform dflags
         , ue_namever   = ghcNameVersion dflags
         , ue_home_unit = Just home_unit
+        , ue_hpt       = ue_hpt old_unit_env
         , ue_units     = unit_state
         , ue_unit_dbs  = Just dbs
         }
@@ -713,13 +715,14 @@ setProgramDynFlags_ invalidate_needed dflags = do
   let changed = packageFlagsChanged dflags_prev dflags'
   if changed
     then do
-        hsc_env <- getSession
-        let cached_unit_dbs = ue_unit_dbs (hsc_unit_env hsc_env)
+        old_unit_env <- hsc_unit_env <$> getSession
+        let cached_unit_dbs = ue_unit_dbs old_unit_env
         (dbs,unit_state,home_unit) <- liftIO $ initUnits logger dflags' cached_unit_dbs
         let unit_env = UnitEnv
               { ue_platform  = targetPlatform dflags'
               , ue_namever   = ghcNameVersion dflags'
               , ue_home_unit = Just home_unit
+              , ue_hpt       = ue_hpt old_unit_env
               , ue_units     = unit_state
               , ue_unit_dbs  = Just dbs
               }
@@ -1211,7 +1214,7 @@ loadModule tcm = do
                                     hsc_env ms 1 1 Nothing mb_linkable
                                     source_modified
 
-   modifySession $ \e -> e{ hsc_HPT = addToHpt (hsc_HPT e) mod mod_info }
+   modifySession $ hscUpdateHPT (\hpt -> addToHpt hpt mod mod_info)
    return tcm
 
 

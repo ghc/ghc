@@ -4,7 +4,7 @@
 
 -}
 
-{-# LANGUAGE CPP, BangPatterns, RecordWildCards, NondecreasingIndentation #-}
+{-# LANGUAGE CPP, BangPatterns, NondecreasingIndentation #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -631,7 +631,7 @@ home-package modules however, so it's safe for the HPT to be empty.
 dontLeakTheHPT :: IfL a -> IfL a
 dontLeakTheHPT thing_inside = do
   let
-    cleanTopEnv HscEnv{..} =
+    cleanTopEnv hsc_env =
        let
          -- wrinkle: when we're typechecking in --backpack mode, the
          -- instantiation of a signature might reside in the HPT, so
@@ -642,14 +642,20 @@ dontLeakTheHPT thing_inside = do
          -- a bit of a hack, better suggestions welcome). A number of
          -- tests in testsuite/tests/backpack break without this
          -- tweak.
-         !hpt | backend hsc_dflags == NoBackend = hsc_HPT
-              | otherwise = emptyHomePackageTable
+         old_unit_env = hsc_unit_env hsc_env
+         !unit_env
+          | NoBackend <- backend (hsc_dflags hsc_env)
+          = old_unit_env
+          | otherwise
+          = old_unit_env
+             { ue_hpt = emptyHomePackageTable
+             }
        in
-       HscEnv {  hsc_targets      = panic "cleanTopEnv: hsc_targets"
-              ,  hsc_mod_graph    = panic "cleanTopEnv: hsc_mod_graph"
-              ,  hsc_IC           = panic "cleanTopEnv: hsc_IC"
-              ,  hsc_HPT          = hpt
-              , .. }
+       hsc_env {  hsc_targets      = panic "cleanTopEnv: hsc_targets"
+               ,  hsc_mod_graph    = panic "cleanTopEnv: hsc_mod_graph"
+               ,  hsc_IC           = panic "cleanTopEnv: hsc_IC"
+               ,  hsc_unit_env     = unit_env
+               }
 
   updTopEnv cleanTopEnv $ do
   !_ <- getTopEnv        -- force the updTopEnv
