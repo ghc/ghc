@@ -251,6 +251,7 @@ lint-release-changelogs:
     paths:
       - cabal-cache
   artifacts:
+    when: always
     reports:
       junit: junit.xml
     expire_in: 2 week
@@ -362,6 +363,7 @@ hadrian-ghc-in-ghci:
 
   dependencies: []
   artifacts:
+    when: always
     reports:
       junit: junit.xml
     expire_in: 2 week
@@ -563,6 +565,7 @@ validate-x86_64-darwin:
     exit $status
 
   artifacts:
+    when: always
     reports:
       junit: junit.xml
     expire_in: 2 week
@@ -647,6 +650,7 @@ validate-aarch64-darwin:
     exit $status
 
   artifacts:
+    when: always
     reports:
       junit: junit.xml
     expire_in: 2 week
