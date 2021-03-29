@@ -85,7 +85,7 @@ runInteractiveHsc :: HscEnv -> Hsc a -> IO a
 runInteractiveHsc hsc_env = runHsc (mkInteractiveHscEnv hsc_env)
 
 hsc_home_unit :: HscEnv -> HomeUnit
-hsc_home_unit = ue_home_unit . hsc_unit_env
+hsc_home_unit = unsafeGetHomeUnit . hsc_unit_env
 
 hsc_units :: HscEnv -> UnitState
 hsc_units = ue_units . hsc_unit_env
