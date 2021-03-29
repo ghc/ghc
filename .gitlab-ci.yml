@@ -11,10 +11,35 @@ variables:
   # Disable shallow clones; they break our linting rules
   GIT_DEPTH: 0
 
+  # Always start with a fresh clone to avoid non-hermetic builds
+  GIT_STRATEGY: clone
+
   # Overridden by individual jobs
   CONFIGURE_ARGS: ""
 
   GIT_SUBMODULE_STRATEGY: "recursive"
+
+  HACKAGE_INDEX_STATE: "2020-12-21T14:48:20Z"
+
+  # Reduce XZ compression level for regular jobs (it is bumped to 9 for releases
+  # and nightly jobs). In my experiments I've got the following bindist size in
+  # the given time for each compression level (with the quick flavour):
+  #
+  #     XZ_OPT        Time    Size
+  #     -9            4m06s   112 MB
+  #     -8            4m00s   114 MB
+  #     -7            3m50s   116 MB
+  #     -6 (default)  3m40s   118 MB
+  #     -5            2m47s   123 MB
+  #     -4            1m57s   134 MB
+  #     -3            1m03s   129 MB
+  #     -2            49.73s  136 MB
+  #     -1            37.72s  142 MB
+  #     -0            34.40s  156 MB
+  #
+  XZ_OPT: "-1"
+default:
+  interruptible: true
 
 stages:
   - lint        # Source linting
@@ -25,19 +50,36 @@ stages:
   - testing     # head.hackage correctness and compiler performance testing
   - deploy      # push documentation
 
-# N.B.Don't run on wip/ branches, instead on run on merge requests.
-.only-default: &only-default
-  only:
-    - master
-    - /ghc-[0-9]+\.[0-9]+/
-    - merge_requests
-    - tags
-    - web
+# Note [The CI Story]
+# ~~~~~~~~~~~~~~~~~~~
+#
+# There are two different types of pipelines:
+#
+#  - marge-bot merges to `master`. Here we perform an exhaustive validation
+#    across all of the platforms which we support. In addition, we push
+#    performance metric notes upstream, providing a persistent record of the
+#    performance characteristics of the compiler.
+#
+#  - merge requests. Here we perform a slightly less exhaustive battery of
+#    testing. Namely we omit some configurations (e.g. the unregisterised job).
+#    These use the merge request's base commit for performance metric
+#    comparisons.
+#
+
+workflow:
+  # N.B. Don't run on wip/ branches, instead on run on merge requests.
+  rules:
+    - if: $CI_MERGE_REQUEST_ID
+    - if: $CI_COMMIT_TAG
+    - if: '$CI_COMMIT_BRANCH == "master"'
+    - if: '$CI_COMMIT_BRANCH =~ /ghc-[0-9]+\.[0-9]+/'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
 
 .nightly: &nightly
-  only:
-    variables:
-      - $NIGHTLY
+  variables:
+    XZ_OPT: "-9"
+  rules:
+    - if: $NIGHTLY
   artifacts:
     when: always
     expire_in: 8 weeks
@@ -45,13 +87,13 @@ stages:
 .release: &release
   variables:
     BUILD_FLAVOUR: "perf"
+    XZ_OPT: "-9"
     FLAVOUR: "perf"
   artifacts:
     when: always
     expire_in: 1 year
-  only:
-    variables:
-      - $RELEASE_JOB == "yes"
+  rules:
+    - if: '$RELEASE_JOB == "yes"'
 
 ############################################################
 # Runner Tags
@@ -85,13 +127,11 @@ ghc-linters:
   dependencies: []
   tags:
     - lint
-  only:
-    refs:
-      - merge_requests
+  rules:
+    - if: $CI_MERGE_REQUEST_ID
 
 # Run mypy Python typechecker on linter scripts.
 lint-linters:
-  <<: *only-default
   stage: lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   script:
@@ -102,7 +142,6 @@ lint-linters:
 
 # Check that .T files all parse by listing broken tests.
 lint-testsuite:
-  <<: *only-default
   stage: lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   script:
@@ -113,7 +152,6 @@ lint-testsuite:
 
 # Run mypy Python typechecker on testsuite driver
 typecheck-testsuite:
-  <<: *only-default
   stage: lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   script:
@@ -126,7 +164,6 @@ typecheck-testsuite:
 # accommodate, e.g., haddock changes not yet upstream) but not on `master` or
 # Marge jobs.
 .lint-submods:
-  <<: *only-default
   stage: lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   script:
@@ -165,13 +202,11 @@ lint-submods-branch:
     - "echo Linting submodule changes between $CI_COMMIT_BEFORE_SHA..$CI_COMMIT_SHA"
     - git submodule foreach git remote update
     - submodchecker . $(git rev-list $CI_COMMIT_BEFORE_SHA..$CI_COMMIT_SHA)
-  only:
-    refs:
-      - master
-      - /ghc-[0-9]+\.[0-9]+/
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master"'
+    - if: '$CI_COMMIT_BRANCH =~ /ghc-[0.9]+\.[0-9]+/'
 
 .lint-changelogs:
-  <<: *only-default
   stage: lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   dependencies: []
@@ -184,15 +219,13 @@ lint-changelogs:
   extends: .lint-changelogs
   # Allow failure since this isn't a final release.
   allow_failure: true
-  only:
-    refs:
-      - /ghc-[0-9]+\.[0-9]+/
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ /ghc-[0.9]+\.[0-9]+/'
 
 lint-release-changelogs:
   extends: .lint-changelogs
-  only:
-    refs:
-      - /ghc-[0-9]+\.[0-9]+\.[0-9]+-.*/
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ /ghc-[0.9]+\.[0-9]+/'
 
 
 ############################################################
@@ -200,7 +233,6 @@ lint-release-changelogs:
 ############################################################
 
 .validate-hadrian:
-  <<: *only-default
   variables:
     FLAVOUR: "validate"
   script:
@@ -213,6 +245,7 @@ lint-release-changelogs:
     paths:
       - cabal-cache
   artifacts:
+    when: always
     reports:
       junit: junit.xml
     expire_in: 2 week
@@ -249,7 +282,6 @@ validate-x86_64-linux-deb9-unreg-hadrian:
     TEST_ENV: "x86_64-linux-deb9-unreg-hadrian"
 
 hadrian-ghc-in-ghci:
-  <<: *only-default
   stage: quick-build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   before_script:
@@ -282,7 +314,6 @@ hadrian-ghc-in-ghci:
 ############################################################
 
 .validate:
-  <<: *only-default
   variables:
     TEST_TYPE: test
     MAKE_ARGS: "-Werror"
@@ -324,6 +355,7 @@ hadrian-ghc-in-ghci:
 
   dependencies: []
   artifacts:
+    when: always
     reports:
       junit: junit.xml
     expire_in: 2 week
@@ -525,6 +557,7 @@ validate-x86_64-darwin:
     exit $status
 
   artifacts:
+    when: always
     reports:
       junit: junit.xml
     expire_in: 2 week
@@ -609,6 +642,7 @@ validate-aarch64-darwin:
     exit $status
 
   artifacts:
+    when: always
     reports:
       junit: junit.xml
     expire_in: 2 week
@@ -619,7 +653,6 @@ validate-aarch64-darwin:
 
 # Disabled because of OS X CI capacity
 .validate-x86_64-darwin-hadrian:
-  <<: *only-default
   stage: full-build
   tags:
     - x86_64-darwin
@@ -1025,7 +1058,6 @@ release-x86_64-linux-fedora27-dwarf:
 ############################################################
 
 .build-windows:
-  <<: *only-default
   # For the reasons given in #17777 this build isn't reliable.
   allow_failure: true
   before_script:
@@ -1184,7 +1216,6 @@ nightly-i386-windows:
 ############################################################
 
 doc-tarball:
-  <<: *only-default
   stage: packaging
   tags:
     - x86_64-linux
@@ -1224,10 +1255,10 @@ source-tarball:
   tags:
     - x86_64-linux
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
-  when: always
   dependencies: []
-  only:
-    - tags
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: always
   artifacts:
     paths:
       - ghc-*.tar.xz
@@ -1254,7 +1285,6 @@ source-tarball:
 # pipeline.
 
 .hackage:
-  <<: *only-default
   stage: testing
   image: ghcci/x86_64-linux-deb9:0.2
   tags:
@@ -1271,12 +1301,12 @@ hackage:
 
 hackage-label:
   extends: .hackage
-  only:
-    variables:
-      - $CI_MERGE_REQUEST_LABELS =~ /.*user-facing.*/
+  rules:
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*user-facing.*/'
 
 nightly-hackage:
-  <<: *nightly
+  rules:
+    - if: $NIGHTLY
   extends: .hackage
 
 ############################################################
@@ -1288,11 +1318,10 @@ perf-nofib:
   dependencies:
     - validate-x86_64-linux-deb9-dwarf
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
-  only:
-    refs:
-      - merge_requests
-      - master
-      - /ghc-[0-9]+\.[0-9]+/
+  rules:
+    - if: $CI_MERGE_REQUEST_ID
+    - if: '$CI_COMMIT_BRANCH == "master"'
+    - if: '$CI_COMMIT_BRANCH =~ /ghc-[0.9]+\.[0-9]+/'
   tags:
     - x86_64-linux
   script:
@@ -1341,8 +1370,10 @@ pages:
       <meta http-equiv="refresh" content="1; url=doc/">
       EOF
     - cp -f index.html public/doc
-  only:
-    - master
+  rules:
+    # N.B. only run this on ghc/ghc since the deployed pages are quite large
+    # and we only serve GitLab Pages for ghc/ghc.
+    - if: '$CI_COMMIT_BRANCH == "master" && $CI_PROJECT_NAMESPACE == "ghc"'
   artifacts:
     paths:
       - public
