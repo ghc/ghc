@@ -417,7 +417,8 @@ addUnit :: GhcMonad m => UnitInfo -> m ()
 addUnit u = do
     hsc_env <- getSession
     logger <- getLogger
-    newdbs <- case ue_unit_dbs (hsc_unit_env hsc_env) of
+    let old_unit_env = hsc_unit_env hsc_env
+    newdbs <- case ue_unit_dbs old_unit_env of
         Nothing  -> panic "addUnit: called too early"
         Just dbs ->
          let newdb = UnitDatabase
@@ -430,6 +431,7 @@ addUnit u = do
           { ue_platform  = targetPlatform (hsc_dflags hsc_env)
           , ue_namever   = ghcNameVersion (hsc_dflags hsc_env)
           , ue_home_unit = Just home_unit
+          , ue_hpt       = ue_hpt old_unit_env
           , ue_units     = unit_state
           , ue_unit_dbs  = Just dbs
           }

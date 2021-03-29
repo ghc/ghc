@@ -2,6 +2,7 @@ module GHC.Unit.Env
     ( UnitEnv (..)
     , initUnitEnv
     , unsafeGetHomeUnit
+    , updateHpt
     , preloadUnitsInfo
     , preloadUnitsInfo'
     )
@@ -12,6 +13,7 @@ import GHC.Prelude
 import GHC.Unit.State
 import GHC.Unit.Home
 import GHC.Unit.Types
+import GHC.Unit.Home.ModInfo
 
 import GHC.Platform
 import GHC.Settings
@@ -35,6 +37,26 @@ data UnitEnv = UnitEnv
     , ue_home_unit :: !(Maybe HomeUnit)
         -- ^ Home unit
 
+    , ue_hpt :: !HomePackageTable
+        -- ^ The home package table describes already-compiled
+        -- home-package modules, /excluding/ the module we
+        -- are compiling right now.
+        -- (In one-shot mode the current module is the only
+        -- home-package module, so hsc_HPT is empty.  All other
+        -- modules count as \"external-package\" modules.
+        -- However, even in GHCi mode, hi-boot interfaces are
+        -- demand-loaded into the external-package table.)
+        --
+        -- 'hsc_HPT' is not mutable because we only demand-load
+        -- external packages; the home package is eagerly
+        -- loaded, module by module, by the compilation manager.
+        --
+        -- The HPT may contain modules compiled earlier by @--make@
+        -- but not actually below the current module in the dependency
+        -- graph.
+        --
+        -- (This changes a previous invariant: changed Jan 05.)
+
     , ue_platform  :: !Platform
         -- ^ Platform
 
@@ -48,6 +70,7 @@ initUnitEnv namever platform = do
     { ue_units     = emptyUnitState
     , ue_unit_dbs  = Nothing
     , ue_home_unit = Nothing
+    , ue_hpt       = emptyHomePackageTable
     , ue_platform  = platform
     , ue_namever   = namever
     }
@@ -59,6 +82,9 @@ unsafeGetHomeUnit :: UnitEnv -> HomeUnit
 unsafeGetHomeUnit ue = case ue_home_unit ue of
   Nothing -> panic "unsafeGetHomeUnit: No home unit"
   Just h  -> h
+
+updateHpt :: (HomePackageTable -> HomePackageTable) -> UnitEnv -> UnitEnv
+updateHpt f ue = ue { ue_hpt = f (ue_hpt ue) }
 
 -- -----------------------------------------------------------------------------
 -- Extracting information from the packages in scope
