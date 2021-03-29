@@ -822,12 +822,12 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_input_buf, mb_phase)
                        let unit_env = UnitEnv
                              { ue_platform  = targetPlatform dflags'
                              , ue_namever   = ghcNameVersion dflags'
-                             , ue_home_unit = home_unit
+                             , ue_home_unit = Just home_unit
                              , ue_units     = unit_state
+                             , ue_unit_dbs  = Just dbs
                              }
                        let hsc_env'' = hsc_env'
                             { hsc_unit_env = unit_env
-                            , hsc_unit_dbs = Just dbs
                             }
                        _ <- runPipeline' start_phase hsc_env'' env input_fn'
                                          maybe_loc foreign_os
