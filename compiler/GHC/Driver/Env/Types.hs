@@ -18,7 +18,6 @@ import GHC.Unit.Finder.Types
 import GHC.Unit.Home.ModInfo
 import GHC.Unit.Module.Graph
 import GHC.Unit.Env
-import GHC.Unit.State
 import GHC.Unit.Types
 import GHC.Utils.Logger
 import GHC.Utils.TmpFs
@@ -133,16 +132,6 @@ data HscEnv
                 --
                 -- To add dynamically loaded plugins through the GHC API see
                 -- 'addPluginModuleName' instead.
-
-        , hsc_unit_dbs :: !(Maybe [UnitDatabase UnitId])
-                -- ^ Stack of unit databases for the target platform.
-                --
-                -- This field is populated with the result of `initUnits`.
-                --
-                -- 'Nothing' means the databases have never been read from disk.
-                --
-                -- Usually we don't reload the databases from disk if they are
-                -- cached, even if the database flags changed!
 
         , hsc_unit_env :: UnitEnv
                 -- ^ Unit environment (unit state, home unit, etc.).

@@ -1414,7 +1414,7 @@ cantFindErr using_cabal cannot_find _ unit_env profile tried_these mod_name find
   = ptext cannot_find <+> quotes (ppr mod_name)
     $$ more_info
   where
-    home_unit  = ue_home_unit unit_env
+    mhome_unit = ue_home_unit unit_env
     more_info
       = case find_result of
             NoPackage pkg
@@ -1424,7 +1424,13 @@ cantFindErr using_cabal cannot_find _ unit_env profile tried_these mod_name find
             NotFound { fr_paths = files, fr_pkg = mb_pkg
                      , fr_mods_hidden = mod_hiddens, fr_pkgs_hidden = pkg_hiddens
                      , fr_unusables = unusables, fr_suggestions = suggest }
-                | Just pkg <- mb_pkg, not (isHomeUnit home_unit pkg)
+                | Just pkg <- mb_pkg
+                , Nothing <- mhome_unit           -- no home-unit
+                -> not_found_in_package pkg files
+
+                | Just pkg <- mb_pkg
+                , Just home_unit <- mhome_unit    -- there is a home-unit but the
+                , not (isHomeUnit home_unit pkg)  -- module isn't from it
                 -> not_found_in_package pkg files
 
                 | not (null suggest)

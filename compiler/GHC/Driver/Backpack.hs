@@ -417,7 +417,7 @@ addUnit :: GhcMonad m => UnitInfo -> m ()
 addUnit u = do
     hsc_env <- getSession
     logger <- getLogger
-    newdbs <- case hsc_unit_dbs hsc_env of
+    newdbs <- case ue_unit_dbs (hsc_unit_env hsc_env) of
         Nothing  -> panic "addUnit: called too early"
         Just dbs ->
          let newdb = UnitDatabase
@@ -429,12 +429,12 @@ addUnit u = do
     let unit_env = UnitEnv
           { ue_platform  = targetPlatform (hsc_dflags hsc_env)
           , ue_namever   = ghcNameVersion (hsc_dflags hsc_env)
-          , ue_home_unit = home_unit
+          , ue_home_unit = Just home_unit
           , ue_units     = unit_state
+          , ue_unit_dbs  = Just dbs
           }
     setSession $ hsc_env
-        { hsc_unit_dbs = Just dbs
-        , hsc_unit_env = unit_env
+        { hsc_unit_env = unit_env
         }
 
 compileInclude :: Int -> (Int, Unit) -> BkpM ()

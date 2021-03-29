@@ -266,7 +266,6 @@ newHscEnv dflags = do
                   ,  hsc_unit_env       = unit_env
                   ,  hsc_plugins        = []
                   ,  hsc_static_plugins = []
-                  ,  hsc_unit_dbs       = Nothing
                   ,  hsc_hooks          = emptyHooks
                   ,  hsc_tmpfs          = tmpfs
                   }
