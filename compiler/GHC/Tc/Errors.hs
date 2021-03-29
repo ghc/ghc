@@ -50,7 +50,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Name.Set
 import GHC.Data.Bag
-import GHC.Utils.Error  ( pprLocMsgEnvelope )
+import GHC.Utils.Error  (diagReasonSeverity,  pprLocMsgEnvelope )
 import GHC.Types.Basic
 import GHC.Types.Error
 import GHC.Core.ConLike ( ConLike(..))
@@ -66,7 +66,7 @@ import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Utils.FV ( fvVarList, unionFV )
 
-import Control.Monad    ( (>=>),  unless,  when )
+import Control.Monad    ( unless,  when )
 import Data.Foldable    ( toList )
 import Data.List        ( partition, mapAccumL, sortBy, unfoldr )
 
@@ -74,6 +74,7 @@ import {-# SOURCE #-} GHC.Tc.Errors.Hole ( findValidHoleFits )
 
 -- import Data.Semigroup   ( Semigroup )
 import qualified Data.Semigroup as Semigroup
+import Control.Monad (forM_)
 
 
 {-
@@ -714,21 +715,22 @@ mkSkolReporter ctxt cts
 
 reportHoles :: [Ct]  -- other (tidied) constraints
             -> ReportErrCtxt -> [Hole] -> TcM ()
-reportHoles tidy_cts ctxt
-  = mapM_ $ \hole -> unless (ignoreThisHole ctxt hole) $
-        mkHoleError tidy_cts ctxt hole >>= reportDiagnostic
+reportHoles tidy_cts ctxt holes
+  = do df <- getDynFlags
+       forM_ holes $ \hole -> unless (ignoreThisHole df ctxt hole) $
+          mkHoleError tidy_cts ctxt hole >>= reportDiagnostic
 
-ignoreThisHole :: ReportErrCtxt -> Hole -> Bool
+ignoreThisHole :: DynFlags -> ReportErrCtxt -> Hole -> Bool
 -- See Note [Skip type holes rapidly]
-ignoreThisHole ctxt hole
+ignoreThisHole df ctxt hole
   = case hole_sort hole of
        ExprHole {}    -> False
        TypeHole       -> ignore_type_hole
        ConstraintHole -> ignore_type_hole
   where
-    ignore_type_hole = case cec_type_holes ctxt of
-                         Nothing -> True
-                         _       -> False
+    ignore_type_hole = case diagReasonSeverity df (cec_type_holes ctxt) of
+                         SevIgnore -> True
+                         _         -> False
 
 {- Note [Skip type holes rapidly]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
