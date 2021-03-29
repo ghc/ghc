@@ -130,7 +130,6 @@ import GHC.Types.Unique.FM
 import GHC.Types.Basic
 import GHC.Types.CostCentre.State
 import GHC.Types.HpcInfo
-import GHC.Types.Error ( DiagnosticMessage )
 
 import GHC.Data.IOEnv
 import GHC.Data.Bag
@@ -162,6 +161,7 @@ import GHCi.Message
 import GHCi.RemoteTypes
 
 import qualified Language.Haskell.TH as TH
+import GHC.Tc.Errors.Types
 
 -- | A 'NameShape' is a substitution on 'Name's that can be used
 -- to refine the identities of a hole while we are renaming interfaces
@@ -766,7 +766,7 @@ data TcLclEnv           -- Changes as we move inside an expression
                                       -- and for tidying types
 
         tcl_lie  :: TcRef WantedConstraints,    -- Place to accumulate type constraints
-        tcl_errs :: TcRef (Messages DiagnosticMessage)     -- Place to accumulate errors
+        tcl_errs :: TcRef (Messages TcRnMessage) -- Place to accumulate errors
     }
 
 setLclEnvTcLevel :: TcLclEnv -> TcLevel -> TcLclEnv

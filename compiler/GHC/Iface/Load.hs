@@ -84,7 +84,6 @@ import GHC.Types.Name
 import GHC.Types.Name.Cache
 import GHC.Types.Name.Env
 import GHC.Types.Avail
-import GHC.Types.Error ( mkMessages )
 import GHC.Types.Fixity
 import GHC.Types.Fixity.Env
 import GHC.Types.SourceError
@@ -702,7 +701,7 @@ computeInterface hsc_env doc_str hi_boot_file mod0 = do
           Succeeded (iface0, path) ->
             rnModIface hsc_env (instUnitInsts (moduleUnit indef)) Nothing iface0 >>= \case
               Right x   -> return (Succeeded (x, path))
-              Left errs -> throwErrors . mkMessages $ errs
+              Left errs -> throwErrors errs
           Failed err -> return (Failed err)
       (mod, _) -> find_iface mod
 
