@@ -39,8 +39,8 @@ module Parsers (
         , initDynFlags
         , initDynFlagsPure
         , parseModuleFromStringInternal
-        , parseModuleApiAnnsWithCpp
-        , parseModuleApiAnnsWithCppInternal
+        , parseModuleEpAnnsWithCpp
+        , parseModuleEpAnnsWithCppInternal
         , postParseTransform
         ) where
 
@@ -210,7 +210,7 @@ parseModuleWithCpp
   -> FilePath -- ^ File to be parsed
   -> IO (ParseResult GHC.ParsedSource)
 parseModuleWithCpp libdir cpp fp = do
-  res <- parseModuleApiAnnsWithCpp libdir cpp fp
+  res <- parseModuleEpAnnsWithCpp libdir cpp fp
   return $ postParseTransform res
 
 -- ---------------------------------------------------------------------
@@ -218,7 +218,7 @@ parseModuleWithCpp libdir cpp fp = do
 -- | Low level function which is used in the internal tests.
 -- It is advised to use 'parseModule' or 'parseModuleWithCpp' instead of
 -- this function.
-parseModuleApiAnnsWithCpp
+parseModuleEpAnnsWithCpp
   :: FilePath -- ^ GHC libdir
   -> CppOptions
   -> FilePath -- ^ File to be parsed
@@ -227,9 +227,9 @@ parseModuleApiAnnsWithCpp
            GHC.ErrorMessages
            ([Comment], GHC.DynFlags, GHC.ParsedSource)
        )
-parseModuleApiAnnsWithCpp libdir cppOptions file = ghcWrapper libdir $ do
+parseModuleEpAnnsWithCpp libdir cppOptions file = ghcWrapper libdir $ do
   dflags <- initDynFlags file
-  parseModuleApiAnnsWithCppInternal cppOptions dflags file
+  parseModuleEpAnnsWithCppInternal cppOptions dflags file
 
 -- | Internal function. Default runner of GHC.Ghc action in IO.
 ghcWrapper :: FilePath -> GHC.Ghc a -> IO a
@@ -239,7 +239,7 @@ ghcWrapper libdir a =
 
 -- | Internal function. Exposed if you want to muck with DynFlags
 -- before parsing.
-parseModuleApiAnnsWithCppInternal
+parseModuleEpAnnsWithCppInternal
   :: GHC.GhcMonad m
   => CppOptions
   -> GHC.DynFlags
@@ -249,7 +249,7 @@ parseModuleApiAnnsWithCppInternal
            GHC.ErrorMessages
            ([Comment], GHC.DynFlags, GHC.ParsedSource)
        )
-parseModuleApiAnnsWithCppInternal cppOptions dflags file = do
+parseModuleEpAnnsWithCppInternal cppOptions dflags file = do
   let useCpp = GHC.xopt LangExt.Cpp dflags
   (fileContents, injectedComments, dflags') <-
     if useCpp
@@ -275,7 +275,7 @@ postParseTransform
 postParseTransform parseRes = fmap mkAnns parseRes
   where
     mkAnns (_cs, _, m) = m
-      -- (relativiseApiAnnsWithOptions opts cs m apianns, m)
+      -- (relativiseEpAnnsWithOptions opts cs m apianns, m)
 
 -- | Internal function. Initializes DynFlags value for parsing.
 --
