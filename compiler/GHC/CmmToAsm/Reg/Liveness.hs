@@ -172,6 +172,7 @@ instance Instruction instr => Instruction (InstrSR instr) where
         mkStackDeallocInstr platform amount =
              Instr <$> mkStackDeallocInstr platform amount
 
+        {-# INLINEABLE pprInstr #-}
         pprInstr platform i = ppr (fmap (pprInstr platform) i)
 
 
