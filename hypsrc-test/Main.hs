@@ -2,7 +2,7 @@
 
 
 import Data.Char
-import Data.List
+import Data.List (isPrefixOf)
 import Data.Function (on)
 
 import System.Environment
