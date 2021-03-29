@@ -16,6 +16,28 @@ variables:
 
   GIT_SUBMODULE_STRATEGY: "recursive"
 
+  HACKAGE_INDEX_STATE: "2020-12-21T14:48:20Z"
+
+  # Reduce XZ compression level for regular jobs (it is bumped to 9 for releases
+  # and nightly jobs). In my experiments I've got the following bindist size in
+  # the given time for each compression level (with the quick flavour):
+  #
+  #     XZ_OPT        Time    Size
+  #     -9            4m06s   112 MB
+  #     -8            4m00s   114 MB
+  #     -7            3m50s   116 MB
+  #     -6 (default)  3m40s   118 MB
+  #     -5            2m47s   123 MB
+  #     -4            1m57s   134 MB
+  #     -3            1m03s   129 MB
+  #     -2            49.73s  136 MB
+  #     -1            37.72s  142 MB
+  #     -0            34.40s  156 MB
+  #
+  XZ_OPT: "-1"
+default:
+  interruptible: true
+
 stages:
   - lint        # Source linting
   - quick-build # A very quick smoke-test to weed out broken commits
@@ -25,14 +47,30 @@ stages:
   - testing     # head.hackage correctness and compiler performance testing
   - deploy      # push documentation
 
-# N.B.Don't run on wip/ branches, instead on run on merge requests.
-.only-default: &only-default
-  only:
-    - master
-    - /ghc-[0-9]+\.[0-9]+/
-    - merge_requests
-    - tags
-    - web
+# Note [The CI Story]
+# ~~~~~~~~~~~~~~~~~~~
+#
+# There are two different types of pipelines:
+#
+#  - marge-bot merges to `master`. Here we perform an exhaustive validation
+#    across all of the platforms which we support. In addition, we push
+#    performance metric notes upstream, providing a persistent record of the
+#    performance characteristics of the compiler.
+#
+#  - merge requests. Here we perform a slightly less exhaustive battery of
+#    testing. Namely we omit some configurations (e.g. the unregisterised job).
+#    These use the merge request's base commit for performance metric
+#    comparisons.
+#
+
+workflow:
+  # N.B. Don't run on wip/ branches, instead on run on merge requests.
+  rules:
+    - if: $CI_MERGE_REQUEST_ID
+    - if: $CI_COMMIT_TAG
+    - if: '$CI_COMMIT_BRANCH == "master"'
+    - if: '$CI_COMMIT_BRANCH =~ /ghc-[0-9]+\.[0-9]+/'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
 
 .nightly: &nightly
   only:
@@ -213,6 +251,7 @@ lint-release-changelogs:
     paths:
       - cabal-cache
   artifacts:
+    when: always
     reports:
       junit: junit.xml
     expire_in: 2 week
@@ -324,6 +363,7 @@ hadrian-ghc-in-ghci:
 
   dependencies: []
   artifacts:
+    when: always
     reports:
       junit: junit.xml
     expire_in: 2 week
@@ -525,6 +565,7 @@ validate-x86_64-darwin:
     exit $status
 
   artifacts:
+    when: always
     reports:
       junit: junit.xml
     expire_in: 2 week
@@ -609,6 +650,7 @@ validate-aarch64-darwin:
     exit $status
 
   artifacts:
+    when: always
     reports:
       junit: junit.xml
     expire_in: 2 week
