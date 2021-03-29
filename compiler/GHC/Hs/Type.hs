@@ -27,7 +27,7 @@ module GHC.Hs.Type (
         hsLinear, hsUnrestricted, isUnrestricted,
 
         HsType(..), HsCoreTy, LHsType, HsKind, LHsKind,
-        HsForAllTelescope(..), ApiAnnForallTy, HsTyVarBndr(..), LHsTyVarBndr,
+        HsForAllTelescope(..), EpAnnForallTy, HsTyVarBndr(..), LHsTyVarBndr,
         LHsQTyVars(..),
         HsOuterTyVarBndrs(..), HsOuterFamEqnTyVarBndrs, HsOuterSigTyVarBndrs,
         HsWildCardBndrs(..),
@@ -144,14 +144,14 @@ getBangStrictness _ = (HsSrcBang NoSourceText NoSrcUnpack NoSrcStrict)
 fromMaybeContext :: Maybe (LHsContext (GhcPass p)) -> HsContext (GhcPass p)
 fromMaybeContext mctxt = unLoc $ fromMaybe (noLocA []) mctxt
 
-type instance XHsForAllVis   (GhcPass _) = ApiAnnForallTy
+type instance XHsForAllVis   (GhcPass _) = EpAnnForallTy
                                            -- Location of 'forall' and '->'
-type instance XHsForAllInvis (GhcPass _) = ApiAnnForallTy
+type instance XHsForAllInvis (GhcPass _) = EpAnnForallTy
                                            -- Location of 'forall' and '.'
 
 type instance XXHsForAllTelescope (GhcPass _) = NoExtCon
 
-type ApiAnnForallTy = ApiAnn' (AddApiAnn, AddApiAnn)
+type EpAnnForallTy = EpAnn' (AddEpAnn, AddEpAnn)
   -- ^ Location of 'forall' and '->' for HsForAllVis
   -- Location of 'forall' and '.' for HsForAllInvis
 
@@ -165,12 +165,12 @@ type instance XHsQTvs GhcTc = HsQTvsRn
 
 type instance XXLHsQTyVars  (GhcPass _) = NoExtCon
 
-mkHsForAllVisTele ::ApiAnnForallTy ->
+mkHsForAllVisTele ::EpAnnForallTy ->
   [LHsTyVarBndr () (GhcPass p)] -> HsForAllTelescope (GhcPass p)
 mkHsForAllVisTele an vis_bndrs =
   HsForAllVis { hsf_xvis = an, hsf_vis_bndrs = vis_bndrs }
 
-mkHsForAllInvisTele :: ApiAnnForallTy
+mkHsForAllInvisTele :: EpAnnForallTy
   -> [LHsTyVarBndr Specificity (GhcPass p)] -> HsForAllTelescope (GhcPass p)
 mkHsForAllInvisTele an invis_bndrs =
   HsForAllInvis { hsf_xinvis = an, hsf_invis_bndrs = invis_bndrs }
@@ -188,7 +188,7 @@ type instance XHsOuterImplicit GhcPs = NoExtField
 type instance XHsOuterImplicit GhcRn = [Name]
 type instance XHsOuterImplicit GhcTc = [TyVar]
 
-type instance XHsOuterExplicit GhcPs _    = ApiAnnForallTy
+type instance XHsOuterExplicit GhcPs _    = EpAnnForallTy
 type instance XHsOuterExplicit GhcRn _    = NoExtField
 type instance XHsOuterExplicit GhcTc flag = [VarBndr TyVar flag]
 
@@ -228,7 +228,7 @@ hsOuterExplicitBndrs (HsOuterImplicit{})                  = []
 mkHsOuterImplicit :: HsOuterTyVarBndrs flag GhcPs
 mkHsOuterImplicit = HsOuterImplicit{hso_ximplicit = noExtField}
 
-mkHsOuterExplicit :: ApiAnnForallTy -> [LHsTyVarBndr flag GhcPs]
+mkHsOuterExplicit :: EpAnnForallTy -> [LHsTyVarBndr flag GhcPs]
                   -> HsOuterTyVarBndrs flag GhcPs
 mkHsOuterExplicit an bndrs = HsOuterExplicit { hso_xexplicit = an
                                              , hso_bndrs     = bndrs }
@@ -238,7 +238,7 @@ mkHsImplicitSigType body =
   HsSig { sig_ext   = noExtField
         , sig_bndrs = mkHsOuterImplicit, sig_body = body }
 
-mkHsExplicitSigType :: ApiAnnForallTy
+mkHsExplicitSigType :: EpAnnForallTy
                     -> [LHsTyVarBndr Specificity GhcPs] -> LHsType GhcPs
                     -> HsSigType GhcPs
 mkHsExplicitSigType an bndrs body =
@@ -259,8 +259,8 @@ mkEmptyWildCardBndrs x = HsWC { hswc_body = x
 
 --------------------------------------------------
 
-type instance XUserTyVar    (GhcPass _) = ApiAnn
-type instance XKindedTyVar  (GhcPass _) = ApiAnn
+type instance XUserTyVar    (GhcPass _) = EpAnn
+type instance XKindedTyVar  (GhcPass _) = EpAnn
 
 type instance XXTyVarBndr   (GhcPass _) = NoExtCon
 
@@ -285,17 +285,17 @@ instance NamedThing (HsTyVarBndr flag GhcRn) where
 
 type instance XForAllTy        (GhcPass _) = NoExtField
 type instance XQualTy          (GhcPass _) = NoExtField
-type instance XTyVar           (GhcPass _) = ApiAnn
+type instance XTyVar           (GhcPass _) = EpAnn
 type instance XAppTy           (GhcPass _) = NoExtField
-type instance XFunTy           (GhcPass _) = ApiAnn' TrailingAnn -- For the AnnRarrow or AnnLolly
-type instance XListTy          (GhcPass _) = ApiAnn' AnnParen
-type instance XTupleTy         (GhcPass _) = ApiAnn' AnnParen
-type instance XSumTy           (GhcPass _) = ApiAnn' AnnParen
+type instance XFunTy           (GhcPass _) = EpAnn' TrailingAnn -- For the AnnRarrow or AnnLolly
+type instance XListTy          (GhcPass _) = EpAnn' AnnParen
+type instance XTupleTy         (GhcPass _) = EpAnn' AnnParen
+type instance XSumTy           (GhcPass _) = EpAnn' AnnParen
 type instance XOpTy            (GhcPass _) = NoExtField
-type instance XParTy           (GhcPass _) = ApiAnn' AnnParen
-type instance XIParamTy        (GhcPass _) = ApiAnn
+type instance XParTy           (GhcPass _) = EpAnn' AnnParen
+type instance XIParamTy        (GhcPass _) = EpAnn
 type instance XStarTy          (GhcPass _) = NoExtField
-type instance XKindSig         (GhcPass _) = ApiAnn
+type instance XKindSig         (GhcPass _) = EpAnn
 
 type instance XAppKindTy       (GhcPass _) = SrcSpan -- Where the `@` lives
 
@@ -303,18 +303,18 @@ type instance XSpliceTy        GhcPs = NoExtField
 type instance XSpliceTy        GhcRn = NoExtField
 type instance XSpliceTy        GhcTc = Kind
 
-type instance XDocTy           (GhcPass _) = ApiAnn
-type instance XBangTy          (GhcPass _) = ApiAnn
+type instance XDocTy           (GhcPass _) = EpAnn
+type instance XBangTy          (GhcPass _) = EpAnn
 
-type instance XRecTy           GhcPs = ApiAnn' AnnList
+type instance XRecTy           GhcPs = EpAnn' AnnList
 type instance XRecTy           GhcRn = NoExtField
 type instance XRecTy           GhcTc = NoExtField
 
-type instance XExplicitListTy  GhcPs = ApiAnn
+type instance XExplicitListTy  GhcPs = EpAnn
 type instance XExplicitListTy  GhcRn = NoExtField
 type instance XExplicitListTy  GhcTc = Kind
 
-type instance XExplicitTupleTy GhcPs = ApiAnn
+type instance XExplicitTupleTy GhcPs = EpAnn
 type instance XExplicitTupleTy GhcRn = NoExtField
 type instance XExplicitTupleTy GhcTc = [Kind]
 
@@ -354,7 +354,7 @@ pprHsArrow (HsUnrestrictedArrow _) = arrow
 pprHsArrow (HsLinearArrow _ _) = lollipop
 pprHsArrow (HsExplicitMult _ _ p) = (mulArrow (ppr p))
 
-type instance XConDeclField  (GhcPass _) = ApiAnn
+type instance XConDeclField  (GhcPass _) = EpAnn
 type instance XXConDeclField (GhcPass _) = NoExtCon
 
 instance OutputableBndrId p
@@ -474,21 +474,21 @@ mkHsAppKindTy ext ty k
 -- It returns API Annotations for any parens removed
 splitHsFunType ::
      LHsType (GhcPass p)
-  -> ( [AddApiAnn], ApiAnnComments -- The locations of any parens and
-                                   -- comments discarded
+  -> ( [AddEpAnn], EpAnnComments -- The locations of any parens and
+                                  -- comments discarded
      , [HsScaled (GhcPass p) (LHsType (GhcPass p))], LHsType (GhcPass p))
 splitHsFunType ty = go ty
   where
     go (L l (HsParTy an ty))
       = let
           (anns, cs, args, res) = splitHsFunType ty
-          anns' = anns ++ annParen2AddApiAnn an
-          cs' = cs S.<> apiAnnComments (ann l) S.<> apiAnnComments an
+          anns' = anns ++ annParen2AddEpAnn an
+          cs' = cs S.<> epAnnComments (ann l) S.<> epAnnComments an
         in (anns', cs', args, res)
 
-    go (L ll (HsFunTy (ApiAnn _ an cs) mult x y))
+    go (L ll (HsFunTy (EpAnn _ an cs) mult x y))
       | (anns, csy, args, res) <- splitHsFunType y
-      = (anns, csy S.<> apiAnnComments (ann ll), HsScaled mult x':args, res)
+      = (anns, csy S.<> epAnnComments (ann ll), HsScaled mult x':args, res)
       where
         (L (SrcSpanAnn a l) t) = x
         an' = addTrailingAnnToA l an cs a
@@ -618,11 +618,11 @@ splitLHsGadtTy (L _ sig_ty)
 -- Unlike 'splitLHsSigmaTyInvis', this function does not look through
 -- parentheses, hence the suffix @_KP@ (short for \"Keep Parentheses\").
 splitLHsForAllTyInvis ::
-  LHsType (GhcPass pass) -> ( (ApiAnnForallTy, [LHsTyVarBndr Specificity (GhcPass pass)])
+  LHsType (GhcPass pass) -> ( (EpAnnForallTy, [LHsTyVarBndr Specificity (GhcPass pass)])
                             , LHsType (GhcPass pass))
 splitLHsForAllTyInvis ty
   | ((mb_tvbs), body) <- splitLHsForAllTyInvis_KP (ignoreParens ty)
-  = (fromMaybe (ApiAnnNotUsed,[]) mb_tvbs, body)
+  = (fromMaybe (EpAnnNotUsed,[]) mb_tvbs, body)
 
 -- | Decompose a type of the form @forall <tvs>. body@ into its constituent
 -- parts. Only splits type variable binders that
@@ -636,7 +636,7 @@ splitLHsForAllTyInvis ty
 -- Unlike 'splitLHsForAllTyInvis', this function does not look through
 -- parentheses, hence the suffix @_KP@ (short for \"Keep Parentheses\").
 splitLHsForAllTyInvis_KP ::
-  LHsType (GhcPass pass) -> (Maybe (ApiAnnForallTy, [LHsTyVarBndr Specificity (GhcPass pass)])
+  LHsType (GhcPass pass) -> (Maybe (EpAnnForallTy, [LHsTyVarBndr Specificity (GhcPass pass)])
                             , LHsType (GhcPass pass))
 splitLHsForAllTyInvis_KP lty@(L _ ty) =
   case ty of
