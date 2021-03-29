@@ -852,28 +852,34 @@ loop:
 #if defined(COMPILING_WINDOWS_DLL)
       copy_tag_nolock(p,info,q,sizeofW(StgHeader)+1,gen_no,tag);
 #else
-      StgWord w = (StgWord)q->payload[0];
-      if (info == Czh_con_info &&
-          // unsigned, so always true:  (StgChar)w >= MIN_STATIC_CHAR &&
-          (StgChar)w <= MAX_STATIC_CHAR) {
-          RELAXED_STORE(p, \
-                        TAG_CLOSURE(tag, \
-                                    (StgClosure *)STATIC_CHAR_CLOSURE((StgChar)w)
-                                   ));
-      }
-      else if (info == Izh_con_info &&
-          (StgInt)w >= MIN_STATIC_INT && (StgInt)w <= MAX_STATIC_INT) {
-          RELAXED_STORE(p, \
-                        TAG_CLOSURE(tag, \
-                                    (StgClosure *)STATIC_INT_CLOSURE((StgInt)w)
-                                   ));
-      }
-      else if (info == Wzh_con_info &&
-          // unsigned, so always true:  (StgWord)w >= MIN_STATIC_WORD &&
-          (StgWord)w <= MAX_STATIC_WORD) {
-          *p = TAG_CLOSURE(tag,
-                             (StgClosure *)STATIC_WORD_CLOSURE((StgWord)w)
-                             );
+      // only do this when promoting to generation 1
+      if (gct->evac_gen_no == 1 && gen_no < gct->evac_gen_no) {
+        StgWord w = (StgWord)q->payload[0];
+        if (info == Czh_con_info &&
+            // unsigned, so always true:  (StgChar)w >= MIN_STATIC_CHAR &&
+            (StgChar)w <= MAX_STATIC_CHAR) {
+            RELAXED_STORE(p, \
+                          TAG_CLOSURE(tag, \
+                                      (StgClosure *)STATIC_CHAR_CLOSURE((StgChar)w)
+                                     ));
+        }
+        else if (info == Izh_con_info &&
+            (StgInt)w >= MIN_STATIC_INT && (StgInt)w <= MAX_STATIC_INT) {
+            RELAXED_STORE(p, \
+                          TAG_CLOSURE(tag, \
+                                      (StgClosure *)STATIC_INT_CLOSURE((StgInt)w)
+                                     ));
+        }
+        else if (info == Wzh_con_info &&
+            // unsigned, so always true:  (StgWord)w >= MIN_STATIC_WORD &&
+            (StgWord)w <= MAX_STATIC_WORD) {
+            *p = TAG_CLOSURE(tag,
+                               (StgClosure *)STATIC_WORD_CLOSURE((StgWord)w)
+                               );
+        }
+        else {
+            copy_tag_nolock(p,info,q,sizeofW(StgHeader)+1,gen_no,tag);
+        }
       }
       else {
           copy_tag_nolock(p,info,q,sizeofW(StgHeader)+1,gen_no,tag);
