@@ -357,7 +357,7 @@ viewProd :: Arity -> SubDemand -> Maybe [Demand]
 viewProd n (Prod ds)   | ds `lengthIs` n = Just ds
 -- Note the strict application to replicate: This makes sure we don't allocate
 -- a thunk for it, inlines it and lets case-of-case fire at call sites.
-viewProd n (Poly card)                   = Just (replicate n $! polyDmd card)
+viewProd n (Poly card)                   = Just $! (replicate n $! polyDmd card)
 viewProd _ _                             = Nothing
 {-# INLINE viewProd #-} -- we want to fuse away the replicate and the allocation
                         -- for Arity. Otherwise, #18304 bites us.
@@ -386,7 +386,7 @@ seqDmd = C_11 :* seqSubDmd
 lubSubDmd :: SubDemand -> SubDemand -> SubDemand
 -- Handle Prod
 lubSubDmd (Prod ds1) (viewProd (length ds1) -> Just ds2) =
-  Prod $ zipWith lubDmd ds2 ds1 -- try to fuse with ds2
+  Prod $ strictZipWith lubDmd ds2 ds1 -- try to fuse with ds2
 -- Handle Call
 lubSubDmd (Call n1 d1) (viewCall -> Just (n2, d2))
   -- See Note [Call demands are relative]
