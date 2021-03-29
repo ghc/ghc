@@ -24,7 +24,7 @@ module Main (main) where
 
 import Control.Exception
 import Control.Monad
-import Data.List
+import Data.List (intersperse, transpose, tails, isSuffixOf, sort, sortBy)
 import Data.Maybe
 import Numeric
 import System.Directory
