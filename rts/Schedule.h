@@ -119,6 +119,11 @@ extern bool heap_overflow;
 extern Mutex sched_mutex;
 #endif
 
+/* Counter for number of requests for backtrace, wrap around allowed
+ * Typically triggered by SIGQUIT, i.e. Ctrl^\ pressed by user
+ */
+extern volatile StgWord backtrace_request;
+
 /* Called by shutdown_handler(). */
 void interruptStgRts (void);
 
