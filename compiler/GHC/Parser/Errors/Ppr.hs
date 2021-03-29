@@ -13,10 +13,10 @@ import GHC.Driver.Flags
 import GHC.Parser.Errors
 import GHC.Parser.Types
 import GHC.Types.Basic
+import GHC.Types.Error
 import GHC.Types.SrcLoc
 import GHC.Types.Name.Reader (starInfo, rdrNameOcc, opIsAt, mkUnqual)
 import GHC.Types.Name.Occurrence (isSymOcc, occNameFS, varName)
-import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Data.FastString
@@ -25,25 +25,23 @@ import GHC.Hs.Type (pprLHsContext)
 import GHC.Builtin.Names (allNameStrings)
 import GHC.Builtin.Types (filterCTuple)
 
-mkParserErr :: SrcSpan -> SDoc -> MsgEnvelope DecoratedSDoc
+mkParserErr :: SrcSpan -> SDoc -> MsgEnvelope DiagnosticMessage
 mkParserErr span doc = MsgEnvelope
    { errMsgSpan        = span
    , errMsgContext     = alwaysQualify
-   , errMsgDiagnostic  = mkDecorated [doc]
+   , errMsgDiagnostic  = DiagnosticMessage (mkDecorated [doc]) ErrorWithoutFlag
    , errMsgSeverity    = SevError
-   , errMsgReason      = NoReason
    }
 
-mkParserWarn :: WarningFlag -> SrcSpan -> SDoc -> MsgEnvelope DecoratedSDoc
+mkParserWarn :: WarningFlag -> SrcSpan -> SDoc -> MsgEnvelope DiagnosticMessage
 mkParserWarn flag span doc = MsgEnvelope
    { errMsgSpan        = span
    , errMsgContext     = alwaysQualify
-   , errMsgDiagnostic  = mkDecorated [doc]
+   , errMsgDiagnostic  = DiagnosticMessage (mkDecorated [doc]) (WarningWithFlag flag)
    , errMsgSeverity    = SevWarning
-   , errMsgReason      = Reason flag
    }
 
-pprWarning :: PsWarning -> MsgEnvelope DecoratedSDoc
+pprWarning :: PsWarning -> MsgEnvelope DiagnosticMessage
 pprWarning = \case
    PsWarnTab loc tc
       -> mkParserWarn Opt_WarnTabs loc $
@@ -129,7 +127,7 @@ pprWarning = \case
            OperatorWhitespaceOccurrence_Suffix -> mk_msg "suffix"
            OperatorWhitespaceOccurrence_TightInfix -> mk_msg "tight infix"
 
-pprError :: PsError -> MsgEnvelope DecoratedSDoc
+pprError :: PsError -> MsgEnvelope DiagnosticMessage
 pprError err = mkParserErr (errLoc err) $ vcat
    (pp_err (errDesc err) : map pp_hint (errHints err))
 

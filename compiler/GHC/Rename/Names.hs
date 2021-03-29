@@ -334,8 +334,8 @@ rnImportDecl this_mod
         _  | implicit   -> return () -- Do not bleat for implicit imports
            | qual_only  -> return ()
            | otherwise  -> whenWOptM Opt_WarnMissingImportList $
-                           addWarn (Reason Opt_WarnMissingImportList)
-                                   (missingImportListWarn imp_mod_name)
+                           addDiagnostic (WarningWithFlag Opt_WarnMissingImportList)
+                                         (missingImportListWarn imp_mod_name)
 
     iface <- loadSrcInterface doc imp_mod_name want_boot (fmap sl_fs mb_pkg)
 
@@ -396,8 +396,8 @@ rnImportDecl this_mod
     -- Complain if we import a deprecated module
     whenWOptM Opt_WarnWarningsDeprecations (
        case (mi_warns iface) of
-          WarnAll txt -> addWarn (Reason Opt_WarnWarningsDeprecations)
-                                (moduleWarn imp_mod_name txt)
+          WarnAll txt -> addDiagnostic (WarningWithFlag Opt_WarnWarningsDeprecations)
+                                       (moduleWarn imp_mod_name txt)
           _           -> return ()
      )
 
@@ -522,7 +522,7 @@ warnUnqualifiedImport :: ImportDecl GhcPs -> ModIface -> RnM ()
 warnUnqualifiedImport decl iface =
     whenWOptM Opt_WarnCompatUnqualifiedImports
     $ when bad_import
-    $ addWarnAt (Reason Opt_WarnCompatUnqualifiedImports) loc warning
+    $ addDiagnosticAt (WarningWithFlag Opt_WarnCompatUnqualifiedImports) loc warning
   where
     mod = mi_module iface
     loc = getLoc $ ideclName decl
@@ -1165,11 +1165,11 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
         where
             -- Warn when importing T(..) if T was exported abstractly
             emit_warning (DodgyImport n) = whenWOptM Opt_WarnDodgyImports $
-              addWarn (Reason Opt_WarnDodgyImports) (dodgyImportWarn n)
+              addDiagnostic (WarningWithFlag Opt_WarnDodgyImports) (dodgyImportWarn n)
             emit_warning MissingImportList = whenWOptM Opt_WarnMissingImportList $
-              addWarn (Reason Opt_WarnMissingImportList) (missingImportListItem ieRdr)
+              addDiagnostic (WarningWithFlag Opt_WarnMissingImportList) (missingImportListItem ieRdr)
             emit_warning (BadImportW ie) = whenWOptM Opt_WarnDodgyImports $
-              addWarn (Reason Opt_WarnDodgyImports) (lookup_err_msg (BadImport ie))
+              addDiagnostic (WarningWithFlag Opt_WarnDodgyImports) (lookup_err_msg (BadImport ie))
 
             run_lookup :: IELookupM a -> TcRn (Maybe a)
             run_lookup m = case m of
@@ -1514,7 +1514,7 @@ warnMissingSignatures gbl_env
 
                   add_warn name msg
                     = when (name `elemNameSet` sig_ns && export_check name)
-                           (addWarnAt (Reason flag) (getSrcSpan name) msg)
+                           (addDiagnosticAt (WarningWithFlag flag) (getSrcSpan name) msg)
 
                   export_check name
                     = warn_missing_sigs || not warn_only_exported || name `elemNameSet` exports
@@ -1536,7 +1536,7 @@ warnMissingKindSignatures gbl_env
 
     add_ty_warn :: Bool -> TyCon -> IOEnv (Env TcGblEnv TcLclEnv) ()
     add_ty_warn cusks_enabled tyCon = when (name `elemNameSet` ksig_ns) $
-        addWarnAt (Reason Opt_WarnMissingKindSignatures) (getSrcSpan name) $
+        addDiagnosticAt (WarningWithFlag Opt_WarnMissingKindSignatures) (getSrcSpan name) $
             hang msg 2 (text "type" <+> pprPrefixName name <+> dcolon <+> ki_msg)
       where
         msg | cusks_enabled = text "Top-level type constructor with no standalone kind signature or CUSK:"
@@ -1703,7 +1703,7 @@ warnUnusedImport flag fld_env (L loc decl, used, unused)
 
   -- Nothing used; drop entire declaration
   | null used
-  = addWarnAt (Reason flag) (locA loc) msg1
+  = addDiagnosticAt (WarningWithFlag flag) (locA loc) msg1
 
   -- Everything imported is used; nop
   | null unused
@@ -1714,11 +1714,11 @@ warnUnusedImport flag fld_env (L loc decl, used, unused)
   | Just (_, L _ imports) <- ideclHiding decl
   , length unused == 1
   , Just (L loc _) <- find (\(L _ ie) -> ((ieName ie) :: Name) `elem` unused) imports
-  = addWarnAt (Reason flag) (locA loc) msg2
+  = addDiagnosticAt (WarningWithFlag flag) (locA loc) msg2
 
   -- Some imports are unused
   | otherwise
-  = addWarnAt (Reason flag) (locA loc)  msg2
+  = addDiagnosticAt (WarningWithFlag flag) (locA loc) msg2
 
   where
     msg1 = vcat [ pp_herald <+> quotes pp_mod <+> is_redundant
