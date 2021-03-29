@@ -1084,7 +1084,7 @@ a consequence of fixed-point iteration, it's not important that they agree.
 -- Subject to Note [Default demand on free variables and arguments]
 type DmdEnv = VarEnv Demand
 
-emptyDmdEnv :: VarEnv Demand
+emptyDmdEnv :: DmdEnv
 emptyDmdEnv = emptyVarEnv
 
 multDmdEnv :: Card -> DmdEnv -> DmdEnv
