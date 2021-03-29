@@ -859,14 +859,14 @@ allows DFuns to specialise as well.
 Note [Avoiding loops in specImports]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We must take great care when specialising instance declarations
-(functions like $fOrdList) lest we accidentally build a recursive
-dictionary. See Note [Avoiding loops].
+(DFuns like $fOrdList) lest we accidentally build a recursive
+dictionary. See Note [Avoiding loops (DFuns)].
 
-The basic strategy of Note [Avoiding loops] is to use filterCalls
+The basic strategy of Note [Avoiding loops (DFuns)] is to use filterCalls
 to discard loopy specialisations.  But to do that we must ensure
 that the in-scope dict-binds (passed to filterCalls) contains
 all the needed dictionary bindings.  In particular, in the recursive
-call to spec_imorpts in spec_import, we must include the dict-binds
+call to spec_imports in spec_import, we must include the dict-binds
 from the parent.  Lacking this caused #17151, a really nasty bug.
 
 Here is what happened.
@@ -1820,8 +1820,8 @@ In general, we need only make this Rec if
   - there are some specialisations (spec_binds non-empty)
   - there are some dict_binds that depend on f (dump_dbs non-empty)
 
-Note [Avoiding loops]
-~~~~~~~~~~~~~~~~~~~~~
+Note [Avoiding loops (DFuns)]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When specialising /dictionary functions/ we must be very careful to
 avoid building loops. Here is an example that bit us badly, on
 several distinct occasions.
@@ -1862,8 +1862,10 @@ Solution:
   (directly or indirectly) on the dfun we are specialising.
   This is done by 'filterCalls'
 
---------------
-Here's yet another example
+Note [Avoiding loops (non-DFuns)]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The whole Note [Avoiding loops (DFuns)] things applies only to DFuns.
+It's important /not/ to apply filterCalls to non-DFuns. For example:
 
   class C a where { foo,bar :: [a] -> [a] }
 
@@ -1884,8 +1886,8 @@ That translates to:
 The call (r_bar $fCInt) mentions $fCInt,
                         which mentions foo_help,
                         which mentions r_bar
-But we DO want to specialise r_bar at Int:
 
+But we DO want to specialise r_bar at Int:
     Rec { $fCInt :: C Int = MkC foo_help reverse
           foo_help (xs::[Int]) = r_bar Int $fCInt xs
 
@@ -1897,6 +1899,22 @@ But we DO want to specialise r_bar at Int:
 
 Note that, because of its RULE, r_bar joins the recursive
 group.  (In this case it'll unravel a short moment later.)
+See test simplCore/should_compile/T19599a.
+
+Another example is #19599, which looked like this:
+
+   class (Show a, Enum a) => MyShow a where
+      myShow :: a -> String
+
+   myShow_impl :: MyShow a => a -> String
+
+   foo :: Int -> String
+   foo = myShow_impl @Int $fMyShowInt
+
+   Rec { $fMyShowInt = MkMyShowD $fEnumInt $fShowInt $cmyShow
+       ; $cmyShow = myShow_impl @Int $fMyShowInt }
+
+Here, we really do want to specialise `myShow_impl @Int $fMyShowInt`.
 
 
 Note [Specialising a recursive group]
@@ -2677,11 +2695,10 @@ pair_fvs (bndr, rhs) = exprSomeFreeVars interesting rhs
     interesting :: InterestingVarFun
     interesting v = isLocalVar v || (isId v && isDFunId v)
         -- Very important: include DFunIds /even/ if it is imported
-        -- Reason: See Note [Avoiding loops], the second example
-        --         involving an imported dfun.  We must know whether
-        --         a dictionary binding depends on an imported dfun,
-        --         in case we try to specialise that imported dfun
-        --         #13429 illustrates
+        -- Reason: See Note [Avoiding loops in specImports], the #13429
+        --         example involving an imported dfun.  We must know
+        --         whether a dictionary binding depends on an imported
+        --         DFun in case we try to specialise that imported DFun
 
 -- | Flatten a set of "dumped" 'DictBind's, and some other binding
 -- pairs, into a single recursive binding.
@@ -2771,14 +2788,19 @@ callsForMe fn (MkUD { ud_binds = orig_dbs, ud_calls = orig_calls })
                         Nothing -> []
                         Just cis -> filterCalls cis orig_dbs
          -- filterCalls: drop calls that (directly or indirectly)
-         -- refer to fn.  See Note [Avoiding loops]
+         -- refer to fn.  See Note [Avoiding loops (DFuns)]
 
 ----------------------
 filterCalls :: CallInfoSet -> Bag DictBind -> [CallInfo]
--- See Note [Avoiding loops]
+-- See Note [Avoiding loops (DFuns)]
 filterCalls (CIS fn call_bag) dbs
-  = filter ok_call (bagToList call_bag)
+  | isDFunId fn  -- Note [Avoiding loops (DFuns)] applies only to DFuns
+  = filter ok_call unfiltered_calls
+  | otherwise         -- Do not apply it to non-DFuns
+  = unfiltered_calls  -- See Note [Avoiding loops (non-DFuns)]
   where
+    unfiltered_calls = bagToList call_bag
+
     dump_set = foldl' go (unitVarSet fn) dbs
       -- This dump-set could also be computed by splitDictBinds
       --   (_,_,dump_set) = splitDictBinds dbs {fn}
