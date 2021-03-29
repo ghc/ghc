@@ -218,7 +218,7 @@ import qualified GHC.Data.Stream as Stream
 import GHC.Data.Stream (Stream)
 
 import Data.Data hiding (Fixity, TyCon)
-import Data.Maybe       ( fromJust, fromMaybe )
+import Data.Maybe       ( fromJust )
 import Data.List        ( nub, isPrefixOf, partition )
 import Control.Monad
 import Data.IORef
@@ -431,7 +431,7 @@ hscParse' mod_summary
                         FormatHaskell (ppr rdr_module)
             liftIO $ dumpIfSet_dyn logger dflags Opt_D_dump_parsed_ast "Parser AST"
                         FormatHaskell (showAstData NoBlankSrcSpan
-                                                   NoBlankApiAnnotations
+                                                   NoBlankEpAnnotations
                                                    rdr_module)
             liftIO $ dumpIfSet_dyn logger dflags Opt_D_source_stats "Source Statistics"
                         FormatText (ppSourceStats False rdr_module)
@@ -463,13 +463,9 @@ hscParse' mod_summary
             -- filter them out:
             srcs2 <- liftIO $ filterM doesFileExist srcs1
 
-            let api_anns = ApiAnns {
-                      apiAnnRogueComments = (fromMaybe [] (header_comments pst)) ++ comment_q pst
-                   }
-                res = HsParsedModule {
+            let res = HsParsedModule {
                       hpm_module    = rdr_module,
-                      hpm_src_files = srcs2,
-                      hpm_annotations = api_anns
+                      hpm_src_files = srcs2
                    }
 
             -- apply parse transformation of plugins
@@ -488,7 +484,7 @@ extract_renamed_stuff mod_summary tc_result = do
     dflags <- getDynFlags
     logger <- getLogger
     liftIO $ dumpIfSet_dyn logger dflags Opt_D_dump_rn_ast "Renamer"
-                FormatHaskell (showAstData NoBlankSrcSpan NoBlankApiAnnotations rn_info)
+                FormatHaskell (showAstData NoBlankSrcSpan NoBlankEpAnnotations rn_info)
 
     -- Create HIE files
     when (gopt Opt_WriteHie dflags) $ do
@@ -2084,7 +2080,7 @@ hscParseThingWithLocation source linenumber parser str = do
                 liftIO $ dumpIfSet_dyn logger dflags Opt_D_dump_parsed "Parser"
                             FormatHaskell (ppr thing)
                 liftIO $ dumpIfSet_dyn logger dflags Opt_D_dump_parsed_ast "Parser AST"
-                            FormatHaskell (showAstData NoBlankSrcSpan NoBlankApiAnnotations thing)
+                            FormatHaskell (showAstData NoBlankSrcSpan NoBlankEpAnnotations thing)
                 return thing
 
 

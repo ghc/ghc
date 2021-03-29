@@ -580,7 +580,7 @@ instance Outputable Origin where
 --                              @'\{-\# INCOHERENT'@,
 --      'GHC.Parser.Annotation.AnnClose' @`\#-\}`@,
 
--- For details on above see note [Api annotations] in "GHC.Parser.Annotation"
+-- For details on above see note [exact print annotations] in "GHC.Parser.Annotation"
 data OverlapFlag = OverlapFlag
   { overlapMode   :: OverlapMode
   , isSafeOverlap :: Bool
