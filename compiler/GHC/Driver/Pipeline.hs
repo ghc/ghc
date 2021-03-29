@@ -825,6 +825,7 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_input_buf, mb_phase)
                              , ue_home_unit = Just home_unit
                              , ue_units     = unit_state
                              , ue_unit_dbs  = Just dbs
+                             , ue_hpt       = emptyHomePackageTable
                              }
                        let hsc_env'' = hsc_env'
                             { hsc_unit_env = unit_env
