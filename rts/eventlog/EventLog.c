@@ -1499,6 +1499,8 @@ static HeapProfBreakdown getHeapProfBreakdown(void)
         return HEAP_PROF_BREAKDOWN_CLOSURE_TYPE;
     case HEAP_BY_INFO_TABLE:
         return HEAP_PROF_BREAKDOWN_INFO_TABLE;
+    case HEAP_BY_ROOT:
+        return HEAP_PROF_BREAKDOWN_ROOT;
     default:
         barf("getHeapProfBreakdown: unknown heap profiling mode");
     }

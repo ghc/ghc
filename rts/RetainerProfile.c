@@ -14,7 +14,7 @@
 
 #include "RetainerProfile.h"
 #include "RetainerSet.h"
-#include "TraverseHeap.h"
+#include "rts/TraverseHeap.h"
 #include "Profiling.h"
 #include "Stats.h"
 #include "StablePtr.h" /* markStablePtrTable */
@@ -65,24 +65,6 @@ static uint32_t retainerGeneration;  // generation
 static uint32_t numObjectVisited;    // total number of objects visited
 static uint32_t timesAnyObjectVisited;  // number of times any objects are
                                         // visited
-
-/* -----------------------------------------------------------------------------
- * Retainer stack - header
- *   Note:
- *     Although the retainer stack implementation could be separated *
- *     from the retainer profiling engine, there does not seem to be
- *     any advantage in doing that; retainer stack is an integral part
- *     of retainer profiling engine and cannot be use elsewhere at
- *     all.
- * -------------------------------------------------------------------------- */
-
-traverseState g_retainerTraverseState;
-
-W_
-retainerStackBlocks(void)
-{
-    return traverseWorkStackBlocks(&g_retainerTraverseState);
-}
 
 /* -----------------------------------------------------------------------------
  * RETAINER PROFILING ENGINE
@@ -251,19 +233,14 @@ associate( StgClosure *c, RetainerSet *s )
 {
     // StgWord has the same size as pointers, so the following type
     // casting is okay.
-    setTravData(&g_retainerTraverseState, c, (StgWord)s);
-}
-
-bool isRetainerSetValid( const StgClosure *c )
-{
-    return isTravDataValid(&g_retainerTraverseState, c);
+    traverseSetClosureData(c, (StgWord)s);
 }
 
 inline RetainerSet*
 retainerSetOf( const StgClosure *c )
 {
-    ASSERT(isRetainerSetValid(c));
-    return (RetainerSet*)getTravData(c);
+    ASSERT(traverseIsClosureDataValid(c));
+    return (RetainerSet*)traverseGetClosureData(c);
 }
 
 static bool
@@ -360,7 +337,6 @@ retainRoot(void *user, StgClosure **tl)
     // be a root.
 
     c = UNTAG_CLOSURE(*tl);
-    traverseMaybeInitClosureData(&g_retainerTraverseState, c);
     if (c != &stg_END_TSO_QUEUE_closure && isRetainer(c)) {
         traversePushRoot(ts, c, c, (stackData)getRetainerFrom(c));
     } else {
@@ -380,8 +356,6 @@ computeRetainerSet( traverseState *ts )
 {
     StgWeak *weak;
     uint32_t g, n;
-
-    traverseInvalidateClosureData(ts);
 
     markCapabilities(retainRoot, (void*)ts); // for scheduler roots
 
@@ -408,7 +382,7 @@ computeRetainerSet( traverseState *ts )
     // Remember old stable name addresses.
     rememberOldStableNameAddresses ();
 
-    traverseWorkStack(ts, &retainVisitClosure);
+    traverseWorkStack(ts, &retainVisitClosure, NULL);
 }
 
 /* -----------------------------------------------------------------------------
@@ -421,30 +395,23 @@ computeRetainerSet( traverseState *ts )
  *   collection.
  * ------------------------------------------------------------------------- */
 void
-retainerProfile(void)
+retainerProfile(traverseState *ts)
 {
   stat_startRP();
 
   numObjectVisited = 0;
   timesAnyObjectVisited = 0;
 
-  /*
-    We initialize the traverse stack each time the retainer profiling is
-    performed (because the traverse stack size varies on each retainer profiling
-    and this operation is not costly anyhow). However, we just refresh the
-    retainer sets.
-   */
-  initializeTraverseStack(&g_retainerTraverseState);
+  // Rrefresh the retainer sets.
   initializeAllRetainerSet();
-  computeRetainerSet(&g_retainerTraverseState);
+  computeRetainerSet(ts);
 
   // post-processing
-  closeTraverseStack(&g_retainerTraverseState);
   retainerGeneration++;
 
   stat_endRP(
     retainerGeneration - 1,   // retainerGeneration has just been incremented!
-    getTraverseStackMaxSize(&g_retainerTraverseState),
+    getTraverseStackMaxSize(ts),
     (double)timesAnyObjectVisited / numObjectVisited);
 }
 
