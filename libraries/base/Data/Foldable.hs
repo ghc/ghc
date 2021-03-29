@@ -182,6 +182,7 @@ class Foldable t where
     --
     fold :: Monoid m => t m -> m
     fold = foldMap id
+    {-# INLINE fold #-}
 
     -- | Map each element of the structure into a monoid, and combine the
     -- results with @('<>')@.  This fold is right-associative and lazy in the
@@ -700,6 +701,11 @@ instance Foldable [] where
     foldl'  = List.foldl'
     foldl1  = List.foldl1
     foldr   = List.foldr
+    -- This, along with the fold definition below, allows specialized mconcat
+    -- implementations an opportunity to combine elements efficiently in a
+    -- single pass.
+    foldMap = (mconcat .) . map
+    fold    = mconcat
     foldr1  = List.foldr1
     length  = List.length
     maximum = List.maximum
