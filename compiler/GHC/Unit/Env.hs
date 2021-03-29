@@ -1,6 +1,7 @@
 module GHC.Unit.Env
     ( UnitEnv (..)
     , initUnitEnv
+    , unsafeGetHomeUnit
     , preloadUnitsInfo
     , preloadUnitsInfo'
     )
@@ -21,7 +22,17 @@ data UnitEnv = UnitEnv
     { ue_units     :: !UnitState
         -- ^ External units
 
-    , ue_home_unit :: !HomeUnit
+    , ue_unit_dbs :: !(Maybe [UnitDatabase UnitId])
+        -- ^ Stack of unit databases for the target platform.
+        --
+        -- This field is populated with the result of `initUnits`.
+        --
+        -- 'Nothing' means the databases have never been read from disk.
+        --
+        -- Usually we don't reload the databases from disk if they are
+        -- cached, even if the database flags changed!
+
+    , ue_home_unit :: !(Maybe HomeUnit)
         -- ^ Home unit
 
     , ue_platform  :: !Platform
@@ -35,10 +46,19 @@ initUnitEnv :: GhcNameVersion -> Platform -> IO UnitEnv
 initUnitEnv namever platform = do
   return $ UnitEnv
     { ue_units     = emptyUnitState
-    , ue_home_unit = panic "No home unit"
+    , ue_unit_dbs  = Nothing
+    , ue_home_unit = Nothing
     , ue_platform  = platform
     , ue_namever   = namever
     }
+
+-- | Get home-unit
+--
+-- Unsafe because the home-unit may not be set
+unsafeGetHomeUnit :: UnitEnv -> HomeUnit
+unsafeGetHomeUnit ue = case ue_home_unit ue of
+  Nothing -> panic "unsafeGetHomeUnit: No home unit"
+  Just h  -> h
 
 -- -----------------------------------------------------------------------------
 -- Extracting information from the packages in scope
@@ -57,15 +77,16 @@ initUnitEnv namever platform = do
 preloadUnitsInfo' :: UnitEnv -> [UnitId] -> MaybeErr UnitErr [UnitInfo]
 preloadUnitsInfo' unit_env ids0 = all_infos
   where
-    home_unit  = ue_home_unit unit_env
-    unit_state = ue_units     unit_env
+    unit_state = ue_units unit_env
     ids      = ids0 ++ inst_ids
-    inst_ids
+    inst_ids = case ue_home_unit unit_env of
+      Nothing -> []
+      Just home_unit
        -- An indefinite package will have insts to HOLE,
        -- which is not a real package. Don't look it up.
        -- Fixes #14525
-       | isHomeUnitIndefinite home_unit = []
-       | otherwise = map (toUnitId . moduleUnit . snd) (homeUnitInstantiations home_unit)
+       | isHomeUnitIndefinite home_unit -> []
+       | otherwise -> map (toUnitId . moduleUnit . snd) (homeUnitInstantiations home_unit)
     pkg_map = unitInfoMap unit_state
     preload = preloadUnits unit_state
 

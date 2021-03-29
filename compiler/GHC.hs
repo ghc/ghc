@@ -641,7 +641,8 @@ setSessionDynFlags dflags0 = do
   logger <- getLogger
   dflags <- checkNewDynFlags logger dflags0
   hsc_env <- getSession
-  (dbs,unit_state,home_unit) <- liftIO $ initUnits logger dflags (hsc_unit_dbs hsc_env)
+  let cached_unit_dbs = ue_unit_dbs (hsc_unit_env hsc_env)
+  (dbs,unit_state,home_unit) <- liftIO $ initUnits logger dflags cached_unit_dbs
 
   -- Interpreter
   interp <- if gopt Opt_ExternalInterpreter dflags
@@ -682,8 +683,9 @@ setSessionDynFlags dflags0 = do
   let unit_env = UnitEnv
         { ue_platform  = targetPlatform dflags
         , ue_namever   = ghcNameVersion dflags
-        , ue_home_unit = home_unit
+        , ue_home_unit = Just home_unit
         , ue_units     = unit_state
+        , ue_unit_dbs  = Just dbs
         }
   modifySession $ \h -> h{ hsc_dflags = dflags
                          , hsc_IC = (hsc_IC h){ ic_dflags = dflags }
@@ -691,7 +693,6 @@ setSessionDynFlags dflags0 = do
                            -- we only update the interpreter if there wasn't
                            -- already one set up
                          , hsc_unit_env = unit_env
-                         , hsc_unit_dbs = Just dbs
                          }
   invalidateModSummaryCache
 
@@ -713,15 +714,16 @@ setProgramDynFlags_ invalidate_needed dflags = do
   if changed
     then do
         hsc_env <- getSession
-        (dbs,unit_state,home_unit) <- liftIO $ initUnits logger dflags' (hsc_unit_dbs hsc_env)
+        let cached_unit_dbs = ue_unit_dbs (hsc_unit_env hsc_env)
+        (dbs,unit_state,home_unit) <- liftIO $ initUnits logger dflags' cached_unit_dbs
         let unit_env = UnitEnv
               { ue_platform  = targetPlatform dflags'
               , ue_namever   = ghcNameVersion dflags'
-              , ue_home_unit = home_unit
+              , ue_home_unit = Just home_unit
               , ue_units     = unit_state
+              , ue_unit_dbs  = Just dbs
               }
         modifySession $ \h -> h{ hsc_dflags   = dflags'
-                               , hsc_unit_dbs = Just dbs
                                , hsc_unit_env = unit_env
                                }
     else modifySession $ \h -> h{ hsc_dflags = dflags' }
@@ -991,7 +993,7 @@ guessTarget str mUnitId Nothing
 -- of the current 'HomeUnit'.
 unitIdOrHomeUnit :: GhcMonad m => Maybe UnitId -> m UnitId
 unitIdOrHomeUnit mUnitId = do
-  currentHomeUnitId <- homeUnitId . ue_home_unit . hsc_unit_env <$> getSession
+  currentHomeUnitId <- homeUnitId . hsc_home_unit <$> getSession
   pure (fromMaybe currentHomeUnitId mUnitId)
 
 -- | Inform GHC that the working directory has changed.  GHC will flush
