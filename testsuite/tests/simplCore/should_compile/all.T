@@ -105,6 +105,7 @@ test('T5168',
      normal,
      makefile_test, ['T5168'])
 
+test('T5298', [extra_files(['T5298A.hs', 'T5298B.hs'])], makefile_test, ['T5298'])
 test('T5329', normal, compile, [''])
 test('T5303', normal, compile, [''])   # Coercion-optimisation test
 test('T5342', normal, compile, [''])   # Lint error with -prof
