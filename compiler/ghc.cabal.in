@@ -375,6 +375,7 @@ Library
         GHC.Data.Stream
         GHC.Data.StringBuffer
         GHC.Data.TrieMap
+        GHC.Diagnostics
         GHC.Driver.Backend
         GHC.Driver.Backpack
         GHC.Driver.Backpack.Syntax
