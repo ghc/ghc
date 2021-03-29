@@ -2,7 +2,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleInstances #-}
-
+-- AZ gratuitous add to check git metadata on push
 module GHC.Parser.Annotation (
   -- * Core Exact Print Annotation types
   AnnKeywordId(..),
