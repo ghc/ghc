@@ -119,11 +119,13 @@ go label targets mods = do
   where
     mkTarget t mod@(name,_,_,_,sync) = do
       src <- liftIO $ genMod mod
+      dflags <- getSessionDynFlags
       return $ if not (name `elem` targets)
          then Nothing
          else Just $ Target
            { targetId = TargetFile (name++".hs") Nothing
            , targetAllowObjCode = False
+           , targetUnitId = homeUnitId_ dflags
            , targetContents =
                case sync of
                  OnDisk -> Nothing

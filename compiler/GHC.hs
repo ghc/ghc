@@ -935,7 +935,7 @@ removeTarget :: GhcMonad m => TargetId -> m ()
 removeTarget target_id
   = modifySession (\h -> h{ hsc_targets = filter (hsc_targets h) })
   where
-   filter targets = [ t | t@(Target id _ _) <- targets, id /= target_id ]
+   filter targets = [ t | t@Target { targetId = id } <- targets, id /= target_id ]
 
 -- | Attempts to guess what Target a string refers to.  This function
 -- implements the @--make@/GHCi command-line syntax for filenames:
@@ -948,23 +948,25 @@ removeTarget target_id
 --
 --   - otherwise interpret the string as a module name
 --
-guessTarget :: GhcMonad m => String -> Maybe Phase -> m Target
-guessTarget str (Just phase)
-   = return (Target (TargetFile str (Just phase)) True Nothing)
-guessTarget str Nothing
+guessTarget :: GhcMonad m => String -> Maybe UnitId -> Maybe Phase -> m Target
+guessTarget str mUnitId (Just phase)
+   = do
+     tuid <- unitIdOrHomeUnit mUnitId
+     return (Target (TargetFile str (Just phase)) True tuid Nothing)
+guessTarget str mUnitId Nothing
    | isHaskellSrcFilename file
-   = return (target (TargetFile file Nothing))
+   = target (TargetFile file Nothing)
    | otherwise
    = do exists <- liftIO $ doesFileExist hs_file
         if exists
-           then return (target (TargetFile hs_file Nothing))
+           then target (TargetFile hs_file Nothing)
            else do
         exists <- liftIO $ doesFileExist lhs_file
         if exists
-           then return (target (TargetFile lhs_file Nothing))
+           then target (TargetFile lhs_file Nothing)
            else do
         if looksLikeModuleName file
-           then return (target (TargetModule (mkModuleName file)))
+           then target (TargetModule (mkModuleName file))
            else do
         dflags <- getDynFlags
         liftIO $ throwGhcExceptionIO
@@ -979,8 +981,16 @@ guessTarget str Nothing
          hs_file  = file <.> "hs"
          lhs_file = file <.> "lhs"
 
-         target tid = Target tid obj_allowed Nothing
+         target tid = do
+           tuid <- unitIdOrHomeUnit mUnitId
+           pure $ Target tid obj_allowed tuid Nothing
 
+-- | Unwrap 'UnitId' or retrieve the 'UnitId'
+-- of the current 'HomeUnit'.
+unitIdOrHomeUnit :: GhcMonad m => Maybe UnitId -> m UnitId
+unitIdOrHomeUnit mUnitId = do
+  currentHomeUnitId <- homeUnitId . ue_home_unit . hsc_unit_env <$> getSession
+  pure (fromMaybe currentHomeUnitId mUnitId)
 
 -- | Inform GHC that the working directory has changed.  GHC will flush
 -- its cache of module locations, since it may no longer be valid.
@@ -1249,7 +1259,7 @@ compileToCoreSimplified = compileCore True
 compileCore :: GhcMonad m => Bool -> FilePath -> m CoreModule
 compileCore simplify fn = do
    -- First, set the target to the desired filename
-   target <- guessTarget fn Nothing
+   target <- guessTarget fn Nothing Nothing
    addTarget target
    _ <- load LoadAllTargets
    -- Then find dependencies

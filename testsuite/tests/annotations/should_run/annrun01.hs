@@ -28,7 +28,7 @@ main = defaultErrorHandler defaultFatalMessager defaultFlushOut
     let mod_nm = mkModuleName "Annrun01_Help"
 
     liftIO $ putStrLn "Setting Target"
-    setTargets [Target (TargetModule mod_nm) True Nothing]
+    setTargets [Target (TargetModule mod_nm) True (homeUnitId_ dflags) Nothing]
     liftIO $ putStrLn "Loading Targets"
     load LoadAllTargets
 

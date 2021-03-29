@@ -114,7 +114,7 @@ cprAnalProgram logger dflags fam_envs binds = do
   let env            = emptyAnalEnv fam_envs
   let binds_plus_cpr = snd $ mapAccumL cprAnalTopBind env binds
   dumpIfSet_dyn logger dflags Opt_D_dump_cpr_signatures "Cpr signatures" FormatText $
-    dumpIdInfoOfProgram (ppr . cprInfo) binds_plus_cpr
+    dumpIdInfoOfProgram (ppr . cprSigInfo) binds_plus_cpr
   -- See Note [Stamp out space leaks in demand analysis] in GHC.Core.Opt.DmdAnal
   seqBinds binds_plus_cpr `seq` return binds_plus_cpr
 
@@ -252,7 +252,7 @@ cprTransform env id
       = fst $ cprAnal env rhs
       -- Imported function or data con worker
       | isGlobalId id
-      = getCprSig (idCprInfo id)
+      = getCprSig (idCprSig id)
       | otherwise
       = topCprType
 
@@ -274,11 +274,11 @@ cprFix top_lvl orig_env orig_pairs
       | otherwise              = mkCprSig 0 botCpr
     -- See Note [Initialising strictness] in GHC.Core.Opt.DmdAnal
     orig_virgin = ae_virgin orig_env
-    init_pairs | orig_virgin  = [(setIdCprInfo id (init_sig id rhs), rhs) | (id, rhs) <- orig_pairs ]
+    init_pairs | orig_virgin  = [(setIdCprSig id (init_sig id rhs), rhs) | (id, rhs) <- orig_pairs ]
                | otherwise    = orig_pairs
     init_env = extendSigEnvFromIds orig_env (map fst init_pairs)
 
-    -- The fixed-point varies the idCprInfo field of the binders and and their
+    -- The fixed-point varies the idCprSig field of the binders and and their
     -- entries in the AnalEnv, and terminates if that annotation does not change
     -- any more.
     loop :: Int -> AnalEnv -> [(Id,CoreExpr)] -> (AnalEnv, [(Id,CoreExpr)])
@@ -291,7 +291,7 @@ cprFix top_lvl orig_env orig_pairs
         (env', pairs') = step (applyWhen (n/=1) nonVirgin env) pairs
         -- Make sure we reset the virgin flag to what it was when we are stable
         reset_env'     = env'{ ae_virgin = orig_virgin }
-        found_fixpoint = map (idCprInfo . fst) pairs' == map (idCprInfo . fst) pairs
+        found_fixpoint = map (idCprSig . fst) pairs' == map (idCprSig . fst) pairs
 
     step :: AnalEnv -> [(Id, CoreExpr)] -> (AnalEnv, [(Id, CoreExpr)])
     step env pairs = mapAccumL go env pairs
@@ -325,7 +325,7 @@ cprAnalBind top_lvl env id rhs
       | otherwise   = rhs_ty
     -- See Note [Arity trimming for CPR signatures]
     sig  = mkCprSigForArity (idArity id) rhs_ty'
-    id'  = setIdCprInfo id sig
+    id'  = setIdCprSig id sig
     env' = extendSigEnv env id sig
 
     -- See Note [CPR for thunks]
@@ -452,7 +452,7 @@ extendSigEnvList env ids_cprs
 -- | Extend an environment with the CPR sigs attached to the ids
 extendSigEnvFromIds :: AnalEnv -> [Id] -> AnalEnv
 extendSigEnvFromIds env ids
-  = foldl' (\env id -> extendSigEnv env id (idCprInfo id)) env ids
+  = foldl' (\env id -> extendSigEnv env id (idCprSig id)) env ids
 
 -- | Extend an environment with the same CPR sig for all ids
 extendSigEnvAllSame :: AnalEnv -> [Id] -> CprSig -> AnalEnv

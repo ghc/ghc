@@ -208,7 +208,7 @@ tidyLetBndr rec_tidy_env env@(tidy_env, var_env) id
         new_info = vanillaIdInfo
                     `setOccInfo`        occInfo old_info
                     `setArityInfo`      arityInfo old_info
-                    `setStrictnessInfo` zapDmdEnvSig (strictnessInfo old_info)
+                    `setDmdSigInfo` zapDmdEnvSig (dmdSigInfo old_info)
                     `setDemandInfo`     demandInfo old_info
                     `setInlinePragInfo` inlinePragInfo old_info
                     `setUnfoldingInfo`  new_unf

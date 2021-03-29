@@ -2334,14 +2334,20 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
         old_summary_map = mkNodeMap old_summaries
 
         getRootSummary :: Target -> IO (Either ErrorMessages ExtendedModSummary)
-        getRootSummary (Target (TargetFile file mb_phase) obj_allowed maybe_buf)
+        getRootSummary Target { targetId = TargetFile file mb_phase
+                              , targetAllowObjCode = obj_allowed
+                              , targetContents = maybe_buf
+                              }
            = do exists <- liftIO $ doesFileExist file
                 if exists || isJust maybe_buf
                     then summariseFile hsc_env old_summaries file mb_phase
                                        obj_allowed maybe_buf
                     else return $ Left $ unitBag $ mkPlainMsgEnvelope noSrcSpan $
                            text "can't find file:" <+> text file
-        getRootSummary (Target (TargetModule modl) obj_allowed maybe_buf)
+        getRootSummary Target { targetId = TargetModule modl
+                              , targetAllowObjCode = obj_allowed
+                              , targetContents = maybe_buf
+                              }
            = do maybe_summary <- summariseModule hsc_env old_summary_map NotBoot
                                            (L rootLoc modl) obj_allowed
                                            maybe_buf excl_mods

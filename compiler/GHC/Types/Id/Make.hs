@@ -484,8 +484,8 @@ mkDictSelId name clas
 
     base_info = noCafIdInfo
                 `setArityInfo`          1
-                `setStrictnessInfo`     strict_sig
-                `setCprInfo`            topCprSig
+                `setDmdSigInfo`     strict_sig
+                `setCprSigInfo`            topCprSig
                 `setLevityInfoWithType` sel_ty
 
     info | new_tycon
@@ -515,7 +515,7 @@ mkDictSelId name clas
         -- It's worth giving one, so that absence info etc is generated
         -- even if the selector isn't inlined
 
-    strict_sig = mkClosedStrictSig [arg_dmd] topDiv
+    strict_sig = mkClosedDmdSig [arg_dmd] topDiv
     arg_dmd | new_tycon = evalDmd
             | otherwise = C_1N :*
                           Prod [ if name == sel_name then evalDmd else absDmd
@@ -582,7 +582,7 @@ mkDataConWorkId wkr_name data_con
     ----------- Workers for data types --------------
     alg_wkr_info = noCafIdInfo
                    `setArityInfo`          wkr_arity
-                   `setCprInfo`            mkCprSig wkr_arity (dataConCPR data_con)
+                   `setCprSigInfo`            mkCprSig wkr_arity (dataConCPR data_con)
                    `setInlinePragInfo`     wkr_inline_prag
                    `setUnfoldingInfo`      evaldUnfolding  -- Record that it's evaluated,
                                                            -- even if arity = 0
@@ -710,14 +710,14 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
                              -- applications are treated as values
                          `setInlinePragInfo`    wrap_prag
                          `setUnfoldingInfo`     wrap_unf
-                         `setStrictnessInfo`    wrap_sig
-                         `setCprInfo`           mkCprSig wrap_arity (dataConCPR data_con)
+                         `setDmdSigInfo`    wrap_sig
+                         `setCprSigInfo`           mkCprSig wrap_arity (dataConCPR data_con)
                              -- We need to get the CAF info right here because GHC.Iface.Tidy
                              -- does not tidy the IdInfo of implicit bindings (like the wrapper)
                              -- so it not make sure that the CAF info is sane
                          `setLevityInfoWithType` wrap_ty
 
-             wrap_sig = mkClosedStrictSig wrap_arg_dmds topDiv
+             wrap_sig = mkClosedDmdSig wrap_arg_dmds topDiv
 
              wrap_arg_dmds =
                replicate (length theta) topDmd ++ map mk_dmd arg_ibangs
@@ -1322,14 +1322,14 @@ mkPrimOpId prim_op
 
     -- PrimOps don't ever construct a product, but we want to preserve bottoms
     cpr
-      | isDeadEndDiv (snd (splitStrictSig strict_sig)) = botCpr
+      | isDeadEndDiv (snd (splitDmdSig strict_sig)) = botCpr
       | otherwise                                      = topCpr
 
     info = noCafIdInfo
            `setRuleInfo`           mkRuleInfo (maybeToList $ primOpRules name prim_op)
            `setArityInfo`          arity
-           `setStrictnessInfo`     strict_sig
-           `setCprInfo`            mkCprSig arity cpr
+           `setDmdSigInfo`     strict_sig
+           `setCprSigInfo`            mkCprSig arity cpr
            `setInlinePragInfo`     neverInlinePragma
            `setLevityInfoWithType` res_ty
                -- We give PrimOps a NOINLINE pragma so that we don't
@@ -1361,13 +1361,13 @@ mkFCallId dflags uniq fcall ty
 
     info = noCafIdInfo
            `setArityInfo`          arity
-           `setStrictnessInfo`     strict_sig
-           `setCprInfo`            topCprSig
+           `setDmdSigInfo`     strict_sig
+           `setCprSigInfo`            topCprSig
            `setLevityInfoWithType` ty
 
     (bndrs, _) = tcSplitPiTys ty
     arity      = count isAnonTyCoBinder bndrs
-    strict_sig = mkClosedStrictSig (replicate arity topDmd) topDiv
+    strict_sig = mkClosedDmdSig (replicate arity topDmd) topDiv
     -- the call does not claim to be strict in its arguments, since they
     -- may be lifted (foreign import prim) and the called code doesn't
     -- necessarily force them. See #11076.

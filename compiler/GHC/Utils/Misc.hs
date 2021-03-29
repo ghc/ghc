@@ -1183,7 +1183,7 @@ readRational__ r = do
 readRational :: String -> Rational -- NB: *does* handle a leading "-"
 readRational top_s
   = case top_s of
-      '-' : xs -> - (read_me xs)
+      '-' : xs -> negate (read_me xs)
       xs       -> read_me xs
   where
     read_me s
@@ -1256,7 +1256,7 @@ readSignificandExponentPair top_s
 readHexRational :: String -> Rational
 readHexRational str =
   case str of
-    '-' : xs -> - (readMe xs)
+    '-' : xs -> negate (readMe xs)
     xs       -> readMe xs
   where
   readMe as =

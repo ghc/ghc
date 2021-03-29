@@ -42,8 +42,8 @@ module GHC.Types.Id.Info (
         callArityInfo, setCallArityInfo,
 
         -- ** Demand and strictness Info
-        strictnessInfo, setStrictnessInfo,
-        cprInfo, setCprInfo,
+        dmdSigInfo, setDmdSigInfo,
+        cprSigInfo, setCprSigInfo,
         demandInfo, setDemandInfo, pprStrictness,
 
         -- ** Unfolding Info
@@ -125,8 +125,8 @@ infixl  1 `setRuleInfo`,
           `setOneShotInfo`,
           `setOccInfo`,
           `setCafInfo`,
-          `setStrictnessInfo`,
-          `setCprInfo`,
+          `setDmdSigInfo`,
+          `setCprSigInfo`,
           `setDemandInfo`,
           `setNeverLevPoly`,
           `setLevityInfoWithType`
@@ -263,10 +263,10 @@ data IdInfo
         -- ^ Any inline pragma attached to the 'Id'
         occInfo         :: OccInfo,
         -- ^ How the 'Id' occurs in the program
-        strictnessInfo  :: StrictSig,
+        dmdSigInfo      :: DmdSig,
         -- ^ A strictness signature. Digests how a function uses its arguments
         -- if applied to at least 'arityInfo' arguments.
-        cprInfo         :: CprSig,
+        cprSigInfo      :: CprSig,
         -- ^ Information on whether the function will ultimately return a
         -- freshly allocated constructor.
         demandInfo      :: Demand,
@@ -409,11 +409,11 @@ setOneShotInfo info lb =
 setDemandInfo :: IdInfo -> Demand -> IdInfo
 setDemandInfo info dd = dd `seq` info { demandInfo = dd }
 
-setStrictnessInfo :: IdInfo -> StrictSig -> IdInfo
-setStrictnessInfo info dd = dd `seq` info { strictnessInfo = dd }
+setDmdSigInfo :: IdInfo -> DmdSig -> IdInfo
+setDmdSigInfo info dd = dd `seq` info { dmdSigInfo = dd }
 
-setCprInfo :: IdInfo -> CprSig -> IdInfo
-setCprInfo info cpr = cpr `seq` info { cprInfo = cpr }
+setCprSigInfo :: IdInfo -> CprSig -> IdInfo
+setCprSigInfo info cpr = cpr `seq` info { cprSigInfo = cpr }
 
 -- | Basic 'IdInfo' that carries no useful information whatsoever
 vanillaIdInfo :: IdInfo
@@ -424,8 +424,8 @@ vanillaIdInfo
             inlinePragInfo      = defaultInlinePragma,
             occInfo             = noOccInfo,
             demandInfo          = topDmd,
-            strictnessInfo      = nopSig,
-            cprInfo             = topCprSig,
+            dmdSigInfo      = nopSig,
+            cprSigInfo             = topCprSig,
             bitfield            = bitfieldSetCafInfo vanillaCafInfo $
                                   bitfieldSetArityInfo unknownArity $
                                   bitfieldSetCallArityInfo unknownArity $
@@ -501,7 +501,7 @@ type InlinePragInfo = InlinePragma
 ************************************************************************
 -}
 
-pprStrictness :: StrictSig -> SDoc
+pprStrictness :: DmdSig -> SDoc
 pprStrictness sig = ppr sig
 
 {-
@@ -649,14 +649,14 @@ zapUsageInfo info = Just (info {demandInfo = zapUsageDemand (demandInfo info)})
 -- | Remove usage environment info from the strictness signature on the 'IdInfo'
 zapUsageEnvInfo :: IdInfo -> Maybe IdInfo
 zapUsageEnvInfo info
-    | hasDemandEnvSig (strictnessInfo info)
-    = Just (info {strictnessInfo = zapDmdEnvSig (strictnessInfo info)})
+    | hasDemandEnvSig (dmdSigInfo info)
+    = Just (info {dmdSigInfo = zapDmdEnvSig (dmdSigInfo info)})
     | otherwise
     = Nothing
 
 zapUsedOnceInfo :: IdInfo -> Maybe IdInfo
 zapUsedOnceInfo info
-    = Just $ info { strictnessInfo = zapUsedOnceSig    (strictnessInfo info)
+    = Just $ info { dmdSigInfo = zapUsedOnceSig    (dmdSigInfo info)
                   , demandInfo     = zapUsedOnceDemand (demandInfo     info) }
 
 zapFragileInfo :: IdInfo -> Maybe IdInfo

@@ -849,8 +849,8 @@ cpeApp top_env expr
            ; (app, floats) <- rebuild_app args e2 (exprType e2) emptyFloats stricts
            ; mb_saturate hd app floats depth }
         where
-          stricts = case idStrictness v of
-                            StrictSig (DmdType _ demands _)
+          stricts = case idDmdSig v of
+                            DmdSig (DmdType _ demands _)
                               | listLengthCmp demands depth /= GT -> demands
                                     -- length demands <= depth
                               | otherwise                         -> []
@@ -1345,7 +1345,7 @@ Note [Speculative evaluation]
 Since call-by-value is much cheaper than call-by-need, we case-bind arguments
 that are either
 
-  1. Strictly evaluated anyway, according to the StrictSig of the callee, or
+  1. Strictly evaluated anyway, according to the DmdSig of the callee, or
   2. ok-for-spec, according to 'exprOkForSpeculation'
 
 While (1) is a no-brainer and always beneficial, (2) is a bit

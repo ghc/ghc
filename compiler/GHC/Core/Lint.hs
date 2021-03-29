@@ -81,7 +81,7 @@ import GHC.Utils.Misc
 import GHC.Core.InstEnv      ( instanceDFunId )
 import GHC.Core.Coercion.Opt ( checkAxInstCo )
 import GHC.Core.Opt.Arity    ( typeArity )
-import GHC.Types.Demand      ( splitStrictSig, isDeadEndDiv )
+import GHC.Types.Demand      ( splitDmdSig, isDeadEndDiv )
 import GHC.Types.TypeEnv
 import GHC.Unit.Module.ModGuts
 import GHC.Runtime.Context
@@ -677,12 +677,12 @@ lintLetBind top_lvl rec_flag binder rhs rhs_ty
            ppr (length (typeArity (idType binder))) <> colon <+>
            ppr binder)
 
-       ; case splitStrictSig (idStrictness binder) of
+       ; case splitDmdSig (idDmdSig binder) of
            (demands, result_info) | isDeadEndDiv result_info ->
              checkL (demands `lengthAtLeast` idArity binder)
                (text "idArity" <+> ppr (idArity binder) <+>
                text "exceeds arity imposed by the strictness signature" <+>
-               ppr (idStrictness binder) <> colon <+>
+               ppr (idDmdSig binder) <> colon <+>
                ppr binder)
            _ -> return ()
 

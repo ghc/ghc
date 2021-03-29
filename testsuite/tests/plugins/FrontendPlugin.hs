@@ -45,7 +45,7 @@ doMake opts srcs  = do
                                       ++ ldInputs dflags }
     _ <- GHC.setSessionDynFlags dflags'
 
-    targets <- mapM (uncurry GHC.guessTarget) hs_srcs
+    targets <- mapM (\(src, phase) -> GHC.guessTarget src Nothing phase) hs_srcs
     GHC.setTargets targets
     ok_flag <- GHC.load LoadAllTargets
 

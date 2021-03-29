@@ -30,7 +30,7 @@ import GHC.Core.DataCon
 import GHC.Core.Utils
 import GHC.Types.Basic
 import GHC.Types.Id
-import GHC.Types.Demand ( StrictSig, isDeadEndSig )
+import GHC.Types.Demand ( DmdSig, isDeadEndSig )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
@@ -41,7 +41,7 @@ import {-# SOURCE #-} GHC.Core.SimpleOpt
 
 
 
-mkFinalUnfolding :: UnfoldingOpts -> UnfoldingSource -> StrictSig -> CoreExpr -> Unfolding
+mkFinalUnfolding :: UnfoldingOpts -> UnfoldingSource -> DmdSig -> CoreExpr -> Unfolding
 -- "Final" in the sense that this is a GlobalId that will not be further
 -- simplified; so the unfolding should be occurrence-analysed
 mkFinalUnfolding opts src strict_sig expr

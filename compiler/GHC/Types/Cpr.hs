@@ -4,7 +4,7 @@
 
 -- | Types for the Constructed Product Result lattice.
 -- "GHC.Core.Opt.CprAnal" and "GHC.Core.Opt.WorkWrap.Utils"
--- are its primary customers via 'GHC.Types.Id.idCprInfo'.
+-- are its primary customers via 'GHC.Types.Id.idCprSig'.
 module GHC.Types.Cpr (
     Cpr (ConCpr), topCpr, botCpr, flatConCpr, asConCpr,
     CprType (..), topCprType, botCprType, flatConCprType,
@@ -161,12 +161,12 @@ seqCprTy :: CprType -> ()
 seqCprTy (CprType _ cpr) = seqCpr cpr
 
 -- | The arity of the wrapped 'CprType' is the arity at which it is safe
--- to unleash. See Note [Understanding DmdType and StrictSig] in "GHC.Types.Demand"
+-- to unleash. See Note [Understanding DmdType and DmdSig] in "GHC.Types.Demand"
 newtype CprSig = CprSig { getCprSig :: CprType }
   deriving (Eq, Binary)
 
 -- | Turns a 'CprType' computed for the particular 'Arity' into a 'CprSig'
--- unleashable at that arity. See Note [Understanding DmdType and StrictSig] in
+-- unleashable at that arity. See Note [Understanding DmdType and DmdSig] in
 -- "GHC.Types.Demand"
 mkCprSigForArity :: Arity -> CprType -> CprSig
 mkCprSigForArity arty ty@(CprType n cpr)

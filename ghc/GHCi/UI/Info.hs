@@ -237,7 +237,7 @@ findType infos span0 string = do
 guessModule :: GhcMonad m
             => Map ModuleName ModInfo -> FilePath -> MaybeT m ModuleName
 guessModule infos fp = do
-    target <- lift $ guessTarget fp Nothing
+    target <- lift $ guessTarget fp Nothing Nothing
     case targetId target of
         TargetModule mn  -> return mn
         TargetFile fp' _ -> guessModule' fp'
@@ -248,7 +248,7 @@ guessModule infos fp = do
         Nothing -> do
             fp'' <- liftIO (makeRelativeToCurrentDirectory fp')
 
-            target' <- lift $ guessTarget fp'' Nothing
+            target' <- lift $ guessTarget fp'' Nothing Nothing
             case targetId target' of
                 TargetModule mn -> return mn
                 _               -> MaybeT . pure $ findModByFp fp''

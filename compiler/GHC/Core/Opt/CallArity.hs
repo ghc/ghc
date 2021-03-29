@@ -706,7 +706,7 @@ trimArity v a = minimum [a, max_arity_by_type, max_arity_by_strsig]
         | isDeadEndDiv result_info = length demands
         | otherwise = a
 
-    (demands, result_info) = splitStrictSig (idStrictness v)
+    (demands, result_info) = splitDmdSig (idDmdSig v)
 
 ---------------------------------------
 -- Functions related to CallArityRes --

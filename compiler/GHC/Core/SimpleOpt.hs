@@ -40,7 +40,7 @@ import GHC.Types.Var      ( isNonCoVarId )
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Core.DataCon
-import GHC.Types.Demand( etaConvertStrictSig )
+import GHC.Types.Demand( etaConvertDmdSig )
 import GHC.Types.Tickish
 import GHC.Core.Coercion.Opt ( optCoercion, OptCoercionOpts (..) )
 import GHC.Core.Type hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
@@ -828,10 +828,10 @@ joinPointBinding_maybe bndr rhs
 
   | AlwaysTailCalled join_arity <- tailCallInfo (idOccInfo bndr)
   , (bndrs, body) <- etaExpandToJoinPoint join_arity rhs
-  , let str_sig   = idStrictness bndr
+  , let str_sig   = idDmdSig bndr
         str_arity = count isId bndrs  -- Strictness demands are for Ids only
         join_bndr = bndr `asJoinId`        join_arity
-                         `setIdStrictness` etaConvertStrictSig str_arity str_sig
+                         `setIdDmdSig` etaConvertDmdSig str_arity str_sig
   = Just (join_bndr, mkLams bndrs body)
 
   | otherwise

@@ -103,7 +103,7 @@ import GHC.Types.Unique.Set   ( nonDetStrictFoldUniqSet )
 import GHC.Types.Unique.DSet  ( getUniqDSet )
 import GHC.Types.Var.Env
 import GHC.Types.Literal      ( litIsTrivial )
-import GHC.Types.Demand       ( StrictSig, Demand, isStrUsedDmd, splitStrictSig, prependArgsStrictSig )
+import GHC.Types.Demand       ( DmdSig, Demand, isStrUsedDmd, splitDmdSig, prependArgsDmdSig )
 import GHC.Types.Cpr          ( mkCprSig, botCpr )
 import GHC.Types.Name         ( getOccName, mkSystemVarName )
 import GHC.Types.Name.Occurrence ( occNameString )
@@ -446,7 +446,7 @@ lvlApp env orig_expr ((_,AnnVar fn), args)
     arity      = idArity fn
 
     stricts :: [Demand]   -- True for strict /value/ arguments
-    stricts = case splitStrictSig (idStrictness fn) of
+    stricts = case splitDmdSig (idDmdSig fn) of
                 (arg_ds, _) | arg_ds `lengthExceeds` n_val_args
                             -> []
                             | otherwise
@@ -822,7 +822,7 @@ Exammples:
      t = f (g True)
   If f is lazy, we /do/ float (g True) because then we can allocate
   the thunk statically rather than dynamically.  But if f is strict
-  we don't (see the use of idStrictness in lvlApp).  It's not clear
+  we don't (see the use of idDmdSig in lvlApp).  It's not clear
   if this test is worth the bother: it's only about CAFs!
 
 It's controlled by a flag (floatConsts), because doing this too
@@ -1024,7 +1024,7 @@ answer.
 
 -}
 
-annotateBotStr :: Id -> Arity -> Maybe (Arity, StrictSig) -> Id
+annotateBotStr :: Id -> Arity -> Maybe (Arity, DmdSig) -> Id
 -- See Note [Bottoming floats] for why we want to add
 -- bottoming information right now
 --
@@ -1033,8 +1033,8 @@ annotateBotStr id n_extra mb_str
   = case mb_str of
       Nothing           -> id
       Just (arity, sig) -> id `setIdArity`      (arity + n_extra)
-                              `setIdStrictness` (prependArgsStrictSig n_extra sig)
-                              `setIdCprInfo`    mkCprSig (arity + n_extra) botCpr
+                              `setIdDmdSig` (prependArgsDmdSig n_extra sig)
+                              `setIdCprSig`    mkCprSig (arity + n_extra) botCpr
 
 notWorthFloating :: CoreExpr -> [Var] -> Bool
 -- Returns True if the expression would be replaced by
