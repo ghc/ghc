@@ -162,7 +162,7 @@ configured via command-line flags (in `GHC.setSessionDynFlags`).
 
 -- | Retrieve the ExternalPackageState cache.
 hscEPS :: HscEnv -> IO ExternalPackageState
-hscEPS hsc_env = readIORef (hsc_EPS hsc_env)
+hscEPS hsc_env = readIORef (euc_eps (hsc_EPS hsc_env))
 
 hptCompleteSigs :: HscEnv -> [CompleteMatch]
 hptCompleteSigs = hptAllThings  (md_complete_matches . hm_details)
@@ -248,7 +248,7 @@ prepareAnnotations hsc_env mb_guts = do
 -- have to do that yourself, if desired
 lookupType :: HscEnv -> Name -> IO (Maybe TyThing)
 lookupType hsc_env name = do
-   eps <- liftIO $ readIORef (hsc_EPS hsc_env)
+   eps <- liftIO $ hscEPS hsc_env
    let pte = eps_PTE eps
        hpt = hsc_HPT hsc_env
 

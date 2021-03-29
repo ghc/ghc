@@ -1,5 +1,8 @@
 module GHC.Unit.External
-   ( ExternalPackageState (..)
+   ( ExternalUnitCache (..)
+   , initExternalUnitCache
+   , ExternalPackageState (..)
+   , initExternalPackageState
    , EpsStats(..)
    , addEpsInStats
    , PackageTypeEnv
@@ -19,12 +22,17 @@ import GHC.Unit.Module.ModIface
 
 import GHC.Core         ( RuleBase )
 import GHC.Core.FamInstEnv
-import GHC.Core.InstEnv ( InstEnv )
+import GHC.Core.InstEnv ( InstEnv, emptyInstEnv )
+import GHC.Core.Opt.ConstantFold
+import GHC.Core.Rules (mkRuleBase)
 
-import GHC.Types.Annotations ( AnnEnv )
+import GHC.Types.Annotations ( AnnEnv, emptyAnnEnv )
 import GHC.Types.CompleteMatch
 import GHC.Types.TypeEnv
 import GHC.Types.Unique.DSet
+import GHC.Types.Unique.FM
+
+import Data.IORef
 
 
 type PackageTypeEnv          = TypeEnv
@@ -41,6 +49,40 @@ type PackageIfaceTable = ModuleEnv ModIface
 -- | Constructs an empty PackageIfaceTable
 emptyPackageIfaceTable :: PackageIfaceTable
 emptyPackageIfaceTable = emptyModuleEnv
+
+-- | Information about the currently loaded external packages.
+-- This is mutable because packages will be demand-loaded during
+-- a compilation run as required.
+newtype ExternalUnitCache = ExternalUnitCache
+  { euc_eps :: IORef ExternalPackageState
+  }
+
+initExternalUnitCache :: IO ExternalUnitCache
+initExternalUnitCache = ExternalUnitCache <$> newIORef initExternalPackageState
+
+initExternalPackageState :: ExternalPackageState
+initExternalPackageState = EPS
+  { eps_is_boot          = emptyUFM
+  , eps_PIT              = emptyPackageIfaceTable
+  , eps_free_holes       = emptyInstalledModuleEnv
+  , eps_PTE              = emptyTypeEnv
+  , eps_inst_env         = emptyInstEnv
+  , eps_fam_inst_env     = emptyFamInstEnv
+  , eps_rule_base        = mkRuleBase builtinRules
+  , -- Initialise the EPS rule pool with the built-in rules
+    eps_mod_fam_inst_env = emptyModuleEnv
+  , eps_complete_matches = []
+  , eps_ann_env          = emptyAnnEnv
+  , eps_stats            = EpsStats
+                            { n_ifaces_in = 0
+                            , n_decls_in = 0
+                            , n_decls_out = 0
+                            , n_insts_in = 0
+                            , n_insts_out = 0
+                            , n_rules_in = length builtinRules
+                            , n_rules_out = 0
+                            }
+  }
 
 
 -- | Information about other packages that we have slurped in by reading

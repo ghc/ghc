@@ -26,7 +26,6 @@ module GHC.Iface.Load (
         loadInterface,
         loadSysInterface, loadUserInterface, loadPluginInterface,
         findAndReadIface, readIface, writeIface,
-        initExternalPackageState,
         moduleFreeHolesPrecise,
         needWiredInHomeIface, loadWiredInHomeIface,
 
@@ -988,33 +987,6 @@ readIface dflags name_cache wanted_mod file_path = do
           err = hiModuleNameMismatchWarn wanted_mod actual_mod
 
     Left exn    -> return (Failed (text (showException exn)))
-
-{-
-*********************************************************
-*                                                       *
-        Wired-in interface for GHC.Prim
-*                                                       *
-*********************************************************
--}
-
-initExternalPackageState :: ExternalPackageState
-initExternalPackageState
-  = EPS {
-      eps_is_boot          = emptyUFM,
-      eps_PIT              = emptyPackageIfaceTable,
-      eps_free_holes       = emptyInstalledModuleEnv,
-      eps_PTE              = emptyTypeEnv,
-      eps_inst_env         = emptyInstEnv,
-      eps_fam_inst_env     = emptyFamInstEnv,
-      eps_rule_base        = mkRuleBase builtinRules,
-        -- Initialise the EPS rule pool with the built-in rules
-      eps_mod_fam_inst_env = emptyModuleEnv,
-      eps_complete_matches = [],
-      eps_ann_env          = emptyAnnEnv,
-      eps_stats = EpsStats { n_ifaces_in = 0, n_decls_in = 0, n_decls_out = 0
-                           , n_insts_in = 0, n_insts_out = 0
-                           , n_rules_in = length builtinRules, n_rules_out = 0 }
-    }
 
 {-
 *********************************************************

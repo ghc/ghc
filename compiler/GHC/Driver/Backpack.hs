@@ -508,13 +508,13 @@ innerBkpM do_this =
 updateEpsGhc_ :: GhcMonad m => (ExternalPackageState -> ExternalPackageState) -> m ()
 updateEpsGhc_ f = do
     hsc_env <- getSession
-    liftIO $ atomicModifyIORef' (hsc_EPS hsc_env) (\x -> (f x, ()))
+    liftIO $ atomicModifyIORef' (euc_eps (hsc_EPS hsc_env)) (\x -> (f x, ()))
 
 -- | Get the EPS from a 'GhcMonad'.
 getEpsGhc :: GhcMonad m => m ExternalPackageState
 getEpsGhc = do
     hsc_env <- getSession
-    liftIO $ readIORef (hsc_EPS hsc_env)
+    liftIO $ hscEPS hsc_env
 
 -- | Run 'BkpM' in 'Ghc'.
 initBkpM :: FilePath -> [LHsUnit HsComponentId] -> BkpM a -> Ghc a
