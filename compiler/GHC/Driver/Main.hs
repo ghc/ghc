@@ -117,7 +117,7 @@ import GHC.StgToByteCode    ( byteCodeGen, stgExprToBCOs )
 
 import GHC.IfaceToCore  ( typecheckIface )
 
-import GHC.Iface.Load   ( ifaceStats, initExternalPackageState, writeIface )
+import GHC.Iface.Load   ( ifaceStats, writeIface )
 import GHC.Iface.Make
 import GHC.Iface.Recomp
 import GHC.Iface.Tidy
@@ -242,7 +242,7 @@ newHscEnv :: DynFlags -> IO HscEnv
 newHscEnv dflags = do
     -- we don't store the unit databases and the unit state to still
     -- allow `setSessionDynFlags` to be used to set unit db flags.
-    eps_var <- newIORef initExternalPackageState
+    eps_var <- initExternalUnitCache
     nc_var  <- initNameCache 'r' knownKeyNames
     fc_var  <- initFinderCache
     logger  <- initLogger
@@ -2141,7 +2141,7 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr
 
 dumpIfaceStats :: HscEnv -> IO ()
 dumpIfaceStats hsc_env = do
-    eps <- readIORef (hsc_EPS hsc_env)
+    eps <- hscEPS hsc_env
     dumpIfSet logger dflags (dump_if_trace || dump_rn_stats)
               "Interface statistics"
               (ifaceStats eps)

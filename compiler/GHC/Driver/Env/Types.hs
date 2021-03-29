@@ -97,7 +97,7 @@ data HscEnv
                 --
                 -- (This changes a previous invariant: changed Jan 05.)
 
-        hsc_EPS :: {-# UNPACK #-} !(IORef ExternalPackageState),
+        hsc_EPS :: {-# UNPACK #-} !ExternalUnitCache,
                 -- ^ Information about the currently loaded external packages.
                 -- This is mutable because packages will be demand-loaded during
                 -- a compilation run as required.
