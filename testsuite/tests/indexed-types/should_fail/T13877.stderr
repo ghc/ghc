@@ -1,7 +1,63 @@
 
+T13877.hs:65:17: error:
+    • Couldn't match type: Apply p l
+                     with: t0 l
+      Expected: Sing l
+                -> (p @@ '[])
+                -> (forall (x :: a1) (xs :: [a1]).
+                    Sing x -> Sing xs -> (p @@ xs) -> p @@ (x : xs))
+                -> p @@ l
+        Actual: Sing l
+                -> App [a1] (':->) (*) t0 '[]
+                -> (forall (x :: a1) (xs :: [a1]).
+                    Sing x
+                    -> Sing xs
+                    -> App [a1] (':->) (*) t0 xs
+                    -> App [a1] (':->) (*) t0 (x : xs))
+                -> App [a1] (':->) (*) t0 l
+      The type variable ‘t0’ is ambiguous
+    • In the expression: listElimPoly @(:->) @a @p @l
+      In an equation for ‘listElimTyFun’:
+          listElimTyFun = listElimPoly @(:->) @a @p @l
+    • Relevant bindings include
+        listElimTyFun :: Sing l
+                         -> (p @@ '[])
+                         -> (forall (x :: a1) (xs :: [a1]).
+                             Sing x -> Sing xs -> (p @@ xs) -> p @@ (x : xs))
+                         -> p @@ l
+          (bound at T13877.hs:65:1)
+
+T13877.hs:65:17: error:
+    • Couldn't match type: Apply p xs
+                     with: t0 xs
+      Expected: Sing l
+                -> (p @@ '[])
+                -> (forall (x :: a1) (xs :: [a1]).
+                    Sing x -> Sing xs -> (p @@ xs) -> p @@ (x : xs))
+                -> p @@ l
+        Actual: Sing l
+                -> App [a1] (':->) (*) t0 '[]
+                -> (forall (x :: a1) (xs :: [a1]).
+                    Sing x
+                    -> Sing xs
+                    -> App [a1] (':->) (*) t0 xs
+                    -> App [a1] (':->) (*) t0 (x : xs))
+                -> App [a1] (':->) (*) t0 l
+      The type variable ‘t0’ is ambiguous
+    • In the expression: listElimPoly @(:->) @a @p @l
+      In an equation for ‘listElimTyFun’:
+          listElimTyFun = listElimPoly @(:->) @a @p @l
+    • Relevant bindings include
+        listElimTyFun :: Sing l
+                         -> (p @@ '[])
+                         -> (forall (x :: a1) (xs :: [a1]).
+                             Sing x -> Sing xs -> (p @@ xs) -> p @@ (x : xs))
+                         -> p @@ l
+          (bound at T13877.hs:65:1)
+
 T13877.hs:65:41: error:
     • Expecting one more argument to ‘p’
-      Expected kind ‘(-?>) [a] (*) (':->)’, but ‘p’ has kind ‘[a] ~> *’
+      Expected kind ‘(-?>) [a1] (*) (':->)’, but ‘p’ has kind ‘[a1] ~> *’
     • In the type ‘p’
       In the expression: listElimPoly @(:->) @a @p @l
       In an equation for ‘listElimTyFun’:
@@ -9,7 +65,7 @@ T13877.hs:65:41: error:
     • Relevant bindings include
         listElimTyFun :: Sing l
                          -> (p @@ '[])
-                         -> (forall (x :: a) (xs :: [a]).
+                         -> (forall (x :: a1) (xs :: [a1]).
                              Sing x -> Sing xs -> (p @@ xs) -> p @@ (x : xs))
                          -> p @@ l
           (bound at T13877.hs:65:1)
