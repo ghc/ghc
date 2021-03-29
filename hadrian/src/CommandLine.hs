@@ -1,10 +1,12 @@
 module CommandLine (
+    TestArgs(..), NofibArgs(..), TestSpeed(..), NofibMode,
     optDescrs, cmdLineArgsMap, cmdFlavour, lookupFreeze1, lookupFreeze2, lookupSkipDepends,
     cmdBignum, cmdBignumCheck, cmdProgressInfo, cmdConfigure, cmdCompleteSetting,
-    cmdDocsArgs, lookupBuildRoot, TestArgs(..), TestSpeed(..), defaultTestArgs,
-    cmdPrefix
+    cmdDocsArgs, lookupBuildRoot, defaultTestArgs, cmdPrefix,
+    defaultNofibArgs, lookupNofibArgs,
     ) where
 
+import Data.Char
 import Data.Either
 import qualified Data.HashMap.Strict as Map
 import Data.List.Extra
@@ -32,6 +34,7 @@ data CommandLineArgs = CommandLineArgs
     , progressInfo   :: ProgressInfo
     , buildRoot      :: BuildRoot
     , testArgs       :: TestArgs
+    , nofibArgs      :: NofibArgs
     , docTargets     :: DocTargets
     , prefix         :: Maybe FilePath
     , completeStg    :: Maybe String }
@@ -50,6 +53,7 @@ defaultCommandLineArgs = CommandLineArgs
     , progressInfo   = Brief
     , buildRoot      = BuildRoot "_build"
     , testArgs       = defaultTestArgs
+    , nofibArgs      = defaultNofibArgs
     , docTargets     = Set.fromList [minBound..maxBound]
     , prefix         = Nothing
     , completeStg    = Nothing }
@@ -93,6 +97,52 @@ defaultTestArgs = TestArgs
     , testWays       = []
     , brokenTests    = []
     , testAccept     = False }
+
+type NofibMode = TestSpeed
+
+data NofibArgs = NofibArgs
+    { logFile    :: Maybe String
+    , mode       :: NofibMode
+    , cacheGrind :: Bool
+    , numOfRuns  :: String
+    } deriving (Eq, Show)
+
+defaultNofibArgs :: NofibArgs
+defaultNofibArgs = NofibArgs
+    { logFile    = Just "nofib-log"
+    , mode       = TestNormal
+    , cacheGrind = False
+    , numOfRuns  = "10"
+    }
+
+readNofibCacheGrind :: Either String (CommandLineArgs -> CommandLineArgs)
+readNofibCacheGrind =
+    Right $ \flags -> flags {
+        nofibArgs = (nofibArgs flags) { cacheGrind = True }
+    }
+
+readNofibNumOfRuns :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
+readNofibNumOfRuns maybeRuns = case maybeRuns of
+    Nothing -> Right id
+    Just runs ->
+        if all isNumber runs
+        then Right $ \flags -> flags {
+                nofibArgs = (nofibArgs flags) { numOfRuns = runs }
+            }
+        else Left "Cannot parse nofib number or runs"
+
+readNofibLogFile :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
+readNofibLogFile f =
+    Right $ \flags -> flags {
+        nofibArgs = (nofibArgs flags) { logFile = f }
+    }
+
+readNofibMode :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
+readNofibMode tm =
+    maybe (Left "Cannot parse nofib time mode") (Right . set) (read_test_speed =<< lower <$> tm)
+  where
+    set :: NofibMode -> CommandLineArgs -> CommandLineArgs
+    set flag flags = flags { nofibArgs = (nofibArgs flags) { mode = flag} }
 
 readConfigure :: Either String (CommandLineArgs -> CommandLineArgs)
 readConfigure = Right $ \flags -> flags { configure = True }
@@ -187,15 +237,16 @@ readTestRootDirs rootdirs = Right $ \flags ->
 
 readTestSpeed :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readTestSpeed ms =
-    maybe (Left "Cannot parse test-speed") (Right . set) (go =<< lower <$> ms)
+    maybe (Left "Cannot parse test-speed") (Right . set) (read_test_speed =<< lower <$> ms)
   where
-    go :: String -> Maybe TestSpeed
-    go "fast"    = Just TestFast
-    go "slow"    = Just TestSlow
-    go "normal"  = Just TestNormal
-    go _         = Nothing
     set :: TestSpeed -> CommandLineArgs -> CommandLineArgs
     set flag flags = flags { testArgs = (testArgs flags) {testSpeed = flag} }
+
+read_test_speed :: String -> Maybe TestSpeed
+read_test_speed "fast"    = Just TestFast
+read_test_speed "slow"    = Just TestSlow
+read_test_speed "normal"  = Just TestNormal
+read_test_speed _         = Nothing
 
 readTestSummary :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readTestSummary filepath = Right $ \flags -> flags { testArgs = (testArgs flags) { testSummary = filepath } }
@@ -285,6 +336,14 @@ optDescrs =
       "Only run performance tests."
     , Option [] ["skip-perf"] (NoArg readTestSkipPerf)
       "Skip performance tests."
+    , Option [] ["cachegrind"] (NoArg readNofibCacheGrind)
+      "Nofib: Get instruction counts, memory reads/writes, and \"cache misses\" using Valgrind."
+    , Option [] ["nofib-runs"] (OptArg readNofibNumOfRuns "NOFIB_NUM_OF_RUNS")
+      "Nofib: Number of times benchmark will be run. Default=10"
+    , Option [] ["nofib-mode"] (OptArg readNofibMode "NOFIB_MODE")
+      "Nofib: Benchmark time mode (fast, norm, slow). Default=norm"
+    , Option [] ["nofib-log"] (OptArg readNofibLogFile "NOFIB_LOG_FILE")
+      "Nofib: Results file name. Default=nofib-log"
     , Option [] ["test-root-dirs"] (OptArg readTestRootDirs "DIR1:[DIR2:...:DIRn]")
       "Test root directories to look at (all by default)."
     , Option [] ["test-speed"] (OptArg readTestSpeed "SPEED")
@@ -368,6 +427,9 @@ lookupFreeze2 = freeze2 . lookupExtra defaultCommandLineArgs
 
 lookupSkipDepends :: Map.HashMap TypeRep Dynamic -> Bool
 lookupSkipDepends = skipDepends . lookupExtra defaultCommandLineArgs
+
+lookupNofibArgs :: Rules NofibArgs
+lookupNofibArgs = nofibArgs <$> userSettingRules defaultCommandLineArgs
 
 cmdBignum :: Action (Maybe String)
 cmdBignum = bignum <$> cmdLineArgs
