@@ -132,7 +132,7 @@ Language
       g = (`f` "hello")
 
   ``g`` can be made to typecheck once more by eta expanding it to
-  ``\x -> x \`f\` "hello"``. For more information, see
+  ``\x -> x `f` "hello"``. For more information, see
   :ref:`simple-subsumption`.
 
 * :extension:`LinearTypes` can now infer multiplicity for ``case``
@@ -246,7 +246,7 @@ Runtime system
 
 - The ``-xt`` RTS flag has been removed. Now STACK and TSO closures are always
   included in heap profiles. Tooling can choose to filter out these closure types
-`  if necessary.
+  if necessary.
 
 - A new heap profiling mode, :rts-flag:`-hi`, profile by info table allows for
   fine-grain banding by the info table address of a closure. The profiling
@@ -391,7 +391,7 @@ Eventlog
     test2 :: forall (x :: Nat). Proxy (x <=? x) -> Proxy True
 
 - On POSIX, ``System.IO.openFile`` can no longer leak a file descriptor if it
-  is interrupted by an asynchronous exception (#19114, #19115).
+  is interrupted by an asynchronous exception (:ghc-ticket:`19114`, :ghc-ticket:`19115`).
 
 - There's a new binding ``GHC.Exts.considerAccessible``. It's equivalent to
   ``True`` and allows the programmer to turn off pattern-match redundancy
