@@ -1265,14 +1265,14 @@ deferAfterIO d@(DmdType _ _ res) =
   defer_res r@(Dunno {}) = r
   defer_res _            = topRes  -- Diverges
 
-strictenDmd :: Demand -> CleanDemand
+strictenDmd :: Demand -> Demand
 strictenDmd (JD { sd = s, ud = u})
   = JD { sd = poke_s s, ud = poke_u u }
   where
-    poke_s Lazy      = HeadStr
-    poke_s (Str s)   = s
-    poke_u Abs       = UHead
-    poke_u (Use _ u) = u
+    poke_s Lazy      = Str HeadStr
+    poke_s s         = s
+    poke_u Abs       = useTop
+    poke_u u         = u
 
 -- Deferring and peeling
 
