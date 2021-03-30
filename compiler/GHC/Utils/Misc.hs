@@ -1079,8 +1079,8 @@ strictMap f (x : xs) =
     x' : xs'
 
 strictZipWith :: (a -> b -> c) -> [a] -> [b] -> [c]
-strictZipWith _ [] ys = []
-strictZipWith _ xs [] = []
+strictZipWith _ [] _ = []
+strictZipWith _ _ [] = []
 strictZipWith f (x : xs) (y: ys) =
   let
     !x' = f x y
