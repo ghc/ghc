@@ -1,5 +1,5 @@
 
-drvfail-functor2.hs:2:29: warning:
+drvfail-functor2.hs:2:29: warning: [-Wdeprecated-flags (in -Wdefault)]
     -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
 
 drvfail-functor2.hs:8:14: error:

@@ -1,5 +1,5 @@
 
-WildcardInADTContext2.hs:1:53: warning:
+WildcardInADTContext2.hs:1:53: warning: [-Wdeprecated-flags (in -Wdefault)]
     -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
 
 WildcardInADTContext2.hs:4:10: error:
