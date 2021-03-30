@@ -246,11 +246,11 @@ A typical garbage collection will look something like the following:
    are allocated.
 
 10. A :event-type:`BLOCKS_SIZE` event will be emitted giving the
-   current size of the heap, in bytes, calculated by how many blocks
-   are allocated.
+    current size of the heap, in bytes, calculated by how many blocks
+    are allocated.
 
 11. A :event-type:`GC_STATS_GHC` event will be emitted
-   containing various details of the collection and heap state.
+    containing various details of the collection and heap state.
 
 12. In the case of a major collection, a
     :event-type:`HEAP_LIVE` event will be emitted describing
