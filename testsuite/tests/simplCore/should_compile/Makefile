@@ -156,6 +156,12 @@ simpl021:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c Simpl021A.hs -O
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c Simpl021B.hs -O
 
+.PHONY: T5298
+T5298:
+	$(RM) -f T5298A.hi T5298A.o T5298B.hi T5298B.o
+	'$(TEST_HC)' $(TEST_HC_OPTS) T5298B.hs -O -ddump-simpl -dsuppress-all -dsuppress-uniques | grep -E -A6 '^(.w)?g'
+	# The g function should be fully specialized
+
 .PHONY: T5327
 T5327:
 	$(RM) -f T5327.hi T5327.o
