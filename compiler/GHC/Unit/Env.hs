@@ -10,6 +10,7 @@ where
 
 import GHC.Prelude
 
+import GHC.Unit.External
 import GHC.Unit.State
 import GHC.Unit.Home
 import GHC.Unit.Types
@@ -33,6 +34,11 @@ data UnitEnv = UnitEnv
         --
         -- Usually we don't reload the databases from disk if they are
         -- cached, even if the database flags changed!
+
+    , ue_eps :: {-# UNPACK #-} !ExternalUnitCache
+        -- ^ Information about the currently loaded external packages.
+        -- This is mutable because packages will be demand-loaded during
+        -- a compilation run as required.
 
     , ue_home_unit :: !(Maybe HomeUnit)
         -- ^ Home unit
@@ -66,9 +72,11 @@ data UnitEnv = UnitEnv
 
 initUnitEnv :: GhcNameVersion -> Platform -> IO UnitEnv
 initUnitEnv namever platform = do
+  eps <- initExternalUnitCache
   return $ UnitEnv
     { ue_units     = emptyUnitState
     , ue_unit_dbs  = Nothing
+    , ue_eps       = eps
     , ue_home_unit = Nothing
     , ue_hpt       = emptyHomePackageTable
     , ue_platform  = platform

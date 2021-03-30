@@ -170,7 +170,7 @@ configured via command-line flags (in `GHC.setSessionDynFlags`).
 
 -- | Retrieve the ExternalPackageState cache.
 hscEPS :: HscEnv -> IO ExternalPackageState
-hscEPS hsc_env = readIORef (euc_eps (hsc_EPS hsc_env))
+hscEPS hsc_env = readIORef (euc_eps (ue_eps (hsc_unit_env hsc_env)))
 
 hptCompleteSigs :: HscEnv -> [CompleteMatch]
 hptCompleteSigs = hptAllThings  (md_complete_matches . hm_details)

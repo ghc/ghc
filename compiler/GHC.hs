@@ -686,6 +686,7 @@ setSessionDynFlags dflags0 = do
         , ue_namever   = ghcNameVersion dflags
         , ue_home_unit = Just home_unit
         , ue_hpt       = ue_hpt old_unit_env
+        , ue_eps       = ue_eps old_unit_env
         , ue_units     = unit_state
         , ue_unit_dbs  = Just dbs
         }
@@ -723,6 +724,7 @@ setProgramDynFlags_ invalidate_needed dflags = do
               , ue_namever   = ghcNameVersion dflags'
               , ue_home_unit = Just home_unit
               , ue_hpt       = ue_hpt old_unit_env
+              , ue_eps       = ue_eps old_unit_env
               , ue_units     = unit_state
               , ue_unit_dbs  = Just dbs
               }
