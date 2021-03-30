@@ -18,4 +18,8 @@ test('T13536a',
     compile_and_run,
     [''])
 
+test('inferTags001', normal, multimod_compile_and_run, ['inferTags001', 'inferTags001_a'])
 
+# test('T5462Yes1', [extra_files(['GEnum/', 'GEq/', 'GFunctor/']),
+#                    outputdir('out_T5462Yes1')]
+#     , multimod_compile_and_run, ['T5462Yes1', '-iGEq -iGEnum -iGFunctor'])

@@ -20,11 +20,12 @@ module GHC.CoreToStg ( coreToStg ) where
 import GHC.Prelude
 
 import GHC.Core
-import GHC.Core.Utils   ( exprType, findDefault, isJoinBind
-                        , exprIsTickedString_maybe )
+import GHC.Core.Utils   ( exprType, isJoinBind
+                        , exprIsTickedString_maybe, findDefault )
 import GHC.Core.Opt.Arity   ( manifestArity )
 import GHC.Stg.Syntax
 import GHC.Stg.Debug
+import GHC.Stg.Utils
 
 import GHC.Core.Type
 import GHC.Types.RepType
@@ -52,7 +53,7 @@ import GHC.Driver.Ppr
 import GHC.Types.ForeignCall
 import GHC.Types.IPE
 import GHC.Types.Demand    ( isUsedOnceDmd )
-import GHC.Builtin.PrimOps ( PrimCall(..) )
+import GHC.Builtin.PrimOps ( PrimCall(..), primOpWrapperId )
 import GHC.Types.SrcLoc    ( mkGeneralSrcSpan )
 import GHC.Builtin.Names   ( unsafeEqualityProofName )
 
@@ -440,8 +441,8 @@ coreToStgExpr e0@(Case scrut bndr _ alts) = do
     let stg = StgCase scrut2 bndr (mkStgAltType bndr alts) alts2
     -- See (U2) in Note [Implementing unsafeCoerce] in base:Unsafe.Coerce
     case scrut2 of
-      StgApp id [] | idName id == unsafeEqualityProofName
-                   , isDeadBinder bndr ->
+      StgApp _ id [] | idName id == unsafeEqualityProofName
+                     , isDeadBinder bndr ->
         -- We can only discard the case if the case-binder is dead
         -- It usually is, but see #18227
         case alts2 of
@@ -542,14 +543,15 @@ coreToStgApp f args ticks = do
         res_ty = exprType (mkApps (Var f) args)
         app = case idDetails f of
                 DataConWorkId dc
-                  | saturated    -> StgConApp dc NoNumber args'
+                  | saturated    -> StgConApp noExtFieldSilent dc NoNumber args'
                                       (dropRuntimeRepArgs (fromMaybe [] (tyConAppArgs_maybe res_ty)))
 
                 -- Some primitive operator that might be implemented as a library call.
                 -- As noted by Note [Eta expanding primops] in GHC.Builtin.PrimOps
                 -- we require that primop applications be saturated.
-                PrimOpId op      -> ASSERT( saturated )
-                                    StgOpApp (StgPrimOp op) args' res_ty
+                PrimOpId op   -- TODO: Are calls guaranteed to be saturated already here?
+                  | saturated    -> StgOpApp (StgPrimOp op) args' res_ty
+                  | otherwise    -> StgApp MayEnter (primOpWrapperId op) args'
 
                 -- A call to some primitive Cmm function.
                 FCallId (CCall (CCallSpec (StaticTarget _ lbl (Just pkgId) True)
@@ -562,7 +564,7 @@ coreToStgApp f args ticks = do
                                     StgOpApp (StgFCallOp call (idType f)) args' res_ty
 
                 TickBoxOpId {}   -> pprPanic "coreToStg TickBox" $ ppr (f,args')
-                _other           -> StgApp f args'
+                _other           -> StgApp MayEnter f args'
 
         add_tick !t !e = StgTick t e
         tapp = foldr add_tick app (map (coreToStgTick res_ty) ticks ++ ticks')
@@ -600,8 +602,8 @@ coreToStgArgs (arg : args) = do         -- Non-type argument
     let
         (aticks, arg'') = stripStgTicksTop tickishFloatable arg'
         stg_arg = case arg'' of
-                       StgApp v []        -> StgVarArg v
-                       StgConApp con _ [] _ -> StgVarArg (dataConWorkId con)
+                       StgApp _ext v []        -> StgVarArg v
+                       StgConApp _ con _ [] _ -> StgVarArg (dataConWorkId con)
                        StgLit lit         -> StgLitArg lit
                        _                  -> pprPanic "coreToStgArgs" (ppr arg)
 
@@ -725,13 +727,13 @@ mkTopStgRhs dflags this_mod ccs bndr (PreStgRhs bndrs rhs)
 
   -- After this point we know that `bndrs` is empty,
   -- so this is not a function binding
-  | StgConApp con mn args _ <- unticked_rhs
+  | StgConApp _ con mn args _ <- unticked_rhs
   , -- Dynamic StgConApps are updatable
     not (isDllConApp dflags this_mod con args)
   = -- CorePrep does this right, but just to make sure
     ASSERT2( not (isUnboxedTupleDataCon con || isUnboxedSumDataCon con)
            , ppr bndr $$ ppr con $$ ppr args)
-    ( StgRhsCon dontCareCCS con mn ticks args, ccs )
+    ( StgRhsCon noExtFieldSilent dontCareCCS con mn ticks args, ccs )
 
   -- Otherwise it's a CAF, see Note [Cost-centre initialization plan].
   | gopt Opt_AutoSccsOnIndividualCafs dflags
@@ -783,8 +785,8 @@ mkStgRhs bndr (PreStgRhs bndrs rhs)
                   ReEntrant -- ignored for LNE
                   [] rhs
 
-  | StgConApp con mn args _ <- unticked_rhs
-  = StgRhsCon currentCCS con mn ticks args
+  | StgConApp _ext con mn args _ <- unticked_rhs
+  = StgRhsCon noExtFieldSilent currentCCS con mn ticks args
 
   | otherwise
   = StgRhsClosure noExtFieldSilent
