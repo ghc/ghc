@@ -241,9 +241,6 @@ import Data.Bifunctor (first, bimap)
 
 newHscEnv :: DynFlags -> IO HscEnv
 newHscEnv dflags = do
-    -- we don't store the unit databases and the unit state to still
-    -- allow `setSessionDynFlags` to be used to set unit db flags.
-    eps_var <- initExternalUnitCache
     nc_var  <- initNameCache 'r' knownKeyNames
     fc_var  <- initFinderCache
     logger  <- initLogger
@@ -254,7 +251,6 @@ newHscEnv dflags = do
                   ,  hsc_targets        = []
                   ,  hsc_mod_graph      = emptyMG
                   ,  hsc_IC             = emptyInteractiveContext dflags
-                  ,  hsc_EPS            = eps_var
                   ,  hsc_NC             = nc_var
                   ,  hsc_FC             = fc_var
                   ,  hsc_type_env_var   = Nothing
