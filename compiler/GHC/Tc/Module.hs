@@ -54,6 +54,7 @@ import GHC.Driver.Plugins
 import GHC.Driver.Session
 
 import GHC.Tc.Errors.Hole.FitTypes ( HoleFitPluginR (..) )
+import GHC.Tc.Errors.Types
 import {-# SOURCE #-} GHC.Tc.Gen.Splice ( finishTH, runRemoteModFinalizers )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Validity( checkValidType )
@@ -191,7 +192,7 @@ tcRnModule :: HscEnv
            -> ModSummary
            -> Bool              -- True <=> save renamed syntax
            -> HsParsedModule
-           -> IO (Messages DiagnosticMessage, Maybe TcGblEnv)
+           -> IO (Messages TcRnMessage, Maybe TcGblEnv)
 
 tcRnModule hsc_env mod_sum save_rn_syntax
    parsedModule@HsParsedModule {hpm_module= L loc this_module}
@@ -212,8 +213,8 @@ tcRnModule hsc_env mod_sum save_rn_syntax
     dflags  = hsc_dflags hsc_env
     logger  = hsc_logger hsc_env
     home_unit = hsc_home_unit hsc_env
-    err_msg = mkPlainErrorMsgEnvelope loc $
-              text "Module does not have a RealSrcSpan:" <+> ppr this_mod
+    err_msg = fmap TcRnUnknownMessage $ mkPlainErrorMsgEnvelope loc $
+                text "Module does not have a RealSrcSpan:" <+> ppr this_mod
 
     pair :: (Module, SrcSpan)
     pair@(this_mod,_)
@@ -2010,7 +2011,7 @@ get two defns for 'main' in the interface file!
 *********************************************************
 -}
 
-runTcInteractive :: HscEnv -> TcRn a -> IO (Messages DiagnosticMessage, Maybe a)
+runTcInteractive :: HscEnv -> TcRn a -> IO (Messages TcRnMessage, Maybe a)
 -- Initialise the tcg_inst_env with instances from all home modules.
 -- This mimics the more selective call to hptInstances in tcRnImports
 runTcInteractive hsc_env thing_inside
@@ -2126,7 +2127,7 @@ We don't bother with the tcl_th_bndrs environment either.
 -- The returned TypecheckedHsExpr is of type IO [ () ], a list of the bound
 -- values, coerced to ().
 tcRnStmt :: HscEnv -> GhciLStmt GhcPs
-         -> IO (Messages DiagnosticMessage, Maybe ([Id], LHsExpr GhcTc, FixityEnv))
+         -> IO (Messages TcRnMessage, Maybe ([Id], LHsExpr GhcTc, FixityEnv))
 tcRnStmt hsc_env rdr_stmt
   = runTcInteractive hsc_env $ do {
 
@@ -2507,7 +2508,7 @@ getGhciStepIO = do
 
     return (noLocA $ ExprWithTySig noExtField (nlHsVar ghciStepIoMName) stepTy)
 
-isGHCiMonad :: HscEnv -> String -> IO (Messages DiagnosticMessage, Maybe Name)
+isGHCiMonad :: HscEnv -> String -> IO (Messages TcRnMessage, Maybe Name)
 isGHCiMonad hsc_env ty
   = runTcInteractive hsc_env $ do
         rdrEnv <- getGlobalRdrEnv
@@ -2534,7 +2535,7 @@ data TcRnExprMode = TM_Inst     -- ^ Instantiate inferred quantifiers only (:typ
 tcRnExpr :: HscEnv
          -> TcRnExprMode
          -> LHsExpr GhcPs
-         -> IO (Messages DiagnosticMessage, Maybe Type)
+         -> IO (Messages TcRnMessage, Maybe Type)
 tcRnExpr hsc_env mode rdr_expr
   = runTcInteractive hsc_env $
     do {
@@ -2603,7 +2604,7 @@ has a special case for application chains.
 --------------------------
 tcRnImportDecls :: HscEnv
                 -> [LImportDecl GhcPs]
-                -> IO (Messages DiagnosticMessage, Maybe GlobalRdrEnv)
+                -> IO (Messages TcRnMessage, Maybe GlobalRdrEnv)
 -- Find the new chunk of GlobalRdrEnv created by this list of import
 -- decls.  In contract tcRnImports *extends* the TcGblEnv.
 tcRnImportDecls hsc_env import_decls
@@ -2619,7 +2620,7 @@ tcRnType :: HscEnv
          -> ZonkFlexi
          -> Bool        -- Normalise the returned type
          -> LHsType GhcPs
-         -> IO (Messages DiagnosticMessage, Maybe (Type, Kind))
+         -> IO (Messages TcRnMessage, Maybe (Type, Kind))
 tcRnType hsc_env flexi normalise rdr_type
   = runTcInteractive hsc_env $
     setXOptM LangExt.PolyKinds $   -- See Note [Kind-generalise in tcRnType]
@@ -2753,7 +2754,7 @@ tcRnDeclsi exists to allow class, data, and other declarations in GHCi.
 
 tcRnDeclsi :: HscEnv
            -> [LHsDecl GhcPs]
-           -> IO (Messages DiagnosticMessage, Maybe TcGblEnv)
+           -> IO (Messages TcRnMessage, Maybe TcGblEnv)
 tcRnDeclsi hsc_env local_decls
   = runTcInteractive hsc_env $
     tcRnSrcDecls False Nothing local_decls
@@ -2778,13 +2779,13 @@ externaliseAndTidyId this_mod id
 -- a package module with an interface on disk.  If neither of these is
 -- true, then the result will be an error indicating the interface
 -- could not be found.
-getModuleInterface :: HscEnv -> Module -> IO (Messages DiagnosticMessage, Maybe ModIface)
+getModuleInterface :: HscEnv -> Module -> IO (Messages TcRnMessage, Maybe ModIface)
 getModuleInterface hsc_env mod
   = runTcInteractive hsc_env $
     loadModuleInterface (text "getModuleInterface") mod
 
 tcRnLookupRdrName :: HscEnv -> LocatedN RdrName
-                  -> IO (Messages DiagnosticMessage, Maybe [Name])
+                  -> IO (Messages TcRnMessage, Maybe [Name])
 -- ^ Find all the Names that this RdrName could mean, in GHCi
 tcRnLookupRdrName hsc_env (L loc rdr_name)
   = runTcInteractive hsc_env $
@@ -2798,7 +2799,7 @@ tcRnLookupRdrName hsc_env (L loc rdr_name)
        ; when (null names) (addErrTc (text "Not in scope:" <+> quotes (ppr rdr_name)))
        ; return names }
 
-tcRnLookupName :: HscEnv -> Name -> IO (Messages DiagnosticMessage, Maybe TyThing)
+tcRnLookupName :: HscEnv -> Name -> IO (Messages TcRnMessage, Maybe TyThing)
 tcRnLookupName hsc_env name
   = runTcInteractive hsc_env $
     tcRnLookupName' name
@@ -2817,7 +2818,7 @@ tcRnLookupName' name = do
 
 tcRnGetInfo :: HscEnv
             -> Name
-            -> IO ( Messages DiagnosticMessage
+            -> IO ( Messages TcRnMessage
                   , Maybe (TyThing, Fixity, [ClsInst], [FamInst], SDoc))
 
 -- Used to implement :info in GHCi
@@ -3147,5 +3148,6 @@ mark_plugin_unsafe dflags = unless (gopt Opt_PluginTrustworthy dflags) $
   recordUnsafeInfer pluginUnsafe
   where
     unsafeText = "Use of plugins makes the module unsafe"
-    pluginUnsafe = unitBag ( mkPlainMsgEnvelope dflags WarningWithoutFlag noSrcSpan
-                                   (Outputable.text unsafeText) )
+    pluginUnsafe =
+      singleMessage ( TcRnUnknownMessage <$> (mkPlainMsgEnvelope dflags WarningWithoutFlag noSrcSpan $
+                                               (Outputable.text unsafeText) ))

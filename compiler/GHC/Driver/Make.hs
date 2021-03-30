@@ -61,7 +61,7 @@ import GHC.Driver.Backend
 import GHC.Driver.Monad
 import GHC.Driver.Env
 import GHC.Driver.Errors
-import GHC.Driver.Errors.Types ( GhcMessage, ghcUnknownMessage )
+import GHC.Driver.Errors.Types
 import GHC.Driver.Main
 
 import GHC.Parser.Header
@@ -272,7 +272,7 @@ instantiationNodes unit_state = InstantiationNode <$> iuids_to_check
 warnMissingHomeModules :: GhcMonad m => HscEnv -> ModuleGraph -> m ()
 warnMissingHomeModules hsc_env mod_graph =
     when (not (null missing)) $
-        logWarnings (listToBag [warn])
+        logDiagnostics warn
   where
     dflags = hsc_dflags hsc_env
     targets = map targetId (hsc_targets hsc_env)
@@ -319,7 +319,7 @@ warnMissingHomeModules hsc_env mod_graph =
           (text "Modules are not listed in command line but needed for compilation: ")
           4
           (sep (map ppr missing))
-    warn =
+    warn = singleMessage $ fmap (GhcDriverMessage . DriverUnknownMessage) $
       mkPlainMsgEnvelope (hsc_dflags hsc_env) (WarningWithFlag Opt_WarnMissingHomeModules) noSrcSpan msg
 
 -- | Describes which modules of the module graph need to be loaded.
@@ -385,7 +385,7 @@ warnUnusedPackages = do
           = filter (\arg -> not $ any (matching state arg) loadedPackages)
                    requestedArgs
 
-    let warn =
+    let warn = singleMessage $ fmap (GhcDriverMessage . DriverUnknownMessage) $
           mkPlainMsgEnvelope dflags (WarningWithFlag Opt_WarnUnusedPackages) noSrcSpan msg
         msg = vcat [ text "The following packages were specified" <+>
                      text "via -package or -package-id flags,"
@@ -393,7 +393,7 @@ warnUnusedPackages = do
                    , nest 2 (vcat (map (withDash . pprUnusedArg) unusedArgs)) ]
 
     when (not (null unusedArgs)) $
-      logWarnings (listToBag [warn])
+      logDiagnostics warn
 
     where
         packageArg (ExposePackage _ arg _) = Just arg
@@ -1671,7 +1671,7 @@ upsweep_inst hsc_env mHscMessage mod_index nmods iuid = do
         case mHscMessage of
             Just hscMessage -> hscMessage hsc_env (mod_index, nmods) MustCompile (InstantiationNode iuid)
             Nothing -> return ()
-        runHsc hsc_env $ ioMsgMaybe $ tcRnCheckUnit hsc_env $ VirtUnit iuid
+        runHsc hsc_env $ ioMsgMaybe $ liftTcRnMessage $ tcRnCheckUnit hsc_env $ VirtUnit iuid
         pure ()
 
 -- | Compile a single module.  Always produce a Linkable for it if
@@ -2214,14 +2214,14 @@ warnUnnecessarySourceImports :: GhcMonad m => [SCC ModSummary] -> m ()
 warnUnnecessarySourceImports sccs = do
   dflags <- getDynFlags
   when (wopt Opt_WarnUnusedImports dflags)
-    (logWarnings (listToBag (concatMap (check dflags . flattenSCC) sccs)))
+    (logDiagnostics (mkMessages $ listToBag (concatMap (check dflags . flattenSCC) sccs)))
   where check dflags ms =
            let mods_in_this_cycle = map ms_mod_name ms in
            [ warn dflags i | m <- ms, i <- ms_home_srcimps m,
                              unLoc i `notElem`  mods_in_this_cycle ]
 
-        warn :: DynFlags -> Located ModuleName -> WarnMsg
-        warn dflags (L loc mod) =
+        warn :: DynFlags -> Located ModuleName -> MsgEnvelope GhcMessage
+        warn dflags (L loc mod) = fmap (GhcDriverMessage . DriverUnknownMessage) $
            mkPlainMsgEnvelope dflags WarningWithoutFlag loc
                 (text "{-# SOURCE #-} unnecessary in import of "
                  <+> quotes (ppr mod))

@@ -560,7 +560,7 @@ data TcGblEnv
                                              -- function, if this module is
                                              -- the main module.
 
-        tcg_safeInfer :: TcRef (Bool, WarningMessages),
+        tcg_safeInfer :: TcRef (Bool, Messages TcRnMessage),
         -- ^ Has the typechecker inferred this module as -XSafe (Safe Haskell)
         -- See Note [Safe Haskell Overlapping Instances Implementation],
         -- although this is used for more than just that failure case.

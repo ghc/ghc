@@ -238,9 +238,16 @@ mkDsEnvsFromTcGbl hsc_env msg_var tcg_env
              complete_matches = hptCompleteSigs hsc_env         -- from the home package
                                 ++ tcg_complete_matches tcg_env -- from the current module
                                 ++ eps_complete_matches eps     -- from imports
+       ; msg_var' <- liftTcRnMessages msg_var
        ; return $ mkDsEnvs unit_env this_mod rdr_env type_env fam_inst_env
-                           msg_var cc_st_var complete_matches
+                           msg_var' cc_st_var complete_matches
        }
+
+liftTcRnMessages :: MonadIO m => IORef (Messages TcRnMessage) -> m (IORef (Messages DsMessage))
+liftTcRnMessages ref = liftIO $ do
+  oldContent <- readIORef ref
+  newIORef (DsLiftedTcRnMessage <$> oldContent)
+
 
 runDs :: HscEnv -> (DsGblEnv, DsLclEnv) -> DsM a -> IO (Messages DsMessage, Maybe a)
 runDs hsc_env (ds_gbl, ds_lcl) thing_inside
@@ -315,7 +322,7 @@ initTcDsForSolver thing_inside
            Nothing  -> pprPanic "initTcDsForSolver" (vcat $ pprMsgEnvelopeBagWithLoc (getErrorMessages msgs)) }
 
 mkDsEnvs :: UnitEnv -> Module -> GlobalRdrEnv -> TypeEnv -> FamInstEnv
-         -> IORef (Messages TcRnMessage) -> IORef CostCentreState -> CompleteMatches
+         -> IORef (Messages DsMessage) -> IORef CostCentreState -> CompleteMatches
          -> (DsGblEnv, DsLclEnv)
 mkDsEnvs unit_env mod rdr_env type_env fam_inst_env msg_var cc_st_var
          complete_matches

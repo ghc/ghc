@@ -11,7 +11,7 @@ import GHC.Types.Basic
 import GHC.Types.Error
 import GHC.Types.Name ( nameSrcSpan, getName )
 import GHC.Driver.Errors.Types
--- import GHC.Iface.Load  ( cannotFindModule )
+import GHC.Iface.Errors  ( cannotFindModule' )
 import GHC.Unit.State
 import GHC.Utils.Error
 import GHC.Utils.Outputable
@@ -46,14 +46,38 @@ instance Diagnostic GhcMessage where
       -> diagnosticReason m
 
 instance Diagnostic DriverMessage where
-  diagnosticReason _ = ErrorWithoutFlag -- FIXME(adn)
+  diagnosticReason  = \case
+    DriverUnknownMessage d
+      -> diagnosticReason d
+
+    DriverCannotFindModule{}
+      -> ErrorWithoutFlag
+
+    DriverNotAnExpression{}
+      -> ErrorWithoutFlag
+
+    DriverParseErrorImport
+      -> ErrorWithoutFlag
+
+    DriverPkgRequiredTrusted{}
+      -> ErrorWithoutFlag
+
+    DriverCantLoadIfaceForSafe{}
+      -> ErrorWithoutFlag
+
+    DriverWarnModuleInferredUnsafe{}
+      -> WarningWithoutFlag
+
+    DriverWarnInferredSafeImports{}
+      -> WarningWithoutFlag
+
   diagnosticMessage = \case
 
     DriverUnknownMessage d
-      -> d
+      -> diagnosticMessage d
 
-    DriverCannotFindModule _env _m _res
-      -> mkDecorated [ {- cannotFindModule env m res -} ]
+    DriverCannotFindModule df unitEnv profile modName res
+      -> mkDecorated [ cannotFindModule' df unitEnv profile modName res ]
 
     DriverNotAnExpression str
       -> mkDecorated [ text "not an expression:" <+> quotes (text str) ]

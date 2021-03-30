@@ -152,7 +152,7 @@ simplifyTop wanteds
 
            ; whyUnsafe <- getWarningMessages <$> TcM.readTcRef errs_var
            ; TcM.writeTcRef errs_var saved_msg
-           ; recordUnsafeInfer whyUnsafe
+           ; recordUnsafeInfer (mkMessages whyUnsafe)
            }
        ; traceTc "reportUnsolved (unsafe overlapping) }" empty
 

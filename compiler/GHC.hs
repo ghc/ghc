@@ -303,6 +303,8 @@ import GHC.Prelude hiding (init)
 import GHC.Platform
 import GHC.Platform.Ways
 
+import GHC.Diagnostics hiding (getMessages, getErrorMessages, getWarningMessages)
+
 import GHC.Driver.Phases   ( Phase(..), isHaskellSrcFilename
                            , isSourceFilename, startPhase )
 import GHC.Driver.Env
@@ -331,14 +333,12 @@ import GHCi.RemoteTypes
 import qualified GHC.Parser as Parser
 import GHC.Parser.Lexer
 import GHC.Parser.Annotation
-import GHC.Parser.Errors.Ppr
 import GHC.Parser.Utils
 
 import GHC.Iface.Load        ( loadSysInterface )
 import GHC.Hs
 import GHC.Builtin.Types.Prim ( alphaTyVars )
 import GHC.Iface.Tidy
-import GHC.Data.Bag        ( listToBag )
 import GHC.Data.StringBuffer
 import GHC.Data.FastString
 import qualified GHC.LanguageExtensions as LangExt
@@ -354,12 +354,10 @@ import GHC.Utils.TmpFs
 import GHC.SysTools
 import GHC.SysTools.BaseDir
 
-import GHC.Utils.Error
 import GHC.Utils.Monad
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Logger
 
 import GHC.Core.Predicate
 import GHC.Core.Type  hiding( typeKind )
@@ -380,7 +378,6 @@ import GHC.Types.TyThing.Ppr  ( pprFamInst )
 import GHC.Types.Annotations
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
-import GHC.Types.SourceError
 import GHC.Types.SafeHaskell
 import GHC.Types.Fixity
 import GHC.Types.Target
@@ -390,7 +387,6 @@ import GHC.Types.Name.Env
 import GHC.Types.Name.Ppr
 import GHC.Types.TypeEnv
 import GHC.Types.SourceFile
-import GHC.Types.Error ( mkMessages, DiagnosticMessage )
 
 import GHC.Unit
 import GHC.Unit.Env
@@ -900,9 +896,10 @@ checkNewInteractiveDynFlags logger dflags0 = do
   -- We currently don't support use of StaticPointers in expressions entered on
   -- the REPL. See #12356.
   if xopt LangExt.StaticPointers dflags0
-  then do liftIO $ printOrThrowDiagnostics logger dflags0 $ listToBag
-            [mkPlainMsgEnvelope dflags0 Session.WarningWithoutFlag interactiveSrcSpan
-             $ text "StaticPointers is not supported in GHCi interactive expressions."]
+  then do liftIO $ printOrThrowDiagnostics logger dflags0 $ singleMessage
+            $ fmap (GhcDriverMessage . DriverUnknownMessage)
+            $ mkPlainMsgEnvelope dflags0 Session.WarningWithoutFlag interactiveSrcSpan
+               $ text "StaticPointers is not supported in GHCi interactive expressions."
           return $ xopt_unset dflags0 LangExt.StaticPointers
   else return dflags0
 
@@ -1493,7 +1490,7 @@ getNameToInstancesIndex :: GhcMonad m
                      -- if it is visible from at least one module in the list.
   -> Maybe [Module]  -- ^ modules to load. If this is not specified, we load
                      -- modules for everything that is in scope unqualified.
-  -> m (Messages DiagnosticMessage, Maybe (NameEnv ([ClsInst], [FamInst])))
+  -> m (Messages TcRnMessage, Maybe (NameEnv ([ClsInst], [FamInst])))
 getNameToInstancesIndex visible_mods mods_to_load = do
   hsc_env <- getSession
   liftIO $ runTcInteractive hsc_env $

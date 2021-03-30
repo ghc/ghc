@@ -31,10 +31,11 @@ import GHC.Builtin.Types (filterCTuple)
 import GHC.Driver.Session (DynFlags)
 import GHC.Utils.Error (diagReasonSeverity)
 
--- This is a totally uninteresting instance will will be populated in the context of #18516.
 instance Diagnostic PsMessage where
-  diagnosticMessage _ = mkDecorated []
-  diagnosticReason  _ = ErrorWithoutFlag
+  diagnosticMessage = \case
+    PsUnknownMessage m -> diagnosticMessage m
+  diagnosticReason  = \case
+    PsUnknownMessage m -> diagnosticReason m
 
 mk_parser_err :: SrcSpan -> SDoc -> MsgEnvelope DiagnosticMessage
 mk_parser_err span doc = MsgEnvelope

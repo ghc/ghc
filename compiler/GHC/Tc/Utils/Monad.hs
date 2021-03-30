@@ -243,7 +243,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
         used_gre_var <- newIORef [] ;
         th_var       <- newIORef False ;
         th_splice_var<- newIORef False ;
-        infer_var    <- newIORef (True, emptyBag) ;
+        infer_var    <- newIORef (True, emptyMessages) ;
         dfun_n_var   <- newIORef emptyOccSet ;
         type_env_var <- case hsc_type_env_var hsc_env of {
                            Just (_mod, te_var) -> return te_var ;
@@ -1980,7 +1980,7 @@ addModFinalizersWithLclEnv mod_finalizers
 -- | Mark that safe inference has failed
 -- See Note [Safe Haskell Overlapping Instances Implementation]
 -- although this is used for more than just that failure case.
-recordUnsafeInfer :: WarningMessages -> TcM ()
+recordUnsafeInfer :: Messages TcRnMessage -> TcM ()
 recordUnsafeInfer warns =
     getGblEnv >>= \env -> writeTcRef (tcg_safeInfer env) (False, warns)
 
