@@ -1261,28 +1261,31 @@ layoutTuple profile start_off arg_ty reps =
       orig_stk_params = [(x, fromIntegral off) | (x, StackParam off) <- pos]
 
       -- sort the register parameters by register and add them to the stack
+      regs_order :: Map.Map GlobalReg Int
+      regs_order = Map.fromList $ zip (tupleRegsCover platform) [0..]
+
+      reg_order :: GlobalReg -> (Int, GlobalReg)
+      reg_order reg | Just n <- Map.lookup reg regs_order = (n, reg)
+      -- a VanillaReg goes to the same place regardless of whether it
+      -- contains a pointer
+      reg_order (VanillaReg n VNonGcPtr) = reg_order (VanillaReg n VGcPtr)
+      -- if we don't have a position for a FloatReg then they must be passed
+      -- in the equivalent DoubleReg
+      reg_order (FloatReg n) = reg_order (DoubleReg n)
+      -- one-tuples can be passed in other registers, but then we don't need
+      -- to care about the order
+      reg_order reg          = (0, reg)
+
       (regs, reg_params)
           = unzip $ sortBy (comparing fst)
-                           [(reg, x) | (x, RegisterParam reg) <- pos]
+                           [(reg_order reg, x) | (x, RegisterParam reg) <- pos]
 
       (new_stk_bytes, new_stk_params) = assignStack platform
                                                     orig_stk_bytes
                                                     arg_ty
                                                     reg_params
 
-      -- make live register bitmaps
-      bmp_reg r ~(v, f, d, l)
-        = case r of VanillaReg n _ -> (a v n, f,     d,     l    )
-                    FloatReg n     -> (v,     a f n, d,     l    )
-                    DoubleReg n    -> (v,     f,     a d n, l    )
-                    LongReg n      -> (v,     f,     d,     a l n)
-                    _              ->
-                      pprPanic "GHC.StgToByteCode.layoutTuple unsupported register type"
-                               (ppr r)
-              where a bmp n = bmp .|. (1 `shiftL` (n-1))
-
-      (vanilla_regs, float_regs, double_regs, long_regs)
-          = foldr bmp_reg (0, 0, 0, 0) regs
+      regs_set = mkRegSet (map snd regs)
 
       get_byte_off (x, StackParam y) = (x, fromIntegral y)
       get_byte_off _                 =
@@ -1290,10 +1293,7 @@ layoutTuple profile start_off arg_ty reps =
 
   in ( TupleInfo
          { tupleSize        = bytesToWords platform (ByteOff new_stk_bytes)
-         , tupleVanillaRegs = vanilla_regs
-         , tupleLongRegs    = long_regs
-         , tupleFloatRegs   = float_regs
-         , tupleDoubleRegs  = double_regs
+         , tupleRegs        = regs_set
          , tupleNativeStackSize = bytesToWords platform
                                                (ByteOff orig_stk_bytes)
          }

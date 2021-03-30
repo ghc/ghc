@@ -43,6 +43,7 @@ import qualified Data.IntMap as IntMap
 import Data.Maybe (catMaybes)
 import qualified GHC.Exts.Heap as Heap
 import GHC.Stack.CCS
+import GHC.Cmm.Expr ( GlobalRegSet, emptyRegSet, regSetToList )
 
 -- -----------------------------------------------------------------------------
 -- Compiled Byte Code
@@ -106,10 +107,7 @@ newtype RegBitmap = RegBitmap { unRegBitmap :: Word32 }
 -}
 data TupleInfo = TupleInfo
   { tupleSize            :: !WordOff   -- total size of tuple in words
-  , tupleVanillaRegs     :: !RegBitmap -- vanilla registers used
-  , tupleLongRegs        :: !RegBitmap -- long registers used
-  , tupleFloatRegs       :: !RegBitmap -- float registers used
-  , tupleDoubleRegs      :: !RegBitmap -- double registers used
+  , tupleRegs            :: !GlobalRegSet
   , tupleNativeStackSize :: !WordOff {- words spilled on the stack by
                                         GHCs native calling convention -}
   } deriving (Show)
@@ -118,14 +116,11 @@ instance Outputable TupleInfo where
   ppr TupleInfo{..} = text "<size" <+> ppr tupleSize <+>
                       text "stack" <+> ppr tupleNativeStackSize <+>
                       text "regs"  <+>
-                          char 'R' <> ppr tupleVanillaRegs <+>
-                          char 'L' <> ppr tupleLongRegs <+>
-                          char 'F' <> ppr tupleFloatRegs <+>
-                          char 'D' <> ppr tupleDoubleRegs <>
+                      ppr (map (text.show) $ regSetToList tupleRegs) <>
                       char '>'
 
 voidTupleInfo :: TupleInfo
-voidTupleInfo = TupleInfo 0 0 0 0 0 0
+voidTupleInfo = TupleInfo 0 emptyRegSet 0
 
 type ItblEnv = NameEnv (Name, ItblPtr)
         -- We need the Name in the range so we know which
