@@ -159,8 +159,8 @@ constantWord w name expr = [(w, GetWord name (Fst (CExpr expr)))]
 constantNatural :: Where -> Name -> String -> Wanteds
 constantNatural w name expr = [(w, GetNatural name (Fst (CExpr expr)))]
 
-constantBool :: Where -> Name -> String -> Wanteds
-constantBool w name expr = [(w, GetBool name (Fst (CPPExpr expr)))]
+-- constantBool :: Where -> Name -> String -> Wanteds
+-- constantBool w name expr = [(w, GetBool name (Fst (CPPExpr expr)))]
 
 fieldOffset :: Where -> String -> String -> Wanteds
 fieldOffset w theType theField = fieldOffset_ w nameBase theType theField
@@ -660,8 +660,6 @@ wanteds os = concat
 
           -- Amount of pointer bits used for semi-tagging constructor closures
           ,constantWord Haskell "HS_TAG_BITS" "TAG_BITS"
-
-          ,constantBool Haskell "HS_DYNAMIC_BY_DEFAULT" "defined(DYNAMIC_BY_DEFAULT)"
 
           ,constantWord    Haskell "HS_LDV_SHIFT"         "LDV_SHIFT"
           ,constantNatural Haskell "HS_ILDV_CREATE_MASK"  "LDV_CREATE_MASK"
