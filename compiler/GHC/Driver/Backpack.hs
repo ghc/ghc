@@ -432,6 +432,7 @@ addUnit u = do
           , ue_namever   = ghcNameVersion (hsc_dflags hsc_env)
           , ue_home_unit = Just home_unit
           , ue_hpt       = ue_hpt old_unit_env
+          , ue_eps       = ue_eps old_unit_env
           , ue_units     = unit_state
           , ue_unit_dbs  = Just dbs
           }
@@ -510,7 +511,7 @@ innerBkpM do_this =
 updateEpsGhc_ :: GhcMonad m => (ExternalPackageState -> ExternalPackageState) -> m ()
 updateEpsGhc_ f = do
     hsc_env <- getSession
-    liftIO $ atomicModifyIORef' (euc_eps (hsc_EPS hsc_env)) (\x -> (f x, ()))
+    liftIO $ atomicModifyIORef' (euc_eps (ue_eps (hsc_unit_env hsc_env))) (\x -> (f x, ()))
 
 -- | Get the EPS from a 'GhcMonad'.
 getEpsGhc :: GhcMonad m => m ExternalPackageState
