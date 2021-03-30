@@ -1181,6 +1181,9 @@ stmtMacros = listToUFM [
   ( fsLit "SAVE_REGS",             \[] -> emitSaveRegs ),
   ( fsLit "RESTORE_REGS",          \[] -> emitRestoreRegs ),
 
+  ( fsLit "PUSH_TUPLE_REGS",      \[live_regs] -> emitPushTupleRegs live_regs ),
+  ( fsLit "POP_TUPLE_REGS",       \[live_regs] -> emitPopTupleRegs live_regs ),
+
   ( fsLit "LDV_ENTER",             \[e] -> ldvEnter e ),
   ( fsLit "LDV_RECORD_CREATE",     \[e] -> ldvRecordCreate e ),
 
