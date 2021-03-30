@@ -75,7 +75,7 @@ lintStgTopBindings :: forall a . (OutputablePass a, BinderP a ~ Id)
 
 lintStgTopBindings logger dflags ictxt this_mod unarised whodunnit binds
   = {-# SCC "StgLint" #-}
-    case initL this_mod unarised opts top_level_binds (lint_binds binds) of
+    case initL dflags this_mod unarised opts top_level_binds (lint_binds binds) of
       Nothing  ->
         return ()
       Just msg -> do
@@ -247,6 +247,7 @@ The Lint monad
 newtype LintM a = LintM
     { unLintM :: Module
               -> LintFlags
+              -> DynFlags
               -> StgPprOpts        -- Pretty-printing options
               -> [LintLocInfo]     -- Locations
               -> IdSet             -- Local vars in scope
@@ -281,16 +282,16 @@ pp_binders bs
     pp_binder b
       = hsep [ppr b, dcolon, ppr (idType b)]
 
-initL :: Module -> Bool -> StgPprOpts -> IdSet -> LintM a -> Maybe SDoc
-initL this_mod unarised opts locals (LintM m) = do
-  let (_, errs) = m this_mod (LintFlags unarised) opts [] locals emptyBag
+initL :: DynFlags -> Module -> Bool -> StgPprOpts -> IdSet -> LintM a -> Maybe SDoc
+initL dflags this_mod unarised opts locals (LintM m) = do
+  let (_, errs) = m this_mod (LintFlags unarised) dflags opts [] locals emptyBag
   if isEmptyBag errs then
       Nothing
   else
       Just (vcat (punctuate blankLine (bagToList errs)))
 
 instance Applicative LintM where
-      pure a = LintM $ \_mod _lf _opts _loc _scope errs -> (a, errs)
+      pure a = LintM $ \_mod _lf _df _opts _loc _scope errs -> (a, errs)
       (<*>) = ap
       (*>)  = thenL_
 
@@ -299,14 +300,14 @@ instance Monad LintM where
     (>>)  = (*>)
 
 thenL :: LintM a -> (a -> LintM b) -> LintM b
-thenL m k = LintM $ \mod lf opts loc scope errs
-  -> case unLintM m mod lf opts loc scope errs of
-      (r, errs') -> unLintM (k r) mod lf opts loc scope errs'
+thenL m k = LintM $ \mod lf dflags opts loc scope errs
+  -> case unLintM m mod lf dflags opts loc scope errs of
+      (r, errs') -> unLintM (k r) mod lf dflags opts loc scope errs'
 
 thenL_ :: LintM a -> LintM b -> LintM b
-thenL_ m k = LintM $ \mod lf opts loc scope errs
-  -> case unLintM m mod lf opts loc scope errs of
-      (_, errs') -> unLintM k mod lf opts loc scope errs'
+thenL_ m k = LintM $ \mod lf dflags opts loc scope errs
+  -> case unLintM m mod lf dflags opts loc scope errs of
+      (_, errs') -> unLintM k mod lf dflags opts loc scope errs'
 
 checkL :: Bool -> SDoc -> LintM ()
 checkL True  _   = return ()
@@ -351,37 +352,37 @@ checkPostUnariseId id =
       is_sum <|> is_tuple <|> is_void
 
 addErrL :: SDoc -> LintM ()
-addErrL msg = LintM $ \_mod _lf _opts loc _scope errs -> ((), addErr errs msg loc)
+addErrL msg = LintM $ \_mod _lf df _opts loc _scope errs -> ((), addErr df errs msg loc)
 
-addErr :: Bag SDoc -> SDoc -> [LintLocInfo] -> Bag SDoc
-addErr errs_so_far msg locs
+addErr :: DynFlags -> Bag SDoc -> SDoc -> [LintLocInfo] -> Bag SDoc
+addErr dflags errs_so_far msg locs
   = errs_so_far `snocBag` mk_msg locs
   where
     mk_msg (loc:_) = let (l,hdr) = dumpLoc loc
-                     in  mkLocMessage (Err.mkMCDiagnostic WarningWithoutFlag)
+                     in  mkLocMessage (Err.mkMCDiagnostic dflags WarningWithoutFlag)
                                       l (hdr $$ msg)
     mk_msg []      = msg
 
 addLoc :: LintLocInfo -> LintM a -> LintM a
-addLoc extra_loc m = LintM $ \mod lf opts loc scope errs
-   -> unLintM m mod lf opts (extra_loc:loc) scope errs
+addLoc extra_loc m = LintM $ \mod lf dflags opts loc scope errs
+   -> unLintM m mod lf dflags opts (extra_loc:loc) scope errs
 
 addInScopeVars :: [Id] -> LintM a -> LintM a
-addInScopeVars ids m = LintM $ \mod lf opts loc scope errs
+addInScopeVars ids m = LintM $ \mod lf dflags opts loc scope errs
  -> let
         new_set = mkVarSet ids
-    in unLintM m mod lf opts loc (scope `unionVarSet` new_set) errs
+    in unLintM m mod lf dflags opts loc (scope `unionVarSet` new_set) errs
 
 getLintFlags :: LintM LintFlags
-getLintFlags = LintM $ \_mod lf _opts _loc _scope errs -> (lf, errs)
+getLintFlags = LintM $ \_mod lf _df _opts _loc _scope errs -> (lf, errs)
 
 getStgPprOpts :: LintM StgPprOpts
-getStgPprOpts = LintM $ \_mod _lf opts _loc _scope errs -> (opts, errs)
+getStgPprOpts = LintM $ \_mod _lf _df opts _loc _scope errs -> (opts, errs)
 
 checkInScope :: Id -> LintM ()
-checkInScope id = LintM $ \mod _lf _opts loc scope errs
+checkInScope id = LintM $ \mod _lf dflags _opts loc scope errs
  -> if nameIsLocalOrFrom mod (idName id) && not (id `elemVarSet` scope) then
-        ((), addErr errs (hsep [ppr id, dcolon, ppr (idType id),
+        ((), addErr dflags errs (hsep [ppr id, dcolon, ppr (idType id),
                                 text "is out of scope"]) loc)
     else
         ((), errs)

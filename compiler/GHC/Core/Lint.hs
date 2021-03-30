@@ -2774,7 +2774,7 @@ addMsg is_error env msgs msg
                           , isGoodSrcSpan span ] of
                []    -> noSrcSpan
                (s:_) -> s
-   mk_msg msg = mkLocMessage (mkMCDiagnostic WarningWithoutFlag) msg_span
+   mk_msg msg = mkLocMessage (mkMCDiagnostic (le_dynflags env) WarningWithoutFlag) msg_span
                              (msg $$ context)
 
 addLoc :: LintLocInfo -> LintM a -> LintM a
