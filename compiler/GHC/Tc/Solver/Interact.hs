@@ -1755,6 +1755,68 @@ Then it is solvable, but its very hard to detect this on the spot.
 It's exactly the same with implicit parameters, except that the
 "aggressive" approach would be much easier to implement.
 
+Note [Fundeps with instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+doTopFundepImprovement compares the constraint with all the instance
+declarations, to see if we can produce any derived equalities. E.g
+   class C2 a b | a -> b
+   instance C Int Bool
+Then the constraint (C Int ty) generates the Derived equality [D] ty ~ Bool.
+
+There is a nasty corner in #19415 which led to the typechecker looping:
+   class C s t b | s -> t
+   instance ... => C (T kx x) (T ky y) Int
+   T :: forall k. k -> Type
+
+   work_item: dwrk :: C (T @ka (a::ka)) (T @kb0 (b0::kb0)) Char
+      where kb0, b0 are unification vars
+   ==> {fundeps against instance; k0, y0 fresh unification vars}
+       [D] T kb0 (b0::kb0) ~ T k0 (y0::k0)
+       Add dwrk to inert set
+   ==> {solve that Derived kb0 := k0, b0 := y0
+   Now kick out dwrk, since it mentions kb0
+   But now we are back to the start!  Loop!
+
+NB1: this example relies on an instance that does not satisfy
+the coverage condition (although it may satisfy the weak coverage
+condition), which is known to lead to termination trouble
+
+NB2: if the unification was the other way round, k0:=kb0, all would be
+well.  It's a very delicate problem.
+
+The ticket #19415 discusses various solutions, but the one we adopted
+is very simple:
+
+* There is a flag in CDictCan (cc_fundeps :: Bool)
+
+* cc_fundeps = True means
+    a) The class has fundeps
+    b) We have not had a successful hit against instances yet
+
+* In doTopFundepImprovement, if we emit some Deriveds we flip the flag
+  to False, so that we won't try again with the same CDictCan.  In our
+  example, dwrk will have its flag set to False.
+
+* Not that if we have no "hits" we must /not/ flip the flag. We might have
+      dwrk :: C alpha beta Char
+  which does not yet trigger fundeps from the instance, but later we
+  get alpha := T ka a.  We could be cleverer, and spot that the constraint
+  is such that we will /never/ get any hits (no unifiers) but we don't do
+  that yet.
+
+Easy!  What could go wrong?
+* Maybe the class has multiple fundeps, and we get hit with one but not
+  the other.  Per-fundep flags?
+* Maybe we get a hit against one instance with one fundep but, after
+  the work-item is instantiated a bit more, we get a second hit
+  against a second instance.  (This is a pretty strange and
+  undesirable thing anyway, and can only happen with overlapping
+  instances; one example is in Note [Weird fundeps].)
+
+But both of these seem extremely exotic, and ignoring them threatens
+completeness (fixable with some type signature), but not termination
+(not fixable).  So for now we are just doing the simplest thing.
+
 Note [Weird fundeps]
 ~~~~~~~~~~~~~~~~~~~~
 Consider   class Het a b | a -> b where
@@ -1776,6 +1838,39 @@ as the fundeps.
 
 #7875 is a case in point.
 -}
+
+doTopFundepImprovement ::Ct -> TcS (StopOrContinue Ct)
+-- Try to functional-dependency improvement betweeen the constraint
+-- and the top-level instance declarations
+-- See Note [Fundeps with instances]
+-- See also Note [Weird fundeps]
+doTopFundepImprovement work_item@(CDictCan { cc_ev = ev, cc_class = cls
+                                           , cc_tyargs = xis
+                                           , cc_fundeps = has_fds })
+  | has_fds, isImprovable ev
+  = do { traceTcS "try_fundeps" (ppr work_item)
+       ; instEnvs <- getInstEnvs
+       ; let fundep_eqns = improveFromInstEnv instEnvs mk_ct_loc cls xis
+       ; case fundep_eqns of
+           [] -> continueWith work_item  -- No improvement
+           _  -> do { emitFunDepDeriveds fundep_eqns
+                    ; continueWith (work_item { cc_fundeps = False }) } }
+  | otherwise
+  = continueWith work_item
+
+  where
+     dict_pred   = mkClassPred cls xis
+     dict_loc    = ctEvLoc ev
+     dict_origin = ctLocOrigin dict_loc
+
+     mk_ct_loc :: PredType   -- From instance decl
+               -> SrcSpan    -- also from instance deol
+               -> CtLoc
+     mk_ct_loc inst_pred inst_loc
+       = dict_loc { ctl_origin = FunDepOrigin2 dict_pred dict_origin
+                                               inst_pred inst_loc }
+
+doTopFundepImprovement work_item = pprPanic "doTopFundepImprovement" (ppr work_item)
 
 emitFunDepDeriveds :: [FunDepEqn CtLoc] -> TcS ()
 -- See Note [FunDep and implicit parameter reactions]
@@ -2033,8 +2128,7 @@ doTopReactDict :: InertSet -> Ct -> TcS (StopOrContinue Ct)
 doTopReactDict inerts work_item@(CDictCan { cc_ev = ev, cc_class = cls
                                           , cc_tyargs = xis })
   | isGiven ev   -- Never use instances for Given constraints
-  = do { try_fundep_improvement
-       ; continueWith work_item }
+  = doTopFundepImprovement work_item
 
   | Just solved_ev <- lookupSolvedDict inerts dict_loc cls xis   -- Cached
   = do { setEvBindIfWanted ev (ctEvTerm solved_ev)
@@ -2048,30 +2142,13 @@ doTopReactDict inerts work_item@(CDictCan { cc_ev = ev, cc_class = cls
                   -> do { insertSafeOverlapFailureTcS what work_item
                         ; addSolvedDict what ev cls xis
                         ; chooseInstance work_item lkup_res }
-               _  ->  -- NoInstance or NotSure
-                     do { when (isImprovable ev) $
-                          try_fundep_improvement
-                        ; continueWith work_item } }
+               _  -> -- NoInstance or NotSure
+                     -- We didn't solve it; so try functional dependencies with
+                     -- the instance environment, and return
+                     doTopFundepImprovement work_item }
    where
-     dict_pred   = mkClassPred cls xis
-     dict_loc    = ctEvLoc ev
-     dict_origin = ctLocOrigin dict_loc
+     dict_loc = ctEvLoc ev
 
-     -- We didn't solve it; so try functional dependencies with
-     -- the instance environment, and return
-     -- See also Note [Weird fundeps]
-     try_fundep_improvement
-        = do { traceTcS "try_fundeps" (ppr work_item)
-             ; instEnvs <- getInstEnvs
-             ; emitFunDepDeriveds $
-               improveFromInstEnv instEnvs mk_ct_loc dict_pred }
-
-     mk_ct_loc :: PredType   -- From instance decl
-               -> SrcSpan    -- also from instance deol
-               -> CtLoc
-     mk_ct_loc inst_pred inst_loc
-       = dict_loc { ctl_origin = FunDepOrigin2 dict_pred dict_origin
-                                               inst_pred inst_loc }
 
 doTopReactDict _ w = pprPanic "doTopReactDict" (ppr w)
 
