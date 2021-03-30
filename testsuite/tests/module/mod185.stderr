@@ -4,7 +4,7 @@
 (L
  { mod185.hs:1:1 }
  (HsModule
-  (ApiAnn
+  (EpAnn
    (Anchor
     { mod185.hs:1:1 }
     (UnchangedAnchor))
@@ -16,27 +16,27 @@
      (Nothing)
      []
      []))
-   (AnnCommentsBalanced
+   (EpaCommentsBalanced
     []
     [(L
       (Anchor
        { mod185.hs:6:1 }
        (UnchangedAnchor))
-      (AnnComment
-       (AnnEofComment)
+      (EpaComment
+       (EpaEofComment)
        { mod185.hs:6:1 }))]))
   (VirtualBraces
    (1))
   (Nothing)
   (Nothing)
   [(L
-    (SrcSpanAnn (ApiAnnNotUsed) { mod185.hs:3:1-24 })
+    (SrcSpanAnn (EpAnnNotUsed) { mod185.hs:3:1-24 })
     (ImportDecl
-     (ApiAnn
+     (EpAnn
       (Anchor
        { mod185.hs:3:1-6 }
        (UnchangedAnchor))
-      (ApiAnnImportDecl
+      (EpAnnImportDecl
        (AR { mod185.hs:3:1-6 })
        (Nothing)
        (Nothing)
@@ -44,7 +44,7 @@
         (AR { mod185.hs:3:16-24 }))
        (Nothing)
        (Nothing))
-      (AnnComments
+      (EpaComments
        []))
      (NoSourceText)
      (L
@@ -58,39 +58,39 @@
      (Nothing)
      (Nothing)))]
   [(L
-    (SrcSpanAnn (ApiAnn
+    (SrcSpanAnn (EpAnn
                  (Anchor
                   { mod185.hs:5:1-24 }
                   (UnchangedAnchor))
                  (AnnListItem
                   [])
-                 (AnnComments
+                 (EpaComments
                   [])) { mod185.hs:5:1-24 })
     (ValD
      (NoExtField)
      (FunBind
       (NoExtField)
       (L
-       (SrcSpanAnn (ApiAnnNotUsed) { mod185.hs:5:1-4 })
+       (SrcSpanAnn (EpAnnNotUsed) { mod185.hs:5:1-4 })
        (Unqual
         {OccName: main}))
       (MG
        (NoExtField)
        (L
-        (SrcSpanAnn (ApiAnnNotUsed) { mod185.hs:5:1-24 })
+        (SrcSpanAnn (EpAnnNotUsed) { mod185.hs:5:1-24 })
         [(L
-          (SrcSpanAnn (ApiAnnNotUsed) { mod185.hs:5:1-24 })
+          (SrcSpanAnn (EpAnnNotUsed) { mod185.hs:5:1-24 })
           (Match
-           (ApiAnn
+           (EpAnn
             (Anchor
              { mod185.hs:5:1-24 }
              (UnchangedAnchor))
             []
-            (AnnComments
+            (EpaComments
              []))
            (FunRhs
             (L
-             (SrcSpanAnn (ApiAnnNotUsed) { mod185.hs:5:1-4 })
+             (SrcSpanAnn (EpAnnNotUsed) { mod185.hs:5:1-4 })
              (Unqual
               {OccName: main}))
             (Prefix)
@@ -101,22 +101,22 @@
             [(L
               { mod185.hs:5:6-24 }
               (GRHS
-               (ApiAnn
+               (EpAnn
                 (Anchor
                  { mod185.hs:5:6-24 }
                  (UnchangedAnchor))
                 (GrhsAnn
                  (Nothing)
-                 (AddApiAnn AnnEqual (AR { mod185.hs:5:6 })))
-                (AnnComments
+                 (AddEpAnn AnnEqual (AR { mod185.hs:5:6 })))
+                (EpaComments
                  []))
                []
                (L
-                (SrcSpanAnn (ApiAnnNotUsed) { mod185.hs:5:8-24 })
+                (SrcSpanAnn (EpAnnNotUsed) { mod185.hs:5:8-24 })
                 (HsVar
                  (NoExtField)
                  (L
-                  (SrcSpanAnn (ApiAnnNotUsed) { mod185.hs:5:8-24 })
+                  (SrcSpanAnn (EpAnnNotUsed) { mod185.hs:5:8-24 })
                   (Qual
                    {ModuleName: Prelude}
                    {OccName: undefined}))))))]
