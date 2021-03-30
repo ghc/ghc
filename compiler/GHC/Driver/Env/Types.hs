@@ -13,7 +13,6 @@ import GHC.Types.Error ( WarningMessages )
 import GHC.Types.Name.Cache
 import GHC.Types.Target
 import GHC.Types.TypeEnv
-import GHC.Unit.External
 import GHC.Unit.Finder.Types
 import GHC.Unit.Module.Graph
 import GHC.Unit.Env
@@ -74,11 +73,6 @@ data HscEnv
 
         hsc_IC :: InteractiveContext,
                 -- ^ The context for evaluating interactive statements
-
-        hsc_EPS :: {-# UNPACK #-} !ExternalUnitCache,
-                -- ^ Information about the currently loaded external packages.
-                -- This is mutable because packages will be demand-loaded during
-                -- a compilation run as required.
 
         hsc_NC  :: {-# UNPACK #-} !NameCache,
                 -- ^ Global Name cache so that each Name gets a single Unique.

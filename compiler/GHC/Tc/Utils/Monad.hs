@@ -164,6 +164,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Hs hiding (LIE)
 
 import GHC.Unit
+import GHC.Unit.Env
 import GHC.Unit.External
 import GHC.Unit.Module.Warnings
 import GHC.Unit.Home.ModInfo
@@ -557,7 +558,9 @@ withoutDynamicNow =
               top { hsc_dflags = dflags { dynamicNow = False} })
 
 getEpsVar :: TcRnIf gbl lcl (TcRef ExternalPackageState)
-getEpsVar = do { env <- getTopEnv; return (euc_eps (hsc_EPS env)) }
+getEpsVar = do
+  env <- getTopEnv
+  return (euc_eps (ue_eps (hsc_unit_env env)))
 
 getEps :: TcRnIf gbl lcl ExternalPackageState
 getEps = do { env <- getTopEnv; liftIO $ hscEPS env }
