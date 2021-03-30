@@ -144,7 +144,6 @@ import GHC.CoreToStg    ( coreToStg )
 
 import GHC.Parser.Errors
 import GHC.Parser.Errors.Ppr
-import GHC.Parser.Errors.Types
 import GHC.Parser
 import GHC.Parser.Lexer as Lexer
 
@@ -293,7 +292,7 @@ handleWarnings = do
 logWarningsReportErrors :: (Bag PsWarning, Bag PsError) -> Hsc ()
 logWarningsReportErrors (warnings,errors) = do
     dflags <- getDynFlags
-    let warns = fmap (fmap (GhcPsMessage . PsUnknownMessage) . mkParserWarn dflags) warnings
+    let warns = fmap (fmap GhcPsMessage . mkParserWarn dflags) warnings
         errs  = fmap mkParserErr errors
     logDiagnostics (mkMessages warns)
     when (not $ isEmptyBag errs)
@@ -304,8 +303,8 @@ logWarningsReportErrors (warnings,errors) = do
 handleWarningsThrowErrors :: (Bag PsWarning, Bag PsError) -> Hsc a
 handleWarningsThrowErrors (warnings, errors) = do
     dflags <- getDynFlags
-    let warns = fmap (fmap (GhcPsMessage . PsUnknownMessage) . mkParserWarn dflags) warnings
-        errs  = fmap (fmap (GhcPsMessage . PsUnknownMessage) . mkParserErr        ) errors
+    let warns = fmap (fmap GhcPsMessage . mkParserWarn dflags) warnings
+        errs  = fmap (fmap GhcPsMessage . mkParserErr        ) errors
     logDiagnostics (mkMessages warns)
     logger <- getLogger
     let (wWarns, wErrs) = partitionMessageBag warns
@@ -422,8 +421,8 @@ hscParse' mod_summary
             handleWarningsThrowErrors (getMessages pst)
         POk pst rdr_module -> do
             let (warns, errs) =
-                  bimap (fmap (fmap (GhcPsMessage . PsUnknownMessage) . mkParserWarn dflags))
-                        (fmap (fmap (GhcPsMessage . PsUnknownMessage) . mkParserErr))
+                  bimap (fmap (fmap GhcPsMessage . mkParserWarn dflags))
+                        (fmap (fmap GhcPsMessage . mkParserErr))
                         (getMessages pst)
             logDiagnostics (mkMessages warns)
             liftIO $ dumpIfSet_dyn logger dflags Opt_D_dump_parsed "Parser"
@@ -1658,8 +1657,8 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
                $ do
                   (warns,errs,cmm) <- withTiming logger dflags (text "ParseCmm"<+>brackets (text filename)) (\_ -> ())
                                        $ parseCmmFile dflags cmm_mod home_unit filename
-                  let msgs = unionBags (fmap (fmap (GhcPsMessage . PsUnknownMessage) . mkParserWarn dflags) warns)
-                                       (fmap (fmap (GhcPsMessage . PsUnknownMessage) . mkParserErr) errs)
+                  let msgs = unionBags (fmap (fmap GhcPsMessage . mkParserWarn dflags) warns)
+                                       (fmap (fmap GhcPsMessage . mkParserErr) errs)
                   return (mkMessages msgs, cmm)
     liftIO $ do
         dumpIfSet_dyn logger dflags Opt_D_dump_cmm_verbose_by_proc "Parsed Cmm" FormatCMM (pdoc platform cmm)
