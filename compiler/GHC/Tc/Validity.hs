@@ -352,7 +352,7 @@ checkValidType ctxt ty
                  RuleSigCtxt _  -> rank1
                  TySynCtxt _    -> rank0
 
-                 ExprSigCtxt    -> rank1
+                 ExprSigCtxt {} -> rank1
                  KindSigCtxt    -> rank1
                  StandaloneKindSigCtxt{} -> rank1
                  TypeAppCtxt | impred_flag -> ArbitraryRank
@@ -1351,7 +1351,7 @@ okIPCtxt :: UserTypeCtxt -> Bool
   -- See Note [Implicit parameters in instance decls]
 okIPCtxt (FunSigCtxt {})        = True
 okIPCtxt (InfSigCtxt {})        = True
-okIPCtxt ExprSigCtxt            = True
+okIPCtxt (ExprSigCtxt {})       = True
 okIPCtxt TypeAppCtxt            = True
 okIPCtxt PatSigCtxt             = True
 okIPCtxt GenSigCtxt             = True
