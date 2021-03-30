@@ -1,3 +1,4 @@
+{-# LANGUAGE ViewPatterns #-}
 module GHC.Driver.Errors (
     printOrThrowDiagnostics
   , printBagOfErrors
@@ -16,6 +17,7 @@ import GHC.Types.Error
 import GHC.Utils.Outputable ( text, withPprStyle, mkErrStyle )
 import GHC.Utils.Logger
 import qualified GHC.Driver.CmdLine as CmdLine
+import Data.Typeable
 
 -- | Partitions the messages and returns a tuple which first element are the warnings, and the
 -- second the errors.
@@ -41,13 +43,14 @@ handleFlagWarnings logger dflags warns = do
       bag = listToBag [ mkPlainMsgEnvelope dflags reason loc (text warn)
                       | CmdLine.Warn reason (L loc warn) <- warns ]
 
-  printOrThrowDiagnostics logger dflags bag
+<<<<<<< HEAD
+  printOrThrowDiagnostics logger dflags (mkMessages bag)
 
 -- | Given a bag of diagnostics, turn them into an exception if
 -- any has 'SevError', or print them out otherwise.
-printOrThrowDiagnostics :: Logger -> DynFlags -> Bag WarnMsg -> IO ()
-printOrThrowDiagnostics logger dflags warns
-  | any ((==) SevError . errMsgSeverity) warns
-  = throwIO (mkSrcErr . mkMessages $ warns)
+printOrThrowDiagnostics :: (Diagnostic e, Typeable e) => Logger -> DynFlags -> Messages e -> IO ()
+printOrThrowDiagnostics logger dflags (getMessages -> msgs)
+  | any ((==) SevError . errMsgSeverity) msgs
+  = throwIO (mkSrcErr . mkMessages $ msgs)
   | otherwise
-  = printBagOfErrors logger dflags warns
+  = printBagOfErrors logger dflags msgs

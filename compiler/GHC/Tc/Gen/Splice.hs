@@ -42,6 +42,7 @@ import GHC.Driver.Hooks
 
 import GHC.Hs
 
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Gen.Expr
@@ -1438,7 +1439,7 @@ runTH ty fhv = do
 -- See Note [Remote Template Haskell] in libraries/ghci/GHCi/TH.hs.
 runRemoteTH
   :: IServInstance
-  -> [Messages DiagnosticMessage]   --  saved from nested calls to qRecover
+  -> [Messages TcRnMessage]   --  saved from nested calls to qRecover
   -> TcM ()
 runRemoteTH iserv recovers = do
   THMsg msg <- liftIO $ readIServ iserv getTHMessage
