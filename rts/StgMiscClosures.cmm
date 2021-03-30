@@ -110,9 +110,6 @@ stg_interp_constr7_entry (P_ ret) { return (ret + 7); }
 
    which is just what we want -- the "standard" return layout for the
    interpreter.  Hurrah!
-
-   Don't ask me how unboxed tuple returns are supposed to work.  We
-   haven't got a good story about that yet.
 */
 
 INFO_TABLE_RET( stg_ctoi_R1p, RET_BCO)
@@ -221,7 +218,7 @@ INFO_TABLE_RET( stg_ctoi_V, RET_BCO )
        spilled_1
        spilled_2
        spilled_3    <- Sp
-  
+
    When stg_ctoi_t is called, the stack looks like:
 
        ...
@@ -340,26 +337,23 @@ MK_STG_CTOI_T(62)
 
   the tuple_info word describes the register and stack usage of the tuple:
 
-  [ rrrr ffff ffdd dddd llss ssss ssss ssss ]
+  [ ssss ssss rrrr rrrr rrrr rrrr rrrr rrrr ]
 
-  - r: number of vanilla registers R1..Rn
-  - f: bitmap of float registers F1..F6
-  - d: bitmap of double registers D1..D6
-  - l: bitmap of long registers L1..Ln
+  - r: bitmap of live registers, corresponding to the list of registers
+       returned by GHC.Cmm.CallConv.tupleRegsCover (the least significant
+       bit corresponds to the first element in the list)
   - s: number of words on stack (in addition to registers)
 
-  The order in which the registers are pushed on the stack is determined by
-  the Ord instance of GHC.Cmm.Expr.GlobalReg. If you change the Ord instance,
-  the order in stg_ctoi_t and stg_ret_t needs to be adjusted accordingly.
-
+  The order of the live registers in the bitmap is the same as the list
+  given by GHC.Cmm.CallConv.tupleRegsCover, with the least significant
+  bit corresponding to the first register in the list.
  */
 
 stg_ctoi_t
     /* explicit stack */
 {
 
-    W_ tuple_info, tuple_stack, tuple_regs_R,
-       tuple_regs_F, tuple_regs_D, tuple_regs_L;
+    W_ tuple_info, tuple_stack;
     P_ tuple_BCO;
 
     tuple_info = Sp(2); /* tuple information word */
@@ -370,41 +364,12 @@ stg_ctoi_t
     CCCS = Sp(4);
 #endif
 
-    tuple_stack  = tuple_info & 0x3fff; /* number of words spilled on stack */
-    tuple_regs_R = (tuple_info >> 28) & 0xf;  /* number of R1..Rn */
-    tuple_regs_F = (tuple_info >> 22) & 0x3f; /* 6 bits bitmap */
-    tuple_regs_D = (tuple_info >> 16) & 0x3f; /* 6 bits bitmap */
-    tuple_regs_L = (tuple_info >> 14) & 0x3;  /* 2 bits bitmap */
+    /* number of words spilled on stack */
+    tuple_stack  = (tuple_info >> 24) & 0xff;
 
     Sp = Sp - WDS(tuple_stack);
 
-    /* save long registers */
-    /* fixme L2 ? */
-    if((tuple_regs_L & 1) != 0) { Sp = Sp - 8; L_[Sp] = L1; }
-
-    /* save double registers */
-    if((tuple_regs_D & 32) != 0) { Sp = Sp - SIZEOF_DOUBLE; D_[Sp] = D6; }
-    if((tuple_regs_D & 16) != 0) { Sp = Sp - SIZEOF_DOUBLE; D_[Sp] = D5; }
-    if((tuple_regs_D & 8)  != 0) { Sp = Sp - SIZEOF_DOUBLE; D_[Sp] = D4; }
-    if((tuple_regs_D & 4)  != 0) { Sp = Sp - SIZEOF_DOUBLE; D_[Sp] = D3; }
-    if((tuple_regs_D & 2)  != 0) { Sp = Sp - SIZEOF_DOUBLE; D_[Sp] = D2; }
-    if((tuple_regs_D & 1)  != 0) { Sp = Sp - SIZEOF_DOUBLE; D_[Sp] = D1; }
-
-    /* save float registers */
-    if((tuple_regs_F & 32) != 0) { Sp_adj(-1); F_[Sp] = F6; }
-    if((tuple_regs_F & 16) != 0) { Sp_adj(-1); F_[Sp] = F5; }
-    if((tuple_regs_F & 8)  != 0) { Sp_adj(-1); F_[Sp] = F4; }
-    if((tuple_regs_F & 4)  != 0) { Sp_adj(-1); F_[Sp] = F3; }
-    if((tuple_regs_F & 2)  != 0) { Sp_adj(-1); F_[Sp] = F2; }
-    if((tuple_regs_F & 1)  != 0) { Sp_adj(-1); F_[Sp] = F1; }
-
-    /* save vanilla registers */
-    if(tuple_regs_R >= 6) { Sp_adj(-1); Sp(0) = R6; }
-    if(tuple_regs_R >= 5) { Sp_adj(-1); Sp(0) = R5; }
-    if(tuple_regs_R >= 4) { Sp_adj(-1); Sp(0) = R4; }
-    if(tuple_regs_R >= 3) { Sp_adj(-1); Sp(0) = R3; }
-    if(tuple_regs_R >= 2) { Sp_adj(-1); Sp(0) = R2; }
-    if(tuple_regs_R >= 1) { Sp_adj(-1); Sp(0) = R1; }
+    PUSH_TUPLE_REGS(tuple_info);
 
     /* jump to the BCO that will finish the return of the tuple */
     Sp_adj(-3);
@@ -417,46 +382,15 @@ stg_ctoi_t
 
 INFO_TABLE_RET( stg_ret_t, RET_BCO )
 {
-    W_ tuple_info, tuple_stack, tuple_regs_R, tuple_regs_F,
-       tuple_regs_D, tuple_regs_L;
+    W_ tuple_info, tuple_stack;
 
     tuple_info = Sp(2);
     Sp_adj(3);
 
-    tuple_stack  = tuple_info & 0x3fff; /* number of words spilled on stack */
-    tuple_regs_R = (tuple_info >> 28) & 0xf;  /* number of R1..Rn */
-    tuple_regs_F = (tuple_info >> 22) & 0x3f; /* 6 bits bitmap */
-    tuple_regs_D = (tuple_info >> 16) & 0x3f; /* 6 bits bitmap */
-    tuple_regs_L = (tuple_info >> 14) & 0x3;  /* 2 bits bitmap */
+    /* number of words spilled on stack */
+    tuple_stack  = (tuple_info >> 24) & 0xff;
 
-    /* restore everything in the reverse order of stg_ctoi_t */
-
-    /* restore vanilla registers */
-    if(tuple_regs_R >= 1) { R1 = Sp(0); Sp_adj(1); }
-    if(tuple_regs_R >= 2) { R2 = Sp(0); Sp_adj(1); }
-    if(tuple_regs_R >= 3) { R3 = Sp(0); Sp_adj(1); }
-    if(tuple_regs_R >= 4) { R4 = Sp(0); Sp_adj(1); }
-    if(tuple_regs_R >= 5) { R5 = Sp(0); Sp_adj(1); }
-    if(tuple_regs_R >= 6) { R6 = Sp(0); Sp_adj(1); }
-
-    /* restore float registers */
-    if((tuple_regs_F & 1)  != 0) { F1 = F_[Sp]; Sp_adj(1); }
-    if((tuple_regs_F & 2)  != 0) { F2 = F_[Sp]; Sp_adj(1); }
-    if((tuple_regs_F & 4)  != 0) { F3 = F_[Sp]; Sp_adj(1); }
-    if((tuple_regs_F & 8)  != 0) { F4 = F_[Sp]; Sp_adj(1); }
-    if((tuple_regs_F & 16) != 0) { F5 = F_[Sp]; Sp_adj(1); }
-    if((tuple_regs_F & 32) != 0) { F6 = F_[Sp]; Sp_adj(1); }
-
-    /* restore double registers */
-    if((tuple_regs_D & 1)  != 0) { D1 = D_[Sp]; Sp = Sp + SIZEOF_DOUBLE; }
-    if((tuple_regs_D & 2)  != 0) { D2 = D_[Sp]; Sp = Sp + SIZEOF_DOUBLE; }
-    if((tuple_regs_D & 4)  != 0) { D3 = D_[Sp]; Sp = Sp + SIZEOF_DOUBLE; }
-    if((tuple_regs_D & 8)  != 0) { D4 = D_[Sp]; Sp = Sp + SIZEOF_DOUBLE; }
-    if((tuple_regs_D & 16) != 0) { D5 = D_[Sp]; Sp = Sp + SIZEOF_DOUBLE; }
-    if((tuple_regs_D & 32) != 0) { D6 = D_[Sp]; Sp = Sp + SIZEOF_DOUBLE; }
-
-    /* restore long registers */
-    if((tuple_regs_L & 1) != 0) { L1 = L_[Sp]; Sp = Sp + 8; }
+    POP_TUPLE_REGS(tuple_info);
 
     /* Sp points to the topmost argument now */
     jump %ENTRY_CODE(Sp(tuple_stack)) [*]; // NB. all registers live!

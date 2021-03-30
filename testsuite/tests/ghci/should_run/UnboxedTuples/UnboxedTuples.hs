@@ -179,4 +179,4 @@ testX :: (Eq a, Show a)
       => String -> (p -> t) -> (p -> t) -> p -> p -> (t -> a) -> IO ()
 testX msg a1 a2 b1 b2 ap =
     let (r:rs) = [ap (f g) | f <- [a1,a2], g <- [b1,b2]]
-    in putStrLn (msg ++ " " ++ (show $ all (==r) rs) ++ " " ++ show r)
+    in putStrLn (msg ++ " " ++ show (all (==r) rs) ++ " " ++ show r)
