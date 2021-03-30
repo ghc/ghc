@@ -1350,7 +1350,8 @@ source-tarball:
   needs: [doc-tarball]
   variables:
     UPSTREAM_PROJECT_PATH: "$CI_PROJECT_PATH"
-    UPSTREAM_COMMIT_SHA: "$CI_COMMIT_SHA"
+    UPSTREAM_PROJECT_ID: "$CI_PROJECT_ID"
+    UPSTREAM_PIPELINE_ID: "$CI_PIPELINE_ID"
     EXTRA_HC_OPTS: "-dcore-lint"
   trigger:
     project: "ghc/head.hackage"
