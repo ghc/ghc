@@ -1775,7 +1775,7 @@ lookupName name =
 parser :: String         -- ^ Haskell module source text (full Unicode is supported)
        -> DynFlags       -- ^ the flags
        -> FilePath       -- ^ the filename (for source locations)
-       -> (WarningMessages, Either ErrorMessages (Located HsModule))
+       -> (Messages PsMessage, Either (Messages PsMessage) (Located HsModule))
 
 parser str dflags filename =
    let
@@ -1786,11 +1786,11 @@ parser str dflags filename =
 
      PFailed pst ->
          let (warns,errs) = getMessages pst in
-         (fmap (mkParserWarn dflags) warns, Left (fmap mkParserErr errs))
+         (mkMessages $ fmap (mkParserWarn dflags) warns, Left $ mkMessages (fmap mkParserErr errs))
 
      POk pst rdr_module ->
          let (warns,_) = getMessages pst in
-         (fmap (mkParserWarn dflags) warns, Right rdr_module)
+         (mkMessages $ fmap (mkParserWarn dflags) warns, Right rdr_module)
 
 -- -----------------------------------------------------------------------------
 -- | Find the package environment (if one exists)

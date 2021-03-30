@@ -67,7 +67,7 @@ import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Utils.FV ( fvVarList, unionFV )
 
-import Control.Monad    ( unless,  when )
+import Control.Monad    ( unless,  when, forM_ )
 import Data.Foldable    ( toList )
 import Data.List        ( partition, mapAccumL, sortBy, unfoldr )
 
@@ -75,7 +75,6 @@ import {-# SOURCE #-} GHC.Tc.Errors.Hole ( findValidHoleFits )
 
 -- import Data.Semigroup   ( Semigroup )
 import qualified Data.Semigroup as Semigroup
-import Control.Monad (forM_)
 
 
 {-
