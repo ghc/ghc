@@ -5,6 +5,7 @@ module GHC.Iface.Errors
   ( cannotFindInterface
   , cantFindInstalledErr
   , cannotFindModule
+  , cannotFindModule'
   , cantFindErr
   -- * Utility functions
   , mayShowLocations

@@ -5,18 +5,22 @@ module GHC.Driver.Errors.Types (
   , DriverMessage(..)
   -- * Constructors
   , ghcUnknownMessage
+  -- * Utility functions
+  , liftTcRnMessage
   ) where
 
 import Data.Typeable
+import Data.Bifunctor
 
 import GHC.Core.InstEnv ( ClsInst )
-import GHC.Driver.Env.Types
 import GHC.Driver.Session ( DynFlags )
-import GHC.Prelude ( String )
+import GHC.Prelude
+import GHC.Platform.Profile ( Profile )
 import GHC.Types.Error
 import GHC.Unit.Finder.Types ( FindResult )
 import GHC.Unit.Module.Name ( ModuleName )
 import GHC.Unit.State
+import GHC.Unit.Env ( UnitEnv )
 import GHC.Unit.Types ( UnitId, Module )
 
 import GHC.Parser.Errors.Types ( PsMessage )
@@ -71,6 +75,11 @@ data GhcMessage where
 ghcUnknownMessage :: (Diagnostic a, Typeable a) => a -> GhcMessage
 ghcUnknownMessage = GhcUnknownMessage
 
+-- | Abstracts away the classic pattern where we are calling 'ioMsgMaybe' on the result of
+-- 'IO (Messages TcRnMessage, a)'.
+liftTcRnMessage :: Monad m => m (Messages TcRnMessage, a) -> m (Messages GhcMessage, a)
+liftTcRnMessage = fmap (first (fmap GhcTcRnMessage))
+
 -- | A message from the driver.
 data DriverMessage
   = -- Warnings
@@ -78,9 +87,9 @@ data DriverMessage
   | DriverWarnInferredSafeImports  !ModuleName
 
     -- Errors
-  | DriverCannotFindModule !HscEnv !ModuleName !FindResult
+  | DriverCannotFindModule !DynFlags !UnitEnv !Profile !ModuleName !FindResult
   | DriverNotAnExpression !String
   | DriverParseErrorImport
   | DriverPkgRequiredTrusted !UnitState !UnitId
   | DriverCantLoadIfaceForSafe !Module
-  | DriverUnknownMessage !DecoratedSDoc
+  | DriverUnknownMessage !DiagnosticMessage
