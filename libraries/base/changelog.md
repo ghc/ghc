@@ -43,8 +43,13 @@
   * Under POSIX, `System.IO.openFile` will no longer leak a file descriptor if it
     is interrupted by an asynchronous exception (#19114, #19115).
 
+  * Additionally export `asum` from `Control.Applicative`
+
   * `fromInteger :: Integer -> Float/Double` now consistently round to the
     nearest value, with ties to even.
+
+  * Functions in `Data.List` are specialized to list.
+    `Data.OldList` and `GHC.List` modules are removed.
 
 ## 4.15.0.0 *TBA*
 
