@@ -1,3 +1,3 @@
 
-T2464.hs:3:16:
-    Warning: -fffi is deprecated: use -XForeignFunctionInterface or pragma {-# LANGUAGE ForeignFunctionInterface #-} instead
+T2464.hs:3:16: warning: [-Wdeprecated-flags (in -Wdefault)]
+    -fffi is deprecated: use -XForeignFunctionInterface or pragma {-# LANGUAGE ForeignFunctionInterface #-} instead
