@@ -542,7 +542,8 @@ tcInstSkolTyVarsPushLevel :: Bool  -- True <=> make "super skolem"
 -- See Note [Skolemising type variables]
 tcInstSkolTyVarsPushLevel overlappable subst tvs
   = do { tc_lvl <- getTcLevel
-       ; let pushed_lvl = pushTcLevel tc_lvl
+       -- Do not retain the whole TcLclEnv
+       ; let !pushed_lvl = pushTcLevel tc_lvl
        ; tcInstSkolTyVarsAt pushed_lvl overlappable subst tvs }
 
 tcInstSkolTyVarsAt :: TcLevel -> Bool
