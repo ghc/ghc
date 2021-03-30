@@ -37,26 +37,28 @@ instance Diagnostic PsMessage where
   diagnosticReason  = \case
     PsUnknownMessage m -> diagnosticReason m
 
-mk_parser_err :: SrcSpan -> SDoc -> MsgEnvelope DiagnosticMessage
+mk_parser_err :: SrcSpan -> SDoc -> MsgEnvelope PsMessage
 mk_parser_err span doc = MsgEnvelope
    { errMsgSpan        = span
    , errMsgContext     = alwaysQualify
-   , errMsgDiagnostic  = DiagnosticMessage (mkDecorated [doc]) ErrorWithoutFlag
+   , errMsgDiagnostic  = PsUnknownMessage $ DiagnosticMessage (mkDecorated [doc]) ErrorWithoutFlag
+                         -- provisional (#18516)
    , errMsgSeverity    = SevError
    }
 
-mk_parser_warn :: DynFlags -> WarningFlag -> SrcSpan -> SDoc -> MsgEnvelope DiagnosticMessage
+mk_parser_warn :: DynFlags -> WarningFlag -> SrcSpan -> SDoc -> MsgEnvelope PsMessage
 mk_parser_warn df flag span doc = MsgEnvelope
    { errMsgSpan        = span
    , errMsgContext     = alwaysQualify
-   , errMsgDiagnostic  = DiagnosticMessage (mkDecorated [doc]) reason
+   , errMsgDiagnostic  = PsUnknownMessage $ DiagnosticMessage (mkDecorated [doc]) reason
+                         -- provisional (#18516)
    , errMsgSeverity    = diagReasonSeverity df reason
    }
   where
     reason :: DiagnosticReason
     reason = WarningWithFlag flag
 
-mkParserWarn :: DynFlags -> PsWarning -> MsgEnvelope DiagnosticMessage
+mkParserWarn :: DynFlags -> PsWarning -> MsgEnvelope PsMessage
 mkParserWarn df = \case
    PsWarnTab loc tc
       -> mk_parser_warn df Opt_WarnTabs loc $
@@ -142,7 +144,7 @@ mkParserWarn df = \case
            OperatorWhitespaceOccurrence_Suffix -> mk_msg "suffix"
            OperatorWhitespaceOccurrence_TightInfix -> mk_msg "tight infix"
 
-mkParserErr :: PsError -> MsgEnvelope DiagnosticMessage
+mkParserErr :: PsError -> MsgEnvelope PsMessage
 mkParserErr err = mk_parser_err (errLoc err) $ vcat
    (pp_err (errDesc err) : map pp_hint (errHints err))
 
