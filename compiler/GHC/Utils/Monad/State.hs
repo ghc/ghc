@@ -1,12 +1,26 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 module GHC.Utils.Monad.State where
 
 import GHC.Prelude
 
-newtype State s a = State { runState' :: s -> (# a, s #) }
+import GHC.Exts (oneShot)
+
+newtype State s a = State' { runState' :: s -> (# a, s #) }
     deriving (Functor)
+
+pattern State :: (s -> (# a, s #))
+              -> State s a
+
+-- This pattern synonym makes the monad eta-expand,
+-- which as a very beneficial effect on compiler performance
+-- See #18202.
+-- See Note [The one-shot state monad trick] in GHC.Utils.Monad
+pattern State m <- State' m
+  where
+    State m = State' (oneShot $ \s -> m s)
 
 instance Applicative (State s) where
    pure x   = State $ \s -> (# x, s #)
