@@ -117,9 +117,10 @@ SrcSpans everywhere.
 instead of `Located (HsExpr p)` or similar types, we will now have `XRec p
 (HsExpr p)`
 
-XRec allows annotating certain points in the AST with extra information. This
-maybe be source spans (for GHC), nothing (for TH), types (for HIE files), api
-annotations (for exactprint) or anything else.
+XRec allows annotating certain points in the AST with extra
+information. This maybe be source spans (for GHC), nothing (for TH),
+types (for HIE files), exact print annotations (for exactprint) or
+anything else.
 
 This should hopefully bring us one step closer to sharing the AST between GHC
 and TH.

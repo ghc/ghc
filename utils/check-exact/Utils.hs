@@ -18,32 +18,20 @@ module Utils
   -- ) where
   where
 import Control.Monad.State
--- import qualified Data.ByteString as B
--- import GHC.Generics hiding (Fixity)
 import Data.Function
 import Data.Ord (comparing)
 
 import GHC.Hs.Dump
--- import Language.Haskell.GHC.ExactPrint.Types
 import Lookup
 
--- import GHC.Data.Bag
--- import GHC.Driver.Session
--- import GHC.Data.FastString
-import GHC hiding (AnnComment)
+import GHC hiding (EpaComment)
 import qualified GHC
--- import qualified Name           as GHC
--- import qualified NameSet        as GHC
--- import GHC.Utils.Outputable
 import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
 import GHC.Driver.Ppr
 import GHC.Data.FastString
--- import GHC.Types.Var
--- import GHC.Types.Name.Occurrence
 
--- import qualified OccName(OccName(..),occNameString,pprNameSpaceBrief)
 import qualified GHC.Types.Name.Occurrence as OccName (OccName(..),pprNameSpaceBrief)
 
 import Control.Arrow
@@ -51,13 +39,11 @@ import Control.Arrow
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Data.Data hiding ( Fixity )
-import Data.List
+import Data.List (foldl', sortBy, elemIndex)
 
 import Debug.Trace
 import Types
 
--- ---------------------------------------------------------------------
--- ---------------------------------------------------------------------
 -- ---------------------------------------------------------------------
 
 -- |Global switch to enable debug tracing in ghc-exactprint Delta / Print
@@ -145,8 +131,8 @@ undelta (l,c) (DP dl dc) (LayoutStartCol co) = (fl,fc)
     fc = if dl == 0 then c  + dc
                     else co + dc
 
-undeltaSpan :: RealSrcSpan -> AnnKeywordId -> DeltaPos -> AddApiAnn
-undeltaSpan anchor kw dp = AddApiAnn kw (AR sp)
+undeltaSpan :: RealSrcSpan -> AnnKeywordId -> DeltaPos -> AddEpAnn
+undeltaSpan anchor kw dp = AddEpAnn kw (AR sp)
   where
     (l,c) = undelta (ss2pos anchor) dp (LayoutStartCol 0)
     len = length (keywordToString (G kw))
@@ -274,17 +260,17 @@ isExactName = False `mkQ` isExact
 
 -- ---------------------------------------------------------------------
 
-ghcCommentText :: LAnnotationComment -> String
-ghcCommentText (L _ (GHC.AnnComment (AnnDocCommentNext s) _))  = s
-ghcCommentText (L _ (GHC.AnnComment (AnnDocCommentPrev s) _))  = s
-ghcCommentText (L _ (GHC.AnnComment (AnnDocCommentNamed s) _)) = s
-ghcCommentText (L _ (GHC.AnnComment (AnnDocSection _ s) _))    = s
-ghcCommentText (L _ (GHC.AnnComment (AnnDocOptions s) _))      = s
-ghcCommentText (L _ (GHC.AnnComment (AnnLineComment s) _))     = s
-ghcCommentText (L _ (GHC.AnnComment (AnnBlockComment s) _))    = s
-ghcCommentText (L _ (GHC.AnnComment (AnnEofComment) _))        = ""
+ghcCommentText :: LEpaComment -> String
+ghcCommentText (L _ (GHC.EpaComment (EpaDocCommentNext s) _))  = s
+ghcCommentText (L _ (GHC.EpaComment (EpaDocCommentPrev s) _))  = s
+ghcCommentText (L _ (GHC.EpaComment (EpaDocCommentNamed s) _)) = s
+ghcCommentText (L _ (GHC.EpaComment (EpaDocSection _ s) _))    = s
+ghcCommentText (L _ (GHC.EpaComment (EpaDocOptions s) _))      = s
+ghcCommentText (L _ (GHC.EpaComment (EpaLineComment s) _))     = s
+ghcCommentText (L _ (GHC.EpaComment (EpaBlockComment s) _))    = s
+ghcCommentText (L _ (GHC.EpaComment (EpaEofComment) _))        = ""
 
-tokComment :: LAnnotationComment -> Comment
+tokComment :: LEpaComment -> Comment
 tokComment t@(L lt _) = mkComment (normaliseCommentText $ ghcCommentText t) lt
 
 mkComment :: String -> Anchor -> Comment
@@ -297,7 +283,7 @@ normaliseCommentText ('\r':xs) = normaliseCommentText xs
 normaliseCommentText (x:xs) = x:normaliseCommentText xs
 
 -- | Makes a comment which originates from a specific keyword.
-mkKWComment :: AnnKeywordId -> AnnAnchor -> Comment
+mkKWComment :: AnnKeywordId -> EpaAnchor -> Comment
 mkKWComment kw (AR ss)
   = Comment (keywordToString $ G kw) (Anchor ss UnchangedAnchor) (Just kw)
 mkKWComment kw (AD dp)
@@ -443,8 +429,8 @@ data NameSpace = VarName        -- Variables, including "real" data constructors
  -- ---------------------------------------------------------------------
 
 locatedAnAnchor :: LocatedAn a t -> RealSrcSpan
-locatedAnAnchor (L (SrcSpanAnn ApiAnnNotUsed l) _) = realSrcSpan l
-locatedAnAnchor (L (SrcSpanAnn (ApiAnn a _ _) _) _) = anchor a
+locatedAnAnchor (L (SrcSpanAnn EpAnnNotUsed l) _) = realSrcSpan l
+locatedAnAnchor (L (SrcSpanAnn (EpAnn a _ _) _) _) = anchor a
 
  -- ---------------------------------------------------------------------
 
@@ -460,7 +446,7 @@ locatedAnAnchor (L (SrcSpanAnn (ApiAnn a _ _) _) _) = anchor a
 showAst :: (Data a) => a -> String
 showAst ast
   = showSDocUnsafe
-    $ showAstData NoBlankSrcSpan NoBlankApiAnnotations ast
+    $ showAstData NoBlankSrcSpan NoBlankEpAnnotations ast
 
 -- ---------------------------------------------------------------------
 -- Putting these here for the time being, to avoid import loops
