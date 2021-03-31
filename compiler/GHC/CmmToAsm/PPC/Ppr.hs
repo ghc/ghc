@@ -44,7 +44,6 @@ import GHC.Utils.Panic
 
 import Data.Word
 import Data.Int
-import Data.Bits
 
 -- -----------------------------------------------------------------------------
 -- Printing this stuff out

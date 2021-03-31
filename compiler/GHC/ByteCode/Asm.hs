@@ -58,7 +58,7 @@ import Data.Array.Base  ( UArray(..) )
 
 import Data.Array.Unsafe( castSTUArray )
 
-import Foreign
+import Foreign hiding (shiftL, shiftR)
 import Data.Char        ( ord )
 import Data.List        ( genericLength )
 import Data.Map.Strict (Map)

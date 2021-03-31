@@ -40,7 +40,6 @@ import GHC.IO
 
 import GHC.Utils.Monad
 import Control.Monad
-import Data.Bits
 import Data.Char
 import GHC.Exts( Ptr(..), noDuplicate#, oneShot )
 #if MIN_VERSION_GLASGOW_HASKELL(9,1,0,0)

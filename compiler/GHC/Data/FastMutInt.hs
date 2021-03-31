@@ -15,7 +15,6 @@ module GHC.Data.FastMutInt(
 
 import GHC.Prelude
 
-import Data.Bits
 import GHC.Base
 
 data FastMutInt = FastMutInt !(MutableByteArray# RealWorld)

@@ -79,7 +79,6 @@ import GHC.Types.CostCentre ( CostCentre, ccFromThisModule )
 import GHC.Types.Unique.Supply
 
 import GHC.Data.Pair
-import Data.Bits
 import Data.List        ( unfoldr )
 import Data.Functor.Identity
 import Control.Monad
@@ -2097,4 +2096,3 @@ mkConvertNumLiteral hsc_env = do
 
 
    return convertNumLit
-

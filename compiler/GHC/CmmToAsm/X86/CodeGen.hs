@@ -86,7 +86,6 @@ import GHC.Utils.Misc
 import GHC.Types.Unique.Supply ( getUniqueM )
 
 import Control.Monad
-import Data.Bits
 import Data.Foldable (fold)
 import Data.Int
 import Data.Maybe

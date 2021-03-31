@@ -123,7 +123,6 @@ import GHC.Data.FastString
 
 import Control.DeepSeq
 import Control.Applicative (liftA2)
-import Data.Bits
 import Data.Data
 import Data.List (sortBy, intercalate)
 import Data.Function (on)

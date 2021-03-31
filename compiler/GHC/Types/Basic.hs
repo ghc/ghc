@@ -110,7 +110,6 @@ import GHC.Utils.Panic
 import GHC.Utils.Binary
 import GHC.Types.SourceText
 import Data.Data
-import Data.Bits
 import qualified Data.Semigroup as Semi
 
 {-

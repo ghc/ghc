@@ -85,7 +85,6 @@ import GHC.Platform.Regs
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
-import Data.Bits
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.Dataflow.Block
