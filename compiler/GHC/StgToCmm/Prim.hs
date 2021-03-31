@@ -51,7 +51,6 @@ import GHC.Utils.Misc
 import GHC.Utils.Panic
 import Data.Maybe
 
-import Data.Bits ((.&.), bit)
 import Control.Monad (liftM, when, unless)
 
 ------------------------------------------------------------------------
