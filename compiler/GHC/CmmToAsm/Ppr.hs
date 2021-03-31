@@ -35,7 +35,6 @@ import Data.Array.ST
 import Control.Monad.ST
 
 import Data.Word
-import Data.Bits
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import GHC.Exts

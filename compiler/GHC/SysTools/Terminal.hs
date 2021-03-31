@@ -12,7 +12,7 @@ import System.Console.Terminfo (SetupTermError, Terminal, getCapability,
 import System.Posix (queryTerminal, stdError)
 #elif defined(mingw32_HOST_OS)
 import Control.Exception (catch, try)
-import Data.Bits ((.|.), (.&.))
+-- import Data.Bits ((.|.), (.&.))
 import Foreign (Ptr, peek, with)
 import qualified Graphics.Win32 as Win32
 import qualified System.Win32 as Win32
