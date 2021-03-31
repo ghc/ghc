@@ -22,6 +22,7 @@ import GHC.StgToCmm.Expr
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Env
 import GHC.StgToCmm.DataCon
+import GHC.StgToCmm.FirstClassEnv
 import GHC.StgToCmm.Heap
 import GHC.StgToCmm.Prof (ldvEnterClosure, enterCostCentreFun, enterCostCentreThunk,
                    initUpdFrameProf)
@@ -210,6 +211,9 @@ cgRhs id (StgRhsCon cc con args)
     buildDynCon id True cc con (assertNonVoidStgArgs args)
       -- con args are always non-void,
       -- see Note [Post-unarisation invariants] in GHC.Stg.Unarise
+
+cgRhs id (StgRhsEnv vs)
+  = buildFirstClassEnv id (dVarSetElems vs)
 
 {- See Note [GC recovery] in "GHC.StgToCmm.Closure" -}
 cgRhs id (StgRhsClosure fvs cc upd_flag args body)

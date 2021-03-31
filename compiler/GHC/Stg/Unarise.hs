@@ -297,6 +297,9 @@ unariseRhs rho (StgRhsCon ccs con args)
   = ASSERT(not (isUnboxedTupleDataCon con || isUnboxedSumDataCon con))
     return (StgRhsCon ccs con (unariseConArgs rho args))
 
+unariseRhs _ (StgRhsEnv vars)
+  = return (StgRhsEnv vars)
+
 --------------------------------------------------------------------------------
 
 unariseExpr :: UnariseEnv -> StgExpr -> UniqSM StgExpr
@@ -365,6 +368,9 @@ unariseExpr rho (StgLetNoEscape ext bind e)
 
 unariseExpr rho (StgTick tick e)
   = StgTick tick <$> unariseExpr rho e
+
+unariseExpr rho (StgCaseEnv env_v vs e)
+  = StgCaseEnv env_v vs <$> unariseExpr rho e
 
 -- Doesn't return void args.
 unariseMulti_maybe :: UnariseEnv -> DataCon -> [InStgArg] -> [Type] -> Maybe [OutStgArg]

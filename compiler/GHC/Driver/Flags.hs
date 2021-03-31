@@ -166,6 +166,7 @@ data GeneralFlag
    | Opt_CSE
    | Opt_StgCSE
    | Opt_StgLiftLams
+   | Opt_StgClosEnvShare
    | Opt_LiberateCase
    | Opt_SpecConstr
    | Opt_SpecConstrKeen

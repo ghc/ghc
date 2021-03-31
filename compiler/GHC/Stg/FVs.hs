@@ -135,6 +135,10 @@ expr env = go
         fvs = delDVarSet (unionDVarSet scrut_fvs alt_fvs) bndr
     go (StgLet ext bind body) = go_bind (StgLet ext) bind body
     go (StgLetNoEscape ext bind body) = go_bind (StgLetNoEscape ext) bind body
+    go (StgCaseEnv env_var vars expr) = (StgCaseEnv env_var vars expr',fvs)
+      where
+        (expr', expr_fvs) = go expr
+        fvs = unionDVarSet (expr_fvs `minusDVarSet` vars) (mkFreeVarSet env [env_var])
     go (StgTick tick e) = (StgTick tick e', fvs')
       where
         (e', fvs) = go e
@@ -157,6 +161,7 @@ rhs env (StgRhsClosure _ ccs uf bndrs body)
     (body', body_fvs) = expr (addLocals bndrs env) body
     fvs = delDVarSetList body_fvs bndrs
 rhs env (StgRhsCon ccs dc as) = (StgRhsCon ccs dc as, args env as)
+rhs env (StgRhsEnv vars) = (StgRhsEnv vars, mkFreeVarSet env (dVarSetElems vars))
 
 alt :: Env -> StgAlt -> (CgStgAlt, DIdSet)
 alt env (con, bndrs, e) = ((con, bndrs, e'), fvs)

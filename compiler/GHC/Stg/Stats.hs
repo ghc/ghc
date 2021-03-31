@@ -136,6 +136,8 @@ statRhs top (_, StgRhsClosure _ _ u _ body)
         SingleEntry -> SingleEntryBinds top
     )
 
+statRhs _ (_, StgRhsEnv _) = emptySE
+
 {-
 ************************************************************************
 *                                                                      *
@@ -146,11 +148,12 @@ statRhs top (_, StgRhsClosure _ _ u _ body)
 
 statExpr :: StgExpr -> StatEnv
 
-statExpr (StgApp _ _)     = countOne Applications
-statExpr (StgLit _)       = countOne Literals
-statExpr (StgConApp _ _ _)= countOne ConstructorApps
-statExpr (StgOpApp _ _ _) = countOne PrimitiveApps
-statExpr (StgTick _ e)    = statExpr e
+statExpr (StgApp _ _)       = countOne Applications
+statExpr (StgLit _)         = countOne Literals
+statExpr (StgConApp _ _ _)  = countOne ConstructorApps
+statExpr (StgOpApp _ _ _)   = countOne PrimitiveApps
+statExpr (StgTick _ e)      = statExpr e
+statExpr (StgCaseEnv _ _ e) = statExpr e
 
 statExpr (StgLetNoEscape _ binds body)
   = statBinding False{-not top-level-} binds    `combineSE`

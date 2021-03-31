@@ -173,6 +173,8 @@ lintStgRhs rhs@(StgRhsCon _ con args) = do
     mapM_ lintStgArg args
     mapM_ checkPostUnariseConArg args
 
+lintStgRhs (StgRhsEnv vars) = mapM_ checkInScope (dVarSetElems vars)
+
 lintStgExpr :: (OutputablePass a, BinderP a ~ Id) => GenStgExpr a -> LintM ()
 
 lintStgExpr (StgLit _) = return ()
@@ -205,6 +207,10 @@ lintStgExpr (StgLetNoEscape _ binds body) = do
     addLoc (BodyOfLetRec binders) $
       addInScopeVars binders $
         lintStgExpr body
+
+lintStgExpr (StgCaseEnv env_var vars expr) = do
+    checkInScope env_var
+    addInScopeVars (dVarSetElems vars) (lintStgExpr expr)
 
 lintStgExpr (StgTick _ expr) = lintStgExpr expr
 

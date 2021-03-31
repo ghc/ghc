@@ -129,6 +129,9 @@ cgExpr (StgLetNoEscape _ binds expr) =
 cgExpr (StgCase expr bndr alt_type alts) =
   cgCase expr bndr alt_type alts
 
+cgExpr (StgCaseEnv _ _ e) =
+  do { cgExpr e }
+
 ------------------------------------------------------------------------
 --              Let no escape
 ------------------------------------------------------------------------
@@ -195,6 +198,8 @@ cgLetNoEscapeRhsBody local_cc bndr (StgRhsCon cc con args)
         -- code which can be jumped to from many places, which will
         -- return the constructor. It's easy; just behave as if it
         -- was an StgRhsClosure with a ConApp inside!
+cgLetNoEscapeRhsBody _ _ (StgRhsEnv _) = pprPanic "geLetNoEscapeRhsBody"
+  $ text "StgRhsEnv"
 
 -------------------------
 cgLetNoEscapeClosure

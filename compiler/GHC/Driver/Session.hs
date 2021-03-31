@@ -3219,6 +3219,7 @@ fFlagsDeps = [
   flagSpec "cse"                              Opt_CSE,
   flagSpec "stg-cse"                          Opt_StgCSE,
   flagSpec "stg-lift-lams"                    Opt_StgLiftLams,
+  flagSpec "stg-clos-env-share"               Opt_StgClosEnvShare,
   flagSpec "cpr-anal"                         Opt_CprAnal,
   flagSpec "defer-diagnostics"                Opt_DeferDiagnostics,
   flagSpec "defer-type-errors"                Opt_DeferTypeErrors,

@@ -65,6 +65,8 @@ annTopBindingsDeps this_mod bs = zip bs (map top_bind bs)
     rhs bounds (StgRhsCon _ _ as) =
       args bounds as
 
+    rhs bounds (StgRhsEnv vars) = unionVarSets (map (var bounds) (dVarSetElems vars))
+
     var :: BVs -> Var -> FVs
     var bounds v
       | not (elemVarSet v bounds)
@@ -100,6 +102,9 @@ annTopBindingsDeps this_mod bs = zip bs (map top_bind bs)
     expr bounds (StgLetNoEscape _ bs e) =
       binding bounds bs `unionVarSet`
         expr (extendVarSetList bounds (bindersOf bs)) e
+
+    expr bounds (StgCaseEnv env_var vs e) =
+      var bounds env_var `unionVarSet` (expr (extendVarSetList bounds (dVarSetElems vs)) e)
 
     expr bounds (StgTick _ e) =
       expr bounds e

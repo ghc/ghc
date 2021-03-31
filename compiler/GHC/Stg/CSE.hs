@@ -94,6 +94,7 @@ import GHC.Prelude
 
 import GHC.Core.DataCon
 import GHC.Types.Id
+import GHC.Types.Var.Set
 import GHC.Stg.Syntax
 import GHC.Types.Basic (isWeakLoopBreaker)
 import GHC.Types.Var.Env
@@ -294,6 +295,8 @@ stgCseTopLvlRhs in_scope (StgRhsClosure ext ccs upd args body)
       in  StgRhsClosure ext ccs upd args body'
 stgCseTopLvlRhs _ (StgRhsCon ccs dataCon args)
     = StgRhsCon ccs dataCon args
+stgCseTopLvlRhs _ (StgRhsEnv vars)
+    = StgRhsEnv vars
 
 ------------------------------
 -- The actual AST traversal --
@@ -345,6 +348,12 @@ stgCseExpr env (StgLetNoEscape ext binds body)
     = let (binds', env') = stgCseBind env binds
           body' = stgCseExpr env' body
       in mkStgLet (StgLetNoEscape ext) binds' body'
+
+stgCseExpr env (StgCaseEnv env_var vars expr)
+  = StgCaseEnv env_var' (mkDVarSet vars') expr'
+  where env_var' = substVar env env_var
+        (env1,vars') = substBndrs env (dVarSetElems vars)
+        expr' = stgCseExpr env1 expr
 
 -- Case alternatives
 -- Extend the CSE environment
@@ -412,6 +421,9 @@ stgCseRhs env bndr (StgRhsClosure ext ccs upd args body)
           env2 = forgetCse env1 -- See note [Free variables of an StgClosure]
           body' = stgCseExpr env2 body
       in (Just (substVar env bndr, StgRhsClosure ext ccs upd args' body'), env)
+
+stgCseRhs env bndr (StgRhsEnv vars)
+    = (Just (bndr, StgRhsEnv vars), env)
 
 
 mkStgCase :: StgExpr -> OutId -> AltType -> [StgAlt] -> StgExpr

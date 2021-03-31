@@ -544,6 +544,7 @@ Library
         GHC.StgToCmm.Expr
         GHC.StgToCmm.ExtCode
         GHC.StgToCmm.Foreign
+        GHC.StgToCmm.FirstClassEnv
         GHC.StgToCmm.Heap
         GHC.StgToCmm.Hpc
         GHC.StgToCmm.Layout

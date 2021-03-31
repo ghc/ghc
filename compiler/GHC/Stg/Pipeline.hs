@@ -17,13 +17,14 @@ import GHC.Prelude
 
 import GHC.Stg.Syntax
 
-import GHC.Stg.Lint     ( lintStgTopBindings )
-import GHC.Stg.Stats    ( showStgStats )
-import GHC.Stg.DepAnal  ( depSortStgPgm )
-import GHC.Stg.Unarise  ( unarise )
-import GHC.Stg.CSE      ( stgCse )
-import GHC.Stg.Lift     ( stgLiftLams )
-import GHC.Unit.Module ( Module )
+import GHC.Stg.Lint          ( lintStgTopBindings )
+import GHC.Stg.Stats         ( showStgStats )
+import GHC.Stg.DepAnal       ( depSortStgPgm )
+import GHC.Stg.Unarise       ( unarise )
+import GHC.Stg.CSE           ( stgCse )
+import GHC.Stg.Lift          ( stgLiftLams )
+import GHC.Stg.ClosEnvShare  ( stgClosEnvShare )
+import GHC.Unit.Module       ( Module )
 
 import GHC.Driver.Session
 import GHC.Utils.Error
@@ -106,6 +107,11 @@ stg2stg logger dflags this_mod binds
             liftIO (stg_linter True "Unarise" binds')
             return binds'
 
+          StgClosEnvShare -> do
+            us <- getUniqueSupplyM
+            let _ =  {-# SCC "StgLiftLams" #-} stgClosEnvShare us binds
+            end_pass "StgClosEnvShare" binds
+
     opts = initStgPprOpts dflags
     dump_when flag header binds
       = dumpIfSet_dyn logger dflags flag header FormatSTG (pprStgTopBindings opts binds)
@@ -127,6 +133,8 @@ data StgToDo
   | StgLiftLams
   -- ^ Lambda lifting closure variables, trading stack/register allocation for
   -- heap allocation
+  | StgClosEnvShare
+  -- ^ Introduce shared environment objects for closures
   | StgStats
   | StgUnarise
   -- ^ Mandatory unarise pass, desugaring unboxed tuple and sum binders
@@ -143,6 +151,7 @@ getStgToDo dflags =
     -- See Note [StgCse after unarisation] in GHC.Stg.CSE
     , optional Opt_StgCSE StgCSE
     , optional Opt_StgLiftLams StgLiftLams
+    , optional Opt_StgClosEnvShare StgClosEnvShare
     , optional Opt_StgStats StgStats
     ] where
       optional opt = runWhen (gopt opt dflags)

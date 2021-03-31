@@ -211,6 +211,10 @@ liftRhs (Just former_fvs) (StgRhsClosure _ ccs upd infos body) =
   withSubstBndrs (map binderInfoBndr infos) $ \bndrs' -> do
     let bndrs'' = dVarSetElems former_fvs ++ bndrs'
     StgRhsClosure noExtFieldSilent ccs upd bndrs'' <$> liftExpr body
+liftRhs mb_former_fvs (StgRhsEnv vars)
+  = ASSERT2(isNothing mb_former_fvs, text "Lifting a first-class environment")
+    StgRhsEnv . mkDVarSet <$> traverse pure (dVarSetElems vars)
+
 
 liftArgs :: InStgArg -> LiftM OutStgArg
 liftArgs a@(StgLitArg _) = pure a
@@ -246,6 +250,7 @@ liftExpr (StgLetNoEscape scope bind body)
       case mb_bind' of
         Nothing -> pprPanic "stgLiftLams" (text "Should never decide to lift LNEs")
         Just bind' -> pure (StgLetNoEscape noExtFieldSilent bind' body')
+liftExpr (StgCaseEnv env_v vs e) = StgCaseEnv env_v vs <$> liftExpr e
 
 liftAlt :: LlStgAlt -> LiftM OutStgAlt
 liftAlt (con, infos, rhs) = withSubstBndrs (map binderInfoBndr infos) $ \bndrs' ->

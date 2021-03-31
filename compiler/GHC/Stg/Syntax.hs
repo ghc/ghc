@@ -40,6 +40,9 @@ module GHC.Stg.Syntax (
         -- a set of synonyms for the lambda lifting parameterisation
         LlStgTopBinding, LlStgBinding, LlStgExpr, LlStgRhs, LlStgAlt,
 
+        -- a set of synonyms for the environment sharing parameterisation
+        CesStgTopBinding, CesStgBinding, CesStgExpr, CesStgRhs, CesStgAlt,
+
         -- a set of synonyms to distinguish in- and out variants
         InStgArg,  InStgTopBinding,  InStgBinding,  InStgExpr,  InStgRhs,  InStgAlt,
         OutStgArg, OutStgTopBinding, OutStgBinding, OutStgExpr, OutStgRhs, OutStgAlt,
@@ -357,6 +360,18 @@ And so the code for let(rec)-things:
 {-
 *************************************************************************
 *                                                                      *
+GenStgExpr: first class environments
+*                                                                      *
+*************************************************************************
+-}
+  | StgCaseEnv
+      Id                -- Variable pointing to heap allocated env
+      DIdSet            -- Set of variables to bind
+      (GenStgExpr pass) -- Expression to continue with
+
+{-
+*************************************************************************
+*                                                                      *
 GenStgExpr: hpc, scc and other debug annotations
 *                                                                      *
 *************************************************************************
@@ -418,6 +433,9 @@ important):
                         -- are not allocated.
         [StgArg]        -- Args
 
+  | StgRhsEnv
+        DIdSet -- Captured free variables
+
 {-
 Note Stg Passes
 ~~~~~~~~~~~~~~~
@@ -446,6 +464,7 @@ StgPass data type indexes:
 data StgPass
   = Vanilla
   | LiftLams
+  | ClosEnvShare
   | CodeGen
 
 -- | Like 'GHC.Hs.Extension.NoExtField', but with an 'Outputable' instance that
@@ -487,6 +506,7 @@ stgRhsArity (StgRhsClosure _ _ _ bndrs _)
   = ASSERT( all isId bndrs ) length bndrs
   -- The arity never includes type parameters, but they should have gone by now
 stgRhsArity (StgRhsCon _ _ _) = 0
+stgRhsArity (StgRhsEnv _) = 0
 
 {-
 ************************************************************************
@@ -540,6 +560,12 @@ type LlStgBinding    = GenStgBinding    'LiftLams
 type LlStgExpr       = GenStgExpr       'LiftLams
 type LlStgRhs        = GenStgRhs        'LiftLams
 type LlStgAlt        = GenStgAlt        'LiftLams
+
+type CesStgTopBinding = GenStgTopBinding 'ClosEnvShare
+type CesStgBinding    = GenStgBinding    'ClosEnvShare
+type CesStgExpr       = GenStgExpr       'ClosEnvShare
+type CesStgRhs        = GenStgRhs        'ClosEnvShare
+type CesStgAlt        = GenStgAlt        'ClosEnvShare
 
 type CgStgTopBinding = GenStgTopBinding 'CodeGen
 type CgStgBinding    = GenStgBinding    'CodeGen
@@ -787,6 +813,11 @@ pprStgExpr opts e = case e of
              , char '}'
              ]
 
+   StgCaseEnv env_var vars expr
+     -> sep [ sep [ text "case-env", ppr env_var, text "of", char '{' ]
+            , sep [ ppr vars, text "->", pprStgExpr opts expr ]
+            , char '}'
+            ]
 
 pprStgAlt :: OutputablePass pass => StgPprOpts -> Bool -> GenStgAlt pass -> SDoc
 pprStgAlt opts indent (con, params, expr)
@@ -818,3 +849,5 @@ pprStgRhs opts rhs = case rhs of
 
    StgRhsCon cc con args
       -> hcat [ ppr cc, space, ppr con, text "! ", brackets (sep (map pprStgArg args))]
+
+   StgRhsEnv vars -> text "env" <> ppr vars

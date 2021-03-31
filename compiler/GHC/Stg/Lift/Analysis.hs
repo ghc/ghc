@@ -118,6 +118,7 @@ type instance XLetNoEscape 'LiftLams = Skeleton
 freeVarsOfRhs :: (XRhsClosure pass ~ DIdSet) => GenStgRhs pass -> DIdSet
 freeVarsOfRhs (StgRhsCon _ _ args) = mkDVarSet [ id | StgVarArg id <- args ]
 freeVarsOfRhs (StgRhsClosure fvs _ _ _ _) = fvs
+freeVarsOfRhs (StgRhsEnv vs) = vs
 
 -- | Captures details of the syntax tree relevant to the cost model, such as
 -- closures, multi-shot lambdas and case expressions.
@@ -236,6 +237,10 @@ tagSkeletonExpr (StgTick t e)
     (skel, arg_occs, e') = tagSkeletonExpr e
 tagSkeletonExpr (StgLet _ bind body) = tagSkeletonLet False body bind
 tagSkeletonExpr (StgLetNoEscape _ bind body) = tagSkeletonLet True body bind
+tagSkeletonExpr (StgCaseEnv env_v vs e)
+  = (skel, arg_occs', StgCaseEnv env_v vs e')
+  where (skel, arg_occs, e') = tagSkeletonExpr e
+        arg_occs' = arg_occs `delVarSetList` (dVarSetElems vs)
 
 mkLet :: Bool -> Skeleton -> LlStgBinding -> LlStgExpr -> LlStgExpr
 mkLet True = StgLetNoEscape
@@ -322,6 +327,8 @@ tagSkeletonRhs bndr (StgRhsClosure fvs ccs upd bndrs body)
     bndrs' = map BoringBinder bndrs
     (body_skel, body_arg_occs, body') = tagSkeletonExpr body
     rhs_skel = rhsSk (rhsCard bndr) body_skel
+tagSkeletonRhs _ (StgRhsEnv vs)
+  = (NilSk, mkVarSet (dVarSetElems vs), StgRhsEnv vs)
 
 -- | How many times will the lambda body of the RHS bound to the given
 -- identifier be evaluated, relative to its defining context? This function
@@ -404,6 +411,7 @@ goodToLift dflags top_lvl rec_flag expander pairs scope = decide
       any_memoized = any is_memoized_rhs rhss
       is_memoized_rhs StgRhsCon{} = True
       is_memoized_rhs (StgRhsClosure _ _ upd _ _) = isUpdatable upd
+      is_memoized_rhs (StgRhsEnv _) = False
 
       -- Don't lift binders occurring as arguments. This would result in complex
       -- argument expressions which would have to be given a name, reintroducing
@@ -473,6 +481,7 @@ goodToLift dflags top_lvl rec_flag expander pairs scope = decide
 rhsLambdaBndrs :: LlStgRhs -> [Id]
 rhsLambdaBndrs StgRhsCon{} = []
 rhsLambdaBndrs (StgRhsClosure _ _ _ bndrs _) = map binderInfoBndr bndrs
+rhsLambdaBndrs (StgRhsEnv vars) = dVarSetElems vars
 
 -- | The size in words of a function closure closing over the given 'Id's,
 -- including the header.

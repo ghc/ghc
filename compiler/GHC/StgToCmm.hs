@@ -200,6 +200,9 @@ cgTopRhs dflags rec bndr (StgRhsClosure fvs cc upd_flag args body)
   = ASSERT(isEmptyDVarSet fvs)    -- There should be no free variables
     cgTopRhsClosure (targetPlatform dflags) rec bndr cc upd_flag args body
 
+cgTopRhs _ _ _ (StgRhsEnv _)
+  = pprPanic "cgTopRhs" $ text "StgRhsEnv should not happen at the top level."
+
 
 ---------------------------------------------------------------
 --      Module initialisation code
