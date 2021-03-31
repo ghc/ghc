@@ -1444,7 +1444,7 @@ perf:
     - export HC=$root/bin/ghc
     - .gitlab/ci.sh perf_test
   artifacts:
-    expire_in: 12 week
+    expire_in: 2 year
     when: always
     paths:
       - out
