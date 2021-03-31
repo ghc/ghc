@@ -117,7 +117,7 @@ import GHC.StgToByteCode    ( byteCodeGen, stgExprToBCOs )
 
 import GHC.IfaceToCore  ( typecheckIface )
 
-import GHC.Iface.Load   ( ifaceStats, initExternalPackageState, writeIface )
+import GHC.Iface.Load   ( ifaceStats, writeIface )
 import GHC.Iface.Make
 import GHC.Iface.Recomp
 import GHC.Iface.Tidy
@@ -168,6 +168,7 @@ import GHC.Cmm.Pipeline
 import GHC.Cmm.Info
 
 import GHC.Unit
+import GHC.Unit.Env
 import GHC.Unit.Finder
 import GHC.Unit.External
 import GHC.Unit.State
@@ -240,31 +241,23 @@ import Data.Bifunctor (first, bimap)
 
 newHscEnv :: DynFlags -> IO HscEnv
 newHscEnv dflags = do
-    -- we don't store the unit databases and the unit state to still
-    -- allow `setSessionDynFlags` to be used to set unit db flags.
-    eps_var <- newIORef initExternalPackageState
     nc_var  <- initNameCache 'r' knownKeyNames
     fc_var  <- initFinderCache
     logger  <- initLogger
     tmpfs   <- initTmpFs
-    -- FIXME: it's sad that we have so many "unitialized" fields filled with
-    -- empty stuff or lazy panics. We should have two kinds of HscEnv
-    -- (initialized or not) instead and less fields that are mutable over time.
+    unit_env <- initUnitEnv (ghcNameVersion dflags) (targetPlatform dflags)
     return HscEnv {  hsc_dflags         = dflags
                   ,  hsc_logger         = logger
                   ,  hsc_targets        = []
                   ,  hsc_mod_graph      = emptyMG
                   ,  hsc_IC             = emptyInteractiveContext dflags
-                  ,  hsc_HPT            = emptyHomePackageTable
-                  ,  hsc_EPS            = eps_var
                   ,  hsc_NC             = nc_var
                   ,  hsc_FC             = fc_var
                   ,  hsc_type_env_var   = Nothing
                   ,  hsc_interp         = Nothing
-                  ,  hsc_unit_env       = panic "hsc_unit_env not initialized"
+                  ,  hsc_unit_env       = unit_env
                   ,  hsc_plugins        = []
                   ,  hsc_static_plugins = []
-                  ,  hsc_unit_dbs       = Nothing
                   ,  hsc_hooks          = emptyHooks
                   ,  hsc_tmpfs          = tmpfs
                   }
@@ -812,11 +805,9 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
         Left iface -> do
             -- Knot tying!  See Note [Knot-tying typecheckIface]
             details <- liftIO . fixIO $ \details' -> do
-                let hsc_env' =
-                        hsc_env {
-                            hsc_HPT = addToHpt (hsc_HPT hsc_env)
-                                        (ms_mod_name mod_summary) (HomeModInfo iface details' Nothing)
-                        }
+                let act hpt  = addToHpt hpt (ms_mod_name mod_summary)
+                                            (HomeModInfo iface details' Nothing)
+                let hsc_env' = hscUpdateHPT act hsc_env
                 -- NB: This result is actually not that useful
                 -- in one-shot mode, since we're not going to do
                 -- any further typechecking.  It's much more useful
@@ -2141,7 +2132,7 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr
 
 dumpIfaceStats :: HscEnv -> IO ()
 dumpIfaceStats hsc_env = do
-    eps <- readIORef (hsc_EPS hsc_env)
+    eps <- hscEPS hsc_env
     dumpIfSet logger dflags (dump_if_trace || dump_rn_stats)
               "Interface statistics"
               (ifaceStats eps)
