@@ -1028,32 +1028,6 @@ release-x86_64-linux-ubuntu2004:
   extends: .build-x86_64-linux-ubuntu2004
 
 #################################
-# x86_64-linux-deb8
-#################################
-
-.build-x86_64-linux-deb8:
-  extends: .validate-linux
-  stage: full-build
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb8:$DOCKER_REV"
-  # Due to #18298.
-  allow_failure: true
-  variables:
-    TEST_ENV: "x86_64-linux-deb8"
-    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-deb8-linux.tar.xz"
-    # Debian 8's Sphinx is too old to support the table directive's :widths:
-    # option: https://sourceforge.net/p/docutils/patches/120/
-    BUILD_SPHINX_HTML: "NO"
-    BUILD_SPHINX_INFO: "NO"
-    BUILD_SPHINX_PDF: "NO"
-    BUILD_SPHINX_MAN: "NO"
-  cache:
-    key: linux-x86_64-deb8
-
-release-x86_64-linux-deb8:
-  <<: *release
-  extends: .build-x86_64-linux-deb8
-
-#################################
 # x86_64-linux-alpine
 #################################
 
