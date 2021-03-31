@@ -77,7 +77,6 @@ import GHC.Types.TyThing
 import GHC.Types.CostCentre ( CostCentre, ccFromThisModule )
 import GHC.Types.Unique.Supply
 
-import Data.Bits
 import Data.List        ( unfoldr )
 import Control.Monad
 import qualified Data.Set as S
