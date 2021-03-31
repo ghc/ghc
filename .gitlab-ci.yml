@@ -87,6 +87,7 @@ workflow:
   variables:
     BUILD_FLAVOUR: "perf"
     XZ_OPT: "-9"
+    IGNORE_PERF_FAILURES: "all"
     HADDOCK_HYPERLINKED_SOURCES: "YES"
   artifacts:
     when: always
@@ -973,6 +974,7 @@ release-x86_64-linux-deb10-dwarf:
   variables:
     CONFIGURE_ARGS: "--enable-dwarf-unwind"
     BUILD_FLAVOUR: dwarf
+    IGNORE_PERF_FAILURES: "all"
     TEST_ENV: "x86_64-linux-deb10-dwarf"
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-deb10-linux-dwarf.tar.xz"
   artifacts:
@@ -1097,6 +1099,7 @@ nightly-x86_64-linux-alpine:
     BUILD_SPHINX_HTML: "NO"
     BUILD_SPHINX_PDF: "NO"
     TEST_ENV: "x86_64-linux-centos7"
+    IGNORE_PERF_FAILURES: "all"
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-centos7-linux.tar.xz"
     # CentOS seems to default to ascii
     LANG: "en_US.UTF-8"
@@ -1140,6 +1143,7 @@ release-x86_64-linux-fedora27-dwarf:
     HADDOCK_HYPERLINKED_SOURCES: "yes"
     CONFIGURE_ARGS: "--enable-dwarf-unwind"
     BUILD_FLAVOUR: dwarf
+    IGNORE_PERF_FAILURES: "all"
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-fedora27-linux-dwarf.tar.xz"
     TEST_ENV: "x86_64-linux-fedora27-dwarf"
 
@@ -1254,6 +1258,7 @@ release-x86_64-windows:
   extends: .build-x86_64-windows-hadrian
   variables:
     BUILD_FLAVOUR: "perf"
+    IGNORE_PERF_FAILURES: "all"
     HADDOCK_HYPERLINKED_SOURCES: "yes"
 
 release-x86_64-windows-integer-simple:
@@ -1262,6 +1267,7 @@ release-x86_64-windows-integer-simple:
   variables:
     HADDOCK_HYPERLINKED_SOURCES: "yes"
     BIGNUM_BACKEND: native
+    IGNORE_PERF_FAILURES: "all"
     BUILD_FLAVOUR: "perf"
     BIN_DIST_NAME: "ghc-x86_64-mingw32-unknown-nogmp"
 
