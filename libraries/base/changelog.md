@@ -48,6 +48,9 @@
   * `fromInteger :: Integer -> Float/Double` now consistently round to the
     nearest value, with ties to even.
 
+  * Functions in `Data.List` are specialized to list.
+    `Data.OldList` and `GHC.List` modules are removed.
+
 ## 4.15.0.0 *TBA*
 
   * `openFile` now calls the `open` system call with an `interruptible` FFI
