@@ -370,7 +370,7 @@ stg_ctoi_t
 
     Sp = Sp - WDS(tuple_stack);
 
-    SAVE_ARG_REGS(tuple_info);
+    PUSH_REGS_BITMAP(tuple_info);
 
     /* jump to the BCO that will finish the return of the tuple */
     Sp_adj(-3);
@@ -391,7 +391,7 @@ INFO_TABLE_RET( stg_ret_t, RET_BCO )
     /* number of words spilled on stack */
     tuple_stack  = (tuple_info >> 24) & 0xff;
 
-    RESTORE_ARG_REGS(tuple_info);
+    POP_REGS_BITMAP(tuple_info);
 
     /* Sp points to the topmost argument now */
     jump %ENTRY_CODE(Sp(tuple_stack)) [*]; // NB. all registers live!
