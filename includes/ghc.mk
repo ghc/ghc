@@ -268,9 +268,6 @@ $(includes_SETTINGS) : includes/Makefile | $$(dir $$@)/.
 
 includes_DERIVEDCONSTANTS = includes/dist-derivedconstants/header/DerivedConstants.h
 includes_GHCCONSTANTS_HASKELL_TYPE = includes/dist-derivedconstants/header/GHCConstantsHaskellType.hs
-includes_GHCCONSTANTS_HASKELL_VALUE = includes/dist-derivedconstants/header/platformConstants
-
-INSTALL_LIBS += $(includes_GHCCONSTANTS_HASKELL_VALUE)
 
 DERIVE_CONSTANTS_FLAGS += --gcc-program "$(CC)"
 DERIVE_CONSTANTS_FLAGS += $(addprefix --gcc-flag$(space),$(includes_CC_OPTS) -fcommon)
@@ -282,16 +279,12 @@ DERIVE_CONSTANTS_FLAGS += --target-os "$(TargetOS_CPP)"
 
 ifneq "$(BINDIST)" "YES"
 $(includes_DERIVEDCONSTANTS):           $$(includes_H_FILES) $$(rts_H_FILES)
-$(includes_GHCCONSTANTS_HASKELL_VALUE): $$(includes_H_FILES) $$(rts_H_FILES)
 
 $(includes_DERIVEDCONSTANTS): $(deriveConstants_INPLACE) $(includes_1_H_CONFIG) $(includes_1_H_PLATFORM) | $$(dir $$@)/.
 	$< --gen-header -o $@ --tmpdir $(dir $@) $(DERIVE_CONSTANTS_FLAGS)
 
 $(includes_GHCCONSTANTS_HASKELL_TYPE): $(deriveConstants_INPLACE) | $$(dir $$@)/.
 	$< --gen-haskell-type -o $@ --tmpdir $(dir $@) $(DERIVE_CONSTANTS_FLAGS)
-
-$(includes_GHCCONSTANTS_HASKELL_VALUE): $(deriveConstants_INPLACE) | $$(dir $$@)/.
-	$< --gen-haskell-value -o $@ --tmpdir $(dir $@) $(DERIVE_CONSTANTS_FLAGS)
 endif
 
 # ---------------------------------------------------------------------------
@@ -305,7 +298,6 @@ $(eval $(call all-target,includes,\
   $(includes_0_H_CONFIG) $(includes_0_H_PLATFORM) $(includes_0_H_VERSION) \
   $(includes_1_H_CONFIG) $(includes_1_H_PLATFORM) $(includes_1_H_VERSION) \
   $(includes_GHCCONSTANTS_HASKELL_TYPE) \
-  $(includes_GHCCONSTANTS_HASKELL_VALUE) \
   $(includes_DERIVEDCONSTANTS)))
 
 install: install_includes
