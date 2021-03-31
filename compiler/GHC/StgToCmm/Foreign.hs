@@ -15,8 +15,8 @@ module GHC.StgToCmm.Foreign (
   emitLoadThreadState,
   emitSaveRegs,
   emitRestoreRegs,
-  emitSaveArgRegs,
-  emitRestoreArgRegs,
+  emitPushRegsBitmap,
+  emitPopRegsBitmap,
   loadThreadState,
   emitOpenNursery,
   emitCloseNursery,
@@ -343,8 +343,11 @@ emitRestoreRegs = do
        restore = catAGraphs (map (callerRestoreGlobalReg platform) regs)
    emit restore
 
-emitSaveArgRegs :: CmmExpr -> FCode ()
-emitSaveArgRegs regs_live = do
+-- | Push a subset of STG registers onto the stack, specified by the bitmap
+--
+-- XXX docs
+emitPushRegsBitmap :: CmmExpr -> FCode ()
+emitPushRegsBitmap regs_live = do
   platform <- getPlatform
   let regs = zip (realArgRegsCover platform) [0..]
       save_arg (reg, n) =
@@ -352,14 +355,17 @@ emitSaveArgRegs regs_live = do
             live     = cmmAndWord platform regs_live mask
             cond     = cmmNeWord platform live (zeroExpr platform)
             width    = typeWidth (cmmRegType platform $ CmmGlobal reg)
-            adj_sp   = mkAssign spReg (cmmOffset platform spExpr $ negate (widthInBytes width))
+            adj_sp   = mkAssign spReg
+                                (cmmOffset platform
+                                           spExpr
+                                           (negate (widthInBytes width)))
             save_reg = mkStore spExpr (CmmReg $ CmmGlobal reg)
         in mkCmmIfThen cond $ catAGraphs [adj_sp, save_reg]
   emit . catAGraphs =<< mapM save_arg (reverse regs)
 
-
-emitRestoreArgRegs :: CmmExpr -> FCode ()
-emitRestoreArgRegs regs_live = do
+-- | Pop a subset of STG registers from the stack (see 'emitPushRegsBitmap')
+emitPopRegsBitmap :: CmmExpr -> FCode ()
+emitPopRegsBitmap regs_live = do
   platform <- getPlatform
   let regs = zip (realArgRegsCover platform) [0..]
       save_arg (reg, n) =
@@ -368,7 +374,10 @@ emitRestoreArgRegs regs_live = do
             cond     = cmmNeWord platform live (zeroExpr platform)
             reg_ty   = cmmRegType platform (CmmGlobal reg)
             width    = typeWidth reg_ty
-            adj_sp   = mkAssign spReg (cmmOffset platform spExpr $ widthInBytes width)
+            adj_sp   = mkAssign spReg
+                                (cmmOffset platform
+                                           spExpr
+                                           (widthInBytes width))
             restore_reg = mkAssign (CmmGlobal reg) (CmmLoad spExpr reg_ty)
         in mkCmmIfThen cond $ catAGraphs [restore_reg, adj_sp]
   emit . catAGraphs =<< mapM save_arg regs
