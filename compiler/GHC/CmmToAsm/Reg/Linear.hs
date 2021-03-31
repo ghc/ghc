@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns, CPP, ScopedTypeVariables #-}
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -113,10 +114,6 @@ import GHC.CmmToAsm.Reg.Linear.StackMap
 import GHC.CmmToAsm.Reg.Linear.FreeRegs
 import GHC.CmmToAsm.Reg.Linear.Stats
 import GHC.CmmToAsm.Reg.Linear.JoinToTargets
-import qualified GHC.CmmToAsm.Reg.Linear.PPC    as PPC
-import qualified GHC.CmmToAsm.Reg.Linear.SPARC  as SPARC
-import qualified GHC.CmmToAsm.Reg.Linear.X86    as X86
-import qualified GHC.CmmToAsm.Reg.Linear.X86_64 as X86_64
 import GHC.CmmToAsm.Reg.Target
 import GHC.CmmToAsm.Reg.Liveness
 import GHC.CmmToAsm.Reg.Utils
@@ -146,10 +143,42 @@ import Control.Applicative
 -- -----------------------------------------------------------------------------
 -- Top level of the register allocator
 
+{- Note [Specializing the register allocator]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The register allocator is quite overloaded. Most importantly over the instruction
+set (instr) and the bitmap to keep track of free registers (freeRegs).
+
+I (AndreasK) added a fair few number of INLINEABLE pragmas which now allows us to
+specialize the allocator in the modules defining the NcgImpl for the varius backends.
+
+Each NcgImpl will then carry around a function that is the (usually specialized)
+allocator for that particular backend.
+
+When compiling with -Wall-missed-specializations sadly it becomes obvious that quite
+often there are spurious errors. For the details see #19592.
+The way to check that we really fully specialize the allocator is then:
+* Compile with -Wall-missed-specialisations.
+* Look at the list of "failed" specialisations.
+* Ignore constraint tuple selectors "$p2(%,,%)" and the like.
+* For all other reported functions make sure they either don't appear in the
+  final core (because of inlining) or are replaced by their monomorphic variant.
+
+I did this when making the simplifier specializable in early 2021. If you perform
+major refactorings on it it would be wise to do so again.
+
+NB. Another reasonable design would be the have a register allocator class, with instances
+for the various backends. Maybe worth changing over if we apply this to the graph
+allocator as well.
+
+-}
+
 -- Allocate registers
+{-# INLINEABLE regAlloc #-}
 regAlloc
-        :: Instruction instr
-        => NCGConfig
+        :: (Outputable freeRegs, FR freeRegs, Instruction instr)
+        => freeRegs
+        -> NCGConfig
         -> LiveCmmDecl statics instr
         -> UniqSM ( NatCmmDecl statics instr
                   , Maybe Int  -- number of extra stack slots required,
@@ -157,23 +186,23 @@ regAlloc
                   , Maybe RegAllocStats
                   )
 
-regAlloc _ (CmmData sec d)
+regAlloc _fr _ (CmmData sec d)
         = return
                 ( CmmData sec d
                 , Nothing
                 , Nothing )
 
-regAlloc _ (CmmProc (LiveInfo info _ _ _) lbl live [])
+regAlloc _fr _ (CmmProc (LiveInfo info _ _ _) lbl live [])
         = return ( CmmProc info lbl live (ListGraph [])
                  , Nothing
                  , Nothing )
 
-regAlloc config (CmmProc static lbl live sccs)
+regAlloc fr config (CmmProc static lbl live sccs)
         | LiveInfo info entry_ids@(first_id:_) block_live _ <- static
         = do
                 -- do register allocation on each component.
                 !(!final_blocks, !stats, !stack_use)
-                        <- linearRegAlloc config entry_ids block_live sccs
+                        <- linearRegAlloc fr config entry_ids block_live sccs
 
                 -- make sure the block that was first in the input list
                 --      stays at the front of the output
@@ -192,21 +221,22 @@ regAlloc config (CmmProc static lbl live sccs)
                         , Just stats)
 
 -- bogus. to make non-exhaustive match warning go away.
-regAlloc _ (CmmProc _ _ _ _)
+regAlloc _fr _ (CmmProc _ _ _ _)
         = panic "RegAllocLinear.regAlloc: no match"
 
 
 -- -----------------------------------------------------------------------------
 -- Linear sweep to allocate registers
 
-
 -- | Do register allocation on some basic blocks.
 --   But be careful to allocate a block in an SCC only if it has
 --   an entry in the block map or it is the first block.
 --
+{-# INLINEABLE linearRegAlloc #-}
 linearRegAlloc
-        :: forall instr. Instruction instr
-        => NCGConfig
+        :: forall instr freeRegs. (Outputable freeRegs, FR freeRegs, Instruction instr)
+        => freeRegs
+        -> NCGConfig
         -> [BlockId] -- ^ entry points
         -> BlockMap RegSet
               -- ^ live regs on entry to each basic block
@@ -214,17 +244,17 @@ linearRegAlloc
               -- ^ instructions annotated with "deaths"
         -> UniqSM ([NatBasicBlock instr], RegAllocStats, Int)
 
-linearRegAlloc config entry_ids block_live sccs
+linearRegAlloc initFreeRegs config entry_ids block_live sccs
  = case platformArch platform of
-      ArchX86        -> go $ (frInitFreeRegs platform :: X86.FreeRegs)
-      ArchX86_64     -> go $ (frInitFreeRegs platform :: X86_64.FreeRegs)
+      ArchX86        -> go
+      ArchX86_64     -> go
+      ArchSPARC      -> go --go $ (frInitFreeRegs platform :: SPARC.FreeRegs)
+      ArchPPC        -> go --go $ (frInitFreeRegs platform :: PPC.FreeRegs)
+      ArchPPC_64 _   -> go --go $ (frInitFreeRegs platform :: PPC.FreeRegs)
       ArchS390X      -> panic "linearRegAlloc ArchS390X"
-      ArchSPARC      -> go $ (frInitFreeRegs platform :: SPARC.FreeRegs)
       ArchSPARC64    -> panic "linearRegAlloc ArchSPARC64"
-      ArchPPC        -> go $ (frInitFreeRegs platform :: PPC.FreeRegs)
       ArchARM _ _ _  -> panic "linearRegAlloc ArchARM"
       ArchAArch64    -> panic "linearRegAlloc ArchAArch64"
-      ArchPPC_64 _   -> go $ (frInitFreeRegs platform :: PPC.FreeRegs)
       ArchAlpha      -> panic "linearRegAlloc ArchAlpha"
       ArchMipseb     -> panic "linearRegAlloc ArchMipseb"
       ArchMipsel     -> panic "linearRegAlloc ArchMipsel"
@@ -232,9 +262,8 @@ linearRegAlloc config entry_ids block_live sccs
       ArchJavaScript -> panic "linearRegAlloc ArchJavaScript"
       ArchUnknown    -> panic "linearRegAlloc ArchUnknown"
  where
-  go :: (FR regs, Outputable regs)
-     => regs -> UniqSM ([NatBasicBlock instr], RegAllocStats, Int)
-  go f = linearRegAlloc' config f entry_ids block_live sccs
+  go :: UniqSM ([NatBasicBlock instr], RegAllocStats, Int)
+  go = linearRegAlloc' config initFreeRegs entry_ids block_live sccs
   platform = ncgPlatform config
 
 -- | Constraints on the instruction instances used by the
@@ -242,6 +271,7 @@ linearRegAlloc config entry_ids block_live sccs
 type OutputableRegConstraint freeRegs instr =
         (FR freeRegs, Outputable freeRegs, Instruction instr)
 
+{-# INLINEABLE linearRegAlloc' #-}
 linearRegAlloc'
         :: OutputableRegConstraint freeRegs instr
         => NCGConfig
@@ -259,6 +289,7 @@ linearRegAlloc' config initFreeRegs entry_ids block_live sccs
         return  (blocks, stats, getStackUse stack)
 
 
+{-# INLINEABLE linearRA_SCCs #-}
 linearRA_SCCs :: OutputableRegConstraint freeRegs instr
               => [BlockId]
               -> BlockMap RegSet
@@ -293,7 +324,7 @@ linearRA_SCCs entry_ids block_live blocksAcc (CyclicSCC blocks : sccs)
    some reason then this function will loop. We should probably do some
    more sanity checking to guard against this eventuality.
 -}
-
+{-# INLINEABLE process #-}
 process :: forall freeRegs instr. (OutputableRegConstraint freeRegs instr)
         => [BlockId]
         -> BlockMap RegSet
@@ -330,7 +361,7 @@ process entry_ids block_live =
 
             else do go blocks (b : next_round) accum madeProgress
 
-
+{-# INLINEABLE processBlock #-}
 -- | Do register allocation on this basic block
 --
 processBlock
@@ -348,7 +379,7 @@ processBlock block_live (BasicBlock id instrs)
         -- pprTraceM "blockResult" $ ppr (instrs', fixups)
         return  $ BasicBlock id instrs' : fixups
 
-
+{-# INLINEABLE initBlock #-}
 -- | Load the freeregs and current reg assignment into the RegM state
 --      for the basic block with this BlockId.
 initBlock :: FR freeRegs
@@ -378,7 +409,7 @@ initBlock id block_live
                  -> do  setFreeRegsR    freeregs
                         setAssigR       assig
 
-
+{-# INLINEABLE linearRA #-}
 -- | Do allocation for a sequence of instructions.
 linearRA
         :: forall freeRegs instr. (OutputableRegConstraint freeRegs instr)
@@ -468,7 +499,7 @@ raInsn block_live new_instrs id (LiveInstr (Instr instr) (Just live))
 raInsn _ _ _ instr
         = do
             platform <- getPlatform
-            let instr' = fmap (pprInstr platform) instr
+            let instr' = fmap (pprInstr platform) instr :: LiveInstr SDoc
             pprPanic "raInsn" (text "no match for:" <> ppr instr')
 
 -- ToDo: what can we do about
@@ -488,7 +519,7 @@ isInReg :: Reg -> RegMap Loc -> Bool
 isInReg src assig | Just (InReg _) <- lookupUFM assig src = True
                   | otherwise = False
 
-
+{-# INLINEABLE genRaInsn #-}
 genRaInsn :: forall freeRegs instr.
              OutputableRegConstraint freeRegs instr
           => BlockMap RegSet
@@ -607,6 +638,7 @@ genRaInsn block_live new_instrs block_id instr r_dying w_dying = do
 -- -----------------------------------------------------------------------------
 -- releaseRegs
 
+{-# INLINEABLE releaseRegs #-}
 releaseRegs :: FR freeRegs => [Reg] -> RegM freeRegs ()
 releaseRegs regs = do
   platform <- getPlatform
@@ -638,6 +670,7 @@ releaseRegs regs = do
 --        - clobbered regs are not allocatable.
 --
 
+{-# INLINEABLE saveClobberedTemps #-}
 saveClobberedTemps
         :: forall instr freeRegs.
            (Instruction instr, FR freeRegs)
@@ -706,7 +739,7 @@ saveClobberedTemps clobbered dying
                   clobber new_assign (spill : instrs) rest
 
 
-
+{-# INLINEABLE clobberRegs #-}
 -- | Mark all these real regs as allocated,
 --      and kick out their vreg assignments.
 --
@@ -763,6 +796,7 @@ data SpillLoc = ReadMem StackSlot  -- reading from register only in memory
 --   We also update the register assignment in the process, and
 --   the list of free registers and free stack slots.
 
+{-# INLINEABLE allocateRegsAndSpill #-}
 allocateRegsAndSpill
         :: forall freeRegs instr. (FR freeRegs, Instruction instr)
         => Bool                 -- True <=> reading (load up spilled regs)
@@ -828,6 +862,7 @@ findPrefRealReg vreg = do
                         Just (InBoth real_reg _) -> Just real_reg
                         _ -> z
 
+{-# INLINEABLE allocRegsAndSpill_spill #-}
 -- reading is redundant with reason, but we keep it around because it's
 -- convenient and it maintains the recursive structure of the allocator. -- EZY
 allocRegsAndSpill_spill :: (FR freeRegs, Instruction instr)
