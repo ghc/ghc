@@ -206,16 +206,11 @@ pprEquation (FDEqn { fd_qtvs = qtvs, fd_eqs = pairs })
 
 improveFromInstEnv :: InstEnvs
                    -> (PredType -> SrcSpan -> loc)
-                   -> PredType
+                   -> Class -> [Type]
                    -> [FunDepEqn loc] -- Needs to be a FunDepEqn because
                                       -- of quantified variables
 -- Post: Equations oriented from the template (matching instance) to the workitem!
-improveFromInstEnv inst_env mk_loc pred
-  | Just (cls, tys) <- ASSERT2( isClassPred pred, ppr pred )
-                       getClassPredTys_maybe pred
-  , let (cls_tvs, cls_fds) = classTvsFds cls
-        instances          = classInstances inst_env cls
-        rough_tcs          = roughMatchTcs tys
+improveFromInstEnv inst_env mk_loc cls tys
   = [ FDEqn { fd_qtvs = meta_tvs, fd_eqs = eqs
             , fd_pred1 = p_inst, fd_pred2 = pred
             , fd_loc = mk_loc p_inst (getSrcSpan (is_dfun ispec)) }
@@ -231,7 +226,12 @@ improveFromInstEnv inst_env mk_loc pred
                                       tys trimmed_tcs -- NB: orientation
     , let p_inst = mkClassPred cls (is_tys ispec)
     ]
-improveFromInstEnv _ _ _ = []
+  where
+    (cls_tvs, cls_fds) = classTvsFds cls
+    instances          = classInstances inst_env cls
+    rough_tcs          = roughMatchTcs tys
+    pred               = mkClassPred cls tys
+
 
 
 improveClsFD :: [TyVar] -> FunDep TyVar    -- One functional dependency from the class
