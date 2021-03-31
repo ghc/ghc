@@ -890,7 +890,10 @@ anyRewritableTyVar :: Bool     -- Ignore casts and coercions
                    -> TcType -> Bool
 anyRewritableTyVar ignore_cos role pred
   = any_rewritable ignore_cos role pred
-      (\ _ _ _ -> False) -- don't check tyconapps
+      (\ _ _ _ -> False) -- no special check for tyconapps
+                         -- (this False is ORed with other results, so it
+                         --  really means "do nothing special"; the arguments
+                         --   are still inspected)
       (\ _ -> False)     -- don't expand synonyms
     -- NB: No need to expand synonyms, because we can find
     -- all free variables of a synonym by looking at its
@@ -931,6 +934,7 @@ this case) is nominal, the work item can't actually rewrite the inert item.
 Moreover, if we were to kick out the inert item the exact same situation
 would re-occur and we end up with an infinite loop in which each kicks
 out the other (#14363).
+
 -}
 
 {- *********************************************************************
