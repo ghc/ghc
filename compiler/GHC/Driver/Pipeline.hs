@@ -47,7 +47,7 @@ import GHC.Tc.Types
 import GHC.Driver.Main
 import GHC.Driver.Env hiding ( Hsc )
 import GHC.Driver.Errors
-import GHC.Driver.Errors.Types ( GhcMessage, ghcUnknownMessage )
+import GHC.Driver.Errors.Types
 import GHC.Driver.Pipeline.Monad
 import GHC.Driver.Config
 import GHC.Driver.Phases
@@ -1258,7 +1258,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
             eimps <- getImports popts imp_prelude buf input_fn (basename <.> suff)
             case eimps of
               Left errs
-                -> throwErrors $ mkMessages $ fmap mkParserErr errs
+                -> throwErrors $ fmap GhcPsMessage . mkMessages $ fmap mkParserErr errs
               Right (src_imps,imps,L _ mod_name) -> return
                   (Just buf, mod_name, imps, src_imps)
 

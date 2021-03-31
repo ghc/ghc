@@ -94,7 +94,7 @@ import GHC.Driver.Session
 import GHC.Driver.Backend
 import GHC.Driver.Env
 import GHC.Driver.Errors
-import GHC.Driver.Errors.Types ( liftTcRnMessage,  GhcMessage(..),  ghcUnknownMessage )
+import GHC.Driver.Errors.Types
 import GHC.Driver.CodeOutput
 import GHC.Driver.Config
 import GHC.Driver.Hooks
@@ -208,7 +208,6 @@ import GHC.Utils.Fingerprint ( Fingerprint )
 import GHC.Utils.Panic
 import GHC.Utils.Error
 import GHC.Utils.Outputable
-import GHC.Utils.Exception
 import GHC.Utils.Misc
 import GHC.Utils.Logger
 import GHC.Utils.TmpFs
@@ -293,7 +292,7 @@ logWarningsReportErrors :: (Bag PsWarning, Bag PsError) -> Hsc ()
 logWarningsReportErrors (warnings,errors) = do
     dflags <- getDynFlags
     let warns = fmap (fmap GhcPsMessage . mkParserWarn dflags) warnings
-        errs  = fmap mkParserErr errors
+        errs  = fmap (fmap GhcPsMessage . mkParserErr) errors
     logDiagnostics (mkMessages warns)
     when (not $ isEmptyBag errs)
       $ throwErrors $ mkMessages errs
@@ -1406,7 +1405,7 @@ checkPkgTrust pkgs = do
                         <> text ") is required to be trusted but it isn't!"
     case errors of
         [] -> return ()
-        _  -> (liftIO . throwIO . mkSrcErr . mkMessages . listToBag) errors
+        _  -> (liftIO . throwErrors . fmap ghcUnknownMessage . mkMessages . listToBag) errors
 
 -- | Set module to unsafe and (potentially) wipe trust information.
 --
@@ -2050,7 +2049,7 @@ hscParseExpr expr = do
   case maybe_stmt of
     Just (L _ (BodyStmt _ expr _ _)) -> return expr
     _ -> throwOneError . fmap ghcUnknownMessage $ mkPlainErrorMsgEnvelope noSrcSpan
-      (text "not an expression:" <+> quotes (text expr))
+       (text "not an expression:" <+> quotes (text expr))
 
 hscParseStmt :: String -> Hsc (Maybe (GhciLStmt GhcPs))
 hscParseStmt = hscParseThing parseStmt

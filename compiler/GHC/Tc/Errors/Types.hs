@@ -44,7 +44,6 @@ data TcRnMessage
       !SDoc -- extra contents (see 'unboundNameX'). TODO: Make it structured, eventually (#18516).
       !SDoc -- context lines. TODO: Make it structured, eventually (#18516).
   | TcRnOutOfScopeHole
-      !DiagnosticReason
       !OccName -- out of scope name
       !TcType  -- type of the hole
       !OutOfScopeSuggestions -- similar name, import, etc suggestions
