@@ -294,7 +294,7 @@ profHdrSize profile =
 minClosureSize :: Profile -> WordOff
 minClosureSize profile
  = fixedHdrSizeW profile
-   + pc_MIN_PAYLOAD_SIZE (profileConstants profile)
+   + pc_HS_MIN_PAYLOAD_SIZE (profileConstants profile)
 
 arrWordsHdrSize :: Profile -> ByteOff
 arrWordsHdrSize profile
@@ -386,12 +386,12 @@ closureTypeHdrSize profile ty = case ty of
 
 -- | The byte offset into the card table of the card for a given element
 card :: Platform -> Int -> Int
-card platform i = i `shiftR` pc_MUT_ARR_PTRS_CARD_BITS (platformConstants platform)
+card platform i = i `shiftR` pc_HS_MUT_ARR_PTRS_CARD_BITS (platformConstants platform)
 
 -- | Convert a number of elements to a number of cards, rounding up
 cardRoundUp :: Platform -> Int -> Int
 cardRoundUp platform i =
-  card platform (i + ((1 `shiftL` pc_MUT_ARR_PTRS_CARD_BITS (platformConstants platform)) - 1))
+  card platform (i + ((1 `shiftL` pc_HS_MUT_ARR_PTRS_CARD_BITS (platformConstants platform)) - 1))
 
 -- | The size of a card table, in bytes
 cardTableSizeB :: Platform -> Int -> ByteOff

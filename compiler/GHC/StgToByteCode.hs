@@ -384,7 +384,7 @@ mkProtoBCO platform nm instrs_ordlist origin arity bitmap_size bitmap is_ret ffi
         -- (hopefully rare) cases when the (overestimated) stack use
         -- exceeds iNTERP_STACK_CHECK_THRESH.
         maybe_with_stack_check
-           | is_ret && stack_usage < fromIntegral (pc_AP_STACK_SPLIM (platformConstants platform)) = peep_d
+           | is_ret && stack_usage < fromIntegral (pc_HS_AP_STACK_SPLIM (platformConstants platform)) = peep_d
                 -- don't do stack checks at return points,
                 -- everything is aggregated up to the top BCO
                 -- (which must be a function).

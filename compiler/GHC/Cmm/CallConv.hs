@@ -166,23 +166,23 @@ allFloatRegs, allDoubleRegs, allLongRegs :: Platform -> [GlobalReg]
 allVanillaRegs :: Platform -> [VGcPtr -> GlobalReg]
 allXmmRegs :: Platform -> [Int]
 
-allVanillaRegs platform = map VanillaReg $ regList (pc_MAX_Vanilla_REG (platformConstants platform))
-allFloatRegs   platform = map FloatReg   $ regList (pc_MAX_Float_REG   (platformConstants platform))
-allDoubleRegs  platform = map DoubleReg  $ regList (pc_MAX_Double_REG  (platformConstants platform))
-allLongRegs    platform = map LongReg    $ regList (pc_MAX_Long_REG    (platformConstants platform))
-allXmmRegs     platform =                  regList (pc_MAX_XMM_REG     (platformConstants platform))
+allVanillaRegs platform = map VanillaReg $ regList (pc_HS_MAX_Vanilla_REG (platformConstants platform))
+allFloatRegs   platform = map FloatReg   $ regList (pc_HS_MAX_Float_REG   (platformConstants platform))
+allDoubleRegs  platform = map DoubleReg  $ regList (pc_HS_MAX_Double_REG  (platformConstants platform))
+allLongRegs    platform = map LongReg    $ regList (pc_HS_MAX_Long_REG    (platformConstants platform))
+allXmmRegs     platform =                  regList (pc_HS_MAX_XMM_REG     (platformConstants platform))
 
 realFloatRegs, realDoubleRegs, realLongRegs :: Platform -> [GlobalReg]
 realVanillaRegs :: Platform -> [VGcPtr -> GlobalReg]
 
-realVanillaRegs platform = map VanillaReg $ regList (pc_MAX_Real_Vanilla_REG (platformConstants platform))
-realFloatRegs   platform = map FloatReg   $ regList (pc_MAX_Real_Float_REG   (platformConstants platform))
-realDoubleRegs  platform = map DoubleReg  $ regList (pc_MAX_Real_Double_REG  (platformConstants platform))
-realLongRegs    platform = map LongReg    $ regList (pc_MAX_Real_Long_REG    (platformConstants platform))
+realVanillaRegs platform = map VanillaReg $ regList (pc_HS_MAX_Real_Vanilla_REG (platformConstants platform))
+realFloatRegs   platform = map FloatReg   $ regList (pc_HS_MAX_Real_Float_REG   (platformConstants platform))
+realDoubleRegs  platform = map DoubleReg  $ regList (pc_HS_MAX_Real_Double_REG  (platformConstants platform))
+realLongRegs    platform = map LongReg    $ regList (pc_HS_MAX_Real_Long_REG    (platformConstants platform))
 
 realXmmRegNos :: Platform -> [Int]
 realXmmRegNos platform
-    | isSse2Enabled platform = regList (pc_MAX_Real_XMM_REG (platformConstants platform))
+    | isSse2Enabled platform = regList (pc_HS_MAX_Real_XMM_REG (platformConstants platform))
     | otherwise              = []
 
 regList :: Int -> [Int]

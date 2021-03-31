@@ -665,22 +665,22 @@ mkRtsPrimOpLabel primop = RtsLabel (RtsPrimOp primop)
 
 mkSelectorInfoLabel :: Platform -> Bool -> Int -> CLabel
 mkSelectorInfoLabel platform upd offset =
-   ASSERT(offset >= 0 && offset <= pc_MAX_SPEC_SELECTEE_SIZE (platformConstants platform))
+   ASSERT(offset >= 0 && offset <= pc_HS_MAX_SPEC_SELECTEE_SIZE (platformConstants platform))
    RtsLabel (RtsSelectorInfoTable upd offset)
 
 mkSelectorEntryLabel :: Platform -> Bool -> Int -> CLabel
 mkSelectorEntryLabel platform upd offset =
-   ASSERT(offset >= 0 && offset <= pc_MAX_SPEC_SELECTEE_SIZE (platformConstants platform))
+   ASSERT(offset >= 0 && offset <= pc_HS_MAX_SPEC_SELECTEE_SIZE (platformConstants platform))
    RtsLabel (RtsSelectorEntry upd offset)
 
 mkApInfoTableLabel :: Platform -> Bool -> Int -> CLabel
 mkApInfoTableLabel platform upd arity =
-   ASSERT(arity > 0 && arity <= pc_MAX_SPEC_AP_SIZE (platformConstants platform))
+   ASSERT(arity > 0 && arity <= pc_HS_MAX_SPEC_AP_SIZE (platformConstants platform))
    RtsLabel (RtsApInfoTable upd arity)
 
 mkApEntryLabel :: Platform -> Bool -> Int -> CLabel
 mkApEntryLabel platform upd arity =
-   ASSERT(arity > 0 && arity <= pc_MAX_SPEC_AP_SIZE (platformConstants platform))
+   ASSERT(arity > 0 && arity <= pc_HS_MAX_SPEC_AP_SIZE (platformConstants platform))
    RtsLabel (RtsApEntry upd arity)
 
 
