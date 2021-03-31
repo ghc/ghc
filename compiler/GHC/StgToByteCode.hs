@@ -71,7 +71,7 @@ import GHC.Types.Tickish
 
 import Data.List ( genericReplicate, genericLength, intersperse
                  , partition, scanl', sort, sortBy, zip4, zip6, nub )
-import Foreign
+import Foreign hiding (shiftL, shiftR)
 import Control.Monad
 import Data.Char
 
