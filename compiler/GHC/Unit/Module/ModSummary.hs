@@ -39,6 +39,7 @@ import GHC.Data.Maybe
 import GHC.Data.FastString
 import GHC.Data.StringBuffer ( StringBuffer )
 
+import GHC.Utils.Fingerprint
 import GHC.Utils.Outputable
 
 import Data.Time
@@ -73,14 +74,13 @@ data ModSummary
           -- ^ The module source either plain Haskell, hs-boot, or hsig
         ms_location     :: ModLocation,
           -- ^ Location of the various files belonging to the module
-        ms_hs_date      :: UTCTime,
-          -- ^ Timestamp of source file
+        ms_hs_hash      :: Fingerprint,
+          -- ^ Content hash of source file
         ms_obj_date     :: Maybe UTCTime,
           -- ^ Timestamp of object, if we have one
         ms_iface_date   :: Maybe UTCTime,
-          -- ^ Timestamp of hi file, if we *only* are typechecking (it is
-          -- 'Nothing' otherwise.
-          -- See Note [Recompilation checking in -fno-code mode] and #9243
+          -- ^ Timestamp of hi file, if we have one
+          -- See Note [When source is considered modified] and #9243
         ms_hie_date   :: Maybe UTCTime,
           -- ^ Timestamp of hie file, if we have one
         ms_srcimps      :: [(Maybe FastString, Located ModuleName)],
@@ -145,7 +145,7 @@ ms_home_imps = home_imps . ms_imps
 -- and let @compile@ read from that file on the way back up.
 
 -- The ModLocation is stable over successive up-sweeps in GHCi, wheres
--- the ms_hs_date and imports can, of course, change
+-- the ms_hs_hash and imports can, of course, change
 
 msHsFilePath, msHiFilePath, msObjFilePath :: ModSummary -> FilePath
 msHsFilePath  ms = expectJust "msHsFilePath" (ml_hs_file  (ms_location ms))
@@ -162,7 +162,7 @@ isBootSummary ms = if ms_hsc_src ms == HsBootFile then IsBoot else NotBoot
 instance Outputable ModSummary where
    ppr ms
       = sep [text "ModSummary {",
-             nest 3 (sep [text "ms_hs_date = " <> text (show (ms_hs_date ms)),
+             nest 3 (sep [text "ms_hs_hash = " <> text (show (ms_hs_hash ms)),
                           text "ms_mod =" <+> ppr (ms_mod ms)
                                 <> text (hscSourceString (ms_hsc_src ms)) <> comma,
                           text "ms_textual_imps =" <+> ppr (ms_textual_imps ms),
@@ -170,6 +170,8 @@ instance Outputable ModSummary where
              char '}'
             ]
 
+-- | Find the first target in the provided list which matches the specified
+-- 'ModSummary'.
 findTarget :: ModSummary -> [Target] -> Maybe Target
 findTarget ms ts =
   case filter (matches ms) ts of
