@@ -172,6 +172,7 @@ instance Instruction instr => Instruction (InstrSR instr) where
         mkStackDeallocInstr platform amount =
              Instr <$> mkStackDeallocInstr platform amount
 
+        {-# INLINEABLE pprInstr #-}
         pprInstr platform i = ppr (fmap (pprInstr platform) i)
 
 
@@ -570,11 +571,13 @@ stripLiveBlock config (BasicBlock i lis)
 
         spillNat acc (LiveInstr (SPILL reg slot) _ : instrs)
          = do   delta   <- get
-                spillNat (mkSpillInstr config reg delta slot : acc) instrs
+                let !ins = mkSpillInstr config reg delta slot
+                spillNat (ins : acc) instrs
 
         spillNat acc (LiveInstr (RELOAD slot reg) _ : instrs)
          = do   delta   <- get
-                spillNat (mkLoadInstr config reg delta slot : acc) instrs
+                let !ins = mkLoadInstr config reg delta slot
+                spillNat (ins : acc) instrs
 
         spillNat acc (LiveInstr (Instr instr) _ : instrs)
          | Just i <- takeDeltaInstr instr
