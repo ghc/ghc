@@ -66,7 +66,6 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 import Control.Monad    ( mapAndUnzipM, when )
-import Data.Bits
 import Data.Word
 
 import GHC.Types.Basic

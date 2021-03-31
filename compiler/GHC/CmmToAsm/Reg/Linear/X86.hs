@@ -13,7 +13,6 @@ import GHC.Platform
 import GHC.Utils.Outputable
 
 import Data.Word
-import Data.Bits
 
 newtype FreeRegs = FreeRegs Word32
     deriving (Show,Outputable)

@@ -59,7 +59,6 @@ import GHC.Utils.Panic
 import GHC.Exts (indexCharOffAddr#, Char(..), Int(..))
 
 import Data.Char        ( chr, ord )
-import Data.Bits
 
 {-
 ************************************************************************

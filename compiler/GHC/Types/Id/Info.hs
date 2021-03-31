@@ -113,7 +113,6 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 import Data.Word
-import Data.Bits
 
 import GHC.StgToCmm.Types (LambdaFormInfo (..))
 

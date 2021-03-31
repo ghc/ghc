@@ -68,7 +68,6 @@ import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 
-import Data.Bits
 import Data.Maybe
 
 -- | Get the 'Name' associated with a known-key 'Unique'.
