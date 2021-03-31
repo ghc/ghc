@@ -38,9 +38,9 @@ reasonTcRnMessage = \case
   TcRnBadTelescope{} ->
     ErrorWithoutFlag -- a bad telescope is always an error.
 
-  TcRnOutOfScope{} -> error "todo"
+  TcRnOutOfScope{} -> ErrorWithoutFlag -- FIXME(adn)
 
-  TcRnOutOfScopeHole reason _ _ _ -> reason
+  TcRnOutOfScopeHole _ _ _ -> ErrorWithoutFlag --FIXME(adn)
 
 notInScopeErr :: RdrName -> SDoc
 notInScopeErr rdr_name
@@ -77,7 +77,7 @@ pprTcRnMessage = \case
     mkDecorated [notInScopeErr tried_rdr_name $$ suggestions $$ extra, contextlines]
       where suggestions = pprOutOfScopeSuggestions (rdrNameOcc tried_rdr_name) suggs
 
-  TcRnOutOfScopeHole _reason occ ty suggs ->
+  TcRnOutOfScopeHole occ ty suggs ->
     mkDecorated [m, suggestions]
       where herald | isDataOcc occ = text "Data constructor not in scope:"
                    | otherwise     = text "Variable not in scope:"

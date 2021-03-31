@@ -11,7 +11,7 @@ where
 
 import GHC.Prelude
 import GHC.Types.Error
-import GHC.Driver.Errors.Types (ghcUnknownMessage,  GhcMessage )
+import GHC.Driver.Errors.Types ( GhcMessage )
 import GHC.Driver.Errors.Ppr () -- instance Diagnostic GhcMessage
 import GHC.Utils.Monad
 import GHC.Utils.Panic
@@ -20,18 +20,17 @@ import GHC.Utils.Exception
 import Control.Monad.Catch as MC (MonadCatch, catch)
 import GHC.Utils.Error (pprMsgEnvelopeBagWithLoc)
 import GHC.Utils.Outputable
-import Data.Data (Typeable)
 
-mkSrcErr :: (Diagnostic e, Typeable e) => Messages e -> SourceError
-mkSrcErr = SourceError . fmap ghcUnknownMessage
+mkSrcErr :: Messages GhcMessage -> SourceError
+mkSrcErr = SourceError
 
 srcErrorMessages :: SourceError -> Messages GhcMessage
 srcErrorMessages (SourceError msgs) = msgs
 
-throwErrors :: (Diagnostic e, Typeable e, MonadIO io) => Messages e -> io a
+throwErrors :: MonadIO io => Messages GhcMessage -> io a
 throwErrors = liftIO . throwIO . mkSrcErr
 
-throwOneError :: (Diagnostic e, Typeable e, MonadIO io) => MsgEnvelope e -> io a
+throwOneError :: MonadIO io => MsgEnvelope GhcMessage -> io a
 throwOneError = throwErrors . singleMessage
 
 -- | A source error is an error that is caused by one or more errors in the

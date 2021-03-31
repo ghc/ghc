@@ -31,7 +31,7 @@ module GHC.Utils.Error (
 
         -- ** Construction
         emptyMessages, mkDecorated, mkLocMessage, mkLocMessageAnn,
-        mkMsgEnvelope, mkPlainMsgEnvelope, mkPlainErrorMsgEnvelope,
+        mkMsgEnvelope, mkMsgErrorEnvelope, mkPlainMsgEnvelope, mkPlainErrorMsgEnvelope,
         mkShortMsgEnvelope, mkShortErrorMsgEnvelope, mkLongMsgEnvelope,
         mkMCDiagnostic, errorDiagnostic, diagReasonSeverity,
 
@@ -64,6 +64,7 @@ import GHC.Driver.Ppr
 
 import GHC.Data.Bag
 import GHC.Utils.Exception
+import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Logger
@@ -123,6 +124,18 @@ mkMsgEnvelope
   -> MsgEnvelope e
 mkMsgEnvelope dflags locn print_unqual err
  = mk_msg_envelope (diagReasonSeverity dflags (diagnosticReason err)) locn print_unqual err
+
+-- | Varation of 'mkMsgErrorEnvelope which can be used when we are /sure/ the
+-- input 'Diagnostic' has reason 'ErrorWithoutFlag'.
+mkMsgErrorEnvelope
+  :: Diagnostic e
+  => SrcSpan
+  -> PrintUnqualified
+  -> e
+  -> MsgEnvelope e
+mkMsgErrorEnvelope locn print_unqual err
+ = let msg = mk_msg_envelope SevError locn print_unqual err
+   in ASSERT(isIntrinsicErrorMessage msg) msg
 
 -- | Make a 'MessageClass' for a given 'DiagnosticReason', consulting the 'DynFlags'.
 mkMCDiagnostic :: DynFlags -> DiagnosticReason -> MessageClass

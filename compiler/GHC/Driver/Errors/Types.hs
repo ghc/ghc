@@ -89,6 +89,13 @@ data DriverMessage
     -- Errors
   | DriverCannotFindModule !DynFlags !UnitEnv !Profile !ModuleName !FindResult
   | DriverNotAnExpression !String
+  {- DriverNotAnExpression occurs when the input 'String' can't be parsed into a 'LHsExpr GhcPs'.
+
+     Example: See 'GHC.Driver.Main.hscParseExpr'.
+
+     Test case(s): ghc-api/T10508_api
+  -}
+
   | DriverParseErrorImport
   | DriverPkgRequiredTrusted !UnitState !UnitId
   | DriverCantLoadIfaceForSafe !Module
