@@ -255,7 +255,6 @@ Library
         GHC.MVar
         GHC.Natural
         GHC.Num
-        GHC.OldList
         GHC.OverloadedLabels
         GHC.Pack
         GHC.Profiling
@@ -324,7 +323,6 @@ Library
         Control.Monad.ST.Imp
         Control.Monad.ST.Lazy.Imp
         Data.Functor.Utils
-        Data.OldList
         Data.Semigroup.Internal
         Data.Typeable.Internal
         Foreign.ForeignPtr.Imp
