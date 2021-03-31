@@ -418,7 +418,7 @@ loadThreadState profile = do
     mkAssign spReg (CmmLoad (cmmOffset platform (CmmReg (CmmLocal stack)) (stack_SP profile)) (bWord platform)),
     -- SpLim = stack->stack + RESERVED_STACK_WORDS;
     mkAssign spLimReg (cmmOffsetW platform (cmmOffset platform (CmmReg (CmmLocal stack)) (stack_STACK profile))
-                                (pc_RESERVED_STACK_WORDS (platformConstants platform))),
+                                (pc_HS_RESERVED_STACK_WORDS (platformConstants platform))),
     -- HpAlloc = 0;
     --   HpAlloc is assumed to be set to non-zero only by a failed
     --   a heap check, see HeapStackCheck.cmm:GC_GENERIC

@@ -1331,9 +1331,9 @@ pprHexVal platform w rep = parens ctype <> rawlit
       constants = platformConstants platform
 
       repsuffix W64 =
-               if pc_CINT_SIZE       constants == 8 then char 'U'
-          else if pc_CLONG_SIZE      constants == 8 then text "UL"
-          else if pc_CLONG_LONG_SIZE constants == 8 then text "ULL"
+               if pc_HS_CINT_SIZE       constants == 8 then char 'U'
+          else if pc_HS_CLONG_SIZE      constants == 8 then text "UL"
+          else if pc_HS_CLONG_LONG_SIZE constants == 8 then text "ULL"
           else panic "pprHexVal: Can't find a 64-bit type"
       repsuffix _ = char 'U'
 

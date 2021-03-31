@@ -2140,7 +2140,7 @@ doWritePtrArrayOp addr idx val
           (cmmOffsetExprW platform (cmmOffsetB platform addr hdr_size)
                          (loadArrPtrsSize profile addr))
           (CmmMachOp (mo_wordUShr platform) [idx,
-                                           mkIntExpr platform (pc_MUT_ARR_PTRS_CARD_BITS (platformConstants platform))])
+                                           mkIntExpr platform (pc_HS_MUT_ARR_PTRS_CARD_BITS (platformConstants platform))])
          ) (CmmLit (CmmInt 1 W8))
 
 loadArrPtrsSize :: Profile -> CmmExpr -> CmmExpr
@@ -2917,7 +2917,7 @@ emitSetCards dst_start dst_cards_start n = do
 -- Convert an element index to a card index
 cardCmm :: Platform -> CmmExpr -> CmmExpr
 cardCmm platform i =
-    cmmUShrWord platform i (mkIntExpr platform (pc_MUT_ARR_PTRS_CARD_BITS (platformConstants platform)))
+    cmmUShrWord platform i (mkIntExpr platform (pc_HS_MUT_ARR_PTRS_CARD_BITS (platformConstants platform)))
 
 ------------------------------------------------------------------------------
 -- SmallArray PrimOp implementations

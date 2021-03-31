@@ -65,7 +65,7 @@ main = do opts <- parseArgs
                                      , wh `elem` [Haskell, Both] ]
                          cRs = [ what
                                | (wh, what) <- rs
-                               , wh `elem` [C, Both] ]
+                               , wh `elem` [C, Both, Haskell] ]
                      case cm of
                          ComputeHaskell -> writeHaskellValue fn haskellRs
                          ComputeHeader  -> writeHeader       fn cRs
@@ -159,8 +159,8 @@ constantWord w name expr = [(w, GetWord name (Fst (CExpr expr)))]
 constantNatural :: Where -> Name -> String -> Wanteds
 constantNatural w name expr = [(w, GetNatural name (Fst (CExpr expr)))]
 
-constantBool :: Where -> Name -> String -> Wanteds
-constantBool w name expr = [(w, GetBool name (Fst (CPPExpr expr)))]
+-- constantBool :: Where -> Name -> String -> Wanteds
+-- constantBool w name expr = [(w, GetBool name (Fst (CPPExpr expr)))]
 
 fieldOffset :: Where -> String -> String -> Wanteds
 fieldOffset w theType theField = fieldOffset_ w nameBase theType theField
@@ -610,63 +610,61 @@ wanteds os = concat
            else []
 
           -- pre-compiled thunk types
-          ,constantWord Haskell "MAX_SPEC_SELECTEE_SIZE" "MAX_SPEC_SELECTEE_SIZE"
-          ,constantWord Haskell "MAX_SPEC_AP_SIZE"       "MAX_SPEC_AP_SIZE"
+          ,constantWord Haskell "HS_MAX_SPEC_SELECTEE_SIZE" "MAX_SPEC_SELECTEE_SIZE"
+          ,constantWord Haskell "HS_MAX_SPEC_AP_SIZE"       "MAX_SPEC_AP_SIZE"
 
           -- closure sizes: these do NOT include the header (see below for
           -- header sizes)
-          ,constantWord Haskell "MIN_PAYLOAD_SIZE" "MIN_PAYLOAD_SIZE"
+          ,constantWord Haskell "HS_MIN_PAYLOAD_SIZE" "MIN_PAYLOAD_SIZE"
 
-          ,constantInt  Haskell "MIN_INTLIKE" "MIN_INTLIKE"
-          ,constantWord Haskell "MAX_INTLIKE" "MAX_INTLIKE"
+          ,constantInt  Haskell "HS_MIN_INTLIKE" "MIN_INTLIKE"
+          ,constantWord Haskell "HS_MAX_INTLIKE" "MAX_INTLIKE"
 
-          ,constantWord Haskell "MIN_CHARLIKE" "MIN_CHARLIKE"
-          ,constantWord Haskell "MAX_CHARLIKE" "MAX_CHARLIKE"
+          ,constantWord Haskell "HS_MIN_CHARLIKE" "MIN_CHARLIKE"
+          ,constantWord Haskell "HS_MAX_CHARLIKE" "MAX_CHARLIKE"
 
-          ,constantWord Haskell "MUT_ARR_PTRS_CARD_BITS" "MUT_ARR_PTRS_CARD_BITS"
+          ,constantWord Haskell "HS_MUT_ARR_PTRS_CARD_BITS" "MUT_ARR_PTRS_CARD_BITS"
 
           -- A section of code-generator-related MAGIC CONSTANTS.
-          ,constantWord Haskell "MAX_Vanilla_REG"      "MAX_VANILLA_REG"
-          ,constantWord Haskell "MAX_Float_REG"        "MAX_FLOAT_REG"
-          ,constantWord Haskell "MAX_Double_REG"       "MAX_DOUBLE_REG"
-          ,constantWord Haskell "MAX_Long_REG"         "MAX_LONG_REG"
-          ,constantWord Haskell "MAX_XMM_REG"          "MAX_XMM_REG"
-          ,constantWord Haskell "MAX_Real_Vanilla_REG" "MAX_REAL_VANILLA_REG"
-          ,constantWord Haskell "MAX_Real_Float_REG"   "MAX_REAL_FLOAT_REG"
-          ,constantWord Haskell "MAX_Real_Double_REG"  "MAX_REAL_DOUBLE_REG"
-          ,constantWord Haskell "MAX_Real_XMM_REG"     "MAX_REAL_XMM_REG"
-          ,constantWord Haskell "MAX_Real_Long_REG"    "MAX_REAL_LONG_REG"
+          ,constantWord Haskell "HS_MAX_Vanilla_REG"      "MAX_VANILLA_REG"
+          ,constantWord Haskell "HS_MAX_Float_REG"        "MAX_FLOAT_REG"
+          ,constantWord Haskell "HS_MAX_Double_REG"       "MAX_DOUBLE_REG"
+          ,constantWord Haskell "HS_MAX_Long_REG"         "MAX_LONG_REG"
+          ,constantWord Haskell "HS_MAX_XMM_REG"          "MAX_XMM_REG"
+          ,constantWord Haskell "HS_MAX_Real_Vanilla_REG" "MAX_REAL_VANILLA_REG"
+          ,constantWord Haskell "HS_MAX_Real_Float_REG"   "MAX_REAL_FLOAT_REG"
+          ,constantWord Haskell "HS_MAX_Real_Double_REG"  "MAX_REAL_DOUBLE_REG"
+          ,constantWord Haskell "HS_MAX_Real_XMM_REG"     "MAX_REAL_XMM_REG"
+          ,constantWord Haskell "HS_MAX_Real_Long_REG"    "MAX_REAL_LONG_REG"
 
           -- This tells the native code generator the size of the spill
           -- area it has available.
-          ,constantWord Haskell "RESERVED_C_STACK_BYTES" "RESERVED_C_STACK_BYTES"
+          ,constantWord Haskell "HS_RESERVED_C_STACK_BYTES" "RESERVED_C_STACK_BYTES"
           -- The amount of (Haskell) stack to leave free for saving
           -- registers when returning to the scheduler.
-          ,constantWord Haskell "RESERVED_STACK_WORDS" "RESERVED_STACK_WORDS"
+          ,constantWord Haskell "HS_RESERVED_STACK_WORDS" "RESERVED_STACK_WORDS"
           -- Continuations that need more than this amount of stack
           -- should do their own stack check (see bug #1466).
-          ,constantWord Haskell "AP_STACK_SPLIM" "AP_STACK_SPLIM"
+          ,constantWord Haskell "HS_AP_STACK_SPLIM" "AP_STACK_SPLIM"
 
           -- Size of a word, in bytes
-          ,constantWord Haskell "WORD_SIZE" "SIZEOF_HSWORD"
+          ,constantWord Haskell "HS_WORD_SIZE" "SIZEOF_HSWORD"
 
           -- Size of a C int, in bytes. May be smaller than wORD_SIZE.
-          ,constantWord Haskell "CINT_SIZE"       "SIZEOF_INT"
-          ,constantWord Haskell "CLONG_SIZE"      "SIZEOF_LONG"
-          ,constantWord Haskell "CLONG_LONG_SIZE" "SIZEOF_LONG_LONG"
+          ,constantWord Haskell "HS_CINT_SIZE"       "SIZEOF_INT"
+          ,constantWord Haskell "HS_CLONG_SIZE"      "SIZEOF_LONG"
+          ,constantWord Haskell "HS_CLONG_LONG_SIZE" "SIZEOF_LONG_LONG"
 
           -- Number of bits to shift a bitfield left by in an info table.
-          ,constantWord Haskell "BITMAP_BITS_SHIFT" "BITMAP_BITS_SHIFT"
+          ,constantWord Haskell "HS_BITMAP_BITS_SHIFT" "BITMAP_BITS_SHIFT"
 
           -- Amount of pointer bits used for semi-tagging constructor closures
-          ,constantWord Haskell "TAG_BITS" "TAG_BITS"
+          ,constantWord Haskell "HS_TAG_BITS" "TAG_BITS"
 
-          ,constantBool Haskell "DYNAMIC_BY_DEFAULT" "defined(DYNAMIC_BY_DEFAULT)"
-
-          ,constantWord    Haskell "LDV_SHIFT"         "LDV_SHIFT"
-          ,constantNatural Haskell "ILDV_CREATE_MASK"  "LDV_CREATE_MASK"
-          ,constantNatural Haskell "ILDV_STATE_CREATE" "LDV_STATE_CREATE"
-          ,constantNatural Haskell "ILDV_STATE_USE"    "LDV_STATE_USE"
+          ,constantWord    Haskell "HS_LDV_SHIFT"         "LDV_SHIFT"
+          ,constantNatural Haskell "HS_ILDV_CREATE_MASK"  "LDV_CREATE_MASK"
+          ,constantNatural Haskell "HS_ILDV_STATE_CREATE" "LDV_STATE_CREATE"
+          ,constantNatural Haskell "HS_ILDV_STATE_USE"    "LDV_STATE_USE"
           ]
 
 getWanted :: Bool -> String -> FilePath -> FilePath -> [String] -> FilePath -> Maybe FilePath
@@ -861,11 +859,15 @@ getWanted verbose os tmpdir gccProgram gccFlags nmProgram mobjdumpProgram
 
 writeHaskellType :: FilePath -> [What Fst] -> IO ()
 writeHaskellType fn ws = writeFile fn xs
-    where xs = unlines [header, body, footer]
+    where xs = unlines [header, body, footer, parser]
           header = "module GHC.Platform.Constants where\n\n\
-                   \import Prelude\n\n\
+                   \import Prelude\n\
+                   \import Data.Maybe\n\
+                   \import Control.Arrow\n\
+                   \import qualified Data.Map as Map\n\
+                   \import qualified Data.List as List\n\n\
                    \data PlatformConstants = PlatformConstants {"
-          footer = "  } deriving (Show,Read,Eq)"
+          footer = "  } deriving (Show,Read,Eq)\n\n"
           body = intercalate ",\n" (concatMap doWhat ws)
 
           doWhat (GetClosureSize name _) = ["      pc_" ++ name ++ " :: Int"]
@@ -878,6 +880,31 @@ writeHaskellType fn ws = writeFile fn xs
           doWhat (ClosureFieldMacro {}) = []
           doWhat (ClosurePayloadMacro {}) = []
           doWhat (FieldTypeGcptrMacro {}) = []
+
+          parser =
+            "parseConstantsHeader :: FilePath -> IO PlatformConstants\n\
+            \parseConstantsHeader fp = do\n\
+            \  s <- readFile fp\n\
+            \  let m = Map.fromList\n\
+            \           $ fmap (second tail)\n\
+            \           $ fmap (List.break (== ' '))\n\
+            \           $ mapMaybe (List.stripPrefix \"#define \") (lines s)\n\
+            \  return $ PlatformConstants\n\
+            \    { "
+            ++ intercalate "\n    , " (concatMap doParse ws)
+            ++ "\n    }\n"
+
+          doParse (GetClosureSize name _) = ["pc_" ++ name ++ " = read $ m Map.! \"" ++ name ++ "\""]
+          doParse (GetFieldType   name _) = ["pc_" ++ name ++ " = flip div 8 $ read $ tail $ m Map.! \"" ++ name ++ "\""]
+          doParse (GetWord        name _) = ["pc_" ++ name ++ " = read $ m Map.! \"" ++ name ++ "\""]
+          doParse (GetInt         name _) = ["pc_" ++ name ++ " = read $ m Map.! \"" ++ name ++ "\""]
+          doParse (GetNatural     name _) = ["pc_" ++ name ++ " = read $ m Map.! \"" ++ name ++ "\""]
+          doParse (GetBool        name _) = ["pc_" ++ name ++ " = (>(0::Int)) $ read $ m Map.! \"" ++ name ++ "\""]
+          doParse (StructFieldMacro {}) = []
+          doParse (ClosureFieldMacro {}) = []
+          doParse (ClosurePayloadMacro {}) = []
+          doParse (FieldTypeGcptrMacro {}) = []
+
 
 writeHaskellValue :: FilePath -> [What Snd] -> IO ()
 writeHaskellValue fn rs = writeFile fn xs

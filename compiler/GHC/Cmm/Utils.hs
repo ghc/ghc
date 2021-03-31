@@ -431,7 +431,7 @@ isComparisonExpr _                  = False
 ---------------------------------------------------
 
 tAG_MASK :: Platform -> Int
-tAG_MASK platform = (1 `shiftL` pc_TAG_BITS (platformConstants platform)) - 1
+tAG_MASK platform = (1 `shiftL` pc_HS_TAG_BITS (platformConstants platform)) - 1
 
 mAX_PTR_TAG :: Platform -> Int
 mAX_PTR_TAG = tAG_MASK
