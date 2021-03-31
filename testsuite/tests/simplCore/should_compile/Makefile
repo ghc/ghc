@@ -273,6 +273,12 @@ T11272:
 T12600:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O -ddump-prep -dsuppress-all -dsuppress-uniques -dno-suppress-type-signatures -dppr-cols=200 T12600.hs | grep "wfoo" | head -n 1
 
+# test1 and test2 should have the exact same Core.
+.PHONY: T14062
+T14062:
+	$(RM) -f T14062.hi T14062.o
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O -ddump-simpl -dsuppress-module-prefixes -dsuppress-uniques -dsuppress-unfoldings T14062.hs | grep -B1 -A5 "^test[12]"
+
 # We don't expect to case match on any literal numbers other than
 # 0 or 1. See T14140.hs for an explanation.
 T14140:

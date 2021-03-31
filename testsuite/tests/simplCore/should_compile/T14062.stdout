@@ -1,0 +1,28 @@
+-- RHS size: {terms: 10, types: 10, coercions: 0, joins: 0/0}
+test1 [InlPrag=INLINE (sat-args=0)] :: Int -> Int
+[GblId,
+ Arity=1,
+ Str=<1P(1L)>,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=False,boring_ok=True)}]
+test1
+  = \ (n :: Int) ->
+      case n of { I# ww1 ->
+      case $wgo ww1 lvl of { (# ww3, ww4 #) -> ww4 }
+      }
+
+-- RHS size: {terms: 10, types: 10, coercions: 0, joins: 0/0}
+test2 [InlPrag=INLINE (sat-args=0)] :: Int -> Int
+[GblId,
+ Arity=1,
+ Str=<1P(1L)>,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=False,boring_ok=True)}]
+test2
+  = \ (n :: Int) ->
+      case n of { I# ww1 ->
+      case $wgo ww1 lvl of { (# ww3, ww4 #) -> ww4 }
+      }
+

@@ -248,6 +248,7 @@ test('T13543', only_ways(['optasm']), compile, ['-ddump-str-signatures -ddump-cp
 test('T11272', normal, makefile_test, ['T11272'])
 test('T12600', normal, makefile_test, ['T12600'])
 test('T13658', normal, compile, ['-dcore-lint'])
+test('T14062', only_ways(['optasm']), makefile_test, ['T14062'])
 test('T14779a', normal, compile, ['-dcore-lint'])
 test('T14779b', normal, compile, ['-dcore-lint'])
 test('T13708', normal, compile, [''])
