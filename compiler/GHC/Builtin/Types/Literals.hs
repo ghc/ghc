@@ -541,6 +541,8 @@ typeNatCoAxiomRules = listToUFM $ map (\x -> (coaxrName x, x))
   , axAppendSymbolDef
   , axConsSymbolDef
   , axUnconsSymbolDef
+  , axCharToNatDef
+  , axNatToCharDef
   , axAdd0L
   , axAdd0R
   , axMul0L
