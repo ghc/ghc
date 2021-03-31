@@ -58,7 +58,6 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 
 import Data.ByteString (ByteString)
-import Data.Bits
 
 -- When we split at proc points, we need an empty info table.
 mkEmptyContInfoTable :: CLabel -> CmmInfoTable
