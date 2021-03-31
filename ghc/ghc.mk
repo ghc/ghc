@@ -146,9 +146,6 @@ $(INPLACE_LIB)/llvm-targets : llvm-targets
 $(INPLACE_LIB)/llvm-passes : llvm-passes
 	"$(CP)" $< $@
 
-$(INPLACE_LIB)/platformConstants: $(includes_GHCCONSTANTS_HASKELL_VALUE)
-	"$(CP)" $< $@
-
 # The GHC programs need to depend on all the helper programs they might call,
 # and the settings files they use
 
