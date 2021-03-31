@@ -29,7 +29,9 @@ import GHC.Platform
 
 import GHC.Driver.Session
 import GHC.Driver.Config
+import GHC.Driver.Errors.Types -- Unfortunate, due to the fact we throw exceptions!
 
+import GHC.Parser.Errors.Types
 import GHC.Parser.Errors.Ppr
 import GHC.Parser.Errors
 import GHC.Parser           ( parseHeader )
@@ -91,7 +93,7 @@ getImports popts implicit_prelude buf filename source_filename = do
       -- don't log warnings: they'll be reported when we parse the file
       -- for real.  See #2500.
       if not (isEmptyBag errs)
-        then throwErrors $ mkMessages $ fmap mkParserErr errs
+        then throwErrors $ fmap GhcPsMessage . mkMessages $ fmap mkParserErr errs
         else
           let   hsmod = unLoc rdr_module
                 mb_mod = hsmodName hsmod
@@ -313,7 +315,8 @@ getOptions' dflags toks
 checkProcessArgsResult :: MonadIO m => [Located String] -> m ()
 checkProcessArgsResult flags
   = when (notNull flags) $
-      liftIO . throwErrors . mkMessages . listToBag . map mkMsg $ flags
+      liftIO . throwErrors . fmap (GhcPsMessage . PsUnknownMessage) . mkMessages $
+        listToBag . map mkMsg $ flags
     where mkMsg (L loc flag)
               = mkPlainErrorMsgEnvelope loc $
                   (text "unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+>
@@ -372,4 +375,5 @@ optionsParseError str loc =
 
 throwErr :: SrcSpan -> SDoc -> a                -- #15053
 throwErr loc doc =
-  throw . mkSrcErr . singleMessage $ mkPlainErrorMsgEnvelope loc doc
+  throw . mkSrcErr . fmap (GhcPsMessage . PsUnknownMessage) . singleMessage $
+    mkPlainErrorMsgEnvelope loc doc

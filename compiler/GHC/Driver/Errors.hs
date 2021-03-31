@@ -6,6 +6,7 @@ module GHC.Driver.Errors (
   , partitionMessageBag
   ) where
 
+import GHC.Driver.Errors.Types
 import GHC.Driver.Session
 import GHC.Data.Bag
 import GHC.Utils.Exception
@@ -17,7 +18,6 @@ import GHC.Types.Error
 import GHC.Utils.Outputable ( text, withPprStyle, mkErrStyle )
 import GHC.Utils.Logger
 import qualified GHC.Driver.CmdLine as CmdLine
-import Data.Typeable
 
 -- | Partitions the messages and returns a tuple which first element are the warnings, and the
 -- second the errors.
@@ -44,7 +44,7 @@ handleFlagWarnings logger dflags warns = do
       bag = listToBag [ mkPlainMsgEnvelope dflags WarningWithoutFlag loc (text warn)
                       | CmdLine.Warn _ (L loc warn) <- warns' ]
 
-  printOrThrowDiagnostics logger dflags (mkMessages bag)
+  printOrThrowDiagnostics logger dflags (fmap GhcUnknownMessage $ mkMessages bag)
   where
     -- Given a warn reason, check to see if it's associated -W opt is enabled
     should_print_warning :: DynFlags -> DiagnosticReason -> Bool
@@ -57,7 +57,7 @@ handleFlagWarnings logger dflags warns = do
 
 -- | Given a bag of diagnostics, turn them into an exception if
 -- any has 'SevError', or print them out otherwise.
-printOrThrowDiagnostics :: (Diagnostic e, Typeable e) => Logger -> DynFlags -> Messages e -> IO ()
+printOrThrowDiagnostics :: Logger -> DynFlags -> Messages GhcMessage -> IO ()
 printOrThrowDiagnostics logger dflags (getMessages -> msgs)
   | any ((==) SevError . errMsgSeverity) msgs
   = throwIO (mkSrcErr . mkMessages $ msgs)

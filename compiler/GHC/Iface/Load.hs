@@ -45,6 +45,7 @@ import {-# SOURCE #-} GHC.IfaceToCore
    , tcIfaceAnnotations, tcIfaceCompleteMatches )
 
 import GHC.Driver.Env
+import GHC.Driver.Errors.Types -- unfortunate dependency due to the fact we throw exceptions
 import GHC.Driver.Session
 import GHC.Driver.Backend
 import GHC.Driver.Ppr
@@ -701,7 +702,7 @@ computeInterface hsc_env doc_str hi_boot_file mod0 = do
           Succeeded (iface0, path) ->
             rnModIface hsc_env (instUnitInsts (moduleUnit indef)) Nothing iface0 >>= \case
               Right x   -> return (Succeeded (x, path))
-              Left errs -> throwErrors errs
+              Left errs -> throwErrors (GhcTcRnMessage <$> errs)
           Failed err -> return (Failed err)
       (mod, _) -> find_iface mod
 
