@@ -77,7 +77,6 @@ import GHC.Prelude
 
 -- base
 import Control.Monad
-import Data.Bits
 import Data.Char
 import Data.List (stripPrefix, isInfixOf, partition)
 import Data.Maybe
