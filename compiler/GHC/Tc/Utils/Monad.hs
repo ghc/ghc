@@ -164,6 +164,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Hs hiding (LIE)
 
 import GHC.Unit
+import GHC.Unit.Env
 import GHC.Unit.External
 import GHC.Unit.Module.Warnings
 import GHC.Unit.Home.ModInfo
@@ -557,10 +558,12 @@ withoutDynamicNow =
               top { hsc_dflags = dflags { dynamicNow = False} })
 
 getEpsVar :: TcRnIf gbl lcl (TcRef ExternalPackageState)
-getEpsVar = do { env <- getTopEnv; return (hsc_EPS env) }
+getEpsVar = do
+  env <- getTopEnv
+  return (euc_eps (ue_eps (hsc_unit_env env)))
 
 getEps :: TcRnIf gbl lcl ExternalPackageState
-getEps = do { env <- getTopEnv; readMutVar (hsc_EPS env) }
+getEps = do { env <- getTopEnv; liftIO $ hscEPS env }
 
 -- | Update the external package state.  Returns the second result of the
 -- modifier function.
@@ -586,7 +589,7 @@ getHpt :: TcRnIf gbl lcl HomePackageTable
 getHpt = do { env <- getTopEnv; return (hsc_HPT env) }
 
 getEpsAndHpt :: TcRnIf gbl lcl (ExternalPackageState, HomePackageTable)
-getEpsAndHpt = do { env <- getTopEnv; eps <- readMutVar (hsc_EPS env)
+getEpsAndHpt = do { env <- getTopEnv; eps <- liftIO $ hscEPS env
                   ; return (eps, hsc_HPT env) }
 
 -- | A convenient wrapper for taking a @MaybeErr SDoc a@ and throwing
