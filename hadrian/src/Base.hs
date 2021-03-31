@@ -109,7 +109,6 @@ ghcLibDeps :: Stage -> Action [FilePath]
 ghcLibDeps stage = mapM (\f -> stageLibPath stage <&> (-/- f))
     [ "llvm-targets"
     , "llvm-passes"
-    , "platformConstants"
     , "settings"
     ]
 

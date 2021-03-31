@@ -141,17 +141,6 @@ time you fire up a build. This is not possible with the Make build system.
   all the options that hadrian supports and what they correspond to in the Make
   build system.
 
-- Generate the `platformConstants` file to be used for stage 1/2 GHC
-
-  ``` sh
-  # Make
-  make inplace/lib/platformConstants
-
-  # Hadrian
-  build _build/stage0/lib/platformConstants
-  build _build/stage1/lib/platformConstants
-  ```
-
 - Generate the `settings` file to be used for stage 1/2 GHC
 
   ``` sh
