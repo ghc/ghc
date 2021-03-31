@@ -366,8 +366,8 @@ staticLdvInit = zeroCLit
 dynLdvInit :: Platform -> CmmExpr
 dynLdvInit platform =     -- (era << LDV_SHIFT) | LDV_STATE_CREATE
   CmmMachOp (mo_wordOr platform) [
-      CmmMachOp (mo_wordShl platform) [loadEra platform, mkIntExpr platform (pc_LDV_SHIFT (platformConstants platform))],
-      CmmLit (mkWordCLit platform (pc_ILDV_STATE_CREATE (platformConstants platform)))
+      CmmMachOp (mo_wordShl platform) [loadEra platform, mkIntExpr platform (pc_HS_LDV_SHIFT (platformConstants platform))],
+      CmmLit (mkWordCLit platform (pc_HS_ILDV_STATE_CREATE (platformConstants platform)))
   ]
 
 --
@@ -399,8 +399,8 @@ ldvEnter cl_ptr = do
         ldv_wd = ldvWord platform cl_ptr
         new_ldv_wd = cmmOrWord platform
                         (cmmAndWord platform (CmmLoad ldv_wd (bWord platform))
-                                             (CmmLit (mkWordCLit platform (pc_ILDV_CREATE_MASK constants))))
-                        (cmmOrWord platform (loadEra platform) (CmmLit (mkWordCLit platform (pc_ILDV_STATE_USE constants))))
+                                             (CmmLit (mkWordCLit platform (pc_HS_ILDV_CREATE_MASK constants))))
+                        (cmmOrWord platform (loadEra platform) (CmmLit (mkWordCLit platform (pc_HS_ILDV_STATE_USE constants))))
     ifProfiling $
          -- if (era > 0) {
          --    LDVW((c)) = (LDVW((c)) & LDV_CREATE_MASK) |

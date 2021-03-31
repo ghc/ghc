@@ -49,7 +49,7 @@ ncgWordWidth config = platformWordWidth (ncgPlatform config)
 
 -- | Size in bytes of the pre-allocated spill space on the C stack
 ncgSpillPreallocSize :: NCGConfig -> Int
-ncgSpillPreallocSize config = pc_RESERVED_C_STACK_BYTES (platformConstants (ncgPlatform config))
+ncgSpillPreallocSize config = pc_HS_RESERVED_C_STACK_BYTES (platformConstants (ncgPlatform config))
 
 -- | Return Word size
 platformWordWidth :: Platform -> Width

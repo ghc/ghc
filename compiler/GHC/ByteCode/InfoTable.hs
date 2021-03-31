@@ -75,8 +75,8 @@ make_constr_itbls interp profile cons =
          ptrs'  = ptr_wds
          nptrs' = tot_wds - ptr_wds
          nptrs_really
-            | ptrs' + nptrs' >= pc_MIN_PAYLOAD_SIZE constants = nptrs'
-            | otherwise = pc_MIN_PAYLOAD_SIZE constants - ptrs'
+            | ptrs' + nptrs' >= pc_HS_MIN_PAYLOAD_SIZE constants = nptrs'
+            | otherwise = pc_HS_MIN_PAYLOAD_SIZE constants - ptrs'
 
          descr = dataConIdentity dcon
 

@@ -358,12 +358,12 @@ precomputedStaticConInfo_maybe dflags binder con [arg]
 
     min_static_range :: Integer
     min_static_range
-      | intClosure = fromIntegral (pc_MIN_INTLIKE constants)
-      | charClosure = fromIntegral (pc_MIN_CHARLIKE constants)
+      | intClosure = fromIntegral (pc_HS_MIN_INTLIKE constants)
+      | charClosure = fromIntegral (pc_HS_MIN_CHARLIKE constants)
       | otherwise = panic "precomputedStaticConInfo_maybe: Unknown closure type"
     max_static_range
-      | intClosure = fromIntegral (pc_MAX_INTLIKE constants)
-      | charClosure = fromIntegral (pc_MAX_CHARLIKE constants)
+      | intClosure = fromIntegral (pc_HS_MAX_INTLIKE constants)
+      | charClosure = fromIntegral (pc_HS_MAX_CHARLIKE constants)
       | otherwise = panic "precomputedStaticConInfo_maybe: Unknown closure type"
     label
       | intClosure = "stg_INTLIKE"
