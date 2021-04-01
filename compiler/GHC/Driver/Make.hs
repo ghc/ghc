@@ -319,7 +319,7 @@ warnMissingHomeModules hsc_env mod_graph =
           4
           (sep (map ppr missing))
     warn =
-      mkPlainMsgEnvelope (WarningWithFlag Opt_WarnMissingHomeModules) noSrcSpan msg
+      mkPlainMsgEnvelope (hsc_dflags hsc_env) (WarningWithFlag Opt_WarnMissingHomeModules) noSrcSpan msg
 
 -- | Describes which modules of the module graph need to be loaded.
 data LoadHowMuch
@@ -385,7 +385,7 @@ warnUnusedPackages = do
                    requestedArgs
 
     let warn =
-          mkPlainMsgEnvelope (WarningWithFlag Opt_WarnUnusedPackages) noSrcSpan msg
+          mkPlainMsgEnvelope dflags (WarningWithFlag Opt_WarnUnusedPackages) noSrcSpan msg
         msg = vcat [ text "The following packages were specified" <+>
                      text "via -package or -package-id flags,"
                    , text "but were not needed for compilation:"
@@ -2214,15 +2214,15 @@ warnUnnecessarySourceImports :: GhcMonad m => [SCC ModSummary] -> m ()
 warnUnnecessarySourceImports sccs = do
   dflags <- getDynFlags
   when (wopt Opt_WarnUnusedImports dflags)
-    (logWarnings (listToBag (concatMap (check . flattenSCC) sccs)))
-  where check ms =
+    (logWarnings (listToBag (concatMap (check dflags . flattenSCC) sccs)))
+  where check dflags ms =
            let mods_in_this_cycle = map ms_mod_name ms in
-           [ warn i | m <- ms, i <- ms_home_srcimps m,
-                      unLoc i `notElem`  mods_in_this_cycle ]
+           [ warn dflags i | m <- ms, i <- ms_home_srcimps m,
+                             unLoc i `notElem`  mods_in_this_cycle ]
 
-        warn :: Located ModuleName -> WarnMsg
-        warn (L loc mod) =
-           mkPlainMsgEnvelope WarningWithoutFlag loc
+        warn :: DynFlags -> Located ModuleName -> WarnMsg
+        warn dflags (L loc mod) =
+           mkPlainMsgEnvelope dflags WarningWithoutFlag loc
                 (text "{-# SOURCE #-} unnecessary in import of "
                  <+> quotes (ppr mod))
 
@@ -2295,7 +2295,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
                 if exists || isJust maybe_buf
                     then summariseFile hsc_env old_summaries file mb_phase
                                        obj_allowed maybe_buf
-                    else return $ Left $ unitBag $ mkPlainMsgEnvelope ErrorWithoutFlag noSrcSpan $
+                    else return $ Left $ unitBag $ mkPlainErrorMsgEnvelope noSrcSpan $
                            text "can't find file:" <+> text file
         getRootSummary Target { targetId = TargetModule modl
                               , targetAllowObjCode = obj_allowed
@@ -2730,7 +2730,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
               | otherwise = HsSrcFile
 
         when (pi_mod_name /= wanted_mod) $
-                throwE $ unitBag $ mkPlainMsgEnvelope ErrorWithoutFlag pi_mod_name_loc $
+                throwE $ unitBag $ mkPlainErrorMsgEnvelope pi_mod_name_loc $
                               text "File name does not match module name:"
                               $$ text "Saw:" <+> quotes (ppr pi_mod_name)
                               $$ text "Expected:" <+> quotes (ppr wanted_mod)
@@ -2742,7 +2742,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
                         | (k,v) <- ((pi_mod_name, mkHoleModule pi_mod_name)
                                 : homeUnitInstantiations home_unit)
                         ])
-            in throwE $ unitBag $ mkPlainMsgEnvelope ErrorWithoutFlag pi_mod_name_loc $
+            in throwE $ unitBag $ mkPlainErrorMsgEnvelope pi_mod_name_loc $
                 text "Unexpected signature:" <+> quotes (ppr pi_mod_name)
                 $$ if gopt Opt_BuildingCabalPackage dflags
                     then parens (text "Try adding" <+> quotes (ppr pi_mod_name)
@@ -2855,7 +2855,7 @@ getPreprocessedImports hsc_env src_fn mb_phase maybe_buf = do
           let imp_prelude = xopt LangExt.ImplicitPrelude pi_local_dflags
               popts = initParserOpts pi_local_dflags
           mimps <- getImports popts imp_prelude pi_hspp_buf pi_hspp_fn src_fn
-          return (first (fmap pprError) mimps)
+          return (first (fmap mkParserErr) mimps)
   return PreprocessedImports {..}
 
 
@@ -2902,21 +2902,21 @@ withDeferredDiagnostics f = do
 noModError :: HscEnv -> SrcSpan -> ModuleName -> FindResult -> MsgEnvelope DiagnosticMessage
 -- ToDo: we don't have a proper line number for this error
 noModError hsc_env loc wanted_mod err
-  = mkPlainMsgEnvelope ErrorWithoutFlag loc $ cannotFindModule hsc_env wanted_mod err
+  = mkPlainErrorMsgEnvelope loc $ cannotFindModule hsc_env wanted_mod err
 
 noHsFileErr :: SrcSpan -> String -> ErrorMessages
 noHsFileErr loc path
-  = unitBag $ mkPlainMsgEnvelope ErrorWithoutFlag loc $ text "Can't find" <+> text path
+  = unitBag $ mkPlainErrorMsgEnvelope loc $ text "Can't find" <+> text path
 
 moduleNotFoundErr :: ModuleName -> ErrorMessages
 moduleNotFoundErr mod
-  = unitBag $ mkPlainMsgEnvelope ErrorWithoutFlag noSrcSpan $
+  = unitBag $ mkPlainErrorMsgEnvelope noSrcSpan $
         text "module" <+> quotes (ppr mod) <+> text "cannot be found locally"
 
 multiRootsErr :: [ModSummary] -> IO ()
 multiRootsErr [] = panic "multiRootsErr"
 multiRootsErr summs@(summ1:_)
-  = throwOneError $ mkPlainMsgEnvelope ErrorWithoutFlag noSrcSpan $
+  = throwOneError $ mkPlainErrorMsgEnvelope noSrcSpan $
         text "module" <+> quotes (ppr mod) <+>
         text "is defined in multiple files:" <+>
         sep (map text files)
