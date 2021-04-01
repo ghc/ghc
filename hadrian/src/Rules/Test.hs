@@ -18,6 +18,7 @@ import Settings.Program (programContext)
 import Target
 import Utilities
 import qualified System.Directory as IO
+import Context.Type
 
 ghcConfigHsPath :: FilePath
 ghcConfigHsPath = "testsuite/mk/ghc-config.hs"
@@ -223,12 +224,24 @@ needIservBins :: Action ()
 needIservBins = do
   testGhc <- testCompiler <$> userSetting defaultTestArgs
   let stg = stageOf testGhc
-  rtsways <- interpretInContext (vanillaContext stg ghc) getRtsWays
-  need =<< traverse programPath
-      [ Context stg iserv w
-      | w <- [vanilla, profiling, dynamic]
-      , w `elem` rtsways
-      ]
+      ws = [vanilla, profiling, dynamic]
+  progs <- catMaybes <$> mapM (canBuild stg) ws
+  need progs
+  where
+    -- Only build iserv binaries if all dependencies are built the right
+    -- way already. In particular this fixes the case of no_profiled_libs
+    -- not working with the testsuite, see #19624
+    canBuild stg w = do
+      contextDeps <- contextDependencies (Context stg iserv w)
+      ws <- forM contextDeps $ \c ->
+              interpretInContext c (getLibraryWays <>
+                                    if Context.Type.package c == rts
+                                      then getRtsWays
+                                      else mempty)
+      if (all (w `elem`) ws)
+        then Just <$> programPath (Context stg iserv w)
+        else return Nothing
+
 
 pkgFile :: Stage -> Package -> Action FilePath
 pkgFile stage pkg
