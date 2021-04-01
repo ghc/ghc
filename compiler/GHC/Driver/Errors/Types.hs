@@ -6,7 +6,10 @@ module GHC.Driver.Errors.Types (
   -- * Constructors
   , ghcUnknownMessage
   -- * Utility functions
-  , liftTcRnMessage
+  , hoistMessage
+  , hoistTcRnMessage
+  , hoistTcRnDsMessage
+  , tcRnDsToGhcMessage
   ) where
 
 import Data.Typeable
@@ -24,7 +27,7 @@ import GHC.Unit.Env ( UnitEnv )
 import GHC.Unit.Types ( UnitId, Module )
 
 import GHC.Parser.Errors.Types ( PsMessage )
-import GHC.Tc.Errors.Types ( TcRnMessage )
+import GHC.Tc.Errors.Types (TcRnDsMessage(..),  TcRnMessage )
 import GHC.HsToCore.Errors.Types ( DsMessage )
 
 {- Note [GhcMessage]
@@ -76,9 +79,21 @@ ghcUnknownMessage :: (Diagnostic a, Typeable a) => a -> GhcMessage
 ghcUnknownMessage = GhcUnknownMessage
 
 -- | Abstracts away the classic pattern where we are calling 'ioMsgMaybe' on the result of
+-- 'IO (Messages e, a)'.
+hoistMessage :: Monad m => (e -> GhcMessage) -> m (Messages e, a) -> m (Messages GhcMessage, a)
+hoistMessage f m = fmap (first (fmap f)) m
+
+-- | Abstracts away the classic pattern where we are calling 'ioMsgMaybe' on the result of
 -- 'IO (Messages TcRnMessage, a)'.
-liftTcRnMessage :: Monad m => m (Messages TcRnMessage, a) -> m (Messages GhcMessage, a)
-liftTcRnMessage = fmap (first (fmap GhcTcRnMessage))
+hoistTcRnMessage :: Monad m => m (Messages TcRnMessage, a) -> m (Messages GhcMessage, a)
+hoistTcRnMessage = hoistMessage GhcTcRnMessage
+
+hoistTcRnDsMessage :: Monad m => m (Messages TcRnDsMessage, a) -> m (Messages GhcMessage, a)
+hoistTcRnDsMessage = hoistMessage tcRnDsToGhcMessage
+
+tcRnDsToGhcMessage :: TcRnDsMessage -> GhcMessage
+tcRnDsToGhcMessage (TcRnDsMessage m) = either GhcDsMessage GhcTcRnMessage m
+
 
 -- | A message from the driver.
 data DriverMessage

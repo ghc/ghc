@@ -1,6 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 
-{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}  -- instance Diagnostic {TcRnDsMessage, TcRnMessage}
 
 module GHC.Tc.Errors.Ppr (
     notInScopeErr
@@ -22,6 +22,12 @@ import GHC.Types.SrcLoc
 import GHC.Unit.State ( pprWithUnitState )
 import GHC.Utils.Outputable
 import qualified Data.List.NonEmpty as NE
+
+import GHC.HsToCore.Errors.Ppr () -- instance Diagnostic DsMessage
+
+instance Diagnostic TcRnDsMessage where
+  diagnosticMessage (TcRnDsMessage m) = either diagnosticMessage diagnosticMessage m
+  diagnosticReason  (TcRnDsMessage m) = either diagnosticReason  diagnosticReason m
 
 instance Diagnostic TcRnMessage where
   diagnosticMessage = pprTcRnMessage

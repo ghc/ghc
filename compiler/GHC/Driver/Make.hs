@@ -1672,7 +1672,7 @@ upsweep_inst hsc_env mHscMessage mod_index nmods iuid = do
         case mHscMessage of
             Just hscMessage -> hscMessage hsc_env (mod_index, nmods) MustCompile (InstantiationNode iuid)
             Nothing -> return ()
-        runHsc hsc_env $ ioMsgMaybe $ liftTcRnMessage $ tcRnCheckUnit hsc_env $ VirtUnit iuid
+        runHsc hsc_env $ ioMsgMaybe $ hoistTcRnDsMessage $ tcRnCheckUnit hsc_env $ VirtUnit iuid
         pure ()
 
 -- | Compile a single module.  Always produce a Linkable for it if
