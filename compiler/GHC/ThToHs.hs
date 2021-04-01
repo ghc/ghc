@@ -933,7 +933,7 @@ cvtl e = wrapLA (cvt e)
         go cvt_lit mk_expr is_compound_lit = do
           l' <- cvt_lit l
           let e' = mk_expr l'
-          return $ if is_compound_lit l' then HsPar noAnn (noLocA e') else e'
+          return $ if is_compound_lit l' then gHsPar (noLocA e') else e'
     cvt (AppE x@(LamE _ _) y) = do { x' <- cvtl x; y' <- cvtl y
                                    ; return $ HsApp noComments (mkLHsPar x')
                                                           (mkLHsPar y')}
@@ -998,7 +998,7 @@ cvtl e = wrapLA (cvt e)
          ; y' <- cvtl y
          ; let px = parenthesizeHsExpr opPrec x'
                py = parenthesizeHsExpr opPrec y'
-         ; wrapParLA (HsPar noAnn)
+         ; wrapParLA gHsPar
            $ OpApp noAnn px s' py }
            -- Parenthesise both arguments and result,
            -- to ensure this operator application does
@@ -1006,17 +1006,17 @@ cvtl e = wrapLA (cvt e)
            -- See Note [Operator association]
     cvt (InfixE Nothing  s (Just y)) = ensureValidOpExp s $
                                        do { s' <- cvtl s; y' <- cvtl y
-                                          ; wrapParLA (HsPar noAnn) $
+                                          ; wrapParLA gHsPar $
                                                           SectionR noComments s' y' }
                                             -- See Note [Sections in HsSyn] in GHC.Hs.Expr
     cvt (InfixE (Just x) s Nothing ) = ensureValidOpExp s $
                                        do { x' <- cvtl x; s' <- cvtl s
-                                          ; wrapParLA (HsPar noAnn) $
+                                          ; wrapParLA gHsPar $
                                                           SectionL noComments x' s' }
 
     cvt (InfixE Nothing  s Nothing ) = ensureValidOpExp s $
                                        do { s' <- cvtl s
-                                          ; return $ HsPar noAnn s' }
+                                          ; return $ gHsPar s' }
                                        -- Can I indicate this is an infix thing?
                                        -- Note [Dropping constructors]
 
@@ -1027,7 +1027,7 @@ cvtl e = wrapLA (cvt e)
                                             _ -> mkLHsPar x'
                               ; cvtOpApp x'' s y } --  Note [Converting UInfix]
 
-    cvt (ParensE e)      = do { e' <- cvtl e; return $ HsPar noAnn e' }
+    cvt (ParensE e)      = do { e' <- cvtl e; return $ gHsPar e' }
     cvt (SigE e t)       = do { e' <- cvtl e; t' <- cvtSigType t
                               ; let pe = parenthesizeHsExpr sigPrec e'
                               ; return $ ExprWithTySig noAnn pe (mkHsWildCardBndrs t') }
@@ -1208,7 +1208,7 @@ cvtMatch :: HsMatchContext GhcPs
 cvtMatch ctxt (TH.Match p body decs)
   = do  { p' <- cvtPat p
         ; let lp = case p' of
-                     (L loc SigPat{}) -> L loc (ParPat noAnn p') -- #14875
+                     (L loc SigPat{}) -> L loc (gParPat p') -- #14875
                      _                -> p'
         ; g' <- cvtGuard body
         ; decs' <- cvtLocalDecs (text "a where clause") decs
@@ -1322,7 +1322,7 @@ cvtp (ConP s ts ps)    = do { s' <- cNameN s
                                 }
                             }
 cvtp (InfixP p1 s p2)  = do { s' <- cNameN s; p1' <- cvtPat p1; p2' <- cvtPat p2
-                            ; wrapParLA (ParPat noAnn) $
+                            ; wrapParLA gParPat $
                               ConPat
                                 { pat_con_ext = noAnn
                                 , pat_con = s'
@@ -1336,7 +1336,7 @@ cvtp (UInfixP p1 s p2) = do { p1' <- cvtPat p1; cvtOpAppP p1' s p2 } -- Note [Co
 cvtp (ParensP p)       = do { p' <- cvtPat p;
                             ; case unLoc p' of  -- may be wrapped ConPatIn
                                 ParPat {} -> return $ unLoc p'
-                                _         -> return $ ParPat noAnn p' }
+                                _         -> return $ gParPat p' }
 cvtp (TildeP p)        = do { p' <- cvtPat p; return $ LazyPat noAnn p' }
 cvtp (BangP p)         = do { p' <- cvtPat p; return $ BangPat noAnn p' }
 cvtp (TH.AsP s p)      = do { s' <- vNameN s; p' <- cvtPat p

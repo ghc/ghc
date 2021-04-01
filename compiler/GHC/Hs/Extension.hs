@@ -229,3 +229,8 @@ pprIfRn pp = case ghcPass @p of GhcRn -> pp
 pprIfTc :: forall p. IsPass p => (p ~ 'Typechecked => SDoc) -> SDoc
 pprIfTc pp = case ghcPass @p of GhcTc -> pp
                                 _     -> empty
+
+type instance Anno (HsToken tok) = EpAnnCO
+
+noHsTok :: GenLocated (EpAnn a) (HsToken tok)
+noHsTok = L noAnn HsTok

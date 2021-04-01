@@ -39,7 +39,7 @@ module GHC.Hs.Pat (
         isSimplePat,
         looksLazyPatBind,
         isBangedLPat,
-        patNeedsParens, parenthesizePat,
+        gParPat, patNeedsParens, parenthesizePat,
         isIrrefutableHsPat,
 
         collectEvVarsPat, collectEvVarsPats,
@@ -103,7 +103,7 @@ type instance XAsPat   GhcPs = EpAnn [AddEpAnn] -- For '@'
 type instance XAsPat   GhcRn = NoExtField
 type instance XAsPat   GhcTc = NoExtField
 
-type instance XParPat  (GhcPass _) = EpAnn AnnParen
+type instance XParPat (GhcPass _) = EpAnnCO
 
 type instance XBangPat GhcPs = EpAnn [AddEpAnn] -- For '!'
 type instance XBangPat GhcRn = NoExtField
@@ -285,7 +285,7 @@ pprPat (BangPat _ pat)          = char '!' <> pprParendLPat appPrec pat
 pprPat (AsPat _ name pat)       = hcat [pprPrefixOcc (unLoc name), char '@',
                                         pprParendLPat appPrec pat]
 pprPat (ViewPat _ expr pat)     = hcat [pprLExpr expr, text " -> ", ppr pat]
-pprPat (ParPat _ pat)           = parens (ppr pat)
+pprPat (ParPat _ _ pat _)      = parens (ppr pat)
 pprPat (LitPat _ s)             = ppr s
 pprPat (NPat _ l Nothing  _)    = ppr l
 pprPat (NPat _ l (Just _) _)    = char '-' <> ppr l
@@ -420,7 +420,7 @@ isBangedLPat :: LPat (GhcPass p) -> Bool
 isBangedLPat = isBangedPat . unLoc
 
 isBangedPat :: Pat (GhcPass p) -> Bool
-isBangedPat (ParPat _ p) = isBangedLPat p
+isBangedPat (ParPat _ _ p _) = isBangedLPat p
 isBangedPat (BangPat {}) = True
 isBangedPat _            = False
 
@@ -441,8 +441,8 @@ looksLazyLPat :: LPat (GhcPass p) -> Bool
 looksLazyLPat = looksLazyPat . unLoc
 
 looksLazyPat :: Pat (GhcPass p) -> Bool
-looksLazyPat (ParPat _ p)  = looksLazyLPat p
-looksLazyPat (AsPat _ _ p) = looksLazyLPat p
+looksLazyPat (ParPat _ _ p _)  = looksLazyLPat p
+looksLazyPat (AsPat _ _ p)     = looksLazyLPat p
 looksLazyPat (BangPat {})  = False
 looksLazyPat (VarPat {})   = False
 looksLazyPat (WildPat {})  = False
@@ -508,7 +508,7 @@ isIrrefutableHsPat' is_strict = goL
       = isIrrefutableHsPat' False p'
       | otherwise          = True
     go (BangPat _ pat)     = goL pat
-    go (ParPat _ pat)      = goL pat
+    go (ParPat _ _ pat _)  = goL pat
     go (AsPat _ _ pat)     = goL pat
     go (ViewPat _ _ pat)   = goL pat
     go (SigPat _ pat _)    = goL pat
@@ -553,7 +553,7 @@ isIrrefutableHsPat' is_strict = goL
 -- - x (variable)
 isSimplePat :: LPat (GhcPass x) -> Maybe (IdP (GhcPass x))
 isSimplePat p = case unLoc p of
-  ParPat _ x -> isSimplePat x
+  ParPat _ _ x _ -> isSimplePat x
   SigPat _ x _ -> isSimplePat x
   LazyPat _ x -> isSimplePat x
   BangPat _ x -> isSimplePat x
@@ -628,6 +628,11 @@ conPatNeedsParens p = go
     go (InfixCon {})       = p >= opPrec -- type args should be empty in this case
     go (RecCon {})         = False
 
+
+-- | Parenthesize a pattern without token information
+gParPat :: LPat (GhcPass pass) -> Pat (GhcPass pass)
+gParPat p = ParPat noAnn noHsTok p noHsTok
+
 -- | @'parenthesizePat' p pat@ checks if @'patNeedsParens' p pat@ is true, and
 -- if so, surrounds @pat@ with a 'ParPat'. Otherwise, it simply returns @pat@.
 parenthesizePat :: IsPass p
@@ -635,7 +640,7 @@ parenthesizePat :: IsPass p
                 -> LPat (GhcPass p)
                 -> LPat (GhcPass p)
 parenthesizePat p lpat@(L loc pat)
-  | patNeedsParens p pat = L loc (ParPat noAnn lpat)
+  | patNeedsParens p pat = L loc (gParPat lpat)
   | otherwise            = lpat
 
 {-
@@ -654,7 +659,7 @@ collectEvVarsPat pat =
   case pat of
     LazyPat _ p      -> collectEvVarsLPat p
     AsPat _ _ p      -> collectEvVarsLPat p
-    ParPat  _ p      -> collectEvVarsLPat p
+    ParPat  _ _ p _  -> collectEvVarsLPat p
     BangPat _ p      -> collectEvVarsLPat p
     ListPat _ ps     -> unionManyBags $ map collectEvVarsLPat ps
     TuplePat _ ps _  -> unionManyBags $ map collectEvVarsLPat ps
