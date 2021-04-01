@@ -45,6 +45,7 @@ module GHC.Types.Unique.FM (
         addToUFM_Directly,
         addListToUFM_Directly,
         adjustUFM, alterUFM,
+        adjustManyUFM,
         adjustUFM_Directly,
         delFromUFM,
         delFromUFM_Directly,
@@ -55,6 +56,7 @@ module GHC.Types.Unique.FM (
         plusUFM_CD,
         plusUFM_CD2,
         plusMaybeUFM_C,
+        plusFilterUFM_C,
         plusUFMList,
         minusUFM,
         intersectUFM,
@@ -86,6 +88,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic (assertPanic)
 import GHC.Utils.Misc (debugIsOn)
 import qualified Data.IntMap as M
+import qualified Data.IntMap.Merge.Lazy as M
 import qualified Data.IntSet as S
 import Data.Data
 import qualified Data.Semigroup as Semi
@@ -202,6 +205,14 @@ adjustUFM f (UFM m) k = UFM (M.adjust f (getKey $ getUnique k) m)
 adjustUFM_Directly :: (elt -> elt) -> UniqFM key elt -> Unique -> UniqFM key elt
 adjustUFM_Directly f (UFM m) u = UFM (M.adjust f (getKey u) m)
 
+adjustManyUFM :: Uniquable key => (elt -> elt) -> UniqFM key elt -> UniqFM key any -> UniqFM key elt
+adjustManyUFM f (UFM m) (UFM keys)
+  = UFM $ M.merge
+      M.preserveMissing -- preserve all entries in m that aren't in keys
+      M.dropMissing     -- drop all entries in keys that aren't in m
+      (M.zipWithMatched $ \_key elt _any -> f elt) -- apply f to common keys
+      m keys
+
 delFromUFM :: Uniquable key => UniqFM key elt -> key    -> UniqFM key elt
 delFromUFM (UFM m) k = UFM (M.delete (getKey $ getUnique k) m)
 
@@ -276,6 +287,21 @@ plusMaybeUFM_C f (UFM xm) (UFM ym)
         id
         id
         xm ym
+
+-- | @plusFilterUFM_C f p l r@ is like @'plusUFM_C' f l r@, but filters the
+-- entries /that only occur/ in @r@ by @p@ before.
+plusFilterUFM_C
+  :: (elt -> elt -> elt)
+  -> (elt -> Bool)
+  -> UniqFM key elt
+  -> UniqFM key elt
+  -> UniqFM key elt
+plusFilterUFM_C f p (UFM l) (UFM r)
+  = UFM $ M.merge
+      M.preserveMissing                -- preserve entries in l that aren't in r
+      (M.filterMissing $ \_k x -> p x) -- filter entries in r by p
+      (M.zipWithMatched $ \_k a b -> f a b) -- apply f to common keys
+      l r
 
 plusUFMList :: [UniqFM key elt] -> UniqFM key elt
 plusUFMList = foldl' plusUFM emptyUFM
