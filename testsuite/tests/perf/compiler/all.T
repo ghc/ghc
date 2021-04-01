@@ -452,3 +452,7 @@ test ('T9198',
       [ collect_compiler_stats('bytes allocated',2) ],
       compile,
       [''])
+
+test('T11545',
+     [ expect_broken(11545) ],
+     compile, ['-O +RTS -M50M -RTS'])
