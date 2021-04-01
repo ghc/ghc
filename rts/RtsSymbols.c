@@ -513,6 +513,12 @@
       SymI_HasProto(RET_OLD_ctr)                        \
       SymI_HasProto(RET_UNBOXED_TUP_ctr)                \
       SymI_HasProto(RET_SEMI_loads_avoided)             \
+                                                        \
+      SymI_HasProto(TAG_UNTAGGED_pred)                 \
+      SymI_HasProto(TAG_UNTAGGED_miss)                 \
+      SymI_HasProto(TAG_TAGGED_pred)                 \
+      SymI_HasProto(TAG_TAGGED_miss)                 \
+                                                      \
       SymI_HasProto(RET_NEW_hst)                        \
       SymI_HasProto(RET_OLD_hst)                        \
       SymI_HasProto(RET_UNBOXED_TUP_hst)
