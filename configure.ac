@@ -14,8 +14,10 @@ dnl
 #
 
 AC_INIT([The Glorious Glasgow Haskell Compilation System], [9.1], [glasgow-haskell-bugs@haskell.org], [ghc-AC_PACKAGE_VERSION])
-    # Version on HEAD must be X.Y (not X.Y.Z) for ProjectVersionMunged variable
-    # to be useful (cf #19058)
+    # Version on master must be X.Y (not X.Y.Z) for ProjectVersionMunged variable
+    # to be useful (cf #19058). However, the version must have three components
+    # (X.Y.Z) on stable branches (e.g. ghc-9.2) to ensure that pre-releases are
+    # versioned correctly.
 
 
 # Set this to YES for a released version, otherwise NO
