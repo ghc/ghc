@@ -119,7 +119,7 @@ makeRAStats state
         { ra_spillInstrs        = binSpillReasons (ra_spills state)
         , ra_fixupList          = ra_fixups state }
 
-
+{-# INLINEABLE spillR #-}
 spillR :: Instruction instr
        => Reg -> Unique -> RegM freeRegs (instr, Int)
 
