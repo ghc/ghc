@@ -6,13 +6,10 @@ module GHC.HsToCore.Errors.Ppr where
 
 import GHC.Types.Error
 import GHC.HsToCore.Errors.Types
-import GHC.Tc.Errors.Ppr () -- instance Diagnostic TcRnMessage
 
 -- This instance will be made a bit more interesting in the context of #18516.
 instance Diagnostic DsMessage where
   diagnosticMessage  = \case
     DsUnknownMessage d    -> diagnosticMessage d
-    DsLiftedTcRnMessage d -> diagnosticMessage d
   diagnosticReason = \case
     DsUnknownMessage d    -> diagnosticReason d
-    DsLiftedTcRnMessage d -> diagnosticReason d
