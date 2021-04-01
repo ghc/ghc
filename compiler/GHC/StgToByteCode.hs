@@ -1273,6 +1273,9 @@ layoutTuple profile start_off arg_ty reps =
       -- if we don't have a position for a DoubleReg then they must be passed
       -- in the equivalent VanillaReg
       reg_order (DoubleReg n) = reg_order (VanillaReg n VGcPtr)
+      -- if we don't have a position for a LongReg then they must be passed
+      -- in the equivalent VanillaReg
+      reg_order (LongReg n)   = reg_order (VanillaReg n VGcPtr)
       reg_order reg          =
         pprPanic "StgToByteCode.layoutTuple: invalid register"
                  (ppr reg <+> ppr (realArgRegsCover platform))
