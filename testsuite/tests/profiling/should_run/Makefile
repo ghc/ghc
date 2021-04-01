@@ -30,3 +30,19 @@ T15897:
 	"$(TEST_HC)" -prof -fprof-auto -debug -v0 T15897.hs
 	./T15897 10000000 +RTS -s -hc 2>/dev/null
 	./T15897 10000000 +RTS -s -hr 2>/dev/null
+
+
+.PHONY: TraverseHeapTest
+TraverseHeapTest:
+	"$(TEST_HC)" -prof -no-hs-main -v0 TraverseHeapTest.c -o TraverseHeapTest
+	./TraverseHeapTest
+
+.PHONY: ProfHeapTest
+ProfHeapTest:
+	"$(TEST_HC)" -prof -debug -no-hs-main -v0 $@.c -o $@
+	./$@
+
+.PHONY: RootProfSynthTest
+RootProfSynthTest:
+	"$(TEST_HC)" -prof -debug -no-hs-main -v0 $@.c -o $@
+	./$@
