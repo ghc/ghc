@@ -357,7 +357,7 @@ viewProd :: Arity -> SubDemand -> Maybe [Demand]
 viewProd n (Prod ds)   | ds `lengthIs` n = Just ds
 -- Note the strict application to replicate: This makes sure we don't allocate
 -- a thunk for it, inlines it and lets case-of-case fire at call sites.
-viewProd n (Poly card)                   = Just (replicate n $! polyDmd card)
+viewProd n (Poly card)                   = Just $! (replicate n $! polyDmd card)
 viewProd _ _                             = Nothing
 {-# INLINE viewProd #-} -- we want to fuse away the replicate and the allocation
                         -- for Arity. Otherwise, #18304 bites us.
@@ -386,7 +386,7 @@ seqDmd = C_11 :* seqSubDmd
 lubSubDmd :: SubDemand -> SubDemand -> SubDemand
 -- Handle Prod
 lubSubDmd (Prod ds1) (viewProd (length ds1) -> Just ds2) =
-  Prod $ zipWith lubDmd ds2 ds1 -- try to fuse with ds2
+  Prod $ strictZipWith lubDmd ds2 ds1 -- try to fuse with ds2
 -- Handle Call
 lubSubDmd (Call n1 d1) (viewCall -> Just (n2, d2))
   -- See Note [Call demands are relative]
@@ -1084,7 +1084,7 @@ a consequence of fixed-point iteration, it's not important that they agree.
 -- Subject to Note [Default demand on free variables and arguments]
 type DmdEnv = VarEnv Demand
 
-emptyDmdEnv :: VarEnv Demand
+emptyDmdEnv :: DmdEnv
 emptyDmdEnv = emptyVarEnv
 
 multDmdEnv :: Card -> DmdEnv -> DmdEnv
@@ -1118,9 +1118,9 @@ keepAliveDmdEnv env vs
 --    * Diverges on every code path or not ('dt_div')
 data DmdType
   = DmdType
-  { dt_env  :: DmdEnv     -- ^ Demand on explicitly-mentioned free variables
-  , dt_args :: [Demand]   -- ^ Demand on arguments
-  , dt_div  :: Divergence -- ^ Whether evaluation diverges.
+  { dt_env  :: !DmdEnv     -- ^ Demand on explicitly-mentioned free variables
+  , dt_args :: ![Demand]   -- ^ Demand on arguments
+  , dt_div  :: !Divergence -- ^ Whether evaluation diverges.
                           -- See Note [Demand type Divergence]
   }
 
@@ -1225,9 +1225,10 @@ peelFV :: DmdType -> Var -> (DmdType, Demand)
 peelFV (DmdType fv ds res) id = -- pprTrace "rfv" (ppr id <+> ppr dmd $$ ppr fv)
                                (DmdType fv' ds res, dmd)
   where
-  fv' = fv `delVarEnv` id
+  -- Force these arguments so that old `Env` is not retained.
+  !fv' = fv `delVarEnv` id
   -- See Note [Default demand on free variables and arguments]
-  dmd  = lookupVarEnv fv id `orElse` defaultFvDmd res
+  !dmd  = lookupVarEnv fv id `orElse` defaultFvDmd res
 
 addDemand :: Demand -> DmdType -> DmdType
 addDemand dmd (DmdType fv ds res) = DmdType fv (dmd:ds) res
