@@ -1204,6 +1204,7 @@ initNCGConfig dflags this_mod = NCGConfig
    , ncgInlineThresholdMemset = fromIntegral $ maxInlineMemsetInsns dflags
    , ncgSplitSections         = gopt Opt_SplitSections dflags
    , ncgRegsIterative         = gopt Opt_RegsIterative dflags
+   , ncgRegsGraphChaitin      = gopt Opt_RegsGraphChaitin dflags
    , ncgAsmLinting            = gopt Opt_DoAsmLinting dflags
    , ncgCfgWeights            = cfgWeights dflags
    , ncgCfgBlockLayout        = gopt Opt_CfgBlocklayout dflags

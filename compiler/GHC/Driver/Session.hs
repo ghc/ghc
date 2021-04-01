@@ -3354,7 +3354,8 @@ fFlagsDeps = [
   flagSpec "whole-archive-hs-libs"            Opt_WholeArchiveHsLibs,
   flagSpec "keep-cafs"                        Opt_KeepCAFs,
   flagSpec "link-rts"                         Opt_LinkRts,
-  flagSpec "ssa-transform"                    Opt_SsaTransform
+  flagSpec "ssa-transform"                    Opt_SsaTransform,
+  flagSpec "regs-graph-chaitin"               Opt_RegsGraphChaitin
   ]
   ++ fHoleFlags
 

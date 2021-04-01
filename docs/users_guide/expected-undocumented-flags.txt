@@ -74,6 +74,7 @@
 -fpre-inlining
 -fprint-bind-contents
 -freduction-depth
+-fregs-graph-chaitin
 -frewrite-rules
 -fscoped-type-variables
 -fshared-implib
