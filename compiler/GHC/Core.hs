@@ -252,12 +252,12 @@ is better for at least three reasons:
 -- If you edit this type, you may need to update the GHC formalism
 -- See Note [GHC Formalism] in GHC.Core.Lint
 data Expr b
-  = Var   Id
+  = Var   !Id
   | Lit   Literal
   | App   (Expr b) (Arg b)
-  | Lam   b (Expr b)
+  | Lam   !b (Expr b)
   | Let   (Bind b) (Expr b)
-  | Case  (Expr b) b Type [Alt b]   -- See Note [Case expression invariants]
+  | Case  (Expr b) !b Type [Alt b]   -- See Note [Case expression invariants]
                                     -- and Note [Why does Case have a 'Type' field?]
   | Cast  (Expr b) Coercion
   | Tick  CoreTickish (Expr b)
@@ -276,7 +276,7 @@ type Arg b = Expr b
 -- If you edit this type, you may need to update the GHC formalism
 -- See Note [GHC Formalism] in GHC.Core.Lint
 data Alt b
-    = Alt AltCon [b] (Expr b)
+    = Alt AltCon ![b] (Expr b)
     deriving (Data)
 
 -- | A case alternative constructor (i.e. pattern match)
