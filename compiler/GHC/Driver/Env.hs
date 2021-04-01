@@ -30,7 +30,7 @@ import GHC.Prelude
 
 import GHC.Driver.Ppr
 import GHC.Driver.Session
-import GHC.Driver.Errors ( printOrThrowWarnings )
+import GHC.Driver.Errors ( printOrThrowDiagnostics )
 
 import GHC.Runtime.Context
 import GHC.Driver.Env.Types ( Hsc(..), HscEnv(..) )
@@ -70,7 +70,7 @@ import Data.IORef
 runHsc :: HscEnv -> Hsc a -> IO a
 runHsc hsc_env (Hsc hsc) = do
     (a, w) <- hsc hsc_env emptyBag
-    printOrThrowWarnings (hsc_logger hsc_env) (hsc_dflags hsc_env) w
+    printOrThrowDiagnostics (hsc_logger hsc_env) (hsc_dflags hsc_env) w
     return a
 
 -- | Switches in the DynFlags and Plugins from the InteractiveContext
