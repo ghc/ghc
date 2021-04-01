@@ -452,3 +452,11 @@ test ('T9198',
       [ collect_compiler_stats('bytes allocated',2) ],
       compile,
       [''])
+
+test('T14565',
+     [ reqlib('vector'),
+       only_ways(['optasm']),
+       collect_compiler_stats('bytes allocated',2),
+     ],
+     compile,
+     ['-O2 -fspec-constr'])
