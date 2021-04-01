@@ -46,6 +46,8 @@ void reportCCSProfiling ( void );
 void fprintCCS( FILE *f, CostCentreStack *ccs );
 void fprintCCS_stderr (CostCentreStack *ccs, StgClosure *exception, StgTSO *tso);
 
+void fprintBacktrace (FILE *f, CostCentreStack *ccs, StgTSO *tso);
+
 bool ignoreCCS (CostCentreStack const *ccs);
 bool ignoreCC (CostCentre const *cc);
 
