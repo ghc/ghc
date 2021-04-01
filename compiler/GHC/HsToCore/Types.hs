@@ -15,9 +15,8 @@ import GHC.Types.SrcLoc
 import GHC.Types.Var
 import GHC.Types.Name.Reader (GlobalRdrEnv)
 import GHC.Hs (LForeignDecl, HsExpr, GhcTc)
-import GHC.Tc.Types (TcRnIf, IfGblEnv, IfLclEnv, CompleteMatches)
+import GHC.Tc.Types (TcRnDsMessage, TcRnIf, IfGblEnv, IfLclEnv, CompleteMatches)
 import GHC.HsToCore.Pmc.Types (Nablas)
-import GHC.HsToCore.Errors.Types (DsMessage)
 import GHC.Core (CoreExpr)
 import GHC.Core.FamInstEnv
 import GHC.Utils.Outputable as Outputable
@@ -48,7 +47,7 @@ data DsGblEnv
                                           -- constructors are in scope during
                                           -- pattern-match satisfiability checking
   , ds_unqual  :: PrintUnqualified
-  , ds_msgs    :: IORef (Messages DsMessage) -- Diagnostic messages
+  , ds_msgs    :: IORef (Messages TcRnDsMessage) -- Diagnostic messages
   , ds_if_env  :: (IfGblEnv, IfLclEnv)    -- Used for looking up global,
                                           -- possibly-imported things
   , ds_complete_matches :: CompleteMatches

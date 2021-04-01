@@ -53,7 +53,7 @@ import qualified Data.Traversable as T
 
 import Data.IORef
 
-tcRnMsgMaybe :: IO (Either (Messages TcRnMessage) a) -> TcM a
+tcRnMsgMaybe :: IO (Either (Messages TcRnDsMessage) a) -> TcM a
 tcRnMsgMaybe do_this = do
     r <- liftIO $ do_this
     case r of
@@ -77,7 +77,7 @@ failWithRn doc = do
     errs_var <- fmap sh_if_errs getGblEnv
     errs <- readTcRef errs_var
     -- TODO: maybe associate this with a source location?
-    let msg = TcRnUnknownMessage <$> mkPlainErrorMsgEnvelope noSrcSpan doc
+    let msg = mkTcRnDsMessage . Right . TcRnUnknownMessage <$> mkPlainErrorMsgEnvelope noSrcSpan doc
     writeTcRef errs_var (msg `addMessage` errs)
     failM
 
@@ -102,7 +102,7 @@ failWithRn doc = do
 -- should be Foo.T; then we'll also rename this (this is used
 -- when loading an interface to merge it into a requirement.)
 rnModIface :: HscEnv -> [(ModuleName, Module)] -> Maybe NameShape
-           -> ModIface -> IO (Either (Messages TcRnMessage) ModIface)
+           -> ModIface -> IO (Either (Messages TcRnDsMessage) ModIface)
 rnModIface hsc_env insts nsubst iface =
     initRnIface hsc_env iface insts nsubst $ do
         mod <- rnModule (mi_module iface)
@@ -126,7 +126,7 @@ rnModIface hsc_env insts nsubst iface =
 
 -- | Rename just the exports of a 'ModIface'.  Useful when we're doing
 -- shaping prior to signature merging.
-rnModExports :: HscEnv -> [(ModuleName, Module)] -> ModIface -> IO (Either (Messages TcRnMessage) [AvailInfo])
+rnModExports :: HscEnv -> [(ModuleName, Module)] -> ModIface -> IO (Either (Messages TcRnDsMessage) [AvailInfo])
 rnModExports hsc_env insts iface
     = initRnIface hsc_env iface insts Nothing
     $ mapM rnAvailInfo (mi_exports iface)
@@ -186,7 +186,7 @@ rnDepModules sel deps = do
 
 -- | Run a computation in the 'ShIfM' monad.
 initRnIface :: HscEnv -> ModIface -> [(ModuleName, Module)] -> Maybe NameShape
-            -> ShIfM a -> IO (Either (Messages TcRnMessage) a)
+            -> ShIfM a -> IO (Either (Messages TcRnDsMessage) a)
 initRnIface hsc_env iface insts nsubst do_this = do
     errs_var <- newIORef emptyMessages
     let hsubst = listToUFM insts
@@ -223,7 +223,7 @@ data ShIfEnv = ShIfEnv {
         -- list to determine the renaming.
         sh_if_shape :: Maybe NameShape,
         -- Mutable reference to keep track of errors (similar to 'tcl_errs')
-        sh_if_errs :: IORef (Messages TcRnMessage)
+        sh_if_errs :: IORef (Messages TcRnDsMessage)
     }
 
 getHoleSubst :: ShIfM ShHoleSubst

@@ -29,7 +29,6 @@ import GHC.Hs
 
 import GHC.HsToCore.Usage
 import GHC.HsToCore.Monad
-import GHC.HsToCore.Errors.Types
 import GHC.HsToCore.Expr
 import GHC.HsToCore.Binds
 import GHC.HsToCore.Foreign.Decl
@@ -101,7 +100,7 @@ import GHC.Driver.Plugins ( LoadedPlugin(..) )
 -}
 
 -- | Main entry point to the desugarer.
-deSugar :: HscEnv -> ModLocation -> TcGblEnv -> IO (Messages DsMessage, Maybe ModGuts)
+deSugar :: HscEnv -> ModLocation -> TcGblEnv -> IO (Messages TcRnDsMessage, Maybe ModGuts)
 -- Can modify PCS by faulting in more declarations
 
 deSugar hsc_env
@@ -285,7 +284,7 @@ So we pull out the type/coercion variables (which are in dependency order),
 and Rec the rest.
 -}
 
-deSugarExpr :: HscEnv -> LHsExpr GhcTc -> IO (Messages DsMessage, Maybe CoreExpr)
+deSugarExpr :: HscEnv -> LHsExpr GhcTc -> IO (Messages TcRnDsMessage, Maybe CoreExpr)
 deSugarExpr hsc_env tc_expr = do
     let dflags = hsc_dflags hsc_env
     let logger = hsc_logger hsc_env
@@ -301,7 +300,7 @@ deSugarExpr hsc_env tc_expr = do
        Just expr -> dumpIfSet_dyn logger dflags Opt_D_dump_ds "Desugared"
                     FormatCore (pprCoreExpr expr)
 
-    return (DsLiftedTcRnMessage <$> msgs, mb_core_expr)
+    return (msgs, mb_core_expr)
 
 {-
 ************************************************************************
