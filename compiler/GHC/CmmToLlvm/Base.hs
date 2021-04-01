@@ -475,14 +475,17 @@ getUniqMeta s = getEnv (flip lookupUFM s . envUniqMeta)
 ghcInternalFunctions :: LlvmM ()
 ghcInternalFunctions = do
     platform <- getPlatform
+    dflags <- getDynFlags
     let w = llvmWord platform
+        cint = LMInt $ widthInBits $ cIntWidth dflags
+    mk "memcmp" cint [i8Ptr, i8Ptr, w]
     mk "memcpy" i8Ptr [i8Ptr, i8Ptr, w]
     mk "memmove" i8Ptr [i8Ptr, i8Ptr, w]
     mk "memset" i8Ptr [i8Ptr, w, w]
     mk "newSpark" w [i8Ptr, i8Ptr]
   where
     mk n ret args = do
-      let n' = llvmDefLabel $ fsLit n
+      let n' = fsLit n
           decl = LlvmFunctionDecl n' ExternallyVisible CC_Ccc ret
                                  FixedArgs (tysToParams args) Nothing
       renderLlvm $ ppLlvmFunctionDecl decl
@@ -515,7 +518,10 @@ getGlobalPtr llvmLbl = do
   let mkGlbVar lbl ty = LMGlobalVar lbl (LMPointer ty) Private Nothing Nothing
   case m_ty of
     -- Directly reference if we have seen it already
-    Just ty -> return $ mkGlbVar (llvmDefLabel llvmLbl) ty Global
+    Just ty -> do
+      if llvmLbl `elem` (map fsLit ["newSpark", "memmove", "memcpy", "memcmp", "memset"])
+        then return $ mkGlbVar (llvmLbl) ty Global
+        else return $ mkGlbVar (llvmDefLabel llvmLbl) ty Global
     -- Otherwise use a forward alias of it
     Nothing -> do
       saveAlias llvmLbl
