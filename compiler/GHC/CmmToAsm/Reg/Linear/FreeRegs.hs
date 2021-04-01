@@ -30,14 +30,16 @@ import GHC.Platform
 --      getFreeRegs cls f = filter ( (==cls) . regClass . RealReg ) f
 --      allocateReg f r = filter (/= r) f
 
-import qualified GHC.CmmToAsm.Reg.Linear.PPC    as PPC
-import qualified GHC.CmmToAsm.Reg.Linear.SPARC  as SPARC
-import qualified GHC.CmmToAsm.Reg.Linear.X86    as X86
-import qualified GHC.CmmToAsm.Reg.Linear.X86_64 as X86_64
+import qualified GHC.CmmToAsm.Reg.Linear.PPC     as PPC
+import qualified GHC.CmmToAsm.Reg.Linear.SPARC   as SPARC
+import qualified GHC.CmmToAsm.Reg.Linear.X86     as X86
+import qualified GHC.CmmToAsm.Reg.Linear.X86_64  as X86_64
+import qualified GHC.CmmToAsm.Reg.Linear.AArch64 as AArch64
 
-import qualified GHC.CmmToAsm.PPC.Instr   as PPC.Instr
-import qualified GHC.CmmToAsm.SPARC.Instr as SPARC.Instr
-import qualified GHC.CmmToAsm.X86.Instr   as X86.Instr
+import qualified GHC.CmmToAsm.PPC.Instr     as PPC.Instr
+import qualified GHC.CmmToAsm.SPARC.Instr   as SPARC.Instr
+import qualified GHC.CmmToAsm.X86.Instr     as X86.Instr
+import qualified GHC.CmmToAsm.AArch64.Instr as AArch64.Instr
 
 class Show freeRegs => FR freeRegs where
     frAllocateReg :: Platform -> RealReg -> freeRegs -> freeRegs
@@ -63,6 +65,12 @@ instance FR PPC.FreeRegs where
     frInitFreeRegs = PPC.initFreeRegs
     frReleaseReg   = \_ -> PPC.releaseReg
 
+instance FR AArch64.FreeRegs where
+    frAllocateReg = \_ -> AArch64.allocateReg
+    frGetFreeRegs = \_ -> AArch64.getFreeRegs
+    frInitFreeRegs = AArch64.initFreeRegs
+    frReleaseReg = \_ -> AArch64.releaseReg
+
 instance FR SPARC.FreeRegs where
     frAllocateReg  = SPARC.allocateReg
     frGetFreeRegs  = \_ -> SPARC.getFreeRegs
@@ -78,7 +86,7 @@ maxSpillSlots config = case platformArch (ncgPlatform config) of
    ArchSPARC     -> SPARC.Instr.maxSpillSlots config
    ArchSPARC64   -> panic "maxSpillSlots ArchSPARC64"
    ArchARM _ _ _ -> panic "maxSpillSlots ArchARM"
-   ArchAArch64   -> panic "maxSpillSlots ArchAArch64"
+   ArchAArch64   -> AArch64.Instr.maxSpillSlots config
    ArchPPC_64 _  -> PPC.Instr.maxSpillSlots config
    ArchAlpha     -> panic "maxSpillSlots ArchAlpha"
    ArchMipseb    -> panic "maxSpillSlots ArchMipseb"
