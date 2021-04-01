@@ -14,12 +14,12 @@ PluralS.hs:17:24: warning: [-Wtype-defaults (in -Wall)]
       In an equation for ‘defaultingNumAndShow’:
           defaultingNumAndShow = show 123
 
-PluralS.hs:23:1: warning: [-Wredundant-constraints]
+PluralS.hs:23:17: warning: [-Wredundant-constraints]
     • Redundant constraint: Num a
     • In the type signature for:
            redundantNum :: forall a. (Num a, Num a) => a
 
-PluralS.hs:26:1: warning: [-Wredundant-constraints]
+PluralS.hs:26:22: warning: [-Wredundant-constraints]
     • Redundant constraints: (Show a, Num a, Eq a, Eq a)
     • In the type signature for:
            redundantMultiple :: forall a.
