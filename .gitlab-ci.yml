@@ -274,11 +274,10 @@ stack-hadrian-build:
 
 validate-x86_64-linux-deb9-hadrian:
   extends: .validate-linux-hadrian
-  stage: quick-build
+  stage: full-build
 
 validate-x86_64-linux-deb9-unreg-hadrian:
   extends: .validate-linux-hadrian
-  needs: [validate-x86_64-linux-deb9-hadrian]
   stage: full-build
   variables:
     CONFIGURE_ARGS: --enable-unregisterised
@@ -446,7 +445,6 @@ lint-compiler:
 .build-x86_64-freebsd:
   stage: full-build
   extends: .validate
-  needs: [validate-x86_64-linux-deb9-hadrian]
   tags:
     - x86_64-freebsd
   allow_failure: true
@@ -721,7 +719,6 @@ validate-aarch64-darwin:
 
 .validate-linux:
   extends: .validate
-  needs: [validate-x86_64-linux-deb9-hadrian]
   tags:
     - x86_64-linux
   variables:
@@ -1118,7 +1115,6 @@ release-x86_64-linux-fedora27-dwarf:
 ############################################################
 
 .build-windows:
-  needs: [validate-x86_64-linux-deb9-hadrian]
   before_script:
     - git clean -xdf
 
