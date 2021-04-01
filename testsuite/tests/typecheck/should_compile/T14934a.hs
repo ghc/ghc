@@ -13,3 +13,6 @@ data Foo :: Nat -> Type where
 
 f :: Foo (1 - 0) -> Foo 1
 f x = x
+
+g :: Foo (CharToNat '\1') -> Foo 1
+g x = x
