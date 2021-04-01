@@ -9,6 +9,8 @@
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE ViewPatterns         #-}
+{-# LANGUAGE ScopedTypeVariables  #-}
+{-# LANGUAGE TypeApplications     #-}
 
 module ExactPrint
   (
@@ -31,6 +33,7 @@ import GHC.Driver.Ppr
 import GHC.Unit.Module.Warnings
 import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.TypeLits
 
 import Control.Monad.Identity
 import Control.Monad.RWS
@@ -600,6 +603,13 @@ markKw (AddEpAnn kw ss) = markKwA kw ss
 -- | This should be the main driver of the process, managing comments
 markKwA :: AnnKeywordId -> EpaAnchor -> EPP ()
 markKwA kw aa = printStringAtAA aa (keywordToString (G kw))
+
+markToken :: forall tok. KnownSymbol tok => LHsToken tok GhcPs -> EPP ()
+markToken (L EpAnnNotUsed _) = return ()
+markToken (L (EpAnn (Anchor a a_op) _ _) _) = printStringAtAA aa (symbolVal (Proxy @tok))
+  where aa = case a_op of
+               UnchangedAnchor -> AR a
+               MovedAnchor dp  -> AD dp
 
 -- ---------------------------------------------------------------------
 
@@ -1800,7 +1810,7 @@ instance ExactPrint (HsExpr GhcPs) where
   getAnnotationEntry (HsAppType _ _ _)            = NoEntryVal
   getAnnotationEntry (OpApp an _ _ _)             = fromAnn an
   getAnnotationEntry (NegApp an _ _)              = fromAnn an
-  getAnnotationEntry (HsPar an _)                 = fromAnn an
+  getAnnotationEntry (HsPar an _ _ _)             = fromAnn an
   getAnnotationEntry (SectionL an _ _)            = fromAnn an
   getAnnotationEntry (SectionR an _ _)            = fromAnn an
   getAnnotationEntry (ExplicitTuple an _ _)       = fromAnn an
@@ -1886,11 +1896,11 @@ instance ExactPrint (HsExpr GhcPs) where
     markEpAnn an AnnMinus
     markAnnotated e
 
-  exact (HsPar an e) = do
-    markOpeningParen an
+  exact (HsPar _an lpar e rpar) = do
+    markToken lpar
     markAnnotated e
     debugM $ "HsPar closing paren"
-    markClosingParen an
+    markToken rpar
     debugM $ "HsPar done"
 
   -- exact (SectionL an expr op) = do
@@ -2297,7 +2307,7 @@ instance ExactPrint (HsCmd GhcPs) where
   getAnnotationEntry (HsCmdArrForm an _ _ _ _ ) = fromAnn an
   getAnnotationEntry (HsCmdApp an _ _ )         = fromAnn an
   getAnnotationEntry (HsCmdLam {})              = NoEntryVal
-  getAnnotationEntry (HsCmdPar an _)            = fromAnn an
+  getAnnotationEntry (HsCmdPar an _ _ _)        = fromAnn an
   getAnnotationEntry (HsCmdCase an _ _)         = fromAnn an
   getAnnotationEntry (HsCmdLamCase an _)        = fromAnn an
   getAnnotationEntry (HsCmdIf an _ _ _ _)       = fromAnn an
@@ -2379,10 +2389,10 @@ instance ExactPrint (HsCmd GhcPs) where
 --   markAST l (GHC.HsCmdLam _ match) = do
 --     setContext (Set.singleton LambdaExpr) $ do markMatchGroup l match
 
-  exact (HsCmdPar an e) = do
-    markOpeningParen an
+  exact (HsCmdPar _an lpar e rpar) = do
+    markToken lpar
     markAnnotated e
-    markClosingParen an
+    markToken rpar
 
   exact (HsCmdCase an e alts) = do
     markAnnKw an hsCaseAnnCase AnnCase
@@ -3603,7 +3613,7 @@ instance ExactPrint (Pat GhcPs) where
   getAnnotationEntry (VarPat _ _)             = NoEntryVal
   getAnnotationEntry (LazyPat an _)           = fromAnn an
   getAnnotationEntry (AsPat an _ _)           = fromAnn an
-  getAnnotationEntry (ParPat an _)            = fromAnn an
+  getAnnotationEntry (ParPat an _ _ _)        = fromAnn an
   getAnnotationEntry (BangPat an _)           = fromAnn an
   getAnnotationEntry (ListPat an _)           = fromAnn an
   getAnnotationEntry (TuplePat an _ _)        = fromAnn an
@@ -3632,10 +3642,10 @@ instance ExactPrint (Pat GhcPs) where
     markAnnotated n
     markEpAnn an AnnAt
     markAnnotated pat
-  exact (ParPat an pat) = do
-    markAnnKw an ap_open AnnOpenP
+  exact (ParPat _an lpar pat rpar) = do
+    markToken lpar
     markAnnotated pat
-    markAnnKw an ap_close AnnCloseP
+    markToken rpar
 
   exact (BangPat an pat) = do
     markEpAnn an AnnBang

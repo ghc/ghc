@@ -357,7 +357,9 @@ data HsExpr p
 
   -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
   | HsPar       (XPar p)
+               !(LHsToken "(" p)
                 (LHsExpr p)  -- ^ Parenthesised expr; see Note [Parens in HsSyn]
+               !(LHsToken ")" p)
 
   | SectionL    (XSectionL p)
                 (LHsExpr p)    -- operand; see Note [Sections in HsSyn]
@@ -880,7 +882,9 @@ data HsCmd id
        -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
 
   | HsCmdPar    (XCmdPar id)
+               !(LHsToken "(" id)
                 (LHsCmd id)                     -- parenthesised command
+               !(LHsToken ")" id)
     -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'('@,
     --             'GHC.Parser.Annotation.AnnClose' @')'@
 
