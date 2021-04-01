@@ -42,6 +42,8 @@ data DumpFlag
    | Opt_D_dump_asm
    | Opt_D_dump_asm_native
    | Opt_D_dump_asm_liveness
+   | Opt_D_dump_asm_ssa
+   | Opt_D_dump_asm_out_of_ssa
    | Opt_D_dump_asm_regalloc
    | Opt_D_dump_asm_regalloc_stages
    | Opt_D_dump_asm_conflicts
@@ -204,6 +206,7 @@ data GeneralFlag
    | Opt_AlignmentSanitisation
    | Opt_CatchBottoms
    | Opt_NumConstantFolding
+   | Opt_SsaTransform
 
    -- PreInlining is on by default. The option is there just to see how
    -- bad things get if you turn it off!
@@ -417,6 +420,7 @@ optimisationFlags = EnumSet.fromList
    , Opt_SolveConstantDicts
    , Opt_CatchBottoms
    , Opt_IgnoreAsserts
+   , Opt_SsaTransform
    ]
 
 data WarningFlag =
