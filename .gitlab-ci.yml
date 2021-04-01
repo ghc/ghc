@@ -273,11 +273,10 @@ stack-hadrian-build:
 
 validate-x86_64-linux-deb9-hadrian:
   extends: .validate-linux-hadrian
-  stage: quick-build
+  stage: full-build
 
 validate-x86_64-linux-deb9-unreg-hadrian:
   extends: .validate-linux-hadrian
-  needs: [validate-x86_64-linux-deb9-hadrian]
   stage: full-build
   variables:
     CONFIGURE_ARGS: --enable-unregisterised
@@ -445,7 +444,6 @@ lint-compiler:
 .build-x86_64-freebsd:
   stage: full-build
   extends: .validate
-  needs: [validate-x86_64-linux-deb9-hadrian]
   tags:
     - x86_64-freebsd
   allow_failure: true
@@ -704,7 +702,6 @@ validate-aarch64-darwin:
 # Disabled because of OS X CI capacity
 .validate-x86_64-darwin-hadrian:
   stage: full-build
-  needs: [validate-x86_64-linux-deb9-hadrian]
   tags:
     - x86_64-darwin
   variables:
@@ -737,7 +734,6 @@ validate-aarch64-darwin:
 
 .validate-linux:
   extends: .validate
-  needs: [validate-x86_64-linux-deb9-hadrian]
   tags:
     - x86_64-linux
   variables:
@@ -770,14 +766,6 @@ validate-aarch64-darwin:
   tags:
     - aarch64-linux
 
-.build-aarch64-linux-deb10-llvm:
-  extends: .build-aarch64-linux-deb10
-  stage: full-build
-  variables:
-    BUILD_FLAVOUR: perf-llvm
-  tags:
-    - aarch64-linux
-
 validate-aarch64-linux-deb10:
   extends: .build-aarch64-linux-deb10
   artifacts:
@@ -789,6 +777,22 @@ nightly-aarch64-linux-deb10:
   extends: .build-aarch64-linux-deb10
   variables:
     TEST_TYPE: slowtest
+
+.build-aarch64-linux-deb10-llvm:
+  extends: .build-aarch64-linux-deb10
+  stage: full-build
+  variables:
+    BUILD_FLAVOUR: perf-llvm
+  tags:
+    - aarch64-linux
+
+validate-aarch64-linux-deb10-llvm:
+  extends: .build-aarch64-linux-deb10-llvm
+  variables:
+    RUNTEST_ARGS: "--way=llvm"
+  artifacts:
+    when: always
+    expire_in: 2 week
 
 #################################
 # armv7-linux-deb10
@@ -1154,7 +1158,6 @@ release-x86_64-linux-fedora27-dwarf:
 ############################################################
 
 .build-windows:
-  needs: [validate-x86_64-linux-deb9-hadrian]
   before_script:
     - git clean -xdf
 
