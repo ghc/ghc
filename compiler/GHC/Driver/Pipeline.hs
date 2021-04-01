@@ -151,7 +151,7 @@ preprocess hsc_env input_fn mb_input_buf mb_phase =
   where
     srcspan = srcLocSpan $ mkSrcLoc (mkFastString input_fn) 1 1
     handler (ProgramError msg) = return $ Left $ unitBag $
-        mkPlainMsgEnvelope ErrorWithoutFlag srcspan $ text msg
+        mkPlainErrorMsgEnvelope srcspan $ text msg
     handler ex = throwGhcExceptionIO ex
 
 -- ---------------------------------------------------------------------------
@@ -1255,7 +1255,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
                 popts = initParserOpts dflags
             eimps <- getImports popts imp_prelude buf input_fn (basename <.> suff)
             case eimps of
-              Left errs -> throwErrors (fmap pprError errs)
+              Left errs -> throwErrors (fmap mkParserErr errs)
               Right (src_imps,imps,L _ mod_name) -> return
                   (Just buf, mod_name, imps, src_imps)
 

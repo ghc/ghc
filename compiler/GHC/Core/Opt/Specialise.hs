@@ -55,6 +55,7 @@ import GHC.Types.Var.Env
 import GHC.Types.Id
 import GHC.Types.Error
 
+import GHC.Utils.Error ( mkMCDiagnostic )
 import GHC.Utils.Monad    ( foldlM )
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -809,7 +810,7 @@ tryWarnMissingSpecs dflags callers fn calls_for_fn
   where
     allCallersInlined = all (isAnyInlinePragma . idInlinePragma) callers
     doWarn reason =
-      msg (mkMCDiagnostic reason)
+      msg (mkMCDiagnostic dflags reason)
         (vcat [ hang (text ("Could not specialise imported function") <+> quotes (ppr fn))
                 2 (vcat [ text "when specialising" <+> quotes (ppr caller)
                         | caller <- callers])
