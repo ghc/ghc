@@ -16,7 +16,6 @@ module Preprocess
 import qualified GHC            as GHC hiding (parseModule)
 
 import qualified Control.Monad.IO.Class as GHC
-import qualified GHC.Data.Bag          as GHC
 import qualified GHC.Data.FastString   as GHC
 import qualified GHC.Data.StringBuffer as GHC
 import qualified GHC.Driver.Config     as GHC
@@ -38,7 +37,7 @@ import qualified GHC.Utils.Outputable  as GHC
 import GHC.Types.SrcLoc (mkSrcSpan, mkSrcLoc)
 import GHC.Data.FastString (mkFastString)
 
-import Data.List (isPrefixOf, intercalate)
+import Data.List (isPrefixOf)
 import Data.Maybe
 import Types
 import Utils

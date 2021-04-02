@@ -2,7 +2,10 @@
 {-# LANGUAGE FlexibleContexts #-}
 
 module GHC.Iface.Errors
-  ( cannotFindInterface
+  ( badIfaceFile
+  , hiModuleNameMismatchWarn
+  , homeModError
+  , cannotFindInterface
   , cantFindInstalledErr
   , cannotFindModule
   , cannotFindModule'
@@ -24,6 +27,52 @@ import GHC.Unit.Env
 import GHC.Unit.Finder.Types
 import GHC.Unit.State
 import GHC.Utils.Outputable as Outputable
+
+
+{-
+*********************************************************
+*                                                       *
+\subsection{Errors}
+*                                                       *
+*********************************************************
+-}
+
+badIfaceFile :: String -> SDoc -> SDoc
+badIfaceFile file err
+  = vcat [text "Bad interface file:" <+> text file,
+          nest 4 err]
+
+hiModuleNameMismatchWarn :: Module -> Module -> SDoc
+hiModuleNameMismatchWarn requested_mod read_mod
+ | moduleUnit requested_mod == moduleUnit read_mod =
+    sep [text "Interface file contains module" <+> quotes (ppr read_mod) <> comma,
+         text "but we were expecting module" <+> quotes (ppr requested_mod),
+         sep [text "Probable cause: the source code which generated interface file",
+             text "has an incompatible module name"
+            ]
+        ]
+ | otherwise =
+  -- ToDo: This will fail to have enough qualification when the package IDs
+  -- are the same
+  withPprStyle (mkUserStyle alwaysQualify AllTheWay) $
+    -- we want the Modules below to be qualified with package names,
+    -- so reset the PrintUnqualified setting.
+    hsep [ text "Something is amiss; requested module "
+         , ppr requested_mod
+         , text "differs from name found in the interface file"
+         , ppr read_mod
+         , parens (text "if these names look the same, try again with -dppr-debug")
+         ]
+
+homeModError :: InstalledModule -> ModLocation -> SDoc
+-- See Note [Home module load error]
+homeModError mod location
+  = text "attempting to use module " <> quotes (ppr mod)
+    <> (case ml_hs_file location of
+           Just file -> space <> parens (text file)
+           Nothing   -> Outputable.empty)
+    <+> text "which is not loaded"
+
 
 -- -----------------------------------------------------------------------------
 -- Error messages
@@ -173,7 +222,7 @@ cantFindErr using_cabal cannot_find _ unit_env profile tried_these mod_name find
   = ptext cannot_find <+> quotes (ppr mod_name)
     $$ more_info
   where
-    home_unit  = ue_home_unit unit_env
+    mhome_unit = ue_home_unit unit_env
     more_info
       = case find_result of
             NoPackage pkg
@@ -183,7 +232,13 @@ cantFindErr using_cabal cannot_find _ unit_env profile tried_these mod_name find
             NotFound { fr_paths = files, fr_pkg = mb_pkg
                      , fr_mods_hidden = mod_hiddens, fr_pkgs_hidden = pkg_hiddens
                      , fr_unusables = unusables, fr_suggestions = suggest }
-                | Just pkg <- mb_pkg, not (isHomeUnit home_unit pkg)
+                | Just pkg <- mb_pkg
+                , Nothing <- mhome_unit           -- no home-unit
+                -> not_found_in_package pkg files
+
+                | Just pkg <- mb_pkg
+                , Just home_unit <- mhome_unit    -- there is a home-unit but the
+                , not (isHomeUnit home_unit pkg)  -- module isn't from it
                 -> not_found_in_package pkg files
 
                 | not (null suggest)
@@ -286,3 +341,4 @@ cantFindErr using_cabal cannot_find _ unit_env profile tried_these mod_name find
                  = parens (text "needs flag -package-id"
                     <+> ppr (mkUnit pkg))
               | otherwise = Outputable.empty
+
