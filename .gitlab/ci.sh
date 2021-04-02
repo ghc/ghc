@@ -3,7 +3,9 @@
 
 # This is the primary driver of the GitLab CI infrastructure.
 # Run `ci.sh usage` for usage information.
-set -Eeuo pipefail
+
+
+set -e -o pipefail
 
 # Configuration:
 HACKAGE_INDEX_STATE="2020-12-21T14:48:20Z" # TODO dedup with yaml's def
@@ -171,18 +173,12 @@ function show_tool() {
 
 function set_toolchain_paths() {
   needs_toolchain="1"
-  case "$(uname -m)-$(uname)" in
-    *-Linux) needs_toolchain="" ;;
+  case "$(uname)" in
+    Linux) needs_toolchain="0" ;;
     *) ;;
   esac
 
-  if [[ -n "${IN_NIX_SHELL:-}" ]]; then
-      needs_toolchain=""
-      GHC="$(which ghc)"
-      CABAL="$(which cabal)"
-      HAPPY="$(which happy)"
-      ALEX="$(which alex)"
-  elif [[ -n "$needs_toolchain" ]]; then
+  if [[ "$needs_toolchain" = "1" ]]; then
       # These are populated by setup_toolchain
       GHC="$toolchain/bin/ghc$exe"
       CABAL="$toolchain/bin/cabal$exe"
@@ -358,7 +354,7 @@ BUILD_SPHINX_HTML=$BUILD_SPHINX_HTML
 BUILD_SPHINX_PDF=$BUILD_SPHINX_PDF
 BeConservative=YES
 BIGNUM_BACKEND=$BIGNUM_BACKEND
-XZ_CMD=${XZ:-}
+XZ_CMD=$XZ
 
 BuildFlavour=$BUILD_FLAVOUR
 ifneq "\$(BuildFlavour)" ""
@@ -367,7 +363,7 @@ endif
 GhcLibHcOpts+=-haddock
 EOF
 
-  if [ -n "${HADDOCK_HYPERLINKED_SOURCES:-}" ]; then
+  if [ -n "$HADDOCK_HYPERLINKED_SOURCES" ]; then
     echo "EXTRA_HADDOCK_OPTS += --hyperlinked-source --quickjump" >> mk/build.mk
   fi
 
@@ -386,7 +382,7 @@ function configure() {
   end_section "booting"
 
   local target_args=""
-  if [[ -n "${target_triple:-}" ]]; then
+  if [[ -n "$target_triple" ]]; then
     target_args="--target=$target_triple"
   fi
 
@@ -394,7 +390,7 @@ function configure() {
   run ./configure \
     --enable-tarballs-autodownload \
     $target_args \
-    ${CONFIGURE_ARGS:-} \
+    $CONFIGURE_ARGS \
     GHC="$GHC" \
     HAPPY="$HAPPY" \
     ALEX="$ALEX" \
@@ -407,10 +403,10 @@ function build_make() {
   if [[ -z "$BIN_DIST_PREP_TAR_COMP" ]]; then
     fail "BIN_DIST_PREP_TAR_COMP is not set"
   fi
-  if [[ -n "${VERBOSE:-}" ]]; then
-    MAKE_ARGS="${MAKE_ARGS:-} V=1"
+  if [[ -n "$VERBOSE" ]]; then
+    MAKE_ARGS="$MAKE_ARGS V=1"
   else
-    MAKE_ARGS="${MAKE_ARGS:-} V=0"
+    MAKE_ARGS="$MAKE_ARGS V=0"
   fi
 
   echo "include mk/flavours/${BUILD_FLAVOUR}.mk" > mk/build.mk
@@ -426,7 +422,7 @@ function fetch_perf_notes() {
 }
 
 function push_perf_notes() {
-  if [ -n "${CROSS_TARGET:-}" ]; then
+  if [ -n "$CROSS_TARGET" ]; then
     info "Can't test cross-compiled build."
     return
   fi
@@ -443,16 +439,16 @@ function determine_metric_baseline() {
 }
 
 function test_make() {
-  if [ -n "${CROSS_TARGET:-}" ]; then
+  if [ -n "$CROSS_TARGET" ]; then
     info "Can't test cross-compiled build."
     return
   fi
 
   run "$MAKE" test_bindist TEST_PREP=YES
-  run "$MAKE" V=0 VERBOSE=1 test \
+  run "$MAKE" V=0 test \
     THREADS="$cores" \
     JUNIT_FILE=../../junit.xml \
-    EXTRA_RUNTEST_OPTS="${RUNTEST_ARGS:-}"
+    EXTRA_RUNTEST_OPTS="$RUNTEST_ARGS"
 }
 
 function build_hadrian() {
@@ -466,7 +462,7 @@ function build_hadrian() {
 }
 
 function test_hadrian() {
-  if [ -n "${CROSS_TARGET:-}" ]; then
+  if [ -n "$CROSS_TARGET" ]; then
     info "Can't test cross-compiled build."
     return
   fi
@@ -480,7 +476,7 @@ function test_hadrian() {
     test \
     --summary-junit=./junit.xml \
     --test-compiler="$TOP"/_build/install/bin/ghc \
-    "runtest.opts+=${RUNTEST_ARGS:-}"
+    "runtest.opts+=$RUNTEST_ARGS"
 }
 
 function cabal_test() {
@@ -521,14 +517,14 @@ function run_hadrian() {
   if [ -z "$BUILD_FLAVOUR" ]; then
     fail "BUILD_FLAVOUR not set"
   fi
-  if [ -z "${BIGNUM_BACKEND:-}" ]; then BIGNUM_BACKEND="gmp"; fi
-  if [ -n "${VERBOSE:-}" ]; then HADRIAN_ARGS="${HADRIAN_ARGS:-} -V"; fi
+  if [ -z "$BIGNUM_BACKEND" ]; then BIGNUM_BACKEND="gmp"; fi
+  if [ -n "$VERBOSE" ]; then HADRIAN_ARGS="$HADRIAN_ARGS -V"; fi
   run hadrian/build-cabal \
     --flavour="$BUILD_FLAVOUR" \
     -j"$cores" \
-    --broken-test="${BROKEN_TESTS:-}" \
+    --broken-test="$BROKEN_TESTS" \
     --bignum=$BIGNUM_BACKEND \
-    ${HADRIAN_ARGS:-} \
+    $HADRIAN_ARGS \
     $@
 }
 
@@ -564,7 +560,7 @@ case "$(uname)" in
   *) fail "uname $(uname) is not supported" ;;
 esac
 
-if [ -n "${CROSS_TARGET:-}" ]; then
+if [ -n "$CROSS_TARGET" ]; then
   info "Cross-compiling for $CROSS_TARGET..."
   target_triple="$CROSS_TARGET"
 fi
