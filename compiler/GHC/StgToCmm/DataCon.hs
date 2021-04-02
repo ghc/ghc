@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE MultiWayIf #-}
 
 -----------------------------------------------------------------------------
 --
@@ -47,7 +48,7 @@ import GHC.Types.Id.Info( CafInfo( NoCafRefs ) )
 import GHC.Types.Name (isInternalName)
 import GHC.Types.RepType (countConRepArgs)
 import GHC.Types.Literal
-import GHC.Builtin.Utils
+import GHC.Builtin.Types
 import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Utils.Monad (mapMaybeM)
@@ -228,10 +229,8 @@ buildDynCon' _ binder mn actually_bound ccs con args
 {- Note [Precomputed static closures]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-For Char/Int closures there are some value closures
-built into the RTS. This is the case for all values in
-the range mINT_INTLIKE .. mAX_INTLIKE (or CHARLIKE).
-See Note [CHARLIKE and INTLIKE closures.] in the RTS code.
+For some types (e.g., Char, Int, Word) there are some value closures
+built into the RTS.  See Note [STATIC_* closures.] in the RTS code.
 
 Similarly zero-arity constructors have a closure
 in their defining Module we can use.
@@ -308,7 +307,7 @@ we can see in the closure built for `foo`:
     [section ""data" . M.foo_closure" {
         M.foo_closure:
             const GHC.Maybe.Just_con_info;
-            const stg_INTLIKE_closure+289; // == I# 2
+            const stg_STATIC_INT_closure+289; // == I# 2
             const 3;
     }]
 
@@ -330,45 +329,33 @@ precomputedStaticConInfo_maybe dflags binder con []
   = Just $ litIdInfo (targetPlatform dflags) binder (mkConLFInfo con)
                 (CmmLabel (mkClosureLabel (dataConName con) NoCafRefs))
 precomputedStaticConInfo_maybe dflags binder con [arg]
-  -- Int/Char values with existing closures in the RTS
-  | intClosure || charClosure
-  , platformOS platform /= OSMinGW32 || not (positionIndependent dflags)
+  -- Int/Char/Word values with existing closures in the RTS
+  | platformOS platform /= OSMinGW32 || not (positionIndependent dflags)
+  , Just (label,min_static_range,max_static_range) <- getConInfo
   , Just val <- getClosurePayload arg
-  , inRange val
-  = let intlike_lbl   = mkCmmClosureLabel rtsUnitId (fsLit label)
-        val_int = fromIntegral val :: Int
-        offsetW = (val_int - (fromIntegral min_static_range)) * (fixedHdrSizeW profile + 1)
-                -- INTLIKE/CHARLIKE closures consist of a header and one word payload
-        static_amode = cmmLabelOffW platform intlike_lbl offsetW
+  , val >= min_static_range && val <= max_static_range
+  = let closure_array = mkCmmClosureLabel rtsUnitId (fsLit label)
+        offsetW = fromIntegral (val - min_static_range) * (fixedHdrSizeW profile + 1)
+                -- Int/Char/Word closures consist of a header and one word payload
+        static_amode = cmmLabelOffW platform closure_array offsetW
     in Just $ litIdInfo platform binder (mkConLFInfo con) static_amode
   where
     profile = targetProfile dflags
     platform = profilePlatform profile
-    intClosure = maybeIntLikeCon con
-    charClosure = maybeCharLikeCon con
-    getClosurePayload (NonVoid (StgLitArg (LitNumber LitNumInt val))) = Just val
-    getClosurePayload (NonVoid (StgLitArg (LitChar val))) = Just $ (fromIntegral . ord $ val)
-    getClosurePayload _ = Nothing
-    -- Avoid over/underflow by comparisons at type Integer!
-    inRange :: Integer -> Bool
-    inRange val
-      = val >= min_static_range && val <= max_static_range
 
-    constants = platformConstants platform
+    -- Avoid over/underflow by doing comparisons at type Integer!
+    getClosurePayload :: NonVoid StgArg -> Maybe Integer
+    getClosurePayload (NonVoid (StgLitArg (LitNumber _ val))) = Just val
+    getClosurePayload (NonVoid (StgLitArg (LitChar val)))     = Just $ (fromIntegral . ord $ val)
+    getClosurePayload _                                       = Nothing
 
-    min_static_range :: Integer
-    min_static_range
-      | intClosure = fromIntegral (pc_MIN_INTLIKE constants)
-      | charClosure = fromIntegral (pc_MIN_CHARLIKE constants)
-      | otherwise = panic "precomputedStaticConInfo_maybe: Unknown closure type"
-    max_static_range
-      | intClosure = fromIntegral (pc_MAX_INTLIKE constants)
-      | charClosure = fromIntegral (pc_MAX_CHARLIKE constants)
-      | otherwise = panic "precomputedStaticConInfo_maybe: Unknown closure type"
-    label
-      | intClosure = "stg_INTLIKE"
-      | charClosure =  "stg_CHARLIKE"
-      | otherwise = panic "precomputedStaticConInfo_maybe: Unknown closure type"
+    c f = fromIntegral (f (platformConstants platform))
+
+    getConInfo = if
+      | con == charDataCon -> Just ("stg_STATIC_CHAR", c pc_MIN_STATIC_CHAR, c pc_MAX_STATIC_CHAR)
+      | con == intDataCon  -> Just ("stg_STATIC_INT",  c pc_MIN_STATIC_INT,  c pc_MAX_STATIC_INT)
+      | con == wordDataCon -> Just ("stg_STATIC_WORD", c pc_MIN_STATIC_WORD, c pc_MAX_STATIC_WORD)
+      | otherwise          -> Nothing
 
 precomputedStaticConInfo_maybe _ _ _ _ = Nothing
 
