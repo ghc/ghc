@@ -391,15 +391,14 @@ class Foldable t where
     foldl' :: (b -> a -> b) -> b -> t a -> b
     {-# INLINE foldl' #-}
     foldl' f z0 = \ xs ->
-        foldr (\ x k -> oneShot (\ z -> z `seq` k (f z x))) id xs z0
+        foldr (\ (x::a) (k::b->b) -> oneShot (\ (z::b) -> z `seq` k (f z x)))
+              (id::b->b) xs z0
     --
     -- We now force the accumulator `z` rather than the value computed by the
-    -- operator `k`, this matches the documented strictness.  The code is now
-    -- essentially identical to the code for 'foldl'' in GHC.List, where the
-    -- only difference is explicit type annotations on some of the arguments.
+    -- operator `k`, this matches the documented strictness.
     --
-    -- The rationale for arity reduction from 3 to 2 and potential impact and
-    -- work-arounds are discussed at length in !5259, and noted in GHC.List.
+    -- For the rationale for the arity reduction from 3 to 2, inlining, etc.
+    -- see Note [Definition of foldl'] in GHC.List.
 
     -- | A variant of 'foldr' that has no base case,
     -- and thus may only be applied to non-empty structures.
