@@ -19,6 +19,7 @@ AC_INIT([The Glorious Glasgow Haskell Compilation System], [9.3], [glasgow-haske
     # (X.Y.Z) on stable branches (e.g. ghc-9.2) to ensure that pre-releases are
     # versioned correctly.
 
+AC_CONFIG_MACRO_DIRS([m4])
 
 # Set this to YES for a released version, otherwise NO
 : ${RELEASE=NO}
