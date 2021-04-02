@@ -899,7 +899,7 @@ checkNewDynFlags :: MonadIO m => Logger -> DynFlags -> m DynFlags
 checkNewDynFlags logger dflags = do
   -- See Note [DynFlags consistency]
   let (dflags', warnings) = makeDynFlagsConsistent dflags
-  liftIO $ handleFlagWarnings logger dflags (map (Warn NoReason) warnings)
+  liftIO $ handleFlagWarnings logger dflags (map (Warn WarningWithoutFlag) warnings)
   return dflags'
 
 checkNewInteractiveDynFlags :: MonadIO m => Logger -> DynFlags -> m DynFlags
@@ -1949,4 +1949,3 @@ instance Exception GhcApiError
 
 mkApiErr :: DynFlags -> SDoc -> GhcApiError
 mkApiErr dflags msg = GhcApiError (showSDoc dflags msg)
-
