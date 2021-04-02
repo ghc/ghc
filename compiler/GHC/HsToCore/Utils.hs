@@ -407,7 +407,7 @@ mkErrorAppDs err_id ty msg = do
         full_msg = showSDoc dflags (hcat [ppr src_loc, vbar, msg])
         core_msg = Lit (mkLitString full_msg)
         -- mkLitString returns a result of type String#
-    return (mkApps (Var err_id) [Type (getRuntimeRep ty), Type ty, core_msg])
+    return (mkApps (Var err_id) [Type (getRuntimeInfo ty), Type ty, core_msg])
 
 {-
 'mkCoreAppDs' and 'mkCoreAppsDs' handle the special-case desugaring of 'seq'.

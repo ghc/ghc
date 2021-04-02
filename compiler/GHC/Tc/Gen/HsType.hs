@@ -1340,7 +1340,8 @@ finish_tuple rn_ty tup_sort tau_tys tau_kinds exp_kind = do
   where
     arity = length tau_tys
     check_expected_kind ty act_kind =
-      checkExpectedKind rn_ty ty act_kind exp_kind
+      pprPanic "here" (ppr exp_kind)
+      -- checkExpectedKind rn_ty ty act_kind exp_kind
 
 {-
 Note [Ignore unary constraint tuples]

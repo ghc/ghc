@@ -140,7 +140,7 @@ import {-# SOURCE #-} GHC.Core.TyCo.Rep
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr
    ( pprType )
 import {-# SOURCE #-} GHC.Builtin.Types
-   ( runtimeRepTyCon, runtimeInfoTyCon, constraintKind
+   ( runtimeRepTyCon, constraintKind
    , multiplicityTyCon
    , vecCountTyCon, vecElemTyCon, liftedTypeKind )
 import {-# SOURCE #-} GHC.Core.DataCon
@@ -172,6 +172,10 @@ import GHC.Types.Unique.Set
 import GHC.Unit.Module
 
 import qualified Data.Data as Data
+
+import {-# SOURCE #-} GHC.Core.Type (splitTyConApp_maybe)
+-- import {-# SOURCE #-} GHC.Builtin.Types.Prim (mutableByteArrayPrimTyConKey)
+import GHC.Builtin.Names
 
 {-
 -----------------------------------------------
@@ -1571,7 +1575,7 @@ data PrimConv =
   -- | ConvCall [PrimRep] 
   deriving (Show)
 
-data PrimInfo = RInfo {rep :: PrimRep, conv :: PrimConv}  
+data PrimInfo = RInfo {reps :: [PrimRep], conv :: PrimConv}  
 
 
 {-
@@ -2260,7 +2264,6 @@ kindTyConKeys :: UniqSet Unique
 kindTyConKeys = unionManyUniqSets
   ( mkUniqSet [ liftedTypeKindTyConKey, constraintKindTyConKey, tYPETyConKey ]
   : map (mkUniqSet . tycon_with_datacons) [ runtimeRepTyCon
-                                          , runtimeInfoTyCon
                                           , multiplicityTyCon
                                           , vecCountTyCon, vecElemTyCon ] )
   where
@@ -2350,11 +2353,17 @@ expandSynTyCon_maybe
 
 -- ^ Expand a type synonym application, if any
 expandSynTyCon_maybe tc tys
+  -- | SynonymTyCon { tyConTyVars = tvs, synTcRhs = rhs, tyConArity = arity } <- tc
+  -- , Just (tc' , _) <- splitTyConApp_maybe rhs
+  -- , tc' `hasKey` (mutableByteArrayPrimTyConKey)
+  -- = pprPanic "here" (ppr tc)
+  
   | SynonymTyCon { tyConTyVars = tvs, synTcRhs = rhs, tyConArity = arity } <- tc
   = case tys `listLengthCmp` arity of
         GT -> Just (tvs `zip` tys, rhs, drop arity tys)
         EQ -> Just (tvs `zip` tys, rhs, [])
         LT -> Nothing
+  
   | otherwise
   = Nothing
 

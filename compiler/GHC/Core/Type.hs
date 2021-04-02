@@ -68,7 +68,7 @@ module GHC.Core.Type (
         isPredTy,
 
         getRuntimeRep_maybe, kindRep_maybe, kindRep,
-        getRuntimeInfo_maybe, kindInfo,
+        getRuntimeInfo, getRuntimeInfo_maybe, kindInfo,
 
         mkCastTy, mkCoercionTy, splitCastTy_maybe,
 
@@ -981,8 +981,8 @@ repSplitAppTy_maybe :: HasDebugCallStack => Type -> Maybe (Type,Type)
 repSplitAppTy_maybe (FunTy _ w ty1 ty2)
   = Just (TyConApp funTyCon [w, rep1, rep2, ty1], ty2)
   where
-    rep1 = getRuntimeRep ty1
-    rep2 = getRuntimeRep ty2
+    rep1 = getRuntimeInfo ty1
+    rep2 = getRuntimeInfo ty2
 
 repSplitAppTy_maybe (AppTy ty1 ty2)
   = Just (ty1, ty2)
