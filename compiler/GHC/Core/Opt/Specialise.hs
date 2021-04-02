@@ -815,7 +815,7 @@ tryWarnMissingSpecs dflags callers fn calls_for_fn
                 2 (vcat [ text "when specialising" <+> quotes (ppr caller)
                         | caller <- callers])
           , whenPprDebug (text "calls:" <+> vcat (map (pprCallInfo fn) calls_for_fn))
-          , text "Probable fix: add INLINABLE pragma on" <+> quotes (ppr fn) ])
+          , text "Probable fix: add INLINABLE pragma on" <+> quotes (ppr fn) <+> (pprNameDefnLoc (idName fn)) ])
 
 
 
