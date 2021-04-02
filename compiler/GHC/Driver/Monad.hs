@@ -28,7 +28,7 @@ module GHC.Driver.Monad (
         withTimingM,
 
         -- ** Warnings
-        logWarnings, printException,
+        logDiagnostics, printException,
         WarnErrLogger, defaultWarnErrLogger
   ) where
 
@@ -37,6 +37,7 @@ import GHC.Prelude
 import GHC.Driver.Session
 import GHC.Driver.Env
 import GHC.Driver.Errors ( printOrThrowDiagnostics, printBagOfErrors )
+import GHC.Driver.Errors.Types
 
 import GHC.Utils.Monad
 import GHC.Utils.Exception
@@ -44,6 +45,7 @@ import GHC.Utils.Error
 import GHC.Utils.Logger
 
 import GHC.Types.SrcLoc
+import GHC.Types.Error ( getMessages )
 import GHC.Types.SourceError
 
 import Control.Monad
@@ -141,13 +143,13 @@ withTimingM doc force action = do
     withTiming logger dflags doc force action
 
 -- -----------------------------------------------------------------------------
--- | A monad that allows logging of warnings.
+-- | A monad that allows logging of diagnostics.
 
-logWarnings :: GhcMonad m => WarningMessages -> m ()
-logWarnings warns = do
+logDiagnostics :: GhcMonad m => Messages GhcMessage -> m ()
+logDiagnostics msgs = do
   dflags <- getSessionDynFlags
   logger <- getLogger
-  liftIO $ printOrThrowDiagnostics logger dflags warns
+  liftIO $ printOrThrowDiagnostics logger dflags msgs
 
 -- -----------------------------------------------------------------------------
 -- | A minimal implementation of a 'GhcMonad'.  If you need a custom monad,
@@ -246,7 +248,7 @@ printException :: GhcMonad m => SourceError -> m ()
 printException err = do
   dflags <- getSessionDynFlags
   logger <- getLogger
-  liftIO $ printBagOfErrors logger dflags (srcErrorMessages err)
+  liftIO $ printBagOfErrors logger dflags (getMessages $ srcErrorMessages err)
 
 -- | A function called to log warnings and errors.
 type WarnErrLogger = forall m. GhcMonad m => Maybe SourceError -> m ()

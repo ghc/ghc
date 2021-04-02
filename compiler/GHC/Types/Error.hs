@@ -8,8 +8,10 @@ module GHC.Types.Error
    , WarningMessages
    , ErrorMessages
    , mkMessages
+   , getMessages
    , emptyMessages
    , isEmptyMessages
+   , singleMessage
    , addMessage
    , unionMessages
    , MsgEnvelope (..)
@@ -27,6 +29,7 @@ module GHC.Types.Error
 
    , SDoc
    , DecoratedSDoc (unDecorated)
+   , mapDecorated
    , pprMessageBag
    , mkDecorated
    , mkLocMessage
@@ -76,7 +79,7 @@ a bit more declarative) or removed altogether.
 
 -- | A collection of messages emitted by GHC during error reporting. A diagnostic message is typically
 -- a warning or an error. See Note [Messages].
-newtype Messages e = Messages (Bag (MsgEnvelope e))
+newtype Messages e = Messages { getMessages :: Bag (MsgEnvelope e) }
 
 instance Functor Messages where
   fmap f (Messages xs) = Messages (mapBag (fmap f) xs)
@@ -89,6 +92,9 @@ mkMessages = Messages
 
 isEmptyMessages :: Messages e -> Bool
 isEmptyMessages (Messages msgs) = isEmptyBag msgs
+
+singleMessage :: MsgEnvelope e -> Messages e
+singleMessage e = addMessage e emptyMessages
 
 {- Note [Discarding Messages]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -302,13 +308,8 @@ instance ToJson MessageClass where
   json (MCDiagnostic sev reason) =
     JSString $ renderWithContext defaultSDocContext (ppr $ text "MCDiagnostic" <+> ppr sev <+> ppr reason)
 
-instance Show (MsgEnvelope DiagnosticMessage) where
-    show = showMsgEnvelope
-
--- | Shows an 'MsgEnvelope'.
-showMsgEnvelope :: Diagnostic a => MsgEnvelope a -> String
-showMsgEnvelope err =
-  renderWithContext defaultSDocContext (vcat (unDecorated . diagnosticMessage $ errMsgDiagnostic err))
+mapDecorated :: (SDoc -> SDoc) -> DecoratedSDoc -> DecoratedSDoc
+mapDecorated f (Decorated xs) = Decorated (map f xs)
 
 pprMessageBag :: Bag SDoc -> SDoc
 pprMessageBag msgs = vcat (punctuate blankLine (bagToList msgs))

@@ -81,13 +81,18 @@ module GHC.Tc.Types(
         lookupRoleAnnot, getRoleAnnots,
 
         -- Linting
-        lintGblEnv
+        lintGblEnv,
+
+        -- Diagnostics
+        TcRnDsMessage, mkTcRnDsMessage, tcRnDsToGhcMessage
   ) where
 
 #include "HsVersions.h"
 
 import GHC.Prelude
 import GHC.Platform
+
+import GHC.Diagnostics
 
 import GHC.Driver.Env
 import GHC.Driver.Session
@@ -130,7 +135,6 @@ import GHC.Types.Unique.FM
 import GHC.Types.Basic
 import GHC.Types.CostCentre.State
 import GHC.Types.HpcInfo
-import GHC.Types.Error ( DiagnosticMessage )
 
 import GHC.Data.IOEnv
 import GHC.Data.Bag
@@ -141,12 +145,10 @@ import GHC.Unit.Module.Warnings
 import GHC.Unit.Module.Imported
 import GHC.Unit.Module.ModDetails
 
-import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Fingerprint
 import GHC.Utils.Misc
 import GHC.Utils.Panic
-import GHC.Utils.Logger
 
 import GHC.Builtin.Names ( isUnboundName )
 
@@ -560,7 +562,7 @@ data TcGblEnv
                                              -- function, if this module is
                                              -- the main module.
 
-        tcg_safeInfer :: TcRef (Bool, WarningMessages),
+        tcg_safeInfer :: TcRef (Bool, Messages TcRnDsMessage),
         -- ^ Has the typechecker inferred this module as -XSafe (Safe Haskell)
         -- See Note [Safe Haskell Overlapping Instances Implementation],
         -- although this is used for more than just that failure case.
@@ -766,8 +768,9 @@ data TcLclEnv           -- Changes as we move inside an expression
                                       -- and for tidying types
 
         tcl_lie  :: TcRef WantedConstraints,    -- Place to accumulate type constraints
-        tcl_errs :: TcRef (Messages DiagnosticMessage)     -- Place to accumulate errors
+        tcl_errs :: TcRef (Messages TcRnDsMessage) -- Place to accumulate errors
     }
+
 
 setLclEnvTcLevel :: TcLclEnv -> TcLevel -> TcLclEnv
 setLclEnvTcLevel env lvl = env { tcl_tclvl = lvl }
