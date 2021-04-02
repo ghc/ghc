@@ -16,7 +16,6 @@ module Preprocess
 import qualified GHC            as GHC hiding (parseModule)
 
 import qualified Control.Monad.IO.Class as GHC
-import qualified GHC.Data.Bag          as GHC
 import qualified GHC.Data.FastString   as GHC
 import qualified GHC.Data.StringBuffer as GHC
 import qualified GHC.Driver.Config     as GHC
