@@ -457,6 +457,7 @@ PACKAGES_STAGE1 += Cabal/Cabal
 PACKAGES_STAGE1 += ghc-compact
 PACKAGES_STAGE1 += ghc-heap
 PACKAGES_STAGE1 += integer-gmp # compat library
+PACKAGES_STAGE1 += network
 
 ifeq "$(HADDOCK_DOCS)" "YES"
 PACKAGES_STAGE1 += xhtml
