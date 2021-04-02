@@ -3,7 +3,7 @@
 test('T18623',
     [when(opsys('mingw32'), skip),
      # This keeps failing on aarch64-linux for reasons that are not
-     # fully clear.  Maybe it needs a higher limit due to LLMV?
+     # fully clear.  Maybe it needs a higher limit due to LLVM?
      when(arch('aarch64'), skip),
      when(arch('powerpc64le'), skip),
      cmd_prefix('ulimit -v ' + str(1024 ** 2) + ' && '),
