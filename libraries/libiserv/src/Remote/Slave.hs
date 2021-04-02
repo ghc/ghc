@@ -62,11 +62,12 @@ startSlave' verbose base_path port = do
   hSetBuffering stdout LineBuffering
 
   sock <- openSocket port
+  actualPort <- socketPort sock
+  putStrLn $ "Listening on port " ++ show actualPort
 
   forever $ do
     when verbose $ trace "Opening socket"
     pipe <- acceptSocket sock >>= socketToPipe
-    putStrLn $ "Listening on port " ++ show port
     when verbose $ trace "Starting serv"
     uninterruptibleMask $ serv verbose (hook verbose base_path pipe) pipe
     when verbose $ trace "serv ended"
