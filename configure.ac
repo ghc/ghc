@@ -19,6 +19,7 @@ AC_INIT([The Glorious Glasgow Haskell Compilation System], [9.1], [glasgow-haske
     # (X.Y.Z) on stable branches (e.g. ghc-9.2) to ensure that pre-releases are
     # versioned correctly.
 
+AC_CONFIG_MACRO_DIRS([m4])
 
 # Set this to YES for a released version, otherwise NO
 : ${RELEASE=NO}
@@ -1186,49 +1187,7 @@ AC_LINK_IFELSE([AC_LANG_CALL([], [printf\$LDBLStub])],
             [Define to 1 if we have printf$LDBLStub (Apple Mac OS >= 10.4, PPC).])
     ])
 
-dnl Some platforms (e.g. Android's Bionic) have pthreads support available
-dnl without linking against libpthread. Check whether -lpthread is necessary
-dnl to use pthreads.
-dnl
-dnl Note that it is important that this happens before we AC_CHECK_LIB(thread)
-AC_MSG_CHECKING(whether -lpthread is needed for pthreads)
-AC_CHECK_FUNC(pthread_create,
-    [
-        AC_MSG_RESULT(no)
-        AC_SUBST([CabalNeedLibpthread],[False])
-        need_lpthread=0
-    ],
-    [
-        AC_CHECK_LIB(pthread, pthread_create,
-            [
-                AC_MSG_RESULT(yes)
-                AC_SUBST([CabalNeedLibpthread],[True])
-                need_lpthread=1
-            ],
-            [
-                AC_SUBST([CabalNeedLibpthread],[False])
-                AC_MSG_RESULT([no pthreads support found.])
-                need_lpthread=0
-            ])
-    ])
-AC_DEFINE_UNQUOTED([NEED_PTHREAD_LIB], [$need_lpthread],
-    [Define 1 if we need to link code using pthreads with -lpthread])
-
-dnl ** pthread_setname_np is a recent addition to glibc, and OS X has
-dnl    a different single-argument version.
-AC_CHECK_LIB(pthread, pthread_setname_np)
-AC_MSG_CHECKING(for pthread_setname_np)
-AC_LINK_IFELSE([AC_LANG_PROGRAM(
-[[
-#define _GNU_SOURCE
-#include <pthread.h>
-]],
-[[pthread_setname_np(pthread_self(), "name");]])],
-    AC_MSG_RESULT(yes)
-    AC_DEFINE([HAVE_PTHREAD_SETNAME_NP], [1],
-      [Define to 1 if you have the glibc version of pthread_setname_np]),
-    AC_MSG_RESULT(no)
-)
+FP_CHECK_PTHREADS
 
 dnl ** check for eventfd which is needed by the I/O manager
 AC_CHECK_HEADERS([sys/eventfd.h])
@@ -1321,116 +1280,8 @@ case ${TargetOS} in
 AC_DEFINE_UNQUOTED([RTS_LINKER_USE_MMAP], [$RtsLinkerUseMmap],
                    [Use mmap in the runtime linker])
 
-dnl ** Have libdw?
-dnl --------------------------------------------------------------
-AC_ARG_WITH([libdw-libraries],
-  [AS_HELP_STRING([--with-libdw-libraries=ARG],
-    [Find libraries for libdw in ARG [default=system default]])
-  ],
-  [
-    LibdwLibDir="$withval"
-    LIBDW_LDFLAGS="-L$withval"
-  ])
-
-AC_SUBST(LibdwLibDir)
-
-AC_ARG_WITH([libdw-includes],
-  [AS_HELP_STRING([--with-libdw-includes=ARG],
-    [Find includes for libdw in ARG [default=system default]])
-  ],
-  [
-    LibdwIncludeDir="$withval"
-    LIBDW_CFLAGS="-I$withval"
-  ])
-
-AC_SUBST(LibdwIncludeDir)
-
-UseLibdw=NO
-USE_LIBDW=0
-AC_ARG_ENABLE(dwarf-unwind,
-    [AS_HELP_STRING([--enable-dwarf-unwind],
-        [Enable DWARF unwinding support in the runtime system via elfutils' libdw [default=no]])])
-if test "$enable_dwarf_unwind" = "yes" ; then
-  CFLAGS2="$CFLAGS"
-  CFLAGS="$LIBDW_CFLAGS $CFLAGS"
-  LDFLAGS2="$LDFLAGS"
-  LDFLAGS="$LIBDW_LDFLAGS $LDFLAGS"
-
-  AC_CHECK_LIB(dw, dwfl_attach_state,
-      [AC_CHECK_HEADERS([elfutils/libdw.h], [break], [])
-       UseLibdw=YES],
-      [AC_MSG_ERROR([Cannot find system libdw (required by --enable-dwarf-unwind)])])
-
-  CFLAGS="$CFLAGS2"
-  LDFLAGS="$LDFLAGS2"
-fi
-
-AC_SUBST(UseLibdw)
-if test $UseLibdw = "YES" ; then
-	USE_LIBDW=1
-  AC_SUBST([CabalHaveLibdw],[True])
-else
-  AC_SUBST([CabalHaveLibdw],[False])
-fi
-AC_DEFINE_UNQUOTED([USE_LIBDW], [$USE_LIBDW], [Set to 1 to use libdw])
-
-dnl ** Have libnuma?
-dnl --------------------------------------------------------------
-AC_ARG_WITH([libnuma-libraries],
-  [AS_HELP_STRING([--with-libnuma-libraries=ARG],
-    [Find libraries for libnuma in ARG [default=system default]])
-  ],
-  [
-    LibNumaLibDir="$withval"
-    LIBNUMA_LDFLAGS="-L$withval"
-  ])
-
-AC_SUBST(LibNumaLibDir)
-
-AC_ARG_WITH([libnuma-includes],
-  [AS_HELP_STRING([--with-libnuma-includes=ARG],
-    [Find includes for libnuma in ARG [default=system default]])
-  ],
-  [
-    LibNumaIncludeDir="$withval"
-    LIBNUMA_CFLAGS="-I$withval"
-  ])
-
-AC_SUBST(LibNumaIncludeDir)
-
-HaveLibNuma=0
-AC_ARG_ENABLE(numa,
-    [AS_HELP_STRING([--enable-numa],
-        [Enable NUMA memory policy and thread affinity support in the
-         runtime system via numactl's libnuma [default=auto]])])
-
-if test "$enable_numa" != "no" ; then
-  CFLAGS2="$CFLAGS"
-  CFLAGS="$LIBNUMA_CFLAGS $CFLAGS"
-  LDFLAGS2="$LDFLAGS"
-  LDFLAGS="$LIBNUMA_LDFLAGS $LDFLAGS"
-
-  AC_CHECK_HEADERS([numa.h numaif.h])
-
-  if test "$ac_cv_header_numa_h$ac_cv_header_numaif_h" = "yesyes" ; then
-    AC_CHECK_LIB(numa, numa_available,HaveLibNuma=1)
-  fi
-  if test "$enable_numa:$HaveLibNuma" = "yes:0" ; then
-      AC_MSG_ERROR([Cannot find system libnuma (required by --enable-numa)])]
-  fi
-
-  CFLAGS="$CFLAGS2"
-  LDFLAGS="$LDFLAGS2"
-fi
-
-AC_DEFINE_UNQUOTED([HAVE_LIBNUMA], [$HaveLibNuma], [Define to 1 if you have libnuma])
-if test $HaveLibNuma = "1" ; then
-  AC_SUBST([UseLibNuma],[YES])
-  AC_SUBST([CabalHaveLibNuma],[True])
-else
-  AC_SUBST([UseLibNuma],[NO])
-  AC_SUBST([CabalHaveLibNuma],[False])
-fi
+FP_FIND_LIBDW
+FP_FIND_LIBNUMA
 
 dnl ** Documentation
 dnl --------------------------------------------------------------
