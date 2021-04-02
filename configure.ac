@@ -17,6 +17,7 @@ AC_INIT([The Glorious Glasgow Haskell Compilation System], [9.2.0], [glasgow-has
     # Version on HEAD must be X.Y (not X.Y.Z) for ProjectVersionMunged variable
     # to be useful (cf #19058)
 
+AC_CONFIG_MACRO_DIRS([m4])
 
 # Set this to YES for a released version, otherwise NO
 : ${RELEASE=NO}
