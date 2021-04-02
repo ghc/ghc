@@ -5,7 +5,8 @@ module GHC.Cmm.Type
     , cmmBits, cmmFloat
     , typeWidth, cmmEqType, cmmEqType_ignoring_ptrhood
     , isFloatType, isGcPtrType, isBitsType
-    , isWord32, isWord64, isFloat64, isFloat32
+    , isWordAny, isWord32, isWord64
+    , isFloat64, isFloat32
 
     , Width(..)
     , widthInBits, widthInBytes, widthInLog, widthFromBytes
@@ -144,9 +145,14 @@ isGcPtrType _other               = False
 isBitsType (CmmType BitsCat _) = True
 isBitsType _                   = False
 
-isWord32, isWord64, isFloat32, isFloat64 :: CmmType -> Bool
+isWordAny, isWord32, isWord64,
+  isFloat32, isFloat64 :: CmmType -> Bool
 -- isWord64 is true of 64-bit non-floats (both gc-ptrs and otherwise)
 -- isFloat32 and 64 are obvious
+
+isWordAny (CmmType BitsCat  _) = True
+isWordAny (CmmType GcPtrCat _) = True
+isWordAny _other               = False
 
 isWord64 (CmmType BitsCat  W64) = True
 isWord64 (CmmType GcPtrCat W64) = True
