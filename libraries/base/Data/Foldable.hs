@@ -368,6 +368,7 @@ class Foldable t where
     -- >>> foldl (\a _ -> a) 0 $ repeat 1
     -- * Hangs forever *
     --
+    -- WARNING: When it comes to lists, you always want to use 'foldl'' instead.
     foldl :: (b -> a -> b) -> b -> t a -> b
     foldl f z t = appEndo (getDual (foldMap (Dual . Endo . flip f) t)) z
     -- There's no point mucking around with coercions here,
@@ -599,6 +600,8 @@ class Foldable t where
     -- >>> maximum Nothing
     -- *** Exception: maximum: empty structure
     --
+    -- WARNING: This function is partial for possibly-empty structures like lists.
+    --
     -- @since 4.8.0.0
     maximum :: forall a . Ord a => t a -> a
     maximum = fromMaybe (errorWithoutStackTrace "maximum: empty structure") .
@@ -624,6 +627,8 @@ class Foldable t where
     --
     -- >>> minimum Nothing
     -- *** Exception: minimum: empty structure
+    --
+    -- WARNING: This function is partial for possibly-empty structures like lists.
     --
     -- @since 4.8.0.0
     minimum :: forall a . Ord a => t a -> a
@@ -1145,6 +1150,8 @@ msum = asum
 -- >>> concat [[1, 2, 3], [4, 5], [6], []]
 -- [1,2,3,4,5,6]
 --
+-- WARNING: This function takes O(n^2) time in the total number of elements
+-- when the 't' is '[]'.
 concat :: Foldable t => t [a] -> [a]
 concat xs = build (\c n -> foldr (\x y -> foldr c y x) n xs)
 {-# INLINE concat #-}
@@ -1278,6 +1285,8 @@ all p = getAll #. foldMap (All #. p)
 --
 -- >>> maximumBy (compare `on` length) ["Hello", "World", "!", "Longest", "bar"]
 -- "Longest"
+--
+-- WARNING: This function is partial for possibly-empty structures like lists.
 
 -- See Note [maximumBy/minimumBy space usage]
 maximumBy :: Foldable t => (a -> a -> Ordering) -> t a -> a
@@ -1300,6 +1309,8 @@ maximumBy cmp = fromMaybe (errorWithoutStackTrace "maximumBy: empty structure")
 --
 -- >>> minimumBy (compare `on` length) ["Hello", "World", "!", "Longest", "bar"]
 -- "!"
+--
+-- WARNING: This function is partial for possibly-empty structures like lists.
 
 -- See Note [maximumBy/minimumBy space usage]
 minimumBy :: Foldable t => (a -> a -> Ordering) -> t a -> a
