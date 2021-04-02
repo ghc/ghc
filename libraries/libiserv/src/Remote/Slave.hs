@@ -53,20 +53,18 @@ startSlave verbose port s = do
   _ <- forkIO $ startSlave' verbose base_path (toEnum port)
   return ()
 
--- | @startSlave'@ provdes a blocking haskell interface, that
--- the hosting application on the target can use to start the
--- slave process.
 startSlave' :: Bool -> String -> PortNumber -> IO ()
 startSlave' verbose base_path port = do
   hSetBuffering stdin LineBuffering
   hSetBuffering stdout LineBuffering
 
   sock <- openSocket port
+  actualPort <- socketPort sock
 
   forever $ do
     when verbose $ trace "Opening socket"
     pipe <- acceptSocket sock >>= socketToPipe
-    putStrLn $ "Listening on port " ++ show port
+    putStrLn $ "Listening on port " ++ show actualPort
     when verbose $ trace "Starting serv"
     uninterruptibleMask $ serv verbose (hook verbose base_path pipe) pipe
     when verbose $ trace "serv ended"
