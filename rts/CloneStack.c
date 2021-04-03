@@ -1,9 +1,10 @@
 /* ---------------------------------------------------------------------------
  *
- * (c) The GHC Team, 2001-2021
+ * (c) The GHC Team, 2020-2021
  *
- * Stack snapshotting.
- */
+ * Stack snapshotting and decoding. (Cloning and unwinding.)
+ *
+ *---------------------------------------------------------------------------*/
 
 #include <string.h>
 
@@ -15,9 +16,11 @@
 #include "CloneStack.h"
 #include "StablePtr.h"
 #include "Threads.h"
+#include "Prelude.h"
 
 #if defined(DEBUG)
 #include "sm/Sanity.h"
+#include "Printer.h"
 #endif
 
 static StgStack* cloneStackChunk(Capability* capability, const StgStack* stack)
@@ -102,3 +105,113 @@ void sendCloneStackMessage(StgTSO *tso STG_UNUSED, HsStablePtr mvar STG_UNUSED) 
 }
 
 #endif // end !defined(THREADED_RTS)
+
+// Creates a MutableArray# (Haskell representation) that contains an pointer
+// (address) for every stack frame on the given stack. Thus, the size of the
+// array is the count of stack frames.
+StgMutArrPtrs* decodeClonedStack(StgStack* stack) {
+  StgWord closureCount = getStackFrameCount(stack);
+
+  StgMutArrPtrs* array = allocateMutableArray(closureCount);
+
+  copyPtrsToArray(array, stack);
+
+  return array;
+}
+
+// Count the stack frames that are on the given stack.
+// This is the sum of all stack frames in all stack chunks of this stack.
+StgWord getStackFrameCount(StgStack* stack) {
+  StgWord closureCount = 0;
+  StgStack *last_stack = stack;
+  while (true) {
+    closureCount += getStackChunkClosureCount(last_stack);
+
+    // check whether the stack ends in an underflow frame
+    StgPtr top = last_stack->stack + last_stack->stack_size;
+    StgUnderflowFrame *underFlowFrame = ((StgUnderflowFrame *) top);
+    StgUnderflowFrame *frame = underFlowFrame--;
+    if (frame->info == &stg_stack_underflow_frame_info) {
+      last_stack = frame->next_chunk;
+    } else {
+      break;
+    }
+  }
+  return closureCount;
+}
+
+StgWord getStackChunkClosureCount(StgStack* stack) {
+    StgWord closureCount = 0;
+    StgPtr sp = stack->sp;
+    StgPtr spBottom = stack->stack + stack->stack_size;
+    for (; sp < spBottom; sp += stack_frame_sizeW((StgClosure *)sp)) {
+      closureCount++;
+    }
+
+    return closureCount;
+}
+
+// Allocate and initialize memory for a MutableArray# (Haskell representation).
+StgMutArrPtrs* allocateMutableArray(StgWord closureCount) {
+  // Idea stolen from PrimOps.cmm:stg_newArrayzh()
+  StgWord size = closureCount + mutArrPtrsCardTableSize(closureCount);
+  StgWord words = sizeofW(StgMutArrPtrs) + size;
+
+  StgMutArrPtrs* array = (StgMutArrPtrs*) allocate(myTask()->cap, words);
+
+  SET_HDR(array, &stg_MUT_ARR_PTRS_DIRTY_info, CCS_SYSTEM);
+  array->ptrs  = closureCount;
+  array->size = size;
+
+  return array;
+}
+
+
+void copyPtrsToArray(StgMutArrPtrs* arr, StgStack* stack) {
+  StgWord index = 0;
+  StgStack *last_stack = stack;
+  while (true) {
+    StgPtr sp = last_stack->sp;
+    StgPtr spBottom = last_stack->stack + last_stack->stack_size;
+    for (; sp < spBottom; sp += stack_frame_sizeW((StgClosure *)sp)) {
+      const StgInfoTable* infoTable = get_itbl((StgClosure *)sp);
+
+      // Add the address that will be used by lookupIPE() to the MutableArray#.
+      // The "Info Table Provernance Entry Map" (IPE) idea is to use a pointer
+      // (address) to the info table to lookup entries, this is fulfilled in
+      // non-"Tables Next to Code" builds.
+      // When "Tables Next to Code" is used, the assembly label of the info table
+      // is between the info table and it's code. There's no other label in the
+      // assembly code  which could be used instead, thus lookupIPE() is actuallly
+      // called with the code pointer of the info table.
+      // (As long as it's used consistently, this doesn't really matter - IPE uses
+      // the pointer only to connect an info table to it's provenance entry in the
+      // IPE map.)
+#if defined(TABLES_NEXT_TO_CODE)
+      arr->payload[index] = createPtrClosure(myTask()->cap, (StgClosure*) infoTable->code);
+#else
+      arr->payload[index] = createPtrClosure(myTask()->cap, (StgClosure*) infoTable);
+#endif
+      index++;
+    }
+
+    // check whether the stack ends in an underflow frame
+    StgPtr top = last_stack->stack + last_stack->stack_size;
+    StgUnderflowFrame *underFlowFrame = ((StgUnderflowFrame *) top);
+    StgUnderflowFrame *frame = underFlowFrame--;
+    if (frame->info == &stg_stack_underflow_frame_info) {
+      last_stack = frame->next_chunk;
+    } else {
+      break;
+    }
+  }
+}
+
+// Create a GHC.Ptr (Haskell constructor: `Ptr Addr#`) pointing to the closure
+// c.
+StgClosure* createPtrClosure(Capability *cap, StgClosure* c) {
+  StgClosure *p = (StgClosure *) allocate(cap, CONSTR_sizeW(0,1));
+  SET_HDR(p, &base_GHCziPtr_Ptr_con_info, CCS_SYSTEM);
+  p->payload[0] = c;
+  return TAG_CLOSURE(1, p);
+}
