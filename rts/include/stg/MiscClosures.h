@@ -571,8 +571,6 @@ RTS_FUN_DECL(stg_traceBinaryEventzh);
 RTS_FUN_DECL(stg_traceMarkerzh);
 RTS_FUN_DECL(stg_getThreadAllocationCounterzh);
 RTS_FUN_DECL(stg_setThreadAllocationCounterzh);
-RTS_FUN_DECL(stg_cloneMyStackzh);
-
 
 /* Other misc stuff */
 // See wiki:commentary/compiler/backends/ppr-c#prototypes

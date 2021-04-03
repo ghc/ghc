@@ -1,0 +1,12 @@
+StackEntry {functionName = "main.(...)", moduleName = "Main", srcLoc = "decodeMyStack.hs:22:27-41", closureType = 53}
+StackEntry {functionName = "getDeepStack.getDeepStackCase", moduleName = "Main", srcLoc = "decodeMyStack.hs:18:26-28", closureType = 53}
+StackEntry {functionName = "getDeepStack.getDeepStackCase", moduleName = "Main", srcLoc = "decodeMyStack.hs:18:26-28", closureType = 53}
+StackEntry {functionName = "getDeepStack.getDeepStackCase", moduleName = "Main", srcLoc = "decodeMyStack.hs:18:26-28", closureType = 53}
+StackEntry {functionName = "getDeepStack.getDeepStackCase", moduleName = "Main", srcLoc = "decodeMyStack.hs:18:26-28", closureType = 53}
+StackEntry {functionName = "getDeepStack.getDeepStackCase", moduleName = "Main", srcLoc = "decodeMyStack.hs:18:26-28", closureType = 53}
+StackEntry {functionName = "getDeepStack.getDeepStackCase", moduleName = "Main", srcLoc = "decodeMyStack.hs:18:26-28", closureType = 53}
+StackEntry {functionName = "getDeepStack.getDeepStackCase", moduleName = "Main", srcLoc = "decodeMyStack.hs:18:26-28", closureType = 53}
+StackEntry {functionName = "getDeepStack.getDeepStackCase", moduleName = "Main", srcLoc = "decodeMyStack.hs:18:26-28", closureType = 53}
+StackEntry {functionName = "getDeepStack.getDeepStackCase", moduleName = "Main", srcLoc = "decodeMyStack.hs:18:26-28", closureType = 53}
+StackEntry {functionName = "getDeepStack.getDeepStackCase", moduleName = "Main", srcLoc = "decodeMyStack.hs:18:26-28", closureType = 53}
+StackEntry {functionName = "getDeepStack.getDeepStackCase", moduleName = "Main", srcLoc = "decodeMyStack.hs:13:7-21", closureType = 53}

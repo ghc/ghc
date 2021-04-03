@@ -1,0 +1,26 @@
+#include "Cmm.h"
+
+stg_cloneMyStackzh () {
+    gcptr stgStack;
+    gcptr clonedStack;
+
+    stgStack = StgTSO_stackobj(CurrentTSO);
+    StgStack_sp(stgStack) = Sp;
+
+    ("ptr" clonedStack) = ccall cloneStack(MyCapability() "ptr", stgStack "ptr");
+
+    return (clonedStack);
+}
+
+stg_sendCloneStackMessagezh (gcptr threadId, gcptr mVarStablePtr) {
+    ccall sendCloneStackMessage(threadId "ptr", mVarStablePtr "ptr");
+
+    return ();
+}
+
+stg_decodeStackzh (gcptr stgStack) {
+    gcptr stackEntries;
+    ("ptr" stackEntries) = ccall decodeClonedStack(MyCapability() "ptr", stgStack "ptr");
+
+    return (stackEntries);
+}

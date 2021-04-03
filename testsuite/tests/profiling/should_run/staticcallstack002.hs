@@ -7,8 +7,7 @@ import GHC.Stack.CCS
 -- a special case to not generate distinct info tables for unboxed
 -- constructors.
 main = do
-  print . tail =<< whereFrom (undefined (# #))
-  print . tail =<< whereFrom (undefined (# () #))
-  print . tail =<< whereFrom (undefined (# (), () #))
-  print . tail =<< whereFrom (undefined (# | () #))
-
+  print =<< whereFrom (undefined (# #))
+  print =<< whereFrom (undefined (# () #))
+  print =<< whereFrom (undefined (# (), () #))
+  print =<< whereFrom (undefined (# | () #))

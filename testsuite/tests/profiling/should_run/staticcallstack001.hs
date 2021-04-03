@@ -13,7 +13,6 @@ qq x = D x
 caf = D 5
 
 main = do
-  print . tail =<< whereFrom (D 5)
-  print . tail =<< whereFrom caf
-  print . tail =<< whereFrom (id (D 5))
-
+  print =<< whereFrom (D 5)
+  print =<< whereFrom caf
+  print =<< whereFrom (id (D 5))

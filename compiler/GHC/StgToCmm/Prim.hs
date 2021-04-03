@@ -1669,7 +1669,6 @@ emitPrimOp dflags primop = case primop of
   TraceEventBinaryOp -> alwaysExternal
   TraceMarkerOp -> alwaysExternal
   SetThreadAllocationCounter -> alwaysExternal
-  CloneMyStack -> alwaysExternal
 
   -- See Note [keepAlive# magic] in GHC.CoreToStg.Prep.
   KeepAliveOp -> panic "keepAlive# should have been eliminated in CorePrep"
