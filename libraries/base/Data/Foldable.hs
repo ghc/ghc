@@ -184,6 +184,7 @@ class Foldable t where
     -- 2666668666666
     --
     fold :: Monoid m => t m -> m
+    {-# INLINE fold #-}
     fold = foldMap id
 
     -- | Map each element of the structure into a monoid, and combine the
@@ -703,6 +704,11 @@ instance Foldable [] where
     foldl'  = List.foldl'
     foldl1  = List.foldl1
     foldr   = List.foldr
+    -- This, along with the fold definition below, allows specialized mconcat
+    -- implementations an opportunity to combine elements efficiently in a
+    -- single pass.
+    foldMap = (mconcat .) . map
+    fold    = mconcat
     foldr1  = List.foldr1
     length  = List.length
     maximum = List.maximum
