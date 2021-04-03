@@ -1010,6 +1010,7 @@
       SymI_HasProto(registerInfoProvList)                               \
       SymI_HasProto(lookupIPE)                                          \
       SymI_HasProto(sendCloneStackMessage)                              \
+      SymI_HasProto(decodeClonedStack)                                  \
       RTS_USER_SIGNALS_SYMBOLS                                          \
       RTS_INTCHAR_SYMBOLS
 

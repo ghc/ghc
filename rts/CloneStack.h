@@ -14,10 +14,17 @@ StgStack* cloneStack(Capability* capability, const StgStack* stack);
 
 void sendCloneStackMessage(StgTSO *tso, HsStablePtr mvar);
 
+StgMutArrPtrs* decodeClonedStack(StgStack* stack);
+
 #include "BeginPrivate.h"
 
 #if defined(THREADED_RTS)
 void handleCloneStackMessage(MessageCloneStack *msg);
 #endif
+
+StgWord getStackClosureCount(StgStack* stack);
+StgWord getStackChunkClosureCount(StgStack* stack);
+void copyPtrsToArray(StgMutArrPtrs* arr, StgStack* stack);
+StgClosure* createWordClosure (Capability *cap, StgAddr i);
 
 #include "EndPrivate.h"
