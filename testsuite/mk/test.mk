@@ -172,13 +172,7 @@ else
 RUNTEST_OPTS += -e config.have_fast_bignum=True
 endif
 
-ifeq "$(GhcDynamicByDefault)" "YES"
-RUNTEST_OPTS += -e config.ghc_dynamic_by_default=True
-CABAL_MINIMAL_BUILD = --enable-shared --disable-library-vanilla
-else
-RUNTEST_OPTS += -e config.ghc_dynamic_by_default=False
 CABAL_MINIMAL_BUILD = --enable-library-vanilla --disable-shared
-endif
 
 ifeq "$(GhcDynamic)" "YES"
 RUNTEST_OPTS += -e config.ghc_dynamic=True
