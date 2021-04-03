@@ -17,8 +17,6 @@ extra-source-files:
     aclocal.m4
     cbits/gmp_wrappers.c
     changelog.md
-    config.guess
-    config.sub
     configure
     configure.ac
     config.mk.in
