@@ -15,9 +15,11 @@
 #include "CloneStack.h"
 #include "StablePtr.h"
 #include "Threads.h"
+#include "Prelude.h"
 
 #if defined(DEBUG)
 #include "sm/Sanity.h"
+#include "Printer.h"
 #endif
 
 static StgStack* cloneStackChunk(Capability* capability, const StgStack* stack)
@@ -102,3 +104,98 @@ void sendCloneStackMessage(StgTSO *tso STG_UNUSED, HsStablePtr mvar STG_UNUSED) 
 }
 
 #endif // end !defined(THREADED_RTS)
+
+// From Cmm.h
+#define mutArrCardMask ((1 << MUT_ARR_PTRS_CARD_BITS) - 1)
+#define mutArrPtrCardDown(i) ((i) >> MUT_ARR_PTRS_CARD_BITS)
+#define mutArrPtrCardUp(i)   (((i) + mutArrCardMask) >> MUT_ARR_PTRS_CARD_BITS)
+#define mutArrPtrsCardWords(n) ROUNDUP_BYTES_TO_WDS(mutArrPtrCardUp(n))
+#define BYTES_TO_WDS(n) ((n) / sizeof(StgWord))
+
+StgMutArrPtrs* decodeClonedStack(StgStack* stack){
+#if defined(DEBUG)
+  printStack(stack);
+#endif
+
+  StgWord closureCount = getStackClosureCount(stack);
+
+  // Stolen from PrimOps.cmm:stg_newArrayzh()
+  StgWord size = closureCount + mutArrPtrsCardWords(closureCount);
+  StgWord words = BYTES_TO_WDS(sizeof(StgMutArrPtrs)) + size;
+
+  StgMutArrPtrs* arr = (StgMutArrPtrs*) allocate(myTask()->cap, words);
+
+  SET_HDR(arr, &stg_MUT_ARR_PTRS_DIRTY_info, CCS_SYSTEM);
+  arr->ptrs  = closureCount;
+  arr->size = size;
+
+  copyPtrsToArray(arr, stack);
+
+  return arr;
+}
+
+StgWord getStackChunkClosureCount(StgStack* stack) {
+    StgWord closureCount = 0;
+    StgPtr sp = stack->sp;
+    StgPtr spBottom = stack->stack + stack->stack_size;
+    for (; sp < spBottom; sp += stack_frame_sizeW((StgClosure *)sp)) {
+      closureCount++;
+    }
+
+    return closureCount;
+}
+
+StgWord getStackClosureCount(StgStack* stack) {
+  StgWord closureCount = 0;
+  StgStack *last_stack = stack;
+  while (true) {
+    closureCount += getStackChunkClosureCount(last_stack);
+
+    // check whether the stack ends in an underflow frame
+    StgPtr top = last_stack->stack + last_stack->stack_size;
+    StgUnderflowFrame *underFlowFrame = ((StgUnderflowFrame *) top);
+    StgUnderflowFrame *frame = underFlowFrame--;
+    if (frame->info == &stg_stack_underflow_frame_info) {
+      last_stack = frame->next_chunk;
+    } else {
+      break;
+    }
+  }
+  return closureCount;
+}
+
+void copyPtrsToArray(StgMutArrPtrs* arr, StgStack* stack) {
+  StgWord index = 0;
+  StgStack *last_stack = stack;
+  while (true) {
+    StgPtr sp = last_stack->sp;
+    StgPtr spBottom = last_stack->stack + last_stack->stack_size;
+    for (; sp < spBottom; sp += stack_frame_sizeW((StgClosure *)sp)) {
+      const StgInfoTable* infoTable = get_itbl((StgClosure *)sp);
+      debugBelch("infoTable %p \n", infoTable);
+      arr->payload[index] = createWordClosure(myTask()->cap, (StgAddr) infoTable);
+      debugBelch("Saved %p \n", arr->payload[index]);
+      index++;
+    }
+
+    // check whether the stack ends in an underflow frame
+    StgPtr top = last_stack->stack + last_stack->stack_size;
+    StgUnderflowFrame *underFlowFrame = ((StgUnderflowFrame *) top);
+    StgUnderflowFrame *frame = underFlowFrame--;
+    if (frame->info == &stg_stack_underflow_frame_info) {
+      last_stack = frame->next_chunk;
+    } else {
+      break;
+    }
+  }
+}
+
+// TODO: Should use something better than a word for pointers
+StgClosure* createWordClosure (Capability *cap, StgAddr i)
+{
+  debugBelch("Add %p as Ptr.\n", i);
+  StgClosure *p = (StgClosure *)allocate(cap,CONSTR_sizeW(0,1));
+  SET_HDR(p, &base_GHCziPtr_Ptr_con_info, CCS_SYSTEM);
+  *(StgWord *)p->payload = i;
+  return TAG_CLOSURE(1, p);
+}
