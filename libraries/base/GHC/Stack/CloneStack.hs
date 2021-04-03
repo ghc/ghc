@@ -12,14 +12,18 @@
 module GHC.Stack.CloneStack (
   StackSnapshot(..),
   cloneMyStack,
-  cloneThreadStack
+  cloneThreadStack,
+  decode
   ) where
 
-import GHC.Prim (StackSnapshot#, cloneMyStack#, ThreadId#)
+import GHC.Prim (StackSnapshot#, cloneMyStack#, ThreadId#, MutableArray#, Addr#, sizeofMutableArray#, readArray#)
+import GHC.Exts (Int(I#), Int#, RealWorld, Ptr(..))
 import Control.Concurrent.MVar
+import Control.Monad (forM)
 import GHC.Conc.Sync
 import GHC.Stable
 import GHC.IO (IO(..))
+import Foreign -- Foreign.Ptr
 
 -- | A frozen snapshot of the state of an execution stack.
 --
@@ -68,3 +72,20 @@ cloneThreadStack (ThreadId tid#) = do
   freeStablePtr ptr
   takeMVar resultVar
 
+-- TODO: Cannot use `import GHC.Exts.Heap (StgInfoTable(..))` -> hidden package
+type InfoTable = Word
+
+foreign import ccall "decodeClonedStack" decodeClonedStack:: StackSnapshot# -> MutableArray# RealWorld (Ptr Word)
+
+decode :: StackSnapshot -> IO [Ptr Word]
+decode (StackSnapshot stack) = let
+    array = decodeClonedStack stack
+    arraySize = I# (sizeofMutableArray# array)
+  in
+    do
+      print $ "arraySize : " ++ show arraySize
+      forM [0 .. arraySize - 1] $ \(I# i) -> do
+        print $ "No : " ++ show (I# i)
+        v <- IO $ readArray# array i
+        print $ "element : " ++ show v
+        return v
