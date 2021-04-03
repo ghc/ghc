@@ -73,10 +73,16 @@ struct NonmovingAllocator {
 
 // allocators cover block sizes of 2^NONMOVING_ALLOCA0 to
 // 2^(NONMOVING_ALLOCA0 + NONMOVING_ALLOCA_CNT) (in bytes)
+// The largest allocator class must be at least LARGE_OBJECT_THRESHOLD in size
+// as Storage.c:allocatePinned will allocate small pinned allocations into the
+// non-moving heap.
 #define NONMOVING_ALLOCA_CNT 12
 
 // maximum number of free segments to hold on to
 #define NONMOVING_MAX_FREE 16
+
+// block size of largest allocator in bytes.
+#define NONMOVING_MAX_BLOCK_SZ (1 << (NONMOVING_ALLOCA0 + NONMOVING_ALLOCA_CNT - 1))
 
 struct NonmovingHeap {
     struct NonmovingAllocator *allocators[NONMOVING_ALLOCA_CNT];
