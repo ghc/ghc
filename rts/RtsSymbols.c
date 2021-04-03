@@ -989,7 +989,6 @@
       SymI_HasProto(stg_traceBinaryEventzh)                             \
       SymI_HasProto(stg_getThreadAllocationCounterzh)                   \
       SymI_HasProto(stg_setThreadAllocationCounterzh)                   \
-      SymI_HasProto(stg_cloneMyStackzh)                                 \
       SymI_HasProto(getMonotonicNSec)                                   \
       SymI_HasProto(lockFile)                                           \
       SymI_HasProto(unlockFile)                                         \
@@ -1015,6 +1014,8 @@
       SymI_HasProto(registerInfoProvList)                               \
       SymI_HasProto(lookupIPE)                                          \
       SymI_HasProto(sendCloneStackMessage)                              \
+      SymI_HasProto(cloneStack)                                         \
+      SymI_HasProto(decodeClonedStack)                                  \
       RTS_USER_SIGNALS_SYMBOLS                                          \
       RTS_INTCHAR_SYMBOLS
 

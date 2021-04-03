@@ -16,14 +16,14 @@ foreign import ccall "expectClosureTypes" expectClosureTypes:: StackSnapshot# ->
 -- snapshot is still valid afterwards (is not gc'ed while in use).
 main :: IO ()
 main = do
-    stackSnapshot <- cloneMyStack
+  stackSnapshot <- cloneMyStack
 
-    performMajorGC
+  performMajorGC
 
-    let (StackSnapshot stack) = stackSnapshot
-    let expectedClosureTypes = [ 30 -- RET_SMALL
-                               , 30 -- RET_SMALL
-                               , 34 -- CATCH_FRAME
-                               , 36 -- STOP_FRAME
-                               ]
-    withArray expectedClosureTypes (\ptr -> expectClosureTypes stack ptr (length expectedClosureTypes))
+  let (StackSnapshot stack) = stackSnapshot
+  let expectedClosureTypes = [  30 -- RET_SMALL
+                              , 30 -- RET_SMALL
+                              , 34 -- CATCH_FRAME
+                              , 36 -- STOP_FRAME
+                             ]
+  withArray expectedClosureTypes (\ptr -> expectClosureTypes stack ptr (length expectedClosureTypes))

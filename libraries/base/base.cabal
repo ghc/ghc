@@ -352,6 +352,7 @@ Library
 
     cmm-sources:
         cbits/CastFloatWord.cmm
+        cbits/StackCloningDecoding.cmm
 
     include-dirs: include
     includes:

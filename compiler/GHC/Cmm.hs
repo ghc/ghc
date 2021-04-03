@@ -167,12 +167,12 @@ data CmmInfoTable
         -- place to convey this information from the code generator to
         -- where we build the static closures in
         -- GHC.Cmm.Info.Build.doSRTs.
-    }
+    } deriving Eq
 
 data ProfilingInfo
   = NoProfilingInfo
   | ProfilingInfo ByteString ByteString -- closure_type, closure_desc
-
+  deriving Eq
 -----------------------------------------------------------------------------
 --              Static Data
 -----------------------------------------------------------------------------
@@ -288,4 +288,3 @@ instance OutputableP env instr => OutputableP env (GenBasicBlock instr) where
 pprBBlock :: Outputable stmt => GenBasicBlock stmt -> SDoc
 pprBBlock (BasicBlock ident stmts) =
     hang (ppr ident <> colon) 4 (vcat (map ppr stmts))
-

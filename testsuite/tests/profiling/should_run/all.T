@@ -14,13 +14,19 @@ test('dynamic-prof2', [only_ways(['normal']), extra_run_opts('+RTS -hT --no-auto
 
 test('dynamic-prof3', [only_ways(['normal']), extra_run_opts('+RTS -hT --no-automatic-heap-samples')], compile_and_run, [''])
 
+# Remove the ipName field as it's volatile (depends on e.g. architecture and may change with every new GHC version)
+def normalise_InfoProv_ipName(str):
+     return re.sub('ipName = "\\w*"', '', str)
+
 test('staticcallstack001',
      [ omit_ways(['ghci-ext-prof']), # produces a different stack
+       normalise_fun(normalise_InfoProv_ipName)
      ], compile_and_run,
      ['-O0 -g3 -fdistinct-constructor-tables -finfo-table-map'])
 
 test('staticcallstack002',
      [ omit_ways(['ghci-ext-prof']), # produces a different stack
+       normalise_fun(normalise_InfoProv_ipName)
      ], compile_and_run,
      ['-O0 -g3 -fdistinct-constructor-tables -finfo-table-map'])
 

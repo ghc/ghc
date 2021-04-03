@@ -3648,19 +3648,9 @@ primop  SetThreadAllocationCounter "setThreadAllocationCounter#" GenPrimOp
    out_of_line      = True
 
 primtype StackSnapshot#
-
-primop  CloneMyStack "cloneMyStack#" GenPrimOp
-   State# RealWorld -> (# State# RealWorld, StackSnapshot# #)
-   { Clones the stack of the current (active) Haskell thread. A cloned stack is
-     represented by {\tt StackSnapshot# } and is not evaluated any further
-     (i.e. it's "cold"). This is useful for stack decoding (backtraces) and
-     analyses because there are no concurrent mutations on a cloned stack.
-     The module {\tt GHC.Stack.CloneStack } contains related funcions.
-     Please see Note [Stack Cloning] for technical details. }
-   with
-   has_side_effects = True
-   out_of_line      = True
-
+   { Haskell representation of a {\tt StgStack*} that was created (cloned)
+     with a function in {\tt GHC.Stack.CloneStack}. Please check the
+     documentation in this module for more detailed explanations. }
 
 ------------------------------------------------------------------------
 section "Safe coercions"

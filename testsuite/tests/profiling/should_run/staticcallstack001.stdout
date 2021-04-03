@@ -1,3 +1,3 @@
-["2","D","main","Main","staticcallstack001.hs:16:20-34"]
-["2","D","caf","Main","staticcallstack001.hs:13:1-9"]
-["15","D","main","Main","staticcallstack001.hs:18:30-39"]
+Just (InfoProv {ipName = "D_Main_4_con_info", ipDesc = "2", ipTyDesc = "D", ipLabel = "main", ipMod = "Main", ipLoc = "staticcallstack001.hs:16:13-27"})
+Just (InfoProv {ipName = "D_Main_2_con_info", ipDesc = "2", ipTyDesc = "D", ipLabel = "caf", ipMod = "Main", ipLoc = "staticcallstack001.hs:13:1-9"})
+Just (InfoProv {ipName = "sat_s11g_info", ipDesc = "15", ipTyDesc = "D", ipLabel = "main", ipMod = "Main", ipLoc = "staticcallstack001.hs:18:23-32"})

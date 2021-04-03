@@ -284,8 +284,6 @@ initInfoTableProv infos itmap this_mod
   = do
        dflags <- getDynFlags
        let ents = convertInfoProvMap dflags infos this_mod itmap
-       --pprTraceM "UsedInfo" (ppr (length infos))
-       --pprTraceM "initInfoTable" (ppr (length ents))
        -- Output the actual IPE data
        mapM_ emitInfoTableProv ents
        -- Create the C stub which initialises the IPE map

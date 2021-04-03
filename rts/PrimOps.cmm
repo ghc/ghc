@@ -2927,14 +2927,3 @@ stg_setThreadAllocationCounterzh ( I64 counter )
     StgTSO_alloc_limit(CurrentTSO) = counter + TO_I64(offset);
     return ();
 }
-
-stg_cloneMyStackzh () {
-    W_ stgStack;
-    W_ clonedStack;
-    stgStack = StgTSO_stackobj(CurrentTSO);
-    StgStack_sp(stgStack) = Sp;
-
-    ("ptr" clonedStack) = ccall cloneStack(MyCapability() "ptr", stgStack "ptr");
-
-    return (clonedStack);
-}
