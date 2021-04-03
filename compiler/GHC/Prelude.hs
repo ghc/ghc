@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
-
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE ConstraintKinds #-}
 -- | Custom GHC "Prelude"
 --
 -- This module serves as a replacement for the "Prelude" module
@@ -10,7 +11,7 @@
 --   * Is compiled with -XNoImplicitPrelude
 --   * Explicitly imports GHC.Prelude
 
-module GHC.Prelude (module X) where
+module GHC.Prelude (module X, HasDebugCallStack) where
 
 -- We export the 'Semigroup' class but w/o the (<>) operator to avoid
 -- clashing with the (Outputable.<>) operator which is heavily used
@@ -18,6 +19,19 @@ module GHC.Prelude (module X) where
 
 import Prelude as X hiding ((<>))
 import Data.Foldable as X (foldl')
+
+import GHC.Exts (Constraint)
+#if defined(DEBUG)
+import GHC.Stack (HasCallStack)
+#endif
+-- We define
+
+-- | A call stack constraint, but only when 'isDebugOn'.
+#if defined(DEBUG)
+type HasDebugCallStack = HasCallStack
+#else
+type HasDebugCallStack = (() :: Constraint)
+#endif
 
 {-
 Note [Why do we import Prelude here?]
