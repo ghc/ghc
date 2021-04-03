@@ -712,13 +712,17 @@ insertBy cmp x ys@(y:ys')
 --
 -- >>> maximumBy (\x y -> compare (length x) (length y)) ["Hello", "World", "!", "Longest", "bar"]
 -- "Longest"
-maximumBy               :: (a -> a -> Ordering) -> [a] -> a
-maximumBy _ []          =  errorWithoutStackTrace "List.maximumBy: empty list"
-maximumBy cmp xs        =  foldl1 maxBy xs
-                        where
-                           maxBy x y = case cmp x y of
-                                       GT -> x
-                                       _  -> y
+maximumBy :: (a -> a -> Ordering) -> [a] -> a
+maximumBy cmp = fromMaybe (errorWithoutStackTrace "maximumBy: empty structure")
+  . foldl' max' Nothing
+  where
+    max' mx y = Just $! case mx of
+      Nothing -> y
+      Just x -> case cmp x y of
+        GT -> x
+        _  -> y
+{-# INLINEABLE maximumBy #-}
+
 
 -- | The 'minimumBy' function takes a comparison function and a list
 -- and returns the least element of the list by the comparison function.
@@ -728,13 +732,16 @@ maximumBy cmp xs        =  foldl1 maxBy xs
 --
 -- >>> minimumBy (\x y -> compare (length x) (length y)) ["Hello", "World", "!", "Longest", "bar"]
 -- "!"
-minimumBy               :: (a -> a -> Ordering) -> [a] -> a
-minimumBy _ []          =  errorWithoutStackTrace "List.minimumBy: empty list"
-minimumBy cmp xs        =  foldl1 minBy xs
-                        where
-                           minBy x y = case cmp x y of
-                                       GT -> y
-                                       _  -> x
+minimumBy :: (a -> a -> Ordering) -> [a] -> a
+minimumBy cmp = fromMaybe (errorWithoutStackTrace "minimumBy: empty structure")
+  . foldl' min' Nothing
+  where
+    min' mx y = Just $! case mx of
+      Nothing -> y
+      Just x -> case cmp x y of
+        GT -> y
+        _  -> x
+{-# INLINEABLE minimumBy #-}
 
 -- | \(\mathcal{O}(n)\). The 'genericLength' function is an overloaded version
 -- of 'length'. In particular, instead of returning an 'Int', it returns any
