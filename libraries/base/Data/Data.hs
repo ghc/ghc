@@ -123,6 +123,7 @@ import Data.Monoid
 import Data.Ord
 import Data.List (findIndex)
 import Data.Typeable
+import qualified Type.Reflection as Refl
 import Data.Version( Version(..) )
 import GHC.Base hiding (Any, IntRep, FloatRep)
 import GHC.List
@@ -1364,3 +1365,15 @@ deriving instance Data DecidedStrictness
 
 -- | @since 4.12.0.0
 deriving instance Data a => Data (Down a)
+
+----------------------------------------------------------------------------
+-- Data instances for Type.Reflection
+
+-- If we have Typeable a, then TypeRep a carries no further information and can
+-- be regarded as being isomorphic to ().
+
+-- | @since 4.15.0.0
+instance (Typeable a, Typeable k) => Data (Refl.TypeRep (a :: k)) where
+  gunfold _ point _ = point Refl.typeRep
+  toConstr tr = mkConstr (dataTypeOf tr) "typeRep" [] Prefix
+  dataTypeOf tr = mkDataType "Data.Typeable.Internal.TypeRep" [toConstr tr]
