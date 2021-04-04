@@ -74,6 +74,7 @@ import Data.Complex (Complex((:+)))
 
 import GHC.Tuple (Solo (..))
 import GHC.Read (expectP, list, paren)
+import Data.Fixed (Fixed (..))
 
 import Text.ParserCombinators.ReadPrec (ReadPrec, readPrec_to_S, readS_to_Prec)
 import Text.Read (Read(..), parens, prec, step)
@@ -869,6 +870,14 @@ instance Show1 Complex where
         sp (complexPrec+1) x . showString " :+ " . sp (complexPrec+1) y
       where
         complexPrec = 6
+
+-- | @since 4.16.0.0
+instance Eq1 Fixed where
+    liftEq _eq (MkFixed x) (MkFixed y) = x == y
+
+-- | @since 4.16.0.0
+instance Ord1 Fixed where
+    liftCompare _cmp (MkFixed x) (MkFixed y) = compare x y
 
 -- Building blocks
 
