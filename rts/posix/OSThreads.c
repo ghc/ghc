@@ -30,7 +30,7 @@
 
 #if defined(HAVE_PTHREAD_H)
 #include <pthread.h>
-#if defined(freebsd_HOST_OS)
+#if defined(HAVE_PTHREAD_NP_H)
 #include <pthread_np.h>
 #endif
 #endif
@@ -153,8 +153,12 @@ createOSThread (OSThreadId* pId, char *name STG_UNUSED,
   int result = pthread_create(pId, NULL, startProc, param);
   if (!result) {
     pthread_detach(*pId);
-#if defined(HAVE_PTHREAD_SETNAME_NP)
+#if defined(HAVE_PTHREAD_SET_NAME_NP)
+    pthread_set_name_np(*pId, name);
+#elif defined(HAVE_PTHREAD_SETNAME_NP)
     pthread_setname_np(*pId, name);
+#elif defined(HAVE_PTHREAD_SETNAME_NP_DARWIN)
+    pthread_setname_np(name);
 #endif
   }
   return result;
