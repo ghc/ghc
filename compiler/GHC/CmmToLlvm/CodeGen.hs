@@ -915,8 +915,7 @@ genJump (CmmLit (CmmLabel lbl)) live = do
     (vf, stmts, top) <- getHsFunc live lbl
     (stgRegs, stgStmts) <- funEpilogue live
     let s1  = Expr $ Call TailCall vf stgRegs llvmStdFunAttrs
-    let s2  = Return Nothing
-    return (stmts `appOL` stgStmts `snocOL` s1 `snocOL` s2, top)
+    return (stmts `appOL` stgStmts `snocOL` s1, top)
 
 
 -- Call to unknown function / address
@@ -935,9 +934,7 @@ genJump expr live = do
     (v1, s1) <- doExpr (pLift fty) $ Cast cast vf (pLift fty)
     (stgRegs, stgStmts) <- funEpilogue live
     let s2 = Expr $ Call TailCall v1 stgRegs llvmStdFunAttrs
-    let s3 = Return Nothing
-    return (stmts `snocOL` s1 `appOL` stgStmts `snocOL` s2 `snocOL` s3,
-            top)
+    return (stmts `snocOL` s1 `appOL` stgStmts `snocOL` s2, top)
 
 
 -- | CmmAssign operation
