@@ -194,14 +194,7 @@ pprTyThing ss ty_thing
 
 pprTypeForUser :: Type -> SDoc
 -- The type is tidied
-pprTypeForUser ty
-  = pprSigmaType tidy_ty
-  where
-    (_, tidy_ty)     = tidyOpenType emptyTidyEnv ty
-     -- Often the types/kinds we print in ghci are fully generalised
-     -- and have no free variables, but it turns out that we sometimes
-     -- print un-generalised kinds (eg when doing :k T), so it's
-     -- better to use tidyOpenType here
+pprTypeForUser ty = pprSigmaType ty
 
 showWithLoc :: SDoc -> SDoc -> SDoc
 showWithLoc loc doc
