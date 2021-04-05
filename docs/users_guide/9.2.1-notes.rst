@@ -235,6 +235,10 @@ Runtime system
   is returned is controlled by the :rts-flag:`-Fd ⟨factor⟩`. Memory return
   is triggered by consecutive idle collections.
 
+- The default nursery size, :rts-flag:`-A <-A ⟨size⟩>`, has been increased from 1mb to 4mb.
+  GHC itself uses the default nursery size, and so now runs with a larger
+  nursery by default.
+
 Template Haskell
 ~~~~~~~~~~~~~~~~
 
