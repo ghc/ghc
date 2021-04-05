@@ -66,6 +66,7 @@ import GHC.Driver.Env
 import GHC.Runtime.Context
 import GHC.Types.TyThing
 import GHC.Types.TyThing.Ppr
+import GHC.Core.TyCo.Ppr
 import GHC.Types.SafeHaskell ( getSafeMode )
 import GHC.Types.Name
 import GHC.Types.SourceText
@@ -1855,10 +1856,10 @@ sigAndLocDoc :: String -> TyThing -> SDoc
 sigAndLocDoc str tyThing =
   let tyThingTyDoc :: TyThing -> SDoc
       tyThingTyDoc = \case
-        AnId i                      -> pprTypeForUser $ varType i
-        AConLike (RealDataCon dc)   -> pprTypeForUser $ dataConDisplayType False dc
+        AnId i                      -> pprSigmaType $ varType i
+        AConLike (RealDataCon dc)   -> pprSigmaType $ dataConDisplayType False dc
         AConLike (PatSynCon patSyn) -> pprPatSynType patSyn
-        ATyCon tyCon                -> pprTypeForUser $ GHC.tyConKind tyCon
+        ATyCon tyCon                -> pprSigmaType $ GHC.tyConKind tyCon
         ACoAxiom _                  -> empty
 
       tyDoc = tyThingTyDoc tyThing
@@ -2229,7 +2230,7 @@ typeOfExpr str = handleSourceError GHC.printException $
     do_it mode expr_str
       = do { ty <- GHC.exprType mode expr_str
            ;    printForUser $ sep [ text expr_str
-                                   , nest 2 (dcolon <+> pprTypeForUser ty)] }
+                                   , nest 2 (dcolon <+> pprSigmaType ty)] }
 
 -----------------------------------------------------------------------------
 -- | @:type-at@ command
@@ -2277,7 +2278,7 @@ allTypesCmd _ = runExceptGhcMonad $ do
         let tyInfo = unwords . words $
                      showSDocForUser (hsc_dflags hsc_env)
                                      (hsc_units  hsc_env)
-                                     alwaysQualify (pprTypeForUser ty)
+                                     alwaysQualify (pprSigmaType ty)
         liftIO . putStrLn $
             showRealSrcSpan (spaninfoSrcSpan span') ++ ": " ++ tyInfo
       | otherwise = return ()
@@ -2362,8 +2363,8 @@ showRealSrcSpan spn = concat [ fp, ":(", show sl, ",", show sc
 kindOfType :: GHC.GhcMonad m => Bool -> String -> m ()
 kindOfType norm str = handleSourceError GHC.printException $ do
     (ty, kind) <- GHC.typeKind norm str
-    printForUser $ vcat [ text str <+> dcolon <+> pprTypeForUser kind
-                        , ppWhen norm $ equals <+> pprTypeForUser ty ]
+    printForUser $ vcat [ text str <+> dcolon <+> pprSigmaType kind
+                        , ppWhen norm $ equals <+> pprSigmaType ty ]
 
 -----------------------------------------------------------------------------
 -- :quit
