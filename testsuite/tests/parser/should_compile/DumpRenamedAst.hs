@@ -24,4 +24,11 @@ data T f (a :: k) = MkT (f a)
 type family F1 (a :: k) (f :: k -> Type) :: Type where
   F1 @Peano a f = T @Peano f a
 
+class C a where
+  type F a b
+
+instance C [a] where
+  type F [a] b = Either a b -- Ensure that the HsOuterImplicit for the F
+                            -- instance only quantifies over `b` (#19649)
+
 main = putStrLn "hello"
