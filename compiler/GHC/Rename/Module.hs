@@ -719,7 +719,10 @@ rnFamEqn doc atfi extra_kvars
          -- data instance H :: k -> Type where ...
          --   -- all_imp_vars = [k]
          -- @
-       ; let all_imp_vars = pat_kity_vars ++ extra_kvars
+         --
+         -- For associated type family instances, exclude the type variables
+         -- bound by the instance head with filterInScopeM (#19649).
+       ; all_imp_vars <- filterInScopeM $ pat_kity_vars ++ extra_kvars
 
        ; bindHsOuterTyVarBndrs doc mb_cls all_imp_vars outer_bndrs $ \rn_outer_bndrs ->
     do { (pats', pat_fvs) <- rnLHsTypeArgs (FamPatCtx tycon) pats
@@ -755,8 +758,18 @@ rnFamEqn doc atfi extra_kvars
          -- parent instance declaration is mentioned on the RHS of the
          -- associated family instance but not bound on the LHS, then reject
          -- that type variable as being out of scope.
-         -- See Note [Renaming associated types]
-       ; let lhs_bound_vars = extendNameSetList pat_fvs all_nms
+         -- See Note [Renaming associated types].
+         -- Per that Note, the LHS type variables consist of:
+         --
+         -- * The variables mentioned in the instance's type patterns
+         --   (pat_fvs), and
+         --
+         -- * The variables mentioned in an outermost kind signature on the
+         --   RHS. This is a subset of `rhs_fvs`. To compute it, we look up
+         --   each RdrName in `extra_kvars` to find its corresponding Name in
+         --   the LocalRdrEnv.
+       ; extra_kvar_nms <- mapMaybeM (lookupLocalOccRn_maybe . unLoc) extra_kvars
+       ; let lhs_bound_vars = pat_fvs `extendNameSetList` extra_kvar_nms
              improperly_scoped cls_tkv =
                   cls_tkv `elemNameSet` rhs_fvs
                     -- Mentioned on the RHS...
@@ -1120,7 +1133,7 @@ example:
 Here, we /do/ want to warn that `CF` is unused in the module `C`, as it is
 defined but not used (#18470).
 
-GHC accomplishes this in rnFamInstEqn when determining the set of free
+GHC accomplishes this in rnFamEqn when determining the set of free
 variables to return at the end. If renaming a data family or open type family
 equation, we add the name of the type family constructor to the set of returned
 free variables to ensure that the name is marked as an occurrence. If renaming
