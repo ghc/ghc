@@ -224,9 +224,9 @@ tcExpr e@(HsLit x lit) res_ty
   = do { let lit_ty = hsLitType lit
        ; tcWrapResult e (HsLit x (convertLit lit)) lit_ty res_ty }
 
-tcExpr (HsPar x expr) res_ty
+tcExpr (HsPar x lpar expr rpar) res_ty
   = do { expr' <- tcMonoExprNC expr res_ty
-       ; return (HsPar x expr') }
+       ; return (HsPar x lpar expr' rpar) }
 
 tcExpr (HsPragE x prag expr) res_ty
   = do { expr' <- tcMonoExpr expr res_ty
