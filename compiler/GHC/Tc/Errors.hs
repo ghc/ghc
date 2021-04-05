@@ -48,6 +48,7 @@ import GHC.Types.Id
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
+import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Data.Bag
 import GHC.Utils.Error  (diagReasonSeverity,  pprLocMsgEnvelope )
@@ -66,7 +67,7 @@ import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Utils.FV ( fvVarList, unionFV )
 
-import Control.Monad    ( unless,  when, forM_ )
+import Control.Monad    ( unless, when, foldM, forM_ )
 import Data.Foldable    ( toList )
 import Data.List        ( partition, mapAccumL, sortBy, unfoldr )
 
@@ -715,21 +716,57 @@ mkSkolReporter ctxt cts
 reportHoles :: [Ct]  -- other (tidied) constraints
             -> ReportErrCtxt -> [Hole] -> TcM ()
 reportHoles tidy_cts ctxt holes
-  = do df <- getDynFlags
-       forM_ holes $ \hole -> unless (ignoreThisHole df ctxt hole) $
-          mkHoleError tidy_cts ctxt hole >>= reportDiagnostic
+  = do
+      df <- getDynFlags
+      let severity = diagReasonSeverity df (cec_type_holes ctxt)
+          holes'   = filter (keepThisHole severity) holes
+      -- Zonk and tidy all the TcLclEnvs before calling `mkHoleError`
+      -- because otherwise types will be zonked and tidied many times over.
+      (tidy_env', lcl_name_cache) <- zonkTidyTcLclEnvs (cec_tidy ctxt) (map (ctl_env . hole_loc) holes')
+      let ctxt' = ctxt { cec_tidy = tidy_env' }
+      forM_ holes' $ \hole -> do { msg <- mkHoleError lcl_name_cache tidy_cts ctxt' hole
+                                 ; reportDiagnostic msg }
 
-ignoreThisHole :: DynFlags -> ReportErrCtxt -> Hole -> Bool
+keepThisHole :: Severity -> Hole -> Bool
 -- See Note [Skip type holes rapidly]
-ignoreThisHole df ctxt hole
+keepThisHole sev hole
   = case hole_sort hole of
-       ExprHole {}    -> False
-       TypeHole       -> ignore_type_hole
-       ConstraintHole -> ignore_type_hole
+       ExprHole {}    -> True
+       TypeHole       -> keep_type_hole
+       ConstraintHole -> keep_type_hole
   where
-    ignore_type_hole = case diagReasonSeverity df (cec_type_holes ctxt) of
-                         SevIgnore -> True
-                         _         -> False
+    keep_type_hole = case sev of
+                         SevIgnore -> False
+                         _         -> True
+
+-- | zonkTidyTcLclEnvs takes a bunch of 'TcLclEnv's, each from a Hole.
+-- It returns a ('Name' :-> 'Type') mapping which gives the zonked, tidied
+-- type for each Id in any of the binder stacks in the  'TcLclEnv's.
+-- Since there is a huge overlap between these stacks, is is much,
+-- much faster to do them all at once, avoiding duplication.
+zonkTidyTcLclEnvs :: TidyEnv -> [TcLclEnv] -> TcM (TidyEnv, NameEnv Type)
+zonkTidyTcLclEnvs tidy_env lcls = foldM go (tidy_env, emptyNameEnv) (concatMap tcl_bndrs lcls)
+  where
+    go envs tc_bndr = case tc_bndr of
+          TcTvBndr {} -> return envs
+          TcIdBndr id _top_lvl -> go_one (idName id) (idType id) envs
+          TcIdBndr_ExpType name et _top_lvl ->
+            do { mb_ty <- readExpType_maybe et
+                   -- et really should be filled in by now. But there's a chance
+                   -- it hasn't, if, say, we're reporting a kind error en route to
+                   -- checking a term. See test indexed-types/should_fail/T8129
+                   -- Or we are reporting errors from the ambiguity check on
+                   -- a local type signature
+               ; case mb_ty of
+                   Just ty -> go_one name ty envs
+                   Nothing -> return envs
+               }
+    go_one name ty (tidy_env, name_env) = do
+            if name `elemNameEnv` name_env
+              then return (tidy_env, name_env)
+              else do
+                (tidy_env', tidy_ty) <- zonkTidyTcType tidy_env ty
+                return (tidy_env',  extendNameEnv name_env name tidy_ty)
 
 {- Note [Skip type holes rapidly]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1148,8 +1185,8 @@ See also 'reportUnsolved'.
 
 ----------------
 -- | Constructs a new hole error, unless this is deferred. See Note [Constructing Hole Errors].
-mkHoleError :: [Ct] -> ReportErrCtxt -> Hole -> TcM (MsgEnvelope DiagnosticMessage)
-mkHoleError _tidy_simples ctxt hole@(Hole { hole_occ = occ
+mkHoleError :: NameEnv Type -> [Ct] -> ReportErrCtxt -> Hole -> TcM (MsgEnvelope DiagnosticMessage)
+mkHoleError _ _tidy_simples ctxt hole@(Hole { hole_occ = occ
                                            , hole_ty = hole_ty
                                            , hole_loc = ct_loc })
   | isOutOfScopeHole hole
@@ -1178,12 +1215,13 @@ mkHoleError _tidy_simples ctxt hole@(Hole { hole_occ = occ
     lcl_env     = ctLocEnv ct_loc
     boring_type = isTyVarTy hole_ty
 
-mkHoleError tidy_simples ctxt hole@(Hole { hole_occ = occ
+ -- general case: not an out-of-scope error
+mkHoleError lcl_name_cache tidy_simples ctxt hole@(Hole { hole_occ = occ
                                          , hole_ty = hole_ty
                                          , hole_sort = sort
                                          , hole_loc = ct_loc })
-  = do { (ctxt, binds_msg)
-           <- relevant_bindings False ctxt lcl_env (tyCoVarsOfType hole_ty)
+  = do { binds_msg
+           <- relevant_bindings False lcl_env lcl_name_cache (tyCoVarsOfType hole_ty)
                -- The 'False' means "don't filter the bindings"; see Trac #8191
 
        ; show_hole_constraints <- goptM Opt_ShowHoleConstraints
@@ -2902,21 +2940,23 @@ relevantBindings want_filtering ctxt ct
              -- Put a zonked, tidied CtOrigin into the Ct
              loc'   = setCtLocOrigin loc tidy_orig
              ct'    = setCtLoc ct loc'
-             ctxt1  = ctxt { cec_tidy = env1 }
 
-       ; (ctxt2, doc) <- relevant_bindings want_filtering ctxt1 lcl_env ct_fvs
-       ; return (ctxt2, doc, ct') }
+       ; (env2, lcl_name_cache) <- zonkTidyTcLclEnvs env1 [lcl_env]
+
+       ; doc <- relevant_bindings want_filtering lcl_env lcl_name_cache ct_fvs
+       ; let ctxt'  = ctxt { cec_tidy = env2 }
+       ; return (ctxt', doc, ct') }
   where
     loc     = ctLoc ct
     lcl_env = ctLocEnv loc
 
 -- slightly more general version, to work also with holes
 relevant_bindings :: Bool
-                  -> ReportErrCtxt
                   -> TcLclEnv
+                  -> NameEnv Type -- Cache of already zonked and tidied types
                   -> TyCoVarSet
-                  -> TcM (ReportErrCtxt, SDoc)
-relevant_bindings want_filtering ctxt lcl_env ct_tvs
+                  -> TcM SDoc
+relevant_bindings want_filtering lcl_env lcl_name_env ct_tvs
   = do { dflags <- getDynFlags
        ; traceTc "relevant_bindings" $
            vcat [ ppr ct_tvs
@@ -2925,8 +2965,8 @@ relevant_bindings want_filtering ctxt lcl_env ct_tvs
                 , pprWithCommas id
                     [ ppr id | TcIdBndr_ExpType id _ _ <- tcl_bndrs lcl_env ] ]
 
-       ; (tidy_env', docs, discards)
-              <- go dflags (cec_tidy ctxt) (maxRelevantBinds dflags)
+       ; (docs, discards)
+              <- go dflags (maxRelevantBinds dflags)
                     emptyVarSet [] False
                     (removeBindingShadowing $ tcl_bndrs lcl_env)
          -- tcl_bndrs has the innermost bindings first,
@@ -2936,9 +2976,7 @@ relevant_bindings want_filtering ctxt lcl_env ct_tvs
                    hang (text "Relevant bindings include")
                       2 (vcat docs $$ ppWhen discards discardMsg)
 
-             ctxt' = ctxt { cec_tidy = tidy_env' }
-
-       ; return (ctxt', doc) }
+       ; return doc }
   where
     run_out :: Maybe Int -> Bool
     run_out Nothing = False
@@ -2948,17 +2986,17 @@ relevant_bindings want_filtering ctxt lcl_env ct_tvs
     dec_max = fmap (\n -> n - 1)
 
 
-    go :: DynFlags -> TidyEnv -> Maybe Int -> TcTyVarSet -> [SDoc]
+    go :: DynFlags -> Maybe Int -> TcTyVarSet -> [SDoc]
        -> Bool                          -- True <=> some filtered out due to lack of fuel
        -> [TcBinder]
-       -> TcM (TidyEnv, [SDoc], Bool)   -- The bool says if we filtered any out
+       -> TcM ([SDoc], Bool)   -- The bool says if we filtered any out
                                         -- because of lack of fuel
-    go _ tidy_env _ _ docs discards []
-      = return (tidy_env, reverse docs, discards)
-    go dflags tidy_env n_left tvs_seen docs discards (tc_bndr : tc_bndrs)
+    go _ _ _ docs discards []
+      = return (reverse docs, discards)
+    go dflags n_left tvs_seen docs discards (tc_bndr : tc_bndrs)
       = case tc_bndr of
           TcTvBndr {} -> discard_it
-          TcIdBndr id top_lvl -> go2 (idName id) (idType id) top_lvl
+          TcIdBndr id top_lvl -> go2 (idName id) top_lvl
           TcIdBndr_ExpType name et top_lvl ->
             do { mb_ty <- readExpType_maybe et
                    -- et really should be filled in by now. But there's a chance
@@ -2967,14 +3005,16 @@ relevant_bindings want_filtering ctxt lcl_env ct_tvs
                    -- Or we are reporting errors from the ambiguity check on
                    -- a local type signature
                ; case mb_ty of
-                   Just ty -> go2 name ty top_lvl
+                   Just _ty -> go2 name top_lvl
                    Nothing -> discard_it  -- No info; discard
                }
       where
-        discard_it = go dflags tidy_env n_left tvs_seen docs
+        discard_it = go dflags n_left tvs_seen docs
                         discards tc_bndrs
-        go2 id_name id_type top_lvl
-          = do { (tidy_env', tidy_ty) <- zonkTidyTcType tidy_env id_type
+        go2 id_name top_lvl
+          = do { let tidy_ty = case lookupNameEnv lcl_name_env id_name of
+                                  Just tty -> tty
+                                  Nothing -> pprPanic "relevant_bindings" (ppr id_name)
                ; traceTc "relevantBindings 1" (ppr id_name <+> dcolon <+> ppr tidy_ty)
                ; let id_tvs = tyCoVarsOfType tidy_ty
                      doc = sep [ pprPrefixOcc id_name <+> dcolon <+> ppr tidy_ty
@@ -2996,12 +3036,12 @@ relevant_bindings want_filtering ctxt lcl_env ct_tvs
                  else if run_out n_left && id_tvs `subVarSet` tvs_seen
                           -- We've run out of n_left fuel and this binding only
                           -- mentions already-seen type variables, so discard it
-                 then go dflags tidy_env n_left tvs_seen docs
+                 then go dflags n_left tvs_seen docs
                          True      -- Record that we have now discarded something
                          tc_bndrs
 
                           -- Keep this binding, decrement fuel
-                 else go dflags tidy_env' (dec_max n_left) new_seen
+                 else go dflags (dec_max n_left) new_seen
                          (doc:docs) discards tc_bndrs }
 
 
