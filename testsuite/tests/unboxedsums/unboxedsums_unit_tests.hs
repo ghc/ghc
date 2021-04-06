@@ -62,19 +62,19 @@ layout_tests = sequence_
       assert_layout "layout1"
         [ ubxtup [ intTy, intPrimTy ]
         , ubxtup [ intPrimTy, intTy ] ]
-        [ WordSlot, PtrSlot, WordSlot ]
+        [ WordSlot, PtrLiftedSlot, WordSlot ]
 
     layout2 =
       assert_layout "layout2"
         [ ubxtup [ intTy ]
         , intTy ]
-        [ WordSlot, PtrSlot ]
+        [ WordSlot, PtrLiftedSlot ]
 
     layout3 =
       assert_layout "layout3"
         [ ubxtup [ intTy, intPrimTy, intTy, intPrimTy ]
         , ubxtup [ intPrimTy, intTy, intPrimTy, intTy ] ]
-        [ WordSlot, PtrSlot, PtrSlot, WordSlot, WordSlot ]
+        [ WordSlot, PtrLiftedSlot, PtrLiftedSlot, WordSlot, WordSlot ]
 
     layout4 =
       assert_layout "layout4"
