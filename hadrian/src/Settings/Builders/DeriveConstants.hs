@@ -11,7 +11,6 @@ deriveConstantsPairs =
   , ("platformConstants", "--gen-haskell-value")
   ]
 
--- TODO: do we need to support `includes_CC_OPTS += -DDYNAMIC_BY_DEFAULT`?
 deriveConstantsBuilderArgs :: Args
 deriveConstantsBuilderArgs = builder DeriveConstants ? do
     cFlags <- includeCcArgs
