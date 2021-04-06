@@ -91,9 +91,6 @@ module GHC.Utils.Misc (
         looksLikeModuleName,
         looksLikePackageName,
 
-        -- * Argument processing
-        getCmd, toCmdArgs, toArgs,
-
         -- * Integers
         exactLog2,
 
@@ -1102,67 +1099,6 @@ looksLikeModuleName (c:cs) = isUpper c && go cs
 looksLikePackageName :: String -> Bool
 looksLikePackageName = all (all isAlphaNum <&&> not . (all isDigit)) . split '-'
 
-{-
-Akin to @Prelude.words@, but acts like the Bourne shell, treating
-quoted strings as Haskell Strings, and also parses Haskell [String]
-syntax.
--}
-
-getCmd :: String -> Either String             -- Error
-                           (String, String) -- (Cmd, Rest)
-getCmd s = case break isSpace $ dropWhile isSpace s of
-           ([], _) -> Left ("Couldn't find command in " ++ show s)
-           res -> Right res
-
-toCmdArgs :: String -> Either String             -- Error
-                              (String, [String]) -- (Cmd, Args)
-toCmdArgs s = case getCmd s of
-              Left err -> Left err
-              Right (cmd, s') -> case toArgs s' of
-                                 Left err -> Left err
-                                 Right args -> Right (cmd, args)
-
-toArgs :: String -> Either String   -- Error
-                           [String] -- Args
-toArgs str
-    = case dropWhile isSpace str of
-      s@('[':_) -> case reads s of
-                   [(args, spaces)]
-                    | all isSpace spaces ->
-                       Right args
-                   _ ->
-                       Left ("Couldn't read " ++ show str ++ " as [String]")
-      s -> toArgs' s
- where
-  toArgs' :: String -> Either String [String]
-  -- Remove outer quotes:
-  -- > toArgs' "\"foo\" \"bar baz\""
-  -- Right ["foo", "bar baz"]
-  --
-  -- Keep inner quotes:
-  -- > toArgs' "-DFOO=\"bar baz\""
-  -- Right ["-DFOO=\"bar baz\""]
-  toArgs' s = case dropWhile isSpace s of
-              [] -> Right []
-              ('"' : _) -> do
-                    -- readAsString removes outer quotes
-                    (arg, rest) <- readAsString s
-                    (arg:) `fmap` toArgs' rest
-              s' -> case break (isSpace <||> (== '"')) s' of
-                    (argPart1, s''@('"':_)) -> do
-                        (argPart2, rest) <- readAsString s''
-                        -- show argPart2 to keep inner quotes
-                        ((argPart1 ++ show argPart2):) `fmap` toArgs' rest
-                    (arg, s'') -> (arg:) `fmap` toArgs' s''
-
-  readAsString :: String -> Either String (String, String)
-  readAsString s = case reads s of
-                [(arg, rest)]
-                    -- rest must either be [] or start with a space
-                    | all isSpace (take 1 rest) ->
-                    Right (arg, rest)
-                _ ->
-                    Left ("Couldn't read " ++ show s ++ " as String")
 -----------------------------------------------------------------------------
 -- Integers
 

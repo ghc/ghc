@@ -16,7 +16,7 @@ module GHC.Parser.Header
    , mkPrelImports -- used by the renamer too
    , getOptionsFromFile
    , getOptions
-   , optionsErrorMsgs
+   , toArgs
    , checkProcessArgsResult
    )
 where
@@ -29,7 +29,9 @@ import GHC.Platform
 
 import GHC.Driver.Session
 import GHC.Driver.Config
+import GHC.Driver.Errors.Types -- Unfortunate, needed due to the fact we throw exceptions!
 
+import GHC.Parser.Errors.Types
 import GHC.Parser.Errors.Ppr
 import GHC.Parser.Errors
 import GHC.Parser           ( parseHeader )
@@ -39,7 +41,7 @@ import GHC.Hs
 import GHC.Unit.Module
 import GHC.Builtin.Names
 
-import GHC.Types.Error hiding ( getMessages, getErrorMessages, getWarningMessages )
+import GHC.Types.Error hiding ( getErrorMessages, getWarningMessages, getMessages )
 import GHC.Types.SrcLoc
 import GHC.Types.SourceError
 import GHC.Types.SourceText
@@ -53,13 +55,17 @@ import GHC.Utils.Exception as Exception
 
 import GHC.Data.StringBuffer
 import GHC.Data.Maybe
-import GHC.Data.Bag         ( Bag, listToBag, unitBag, isEmptyBag )
+import GHC.Data.Bag         (Bag, isEmptyBag )
 import GHC.Data.FastString
 
 import Control.Monad
 import System.IO
 import System.IO.Unsafe
 import Data.List (partition)
+import Data.Char (isSpace)
+import Text.ParserCombinators.ReadP (readP_to_S, gather)
+import Text.ParserCombinators.ReadPrec (readPrec_to_P)
+import Text.Read (readPrec)
 
 ------------------------------------------------------------------------------
 
@@ -91,7 +97,7 @@ getImports popts implicit_prelude buf filename source_filename = do
       -- don't log warnings: they'll be reported when we parse the file
       -- for real.  See #2500.
       if not (isEmptyBag errs)
-        then throwIO $ mkSrcErr (fmap mkParserErr errs)
+        then throwErrors $ foldPsMessages mkParserErr errs
         else
           let   hsmod = unLoc rdr_module
                 mb_mod = hsmodName hsmod
@@ -260,10 +266,14 @@ getOptions' dflags toks
           parseToks (open:close:xs)
               | IToptions_prag str <- unLoc open
               , ITclose_prag       <- unLoc close
-              = case toArgs str of
+              = case toArgs starting_loc str of
                   Left _err -> optionsParseError str $   -- #15053
                                  combineSrcSpans (getLoc open) (getLoc close)
-                  Right args -> map (L (getLoc open)) args ++ parseToks xs
+                  Right args -> args ++ parseToks xs
+            where
+              src_span      = getLoc open
+              real_src_span = expectJust "getOptions'" (srcSpanToRealSrcSpan src_span)
+              starting_loc  = realSrcSpanStart real_src_span
           parseToks (open:close:xs)
               | ITinclude_prag str <- unLoc open
               , ITclose_prag       <- unLoc close
@@ -304,6 +314,107 @@ getOptions' dflags toks
               (ITdocSection {})      -> True
               _                      -> False
 
+toArgs :: RealSrcLoc
+       -> String -> Either String   -- Error
+                           [Located String] -- Args
+toArgs starting_loc orig_str
+    = let (after_spaces_loc, after_spaces_str) = consume_spaces starting_loc orig_str in
+      case after_spaces_str of
+      '[':after_bracket ->
+        let after_bracket_loc = advanceSrcLoc after_spaces_loc '['
+            (after_bracket_spaces_loc, after_bracket_spaces_str)
+              = consume_spaces after_bracket_loc after_bracket in
+        case after_bracket_spaces_str of
+          ']':rest | all isSpace rest -> Right []
+          _ -> readAsList after_bracket_spaces_loc after_bracket_spaces_str
+
+      _ -> toArgs' after_spaces_loc after_spaces_str
+ where
+  consume_spaces :: RealSrcLoc -> String -> (RealSrcLoc, String)
+  consume_spaces loc [] = (loc, [])
+  consume_spaces loc (c:cs)
+    | isSpace c = consume_spaces (advanceSrcLoc loc c) cs
+    | otherwise = (loc, c:cs)
+
+  break_with_loc :: (Char -> Bool) -> RealSrcLoc -> String
+                 -> (String, RealSrcLoc, String)  -- location is start of second string
+  break_with_loc p = go []
+    where
+      go reversed_acc loc [] = (reverse reversed_acc, loc, [])
+      go reversed_acc loc (c:cs)
+        | p c       = (reverse reversed_acc, loc, c:cs)
+        | otherwise = go (c:reversed_acc) (advanceSrcLoc loc c) cs
+
+  advance_src_loc_many :: RealSrcLoc -> String -> RealSrcLoc
+  advance_src_loc_many = foldl' advanceSrcLoc
+
+  locate :: RealSrcLoc -> RealSrcLoc -> a -> Located a
+  locate begin end x = L (RealSrcSpan (mkRealSrcSpan begin end) Nothing) x
+
+  toArgs' :: RealSrcLoc -> String -> Either String [Located String]
+  -- Remove outer quotes:
+  -- > toArgs' "\"foo\" \"bar baz\""
+  -- Right ["foo", "bar baz"]
+  --
+  -- Keep inner quotes:
+  -- > toArgs' "-DFOO=\"bar baz\""
+  -- Right ["-DFOO=\"bar baz\""]
+  toArgs' loc s =
+    let (after_spaces_loc, after_spaces_str) = consume_spaces loc s in
+    case after_spaces_str of
+      [] -> Right []
+      '"' : _ -> do
+        -- readAsString removes outer quotes
+        (arg, new_loc, rest) <- readAsString after_spaces_loc after_spaces_str
+        check_for_space rest
+        (locate after_spaces_loc new_loc arg:)
+          `fmap` toArgs' new_loc rest
+      _ -> case break_with_loc (isSpace <||> (== '"')) after_spaces_loc after_spaces_str of
+            (argPart1, loc2, s''@('"':_)) -> do
+                (argPart2, loc3, rest) <- readAsString loc2 s''
+                check_for_space rest
+                -- show argPart2 to keep inner quotes
+                (locate after_spaces_loc loc3 (argPart1 ++ show argPart2):)
+                  `fmap` toArgs' loc3 rest
+            (arg, loc2, s'') -> (locate after_spaces_loc loc2 arg:)
+                                  `fmap` toArgs' loc2 s''
+
+  check_for_space :: String -> Either String ()
+  check_for_space [] = Right ()
+  check_for_space (c:_)
+    | isSpace c = Right ()
+    | otherwise = Left ("Whitespace expected after string in " ++ show orig_str)
+
+  reads_with_consumed :: Read a => String
+                      -> [((String, a), String)]
+                        -- ((consumed string, parsed result), remainder of input)
+  reads_with_consumed = readP_to_S (gather (readPrec_to_P readPrec 0))
+
+  readAsString :: RealSrcLoc
+               -> String
+               -> Either String (String, RealSrcLoc, String)
+  readAsString loc s = case reads_with_consumed s of
+                [((consumed, arg), rest)] ->
+                    Right (arg, advance_src_loc_many loc consumed, rest)
+                _ ->
+                    Left ("Couldn't read " ++ show s ++ " as String")
+
+   -- input has had the '[' stripped off
+  readAsList :: RealSrcLoc -> String -> Either String [Located String]
+  readAsList loc s = do
+    let (after_spaces_loc, after_spaces_str) = consume_spaces loc s
+    (arg, after_arg_loc, after_arg_str) <- readAsString after_spaces_loc after_spaces_str
+    let (after_arg_spaces_loc, after_arg_spaces_str)
+          = consume_spaces after_arg_loc after_arg_str
+    (locate after_spaces_loc after_arg_loc arg :) <$>
+      case after_arg_spaces_str of
+        ',':after_comma -> readAsList (advanceSrcLoc after_arg_spaces_loc ',') after_comma
+        ']':after_bracket
+          | all isSpace after_bracket
+          -> Right []
+        _ -> Left ("Couldn't read " ++ show ('[' : s) ++ " as [String]")
+             -- reinsert missing '[' for clarity.
+
 -----------------------------------------------------------------------------
 
 -- | Complain about non-dynamic flags in OPTIONS pragmas.
@@ -313,11 +424,12 @@ getOptions' dflags toks
 checkProcessArgsResult :: MonadIO m => [Located String] -> m ()
 checkProcessArgsResult flags
   = when (notNull flags) $
-      liftIO $ throwIO $ mkSrcErr $ listToBag $ map mkMsg flags
+      liftIO $ throwErrors $ foldMap (singleMessage . mkMsg) flags
     where mkMsg (L loc flag)
               = mkPlainErrorMsgEnvelope loc $
-                  (text "unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+>
-                   text flag)
+                GhcDriverMessage $ DriverUnknownMessage $ mkPlainError $
+                  text "unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+>
+                  text flag
 
 -----------------------------------------------------------------------------
 
@@ -349,19 +461,6 @@ unsupportedExtnError dflags loc unsup =
      supported = supportedLanguagesAndExtensions $ platformArchOS $ targetPlatform dflags
      suggestions = fuzzyMatch unsup supported
 
-
-optionsErrorMsgs :: [String] -> [Located String] -> FilePath -> Messages DiagnosticMessage
-optionsErrorMsgs unhandled_flags flags_lines _filename
-  = mkMessages $ listToBag (map mkMsg unhandled_flags_lines)
-  where unhandled_flags_lines :: [Located String]
-        unhandled_flags_lines = [ L l f
-                                | f <- unhandled_flags
-                                , L l f' <- flags_lines
-                                , f == f' ]
-        mkMsg (L flagSpan flag) =
-            mkPlainErrorMsgEnvelope flagSpan $
-                    text "unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+> text flag
-
 optionsParseError :: String -> SrcSpan -> a     -- #15053
 optionsParseError str loc =
   throwErr loc $
@@ -372,4 +471,5 @@ optionsParseError str loc =
 
 throwErr :: SrcSpan -> SDoc -> a                -- #15053
 throwErr loc doc =
-  throw $ mkSrcErr $ unitBag $ mkPlainErrorMsgEnvelope loc doc
+  let msg = mkPlainErrorMsgEnvelope loc $ GhcPsMessage $ PsUnknownMessage $ mkPlainError doc
+  in throw $ mkSrcErr $ singleMessage msg
