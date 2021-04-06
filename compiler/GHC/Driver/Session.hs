@@ -148,7 +148,6 @@ module GHC.Driver.Session (
         -- ** Manipulating DynFlags
         addPluginModuleName,
         defaultDynFlags,                -- Settings -> DynFlags
-        defaultWays,
         initDynFlags,                   -- DynFlags -> IO DynFlags
         defaultFatalMessager,
         defaultFlushOut,
@@ -1174,7 +1173,7 @@ defaultDynFlags mySettings llvmConfig =
         ignorePackageFlags      = [],
         trustFlags              = [],
         packageEnv              = Nothing,
-        targetWays_             = defaultWays mySettings,
+        targetWays_             = Set.empty,
         splitInfo               = Nothing,
 
         ghcNameVersion = sGhcNameVersion mySettings,
@@ -1256,12 +1255,6 @@ defaultDynFlags mySettings llvmConfig =
         maxErrors     = Nothing,
         cfgWeights    = defaultWeights
       }
-
-defaultWays :: Settings -> Ways
-defaultWays settings = if pc_DYNAMIC_BY_DEFAULT (sPlatformConstants settings)
-                       then Set.singleton WayDyn
-                       else Set.empty
-
 
 type FatalMessager = String -> IO ()
 
@@ -3652,7 +3645,6 @@ defaultFlags settings
 
     ++ default_RPath platform
 
-    ++ concatMap (wayGeneralFlags platform) (defaultWays settings)
     ++ validHoleFitDefaults
 
     where platform = sTargetPlatform settings
@@ -4681,8 +4673,6 @@ compilerInfo dflags
        ("Uses package keys",           "YES"),
        -- Whether or not we support the @-this-unit-id@ flag
        ("Uses unit IDs",               "YES"),
-       -- Whether or not GHC compiles libraries as dynamic by default
-       ("Dynamic by default",          showBool $ pc_DYNAMIC_BY_DEFAULT constants),
        -- Whether or not GHC was compiled using -dynamic
        ("GHC Dynamic",                 showBool hostIsDynamic),
        -- Whether or not GHC was compiled using -prof
@@ -4696,7 +4686,6 @@ compilerInfo dflags
     showBool True  = "YES"
     showBool False = "NO"
     platform  = targetPlatform dflags
-    constants = platformConstants platform
     isWindows = platformOS platform == OSMinGW32
     expandDirectories :: FilePath -> Maybe FilePath -> String -> String
     expandDirectories topd mtoold = expandToolDir mtoold . expandTopDir topd

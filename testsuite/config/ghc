@@ -55,11 +55,8 @@ if ghc_with_threaded_rts:
 if ghc_with_dynamic_rts:
     config.have_shared_libs = True
 
-if config.ghc_dynamic_by_default and config.have_vanilla == 1:
-    config.run_ways.append('static')
-else:
-    if ghc_with_dynamic_rts:
-        config.run_ways.append('dyn')
+if ghc_with_dynamic_rts:
+    config.run_ways.append('dyn')
 
 if (config.have_profiling and ghc_with_threaded_rts):
     config.run_ways.append('profthreaded')

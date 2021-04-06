@@ -28,7 +28,6 @@ data TestSetting = TestHostOS
                  | TestGhcWithInterpreter
                  | TestGhcUnregisterised
                  | TestGhcWithSMP
-                 | TestGhcDynamicByDefault
                  | TestGhcDynamic
                  | TestGhcProfiled
                  | TestAR
@@ -57,7 +56,6 @@ testSetting key = do
         TestGhcWithInterpreter    -> "GhcWithInterpreter"
         TestGhcUnregisterised     -> "GhcUnregisterised"
         TestGhcWithSMP            -> "GhcWithSMP"
-        TestGhcDynamicByDefault   -> "GhcDynamicByDefault"
         TestGhcDynamic            -> "GhcDynamic"
         TestGhcProfiled           -> "GhcProfiled"
         TestAR                    -> "AR"

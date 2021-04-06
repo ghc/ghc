@@ -62,10 +62,6 @@ ifneq "$(GhcWithSMP)" "YES"
 includes_CC_OPTS += -DNOSMP
 endif
 
-ifeq "$(DYNAMIC_BY_DEFAULT)" "YES"
-includes_CC_OPTS += -DDYNAMIC_BY_DEFAULT
-endif
-
 define includesHeaderVersion
 # $1 = stage
 $$(includes_$1_H_VERSION) : mk/project.mk | $$$$(dir $$$$@)/.
