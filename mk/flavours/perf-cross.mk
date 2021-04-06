@@ -11,5 +11,4 @@ WITH_TERMINFO      = NO
 
 BIGNUM_BACKEND       = native
 Stage1Only           = YES
-DYNAMIC_BY_DEFAULT   = NO
 DYNAMIC_GHC_PROGRAMS = NO
