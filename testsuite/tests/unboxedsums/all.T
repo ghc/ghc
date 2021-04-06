@@ -32,3 +32,4 @@ test('T12711', only_ways(['ghci']), ghci_script, ['T12711.script'])
 
 test('UbxSumLevPoly', normal, compile, [''])
 test('T14051', normal, multi_compile, ['T14051.hs', [('T14051a.hs', '')], '-O2 -v0'])
+test('T19645', normal, compile_and_run, [''])
