@@ -18,17 +18,13 @@ include $(TOP)/mk/test.mk
 LOCAL_PKGCONF=local.package.conf
 LOCAL_GHC_PKG = '$(GHC_PKG)' --no-user-package-db -f $(LOCAL_PKGCONF)
 
-ifeq "$(GhcDynamicByDefault)" "YES"
-RM_PROG006_EXTRA_FLAGS = -hisuf dyn_hi -osuf dyn_o
-endif
-
 rn.prog006:
 	rm -f A.hi     A.o     B/C.hi     B/C.o     Main.hi     Main.o
 	rm -f A.dyn_hi A.dyn_o B/C.dyn_hi B/C.dyn_o Main.dyn_hi Main.dyn_o
 	rm -f pkg.conf
 	rm -f pwd pwd.exe pwd.exe.manifest pwd.hi pwd.o
 	'$(TEST_HC)' $(TEST_HC_OPTS) --make pwd -v0
-	'$(TEST_HC)' $(TEST_HC_OPTS) --make -this-unit-id test-1.0-XXX B.C -fforce-recomp -v0 $(RM_PROG006_EXTRA_FLAGS)
+	'$(TEST_HC)' $(TEST_HC_OPTS) --make -this-unit-id test-1.0-XXX B.C -fforce-recomp -v0
 	rm -f pkg.conf
 	echo "name: test" >>pkg.conf
 	echo "version: 1.0" >>pkg.conf
