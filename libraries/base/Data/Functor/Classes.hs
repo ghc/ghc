@@ -74,6 +74,7 @@ import Data.Complex (Complex((:+)))
 
 import GHC.Tuple (Solo (..))
 import GHC.Read (expectP, list, paren)
+import Data.Fixed (Fixed (..))
 
 import Text.ParserCombinators.ReadPrec (ReadPrec, readPrec_to_S, readS_to_Prec)
 import Text.Read (Read(..), parens, prec, step)
@@ -865,6 +866,14 @@ instance Read1 Complex where
 instance Show1 Complex where
     liftShowsPrec sp _ d (x :+ y) = showParen (d >= 10) $
         sp 10 x . showString " :+ " . sp 10 y
+
+-- | @since 4.16.0.0
+instance Eq1 Fixed where
+    liftEq _eq (MkFixed x) (MkFixed y) = x == y
+
+-- | @since 4.16.0.0
+instance Ord1 Fixed where
+    liftCompare _cmp (MkFixed x) (MkFixed y) = compare x y
 
 -- Building blocks
 
