@@ -2,6 +2,8 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE FlexibleContexts #-}
 
+{-# OPTIONS_GHC -fno-warn-orphans #-} -- instance Diagnostic PsMessage
+
 module GHC.Parser.Errors.Ppr
    ( mkParserWarn
    , mkParserErr
@@ -11,6 +13,7 @@ where
 import GHC.Prelude
 import GHC.Driver.Flags
 import GHC.Parser.Errors
+import GHC.Parser.Errors.Types
 import GHC.Parser.Types
 import GHC.Types.Basic
 import GHC.Types.Error
@@ -26,6 +29,10 @@ import GHC.Builtin.Names (allNameStrings)
 import GHC.Builtin.Types (filterCTuple)
 import GHC.Driver.Session (DynFlags)
 import GHC.Utils.Error (diagReasonSeverity)
+
+instance Diagnostic PsMessage where
+  diagnosticMessage (PsUnknownMessage m) = diagnosticMessage m
+  diagnosticReason  (PsUnknownMessage m) = diagnosticReason m
 
 mk_parser_err :: SrcSpan -> SDoc -> MsgEnvelope DiagnosticMessage
 mk_parser_err span doc = MsgEnvelope
