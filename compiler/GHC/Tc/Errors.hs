@@ -17,6 +17,7 @@ module GHC.Tc.Errors(
 import GHC.Prelude
 
 import GHC.Tc.Types
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.Constraint
 import GHC.Core.Predicate
@@ -1029,26 +1030,28 @@ mkErrorReport :: DiagnosticReason
               -> ReportErrCtxt
               -> TcLclEnv
               -> Report
-              -> TcM (MsgEnvelope DiagnosticMessage)
+              -> TcM (MsgEnvelope TcRnMessage)
 mkErrorReport rea ctxt tcl_env (Report important relevant_bindings valid_subs)
   = do { context <- mkErrInfo (cec_tidy ctxt) (tcl_ctxt tcl_env)
-       ; mkDecoratedSDocAt rea
-                           (RealSrcSpan (tcl_loc tcl_env) Nothing)
-                           (vcat important)
-                           context
-                           (vcat $ relevant_bindings ++ valid_subs)
+       ; fmap TcRnUnknownMessage <$>
+           mkDecoratedSDocAt rea
+                             (RealSrcSpan (tcl_loc tcl_env) Nothing)
+                             (vcat important)
+                             context
+                             (vcat $ relevant_bindings ++ valid_subs)
        }
 
 -- This version does not include the context
 mkErrorReportNC :: DiagnosticReason
                 -> TcLclEnv
                 -> Report
-                -> TcM (MsgEnvelope DiagnosticMessage)
+                -> TcM (MsgEnvelope TcRnMessage)
 mkErrorReportNC rea tcl_env (Report important relevant_bindings valid_subs)
-  = mkDecoratedSDocAt rea (RealSrcSpan (tcl_loc tcl_env) Nothing)
-                      (vcat important)
-                      O.empty
-                      (vcat $ relevant_bindings ++ valid_subs)
+  = fmap TcRnUnknownMessage <$>
+      mkDecoratedSDocAt rea (RealSrcSpan (tcl_loc tcl_env) Nothing)
+                        (vcat important)
+                        O.empty
+                        (vcat $ relevant_bindings ++ valid_subs)
 
 type UserGiven = Implication
 
@@ -1186,7 +1189,7 @@ See also 'reportUnsolved'.
 
 ----------------
 -- | Constructs a new hole error, unless this is deferred. See Note [Constructing Hole Errors].
-mkHoleError :: NameEnv Type -> [Ct] -> ReportErrCtxt -> Hole -> TcM (MsgEnvelope DiagnosticMessage)
+mkHoleError :: NameEnv Type -> [Ct] -> ReportErrCtxt -> Hole -> TcM (MsgEnvelope TcRnMessage)
 mkHoleError _ _tidy_simples ctxt hole@(Hole { hole_occ = occ
                                            , hole_ty = hole_ty
                                            , hole_loc = ct_loc })
@@ -1310,7 +1313,6 @@ mkHoleError lcl_name_cache tidy_simples ctxt hole@(Hole { hole_occ = occ
 When working with typed holes we have to deal with the case where
 we want holes to be reported as warnings to users during compile time but
 as errors during runtime. Therefore, we have to call 'maybeAddDeferredBindings'
-with a function which is able to override the 'DiagnosticReason' of a 'DiagnosticMessage',
 so that the correct 'Severity' can be computed out of that later on.
 
 -}

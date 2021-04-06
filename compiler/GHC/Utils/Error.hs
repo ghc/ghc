@@ -15,12 +15,11 @@ module GHC.Utils.Error (
         Severity(..),
 
         -- * Messages
-        WarnMsg,
         MsgEnvelope(..),
         MessageClass(..),
         SDoc,
         DecoratedSDoc(unDecorated),
-        Messages, ErrorMessages, WarningMessages,
+        Messages,
         unionMessages,
         errorsFound, isEmptyMessages,
 
