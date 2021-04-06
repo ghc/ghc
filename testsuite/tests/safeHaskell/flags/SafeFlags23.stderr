@@ -1,5 +1,5 @@
 
-SafeFlags23.hs:2:16: error: [-Wunsafe, -Werror=unsafe]
+SafeFlags23.hs:2:17: error: [-Wunsafe, -Werror=unsafe]
     ‘SafeFlags22’ has been inferred as unsafe!
     Reason:
         SafeFlags23.hs:8:1: error:

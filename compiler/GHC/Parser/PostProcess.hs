@@ -1078,7 +1078,7 @@ checkImportDecl mPre mPost = do
 checkPattern :: LocatedA (PatBuilder GhcPs) -> P (LPat GhcPs)
 checkPattern = runPV . checkLPat
 
-checkPattern_hints :: [Hint] -> PV (LocatedA (PatBuilder GhcPs)) -> P (LPat GhcPs)
+checkPattern_hints :: [PsHint] -> PV (LocatedA (PatBuilder GhcPs)) -> P (LPat GhcPs)
 checkPattern_hints hints pp = runPV_hints hints (pp >>= checkLPat)
 
 checkLPat :: LocatedA (PatBuilder GhcPs) -> PV (LPat GhcPs)
@@ -2721,7 +2721,7 @@ failOpFewArgs (L loc op) =
 data PV_Context =
   PV_Context
     { pv_options :: ParserOpts
-    , pv_hints   :: [Hint]  -- See Note [Parser-Validator Hint]
+    , pv_hints   :: [PsHint]  -- See Note [Parser-Validator Hint]
     }
 
 data PV_Accum =
@@ -2771,7 +2771,7 @@ instance Monad PV where
 runPV :: PV a -> P a
 runPV = runPV_hints []
 
-runPV_hints :: [Hint] -> PV a -> P a
+runPV_hints :: [PsHint] -> PV a -> P a
 runPV_hints hints m =
   P $ \s ->
     let
@@ -2792,7 +2792,7 @@ runPV_hints hints m =
         PV_Ok acc' a -> POk (mkPState acc') a
         PV_Failed acc' -> PFailed (mkPState acc')
 
-add_hint :: Hint -> PV a -> PV a
+add_hint :: PsHint -> PV a -> PV a
 add_hint hint m =
   let modifyHint ctx = ctx{pv_hints = pv_hints ctx ++ [hint]} in
   PV (\ctx acc -> unPV m (modifyHint ctx) acc)

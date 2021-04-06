@@ -124,7 +124,7 @@ compileCmmForRegAllocStats logger dflags' cmmFile ncgImplF us = do
         errorMsgs   = fmap mkParserErr errors
 
     -- print parser errors or warnings
-    mapM_ (printBagOfErrors logger dflags) [warningMsgs, errorMsgs]
+    mapM_ (printMessages logger dflags . mkMessages) [warningMsgs, errorMsgs]
 
     let initTopSRT = emptySRT thisMod
     cmmGroup <- fmap snd $ cmmPipeline hscEnv initTopSRT $ fst $ fromJust parsedCmm

@@ -50,6 +50,7 @@ import GHC.Core.InstEnv ( ClsInst )
 
 import GHC.Types.Annotations ( Annotation, AnnEnv, mkAnnEnv, plusAnnEnv )
 import GHC.Types.CompleteMatch
+import GHC.Types.Error ( emptyMessages )
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.TyThing
@@ -57,7 +58,6 @@ import GHC.Types.TyThing
 import GHC.Builtin.Names ( gHC_PRIM )
 
 import GHC.Data.Maybe
-import GHC.Data.Bag
 
 import GHC.Utils.Outputable
 import GHC.Utils.Monad
@@ -69,7 +69,7 @@ import Data.IORef
 
 runHsc :: HscEnv -> Hsc a -> IO a
 runHsc hsc_env (Hsc hsc) = do
-    (a, w) <- hsc hsc_env emptyBag
+    (a, w) <- hsc hsc_env emptyMessages
     printOrThrowDiagnostics (hsc_logger hsc_env) (hsc_dflags hsc_env) w
     return a
 
