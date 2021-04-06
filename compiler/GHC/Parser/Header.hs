@@ -39,7 +39,7 @@ import GHC.Hs
 import GHC.Unit.Module
 import GHC.Builtin.Names
 
-import GHC.Types.Error hiding ( getErrorMessages, getWarningMessages )
+import GHC.Types.Error hiding ( getErrorMessages, getWarningMessages, getMessages )
 import GHC.Types.SrcLoc
 import GHC.Types.SourceError
 import GHC.Types.SourceText
