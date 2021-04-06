@@ -8,6 +8,7 @@ module GHC.Types.Error
    , WarningMessages
    , ErrorMessages
    , mkMessages
+   , getMessages
    , emptyMessages
    , isEmptyMessages
    , addMessage
@@ -27,7 +28,6 @@ module GHC.Types.Error
 
    , SDoc
    , DecoratedSDoc (unDecorated)
-   , Severity (..)
    , mapDecorated
    , pprMessageBag
    , mkDecorated
@@ -78,7 +78,7 @@ a bit more declarative) or removed altogether.
 
 -- | A collection of messages emitted by GHC during error reporting. A diagnostic message is typically
 -- a warning or an error. See Note [Messages].
-newtype Messages e = Messages (Bag (MsgEnvelope e))
+newtype Messages e = Messages { getMessages :: Bag (MsgEnvelope e) }
 
 instance Functor Messages where
   fmap f (Messages xs) = Messages (mapBag (fmap f) xs)
