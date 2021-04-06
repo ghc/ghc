@@ -22,6 +22,27 @@ lint lintAction = do
   else
     putFailure "| Please make sure you have the `hlint` executable in your $PATH"
 
+runHLint :: [FilePath] -- ^ include directories
+         -> [String]   -- ^ CPP defines
+         -> FilePath
+         -> Action ()
+runHLint includeDirs defines dir = do
+  threads <- shakeThreads <$> getShakeOptions
+  hostArch <- (<> "_HOST_ARCH") <$> setting HostArch
+  let hlintYaml = dir </> ".hlint.yaml"
+      defines' = [hostArch] ++ defines
+      cmdLine = unwords $
+        [ "hlint"
+        , "-j" <> show threads
+        ] ++
+        map ("--cpp-define=" <>) defines' ++
+        map ("--cpp-include=" <>) includeDirs ++
+        [ "-h" <> hlintYaml
+        , dir
+        ]
+  putBuild $ "| " <> cmdLine
+  cmd_ cmdLine
+
 base :: Action ()
 base = do
   buildDir <- buildRoot
@@ -30,19 +51,13 @@ base = do
   let ghcautoconf  = stage1Lib </> "ghcautoconf.h"
   let ghcplatform  = stage1Lib </> "ghcplatform.h"
   need ["stage1:lib:base", ghcautoconf, ghcplatform, machDeps]
-  let include0  = "includes"
-  let include1  = "libraries/base/include"
-  let include2  = stage1Lib
-  let include3  = buildDir </> "stage1/libraries/base/build/include"
-  let hlintYaml = "libraries/base/.hlint.yaml"
-  hostArch <- (<> "_HOST_ARCH") <$> setting HostArch
-  let cmdLine = "hlint -j --cpp-define " <> hostArch <> " --cpp-include=" <> include0 <>
-                " --cpp-include=" <> include1 <>
-                " --cpp-include=" <> include2 <>
-                " --cpp-include=" <> include3 <>
-                " -h " <> hlintYaml <> " libraries/base"
-  putBuild $ "| " <> cmdLine
-  cmd_ cmdLine
+  let includeDirs =
+        [ "includes"
+        , "libraries/base/include"
+        , stage1Lib
+        , buildDir </> "stage1/libraries/base/build/include"
+        ]
+  runHLint includeDirs [] "libraries/base"
 
 compiler :: Action ()
 compiler = do
@@ -55,19 +70,14 @@ compiler = do
   let ghcautoconf    = stage1Lib </> "ghcautoconf.h"
   let ghcplatform    = stage1Lib </> "ghcplatform.h"
   need $ mconcat [[ghcautoconf, ghcplatform], hsIncls stage1Compiler, [machDeps, hsVersions]]
-  let include0  = "includes"
-  let include1  = stage1Lib
-  let hlintYaml = "compiler/.hlint.yaml"
-  hostArch <- (<> "_HOST_ARCH") <$> setting HostArch
-  let cmdLine = "hlint -j --cpp-define " <> hostArch <>
-                " --cpp-include=" <> include0 <>
-                " --cpp-include=" <> include1 <>
-                " --cpp-include=" <> compilerDir <>
-                " --cpp-include=" <> ghcplatform <>
-                " --cpp-include=" <> stage1Compiler <>
-                " -h " <> hlintYaml <> " compiler"
-  putBuild $ "| " <> cmdLine
-  cmd_ cmdLine
+  let includeDirs =
+        [ "includes"
+        , stage1Lib
+        , compilerDir
+        , ghcplatform
+        , stage1Compiler
+        ]
+  runHLint includeDirs [] "compiler"
 
 hsIncls :: FilePath -> [FilePath]
 hsIncls path = [ path </> "primop-vector-tycons.hs-incl"
