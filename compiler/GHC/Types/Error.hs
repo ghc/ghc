@@ -5,16 +5,14 @@
 module GHC.Types.Error
    ( -- * Messages
      Messages
-   , WarningMessages
-   , ErrorMessages
    , mkMessages
    , getMessages
    , emptyMessages
    , isEmptyMessages
+   , singleMessage
    , addMessage
    , unionMessages
    , MsgEnvelope (..)
-   , WarnMsg
 
    -- * Classifying Messages
 
@@ -91,6 +89,9 @@ mkMessages = Messages
 isEmptyMessages :: Messages e -> Bool
 isEmptyMessages (Messages msgs) = isEmptyBag msgs
 
+singleMessage :: MsgEnvelope e -> Messages e
+singleMessage e = addMessage e emptyMessages
+
 {- Note [Discarding Messages]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -115,11 +116,6 @@ unionMessages (Messages msgs1) (Messages msgs2) =
   where
     interesting :: MsgEnvelope e -> Bool
     interesting = (/=) SevIgnore . errMsgSeverity
-
-type WarningMessages = Bag (MsgEnvelope DiagnosticMessage)
-type ErrorMessages   = Bag (MsgEnvelope DiagnosticMessage)
-
-type WarnMsg         = MsgEnvelope DiagnosticMessage
 
 -- | A 'DecoratedSDoc' is isomorphic to a '[SDoc]' but it carries the invariant that the input '[SDoc]'
 -- needs to be rendered /decorated/ into its final form, where the typical case would be adding bullets
