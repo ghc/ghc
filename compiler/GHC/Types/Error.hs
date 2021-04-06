@@ -5,16 +5,14 @@
 module GHC.Types.Error
    ( -- * Messages
      Messages
-   , WarningMessages
-   , ErrorMessages
    , mkMessages
    , getMessages
    , emptyMessages
    , isEmptyMessages
+   , singleMessage
    , addMessage
    , unionMessages
    , MsgEnvelope (..)
-   , WarnMsg
 
    -- * Classifying Messages
 
@@ -92,6 +90,9 @@ mkMessages = Messages
 isEmptyMessages :: Messages e -> Bool
 isEmptyMessages (Messages msgs) = isEmptyBag msgs
 
+singleMessage :: MsgEnvelope e -> Messages e
+singleMessage e = addMessage e emptyMessages
+
 {- Note [Discarding Messages]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -116,11 +117,6 @@ unionMessages (Messages msgs1) (Messages msgs2) =
   where
     interesting :: MsgEnvelope e -> Bool
     interesting = (/=) SevIgnore . errMsgSeverity
-
-type WarningMessages = Bag (MsgEnvelope DiagnosticMessage)
-type ErrorMessages   = Bag (MsgEnvelope DiagnosticMessage)
-
-type WarnMsg         = MsgEnvelope DiagnosticMessage
 
 -- | A 'DecoratedSDoc' is isomorphic to a '[SDoc]' but it carries the invariant that the input '[SDoc]'
 -- needs to be rendered /decorated/ into its final form, where the typical case would be adding bullets
@@ -303,14 +299,6 @@ instance ToJson MessageClass where
   json MCInfo = JSString "MCInfo"
   json (MCDiagnostic sev reason) =
     JSString $ renderWithContext defaultSDocContext (ppr $ text "MCDiagnostic" <+> ppr sev <+> ppr reason)
-
-instance Show (MsgEnvelope DiagnosticMessage) where
-    show = showMsgEnvelope
-
--- | Shows an 'MsgEnvelope'.
-showMsgEnvelope :: Diagnostic a => MsgEnvelope a -> String
-showMsgEnvelope err =
-  renderWithContext defaultSDocContext (vcat (unDecorated . diagnosticMessage $ errMsgDiagnostic err))
 
 mapDecorated :: (SDoc -> SDoc) -> DecoratedSDoc -> DecoratedSDoc
 mapDecorated f (Decorated xs) = Decorated (map f xs)
