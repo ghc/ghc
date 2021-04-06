@@ -124,26 +124,6 @@ endif
 PlatformSupportsSharedLibs = $(if $(filter $(TARGETPLATFORM),\
     $(NoSharedLibsPlatformList)),NO,YES)
 
-# DYNAMIC_BY_DEFAULT says whether this compiler will default to
-# building dynamic executables, i.e. -dynamic is on.  We do this for
-# most platforms because it lets us use the system dynamic linker
-# instead of our own linker for GHCi.
-#
-# Currently this isn't possible on Windows, and we have not yet enabled
-# it on i386 while we consider the performance implications.
-#
-ifeq "$(TargetOS_CPP)" "mingw32"
-DYNAMIC_BY_DEFAULT = NO
-else ifeq "$(TargetArch_CPP)" "i386"
-DYNAMIC_BY_DEFAULT = NO
-else
-DYNAMIC_BY_DEFAULT = YES
-endif
-
-# For now, we unconditionally disable dynamic-by-default, as the
-# cabal-install's that are in the wild don't handle it properly.
-DYNAMIC_BY_DEFAULT = NO
-
 # If building both v and dyn ways, then use -dynamic-too to build them.
 # This makes the build faster.
 DYNAMIC_TOO = YES
