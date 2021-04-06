@@ -106,9 +106,9 @@ For layout of a sum type,
 
 For example, say we have (# (# Int#, Char #) | (# Int#, Int# #) | Int# #)
 
-  - Layouts of alternatives: [ [Word, Ptr], [Word, Word], [Word] ]
-  - Sorted: [ [Ptr, Word], [Word, Word], [Word] ]
-  - Merge all alternatives together: [ Ptr, Word, Word ]
+  - Layouts of alternatives: [ [Word, LiftedPtr], [Word, Word], [Word] ]
+  - Sorted: [ [LiftedPtr, Word], [Word, Word], [Word] ]
+  - Merge all alternatives together: [ LiftedPtr, Word, Word ]
 
 We add a slot for the tag to the first position. So our tuple type is
 
@@ -129,6 +129,20 @@ Another example using the same type: (# | (# 2#, 3# #) | #). 2# fits in Word#,
 3# fits in Word #, so we get:
 
   (# 2#, rubbish, 2#, 3# #).
+
+When merging slots, one might be tempted to collapse lifted and unlifted
+points. However, as seen in #19645, this is wrong. Imagine that you have
+the program:
+
+    test :: (# Char | ByteArray# #) -> ByteArray#
+    test (# | ba #) = ba
+    test (# c | #) = ...
+
+If we were to collapse the sum argument to (# Tag#, Any #) we would end up treating
+the ByteArray# as a lifted object. This would cause the code generator to
+attempt to enter it upon returning, causing a runtime crash. For this reason we
+treat unlifted and lifted things as distinct slot types, despite both being GC
+pointers.
 
 Note [Types in StgConApp]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -591,7 +605,8 @@ mkUbxSum dc ty_args args0
 -- See Note [aBSENT_SUM_FIELD_ERROR_ID] in "GHC.Core.Make"
 --
 ubxSumRubbishArg :: SlotTy -> StgArg
-ubxSumRubbishArg PtrSlot    = StgVarArg aBSENT_SUM_FIELD_ERROR_ID
+ubxSumRubbishArg PtrLiftedSlot    = StgVarArg aBSENT_SUM_FIELD_ERROR_ID
+ubxSumRubbishArg PtrUnliftedSlot  = StgVarArg aBSENT_SUM_FIELD_ERROR_ID
 ubxSumRubbishArg WordSlot   = StgLitArg (LitNumber LitNumWord 0)
 ubxSumRubbishArg Word64Slot = StgLitArg (LitNumber LitNumWord64 0)
 ubxSumRubbishArg FloatSlot  = StgLitArg (LitFloat 0)

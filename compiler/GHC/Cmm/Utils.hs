@@ -119,11 +119,12 @@ primRepCmmType platform = \case
 
 slotCmmType :: Platform -> SlotTy -> CmmType
 slotCmmType platform = \case
-   PtrSlot    -> gcWord platform
-   WordSlot   -> bWord platform
-   Word64Slot -> b64
-   FloatSlot  -> f32
-   DoubleSlot -> f64
+   PtrUnliftedSlot -> gcWord platform
+   PtrLiftedSlot   -> gcWord platform
+   WordSlot        -> bWord platform
+   Word64Slot      -> b64
+   FloatSlot       -> f32
+   DoubleSlot      -> f64
 
 primElemRepCmmType :: PrimElemRep -> CmmType
 primElemRepCmmType Int8ElemRep   = b8
@@ -160,11 +161,12 @@ primRepForeignHint DoubleRep    = NoHint
 primRepForeignHint (VecRep {})  = NoHint
 
 slotForeignHint :: SlotTy -> ForeignHint
-slotForeignHint PtrSlot       = AddrHint
-slotForeignHint WordSlot      = NoHint
-slotForeignHint Word64Slot    = NoHint
-slotForeignHint FloatSlot     = NoHint
-slotForeignHint DoubleSlot    = NoHint
+slotForeignHint PtrLiftedSlot   = AddrHint
+slotForeignHint PtrUnliftedSlot = AddrHint
+slotForeignHint WordSlot        = NoHint
+slotForeignHint Word64Slot      = NoHint
+slotForeignHint FloatSlot       = NoHint
+slotForeignHint DoubleSlot      = NoHint
 
 typeForeignHint :: UnaryType -> ForeignHint
 typeForeignHint = primRepForeignHint . typePrimRep1
