@@ -29,6 +29,7 @@ import GHC.Hs
 
 import GHC.HsToCore.Usage
 import GHC.HsToCore.Monad
+import GHC.HsToCore.Errors.Types
 import GHC.HsToCore.Expr
 import GHC.HsToCore.Binds
 import GHC.HsToCore.Foreign.Decl
@@ -59,6 +60,7 @@ import GHC.Builtin.Types.Prim
 import GHC.Builtin.Types
 
 import GHC.Data.FastString
+import GHC.Data.Maybe    ( expectJust )
 import GHC.Data.OrdList
 
 import GHC.Utils.Error
@@ -82,7 +84,6 @@ import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Types.Name.Ppr
 import GHC.Types.HpcInfo
-import GHC.Types.Error
 
 import GHC.Unit
 import GHC.Unit.Module.ModGuts
@@ -101,7 +102,7 @@ import GHC.Driver.Plugins ( LoadedPlugin(..) )
 -}
 
 -- | Main entry point to the desugarer.
-deSugar :: HscEnv -> ModLocation -> TcGblEnv -> IO (Messages DiagnosticMessage, Maybe ModGuts)
+deSugar :: HscEnv -> ModLocation -> TcGblEnv -> IO (Messages DsMessage, Maybe ModGuts)
 -- Can modify PCS by faulting in more declarations
 
 deSugar hsc_env
@@ -285,7 +286,7 @@ So we pull out the type/coercion variables (which are in dependency order),
 and Rec the rest.
 -}
 
-deSugarExpr :: HscEnv -> LHsExpr GhcTc -> IO (Messages DiagnosticMessage, Maybe CoreExpr)
+deSugarExpr :: HscEnv -> LHsExpr GhcTc -> IO (Messages DsMessage, Maybe CoreExpr)
 deSugarExpr hsc_env tc_expr = do
     let dflags = hsc_dflags hsc_env
     let logger = hsc_logger hsc_env
@@ -293,15 +294,27 @@ deSugarExpr hsc_env tc_expr = do
     showPass logger dflags "Desugar"
 
     -- Do desugaring
-    (msgs, mb_core_expr) <- runTcInteractive hsc_env $ initDsTc $
-                                 dsLExpr tc_expr
+    (tc_msgs, mb_result) <- runTcInteractive hsc_env $
+                            initDsTc $
+                            dsLExpr tc_expr
+
+    MASSERT( isEmptyMessages tc_msgs )  -- the type-checker isn't doing anything here
+
+      -- mb_result is Nothing only when a failure happens in the type-checker,
+      -- but mb_core_expr is Nothing when a failure happens in the desugarer
+    let (ds_msgs, mb_core_expr) = expectJust "deSugarExpr" mb_result
 
     case mb_core_expr of
        Nothing   -> return ()
        Just expr -> dumpIfSet_dyn logger dflags Opt_D_dump_ds "Desugared"
                     FormatCore (pprCoreExpr expr)
 
-    return (msgs, mb_core_expr)
+      -- callers (i.e. ioMsgMaybe) expect that no expression is returned if
+      -- there are errors
+    let final_res | errorsFound ds_msgs = Nothing
+                  | otherwise           = mb_core_expr
+
+    return (ds_msgs, final_res)
 
 {-
 ************************************************************************

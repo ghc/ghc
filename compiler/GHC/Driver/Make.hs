@@ -61,16 +61,16 @@ import GHC.Driver.Backend
 import GHC.Driver.Monad
 import GHC.Driver.Env
 import GHC.Driver.Errors
+import GHC.Driver.Errors.Types
 import GHC.Driver.Main
 
 import GHC.Parser.Header
-import GHC.Parser.Errors.Ppr
 
 import GHC.Iface.Load      ( cannotFindModule )
 import GHC.IfaceToCore     ( typecheckIface )
 import GHC.Iface.Recomp    ( RecompileRequired ( MustCompile ) )
 
-import GHC.Data.Bag        ( unitBag, listToBag, unionManyBags, isEmptyBag )
+import GHC.Data.Bag        ( listToBag )
 import GHC.Data.Graph.Directed
 import GHC.Data.FastString
 import GHC.Data.Maybe      ( expectJust )
@@ -164,20 +164,20 @@ depanal :: GhcMonad m =>
         -> m ModuleGraph
 depanal excluded_mods allow_dup_roots = do
     (errs, mod_graph) <- depanalE excluded_mods allow_dup_roots
-    if isEmptyBag errs
+    if isEmptyMessages errs
       then pure mod_graph
-      else throwErrors errs
+      else throwErrors (fmap GhcDriverMessage errs)
 
 -- | Perform dependency analysis like in 'depanal'.
 -- In case of errors, the errors and an empty module graph are returned.
 depanalE :: GhcMonad m =>     -- New for #17459
             [ModuleName]      -- ^ excluded modules
             -> Bool           -- ^ allow duplicate roots
-            -> m (ErrorMessages, ModuleGraph)
+            -> m (DriverMessages, ModuleGraph)
 depanalE excluded_mods allow_dup_roots = do
     hsc_env <- getSession
     (errs, mod_graph) <- depanalPartial excluded_mods allow_dup_roots
-    if isEmptyBag errs
+    if isEmptyMessages errs
       then do
         warnMissingHomeModules hsc_env mod_graph
         setSession hsc_env { hsc_mod_graph = mod_graph }
@@ -202,7 +202,7 @@ depanalPartial
     :: GhcMonad m
     => [ModuleName]  -- ^ excluded modules
     -> Bool          -- ^ allow duplicate roots
-    -> m (ErrorMessages, ModuleGraph)
+    -> m (DriverMessages, ModuleGraph)
     -- ^ possibly empty 'Bag' of errors and a module graph.
 depanalPartial excluded_mods allow_dup_roots = do
   hsc_env <- getSession
@@ -230,7 +230,7 @@ depanalPartial excluded_mods allow_dup_roots = do
       (errs, mod_summaries) = partitionEithers mod_summariesE
       mod_graph = mkModuleGraph' $
         fmap ModuleNode mod_summaries ++ instantiationNodes (hsc_units hsc_env)
-    return (unionManyBags errs, mod_graph)
+    return (unionManyMessages errs, mod_graph)
 
 -- | Collect the instantiations of dependencies to create 'InstantiationNode' work graph nodes.
 -- These are used to represent the type checking that is done after
@@ -271,7 +271,7 @@ instantiationNodes unit_state = InstantiationNode <$> iuids_to_check
 warnMissingHomeModules :: GhcMonad m => HscEnv -> ModuleGraph -> m ()
 warnMissingHomeModules hsc_env mod_graph =
     when (not (null missing)) $
-        logWarnings (listToBag [warn])
+        logDiagnostics warn
   where
     dflags = hsc_dflags hsc_env
     targets = map targetId (hsc_targets hsc_env)
@@ -318,8 +318,10 @@ warnMissingHomeModules hsc_env mod_graph =
           (text "Modules are not listed in command line but needed for compilation: ")
           4
           (sep (map ppr missing))
-    warn =
-      mkPlainMsgEnvelope (hsc_dflags hsc_env) (WarningWithFlag Opt_WarnMissingHomeModules) noSrcSpan msg
+    warn = singleMessage $
+      mkPlainMsgEnvelope (hsc_dflags hsc_env) noSrcSpan $
+      GhcDriverMessage $ DriverUnknownMessage $
+      mkPlainDiagnostic (WarningWithFlag Opt_WarnMissingHomeModules) msg
 
 -- | Describes which modules of the module graph need to be loaded.
 data LoadHowMuch
@@ -351,9 +353,9 @@ load how_much = do
     (errs, mod_graph) <- depanalE [] False                        -- #17459
     success <- load' how_much (Just batchMsg) mod_graph
     warnUnusedPackages
-    if isEmptyBag errs
+    if isEmptyMessages errs
       then pure success
-      else throwErrors errs
+      else throwErrors (fmap GhcDriverMessage errs)
 
 -- Note [Unused packages]
 --
@@ -384,15 +386,17 @@ warnUnusedPackages = do
           = filter (\arg -> not $ any (matching state arg) loadedPackages)
                    requestedArgs
 
-    let warn =
-          mkPlainMsgEnvelope dflags (WarningWithFlag Opt_WarnUnusedPackages) noSrcSpan msg
+    let warn = singleMessage $
+          mkPlainMsgEnvelope dflags noSrcSpan $
+          GhcDriverMessage $ DriverUnknownMessage $
+          mkPlainDiagnostic (WarningWithFlag Opt_WarnUnusedPackages) msg
         msg = vcat [ text "The following packages were specified" <+>
                      text "via -package or -package-id flags,"
                    , text "but were not needed for compilation:"
                    , nest 2 (vcat (map (withDash . pprUnusedArg) unusedArgs)) ]
 
     when (not (null unusedArgs)) $
-      logWarnings (listToBag [warn])
+      logDiagnostics warn
 
     where
         packageArg (ExposePackage _ arg _) = Just arg
@@ -1419,7 +1423,7 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_logger lcl_tmpfs lcl_dflags
         hsc_env <- readMVar hsc_env_var
         old_hpt <- readIORef old_hpt_var
 
-        let logg err = printBagOfErrors lcl_logger lcl_dflags (srcErrorMessages err)
+        let logg err = printMessages lcl_logger lcl_dflags (srcErrorMessages err)
 
         -- Limit the number of parallel compiles.
         let withSem sem = MC.bracket_ (waitQSem sem) (signalQSem sem)
@@ -1671,7 +1675,7 @@ upsweep_inst hsc_env mHscMessage mod_index nmods iuid = do
         case mHscMessage of
             Just hscMessage -> hscMessage hsc_env (mod_index, nmods) MustCompile (InstantiationNode iuid)
             Nothing -> return ()
-        runHsc hsc_env $ ioMsgMaybe $ tcRnCheckUnit hsc_env $ VirtUnit iuid
+        runHsc hsc_env $ ioMsgMaybe $ hoistTcRnMessage $ tcRnCheckUnit hsc_env $ VirtUnit iuid
         pure ()
 
 -- | Compile a single module.  Always produce a Linkable for it if
@@ -2214,17 +2218,18 @@ warnUnnecessarySourceImports :: GhcMonad m => [SCC ModSummary] -> m ()
 warnUnnecessarySourceImports sccs = do
   dflags <- getDynFlags
   when (wopt Opt_WarnUnusedImports dflags)
-    (logWarnings (listToBag (concatMap (check dflags . flattenSCC) sccs)))
+    (logDiagnostics (mkMessages $ listToBag (concatMap (check dflags . flattenSCC) sccs)))
   where check dflags ms =
            let mods_in_this_cycle = map ms_mod_name ms in
            [ warn dflags i | m <- ms, i <- ms_home_srcimps m,
                              unLoc i `notElem`  mods_in_this_cycle ]
 
-        warn :: DynFlags -> Located ModuleName -> WarnMsg
+        warn :: DynFlags -> Located ModuleName -> MsgEnvelope GhcMessage
         warn dflags (L loc mod) =
-           mkPlainMsgEnvelope dflags WarningWithoutFlag loc
-                (text "{-# SOURCE #-} unnecessary in import of "
-                 <+> quotes (ppr mod))
+           mkPlainMsgEnvelope dflags loc $
+           GhcDriverMessage $ DriverUnknownMessage $
+           mkPlainDiagnostic WarningWithoutFlag $
+           text "{-# SOURCE #-} unnecessary in import of " <+> quotes (ppr mod)
 
 
 -----------------------------------------------------------------------------
@@ -2250,7 +2255,7 @@ downsweep :: HscEnv
           -> Bool               -- True <=> allow multiple targets to have
                                 --          the same module name; this is
                                 --          very useful for ghc -M
-          -> IO [Either ErrorMessages ExtendedModSummary]
+          -> IO [Either DriverMessages ExtendedModSummary]
                 -- The non-error elements of the returned list all have distinct
                 -- (Modules, IsBoot) identifiers, unless the Bool is true in
                 -- which case there can be repeats
@@ -2286,7 +2291,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
         old_summary_map :: ModNodeMap ExtendedModSummary
         old_summary_map = mkNodeMap old_summaries
 
-        getRootSummary :: Target -> IO (Either ErrorMessages ExtendedModSummary)
+        getRootSummary :: Target -> IO (Either DriverMessages ExtendedModSummary)
         getRootSummary Target { targetId = TargetFile file mb_phase
                               , targetAllowObjCode = obj_allowed
                               , targetContents = maybe_buf
@@ -2295,8 +2300,10 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
                 if exists || isJust maybe_buf
                     then summariseFile hsc_env old_summaries file mb_phase
                                        obj_allowed maybe_buf
-                    else return $ Left $ unitBag $ mkPlainErrorMsgEnvelope noSrcSpan $
-                           text "can't find file:" <+> text file
+                    else return $ Left $ singleMessage $
+                           mkPlainErrorMsgEnvelope noSrcSpan $
+                           DriverUnknownMessage $ mkPlainError $
+                             text "can't find file:" <+> text file
         getRootSummary Target { targetId = TargetModule modl
                               , targetAllowObjCode = obj_allowed
                               , targetContents = maybe_buf
@@ -2316,7 +2323,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
         -- ignored, leading to confusing behaviour).
         checkDuplicates
           :: ModNodeMap
-               [Either ErrorMessages
+               [Either DriverMessages
                        ExtendedModSummary]
           -> IO ()
         checkDuplicates root_map
@@ -2329,11 +2336,11 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
 
         loop :: [GenWithIsBoot (Located ModuleName)]
                         -- Work list: process these modules
-             -> ModNodeMap [Either ErrorMessages ExtendedModSummary]
+             -> ModNodeMap [Either DriverMessages ExtendedModSummary]
                         -- Visited set; the range is a list because
                         -- the roots can have the same module names
                         -- if allow_dup_roots is True
-             -> IO (ModNodeMap [Either ErrorMessages ExtendedModSummary])
+             -> IO (ModNodeMap [Either DriverMessages ExtendedModSummary])
                         -- The result is the completed NodeMap
         loop [] done = return done
         loop (s : ss) done
@@ -2373,8 +2380,8 @@ enableCodeGenForTH
   -> TmpFs
   -> HomeUnit
   -> Backend
-  -> ModNodeMap [Either ErrorMessages ExtendedModSummary]
-  -> IO (ModNodeMap [Either ErrorMessages ExtendedModSummary])
+  -> ModNodeMap [Either DriverMessages ExtendedModSummary]
+  -> IO (ModNodeMap [Either DriverMessages ExtendedModSummary])
 enableCodeGenForTH logger tmpfs home_unit =
   enableCodeGenWhen logger tmpfs condition should_modify TFL_CurrentModule TFL_GhcSession
   where
@@ -2399,8 +2406,8 @@ enableCodeGenWhen
   -> TempFileLifetime
   -> TempFileLifetime
   -> Backend
-  -> ModNodeMap [Either ErrorMessages ExtendedModSummary]
-  -> IO (ModNodeMap [Either ErrorMessages ExtendedModSummary])
+  -> ModNodeMap [Either DriverMessages ExtendedModSummary]
+  -> IO (ModNodeMap [Either DriverMessages ExtendedModSummary])
 enableCodeGenWhen logger tmpfs condition should_modify staticLife dynLife bcknd nodemap =
   traverse (traverse (traverse enable_code_gen)) nodemap
   where
@@ -2469,7 +2476,7 @@ enableCodeGenWhen logger tmpfs condition should_modify staticLife dynLife bcknd 
 
 mkRootMap
   :: [ExtendedModSummary]
-  -> ModNodeMap [Either ErrorMessages ExtendedModSummary]
+  -> ModNodeMap [Either DriverMessages ExtendedModSummary]
 mkRootMap summaries = ModNodeMap $ Map.insertListWith
   (flip (++))
   [ (msKey $ emsModSummary s, [Right s]) | s <- summaries ]
@@ -2514,7 +2521,7 @@ summariseFile
         -> Maybe Phase                  -- start phase
         -> Bool                         -- object code allowed?
         -> Maybe (StringBuffer,UTCTime)
-        -> IO (Either ErrorMessages ExtendedModSummary)
+        -> IO (Either DriverMessages ExtendedModSummary)
 
 summariseFile hsc_env old_summaries src_fn mb_phase obj_allowed maybe_buf
         -- we can use a cached summary if one is available and the
@@ -2642,7 +2649,7 @@ summariseModule
           -> Bool               -- object code allowed?
           -> Maybe (StringBuffer, UTCTime)
           -> [ModuleName]               -- Modules to exclude
-          -> IO (Maybe (Either ErrorMessages ExtendedModSummary))      -- Its new summary
+          -> IO (Maybe (Either DriverMessages ExtendedModSummary))      -- Its new summary
 
 summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
                 obj_allowed maybe_buf excl_mods
@@ -2730,7 +2737,9 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
               | otherwise = HsSrcFile
 
         when (pi_mod_name /= wanted_mod) $
-                throwE $ unitBag $ mkPlainErrorMsgEnvelope pi_mod_name_loc $
+                throwE $ singleMessage $
+                  mkPlainErrorMsgEnvelope pi_mod_name_loc $
+                  DriverUnknownMessage $ mkPlainError $
                               text "File name does not match module name:"
                               $$ text "Saw:" <+> quotes (ppr pi_mod_name)
                               $$ text "Expected:" <+> quotes (ppr wanted_mod)
@@ -2742,7 +2751,9 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
                         | (k,v) <- ((pi_mod_name, mkHoleModule pi_mod_name)
                                 : homeUnitInstantiations home_unit)
                         ])
-            in throwE $ unitBag $ mkPlainErrorMsgEnvelope pi_mod_name_loc $
+            in throwE $ singleMessage $
+                mkPlainErrorMsgEnvelope pi_mod_name_loc $
+                DriverUnknownMessage $ mkPlainError $
                 text "Unexpected signature:" <+> quotes (ppr pi_mod_name)
                 $$ if gopt Opt_BuildingCabalPackage dflags
                     then parens (text "Try adding" <+> quotes (ppr pi_mod_name)
@@ -2845,7 +2856,7 @@ getPreprocessedImports
     -> Maybe Phase
     -> Maybe (StringBuffer, UTCTime)
     -- ^ optional source code buffer and modification time
-    -> ExceptT ErrorMessages IO PreprocessedImports
+    -> ExceptT DriverMessages IO PreprocessedImports
 getPreprocessedImports hsc_env src_fn mb_phase maybe_buf = do
   (pi_local_dflags, pi_hspp_fn)
       <- ExceptT $ preprocess hsc_env src_fn (fst <$> maybe_buf) mb_phase
@@ -2855,7 +2866,7 @@ getPreprocessedImports hsc_env src_fn mb_phase maybe_buf = do
           let imp_prelude = xopt LangExt.ImplicitPrelude pi_local_dflags
               popts = initParserOpts pi_local_dflags
           mimps <- getImports popts imp_prelude pi_hspp_buf pi_hspp_fn src_fn
-          return (first (fmap mkParserErr) mimps)
+          return (first (mkMessages . fmap mkDriverPsHeaderMessage) mimps)
   return PreprocessedImports {..}
 
 
@@ -2899,24 +2910,30 @@ withDeferredDiagnostics f = do
       (\_ -> popLogHookM >> printDeferredDiagnostics)
       (\_ -> f)
 
-noModError :: HscEnv -> SrcSpan -> ModuleName -> FindResult -> MsgEnvelope DiagnosticMessage
+noModError :: HscEnv -> SrcSpan -> ModuleName -> FindResult -> MsgEnvelope GhcMessage
 -- ToDo: we don't have a proper line number for this error
 noModError hsc_env loc wanted_mod err
-  = mkPlainErrorMsgEnvelope loc $ cannotFindModule hsc_env wanted_mod err
+  = mkPlainErrorMsgEnvelope loc $ GhcDriverMessage $ DriverUnknownMessage $ mkPlainError $
+    cannotFindModule hsc_env wanted_mod err
 
-noHsFileErr :: SrcSpan -> String -> ErrorMessages
+noHsFileErr :: SrcSpan -> String -> DriverMessages
 noHsFileErr loc path
-  = unitBag $ mkPlainErrorMsgEnvelope loc $ text "Can't find" <+> text path
+  = singleMessage $ mkPlainErrorMsgEnvelope loc $
+    DriverUnknownMessage $ mkPlainError $
+    text "Can't find" <+> text path
 
-moduleNotFoundErr :: ModuleName -> ErrorMessages
+moduleNotFoundErr :: ModuleName -> DriverMessages
 moduleNotFoundErr mod
-  = unitBag $ mkPlainErrorMsgEnvelope noSrcSpan $
+  = singleMessage $ mkPlainErrorMsgEnvelope noSrcSpan $
+    DriverUnknownMessage $ mkPlainError $
         text "module" <+> quotes (ppr mod) <+> text "cannot be found locally"
 
 multiRootsErr :: [ModSummary] -> IO ()
 multiRootsErr [] = panic "multiRootsErr"
 multiRootsErr summs@(summ1:_)
-  = throwOneError $ mkPlainErrorMsgEnvelope noSrcSpan $
+  = throwOneError $
+      mkPlainErrorMsgEnvelope noSrcSpan $
+      GhcDriverMessage $ DriverUnknownMessage $ mkPlainError $
         text "module" <+> quotes (ppr mod) <+>
         text "is defined in multiple files:" <+>
         sep (map text files)

@@ -1,0 +1,6 @@
+
+T19709a.hs:8:14: error:
+    A levity-polymorphic type is not allowed here:
+      Type: a
+      Kind: TYPE r
+    In the type of binder ‘x’

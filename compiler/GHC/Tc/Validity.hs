@@ -68,7 +68,6 @@ import GHC.Types.SrcLoc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Builtin.Uniques  ( mkAlphaTyVarUnique )
-import GHC.Data.Bag      ( emptyBag )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
@@ -1565,7 +1564,7 @@ check_special_inst_head dflags is_boot is_sig ctxt clas cls_args
   | clas_nm `elem` genericClassNames
   , hand_written_bindings
   =  do { failIfTc (safeLanguageOn dflags) gen_inst_err
-        ; when (safeInferOn dflags) (recordUnsafeInfer emptyBag) }
+        ; when (safeInferOn dflags) (recordUnsafeInfer emptyMessages) }
 
   | clas_nm == hasFieldClassName
   = checkHasFieldInst clas cls_args
