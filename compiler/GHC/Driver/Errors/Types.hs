@@ -3,17 +3,33 @@
 module GHC.Driver.Errors.Types (
     GhcMessage(..)
   , DriverMessage(..)
+  , WarningMessages
+  , ErrorMessages
+  , WarnMsg
   -- * Constructors
   , ghcUnknownMessage
+  -- * Utility functions
+  , hoistMessageBiM
+  , hoistTcRnMessage
+  , hoistTcRnDsMessage
+  , tcRnDsToGhcMessage
+  , foldMessages
   ) where
 
-import Data.Typeable
+import GHC.Prelude
 
+import Data.Typeable
 import GHC.Types.Error
 
 import GHC.Parser.Errors.Types ( PsMessage )
-import GHC.Tc.Errors.Types ( TcRnMessage )
+import GHC.Tc.Errors.Types ( TcRnDsMessage(..), TcRnMessage )
 import GHC.HsToCore.Errors.Types ( DsMessage )
+import Data.Bifunctor
+
+type WarningMessages = Messages GhcMessage
+type ErrorMessages   = Messages GhcMessage
+type WarnMsg         = MsgEnvelope GhcMessage
+
 
 {- Note [GhcMessage]
 ~~~~~~~~~~~~~~~~~~~~
@@ -62,6 +78,35 @@ data GhcMessage where
 -- type constructor)
 ghcUnknownMessage :: (Diagnostic a, Typeable a) => a -> GhcMessage
 ghcUnknownMessage = GhcUnknownMessage
+
+-- | Hoist a transformation into a 'Bifunctor' wrapped in a 'Monad'. Abstracts away the classic pattern
+-- where we are calling 'ioMsgMaybe' on the result of 'IO (Messages e, a)'.
+hoistMessageBiM :: (Monad m, Bifunctor f)
+                => (e -> GhcMessage)
+                -- ^ A function to transform 'e' into a 'GhcMessage'.
+                -> m (f (Messages e) a)
+                -- ^ A 'Bifunctor' @f@ wrapped into a 'Monad' @m@.
+                -> m (f (Messages GhcMessage) a)
+hoistMessageBiM f m = fmap (first (fmap f)) m
+
+-- | Given a collection of @e@ wrapped in a 'Foldable' structure, converts it into 'Messages'
+-- via the supplied transformation function.
+foldMessages :: Foldable f
+             => (e -> MsgEnvelope GhcMessage)
+             -> f e
+             -> Messages GhcMessage
+foldMessages f = foldl' (\acc m -> addMessage (f m) acc) emptyMessages
+
+-- | Abstracts away the classic pattern where we are calling 'ioMsgMaybe' on the result of
+-- 'IO (Messages TcRnMessage, a)'.
+hoistTcRnMessage :: Monad m => m (Messages TcRnMessage, a) -> m (Messages GhcMessage, a)
+hoistTcRnMessage = hoistMessageBiM GhcTcRnMessage
+
+hoistTcRnDsMessage :: Monad m => m (Messages TcRnDsMessage, a) -> m (Messages GhcMessage, a)
+hoistTcRnDsMessage = hoistMessageBiM tcRnDsToGhcMessage
+
+tcRnDsToGhcMessage :: TcRnDsMessage -> GhcMessage
+tcRnDsToGhcMessage (TcRnDsMessage m) = either GhcDsMessage GhcTcRnMessage m
 
 -- | A message from the driver.
 data DriverMessage

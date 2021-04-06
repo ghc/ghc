@@ -707,7 +707,7 @@ computeInterface hsc_env doc_str hi_boot_file mod0 = do
           Succeeded (iface0, path) ->
             rnModIface hsc_env (instUnitInsts (moduleUnit indef)) Nothing iface0 >>= \case
               Right x   -> return (Succeeded (x, path))
-              Left errs -> throwErrors errs
+              Left errs -> throwErrors (tcRnDsToGhcMessage <$> errs)
           Failed err -> return (Failed err)
       (mod, _) -> find_iface mod
 
