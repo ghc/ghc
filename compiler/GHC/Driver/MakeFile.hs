@@ -23,6 +23,7 @@ import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Utils.Misc
 import GHC.Driver.Env
+import GHC.Driver.Errors.Types ( ghcUnknownMessage )
 import qualified GHC.SysTools as SysTools
 import GHC.Data.Graph.Directed ( SCC(..) )
 import GHC.Utils.Outputable
@@ -305,7 +306,7 @@ findDependency hsc_env srcloc pkg imp is_boot include_pkg_deps = do
         -> return Nothing
 
     fail ->
-        throwOneError $ mkPlainErrorMsgEnvelope srcloc $
+        throwOneError $ fmap ghcUnknownMessage $ mkPlainErrorMsgEnvelope srcloc $
              cannotFindModule hsc_env imp fail
 
 -----------------------------
