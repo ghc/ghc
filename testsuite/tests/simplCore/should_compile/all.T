@@ -130,6 +130,7 @@ test('T6082-RULE', normal, compile, [''])
 test('T7165', [], makefile_test, ['T7165'])
 test('T7287', normal, compile, [''])
 test('T7360', only_ways(['optasm']), compile, ['-ddump-simpl -dsuppress-uniques -dsuppress-ticks'])
+test('T7378', [grep_errmsg(r'case'), only_ways(['optasm'])], compile, ['-O -funfolding-use-threshold=109 -ddump-simpl -dsuppress-all -dsuppress-uniques'])
 test('T5366',
      normal,
      makefile_test, ['T5366'])
