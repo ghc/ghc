@@ -147,6 +147,7 @@ import qualified Data.Semigroup as Semi
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import qualified GHC.LanguageExtensions as LangExt
+import qualified GHC.Data.Strict as Strict
 
 import Control.Monad
 import Text.ParserCombinators.ReadP as ReadP
@@ -963,13 +964,13 @@ checkTyClHdr is_cls ty
         lr = combineRealSrcSpans (realSrcSpan l) (anchor as)
         -- lr = widenAnchorR as (realSrcSpan l)
         an = (EpAnn (Anchor lr UnchangedAnchor) (NameAnn NameParens o (EpaSpan $ realSrcSpan l) c []) cs)
-      in SrcSpanAnn an (RealSrcSpan lr Nothing)
+      in SrcSpanAnn an (RealSrcSpan lr Strict.Nothing)
     newAnns _ EpAnnNotUsed = panic "missing AnnParen"
     newAnns (SrcSpanAnn (EpAnn ap (AnnListItem ta) csp) l) (EpAnn as (AnnParen _ o c) cs) =
       let
         lr = combineRealSrcSpans (anchor ap) (anchor as)
         an = (EpAnn (Anchor lr UnchangedAnchor) (NameAnn NameParens o (EpaSpan $ realSrcSpan l) c ta) (csp Semi.<> cs))
-      in SrcSpanAnn an (RealSrcSpan lr Nothing)
+      in SrcSpanAnn an (RealSrcSpan lr Strict.Nothing)
 
 -- | Yield a parse error if we have a function applied directly to a do block
 -- etc. and BlockArguments is not enabled.
@@ -1053,18 +1054,18 @@ checkImportDecl mPre mPost = do
   -- 'ImportQualifiedPost' is not in effect.
   whenJust mPost $ \post ->
     when (not importQualifiedPostEnabled) $
-      failOpNotEnabledImportQualifiedPost (RealSrcSpan (epaLocationRealSrcSpan post) Nothing)
+      failOpNotEnabledImportQualifiedPost (RealSrcSpan (epaLocationRealSrcSpan post) Strict.Nothing)
 
   -- Error if 'qualified' occurs in both pre and postpositive
   -- positions.
   whenJust mPost $ \post ->
     when (isJust mPre) $
-      failOpImportQualifiedTwice (RealSrcSpan (epaLocationRealSrcSpan post) Nothing)
+      failOpImportQualifiedTwice (RealSrcSpan (epaLocationRealSrcSpan post) Strict.Nothing)
 
   -- Warn if 'qualified' found in prepositive position and
   -- 'Opt_WarnPrepositiveQualifiedModule' is enabled.
   whenJust mPre $ \pre ->
-    warnPrepositiveQualifiedModule (RealSrcSpan (epaLocationRealSrcSpan pre) Nothing)
+    warnPrepositiveQualifiedModule (RealSrcSpan (epaLocationRealSrcSpan pre) Strict.Nothing)
 
 -- -------------------------------------------------------------------------
 -- Checking Patterns.
@@ -2724,7 +2725,7 @@ data PV_Accum =
   PV_Accum
     { pv_warnings        :: Bag PsWarning
     , pv_errors          :: Bag PsError
-    , pv_header_comments :: Maybe [LEpaComment]
+    , pv_header_comments :: Strict.Maybe [LEpaComment]
     , pv_comment_q       :: [LEpaComment]
     }
 
@@ -2828,7 +2829,7 @@ instance MonadP PV where
       PV_Ok s {
          pv_header_comments = header_comments',
          pv_comment_q = comment_q'
-       } (EpaCommentsBalanced (fromMaybe [] header_comments') (reverse newAnns))
+       } (EpaCommentsBalanced (Strict.fromMaybe [] header_comments') (reverse newAnns))
 
 {- Note [Parser-Validator Hint]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
