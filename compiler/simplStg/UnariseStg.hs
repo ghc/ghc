@@ -124,6 +124,44 @@ Another example using the same type: (# | (# 2#, 3# #) | #). 2# fits in Word#,
 
   (# 2#, rubbish, 2#, 3# #).
 
+
+Note [Don't merge lifted and unlifted slots]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When merging slots, one might be tempted to collapse lifted and unlifted
+pointers. However, as seen in #19645, this is wrong. Imagine that you have
+the program:
+
+  test :: (# Char | ByteArray# #) -> ByteArray#
+  test (# c | #) = doSomething c
+  test (# | ba #) = ba
+
+Collapsing the Char and ByteArray# slots would produce STG like:
+
+  test :: forall {t}. (# t | GHC.Prim.ByteArray# #) -> GHC.Prim.ByteArray#
+    = {} \r [ (tag :: Int#) (slot0 :: (Any :: Type)) ]
+          case tag of tag'
+            1# -> doSomething slot0
+            2# -> slot0;
+
+Note how `slot0` has a lifted type, despite being bound to an unlifted
+ByteArray# in the 2# alternative. This liftedness would cause the code generator to
+attempt to enter it upon returning. As unlifted objects do not have entry code,
+this causes a runtime crash.
+
+For this reason, Unarise treats unlifted and lifted things as distinct slot
+types, despite both being GC pointers. This approach is a slight pessimisation
+(since we need to pass more arguments) but appears to be the simplest way to
+avoid #19645. Other alternatives considered include:
+
+ a. Giving unlifted objects "trivial" entry code. However, we ultimately
+    concluded that the value of the "unlifted things are never entered" invariant
+    outweighed the simplicity of this approach.
+
+ b. Annotating occurrences with calling convention information instead of
+    relying on the binder's type. This seemed like a very complicated
+    way to fix what is ultimately a corner-case.
+
+
 Note [Types in StgConApp]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have this unboxed sum term:
@@ -578,7 +616,8 @@ mkUbxSum dc ty_args args0
         = slotRubbishArg slot : mkTupArgs (arg_idx + 1) slots_left arg_map
 
       slotRubbishArg :: SlotTy -> StgArg
-      slotRubbishArg PtrSlot    = StgVarArg aBSENT_SUM_FIELD_ERROR_ID
+      slotRubbishArg PtrLiftedSlot    = StgVarArg aBSENT_SUM_FIELD_ERROR_ID
+      slotRubbishArg PtrUnliftedSlot  = StgVarArg aBSENT_SUM_FIELD_ERROR_ID
                          -- See Note [aBSENT_SUM_FIELD_ERROR_ID] in MkCore
       slotRubbishArg WordSlot   = StgLitArg (LitNumber LitNumWord 0 wordPrimTy)
       slotRubbishArg Word64Slot = StgLitArg (LitNumber LitNumWord64 0 word64PrimTy)
