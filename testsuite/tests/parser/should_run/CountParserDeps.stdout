@@ -1,4 +1,4 @@
-Found 253 GHC.Parser module dependencies
+Found 254 GHC.Parser module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.Types
@@ -76,6 +76,7 @@ GHC.Data.Maybe
 GHC.Data.OrdList
 GHC.Data.Pair
 GHC.Data.Stream
+GHC.Data.Strict
 GHC.Data.StringBuffer
 GHC.Data.TrieMap
 GHC.Driver.Backend

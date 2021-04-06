@@ -74,9 +74,11 @@ module GHC.Parser.Lexer (
   ) where
 
 import GHC.Prelude
+import qualified GHC.Data.Strict as Strict
 
 -- base
 import Control.Monad
+import Control.Applicative
 import Data.Bits
 import Data.Char
 import Data.List (stripPrefix, isInfixOf, partition)
@@ -1577,7 +1579,7 @@ varid span buf len =
     Just (ITcase, _) -> do
       lastTk <- getLastTk
       keyword <- case lastTk of
-        Just (L _ ITlam) -> do
+        Strict.Just (L _ ITlam) -> do
           lambdaCase <- getBit LambdaCaseBit
           unless lambdaCase $ do
             pState <- getPState
@@ -2252,7 +2254,7 @@ warnTab srcspan _buf _len = do
 
 warnThen :: WarningFlag -> (SrcSpan -> PsWarning) -> Action -> Action
 warnThen flag warning action srcspan buf len = do
-    addWarning flag (warning (RealSrcSpan (psRealSpan srcspan) Nothing))
+    addWarning flag (warning (RealSrcSpan (psRealSpan srcspan) Strict.Nothing))
     action srcspan buf len
 
 -- -----------------------------------------------------------------------------
@@ -2312,15 +2314,16 @@ data PState = PState {
         options    :: ParserOpts,
         warnings   :: Bag PsWarning,
         errors     :: Bag PsError,
-        tab_first  :: Maybe RealSrcSpan, -- pos of first tab warning in the file
+        tab_first  :: !(Strict.Maybe RealSrcSpan),
+                                         -- pos of first tab warning in the file
         tab_count  :: !Word,             -- number of tab warnings in the file
-        last_tk    :: Maybe (PsLocated Token), -- last non-comment token
-        prev_loc   :: PsSpan,      -- pos of previous token, including comments,
-        prev_loc2  :: PsSpan,      -- pos of two back token, including comments,
+        last_tk    :: !(Strict.Maybe (PsLocated Token)), -- last non-comment token
+        prev_loc   :: !PsSpan,     -- pos of previous token, including comments,
+        prev_loc2  :: !PsSpan,     -- pos of two back token, including comments,
                                    -- see Note [PsSpan in Comments]
-        last_loc   :: PsSpan,      -- pos of current token
+        last_loc   :: !PsSpan,     -- pos of current token
         last_len   :: !Int,        -- len of current token
-        loc        :: PsLoc,       -- current loc (end of prev token + 1)
+        loc        :: !PsLoc,      -- current loc (end of prev token + 1)
         context    :: [LayoutContext],
         lex_state  :: [Int],
         srcfiles   :: [FastString],
@@ -2347,8 +2350,8 @@ data PState = PState {
         -- locations of 'noise' tokens in the source, so that users of
         -- the GHC API can do source to source conversions.
         -- See note [exact print annotations] in GHC.Parser.Annotation
-        eof_pos :: Maybe (RealSrcSpan, RealSrcSpan), -- pos, gap to prior token
-        header_comments :: Maybe [LEpaComment],
+        eof_pos :: !(Strict.Maybe (Strict.Pair RealSrcSpan RealSrcSpan)), -- pos, gap to prior token
+        header_comments :: !(Strict.Maybe [LEpaComment]),
         comment_q :: [LEpaComment],
 
         -- Haddock comments accumulated in ascending order of their location
@@ -2406,7 +2409,7 @@ failMsgP f = do
 
 failLocMsgP :: RealSrcLoc -> RealSrcLoc -> (SrcSpan -> PsError) -> P a
 failLocMsgP loc1 loc2 f =
-  addFatalError (f (RealSrcSpan (mkRealSrcSpan loc1 loc2) Nothing))
+  addFatalError (f (RealSrcSpan (mkRealSrcSpan loc1 loc2) Strict.Nothing))
 
 getPState :: P PState
 getPState = P $ \s -> POk s s
@@ -2436,7 +2439,7 @@ addSrcFile :: FastString -> P ()
 addSrcFile f = P $ \s -> POk s{ srcfiles = f : srcfiles s } ()
 
 setEofPos :: RealSrcSpan -> RealSrcSpan -> P ()
-setEofPos span gap = P $ \s -> POk s{ eof_pos = Just (span, gap) } ()
+setEofPos span gap = P $ \s -> POk s{ eof_pos = Strict.Just (span `Strict.And` gap) } ()
 
 setLastToken :: PsSpan -> Int -> P ()
 setLastToken loc len = P $ \s -> POk s {
@@ -2445,7 +2448,7 @@ setLastToken loc len = P $ \s -> POk s {
   } ()
 
 setLastTk :: PsLocated Token -> P ()
-setLastTk tk@(L l _) = P $ \s -> POk s { last_tk = Just tk
+setLastTk tk@(L l _) = P $ \s -> POk s { last_tk = Strict.Just tk
                                        , prev_loc = l
                                        , prev_loc2 = prev_loc s} ()
 
@@ -2453,7 +2456,7 @@ setLastComment :: PsLocated Token -> P ()
 setLastComment (L l _) = P $ \s -> POk s { prev_loc = l
                                          , prev_loc2 = prev_loc s} ()
 
-getLastTk :: P (Maybe (PsLocated Token))
+getLastTk :: P (Strict.Maybe (PsLocated Token))
 getLastTk = P $ \s@(PState { last_tk = last_tk }) -> POk s last_tk
 
 -- see Note [PsSpan in Comments]
@@ -2832,9 +2835,9 @@ initParserState options buf loc =
       options       = options,
       errors        = emptyBag,
       warnings      = emptyBag,
-      tab_first     = Nothing,
+      tab_first     = Strict.Nothing,
       tab_count     = 0,
-      last_tk       = Nothing,
+      last_tk       = Strict.Nothing,
       prev_loc      = mkPsSpan init_loc init_loc,
       prev_loc2     = mkPsSpan init_loc init_loc,
       last_loc      = mkPsSpan init_loc init_loc,
@@ -2849,8 +2852,8 @@ initParserState options buf loc =
       alr_context = [],
       alr_expecting_ocurly = Nothing,
       alr_justClosedExplicitLetBlock = False,
-      eof_pos = Nothing,
-      header_comments = Nothing,
+      eof_pos = Strict.Nothing,
+      header_comments = Strict.Nothing,
       comment_q = [],
       hdk_comments = nilOL
     }
@@ -2932,7 +2935,7 @@ instance MonadP P where
       POk s {
          header_comments = header_comments',
          comment_q = comment_q'
-       } (EpaCommentsBalanced (fromMaybe [] header_comments') (reverse newAnns))
+       } (EpaCommentsBalanced (Strict.fromMaybe [] header_comments') (reverse newAnns))
 
 getCommentsFor :: (MonadP m) => SrcSpan -> m EpAnnComments
 getCommentsFor (RealSrcSpan l _) = allocateCommentsP l
@@ -2946,13 +2949,13 @@ getFinalCommentsFor :: (MonadP m) => SrcSpan -> m EpAnnComments
 getFinalCommentsFor (RealSrcSpan l _) = allocateFinalCommentsP l
 getFinalCommentsFor _ = return noCom
 
-getEofPos :: P (Maybe (RealSrcSpan, RealSrcSpan))
+getEofPos :: P (Strict.Maybe (Strict.Pair RealSrcSpan RealSrcSpan))
 getEofPos = P $ \s@(PState { eof_pos = pos }) -> POk s pos
 
 addTabWarning :: RealSrcSpan -> P ()
 addTabWarning srcspan
  = P $ \s@PState{tab_first=tf, tab_count=tc, options=o} ->
-       let tf' = if isJust tf then tf else Just srcspan
+       let tf' = tf <|> Strict.Just srcspan
            tc' = tc + 1
            s' = if warnopt Opt_WarnTabs o
                 then s{tab_first = tf', tab_count = tc'}
@@ -2972,8 +2975,9 @@ getMessages p =
       -- we add the tabulation warning on the fly because
       -- we count the number of occurrences of tab characters
       ws' = case tab_first p of
-               Nothing -> ws
-               Just tf -> PsWarnTab (RealSrcSpan tf Nothing) (tab_count p)
+        Strict.Nothing -> ws
+        Strict.Just tf ->
+          PsWarnTab (RealSrcSpan tf Strict.Nothing) (tab_count p)
                            `consBag` ws
   in (ws', errors p)
 
@@ -3470,8 +3474,8 @@ allocateComments ss comment_q =
 allocatePriorComments
   :: RealSrcSpan
   -> [LEpaComment]
-  -> Maybe [LEpaComment]
-  -> (Maybe [LEpaComment], [LEpaComment], [LEpaComment])
+  -> Strict.Maybe [LEpaComment]
+  -> (Strict.Maybe [LEpaComment], [LEpaComment], [LEpaComment])
 allocatePriorComments ss comment_q mheader_comments =
   let
     cmp (L l _) = anchor l <= ss
@@ -3480,14 +3484,14 @@ allocatePriorComments ss comment_q mheader_comments =
     comment_q'= after
   in
     case mheader_comments of
-      Nothing -> (Just newAnns, comment_q', [])
-      Just _ -> (mheader_comments, comment_q', newAnns)
+      Strict.Nothing -> (Strict.Just newAnns, comment_q', [])
+      Strict.Just _ -> (mheader_comments, comment_q', newAnns)
 
 allocateFinalComments
   :: RealSrcSpan
   -> [LEpaComment]
-  -> Maybe [LEpaComment]
-  -> (Maybe [LEpaComment], [LEpaComment], [LEpaComment])
+  -> Strict.Maybe [LEpaComment]
+  -> (Strict.Maybe [LEpaComment], [LEpaComment], [LEpaComment])
 allocateFinalComments ss comment_q mheader_comments =
   let
     cmp (L l _) = anchor l <= ss
@@ -3496,8 +3500,8 @@ allocateFinalComments ss comment_q mheader_comments =
     comment_q'= before
   in
     case mheader_comments of
-      Nothing -> (Just newAnns,    [], comment_q')
-      Just _ -> (mheader_comments, [], comment_q' ++ newAnns)
+      Strict.Nothing -> (Strict.Just newAnns, [], comment_q')
+      Strict.Just _ -> (mheader_comments, [], comment_q' ++ newAnns)
 
 commentToAnnotation :: RealLocated Token -> LEpaComment
 commentToAnnotation (L l (ITdocCommentNext s ll))  = mkLEpaComment l ll (EpaDocCommentNext s)

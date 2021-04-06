@@ -64,6 +64,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Misc          ( looksLikePackageName, fstOf3, sndOf3, thdOf3 )
 import GHC.Utils.Panic
 import GHC.Prelude
+import qualified GHC.Data.Strict as Strict
 
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Occurrence ( varName, dataName, tcClsName, tvName, occNameFS, mkVarOcc, occNameString)
@@ -4090,9 +4091,9 @@ looksLikeMult :: LHsType GhcPs -> LocatedN RdrName -> LHsType GhcPs -> Bool
 looksLikeMult ty1 l_op ty2
   | Unqual op_name <- unLoc l_op
   , occNameFS op_name == fsLit "%"
-  , Just ty1_pos <- getBufSpan (getLocA ty1)
-  , Just pct_pos <- getBufSpan (getLocA l_op)
-  , Just ty2_pos <- getBufSpan (getLocA ty2)
+  , Strict.Just ty1_pos <- getBufSpan (getLocA ty1)
+  , Strict.Just pct_pos <- getBufSpan (getLocA l_op)
+  , Strict.Just ty2_pos <- getBufSpan (getLocA ty2)
   , bufSpanEnd ty1_pos /= bufSpanStart pct_pos
   , bufSpanEnd pct_pos == bufSpanStart ty2_pos
   = True
@@ -4223,8 +4224,9 @@ acsFinal a = do
   csf <- getFinalCommentsFor l
   meof <- getEofPos
   let ce = case meof of
-             Nothing  -> EpaComments []
-             Just (pos, gap) -> EpaCommentsBalanced [] [L (realSpanAsAnchor pos) (EpaComment EpaEofComment gap)]
+             Strict.Nothing  -> EpaComments []
+             Strict.Just (pos `Strict.And` gap) ->
+               EpaCommentsBalanced [] [L (realSpanAsAnchor pos) (EpaComment EpaEofComment gap)]
   return (a (cs Semi.<> csf Semi.<> ce))
 
 acsa :: MonadP m => (EpAnnComments -> LocatedAn t a) -> m (LocatedAn t a)
