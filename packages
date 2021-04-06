@@ -54,6 +54,7 @@ libraries/haskeline          -           -                               https:/
 libraries/hpc                -           -                               -
 libraries/libiserv           -           -                               -
 libraries/mtl                -           -                               https://github.com/haskell/mtl.git
+libraries/network            -           libraries/network               https://github.com/haskell/network.git
 libraries/parsec             -           -                               https://github.com/haskell/parsec.git
 libraries/pretty             -           -                               https://github.com/haskell/pretty.git
 libraries/process            -           -                               ssh://git@github.com/haskell/process.git

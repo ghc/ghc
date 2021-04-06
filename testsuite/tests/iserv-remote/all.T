@@ -3,9 +3,11 @@ def normalise_port(str):
   return str
 
 test('remote-iserv'
-    , [ reqlib('network')
-      , normalise_fun(normalise_port)
-      , normalise_errmsg_fun(normalise_port)
-      , extra_files(['Main.hs', 'Lib.hs', 'iserv-wrapper', 'Setup.hs'])]
-    , makefile_test
-    , [])
+    , skip
+#    , [ reqlib('network')
+#      , normalise_fun(normalise_port)
+#      , normalise_errmsg_fun(normalise_port)
+#      , extra_files(['Main.hs', 'Lib.hs', 'iserv-wrapper', 'Setup.hs'])]
+#    , makefile_test
+     , compile
+    , [''])
