@@ -48,6 +48,7 @@ import           GHC.Utils.Outputable
 import           GHC.Types.SrcLoc
 import           GHC.Tc.Utils.Zonk
 import           GHC.Types.Var
+import qualified GHC.Data.Strict as Strict
 
 -- | Info about a module. This information is generated every time a
 -- module is loaded.
@@ -145,7 +146,7 @@ findNameUses infos span0 string =
     locToSpans (modinfo,name',span') =
         stripSurrounding (span' : map toSrcSpan spans)
       where
-        toSrcSpan s = RealSrcSpan (spaninfoSrcSpan s) Nothing
+        toSrcSpan s = RealSrcSpan (spaninfoSrcSpan s) Strict.Nothing
         spans = filter ((== Just name') . fmap getName . spaninfoVar)
                        (modinfoSpans modinfo)
 

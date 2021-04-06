@@ -24,6 +24,6 @@ test('T18522-dbg-ppr',
   extra_run_opts('"' + config.libdir + '"'),
   compile_and_run,
   ['-package ghc'])
-test('T19156', [extra_run_opts('"' + config.libdir + '"'), expect_broken(19156)],
+test('T19156', extra_run_opts('"' + config.libdir + '"'),
               compile_and_run,
               ['-package ghc'])
