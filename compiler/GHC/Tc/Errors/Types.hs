@@ -11,7 +11,7 @@ import GHC.Types.Error
 import GHC.HsToCore.Errors.Types
 
 {- Note [TcRnDsMessage]
-~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
 
 There is a mutual dependency between typecheck-rename and desugaring,
 because we need to desugar expressions during TH splicing. This means that
