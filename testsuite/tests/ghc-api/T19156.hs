@@ -4,14 +4,15 @@
 
 import GHC.Exts.Heap
 import GHC.Types.SrcLoc
+import qualified GHC.Data.Strict as Strict
 
 rsl :: RealSrcLoc
 rsl = mkRealSrcLoc "Foo" 1 1
 
 main = do
-  let !s1 = RealSrcLoc rsl (Just (BufPos 999222))
-      !s2 = RealSrcLoc rsl (Just (BufPos 999333))
-      !s3 = RealSrcLoc rsl (Just (BufPos 999444))
+  let !s1 = RealSrcLoc rsl (Strict.Just (BufPos 999222))
+      !s2 = RealSrcLoc rsl (Strict.Just (BufPos 999333))
+      !s3 = RealSrcLoc rsl (Strict.Just (BufPos 999444))
 
       !res = combineSrcSpans (combineSrcSpans (srcLocSpan s1) (srcLocSpan s2)) (srcLocSpan s3)
   cs <- unbox res
