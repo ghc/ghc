@@ -52,7 +52,7 @@ scaleUsage x   Bottom     = MUsage x
 scaleUsage x   (MUsage y) = MUsage $ mkMultMul x y
 
 -- For now, we use extra multiplicity Bottom for empty case.
-data UsageEnv = UsageEnv (NameEnv Mult) Bool
+data UsageEnv = UsageEnv !(NameEnv Mult) Bool
 
 unitUE :: NamedThing n => n -> Mult -> UsageEnv
 unitUE x w = UsageEnv (unitNameEnv (getName x) w) False
