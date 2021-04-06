@@ -1409,8 +1409,7 @@ checkMissingFields con_like rbinds arg_tys
         -- Illegal if any arg is strict
         addErrTc (missingStrictFields con_like [])
     else do
-        warn <- woptM Opt_WarnMissingFields
-        when (warn && notNull field_strs && null field_labels)
+        when (notNull field_strs && null field_labels)
              (diagnosticTc (WarningWithFlag Opt_WarnMissingFields) True
                            (missingFields con_like []))
 
