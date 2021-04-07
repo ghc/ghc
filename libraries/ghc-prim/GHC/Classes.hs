@@ -613,14 +613,66 @@ x# `divInt#` y# = ((x# +# bias#) `quotInt#` y#) -# hard#
 
 
 modInt# :: Int# -> Int# -> Int#
-x# `modInt#` y#
-    = if isTrue# (x# ># 0#) && isTrue# (y# <# 0#) ||
-         isTrue# (x# <# 0#) && isTrue# (y# ># 0#)
-      then if isTrue# (r# /=# 0#) then r# +# y# else 0#
-      else r#
-    where
-    !r# = x# `remInt#` y#
+x# `modInt#` y# = r# +# k#
+  where
+    -- See Note [modInt# implementation]
+    !yn# = y# <# 0#
+    !c0# = (x# <# 0#) `andI#` (notI# yn#)
+    !c1# = (x# ># 0#) `andI#` yn#
+    !s#  = 0# -# ((c0# `orI#` c1#) `andI#` (r# /=# 0#))
+    !k#  = s# `andI#` y#
+    !r#  = x# `remInt#` y#
 
+
+-- Note [modInt# implementation]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- Similarly to divInt# (see Note [divInt# implementation]), we can derive the
+-- branchless implementation of modInt# as follows:
+--
+--    = if isTrue# (x# ># 0#) && isTrue# (y# <# 0#) ||
+--         isTrue# (x# <# 0#) && isTrue# (y# ># 0#)
+--      then if isTrue# (r# /=# 0#) then r# +# y# else 0#
+--      else r#
+--    where
+--     r# = x# `remInt#` y#
+--
+--  ===> { Introduce constant k# }
+--
+--    r# +# k#
+--      where
+--        k# = if isTrue# (x# ># 0#) && isTrue# (y# <# 0#) ||
+--                isTrue# (x# <# 0#) && isTrue# (y# ># 0#)
+--             then if isTrue# (r# /=# 0#) then y# else 0#
+--             else 0#
+--        r# = x# `remInt#` y#
+--
+--  ===> { Compute using Bool# }
+--
+--    r# +# k#
+--      where
+--        yn# = y# <# 0# -- we don't need to consider y# ==# 0#
+--        c0# = (x# <# 0#) &&# (notI# yn#)
+--        c1# = (x# ># 0#) &&# yn#
+--        k#  = if isTrue# ((c0# ||# c1#) &&# (r# /=# 0#))
+--                then y#
+--                else 0#
+--        r#  = x# `remInt#` y#
+--
+--  ===> { Select y# or 0# in branchless way }
+--
+--    r# +# k#
+--      where
+--        yn# = y# <# 0#
+--        c0# = (x# <# 0#) &&# (notI# yn#)
+--        c1# = (x# ># 0#) &&# yn#
+--        -- s# is either equal to:
+--        --    0#  (00..00b)
+--        --    -1# (11..11b)
+--        -- So we can AND s# with y#
+--        s#  = 0# -# ((c0# ||# c1#) &&# (r# /=# 0#))
+--        k#  = s# &&# y#
+--        r#  = x# `remInt#` y#
 
 {- *************************************************************
 *                                                              *
