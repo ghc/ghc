@@ -246,6 +246,10 @@ Language
   as ``f (-123)``, but ``x-123`` as ``(-) x 123``. Before this amendment,
   :extension:`NegativeLiterals` caused ``x-123`` to be parsed as ``x(-123)``.
 
+* GHC now requires whitespace between infix operators and their arguments in
+  some cases where it was not previously necessary as the result of the
+  :ref:`whitespace-sensitive operator parsing proposal <https://github.com/ghc-proposals/ghc-proposals/pull/229>`.
+
 Compiler
 ~~~~~~~~
 

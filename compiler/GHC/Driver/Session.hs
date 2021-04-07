@@ -3028,7 +3028,7 @@ dynamic_flags_deps = [
       (intSuffix   (\n d -> d {ufDictDiscount = n}))
   , make_dep_flag defFlag "funfolding-keeness-factor"
       (floatSuffix (\_ d -> d))
-      "-funfolding-keeness-factor is no longer respected as of GHC 8.12"
+      "-funfolding-keeness-factor is no longer respected as of GHC 9.0"
   , make_ord_flag defFlag "fmax-worker-args"
       (intSuffix (\n d -> d {maxWorkerArgs = n}))
   , make_ord_flag defGhciFlag "fghci-hist-size"
