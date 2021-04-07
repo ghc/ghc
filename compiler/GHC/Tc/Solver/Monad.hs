@@ -916,21 +916,22 @@ binary relation with the following properties
   (R1) >= is transitive
   (R2) If f1 >= f, and f2 >= f,
        then either f1 >= f2 or f2 >= f1
+  (See Note [Why R2?].)
 
-Lemma.  If f1 >= f then f1 >= f1
-Proof.  By property (R2), with f1=f2
+Lemma (L0). If f1 >= f then f1 >= f1
+Proof.      By property (R2), with f1=f2
 
 Definition [Generalised substitution]
-A "generalised substitution" S is a set of triples (t0 -f-> t), where
-  t0 is a type variable or an exactly-saturated type family application
-    (that is, t0 is a CanEqLHS)
+A "generalised substitution" S is a set of triples (lhs -f-> t), where
+  lhs is a type variable or an exactly-saturated type family application
+    (that is, lhs is a CanEqLHS)
   t is a type
   f is a flavour
 such that
-  (WF1) if (t0 -f1-> t1) in S
-           (t0' -f2-> t2) in S
-        then either not (f1 >= f2) or t0 does not appear within t0'
-  (WF2) if (t0 -f-> t) is in S, then t /= t0
+  (WF1) if (lhs1 -f1-> t1) in S
+           (lhs2 -f2-> t2) in S
+        then (f1 >= f2) implies that lhs1 does not appear within lhs2
+  (WF2) if (lhs -f-> t) is in S, then t /= lhs
 
 Definition [Applying a generalised substitution]
 If S is a generalised substitution
@@ -939,7 +940,7 @@ If S is a generalised substitution
 See also Note [Flavours with roles].
 
 Theorem: S(f,t0) is well defined as a function.
-Proof: Suppose (t0 -f1-> t1) and (t0 -f2-> t2) are both in S,
+Proof: Suppose (lhs -f1-> t1) and (lhs -f2-> t2) are both in S,
                and  f1 >= f and f2 >= f
        Then by (R2) f1 >= f2 or f2 >= f1, which contradicts (WF1)
 
@@ -947,8 +948,8 @@ Notation: repeated application.
   S^0(f,t)     = t
   S^(n+1)(f,t) = S(f, S^n(t))
 
-Definition: inert generalised substitution
-A generalised substitution S is "inert" iff
+Definition: terminating generalised substitution
+A generalised substitution S is *terminating* iff
 
   (IG1) there is an n such that
         for every f,t, S^n(f,t) = S^(n+1)(f,t)
@@ -956,61 +957,136 @@ A generalised substitution S is "inert" iff
 By (IG1) we define S*(f,t) to be the result of exahaustively
 applying S(f,_) to t.
 
-----------------------------------------------------------------
+-----------------------------------------------------------------------------
 Our main invariant:
-   the inert CEqCans should be an inert generalised substitution
-----------------------------------------------------------------
+   the CEqCans in inert_eqs should be a terminating generalised substitution
+-----------------------------------------------------------------------------
 
-Note that inertness is not the same as idempotence.  To apply S to a
-type, you may have to apply it recursively.  But inertness does
+Note that termination is not the same as idempotence.  To apply S to a
+type, you may have to apply it recursively.  But termination does
 guarantee that this recursive use will terminate.
+
+Note [Why R2?]
+~~~~~~~~~~~~~~
+R2 states that, if we have f1 >= f and f2 >= f, then either f1 >= f2 or f2 >=
+f1. If we do not have R2, we will easily fall into a loop.
+
+To see why, imagine we have f1 >= f, f2 >= f, and that's it. Then, let our
+inert set S = {a -f1-> b, b -f2-> a}. Computing S(f,a) does not terminate. And
+yet, we have a hard time noticing an occurs-check problem when building S, as
+the two equalities cannot rewrite one another.
+
+R2 actually restricts our ability to accept user-written programs. See Note
+[Deriveds do rewrite Deriveds] in GHC.Tc.Types.Constraint for an example.
+
+Note [Rewritable]
+~~~~~~~~~~~~~~~~~
+This Note defines what it means for a type variable or type family application
+(that is, a CanEqLHS) to be rewritable in a type. This definition is used
+by the anyRewritableXXX family of functions and is meant to model the actual
+behaviour in GHC.Tc.Solver.Rewrite.
+
+Ignoring roles (for now): A CanEqLHS lhs is *rewritable* in a type t if the
+lhs tree appears as a subtree within t without traversing any of the following
+components of t:
+  * coercions (whether they appear in casts CastTy or as arguments CoercionTy)
+  * kinds of variable occurrences
+The check for rewritability *does* look in kinds of the bound variable of a
+ForAllTy.
+
+Goal: If lhs is not rewritable in t, then t is a fixpoint of the generalised
+substitution containing only {lhs -f*-> t'}, where f* is a flavour such that f* >= f
+for all f.
+
+The reason for this definition is that the rewriter does not rewrite in coercions
+or variables' kinds. In turn, the rewriter does not need to rewrite there because
+those places are never used for controlling the behaviour of the solver: these
+places are not used in matching instances or in decomposing equalities.
+
+There is one exception to the claim that non-rewritable parts of the tree do
+not affect the solver: we sometimes do an occurs-check to decide e.g. how to
+orient an equality. (See the comments on
+GHC.Tc.Solver.Canonical.canEqTyVarFunEq.) Accordingly, the presence of a
+variable in a kind or coercion just might influence the solver. Here is an
+example:
+
+  type family Const x y where
+    Const x y = x
+
+  AxConst :: forall x y. Const x y ~# x
+
+  alpha :: Const Type Nat
+  [W] alpha ~ Int |> (sym (AxConst Type alpha) ;;
+                      AxConst Type alpha ;;
+                      sym (AxConst Type Nat))
+
+The cast is clearly ludicrous (it ties together a cast and its symmetric version),
+but we can't quite rule it out. (See (EQ1) from
+Note [Respecting definitional equality] in GHC.Core.TyCo.Rep to see why we need
+the Const Type Nat bit.) And yet this cast will (quite rightly) prevent alpha
+from unifying with the RHS. I (Richard E) don't have an example of where this
+problem can arise from a Haskell program, but we don't have an air-tight argument
+for why the definition of *rewritable* given here is correct.
+
+Taking roles into account: we must consider a rewrite at a given role. That is,
+a rewrite arises from some equality, and that equality has a role associated
+with it. As we traverse a type, we track what role we are allowed to rewrite with.
+
+For example, suppose we have an inert [G] b ~R# Int. Then b is rewritable in
+Maybe b but not in F b, where F is a type function. This role-aware logic is
+present in both the anyRewritableXXX functions and in the rewriter.
+See also Note [anyRewritableTyVar must be role-aware] in GHC.Tc.Utils.TcType.
 
 Note [Extending the inert equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Main Theorem [Stability under extension]
    Suppose we have a "work item"
-       t0 -fw-> t
-   and an inert generalised substitution S,
-   THEN the extended substitution T = S+(t0 -fw-> t)
-        is an inert generalised substitution
+       lhs -fw-> t
+   and a terminating generalised substitution S,
+   THEN the extended substitution T = S+(lhs -fw-> t)
+        is a terminating generalised substitution
    PROVIDED
-      (T1) S(fw,t0) = t0     -- LHS of work-item is a fixpoint of S(fw,_)
-      (T2) S(fw,t)  = t      -- RHS of work-item is a fixpoint of S(fw,_)
-      (T3) t0 not in t       -- No occurs check in the work item
+      (T1) S(fw,lhs) = lhs   -- LHS of work-item is a fixpoint of S(fw,_)
+      (T2) S(fw,t)   = t     -- RHS of work-item is a fixpoint of S(fw,_)
+      (T3) lhs not in t      -- No occurs check in the work item
+          -- If lhs is a type family application, we require only that
+          -- lhs is not *rewritable* in t. See Note [Rewritable] and
+          -- Note [CEqCan occurs check] in GHC.Tc.Types.Constraint.
 
-      AND, for every (t0' -fs-> s) in S:
+      AND, for every (lhs1 -fs-> s) in S:
            (K0) not (fw >= fs)
-                Reason: suppose we kick out (a -fs-> s),
-                        and add (t0 -fw-> t) to the inert set.
+                Reason: suppose we kick out (lhs1 -fs-> s),
+                        and add (lhs -fw-> t) to the inert set.
                         The latter can't rewrite the former,
                         so the kick-out achieved nothing
 
-           OR { (K1) t0 is not rewritable in t0'. That is, t0 does not occur
-                     in t0' (except perhaps in a cast or coercion).
-                     Reason: if fw >= fs, WF1 says we can't have both
-                             t0 -fw-> t  and  F t0 -fs-> s
+              -- From here, we can assume fw >= fs
+           OR (K4) lhs1 is a tyvar AND fs >= fw
 
-                AND (K2): guarantees inertness of the new substitution
+           OR { (K1) lhs is not rewritable in lhs1. See Note [Rewritable].
+                     Reason: if fw >= fs, WF1 says we can't have both
+                             lhs0 -fw-> t  and  F lhs0 -fs-> s
+
+                AND (K2): guarantees termination of the new substitution
                     {  (K2a) not (fs >= fs)
-                    OR (K2b) fs >= fw
-                    OR (K2d) t0 not in s }
+                    OR (K2b) lhs not in s }
 
                 AND (K3) See Note [K3: completeness of solving]
-                    { (K3a) If the role of fs is nominal: s /= t0
+                    { (K3a) If the role of fs is nominal: s /= lhs
                       (K3b) If the role of fs is representational:
-                            s is not of form (t0 t1 .. tn) } }
+                            s is not of form (lhs t1 .. tn) } }
 
 
 Conditions (T1-T3) are established by the canonicaliser
 Conditions (K1-K3) are established by GHC.Tc.Solver.Monad.kickOutRewritable
 
 The idea is that
-* (T1-2) are guaranteed by exhaustively rewriting the work-item
+* T1 and T2 are guaranteed by exhaustively rewriting the work-item
   with S(fw,_).
 
-* T3 is guaranteed by a simple occurs-check on the work item.
-  This is done during canonicalisation, in canEqCanLHSFinish; invariant
-  (TyEq:OC) of CEqCan.
+* T3 is guaranteed by an occurs-check on the work item.
+  This is done during canonicalisation, in canEqOK and checkTypeEq; invariant
+  (TyEq:OC) of CEqCan. See also Note [CEqCan occurs check] in GHC.Tc.Types.Constraint.
 
 * (K1-3) are the "kick-out" criteria.  (As stated, they are really the
   "keep" criteria.) If the current inert S contains a triple that does
@@ -1025,48 +1101,44 @@ The idea is that
 * Assume we have  G>=G, G>=W and that's all.  Then, when performing
   a unification we add a new given  a -G-> ty.  But doing so does NOT require
   us to kick out an inert wanted that mentions a, because of (K2a).  This
-  is a common case, hence good not to kick out.
+  is a common case, hence good not to kick out. See also (K2a) below.
 
 * Lemma (L2): if not (fw >= fw), then K0 holds and we kick out nothing
   Proof: using Definition [Can-rewrite relation], fw can't rewrite anything
-         and so K0 holds.  Intuitively, since fw can't rewrite anything,
+         and so K0 holds.  Intuitively, since fw can't rewrite anything (Lemma (L0)),
          adding it cannot cause any loops
   This is a common case, because Wanteds cannot rewrite Wanteds.
   It's used to avoid even looking for constraint to kick out.
 
 * Lemma (L1): The conditions of the Main Theorem imply that there is no
-              (t0 -fs-> t) in S, s.t.  (fs >= fw).
+              (lhs -fs-> t) in S, s.t.  (fs >= fw).
   Proof. Suppose the contrary (fs >= fw).  Then because of (T1),
-  S(fw,t0)=t0.  But since fs>=fw, S(fw,t0) = s, hence s=t0.  But now we
-  have (t0 -fs-> t0) in S, which contradicts (WF2).
+  S(fw,lhs)=lhs.  But since fs>=fw, S(fw,lhs) = t, hence t=lhs.  But now we
+  have (lhs -fs-> lhs) in S, which contradicts (WF2).
 
 * The extended substitution satisfies (WF1) and (WF2)
   - (K1) plus (L1) guarantee that the extended substitution satisfies (WF1).
   - (T3) guarantees (WF2).
 
-* (K2) is about inertness.  Intuitively, any infinite chain T^0(f,t),
-  T^1(f,t), T^2(f,T).... must pass through the new work item infinitely
-  often, since the substitution without the work item is inert; and must
+* (K2) and (K4) are about termination.  Intuitively, any infinite chain S^0(f,t),
+  S^1(f,t), S^2(f,t).... must pass through the new work item infinitely
+  often, since the substitution without the work item is terminating; and must
   pass through at least one of the triples in S infinitely often.
 
-  - (K2a): if not(fs>=fs) then there is no f that fs can rewrite (fs>=f),
-    and hence this triple never plays a role in application S(f,a).
+  - (K2a): if not(fs>=fs) then there is no f that fs can rewrite (fs>=f)
+    (this is Lemma (L0)), and hence this triple never plays a role in application S(f,t).
     It is always safe to extend S with such a triple.
 
     (NB: we could strengten K1) in this way too, but see K3.
 
-  - (K2b): If this holds then, by (T2), b is not in t.  So applying the
-    work item does not generate any new opportunities for applying S
+  - (K2b): if lhs not in s, we have no further opportunity to apply the
+    work item
 
-  - (K2c): If this holds, we can't pass through this triple infinitely
-    often, because if we did then fs>=f, fw>=f, hence by (R2)
-      * either fw>=fs, contradicting K2c
-      * or fs>=fw; so by the argument in K2b we can't have a loop
+  - (K4): See Note [K4]
 
-  - (K2d): if a not in s, we hae no further opportunity to apply the
-    work item, similar to (K2b)
-
-  NB: Dimitrios has a PDF that does this in more detail
+* Lemma (L3). Suppose we have f* such that, for all f, f* >= f. Then
+  if we are adding lhs -fw-> t (where T1, T2, and T3 hold), we will keep a -f*-> s.
+  Proof. K4 holds; thus, we keep.
 
 Key lemma to make it watertight.
   Under the conditions of the Main Theorem,
@@ -1074,12 +1146,91 @@ Key lemma to make it watertight.
 
 Also, consider roles more carefully. See Note [Flavours with roles]
 
+Note [K4]
+~~~~~~~~~
+K4 is a "keep" condition of Note [Extending the inert equalities].
+Here is the scenario:
+
+* We are considering adding (lhs -fw-> t) to the inert set S.
+* S already has (lhs1 -fs-> s).
+* We know S(fw, lhs) = lhs, S(fw, t) = t, and lhs is not rewritable in t.
+  See Note [Rewritable]. These are (T1), (T2), and (T3).
+* We further know fw >= fs. (If not, then we short-circuit via (K0).)
+
+K4 says that we may keep lhs1 -fs-> s in S if:
+  lhs1 is a tyvar AND fs >= fw
+
+Why K4 guarantees termination:
+  * If fs >= fw, we know a is not rewritable in t, because of (T2).
+  * We further know lhs /= a, because of (T1).
+  * Accordingly, a use of the new inert item lhs -fw-> t cannot create the conditions
+    for a use of a -fs-> s (precisely because t does not mention a), and hence,
+    the extended substitution (with lhs -fw-> t in it) is a terminating
+    generalised substitution.
+
+Recall that the termination generalised substitution includes only mappings that
+pass an occurs check. This is (T3). At one point, we worried that the
+argument here would fail if s mentioned a, but (T3) rules out this possibility.
+Put another way: the terminating generalised substitution considers only the inert_eqs,
+not other parts of the inert set (such as the irreds).
+
+Can we liberalise K4? No.
+
+Why we cannot drop the (fs >= fw) condition:
+  * Suppose not (fs >= fw). It might be the case that t mentions a, and this
+    can cause a loop. Example:
+
+      Work:  [G] b ~ a
+      Inert: [D] a ~ b
+
+    (where G >= G, G >= D, and D >= D)
+    If we don't kick out the inert, then we get a loop on e.g. [D] a ~ Int.
+
+  * Note that the above example is different if the inert is a Given G, because
+    (T1) won't hold.
+
+Why we cannot drop the tyvar condition:
+  * Presume fs >= fw. Thus, F tys is not rewritable in t, because of (T2).
+  * Can the use of lhs -fw-> t create the conditions for a use of F tys -fs-> s?
+    Yes! This can happen if t appears within tys.
+
+    Here is an example:
+
+      Work:  [G] a ~ Int
+      Inert: [G] F Int ~ F a
+
+    Now, if we have [W] F a ~ Bool, we will rewrite ad infinitum on the left-hand
+    side. The key reason why K2b works in the tyvar case is that tyvars are atomic:
+    if the right-hand side of an equality does not mention a variable a, then it
+    cannot allow an equality with an LHS of a to fire. This is not the case for
+    type family applications.
+
+Bottom line: K4 can keep only inerts with tyvars on the left. Put differently,
+K4 will never prevent an inert with a type family on the left from being kicked
+out.
+
+Consequence: We never kick out a Given/Nominal equality with a tyvar on the left.
+This is Lemma (L3) of Note [Extending the inert equalities]. It is good because
+it means we can effectively model the mutable filling of metavariables with
+Given/Nominal equalities. That is: it should be the case that we could rewrite
+our solver never to fill in a metavariable; instead, it would "solve" a wanted
+like alpha ~ Int by turning it into a Given, allowing it to be used in rewriting.
+We would want the solver to behave the same whether it uses metavariables or
+Givens. And (L3) says that no Given/Nominals over tyvars are ever kicked out,
+just like we never unfill a metavariable. Nice.
+
+Getting this wrong (that is, allowing K4 to apply to situations with the type
+family on the left) led to #19042. (At that point, K4 was known as K2b.)
+
+Originally, this condition was part of K2, but #17672 suggests it should be
+a top-level K condition.
+
 Note [K3: completeness of solving]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 (K3) is not necessary for the extended substitution
-to be inert.  In fact K1 could be made stronger by saying
+to be terminating.  In fact K1 could be made stronger by saying
    ... then (not (fw >= fs) or not (fs >= fs))
-But it's not enough for S to be inert; we also want completeness.
+But it's not enough for S to be terminating; we also want completeness.
 That is, we want to be able to solve all soluble wanted equalities.
 Suppose we have
 
@@ -1127,8 +1278,8 @@ representational inert out. And then, we'd miss solving the inert, which
 now reduced to reflexivity.
 
 The solution here is to kick out representational inerts whenever the
-tyvar of a work item is "exposed", where exposed means being at the
-head of the top-level application chain (a t1 .. tn).  See
+lhs of a work item is "exposed", where exposed means being at the
+head of the top-level application chain (lhs t1 .. tn).  See
 is_can_eq_lhs_head. This is encoded in (K3b).
 
 Beware: if we make this test succeed too often, we kick out too much,
@@ -1911,24 +2062,29 @@ kick_out_rewritable new_fr new_lhs
     kick_out_eq (CEqCan { cc_lhs = lhs, cc_rhs = rhs_ty
                         , cc_ev = ev, cc_eq_rel = eq_rel })
       | not (fr_may_rewrite fs)
-      = False  -- Keep it in the inert set if the new thing can't rewrite it
+      = False  -- (K0) Keep it in the inert set if the new thing can't rewrite it
 
       -- Below here (fr_may_rewrite fs) is True
-      | fr_can_rewrite_ty eq_rel (canEqLHSType lhs) = True   -- (K1)
+
+      | TyVarLHS _ <- lhs
+      , fs `eqMayRewriteFR` new_fr
+      = False  -- (K4) Keep it in the inert set if the LHS is a tyvar and
+               -- it can rewrite the work item. See Note [K4]
+
+      | fr_can_rewrite_ty eq_rel (canEqLHSType lhs)
+      = True   -- (K1)
          -- The above check redundantly checks the role & flavour,
          -- but it's very convenient
 
-      | kick_out_for_inertness    = True
-      | kick_out_for_completeness = True
+      | kick_out_for_inertness    = True   -- (K2)
+      | kick_out_for_completeness = True   -- (K3)
       | otherwise                 = False
 
       where
         fs = (ctEvFlavour ev, eq_rel)
         kick_out_for_inertness
-          =        (fs `eqMayRewriteFR` fs)       -- (K2a)
-            && not (fs `eqMayRewriteFR` new_fr)   -- (K2b)
-            && fr_can_rewrite_ty eq_rel rhs_ty    -- (K2d)
-            -- (K2c) is guaranteed by the first guard of keep_eq
+          =    (fs `eqMayRewriteFR` fs)           -- (K2a)
+            && fr_can_rewrite_ty eq_rel rhs_ty    -- (K2b)
 
         kick_out_for_completeness  -- (K3) and Note [K3: completeness of solving]
           = case eq_rel of
