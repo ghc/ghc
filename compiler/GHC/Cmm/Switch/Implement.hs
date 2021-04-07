@@ -83,6 +83,8 @@ floatSwitchExpr platform expr             = do
 implementSwitchPlan :: Platform -> CmmTickScope -> CmmExpr -> SwitchPlan -> UniqSM (Block CmmNode O C, [CmmBlock])
 implementSwitchPlan platform scope expr = go
   where
+    width = typeWidth $ cmmExprType platform expr
+
     go (Unconditionally l)
       = return (emptyBlock `blockJoinTail` CmmBranch l, [])
     go (JumpTable ids)
@@ -92,9 +94,9 @@ implementSwitchPlan platform scope expr = go
         (bid1, newBlocks1) <- go' ids1
         (bid2, newBlocks2) <- go' ids2
 
-        let lt | signed    = cmmSLtWord
-               | otherwise = cmmULtWord
-            scrut = lt platform expr $ CmmLit $ mkWordCLit platform i
+        let lt | signed    = MO_S_Lt
+               | otherwise = MO_U_Lt
+            scrut = CmmMachOp (lt width) [expr, CmmLit $ CmmInt i width]
             lastNode = CmmCondBranch scrut bid1 bid2 Nothing
             lastBlock = emptyBlock `blockJoinTail` lastNode
         return (lastBlock, newBlocks1++newBlocks2)
@@ -102,7 +104,7 @@ implementSwitchPlan platform scope expr = go
       = do
         (bid2, newBlocks2) <- go' ids2
 
-        let scrut = cmmNeWord platform expr $ CmmLit $ mkWordCLit platform i
+        let scrut = CmmMachOp (MO_Ne width) [expr, CmmLit $ CmmInt i width]
             lastNode = CmmCondBranch scrut bid2 l Nothing
             lastBlock = emptyBlock `blockJoinTail` lastNode
         return (lastBlock, newBlocks2)
