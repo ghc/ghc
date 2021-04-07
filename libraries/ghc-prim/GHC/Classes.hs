@@ -540,8 +540,8 @@ not False               =  True
 -- put them
 
 -- These functions have built-in rules.
-{-# NOINLINE divInt# #-}
-{-# NOINLINE modInt# #-}
+{-# INLINE [0] divInt# #-}
+{-# INLINE [0] modInt# #-}
 
 divInt# :: Int# -> Int# -> Int#
 x# `divInt#` y# = ((x# +# bias#) `quotInt#` y#) -# hard#
