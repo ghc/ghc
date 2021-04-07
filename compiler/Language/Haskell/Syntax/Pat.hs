@@ -9,6 +9,7 @@
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
                                       -- in module Language.Haskell.Syntax.Extension
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE DataKinds #-}
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
@@ -74,7 +75,9 @@ data Pat p
     -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
 
   | ParPat      (XParPat p)
+               !(LHsToken "(" p)
                 (LPat p)                -- ^ Parenthesised pattern
+               !(LHsToken ")" p)
                                         -- See Note [Parens in HsSyn] in GHC.Hs.Expr
     -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'('@,
     --                                    'GHC.Parser.Annotation.AnnClose' @')'@
