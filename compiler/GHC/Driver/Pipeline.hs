@@ -291,7 +291,7 @@ compileOne' m_tc_result mHscMessage
                             (Temporary TFL_CurrentModule)
                             basename dflags next_phase (Just location)
             -- We're in --make mode: finish the compilation pipeline.
-            (_, _, Just (iface, details)) <- runPipeline StopLn hsc_env'
+            (_, _, Just (iface, _details)) <- runPipeline StopLn hsc_env'
                               (output_fn,
                                Nothing,
                                Just (HscOut src_flavour mod_name status))
@@ -302,6 +302,7 @@ compileOne' m_tc_result mHscMessage
                   -- The object filename comes from the ModLocation
             o_time <- getModificationUTCTime object_filename
             let !linkable = LM o_time this_mod [DotO object_filename]
+            details <- initModDetails hsc_env' summary iface
             return $! HomeModInfo iface details (Just linkable)
 
  where dflags0     = ms_hspp_opts summary
