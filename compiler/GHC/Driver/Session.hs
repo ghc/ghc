@@ -3251,6 +3251,7 @@ fFlagsDeps = [
   flagSpec "defer-typed-holes"                Opt_DeferTypedHoles,
   flagSpec "defer-out-of-scope-variables"     Opt_DeferOutOfScopeVariables,
   flagSpec "diagnostics-show-caret"           Opt_DiagnosticsShowCaret,
+  flagSpec "diagnostics-show-contexts"        Opt_DiagnosticsShowContexts,
   flagSpec "dicts-cheap"                      Opt_DictsCheap,
   flagSpec "dicts-strict"                     Opt_DictsStrict,
   depFlagSpec "dmd-tx-dict-sel"
