@@ -1,10 +1,10 @@
 
-OverDirectThisModB.hs:7:15: error:
+OverDirectThisModC.hs:1:1: error:
     Conflicting family instance declarations:
-      C [Int] [a] -- Defined at OverDirectThisModB.hs:7:15
-      C [a] [Int] -- Defined at OverDirectThisModC.hs:10:15
-
-OverDirectThisModB.hs:9:15: error:
-    Conflicting family instance declarations:
-      D [Int] [a] = Int -- Defined at OverDirectThisModB.hs:9:15
+      D [Int] [a] = Int -- Defined in module OverDirectThisModB
       D [a] [Int] = Char -- Defined at OverDirectThisModC.hs:12:15
+
+OverDirectThisModC.hs:1:1: error:
+    Conflicting family instance declarations:
+      C [Int] [a] -- Defined in module OverDirectThisModB
+      C [a] [Int] -- Defined at OverDirectThisModC.hs:10:15
