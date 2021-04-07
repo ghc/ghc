@@ -65,7 +65,7 @@ import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Utils.FV ( fvVarList, unionFV )
 
-import Control.Monad    ( when )
+import Control.Monad    ( when, unless )
 import Data.Foldable    ( toList )
 import Data.List        ( partition, mapAccumL, nub, sortBy, unfoldr )
 
@@ -723,9 +723,34 @@ mkSkolReporter ctxt cts
 reportHoles :: [Ct]  -- other (tidied) constraints
             -> ReportErrCtxt -> [Hole] -> TcM ()
 reportHoles tidy_cts ctxt
-  = mapM_ $ \hole -> do { err <- mkHoleError tidy_cts ctxt hole
+  = mapM_ $ \hole -> unless (ignoreThisHole ctxt hole) $
+                     do { err <- mkHoleError tidy_cts ctxt hole
                         ; maybeReportHoleError ctxt hole err
                         ; maybeAddDeferredHoleBinding ctxt err hole }
+
+ignoreThisHole :: ReportErrCtxt -> Hole -> Bool
+-- See Note [Skip type holes rapidly]
+ignoreThisHole ctxt hole
+  = case hole_sort hole of
+       ExprHole {}    -> False
+       TypeHole       -> ignore_type_hole
+  where
+    ignore_type_hole = case cec_type_holes ctxt of
+                         HoleDefer -> True
+                         _         -> False
+
+{- Note [Skip type holes rapidly]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have module with a /lot/ of partial type signatures, and we
+compile it while suppressing partial-type-signature warnings.  Then
+we don't want to spend ages constructing error messages and lists of
+relevant bindings that we never display! This happened in #14766, in
+which partial type signatures in a Happy-generated parser cause a huge
+increase in compile time.
+
+The function ignoreThisHole short-circuits the error/warning generation
+machinery, in cases where it is definitely going to be a no-op.
+-}
 
 mkUserTypeErrorReporter :: Reporter
 mkUserTypeErrorReporter ctxt

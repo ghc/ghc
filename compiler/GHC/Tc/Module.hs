@@ -305,10 +305,14 @@ tcRnModuleTcRnM hsc_env mod_sum
                         reportUnusedNames tcg_env hsc_src
                       ; -- add extra source files to tcg_dependent_files
                         addDependentFiles src_files
-                      ; tcg_env <- runTypecheckerPlugin mod_sum hsc_env tcg_env
-                      ; -- Dump output and return
-                        tcDump tcg_env
-                      ; return tcg_env }
+                        -- Ensure plugins run with the same tcg_env that we pass in
+                      ; setGblEnv tcg_env
+                        $ do { tcg_env <- runTypecheckerPlugin mod_sum hsc_env tcg_env
+                             ; -- Dump output and return
+                               tcDump tcg_env
+                             ; return tcg_env
+                             }
+                      }
                }
         }
       }
