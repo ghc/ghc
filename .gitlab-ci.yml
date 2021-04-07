@@ -764,6 +764,7 @@ nightly-aarch64-linux-deb10:
 validate-aarch64-linux-deb10-llvm:
   extends: .build-aarch64-linux-deb10-llvm
   variables:
+    CONFIGURE_ARGS: "CC=/opt/llvm/bin/clang"
     RUNTEST_ARGS: "--way=llvm"
     BUILD_FLAVOUR: perf-llvm
     # No docs, for this build, slows it down unncessarily.
