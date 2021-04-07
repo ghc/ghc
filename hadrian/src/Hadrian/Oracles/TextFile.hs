@@ -18,6 +18,7 @@ module Hadrian.Oracles.TextFile (
 import Control.Monad
 import qualified Data.HashMap.Strict as Map
 import Data.Maybe
+import Data.List
 import Development.Shake
 import Development.Shake.Classes
 import Development.Shake.Config
@@ -60,7 +61,14 @@ lookupValuesOrError file key = fromMaybe (error msg) <$> lookupValues file key
 -- compiling @source@, which in turn also depends on a number of other @files@.
 lookupDependencies :: FilePath -> FilePath -> Action (FilePath, [FilePath])
 lookupDependencies depFile file = do
-    deps <- lookupValues depFile file
+    let -- .hs needs to come before .hi-boot deps added to fix #14482.
+        -- This is still a bit fragile: we have no order guaranty from the input
+        -- file. Let's hope we don't have two different .hs source files (e.g.
+        -- one included into the other)...
+        weigh p
+          | ".hs" `isSuffixOf` p = 0 :: Int
+          | otherwise            = 1
+    deps <- fmap (sortOn weigh) <$> lookupValues depFile file
     case deps of
         Nothing -> error $ "No dependencies found for file " ++ quote file
         Just [] -> error $ "No source file found for file " ++ quote file

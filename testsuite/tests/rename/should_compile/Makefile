@@ -56,3 +56,7 @@ T7969:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T7969a.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T7969.hs -ddump-minimal-imports
 	cat T7969.imports
+
+T18497:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -fno-code T18497_Foo.hs T18497_Bar.hs -ddump-minimal-imports
+	cat T18497_Bar.imports-boot

@@ -39,7 +39,7 @@ import System.Directory
 import System.FilePath
 import System.IO
 import System.IO.Error  ( isEOFError )
-import Control.Monad    ( when )
+import Control.Monad    ( when, forM_ )
 import Data.Maybe       ( isJust )
 import Data.IORef
 
@@ -224,6 +224,16 @@ processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC node)
                 -- Emit std dependency of the object(s) on the source file
                 -- Something like       A.o : A.hs
         ; writeDependency root hdl obj_files src_file
+
+          -- add dependency between objects and their corresponding .hi-boot
+          -- files if the module has a corresponding .hs-boot file (#14482)
+        ; when (isBootSummary node) $ do
+            let hi_boot = msHiFilePath node
+            let obj     = removeBootSuffix (msObjFilePath node)
+            forM_ extra_suffixes $ \suff -> do
+               let way_obj     = insertSuffixes obj     [suff]
+               let way_hi_boot = insertSuffixes hi_boot [suff]
+               mapM_ (writeDependency root hdl way_obj) way_hi_boot
 
                 -- Emit a dependency for each CPP import
         ; when (depIncludeCppDeps dflags) $ do
