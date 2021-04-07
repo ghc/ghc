@@ -2,7 +2,7 @@ variables:
   GIT_SSL_NO_VERIFY: "1"
 
   # Commit of ghc/ci-images repository from which to pull Docker images
-  DOCKER_REV: 6223fe0b5942f4fa35bdec92c74566cf195bfb42
+  DOCKER_REV: 428be74207443be5a06e15a7c13d9eadb9eb9344
 
   # Sequential version number capturing the versions of all tools fetched by
   # .gitlab/ci.sh. Used for invalidation of GitLab CI cache.
@@ -117,7 +117,7 @@ lint-testsuite:
   stage: lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   script:
-    - make -Ctestsuite list_broken TEST_HC=ghc
+    - make -Ctestsuite list_broken TEST_HC=$GHC
   dependencies: []
   tags:
     - lint
@@ -257,7 +257,7 @@ hadrian-ghc-in-ghci:
     - x86_64-linux
   script:
     - cabal update
-    - cd hadrian; cabal new-build --project-file=ci.project; cd ..
+    - cd hadrian; cabal new-build --with-compiler=$GHC --project-file=ci.project; cd ..
     - git clean -xdf && git submodule foreach git clean -xdf
     - .gitlab/ci.sh setup
     - if [[ -d ./cabal-cache ]]; then cp -R ./.cabal-cache ~/.cabal-cache; fi
@@ -460,66 +460,66 @@ validate-x86_64-darwin:
       - toolchain
 
 #################################
-# aarch64-linux-deb9
+# aarch64-linux-deb10
 #################################
 
-.build-aarch64-linux-deb9:
+.build-aarch64-linux-deb10:
   extends: .validate-linux
   stage: full-build
-  image: "registry.gitlab.haskell.org/ghc/ci-images/aarch64-linux-deb9:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/ghc/ci-images/aarch64-linux-deb10:$DOCKER_REV"
   allow_failure: true
   variables:
-    TEST_ENV: "aarch64-linux-deb9"
-    BIN_DIST_PREP_TAR_COMP: "ghc-aarch64-linux-deb9.tar.xz"
+    TEST_ENV: "aarch64-linux-deb10"
+    BIN_DIST_PREP_TAR_COMP: "ghc-aarch64-linux-deb10.tar.xz"
   cache:
-    key: linux-aarch64-deb9
+    key: linux-aarch64-deb10
   tags:
     - aarch64-linux
 
-validate-aarch64-linux-deb9:
-  extends: .build-aarch64-linux-deb9
+validate-aarch64-linux-deb10:
+  extends: .build-aarch64-linux-deb10
   artifacts:
     when: always
     expire_in: 2 week
 
-nightly-aarch64-linux-deb9:
+nightly-aarch64-linux-deb10:
   <<: *nightly
-  extends: .build-aarch64-linux-deb9
+  extends: .build-aarch64-linux-deb10
   variables:
     TEST_TYPE: slowtest
 
 #################################
-# armv7-linux-deb9
+# armv7-linux-deb10
 #################################
 
-.build-armv7-linux-deb9:
+.build-armv7-linux-deb10:
   extends: .validate-linux
   stage: full-build
-  image: "registry.gitlab.haskell.org/ghc/ci-images/armv7-linux-deb9:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/ghc/ci-images/armv7-linux-deb10:$DOCKER_REV"
   # Due to linker issues
   allow_failure: true
   variables:
-    TEST_ENV: "armv7-linux-deb9"
-    BIN_DIST_PREP_TAR_COMP: "ghc-armv7-linux-deb9.tar.xz"
+    TEST_ENV: "armv7-linux-deb10"
+    BIN_DIST_PREP_TAR_COMP: "ghc-armv7-linux-deb10.tar.xz"
     CONFIGURE_ARGS: "--host=armv7-linux-gnueabihf --build=armv7-linux-gnueabihf --target=armv7-linux-gnueabihf"
     # N.B. We disable ld.lld explicitly here because it appears to fail
     # non-deterministically on ARMv7. See #18280.
     LD: "ld.gold"
     GccUseLdOpt: "-fuse-ld=gold"
   cache:
-    key: linux-armv7-deb9
+    key: linux-armv7-deb10
   tags:
     - armv7-linux
 
-validate-armv7-linux-deb9:
-  extends: .build-armv7-linux-deb9
+validate-armv7-linux-deb10:
+  extends: .build-armv7-linux-deb10
   artifacts:
     when: always
     expire_in: 2 week
 
-nightly-armv7-linux-deb9:
+nightly-armv7-linux-deb10:
   <<: *nightly
-  extends: .build-armv7-linux-deb9
+  extends: .build-armv7-linux-deb10
   variables:
     TEST_TYPE: slowtest
 
@@ -710,6 +710,35 @@ validate-x86_64-linux-deb10-dwarf:
     expire_in: 1 year
 
 #################################
+# x86_64-linux-ubuntu 20.04
+#################################
+
+.build-x86_64-linux-ubuntu2004:
+  extends: .validate-linux
+  stage: full-build
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-ubuntu2004:$DOCKER_REV"
+  variables:
+    TEST_ENV: "x86_64-linux-ubuntu2004"
+    BIN_DIST_PREP_TAR_COMP: "./ghc-x86_64-ubuntu2004-linux.tar.xz"
+  cache:
+    key: linux-x86_64-ubuntu2004
+
+# Disabled to alleviate CI load
+.validate-x86_64-linux-ubuntu2004:
+  extends: .build-x86_64-linux-ubuntu2004
+  stage: full-build
+
+nightly-x86_64-linux-ubuntu2004:
+  <<: *nightly
+  extends: .build-x86_64-linux-ubuntu2004
+  variables:
+    TEST_TYPE: slowtest
+
+release-x86_64-linux-ubuntu2004:
+  <<: *release
+  extends: .build-x86_64-linux-ubuntu2004
+
+#################################
 # x86_64-linux-deb8
 #################################
 
@@ -742,7 +771,7 @@ release-x86_64-linux-deb8:
 .build-x86_64-linux-alpine-hadrian:
   extends: .validate-linux-hadrian
   stage: full-build
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine3_12:$DOCKER_REV"
   # There are currently a few failing tests
   allow_failure: true
   variables:
@@ -1090,8 +1119,8 @@ perf-nofib:
       make install
       popd
       rm -Rf tmp
-    - export BOOT_HC=$(which ghc)
-    - cabal update; cabal install -w $BOOT_HC regex-compat
+    - export BOOT_HC=$GHC
+    - cabal update; cabal install -w "$BOOT_HC" --lib regex-compat
     - export PATH=$root/bin:$PATH
     - make -C nofib boot mode=fast -j$CPUS
     - "make -C nofib EXTRA_RUNTEST_OPTS='-cachegrind +RTS -V0 -RTS' NoFibRuns=1 mode=fast -j$CPUS 2>&1 | tee nofib.log"
