@@ -428,10 +428,10 @@ lvlApp env orig_expr ((_,AnnVar fn), args)
   = do { args' <- mapM (lvlExpr env) args
        ; return (foldl' App (lookupVar env fn) args') }
 
-  | floatOverSat env   -- See Note [Floating over-saturated applications]
-  , arity > 0
+  | -- See Note [Floating over-saturated applications]
+    arity > 0
   , arity < n_val_args
-  , Nothing <- isClassOpId_maybe fn
+  , (floatOverSat env || allIdsTopLevel env (freeVarsOf lapp))
   =  do { rargs' <- mapM (lvlNonTailMFE env False) rargs
         ; lapp'  <- lvlNonTailMFE env False lapp
         ; return (foldl' App lapp' rargs') }
@@ -457,6 +457,9 @@ lvlApp env orig_expr ((_,AnnVar fn), args)
     -- (n_val_args - arity) value arguments.
     (lapp, rargs) = left (n_val_args - arity) orig_expr []
 
+    left :: Int -> CoreExprWithFVs -> [CoreExprWithFVs]
+         -> (CoreExprWithFVs, [CoreExprWithFVs])
+    -- Remove the trailing N arguments
     left 0 e               rargs = (e, rargs)
     left n (_, AnnApp f a) rargs
        | isValArg (deAnnotate a) = left (n-1) f (a:rargs)
@@ -1640,6 +1643,10 @@ maxFvLevel' :: (Var -> Bool) -> LevelEnv -> TyCoVarSet -> Level
 maxFvLevel' max_me env var_set
   = nonDetStrictFoldUniqSet (maxIn max_me env) tOP_LEVEL var_set
     -- It's OK to use a non-deterministic fold here because maxIn commutes.
+
+allIdsTopLevel :: LevelEnv -> DVarSet -> Bool
+-- True if all the free Ids are top-level
+allIdsTopLevel env var_set = isTopLvl (maxFvLevel isId env var_set)
 
 maxIn :: (Var -> Bool) -> LevelEnv -> InVar -> Level -> Level
 maxIn max_me (LE { le_lvl_env = lvl_env, le_env = id_env }) in_var lvl
