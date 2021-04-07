@@ -8,11 +8,7 @@ cleanPackageDatabase.%:
 HERE := $(abspath .)
 $(eval $(call canonicalise,HERE))
 
-ifeq "$(GhcDynamicByDefault)" "YES"
-HI_SUF = dyn_hi
-else
 HI_SUF = hi
-endif
 
 mkPackageDatabase.%:
 	$(MAKE) -s --no-print-directory cleanPackageDatabase.$*
