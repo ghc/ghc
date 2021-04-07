@@ -1629,17 +1629,6 @@ divModInt :: Int -> Int -> (Int, Int)
 (I# x) `divModInt` (I# y) = case x `divModInt#` y of
                             (# q, r #) -> (I# q, I# r)
 
-divModInt# :: Int# -> Int# -> (# Int#, Int# #)
-x# `divModInt#` y#
- | isTrue# (x# ># 0#) && isTrue# (y# <# 0#) =
-                                    case (x# -# 1#) `quotRemInt#` y# of
-                                      (# q, r #) -> (# q -# 1#, r +# y# +# 1# #)
- | isTrue# (x# <# 0#) && isTrue# (y# ># 0#) =
-                                    case (x# +# 1#) `quotRemInt#` y# of
-                                      (# q, r #) -> (# q -# 1#, r +# y# -# 1# #)
- | otherwise                                =
-                                    x# `quotRemInt#` y#
-
 {- Note [INLINE division wrappers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The Int division functions such as 'quotRemInt' and 'divModInt' have

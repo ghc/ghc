@@ -2,6 +2,7 @@
 {-# LANGUAGE NoImplicitPrelude, MagicHash, StandaloneDeriving, BangPatterns,
              KindSignatures, DataKinds, ConstraintKinds,
               MultiParamTypeClasses, FunctionalDependencies #-}
+{-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
   -- ip :: IP x a => a  is strictly speaking ambiguous, but IP is magic
 {-# LANGUAGE UndecidableSuperClasses #-}
@@ -50,7 +51,7 @@ module GHC.Classes(
     (&&), (||), not,
 
     -- * Integer arithmetic
-    divInt#, modInt#
+    divInt#, modInt#, divModInt#
  ) where
 
 -- GHC.Magic is used in some derived instances
@@ -542,6 +543,7 @@ not False               =  True
 -- These functions have built-in rules.
 {-# INLINE [0] divInt# #-}
 {-# INLINE [0] modInt# #-}
+{-# INLINE [0] divModInt# #-}
 
 divInt# :: Int# -> Int# -> Int#
 x# `divInt#` y# = ((x# +# bias#) `quotInt#` y#) -# hard#
@@ -552,6 +554,31 @@ x# `divInt#` y# = ((x# +# bias#) `quotInt#` y#) -# hard#
       !c1#   = (x# ># 0#) `andI#` yn#
       !bias# = c0# -# c1#
       !hard# = c0# `orI#` c1#
+
+modInt# :: Int# -> Int# -> Int#
+x# `modInt#` y# = r# +# k#
+  where
+    -- See Note [modInt# implementation]
+    !yn# = y# <# 0#
+    !c0# = (x# <# 0#) `andI#` (notI# yn#)
+    !c1# = (x# ># 0#) `andI#` yn#
+    !s#  = 0# -# ((c0# `orI#` c1#) `andI#` (r# /=# 0#))
+    !k#  = s# `andI#` y#
+    !r#  = x# `remInt#` y#
+
+divModInt# :: Int# -> Int# -> (# Int#, Int# #)
+x# `divModInt#` y# = case (x# +# bias#) `quotRemInt#` y# of
+  (# q#, r# #) -> (# q# -# hard#, r# +# k# #)
+  where
+    -- See Note [divModInt# implementation]
+    !yn#   = y# <# 0#
+    !c0#   = (x# <# 0#) `andI#` (notI# yn#)
+    !c1#   = (x# ># 0#) `andI#` yn#
+    !bias# = c0# -# c1#
+    !hard# = c0# `orI#` c1#
+    !s#    = 0# -# hard#
+    !k#    = (s# `andI#` y#) -# bias#
+
 
 -- See Note [divInt# implementation]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -612,18 +639,6 @@ x# `divInt#` y# = ((x# +# bias#) `quotInt#` y#) -# hard#
 --    | (x# <# 0#) && (y# ># 0#) = ((x# -# y#) +# 1#) `quotInt#` y#
 
 
-modInt# :: Int# -> Int# -> Int#
-x# `modInt#` y# = r# +# k#
-  where
-    -- See Note [modInt# implementation]
-    !yn# = y# <# 0#
-    !c0# = (x# <# 0#) `andI#` (notI# yn#)
-    !c1# = (x# ># 0#) `andI#` yn#
-    !s#  = 0# -# ((c0# `orI#` c1#) `andI#` (r# /=# 0#))
-    !k#  = s# `andI#` y#
-    !r#  = x# `remInt#` y#
-
-
 -- Note [modInt# implementation]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
@@ -673,6 +688,47 @@ x# `modInt#` y# = r# +# k#
 --        s#  = 0# -# ((c0# ||# c1#) &&# (r# /=# 0#))
 --        k#  = s# &&# y#
 --        r#  = x# `remInt#` y#
+
+-- Note [divModInt# implementation]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- divModInt# is written by deriving the following code similarly to divInt# and
+-- modInt# (see Note [divInt# implementation] and Note [modInt#
+-- implementation]).
+--
+--    x# `divModInt#` y#
+--     | isTrue# (x# ># 0#) && isTrue# (y# <# 0#) =
+--                                        case (x# -# 1#) `quotRemInt#` y# of
+--                                          (# q, r #) -> (# q -# 1#, r +# y# +# 1# #)
+--     | isTrue# (x# <# 0#) && isTrue# (y# ># 0#) =
+--                                        case (x# +# 1#) `quotRemInt#` y# of
+--                                          (# q, r #) -> (# q -# 1#, r +# y# -# 1# #)
+--     | otherwise                                =
+--                                        x# `quotRemInt#` y#
+--
+--  ===> { Introduce constants }
+--
+--    case (x# +# bias#) `quotRemInt#` y# of
+--      (# q#, r# #) -> (# q# -# hard#, r# +# k# #)
+--      where
+--       (bias#,hard#,k#)
+--        | isTrue# (x# ># 0#) && isTrue# (y# <# 0#) = (-1#, 1#, y#+1#)
+--        | isTrue# (x# <# 0#) && isTrue# (y# ># 0#) = ( 1#, 1#, y#-1#)
+--        | otherwise                                = ( 0#, 0#, 0#-0#)
+--
+--  ===> { Compute using Bool# }
+--
+--    case (x# +# bias#) `quotRemInt#` y# of
+--      (# q#, r# #) -> (# q# -# hard#, r# +# k# #)
+--      where
+--        yn#   = y# <# 0#
+--        c0#   = (x# <# 0#) `andI#` (notI# yn#)
+--        c1#   = (x# ># 0#) `andI#` yn#
+--        bias# = c0# -# c1#
+--        hard# = c0# `orI#` c1#
+--        s#    = 0# -# hard#
+--        k#    = (s# `andI#` y#) -# bias#
+--
 
 {- *************************************************************
 *                                                              *
