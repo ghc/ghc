@@ -13,7 +13,7 @@ module GHC.Core.TyCo.FVs
         shallowTyCoVarsOfTyVarEnv, shallowTyCoVarsOfCoVarEnv,
 
         shallowTyCoVarsOfCo, shallowTyCoVarsOfCos,
-        tyCoVarsOfCo,        tyCoVarsOfCos,
+        tyCoVarsOfCo, tyCoVarsOfCos, tyCoVarsOfMCo,
         coVarsOfType, coVarsOfTypes,
         coVarsOfCo, coVarsOfCos,
         tyCoVarsOfCoDSet,
@@ -289,6 +289,10 @@ tyCoVarsOfTypes tys = runTyCoVars (deep_tys tys)
 tyCoVarsOfCo :: Coercion -> TyCoVarSet
 -- See Note [Free variables of Coercions]
 tyCoVarsOfCo co = runTyCoVars (deep_co co)
+
+tyCoVarsOfMCo :: MCoercion -> TyCoVarSet
+tyCoVarsOfMCo MRefl    = emptyVarSet
+tyCoVarsOfMCo (MCo co) = tyCoVarsOfCo co
 
 tyCoVarsOfCos :: [Coercion] -> TyCoVarSet
 tyCoVarsOfCos cos = runTyCoVars (deep_cos cos)

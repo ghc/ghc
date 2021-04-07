@@ -207,12 +207,12 @@ function setup() {
 }
 
 function fetch_ghc() {
-  local v="$GHC_VERSION"
-  if [[ -z "$v" ]]; then
-      fail "GHC_VERSION is not set"
-  fi
-
   if [ ! -e "$GHC" ]; then
+      local v="$GHC_VERSION"
+      if [[ -z "$v" ]]; then
+          fail "neither GHC nor GHC_VERSION are not set"
+      fi
+
       start_section "fetch GHC"
       url="https://downloads.haskell.org/~ghc/${GHC_VERSION}/ghc-${GHC_VERSION}-${boot_triple}.tar.xz"
       info "Fetching GHC binary distribution from $url..."
@@ -232,16 +232,15 @@ function fetch_ghc() {
       rm -Rf "ghc-${GHC_VERSION}" ghc.tar.xz
       end_section "fetch GHC"
   fi
-
 }
 
 function fetch_cabal() {
-  local v="$CABAL_INSTALL_VERSION"
-  if [[ -z "$v" ]]; then
-      fail "CABAL_INSTALL_VERSION is not set"
-  fi
-
   if [ ! -e "$CABAL" ]; then
+      local v="$CABAL_INSTALL_VERSION"
+      if [[ -z "$v" ]]; then
+          fail "neither CABAL nor CABAL_INSTALL_VERSION are not set"
+      fi
+
       start_section "fetch GHC"
       case "$(uname)" in
         # N.B. Windows uses zip whereas all others use .tar.xz
@@ -284,6 +283,7 @@ function setup_toolchain() {
   fetch_cabal
 
   cabal_install="$CABAL v2-install \
+    --with-compiler=$GHC \
     --index-state=$hackage_index_state \
     --installdir=$toolchain/bin \
     --overwrite-policy=always"
@@ -294,13 +294,17 @@ function setup_toolchain() {
     *) ;;
   esac
 
-  cabal update
+  if [ ! -e "$HAPPY" ]; then
+      info "Building happy..."
+      cabal update
+      $cabal_install happy
+  fi
 
-  info "Building happy..."
-  $cabal_install happy --constraint="happy==1.19.*"
-
-  info "Building alex..."
-  $cabal_install alex --constraint="alex>=$MIN_ALEX_VERSION"
+  if [ ! -e "$ALEX" ]; then
+      info "Building alex..."
+      cabal update
+      $cabal_install alex
+  fi
 }
 
 function cleanup_submodules() {
