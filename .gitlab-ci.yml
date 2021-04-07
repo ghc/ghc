@@ -765,6 +765,13 @@ validate-aarch64-linux-deb10-llvm:
   extends: .build-aarch64-linux-deb10-llvm
   variables:
     RUNTEST_ARGS: "--way=llvm"
+    BUILD_FLAVOUR: perf-llvm
+    # No docs, for this build, slows it down unncessarily.
+    # We build docs on other platforms already anyway.
+    BUILD_SPHINX_HTML: "NO"
+    BUILD_SPHINX_INFO: "NO"
+    BUILD_SPHINX_PDF: "NO"
+    BUILD_SPHINX_MAN: "NO"
   artifacts:
     when: always
     expire_in: 2 week
