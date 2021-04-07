@@ -282,8 +282,8 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
                              -- NB: the binding is always a FunBind
 
              warn_redundant = case dm_spec of
-                                GenericDM {} -> True
-                                VanillaDM    -> False
+                                GenericDM {} -> lhsSigTypeContextSpan hs_ty
+                                VanillaDM    -> NoRRC
                 -- For GenericDM, warn if the user specifies a signature
                 -- with redundant constraints; but not for VanillaDM, where
                 -- the default method may well be 'error' or something
