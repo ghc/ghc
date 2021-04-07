@@ -585,7 +585,12 @@ interruptOSThread (OSThreadId id)
 void
 joinOSThread (OSThreadId id)
 {
-    int ret = WaitForSingleObject(id, INFINITE);
+    HANDLE hdl;
+    if (!(hdl = OpenThread(SYNCHRONIZE,FALSE,id))) {
+        sysErrorBelch("interruptOSThread: OpenThread");
+        stg_exit(EXIT_FAILURE);
+    }
+    int ret = WaitForSingleObject(hdl, INFINITE);
     if (ret != WAIT_OBJECT_0) {
         sysErrorBelch("joinOSThread: error %d", ret);
     }

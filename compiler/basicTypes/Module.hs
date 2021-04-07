@@ -112,7 +112,7 @@ module Module
 
         -- * The ModuleLocation type
         ModLocation(..),
-        addBootSuffix, addBootSuffix_maybe,
+        addBootSuffix, removeBootSuffix, addBootSuffix_maybe,
         addBootSuffixLocn, addBootSuffixLocnOut,
 
         -- * Module mappings
@@ -292,6 +292,12 @@ where the object file will reside if/when it is created.
 addBootSuffix :: FilePath -> FilePath
 -- ^ Add the @-boot@ suffix to .hs, .hi and .o files
 addBootSuffix path = path ++ "-boot"
+
+-- | Remove the @-boot@ suffix to .hs, .hi and .o files
+removeBootSuffix :: FilePath -> FilePath
+removeBootSuffix "-boot" = []
+removeBootSuffix (x:xs)  = x : removeBootSuffix xs
+removeBootSuffix []      = error "removeBootSuffix: no -boot suffix"
 
 addBootSuffix_maybe :: Bool -> FilePath -> FilePath
 -- ^ Add the @-boot@ suffix if the @Bool@ argument is @True@
