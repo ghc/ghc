@@ -29,7 +29,9 @@ import GHC.Platform
 
 import GHC.Driver.Session
 import GHC.Driver.Config
+import GHC.Driver.Errors.Types -- Unfortunate, due to the fact we throw exceptions!
 
+import GHC.Parser.Errors.Types
 import GHC.Parser.Errors.Ppr
 import GHC.Parser.Errors
 import GHC.Parser           ( parseHeader )
@@ -39,7 +41,7 @@ import GHC.Hs
 import GHC.Unit.Module
 import GHC.Builtin.Names
 
-import GHC.Types.Error hiding ( getErrorMessages, getWarningMessages )
+import GHC.Types.Error hiding ( getErrorMessages, getWarningMessages, getMessages )
 import GHC.Types.SrcLoc
 import GHC.Types.SourceError
 import GHC.Types.SourceText
@@ -53,7 +55,7 @@ import GHC.Utils.Exception as Exception
 
 import GHC.Data.StringBuffer
 import GHC.Data.Maybe
-import GHC.Data.Bag         ( Bag, listToBag, unitBag, isEmptyBag )
+import GHC.Data.Bag         ( Bag, listToBag, isEmptyBag )
 import GHC.Data.FastString
 
 import Control.Monad
@@ -91,7 +93,7 @@ getImports popts implicit_prelude buf filename source_filename = do
       -- don't log warnings: they'll be reported when we parse the file
       -- for real.  See #2500.
       if not (isEmptyBag errs)
-        then throwIO $ mkSrcErr (fmap mkParserErr errs)
+        then throwErrors $ fmap GhcPsMessage . mkMessages $ fmap mkParserErr errs
         else
           let   hsmod = unLoc rdr_module
                 mb_mod = hsmodName hsmod
@@ -313,7 +315,8 @@ getOptions' dflags toks
 checkProcessArgsResult :: MonadIO m => [Located String] -> m ()
 checkProcessArgsResult flags
   = when (notNull flags) $
-      liftIO $ throwIO $ mkSrcErr $ listToBag $ map mkMsg flags
+      liftIO . throwErrors . fmap (GhcPsMessage . PsUnknownMessage) . mkMessages $
+        listToBag . map mkMsg $ flags
     where mkMsg (L loc flag)
               = mkPlainErrorMsgEnvelope loc $
                   (text "unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+>
@@ -372,4 +375,5 @@ optionsParseError str loc =
 
 throwErr :: SrcSpan -> SDoc -> a                -- #15053
 throwErr loc doc =
-  throw $ mkSrcErr $ unitBag $ mkPlainErrorMsgEnvelope loc doc
+  throw . mkSrcErr . fmap (GhcPsMessage . PsUnknownMessage) . singleMessage $
+    mkPlainErrorMsgEnvelope loc doc
