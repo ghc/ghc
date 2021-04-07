@@ -145,8 +145,8 @@ between one type and another when the to- and from- types are the
 same.  Then it's probably (albeit not definitely) the identity
 -}
 
-warnAboutIdentities :: DynFlags -> CoreExpr -> Type -> DsM ()
-warnAboutIdentities dflags (Var conv_fn) type_of_conv
+warnAboutIdentities :: DynFlags -> Id -> Type -> DsM ()
+warnAboutIdentities dflags conv_fn type_of_conv
   | wopt Opt_WarnIdentities dflags
   , idName conv_fn `elem` conversionNames
   , Just (_, arg_ty, res_ty) <- splitFunTy_maybe type_of_conv

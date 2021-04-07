@@ -2,7 +2,7 @@ variables:
   GIT_SSL_NO_VERIFY: "1"
 
   # Commit of ghc/ci-images repository from which to pull Docker images
-  DOCKER_REV: 6223fe0b5942f4fa35bdec92c74566cf195bfb42
+  DOCKER_REV: a59df0ab737f11ea39d660345648517fa9b0d09d
 
   # Sequential version number capturing the versions of all tools fetched by
   # .gitlab/ci.sh. Used for invalidation of GitLab CI cache.
@@ -117,7 +117,7 @@ lint-testsuite:
   stage: lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   script:
-    - make -Ctestsuite list_broken TEST_HC=ghc
+    - make -Ctestsuite list_broken TEST_HC=$GHC
   dependencies: []
   tags:
     - lint
@@ -394,6 +394,8 @@ validate-x86_64-darwin:
     MACOSX_DEPLOYMENT_TARGET: "10.7"
     # Only Sierra and onwards supports clock_gettime. See #12858
     ac_cv_func_clock_gettime: "no"
+    # Only newer OS Xs support utimensat. See #17895
+    ac_cv_func_utimensat: "no"
     LANG: "en_US.UTF-8"
     CONFIGURE_ARGS: "--with-intree-gmp"
     TEST_ENV: "x86_64-darwin"
@@ -1088,7 +1090,7 @@ perf-nofib:
       make install
       popd
       rm -Rf tmp
-    - export BOOT_HC=$(which ghc)
+    - export BOOT_HC=$GHC
     - cabal update; cabal install -w $BOOT_HC regex-compat
     - export PATH=$root/bin:$PATH
     - make -C nofib boot mode=fast -j$CPUS
