@@ -1751,6 +1751,9 @@ half of the split to rewrite the second D, and off we go. This splitting
 would allow the split-off R equality to be rewritten by other equalities,
 thus avoiding the problem in Note [Why R2?] in GHC.Tc.Solver.Monad.
 
+This infelicity is #19665 and tested in typecheck/should_compile/T19665
+(marked as expect_broken).
+
 -}
 
 eqCanRewrite :: EqRel -> EqRel -> Bool
