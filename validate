@@ -11,25 +11,31 @@ https://gitlab.haskell.org/ghc/ghc/wikis/testing-patches for more
 information.
 
 Flags:
-  --no-clean        don't clean first, just carry on from
-                    a previous interrupted validation run
-  --testsuite-only  don't build the compiler, just run the test suite
-  --build-only      don't test the compiler, just build it
-  --hpc             build stage2 with -fhpc, and see how much of the
-                    compiler the test suite covers.
-                    2008-07-01: 63% slower than the default.
-                    HTML generated here: testsuite/hpc_output/hpc_index.html
-  --fast            Omit binary distribution. Omit certain tests.
-  --slow            Build stage2 with -DDEBUG. Run tests for all WAYS,
-                    but skip those that call compiler_stats_num_field.
-                    2008-07-01: 14% slower than the default.
-  --quiet           More pretty build log.
-                    See Note [Default build system verbosity].
-  --legacy          Build the compiler and run the tests through the legacy
-                    make-based build system.
-  --stack           Use Stack to build Hadrian and to provide the bootstrap
-                    compiler.
-  --help            shows this usage help.
+  --no-clean           don't clean first, just carry on from
+                       a previous interrupted validation run
+  --testsuite-only     don't build the compiler, just run the test suite
+  --build-only         don't test the compiler, just build it
+  --hpc                build stage2 with -fhpc, and see how much of the
+                       compiler the test suite covers.
+                       2008-07-01: 63% slower than the default.
+                       HTML generated here: testsuite/hpc_output/hpc_index.html
+  --fast               Omit binary distribution. Omit certain tests.
+  --slow               Build stage2 with -DDEBUG. Run tests for all WAYS,
+                       but skip those that call compiler_stats_num_field.
+                       2008-07-01: 14% slower than the default.
+  --quiet              More pretty build log.
+                       See Note [Default build system verbosity].
+  --legacy             Build the compiler and run the tests through the legacy
+                       make-based build system.
+  --stack              Use Stack to build Hadrian and to provide the bootstrap
+                       compiler.
+  --ignore-perf-all    Use Hadrian's user settings to ask the "runtests" driver
+                       to ignore all changes in performance tests
+  --ignore-perf-incrs  Use Hadrian's user settings to ask the "runtests" driver
+                       to ignore increases in performance tests
+  --ignore-perf-decrs  Use Hadrian's user settings to ask the "runtests" driver
+                       to ignore decreases in performance tests
+  --help               shows this usage help.
 
   validate runs 'make -j\$THREADS', where by default THREADS is the number of
   cpus your computer has +1. You can set the environment variable THREADS to
@@ -60,6 +66,9 @@ be_quiet=0
 tar_comp=gzip
 use_hadrian=YES
 use_stack=NO
+ignore_perf_all=NO
+ignore_perf_increases=NO
+ignore_perf_decreases=NO
 hadrian_build_root=_validatebuild
 basedir="$($(dirname $hadrian_build_root) 2>&1 /dev/null && pwd)"
 
@@ -100,6 +109,15 @@ do
         ;;
     --stack)
         use_stack=YES
+        ;;
+    --ignore-perf-all)
+        ignore_perf_all=YES
+        ;;
+    --ignore-perf-incrs)
+        ignore_perf_increases=YES
+        ;;
+    --ignore-perf-decrs)
+        ignore_perf_decreases=YES
         ;;
     --help)
         show_help
@@ -341,6 +359,14 @@ else
     PYTHON_ARG="PYTHONPATH=$(which python)"
 fi
 
+if [ "$ignore_perf_all" = "YES" ]; then
+    test_perf_args="runtest.opts +=--ignore-perf-failures=all"
+elif [ "$ignore_perf_increases" = "YES" ]; then
+    test_perf_args="runtest.opts +=--ignore-perf-failures=increases"
+elif [ "$ignore_perf_decreases" = "YES" ]; then
+    test_perf_args="runtest.opts +=--ignore-perf-failures=decreases"
+fi
+
 # Run the testsuite
 if [ $testsuite_only -eq 1 ] ||
     { [ $build_only -eq 0 ] && [ $testsuite_only -eq 0 ]; };  then
@@ -376,7 +402,7 @@ if [ $testsuite_only -eq 1 ] ||
             --test-compiler=\"$testghc\" \
             --summary=$basedir/testsuite_summary.txt \
             --summary-junit=$basedir/testsuite.xml"
-        sh -c "$hadrian $hadrian_args"
+        sh -c "$hadrian $hadrian_test_with_args \"$test_perf_args\""
         # TODO: Run testsuite/tests/stage1 using the stage 1 compiler when
         # BINDIST=NO.
 
@@ -399,12 +425,16 @@ if [ "$use_hadrian" = "YES" ]; then
     if
         grep '\<0 caused framework failures' testsuite_summary.txt >/dev/null 2>/dev/null &&
         grep '\<0 unexpected passes' testsuite_summary.txt >/dev/null 2>/dev/null &&
-        grep '\<0 unexpected failures' testsuite_summary.txt >/dev/null 2>/dev/null &&
-        grep '\<0 unexpected stat failures' testsuite_summary.txt >/dev/null 2>/dev/null; then
+        grep '\<0 unexpected failures' testsuite_summary.txt >/dev/null 2>/dev/null; then
 
         no_hadrian_test_failures=1
     fi
-else
+    if
+        grep '\<0 unexpected stat failures' testsuite_summary.txt >/dev/null 2>/dev/null; then
+
+        no_hadrian_perf_test_failures=1
+    fi
+elif [ "$use_hadrian" = "NO" ]; then
     if
         grep '\<0 caused framework failures' testsuite_summary.txt >/dev/null 2>/dev/null &&
         grep '\<0 unexpected passes' testsuite_summary.txt >/dev/null 2>/dev/null &&
@@ -420,9 +450,32 @@ else
     fi
 fi
 
-if { [ $no_hadrian_perf_test_failures = 1 ] && [ $no_hadrian_test_failures = 1 ]; } ||
-        [ $no_make_test_failures = 1 ]; then
-
+if [ $no_hadrian_test_failures ] || [ $no_make_test_failures ]; then
+    if [ $no_hadrian_perf_test_failures -eq 1 ] ||
+                                [ $no_make_perf_test_failures -eq 1 ]; then
+        if [ "$ignore_perf_all" = "YES" ] ||
+           [ "$ignore_perf_increases" = "YES" ] ||
+           [ "$ignore_perf_decreases" = "YES" ]; then
+           cat <<EOF
+--------------------------------------------------------------------
+Changes in metrics for performance tests were ignored in this test run.
+If you want to either log changes in performance test metrics on your
+commits or want to compare the metrics produced by your commits to the
+current CI performance metrics, use the instructions at
+https://gitlab.haskell.org/ghc/ghc/-/wikis/building/running-tests/performance-tests#ci-performance-metrics
+to do so.
+--------------------------------------------------------------------
+EOF
+        else
+            cat <<EOF
+--------------------------------------------------------------------
+Performance test failures could not be detected in this test run. For
+adding new performance tests (if applicable) along with you changes,
+refer to https://gitlab.haskell.org/ghc/ghc/-/wikis/building/running-tests/adding#performance-tests
+--------------------------------------------------------------------
+EOF
+        fi
+    fi
     if [ $testsuite_only -eq 0 ] && [ $no_clean -eq 0 ]; then
         cat <<EOF
 -------------------------------------------------------------------
@@ -441,9 +494,6 @@ WARNING: You seem to have things set in mk/validate.mk. Please check
 that it is OK before pushing.
 EOF
         fi
-        cat <<EOF
--------------------------------------------------------------------
-EOF
     else
         cat <<EOF
 -------------------------------------------------------------------
@@ -456,6 +506,17 @@ the minimal testing procedure, please do further testing as necessary.
 EOF
     fi
 else
+    if [ -z "${no_hadrian_perf_test_failures}" ] ||
+                    [ -z "${no_make_perf_test_failures}" ]; then
+        cat <<EOF
+--------------------------------------------------------------------
+Unexpected performance test failures occured in this run. Please
+refer to instructions at
+https://gitlab.haskell.org/ghc/ghc/-/wikis/building/running-tests/performance-tests
+to pin-point the cause.
+--------------------------------------------------------------------
+EOF
+    fi
     if [ $be_quiet -eq 0 ]; then
        cat <<EOF
 -------------------------------------------------------------------
