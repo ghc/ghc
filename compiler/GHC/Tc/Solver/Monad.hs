@@ -990,12 +990,12 @@ Ignoring roles (for now): A CanEqLHS lhs is *rewritable* in a type t if the
 lhs tree appears as a subtree within t without traversing any of the following
 components of t:
   * coercions (whether they appear in casts CastTy or as arguments CoercionTy)
-  * kinds of variables
+  * kinds of variable occurrences
 The check for rewritability *does* look in kinds of the bound variable of a
 ForAllTy.
 
 Goal: If lhs is not rewritable in t, then t is a fixpoint of the generalised
-substitution containing lhs -f*-> t', where f* is a flavour such that f* >= f
+substitution containing only {lhs -f*-> t'}, where f* is a flavour such that f* >= f
 for all f.
 
 The reason for this definition is that the rewriter does not rewrite in coercions
@@ -1003,10 +1003,12 @@ or variables' kinds. In turn, the rewriter does not need to rewrite there becaus
 those places are never used for controlling the behaviour of the solver: these
 places are not used in matching instances or in decomposing equalities.
 
-There is one exception: we sometimes do an occurs-check to decide e.g. how to
-orient an equality. (See the comments on GHC.Tc.Solver.Canonical.canEqTyVarFunEq.)
-Accordingly, the presence of a variable in a kind or coercion just might influence
-the solver. Here is an example:
+There is one exception to the claim that non-rewritable parts of the tree do
+not affect the solver: we sometimes do an occurs-check to decide e.g. how to
+orient an equality. (See the comments on
+GHC.Tc.Solver.Canonical.canEqTyVarFunEq.) Accordingly, the presence of a
+variable in a kind or coercion just might influence the solver. Here is an
+example:
 
   type family Const x y where
     Const x y = x
@@ -1018,7 +1020,8 @@ the solver. Here is an example:
                       AxConst Type alpha ;;
                       sym (AxConst Type Nat))
 
-The cast is clearly ludicrous, but we can't quite rule it out. (See (EQ1) from
+The cast is clearly ludicrous (it ties together a cast and its symmetric version),
+but we can't quite rule it out. (See (EQ1) from
 Note [Respecting definitional equality] in GHC.Core.TyCo.Rep to see why we need
 the Const Type Nat bit.) And yet this cast will (quite rightly) prevent alpha
 from unifying with the RHS. I (Richard E) don't have an example of where this
@@ -1131,7 +1134,7 @@ The idea is that
   - (K2b): if lhs not in s, we have no further opportunity to apply the
     work item
 
-  - See Note [K4] about (K4)
+  - (K4): See Note [K4]
 
 * Lemma (L3). Suppose we have f* such that, for all f, f* >= f. Then
   if we are adding lhs -fw-> t (where T1, T2, and T3 hold), we will keep a -f*-> s.
