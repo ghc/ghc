@@ -1,11 +1,11 @@
-MkFun :: (a -> b) -> Fun a b
+MkFun :: (b -> c) -> Fun b c
 Fun :: (a ~ 'OP) => * -> * -> *
 type Fun :: forall (a :: WHICH). (a ~ 'OP) => * -> * -> *
 data Fun b c where
   MkFun :: (b -> c) -> Fun b c
   	-- Defined at T15872.hs:11:1
 MkFun
-  :: (a -> b) -> Fun @'OP @{'GHC.Types.Eq# @WHICH @'OP @'OP <>} a b
+  :: (b -> c) -> Fun @'OP @{'GHC.Types.Eq# @WHICH @'OP @'OP <>} b c
 Fun :: ((a :: WHICH) ~ ('OP :: WHICH)) => * -> * -> *
 type role Fun nominal nominal representational representational
 type Fun :: forall (a :: WHICH).
