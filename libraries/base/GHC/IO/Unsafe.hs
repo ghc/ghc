@@ -27,6 +27,40 @@ module GHC.IO.Unsafe (
 
 import GHC.Base
 
+{- Note [unsafePerformIO and strictness]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this sub-expression (from tests/lib/should_run/memo002)
+
+ unsafePerformIO (do { lockMemoTable
+                     ; let r = f x
+                     ; updateMemoTable x r
+                     ; unlockMemoTable
+                     ; return r })
+
+It's super-important that the `let r = f x` is lazy. If the demand
+analyser sees that `r` is sure to be demanded, it'll use call-by-value
+for (f x), that will try to lock the already-locked table => deadlock.
+See #19181.
+
+Now `r` doesn't look strict, because it's wrapped in a `return`.
+But if we were to define unsafePerformIO like this
+  unsafePerformIO (IO m) = case runRW# m of (# _, r #) -> r
+
+then we'll push that `case` inside the arugment to runRW#, givign
+  runRW# (\s -> case lockMemoTable s of s1 ->
+                let r = f x in
+                case updateMemoTable s1 of s2 ->
+                case unlockMemoTable s2 of _ ->
+                r)
+
+And now that `let` really does look strict.  No good!
+
+Solution: wrap the result of the unsafePerformIO in 'lazy', to conceal
+it from the demand analyser:
+  unsafePerformIO (IO m) = case runRW# m of (# _, r #) -> lazy r
+                                                 ------>  ^^^^
+See also Note [lazyId magic] in GHC.Types.Id.Make
+-}
 
 {-|
 This is the \"back door\" into the 'IO' monad, allowing
@@ -102,7 +136,8 @@ like 'Control.Exception.bracket' cannot be used safely within
 @since 4.4.0.0
 -}
 unsafeDupablePerformIO  :: IO a -> a
-unsafeDupablePerformIO (IO m) = case runRW# m of (# _, a #) -> a
+-- See Note [unsafePerformIO and strictness]
+unsafeDupablePerformIO (IO m) = case runRW# m of (# _, a #) -> lazy a
 
 {-|
 'unsafeInterleaveIO' allows an 'IO' computation to be deferred lazily.

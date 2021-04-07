@@ -3,6 +3,8 @@
 # To be a good autoconf citizen, names of local macros have prefixed with FP_ to
 # ensure we don't clash with any pre-supplied autoconf ones.
 
+m4_include([m4/ax_compare_version.m4])
+
 # FPTOOLS_WRITE_FILE
 # ------------------
 # Write $2 to the file named $1.
@@ -917,7 +919,7 @@ AC_DEFUN(
     [FP_DEFAULT_CHOICE_OVERRIDE_CHECK],
     [AC_ARG_ENABLE(
         [$1],
-        [AC_HELP_STRING(
+        [AS_HELP_STRING(
             [--enable-$1],
             [$5])],
         [AS_IF(
@@ -1857,12 +1859,12 @@ AC_DEFUN([FP_ICONV],
   dnl environment.
 
   AC_ARG_WITH([iconv-includes],
-    [AC_HELP_STRING([--with-iconv-includes],
+    [AS_HELP_STRING([--with-iconv-includes],
       [directory containing iconv.h])],
       [ICONV_INCLUDE_DIRS=$withval])
 
   AC_ARG_WITH([iconv-libraries],
-    [AC_HELP_STRING([--with-iconv-libraries],
+    [AS_HELP_STRING([--with-iconv-libraries],
       [directory containing iconv library])],
       [ICONV_LIB_DIRS=$withval])
 
@@ -1879,23 +1881,23 @@ AC_DEFUN([FP_GMP],
   dnl--------------------------------------------------------------------
 
   AC_ARG_WITH([gmp-includes],
-    [AC_HELP_STRING([--with-gmp-includes],
+    [AS_HELP_STRING([--with-gmp-includes],
       [directory containing gmp.h])],
       [GMP_INCLUDE_DIRS=$withval])
 
   AC_ARG_WITH([gmp-libraries],
-    [AC_HELP_STRING([--with-gmp-libraries],
+    [AS_HELP_STRING([--with-gmp-libraries],
       [directory containing gmp library])],
       [GMP_LIB_DIRS=$withval])
 
   AC_ARG_WITH([intree-gmp],
-    [AC_HELP_STRING([--with-intree-gmp],
+    [AS_HELP_STRING([--with-intree-gmp],
       [force using the in-tree GMP])],
       [GMP_FORCE_INTREE=YES],
       [GMP_FORCE_INTREE=NO])
 
   AC_ARG_WITH([gmp-framework-preferred],
-    [AC_HELP_STRING([--with-gmp-framework-preferred],
+    [AS_HELP_STRING([--with-gmp-framework-preferred],
       [on OSX, prefer the GMP framework to the gmp lib])],
       [GMP_PREFER_FRAMEWORK=YES],
       [GMP_PREFER_FRAMEWORK=NO])
@@ -1915,7 +1917,7 @@ AC_DEFUN([FP_CURSES],
   dnl--------------------------------------------------------------------
 
   AC_ARG_WITH([curses-libraries],
-    [AC_HELP_STRING([--with-curses-libraries],
+    [AS_HELP_STRING([--with-curses-libraries],
       [directory containing curses libraries])],
       [CURSES_LIB_DIRS=$withval])
 
@@ -2231,22 +2233,29 @@ AC_DEFUN([XCODE_VERSION],[
 #
 # $1 = the variable to set
 # $2 = the command to look for
-# $3 = the version of the command to look for
+# $3 = the lower bound version of the command to look for
+# $4 = the upper bound version of the command to look for.
 #
 AC_DEFUN([FIND_LLVM_PROG],[
     # Test for program with and without version name.
-    AC_CHECK_TOOLS([$1], [$2-$3 $2-$3.0 $2], [:])
-    if test "$$1" != ":"; then
-        AC_MSG_CHECKING([$$1 is version $3])
-        if test `$$1 --version | grep -c "version $3"` -gt 0 ; then
-            AC_MSG_RESULT(yes)
-        else
-            AC_MSG_RESULT(no)
-            $1=""
-        fi
-    else
-        $1=""
-    fi
+    PROG_VERSION_CANDIDATES=$(for llvmVersion in `seq $4 -1 $3`; do echo "$2-$llvmVersion $2-$llvmVersion.0"; done)
+    AC_CHECK_TOOLS([$1], [$PROG_VERSION_CANDIDATES $2], [])
+    AS_IF([test x"$$1" != x],[
+        PROG_VERSION=`$$1 --version | awk '/.*version [[0-9\.]]+/{for(i=1;i<=NF;i++){ if(\$i ~ /^[[0-9\.]]+$/){print \$i}}}'`
+        AS_IF([test x"$PROG_VERSION" == x],
+          [AC_MSG_RESULT(no)
+           $1=""
+           AC_MSG_NOTICE([We only support llvm $3 to $4 (no version found).])],
+          [AC_MSG_CHECKING([$$1 version ($PROG_VERSION) is between $3 and $4])
+           AX_COMPARE_VERSION([$PROG_VERSION], [lt], [$3],
+            [AC_MSG_RESULT(no)
+             $1=""
+             AC_MSG_NOTICE([We only support llvm $3 to $4 (found $PROG_VERSION).])],
+            [AX_COMPARE_VERSION([$PROG_VERSION], [gt], [$4],
+             [AC_MSG_RESULT(no)
+              $1=""
+              AC_MSG_NOTICE([We only support llvm $3 to $4 (found $PROG_VERSION).])],
+             [AC_MSG_RESULT(yes)])])])])
 ])
 
 # CHECK_LD_COPY_BUG()
@@ -2347,7 +2356,7 @@ AC_DEFUN([FP_CPP_CMD_WITH_ARGS],[
 dnl ** what cpp to use?
 dnl --------------------------------------------------------------
 AC_ARG_WITH(hs-cpp,
-[AC_HELP_STRING([--with-hs-cpp=ARG],
+[AS_HELP_STRING([--with-hs-cpp=ARG],
       [Path to the (C) preprocessor for Haskell files [default=autodetect]])],
 [
     if test "$HostOS" = "mingw32"
@@ -2401,7 +2410,7 @@ AC_ARG_WITH(hs-cpp,
 dnl ** what cpp flags to use?
 dnl -----------------------------------------------------------
 AC_ARG_WITH(hs-cpp-flags,
-  [AC_HELP_STRING([--with-hs-cpp-flags=ARG],
+  [AS_HELP_STRING([--with-hs-cpp-flags=ARG],
       [Flags to the (C) preprocessor for Haskell files [default=autodetect]])],
   [
       if test "$HostOS" = "mingw32"
@@ -2443,7 +2452,7 @@ $2=$HS_CPP_ARGS
 AC_DEFUN([FP_BFD_SUPPORT], [
     AC_SUBST([CabalHaveLibbfd], [False])
     AC_ARG_ENABLE(bfd-debug,
-        [AC_HELP_STRING([--enable-bfd-debug],
+        [AS_HELP_STRING([--enable-bfd-debug],
               [Enable symbol resolution for -debug rts ('+RTS -Di') via binutils' libbfd [default=no]])],
         [
             # don't pollute general LIBS environment
@@ -2455,8 +2464,8 @@ AC_DEFUN([FP_BFD_SUPPORT], [
             dnl 'bfd_init' is a rare non-macro in libbfd
             AC_CHECK_LIB(bfd,    bfd_init)
 
-            AC_TRY_LINK([#include <bfd.h>],
-                        [
+            AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <bfd.h>]],
+                        [[
                                 /* mimic our rts/Printer.c */
                                 bfd* abfd;
                                 const char * name;
@@ -2478,7 +2487,7 @@ AC_DEFUN([FP_BFD_SUPPORT], [
                                     number_of_symbols = bfd_canonicalize_symtab (abfd, symbol_table);
                                     bfd_get_symbol_info(abfd,symbol_table[0],&info);
                                 }
-                        ],
+                        ]])],
                         [AC_SUBST([CabalHaveLibbfd], [True])],dnl bfd seems to work
                         [AC_MSG_ERROR([can't use 'bfd' library])])
             LIBS="$save_LIBS"
@@ -2519,7 +2528,7 @@ AC_DEFUN([FP_CC_LINKER_FLAG_TRY], [
 #
 AC_DEFUN([FIND_LD],[
     AC_ARG_ENABLE(ld-override,
-      [AC_HELP_STRING([--disable-ld-override],
+      [AS_HELP_STRING([--disable-ld-override],
         [Prevent GHC from overriding the default linker used by gcc. If ld-override is enabled GHC will try to tell gcc to use whichever linker is selected by the LD environment variable. [default=override enabled]])],
       [],
       [enable_ld_override=yes])

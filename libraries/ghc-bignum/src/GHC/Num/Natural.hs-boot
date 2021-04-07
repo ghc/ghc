@@ -10,7 +10,7 @@ import GHC.Types
 
 data Natural
    = NS !Word#
-   | NB !BigNat
+   | NB !BigNat#
 
 naturalToWord# :: Natural -> Word#
 naturalFromWord# :: Word# -> Natural
