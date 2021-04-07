@@ -882,7 +882,6 @@ finish summary tc_result mb_old_hash = do
 
           return HscRecomp { hscs_guts = cg_guts,
                              hscs_mod_location = ms_location summary,
-                             hscs_mod_details = details,
                              hscs_partial_iface = partial_iface,
                              hscs_old_iface_hash = mb_old_hash
                            }
