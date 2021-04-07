@@ -2247,6 +2247,9 @@ def normalise_errmsg(s: str) -> str:
     s = re.sub('We will try though\.\.\..*\n','',s)
     # ignore warning about strip invalidating signatures
     s = re.sub('.*strip: changes being made to the file will invalidate the code signature in.*\n','',s)
+    # clang may warn about unused argument when used as assembler
+    s = re.sub('.*warning: argument unused during compilation:.*\n', '', s)
+
     return s
 
 # normalise a .prof file, so that we can reasonably compare it against
@@ -2330,6 +2333,8 @@ def normalise_output( s: str ) -> str:
     s = re.sub('We will try though\.\.\..*\n','',s)
     # ignore warning about strip invalidating signatures
     s = re.sub('.*strip: changes being made to the file will invalidate the code signature in.*\n','',s)
+    # clang may warn about unused argument when used as assembler
+    s = re.sub('.*warning: argument unused during compilation:.*\n', '', s)
 
     return s
 
