@@ -9,6 +9,8 @@
 module GHC.Tc.Types.Origin (
   -- UserTypeCtxt
   UserTypeCtxt(..), pprUserTypeCtxt, isSigMaybe,
+  ReportRedundantConstraints(..), reportRedundantConstraints,
+  redundantConstraintsSpan,
 
   -- SkolemInfo
   SkolemInfo(..), pprSigSkolInfo, pprSkolInfo,
@@ -61,17 +63,16 @@ data UserTypeCtxt
   = FunSigCtxt      -- Function type signature, when checking the type
                     -- Also used for types in SPECIALISE pragmas
        Name              -- Name of the function
-       Bool              -- True <=> report redundant constraints
-                            -- This is usually True, but False for
-                            --   * Record selectors (not important here)
-                            --   * Class and instance methods.  Here
-                            --     the code may legitimately be more
-                            --     polymorphic than the signature
-                            --     generated from the class
-                            --     declaration
+       ReportRedundantConstraints
+         -- This is usually 'WantRCC', but 'NoRCC' for
+         --   * Record selectors (not important here)
+         --   * Class and instance methods.  Here the code may legitimately
+         --     be more polymorphic than the signature generated from the
+         --     class declaration
 
   | InfSigCtxt Name     -- Inferred type for function
   | ExprSigCtxt         -- Expression type signature
+      ReportRedundantConstraints
   | KindSigCtxt         -- Kind signature
   | StandaloneKindSigCtxt  -- Standalone kind signature
        Name                -- Name of the type/class
@@ -110,6 +111,23 @@ data UserTypeCtxt
   | TySynKindCtxt Name  -- The kind of the RHS of a type synonym
   | TyFamResKindCtxt Name   -- The result kind of a type family
 
+-- | Report Redundant Constraints.
+data ReportRedundantConstraints
+  = NoRRC            -- ^ Don't report redundant constraints
+  | WantRRC SrcSpan  -- ^ Report redundant constraints, and here
+                     -- is the SrcSpan for the constraints
+                     -- E.g. f :: (Eq a, Ord b) => blah
+                     -- The span is for the (Eq a, Ord b)
+
+reportRedundantConstraints :: ReportRedundantConstraints -> Bool
+reportRedundantConstraints NoRRC        = False
+reportRedundantConstraints (WantRRC {}) = True
+
+redundantConstraintsSpan :: UserTypeCtxt -> SrcSpan
+redundantConstraintsSpan (FunSigCtxt _ (WantRRC span)) = span
+redundantConstraintsSpan (ExprSigCtxt (WantRRC span))  = span
+redundantConstraintsSpan _ = noSrcSpan
+
 {-
 -- Notes re TySynCtxt
 -- We allow type synonyms that aren't types; e.g.  type List = []
@@ -127,7 +145,7 @@ pprUserTypeCtxt :: UserTypeCtxt -> SDoc
 pprUserTypeCtxt (FunSigCtxt n _)  = text "the type signature for" <+> quotes (ppr n)
 pprUserTypeCtxt (InfSigCtxt n)    = text "the inferred type for" <+> quotes (ppr n)
 pprUserTypeCtxt (RuleSigCtxt n)   = text "the type signature for" <+> quotes (ppr n)
-pprUserTypeCtxt ExprSigCtxt       = text "an expression type signature"
+pprUserTypeCtxt (ExprSigCtxt _)   = text "an expression type signature"
 pprUserTypeCtxt KindSigCtxt       = text "a kind signature"
 pprUserTypeCtxt (StandaloneKindSigCtxt n) = text "a standalone kind signature for" <+> quotes (ppr n)
 pprUserTypeCtxt TypeAppCtxt       = text "a type argument"
