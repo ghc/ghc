@@ -314,7 +314,7 @@ getCoreToDo logger dflags
            CoreDoFloatOutwards FloatOutSwitches {
                                  floatOutLambdas     = floatLamArgs dflags,
                                  floatOutConstants   = True,
-                                 floatOutOverSatApps = True,
+                                 floatOutOverSatApps = False,
                                  floatToTopLevelOnly = False },
                 -- nofib/spectral/hartel/wang doubles in speed if you
                 -- do full laziness late in the day.  It only happens
@@ -745,13 +745,13 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
         -- iteration_no is the number of the iteration we are
         -- about to begin, with '1' for the first
       | iteration_no > max_iterations   -- Stop if we've run out of iterations
-      = WARN( debugIsOn && (max_iterations > 2)
-            , hang (text "Simplifier bailing out after" <+> int max_iterations
-                    <+> text "iterations"
-                    <+> (brackets $ hsep $ punctuate comma $
-                         map (int . simplCountN) (reverse counts_so_far)))
-                 2 (text "Size =" <+> ppr (coreBindsStats binds)))
-
+      , let warn_msg = hang (text "Simplifier bailing out after" <+> int max_iterations
+                             <+> text "iterations"
+                             <+> (brackets $ hsep $ punctuate comma $
+                                  map (int . simplCountN) (reverse counts_so_far)))
+                         2 (vcat [ text "Module =" <+> ppr this_mod
+                                 , text "Size =" <+> ppr (coreBindsStats binds) ])
+      = WARN( debugIsOn && (max_iterations > 2), warn_msg )
                 -- Subtract 1 from iteration_no to get the
                 -- number of iterations we actually completed
         return ( "Simplifier baled out", iteration_no - 1
