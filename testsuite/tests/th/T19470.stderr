@@ -1,0 +1,13 @@
+
+<interactive>:2:10: error:
+    • Exception when trying to run compile-time code:
+        Prelude.undefined
+CallStack (from HasCallStack):
+  error, called at libraries/base/GHC/Err.hs:74:14 in base:GHC.Err
+  undefined, called at <interactive>:2:10 in interactive:Ghci1
+      Code: undefined
+    • In the Template Haskell splice $$undefined
+      In the first argument of ‘print’, namely ‘($$undefined :: String)’
+      In the first argument of ‘GHC.GHCi.ghciStepIO ::
+                                  IO a -> IO a’, namely
+        ‘(print ($$undefined :: String))’
