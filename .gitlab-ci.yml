@@ -69,7 +69,6 @@ workflow:
   # N.B. Don't run on wip/ branches, instead on run on merge requests.
   rules:
     - if: $CI_MERGE_REQUEST_ID
-    - if: $CI_COMMIT_TAG
     - if: '$CI_COMMIT_BRANCH == "master"'
     - if: '$CI_COMMIT_BRANCH =~ /ghc-[0-9]+\.[0-9]+/'
     - if: '$CI_PIPELINE_SOURCE == "web"'
@@ -1292,7 +1291,7 @@ source-tarball:
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   dependencies: []
   rules:
-    - if: $CI_COMMIT_TAG
+    - if: '$RELEASE_JOB == "yes"'
       when: always
   artifacts:
     paths:
