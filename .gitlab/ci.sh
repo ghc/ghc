@@ -8,7 +8,11 @@ set -e -o pipefail
 # Configuration:
 hackage_index_state="@1579718451"
 
-MIN_ALEX_VERSION="3.2"
+# Version bounds (both inclusive)
+MIN_HAPPY_VERSION="1.20"
+MAX_HAPPY_VERSION="1.21"
+MIN_ALEX_VERSION="3.2.6"
+MAX_ALEX_VERSION="3.3"
 
 TOP="$(pwd)"
 if [ ! -d "$TOP/.gitlab" ]; then
@@ -255,17 +259,13 @@ function setup_toolchain() {
     *) ;;
   esac
 
-  if [ ! -e "$HAPPY" ]; then
-      info "Building happy..."
-      cabal update
-      $cabal_install happy
-  fi
+  cabal update --index="$HACKAGE_INDEX_STATE"
 
-  if [ ! -e "$ALEX" ]; then
-      info "Building alex..."
-      cabal update
-      $cabal_install alex
-  fi
+  info "Building happy..."
+  $cabal_install happy --constraint="happy>=$MIN_HAPPY_VERSION" --constraint="happy<=$MAX_HAPPY_VERSION"
+
+  info "Building alex..."
+  $cabal_install alex --constraint="alex>=$MIN_ALEX_VERSION" --constraint="alex<=$MAX_ALEX_VERSION"
 }
 
 function cleanup_submodules() {
