@@ -135,7 +135,7 @@ selectMatchVar :: Mult -> Pat GhcTc -> DsM Id
 -- Postcondition: the returned Id has an Internal Name
 selectMatchVar w (BangPat _ pat) = selectMatchVar w (unLoc pat)
 selectMatchVar w (LazyPat _ pat) = selectMatchVar w (unLoc pat)
-selectMatchVar w (ParPat _ pat)  = selectMatchVar w (unLoc pat)
+selectMatchVar w (ParPat _ _ pat _) = selectMatchVar w (unLoc pat)
 selectMatchVar _w (VarPat _ var)  = return (localiseId (unLoc var))
                                   -- Note [Localise pattern binders]
                                   --
@@ -785,7 +785,7 @@ mkSelectorBinds ticks pat val_expr
 
 strip_bangs :: LPat (GhcPass p) -> LPat (GhcPass p)
 -- Remove outermost bangs and parens
-strip_bangs (L _ (ParPat _ p))  = strip_bangs p
+strip_bangs (L _ (ParPat _ _ p _))  = strip_bangs p
 strip_bangs (L _ (BangPat _ p)) = strip_bangs p
 strip_bangs lp                  = lp
 
@@ -793,7 +793,7 @@ is_flat_prod_lpat :: LPat GhcTc -> Bool
 is_flat_prod_lpat = is_flat_prod_pat . unLoc
 
 is_flat_prod_pat :: Pat GhcTc -> Bool
-is_flat_prod_pat (ParPat _ p)          = is_flat_prod_lpat p
+is_flat_prod_pat (ParPat _ _ p _)      = is_flat_prod_lpat p
 is_flat_prod_pat (TuplePat _ ps Boxed) = all is_triv_lpat ps
 is_flat_prod_pat (ConPat { pat_con  = L _ pcon
                          , pat_args = ps})
@@ -808,7 +808,7 @@ is_triv_lpat = is_triv_pat . unLoc
 is_triv_pat :: Pat (GhcPass p) -> Bool
 is_triv_pat (VarPat {})  = True
 is_triv_pat (WildPat{})  = True
-is_triv_pat (ParPat _ p) = is_triv_lpat p
+is_triv_pat (ParPat _ _ p _) = is_triv_lpat p
 is_triv_pat _            = False
 
 
@@ -1058,7 +1058,7 @@ decideBangHood dflags lpat
   where
     go lp@(L l p)
       = case p of
-           ParPat x p    -> L l (ParPat x (go p))
+           ParPat x lpar p rpar -> L l (ParPat x lpar (go p) rpar)
            LazyPat _ lp' -> lp'
            BangPat _ _   -> lp
            _             -> L l (BangPat noExtField lp)
@@ -1090,5 +1090,5 @@ isTrueLHsExpr (L _ (HsBinTick _ ixT _ e))
                      this_mod <- getModule
                      return (Tick (HpcTick this_mod ixT) e))
 
-isTrueLHsExpr (L _ (HsPar _ e))   = isTrueLHsExpr e
-isTrueLHsExpr _                   = Nothing
+isTrueLHsExpr (L _ (HsPar _ _ e _)) = isTrueLHsExpr e
+isTrueLHsExpr _                     = Nothing
