@@ -1000,16 +1000,16 @@ readIface dflags name_cache wanted_mod file_path = do
 readIfaceSourceHash
   :: DynFlags
   -> NameCache
-  -> Module
   -> FilePath
   -> IO (Maybe Fingerprint)
-readIfaceSourceHash dflags name_cache wanted_mod file_path
-  = do mb_iface <- readIface dflags name_cache wanted_mod file_path
-       case mb_iface of
-         Succeeded iface ->
-           return $ Just $ mi_src_hash (mi_final_exts iface)
-         Failed _ ->
-           return Nothing
+readIfaceSourceHash dflags name_cache file_path = do
+    let profile = targetProfile dflags
+    res <- tryMost $ readBinIfaceHeader profile name_cache CheckHiWay QuietBinIFace file_path
+    case res of
+      Right (src_hash, _) ->
+        return $ Just src_hash
+      Left _ ->
+        return Nothing
 
 {-
 *********************************************************

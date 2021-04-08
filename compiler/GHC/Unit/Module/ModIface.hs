@@ -338,7 +338,8 @@ instance Binary ModIface where
                    mi_finsts = hasFamInsts,
                    mi_exp_hash = exp_hash,
                    mi_orphan_hash = orphan_hash,
-                   mi_src_hash = src_hash
+                   mi_src_hash = _src_hash -- Like mi_ext_fields; this goes into
+                                           -- the iface header so we ignore it here
                  }}) = do
         put_ bh mod
         put_ bh sig_of
@@ -355,7 +356,6 @@ instance Binary ModIface where
         lazyPut bh usages
         put_ bh exports
         put_ bh exp_hash
-        put_ bh src_hash
         put_ bh used_th
         put_ bh fixities
         lazyPut bh warns
@@ -389,7 +389,6 @@ instance Binary ModIface where
         usages      <- {-# SCC "bin_usages" #-} lazyGet bh
         exports     <- {-# SCC "bin_exports" #-} get bh
         exp_hash    <- get bh
-        src_hash    <- get bh
         used_th     <- get bh
         fixities    <- {-# SCC "bin_fixities" #-} get bh
         warns       <- {-# SCC "bin_warns" #-} lazyGet bh
@@ -443,7 +442,8 @@ instance Binary ModIface where
                    mi_finsts = hasFamInsts,
                    mi_exp_hash = exp_hash,
                    mi_orphan_hash = orphan_hash,
-                   mi_src_hash = src_hash,
+                   mi_src_hash = fingerprint0, -- placeholder because this is dealt
+                                               -- with specially when the file is read
                    mi_warn_fn = mkIfaceWarnCache warns,
                    mi_fix_fn = mkIfaceFixCache fixities,
                    mi_hash_fn = mkIfaceHashCache decls

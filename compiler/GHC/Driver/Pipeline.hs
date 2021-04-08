@@ -1797,7 +1797,6 @@ readIfaceSourceHash' hsc_env ms =
     readIfaceSourceHash
         (hsc_dflags hsc_env)
         (hsc_NC hsc_env)
-        (ms_mod ms)
         (ml_hi_file (ms_location ms))
 
 -- | Check whether a module's current hash matches the previously recorded hash
