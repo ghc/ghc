@@ -10,7 +10,9 @@ set -e -o pipefail
 # Configuration:
 HACKAGE_INDEX_STATE="2020-12-21T14:48:20Z" # TODO dedup with yaml's def
 MIN_HAPPY_VERSION="1.20"
+MAX_HAPPY_VERSION="1.21"
 MIN_ALEX_VERSION="3.2.6"
+MAX_ALEX_VERSION="3.3"
 
 TOP="$(pwd)"
 if [ ! -d "$TOP/.gitlab" ]; then
@@ -321,10 +323,10 @@ function setup_toolchain() {
   cabal update --index="$HACKAGE_INDEX_STATE"
 
   info "Building happy..."
-  $cabal_install happy --constraint="happy>=$MIN_HAPPY_VERSION"
+  $cabal_install happy --constraint="happy>=$MIN_HAPPY_VERSION && happy<$MAX_HAPPY_VERSION"
 
   info "Building alex..."
-  $cabal_install alex --constraint="alex>=$MIN_ALEX_VERSION"
+  $cabal_install alex --constraint="alex>=$MIN_ALEX_VERSION && alex<$MAX_ALEX_VERSION"
 }
 
 function cleanup_submodules() {
