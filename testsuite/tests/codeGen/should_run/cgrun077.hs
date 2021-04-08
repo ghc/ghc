@@ -37,11 +37,7 @@ lzcnt32 (W# w#) = W# (clz32# w#)
 
 lzcnt64 :: Word64 -> Word
 lzcnt64 (W64# w#) =
-#if SIZEOF_HSWORD == 4
     W# (clz64# w#)
-#else
-    W# (clz# w#)
-#endif
 
 lzcnt_slow :: Int -> Word -> Word
 lzcnt_slow size x = fromIntegral $ min size $ length $ takeWhile (== False) $ reverse $ map (testBit x) [0 .. size - 1]
@@ -60,11 +56,7 @@ tzcnt32 (W# w#) = W# (ctz32# w#)
 
 tzcnt64 :: Word64 -> Word
 tzcnt64 (W64# w#) =
-#if SIZEOF_HSWORD == 4
     W# (ctz64# w#)
-#else
-    W# (ctz# w#)
-#endif
 
 tzcnt_slow :: Int -> Word -> Word
 tzcnt_slow size x = fromIntegral $ min size $ length $ takeWhile (== False) $ map (testBit x) [0 .. size - 1]
