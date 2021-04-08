@@ -1757,7 +1757,7 @@ and can lead to a massive blow-up in code size, exhibited by #9020.
 Suppose we have a PAP
     foo :: IO ()
     foo = returnIO ()
-Then we can eta-expand do
+Then we can eta-expand to
     foo = (\eta. (returnIO () |> sym g) eta) |> g
 where
     g :: IO () ~ State# RealWorld -> (# State# RealWorld, () #)
