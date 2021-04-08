@@ -22,7 +22,7 @@ from testglobals import config, ghc_env, default_testopts, brokens, t, \
                         TestRun, TestResult, TestOptions, PerfMetric
 from testutil import strip_quotes, lndir, link_or_copy_file, passed, \
                      failBecause, testing_metrics, \
-                     PassFail, memoize
+                     PassFail, badResult, memoize
 from term_color import Color, colored
 import testutil
 from cpu_features import have_cpu_feature
@@ -1156,29 +1156,24 @@ def do_test(name: TestName,
     if opts.expect not in ['pass', 'fail', 'missing-lib']:
         framework_fail(name, way, 'bad expected ' + opts.expect)
 
-    try:
-        passFail = result.passFail
-    except (KeyError, TypeError):
-        passFail = 'No passFail found'
-
     directory = re.sub('^\\.[/\\\\]', '', str(opts.testdir))
 
     if way in opts.fragile_ways:
-        if_verbose(1, '*** fragile test %s resulted in %s' % (full_name, passFail))
-        if passFail == 'pass':
+        if_verbose(1, '*** fragile test %s resulted in %s' % (full_name, 'pass' if result.passed else 'fail'))
+        if result.passed:
             t.fragile_passes.append(TestResult(directory, name, 'fragile', way))
         else:
             t.fragile_failures.append(TestResult(directory, name, 'fragile', way,
                                                  stdout=result.stdout,
                                                  stderr=result.stderr))
-    elif passFail == 'pass':
+    elif result.passed:
         if _expect_pass(way):
             t.expected_passes.append(TestResult(directory, name, "", way))
             t.n_expected_passes += 1
         else:
             if_verbose(1, '*** unexpected pass for %s' % full_name)
             t.unexpected_passes.append(TestResult(directory, name, 'unexpected', way))
-    elif passFail == 'fail':
+    else:
         if _expect_pass(way):
             reason = result.reason
             tag = result.tag
@@ -1196,8 +1191,6 @@ def do_test(name: TestName,
                 t.missing_libs.append(TestResult(directory, name, 'missing-lib', way))
             else:
                 t.n_expected_failures += 1
-    else:
-        framework_fail(name, way, 'bad result ' + passFail)
 
 # Make is often invoked with -s, which means if it fails, we get
 # no feedback at all. This is annoying. So let's remove the option
@@ -1226,14 +1219,6 @@ def framework_warn(name: TestName, way: WayName, reason: str) -> None:
     full_name = name + '(' + way + ')'
     if_verbose(1, '*** framework warning for %s %s ' % (full_name, reason))
     t.framework_warnings.append(TestResult(directory, name, reason, way))
-
-def badResult(result: PassFail) -> bool:
-    try:
-        if result.passFail == 'pass':
-            return False
-        return True
-    except (KeyError, TypeError):
-        return True
 
 # -----------------------------------------------------------------------------
 # Generic command tests
@@ -1540,7 +1525,7 @@ def check_stats(name: TestName,
                 # If any metric fails then the test fails.
                 # Note, the remaining metrics are still run so that
                 # a complete list of changes can be presented to the user.
-                if metric_result.passFail == 'fail':
+                if not metric_result.passed:
                     if config.ignore_perf_increases and perf_change == MetricChange.Increase:
                         metric_result = passed()
                     elif config.ignore_perf_decreases and perf_change == MetricChange.Decrease:
@@ -1641,11 +1626,6 @@ def simple_build(name: Union[TestName, str],
 
     # ToDo: if the sub-shell was killed by ^C, then exit
 
-    if isCompilerStatsTest():
-        statsResult = check_stats(TestName(name), way, in_testdir(stats_file), opts.stats_range_fields)
-        if badResult(statsResult):
-            return statsResult
-
     if should_fail:
         if exit_code == 0:
             stderr_contents = actual_stderr_path.read_text(encoding='UTF-8', errors='replace')
@@ -1654,6 +1634,11 @@ def simple_build(name: Union[TestName, str],
         if exit_code != 0:
             stderr_contents = actual_stderr_path.read_text(encoding='UTF-8', errors='replace')
             return failBecause('exit code non-0', stderr=stderr_contents)
+
+    if isCompilerStatsTest():
+        statsResult = check_stats(TestName(name), way, in_testdir(stats_file), opts.stats_range_fields)
+        if badResult(statsResult):
+            return statsResult
 
     return passed()
 
@@ -1809,10 +1794,9 @@ def interpreter_run(name: TestName,
 
     # check the exit code
     if exit_code != getTestOpts().exit_code:
-        if config.verbose >= 1 and _expect_pass(way):
-            print('Wrong exit code for ' + name + '(' + way + ') (expected', getTestOpts().exit_code, ', actual', exit_code, ')')
-            dump_stdout(name)
-            dump_stderr(name)
+        print('Wrong exit code for ' + name + '(' + way + ') (expected', getTestOpts().exit_code, ', actual', exit_code, ')')
+        dump_stdout(name)
+        dump_stderr(name)
         message = format_bad_exit_code_message(exit_code)
         return failBecause(message,
                            stderr=read_stderr(name),
@@ -2237,16 +2221,9 @@ def normalise_errmsg(s: str) -> str:
     # and not understood by older binutils (ar, ranlib, ...)
     s = modify_lines(s, lambda l: re.sub('^(.+)warning: (.+): unsupported GNU_PROPERTY_TYPE \(5\) type: 0xc000000(.*)$', '', l))
 
-    s = re.sub('ld: warning: passed .* min versions \(.*\) for platform macOS. Using [\.0-9]+.','',s)
-    s = re.sub('ld: warning: -sdk_version and -platform_version are not compatible, ignoring -sdk_version','',s)
-    # ignore superfluous dylibs passed to the linker.
-    s = re.sub('ld: warning: .*, ignoring unexpected dylib file\n','',s)
-    # ignore LLVM Version mismatch garbage; this will just break tests.
-    s = re.sub('You are using an unsupported version of LLVM!.*\n','',s)
-    s = re.sub('Currently only [\.0-9]+ is supported. System LLVM version: [\.0-9]+.*\n','',s)
-    s = re.sub('We will try though\.\.\..*\n','',s)
-    # ignore warning about strip invalidating signatures
-    s = re.sub('.*strip: changes being made to the file will invalidate the code signature in.*\n','',s)
+    # filter out nix garbage, that just keeps on showing up as errors on darwin
+    s = modify_lines(s, lambda l: re.sub('^(.+)\.dylib, ignoring unexpected dylib file$','', l))
+
     return s
 
 # normalise a .prof file, so that we can reasonably compare it against
@@ -2320,17 +2297,6 @@ def normalise_output( s: str ) -> str:
     # ghci outputs are pretty unstable with -fexternal-dynamic-refs, which is
     # requires for -fPIC
     s = re.sub('  -fexternal-dynamic-refs\n','',s)
-    s = re.sub('ld: warning: passed .* min versions \(.*\) for platform macOS. Using [\.0-9]+.','',s)
-    s = re.sub('ld: warning: -sdk_version and -platform_version are not compatible, ignoring -sdk_version','',s)
-    # ignore superfluous dylibs passed to the linker.
-    s = re.sub('ld: warning: .*, ignoring unexpected dylib file\n','',s)
-    # ignore LLVM Version mismatch garbage; this will just break tests.
-    s = re.sub('You are using an unsupported version of LLVM!.*\n','',s)
-    s = re.sub('Currently only [\.0-9]+ is supported. System LLVM version: [\.0-9]+.*\n','',s)
-    s = re.sub('We will try though\.\.\..*\n','',s)
-    # ignore warning about strip invalidating signatures
-    s = re.sub('.*strip: changes being made to the file will invalidate the code signature in.*\n','',s)
-
     return s
 
 def normalise_asm( s: str ) -> str:

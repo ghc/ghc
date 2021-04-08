@@ -24,7 +24,6 @@ main = do
   getGhcFieldOrFail fields "GhcWithSMP" "Support SMP"
   getGhcFieldOrFail fields "GhcRTSWays" "RTS ways"
   getGhcFieldOrFail fields "GhcLeadingUnderscore" "Leading underscore"
-  getGhcFieldOrDefault fields "GhcDynamicByDefault" "Dynamic by default" "NO"
   getGhcFieldOrDefault fields "GhcDynamic" "GHC Dynamic" "NO"
   getGhcFieldOrDefault fields "GhcProfiled" "GHC Profiled" "NO"
   getGhcFieldProgWithDefault fields "AR" "ar command" "ar"

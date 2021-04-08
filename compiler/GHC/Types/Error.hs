@@ -19,7 +19,6 @@ module GHC.Types.Error
 
    , MessageClass (..)
    , Severity (..)
-   , mkMCDiagnostic
    , Diagnostic (..)
    , DiagnosticMessage (..)
    , DiagnosticReason (..)
@@ -33,14 +32,8 @@ module GHC.Types.Error
    , mkLocMessage
    , mkLocMessageAnn
    , getCaretDiagnostic
-   -- * Constructing individual diagnostic messages
-   , mkMsgEnvelope
-   , mkPlainMsgEnvelope
-   , mkLongMsgEnvelope
-   , mkShortMsgEnvelope
-   , defaultReasonSeverity
    -- * Queries
-   , isErrorMessage
+   , isIntrinsicErrorMessage
    , isWarningMessage
    , getErrorMessages
    , getWarningMessages
@@ -97,12 +90,30 @@ mkMessages = Messages
 isEmptyMessages :: Messages e -> Bool
 isEmptyMessages (Messages msgs) = isEmptyBag msgs
 
+{- Note [Discarding Messages]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Discarding a 'SevIgnore' message from 'addMessage' and 'unionMessages' is
+just an optimisation, as GHC would /also/ suppress any diagnostic which severity is
+'SevIgnore' before printing the message: See for example 'putLogMsg' and 'defaultLogAction'.
+
+-}
+
+-- | Adds a 'Message' to the input collection of messages.
+-- See Note [Discarding Messages].
 addMessage :: MsgEnvelope e -> Messages e -> Messages e
-addMessage x (Messages xs) = Messages (x `consBag` xs)
+addMessage x (Messages xs)
+  | SevIgnore <- errMsgSeverity x = Messages xs
+  | otherwise                     = Messages (x `consBag` xs)
 
 -- | Joins two collections of messages together.
+-- See Note [Discarding Messages].
 unionMessages :: Messages e -> Messages e -> Messages e
-unionMessages (Messages msgs1) (Messages msgs2) = Messages (msgs1 `unionBags` msgs2)
+unionMessages (Messages msgs1) (Messages msgs2) =
+  Messages (filterBag interesting $ msgs1 `unionBags` msgs2)
+  where
+    interesting :: MsgEnvelope e -> Bool
+    interesting = (/=) SevIgnore . errMsgSeverity
 
 type WarningMessages = Bag (MsgEnvelope DiagnosticMessage)
 type ErrorMessages   = Bag (MsgEnvelope DiagnosticMessage)
@@ -193,9 +204,9 @@ data DiagnosticReason
 
 instance Outputable DiagnosticReason where
   ppr = \case
-    WarningWithoutFlag              -> text "WarningWithoutFlag"
-    WarningWithFlag wf              -> text ("WarningWithFlag " ++ show wf)
-    ErrorWithoutFlag                -> text "ErrorWithoutFlag"
+    WarningWithoutFlag  -> text "WarningWithoutFlag"
+    WarningWithFlag wf  -> text ("WarningWithFlag " ++ show wf)
+    ErrorWithoutFlag    -> text "ErrorWithoutFlag"
 
 -- | An envelope for GHC's facts about a running program, parameterised over the
 -- /domain-specific/ (i.e. parsing, typecheck-renaming, etc) diagnostics.
@@ -237,24 +248,45 @@ data MessageClass
     -- /especially/ when emitting compiler diagnostics, use the smart constructor.
   deriving (Eq, Show)
 
--- | Make a 'MessageClass' for a given 'DiagnosticReason', without consulting the 'DynFlags'.
--- This will not respect -Werror or warning suppression and so is probably wrong
--- for any warning.
-mkMCDiagnostic :: DiagnosticReason -> MessageClass
-mkMCDiagnostic reason = MCDiagnostic (defaultReasonSeverity reason) reason
+{- Note [Suppressing Messages]
+
+The 'SevIgnore' constructor is used to generate messages for diagnostics which are
+meant to be suppressed and not reported to the user: the classic example are warnings
+for which the user didn't enable the corresponding 'WarningFlag', so GHC shouldn't print them.
+
+A different approach would be to extend the zoo of 'mkMsgEnvelope' functions to return
+a 'Maybe (MsgEnvelope e)', so that we won't need to even create the message to begin with.
+Both approaches have been evaluated, but we settled on the "SevIgnore one" for a number of reasons:
+
+* It's less invasive to deal with;
+* It plays slightly better with deferred diagnostics (see 'GHC.Tc.Errors') as for those we need
+  to be able to /always/ produce a message (so that is reported at runtime);
+* It gives us more freedom: we can still decide to drop a 'SevIgnore' message at leisure, or we can
+  decide to keep it around until the last moment. Maybe in the future we would need to
+  turn a 'SevIgnore' into something else, for example to "unsuppress" diagnostics if a flag is
+  set: with this approach, we have more leeway to accommodate new features.
+
+-}
+
 
 -- | Used to describe warnings and errors
 --   o The message has a file\/line\/column heading,
 --     plus "warning:" or "error:",
 --     added by mkLocMessage
+--   o With 'SevIgnore' the message is suppressed
 --   o Output is intended for end users
 data Severity
-  = SevWarning
+  = SevIgnore
+  -- ^ Ignore this message, for example in
+  -- case of suppression of warnings users
+  -- don't want to see. See Note [Suppressing Messages]
+  | SevWarning
   | SevError
   deriving (Eq, Show)
 
 instance Outputable Severity where
   ppr = \case
+    SevIgnore  -> text "SevIgnore"
     SevWarning -> text "SevWarning"
     SevError   -> text "SevError"
 
@@ -324,14 +356,6 @@ mkLocMessageAnn ann msg_class locn msg
         MCDiagnostic SevWarning _reason -> text "warning:"
         MCFatal                         -> text "fatal:"
         _                               -> empty
-
--- | Computes a severity from a reason in the absence of DynFlags. This will likely
--- be wrong in the presence of -Werror. It will be removed in the context of #18516.
-defaultReasonSeverity :: DiagnosticReason -> Severity
-defaultReasonSeverity = \case
-  WarningWithoutFlag    -> SevWarning
-  WarningWithFlag _flag -> SevWarning
-  ErrorWithoutFlag      -> SevError
 
 getMessageClassColour :: MessageClass -> Col.Scheme -> Col.PprColour
 getMessageClassColour (MCDiagnostic SevError _reason)   = Col.sError
@@ -416,76 +440,40 @@ getCaretDiagnostic msg_class (RealSrcSpan span _) =
         caretLine = replicate start ' ' ++ replicate width '^' ++ caretEllipsis
 
 --
--- Creating MsgEnvelope(s)
---
-
-mkMsgEnvelope
-  :: Diagnostic e
-  => Severity
-  -> SrcSpan
-  -> PrintUnqualified
-  -> e
-  -> MsgEnvelope e
-mkMsgEnvelope sev locn print_unqual err
- = MsgEnvelope { errMsgSpan = locn
-               , errMsgContext = print_unqual
-               , errMsgDiagnostic = err
-               , errMsgSeverity = sev
-               }
-
--- | A long (multi-line) diagnostic message.
--- The 'Severity' will be calculated out of the 'DiagnosticReason', and will likely be
--- incorrect in the presence of '-Werror'.
-mkLongMsgEnvelope :: DiagnosticReason
-                  -> SrcSpan
-                  -> PrintUnqualified
-                  -> SDoc
-                  -> SDoc
-                  -> MsgEnvelope DiagnosticMessage
-mkLongMsgEnvelope rea locn unqual msg extra =
-  mkMsgEnvelope (defaultReasonSeverity rea) -- wrong, but will be fixed in printOrThrowWarnings
-                locn unqual (DiagnosticMessage (mkDecorated [msg,extra]) rea)
-
--- | A short (one-line) diagnostic message.
--- Same 'Severity' considerations as for 'mkLongMsgEnvelope'.
-mkShortMsgEnvelope :: DiagnosticReason
-                   -> SrcSpan
-                   -> PrintUnqualified
-                   -> SDoc
-                   -> MsgEnvelope DiagnosticMessage
-mkShortMsgEnvelope rea locn unqual msg =
-  mkMsgEnvelope (defaultReasonSeverity rea) -- wrong, but will be fixed in printOrThrowWarnings
-                locn unqual (DiagnosticMessage (mkDecorated [msg]) rea)
-
--- | Variant that doesn't care about qualified/unqualified names.
--- Same 'Severity' considerations as for 'mkLongMsgEnvelope'.
-mkPlainMsgEnvelope :: DiagnosticReason
-                   -> SrcSpan
-                   -> SDoc
-                   -> MsgEnvelope DiagnosticMessage
-mkPlainMsgEnvelope rea locn msg =
-  mkMsgEnvelope (defaultReasonSeverity rea) -- wrong, but will be fixed in printOrThrowWarnings
-                locn alwaysQualify (DiagnosticMessage (mkDecorated [msg]) rea)
-
---
 -- Queries
 --
 
-isErrorMessage :: Diagnostic e => MsgEnvelope e -> Bool
-isErrorMessage MsgEnvelope { errMsgSeverity = SevError } = True
-isErrorMessage _ = False
+{- Note [Intrinsic And Extrinsic Failures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+We distinguish between /intrinsic/ and /extrinsic/ failures. We classify in the former category
+those diagnostics which are /essentially/ failures, and their nature can't be changed. This is
+the case for 'ErrorWithoutFlag'. We classify as /extrinsic/ all those diagnostics (like fatal warnings)
+which are born as warnings but which are still failures under particular 'DynFlags' settings. It's important
+to be aware of such logic distinction, because when we are inside the typechecker or the desugarer, we are
+interested about intrinsic errors, and to bail out as soon as we find one of them. Conversely, if we find
+an /extrinsic/ one, for example because a particular 'WarningFlag' makes a warning and error, we /don't/
+want to bail out, that's still not the right time to do so: Rather, we want to first collect all the
+diagnostics, and later classify and report them appropriately (in the driver).
+
+-}
+
+
+-- | Returns 'True' if this is, intrinsically, a failure. See Note [Intrinsic And Extrinsic Failures].
+isIntrinsicErrorMessage :: Diagnostic e => MsgEnvelope e -> Bool
+isIntrinsicErrorMessage = (==) ErrorWithoutFlag . diagnosticReason . errMsgDiagnostic
 
 isWarningMessage :: Diagnostic e => MsgEnvelope e -> Bool
-isWarningMessage = not . isErrorMessage
+isWarningMessage = not . isIntrinsicErrorMessage
 
 errorsFound :: Diagnostic e => Messages e -> Bool
-errorsFound (Messages msgs) = any isErrorMessage msgs
+errorsFound (Messages msgs) = any isIntrinsicErrorMessage msgs
 
 getWarningMessages :: Diagnostic e => Messages e -> Bag (MsgEnvelope e)
 getWarningMessages (Messages xs) = fst $ partitionBag isWarningMessage xs
 
 getErrorMessages :: Diagnostic e => Messages e -> Bag (MsgEnvelope e)
-getErrorMessages (Messages xs) = fst $ partitionBag isErrorMessage xs
+getErrorMessages (Messages xs) = fst $ partitionBag isIntrinsicErrorMessage xs
 
 -- | Partitions the 'Messages' and returns a tuple which first element are the warnings, and the
 -- second the errors.

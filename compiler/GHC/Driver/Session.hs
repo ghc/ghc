@@ -148,7 +148,6 @@ module GHC.Driver.Session (
         -- ** Manipulating DynFlags
         addPluginModuleName,
         defaultDynFlags,                -- Settings -> DynFlags
-        defaultWays,
         initDynFlags,                   -- DynFlags -> IO DynFlags
         defaultFatalMessager,
         defaultFlushOut,
@@ -235,7 +234,6 @@ import GHC.Settings.Config
 import GHC.Utils.CliOption
 import {-# SOURCE #-} GHC.Core.Unfold
 import GHC.Driver.CmdLine
-import qualified GHC.Driver.CmdLine as Cmd
 import GHC.Settings.Constants
 import GHC.Utils.Panic
 import qualified GHC.Utils.Ppr.Colour as Col
@@ -1174,7 +1172,7 @@ defaultDynFlags mySettings llvmConfig =
         ignorePackageFlags      = [],
         trustFlags              = [],
         packageEnv              = Nothing,
-        targetWays_             = defaultWays mySettings,
+        targetWays_             = Set.empty,
         splitInfo               = Nothing,
 
         ghcNameVersion = sGhcNameVersion mySettings,
@@ -1255,12 +1253,6 @@ defaultDynFlags mySettings llvmConfig =
         maxErrors     = Nothing,
         cfgWeights    = defaultWeights
       }
-
-defaultWays :: Settings -> Ways
-defaultWays settings = if pc_DYNAMIC_BY_DEFAULT (sPlatformConstants settings)
-                       then Set.singleton WayDyn
-                       else Set.empty
-
 
 type FatalMessager = String -> IO ()
 
@@ -1869,7 +1861,7 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
 
   liftIO $ setUnsafeGlobalDynFlags dflags4
 
-  let warns' = map (Warn Cmd.NoReason) (consistency_warnings ++ sh_warns)
+  let warns' = map (Warn WarningWithoutFlag) (consistency_warnings ++ sh_warns)
 
   return (dflags4, leftover, warns' ++ warns)
 
@@ -2889,7 +2881,7 @@ unrecognisedWarning prefix = defHiddenFlag prefix (Prefix action)
     action :: String -> EwM (CmdLineP DynFlags) ()
     action flag = do
       f <- wopt Opt_WarnUnrecognisedWarningFlags <$> liftEwM getCmdLineState
-      when f $ addFlagWarn Cmd.ReasonUnrecognisedFlag $
+      when f $ addFlagWarn (WarningWithFlag Opt_WarnUnrecognisedWarningFlags) $
         "unrecognised warning flag: -" ++ prefix ++ flag
 
 -- See Note [Supporting CLI completion]
@@ -3049,6 +3041,12 @@ mkFlag :: TurnOnFlag            -- ^ True <=> it should be turned on
 mkFlag turn_on flagPrefix f (dep, (FlagSpec name flag extra_action mode))
     = (dep,
        Flag (flagPrefix ++ name) (NoArg (f flag >> extra_action turn_on)) mode)
+
+-- here to avoid module cycle with GHC.Driver.CmdLine
+deprecate :: Monad m => String -> EwM m ()
+deprecate s = do
+    arg <- getArg
+    addFlagWarn (WarningWithFlag Opt_WarnDeprecatedFlags) (arg ++ " is deprecated: " ++ s)
 
 deprecatedForExtension :: String -> TurnOnFlag -> String
 deprecatedForExtension lang turn_on
@@ -3647,7 +3645,6 @@ defaultFlags settings
 
     ++ default_RPath platform
 
-    ++ concatMap (wayGeneralFlags platform) (defaultWays settings)
     ++ validHoleFitDefaults
 
     where platform = sTargetPlatform settings
@@ -4672,8 +4669,6 @@ compilerInfo dflags
        ("Uses package keys",           "YES"),
        -- Whether or not we support the @-this-unit-id@ flag
        ("Uses unit IDs",               "YES"),
-       -- Whether or not GHC compiles libraries as dynamic by default
-       ("Dynamic by default",          showBool $ pc_DYNAMIC_BY_DEFAULT constants),
        -- Whether or not GHC was compiled using -dynamic
        ("GHC Dynamic",                 showBool hostIsDynamic),
        -- Whether or not GHC was compiled using -prof
@@ -4687,7 +4682,6 @@ compilerInfo dflags
     showBool True  = "YES"
     showBool False = "NO"
     platform  = targetPlatform dflags
-    constants = platformConstants platform
     isWindows = platformOS platform == OSMinGW32
     expandDirectories :: FilePath -> Maybe FilePath -> String -> String
     expandDirectories topd mtoold = expandToolDir mtoold . expandTopDir topd

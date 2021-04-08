@@ -9,8 +9,9 @@ import threading
 
 from my_typing import *
 
+
 PassFail = NamedTuple('PassFail',
-                      [('passFail', str),
+                      [('passed', bool),
                        ('reason', str),
                        ('tag', Optional[str]),
                        ('stderr', Optional[str]),
@@ -18,8 +19,11 @@ PassFail = NamedTuple('PassFail',
                        ('hc_opts', Optional[str]),
                        ])
 
+def badResult(result: PassFail) -> bool:
+    return not result.passed
+
 def passed(hc_opts=None) -> PassFail:
-    return PassFail(passFail='pass',
+    return PassFail(passed=True,
                     reason='',
                     tag=None,
                     stderr=None,
@@ -31,7 +35,7 @@ def failBecause(reason: str,
                 stderr: str=None,
                 stdout: str=None
                 ) -> PassFail:
-    return PassFail(passFail='fail', reason=reason, tag=tag,
+    return PassFail(passed=False, reason=reason, tag=tag,
                     stderr=stderr, stdout=stdout, hc_opts=None)
 
 def strip_quotes(s: str) -> str:

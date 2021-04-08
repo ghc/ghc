@@ -63,7 +63,7 @@ main = do
         ]
 
     -- These check if on-disk modules can import in-memory targets and
-    -- vice-verca.
+    -- vice-versa.
     forM_ (words "DD MM DM MD") $ \sync@[a_sync, b_sync] -> do
       dep <- return $ \y ->
          [( "A"
@@ -101,6 +101,15 @@ ppSync InMemory = "M"
 readSync 'D' = OnDisk
 readSync 'M' = InMemory
 
+type Mod =
+  ( String -- module name
+  , String -- pragmas
+  , [String] -- imports
+  , [(String, String)] -- bindings (LHS, RHS)
+  , Sync -- Is the module on disk or just in memory?
+  )
+
+go :: String -> [String] -> [Mod] -> Ghc ()
 go label targets mods = do
     liftIO $ createDirectoryIfMissing False "./outdir"
     setTargets []; _ <- load LoadAllTargets

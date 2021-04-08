@@ -212,7 +212,7 @@ tcRnModule hsc_env mod_sum save_rn_syntax
     dflags  = hsc_dflags hsc_env
     logger  = hsc_logger hsc_env
     home_unit = hsc_home_unit hsc_env
-    err_msg = mkPlainMsgEnvelope ErrorWithoutFlag loc $
+    err_msg = mkPlainErrorMsgEnvelope loc $
               text "Module does not have a RealSrcSpan:" <+> ppr this_mod
 
     pair :: (Module, SrcSpan)
@@ -258,9 +258,8 @@ tcRnModuleTcRnM hsc_env mod_sum
         ; let { prel_imports = mkPrelImports (moduleName this_mod) prel_imp_loc
                                implicit_prelude import_decls }
 
-        ; whenWOptM Opt_WarnImplicitPrelude $
-             when (notNull prel_imports) $
-                addDiagnostic (WarningWithFlag Opt_WarnImplicitPrelude) (implicitPreludeWarn)
+        ; when (notNull prel_imports) $
+            addDiagnostic (WarningWithFlag Opt_WarnImplicitPrelude) (implicitPreludeWarn)
 
         ; -- TODO This is a little skeevy; maybe handle a bit more directly
           let { simplifyImport (L _ idecl) =
@@ -3148,5 +3147,5 @@ mark_plugin_unsafe dflags = unless (gopt Opt_PluginTrustworthy dflags) $
   recordUnsafeInfer pluginUnsafe
   where
     unsafeText = "Use of plugins makes the module unsafe"
-    pluginUnsafe = unitBag ( mkPlainMsgEnvelope WarningWithoutFlag noSrcSpan
+    pluginUnsafe = unitBag ( mkPlainMsgEnvelope dflags WarningWithoutFlag noSrcSpan
                                    (Outputable.text unsafeText) )

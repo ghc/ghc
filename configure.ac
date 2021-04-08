@@ -90,10 +90,10 @@ dnl use either is considered a Feature.
 dnl ** What command to use to compile compiler sources ?
 dnl --------------------------------------------------------------
 
-AC_ARG_VAR(GHC,[Use as the path to GHC [default=autodetect]])
+AC_ARG_VAR(GHC,[Use as the full path to GHC. [default=autodetect]])
 AC_PATH_PROG([GHC], [ghc])
 AC_ARG_WITH([ghc],
-        AS_HELP_STRING([--with-ghc=ARG], [Use ARG as the path to ghc (obsolete, use GHC=ARG instead) [default=autodetect]]),
+        AS_HELP_STRING([--with-ghc=PATH], [Use PATH as the full path to ghc (obsolete, use GHC=PATH instead) [default=autodetect]]),
         AC_MSG_ERROR([--with-ghc=$withval is obsolete (use './configure GHC=$withval' or 'GHC=$withval ./configure' instead)]))
 AC_SUBST(WithGhc,$GHC)
 
@@ -1214,20 +1214,70 @@ AC_CHECK_FUNC(pthread_create,
 AC_DEFINE_UNQUOTED([NEED_PTHREAD_LIB], [$need_lpthread],
     [Define 1 if we need to link code using pthreads with -lpthread])
 
+dnl Setting thread names
+dnl ~~~~~~~~~~~~~~~~~~~~
+dnl The portability situation here is complicated:
+dnl
+dnl * FreeBSD supports pthread_set_name_np in <pthread_np.h>
+dnl * glibc supports pthread_setname_np
+dnl * Darwin supports pthread_setname_np but does not take a
+dnl   pthread_t argument.
+dnl
+AC_CHECK_HEADERS([pthread_np.h])
+
 dnl ** pthread_setname_np is a recent addition to glibc, and OS X has
 dnl    a different single-argument version.
 AC_CHECK_LIB(pthread, pthread_setname_np)
-AC_MSG_CHECKING(for pthread_setname_np)
-AC_LINK_IFELSE([AC_LANG_PROGRAM(
-[[
-#define _GNU_SOURCE
-#include <pthread.h>
-]],
-[[pthread_setname_np(pthread_self(), "name");]])],
+
+AC_MSG_CHECKING([for pthread_setname_np (Darwin)])
+AC_LINK_IFELSE([
+  AC_LANG_PROGRAM(
+    [[
+    #include <pthread.h>
+    ]],
+    [[pthread_setname_np("name");]]
+  )],
+  [
+    AC_MSG_RESULT(yes)
+    AC_DEFINE([HAVE_PTHREAD_SETNAME_NP_DARWIN], [1],
+      [Define to 1 if you have the Darwin version of pthread_setname_np])
+  ],
+  AC_MSG_RESULT(no)
+)
+
+dnl glibc
+AC_MSG_CHECKING([for pthread_setname_np (glibc)])
+AC_LINK_IFELSE([
+  AC_LANG_PROGRAM(
+    [[
+    #define _GNU_SOURCE
+    #include <pthread.h>
+    ]],
+    [[pthread_setname_np(pthread_self(), "name");]]
+  )],
+  [
     AC_MSG_RESULT(yes)
     AC_DEFINE([HAVE_PTHREAD_SETNAME_NP], [1],
-      [Define to 1 if you have the glibc version of pthread_setname_np]),
-    AC_MSG_RESULT(no)
+      [Define to 1 if you have the glibc version of pthread_setname_np])
+  ],
+  AC_MSG_RESULT(no)
+)
+
+dnl FreeBSD
+AC_MSG_CHECKING([for pthread_set_name_np])
+AC_LINK_IFELSE([
+  AC_LANG_PROGRAM(
+    [[
+    #include <pthread_np.h>
+    ]],
+    [[pthread_setname_np(pthread_self(), "name");]]
+  )],
+  [
+    AC_MSG_RESULT(yes)
+    AC_DEFINE([HAVE_PTHREAD_SET_NAME_NP], [1],
+      [Define to 1 if you have pthread_set_name_np])
+  ],
+  AC_MSG_RESULT(no)
 )
 
 dnl ** check for eventfd which is needed by the I/O manager

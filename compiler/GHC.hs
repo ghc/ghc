@@ -899,7 +899,7 @@ checkNewDynFlags :: MonadIO m => Logger -> DynFlags -> m DynFlags
 checkNewDynFlags logger dflags = do
   -- See Note [DynFlags consistency]
   let (dflags', warnings) = makeDynFlagsConsistent dflags
-  liftIO $ handleFlagWarnings logger dflags (map (Warn NoReason) warnings)
+  liftIO $ handleFlagWarnings logger dflags (map (Warn WarningWithoutFlag) warnings)
   return dflags'
 
 checkNewInteractiveDynFlags :: MonadIO m => Logger -> DynFlags -> m DynFlags
@@ -907,8 +907,8 @@ checkNewInteractiveDynFlags logger dflags0 = do
   -- We currently don't support use of StaticPointers in expressions entered on
   -- the REPL. See #12356.
   if xopt LangExt.StaticPointers dflags0
-  then do liftIO $ printOrThrowWarnings logger dflags0 $ listToBag
-            [mkPlainMsgEnvelope Session.WarningWithoutFlag interactiveSrcSpan
+  then do liftIO $ printOrThrowDiagnostics logger dflags0 $ listToBag
+            [mkPlainMsgEnvelope dflags0 Session.WarningWithoutFlag interactiveSrcSpan
              $ text "StaticPointers is not supported in GHCi interactive expressions."]
           return $ xopt_unset dflags0 LangExt.StaticPointers
   else return dflags0
@@ -1611,7 +1611,7 @@ getTokenStream mod = do
   let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
   case lexTokenStream (initParserOpts dflags) source startLoc of
     POk _ ts    -> return ts
-    PFailed pst -> throwErrors (fmap pprError (getErrorMessages pst))
+    PFailed pst -> throwErrors (fmap mkParserErr (getErrorMessages pst))
 
 -- | Give even more information on the source than 'getTokenStream'
 -- This function allows reconstructing the source completely with
@@ -1622,7 +1622,7 @@ getRichTokenStream mod = do
   let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
   case lexTokenStream (initParserOpts dflags) source startLoc of
     POk _ ts    -> return $ addSourceToTokens startLoc source ts
-    PFailed pst -> throwErrors (fmap pprError (getErrorMessages pst))
+    PFailed pst -> throwErrors (fmap mkParserErr (getErrorMessages pst))
 
 -- | Given a source location and a StringBuffer corresponding to this
 -- location, return a rich token stream with the source associated to the
@@ -1802,11 +1802,11 @@ parser str dflags filename =
 
      PFailed pst ->
          let (warns,errs) = getMessages pst in
-         (fmap pprWarning warns, Left (fmap pprError errs))
+         (fmap (mkParserWarn dflags) warns, Left (fmap mkParserErr errs))
 
      POk pst rdr_module ->
          let (warns,_) = getMessages pst in
-         (fmap pprWarning warns, Right rdr_module)
+         (fmap (mkParserWarn dflags) warns, Right rdr_module)
 
 -- -----------------------------------------------------------------------------
 -- | Find the package environment (if one exists)
@@ -1955,4 +1955,3 @@ instance Exception GhcApiError
 
 mkApiErr :: DynFlags -> SDoc -> GhcApiError
 mkApiErr dflags msg = GhcApiError (showSDoc dflags msg)
-

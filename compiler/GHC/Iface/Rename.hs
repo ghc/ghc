@@ -43,6 +43,7 @@ import GHC.Types.Name.Shape
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
+import GHC.Utils.Error
 import GHC.Utils.Fingerprint
 import GHC.Utils.Panic
 
@@ -76,7 +77,7 @@ failWithRn doc = do
     errs_var <- fmap sh_if_errs getGblEnv
     errs <- readTcRef errs_var
     -- TODO: maybe associate this with a source location?
-    writeTcRef errs_var (errs `snocBag` mkPlainMsgEnvelope ErrorWithoutFlag noSrcSpan doc)
+    writeTcRef errs_var (errs `snocBag` mkPlainErrorMsgEnvelope noSrcSpan doc)
     failM
 
 -- | What we have is a generalized ModIface, which corresponds to

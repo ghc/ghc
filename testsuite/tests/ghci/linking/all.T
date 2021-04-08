@@ -11,12 +11,11 @@ test('ghcilink002', [extra_files(['TestLink.hs', 'f.c']),
      makefile_test, ['ghcilink002'])
 
 test('ghcilink003',
-     [ unless(doing_ghci, skip),
-       # libstdc++ is named differently on FreeBSD
-       when(opsys('freebsd'), expect_broken(17739)),
-       when(opsys('darwin'), fragile(16083))
-     ], makefile_test, ['ghcilink003'])
-
+     [unless(doing_ghci, skip),
+      # libstdc++ is named differently on FreeBSD
+      when(opsys('freebsd'), expect_broken(17739))],
+     makefile_test,
+     ['ghcilink003'])
 
 test('ghcilink004',
      [extra_files(['TestLink.hs', 'f.c']),
@@ -32,16 +31,17 @@ test('ghcilink005',
      makefile_test, ['ghcilink005'])
 
 test('ghcilink006',
-     [ unless(doing_ghci, skip),
-       # libstdc++ is named differently on FreeBSD
-       when(opsys('freebsd'), expect_broken(17739)),
-       when(opsys('darwin'), fragile(16083))
-     ], makefile_test, ['ghcilink006'])
+     [unless(doing_ghci, skip),
+      # libstdc++ is named differently on FreeBSD
+      when(opsys('freebsd'), expect_broken(17739))],
+     makefile_test,
+     ['ghcilink006'])
 
 test('T3333',
      [unless(doing_ghci, skip),
       unless(opsys('linux') or opsys('darwin') or ghc_dynamic(),
-             expect_broken(3333))],
+             expect_broken(3333)),
+      when(unregisterised(), fragile(17018))],
      makefile_test, ['T3333'])
 
 test('T11531',

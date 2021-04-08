@@ -4,6 +4,15 @@ include $(TOP)/mk/test.mk
 
 DECIMAL_REGEXP = [0-9]\+.[0-9]\+
 
+.PHONY: T7275
+T7275:
+	"$(TEST_HC)" -prof -v0 -rtsopts T7275.hs
+	./T7275 +RTS -hc -i0
+	# Suzanne should appear here, despite having produced only pinned
+	# allocations. Strip off the actual amounts since they will be
+	# non-determinstic.
+	grep suzanne T7275.hp | cut -f1 -d'	'
+
 .PHONY: T11489
 T11489:
 	$(RM) T11489

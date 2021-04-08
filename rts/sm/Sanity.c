@@ -1273,7 +1273,7 @@ memInventory (bool show)
       debugBelch("  nursery      : %5" FMT_Word " blocks (%6.1lf MB)\n",
                  nursery_blocks, MB(nursery_blocks));
       debugBelch("  empty pinned : %5" FMT_Word " blocks (%6.1lf MB)\n",
-                 nursery_blocks, MB(free_pinned_blocks));
+                 free_pinned_blocks, MB(free_pinned_blocks));
       debugBelch("  retainer     : %5" FMT_Word " blocks (%6.1lf MB)\n",
                  retainer_blocks, MB(retainer_blocks));
       debugBelch("  arena blocks : %5" FMT_Word " blocks (%6.1lf MB)\n",
