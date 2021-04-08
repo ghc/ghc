@@ -48,6 +48,7 @@ import GHC.Stack
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic.Plain
+import GHC.Utils.Misc
 
 import GHC.Utils.Exception as Exception
 
@@ -295,6 +296,6 @@ callStackDoc =
 
 -- | Panic with an assertion failure, recording the given file and
 -- line number. Should typically be accessed with the ASSERT family of macros
-assertPprPanic :: HasCallStack => String -> Int -> SDoc -> a
+assertPprPanic :: HasDebugCallStack => String -> Int -> SDoc -> a
 assertPprPanic _file _line msg
   = pprPanic "ASSERT failed!" msg
