@@ -25,7 +25,7 @@ module GHC.Iface.Load (
         -- IfM functions
         loadInterface,
         loadSysInterface, loadUserInterface, loadPluginInterface,
-        findAndReadIface, readIface, writeIface,
+        findAndReadIface, readIface, readIfaceSourceHash, writeIface,
         moduleFreeHolesPrecise,
         needWiredInHomeIface, loadWiredInHomeIface,
 
@@ -65,6 +65,7 @@ import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Utils.Logger
+import GHC.Utils.Fingerprint
 
 import GHC.Settings.Constants
 
@@ -992,6 +993,22 @@ readIface dflags name_cache wanted_mod file_path = do
 
     Left exn    -> return (Failed (text (showException exn)))
 
+-- | Like @readIface@, but just get the source file hash out of it if it
+-- exists, and don't bother returning the error otherwise.
+readIfaceSourceHash
+  :: DynFlags
+  -> NameCache
+  -> FilePath
+  -> IO (Maybe Fingerprint)
+readIfaceSourceHash dflags name_cache file_path = do
+    let profile = targetProfile dflags
+    res <- tryMost $ readBinIfaceHeader profile name_cache CheckHiWay QuietBinIFace file_path
+    case res of
+      Right (src_hash, _) ->
+        return $ Just src_hash
+      Left _ ->
+        return Nothing
+
 {-
 *********************************************************
 *                                                       *
@@ -1107,6 +1124,7 @@ pprModIface unit_state iface@ModIface{ mi_final_exts = exts }
         , nest 2 (text "opt_hash:" <+> ppr (mi_opt_hash exts))
         , nest 2 (text "hpc_hash:" <+> ppr (mi_hpc_hash exts))
         , nest 2 (text "plugin_hash:" <+> ppr (mi_plugin_hash exts))
+        , nest 2 (text "src_hash:" <+> ppr (mi_src_hash exts))
         , nest 2 (text "sig of:" <+> ppr (mi_sig_of iface))
         , nest 2 (text "used TH splices:" <+> ppr (mi_used_th iface))
         , nest 2 (text "where")
