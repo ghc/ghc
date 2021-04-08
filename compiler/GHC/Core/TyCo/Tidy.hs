@@ -1,4 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE LambdaCase #-}
+
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 
@@ -14,7 +17,7 @@ module GHC.Core.TyCo.Tidy
         tidyTyCoVarOcc,
         tidyTopType,
         tidyKind,
-        tidyCo, tidyCos,
+        tidyCo,
         tidyTyCoVarBinder, tidyTyCoVarBinders
   ) where
 
@@ -26,9 +29,7 @@ import GHC.Core.TyCo.FVs (tyCoVarsOfTypesWellScoped, tyCoVarsOfTypeList)
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Var
 import GHC.Types.Var.Env
-import GHC.Utils.Misc (strictMap)
-
-import Data.List (mapAccumL)
+import GHC.Utils.Update as Upd
 
 {-
 %************************************************************************
@@ -43,18 +44,37 @@ import Data.List (mapAccumL)
 --
 -- It doesn't change the uniques at all, just the print names.
 tidyVarBndrs :: TidyEnv -> [TyCoVar] -> (TidyEnv, [TyCoVar])
-tidyVarBndrs tidy_env tvs
-  = mapAccumL tidyVarBndr (avoidNameClashes tvs tidy_env) tvs
+tidyVarBndrs tidy_env tvs = case tidy_tycovars_upd (avoidNameClashes tvs tidy_env) tvs of
+  (# env', upd_tvs #) -> (env', runUpd upd_tvs)
+
+tidy_tycovars_upd :: TidyEnv -> [TyCoVar] -> (# TidyEnv, Upd [TyCoVar] #)
+tidy_tycovars_upd tidy_env tvs = updateListAccumL tidy_tycovar_upd tidy_env tvs
 
 tidyVarBndr :: TidyEnv -> TyCoVar -> (TidyEnv, TyCoVar)
-tidyVarBndr tidy_env@(occ_env, subst) var
-  = case tidyOccName occ_env (getHelpfulOccName var) of
-      (occ_env', occ') -> ((occ_env', subst'), var')
-        where
-          subst' = extendVarEnv subst var var'
-          var'   = updateVarType (tidyType tidy_env) (setVarName var name')
-          name'  = tidyNameOcc name occ'
-          name   = varName var
+tidyVarBndr tidy_env var = case tidy_tycovar_upd tidy_env var of
+  (# tidy_env', var' #) -> (tidy_env', runUpd var' )
+
+tidy_tycovar_upd :: TidyEnv -> TyCoVar -> (# TidyEnv, Upd TyCoVar #)
+tidy_tycovar_upd tidy_env var = (# tidy_env', upd_var #)
+  where
+    (occ_env, subst) = tidy_env
+    tidy_env'        = (occ_env', subst')
+    subst'           = extendVarEnv subst var (runUpd upd_var)
+
+    -- tidy the helpful OccName and update the occ only when
+    --    helpful_occ /= current_occ
+    --  or
+    --    tidy_occ /= helpful_occ
+    current_occ = getOccName (varName var)
+    helpful_occ = getHelpfulOccName var
+    !(# occ_env', tidy_occ #) = tidy_OccName_upd occ_env (runUpd helpful_occ)
+    upd_occ = rebuild current_occ const (# tidy_occ, helpful_occ #)
+
+    -- tidy the Name with the given OccName and finally rebuild the Var
+    upd_name = tidyNameOcc_upd (varName var) upd_occ
+    upd_var  = rebuild var
+                       (\name ty -> (setVarName var name) { varType = ty })
+                       (# upd_name, tidy_type_upd tidy_env (varType var) #)
 
 avoidNameClashes :: [TyCoVar] -> TidyEnv -> TidyEnv
 -- Seed the occ_env with clashes among the names, see
@@ -62,9 +82,9 @@ avoidNameClashes :: [TyCoVar] -> TidyEnv -> TidyEnv
 avoidNameClashes tvs (occ_env, subst)
   = (avoidClashesOccEnv occ_env occs, subst)
   where
-    occs = map getHelpfulOccName tvs
+    occs = map (\tv -> runUpd (getHelpfulOccName tv)) tvs
 
-getHelpfulOccName :: TyCoVar -> OccName
+getHelpfulOccName :: TyCoVar -> Upd OccName
 -- A TcTyVar with a System Name is probably a
 -- unification variable; when we tidy them we give them a trailing
 -- "0" (or 1 etc) so that they don't take precedence for the
@@ -72,12 +92,12 @@ getHelpfulOccName :: TyCoVar -> OccName
 -- this way is a helpful clue for users
 getHelpfulOccName tv
   | isSystemName name, isTcTyVar tv
-  = mkTyVarOcc (occNameString occ ++ "0")
+  = Update (mkTyVarOcc (occNameString occ ++ "0"))
   | otherwise
-  = occ
+  = NoUpdate occ
   where
-   name = varName tv
-   occ  = getOccName name
+   !name = varName tv
+   occ   = getOccName name
 
 tidyTyCoVarBinder :: TidyEnv -> VarBndr TyCoVar vis
                   -> (TidyEnv, VarBndr TyCoVar vis)
@@ -88,9 +108,14 @@ tidyTyCoVarBinder tidy_env (Bndr tv vis)
 
 tidyTyCoVarBinders :: TidyEnv -> [VarBndr TyCoVar vis]
                    -> (TidyEnv, [VarBndr TyCoVar vis])
-tidyTyCoVarBinders tidy_env tvbs
-  = mapAccumL tidyTyCoVarBinder
-              (avoidNameClashes (binderVars tvbs) tidy_env) tvbs
+tidyTyCoVarBinders tidy_env tvbs = go tidy_env' tvbs
+  where
+    tidy_env' = avoidNameClashes (binderVars tvbs) tidy_env
+    go env []       = (env, [])
+    go env (tv:tvs) = (env'', tv':tvs')
+      where
+        !(!env',  !tv')  = tidyTyCoVarBinder env tv
+        !(!env'', !tvs') = go env' tvs
 
 ---------------
 tidyFreeTyCoVars :: TidyEnv -> [TyCoVar] -> TidyEnv
@@ -101,7 +126,13 @@ tidyFreeTyCoVars tidy_env tyvars
 
 ---------------
 tidyOpenTyCoVars :: TidyEnv -> [TyCoVar] -> (TidyEnv, [TyCoVar])
-tidyOpenTyCoVars env tyvars = mapAccumL tidyOpenTyCoVar env tyvars
+tidyOpenTyCoVars = go
+  where
+    go env []       = (env, [])
+    go env (tv:tvs) = (env'', tv':tvs')
+      where
+        !(!env',  !tv')  = tidyOpenTyCoVar env tv
+        !(!env'', !tvs') = go env' tvs
 
 ---------------
 tidyOpenTyCoVar :: TidyEnv -> TyCoVar -> (TidyEnv, TyCoVar)
@@ -122,24 +153,46 @@ tidyTyCoVarOcc env@(_, subst) tv
         Nothing  -> updateVarType (tidyType env) tv
         Just tv' -> tv'
 
+tidy_TyCoVar_upd :: TidyEnv -> TyCoVar -> Upd TyCoVar
+tidy_TyCoVar_upd env@(_, subst) tv
+  = case lookupVarEnv subst tv of
+        Nothing  -> updateVarType_upd (tidy_type_upd env) tv
+        Just tv' -> Update tv'
+
+-- FIXME: adapted from GHC.Types.Var
+updateVarType_upd :: (Type -> Upd Type) -> Var -> Upd Var
+updateVarType_upd upd var = rebuild var (\t -> var { varType = t}) (# upd (varType var) #)
 ---------------
 
 {-
 Note [Strictness in tidyType and friends]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Perhaps surprisingly, making `tidyType` strict has a rather large effect on
-performance: see #14738.  So you will see lots of strict applications ($!)
-and uses of `strictMap` in `tidyType`, `tidyTypes` and `tidyCo`.
 
-See #14738 for the performance impact -- sometimes as much as a 5%
-reduction in allocation.
+Since the result of tidying will be inserted into the HPT, a potentially
+long-lived structure, we generally want to avoid pieces of the old AST
+being retained by the thunks produced by tidying.
+
+For this reason we take great care to ensure that all pieces of the tidied AST
+are evaluated strictly.  So you will see lots of strict applications ($!) and
+uses of `strictMap` in `tidyType`, `tidyTypes` and `tidyCo`.
+
+In the case of tidying of lists (e.g. lists of arguments) we prefer to use
+`strictMap f xs` rather than `seqList (map f xs)` as the latter will
+unnecessarily allocate a thunk, which will then be almost-immediately
+evaluated, for each list element.
+
+Making `tidyType` strict has a rather large effect on performance: see #14738.
+Sometimes as much as a 5% reduction in allocation.
 -}
 
 -- | Tidy a list of Types
 --
 -- See Note [Strictness in tidyType and friends]
 tidyTypes :: TidyEnv -> [Type] -> [Type]
-tidyTypes env tys = strictMap (tidyType env) tys
+tidyTypes env tys = Upd.update (tidy_types_upd env) tys
+
+tidy_types_upd :: TidyEnv -> [Type] -> Upd [Type]
+tidy_types_upd env tys = Upd.updateList (tidy_type_upd env) tys
 
 ---------------
 
@@ -148,35 +201,40 @@ tidyTypes env tys = strictMap (tidyType env) tys
 --
 -- See Note [Strictness in tidyType and friends]
 tidyType :: TidyEnv -> Type -> Type
-tidyType _   (LitTy n)             = LitTy n
-tidyType env (TyVarTy tv)          = TyVarTy $! tidyTyCoVarOcc env tv
-tidyType env (TyConApp tycon tys)  = TyConApp tycon $! tidyTypes env tys
-tidyType env (AppTy fun arg)       = (AppTy $! (tidyType env fun)) $! (tidyType env arg)
-tidyType env ty@(FunTy _ w arg res)  = let { !w'   = tidyType env w
-                                           ; !arg' = tidyType env arg
-                                           ; !res' = tidyType env res }
-                                       in ty { ft_mult = w', ft_arg = arg', ft_res = res' }
-tidyType env (ty@(ForAllTy{}))     = (mkForAllTys' $! (zip tvs' vis)) $! tidyType env' body_ty
-  where
-    (tvs, vis, body_ty) = splitForAllTyCoVars' ty
-    (env', tvs') = tidyVarBndrs env tvs
-tidyType env (CastTy ty co)       = (CastTy $! tidyType env ty) $! (tidyCo env co)
-tidyType env (CoercionTy co)      = CoercionTy $! (tidyCo env co)
+tidyType env ty = Upd.update (tidy_type_upd env) ty
 
-
--- The following two functions differ from mkForAllTys and splitForAllTyCoVars in that
--- they expect/preserve the ArgFlag argument. These belong to "GHC.Core.Type", but
--- how should they be named?
-mkForAllTys' :: [(TyCoVar, ArgFlag)] -> Type -> Type
-mkForAllTys' tvvs ty = foldr strictMkForAllTy ty tvvs
+tidy_type_upd :: TidyEnv -> Type -> Upd Type
+tidy_type_upd = go
   where
-    strictMkForAllTy (tv,vis) ty = (ForAllTy $! ((Bndr $! tv) $! vis)) $! ty
+    go env t = case t of
+      LitTy _             -> NoUpdate t
+      TyVarTy tv          -> rebuild t TyVarTy (# tidy_TyCoVar_upd env tv #)
+      TyConApp _ []       -> NoUpdate t
+      TyConApp tycon tys  -> rebuild t TyConApp (# NoUpdate tycon, tidy_types_upd env tys #)
+      AppTy fun arg       -> rebuild t AppTy (# go env fun, go env arg #)
+      FunTy af w arg res  -> rebuild t (FunTy af) (# go env w, go env arg, go env res #)
+      CastTy ty co        -> rebuild t CastTy  (# go env ty, tidy_co_upd env co #)
+      CoercionTy co       -> rebuild t CoercionTy (# tidy_co_upd env co #)
+      ForAllTy{}          -> go_forall env' t
+            where
+              -- get all the successive ForAllTys' TyCoVars and rename them at
+              -- once. See Note [Tidying multiple names at once] in
+              -- GHC.Types.Names.OccName
+              all_tvs = get_forall_tvs t
+              env'    = avoidNameClashes all_tvs env
 
-splitForAllTyCoVars' :: Type -> ([TyCoVar], [ArgFlag], Type)
-splitForAllTyCoVars' ty = go ty [] []
-  where
-    go (ForAllTy (Bndr tv vis) ty) tvs viss = go ty (tv:tvs) (vis:viss)
-    go ty                          tvs viss = (reverse tvs, reverse viss, ty)
+    go_forall env t = case t of
+      ForAllTy bndr@(Bndr tv vis) ty
+        -> rebuild t ForAllTy (# upd_bndr, go_forall env' ty #)
+            where
+              !upd_bndr = rebuild bndr Bndr (# upd_tv, NoUpdate vis #)
+              !(# !env', !upd_tv #) = tidy_tycovar_upd env tv
+      _ -> go env t
+
+    -- get successive ForAllTy TyCoVars
+    get_forall_tvs = \case
+      ForAllTy (Bndr tv _) ty -> tv : get_forall_tvs ty
+      _                       -> []
 
 
 ---------------
@@ -216,40 +274,41 @@ tidyKind = tidyType
 --
 -- See Note [Strictness in tidyType and friends]
 tidyCo :: TidyEnv -> Coercion -> Coercion
-tidyCo env@(_, subst) co
-  = go co
-  where
-    go_mco MRefl    = MRefl
-    go_mco (MCo co) = MCo $! go co
+tidyCo env co = Upd.update (tidy_co_upd env) co
 
-    go (Refl ty)             = Refl $! tidyType env ty
-    go (GRefl r ty mco)      = (GRefl r $! tidyType env ty) $! go_mco mco
-    go (TyConAppCo r tc cos) = TyConAppCo r tc $! strictMap go cos
-    go (AppCo co1 co2)       = (AppCo $! go co1) $! go co2
-    go (ForAllCo tv h co)    = ((ForAllCo $! tvp) $! (go h)) $! (tidyCo envp co)
-                               where (envp, tvp) = tidyVarBndr env tv
+tidy_co_upd :: TidyEnv -> Coercion -> Upd Coercion
+tidy_co_upd = go
+  where
+    go_mco env c = case c of
+      MRefl    -> NoUpdate c
+      MCo co   -> rebuild c MCo (# go env co #)
+
+    go env@(_, subst) c = case c of
+      Refl ty                 -> rebuild c Refl (# tidy_type_upd env ty #)
+      GRefl r ty mco          -> rebuild c GRefl (# NoUpdate r, tidy_type_upd env ty, go_mco env mco #)
+      TyConAppCo r tc cos     -> rebuild c TyConAppCo (# NoUpdate r, NoUpdate tc, Upd.updateList (go env) cos #)
+      AppCo co1 co2           -> rebuild c AppCo (# go env co1, go env co2 #)
+      ForAllCo tv h co        -> rebuild c ForAllCo (# tvp, go env h, tidy_co_upd envp co #)
+                               where !(# envp, tvp #) = tidy_tycovar_upd env tv
             -- the case above duplicates a bit of work in tidying h and the kind
             -- of tv. But the alternative is to use coercionKind, which seems worse.
-    go (FunCo r w co1 co2)   = ((FunCo r $! go w) $! go co1) $! go co2
-    go (CoVarCo cv)          = case lookupVarEnv subst cv of
-                                 Nothing  -> CoVarCo cv
-                                 Just cv' -> CoVarCo cv'
-    go (HoleCo h)            = HoleCo h
-    go (AxiomInstCo con ind cos) = AxiomInstCo con ind $! strictMap go cos
-    go (UnivCo p r t1 t2)    = (((UnivCo $! (go_prov p)) $! r) $!
-                                tidyType env t1) $! tidyType env t2
-    go (SymCo co)            = SymCo $! go co
-    go (TransCo co1 co2)     = (TransCo $! go co1) $! go co2
-    go (NthCo r d co)        = NthCo r d $! go co
-    go (LRCo lr co)          = LRCo lr $! go co
-    go (InstCo co ty)        = (InstCo $! go co) $! go ty
-    go (KindCo co)           = KindCo $! go co
-    go (SubCo co)            = SubCo $! go co
-    go (AxiomRuleCo ax cos)  = AxiomRuleCo ax $ strictMap go cos
+      FunCo r w co1 co2       -> rebuild c FunCo (# NoUpdate r, go env w, go env co1, go env co2 #)
+      CoVarCo cv              -> case lookupVarEnv subst cv of
+                                  Nothing  -> NoUpdate c
+                                  Just cv' -> Update (CoVarCo cv')
+      HoleCo _                -> NoUpdate c
+      AxiomInstCo con ind cos -> rebuild c AxiomInstCo (# NoUpdate con, NoUpdate ind, Upd.updateList (go env) cos #)
+      UnivCo p r t1 t2        -> rebuild c UnivCo (# go_prov env p, NoUpdate r, tidy_type_upd env t1, tidy_type_upd env t2 #)
+      SymCo co                -> rebuild c SymCo (# go env co #)
+      TransCo co1 co2         -> rebuild c TransCo (# go env co1, go env co2 #)
+      NthCo r d co            -> rebuild c NthCo (# NoUpdate r, NoUpdate d, go env co #)
+      LRCo lr co              -> rebuild c LRCo (# NoUpdate lr, go env co #)
+      InstCo co ty            -> rebuild c InstCo (# go env co, go env ty #)
+      KindCo co               -> rebuild c KindCo (# go env co #)
+      SubCo co                -> rebuild c SubCo (# go env co #)
+      AxiomRuleCo ax cos      -> rebuild c AxiomRuleCo (# NoUpdate ax, Upd.updateList (go env) cos #)
 
-    go_prov (PhantomProv co)    = PhantomProv $! go co
-    go_prov (ProofIrrelProv co) = ProofIrrelProv $! go co
-    go_prov p@(PluginProv _)    = p
-
-tidyCos :: TidyEnv -> [Coercion] -> [Coercion]
-tidyCos env = strictMap (tidyCo env)
+    go_prov env p = case p of
+      PhantomProv co          -> rebuild p PhantomProv (# go env co #)
+      ProofIrrelProv co       -> rebuild p ProofIrrelProv (# go env co #)
+      PluginProv _            -> NoUpdate p
