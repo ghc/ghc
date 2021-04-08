@@ -454,5 +454,5 @@ test ('T9198',
       [''])
 
 test('T11545',
-     [ expect_broken(11545) ],
+     [ normal ],
      compile, ['-O +RTS -M50M -RTS'])

@@ -304,11 +304,51 @@ allocation-free. Also see #13001.
 -- ----------------------------------------------------------------------------
 
 -- | A strict version of 'foldl'.
-foldl'           :: forall a b . (b -> a -> b) -> b -> [a] -> b
+foldl' :: forall a b . (b -> a -> b) -> b -> [a] -> b
 {-# INLINE foldl' #-}
-foldl' k z0 xs =
+foldl' k z0 = \xs ->
   foldr (\(v::a) (fn::b->b) -> oneShot (\(z::b) -> z `seq` fn (k z v))) (id :: b -> b) xs z0
-  -- See Note [Left folds via right fold]
+{-
+Note [Definition of foldl']
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We want foldl' to be a good consumer, so:
+
+* We define it (rather cunningly) with `foldr`.  That way, the `fold/build`
+  rule might fire.  See Note [Left folds via right fold]
+
+* We give it an INLINE pragma, so that it'll inline at its call sites, again
+  giving the `fold/build` rule a chance to fire.
+
+* We eta-reduce it so that it has arity 2, not 3.  Reason: consider
+
+     sumlen :: [Float] -> (Float, Int)
+     sumlen = foldl' f (0, 0)
+        where
+          f (!s, !n) !x = (s + x, n + 1)
+
+The RHS of `sumlen` is a partial application of foldl', and is not
+eta-expanded (and it isn't, because we don't eta-expand PAPs.  See Note
+[Do not eta-expand PAPs] in GHC.Core.Opt.Simplify.Utils)
+
+So foldl' is partially applied to two arguments, /and it won't inline/
+if its defn is:
+
+      {-# INLINE foldl' #-}
+      foldl' k z xs = ...
+
+because INLINE functions only inline when saturated.
+
+Conclusion: move the `xs` parameter to the RHS, and define it thus
+
+  fold' k z = \xs -> ...
+
+See !5259 for additional discussion.  This may result in partial applications
+of 'foldl'' inlining in some functions where they previously did not.  Absent
+an INLINE pragam for the calling function, it may become too expensive to
+automatically inline, resulting in a loss of previously accidental list
+fusion.  Such call sites may now need explicit INLINE or INLINABLE pragmas
+to make the desired list fusion robust.
+-}
 
 -- | 'foldl1' is a variant of 'foldl' that has no starting value argument,
 -- and thus must be applied to non-empty lists. Note that unlike 'foldl', the accumulated value must be of the same type as the list elements.
