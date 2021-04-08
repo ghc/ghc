@@ -22,7 +22,6 @@ import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Platform
 
-import Data.Bits
 import Data.Maybe
 
 

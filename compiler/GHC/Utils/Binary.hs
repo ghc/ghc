@@ -85,7 +85,7 @@ import GHC.Utils.Fingerprint
 import GHC.Types.SrcLoc
 
 import Control.DeepSeq
-import Foreign
+import Foreign hiding (shiftL, shiftR)
 import Data.Array
 import Data.Array.IO
 import Data.Array.Unsafe
