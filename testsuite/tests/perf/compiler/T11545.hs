@@ -1,6 +1,6 @@
 module T11545 where
 
-data A = A A A A A A A A A A A A A A A A A A A A A A A A A A A A A A A A A deriving (Eq)
+data A = A A A A A A A A A A A A A A A A A A A A A A A A A A A A A A A A A A A A A A A A A A deriving (Eq)
 
 data QuadTree a = QuadTree !Int [a] (QuadTree a) (QuadTree a) (QuadTree a) (QuadTree a)
 
