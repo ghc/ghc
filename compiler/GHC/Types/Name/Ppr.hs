@@ -132,9 +132,10 @@ mkPrintUnqualified unit_env env
 -- | Creates a function for formatting modules based on two heuristics:
 -- (1) if the module is the current module, don't qualify, and (2) if there
 -- is only one exposed package which exports this module, don't qualify.
-mkQualModule :: UnitState -> HomeUnit -> QueryQualifyModule
-mkQualModule unit_state home_unit mod
-     | isHomeModule home_unit mod = False
+mkQualModule :: UnitState -> Maybe HomeUnit -> QueryQualifyModule
+mkQualModule unit_state mhome_unit mod
+     | Just home_unit <- mhome_unit
+     , isHomeModule home_unit mod = False
 
      | [(_, pkgconfig)] <- lookup,
        mkUnit pkgconfig == moduleUnit mod

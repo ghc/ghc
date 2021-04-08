@@ -1032,32 +1032,6 @@ release-x86_64-linux-ubuntu2004:
   extends: .build-x86_64-linux-ubuntu2004
 
 #################################
-# x86_64-linux-deb8
-#################################
-
-.build-x86_64-linux-deb8:
-  extends: .validate-linux
-  stage: full-build
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb8:$DOCKER_REV"
-  # Due to #18298.
-  allow_failure: true
-  variables:
-    TEST_ENV: "x86_64-linux-deb8"
-    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-deb8-linux.tar.xz"
-    # Debian 8's Sphinx is too old to support the table directive's :widths:
-    # option: https://sourceforge.net/p/docutils/patches/120/
-    BUILD_SPHINX_HTML: "NO"
-    BUILD_SPHINX_INFO: "NO"
-    BUILD_SPHINX_PDF: "NO"
-    BUILD_SPHINX_MAN: "NO"
-  cache:
-    key: linux-x86_64-deb8
-
-release-x86_64-linux-deb8:
-  <<: *release
-  extends: .build-x86_64-linux-deb8
-
-#################################
 # x86_64-linux-alpine
 #################################
 
@@ -1350,7 +1324,8 @@ source-tarball:
   needs: [doc-tarball]
   variables:
     UPSTREAM_PROJECT_PATH: "$CI_PROJECT_PATH"
-    UPSTREAM_COMMIT_SHA: "$CI_COMMIT_SHA"
+    UPSTREAM_PROJECT_ID: "$CI_PROJECT_ID"
+    UPSTREAM_PIPELINE_ID: "$CI_PIPELINE_ID"
     EXTRA_HC_OPTS: "-dcore-lint"
   trigger:
     project: "ghc/head.hackage"
@@ -1443,7 +1418,7 @@ perf:
     - export HC=$root/bin/ghc
     - .gitlab/ci.sh perf_test
   artifacts:
-    expire_in: 12 week
+    expire_in: 2 year
     when: always
     paths:
       - out

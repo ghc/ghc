@@ -1,6 +1,6 @@
 cabal-version: 3.0
 name: rts
-version: 1.0
+version: 1.0.1
 license: BSD-3-Clause
 maintainer: glasgow-haskell-users@haskell.org
 build-type: Simple
@@ -498,6 +498,8 @@ library
                linker/LoadArchive.c
                linker/M32Alloc.c
                linker/MachO.c
+               linker/macho/plt.c
+               linker/macho/plt_aarch64.c
                linker/PEi386.c
                linker/SymbolExtras.c
                linker/elf_got.c

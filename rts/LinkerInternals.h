@@ -13,6 +13,11 @@
 #include "linker/M32Alloc.h"
 
 #if RTS_LINKER_USE_MMAP
+#if defined(ios_HOST_OS) || defined(darwin_HOST_OS)
+/* Inclusion of system headers usually requires _DARWIN_C_SOURCE on Mac OS X
+ * because of some specific defines like MMAP_ANON, MMAP_ANONYMOUS. */
+#define _DARWIN_C_SOURCE 1
+#endif
 #include <sys/mman.h>
 #endif
 
@@ -165,7 +170,7 @@ typedef struct _Segment {
     int n_sections;
 } Segment;
 
-#if defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH) || defined(aarch64_HOST_ARCH)
+#if defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH) || defined(arm_HOST_ARCH) || defined(aarch64_HOST_ARCH)
 #define NEED_SYMBOL_EXTRAS 1
 #endif
 

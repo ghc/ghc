@@ -13,12 +13,9 @@ import GHC.Types.Error ( WarningMessages )
 import GHC.Types.Name.Cache
 import GHC.Types.Target
 import GHC.Types.TypeEnv
-import GHC.Unit.External
 import GHC.Unit.Finder.Types
-import GHC.Unit.Home.ModInfo
 import GHC.Unit.Module.Graph
 import GHC.Unit.Env
-import GHC.Unit.State
 import GHC.Unit.Types
 import GHC.Utils.Logger
 import GHC.Utils.TmpFs
@@ -77,31 +74,6 @@ data HscEnv
         hsc_IC :: InteractiveContext,
                 -- ^ The context for evaluating interactive statements
 
-        hsc_HPT    :: HomePackageTable,
-                -- ^ The home package table describes already-compiled
-                -- home-package modules, /excluding/ the module we
-                -- are compiling right now.
-                -- (In one-shot mode the current module is the only
-                -- home-package module, so hsc_HPT is empty.  All other
-                -- modules count as \"external-package\" modules.
-                -- However, even in GHCi mode, hi-boot interfaces are
-                -- demand-loaded into the external-package table.)
-                --
-                -- 'hsc_HPT' is not mutable because we only demand-load
-                -- external packages; the home package is eagerly
-                -- loaded, module by module, by the compilation manager.
-                --
-                -- The HPT may contain modules compiled earlier by @--make@
-                -- but not actually below the current module in the dependency
-                -- graph.
-                --
-                -- (This changes a previous invariant: changed Jan 05.)
-
-        hsc_EPS :: {-# UNPACK #-} !(IORef ExternalPackageState),
-                -- ^ Information about the currently loaded external packages.
-                -- This is mutable because packages will be demand-loaded during
-                -- a compilation run as required.
-
         hsc_NC  :: {-# UNPACK #-} !NameCache,
                 -- ^ Global Name cache so that each Name gets a single Unique.
                 -- Also track the origin of the Names.
@@ -133,16 +105,6 @@ data HscEnv
                 --
                 -- To add dynamically loaded plugins through the GHC API see
                 -- 'addPluginModuleName' instead.
-
-        , hsc_unit_dbs :: !(Maybe [UnitDatabase UnitId])
-                -- ^ Stack of unit databases for the target platform.
-                --
-                -- This field is populated with the result of `initUnits`.
-                --
-                -- 'Nothing' means the databases have never been read from disk.
-                --
-                -- Usually we don't reload the databases from disk if they are
-                -- cached, even if the database flags changed!
 
         , hsc_unit_env :: UnitEnv
                 -- ^ Unit environment (unit state, home unit, etc.).

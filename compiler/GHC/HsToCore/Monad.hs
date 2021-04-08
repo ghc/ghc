@@ -40,7 +40,7 @@ module GHC.HsToCore.Monad (
         dsGetCompleteMatches,
 
         -- Warnings and errors
-        DsWarning, warnDs, warnIfSetDs, errDs, errDsCoreExpr,
+        DsWarning, diagnosticDs, warnIfSetDs, errDs, errDsCoreExpr,
         failWithDs, failDs, discardWarningsDs,
         askNoErrsDs,
 
@@ -214,7 +214,7 @@ initDsTc thing_inside
        }
 
 -- | Run a 'DsM' action inside the 'IO' monad.
-initDs :: HscEnv -> TcGblEnv -> DsM a -> IO (Messages DecoratedSDoc, Maybe a)
+initDs :: HscEnv -> TcGblEnv -> DsM a -> IO (Messages DiagnosticMessage, Maybe a)
 initDs hsc_env tcg_env thing_inside
   = do { msg_var <- newIORef emptyMessages
        ; envs <- mkDsEnvsFromTcGbl hsc_env msg_var tcg_env
@@ -223,7 +223,7 @@ initDs hsc_env tcg_env thing_inside
 
 -- | Build a set of desugarer environments derived from a 'TcGblEnv'.
 mkDsEnvsFromTcGbl :: MonadIO m
-                  => HscEnv -> IORef (Messages DecoratedSDoc) -> TcGblEnv
+                  => HscEnv -> IORef (Messages DiagnosticMessage) -> TcGblEnv
                   -> m (DsGblEnv, DsLclEnv)
 mkDsEnvsFromTcGbl hsc_env msg_var tcg_env
   = do { cc_st_var   <- liftIO $ newIORef newCostCentreState
@@ -240,7 +240,7 @@ mkDsEnvsFromTcGbl hsc_env msg_var tcg_env
                            msg_var cc_st_var complete_matches
        }
 
-runDs :: HscEnv -> (DsGblEnv, DsLclEnv) -> DsM a -> IO (Messages DecoratedSDoc, Maybe a)
+runDs :: HscEnv -> (DsGblEnv, DsLclEnv) -> DsM a -> IO (Messages DiagnosticMessage, Maybe a)
 runDs hsc_env (ds_gbl, ds_lcl) thing_inside
   = do { res    <- initTcRnIf 'd' hsc_env ds_gbl ds_lcl
                               (tryM thing_inside)
@@ -253,7 +253,7 @@ runDs hsc_env (ds_gbl, ds_lcl) thing_inside
        }
 
 -- | Run a 'DsM' action in the context of an existing 'ModGuts'
-initDsWithModGuts :: HscEnv -> ModGuts -> DsM a -> IO (Messages DecoratedSDoc, Maybe a)
+initDsWithModGuts :: HscEnv -> ModGuts -> DsM a -> IO (Messages DiagnosticMessage, Maybe a)
 initDsWithModGuts hsc_env (ModGuts { mg_module = this_mod, mg_binds = binds
                                    , mg_tcs = tycons, mg_fam_insts = fam_insts
                                    , mg_patsyns = patsyns, mg_rdr_env = rdr_env
@@ -313,7 +313,7 @@ initTcDsForSolver thing_inside
            Nothing  -> pprPanic "initTcDsForSolver" (vcat $ pprMsgEnvelopeBagWithLoc (getErrorMessages msgs)) }
 
 mkDsEnvs :: UnitEnv -> Module -> GlobalRdrEnv -> TypeEnv -> FamInstEnv
-         -> IORef (Messages DecoratedSDoc) -> IORef CostCentreState -> CompleteMatches
+         -> IORef (Messages DiagnosticMessage) -> IORef CostCentreState -> CompleteMatches
          -> (DsGblEnv, DsLclEnv)
 mkDsEnvs unit_env mod rdr_env type_env fam_inst_env msg_var cc_st_var
          complete_matches
@@ -454,27 +454,26 @@ putSrcSpanDs (RealSrcSpan real_span _) thing_inside
 putSrcSpanDsA :: SrcSpanAnn' ann -> DsM a -> DsM a
 putSrcSpanDsA loc = putSrcSpanDs (locA loc)
 
--- | Emit a warning for the current source location
+-- | Emit a diagnostic for the current source location
 -- NB: Warns whether or not -Wxyz is set
-warnDs :: WarnReason -> SDoc -> DsM ()
-warnDs reason warn
+diagnosticDs :: DiagnosticReason -> SDoc -> DsM ()
+diagnosticDs reason warn
   = do { env <- getGblEnv
        ; loc <- getSrcSpanDs
-       ; let msg = makeIntoWarning reason $
-                   mkWarnMsg loc (ds_unqual env) warn
+       ; let msg = mkShortMsgEnvelope reason loc (ds_unqual env) warn
        ; updMutVar (ds_msgs env) (\ msgs -> msg `addMessage` msgs) }
 
--- | Emit a warning only if the correct WarnReason is set in the DynFlags
+-- | Emit a warning only if the correct WarningWithoutFlag is set in the DynFlags
 warnIfSetDs :: WarningFlag -> SDoc -> DsM ()
 warnIfSetDs flag warn
   = whenWOptM flag $
-    warnDs (Reason flag) warn
+    diagnosticDs (WarningWithFlag flag) warn
 
 errDs :: SDoc -> DsM ()
 errDs err
   = do  { env <- getGblEnv
         ; loc <- getSrcSpanDs
-        ; let msg = mkMsgEnvelope loc (ds_unqual env) err
+        ; let msg = mkShortMsgEnvelope ErrorWithoutFlag loc (ds_unqual env) err
         ; updMutVar (ds_msgs env) (\ msgs -> msg `addMessage` msgs) }
 
 -- | Issue an error, but return the expression for (), so that we can continue

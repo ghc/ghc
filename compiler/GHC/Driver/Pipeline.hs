@@ -154,7 +154,7 @@ preprocess hsc_env input_fn mb_input_buf mb_phase =
   where
     srcspan = srcLocSpan $ mkSrcLoc (mkFastString input_fn) 1 1
     handler (ProgramError msg) = return $ Left $ unitBag $
-        mkPlainMsgEnvelope srcspan $ text msg
+        mkPlainMsgEnvelope ErrorWithoutFlag srcspan $ text msg
     handler ex = throwGhcExceptionIO ex
 
 -- ---------------------------------------------------------------------------
@@ -820,15 +820,14 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_input_buf, mb_phase)
                                       $ dflags
                        hsc_env' <- newHscEnv dflags'
                        (dbs,unit_state,home_unit) <- initUnits logger dflags' Nothing
-                       let unit_env = UnitEnv
-                             { ue_platform  = targetPlatform dflags'
-                             , ue_namever   = ghcNameVersion dflags'
-                             , ue_home_unit = home_unit
+                       unit_env0 <- initUnitEnv (ghcNameVersion dflags') (targetPlatform dflags')
+                       let unit_env = unit_env0
+                             { ue_home_unit = Just home_unit
                              , ue_units     = unit_state
+                             , ue_unit_dbs  = Just dbs
                              }
                        let hsc_env'' = hsc_env'
                             { hsc_unit_env = unit_env
-                            , hsc_unit_dbs = Just dbs
                             }
                        _ <- runPipeline' start_phase hsc_env'' env input_fn'
                                          maybe_loc foreign_os
@@ -1882,7 +1881,7 @@ getHCFilePackages filename =
 linkDynLibCheck :: Logger -> TmpFs -> DynFlags -> UnitEnv -> [String] -> [UnitId] -> IO ()
 linkDynLibCheck logger tmpfs dflags unit_env o_files dep_units = do
   when (haveRtsOptsFlags dflags) $
-    putLogMsg logger dflags NoReason SevInfo noSrcSpan
+    putLogMsg logger dflags MCInfo noSrcSpan
       $ withPprStyle defaultUserStyle
       (text "Warning: -rtsopts and -with-rtsopts have no effect with -shared." $$
       text "    Call hs_init_ghc() from your main() function to set these options.")

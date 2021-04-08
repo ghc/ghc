@@ -121,7 +121,7 @@ import GHC.Data.FastString
 -- import qualified Data.Generics as SYB
 
 import Data.Data
-import Data.List
+import Data.List (sort, sortBy, find)
 import Data.Maybe
 
 import qualified Data.Map as Map
@@ -274,7 +274,7 @@ captureMatchLineSpacing (L l (ValD x (FunBind a b (MG c (L d ms ) e) f)))
 captureMatchLineSpacing d = d
 
 captureLineSpacing :: Monoid t
-                   => [LocatedAn t e] -> [GenLocated (SrcSpanAnn' (ApiAnn' t)) e]
+                   => [LocatedAn t e] -> [GenLocated (SrcSpanAnn' (EpAnn' t)) e]
 captureLineSpacing [] = []
 captureLineSpacing [d] = [d]
 captureLineSpacing (de1:d2:ds) = de1:captureLineSpacing (d2':ds)
@@ -286,38 +286,38 @@ captureLineSpacing (de1:d2:ds) = de1:captureLineSpacing (d2':ds)
 -- ---------------------------------------------------------------------
 
 captureTypeSigSpacing :: LHsDecl GhcPs -> LHsDecl GhcPs
-captureTypeSigSpacing (L l (SigD x (TypeSig (ApiAnn anc (AnnSig dc rs') cs) ns (HsWC xw ty))))
-  = (L l (SigD x (TypeSig (ApiAnn anc (AnnSig dc' rs') cs) ns (HsWC xw ty'))))
+captureTypeSigSpacing (L l (SigD x (TypeSig (EpAnn anc (AnnSig dc rs') cs) ns (HsWC xw ty))))
+  = (L l (SigD x (TypeSig (EpAnn anc (AnnSig dc' rs') cs) ns (HsWC xw ty'))))
   where
     -- we want DPs for the distance from the end of the ns to the
     -- AnnDColon, and to the start of the ty
-    AddApiAnn kw dca = dc
+    AddEpAnn kw dca = dc
     rd = case last ns of
-      L (SrcSpanAnn ApiAnnNotUsed   ll) _ -> realSrcSpan ll
-      L (SrcSpanAnn (ApiAnn anc' _ _) _) _ -> anchor anc' -- TODO MovedAnchor?
+      L (SrcSpanAnn EpAnnNotUsed   ll) _ -> realSrcSpan ll
+      L (SrcSpanAnn (EpAnn anc' _ _) _) _ -> anchor anc' -- TODO MovedAnchor?
     -- DP (line, col) = ss2delta (ss2pos $ anchor $ getLoc lc) r
     dc' = case dca of
-      AR r -> AddApiAnn kw (AD $ ss2delta (ss2posEnd rd) r)
-      AD _ -> AddApiAnn kw dca
+      AR r -> AddEpAnn kw (AD $ ss2delta (ss2posEnd rd) r)
+      AD _ -> AddEpAnn kw dca
 
     -- ---------------------------------
 
     ty' :: LHsSigType GhcPs
     ty' = case ty of
-      (L (SrcSpanAnn ApiAnnNotUsed    ll) b)
+      (L (SrcSpanAnn EpAnnNotUsed    ll) b)
         -> let
              op = case dca of
                AR r -> MovedAnchor (ss2delta (ss2posEnd r) (realSrcSpan ll))
                AD _ -> MovedAnchor (DP 0 1)
-           in (L (SrcSpanAnn (ApiAnn (Anchor (realSrcSpan ll) op) mempty noCom) ll) b)
-      (L (SrcSpanAnn (ApiAnn (Anchor r op) a c) ll) b)
+           in (L (SrcSpanAnn (EpAnn (Anchor (realSrcSpan ll) op) mempty noCom) ll) b)
+      (L (SrcSpanAnn (EpAnn (Anchor r op) a c) ll) b)
         -> let
               op' = case op of
                 MovedAnchor _ -> op
                 _ -> case dca of
                   AR dcr -> MovedAnchor (ss2delta (ss2posEnd dcr) r)
                   AD _ -> MovedAnchor (DP 0 1)
-           in (L (SrcSpanAnn (ApiAnn (Anchor r op') a c) ll) b)
+           in (L (SrcSpanAnn (EpAnn (Anchor r op') a c) ll) b)
 
 captureTypeSigSpacing s = s
 
@@ -466,23 +466,23 @@ setEntryDPDecl d dp = setEntryDP' d dp
 -- element. This is the 'DeltaPos' ignoring any comments.
 -- setEntryDP' :: (Data a) => LocatedA a -> DeltaPos -> LocatedA a
 setEntryDP' :: (Monoid t) => LocatedAn t a -> DeltaPos -> LocatedAn t a
-setEntryDP' (L (SrcSpanAnn ApiAnnNotUsed l) a) dp
+setEntryDP' (L (SrcSpanAnn EpAnnNotUsed l) a) dp
   = L (SrcSpanAnn
-           (ApiAnn (Anchor (realSrcSpan l) (MovedAnchor dp)) mempty noCom)
+           (EpAnn (Anchor (realSrcSpan l) (MovedAnchor dp)) mempty noCom)
            l) a
-setEntryDP' (L (SrcSpanAnn (ApiAnn (Anchor r _) an (AnnComments [])) l) a) dp
+setEntryDP' (L (SrcSpanAnn (EpAnn (Anchor r _) an (EpaComments [])) l) a) dp
   = L (SrcSpanAnn
-           (ApiAnn (Anchor r (MovedAnchor dp)) an (AnnComments []))
+           (EpAnn (Anchor r (MovedAnchor dp)) an (EpaComments []))
            l) a
-setEntryDP' (L (SrcSpanAnn (ApiAnn (Anchor r _) an cs) l) a) dp
+setEntryDP' (L (SrcSpanAnn (EpAnn (Anchor r _) an cs) l) a) dp
   = case sort (priorComments cs) of
       [] ->
         L (SrcSpanAnn
-               (ApiAnn (Anchor r (MovedAnchor dp)) an cs)
+               (EpAnn (Anchor r (MovedAnchor dp)) an cs)
                l) a
       (L ca c:cs') ->
         L (SrcSpanAnn
-               (ApiAnn (Anchor r (MovedAnchor edp)) an cs'')
+               (EpAnn (Anchor r (MovedAnchor edp)) an cs'')
                l) a
               where
                 cs'' = setPriorComments cs (L (Anchor (anchor ca) (MovedAnchor dp)) c:cs')
@@ -502,57 +502,45 @@ setEntryDP _ast _dp anns = anns
 
 -- ---------------------------------------------------------------------
 
-addAnnAnchorDelta :: LayoutStartCol -> RealSrcSpan -> AnnAnchor -> AnnAnchor
-addAnnAnchorDelta _off _anc (AD d) = AD d
-addAnnAnchorDelta  off  anc (AR r)
+addEpaAnchorDelta :: LayoutStartCol -> RealSrcSpan -> EpaAnchor -> EpaAnchor
+addEpaAnchorDelta _off _anc (AD d) = AD d
+addEpaAnchorDelta  off  anc (AR r)
   = AD (adjustDeltaForOffset 0 off (ss2deltaEnd anc r))
 
 -- Set the entry DP for an element coming after an existing keyword annotation
-setEntryDPFromAnchor :: LayoutStartCol -> AnnAnchor -> LocatedA t -> LocatedA t
+setEntryDPFromAnchor :: LayoutStartCol -> EpaAnchor -> LocatedA t -> LocatedA t
 setEntryDPFromAnchor _off (AD _) (L la a) = L la a
 setEntryDPFromAnchor  off (AR anc) ll@(L la _) = setEntryDP' ll dp'
   where
     r = case la of
-      (SrcSpanAnn ApiAnnNotUsed l) -> realSrcSpan l
-      (SrcSpanAnn (ApiAnn (Anchor r' _) _ _) _) -> r'
+      (SrcSpanAnn EpAnnNotUsed l) -> realSrcSpan l
+      (SrcSpanAnn (EpAnn (Anchor r' _) _ _) _) -> r'
     dp' = adjustDeltaForOffset 0 off (ss2deltaEnd anc r)
-
--- ---------------------------------------------------------------------
-
--- -- |When setting an entryDP, the leading comment needs to be adjusted too
--- setCommentEntryDP :: Annotation -> DeltaPos -> Annotation
--- -- setCommentEntryDP ann dp = error $ "setCommentEntryDP:ann'=" ++ show ann'
--- setCommentEntryDP ann dp = ann'
---   where
---     ann' = case (annPriorComments ann) of
---       [] -> ann
---       [(pc,_)]     -> ann { annPriorComments = [(pc,dp)] }
---       ((pc,_):pcs) -> ann { annPriorComments = ((pc,dp):pcs) }
 
 -- ---------------------------------------------------------------------
 
 -- |Take the annEntryDelta associated with the first item and associate it with the second.
 -- Also transfer any comments occuring before it.
 transferEntryDP :: (Monad m, Monoid t) => LocatedAn t a -> LocatedAn t b -> TransformT m (LocatedAn t b)
-transferEntryDP (L (SrcSpanAnn ApiAnnNotUsed l1) _) (L (SrcSpanAnn ApiAnnNotUsed _) b) = do
-  logTr $ "transferEntryDP': ApiAnnNotUsed,ApiAnnNotUsed"
-  return (L (SrcSpanAnn ApiAnnNotUsed l1) b)
-transferEntryDP (L (SrcSpanAnn (ApiAnn anc _an cs) _l1) _) (L (SrcSpanAnn ApiAnnNotUsed l2) b) = do
-  logTr $ "transferEntryDP': ApiAnn,ApiAnnNotUsed"
-  return (L (SrcSpanAnn (ApiAnn anc mempty cs) l2) b)
-transferEntryDP (L (SrcSpanAnn (ApiAnn anc1 _an1 cs1) _l1) _) (L (SrcSpanAnn (ApiAnn _anc2 an2 cs2) l2) b) = do
-  logTr $ "transferEntryDP': ApiAnn,ApiAnn"
+transferEntryDP (L (SrcSpanAnn EpAnnNotUsed l1) _) (L (SrcSpanAnn EpAnnNotUsed _) b) = do
+  logTr $ "transferEntryDP': EpAnnNotUsed,EpAnnNotUsed"
+  return (L (SrcSpanAnn EpAnnNotUsed l1) b)
+transferEntryDP (L (SrcSpanAnn (EpAnn anc _an cs) _l1) _) (L (SrcSpanAnn EpAnnNotUsed l2) b) = do
+  logTr $ "transferEntryDP': EpAnn,EpAnnNotUsed"
+  return (L (SrcSpanAnn (EpAnn anc mempty cs) l2) b)
+transferEntryDP (L (SrcSpanAnn (EpAnn anc1 _an1 cs1) _l1) _) (L (SrcSpanAnn (EpAnn _anc2 an2 cs2) l2) b) = do
+  logTr $ "transferEntryDP': EpAnn,EpAnn"
   -- Problem: if the original had preceding comments, blindly
   -- transferring the location is not correct
   case priorComments cs1 of
-    [] -> return (L (SrcSpanAnn (ApiAnn anc1 an2 cs2) l2) b)
+    [] -> return (L (SrcSpanAnn (EpAnn anc1 an2 cs2) l2) b)
     -- TODO: what happens if the receiving side already has comments?
     (L anc _:_) -> do
       logDataWithAnnsTr "transferEntryDP':priorComments anc=" anc
-      return (L (SrcSpanAnn (ApiAnn (kludgeAnchor anc) an2 cs2) l2) b)
-transferEntryDP (L (SrcSpanAnn ApiAnnNotUsed _l1) _) (L (SrcSpanAnn (ApiAnn anc2 an2 cs2) l2) b) = do
-  logTr $ "transferEntryDP': ApiAnnNotUsed,ApiAnn"
-  return (L (SrcSpanAnn (ApiAnn anc2' an2 cs2) l2) b)
+      return (L (SrcSpanAnn (EpAnn (kludgeAnchor anc) an2 cs2) l2) b)
+transferEntryDP (L (SrcSpanAnn EpAnnNotUsed _l1) _) (L (SrcSpanAnn (EpAnn anc2 an2 cs2) l2) b) = do
+  logTr $ "transferEntryDP': EpAnnNotUsed,EpAnn"
+  return (L (SrcSpanAnn (EpAnn anc2' an2 cs2) l2) b)
     where
       anc2' = case anc2 of
         Anchor _a op   -> Anchor (realSrcSpan l2) op
@@ -675,7 +663,7 @@ balanceCommentsMatch (L l (Match am mctxt pats (GRHSs xg grhss binds))) = do
   where
     simpleBreak (r,_) = r /= 0
     (SrcSpanAnn an1 _loc1) = l
-    anc1 = addCommentOrigDeltas $ apiAnnComments an1
+    anc1 = addCommentOrigDeltas $ epAnnComments an1
     cs1f = getFollowingComments anc1
     -- (move',stay') = break simpleBreak (commentsDeltas (anchorFromLocatedA (L l ())) cs1f)
     (move',stay') = break simpleBreak (trailingCommentsDeltas (anchorFromLocatedA (L l ())) cs1f)
@@ -683,27 +671,27 @@ balanceCommentsMatch (L l (Match am mctxt pats (GRHSs xg grhss binds))) = do
     stay = map snd stay'
     (l'', grhss', binds', logInfo)
       = case reverse grhss of
-          [] -> (l, [], binds, (AnnComments [], SrcSpanAnn ApiAnnNotUsed noSrcSpan))
-          (L lg g@(GRHS ApiAnnNotUsed _grs _rhs):gs) -> (l, reverse (L lg g:gs), binds, (AnnComments [], SrcSpanAnn ApiAnnNotUsed noSrcSpan))
+          [] -> (l, [], binds, (EpaComments [], SrcSpanAnn EpAnnNotUsed noSrcSpan))
+          (L lg g@(GRHS EpAnnNotUsed _grs _rhs):gs) -> (l, reverse (L lg g:gs), binds, (EpaComments [], SrcSpanAnn EpAnnNotUsed noSrcSpan))
           (L lg (GRHS ag grs rhs):gs) ->
             let
               anc1' = setFollowingComments anc1 stay
               an1' = setCommentsSrcAnn l anc1'
 
               -- ---------------------------------
-              (moved,bindsm) = pushTrailingComments WithWhere (AnnCommentsBalanced [] move) binds
+              (moved,bindsm) = pushTrailingComments WithWhere (EpaCommentsBalanced [] move) binds
               -- ---------------------------------
 
-              (ApiAnn anc an lgc) = ag
+              (EpAnn anc an lgc) = ag
               lgc' = splitComments (realSrcSpan lg) $ addCommentOrigDeltas lgc
               ag' = if moved
-                      then ApiAnn anc an lgc'
-                      else ApiAnn anc an (lgc' <> (AnnCommentsBalanced [] move))
-              -- ag' = ApiAnn anc an lgc'
+                      then EpAnn anc an lgc'
+                      else EpAnn anc an (lgc' <> (EpaCommentsBalanced [] move))
+              -- ag' = EpAnn anc an lgc'
 
             in (an1', (reverse $ (L lg (GRHS ag' grs rhs):gs)), bindsm, (anc1',an1'))
 
-pushTrailingComments :: WithWhere -> ApiAnnComments -> HsLocalBinds GhcPs -> (Bool, HsLocalBinds GhcPs)
+pushTrailingComments :: WithWhere -> EpAnnComments -> HsLocalBinds GhcPs -> (Bool, HsLocalBinds GhcPs)
 pushTrailingComments _ _cs b@EmptyLocalBinds{} = (False, b)
 pushTrailingComments _ _cs (HsIPBinds _ _) = error "TODO: pushTrailingComments:HsIPBinds"
 pushTrailingComments w cs lb@(HsValBinds an _)
@@ -711,7 +699,7 @@ pushTrailingComments w cs lb@(HsValBinds an _)
   where
     (decls, _, _ws1) = runTransform mempty (hsDeclsValBinds lb)
     (an', decls') = case reverse decls of
-      [] -> (addCommentsToApiAnn (spanHsLocaLBinds lb) an cs, decls)
+      [] -> (addCommentsToEpAnn (spanHsLocaLBinds lb) an cs, decls)
       (L la d:ds) -> (an, L (addCommentsToSrcAnn la cs) d:ds)
     (vb,_ws2) = case runTransform mempty (replaceDeclsValbinds w lb decls') of
       ((HsValBinds _ vb'), _, ws2') -> (vb', ws2')
@@ -746,8 +734,8 @@ balanceComments' la1 la2 = do
     simpleBreak n (r,_) = r > n
     L (SrcSpanAnn an1 loc1) f = la1
     L (SrcSpanAnn an2 loc2) s = la2
-    anc1 = addCommentOrigDeltas $ apiAnnComments an1
-    anc2 = addCommentOrigDeltas $ apiAnnComments an2
+    anc1 = addCommentOrigDeltas $ epAnnComments an1
+    anc2 = addCommentOrigDeltas $ epAnnComments an2
     cs1f = getFollowingComments anc1
     cs2b = priorComments anc2
     (stay'',move') = break (simpleBreak 1) (priorCommentsDeltas (anchorFromLocatedA la2) cs2b)
@@ -765,8 +753,8 @@ balanceComments' la1 la2 = do
     la2' = L an2' s
 
 -- | Like commentsDeltas, but calculates the delta from the end of the anchor, not the start
-trailingCommentsDeltas :: RealSrcSpan -> [LAnnotationComment]
-               -> [(Int, LAnnotationComment)]
+trailingCommentsDeltas :: RealSrcSpan -> [LEpaComment]
+               -> [(Int, LEpaComment)]
 trailingCommentsDeltas _ [] = []
 trailingCommentsDeltas anc (la@(L l _):las)
   = deltaComment anc la : trailingCommentsDeltas (anchor l) las
@@ -777,15 +765,15 @@ trailingCommentsDeltas anc (la@(L l _):las)
         (ll,_) = ss2pos (anchor loc)
 
 -- AZ:TODO: this is identical to commentsDeltas
-priorCommentsDeltas :: RealSrcSpan -> [LAnnotationComment]
-                    -> [(Int, LAnnotationComment)]
+priorCommentsDeltas :: RealSrcSpan -> [LEpaComment]
+                    -> [(Int, LEpaComment)]
 priorCommentsDeltas anc cs = go anc (reverse $ sort cs)
   where
-    go :: RealSrcSpan -> [LAnnotationComment] -> [(Int, LAnnotationComment)]
+    go :: RealSrcSpan -> [LEpaComment] -> [(Int, LEpaComment)]
     go _ [] = []
     go anc' (la@(L l _):las) = deltaComment anc' la : go (anchor l) las
 
-    deltaComment :: RealSrcSpan -> LAnnotationComment -> (Int, LAnnotationComment)
+    deltaComment :: RealSrcSpan -> LEpaComment -> (Int, LEpaComment)
     deltaComment anc' (L loc c) = (abs(ll - al), L loc c)
       where
         (al,_) = ss2pos anc'
@@ -794,15 +782,15 @@ priorCommentsDeltas anc cs = go anc (reverse $ sort cs)
 
 -- | Split comments into ones occuring before the end of the reference
 -- span, and those after it.
-splitComments :: RealSrcSpan -> ApiAnnComments -> ApiAnnComments
-splitComments p (AnnComments cs) = cs'
+splitComments :: RealSrcSpan -> EpAnnComments -> EpAnnComments
+splitComments p (EpaComments cs) = cs'
   where
     cmp (L (Anchor l _) _) = ss2pos l < ss2posEnd p
     (before, after) = break cmp cs
     cs' = case after of
-      [] -> AnnComments cs
-      _ -> AnnCommentsBalanced before after
-splitComments p (AnnCommentsBalanced cs ts) = AnnCommentsBalanced cs' ts'
+      [] -> EpaComments cs
+      _ -> EpaCommentsBalanced before after
+splitComments p (EpaCommentsBalanced cs ts) = EpaCommentsBalanced cs' ts'
   where
     cmp (L (Anchor l _) _) = ss2pos l < ss2posEnd p
     (before, after) = break cmp cs
@@ -813,42 +801,42 @@ splitComments p (AnnCommentsBalanced cs ts) = AnnCommentsBalanced cs' ts'
 -- token.  Takes an original list of comments, and converts the
 -- 'Anchor's to have a have a `MovedAnchor` operation based on the
 -- original locations.
-commentOrigDeltas :: [LAnnotationComment] -> [LAnnotationComment]
+commentOrigDeltas :: [LEpaComment] -> [LEpaComment]
 commentOrigDeltas [] = []
-commentOrigDeltas lcs@(L _ (GHC.AnnComment _ pt):_) = go pt lcs
+commentOrigDeltas lcs@(L _ (GHC.EpaComment _ pt):_) = go pt lcs
   -- TODO:AZ: we now have deltas wrt *all* tokens, not just preceding
   -- non-comment. Simplify this.
   where
-    go :: RealSrcSpan -> [LAnnotationComment] -> [LAnnotationComment]
+    go :: RealSrcSpan -> [LEpaComment] -> [LEpaComment]
     go _ [] = []
-    go p (L (Anchor la _) (GHC.AnnComment t pp):ls)
-      = L (Anchor la op) (GHC.AnnComment t pp) : go p' ls
+    go p (L (Anchor la _) (GHC.EpaComment t pp):ls)
+      = L (Anchor la op) (GHC.EpaComment t pp) : go p' ls
       where
         p' = p
         (r,c) = ss2posEnd pp
         op' = if r == 0
                then MovedAnchor (ss2delta (r,c+1) la)
                else MovedAnchor (ss2delta (r,c)   la)
-        op = if t == AnnEofComment && op' == MovedAnchor (DP 0 0)
+        op = if t == EpaEofComment && op' == MovedAnchor (DP 0 0)
                then MovedAnchor (DP 1 0)
                else op'
 
-addCommentOrigDeltas :: ApiAnnComments -> ApiAnnComments
-addCommentOrigDeltas (AnnComments cs) = AnnComments (commentOrigDeltas cs)
-addCommentOrigDeltas (AnnCommentsBalanced pcs fcs)
-  = AnnCommentsBalanced (commentOrigDeltas pcs) (commentOrigDeltas fcs)
+addCommentOrigDeltas :: EpAnnComments -> EpAnnComments
+addCommentOrigDeltas (EpaComments cs) = EpaComments (commentOrigDeltas cs)
+addCommentOrigDeltas (EpaCommentsBalanced pcs fcs)
+  = EpaCommentsBalanced (commentOrigDeltas pcs) (commentOrigDeltas fcs)
 
-addCommentOrigDeltasAnn :: (ApiAnn' a) -> (ApiAnn' a)
-addCommentOrigDeltasAnn ApiAnnNotUsed   = ApiAnnNotUsed
-addCommentOrigDeltasAnn (ApiAnn e a cs) = ApiAnn e a (addCommentOrigDeltas cs)
+addCommentOrigDeltasAnn :: (EpAnn' a) -> (EpAnn' a)
+addCommentOrigDeltasAnn EpAnnNotUsed   = EpAnnNotUsed
+addCommentOrigDeltasAnn (EpAnn e a cs) = EpAnn e a (addCommentOrigDeltas cs)
 
 -- TODO: this is replicating functionality in ExactPrint. Sort out the
 -- import loop`
 anchorFromLocatedA :: LocatedA a -> RealSrcSpan
 anchorFromLocatedA (L (SrcSpanAnn an loc) _)
   = case an of
-      ApiAnnNotUsed    -> realSrcSpan loc
-      (ApiAnn anc _ _) -> anchor anc
+      EpAnnNotUsed    -> realSrcSpan loc
+      (EpAnn anc _ _) -> anchor anc
 
 -- ---------------------------------------------------------------------
 
@@ -862,24 +850,24 @@ balanceSameLineComments (L la (Match anm mctxt pats (GRHSs x grhss lb))) = do
     simpleBreak n (r,_) = r > n
     (la',grhss', logInfo) = case reverse grhss of
       [] -> (la,grhss,[])
-      (L lg g@(GRHS ApiAnnNotUsed _gs _rhs):grs) -> (la,reverse $ (L lg g):grs,[])
+      (L lg g@(GRHS EpAnnNotUsed _gs _rhs):grs) -> (la,reverse $ (L lg g):grs,[])
       (L lg (GRHS ga gs rhs):grs) -> (la'',reverse $ (L lg (GRHS ga' gs rhs)):grs,[(gac,(csp,csf))])
         where
           (SrcSpanAnn an1 _loc1) = la
-          anc1 = addCommentOrigDeltas $ apiAnnComments an1
-          (ApiAnn anc an _) = ga :: ApiAnn' GrhsAnn
+          anc1 = addCommentOrigDeltas $ epAnnComments an1
+          (EpAnn anc an _) = ga :: EpAnn' GrhsAnn
           (csp,csf) = case anc1 of
-            AnnComments cs -> ([],cs)
-            AnnCommentsBalanced p f -> (p,f)
+            EpaComments cs -> ([],cs)
+            EpaCommentsBalanced p f -> (p,f)
           (move',stay') = break (simpleBreak 0) (trailingCommentsDeltas (anchor anc) csf)
           move = map snd move'
           stay = map snd stay'
-          cs1 = AnnCommentsBalanced csp stay
+          cs1 = EpaCommentsBalanced csp stay
 
-          gac = addCommentOrigDeltas $ apiAnnComments ga
+          gac = addCommentOrigDeltas $ epAnnComments ga
           gfc = getFollowingComments gac
           gac' = setFollowingComments gac (sort $ gfc ++ move)
-          ga' = (ApiAnn anc an gac')
+          ga' = (EpAnn anc an gac')
 
           an1' = setCommentsSrcAnn la cs1
           la'' = an1'
@@ -956,26 +944,26 @@ deltaAnchor (Anchor anc _) ss = Anchor anc (MovedAnchor dp)
 
 -- | Create a @SrcSpanAnn@ with a @MovedAnchor@ operation using the
 -- given @DeltaPos@.
-noAnnSrcSpanDP :: (Monoid ann) => SrcSpan -> DeltaPos -> SrcSpanAnn' (ApiAnn' ann)
+noAnnSrcSpanDP :: (Monoid ann) => SrcSpan -> DeltaPos -> SrcSpanAnn' (EpAnn' ann)
 noAnnSrcSpanDP l dp
-  = SrcSpanAnn (ApiAnn (Anchor (realSrcSpan l) (MovedAnchor dp)) mempty noCom) l
+  = SrcSpanAnn (EpAnn (Anchor (realSrcSpan l) (MovedAnchor dp)) mempty noCom) l
 
-noAnnSrcSpanDP0 :: (Monoid ann) => SrcSpan -> SrcSpanAnn' (ApiAnn' ann)
+noAnnSrcSpanDP0 :: (Monoid ann) => SrcSpan -> SrcSpanAnn' (EpAnn' ann)
 noAnnSrcSpanDP0 l = noAnnSrcSpanDP l (DP 0 0)
 
-noAnnSrcSpanDP1 :: (Monoid ann) => SrcSpan -> SrcSpanAnn' (ApiAnn' ann)
+noAnnSrcSpanDP1 :: (Monoid ann) => SrcSpan -> SrcSpanAnn' (EpAnn' ann)
 noAnnSrcSpanDP1 l = noAnnSrcSpanDP l (DP 0 1)
 
-noAnnSrcSpanDPn :: (Monoid ann) => SrcSpan -> Int -> SrcSpanAnn' (ApiAnn' ann)
+noAnnSrcSpanDPn :: (Monoid ann) => SrcSpan -> Int -> SrcSpanAnn' (EpAnn' ann)
 noAnnSrcSpanDPn l s = noAnnSrcSpanDP l (DP 0 s)
 
-d0 :: AnnAnchor
+d0 :: EpaAnchor
 d0 = AD $ DP 0 0
 
-d1 :: AnnAnchor
+d1 :: EpaAnchor
 d1 = AD $ DP 0 1
 
-dn :: Int -> AnnAnchor
+dn :: Int -> EpaAnchor
 dn n = AD $ DP 0 n
 
 m0 :: AnchorOperation
@@ -988,10 +976,10 @@ mn :: Int -> AnchorOperation
 mn n = MovedAnchor $ DP 0 n
 
 addComma :: SrcSpanAnnA -> SrcSpanAnnA
-addComma (SrcSpanAnn ApiAnnNotUsed l)
-  = (SrcSpanAnn (ApiAnn (spanAsAnchor l) (AnnListItem [AddCommaAnn d0]) noCom) l)
-addComma (SrcSpanAnn (ApiAnn anc (AnnListItem as) cs) l)
-  = (SrcSpanAnn (ApiAnn anc (AnnListItem (AddCommaAnn d0:as)) cs) l)
+addComma (SrcSpanAnn EpAnnNotUsed l)
+  = (SrcSpanAnn (EpAnn (spanAsAnchor l) (AnnListItem [AddCommaAnn d0]) noCom) l)
+addComma (SrcSpanAnn (EpAnn anc (AnnListItem as) cs) l)
+  = (SrcSpanAnn (EpAnn anc (AnnListItem (AddCommaAnn d0:as)) cs) l)
 
 -- ---------------------------------------------------------------------
 
@@ -1109,7 +1097,7 @@ instance HasDecls (LocatedA (Match GhcPs (LocatedA (HsExpr GhcPs)))) where
 
             -- only move the comment if the original where clause was empty.
             -- toMove <- balanceTrailingComments m m
-            -- insertCommentBefore (mkAnnKey m) toMove (matchApiAnn AnnWhere)
+            -- insertCommentBefore (mkAnnKey m) toMove (matchEpAnn AnnWhere)
             -- TODO: move trailing comments on the same line to before the binds
             logDataWithAnnsTr "Match.replaceDecls:balancing comments:m" m
             L l' m' <- balanceSameLineComments m
@@ -1132,8 +1120,8 @@ instance HasDecls (LocatedA (HsExpr GhcPs)) where
         let lastAnc = realSrcSpan $ spanHsLocaLBinds binds
         -- TODO: may be an intervening comment, take account for lastAnc
         let (x', ex',newDecls') = case x of
-              ApiAnnNotUsed -> (x, ex, newDecls)
-              (ApiAnn a (AnnsLet l i) cs) ->
+              EpAnnNotUsed -> (x, ex, newDecls)
+              (EpAnn a (AnnsLet l i) cs) ->
                 let
                   off = case l of
                           (AR r) -> LayoutStartCol $ snd $ ss2pos r
@@ -1143,7 +1131,7 @@ instance HasDecls (LocatedA (HsExpr GhcPs)) where
                   newDecls'' = case newDecls of
                     [] -> newDecls
                     (d:ds) -> setEntryDPDecl d (DP 0 0) : ds
-                in ( ApiAnn a (AnnsLet l (addAnnAnchorDelta off lastAnc i)) cs
+                in ( EpAnn a (AnnsLet l (addEpaAnchorDelta off lastAnc i)) cs
                    , ex''
                    , newDecls'')
         binds' <- replaceDeclsValbinds WithoutWhere binds newDecls'
@@ -1410,45 +1398,45 @@ replaceDeclsValbinds w (EmptyLocalBinds _) new
         return (HsValBinds an (ValBinds sortKey decs sigs))
 
 oldWhereAnnotation :: (Monad m)
-  => ApiAnn' AnnList -> WithWhere -> RealSrcSpan -> TransformT m (ApiAnn' AnnList)
-oldWhereAnnotation ApiAnnNotUsed ww _oldSpan = do
+  => EpAnn' AnnList -> WithWhere -> RealSrcSpan -> TransformT m (EpAnn' AnnList)
+oldWhereAnnotation EpAnnNotUsed ww _oldSpan = do
   newSpan <- uniqueSrcSpanT
   let w = case ww of
-        WithWhere -> [AddApiAnn AnnWhere (AD (DP 0 0))]
+        WithWhere -> [AddEpAnn AnnWhere (AD (DP 0 0))]
         WithoutWhere -> []
   let anc2' = Anchor (rs newSpan) (MovedAnchor (DP 0 1))
   (anc, anc2) <- do
           newSpan' <- uniqueSrcSpanT
           return ( Anchor (rs newSpan') (MovedAnchor (DP 1 2))
                  , anc2')
-  let an = ApiAnn anc
+  let an = EpAnn anc
                   (AnnList (Just anc2) Nothing Nothing w [])
                   noCom
   return an
-oldWhereAnnotation (ApiAnn anc an cs) ww _oldSpan = do
-  -- TODO: when we set DP (0,0) for the HsValBinds ApiAnnAnchor, change the AnnList anchor to have the correct DP too
+oldWhereAnnotation (EpAnn anc an cs) ww _oldSpan = do
+  -- TODO: when we set DP (0,0) for the HsValBinds EpEpaAnchor, change the AnnList anchor to have the correct DP too
   let (AnnList ancl o c _r t) = an
   let w = case ww of
-        WithWhere -> [AddApiAnn AnnWhere (AD (DP 0 0))]
+        WithWhere -> [AddEpAnn AnnWhere (AD (DP 0 0))]
         WithoutWhere -> []
   (anc', ancl') <- do
         case ww of
           WithWhere -> return (anc, ancl)
           WithoutWhere -> return (anc, ancl)
-  let an' = ApiAnn anc'
+  let an' = EpAnn anc'
                   (AnnList ancl' o c w t)
                   cs
   return an'
 
-newWhereAnnotation :: (Monad m) => WithWhere -> TransformT m (ApiAnn' AnnList)
+newWhereAnnotation :: (Monad m) => WithWhere -> TransformT m (EpAnn' AnnList)
 newWhereAnnotation ww = do
   newSpan <- uniqueSrcSpanT
   let anc  = Anchor (rs newSpan) (MovedAnchor (DP 1 2))
   let anc2 = Anchor (rs newSpan) (MovedAnchor (DP 1 4))
   let w = case ww of
-        WithWhere -> [AddApiAnn AnnWhere (AD (DP 0 0))]
+        WithWhere -> [AddEpAnn AnnWhere (AD (DP 0 0))]
         WithoutWhere -> []
-  let an = ApiAnn anc
+  let an = EpAnn anc
                   (AnnList (Just anc2) Nothing Nothing w [])
                   noCom
   return an

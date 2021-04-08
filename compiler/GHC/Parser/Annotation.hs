@@ -4,27 +4,27 @@
 {-# LANGUAGE FlexibleInstances #-}
 
 module GHC.Parser.Annotation (
-  -- * Core API Annotation types
+  -- * Core Exact Print Annotation types
   AnnKeywordId(..),
-  AnnotationComment(..), AnnotationCommentTok(..),
+  EpaComment(..), EpaCommentTok(..),
   IsUnicodeSyntax(..),
   unicodeAnn,
   HasE(..),
 
-  -- * In-tree Api Annotations
-  AddApiAnn(..),
-  AnnAnchor(..), annAnchorRealSrcSpan,
+  -- * In-tree Exact Print Annotations
+  AddEpAnn(..),
+  EpaAnchor(..), epaAnchorRealSrcSpan,
   DeltaPos(..),
 
-  ApiAnn, ApiAnn'(..), Anchor(..), AnchorOperation(..),
+  EpAnn, EpAnn'(..), Anchor(..), AnchorOperation(..),
   spanAsAnchor, realSpanAsAnchor,
   noAnn,
 
   -- ** Comments in Annotations
 
-  ApiAnnComments(..), LAnnotationComment, com, noCom,
+  EpAnnComments(..), LEpaComment, com, noCom,
   getFollowingComments, setFollowingComments, setPriorComments,
-  ApiAnnCO,
+  EpAnnCO,
 
   -- ** Annotations in 'GenLocated'
   LocatedA, LocatedL, LocatedC, LocatedN, LocatedAn, LocatedP,
@@ -37,7 +37,7 @@ module GHC.Parser.Annotation (
   AnnPragma(..),
   AnnContext(..),
   NameAnn(..), NameAdornment(..),
-  NoApiAnns(..),
+  NoEpAnns(..),
   AnnSortKey(..),
 
   -- ** Trailing annotations in lists
@@ -57,9 +57,9 @@ module GHC.Parser.Annotation (
 
   -- ** Querying annotations
   getLocAnn,
-  apiAnnAnns, apiAnnAnnsL,
-  annParen2AddApiAnn,
-  apiAnnComments,
+  epAnnAnns, epAnnAnnsL,
+  annParen2AddEpAnn,
+  epAnnComments,
 
   -- ** Working with locations of annotations
   sortLocatedA,
@@ -75,7 +75,7 @@ module GHC.Parser.Annotation (
 
   -- ** Working with comments in annotations
   noComments, comment, addCommentsToSrcAnn, setCommentsSrcAnn,
-  addCommentsToApiAnn, setCommentsApiAnn,
+  addCommentsToEpAnn, setCommentsEpAnn,
   transferComments,
 
   placeholderRealSpan,
@@ -95,7 +95,7 @@ import GHC.Utils.Outputable hiding ( (<>) )
 import GHC.Utils.Panic
 
 {-
-Note [Api annotations]
+Note [exact print annotations]
 ~~~~~~~~~~~~~~~~~~~~~~
 Given a parse tree of a Haskell module, how can we reconstruct
 the original Haskell source code, retaining all whitespace and
@@ -103,7 +103,7 @@ source code comments?  We need to track the locations of all
 elements from the original source: this includes keywords such as
 'let' / 'in' / 'do' etc as well as punctuation such as commas and
 braces, and also comments.  We collectively refer to this
-metadata as the "API annotations".
+metadata as the "exact print annotations".
 
 NON-COMMENT ELEMENTS
 
@@ -132,8 +132,8 @@ PARSER STATE
 There are three fields in PState (the parser state) which play a role
 with annotation comments.
 
->  comment_q :: [LAnnotationComment],
->  header_comments :: Maybe [LAnnotationComment],
+>  comment_q :: [LEpaComment],
+>  header_comments :: Maybe [LEpaComment],
 >  eof_pos :: Maybe (RealSrcSpan, RealSrcSpan), -- pos, gap to prior token
 
 The 'comment_q' field captures comments as they are seen in the token stream,
@@ -153,9 +153,9 @@ PARSER EMISSION OF ANNOTATIONS
 
 The parser interacts with the lexer using the functions
 
-> getCommentsFor      :: (MonadP m) => SrcSpan -> m ApiAnnComments
-> getPriorCommentsFor :: (MonadP m) => SrcSpan -> m ApiAnnComments
-> getFinalCommentsFor :: (MonadP m) => SrcSpan -> m ApiAnnComments
+> getCommentsFor      :: (MonadP m) => SrcSpan -> m EpAnnComments
+> getPriorCommentsFor :: (MonadP m) => SrcSpan -> m EpAnnComments
+> getFinalCommentsFor :: (MonadP m) => SrcSpan -> m EpAnnComments
 
 The 'getCommentsFor' function is the one used most often.  It takes
 the AST element SrcSpan and removes and returns any comments in the
@@ -181,10 +181,10 @@ https://gitlab.haskell.org/ghc/ghc/wikis/api-annotations
 
 -- --------------------------------------------------------------------
 
--- | API Annotations exist so that tools can perform source to source
--- conversions of Haskell code. They are used to keep track of the
--- various syntactic keywords that are not captured in the existing
--- AST.
+-- | Exact print annotations exist so that tools can perform source to
+-- source conversions of Haskell code. They are used to keep track of
+-- the various syntactic keywords that are not captured in the
+-- existing AST.
 --
 -- The annotations, together with original source comments are made available in
 -- the @'pm_parsed_source@ field of @'GHC.Driver.Env.HsParsedModule'@.
@@ -195,7 +195,7 @@ https://gitlab.haskell.org/ghc/ghc/wikis/api-annotations
 --
 -- Note: in general the names of these are taken from the
 -- corresponding token, unless otherwise noted
--- See note [Api annotations] above for details of the usage
+-- See note [exact print annotations] above for details of the usage
 data AnnKeywordId
     = AnnAnyclass
     | AnnAs
@@ -255,7 +255,10 @@ data AnnKeywordId
     | AnnNewtype
     | AnnName -- ^ where a name loses its location in the AST, this carries it
     | AnnOf
-    | AnnOpen    -- ^ '{-\# LANGUAGE' etc
+    | AnnOpen    -- ^ '{-\# DEPRECATED' etc. Opening of pragmas where
+                 -- the capitalisation of the string can be changed by
+                 -- the user. The actual text used is stored in a
+                 -- 'SourceText' on the relevant pragma item.
     | AnnOpenB   -- ^ '(|'
     | AnnOpenBU  -- ^ '(|', unicode variant
     | AnnOpenC   -- ^ '{'
@@ -309,29 +312,31 @@ instance Outputable AnnKeywordId where
 
 -- ---------------------------------------------------------------------
 
-data AnnotationComment = AnnComment { ac_tok :: AnnotationCommentTok
-                                    , ac_prior_tok :: RealSrcSpan
-                                    -- ^ The location of the prior
-                                    -- token, used for exact printing
-                                    }
+data EpaComment =
+  EpaComment
+    { ac_tok :: EpaCommentTok
+    , ac_prior_tok :: RealSrcSpan
+    -- ^ The location of the prior
+    -- token, used for exact printing
+    }
     deriving (Eq, Ord, Data, Show)
 
-data AnnotationCommentTok =
+data EpaCommentTok =
   -- Documentation annotations
-    AnnDocCommentNext  String     -- ^ something beginning '-- |'
-  | AnnDocCommentPrev  String     -- ^ something beginning '-- ^'
-  | AnnDocCommentNamed String     -- ^ something beginning '-- $'
-  | AnnDocSection      Int String -- ^ a section heading
-  | AnnDocOptions      String     -- ^ doc options (prune, ignore-exports, etc)
-  | AnnLineComment     String     -- ^ comment starting by "--"
-  | AnnBlockComment    String     -- ^ comment in {- -}
-  | AnnEofComment                 -- ^ empty comment, capturing
+    EpaDocCommentNext  String     -- ^ something beginning '-- |'
+  | EpaDocCommentPrev  String     -- ^ something beginning '-- ^'
+  | EpaDocCommentNamed String     -- ^ something beginning '-- $'
+  | EpaDocSection      Int String -- ^ a section heading
+  | EpaDocOptions      String     -- ^ doc options (prune, ignore-exports, etc)
+  | EpaLineComment     String     -- ^ comment starting by "--"
+  | EpaBlockComment    String     -- ^ comment in {- -}
+  | EpaEofComment                 -- ^ empty comment, capturing
                                   -- location of EOF
     deriving (Eq, Ord, Data, Show)
 -- Note: these are based on the Token versions, but the Token type is
 -- defined in GHC.Parser.Lexer and bringing it in here would create a loop
 
-instance Outputable AnnotationComment where
+instance Outputable EpaComment where
   ppr x = text (show x)
 
 -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
@@ -343,7 +348,7 @@ instance Outputable AnnotationComment where
 -- | Certain tokens can have alternate representations when unicode syntax is
 -- enabled. This flag is attached to those tokens in the lexer so that the
 -- original source representation can be reproduced in the corresponding
--- 'ApiAnnotation'
+-- 'EpAnnotation'
 data IsUnicodeSyntax = UnicodeSyntax | NormalSyntax
     deriving (Eq, Ord, Data, Show)
 
@@ -378,15 +383,15 @@ data HasE = HasE | NoE
 -- ---------------------------------------------------------------------
 
 -- | Captures an annotation, storing the @'AnnKeywordId'@ and its
--- location.  The parser only ever inserts @'AnnAnchor'@ fields with a
+-- location.  The parser only ever inserts @'EpaAnchor'@ fields with a
 -- RealSrcSpan being the original location of the annotation in the
 -- source file.
--- The @'AnnAnchor'@ can also store a delta position if the AST has been
+-- The @'EpaAnchor'@ can also store a delta position if the AST has been
 -- modified and needs to be pretty printed again.
--- The usual way an 'AddApiAnn' is created is using the 'mj' ("make
+-- The usual way an 'AddEpAnn' is created is using the 'mj' ("make
 -- jump") function, and then it can be inserted into the appropriate
 -- annotation.
-data AddApiAnn = AddApiAnn AnnKeywordId AnnAnchor deriving (Data,Show,Eq,Ord)
+data AddEpAnn = AddEpAnn AnnKeywordId EpaAnchor deriving (Data,Show,Eq,Ord)
 
 -- | The anchor for an @'AnnKeywordId'@. The Parser inserts the @'AR'@
 -- variant, giving the exact location of the original item in the
@@ -394,7 +399,7 @@ data AddApiAnn = AddApiAnn AnnKeywordId AnnAnchor deriving (Data,Show,Eq,Ord)
 -- provide a position for the item relative to the end of the previous
 -- item in the source.  This is useful when editing an AST prior to
 -- exact printing the changed one.
-data AnnAnchor = AR RealSrcSpan
+data EpaAnchor = AR RealSrcSpan
                | AD DeltaPos
                deriving (Data,Show,Eq,Ord)
 
@@ -411,16 +416,16 @@ data DeltaPos =
     } deriving (Show,Eq,Ord,Data)
 
 
-annAnchorRealSrcSpan :: AnnAnchor -> RealSrcSpan
-annAnchorRealSrcSpan (AR r) = r
-annAnchorRealSrcSpan (AD _) = placeholderRealSpan
+epaAnchorRealSrcSpan :: EpaAnchor -> RealSrcSpan
+epaAnchorRealSrcSpan (AR r) = r
+epaAnchorRealSrcSpan (AD _) = placeholderRealSpan
 
-instance Outputable AnnAnchor where
+instance Outputable EpaAnchor where
   ppr (AR r) = text "AR" <+> ppr r
   ppr (AD d) = text "AD" <+> ppr d
 
-instance Outputable AddApiAnn where
-  ppr (AddApiAnn kw ss) = text "AddApiAnn" <+> ppr kw <+> ppr ss
+instance Outputable AddEpAnn where
+  ppr (AddEpAnn kw ss) = text "AddEpAnn" <+> ppr kw <+> ppr ss
 
 -- ---------------------------------------------------------------------
 
@@ -473,29 +478,29 @@ See Note [XRec and Anno in the AST] for details of how this is done.
 -- specialised to the specific set of locations of original API
 -- Annotation elements.  So for 'HsLet' we have
 --
---    type instance XLet GhcPs = ApiAnn' AnnsLet
+--    type instance XLet GhcPs = EpAnn' AnnsLet
 --    data AnnsLet
 --      = AnnsLet {
---          alLet :: AnnAnchor,
---          alIn :: AnnAnchor
+--          alLet :: EpaAnchor,
+--          alIn :: EpaAnchor
 --          } deriving Data
 --
--- The spacing between the items under the scope of a given ApiAnn' is
+-- The spacing between the items under the scope of a given EpAnn' is
 -- derived from the original 'Anchor'.  But there is no requirement
 -- that the items included in the sub-element have a "matching"
 -- location in their relative anchors. This allows us to freely move
 -- elements around, and stitch together new AST fragments out of old
 -- ones, and have them still printed out in a reasonable way.
-data ApiAnn' ann
-  = ApiAnn { entry   :: Anchor
+data EpAnn' ann
+  = EpAnn { entry   :: Anchor
            -- ^ Base location for the start of the syntactic element
            -- holding the annotations.
            , anns     :: ann -- ^ Annotations added by the Parser
-           , comments :: ApiAnnComments
+           , comments :: EpAnnComments
               -- ^ Comments enclosed in the SrcSpan of the element
-              -- this `ApiAnn'` is attached to
+              -- this `EpAnn'` is attached to
            }
-  | ApiAnnNotUsed -- ^ No Annotation for generated code,
+  | EpAnnNotUsed -- ^ No Annotation for generated code,
                   -- e.g. from TH, deriving, etc.
         deriving (Data, Eq, Functor)
 
@@ -534,30 +539,30 @@ realSpanAsAnchor s  = Anchor s UnchangedAnchor
 -- them into the output stream.  But when editin the AST, to move
 -- fragments around, it is useful to be able to first separate the
 -- comments into those occuring before the AST element and those
--- following it.  The 'AnnCommentsBalanced' constructor is used to do
--- this. The GHC parser will only insert the 'AnnComments' form.
-data ApiAnnComments = AnnComments
-                        { priorComments :: ![LAnnotationComment] }
-                    | AnnCommentsBalanced
-                        { priorComments :: ![LAnnotationComment]
-                        , followingComments :: ![LAnnotationComment] }
+-- following it.  The 'EpaCommentsBalanced' constructor is used to do
+-- this. The GHC parser will only insert the 'EpaComments' form.
+data EpAnnComments = EpaComments
+                        { priorComments :: ![LEpaComment] }
+                    | EpaCommentsBalanced
+                        { priorComments :: ![LEpaComment]
+                        , followingComments :: ![LEpaComment] }
         deriving (Data, Eq)
 
-type LAnnotationComment = GenLocated Anchor AnnotationComment
+type LEpaComment = GenLocated Anchor EpaComment
 
-noCom :: ApiAnnComments
-noCom = AnnComments []
+noCom :: EpAnnComments
+noCom = EpaComments []
 
-com :: [LAnnotationComment] -> ApiAnnComments
-com cs = AnnComments cs
+com :: [LEpaComment] -> EpAnnComments
+com cs = EpaComments cs
 
 -- ---------------------------------------------------------------------
 
--- | This type is the most direct mapping of the previous API
--- Annotations model. It captures the containing `SrcSpan' in its
--- `entry` `Anchor`, has a list of `AddApiAnn` as before, and keeps
--- track of the comments associated with the anchor.
-type ApiAnn = ApiAnn' [AddApiAnn]
+-- | This type is the "vanilla" Exact Print Annotation.  It captures
+-- the containing `SrcSpan' in its `entry` `Anchor`, has a list of
+-- `AddEpAnn`, and keeps track of the comments associated with the
+-- anchor.
+type EpAnn = EpAnn' [AddEpAnn]
 
 -- ---------------------------------------------------------------------
 -- Annotations attached to a 'SrcSpan'.
@@ -570,8 +575,8 @@ data SrcSpanAnn' a = SrcSpanAnn { ann :: a, locA :: SrcSpan }
         deriving (Data, Eq)
 -- See Note [XRec and Anno in the AST]
 
--- | We mostly use 'SrcSpanAnn\'' with an 'ApiAnn\''
-type SrcAnn ann = SrcSpanAnn' (ApiAnn' ann)
+-- | We mostly use 'SrcSpanAnn\'' with an 'EpAnn\''
+type SrcAnn ann = SrcSpanAnn' (EpAnn' ann)
 -- AZ: is SrcAnn the right abbreviation here? Any better suggestions?
 
 -- AZ: should we rename LocatedA to LocatedL?  The name comes from
@@ -637,11 +642,11 @@ meaning we can have type LocatedN RdrName
 -- | Captures the location of punctuation occuring between items,
 -- normally in a list.  It is captured as a trailing annotation.
 data TrailingAnn
-  = AddSemiAnn AnnAnchor    -- ^ Trailing ';'
-  | AddCommaAnn AnnAnchor   -- ^ Trailing ','
-  | AddVbarAnn AnnAnchor    -- ^ Trailing '|'
-  | AddRarrowAnn AnnAnchor  -- ^ Trailing '->'
-  | AddRarrowAnnU AnnAnchor -- ^ Trailing '->', unicode variant
+  = AddSemiAnn EpaAnchor    -- ^ Trailing ';'
+  | AddCommaAnn EpaAnchor   -- ^ Trailing ','
+  | AddVbarAnn EpaAnchor    -- ^ Trailing '|'
+  | AddRarrowAnn EpaAnchor  -- ^ Trailing '->'
+  | AddRarrowAnnU EpaAnchor -- ^ Trailing '->', unicode variant
   deriving (Data,Show,Eq, Ord)
 
 instance Outputable TrailingAnn where
@@ -671,9 +676,9 @@ data AnnList
       -- TODO:AZ: should we distinguish AnnList variants for lists
       -- with layout and without?
       al_anchor    :: Maybe Anchor, -- ^ start point of a list having layout
-      al_open      :: Maybe AddApiAnn,
-      al_close     :: Maybe AddApiAnn,
-      al_rest      :: [AddApiAnn], -- ^ context, such as 'where' keyword
+      al_open      :: Maybe AddEpAnn,
+      al_close     :: Maybe AddEpAnn,
+      al_rest      :: [AddEpAnn], -- ^ context, such as 'where' keyword
       al_trailing  :: [TrailingAnn]
       } deriving (Data,Eq)
 
@@ -686,8 +691,8 @@ data AnnList
 data AnnParen
   = AnnParen {
       ap_adornment :: ParenType,
-      ap_open      :: AnnAnchor,
-      ap_close     :: AnnAnchor
+      ap_open      :: EpaAnchor,
+      ap_close     :: EpaAnchor
       } deriving (Data)
 
 -- | Detail of the "brackets" used in an 'AnnParen' API Annotation.
@@ -709,10 +714,10 @@ parenTypeKws AnnParensSquare = (AnnOpenS, AnnCloseS)
 -- | API Annotation for the 'Context' data type.
 data AnnContext
   = AnnContext {
-      ac_darrow    :: Maybe (IsUnicodeSyntax, AnnAnchor),
+      ac_darrow    :: Maybe (IsUnicodeSyntax, EpaAnchor),
                       -- ^ location and encoding of the '=>', if present.
-      ac_open      :: [AnnAnchor], -- ^ zero or more opening parentheses.
-      ac_close     :: [AnnAnchor]  -- ^ zero or more closing parentheses.
+      ac_open      :: [EpaAnchor], -- ^ zero or more opening parentheses.
+      ac_close     :: [EpaAnchor]  -- ^ zero or more closing parentheses.
       } deriving (Data)
 
 
@@ -727,40 +732,40 @@ data NameAnn
   -- | Used for a name with an adornment, so '`foo`', '(bar)'
   = NameAnn {
       nann_adornment :: NameAdornment,
-      nann_open      :: AnnAnchor,
-      nann_name      :: AnnAnchor,
-      nann_close     :: AnnAnchor,
+      nann_open      :: EpaAnchor,
+      nann_name      :: EpaAnchor,
+      nann_close     :: EpaAnchor,
       nann_trailing  :: [TrailingAnn]
       }
   -- | Used for @(,,,)@, or @(#,,,#)#
   | NameAnnCommas {
       nann_adornment :: NameAdornment,
-      nann_open      :: AnnAnchor,
-      nann_commas    :: [AnnAnchor],
-      nann_close     :: AnnAnchor,
+      nann_open      :: EpaAnchor,
+      nann_commas    :: [EpaAnchor],
+      nann_close     :: EpaAnchor,
       nann_trailing  :: [TrailingAnn]
       }
   -- | Used for @()@, @(##)@, @[]@
   | NameAnnOnly {
       nann_adornment :: NameAdornment,
-      nann_open      :: AnnAnchor,
-      nann_close     :: AnnAnchor,
+      nann_open      :: EpaAnchor,
+      nann_close     :: EpaAnchor,
       nann_trailing  :: [TrailingAnn]
       }
   -- | Used for @->@, as an identifier
   | NameAnnRArrow {
-      nann_name      :: AnnAnchor,
+      nann_name      :: EpaAnchor,
       nann_trailing  :: [TrailingAnn]
       }
   -- | Used for an item with a leading @'@. The annotation for
   -- unquoted item is stored in 'nann_quoted'.
   | NameAnnQuote {
-      nann_quote     :: AnnAnchor,
+      nann_quote     :: EpaAnchor,
       nann_quoted    :: SrcSpanAnnN,
       nann_trailing  :: [TrailingAnn]
       }
   -- | Used when adding a 'TrailingAnn' to an existing 'LocatedN'
-  -- which has no Api Annotation (via the 'ApiAnnNotUsed' constructor.
+  -- which has no Api Annotation (via the 'EpAnnNotUsed' constructor.
   | NameAnnTrailing {
       nann_trailing  :: [TrailingAnn]
       }
@@ -782,9 +787,9 @@ data NameAdornment
 -- pragmas.
 data AnnPragma
   = AnnPragma {
-      apr_open      :: AddApiAnn,
-      apr_close     :: AddApiAnn,
-      apr_rest      :: [AddApiAnn]
+      apr_open      :: AddEpAnn,
+      apr_close     :: AddEpAnn,
+      apr_rest      :: [AddEpAnn]
       } deriving (Data,Eq)
 
 -- ---------------------------------------------------------------------
@@ -805,10 +810,10 @@ data AnnSortKey
 
 -- | Helper function used in the parser to add a 'TrailingAnn' items
 -- to an existing annotation.
-addTrailingAnnToL :: SrcSpan -> TrailingAnn -> ApiAnnComments
-                  -> ApiAnn' AnnList -> ApiAnn' AnnList
-addTrailingAnnToL s t cs ApiAnnNotUsed
-  = ApiAnn (spanAsAnchor s) (AnnList (Just $ spanAsAnchor s) Nothing Nothing [] [t]) cs
+addTrailingAnnToL :: SrcSpan -> TrailingAnn -> EpAnnComments
+                  -> EpAnn' AnnList -> EpAnn' AnnList
+addTrailingAnnToL s t cs EpAnnNotUsed
+  = EpAnn (spanAsAnchor s) (AnnList (Just $ spanAsAnchor s) Nothing Nothing [] [t]) cs
 addTrailingAnnToL _ t cs n = n { anns = addTrailing (anns n)
                                , comments = comments n <> cs }
   where
@@ -816,10 +821,10 @@ addTrailingAnnToL _ t cs n = n { anns = addTrailing (anns n)
 
 -- | Helper function used in the parser to add a 'TrailingAnn' items
 -- to an existing annotation.
-addTrailingAnnToA :: SrcSpan -> TrailingAnn -> ApiAnnComments
-                  -> ApiAnn' AnnListItem -> ApiAnn' AnnListItem
-addTrailingAnnToA s t cs ApiAnnNotUsed
-  = ApiAnn (spanAsAnchor s) (AnnListItem [t]) cs
+addTrailingAnnToA :: SrcSpan -> TrailingAnn -> EpAnnComments
+                  -> EpAnn' AnnListItem -> EpAnn' AnnListItem
+addTrailingAnnToA s t cs EpAnnNotUsed
+  = EpAnn (spanAsAnchor s) (AnnListItem [t]) cs
 addTrailingAnnToA _ t cs n = n { anns = addTrailing (anns n)
                                , comments = comments n <> cs }
   where
@@ -827,12 +832,12 @@ addTrailingAnnToA _ t cs n = n { anns = addTrailing (anns n)
 
 -- | Helper function used in the parser to add a comma location to an
 -- existing annotation.
-addTrailingCommaToN :: SrcSpan -> ApiAnn' NameAnn -> AnnAnchor -> ApiAnn' NameAnn
-addTrailingCommaToN s ApiAnnNotUsed l
-  = ApiAnn (spanAsAnchor s) (NameAnnTrailing [AddCommaAnn l]) noCom
+addTrailingCommaToN :: SrcSpan -> EpAnn' NameAnn -> EpaAnchor -> EpAnn' NameAnn
+addTrailingCommaToN s EpAnnNotUsed l
+  = EpAnn (spanAsAnchor s) (NameAnnTrailing [AddCommaAnn l]) noCom
 addTrailingCommaToN _ n l = n { anns = addTrailing (anns n) l }
   where
-    addTrailing :: NameAnn -> AnnAnchor -> NameAnn
+    addTrailing :: NameAnn -> EpaAnchor -> NameAnn
     addTrailing n l = n { nann_trailing = AddCommaAnn l : nann_trailing n }
 
 -- ---------------------------------------------------------------------
@@ -867,7 +872,7 @@ reLoc :: LocatedAn a e -> Located e
 reLoc (L (SrcSpanAnn _ l) a) = L l a
 
 reLocA :: Located e -> LocatedAn ann e
-reLocA (L l a) = (L (SrcSpanAnn ApiAnnNotUsed l) a)
+reLocA (L l a) = (L (SrcSpanAnn EpAnnNotUsed l) a)
 
 reLocL :: LocatedN e -> LocatedA e
 reLocL (L l a) = (L (na2la l) a)
@@ -889,102 +894,102 @@ realSrcSpan _ = mkRealSrcSpan l l -- AZ temporary
 la2r :: SrcSpanAnn' a -> RealSrcSpan
 la2r l = realSrcSpan (locA l)
 
-extraToAnnList :: AnnList -> [AddApiAnn] -> AnnList
+extraToAnnList :: AnnList -> [AddEpAnn] -> AnnList
 extraToAnnList (AnnList a o c e t) as = AnnList a o c (e++as) t
 
-reAnn :: [TrailingAnn] -> ApiAnnComments -> Located a -> LocatedA a
-reAnn anns cs (L l a) = L (SrcSpanAnn (ApiAnn (spanAsAnchor l) (AnnListItem anns) cs) l) a
+reAnn :: [TrailingAnn] -> EpAnnComments -> Located a -> LocatedA a
+reAnn anns cs (L l a) = L (SrcSpanAnn (EpAnn (spanAsAnchor l) (AnnListItem anns) cs) l) a
 
-reAnnC :: AnnContext -> ApiAnnComments -> Located a -> LocatedC a
-reAnnC anns cs (L l a) = L (SrcSpanAnn (ApiAnn (spanAsAnchor l) anns cs) l) a
+reAnnC :: AnnContext -> EpAnnComments -> Located a -> LocatedC a
+reAnnC anns cs (L l a) = L (SrcSpanAnn (EpAnn (spanAsAnchor l) anns cs) l) a
 
-reAnnL :: ann -> ApiAnnComments -> Located e -> GenLocated (SrcAnn ann) e
-reAnnL anns cs (L l a) = L (SrcSpanAnn (ApiAnn (spanAsAnchor l) anns cs) l) a
+reAnnL :: ann -> EpAnnComments -> Located e -> GenLocated (SrcAnn ann) e
+reAnnL anns cs (L l a) = L (SrcSpanAnn (EpAnn (spanAsAnchor l) anns cs) l) a
 
 getLocAnn :: Located a  -> SrcSpanAnnA
-getLocAnn (L l _) = SrcSpanAnn ApiAnnNotUsed l
+getLocAnn (L l _) = SrcSpanAnn EpAnnNotUsed l
 
 
 getLocA :: GenLocated (SrcSpanAnn' a) e -> SrcSpan
 getLocA (L (SrcSpanAnn _ l) _) = l
 
 noLocA :: a -> LocatedAn an a
-noLocA = L (SrcSpanAnn ApiAnnNotUsed noSrcSpan)
+noLocA = L (SrcSpanAnn EpAnnNotUsed noSrcSpan)
 
 noAnnSrcSpan :: SrcSpan -> SrcAnn ann
-noAnnSrcSpan l = SrcSpanAnn ApiAnnNotUsed l
+noAnnSrcSpan l = SrcSpanAnn EpAnnNotUsed l
 
 noSrcSpanA :: SrcAnn ann
 noSrcSpanA = noAnnSrcSpan noSrcSpan
 
--- | Short form for 'ApiAnnNotUsed'
-noAnn :: ApiAnn' a
-noAnn = ApiAnnNotUsed
+-- | Short form for 'EpAnnNotUsed'
+noAnn :: EpAnn' a
+noAnn = EpAnnNotUsed
 
 
-addAnns :: ApiAnn -> [AddApiAnn] -> ApiAnnComments -> ApiAnn
-addAnns (ApiAnn l as1 cs) as2 cs2
-  = ApiAnn (widenAnchor l (as1 ++ as2)) (as1 ++ as2) (cs <> cs2)
-addAnns ApiAnnNotUsed [] (AnnComments []) = ApiAnnNotUsed
-addAnns ApiAnnNotUsed [] (AnnCommentsBalanced [] []) = ApiAnnNotUsed
-addAnns ApiAnnNotUsed as cs = ApiAnn (Anchor placeholderRealSpan UnchangedAnchor) as cs
+addAnns :: EpAnn -> [AddEpAnn] -> EpAnnComments -> EpAnn
+addAnns (EpAnn l as1 cs) as2 cs2
+  = EpAnn (widenAnchor l (as1 ++ as2)) (as1 ++ as2) (cs <> cs2)
+addAnns EpAnnNotUsed [] (EpaComments []) = EpAnnNotUsed
+addAnns EpAnnNotUsed [] (EpaCommentsBalanced [] []) = EpAnnNotUsed
+addAnns EpAnnNotUsed as cs = EpAnn (Anchor placeholderRealSpan UnchangedAnchor) as cs
 
 -- AZ:TODO use widenSpan here too
-addAnnsA :: SrcSpanAnnA -> [TrailingAnn] -> ApiAnnComments -> SrcSpanAnnA
-addAnnsA (SrcSpanAnn (ApiAnn l as1 cs) loc) as2 cs2
-  = SrcSpanAnn (ApiAnn l (AnnListItem (lann_trailing as1 ++ as2)) (cs <> cs2)) loc
-addAnnsA (SrcSpanAnn ApiAnnNotUsed loc) [] (AnnComments [])
-  = SrcSpanAnn ApiAnnNotUsed loc
-addAnnsA (SrcSpanAnn ApiAnnNotUsed loc) [] (AnnCommentsBalanced [] [])
-  = SrcSpanAnn ApiAnnNotUsed loc
-addAnnsA (SrcSpanAnn ApiAnnNotUsed loc) as cs
-  = SrcSpanAnn (ApiAnn (spanAsAnchor loc) (AnnListItem as) cs) loc
+addAnnsA :: SrcSpanAnnA -> [TrailingAnn] -> EpAnnComments -> SrcSpanAnnA
+addAnnsA (SrcSpanAnn (EpAnn l as1 cs) loc) as2 cs2
+  = SrcSpanAnn (EpAnn l (AnnListItem (lann_trailing as1 ++ as2)) (cs <> cs2)) loc
+addAnnsA (SrcSpanAnn EpAnnNotUsed loc) [] (EpaComments [])
+  = SrcSpanAnn EpAnnNotUsed loc
+addAnnsA (SrcSpanAnn EpAnnNotUsed loc) [] (EpaCommentsBalanced [] [])
+  = SrcSpanAnn EpAnnNotUsed loc
+addAnnsA (SrcSpanAnn EpAnnNotUsed loc) as cs
+  = SrcSpanAnn (EpAnn (spanAsAnchor loc) (AnnListItem as) cs) loc
 
 -- | The annotations need to all come after the anchor.  Make sure
 -- this is the case.
-widenSpan :: SrcSpan -> [AddApiAnn] -> SrcSpan
+widenSpan :: SrcSpan -> [AddEpAnn] -> SrcSpan
 widenSpan s as = foldl combineSrcSpans s (go as)
   where
     go [] = []
-    go (AddApiAnn _ (AR s):rest) = RealSrcSpan s Nothing : go rest
-    go (AddApiAnn _ (AD _):rest) = go rest
+    go (AddEpAnn _ (AR s):rest) = RealSrcSpan s Nothing : go rest
+    go (AddEpAnn _ (AD _):rest) = go rest
 
 -- | The annotations need to all come after the anchor.  Make sure
 -- this is the case.
-widenRealSpan :: RealSrcSpan -> [AddApiAnn] -> RealSrcSpan
+widenRealSpan :: RealSrcSpan -> [AddEpAnn] -> RealSrcSpan
 widenRealSpan s as = foldl combineRealSrcSpans s (go as)
   where
     go [] = []
-    go (AddApiAnn _ (AR s):rest) = s : go rest
-    go (AddApiAnn _ (AD _):rest) =     go rest
+    go (AddEpAnn _ (AR s):rest) = s : go rest
+    go (AddEpAnn _ (AD _):rest) =     go rest
 
-widenAnchor :: Anchor -> [AddApiAnn] -> Anchor
+widenAnchor :: Anchor -> [AddEpAnn] -> Anchor
 widenAnchor (Anchor s op) as = Anchor (widenRealSpan s as) op
 
 widenAnchorR :: Anchor -> RealSrcSpan -> Anchor
 widenAnchorR (Anchor s op) r = Anchor (combineRealSrcSpans s r) op
 
-widenLocatedAn :: SrcSpanAnn' an -> [AddApiAnn] -> SrcSpanAnn' an
+widenLocatedAn :: SrcSpanAnn' an -> [AddEpAnn] -> SrcSpanAnn' an
 widenLocatedAn (SrcSpanAnn a l) as = SrcSpanAnn a (widenSpan l as)
 
-apiAnnAnnsL :: ApiAnn' a -> [a]
-apiAnnAnnsL ApiAnnNotUsed = []
-apiAnnAnnsL (ApiAnn _ anns _) = [anns]
+epAnnAnnsL :: EpAnn' a -> [a]
+epAnnAnnsL EpAnnNotUsed = []
+epAnnAnnsL (EpAnn _ anns _) = [anns]
 
-apiAnnAnns :: ApiAnn -> [AddApiAnn]
-apiAnnAnns ApiAnnNotUsed = []
-apiAnnAnns (ApiAnn _ anns _) = anns
+epAnnAnns :: EpAnn -> [AddEpAnn]
+epAnnAnns EpAnnNotUsed = []
+epAnnAnns (EpAnn _ anns _) = anns
 
-annParen2AddApiAnn :: ApiAnn' AnnParen -> [AddApiAnn]
-annParen2AddApiAnn ApiAnnNotUsed = []
-annParen2AddApiAnn (ApiAnn _ (AnnParen pt o c) _)
-  = [AddApiAnn ai o, AddApiAnn ac c]
+annParen2AddEpAnn :: EpAnn' AnnParen -> [AddEpAnn]
+annParen2AddEpAnn EpAnnNotUsed = []
+annParen2AddEpAnn (EpAnn _ (AnnParen pt o c) _)
+  = [AddEpAnn ai o, AddEpAnn ac c]
   where
     (ai,ac) = parenTypeKws pt
 
-apiAnnComments :: ApiAnn' an -> ApiAnnComments
-apiAnnComments ApiAnnNotUsed = AnnComments []
-apiAnnComments (ApiAnn _ _ cs) = cs
+epAnnComments :: EpAnn' an -> EpAnnComments
+epAnnComments EpAnnNotUsed = EpaComments []
+epAnnComments (EpAnn _ _ cs) = cs
 
 -- ---------------------------------------------------------------------
 -- sortLocatedA :: [LocatedA a] -> [LocatedA a]
@@ -1011,85 +1016,85 @@ addCLocAA :: GenLocated (SrcSpanAnn' a1) e1 -> GenLocated (SrcSpanAnn' a2) e2 ->
 addCLocAA a b c = L (noAnnSrcSpan $ combineSrcSpans (locA $ getLoc a) (locA $ getLoc b)) c
 
 -- ---------------------------------------------------------------------
--- Utilities for manipulating ApiAnnComments
+-- Utilities for manipulating EpAnnComments
 -- ---------------------------------------------------------------------
 
-getFollowingComments :: ApiAnnComments -> [LAnnotationComment]
-getFollowingComments (AnnComments _) = []
-getFollowingComments (AnnCommentsBalanced _ cs) = cs
+getFollowingComments :: EpAnnComments -> [LEpaComment]
+getFollowingComments (EpaComments _) = []
+getFollowingComments (EpaCommentsBalanced _ cs) = cs
 
-setFollowingComments :: ApiAnnComments -> [LAnnotationComment] -> ApiAnnComments
-setFollowingComments (AnnComments ls) cs           = AnnCommentsBalanced ls cs
-setFollowingComments (AnnCommentsBalanced ls _) cs = AnnCommentsBalanced ls cs
+setFollowingComments :: EpAnnComments -> [LEpaComment] -> EpAnnComments
+setFollowingComments (EpaComments ls) cs           = EpaCommentsBalanced ls cs
+setFollowingComments (EpaCommentsBalanced ls _) cs = EpaCommentsBalanced ls cs
 
-setPriorComments :: ApiAnnComments -> [LAnnotationComment] -> ApiAnnComments
-setPriorComments (AnnComments _) cs            = AnnComments cs
-setPriorComments (AnnCommentsBalanced _ ts) cs = AnnCommentsBalanced cs ts
+setPriorComments :: EpAnnComments -> [LEpaComment] -> EpAnnComments
+setPriorComments (EpaComments _) cs            = EpaComments cs
+setPriorComments (EpaCommentsBalanced _ ts) cs = EpaCommentsBalanced cs ts
 
 -- ---------------------------------------------------------------------
 -- Comment-only annotations
 -- ---------------------------------------------------------------------
 
--- TODO:AZ I think ApiAnnCO is not needed
-type ApiAnnCO = ApiAnn' NoApiAnns -- ^ Api Annotations for comments only
+-- TODO:AZ I think EpAnnCO is not needed
+type EpAnnCO = EpAnn' NoEpAnns -- ^ Api Annotations for comments only
 
-data NoApiAnns = NoApiAnns
+data NoEpAnns = NoEpAnns
   deriving (Data,Eq,Ord)
 
-noComments ::ApiAnnCO
-noComments = ApiAnn (Anchor placeholderRealSpan UnchangedAnchor) NoApiAnns noCom
+noComments ::EpAnnCO
+noComments = EpAnn (Anchor placeholderRealSpan UnchangedAnchor) NoEpAnns noCom
 
 -- TODO:AZ get rid of this
 placeholderRealSpan :: RealSrcSpan
 placeholderRealSpan = realSrcLocSpan (mkRealSrcLoc (mkFastString "placeholder") (-1) (-1))
 
-comment :: RealSrcSpan -> ApiAnnComments -> ApiAnnCO
-comment loc cs = ApiAnn (Anchor loc UnchangedAnchor) NoApiAnns cs
+comment :: RealSrcSpan -> EpAnnComments -> EpAnnCO
+comment loc cs = EpAnn (Anchor loc UnchangedAnchor) NoEpAnns cs
 
 -- ---------------------------------------------------------------------
--- Utilities for managing comments in an `ApiAnn' a` structure.
+-- Utilities for managing comments in an `EpAnn' a` structure.
 -- ---------------------------------------------------------------------
 
 -- | Add additional comments to a 'SrcAnn', used for manipulating the
 -- AST prior to exact printing the changed one.
-addCommentsToSrcAnn :: (Monoid ann) => SrcAnn ann -> ApiAnnComments -> SrcAnn ann
-addCommentsToSrcAnn (SrcSpanAnn ApiAnnNotUsed loc) cs
-  = SrcSpanAnn (ApiAnn (Anchor (realSrcSpan loc) UnchangedAnchor) mempty cs) loc
-addCommentsToSrcAnn (SrcSpanAnn (ApiAnn a an cs) loc) cs'
-  = SrcSpanAnn (ApiAnn a an (cs <> cs')) loc
+addCommentsToSrcAnn :: (Monoid ann) => SrcAnn ann -> EpAnnComments -> SrcAnn ann
+addCommentsToSrcAnn (SrcSpanAnn EpAnnNotUsed loc) cs
+  = SrcSpanAnn (EpAnn (Anchor (realSrcSpan loc) UnchangedAnchor) mempty cs) loc
+addCommentsToSrcAnn (SrcSpanAnn (EpAnn a an cs) loc) cs'
+  = SrcSpanAnn (EpAnn a an (cs <> cs')) loc
 
 -- | Replace any existing comments on a 'SrcAnn', used for manipulating the
 -- AST prior to exact printing the changed one.
-setCommentsSrcAnn :: (Monoid ann) => SrcAnn ann -> ApiAnnComments -> SrcAnn ann
-setCommentsSrcAnn (SrcSpanAnn ApiAnnNotUsed loc) cs
-  = SrcSpanAnn (ApiAnn (Anchor (realSrcSpan loc) UnchangedAnchor) mempty cs) loc
-setCommentsSrcAnn (SrcSpanAnn (ApiAnn a an _) loc) cs
-  = SrcSpanAnn (ApiAnn a an cs) loc
+setCommentsSrcAnn :: (Monoid ann) => SrcAnn ann -> EpAnnComments -> SrcAnn ann
+setCommentsSrcAnn (SrcSpanAnn EpAnnNotUsed loc) cs
+  = SrcSpanAnn (EpAnn (Anchor (realSrcSpan loc) UnchangedAnchor) mempty cs) loc
+setCommentsSrcAnn (SrcSpanAnn (EpAnn a an _) loc) cs
+  = SrcSpanAnn (EpAnn a an cs) loc
 
 -- | Add additional comments, used for manipulating the
 -- AST prior to exact printing the changed one.
-addCommentsToApiAnn :: (Monoid a)
-  => SrcSpan -> ApiAnn' a -> ApiAnnComments -> ApiAnn' a
-addCommentsToApiAnn loc ApiAnnNotUsed cs
-  = ApiAnn (Anchor (realSrcSpan loc) UnchangedAnchor) mempty cs
-addCommentsToApiAnn _ (ApiAnn a an ocs) ncs = ApiAnn a an (ocs <> ncs)
+addCommentsToEpAnn :: (Monoid a)
+  => SrcSpan -> EpAnn' a -> EpAnnComments -> EpAnn' a
+addCommentsToEpAnn loc EpAnnNotUsed cs
+  = EpAnn (Anchor (realSrcSpan loc) UnchangedAnchor) mempty cs
+addCommentsToEpAnn _ (EpAnn a an ocs) ncs = EpAnn a an (ocs <> ncs)
 
 -- | Replace any existing comments, used for manipulating the
 -- AST prior to exact printing the changed one.
-setCommentsApiAnn :: (Monoid a)
-  => SrcSpan -> ApiAnn' a -> ApiAnnComments -> ApiAnn' a
-setCommentsApiAnn loc ApiAnnNotUsed cs
-  = ApiAnn (Anchor (realSrcSpan loc) UnchangedAnchor) mempty cs
-setCommentsApiAnn _ (ApiAnn a an _) cs = ApiAnn a an cs
+setCommentsEpAnn :: (Monoid a)
+  => SrcSpan -> EpAnn' a -> EpAnnComments -> EpAnn' a
+setCommentsEpAnn loc EpAnnNotUsed cs
+  = EpAnn (Anchor (realSrcSpan loc) UnchangedAnchor) mempty cs
+setCommentsEpAnn _ (EpAnn a an _) cs = EpAnn a an cs
 
 -- | Transfer comments from the annotations in one 'SrcAnn' to those
 -- in another.  The originals are not changed.  This is used when
 -- manipulating an AST prior to exact printing,
 transferComments :: (Monoid ann)
   => SrcAnn ann -> SrcAnn ann -> (SrcAnn ann,  SrcAnn ann)
-transferComments from@(SrcSpanAnn ApiAnnNotUsed _) to = (from, to)
-transferComments (SrcSpanAnn (ApiAnn a an cs) l) to
-  = ((SrcSpanAnn (ApiAnn a an noCom) l), addCommentsToSrcAnn to cs)
+transferComments from@(SrcSpanAnn EpAnnNotUsed _) to = (from, to)
+transferComments (SrcSpanAnn (EpAnn a an cs) l) to
+  = ((SrcSpanAnn (EpAnn a an noCom) l), addCommentsToSrcAnn to cs)
 
 -- ---------------------------------------------------------------------
 -- Semigroup instances, to allow easy combination of annotaion elements
@@ -1101,10 +1106,10 @@ instance (Semigroup an) => Semigroup (SrcSpanAnn' an) where
    -- annotations must follow it. So we combine them which yields the
    -- largest span
 
-instance (Semigroup a) => Semigroup (ApiAnn' a) where
-  ApiAnnNotUsed <> x = x
-  x <> ApiAnnNotUsed = x
-  (ApiAnn l1 a1 b1) <> (ApiAnn l2 a2 b2) = ApiAnn (l1 <> l2) (a1 <> a2) (b1 <> b2)
+instance (Semigroup a) => Semigroup (EpAnn' a) where
+  EpAnnNotUsed <> x = x
+  x <> EpAnnNotUsed = x
+  (EpAnn l1 a1 b1) <> (EpAnn l2 a2 b2) = EpAnn (l1 <> l2) (a1 <> a2) (b1 <> b2)
    -- The critical part about the anchor is its left edge, and all
    -- annotations must follow it. So we combine them which yields the
    -- largest span
@@ -1115,15 +1120,15 @@ instance Ord Anchor where
 instance Semigroup Anchor where
   Anchor r1 o1 <> Anchor r2 _ = Anchor (combineRealSrcSpans r1 r2) o1
 
-instance Semigroup ApiAnnComments where
-  AnnComments cs1 <> AnnComments cs2 = AnnComments (cs1 ++ cs2)
-  AnnComments cs1 <> AnnCommentsBalanced cs2 as2 = AnnCommentsBalanced (cs1 ++ cs2) as2
-  AnnCommentsBalanced cs1 as1 <> AnnComments cs2 = AnnCommentsBalanced (cs1 ++ cs2) as1
-  AnnCommentsBalanced cs1 as1 <> AnnCommentsBalanced cs2 as2 = AnnCommentsBalanced (cs1 ++ cs2) (as1++as2)
+instance Semigroup EpAnnComments where
+  EpaComments cs1 <> EpaComments cs2 = EpaComments (cs1 ++ cs2)
+  EpaComments cs1 <> EpaCommentsBalanced cs2 as2 = EpaCommentsBalanced (cs1 ++ cs2) as2
+  EpaCommentsBalanced cs1 as1 <> EpaComments cs2 = EpaCommentsBalanced (cs1 ++ cs2) as1
+  EpaCommentsBalanced cs1 as1 <> EpaCommentsBalanced cs2 as2 = EpaCommentsBalanced (cs1 ++ cs2) (as1++as2)
 
 
-instance (Monoid a) => Monoid (ApiAnn' a) where
-  mempty = ApiAnnNotUsed
+instance (Monoid a) => Monoid (EpAnn' a) where
+  mempty = EpAnnNotUsed
 
 instance Semigroup AnnListItem where
   (AnnListItem l1) <> (AnnListItem l2) = AnnListItem (l1 <> l2)
@@ -1159,9 +1164,9 @@ instance Semigroup AnnSortKey where
 instance Monoid AnnSortKey where
   mempty = NoAnnSortKey
 
-instance (Outputable a) => Outputable (ApiAnn' a) where
-  ppr (ApiAnn l a c)  = text "ApiAnn" <+> ppr l <+> ppr a <+> ppr c
-  ppr ApiAnnNotUsed = text "ApiAnnNotUsed"
+instance (Outputable a) => Outputable (EpAnn' a) where
+  ppr (EpAnn l a c)  = text "EpAnn" <+> ppr l <+> ppr a <+> ppr c
+  ppr EpAnnNotUsed = text "EpAnnNotUsed"
 
 instance Outputable Anchor where
   ppr (Anchor a o)        = text "Anchor" <+> ppr a <+> ppr o
@@ -1173,12 +1178,12 @@ instance Outputable AnchorOperation where
 instance Outputable DeltaPos where
   ppr (DP l c) = text "DP" <+> ppr l <+> ppr c
 
-instance Outputable (GenLocated Anchor AnnotationComment) where
+instance Outputable (GenLocated Anchor EpaComment) where
   ppr (L l c) = text "L" <+> ppr l <+> ppr c
 
-instance Outputable ApiAnnComments where
-  ppr (AnnComments cs) = text "AnnComments" <+> ppr cs
-  ppr (AnnCommentsBalanced cs ts) = text "AnnCommentsBalanced" <+> ppr cs <+> ppr ts
+instance Outputable EpAnnComments where
+  ppr (EpaComments cs) = text "EpaComments" <+> ppr cs
+  ppr (EpaCommentsBalanced cs ts) = text "EpaCommentsBalanced" <+> ppr cs <+> ppr ts
 
 instance (NamedThing (Located a)) => NamedThing (LocatedAn an a) where
   getName (L l a) = getName (L (locA l) a)

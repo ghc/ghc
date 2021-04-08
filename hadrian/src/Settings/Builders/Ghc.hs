@@ -34,6 +34,7 @@ compileAndLinkHs = (builder (Ghc CompileHs) ||^ builder (Ghc LinkHs)) ? do
     let hasVanilla = elem vanilla ways
         hasDynamic = elem dynamic ways
     mconcat [ arg "-Wall"
+            , arg "-Wcompat"
             , not useColor ? builder (Ghc CompileHs) ?
               -- N.B. Target.trackArgument ignores this argument from the
               -- input hash to avoid superfluous recompilation, avoiding

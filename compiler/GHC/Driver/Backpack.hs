@@ -418,7 +418,8 @@ addUnit :: GhcMonad m => UnitInfo -> m ()
 addUnit u = do
     hsc_env <- getSession
     logger <- getLogger
-    newdbs <- case hsc_unit_dbs hsc_env of
+    let old_unit_env = hsc_unit_env hsc_env
+    newdbs <- case ue_unit_dbs old_unit_env of
         Nothing  -> panic "addUnit: called too early"
         Just dbs ->
          let newdb = UnitDatabase
@@ -430,12 +431,14 @@ addUnit u = do
     let unit_env = UnitEnv
           { ue_platform  = targetPlatform (hsc_dflags hsc_env)
           , ue_namever   = ghcNameVersion (hsc_dflags hsc_env)
-          , ue_home_unit = home_unit
+          , ue_home_unit = Just home_unit
+          , ue_hpt       = ue_hpt old_unit_env
+          , ue_eps       = ue_eps old_unit_env
           , ue_units     = unit_state
+          , ue_unit_dbs  = Just dbs
           }
     setSession $ hsc_env
-        { hsc_unit_dbs = Just dbs
-        , hsc_unit_env = unit_env
+        { hsc_unit_env = unit_env
         }
 
 compileInclude :: Int -> (Int, Unit) -> BkpM ()
@@ -509,13 +512,13 @@ innerBkpM do_this =
 updateEpsGhc_ :: GhcMonad m => (ExternalPackageState -> ExternalPackageState) -> m ()
 updateEpsGhc_ f = do
     hsc_env <- getSession
-    liftIO $ atomicModifyIORef' (hsc_EPS hsc_env) (\x -> (f x, ()))
+    liftIO $ atomicModifyIORef' (euc_eps (ue_eps (hsc_unit_env hsc_env))) (\x -> (f x, ()))
 
 -- | Get the EPS from a 'GhcMonad'.
 getEpsGhc :: GhcMonad m => m ExternalPackageState
 getEpsGhc = do
     hsc_env <- getSession
-    liftIO $ readIORef (hsc_EPS hsc_env)
+    liftIO $ hscEPS hsc_env
 
 -- | Run 'BkpM' in 'Ghc'.
 initBkpM :: FilePath -> [LHsUnit HsComponentId] -> BkpM a -> Ghc a
@@ -800,7 +803,8 @@ summariseDecl _pn hsc_src lmodname@(L loc modname) Nothing
                          Nothing -- GHC API buffer support not supported
                          [] -- No exclusions
          case r of
-            Nothing -> throwOneError (mkPlainMsgEnvelope loc (text "module" <+> ppr modname <+> text "was not found"))
+            Nothing -> throwOneError (mkPlainMsgEnvelope ErrorWithoutFlag
+                                        loc (text "module" <+> ppr modname <+> text "was not found"))
             Just (Left err) -> throwErrors err
             Just (Right summary) -> return summary
 

@@ -5,6 +5,8 @@ module GHC.Driver.Env
    , HscEnv (..)
    , hsc_home_unit
    , hsc_units
+   , hsc_HPT
+   , hscUpdateHPT
    , runHsc
    , mkInteractiveHscEnv
    , runInteractiveHsc
@@ -85,10 +87,16 @@ runInteractiveHsc :: HscEnv -> Hsc a -> IO a
 runInteractiveHsc hsc_env = runHsc (mkInteractiveHscEnv hsc_env)
 
 hsc_home_unit :: HscEnv -> HomeUnit
-hsc_home_unit = ue_home_unit . hsc_unit_env
+hsc_home_unit = unsafeGetHomeUnit . hsc_unit_env
 
 hsc_units :: HscEnv -> UnitState
 hsc_units = ue_units . hsc_unit_env
+
+hsc_HPT :: HscEnv -> HomePackageTable
+hsc_HPT = ue_hpt . hsc_unit_env
+
+hscUpdateHPT :: (HomePackageTable -> HomePackageTable) -> HscEnv -> HscEnv
+hscUpdateHPT f hsc_env = hsc_env { hsc_unit_env = updateHpt f (hsc_unit_env hsc_env) }
 
 {-
 
@@ -162,7 +170,7 @@ configured via command-line flags (in `GHC.setSessionDynFlags`).
 
 -- | Retrieve the ExternalPackageState cache.
 hscEPS :: HscEnv -> IO ExternalPackageState
-hscEPS hsc_env = readIORef (hsc_EPS hsc_env)
+hscEPS hsc_env = readIORef (euc_eps (ue_eps (hsc_unit_env hsc_env)))
 
 hptCompleteSigs :: HscEnv -> [CompleteMatch]
 hptCompleteSigs = hptAllThings  (md_complete_matches . hm_details)
@@ -248,7 +256,7 @@ prepareAnnotations hsc_env mb_guts = do
 -- have to do that yourself, if desired
 lookupType :: HscEnv -> Name -> IO (Maybe TyThing)
 lookupType hsc_env name = do
-   eps <- liftIO $ readIORef (hsc_EPS hsc_env)
+   eps <- liftIO $ hscEPS hsc_env
    let pte = eps_PTE eps
        hpt = hsc_HPT hsc_env
 

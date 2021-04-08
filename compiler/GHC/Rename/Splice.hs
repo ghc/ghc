@@ -913,9 +913,9 @@ check_cross_stage_lifting top_lvl name ps_var
 
           -- Warning for implicit lift (#17804)
         ; whenWOptM Opt_WarnImplicitLift $
-            addWarnTc (Reason Opt_WarnImplicitLift)
-                       (text "The variable" <+> quotes (ppr name) <+>
-                        text "is implicitly lifted in the TH quotation")
+            addDiagnosticTc (WarningWithFlag Opt_WarnImplicitLift)
+                            (text "The variable" <+> quotes (ppr name) <+>
+                             text "is implicitly lifted in the TH quotation")
 
           -- Update the pending splices
         ; ps <- readMutVar ps_var

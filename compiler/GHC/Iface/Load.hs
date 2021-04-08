@@ -4,7 +4,7 @@
 
 -}
 
-{-# LANGUAGE CPP, BangPatterns, RecordWildCards, NondecreasingIndentation #-}
+{-# LANGUAGE CPP, BangPatterns, NondecreasingIndentation #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -26,7 +26,6 @@ module GHC.Iface.Load (
         loadInterface,
         loadSysInterface, loadUserInterface, loadPluginInterface,
         findAndReadIface, readIface, readIfaceSourceHash, writeIface,
-        initExternalPackageState,
         moduleFreeHolesPrecise,
         needWiredInHomeIface, loadWiredInHomeIface,
 
@@ -633,7 +632,7 @@ home-package modules however, so it's safe for the HPT to be empty.
 dontLeakTheHPT :: IfL a -> IfL a
 dontLeakTheHPT thing_inside = do
   let
-    cleanTopEnv HscEnv{..} =
+    cleanTopEnv hsc_env =
        let
          -- wrinkle: when we're typechecking in --backpack mode, the
          -- instantiation of a signature might reside in the HPT, so
@@ -644,14 +643,20 @@ dontLeakTheHPT thing_inside = do
          -- a bit of a hack, better suggestions welcome). A number of
          -- tests in testsuite/tests/backpack break without this
          -- tweak.
-         !hpt | backend hsc_dflags == NoBackend = hsc_HPT
-              | otherwise = emptyHomePackageTable
+         old_unit_env = hsc_unit_env hsc_env
+         !unit_env
+          | NoBackend <- backend (hsc_dflags hsc_env)
+          = old_unit_env
+          | otherwise
+          = old_unit_env
+             { ue_hpt = emptyHomePackageTable
+             }
        in
-       HscEnv {  hsc_targets      = panic "cleanTopEnv: hsc_targets"
-              ,  hsc_mod_graph    = panic "cleanTopEnv: hsc_mod_graph"
-              ,  hsc_IC           = panic "cleanTopEnv: hsc_IC"
-              ,  hsc_HPT          = hpt
-              , .. }
+       hsc_env {  hsc_targets      = panic "cleanTopEnv: hsc_targets"
+               ,  hsc_mod_graph    = panic "cleanTopEnv: hsc_mod_graph"
+               ,  hsc_IC           = panic "cleanTopEnv: hsc_IC"
+               ,  hsc_unit_env     = unit_env
+               }
 
   updTopEnv cleanTopEnv $ do
   !_ <- getTopEnv        -- force the updTopEnv
@@ -1014,33 +1019,6 @@ readIfaceSourceHash dflags name_cache wanted_mod file_path
 *********************************************************
 -}
 
-initExternalPackageState :: ExternalPackageState
-initExternalPackageState
-  = EPS {
-      eps_is_boot          = emptyUFM,
-      eps_PIT              = emptyPackageIfaceTable,
-      eps_free_holes       = emptyInstalledModuleEnv,
-      eps_PTE              = emptyTypeEnv,
-      eps_inst_env         = emptyInstEnv,
-      eps_fam_inst_env     = emptyFamInstEnv,
-      eps_rule_base        = mkRuleBase builtinRules,
-        -- Initialise the EPS rule pool with the built-in rules
-      eps_mod_fam_inst_env = emptyModuleEnv,
-      eps_complete_matches = [],
-      eps_ann_env          = emptyAnnEnv,
-      eps_stats = EpsStats { n_ifaces_in = 0, n_decls_in = 0, n_decls_out = 0
-                           , n_insts_in = 0, n_insts_out = 0
-                           , n_rules_in = length builtinRules, n_rules_out = 0 }
-    }
-
-{-
-*********************************************************
-*                                                       *
-        Wired-in interface for GHC.Prim
-*                                                       *
-*********************************************************
--}
-
 -- See Note [GHC.Prim] in primops.txt.pp.
 ghcPrimIface :: ModIface
 ghcPrimIface
@@ -1104,7 +1082,7 @@ For some background on this choice see trac #15269.
 showIface :: Logger -> DynFlags -> UnitState -> NameCache -> FilePath -> IO ()
 showIface logger dflags unit_state name_cache filename = do
    let profile = targetProfile dflags
-       printer = putLogMsg logger dflags NoReason SevOutput noSrcSpan . withPprStyle defaultDumpStyle
+       printer = putLogMsg logger dflags MCOutput noSrcSpan . withPprStyle defaultDumpStyle
 
    -- skip the hi way check; we don't want to worry about profiled vs.
    -- non-profiled interfaces, for example.
@@ -1117,7 +1095,7 @@ showIface logger dflags unit_state name_cache filename = do
        print_unqual = QueryQualify qualifyImportedNames
                                    neverQualifyModules
                                    neverQualifyPackages
-   putLogMsg logger dflags NoReason SevDump noSrcSpan
+   putLogMsg logger dflags MCDump noSrcSpan
       $ withPprStyle (mkDumpStyle print_unqual)
       $ pprModIface unit_state iface
 
@@ -1460,7 +1438,7 @@ cantFindErr using_cabal cannot_find _ unit_env profile tried_these mod_name find
   = ptext cannot_find <+> quotes (ppr mod_name)
     $$ more_info
   where
-    home_unit  = ue_home_unit unit_env
+    mhome_unit = ue_home_unit unit_env
     more_info
       = case find_result of
             NoPackage pkg
@@ -1470,7 +1448,13 @@ cantFindErr using_cabal cannot_find _ unit_env profile tried_these mod_name find
             NotFound { fr_paths = files, fr_pkg = mb_pkg
                      , fr_mods_hidden = mod_hiddens, fr_pkgs_hidden = pkg_hiddens
                      , fr_unusables = unusables, fr_suggestions = suggest }
-                | Just pkg <- mb_pkg, not (isHomeUnit home_unit pkg)
+                | Just pkg <- mb_pkg
+                , Nothing <- mhome_unit           -- no home-unit
+                -> not_found_in_package pkg files
+
+                | Just pkg <- mb_pkg
+                , Just home_unit <- mhome_unit    -- there is a home-unit but the
+                , not (isHomeUnit home_unit pkg)  -- module isn't from it
                 -> not_found_in_package pkg files
 
                 | not (null suggest)

@@ -51,7 +51,7 @@ type LImportDecl pass = XRec pass (ImportDecl pass)
         --
         --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnSemi'
 
-        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
+        -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
 type instance Anno (ImportDecl (GhcPass p)) = SrcSpanAnnA
 
 -- | If/how an import is 'qualified'.
@@ -64,9 +64,9 @@ data ImportDeclQualifiedStyle
 -- | Given two possible located 'qualified' tokens, compute a style
 -- (in a conforming Haskell program only one of the two can be not
 -- 'Nothing'). This is called from "GHC.Parser".
-importDeclQualifiedStyle :: Maybe AnnAnchor
-                         -> Maybe AnnAnchor
-                         -> (Maybe AnnAnchor, ImportDeclQualifiedStyle)
+importDeclQualifiedStyle :: Maybe EpaAnchor
+                         -> Maybe EpaAnchor
+                         -> (Maybe EpaAnchor, ImportDeclQualifiedStyle)
 importDeclQualifiedStyle mPre mPost =
   if isJust mPre then (mPre, QualifiedPre)
   else if isJust mPost then (mPost,QualifiedPost) else (Nothing, NotQualified)
@@ -111,9 +111,9 @@ data ImportDecl pass
      --    'GHC.Parser.Annotation.AnnClose' attached
      --     to location in ideclHiding
 
-     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
+     -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
 
-type instance XCImportDecl  GhcPs = ApiAnn' ApiAnnImportDecl
+type instance XCImportDecl  GhcPs = EpAnn' EpAnnImportDecl
 type instance XCImportDecl  GhcRn = NoExtField
 type instance XCImportDecl  GhcTc = NoExtField
 
@@ -126,13 +126,13 @@ type instance Anno [LocatedA (IE (GhcPass p))] = SrcSpanAnnL
 
 -- API Annotations types
 
-data ApiAnnImportDecl = ApiAnnImportDecl
-  { importDeclAnnImport    :: AnnAnchor
-  , importDeclAnnPragma    :: Maybe (AnnAnchor, AnnAnchor)
-  , importDeclAnnSafe      :: Maybe AnnAnchor
-  , importDeclAnnQualified :: Maybe AnnAnchor
-  , importDeclAnnPackage   :: Maybe AnnAnchor
-  , importDeclAnnAs        :: Maybe AnnAnchor
+data EpAnnImportDecl = EpAnnImportDecl
+  { importDeclAnnImport    :: EpaAnchor
+  , importDeclAnnPragma    :: Maybe (EpaAnchor, EpaAnchor)
+  , importDeclAnnSafe      :: Maybe EpaAnchor
+  , importDeclAnnQualified :: Maybe EpaAnchor
+  , importDeclAnnPackage   :: Maybe EpaAnchor
+  , importDeclAnnAs        :: Maybe EpaAnchor
   } deriving (Data)
 
 -- ---------------------------------------------------------------------
@@ -209,15 +209,15 @@ instance (OutputableBndrId p
 -- the original source.
 data IEWrappedName name
   = IEName              (LocatedN name)  -- ^ no extra
-  | IEPattern AnnAnchor (LocatedN name)  -- ^ pattern X
-  | IEType    AnnAnchor (LocatedN name)  -- ^ type (:+:)
+  | IEPattern EpaAnchor (LocatedN name)  -- ^ pattern X
+  | IEType    EpaAnchor (LocatedN name)  -- ^ type (:+:)
   deriving (Eq,Data)
 
 -- | Located name with possible adornment
 -- - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnType',
 --         'GHC.Parser.Annotation.AnnPattern'
 type LIEWrappedName name = LocatedA (IEWrappedName name)
--- For details on above see note [Api annotations] in GHC.Parser.Annotation
+-- For details on above see note [exact print annotations] in GHC.Parser.Annotation
 
 
 -- | Located Import or Export
@@ -226,7 +226,7 @@ type LIE pass = XRec pass (IE pass)
         --
         --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnComma'
 
-        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
+        -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
 type instance Anno (IE (GhcPass p)) = SrcSpanAnnA
 
 -- | Imported or exported entity.
@@ -241,7 +241,7 @@ data IE pass
         --  - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnPattern',
         --             'GHC.Parser.Annotation.AnnType','GHC.Parser.Annotation.AnnVal'
 
-        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
+        -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
         -- See Note [Located RdrNames] in GHC.Hs.Expr
   | IEThingAll  (XIEThingAll pass) (LIEWrappedName (IdP pass))
         -- ^ Imported or exported Thing with All imported or exported
@@ -252,7 +252,7 @@ data IE pass
         --       'GHC.Parser.Annotation.AnnDotdot','GHC.Parser.Annotation.AnnClose',
         --                                 'GHC.Parser.Annotation.AnnType'
 
-        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
+        -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
         -- See Note [Located RdrNames] in GHC.Hs.Expr
 
   | IEThingWith (XIEThingWith pass)
@@ -268,7 +268,7 @@ data IE pass
         --                                   'GHC.Parser.Annotation.AnnComma',
         --                                   'GHC.Parser.Annotation.AnnType'
 
-        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
+        -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
   | IEModuleContents  (XIEModuleContents pass) (XRec pass ModuleName)
         -- ^ Imported or exported module contents
         --
@@ -276,7 +276,7 @@ data IE pass
         --
         -- - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnModule'
 
-        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
+        -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
   | IEGroup             (XIEGroup pass) Int HsDocString -- ^ Doc section heading
   | IEDoc               (XIEDoc pass) HsDocString       -- ^ Some documentation
   | IEDocNamed          (XIEDocNamed pass) String    -- ^ Reference to named doc
@@ -286,15 +286,15 @@ type instance XIEVar             GhcPs = NoExtField
 type instance XIEVar             GhcRn = NoExtField
 type instance XIEVar             GhcTc = NoExtField
 
-type instance XIEThingAbs        (GhcPass _) = ApiAnn
-type instance XIEThingAll        (GhcPass _) = ApiAnn
+type instance XIEThingAbs        (GhcPass _) = EpAnn
+type instance XIEThingAll        (GhcPass _) = EpAnn
 
 -- See Note [IEThingWith]
-type instance XIEThingWith       (GhcPass 'Parsed)      = ApiAnn
+type instance XIEThingWith       (GhcPass 'Parsed)      = EpAnn
 type instance XIEThingWith       (GhcPass 'Renamed)     = [Located FieldLabel]
 type instance XIEThingWith       (GhcPass 'Typechecked) = NoExtField
 
-type instance XIEModuleContents  GhcPs = ApiAnn
+type instance XIEModuleContents  GhcPs = EpAnn
 type instance XIEModuleContents  GhcRn = NoExtField
 type instance XIEModuleContents  GhcTc = NoExtField
 

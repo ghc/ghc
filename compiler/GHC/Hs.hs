@@ -69,7 +69,7 @@ import Data.Data hiding ( Fixity )
 -- All we actually declare here is the top-level structure for a module.
 data HsModule
   = HsModule {
-      hsmodAnn :: ApiAnn' AnnsModule,
+      hsmodAnn :: EpAnn' AnnsModule,
       hsmodLayout :: LayoutInfo,
         -- ^ Layout info for the module.
         -- For incomplete modules (e.g. the output of parseHeader), it is NoLayoutInfo.
@@ -89,7 +89,7 @@ data HsModule
         --  - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnOpen'
         --                                   ,'GHC.Parser.Annotation.AnnClose'
 
-        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
+        -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
       hsmodImports :: [LImportDecl GhcPs],
         -- ^ We snaffle interesting stuff out of the imported interfaces early
         -- on, adding that info to TyDecls/etc; so this list is often empty,
@@ -103,14 +103,14 @@ data HsModule
         --                                   ,'GHC.Parser.Annotation.AnnClose'
         --
 
-        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
+        -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
       hsmodHaddockModHeader :: Maybe LHsDocString
         -- ^ Haddock module info and description, unparsed
         --
         --  - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnOpen'
         --                                   ,'GHC.Parser.Annotation.AnnClose'
 
-        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
+        -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
    }
      -- ^ 'GHC.Parser.Annotation.AnnKeywordId's
      --
@@ -120,13 +120,13 @@ data HsModule
      --    'GHC.Parser.Annotation.AnnClose' for explicit braces and semi around
      --    hsmodImports,hsmodDecls if this style is used.
 
-     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
+     -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
 
 deriving instance Data HsModule
 
 data AnnsModule
   = AnnsModule {
-    am_main :: [AddApiAnn],
+    am_main :: [AddEpAnn],
     am_decls :: AnnList
     } deriving (Data, Eq)
 

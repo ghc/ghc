@@ -34,7 +34,7 @@ import Distribution.Utils.Path (getSymbolicPath)
 import Control.Exception (bracket)
 import Control.Monad
 import Control.Applicative ((<|>))
-import Data.List
+import Data.List (nub, intercalate, isPrefixOf, isSuffixOf)
 import Data.Maybe
 import System.IO
 import System.Directory (setCurrentDirectory, getCurrentDirectory, doesFileExist)
@@ -385,7 +385,7 @@ generate directory distdir config_args
           transitiveDepLibNames
             | packageKeySupported comp = map fixupRtsLibName transitiveDeps
             | otherwise = transitiveDeps
-          fixupRtsLibName "rts-1.0" = "rts"
+          fixupRtsLibName x | "rts-" `isPrefixOf` x = "rts"
           fixupRtsLibName x = x
           transitiveDepNames = map (display . packageName) transitive_dep_ids
 

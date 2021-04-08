@@ -13,13 +13,13 @@
    [(TyClGroup
      (NoExtField)
      [(L
-       (SrcSpanAnn (ApiAnn
+       (SrcSpanAnn (EpAnn
                     (Anchor
                      { T14189.hs:6:1-42 }
                      (UnchangedAnchor))
                     (AnnListItem
                      [])
-                    (AnnComments
+                    (EpaComments
                      [])) { T14189.hs:6:1-42 })
        (DataDecl
         (DataDeclRn
@@ -27,32 +27,32 @@
          {NameSet:
           [{Name: GHC.Types.Int}]})
         (L
-         (SrcSpanAnn (ApiAnnNotUsed) { T14189.hs:6:6-11 })
+         (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:6:6-11 })
          {Name: T14189.MyType})
         (HsQTvs
          []
          [])
         (Prefix)
         (HsDataDefn
-         (ApiAnnNotUsed)
+         (EpAnnNotUsed)
          (DataType)
          (Nothing)
          (Nothing)
          (Nothing)
          [(L
-           (SrcSpanAnn (ApiAnn
+           (SrcSpanAnn (EpAnn
                         (Anchor
                          { T14189.hs:6:15-20 }
                          (UnchangedAnchor))
                         (AnnListItem
                          [(AddVbarAnn
                            (AR { T14189.hs:6:22 }))])
-                        (AnnComments
+                        (EpaComments
                          [])) { T14189.hs:6:15-20 })
            (ConDeclH98
-            (ApiAnnNotUsed)
+            (EpAnnNotUsed)
             (L
-             (SrcSpanAnn (ApiAnnNotUsed) { T14189.hs:6:15-16 })
+             (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:6:15-16 })
              {Name: T14189.MT})
             (False)
             []
@@ -64,28 +64,28 @@
                 (NormalSyntax)
                 (Nothing))
                (L
-                (SrcSpanAnn (ApiAnnNotUsed) { T14189.hs:6:18-20 })
+                (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:6:18-20 })
                 (HsTyVar
-                 (ApiAnnNotUsed)
+                 (EpAnnNotUsed)
                  (NotPromoted)
                  (L
-                  (SrcSpanAnn (ApiAnnNotUsed) { T14189.hs:6:18-20 })
+                  (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:6:18-20 })
                   {Name: GHC.Types.Int}))))])
             (Nothing)))
          ,(L
-           (SrcSpanAnn (ApiAnn
+           (SrcSpanAnn (EpAnn
                         (Anchor
                          { T14189.hs:6:24-25 }
                          (UnchangedAnchor))
                         (AnnListItem
                          [(AddVbarAnn
                            (AR { T14189.hs:6:27 }))])
-                        (AnnComments
+                        (EpaComments
                          [])) { T14189.hs:6:24-25 })
            (ConDeclH98
-            (ApiAnnNotUsed)
+            (EpAnnNotUsed)
             (L
-             (SrcSpanAnn (ApiAnnNotUsed) { T14189.hs:6:24-25 })
+             (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:6:24-25 })
              {Name: T14189.NT})
             (False)
             []
@@ -95,18 +95,18 @@
              [])
             (Nothing)))
          ,(L
-           (SrcSpanAnn (ApiAnnNotUsed) { T14189.hs:6:29-42 })
+           (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:6:29-42 })
            (ConDeclH98
-            (ApiAnnNotUsed)
+            (EpAnnNotUsed)
             (L
-             (SrcSpanAnn (ApiAnnNotUsed) { T14189.hs:6:29 })
+             (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:6:29 })
              {Name: T14189.F})
             (False)
             []
             (Nothing)
             (RecCon
              (L
-              (SrcSpanAnn (ApiAnn
+              (SrcSpanAnn (EpAnn
                            (Anchor
                             { T14189.hs:6:31 }
                             (UnchangedAnchor))
@@ -116,32 +116,32 @@
                               { T14189.hs:6:33-40 }
                               (UnchangedAnchor)))
                             (Just
-                             (AddApiAnn AnnOpenC (AR { T14189.hs:6:31 })))
+                             (AddEpAnn AnnOpenC (AR { T14189.hs:6:31 })))
                             (Just
-                             (AddApiAnn AnnCloseC (AR { T14189.hs:6:42 })))
+                             (AddEpAnn AnnCloseC (AR { T14189.hs:6:42 })))
                             []
                             [])
-                           (AnnComments
+                           (EpaComments
                             [])) { T14189.hs:6:31-42 })
               [(L
-                (SrcSpanAnn (ApiAnnNotUsed) { T14189.hs:6:33-40 })
+                (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:6:33-40 })
                 (ConDeclField
-                 (ApiAnnNotUsed)
+                 (EpAnnNotUsed)
                  [(L
                    { T14189.hs:6:33 }
                    (FieldOcc
                     {Name: T14189.f}
                     (L
-                     (SrcSpanAnn (ApiAnnNotUsed) { T14189.hs:6:33 })
+                     (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:6:33 })
                      (Unqual
                       {OccName: f}))))]
                  (L
-                  (SrcSpanAnn (ApiAnnNotUsed) { T14189.hs:6:38-40 })
+                  (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:6:38-40 })
                   (HsTyVar
-                   (ApiAnnNotUsed)
+                   (EpAnnNotUsed)
                    (NotPromoted)
                    (L
-                    (SrcSpanAnn (ApiAnnNotUsed) { T14189.hs:6:38-40 })
+                    (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:6:38-40 })
                     {Name: GHC.Types.Int})))
                  (Nothing)))]))
             (Nothing)))]
@@ -158,7 +158,7 @@
    []
    [])
   [(L
-    (SrcSpanAnn (ApiAnnNotUsed) { T14189.hs:1:8-13 })
+    (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:1:8-13 })
     (ImportDecl
      (NoExtField)
      (NoSourceText)
@@ -175,7 +175,7 @@
   (Just
    [((,)
      (L
-      (SrcSpanAnn (ApiAnnNotUsed) { T14189.hs:3:3-15 })
+      (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:3:3-15 })
       (IEThingWith
        [(L
          { T14189.hs:3:11 }
@@ -185,17 +185,17 @@
           (FieldSelectors)
           {Name: T14189.f}))]
        (L
-        (SrcSpanAnn (ApiAnnNotUsed) { T14189.hs:3:3-8 })
+        (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:3:3-8 })
         (IEName
          (L
-          (SrcSpanAnn (ApiAnnNotUsed) { T14189.hs:3:3-8 })
+          (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:3:3-8 })
           {Name: T14189.MyType})))
        (NoIEWildcard)
        [(L
-         (SrcSpanAnn (ApiAnnNotUsed) { T14189.hs:3:13-14 })
+         (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:3:13-14 })
          (IEName
           (L
-           (SrcSpanAnn (ApiAnnNotUsed) { T14189.hs:3:13-14 })
+           (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:3:13-14 })
            {Name: T14189.NT})))]))
      [(AvailTC
        {Name: T14189.MyType}

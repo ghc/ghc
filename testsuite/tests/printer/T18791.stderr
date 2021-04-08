@@ -4,27 +4,27 @@
 (L
  { T18791.hs:1:1 }
  (HsModule
-  (ApiAnn
+  (EpAnn
    (Anchor
     { T18791.hs:1:1 }
     (UnchangedAnchor))
    (AnnsModule
-    [(AddApiAnn AnnModule (AR { T18791.hs:2:1-6 }))
-    ,(AddApiAnn AnnWhere (AR { T18791.hs:2:15-19 }))]
+    [(AddEpAnn AnnModule (AR { T18791.hs:2:1-6 }))
+    ,(AddEpAnn AnnWhere (AR { T18791.hs:2:15-19 }))]
     (AnnList
      (Nothing)
      (Nothing)
      (Nothing)
      []
      []))
-   (AnnCommentsBalanced
+   (EpaCommentsBalanced
     []
     [(L
       (Anchor
        { T18791.hs:6:1 }
        (UnchangedAnchor))
-      (AnnComment
-       (AnnEofComment)
+      (EpaComment
+       (EpaEofComment)
        { T18791.hs:6:1 }))]))
   (VirtualBraces
    (1))
@@ -35,27 +35,27 @@
   (Nothing)
   []
   [(L
-    (SrcSpanAnn (ApiAnn
+    (SrcSpanAnn (EpAnn
                  (Anchor
                   { T18791.hs:(4,1)-(5,17) }
                   (UnchangedAnchor))
                  (AnnListItem
                   [])
-                 (AnnComments
+                 (EpaComments
                   [])) { T18791.hs:(4,1)-(5,17) })
     (TyClD
      (NoExtField)
      (DataDecl
-      (ApiAnn
+      (EpAnn
        (Anchor
         { T18791.hs:(4,1)-(5,17) }
         (UnchangedAnchor))
-       [(AddApiAnn AnnData (AR { T18791.hs:4:1-4 }))
-       ,(AddApiAnn AnnWhere (AR { T18791.hs:4:8-12 }))]
-       (AnnComments
+       [(AddEpAnn AnnData (AR { T18791.hs:4:1-4 }))
+       ,(AddEpAnn AnnWhere (AR { T18791.hs:4:8-12 }))]
+       (EpaComments
         []))
       (L
-       (SrcSpanAnn (ApiAnnNotUsed) { T18791.hs:4:6 })
+       (SrcSpanAnn (EpAnnNotUsed) { T18791.hs:4:6 })
        (Unqual
         {OccName: T}))
       (HsQTvs
@@ -63,34 +63,34 @@
        [])
       (Prefix)
       (HsDataDefn
-       (ApiAnn
+       (EpAnn
         (Anchor
          { T18791.hs:(4,1)-(5,17) }
          (UnchangedAnchor))
-        [(AddApiAnn AnnData (AR { T18791.hs:4:1-4 }))
-        ,(AddApiAnn AnnWhere (AR { T18791.hs:4:8-12 }))]
-        (AnnComments
+        [(AddEpAnn AnnData (AR { T18791.hs:4:1-4 }))
+        ,(AddEpAnn AnnWhere (AR { T18791.hs:4:8-12 }))]
+        (EpaComments
          []))
        (DataType)
        (Nothing)
        (Nothing)
        (Nothing)
        [(L
-         (SrcSpanAnn (ApiAnnNotUsed) { T18791.hs:5:3-17 })
+         (SrcSpanAnn (EpAnnNotUsed) { T18791.hs:5:3-17 })
          (ConDeclGADT
-          (ApiAnn
+          (EpAnn
            (Anchor
             { T18791.hs:5:3-17 }
             (UnchangedAnchor))
-           [(AddApiAnn AnnDcolon (AR { T18791.hs:5:7-8 }))]
-           (AnnComments
+           [(AddEpAnn AnnDcolon (AR { T18791.hs:5:7-8 }))]
+           (EpaComments
             []))
           [(L
-            (SrcSpanAnn (ApiAnnNotUsed) { T18791.hs:5:3-5 })
+            (SrcSpanAnn (EpAnnNotUsed) { T18791.hs:5:3-5 })
             (Unqual
              {OccName: MkT}))]
           (L
-           (SrcSpanAnn (ApiAnnNotUsed) { T18791.hs:5:10-17 })
+           (SrcSpanAnn (EpAnnNotUsed) { T18791.hs:5:10-17 })
            (HsOuterImplicit
             (NoExtField)))
           (Nothing)
@@ -99,41 +99,41 @@
              (HsUnrestrictedArrow
               (NormalSyntax))
              (L
-              (SrcSpanAnn (ApiAnn
+              (SrcSpanAnn (EpAnn
                            (Anchor
                             { T18791.hs:5:10-12 }
                             (UnchangedAnchor))
                            (AnnListItem
                             [(AddRarrowAnn
                               (AR { T18791.hs:5:14-15 }))])
-                           (AnnComments
+                           (EpaComments
                             [])) { T18791.hs:5:10-12 })
               (HsTyVar
-               (ApiAnn
+               (EpAnn
                 (Anchor
                  { T18791.hs:5:10-12 }
                  (UnchangedAnchor))
                 []
-                (AnnComments
+                (EpaComments
                  []))
                (NotPromoted)
                (L
-                (SrcSpanAnn (ApiAnnNotUsed) { T18791.hs:5:10-12 })
+                (SrcSpanAnn (EpAnnNotUsed) { T18791.hs:5:10-12 })
                 (Unqual
                  {OccName: Int})))))])
           (L
-           (SrcSpanAnn (ApiAnnNotUsed) { T18791.hs:5:17 })
+           (SrcSpanAnn (EpAnnNotUsed) { T18791.hs:5:17 })
            (HsTyVar
-            (ApiAnn
+            (EpAnn
              (Anchor
               { T18791.hs:5:17 }
               (UnchangedAnchor))
              []
-             (AnnComments
+             (EpaComments
               []))
             (NotPromoted)
             (L
-             (SrcSpanAnn (ApiAnnNotUsed) { T18791.hs:5:17 })
+             (SrcSpanAnn (EpAnnNotUsed) { T18791.hs:5:17 })
              (Unqual
               {OccName: T}))))
           (Nothing)))]

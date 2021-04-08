@@ -241,7 +241,7 @@ instance Outputable Header where
 --        'GHC.Parser.Annotation.AnnHeader','GHC.Parser.Annotation.AnnVal',
 --        'GHC.Parser.Annotation.AnnClose' @'\#-}'@,
 
--- For details on above see note [Api annotations] in "GHC.Parser.Annotation"
+-- For details on above see note [exact print annotations] in "GHC.Parser.Annotation"
 data CType = CType SourceText -- Note [Pragma source text] in GHC.Types.SourceText
                    (Maybe Header) -- header to include for this type
                    (SourceText,FastString) -- the type itself

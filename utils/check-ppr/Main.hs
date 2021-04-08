@@ -42,7 +42,7 @@ testOneFile libdir fileName = do
        p <- parseOneFile libdir fileName
        let
          origAst = showPprUnsafe
-                     $ showAstData BlankSrcSpan BlankApiAnnotations
+                     $ showAstData BlankSrcSpan BlankEpAnnotations
                      $ eraseLayoutInfo (pm_parsed_source p)
          pped    = pragmas ++ "\n" ++ pp (pm_parsed_source p)
          pragmas = getPragmas (pm_parsed_source p)
@@ -58,7 +58,7 @@ testOneFile libdir fileName = do
 
        let newAstStr :: String
            newAstStr = showPprUnsafe
-                         $ showAstData BlankSrcSpan BlankApiAnnotations
+                         $ showAstData BlankSrcSpan BlankEpAnnotations
                          $ eraseLayoutInfo (pm_parsed_source p')
        writeBinFile newAstFile newAstStr
 
@@ -101,12 +101,12 @@ parseOneFile libdir fileName = do
 getPragmas :: Located HsModule -> String
 getPragmas (L _ (HsModule { hsmodAnn = anns'})) = pragmaStr
   where
-    tokComment (L _ (AnnComment (AnnBlockComment s) _)) = s
-    tokComment (L _ (AnnComment (AnnLineComment  s) _)) = s
+    tokComment (L _ (EpaComment (EpaBlockComment s) _)) = s
+    tokComment (L _ (EpaComment (EpaLineComment  s) _)) = s
     tokComment _ = ""
 
     cmp (L l1 _) (L l2 _) = compare (anchor l1) (anchor l2)
-    comments' = map tokComment $ sortBy cmp $ priorComments $ apiAnnComments anns'
+    comments' = map tokComment $ sortBy cmp $ priorComments $ epAnnComments anns'
     pragmas = filter (\c -> isPrefixOf "{-#" c ) comments'
     pragmaStr = intercalate "\n" pragmas
 

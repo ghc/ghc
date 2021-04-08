@@ -21,7 +21,7 @@
 
 module GHC.Hs.Pat (
         Pat(..), LPat,
-        ApiAnnSumPat(..),
+        EpAnnSumPat(..),
         ConPatTc (..),
         CoPat (..),
         ListPatTc(..),
@@ -95,55 +95,55 @@ type instance XWildPat GhcTc = Type
 
 type instance XVarPat  (GhcPass _) = NoExtField
 
-type instance XLazyPat GhcPs = ApiAnn -- For '~'
+type instance XLazyPat GhcPs = EpAnn -- For '~'
 type instance XLazyPat GhcRn = NoExtField
 type instance XLazyPat GhcTc = NoExtField
 
-type instance XAsPat   GhcPs = ApiAnn -- For '@'
+type instance XAsPat   GhcPs = EpAnn -- For '@'
 type instance XAsPat   GhcRn = NoExtField
 type instance XAsPat   GhcTc = NoExtField
 
-type instance XParPat  (GhcPass _) = ApiAnn' AnnParen
+type instance XParPat  (GhcPass _) = EpAnn' AnnParen
 
-type instance XBangPat GhcPs = ApiAnn -- For '!'
+type instance XBangPat GhcPs = EpAnn -- For '!'
 type instance XBangPat GhcRn = NoExtField
 type instance XBangPat GhcTc = NoExtField
 
 -- Note: XListPat cannot be extended when using GHC 8.0.2 as the bootstrap
 -- compiler, as it triggers https://gitlab.haskell.org/ghc/ghc/issues/14396 for
 -- `SyntaxExpr`
-type instance XListPat GhcPs = ApiAnn' AnnList
+type instance XListPat GhcPs = EpAnn' AnnList
 type instance XListPat GhcRn = Maybe (SyntaxExpr GhcRn)
 type instance XListPat GhcTc = ListPatTc
 
-type instance XTuplePat GhcPs = ApiAnn
+type instance XTuplePat GhcPs = EpAnn
 type instance XTuplePat GhcRn = NoExtField
 type instance XTuplePat GhcTc = [Type]
 
-type instance XSumPat GhcPs = ApiAnn' ApiAnnSumPat
+type instance XSumPat GhcPs = EpAnn' EpAnnSumPat
 type instance XSumPat GhcRn = NoExtField
 type instance XSumPat GhcTc = [Type]
 
-type instance XConPat GhcPs = ApiAnn
+type instance XConPat GhcPs = EpAnn
 type instance XConPat GhcRn = NoExtField
 type instance XConPat GhcTc = ConPatTc
 
-type instance XViewPat GhcPs = ApiAnn
+type instance XViewPat GhcPs = EpAnn
 type instance XViewPat GhcRn = NoExtField
 type instance XViewPat GhcTc = Type
 
 type instance XSplicePat (GhcPass _) = NoExtField
 type instance XLitPat    (GhcPass _) = NoExtField
 
-type instance XNPat GhcPs = ApiAnn
-type instance XNPat GhcRn = ApiAnn
+type instance XNPat GhcPs = EpAnn
+type instance XNPat GhcRn = EpAnn
 type instance XNPat GhcTc = Type
 
-type instance XNPlusKPat GhcPs = ApiAnn
+type instance XNPlusKPat GhcPs = EpAnn
 type instance XNPlusKPat GhcRn = NoExtField
 type instance XNPlusKPat GhcTc = Type
 
-type instance XSigPat GhcPs = ApiAnn
+type instance XSigPat GhcPs = EpAnn
 type instance XSigPat GhcRn = NoExtField
 type instance XSigPat GhcTc = Type
 
@@ -156,16 +156,16 @@ type instance ConLikeP GhcPs = RdrName -- IdP GhcPs
 type instance ConLikeP GhcRn = Name    -- IdP GhcRn
 type instance ConLikeP GhcTc = ConLike
 
-type instance XHsRecField _ = ApiAnn
+type instance XHsRecField _ = EpAnn
 
 -- ---------------------------------------------------------------------
 
 -- API Annotations types
 
-data ApiAnnSumPat = ApiAnnSumPat
-      { sumPatParens      :: [AddApiAnn]
-      , sumPatVbarsBefore :: [AnnAnchor]
-      , sumPatVbarsAfter  :: [AnnAnchor]
+data EpAnnSumPat = EpAnnSumPat
+      { sumPatParens      :: [AddEpAnn]
+      , sumPatVbarsBefore :: [EpaAnchor]
+      , sumPatVbarsAfter  :: [EpaAnchor]
       } deriving Data
 
 -- ---------------------------------------------------------------------

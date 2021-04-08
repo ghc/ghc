@@ -11,7 +11,7 @@ Let-generalisation
 
     Infer less polymorphic types for local bindings by default.
 
-An ML-style language usually generalises the type of any let-bound or where-bound variable, so that it is as polymorphic as possible. With the extension :extension:`MonoLocalBinds` GHC implements a slightly more conservative policy, for reasons descibed in Section 4.2 of `"OutsideIn(X): Modular type inference with local assumptions”<https://www.microsoft.com/en-us/research/publication/outsideinx-modular-type-inference-with-local-assumptions/>`__,
+An ML-style language usually generalises the type of any let-bound or where-bound variable, so that it is as polymorphic as possible. With the extension :extension:`MonoLocalBinds` GHC implements a slightly more conservative policy, for reasons descibed in Section 4.2 of `OutsideIn(X): Modular type inference with local assumptions <https://www.microsoft.com/en-us/research/publication/outsideinx-modular-type-inference-with-local-assumptions/>`__,
 and a `related blog post
 <https://www.haskell.org/ghc/blog/20100930-LetGeneralisationInGhc7.html>`__.
 
