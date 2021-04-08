@@ -1162,6 +1162,18 @@ Note [exprIsDupable]
 -}
 
 exprIsDupable :: Platform -> CoreExpr -> Bool
+exprIsDupable platform e = go e
+  where
+    go (Type {})     = True
+    go (Coercion {}) = True
+    go (Var {})      = True
+    go (Tick _ e)    = go e
+    go (Cast e _)    = go e
+    go (App f a)     = exprIsTrivial a && go f
+    go (Lit lit)     = litIsDupable platform lit
+    go _ = False
+
+{-
 exprIsDupable platform e
   = isJust (go dupAppSize e)
   where
@@ -1184,7 +1196,7 @@ dupAppSize = 8   -- Size of term we are prepared to duplicate
                  -- This is *just* big enough to make test MethSharing
                  -- inline enough join points.  Really it should be
                  -- smaller, and could be if we fixed #4960.
-
+-}
 {-
 ************************************************************************
 *                                                                      *
