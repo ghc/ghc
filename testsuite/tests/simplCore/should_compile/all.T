@@ -354,3 +354,7 @@ test('T19581', [ grep_errmsg(r'case') ], compile, ['-O -ddump-simpl -dsuppress-u
 
 test('T19599', normal, compile, ['-O -ddump-rules'])
 test('T19599a', normal, compile, ['-O -ddump-rules'])
+
+# Look for a specialisation rule for wimwam
+test('T19672', normal, compile, ['-O2 -ddump-rules'])
+
