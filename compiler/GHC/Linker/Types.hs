@@ -96,7 +96,9 @@ type ClosureEnv = NameEnv (Name, ForeignHValue)
 data Linkable = LM {
   linkableTime     :: UTCTime,          -- ^ Time at which this linkable was built
                                         -- (i.e. when the bytecodes were produced,
-                                        --       or the mod date on the files)
+                                        --       or the mod date on the file)
+  linkableHash     :: Fingerprint,      -- ^ The hash of the source file which
+                                        -- this linkable was built from
   linkableModule   :: Module,           -- ^ The linkable module itself
   linkableUnlinked :: [Unlinked]
     -- ^ Those files and chunks of code we have yet to link.
@@ -109,8 +111,11 @@ data Linkable = LM {
  }
 
 instance Outputable Linkable where
-  ppr (LM when_made mod unlinkeds)
-     = (text "LinkableM" <+> parens (text (show when_made)) <+> ppr mod)
+  ppr (LM when_made src_hash mod unlinkeds)
+     = (text "LinkableM"
+        <+> parens (text (show when_made))
+        <+> ppr src_hash
+        <+> ppr mod)
        $$ nest 3 (ppr unlinkeds)
 
 -- | Objects which have yet to be linked by the compiler
