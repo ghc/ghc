@@ -216,6 +216,8 @@ addListToUDFM_Directly_C f = foldl' (\m (k, v) -> addToUDFM_C_Directly f m k v)
 delFromUDFM :: Uniquable key => UniqDFM key elt -> key -> UniqDFM key elt
 delFromUDFM (UDFM m i) k = UDFM (M.delete (getKey $ getUnique k) m) i
 
+-- | Note that this operation is not associative unless the two maps are
+-- disjoint.
 plusUDFM_C :: (elt -> elt -> elt) -> UniqDFM key elt -> UniqDFM key elt -> UniqDFM key elt
 plusUDFM_C f udfml@(UDFM _ i) udfmr@(UDFM _ j)
   -- we will use the upper bound on the tag as a proxy for the set size,
@@ -256,6 +258,8 @@ plusUDFM_C f udfml@(UDFM _ i) udfmr@(UDFM _ j)
 -- insertion order and O(m * min(n+m, W)) to insert them into the bigger
 -- set.
 
+-- | Note that this operation is not associative unless the two maps are
+-- disjoint.
 plusUDFM :: UniqDFM key elt -> UniqDFM key elt -> UniqDFM key elt
 plusUDFM udfml@(UDFM _ i) udfmr@(UDFM _ j)
   -- we will use the upper bound on the tag as a proxy for the set size,
@@ -413,7 +417,9 @@ allUDFM :: (elt -> Bool) -> UniqDFM key elt -> Bool
 allUDFM p (UDFM m _i) = M.foldr ((&&) . p . taggedFst) True m
 
 instance Semi.Semigroup (UniqDFM key a) where
-  (<>) = plusUDFM
+  -- Important to use 'insertUDFMIntoLeft' here as 'plusUDFM' is not
+  -- associative.
+  (<>) = insertUDFMIntoLeft
 
 instance Monoid (UniqDFM key a) where
   mempty = emptyUDFM

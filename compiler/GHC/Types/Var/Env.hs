@@ -594,9 +594,13 @@ filterDVarEnv = filterUDFM
 alterDVarEnv :: (Maybe a -> Maybe a) -> DVarEnv a -> Var -> DVarEnv a
 alterDVarEnv = alterUDFM
 
+-- | Note that 'plusDVarEnv' is *not* associative unless the keys of the two
+-- maps are disjoint.
 plusDVarEnv :: DVarEnv a -> DVarEnv a -> DVarEnv a
 plusDVarEnv = plusUDFM
 
+-- | Note that 'plusDVarEnv_C' is *not* associative unless the keys of the two
+-- maps are disjoint.
 plusDVarEnv_C :: (a -> a -> a) -> DVarEnv a -> DVarEnv a -> DVarEnv a
 plusDVarEnv_C = plusUDFM_C
 
