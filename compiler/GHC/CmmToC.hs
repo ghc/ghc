@@ -59,7 +59,6 @@ import GHC.Utils.Misc
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import Control.Monad.ST
-import Data.Bits
 import Data.Char
 import Data.List (intersperse)
 import Data.Map (Map)

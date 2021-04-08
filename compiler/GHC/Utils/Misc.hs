@@ -160,7 +160,6 @@ import Data.Char        ( isUpper, isAlphaNum, isSpace, chr, ord, isDigit, toUpp
 import Data.Int
 import Data.Ratio       ( (%) )
 import Data.Ord         ( comparing )
-import Data.Bits
 import Data.Word
 import qualified Data.IntMap as IM
 import qualified Data.Set as Set
