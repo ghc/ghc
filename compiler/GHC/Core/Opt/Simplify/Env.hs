@@ -71,7 +71,8 @@ import GHC.Core.Make            ( mkWildValBinder, mkCoreLet )
 import GHC.Builtin.Types
 import GHC.Core.TyCo.Rep        ( TyCoBinder(..) )
 import qualified GHC.Core.Type as Type
-import GHC.Core.Type hiding     ( substTy, substTyVar, substTyVarBndr, extendTvSubst, extendCvSubst )
+import GHC.Core.Type hiding     ( substTy, substTyVar, substTyVarBndr, substCo
+                                , extendTvSubst, extendCvSubst )
 import qualified GHC.Core.Coercion as Coercion
 import GHC.Core.Coercion hiding ( substCo, substCoVar, substCoVarBndr )
 import GHC.Platform ( Platform )

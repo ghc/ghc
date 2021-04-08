@@ -219,7 +219,7 @@ module GHC.Core.Type (
         substTyAddInScope,
         substTyUnchecked, substTysUnchecked, substScaledTyUnchecked, substScaledTysUnchecked,
         substThetaUnchecked, substTyWithUnchecked,
-        substCoUnchecked, substCoWithUnchecked,
+        substCo, substCoUnchecked, substCoWithUnchecked,
         substTyVarBndr, substTyVarBndrs, substTyVar, substTyVars,
         substVarBndr, substVarBndrs,
         substTyCoBndr,
