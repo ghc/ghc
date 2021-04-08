@@ -1109,14 +1109,17 @@ strictMap f = strict_map
         !xs' = strict_map xs
 
 strictZipWith :: (a -> b -> c) -> [a] -> [b] -> [c]
-strictZipWith _ [] _ = []
-strictZipWith _ _ [] = []
-strictZipWith f (x : xs) (y: ys) =
-  let
-    !x' = f x y
-    !xs' = strictZipWith f xs ys
-  in
-    x' : xs'
+{-# INLINE strictZipWith #-}
+strictZipWith f = strict_zip_with
+  where
+    strict_zip_with [] _ = []
+    strict_zip_with _ [] = []
+    strict_zip_with (x : xs) (y : ys) =
+      let
+        !x' = f x y
+        !xs' = strict_tip_with xs ys
+      in
+        x' : xs'
 
 
 -- Module names:
