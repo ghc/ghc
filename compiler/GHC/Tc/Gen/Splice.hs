@@ -664,7 +664,11 @@ tcTopSplice expr res_ty
 -- See Note [Running typed splices in the zonker]
 runTopSplice :: DelayedSplice -> TcM (HsExpr GhcTc)
 runTopSplice (DelayedSplice lcl_env orig_expr res_ty q_expr)
-  = setLclEnv lcl_env $ do {
+  = do
+      errs_var <- getErrsVar
+      setLclEnv lcl_env $ setErrsVar errs_var $ do {
+         -- Set the errs_var to the errs_var from the current context,
+         -- otherwise error messages can go missing in GHCi (#19470)
          zonked_ty <- zonkTcType res_ty
        ; zonked_q_expr <- zonkTopLExpr q_expr
         -- See Note [Collecting modFinalizers in typed splices].
