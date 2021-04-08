@@ -627,6 +627,10 @@ EQUAL TO, but we'd need to think carefully about
 But in fact (GivenInv) is automatically true, so we're adhering to
 it for now.  See #18929.
 
+* If a tyvar tv has level n, then the levels of all variables free
+  in tv's kind are <= n. Consequence: if tv is untouchable, so are
+  all variables in tv's kind.
+
 Note [WantedInv]
 ~~~~~~~~~~~~~~~~
 Why is WantedInv important?  Consider this implication, where
@@ -1584,6 +1588,7 @@ tc_eq_type :: Bool          -- ^ True <=> do not expand type synonyms
            -> Type -> Type
            -> Bool
 -- Flags False, False is the usual setting for tc_eq_type
+-- See Note [Computing equality on types] in Type
 tc_eq_type keep_syns vis_only orig_ty1 orig_ty2
   = go orig_env orig_ty1 orig_ty2
   where
@@ -1610,22 +1615,16 @@ tc_eq_type keep_syns vis_only orig_ty1 orig_ty2
       && (vis_only || go env (varType tv1) (varType tv2))
       && go (rnBndr2 env tv1 tv2) ty1 ty2
 
-    -- Make sure we handle all FunTy cases since falling through to the
-    -- AppTy case means that tcRepSplitAppTy_maybe may see an unzonked
-    -- kind variable, which causes things to blow up.
+      -- See Note [Equality on FunTys] in TyCoRep
     go env (FunTy _ w1 arg1 res1) (FunTy _ w2 arg2 res2)
-      = go env w1 w2 && go env arg1 arg2 && go env res1 res2
-    go env ty (FunTy _ w arg res) = eqFunTy env w arg res ty
-    go env (FunTy _ w arg res) ty = eqFunTy env w arg res ty
+      = kinds_eq && go env arg1 arg2 && go env res1 res2 && go env w1 w2
+      where
+        kinds_eq | vis_only  = True
+                 | otherwise = go env (typeKind arg1) (typeKind arg2) &&
+                               go env (typeKind res1) (typeKind res2)
 
-      -- See Note [Equality on AppTys] in GHC.Core.Type
-    go env (AppTy s1 t1)        ty2
-      | Just (s2, t2) <- tcRepSplitAppTy_maybe ty2
-      = go env s1 s2 && go env t1 t2
-    go env ty1                  (AppTy s2 t2)
-      | Just (s1, t1) <- tcRepSplitAppTy_maybe ty1
-      = go env s1 s2 && go env t1 t2
-
+    go env (AppTy s1 t1)        (AppTy s2 t2)
+      = go_app_tys env s1 [t1] s2 [t2]
     go env (TyConApp tc1 ts1)   (TyConApp tc2 ts2)
       = tc1 == tc2 && gos env (tc_vis tc1) ts1 ts2
 
@@ -1635,41 +1634,44 @@ tc_eq_type keep_syns vis_only orig_ty1 orig_ty2
 
     go _ _ _ = False
 
+        -- See Note [Equality on AppTys] in GHC.Core.TyCo.Rep
+    go_app_tys env (AppTy s1 t1) us1 (AppTy s2 t2) us2
+      = go_app_tys env s1 (t1:us1) s2 (t2:us2)
+    go_app_tys _   (AppTy {}) _ _ _ = False
+    go_app_tys _   _ _ (AppTy {}) _ = False
+    go_app_tys env s1 ts1 s2 ts2
+      = go env sk1 sk2 && gos env igs tsk1 tsk2 &&
+        go env s1 s2   && gos env igs ts1  ts2
+      where
+        sk1 = typeKind s1
+        sk2 = typeKind s2
+        tsk1 = map typeKind ts1
+        tsk2 = map typeKind ts2
+
+        bndrs  = fst (splitPiTys sk1)  -- this is used only when sk1 `eqType` sk2
+        inviss = map isInvisibleBinder bndrs
+        igs    = mk_igs inviss
+
     gos _   _         []       []      = True
     gos env (ig:igs) (t1:ts1) (t2:ts2) = (ig || go env t1 t2)
                                       && gos env igs ts1 ts2
     gos _ _ _ _ = False
 
     tc_vis :: TyCon -> [Bool]  -- True for the fields we should ignore
-    tc_vis tc | vis_only  = inviss ++ repeat False    -- Ignore invisibles
-              | otherwise = repeat False              -- Ignore nothing
+    tc_vis tc = mk_igs inviss
+      where
+        bndrs  = tyConBinders tc
+        inviss = map isInvisibleTyConBinder bndrs
+
+    mk_igs :: [Bool]   -- is the corresponding arg invisible?
+           -> [Bool]   -- should we ignore the corresponding arg?
+    mk_igs inviss | vis_only  = inviss ++ repeat False   -- Ignore invisibles
+                  | otherwise = repeat False             -- Ignore nothing
        -- The repeat False is necessary because tycons
        -- can legitimately be oversaturated
-      where
-        bndrs = tyConBinders tc
-        inviss  = map isInvisibleTyConBinder bndrs
 
     orig_env = mkRnEnv2 $ mkInScopeSet $ tyCoVarsOfTypes [orig_ty1, orig_ty2]
 
-    -- @eqFunTy w arg res ty@ is True when @ty@ equals @FunTy w arg res@. This is
-    -- sometimes hard to know directly because @ty@ might have some casts
-    -- obscuring the FunTy. And 'splitAppTy' is difficult because we can't
-    -- always extract a RuntimeRep (see Note [xyz]) if the kind of the arg or
-    -- res is unzonked. Thus this function, which handles this
-    -- corner case.
-    eqFunTy :: RnEnv2 -> Mult -> Type -> Type -> Type -> Bool
-               -- Last arg is /not/ FunTy
-    eqFunTy env w arg res ty@(AppTy{}) = get_args ty []
-      where
-        get_args :: Type -> [Type] -> Bool
-        get_args (AppTy f x)       args = get_args f (x:args)
-        get_args (CastTy t _)      args = get_args t args
-        get_args (TyConApp tc tys) args
-          | tc == funTyCon
-          , [w', _, _, arg', res'] <- tys ++ args
-          = go env w w' && go env arg arg' && go env res res'
-        get_args _ _    = False
-    eqFunTy _ _ _ _ _   = False
 {-# INLINE tc_eq_type #-} -- See Note [Specialising tc_eq_type].
 
 {- Note [Typechecker equality vs definitional equality]
