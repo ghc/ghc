@@ -176,6 +176,7 @@ generateRules = do
 
     (root -/- "ghc-stage1") <~+ ghcWrapper Stage1
     (root -/- "ghc-stage2") <~+ ghcWrapper Stage2
+    (root -/- "ghc-stage3") <~+ ghcWrapper Stage3
 
     forM_ [Stage0 ..] $ \stage -> do
         let prefix = root -/- stageString stage -/- "lib"
