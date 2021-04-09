@@ -454,8 +454,8 @@ test ('T9198',
       [''])
 
 test('T11545',
-     [ normal ],
-     compile, ['-O +RTS -M50M -RTS'])
+     [ collect_compiler_stats('all', 10) ],
+     compile, ['-O'])
 
 test('T15304',
      [ collect_compiler_stats('all', 10) ],
