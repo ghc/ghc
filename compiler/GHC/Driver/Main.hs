@@ -42,6 +42,7 @@ module GHC.Driver.Main
     , Messager, batchMsg
     , HscStatus (..)
     , hscIncrementalCompile
+    , initModDetails
     , hscMaybeWriteIface
     , hscCompileCmmFile
 
@@ -804,16 +805,7 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
         -- We didn't need to do any typechecking; the old interface
         -- file on disk was good enough.
         Left iface -> do
-            -- Knot tying!  See Note [Knot-tying typecheckIface]
-            details <- liftIO . fixIO $ \details' -> do
-                let act hpt  = addToHpt hpt (ms_mod_name mod_summary)
-                                            (HomeModInfo iface details' Nothing)
-                let hsc_env' = hscUpdateHPT act hsc_env
-                -- NB: This result is actually not that useful
-                -- in one-shot mode, since we're not going to do
-                -- any further typechecking.  It's much more useful
-                -- in make mode, since this HMI will go into the HPT.
-                genModDetails hsc_env' iface
+            details <- liftIO $ initModDetails hsc_env mod_summary iface
             return (HscUpToDate iface details, hsc_env')
         -- We finished type checking.  (mb_old_hash is the hash of
         -- the interface that existed on disk; it's possible we had
@@ -822,6 +814,20 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
         Right (FrontendTypecheck tc_result, mb_old_hash) -> do
             status <- finish mod_summary tc_result mb_old_hash
             return (status, hsc_env)
+
+-- Knot tying!  See Note [Knot-tying typecheckIface]
+initModDetails :: HscEnv -> ModSummary -> ModIface -> IO ModDetails
+initModDetails hsc_env mod_summary iface =
+  fixIO $ \details' -> do
+    let act hpt  = addToHpt hpt (ms_mod_name mod_summary)
+                                (HomeModInfo iface details' Nothing)
+    let hsc_env' = hscUpdateHPT act hsc_env
+    -- NB: This result is actually not that useful
+    -- in one-shot mode, since we're not going to do
+    -- any further typechecking.  It's much more useful
+    -- in make mode, since this HMI will go into the HPT.
+    genModDetails hsc_env' iface
+
 
 -- Runs the post-typechecking frontend (desugar and simplify). We want to
 -- generate most of the interface as late as possible. This gets us up-to-date
@@ -876,7 +882,6 @@ finish summary tc_result mb_old_hash = do
 
           return HscRecomp { hscs_guts = cg_guts,
                              hscs_mod_location = ms_location summary,
-                             hscs_mod_details = details,
                              hscs_partial_iface = partial_iface,
                              hscs_old_iface_hash = mb_old_hash
                            }
