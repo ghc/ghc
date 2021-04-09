@@ -10,7 +10,7 @@
  *
  * Constants which are derived automatically from other definitions in
  * the system (eg. structure sizes) are generated into the file
- * DerivedConstants.h by a C program (mkDerivedConstantsHdr).
+ * DerivedConstants.h by a C program (utils/deriveConstants).
  *
  * To understand the structure of the RTS headers, see the wiki:
  *   https://gitlab.haskell.org/ghc/ghc/wikis/commentary/source-tree/includes
