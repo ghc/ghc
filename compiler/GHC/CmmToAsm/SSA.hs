@@ -82,7 +82,7 @@ type SsaLiveCmmDecl statics instr
 --   This should only ever contain virtual regs.
 type DefSites = RegMap (UniqSet BlockId)
 
--- | List of pair of node and its immediate dominators
+-- | List of pair of node and its immediate dominator
 type IDomList = [(Node, Node)]
 
 type BlockLookupTable instr
@@ -121,7 +121,7 @@ phiDef (PhiF _ def _) = def
 
 -- | Wrapping a LiveBasicBlock to add Phi-Functions
 data SSABasicBlock instr
-        = SSABB [PhiFun] (LiveBasicBlock instr)
+        = SSABB [PhiFun] !(LiveBasicBlock instr)
         deriving (Functor)
 
 
@@ -149,10 +149,9 @@ ssaBBlockLiveBB (SSABB _ li) = li
 
 
 mapSsaBBlockPhiFunsM
-        :: Monad m
-        => (PhiFun -> m PhiFun)
+        :: (PhiFun -> RenameM PhiFun)
         -> SSABasicBlock instr
-        -> m (SSABasicBlock instr)
+        -> RenameM (SSABasicBlock instr)
 mapSsaBBlockPhiFunsM f (SSABB phis ins)
  = do
          phis'   <- mapM f phis
@@ -403,7 +402,7 @@ renameVars platform cfg blkTbl liveIns (T.Node n sub)
  = do
         enterScope
 
-        let bid = toBlockId n
+        let !bid = toBlockId n
 
         -- First, rename Phi definitions, as they are in Live_in
         blkTbl1 <- adjustUDFM_M renameVars_phis blkTbl bid
@@ -811,13 +810,13 @@ data RenameS
           stateUS            :: UniqSupply
 
           -- | Current new name for original vreg
-        , stateReachingDef   :: UniqFM RegId [RegId]
+        , stateReachingDef   :: !(UniqFM RegId [RegId])
 
           -- | New definitions in current scope. Used to pop defs in rename.
         , stateScopedDefs    :: [UniqSet RegId]
 
           -- | Stats: Count of unique names starting out.
-        , stateOriginalNames :: Int }
+        , stateOriginalNames :: !Int }
 
 
 -- | Create a new renamer state.
