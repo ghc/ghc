@@ -6,58 +6,20 @@
 set -e -o pipefail
 
 # Configuration:
-hackage_index_state="@1579718451"
+hackage_index_state="2021-04-08T21:41:19Z"
 
-MIN_ALEX_VERSION="3.2"
-
-# Colors
-BLACK="0;30"
-GRAY="1;30"
-RED="0;31"
-LT_RED="1;31"
-BROWN="0;33"
-LT_BROWN="1;33"
-GREEN="0;32"
-LT_GREEN="1;32"
-BLUE="0;34"
-LT_BLUE="1;34"
-PURPLE="0;35"
-LT_PURPLE="1;35"
-CYAN="0;36"
-LT_CYAN="1;36"
-WHITE="1;37"
-LT_GRAY="0;37"
-
-# GitLab Pipelines log section delimiters
-# https://gitlab.com/gitlab-org/gitlab-foss/issues/14664
-start_section() {
-  name="$1"
-  echo -e "section_start:$(date +%s):$name\015\033[0K"
-}
-
-end_section() {
-  name="$1"
-  echo -e "section_end:$(date +%s):$name\015\033[0K"
-}
-
-echo_color() {
-  local color="$1"
-  local msg="$2"
-  echo -e "\033[${color}m${msg}\033[0m"
-}
-
-error() { echo_color "${RED}" "$1"; }
-warn() { echo_color "${LT_BROWN}" "$1"; }
-info() { echo_color "${LT_BLUE}" "$1"; }
-
-fail() { error "error: $1"; exit 1; }
-
-function run() {
-  info "Running $*..."
-  "$@" || ( error "$* failed"; return 1; )
-}
+# Version bounds (min inclusive, max exclusive)
+MIN_HAPPY_VERSION="1.20"
+MAX_HAPPY_VERSION="1.21"
+MIN_ALEX_VERSION="3.2.6"
+MAX_ALEX_VERSION="3.3"
 
 TOP="$(pwd)"
+if [ ! -d "$TOP/.gitlab" ]; then
+  echo "This script expects to be run from the root of a ghc checkout"
+fi
+
+source $TOP/.gitlab/common.sh
 
 function setup_locale() {
   # Musl doesn't provide locale support at all...
@@ -165,10 +127,13 @@ function set_toolchain_paths() {
       HAPPY="$toolchain/bin/happy$exe"
       ALEX="$toolchain/bin/alex$exe"
   else
-      GHC="$(which ghc)"
-      CABAL="/usr/local/bin/cabal"
-      HAPPY="$HOME/.cabal/bin/happy"
-      ALEX="$HOME/.cabal/bin/alex"
+      # These are generally set by the Docker image but
+      # we provide these handy fallbacks in case the
+      # script isn't run from within a GHC CI docker image.
+      if [ -z "$GHC" ]; then GHC="$(which ghc)"; fi
+      if [ -z "$CABAL" ]; then CABAL="$(which cabal)"; fi
+      if [ -z "$HAPPY" ]; then HAPPY="$(which happy)"; fi
+      if [ -z "$ALEX" ]; then ALEX="$(which alex)"; fi
   fi
 
   export GHC
@@ -207,12 +172,12 @@ function setup() {
 }
 
 function fetch_ghc() {
-  local v="$GHC_VERSION"
-  if [[ -z "$v" ]]; then
-      fail "GHC_VERSION is not set"
-  fi
-
   if [ ! -e "$GHC" ]; then
+      local v="$GHC_VERSION"
+      if [[ -z "$v" ]]; then
+          fail "neither GHC nor GHC_VERSION are not set"
+      fi
+
       start_section "fetch GHC"
       url="https://downloads.haskell.org/~ghc/${GHC_VERSION}/ghc-${GHC_VERSION}-${boot_triple}.tar.xz"
       info "Fetching GHC binary distribution from $url..."
@@ -232,16 +197,15 @@ function fetch_ghc() {
       rm -Rf "ghc-${GHC_VERSION}" ghc.tar.xz
       end_section "fetch GHC"
   fi
-
 }
 
 function fetch_cabal() {
-  local v="$CABAL_INSTALL_VERSION"
-  if [[ -z "$v" ]]; then
-      fail "CABAL_INSTALL_VERSION is not set"
-  fi
-
   if [ ! -e "$CABAL" ]; then
+      local v="$CABAL_INSTALL_VERSION"
+      if [[ -z "$v" ]]; then
+          fail "neither CABAL nor CABAL_INSTALL_VERSION are not set"
+      fi
+
       start_section "fetch GHC"
       case "$(uname)" in
         # N.B. Windows uses zip whereas all others use .tar.xz
@@ -284,6 +248,7 @@ function setup_toolchain() {
   fetch_cabal
 
   cabal_install="$CABAL v2-install \
+    --with-compiler=$GHC \
     --index-state=$hackage_index_state \
     --installdir=$toolchain/bin \
     --overwrite-policy=always"
@@ -294,13 +259,13 @@ function setup_toolchain() {
     *) ;;
   esac
 
-  cabal update
+  cabal update --index="$hackage_index_state"
 
   info "Building happy..."
-  $cabal_install happy --constraint="happy==1.19.*"
+  $cabal_install happy --constraint="happy>=$MIN_HAPPY_VERSION" --constraint="happy<$MAX_HAPPY_VERSION"
 
   info "Building alex..."
-  $cabal_install alex --constraint="alex>=$MIN_ALEX_VERSION"
+  $cabal_install alex --constraint="alex>=$MIN_ALEX_VERSION" --constraint="alex<$MAX_ALEX_VERSION"
 }
 
 function cleanup_submodules() {
