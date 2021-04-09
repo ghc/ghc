@@ -8,7 +8,6 @@ import Settings.Builders.Common
 deriveConstantsPairs :: [(String, String)]
 deriveConstantsPairs =
   [ ("DerivedConstants.h", "--gen-header")
-  , ("platformConstants", "--gen-haskell-value")
   ]
 
 deriveConstantsBuilderArgs :: Args
