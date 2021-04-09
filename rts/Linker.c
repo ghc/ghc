@@ -491,9 +491,6 @@ initLinker_ (int retain_cafs)
 
 void
 exitLinker( void ) {
-#if defined(OBJFORMAT_PEi386)
-   exitLinker_PEi386();
-#endif
 #if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
    if (linker_init_done == 1) {
       regfree(&re_invalid);
@@ -1926,19 +1923,23 @@ addSection (Section *s, SectionKind kind, SectionAlloc alloc,
 
 #define UNUSED(x) (void)(x)
 
+#if defined(OBJFORMAT_ELF)
 void * loadNativeObj (pathchar *path, char **errmsg)
 {
-#if defined(OBJFORMAT_ELF)
    ACQUIRE_LOCK(&linker_mutex);
    void *r = loadNativeObj_ELF(path, errmsg);
    RELEASE_LOCK(&linker_mutex);
    return r;
+}
 #else
+void * GNU_ATTRIBUTE(__noreturn__)
+loadNativeObj (pathchar *path, char **errmsg)
+{
    UNUSED(path);
    UNUSED(errmsg);
    barf("loadNativeObj: not implemented on this platform");
-#endif
 }
+#endif
 
 HsInt unloadNativeObj (void *handle)
 {
