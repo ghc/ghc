@@ -1733,6 +1733,11 @@ definition in Core.  The rewrite rule works as follows:
 The `co` coercion is the newtype-coercion extracted from the type-class.
 The type class is obtain by looking at the type of wrap.
 
+In the constant folding rule it's very import to make sure to strip all ticks
+from the expression as if there's an occurence of
+magicDict we *must* convert it for correctness. See #19667 for where this went
+wrong in GHCi.
+
 
 -------------------------------------------------------------
 @realWorld#@ used to be a magic literal, \tr{void#}.  If things get

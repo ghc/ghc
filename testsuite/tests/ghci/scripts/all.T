@@ -319,3 +319,5 @@ test('T17431', normal, ghci_script, ['T17431.script'])
 test('T17549', normal, ghci_script, ['T17549.script'])
 test('T17669', [extra_run_opts('-fexternal-interpreter -fobject-code'), expect_broken(17669)], ghci_script, ['T17669.script'])
 test('T18955', [extra_hc_opts("-fobject-code")], ghci_script, ['T18955.script'])
+test('T19667Ghci', extra_files(['T19667Ghci.hs']), ghci_script, ['T19667Ghci.script'])
+
