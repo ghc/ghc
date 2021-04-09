@@ -26,6 +26,7 @@ import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
 import GHC.Types.Literal   ( litIsLifted ) --, mkLitInt ) -- temporalily commented out. See #8326
 import GHC.Types.SourceText
 import GHC.Types.Id
+import GHC.Types.Var.Set
 import GHC.Types.Id.Make   ( seqId )
 import GHC.Core.Make       ( FloatBind, mkImpossibleExpr, castBottomExpr )
 import qualified GHC.Core.Make
@@ -3513,9 +3514,9 @@ mkDupableStrictBind env arg_bndr join_rhs res_ty
 mkDupableAlt :: Platform -> OutId
              -> JoinFloats -> OutAlt
              -> SimplM (JoinFloats, OutAlt)
-mkDupableAlt platform case_bndr jfloats (Alt con bndrs' rhs')
+mkDupableAlt platform case_bndr jfloats (Alt con alt_bndrs' rhs')
   | exprIsDupable platform rhs'  -- Note [Small alternative rhs]
-  = return (jfloats, Alt con bndrs' rhs')
+  = return (jfloats, Alt con alt_bndrs' rhs')
 
   | otherwise
   = do  { simpl_opts <- initSimpleOpts <$> getDynFlags
@@ -3528,7 +3529,7 @@ mkDupableAlt platform case_bndr jfloats (Alt con bndrs' rhs')
                           where
                                  -- See Note [Case binders and join points]
                              unf = mkInlineUnfolding simpl_opts rhs
-                             rhs = mkConApp2 dc (tyConAppArgs scrut_ty) bndrs'
+                             rhs = mkConApp2 dc (tyConAppArgs scrut_ty) alt_bndrs'
 
                       LitAlt {} -> WARN( True, text "mkDupableAlt"
                                                 <+> ppr case_bndr <+> ppr con )
@@ -3536,36 +3537,69 @@ mkDupableAlt platform case_bndr jfloats (Alt con bndrs' rhs')
                            -- The case binder is alive but trivial, so why has
                            -- it not been substituted away?
 
-              final_bndrs'
-                | isDeadBinder case_bndr = filter abstract_over bndrs'
-                | otherwise              = bndrs' ++ [case_bndr_w_unf]
+              join_lam_bndrs
+                | isDeadBinder case_bndr = filter abstract_over alt_bndrs'
+                | otherwise              = alt_bndrs' ++ [case_bndr_w_unf]
+                -- Note [Join point abstraction]
 
               abstract_over bndr
                   | isTyVar bndr = True -- Abstract over all type variables just in case
                   | otherwise    = not (isDeadBinder bndr)
                         -- The deadness info on the new Ids is preserved by simplBinders
-              final_args = varsToCoreExprs final_bndrs'
-                           -- Note [Join point abstraction]
 
                 -- We make the lambdas into one-shot-lambdas.  The
                 -- join point is sure to be applied at most once, and doing so
                 -- prevents the body of the join point being floated out by
                 -- the full laziness pass
-              really_final_bndrs     = map one_shot final_bndrs'
+              final_join_lam_bndrs   = map one_shot join_lam_bndrs
               one_shot v | isId v    = setOneShotLambda v
                          | otherwise = v
-              join_rhs   = mkLams really_final_bndrs rhs'
 
-        ; join_bndr <- newJoinId final_bndrs' rhs_ty'
+              final_alt_bndrs = map set_occ_info alt_bndrs'
+              join_lam_bndr_set = mkVarSet join_lam_bndrs
+              set_occ_info v | isId v    = setIdOccInfo v (alt_bndr_occ v)
+                             | otherwise = v
 
-        ; let join_call = mkApps (Var join_bndr) final_args
-              alt'      = Alt con bndrs' join_call
+              alt_bndr_occ :: Id -> OccInfo
+              -- See Note [One-occ info on join-point calls]
+              alt_bndr_occ v | v `elemVarSet` join_lam_bndr_set = oneOcc
+                             | otherwise = IAmDead
+
+        ; join_bndr <- newJoinId join_lam_bndrs rhs_ty'
+
+        ; let join_rhs  = mkLams final_join_lam_bndrs rhs'
+              join_call = mkApps (Var join_bndr) (varsToCoreExprs join_lam_bndrs)
+              alt'      = Alt con final_alt_bndrs join_call
 
         ; return ( jfloats `addJoinFlts` unitJoinFloat (NonRec join_bndr join_rhs)
                  , alt') }
                 -- See Note [Duplicated env]
 
-{-
+oneOcc :: OccInfo
+oneOcc = OneOcc { occ_in_lam = NotInsideLam, occ_n_br = 1
+                , occ_int_cxt = NotInteresting, occ_tail = NoTailCallInfo }
+
+{- Note [One-occ info on join-point calls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When mkDupableAlts replaces the alternative RHS with a call to a join
+point we want to decorate it with OneOcc information:
+    case e of
+       K a b c -> ...a...c...
+==>
+    join $j a c = ...a...c...
+    in case e of
+      K a{OneOcc} b{dead} c{OneOcc} -> $j a c
+
+Notice the OneOcc on a,c.  Why is this important?  Because if e turns out
+to be (K e1 e2 e3), we want to get
+     $j e1 e3
+and not
+     let a = e1; c = c3 in $j a c
+because the latter takes another iteration of the simplier to inline
+'a' and 'c' at their unique usage sites -- and then perhaps to trigger
+$j inlining.  I found that this reduced the number of iterations of the
+Simplifier.
+
 Note [Fusing case continuations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It's important to fuse two successive case continuations when the
