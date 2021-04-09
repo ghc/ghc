@@ -1658,6 +1658,18 @@ shiftL# :: Word# -> Int# -> Word#
 a `shiftL#` b   | isTrue# (b >=# WORD_SIZE_IN_BITS#) = 0##
                 | otherwise                          = a `uncheckedShiftL#` b
 
+shiftLWord8# :: Word8# -> Int# -> Word8#
+a `shiftLWord8#` b | isTrue# (b >=# 8#) = wordToWord8# 0##
+                   | otherwise          = a `uncheckedShiftLWord8#` b
+
+shiftLWord16# :: Word16# -> Int# -> Word16#
+a `shiftLWord16#` b | isTrue# (b >=# 16#) = wordToWord16# 0##
+                    | otherwise           = a `uncheckedShiftLWord16#` b
+
+shiftLWord32# :: Word32# -> Int# -> Word32#
+a `shiftLWord32#` b | isTrue# (b >=# 32#) = wordToWord32# 0##
+                    | otherwise           = a `uncheckedShiftLWord32#` b
+
 -- | Shift the argument right by the specified number of bits
 -- (which must be non-negative).
 -- The "RL" means "right, logical" (as opposed to RA for arithmetic)
@@ -1666,11 +1678,35 @@ shiftRL# :: Word# -> Int# -> Word#
 a `shiftRL#` b  | isTrue# (b >=# WORD_SIZE_IN_BITS#) = 0##
                 | otherwise                          = a `uncheckedShiftRL#` b
 
+shiftRLWord8# :: Word8# -> Int# -> Word8#
+a `shiftRLWord8#` b | isTrue# (b >=# 8#) = wordToWord8# 0##
+                    | otherwise          = a `uncheckedShiftRLWord8#` b
+
+shiftRLWord16# :: Word16# -> Int# -> Word16#
+a `shiftRLWord16#` b | isTrue# (b >=# 16#) = wordToWord16# 0##
+                     | otherwise           = a `uncheckedShiftRLWord16#` b
+
+shiftRLWord32# :: Word32# -> Int# -> Word32#
+a `shiftRLWord32#` b | isTrue# (b >=# 32#) = wordToWord32# 0##
+                     | otherwise           = a `uncheckedShiftRLWord32#` b
+
 -- | Shift the argument left by the specified number of bits
 -- (which must be non-negative).
 iShiftL# :: Int# -> Int# -> Int#
 a `iShiftL#` b  | isTrue# (b >=# WORD_SIZE_IN_BITS#) = 0#
                 | otherwise                          = a `uncheckedIShiftL#` b
+
+shiftLInt8# :: Int8# -> Int# -> Int8#
+a `shiftLInt8#` b | isTrue# (b >=# 8#) = intToInt8# 0#
+                  | otherwise          = a `uncheckedShiftLInt8#` b
+
+shiftLInt16# :: Int16# -> Int# -> Int16#
+a `shiftLInt16#` b | isTrue# (b >=# 16#) = intToInt16# 0#
+                   | otherwise           = a `uncheckedShiftLInt16#` b
+
+shiftLInt32# :: Int32# -> Int# -> Int32#
+a `shiftLInt32#` b | isTrue# (b >=# 32#) = intToInt32# 0#
+                   | otherwise           = a `uncheckedShiftLInt32#` b
 
 -- | Shift the argument right (signed) by the specified number of bits
 -- (which must be non-negative).
@@ -1681,12 +1717,42 @@ a `iShiftRA#` b | isTrue# (b >=# WORD_SIZE_IN_BITS#) = if isTrue# (a <# 0#)
                                                           else 0#
                 | otherwise                          = a `uncheckedIShiftRA#` b
 
+shiftRAInt8# :: Int8# -> Int# -> Int8#
+a `shiftRAInt8#` b | isTrue# (b >=# 8#) = if isTrue# (a `ltInt8#` (intToInt8# 0#))
+                                             then intToInt8# (-1#)
+                                             else intToInt8# 0#
+                   | otherwise          = a `uncheckedShiftRAInt8#` b
+
+shiftRAInt16# :: Int16# -> Int# -> Int16#
+a `shiftRAInt16#` b | isTrue# (b >=# 16#) = if isTrue# (a `ltInt16#` (intToInt16# 0#))
+                                               then intToInt16# (-1#)
+                                               else intToInt16# 0#
+                    | otherwise           = a `uncheckedShiftRAInt16#` b
+
+shiftRAInt32# :: Int32# -> Int# -> Int32#
+a `shiftRAInt32#` b | isTrue# (b >=# 32#) = if isTrue# (a `ltInt32#` (intToInt32# 0#))
+                                               then intToInt32# (-1#)
+                                               else intToInt32# 0#
+                    | otherwise           = a `uncheckedShiftRAInt32#` b
+
 -- | Shift the argument right (unsigned) by the specified number of bits
 -- (which must be non-negative).
 -- The "RL" means "right, logical" (as opposed to RA for arithmetic)
 iShiftRL# :: Int# -> Int# -> Int#
 a `iShiftRL#` b | isTrue# (b >=# WORD_SIZE_IN_BITS#) = 0#
                 | otherwise                          = a `uncheckedIShiftRL#` b
+
+shiftRLInt8# :: Int8# -> Int# -> Int8#
+a `shiftRLInt8#` b | isTrue# (b >=# 8#) = intToInt8# 0#
+                   | otherwise          = a `uncheckedShiftRLInt8#` b
+
+shiftRLInt16# :: Int16# -> Int# -> Int16#
+a `shiftRLInt16#` b | isTrue# (b >=# 16#) = intToInt16# 0#
+                    | otherwise           = a `uncheckedShiftRLInt16#` b
+
+shiftRLInt32# :: Int32# -> Int# -> Int32#
+a `shiftRLInt32#` b | isTrue# (b >=# 32#) = intToInt32# 0#
+                    | otherwise           = a `uncheckedShiftRLInt32#` b
 
 -- Rules for C strings (the functions themselves are now in GHC.CString)
 {-# RULES
