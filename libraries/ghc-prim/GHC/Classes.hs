@@ -50,12 +50,12 @@ module GHC.Classes(
     (&&), (||), not,
 
     -- * Integer arithmetic
-    divInt#, modInt#
+    divInt#, divInt8#, divInt16#, divInt32#, divInt64#,
+    modInt#, modInt8#, modInt16#, modInt32#, modInt64#
  ) where
 
 -- GHC.Magic is used in some derived instances
 import GHC.Magic ()
-import GHC.IntWord64
 import GHC.Prim
 import GHC.Tuple
 import GHC.CString (unpackCString#)
@@ -274,7 +274,6 @@ eqInt, neInt :: Int -> Int -> Bool
 (I# x) `eqInt` (I# y) = isTrue# (x ==# y)
 (I# x) `neInt` (I# y) = isTrue# (x /=# y)
 
-#if WORD_SIZE_IN_BITS < 64
 instance Eq TyCon where
   (==) (TyCon hi1 lo1 _ _ _ _) (TyCon hi2 lo2 _ _ _ _)
        = isTrue# (hi1 `eqWord64#` hi2) && isTrue# (lo1 `eqWord64#` lo2)
@@ -285,18 +284,6 @@ instance Ord TyCon where
     | isTrue# (lo1 `gtWord64#` lo2) = GT
     | isTrue# (lo1 `ltWord64#` lo2) = LT
     | True                = EQ
-#else
-instance Eq TyCon where
-  (==) (TyCon hi1 lo1 _ _ _ _) (TyCon hi2 lo2 _ _ _ _)
-       = isTrue# (hi1 `eqWord#` hi2) && isTrue# (lo1 `eqWord#` lo2)
-instance Ord TyCon where
-  compare (TyCon hi1 lo1 _ _ _ _) (TyCon hi2 lo2 _ _ _ _)
-    | isTrue# (hi1 `gtWord#` hi2) = GT
-    | isTrue# (hi1 `ltWord#` hi2) = LT
-    | isTrue# (lo1 `gtWord#` lo2) = GT
-    | isTrue# (lo1 `ltWord#` lo2) = LT
-    | True              = EQ
-#endif
 
 
 -- | The 'Ord' class is used for totally ordered datatypes.
@@ -541,7 +528,6 @@ not False               =  True
 
 -- These functions have built-in rules.
 {-# NOINLINE [0] divInt# #-}
-{-# NOINLINE [0] modInt# #-}
 divInt# :: Int# -> Int# -> Int#
 x# `divInt#` y#
         -- Be careful NOT to overflow if we do any additional arithmetic
@@ -553,6 +539,52 @@ x# `divInt#` y#
       else if isTrue# (x# <# 0#) && isTrue# (y# ># 0#) then ((x# +# 1#) `quotInt#` y#) -# 1#
       else x# `quotInt#` y#
 
+{-# NOINLINE [0] divInt8# #-}
+divInt8# :: Int8# -> Int8# -> Int8#
+x# `divInt8#` y#
+    | y0x = ((x# `subInt8#` one#) `quotInt8#` y#) `subInt8#` one#
+    | x0y = ((x# `plusInt8#` one#) `quotInt8#` y#) `subInt8#` one#
+    | True = x# `quotInt8#` y#
+  where zero# = intToInt8# 0#
+        one# = intToInt8# 1#
+        y0x = isTrue# (x# `gtInt8#` zero#) && isTrue# (y# `ltInt8#` zero#)
+        x0y = isTrue# (x# `ltInt8#` zero#) && isTrue# (y# `gtInt8#` zero#)
+
+{-# NOINLINE [0] divInt16# #-}
+divInt16# :: Int16# -> Int16# -> Int16#
+x# `divInt16#` y#
+    | y0x = ((x# `subInt16#` one#) `quotInt16#` y#) `subInt16#` one#
+    | x0y = ((x# `plusInt16#` one#) `quotInt16#` y#) `subInt16#` one#
+    | True = x# `quotInt16#` y#
+  where zero# = intToInt16# 0#
+        one# = intToInt16# 1#
+        y0x = isTrue# (x# `gtInt16#` zero#) && isTrue# (y# `ltInt16#` zero#)
+        x0y = isTrue# (x# `ltInt16#` zero#) && isTrue# (y# `gtInt16#` zero#)
+
+{-# NOINLINE [0] divInt32# #-}
+divInt32# :: Int32# -> Int32# -> Int32#
+x# `divInt32#` y#
+    | y0x = ((x# `subInt32#` one#) `quotInt32#` y#) `subInt32#` one#
+    | x0y = ((x# `plusInt32#` one#) `quotInt32#` y#) `subInt32#` one#
+    | True = x# `quotInt32#` y#
+  where zero# = intToInt32# 0#
+        one# = intToInt32# 1#
+        y0x = isTrue# (x# `gtInt32#` zero#) && isTrue# (y# `ltInt32#` zero#)
+        x0y = isTrue# (x# `ltInt32#` zero#) && isTrue# (y# `gtInt32#` zero#)
+
+{-# NOINLINE [0] divInt64# #-}
+divInt64# :: Int64# -> Int64# -> Int64#
+x# `divInt64#` y#
+    | y0x = ((x# `subInt64#` one#) `quotInt64#` y#) `subInt64#` one#
+    | x0y = ((x# `plusInt64#` one#) `quotInt64#` y#) `subInt64#` one#
+    | True = x# `quotInt64#` y#
+  where zero# = intToInt64# 0#
+        one# = intToInt64# 1#
+        y0x = isTrue# (x# `gtInt64#` zero#) && isTrue# (y# `ltInt64#` zero#)
+        x0y = isTrue# (x# `ltInt64#` zero#) && isTrue# (y# `gtInt64#` zero#)
+
+
+{-# NOINLINE [0] modInt# #-}
 modInt# :: Int# -> Int# -> Int#
 x# `modInt#` y#
     = if isTrue# (x# ># 0#) && isTrue# (y# <# 0#) ||
@@ -561,6 +593,51 @@ x# `modInt#` y#
       else r#
     where
     !r# = x# `remInt#` y#
+
+{-# NOINLINE [0] modInt8# #-}
+modInt8# :: Int8# -> Int8# -> Int8#
+x# `modInt8#` y#
+    = if isTrue# (x# `gtInt8#` zero#) && isTrue# (y# `ltInt8#` zero#) ||
+         isTrue# (x# `ltInt8#` zero#) && isTrue# (y# `gtInt8#` zero#)
+      then if isTrue# (r# `neInt8#` zero#) then r# `plusInt8#` y# else zero#
+      else r#
+    where
+    !r# = x# `remInt8#` y#
+    zero# = intToInt8# 0#
+
+{-# NOINLINE [0] modInt16# #-}
+modInt16# :: Int16# -> Int16# -> Int16#
+x# `modInt16#` y#
+    = if isTrue# (x# `gtInt16#` zero#) && isTrue# (y# `ltInt16#` zero#) ||
+         isTrue# (x# `ltInt16#` zero#) && isTrue# (y# `gtInt16#` zero#)
+      then if isTrue# (r# `neInt16#` zero#) then r# `plusInt16#` y# else zero#
+      else r#
+    where
+    !r# = x# `remInt16#` y#
+    zero# = intToInt16# 0#
+
+{-# NOINLINE [0] modInt32# #-}
+modInt32# :: Int32# -> Int32# -> Int32#
+x# `modInt32#` y#
+    = if isTrue# (x# `gtInt32#` zero#) && isTrue# (y# `ltInt32#` zero#) ||
+         isTrue# (x# `ltInt32#` zero#) && isTrue# (y# `gtInt32#` zero#)
+      then if isTrue# (r# `neInt32#` zero#) then r# `plusInt32#` y# else zero#
+      else r#
+    where
+    !r# = x# `remInt32#` y#
+    zero# = intToInt32# 0#
+
+{-# NOINLINE [0] modInt64# #-}
+modInt64# :: Int64# -> Int64# -> Int64#
+x# `modInt64#` y#
+    = if isTrue# (x# `gtInt64#` zero#) && isTrue# (y# `ltInt64#` zero#) ||
+         isTrue# (x# `ltInt64#` zero#) && isTrue# (y# `gtInt64#` zero#)
+      then if isTrue# (r# `neInt64#` zero#) then r# `plusInt64#` y# else zero#
+      else r#
+    where
+    !r# = x# `remInt64#` y#
+    zero# = intToInt64# 0#
+
 
 
 {- *************************************************************
