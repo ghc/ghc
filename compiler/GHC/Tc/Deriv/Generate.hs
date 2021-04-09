@@ -2439,7 +2439,8 @@ litConTbl
     ]
 
 -- | Lookup `Type` in an association list.
-assoc_ty_id :: HasCallStack => String           -- The class involved
+assoc_ty_id :: HasDebugCallStack
+            => String           -- The class involved
             -> [(Type,a)]       -- The table
             -> Type             -- The type
             -> a                -- The result of the lookup
