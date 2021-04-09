@@ -610,7 +610,7 @@ both j's RHS and in its stable unfolding.  We want to discover
 j2 as a join point.  So we must do the adjustRhsUsage thing
 on j's RHS.  That's why we pass mb_join_arity to calcUnfolding.
 
-Aame with rules. Suppose we have:
+Same with rules. Suppose we have:
 
   let j :: Int -> Int
       j y = 2 * y
@@ -622,7 +622,7 @@ Aame with rules. Suppose we have:
 We identify k as a join point, and we want j to be a join point too.
 Without the RULE it would be, and we don't want the RULE to mess it
 up.  So provided the join-point arity of k matches the args of the
-rule we can allow the tail-cal info from the RHS of the rule to
+rule we can allow the tail-call info from the RHS of the rule to
 propagate.
 
 * Wrinkle for Rec case. In the recursive case we don't know the
@@ -2124,7 +2124,7 @@ occAnalApp env (fun, args, ticks)
         -- often leaves behind beta redexs like
         --      (\x y -> e) a1 a2
         -- Here we would like to mark x,y as one-shot, and treat the whole
-        -- thing much like a let.  We do this by pushing some True items
+        -- thing much like a let.  We do this by pushing some OneShotLam items
         -- onto the context stack.
     !(args_uds, args') = occAnalArgs env args []
 
@@ -2409,7 +2409,13 @@ markJoinOneShots mb_join_arity bndrs
 
 addAppCtxt :: OccEnv -> [Arg CoreBndr] -> OccEnv
 addAppCtxt env@(OccEnv { occ_one_shots = ctxt }) args
-  = env { occ_one_shots = replicate (valArgCount args) OneShotLam ++ ctxt }
+  | n_val_args > 0
+  = env { occ_one_shots = replicate n_val_args OneShotLam ++ ctxt
+        , occ_encl = OccVanilla }
+  | otherwise
+  = env
+  where
+    n_val_args = valArgCount args
 
 --------------------
 transClosureFV :: VarEnv VarSet -> VarEnv VarSet
