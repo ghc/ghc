@@ -4271,7 +4271,7 @@ checkPartialRecordField :: [DataCon] -> FieldLabel -> TcM ()
 -- See Note [Checking partial record field]
 checkPartialRecordField all_cons fld
   = setSrcSpan loc $
-      warnIfFlag Opt_WarnPartialFields
+      warnIfWithFlag Opt_WarnPartialFields
         (not is_exhaustive && not (startsWithUnderscore occ_name))
         (sep [text "Use of partial record field selector" <> colon,
               nest 2 $ quotes (ppr occ_name)])
