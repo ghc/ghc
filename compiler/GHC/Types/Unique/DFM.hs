@@ -69,7 +69,7 @@ module GHC.Types.Unique.DFM (
 
 import GHC.Prelude
 
-import GHC.Types.Unique ( Uniquable(..), Unique, getKey )
+import GHC.Types.Unique ( Uniquable(..), Unique )
 import GHC.Utils.Outputable
 
 import qualified Data.IntMap as M
@@ -78,7 +78,7 @@ import Data.Functor.Classes (Eq1 (..))
 import Data.List (sortBy)
 import Data.Function (on)
 import qualified Data.Semigroup as Semi
-import GHC.Types.Unique.FM (UniqFM, nonDetUFMToList, ufmToIntMap, unsafeIntMapToUFM)
+import GHC.Types.Unique.FM (UniqFM, getMixedKey, getUnmixedUnique, nonDetUFMToList, ufmToIntMap, unsafeIntMapToUFM)
 import Unsafe.Coerce
 
 -- Note [Deterministic UniqFM]
@@ -166,7 +166,7 @@ emptyUDFM :: UniqDFM key elt
 emptyUDFM = UDFM M.empty 0
 
 unitUDFM :: Uniquable key => key -> elt -> UniqDFM key elt
-unitUDFM k v = UDFM (M.singleton (getKey $ getUnique k) (TaggedVal v 0)) 1
+unitUDFM k v = UDFM (M.singleton (getMixedKey $ getUnique k) (TaggedVal v 0)) 1
 
 -- The new binding always goes to the right of existing ones
 addToUDFM :: Uniquable key => UniqDFM key elt -> key -> elt  -> UniqDFM key elt
@@ -175,7 +175,7 @@ addToUDFM m k v = addToUDFM_Directly m (getUnique k) v
 -- The new binding always goes to the right of existing ones
 addToUDFM_Directly :: UniqDFM key elt -> Unique -> elt -> UniqDFM key elt
 addToUDFM_Directly (UDFM m i) u v
-  = UDFM (M.insertWith tf (getKey u) (TaggedVal v i) m) (i + 1)
+  = UDFM (M.insertWith tf (getMixedKey u) (TaggedVal v i) m) (i + 1)
   where
     tf (TaggedVal new_v _) (TaggedVal _ old_i) = TaggedVal new_v old_i
       -- Keep the old tag, but insert the new value
@@ -188,7 +188,7 @@ addToUDFM_C_Directly
   -> Unique -> elt
   -> UniqDFM key elt
 addToUDFM_C_Directly f (UDFM m i) u v
-  = UDFM (M.insertWith tf (getKey u) (TaggedVal v i) m) (i + 1)
+  = UDFM (M.insertWith tf (getMixedKey u) (TaggedVal v i) m) (i + 1)
     where
       tf (TaggedVal new_v _) (TaggedVal old_v old_i)
          = TaggedVal (f old_v new_v) old_i
@@ -214,7 +214,7 @@ addListToUDFM_Directly_C
 addListToUDFM_Directly_C f = foldl' (\m (k, v) -> addToUDFM_C_Directly f m k v)
 
 delFromUDFM :: Uniquable key => UniqDFM key elt -> key -> UniqDFM key elt
-delFromUDFM (UDFM m i) k = UDFM (M.delete (getKey $ getUnique k) m) i
+delFromUDFM (UDFM m i) k = UDFM (M.delete (getMixedKey $ getUnique k) m) i
 
 plusUDFM_C :: (elt -> elt -> elt) -> UniqDFM key elt -> UniqDFM key elt -> UniqDFM key elt
 plusUDFM_C f udfml@(UDFM _ i) udfmr@(UDFM _ j)
@@ -272,13 +272,13 @@ insertUDFMIntoLeft_C f udfml udfmr =
   addListToUDFM_Directly_C f udfml $ udfmToList udfmr
 
 lookupUDFM :: Uniquable key => UniqDFM key elt -> key -> Maybe elt
-lookupUDFM (UDFM m _i) k = taggedFst `fmap` M.lookup (getKey $ getUnique k) m
+lookupUDFM (UDFM m _i) k = taggedFst `fmap` M.lookup (getMixedKey $ getUnique k) m
 
 lookupUDFM_Directly :: UniqDFM key elt -> Unique -> Maybe elt
-lookupUDFM_Directly (UDFM m _i) k = taggedFst `fmap` M.lookup (getKey k) m
+lookupUDFM_Directly (UDFM m _i) k = taggedFst `fmap` M.lookup (getMixedKey k) m
 
 elemUDFM :: Uniquable key => key -> UniqDFM key elt -> Bool
-elemUDFM k (UDFM m _i) = M.member (getKey $ getUnique k) m
+elemUDFM k (UDFM m _i) = M.member (getMixedKey $ getUnique k) m
 
 -- | Performs a deterministic fold over the UniqDFM.
 -- It's O(n log n) while the corresponding function on `UniqFM` is O(n).
@@ -304,13 +304,13 @@ filterUDFM p (UDFM m i) = UDFM (M.filter (\(TaggedVal v _) -> p v) m) i
 filterUDFM_Directly :: (Unique -> elt -> Bool) -> UniqDFM key elt -> UniqDFM key elt
 filterUDFM_Directly p (UDFM m i) = UDFM (M.filterWithKey p' m) i
   where
-  p' k (TaggedVal v _) = p (getUnique k) v
+  p' k (TaggedVal v _) = p (getUnmixedUnique k) v
 
 -- | Converts `UniqDFM` to a list, with elements in deterministic order.
 -- It's O(n log n) while the corresponding function on `UniqFM` is O(n).
 udfmToList :: UniqDFM key elt -> [(Unique, elt)]
 udfmToList (UDFM m _i) =
-  [ (getUnique k, taggedFst v)
+  [ (getUnmixedUnique k, taggedFst v)
   | (k, v) <- sortBy (compare `on` (taggedSnd . snd)) $ M.toList m ]
 
 -- Determines whether two 'UniqDFM's contain the same keys.
@@ -374,11 +374,11 @@ listToUDFM_Directly = foldl' (\m (u, v) -> addToUDFM_Directly m u v) emptyUDFM
 
 -- | Apply a function to a particular element
 adjustUDFM :: Uniquable key => (elt -> elt) -> UniqDFM key elt -> key -> UniqDFM key elt
-adjustUDFM f (UDFM m i) k = UDFM (M.adjust (fmap f) (getKey $ getUnique k) m) i
+adjustUDFM f (UDFM m i) k = UDFM (M.adjust (fmap f) (getMixedKey $ getUnique k) m) i
 
 -- | Apply a function to a particular element
 adjustUDFM_Directly :: (elt -> elt) -> UniqDFM key elt -> Unique -> UniqDFM key elt
-adjustUDFM_Directly f (UDFM m i) k = UDFM (M.adjust (fmap f) (getKey k) m) i
+adjustUDFM_Directly f (UDFM m i) k = UDFM (M.adjust (fmap f) (getMixedKey k) m) i
 
 -- | The expression (alterUDFM f k map) alters value x at k, or absence
 -- thereof. alterUDFM can be used to insert, delete, or update a value in
@@ -391,7 +391,7 @@ alterUDFM
   -> key                       -- new
   -> UniqDFM key elt               -- result
 alterUDFM f (UDFM m i) k =
-  UDFM (M.alter alterf (getKey $ getUnique k) m) (i + 1)
+  UDFM (M.alter alterf (getMixedKey $ getUnique k) m) (i + 1)
   where
   alterf Nothing = inject $ f Nothing
   alterf (Just (TaggedVal v _)) = inject $ f (Just v)
