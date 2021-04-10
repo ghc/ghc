@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <stdio.h>
+// stdlib is needed for exit()
+#include <stdlib.h>
 #if mingw32_HOST_OS
 #include <windows.h>
 #else
