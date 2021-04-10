@@ -1,6 +1,6 @@
 Considering inlining: foo
   arg infos [ValueArg]
-  interesting continuation RhsCtxt
+  interesting continuation RhsCtxt(NonRecursive)
   some_benefit True
   is exp: True
   is work-free: True
@@ -19,7 +19,7 @@ Inactive unfolding: foo1
 Inactive unfolding: foo1
 Considering inlining: foo
   arg infos []
-  interesting continuation RhsCtxt
+  interesting continuation RhsCtxt(NonRecursive)
   some_benefit False
   is exp: True
   is work-free: True
