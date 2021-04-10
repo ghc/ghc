@@ -187,10 +187,9 @@ lintCmmLast labels node = case node of
             platform <- getPlatform
             mapM_ checkTarget $ switchTargetsToList ids
             erep <- lintCmmExpr e
-            if (erep `cmmEqType_ignoring_ptrhood` bWord platform)
-              then return ()
-              else cmmLintErr (text "switch scrutinee is not a word: " <>
-                               pdoc platform e <> text " :: " <> ppr erep)
+            unless (isWordAny erep) $
+              cmmLintErr (text "switch scrutinee is not a word (of any size): " <>
+                          pdoc platform e <> text " :: " <> ppr erep)
 
   CmmCall { cml_target = target, cml_cont = cont } -> do
           _ <- lintCmmExpr target
