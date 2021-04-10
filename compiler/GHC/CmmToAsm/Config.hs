@@ -26,6 +26,7 @@ data NCGConfig = NCGConfig
    , ncgInlineThresholdMemset :: !Word            -- ^ Ditto for `memset`
    , ncgSplitSections         :: !Bool            -- ^ Split sections
    , ncgRegsIterative         :: !Bool
+   , ncgRegsGraphChaitin      :: !Bool
    , ncgAsmLinting            :: !Bool            -- ^ Perform ASM linting pass
    , ncgDoConstantFolding     :: !Bool            -- ^ Perform CMM constant folding
    , ncgSseVersion            :: Maybe SseVersion -- ^ (x86) SSE instructions
