@@ -1,10 +1,10 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE LambdaCase #-}
 
 -- | Platform description
 module GHC.Platform
    ( Platform (..)
    , PlatformWordSize(..)
-   , PlatformConstants(..)
    , platformArch
    , platformOS
    , ArchOS(..)
@@ -32,6 +32,10 @@ module GHC.Platform
    , PlatformMisc(..)
    , SseVersion (..)
    , BmiVersion (..)
+   -- * Platform constants
+   , PlatformConstants(..)
+   , lookupPlatformConstants
+   , platformConstants
    -- * Shared libraries
    , platformSOName
    , platformHsSOName
@@ -45,10 +49,12 @@ import GHC.Read
 import GHC.ByteOrder (ByteOrder(..))
 import GHC.Platform.Constants
 import GHC.Platform.ArchOS
+import GHC.Utils.Panic.Plain
 
 import Data.Word
 import Data.Int
 import System.FilePath
+import System.Directory
 
 -- | Platform description
 --
@@ -67,10 +73,15 @@ data Platform = Platform
       -- ^ Determines whether we will be compiling info tables that reside just
       --   before the entry code, or with an indirection to the entry code. See
       --   TABLES_NEXT_TO_CODE in includes/rts/storage/InfoTables.h.
-   , platformConstants                :: !PlatformConstants
+   , platform_constants               :: !(Maybe PlatformConstants)
       -- ^ Constants such as structure offsets, type sizes, etc.
    }
    deriving (Read, Show, Eq)
+
+platformConstants :: Platform -> PlatformConstants
+platformConstants platform = case platform_constants platform of
+  Nothing -> panic "Platform constants not available!"
+  Just c  -> c
 
 data PlatformWordSize
   = PW4 -- ^ A 32-bit platform
@@ -242,3 +253,57 @@ platformSOExt platform
       OSDarwin  -> "dylib"
       OSMinGW32 -> "dll"
       _         -> "so"
+
+-- Note [Platform constants]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- The RTS is partly written in C, hence we use an external C compiler to build
+-- it. Thus GHC must somehow retrieve some information about the produced code
+-- (sizes of types, offsets of struct fields, etc.) to produce compatible code.
+--
+-- This is the role of utils/deriveConstants utility: it produces a C
+-- source, compiles it with the same toolchain that will be used to build the
+-- RTS, and finally retrieves the constants from the built artefact. We can't
+-- directly run the produced program because we may be cross-compiling.
+--
+-- These constants are then stored in DerivedConstants.h header file that is
+-- bundled with the RTS unit. This file is directly imported by Cmm codes and it
+-- is also read by GHC. deriveConstants also produces the Haskell definition of
+-- the PlatformConstants datatype and the Haskell parser for the
+-- DerivedConstants.h file.
+--
+-- For quite some time, constants used by GHC were globally installed in
+-- ${libdir}/platformConstants but now GHC reads the DerivedConstants.h header
+-- bundled with the RTS unit. GHC detects when it builds the RTS unit itself and
+-- in this case it loads the header from the include-dirs passed on the
+-- command-line.
+--
+-- Note that GHC doesn't parse every "#define SOME_CONSTANT 123" individually.
+-- Instead there is a single #define that contains all the constants useful to
+-- GHC in a comma separated list:
+--
+--    #define HS_CONSTANTS "123,45,..."
+--
+-- Note that GHC mustn't directly import DerivedConstants.h as these constants
+-- are only valid for a specific target platform and we want GHC to be target
+-- agnostic.
+--
+
+
+-- | Try to locate "DerivedConstants.h" file in the given dirs and to parse the
+-- PlatformConstants from it.
+--
+-- See Note [Platform constants]
+lookupPlatformConstants :: [FilePath] -> IO (Maybe PlatformConstants)
+lookupPlatformConstants include_dirs = find_constants include_dirs
+  where
+    try_parse d = do
+        let p = d </> "DerivedConstants.h"
+        doesFileExist p >>= \case
+          True  -> Just <$> parseConstantsHeader p
+          False -> return Nothing
+
+    find_constants []     = return Nothing
+    find_constants (x:xs) = try_parse x >>= \case
+        Nothing -> find_constants xs
+        Just c  -> return (Just c)
