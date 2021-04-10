@@ -236,8 +236,7 @@ exports_from_avail Nothing rdr_env _imports _this_mod
    -- so that's how we handle it, except we also export the data family
    -- when a data instance is exported.
   = do {
-    ; warnIfFlag Opt_WarnMissingExportList
-        True
+    ; addDiagnostic (WarningWithFlag Opt_WarnMissingExportList)
         (missingModuleExportWarn $ moduleName _this_mod)
     ; let avails =
             map fix_faminst . gresToAvailInfo
@@ -283,8 +282,8 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
     exports_from_item (ExportAccum occs earlier_mods)
                       (L loc ie@(IEModuleContents _ lmod@(L _ mod)))
         | mod `elementOfUniqSet` earlier_mods    -- Duplicate export of M
-        = do { warnIfFlag Opt_WarnDuplicateExports True
-                          (dupModuleExport mod) ;
+        = do { addDiagnostic (WarningWithFlag Opt_WarnDuplicateExports)
+                             (dupModuleExport mod) ;
                return Nothing }
 
         | otherwise
@@ -299,9 +298,9 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                    }
 
              ; checkErr exportValid (moduleNotImported mod)
-             ; warnIfFlag Opt_WarnDodgyExports
-                          (exportValid && null gre_prs)
-                          (nullModuleExport mod)
+             ; warnIfWithFlag Opt_WarnDodgyExports
+                              (exportValid && null gre_prs)
+                              (nullModuleExport mod)
 
              ; traceRn "efa" (ppr mod $$ ppr all_gres)
              ; addUsedGREs all_gres
@@ -670,9 +669,9 @@ check_occs ie occs avails
             | greNameMangledName child == greNameMangledName child'   -- Duplicate export
             -- But we don't want to warn if the same thing is exported
             -- by two different module exports. See ticket #4478.
-            -> do { warnIfFlag Opt_WarnDuplicateExports
-                               (not (dupExport_ok child ie ie'))
-                               (dupExportWarn child ie ie')
+            -> do { warnIfWithFlag Opt_WarnDuplicateExports
+                                   (not (dupExport_ok child ie ie'))
+                                   (dupExportWarn child ie ie')
                   ; return occs }
 
             | otherwise    -- Same occ name but different names: an error

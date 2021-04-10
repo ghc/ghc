@@ -1989,7 +1989,6 @@ doDerivInstErrorChecks2 clas clas_inst theta wildcard mechanism
   = do { traceTc "doDerivInstErrorChecks2" (ppr clas_inst)
        ; dflags <- getDynFlags
        ; xpartial_sigs <- xoptM LangExt.PartialTypeSignatures
-       ; wpartial_sigs <- woptM Opt_WarnPartialTypeSignatures
 
          -- Error if PartialTypeSignatures isn't enabled when a user tries
          -- to write @deriving instance _ => Eq (Foo a)@. Or, if that
@@ -1999,8 +1998,8 @@ doDerivInstErrorChecks2 clas clas_inst theta wildcard mechanism
            Nothing -> pure ()
            Just span -> setSrcSpan span $ do
              checkTc xpartial_sigs (hang partial_sig_msg 2 pts_suggestion)
-             diagnosticTc (WarningWithFlag Opt_WarnPartialTypeSignatures)
-                          wpartial_sigs partial_sig_msg
+             addDiagnosticTc (WarningWithFlag Opt_WarnPartialTypeSignatures)
+                             partial_sig_msg
 
          -- Check for Generic instances that are derived with an exotic
          -- deriving strategy like DAC

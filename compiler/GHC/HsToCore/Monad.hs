@@ -40,7 +40,7 @@ module GHC.HsToCore.Monad (
         dsGetCompleteMatches,
 
         -- Warnings and errors
-        DsWarning, diagnosticDs, warnIfSetDs, errDs, errDsCoreExpr,
+        DsWarning, diagnosticDs, errDs, errDsCoreExpr,
         failWithDs, failDs, discardWarningsDs,
         askNoErrsDs,
 
@@ -463,12 +463,6 @@ diagnosticDs reason warn
        ; dflags <- getDynFlags
        ; let msg = mkShortMsgEnvelope dflags reason loc (ds_unqual env) warn
        ; updMutVar (ds_msgs env) (\ msgs -> msg `addMessage` msgs) }
-
--- | Emit a warning only if the correct WarningWithoutFlag is set in the DynFlags
-warnIfSetDs :: WarningFlag -> SDoc -> DsM ()
-warnIfSetDs flag warn
-  = whenWOptM flag $
-    diagnosticDs (WarningWithFlag flag) warn
 
 errDs :: SDoc -> DsM ()
 errDs err
