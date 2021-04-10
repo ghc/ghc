@@ -333,8 +333,7 @@ rnImportDecl this_mod
         Just (False, _) -> return () -- Explicit import list
         _  | implicit   -> return () -- Do not bleat for implicit imports
            | qual_only  -> return ()
-           | otherwise  -> whenWOptM Opt_WarnMissingImportList $
-                           addDiagnostic (WarningWithFlag Opt_WarnMissingImportList)
+           | otherwise  -> addDiagnostic (WarningWithFlag Opt_WarnMissingImportList)
                                          (missingImportListWarn imp_mod_name)
 
     iface <- loadSrcInterface doc imp_mod_name want_boot (fmap sl_fs mb_pkg)
@@ -1164,11 +1163,11 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
              return [ (L loc ie, avail) | (ie,avail) <- stuff ]
         where
             -- Warn when importing T(..) if T was exported abstractly
-            emit_warning (DodgyImport n) = whenWOptM Opt_WarnDodgyImports $
+            emit_warning (DodgyImport n) =
               addDiagnostic (WarningWithFlag Opt_WarnDodgyImports) (dodgyImportWarn n)
-            emit_warning MissingImportList = whenWOptM Opt_WarnMissingImportList $
+            emit_warning MissingImportList =
               addDiagnostic (WarningWithFlag Opt_WarnMissingImportList) (missingImportListItem ieRdr)
-            emit_warning (BadImportW ie) = whenWOptM Opt_WarnDodgyImports $
+            emit_warning (BadImportW ie) =
               addDiagnostic (WarningWithFlag Opt_WarnDodgyImports) (lookup_err_msg (BadImport ie))
 
             run_lookup :: IELookupM a -> TcRn (Maybe a)
@@ -1584,6 +1583,8 @@ warnUnusedImportDecls gbl_env hsc_src
                        (vcat [ text "Uses:" <+> ppr uses
                              , text "Import usage" <+> ppr usage])
 
+       -- This warning is costly to emit, so only do so if we will actually show
+       -- it (i.e. if the relevant flag is actually set).
        ; whenWOptM Opt_WarnUnusedImports $
          mapM_ (warnUnusedImport Opt_WarnUnusedImports fld_env) usage
 

@@ -385,9 +385,8 @@ checkUnusedRecordWildcard loc fvs (Just dotdot_names) =
 -- The `..` here doesn't bind any variables as `x` is already bound.
 warnRedundantRecordWildcard :: RnM ()
 warnRedundantRecordWildcard =
-  whenWOptM Opt_WarnRedundantRecordWildcards
-            (addDiagnostic (WarningWithFlag Opt_WarnRedundantRecordWildcards)
-                           redundantWildcardWarning)
+  addDiagnostic (WarningWithFlag Opt_WarnRedundantRecordWildcards)
+    redundantWildcardWarning
 
 
 -- | Produce a warning when no variables bound by a `..` pattern are used.
@@ -404,7 +403,7 @@ warnUnusedRecordWildcard :: [Name] -> FreeVars -> RnM ()
 warnUnusedRecordWildcard ns used_names = do
   let used = filter (`elemNameSet` used_names) ns
   traceRn "warnUnused" (ppr ns $$ ppr used_names $$ ppr used)
-  warnIfFlag Opt_WarnUnusedRecordWildcards (null used)
+  warnIfWithFlag Opt_WarnUnusedRecordWildcards (null used)
     unusedRecordWildcardWarning
 
 

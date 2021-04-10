@@ -2108,9 +2108,7 @@ derivBindCtxt sel_id clas tys
 
 warnUnsatisfiedMinimalDefinition :: ClassMinimalDef -> TcM ()
 warnUnsatisfiedMinimalDefinition mindef
-  = do { warn <- woptM Opt_WarnMissingMethods
-       ; diagnosticTc (WarningWithFlag Opt_WarnMissingMethods) warn message
-       }
+  = addDiagnosticTc (WarningWithFlag Opt_WarnMissingMethods) message
   where
     message = vcat [text "No explicit implementation for"
                    ,nest 2 $ pprBooleanFormulaNice mindef
