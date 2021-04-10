@@ -90,8 +90,8 @@ test('ghci055', combined_output, ghci_script, ['ghci055.script'])
 
 test('ghci056',
      [pre_cmd('$MAKE -s --no-print-directory ghci056_setup'),
-      extra_run_opts('ghci056_c.o'),
-      fragile(17018)],
+      when(unregisterised(), fragile(17018)),
+      extra_run_opts('ghci056_c.o')],
      ghci_script, ['ghci056.script'])
 
 test('ghci057', extra_hc_opts("-fno-ghci-leak-check"), ghci_script, ['ghci057.script'])
@@ -328,4 +328,3 @@ test('T19197', normal, ghci_script, ['T19197.script'])
 test('T19158', normal, ghci_script, ['T19158.script'])
 test('T19279', normal, ghci_script, ['T19279.script'])
 test('T19310', normal, ghci_script, ['T19310.script'])
-
