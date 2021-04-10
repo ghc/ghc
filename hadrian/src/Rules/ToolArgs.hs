@@ -34,6 +34,7 @@ import System.Directory (canonicalizePath)
 -- options needed to compile the specific file.
 toolArgsTarget :: Rules ()
 toolArgsTarget = do
+  -- TODO: magic `(drop 5 s)`
   phonys (\s -> if "tool:" `isPrefixOf` s then Just (toolRuleBody (drop 5 s)) else Nothing)
 
 toolRuleBody :: FilePath -> Action ()
@@ -98,7 +99,17 @@ toolTargets = [ array
              , stm
              , time
              , unlit
-             , xhtml ]
+             , xhtml
+             , checkApiAnnotations
+             , checkPpr
+             , compareSizes
+             , deriveConstants
+             , genapply
+             , genprimopcode
+             , ghcPkg
+             , hpc
+             , hpcBin
+             , runGhc ]
 
 -- | Create a mapping from files to which component it belongs to.
 dirMap :: Action [(FilePath, (Package, [String]))]
@@ -125,4 +136,3 @@ dirMap = do
       cd <- readContextData c
       ids <- liftIO $ mapM canonicalizePath [pkgPath p </> i | i <- srcDirs cd]
       return $ map (,(p, modules cd ++ otherModules cd)) ids
-
