@@ -171,8 +171,8 @@ function show_tool() {
 
 function set_toolchain_paths() {
   needs_toolchain="1"
-  case "$(uname)" in
-    Linux) needs_toolchain="0" ;;
+  case "$(uname -m)-$(uname)" in
+    *-Linux) needs_toolchain="" ;;
     *) ;;
   esac
 
@@ -182,7 +182,7 @@ function set_toolchain_paths() {
       CABAL="$(which cabal)"
       HAPPY="$(which happy)"
       ALEX="$(which alex)"
-  elif [[ -n "$needs_toolchain" = "1" ]]; then
+  elif [[ -n "$needs_toolchain" ]]; then
       # These are populated by setup_toolchain
       GHC="$toolchain/bin/ghc$exe"
       CABAL="$toolchain/bin/cabal$exe"
@@ -358,7 +358,7 @@ BUILD_SPHINX_HTML=$BUILD_SPHINX_HTML
 BUILD_SPHINX_PDF=$BUILD_SPHINX_PDF
 BeConservative=YES
 BIGNUM_BACKEND=$BIGNUM_BACKEND
-XZ_CMD=$XZ
+XZ_CMD=${XZ:-}
 
 BuildFlavour=$BUILD_FLAVOUR
 ifneq "\$(BuildFlavour)" ""
@@ -426,7 +426,7 @@ function fetch_perf_notes() {
 }
 
 function push_perf_notes() {
-  if [ -n "$CROSS_TARGET" ]; then
+  if [ -n "${CROSS_TARGET:-}" ]; then
     info "Can't test cross-compiled build."
     return
   fi
@@ -443,7 +443,7 @@ function determine_metric_baseline() {
 }
 
 function test_make() {
-  if [ -n "$CROSS_TARGET" ]; then
+  if [ -n "${CROSS_TARGET:-}" ]; then
     info "Can't test cross-compiled build."
     return
   fi
@@ -452,7 +452,7 @@ function test_make() {
   run "$MAKE" V=0 VERBOSE=1 test \
     THREADS="$cores" \
     JUNIT_FILE=../../junit.xml \
-    EXTRA_RUNTEST_OPTS="$RUNTEST_ARGS"
+    EXTRA_RUNTEST_OPTS="${RUNTEST_ARGS:-}"
 }
 
 function build_hadrian() {
@@ -466,7 +466,7 @@ function build_hadrian() {
 }
 
 function test_hadrian() {
-  if [ -n "$CROSS_TARGET" ]; then
+  if [ -n "${CROSS_TARGET:-}" ]; then
     info "Can't test cross-compiled build."
     return
   fi
@@ -480,7 +480,7 @@ function test_hadrian() {
     test \
     --summary-junit=./junit.xml \
     --test-compiler="$TOP"/_build/install/bin/ghc \
-    "runtest.opts+=$RUNTEST_ARGS"
+    "runtest.opts+=${RUNTEST_ARGS:-}"
 }
 
 function cabal_test() {
@@ -521,14 +521,14 @@ function run_hadrian() {
   if [ -z "$BUILD_FLAVOUR" ]; then
     fail "BUILD_FLAVOUR not set"
   fi
-  if [ -z "$BIGNUM_BACKEND" ]; then BIGNUM_BACKEND="gmp"; fi
-  if [ -n "$VERBOSE" ]; then HADRIAN_ARGS="$HADRIAN_ARGS -V"; fi
+  if [ -z "${BIGNUM_BACKEND:-}" ]; then BIGNUM_BACKEND="gmp"; fi
+  if [ -n "${VERBOSE:-}" ]; then HADRIAN_ARGS="${HADRIAN_ARGS:-} -V"; fi
   run hadrian/build-cabal \
     --flavour="$BUILD_FLAVOUR" \
     -j"$cores" \
-    --broken-test="$BROKEN_TESTS" \
+    --broken-test="${BROKEN_TESTS:-}" \
     --bignum=$BIGNUM_BACKEND \
-    $HADRIAN_ARGS \
+    ${HADRIAN_ARGS:-} \
     $@
 }
 
@@ -564,7 +564,7 @@ case "$(uname)" in
   *) fail "uname $(uname) is not supported" ;;
 esac
 
-if [ -n "$CROSS_TARGET" ]; then
+if [ -n "${CROSS_TARGET:-}" ]; then
   info "Cross-compiling for $CROSS_TARGET..."
   target_triple="$CROSS_TARGET"
 fi
