@@ -202,7 +202,7 @@ typedef struct {
 typedef struct {
   StgHeader header;
   StgWord data;
-} StgIntCharlikeClosure;
+} StgWordlikeClosure;
 
 /* statically allocated */
 typedef struct {
