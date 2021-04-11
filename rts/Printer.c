@@ -678,7 +678,7 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
     }
 }
 
-static void printStack( StgStack *stack )
+void printStack( StgStack *stack )
 {
     printStackChunk( stack->sp, stack->stack + stack->stack_size );
 }
