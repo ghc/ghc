@@ -1270,15 +1270,9 @@ layoutTuple profile start_off arg_ty reps =
       -- if we don't have a position for a FloatReg then they must be passed
       -- in the equivalent DoubleReg
       reg_order (FloatReg n) = reg_order (DoubleReg n)
-      -- if we don't have a position for a DoubleReg then they must be passed
-      -- in the equivalent VanillaReg
-      reg_order (DoubleReg n) = reg_order (VanillaReg n VGcPtr)
-      -- if we don't have a position for a LongReg then they must be passed
-      -- in the equivalent VanillaReg
-      reg_order (LongReg n)   = reg_order (VanillaReg n VGcPtr)
-      reg_order reg          =
-        pprPanic "StgToByteCode.layoutTuple: invalid register"
-                 (ppr reg <+> ppr (realArgRegsCover platform))
+      -- one-tuples can be passed in other registers, but then we don't need
+      -- to care about the order
+      reg_order reg          = (0, reg)
 
       (regs, reg_params)
           = unzip $ sortBy (comparing fst) [(reg_order reg, x) | (x, RegisterParam reg) <- pos]
