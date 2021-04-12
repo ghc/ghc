@@ -3929,19 +3929,23 @@ instance Outputable BreakTyVarCyclesHow where
 -- should we break the cycles? See Note [Type variable cycles]
 -- in GHC.Tc.Solver.Canonical
 shouldBreakCycle :: CtFlavour   -- of the equality
+                 -> CtLoc       -- of the equality
                  -> TcTyVar     -- the LHS
                  -> TcType      -- the RHS
                  -> TcS (Maybe BreakTyVarCyclesHow)
-shouldBreakCycle Given lhs_tv _rhs
+shouldBreakCycle Given _loc lhs_tv _rhs
   | not (isCycleBreakerTyVar lhs_tv)  -- See Detail (7) of Note
   = return $ Just BTVC_Given
-shouldBreakCycle flav lhs_tv rhs
+shouldBreakCycle flav loc lhs_tv rhs
   | ctFlavourContainsDerived flav
+     -- See Detail (7) of Note
+  , case ctLocOrigin loc of CycleBreakerOrigin _ -> False
+                            _                    -> True
   = do { result <- unifyTest Derived lhs_tv rhs
        ; return $ case result of
            NoUnify -> Nothing
            _       -> Just BTVC_Derived }
-shouldBreakCycle _ _ _ = return Nothing
+shouldBreakCycle _ _ _ _ = return Nothing
 
 -- | Replace all type family applications in the RHS with fresh variables,
 -- emitting givens that relate the type family application to the variable.
@@ -4015,7 +4019,9 @@ breakTyVarCycle how loc = go
       BTVC_Derived ->
         do { new_tv <- wrapTcS (TcM.newFlexiTyVar fun_app_kind)
            ; let new_ty = mkTyVarTy new_tv
-           ; co <- emitNewWantedEq loc Nominal new_ty fun_app
+                 new_loc = updateCtLocOrigin loc CycleBreakerOrigin
+                   -- See Detail (7) of the Note
+           ; co <- emitNewWantedEq new_loc Nominal new_ty fun_app
            ; return (co, new_ty) }
 
 -- | Fill in CycleBreakerTvs with the variables they stand for.

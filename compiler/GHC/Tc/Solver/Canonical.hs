@@ -2352,7 +2352,7 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
              | SolubleOccursCheckCIS <- status
              , TyVarLHS lhs_tv <- lhs
              , NomEq <- eq_rel
-             -> do { m_break_how <- shouldBreakCycle (ctEvFlavour ev) lhs_tv rhs
+             -> do { m_break_how <- shouldBreakCycle (ctEvFlavour ev) loc lhs_tv rhs
                    ; case m_break_how of
                      { Nothing ->
                          do { traceTcS "Decided against breaking tyvar cycle" empty
@@ -2364,11 +2364,13 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
                    ; traceTcS "new RHS:" (ppr new_rhs)
 
                      -- This check is Detail (1) in the Note
-                   ; if anyRewritableTyVar True NomEq (\ _ tv -> tv == lhs_tv) new_rhs
-                     then do { traceTcS "Note [Type variable cycles] Detail (1)"
+                   ; case checkTyVarEq dflags YesTypeFamilies lhs_tv new_rhs of
+                       CTE_Occurs ->
+                          do { traceTcS "Note [Type variable cycles] Detail (1)"
                                         (ppr new_rhs)
                              ; continueWith (mkIrredCt status new_ev) }
-                     else do { -- See Detail (6) of Note [Type variable cycles]
+                       CTE_OK ->
+                         do { -- See Detail (6) of Note [Type variable cycles]
                                new_new_ev <- rewriteEqEvidence new_ev NotSwapped
                                                lhs_ty new_rhs
                                                (mkTcNomReflCo lhs_ty) co
@@ -2376,13 +2378,17 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
                              ; continueWith (CEqCan { cc_ev = new_new_ev
                                                     , cc_lhs = lhs
                                                     , cc_rhs = new_rhs
-                                                    , cc_eq_rel = eq_rel }) }}}}
+                                                    , cc_eq_rel = eq_rel }) }
+
+                       other -> pprPanic "cycle breaking introduced an error" $
+                                  ppr lhs_tv $$ ppr rhs $$ ppr new_rhs $$ ppr other }}}
 
                -- We must not use it for further rewriting!
              | otherwise
              -> do { traceTcS "canEqCanLHSFinish can't make a canonical" (ppr lhs $$ ppr rhs)
                    ; continueWith (mkIrredCt status new_ev) } }
   where
+    loc  = ctEvLoc ev
     role = eqRelRole eq_rel
 
     lhs_ty = canEqLHSType lhs
@@ -2808,10 +2814,14 @@ Details:
 
      However, we still must check to make sure that breakTyVarCycle actually
      succeeds in getting rid of all occurrences of the offending variable.
-     If one is hidden under a forall, this won't be true. So we perform
-     an additional check after performing the substitution.
+     If one is hidden under a forall, this won't be true. A similar problem
+     can happen if the variable appears only in a kind. So we perform
+     an additional check after performing the substitution. It is tiresome
+     to re-run all of checkTyVarEq here, but reimplementing just the occurs-check
+     is even more tiresome.
 
-     Skipping this check causes typecheck/should_fail/GivenForallLoop to loop.
+     Skipping this check causes typecheck/should_fail/GivenForallLoop and
+     polykinds/T18451 to loop.
 
  (2) Our goal here is to avoid loops in rewriting. We can thus skip looking
      in coercions, as we don't rewrite in coercions. (This is another reason
@@ -2890,14 +2900,15 @@ Details:
      if the var is already a CycleBreakerTv. Instead, we mark this
      final Given as a CIrredCan with a SolubleOccursCheckCIS status.
 
-     NB: When filling in CycleBreakerTvs, we fill them in with what
-     they originally stood for (e.g. cbv1 := TF a, cbv2 := TF Int),
-     not what may be in a rewritten constraint.
-
-     Not breaking cycles further (which would mean changing TF cbv1 to cbv3
-     and TF cbv2 to cbv4) makes sense, because we only want to break cycles
-     for user-written loopy Givens, and a CycleBreakerTv certainly isn't
-     user-written.
+     Though this example works with Givens, a similar problem can
+     arise with Wanteds, as we see in typecheck/should_fail/T17139.
+     With Givens, we detect the cycle-breaker by looking at the
+     MetaInfo on the tyvar. Because the tyvars invented for breaking
+     cycles in Wanteds are like TauTvs in all other respects, we do
+     not create a new MetaInfo for Wanted cycle-breaker vars. Instead,
+     we use a CycleBreakerOrigin for the new equalities emitted during
+     cycle-breaking, and we refuse to break cycles in CycleBreakerOrigin
+     equalities.
 
  (8) We really want to do this all only when there is an occurs-check
      failure, not when other problems arise (such as an impredicative
