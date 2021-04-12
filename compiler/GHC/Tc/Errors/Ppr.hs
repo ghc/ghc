@@ -31,6 +31,8 @@ instance Diagnostic TcRnMessage where
                      ]
     TcRnUnusedPatternBinds bind
       -> mkDecorated [hang (text "This pattern-binding binds no variables:") 2 (ppr bind)]
+    TcRnDodgyImports name
+      -> mkDecorated [dodgyMsg (text "import") name (dodgyMsgInsert name :: IE GhcPs)]
     TcRnDodgyExports name
       -> mkDecorated [dodgyMsg (text "export") name (dodgyMsgInsert name :: IE GhcRn)]
     TcRnMissingImportList ie
@@ -44,6 +46,8 @@ instance Diagnostic TcRnMessage where
       -> WarningWithFlag Opt_WarnImplicitLift
     TcRnUnusedPatternBinds{}
       -> WarningWithFlag Opt_WarnUnusedPatternBinds
+    TcRnDodgyImports{}
+      -> WarningWithFlag Opt_WarnDodgyImports
     TcRnDodgyExports{}
       -> WarningWithFlag Opt_WarnDodgyExports
     TcRnMissingImportList{}

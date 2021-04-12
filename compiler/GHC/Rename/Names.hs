@@ -40,7 +40,6 @@ import GHC.Rename.Env
 import GHC.Rename.Fixity
 import GHC.Rename.Utils ( warnUnusedTopBinds, mkFieldEnv )
 
-import GHC.Tc.Errors.Ppr
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
@@ -1165,7 +1164,7 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
         where
             -- Warn when importing T(..) if T was exported abstractly
             emit_warning (DodgyImport n) = whenWOptM Opt_WarnDodgyImports $
-              addDiagnostic (WarningWithFlag Opt_WarnDodgyImports) (dodgyImportWarn n)
+              addTcRnDiagnostic (TcRnDodgyImports n)
             emit_warning MissingImportList = whenWOptM Opt_WarnMissingImportList $
               addTcRnDiagnostic (TcRnMissingImportList ieRdr)
             emit_warning (BadImportW ie) = whenWOptM Opt_WarnDodgyImports $
@@ -2005,10 +2004,6 @@ badImportItemErr iface decl_spec ie avails
 
 illegalImportItemErr :: SDoc
 illegalImportItemErr = text "Illegal import item"
-
-dodgyImportWarn :: RdrName -> SDoc
-dodgyImportWarn item
-  = dodgyMsg (text "import") item (dodgyMsgInsert item :: IE GhcPs)
 
 addDupDeclErr :: [GlobalRdrElt] -> TcRn ()
 addDupDeclErr [] = panic "addDupDeclErr: empty list"
