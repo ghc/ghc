@@ -8,12 +8,13 @@ module GHC.Tc.Errors.Types (
   , mkTcRnDsMessage
   ) where
 
+import GHC.Hs (GhcRn)
+import GHC.Hs.Binds
+import GHC.HsToCore.Errors.Types
 import GHC.Prelude
 import GHC.Types.Error
-import GHC.HsToCore.Errors.Types
+import GHC.Types.Name (Name)
 import GHC.Utils.Outputable
-import GHC.Hs.Binds
-import GHC.Hs (GhcRn)
 
 
 {- Note [TcRnDsMessage]
@@ -70,3 +71,15 @@ data TcRnMessage where
      Test cases: rename/{T13646,T17c,T17e,T7085}
   -}
   TcRnUnusedPatternBinds :: HsBind GhcRn -> TcRnMessage
+  {-| TcRnDodgyExports occurs when a datatype 'T' is exported with all constructors,
+      i.e. 'T(..)', but is it just a type synonym. Also emitted when a module is re-exported,
+      but that module exports nothing.
+
+     Example:
+       module Foo (T(..)) where
+
+       type T = Int
+
+     Test cases: warnings/should_compile/DodgyExports01
+  -}
+  TcRnDodgyExports :: Name -> TcRnMessage
