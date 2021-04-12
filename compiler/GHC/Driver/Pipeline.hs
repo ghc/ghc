@@ -272,30 +272,7 @@ compileOne' m_tc_result mHscMessage
         HscUpToDate iface hmi_details ->
             ASSERT( isJust mb_old_linkable || isNoLink (ghcLink dflags) )
             return $! HomeModInfo iface hmi_details mb_old_linkable
-        HscUpdateBoot iface hmi_details -> do
-            touchObjectFile logger dflags object_filename
-            return $! HomeModInfo iface hmi_details Nothing
-        HscUpdateSig iface hmi_details -> do
-            output_fn <- getOutputFilename logger tmpfs next_phase
-                            (Temporary TFL_CurrentModule) basename dflags
-                            next_phase (Just location)
-
-            -- #10660: Use the pipeline instead of calling
-            -- compileEmptyStub directly, so -dynamic-too gets
-            -- handled properly
-            _ <- runPipeline StopLn hsc_env'
-                              (output_fn,
-                               Nothing,
-                               Just (HscOut src_flavour
-                                            mod_name (HscUpdateSig iface hmi_details)))
-                              (Just basename)
-                              Persistent
-                              (Just location)
-                              []
-            o_time <- getModificationUTCTime object_filename
-            let !linkable = LM o_time this_mod [DotO object_filename]
-            return $! HomeModInfo iface hmi_details (Just linkable)
-        HscRecomp{} -> do
+        _ -> do
             output_fn <- getOutputFilename logger tmpfs next_phase
                             (Temporary TFL_CurrentModule)
                             basename dflags next_phase (Just location)
@@ -308,11 +285,14 @@ compileOne' m_tc_result mHscMessage
                               Persistent
                               (Just location)
                               []
+            mLinkable <- case src_flavour of
+              HsSrcFile -> do
                   -- The object filename comes from the ModLocation
-            o_time <- getModificationUTCTime object_filename
-            let !linkable = LM o_time this_mod [DotO object_filename]
-            return $! HomeModInfo iface details (Just linkable)
-        _ -> panic "compileOne HscNotGeneratingCode"
+                  o_time <- getModificationUTCTime object_filename
+                  let !linkable = LM o_time this_mod [DotO object_filename]
+                  return $ Just linkable
+              _ -> return Nothing
+            return $! HomeModInfo iface details mLinkable
 
  where dflags0     = ms_hspp_opts summary
        this_mod    = ms_mod summary
@@ -1356,27 +1336,32 @@ runPhase (HscOut src_flavour mod_name result) _ = do
             next_phase = hscPostBackendPhase src_flavour (backend dflags)
 
         case result of
-            HscNotGeneratingCode _ _ ->
-                return (RealPhase StopLn,
+            HscNotGeneratingCode iface mod_details ->
+                do
+                   setIface iface mod_details
+                   return (RealPhase StopLn,
                         panic "No output filename from Hsc when no-code")
-            HscUpToDate _ _ ->
+            HscUpToDate iface mod_details ->
                 do liftIO $ touchObjectFile logger dflags o_file
                    -- The .o file must have a later modification date
                    -- than the source file (else we wouldn't get Nothing)
                    -- but we touch it anyway, to keep 'make' happy (we think).
+                   setIface iface mod_details
                    return (RealPhase StopLn, o_file)
-            HscUpdateBoot _ _ ->
+            HscUpdateBoot iface mod_details ->
                 do -- In the case of hs-boot files, generate a dummy .o-boot
                    -- stamp file for the benefit of Make
                    liftIO $ touchObjectFile logger dflags o_file
+                   setIface iface mod_details
                    return (RealPhase StopLn, o_file)
-            HscUpdateSig _ _ ->
+            HscUpdateSig iface mod_details ->
                 do -- We need to create a REAL but empty .o file
                    -- because we are going to attempt to put it in a library
                    PipeState{hsc_env=hsc_env'} <- getPipeState
                    let input_fn = expectJust "runPhase" (ml_hs_file location)
                        basename = dropExtension input_fn
                    liftIO $ compileEmptyStub dflags hsc_env' basename location mod_name
+                   setIface iface mod_details
                    return (RealPhase StopLn, o_file)
             HscRecomp { hscs_guts = cgguts,
                         hscs_mod_location = mod_location,
