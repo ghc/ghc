@@ -332,3 +332,11 @@ test('T19667Ghci', extra_files(['T19667Ghci.hs']), ghci_script, ['T19667Ghci.scr
 test('T19688', normal, ghci_script, ['T19688.script'])
 test('T20019', normal, ghci_script, ['T20019.script'])
 test('T20101', normal, ghci_script, ['T20101.script'])
+test('T19650',
+     [ pre_cmd('$MAKE -s --no-print-directory T19650_setup'),
+       extra_hc_opts('-package-env my_package_env -v1'),
+       # Should only appear once
+       filter_stdout_lines(r'Loaded package env.*')
+     ],
+     ghci_script,
+     ['T19650.script'])

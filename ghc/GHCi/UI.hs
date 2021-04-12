@@ -3028,13 +3028,17 @@ setOptions wds =
       -- then, dynamic flags
       when (not (null minus_opts)) $ newDynFlags False minus_opts
 
+-- | newDynFlags will *not* read package environment files, therefore we
+-- use 'parseDynamicFlagsCmdLine' rather than 'parseDynamicFlags'. This
+-- function is called very often and results in repeatedly loading
+-- environment files (see #19650)
 newDynFlags :: GhciMonad m => Bool -> [String] -> m ()
 newDynFlags interactive_only minus_opts = do
       let lopts = map noLoc minus_opts
 
       logger <- getLogger
       idflags0 <- GHC.getInteractiveDynFlags
-      (idflags1, leftovers, warns) <- GHC.parseDynamicFlags logger idflags0 lopts
+      (idflags1, leftovers, warns) <- DynFlags.parseDynamicFlagsCmdLine idflags0 lopts
 
       liftIO $ handleFlagWarnings logger idflags1 warns
       when (not $ null leftovers)
@@ -3050,7 +3054,7 @@ newDynFlags interactive_only minus_opts = do
       dflags0 <- getDynFlags
 
       when (not interactive_only) $ do
-        (dflags1, _, _) <- liftIO $ GHC.parseDynamicFlags logger dflags0 lopts
+        (dflags1, _, _) <- liftIO $ DynFlags.parseDynamicFlagsCmdLine dflags0 lopts
         must_reload <- GHC.setProgramDynFlags dflags1
 
         -- if the package flags changed, reset the context and link
