@@ -663,8 +663,8 @@ once had done). This problem can be tickled by typecheck/should_compile/holes.
 -- mean that (ty1 ~ ty2)
 interactIrred :: InertCans -> Ct -> TcS (StopOrContinue Ct)
 
-interactIrred inerts workItem@(CIrredCan { cc_ev = ev_w, cc_status = status })
-  | InsolubleCIS <- status
+interactIrred inerts workItem@(CIrredCan { cc_ev = ev_w, cc_reason = reason })
+  | isInsolubleReason reason
                -- For insolubles, don't allow the constraint to be dropped
                -- which can happen with solveOneFromTheOther, so that
                -- we get distinct error messages with -fdefer-type-errors
@@ -1583,15 +1583,15 @@ tryToSolveByUnification :: Ct -> CtEvidence
                         -> TcType    -- RHS
                         -> TcS (StopOrContinue Ct)
 tryToSolveByUnification work_item ev tv rhs
-  = do { can_unify <- unifyTest ev tv rhs
+  = do { is_touchable <- touchabilityTest (ctEvFlavour ev) tv rhs
        ; traceTcS "tryToSolveByUnification" (vcat [ ppr tv <+> char '~' <+> ppr rhs
-                                                  , ppr can_unify ])
+                                                  , ppr is_touchable ])
 
-       ; case can_unify of
-           NoUnify -> continueWith work_item
+       ; case is_touchable of
+           Untouchable -> continueWith work_item
            -- For the latter two cases see Note [Solve by unification]
-           UnifySameLevel -> solveByUnification ev tv rhs
-           UnifyOuterLevel free_metas tv_lvl
+           TouchableSameLevel -> solveByUnification ev tv rhs
+           TouchableOuterLevel free_metas tv_lvl
              -> do { wrapTcS $ mapM_ (promoteMetaTyVarTo tv_lvl) free_metas
                    ; setUnificationFlag tv_lvl
                    ; solveByUnification ev tv rhs } }
@@ -1663,10 +1663,10 @@ If we solve
    alpha[n] ~ ty
 by unification, there are two cases to consider
 
-* UnifySameLevel: if the ambient level is 'n', then
+* TouchableSameLevel: if the ambient level is 'n', then
   we can simply update alpha := ty, and do nothing else
 
-* UnifyOuterLevel free_metas n: if the ambient level is greater than
+* TouchableOuterLevel free_metas n: if the ambient level is greater than
   'n' (the level of alpha), in addition to setting alpha := ty we must
   do two other things:
 
@@ -1680,7 +1680,7 @@ by unification, there are two cases to consider
   2. Set the Unification Level Flag to record that a level-n unification has
      taken place. See Note [The Unification Level Flag] in GHC.Tc.Solver.Monad
 
-NB: UnifySameLevel is just an optimisation for UnifyOuterLevel. Promotion
+NB: TouchableSameLevel is just an optimisation for TouchableOuterLevel. Promotion
 would be a no-op, and setting the unification flag unnecessarily would just
 make the solver iterate more often.  (We don't need to iterate when unifying
 at the ambient level because of the kick-out mechanism.)

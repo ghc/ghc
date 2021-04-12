@@ -10,7 +10,7 @@ module GHC.Tc.Types.Constraint (
         QCInst(..), isPendingScInst,
 
         -- Canonical constraints
-        Xi, Ct(..), Cts, CtIrredStatus(..), HoleSet,
+        Xi, Ct(..), Cts,
         emptyCts, andCts, andManyCts, pprCts,
         singleCt, listToCts, ctsElts, consCts, snocCts, extendCtsList,
         isEmptyCts,
@@ -25,6 +25,14 @@ module GHC.Tc.Types.Constraint (
         ctEvExpr, ctEvTerm, ctEvCoercion, ctEvEvId,
         tyCoVarsOfCt, tyCoVarsOfCts,
         tyCoVarsOfCtList, tyCoVarsOfCtsList,
+
+        CtIrredReason(..), HoleSet, isInsolubleReason,
+
+        CheckTyEqResult, CheckTyEqProblem, cteProblem, cterClearOccursCheck,
+        cteOK, cteImpredicative, cteTypeFamily, cteHoleBlocker,
+        cteInsolubleOccurs, cteSolubleOccurs, cterSetOccursCheckSoluble,
+        cterHasNoProblem, cterHasProblem, cterHasOnlyProblem,
+        cterRemoveProblem, cterHasOccursCheck, cterFromKind,
 
         CanEqLHS(..), canEqLHS_maybe, canEqLHSKind, canEqLHSType,
         eqCanEqLHS,
@@ -58,7 +66,7 @@ module GHC.Tc.Types.Constraint (
 
         wrapType,
 
-        CtFlavour(..), ShadowInfo(..), ctEvFlavour,
+        CtFlavour(..), ShadowInfo(..), ctFlavourContainsDerived, ctEvFlavour,
         CtFlavourRole, ctEvFlavourRole, ctFlavourRole,
         eqCanRewrite, eqCanRewriteFR, eqMayRewriteFR,
         eqCanDischargeFR,
@@ -105,6 +113,12 @@ import GHC.Utils.Panic
 
 import Control.Monad ( msum )
 import qualified Data.Semigroup ( (<>) )
+
+-- these are for CheckTyEqResult
+import Data.Word  ( Word8 )
+import Data.List  ( intersperse )
+
+
 
 {-
 ************************************************************************
@@ -173,7 +187,7 @@ data Ct
 
   | CIrredCan {  -- These stand for yet-unusable predicates
       cc_ev     :: CtEvidence,   -- See Note [Ct/evidence invariant]
-      cc_status :: CtIrredStatus
+      cc_reason :: CtIrredReason
 
         -- For the might-be-soluble case, the ctev_pred of the evidence is
         -- of form   (tv xi1 xi2 ... xin)   with a tyvar at the head
@@ -296,21 +310,156 @@ instance Outputable HoleSort where
 
 ------------
 -- | Used to indicate extra information about why a CIrredCan is irreducible
-data CtIrredStatus
-  = InsolubleCIS   -- this constraint will never be solved
-  | BlockedCIS HoleSet
-                   -- this constraint is blocked on the coercion hole(s) listed
-                   -- See Note [Equalities with incompatible kinds] in GHC.Tc.Solver.Canonical
-                   -- Wrinkle (4a). Why store the HoleSet? See Wrinkle (2) of that
-                   -- same Note.
-                   -- INVARIANT: A BlockedCIS is a homogeneous equality whose
-                   --   left hand side can fit in a CanEqLHS.
-  | OtherCIS
+data CtIrredReason
+  = IrredShapeReason
+      -- ^ this constraint has a non-canonical shape (e.g. @c Int@, for a variable @c@)
 
-instance Outputable CtIrredStatus where
-  ppr InsolubleCIS       = text "(insoluble)"
-  ppr (BlockedCIS holes) = parens (text "blocked on" <+> ppr holes)
-  ppr OtherCIS           = text "(soluble)"
+  | HoleBlockerReason HoleSet
+     -- ^ this constraint is blocked on the coercion hole(s) listed
+     -- See Note [Equalities with incompatible kinds] in GHC.Tc.Solver.Canonical
+     -- Wrinkle (4a). Why store the HoleSet? See Wrinkle (2) of that
+     -- same Note.
+     -- INVARIANT: A HoleBlockerReason constraint is a homogeneous equality whose
+     --   left hand side can fit in a CanEqLHS.
+
+  | NonCanonicalReason CheckTyEqResult
+   -- ^ an equality where some invariant other than (TyEq:H) of 'CEqCan' is not satisfied;
+   -- the 'CheckTyEqResult' states exactly why
+   -- INVARIANT: the 'CheckTyEqResult' has some bit set other than cteHoleBlocker
+
+  | ReprEqReason
+    -- ^ an equality that cannot be decomposed because it is representational.
+    -- Example: @a b ~R# Int@.
+    -- These might still be solved later.
+    -- INVARIANT: The constraint is a representational equality constraint
+
+  | ShapeMismatchReason
+    -- ^ a nominal equality that relates two wholly different types,
+    -- like @Int ~# Bool@ or @a b ~# 3@.
+    -- INVARIANT: The constraint is a nominal equality constraint
+
+  | AbstractTyConReason
+    -- ^ an equality like @T a b c ~ Q d e@ where either @T@ or @Q@
+    -- is an abstract type constructor. See Note [Skolem abstract data]
+    -- in GHC.Core.TyCon.
+    -- INVARIANT: The constraint is an equality constraint between two TyConApps
+
+instance Outputable CtIrredReason where
+  ppr IrredShapeReason          = text "(irred)"
+  ppr (HoleBlockerReason holes) = parens (text "blocked on" <+> ppr holes)
+  ppr (NonCanonicalReason cter) = ppr cter
+  ppr ReprEqReason              = text "(repr)"
+  ppr ShapeMismatchReason       = text "(shape)"
+  ppr AbstractTyConReason       = text "(abstc)"
+
+-- | Are we sure that more solving will never solve this constraint?
+isInsolubleReason :: CtIrredReason -> Bool
+isInsolubleReason IrredShapeReason          = False
+isInsolubleReason (HoleBlockerReason {})    = False
+isInsolubleReason (NonCanonicalReason cter) = cterIsInsoluble cter
+isInsolubleReason ReprEqReason              = False
+isInsolubleReason ShapeMismatchReason       = True
+isInsolubleReason AbstractTyConReason       = True
+
+------------------------------------------------------------------------------
+--
+-- CheckTyEqResult, defined here because it is stored in a CtIrredReason
+--
+------------------------------------------------------------------------------
+
+-- | A set of problems in checking the validity of a type equality.
+-- See 'checkTypeEq'.
+newtype CheckTyEqResult = CTER Word8
+
+-- | No problems in checking the validity of a type equality.
+cteOK :: CheckTyEqResult
+cteOK = CTER zeroBits
+
+-- | Check whether a 'CheckTyEqResult' is marked successful.
+cterHasNoProblem :: CheckTyEqResult -> Bool
+cterHasNoProblem (CTER 0) = True
+cterHasNoProblem _        = False
+
+-- | An individual problem that might be logged in a 'CheckTyEqResult'
+newtype CheckTyEqProblem = CTEP Word8
+
+cteImpredicative, cteTypeFamily, cteHoleBlocker, cteInsolubleOccurs,
+  cteSolubleOccurs :: CheckTyEqProblem
+cteImpredicative   = CTEP (bit 0)   -- forall or (=>) encountered
+cteTypeFamily      = CTEP (bit 1)   -- type family encountered
+cteHoleBlocker     = CTEP (bit 2)   -- blocking coercion hole
+      -- See Note [Equalities with incompatible kinds] in GHC.Tc.Solver.Canonical
+cteInsolubleOccurs = CTEP (bit 3)   -- occurs-check
+cteSolubleOccurs   = CTEP (bit 4)   -- occurs-check under a type function or in a coercion
+                                    -- must be one bit to the left of cteInsolubleOccurs
+-- See also Note [Insoluble occurs check] in GHC.Tc.Errors
+
+cteProblem :: CheckTyEqProblem -> CheckTyEqResult
+cteProblem (CTEP mask) = CTER mask
+
+occurs_mask :: Word8
+occurs_mask = insoluble_mask .|. soluble_mask
+  where
+    CTEP insoluble_mask = cteInsolubleOccurs
+    CTEP soluble_mask   = cteSolubleOccurs
+
+-- | Check whether a 'CheckTyEqResult' has a 'CheckTyEqProblem'
+cterHasProblem :: CheckTyEqResult -> CheckTyEqProblem -> Bool
+CTER bits `cterHasProblem` CTEP mask = (bits .&. mask) /= 0
+
+-- | Check whether a 'CheckTyEqResult' has one 'CheckTyEqProblem' and no other
+cterHasOnlyProblem :: CheckTyEqResult -> CheckTyEqProblem -> Bool
+CTER bits `cterHasOnlyProblem` CTEP mask = bits == mask
+
+cterRemoveProblem :: CheckTyEqResult -> CheckTyEqProblem -> CheckTyEqResult
+cterRemoveProblem (CTER bits) (CTEP mask) = CTER (bits .&. complement mask)
+
+cterHasOccursCheck :: CheckTyEqResult -> Bool
+cterHasOccursCheck (CTER bits) = (bits .&. occurs_mask) /= 0
+
+cterClearOccursCheck :: CheckTyEqResult -> CheckTyEqResult
+cterClearOccursCheck (CTER bits) = CTER (bits .&. complement occurs_mask)
+
+-- | Mark a 'CheckTyEqResult' as not having an insoluble occurs-check: any occurs
+-- check under a type family or in a representation equality is soluble.
+cterSetOccursCheckSoluble :: CheckTyEqResult -> CheckTyEqResult
+cterSetOccursCheckSoluble (CTER bits)
+  = CTER $ ((bits .&. insoluble_mask) `shift` 1) .|. (bits .&. complement insoluble_mask)
+  where
+    CTEP insoluble_mask = cteInsolubleOccurs
+
+-- | Retain only information about occurs-check failures, because only that
+-- matters after recurring into a kind.
+cterFromKind :: CheckTyEqResult -> CheckTyEqResult
+cterFromKind (CTER bits)
+  = CTER (bits .&. occurs_mask)
+
+cterIsInsoluble :: CheckTyEqResult -> Bool
+cterIsInsoluble (CTER bits) = (bits .&. mask) /= 0
+  where
+    mask = impredicative_mask .|. insoluble_occurs_mask
+
+    CTEP impredicative_mask    = cteImpredicative
+    CTEP insoluble_occurs_mask = cteInsolubleOccurs
+
+instance Semigroup CheckTyEqResult where
+  CTER bits1 <> CTER bits2 = CTER (bits1 .|. bits2)
+instance Monoid CheckTyEqResult where
+  mempty = cteOK
+
+instance Outputable CheckTyEqResult where
+  ppr cter | cterHasNoProblem cter = text "cteOK"
+           | otherwise
+           = parens $ fcat $ intersperse vbar $ set_bits
+    where
+      all_bits = [ (cteImpredicative,   "cteImpredicative")
+                 , (cteTypeFamily,      "cteTypeFamily")
+                 , (cteHoleBlocker,     "cteHoleBlocker")
+                 , (cteInsolubleOccurs, "cteInsolubleOccurs")
+                 , (cteSolubleOccurs,   "cteSolubleOccurs") ]
+      set_bits = [ text str
+                 | (bitmask, str) <- all_bits
+                 , cter `cterHasProblem` bitmask ]
 
 {- Note [CIrredCan constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -393,8 +542,8 @@ mkNonCanonical ev = CNonCanonical { cc_ev = ev }
 mkNonCanonicalCt :: Ct -> Ct
 mkNonCanonicalCt ct = CNonCanonical { cc_ev = cc_ev ct }
 
-mkIrredCt :: CtIrredStatus -> CtEvidence -> Ct
-mkIrredCt status ev = CIrredCan { cc_ev = ev, cc_status = status }
+mkIrredCt :: CtIrredReason -> CtEvidence -> Ct
+mkIrredCt reason ev = CIrredCan { cc_ev = ev, cc_reason = reason }
 
 mkGivens :: CtLoc -> [EvId] -> [Ct]
 mkGivens loc ev_ids
@@ -452,7 +601,7 @@ instance Outputable Ct where
          CDictCan { cc_pend_sc = pend_sc }
             | pend_sc   -> text "CDictCan(psc)"
             | otherwise -> text "CDictCan"
-         CIrredCan { cc_status = status } -> text "CIrredCan" <> ppr status
+         CIrredCan { cc_reason = reason } -> text "CIrredCan" <> ppr reason
          CQuantCan (QCI { qci_pend_sc = pend_sc })
             | pend_sc   -> text "CQuantCan(psc)"
             | otherwise -> text "CQuantCan"
@@ -623,8 +772,8 @@ isDroppableCt ct
 
     keep_deriv
       = case ct of
-          CIrredCan { cc_status = InsolubleCIS } -> keep_eq True
-          _                                      -> keep_eq False
+          CIrredCan { cc_reason = reason } | isInsolubleReason reason -> keep_eq True
+          _                                                           -> keep_eq False
 
     keep_eq definitely_insoluble
        | isGivenOrigin orig    -- Arising only from givens
@@ -1031,8 +1180,8 @@ insolubleEqCt :: Ct -> Bool
 --                   True for  Int ~ F a Int
 --               but False for  Maybe Int ~ F a Int Int
 --               (where F is an arity-1 type function)
-insolubleEqCt (CIrredCan { cc_status = InsolubleCIS }) = True
-insolubleEqCt _                                        = False
+insolubleEqCt (CIrredCan { cc_reason = reason }) = isInsolubleReason reason
+insolubleEqCt _                                  = False
 
 -- | Does this hole represent an "out of scope" error?
 -- See Note [Insoluble holes]
@@ -1633,6 +1782,12 @@ instance Outputable CtFlavour where
   ppr (Wanted WDeriv) = text "[WD]"
   ppr (Wanted WOnly)  = text "[W]"
   ppr Derived         = text "[D]"
+
+-- | Does this 'CtFlavour' subsumed 'Derived'? True of @[WD]@ and @[D]@.
+ctFlavourContainsDerived :: CtFlavour -> Bool
+ctFlavourContainsDerived (Wanted WDeriv) = True
+ctFlavourContainsDerived Derived         = True
+ctFlavourContainsDerived _               = False
 
 ctEvFlavour :: CtEvidence -> CtFlavour
 ctEvFlavour (CtWanted { ctev_nosh = nosh }) = Wanted nosh

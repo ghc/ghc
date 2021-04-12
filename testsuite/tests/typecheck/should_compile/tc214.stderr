@@ -1,0 +1,18 @@
+
+tc214.hs:19:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match has inaccessible right hand side
+    In an equation for ‘bar2’: bar2 (F2 _) = ...
+
+tc214.hs:19:7: warning: [-Winaccessible-code (in -Wdefault)]
+    • Couldn't match type ‘a’ with ‘forall a1. a1’
+      Cannot equate type variable ‘a’
+      with a type involving polytypes: forall a1. a1
+      ‘a’ is a rigid type variable bound by
+        a pattern with constructor: F2 :: forall a. a -> Foo2 [a],
+        in an equation for ‘bar2’
+        at tc214.hs:19:7-10
+      Inaccessible code in
+        a pattern with constructor: F2 :: forall a. a -> Foo2 [a],
+        in an equation for ‘bar2’
+    • In the pattern: F2 _
+      In an equation for ‘bar2’: bar2 (F2 _) = ()

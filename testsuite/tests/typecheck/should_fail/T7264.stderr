@@ -3,6 +3,8 @@ T7264.hs:13:19: error:
     • Couldn't match type ‘a’ with ‘forall r. r -> String’
       Expected: a -> Foo
         Actual: (forall r. r -> String) -> Foo
+      Cannot equate type variable ‘a’
+      with a type involving polytypes: forall r. r -> String
       ‘a’ is a rigid type variable bound by
         the inferred type of mkFoo2 :: a -> Maybe Foo
         at T7264.hs:13:1-32

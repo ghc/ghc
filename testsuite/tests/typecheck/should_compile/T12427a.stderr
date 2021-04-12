@@ -2,6 +2,8 @@
 T12427a.hs:17:29: error:
     • Couldn't match expected type ‘p’
                   with actual type ‘(forall b. [b] -> [b]) -> Int’
+      Cannot equate type variable ‘p’
+      with a type involving polytypes: (forall b. [b] -> [b]) -> Int
       ‘p’ is a rigid type variable bound by
         the inferred type of h11 :: T -> p
         at T12427a.hs:17:1-29
@@ -12,10 +14,13 @@ T12427a.hs:17:29: error:
         h11 :: T -> p (bound at T12427a.hs:17:1)
 
 T12427a.hs:28:6: error:
-    • Couldn't match expected type ‘p0’
+    • Couldn't match expected type ‘p’
                   with actual type ‘(forall b. [b] -> [b]) -> Int’
-      Cannot instantiate unification variable ‘p0’
+      Cannot equate type variable ‘p’
       with a type involving polytypes: (forall b. [b] -> [b]) -> Int
+      ‘p’ is a rigid type variable bound by
+        the inferred type of x1 :: p
+        at T12427a.hs:28:1-19
     • In the pattern: T1 _ x1
       In a pattern binding: T1 _ x1 = undefined
 

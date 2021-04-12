@@ -82,7 +82,7 @@ module GHC.Tc.Utils.TcType (
   isIntegerTy, isNaturalTy,
   isBoolTy, isUnitTy, isCharTy, isCallStackTy, isCallStackPred,
   isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy,
-  isPredTy, isTyVarClassPred, isInsolubleOccursCheck,
+  isPredTy, isTyVarClassPred,
   checkValidClsArgs, hasTyVarHead,
   isRigidTy,
 
@@ -533,7 +533,7 @@ data MetaInfo
                    -- It /is/ allowed to unify with a polytype, unlike TauTv
 
    | CycleBreakerTv  -- Used to fix occurs-check problems in Givens
-                     -- See Note [Type variable cycles in Givens] in
+                     -- See Note [Type variable cycles] in
                      -- GHC.Tc.Solver.Canonical
 
 instance Outputable MetaDetails where
@@ -1948,40 +1948,6 @@ isImprovementPred ty
       IrredPred {}       -> True -- Might have equalities after reduction?
       ForAllPred {}      -> False
 
--- | Is the equality
---        a ~r ...a....
--- definitely insoluble or not?
---      a ~r Maybe a      -- Definitely insoluble
---      a ~N ...(F a)...  -- Not definitely insoluble
---                        -- Perhaps (F a) reduces to Int
---      a ~R ...(N a)...  -- Not definitely insoluble
---                        -- Perhaps newtype N a = MkN Int
--- See Note [Occurs check error] in
--- "GHC.Tc.Solver.Canonical" for the motivation for this function.
-isInsolubleOccursCheck :: EqRel -> TcTyVar -> TcType -> Bool
-isInsolubleOccursCheck eq_rel tv ty
-  = go ty
-  where
-    go ty | Just ty' <- tcView ty = go ty'
-    go (TyVarTy tv') = tv == tv' || go (tyVarKind tv')
-    go (LitTy {})    = False
-    go (AppTy t1 t2) = case eq_rel of  -- See Note [AppTy and ReprEq]
-                         NomEq  -> go t1 || go t2
-                         ReprEq -> go t1
-    go (FunTy _ w t1 t2) = go w || go t1 || go t2
-    go (ForAllTy (Bndr tv' _) inner_ty)
-      | tv' == tv = False
-      | otherwise = go (varType tv') || go inner_ty
-    go (CastTy ty _)  = go ty   -- ToDo: what about the coercion
-    go (CoercionTy _) = False   -- ToDo: what about the coercion
-    go (TyConApp tc tys)
-      | isGenerativeTyCon tc role = any go tys
-      | otherwise                 = any go (drop (tyConArity tc) tys)
-         -- (a ~ F b a), where F has arity 1,
-         -- has an insoluble occurs check
-
-    role = eqRelRole eq_rel
-
 {- Note [Expanding superclasses]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When we expand superclasses, we use the following algorithm:
@@ -2180,19 +2146,6 @@ is_tc :: Unique -> Type -> Bool
 is_tc uniq ty = case tcSplitTyConApp_maybe ty of
                         Just (tc, _) -> uniq == getUnique tc
                         Nothing      -> False
-
-
-{- Note [AppTy and ReprEq]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider   a ~R# b a
-           a ~R# a b
-
-The former is /not/ a definite error; we might instantiate 'b' with Id
-   newtype Id a = MkId a
-but the latter /is/ a definite error.
-
-On the other hand, with nominal equality, both are definite errors
--}
 
 isRigidTy :: TcType -> Bool
 isRigidTy ty
