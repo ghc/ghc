@@ -694,6 +694,39 @@ This is the only thing that isn't caught by the type-system.
 
 type Messager = HscEnv -> (Int,Int) -> RecompSummary -> ModuleGraphNode -> IO ()
 
+getRecompDetails :: HscEnv
+  -> ModSummary
+  -> SourceModified
+  -> Maybe ModIface  -- ^ Old interface, if available
+  -> IO RecompDetails
+getRecompDetails hsc_env mod_summary source_modified mb_old_iface = do
+  recomp_result
+         <- {-# SCC "checkOldIface" #-}
+            checkOldIface hsc_env mod_summary
+                          source_modified mb_old_iface
+
+  pure $ case recomp_result of
+    RecompNotNeeded checked_iface | mi_used_th checked_iface && not stable ->
+      -- If the module used TH splices when it was last
+      -- compiled, then the recompilation check is not
+      -- accurate enough (#481) and we must ignore
+      -- it.  However, if the module is stable (none of
+      -- the modules it depends on, directly or
+      -- indirectly, changed), then we *can* skip
+      -- recompilation. This is why the SourceModified
+      -- type contains SourceUnmodifiedAndStable, and
+      -- it's pretty important: otherwise ghc --make
+      -- would always recompile TH modules, even if
+      -- nothing at all has changed. Stability is just
+      -- the same check that make is doing for us in
+      -- one-shot mode.
+      RecompNeeded (RecompBecause "TH") (Just (mi_iface_hash . mi_final_exts $ checked_iface))
+      where
+        stable = case source_modified of
+          SourceUnmodifiedAndStable -> True
+          _                         -> False
+    _otherwise -> recomp_result
+
 -- | This function runs GHC's frontend with recompilation
 -- avoidance. Specifically, it checks if recompilation is needed,
 -- and if it is, it parses and typechecks the input module.
@@ -718,10 +751,8 @@ hscIncrementalFrontend always_do_basic_recompilation_check (Just tc_result) _ _ 
   return $ Right (FrontendTypecheck tc_result, Nothing)
 hscIncrementalFrontend _ _ mHscMessage mod_summary source_modified mb_old_iface mod_index = do
   hsc_env <- getHscEnv
-  recomp_result
-         <- {-# SCC "checkOldIface" #-}
-            liftIO $ checkOldIface hsc_env mod_summary
-                         source_modified mb_old_iface
+
+  recomp_result <- liftIO $ getRecompDetails hsc_env mod_summary source_modified mb_old_iface
 
   let
     msg what = case mHscMessage of
@@ -729,48 +760,16 @@ hscIncrementalFrontend _ _ mHscMessage mod_summary source_modified mb_old_iface 
       Just hscMessage -> hscMessage hsc_env mod_index what (ModuleNode (extendModSummaryNoDeps mod_summary))
       Nothing -> return ()
 
-    -- save the interface that comes back from checkOldIface.
-    -- In one-shot mode we don't have the old iface until this
-    -- point, when checkOldIface reads it from the disk.
-    mb_old_hash = case recomp_result of
-      RecompNotNeeded checked_iface -> Just (mi_iface_hash . mi_final_exts $ checked_iface)
-      RecompNeeded _ mb_checked_iface -> mb_checked_iface
-
-    compile
-      :: CompileReason
-      -> Hsc (FrontendResult, Maybe Fingerprint)
-    compile reason = do
+  case recomp_result of
+    RecompNotNeeded checked_iface -> do
+      liftIO $ msg UpToDate
+      return $ Left checked_iface
+    RecompNeeded reason mb_hash -> do
       liftIO $ msg $ NeedsRecompile reason
       tc_result <- case hscFrontendHook (hsc_hooks hsc_env) of
         Nothing -> FrontendTypecheck . fst <$> hsc_typecheck False mod_summary Nothing
         Just h  -> h mod_summary
-      return (tc_result, mb_old_hash)
-
-  case recomp_result of
-    RecompNotNeeded checked_iface | mi_used_th checked_iface && not stable ->
-      -- If the module used TH splices when it was last
-      -- compiled, then the recompilation check is not
-      -- accurate enough (#481) and we must ignore
-      -- it.  However, if the module is stable (none of
-      -- the modules it depends on, directly or
-      -- indirectly, changed), then we *can* skip
-      -- recompilation. This is why the SourceModified
-      -- type contains SourceUnmodifiedAndStable, and
-      -- it's pretty important: otherwise ghc --make
-      -- would always recompile TH modules, even if
-      -- nothing at all has changed. Stability is just
-      -- the same check that make is doing for us in
-      -- one-shot mode.
-      fmap Right $ compile $ RecompBecause "TH"
-      where
-        stable = case source_modified of
-          SourceUnmodifiedAndStable -> True
-          _                         -> False
-    RecompNotNeeded checked_iface -> do
-      liftIO $ msg UpToDate
-      return $ Left checked_iface
-    RecompNeeded comp_reason _ ->
-      fmap Right $ compile comp_reason
+      return $ Right (tc_result, mb_hash)
 
 --------------------------------------------------------------
 -- Compilers
