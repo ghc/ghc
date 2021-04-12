@@ -22,8 +22,6 @@ module GHC.Rename.Names (
         checkConName,
         mkChildEnv,
         findChildren,
-        dodgyMsg,
-        dodgyMsgInsert,
         findImportUsage,
         getMinimalImports,
         printMinimalImports,
@@ -42,6 +40,7 @@ import GHC.Rename.Env
 import GHC.Rename.Fixity
 import GHC.Rename.Utils ( warnUnusedTopBinds, mkFieldEnv )
 
+import GHC.Tc.Errors.Ppr
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
 
@@ -2009,22 +2008,6 @@ illegalImportItemErr = text "Illegal import item"
 dodgyImportWarn :: RdrName -> SDoc
 dodgyImportWarn item
   = dodgyMsg (text "import") item (dodgyMsgInsert item :: IE GhcPs)
-
-dodgyMsg :: (Outputable a, Outputable b) => SDoc -> a -> b -> SDoc
-dodgyMsg kind tc ie
-  = sep [ text "The" <+> kind <+> ptext (sLit "item")
-                    -- <+> quotes (ppr (IEThingAll (noLoc (IEName $ noLoc tc))))
-                     <+> quotes (ppr ie)
-                <+> text "suggests that",
-          quotes (ppr tc) <+> text "has (in-scope) constructors or class methods,",
-          text "but it has none" ]
-
-dodgyMsgInsert :: forall p . IdP (GhcPass p) -> IE (GhcPass p)
-dodgyMsgInsert tc = IEThingAll noAnn ii
-  where
-    ii :: LIEWrappedName (IdP (GhcPass p))
-    ii = noLocA (IEName $ noLocA tc)
-
 
 addDupDeclErr :: [GlobalRdrElt] -> TcRn ()
 addDupDeclErr [] = panic "addDupDeclErr: empty list"
