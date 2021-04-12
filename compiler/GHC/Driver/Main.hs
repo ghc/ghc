@@ -727,50 +727,6 @@ getRecompDetails hsc_env mod_summary source_modified mb_old_iface = do
           _                         -> False
     _otherwise -> recomp_result
 
--- | This function runs GHC's frontend with recompilation
--- avoidance. Specifically, it checks if recompilation is needed,
--- and if it is, it parses and typechecks the input module.
--- It does not write out the results of typechecking (See
--- compileOne and hscIncrementalCompile).
---
--- In the case that the interface file is up to date, and
--- the typechecker result is provided (Just), this will
--- produce Left of the old interface (which is still up to date).
--- In any other case, it produces Right of a pair of the frontend
--- result (basically the typechecker environment) and
--- a Maybe of the old interface fingerprint, if there was one.
-hscIncrementalFrontend :: Bool -- ^ always do basic recompilation check?
-                       -> Maybe TcGblEnv
-                       -> Maybe Messager
-                       -> ModSummary
-                       -> SourceModified
-                       -> Maybe ModIface  -- ^ Old interface, if available
-                       -> (Int,Int)       -- ^ (i,n) means Module i of n (for msgs)
-                       -> Hsc (Either ModIface (FrontendResult, Maybe Fingerprint))
-hscIncrementalFrontend always_do_basic_recompilation_check (Just tc_result) _ _ _ _ _ | not always_do_basic_recompilation_check =
-  return $ Right (FrontendTypecheck tc_result, Nothing)
-hscIncrementalFrontend _ _ mHscMessage mod_summary source_modified mb_old_iface mod_index = do
-  hsc_env <- getHscEnv
-
-  recomp_result <- liftIO $ getRecompDetails hsc_env mod_summary source_modified mb_old_iface
-
-  let
-    msg what = case mHscMessage of
-      -- We use extendModSummaryNoDeps because extra backpack deps are only needed for batch mode
-      Just hscMessage -> hscMessage hsc_env mod_index what (ModuleNode (extendModSummaryNoDeps mod_summary))
-      Nothing -> return ()
-
-  case recomp_result of
-    RecompNotNeeded checked_iface -> do
-      liftIO $ msg UpToDate
-      return $ Left checked_iface
-    RecompNeeded reason mb_hash -> do
-      liftIO $ msg $ NeedsRecompile reason
-      tc_result <- case hscFrontendHook (hsc_hooks hsc_env) of
-        Nothing -> FrontendTypecheck . fst <$> hsc_typecheck False mod_summary Nothing
-        Just h  -> h mod_summary
-      return $ Right (tc_result, mb_hash)
-
 --------------------------------------------------------------
 -- Compilers
 --------------------------------------------------------------
@@ -804,13 +760,33 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
                 | otherwise
                 = hsc_env''
 
+        msg what = case mHscMessage of
+          -- We use extendModSummaryNoDeps because extra backpack deps are only needed for batch mode
+          Just hscMessage -> hscMessage hsc_env mod_index what (ModuleNode (extendModSummaryNoDeps mod_summary))
+          Nothing -> return ()
+
     -- NB: enter Hsc monad here so that we don't bail out early with
     -- -Werror on typechecker warnings; we also want to run the desugarer
     -- to get those warnings too. (But we'll always exit at that point
     -- because the desugarer runs ioMsgMaybe.)
     runHsc hsc_env $ do
-    e <- hscIncrementalFrontend always_do_basic_recompilation_check m_tc_result mHscMessage
-            mod_summary source_modified mb_old_iface mod_index
+    e <- case m_tc_result of
+      Just tc_result
+        | not always_do_basic_recompilation_check ->
+          return $ Right (FrontendTypecheck tc_result, Nothing)
+      _ -> do
+        recomp_result <- liftIO $ getRecompDetails hsc_env mod_summary source_modified mb_old_iface
+        case recomp_result of
+          RecompNotNeeded checked_iface -> do
+            liftIO $ msg UpToDate
+            return $ Left checked_iface
+          RecompNeeded reason mb_hash -> do
+            liftIO $ msg $ NeedsRecompile reason
+            tc_result <- case hscFrontendHook (hsc_hooks hsc_env) of
+              Nothing -> FrontendTypecheck . fst <$> hsc_typecheck False mod_summary Nothing
+              Just h  -> h mod_summary
+            return $ Right (tc_result, mb_hash)
+
     case e of
         -- We didn't need to do any typechecking; the old interface
         -- file on disk was good enough.
