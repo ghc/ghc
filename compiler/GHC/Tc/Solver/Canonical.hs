@@ -4,7 +4,7 @@
 
 module GHC.Tc.Solver.Canonical(
      canonicalize,
-     unifyDerived, unifyTest, UnifyTestResult(..),
+     unifyDerived,
      makeSuperClasses,
      StopOrContinue(..), stopWith, continueWith, andWhenContinue,
      solveCallStack    -- For GHC.Tc.Solver
@@ -51,8 +51,7 @@ import GHC.Data.Bag
 import GHC.Utils.Monad
 import Control.Monad
 import Data.Maybe ( isJust, isNothing )
-import Data.List  ( zip4, partition )
-import GHC.Types.Unique.Set( nonDetEltsUniqSet )
+import Data.List  ( zip4 )
 import GHC.Types.Basic
 
 import Data.Bifunctor ( bimap )
@@ -724,7 +723,7 @@ canIrred ev
                                     do traceTcS "canEvNC:forall" (ppr pred)
                                        canForAllNC ev tvs th p
            IrredPred {}          -> continueWith $
-                                    mkIrredCt OtherCIS new_ev } }
+                                    mkIrredCt IrreducibleCIS new_ev } }
 
 {- *********************************************************************
 *                                                                      *
@@ -1094,7 +1093,7 @@ can_eq_nc' True _rdr_env _envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
 can_eq_nc' True _rdr_env _envs ev eq_rel _ ps_ty1 _ ps_ty2
   = do { traceTcS "can_eq_nc' catch-all case" (ppr ps_ty1 $$ ppr ps_ty2)
        ; case eq_rel of -- See Note [Unsolved equalities]
-            ReprEq -> continueWith (mkIrredCt OtherCIS ev)
+            ReprEq -> continueWith (mkIrredCt ReprEqCIS ev)
             NomEq  -> continueWith (mkIrredCt InsolubleCIS ev) }
           -- No need to call canEqFailure/canEqHardFailure because they
           -- rewrite, and the types involved here are already rewritten
@@ -1575,10 +1574,10 @@ canTyConApp ev eq_rel tc1 tys1 tc2 tys2
          then canDecomposableTyConAppOK ev eq_rel tc1 tys1 tys2
          else canEqFailure ev eq_rel ty1 ty2 }
 
-  -- See Note [Skolem abstract data] (at tyConSkolem)
+  -- See Note [Skolem abstract data] in GHC.Core.Tycon
   | tyConSkolem tc1 || tyConSkolem tc2
   = do { traceTcS "canTyConApp: skolem abstract" (ppr tc1 $$ ppr tc2)
-       ; continueWith (mkIrredCt OtherCIS ev) }
+       ; continueWith (mkIrredCt AbstractTyConCIS ev) }
 
   -- Fail straight away for better error messages
   -- See Note [Use canEqFailure in canDecomposableTyConApp]
@@ -1920,7 +1919,7 @@ canEqFailure ev ReprEq ty1 ty2
        ; traceTcS "canEqFailure with ReprEq" $
          vcat [ ppr ev, ppr ty1, ppr ty2, ppr xi1, ppr xi2 ]
        ; new_ev <- rewriteEqEvidence ev NotSwapped xi1 xi2 co1 co2
-       ; continueWith (mkIrredCt OtherCIS new_ev) }
+       ; continueWith (mkIrredCt ReprEqCIS new_ev) }
 
 -- | Call when canonicalizing an equality fails with utterly no hope.
 canEqHardFailure :: CtEvidence
@@ -2299,7 +2298,7 @@ canEqTyVarFunEq :: CtEvidence               -- :: lhs ~ (rhs |> mco)
                 -> MCoercion                -- :: kind(rhs) ~N kind(lhs)
                 -> TcS (StopOrContinue Ct)
 canEqTyVarFunEq ev eq_rel swapped tv1 ps_xi1 fun_tc2 fun_args2 ps_xi2 mco
-  = do { can_unify <- unifyTest ev tv1 rhs
+  = do { can_unify <- unifyTest (ctEvFlavour ev) tv1 rhs
        ; dflags    <- getDynFlags
        ; if | case can_unify of { NoUnify -> False; _ -> True }
             , CTE_OK <- checkTyVarEq dflags YesTypeFamilies tv1 rhs
@@ -2315,82 +2314,6 @@ canEqTyVarFunEq ev eq_rel swapped tv1 ps_xi1 fun_tc2 fun_args2 ps_xi2 mco
   where
     sym_mco = mkTcSymMCo mco
     rhs = ps_xi2 `mkCastTyMCo` mco
-
-data UnifyTestResult
-  -- See Note [Solve by unification] in GHC.Tc.Solver.Interact
-  -- which points out that having UnifySameLevel is just an optimisation;
-  -- we could manage with UnifyOuterLevel alone (suitably renamed)
-  = UnifySameLevel
-  | UnifyOuterLevel [TcTyVar]   -- Promote these
-                    TcLevel     -- ..to this level
-  | NoUnify
-
-instance Outputable UnifyTestResult where
-  ppr UnifySameLevel            = text "UnifySameLevel"
-  ppr (UnifyOuterLevel tvs lvl) = text "UnifyOuterLevel" <> parens (ppr lvl <+> ppr tvs)
-  ppr NoUnify                   = text "NoUnify"
-
-unifyTest :: CtEvidence -> TcTyVar -> TcType -> TcS UnifyTestResult
--- This is the key test for untouchability:
--- See Note [Unification preconditions] in GHC.Tc.Utils.Unify
--- and Note [Solve by unification] in GHC.Tc.Solver.Interact
-unifyTest ev tv1 rhs
-  | not (isGiven ev)  -- See Note [Do not unify Givens]
-  , MetaTv { mtv_tclvl = tv_lvl, mtv_info = info } <- tcTyVarDetails tv1
-  , canSolveByUnification info rhs
-  = do { ambient_lvl  <- getTcLevel
-       ; given_eq_lvl <- getInnermostGivenEqLevel
-
-       ; if | tv_lvl `sameDepthAs` ambient_lvl
-            -> return UnifySameLevel
-
-            | tv_lvl `deeperThanOrSame` given_eq_lvl   -- No intervening given equalities
-            , all (does_not_escape tv_lvl) free_skols  -- No skolem escapes
-            -> return (UnifyOuterLevel free_metas tv_lvl)
-
-            | otherwise
-            -> return NoUnify }
-  | otherwise
-  = return NoUnify
-  where
-     (free_metas, free_skols) = partition isPromotableMetaTyVar $
-                                nonDetEltsUniqSet               $
-                                tyCoVarsOfType rhs
-
-     does_not_escape tv_lvl fv
-       | isTyVar fv = tv_lvl `deeperThanOrSame` tcTyVarLevel fv
-       | otherwise  = True
-       -- Coercion variables are not an escape risk
-       -- If an implication binds a coercion variable, it'll have equalities,
-       -- so the "intervening given equalities" test above will catch it
-       -- Coercion holes get filled with coercions, so again no problem.
-
-{- Note [Do not unify Givens]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider this GADT match
-   data T a where
-      T1 :: T Int
-      ...
-
-   f x = case x of
-           T1 -> True
-           ...
-
-So we get f :: T alpha[1] -> beta[1]
-          x :: T alpha[1]
-and from the T1 branch we get the implication
-   forall[2] (alpha[1] ~ Int) => beta[1] ~ Bool
-
-Now, clearly we don't want to unify alpha:=Int!  Yet at the moment we
-process [G] alpha[1] ~ Int, we don't have any given-equalities in the
-inert set, and hence there are no given equalities to make alpha untouchable.
-
-NB: if it were alpha[2] ~ Int, this argument wouldn't hold.  But that
-never happens: invariant (GivenInv) in Note [TcLevel invariants]
-in GHC.Tc.Utils.TcType.
-
-Simple solution: never unify in Givens!
--}
 
 -- The RHS here is either not CanEqLHS, or it's one that we
 -- want to rewrite the LHS to (as per e.g. swapOverTyVars)
@@ -2425,25 +2348,35 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
        -- occurs-check for a function application, which seems awkward.
 
            CanEqNotOK status
-                -- See Note [Type variable cycles in Givens]
-             | OtherCIS <- status
-             , Given <- ctEvFlavour ev
+                -- See Note [Type variable cycles]
+             | SolubleOccursCheckCIS <- status
              , TyVarLHS lhs_tv <- lhs
-             , not (isCycleBreakerTyVar lhs_tv) -- See Detail (7) of Note
              , NomEq <- eq_rel
-             -> do { traceTcS "canEqCanLHSFinish breaking a cycle" (ppr lhs $$ ppr rhs)
-                   ; new_rhs <- breakTyVarCycle (ctEvLoc ev) rhs
+             -> do { m_break_how <- shouldBreakCycle (ctEvFlavour ev) lhs_tv rhs
+                   ; case m_break_how of
+                     { Nothing ->
+                         do { traceTcS "Decided against breaking tyvar cycle" empty
+                            ; continueWith (mkIrredCt status new_ev) }
+                     ; Just how ->
+                do { traceTcS "canEqCanLHSFinish breaking a cycle" $
+                              ppr how $$ ppr lhs $$ ppr rhs
+                   ; (co, new_rhs) <- breakTyVarCycle how (ctEvLoc ev) rhs
                    ; traceTcS "new RHS:" (ppr new_rhs)
-                   ; let new_pred   = mkPrimEqPred (mkTyVarTy lhs_tv) new_rhs
-                         new_new_ev = new_ev { ctev_pred = new_pred }
-                           -- See Detail (6) of Note [Type variable cycles in Givens]
 
+                     -- This check is Detail (1) in the Note
                    ; if anyRewritableTyVar True NomEq (\ _ tv -> tv == lhs_tv) new_rhs
-                     then do { traceTcS "Note [Type variable cycles in Givens] Detail (1)"
-                                        (ppr new_new_ev)
+                     then do { traceTcS "Note [Type variable cycles] Detail (1)"
+                                        (ppr new_rhs)
                              ; continueWith (mkIrredCt status new_ev) }
-                     else continueWith (CEqCan { cc_ev = new_new_ev, cc_lhs = lhs
-                                               , cc_rhs = new_rhs, cc_eq_rel = eq_rel }) }
+                     else do { -- See Detail (6) of Note [Type variable cycles]
+                               new_new_ev <- rewriteEqEvidence new_ev NotSwapped
+                                               lhs_ty new_rhs
+                                               (mkTcNomReflCo lhs_ty) co
+
+                             ; continueWith (CEqCan { cc_ev = new_new_ev
+                                                    , cc_lhs = lhs
+                                                    , cc_rhs = new_rhs
+                                                    , cc_eq_rel = eq_rel }) }}}}
 
                -- We must not use it for further rewriting!
              | otherwise
@@ -2511,7 +2444,7 @@ canEqOK dflags eq_rel lhs rhs
   = ASSERT( good_rhs )
     case checkTypeEq dflags YesTypeFamilies lhs rhs of
       CTE_OK  -> CanEqOK
-      CTE_Bad -> CanEqNotOK OtherCIS
+      CTE_Bad -> CanEqNotOK ImpredicativeCIS
                  -- Violation of TyEq:F
 
       CTE_HoleBlocker -> CanEqNotOK (BlockedCIS holes)
@@ -2532,7 +2465,7 @@ canEqOK dflags eq_rel lhs rhs
                  -- NB: no occCheckExpand here; see Note [Rewriting synonyms]
                  -- in GHC.Tc.Solver.Rewrite
 
-                  | otherwise                            -> CanEqNotOK OtherCIS
+                  | otherwise                            -> CanEqNotOK SolubleOccursCheckCIS
                  -- A representational equality with an occurs-check problem isn't
                  -- insoluble! For example:
                  --   a ~R b a
@@ -2725,28 +2658,55 @@ NOT (necessarily) expand the type synonym, since for the purpose of
 good error messages we want to leave type synonyms unexpanded as much
 as possible.  Hence the ps_xi1, ps_xi2 argument passed to canEqCanLHS.
 
-Note [Type variable cycles in Givens]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Type variable cycles]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this situation (from indexed-types/should_compile/GivenLoop):
 
   instance C (Maybe b)
-  [G] a ~ Maybe (F a)
+  *[G] a ~ Maybe (F a)
   [W] C a
 
-In order to solve the Wanted, we must use the Given to rewrite `a` to
-Maybe (F a). But note that the Given has an occurs-check failure, and
-so we can't straightforwardly add the Given to the inert set.
+or (typecheck/should_compile/T19682b):
 
-The key idea is to replace the (F a) in the RHS of the Given with a
-fresh variable, which we'll call a CycleBreakerTv, or cbv. Then, emit
-a new Given to connect cbv with F a. So our situation becomes
+  instance C (a -> b)
+  *[WD] alpha ~ (Arg alpha -> Res alpha)
+  [W] C alpha
+
+In order to solve the final Wanted, we must use the starred constraint
+for rewriting. But note that both starred constraints have occurs-check failures,
+and so we can't straightforwardly add these to the inert set and
+use them for rewriting.
+
+The key idea is to replace the type family applications in the RHS of the
+starred constraints with a fresh variable, which we'll call a cycle-breaker
+variable, or cbv. Then, relate the cbv back with the original type family application
+via new equality constraints. Our situations thus become:
 
   instance C (Maybe b)
   [G] a ~ Maybe cbv
   [G] F a ~ cbv
   [W] C a
 
-Note the orientation of the second Given. The type family ends up
+or
+
+  instance C (a -> b)
+  [WD] alpha ~ (cbv1 -> cbv2)
+  [WD] cbv1 ~ Arg alpha
+  [WD] cbv2 ~ Res alpha
+  [W] C alpha
+
+This transformation (creating the new types and emitting new equality
+constraints) is done in breakTyVarCycle.
+
+The details depend on whether we're working with a Given or a Derived.
+(Note that the Wanteds are really WDs, above. This is because Wanteds
+are not used for rewriting.)
+
+Given
+-----
+
+We emit a new Given equating the type family application to our new
+cbv. Note its orientation: The type family ends up
 on the left; see commentary on canEqTyVarFunEq, which decides how to
 orient such cases. No special treatment for CycleBreakerTvs is
 necessary. This scenario is now easily soluble, by using the first
@@ -2754,18 +2714,6 @@ Given to rewrite the Wanted, which can now be solved.
 
 (The first Given actually also rewrites the second one. This causes
 no trouble.)
-
-More generally, we detect this scenario by the following characteristics:
- - a Given CEqCan constraint
- - with a tyvar on its LHS
- - with a soluble occurs-check failure
- - and a nominal equality
-
-Having identified the scenario, we wish to replace all type family
-applications on the RHS with fresh metavariables (with MetaInfo
-CycleBreakerTv). This is done in breakTyVarCycle. These metavariables are
-untouchable, but we also emit Givens relating the fresh variables to the type
-family applications they replace.
 
 Of course, we don't want our fresh variables leaking into e.g. error messages.
 So we fill in the metavariables with their original type family applications
@@ -2796,27 +2744,57 @@ Note that
 * The evidence for the new `F a ~ cbv` constraint is Refl, because we know this fill-in is
   ultimately going to happen.
 
-There are drawbacks of this approach:
+Wanted/Derived
+--------------
 
- 1. We apply this trick only for Givens, never for Wanted or Derived.
-    It wouldn't make sense for Wanted, because Wanted never rewrite.
-    But it's conceivable that a Derived would benefit from this all.
-    I doubt it would ever happen, though, so I'm holding off.
+The fresh variables here must actually be normal, touchable metavariables.
+That is, they are TauTvs. Nothing at all unusual. This is done because we
+might eventually learn more about what the cycle-breaker vars should be
+(and, thus, the original variable on the left-hand side of the constraint
+we started with). We thus emit new WD constraints relating the fresh variables
+to their type family applications.
 
- 2. We don't use this trick for representational equalities, as there
-    is no concrete use case where it is helpful (unlike for nominal
-    equalities). Furthermore, because function applications can be
-    CanEqLHSs, but newtype applications cannot, the disparities between
-    the cases are enough that it would be effortful to expand the idea
-    to representational equalities. A quick attempt, with
+Critically, we do *not* call unifyWanted. This is because we want the current
+(starred) constraint to be fully processed before processing the new ones.
+Let's revisit the example above, after calling breakTyVarCycle:
+
+  [WD] alpha ~ (cbv1 -> cbv2)
+  [WD] cbv1 ~ Arg alpha
+  [WD] cbv2 ~ Res alpha
+
+Here, cbv1 and cbv2 are just TauTvs (as is alpha). If we see either of the
+last two constraints first, we'll unify a cbv variable and end up back
+where we started. This is bad. Instead, we put these constraints on the
+work list and continue processing that first constraint. There is now
+no occurs-check failure, and so we can write alpha := cbv1 -> cbv2 and
+make forward progress.
+
+Both
+----
+
+We detect this scenario by the following characteristics:
+ - a constraint with a tyvar on its LHS
+ - with a soluble occurs-check failure
+ - and a nominal equality
+ - and either
+    - a Given flavour (but see also Detail (7) below)
+    - a Wanted/Derived or just plain Derived flavour, with a touchable metavariable
+      on the left
+
+We don't use this trick for representational equalities, as there is no
+concrete use case where it is helpful (unlike for nominal equalities).
+Furthermore, because function applications can be CanEqLHSs, but newtype
+applications cannot, the disparities between the cases are enough that it
+would be effortful to expand the idea to representational equalities. A quick
+attempt, with
 
       data family N a b
 
       f :: (Coercible a (N a b), Coercible (N a b) b) => a -> b
       f = coerce
 
-    failed with "Could not match 'b' with 'b'." Further work is held off
-    until when we have a concrete incentive to explore this dark corner.
+failed with "Could not match 'b' with 'b'." Further work is held off
+until when we have a concrete incentive to explore this dark corner.
 
 Details:
 
@@ -2836,9 +2814,9 @@ Details:
      Skipping this check causes typecheck/should_fail/GivenForallLoop to loop.
 
  (2) Our goal here is to avoid loops in rewriting. We can thus skip looking
-     in coercions, as we don't rewrite in coercions.
-     (There is no worry about unifying a meta-variable here: this Note is
-      only about Givens.)
+     in coercions, as we don't rewrite in coercions. (This is another reason
+     we need to re-check that we've gotten rid of all occurrences of the
+     offending variable.)
 
  (3) As we're substituting, we can build ill-kinded
      types. For example, if we have Proxy (F a) b, where (b :: F a), then
@@ -2868,19 +2846,15 @@ Details:
      Note [Flattening type-family applications when matching instances]
      in GHC.Core.Unify, which
      goes to this extra effort.) There may be other opportunities for
-     improvement. However, this is really a very small corner case, always
-     tickled by a user-written Given. The investment to craft a clever,
+     improvement. However, this is really a very small corner case.
+     The investment to craft a clever,
      performant solution seems unworthwhile.
 
  (6) We often get the predicate associated with a constraint from its
      evidence. We thus must not only make sure the generated CEqCan's
      fields have the updated RHS type, but we must also update the
-     evidence itself. As in Detail (4), we don't need to change the
-     evidence term (as in e.g. rewriteEqEvidence) because the cycle
-     breaker variables are all zonked away by the time we examine the
-     evidence. That is, we must set the ctev_pred of the ctEvidence.
-     This is implemented in canEqCanLHSFinish, with a reference to
-     this detail.
+     evidence itself. This is done by the call to rewriteEqEvidence
+     in canEqCanLHSFinish.
 
  (7) We don't wish to apply this magic to CycleBreakerTvs themselves.
      Consider this, from typecheck/should_compile/ContextStack2:
@@ -2914,8 +2888,7 @@ Details:
      infinitum (and resulting in a context-stack reduction error,
      not an outright loop). The solution is easy: don't break cycles
      if the var is already a CycleBreakerTv. Instead, we mark this
-     final Given as a CIrredCan with an OtherCIS status (it's not
-     insoluble).
+     final Given as a CIrredCan with a SolubleOccursCheckCIS status.
 
      NB: When filling in CycleBreakerTvs, we fill them in with what
      they originally stood for (e.g. cbv1 := TF a, cbv2 := TF Int),
@@ -2926,9 +2899,16 @@ Details:
      for user-written loopy Givens, and a CycleBreakerTv certainly isn't
      user-written.
 
-NB: This same situation (an equality like b ~ Maybe (F b)) can arise with
-Wanteds, but we have no concrete case incentivising special treatment. It
-would just be a CIrredCan.
+ (8) We really want to do this all only when there is an occurs-check
+     failure, not when other problems arise (such as an impredicative
+     equality like alpha ~ forall a. a -> a). In checkTypeEq (which looks
+     for the occurs-check), we prioritize all other errors over occurs-check
+     ones. We thus know that, when checkTypeEq says there is an occurs-check
+     error, that's the only problem, and the approach outlined in this
+     Note is appropriate to apply.
+
+     This prioritization is implemented in the Semigroup instance for
+     CheckTyEqResult.
 
 -}
 
