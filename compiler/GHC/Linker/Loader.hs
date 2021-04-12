@@ -1430,11 +1430,9 @@ load_dyn interp hsc_env crash_early dll = do
     Just err ->
       if crash_early
         then cmdLineErrorIO err
-        else
-          when (wopt Opt_WarnMissedExtraSharedLib dflags)
-            $ putLogMsg logger dflags
+        else putLogMsg logger dflags
                 (mkMCDiagnostic dflags $ WarningWithFlag Opt_WarnMissedExtraSharedLib)
-                  noSrcSpan $ withPprStyle defaultUserStyle (note err)
+                noSrcSpan $ withPprStyle defaultUserStyle (note err)
   where
     dflags = hsc_dflags hsc_env
     logger = hsc_logger hsc_env
