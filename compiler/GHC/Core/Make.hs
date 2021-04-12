@@ -844,7 +844,7 @@ tYPE_ERROR_ID                   = mkRuntimeErrorId typeErrorName
 --   (`package.conf`, `rts.cabal`, `win32/libHSbase.def`, `Prelude.h`...). It
 --   explains why exceptions are only wired in the RTS when necessary.
 --
--- * `absentSumFieldError` is defined in ghc-prim:GHC.Prim.Panic, hence, it can
+-- * `absentSumFieldError` is defined in ghc-prim:GHC.Magic, hence, it can
 --   be invoked in libraries compiled before `base`. It does not throw a Haskell
 --   exception; instead, it calls `stg_panic#`, which immediately halts
 --   execution.  A runtime invocation of `absentSumFieldError` indicates a GHC
@@ -854,14 +854,14 @@ tYPE_ERROR_ID                   = mkRuntimeErrorId typeErrorName
 
 absentSumFieldErrorName
    = mkWiredInIdName
-      gHC_PRIM_PANIC
+      gHC_MAGIC
       (fsLit "absentSumFieldError")
       absentSumFieldErrorIdKey
       aBSENT_SUM_FIELD_ERROR_ID
 
 absentErrorName
    = mkWiredInIdName
-      gHC_PRIM_PANIC
+      gHC_MAGIC
       (fsLit "absentError")
       absentErrorIdKey
       aBSENT_ERROR_ID

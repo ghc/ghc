@@ -391,7 +391,7 @@ instance Exception NestedAtomically
 
 -----
 
--- See Note [Compiler error functions] in ghc-prim:GHC.Prim.Panic
+-- See Note [Compiler error functions] in ghc-prim:GHC.Magic
 recSelError, recConError, runtimeError,
   nonExhaustiveGuardsError, patError, noMethodBindingError,
   typeError

@@ -37,7 +37,7 @@ import GHC.Prelude
 
 import GHC.Driver.Ppr
 
-import {-# SOURCE #-} GHC.Types.Id.Make ( mkPrimOpId, magicDictId, voidPrimId )
+import {-# SOURCE #-} GHC.Types.Id.Make ( mkPrimOpId, voidPrimId )
 
 import GHC.Core
 import GHC.Core.Make
@@ -1739,7 +1739,7 @@ builtinRules
                    ru_nargs = 1, ru_try = match_cstring_length },
      BuiltinRule { ru_name = fsLit "Inline", ru_fn = inlineIdName,
                    ru_nargs = 2, ru_try = \_ _ _ -> match_inline },
-     BuiltinRule { ru_name = fsLit "MagicDict", ru_fn = idName magicDictId,
+     BuiltinRule { ru_name = fsLit "MagicDict", ru_fn = magicDictName,
                    ru_nargs = 4, ru_try = \_ _ _ -> match_magicDict },
 
      mkBasicRule unsafeEqualityProofName 3 unsafeEqualityProofRule,

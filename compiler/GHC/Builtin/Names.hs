@@ -225,6 +225,7 @@ basicKnownKeyNames
         ioTyConName, ioDataConName,
         runMainIOName,
         runRWName,
+        magicDictName,
 
         -- Type representation types
         trModuleTyConName, trModuleDataConName,
@@ -544,7 +545,7 @@ genericTyConNames = [
 pRELUDE :: Module
 pRELUDE         = mkBaseModule_ pRELUDE_NAME
 
-gHC_PRIM, gHC_PRIM_PANIC, gHC_PRIM_EXCEPTION,
+gHC_PRIM, gHC_PRIM_EXCEPTION,
     gHC_TYPES, gHC_GENERICS, gHC_MAGIC,
     gHC_CLASSES, gHC_PRIMOPWRAPPERS, gHC_BASE, gHC_ENUM,
     gHC_GHCI, gHC_GHCI_HELPERS, gHC_CSTRING,
@@ -563,7 +564,6 @@ gHC_PRIM, gHC_PRIM_PANIC, gHC_PRIM_EXCEPTION,
     dATA_COERCE, dEBUG_TRACE, uNSAFE_COERCE :: Module
 
 gHC_PRIM        = mkPrimModule (fsLit "GHC.Prim")   -- Primitive types and values
-gHC_PRIM_PANIC  = mkPrimModule (fsLit "GHC.Prim.Panic")
 gHC_PRIM_EXCEPTION = mkPrimModule (fsLit "GHC.Prim.Exception")
 gHC_TYPES       = mkPrimModule (fsLit "GHC.Types")
 gHC_MAGIC       = mkPrimModule (fsLit "GHC.Magic")
@@ -959,9 +959,10 @@ and it's convenient to write them all down in one place.
 wildCardName :: Name
 wildCardName = mkSystemVarName wildCardKey (fsLit "wild")
 
-runMainIOName, runRWName :: Name
+runMainIOName, runRWName, magicDictName :: Name
 runMainIOName = varQual gHC_TOP_HANDLER (fsLit "runMainIO") runMainKey
 runRWName     = varQual gHC_MAGIC       (fsLit "runRW#")    runRWKey
+magicDictName = varQual gHC_MAGIC       (fsLit "magicDict") magicDictKey
 
 orderingTyConName, ordLTDataConName, ordEQDataConName, ordGTDataConName :: Name
 orderingTyConName = tcQual  gHC_TYPES (fsLit "Ordering") orderingTyConKey

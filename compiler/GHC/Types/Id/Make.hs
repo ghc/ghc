@@ -30,7 +30,7 @@ module GHC.Types.Id.Make (
         realWorldPrimId,
         voidPrimId, voidArgId,
         nullAddrId, seqId, lazyId, lazyIdKey,
-        coercionTokenId, magicDictId, coerceId,
+        coercionTokenId, coerceId,
         proxyHashId, noinlineId, noinlineIdName,
         coerceName, leftSectionName, rightSectionName,
 
@@ -173,7 +173,6 @@ ghcPrimIds
     , voidPrimId
     , nullAddrId
     , seqId
-    , magicDictId
     , coerceId
     , proxyHashId
     , leftSectionId
@@ -1429,14 +1428,13 @@ failure when trying.)
 
 nullAddrName, seqName,
    realWorldName, voidPrimIdName, coercionTokenName,
-   magicDictName, coerceName, proxyName,
+   coerceName, proxyName,
    leftSectionName, rightSectionName :: Name
 nullAddrName      = mkWiredInIdName gHC_PRIM  (fsLit "nullAddr#")      nullAddrIdKey      nullAddrId
 seqName           = mkWiredInIdName gHC_PRIM  (fsLit "seq")            seqIdKey           seqId
 realWorldName     = mkWiredInIdName gHC_PRIM  (fsLit "realWorld#")     realWorldPrimIdKey realWorldPrimId
 voidPrimIdName    = mkWiredInIdName gHC_PRIM  (fsLit "void#")          voidPrimIdKey      voidPrimId
 coercionTokenName = mkWiredInIdName gHC_PRIM  (fsLit "coercionToken#") coercionTokenIdKey coercionTokenId
-magicDictName     = mkWiredInIdName gHC_PRIM  (fsLit "magicDict")      magicDictKey       magicDictId
 coerceName        = mkWiredInIdName gHC_PRIM  (fsLit "coerce")         coerceKey          coerceId
 proxyName         = mkWiredInIdName gHC_PRIM  (fsLit "proxy#")         proxyHashKey       proxyHashId
 leftSectionName   = mkWiredInIdName gHC_PRIM  (fsLit "leftSection")    leftSectionKey     leftSectionId
@@ -1596,14 +1594,6 @@ rightSectionId = pcMiscPrelId rightSectionName ty info
                   , multiplicityTyVar1, multiplicityTyVar2
                   , openAlphaTyVar,   openBetaTyVar,    openGammaTyVar ] body
     body = mkLams [f,ymult,xmult] $ mkVarApps (Var f) [xmult,ymult]
-
---------------------------------------------------------------------------------
-magicDictId :: Id  -- See Note [magicDictId magic]
-magicDictId = pcMiscPrelId magicDictName ty info
-  where
-  info = noCafIdInfo `setInlinePragInfo` neverInlinePragma
-                     `setNeverLevPoly`   ty
-  ty   = mkSpecForAllTys [alphaTyVar] alphaTy
 
 --------------------------------------------------------------------------------
 

@@ -654,14 +654,14 @@ stg_raiseOverflowzh ()
 
 /* The FFI doesn't support variadic C functions so we can't directly expose
  * `barf` to Haskell code. Instead we define "stg_panic#" and it is exposed to
- * Haskell programs in GHC.Prim.Panic.
+ * Haskell programs in GHC.Magic.
  */
 stg_paniczh (W_ str)
 {
     ccall barf(str) never returns;
 }
 
-// See Note [Compiler error functions] in GHC.Prim.Panic
+// See Note [Compiler error functions] in GHC.Magic
 stg_absentErrorzh (W_ str)
 {
     ccall barf("Oops!  Entered absent arg %s", str) never returns;

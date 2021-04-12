@@ -611,7 +611,7 @@ mkUbxSum dc ty_args args0
 --
 -- We use the following rubbish values:
 --    * Literals: 0 or 0.0
---    * Pointers: `ghc-prim:GHC.Prim.Panic.absentSumFieldError`
+--    * Pointers: `ghc-prim:GHC.Magic.absentSumFieldError`
 --
 -- See Note [aBSENT_SUM_FIELD_ERROR_ID] in "GHC.Core.Make"
 --
