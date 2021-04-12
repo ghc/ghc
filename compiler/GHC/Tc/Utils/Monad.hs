@@ -93,7 +93,7 @@ module GHC.Tc.Utils.Monad(
   failWithTc, failWithTcM,
   checkTc, checkTcM,
   failIfTc, failIfTcM,
-  warnIfWithFlag, warnIf,
+  warnIfFlag, warnIf,
   addDiagnosticTc, addDiagnosticTcM, addDiagnostic, addDiagnosticAt, add_diagnostic,
   mkErrInfo,
 
@@ -1503,8 +1503,8 @@ failIfTcM True  err = failWithTcM err
 --         Warnings have no 'M' variant, nor failure
 
 -- | Display a warning relating to a flag, if a condition is met.
-warnIfWithFlag :: WarningFlag -> Bool -> SDoc -> TcRn ()
-warnIfWithFlag warn_flag is_bad msg
+warnIfFlag :: WarningFlag -> Bool -> SDoc -> TcRn ()
+warnIfFlag warn_flag is_bad msg
   -- No need to check the flag here, it will be done in 'diagReasonSeverity'.
   = when is_bad $ addDiagnostic (WarningWithFlag warn_flag) msg
 
