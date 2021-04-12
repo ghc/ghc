@@ -213,51 +213,32 @@ compileOne' m_tc_result mHscMessage
                addFilesToClean tmpfs TFL_GhcSession $
                    [ml_obj_file $ ms_location summary]
 
-   case (status, bcknd) of
-        (HscUpToDate iface hmi_details, _) ->
+   case bcknd of
+     NoBackend -> case status of
+        HscUpToDate iface hmi_details ->
             ASSERT( isJust mb_old_linkable || isNoLink (ghcLink dflags) )
             return $! HomeModInfo iface hmi_details mb_old_linkable
-        (HscNotGeneratingCode iface hmi_details, NoBackend) ->
+        HscNotGeneratingCode iface hmi_details ->
             let mb_linkable = if isHsBootOrSig src_flavour
                                 then Nothing
                                 -- TODO: Questionable.
                                 else Just (LM (ms_hs_date summary) this_mod [])
             in return $! HomeModInfo iface hmi_details mb_linkable
-        (HscNotGeneratingCode _ _, _) -> panic "compileOne HscNotGeneratingCode"
-        (_, NoBackend) -> panic "compileOne NoBackend"
-        (HscUpdateBoot iface hmi_details, Interpreter) ->
+        _ -> panic "compileOne NoBackend"
+     Interpreter -> case status of
+        HscUpToDate iface hmi_details ->
+            ASSERT( isJust mb_old_linkable || isNoLink (ghcLink dflags) )
+            return $! HomeModInfo iface hmi_details mb_old_linkable
+        HscUpdateBoot iface hmi_details ->
             return $! HomeModInfo iface hmi_details Nothing
-        (HscUpdateBoot iface hmi_details, _) -> do
-            touchObjectFile logger dflags object_filename
-            return $! HomeModInfo iface hmi_details Nothing
-        (HscUpdateSig iface hmi_details, Interpreter) -> do
+        HscUpdateSig iface hmi_details -> do
             let !linkable = LM (ms_hs_date summary) this_mod []
             return $! HomeModInfo iface hmi_details (Just linkable)
-        (HscUpdateSig iface hmi_details, _) -> do
-            output_fn <- getOutputFilename logger tmpfs next_phase
-                            (Temporary TFL_CurrentModule) basename dflags
-                            next_phase (Just location)
-
-            -- #10660: Use the pipeline instead of calling
-            -- compileEmptyStub directly, so -dynamic-too gets
-            -- handled properly
-            _ <- runPipeline StopLn hsc_env'
-                              (output_fn,
-                               Nothing,
-                               Just (HscOut src_flavour
-                                            mod_name (HscUpdateSig iface hmi_details)))
-                              (Just basename)
-                              Persistent
-                              (Just location)
-                              []
-            o_time <- getModificationUTCTime object_filename
-            let !linkable = LM o_time this_mod [DotO object_filename]
-            return $! HomeModInfo iface hmi_details (Just linkable)
-        (HscRecomp { hscs_guts = cgguts,
+        HscRecomp { hscs_guts = cgguts,
                      hscs_mod_location = mod_location,
                      hscs_partial_iface = partial_iface,
                      hscs_old_iface_hash = mb_old_iface_hash
-                   }, Interpreter) -> do
+                   } -> do
             -- In interpreted mode the regular codeGen backend is not run so we
             -- generate a interface without codeGen info.
             final_iface <- mkFullIface hsc_env' partial_iface Nothing
@@ -285,7 +266,36 @@ compileOne' m_tc_result mHscMessage
             let !linkable = LM unlinked_time (ms_mod summary)
                            (hs_unlinked ++ stub_o)
             return $! HomeModInfo final_iface hmi_details (Just linkable)
-        (HscRecomp{}, _) -> do
+        _ -> panic "compileOne HscNotGeneratingCode"
+
+     _ -> case status of
+        HscUpToDate iface hmi_details ->
+            ASSERT( isJust mb_old_linkable || isNoLink (ghcLink dflags) )
+            return $! HomeModInfo iface hmi_details mb_old_linkable
+        HscUpdateBoot iface hmi_details -> do
+            touchObjectFile logger dflags object_filename
+            return $! HomeModInfo iface hmi_details Nothing
+        HscUpdateSig iface hmi_details -> do
+            output_fn <- getOutputFilename logger tmpfs next_phase
+                            (Temporary TFL_CurrentModule) basename dflags
+                            next_phase (Just location)
+
+            -- #10660: Use the pipeline instead of calling
+            -- compileEmptyStub directly, so -dynamic-too gets
+            -- handled properly
+            _ <- runPipeline StopLn hsc_env'
+                              (output_fn,
+                               Nothing,
+                               Just (HscOut src_flavour
+                                            mod_name (HscUpdateSig iface hmi_details)))
+                              (Just basename)
+                              Persistent
+                              (Just location)
+                              []
+            o_time <- getModificationUTCTime object_filename
+            let !linkable = LM o_time this_mod [DotO object_filename]
+            return $! HomeModInfo iface hmi_details (Just linkable)
+        HscRecomp{} -> do
             output_fn <- getOutputFilename logger tmpfs next_phase
                             (Temporary TFL_CurrentModule)
                             basename dflags next_phase (Just location)
@@ -304,6 +314,7 @@ compileOne' m_tc_result mHscMessage
             -- See Note [ModDetails and --make mode]
             details <- initModDetails hsc_env' summary iface
             return $! HomeModInfo iface details (Just linkable)
+        _ -> panic "compileOne HscNotGeneratingCode"
 
  where dflags0     = ms_hspp_opts summary
        this_mod    = ms_mod summary
