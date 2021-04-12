@@ -23,6 +23,7 @@ module GHC.Exception.Type
          Exception(..)
        , SomeException(..)
        , SomeExceptionWithLocation(..)
+       , addBacktrace
          -- * Concrete exception types
        , ArithException(..)
        , divZeroException, overflowException, ratioZeroDenomException
@@ -45,6 +46,10 @@ encapsulated in a @SomeException@.
 @since 4.16.0.0
 -}
 data SomeExceptionWithLocation = forall e. Exception e => SomeExceptionWithLocation [Backtrace] e
+
+addBacktrace :: Backtrace -> SomeExceptionWithLocation -> SomeExceptionWithLocation
+addBacktrace bt (SomeExceptionWithLocation bts e) =
+    SomeExceptionWithLocation (bt : bts) e
 
 {- |
 The @SomeException@ type represents any exception. This used to be the root of

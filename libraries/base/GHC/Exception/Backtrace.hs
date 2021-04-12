@@ -26,6 +26,7 @@ module GHC.Exception.Backtrace
        , setGlobalBacktraceMechanism
        , getGlobalBacktraceMechanism
        , showBacktraces
+       , collectBacktrace
        ) where
 
 import Data.Maybe
@@ -35,7 +36,8 @@ import GHC.IO.Unsafe
 import GHC.Ptr
 import GHC.Stack.CCS
 import GHC.Stack
-import GHC.ExecutionStack
+import GHC.ExecutionStack (getStackTrace, Location)
+import GHC.ExecutionStack.Internal (showStackFrames)
 import GHC.Base
 import GHC.Show
 
@@ -53,9 +55,9 @@ data Backtrace
 -- | @since 4.15
 instance Show Backtrace where
     -- TODO
-    showsPrec p (CostCenterBacktrace ccs) = showsPrec p ccs
+    showsPrec p (CostCenterBacktrace ccs)   = showsPrec p ccs
     showsPrec p (HasCallStackBacktrace ccs) = showsPrec p ccs
-    showsPrec p (ExecutionBacktrace ccs) = showsPrec p ccs
+    showsPrec _ (ExecutionBacktrace ccs)    = showStackFrames ccs
 
 -- | How to collect a backtrace when an exception is thrown.
 data BacktraceMechanism

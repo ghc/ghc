@@ -53,6 +53,7 @@ import GHC.IO
 import GHC.Show
 import GHC.Read
 import GHC.Exception
+import {-# SOURCE #-} GHC.Exception.Backtrace (collectBacktrace)
 import GHC.IO.Handle.Types
 import Data.List ( intercalate )
 import {-# SOURCE #-} GHC.Stack.CCS
