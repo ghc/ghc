@@ -45,6 +45,7 @@ import GHC.Core.FamInstEnv    ( FamInstEnvs )
 import GHC.Core.UsageEnv      ( unitUE )
 import GHC.Rename.Env         ( addUsedGRE )
 import GHC.Rename.Utils       ( addNameClashErrRn, unknownSubordinateErr )
+import GHC.Tc.Errors.Types
 import GHC.Tc.Solver          ( InferMode(..), simplifyInfer )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Zonk      ( hsLitType )
@@ -1136,9 +1137,7 @@ checkCrossStageLifting top_lvl id (Brack _ (TcPending ps_var lie_var q))
                                        [getRuntimeRep id_ty, id_ty]
 
                    -- Warning for implicit lift (#17804)
-        ; addDiagnosticTc (WarningWithFlag Opt_WarnImplicitLift)
-                          (text "The variable" <+> quotes (ppr id) <+>
-                           text "is implicitly lifted in the TH quotation")
+        ; addDetailedDiagnostic (TcRnImplicitLift id)
 
                    -- Update the pending splices
         ; ps <- readMutVar ps_var

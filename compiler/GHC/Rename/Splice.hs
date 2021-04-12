@@ -17,6 +17,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Hs
 import GHC.Types.Name.Reader
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Driver.Env.Types
 
@@ -910,9 +911,7 @@ check_cross_stage_lifting top_lvl name ps_var
               pend_splice = PendingRnSplice UntypedExpSplice name lift_expr
 
           -- Warning for implicit lift (#17804)
-        ; addDiagnosticTc (WarningWithFlag Opt_WarnImplicitLift)
-                          (text "The variable" <+> quotes (ppr name) <+>
-                           text "is implicitly lifted in the TH quotation")
+        ; addDetailedDiagnostic (TcRnImplicitLift name)
 
           -- Update the pending splices
         ; ps <- readMutVar ps_var
