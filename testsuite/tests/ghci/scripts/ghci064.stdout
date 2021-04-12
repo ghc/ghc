@@ -29,8 +29,8 @@ instance [safe] MyShow w => MyShow [w]
 instance Monoid [T] -- Defined in ‘GHC.Base’
 instance Semigroup [T] -- Defined in ‘GHC.Base’
 instance GHC.Generics.Generic [T] -- Defined in ‘GHC.Generics’
-instance [safe] MyShow [T] -- Defined at ghci064.hs:8:10
 instance [safe] MyShow [T] -- Defined at ghci064.hs:16:10
+instance [safe] MyShow [T] -- Defined at ghci064.hs:8:10
 instance Eq Bool -- Defined in ‘GHC.Classes’
 instance Ord Bool -- Defined in ‘GHC.Classes’
 instance Enum Bool -- Defined in ‘GHC.Enum’
