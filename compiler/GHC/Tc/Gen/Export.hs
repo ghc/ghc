@@ -298,7 +298,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                    }
 
              ; checkErr exportValid (moduleNotImported mod)
-             ; warnIfWithFlag Opt_WarnDodgyExports
+             ; warnIfFlag Opt_WarnDodgyExports
                               (exportValid && null gre_prs)
                               (nullModuleExport mod)
 
@@ -669,9 +669,9 @@ check_occs ie occs avails
             | greNameMangledName child == greNameMangledName child'   -- Duplicate export
             -- But we don't want to warn if the same thing is exported
             -- by two different module exports. See ticket #4478.
-            -> do { warnIfWithFlag Opt_WarnDuplicateExports
-                                   (not (dupExport_ok child ie ie'))
-                                   (dupExportWarn child ie ie')
+            -> do { warnIfFlag Opt_WarnDuplicateExports
+                               (not (dupExport_ok child ie ie'))
+                               (dupExportWarn child ie ie')
                   ; return occs }
 
             | otherwise    -- Same occ name but different names: an error
