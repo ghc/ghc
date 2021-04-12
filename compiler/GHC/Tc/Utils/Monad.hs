@@ -93,7 +93,7 @@ module GHC.Tc.Utils.Monad(
   failWithTc, failWithTcM,
   checkTc, checkTcM,
   failIfTc, failIfTcM,
-  warnIfFlag, warnIf, diagnosticTc, diagnosticTcM, addDetailedDiagnostic,
+  warnIfFlag, warnIf, diagnosticTc, diagnosticTcM, addDetailedDiagnostic, addTcRnDiagnostic,
   addDiagnosticTc, addDiagnosticTcM, addDiagnostic, addDiagnosticAt, add_diagnostic,
   mkErrInfo,
 
@@ -1556,6 +1556,13 @@ addDetailedDiagnostic mkMsg = do
   ctxt <- getErrCtxt
   err_info <- mkErrInfo env0 ctxt
   reportDiagnostic (mkMsgEnvelope dflags loc printer (mkMsg (ErrInfo err_info)))
+
+addTcRnDiagnostic :: TcRnMessage -> TcM ()
+addTcRnDiagnostic msg = do
+  loc <- getSrcSpanM
+  printer <- getPrintUnqualified
+  dflags  <- getDynFlags
+  reportDiagnostic (mkMsgEnvelope dflags loc printer msg)
 
 -- | Display a diagnostic for a given source location.
 addDiagnosticAt :: DiagnosticReason -> SrcSpan -> SDoc -> TcRn ()
