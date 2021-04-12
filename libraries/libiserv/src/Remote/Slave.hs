@@ -149,7 +149,7 @@ openSocket :: PortNumber -> IO Socket
 openSocket port = do
   sock <- socket AF_INET Stream 0
   setSocketOption sock ReuseAddr 1
-  bind sock (SockAddrInet port iNADDR_ANY)
+  bind sock (SockAddrInet port (tupleToHostAddress (0, 0, 0, 0)))
   listen sock 1
   return sock
 
