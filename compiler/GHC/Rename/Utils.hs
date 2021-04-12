@@ -403,7 +403,7 @@ warnUnusedRecordWildcard :: [Name] -> FreeVars -> RnM ()
 warnUnusedRecordWildcard ns used_names = do
   let used = filter (`elemNameSet` used_names) ns
   traceRn "warnUnused" (ppr ns $$ ppr used_names $$ ppr used)
-  warnIfWithFlag Opt_WarnUnusedRecordWildcards (null used)
+  warnIfFlag Opt_WarnUnusedRecordWildcards (null used)
     unusedRecordWildcardWarning
 
 
