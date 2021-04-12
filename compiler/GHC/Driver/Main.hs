@@ -1300,8 +1300,7 @@ hscCheckSafe' m l = do
                     -- pkg trust reqs
                     pkgRs = S.fromList . map fst $ filter snd $ dep_pkgs $ mi_deps iface'
                     -- warn if Safe module imports Safe-Inferred module.
-                    warns = if wopt Opt_WarnInferredSafeImports dflags
-                                && safeLanguageOn dflags
+                    warns = if safeLanguageOn dflags
                                 && trust == Sf_SafeInferred
                                 then inferredImportWarn dflags
                                 else emptyBag
