@@ -35,6 +35,7 @@ import GHC.Prelude
 import {-# SOURCE #-} GHC.Rename.Expr( rnExpr, rnLExpr, rnStmts )
 
 import GHC.Hs
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Rename.HsType
 import GHC.Rename.Pat
@@ -500,8 +501,7 @@ rnBind _ bind@(PatBind { pat_lhs = pat
         -- See Note [Pattern bindings that bind no variables]
         ; whenWOptM Opt_WarnUnusedPatternBinds $
           when (null bndrs && not ok_nobind_pat) $
-          addDiagnostic (WarningWithFlag Opt_WarnUnusedPatternBinds) $
-          unusedPatBindWarn bind'
+          addTcRnDiagnostic (TcRnUnusedPatternBinds bind')
 
         ; fvs' `seq` -- See Note [Free-variable space leak]
           return (bind', bndrs, all_fvs) }
@@ -1344,11 +1344,6 @@ nonStdGuardErr :: (Outputable body,
 nonStdGuardErr guards
   = hang (text "accepting non-standard pattern guards (use PatternGuards to suppress this message)")
        4 (interpp'SP guards)
-
-unusedPatBindWarn :: HsBind GhcRn -> SDoc
-unusedPatBindWarn bind
-  = hang (text "This pattern-binding binds no variables:")
-       2 (ppr bind)
 
 dupMinimalSigErr :: [LSig GhcPs] -> RnM ()
 dupMinimalSigErr sigs@(L loc _ : _)

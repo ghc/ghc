@@ -92,7 +92,7 @@ module GHC.Tc.Utils.Monad(
   failWithTc, failWithTcM,
   checkTc, checkTcM,
   failIfTc, failIfTcM,
-  warnIfFlag, warnIf, diagnosticTc, diagnosticTcM,
+  warnIfFlag, warnIf, diagnosticTc, diagnosticTcM, addDetailedDiagnostic, addTcRnDiagnostic,
   addDiagnosticTc, addDiagnosticTcM, addDiagnostic, addDiagnosticAt, add_diagnostic,
   mkErrInfo,
 
@@ -1547,6 +1547,25 @@ addDiagnosticTcM reason (env0, msg)
 -- | Display a diagnostic for the current source location.
 addDiagnostic :: DiagnosticReason -> SDoc -> TcRn ()
 addDiagnostic reason msg = add_diagnostic reason msg Outputable.empty
+
+-- | A variation of 'addDiagnostic' that takes a function to produce a 'TcRnDsMessage'
+-- given some additional context about the diagnostic.
+addDetailedDiagnostic :: (ErrInfo -> TcRnMessage) -> TcM ()
+addDetailedDiagnostic mkMsg = do
+  loc <- getSrcSpanM
+  printer <- getPrintUnqualified
+  dflags  <- getDynFlags
+  env0 <- tcInitTidyEnv
+  ctxt <- getErrCtxt
+  err_info <- mkErrInfo env0 ctxt
+  reportDiagnostic (mkMsgEnvelope dflags loc printer (mkMsg (ErrInfo err_info)))
+
+addTcRnDiagnostic :: TcRnMessage -> TcM ()
+addTcRnDiagnostic msg = do
+  loc <- getSrcSpanM
+  printer <- getPrintUnqualified
+  dflags  <- getDynFlags
+  reportDiagnostic (mkMsgEnvelope dflags loc printer msg)
 
 -- | Display a diagnostic for a given source location.
 addDiagnosticAt :: DiagnosticReason -> SrcSpan -> SDoc -> TcRn ()
