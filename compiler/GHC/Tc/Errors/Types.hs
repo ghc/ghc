@@ -1,7 +1,9 @@
+{-# LANGUAGE GADTs #-}
 module GHC.Tc.Errors.Types (
   -- * Main types
     TcRnMessage(..)
   , TcRnDsMessage(..)
+  , ErrInfo(..)
   -- * Smart constructors
   , mkTcRnDsMessage
   ) where
@@ -9,6 +11,7 @@ module GHC.Tc.Errors.Types (
 import GHC.Prelude
 import GHC.Types.Error
 import GHC.HsToCore.Errors.Types
+import GHC.Utils.Outputable
 
 {- Note [TcRnDsMessage]
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -33,8 +36,22 @@ newtype TcRnDsMessage = TcRnDsMessage (Either DsMessage TcRnMessage)
 mkTcRnDsMessage :: Either DsMessage TcRnMessage -> TcRnDsMessage
 mkTcRnDsMessage = TcRnDsMessage
 
+-- The majority of TcRn messages comes with extra context about the error,
+-- and this newtype captures it.
+newtype ErrInfo = ErrInfo { getErrInfo :: SDoc }
+
 -- | An error which might arise during typechecking/renaming.
-data TcRnMessage
-  = TcRnUnknownMessage !DiagnosticMessage
-  -- ^ Simply rewraps a generic 'DiagnosticMessage'. More
+data TcRnMessage where
+  -- | Simply rewraps a generic 'DiagnosticMessage'. More
   -- instances will be added in the future (#18516).
+  TcRnUnknownMessage :: !DiagnosticMessage -> TcRnMessage
+  {-| TcRnImplicitLift occurs when when a Template Haskell quote implicitly uses 'lift'.
+
+     Example:
+       warning1 :: Lift t => t -> Q Exp
+       warning1 x = [| x |]
+
+     Test cases: th/T17804
+  -}
+  TcRnImplicitLift :: Outputable var => var -> !ErrInfo -> TcRnMessage
+
