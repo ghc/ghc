@@ -4010,7 +4010,7 @@ breakTyVarCycle how loc = go
                is { inert_cycle_breakers = (new_tv, fun_app) :
                                            inert_cycle_breakers is }
            ; return (mkNomReflCo new_ty, new_ty) }
-                                      -- "RAE" document
+                -- Why reflexive? See Detail (4) of the Note
 
       BTVC_Derived ->
         do { new_tv <- wrapTcS (TcM.newFlexiTyVar fun_app_kind)

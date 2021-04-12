@@ -1937,8 +1937,7 @@ data CheckTyEqResult
   | CTE_Occurs  -- occurs check (with no other problem)
 
 instance S.Semigroup CheckTyEqResult where
-  -- "RAE": document
-
+  -- See Detail (8) of Note [Type variable cycles] in GHC.Tc.Solver.Canonical.
   CTE_OK     <> x               = x
 
   CTE_Occurs <> CTE_OK          = CTE_Occurs
