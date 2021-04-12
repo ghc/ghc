@@ -10,14 +10,17 @@ icfp20-fail.hs:20:10: error:
         auto'1 :: SId -> b -> b (bound at icfp20-fail.hs:20:1)
 
 icfp20-fail.hs:23:9: error:
-    • Couldn't match expected type ‘a0’
+    • Couldn't match expected type ‘a’
                   with actual type ‘SId -> b0 -> b0’
-      Cannot instantiate unification variable ‘a0’
+      Cannot equate type variable ‘a’
       with a type involving polytypes: SId -> b0 -> b0
+      ‘a’ is a rigid type variable bound by
+        the inferred type of a6 :: a
+        at icfp20-fail.hs:23:1-14
     • In the first argument of ‘id’, namely ‘auto'2’
       In the expression: id auto'2
       In an equation for ‘a6’: a6 = id auto'2
-    • Relevant bindings include a6 :: a0 (bound at icfp20-fail.hs:23:1)
+    • Relevant bindings include a6 :: a (bound at icfp20-fail.hs:23:1)
 
 icfp20-fail.hs:26:16: error:
     • Couldn't match type ‘SId’ with ‘b -> b’
