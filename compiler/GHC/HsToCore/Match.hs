@@ -422,7 +422,7 @@ tidy1 :: Id                  -- The Id being scrutinised
 -- It eliminates many pattern forms (as-patterns, variable patterns,
 -- list patterns, etc) and returns any created bindings in the wrapper.
 
-tidy1 v o (ParPat _ pat)      = tidy1 v o (unLoc pat)
+tidy1 v o (ParPat _ _ pat _)  = tidy1 v o (unLoc pat)
 tidy1 v o (SigPat _ pat _)    = tidy1 v o (unLoc pat)
 tidy1 _ _ (WildPat ty)        = return (idDsWrapper, WildPat ty)
 tidy1 v o (BangPat _ (L l p)) = tidy_bang_pat v o l p
@@ -518,7 +518,7 @@ tidy_bang_pat :: Id -> Origin -> SrcSpanAnnA -> Pat GhcTc
               -> DsM (DsWrapper, Pat GhcTc)
 
 -- Discard par/sig under a bang
-tidy_bang_pat v o _ (ParPat _ (L l p)) = tidy_bang_pat v o l p
+tidy_bang_pat v o _ (ParPat _ _ (L l p) _) = tidy_bang_pat v o l p
 tidy_bang_pat v o _ (SigPat _ (L l p) _) = tidy_bang_pat v o l p
 
 -- Push the bang-pattern inwards, in the hope that
@@ -1053,8 +1053,8 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     exp :: HsExpr GhcTc -> HsExpr GhcTc -> Bool
     -- real comparison is on HsExpr's
     -- strip parens
-    exp (HsPar _ (L _ e)) e'   = exp e e'
-    exp e (HsPar _ (L _ e'))   = exp e e'
+    exp (HsPar _ _ (L _ e) _) e' = exp e e'
+    exp e (HsPar _ _ (L _ e') _) = exp e e'
     -- because the expressions do not necessarily have the same type,
     -- we have to compare the wrappers
     exp (XExpr (WrapExpr (HsWrap h e))) (XExpr (WrapExpr (HsWrap  h' e'))) =
