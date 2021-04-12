@@ -8,8 +8,7 @@ module GHC.Tc.Errors.Types (
   , mkTcRnDsMessage
   ) where
 
-import GHC.Hs (GhcRn)
-import GHC.Hs.Binds
+import GHC.Hs
 import GHC.HsToCore.Errors.Types
 import GHC.Prelude
 import GHC.Types.Error
@@ -83,3 +82,9 @@ data TcRnMessage where
      Test cases: warnings/should_compile/DodgyExports01
   -}
   TcRnDodgyExports :: Name -> TcRnMessage
+  {-| TcRnMissingImportList occurs when an import declaration does not explicitly list all the
+        names brought into scope.
+
+     Test cases: rename/should_compile/T4489
+  -}
+  TcRnMissingImportList :: IE GhcPs -> TcRnMessage

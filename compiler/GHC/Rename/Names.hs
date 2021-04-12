@@ -41,6 +41,7 @@ import GHC.Rename.Fixity
 import GHC.Rename.Utils ( warnUnusedTopBinds, mkFieldEnv )
 
 import GHC.Tc.Errors.Ppr
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
 
@@ -1166,7 +1167,7 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
             emit_warning (DodgyImport n) = whenWOptM Opt_WarnDodgyImports $
               addDiagnostic (WarningWithFlag Opt_WarnDodgyImports) (dodgyImportWarn n)
             emit_warning MissingImportList = whenWOptM Opt_WarnMissingImportList $
-              addDiagnostic (WarningWithFlag Opt_WarnMissingImportList) (missingImportListItem ieRdr)
+              addTcRnDiagnostic (TcRnMissingImportList ieRdr)
             emit_warning (BadImportW ie) = whenWOptM Opt_WarnDodgyImports $
               addDiagnostic (WarningWithFlag Opt_WarnDodgyImports) (lookup_err_msg (BadImport ie))
 
@@ -2031,10 +2032,6 @@ addDupDeclErr gres@(gre : _)
 missingImportListWarn :: ModuleName -> SDoc
 missingImportListWarn mod
   = text "The module" <+> quotes (ppr mod) <+> ptext (sLit "does not have an explicit import list")
-
-missingImportListItem :: IE GhcPs -> SDoc
-missingImportListItem ie
-  = text "The import item" <+> quotes (ppr ie) <+> ptext (sLit "does not have an explicit import list")
 
 moduleWarn :: ModuleName -> WarningTxt -> SDoc
 moduleWarn mod (WarningTxt _ txt)
