@@ -716,7 +716,7 @@ hscIncrementalFrontend :: Bool -- ^ always do basic recompilation check?
                        -> Hsc (Either ModIface (FrontendResult, Maybe Fingerprint))
 hscIncrementalFrontend always_do_basic_recompilation_check (Just tc_result) _ _ _ _ _ | not always_do_basic_recompilation_check =
   return $ Right (FrontendTypecheck tc_result, Nothing)
-hscIncrementalFrontend _ m_tc_result mHscMessage mod_summary source_modified mb_old_iface mod_index = do
+hscIncrementalFrontend _ _ mHscMessage mod_summary source_modified mb_old_iface mod_index = do
   hsc_env <- getHscEnv
   recomp_result
          <- {-# SCC "checkOldIface" #-}
@@ -746,8 +746,8 @@ hscIncrementalFrontend _ m_tc_result mHscMessage mod_summary source_modified mb_
         Just h  -> h mod_summary
       return (tc_result, mb_old_hash)
 
-  case (m_tc_result, recomp_result) of
-    (Nothing, RecompNotNeeded checked_iface) | mi_used_th checked_iface && not stable ->
+  case recomp_result of
+    RecompNotNeeded checked_iface | mi_used_th checked_iface && not stable ->
       -- If the module used TH splices when it was last
       -- compiled, then the recompilation check is not
       -- accurate enough (#481) and we must ignore
@@ -766,18 +766,11 @@ hscIncrementalFrontend _ m_tc_result mHscMessage mod_summary source_modified mb_
         stable = case source_modified of
           SourceUnmodifiedAndStable -> True
           _                         -> False
-    (Nothing, RecompNeeded comp_reason _) ->
-      fmap Right $ compile comp_reason
-    (_, RecompNotNeeded checked_iface) -> do
+    RecompNotNeeded checked_iface -> do
       liftIO $ msg UpToDate
       return $ Left checked_iface
-    (Just tc_result, RecompNeeded _comp_reason _) ->
-      -- TODO: @Ericson2314 and @cgibbard have no idea why it decides it
-      -- needs to recompile but then uses the old type check result. This
-      -- seems like a bug that was hiden by the devious pattern matching
-      -- that existed before. Nevertheless, we want to make a pure
-      -- refactor, so we are leaving this as is, to return to later.
-      return $ Right (FrontendTypecheck tc_result, mb_old_hash)
+    RecompNeeded comp_reason _ ->
+      fmap Right $ compile comp_reason
 
 --------------------------------------------------------------
 -- Compilers
