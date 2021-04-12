@@ -13,6 +13,7 @@ import GHC.HsToCore.Errors.Types
 import GHC.Prelude
 import GHC.Types.Error
 import GHC.Types.Name (Name)
+import GHC.Types.Name.Reader
 import GHC.Utils.Outputable
 
 
@@ -70,6 +71,13 @@ data TcRnMessage where
      Test cases: rename/{T13646,T17c,T17e,T7085}
   -}
   TcRnUnusedPatternBinds :: HsBind GhcRn -> TcRnMessage
+  {-| TcRnDodgyImports occurs when a datatype 'T' is imported with all constructors, i.e.
+       'T(..)', but has been exported abstractly, i.e. 'T'. It's also emitted when an 'import' statement
+       hides an entity that is not exported.
+
+     Test cases: rename/should_compile/T7167
+  -}
+  TcRnDodgyImports :: RdrName -> TcRnMessage
   {-| TcRnDodgyExports occurs when a datatype 'T' is exported with all constructors,
       i.e. 'T(..)', but is it just a type synonym. Also emitted when a module is re-exported,
       but that module exports nothing.
