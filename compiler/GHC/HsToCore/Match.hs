@@ -1165,7 +1165,9 @@ patGroup _ (WildPat {})                 = PgAny
 patGroup _ (BangPat {})                 = PgBang
 patGroup _ (NPat _ (L _ (OverLit {ol_val=oval})) mb_neg _) =
   case (oval, isJust mb_neg) of
-    (HsIntegral   i, is_neg) -> PgN (integralFractionalLit is_neg (il_value i))
+    (HsIntegral   i, is_neg) -> PgN (integralFractionalLit is_neg (if is_neg
+                                                                    then negate (il_value i)
+                                                                    else il_value i))
     (HsFractional f, is_neg)
       | is_neg    -> PgN $! negateFractionalLit f
       | otherwise -> PgN f
