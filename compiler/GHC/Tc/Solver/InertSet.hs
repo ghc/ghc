@@ -241,7 +241,7 @@ data InertSet
        , inert_cycle_breakers :: [(TcTyVar, TcType)]
               -- a list of CycleBreakerTv / original family applications
               -- used to undo the cycle-breaking needed to handle
-              -- Note [Type variable cycles in Givens] in GHC.Tc.Solver.Canonical
+              -- Note [Type variable cycles] in GHC.Tc.Solver.Canonical
 
        , inert_famapp_cache :: FunEqMap (TcCoercion, TcType)
               -- Just a hash-cons cache for use when reducing family applications
@@ -277,7 +277,8 @@ emptyInertCans
        , inert_safehask     = emptyDictMap
        , inert_funeqs       = emptyFunEqs
        , inert_insts        = []
-       , inert_irreds       = emptyCts }
+       , inert_irreds       = emptyCts
+       , inert_blocked      = emptyCts }
 
 emptyInert :: InertSet
 emptyInert
@@ -839,7 +840,7 @@ The idea is that
   with S(fw,_).
 
 * T3 is guaranteed by an occurs-check on the work item.
-  This is done during canonicalisation, in canEqOK and checkTypeEq; invariant
+  This is done during canonicalisation, in checkTypeEq; invariant
   (TyEq:OC) of CEqCan. See also Note [CEqCan occurs check] in GHC.Tc.Types.Constraint.
 
 * (K1-3) are the "kick-out" criteria.  (As stated, they are really the
@@ -1101,6 +1102,14 @@ data InertCans   -- See Note [Detailed InertCans Invariants] for more
               --     and which don't interact with others (e.g.  (c a))
               -- and insoluble predicates (e.g.  Int ~ Bool, or a ~ [a])
 
+       , inert_blocked :: Cts
+              -- Equality predicates blocked on a coercion hole.
+              -- Each Ct is a CIrredCan with cc_reason = HoleBlockerReason
+              -- See Note [Equalities with incompatible kinds] in GHC.Tc.Solver.Canonical
+              -- wrinkle (2)
+              -- These are stored separately from inert_irreds because
+              -- they get kicked out for different reasons
+
        , inert_given_eq_lvl :: TcLevel
               -- The TcLevel of the innermost implication that has a Given
               -- equality of the sort that make a unification variable untouchable
@@ -1119,8 +1128,11 @@ type InertEqs    = DTyVarEnv EqualCtList
 
 instance Outputable InertCans where
   ppr (IC { inert_eqs = eqs
-          , inert_funeqs = funeqs, inert_dicts = dicts
-          , inert_safehask = safehask, inert_irreds = irreds
+          , inert_funeqs = funeqs
+          , inert_dicts = dicts
+          , inert_safehask = safehask
+          , inert_irreds = irreds
+          , inert_blocked = blocked
           , inert_given_eq_lvl = ge_lvl
           , inert_given_eqs = given_eqs
           , inert_insts = insts })
@@ -1137,6 +1149,8 @@ instance Outputable InertCans where
         text "Safe Haskell unsafe overlap =" <+> pprCts (dictsToBag safehask)
       , ppUnless (isEmptyCts irreds) $
         text "Irreds =" <+> pprCts irreds
+      , ppUnless (isEmptyCts blocked) $
+        text "Blocked =" <+> pprCts blocked
       , ppUnless (null insts) $
         text "Given instances =" <+> vcat (map ppr insts)
       , text "Innermost given equalities =" <+> ppr ge_lvl
@@ -1209,6 +1223,11 @@ addInertItem tc_lvl
     case lhs of
        TyFamLHS tc tys -> ics { inert_funeqs = addCanFunEq funeqs tc tys item }
        TyVarLHS tv     -> ics { inert_eqs    = addTyEq eqs tv item }
+
+addInertItem tc_lvl ics@(IC { inert_blocked = blocked })
+             item@(CIrredCan { cc_reason = HoleBlockerReason {}})
+  = updateGivenEqs tc_lvl item $  -- this item is always an equality
+    ics { inert_blocked = blocked `snocBag` item }
 
 addInertItem tc_lvl ics@(IC { inert_irreds = irreds }) item@(CIrredCan {})
   = updateGivenEqs tc_lvl item $   -- An Irred might turn out to be an
