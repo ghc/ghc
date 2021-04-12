@@ -37,7 +37,7 @@ NoImplicitPrelude. There are two motivations for this:
 import Prelude as X hiding ((<>))
 import Data.Foldable as X (foldl')
 
-#if MIN_VERSION_base(4,15,0)
+#if MIN_VERSION_base(4,16,0)
 import GHC.Bits as Bits hiding (shiftL, shiftR)
 # if defined(DEBUG)
 import qualified GHC.Bits as Bits (shiftL, shiftR)
@@ -85,4 +85,3 @@ shiftR = Bits.shiftR
 shiftL = Bits.unsafeShiftL
 shiftR = Bits.unsafeShiftR
 #endif
-
