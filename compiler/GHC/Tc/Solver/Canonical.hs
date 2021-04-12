@@ -723,7 +723,7 @@ canIrred ev
                                     do traceTcS "canEvNC:forall" (ppr pred)
                                        canForAllNC ev tvs th p
            IrredPred {}          -> continueWith $
-                                    mkIrredCt OtherCIS new_ev } }
+                                    mkIrredCt IrreducibleCIS new_ev } }
 
 {- *********************************************************************
 *                                                                      *
@@ -1093,7 +1093,7 @@ can_eq_nc' True _rdr_env _envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
 can_eq_nc' True _rdr_env _envs ev eq_rel _ ps_ty1 _ ps_ty2
   = do { traceTcS "can_eq_nc' catch-all case" (ppr ps_ty1 $$ ppr ps_ty2)
        ; case eq_rel of -- See Note [Unsolved equalities]
-            ReprEq -> continueWith (mkIrredCt OtherCIS ev)
+            ReprEq -> continueWith (mkIrredCt ReprEqCIS ev)
             NomEq  -> continueWith (mkIrredCt InsolubleCIS ev) }
           -- No need to call canEqFailure/canEqHardFailure because they
           -- rewrite, and the types involved here are already rewritten
@@ -1574,10 +1574,10 @@ canTyConApp ev eq_rel tc1 tys1 tc2 tys2
          then canDecomposableTyConAppOK ev eq_rel tc1 tys1 tys2
          else canEqFailure ev eq_rel ty1 ty2 }
 
-  -- See Note [Skolem abstract data] (at tyConSkolem)
+  -- See Note [Skolem abstract data] in GHC.Core.Tycon
   | tyConSkolem tc1 || tyConSkolem tc2
   = do { traceTcS "canTyConApp: skolem abstract" (ppr tc1 $$ ppr tc2)
-       ; continueWith (mkIrredCt OtherCIS ev) }
+       ; continueWith (mkIrredCt AbstractTyConCIS ev) }
 
   -- Fail straight away for better error messages
   -- See Note [Use canEqFailure in canDecomposableTyConApp]
@@ -1919,7 +1919,7 @@ canEqFailure ev ReprEq ty1 ty2
        ; traceTcS "canEqFailure with ReprEq" $
          vcat [ ppr ev, ppr ty1, ppr ty2, ppr xi1, ppr xi2 ]
        ; new_ev <- rewriteEqEvidence ev NotSwapped xi1 xi2 co1 co2
-       ; continueWith (mkIrredCt OtherCIS new_ev) }
+       ; continueWith (mkIrredCt ReprEqCIS new_ev) }
 
 -- | Call when canonicalizing an equality fails with utterly no hope.
 canEqHardFailure :: CtEvidence
@@ -2349,7 +2349,7 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
 
            CanEqNotOK status
                 -- See Note [Type variable cycles]
-             | OtherCIS <- status
+             | SolubleOccursCheckCIS <- status
              , TyVarLHS lhs_tv <- lhs
              , NomEq <- eq_rel
              -> do { m_break_how <- shouldBreakCycle (ctEvFlavour ev) lhs_tv rhs
@@ -2445,7 +2445,7 @@ canEqOK dflags eq_rel lhs rhs
   = ASSERT( good_rhs )
     case checkTypeEq dflags YesTypeFamilies lhs rhs of
       CTE_OK  -> CanEqOK
-      CTE_Bad -> CanEqNotOK OtherCIS
+      CTE_Bad -> CanEqNotOK ImpredicativeCIS
                  -- Violation of TyEq:F
 
       CTE_HoleBlocker -> CanEqNotOK (BlockedCIS holes)
@@ -2466,7 +2466,7 @@ canEqOK dflags eq_rel lhs rhs
                  -- NB: no occCheckExpand here; see Note [Rewriting synonyms]
                  -- in GHC.Tc.Solver.Rewrite
 
-                  | otherwise                            -> CanEqNotOK OtherCIS
+                  | otherwise                            -> CanEqNotOK SolubleOccursCheckCIS
                  -- A representational equality with an occurs-check problem isn't
                  -- insoluble! For example:
                  --   a ~R b a
@@ -2664,8 +2664,12 @@ Note [Type variable cycles]
 Consider this situation (from indexed-types/should_compile/GivenLoop):
 
   instance C (Maybe b)
-  [G] a ~ Maybe (F a)
+  *[G] a ~ Maybe (F a)
   [W] C a
+
+or (typecheck/should_compile/T19682):
+"RAE"
+  instance
 
 In order to solve the Wanted, we must use the Given to rewrite `a` to
 Maybe (F a). But note that the Given has an occurs-check failure, and
@@ -2848,8 +2852,7 @@ Details:
      infinitum (and resulting in a context-stack reduction error,
      not an outright loop). The solution is easy: don't break cycles
      if the var is already a CycleBreakerTv. Instead, we mark this
-     final Given as a CIrredCan with an OtherCIS status (it's not
-     insoluble).
+     final Given as a CIrredCan with a SolubleOccursCheckCIS status.
 
      NB: When filling in CycleBreakerTvs, we fill them in with what
      they originally stood for (e.g. cbv1 := TF a, cbv2 := TF Int),
