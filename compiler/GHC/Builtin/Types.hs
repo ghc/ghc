@@ -1447,7 +1447,7 @@ vecRepDataConTyCon = promoteDataCon vecRepDataCon
 
 tupleRepDataCon :: DataCon
 tupleRepDataCon = pcSpecialDataCon tupleRepDataConName [ mkListTy runtimeRepTy ]
-                                   runtimeRepTyCon (RuntimeInfo prim_rep_fun)
+                                   runtimeRepTyCon (RuntimeRep prim_rep_fun)
   where
     -- See Note [Getting from RuntimeRep to PrimRep] in GHC.Types.RepType
     prim_rep_fun [rr_ty_list]
