@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -47,7 +48,7 @@ module GHC.Tc.Solver.Monad (
     newWantedNC, newWantedEvVarNC,
     newDerivedNC,
     newBoundEvVarId,
-    unifyTyVar, reportUnifications,
+    unifyTyVar, reportUnifications, unifyTest, UnifyTestResult(..),
     setEvBind, setWantedEq,
     setWantedEvTerm, setEvBindIfWanted,
     newEvVar, newGivenEvVar, newGivenEvVars,
@@ -130,7 +131,7 @@ module GHC.Tc.Solver.Monad (
                                              -- if the whole instance matcher simply belongs
                                              -- here
 
-    breakTyVarCycle, rewriterView
+    shouldBreakCycle, BreakTyVarCyclesHow(..), breakTyVarCycle, rewriterView
 ) where
 
 #include "HsVersions.h"
@@ -179,6 +180,7 @@ import GHC.Utils.Misc
 import GHC.Tc.Types
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Constraint
+import GHC.Tc.Utils.Unify
 import GHC.Core.Predicate
 
 import GHC.Types.Unique.Set
@@ -395,7 +397,7 @@ data InertSet
        , inert_cycle_breakers :: [(TcTyVar, TcType)]
               -- a list of CycleBreakerTv / original family applications
               -- used to undo the cycle-breaking needed to handle
-              -- Note [Type variable cycles in Givens] in GHC.Tc.Solver.Canonical
+              -- Note [Type variable cycles] in GHC.Tc.Solver.Canonical
 
        , inert_famapp_cache :: FunEqMap (TcCoercion, TcType)
               -- Just a hash-cons cache for use when reducing family applications
@@ -2491,7 +2493,7 @@ This is best understood by example.
    where cbv = F a
 
    The cbv is a cycle-breaker var which stands for F a. See
-   Note [Type variable cycles in Givens] in GHC.Tc.Solver.Canonical.
+   Note [Type variable cycles] in GHC.Tc.Solver.Canonical.
    This is just like case 6, and we say "no". Saying "no" here is
    essential in getting the parser to type-check, with its use of DisambECP.
 
@@ -3043,7 +3045,7 @@ runTcSWithEvBinds = runTcSWithEvBinds' True
 
 runTcSWithEvBinds' :: Bool -- ^ Restore type variable cycles afterwards?
                            -- Don't if you want to reuse the InertSet.
-                           -- See also Note [Type variable cycles in Givens]
+                           -- See also Note [Type variable cycles]
                            -- in GHC.Tc.Solver.Canonical
                    -> EvBindsVar
                    -> TcS a
@@ -3339,6 +3341,82 @@ reportUnifications (TcS thing_inside)
        ; n_unifs <- TcM.readTcRef inner_unified
        ; TcM.updTcRef (tcs_unified env) (+ n_unifs)
        ; return (n_unifs, res) }
+
+data UnifyTestResult
+  -- See Note [Solve by unification] in GHC.Tc.Solver.Interact
+  -- which points out that having UnifySameLevel is just an optimisation;
+  -- we could manage with UnifyOuterLevel alone (suitably renamed)
+  = UnifySameLevel
+  | UnifyOuterLevel [TcTyVar]   -- Promote these
+                    TcLevel     -- ..to this level
+  | NoUnify
+
+instance Outputable UnifyTestResult where
+  ppr UnifySameLevel            = text "UnifySameLevel"
+  ppr (UnifyOuterLevel tvs lvl) = text "UnifyOuterLevel" <> parens (ppr lvl <+> ppr tvs)
+  ppr NoUnify                   = text "NoUnify"
+
+unifyTest :: CtFlavour -> TcTyVar -> TcType -> TcS UnifyTestResult
+-- This is the key test for untouchability:
+-- See Note [Unification preconditions] in GHC.Tc.Utils.Unify
+-- and Note [Solve by unification] in GHC.Tc.Solver.Interact
+unifyTest flav tv1 rhs
+  | flav /= Given  -- See Note [Do not unify Givens]
+  , MetaTv { mtv_tclvl = tv_lvl, mtv_info = info } <- tcTyVarDetails tv1
+  , canSolveByUnification info rhs
+  = do { ambient_lvl  <- getTcLevel
+       ; given_eq_lvl <- getInnermostGivenEqLevel
+
+       ; if | tv_lvl `sameDepthAs` ambient_lvl
+            -> return UnifySameLevel
+
+            | tv_lvl `deeperThanOrSame` given_eq_lvl   -- No intervening given equalities
+            , all (does_not_escape tv_lvl) free_skols  -- No skolem escapes
+            -> return (UnifyOuterLevel free_metas tv_lvl)
+
+            | otherwise
+            -> return NoUnify }
+  | otherwise
+  = return NoUnify
+  where
+     (free_metas, free_skols) = partition isPromotableMetaTyVar $
+                                nonDetEltsUniqSet               $
+                                tyCoVarsOfType rhs
+
+     does_not_escape tv_lvl fv
+       | isTyVar fv = tv_lvl `deeperThanOrSame` tcTyVarLevel fv
+       | otherwise  = True
+       -- Coercion variables are not an escape risk
+       -- If an implication binds a coercion variable, it'll have equalities,
+       -- so the "intervening given equalities" test above will catch it
+       -- Coercion holes get filled with coercions, so again no problem.
+
+{- Note [Do not unify Givens]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this GADT match
+   data T a where
+      T1 :: T Int
+      ...
+
+   f x = case x of
+           T1 -> True
+           ...
+
+So we get f :: T alpha[1] -> beta[1]
+          x :: T alpha[1]
+and from the T1 branch we get the implication
+   forall[2] (alpha[1] ~ Int) => beta[1] ~ Bool
+
+Now, clearly we don't want to unify alpha:=Int!  Yet at the moment we
+process [G] alpha[1] ~ Int, we don't have any given-equalities in the
+inert set, and hence there are no given equalities to make alpha untouchable.
+
+NB: if it were alpha[2] ~ Int, this argument wouldn't hold.  But that
+never happens: invariant (GivenInv) in Note [TcLevel invariants]
+in GHC.Tc.Utils.TcType.
+
+Simple solution: never unify in Givens!
+-}
 
 getDefaultInfo ::  TcS ([Type], (Bool, Bool))
 getDefaultInfo = wrapTcS TcM.tcGetDefaultTys
@@ -3839,51 +3917,109 @@ See GHC.Tc.Solver.Monad.deferTcSForAllEq
 ************************************************************************
 -}
 
+-- | Are we breaking tyvar cycles in a Given or a Derived?
+data BreakTyVarCyclesHow = BTVC_Given
+                         | BTVC_Derived
+
+instance Outputable BreakTyVarCyclesHow where
+  ppr BTVC_Given   = text "BTVC_Given"
+  ppr BTVC_Derived = text "BTVC_Derived"
+
+-- | Should we break cycles in the given constraint? And, if so, how
+-- should we break the cycles? See Note [Type variable cycles]
+-- in GHC.Tc.Solver.Canonical
+shouldBreakCycle :: CtFlavour   -- of the equality
+                 -> TcTyVar     -- the LHS
+                 -> TcType      -- the RHS
+                 -> TcS (Maybe BreakTyVarCyclesHow)
+shouldBreakCycle Given lhs_tv _rhs
+  | not (isCycleBreakerTyVar lhs_tv)  -- See Detail (7) of Note
+  = return $ Just BTVC_Given
+shouldBreakCycle flav lhs_tv rhs
+  | ctFlavourContainsDerived flav
+  = do { result <- unifyTest Derived lhs_tv rhs
+       ; return $ case result of
+           NoUnify -> Nothing
+           _       -> Just BTVC_Derived }
+shouldBreakCycle _ _ _ = return Nothing
+
 -- | Replace all type family applications in the RHS with fresh variables,
 -- emitting givens that relate the type family application to the variable.
--- See Note [Type variable cycles in Givens] in GHC.Tc.Solver.Canonical.
-breakTyVarCycle :: CtLoc
-                -> TcType      -- the RHS
-                -> TcS TcType  -- new RHS that doesn't have any type families
+-- See Note [Type variable cycles] in GHC.Tc.Solver.Canonical.
+breakTyVarCycle :: BreakTyVarCyclesHow
+                -> CtLoc
+                -> TcType                   -- the RHS
+                -> TcS (CoercionN, TcType)  -- new RHS that doesn't have any type families
+                  -- co :: new type ~N old type
 -- This could be considerably more efficient. See Detail (5) of Note.
-breakTyVarCycle loc = go
+breakTyVarCycle how loc = go
   where
+    go :: TcType -> TcS (CoercionN, TcType)
     go ty | Just ty' <- rewriterView ty = go ty'
     go (Rep.TyConApp tc tys)
       | isTypeFamilyTyCon tc
       = do { let (fun_args, extra_args) = splitAt (tyConArity tc) tys
                  fun_app                = mkTyConApp tc fun_args
                  fun_app_kind           = tcTypeKind fun_app
-           ; new_tv <- wrapTcS (TcM.newCycleBreakerTyVar fun_app_kind)
+           ; (co, new_ty) <- emit_work fun_app_kind fun_app
+           ; (extra_args_cos, extra_args') <- mapAndUnzipM go extra_args
+           ; return (mkAppCos co extra_args_cos, mkAppTys new_ty extra_args') }
+              -- Worried that this substitution will change kinds?
+              -- See Detail (3) of Note
+
+      | otherwise
+      = do { (cos, tys) <- mapAndUnzipM go tys
+           ; return (mkTyConAppCo Nominal tc cos, mkTyConApp tc tys) }
+
+    go (Rep.AppTy ty1 ty2)
+      = do { (co1, ty1') <- go ty1
+           ; (co2, ty2') <- go ty2
+           ; return (mkAppCo co1 co2, mkAppTy ty1' ty2') }
+    go (Rep.FunTy vis w arg res)
+      = do { (co_w, w') <- go w
+           ; (co_arg, arg') <- go arg
+           ; (co_res, res') <- go res
+           ; return (mkFunCo Nominal co_w co_arg co_res, mkFunTy vis w' arg' res') }
+    go (Rep.CastTy ty cast_co)
+      = do { (co, ty') <- go ty
+             -- co :: ty' ~N ty
+             -- return_co :: (ty' |> cast_co) ~ (ty |> cast_co)
+           ; return (castCoercionKind1 co Nominal ty' ty cast_co, mkCastTy ty' cast_co) }
+
+    go ty@(Rep.TyVarTy {})    = skip ty
+    go ty@(Rep.LitTy {})      = skip ty
+    go ty@(Rep.ForAllTy {})   = skip ty  -- See Detail (1) of Note
+    go ty@(Rep.CoercionTy {}) = skip ty  -- See Detail (2) of Note
+
+    skip ty = return (mkNomReflCo ty, ty)
+
+    emit_work :: TcKind                   -- of the function application
+              -> TcType                   -- original function application
+              -> TcS (CoercionN, TcType)  -- rewritten type (the fresh tyvar)
+    emit_work fun_app_kind fun_app = case how of
+      BTVC_Given   ->
+        do { new_tv <- wrapTcS (TcM.newCycleBreakerTyVar fun_app_kind)
            ; let new_ty     = mkTyVarTy new_tv
                  given_pred = mkHeteroPrimEqPred fun_app_kind fun_app_kind
                                                  fun_app new_ty
                  given_term = evCoercion $ mkNomReflCo new_ty  -- See Detail (4) of Note
            ; new_given <- newGivenEvVar loc (given_pred, given_term)
-           ; traceTcS "breakTyVarCycle replacing type family" (ppr new_given)
+           ; traceTcS "breakTyVarCycle replacing type family in Given" (ppr new_given)
            ; emitWorkNC [new_given]
            ; updInertTcS $ \is ->
                is { inert_cycle_breakers = (new_tv, fun_app) :
                                            inert_cycle_breakers is }
-           ; extra_args' <- mapM go extra_args
-           ; return (mkAppTys new_ty extra_args') }
-              -- Worried that this substitution will change kinds?
-              -- See Detail (3) of Note
+           ; return (mkNomReflCo new_ty, new_ty) }
+                                      -- "RAE" document
 
-      | otherwise
-      = mkTyConApp tc <$> mapM go tys
-
-    go (Rep.AppTy ty1 ty2)       = mkAppTy <$> go ty1 <*> go ty2
-    go (Rep.FunTy vis w arg res) = mkFunTy vis <$> go w <*> go arg <*> go res
-    go (Rep.CastTy ty co)        = mkCastTy <$> go ty <*> pure co
-
-    go ty@(Rep.TyVarTy {})    = return ty
-    go ty@(Rep.LitTy {})      = return ty
-    go ty@(Rep.ForAllTy {})   = return ty  -- See Detail (1) of Note
-    go ty@(Rep.CoercionTy {}) = return ty  -- See Detail (2) of Note
+      BTVC_Derived ->
+        do { new_tv <- wrapTcS (TcM.newFlexiTyVar fun_app_kind)
+           ; let new_ty = mkTyVarTy new_tv
+           ; co <- emitNewWantedEq loc Nominal new_ty fun_app
+           ; return (co, new_ty) }
 
 -- | Fill in CycleBreakerTvs with the variables they stand for.
--- See Note [Type variable cycles in Givens] in GHC.Tc.Solver.Canonical.
+-- See Note [Type variable cycles] in GHC.Tc.Solver.Canonical.
 restoreTyVarCycles :: InertSet -> TcM ()
 restoreTyVarCycles is
   = forM_ (inert_cycle_breakers is) $ \ (cycle_breaker_tv, orig_ty) ->

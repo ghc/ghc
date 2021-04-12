@@ -58,7 +58,7 @@ module GHC.Tc.Types.Constraint (
 
         wrapType,
 
-        CtFlavour(..), ShadowInfo(..), ctEvFlavour,
+        CtFlavour(..), ShadowInfo(..), ctFlavourContainsDerived, ctEvFlavour,
         CtFlavourRole, ctEvFlavourRole, ctFlavourRole,
         eqCanRewrite, eqCanRewriteFR, eqMayRewriteFR,
         eqCanDischargeFR,
@@ -1640,6 +1640,12 @@ instance Outputable CtFlavour where
   ppr (Wanted WDeriv) = text "[WD]"
   ppr (Wanted WOnly)  = text "[W]"
   ppr Derived         = text "[D]"
+
+-- | Does this 'CtFlavour' subsumed 'Derived'? True of @[WD]@ and @[D]@.
+ctFlavourContainsDerived :: CtFlavour -> Bool
+ctFlavourContainsDerived (Wanted WDeriv) = True
+ctFlavourContainsDerived Derived         = True
+ctFlavourContainsDerived _               = False
 
 ctEvFlavour :: CtEvidence -> CtFlavour
 ctEvFlavour (CtWanted { ctev_nosh = nosh }) = Wanted nosh

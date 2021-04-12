@@ -4,7 +4,7 @@
 
 module GHC.Tc.Solver.Canonical(
      canonicalize,
-     unifyDerived, unifyTest, UnifyTestResult(..),
+     unifyDerived,
      makeSuperClasses,
      StopOrContinue(..), stopWith, continueWith, andWhenContinue,
      solveCallStack    -- For GHC.Tc.Solver
@@ -51,8 +51,7 @@ import GHC.Data.Bag
 import GHC.Utils.Monad
 import Control.Monad
 import Data.Maybe ( isJust, isNothing )
-import Data.List  ( zip4, partition )
-import GHC.Types.Unique.Set( nonDetEltsUniqSet )
+import Data.List  ( zip4 )
 import GHC.Types.Basic
 
 import Data.Bifunctor ( bimap )
@@ -2299,7 +2298,7 @@ canEqTyVarFunEq :: CtEvidence               -- :: lhs ~ (rhs |> mco)
                 -> MCoercion                -- :: kind(rhs) ~N kind(lhs)
                 -> TcS (StopOrContinue Ct)
 canEqTyVarFunEq ev eq_rel swapped tv1 ps_xi1 fun_tc2 fun_args2 ps_xi2 mco
-  = do { can_unify <- unifyTest ev tv1 rhs
+  = do { can_unify <- unifyTest (ctEvFlavour ev) tv1 rhs
        ; dflags    <- getDynFlags
        ; if | case can_unify of { NoUnify -> False; _ -> True }
             , CTE_OK <- checkTyVarEq dflags YesTypeFamilies tv1 rhs
@@ -2315,82 +2314,6 @@ canEqTyVarFunEq ev eq_rel swapped tv1 ps_xi1 fun_tc2 fun_args2 ps_xi2 mco
   where
     sym_mco = mkTcSymMCo mco
     rhs = ps_xi2 `mkCastTyMCo` mco
-
-data UnifyTestResult
-  -- See Note [Solve by unification] in GHC.Tc.Solver.Interact
-  -- which points out that having UnifySameLevel is just an optimisation;
-  -- we could manage with UnifyOuterLevel alone (suitably renamed)
-  = UnifySameLevel
-  | UnifyOuterLevel [TcTyVar]   -- Promote these
-                    TcLevel     -- ..to this level
-  | NoUnify
-
-instance Outputable UnifyTestResult where
-  ppr UnifySameLevel            = text "UnifySameLevel"
-  ppr (UnifyOuterLevel tvs lvl) = text "UnifyOuterLevel" <> parens (ppr lvl <+> ppr tvs)
-  ppr NoUnify                   = text "NoUnify"
-
-unifyTest :: CtEvidence -> TcTyVar -> TcType -> TcS UnifyTestResult
--- This is the key test for untouchability:
--- See Note [Unification preconditions] in GHC.Tc.Utils.Unify
--- and Note [Solve by unification] in GHC.Tc.Solver.Interact
-unifyTest ev tv1 rhs
-  | not (isGiven ev)  -- See Note [Do not unify Givens]
-  , MetaTv { mtv_tclvl = tv_lvl, mtv_info = info } <- tcTyVarDetails tv1
-  , canSolveByUnification info rhs
-  = do { ambient_lvl  <- getTcLevel
-       ; given_eq_lvl <- getInnermostGivenEqLevel
-
-       ; if | tv_lvl `sameDepthAs` ambient_lvl
-            -> return UnifySameLevel
-
-            | tv_lvl `deeperThanOrSame` given_eq_lvl   -- No intervening given equalities
-            , all (does_not_escape tv_lvl) free_skols  -- No skolem escapes
-            -> return (UnifyOuterLevel free_metas tv_lvl)
-
-            | otherwise
-            -> return NoUnify }
-  | otherwise
-  = return NoUnify
-  where
-     (free_metas, free_skols) = partition isPromotableMetaTyVar $
-                                nonDetEltsUniqSet               $
-                                tyCoVarsOfType rhs
-
-     does_not_escape tv_lvl fv
-       | isTyVar fv = tv_lvl `deeperThanOrSame` tcTyVarLevel fv
-       | otherwise  = True
-       -- Coercion variables are not an escape risk
-       -- If an implication binds a coercion variable, it'll have equalities,
-       -- so the "intervening given equalities" test above will catch it
-       -- Coercion holes get filled with coercions, so again no problem.
-
-{- Note [Do not unify Givens]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider this GADT match
-   data T a where
-      T1 :: T Int
-      ...
-
-   f x = case x of
-           T1 -> True
-           ...
-
-So we get f :: T alpha[1] -> beta[1]
-          x :: T alpha[1]
-and from the T1 branch we get the implication
-   forall[2] (alpha[1] ~ Int) => beta[1] ~ Bool
-
-Now, clearly we don't want to unify alpha:=Int!  Yet at the moment we
-process [G] alpha[1] ~ Int, we don't have any given-equalities in the
-inert set, and hence there are no given equalities to make alpha untouchable.
-
-NB: if it were alpha[2] ~ Int, this argument wouldn't hold.  But that
-never happens: invariant (GivenInv) in Note [TcLevel invariants]
-in GHC.Tc.Utils.TcType.
-
-Simple solution: never unify in Givens!
--}
 
 -- The RHS here is either not CanEqLHS, or it's one that we
 -- want to rewrite the LHS to (as per e.g. swapOverTyVars)
@@ -2425,25 +2348,36 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
        -- occurs-check for a function application, which seems awkward.
 
            CanEqNotOK status
-                -- See Note [Type variable cycles in Givens]
+                -- See Note [Type variable cycles]
              | OtherCIS <- status
-             , Given <- ctEvFlavour ev
              , TyVarLHS lhs_tv <- lhs
-             , not (isCycleBreakerTyVar lhs_tv) -- See Detail (7) of Note
              , NomEq <- eq_rel
-             -> do { traceTcS "canEqCanLHSFinish breaking a cycle" (ppr lhs $$ ppr rhs)
-                   ; new_rhs <- breakTyVarCycle (ctEvLoc ev) rhs
+             -> do { m_break_how <- shouldBreakCycle (ctEvFlavour ev) lhs_tv rhs
+                   ; case m_break_how of
+                     { Nothing ->
+                         do { traceTcS "Decided against breaking tyvar cycle" empty
+                            ; continueWith (mkIrredCt status new_ev) }
+                     ; Just how ->
+                do { traceTcS "canEqCanLHSFinish breaking a cycle" $
+                              ppr how $$ ppr lhs $$ ppr rhs
+                   ; (co, new_rhs) <- breakTyVarCycle how (ctEvLoc ev) rhs
                    ; traceTcS "new RHS:" (ppr new_rhs)
-                   ; let new_pred   = mkPrimEqPred (mkTyVarTy lhs_tv) new_rhs
-                         new_new_ev = new_ev { ctev_pred = new_pred }
-                           -- See Detail (6) of Note [Type variable cycles in Givens]
+
+                           -- "RAE": remove/update this Detail
+                           -- See Detail (6) of Note [Type variable cycles]
 
                    ; if anyRewritableTyVar True NomEq (\ _ tv -> tv == lhs_tv) new_rhs
-                     then do { traceTcS "Note [Type variable cycles in Givens] Detail (1)"
-                                        (ppr new_new_ev)
+                     then do { traceTcS "Note [Type variable cycles] Detail (1)"
+                                        (ppr new_rhs)
                              ; continueWith (mkIrredCt status new_ev) }
-                     else continueWith (CEqCan { cc_ev = new_new_ev, cc_lhs = lhs
-                                               , cc_rhs = new_rhs, cc_eq_rel = eq_rel }) }
+                     else do { new_new_ev <- rewriteEqEvidence new_ev NotSwapped
+                                               lhs_ty new_rhs
+                                               (mkTcNomReflCo lhs_ty) co
+
+                             ; continueWith (CEqCan { cc_ev = new_new_ev
+                                                    , cc_lhs = lhs
+                                                    , cc_rhs = new_rhs
+                                                    , cc_eq_rel = eq_rel }) }}}}
 
                -- We must not use it for further rewriting!
              | otherwise
@@ -2725,8 +2659,8 @@ NOT (necessarily) expand the type synonym, since for the purpose of
 good error messages we want to leave type synonyms unexpanded as much
 as possible.  Hence the ps_xi1, ps_xi2 argument passed to canEqCanLHS.
 
-Note [Type variable cycles in Givens]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Type variable cycles]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this situation (from indexed-types/should_compile/GivenLoop):
 
   instance C (Maybe b)
