@@ -215,8 +215,7 @@ compileOne' m_tc_result mHscMessage
 
    case (status, bcknd) of
         (HscUpToDate iface hmi_details, _) ->
-            -- TODO recomp014 triggers this assert. What's going on?!
-            -- ASSERT( isJust mb_old_linkable || isNoLink (ghcLink dflags) )
+            ASSERT( isJust mb_old_linkable || isNoLink (ghcLink dflags) )
             return $! HomeModInfo iface hmi_details mb_old_linkable
         (HscNotGeneratingCode iface hmi_details, NoBackend) ->
             let mb_linkable = if isHsBootOrSig src_flavour
