@@ -24,8 +24,12 @@ instance Diagnostic TcRnMessage where
                       text "is implicitly lifted in the TH quotation"
                      , getErrInfo errInfo
                      ]
+    TcRnUnusedPatternBinds bind
+      -> mkDecorated [hang (text "This pattern-binding binds no variables:") 2 (ppr bind)]
   diagnosticReason = \case
     TcRnUnknownMessage m
       -> diagnosticReason m
     TcRnImplicitLift{}
       -> WarningWithFlag Opt_WarnImplicitLift
+    TcRnUnusedPatternBinds{}
+      -> WarningWithFlag Opt_WarnUnusedPatternBinds

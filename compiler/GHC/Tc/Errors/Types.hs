@@ -12,6 +12,9 @@ import GHC.Prelude
 import GHC.Types.Error
 import GHC.HsToCore.Errors.Types
 import GHC.Utils.Outputable
+import GHC.Hs.Binds
+import GHC.Hs (GhcRn)
+
 
 {- Note [TcRnDsMessage]
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -54,4 +57,16 @@ data TcRnMessage where
      Test cases: th/T17804
   -}
   TcRnImplicitLift :: Outputable var => var -> !ErrInfo -> TcRnMessage
+  {-| TcRnUnusedPatternBinds occurs when when some pattern match bindings are unused
 
+     Example:
+       foo :: IO ()
+       foo = do let !() = assert False ()
+                    -- Should not give a warning
+                let () = assert False ()
+                    -- Should give a warning
+                pure ()
+
+     Test cases: rename/{T13646,T17c,T17e,T7085}
+  -}
+  TcRnUnusedPatternBinds :: HsBind GhcRn -> TcRnMessage
