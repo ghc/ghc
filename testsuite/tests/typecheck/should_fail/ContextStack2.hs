@@ -9,6 +9,8 @@ type instance TF (a,b) = (TF a, TF b)
 
 -- Succeeds with new approach to fuvs
 -- Aug 2016
+
+-- fails again in 2021 with new treatment of flattening. OK.
 t :: (a ~ TF (a,Int)) => Int
 t = undefined
 

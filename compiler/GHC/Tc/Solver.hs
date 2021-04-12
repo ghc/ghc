@@ -69,6 +69,8 @@ import Data.Foldable      ( toList )
 import Data.List          ( partition )
 import Data.List.NonEmpty ( NonEmpty(..) )
 
+import GHC.Driver.Ppr
+
 {-
 *********************************************************************************
 *                                                                               *
@@ -2021,8 +2023,14 @@ checkBadTelescope :: Implication -> TcS Bool
 -- See Note [Checking telescopes] in GHC.Tc.Types.Constraint
 checkBadTelescope (Implic { ic_info  = info
                           , ic_skols = skols })
-  | checkTelescopeSkol info
-  = do{ skols <- mapM TcS.zonkTyCoVarKind skols
+  | pprTrace "RAE1" empty $
+    pprTraceIt "RAE2" $
+    checkTelescopeSkol info
+  = do{ traceTcS "RAE3" empty
+      ; traceTcS "RAE4" (ppr skols $$ ppr (map tyVarKind skols) $$ ppr (map (typeKind . tyVarKind) skols))
+      ; skols <- mapM TcS.zonkTyCoVarKind skols
+      ; traceTcS "RAE5" empty
+      ; traceTcS "RAE6" (ppr skols)
       ; return (go emptyVarSet (reverse skols))}
 
   | otherwise
