@@ -5,8 +5,8 @@
 -- | Module for detecting if recompilation is required
 module GHC.Iface.Recomp
    ( checkOldIface
-   , RecompileRequired(..)
-   , RecompileRequiredWithEvidence(..)
+   , RecompSummary(..)
+   , RecompDetails(..)
    , CompileReason(..)
    , recompileRequired
    , addFingerprints
@@ -102,13 +102,13 @@ Basic idea:
     the actual fingerprint for all each thing recorded in mi_usages
 -}
 
-data RecompileRequired
+data RecompSummary
   = UpToDate
   | NeedsRecompile CompileReason
 
-data RecompileRequiredWithEvidence
-  = UpToDateWithEvidence ModIface
-  | NeedsRecompileWithOld
+data RecompDetails
+  = RecompNotNeeded ModIface
+  | RecompNeeded
      CompileReason
      -- ^ the reason we need to recompile.
      (Maybe Fingerprint)
@@ -122,7 +122,7 @@ data CompileReason
        -- to force recompilation; the String says what (one-line summary)
    deriving Eq
 
-recompileRequired :: RecompileRequired -> Bool
+recompileRequired :: RecompSummary -> Bool
 recompileRequired UpToDate = False
 recompileRequired (NeedsRecompile _) = True
 
@@ -139,7 +139,7 @@ checkOldIface
   -> ModSummary
   -> SourceModified
   -> Maybe ModIface         -- Old interface from compilation manager, if any
-  -> IO RecompileRequiredWithEvidence
+  -> IO RecompDetails
 
 checkOldIface hsc_env mod_summary source_modified maybe_iface
   = do  let dflags = hsc_dflags hsc_env
@@ -156,7 +156,7 @@ check_old_iface
   -> ModSummary
   -> SourceModified
   -> Maybe ModIface
-  -> IfG RecompileRequiredWithEvidence
+  -> IfG RecompDetails
 
 check_old_iface hsc_env mod_summary src_modified maybe_iface
   = let dflags = hsc_dflags hsc_env
@@ -191,19 +191,19 @@ check_old_iface hsc_env mod_summary src_modified maybe_iface
             -- avoid reading an interface; just return the one we might
             -- have been supplied with.
             True | not (backendProducesObject $ backend dflags) ->
-                return $ NeedsRecompileWithOld MustCompile (mi_iface_hash . mi_final_exts <$> maybe_iface)
+                return $ RecompNeeded MustCompile (mi_iface_hash . mi_final_exts <$> maybe_iface)
 
             -- Try and read the old interface for the current module
             -- from the .hi file left from the last time we compiled it
             True -> do
                 maybe_iface' <- getIface
-                return $ NeedsRecompileWithOld MustCompile (mi_iface_hash . mi_final_exts <$> maybe_iface')
+                return $ RecompNeeded MustCompile (mi_iface_hash . mi_final_exts <$> maybe_iface')
 
             False -> do
                 maybe_iface' <- getIface
                 case maybe_iface' of
                     -- We can't retrieve the iface
-                    Nothing    -> return $ NeedsRecompileWithOld MustCompile Nothing
+                    Nothing    -> return $ RecompNeeded MustCompile Nothing
 
                     -- We have got the old iface; check its versions
                     -- even in the SourceUnmodifiedAndStable case we
@@ -225,7 +225,7 @@ check_old_iface hsc_env mod_summary src_modified maybe_iface
 checkVersions :: HscEnv
               -> ModSummary
               -> ModIface       -- Old interface
-              -> IfG RecompileRequiredWithEvidence
+              -> IfG RecompDetails
 checkVersions hsc_env mod_summary iface
   = do { traceHiDiffs (text "Considering whether compilation is required for" <+>
                         ppr (mi_module iface) <> colon)
@@ -234,23 +234,23 @@ checkVersions hsc_env mod_summary iface
        -- but we ALSO must make sure the instantiation matches up.  See
        -- test case bkpcabal04!
        ; if not (isHomeModule home_unit (mi_module iface))
-            then return $ NeedsRecompileWithOld (RecompBecause "-this-unit-id changed") Nothing else do {
+            then return $ RecompNeeded (RecompBecause "-this-unit-id changed") Nothing else do {
        ; recomp <- checkFlagHash hsc_env iface
-       ; case recomp of (NeedsRecompile reason) -> return $ NeedsRecompileWithOld reason Nothing ; _ -> do {
+       ; case recomp of (NeedsRecompile reason) -> return $ RecompNeeded reason Nothing ; _ -> do {
        ; recomp <- checkOptimHash hsc_env iface
-       ; case recomp of (NeedsRecompile reason) -> return $ NeedsRecompileWithOld reason Nothing ; _ -> do {
+       ; case recomp of (NeedsRecompile reason) -> return $ RecompNeeded reason Nothing ; _ -> do {
        ; recomp <- checkHpcHash hsc_env iface
-       ; case recomp of (NeedsRecompile reason) -> return $ NeedsRecompileWithOld reason Nothing ; _ -> do {
+       ; case recomp of (NeedsRecompile reason) -> return $ RecompNeeded reason Nothing ; _ -> do {
        ; recomp <- checkMergedSignatures mod_summary iface
-       ; case recomp of (NeedsRecompile reason) -> return $ NeedsRecompileWithOld reason Nothing ; _ -> do {
+       ; case recomp of (NeedsRecompile reason) -> return $ RecompNeeded reason Nothing ; _ -> do {
        ; recomp <- checkHsig mod_summary iface
-       ; case recomp of (NeedsRecompile reason) -> return $ NeedsRecompileWithOld reason Nothing ; _ -> do {
+       ; case recomp of (NeedsRecompile reason) -> return $ RecompNeeded reason Nothing ; _ -> do {
        ; recomp <- checkHie mod_summary
-       ; case recomp of (NeedsRecompile reason) -> return $ NeedsRecompileWithOld reason Nothing ; _ -> do {
+       ; case recomp of (NeedsRecompile reason) -> return $ RecompNeeded reason Nothing ; _ -> do {
        ; recomp <- checkDependencies hsc_env mod_summary iface
-       ; case recomp of (NeedsRecompile reason) -> return $ NeedsRecompileWithOld reason (Just (mi_iface_hash . mi_final_exts $ iface)) ; _ -> do {
+       ; case recomp of (NeedsRecompile reason) -> return $ RecompNeeded reason (Just (mi_iface_hash . mi_final_exts $ iface)) ; _ -> do {
        ; recomp <- checkPlugins hsc_env iface
-       ; case recomp of (NeedsRecompile reason) -> return $ NeedsRecompileWithOld reason Nothing ; _ -> do {
+       ; case recomp of (NeedsRecompile reason) -> return $ RecompNeeded reason Nothing ; _ -> do {
 
 
        -- Source code unchanged and no errors yet... carry on
@@ -269,8 +269,8 @@ checkVersions hsc_env mod_summary iface
        ; updateEps_ $ \eps  -> eps { eps_is_boot = mod_deps }
        ; recomp <- checkList [checkModUsage (homeUnitAsUnit home_unit) u
                              | u <- mi_usages iface]
-       ; case recomp of (NeedsRecompile reason) -> return $ NeedsRecompileWithOld reason Nothing ; _ -> do {
-       ; return $ UpToDateWithEvidence iface
+       ; case recomp of (NeedsRecompile reason) -> return $ RecompNeeded reason Nothing ; _ -> do {
+       ; return $ RecompNotNeeded iface
     }}}}}}}}}}}
   where
     home_unit = hsc_home_unit hsc_env
@@ -279,13 +279,13 @@ checkVersions hsc_env mod_summary iface
     mod_deps = mkModDeps (dep_mods (mi_deps iface))
 
 -- | Check if any plugins are requesting recompilation
-checkPlugins :: HscEnv -> ModIface -> IfG RecompileRequired
+checkPlugins :: HscEnv -> ModIface -> IfG RecompSummary
 checkPlugins hsc_env iface = liftIO $ do
   new_fingerprint <- fingerprintPlugins hsc_env
   let old_fingerprint = mi_plugin_hash (mi_final_exts iface)
   pr <- mconcat <$> mapM pluginRecompile' (plugins hsc_env)
   return $
-    pluginRecompileToRecompileRequired old_fingerprint new_fingerprint pr
+    pluginRecompileToRecompSummary old_fingerprint new_fingerprint pr
 
 fingerprintPlugins :: HscEnv -> IO Fingerprint
 fingerprintPlugins hsc_env =
@@ -303,9 +303,9 @@ fingerprintPlugins' plugins = do
       (MaybeRecompile fp) -> fp
 
 
-pluginRecompileToRecompileRequired
-    :: Fingerprint -> Fingerprint -> PluginRecompile -> RecompileRequired
-pluginRecompileToRecompileRequired old_fp new_fp pr
+pluginRecompileToRecompSummary
+    :: Fingerprint -> Fingerprint -> PluginRecompile -> RecompSummary
+pluginRecompileToRecompSummary old_fp new_fp pr
   | old_fp == new_fp =
     case pr of
       NoForceRecompile  -> UpToDate
@@ -350,7 +350,7 @@ pluginRecompileToRecompileRequired old_fp new_fp pr
 
 -- | Check if an hsig file needs recompilation because its
 -- implementing module has changed.
-checkHsig :: ModSummary -> ModIface -> IfG RecompileRequired
+checkHsig :: ModSummary -> ModIface -> IfG RecompSummary
 checkHsig mod_summary iface = do
     hsc_env <- getTopEnv
     let home_unit = hsc_home_unit hsc_env
@@ -362,7 +362,7 @@ checkHsig mod_summary iface = do
         False -> return (NeedsRecompile $ RecompBecause "implementing module changed")
 
 -- | Check if @.hie@ file is out of date or missing.
-checkHie :: ModSummary -> IfG RecompileRequired
+checkHie :: ModSummary -> IfG RecompSummary
 checkHie mod_summary = do
     dflags <- getDynFlags
     let hie_date_opt = ms_hie_date mod_summary
@@ -378,7 +378,7 @@ checkHie mod_summary = do
                                -> UpToDate
 
 -- | Check the flags haven't changed
-checkFlagHash :: HscEnv -> ModIface -> IfG RecompileRequired
+checkFlagHash :: HscEnv -> ModIface -> IfG RecompSummary
 checkFlagHash hsc_env iface = do
     let old_hash = mi_flag_hash (mi_final_exts iface)
     new_hash <- liftIO $ fingerprintDynFlags hsc_env
@@ -391,7 +391,7 @@ checkFlagHash hsc_env iface = do
                      old_hash new_hash
 
 -- | Check the optimisation flags haven't changed
-checkOptimHash :: HscEnv -> ModIface -> IfG RecompileRequired
+checkOptimHash :: HscEnv -> ModIface -> IfG RecompSummary
 checkOptimHash hsc_env iface = do
     let old_hash = mi_opt_hash (mi_final_exts iface)
     new_hash <- liftIO $ fingerprintOptFlags (hsc_dflags hsc_env)
@@ -406,7 +406,7 @@ checkOptimHash hsc_env iface = do
                      old_hash new_hash
 
 -- | Check the HPC flags haven't changed
-checkHpcHash :: HscEnv -> ModIface -> IfG RecompileRequired
+checkHpcHash :: HscEnv -> ModIface -> IfG RecompSummary
 checkHpcHash hsc_env iface = do
     let old_hash = mi_hpc_hash (mi_final_exts iface)
     new_hash <- liftIO $ fingerprintHpcFlags (hsc_dflags hsc_env)
@@ -422,7 +422,7 @@ checkHpcHash hsc_env iface = do
 
 -- Check that the set of signatures we are merging in match.
 -- If the -unit-id flags change, this can change too.
-checkMergedSignatures :: ModSummary -> ModIface -> IfG RecompileRequired
+checkMergedSignatures :: ModSummary -> ModIface -> IfG RecompSummary
 checkMergedSignatures mod_summary iface = do
     unit_state <- hsc_units <$> getTopEnv
     let old_merged = sort [ mod | UsageMergedRequirement{ usg_mod = mod } <- mi_usages iface ]
@@ -451,7 +451,7 @@ checkMergedSignatures mod_summary iface = do
 -- See bug #16511.
 --
 -- Returns (RecompBecause <textual reason>) if recompilation is required.
-checkDependencies :: HscEnv -> ModSummary -> ModIface -> IfG RecompileRequired
+checkDependencies :: HscEnv -> ModSummary -> ModIface -> IfG RecompSummary
 checkDependencies hsc_env summary iface
  =
    checkList $
@@ -555,8 +555,8 @@ checkDependencies hsc_env summary iface
        else return UpToDate
 
 -- TODO might want to inline this
-needInterface :: Module -> (ModIface -> IfG RecompileRequired)
-             -> IfG RecompileRequired
+needInterface :: Module -> (ModIface -> IfG RecompSummary)
+             -> IfG RecompSummary
 needInterface mod continue = tryGetModIface "need version info for" mod >>= \case
   Nothing -> return $ NeedsRecompile MustCompile
   Just iface -> continue iface
@@ -585,7 +585,7 @@ tryGetModIface doc_msg mod
 -- | Given the usage information extracted from the old
 -- M.hi file for the module being compiled, figure out
 -- whether M needs to be recompiled.
-checkModUsage :: Unit -> Usage -> IfG RecompileRequired
+checkModUsage :: Unit -> Usage -> IfG RecompSummary
 checkModUsage _this_pkg UsagePackageModule{
                                 usg_mod = mod,
                                 usg_mod_hash = old_mod_hash }
@@ -654,7 +654,7 @@ checkModUsage _this_pkg UsageFile{ usg_file_path = file,
 
 ------------------------
 checkModuleFingerprint :: String -> Fingerprint -> Fingerprint
-                       -> IfG RecompileRequired
+                       -> IfG RecompSummary
 checkModuleFingerprint reason old_mod_hash new_mod_hash
   | new_mod_hash == old_mod_hash
   = up_to_date (text "Module fingerprint unchanged")
@@ -665,7 +665,7 @@ checkModuleFingerprint reason old_mod_hash new_mod_hash
 
 ------------------------
 checkMaybeHash :: String -> Maybe Fingerprint -> Fingerprint -> SDoc
-               -> IfG RecompileRequired -> IfG RecompileRequired
+               -> IfG RecompSummary -> IfG RecompSummary
 checkMaybeHash reason maybe_old_hash new_hash doc continue
   | Just hash <- maybe_old_hash, hash /= new_hash
   = out_of_date_hash reason doc hash new_hash
@@ -676,7 +676,7 @@ checkMaybeHash reason maybe_old_hash new_hash doc continue
 checkEntityUsage :: String
                  -> (OccName -> Maybe (OccName, Fingerprint))
                  -> (OccName, Fingerprint)
-                 -> IfG RecompileRequired
+                 -> IfG RecompSummary
 checkEntityUsage reason new_hash (name,old_hash)
   = case new_hash name of
 
@@ -689,18 +689,18 @@ checkEntityUsage reason new_hash (name,old_hash)
           | otherwise            -> out_of_date_hash reason (text "  Out of date:" <+> ppr name)
                                                      old_hash new_hash
 
-up_to_date :: SDoc -> IfG RecompileRequired
+up_to_date :: SDoc -> IfG RecompSummary
 up_to_date  msg = UpToDate <$ traceHiDiffs msg
 
-out_of_date :: String -> SDoc -> IfG RecompileRequired
+out_of_date :: String -> SDoc -> IfG RecompSummary
 out_of_date reason msg = NeedsRecompile (RecompBecause reason) <$ traceHiDiffs msg
 
-out_of_date_hash :: String -> SDoc -> Fingerprint -> Fingerprint -> IfG RecompileRequired
+out_of_date_hash :: String -> SDoc -> Fingerprint -> Fingerprint -> IfG RecompSummary
 out_of_date_hash reason msg old_hash new_hash
   = out_of_date reason (hsep [msg, ppr old_hash, text "->", ppr new_hash])
 
 ----------------------
-checkList :: [IfG RecompileRequired] -> IfG RecompileRequired
+checkList :: [IfG RecompSummary] -> IfG RecompSummary
 -- This helper is used in two places
 checkList []             = return UpToDate
 checkList (check:checks) = do recompile <- check

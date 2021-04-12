@@ -67,7 +67,7 @@ import GHC.Parser.Errors.Ppr
 
 import GHC.Iface.Load      ( cannotFindModule )
 import GHC.IfaceToCore     ( typecheckIface )
-import GHC.Iface.Recomp    ( RecompileRequired(..), CompileReason(..) )
+import GHC.Iface.Recomp    ( RecompSummary(..), CompileReason(..) )
 
 import GHC.Data.Bag        ( unitBag, listToBag, unionManyBags, isEmptyBag )
 import GHC.Data.Graph.Directed

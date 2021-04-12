@@ -692,7 +692,7 @@ This is the only thing that isn't caught by the type-system.
 -}
 
 
-type Messager = HscEnv -> (Int,Int) -> RecompileRequired -> ModuleGraphNode -> IO ()
+type Messager = HscEnv -> (Int,Int) -> RecompSummary -> ModuleGraphNode -> IO ()
 
 -- | This function runs GHC's frontend with recompilation
 -- avoidance. Specifically, it checks if recompilation is needed,
@@ -733,8 +733,8 @@ hscIncrementalFrontend _ m_tc_result mHscMessage mod_summary source_modified mb_
     -- In one-shot mode we don't have the old iface until this
     -- point, when checkOldIface reads it from the disk.
     mb_old_hash = case recomp_result of
-      UpToDateWithEvidence checked_iface -> Just (mi_iface_hash . mi_final_exts $ checked_iface)
-      NeedsRecompileWithOld _ mb_checked_iface -> mb_checked_iface
+      RecompNotNeeded checked_iface -> Just (mi_iface_hash . mi_final_exts $ checked_iface)
+      RecompNeeded _ mb_checked_iface -> mb_checked_iface
 
     compile
       :: CompileReason
@@ -747,7 +747,7 @@ hscIncrementalFrontend _ m_tc_result mHscMessage mod_summary source_modified mb_
       return (tc_result, mb_old_hash)
 
   case (m_tc_result, recomp_result) of
-    (Nothing, UpToDateWithEvidence checked_iface) | mi_used_th checked_iface && not stable ->
+    (Nothing, RecompNotNeeded checked_iface) | mi_used_th checked_iface && not stable ->
       -- If the module used TH splices when it was last
       -- compiled, then the recompilation check is not
       -- accurate enough (#481) and we must ignore
@@ -766,12 +766,12 @@ hscIncrementalFrontend _ m_tc_result mHscMessage mod_summary source_modified mb_
         stable = case source_modified of
           SourceUnmodifiedAndStable -> True
           _                         -> False
-    (Nothing, NeedsRecompileWithOld comp_reason _) ->
+    (Nothing, RecompNeeded comp_reason _) ->
       fmap Right $ compile comp_reason
-    (_, UpToDateWithEvidence checked_iface) -> do
+    (_, RecompNotNeeded checked_iface) -> do
       liftIO $ msg UpToDate
       return $ Left checked_iface
-    (Just tc_result, NeedsRecompileWithOld _comp_reason _) ->
+    (Just tc_result, RecompNeeded _comp_reason _) ->
       -- TODO: @Ericson2314 and @cgibbard have no idea why it decides it
       -- needs to recompile but then uses the old type check result. This
       -- seems like a bug that was hiden by the devious pattern matching
@@ -1049,7 +1049,7 @@ genModDetails hsc_env old_iface
 -- Progress displayers.
 --------------------------------------------------------------
 
-oneShotMsg :: HscEnv -> RecompileRequired -> IO ()
+oneShotMsg :: HscEnv -> RecompSummary -> IO ()
 oneShotMsg hsc_env recomp =
     case recomp of
         UpToDate ->
