@@ -33,6 +33,10 @@ instance Diagnostic TcRnMessage where
       -> mkDecorated [hang (text "This pattern-binding binds no variables:") 2 (ppr bind)]
     TcRnDodgyExports name
       -> mkDecorated [dodgyMsg (text "export") name (dodgyMsgInsert name :: IE GhcRn)]
+    TcRnMissingImportList ie
+      -> mkDecorated [ text "The import item" <+> quotes (ppr ie) <+>
+                       ptext (sLit "does not have an explicit import list")
+                     ]
   diagnosticReason = \case
     TcRnUnknownMessage m
       -> diagnosticReason m
@@ -42,6 +46,8 @@ instance Diagnostic TcRnMessage where
       -> WarningWithFlag Opt_WarnUnusedPatternBinds
     TcRnDodgyExports{}
       -> WarningWithFlag Opt_WarnDodgyExports
+    TcRnMissingImportList{}
+      -> WarningWithFlag Opt_WarnMissingImportList
 
 dodgyMsg :: (Outputable a, Outputable b) => SDoc -> a -> b -> SDoc
 dodgyMsg kind tc ie
