@@ -222,10 +222,11 @@ mkTHFractionalLit r =  FL { fl_text = SourceText (show (realToFrac r::Double))
 negateFractionalLit :: FractionalLit -> FractionalLit
 negateFractionalLit (FL text neg i e eb)
   = case text of
-      SourceText ('-':src) -> FL (SourceText src)       False i e eb
-      SourceText      src  -> FL (SourceText ('-':src)) True  i e eb
+      SourceText ('-':src) -> FL (SourceText src)       False (negate i) e eb
+      SourceText      src  -> FL (SourceText ('-':src)) True  (negate i) e eb
       NoSourceText         -> FL NoSourceText (not neg) (negate i) e eb
 
+-- | The integer should already be negated if it's negative.
 integralFractionalLit :: Bool -> Integer -> FractionalLit
 integralFractionalLit neg i = FL { fl_text = SourceText (show i)
                                  , fl_neg = neg
@@ -233,6 +234,7 @@ integralFractionalLit neg i = FL { fl_text = SourceText (show i)
                                  , fl_exp = 0
                                  , fl_exp_base = Base10 }
 
+-- | The arguments should already be negated if they are negative.
 mkSourceFractionalLit :: String -> Bool -> Integer -> Integer
                       -> FractionalExponentBase
                       -> FractionalLit
