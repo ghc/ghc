@@ -22,8 +22,6 @@ module GHC.Rename.Names (
         checkConName,
         mkChildEnv,
         findChildren,
-        dodgyMsg,
-        dodgyMsgInsert,
         findImportUsage,
         getMinimalImports,
         printMinimalImports,
@@ -40,6 +38,7 @@ import GHC.Rename.Env
 import GHC.Rename.Fixity
 import GHC.Rename.Utils ( warnUnusedTopBinds, mkFieldEnv )
 
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
 
@@ -1162,9 +1161,9 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
         where
             -- Warn when importing T(..) if T was exported abstractly
             emit_warning (DodgyImport n) = whenWOptM Opt_WarnDodgyImports $
-              addDiagnostic (WarningWithFlag Opt_WarnDodgyImports) (dodgyImportWarn n)
+              addTcRnDiagnostic (TcRnDodgyImports n)
             emit_warning MissingImportList = whenWOptM Opt_WarnMissingImportList $
-              addDiagnostic (WarningWithFlag Opt_WarnMissingImportList) (missingImportListItem ieRdr)
+              addTcRnDiagnostic (TcRnMissingImportList ieRdr)
             emit_warning (BadImportW ie) = whenWOptM Opt_WarnDodgyImports $
               addDiagnostic (WarningWithFlag Opt_WarnDodgyImports) (lookup_err_msg (BadImport ie))
 
@@ -2003,26 +2002,6 @@ badImportItemErr iface decl_spec ie avails
 illegalImportItemErr :: SDoc
 illegalImportItemErr = text "Illegal import item"
 
-dodgyImportWarn :: RdrName -> SDoc
-dodgyImportWarn item
-  = dodgyMsg (text "import") item (dodgyMsgInsert item :: IE GhcPs)
-
-dodgyMsg :: (Outputable a, Outputable b) => SDoc -> a -> b -> SDoc
-dodgyMsg kind tc ie
-  = sep [ text "The" <+> kind <+> text "item"
-                    -- <+> quotes (ppr (IEThingAll (noLoc (IEName $ noLoc tc))))
-                     <+> quotes (ppr ie)
-                <+> text "suggests that",
-          quotes (ppr tc) <+> text "has (in-scope) constructors or class methods,",
-          text "but it has none" ]
-
-dodgyMsgInsert :: forall p . IdP (GhcPass p) -> IE (GhcPass p)
-dodgyMsgInsert tc = IEThingAll noAnn ii
-  where
-    ii :: LIEWrappedName (IdP (GhcPass p))
-    ii = noLocA (IEName $ noLocA tc)
-
-
 addDupDeclErr :: [GlobalRdrElt] -> TcRn ()
 addDupDeclErr [] = panic "addDupDeclErr: empty list"
 addDupDeclErr gres@(gre : _)
@@ -2045,10 +2024,6 @@ addDupDeclErr gres@(gre : _)
 missingImportListWarn :: ModuleName -> SDoc
 missingImportListWarn mod
   = text "The module" <+> quotes (ppr mod) <+> text "does not have an explicit import list"
-
-missingImportListItem :: IE GhcPs -> SDoc
-missingImportListItem ie
-  = text "The import item" <+> quotes (ppr ie) <+> text "does not have an explicit import list"
 
 moduleWarn :: ModuleName -> WarningTxt -> SDoc
 moduleWarn mod (WarningTxt _ txt)
