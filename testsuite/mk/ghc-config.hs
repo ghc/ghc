@@ -37,17 +37,14 @@ main = do
         _ -> "package-conf"
   putStrLn $ "GhcPackageDbFlag" ++ '=':pkgdb_flag
 
-  let minGhcVersion711 = case lookup "Project version" fields of
+  let minGhcVersion ver = case lookup "Project version" fields of
         Just v
-          | parseVersion v >= [7,11] -> "YES"
+          | parseVersion v >= ver -> "YES"
         _ -> "NO"
-  putStrLn $ "MinGhcVersion711" ++ '=':minGhcVersion711
 
-  let minGhcVersion801 = case lookup "Project version" fields of
-        Just v
-          | parseVersion v >= [8,1] -> "YES"
-        _ -> "NO"
-  putStrLn $ "MinGhcVersion801" ++ '=':minGhcVersion801
+  putStrLn $ "MinGhcVersion711" ++ '=':minGhcVersion [7,11]
+  putStrLn $ "MinGhcVersion801" ++ '=':minGhcVersion [8,1]
+  putStrLn $ "MinGhcVersion811" ++ '=':minGhcVersion [8,11]
 
 
 getGhcFieldOrFail :: [(String,String)] -> String -> String -> IO ()
