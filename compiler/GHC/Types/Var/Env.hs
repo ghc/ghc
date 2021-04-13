@@ -200,14 +200,14 @@ uniqAway' in_scope var
 -- given 'InScopeSet'. This must be used very carefully since one can very easily
 -- introduce non-unique 'Unique's this way. See Note [Local uniques].
 unsafeGetFreshLocalUnique :: InScopeSet -> Unique
-unsafeGetFreshLocalUnique (InScope set)
-  | Just (uniq,_) <- IntMap.lookupLT (getKey maxLocalUnique) (ufmToIntMap $ getUniqSet set)
-  , let uniq' = mkLocalUnique uniq
-  , not $ uniq' `ltUnique` minLocalUnique
-  = incrUnique uniq'
-
-  | otherwise
-  = minLocalUnique
+unsafeGetFreshLocalUnique (InScope set) = go (getMixedKey (getUnique (sizeUniqSet set))) -- much stuff to fix here
+  where
+    go n
+      | let uniq = mkLocalUnique n
+      , Nothing <- IntMap.lookup (getMixedKey $ uniq) (ufmToIntMap $ getUniqSet set)
+      = uniq
+      | otherwise
+      = go (getMixedKey $ getUnique (n+1)) -- hopefully this will eventually traverse the whole space
 
 {-
 ************************************************************************
