@@ -689,16 +689,14 @@ type Messager = HscEnv -> (Int,Int) -> RecompileRequired -> ModuleGraphNode -> I
 -- We return a interface if we already had an old one around and recompilation
 -- was not needed. Otherwise it will be created during later passes when we
 -- run the compilation pipeline.
-hscIncrementalCompile :: Bool
-                      -> Maybe TcGblEnv
-                      -> Maybe Messager
+hscIncrementalCompile :: Maybe Messager
                       -> HscEnv
                       -> ModSummary
                       -> SourceModified
                       -> Maybe ModIface
                       -> (Int,Int)
                       -> IO HscStatus
-hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
+hscIncrementalCompile
     mHscMessage hsc_env mod_summary source_modified mb_old_iface mod_index
   = do
     let
@@ -707,38 +705,33 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
           Just hscMessage -> hscMessage hsc_env mod_index what (ModuleNode (extendModSummaryNoDeps mod_summary))
           Nothing -> return ()
 
-    case m_tc_result of
-      Just tc_result
-       | not always_do_basic_recompilation_check -> runHsc hsc_env $
-        hscDesugarAndSimplify mod_summary tc_result Nothing
-      _ -> do
-        (recomp_reqd, mb_checked_iface)
-            <- {-# SCC "checkOldIface" #-}
-               liftIO $ checkOldIface hsc_env mod_summary
-                            source_modified mb_old_iface
+    (recomp_reqd, mb_checked_iface)
+        <- {-# SCC "checkOldIface" #-}
+           liftIO $ checkOldIface hsc_env mod_summary
+                        source_modified mb_old_iface
 
-        -- save the interface that comes back from checkOldIface.
-        -- In one-shot mode we don't have the old iface until this
-        -- point, when checkOldIface reads it from the disk.
-        let mb_old_hash = fmap (mi_iface_hash . mi_final_exts) mb_checked_iface
+    -- save the interface that comes back from checkOldIface.
+    -- In one-shot mode we don't have the old iface until this
+    -- point, when checkOldIface reads it from the disk.
+    let mb_old_hash = fmap (mi_iface_hash . mi_final_exts) mb_checked_iface
 
-        msg recomp_reqd
-        case mb_checked_iface of
-          Just iface | not (recompileRequired recomp_reqd) -> do
-            -- We didn't need to do any typechecking; the old interface
-            -- file on disk was good enough.
-            details <- initModDetails hsc_env mod_summary iface
-            return $ HscUpToDate iface details
+    msg recomp_reqd
+    case mb_checked_iface of
+      Just iface | not (recompileRequired recomp_reqd) -> do
+        -- We didn't need to do any typechecking; the old interface
+        -- file on disk was good enough.
+        details <- initModDetails hsc_env mod_summary iface
+        return $ HscUpToDate iface details
 
-          -- NB: enter Hsc monad here so that we don't bail out early with
-          -- -Werror on typechecker warnings; we also want to run the desugarer
-          -- to get those warnings too. (But we'll always exit at that point
-          -- because the desugarer runs ioMsgMaybe.)
-          _ -> runHsc hsc_env $ do
-            FrontendTypecheck tc_result <- case hscFrontendHook (hsc_hooks hsc_env) of
-              Nothing -> FrontendTypecheck . fst <$> hsc_typecheck False mod_summary Nothing
-              Just h  -> h mod_summary
-            hscDesugarAndSimplify mod_summary tc_result mb_old_hash
+      -- NB: enter Hsc monad here so that we don't bail out early with
+      -- -Werror on typechecker warnings; we also want to run the desugarer
+      -- to get those warnings too. (But we'll always exit at that point
+      -- because the desugarer runs ioMsgMaybe.)
+      _ -> runHsc hsc_env $ do
+        FrontendTypecheck tc_result <- case hscFrontendHook (hsc_hooks hsc_env) of
+          Nothing -> FrontendTypecheck . fst <$> hsc_typecheck False mod_summary Nothing
+          Just h  -> h mod_summary
+        hscDesugarAndSimplify mod_summary tc_result mb_old_hash
 
 -- Knot tying!  See Note [Knot-tying typecheckIface]
 -- See Note [ModDetails and --make mode]
