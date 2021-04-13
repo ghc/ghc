@@ -201,6 +201,14 @@ compileOne' m_tc_result mHscMessage
    let tmpfs  = hsc_tmpfs hsc_env0
    debugTraceMsg logger dflags1 2 (text "compile: input file" <+> text input_fnpp)
 
+   let flags = hsc_dflags hsc_env0
+     in do unless (gopt Opt_KeepHiFiles flags) $
+               addFilesToClean tmpfs TFL_CurrentModule $
+                   [ml_hi_file $ ms_location summary]
+           unless (gopt Opt_KeepOFiles flags) $
+               addFilesToClean tmpfs TFL_GhcSession $
+                   [ml_obj_file $ ms_location summary]
+
    plugin_hsc_env <- initializePlugins hsc_env
 
    -- Run the pipeline up to codeGen (so everything up to, but not including, STG)
@@ -213,14 +221,6 @@ compileOne' m_tc_result mHscMessage
 
    -- Use an HscEnv updated with the plugin info
    let hsc_env' = plugin_hsc_env
-
-   let flags = hsc_dflags hsc_env0
-     in do unless (gopt Opt_KeepHiFiles flags) $
-               addFilesToClean tmpfs TFL_CurrentModule $
-                   [ml_hi_file $ ms_location summary]
-           unless (gopt Opt_KeepOFiles flags) $
-               addFilesToClean tmpfs TFL_GhcSession $
-                   [ml_obj_file $ ms_location summary]
 
    case status of
         HscUpToDate iface hmi_details ->
