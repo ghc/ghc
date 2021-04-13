@@ -11,6 +11,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE TypeApplications #-}
 
 {-|
 GHC's @DataKinds@ language extension lifts data constructors, natural
@@ -306,18 +307,16 @@ cmpChar x y = case compare (charVal x) (charVal y) of
 
 newtype SSymbol (s :: Symbol) = SSymbol String
 
-data WrapS a b = WrapS (KnownSymbol a => Proxy a -> b)
-
 -- See Note [magicDictId magic] in "GHC.Types.Id.Make" in GHC
-withSSymbol :: (KnownSymbol a => Proxy a -> b)
+withSSymbol :: forall a b.
+               (KnownSymbol a => Proxy a -> b)
             -> SSymbol a      -> Proxy a -> b
-withSSymbol f x y = magicDict (WrapS f) x y
+withSSymbol f x y = magicDict @(KnownSymbol a) f x y
 
 newtype SChar (s :: Char) = SChar Char
 
-data WrapC a b = WrapC (KnownChar a => Proxy a -> b)
-
 -- See Note [magicDictId magic] in "GHC.Types.Id.Make" in GHC
-withSChar :: (KnownChar a => Proxy a -> b)
+withSChar :: forall a b.
+             (KnownChar a => Proxy a -> b)
             -> SChar a      -> Proxy a -> b
-withSChar f x y = magicDict (WrapC f) x y
+withSChar f x y = magicDict @(KnownChar a) f x y
