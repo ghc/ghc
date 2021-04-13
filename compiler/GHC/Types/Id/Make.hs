@@ -137,9 +137,10 @@ Note [magicIds]
 ~~~~~~~~~~~~~~~
 The magicIds
 
-  * Are exported from GHC.Magic
+  * Are exported from GHC.Magic and GHC.Magic.Dict. (The former is
+    Trustworthy, while the latter is unsafe.)
 
-  * Can be defined in Haskell (and are, in ghc-prim:GHC/Magic.hs).
+  * Can be defined in Haskell (and are, in ghc-prim:GHC/Magic{/Dict}.hs).
     This definition at least generates Haddock documentation for them.
 
   * May or may not have a CompulsoryUnfolding.
@@ -165,7 +166,7 @@ wiredInIds
   ++ errorIds           -- Defined in GHC.Core.Make
 
 magicIds :: [Id]    -- See Note [magicIds]
-magicIds = [lazyId, oneShotId, noinlineId]
+magicIds = [lazyId, oneShotId, noinlineId, magicDictId]
 
 ghcPrimIds :: [Id]  -- See Note [ghcPrimIds (aka pseudoops)]
 ghcPrimIds
@@ -173,7 +174,6 @@ ghcPrimIds
     , voidPrimId
     , nullAddrId
     , seqId
-    , magicDictId
     , coerceId
     , proxyHashId
     , leftSectionId
@@ -1436,7 +1436,6 @@ seqName           = mkWiredInIdName gHC_PRIM  (fsLit "seq")            seqIdKey 
 realWorldName     = mkWiredInIdName gHC_PRIM  (fsLit "realWorld#")     realWorldPrimIdKey realWorldPrimId
 voidPrimIdName    = mkWiredInIdName gHC_PRIM  (fsLit "void#")          voidPrimIdKey      voidPrimId
 coercionTokenName = mkWiredInIdName gHC_PRIM  (fsLit "coercionToken#") coercionTokenIdKey coercionTokenId
-magicDictName     = mkWiredInIdName gHC_PRIM  (fsLit "magicDict")      magicDictKey       magicDictId
 coerceName        = mkWiredInIdName gHC_PRIM  (fsLit "coerce")         coerceKey          coerceId
 proxyName         = mkWiredInIdName gHC_PRIM  (fsLit "proxy#")         proxyHashKey       proxyHashId
 leftSectionName   = mkWiredInIdName gHC_PRIM  (fsLit "leftSection")    leftSectionKey     leftSectionId
@@ -1447,6 +1446,7 @@ lazyIdName, oneShotName, noinlineIdName :: Name
 lazyIdName        = mkWiredInIdName gHC_MAGIC (fsLit "lazy")           lazyIdKey          lazyId
 oneShotName       = mkWiredInIdName gHC_MAGIC (fsLit "oneShot")        oneShotKey         oneShotId
 noinlineIdName    = mkWiredInIdName gHC_MAGIC (fsLit "noinline")       noinlineIdKey      noinlineId
+magicDictName     = mkWiredInIdName gHC_MAGIC_DICT (fsLit "magicDict") magicDictKey       magicDictId
 
 ------------------------------------------------
 proxyHashId :: Id
