@@ -890,11 +890,8 @@ finish summary tc_result mb_old_hash = do
         liftIO $ hscMaybeWriteIface logger dflags True iface mb_old_iface_hash (ms_location summary)
 
         return $ case bcknd of
-          NoBackend -> HscNotGeneratingCode iface details
-          _         -> case hsc_src of
-                        HsBootFile -> HscUpdateBoot iface details
-                        HsigFile   -> HscUpdateSig iface details
-                        _          -> panic "finish"
+          NoBackend -> HscUpToDate iface details
+          _         -> HscUpdate iface details
 
 {-
 Note [Writing interface files]

@@ -14,14 +14,10 @@ import GHC.Utils.Fingerprint
 
 -- | Status of a module compilation to machine code
 data HscStatus
-    -- | Nothing to do.
-    = HscNotGeneratingCode ModIface ModDetails
     -- | Nothing to do because code already exists.
-    | HscUpToDate ModIface ModDetails
+    = HscUpToDate ModIface ModDetails
     -- | Update boot file result.
-    | HscUpdateBoot ModIface ModDetails
-    -- | Generate signature file (backpack)
-    | HscUpdateSig ModIface ModDetails
+    | HscUpdate ModIface ModDetails
     -- | Recompile this module.
     | HscRecomp
         { hscs_guts           :: CgGuts
