@@ -226,13 +226,6 @@ compileOne' m_tc_result mHscMessage
                    [ml_obj_file $ ms_location summary]
 
    case bcknd of
-     NoBackend -> case status of
-        HscUpToDate iface hmi_details ->
-            let mb_linkable = if isHsBootOrSig src_flavour
-                                then Nothing
-                                else mb_old_linkable
-            in return $! HomeModInfo iface hmi_details mb_linkable
-        _ -> panic "compileOne NoBackend"
      Interpreter -> case status of
         HscUpToDate iface hmi_details ->
             assert ( isJust mb_old_linkable || isNoLink (ghcLink dflags) )
