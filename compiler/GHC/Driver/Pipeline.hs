@@ -204,10 +204,13 @@ compileOne' m_tc_result mHscMessage
    plugin_hsc_env <- initializePlugins hsc_env
 
    -- Run the pipeline up to codeGen (so everything up to, but not including, STG)
-   status <- hscIncrementalCompile
-                        always_do_basic_recompilation_check
-                        m_tc_result mHscMessage
-                        plugin_hsc_env summary source_modified mb_old_iface (mod_index, nmods)
+   status <- case m_tc_result of
+     Just tc_result
+       | not always_do_basic_recompilation_check -> runHsc plugin_hsc_env $
+         hscDesugarSimplify summary tc_result Nothing
+     _ -> hscIncrementalCompile mHscMessage plugin_hsc_env summary
+            source_modified mb_old_iface (mod_index, nmods)
+
    -- Use an HscEnv updated with the plugin info
    let hsc_env' = plugin_hsc_env
 
@@ -1276,7 +1279,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
         let plugin_hsc_env = plugin_hsc_env' { hsc_type_env_var = Just (mod, type_env_var) }
 
         result <-
-          liftIO $ hscIncrementalCompile True Nothing (Just msg) plugin_hsc_env
+          liftIO $ hscIncrementalCompile (Just msg) plugin_hsc_env
                             mod_summary source_unchanged Nothing (1,1)
 
         -- In the rest of the pipeline use the loaded plugins
