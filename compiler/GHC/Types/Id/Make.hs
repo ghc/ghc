@@ -30,7 +30,7 @@ module GHC.Types.Id.Make (
         realWorldPrimId,
         voidPrimId, voidArgId,
         nullAddrId, seqId, lazyId, lazyIdKey,
-        coercionTokenId, magicDictId, coerceId,
+        coercionTokenId, coerceId,
         proxyHashId, noinlineId, noinlineIdName,
         coerceName, leftSectionName, rightSectionName,
 
@@ -173,7 +173,6 @@ ghcPrimIds
     , voidPrimId
     , nullAddrId
     , seqId
-    , magicDictId
     , coerceId
     , proxyHashId
     , leftSectionId
@@ -1429,14 +1428,13 @@ failure when trying.)
 
 nullAddrName, seqName,
    realWorldName, voidPrimIdName, coercionTokenName,
-   magicDictName, coerceName, proxyName,
+   coerceName, proxyName,
    leftSectionName, rightSectionName :: Name
 nullAddrName      = mkWiredInIdName gHC_PRIM  (fsLit "nullAddr#")      nullAddrIdKey      nullAddrId
 seqName           = mkWiredInIdName gHC_PRIM  (fsLit "seq")            seqIdKey           seqId
 realWorldName     = mkWiredInIdName gHC_PRIM  (fsLit "realWorld#")     realWorldPrimIdKey realWorldPrimId
 voidPrimIdName    = mkWiredInIdName gHC_PRIM  (fsLit "void#")          voidPrimIdKey      voidPrimId
 coercionTokenName = mkWiredInIdName gHC_PRIM  (fsLit "coercionToken#") coercionTokenIdKey coercionTokenId
-magicDictName     = mkWiredInIdName gHC_PRIM  (fsLit "magicDict")      magicDictKey       magicDictId
 coerceName        = mkWiredInIdName gHC_PRIM  (fsLit "coerce")         coerceKey          coerceId
 proxyName         = mkWiredInIdName gHC_PRIM  (fsLit "proxy#")         proxyHashKey       proxyHashId
 leftSectionName   = mkWiredInIdName gHC_PRIM  (fsLit "leftSection")    leftSectionKey     leftSectionId
@@ -1596,14 +1594,6 @@ rightSectionId = pcMiscPrelId rightSectionName ty info
                   , multiplicityTyVar1, multiplicityTyVar2
                   , openAlphaTyVar,   openBetaTyVar,    openGammaTyVar ] body
     body = mkLams [f,ymult,xmult] $ mkVarApps (Var f) [xmult,ymult]
-
---------------------------------------------------------------------------------
-magicDictId :: Id  -- See Note [magicDictId magic]
-magicDictId = pcMiscPrelId magicDictName ty info
-  where
-  info = noCafIdInfo `setInlinePragInfo` neverInlinePragma
-                     `setNeverLevPoly`   ty
-  ty   = mkSpecForAllTys [alphaTyVar] alphaTy
 
 --------------------------------------------------------------------------------
 
@@ -1799,54 +1789,6 @@ particular it must make it into the interface in unfoldings. See Note [Preserve
 OneShotInfo] in GHC.Core.Tidy.
 
 Also see https://gitlab.haskell.org/ghc/ghc/wikis/one-shot.
-
-
-Note [magicDictId magic]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-The identifier `magicDict` is just a place-holder, which is used to
-implement a primitive that we cannot define in Haskell but we can write
-in Core.  It is declared with a place-holder type:
-
-    magicDict :: forall a. a
-
-The intention is that the identifier will be used in a very specific way,
-to create dictionaries for classes with a single method.  Consider a class
-like this:
-
-   class C a where
-     f :: T a
-
-We are going to use `magicDict`, in conjunction with a built-in Prelude
-rule, to cast values of type `T a` into dictionaries for `C a`.  To do
-this, we define a function like this in the library:
-
-  data WrapC a b = WrapC (C a => Proxy a -> b)
-
-  withT :: (C a => Proxy a -> b)
-        ->  T a -> Proxy a -> b
-  withT f x y = magicDict (WrapC f) x y
-
-The purpose of `WrapC` is to avoid having `f` instantiated.
-Also, it avoids impredicativity, because `magicDict`'s type
-cannot be instantiated with a forall.  The field of `WrapC` contains
-a `Proxy` parameter which is used to link the type of the constraint,
-`C a`, with the type of the `Wrap` value being made.
-
-Next, we add a built-in Prelude rule (see GHC.Core.Opt.ConstantFold),
-which will replace the RHS of this definition with the appropriate
-definition in Core.  The rewrite rule works as follows:
-
-  magicDict @t (wrap @a @b f) x y
----->
-  f (x `cast` co a) y
-
-The `co` coercion is the newtype-coercion extracted from the type-class.
-The type class is obtained by looking at the type of wrap.
-
-In the constant folding rule it's very import to make sure to strip all ticks
-from the expression as if there's an occurence of
-magicDict we *must* convert it for correctness. See #19667 for where this went
-wrong in GHCi.
 
 
 -------------------------------------------------------------

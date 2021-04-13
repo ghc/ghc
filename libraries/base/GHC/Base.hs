@@ -100,6 +100,7 @@ module GHC.Base
         module GHC.Classes,
         module GHC.CString,
         module GHC.Magic,
+        module GHC.Magic.Dict,
         module GHC.Types,
         module GHC.Prim,        -- Re-export GHC.Prim and [boot] GHC.Err,
         module GHC.Prim.Ext,    -- to avoid lots of people having to
@@ -112,6 +113,7 @@ import GHC.Types
 import GHC.Classes
 import GHC.CString
 import GHC.Magic
+import GHC.Magic.Dict
 import GHC.Prim
 import GHC.Prim.Ext
 import GHC.Err
