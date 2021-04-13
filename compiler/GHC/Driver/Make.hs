@@ -61,6 +61,7 @@ import GHC.Driver.Backend
 import GHC.Driver.Monad
 import GHC.Driver.Env
 import GHC.Driver.Errors
+import GHC.Driver.Errors.Ppr
 import GHC.Driver.Errors.Types
 import GHC.Driver.Main
 
@@ -307,20 +308,9 @@ warnMissingHomeModules hsc_env mod_graph =
     missing = map (moduleName . ms_mod) $
       filter (not . is_known_module) (mgModSummaries mod_graph)
 
-    msg
-      | gopt Opt_BuildingCabalPackage dflags
-      = hang
-          (text "These modules are needed for compilation but not listed in your .cabal file's other-modules: ")
-          4
-          (sep (map ppr missing))
-      | otherwise
-      =
-        hang
-          (text "Modules are not listed in command line but needed for compilation: ")
-          4
-          (sep (map ppr missing))
-    warn = singleMessage $ fmap (GhcDriverMessage . DriverUnknownMessage) $
-      mkPlainMsgEnvelope (hsc_dflags hsc_env) (WarningWithFlag Opt_WarnMissingHomeModules) noSrcSpan msg
+    buildingCabalPkg = BuildingCabalPackage (gopt Opt_BuildingCabalPackage dflags)
+    warn = singleMessage $ ghcDriverMessage (hsc_dflags hsc_env) noSrcSpan
+                         $ DriverMissingHomeModules missing buildingCabalPkg
 
 -- | Describes which modules of the module graph need to be loaded.
 data LoadHowMuch
@@ -385,12 +375,7 @@ warnUnusedPackages = do
           = filter (\arg -> not $ any (matching state arg) loadedPackages)
                    requestedArgs
 
-    let warn = singleMessage $ fmap (GhcDriverMessage . DriverUnknownMessage) $
-          mkPlainMsgEnvelope dflags (WarningWithFlag Opt_WarnUnusedPackages) noSrcSpan msg
-        msg = vcat [ text "The following packages were specified" <+>
-                     text "via -package or -package-id flags,"
-                   , text "but were not needed for compilation:"
-                   , nest 2 (vcat (map (withDash . pprUnusedArg) unusedArgs)) ]
+    let warn = singleMessage $ ghcDriverMessage dflags noSrcSpan (DriverUnusedPackages unusedArgs)
 
     when (not (null unusedArgs)) $
       logDiagnostics warn
@@ -398,11 +383,6 @@ warnUnusedPackages = do
     where
         packageArg (ExposePackage _ arg _) = Just arg
         packageArg _ = Nothing
-
-        pprUnusedArg (PackageArg str) = text str
-        pprUnusedArg (UnitIdArg uid) = ppr uid
-
-        withDash = (<+>) (text "-")
 
         matchingStr :: String -> UnitInfo -> Bool
         matchingStr str p
@@ -2222,10 +2202,7 @@ warnUnnecessarySourceImports sccs = do
                              unLoc i `notElem`  mods_in_this_cycle ]
 
         warn :: DynFlags -> Located ModuleName -> MsgEnvelope GhcMessage
-        warn dflags (L loc mod) = fmap (GhcDriverMessage . DriverUnknownMessage) $
-           mkPlainMsgEnvelope dflags WarningWithoutFlag loc
-                (text "{-# SOURCE #-} unnecessary in import of "
-                 <+> quotes (ppr mod))
+        warn dflags (L loc mod) = ghcDriverMessage dflags loc (DriverUnnecessarySourceImports mod)
 
 
 -----------------------------------------------------------------------------
@@ -2296,9 +2273,8 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
                 if exists || isJust maybe_buf
                     then summariseFile hsc_env old_summaries file mb_phase
                                        obj_allowed maybe_buf
-                    else return $ Left $ singleMessage $ fmap (GhcDriverMessage . DriverUnknownMessage) $
-                           mkPlainErrorMsgEnvelope noSrcSpan $
-                             text "can't find file:" <+> text file
+                    else return $ Left $ singleMessage
+                                $ ghcDriverErrorMessage noSrcSpan (DriverFileNotFound file)
         getRootSummary Target { targetId = TargetModule modl
                               , targetAllowObjCode = obj_allowed
                               , targetContents = maybe_buf
@@ -2732,30 +2708,14 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
               | otherwise = HsSrcFile
 
         when (pi_mod_name /= wanted_mod) $
-                throwE $ singleMessage $ fmap (GhcDriverMessage . DriverUnknownMessage) $
-                  mkPlainErrorMsgEnvelope pi_mod_name_loc $
-                              text "File name does not match module name:"
-                              $$ text "Saw:" <+> quotes (ppr pi_mod_name)
-                              $$ text "Expected:" <+> quotes (ppr wanted_mod)
+                throwE $ singleMessage $ ghcDriverErrorMessage pi_mod_name_loc
+                       $ DriverFileModuleNameMismatch pi_mod_name wanted_mod
 
         when (hsc_src == HsigFile && isNothing (lookup pi_mod_name (homeUnitInstantiations home_unit))) $
-            let suggested_instantiated_with =
-                    hcat (punctuate comma $
-                        [ ppr k <> text "=" <> ppr v
-                        | (k,v) <- ((pi_mod_name, mkHoleModule pi_mod_name)
-                                : homeUnitInstantiations home_unit)
-                        ])
-            in throwE $ singleMessage $ fmap (GhcDriverMessage . DriverUnknownMessage) $
-                mkPlainErrorMsgEnvelope pi_mod_name_loc $
-                text "Unexpected signature:" <+> quotes (ppr pi_mod_name)
-                $$ if gopt Opt_BuildingCabalPackage dflags
-                    then parens (text "Try adding" <+> quotes (ppr pi_mod_name)
-                            <+> text "to the"
-                            <+> quotes (text "signatures")
-                            <+> text "field in your Cabal file.")
-                    else parens (text "Try passing -instantiated-with=\"" <>
-                                 suggested_instantiated_with <> text "\"" $$
-                                text "replacing <" <> ppr pi_mod_name <> text "> as necessary.")
+            let suggestions = suggestInstantiatedWith pi_mod_name (homeUnitInstantiations home_unit)
+                buildingCabalPkg = BuildingCabalPackage (gopt Opt_BuildingCabalPackage dflags)
+            in throwE $ singleMessage $ ghcDriverErrorMessage pi_mod_name_loc
+                      $ DriverUnexpectedSignature pi_mod_name buildingCabalPkg suggestions
 
         liftIO $ makeNewModSummary hsc_env $ MakeNewModSummary
             { nms_src_fn = src_fn
@@ -2911,23 +2871,16 @@ noModError hsc_env loc wanted_mod err
 
 noHsFileErr :: SrcSpan -> String -> ErrorMessages
 noHsFileErr loc path
-  = fmap (GhcDriverMessage . DriverUnknownMessage) $
-    singleMessage $ mkPlainErrorMsgEnvelope loc $ text "Can't find" <+> text path
+  = singleMessage $ ghcDriverErrorMessage loc (DriverFileNotFound path)
 
 moduleNotFoundErr :: ModuleName -> ErrorMessages
 moduleNotFoundErr mod
-  = fmap (GhcDriverMessage . DriverUnknownMessage) $
-    singleMessage $ mkPlainErrorMsgEnvelope noSrcSpan $
-        text "module" <+> quotes (ppr mod) <+> text "cannot be found locally"
+  = singleMessage $ ghcDriverErrorMessage noSrcSpan (DriverModuleNotFound mod)
 
 multiRootsErr :: [ModSummary] -> IO ()
 multiRootsErr [] = panic "multiRootsErr"
 multiRootsErr summs@(summ1:_)
-  = throwOneError $ fmap (GhcDriverMessage . DriverUnknownMessage) $
-      mkPlainErrorMsgEnvelope noSrcSpan $
-        text "module" <+> quotes (ppr mod) <+>
-        text "is defined in multiple files:" <+>
-        sep (map text files)
+  = throwOneError $ ghcDriverErrorMessage noSrcSpan $ DriverDuplicatedModuleDeclaration mod files
   where
     mod = ms_mod summ1
     files = map (expectJust "checkDup" . ml_hs_file . ms_location) summs

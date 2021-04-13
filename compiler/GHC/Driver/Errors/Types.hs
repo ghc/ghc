@@ -3,6 +3,8 @@
 module GHC.Driver.Errors.Types (
     GhcMessage(..)
   , DriverMessage(..)
+  , BuildingCabalPackage(..)
+  , InstantiationSuggestion(..)
   , WarningMessages
   , ErrorMessages
   , WarnMsg
@@ -18,13 +20,16 @@ module GHC.Driver.Errors.Types (
 
 import GHC.Prelude
 
+import Data.Bifunctor
 import Data.Typeable
+
+import GHC.Driver.Session
 import GHC.Types.Error
+import GHC.Unit.Module
 
 import GHC.Parser.Errors.Types ( PsMessage )
 import GHC.Tc.Errors.Types ( TcRnDsMessage(..), TcRnMessage )
 import GHC.HsToCore.Errors.Types ( DsMessage )
-import Data.Bifunctor
 
 type WarningMessages = Messages GhcMessage
 type ErrorMessages   = Messages GhcMessage
@@ -116,3 +121,61 @@ data DriverMessage
   = DriverUnknownMessage !DiagnosticMessage
   -- ^ Simply rewraps a generic 'DiagnosticMessage'. More
   -- instances will be added in the future (#18516).
+  | DriverMissingHomeModules [ModuleName] !BuildingCabalPackage
+  {- ^ DriverMissingHomeModules occurs when encountering a home module imported, but not listed
+       on the command line. Useful for cabal to ensure GHC won't pick up modules, not listed neither
+       in 'exposed-modules', nor in 'other-modules'.
+
+     Test cases: warnings/should_compile/MissingMod
+  -}
+  | DriverUnusedPackages [PackageArg]
+  {- ^ DriverUnusedPackages occurs when when package is requested on command line, but was never loaded.
+
+     Test cases: warnings/should_compile/UnusedPackages
+  -}
+  | DriverUnnecessarySourceImports !ModuleName
+  {- ^ DriverUnnecessarySourceImports occurs if there are {-# SOURCE #-} imports which are not
+       necessary. See 'warnUnnecessarySourceImports' in 'GHC.Driver.Make'.
+
+     Test cases: warnings/should_compile/T10637
+  -}
+  | DriverDuplicatedModuleDeclaration !(GenModule Unit) [FilePath]
+  {- ^ DriverDuplicatedModuleDeclaration occurs if a module 'A' is declared in
+       multiple files.
+
+     Test cases: None.
+  -}
+  | DriverModuleNotFound !ModuleName
+  {- ^ DriverModuleNotFound occurs if a module 'A' can't be found.
+
+     Test cases: None.
+  -}
+  | DriverFileModuleNameMismatch !ModuleName !ModuleName
+  {- ^ DriverModuleNotFound occurs if a module 'A' is defined is a file with a different name. The first
+       argument is the /actual/ name, the second argument the expected one.
+
+     Test cases: module/mod178, /driver/bug1677
+  -}
+  | DriverUnexpectedSignature !ModuleName !BuildingCabalPackage [InstantiationSuggestion]
+  {- ^ DriverUnexpectedSignature occurs when there is an unexpected signature in the .hsig file.
+
+     Test cases: driver/T12955
+  -}
+  | DriverFileNotFound !FilePath
+  {- ^ DriverFileNotFound occurs when the input file can't be found.
+
+     Test cases: None.
+  -}
+  | DriverStaticPointersNotSupported
+  {- ^ DriverStaticPointersNotSupported occurs when the 'StaticPointers' extension is used
+       in an interactive GHCi context.
+
+     Test cases: ghci/scripts/StaticPtr
+  -}
+
+-- | An 'InstantiationSuggestion' for a '.hsig' file.
+data InstantiationSuggestion = InstantiationSuggestion !ModuleName !Module
+
+-- | Pass to a 'DriverMessage' the information whether or not the
+-- '-fbuilding-cabal-package' flag is set.
+newtype BuildingCabalPackage = BuildingCabalPackage Bool

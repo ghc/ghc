@@ -3,11 +3,44 @@
 
 module GHC.Driver.Errors.Ppr where
 
-import GHC.Types.Error
+import GHC.Prelude
+
 import GHC.Driver.Errors.Types
+import GHC.Driver.Flags
+import GHC.Driver.Session
+import GHC.HsToCore.Errors.Ppr ()
 import GHC.Parser.Errors.Ppr ()
 import GHC.Tc.Errors.Ppr ()
-import GHC.HsToCore.Errors.Ppr ()
+import GHC.Types.Error
+import GHC.Types.SrcLoc
+import GHC.Unit.Types
+import GHC.Utils.Error
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Unit.Module
+
+-- | Constructs a new 'GhcMessage' out of 'DriverMessage'.
+-- N.B. Due to circular dependencies we can't define this function inside
+-- 'GHC.Driver.Errors.Types', where it would naturally belong.
+ghcDriverMessage :: DynFlags -> SrcSpan -> DriverMessage -> MsgEnvelope GhcMessage
+ghcDriverMessage dflags locn msg = GhcDriverMessage <$> mkMsgEnvelope dflags locn alwaysQualify msg
+
+-- | Like 'ghcDriverMessage', but it can be used when we are sure the produce 'GhcMessage' is
+-- an intrinsic error. See also NOTE [Intrinsic And Extrinsic Failures] in 'GHC.Types.Error'.
+ghcDriverErrorMessage :: SrcSpan -> DriverMessage -> MsgEnvelope GhcMessage
+ghcDriverErrorMessage locn msg =
+  let panicMsg = "ghcDriverErrorMessage called on a DriverMessage which DiagnosticReason was not ErrorWithoutFlag"
+  in ghcDriverMessage (panic panicMsg) locn msg
+
+--
+-- Suggestions
+--
+
+-- | Suggests a list of 'InstantiationSuggestion' for the '.hsig' file to the user.
+suggestInstantiatedWith :: ModuleName -> GenInstantiations UnitId -> [InstantiationSuggestion]
+suggestInstantiatedWith pi_mod_name insts =
+  [ InstantiationSuggestion k v | (k,v) <- ((pi_mod_name, mkHoleModule pi_mod_name) : insts) ]
+
 
 instance Diagnostic GhcMessage where
   diagnosticMessage = \case
@@ -35,5 +68,89 @@ instance Diagnostic GhcMessage where
       -> diagnosticReason m
 
 instance Diagnostic DriverMessage where
-  diagnosticMessage (DriverUnknownMessage m) = diagnosticMessage m
-  diagnosticReason  (DriverUnknownMessage m) = diagnosticReason m
+  diagnosticMessage = \case
+    DriverUnknownMessage m
+      -> diagnosticMessage m
+    DriverMissingHomeModules missing (BuildingCabalPackage buildingCabalPackage)
+      -> let msg | buildingCabalPackage
+                 = hang
+                     (text "These modules are needed for compilation but not listed in your .cabal file's other-modules: ")
+                     4
+                     (sep (map ppr missing))
+                 | otherwise
+                 =
+                   hang
+                     (text "Modules are not listed in command line but needed for compilation: ")
+                     4
+                     (sep (map ppr missing))
+         in mkDecorated [msg]
+    DriverUnusedPackages unusedArgs
+      -> let msg = vcat [ text "The following packages were specified" <+>
+                          text "via -package or -package-id flags,"
+                        , text "but were not needed for compilation:"
+                        , nest 2 (vcat (map (withDash . pprUnusedArg) unusedArgs))
+                        ]
+         in mkDecorated [msg]
+         where
+            withDash :: SDoc -> SDoc
+            withDash = (<+>) (text "-")
+
+            pprUnusedArg :: PackageArg -> SDoc
+            pprUnusedArg (PackageArg str) = text str
+            pprUnusedArg (UnitIdArg uid) = ppr uid
+    DriverUnnecessarySourceImports mod
+      -> mkDecorated [text "{-# SOURCE #-} unnecessary in import of " <+> quotes (ppr mod)]
+    DriverDuplicatedModuleDeclaration mod files
+      -> mkDecorated [ text "module" <+> quotes (ppr mod) <+>
+                       text "is defined in multiple files:" <+>
+                       sep (map text files)
+                     ]
+    DriverModuleNotFound mod
+      -> mkDecorated [ text "module" <+> quotes (ppr mod) <+> text "cannot be found locally" ]
+    DriverFileModuleNameMismatch actual expected
+      -> mkDecorated [ text "File name does not match module name:"
+                       $$ text "Saw:" <+> quotes (ppr actual)
+                       $$ text "Expected:" <+> quotes (ppr expected)
+                     ]
+    DriverUnexpectedSignature pi_mod_name (BuildingCabalPackage buildingCabalPackage) suggestions
+      -> let suggested_instantiated_with =
+               hcat (punctuate comma $
+                   [ ppr k <> text "=" <> ppr v
+                   | InstantiationSuggestion k v <- suggestions
+                   ])
+             msg = text "Unexpected signature:" <+> quotes (ppr pi_mod_name)
+                   $$ if buildingCabalPackage
+                       then parens (text "Try adding" <+> quotes (ppr pi_mod_name)
+                               <+> text "to the"
+                               <+> quotes (text "signatures")
+                               <+> text "field in your Cabal file.")
+                       else parens (text "Try passing -instantiated-with=\"" <>
+                                    suggested_instantiated_with <> text "\"" $$
+                                       text "replacing <" <> ppr pi_mod_name <> text "> as necessary.")
+         in mkDecorated [msg]
+    DriverFileNotFound hsFilePath
+      -> mkDecorated [ text "Can't find" <+> text hsFilePath ]
+    DriverStaticPointersNotSupported
+      -> mkDecorated [ text "StaticPointers is not supported in GHCi interactive expressions." ]
+
+  diagnosticReason = \case
+    DriverUnknownMessage m
+      -> diagnosticReason m
+    DriverMissingHomeModules{}
+      -> WarningWithFlag Opt_WarnMissingHomeModules
+    DriverUnusedPackages{}
+      -> WarningWithFlag Opt_WarnUnusedPackages
+    DriverUnnecessarySourceImports{}
+      -> WarningWithFlag Opt_WarnUnusedImports
+    DriverDuplicatedModuleDeclaration{}
+      -> ErrorWithoutFlag
+    DriverModuleNotFound{}
+      -> ErrorWithoutFlag
+    DriverFileModuleNameMismatch{}
+      -> ErrorWithoutFlag
+    DriverUnexpectedSignature{}
+      -> ErrorWithoutFlag
+    DriverFileNotFound{}
+      -> ErrorWithoutFlag
+    DriverStaticPointersNotSupported
+      -> WarningWithoutFlag
