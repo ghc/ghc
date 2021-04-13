@@ -15,12 +15,20 @@ import GHC.Types.Error
 import GHC.Types.SrcLoc
 import GHC.Utils.Error
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 -- | Constructs a new 'GhcMessage' out of 'DriverMessage'.
 -- N.B. Due to circular dependencies we can't define this function inside
 -- 'GHC.Driver.Errors.Types', where it would naturally belong.
 ghcDriverMessage :: DynFlags -> SrcSpan -> DriverMessage -> MsgEnvelope GhcMessage
 ghcDriverMessage dflags locn msg = GhcDriverMessage <$> mkMsgEnvelope dflags locn alwaysQualify msg
+
+-- | Like 'ghcDriverMessage', but it can be used when we are sure the produce 'GhcMessage' is
+-- an intrinsic error. See also NOTE [Intrinsic And Extrinsic Failures] in 'GHC.Types.Error'.
+ghcDriverErrorMessage :: SrcSpan -> DriverMessage -> MsgEnvelope GhcMessage
+ghcDriverErrorMessage locn msg =
+  let panicMsg = "ghcDriverErrorMessage called on a DriverMessage which DiagnosticReason was not ErrorWithoutFlag"
+  in ghcDriverMessage (panic panicMsg) locn msg
 
 instance Diagnostic GhcMessage where
   diagnosticMessage = \case
@@ -80,6 +88,11 @@ instance Diagnostic DriverMessage where
             pprUnusedArg (UnitIdArg uid) = ppr uid
     DriverUnnecessarySourceImports mod
       -> mkDecorated [text "{-# SOURCE #-} unnecessary in import of " <+> quotes (ppr mod)]
+    DriverDuplicatedModuleDeclaration mod files
+      -> mkDecorated [ text "module" <+> quotes (ppr mod) <+>
+                       text "is defined in multiple files:" <+>
+                       sep (map text files)
+                     ]
 
   diagnosticReason = \case
     DriverUnknownMessage m
@@ -90,3 +103,5 @@ instance Diagnostic DriverMessage where
       -> WarningWithFlag Opt_WarnUnusedPackages
     DriverUnnecessarySourceImports{}
       -> WarningWithFlag Opt_WarnUnusedImports
+    DriverDuplicatedModuleDeclaration{}
+      -> ErrorWithoutFlag

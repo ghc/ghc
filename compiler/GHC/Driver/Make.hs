@@ -2900,11 +2900,7 @@ moduleNotFoundErr mod
 multiRootsErr :: [ModSummary] -> IO ()
 multiRootsErr [] = panic "multiRootsErr"
 multiRootsErr summs@(summ1:_)
-  = throwOneError $ fmap (GhcDriverMessage . DriverUnknownMessage) $
-      mkPlainErrorMsgEnvelope noSrcSpan $
-        text "module" <+> quotes (ppr mod) <+>
-        text "is defined in multiple files:" <+>
-        sep (map text files)
+  = throwOneError $ ghcDriverErrorMessage noSrcSpan $ DriverDuplicatedModuleDeclaration mod files
   where
     mod = ms_mod summ1
     files = map (expectJust "checkDup" . ml_hs_file . ms_location) summs

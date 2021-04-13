@@ -138,6 +138,12 @@ data DriverMessage
 
      Test cases: warnings/should_compile/T10637
   -}
+  | DriverDuplicatedModuleDeclaration !(GenModule Unit) [FilePath]
+  {- ^ DriverDuplicatedModuleDeclaration occurs if a module 'A' is declared in
+       multiple files.
+
+     Test cases: None.
+  -}
 
 -- | Pass to a 'DriverMessage' the information whether or not the
 -- '-fbuilding-cabal-package' flag is set.
