@@ -55,6 +55,7 @@ module GHC.Driver.Main
     , hscDesugar
     , makeSimpleDetails
     , hscSimplify -- ToDo, shouldn't really export this
+    , hscDesugarSimplify
 
     -- * Safe Haskell
     , hscCheckSafe
@@ -755,7 +756,7 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
 
     case m_tc_result of
       Just tc_result
-        | not always_do_basic_recompilation_check -> runHsc hsc_env $ finish mod_summary tc_result Nothing
+        | not always_do_basic_recompilation_check -> runHsc hsc_env $ hscDesugarSimplify mod_summary tc_result Nothing
       _ -> do
         recomp_result <- getRecompDetails hsc_env mod_summary source_modified mb_old_iface
         case recomp_result of
@@ -786,7 +787,7 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
             FrontendTypecheck tc_result <- case hscFrontendHook (hsc_hooks hsc_env) of
               Nothing -> FrontendTypecheck . fst <$> hsc_typecheck False mod_summary Nothing
               Just h  -> h mod_summary
-            finish mod_summary tc_result mb_hash
+            hscDesugarSimplify mod_summary tc_result mb_hash
 
 -- Runs the post-typechecking frontend (desugar and simplify). We want to
 -- generate most of the interface as late as possible. This gets us up-to-date
@@ -800,11 +801,11 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
 -- HscRecomp in turn will carry the information required to compute a interface
 -- when passed the result of the code generator. So all this can and is done at
 -- the call site of the backend code gen if it is run.
-finish :: ModSummary
+hscDesugarSimplify :: ModSummary
        -> TcGblEnv
        -> Maybe Fingerprint
        -> Hsc HscStatus
-finish summary tc_result mb_old_hash = do
+hscDesugarSimplify summary tc_result mb_old_hash = do
   hsc_env <- getHscEnv
   dflags <- getDynFlags
   logger <- getLogger
@@ -881,7 +882,7 @@ contents).
 
 Cases for which we generate simple interfaces:
 
-   * GHC.Driver.Main.finish: when a compilation does NOT require (re)compilation
+   * GHC.Driver.Main.hscDesugarSimplify: when a compilation does NOT require (re)compilation
    of the hard code
 
    * GHC.Driver.Pipeline.compileOne': when we run in One Shot mode and target
