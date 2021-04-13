@@ -18,10 +18,10 @@
 #include "RaiseAsync.h"
 #include "RtsUtils.h"
 #include "Capability.h"
-#include "Select.h"
-#include "AwaitEvent.h"
+#include "IOManager.h"
 #include "Stats.h"
 #include "GetTime.h"
+#include "Threads.h"
 
 # if defined(HAVE_SYS_SELECT_H)
 #  include <sys/select.h>
@@ -38,81 +38,84 @@
 
 #if !defined(THREADED_RTS)
 
-// The target time for a threadDelay is stored in a one-word quantity
-// in the TSO (tso->block_info.target).  On a 32-bit machine we
-// therefore can't afford to use nanosecond resolution because it
-// would overflow too quickly, so instead we use millisecond
-// resolution.
+#define END_TIMEOUT_QUEUE ((StgTimeoutQueue *)END_TSO_QUEUE)
 
-#if SIZEOF_VOID_P == 4
-#define LowResTimeToTime(t)          (USToTime((t) * 1000))
-#define TimeToLowResTimeRoundDown(t) ((LowResTime)(TimeToUS(t) / 1000))
-#define TimeToLowResTimeRoundUp(t)   ((TimeToUS(t) + 1000-1) / 1000)
-#else
-#define LowResTimeToTime(t) (t)
-#define TimeToLowResTimeRoundDown(t) (t)
-#define TimeToLowResTimeRoundUp(t)   (t)
-#endif
-
-/*
- * Return the time since the program started, in LowResTime,
- * rounded down.
- */
-static LowResTime getLowResTimeOfDay(void)
+void registerDelay(Capability *cap, StgMVar *mvar, HsInt usecs)
 {
-    return TimeToLowResTimeRoundDown(getProcessElapsedTime());
-}
+    CapIOManager *iomgr = cap->iomgr;
 
-/*
- * For a given microsecond delay, return the target time in LowResTime.
- */
-LowResTime getDelayTarget (HsInt us)
-{
-    Time elapsed;
-    elapsed = getProcessElapsedTime();
+    Time elapsed = getProcessElapsedTime();
+    Time target;
 
     // If the desired target would be larger than the maximum Time,
     // default to the maximum Time. (#7087)
-    if (us > TimeToUS(TIME_MAX - elapsed)) {
-        return TimeToLowResTimeRoundDown(TIME_MAX);
+    if (usecs > TimeToUS(TIME_MAX - elapsed)) {
+        target = TIME_MAX;
     } else {
-        // round up the target time, because we never want to sleep *less*
-        // than the desired amount.
-        return TimeToLowResTimeRoundUp(elapsed + USToTime(us));
+        target = elapsed + USToTime(usecs);
+    }
+
+    IF_DEBUG(scheduler,
+             debugBelch("scheduler: timer for delay of %llu usec installed at %llu\n",
+                       (unsigned long long)usecs, (unsigned long long)target));
+
+    /* Allocate and fill in a new sleep list entry */
+    StgTimeoutQueue *p = (StgTimeoutQueue *)allocate(cap, sizeofW(StgTimeoutQueue));
+    SET_HDR(p, &stg_TIMEOUT_QUEUE_info, CCS_SYSTEM);
+    p->mvar     = mvar;
+    p->waketime = target;
+
+    /* Insert the request into the right place in the sorted list.
+     * This is not efficient of course, being linear in the worst case.
+     * TODO: replace this data structure with a heap or timer wheel.
+     */
+    StgTimeoutQueue *prev = NULL;
+    StgTimeoutQueue *q = iomgr->timeout_queue;
+    while (q != END_TIMEOUT_QUEUE && q->waketime < target) {
+        prev = q;
+        q = q->next;
+    }
+    p->next = q;
+    if (prev == NULL) {
+        iomgr->timeout_queue = p;
+    } else {
+        prev->next = p;
     }
 }
 
-/* There's a clever trick here to avoid problems when the time wraps
- * around.  Since our maximum delay is smaller than 31 bits of ticks
- * (it's actually 31 bits of microseconds), we can safely check
- * whether a timer has expired even if our timer will wrap around
- * before the target is reached, using the following formula:
+/* We use the 64bit Time type from rts/Time.h so our max time (in nanosecond
+ * precision) is over 290 years from the epoch of the monotonic clock.
  *
- *        (int)((uint)current_time - (uint)target_time) < 0
- *
- * if this is true, then our time has expired.
- * (idea due to Andy Gill).
+ * Previous limitations forced us to use 31 bits with millisecond precision
+ * which meant we would get clock wrap around. There was a cunning formula to
+ * determine if the timer had expired, even if the clock had wrapped around.
+ * With 64bit Time we do not need to worry about clock wraparound and can just
+ * use the simple formula.
  */
-static bool wakeUpSleepingThreads (LowResTime now)
+static bool wakeUpSleepingThreads (Capability *cap, Time now)
 {
-    StgTSO *tso;
-    bool flag = false;
+    CapIOManager *iomgr = cap->iomgr;
 
-    while (sleeping_queue != END_TSO_QUEUE) {
-        tso = sleeping_queue;
-        if (((long)now - (long)tso->block_info.target) < 0) {
+    /* Pop entries from the front of the sleeping queue that are past their
+     * wake time, and unblock the corresponding MVars.
+     */
+    while (iomgr->timeout_queue != END_TIMEOUT_QUEUE) {
+        StgTimeoutQueue *q = iomgr->timeout_queue;
+        if (now < q->waketime) {
             break;
         }
-        sleeping_queue = tso->_link;
-        tso->why_blocked = NotBlocked;
-        tso->_link = END_TSO_QUEUE;
-        IF_DEBUG(scheduler, debugBelch("Waking up sleeping thread %lu\n",
-                                       (unsigned long)tso->id));
-        // MainCapability: this code is !THREADED_RTS
-        pushOnRunQueue(&MainCapability,tso);
-        flag = true;
+        iomgr->timeout_queue = q->next;
+        IF_DEBUG(scheduler,
+                 debugBelch("scheduler: timer expired at %llu, writing to MVar\n",
+                           (unsigned long long)q->waketime));
+        performTryPutMVar(cap, q->mvar, Unit_closure);
     }
-    return flag;
+    /* Filling any of these MVars is not guaranteed to wake any threads, since
+     * threads many not be still waiting on the MVars. We don't actually need
+     * to know if we woke any threads. We need to know if there are now any
+     * runnable threads. We can find out simply by checking the run queue.
+     */
+    return (!emptyRunQueue(cap));
 }
 
 static void GNUC3_ATTRIBUTE(__noreturn__)
@@ -217,15 +220,16 @@ static enum FdState fdPollWriteState (int fd)
  *
  */
 void
-awaitEvent(bool wait)
+awaitEvent(Capability *cap, bool wait)
 {
+    CapIOManager *iomgr = cap->iomgr;
     StgTSO *tso, *prev, *next;
     fd_set rfd,wfd;
     int numFound;
     int maxfd = -1;
     bool seen_bad_fd = false;
     struct timeval tv, *ptv;
-    LowResTime now;
+    Time now;
 
     IF_DEBUG(scheduler,
              debugBelch("scheduler: checking for threads blocked on I/O");
@@ -242,8 +246,10 @@ awaitEvent(bool wait)
      */
     do {
 
-      now = getLowResTimeOfDay();
-      if (wakeUpSleepingThreads(now)) {
+      now = getProcessElapsedTime();
+      if (wakeUpSleepingThreads(cap, now)) {
+          /* If we woke any sleeping threads,
+           * return to the scheduler to run them */
           return;
       }
 
@@ -253,7 +259,9 @@ awaitEvent(bool wait)
       FD_ZERO(&rfd);
       FD_ZERO(&wfd);
 
-      for(tso = blocked_queue_hd; tso != END_TSO_QUEUE; tso = next) {
+      for(tso = iomgr->blocked_queue_hd;
+          tso != END_TSO_QUEUE;
+          tso = next) {
         next = tso->_link;
 
       /* On older FreeBSDs, FD_SETSIZE is unsigned. Cast it to signed int
@@ -298,7 +306,7 @@ awaitEvent(bool wait)
           tv.tv_sec  = 0;
           tv.tv_usec = 0;
           ptv = &tv;
-      } else if (sleeping_queue != END_TSO_QUEUE) {
+      } else if (iomgr->timeout_queue != END_TIMEOUT_QUEUE) {
           /* SUSv2 allows implementations to have an implementation defined
            * maximum timeout for select(2). The standard requires
            * implementations to silently truncate values exceeding this maximum
@@ -317,7 +325,7 @@ awaitEvent(bool wait)
            */
           const time_t max_seconds = 2678400; // 31 * 24 * 60 * 60
 
-          Time min = LowResTimeToTime(sleeping_queue->block_info.target - now);
+          Time min = iomgr->timeout_queue->waketime - now;
           tv.tv_sec  = TimeToSeconds(min);
           if (tv.tv_sec < max_seconds) {
               tv.tv_usec = TimeToUS(min) % 1000000;
@@ -350,7 +358,7 @@ awaitEvent(bool wait)
            */
 #if defined(RTS_USER_SIGNALS)
           if (RtsFlags.MiscFlags.install_signal_handlers && signals_pending()) {
-              startSignalHandlers(&MainCapability);
+              startSignalHandlers(cap);
               return; /* still hold the lock */
           }
 #endif
@@ -361,14 +369,10 @@ awaitEvent(bool wait)
               return; /* still hold the lock */
           }
 
-          /* check for threads that need waking up
+          /* Check for threads that need waking up. If new runnable threads
+           * have arrived, stop waiting for I/O and run them.
            */
-          wakeUpSleepingThreads(getLowResTimeOfDay());
-
-          /* If new runnable threads have arrived, stop waiting for
-           * I/O and run them.
-           */
-          if (!emptyRunQueue(&MainCapability)) {
+          if (wakeUpSleepingThreads(cap, getProcessElapsedTime())) {
               return; /* still hold the lock */
           }
       }
@@ -385,7 +389,9 @@ awaitEvent(bool wait)
            * traversed blocked TSOs. As a result you
            * can't use functions accessing 'blocked_queue_hd'.
            */
-          for(tso = blocked_queue_hd; tso != END_TSO_QUEUE; tso = next) {
+          for(tso = iomgr->blocked_queue_hd;
+              tso != END_TSO_QUEUE;
+              tso = next) {
               next = tso->_link;
               int fd;
               enum FdState fd_state = RTS_FD_IS_BLOCKING;
@@ -422,7 +428,7 @@ awaitEvent(bool wait)
                   IF_DEBUG(scheduler,
                       debugBelch("Killing blocked thread %lu on bad fd=%i\n",
                                  (unsigned long)tso->id, fd));
-                  raiseAsync(&MainCapability, tso,
+                  raiseAsync(cap, tso,
                       (StgClosure *)blockedOnBadFD_closure, false, NULL);
                   break;
               case RTS_FD_IS_READY:
@@ -431,28 +437,29 @@ awaitEvent(bool wait)
                                  (unsigned long)tso->id));
                   tso->why_blocked = NotBlocked;
                   tso->_link = END_TSO_QUEUE;
-                  pushOnRunQueue(&MainCapability,tso);
+                  pushOnRunQueue(cap,tso);
                   break;
               case RTS_FD_IS_BLOCKING:
                   if (prev == NULL)
-                      blocked_queue_hd = tso;
+                      iomgr->blocked_queue_hd = tso;
                   else
-                      setTSOLink(&MainCapability, prev, tso);
+                      setTSOLink(cap, prev, tso);
                   prev = tso;
                   break;
               }
           }
 
           if (prev == NULL)
-              blocked_queue_hd = blocked_queue_tl = END_TSO_QUEUE;
+              iomgr->blocked_queue_hd =
+                iomgr->blocked_queue_tl = END_TSO_QUEUE;
           else {
               prev->_link = END_TSO_QUEUE;
-              blocked_queue_tl = prev;
+              iomgr->blocked_queue_tl = prev;
           }
       }
 
     } while (wait && sched_state == SCHED_RUNNING
-             && emptyRunQueue(&MainCapability));
+                  && emptyRunQueue(cap));
 }
 
 #endif /* THREADED_RTS */
