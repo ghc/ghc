@@ -1,3 +1,25 @@
+## next (edit as necessary)
+
+- `magicDict` has been renamed to `withDict` and is now defined in
+  `GHC.Magic.Dict` instead of `GHC.Prim`. `withDict` now has the type:
+
+  ```
+  withDict :: forall {rr :: RuntimeRep} st dt (r :: TYPE rr). st -> (dt => r) -> r
+  ```
+
+  Unlike `magicDict`, `withDict` can be used without defining an
+  intermediate data type. For example, the `withTypeable` function from the
+  `Data.Typeable` module can now be defined as:
+
+  ```
+  withTypeable :: forall k (a :: k) rep (r :: TYPE rep). ()
+               => TypeRep a -> (Typeable a => r) -> r
+  withTypeable rep k = withDict @(TypeRep a) @(Typeable a) rep k
+  ```
+
+  Note that the explicit type applications are required, as the call to
+  `withDict` would be ambiguous otherwise.
+
 ## 0.8.0 (edit as necessary)
 
 - Change array access primops to use type with size maxing the element size:
@@ -23,7 +45,7 @@
 - Add known-key `cstringLength#` to `GHC.CString`. This is just the
   C function `strlen`, but a built-in rewrite rule allows GHC to
   compute the result at compile time when the argument is known.
-  
+
 - In order to support unicode better the following functions in `GHC.CString`
   gained UTF8 counterparts:
 
@@ -47,7 +69,7 @@
         atomicCasAddrAddr# :: Addr# -> Addr# -> Addr# -> State# s -> (# State# s, Addr# #)
         atomicCasWordAddr# :: Addr# -> Word# -> Word# -> State# s -> (# State# s, Word# #)
 
-- Add an explicit fixity for `(~)` and `(~~)`: 
+- Add an explicit fixity for `(~)` and `(~~)`:
 
         infix 4 ~, ~~
 

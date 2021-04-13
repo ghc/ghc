@@ -44,8 +44,9 @@ import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Utils.Monad
 import GHC.Core.Type
+import GHC.Core.TyCo.Rep
 import GHC.Core.Multiplicity
-import GHC.Core.Coercion( Coercion )
+import GHC.Core.Coercion( instNewTyCon_maybe, mkSymCo )
 import GHC.Core
 import GHC.Core.Utils
 import GHC.Core.Make
@@ -1169,10 +1170,11 @@ dsHsWrapped orig_hs_expr
     go_l wrap (L _ hs_e) = go wrap hs_e
 
     go_head wrap var
-      = do { let wrapped_e  = wrap (Var var)
-                 wrapped_ty = exprType wrapped_e
+      | var `hasKey` withDictKey
+      = ds_withDict wrapped_ty
 
-           ; checkLevPolyFunction (ppr orig_hs_expr) var wrapped_ty
+      | otherwise
+      = do { checkLevPolyFunction (ppr orig_hs_expr) var wrapped_ty
              -- See Note [Checking for levity-polymorphic functions]
              -- Pass orig_hs_expr, so that the user can see entire
              -- expression with -fprint-typechecker-elaboration
@@ -1181,7 +1183,164 @@ dsHsWrapped orig_hs_expr
            ; warnAboutIdentities dflags var wrapped_ty
 
            ; return wrapped_e }
+      where
+        wrapped_e  = wrap (Var var)
+        wrapped_ty = exprType wrapped_e
 
+-- See Note [withDict]
+ds_withDict :: Type -> DsM CoreExpr
+ds_withDict wrapped_ty
+    -- Check that withDict is of the type `st -> (dt => r) -> r`.
+  | Just (Anon VisArg   (Scaled mult1 st),      rest) <- splitPiTy_maybe wrapped_ty
+  , Just (Anon VisArg   (Scaled mult2 dt_to_r), _r1)  <- splitPiTy_maybe rest
+  , Just (Anon InvisArg (Scaled _     dt),      _r2)  <- splitPiTy_maybe dt_to_r
+    -- Check that dt is a class constraint `C t_1 ... t_n`, where
+    -- `dict_tc = C` and `dict_args = t_1 ... t_n`.
+  , Just (dict_tc, dict_args) <- splitTyConApp_maybe dt
+    -- Check that C is a class of the form
+    -- `class C a_1 ... a_n where op :: meth_ty`, where
+    -- `meth_tvs = a_1 ... a_n` and `co` is a newtype coercion between
+    -- `C` and `meth_ty`.
+  , Just (inst_meth_ty, co) <- instNewTyCon_maybe dict_tc dict_args
+    -- Check that `st` is equal to `meth_ty[t_i/a_i]`.
+  , st `eqType` inst_meth_ty
+  = let sv = mkScaledTemplateLocal 1 $ mkScaled mult1 st
+        k  = mkScaledTemplateLocal 2 $ mkScaled mult2 dt_to_r in
+    pure $ mkLams [sv, k] $ Var k `App` Cast (Var sv) (mkSymCo co)
+
+  | otherwise
+  = errDsCoreExpr $ hang (text "Invalid instantiation of" <+>
+                          quotes (ppr withDictName) <+> text "at type:")
+                       4 (ppr wrapped_ty)
+
+{-
+Note [withDict]
+~~~~~~~~~~~~~~~
+The identifier `withDict` is just a place-holder, which is used to
+implement a primitive that we cannot define in Haskell but we can write
+in Core.  It is declared with a place-holder type:
+
+    withDict :: forall {rr :: RuntimeRep} st dt (r :: TYPE rr). st -> (dt => r) -> r
+
+The intention is that the identifier will be used in a very specific way,
+to create dictionaries for classes with a single method.  Consider a class
+like this:
+
+   class C a where
+     f :: T a
+
+We can use `withDict`, in conjunction with a special case in the desugarer, to
+cast values of type `T a` into dictionaries for `C a`. To do this, we can
+define a function like this in the library:
+
+  withT :: T a -> (C a => b) -> b
+  withT t k = withDict @(T a) @(C a) t k
+
+Here:
+
+* The `dt` in `withDict` (short for "dictionary type") is instantiated to
+  `C a`.
+
+* The `st` in `withDict` (short for "singleton type") is instantiated to
+  `T a`. The definition of `T` itself is irrelevant, only that `C a` is a class
+  with a single method of type `T a`.
+
+* The `r` in `withDict` is instantiated to `b`.
+
+There is a special case in dsHsWrapped.go_head which will replace the RHS
+of this definition with an appropriate definition in Core. The special case
+rewrites applications of `withDict` as follows:
+
+  withDict @{rr} @mtype @(C t_1 ... t_n) @r
+---->
+  \(sv :: mtype) (k :: C t_1 ... t_n => r) -> k (sv |> sym (co t_1 ... t_n))
+
+Where:
+
+* The `C t_1 ... t_n` argument to withDict is a class constraint.
+
+* C must be defined as:
+
+    class C a_1 ... a_n where
+      op :: meth_type
+
+  That is, C must be a class with exactly one method and no superclasses.
+
+* The `mtype` argument to withDict must be equal to `meth_type[t_i/a_i]`,
+  which is instantied type of C's method.
+
+* `co` is a newtype coercion that, when applied to `t_1 ... t_n`, coerces from
+  `C t_1 ... t_n` to `mtype`. This coercion is guaranteed to exist by virtue of
+  the fact that C is a class with exactly one method and no superclasses, so it
+  is treated like a newtype when compiled to Core.
+
+These requirements are implemented in the guards in ds_withDict's definition.
+
+Some further observations about `withDict`:
+
+* Every use of `withDict` must be instantiated at a /particular/ class C.
+  It's a bit like levity polymorphism: we don't allow class-polymorphic
+  calls of `withDict`. We check this in the desugarer -- and then we
+  can immediately replace this invocation of `withDict` with appropriate
+  class-specific Core code.
+
+* The `dt` in the type of withDict must be explicitly instantiated with
+  visible type application, as invoking `withDict` would be ambiguous
+  otherwise.
+
+* For examples of how `withDict` is used in the `base` library, see `withSNat`
+  in GHC.TypeNats, as well as `withSChar` and `withSSymbol` n GHC.TypeLits.
+
+* The `r` is levity polymorphic to support things like `withTypeable` in
+  `Data.Typeable.Internal`.
+
+* As an alternative to `withDict`, one could define functions like `withT`
+  above in terms of `unsafeCoerce`. This is more error-prone, however.
+
+* In order to define things like `reifySymbol` below:
+
+    reifySymbol :: forall r. String -> (forall (n :: Symbol). KnownSymbol n => r) -> r
+
+  `withDict` needs to be instantiated with `Any`, like so:
+
+    reifySymbol n k = withDict @String @(KnownSymbol Any) @r n (k @Any)
+
+  The use of `Any` is explained in Note [NOINLINE someNatVal] in
+  base:GHC.TypeNats.
+
+* The only valid way to apply `withDict` is as described above. Applying
+  `withDict` in any other way will result in a non-recoverable error during
+  desugaring. In other words, GHC will never execute the `withDict` function
+  in compiled code.
+
+  In theory, this means that we don't need to define a binding for `withDict`
+  in GHC.Magic.Dict. In practice, we define a binding anyway, for two reasons:
+
+    - To give it Haddocks, and
+    - To define the type of `withDict`, which GHC can find in
+      GHC.Magic.Dict.hi.
+
+  Because we define a binding for `withDict`, we have to provide a right-hand
+  side for its definition. We somewhat arbitrarily choose:
+
+    withDict = panicError "Non rewritten withDict"#
+
+  This should never be reachable anyway, but just in case ds_withDict fails
+  to rewrite away `withDict`, this ensures that the program won't get very far.
+
+* One could conceivably implement this special case for `withDict` as a
+  constant-folding rule instead of during desugaring. We choose not to do so
+  for the following reasons:
+
+  - Having a constant-folding rule would require that `withDict`'s definition
+    be wired in to the compiler so as to prevent `withDict` from inlining too
+    early. Implementing the special case in the desugarer, on the other hand,
+    only requires that `withDict` be known-key.
+
+  - If the constant-folding rule were to fail, we want to throw a compile-time
+    error, which is trickier to do with the way that GHC.Core.Opt.ConstantFold
+    is set up.
+-}
 
 -- | Takes a (pretty-printed) expression, a function, and its
 -- instantiated type.  If the function is a hasNoBinding op, and the
