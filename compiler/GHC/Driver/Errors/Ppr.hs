@@ -78,6 +78,8 @@ instance Diagnostic DriverMessage where
             pprUnusedArg :: PackageArg -> SDoc
             pprUnusedArg (PackageArg str) = text str
             pprUnusedArg (UnitIdArg uid) = ppr uid
+    DriverUnnecessarySourceImports mod
+      -> mkDecorated [text "{-# SOURCE #-} unnecessary in import of " <+> quotes (ppr mod)]
 
   diagnosticReason = \case
     DriverUnknownMessage m
@@ -86,3 +88,5 @@ instance Diagnostic DriverMessage where
       -> WarningWithFlag Opt_WarnMissingHomeModules
     DriverUnusedPackages{}
       -> WarningWithFlag Opt_WarnUnusedPackages
+    DriverUnnecessarySourceImports{}
+      -> WarningWithFlag Opt_WarnUnusedImports

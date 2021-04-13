@@ -132,6 +132,12 @@ data DriverMessage
 
      Test cases: warnings/should_compile/UnusedPackages
   -}
+  | DriverUnnecessarySourceImports !ModuleName
+  {- ^ DriverUnnecessarySourceImports occurs if there are {-# SOURCE #-} imports which are not
+       necessary. See 'warnUnnecessarySourceImports' in 'GHC.Driver.Make'.
+
+     Test cases: warnings/should_compile/T10637
+  -}
 
 -- | Pass to a 'DriverMessage' the information whether or not the
 -- '-fbuilding-cabal-package' flag is set.

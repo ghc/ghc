@@ -2202,10 +2202,7 @@ warnUnnecessarySourceImports sccs = do
                              unLoc i `notElem`  mods_in_this_cycle ]
 
         warn :: DynFlags -> Located ModuleName -> MsgEnvelope GhcMessage
-        warn dflags (L loc mod) = fmap (GhcDriverMessage . DriverUnknownMessage) $
-           mkPlainMsgEnvelope dflags WarningWithoutFlag loc
-                (text "{-# SOURCE #-} unnecessary in import of "
-                 <+> quotes (ppr mod))
+        warn dflags (L loc mod) = ghcDriverMessage dflags loc (DriverUnnecessarySourceImports mod)
 
 
 -----------------------------------------------------------------------------
