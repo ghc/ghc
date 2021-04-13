@@ -218,24 +218,17 @@ compileOne' m_tc_result mHscMessage
    case bcknd of
      NoBackend -> case status of
         HscUpToDate iface hmi_details ->
-            ASSERT( isJust mb_old_linkable || isNoLink (ghcLink dflags) )
-            return $! HomeModInfo iface hmi_details mb_old_linkable
-        HscNotGeneratingCode iface hmi_details ->
             let mb_linkable = if isHsBootOrSig src_flavour
                                 then Nothing
-                                -- TODO: Questionable.
-                                else Just (LM (ms_hs_date summary) this_mod [])
+                                else mb_old_linkable
             in return $! HomeModInfo iface hmi_details mb_linkable
         _ -> panic "compileOne NoBackend"
      Interpreter -> case status of
         HscUpToDate iface hmi_details ->
             ASSERT( isJust mb_old_linkable || isNoLink (ghcLink dflags) )
             return $! HomeModInfo iface hmi_details mb_old_linkable
-        HscUpdateBoot iface hmi_details ->
+        HscUpdate iface hmi_details ->
             return $! HomeModInfo iface hmi_details Nothing
-        HscUpdateSig iface hmi_details -> do
-            let !linkable = LM (ms_hs_date summary) this_mod []
-            return $! HomeModInfo iface hmi_details (Just linkable)
         HscRecomp { hscs_guts = cgguts,
                      hscs_mod_location = mod_location,
                      hscs_mod_details = hmi_details,
@@ -266,7 +259,6 @@ compileOne' m_tc_result mHscMessage
             let !linkable = LM unlinked_time (ms_mod summary)
                            (hs_unlinked ++ stub_o)
             return $! HomeModInfo final_iface hmi_details (Just linkable)
-        _ -> panic "compileOne HscNotGeneratingCode"
 
      _ -> case status of
         HscUpToDate iface hmi_details ->
@@ -1336,11 +1328,6 @@ runPhase (HscOut src_flavour mod_name result) _ = do
             next_phase = hscPostBackendPhase src_flavour (backend dflags)
 
         case result of
-            HscNotGeneratingCode iface mod_details ->
-                do
-                   setIface iface mod_details
-                   return (RealPhase StopLn,
-                        panic "No output filename from Hsc when no-code")
             HscUpToDate iface mod_details ->
                 do liftIO $ touchObjectFile logger dflags o_file
                    -- The .o file must have a later modification date
@@ -1348,19 +1335,22 @@ runPhase (HscOut src_flavour mod_name result) _ = do
                    -- but we touch it anyway, to keep 'make' happy (we think).
                    setIface iface mod_details
                    return (RealPhase StopLn, o_file)
-            HscUpdateBoot iface mod_details ->
-                do -- In the case of hs-boot files, generate a dummy .o-boot
-                   -- stamp file for the benefit of Make
-                   liftIO $ touchObjectFile logger dflags o_file
-                   setIface iface mod_details
-                   return (RealPhase StopLn, o_file)
-            HscUpdateSig iface mod_details ->
-                do -- We need to create a REAL but empty .o file
-                   -- because we are going to attempt to put it in a library
-                   PipeState{hsc_env=hsc_env'} <- getPipeState
-                   let input_fn = expectJust "runPhase" (ml_hs_file location)
-                       basename = dropExtension input_fn
-                   liftIO $ compileEmptyStub dflags hsc_env' basename location mod_name
+            HscUpdate iface mod_details ->
+                do
+                   case src_flavour of
+                     HsigFile -> do
+                       -- We need to create a REAL but empty .o file
+                       -- because we are going to attempt to put it in a library
+                       PipeState{hsc_env=hsc_env'} <- getPipeState
+                       let input_fn = expectJust "runPhase" (ml_hs_file location)
+                           basename = dropExtension input_fn
+                       liftIO $ compileEmptyStub dflags hsc_env' basename location mod_name
+
+                     -- In the case of hs-boot files, generate a dummy .o-boot
+                     -- stamp file for the benefit of Make
+                     HsBootFile -> liftIO $ touchObjectFile logger dflags o_file
+                     HsSrcFile -> panic "HscUpdate not relevant for HscSrcFile"
+
                    setIface iface mod_details
                    return (RealPhase StopLn, o_file)
             HscRecomp { hscs_guts = cgguts,
