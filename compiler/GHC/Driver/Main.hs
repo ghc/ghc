@@ -849,9 +849,7 @@ hscDesugarSimplify summary tc_result mb_old_hash = do
 
         liftIO $ hscMaybeWriteIface logger dflags True iface mb_old_hash (ms_location summary)
 
-        return $ case bcknd of
-          NoBackend -> HscUpToDate iface details
-          _         -> HscUpdate iface details
+        return $ HscUpdate iface details
 
 {-
 Note [Writing interface files]
