@@ -166,6 +166,12 @@ data DriverMessage
 
      Test cases: None.
   -}
+  | DriverStaticPointersNotSupported
+  {- ^ DriverStaticPointersNotSupported occurs when the 'StaticPointers' extension is used
+       in an interactive GHCi context.
+
+     Test cases: ghci/scripts/StaticPtr
+  -}
 
 -- | An 'InstantiationSuggestion' for a '.hsig' file.
 data InstantiationSuggestion = InstantiationSuggestion !ModuleName !Module

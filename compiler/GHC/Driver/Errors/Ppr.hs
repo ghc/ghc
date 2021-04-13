@@ -130,6 +130,8 @@ instance Diagnostic DriverMessage where
          in mkDecorated [msg]
     DriverFileNotFound hsFilePath
       -> mkDecorated [ text "Can't find" <+> text hsFilePath ]
+    DriverStaticPointersNotSupported
+      -> mkDecorated [ text "StaticPointers is not supported in GHCi interactive expressions." ]
 
   diagnosticReason = \case
     DriverUnknownMessage m
@@ -150,3 +152,5 @@ instance Diagnostic DriverMessage where
       -> ErrorWithoutFlag
     DriverFileNotFound{}
       -> ErrorWithoutFlag
+    DriverStaticPointersNotSupported
+      -> WarningWithoutFlag
