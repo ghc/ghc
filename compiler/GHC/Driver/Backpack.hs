@@ -32,6 +32,7 @@ import GHC.Driver.Make
 import GHC.Driver.Env
 import GHC.Driver.Errors
 import GHC.Driver.Errors.Types
+import GHC.Driver.Errors.Ppr ( mkDriverErrorMessage )
 
 import GHC.Parser
 import GHC.Parser.Header
@@ -809,9 +810,8 @@ summariseDecl _pn hsc_src lmodname@(L loc modname) Nothing
                          Nothing -- GHC API buffer support not supported
                          [] -- No exclusions
          case r of
-            Nothing -> throwOneError $ mkPlainErrorMsgEnvelope loc $
-                                       GhcDriverMessage $ DriverUnknownMessage $ mkPlainError $
-                                       (text "module" <+> ppr modname <+> text "was not found")
+            Nothing -> throwOneError $ fmap GhcDriverMessage
+                                     $ mkDriverErrorMessage loc (DriverBackpackModuleNotFound modname)
             Just (Left err) -> throwErrors (fmap GhcDriverMessage err)
             Just (Right summary) -> return summary
 
