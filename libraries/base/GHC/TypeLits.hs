@@ -58,13 +58,13 @@ module GHC.TypeLits
 
   ) where
 
-import GHC.Base(Eq(..), Ord(..), Ordering(..), String, otherwise)
+import GHC.Base(Eq(..), Ord(..), Ordering(..), String, magicDict, otherwise)
 import GHC.Types(Symbol, Char)
 import GHC.Num(Integer, fromInteger)
 import GHC.Show(Show(..))
 import GHC.Read(Read(..))
 import GHC.Real(toInteger)
-import GHC.Prim(magicDict, Proxy#)
+import GHC.Prim(Proxy#)
 import Data.Maybe(Maybe(..))
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality((:~:)(Refl))
@@ -308,7 +308,7 @@ newtype SSymbol (s :: Symbol) = SSymbol String
 
 data WrapS a b = WrapS (KnownSymbol a => Proxy a -> b)
 
--- See Note [magicDictId magic] in "basicType/MkId.hs"
+-- See Note [magicDictId magic] in "GHC.Types.Id.Make" in GHC
 withSSymbol :: (KnownSymbol a => Proxy a -> b)
             -> SSymbol a      -> Proxy a -> b
 withSSymbol f x y = magicDict (WrapS f) x y
@@ -317,7 +317,7 @@ newtype SChar (s :: Char) = SChar Char
 
 data WrapC a b = WrapC (KnownChar a => Proxy a -> b)
 
--- See Note [q] in "basicType/MkId.hs"
+-- See Note [magicDictId magic] in "GHC.Types.Id.Make" in GHC
 withSChar :: (KnownChar a => Proxy a -> b)
             -> SChar a      -> Proxy a -> b
 withSChar f x y = magicDict (WrapC f) x y

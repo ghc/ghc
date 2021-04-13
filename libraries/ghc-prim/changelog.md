@@ -1,3 +1,7 @@
+## next (edit as necessary)
+
+- `magicDict` is now defined in `GHC.Magic.Dict` instead of `GHC.Prim`.
+
 ## 0.8.0 (edit as necessary)
 
 - Change array access primops to use type with size maxing the element size:
@@ -23,7 +27,7 @@
 - Add known-key `cstringLength#` to `GHC.CString`. This is just the
   C function `strlen`, but a built-in rewrite rule allows GHC to
   compute the result at compile time when the argument is known.
-  
+
 - In order to support unicode better the following functions in `GHC.CString`
   gained UTF8 counterparts:
 
@@ -47,7 +51,7 @@
         atomicCasAddrAddr# :: Addr# -> Addr# -> Addr# -> State# s -> (# State# s, Addr# #)
         atomicCasWordAddr# :: Addr# -> Word# -> Word# -> State# s -> (# State# s, Word# #)
 
-- Add an explicit fixity for `(~)` and `(~~)`: 
+- Add an explicit fixity for `(~)` and `(~~)`:
 
         infix 4 ~, ~~
 

@@ -38,12 +38,12 @@ module GHC.TypeNats
 
   ) where
 
-import GHC.Base(Eq(..), Ord(..), otherwise)
+import GHC.Base(Eq(..), Ord(..), magicDict, otherwise)
 import GHC.Types
 import GHC.Num.Natural(Natural)
 import GHC.Show(Show(..))
 import GHC.Read(Read(..))
-import GHC.Prim(magicDict, Proxy#)
+import GHC.Prim(Proxy#)
 import Data.Maybe(Maybe(..))
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality((:~:)(Refl))
@@ -242,7 +242,7 @@ newtype SNat    (n :: Nat)    = SNat    Natural
 
 data WrapN a b = WrapN (KnownNat    a => Proxy a -> b)
 
--- See Note [magicDictId magic] in "basicType/MkId.hs"
+-- See Note [magicDictId magic] in "GHC.Types.Id.Make" in GHC
 withSNat :: (KnownNat a => Proxy a -> b)
          -> SNat a      -> Proxy a -> b
 withSNat f x y = magicDict (WrapN f) x y
