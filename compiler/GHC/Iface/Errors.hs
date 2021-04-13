@@ -18,6 +18,7 @@ import GHC.Platform.Ways
 import GHC.Utils.Panic.Plain
 import GHC.Driver.Session
 import GHC.Driver.Env.Types
+import GHC.Driver.Errors.Types
 import GHC.Data.Maybe
 import GHC.Prelude
 import GHC.Unit
@@ -151,7 +152,7 @@ cannotFindModule hsc_env = cannotFindModule'
 
 cannotFindModule' :: DynFlags -> UnitEnv -> Profile -> ModuleName -> FindResult -> SDoc
 cannotFindModule' dflags unit_env profile mod res = pprWithUnitState (ue_units unit_env) $
-  cantFindErr (gopt Opt_BuildingCabalPackage dflags)
+  cantFindErr (checkBuildingCabalPackage dflags)
               cannotFindMsg
               (text "Ambiguous module name")
               unit_env
@@ -170,7 +171,7 @@ cannotFindModule' dflags unit_env profile mod res = pprWithUnitState (ue_units u
         _ -> text "Could not find module"
 
 cantFindErr
-    :: Bool -- ^ Using Cabal?
+    :: BuildingCabalPackage -- ^ Using Cabal?
     -> SDoc
     -> SDoc
     -> UnitEnv
@@ -273,7 +274,7 @@ cantFindErr using_cabal cannot_find _ unit_env profile tried_these mod_name find
         <> dot $$ pkg_hidden_hint uid
 
     pkg_hidden_hint uid
-     | using_cabal
+     | using_cabal == YesBuildingCabalPackage
         = let pkg = expectJust "pkg_hidden" (lookupUnit (ue_units unit_env) uid)
            in text "Perhaps you need to add" <+>
               quotes (ppr (unitPackageName pkg)) <+>
