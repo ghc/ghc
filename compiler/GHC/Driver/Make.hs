@@ -61,6 +61,7 @@ import GHC.Driver.Backend
 import GHC.Driver.Monad
 import GHC.Driver.Env
 import GHC.Driver.Errors
+import GHC.Driver.Errors.Ppr
 import GHC.Driver.Errors.Types
 import GHC.Driver.Main
 
@@ -307,20 +308,9 @@ warnMissingHomeModules hsc_env mod_graph =
     missing = map (moduleName . ms_mod) $
       filter (not . is_known_module) (mgModSummaries mod_graph)
 
-    msg
-      | gopt Opt_BuildingCabalPackage dflags
-      = hang
-          (text "These modules are needed for compilation but not listed in your .cabal file's other-modules: ")
-          4
-          (sep (map ppr missing))
-      | otherwise
-      =
-        hang
-          (text "Modules are not listed in command line but needed for compilation: ")
-          4
-          (sep (map ppr missing))
-    warn = singleMessage $ fmap (GhcDriverMessage . DriverUnknownMessage) $
-      mkPlainMsgEnvelope (hsc_dflags hsc_env) (WarningWithFlag Opt_WarnMissingHomeModules) noSrcSpan msg
+    buildingCabalPkg = BuildingCabalPackage (gopt Opt_BuildingCabalPackage dflags)
+    warn = singleMessage $ ghcDriverMessage (hsc_dflags hsc_env) noSrcSpan
+                         $ DriverMissingHomeModules missing buildingCabalPkg
 
 -- | Describes which modules of the module graph need to be loaded.
 data LoadHowMuch

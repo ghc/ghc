@@ -3,6 +3,7 @@
 module GHC.Driver.Errors.Types (
     GhcMessage(..)
   , DriverMessage(..)
+  , BuildingCabalPackage(..)
   , WarningMessages
   , ErrorMessages
   , WarnMsg
@@ -18,13 +19,15 @@ module GHC.Driver.Errors.Types (
 
 import GHC.Prelude
 
+import Data.Bifunctor
 import Data.Typeable
+
 import GHC.Types.Error
+import GHC.Unit.Module
 
 import GHC.Parser.Errors.Types ( PsMessage )
 import GHC.Tc.Errors.Types ( TcRnDsMessage(..), TcRnMessage )
 import GHC.HsToCore.Errors.Types ( DsMessage )
-import Data.Bifunctor
 
 type WarningMessages = Messages GhcMessage
 type ErrorMessages   = Messages GhcMessage
@@ -116,3 +119,14 @@ data DriverMessage
   = DriverUnknownMessage !DiagnosticMessage
   -- ^ Simply rewraps a generic 'DiagnosticMessage'. More
   -- instances will be added in the future (#18516).
+  | DriverMissingHomeModules [ModuleName] !BuildingCabalPackage
+  {- ^ DriverMissingHomeModules occurs when encountering a home module imported, but not listed
+       on the command line. Useful for cabal to ensure GHC won't pick up modules, not listed neither
+       in 'exposed-modules', nor in 'other-modules'.
+
+     Test cases: warnings/should_compile/MissingMod
+  -}
+
+-- | Pass to a 'DriverMessage' the information whether or not the
+-- '-fbuilding-cabal-package' flag is set.
+newtype BuildingCabalPackage = BuildingCabalPackage Bool
