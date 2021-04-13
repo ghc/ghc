@@ -144,6 +144,11 @@ data DriverMessage
 
      Test cases: None.
   -}
+  | DriverModuleNotFound !ModuleName
+  {- ^ DriverModuleNotFound occurs if a module 'A' can't be found.
+
+     Test cases: None.
+  -}
 
 -- | Pass to a 'DriverMessage' the information whether or not the
 -- '-fbuilding-cabal-package' flag is set.

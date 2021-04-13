@@ -2893,9 +2893,7 @@ noHsFileErr loc path
 
 moduleNotFoundErr :: ModuleName -> ErrorMessages
 moduleNotFoundErr mod
-  = fmap (GhcDriverMessage . DriverUnknownMessage) $
-    singleMessage $ mkPlainErrorMsgEnvelope noSrcSpan $
-        text "module" <+> quotes (ppr mod) <+> text "cannot be found locally"
+  = singleMessage $ ghcDriverErrorMessage noSrcSpan (DriverModuleNotFound mod)
 
 multiRootsErr :: [ModSummary] -> IO ()
 multiRootsErr [] = panic "multiRootsErr"

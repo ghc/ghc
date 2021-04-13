@@ -93,6 +93,8 @@ instance Diagnostic DriverMessage where
                        text "is defined in multiple files:" <+>
                        sep (map text files)
                      ]
+    DriverModuleNotFound mod
+      -> mkDecorated [ text "module" <+> quotes (ppr mod) <+> text "cannot be found locally" ]
 
   diagnosticReason = \case
     DriverUnknownMessage m
@@ -104,4 +106,6 @@ instance Diagnostic DriverMessage where
     DriverUnnecessarySourceImports{}
       -> WarningWithFlag Opt_WarnUnusedImports
     DriverDuplicatedModuleDeclaration{}
+      -> ErrorWithoutFlag
+    DriverModuleNotFound{}
       -> ErrorWithoutFlag
