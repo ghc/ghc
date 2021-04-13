@@ -11,6 +11,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE TypeApplications #-}
 
 {-|
 GHC's @DataKinds@ language extension lifts data constructors, natural
@@ -58,13 +59,13 @@ module GHC.TypeLits
 
   ) where
 
-import GHC.Base(Eq(..), Ord(..), Ordering(..), String, otherwise)
+import GHC.Base(Eq(..), Ord(..), Ordering(..), String, otherwise, withDict)
 import GHC.Types(Symbol, Char)
 import GHC.Num(Integer, fromInteger)
 import GHC.Show(Show(..))
 import GHC.Read(Read(..))
 import GHC.Real(toInteger)
-import GHC.Prim(magicDict, Proxy#)
+import GHC.Prim(Proxy#)
 import Data.Maybe(Maybe(..))
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality((:~:)(Refl))
@@ -306,18 +307,16 @@ cmpChar x y = case compare (charVal x) (charVal y) of
 
 newtype SSymbol (s :: Symbol) = SSymbol String
 
-data WrapS a b = WrapS (KnownSymbol a => Proxy a -> b)
-
--- See Note [magicDictId magic] in "basicType/MkId.hs"
-withSSymbol :: (KnownSymbol a => Proxy a -> b)
+-- See Note [withDict] in "GHC.HsToCore.Expr" in GHC
+withSSymbol :: forall a b.
+               (KnownSymbol a => Proxy a -> b)
             -> SSymbol a      -> Proxy a -> b
-withSSymbol f x y = magicDict (WrapS f) x y
+withSSymbol f x y = withDict @(SSymbol a) @(KnownSymbol a) x f y
 
 newtype SChar (s :: Char) = SChar Char
 
-data WrapC a b = WrapC (KnownChar a => Proxy a -> b)
-
--- See Note [q] in "basicType/MkId.hs"
-withSChar :: (KnownChar a => Proxy a -> b)
+-- See Note [withDict] in "GHC.HsToCore.Expr" in GHC
+withSChar :: forall a b.
+             (KnownChar a => Proxy a -> b)
             -> SChar a      -> Proxy a -> b
-withSChar f x y = magicDict (WrapC f) x y
+withSChar f x y = withDict @(SChar a) @(KnownChar a) x f y
