@@ -128,6 +128,8 @@ instance Diagnostic DriverMessage where
                                     suggested_instantiated_with <> text "\"" $$
                                        text "replacing <" <> ppr pi_mod_name <> text "> as necessary.")
          in mkDecorated [msg]
+    DriverFileNotFound hsFilePath
+      -> mkDecorated [ text "Can't find" <+> text hsFilePath ]
 
   diagnosticReason = \case
     DriverUnknownMessage m
@@ -145,4 +147,6 @@ instance Diagnostic DriverMessage where
     DriverFileModuleNameMismatch{}
       -> ErrorWithoutFlag
     DriverUnexpectedSignature{}
+      -> ErrorWithoutFlag
+    DriverFileNotFound{}
       -> ErrorWithoutFlag

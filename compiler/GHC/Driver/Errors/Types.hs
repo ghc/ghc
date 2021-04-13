@@ -161,6 +161,11 @@ data DriverMessage
 
      Test cases: driver/T12955
   -}
+  | DriverFileNotFound !FilePath
+  {- ^ DriverFileNotFound occurs when the input file can't be found.
+
+     Test cases: None.
+  -}
 
 -- | An 'InstantiationSuggestion' for a '.hsig' file.
 data InstantiationSuggestion = InstantiationSuggestion !ModuleName !Module

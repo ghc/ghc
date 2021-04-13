@@ -2273,9 +2273,8 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
                 if exists || isJust maybe_buf
                     then summariseFile hsc_env old_summaries file mb_phase
                                        obj_allowed maybe_buf
-                    else return $ Left $ singleMessage $ fmap (GhcDriverMessage . DriverUnknownMessage) $
-                           mkPlainErrorMsgEnvelope noSrcSpan $
-                             text "can't find file:" <+> text file
+                    else return $ Left $ singleMessage
+                                $ ghcDriverErrorMessage noSrcSpan (DriverFileNotFound file)
         getRootSummary Target { targetId = TargetModule modl
                               , targetAllowObjCode = obj_allowed
                               , targetContents = maybe_buf
@@ -2872,8 +2871,7 @@ noModError hsc_env loc wanted_mod err
 
 noHsFileErr :: SrcSpan -> String -> ErrorMessages
 noHsFileErr loc path
-  = fmap (GhcDriverMessage . DriverUnknownMessage) $
-    singleMessage $ mkPlainErrorMsgEnvelope loc $ text "Can't find" <+> text path
+  = singleMessage $ ghcDriverErrorMessage loc (DriverFileNotFound path)
 
 moduleNotFoundErr :: ModuleName -> ErrorMessages
 moduleNotFoundErr mod
