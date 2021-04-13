@@ -765,34 +765,22 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
           Just hscMessage -> hscMessage hsc_env mod_index what (ModuleNode (extendModSummaryNoDeps mod_summary))
           Nothing -> return ()
 
-    -- NB: enter Hsc monad here so that we don't bail out early with
-    -- -Werror on typechecker warnings; we also want to run the desugarer
-    -- to get those warnings too. (But we'll always exit at that point
-    -- because the desugarer runs ioMsgMaybe.)
-    runHsc hsc_env $ do
-    e <- case m_tc_result of
-      Just tc_result
-        | not always_do_basic_recompilation_check ->
-          return $ Right (FrontendTypecheck tc_result, Nothing)
-      _ -> do
-        recomp_result <- liftIO $ getRecompDetails hsc_env mod_summary source_modified mb_old_iface
-        case recomp_result of
-          RecompNotNeeded checked_iface -> do
-            liftIO $ msg UpToDate
-            return $ Left checked_iface
-          RecompNeeded reason mb_hash -> do
-            liftIO $ msg $ NeedsRecompile reason
-            tc_result <- case hscFrontendHook (hsc_hooks hsc_env) of
-              Nothing -> FrontendTypecheck . fst <$> hsc_typecheck False mod_summary Nothing
-              Just h  -> h mod_summary
-            return $ Right (tc_result, mb_hash)
+        doPostTc tc_result mb_old_hash = do
+          status <- finish mod_summary tc_result mb_old_hash
+          return (status, hsc_env)
 
-    case e of
-        -- We didn't need to do any typechecking; the old interface
-        -- file on disk was good enough.
-        Left iface -> do
+    case m_tc_result of
+      Just tc_result
+        | not always_do_basic_recompilation_check -> runHsc hsc_env $ doPostTc tc_result Nothing
+      _ -> do
+        recomp_result <- getRecompDetails hsc_env mod_summary source_modified mb_old_iface
+        case recomp_result of
+          RecompNotNeeded iface -> do
+            -- We didn't need to do any typechecking; the old interface
+            -- file on disk was good enough.
+            msg UpToDate
             -- Knot tying!  See Note [Knot-tying typecheckIface]
-            details <- liftIO . fixIO $ \details' -> do
+            details <- fixIO $ \details' -> do
                 let hsc_env' =
                         hsc_env {
                             hsc_HPT = addToHpt (hsc_HPT hsc_env)
@@ -804,13 +792,17 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
                 -- in make mode, since this HMI will go into the HPT.
                 genModDetails hsc_env' iface
             return (HscUpToDate iface details, hsc_env')
-        -- We finished type checking.  (mb_old_hash is the hash of
-        -- the interface that existed on disk; it's possible we had
-        -- to retypecheck but the resulting interface is exactly
-        -- the same.)
-        Right (FrontendTypecheck tc_result, mb_old_hash) -> do
-            status <- finish mod_summary tc_result mb_old_hash
-            return (status, hsc_env)
+
+          -- NB: enter Hsc monad here so that we don't bail out early with
+          -- -Werror on typechecker warnings; we also want to run the desugarer
+          -- to get those warnings too. (But we'll always exit at that point
+          -- because the desugarer runs ioMsgMaybe.)
+          RecompNeeded reason mb_hash -> runHsc hsc_env $ do
+            liftIO $ msg $ NeedsRecompile reason
+            FrontendTypecheck tc_result <- case hscFrontendHook (hsc_hooks hsc_env) of
+              Nothing -> FrontendTypecheck . fst <$> hsc_typecheck False mod_summary Nothing
+              Just h  -> h mod_summary
+            doPostTc tc_result mb_hash
 
 -- Runs the post-typechecking frontend (desugar and simplify). We want to
 -- generate most of the interface as late as possible. This gets us up-to-date
