@@ -252,14 +252,15 @@ compileOne' m_tc_result mHscMessage
                               (Just location)
                               []
             -- TODO: figure out a way to set this in runPipeline for HsSrcFile
-            mLinkable <- case (mb_linkable, src_flavour) of
-              (Just l, _) -> return $ Just l
-              (_, HsSrcFile) -> do
+            mLinkable <- case () of
+              _ | Just l <- mb_linkable -> return $ Just l
+                | bcknd == NoBackend -> return Nothing
+                | src_flavour == HsSrcFile -> do
                   -- The object filename comes from the ModLocation
                   o_time <- getModificationUTCTime object_filename
                   let !linkable = LM o_time this_mod [DotO object_filename]
                   return $ Just linkable
-              _ -> return Nothing
+                | otherwise -> return Nothing
             -- See Note [ModDetails and --make mode]
             details <- initModDetails hsc_env' summary iface
             return $! HomeModInfo iface details mLinkable
