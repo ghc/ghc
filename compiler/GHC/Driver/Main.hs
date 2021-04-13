@@ -744,34 +744,28 @@ hscIncrementalCompile :: Bool
                       -> SourceModified
                       -> Maybe ModIface
                       -> (Int,Int)
-                      -> IO (HscStatus, HscEnv)
+                      -> IO HscStatus
 hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
-    mHscMessage hsc_env' mod_summary source_modified mb_old_iface mod_index
+    mHscMessage hsc_env0 mod_summary source_modified mb_old_iface mod_index
   = do
-    hsc_env'' <- initializePlugins hsc_env'
-
     -- One-shot mode needs a knot-tying mutable variable for interface
     -- files. See GHC.Tc.Utils.TcGblEnv.tcg_type_env_var.
     -- See also Note [hsc_type_env_var hack]
     type_env_var <- newIORef emptyNameEnv
     let mod = ms_mod mod_summary
-        hsc_env | isOneShot (ghcMode (hsc_dflags hsc_env''))
-                = hsc_env'' { hsc_type_env_var = Just (mod, type_env_var) }
+        hsc_env | isOneShot (ghcMode (hsc_dflags hsc_env0))
+                = hsc_env0 { hsc_type_env_var = Just (mod, type_env_var) }
                 | otherwise
-                = hsc_env''
+                = hsc_env0
 
         msg what = case mHscMessage of
           -- We use extendModSummaryNoDeps because extra backpack deps are only needed for batch mode
           Just hscMessage -> hscMessage hsc_env mod_index what (ModuleNode (extendModSummaryNoDeps mod_summary))
           Nothing -> return ()
 
-        doPostTc tc_result mb_old_hash = do
-          status <- finish mod_summary tc_result mb_old_hash
-          return (status, hsc_env)
-
     case m_tc_result of
       Just tc_result
-        | not always_do_basic_recompilation_check -> runHsc hsc_env $ doPostTc tc_result Nothing
+        | not always_do_basic_recompilation_check -> runHsc hsc_env $ finish mod_summary tc_result Nothing
       _ -> do
         recomp_result <- getRecompDetails hsc_env mod_summary source_modified mb_old_iface
         case recomp_result of
@@ -791,7 +785,7 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
                 -- any further typechecking.  It's much more useful
                 -- in make mode, since this HMI will go into the HPT.
                 genModDetails hsc_env' iface
-            return (HscUpToDate iface details, hsc_env')
+            return $ HscUpToDate iface details
 
           -- NB: enter Hsc monad here so that we don't bail out early with
           -- -Werror on typechecker warnings; we also want to run the desugarer
@@ -802,7 +796,7 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
             FrontendTypecheck tc_result <- case hscFrontendHook (hsc_hooks hsc_env) of
               Nothing -> FrontendTypecheck . fst <$> hsc_typecheck False mod_summary Nothing
               Just h  -> h mod_summary
-            doPostTc tc_result mb_hash
+            finish mod_summary tc_result mb_hash
 
 -- Runs the post-typechecking frontend (desugar and simplify). We want to
 -- generate most of the interface as late as possible. This gets us up-to-date
