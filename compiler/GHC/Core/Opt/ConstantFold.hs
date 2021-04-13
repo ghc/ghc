@@ -28,6 +28,7 @@ module GHC.Core.Opt.ConstantFold
    ( primOpRules
    , builtinRules
    , caseRules
+   , match_magicDict
    )
 where
 
@@ -53,7 +54,7 @@ import GHC.Core.TyCon
    , tyConFamilySize )
 import GHC.Core.DataCon ( dataConTagZ, dataConTyCon, dataConWrapId, dataConWorkId )
 import GHC.Core.Utils  ( eqExpr, cheapEqExpr, exprIsHNF, exprType
-                       , stripTicksTop, stripTicksTopT, mkTicks, stripTicksE )
+                       , stripTicksTop, stripTicksTopT, mkTicks )
 import GHC.Core.Multiplicity
 import GHC.Core.FVs
 import GHC.Core.Type
@@ -1740,7 +1741,7 @@ builtinRules
      BuiltinRule { ru_name = fsLit "Inline", ru_fn = inlineIdName,
                    ru_nargs = 2, ru_try = \_ _ _ -> match_inline },
      BuiltinRule { ru_name = fsLit "MagicDict", ru_fn = idName magicDictId,
-                   ru_nargs = 4, ru_try = \_ _ _ -> match_magicDict },
+                   ru_nargs = 6, ru_try = \_ _ _ -> match_magicDict },
 
      mkBasicRule unsafeEqualityProofName 3 unsafeEqualityProofRule,
 
@@ -2243,14 +2244,19 @@ match_inline _ = Nothing
 -- See Note [magicDictId magic] in "GHC.Types.Id.Make"
 -- for a description of what is going on here.
 match_magicDict :: [Expr CoreBndr] -> Maybe (Expr CoreBndr)
-match_magicDict [Type _, (stripTicksE (const True) -> (Var wrap `App` Type a `App` Type _ `App` f)), x, y ]
-  | Just (_, fieldTy, _)  <- splitFunTy_maybe $ dropForAlls $ idType wrap
-  , Just (_, dictTy, _)   <- splitFunTy_maybe fieldTy
-  , Just dictTc           <- tyConAppTyCon_maybe dictTy
-  , Just (_,_,co)         <- unwrapNewTyCon_maybe dictTc
+match_magicDict [Type _rr, Type dt, Type st, Type _r, k, sv]
+  | -- Check that dt is a class constraint `C t_1 ... t_n`, where
+    -- `dict_tc = C` and `dict_args = t_1 ... t_n`.
+    Just (dict_tc, dict_args)    <- splitTyConApp_maybe dt
+    -- Check that C is a class of the form
+    -- `class C a_1 ... a_n where op :: meth_ty`, where
+    -- `meth_tvs = a_1 ... a_n` and `co` is a newtype coercion between
+    -- `C` and `meth_ty`.
+  , Just (meth_tvs, meth_ty, co) <- unwrapNewTyCon_maybe dict_tc
+    -- Check that `st` is equal to `meth_ty[t_i/a_i]`.
+  , st `eqType` substTyWith meth_tvs dict_args meth_ty
   = Just
-  $ f `App` Cast x (mkSymCo (mkUnbranchedAxInstCo Representational co [a] []))
-      `App` y
+  $ k `App` Cast sv (mkSymCo (mkUnbranchedAxInstCo Representational co dict_args []))
 
 match_magicDict _ = Nothing
 

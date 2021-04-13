@@ -12,6 +12,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE TypeApplications #-}
 
 {-| This module is an internal GHC module.  It declares the constants used
 in the implementation of type-level natural numbers.  The programmer interface
@@ -240,9 +241,8 @@ cmpNat x y = case compare (natVal x) (natVal y) of
 
 newtype SNat    (n :: Nat)    = SNat    Natural
 
-data WrapN a b = WrapN (KnownNat    a => Proxy a -> b)
-
 -- See Note [magicDictId magic] in "GHC.Types.Id.Make" in GHC
-withSNat :: (KnownNat a => Proxy a -> b)
+withSNat :: forall a b.
+            (KnownNat a => Proxy a -> b)
          -> SNat a      -> Proxy a -> b
-withSNat f x y = magicDict (WrapN f) x y
+withSNat f x y = magicDict @(KnownNat a) f x y

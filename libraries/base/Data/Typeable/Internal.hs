@@ -495,12 +495,7 @@ splitApp (TrTyCon{trTyCon = con, trKindVars = kinds})
 -- | Use a 'TypeRep' as 'Typeable' evidence.
 withTypeable :: forall k (a :: k) rep (r :: TYPE rep). ()
              => TypeRep a -> (Typeable a => r) -> r
-withTypeable rep k = unsafeCoerce k' rep
-  where k' :: Gift a r
-        k' = Gift k
-
--- | A helper to satisfy the type checker in 'withTypeable'.
-newtype Gift a (r :: TYPE rep) = Gift (Typeable a => r)
+withTypeable rep k = magicDict @(Typeable a) k rep
 
 -- | Pattern match on a type constructor
 pattern Con :: forall k (a :: k). ()

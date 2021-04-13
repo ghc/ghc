@@ -37,6 +37,7 @@ import GHC.Core
 import GHC.Core.FVs
 import GHC.Core.Utils
 import GHC.Core.Stats ( coreBindsStats )
+import GHC.Core.Opt.ConstantFold ( match_magicDict )
 import GHC.Core.Opt.Monad
 import GHC.Data.Bag
 import GHC.Types.Literal
@@ -936,11 +937,23 @@ lintCoreExpr e@(App _ _)
        ; app_ty <- lintValApp arg3 fun_ty2 arg3_ty ue2 ue3
        ; lintCoreArgs app_ty rest }
 
+    -- If we see an application of magicDict, make sure it upholds the criteria
+    -- specified in Note [magicDictId magic] in GHC.Types.Id.Make.
+  | Var fun <- fun
+  , fun `hasKey` magicDictKey
+  = -- magicDict might be oversaturated, so only look at its first six arguments
+    if isJust (match_magicDict (take 6 args))
+       then lint_core_app
+       else failWithL $ hang (text "Invalid application of magicDict to arguments:")
+                           4 (ppr args)
+
   | otherwise
-  = do { pair <- lintCoreFun fun (length args)
-       ; lintCoreArgs pair args }
+  = lint_core_app
   where
     (fun, args) = collectArgs e
+
+    lint_core_app = do { pair <- lintCoreFun fun (length args)
+                       ; lintCoreArgs pair args }
 
 lintCoreExpr (Lam var expr)
   = markAllJoinsBad $

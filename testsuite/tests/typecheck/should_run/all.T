@@ -76,6 +76,7 @@ test('IPRun', normal, compile_and_run, [''])
 test('IPLocation', normal, compile_and_run, [''])
 test('T10845', normal, compile_and_run, [''])
 test('T10846', normal, compile_and_run, [''])
+test('T16646', normal, compile_and_run, [''])
 
 # Support files for T1735 are in directory T1735_Help/
 test('T1735', normal, multimod_compile_and_run, ['T1735',''])

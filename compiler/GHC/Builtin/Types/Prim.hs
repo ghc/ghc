@@ -31,6 +31,8 @@ module GHC.Builtin.Types.Prim(
 
         multiplicityTyVar1, multiplicityTyVar2,
 
+        constraintKindedTyVar,
+
         -- Kind constructors...
         tYPETyCon, tYPETyConName,
 
@@ -114,7 +116,7 @@ import {-# SOURCE #-} GHC.Builtin.Types
   , int64ElemRepDataConTy, word8ElemRepDataConTy, word16ElemRepDataConTy
   , word32ElemRepDataConTy, word64ElemRepDataConTy, floatElemRepDataConTy
   , doubleElemRepDataConTy
-  , mkPromotedListTy, multiplicityTy )
+  , mkPromotedListTy, multiplicityTy, constraintKind )
 
 import GHC.Types.Var    ( TyVar, mkTyVar )
 import GHC.Types.Name
@@ -380,7 +382,7 @@ alphaTyUnliftedRep :: Type
 
 runtimeRep1TyVar, runtimeRep2TyVar, runtimeRep3TyVar :: TyVar
 (runtimeRep1TyVar : runtimeRep2TyVar : runtimeRep3TyVar : _)
-  = drop 16 (mkTemplateTyVars (repeat runtimeRepTy))  -- selects 'q','r'
+  = drop 16 (mkTemplateTyVars (repeat runtimeRepTy))  -- selects 'q','r','s'
 
 runtimeRep1Ty, runtimeRep2Ty, runtimeRep3Ty :: Type
 runtimeRep1Ty = mkTyVarTy runtimeRep1TyVar
@@ -403,6 +405,9 @@ multiplicityTyVar1, multiplicityTyVar2  :: TyVar
 (multiplicityTyVar1 : multiplicityTyVar2 : _)
    = drop 13 (mkTemplateTyVars (repeat multiplicityTy))  -- selects 'n', 'm'
 
+constraintKindedTyVar :: TyVar
+(constraintKindedTyVar : _)
+   = drop 19 (mkTemplateTyVars (repeat constraintKind))  -- selects 't'
 
 {-
 ************************************************************************
