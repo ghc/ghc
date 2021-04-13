@@ -22,6 +22,7 @@ import GHC.Prelude
 import Data.Bifunctor
 import Data.Typeable
 
+import GHC.Driver.Session
 import GHC.Types.Error
 import GHC.Unit.Module
 
@@ -125,6 +126,11 @@ data DriverMessage
        in 'exposed-modules', nor in 'other-modules'.
 
      Test cases: warnings/should_compile/MissingMod
+  -}
+  | DriverUnusedPackages [PackageArg]
+  {- ^ DriverUnusedPackages occurs when when package is requested on command line, but was never loaded.
+
+     Test cases: warnings/should_compile/UnusedPackages
   -}
 
 -- | Pass to a 'DriverMessage' the information whether or not the

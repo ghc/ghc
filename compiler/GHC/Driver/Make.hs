@@ -375,12 +375,7 @@ warnUnusedPackages = do
           = filter (\arg -> not $ any (matching state arg) loadedPackages)
                    requestedArgs
 
-    let warn = singleMessage $ fmap (GhcDriverMessage . DriverUnknownMessage) $
-          mkPlainMsgEnvelope dflags (WarningWithFlag Opt_WarnUnusedPackages) noSrcSpan msg
-        msg = vcat [ text "The following packages were specified" <+>
-                     text "via -package or -package-id flags,"
-                   , text "but were not needed for compilation:"
-                   , nest 2 (vcat (map (withDash . pprUnusedArg) unusedArgs)) ]
+    let warn = singleMessage $ ghcDriverMessage dflags noSrcSpan (DriverUnusedPackages unusedArgs)
 
     when (not (null unusedArgs)) $
       logDiagnostics warn
@@ -388,11 +383,6 @@ warnUnusedPackages = do
     where
         packageArg (ExposePackage _ arg _) = Just arg
         packageArg _ = Nothing
-
-        pprUnusedArg (PackageArg str) = text str
-        pprUnusedArg (UnitIdArg uid) = ppr uid
-
-        withDash = (<+>) (text "-")
 
         matchingStr :: String -> UnitInfo -> Bool
         matchingStr str p

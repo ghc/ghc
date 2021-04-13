@@ -64,9 +64,25 @@ instance Diagnostic DriverMessage where
                      4
                      (sep (map ppr missing))
          in mkDecorated [msg]
+    DriverUnusedPackages unusedArgs
+      -> let msg = vcat [ text "The following packages were specified" <+>
+                          text "via -package or -package-id flags,"
+                        , text "but were not needed for compilation:"
+                        , nest 2 (vcat (map (withDash . pprUnusedArg) unusedArgs))
+                        ]
+         in mkDecorated [msg]
+         where
+            withDash :: SDoc -> SDoc
+            withDash = (<+>) (text "-")
+
+            pprUnusedArg :: PackageArg -> SDoc
+            pprUnusedArg (PackageArg str) = text str
+            pprUnusedArg (UnitIdArg uid) = ppr uid
 
   diagnosticReason = \case
     DriverUnknownMessage m
       -> diagnosticReason m
     DriverMissingHomeModules{}
       -> WarningWithFlag Opt_WarnMissingHomeModules
+    DriverUnusedPackages{}
+      -> WarningWithFlag Opt_WarnUnusedPackages
