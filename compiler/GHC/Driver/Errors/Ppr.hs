@@ -13,9 +13,11 @@ import GHC.Parser.Errors.Ppr ()
 import GHC.Tc.Errors.Ppr ()
 import GHC.Types.Error
 import GHC.Types.SrcLoc
+import GHC.Unit.Types
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Unit.Module
 
 -- | Constructs a new 'GhcMessage' out of 'DriverMessage'.
 -- N.B. Due to circular dependencies we can't define this function inside
@@ -29,6 +31,16 @@ ghcDriverErrorMessage :: SrcSpan -> DriverMessage -> MsgEnvelope GhcMessage
 ghcDriverErrorMessage locn msg =
   let panicMsg = "ghcDriverErrorMessage called on a DriverMessage which DiagnosticReason was not ErrorWithoutFlag"
   in ghcDriverMessage (panic panicMsg) locn msg
+
+--
+-- Suggestions
+--
+
+-- | Suggests a list of 'InstantiationSuggestion' for the '.hsig' file to the user.
+suggestInstantiatedWith :: ModuleName -> GenInstantiations UnitId -> [InstantiationSuggestion]
+suggestInstantiatedWith pi_mod_name insts =
+  [ InstantiationSuggestion k v | (k,v) <- ((pi_mod_name, mkHoleModule pi_mod_name) : insts) ]
+
 
 instance Diagnostic GhcMessage where
   diagnosticMessage = \case
@@ -100,6 +112,22 @@ instance Diagnostic DriverMessage where
                        $$ text "Saw:" <+> quotes (ppr actual)
                        $$ text "Expected:" <+> quotes (ppr expected)
                      ]
+    DriverUnexpectedSignature pi_mod_name (BuildingCabalPackage buildingCabalPackage) suggestions
+      -> let suggested_instantiated_with =
+               hcat (punctuate comma $
+                   [ ppr k <> text "=" <> ppr v
+                   | InstantiationSuggestion k v <- suggestions
+                   ])
+             msg = text "Unexpected signature:" <+> quotes (ppr pi_mod_name)
+                   $$ if buildingCabalPackage
+                       then parens (text "Try adding" <+> quotes (ppr pi_mod_name)
+                               <+> text "to the"
+                               <+> quotes (text "signatures")
+                               <+> text "field in your Cabal file.")
+                       else parens (text "Try passing -instantiated-with=\"" <>
+                                    suggested_instantiated_with <> text "\"" $$
+                                       text "replacing <" <> ppr pi_mod_name <> text "> as necessary.")
+         in mkDecorated [msg]
 
   diagnosticReason = \case
     DriverUnknownMessage m
@@ -115,4 +143,6 @@ instance Diagnostic DriverMessage where
     DriverModuleNotFound{}
       -> ErrorWithoutFlag
     DriverFileModuleNameMismatch{}
+      -> ErrorWithoutFlag
+    DriverUnexpectedSignature{}
       -> ErrorWithoutFlag

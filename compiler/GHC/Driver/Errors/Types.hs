@@ -4,6 +4,7 @@ module GHC.Driver.Errors.Types (
     GhcMessage(..)
   , DriverMessage(..)
   , BuildingCabalPackage(..)
+  , InstantiationSuggestion(..)
   , WarningMessages
   , ErrorMessages
   , WarnMsg
@@ -155,6 +156,14 @@ data DriverMessage
 
      Test cases: module/mod178, /driver/bug1677
   -}
+  | DriverUnexpectedSignature !ModuleName !BuildingCabalPackage [InstantiationSuggestion]
+  {- ^ DriverUnexpectedSignature occurs when there is an unexpected signature in the .hsig file.
+
+     Test cases: driver/T12955
+  -}
+
+-- | An 'InstantiationSuggestion' for a '.hsig' file.
+data InstantiationSuggestion = InstantiationSuggestion !ModuleName !Module
 
 -- | Pass to a 'DriverMessage' the information whether or not the
 -- '-fbuilding-cabal-package' flag is set.

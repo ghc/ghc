@@ -2713,23 +2713,10 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
                        $ DriverFileModuleNameMismatch pi_mod_name wanted_mod
 
         when (hsc_src == HsigFile && isNothing (lookup pi_mod_name (homeUnitInstantiations home_unit))) $
-            let suggested_instantiated_with =
-                    hcat (punctuate comma $
-                        [ ppr k <> text "=" <> ppr v
-                        | (k,v) <- ((pi_mod_name, mkHoleModule pi_mod_name)
-                                : homeUnitInstantiations home_unit)
-                        ])
-            in throwE $ singleMessage $ fmap (GhcDriverMessage . DriverUnknownMessage) $
-                mkPlainErrorMsgEnvelope pi_mod_name_loc $
-                text "Unexpected signature:" <+> quotes (ppr pi_mod_name)
-                $$ if gopt Opt_BuildingCabalPackage dflags
-                    then parens (text "Try adding" <+> quotes (ppr pi_mod_name)
-                            <+> text "to the"
-                            <+> quotes (text "signatures")
-                            <+> text "field in your Cabal file.")
-                    else parens (text "Try passing -instantiated-with=\"" <>
-                                 suggested_instantiated_with <> text "\"" $$
-                                text "replacing <" <> ppr pi_mod_name <> text "> as necessary.")
+            let suggestions = suggestInstantiatedWith pi_mod_name (homeUnitInstantiations home_unit)
+                buildingCabalPkg = BuildingCabalPackage (gopt Opt_BuildingCabalPackage dflags)
+            in throwE $ singleMessage $ ghcDriverErrorMessage pi_mod_name_loc
+                      $ DriverUnexpectedSignature pi_mod_name buildingCabalPkg suggestions
 
         liftIO $ makeNewModSummary hsc_env $ MakeNewModSummary
             { nms_src_fn = src_fn
