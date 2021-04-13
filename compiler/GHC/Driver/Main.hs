@@ -195,7 +195,6 @@ import GHC.Types.IPE
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
 import GHC.Types.Name
-import GHC.Types.Name.Env
 import GHC.Types.Name.Cache ( initNameCache )
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Ppr
@@ -699,19 +698,9 @@ hscIncrementalCompile :: Bool
                       -> (Int,Int)
                       -> IO HscStatus
 hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
-    mHscMessage hsc_env'' mod_summary source_modified mb_old_iface mod_index
+    mHscMessage hsc_env mod_summary source_modified mb_old_iface mod_index
   = do
-
-    -- One-shot mode needs a knot-tying mutable variable for interface
-    -- files. See GHC.Tc.Utils.TcGblEnv.tcg_type_env_var.
-    -- See also Note [hsc_type_env_var hack]
-    type_env_var <- newIORef emptyNameEnv
-    let mod = ms_mod mod_summary
-        hsc_env | isOneShot (ghcMode (hsc_dflags hsc_env''))
-                = hsc_env'' { hsc_type_env_var = Just (mod, type_env_var) }
-                | otherwise
-                = hsc_env''
-
+    let
         msg what = case mHscMessage of
           -- We use extendModSummaryNoDeps because extra backpack deps are only needed for batch mode
           Just hscMessage -> hscMessage hsc_env mod_index what (ModuleNode (extendModSummaryNoDeps mod_summary))
