@@ -18,12 +18,10 @@ class KnownSymbol (n :: Symbol) where
 symbolVal :: forall n proxy . KnownSymbol n => proxy n -> String
 symbolVal _ = case symbolSing :: SSymbol n of SSymbol x -> x
 
-data WrapS a b = WrapS (KnownSymbol a => Proxy a -> b)
-
 -- See Note [NOINLINE someNatVal] in GHC.TypeNats
 {-# NOINLINE reifySymbol #-}
 reifySymbol :: forall r. String -> (forall (n :: Symbol). KnownSymbol n => Proxy n -> r) -> r
-reifySymbol n k = magicDict (WrapS k) (SSymbol n) (Proxy @(Any @Symbol))
+reifySymbol n k = magicDict @(KnownSymbol Any) (k @Any) (SSymbol n) (Proxy @(Any @Symbol))
 
 main :: IO ()
 main = print $ reifySymbol "Hello World" symbolVal
