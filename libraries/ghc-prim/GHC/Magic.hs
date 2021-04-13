@@ -8,6 +8,10 @@
 {-# LANGUAGE UnliftedFFITypes #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE EmptyCase #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE ImpredicativeTypes #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TypeApplications #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -130,9 +134,9 @@ runRW# m = m realWorld#
 -- It is used internally by modules such as "GHC.TypeNats" to cast a typeclass
 -- dictionary with a single method. It is eliminated by a rule during compilation.
 -- For the details, see @Note [magicDictId magic]@ in "GHC.Types.Id.Make" in GHC.
-magicDict :: a
+magicDict :: forall {rr :: RuntimeRep} dt st (r :: TYPE rr). (dt => r) -> st -> r
 {-# NOINLINE magicDict #-}
-magicDict = panicError "Non-rewritten magicDict"#
+magicDict = panicError @((dt => r) -> st -> r) "Non-rewritten magicDict"#
 
 {-
 Note [Compiler error functions]

@@ -53,7 +53,7 @@ import GHC.Core.TyCon
    , tyConFamilySize )
 import GHC.Core.DataCon ( dataConTagZ, dataConTyCon, dataConWrapId, dataConWorkId )
 import GHC.Core.Utils  ( eqExpr, cheapEqExpr, exprIsHNF, exprType
-                       , stripTicksTop, stripTicksTopT, mkTicks, stripTicksE )
+                       , stripTicksTop, stripTicksTopT, mkTicks )
 import GHC.Core.Multiplicity
 import GHC.Core.FVs
 import GHC.Core.Type
@@ -1740,7 +1740,7 @@ builtinRules
      BuiltinRule { ru_name = fsLit "Inline", ru_fn = inlineIdName,
                    ru_nargs = 2, ru_try = \_ _ _ -> match_inline },
      BuiltinRule { ru_name = fsLit "MagicDict", ru_fn = magicDictName,
-                   ru_nargs = 4, ru_try = \_ _ _ -> match_magicDict },
+                   ru_nargs = 6, ru_try = \_ _ _ -> match_magicDict },
 
      mkBasicRule unsafeEqualityProofName 3 unsafeEqualityProofRule,
 
@@ -2243,14 +2243,11 @@ match_inline _ = Nothing
 -- See Note [magicDictId magic] in "GHC.Types.Id.Make"
 -- for a description of what is going on here.
 match_magicDict :: [Expr CoreBndr] -> Maybe (Expr CoreBndr)
-match_magicDict [Type _, (stripTicksE (const True) -> (Var wrap `App` Type a `App` Type _ `App` f)), x, y ]
-  | Just (_, fieldTy, _)  <- splitFunTy_maybe $ dropForAlls $ idType wrap
-  , Just (_, dictTy, _)   <- splitFunTy_maybe fieldTy
-  , Just dictTc           <- tyConAppTyCon_maybe dictTy
-  , Just (_,_,co)         <- unwrapNewTyCon_maybe dictTc
+match_magicDict [Type _rr, Type dt, Type _st, Type _r, k, sv]
+  | Just (dictTc, dictArgs) <- splitTyConApp_maybe dt
+  , Just (_,_,co)           <- unwrapNewTyCon_maybe dictTc
   = Just
-  $ f `App` Cast x (mkSymCo (mkUnbranchedAxInstCo Representational co [a] []))
-      `App` y
+  $ k `App` Cast sv (mkSymCo (mkUnbranchedAxInstCo Representational co dictArgs []))
 
 match_magicDict _ = Nothing
 
