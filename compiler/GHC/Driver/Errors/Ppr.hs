@@ -95,6 +95,11 @@ instance Diagnostic DriverMessage where
                      ]
     DriverModuleNotFound mod
       -> mkDecorated [ text "module" <+> quotes (ppr mod) <+> text "cannot be found locally" ]
+    DriverFileModuleNameMismatch actual expected
+      -> mkDecorated [ text "File name does not match module name:"
+                       $$ text "Saw:" <+> quotes (ppr actual)
+                       $$ text "Expected:" <+> quotes (ppr expected)
+                     ]
 
   diagnosticReason = \case
     DriverUnknownMessage m
@@ -108,4 +113,6 @@ instance Diagnostic DriverMessage where
     DriverDuplicatedModuleDeclaration{}
       -> ErrorWithoutFlag
     DriverModuleNotFound{}
+      -> ErrorWithoutFlag
+    DriverFileModuleNameMismatch{}
       -> ErrorWithoutFlag

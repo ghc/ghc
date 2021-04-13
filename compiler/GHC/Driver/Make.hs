@@ -2709,11 +2709,8 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
               | otherwise = HsSrcFile
 
         when (pi_mod_name /= wanted_mod) $
-                throwE $ singleMessage $ fmap (GhcDriverMessage . DriverUnknownMessage) $
-                  mkPlainErrorMsgEnvelope pi_mod_name_loc $
-                              text "File name does not match module name:"
-                              $$ text "Saw:" <+> quotes (ppr pi_mod_name)
-                              $$ text "Expected:" <+> quotes (ppr wanted_mod)
+                throwE $ singleMessage $ ghcDriverErrorMessage pi_mod_name_loc
+                       $ DriverFileModuleNameMismatch pi_mod_name wanted_mod
 
         when (hsc_src == HsigFile && isNothing (lookup pi_mod_name (homeUnitInstantiations home_unit))) $
             let suggested_instantiated_with =

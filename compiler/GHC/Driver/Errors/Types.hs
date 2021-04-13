@@ -149,6 +149,12 @@ data DriverMessage
 
      Test cases: None.
   -}
+  | DriverFileModuleNameMismatch !ModuleName !ModuleName
+  {- ^ DriverModuleNotFound occurs if a module 'A' is defined is a file with a different name. The first
+       argument is the /actual/ name, the second argument the expected one.
+
+     Test cases: module/mod178, /driver/bug1677
+  -}
 
 -- | Pass to a 'DriverMessage' the information whether or not the
 -- '-fbuilding-cabal-package' flag is set.
