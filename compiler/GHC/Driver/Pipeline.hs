@@ -91,6 +91,7 @@ import GHC.Iface.UpdateIdInfos ( updateModDetailsIdInfos )
 import GHC.Runtime.Loader      ( initializePlugins )
 
 import GHC.Types.Basic       ( SuccessFlag(..) )
+import GHC.Types.Name.Env
 import GHC.Types.Target
 import GHC.Types.SrcLoc
 import GHC.Types.SourceFile
@@ -111,6 +112,7 @@ import System.FilePath
 import System.IO
 import Control.Monad
 import qualified Control.Monad.Catch as MC (handle)
+import Data.IORef
 import Data.List        ( isInfixOf, intercalate )
 import Data.Maybe
 import Data.Version
@@ -1265,7 +1267,14 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
 
   -- run the compiler!
         let msg hsc_env _ what _ = oneShotMsg hsc_env what
-        plugin_hsc_env <- liftIO $ initializePlugins hsc_env'
+        plugin_hsc_env' <- liftIO $ initializePlugins hsc_env'
+
+        -- One-shot mode needs a knot-tying mutable variable for interface
+        -- files. See GHC.Tc.Utils.TcGblEnv.tcg_type_env_var.
+        -- See also Note [hsc_type_env_var hack]
+        type_env_var <- liftIO $ newIORef emptyNameEnv
+        let plugin_hsc_env = plugin_hsc_env' { hsc_type_env_var = Just (mod, type_env_var) }
+
         result <-
           liftIO $ hscIncrementalCompile True Nothing (Just msg) plugin_hsc_env
                             mod_summary source_unchanged Nothing (1,1)
