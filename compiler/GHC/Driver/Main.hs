@@ -308,8 +308,8 @@ handleWarningsThrowErrors (warnings, errors) = do
     logDiagnostics warns
     logger <- getLogger
     let (wWarns, wErrs) = partitionMessages warns
-    liftIO $ printBagOfErrors logger dflags wWarns
-    throwErrors $ errs `unionMessages` mkMessages wErrs
+    liftIO $ printMessages logger dflags wWarns
+    throwErrors $ errs `unionMessages` wErrs
 
 -- | Deal with errors and warnings returned by a compilation step
 --
@@ -331,10 +331,10 @@ ioMsgMaybe :: IO (Messages GhcMessage, Maybe a) -> Hsc a
 ioMsgMaybe ioA = do
     (msgs, mb_r) <- liftIO ioA
     let (warns, errs) = partitionMessages msgs
-    logDiagnostics (mkMessages warns)
+    logDiagnostics warns
     case mb_r of
-        Nothing -> throwErrors . mkMessages $ errs
-        Just r  -> ASSERT( isEmptyBag errs ) return r
+        Nothing -> throwErrors errs
+        Just r  -> ASSERT( isEmptyMessages errs ) return r
 
 -- | like ioMsgMaybe, except that we ignore error messages and return
 -- 'Nothing' instead.

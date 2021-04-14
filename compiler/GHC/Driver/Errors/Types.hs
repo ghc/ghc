@@ -9,7 +9,6 @@ module GHC.Driver.Errors.Types (
   -- * Constructors
   , ghcUnknownMessage
   -- * Utility functions
-  , hoistMessageBiM
   , hoistTcRnMessage
   , hoistTcRnDsMessage
   , tcRnDsToGhcMessage
@@ -26,23 +25,35 @@ import GHC.Tc.Errors.Types ( TcRnDsMessage(..), TcRnMessage )
 import GHC.HsToCore.Errors.Types ( DsMessage )
 import Data.Bifunctor
 
+-- | A collection of warning messages.
+-- /INVARIANT/: Each 'GhcMessage' in the collection should have 'SevWarning' severity.
 type WarningMessages = Messages GhcMessage
+
+-- | A collection of error messages.
+-- /INVARIANT/: Each 'GhcMessage' in the collection should have 'SevWarning' severity.
 type ErrorMessages   = Messages GhcMessage
+
+-- | A single warning message.
+-- /INVARIANT/: It must have 'SevWarning' severity.
 type WarnMsg         = MsgEnvelope GhcMessage
 
 
 {- Note [GhcMessage]
 ~~~~~~~~~~~~~~~~~~~~
 
-Things can go wrong within GHC, and we might need to report diagnostics (error and/or warnings) to the
-users. The 'GhcMessage' type is the root of the diagnostic hierarchy.
+We might need to report diagnostics (error and/or warnings) to the users. The 'GhcMessage' type is the
+root of the diagnostic hierarchy.
 
 It's useful to have a separate type constructor for the different stages of the compilation pipeline.
-This is not just helpful for tools, as it gives a clear indication on where the error occurred exactly,
-but it's also necessary to allow 'handleSourceError' to be able to catch the relevant exception. In
-particular, it allows the user to write something like:
+This is not just helpful for tools, as it gives a clear indication on where the error occurred exactly.
+Furthermore it increases the modularity amongst the different components of GHC (i.e. to avoid having
+"everything depend on everything else") and allows us to write separate functions that renders the
+different kind of messages.
 
-handleMyErrors = handleSourceError (map handleInvididualError $ getMessages srcErrorMessages )
+Last but not least, it's also helpful to allow 'handleSourceError' to be able to catch the relevant
+exception. In particular, it allows the user to write something like:
+
+handleMyErrors = handleSourceError (mapBag handleInvididualError . getMessages . srcErrorMessages)
   where
     handleInvididualError e = case errMsgDiagnostic of
       GhcPsMessage _   -> .. -- diagnostic emitted during parsing;
@@ -73,21 +84,11 @@ data GhcMessage where
 
 -- | Creates a new 'GhcMessage' out of any diagnostic. This function is also provided to ease the integration
 -- of #18516 by allowing diagnostics to be wrapped into the general (but structured) 'GhcMessage' type,
--- so that the conversion can happen gradually. This function should be needed very rarely within GHC,
+-- so that the conversion can happen gradually. This function should not be needed within GHC,
 -- as it would typically be used by plugin or library authors (see comment for the 'GhcUnknownMessage'
 -- type constructor)
 ghcUnknownMessage :: (Diagnostic a, Typeable a) => a -> GhcMessage
 ghcUnknownMessage = GhcUnknownMessage
-
--- | Hoist a transformation into a 'Bifunctor' wrapped in a 'Monad'. Abstracts away the classic pattern
--- where we are calling 'ioMsgMaybe' on the result of 'IO (Messages e, a)'.
-hoistMessageBiM :: (Monad m, Bifunctor f)
-                => (e -> GhcMessage)
-                -- ^ A function to transform 'e' into a 'GhcMessage'.
-                -> m (f (Messages e) a)
-                -- ^ A 'Bifunctor' @f@ wrapped into a 'Monad' @m@.
-                -> m (f (Messages GhcMessage) a)
-hoistMessageBiM f m = fmap (first (fmap f)) m
 
 -- | Given a collection of @e@ wrapped in a 'Foldable' structure, converts it into 'Messages'
 -- via the supplied transformation function.
@@ -97,15 +98,15 @@ foldMessages :: Foldable f
              -> Messages GhcMessage
 foldMessages f = foldl' (\acc m -> addMessage (f m) acc) emptyMessages
 
--- | Abstracts away the classic pattern where we are calling 'ioMsgMaybe' on the result of
+-- | Abstracts away the frequent pattern where we are calling 'ioMsgMaybe' on the result of
 -- 'IO (Messages TcRnMessage, a)'.
 hoistTcRnMessage :: Monad m => m (Messages TcRnMessage, a) -> m (Messages GhcMessage, a)
-hoistTcRnMessage = hoistMessageBiM GhcTcRnMessage
+hoistTcRnMessage = fmap (first (fmap GhcTcRnMessage))
 
--- | Abstracts away the classic pattern where we are calling 'ioMsgMaybe' on the result of
+-- | Abstracts away the frequent pattern where we are calling 'ioMsgMaybe' on the result of
 -- 'IO (Messages TcRnDsMessage, a)'.
 hoistTcRnDsMessage :: Monad m => m (Messages TcRnDsMessage, a) -> m (Messages GhcMessage, a)
-hoistTcRnDsMessage = hoistMessageBiM tcRnDsToGhcMessage
+hoistTcRnDsMessage = fmap (first (fmap tcRnDsToGhcMessage))
 
 -- | Converts the input 'TcRnDsMessage' into a 'GhcMessage'.
 tcRnDsToGhcMessage :: TcRnDsMessage -> GhcMessage
@@ -115,4 +116,4 @@ tcRnDsToGhcMessage (TcRnDsMessage m) = either GhcDsMessage GhcTcRnMessage m
 data DriverMessage
   = DriverUnknownMessage !DiagnosticMessage
   -- ^ Simply rewraps a generic 'DiagnosticMessage'. More
-  -- instances will be added in the future (#18516).
+  -- constructors will be added in the future (#18516).
