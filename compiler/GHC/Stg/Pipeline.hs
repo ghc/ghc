@@ -109,8 +109,12 @@ stg2stg logger dflags this_mod binds
 
           StgClosEnvShare -> do
             us <- getUniqueSupplyM
-            let _ =  {-# SCC "StgLiftLams" #-} stgClosEnvShare us binds
-            end_pass "StgClosEnvShare" binds
+            let (binds',ces_log) = {-# SCC "StgClosEnvShare" #-} stgClosEnvShare us binds
+            liftIO (dumpIfSet logger dflags
+                      (dopt Opt_D_dump_stg_clos_env_share dflags)
+                      "Closure environment sharing information:"
+                      (ppr ces_log))
+            end_pass "StgClosEnvShare" binds'
 
     opts = initStgPprOpts dflags
     dump_when flag header binds

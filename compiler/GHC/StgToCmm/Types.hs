@@ -130,6 +130,8 @@ data LambdaFormInfo
   | LFUnlifted          -- A value of unboxed type;
                         -- always a value, needs evaluation
 
+  | LFFirstClassEnv     -- Is unlifted like @LFUnlifted@, but is also boxed
+
   | LFLetNoEscape       -- See LetNoEscape module for precise description
 
 instance Outputable LambdaFormInfo where
@@ -146,6 +148,8 @@ instance Outputable LambdaFormInfo where
       text "LFUnknown" <> brackets (pprFuncFlag m_func)
     ppr LFUnlifted =
       text "LFUnlifted"
+    ppr LFFirstClassEnv =
+      text "LFFirstClassEnv"
     ppr LFLetNoEscape =
       text "LFLetNoEscape"
 

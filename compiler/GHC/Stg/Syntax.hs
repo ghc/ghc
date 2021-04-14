@@ -815,7 +815,7 @@ pprStgExpr opts e = case e of
 
    StgCaseEnv env_var vars expr
      -> sep [ sep [ text "case-env", ppr env_var, text "of", char '{' ]
-            , sep [ ppr vars, text "->", pprStgExpr opts expr ]
+            , nest 2 (sep [ ppr vars, text "->", pprStgExpr opts expr ])
             , char '}'
             ]
 

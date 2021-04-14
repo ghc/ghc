@@ -28,7 +28,7 @@ module GHC.StgToCmm.Closure (
         -- * LambdaFormInfo
         LambdaFormInfo,         -- Abstract
         StandardFormInfo,        -- ...ditto...
-        mkLFThunk, mkLFReEntrant, mkConLFInfo, mkSelectorLFInfo,
+        mkLFThunk, mkLFReEntrant, mkConLFInfo, mkEnvLFInfo, mkSelectorLFInfo,
         mkApLFInfo, mkLFImported, mkLFArgument, mkLFLetNoEscape,
         mkLFStringLit,
         lfDynTag,
@@ -254,6 +254,10 @@ might_be_a_function ty
 -------------
 mkConLFInfo :: DataCon -> LambdaFormInfo
 mkConLFInfo con = LFCon con
+
+-------------
+mkEnvLFInfo :: LambdaFormInfo
+mkEnvLFInfo = LFUnlifted
 
 -------------
 mkSelectorLFInfo :: Id -> Int -> Bool -> LambdaFormInfo

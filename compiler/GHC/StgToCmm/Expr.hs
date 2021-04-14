@@ -16,6 +16,9 @@ module GHC.StgToCmm.Expr ( cgExpr ) where
 
 import GHC.Prelude hiding ((<*>))
 
+import GHC.Platform
+import GHC.Platform.Profile
+
 import {-# SOURCE #-} GHC.StgToCmm.Bind ( cgBind )
 
 import GHC.StgToCmm.Monad
@@ -46,13 +49,14 @@ import GHC.Core.TyCon
 import GHC.Core.Type        ( isUnliftedType )
 import GHC.Types.RepType    ( isVoidTy, countConRepArgs )
 import GHC.Types.CostCentre ( CostCentreStack, currentCCS )
+import GHC.Types.Var.Set
 import GHC.Data.Maybe
 import GHC.Utils.Misc
 import GHC.Data.FastString
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
-import Control.Monad ( unless, void )
+import Control.Monad ( unless, void, forM )
 import Control.Arrow ( first )
 import Data.List     ( partition )
 
@@ -129,8 +133,18 @@ cgExpr (StgLetNoEscape _ binds expr) =
 cgExpr (StgCase expr bndr alt_type alts) =
   cgCase expr bndr alt_type alts
 
-cgExpr (StgCaseEnv _ _ e) =
-  do { cgExpr e }
+cgExpr (StgCaseEnv env_id fvs e) =
+  do { base_reg <- rebindToReg (NonVoid env_id)
+     ; profile <- getProfile
+     ; let platform = profilePlatform profile
+           (_, _, fvs_w_offsets)
+             = mkVirtHeapOffsets profile StdHeader . addIdReps . nonVoidIds . dVarSetElems $ fvs
+           tag = lfDynTag platform mkEnvLFInfo
+     ; forM fvs_w_offsets $ \(fv_id, off) ->
+         do { fv_reg <- rebindToReg fv_id
+            ; emit $ mkTaggedObjectLoad platform fv_reg base_reg off tag }
+     ; cgExpr e }
+
 
 ------------------------------------------------------------------------
 --              Let no escape

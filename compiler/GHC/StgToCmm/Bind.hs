@@ -22,7 +22,6 @@ import GHC.StgToCmm.Expr
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Env
 import GHC.StgToCmm.DataCon
-import GHC.StgToCmm.FirstClassEnv
 import GHC.StgToCmm.Heap
 import GHC.StgToCmm.Prof (ldvEnterClosure, enterCostCentreFun, enterCostCentreThunk,
                    initUpdFrameProf)
@@ -212,8 +211,8 @@ cgRhs id (StgRhsCon cc con args)
       -- con args are always non-void,
       -- see Note [Post-unarisation invariants] in GHC.Stg.Unarise
 
-cgRhs id (StgRhsEnv vs)
-  = buildFirstClassEnv id (dVarSetElems vs)
+cgRhs id (StgRhsEnv fvs)
+  = buildEnv id (nonVoidIds (dVarSetElems fvs))
 
 {- See Note [GC recovery] in "GHC.StgToCmm.Closure" -}
 cgRhs id (StgRhsClosure fvs cc upd_flag args body)
@@ -221,7 +220,40 @@ cgRhs id (StgRhsClosure fvs cc upd_flag args body)
        mkRhsClosure profile id cc (nonVoidIds (dVarSetElems fvs)) upd_flag args body
 
 ------------------------------------------------------------------------
---              Non-constructor right hand sides
+--              Environment right hand sides
+------------------------------------------------------------------------
+
+buildEnv :: Id -> [NonVoid Id] -> FCode (CgIdInfo, FCode CmmAGraph)
+buildEnv binder args =
+  do { (id_info, reg) <- rhsIdInfo binder lf_info
+     ; return (id_info, gen_code reg) }
+  where
+    lf_info = mkEnvLFInfo
+    gen_code reg
+      = do { profile <- getProfile
+           ; let platform = profilePlatform profile
+                 (tot_wds, ptr_wds, args_w_offsets)
+                   = mkVirtHeapOffsets profile StdHeader (addIdReps args)
+                 non_ptr_wds = tot_wds - ptr_wds
+                 info_tbl = mkEnvInfoTable profile ptr_wds non_ptr_wds
+                 use_cc = cccsExpr
+                 blame_cc = cccsExpr
+           ; emit (mkComment $ mkFastString "calling allocDynClosure")
+           ; hp_plus_n <- allocDynClosure (Just binder) info_tbl lf_info use_cc
+                            blame_cc (map toVarArg args_w_offsets)
+           ; return (mkRhsInit platform reg lf_info hp_plus_n) }
+    mkEnvInfoTable profile ptr_wds non_ptr_wds =
+      CmmInfoTable
+      { cit_lbl  = mkBytesLabel (idName binder)
+      , cit_rep  = mkHeapRep profile False ptr_wds non_ptr_wds IndStatic
+      , cit_prof = NoProfilingInfo
+      , cit_srt  = Nothing
+      , cit_clo  = Nothing }
+
+    toVarArg (NonVoid a, off) = (NonVoid (StgVarArg a), off)
+
+------------------------------------------------------------------------
+--              Closure right hand sides
 ------------------------------------------------------------------------
 
 mkRhsClosure :: Profile -> Id -> CostCentreStack
