@@ -76,7 +76,9 @@ failWithRn doc = do
     errs_var <- fmap sh_if_errs getGblEnv
     errs <- readTcRef errs_var
     -- TODO: maybe associate this with a source location?
-    let msg = mkTcRnDsMessage . Right . TcRnUnknownMessage <$> mkPlainErrorMsgEnvelope noSrcSpan doc
+    let msg = mkPlainErrorMsgEnvelope noSrcSpan $
+              mkTcRnDsMessage $ Right $ TcRnUnknownMessage $
+              mkPlainError doc
     writeTcRef errs_var (msg `addMessage` errs)
     failM
 

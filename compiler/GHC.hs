@@ -913,8 +913,9 @@ checkNewInteractiveDynFlags logger dflags0 = do
   -- the REPL. See #12356.
   if xopt LangExt.StaticPointers dflags0
   then do liftIO $ printOrThrowDiagnostics logger dflags0 $ singleMessage
-            $ fmap (GhcDriverMessage . DriverUnknownMessage)
-            $ mkPlainMsgEnvelope dflags0 Session.WarningWithoutFlag interactiveSrcSpan
+            $ mkPlainMsgEnvelope dflags0 interactiveSrcSpan
+               $ GhcDriverMessage $ DriverUnknownMessage
+               $ mkPlainDiagnostic Session.WarningWithoutFlag
                $ text "StaticPointers is not supported in GHCi interactive expressions."
           return $ xopt_unset dflags0 LangExt.StaticPointers
   else return dflags0
