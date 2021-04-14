@@ -5,7 +5,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
-module GHC.Tc.Gen.Export (tcRnExports, exports_from_avail) where
+module GHC.Tc.Gen.Export (rnExports, exports_from_avail) where
 
 import GHC.Prelude
 
@@ -151,45 +151,47 @@ type ExportOccMap = OccEnv (Name, IE GhcPs)
         --   it came from.  It's illegal to export two distinct things
         --   that have the same occurrence name
 
-tcRnExports :: Bool       -- False => no 'module M(..) where' header at all
+rnExports :: Bool       -- False => no 'module M(..) where' header at all
           -> Maybe (Located [LIE GhcPs]) -- Nothing => no explicit export list
-          -> TcGblEnv
           -> RnM TcGblEnv
 
         -- Complains if two distinct exports have same OccName
         -- Warns about identical exports.
         -- Complains about exports items not in scope
 
-tcRnExports explicit_mod exports
-          tcg_env@TcGblEnv { tcg_mod     = this_mod,
-                              tcg_rdr_env = rdr_env,
-                              tcg_imports = imports,
-                              tcg_src     = hsc_src }
- = unsetWOptM Opt_WarnWarningsDeprecations $
+rnExports explicit_mod exports
+ = checkNoErrs $   -- Fail if anything in rnExports finds
+                   -- an error fails, to avoid error cascade
+   unsetWOptM Opt_WarnWarningsDeprecations $
        -- Do not report deprecations arising from the export
        -- list, to avoid bleating about re-exporting a deprecated
        -- thing (especially via 'module Foo' export item)
-   do   {
-        ; dflags <- getDynFlags
-        ; let is_main_mod = mainModIs dflags == this_mod
-        ; let default_main = case mainFunIs dflags of
-                 Just main_fun
-                     | is_main_mod -> mkUnqual varName (fsLit main_fun)
-                 _                 -> main_RDR_Unqual
+   do   { dflags <- getDynFlags
+        ; tcg_env <- getGblEnv
+        ; let TcGblEnv { tcg_mod     = this_mod
+                       , tcg_rdr_env = rdr_env
+                       , tcg_imports = imports
+                       , tcg_src     = hsc_src } = tcg_env
+              default_main | mainModIs dflags == this_mod
+                           , Just main_fun <- mainFunIs dflags
+                           = mkUnqual varName (fsLit main_fun)
+                           | otherwise
+                           = main_RDR_Unqual
         ; has_main <- (not . null) <$> lookupInfoOccRn default_main -- #17832
+
         -- If a module has no explicit header, and it has one or more main
         -- functions in scope, then add a header like
         -- "module Main(main) where ..."                               #13839
         -- See Note [Modules without a module header]
         ; let real_exports
                  | explicit_mod = exports
-                 | has_main
-                          = Just (noLoc [noLoc (IEVar noExtField
+                 | has_main = Just (noLoc [noLoc (IEVar noExtField
                                      (noLoc (IEName $ noLoc default_main)))])
-                        -- ToDo: the 'noLoc' here is unhelpful if 'main'
-                        --       turns out to be out of scope
+                              -- ToDo: the 'noLoc' here is unhelpful if 'main'
+                              --       turns out to be out of scope
                  | otherwise = Nothing
 
+        -- Rename the export list
         ; let do_it = exports_from_avail real_exports rdr_env imports this_mod
         ; (rn_exports, final_avails)
             <- if hsc_src == HsigFile
@@ -198,19 +200,18 @@ tcRnExports explicit_mod exports
                             Just r  -> return r
                             Nothing -> addMessages msgs >> failM
                 else checkNoErrs do_it
-        ; let final_ns     = availsToNameSetWithSelectors final_avails
+
+        -- Final processing
+        ; let final_ns = availsToNameSetWithSelectors final_avails
 
         ; traceRn "rnExports: Exports:" (ppr final_avails)
 
-        ; let new_tcg_env =
-                  tcg_env { tcg_exports    = final_avails,
-                             tcg_rn_exports = case tcg_rn_exports tcg_env of
+        ; return (tcg_env { tcg_exports    = final_avails
+                          , tcg_rn_exports = case tcg_rn_exports tcg_env of
                                                 Nothing -> Nothing
-                                                Just _  -> rn_exports,
-                            tcg_dus = tcg_dus tcg_env `plusDU`
-                                      usesOnly final_ns }
-        ; failIfErrsM
-        ; return new_tcg_env }
+                                                Just _  -> rn_exports
+                          , tcg_dus = tcg_dus tcg_env `plusDU`
+                                      usesOnly final_ns }) }
 
 exports_from_avail :: Maybe (Located [LIE GhcPs])
                          -- ^ 'Nothing' means no explicit export list
@@ -616,7 +617,7 @@ checkPatSynParent parent NoParent mpat_syn
   = return ()
 
   | otherwise
-  = do { parent_ty_con <- tcLookupTyCon parent
+  = do { parent_ty_con  <- tcLookupTyCon parent
        ; mpat_syn_thing <- tcLookupGlobal mpat_syn
 
         -- 1. Check that the Id was actually from a thing associated with patsyns
@@ -806,7 +807,7 @@ dcErrMsg ty_con what_is thing parents =
                 <+> text "is not the parent of the" <+> text what_is
                 <+> quotes thing <> char '.'
                 $$ text (capitalise what_is)
-                <> text "s can only be exported with their parent type constructor."
+                   <> text "s can only be exported with their parent type constructor."
                 $$ (case parents of
                       [] -> empty
                       [_] -> text "Parent:"
@@ -815,13 +816,13 @@ dcErrMsg ty_con what_is thing parents =
 failWithDcErr :: Name -> Name -> SDoc -> [Name] -> TcM a
 failWithDcErr parent thing thing_doc parents = do
   ty_thing <- tcLookupGlobal thing
-  failWithTc $ dcErrMsg parent (tyThingCategory' ty_thing)
+  failWithTc $ dcErrMsg parent (pp_category ty_thing)
                         thing_doc (map ppr parents)
   where
-    tyThingCategory' :: TyThing -> String
-    tyThingCategory' (AnId i)
+    pp_category :: TyThing -> String
+    pp_category (AnId i)
       | isRecordSelector i = "record selector"
-    tyThingCategory' i = tyThingCategory i
+    pp_category i = tyThingCategory i
 
 
 exportClashErr :: GlobalRdrEnv -> OccName
