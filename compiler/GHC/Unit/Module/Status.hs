@@ -1,5 +1,5 @@
 module GHC.Unit.Module.Status
-   ( HscStatus (..)
+   ( HscStatus (..), HscRecompStatus (..)
    )
 where
 
@@ -12,12 +12,16 @@ import GHC.Unit.Module.ModDetails
 
 import GHC.Utils.Fingerprint
 
--- | Status of a module compilation to machine code
-data HscStatus
+data HscRecompStatus
     -- | Nothing to do because code already exists.
     = HscUpToDate ModIface ModDetails
+    -- | Recompile this module.
+    | HscRecompNeeded (Maybe Fingerprint)
+
+-- | Status of a module compilation to machine code
+data HscStatus
     -- | Update boot file result.
-    | HscUpdate ModIface ModDetails
+    = HscUpdate ModIface ModDetails
     -- | Recompile this module.
     | HscRecomp
         { hscs_guts           :: CgGuts

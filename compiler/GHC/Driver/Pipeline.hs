@@ -211,27 +211,12 @@ compileOne' m_tc_result mHscMessage
 
    plugin_hsc_env <- initializePlugins hsc_env
 
-   -- Run the pipeline up to codeGen (so everything up to, but not including, STG)
-   status <- case m_tc_result of
-     Just tc_result
-       | not always_do_basic_recompilation_check -> runHsc plugin_hsc_env $
-         hscDesugarSimplify summary tc_result Nothing
-     _ -> hscIncrementalCompile mHscMessage plugin_hsc_env summary
-            source_modified mb_old_iface (mod_index, nmods)
-
-   -- Use an HscEnv updated with the plugin info
-   let hsc_env' = plugin_hsc_env
-
-   case status of
-        HscUpToDate iface hmi_details ->
-            ASSERT( isJust mb_old_linkable || isNoLink (ghcLink dflags) )
-            return $! HomeModInfo iface hmi_details mb_old_linkable
-        _ -> do
+   let runBackend status = do
             output_fn <- getOutputFilename logger tmpfs next_phase
                             (Temporary TFL_CurrentModule)
                             basename dflags next_phase (Just location)
             -- We're in --make mode: finish the compilation pipeline.
-            (_, _, Just (HomeModInfo iface details mb_linkable)) <- runPipeline StopLn hsc_env'
+            (_, _, Just (HomeModInfo iface details mb_linkable)) <- runPipeline StopLn plugin_hsc_env
                               (output_fn,
                                Nothing,
                                Just (HscOut src_flavour mod_name summary status))
@@ -250,6 +235,28 @@ compileOne' m_tc_result mHscMessage
                   return $ Just linkable
                 | otherwise -> return Nothing
             return $! HomeModInfo iface details mLinkable
+
+   case m_tc_result of
+     Just tc_result
+       | not always_do_basic_recompilation_check -> do
+         status <- runHsc plugin_hsc_env $
+           hscDesugarSimplify summary tc_result Nothing
+         runBackend status
+     _ -> do
+       recomp_result <- hscRecompStatus mHscMessage plugin_hsc_env summary
+         source_modified mb_old_iface (mod_index, nmods)
+       case recomp_result of
+         HscUpToDate iface hmi_details ->
+           ASSERT( isJust mb_old_linkable || isNoLink (ghcLink dflags) )
+           return $! HomeModInfo iface hmi_details mb_old_linkable
+         HscRecompNeeded mb_hash -> do
+           status <- runHsc plugin_hsc_env $ do
+             FrontendTypecheck tc_result <- case hscFrontendHook (hsc_hooks hsc_env) of
+               Nothing -> FrontendTypecheck . fst <$> hsc_typecheck False summary Nothing
+               Just h  -> h summary
+             hscDesugarSimplify summary tc_result mb_hash
+           runBackend status
+
 
  where dflags0     = ms_hspp_opts summary
        this_mod    = ms_mod summary
@@ -1271,25 +1278,44 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
   -- run the compiler!
         let msg hsc_env _ what _ = oneShotMsg hsc_env what
         plugin_hsc_env' <- liftIO $ initializePlugins hsc_env'
+        logger <- getLogger
 
         -- One-shot mode needs a knot-tying mutable variable for interface
         -- files. See GHC.Tc.Utils.TcGblEnv.tcg_type_env_var.
         -- See also Note [hsc_type_env_var hack]
         type_env_var <- liftIO $ newIORef emptyNameEnv
         let plugin_hsc_env = plugin_hsc_env' { hsc_type_env_var = Just (mod, type_env_var) }
+            write_obj = case backend dflags of
+                            NoBackend    -> False
+                            Interpreter  -> False
+                            _            -> True
 
-        result <-
-          liftIO $ hscIncrementalCompile (Just msg) plugin_hsc_env
-                            mod_summary source_unchanged Nothing (1,1)
+        recomp_result <- liftIO $ hscRecompStatus (Just msg) plugin_hsc_env mod_summary
+            source_unchanged Nothing (1, 1)
+        case recomp_result of
+            HscUpToDate iface mod_details ->
+                do when write_obj $ liftIO $ touchObjectFile logger dflags o_file
+                   -- The .o file must have a later modification date
+                   -- than the source file (else we wouldn't get Nothing)
+                   -- but we touch it anyway, to keep 'make' happy (we think).
+                   setHomeModInfo $! HomeModInfo iface mod_details Nothing
+                   return (RealPhase StopLn, o_file)
 
-        -- In the rest of the pipeline use the loaded plugins
-        setPlugins (hsc_plugins        plugin_hsc_env)
-                   (hsc_static_plugins plugin_hsc_env)
-        -- "driver" plugins may have modified the DynFlags so we update them
-        setDynFlags (hsc_dflags plugin_hsc_env)
+            HscRecompNeeded mb_hash -> do
+              result <- liftIO $ runHsc plugin_hsc_env $ do
+                  FrontendTypecheck tc_result <- case hscFrontendHook (hsc_hooks plugin_hsc_env) of
+                      Nothing -> FrontendTypecheck . fst <$> hsc_typecheck False mod_summary Nothing
+                      Just h  -> h mod_summary
+                  hscDesugarSimplify mod_summary tc_result mb_hash
 
-        return (HscOut src_flavour mod_name mod_summary result,
-                panic "HscOut doesn't have an input filename")
+              -- In the rest of the pipeline use the loaded plugins
+              setPlugins (hsc_plugins        plugin_hsc_env)
+                         (hsc_static_plugins plugin_hsc_env)
+              -- "driver" plugins may have modified the DynFlags so we update them
+              setDynFlags (hsc_dflags plugin_hsc_env)
+
+              return (HscOut src_flavour mod_name mod_summary result,
+                      panic "HscOut doesn't have an input filename")
 
 runPhase (HscOut src_flavour mod_name mod_summary result) _ = do
         dflags <- getDynFlags
@@ -1305,13 +1331,6 @@ runPhase (HscOut src_flavour mod_name mod_summary result) _ = do
                             _            -> True
 
         case result of
-            HscUpToDate iface mod_details ->
-                do when write_obj $ liftIO $ touchObjectFile logger dflags o_file
-                   -- The .o file must have a later modification date
-                   -- than the source file (else we wouldn't get Nothing)
-                   -- but we touch it anyway, to keep 'make' happy (we think).
-                   setHomeModInfo $! HomeModInfo iface mod_details Nothing
-                   return (RealPhase StopLn, o_file)
             HscUpdate iface mod_details ->
                 do
                    when write_obj $ case src_flavour of
