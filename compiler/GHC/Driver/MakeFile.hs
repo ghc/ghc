@@ -306,8 +306,9 @@ findDependency hsc_env srcloc pkg imp is_boot include_pkg_deps = do
         -> return Nothing
 
     fail ->
-        throwOneError $ fmap (GhcDriverMessage . DriverUnknownMessage) $
+        throwOneError $
           mkPlainErrorMsgEnvelope srcloc $
+          GhcDriverMessage $ DriverUnknownMessage $ mkPlainError $
              cannotFindModule hsc_env imp fail
 
 -----------------------------
@@ -456,4 +457,3 @@ pprCycle summaries = pp_group (CyclicSCC summaries)
 depStartMarker, depEndMarker :: String
 depStartMarker = "# DO NOT DELETE: Beginning of Haskell dependencies"
 depEndMarker   = "# DO NOT DELETE: End of Haskell dependencies"
-

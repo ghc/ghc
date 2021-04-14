@@ -319,8 +319,10 @@ warnMissingHomeModules hsc_env mod_graph =
           (text "Modules are not listed in command line but needed for compilation: ")
           4
           (sep (map ppr missing))
-    warn = singleMessage $ fmap (GhcDriverMessage . DriverUnknownMessage) $
-      mkPlainMsgEnvelope (hsc_dflags hsc_env) (WarningWithFlag Opt_WarnMissingHomeModules) noSrcSpan msg
+    warn = singleMessage $
+      mkPlainMsgEnvelope (hsc_dflags hsc_env) noSrcSpan $
+      GhcDriverMessage $ DriverUnknownMessage $
+      mkPlainDiagnostic (WarningWithFlag Opt_WarnMissingHomeModules) msg
 
 -- | Describes which modules of the module graph need to be loaded.
 data LoadHowMuch
@@ -385,8 +387,10 @@ warnUnusedPackages = do
           = filter (\arg -> not $ any (matching state arg) loadedPackages)
                    requestedArgs
 
-    let warn = singleMessage $ fmap (GhcDriverMessage . DriverUnknownMessage) $
-          mkPlainMsgEnvelope dflags (WarningWithFlag Opt_WarnUnusedPackages) noSrcSpan msg
+    let warn = singleMessage $
+          mkPlainMsgEnvelope dflags noSrcSpan $
+          GhcDriverMessage $ DriverUnknownMessage $
+          mkPlainDiagnostic (WarningWithFlag Opt_WarnUnusedPackages) msg
         msg = vcat [ text "The following packages were specified" <+>
                      text "via -package or -package-id flags,"
                    , text "but were not needed for compilation:"
@@ -2222,10 +2226,11 @@ warnUnnecessarySourceImports sccs = do
                              unLoc i `notElem`  mods_in_this_cycle ]
 
         warn :: DynFlags -> Located ModuleName -> MsgEnvelope GhcMessage
-        warn dflags (L loc mod) = fmap (GhcDriverMessage . DriverUnknownMessage) $
-           mkPlainMsgEnvelope dflags WarningWithoutFlag loc
-                (text "{-# SOURCE #-} unnecessary in import of "
-                 <+> quotes (ppr mod))
+        warn dflags (L loc mod) =
+           mkPlainMsgEnvelope dflags loc $
+           GhcDriverMessage $ DriverUnknownMessage $
+           mkPlainDiagnostic WarningWithoutFlag $
+           text "{-# SOURCE #-} unnecessary in import of " <+> quotes (ppr mod)
 
 
 -----------------------------------------------------------------------------
@@ -2296,8 +2301,9 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
                 if exists || isJust maybe_buf
                     then summariseFile hsc_env old_summaries file mb_phase
                                        obj_allowed maybe_buf
-                    else return $ Left $ singleMessage $ fmap (GhcDriverMessage . DriverUnknownMessage) $
+                    else return $ Left $ singleMessage $
                            mkPlainErrorMsgEnvelope noSrcSpan $
+                           GhcDriverMessage $ DriverUnknownMessage $ mkPlainError $
                              text "can't find file:" <+> text file
         getRootSummary Target { targetId = TargetModule modl
                               , targetAllowObjCode = obj_allowed
@@ -2732,8 +2738,9 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
               | otherwise = HsSrcFile
 
         when (pi_mod_name /= wanted_mod) $
-                throwE $ singleMessage $ fmap (GhcDriverMessage . DriverUnknownMessage) $
+                throwE $ singleMessage $
                   mkPlainErrorMsgEnvelope pi_mod_name_loc $
+                  GhcDriverMessage $ DriverUnknownMessage $ mkPlainError $
                               text "File name does not match module name:"
                               $$ text "Saw:" <+> quotes (ppr pi_mod_name)
                               $$ text "Expected:" <+> quotes (ppr wanted_mod)
@@ -2745,8 +2752,9 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
                         | (k,v) <- ((pi_mod_name, mkHoleModule pi_mod_name)
                                 : homeUnitInstantiations home_unit)
                         ])
-            in throwE $ singleMessage $ fmap (GhcDriverMessage . DriverUnknownMessage) $
+            in throwE $ singleMessage $
                 mkPlainErrorMsgEnvelope pi_mod_name_loc $
+                GhcDriverMessage $ DriverUnknownMessage $ mkPlainError $
                 text "Unexpected signature:" <+> quotes (ppr pi_mod_name)
                 $$ if gopt Opt_BuildingCabalPackage dflags
                     then parens (text "Try adding" <+> quotes (ppr pi_mod_name)
@@ -2906,25 +2914,27 @@ withDeferredDiagnostics f = do
 noModError :: HscEnv -> SrcSpan -> ModuleName -> FindResult -> MsgEnvelope GhcMessage
 -- ToDo: we don't have a proper line number for this error
 noModError hsc_env loc wanted_mod err
-  = fmap (GhcDriverMessage . DriverUnknownMessage) $
-    mkPlainErrorMsgEnvelope loc $ cannotFindModule hsc_env wanted_mod err
+  = mkPlainErrorMsgEnvelope loc $ GhcDriverMessage $ DriverUnknownMessage $ mkPlainError $
+    cannotFindModule hsc_env wanted_mod err
 
 noHsFileErr :: SrcSpan -> String -> ErrorMessages
 noHsFileErr loc path
-  = fmap (GhcDriverMessage . DriverUnknownMessage) $
-    singleMessage $ mkPlainErrorMsgEnvelope loc $ text "Can't find" <+> text path
+  = singleMessage $ mkPlainErrorMsgEnvelope loc $
+    GhcDriverMessage $ DriverUnknownMessage $ mkPlainError $
+    text "Can't find" <+> text path
 
 moduleNotFoundErr :: ModuleName -> ErrorMessages
 moduleNotFoundErr mod
-  = fmap (GhcDriverMessage . DriverUnknownMessage) $
-    singleMessage $ mkPlainErrorMsgEnvelope noSrcSpan $
+  = singleMessage $ mkPlainErrorMsgEnvelope noSrcSpan $
+    GhcDriverMessage $ DriverUnknownMessage $ mkPlainError $
         text "module" <+> quotes (ppr mod) <+> text "cannot be found locally"
 
 multiRootsErr :: [ModSummary] -> IO ()
 multiRootsErr [] = panic "multiRootsErr"
 multiRootsErr summs@(summ1:_)
-  = throwOneError $ fmap (GhcDriverMessage . DriverUnknownMessage) $
+  = throwOneError $
       mkPlainErrorMsgEnvelope noSrcSpan $
+      GhcDriverMessage $ DriverUnknownMessage $ mkPlainError $
         text "module" <+> quotes (ppr mod) <+>
         text "is defined in multiple files:" <+>
         sep (map text files)

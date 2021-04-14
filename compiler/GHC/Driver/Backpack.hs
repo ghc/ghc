@@ -810,8 +810,8 @@ summariseDecl _pn hsc_src lmodname@(L loc modname) Nothing
                          Nothing -- GHC API buffer support not supported
                          [] -- No exclusions
          case r of
-            Nothing -> throwOneError $ fmap (GhcPsMessage . PsUnknownMessage)
-                                     $ mkPlainErrorMsgEnvelope loc
+            Nothing -> throwOneError $ mkPlainErrorMsgEnvelope loc $
+                                       GhcPsMessage $ PsUnknownMessage $ mkPlainError $
                                        (text "module" <+> ppr modname <+> text "was not found")
             Just (Left err) -> throwErrors err
             Just (Right summary) -> return summary

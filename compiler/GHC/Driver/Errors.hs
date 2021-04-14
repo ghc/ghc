@@ -32,10 +32,13 @@ handleFlagWarnings :: Logger -> DynFlags -> [CmdLine.Warn] -> IO ()
 handleFlagWarnings logger dflags warns = do
   let -- It would be nicer if warns :: [Located SDoc], but that
       -- has circular import problems.
-      bag = listToBag [ mkPlainMsgEnvelope dflags reason loc (text warn)
+      bag = listToBag [ mkPlainMsgEnvelope dflags loc $
+                        ghcUnknownMessage $
+                        mkPlainDiagnostic reason $
+                        text warn
                       | CmdLine.Warn reason (L loc warn) <- warns ]
 
-  printOrThrowDiagnostics logger dflags (ghcUnknownMessage <$> mkMessages bag)
+  printOrThrowDiagnostics logger dflags (mkMessages bag)
 
 -- | Given a bag of diagnostics, turn them into an exception if
 -- any has 'SevError', or print them out otherwise.

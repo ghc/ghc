@@ -1033,10 +1033,10 @@ mkLongErrAt :: SrcSpan -> SDoc -> SDoc -> TcRn (MsgEnvelope TcRnMessage)
 mkLongErrAt loc msg extra
   = do { printer <- getPrintUnqualified ;
          unit_state <- hsc_units <$> getTopEnv ;
-         dflags <- getDynFlags ;
          let msg' = pprWithUnitState unit_state msg in
-         return $ fmap TcRnUnknownMessage
-                $ mkLongMsgEnvelope dflags ErrorWithoutFlag loc printer msg' extra }
+         return $ mkErrorMsgEnvelope loc printer
+                $ TcRnUnknownMessage
+                $ mkDecoratedError [msg', extra] }
 
 mkDecoratedSDocAt :: DiagnosticReason
                   -> SrcSpan
@@ -1051,11 +1051,11 @@ mkDecoratedSDocAt reason loc important context extra
   = do { printer <- getPrintUnqualified ;
          unit_state <- hsc_units <$> getTopEnv ;
          dflags <- getDynFlags ;
-         let f = pprWithUnitState unit_state
-             errDoc  = [important, context, extra]
-             errDoc' = DiagnosticMessage (mkDecorated $ map f errDoc) reason
+         let errDocs  = map (pprWithUnitState unit_state)
+                            [important, context, extra]
          in
-         return $ mkMsgEnvelope dflags loc printer errDoc' }
+         return $ mkMsgEnvelope dflags loc printer
+                $ mkDecoratedDiagnostic reason errDocs }
 
 addLongErrAt :: SrcSpan -> SDoc -> SDoc -> TcRn ()
 addLongErrAt loc msg extra = mkLongErrAt loc msg extra >>= reportDiagnostic
@@ -1561,10 +1561,10 @@ add_diagnostic_at :: DiagnosticReason -> SrcSpan -> SDoc -> SDoc -> TcRn ()
 add_diagnostic_at reason loc msg extra_info
   = do { printer <- getPrintUnqualified ;
          dflags  <- getDynFlags ;
-         let { dia = mkLongMsgEnvelope dflags reason
-                                       loc printer
-                                       msg extra_info } ;
-         reportDiagnostic (TcRnUnknownMessage <$> dia) }
+         let { dia = mkMsgEnvelope dflags loc printer $
+                     TcRnUnknownMessage $
+                     mkDecoratedDiagnostic reason [msg, extra_info] } ;
+         reportDiagnostic dia }
 
 
 {-
