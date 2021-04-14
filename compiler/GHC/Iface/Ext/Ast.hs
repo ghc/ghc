@@ -37,7 +37,6 @@ import GHC.Core.ConLike           ( conLikeName, ConLike(RealDataCon) )
 import GHC.Core.TyCon             ( TyCon, tyConClass_maybe )
 import GHC.Core.FVs
 import GHC.Core.DataCon           ( dataConNonlinearType )
-import GHC.HsToCore               ( deSugarExpr )
 import GHC.Types.FieldLabel
 import GHC.Hs
 import GHC.Driver.Env
@@ -78,6 +77,9 @@ import Control.Monad              ( forM_ )
 import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class  ( lift )
+import GHC.HsToCore.Types
+import GHC.HsToCore.Expr
+import GHC.HsToCore.Monad
 
 {- Note [Updating HieAst for changes in the GHC AST]
 
@@ -278,7 +280,7 @@ modifyState = foldr go id
       = addSubstitution mono poly . f
     go _ f = f
 
-type HieM = ReaderT NodeOrigin (StateT HieState Hsc)
+type HieM = ReaderT NodeOrigin (StateT HieState DsM)
 
 -- | Construct an 'HieFile' from the outputs of the typechecker.
 mkHieFile :: ModSummary
@@ -301,7 +303,9 @@ mkHieFileWithSource src_file src ms ts rs = do
       top_ev_binds = tcg_ev_binds ts
       insts = tcg_insts ts
       tcs = tcg_tcs ts
-  (asts', arr) <- getCompressedAsts tc_binds rs top_ev_binds insts tcs
+  hsc_env <- Hsc $ \e w -> return (e, w)
+  (_msgs, res) <- liftIO $ initDs hsc_env ts $ getCompressedAsts tc_binds rs top_ev_binds insts tcs
+  let (asts',arr) = expectJust "mkHieFileWithSource" res
   return $ HieFile
       { hie_hs_file = src_file
       , hie_module = ms_mod ms
@@ -313,13 +317,13 @@ mkHieFileWithSource src_file src ms ts rs = do
       }
 
 getCompressedAsts :: TypecheckedSource -> RenamedSource -> Bag EvBind -> [ClsInst] -> [TyCon]
-  -> Hsc (HieASTs TypeIndex, A.Array TypeIndex HieTypeFlat)
+  -> DsM (HieASTs TypeIndex, A.Array TypeIndex HieTypeFlat)
 getCompressedAsts ts rs top_ev_binds insts tcs = do
   asts <- enrichHie ts rs top_ev_binds insts tcs
   return $ compressTypes asts
 
 enrichHie :: TypecheckedSource -> RenamedSource -> Bag EvBind -> [ClsInst] -> [TyCon]
-  -> Hsc (HieASTs Type)
+  -> DsM (HieASTs Type)
 enrichHie ts (hsGrp, imports, exports, _) ev_bs insts tcs =
   flip evalStateT initState $ flip runReaderT SourceInfo $ do
     tasts <- toHie $ fmap (BC RegularBind ModuleScope) ts
@@ -753,9 +757,10 @@ instance HiePass p => HasType (LocatedA (HsExpr (GhcPass p))) where
           Nothing
             | skipDesugaring e' -> fallback
             | otherwise -> do
-                hs_env <- lift $ lift $ Hsc $ \e w -> return (e,w)
-                (_,mbe) <- liftIO $ deSugarExpr hs_env e
-                maybe fallback (makeTypeNodeA e' spn . exprType) mbe
+                (e, no_errs) <- lift $ lift $ discardWarningsDs $ askNoErrsDs $ dsLExpr e
+                if no_errs
+                  then makeTypeNodeA e' spn . exprType $ e
+                  else fallback
         where
           fallback = makeNodeA e' spn
 
