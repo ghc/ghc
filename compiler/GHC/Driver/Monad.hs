@@ -36,7 +36,7 @@ import GHC.Prelude
 
 import GHC.Driver.Session
 import GHC.Driver.Env
-import GHC.Driver.Errors ( printOrThrowDiagnostics, printBagOfErrors )
+import GHC.Driver.Errors ( printOrThrowDiagnostics, printMessages )
 import GHC.Driver.Errors.Types
 
 import GHC.Utils.Monad
@@ -44,7 +44,6 @@ import GHC.Utils.Exception
 import GHC.Utils.Error
 import GHC.Utils.Logger
 
-import GHC.Types.Error
 import GHC.Types.SrcLoc
 import GHC.Types.SourceError
 
@@ -248,7 +247,7 @@ printException :: GhcMonad m => SourceError -> m ()
 printException err = do
   dflags <- getSessionDynFlags
   logger <- getLogger
-  liftIO $ printBagOfErrors logger dflags (getMessages $ srcErrorMessages err)
+  liftIO $ printMessages logger dflags (srcErrorMessages err)
 
 -- | A function called to log warnings and errors.
 type WarnErrLogger = forall m. GhcMonad m => Maybe SourceError -> m ()

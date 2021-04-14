@@ -1420,7 +1420,7 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_logger lcl_tmpfs lcl_dflags
         hsc_env <- readMVar hsc_env_var
         old_hpt <- readIORef old_hpt_var
 
-        let logg err = printBagOfErrors lcl_logger lcl_dflags (getMessages $ srcErrorMessages err)
+        let logg err = printMessages lcl_logger lcl_dflags (srcErrorMessages err)
 
         -- Limit the number of parallel compiles.
         let withSem sem = MC.bracket_ (waitQSem sem) (signalQSem sem)
