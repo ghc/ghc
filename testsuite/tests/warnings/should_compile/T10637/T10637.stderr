@@ -1,3 +1,3 @@
 
-T10637.hs:3:23: warning:
+T10637.hs:3:23: warning: [-Wunused-imports (in -Wextra)]
     {-# SOURCE #-} unnecessary in import of  ‘A’

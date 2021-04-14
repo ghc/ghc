@@ -307,10 +307,10 @@ import GHC.Driver.Phases   ( Phase(..), isHaskellSrcFilename
                            , isSourceFilename, startPhase )
 import GHC.Driver.Env
 import GHC.Driver.Errors
+import GHC.Driver.Errors.Ppr
 import GHC.Driver.Errors.Types
 import GHC.Driver.CmdLine
 import GHC.Driver.Session
-import qualified GHC.Driver.Session as Session
 import GHC.Driver.Backend
 import GHC.Driver.Config
 import GHC.Driver.Main
@@ -913,9 +913,7 @@ checkNewInteractiveDynFlags logger dflags0 = do
   -- the REPL. See #12356.
   if xopt LangExt.StaticPointers dflags0
   then do liftIO $ printOrThrowDiagnostics logger dflags0 $ singleMessage
-            $ fmap (GhcDriverMessage . DriverUnknownMessage)
-            $ mkPlainMsgEnvelope dflags0 Session.WarningWithoutFlag interactiveSrcSpan
-               $ text "StaticPointers is not supported in GHCi interactive expressions."
+            $ ghcDriverMessage dflags0 interactiveSrcSpan DriverStaticPointersNotSupported
           return $ xopt_unset dflags0 LangExt.StaticPointers
   else return dflags0
 
