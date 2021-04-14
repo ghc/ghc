@@ -23,13 +23,19 @@ module GHC.Types.Error
    , Diagnostic (..)
    , DiagnosticMessage (..)
    , DiagnosticReason (..)
+   , mkDiagnosticMessage
+   , mkPlainDiagnostic
+   , mkPlainError
+   , mkDecoratedDiagnostic
+   , mkDecoratedError
 
     -- * Rendering Messages
 
    , SDoc
    , DecoratedSDoc (unDecorated)
+   , mkDecorated, mkSimpleDecorated
+
    , pprMessageBag
-   , mkDecorated
    , mkLocMessage
    , mkLocMessageAnn
    , getCaretDiagnostic
@@ -134,6 +140,10 @@ newtype DecoratedSDoc = Decorated { unDecorated :: [SDoc] }
 mkDecorated :: [SDoc] -> DecoratedSDoc
 mkDecorated = Decorated
 
+-- | Creates a new 'DecoratedSDoc' out of a single 'SDoc'
+mkSimpleDecorated :: SDoc -> DecoratedSDoc
+mkSimpleDecorated doc = Decorated [doc]
+
 {-
 Note [Rendering Messages]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -188,6 +198,25 @@ data DiagnosticMessage = DiagnosticMessage
 instance Diagnostic DiagnosticMessage where
   diagnosticMessage = diagMessage
   diagnosticReason  = diagReason
+
+-- | Create a 'DiagnosticMessage' with a 'DiagnosticReason'
+mkDiagnosticMessage :: DecoratedSDoc -> DiagnosticReason -> DiagnosticMessage
+mkDiagnosticMessage = DiagnosticMessage
+
+mkPlainDiagnostic :: DiagnosticReason -> SDoc -> DiagnosticMessage
+mkPlainDiagnostic rea doc = DiagnosticMessage (mkSimpleDecorated doc) rea
+
+-- | Create an error 'DiagnosticMessage' holding just a single 'SDoc'
+mkPlainError :: SDoc -> DiagnosticMessage
+mkPlainError doc = DiagnosticMessage (mkSimpleDecorated doc) ErrorWithoutFlag
+
+-- | Create a 'DiagnosticMessage' from a list of bulleted SDocs and a 'DiagnosticReason'
+mkDecoratedDiagnostic :: DiagnosticReason -> [SDoc] -> DiagnosticMessage
+mkDecoratedDiagnostic rea docs = DiagnosticMessage (mkDecorated docs) rea
+
+-- | Create an error 'DiagnosticMessage' from a list of bulleted SDocs
+mkDecoratedError :: [SDoc] -> DiagnosticMessage
+mkDecoratedError docs = DiagnosticMessage (mkDecorated docs) ErrorWithoutFlag
 
 -- | The reason /why/ a 'Diagnostic' was emitted in the first place. Diagnostic messages
 -- are born within GHC with a very precise reason, which can be completely statically-computed
