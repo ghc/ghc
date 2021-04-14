@@ -1726,8 +1726,7 @@ mkModuleNameProvidersMap ctx cfg pkg_map closure vis_map =
           case exposedReexport of
            Nothing -> (pk, m, fromExposedModules e)
            Just (Module pk' m') ->
-            let pkg' = unit_lookup pk'
-            in (pk', m', fromReexportedModules e pkg')
+              (pk', m', fromReexportedModules e pkg)
      return (m, mkModMap pk' m' origin')
 
     esmap :: UniqFM ModuleName (Map Module ModuleOrigin)
