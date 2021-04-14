@@ -64,6 +64,9 @@ infix  4 `elem`, `notElem`
 -- 1
 -- >>> head []
 -- *** Exception: Prelude.head: empty list
+--
+-- WARNING: This function is partial. You can use case-matching, 'uncons' or
+-- 'listToMaybe' instead.
 head                    :: [a] -> a
 head (x:_)              =  x
 head []                 =  badHead
@@ -108,6 +111,9 @@ uncons (x:xs)           = Just (x, xs)
 -- []
 -- >>> tail []
 -- *** Exception: Prelude.tail: empty list
+--
+-- WARNING: This function is partial. You can use case-matching or 'uncons'
+-- instead.
 tail                    :: [a] -> [a]
 tail (_:xs)             =  xs
 tail []                 =  errorEmptyList "tail"
@@ -121,6 +127,9 @@ tail []                 =  errorEmptyList "tail"
 -- * Hangs forever *
 -- >>> last []
 -- *** Exception: Prelude.last: empty list
+--
+-- WARNING: This function is partial. You can use 'reverse' with case-matching,
+-- 'uncons' or 'listToMaybe' instead.
 last                    :: [a] -> a
 #if defined(USE_REPORT_PRELUDE)
 last [x]                =  x
@@ -147,6 +156,9 @@ lastError = errorEmptyList "last"
 -- []
 -- >>> init []
 -- *** Exception: Prelude.init: empty list
+--
+-- WARNING: This function is partial. You can use 'reverse' with case-matching
+-- or 'uncons' instead.
 init                    :: [a] -> [a]
 #if defined(USE_REPORT_PRELUDE)
 init [x]                =  []
@@ -1296,6 +1308,10 @@ concat = foldr (++) []
 -- *** Exception: Prelude.!!: index too large
 -- >>> ['a', 'b', 'c'] !! (-1)
 -- *** Exception: Prelude.!!: negative index
+--
+-- WARNING: This function is partial. You can use <'atMay'
+-- https://hackage.haskell.org/package/safe-0.3.19/docs/Safe.html#v:atMay>
+-- instead.
 (!!)                    :: [a] -> Int -> a
 #if defined(USE_REPORT_PRELUDE)
 xs     !! n | n < 0 =  errorWithoutStackTrace "Prelude.!!: negative index"
