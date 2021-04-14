@@ -20,7 +20,7 @@ module GHC.Utils.Error (
         SDoc,
         DecoratedSDoc(unDecorated),
         Messages,
-        unionMessages,
+        mkMessages, unionMessages,
         errorsFound, isEmptyMessages,
 
         -- ** Formatting
