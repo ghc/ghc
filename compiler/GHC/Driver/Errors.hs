@@ -2,6 +2,7 @@ module GHC.Driver.Errors (
     printOrThrowDiagnostics
   , printMessages
   , handleFlagWarnings
+  , mkDriverPsHeaderMessage
   ) where
 
 import GHC.Driver.Session
@@ -9,9 +10,11 @@ import GHC.Driver.Errors.Types
 import GHC.Data.Bag
 import GHC.Utils.Error ( formatBulleted, sortMsgBag, mkPlainMsgEnvelope )
 import GHC.Prelude
+import GHC.Parser.Errors ( PsError(..) )
 import GHC.Types.SrcLoc
 import GHC.Types.SourceError
 import GHC.Types.Error
+import GHC.Utils.Error
 import GHC.Utils.Outputable ( text, withPprStyle, mkErrStyle )
 import GHC.Utils.Logger
 import qualified GHC.Driver.CmdLine as CmdLine
@@ -48,3 +51,11 @@ printOrThrowDiagnostics logger dflags msgs
   = throwErrors msgs
   | otherwise
   = printMessages logger dflags msgs
+
+-- | Convert a 'PsError' into a wrapped 'DriverMessage'
+-- Defined here to avoid module loops between GHC.Driver.Error.Types and
+-- GHC.Driver.Error.Ppr
+mkDriverPsHeaderMessage :: PsError -> MsgEnvelope DriverMessage
+mkDriverPsHeaderMessage ps_err
+  = mkPlainErrorMsgEnvelope (errLoc ps_err) $
+    DriverPsHeaderMessage (errDesc ps_err) (errHints ps_err)
