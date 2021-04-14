@@ -57,15 +57,13 @@ import GHC.Types.Unique ( hasKey )
 import GHC.Types.Basic
 import GHC.Types.Tickish
 import GHC.Types.Var    ( isTyCoVar )
-
 import GHC.Builtin.PrimOps ( PrimOp (SeqOp) )
 import GHC.Builtin.Types.Prim( realWorldStatePrimTy )
 import GHC.Builtin.Names( runRWKey )
 
-import GHC.Data.Maybe   ( orElse )
+import GHC.Data.Maybe   ( isNothing, orElse )
 import GHC.Data.FastString
 import GHC.Unit.Module ( moduleName, pprModuleName )
-
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
@@ -3428,7 +3426,8 @@ mkDupableContWithDmds env _
     (StrictArg { sc_fun = fun, sc_cont = cont
                , sc_fun_ty = fun_ty })
   -- NB: sc_dup /= OkToDup; that is caught earlier by contIsDupable
-  | thumbsUpPlanA cont
+  | isNothing (isDataConId_maybe (ai_fun fun))
+  , thumbsUpPlanA cont
   = -- Use Plan A of Note [Duplicating StrictArg]
     do { let (_ : dmds) = ai_dmds fun
        ; (floats1, cont')  <- mkDupableContWithDmds env dmds cont
@@ -3537,7 +3536,8 @@ mkDupableContWithDmds env _
 mkDupableStrictBind :: SimplEnv -> OutId -> OutExpr -> OutType
                     -> SimplM (SimplFloats, SimplCont)
 mkDupableStrictBind env arg_bndr join_rhs res_ty
-  | exprIsDupable (targetPlatform (seDynFlags env)) join_rhs
+--  | exprIsDupable (targetPlatform (seDynFlags env)) join_rhs
+  | exprIsTrivial join_rhs
   = return (emptyFloats env
            , StrictBind { sc_bndr = arg_bndr, sc_bndrs = []
                         , sc_body = join_rhs
@@ -3564,8 +3564,9 @@ mkDupableStrictBind env arg_bndr join_rhs res_ty
 mkDupableAlt :: Platform -> OutId
              -> JoinFloats -> OutAlt
              -> SimplM (JoinFloats, OutAlt)
-mkDupableAlt platform case_bndr jfloats (Alt con bndrs' rhs')
-  | exprIsDupable platform rhs'  -- Note [Small alternative rhs]
+mkDupableAlt _platform case_bndr jfloats (Alt con bndrs' rhs')
+--  | exprIsDupable platform rhs'  -- Note [Small alternative rhs]
+  | exprIsTrivial rhs'
   = return (jfloats, Alt con bndrs' rhs')
 
   | otherwise
@@ -3631,6 +3632,72 @@ This is just what we want because the rn produces a box that
 the case rn cancels with.
 
 See #4957 a fuller example.
+
+Note [Duplicating join points]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+IN #19996 we discovered that we want to be really careful about
+inlining join points.   Consider
+    case (join $j x = K f x )
+         (in case v of      )
+         (     p1 -> $j x1  ) of
+         (     p2 -> $j x2  )
+         (     p3 -> $j x3  )
+      K g y -> blah[g,y]
+
+Here the join-point RHS is very small, just a constructor
+application (K x y).  So we might inline it to get
+    case (case v of        )
+         (     p1 -> K f x1  ) of
+         (     p2 -> K f x2  )
+         (     p3 -> K f x3  )
+      K g y -> blah[g,y]
+
+But now we have to make `blah` into a join point, /abstracted/
+over `g` and `y`.   In contrast, if we /don't/ inline $j we
+don't need a join point for `blah` and we'll get
+    join $j x = let g=f, y=x in blah[g,y]
+    in case v of
+       p1 -> $j x1
+       p2 -> $j x2
+       p3 -> $j x3
+
+This can make a /massive/ difference, because `blah` can see
+what `f` is, instead of lambda-abstracting over it.
+
+To achieve this:
+
+1. Do not postInlineUnconditionally a join point, until the Final
+   phase.  (The Final phase is still quite early, so we might consider
+   delaying still more.)
+
+2. In mkDupableAlt, generate an alterative for all alternatives,
+   except for exprIsTrival RHSs. Previously we used exprIsDupable.
+   This generates a lot more join points, but makes them much
+   more case-of-case friendly.
+
+3. By the same token we want to use Plan B in
+   Note [Duplicating StrictArg] when the RHS of the new join point
+   is a data constructor application.  That same Note explains why we
+   want Plan A when the RHS of the new join point would be a
+   non-data-constructor application
+
+4. You might worry that $j will be inlined by the call-site inliner,
+   but it won't because the call-site context for a join is usually
+   extremely boring (the arguments come from the pattern match).
+   And if not, then perhaps inlining it would be a good idea.
+
+   You might also wonder if we get UnfWhen, because the RHS of the
+   join point is no bigger than the call. But in the cases we care
+   about it will be a little bigger, because of that free `f` in
+       $j x = K f x
+   So for now we don't do anything special in callSiteInline
+
+There is a bit of tension between (2) and (3).  Do we want to retain
+the join point only when the RHS is
+* a constructor application? or
+* just non-trivial?
+Currently, a bit ad-hoc, we use convenient predicates for the setting.
+
 
 Historical Note [Case binders and join points]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3749,10 +3816,18 @@ There are two ways to make it duplicable.
      join $j x = f e1 x e3
      in case x of { True  -> jump $j r1
                   ; False -> jump $j r2 }
-  Notice that Plan B is very like the way we handle strict
-  bindings; see Note [Duplicating StrictBind].
 
-Plan A is good. Here's an example from #3116
+  Notice that Plan B is very like the way we handle strict bindings;
+  see Note [Duplicating StrictBind].  And Plan B is exactly what we'd
+  get if we turned use a case expression to evaluate the strict arg:
+
+       case (case x of { True -> r1; False -> r2 }) of
+         r -> f e1 r e3
+
+  So, looking at Note [Duplicating join points], we also want Plan B
+  when `f` is a data constructor.
+
+Plan A is often good. Here's an example from #3116
      go (n+1) (case l of
                  1  -> bs'
                  _  -> Chunk p fpc (o+1) (l-1) bs')
