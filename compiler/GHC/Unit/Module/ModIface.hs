@@ -101,7 +101,8 @@ data ModIfaceBackend = ModIfaceBackend
     -- ^ Hash of export list
   , mi_orphan_hash :: !Fingerprint
     -- ^ Hash for orphan rules, class and family instances combined
-
+  , mi_src_hash :: !Fingerprint
+    -- ^ Hash for the source file on the filesystem
     -- Cached environments for easy lookup. These are computed (lazily) from
     -- other fields and are not put into the interface file.
     -- Not really produced by the backend but there is no need to create them
@@ -336,7 +337,9 @@ instance Binary ModIface where
                    mi_orphan = orphan,
                    mi_finsts = hasFamInsts,
                    mi_exp_hash = exp_hash,
-                   mi_orphan_hash = orphan_hash
+                   mi_orphan_hash = orphan_hash,
+                   mi_src_hash = _src_hash -- Like mi_ext_fields; this goes into
+                                           -- the iface header so we ignore it here
                  }}) = do
         put_ bh mod
         put_ bh sig_of
@@ -439,6 +442,8 @@ instance Binary ModIface where
                    mi_finsts = hasFamInsts,
                    mi_exp_hash = exp_hash,
                    mi_orphan_hash = orphan_hash,
+                   mi_src_hash = fingerprint0, -- placeholder because this is dealt
+                                               -- with specially when the file is read
                    mi_warn_fn = mkIfaceWarnCache warns,
                    mi_fix_fn = mkIfaceFixCache fixities,
                    mi_hash_fn = mkIfaceHashCache decls
@@ -490,6 +495,7 @@ emptyFullModIface mod =
           mi_finsts = False,
           mi_exp_hash = fingerprint0,
           mi_orphan_hash = fingerprint0,
+          mi_src_hash = fingerprint0,
           mi_warn_fn = emptyIfaceWarnCache,
           mi_fix_fn = emptyIfaceFixCache,
           mi_hash_fn = emptyIfaceHashCache } }
