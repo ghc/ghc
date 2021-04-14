@@ -81,7 +81,10 @@ module GHC.Tc.Types(
         lookupRoleAnnot, getRoleAnnots,
 
         -- Linting
-        lintGblEnv
+        lintGblEnv,
+
+        -- Diagnostics
+        TcRnDsMessage, mkTcRnDsMessage, tcRnDsToGhcMessage
   ) where
 
 #include "HsVersions.h"
@@ -90,6 +93,7 @@ import GHC.Prelude
 import GHC.Platform
 
 import GHC.Driver.Env
+import GHC.Driver.Errors.Types ( tcRnDsToGhcMessage )
 import GHC.Driver.Session
 import {-# SOURCE #-} GHC.Driver.Hooks
 
@@ -100,6 +104,7 @@ import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Evidence
 import {-# SOURCE #-} GHC.Tc.Errors.Hole.FitTypes ( HoleFitPlugin )
+import GHC.Tc.Errors.Types
 
 import GHC.Core.Type
 import GHC.Core.TyCon  ( TyCon, tyConKind )
@@ -130,7 +135,6 @@ import GHC.Types.Unique.FM
 import GHC.Types.Basic
 import GHC.Types.CostCentre.State
 import GHC.Types.HpcInfo
-import GHC.Types.Error ( DiagnosticMessage )
 
 import GHC.Data.IOEnv
 import GHC.Data.Bag
@@ -560,7 +564,7 @@ data TcGblEnv
                                              -- function, if this module is
                                              -- the main module.
 
-        tcg_safeInfer :: TcRef (Bool, WarningMessages),
+        tcg_safeInfer :: TcRef (Bool, Messages TcRnDsMessage),
         -- ^ Has the typechecker inferred this module as -XSafe (Safe Haskell)
         -- See Note [Safe Haskell Overlapping Instances Implementation],
         -- although this is used for more than just that failure case.
@@ -766,7 +770,7 @@ data TcLclEnv           -- Changes as we move inside an expression
                                       -- and for tidying types
 
         tcl_lie  :: TcRef WantedConstraints,    -- Place to accumulate type constraints
-        tcl_errs :: TcRef (Messages DiagnosticMessage)     -- Place to accumulate errors
+        tcl_errs :: TcRef (Messages TcRnDsMessage)     -- Place to accumulate diagnostics
     }
 
 setLclEnvTcLevel :: TcLclEnv -> TcLevel -> TcLclEnv
