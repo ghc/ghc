@@ -1269,8 +1269,16 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
   -- the object file for one module.)
   -- Note the nasty duplication with the same computation in compileFile above
         location <- getLocation src_flavour mod_name
-
+        dt_state <- dynamicTooState dflags
         let o_file = ml_obj_file location -- The real object file
+            -- dynamic-too *also* produces the dyn_o_file, so have to check
+            -- that's there, and if it's not, regenerate both .o and
+            -- .dyn_o
+            dyn_o_file = case dt_state of
+                           DT_OK
+                            | not (writeInterfaceOnlyMode dflags)
+                              -> Just (dynamicOutputFile dflags o_file)
+                           _ -> Nothing
             hi_file = ml_hi_file location
             hie_file = ml_hie_file location
             dest_file | writeInterfaceOnlyMode dflags
@@ -1280,11 +1288,11 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
 
   -- Figure out if the source has changed, for recompilation avoidance.
   --
-  -- Setting source_unchanged to True means that M.o (or M.hie) seems
+  -- Setting source_unchanged to True means that M.o, M.dyn_o (or M.hie) seems
   -- to be up to date wrt M.hs; so no need to recompile unless imports have
   -- changed (which the compiler itself figures out).
-  -- Setting source_unchanged to False tells the compiler that M.o is out of
-  -- date wrt M.hs (or M.o doesn't exist) so we must recompile regardless.
+  -- Setting source_unchanged to False tells the compiler that M.o or M.dyn_o is out of
+  -- date wrt M.hs (or M.o/dyn_o doesn't exist) so we must recompile regardless.
         src_timestamp <- liftIO $ getModificationUTCTime (basename <.> suff)
 
         source_unchanged <- liftIO $
@@ -1295,11 +1303,12 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
              then return SourceModified
                 -- Otherwise look at file modification dates
              else do dest_file_mod <- sourceModified dest_file src_timestamp
+                     dyn_file_mod  <- traverse (flip sourceModified src_timestamp) dyn_o_file
                      hie_file_mod <- if gopt Opt_WriteHie dflags
                                         then sourceModified hie_file
                                                             src_timestamp
                                         else pure False
-                     if dest_file_mod || hie_file_mod
+                     if dest_file_mod || hie_file_mod || fromMaybe False dyn_file_mod
                         then return SourceModified
                         else return SourceUnmodified
 
