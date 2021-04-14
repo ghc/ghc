@@ -34,9 +34,9 @@ instance Enum () -- Defined in ‘GHC.Enum’
 instance Show () -- Defined in ‘GHC.Show’
 instance Read () -- Defined in ‘GHC.Read’
 instance Bounded () -- Defined in ‘GHC.Enum’
+data instance B () = MkB 	-- Defined at T4175.hs:14:15
 type instance D () () = Bool 	-- Defined at T4175.hs:23:10
 type instance D Int () = String 	-- Defined at T4175.hs:20:10
-data instance B () = MkB 	-- Defined at T4175.hs:14:15
 type Maybe :: * -> *
 data Maybe a = Nothing | Just a
   	-- Defined in ‘GHC.Maybe’
@@ -67,8 +67,8 @@ instance Show Int -- Defined in ‘GHC.Show’
 instance Read Int -- Defined in ‘GHC.Read’
 instance Bounded Int -- Defined in ‘GHC.Enum’
 instance Integral Int -- Defined in ‘GHC.Real’
-type instance D Int () = String 	-- Defined at T4175.hs:20:10
 type instance A Int Int = () 	-- Defined at T4175.hs:9:15
+type instance D Int () = String 	-- Defined at T4175.hs:20:10
 type Z :: * -> Constraint
 class Z a
   	-- Defined at T4175.hs:29:1
