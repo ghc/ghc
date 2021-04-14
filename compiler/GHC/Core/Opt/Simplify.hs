@@ -55,7 +55,7 @@ import GHC.Core.Rules   ( lookupRule, getRules, initRuleOpts )
 import GHC.Types.Basic
 import GHC.Utils.Monad  ( mapAccumLM, liftIO )
 import GHC.Types.Var    ( isTyCoVar )
-import GHC.Data.Maybe   ( orElse )
+import GHC.Data.Maybe   ( isNothing, orElse )
 import Control.Monad
 import GHC.Utils.Outputable
 import GHC.Data.FastString
@@ -3288,7 +3288,8 @@ mkDupableContWithDmds env _
     (StrictArg { sc_fun = fun, sc_cont = cont
                , sc_fun_ty = fun_ty })
   -- NB: sc_dup /= OkToDup; that is caught earlier by contIsDupable
-  | thumbsUpPlanA cont
+  | isNothing (isDataConId_maybe (ai_fun fun))
+  , thumbsUpPlanA cont
   = -- Use Plan A of Note [Duplicating StrictArg]
     do { let (_ : dmds) = ai_dmds fun
        ; (floats1, cont')  <- mkDupableContWithDmds env dmds cont
@@ -3398,7 +3399,8 @@ mkDupableContWithDmds env _
 mkDupableStrictBind :: SimplEnv -> OutId -> OutExpr -> OutType
                     -> SimplM (SimplFloats, SimplCont)
 mkDupableStrictBind env arg_bndr join_rhs res_ty
-  | exprIsDupable (targetPlatform (seDynFlags env)) join_rhs
+--  | exprIsDupable (targetPlatform (seDynFlags env)) join_rhs
+  | exprIsTrivial join_rhs
   = return (emptyFloats env
            , StrictBind { sc_bndr = arg_bndr, sc_bndrs = []
                         , sc_body = join_rhs
@@ -3425,8 +3427,8 @@ mkDupableStrictBind env arg_bndr join_rhs res_ty
 mkDupableAlt :: Platform -> OutId
              -> JoinFloats -> OutAlt
              -> SimplM (JoinFloats, OutAlt)
-mkDupableAlt platform case_bndr jfloats (con, bndrs', rhs')
-  | exprIsDupable platform rhs'  -- Note [Small alternative rhs]
+mkDupableAlt _platform case_bndr jfloats (con, bndrs', rhs')
+  | exprIsTrivial rhs'  -- Note [Small alternative rhs]
   = return (jfloats, (con, bndrs', rhs'))
 
   | otherwise
@@ -3621,10 +3623,15 @@ There are two ways to make it duplicable.
      join $j x = f e1 x e3
      in case x of { True  -> jump $j r1
                   ; False -> jump $j r2 }
-  Notice that Plan B is very like the way we handle strict
-  bindings; see Note [Duplicating StrictBind].
 
-Plan A is good. Here's an example from #3116
+  Notice that Plan B is very like the way we handle strict bindings;
+  see Note [Duplicating StrictBind].  And Plan B is exactly what we'd
+  get if we turned use a case expression to evaluate the strict arg:
+
+       case (case x of { True -> r1; False -> r2 }) of
+         r -> f e1 r e3
+
+Plan A is often good. Here's an example from #3116
      go (n+1) (case l of
                  1  -> bs'
                  _  -> Chunk p fpc (o+1) (l-1) bs')
