@@ -1731,29 +1731,41 @@ Problem:
     the same as zonkTcTypeToType. (If we distinguished TcType from
     Type, this issue would have been a type error!)
 
-Solution: (see #15552 for other variants)
+Solutions: (see #15552 for other variants)
 
-    One possible solution is simply not to do the short-circuiting.
-    That has less sharing, but maybe sharing is rare. And indeed,
-    that turns out to be viable from a perf point of view
+One possible solution is simply not to do the short-circuiting.
+That has less sharing, but maybe sharing is rare. And indeed,
+that usually turns out to be viable from a perf point of view
 
-    But the code implements something a bit better
+But zonkTyVarOcc implements something a bit better
 
-    * ZonkEnv contains ze_meta_tv_env, which maps
-          from a MetaTyVar (unification variable)
-          to a Type (not a TcType)
+* ZonkEnv contains ze_meta_tv_env, which maps
+      from a MetaTyVar (unification variable)
+      to a Type (not a TcType)
 
-    * In zonkTyVarOcc, we check this map to see if we have zonked
-      this variable before. If so, use the previous answer; if not
-      zonk it, and extend the map.
+* In zonkTyVarOcc, we check this map to see if we have zonked
+  this variable before. If so, use the previous answer; if not
+  zonk it, and extend the map.
 
-    * The map is of course stateful, held in a TcRef. (That is unlike
-      the treatment of lexically-scoped variables in ze_tv_env and
-      ze_id_env.)
+* The map is of course stateful, held in a TcRef. (That is unlike
+  the treatment of lexically-scoped variables in ze_tv_env and
+  ze_id_env.)
 
-    Is the extra work worth it?  Some non-sytematic perf measurements
-    suggest that compiler allocation is reduced overall (by 0.5% or so)
-    but compile time really doesn't change.
+* In zonkTyVarOcc we read the TcRef to look up the unification
+  variable:
+    - if we get a hit we use the zonked result;
+    - if not, in zonk_meta we see if the variable is `Indirect ty`,
+      zonk that, and update the map (in finish_meta)
+  But Nota Bene that the "update map" step must re-read the TcRef
+  (or, more precisely, use updTcRef) because the zonking of the
+  `Indirect ty` may have added lots of stuff to the map.  See
+  #19668 for an example where this made an asymptotic difference!
+
+Is it worth the extra work of carrying ze_meta_tv_env? Some
+non-systematic perf measurements suggest that compiler allocation is
+reduced overall (by 0.5% or so) but compile time really doesn't
+change.  But in some cases it makes a HUGE difference: see test
+T9198 and #19668.  So yes, it seems worth it.
 -}
 
 zonkTyVarOcc :: ZonkEnv -> TyVar -> TcM TcType
@@ -1770,7 +1782,7 @@ zonkTyVarOcc env@(ZonkEnv { ze_flexi = flexi
               ; case lookupVarEnv mtv_env tv of
                   Just ty -> return ty
                   Nothing -> do { mtv_details <- readTcRef ref
-                                ; zonk_meta mtv_env ref mtv_details } }
+                                ; zonk_meta ref mtv_details } }
   | otherwise
   = lookup_in_tv_env
 
@@ -1780,19 +1792,18 @@ zonkTyVarOcc env@(ZonkEnv { ze_flexi = flexi
           Nothing  -> mkTyVarTy <$> updateTyVarKindM (zonkTcTypeToTypeX env) tv
           Just tv' -> return (mkTyVarTy tv')
 
-    zonk_meta mtv_env ref Flexi
+    zonk_meta ref Flexi
       = do { kind <- zonkTcTypeToTypeX env (tyVarKind tv)
            ; ty <- commitFlexi flexi tv kind
            ; writeMetaTyVarRef tv ref ty  -- Belt and braces
-           ; finish_meta mtv_env ty }
+           ; finish_meta ty }
 
-    zonk_meta mtv_env _ (Indirect ty)
+    zonk_meta _ (Indirect ty)
       = do { zty <- zonkTcTypeToTypeX env ty
-           ; finish_meta mtv_env zty }
+           ; finish_meta zty }
 
-    finish_meta mtv_env ty
-      = do { let mtv_env' = extendVarEnv mtv_env tv ty
-           ; writeTcRef mtv_env_ref mtv_env'
+    finish_meta ty
+      = do { updTcRef mtv_env_ref (\env -> extendVarEnv env tv ty)
            ; return ty }
 
 lookupTyVarOcc :: ZonkEnv -> TcTyVar -> Maybe TyVar
