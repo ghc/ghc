@@ -1,5 +1,7 @@
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 
 module GHC.Types.Error
@@ -76,9 +78,8 @@ a bit more declarative) or removed altogether.
 -- | A collection of messages emitted by GHC during error reporting. A diagnostic message is typically
 -- a warning or an error. See Note [Messages].
 newtype Messages e = Messages { getMessages :: Bag (MsgEnvelope e) }
-
-instance Functor Messages where
-  fmap f (Messages xs) = Messages (mapBag (fmap f) xs)
+  deriving newtype (Semigroup, Monoid)
+  deriving stock Functor
 
 emptyMessages :: Messages e
 emptyMessages = Messages emptyBag

@@ -2859,7 +2859,7 @@ getPreprocessedImports hsc_env src_fn mb_phase maybe_buf = do
           let imp_prelude = xopt LangExt.ImplicitPrelude pi_local_dflags
               popts = initParserOpts pi_local_dflags
           mimps <- getImports popts imp_prelude pi_hspp_buf pi_hspp_fn src_fn
-          return (first (foldMessages (fmap GhcPsMessage . mkParserErr)) mimps)
+          return (first (foldPsMessages mkParserErr) mimps)
   return PreprocessedImports {..}
 
 

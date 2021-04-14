@@ -13,7 +13,7 @@ module GHC.Driver.Errors.Types (
   , hoistTcRnMessage
   , hoistTcRnDsMessage
   , tcRnDsToGhcMessage
-  , foldMessages
+  , foldPsMessages
   ) where
 
 import GHC.Prelude
@@ -91,11 +91,11 @@ hoistMessageBiM f m = fmap (first (fmap f)) m
 
 -- | Given a collection of @e@ wrapped in a 'Foldable' structure, converts it into 'Messages'
 -- via the supplied transformation function.
-foldMessages :: Foldable f
-             => (e -> MsgEnvelope GhcMessage)
-             -> f e
-             -> Messages GhcMessage
-foldMessages f = foldl' (\acc m -> addMessage (f m) acc) emptyMessages
+foldPsMessages :: Foldable f
+               => (e -> MsgEnvelope PsMessage)
+               -> f e
+               -> Messages GhcMessage
+foldPsMessages f = foldMap (singleMessage . fmap GhcPsMessage . f)
 
 -- | Abstracts away the classic pattern where we are calling 'ioMsgMaybe' on the result of
 -- 'IO (Messages TcRnMessage, a)'.
