@@ -127,6 +127,9 @@ mk_msg_envelope severity locn print_unqual err
                , errMsgSeverity = severity
                }
 
+-- | Wrap a 'Diagnostic' in a 'MsgEnvelope', recording its location.
+-- If you know your 'Diagnostic' is an error, consider using 'mkErrorMsgEnvelope',
+-- which does not require looking at the 'DynFlags'
 mkMsgEnvelope
   :: Diagnostic e
   => DynFlags
@@ -137,6 +140,9 @@ mkMsgEnvelope
 mkMsgEnvelope dflags locn print_unqual err
  = mk_msg_envelope (diagReasonSeverity dflags (diagnosticReason err)) locn print_unqual err
 
+-- | Wrap a 'Diagnostic' in a 'MsgEnvelope', recording its location.
+-- Precondition: the diagnostic is, in fact, an error. That is,
+-- @diagnosticReason msg == ErrorWithoutFlag@.
 mkErrorMsgEnvelope :: Diagnostic e
                    => SrcSpan
                    -> PrintUnqualified
