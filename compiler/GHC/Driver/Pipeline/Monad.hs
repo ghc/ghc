@@ -22,6 +22,7 @@ import GHC.Driver.Phases
 import GHC.Driver.Env
 import GHC.Driver.Plugins
 
+import GHC.Utils.Fingerprint ( Fingerprint )
 import GHC.Utils.TmpFs (TempFileLifetime)
 
 import GHC.Types.SourceFile
@@ -30,6 +31,8 @@ import GHC.Unit.Home.ModInfo
 import GHC.Unit.Module
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.Status
+
+import GHC.Tc.Types
 
 import Control.Monad
 
@@ -52,10 +55,12 @@ instance MonadIO CompPipeline where
 
 data PhasePlus = RealPhase Phase
                | HscOut HscSource ModuleName ModSummary HscStatus
+               | HscPostTc ModSummary FrontendResult (Maybe Fingerprint)
 
 instance Outputable PhasePlus where
     ppr (RealPhase p) = ppr p
     ppr (HscOut {}) = text "HscOut"
+    ppr (HscPostTc {}) = text "HscPostTc"
 
 -- -----------------------------------------------------------------------------
 -- The pipeline uses a monad to carry around various bits of information

@@ -211,7 +211,7 @@ compileOne' m_tc_result mHscMessage
 
    plugin_hsc_env <- initializePlugins hsc_env
 
-   let runBackend status = do
+   let runBackend tc_result mb_hash = do
             output_fn <- getOutputFilename logger tmpfs next_phase
                             (Temporary TFL_CurrentModule)
                             basename dflags next_phase (Just location)
@@ -219,7 +219,7 @@ compileOne' m_tc_result mHscMessage
             (_, _, Just (HomeModInfo iface details mb_linkable)) <- runPipeline StopLn plugin_hsc_env
                               (output_fn,
                                Nothing,
-                               Just (HscOut src_flavour mod_name summary status))
+                               Just (HscPostTc summary tc_result mb_hash))
                               (Just basename)
                               Persistent
                               (Just location)
@@ -238,10 +238,8 @@ compileOne' m_tc_result mHscMessage
 
    case m_tc_result of
      Just tc_result
-       | not always_do_basic_recompilation_check -> do
-         status <- runHsc plugin_hsc_env $
-           hscDesugarSimplify summary tc_result Nothing
-         runBackend status
+       | not always_do_basic_recompilation_check ->
+         runBackend (FrontendTypecheck tc_result) Nothing
      _ -> do
        recomp_result <- hscRecompStatus mHscMessage plugin_hsc_env summary
          source_modified mb_old_iface (mod_index, nmods)
@@ -250,12 +248,11 @@ compileOne' m_tc_result mHscMessage
            ASSERT( isJust mb_old_linkable || isNoLink (ghcLink dflags) )
            return $! HomeModInfo iface hmi_details mb_old_linkable
          HscRecompNeeded mb_hash -> do
-           status <- runHsc plugin_hsc_env $ do
-             FrontendTypecheck tc_result <- case hscFrontendHook (hsc_hooks hsc_env) of
+           tc_result <- runHsc plugin_hsc_env $ do
+             case hscFrontendHook (hsc_hooks hsc_env) of
                Nothing -> FrontendTypecheck . fst <$> hsc_typecheck False summary Nothing
                Just h  -> h summary
-             hscDesugarSimplify summary tc_result mb_hash
-           runBackend status
+           runBackend tc_result mb_hash
 
 
  where dflags0     = ms_hspp_opts summary
@@ -270,7 +267,6 @@ compileOne' m_tc_result mHscMessage
        internalInterpreter = not (gopt Opt_ExternalInterpreter dflags0)
 
        src_flavour = ms_hsc_src summary
-       mod_name = ms_mod_name summary
        next_phase = hscPostBackendPhase src_flavour bcknd
        object_filename = ml_obj_file location
 
@@ -693,6 +689,7 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_input_buf, mb_phase)
              isHaskell (RealPhase (HsPp  _)) = True
              isHaskell (RealPhase (Hsc   _)) = True
              isHaskell (HscOut {})           = True
+             isHaskell (HscPostTc {})        = True
              isHaskell _                     = False
 
              isHaskellishFile = isHaskell start_phase
@@ -721,6 +718,7 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_input_buf, mb_phase)
                                    ("cannot compile this file to desired target: "
                                       ++ input_fn))
              HscOut {} -> return ()
+             HscPostTc {} -> return ()
 
          -- Write input buffer to temp file if requested
          input_fn' <- case (start_phase, mb_input_buf) of
@@ -1275,7 +1273,6 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
                                         ms_textual_imps = imps,
                                         ms_srcimps      = src_imps }
 
-  -- run the compiler!
         let msg hsc_env _ what _ = oneShotMsg hsc_env what
         plugin_hsc_env' <- liftIO $ initializePlugins hsc_env'
         logger <- getLogger
@@ -1301,12 +1298,12 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
                    setHomeModInfo $! HomeModInfo iface mod_details Nothing
                    return (RealPhase StopLn, o_file)
 
+            -- run the compiler!
             HscRecompNeeded mb_hash -> do
-              result <- liftIO $ runHsc plugin_hsc_env $ do
-                  FrontendTypecheck tc_result <- case hscFrontendHook (hsc_hooks plugin_hsc_env) of
+              tc_result <- liftIO $ runHsc plugin_hsc_env $ do
+                  case hscFrontendHook (hsc_hooks plugin_hsc_env) of
                       Nothing -> FrontendTypecheck . fst <$> hsc_typecheck False mod_summary Nothing
                       Just h  -> h mod_summary
-                  hscDesugarSimplify mod_summary tc_result mb_hash
 
               -- In the rest of the pipeline use the loaded plugins
               setPlugins (hsc_plugins        plugin_hsc_env)
@@ -1314,8 +1311,17 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
               -- "driver" plugins may have modified the DynFlags so we update them
               setDynFlags (hsc_dflags plugin_hsc_env)
 
-              return (HscOut src_flavour mod_name mod_summary result,
-                      panic "HscOut doesn't have an input filename")
+              return (HscPostTc mod_summary tc_result mb_hash,
+                      panic "HscPostTc doesn't have an input filename")
+
+runPhase (HscPostTc mod_summary (FrontendTypecheck tc_result) mb_hash) _ = do
+        PipeState{hsc_env=hsc_env'} <- getPipeState
+        result <- liftIO $ runHsc hsc_env' $ do
+            hscDesugarSimplify mod_summary tc_result mb_hash
+        let mod_name = moduleName (ms_mod mod_summary)
+            src_flavour = (ms_hsc_src mod_summary)
+        return (HscOut src_flavour mod_name mod_summary result,
+               panic "HscOut doesn't have an input filename")
 
 runPhase (HscOut src_flavour mod_name mod_summary result) _ = do
         dflags <- getDynFlags
