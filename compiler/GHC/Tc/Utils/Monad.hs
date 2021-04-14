@@ -76,7 +76,7 @@ module GHC.Tc.Utils.Monad(
   tcCollectingUsage, tcScalingUsage, tcEmitBindingUsage,
 
   -- * Shared error message stuff: renamer and typechecker
-  mkLongErrAt, mkDecoratedSDocAt, addLongErrAt, reportDiagnostic, reportDiagnostics,
+  mkLongErrAt, mkTcRnMessage, addLongErrAt, reportDiagnostic, reportDiagnostics,
   recoverM, mapAndRecoverM, mapAndReportM, foldAndRecoverM,
   attemptM, tryTc,
   askNoErrs, discardErrs, tryTcDiscardingErrs,
@@ -1038,16 +1038,16 @@ mkLongErrAt loc msg extra
                 $ TcRnUnknownMessage
                 $ mkDecoratedError [msg', extra] }
 
-mkDecoratedSDocAt :: DiagnosticReason
-                  -> SrcSpan
-                  -> SDoc
+mkTcRnMessage :: DiagnosticReason
+              -> SrcSpan
+              -> SDoc
                   -- ^ The important part of the message
-                  -> SDoc
+              -> SDoc
                   -- ^ The context of the message
-                  -> SDoc
+              -> SDoc
                   -- ^ Any supplementary information.
-                  -> TcRn (MsgEnvelope DiagnosticMessage)
-mkDecoratedSDocAt reason loc important context extra
+              -> TcRn (MsgEnvelope TcRnMessage)
+mkTcRnMessage reason loc important context extra
   = do { printer <- getPrintUnqualified ;
          unit_state <- hsc_units <$> getTopEnv ;
          dflags <- getDynFlags ;
@@ -1055,6 +1055,7 @@ mkDecoratedSDocAt reason loc important context extra
                             [important, context, extra]
          in
          return $ mkMsgEnvelope dflags loc printer
+                $ TcRnUnknownMessage
                 $ mkDecoratedDiagnostic reason errDocs }
 
 addLongErrAt :: SrcSpan -> SDoc -> SDoc -> TcRn ()
