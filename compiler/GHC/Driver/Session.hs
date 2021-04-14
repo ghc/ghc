@@ -985,9 +985,8 @@ positionIndependent dflags = gopt Opt_PIC dflags || gopt Opt_PIE dflags
 -- Core optimisation, then the backend (from Core to object code) is executed
 -- twice.
 --
--- The implementation is currently rather hacky: recompilation avoidance is
--- broken (#17968), we don't clearly separate non-dynamic and dynamic loaded
--- interfaces (#9176), etc.
+-- The implementation is currently rather hacky, for example, we don't clearly separate non-dynamic
+-- and dynamic loaded interfaces (#9176).
 --
 -- To make matters worse, we automatically enable -dynamic-too when some modules
 -- need Template-Haskell and GHC is dynamically linked (cf
