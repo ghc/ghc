@@ -1,9 +1,7 @@
-{-# LANGUAGE ViewPatterns #-}
 module GHC.Driver.Errors (
     printOrThrowDiagnostics
-  , printBagOfErrors
+  , printMessages
   , handleFlagWarnings
-  , partitionMessageBag
   ) where
 
 import GHC.Driver.Session
@@ -18,13 +16,8 @@ import GHC.Utils.Outputable ( text, withPprStyle, mkErrStyle )
 import GHC.Utils.Logger
 import qualified GHC.Driver.CmdLine as CmdLine
 
--- | Partitions the messages and returns a tuple which first element are the warnings, and the
--- second the errors.
-partitionMessageBag :: Diagnostic e => Bag (MsgEnvelope e) -> (Bag (MsgEnvelope e), Bag (MsgEnvelope e))
-partitionMessageBag = partitionBag isWarningMessage
-
-printBagOfErrors :: Diagnostic a => Logger -> DynFlags -> Bag (MsgEnvelope a) -> IO ()
-printBagOfErrors logger dflags bag_of_errors
+printMessages :: Diagnostic a => Logger -> DynFlags -> Messages a -> IO ()
+printMessages logger dflags msgs
   = sequence_ [ let style = mkErrStyle unqual
                     ctx   = initSDocContext dflags style
                 in putLogMsg logger dflags (MCDiagnostic sev . diagnosticReason $ dia) s $
@@ -33,7 +26,7 @@ printBagOfErrors logger dflags bag_of_errors
                               errMsgDiagnostic = dia,
                               errMsgSeverity = sev,
                               errMsgContext   = unqual } <- sortMsgBag (Just dflags)
-                                                                       bag_of_errors ]
+                                                                       (getMessages msgs) ]
 
 handleFlagWarnings :: Logger -> DynFlags -> [CmdLine.Warn] -> IO ()
 handleFlagWarnings logger dflags warns = do
@@ -47,8 +40,8 @@ handleFlagWarnings logger dflags warns = do
 -- | Given a bag of diagnostics, turn them into an exception if
 -- any has 'SevError', or print them out otherwise.
 printOrThrowDiagnostics :: Logger -> DynFlags -> Messages GhcMessage -> IO ()
-printOrThrowDiagnostics logger dflags (getMessages -> msgs)
-  | any ((==) SevError . errMsgSeverity) msgs
-  = throwErrors (mkMessages msgs)
+printOrThrowDiagnostics logger dflags msgs
+  | any ((==) SevError . errMsgSeverity) (getMessages msgs)
+  = throwErrors msgs
   | otherwise
-  = printBagOfErrors logger dflags msgs
+  = printMessages logger dflags msgs
