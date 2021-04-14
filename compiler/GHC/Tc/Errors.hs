@@ -1033,12 +1033,11 @@ mkErrorReport :: DiagnosticReason
               -> TcM (MsgEnvelope TcRnMessage)
 mkErrorReport rea ctxt tcl_env (Report important relevant_bindings valid_subs)
   = do { context <- mkErrInfo (cec_tidy ctxt) (tcl_ctxt tcl_env)
-       ; fmap TcRnUnknownMessage <$>
-           mkDecoratedSDocAt rea
-                             (RealSrcSpan (tcl_loc tcl_env) Nothing)
-                             (vcat important)
-                             context
-                             (vcat $ relevant_bindings ++ valid_subs)
+       ; mkTcRnMessage rea
+           (RealSrcSpan (tcl_loc tcl_env) Nothing)
+           (vcat important)
+           context
+           (vcat $ relevant_bindings ++ valid_subs)
        }
 
 -- This version does not include the context
@@ -1047,11 +1046,10 @@ mkErrorReportNC :: DiagnosticReason
                 -> Report
                 -> TcM (MsgEnvelope TcRnMessage)
 mkErrorReportNC rea tcl_env (Report important relevant_bindings valid_subs)
-  = fmap TcRnUnknownMessage <$>
-      mkDecoratedSDocAt rea (RealSrcSpan (tcl_loc tcl_env) Nothing)
-                        (vcat important)
-                        O.empty
-                        (vcat $ relevant_bindings ++ valid_subs)
+  = mkTcRnMessage rea (RealSrcSpan (tcl_loc tcl_env) Nothing)
+    (vcat important)
+    O.empty
+    (vcat $ relevant_bindings ++ valid_subs)
 
 type UserGiven = Implication
 
