@@ -3,9 +3,11 @@
 
 module GHC.Driver.Errors.Ppr where
 
+import GHC.Prelude
+
 import GHC.Types.Error
 import GHC.Driver.Errors.Types
-import GHC.Parser.Errors.Ppr ()
+import GHC.Parser.Errors.Ppr
 import GHC.Tc.Errors.Ppr ()
 import GHC.HsToCore.Errors.Ppr ()
 
@@ -35,5 +37,9 @@ instance Diagnostic GhcMessage where
       -> diagnosticReason m
 
 instance Diagnostic DriverMessage where
-  diagnosticMessage (DriverUnknownMessage m) = diagnosticMessage m
-  diagnosticReason  (DriverUnknownMessage m) = diagnosticReason m
+  diagnosticMessage (DriverUnknownMessage m)  = diagnosticMessage m
+  diagnosticMessage (DriverPsHeaderMessage desc hints)
+    = mkSimpleDecorated $ pprPsError desc hints
+
+  diagnosticReason (DriverUnknownMessage m)   = diagnosticReason m
+  diagnosticReason (DriverPsHeaderMessage {}) = ErrorWithoutFlag

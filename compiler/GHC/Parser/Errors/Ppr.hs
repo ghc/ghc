@@ -7,6 +7,7 @@
 module GHC.Parser.Errors.Ppr
    ( mkParserWarn
    , mkParserErr
+   , pprPsError
    )
 where
 
@@ -142,6 +143,9 @@ mkParserWarn df = \case
 mkParserErr :: PsError -> MsgEnvelope PsMessage
 mkParserErr err = mk_parser_err (errLoc err) $ vcat
    (pp_err (errDesc err) : map pp_hint (errHints err))
+
+pprPsError :: PsErrorDesc -> [Hint] -> SDoc
+pprPsError desc hints = vcat (pp_err desc : map pp_hint hints)
 
 pp_err :: PsErrorDesc -> SDoc
 pp_err = \case

@@ -89,7 +89,7 @@ import GHC.Data.Maybe          ( expectJust )
 import GHC.Iface.Make          ( mkFullIface )
 
 import GHC.Types.Basic       ( SuccessFlag(..) )
-import GHC.Types.Error       ( singleMessage )
+import GHC.Types.Error       ( singleMessage, getMessages )
 import GHC.Types.Target
 import GHC.Types.SrcLoc
 import GHC.Types.SourceFile
@@ -131,9 +131,13 @@ preprocess :: HscEnv
            -> Maybe InputFileBuffer
            -- ^ optional buffer to use instead of reading the input file
            -> Maybe Phase -- ^ starting phase
-           -> IO (Either ErrorMessages (DynFlags, FilePath))
+           -> IO (Either (Messages DriverMessage) (DynFlags, FilePath))
 preprocess hsc_env input_fn mb_input_buf mb_phase =
-  handleSourceError (\err -> return (Left (srcErrorMessages err))) $
+  handleSourceError (\err -> pprPanic "SourceError in preprocessor"
+                                      (vcat $
+                                       pprMsgEnvelopeBagWithLoc $
+                                       getMessages $
+                                       srcErrorMessages err)) $
   MC.handle handler $
   fmap Right $ do
   MASSERT2(isJust mb_phase || isHaskellSrcFilename input_fn, text input_fn)
@@ -152,7 +156,7 @@ preprocess hsc_env input_fn mb_input_buf mb_phase =
     handler (ProgramError msg) =
       return $ Left $ singleMessage $
         mkPlainErrorMsgEnvelope srcspan $
-        GhcDriverMessage $ DriverUnknownMessage $ mkPlainError $ text msg
+        DriverUnknownMessage $ mkPlainError $ text msg
     handler ex = throwGhcExceptionIO ex
 
 -- ---------------------------------------------------------------------------
