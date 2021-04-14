@@ -15,6 +15,7 @@ module GHC.Utils.Error (
         Severity(..),
 
         -- * Messages
+        Diagnostic(..),
         MsgEnvelope(..),
         MessageClass(..),
         SDoc,

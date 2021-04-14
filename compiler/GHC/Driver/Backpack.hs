@@ -813,7 +813,7 @@ summariseDecl _pn hsc_src lmodname@(L loc modname) Nothing
             Nothing -> throwOneError $ mkPlainErrorMsgEnvelope loc $
                                        GhcPsMessage $ PsUnknownMessage $ mkPlainError $
                                        (text "module" <+> ppr modname <+> text "was not found")
-            Just (Left err) -> throwErrors err
+            Just (Left err) -> throwErrors (fmap GhcDriverMessage err)
             Just (Right summary) -> return summary
 
 -- | Up until now, GHC has assumed a single compilation target per source file.
