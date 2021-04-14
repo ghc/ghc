@@ -16,7 +16,6 @@ module GHC.Parser.Header
    , mkPrelImports -- used by the renamer too
    , getOptionsFromFile
    , getOptions
-   , optionsErrorMsgs
    , checkProcessArgsResult
    )
 where
@@ -317,9 +316,10 @@ checkProcessArgsResult flags
   = when (notNull flags) $
       liftIO $ throwErrors $ foldl' (\acc m -> addMessage (mkMsg m) acc) emptyMessages flags
     where mkMsg (L loc flag)
-              = fmap (GhcPsMessage . PsUnknownMessage) $ mkPlainErrorMsgEnvelope loc $
-                  (text "unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+>
-                   text flag)
+              = mkPlainErrorMsgEnvelope loc $
+                GhcPsMessage $ PsUnknownMessage $ mkPlainError $
+                  text "unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+>
+                  text flag
 
 -----------------------------------------------------------------------------
 
@@ -351,19 +351,6 @@ unsupportedExtnError dflags loc unsup =
      supported = supportedLanguagesAndExtensions $ platformArchOS $ targetPlatform dflags
      suggestions = fuzzyMatch unsup supported
 
-
-optionsErrorMsgs :: [String] -> [Located String] -> FilePath -> Messages DiagnosticMessage
-optionsErrorMsgs unhandled_flags flags_lines _filename
-  = mkMessages $ listToBag (map mkMsg unhandled_flags_lines)
-  where unhandled_flags_lines :: [Located String]
-        unhandled_flags_lines = [ L l f
-                                | f <- unhandled_flags
-                                , L l f' <- flags_lines
-                                , f == f' ]
-        mkMsg (L flagSpan flag) =
-            mkPlainErrorMsgEnvelope flagSpan $
-                    text "unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+> text flag
-
 optionsParseError :: String -> SrcSpan -> a     -- #15053
 optionsParseError str loc =
   throwErr loc $
@@ -374,5 +361,5 @@ optionsParseError str loc =
 
 throwErr :: SrcSpan -> SDoc -> a                -- #15053
 throwErr loc doc =
-  let msg = GhcPsMessage . PsUnknownMessage <$> mkPlainErrorMsgEnvelope loc doc
+  let msg = mkPlainErrorMsgEnvelope loc $ GhcPsMessage $ PsUnknownMessage $ mkPlainError doc
   in throw $ mkSrcErr $ singleMessage msg

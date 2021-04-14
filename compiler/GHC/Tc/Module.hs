@@ -213,7 +213,8 @@ tcRnModule hsc_env mod_sum save_rn_syntax
     dflags  = hsc_dflags hsc_env
     logger  = hsc_logger hsc_env
     home_unit = hsc_home_unit hsc_env
-    err_msg = fmap (mkTcRnDsMessage . Right . TcRnUnknownMessage) $ mkPlainErrorMsgEnvelope loc $
+    err_msg = mkPlainErrorMsgEnvelope loc $ mkTcRnDsMessage $
+              Right $ TcRnUnknownMessage $ mkPlainError $
                 text "Module does not have a RealSrcSpan:" <+> ppr this_mod
 
     pair :: (Module, SrcSpan)
@@ -3149,6 +3150,8 @@ mark_plugin_unsafe dflags = unless (gopt Opt_PluginTrustworthy dflags) $
   where
     unsafeText = "Use of plugins makes the module unsafe"
     pluginUnsafe =
-      singleMessage ( mkTcRnDsMessage . Right . TcRnUnknownMessage <$>
-                        (mkPlainMsgEnvelope dflags WarningWithoutFlag noSrcSpan $
-                                               (Outputable.text unsafeText) ))
+      singleMessage $
+      mkPlainMsgEnvelope dflags noSrcSpan $
+      mkTcRnDsMessage $ Right $ TcRnUnknownMessage $
+      mkPlainDiagnostic WarningWithoutFlag $
+      Outputable.text unsafeText

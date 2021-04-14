@@ -31,8 +31,13 @@ module GHC.Utils.Error (
         -- ** Construction
         emptyMessages, mkDecorated, mkLocMessage, mkLocMessageAnn,
         mkMsgEnvelope, mkPlainMsgEnvelope, mkPlainErrorMsgEnvelope,
-        mkShortMsgEnvelope, mkShortErrorMsgEnvelope, mkLongMsgEnvelope,
+        mkErrorMsgEnvelope,
         mkMCDiagnostic, errorDiagnostic, diagReasonSeverity,
+
+        mkPlainError,
+        mkPlainDiagnostic,
+        mkDecoratedError,
+        mkDecoratedDiagnostic,
 
         -- * Utilities
         doIfSet, doIfSet_dyn,
@@ -95,6 +100,15 @@ diagReasonSeverity _      ErrorWithoutFlag                                      
 
 
 
+-- | Make a 'MessageClass' for a given 'DiagnosticReason', consulting the 'DynFlags'.
+mkMCDiagnostic :: DynFlags -> DiagnosticReason -> MessageClass
+mkMCDiagnostic dflags reason = MCDiagnostic (diagReasonSeverity dflags reason) reason
+
+-- | Varation of 'mkMCDiagnostic' which can be used when we are /sure/ the
+-- input 'DiagnosticReason' /is/ 'ErrorWithoutFlag'.
+errorDiagnostic :: MessageClass
+errorDiagnostic = MCDiagnostic SevError ErrorWithoutFlag
+
 --
 -- Creating MsgEnvelope(s)
 --
@@ -123,63 +137,31 @@ mkMsgEnvelope
 mkMsgEnvelope dflags locn print_unqual err
  = mk_msg_envelope (diagReasonSeverity dflags (diagnosticReason err)) locn print_unqual err
 
--- | Make a 'MessageClass' for a given 'DiagnosticReason', consulting the 'DynFlags'.
-mkMCDiagnostic :: DynFlags -> DiagnosticReason -> MessageClass
-mkMCDiagnostic dflags reason = MCDiagnostic (diagReasonSeverity dflags reason) reason
-
--- | Varation of 'mkMCDiagnostic' which can be used when we are /sure/ the
--- input 'DiagnosticReason' /is/ 'ErrorWithoutFlag'.
-errorDiagnostic :: MessageClass
-errorDiagnostic = MCDiagnostic SevError ErrorWithoutFlag
-
--- | A long (multi-line) diagnostic message.
--- The 'Severity' will be calculated out of the 'DiagnosticReason', and will likely be
--- incorrect in the presence of '-Werror'.
-mkLongMsgEnvelope :: DynFlags
-                  -> DiagnosticReason
-                  -> SrcSpan
-                  -> PrintUnqualified
-                  -> SDoc
-                  -> SDoc
-                  -> MsgEnvelope DiagnosticMessage
-mkLongMsgEnvelope dflags rea locn unqual msg extra =
-  mkMsgEnvelope dflags locn unqual (DiagnosticMessage (mkDecorated [msg,extra]) rea)
-
--- | A short (one-line) diagnostic message.
--- Same 'Severity' considerations as for 'mkLongMsgEnvelope'.
-mkShortMsgEnvelope :: DynFlags
-                   -> DiagnosticReason
-                   -> SrcSpan
+mkErrorMsgEnvelope :: Diagnostic e
+                   => SrcSpan
                    -> PrintUnqualified
-                   -> SDoc
-                   -> MsgEnvelope DiagnosticMessage
-mkShortMsgEnvelope dflags rea locn unqual msg =
-  mkMsgEnvelope dflags locn unqual (DiagnosticMessage (mkDecorated [msg]) rea)
-
-mkShortErrorMsgEnvelope :: SrcSpan
-                        -> PrintUnqualified
-                        -> SDoc
-                        -> MsgEnvelope DiagnosticMessage
-mkShortErrorMsgEnvelope locn unqual msg =
-  mk_msg_envelope SevError locn unqual (DiagnosticMessage (mkDecorated [msg]) ErrorWithoutFlag)
+                   -> e
+                   -> MsgEnvelope e
+mkErrorMsgEnvelope locn unqual msg =
+  mk_msg_envelope SevError locn unqual msg
 
 -- | Variant that doesn't care about qualified/unqualified names.
--- Same 'Severity' considerations as for 'mkLongMsgEnvelope'.
-mkPlainMsgEnvelope :: DynFlags
-                   -> DiagnosticReason
+mkPlainMsgEnvelope :: Diagnostic e
+                   => DynFlags
                    -> SrcSpan
-                   -> SDoc
-                   -> MsgEnvelope DiagnosticMessage
-mkPlainMsgEnvelope dflags rea locn msg =
-  mkMsgEnvelope dflags locn alwaysQualify (DiagnosticMessage (mkDecorated [msg]) rea)
+                   -> e
+                   -> MsgEnvelope e
+mkPlainMsgEnvelope dflags locn msg =
+  mkMsgEnvelope dflags locn alwaysQualify msg
 
 -- | Variant of 'mkPlainMsgEnvelope' which can be used when we are /sure/ we
 -- are constructing a diagnostic with a 'ErrorWithoutFlag' reason.
-mkPlainErrorMsgEnvelope :: SrcSpan
-                        -> SDoc
-                        -> MsgEnvelope DiagnosticMessage
+mkPlainErrorMsgEnvelope :: Diagnostic e
+                        => SrcSpan
+                        -> e
+                        -> MsgEnvelope e
 mkPlainErrorMsgEnvelope locn msg =
-  mk_msg_envelope SevError locn alwaysQualify (DiagnosticMessage (mkDecorated [msg]) ErrorWithoutFlag)
+  mk_msg_envelope SevError locn alwaysQualify msg
 
 -------------------------
 data Validity
@@ -577,5 +559,3 @@ of the execution through the various labels) and ghc.totals.txt (total time
 spent in each label).
 
 -}
-
-

@@ -150,8 +150,9 @@ preprocess hsc_env input_fn mb_input_buf mb_phase =
   where
     srcspan = srcLocSpan $ mkSrcLoc (mkFastString input_fn) 1 1
     handler (ProgramError msg) =
-      return $ Left $ fmap (GhcDriverMessage . DriverUnknownMessage) . singleMessage $
-        mkPlainErrorMsgEnvelope srcspan $ text msg
+      return $ Left $ singleMessage $
+        mkPlainErrorMsgEnvelope srcspan $
+        GhcDriverMessage $ DriverUnknownMessage $ mkPlainError $ text msg
     handler ex = throwGhcExceptionIO ex
 
 -- ---------------------------------------------------------------------------
