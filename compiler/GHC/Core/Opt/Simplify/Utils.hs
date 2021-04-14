@@ -1380,6 +1380,7 @@ postInlineUnconditionally env top_lvl bndr occ_info rhs
   | isStableUnfolding unfolding = False -- Note [Stable unfoldings and postInlineUnconditionally]
   | isTopLevel top_lvl          = False -- Note [Top level and postInlineUnconditionally]
   | exprIsTrivial rhs           = True
+  | isJoinId bndr               = False
   | otherwise
   = case occ_info of
       OneOcc { occ_in_lam = in_lam, occ_int_cxt = int_cxt, occ_n_br = n_br }
