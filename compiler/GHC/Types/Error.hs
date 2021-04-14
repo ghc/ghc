@@ -54,6 +54,8 @@ import GHC.Data.FastString (unpackFS)
 import GHC.Data.StringBuffer (atLine, hGetStringBuffer, len, lexemeToString)
 import GHC.Utils.Json
 
+import Data.Bifunctor
+
 {-
 Note [Messages]
 ~~~~~~~~~~~~~~~
@@ -74,6 +76,10 @@ a bit more declarative) or removed altogether.
 
 -- | A collection of messages emitted by GHC during error reporting. A diagnostic message is typically
 -- a warning or an error. See Note [Messages].
+--
+-- /INVARIANT/: All the messages in this collection must be relevant, i.e. their 'Severity' should /not/
+-- be 'SevIgnore'. The smart constructor 'mkMessages' will filter out any message which 'Severity' is
+-- 'SevIgnore'.
 newtype Messages e = Messages { getMessages :: Bag (MsgEnvelope e) }
 
 instance Functor Messages where
@@ -83,7 +89,10 @@ emptyMessages :: Messages e
 emptyMessages = Messages emptyBag
 
 mkMessages :: Bag (MsgEnvelope e) -> Messages e
-mkMessages = Messages
+mkMessages = Messages . filterBag interesting
+  where
+    interesting :: MsgEnvelope e -> Bool
+    interesting = (/=) SevIgnore . errMsgSeverity
 
 isEmptyMessages :: Messages e -> Bool
 isEmptyMessages (Messages msgs) = isEmptyBag msgs
@@ -111,10 +120,7 @@ addMessage x (Messages xs)
 -- See Note [Discarding Messages].
 unionMessages :: Messages e -> Messages e -> Messages e
 unionMessages (Messages msgs1) (Messages msgs2) =
-  Messages (filterBag interesting $ msgs1 `unionBags` msgs2)
-  where
-    interesting :: MsgEnvelope e -> Bool
-    interesting = (/=) SevIgnore . errMsgSeverity
+  Messages (msgs1 `unionBags` msgs2)
 
 -- | A 'DecoratedSDoc' is isomorphic to a '[SDoc]' but it carries the invariant that the input '[SDoc]'
 -- needs to be rendered /decorated/ into its final form, where the typical case would be adding bullets
@@ -473,5 +479,5 @@ getErrorMessages (Messages xs) = fst $ partitionBag isIntrinsicErrorMessage xs
 
 -- | Partitions the 'Messages' and returns a tuple which first element are the warnings, and the
 -- second the errors.
-partitionMessages :: Diagnostic e => Messages e -> (Bag (MsgEnvelope e), Bag (MsgEnvelope e))
-partitionMessages (Messages xs) = partitionBag isWarningMessage xs
+partitionMessages :: Diagnostic e => Messages e -> (Messages e, Messages e)
+partitionMessages (Messages xs) = bimap Messages Messages (partitionBag isWarningMessage xs)
