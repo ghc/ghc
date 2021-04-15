@@ -49,6 +49,7 @@ import GHC.Core.Coercion
 import GHC.Core.TyCon
 import GHC.Core.DataCon
 import GHC.Core.Opt.OccurAnal
+import GHC.Core.TyCo.Rep( UnivCoProvenance(..) )
 
 
 import GHC.Data.Maybe
@@ -76,6 +77,8 @@ import GHC.Types.Tickish
 import GHC.Types.TyThing
 import GHC.Types.CostCentre ( CostCentre, ccFromThisModule )
 import GHC.Types.Unique.Supply
+
+import GHC.Data.Pair
 
 import Data.List        ( unfoldr )
 import Control.Monad
@@ -626,9 +629,22 @@ cpeRhsE env expr@(Lam {})
         ; body' <- cpeBodyNF env' body
         ; return (emptyFloats, mkLams bndrs' body') }
 
-cpeRhsE env (Case scrut bndr ty alts)
+cpeRhsE env (Case scrut _ ty [])
+  = do { (floats, scrut') <- cpeRhsE env scrut
+       ; let co = mkUnsafeCo Representational (Pair (exprType scrut) ty)
+       ; return (floats, Cast scrut' co) }
+
+cpeRhsE env (Case scrut bndr _ alts)
   | isUnsafeEqualityProof scrut
-  , [Alt con bs rhs] <- alts
+  , isDeadBinder bndr -- We can only discard the case if the case-binder is dead
+                      -- It usually is, but see #18227
+  , [Alt _ [co_var] rhs] <- alts
+  = do { (floats, rhs') <- cpeRhsE env rhs
+       ; let the_co  = mkUnsafeCo Nominal (coVarTypes co_var)
+             co_bind = NonRec co_var (Coercion the_co)
+       ; return (floats, Let co_bind rhs') }
+
+{-
   = do { (floats1, scrut') <- cpeBody env scrut
        ; (env1, bndr')     <- cpCloneBndr env bndr
        ; (env2, bs')       <- cpCloneBndrs env1 bs
@@ -637,8 +653,9 @@ cpeRhsE env (Case scrut bndr ty alts)
              floats'    = (floats1 `addFloat` case_float)
                           `appendFloats` floats2
        ; return (floats', rhs') }
+-}
 
-  | otherwise
+cpeRhsE env (Case scrut bndr ty alts)
   = do { (floats, scrut') <- cpeBody env scrut
        ; (env', bndr2) <- cpCloneBndr env bndr
        ; let alts'
@@ -1142,6 +1159,11 @@ However, until then we simply add a special case excluding literals from the
 floating done by cpeArg.
 -}
 
+mkUnsafeCo :: Role -> Pair Type -> Coercion
+mkUnsafeCo role (Pair ty1 ty2) = mkUnivCo prov role ty1 ty2
+  where
+    prov = PluginProv "GHC-CorePrep"
+
 -- | Is an argument okay to CPE?
 okCpeArg :: CoreExpr -> Bool
 -- Don't float literals. See Note [ANF-ising literal string arguments].
@@ -1150,7 +1172,8 @@ okCpeArg (Lit _) = False
 okCpeArg expr    = not (cpExprIsTrivial expr)
 
 cpExprIsTrivial :: CoreExpr -> Bool
-cpExprIsTrivial e
+cpExprIsTrivial e = exprIsTrivial e
+{-
   | Tick t e <- e
   , not (tickishIsCode t)
   = cpExprIsTrivial e
@@ -1160,6 +1183,7 @@ cpExprIsTrivial e
   = cpExprIsTrivial rhs
   | otherwise
   = exprIsTrivial e
+-}
 
 -- This is where we arrange that a non-trivial argument is let-bound
 cpeArg :: CorePrepEnv -> Demand
