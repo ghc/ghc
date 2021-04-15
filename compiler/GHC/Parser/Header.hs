@@ -93,7 +93,7 @@ getImports popts implicit_prelude buf filename source_filename = do
       -- don't log warnings: they'll be reported when we parse the file
       -- for real.  See #2500.
       if not (isEmptyBag errs)
-        then throwErrors $ foldMessages (fmap GhcPsMessage . mkParserErr) errs
+        then throwErrors $ foldPsMessages mkParserErr errs
         else
           let   hsmod = unLoc rdr_module
                 mb_mod = hsmodName hsmod
