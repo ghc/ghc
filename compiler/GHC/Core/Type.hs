@@ -54,6 +54,7 @@ module GHC.Core.Type (
         splitForAllTyCoVar_maybe, splitForAllTyCoVar,
         splitForAllTyVar_maybe, splitForAllCoVar_maybe,
         splitPiTy_maybe, splitPiTy, splitPiTys,
+        allTypeOrInvisArgs,
         mkTyConBindersPreferAnon,
         mkPiTy, mkPiTys,
         piResultTy, piResultTys,
@@ -1970,6 +1971,13 @@ splitInvisPiTysN n ty = split n ty ty []
       | FunTy { ft_af = InvisArg, ft_mult = mult, ft_arg = arg, ft_res = res } <- ty
                                 = split (n-1) res res (Anon InvisArg (Scaled mult arg) : bs)
       | otherwise               = (reverse bs, orig_ty)
+
+allTypeOrInvisArgs :: Arity -> Type -> Bool
+allTypeOrInvisArgs 0 _ = True
+allTypeOrInvisArgs n ty | Just ty' <- coreView ty = allTypeOrInvisArgs n ty'
+allTypeOrInvisArgs n (ForAllTy _ ty) = allTypeOrInvisArgs n ty
+allTypeOrInvisArgs n (FunTy { ft_af = InvisArg, ft_res = res }) = allTypeOrInvisArgs (n-1) res
+allTypeOrInvisArgs _ _ = False
 
 -- | Given a 'TyCon' and a list of argument types, filter out any invisible
 -- (i.e., 'Inferred' or 'Specified') arguments.
