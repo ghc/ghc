@@ -1102,7 +1102,7 @@ check_valid_theta _ _ _ []
   = return ()
 check_valid_theta env ctxt expand theta
   = do { dflags <- getDynFlags
-       ; when (notNull dups) $
+       ; unless (null dups) $
           addDiagnosticTcM (WarningWithFlag Opt_WarnDuplicateConstraints)
                            (dupPredWarn env dups)
        ; traceTc "check_valid_theta" (ppr theta)
