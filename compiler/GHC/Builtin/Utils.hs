@@ -79,7 +79,6 @@ import GHC.Unit.Module.ModIface (IfaceExport)
 import GHC.Data.List.SetOps
 
 import Control.Applicative ((<|>))
-import Data.List        ( find )
 import Data.Maybe
 
 {-
@@ -242,13 +241,20 @@ ghcPrimExports
 ghcPrimDeclDocs :: Docs
 ghcPrimDeclDocs = emptyDocs { docs_decls = listToUniqMap $ mapMaybe findName primOpDocs }
   where
-    names = map idName ghcPrimIds ++
-            map idName allThePrimOpIds ++
-            map tyConName exposedPrimTyCons
     findName (nameStr, doc)
-      | Just name <- find ((nameStr ==) . getOccString) names
+      | Just name <- lookupFsEnv ghcPrimNames nameStr
       = Just (name, [WithHsDocIdentifiers (mkGeneratedHsDocString doc) []])
       | otherwise = Nothing
+
+ghcPrimNames :: FastStringEnv Name
+ghcPrimNames
+  = mkFsEnv
+    [ (occNameFS $ nameOccName name, name)
+    | name <-
+        map idName ghcPrimIds ++
+        map idName allThePrimOpIds ++
+        map tyConName exposedPrimTyCons
+    ]
 
 {-
 ************************************************************************
