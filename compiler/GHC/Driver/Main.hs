@@ -218,7 +218,7 @@ import qualified GHC.Data.Stream as Stream
 import GHC.Data.Stream (Stream)
 
 import Data.Data hiding (Fixity, TyCon)
-import Data.Maybe       ( fromJust )
+import Data.Maybe       ( fromJust, catMaybes )
 import Data.List        ( nub, isPrefixOf, partition )
 import Control.Monad
 import Data.IORef
@@ -230,6 +230,10 @@ import Data.Set (Set)
 import Data.Functor
 import Control.DeepSeq (force)
 import Data.Bifunctor (first, bimap)
+import GHC.Cmm.Dataflow.Collections (mapElems)
+import GHC.StgToCmm.Prof (initInfoTableProv)
+import GHC.StgToCmm.Monad (runC, initC, getCmm)
+import GHC.Types.Name.Set (NonCaffySet)
 
 #include "HsVersions.h"
 
@@ -1768,7 +1772,7 @@ doCodeGen hsc_env this_mod denv data_tycons
                         Nothing -> StgToCmm.codeGen logger tmpfs
                         Just h  -> h
 
-    let cmm_stream :: Stream IO CmmGroup (CStub, ModuleLFInfos)
+    let cmm_stream :: Stream IO CmmGroup ModuleLFInfos
         -- See Note [Forcing of stg_binds]
         cmm_stream = stg_binds_w_fvs `seqList` {-# SCC "StgToCmm" #-}
             stg_to_cmm dflags this_mod denv data_tycons cost_centre_info stg_binds_w_fvs hpc_info
@@ -1786,21 +1790,44 @@ doCodeGen hsc_env this_mod denv data_tycons
 
         ppr_stream1 = Stream.mapM dump1 cmm_stream
 
-        pipeline_stream :: Stream IO CmmGroupSRTs CgInfos
+        pipeline_stream :: Stream IO CmmGroupSRTs (NonCaffySet, ModuleLFInfos)
         pipeline_stream = do
-          (non_cafs, (used_info, lf_infos)) <-
+          (non_cafs,  lf_infos) <-
             {-# SCC "cmmPipeline" #-}
             Stream.mapAccumL_ (cmmPipeline hsc_env) (emptySRT this_mod) ppr_stream1
               <&> first (srtMapNonCAFs . moduleSRTMap)
 
-          return CgInfos{ cgNonCafs = non_cafs, cgLFInfos = lf_infos, cgIPEStub = used_info }
+          return (non_cafs, lf_infos)
 
         dump2 a = do
           unless (null a) $
             dumpIfSet_dyn logger dflags Opt_D_dump_cmm "Output Cmm" FormatCMM (pdoc platform a)
           return a
+    -- TODO: Do we have everything in pipeline_stream to emit (call initInfoTableProv)? This would be a good place...
 
-    return (Stream.mapM dump2 pipeline_stream)
+    return $ generateCgIPEStub (Stream.mapM dump2 pipeline_stream)
+  where
+    collectInfoTables:: CmmGroupSRTs -> [CmmInfoTable]
+    collectInfoTables gs = concat $ catMaybes $ map extractCmmInfoTable gs
+      where
+        extractCmmInfoTable :: GenCmmDecl RawCmmStatics CmmTopInfo CmmGraph -> Maybe [CmmInfoTable]
+        extractCmmInfoTable (CmmProc h _ _ _) = Just $ mapElems $ info_tbls h
+        extractCmmInfoTable _ = Nothing
+
+    generateCgIPEStub :: Stream IO CmmGroupSRTs (NonCaffySet, ModuleLFInfos) -> Stream IO CmmGroupSRTs CgInfos
+    generateCgIPEStub s = do
+        let dflags = hsc_dflags hsc_env
+        cgState <- liftIO initC
+        (infoTables, (nonCaffySet, moduleLFInfos)) <- Stream.mapAccumL_ mappy [] s
+        let ((ipeStub, cmmGroup), _) = runC dflags this_mod cgState $ getCmm (initInfoTableProv infoTables denv this_mod)
+        (_, cmmGroupSRTs) <- liftIO $ cmmPipeline hsc_env (emptySRT this_mod) cmmGroup
+        Stream.yield cmmGroupSRTs
+        return CgInfos{ cgNonCafs = nonCaffySet, cgLFInfos = moduleLFInfos, cgIPEStub = ipeStub }
+        where
+          mappy :: [CmmInfoTable] -> CmmGroupSRTs -> IO ([CmmInfoTable], CmmGroupSRTs)
+          mappy acc cmmGroupSRTs = do
+            let infoTables = collectInfoTables cmmGroupSRTs
+            return (acc ++ infoTables, cmmGroupSRTs)
 
 myCoreToStgExpr :: Logger -> DynFlags -> InteractiveContext
                 -> Module -> ModLocation -> CoreExpr
