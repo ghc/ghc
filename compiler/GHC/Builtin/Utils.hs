@@ -34,6 +34,8 @@ module GHC.Builtin.Utils (
 
         ghcPrimExports,
         ghcPrimDeclDocs,
+        ghcPrimWarns,
+        ghcPrimFixities,
 
         -- * Random other things
         maybeCharLikeCon, maybeIntLikeCon,
@@ -61,9 +63,11 @@ import GHC.Core.TyCon
 
 import GHC.Types.Avail
 import GHC.Types.Id
+import GHC.Types.Fixity
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Id.Make
+import GHC.Types.SourceText
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Map
 import GHC.Types.TyThing
@@ -73,8 +77,10 @@ import GHC.Utils.Outputable
 import GHC.Utils.Misc as Utils
 import GHC.Utils.Panic
 import GHC.Utils.Constants (debugIsOn)
+import GHC.Parser.Annotation
 import GHC.Hs.Doc
 import GHC.Unit.Module.ModIface (IfaceExport)
+import GHC.Unit.Module.Warnings
 
 import GHC.Data.List.SetOps
 
@@ -255,6 +261,54 @@ ghcPrimNames
         map idName allThePrimOpIds ++
         map tyConName exposedPrimTyCons
     ]
+
+-- See Note [GHC.Prim Deprecations]
+ghcPrimWarns :: Warnings a
+ghcPrimWarns = WarnSome
+  -- declaration warnings
+  (map mk_decl_dep primOpDeprecations)
+  -- export warnings
+  []
+  where
+    mk_txt msg =
+      DeprecatedTxt NoSourceText [noLocA $ WithHsDocIdentifiers (StringLiteral NoSourceText msg Nothing) []]
+    mk_decl_dep (occ, msg) = (occ, mk_txt msg)
+
+ghcPrimFixities :: [(OccName,Fixity)]
+ghcPrimFixities = fixities
+  where
+    -- The fixity listed here for @`seq`@ should match
+    -- those in primops.txt.pp (from which Haddock docs are generated).
+    fixities = (getOccName seqId, Fixity 0 InfixR)
+             : mapMaybe mkFixity allThePrimOps
+    mkFixity op = (,) (primOpOcc op) <$> primOpFixity op
+
+{-
+Note [GHC.Prim Docs]
+~~~~~~~~~~~~~~~~~~~~
+For haddocks of GHC.Prim we generate a dummy haskell file (gen_hs_source) that
+contains the type signatures and the comments (but no implementations)
+specifically for consumption by haddock.
+
+GHCi's :doc command reads directly from ModIface's though, and GHC.Prim has a
+wired-in iface that has nothing to do with the above haskell file. The code
+below converts primops.txt into an intermediate form that would later be turned
+into a proper DeclDocMap.
+
+We output the docs as a list of pairs (name, docs). We use stringy names here
+because mapping names to "Name"s is difficult for things like primtypes and
+pseudoops.
+
+Note [GHC.Prim Deprecations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Like Haddock documentation, we must record deprecation pragmas in two places:
+in the GHC.Prim source module consumed by Haddock, and in the
+declarations wired-in to GHC. To do the following we generate
+GHC.Builtin.PrimOps.primOpDeprecations, a list of (OccName, DeprecationMessage)
+pairs. We insert these deprecations into the mi_warns field of GHC.Prim's ModIface,
+as though they were written in a source module.
+-}
+
 
 {-
 ************************************************************************

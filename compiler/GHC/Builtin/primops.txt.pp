@@ -74,7 +74,7 @@
 --   2. The dummy Prim.hs file, which is used for Haddock and
 --      contains descriptions taken from primops.txt.pp.
 --      All definitions are replaced by placeholders.
---      See Note [GHC.Prim Docs] in genprimopcode.
+--      See Note [GHC.Prim Docs] in GHC.Builtin.Utils.
 --
 --   3. The module PrimopWrappers.hs, which wraps every call for GHCi;
 --      see Note [Primop wrappers] in GHC.Builtin.Primops for details.

@@ -95,6 +95,7 @@ compilerDependencies = do
                   , "primop-vector-tys.hs-incl"
                   , "primop-vector-uniques.hs-incl"
                   , "primop-docs.hs-incl"
+                  , "primop-deprecations.hs-incl"
                   , "GHC/Platform/Constants.hs"
                   , "GHC/Settings/Config.hs"
                   ]

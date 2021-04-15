@@ -53,6 +53,7 @@ import GHC.Driver.DynFlags
 import GHC.Driver.Hooks
 import GHC.Driver.Plugins
 
+import GHC.Iface.Warnings
 import GHC.Iface.Syntax
 import GHC.Iface.Ext.Fields
 import GHC.Iface.Binary
@@ -74,14 +75,12 @@ import GHC.Settings.Constants
 
 import GHC.Builtin.Names
 import GHC.Builtin.Utils
-import GHC.Builtin.PrimOps    ( allThePrimOps, primOpFixity, primOpOcc )
 
 import GHC.Core.Rules
 import GHC.Core.TyCon
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
 
-import GHC.Types.Id.Make      ( seqId )
 import GHC.Types.Annotations
 import GHC.Types.Name
 import GHC.Types.Name.Cache
@@ -100,6 +99,7 @@ import GHC.Types.PkgQual
 
 import GHC.Unit.External
 import GHC.Unit.Module
+import GHC.Unit.Module.Warnings
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.Deps
 import GHC.Unit.State
@@ -1019,18 +1019,17 @@ ghcPrimIface
   = empty_iface
       & set_mi_exports  ghcPrimExports
       & set_mi_decls    []
-      & set_mi_fixities fixities
-      & set_mi_final_exts ((mi_final_exts empty_iface){ mi_fix_fn = mkIfaceFixCache fixities })
-      & set_mi_docs (Just ghcPrimDeclDocs) -- See Note [GHC.Prim Docs]
+      & set_mi_fixities ghcPrimFixities
+      & set_mi_final_exts ((mi_final_exts empty_iface)
+          { mi_fix_fn = mkIfaceFixCache ghcPrimFixities
+          , mi_decl_warn_fn = mkIfaceDeclWarnCache ghcPrimWarns
+          , mi_export_warn_fn = mkIfaceExportWarnCache ghcPrimWarns
+          })
+      & set_mi_docs (Just ghcPrimDeclDocs) -- See Note [GHC.Prim Docs] in GHC.Builtin.Utils
+      & set_mi_warns (toIfaceWarnings ghcPrimWarns) -- See Note [GHC.Prim Deprecations] in GHC.Builtin.Utils
 
   where
     empty_iface = emptyFullModIface gHC_PRIM
-
-    -- The fixity listed here for @`seq`@ should match
-    -- those in primops.txt.pp (from which Haddock docs are generated).
-    fixities = (getOccName seqId, Fixity 0 InfixR)
-             : mapMaybe mkFixity allThePrimOps
-    mkFixity op = (,) (primOpOcc op) <$> primOpFixity op
 
 {-
 *********************************************************
