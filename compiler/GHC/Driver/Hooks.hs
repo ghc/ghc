@@ -49,7 +49,6 @@ import GHC.Types.CostCentre
 import GHC.Types.IPE
 import GHC.Types.Meta
 import GHC.Types.HpcInfo
-import GHC.Types.ForeignStubs
 
 import GHC.Unit.Module
 import GHC.Unit.Module.ModSummary
