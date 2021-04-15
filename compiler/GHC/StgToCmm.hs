@@ -49,7 +49,6 @@ import GHC.Types.Basic
 import GHC.Types.Var.Set ( isEmptyDVarSet )
 import GHC.Types.Unique.FM
 import GHC.Types.Name.Env
-import GHC.Types.ForeignStubs
 
 import GHC.Core.DataCon
 import GHC.Core.TyCon
