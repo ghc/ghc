@@ -56,6 +56,7 @@ Language extensions can be controlled (i.e. allowed or not) in two ways:
      * :extension:`EmptyDataDeriving`
      * :extension:`ExistentialQuantification`
      * :extension:`ExplicitForAll`
+     * :extension:`FieldSelectors`
      * :extension:`FlexibleContexts`
      * :extension:`FlexibleInstances`
      * :extension:`ForeignFunctionInterface`
