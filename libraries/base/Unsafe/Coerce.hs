@@ -127,10 +127,10 @@ several ways
      and produce a thunk even after discarding the unsafeEqualityProof.
      So instead we float out the case to give
         case unsafeEqualityProof ... of { UnsafeRefl ->
-        let a = K e
+        let a = e
             x = K a
-        in ...
-     Flaoting the case is OK here, even though it broardens the
+        in ...  }
+     Floating the case is OK here, even though it broadens the
      scope, because we are done with simplification.
 
 (U4) GHC.CoreToStg.Prep.cpeExprIsTrivial anticipates the
