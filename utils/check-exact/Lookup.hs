@@ -5,12 +5,7 @@ module Lookup
   , Comment(..)
   ) where
 
--- import Language.Haskell.ExactPrint.Types
 import GHC (AnnKeywordId(..))
--- import GHC.Utils.Outputable hiding ( (<>) )
--- import Data.Data (Data)
--- import GHC.Types.SrcLoc
--- import GHC.Driver.Session
 import Types
 
 -- | Maps `AnnKeywordId` to the corresponding String representation.
@@ -78,7 +73,6 @@ keywordToString kw =
       (G AnnLam      ) -> "\\"
       (G AnnLarrow   ) -> "<-"
       (G AnnLet      ) -> "let"
-      -- (G AnnLolly    ) -> "#->"
       (G AnnLollyU   ) -> "⊸"
       (G AnnMdo      ) -> "mdo"
       (G AnnMinus    ) -> "-"
@@ -93,8 +87,6 @@ keywordToString kw =
       (G AnnOpenEQU  ) ->  "⟦"
       (G AnnOpenP    ) -> "("
       (G AnnOpenPH   ) -> "(#"
-      -- (G AnnOpenPE   ) -> "$("
-      -- (G AnnOpenPTE  ) -> "$$("
       (G AnnOpenS    ) -> "["
       (G AnnPattern  ) -> "pattern"
       (G AnnPercent   ) -> "%"
