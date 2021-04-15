@@ -157,7 +157,7 @@ primOpFixity :: PrimOp -> Maybe Fixity
 See Note [GHC.Prim Docs]
 -}
 
-primOpDocs :: [(String, String)]
+primOpDocs :: [(FastString, String)]
 #include "primop-docs.hs-incl"
 
 {-
