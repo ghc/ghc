@@ -47,7 +47,6 @@ import GHC.Types.ForeignCall
 import GHC.Types.Demand    ( isUsedOnce )
 import GHC.Builtin.PrimOps ( PrimCall(..) )
 import GHC.Types.SrcLoc    ( mkGeneralSrcSpan )
-import GHC.Builtin.Names   ( unsafeEqualityProofName )
 
 import Data.List.NonEmpty (nonEmpty, toList)
 import Data.Maybe    (fromMaybe)
@@ -255,12 +254,13 @@ coreTopBindsToStg
 coreTopBindsToStg _      _        env ccs []
   = (env, ccs, [])
 coreTopBindsToStg dflags this_mod env ccs (b:bs)
+  | NonRec _ rhs <- b, isTyCoArg rhs
+  = coreTopBindsToStg dflags this_mod env1 ccs1 bs
+  | otherwise
   = (env2, ccs2, b':bs')
   where
-        (env1, ccs1, b' ) =
-          coreTopBindToStg dflags this_mod env ccs b
-        (env2, ccs2, bs') =
-          coreTopBindsToStg dflags this_mod env1 ccs1 bs
+    (env1, ccs1, b' ) = coreTopBindToStg dflags this_mod env ccs b
+    (env2, ccs2, bs') = coreTopBindsToStg dflags this_mod env1 ccs1 bs
 
 coreTopBindToStg
         :: DynFlags
@@ -417,6 +417,7 @@ coreToStgExpr (Cast expr _)
 
 -- Cases require a little more real work.
 
+{-
 coreToStgExpr (Case scrut _ _ [])
   = coreToStgExpr scrut
     -- See Note [Empty case alternatives] in GHC.Core If the case
@@ -428,25 +429,20 @@ coreToStgExpr (Case scrut _ _ [])
     -- code generator, and put a return point anyway that calls a
     -- runtime system error function.
 
-
-coreToStgExpr e0@(Case scrut bndr _ alts) = do
-    alts2 <- extendVarEnvCts [(bndr, LambdaBound)] (mapM vars_alt alts)
-    scrut2 <- coreToStgExpr scrut
-    let stg = StgCase scrut2 bndr (mkStgAltType bndr alts) alts2
+coreToStgExpr e0@(Case scrut bndr _ [alt]) = do
+  | isUnsafeEqualityProof scrut
+  , isDeadBinder bndr -- We can only discard the case if the case-binder is dead
+                      -- It usually is, but see #18227
+  , (_,_,rhs) <- alt
+  = coreToStgExpr rhs
     -- See (U2) in Note [Implementing unsafeCoerce] in base:Unsafe.Coerce
-    case scrut2 of
-      StgApp id [] | idName id == unsafeEqualityProofName
-                   , isDeadBinder bndr ->
-        -- We can only discard the case if the case-binder is dead
-        -- It usually is, but see #18227
-        case alts2 of
-          [(_, [_co], rhs)] ->
-            return rhs
-          _ ->
-            pprPanic "coreToStgExpr" $
-              text "Unexpected unsafe equality case expression:" $$ ppr e0 $$
-              text "STG:" $$ pprStgExpr panicStgPprOpts stg
-      _ -> return stg
+-}
+
+-- The normal case for case-expressions
+coreToStgExpr (Case scrut bndr _ alts)
+  = do { scrut2 <- coreToStgExpr scrut
+       ; alts2 <- extendVarEnvCts [(bndr, LambdaBound)] (mapM vars_alt alts)
+       ; return (StgCase scrut2 bndr (mkStgAltType bndr alts) alts2) }
   where
     vars_alt :: (AltCon, [Var], CoreExpr) -> CtsM (AltCon, [Var], StgExpr)
     vars_alt (con, binders, rhs)
@@ -628,25 +624,24 @@ coreToStgLet
          -> CoreExpr     -- body
          -> CtsM StgExpr -- new let
 
-coreToStgLet bind body = do
-    (bind2, body2)
-       <- do
+coreToStgLet bind body
+  | NonRec _ rhs <- bind, isTyCoArg rhs
+  = coreToStgExpr body
 
-          ( bind2, env_ext)
-                <- vars_bind bind
+  | otherwise
+  = do { (bind2, env_ext) <- vars_bind bind
 
           -- Do the body
-          extendVarEnvCts env_ext $ do
-             body2 <- coreToStgExpr body
-
-             return (bind2, body2)
+         ; body2 <- extendVarEnvCts env_ext $
+                    coreToStgExpr body
 
         -- Compute the new let-expression
-    let
-        new_let | isJoinBind bind = StgLetNoEscape noExtFieldSilent bind2 body2
-                | otherwise       = StgLet noExtFieldSilent bind2 body2
+        ; let new_let | isJoinBind bind
+                      = StgLetNoEscape noExtFieldSilent bind2 body2
+                      | otherwise
+                      = StgLet noExtFieldSilent bind2 body2
 
-    return new_let
+        ; return new_let }
   where
     mk_binding binder rhs
         = (binder, LetBound NestedLet (manifestArity rhs))

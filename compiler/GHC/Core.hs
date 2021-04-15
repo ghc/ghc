@@ -261,7 +261,7 @@ data Expr b
   | Let   (Bind b) (Expr b)
   | Case  (Expr b) b Type [Alt b]   -- See Note [Case expression invariants]
                                     -- and Note [Why does Case have a 'Type' field?]
-  | Cast  (Expr b) Coercion
+  | Cast  (Expr b) CoercionR        -- The Coercion has Representational role
   | Tick  (Tickish Id) (Expr b)
   | Type  Type
   | Coercion Coercion

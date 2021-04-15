@@ -309,6 +309,8 @@ toIfaceCoercionX fr co
     go_prov (PhantomProv co)    = IfacePhantomProv (go co)
     go_prov (ProofIrrelProv co) = IfaceProofIrrelProv (go co)
     go_prov (PluginProv str)    = IfacePluginProv str
+    go_prov CorePrepProv        = pprPanic "toIfaceCoercionX" empty
+         -- CorePrepProv only happens after the iface file is generated
 
 toIfaceTcArgs :: TyCon -> [Type] -> IfaceAppArgs
 toIfaceTcArgs = toIfaceTcArgsX emptyVarSet
