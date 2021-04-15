@@ -285,7 +285,7 @@ parseError pst = do
        -- (warns,errs) = GHC.getMessages pst dflags
      -- throw $ GHC.mkSrcErr (GHC.unitBag $ GHC.mkPlainErrMsg dflags sspan err)
      GHC.throwErrors $
-       (GHC.foldMessages (fmap GHC.GhcPsMessage . GHC.mkParserErr) (GHC.getErrorMessages pst))
+       (GHC.foldPsMessages GHC.mkParserErr (GHC.getErrorMessages pst))
 
 -- ---------------------------------------------------------------------
 

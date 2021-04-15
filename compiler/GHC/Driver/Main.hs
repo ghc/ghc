@@ -292,8 +292,8 @@ handleWarnings = do
 logWarningsReportErrors :: (Bag PsWarning, Bag PsError) -> Hsc ()
 logWarningsReportErrors (warnings,errors) = do
     dflags <- getDynFlags
-    let warns = foldMessages (fmap GhcPsMessage . mkParserWarn dflags) warnings
-        errs  = foldMessages (fmap GhcPsMessage . mkParserErr) errors
+    let warns = foldPsMessages (mkParserWarn dflags) warnings
+        errs  = foldPsMessages mkParserErr           errors
     logDiagnostics warns
     when (not $ isEmptyMessages errs) $ throwErrors errs
 
@@ -302,8 +302,8 @@ logWarningsReportErrors (warnings,errors) = do
 handleWarningsThrowErrors :: (Bag PsWarning, Bag PsError) -> Hsc a
 handleWarningsThrowErrors (warnings, errors) = do
     dflags <- getDynFlags
-    let warns = foldMessages (fmap GhcPsMessage . mkParserWarn dflags) warnings
-        errs  = foldMessages (fmap GhcPsMessage . mkParserErr        ) errors
+    let warns = foldPsMessages (mkParserWarn dflags) warnings
+        errs  = foldPsMessages mkParserErr           errors
     logDiagnostics warns
     logger <- getLogger
     let (wWarns, wErrs) = partitionMessages warns
@@ -420,8 +420,8 @@ hscParse' mod_summary
             handleWarningsThrowErrors (getMessages pst)
         POk pst rdr_module -> do
             let (warns, errs) =
-                  bimap (foldMessages (fmap GhcPsMessage . mkParserWarn dflags))
-                        (foldMessages (fmap GhcPsMessage . mkParserErr))
+                  bimap (foldPsMessages (mkParserWarn dflags))
+                        (foldPsMessages mkParserErr)
                         (getMessages pst)
             logDiagnostics warns
             liftIO $ dumpIfSet_dyn logger dflags Opt_D_dump_parsed "Parser"
@@ -1657,9 +1657,9 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
                $ do
                   (warns,errs,cmm) <- withTiming logger dflags (text "ParseCmm"<+>brackets (text filename)) (\_ -> ())
                                        $ parseCmmFile dflags cmm_mod home_unit filename
-                  let msgs = foldMessages (fmap GhcPsMessage . mkParserWarn dflags) warns
+                  let msgs = foldPsMessages (mkParserWarn dflags) warns
                              `unionMessages`
-                             foldMessages (fmap GhcPsMessage . mkParserErr) errs
+                             foldPsMessages mkParserErr errs
                   return (msgs, cmm)
     liftIO $ do
         dumpIfSet_dyn logger dflags Opt_D_dump_cmm_verbose_by_proc "Parsed Cmm" FormatCMM (pdoc platform cmm)
