@@ -37,11 +37,11 @@
        { mod185.hs:3:1-6 }
        (UnchangedAnchor))
       (EpAnnImportDecl
-       (AR { mod185.hs:3:1-6 })
+       (EpaSpan { mod185.hs:3:1-6 })
        (Nothing)
        (Nothing)
        (Just
-        (AR { mod185.hs:3:16-24 }))
+        (EpaSpan { mod185.hs:3:16-24 }))
        (Nothing)
        (Nothing))
       (EpaComments
@@ -107,7 +107,7 @@
                  (UnchangedAnchor))
                 (GrhsAnn
                  (Nothing)
-                 (AddEpAnn AnnEqual (AR { mod185.hs:5:6 })))
+                 (AddEpAnn AnnEqual (EpaSpan { mod185.hs:5:6 })))
                 (EpaComments
                  []))
                []

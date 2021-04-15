@@ -70,8 +70,8 @@ Global bindings (where clauses)
 -- the ...LR datatypes are parametrized by two id types,
 -- one for the left and one for the right.
 
-type instance XHsValBinds      (GhcPass pL) (GhcPass pR) = EpAnn' AnnList
-type instance XHsIPBinds       (GhcPass pL) (GhcPass pR) = EpAnn' AnnList
+type instance XHsValBinds      (GhcPass pL) (GhcPass pR) = EpAnn AnnList
+type instance XHsIPBinds       (GhcPass pL) (GhcPass pR) = EpAnn AnnList
 type instance XEmptyLocalBinds (GhcPass pL) (GhcPass pR) = NoExtField
 type instance XXHsLocalBindsLR (GhcPass pL) (GhcPass pR) = NoExtCon
 
@@ -94,7 +94,7 @@ type instance XFunBind    (GhcPass pL) GhcPs = NoExtField
 type instance XFunBind    (GhcPass pL) GhcRn = NameSet    -- Free variables
 type instance XFunBind    (GhcPass pL) GhcTc = HsWrapper  -- See comments on FunBind.fun_ext
 
-type instance XPatBind    GhcPs (GhcPass pR) = EpAnn
+type instance XPatBind    GhcPs (GhcPass pR) = EpAnn [AddEpAnn]
 type instance XPatBind    GhcRn (GhcPass pR) = NameSet -- Free variables
 type instance XPatBind    GhcTc (GhcPass pR) = Type    -- Type of the GRHSs
 
@@ -106,7 +106,7 @@ type instance XXHsBindsLR (GhcPass pL) (GhcPass pR) = NoExtCon
 type instance XABE       (GhcPass p) = NoExtField
 type instance XXABExport (GhcPass p) = NoExtCon
 
-type instance XPSB         (GhcPass idL) GhcPs = EpAnn
+type instance XPSB         (GhcPass idL) GhcPs = EpAnn [AddEpAnn]
 type instance XPSB         (GhcPass idL) GhcRn = NameSet
 type instance XPSB         (GhcPass idL) GhcTc = NameSet
 
@@ -553,7 +553,7 @@ isEmptyIPBindsPR (IPBinds _ is) = null is
 isEmptyIPBindsTc :: HsIPBinds GhcTc -> Bool
 isEmptyIPBindsTc (IPBinds ds is) = null is && isEmptyTcEvBinds ds
 
-type instance XCIPBind    (GhcPass p) = EpAnn
+type instance XCIPBind    (GhcPass p) = EpAnn [AddEpAnn]
 type instance XXIPBind    (GhcPass p) = NoExtCon
 
 instance OutputableBndrId p
@@ -575,17 +575,17 @@ instance OutputableBndrId p => Outputable (IPBind (GhcPass p)) where
 ************************************************************************
 -}
 
-type instance XTypeSig          (GhcPass p) = EpAnn' AnnSig
-type instance XPatSynSig        (GhcPass p) = EpAnn' AnnSig
-type instance XClassOpSig       (GhcPass p) = EpAnn' AnnSig
+type instance XTypeSig          (GhcPass p) = EpAnn AnnSig
+type instance XPatSynSig        (GhcPass p) = EpAnn AnnSig
+type instance XClassOpSig       (GhcPass p) = EpAnn AnnSig
 type instance XIdSig            (GhcPass p) = NoExtField -- No anns, generated
-type instance XFixSig           (GhcPass p) = EpAnn
-type instance XInlineSig        (GhcPass p) = EpAnn
-type instance XSpecSig          (GhcPass p) = EpAnn
-type instance XSpecInstSig      (GhcPass p) = EpAnn
-type instance XMinimalSig       (GhcPass p) = EpAnn
-type instance XSCCFunSig        (GhcPass p) = EpAnn
-type instance XCompleteMatchSig (GhcPass p) = EpAnn
+type instance XFixSig           (GhcPass p) = EpAnn [AddEpAnn]
+type instance XInlineSig        (GhcPass p) = EpAnn [AddEpAnn]
+type instance XSpecSig          (GhcPass p) = EpAnn [AddEpAnn]
+type instance XSpecInstSig      (GhcPass p) = EpAnn [AddEpAnn]
+type instance XMinimalSig       (GhcPass p) = EpAnn [AddEpAnn]
+type instance XSCCFunSig        (GhcPass p) = EpAnn [AddEpAnn]
+type instance XCompleteMatchSig (GhcPass p) = EpAnn [AddEpAnn]
 
 type instance XXSig             (GhcPass p) = NoExtCon
 

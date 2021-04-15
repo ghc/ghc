@@ -207,14 +207,14 @@ could only do that if the extension field was strict (#18764)
 -- API Annotations types
 
 data EpAnnHsCase = EpAnnHsCase
-      { hsCaseAnnCase :: EpaAnchor
-      , hsCaseAnnOf   :: EpaAnchor
+      { hsCaseAnnCase :: EpaLocation
+      , hsCaseAnnOf   :: EpaLocation
       , hsCaseAnnsRest :: [AddEpAnn]
       } deriving Data
 
 data EpAnnUnboundVar = EpAnnUnboundVar
-     { hsUnboundBackquotes :: (EpaAnchor, EpaAnchor)
-     , hsUnboundHole       :: EpaAnchor
+     { hsUnboundBackquotes :: (EpaLocation, EpaLocation)
+     , hsUnboundHole       :: EpaLocation
      } deriving Data
 
 type instance XVar           (GhcPass _) = NoExtField
@@ -232,7 +232,7 @@ type instance XOverLabel     GhcTc = Void  -- See Note [Constructor cannot occur
 
 type instance XVar           (GhcPass _) = NoExtField
 
-type instance XUnboundVar    GhcPs = EpAnn' EpAnnUnboundVar
+type instance XUnboundVar    GhcPs = EpAnn EpAnnUnboundVar
 type instance XUnboundVar    GhcRn = NoExtField
 type instance XUnboundVar    GhcTc = HoleExprRef
   -- We really don't need the whole HoleExprRef; just the IORef EvTerm
@@ -248,7 +248,7 @@ type instance XLitE          (GhcPass _) = EpAnnCO
 
 type instance XLam           (GhcPass _) = NoExtField
 
-type instance XLamCase       (GhcPass _) = EpAnn
+type instance XLamCase       (GhcPass _) = EpAnn [AddEpAnn]
 type instance XApp           (GhcPass _) = EpAnnCO
 
 type instance XAppTypeE      GhcPs = SrcSpan -- Where the `@` lives
@@ -257,7 +257,7 @@ type instance XAppTypeE      GhcTc = Type
 
 -- OpApp not present in GhcTc pass; see GHC.Rename.Expr
 -- Note [Handling overloaded and rebindable constructs]
-type instance XOpApp         GhcPs = EpAnn
+type instance XOpApp         GhcPs = EpAnn [AddEpAnn]
 type instance XOpApp         GhcRn = Fixity
 type instance XOpApp         GhcTc = Void  -- See Note [Constructor cannot occur]
 
@@ -271,41 +271,41 @@ type instance XSectionL      GhcTc = Void  -- See Note [Constructor cannot occur
 type instance XSectionR      GhcTc = Void  -- See Note [Constructor cannot occur]
 
 
-type instance XNegApp        GhcPs = EpAnn
+type instance XNegApp        GhcPs = EpAnn [AddEpAnn]
 type instance XNegApp        GhcRn = NoExtField
 type instance XNegApp        GhcTc = NoExtField
 
-type instance XPar           (GhcPass _) = EpAnn' AnnParen
+type instance XPar           (GhcPass _) = EpAnn AnnParen
 
-type instance XExplicitTuple GhcPs = EpAnn
+type instance XExplicitTuple GhcPs = EpAnn [AddEpAnn]
 type instance XExplicitTuple GhcRn = NoExtField
 type instance XExplicitTuple GhcTc = NoExtField
 
-type instance XExplicitSum   GhcPs = EpAnn' AnnExplicitSum
+type instance XExplicitSum   GhcPs = EpAnn AnnExplicitSum
 type instance XExplicitSum   GhcRn = NoExtField
 type instance XExplicitSum   GhcTc = [Type]
 
-type instance XCase          GhcPs = EpAnn' EpAnnHsCase
+type instance XCase          GhcPs = EpAnn EpAnnHsCase
 type instance XCase          GhcRn = NoExtField
 type instance XCase          GhcTc = NoExtField
 
-type instance XIf            GhcPs = EpAnn
+type instance XIf            GhcPs = EpAnn [AddEpAnn]
 type instance XIf            GhcRn = NoExtField
 type instance XIf            GhcTc = NoExtField
 
-type instance XMultiIf       GhcPs = EpAnn
+type instance XMultiIf       GhcPs = EpAnn [AddEpAnn]
 type instance XMultiIf       GhcRn = NoExtField
 type instance XMultiIf       GhcTc = Type
 
-type instance XLet           GhcPs = EpAnn' AnnsLet
+type instance XLet           GhcPs = EpAnn AnnsLet
 type instance XLet           GhcRn = NoExtField
 type instance XLet           GhcTc = NoExtField
 
-type instance XDo            GhcPs = EpAnn' AnnList
+type instance XDo            GhcPs = EpAnn AnnList
 type instance XDo            GhcRn = NoExtField
 type instance XDo            GhcTc = Type
 
-type instance XExplicitList  GhcPs = EpAnn' AnnList
+type instance XExplicitList  GhcPs = EpAnn AnnList
 type instance XExplicitList  GhcRn = NoExtField
 type instance XExplicitList  GhcTc = Type
 -- GhcPs: ExplicitList includes all source-level
@@ -316,11 +316,11 @@ type instance XExplicitList  GhcTc = Type
 -- See Note [Handling overloaded and rebindable constructs]
 -- in  GHC.Rename.Expr
 
-type instance XRecordCon     GhcPs = EpAnn
+type instance XRecordCon     GhcPs = EpAnn [AddEpAnn]
 type instance XRecordCon     GhcRn = NoExtField
 type instance XRecordCon     GhcTc = PostTcExpr   -- Instantiated constructor function
 
-type instance XRecordUpd     GhcPs = EpAnn
+type instance XRecordUpd     GhcPs = EpAnn [AddEpAnn]
 type instance XRecordUpd     GhcRn = NoExtField
 type instance XRecordUpd     GhcTc = RecordUpdTc
 
@@ -330,29 +330,29 @@ type instance XGetField     GhcTc = Void
 -- HsGetField is eliminated by the renamer. See [Handling overloaded
 -- and rebindable constructs].
 
-type instance XProjection     GhcPs = EpAnn' AnnProjection
+type instance XProjection     GhcPs = EpAnn AnnProjection
 type instance XProjection     GhcRn = NoExtField
 type instance XProjection     GhcTc = Void
 -- HsProjection is eliminated by the renamer. See [Handling overloaded
 -- and rebindable constructs].
 
-type instance XExprWithTySig GhcPs = EpAnn
+type instance XExprWithTySig GhcPs = EpAnn [AddEpAnn]
 type instance XExprWithTySig GhcRn = NoExtField
 type instance XExprWithTySig GhcTc = NoExtField
 
-type instance XArithSeq      GhcPs = EpAnn
+type instance XArithSeq      GhcPs = EpAnn [AddEpAnn]
 type instance XArithSeq      GhcRn = NoExtField
 type instance XArithSeq      GhcTc = PostTcExpr
 
-type instance XBracket       (GhcPass _) = EpAnn
+type instance XBracket       (GhcPass _) = EpAnn [AddEpAnn]
 
 type instance XRnBracketOut  (GhcPass _) = NoExtField
 type instance XTcBracketOut  (GhcPass _) = NoExtField
 
 type instance XSpliceE       (GhcPass _) = EpAnnCO
-type instance XProc          (GhcPass _) = EpAnn
+type instance XProc          (GhcPass _) = EpAnn [AddEpAnn]
 
-type instance XStatic        GhcPs = EpAnn
+type instance XStatic        GhcPs = EpAnn [AddEpAnn]
 type instance XStatic        GhcRn = NameSet
 type instance XStatic        GhcTc = NameSet
 
@@ -378,40 +378,40 @@ data XXExprGhcTc
 
 data AnnExplicitSum
   = AnnExplicitSum {
-      aesOpen       :: EpaAnchor,
-      aesBarsBefore :: [EpaAnchor],
-      aesBarsAfter  :: [EpaAnchor],
-      aesClose      :: EpaAnchor
+      aesOpen       :: EpaLocation,
+      aesBarsBefore :: [EpaLocation],
+      aesBarsAfter  :: [EpaLocation],
+      aesClose      :: EpaLocation
       } deriving Data
 
 data AnnsLet
   = AnnsLet {
-      alLet :: EpaAnchor,
-      alIn :: EpaAnchor
+      alLet :: EpaLocation,
+      alIn :: EpaLocation
       } deriving Data
 
 data AnnFieldLabel
   = AnnFieldLabel {
-      afDot :: Maybe EpaAnchor
+      afDot :: Maybe EpaLocation
       } deriving Data
 
 data AnnProjection
   = AnnProjection {
-      apOpen  :: EpaAnchor, -- ^ '('
-      apClose :: EpaAnchor  -- ^ ')'
+      apOpen  :: EpaLocation, -- ^ '('
+      apClose :: EpaLocation  -- ^ ')'
       } deriving Data
 
 -- ---------------------------------------------------------------------
 
-type instance XSCC           (GhcPass _) = EpAnn' AnnPragma
+type instance XSCC           (GhcPass _) = EpAnn AnnPragma
 type instance XXPragE        (GhcPass _) = NoExtCon
 
-type instance XCHsFieldLabel (GhcPass _) = EpAnn' AnnFieldLabel
+type instance XCHsFieldLabel (GhcPass _) = EpAnn AnnFieldLabel
 type instance XXHsFieldLabel (GhcPass _) = NoExtCon
 
-type instance XPresent         (GhcPass _) = EpAnn
+type instance XPresent         (GhcPass _) = EpAnn [AddEpAnn]
 
-type instance XMissing         GhcPs = EpAnn' EpaAnchor
+type instance XMissing         GhcPs = EpAnn EpaLocation
 type instance XMissing         GhcRn = NoExtField
 type instance XMissing         GhcTc = Scaled Type
 
@@ -981,33 +981,33 @@ instance (Outputable a, Outputable b) => Outputable (HsExpansion a b) where
 ************************************************************************
 -}
 
-type instance XCmdArrApp  GhcPs = EpAnn' AddEpAnn
+type instance XCmdArrApp  GhcPs = EpAnn AddEpAnn
 type instance XCmdArrApp  GhcRn = NoExtField
 type instance XCmdArrApp  GhcTc = Type
 
-type instance XCmdArrForm GhcPs = EpAnn' AnnList
+type instance XCmdArrForm GhcPs = EpAnn AnnList
 type instance XCmdArrForm GhcRn = NoExtField
 type instance XCmdArrForm GhcTc = NoExtField
 
 type instance XCmdApp     (GhcPass _) = EpAnnCO
 type instance XCmdLam     (GhcPass _) = NoExtField
-type instance XCmdPar     (GhcPass _) = EpAnn' AnnParen
+type instance XCmdPar     (GhcPass _) = EpAnn AnnParen
 
-type instance XCmdCase    GhcPs = EpAnn' EpAnnHsCase
+type instance XCmdCase    GhcPs = EpAnn EpAnnHsCase
 type instance XCmdCase    GhcRn = NoExtField
 type instance XCmdCase    GhcTc = NoExtField
 
-type instance XCmdLamCase (GhcPass _) = EpAnn
+type instance XCmdLamCase (GhcPass _) = EpAnn [AddEpAnn]
 
-type instance XCmdIf      GhcPs = EpAnn
+type instance XCmdIf      GhcPs = EpAnn [AddEpAnn]
 type instance XCmdIf      GhcRn = NoExtField
 type instance XCmdIf      GhcTc = NoExtField
 
-type instance XCmdLet     GhcPs = EpAnn' AnnsLet
+type instance XCmdLet     GhcPs = EpAnn AnnsLet
 type instance XCmdLet     GhcRn = NoExtField
 type instance XCmdLet     GhcTc = NoExtField
 
-type instance XCmdDo      GhcPs = EpAnn' AnnList
+type instance XCmdDo      GhcPs = EpAnn AnnList
 type instance XCmdDo      GhcRn = NoExtField
 type instance XCmdDo      GhcTc = Type
 
@@ -1152,7 +1152,7 @@ type instance XMG         GhcTc b = MatchGroupTc
 
 type instance XXMatchGroup (GhcPass _) b = NoExtCon
 
-type instance XCMatch (GhcPass _) b = EpAnn
+type instance XCMatch (GhcPass _) b = EpAnn [AddEpAnn]
 type instance XXMatch (GhcPass _) b = NoExtCon
 
 instance (OutputableBndrId pr, Outputable body)
@@ -1186,11 +1186,11 @@ type instance XXGRHSs (GhcPass _) _ = NoExtCon
 
 data GrhsAnn
   = GrhsAnn {
-      ga_vbar :: Maybe EpaAnchor, -- TODO:AZ do we need this?
+      ga_vbar :: Maybe EpaLocation, -- TODO:AZ do we need this?
       ga_sep  :: AddEpAnn -- ^ Match separator location
       } deriving (Data)
 
-type instance XCGRHS (GhcPass _) _ = EpAnn' GrhsAnn
+type instance XCGRHS (GhcPass _) _ = EpAnn GrhsAnn
                                    -- Location of matchSeparator
                                    -- TODO:AZ does this belong on the GRHS, or GRHSs?
 
@@ -1304,7 +1304,7 @@ data RecStmtTc =
 
 type instance XLastStmt        (GhcPass _) (GhcPass _) b = NoExtField
 
-type instance XBindStmt        (GhcPass _) GhcPs b = EpAnn
+type instance XBindStmt        (GhcPass _) GhcPs b = EpAnn [AddEpAnn]
 type instance XBindStmt        (GhcPass _) GhcRn b = XBindStmtRn
 type instance XBindStmt        (GhcPass _) GhcTc b = XBindStmtTc
 
@@ -1328,17 +1328,17 @@ type instance XBodyStmt        (GhcPass _) GhcPs b = NoExtField
 type instance XBodyStmt        (GhcPass _) GhcRn b = NoExtField
 type instance XBodyStmt        (GhcPass _) GhcTc b = Type
 
-type instance XLetStmt         (GhcPass _) (GhcPass _) b = EpAnn
+type instance XLetStmt         (GhcPass _) (GhcPass _) b = EpAnn [AddEpAnn]
 
 type instance XParStmt         (GhcPass _) GhcPs b = NoExtField
 type instance XParStmt         (GhcPass _) GhcRn b = NoExtField
 type instance XParStmt         (GhcPass _) GhcTc b = Type
 
-type instance XTransStmt       (GhcPass _) GhcPs b = EpAnn
+type instance XTransStmt       (GhcPass _) GhcPs b = EpAnn [AddEpAnn]
 type instance XTransStmt       (GhcPass _) GhcRn b = NoExtField
 type instance XTransStmt       (GhcPass _) GhcTc b = Type
 
-type instance XRecStmt         (GhcPass _) GhcPs b = EpAnn' AnnList
+type instance XRecStmt         (GhcPass _) GhcPs b = EpAnn AnnList
 type instance XRecStmt         (GhcPass _) GhcRn b = NoExtField
 type instance XRecStmt         (GhcPass _) GhcTc b = RecStmtTc
 
@@ -1523,8 +1523,8 @@ pprQuals quals = interpp'SP quals
 
 newtype HsSplicedT = HsSplicedT DelayedSplice deriving (Data)
 
-type instance XTypedSplice   (GhcPass _) = EpAnn
-type instance XUntypedSplice (GhcPass _) = EpAnn
+type instance XTypedSplice   (GhcPass _) = EpAnn [AddEpAnn]
+type instance XUntypedSplice (GhcPass _) = EpAnn [AddEpAnn]
 type instance XQuasiQuote    (GhcPass _) = NoExtField
 type instance XSpliced       (GhcPass _) = NoExtField
 type instance XXSplice       GhcPs       = NoExtCon
@@ -1838,6 +1838,6 @@ type instance Anno (HsSplice (GhcPass p)) = SrcSpanAnnA
 type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsExpr (GhcPass pr))))] = SrcSpanAnnL
 type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsCmd  (GhcPass pr))))] = SrcSpanAnnL
 
-instance (Anno a ~ SrcSpanAnn' (EpAnn' an))
+instance (Anno a ~ SrcSpanAnn' (EpAnn an))
    => WrapXRec (GhcPass p) a where
   wrapXRec = noLocA
