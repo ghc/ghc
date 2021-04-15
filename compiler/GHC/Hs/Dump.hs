@@ -136,12 +136,13 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
               BlankSrcSpanFile -> parens $ text "SourceText" <+> text src
               _                -> parens $ text "SourceText" <+> text "blanked"
 
-            epaAnchor :: EpaAnchor -> SDoc
-            epaAnchor (AR r) = parens $ text "AR" <+> realSrcSpan r
-            epaAnchor (AD d) = parens $ text "AD" <+> deltaPos d
+            epaAnchor :: EpaLocation -> SDoc
+            epaAnchor (EpaSpan r)  = parens $ text "EpaSpan" <+> realSrcSpan r
+            epaAnchor (EpaDelta d) = parens $ text "EpaDelta" <+> deltaPos d
 
             deltaPos :: DeltaPos -> SDoc
-            deltaPos (DP l c) = parens $ text "DP" <+> ppr l <+> ppr c
+            deltaPos (SameLine c) = parens $ text "SameLine" <+> ppr c
+            deltaPos (DifferentLine l c) = parens $ text "DifferentLine" <+> ppr l <+> ppr c
 
             name :: Name -> SDoc
             name nm    = braces $ text "Name:" <+> ppr nm
@@ -223,38 +224,38 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
 
             -- -------------------------
 
-            annotation :: EpAnn -> SDoc
-            annotation = annotation' (text "EpAnn")
+            annotation :: EpAnn [AddEpAnn] -> SDoc
+            annotation = annotation' (text "EpAnn [AddEpAnn]")
 
-            annotationModule :: EpAnn' AnnsModule -> SDoc
-            annotationModule = annotation' (text "EpAnn' AnnsModule")
+            annotationModule :: EpAnn AnnsModule -> SDoc
+            annotationModule = annotation' (text "EpAnn AnnsModule")
 
-            annotationAddEpAnn :: EpAnn' AddEpAnn -> SDoc
-            annotationAddEpAnn = annotation' (text "EpAnn' AddEpAnn")
+            annotationAddEpAnn :: EpAnn AddEpAnn -> SDoc
+            annotationAddEpAnn = annotation' (text "EpAnn AddEpAnn")
 
-            annotationGrhsAnn :: EpAnn' GrhsAnn -> SDoc
-            annotationGrhsAnn = annotation' (text "EpAnn' GrhsAnn")
+            annotationGrhsAnn :: EpAnn GrhsAnn -> SDoc
+            annotationGrhsAnn = annotation' (text "EpAnn GrhsAnn")
 
-            annotationEpAnnHsCase :: EpAnn' EpAnnHsCase -> SDoc
-            annotationEpAnnHsCase = annotation' (text "EpAnn' EpAnnHsCase")
+            annotationEpAnnHsCase :: EpAnn EpAnnHsCase -> SDoc
+            annotationEpAnnHsCase = annotation' (text "EpAnn EpAnnHsCase")
 
-            annotationEpAnnHsLet :: EpAnn' AnnsLet -> SDoc
-            annotationEpAnnHsLet = annotation' (text "EpAnn' AnnsLet")
+            annotationEpAnnHsLet :: EpAnn AnnsLet -> SDoc
+            annotationEpAnnHsLet = annotation' (text "EpAnn AnnsLet")
 
-            annotationAnnList :: EpAnn' AnnList -> SDoc
-            annotationAnnList = annotation' (text "EpAnn' AnnList")
+            annotationAnnList :: EpAnn AnnList -> SDoc
+            annotationAnnList = annotation' (text "EpAnn AnnList")
 
-            annotationEpAnnImportDecl :: EpAnn' EpAnnImportDecl -> SDoc
-            annotationEpAnnImportDecl = annotation' (text "EpAnn' EpAnnImportDecl")
+            annotationEpAnnImportDecl :: EpAnn EpAnnImportDecl -> SDoc
+            annotationEpAnnImportDecl = annotation' (text "EpAnn EpAnnImportDecl")
 
-            annotationAnnParen :: EpAnn' AnnParen -> SDoc
-            annotationAnnParen = annotation' (text "EpAnn' AnnParen")
+            annotationAnnParen :: EpAnn AnnParen -> SDoc
+            annotationAnnParen = annotation' (text "EpAnn AnnParen")
 
-            annotationTrailingAnn :: EpAnn' TrailingAnn -> SDoc
-            annotationTrailingAnn = annotation' (text "EpAnn' TrailingAnn")
+            annotationTrailingAnn :: EpAnn TrailingAnn -> SDoc
+            annotationTrailingAnn = annotation' (text "EpAnn TrailingAnn")
 
             annotation' :: forall a .(Data a, Typeable a)
-                       => SDoc -> EpAnn' a -> SDoc
+                       => SDoc -> EpAnn a -> SDoc
             annotation' tag anns = case ba of
              BlankEpAnnotations -> parens (text "blanked:" <+> tag)
              NoBlankEpAnnotations -> parens $ text (showConstr (toConstr anns))
@@ -262,19 +263,19 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
 
             -- -------------------------
 
-            srcSpanAnnA :: SrcSpanAnn' (EpAnn' AnnListItem) -> SDoc
+            srcSpanAnnA :: SrcSpanAnn' (EpAnn AnnListItem) -> SDoc
             srcSpanAnnA = locatedAnn'' (text "SrcSpanAnnA")
 
-            srcSpanAnnL :: SrcSpanAnn' (EpAnn' AnnList) -> SDoc
+            srcSpanAnnL :: SrcSpanAnn' (EpAnn AnnList) -> SDoc
             srcSpanAnnL = locatedAnn'' (text "SrcSpanAnnL")
 
-            srcSpanAnnP :: SrcSpanAnn' (EpAnn' AnnPragma) -> SDoc
+            srcSpanAnnP :: SrcSpanAnn' (EpAnn AnnPragma) -> SDoc
             srcSpanAnnP = locatedAnn'' (text "SrcSpanAnnP")
 
-            srcSpanAnnC :: SrcSpanAnn' (EpAnn' AnnContext) -> SDoc
+            srcSpanAnnC :: SrcSpanAnn' (EpAnn AnnContext) -> SDoc
             srcSpanAnnC = locatedAnn'' (text "SrcSpanAnnC")
 
-            srcSpanAnnN :: SrcSpanAnn' (EpAnn' NameAnn) -> SDoc
+            srcSpanAnnN :: SrcSpanAnn' (EpAnn NameAnn) -> SDoc
             srcSpanAnnN = locatedAnn'' (text "SrcSpanAnnN")
 
             locatedAnn'' :: forall a. (Typeable a, Data a)

@@ -44,16 +44,10 @@ module Parsers (
         , postParseTransform
         ) where
 
--- import Language.Haskell.GHC.ExactPrint.Annotate
--- import Language.Haskell.GHC.ExactPrint.Delta
 import Preprocess
 import Types
 
 import Control.Monad.RWS
--- import Data.Data (Data)
-
-
--- import GHC.Paths (libdir)
 
 import qualified GHC hiding (parseModule)
 import qualified Control.Monad.IO.Class as GHC
@@ -70,8 +64,6 @@ import qualified GHC.Types.SrcLoc       as GHC
 import qualified GHC.Utils.Error        as GHC
 
 import qualified GHC.LanguageExtensions as LangExt
-
--- import qualified Data.Map as Map
 
 {-# ANN module "HLint: ignore Eta reduce" #-}
 {-# ANN module "HLint: ignore Redundant do" #-}
@@ -98,8 +90,6 @@ parseWithECP :: (GHC.DisambECP w)
           -> String
           -> ParseResult (GHC.LocatedA w)
 parseWithECP dflags fileName parser s =
-    -- case runParser ff dflags fileName s of
-    -- case runParser (parser >>= \p -> GHC.runECP_P p) dflags fileName s of
     case runParser (parser >>= \p -> GHC.runPV $ GHC.unECP p) dflags fileName s of
       GHC.PFailed pst                     -> Left (fmap GHC.pprError $ GHC.getErrorMessages pst)
       GHC.POk _ pmod -> Right pmod
@@ -275,7 +265,6 @@ postParseTransform
 postParseTransform parseRes = fmap mkAnns parseRes
   where
     mkAnns (_cs, _, m) = m
-      -- (relativiseEpAnnsWithOptions opts cs m apianns, m)
 
 -- | Internal function. Initializes DynFlags value for parsing.
 --

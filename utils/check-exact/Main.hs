@@ -51,7 +51,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/exactprin
  -- "../../testsuite/tests/ghc-api/exactprint/LocToName.hs" (Just changeLocToName)
  -- "../../testsuite/tests/ghc-api/exactprint/LetIn1.hs" (Just changeLetIn1)
  -- "../../testsuite/tests/ghc-api/exactprint/WhereIn4.hs" (Just changeWhereIn4)
- -- "../../testsuite/tests/ghc-api/exactprint/AddDecl1.hs" (Just changeAddDecl1)
+ "../../testsuite/tests/ghc-api/exactprint/AddDecl1.hs" (Just changeAddDecl1)
  -- "../../testsuite/tests/ghc-api/exactprint/AddDecl2.hs" (Just changeAddDecl2)
  -- "../../testsuite/tests/ghc-api/exactprint/AddDecl3.hs" (Just changeAddDecl3)
  -- "../../testsuite/tests/ghc-api/exactprint/LocalDecls.hs" (Just changeLocalDecls)
@@ -63,7 +63,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/exactprin
  -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl3.hs" (Just addLocaLDecl3)
  -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl4.hs" (Just addLocaLDecl4)
  -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl5.hs" (Just addLocaLDecl5)
- -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl6.hs" (Just (Just addLocaLDecl6))
+ -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl6.hs" (Just addLocaLDecl6)
  -- "../../testsuite/tests/ghc-api/exactprint/RmDecl1.hs" (Just rmDecl1)
  -- "../../testsuite/tests/ghc-api/exactprint/RmDecl2.hs" (Just rmDecl2)
  -- "../../testsuite/tests/ghc-api/exactprint/RmDecl3.hs" (Just rmDecl3)
@@ -75,8 +75,8 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/exactprin
  -- "../../testsuite/tests/ghc-api/exactprint/RmTypeSig2.hs" (Just rmTypeSig2)
  -- "../../testsuite/tests/ghc-api/exactprint/AddHiding1.hs" (Just addHiding1)
  -- "../../testsuite/tests/ghc-api/exactprint/AddHiding2.hs" (Just addHiding2)
- -- "../../testsuite/tests/printer/Ppr001.hs" Nothing
 
+ -- "../../testsuite/tests/printer/Ppr001.hs" Nothing
  -- "../../testsuite/tests/ghc-api/annotations/CommentsTest.hs" Nothing
  -- "../../testsuite/tests/hiefile/should_compile/Constructors.hs" Nothing
  -- "../../testsuite/tests/hiefile/should_compile/Scopes.hs" Nothing
@@ -172,7 +172,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/exactprin
  -- "../../testsuite/tests/printer/Test16230.hs" Nothing
  -- "../../testsuite/tests/printer/Test16236.hs" Nothing
  -- "../../testsuite/tests/printer/Test17519.hs" Nothing
- "../../testsuite/tests/printer/InTreeAnnotations1.hs" Nothing
+ -- "../../testsuite/tests/printer/InTreeAnnotations1.hs" Nothing
 
  -- "../../testsuite/tests/qualifieddo/should_compile/qdocompile001.hs" Nothing
  -- "../../testsuite/tests/typecheck/should_fail/StrictBinds.hs" Nothing
@@ -431,9 +431,9 @@ changeLetIn1 _libdir parsed
              [l2,_l1] = map wrapDecl $ bagToList bagDecls
              bagDecls' = listToBag $ concatMap decl2Bind [l2]
              (L (SrcSpanAnn _ le) e) = expr
-             a = (SrcSpanAnn (EpAnn (Anchor (realSrcSpan le) (MovedAnchor (DP 0 1))) mempty noCom) le)
+             a = (SrcSpanAnn (EpAnn (Anchor (realSrcSpan le) (MovedAnchor (SameLine 1))) mempty emptyComments) le)
              expr' = L a e
-         in (HsLet (EpAnn anc (AnnsLet l (AD (DP 1 0))) cs)
+         in (HsLet (EpAnn anc (AnnsLet l (EpaDelta (DifferentLine 1 0))) cs)
                 (HsValBinds x (ValBinds xv bagDecls' sigs)) expr')
 
     replace x = x
@@ -444,7 +444,7 @@ changeLetIn1 _libdir parsed
 changeAddDecl1 :: Changer
 changeAddDecl1 libdir top = do
   Right decl <- withDynFlags libdir (\df -> parseDecl df "<interactive>" "nn = n2")
-  let decl' = setEntryDP' decl (DP 2 0)
+  let decl' = setEntryDP' decl (DifferentLine 2 0)
 
   let (p',(_,_),_) = runTransform mempty doAddDecl
       doAddDecl = everywhereM (mkM replaceTopLevelDecls) top
@@ -456,7 +456,7 @@ changeAddDecl1 libdir top = do
 changeAddDecl2 :: Changer
 changeAddDecl2 libdir top = do
   Right decl <- withDynFlags libdir (\df -> parseDecl df "<interactive>" "nn = n2")
-  let decl' = setEntryDP' decl (DP 2 0)
+  let decl' = setEntryDP' decl (DifferentLine 2 0)
   let top' = anchorEof top
 
   let (p',(_,_),_) = runTransform mempty doAddDecl
@@ -470,13 +470,13 @@ changeAddDecl2 libdir top = do
 changeAddDecl3 :: Changer
 changeAddDecl3 libdir top = do
   Right decl <- withDynFlags libdir (\df -> parseDecl df "<interactive>" "nn = n2")
-  let decl' = setEntryDP' decl (DP 2 0)
+  let decl' = setEntryDP' decl (DifferentLine 2 0)
 
   let (p',(_,_),_) = runTransform mempty doAddDecl
       doAddDecl = everywhereM (mkM replaceTopLevelDecls) top
       f d (l1:l2:ls) = l1:d:l2':ls
         where
-          l2' = setEntryDP' l2 (DP 2 0)
+          l2' = setEntryDP' l2 (DifferentLine 2 0)
       replaceTopLevelDecls :: ParsedSource -> Transform ParsedSource
       replaceTopLevelDecls m = insertAt f m decl'
   return p'
@@ -488,8 +488,8 @@ changeLocalDecls :: Changer
 changeLocalDecls libdir (L l p) = do
   Right s@(L ls (SigD _ sig))  <- withDynFlags libdir (\df -> parseDecl df "sig"  "nn :: Int")
   Right d@(L ld (ValD _ decl)) <- withDynFlags libdir (\df -> parseDecl df "decl" "nn = 2")
-  let decl' = setEntryDP' (L ld decl) (DP 1 0)
-  let  sig' = setEntryDP' (L ls sig)  (DP 0 0)
+  let decl' = setEntryDP' (L ld decl) (DifferentLine 1 0)
+  let  sig' = setEntryDP' (L ls sig)  (SameLine 0)
   let (p',(_,_),_w) = runTransform mempty doAddLocal
       doAddLocal = everywhereM (mkM replaceLocalBinds) p
       replaceLocalBinds :: LMatch GhcPs (LHsExpr GhcPs)
@@ -500,10 +500,10 @@ changeLocalDecls libdir (L l p) = do
         let oldDecls' = captureLineSpacing oldDecls
         let oldBinds     = concatMap decl2Bind oldDecls'
             (os:oldSigs) = concatMap decl2Sig  oldDecls'
-            os' = setEntryDP' os (DP 2 0)
+            os' = setEntryDP' os (DifferentLine 2 0)
         let sortKey = captureOrder decls
         let (EpAnn anc (AnnList (Just (Anchor anc2 _)) a b c dd) cs) = van
-        let van' = (EpAnn anc (AnnList (Just (Anchor anc2 (MovedAnchor (DP 1 4)))) a b c dd) cs)
+        let van' = (EpAnn anc (AnnList (Just (Anchor anc2 (MovedAnchor (DifferentLine 1 4)))) a b c dd) cs)
         let binds' = (HsValBinds van'
                           (ValBinds sortKey (listToBag $ decl':oldBinds)
                                           (sig':os':oldSigs)))
@@ -519,20 +519,20 @@ changeLocalDecls2 :: Changer
 changeLocalDecls2 libdir (L l p) = do
   Right d@(L ld (ValD _ decl)) <- withDynFlags libdir (\df -> parseDecl df "decl" "nn = 2")
   Right s@(L ls (SigD _ sig))  <- withDynFlags libdir (\df -> parseDecl df "sig"  "nn :: Int")
-  let decl' = setEntryDP' (L ld decl) (DP 1 0)
-  let  sig' = setEntryDP' (L ls  sig) (DP 0 2)
+  let decl' = setEntryDP' (L ld decl) (DifferentLine 1 0)
+  let  sig' = setEntryDP' (L ls  sig) (SameLine 2)
   let (p',(_,_),_w) = runTransform mempty doAddLocal
       doAddLocal = everywhereM (mkM replaceLocalBinds) p
       replaceLocalBinds :: LMatch GhcPs (LHsExpr GhcPs)
                         -> Transform (LMatch GhcPs (LHsExpr GhcPs))
       replaceLocalBinds (L lm (Match ma mln pats (GRHSs _ rhs EmptyLocalBinds{}))) = do
         newSpan <- uniqueSrcSpanT
-        let anc = (Anchor (rs newSpan) (MovedAnchor (DP 1 2)))
-        let anc2 = (Anchor (rs newSpan) (MovedAnchor (DP 1 4)))
+        let anc = (Anchor (rs newSpan) (MovedAnchor (DifferentLine 1 2)))
+        let anc2 = (Anchor (rs newSpan) (MovedAnchor (DifferentLine 1 4)))
         let an = EpAnn anc
                         (AnnList (Just anc2) Nothing Nothing
-                                 [(undeltaSpan (rs newSpan) AnnWhere (DP 0 0))] [])
-                        noCom
+                                 [(undeltaSpan (rs newSpan) AnnWhere (SameLine 0))] [])
+                        emptyComments
         let decls = [s,d]
         let sortKey = captureOrder decls
         let binds = (HsValBinds an (ValBinds sortKey (listToBag $ [decl'])
@@ -561,9 +561,9 @@ changeWhereIn3b _libdir (L l p) = do
   let decls0 = hsmodDecls p
       (decls,(_,_),w) = runTransform mempty (balanceCommentsList decls0)
       (de0:_:de1:d2:_) = decls
-      de0' = setEntryDP' de0 (DP 2 0)
-      de1' = setEntryDP' de1 (DP 2 0)
-      d2' = setEntryDP' d2 (DP 2 0)
+      de0' = setEntryDP' de0 (DifferentLine 2 0)
+      de1' = setEntryDP' de1 (DifferentLine 2 0)
+      d2' = setEntryDP' d2 (DifferentLine 2 0)
       decls' = d2':de1':de0':(tail decls)
   debugM $ unlines w
   debugM $ "changeWhereIn3b:de1':" ++ showAst de1'
@@ -575,7 +575,7 @@ changeWhereIn3b _libdir (L l p) = do
 addLocaLDecl1 :: Changer
 addLocaLDecl1 libdir lp = do
   Right (L ld (ValD _ decl)) <- withDynFlags libdir (\df -> parseDecl df "decl" "nn = 2")
-  let decl' = setEntryDP' (L ld decl) (DP 1 4)
+  let decl' = setEntryDP' (L ld decl) (DifferentLine 1 4)
       doAddLocal = do
         (de1:d2:d3:_) <- hsDecls lp
         (de1'',d2') <- balanceComments de1 d2
@@ -599,7 +599,7 @@ addLocaLDecl2 libdir lp = do
 
          (parent',_) <- modifyValD (getLocA de1) de1'' $ \_m (d:ds) -> do
            newDecl' <- transferEntryDP' d newDecl
-           let d' = setEntryDP' d (DP 1 0)
+           let d' = setEntryDP' d (DifferentLine 1 0)
            return ((newDecl':d':ds),Nothing)
 
          replaceDecls lp [parent',d2']
@@ -619,7 +619,7 @@ addLocaLDecl3 libdir lp = do
          (de1'',d2') <- balanceComments de1 d2
 
          (parent',_) <- modifyValD (getLocA de1) de1'' $ \_m (d:ds) -> do
-           let newDecl' = setEntryDP' newDecl (DP 1 0)
+           let newDecl' = setEntryDP' newDecl (DifferentLine 1 0)
            return (((d:ds) ++ [newDecl']),Nothing)
 
          replaceDecls (anchorEof lp) [parent',d2']
@@ -638,8 +638,8 @@ addLocaLDecl4 libdir lp = do
       doAddLocal = do
          (parent:ds) <- hsDecls lp
 
-         let newDecl' = setEntryDP' newDecl (DP 1 0)
-         let newSig'  = setEntryDP' newSig  (DP 1 4)
+         let newDecl' = setEntryDP' newDecl (DifferentLine 1 0)
+         let newSig'  = setEntryDP' newSig  (DifferentLine 1 4)
 
          (parent',_) <- modifyValD (getLocA parent) parent $ \_m decls -> do
            return ((decls++[newSig',newDecl']),Nothing)
@@ -660,10 +660,10 @@ addLocaLDecl5 _libdir lp = do
          decls <- hsDecls lp
          [s1,de1,d2,d3] <- balanceCommentsList decls
 
-         let d3' = setEntryDP' d3 (DP 2 0)
+         let d3' = setEntryDP' d3 (DifferentLine 2 0)
 
          (de1',_) <- modifyValD (getLocA de1) de1 $ \_m _decls -> do
-           let d2' = setEntryDP' d2 (DP 1 0)
+           let d2' = setEntryDP' d2 (DifferentLine 1 0)
            return ([d2'],Nothing)
          replaceDecls lp [s1,de1',d3']
 
@@ -677,7 +677,7 @@ addLocaLDecl6 :: Changer
 addLocaLDecl6 libdir lp = do
   Right newDecl <- withDynFlags libdir (\df -> parseDecl df "decl" "x = 3")
   let
-      newDecl' = setEntryDP' newDecl (DP 1 4)
+      newDecl' = setEntryDP' newDecl (DifferentLine 1 4)
       doAddLocal = do
         decls0 <- hsDecls lp
         [de1'',d2] <- balanceCommentsList decls0
@@ -739,7 +739,7 @@ rmDecl3 _libdir lp = do
          [de1,d2] <- hsDecls lp
 
          (de1',Just sd1) <- modifyValD (getLocA de1) de1 $ \_m [sd1] -> do
-           let sd1' = setEntryDP' sd1 (DP 2 0)
+           let sd1' = setEntryDP' sd1 (DifferentLine 2 0)
            return ([],Just sd1')
 
          replaceDecls lp [de1',sd1,d2]
@@ -759,7 +759,7 @@ rmDecl4 _libdir lp = do
          (de1',Just sd1) <- modifyValD (getLocA de1) de1 $ \_m [sd1,sd2] -> do
            sd2' <- transferEntryDP' sd1 sd2
 
-           let sd1' = setEntryDP' sd1 (DP 2 0)
+           let sd1' = setEntryDP' sd1 (DifferentLine 2 0)
            return ([sd2'],Just sd1')
 
          replaceDecls (anchorEof lp) [de1',sd1]
@@ -881,7 +881,7 @@ addHiding1 _libdir (L l p) = do
                                               (Just (AddEpAnn AnnCloseP d0))
                                               [(AddEpAnn AnnHiding d1)]
                                               [])
-                                       noCom) l0) [v1,v2]
+                                       emptyComments) l0) [v1,v2]
           imp1' = imp1 { ideclHiding = Just (True,impHiding)}
           p' = p { hsmodImports = [L li imp1',imp2]}
         return (L l p')
@@ -906,7 +906,7 @@ addHiding2 _libdir (L l p) = do
                                               (Just (AddEpAnn AnnCloseP d0))
                                               [(AddEpAnn AnnHiding d1)]
                                               [])
-                                       noCom) (locA lh))
+                                       emptyComments) (locA lh))
           n1 = L (noAnnSrcSpanDP0 l1) (mkVarUnqual (mkFastString "n1"))
           n2 = L (noAnnSrcSpanDP0 l2) (mkVarUnqual (mkFastString "n2"))
           v1 = L (addComma $ noAnnSrcSpanDP0 l1) (IEVar noExtField (L (noAnnSrcSpanDP0 l1) (IEName n1)))
