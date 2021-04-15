@@ -63,6 +63,8 @@ import GHC.Core.DataCon
 import GHC.Core.Class
 import GHC.Core.TyCon
 
+import GHC.Data.FastString
+
 import GHC.Types.Avail
 import GHC.Types.Basic
 import GHC.Types.Id
@@ -268,14 +270,24 @@ ghcPrimExports
    [ availTC n [n] []
    | tc <- exposedPrimTyCons, let n = tyConName tc  ]
 
+ghcPrimNames :: FastStringEnv Name
+ghcPrimNames
+  = mkFsEnv
+    [ (occNameFS $ nameOccName name, name)
+    | name <-
+        map idName ghcPrimIds ++
+        map (idName . primOpId) allThePrimOps ++
+        map tyConName exposedPrimTyCons
+    ]
+
 ghcPrimDeclDocs :: DeclDocMap
-ghcPrimDeclDocs = DeclDocMap $ Map.fromList $ mapMaybe findName primOpDocs
+ghcPrimDeclDocs
+  = DeclDocMap $ Map.fromList
+  $ mapMaybe findName primOpDocs
   where
-    names = map idName ghcPrimIds ++
-            map (idName . primOpId) allThePrimOps ++
-            map tyConName exposedPrimTyCons
+    findName :: (FastString, String) -> Maybe (Name, HsDocString)
     findName (nameStr, doc)
-      | Just name <- find ((nameStr ==) . getOccString) names
+      | Just name <- lookupFsEnv ghcPrimNames nameStr
       = Just (name, mkHsDocString doc)
       | otherwise = Nothing
 
