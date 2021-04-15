@@ -58,6 +58,7 @@ import GHC.Utils.Panic
 
 import Data.Word
 import Data.ByteString (ByteString)
+import GHC.Driver.Ppr (showSDocUnsafe)
 
 {-
 ************************************************************************
@@ -445,7 +446,9 @@ rtsClosureType rep
       HeapRep False _ _ BlackHole -> BLACKHOLE
       HeapRep False _ _ IndStatic -> IND_STATIC
 
-      _ -> panic "rtsClosureType"
+      StackRep _ -> STACK
+
+      _ -> trace ("Failing rep " ++ (showSDocUnsafe . ppr) rep) $ panic "rtsClosureType"
 
 -- We export these ones
 rET_SMALL, rET_BIG, aRG_GEN, aRG_GEN_BIG :: Int
