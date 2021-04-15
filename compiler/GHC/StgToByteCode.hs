@@ -466,7 +466,7 @@ schemeR :: [Id]                 -- Free vars of the RHS, ordered as they
 schemeR fvs (nm, rhs)
    = schemeR_wrk fvs nm rhs (collect rhs)
 
--- If an expression is a lambda (after apply bcView), return the
+-- If an expression is a lambda, return the
 -- list of arguments to the lambda (in R-to-L order) and the
 -- underlying expression
 
