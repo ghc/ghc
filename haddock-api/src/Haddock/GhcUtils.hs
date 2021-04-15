@@ -338,7 +338,7 @@ reparenTypePrec = go
   where
 
   -- Shorter name for 'reparenType'
-  go :: XParTy a ~ EpAnn' AnnParen => Precedence -> HsType a -> HsType a
+  go :: XParTy a ~ EpAnn AnnParen => Precedence -> HsType a -> HsType a
   go _ (HsBangTy x b ty)     = HsBangTy x b (reparenLType ty)
   go _ (HsTupleTy x con tys) = HsTupleTy x con (map reparenLType tys)
   go _ (HsSumTy x tys)       = HsSumTy x (map reparenLType tys)
@@ -378,11 +378,11 @@ reparenTypePrec = go
   go _ t@XHsType{} = t
 
   -- Located variant of 'go'
-  goL :: XParTy a ~ EpAnn' AnnParen => Precedence -> LHsType a -> LHsType a
+  goL :: XParTy a ~ EpAnn AnnParen => Precedence -> LHsType a -> LHsType a
   goL ctxt_prec = mapXRec @a (go ctxt_prec)
 
   -- Optionally wrap a type in parens
-  paren :: XParTy a ~ EpAnn' AnnParen
+  paren :: XParTy a ~ EpAnn AnnParen
         => Precedence            -- Precedence of context
         -> Precedence            -- Precedence of top-level operator
         -> HsType a -> HsType a  -- Wrap in parens if (ctxt >= op)
