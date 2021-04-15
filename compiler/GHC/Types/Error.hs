@@ -1,5 +1,7 @@
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 
 module GHC.Types.Error
@@ -81,9 +83,8 @@ a bit more declarative) or removed altogether.
 -- be 'SevIgnore'. The smart constructor 'mkMessages' will filter out any message which 'Severity' is
 -- 'SevIgnore'.
 newtype Messages e = Messages { getMessages :: Bag (MsgEnvelope e) }
-
-instance Functor Messages where
-  fmap f (Messages xs) = Messages (mapBag (fmap f) xs)
+  deriving newtype (Semigroup, Monoid)
+  deriving stock Functor
 
 emptyMessages :: Messages e
 emptyMessages = Messages emptyBag
