@@ -173,7 +173,8 @@ void copyPtrsToArray(StgMutArrPtrs* arr, StgStack* stack) {
     for (; sp < spBottom; sp += stack_frame_sizeW((StgClosure *)sp)) {
       const StgInfoTable* infoTable = get_itbl((StgClosure *)sp);
       debugBelch("infoTable %p \n", infoTable);
-      arr->payload[index] = createWordClosure(myTask()->cap, (StgAddr) infoTable);
+      // TODO: Explain why it's infoTable->code
+      arr->payload[index] = createWordClosure(myTask()->cap, (StgAddr) infoTable->code);
       debugBelch("Saved %p \n", arr->payload[index]);
       index++;
     }

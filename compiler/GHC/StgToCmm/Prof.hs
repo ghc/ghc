@@ -284,8 +284,12 @@ initInfoTableProv infos itmap this_mod
   = do
        dflags <- getDynFlags
        let ents = convertInfoProvMap dflags infos this_mod itmap
-       --pprTraceM "UsedInfo" (ppr (length infos))
-       --pprTraceM "initInfoTable" (ppr (length ents))
+       -- TODO: Remove debugging code before merge.
+       -- pprTraceM "[CmmInfoTable] length" (ppr (length infos))
+       -- pprTraceM "[CmmInfoTable] content" (pdoc (targetPlatform dflags) infos)
+       -- pprTraceM "ents length" (ppr (length ents))
+       -- pprTraceM "ents content" (pdoc (targetPlatform dflags) ents)
+       -- pprTraceM "initInfoTable" (ppr (length ents))
        -- Output the actual IPE data
        mapM_ emitInfoTableProv ents
        -- Create the C stub which initialises the IPE_LIST
@@ -319,6 +323,9 @@ emitInfoTableProv ip = do
               loc,            -- char *srcloc,
               zero platform   -- struct _InfoProvEnt *link
             ]
+-- TODO: Remove debugging code before merge.
+--  ; pprTraceM "mkIPELabel" $ pdoc platform (mkIPELabel ip)
+--  ; pprTraceM "lits" $ hcat (map ppr lits)
   ; emitDataLits (mkIPELabel ip) lits
   }
 -- ---------------------------------------------------------------------------

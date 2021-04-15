@@ -24,6 +24,7 @@ import GHC.Conc.Sync
 import GHC.Stable
 import GHC.IO (IO(..))
 import Foreign -- Foreign.Ptr
+import GHC.Stack.CCS (InfoProvEnt, ipeProv, infoProvToStrings)
 
 -- | A frozen snapshot of the state of an execution stack.
 --
@@ -77,15 +78,17 @@ type InfoTable = Word
 
 foreign import ccall "decodeClonedStack" decodeClonedStack:: StackSnapshot# -> MutableArray# RealWorld (Ptr Word)
 
-decode :: StackSnapshot -> IO [Ptr Word]
+foreign import ccall "lookupIPE" lookupIPE:: Ptr Word -> IO (Ptr InfoProvEnt)
+
+decode :: StackSnapshot -> IO [[String]]
 decode (StackSnapshot stack) = let
     array = decodeClonedStack stack
     arraySize = I# (sizeofMutableArray# array)
   in
     do
-      print $ "arraySize : " ++ show arraySize
       forM [0 .. arraySize - 1] $ \(I# i) -> do
-        print $ "No : " ++ show (I# i)
         v <- IO $ readArray# array i
-        print $ "element : " ++ show v
-        return v
+        print $ "StgInfoTable->code : " ++ show (I# i) ++ " -- " ++ show v
+        ipe <- lookupIPE v
+        s <- (infoProvToStrings . ipeProv) ipe
+        return s

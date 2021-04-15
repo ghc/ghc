@@ -34,7 +34,11 @@ module GHC.Stack.CCS (
     ccModule,
     ccSrcSpan,
     ccsToStrings,
-    renderStack
+    renderStack,
+    ipeProv,
+    infoProvToStrings,
+    InfoProv,
+    InfoProvEnt,
   ) where
 
 import Foreign
