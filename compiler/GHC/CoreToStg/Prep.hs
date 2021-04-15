@@ -49,6 +49,7 @@ import GHC.Core.Coercion
 import GHC.Core.TyCon
 import GHC.Core.DataCon
 import GHC.Core.Opt.OccurAnal
+import GHC.Core.TyCo.Rep( UnivCoProvenance(..) )
 
 
 import GHC.Data.Maybe
@@ -77,7 +78,9 @@ import GHC.Types.TyThing
 import GHC.Types.CostCentre ( CostCentre, ccFromThisModule )
 import GHC.Types.Unique.Supply
 
+import GHC.Data.Pair
 import Data.List        ( unfoldr )
+import Data.Functor.Identity
 import Control.Monad
 import qualified Data.Set as S
 
@@ -584,8 +587,10 @@ cpeRhsE :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CpeRhs)
 -- For example
 --      f (g x)   ===>   ([v = g x], f v)
 
-cpeRhsE _env expr@(Type {})      = return (emptyFloats, expr)
-cpeRhsE _env expr@(Coercion {})  = return (emptyFloats, expr)
+cpeRhsE env (Type ty)
+  = return (emptyFloats, Type (cpSubstTy env ty))
+cpeRhsE env (Coercion co)
+  = return (emptyFloats, Coercion (cpSubstCo env co))
 cpeRhsE env expr@(Lit (LitNumber nt i))
    = case cpe_convertNumLit env nt i of
       Nothing -> return (emptyFloats, expr)
@@ -618,7 +623,7 @@ cpeRhsE env (Tick tickish expr)
 
 cpeRhsE env (Cast expr co)
    = do { (floats, expr') <- cpeRhsE env expr
-        ; return (floats, Cast expr' co) }
+        ; return (floats, Cast expr' (cpSubstCo env co)) }
 
 cpeRhsE env expr@(Lam {})
    = do { let (bndrs,body) = collectBinders expr
@@ -626,9 +631,24 @@ cpeRhsE env expr@(Lam {})
         ; body' <- cpeBodyNF env' body
         ; return (emptyFloats, mkLams bndrs' body') }
 
-cpeRhsE env (Case scrut bndr ty alts)
+cpeRhsE env (Case scrut _ ty [])
+  = do { (floats, scrut') <- cpeRhsE env scrut
+       ; let co = mkUnsafeCo Representational (Pair (exprType scrut) ty)
+       ; return (floats, Cast scrut' co) }
+   -- This can give rise to
+   --   Warning: Unsafe coercion: between unboxed and boxed value
+   -- but it's fine because 'scrut' diverges
+
+cpeRhsE env (Case scrut bndr _ alts)
   | isUnsafeEqualityProof scrut
-  , [Alt con bs rhs] <- alts
+  , isDeadBinder bndr -- We can only discard the case if the case-binder
+                      -- is dead.  It usually is, but see #18227
+  , [Alt _ [co_var] rhs] <- alts
+  , let the_co  = mkUnsafeCo Nominal (coVarTypes co_var)
+        env' = extendCoVarEnv env co_var the_co
+  = cpeRhsE env' rhs
+
+{-
   = do { (floats1, scrut') <- cpeBody env scrut
        ; (env1, bndr')     <- cpCloneBndr env bndr
        ; (env2, bs')       <- cpCloneBndrs env1 bs
@@ -637,8 +657,9 @@ cpeRhsE env (Case scrut bndr ty alts)
              floats'    = (floats1 `addFloat` case_float)
                           `appendFloats` floats2
        ; return (floats', rhs') }
+-}
 
-  | otherwise
+cpeRhsE env (Case scrut bndr ty alts)
   = do { (floats, scrut') <- cpeBody env scrut
        ; (env', bndr2) <- cpCloneBndr env bndr
        ; let alts'
@@ -845,7 +866,7 @@ cpeApp top_env expr
            -- Apps it is under are type applications only (c.f.
            -- exprIsTrivial).  But note that we need the type of the
            -- expression, not the id.
-           ; (app, floats) <- rebuild_app args e2 (exprType e2) emptyFloats stricts
+           ; (app, floats) <- rebuild_app env args e2 (exprType e2) emptyFloats stricts
            ; mb_saturate hd app floats depth }
         where
           stricts = case idDmdSig v of
@@ -868,7 +889,7 @@ cpeApp top_env expr
       = do { (fun_floats, fun') <- cpeArg env evalDmd fun ty
                           -- The evalDmd says that it's sure to be evaluated,
                           -- so we'll end up case-binding it
-           ; (app, floats) <- rebuild_app args fun' ty fun_floats []
+           ; (app, floats) <- rebuild_app env args fun' ty fun_floats []
            ; mb_saturate Nothing app floats depth }
         where
           ty = exprType fun
@@ -886,20 +907,29 @@ cpeApp top_env expr
     -- all of which are used to possibly saturate this application if it
     -- has a constructor or primop at the head.
     rebuild_app
-        :: [ArgInfo]                  -- The arguments (inner to outer)
+        :: CorePrepEnv
+        -> [ArgInfo]                  -- The arguments (inner to outer)
         -> CpeApp
         -> Type
         -> Floats
         -> [Demand]
         -> UniqSM (CpeApp, Floats)
-    rebuild_app [] app _ floats ss = do
-      MASSERT(null ss) -- make sure we used all the strictness info
-      return (app, floats)
-    rebuild_app (a : as) fun' fun_ty floats ss = case a of
-      CpeApp arg@(Type arg_ty) ->
-        rebuild_app as (App fun' arg) (piResultTy fun_ty arg_ty) floats ss
-      CpeApp arg@(Coercion {}) ->
-        rebuild_app as (App fun' arg) (funResultTy fun_ty) floats ss
+    rebuild_app _ [] app _ floats ss
+      = ASSERT(null ss) -- make sure we used all the strictness info
+        return (app, floats)
+
+    rebuild_app env (a : as) fun' fun_ty floats ss = case a of
+
+      CpeApp (Type arg_ty)
+        -> rebuild_app env as (App fun' (Type arg_ty')) (piResultTy fun_ty arg_ty') floats ss
+        where
+          arg_ty' = cpSubstTy env arg_ty
+
+      CpeApp (Coercion co)
+        -> rebuild_app env as (App fun' (Coercion co')) (funResultTy fun_ty) floats ss
+        where
+            co' = cpSubstCo env co
+
       CpeApp arg -> do
         let (ss1, ss_rest)  -- See Note [lazyId magic] in GHC.Types.Id.Make
                = case (ss, isLazyExpr arg) of
@@ -911,13 +941,17 @@ cpeApp top_env expr
                 Just as -> as
                 Nothing -> pprPanic "cpeBody" (ppr fun_ty $$ ppr expr)
         (fs, arg') <- cpeArg top_env ss1 arg arg_ty
-        rebuild_app as (App fun' arg') res_ty (fs `appendFloats` floats) ss_rest
-      CpeCast co ->
-        let ty2 = coercionRKind co
-        in rebuild_app as (Cast fun' co) ty2 floats ss
-      CpeTick tickish ->
+        rebuild_app env as (App fun' arg') res_ty (fs `appendFloats` floats) ss_rest
+
+      CpeCast co
+        -> rebuild_app env as (Cast fun' co') ty2 floats ss
+        where
+           co' = cpSubstCo env co
+           ty2 = coercionRKind co'
+
+      CpeTick tickish
         -- See [Floating Ticks in CorePrep]
-        rebuild_app as fun' fun_ty (addFloat floats (FloatTick tickish)) ss
+        -> rebuild_app env as fun' fun_ty (addFloat floats (FloatTick tickish)) ss
 
 isLazyExpr :: CoreExpr -> Bool
 -- See Note [lazyId magic] in GHC.Types.Id.Make
@@ -1142,6 +1176,11 @@ However, until then we simply add a special case excluding literals from the
 floating done by cpeArg.
 -}
 
+mkUnsafeCo :: Role -> Pair Type -> Coercion
+mkUnsafeCo role (Pair ty1 ty2) = mkUnivCo prov role ty1 ty2
+  where
+    prov = PluginProv "GHC-CorePrep"
+
 -- | Is an argument okay to CPE?
 okCpeArg :: CoreExpr -> Bool
 -- Don't float literals. See Note [ANF-ising literal string arguments].
@@ -1150,7 +1189,8 @@ okCpeArg (Lit _) = False
 okCpeArg expr    = not (cpExprIsTrivial expr)
 
 cpExprIsTrivial :: CoreExpr -> Bool
-cpExprIsTrivial e
+cpExprIsTrivial e = exprIsTrivial e
+{-
   | Tick t e <- e
   , not (tickishIsCode t)
   = cpExprIsTrivial e
@@ -1160,6 +1200,7 @@ cpExprIsTrivial e
   = cpExprIsTrivial rhs
   | otherwise
   = exprIsTrivial e
+-}
 
 -- This is where we arrange that a non-trivial argument is let-bound
 cpeArg :: CorePrepEnv -> Demand
@@ -1621,6 +1662,8 @@ data CorePrepEnv
         --      see Note [lazyId magic], Note [Inlining in CorePrep]
         --      and Note [CorePrep inlines trivial CoreExpr not Id] (#12076)
 
+        , cpe_tyco_env :: Maybe CpeTyCoEnv
+
         , cpe_convertNumLit   :: LitNumType -> Integer -> Maybe CoreExpr
         -- ^ Convert some numeric literals (Integer, Natural) into their
         -- final Core form
@@ -1717,8 +1760,9 @@ mkInitialCorePrepEnv :: HscEnv -> IO CorePrepEnv
 mkInitialCorePrepEnv hsc_env = do
    convertNumLit <- mkConvertNumLiteral hsc_env
    return $ CPE
-      { cpe_dynFlags = hsc_dflags hsc_env
-      , cpe_env = emptyVarEnv
+      { cpe_dynFlags      = hsc_dflags hsc_env
+      , cpe_env           = emptyVarEnv
+      , cpe_tyco_env      = Nothing
       , cpe_convertNumLit = convertNumLit
       }
 
@@ -1742,6 +1786,98 @@ lookupCorePrepEnv cpe id
         Just exp -> exp
 
 ------------------------------------------------------------------------------
+--           CpeTyCoEnv
+-- ---------------------------------------------------------------------------
+
+data CpeTyCoEnv = TCE TvSubstEnv CvSubstEnv
+
+emptyTCE :: CpeTyCoEnv
+emptyTCE = TCE emptyTvSubstEnv emptyCvSubstEnv
+
+extend_tce_cv :: CpeTyCoEnv -> CoVar -> Coercion -> CpeTyCoEnv
+extend_tce_cv (TCE tv_env cv_env) cv co
+  = TCE tv_env (extendVarEnv cv_env cv co)
+
+extend_tce_tv :: CpeTyCoEnv -> TyVar -> Type -> CpeTyCoEnv
+extend_tce_tv (TCE tv_env cv_env) tv ty
+  = TCE (extendVarEnv tv_env tv ty) cv_env
+
+lookup_tce_cv :: CpeTyCoEnv -> CoVar -> Coercion
+lookup_tce_cv (TCE _ cv_env) cv
+  = case lookupVarEnv cv_env cv of
+        Just co -> co
+        Nothing -> mkCoVarCo cv
+
+lookup_tce_tv :: CpeTyCoEnv -> TyVar -> Type
+lookup_tce_tv (TCE tv_env _) tv
+  = case lookupVarEnv tv_env tv of
+        Just ty -> ty
+        Nothing -> mkTyVarTy tv
+
+extendCoVarEnv :: CorePrepEnv -> CoVar -> Coercion -> CorePrepEnv
+extendCoVarEnv cpe@(CPE { cpe_tyco_env = mb_tce }) cv co
+  = cpe { cpe_tyco_env = Just (extend_tce_cv tce cv co) }
+  where
+    tce = mb_tce `orElse` emptyTCE
+
+
+cpSubstTy :: CorePrepEnv -> Type -> Type
+cpSubstTy (CPE { cpe_tyco_env = mb_env }) ty
+  = case mb_env of
+      Just env -> runIdentity (subst_ty env ty)
+      Nothing  -> ty
+
+cpSubstCo :: CorePrepEnv -> Coercion -> Coercion
+cpSubstCo (CPE { cpe_tyco_env = mb_env }) co
+  = case mb_env of
+      Just tce -> runIdentity (subst_co tce co)
+      Nothing  -> co
+
+subst_tyco_mapper :: TyCoMapper CpeTyCoEnv Identity
+subst_tyco_mapper = TyCoMapper
+  { tcm_tyvar      = \env tv -> return (lookup_tce_tv env tv)
+  , tcm_covar      = \env cv -> return (lookup_tce_cv env cv)
+  , tcm_hole       = \_ hole -> pprPanic "subst_co_mapper:hole" (ppr hole)
+  , tcm_tycobinder = \env tcv _vis -> if isTyVar tcv
+                                      then return (subst_tv_bndr env tcv)
+                                      else return (subst_cv_bndr env tcv)
+  , tcm_tycon      = \tc -> return tc }
+
+subst_ty :: CpeTyCoEnv -> Type     -> Identity Type
+subst_co :: CpeTyCoEnv -> Coercion -> Identity Coercion
+(subst_ty, _, subst_co, _) = mapTyCoX subst_tyco_mapper
+
+cpSubstTyVarBndr :: CorePrepEnv -> TyVar -> (CorePrepEnv, TyVar)
+cpSubstTyVarBndr env@(CPE { cpe_tyco_env = mb_env }) tv
+  = case mb_env of
+      Nothing  -> (env, tv)
+      Just tce -> (env { cpe_tyco_env = Just tce' }, tv')
+               where
+                  (tce', tv') = subst_tv_bndr tce tv
+
+subst_tv_bndr :: CpeTyCoEnv -> TyVar -> (CpeTyCoEnv, TyVar)
+subst_tv_bndr tce tv
+  = (extend_tce_tv tce tv (mkTyVarTy tv'), tv')
+  where
+    tv'   = mkTyVar (tyVarName tv) kind'
+    kind' = runIdentity $ subst_ty tce $ tyVarKind tv
+
+cpSubstCoVarBndr :: CorePrepEnv -> CoVar -> (CorePrepEnv, CoVar)
+cpSubstCoVarBndr env@(CPE { cpe_tyco_env = mb_env }) cv
+  = case mb_env of
+      Nothing  -> (env, cv)
+      Just tce -> (env { cpe_tyco_env = Just tce' }, cv')
+               where
+                  (tce', cv') = subst_cv_bndr tce cv
+
+subst_cv_bndr :: CpeTyCoEnv -> CoVar -> (CpeTyCoEnv, CoVar)
+subst_cv_bndr tce cv
+  = (extend_tce_cv tce cv (mkCoVarCo cv'), cv')
+  where
+    cv' = mkCoVar (varName cv) ty'
+    ty' = runIdentity (subst_ty tce $ varType cv)
+
+------------------------------------------------------------------------------
 -- Cloning binders
 -- ---------------------------------------------------------------------------
 
@@ -1750,8 +1886,11 @@ cpCloneBndrs env bs = mapAccumLM cpCloneBndr env bs
 
 cpCloneBndr  :: CorePrepEnv -> InVar -> UniqSM (CorePrepEnv, OutVar)
 cpCloneBndr env bndr
-  | not (isId bndr)
-  = return (env, bndr)
+  | isTyVar bndr
+  = return (cpSubstTyVarBndr env bndr)
+
+  | isCoVar bndr
+  = return (cpSubstCoVarBndr env bndr)
 
   | otherwise
   = do { bndr' <- clone_it bndr
@@ -1768,11 +1907,10 @@ cpCloneBndr env bndr
        ; return (extendCorePrepEnv env bndr bndr'', bndr'') }
   where
     clone_it bndr
-      | isLocalId bndr, not (isCoVar bndr)
+      | isLocalId bndr
       = do { uniq <- getUniqueM; return (setVarUnique bndr uniq) }
       | otherwise   -- Top level things, which we don't want
                     -- to clone, have become GlobalIds by now
-                    -- And we don't clone tyvars, or coercion variables
       = return bndr
 
 {- Note [Drop unfoldings and rules]
