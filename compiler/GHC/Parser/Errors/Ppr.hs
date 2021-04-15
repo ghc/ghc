@@ -2,6 +2,8 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE FlexibleContexts #-}
 
+{-# OPTIONS_GHC -fno-warn-orphans #-} -- instance Diagnostic PsMessage
+
 module GHC.Parser.Errors.Ppr
    ( mkParserWarn
    , mkParserErr
@@ -11,6 +13,7 @@ where
 import GHC.Prelude
 import GHC.Driver.Flags
 import GHC.Parser.Errors
+import GHC.Parser.Errors.Types
 import GHC.Parser.Types
 import GHC.Types.Basic
 import GHC.Types.Error
@@ -27,26 +30,30 @@ import GHC.Builtin.Types (filterCTuple)
 import GHC.Driver.Session (DynFlags)
 import GHC.Utils.Error (diagReasonSeverity)
 
-mk_parser_err :: SrcSpan -> SDoc -> MsgEnvelope DiagnosticMessage
+instance Diagnostic PsMessage where
+  diagnosticMessage (PsUnknownMessage m) = diagnosticMessage m
+  diagnosticReason  (PsUnknownMessage m) = diagnosticReason m
+
+mk_parser_err :: SrcSpan -> SDoc -> MsgEnvelope PsMessage
 mk_parser_err span doc = MsgEnvelope
    { errMsgSpan        = span
    , errMsgContext     = alwaysQualify
-   , errMsgDiagnostic  = DiagnosticMessage (mkDecorated [doc]) ErrorWithoutFlag
+   , errMsgDiagnostic  = PsUnknownMessage $ DiagnosticMessage (mkDecorated [doc]) ErrorWithoutFlag
    , errMsgSeverity    = SevError
    }
 
-mk_parser_warn :: DynFlags -> WarningFlag -> SrcSpan -> SDoc -> MsgEnvelope DiagnosticMessage
+mk_parser_warn :: DynFlags -> WarningFlag -> SrcSpan -> SDoc -> MsgEnvelope PsMessage
 mk_parser_warn df flag span doc = MsgEnvelope
    { errMsgSpan        = span
    , errMsgContext     = alwaysQualify
-   , errMsgDiagnostic  = DiagnosticMessage (mkDecorated [doc]) reason
+   , errMsgDiagnostic  = PsUnknownMessage $ DiagnosticMessage (mkDecorated [doc]) reason
    , errMsgSeverity    = diagReasonSeverity df reason
    }
   where
     reason :: DiagnosticReason
     reason = WarningWithFlag flag
 
-mkParserWarn :: DynFlags -> PsWarning -> MsgEnvelope DiagnosticMessage
+mkParserWarn :: DynFlags -> PsWarning -> MsgEnvelope PsMessage
 mkParserWarn df = \case
    PsWarnTab loc tc
       -> mk_parser_warn df Opt_WarnTabs loc $
@@ -132,7 +139,7 @@ mkParserWarn df = \case
            OperatorWhitespaceOccurrence_Suffix -> mk_msg "suffix"
            OperatorWhitespaceOccurrence_TightInfix -> mk_msg "tight infix"
 
-mkParserErr :: PsError -> MsgEnvelope DiagnosticMessage
+mkParserErr :: PsError -> MsgEnvelope PsMessage
 mkParserErr err = mk_parser_err (errLoc err) $ vcat
    (pp_err (errDesc err) : map pp_hint (errHints err))
 

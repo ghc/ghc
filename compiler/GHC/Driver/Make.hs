@@ -61,6 +61,7 @@ import GHC.Driver.Backend
 import GHC.Driver.Monad
 import GHC.Driver.Env
 import GHC.Driver.Errors
+import GHC.Driver.Errors.Types
 import GHC.Driver.Main
 
 import GHC.Parser.Header
@@ -70,7 +71,7 @@ import GHC.Iface.Load      ( cannotFindModule )
 import GHC.IfaceToCore     ( typecheckIface )
 import GHC.Iface.Recomp    ( RecompileRequired ( MustCompile ) )
 
-import GHC.Data.Bag        ( unitBag, listToBag, unionManyBags, isEmptyBag )
+import GHC.Data.Bag        ( listToBag )
 import GHC.Data.Graph.Directed
 import GHC.Data.FastString
 import GHC.Data.Maybe      ( expectJust )
@@ -164,7 +165,7 @@ depanal :: GhcMonad m =>
         -> m ModuleGraph
 depanal excluded_mods allow_dup_roots = do
     (errs, mod_graph) <- depanalE excluded_mods allow_dup_roots
-    if isEmptyBag errs
+    if isEmptyMessages errs
       then pure mod_graph
       else throwErrors errs
 
@@ -177,7 +178,7 @@ depanalE :: GhcMonad m =>     -- New for #17459
 depanalE excluded_mods allow_dup_roots = do
     hsc_env <- getSession
     (errs, mod_graph) <- depanalPartial excluded_mods allow_dup_roots
-    if isEmptyBag errs
+    if isEmptyMessages errs
       then do
         warnMissingHomeModules hsc_env mod_graph
         setSession hsc_env { hsc_mod_graph = mod_graph }
@@ -230,7 +231,7 @@ depanalPartial excluded_mods allow_dup_roots = do
       (errs, mod_summaries) = partitionEithers mod_summariesE
       mod_graph = mkModuleGraph' $
         fmap ModuleNode mod_summaries ++ instantiationNodes (hsc_units hsc_env)
-    return (unionManyBags errs, mod_graph)
+    return (foldl' unionMessages emptyMessages errs, mod_graph)
 
 -- | Collect the instantiations of dependencies to create 'InstantiationNode' work graph nodes.
 -- These are used to represent the type checking that is done after
@@ -271,7 +272,7 @@ instantiationNodes unit_state = InstantiationNode <$> iuids_to_check
 warnMissingHomeModules :: GhcMonad m => HscEnv -> ModuleGraph -> m ()
 warnMissingHomeModules hsc_env mod_graph =
     when (not (null missing)) $
-        logWarnings (listToBag [warn])
+        logDiagnostics warn
   where
     dflags = hsc_dflags hsc_env
     targets = map targetId (hsc_targets hsc_env)
@@ -318,7 +319,7 @@ warnMissingHomeModules hsc_env mod_graph =
           (text "Modules are not listed in command line but needed for compilation: ")
           4
           (sep (map ppr missing))
-    warn =
+    warn = singleMessage $ fmap (GhcDriverMessage . DriverUnknownMessage) $
       mkPlainMsgEnvelope (hsc_dflags hsc_env) (WarningWithFlag Opt_WarnMissingHomeModules) noSrcSpan msg
 
 -- | Describes which modules of the module graph need to be loaded.
@@ -351,7 +352,7 @@ load how_much = do
     (errs, mod_graph) <- depanalE [] False                        -- #17459
     success <- load' how_much (Just batchMsg) mod_graph
     warnUnusedPackages
-    if isEmptyBag errs
+    if isEmptyMessages errs
       then pure success
       else throwErrors errs
 
@@ -384,7 +385,7 @@ warnUnusedPackages = do
           = filter (\arg -> not $ any (matching state arg) loadedPackages)
                    requestedArgs
 
-    let warn =
+    let warn = singleMessage $ fmap (GhcDriverMessage . DriverUnknownMessage) $
           mkPlainMsgEnvelope dflags (WarningWithFlag Opt_WarnUnusedPackages) noSrcSpan msg
         msg = vcat [ text "The following packages were specified" <+>
                      text "via -package or -package-id flags,"
@@ -392,7 +393,7 @@ warnUnusedPackages = do
                    , nest 2 (vcat (map (withDash . pprUnusedArg) unusedArgs)) ]
 
     when (not (null unusedArgs)) $
-      logWarnings (listToBag [warn])
+      logDiagnostics warn
 
     where
         packageArg (ExposePackage _ arg _) = Just arg
@@ -1419,7 +1420,7 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_logger lcl_tmpfs lcl_dflags
         hsc_env <- readMVar hsc_env_var
         old_hpt <- readIORef old_hpt_var
 
-        let logg err = printBagOfErrors lcl_logger lcl_dflags (srcErrorMessages err)
+        let logg err = printMessages lcl_logger lcl_dflags (srcErrorMessages err)
 
         -- Limit the number of parallel compiles.
         let withSem sem = MC.bracket_ (waitQSem sem) (signalQSem sem)
@@ -1671,7 +1672,7 @@ upsweep_inst hsc_env mHscMessage mod_index nmods iuid = do
         case mHscMessage of
             Just hscMessage -> hscMessage hsc_env (mod_index, nmods) MustCompile (InstantiationNode iuid)
             Nothing -> return ()
-        runHsc hsc_env $ ioMsgMaybe $ tcRnCheckUnit hsc_env $ VirtUnit iuid
+        runHsc hsc_env $ ioMsgMaybe $ hoistTcRnDsMessage $ tcRnCheckUnit hsc_env $ VirtUnit iuid
         pure ()
 
 -- | Compile a single module.  Always produce a Linkable for it if
@@ -2214,14 +2215,14 @@ warnUnnecessarySourceImports :: GhcMonad m => [SCC ModSummary] -> m ()
 warnUnnecessarySourceImports sccs = do
   dflags <- getDynFlags
   when (wopt Opt_WarnUnusedImports dflags)
-    (logWarnings (listToBag (concatMap (check dflags . flattenSCC) sccs)))
+    (logDiagnostics (mkMessages $ listToBag (concatMap (check dflags . flattenSCC) sccs)))
   where check dflags ms =
            let mods_in_this_cycle = map ms_mod_name ms in
            [ warn dflags i | m <- ms, i <- ms_home_srcimps m,
                              unLoc i `notElem`  mods_in_this_cycle ]
 
-        warn :: DynFlags -> Located ModuleName -> WarnMsg
-        warn dflags (L loc mod) =
+        warn :: DynFlags -> Located ModuleName -> MsgEnvelope GhcMessage
+        warn dflags (L loc mod) = fmap (GhcDriverMessage . DriverUnknownMessage) $
            mkPlainMsgEnvelope dflags WarningWithoutFlag loc
                 (text "{-# SOURCE #-} unnecessary in import of "
                  <+> quotes (ppr mod))
@@ -2295,8 +2296,9 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
                 if exists || isJust maybe_buf
                     then summariseFile hsc_env old_summaries file mb_phase
                                        obj_allowed maybe_buf
-                    else return $ Left $ unitBag $ mkPlainErrorMsgEnvelope noSrcSpan $
-                           text "can't find file:" <+> text file
+                    else return $ Left $ singleMessage $ fmap (GhcDriverMessage . DriverUnknownMessage) $
+                           mkPlainErrorMsgEnvelope noSrcSpan $
+                             text "can't find file:" <+> text file
         getRootSummary Target { targetId = TargetModule modl
                               , targetAllowObjCode = obj_allowed
                               , targetContents = maybe_buf
@@ -2730,7 +2732,8 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
               | otherwise = HsSrcFile
 
         when (pi_mod_name /= wanted_mod) $
-                throwE $ unitBag $ mkPlainErrorMsgEnvelope pi_mod_name_loc $
+                throwE $ singleMessage $ fmap (GhcDriverMessage . DriverUnknownMessage) $
+                  mkPlainErrorMsgEnvelope pi_mod_name_loc $
                               text "File name does not match module name:"
                               $$ text "Saw:" <+> quotes (ppr pi_mod_name)
                               $$ text "Expected:" <+> quotes (ppr wanted_mod)
@@ -2742,7 +2745,8 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
                         | (k,v) <- ((pi_mod_name, mkHoleModule pi_mod_name)
                                 : homeUnitInstantiations home_unit)
                         ])
-            in throwE $ unitBag $ mkPlainErrorMsgEnvelope pi_mod_name_loc $
+            in throwE $ singleMessage $ fmap (GhcDriverMessage . DriverUnknownMessage) $
+                mkPlainErrorMsgEnvelope pi_mod_name_loc $
                 text "Unexpected signature:" <+> quotes (ppr pi_mod_name)
                 $$ if gopt Opt_BuildingCabalPackage dflags
                     then parens (text "Try adding" <+> quotes (ppr pi_mod_name)
@@ -2855,7 +2859,7 @@ getPreprocessedImports hsc_env src_fn mb_phase maybe_buf = do
           let imp_prelude = xopt LangExt.ImplicitPrelude pi_local_dflags
               popts = initParserOpts pi_local_dflags
           mimps <- getImports popts imp_prelude pi_hspp_buf pi_hspp_fn src_fn
-          return (first (fmap mkParserErr) mimps)
+          return (first (foldPsMessages mkParserErr) mimps)
   return PreprocessedImports {..}
 
 
@@ -2899,24 +2903,28 @@ withDeferredDiagnostics f = do
       (\_ -> popLogHookM >> printDeferredDiagnostics)
       (\_ -> f)
 
-noModError :: HscEnv -> SrcSpan -> ModuleName -> FindResult -> MsgEnvelope DiagnosticMessage
+noModError :: HscEnv -> SrcSpan -> ModuleName -> FindResult -> MsgEnvelope GhcMessage
 -- ToDo: we don't have a proper line number for this error
 noModError hsc_env loc wanted_mod err
-  = mkPlainErrorMsgEnvelope loc $ cannotFindModule hsc_env wanted_mod err
+  = fmap (GhcDriverMessage . DriverUnknownMessage) $
+    mkPlainErrorMsgEnvelope loc $ cannotFindModule hsc_env wanted_mod err
 
 noHsFileErr :: SrcSpan -> String -> ErrorMessages
 noHsFileErr loc path
-  = unitBag $ mkPlainErrorMsgEnvelope loc $ text "Can't find" <+> text path
+  = fmap (GhcDriverMessage . DriverUnknownMessage) $
+    singleMessage $ mkPlainErrorMsgEnvelope loc $ text "Can't find" <+> text path
 
 moduleNotFoundErr :: ModuleName -> ErrorMessages
 moduleNotFoundErr mod
-  = unitBag $ mkPlainErrorMsgEnvelope noSrcSpan $
+  = fmap (GhcDriverMessage . DriverUnknownMessage) $
+    singleMessage $ mkPlainErrorMsgEnvelope noSrcSpan $
         text "module" <+> quotes (ppr mod) <+> text "cannot be found locally"
 
 multiRootsErr :: [ModSummary] -> IO ()
 multiRootsErr [] = panic "multiRootsErr"
 multiRootsErr summs@(summ1:_)
-  = throwOneError $ mkPlainErrorMsgEnvelope noSrcSpan $
+  = throwOneError $ fmap (GhcDriverMessage . DriverUnknownMessage) $
+      mkPlainErrorMsgEnvelope noSrcSpan $
         text "module" <+> quotes (ppr mod) <+>
         text "is defined in multiple files:" <+>
         sep (map text files)
