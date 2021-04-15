@@ -1502,6 +1502,10 @@ failIfTcM True  err = failWithTcM err
 
 --         Warnings have no 'M' variant, nor failure
 
+-- Diagnostics added by these functions may be suppressed, depending on the
+-- particular `DynFlags` configuration. See Note [Discarding Messages] and
+-- Note [Suppressing Messages], both in GHC.Types.Error.
+
 -- | Display a warning relating to a flag, if a condition is met.
 warnIfFlag :: WarningFlag -> Bool -> SDoc -> TcRn ()
 warnIfFlag warn_flag is_bad msg
