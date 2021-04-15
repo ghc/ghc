@@ -40,15 +40,6 @@ Language extensions can be controlled (i.e. allowed or not) in two ways:
 
     .. hlist::
 
-     * :extension:`ImplicitPrelude`
-     * :extension:`StarIsType`
-     * :extension:`MonomorphismRestriction`
-     * :extension:`TraditionalRecordSyntax`
-     * :extension:`EmptyDataDecls`
-     * :extension:`ForeignFunctionInterface`
-     * :extension:`PatternGuards`
-     * :extension:`DoAndIfThenElse`
-     * :extension:`RelaxedPolyRec`
      * :extension:`BangPatterns`
      * :extension:`BinaryLiterals`
      * :extension:`ConstrainedClassMethods`
@@ -59,28 +50,37 @@ Language extensions can be controlled (i.e. allowed or not) in two ways:
      * :extension:`DeriveGeneric`
      * :extension:`DeriveLift`
      * :extension:`DeriveTraversable`
+     * :extension:`DoAndIfThenElse`
      * :extension:`EmptyCase`
+     * :extension:`EmptyDataDecls`
      * :extension:`EmptyDataDeriving`
      * :extension:`ExistentialQuantification`
      * :extension:`ExplicitForAll`
      * :extension:`FlexibleContexts`
      * :extension:`FlexibleInstances`
+     * :extension:`ForeignFunctionInterface`
      * :extension:`GADTSyntax`
      * :extension:`GeneralisedNewtypeDeriving`
      * :extension:`HexFloatLiterals`
+     * :extension:`ImplicitPrelude`
      * :extension:`ImportQualifiedPost`
      * :extension:`InstanceSigs`
      * :extension:`KindSignatures`
+     * :extension:`MonomorphismRestriction`
      * :extension:`MultiParamTypeClasses`
      * :extension:`NamedFieldPuns`
      * :extension:`NamedWildCards`
      * :extension:`NumericUnderscores`
+     * :extension:`PatternGuards`
      * :extension:`PolyKinds`
      * :extension:`PostfixOperators`
      * :extension:`RankNTypes`
+     * :extension:`RelaxedPolyRec`
      * :extension:`ScopedTypeVariables`
      * :extension:`StandaloneDeriving`
      * :extension:`StandaloneKindSignatures`
+     * :extension:`StarIsType`
+     * :extension:`TraditionalRecordSyntax`
      * :extension:`TupleSections`
      * :extension:`TypeApplications`
      * :extension:`TypeOperators`
@@ -95,18 +95,18 @@ Language extensions can be controlled (i.e. allowed or not) in two ways:
 
     .. hlist::
 
-     * :extension:`ImplicitPrelude`
-     * :extension:`StarIsType`
      * :extension:`CUSKs`
-     * :extension:`MonomorphismRestriction`
      * :extension:`DatatypeContexts`
-     * :extension:`TraditionalRecordSyntax`
-     * :extension:`FieldSelectors`
-     * :extension:`EmptyDataDecls`
-     * :extension:`ForeignFunctionInterface`
-     * :extension:`PatternGuards`
      * :extension:`DoAndIfThenElse`
+     * :extension:`EmptyDataDecls`
+     * :extension:`FieldSelectors`
+     * :extension:`ForeignFunctionInterface`
+     * :extension:`ImplicitPrelude`
+     * :extension:`MonomorphismRestriction`
+     * :extension:`PatternGuards`
      * :extension:`RelaxedPolyRec`
+     * :extension:`StarIsType`
+     * :extension:`TraditionalRecordSyntax`
 
 
 .. extension:: Haskell98
@@ -117,15 +117,15 @@ Language extensions can be controlled (i.e. allowed or not) in two ways:
 
     .. hlist::
 
-     * :extension:`ImplicitPrelude`
-     * :extension:`StarIsType`
      * :extension:`CUSKs`
+     * :extension:`DatatypeContexts`
+     * :extension:`FieldSelectors`
+     * :extension:`ImplicitPrelude`
      * :extension:`MonomorphismRestriction`
      * :extension:`NPlusKPatterns`
-     * :extension:`DatatypeContexts`
-     * :extension:`TraditionalRecordSyntax`
-     * :extension:`FieldSelectors`
      * :extension:`NondecreasingIndentation`
+     * :extension:`StarIsType`
+     * :extension:`TraditionalRecordSyntax`
 
 
 
