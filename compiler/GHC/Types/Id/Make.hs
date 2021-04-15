@@ -764,7 +764,7 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
     tycon        = dataConTyCon data_con       -- The representation TyCon (not family)
     wrap_ty      = dataConWrapperType data_con
     ev_tys       = eqSpecPreds eq_spec ++ theta
-    all_arg_tys  = (map unrestricted ev_tys) ++ orig_arg_tys
+    all_arg_tys  = map unrestricted ev_tys ++ orig_arg_tys
     ev_ibangs    = map (const HsLazy) ev_tys
     orig_bangs   = dataConSrcBangs data_con
 
