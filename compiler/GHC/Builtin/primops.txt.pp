@@ -2773,10 +2773,13 @@ primtype ThreadId#
         other operations can be omitted.)}
 
 primop  ForkOp "fork#" GenPrimOp
-   a -> State# RealWorld -> (# State# RealWorld, ThreadId# #)
+   (State# RealWorld -> (# State# RealWorld, a #))
+   -> State# RealWorld -> (# State# RealWorld, ThreadId# #)
    with
    has_side_effects = True
    out_of_line      = True
+   strictness  = { \ _arity -> mkClosedDmdSig [ lazyApply1Dmd
+                                              , topDmd ] topDiv }
 
 primop  ForkOnOp "forkOn#" GenPrimOp
    Int# -> a -> State# RealWorld -> (# State# RealWorld, ThreadId# #)
