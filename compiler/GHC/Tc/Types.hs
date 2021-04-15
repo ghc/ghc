@@ -84,7 +84,7 @@ module GHC.Tc.Types(
         lintGblEnv,
 
         -- Diagnostics
-        TcRnDsMessage, mkTcRnDsMessage, tcRnDsToGhcMessage
+        TcRnMessage
   ) where
 
 #include "HsVersions.h"
@@ -564,7 +564,7 @@ data TcGblEnv
                                              -- function, if this module is
                                              -- the main module.
 
-        tcg_safeInfer :: TcRef (Bool, Messages TcRnDsMessage),
+        tcg_safeInfer :: TcRef (Bool, Messages TcRnMessage),
         -- ^ Has the typechecker inferred this module as -XSafe (Safe Haskell)
         -- See Note [Safe Haskell Overlapping Instances Implementation],
         -- although this is used for more than just that failure case.
@@ -770,7 +770,7 @@ data TcLclEnv           -- Changes as we move inside an expression
                                       -- and for tidying types
 
         tcl_lie  :: TcRef WantedConstraints,    -- Place to accumulate type constraints
-        tcl_errs :: TcRef (Messages TcRnDsMessage)     -- Place to accumulate diagnostics
+        tcl_errs :: TcRef (Messages TcRnMessage)     -- Place to accumulate diagnostics
     }
 
 setLclEnvTcLevel :: TcLclEnv -> TcLevel -> TcLclEnv

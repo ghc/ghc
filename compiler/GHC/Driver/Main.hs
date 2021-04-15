@@ -350,12 +350,12 @@ hscTcRnLookupRdrName :: HscEnv -> LocatedN RdrName -> IO [Name]
 hscTcRnLookupRdrName hsc_env0 rdr_name
   = runInteractiveHsc hsc_env0 $
     do { hsc_env <- getHscEnv
-       ; ioMsgMaybe $ hoistTcRnDsMessage $ tcRnLookupRdrName hsc_env rdr_name }
+       ; ioMsgMaybe $ hoistTcRnMessage $ tcRnLookupRdrName hsc_env rdr_name }
 
 hscTcRcLookupName :: HscEnv -> Name -> IO (Maybe TyThing)
 hscTcRcLookupName hsc_env0 name = runInteractiveHsc hsc_env0 $ do
   hsc_env <- getHscEnv
-  ioMsgMaybe' $ hoistTcRnDsMessage $ tcRnLookupName hsc_env name
+  ioMsgMaybe' $ hoistTcRnMessage $ tcRnLookupName hsc_env name
       -- ignore errors: the only error we're likely to get is
       -- "name not found", and the Maybe in the return type
       -- is used to indicate that.
@@ -365,23 +365,23 @@ hscTcRnGetInfo :: HscEnv -> Name
 hscTcRnGetInfo hsc_env0 name
   = runInteractiveHsc hsc_env0 $
     do { hsc_env <- getHscEnv
-       ; ioMsgMaybe' $ hoistTcRnDsMessage $ tcRnGetInfo hsc_env name }
+       ; ioMsgMaybe' $ hoistTcRnMessage $ tcRnGetInfo hsc_env name }
 
 hscIsGHCiMonad :: HscEnv -> String -> IO Name
 hscIsGHCiMonad hsc_env name
-  = runHsc hsc_env $ ioMsgMaybe $ hoistTcRnDsMessage $ isGHCiMonad hsc_env name
+  = runHsc hsc_env $ ioMsgMaybe $ hoistTcRnMessage $ isGHCiMonad hsc_env name
 
 hscGetModuleInterface :: HscEnv -> Module -> IO ModIface
 hscGetModuleInterface hsc_env0 mod = runInteractiveHsc hsc_env0 $ do
   hsc_env <- getHscEnv
-  ioMsgMaybe $ hoistTcRnDsMessage $ getModuleInterface hsc_env mod
+  ioMsgMaybe $ hoistTcRnMessage $ getModuleInterface hsc_env mod
 
 -- -----------------------------------------------------------------------------
 -- | Rename some import declarations
 hscRnImportDecls :: HscEnv -> [LImportDecl GhcPs] -> IO GlobalRdrEnv
 hscRnImportDecls hsc_env0 import_decls = runInteractiveHsc hsc_env0 $ do
   hsc_env <- getHscEnv
-  ioMsgMaybe $ hoistTcRnDsMessage $ tcRnImportDecls hsc_env import_decls
+  ioMsgMaybe $ hoistTcRnMessage $ tcRnImportDecls hsc_env import_decls
 
 -- -----------------------------------------------------------------------------
 -- | parse a file, returning the abstract syntax
@@ -542,7 +542,7 @@ hsc_typecheck keep_rn mod_summary mb_rdr_module = do
         keep_rn' = gopt Opt_WriteHie dflags || keep_rn
     MASSERT( isHomeModule home_unit outer_mod )
     tc_result <- if hsc_src == HsigFile && not (isHoleModule inner_mod)
-        then ioMsgMaybe $ hoistTcRnDsMessage $ tcRnInstantiateSignature hsc_env outer_mod' real_loc
+        then ioMsgMaybe $ hoistTcRnMessage $ tcRnInstantiateSignature hsc_env outer_mod' real_loc
         else
          do hpm <- case mb_rdr_module of
                     Just hpm -> return hpm
@@ -550,7 +550,7 @@ hsc_typecheck keep_rn mod_summary mb_rdr_module = do
             tc_result0 <- tcRnModule' mod_summary keep_rn' hpm
             if hsc_src == HsigFile
                 then do (iface, _, _) <- liftIO $ hscSimpleIface hsc_env tc_result0 Nothing
-                        ioMsgMaybe $ hoistTcRnDsMessage $
+                        ioMsgMaybe $ hoistTcRnMessage $
                             tcRnMergeSignatures hsc_env hpm tc_result0 iface
                 else return tc_result0
     -- TODO are we extracting anything when we merely instantiate a signature?
@@ -575,7 +575,7 @@ tcRnModule' sum save_rn_syntax mod = do
         mkPlainDiagnostic reason warnMissingSafeHaskellMode
 
     tcg_res <- {-# SCC "Typecheck-Rename" #-}
-               ioMsgMaybe $ hoistTcRnDsMessage $
+               ioMsgMaybe $ hoistTcRnMessage $
                    tcRnModule hsc_env sum
                      save_rn_syntax mod
 
@@ -628,10 +628,9 @@ hscDesugar hsc_env mod_summary tc_result =
 hscDesugar' :: ModLocation -> TcGblEnv -> Hsc ModGuts
 hscDesugar' mod_location tc_result = do
     hsc_env <- getHscEnv
-    r <- ioMsgMaybe $
-      (first (fmap tcRnDsToGhcMessage) <$>
+    r <- ioMsgMaybe $ hoistDsMessage $
         {-# SCC "deSugar" #-}
-        deSugar hsc_env mod_location tc_result)
+        deSugar hsc_env mod_location tc_result
 
     -- always check -Werror after desugaring, this is the last opportunity for
     -- warnings to arise before the backend.
@@ -1143,7 +1142,7 @@ hscCheckSafeImports tcg_env = do
           False
                 -- SafeInferred: user defined RULES, so not safe
               | safeInferOn dflags && not (null $ tcg_rules tcg_env')
-              -> markUnsafeInfer tcg_env' $ fmap (mkTcRnDsMessage . Right) $ warns dflags (tcg_rules tcg_env')
+              -> markUnsafeInfer tcg_env' $ warns dflags (tcg_rules tcg_env')
 
                 -- Trustworthy OR SafeInferred: with no RULES
               | otherwise
@@ -1210,7 +1209,7 @@ checkSafeImports tcg_env
             let infPassed = isEmptyMessages infErrs
             tcg_env' <- case (not infPassed) of
               True  ->
-                let castMsg m = TcRnDsMessage . Right . TcRnUnknownMessage
+                let castMsg m = TcRnUnknownMessage
                               $ DiagnosticMessage (diagnosticMessage m) (diagnosticReason m)
                 -- NOTE(adinapoli) This is /extremely/ unfortunate. We have
                 -- to cast everything to be a 'TcRnDsMessage'!
@@ -1430,7 +1429,7 @@ checkPkgTrust pkgs = do
 -- may call it on modules using Trustworthy or Unsafe flags so as to allow
 -- warning flags for safety to function correctly. See Note [Safe Haskell
 -- Inference].
-markUnsafeInfer :: TcGblEnv -> Messages TcRnDsMessage -> Hsc TcGblEnv
+markUnsafeInfer :: TcGblEnv -> Messages TcRnMessage -> Hsc TcGblEnv
 markUnsafeInfer tcg_env whyUnsafe = do
     dflags <- getDynFlags
 
@@ -1875,10 +1874,10 @@ hscParsedStmt :: HscEnv
                     , FixityEnv))
 hscParsedStmt hsc_env stmt = runInteractiveHsc hsc_env $ do
   -- Rename and typecheck it
-  (ids, tc_expr, fix_env) <- ioMsgMaybe $ hoistTcRnDsMessage $ tcRnStmt hsc_env stmt
+  (ids, tc_expr, fix_env) <- ioMsgMaybe $ hoistTcRnMessage $ tcRnStmt hsc_env stmt
 
   -- Desugar it
-  ds_expr <- ioMsgMaybe $ hoistTcRnDsMessage $ deSugarExpr hsc_env tc_expr
+  ds_expr <- ioMsgMaybe $ hoistDsMessage $ deSugarExpr hsc_env tc_expr
   liftIO (lintInteractiveExpr (text "desugar expression") hsc_env ds_expr)
   handleWarnings
 
@@ -1922,7 +1921,7 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
     let interp = hscInterp hsc_env
 
     {- Rename and typecheck it -}
-    tc_gblenv <- ioMsgMaybe $ hoistTcRnDsMessage $ tcRnDeclsi hsc_env decls
+    tc_gblenv <- ioMsgMaybe $ hoistTcRnMessage $ tcRnDeclsi hsc_env decls
 
     {- Grab the new instances -}
     -- We grab the whole environment because of the overlapping that may have
@@ -2048,7 +2047,7 @@ hscTcExpr :: HscEnv
 hscTcExpr hsc_env0 mode expr = runInteractiveHsc hsc_env0 $ do
   hsc_env <- getHscEnv
   parsed_expr <- hscParseExpr expr
-  ioMsgMaybe $ hoistTcRnDsMessage $ tcRnExpr hsc_env mode parsed_expr
+  ioMsgMaybe $ hoistTcRnMessage $ tcRnExpr hsc_env mode parsed_expr
 
 -- | Find the kind of a type, after generalisation
 hscKcType
@@ -2059,7 +2058,7 @@ hscKcType
 hscKcType hsc_env0 normalise str = runInteractiveHsc hsc_env0 $ do
     hsc_env <- getHscEnv
     ty <- hscParseType str
-    ioMsgMaybe $ hoistTcRnDsMessage $ tcRnType hsc_env DefaultFlexi normalise ty
+    ioMsgMaybe $ hoistTcRnMessage $ tcRnType hsc_env DefaultFlexi normalise ty
 
 hscParseExpr :: String -> Hsc (LHsExpr GhcPs)
 hscParseExpr expr = do
