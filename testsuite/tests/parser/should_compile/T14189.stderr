@@ -46,7 +46,7 @@
                          (UnchangedAnchor))
                         (AnnListItem
                          [(AddVbarAnn
-                           (AR { T14189.hs:6:22 }))])
+                           (EpaSpan { T14189.hs:6:22 }))])
                         (EpaComments
                          [])) { T14189.hs:6:15-20 })
            (ConDeclH98
@@ -79,7 +79,7 @@
                          (UnchangedAnchor))
                         (AnnListItem
                          [(AddVbarAnn
-                           (AR { T14189.hs:6:27 }))])
+                           (EpaSpan { T14189.hs:6:27 }))])
                         (EpaComments
                          [])) { T14189.hs:6:24-25 })
            (ConDeclH98
@@ -116,9 +116,9 @@
                               { T14189.hs:6:33-40 }
                               (UnchangedAnchor)))
                             (Just
-                             (AddEpAnn AnnOpenC (AR { T14189.hs:6:31 })))
+                             (AddEpAnn AnnOpenC (EpaSpan { T14189.hs:6:31 })))
                             (Just
-                             (AddEpAnn AnnCloseC (AR { T14189.hs:6:42 })))
+                             (AddEpAnn AnnCloseC (EpaSpan { T14189.hs:6:42 })))
                             []
                             [])
                            (EpaComments
@@ -210,3 +210,4 @@
           (FieldSelectors)
           {Name: T14189.f}))])])])
   (Nothing)))
+
