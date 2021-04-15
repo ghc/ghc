@@ -16,8 +16,8 @@ module GHC.Stack.CloneStack (
   decode
   ) where
 
-import GHC.Prim (StackSnapshot#, cloneMyStack#, ThreadId#, MutableArray#, Addr#, sizeofMutableArray#, readArray#)
-import GHC.Exts (Int(I#), Int#, RealWorld, Ptr(..))
+import GHC.Prim (StackSnapshot#, cloneMyStack#, ThreadId#, MutableArray#, sizeofMutableArray#, readArray#)
+import GHC.Exts (Int(I#), RealWorld, Ptr(..))
 import Control.Concurrent.MVar
 import Control.Monad (forM)
 import GHC.Conc.Sync
@@ -74,9 +74,9 @@ cloneThreadStack (ThreadId tid#) = do
   takeMVar resultVar
 
 -- TODO: Cannot use `import GHC.Exts.Heap (StgInfoTable(..))` -> hidden package
-type InfoTable = Word
+type InfoTableCode = Word
 
-foreign import ccall "decodeClonedStack" decodeClonedStack:: StackSnapshot# -> MutableArray# RealWorld (Ptr Word)
+foreign import ccall "decodeClonedStack" decodeClonedStack:: StackSnapshot# -> MutableArray# RealWorld (Ptr InfoTableCode)
 
 foreign import ccall "lookupIPE" lookupIPE:: Ptr Word -> IO (Ptr InfoProvEnt)
 
