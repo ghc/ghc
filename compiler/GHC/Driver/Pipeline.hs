@@ -1261,7 +1261,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
                 popts = initParserOpts dflags
             eimps <- getImports popts imp_prelude buf input_fn (basename <.> suff)
             case eimps of
-              Left errs -> throwErrors (foldMessages (fmap GhcPsMessage . mkParserErr) errs)
+              Left errs -> throwErrors (foldPsMessages mkParserErr errs)
               Right (src_imps,imps,L _ mod_name) -> return
                   (Just buf, mod_name, imps, src_imps)
 
