@@ -18,6 +18,41 @@ import ghczmprim_GHCziTypes_Izh_info;
 import AcquireSRWLockExclusive;
 import ReleaseSRWLockExclusive;
 
+/*
+   Note [Entering unlifted objects]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For a long time (until GHC 9.2), it was an error to attempt to enter unlifted
+objects (e.g. Array#). Afterall, there was no reason why one should need to do
+so: the value is by definition already evaluated.
+
+However, this restriction presents an awkward case to the code generator when
+dealing with unboxed sums. Consider, for instance, a program like:
+
+    hello :: (# Char | ByteArray# #) -> ByteArray#
+    hello x =
+      case x of
+        (# c | #)  -> error "uh oh"
+        (# | ba #) -> ba
+
+Unarise will break apart the unboxed sum argument into an integral tag field and an Any
+field containing the payload:
+
+    hello :: Tag# -> Any {BoxedRep LiftedRep} -> ()
+    hello tag payload =
+      case tag of
+        0# -> error "uh oh"
+        1# -> payload
+
+When returning `payload` the code generator will look at its type to determine
+whether or not the value needs to be entered before returning. Since payload is
+lifted type (Any), it will conclude that it must do so. Consequently, we will
+end up entering an unlifted value.
+
+To fix this we considered a few options:
+
+ 1. Make the 
+*/
+
 /* ----------------------------------------------------------------------------
    Stack underflow
    ------------------------------------------------------------------------- */
@@ -668,8 +703,8 @@ loop:
    NON_ENTERABLE_ENTRY_CODE now defined at the beginning of the file
    ------------------------------------------------------------------------- */
 
-INFO_TABLE(stg_TSO, 0,0,TSO, "TSO", "TSO")
-{ foreign "C" barf("TSO object (%p) entered!", R1) never returns; }
+INFO_TABLE(stg_TSO, 0,0,TSO, "TSO", "TSO") ()
+{ return (R1); }
 
 INFO_TABLE(stg_STACK, 0,0, STACK, "STACK", "STACK")
 { foreign "C" barf("STACK object (%p) entered!", R1) never returns; }
@@ -682,8 +717,8 @@ INFO_TABLE(stg_STACK, 0,0, STACK, "STACK", "STACK")
    live weak pointers with dead ones).
    ------------------------------------------------------------------------- */
 
-INFO_TABLE(stg_WEAK,1,4,WEAK,"WEAK","WEAK")
-{ foreign "C" barf("WEAK object (%p) entered!", R1) never returns; }
+INFO_TABLE(stg_WEAK,1,4,WEAK,"WEAK","WEAK") ()
+{ return (R1); }
 
 /*
  * It's important when turning an existing WEAK into a DEAD_WEAK
@@ -691,8 +726,8 @@ INFO_TABLE(stg_WEAK,1,4,WEAK,"WEAK","WEAK")
  * field and break the linked list of weak pointers.  Hence, we give
  * DEAD_WEAK 5 non-pointer fields.
  */
-INFO_TABLE_CONSTR(stg_DEAD_WEAK,0,5,0,CONSTR,"DEAD_WEAK","DEAD_WEAK")
-{ foreign "C" barf("DEAD_WEAK object (%p) entered!", R1) never returns; }
+INFO_TABLE_CONSTR(stg_DEAD_WEAK,0,5,0,CONSTR,"DEAD_WEAK","DEAD_WEAK") ()
+{ return (R1); }
 
 /* ----------------------------------------------------------------------------
    C finalizer lists
@@ -719,8 +754,8 @@ CLOSURE(stg_NO_FINALIZER_closure,stg_NO_FINALIZER);
    Stable Names are unlifted too.
    ------------------------------------------------------------------------- */
 
-INFO_TABLE(stg_STABLE_NAME,0,1,PRIM,"STABLE_NAME","STABLE_NAME")
-{ foreign "C" barf("STABLE_NAME object (%p) entered!", R1) never returns; }
+INFO_TABLE(stg_STABLE_NAME,0,1,PRIM,"STABLE_NAME","STABLE_NAME") ()
+{ return (R1); }
 
 /* ----------------------------------------------------------------------------
    MVars
@@ -729,21 +764,21 @@ INFO_TABLE(stg_STABLE_NAME,0,1,PRIM,"STABLE_NAME","STABLE_NAME")
    and entry code for each type.
    ------------------------------------------------------------------------- */
 
-INFO_TABLE(stg_MVAR_CLEAN,3,0,MVAR_CLEAN,"MVAR","MVAR")
-{ foreign "C" barf("MVAR object (%p) entered!", R1) never returns; }
+INFO_TABLE(stg_MVAR_CLEAN,3,0,MVAR_CLEAN,"MVAR","MVAR") ()
+{ return (R1); }
 
-INFO_TABLE(stg_MVAR_DIRTY,3,0,MVAR_DIRTY,"MVAR","MVAR")
-{ foreign "C" barf("MVAR object (%p) entered!", R1) never returns; }
+INFO_TABLE(stg_MVAR_DIRTY,3,0,MVAR_DIRTY,"MVAR","MVAR") ()
+{ return (R1); }
 
 /* -----------------------------------------------------------------------------
    STM
    -------------------------------------------------------------------------- */
 
-INFO_TABLE(stg_TVAR_CLEAN, 2, 1, TVAR, "TVAR", "TVAR")
-{ foreign "C" barf("TVAR_CLEAN object (%p) entered!", R1) never returns; }
+INFO_TABLE(stg_TVAR_CLEAN, 2, 1, TVAR, "TVAR", "TVAR") ()
+{ return (R1); }
 
-INFO_TABLE(stg_TVAR_DIRTY, 2, 1, TVAR, "TVAR", "TVAR")
-{ foreign "C" barf("TVAR_DIRTY object (%p) entered!", R1) never returns; }
+INFO_TABLE(stg_TVAR_DIRTY, 2, 1, TVAR, "TVAR", "TVAR") ()
+{ return (R1); }
 
 INFO_TABLE(stg_TVAR_WATCH_QUEUE, 3, 0, MUT_PRIM, "TVAR_WATCH_QUEUE", "TVAR_WATCH_QUEUE")
 { foreign "C" barf("TVAR_WATCH_QUEUE object (%p) entered!", R1) never returns; }
@@ -887,41 +922,41 @@ CLOSURE(stg_STM_AWOKEN_closure,stg_STM_AWOKEN);
 
    ------------------------------------------------------------------------- */
 
-INFO_TABLE(stg_ARR_WORDS, 0, 0, ARR_WORDS, "ARR_WORDS", "ARR_WORDS")
-{ foreign "C" barf("ARR_WORDS object (%p) entered!", R1) never returns; }
+INFO_TABLE(stg_ARR_WORDS, 0, 0, ARR_WORDS, "ARR_WORDS", "ARR_WORDS") ()
+{ return (R1); }
 
-INFO_TABLE(stg_MUT_ARR_PTRS_CLEAN, 0, 0, MUT_ARR_PTRS_CLEAN, "MUT_ARR_PTRS_CLEAN", "MUT_ARR_PTRS_CLEAN")
-{ foreign "C" barf("MUT_ARR_PTRS_CLEAN object (%p) entered!", R1) never returns; }
+INFO_TABLE(stg_MUT_ARR_PTRS_CLEAN, 0, 0, MUT_ARR_PTRS_CLEAN, "MUT_ARR_PTRS_CLEAN", "MUT_ARR_PTRS_CLEAN") ()
+{ return (R1); }
 
-INFO_TABLE(stg_MUT_ARR_PTRS_DIRTY, 0, 0, MUT_ARR_PTRS_DIRTY, "MUT_ARR_PTRS_DIRTY", "MUT_ARR_PTRS_DIRTY")
-{ foreign "C" barf("MUT_ARR_PTRS_DIRTY object (%p) entered!", R1) never returns; }
+INFO_TABLE(stg_MUT_ARR_PTRS_DIRTY, 0, 0, MUT_ARR_PTRS_DIRTY, "MUT_ARR_PTRS_DIRTY", "MUT_ARR_PTRS_DIRTY") ()
+{ return (R1); }
 
-INFO_TABLE(stg_MUT_ARR_PTRS_FROZEN_CLEAN, 0, 0, MUT_ARR_PTRS_FROZEN_CLEAN, "MUT_ARR_PTRS_FROZEN_CLEAN", "MUT_ARR_PTRS_FROZEN_CLEAN")
-{ foreign "C" barf("MUT_ARR_PTRS_FROZEN_CLEAN object (%p) entered!", R1) never returns; }
+INFO_TABLE(stg_MUT_ARR_PTRS_FROZEN_CLEAN, 0, 0, MUT_ARR_PTRS_FROZEN_CLEAN, "MUT_ARR_PTRS_FROZEN_CLEAN", "MUT_ARR_PTRS_FROZEN_CLEAN") ()
+{ return (R1); }
 
-INFO_TABLE(stg_MUT_ARR_PTRS_FROZEN_DIRTY, 0, 0, MUT_ARR_PTRS_FROZEN_DIRTY, "MUT_ARR_PTRS_FROZEN_DIRTY", "MUT_ARR_PTRS_FROZEN_DIRTY")
-{ foreign "C" barf("MUT_ARR_PTRS_FROZEN_DIRTY object (%p) entered!", R1) never returns; }
+INFO_TABLE(stg_MUT_ARR_PTRS_FROZEN_DIRTY, 0, 0, MUT_ARR_PTRS_FROZEN_DIRTY, "MUT_ARR_PTRS_FROZEN_DIRTY", "MUT_ARR_PTRS_FROZEN_DIRTY") ()
+{ return (R1); }
 
-INFO_TABLE(stg_SMALL_MUT_ARR_PTRS_CLEAN, 0, 0, SMALL_MUT_ARR_PTRS_CLEAN, "SMALL_MUT_ARR_PTRS_CLEAN", "SMALL_MUT_ARR_PTRS_CLEAN")
-{ foreign "C" barf("SMALL_MUT_ARR_PTRS_CLEAN object (%p) entered!", R1) never returns; }
+INFO_TABLE(stg_SMALL_MUT_ARR_PTRS_CLEAN, 0, 0, SMALL_MUT_ARR_PTRS_CLEAN, "SMALL_MUT_ARR_PTRS_CLEAN", "SMALL_MUT_ARR_PTRS_CLEAN") ()
+{ return (R1); }
 
-INFO_TABLE(stg_SMALL_MUT_ARR_PTRS_DIRTY, 0, 0, SMALL_MUT_ARR_PTRS_DIRTY, "SMALL_MUT_ARR_PTRS_DIRTY", "SMALL_MUT_ARR_PTRS_DIRTY")
-{ foreign "C" barf("SMALL_MUT_ARR_PTRS_DIRTY object (%p) entered!", R1) never returns; }
+INFO_TABLE(stg_SMALL_MUT_ARR_PTRS_DIRTY, 0, 0, SMALL_MUT_ARR_PTRS_DIRTY, "SMALL_MUT_ARR_PTRS_DIRTY", "SMALL_MUT_ARR_PTRS_DIRTY") ()
+{ return (R1); }
 
-INFO_TABLE(stg_SMALL_MUT_ARR_PTRS_FROZEN_CLEAN, 0, 0, SMALL_MUT_ARR_PTRS_FROZEN_CLEAN, "SMALL_MUT_ARR_PTRS_FROZEN_CLEAN", "SMALL_MUT_ARR_PTRS_FROZEN_CLEAN")
-{ foreign "C" barf("SMALL_MUT_ARR_PTRS_FROZEN_CLEAN object (%p) entered!", R1) never returns; }
+INFO_TABLE(stg_SMALL_MUT_ARR_PTRS_FROZEN_CLEAN, 0, 0, SMALL_MUT_ARR_PTRS_FROZEN_CLEAN, "SMALL_MUT_ARR_PTRS_FROZEN_CLEAN", "SMALL_MUT_ARR_PTRS_FROZEN_CLEAN") ()
+{ return (R1); }
 
-INFO_TABLE(stg_SMALL_MUT_ARR_PTRS_FROZEN_DIRTY, 0, 0, SMALL_MUT_ARR_PTRS_FROZEN_DIRTY, "SMALL_MUT_ARR_PTRS_FROZEN_DIRTY", "SMALL_MUT_ARR_PTRS_FROZEN_DIRTY")
-{ foreign "C" barf("SMALL_MUT_ARR_PTRS_FROZEN_DIRTY object (%p) entered!", R1) never returns; }
+INFO_TABLE(stg_SMALL_MUT_ARR_PTRS_FROZEN_DIRTY, 0, 0, SMALL_MUT_ARR_PTRS_FROZEN_DIRTY, "SMALL_MUT_ARR_PTRS_FROZEN_DIRTY", "SMALL_MUT_ARR_PTRS_FROZEN_DIRTY") ()
+{ return (R1); }
 
 /* ----------------------------------------------------------------------------
    Mutable Variables
    ------------------------------------------------------------------------- */
 
-INFO_TABLE(stg_MUT_VAR_CLEAN, 1, 0, MUT_VAR_CLEAN, "MUT_VAR_CLEAN", "MUT_VAR_CLEAN")
-{ foreign "C" barf("MUT_VAR_CLEAN object (%p) entered!", R1) never returns; }
-INFO_TABLE(stg_MUT_VAR_DIRTY, 1, 0, MUT_VAR_DIRTY, "MUT_VAR_DIRTY", "MUT_VAR_DIRTY")
-{ foreign "C" barf("MUT_VAR_DIRTY object (%p) entered!", R1) never returns; }
+INFO_TABLE(stg_MUT_VAR_CLEAN, 1, 0, MUT_VAR_CLEAN, "MUT_VAR_CLEAN", "MUT_VAR_CLEAN") ()
+{ return (R1); }
+INFO_TABLE(stg_MUT_VAR_DIRTY, 1, 0, MUT_VAR_DIRTY, "MUT_VAR_DIRTY", "MUT_VAR_DIRTY") ()
+{ return (R1); }
 
 /* ----------------------------------------------------------------------------
    Dummy return closure
@@ -956,11 +991,11 @@ INFO_TABLE_CONSTR(stg_MVAR_TSO_QUEUE,2,0,0,PRIM,"MVAR_TSO_QUEUE","MVAR_TSO_QUEUE
 
 INFO_TABLE( stg_COMPACT_NFDATA_CLEAN, 0, 9, COMPACT_NFDATA, "COMPACT_NFDATA", "COMPACT_NFDATA")
     ()
-{ foreign "C" barf("COMPACT_NFDATA_CLEAN object (%p) entered!", R1) never returns; }
+{ return (R1); }
 
 INFO_TABLE( stg_COMPACT_NFDATA_DIRTY, 0, 9, COMPACT_NFDATA, "COMPACT_NFDATA", "COMPACT_NFDATA")
     ()
-{ foreign "C" barf("COMPACT_NFDATA_DIRTY object (%p) entered!", R1) never returns; }
+{ return (R1); }
 
 /* ----------------------------------------------------------------------------
    Note [CHARLIKE and INTLIKE closures.]
