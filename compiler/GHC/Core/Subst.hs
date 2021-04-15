@@ -579,7 +579,7 @@ cloneTyVarBndr (Subst in_scope id_env tv_env cv_env) tv uniq
         (TCvSubst in_scope' tv_env' cv_env', tv')
            -> (Subst in_scope' id_env tv_env' cv_env', tv')
 
-substCoVarBndr :: Subst -> TyVar -> (Subst, TyVar)
+substCoVarBndr :: Subst -> CoVar -> (Subst, CoVar)
 substCoVarBndr (Subst in_scope id_env tv_env cv_env) cv
   = case Coercion.substCoVarBndr (TCvSubst in_scope tv_env cv_env) cv of
         (TCvSubst in_scope' tv_env' cv_env', cv')

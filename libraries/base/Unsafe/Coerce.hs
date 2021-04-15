@@ -90,10 +90,10 @@ several ways
 
 (U1) unsafeEqualityProof is /never/ inlined.
 
-(U2) In CoreToStg.coreToStg, we transform
-       case unsafeEqualityProof of UnsafeRefl -> blah
+(U2) In CoreToStg.Prep, we transform
+       case unsafeEqualityProof of UnsafeRefl g -> blah
       ==>
-       blah
+       blah[unsafe-co/g]
 
      This eliminates the overhead of evaluating the unsafe
      equality proof.
@@ -127,18 +127,15 @@ several ways
      and produce a thunk even after discarding the unsafeEqualityProof.
      So instead we float out the case to give
         case unsafeEqualityProof ... of { UnsafeRefl ->
-        let a = K e
+        let a = e
             x = K a
-        in ...
-     Flaoting the case is OK here, even though it broardens the
+        in ...  }
+     Floating the case is OK here, even though it broadens the
      scope, because we are done with simplification.
 
-(U4) GHC.CoreToStg.Prep.cpeExprIsTrivial anticipates the
-     upcoming discard of unsafeEqualityProof.
-
-(U4a) Ditto GHC.Core.Unfold.inlineBoringOk we want to treat
-      the RHS of unsafeCoerce as very small; see
-      Note [Inline unsafeCoerce] in that module.
+(U4) Ditto GHC.Core.Unfold.inlineBoringOk we want to treat
+     the RHS of unsafeCoerce as very small; see
+     Note [Inline unsafeCoerce] in that module.
 
 (U5) The definition of unsafeEqualityProof in Unsafe.Coerce
      looks very strange:
@@ -212,17 +209,6 @@ There are yet more wrinkles
       the kind-/homogeneous/ unsafeEqualityProof twice.
 
       See Note [Wiring in unsafeCoerce#] in Desugar.
-
-(U11) We must also be careful to discard unsafeEqualityProof in the
-      bytecode generator; see ByteCodeGen.bcView.  Here we don't really
-      care about fast execution, but (annoyingly) we /do/ care about the
-      GHCi debugger, and GHCi itself uses unsafeCoerce.
-
-      Moreover, in GHC.Tc.Module.tcGhciStmts we use unsafeCoerce#, rather
-      than the more kosher unsafeCoerce, because (with -O0) the latter
-      may not be inlined.
-
-      Sigh
 -}
 
 -- | This type is treated magically within GHC. Any pattern match of the
