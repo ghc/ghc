@@ -660,8 +660,9 @@ gen_wired_in_docs (Info _ entries)
   = "primOpDocs =\n  [ " ++ intercalate "\n  , " (catMaybes $ map mkDoc $ concatMap desugarVectorSpec entries) ++ "\n  ]\n"
     where
       mkDoc po | Just poName <- getName po
-               , not $ null $ desc po = Just $ show (poName, desc po)
+               , not $ null $ desc po = Just $ "(fsLit " ++ show poName ++ "," ++ show (desc po) ++ ")"
                | otherwise = Nothing
+
 
 ------------------------------------------------------------------
 -- Create PrimOpInfo text from PrimOpSpecs -----------------------
