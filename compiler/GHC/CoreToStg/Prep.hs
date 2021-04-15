@@ -49,6 +49,7 @@ import GHC.Core.Coercion
 import GHC.Core.TyCon
 import GHC.Core.DataCon
 import GHC.Core.Opt.OccurAnal
+import GHC.Core.TyCo.Rep( UnivCoProvenance(..) )
 
 
 import GHC.Data.Maybe
@@ -77,8 +78,10 @@ import GHC.Types.TyThing
 import GHC.Types.CostCentre ( CostCentre, ccFromThisModule )
 import GHC.Types.Unique.Supply
 
+import GHC.Data.Pair
 import Data.Bits
 import Data.List        ( unfoldr )
+import Data.Functor.Identity
 import Control.Monad
 import qualified Data.Set as S
 
@@ -144,10 +147,58 @@ The goal of this pass is to prepare for code generation.
     profiling mode. We have to do this here beucase we won't have unfoldings
     after this pass (see `zapUnfolding` and Note [Drop unfoldings and rules].
 
+13. Eliminate case clutter in favour of unsafe coercions.
+    See Note [Unsafe coercions]
+
+14. Eliminate some magic Ids, specifically
+     runRW# (\s. e)  ==>  e[readWorldId/s]
+             lazy e  ==>  e
+         noinline e  ==>  e
+     ToDo:  keepAlive# ...
+    This is done in cpeApp
+
 This is all done modulo type applications and abstractions, so that
 when type erasure is done for conversion to STG, we don't end up with
 any trivial or useless bindings.
 
+Note [Unsafe coercions]
+~~~~~~~~~~~~~~~~~~~~~~~
+CorePrep does these two transformations:
+
+* Convert empty case to cast with an unsafe coercion
+          (case e of {}) ===>  e |> unsafe-co
+  See Note [Empty case alternatives] in GHC.Core: if the case
+  alternatives are empty, the scrutinee must diverge or raise an
+  exception, so we can just dive into it.
+
+  Of course, if the scrutinee *does* return, we may get a seg-fault.
+  A belt-and-braces approach would be to persist empty-alternative
+  cases to code generator, and put a return point anyway that calls a
+  runtime system error function.
+
+  Notice that eliminating empty case can lead to an ill-kinded coercion
+      case error @Int "foo" of {}  :: Int#
+      ===> error @Int "foo" |> unsafe-co
+      where unsafe-co :: Int ~ Int#
+  But that's fine because the expression diverges anyway. And it's
+  no different to what happened before.
+
+* Eliminate unsafeEqualityProof in favour of an unsafe coercion
+          case unsafeEqualityProof of UnsafeRefl g -> e
+          ===>  e[unsafe-co/g]
+  See (U2) in Note [Implementing unsafeCoerce] in base:Unsafe.Coerce
+
+  Note that this requiresuse ot substitute 'unsafe-co' for 'g', and
+  that is the main (current) reason for cpe_tyco_env in CorePrepEnv.
+  Tiresome, but not difficult.
+
+These transformations get rid of "case clutter", leaving only casts.
+We are doing no further significant tranformations, so the reasons
+for the case forms have disappeared. And it is extremely helpful for
+the ANF-ery, CoreToStg, and backends, if trivial expressions really do
+look trivial. #19700 was an example.
+
+In both cases, the "unsafe-co" is just (UnivCo ty1 ty2 CorePrepProv).
 
 Note [CorePrep invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -403,7 +454,7 @@ cpeBind top_lvl env (NonRec bndr rhs)
                                    dmd is_unlifted
                                    env bndr1 rhs
        -- See Note [Inlining in CorePrep]
-       ; let triv_rhs = cpExprIsTrivial rhs1
+       ; let triv_rhs = exprIsTrivial rhs1
              env2    | triv_rhs  = extendCorePrepEnvExpr env1 bndr rhs1
                      | otherwise = env1
              floats1 | triv_rhs, isInternalName (idName bndr)
@@ -585,8 +636,10 @@ cpeRhsE :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CpeRhs)
 -- For example
 --      f (g x)   ===>   ([v = g x], f v)
 
-cpeRhsE _env expr@(Type {})      = return (emptyFloats, expr)
-cpeRhsE _env expr@(Coercion {})  = return (emptyFloats, expr)
+cpeRhsE env (Type ty)
+  = return (emptyFloats, Type (cpSubstTy env ty))
+cpeRhsE env (Coercion co)
+  = return (emptyFloats, Coercion (cpSubstCo env co))
 cpeRhsE env expr@(Lit (LitNumber nt i))
    = case cpe_convertNumLit env nt i of
       Nothing -> return (emptyFloats, expr)
@@ -619,7 +672,7 @@ cpeRhsE env (Tick tickish expr)
 
 cpeRhsE env (Cast expr co)
    = do { (floats, expr') <- cpeRhsE env expr
-        ; return (floats, Cast expr' co) }
+        ; return (floats, Cast expr' (cpSubstCo env co)) }
 
 cpeRhsE env expr@(Lam {})
    = do { let (bndrs,body) = collectBinders expr
@@ -627,19 +680,30 @@ cpeRhsE env expr@(Lam {})
         ; body' <- cpeBodyNF env' body
         ; return (emptyFloats, mkLams bndrs' body') }
 
-cpeRhsE env (Case scrut bndr ty alts)
-  | isUnsafeEqualityProof scrut
-  , [Alt con bs rhs] <- alts
-  = do { (floats1, scrut') <- cpeBody env scrut
-       ; (env1, bndr')     <- cpCloneBndr env bndr
-       ; (env2, bs')       <- cpCloneBndrs env1 bs
-       ; (floats2, rhs')   <- cpeBody env2 rhs
-       ; let case_float = FloatCase scrut' bndr' con bs' True
-             floats'    = (floats1 `addFloat` case_float)
-                          `appendFloats` floats2
-       ; return (floats', rhs') }
+-- Eliminate empty case
+-- See Note [Unsafe coercions]
+cpeRhsE env (Case scrut _ ty [])
+  = do { (floats, scrut') <- cpeRhsE env scrut
+       ; let ty' = cpSubstTy env ty
+             co' = mkUnsafeCo Representational (exprType scrut') ty'
+       ; return (floats, Cast scrut' co') }
+   -- This can give rise to
+   --   Warning: Unsafe coercion: between unboxed and boxed value
+   -- but it's fine because 'scrut' diverges
 
-  | otherwise
+-- Eliminate unsafeEqualityProof
+-- See Note [Unsafe coercions]
+cpeRhsE env (Case scrut bndr _ alts)
+  | isUnsafeEqualityProof scrut
+  , isDeadBinder bndr -- We can only discard the case if the case-binder
+                      -- is dead.  It usually is, but see #18227
+  , [Alt _ [co_var] rhs] <- alts
+  , let Pair ty1 ty2 = coVarTypes co_var
+        the_co = mkUnsafeCo Nominal (cpSubstTy env ty1) (cpSubstTy env ty2)
+        env'   = extendCoVarEnv env co_var the_co
+  = cpeRhsE env' rhs
+
+cpeRhsE env (Case scrut bndr ty alts)
   = do { (floats, scrut') <- cpeBody env scrut
        ; (env', bndr2) <- cpCloneBndr env bndr
        ; let alts'
@@ -715,9 +779,9 @@ rhsToBody expr@(Lam {})
   | all isTyVar bndrs           -- Type lambdas are ok
   = return (emptyFloats, expr)
   | otherwise                   -- Some value lambdas
-  = do { fn <- newVar (exprType expr)
-       ; let rhs   = cpeEtaExpand (exprArity expr) expr
-             float = FloatLet (NonRec fn rhs)
+  = do { let rhs = cpeEtaExpand (exprArity expr) expr
+       ; fn <- newVar (exprType rhs)
+       ; let float = FloatLet (NonRec fn rhs)
        ; return (unitFloat float, Var fn) }
   where
     (bndrs,body) = collectBinders expr
@@ -808,7 +872,7 @@ cpeApp top_env expr
           : CpeApp s0
           : CpeApp k
           : rest <- args
-        = do { y <- newVar result_ty
+        = do { y  <- newVar (cpSubstTy env result_ty)
              ; s2 <- newVar realWorldStatePrimTy
              ; -- beta reduce if possible
              ; (floats, k') <- case k of
@@ -846,7 +910,7 @@ cpeApp top_env expr
            -- Apps it is under are type applications only (c.f.
            -- exprIsTrivial).  But note that we need the type of the
            -- expression, not the id.
-           ; (app, floats) <- rebuild_app args e2 (exprType e2) emptyFloats stricts
+           ; (app, floats) <- rebuild_app env args e2 emptyFloats stricts
            ; mb_saturate hd app floats depth }
         where
           stricts = case idStrictness v of
@@ -866,13 +930,11 @@ cpeApp top_env expr
 
         -- N-variable fun, better let-bind it
     cpe_app env fun args depth
-      = do { (fun_floats, fun') <- cpeArg env evalDmd fun ty
+      = do { (fun_floats, fun') <- cpeArg env evalDmd fun
                           -- The evalDmd says that it's sure to be evaluated,
                           -- so we'll end up case-binding it
-           ; (app, floats) <- rebuild_app args fun' ty fun_floats []
+           ; (app, floats) <- rebuild_app env args fun' fun_floats []
            ; mb_saturate Nothing app floats depth }
-        where
-          ty = exprType fun
 
     -- Saturate if necessary
     mb_saturate head app floats depth =
@@ -887,38 +949,45 @@ cpeApp top_env expr
     -- all of which are used to possibly saturate this application if it
     -- has a constructor or primop at the head.
     rebuild_app
-        :: [ArgInfo]                  -- The arguments (inner to outer)
+        :: CorePrepEnv
+        -> [ArgInfo]                  -- The arguments (inner to outer)
         -> CpeApp
-        -> Type
         -> Floats
         -> [Demand]
         -> UniqSM (CpeApp, Floats)
-    rebuild_app [] app _ floats ss = do
-      MASSERT(null ss) -- make sure we used all the strictness info
-      return (app, floats)
-    rebuild_app (a : as) fun' fun_ty floats ss = case a of
-      CpeApp arg@(Type arg_ty) ->
-        rebuild_app as (App fun' arg) (piResultTy fun_ty arg_ty) floats ss
-      CpeApp arg@(Coercion {}) ->
-        rebuild_app as (App fun' arg) (funResultTy fun_ty) floats ss
+    rebuild_app _ [] app floats ss
+      = ASSERT(null ss) -- make sure we used all the strictness info
+        return (app, floats)
+
+    rebuild_app env (a : as) fun' floats ss = case a of
+
+      CpeApp (Type arg_ty)
+        -> rebuild_app env as (App fun' (Type arg_ty')) floats ss
+        where
+          arg_ty' = cpSubstTy env arg_ty
+
+      CpeApp (Coercion co)
+        -> rebuild_app env as (App fun' (Coercion co')) floats ss
+        where
+            co' = cpSubstCo env co
+
       CpeApp arg -> do
         let (ss1, ss_rest)  -- See Note [lazyId magic] in GHC.Types.Id.Make
                = case (ss, isLazyExpr arg) of
                    (_   : ss_rest, True)  -> (topDmd, ss_rest)
                    (ss1 : ss_rest, False) -> (ss1,    ss_rest)
                    ([],            _)     -> (topDmd, [])
-            (_, arg_ty, res_ty) =
-              case splitFunTy_maybe fun_ty of
-                Just as -> as
-                Nothing -> pprPanic "cpeBody" (ppr fun_ty $$ ppr expr)
-        (fs, arg') <- cpeArg top_env ss1 arg arg_ty
-        rebuild_app as (App fun' arg') res_ty (fs `appendFloats` floats) ss_rest
-      CpeCast co ->
-        let ty2 = coercionRKind co
-        in rebuild_app as (Cast fun' co) ty2 floats ss
-      CpeTick tickish ->
+        (fs, arg') <- cpeArg top_env ss1 arg
+        rebuild_app env as (App fun' arg') (fs `appendFloats` floats) ss_rest
+
+      CpeCast co
+        -> rebuild_app env as (Cast fun' co') floats ss
+        where
+           co' = cpSubstCo env co
+
+      CpeTick tickish
         -- See [Floating Ticks in CorePrep]
-        rebuild_app as fun' fun_ty (addFloat floats (FloatTick tickish)) ss
+        -> rebuild_app env as fun' (addFloat floats (FloatTick tickish)) ss
 
 isLazyExpr :: CoreExpr -> Bool
 -- See Note [lazyId magic] in GHC.Types.Id.Make
@@ -1143,30 +1212,24 @@ However, until then we simply add a special case excluding literals from the
 floating done by cpeArg.
 -}
 
+mkUnsafeCo :: Role -> Type -> Type -> Coercion
+mkUnsafeCo role ty1 ty2 = mkUnivCo CorePrepProv role ty1 ty2
+
 -- | Is an argument okay to CPE?
 okCpeArg :: CoreExpr -> Bool
 -- Don't float literals. See Note [ANF-ising literal string arguments].
 okCpeArg (Lit _) = False
 -- Do not eta expand a trivial argument
-okCpeArg expr    = not (cpExprIsTrivial expr)
-
-cpExprIsTrivial :: CoreExpr -> Bool
-cpExprIsTrivial e
-  | Tick t e <- e
-  , not (tickishIsCode t)
-  = cpExprIsTrivial e
-  | Case scrut _ _ alts <- e
-  , isUnsafeEqualityProof scrut
-  , [Alt _ _ rhs] <- alts
-  = cpExprIsTrivial rhs
-  | otherwise
-  = exprIsTrivial e
+okCpeArg expr    = not (exprIsTrivial expr)
 
 -- This is where we arrange that a non-trivial argument is let-bound
 cpeArg :: CorePrepEnv -> Demand
-       -> CoreArg -> Type -> UniqSM (Floats, CpeArg)
-cpeArg env dmd arg arg_ty
+       -> CoreArg -> UniqSM (Floats, CpeArg)
+cpeArg env dmd arg
   = do { (floats1, arg1) <- cpeRhsE env arg     -- arg1 can be a lambda
+       ; let arg_ty      = exprType arg1
+             is_unlifted = isUnliftedType arg_ty
+             want_float  = wantFloatNested NonRecursive dmd is_unlifted
        ; (floats2, arg2) <- if want_float floats1 arg1
                             then return (floats1, arg1)
                             else dontFloat floats1 arg1
@@ -1180,9 +1243,6 @@ cpeArg env dmd arg arg_ty
                  ; return (addFloat floats2 arg_float, varToCoreExpr v) }
          else return (floats2, arg2)
        }
-  where
-    is_unlifted = isUnliftedType arg_ty
-    want_float  = wantFloatNested NonRecursive dmd is_unlifted
 
 {-
 Note [Floating unlifted arguments]
@@ -1345,7 +1405,7 @@ Note [Speculative evaluation]
 Since call-by-value is much cheaper than call-by-need, we case-bind arguments
 that are either
 
-  1. Strictly evaluated anyway, according to the StrictSig of the callee, or
+  1. Strictly evaluated anyway, according to the DmdSig of the callee, or
   2. ok-for-spec, according to 'exprOkForSpeculation'
 
 While (1) is a no-brainer and always beneficial, (2) is a bit
@@ -1622,104 +1682,20 @@ data CorePrepEnv
         --      see Note [lazyId magic], Note [Inlining in CorePrep]
         --      and Note [CorePrep inlines trivial CoreExpr not Id] (#12076)
 
+        , cpe_tyco_env :: Maybe CpeTyCoEnv -- See Note [CpeTyCoEnv]
+
         , cpe_convertNumLit   :: LitNumType -> Integer -> Maybe CoreExpr
         -- ^ Convert some numeric literals (Integer, Natural) into their
         -- final Core form
     }
 
--- | Create a function that converts Bignum literals into their final CoreExpr
-mkConvertNumLiteral
-   :: HscEnv
-   -> IO (LitNumType -> Integer -> Maybe CoreExpr)
-mkConvertNumLiteral hsc_env = do
-   let
-      dflags   = hsc_dflags hsc_env
-      platform = targetPlatform dflags
-      home_unit = hsc_home_unit hsc_env
-      guardBignum act
-         | isHomeUnitInstanceOf home_unit primUnitId
-         = return $ panic "Bignum literals are not supported in ghc-prim"
-         | isHomeUnitInstanceOf home_unit bignumUnitId
-         = return $ panic "Bignum literals are not supported in ghc-bignum"
-         | otherwise = act
-
-      lookupBignumId n      = guardBignum (tyThingId <$> lookupGlobal hsc_env n)
-
-   -- The lookup is done here but the failure (panic) is reported lazily when we
-   -- try to access the `bigNatFromWordList` function.
-   --
-   -- If we ever get built-in ByteArray# literals, we could avoid the lookup by
-   -- directly using the Integer/Natural wired-in constructors for big numbers.
-
-   bignatFromWordListId <- lookupBignumId bignatFromWordListName
-
-   let
-      convertNumLit nt i = case nt of
-         LitNumInteger -> Just (convertInteger i)
-         LitNumNatural -> Just (convertNatural i)
-         _             -> Nothing
-
-      convertInteger i
-         | platformInIntRange platform i -- fit in a Int#
-         = mkConApp integerISDataCon [Lit (mkLitInt platform i)]
-
-         | otherwise -- build a BigNat and embed into IN or IP
-         = let con = if i > 0 then integerIPDataCon else integerINDataCon
-           in mkBigNum con (convertBignatPrim (abs i))
-
-      convertNatural i
-         | platformInWordRange platform i -- fit in a Word#
-         = mkConApp naturalNSDataCon [Lit (mkLitWord platform i)]
-
-         | otherwise --build a BigNat and embed into NB
-         = mkBigNum naturalNBDataCon (convertBignatPrim i)
-
-      -- we can't simply generate:
-      --
-      --    NB (bigNatFromWordList# [W# 10, W# 20])
-      --
-      -- using `mkConApp` because it isn't in ANF form. Instead we generate:
-      --
-      --    case bigNatFromWordList# [W# 10, W# 20] of ba { DEFAULT -> NB ba }
-      --
-      -- via `mkCoreApps`
-
-      mkBigNum con ba = mkCoreApps (Var (dataConWorkId con)) [ba]
-
-      convertBignatPrim i =
-         let
-            target    = targetPlatform dflags
-
-            -- ByteArray# literals aren't supported (yet). Were they supported,
-            -- we would use them directly. We would need to handle
-            -- wordSize/endianness conversion between host and target
-            -- wordSize  = platformWordSize platform
-            -- byteOrder = platformByteOrder platform
-
-            -- For now we build a list of Words and we produce
-            -- `bigNatFromWordList# list_of_words`
-
-            words = mkListExpr wordTy (reverse (unfoldr f i))
-               where
-                  f 0 = Nothing
-                  f x = let low  = x .&. mask
-                            high = x `shiftR` bits
-                        in Just (mkConApp wordDataCon [Lit (mkLitWord platform low)], high)
-                  bits = platformWordSizeInBits target
-                  mask = 2 ^ bits - 1
-
-         in mkApps (Var bignatFromWordListId) [words]
-
-
-   return convertNumLit
-
-
 mkInitialCorePrepEnv :: HscEnv -> IO CorePrepEnv
 mkInitialCorePrepEnv hsc_env = do
    convertNumLit <- mkConvertNumLiteral hsc_env
    return $ CPE
-      { cpe_dynFlags = hsc_dflags hsc_env
-      , cpe_env = emptyVarEnv
+      { cpe_dynFlags      = hsc_dflags hsc_env
+      , cpe_env           = emptyVarEnv
+      , cpe_tyco_env      = Nothing
       , cpe_convertNumLit = convertNumLit
       }
 
@@ -1743,6 +1719,117 @@ lookupCorePrepEnv cpe id
         Just exp -> exp
 
 ------------------------------------------------------------------------------
+--           CpeTyCoEnv
+-- ---------------------------------------------------------------------------
+
+{- Note [CpeTyCoEnv]
+~~~~~~~~~~~~~~~~~~~~
+The cpe_tyco_env :: Maybe CpeTyCoEnv field carries a substitution
+for type and coercion varibles
+
+* We need the coercion substitution to support the elimination of
+  unsafeEqualityProof (see Note [Unsafe coercions])
+
+* We need the type substitution in case one of those unsafe
+  coercions occurs in the kind of tyvar binder (sigh)
+
+We don't need an in-scope set because we don't clone any of these
+binders at all, so no new capture can take place.
+
+The cpe_tyco_env is almost always empty -- it only gets populated
+when we get under an usafeEqualityProof.  Hence the Maybe CpeTyCoEnv,
+which makes everything into a no-op in the common case.
+-}
+
+data CpeTyCoEnv = TCE TvSubstEnv CvSubstEnv
+
+emptyTCE :: CpeTyCoEnv
+emptyTCE = TCE emptyTvSubstEnv emptyCvSubstEnv
+
+extend_tce_cv :: CpeTyCoEnv -> CoVar -> Coercion -> CpeTyCoEnv
+extend_tce_cv (TCE tv_env cv_env) cv co
+  = TCE tv_env (extendVarEnv cv_env cv co)
+
+extend_tce_tv :: CpeTyCoEnv -> TyVar -> Type -> CpeTyCoEnv
+extend_tce_tv (TCE tv_env cv_env) tv ty
+  = TCE (extendVarEnv tv_env tv ty) cv_env
+
+lookup_tce_cv :: CpeTyCoEnv -> CoVar -> Coercion
+lookup_tce_cv (TCE _ cv_env) cv
+  = case lookupVarEnv cv_env cv of
+        Just co -> co
+        Nothing -> mkCoVarCo cv
+
+lookup_tce_tv :: CpeTyCoEnv -> TyVar -> Type
+lookup_tce_tv (TCE tv_env _) tv
+  = case lookupVarEnv tv_env tv of
+        Just ty -> ty
+        Nothing -> mkTyVarTy tv
+
+extendCoVarEnv :: CorePrepEnv -> CoVar -> Coercion -> CorePrepEnv
+extendCoVarEnv cpe@(CPE { cpe_tyco_env = mb_tce }) cv co
+  = cpe { cpe_tyco_env = Just (extend_tce_cv tce cv co) }
+  where
+    tce = mb_tce `orElse` emptyTCE
+
+
+cpSubstTy :: CorePrepEnv -> Type -> Type
+cpSubstTy (CPE { cpe_tyco_env = mb_env }) ty
+  = case mb_env of
+      Just env -> runIdentity (subst_ty env ty)
+      Nothing  -> ty
+
+cpSubstCo :: CorePrepEnv -> Coercion -> Coercion
+cpSubstCo (CPE { cpe_tyco_env = mb_env }) co
+  = case mb_env of
+      Just tce -> runIdentity (subst_co tce co)
+      Nothing  -> co
+
+subst_tyco_mapper :: TyCoMapper CpeTyCoEnv Identity
+subst_tyco_mapper = TyCoMapper
+  { tcm_tyvar      = \env tv -> return (lookup_tce_tv env tv)
+  , tcm_covar      = \env cv -> return (lookup_tce_cv env cv)
+  , tcm_hole       = \_ hole -> pprPanic "subst_co_mapper:hole" (ppr hole)
+  , tcm_tycobinder = \env tcv _vis -> if isTyVar tcv
+                                      then return (subst_tv_bndr env tcv)
+                                      else return (subst_cv_bndr env tcv)
+  , tcm_tycon      = \tc -> return tc }
+
+subst_ty :: CpeTyCoEnv -> Type     -> Identity Type
+subst_co :: CpeTyCoEnv -> Coercion -> Identity Coercion
+(subst_ty, _, subst_co, _) = mapTyCoX subst_tyco_mapper
+
+cpSubstTyVarBndr :: CorePrepEnv -> TyVar -> (CorePrepEnv, TyVar)
+cpSubstTyVarBndr env@(CPE { cpe_tyco_env = mb_env }) tv
+  = case mb_env of
+      Nothing  -> (env, tv)
+      Just tce -> (env { cpe_tyco_env = Just tce' }, tv')
+               where
+                  (tce', tv') = subst_tv_bndr tce tv
+
+subst_tv_bndr :: CpeTyCoEnv -> TyVar -> (CpeTyCoEnv, TyVar)
+subst_tv_bndr tce tv
+  = (extend_tce_tv tce tv (mkTyVarTy tv'), tv')
+  where
+    tv'   = mkTyVar (tyVarName tv) kind'
+    kind' = runIdentity $ subst_ty tce $ tyVarKind tv
+
+cpSubstCoVarBndr :: CorePrepEnv -> CoVar -> (CorePrepEnv, CoVar)
+cpSubstCoVarBndr env@(CPE { cpe_tyco_env = mb_env }) cv
+  = case mb_env of
+      Nothing  -> (env, cv)
+      Just tce -> (env { cpe_tyco_env = Just tce' }, cv')
+               where
+                  (tce', cv') = subst_cv_bndr tce cv
+
+subst_cv_bndr :: CpeTyCoEnv -> CoVar -> (CpeTyCoEnv, CoVar)
+subst_cv_bndr tce cv
+  = (extend_tce_cv tce cv (mkCoVarCo cv'), cv')
+  where
+    cv' = mkCoVar (varName cv) ty'
+    ty' = runIdentity (subst_ty tce $ varType cv)
+
+------------------------------------------------------------------------------
 -- Cloning binders
 -- ---------------------------------------------------------------------------
 
@@ -1751,8 +1838,11 @@ cpCloneBndrs env bs = mapAccumLM cpCloneBndr env bs
 
 cpCloneBndr  :: CorePrepEnv -> InVar -> UniqSM (CorePrepEnv, OutVar)
 cpCloneBndr env bndr
-  | not (isId bndr)
-  = return (env, bndr)
+  | isTyVar bndr
+  = return (cpSubstTyVarBndr env bndr)
+
+  | isCoVar bndr
+  = return (cpSubstCoVarBndr env bndr)
 
   | otherwise
   = do { bndr' <- clone_it bndr
@@ -1769,11 +1859,13 @@ cpCloneBndr env bndr
        ; return (extendCorePrepEnv env bndr bndr'', bndr'') }
   where
     clone_it bndr
-      | isLocalId bndr, not (isCoVar bndr)
-      = do { uniq <- getUniqueM; return (setVarUnique bndr uniq) }
+      | isLocalId bndr
+      = do { uniq <- getUniqueM
+           ; let ty' = cpSubstTy env (idType bndr)
+           ; return (setVarUnique (setIdType bndr ty') uniq) }
+
       | otherwise   -- Top level things, which we don't want
                     -- to clone, have become GlobalIds by now
-                    -- And we don't clone tyvars, or coercion variables
       = return bndr
 
 {- Note [Drop unfoldings and rules]
@@ -1906,3 +1998,95 @@ collectCostCentres mod_name
     -- Unfoldings may have cost centres that in the original definion are
     -- optimized away, see #5889.
     get_unf = maybeUnfoldingTemplate . realIdUnfolding
+
+
+------------------------------------------------------------------------------
+-- Numeric literals
+-- ---------------------------------------------------------------------------
+
+-- | Create a function that converts Bignum literals into their final CoreExpr
+mkConvertNumLiteral
+   :: HscEnv
+   -> IO (LitNumType -> Integer -> Maybe CoreExpr)
+mkConvertNumLiteral hsc_env = do
+   let
+      dflags   = hsc_dflags hsc_env
+      platform = targetPlatform dflags
+      home_unit = hsc_home_unit hsc_env
+      guardBignum act
+         | isHomeUnitInstanceOf home_unit primUnitId
+         = return $ panic "Bignum literals are not supported in ghc-prim"
+         | isHomeUnitInstanceOf home_unit bignumUnitId
+         = return $ panic "Bignum literals are not supported in ghc-bignum"
+         | otherwise = act
+
+      lookupBignumId n      = guardBignum (tyThingId <$> lookupGlobal hsc_env n)
+
+   -- The lookup is done here but the failure (panic) is reported lazily when we
+   -- try to access the `bigNatFromWordList` function.
+   --
+   -- If we ever get built-in ByteArray# literals, we could avoid the lookup by
+   -- directly using the Integer/Natural wired-in constructors for big numbers.
+
+   bignatFromWordListId <- lookupBignumId bignatFromWordListName
+
+   let
+      convertNumLit nt i = case nt of
+         LitNumInteger -> Just (convertInteger i)
+         LitNumNatural -> Just (convertNatural i)
+         _             -> Nothing
+
+      convertInteger i
+         | platformInIntRange platform i -- fit in a Int#
+         = mkConApp integerISDataCon [Lit (mkLitInt platform i)]
+
+         | otherwise -- build a BigNat and embed into IN or IP
+         = let con = if i > 0 then integerIPDataCon else integerINDataCon
+           in mkBigNum con (convertBignatPrim (abs i))
+
+      convertNatural i
+         | platformInWordRange platform i -- fit in a Word#
+         = mkConApp naturalNSDataCon [Lit (mkLitWord platform i)]
+
+         | otherwise --build a BigNat and embed into NB
+         = mkBigNum naturalNBDataCon (convertBignatPrim i)
+
+      -- we can't simply generate:
+      --
+      --    NB (bigNatFromWordList# [W# 10, W# 20])
+      --
+      -- using `mkConApp` because it isn't in ANF form. Instead we generate:
+      --
+      --    case bigNatFromWordList# [W# 10, W# 20] of ba { DEFAULT -> NB ba }
+      --
+      -- via `mkCoreApps`
+
+      mkBigNum con ba = mkCoreApps (Var (dataConWorkId con)) [ba]
+
+      convertBignatPrim i =
+         let
+            target    = targetPlatform dflags
+
+            -- ByteArray# literals aren't supported (yet). Were they supported,
+            -- we would use them directly. We would need to handle
+            -- wordSize/endianness conversion between host and target
+            -- wordSize  = platformWordSize platform
+            -- byteOrder = platformByteOrder platform
+
+            -- For now we build a list of Words and we produce
+            -- `bigNatFromWordList# list_of_words`
+
+            words = mkListExpr wordTy (reverse (unfoldr f i))
+               where
+                  f 0 = Nothing
+                  f x = let low  = x .&. mask
+                            high = x `shiftR` bits
+                        in Just (mkConApp wordDataCon [Lit (mkLitWord platform low)], high)
+                  bits = platformWordSizeInBits target
+                  mask = 2 ^ bits - 1
+
+         in mkApps (Var bignatFromWordListId) [words]
+
+
+   return convertNumLit
+

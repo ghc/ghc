@@ -278,7 +278,7 @@ Moreover, if we /don't/ inline it, we may be left with
 which will build a thunk -- bad, bad, bad.
 
 Conclusion: we really want inlineBoringOk to be True of the RHS of
-unsafeCoerce.  This is (U4a) in Note [Implementing unsafeCoerce].
+unsafeCoerce.  This is (U4) in Note [Implementing unsafeCoerce].
 
 Note [Computing the size of an expression]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
