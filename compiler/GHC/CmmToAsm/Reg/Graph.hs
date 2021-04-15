@@ -156,7 +156,9 @@ regAlloc_spin config spinCount triv regsFree slotsFree slotsCount debug_codeGrap
                         $ map (slurpSpillCostInfo platform cfg) code
 
         -- The function to choose regs to leave uncolored.
-        let spill       = chooseSpill spillCosts
+        let spill       = if ncgRegsGraphChaitin config
+                            then chooseSpill_chaitin spillCosts
+                            else chooseSpill spillCosts
 
         -- Record startup state in our log.
         let stat1
