@@ -93,7 +93,7 @@ module GHC.Tc.Utils.Monad(
   failWithTc, failWithTcM,
   checkTc, checkTcM,
   failIfTc, failIfTcM,
-  warnIfFlag, warnIf, diagnosticTc, diagnosticTcM,
+  warnIfFlag, warnIf,
   addDiagnosticTc, addDiagnosticTcM, addDiagnostic, addDiagnosticAt, add_diagnostic,
   mkErrInfo,
 
@@ -1502,29 +1502,16 @@ failIfTcM True  err = failWithTcM err
 
 --         Warnings have no 'M' variant, nor failure
 
--- | Display a warning if a condition is met,
---   and the warning is enabled
+-- | Display a warning relating to a flag, if a condition is met.
 warnIfFlag :: WarningFlag -> Bool -> SDoc -> TcRn ()
 warnIfFlag warn_flag is_bad msg
-  = do { -- No need to check the flag here, it will be done in 'diagReasonSeverity'.
-       ; when is_bad $ addDiagnostic (WarningWithFlag warn_flag) msg }
+  -- No need to check the flag here, it will be done in 'diagReasonSeverity'.
+  = when is_bad $ addDiagnostic (WarningWithFlag warn_flag) msg
 
 -- | Display a warning if a condition is met.
 warnIf :: Bool -> SDoc -> TcRn ()
 warnIf is_bad msg
   = when is_bad (addDiagnostic WarningWithoutFlag msg)
-
--- | Display a warning if a condition is met.
-diagnosticTc :: DiagnosticReason -> Bool -> SDoc -> TcM ()
-diagnosticTc reason should_report warn_msg
-  | should_report = addDiagnosticTc reason warn_msg
-  | otherwise     = return ()
-
--- | Display a diagnostic if a condition is met.
-diagnosticTcM :: DiagnosticReason -> Bool -> (TidyEnv, SDoc) -> TcM ()
-diagnosticTcM reason should_report warn_msg
-  | should_report = addDiagnosticTcM reason warn_msg
-  | otherwise     = return ()
 
 -- | Display a diagnostic in the current context.
 addDiagnosticTc :: DiagnosticReason -> SDoc -> TcM ()
