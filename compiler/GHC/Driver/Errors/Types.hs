@@ -10,7 +10,7 @@ module GHC.Driver.Errors.Types (
   , ghcUnknownMessage
   -- * Utility functions
   , hoistTcRnMessage
-  , hoistTcRnDsMessage
+  , hoistDsMessage
   , tcRnDsToGhcMessage
   , foldPsMessages
   ) where
@@ -106,9 +106,9 @@ hoistTcRnMessage :: Monad m => m (Messages TcRnMessage, a) -> m (Messages GhcMes
 hoistTcRnMessage = fmap (first (fmap GhcTcRnMessage))
 
 -- | Abstracts away the frequent pattern where we are calling 'ioMsgMaybe' on the result of
--- 'IO (Messages TcRnDsMessage, a)'.
-hoistTcRnDsMessage :: Monad m => m (Messages TcRnDsMessage, a) -> m (Messages GhcMessage, a)
-hoistTcRnDsMessage = fmap (first (fmap tcRnDsToGhcMessage))
+-- 'IO (Messages DsMessage, a)'.
+hoistDsMessage :: Monad m => m (Messages DsMessage, a) -> m (Messages GhcMessage, a)
+hoistDsMessage = fmap (first (fmap GhcDsMessage))
 
 -- | Converts the input 'TcRnDsMessage' into a 'GhcMessage'.
 tcRnDsToGhcMessage :: TcRnDsMessage -> GhcMessage
