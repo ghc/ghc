@@ -6,6 +6,8 @@ module GHC.HsToCore.Types (
         DsMetaEnv, DsMetaVal(..), CompleteMatches
     ) where
 
+import GHC.Prelude (Int)
+
 import Data.IORef
 
 import GHC.Types.CostCentre.State
@@ -54,6 +56,8 @@ data DsGblEnv
      -- Additional complete pattern matches
   , ds_cc_st   :: IORef CostCentreState
      -- Tracking indices for cost centre annotations
+  , ds_next_wrapper_num :: IORef (ModuleEnv Int)
+    -- ^ See Note [Generating fresh names for FFI wrappers]
   }
 
 instance ContainsModule DsGblEnv where

@@ -260,6 +260,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
         th_state_var         <- newIORef Map.empty ;
         th_remote_state_var  <- newIORef Nothing ;
         th_docs_var          <- newIORef Map.empty ;
+        next_wrapper_num     <- newIORef emptyModuleEnv ;
         let {
              -- bangs to avoid leaking the env (#19356)
              !dflags = hsc_dflags hsc_env ;
@@ -347,7 +348,8 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_top_loc        = loc,
                 tcg_static_wc      = static_wc_var,
                 tcg_complete_matches = [],
-                tcg_cc_st          = cc_st_var
+                tcg_cc_st          = cc_st_var,
+                tcg_next_wrapper_num = next_wrapper_num
              } ;
         } ;
 
