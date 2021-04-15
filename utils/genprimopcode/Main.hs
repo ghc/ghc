@@ -194,6 +194,9 @@ main = getArgs >>= \args ->
                       "--wired-in-docs"
                          -> putStr (gen_wired_in_docs p_o_specs)
 
+                      "--wired-in-deprecations"
+                         -> putStr (gen_wired_in_deprecations p_o_specs)
+
                       _ -> error "Should not happen, known_args out of sync?"
                    )
 
@@ -217,7 +220,8 @@ known_args
        "--make-haskell-wrappers",
        "--make-haskell-source",
        "--make-latex-doc",
-       "--wired-in-docs"
+       "--wired-in-docs",
+       "--wired-in-deprecations"
      ]
 
 ------------------------------------------------------------------
@@ -814,6 +818,36 @@ gen_wired_in_docs (Info _ entries)
       | Just poName <- getName po
       , not $ null $ desc po = Just $ "(fsLit " ++ show poName ++ "," ++ show (unlatex $ desc po) ++ ")"
       | otherwise = Nothing
+
+{-
+Note [GHC.Prim Deprecations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Like Haddock documentation, we must record deprecation pragmas in two places:
+in the GHC.Prim source module consumed by Haddock, and in the
+declarations wired-in to GHC. To do the following we generate
+GHC.Builtin.PrimOps.primOpDeprecations, a list of (OccName, DeprecationMessage)
+pairs. We insert these deprecations into the mi_warns field of GHC.Prim's ModIface,
+as though they were written in a source module.
+-}
+gen_wired_in_deprecations :: Info -> String
+gen_wired_in_deprecations (Info _ entries)
+  = "primOpDeprecations =\n  [ "
+    ++ intercalate "\n  , " (catMaybes $ map mkDep $ concatMap desugarVectorSpec entries)
+    ++ "\n  ]\n"
+    where
+      mkDep po
+        | Just poName <- getName po
+        , Just depMsg <- lookup_attrib "deprecated" (opts po)
+        = let mkOcc =
+                case po of
+                  PrimOpSpec{}      -> "mkVarOcc"
+                  PrimVecOpSpec{}   -> "mkVarOcc"
+                  PseudoOpSpec{}    -> "mkVarOcc"
+                  PrimTypeSpec{}    -> "mkTcOcc"
+                  PrimVecTypeSpec{} -> "mkTcOcc"
+                  Section{}         -> error "impossible(Section)"
+          in Just $ "(" ++ mkOcc ++ " " ++ show poName ++ ", " ++ show depMsg ++ ")"
+        | otherwise = Nothing
 
 
 ------------------------------------------------------------------

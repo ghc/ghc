@@ -17,6 +17,7 @@ module GHC.Builtin.PrimOps (
         primOpOutOfLine, primOpCodeSize,
         primOpOkForSpeculation, primOpOkForSideEffects,
         primOpIsCheap, primOpFixity, primOpDocs,
+        primOpDeprecations,
 
         getPrimOpResultInfo,  isComparisonPrimOp, PrimOpResultInfo(..),
 
@@ -154,11 +155,14 @@ primOpFixity :: PrimOp -> Maybe Fixity
 *                                                                      *
 ************************************************************************
 
-See Note [GHC.Prim Docs]
+See Note [GHC.Prim Docs] in genprimopcode's Main.hs
 -}
 
 primOpDocs :: [(FastString, String)]
 #include "primop-docs.hs-incl"
+
+primOpDeprecations :: [(OccName, String)]
+#include "primop-deprecations.hs-incl"
 
 {-
 ************************************************************************
