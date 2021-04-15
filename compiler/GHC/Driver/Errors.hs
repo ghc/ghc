@@ -1,29 +1,23 @@
 module GHC.Driver.Errors (
     printOrThrowDiagnostics
-  , printBagOfErrors
+  , printMessages
   , handleFlagWarnings
-  , partitionMessageBag
   ) where
 
 import GHC.Driver.Session
+import GHC.Driver.Errors.Types
 import GHC.Data.Bag
-import GHC.Utils.Exception
 import GHC.Utils.Error ( formatBulleted, sortMsgBag, mkPlainMsgEnvelope )
-import GHC.Types.SourceError ( mkSrcErr )
 import GHC.Prelude
 import GHC.Types.SrcLoc
+import GHC.Types.SourceError
 import GHC.Types.Error
 import GHC.Utils.Outputable ( text, withPprStyle, mkErrStyle )
 import GHC.Utils.Logger
 import qualified GHC.Driver.CmdLine as CmdLine
 
--- | Partitions the messages and returns a tuple which first element are the warnings, and the
--- second the errors.
-partitionMessageBag :: Diagnostic e => Bag (MsgEnvelope e) -> (Bag (MsgEnvelope e), Bag (MsgEnvelope e))
-partitionMessageBag = partitionBag isWarningMessage
-
-printBagOfErrors :: Diagnostic a => Logger -> DynFlags -> Bag (MsgEnvelope a) -> IO ()
-printBagOfErrors logger dflags bag_of_errors
+printMessages :: Diagnostic a => Logger -> DynFlags -> Messages a -> IO ()
+printMessages logger dflags msgs
   = sequence_ [ let style = mkErrStyle unqual
                     ctx   = initSDocContext dflags style
                 in putLogMsg logger dflags (MCDiagnostic sev . diagnosticReason $ dia) s $
@@ -32,7 +26,7 @@ printBagOfErrors logger dflags bag_of_errors
                               errMsgDiagnostic = dia,
                               errMsgSeverity = sev,
                               errMsgContext   = unqual } <- sortMsgBag (Just dflags)
-                                                                       bag_of_errors ]
+                                                                       (getMessages msgs) ]
 
 handleFlagWarnings :: Logger -> DynFlags -> [CmdLine.Warn] -> IO ()
 handleFlagWarnings logger dflags warns = do
@@ -41,13 +35,13 @@ handleFlagWarnings logger dflags warns = do
       bag = listToBag [ mkPlainMsgEnvelope dflags reason loc (text warn)
                       | CmdLine.Warn reason (L loc warn) <- warns ]
 
-  printOrThrowDiagnostics logger dflags bag
+  printOrThrowDiagnostics logger dflags (ghcUnknownMessage <$> mkMessages bag)
 
 -- | Given a bag of diagnostics, turn them into an exception if
 -- any has 'SevError', or print them out otherwise.
-printOrThrowDiagnostics :: Logger -> DynFlags -> Bag WarnMsg -> IO ()
-printOrThrowDiagnostics logger dflags warns
-  | any ((==) SevError . errMsgSeverity) warns
-  = throwIO (mkSrcErr warns)
+printOrThrowDiagnostics :: Logger -> DynFlags -> Messages GhcMessage -> IO ()
+printOrThrowDiagnostics logger dflags msgs
+  | any ((==) SevError . errMsgSeverity) (getMessages msgs)
+  = throwErrors msgs
   | otherwise
-  = printBagOfErrors logger dflags warns
+  = printMessages logger dflags msgs
