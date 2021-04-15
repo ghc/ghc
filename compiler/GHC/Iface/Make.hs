@@ -14,7 +14,6 @@ module GHC.Iface.Make
    , mkFullIface
    , mkIfaceTc
    , mkIfaceExports
-   , toIfaceWarningTxt
    )
 where
 
@@ -28,6 +27,7 @@ import GHC.StgToCmm.Types (CmmCgInfos (..))
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Monad
 
+import GHC.Iface.Warnings
 import GHC.Iface.Decl
 import GHC.Iface.Syntax
 import GHC.Iface.Recomp
@@ -67,8 +67,6 @@ import GHC.Types.SourceFile
 import GHC.Types.TyThing
 import GHC.Types.HpcInfo
 import GHC.Types.CompleteMatch
-import GHC.Types.SourceText
-import GHC.Types.SrcLoc ( unLoc )
 import GHC.Types.Name.Cache
 
 import GHC.Utils.Outputable
@@ -437,23 +435,6 @@ ifaceRoughMatchTcs tcs = map do_rough tcs
     do_rough (RM_KnownTc n) = Just (toIfaceTyCon_name n)
 
 --------------------------
-toIfaceWarnings :: Warnings GhcRn -> IfaceWarnings
-toIfaceWarnings (WarnAll txt) = IfWarnAll (toIfaceWarningTxt txt)
-toIfaceWarnings (WarnSome vs ds) = IfWarnSome vs' ds'
-  where
-    vs' = [(occ, toIfaceWarningTxt txt) | (occ, txt) <- vs]
-    ds' = [(occ, toIfaceWarningTxt txt) | (occ, txt) <- ds]
-
-toIfaceWarningTxt :: WarningTxt GhcRn -> IfaceWarningTxt
-toIfaceWarningTxt (WarningTxt mb_cat src strs) = IfWarningTxt (unLoc . iwc_wc . unLoc <$> mb_cat) src (map (toIfaceStringLiteralWithNames . unLoc) strs)
-toIfaceWarningTxt (DeprecatedTxt src strs) = IfDeprecatedTxt src (map (toIfaceStringLiteralWithNames . unLoc) strs)
-
-toIfaceStringLiteralWithNames :: WithHsDocIdentifiers StringLiteral GhcRn -> (IfaceStringLiteral, [IfExtName])
-toIfaceStringLiteralWithNames (WithHsDocIdentifiers src names) = (toIfaceStringLiteral src, map unLoc names)
-
-toIfaceStringLiteral :: StringLiteral -> IfaceStringLiteral
-toIfaceStringLiteral (StringLiteral sl fs _) = IfStringLiteral sl fs
-
 coreRuleToIfaceRule :: CoreRule -> IfaceRule
 -- A plugin that installs a BuiltinRule in a CoreDoPluginPass should
 -- ensure that there's another CoreDoPluginPass that removes the rule.

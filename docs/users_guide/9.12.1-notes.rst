@@ -103,6 +103,9 @@ Runtime system
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 
+- Usage of deprecated primops is now correctly reported (#19629).
+
+
 ``ghc`` library
 ~~~~~~~~~~~~~~~
 

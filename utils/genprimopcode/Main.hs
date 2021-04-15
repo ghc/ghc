@@ -199,6 +199,9 @@ main = getArgs >>= \args ->
                       "--wired-in-docs"
                          -> putStr (gen_wired_in_docs p_o_specs)
 
+                      "--wired-in-deprecations"
+                         -> putStr (gen_wired_in_deprecations p_o_specs)
+
                       _ -> error "Should not happen, known_args out of sync?"
                    )
 
@@ -223,7 +226,8 @@ known_args
        "--make-haskell-wrappers",
        "--make-haskell-source",
        "--make-latex-doc",
-       "--wired-in-docs"
+       "--wired-in-docs",
+       "--wired-in-deprecations"
      ]
 
 ------------------------------------------------------------------
@@ -639,22 +643,7 @@ gen_switch_from_attribs attrib_name fn_name (Info defaults entries)
                -> unlines alternatives
                   ++ fn_name ++ " _thisOp = " ++ getAltRhs xx ++ "\n"
 
-{-
-Note [GHC.Prim Docs]
-~~~~~~~~~~~~~~~~~~~~
-For haddocks of GHC.Prim we generate a dummy haskell file (gen_hs_source) that
-contains the type signatures and the comments (but no implementations)
-specifically for consumption by haddock.
-
-GHCi's :doc command reads directly from ModIface's though, and GHC.Prim has a
-wired-in iface that has nothing to do with the above haskell file. The code
-below converts primops.txt into an intermediate form that would later be turned
-into a proper DeclDocMap.
-
-We output the docs as a list of pairs (name, docs). We use stringy names here
-because mapping names to "Name"s is difficult for things like primtypes and
-pseudoops.
--}
+-- See Note [GHC.Prim Docs] in GHC.Builtin.Utils
 gen_wired_in_docs :: Info -> String
 gen_wired_in_docs (Info _ entries)
   = "primOpDocs =\n  [ " ++ intercalate "\n  , " (catMaybes $ map mkDoc $ concatMap desugarVectorSpec entries) ++ "\n  ]\n"
@@ -662,6 +651,27 @@ gen_wired_in_docs (Info _ entries)
       mkDoc po | Just poName <- getName po
                , not $ null $ desc po = Just $ "(fsLit " ++ show poName ++ "," ++ show (desc po) ++ ")"
                | otherwise = Nothing
+
+-- See Note [GHC.Prim Deprecations] in GHC.Builtin.Utils
+gen_wired_in_deprecations :: Info -> String
+gen_wired_in_deprecations (Info _ entries)
+  = "primOpDeprecations =\n  [ "
+    ++ intercalate "\n  , " (catMaybes $ map mkDep $ concatMap desugarVectorSpec entries)
+    ++ "\n  ]\n"
+    where
+      mkDep po
+        | Just poName <- getName po
+        , Just (OptionString _ depMsg) <- lookup_attrib "deprecated_msg" (opts po)
+        = let mkOcc =
+                case po of
+                  PrimOpSpec{}      -> "mkVarOcc"
+                  PrimVecOpSpec{}   -> "mkVarOcc"
+                  PseudoOpSpec{}    -> "mkVarOcc"
+                  PrimTypeSpec{}    -> "mkTcOcc"
+                  PrimVecTypeSpec{} -> "mkTcOcc"
+                  Section{}         -> error "impossible(Section)"
+          in Just $ "(" ++ mkOcc ++ " " ++ show poName ++ ", fsLit " ++ show depMsg ++ ")"
+        | otherwise = Nothing
 
 
 ------------------------------------------------------------------

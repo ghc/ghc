@@ -594,6 +594,7 @@ Library
         GHC.Iface.Syntax
         GHC.Iface.Tidy
         GHC.Iface.Tidy.StaticPtrTable
+        GHC.Iface.Warnings
         GHC.IfaceToCore
         GHC.Iface.Type
         GHC.JS.Ident
