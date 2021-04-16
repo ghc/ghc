@@ -17,6 +17,7 @@
 #include "Trace.h"
 #include "ThreadLabels.h"
 #include "Updates.h"
+#include "Profiling.h"
 #include "Messages.h"
 #include "RaiseAsync.h"
 #include "Prelude.h"
@@ -115,6 +116,7 @@ createThread(Capability *cap, W_ size)
 
 #if defined(PROFILING)
     tso->prof.cccs = CCS_MAIN;
+    tso->backtrace_response = backtrace_request;
 #endif
 
     // put a stop frame on the stack
@@ -134,6 +136,24 @@ createThread(Capability *cap, W_ size)
 
     // ToDo: report the stack size in the event?
     traceEventCreateThread(cap, tso);
+
+#if defined(PROFILING)
+    // welcome hardware threads to cache it locally, so forkings in a short
+    // burst all get dumped
+    // TODO does `StgWord` guarantee atomicity? is it an issue on some arch?
+    static StgWord forking_bt_response = 0;
+    if(forking_bt_response != backtrace_request) {
+        forking_bt_response = backtrace_request;
+        StgTSO *forker = cap->r.rCurrentTSO;
+        fprintf(stderr,
+                "Backtrace #%llu of forker thread %llu @ %llu (forked %llu):\n",
+                (unsigned long long) backtrace_request,
+                (unsigned long long) forker->id,
+                (unsigned long long) kernelThreadId(),
+                (unsigned long long) tso->id);
+        fprintBacktrace(stderr, tso->prof.cccs, tso);
+    }
+#endif
 
     return tso;
 }
