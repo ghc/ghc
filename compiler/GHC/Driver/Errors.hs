@@ -35,7 +35,8 @@ handleFlagWarnings logger dflags warns = do
   let -- It would be nicer if warns :: [Located SDoc], but that
       -- has circular import problems.
       bag = listToBag [ mkPlainMsgEnvelope dflags loc $
-                        ghcUnknownMessage $
+                        GhcDriverMessage $
+                        DriverUnknownMessage $
                         mkPlainDiagnostic reason $
                         text warn
                       | CmdLine.Warn reason (L loc warn) <- warns ]
