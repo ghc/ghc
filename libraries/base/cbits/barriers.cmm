@@ -1,0 +1,11 @@
+#include "Cmm.h"
+
+uring_write_barrier() {
+  prim_write_barrier;
+  return ();
+}
+
+uring_read_barrier() {
+  prim_read_barrier;
+  return ();
+}
