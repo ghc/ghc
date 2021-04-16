@@ -1,19 +1,20 @@
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 
 module GHC.Types.Error
    ( -- * Messages
      Messages
-   , WarningMessages
-   , ErrorMessages
    , mkMessages
+   , getMessages
    , emptyMessages
    , isEmptyMessages
+   , singleMessage
    , addMessage
    , unionMessages
    , MsgEnvelope (..)
-   , WarnMsg
 
    -- * Classifying Messages
 
@@ -22,13 +23,19 @@ module GHC.Types.Error
    , Diagnostic (..)
    , DiagnosticMessage (..)
    , DiagnosticReason (..)
+   , mkDiagnosticMessage
+   , mkPlainDiagnostic
+   , mkPlainError
+   , mkDecoratedDiagnostic
+   , mkDecoratedError
 
     -- * Rendering Messages
 
    , SDoc
    , DecoratedSDoc (unDecorated)
+   , mkDecorated, mkSimpleDecorated
+
    , pprMessageBag
-   , mkDecorated
    , mkLocMessage
    , mkLocMessageAnn
    , getCaretDiagnostic
@@ -55,6 +62,7 @@ import GHC.Data.StringBuffer (atLine, hGetStringBuffer, len, lexemeToString)
 import GHC.Utils.Json
 
 import System.IO.Error  ( catchIOError )
+import Data.Bifunctor
 
 {-
 Note [Messages]
@@ -76,19 +84,28 @@ a bit more declarative) or removed altogether.
 
 -- | A collection of messages emitted by GHC during error reporting. A diagnostic message is typically
 -- a warning or an error. See Note [Messages].
-newtype Messages e = Messages (Bag (MsgEnvelope e))
-
-instance Functor Messages where
-  fmap f (Messages xs) = Messages (mapBag (fmap f) xs)
+--
+-- /INVARIANT/: All the messages in this collection must be relevant, i.e. their 'Severity' should /not/
+-- be 'SevIgnore'. The smart constructor 'mkMessages' will filter out any message which 'Severity' is
+-- 'SevIgnore'.
+newtype Messages e = Messages { getMessages :: Bag (MsgEnvelope e) }
+  deriving newtype (Semigroup, Monoid)
+  deriving stock Functor
 
 emptyMessages :: Messages e
 emptyMessages = Messages emptyBag
 
 mkMessages :: Bag (MsgEnvelope e) -> Messages e
-mkMessages = Messages
+mkMessages = Messages . filterBag interesting
+  where
+    interesting :: MsgEnvelope e -> Bool
+    interesting = (/=) SevIgnore . errMsgSeverity
 
 isEmptyMessages :: Messages e -> Bool
 isEmptyMessages (Messages msgs) = isEmptyBag msgs
+
+singleMessage :: MsgEnvelope e -> Messages e
+singleMessage e = addMessage e emptyMessages
 
 {- Note [Discarding Messages]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -110,15 +127,7 @@ addMessage x (Messages xs)
 -- See Note [Discarding Messages].
 unionMessages :: Messages e -> Messages e -> Messages e
 unionMessages (Messages msgs1) (Messages msgs2) =
-  Messages (filterBag interesting $ msgs1 `unionBags` msgs2)
-  where
-    interesting :: MsgEnvelope e -> Bool
-    interesting = (/=) SevIgnore . errMsgSeverity
-
-type WarningMessages = Bag (MsgEnvelope DiagnosticMessage)
-type ErrorMessages   = Bag (MsgEnvelope DiagnosticMessage)
-
-type WarnMsg         = MsgEnvelope DiagnosticMessage
+  Messages (msgs1 `unionBags` msgs2)
 
 -- | A 'DecoratedSDoc' is isomorphic to a '[SDoc]' but it carries the invariant that the input '[SDoc]'
 -- needs to be rendered /decorated/ into its final form, where the typical case would be adding bullets
@@ -130,6 +139,10 @@ newtype DecoratedSDoc = Decorated { unDecorated :: [SDoc] }
 -- | Creates a new 'DecoratedSDoc' out of a list of 'SDoc'.
 mkDecorated :: [SDoc] -> DecoratedSDoc
 mkDecorated = Decorated
+
+-- | Creates a new 'DecoratedSDoc' out of a single 'SDoc'
+mkSimpleDecorated :: SDoc -> DecoratedSDoc
+mkSimpleDecorated doc = Decorated [doc]
 
 {-
 Note [Rendering Messages]
@@ -185,6 +198,25 @@ data DiagnosticMessage = DiagnosticMessage
 instance Diagnostic DiagnosticMessage where
   diagnosticMessage = diagMessage
   diagnosticReason  = diagReason
+
+-- | Create a 'DiagnosticMessage' with a 'DiagnosticReason'
+mkDiagnosticMessage :: DecoratedSDoc -> DiagnosticReason -> DiagnosticMessage
+mkDiagnosticMessage = DiagnosticMessage
+
+mkPlainDiagnostic :: DiagnosticReason -> SDoc -> DiagnosticMessage
+mkPlainDiagnostic rea doc = DiagnosticMessage (mkSimpleDecorated doc) rea
+
+-- | Create an error 'DiagnosticMessage' holding just a single 'SDoc'
+mkPlainError :: SDoc -> DiagnosticMessage
+mkPlainError doc = DiagnosticMessage (mkSimpleDecorated doc) ErrorWithoutFlag
+
+-- | Create a 'DiagnosticMessage' from a list of bulleted SDocs and a 'DiagnosticReason'
+mkDecoratedDiagnostic :: DiagnosticReason -> [SDoc] -> DiagnosticMessage
+mkDecoratedDiagnostic rea docs = DiagnosticMessage (mkDecorated docs) rea
+
+-- | Create an error 'DiagnosticMessage' from a list of bulleted SDocs
+mkDecoratedError :: [SDoc] -> DiagnosticMessage
+mkDecoratedError docs = DiagnosticMessage (mkDecorated docs) ErrorWithoutFlag
 
 -- | The reason /why/ a 'Diagnostic' was emitted in the first place. Diagnostic messages
 -- are born within GHC with a very precise reason, which can be completely statically-computed
@@ -477,5 +509,5 @@ getErrorMessages (Messages xs) = fst $ partitionBag isIntrinsicErrorMessage xs
 
 -- | Partitions the 'Messages' and returns a tuple which first element are the warnings, and the
 -- second the errors.
-partitionMessages :: Diagnostic e => Messages e -> (Bag (MsgEnvelope e), Bag (MsgEnvelope e))
-partitionMessages (Messages xs) = partitionBag isWarningMessage xs
+partitionMessages :: Diagnostic e => Messages e -> (Messages e, Messages e)
+partitionMessages (Messages xs) = bimap Messages Messages (partitionBag isWarningMessage xs)
