@@ -2312,13 +2312,13 @@ primop   AddrRemOp "remAddr#" GenPrimOp Addr# -> Int# -> Int#
          {Return the remainder when the 'Addr#' arg, treated like an 'Int#',
           is divided by the 'Int#' arg.}
 primop   AddrToIntOp  "addr2Int#"     GenPrimOp   Addr# -> Int#
-        {Coerce directly from address to int.}
+        {Coerce directly from address to int. Users are discouraged from using
+         this operation as it makes little sense on platforms with tagged pointers.}
    with code_size = 0
-        deprecated_msg = { This operation is strongly deprecated. }
 primop   IntToAddrOp   "int2Addr#"    GenPrimOp  Int# -> Addr#
-        {Coerce directly from int to address.}
+        {Coerce directly from int to address. Users are discouraged from using
+         this operation as it makes little sense on platforms with tagged pointers.}
    with code_size = 0
-        deprecated_msg = { This operation is strongly deprecated. }
 
 primop   AddrGtOp  "gtAddr#"   Compare   Addr# -> Addr# -> Int#
 primop   AddrGeOp  "geAddr#"   Compare   Addr# -> Addr# -> Int#
