@@ -47,12 +47,13 @@ handleFlagWarnings logger dflags warns = do
 -- any has 'SevError', or print them out otherwise.
 printOrThrowDiagnostics :: Logger -> DynFlags -> Messages GhcMessage -> IO ()
 printOrThrowDiagnostics logger dflags msgs
-  | any ((==) SevError . errMsgSeverity) (getMessages msgs)
+  | errorsOrFatalWarningsFound msgs
   = throwErrors msgs
   | otherwise
   = printMessages logger dflags msgs
 
--- | Convert a 'PsError' into a wrapped 'DriverMessage'
+-- | Convert a 'PsError' into a wrapped 'DriverMessage'; use it
+-- for dealing with parse errors when the driver is doing dependency analysis.
 -- Defined here to avoid module loops between GHC.Driver.Error.Types and
 -- GHC.Driver.Error.Ppr
 mkDriverPsHeaderMessage :: PsError -> MsgEnvelope DriverMessage
