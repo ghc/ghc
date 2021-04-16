@@ -141,9 +141,10 @@ mkParserWarn df = \case
            OperatorWhitespaceOccurrence_TightInfix -> mk_msg "tight infix"
 
 mkParserErr :: PsError -> MsgEnvelope PsMessage
-mkParserErr err = mk_parser_err (errLoc err) $ vcat
-   (pp_err (errDesc err) : map pp_hint (errHints err))
+mkParserErr err = mk_parser_err (errLoc err) $
+                  pprPsError (errDesc err) (errHints err)
 
+-- | Render a 'PsErrorDesc' into an 'SDoc', with its 'PsHint's.
 pprPsError :: PsErrorDesc -> [PsHint] -> SDoc
 pprPsError desc hints = vcat (pp_err desc : map pp_hint hints)
 
