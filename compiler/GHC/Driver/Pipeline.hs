@@ -71,6 +71,7 @@ import GHC.Linker.Types
 
 import GHC.Utils.Outputable
 import GHC.Utils.Error
+import GHC.Utils.Fingerprint
 import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Utils.Monad
@@ -197,8 +198,6 @@ compileOne' m_tc_result mHscMessage
             source_modified0
  = do
 
-   let logger = hsc_logger hsc_env0
-   let tmpfs  = hsc_tmpfs hsc_env0
    debugTraceMsg logger dflags1 2 (text "compile: input file" <+> text input_fnpp)
 
    let flags = hsc_dflags hsc_env0
@@ -210,31 +209,7 @@ compileOne' m_tc_result mHscMessage
                    [ml_obj_file $ ms_location summary]
 
    plugin_hsc_env <- initializePlugins hsc_env
-
-   let runBackend tc_result warnings mb_hash = do
-            output_fn <- getOutputFilename logger tmpfs next_phase
-                            (Temporary TFL_CurrentModule)
-                            basename dflags next_phase (Just location)
-            -- We're in --make mode: finish the compilation pipeline.
-            (_, _, Just (HomeModInfo iface details mb_linkable)) <- runPipeline StopLn plugin_hsc_env
-                              (output_fn,
-                               Nothing,
-                               Just (HscPostTc summary tc_result warnings mb_hash))
-                              (Just basename)
-                              Persistent
-                              (Just location)
-                              []
-            -- TODO: figure out a way to set this in runPipeline for HsSrcFile
-            mLinkable <- case () of
-              _ | Just l <- mb_linkable -> return $ Just l
-                | bcknd == NoBackend -> return Nothing
-                | src_flavour == HsSrcFile -> do
-                  -- The object filename comes from the ModLocation
-                  o_time <- getModificationUTCTime object_filename
-                  let !linkable = LM o_time this_mod [DotO object_filename]
-                  return $ Just linkable
-                | otherwise -> return Nothing
-            return $! HomeModInfo iface details mLinkable
+   let runBackend = compileOneBackend plugin_hsc_env summary
 
    case m_tc_result of
      Just tc_result
@@ -253,7 +228,6 @@ compileOne' m_tc_result mHscMessage
 
 
  where dflags0     = ms_hspp_opts summary
-       this_mod    = ms_mod summary
        location    = ms_location summary
        input_fn    = expectJust "compile:hs" (ml_hs_file location)
        input_fnpp  = ms_hspp_file summary
@@ -263,9 +237,8 @@ compileOne' m_tc_result mHscMessage
        isProfWay   = any (== WayProf) (ways dflags0)
        internalInterpreter = not (gopt Opt_ExternalInterpreter dflags0)
 
-       src_flavour = ms_hsc_src summary
-       next_phase = hscPostBackendPhase src_flavour bcknd
-       object_filename = ml_obj_file location
+       logger = hsc_logger hsc_env0
+       tmpfs  = hsc_tmpfs hsc_env0
 
        -- #8180 - when using TemplateHaskell, switch on -dynamic-too so
        -- the linker can correctly load the object files.  This isn't necessary
@@ -319,6 +292,52 @@ compileOne' m_tc_result mHscMessage
        always_do_basic_recompilation_check = case bcknd of
                                              Interpreter -> True
                                              _ -> False
+
+compileOneBackend
+  :: HscEnv
+  -> ModSummary
+  -> FrontendResult
+  -> WarningMessages
+  -> Maybe Fingerprint
+  -> IO HomeModInfo
+compileOneBackend hsc_env summary tc_result warnings mb_hash = do
+  output_fn <- getOutputFilename logger tmpfs next_phase
+                  (Temporary TFL_CurrentModule)
+                  basename dflags next_phase (Just location)
+  -- We're in --make mode: finish the compilation pipeline.
+  (_, _, Just (HomeModInfo iface details mb_linkable)) <- runPipeline StopLn hsc_env
+                    (output_fn,
+                     Nothing,
+                     Just (HscPostTc summary tc_result warnings mb_hash))
+                    (Just basename)
+                    Persistent
+                    (Just location)
+                    []
+  -- TODO: figure out a way to set this in runPipeline for HsSrcFile
+  mLinkable <- case () of
+    _ | Just l <- mb_linkable -> return $ Just l
+      | bcknd == NoBackend -> return Nothing
+      | src_flavour == HsSrcFile -> do
+        -- The object filename comes from the ModLocation
+        o_time <- getModificationUTCTime object_filename
+        let !linkable = LM o_time this_mod [DotO object_filename]
+        return $ Just linkable
+      | otherwise -> return Nothing
+  return $! HomeModInfo iface details mLinkable
+
+ where dflags      = hsc_dflags hsc_env
+       this_mod    = ms_mod summary
+       location    = ms_location summary
+       input_fn    = expectJust "compile:hs" (ml_hs_file location)
+
+       logger = hsc_logger hsc_env
+       tmpfs  = hsc_tmpfs hsc_env
+       src_flavour = ms_hsc_src summary
+       next_phase = hscPostBackendPhase src_flavour bcknd
+       bcknd = backend dflags
+       object_filename = ml_obj_file location
+
+       basename = dropExtension input_fn
 
 -----------------------------------------------------------------------------
 -- stub .h and .c files (for foreign export support), and cc files.
