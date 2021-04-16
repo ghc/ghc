@@ -309,7 +309,12 @@ deSugarExpr hsc_env tc_expr = do
        Just expr -> dumpIfSet_dyn logger dflags Opt_D_dump_ds "Desugared"
                     FormatCore (pprCoreExpr expr)
 
-    return (ds_msgs, mb_core_expr)
+      -- callers (i.e. ioMsgMaybe) expect that no expression is returned if
+      -- there are errors
+    let final_res | errorsFound ds_msgs = Nothing
+                  | otherwise           = mb_core_expr
+
+    return (ds_msgs, final_res)
 
 {-
 ************************************************************************
