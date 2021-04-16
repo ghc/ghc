@@ -2817,7 +2817,11 @@ interactiveClassKeys = map getUnique interactiveClassNames
 *                                                                      *
 ************************************************************************
 
-The following names should be considered by GHCi to be in scope always.
+GHCi's :info command will usually filter out instances mentioning types whose
+names are not in scope. GHCi makes an exception for some commonly used names,
+such as Data.Kind.Type, which may not actually be in scope but should be
+treated as though they were in scope. The list in the definition of
+pretendNameIsInScope below contains these commonly used names.
 
 -}
 
@@ -2825,5 +2829,6 @@ pretendNameIsInScope :: Name -> Bool
 pretendNameIsInScope n
   = any (n `hasKey`)
     [ liftedTypeKindTyConKey, unliftedTypeKindTyConKey
+    , liftedDataConKey, unliftedDataConKey
     , tYPETyConKey
     , runtimeRepTyConKey, boxedRepDataConKey ]
