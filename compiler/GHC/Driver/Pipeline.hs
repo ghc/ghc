@@ -131,7 +131,7 @@ preprocess :: HscEnv
            -> Maybe InputFileBuffer
            -- ^ optional buffer to use instead of reading the input file
            -> Maybe Phase -- ^ starting phase
-           -> IO (Either (Messages DriverMessage) (DynFlags, FilePath))
+           -> IO (Either DriverMessages (DynFlags, FilePath))
 preprocess hsc_env input_fn mb_input_buf mb_phase =
   handleSourceError (\err -> pprPanic "SourceError in preprocessor"
                                       (vcat $
