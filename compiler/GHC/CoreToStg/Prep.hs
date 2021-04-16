@@ -417,6 +417,150 @@ Into this one:
 (Since f is not considered to be free in its own RHS.)
 
 
+Note [keepAlive# magic]
+~~~~~~~~~~~~~~~~~~~~~~~
+When interacting with foreign code, it is often necessary for the user to
+extend the lifetime of a heap object beyond the lifetime that would be apparent
+from the on-heap references alone. For instance, a program like:
+
+  foreign import safe "hello" hello :: ByteArray# -> IO ()
+
+  callForeign :: IO ()
+  callForeign = IO $ \s0 ->
+    case newByteArray# n# s0 of (# s1, barr #) ->
+      unIO hello barr s1
+
+As-written this program is susceptible to memory-unsafety since there are
+no references to `barr` visible to the garbage collector. Consequently, if a
+garbage collection happens during the execution of the C function `hello`, it
+may be that the array is freed while in use by the foreign function.
+
+To address this, we introduced a new primop, keepAlive#, which "scopes over"
+the computation needing the kept-alive value:
+
+  keepAlive# :: forall (ra :: RuntimeRep) (rb :: RuntimeRep) (a :: TYPE a) (b :: TYPE b).
+                a -> State# RealWorld -> (State# RealWorld -> b) -> b
+
+When entered, an application (keepAlive# x s k) will apply `k` to the state
+token, evaluating it to WHNF. However, during the course of this evaluation
+will *guarantee* that `x` is considered to be alive.
+
+There are a few things to note here:
+
+ - we are RuntimeRep-polymorphic in the value to be kept-alive. This is
+   necessary since we will often (but not always) be keeping alive something
+   unlifted (like a ByteArray#)
+
+ - we are RuntimeRep-polymorphic in the result value since the result may take
+   many forms (e.g. a boxed value, a raw state token, or a (# State s, result #).
+
+We implement this operation by desugaring to touch# during CorePrep (see
+GHC.CoreToStg.Prep.cpeApp). Specifically,
+
+  keepAlive# x s0 k
+
+is transformed to:
+
+  case k s0 of r ->
+  case touch# x realWorld# of s1 ->
+    r
+
+Operationally, `keepAlive# x s k` is equivalent to pushing a stack frame with a
+pointer to `x` and entering `k s0`. This compilation strategy is safe
+because we do no optimization on STG that would drop or re-order the
+continuation containing the `touch#`. However, if we were to become more
+aggressive in our STG pipeline then we would need to revisit this.
+
+Beyond this CorePrep transformation, there is very little special about
+keepAlive#. However, we did explore (and eventually gave up on)
+an optimisation which would allow unboxing of constructed product results,
+which we describe below.
+
+
+Lost optimisation: CPR unboxing
+--------------------------------
+One unfortunate property of this approach is that the simplifier is unable to
+unbox the result of a keepAlive# expression. For instance, consider the program:
+
+  case keepAlive# arr s0 (
+         \s1 -> case peekInt arr s1 of
+                  (# s2, r #) -> I# r
+  ) of
+    I# x -> ...
+
+This is a surprisingly common pattern, previously used, e.g., in
+GHC.IO.Buffer.readWord8Buf. While exploring ideas, we briefly played around
+with optimising this away by pushing strict contexts (like the
+`case [] of I# x -> ...` above) into keepAlive#'s continuation. While this can
+recover unboxing, it can also unfortunately in general change the asymptotic
+memory (namely stack) behavior of the program. For instance, consider
+
+  writeN =
+    ...
+      case keepAlive# x s0 (\s1 -> something s1) of
+        (# s2, x #) ->
+          writeN ...
+
+As it is tail-recursive, this program will run in constant space. However, if
+we push outer case into the continuation we get:
+
+  writeN =
+
+      case keepAlive# x s0 (\s1 ->
+        case something s1 of
+          (# s2, x #) ->
+            writeN ...
+      ) of
+        ...
+
+Which ends up building a stack which is linear in the recursion depth. For this
+reason, we ended up giving up on this optimisation.
+
+
+Historical note: touch# and its inadequacy
+------------------------------------------
+Prior to the introduction of `keepAlive#` we instead addressed the need for
+lifetime extension with the `touch#` primop:
+
+    touch# :: a -> State# s -> State# s
+
+This operation would ensure that the `a` value passed as the first argument was
+considered "alive" at the time the primop application is entered.
+
+For instance, the user might modify `callForeign` as:
+
+  callForeign :: IO ()
+  callForeign s0 = IO $ \s0 ->
+    case newByteArray# n# s0 of (# s1, barr #) ->
+    case unIO hello barr s1 of (# s2, () #) ->
+    case touch# barr s2 of s3 ->
+      (# s3, () #)
+
+However, in #14346 we discovered that this primop is insufficient in the
+presence of simplification. For instance, consider a program like:
+
+  callForeign :: IO ()
+  callForeign s0 = IO $ \s0 ->
+    case newByteArray# n# s0 of (# s1, barr #) ->
+    case unIO (forever $ hello barr) s1 of (# s2, () #) ->
+    case touch# barr s2 of s3 ->
+      (# s3, () #)
+
+In this case the Simplifier may realize that (forever $ hello barr)
+will never return and consequently that the `touch#` that follows is dead code.
+As such, it will be dropped, resulting in memory unsoundness.
+This unsoundness lead to the introduction of keepAlive#.
+
+
+
+Other related tickets:
+
+ - #15544
+ - #17760
+ - #14375
+ - #15260
+ - #18061
+
 ************************************************************************
 *                                                                      *
                 The main code
@@ -840,6 +984,7 @@ cpeApp top_env expr
         = let (terminal, args', depth') = collect_args arg
           in cpe_app env terminal (args' ++ args) (depth + depth' - 1)
 
+    -- See Note [keepAlive# magic].
     cpe_app env
             (Var f)
             args

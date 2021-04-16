@@ -3303,7 +3303,8 @@ section "Controlling object lifetime"
 -- See Note [keepAlive# magic] in GHC.CoreToStg.Prep.
 primop KeepAliveOp "keepAlive#" GenPrimOp
    o -> State# RealWorld -> (State# RealWorld -> p) -> p
-   { TODO. }
+   { \tt{keepAlive# x s k} keeps the value \tt{x} alive during the execution
+     of the computation \tt{k}. }
    with
    strictness = { \ _arity -> mkClosedStrictSig [topDmd, topDmd, strictApply1Dmd] topDiv }
 
