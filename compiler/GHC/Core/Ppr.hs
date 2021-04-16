@@ -35,6 +35,7 @@ import GHC.Types.Fixity (LexicalFixity(..))
 import GHC.Types.Literal( pprLiteral )
 import GHC.Types.Name( pprInfixName, pprPrefixName )
 import GHC.Types.Var
+import GHC.Types.Var.Env( isEmptyVarEnv )
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Demand
@@ -611,11 +612,13 @@ instance Outputable UnfoldingGuidance where
         parens (text "arity="     <> int arity    <> comma <>
                 text "unsat_ok="  <> ppr unsat_ok <> comma <>
                 text "boring_ok=" <> ppr boring_ok)
-    ppr (UnfIfGoodArgs { ug_args = cs, ug_size = size, ug_res = discount })
-      = hsep [ text "IF_ARGS",
-               brackets (hsep (map int cs)),
-               int size,
-               int discount ]
+    ppr (UnfIfGoodArgs { ug_args = cs, ug_fvs = fvs
+                       , ug_size = size, ug_res = discount })
+      = hsep [ text "IF_ARGS"
+             , brackets (hsep (map int cs))
+             , if isEmptyVarEnv fvs then empty else ppr fvs
+             , int size
+             , int discount ]
 
 instance Outputable Unfolding where
   ppr NoUnfolding                = text "No unfolding"

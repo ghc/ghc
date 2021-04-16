@@ -31,6 +31,8 @@ import GHC.Utils.Outputable
 import GHC.Types.Name
 
 import Data.List (isPrefixOf)
+import GHC.Types.Var.Env
+import GHC.Types.Unique.FM (nonDetStrictFoldUFM_Directly)
 
 {-
 ************************************************************************
@@ -89,6 +91,7 @@ StrictAnal.addStrictnessInfoToTopId
 
 callSiteInline :: Logger
                -> UnfoldingOpts
+               -> InScopeSet
                -> Int                   -- Case depth
                -> Id                    -- The Id
                -> Bool                  -- True <=> unfolding is active
@@ -96,7 +99,8 @@ callSiteInline :: Logger
                -> [ArgSummary]          -- One for each value arg; True if it is interesting
                -> CallCtxt              -- True <=> continuation is interesting
                -> Maybe CoreExpr        -- Unfolding, if any
-callSiteInline logger opts !case_depth id active_unfolding lone_variable arg_infos cont_info
+callSiteInline logger opts in_scope !case_depth id
+               active_unfolding lone_variable arg_infos cont_info
   = case idUnfolding id of
       -- idUnfolding checks for loop-breakers, returning NoUnfolding
       -- Things with an INLINE pragma may have an unfolding *and*
@@ -104,7 +108,7 @@ callSiteInline logger opts !case_depth id active_unfolding lone_variable arg_inf
         CoreUnfolding { uf_tmpl = unf_template
                       , uf_cache = unf_cache
                       , uf_guidance = guidance }
-          | active_unfolding -> tryUnfolding logger opts case_depth id lone_variable
+          | active_unfolding -> tryUnfolding logger opts in_scope case_depth id lone_variable
                                     arg_infos cont_info unf_template
                                     unf_cache guidance
           | otherwise -> traceInline logger opts id "Inactive unfolding:" (ppr id) Nothing
@@ -227,10 +231,12 @@ needed on a per-module basis.
 
 -}
 
-tryUnfolding :: Logger -> UnfoldingOpts -> Int -> Id -> Bool -> [ArgSummary] -> CallCtxt
+tryUnfolding :: Logger -> UnfoldingOpts -> InScopeSet -> Int -> Id
+             -> Bool -> [ArgSummary] -> CallCtxt
              -> CoreExpr -> UnfoldingCache -> UnfoldingGuidance
              -> Maybe CoreExpr
-tryUnfolding logger opts !case_depth id lone_variable arg_infos
+tryUnfolding logger opts in_scope !case_depth id
+             lone_variable arg_infos
              cont_info unf_template unf_cache guidance
  = case guidance of
      UnfNever -> traceInline logger opts id str (text "UnfNever") Nothing
@@ -245,7 +251,8 @@ tryUnfolding logger opts !case_depth id lone_variable arg_infos
           some_benefit = calc_some_benefit uf_arity
           enough_args  = (n_val_args >= uf_arity) || (unsat_ok && n_val_args > 0)
 
-     UnfIfGoodArgs { ug_args = arg_discounts, ug_res = res_discount, ug_size = size }
+     UnfIfGoodArgs { ug_args = arg_discounts, ug_fvs = fv_discounts
+                   , ug_res = res_discount, ug_size = size }
         | unfoldingVeryAggressive opts
         -> traceInline logger opts id str (mk_doc some_benefit extra_doc True) (Just unf_template)
         | is_wf && some_benefit && small_enough
@@ -261,7 +268,8 @@ tryUnfolding logger opts !case_depth id lone_variable arg_infos
                         | otherwise       = (size * (case_depth - depth_treshold)) `div` depth_scaling
           adjusted_size = size + depth_penalty - discount
           small_enough = adjusted_size <= unfoldingUseThreshold opts
-          discount = computeDiscount arg_discounts res_discount arg_infos cont_info
+          discount = computeDiscount in_scope arg_discounts fv_discounts res_discount
+                                     arg_infos cont_info
 
           extra_doc = vcat [ text "case depth =" <+> int case_depth
                            , text "depth based penalty =" <+> int depth_penalty
@@ -510,9 +518,12 @@ which Roman did.
 
 -}
 
-computeDiscount :: [Int] -> Int -> [ArgSummary] -> CallCtxt
-                -> Int
-computeDiscount arg_discounts res_discount arg_infos cont_info
+computeDiscount :: InScopeSet
+                -> [Int]      -- Argument discounts
+                -> VarEnv Int -- Free-variable discounts
+                -> Int -> [ArgSummary] -> CallCtxt -> Int
+computeDiscount in_scope arg_discounts fv_discounts res_discount
+                arg_infos cont_info
 
   = 10          -- Discount of 10 because the result replaces the call
                 -- so we count 10 for the function itself
@@ -521,10 +532,17 @@ computeDiscount arg_discounts res_discount arg_infos cont_info
                -- Discount of 10 for each arg supplied,
                -- because the result replaces the call
 
-    + total_arg_discount + res_discount'
+    + total_arg_discount + fv_discount + res_discount'
   where
     actual_arg_discounts = zipWith mk_arg_discount arg_discounts arg_infos
     total_arg_discount   = sum actual_arg_discounts
+    fv_discount = nonDetStrictFoldUFM_Directly add_fv 0 fv_discounts
+    add_fv uniq disc tot_disc
+      | Just v <- lookupInScope_Directly in_scope uniq
+      , hasCoreUnfolding (idUnfolding v)
+      = disc + tot_disc
+      | otherwise
+      = disc
 
     mk_arg_discount _        TrivArg    = 0
     mk_arg_discount _        NonTrivArg = 10

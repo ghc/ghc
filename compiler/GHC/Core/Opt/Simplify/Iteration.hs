@@ -2300,7 +2300,7 @@ rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args }) cont
 -----------------------------------
 tryInlining :: SimplEnv -> Logger -> OutId -> SimplCont -> SimplM (Maybe OutExpr)
 tryInlining env logger var cont
-  | Just expr <- callSiteInline logger uf_opts case_depth var active_unf
+  | Just expr <- callSiteInline logger uf_opts in_scope case_depth var active_unf
                                 lone_variable arg_infos interesting_cont
   = do { dump_inline expr cont
        ; return (Just expr) }
@@ -2311,6 +2311,7 @@ tryInlining env logger var cont
   where
     uf_opts    = seUnfoldingOpts env
     case_depth = seCaseDepth env
+    in_scope   = seInScope env
     (lone_variable, arg_infos, call_cont) = contArgs cont
     interesting_cont = interestingCallContext env call_cont
     active_unf       = activeUnfolding (seMode env) var
