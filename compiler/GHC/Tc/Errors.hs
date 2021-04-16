@@ -17,7 +17,6 @@ module GHC.Tc.Errors(
 import GHC.Prelude
 
 import GHC.Tc.Types
-import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.Constraint
 import GHC.Core.Predicate

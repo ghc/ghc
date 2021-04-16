@@ -19,9 +19,8 @@ import GHC.Prelude
 
 import Data.Typeable
 import GHC.Types.Error
-import GHC.Utils.Error
 
-import GHC.Parser.Errors       ( PsError(..), PsErrorDesc, Hint )
+import GHC.Parser.Errors       ( PsErrorDesc, Hint )
 import GHC.Parser.Errors.Types ( PsMessage )
 import GHC.Tc.Errors.Types ( TcRnDsMessage(..), TcRnMessage )
 import GHC.HsToCore.Errors.Types ( DsMessage )
