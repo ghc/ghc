@@ -10,3 +10,4 @@ def f( name, opts ):
 setTestOpts(f)
 
 test('T13588', [ grep_errmsg('case') ] , compile, ['-dverbose-stg2stg -fno-worker-wrapper'])
+test('T19717', normal, compile, ['-ddump-stg-final -dsuppress-uniques -dno-typeable-binds'])

@@ -1708,20 +1708,20 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
               -- changes (#4012).
               rule_name  = mkFastString ("SC:" ++ occNameString fn_occ ++ show rule_number)
               spec_name  = mkInternalName spec_uniq spec_occ fn_loc
---      ; pprTrace "spec_one {" (vcat [ text "function:" <+> ppr fn <+> ppr (idUnique fn)
---                                    , text "sc_count:" <+> ppr (sc_count env)
---                                    , text "pats:" <+> ppr pats
---                                    , text "-->" <+> ppr spec_name
---                                    , text "bndrs" <+> ppr arg_bndrs
---                                    , text "body" <+> ppr body
---                                    , text "how_bound" <+> ppr (sc_how_bound env) ]) $
---        return ()
+      ; pprTrace "spec_one {" (vcat [ text "function:" <+> ppr fn <+> ppr (idUnique fn)
+                                    , text "sc_count:" <+> ppr (sc_count env)
+                                    , text "pats:" <+> ppr pats
+                                    , text "-->" <+> ppr spec_name
+                                    , text "bndrs" <+> ppr arg_bndrs
+                                    , text "body" <+> ppr body
+                                    , text "how_bound" <+> ppr (sc_how_bound env) ]) $
+        return ()
 
         -- Specialise the body
         ; (spec_usg, spec_body) <- scExpr body_env body
 
---      ; pprTrace "done spec_one }" (ppr fn $$ ppr (scu_calls spec_usg)) $
---        return ()
+      ; pprTrace "done spec_one }" (ppr fn $$ ppr (scu_calls spec_usg)) $
+        return ()
 
                 -- And build the results
         ; let spec_body_ty   = exprType spec_body
@@ -2046,10 +2046,10 @@ callsToNewPats env fn spec_info@(SI { si_specs = done_specs }) bndr_occs calls
                 -- Discard specialisations if there are too many of them
               (pats_were_discarded, trimmed_pats) = trim_pats env fn spec_info small_pats
 
---        ; pprTrace "callsToPats" (vcat [ text "calls to" <+> ppr fn <> colon <+> ppr calls
---                                       , text "done_specs:" <+> ppr (map os_pat done_specs)
---                                       , text "good_pats:" <+> ppr good_pats ]) $
---          return ()
+        ; pprTrace "callsToPats" (vcat [ text "calls to" <+> ppr fn <> colon <+> ppr calls
+                                       , text "done_specs:" <+> ppr (map os_pat done_specs)
+                                       , text "good_pats:" <+> ppr good_pats ]) $
+          return ()
 
         ; return (have_boring_call || pats_were_discarded, trimmed_pats) }
           -- If any of the calls does not give rise to a specialisation, either
