@@ -144,7 +144,7 @@ mkParserErr :: PsError -> MsgEnvelope PsMessage
 mkParserErr err = mk_parser_err (errLoc err) $ vcat
    (pp_err (errDesc err) : map pp_hint (errHints err))
 
-pprPsError :: PsErrorDesc -> [Hint] -> SDoc
+pprPsError :: PsErrorDesc -> [PsHint] -> SDoc
 pprPsError desc hints = vcat (pp_err desc : map pp_hint hints)
 
 pp_err :: PsErrorDesc -> SDoc
@@ -610,7 +610,7 @@ pp_unexpected_fun_app e a =
     $$ text "You could write it with parentheses"
     $$ text "Or perhaps you meant to enable BlockArguments?"
 
-pp_hint :: Hint -> SDoc
+pp_hint :: PsHint -> SDoc
 pp_hint = \case
    SuggestTH              -> text "Perhaps you intended to use TemplateHaskell"
    SuggestDo              -> text "Perhaps this statement should be within a 'do' block?"
