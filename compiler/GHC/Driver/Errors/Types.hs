@@ -41,24 +41,15 @@ type WarnMsg         = MsgEnvelope GhcMessage
 {- Note [GhcMessage]
 ~~~~~~~~~~~~~~~~~~~~
 
-We might need to report diagnostics (error and/or warnings) to the users. The 'GhcMessage' type is the
-root of the diagnostic hierarchy.
+We might need to report diagnostics (error and/or warnings) to the users. The
+'GhcMessage' type is the root of the diagnostic hierarchy.
 
-It's useful to have a separate type constructor for the different stages of the compilation pipeline.
-This is not just helpful for tools, as it gives a clear indication on where the error occurred exactly.
-Furthermore it increases the modularity amongst the different components of GHC (i.e. to avoid having
-"everything depend on everything else") and allows us to write separate functions that renders the
-different kind of messages.
-
-Last but not least, it's also helpful to allow 'handleSourceError' to be able to catch the relevant
-exception. In particular, it allows the user to write something like:
-
-handleMyErrors = handleSourceError (mapBag handleInvididualError . getMessages . srcErrorMessages)
-  where
-    handleInvididualError e = case errMsgDiagnostic of
-      GhcPsMessage _   -> .. -- diagnostic emitted during parsing;
-      GhcTcRnMessage _ -> .. -- diagnostic emitted during TcRn
-      ...
+It's useful to have a separate type constructor for the different stages of
+the compilation pipeline. This is not just helpful for tools, as it gives a
+clear indication on where the error occurred exactly. Furthermore it increases
+the modularity amongst the different components of GHC (i.e. to avoid having
+"everything depend on everything else") and allows us to write separate
+functions that renders the different kind of messages.
 
 -}
 
