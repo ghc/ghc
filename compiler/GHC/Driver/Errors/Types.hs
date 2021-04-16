@@ -53,8 +53,9 @@ functions that renders the different kind of messages.
 
 -}
 
--- | The umbrella type that encompasses all the different messages that GHC might output during the
--- different compilation stages. See Note [GhcMessage].
+-- | The umbrella type that encompasses all the different messages that GHC
+-- might output during the different compilation stages. See
+-- Note [GhcMessage].
 data GhcMessage where
   -- | A message from the parsing phase.
   GhcPsMessage      :: PsMessage -> GhcMessage
@@ -64,38 +65,43 @@ data GhcMessage where
   GhcDsMessage      :: DsMessage -> GhcMessage
   -- | A message from the driver.
   GhcDriverMessage  :: DriverMessage -> GhcMessage
-  -- | An \"escape\" hatch which can be used when we don't know the source of the message or
-  -- if the message is not one of the typed ones. The 'Diagnostic' and 'Typeable' constraints
-  -- ensure that if we /know/, at pattern-matching time, the originating type, we can attempt a cast and
-  -- access the fully-structured error. This would be the case for a GHC plugin that offers a domain-specific
-  -- error type but that doesn't want to place the burden on IDEs/application code to \"know\" it.
-  -- The 'Diagnostic' constraint ensures that worst case scenario we can still render this
-  -- into something which can be eventually converted into a 'DecoratedSDoc'.
+
+  -- | An \"escape\" hatch which can be used when we don't know the source of
+  -- the message or if the message is not one of the typed ones. The
+  -- 'Diagnostic' and 'Typeable' constraints ensure that if we /know/, at
+  -- pattern-matching time, the originating type, we can attempt a cast and
+  -- access the fully-structured error. This would be the case for a GHC
+  -- plugin that offers a domain-specific error type but that doesn't want to
+  -- place the burden on IDEs/application code to \"know\" it. The
+  -- 'Diagnostic' constraint ensures that worst case scenario we can still
+  -- render this into something which can be eventually converted into a
+  -- 'DecoratedSDoc'.
   GhcUnknownMessage :: forall a. (Diagnostic a, Typeable a) => a -> GhcMessage
 
--- | Creates a new 'GhcMessage' out of any diagnostic. This function is also provided to ease the integration
--- of #18516 by allowing diagnostics to be wrapped into the general (but structured) 'GhcMessage' type,
--- so that the conversion can happen gradually. This function should not be needed within GHC,
--- as it would typically be used by plugin or library authors (see comment for the 'GhcUnknownMessage'
--- type constructor)
+-- | Creates a new 'GhcMessage' out of any diagnostic. This function is also
+-- provided to ease the integration of #18516 by allowing diagnostics to be
+-- wrapped into the general (but structured) 'GhcMessage' type, so that the
+-- conversion can happen gradually. This function should not be needed within
+-- GHC, as it would typically be used by plugin or library authors (see
+-- comment for the 'GhcUnknownMessage' type constructor)
 ghcUnknownMessage :: (Diagnostic a, Typeable a) => a -> GhcMessage
 ghcUnknownMessage = GhcUnknownMessage
 
--- | Given a collection of @e@ wrapped in a 'Foldable' structure, converts it into 'Messages'
--- via the supplied transformation function.
+-- | Given a collection of @e@ wrapped in a 'Foldable' structure, converts it
+-- into 'Messages' via the supplied transformation function.
 foldPsMessages :: Foldable f
                => (e -> MsgEnvelope PsMessage)
                -> f e
                -> Messages GhcMessage
 foldPsMessages f = foldMap (singleMessage . fmap GhcPsMessage . f)
 
--- | Abstracts away the frequent pattern where we are calling 'ioMsgMaybe' on the result of
--- 'IO (Messages TcRnMessage, a)'.
+-- | Abstracts away the frequent pattern where we are calling 'ioMsgMaybe' on
+-- the result of 'IO (Messages TcRnMessage, a)'.
 hoistTcRnMessage :: Monad m => m (Messages TcRnMessage, a) -> m (Messages GhcMessage, a)
 hoistTcRnMessage = fmap (first (fmap GhcTcRnMessage))
 
--- | Abstracts away the frequent pattern where we are calling 'ioMsgMaybe' on the result of
--- 'IO (Messages DsMessage, a)'.
+-- | Abstracts away the frequent pattern where we are calling 'ioMsgMaybe' on
+-- the result of 'IO (Messages DsMessage, a)'.
 hoistDsMessage :: Monad m => m (Messages DsMessage, a) -> m (Messages GhcMessage, a)
 hoistDsMessage = fmap (first (fmap GhcDsMessage))
 

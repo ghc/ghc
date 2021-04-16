@@ -38,7 +38,6 @@ import GHC.Parser.Header
 import GHC.Parser.Lexer
 import GHC.Parser.Annotation
 import GHC.Parser.Errors.Ppr
-import GHC.Parser.Errors.Types
 
 import GHC hiding (Failed, Succeeded)
 import GHC.Tc.Utils.Monad
@@ -811,7 +810,7 @@ summariseDecl _pn hsc_src lmodname@(L loc modname) Nothing
                          [] -- No exclusions
          case r of
             Nothing -> throwOneError $ mkPlainErrorMsgEnvelope loc $
-                                       GhcPsMessage $ PsUnknownMessage $ mkPlainError $
+                                       GhcDriverMessage $ DriverUnknownMessage $ mkPlainError $
                                        (text "module" <+> ppr modname <+> text "was not found")
             Just (Left err) -> throwErrors (fmap GhcDriverMessage err)
             Just (Right summary) -> return summary
