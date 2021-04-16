@@ -126,7 +126,6 @@ import GHC.Utils.Logger
 
 import GHC.Utils.TmpFs ( newTempName, TempFileLifetime(..) )
 
-import GHC.Data.Bag
 import GHC.Data.FastString
 import GHC.Data.Maybe( MaybeErr(..) )
 import qualified GHC.Data.EnumSet as EnumSet
@@ -1002,7 +1001,7 @@ runMeta' show_code ppr_hs run_and_convert expr
             Nothing      -> failM   -- Case (a) from Note [Errors in desugaring a splice]
             Just ds_expr ->  -- There still might be a fatal warning or recoverable
                              -- Cases (b) and (c) from Note [Errors in desugaring a splice]
-              do { when (anyBag ((==) SevError . errMsgSeverity) (getMessages ds_msgs))
+              do { when (errorsOrFatalWarningsFound ds_msgs)
                      failM
                  ; return ds_expr }
 

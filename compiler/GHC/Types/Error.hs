@@ -46,6 +46,7 @@ module GHC.Types.Error
    , getWarningMessages
    , partitionMessages
    , errorsFound
+   , errorsOrFatalWarningsFound
    )
 where
 
@@ -70,24 +71,27 @@ Note [Messages]
 
 We represent the 'Messages' as a single bag of warnings and errors.
 
-The reason behind that is that there is a fluid relationship between errors and warnings and we want to
-be able to promote or demote errors and warnings based on certain flags (e.g. -Werror, -fdefer-type-errors
-or -XPartialTypeSignatures). More specifically, every diagnostic has a 'DiagnosticReason', but a warning
-'DiagnosticReason' might be associated with 'SevError', in the case of -Werror.
+The reason behind that is that there is a fluid relationship between errors
+and warnings and we want to be able to promote or demote errors and warnings
+based on certain flags (e.g. -Werror, -fdefer-type-errors or
+-XPartialTypeSignatures). More specifically, every diagnostic has a
+'DiagnosticReason', but a warning 'DiagnosticReason' might be associated with
+'SevError', in the case of -Werror.
 
 We rely on the 'Severity' to distinguish between a warning and an error.
 
-'WarningMessages' and 'ErrorMessages' are for now simple type aliases to retain backward compatibility, but
-in future iterations these can be either parameterised over an 'e' message type (to make type signatures
-a bit more declarative) or removed altogether.
+'WarningMessages' and 'ErrorMessages' are for now simple type aliases to
+retain backward compatibility, but in future iterations these can be either
+parameterised over an 'e' message type (to make type signatures a bit more
+declarative) or removed altogether.
 -}
 
--- | A collection of messages emitted by GHC during error reporting. A diagnostic message is typically
--- a warning or an error. See Note [Messages].
+-- | A collection of messages emitted by GHC during error reporting. A
+-- diagnostic message is typically a warning or an error. See Note [Messages].
 --
--- /INVARIANT/: All the messages in this collection must be relevant, i.e. their 'Severity' should /not/
--- be 'SevIgnore'. The smart constructor 'mkMessages' will filter out any message which 'Severity' is
--- 'SevIgnore'.
+-- /INVARIANT/: All the messages in this collection must be relevant, i.e.
+-- their 'Severity' should /not/ be 'SevIgnore'. The smart constructor
+-- 'mkMessages' will filter out any message which 'Severity' is 'SevIgnore'.
 newtype Messages e = Messages { getMessages :: Bag (MsgEnvelope e) }
   deriving newtype (Semigroup, Monoid)
   deriving stock Functor
@@ -110,9 +114,10 @@ singleMessage e = addMessage e emptyMessages
 {- Note [Discarding Messages]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Discarding a 'SevIgnore' message from 'addMessage' and 'unionMessages' is
-just an optimisation, as GHC would /also/ suppress any diagnostic which severity is
-'SevIgnore' before printing the message: See for example 'putLogMsg' and 'defaultLogAction'.
+Discarding a 'SevIgnore' message from 'addMessage' and 'unionMessages' is just
+an optimisation, as GHC would /also/ suppress any diagnostic which severity is
+'SevIgnore' before printing the message: See for example 'putLogMsg' and
+'defaultLogAction'.
 
 -}
 
@@ -478,28 +483,36 @@ getCaretDiagnostic msg_class (RealSrcSpan span _) =
 {- Note [Intrinsic And Extrinsic Failures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-We distinguish between /intrinsic/ and /extrinsic/ failures. We classify in the former category
-those diagnostics which are /essentially/ failures, and their nature can't be changed. This is
-the case for 'ErrorWithoutFlag'. We classify as /extrinsic/ all those diagnostics (like fatal warnings)
-which are born as warnings but which are still failures under particular 'DynFlags' settings. It's important
-to be aware of such logic distinction, because when we are inside the typechecker or the desugarer, we are
-interested about intrinsic errors, and to bail out as soon as we find one of them. Conversely, if we find
-an /extrinsic/ one, for example because a particular 'WarningFlag' makes a warning and error, we /don't/
-want to bail out, that's still not the right time to do so: Rather, we want to first collect all the
-diagnostics, and later classify and report them appropriately (in the driver).
-
+We distinguish between /intrinsic/ and /extrinsic/ failures. We classify in
+the former category those diagnostics which are /essentially/ failures, and
+their nature can't be changed. This is the case for 'ErrorWithoutFlag'. We
+classify as /extrinsic/ all those diagnostics (like fatal warnings) which are
+born as warnings but which are still failures under particular 'DynFlags'
+settings. It's important to be aware of such logic distinction, because when
+we are inside the typechecker or the desugarer, we are interested about
+intrinsic errors, and to bail out as soon as we find one of them. Conversely,
+if we find an /extrinsic/ one, for example because a particular 'WarningFlag'
+makes a warning and error, we /don't/ want to bail out, that's still not the
+right time to do so: Rather, we want to first collect all the diagnostics, and
+later classify and report them appropriately (in the driver).
 -}
 
-
--- | Returns 'True' if this is, intrinsically, a failure. See Note [Intrinsic And Extrinsic Failures].
+-- | Returns 'True' if this is, intrinsically, a failure. See
+-- Note [Intrinsic And Extrinsic Failures].
 isIntrinsicErrorMessage :: Diagnostic e => MsgEnvelope e -> Bool
 isIntrinsicErrorMessage = (==) ErrorWithoutFlag . diagnosticReason . errMsgDiagnostic
 
 isWarningMessage :: Diagnostic e => MsgEnvelope e -> Bool
 isWarningMessage = not . isIntrinsicErrorMessage
 
+-- | Are there any hard errors here? -Werror warnings are /not/ detected. If
+-- you want to check for -Werror warnings, use 'errorsOrFatalWarningsFound'.
 errorsFound :: Diagnostic e => Messages e -> Bool
 errorsFound (Messages msgs) = any isIntrinsicErrorMessage msgs
+
+-- | Are there any errors or -Werror warnings here?
+errorsOrFatalWarningsFound :: Messages e -> Bool
+errorsOrFatalWarningsFound (Messages msgs) = any ((==) SevError . errMsgSeverity) msgs
 
 getWarningMessages :: Diagnostic e => Messages e -> Bag (MsgEnvelope e)
 getWarningMessages (Messages xs) = fst $ partitionBag isWarningMessage xs
@@ -507,7 +520,7 @@ getWarningMessages (Messages xs) = fst $ partitionBag isWarningMessage xs
 getErrorMessages :: Diagnostic e => Messages e -> Bag (MsgEnvelope e)
 getErrorMessages (Messages xs) = fst $ partitionBag isIntrinsicErrorMessage xs
 
--- | Partitions the 'Messages' and returns a tuple which first element are the warnings, and the
--- second the errors.
+-- | Partitions the 'Messages' and returns a tuple which first element are the
+-- warnings, and the second the errors.
 partitionMessages :: Diagnostic e => Messages e -> (Messages e, Messages e)
 partitionMessages (Messages xs) = bimap Messages Messages (partitionBag isWarningMessage xs)
