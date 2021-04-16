@@ -11,7 +11,6 @@ module GHC.Driver.Errors.Types (
   -- * Utility functions
   , hoistTcRnMessage
   , hoistDsMessage
-  , tcRnDsToGhcMessage
   , foldPsMessages
   ) where
 
@@ -22,7 +21,7 @@ import GHC.Types.Error
 
 import GHC.Parser.Errors       ( PsErrorDesc, Hint )
 import GHC.Parser.Errors.Types ( PsMessage )
-import GHC.Tc.Errors.Types ( TcRnDsMessage(..), TcRnMessage )
+import GHC.Tc.Errors.Types     ( TcRnMessage )
 import GHC.HsToCore.Errors.Types ( DsMessage )
 import Data.Bifunctor
 
@@ -108,10 +107,6 @@ hoistTcRnMessage = fmap (first (fmap GhcTcRnMessage))
 -- 'IO (Messages DsMessage, a)'.
 hoistDsMessage :: Monad m => m (Messages DsMessage, a) -> m (Messages GhcMessage, a)
 hoistDsMessage = fmap (first (fmap GhcDsMessage))
-
--- | Converts the input 'TcRnDsMessage' into a 'GhcMessage'.
-tcRnDsToGhcMessage :: TcRnDsMessage -> GhcMessage
-tcRnDsToGhcMessage (TcRnDsMessage m) = either GhcDsMessage GhcTcRnMessage m
 
 -- | A message from the driver.
 data DriverMessage

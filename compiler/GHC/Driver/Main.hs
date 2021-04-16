@@ -1212,7 +1212,7 @@ checkSafeImports tcg_env
                 let castMsg m = TcRnUnknownMessage
                               $ DiagnosticMessage (diagnosticMessage m) (diagnosticReason m)
                 -- NOTE(adinapoli) This is /extremely/ unfortunate. We have
-                -- to cast everything to be a 'TcRnDsMessage'!
+                -- to cast everything to be a 'TcRnMessage'!
                 in markUnsafeInfer tcg_env (castMsg <$> infErrs)
               False -> return tcg_env
             when (packageTrustOn dflags) $ checkPkgTrust pkgReqs
