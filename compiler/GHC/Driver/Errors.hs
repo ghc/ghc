@@ -8,7 +8,6 @@ module GHC.Driver.Errors (
 import GHC.Driver.Session
 import GHC.Driver.Errors.Types
 import GHC.Data.Bag
-import GHC.Utils.Error ( formatBulleted, sortMsgBag, mkPlainMsgEnvelope )
 import GHC.Prelude
 import GHC.Parser.Errors ( PsError(..) )
 import GHC.Types.SrcLoc

@@ -93,7 +93,6 @@ import GHC.Prelude
 import GHC.Platform
 
 import GHC.Driver.Env
-import GHC.Driver.Errors.Types ( tcRnDsToGhcMessage )
 import GHC.Driver.Session
 import {-# SOURCE #-} GHC.Driver.Hooks
 

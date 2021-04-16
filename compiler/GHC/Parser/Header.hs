@@ -54,7 +54,7 @@ import GHC.Utils.Exception as Exception
 
 import GHC.Data.StringBuffer
 import GHC.Data.Maybe
-import GHC.Data.Bag         (Bag, listToBag, isEmptyBag )
+import GHC.Data.Bag         (Bag, isEmptyBag )
 import GHC.Data.FastString
 
 import Control.Monad

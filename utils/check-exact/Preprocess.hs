@@ -223,7 +223,7 @@ getPreprocessedSrcDirectPrim cppOptions src_fn = do
       txt <- GHC.liftIO $ readFileGhc hspp_fn
       return (txt, buf, dflags')
 
-showErrorMessages :: GHC.Messages GHC.GhcMessage -> String
+showErrorMessages :: GHC.Messages GHC.DriverMessage -> String
 showErrorMessages msgs =
   GHC.renderWithContext GHC.defaultSDocContext
     $ GHC.vcat
