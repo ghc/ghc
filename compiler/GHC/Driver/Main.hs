@@ -1409,7 +1409,8 @@ checkPkgTrust pkgs = do
             | otherwise
             = (`consBag` acc)
                      $ mkErrorMsgEnvelope noSrcSpan (pkgQual state)
-                     $ ghcUnknownMessage
+                     $ GhcDriverMessage
+                     $ DriverUnknownMessage
                      $ mkPlainError
                      $ pprWithUnitState state
                      $ text "The package ("
