@@ -16,7 +16,6 @@ import GHC.Types.Var
 import GHC.Types.Name.Reader (GlobalRdrEnv)
 import GHC.Hs (LForeignDecl, HsExpr, GhcTc)
 import GHC.Tc.Types (TcRnIf, IfGblEnv, IfLclEnv, CompleteMatches)
-import GHC.Tc.Errors.Types
 import GHC.HsToCore.Pmc.Types (Nablas)
 import GHC.HsToCore.Errors.Types
 import GHC.Core (CoreExpr)

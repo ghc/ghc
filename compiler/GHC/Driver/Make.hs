@@ -65,7 +65,6 @@ import GHC.Driver.Errors.Types
 import GHC.Driver.Main
 
 import GHC.Parser.Header
-import GHC.Parser.Errors.Ppr
 
 import GHC.Iface.Load      ( cannotFindModule )
 import GHC.IfaceToCore     ( typecheckIface )
