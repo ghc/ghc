@@ -134,15 +134,16 @@ cgExpr (StgCase expr bndr alt_type alts) =
   cgCase expr bndr alt_type alts
 
 cgExpr (StgCaseEnv env_id fvs e) =
-  do { base_reg <- rebindToReg (NonVoid env_id)
-     ; profile <- getProfile
+  do { profile <- getProfile
      ; let platform = profilePlatform profile
            (_, _, fvs_w_offsets)
-             = mkVirtHeapOffsets profile StdHeader . addIdReps . nonVoidIds . dVarSetElems $ fvs
+             = mkVirtHeapOffsets profile ThunkHeader
+             . addIdReps . nonVoidIds . dVarSetElems $ fvs
            tag = lfDynTag platform mkEnvLFInfo
+     ; env_reg <- assignTemp . idInfoToAmode =<< getCgIdInfo env_id
      ; forM fvs_w_offsets $ \(fv_id, off) ->
          do { fv_reg <- rebindToReg fv_id
-            ; emit $ mkTaggedObjectLoad platform fv_reg base_reg off tag }
+            ; emit $ mkTaggedObjectLoad platform fv_reg env_reg off tag }
      ; cgExpr e }
 
 

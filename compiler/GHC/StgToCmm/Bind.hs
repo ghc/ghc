@@ -233,19 +233,22 @@ buildEnv binder args =
       = do { profile <- getProfile
            ; let platform = profilePlatform profile
                  (tot_wds, ptr_wds, args_w_offsets)
-                   = mkVirtHeapOffsets profile StdHeader (addIdReps args)
+                   = mkVirtHeapOffsets profile ThunkHeader (addIdReps args)
                  non_ptr_wds = tot_wds - ptr_wds
                  info_tbl = mkEnvInfoTable profile ptr_wds non_ptr_wds
                  use_cc = cccsExpr
                  blame_cc = cccsExpr
-           ; emit (mkComment $ mkFastString "calling allocDynClosure")
+           ; emitClosureProcAndInfoTable True binder lf_info info_tbl [] $
+               (\(_,_node,_) -> return ())
+                  -- Since everything is a closure, generate a boring empty
+                  -- CmmGraph for code
            ; hp_plus_n <- allocDynClosure (Just binder) info_tbl lf_info use_cc
                             blame_cc (map toVarArg args_w_offsets)
            ; return (mkRhsInit platform reg lf_info hp_plus_n) }
     mkEnvInfoTable profile ptr_wds non_ptr_wds =
       CmmInfoTable
-      { cit_lbl  = mkBytesLabel (idName binder)
-      , cit_rep  = mkHeapRep profile False ptr_wds non_ptr_wds IndStatic
+      { cit_lbl  = mkInfoTableLabel (idName binder) NoCafRefs
+      , cit_rep  = mkHeapRep profile False ptr_wds non_ptr_wds Thunk
       , cit_prof = NoProfilingInfo
       , cit_srt  = Nothing
       , cit_clo  = Nothing }
