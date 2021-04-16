@@ -384,6 +384,8 @@ Library
         GHC.Driver.Env
         GHC.Driver.Env.Types
         GHC.Driver.Errors
+        GHC.Driver.Errors.Ppr
+        GHC.Driver.Errors.Types
         GHC.Driver.Flags
         GHC.Driver.Hooks
         GHC.Driver.Main
@@ -413,6 +415,8 @@ Library
         GHC.HsToCore.Binds
         GHC.HsToCore.Coverage
         GHC.HsToCore.Docs
+        GHC.HsToCore.Errors.Ppr
+        GHC.HsToCore.Errors.Types
         GHC.HsToCore.Expr
         GHC.HsToCore.Foreign.Call
         GHC.HsToCore.Foreign.Decl
@@ -475,6 +479,7 @@ Library
         GHC.Parser.CharClass
         GHC.Parser.Errors
         GHC.Parser.Errors.Ppr
+        GHC.Parser.Errors.Types
         GHC.Parser.Header
         GHC.Parser.Lexer
         GHC.Parser.PostProcess
@@ -574,6 +579,8 @@ Library
         GHC.Tc.Errors
         GHC.Tc.Errors.Hole
         GHC.Tc.Errors.Hole.FitTypes
+        GHC.Tc.Errors.Ppr
+        GHC.Tc.Errors.Types
         GHC.Tc.Gen.Annotation
         GHC.Tc.Gen.App
         GHC.Tc.Gen.Arrow
