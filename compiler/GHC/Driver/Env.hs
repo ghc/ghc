@@ -6,6 +6,7 @@ module GHC.Driver.Env
    , hsc_home_unit
    , hsc_units
    , runHsc
+   , runHsc'
    , mkInteractiveHscEnv
    , runInteractiveHsc
    , hscEPS
@@ -48,6 +49,7 @@ import GHC.Core.InstEnv ( ClsInst )
 
 import GHC.Types.Annotations ( Annotation, AnnEnv, mkAnnEnv, plusAnnEnv )
 import GHC.Types.CompleteMatch
+import GHC.Types.Error ( WarningMessages )
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.TyThing
@@ -70,6 +72,9 @@ runHsc hsc_env (Hsc hsc) = do
     (a, w) <- hsc hsc_env emptyBag
     printOrThrowWarnings (hsc_logger hsc_env) (hsc_dflags hsc_env) w
     return a
+
+runHsc' :: HscEnv -> Hsc a -> IO (a, WarningMessages)
+runHsc' hsc_env (Hsc hsc) = hsc hsc_env emptyBag
 
 -- | Switches in the DynFlags and Plugins from the InteractiveContext
 mkInteractiveHscEnv :: HscEnv -> HscEnv
