@@ -635,14 +635,9 @@ hscDesugar hsc_env mod_summary tc_result =
 hscDesugar' :: ModLocation -> TcGblEnv -> Hsc ModGuts
 hscDesugar' mod_location tc_result = do
     hsc_env <- getHscEnv
-    r <- ioMsgMaybe $
+    ioMsgMaybe $
       {-# SCC "deSugar" #-}
       deSugar hsc_env mod_location tc_result
-
-    -- always check -Werror after desugaring, this is the last opportunity for
-    -- warnings to arise before the backend.
-    handleWarnings
-    return r
 
 -- | Make a 'ModDetails' from the results of typechecking. Used when
 -- typechecking only, as opposed to full compilation.

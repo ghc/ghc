@@ -81,7 +81,7 @@ import GHC.CmmToLlvm         ( llvmFixupAsm, llvmVersionList )
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Settings
 
-import GHC.Data.Bag            ( unitBag )
+import GHC.Data.Bag            ( unitBag, emptyBag, unionBags )
 import GHC.Data.FastString     ( mkFastString )
 import GHC.Data.StringBuffer   ( hGetStringBuffer, hPutStringBuffer )
 import GHC.Data.Maybe          ( expectJust )
@@ -211,7 +211,7 @@ compileOne' m_tc_result mHscMessage
 
    plugin_hsc_env <- initializePlugins hsc_env
 
-   let runBackend tc_result mb_hash = do
+   let runBackend tc_result warnings mb_hash = do
             output_fn <- getOutputFilename logger tmpfs next_phase
                             (Temporary TFL_CurrentModule)
                             basename dflags next_phase (Just location)
@@ -219,7 +219,7 @@ compileOne' m_tc_result mHscMessage
             (_, _, Just (HomeModInfo iface details mb_linkable)) <- runPipeline StopLn plugin_hsc_env
                               (output_fn,
                                Nothing,
-                               Just (HscPostTc summary tc_result mb_hash))
+                               Just (HscPostTc summary tc_result warnings mb_hash))
                               (Just basename)
                               Persistent
                               (Just location)
@@ -239,7 +239,7 @@ compileOne' m_tc_result mHscMessage
    case m_tc_result of
      Just tc_result
        | not always_do_basic_recompilation_check ->
-         runBackend (FrontendTypecheck tc_result) Nothing
+         runBackend (FrontendTypecheck tc_result) emptyBag Nothing
      _ -> do
        recomp_result <- hscRecompStatus mHscMessage plugin_hsc_env summary
          source_modified mb_old_iface (mod_index, nmods)
@@ -248,11 +248,8 @@ compileOne' m_tc_result mHscMessage
            ASSERT( isJust mb_old_linkable || isNoLink (ghcLink dflags) )
            return $! HomeModInfo iface hmi_details mb_old_linkable
          HscRecompNeeded mb_hash -> do
-           tc_result <- runHsc plugin_hsc_env $ do
-             case hscFrontendHook (hsc_hooks hsc_env) of
-               Nothing -> FrontendTypecheck . fst <$> hsc_typecheck False summary Nothing
-               Just h  -> h summary
-           runBackend tc_result mb_hash
+           (tc_result, warnings) <- typecheckAndGetWarnings plugin_hsc_env summary
+           runBackend tc_result warnings mb_hash
 
 
  where dflags0     = ms_hspp_opts summary
@@ -381,6 +378,13 @@ compileEmptyStub dflags hsc_env basename location mod_name = do
                   (Just location)
                   []
   return ()
+
+-- | Do Typechecking without throwing SourceError exception with -Werror
+typecheckAndGetWarnings :: HscEnv ->  ModSummary -> IO (FrontendResult, WarningMessages)
+typecheckAndGetWarnings hsc_env summary = runHsc' hsc_env $ do
+  case hscFrontendHook (hsc_hooks hsc_env) of
+    Nothing -> FrontendTypecheck . fst <$> hsc_typecheck False summary Nothing
+    Just h  -> h summary
 
 -- ---------------------------------------------------------------------------
 -- Link
@@ -1300,10 +1304,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
 
             -- run the compiler!
             HscRecompNeeded mb_hash -> do
-              tc_result <- liftIO $ runHsc plugin_hsc_env $ do
-                  case hscFrontendHook (hsc_hooks plugin_hsc_env) of
-                      Nothing -> FrontendTypecheck . fst <$> hsc_typecheck False mod_summary Nothing
-                      Just h  -> h mod_summary
+              (tc_result, warnings) <- liftIO $ typecheckAndGetWarnings plugin_hsc_env mod_summary
 
               -- In the rest of the pipeline use the loaded plugins
               setPlugins (hsc_plugins        plugin_hsc_env)
@@ -1311,15 +1312,19 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
               -- "driver" plugins may have modified the DynFlags so we update them
               setDynFlags (hsc_dflags plugin_hsc_env)
 
-              return (HscPostTc mod_summary tc_result mb_hash,
+              return (HscPostTc mod_summary tc_result warnings mb_hash,
                       panic "HscPostTc doesn't have an input filename")
 
-runPhase (HscPostTc mod_summary (FrontendTypecheck tc_result) mb_hash) _ = do
+runPhase (HscPostTc mod_summary (FrontendTypecheck tc_result) tc_warnings mb_hash) _ = do
         PipeState{hsc_env=hsc_env'} <- getPipeState
-        result <- liftIO $ runHsc hsc_env' $ do
+        (result, ds_warnings) <- liftIO $ runHsc' hsc_env' $ do
             hscDesugarSimplify mod_summary tc_result mb_hash
         let mod_name = moduleName (ms_mod mod_summary)
             src_flavour = (ms_hsc_src mod_summary)
+        dflags <- getDynFlags
+        logger <- getLogger
+        -- Report the warnings from both typechecking and desugar together
+        liftIO $ printOrThrowWarnings logger dflags (unionBags tc_warnings ds_warnings)
         return (HscOut src_flavour mod_name mod_summary result,
                panic "HscOut doesn't have an input filename")
 

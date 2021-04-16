@@ -25,6 +25,7 @@ import GHC.Driver.Plugins
 import GHC.Utils.Fingerprint ( Fingerprint )
 import GHC.Utils.TmpFs (TempFileLifetime)
 
+import GHC.Types.Error ( WarningMessages )
 import GHC.Types.SourceFile
 
 import GHC.Unit.Home.ModInfo
@@ -55,7 +56,7 @@ instance MonadIO CompPipeline where
 
 data PhasePlus = RealPhase Phase
                | HscOut HscSource ModuleName ModSummary HscStatus
-               | HscPostTc ModSummary FrontendResult (Maybe Fingerprint)
+               | HscPostTc ModSummary FrontendResult WarningMessages (Maybe Fingerprint)
 
 instance Outputable PhasePlus where
     ppr (RealPhase p) = ppr p
