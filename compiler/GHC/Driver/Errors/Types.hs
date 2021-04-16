@@ -2,7 +2,7 @@
 
 module GHC.Driver.Errors.Types (
     GhcMessage(..)
-  , DriverMessage(..)
+  , DriverMessage(..), DriverMessages
   , WarningMessages
   , ErrorMessages
   , WarnMsg
@@ -121,3 +121,6 @@ data DriverMessage
   | DriverPsHeaderMessage !PsErrorDesc ![Hint]
   -- ^ A parse error in parsing a Haskell file header during dependency
   -- analysis
+
+-- | A collection of driver messages
+type DriverMessages = Messages DriverMessage
