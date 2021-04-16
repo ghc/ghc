@@ -2,11 +2,8 @@
 
 module GHC.Tc.Errors.Ppr where
 
-import GHC.Prelude
-
 import GHC.Tc.Errors.Types
 import GHC.Types.Error
-import GHC.HsToCore.Errors.Ppr () -- instance Diagnostic DsMessage
 
 instance Diagnostic TcRnMessage where
   diagnosticMessage (TcRnUnknownMessage m) = diagnosticMessage m

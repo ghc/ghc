@@ -3,9 +3,7 @@ module GHC.Tc.Errors.Types (
     TcRnMessage(..)
   ) where
 
-import GHC.Prelude
 import GHC.Types.Error
-import GHC.HsToCore.Errors.Types
 
 -- | An error which might arise during typechecking/renaming.
 data TcRnMessage
