@@ -333,8 +333,7 @@ rnImportDecl this_mod
         Just (False, _) -> return () -- Explicit import list
         _  | implicit   -> return () -- Do not bleat for implicit imports
            | qual_only  -> return ()
-           | otherwise  -> whenWOptM Opt_WarnMissingImportList $
-                           addDiagnostic (WarningWithFlag Opt_WarnMissingImportList)
+           | otherwise  -> addDiagnostic (WarningWithFlag Opt_WarnMissingImportList)
                                          (missingImportListWarn imp_mod_name)
 
     iface <- loadSrcInterface doc imp_mod_name want_boot (fmap sl_fs mb_pkg)
