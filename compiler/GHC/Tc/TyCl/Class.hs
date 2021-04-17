@@ -556,7 +556,8 @@ warnMissingAT name
        -- hs-boot and signatures never need to provide complete "definitions"
        -- of any sort, as they aren't really defining anything, but just
        -- constraining items which are defined elsewhere.
-       ; diagnosticTc (WarningWithFlag Opt_WarnMissingMethods) (warn && hsc_src == HsSrcFile)
-                      (text "No explicit" <+> text "associated type"
-                          <+> text "or default declaration for"
-                          <+> quotes (ppr name)) }
+       ; when (hsc_src == HsSrcFile) $
+          addDiagnosticTc (WarningWithFlag Opt_WarnMissingMethods)
+            (text "No explicit" <+> text "associated type"
+                <+> text "or default declaration for"
+                <+> quotes (ppr name)) }
