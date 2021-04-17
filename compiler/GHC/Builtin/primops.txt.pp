@@ -2329,6 +2329,39 @@ primop  CasAddrOp_Word64 "atomicCasWord64Addr#" GenPrimOp
    with has_side_effects = True
         can_fail         = True
 
+primop  CasAddrOp2_Word32 "atomicCas2Word32Addr#" GenPrimOp
+   Addr# -> Word32# -> Word32# -> Word32# -> Word32# -> State# s -> (# State#
+   s, Word32# , Word32# #)
+   { Compare and swap on a 64 bit-sized and aligned memory location. Expected
+     and desired value are passed as two 32-bit words in little-endian order.
+
+     Use as: \s -> atomicCas2Word32Addr# location expected desired s
+
+     This version always returns the old value read. This follows the normal
+     protocol for CAS operations (and matches the underlying instruction on
+     most architectures).
+
+     Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail         = True
+
+primop  CasAddrOp2_Word "atomicCas2WordAddr#" GenPrimOp
+   Addr# -> Word# -> Word# -> Word# -> Word# -> State# s -> (# State# s,
+   Word#, Word# #)
+   { Compare and swap on a 128 bit-sized and aligned memory location. Expected
+     and desired value are passed as two 64-bit words in little-endian order.
+
+     Use as: \s -> atomicCas2WordAddr# location expected_lo expected_hi
+     desired_lo desired_hi s
+
+     This version always returns the two old values read. This follows the normal
+     protocol for CAS operations (and matches the underlying instruction on
+     most architectures).
+
+     Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail         = True
+
 primop FetchAddAddrOp_Word "fetchAddWordAddr#" GenPrimOp
    Addr# -> Word# -> State# s -> (# State# s, Word# #)
    {Given an address, and a value to add,

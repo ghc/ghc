@@ -947,6 +947,7 @@ pprCallishMachOp_for_C mop
         MO_Ctz w            -> ftext (ctzLabel w)
         MO_AtomicRMW w amop -> ftext (atomicRMWLabel w amop)
         MO_Cmpxchg w        -> ftext (cmpxchgLabel w)
+        MO_Cmpxchg2 _       -> unsupported
         MO_Xchg w           -> ftext (xchgLabel w)
         MO_AtomicRead w     -> ftext (atomicReadLabel w)
         MO_AtomicWrite w    -> ftext (atomicWriteLabel w)
@@ -999,7 +1000,7 @@ pprCallishMachOp_for_C mop
     where unsupported = panic ("pprCallishMachOp_for_C: " ++ show mop
                             ++ " not supported!")
           dontReach64 = panic ("pprCallishMachOp_for_C: " ++ show mop
-                            ++ " should be not be encountered because the regular primop for this 64-bit operation is used instead.")
+                           ++ " should be not be encountered because the regular primop for this 64-bit operation is used instead.")
 
 -- ---------------------------------------------------------------------
 -- Useful #defines

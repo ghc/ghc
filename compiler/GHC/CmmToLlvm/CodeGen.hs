@@ -1017,6 +1017,7 @@ cmmPrimOpFunctions mop = do
     MO_AtomicRMW _ _ -> unsupported
     MO_AtomicWrite _ -> unsupported
     MO_Cmpxchg _     -> unsupported
+    MO_Cmpxchg2 _    -> unsupported
     MO_Xchg _        -> unsupported
 
     MO_I64_ToI       -> dontReach64

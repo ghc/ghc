@@ -676,6 +676,7 @@ data CallishMachOp
   | MO_Cmpxchg Width
   -- | Atomic swap. Arguments are @[dest, new]@
   | MO_Xchg Width
+  | MO_Cmpxchg2 Width
 
   -- These rts provided functions are special: suspendThread releases the
   -- capability, hence we mustn't sink any use of data stored in the capability

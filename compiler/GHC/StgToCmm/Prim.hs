@@ -850,6 +850,7 @@ emitPrimOp cfg primop =
   CasAddrOp_Word64 -> \[dst, expected, new] -> opIntoRegs $ \[res] ->
     emitPrimCall [res] (MO_Cmpxchg W64) [dst, expected, new]
 
+
 -- SIMD primops
   (VecBroadcastOp vcat n w) -> \[e] -> opIntoRegs $ \[res] -> do
     checkVecCompatibility cfg vcat n w
@@ -1534,6 +1535,16 @@ emitPrimOp cfg primop =
     if allowFab
     then Left MO_F64_Fabs
     else Right $ genericFabsOp W64
+
+  CasAddrOp2_Word32 -> \args -> opCallishHandledLater args $
+    if ncg && x86ish
+    then Left $ MO_Cmpxchg2 W32
+    else panic "CasAddrOp2_Word32"
+
+  CasAddrOp2_Word -> \args -> opCallishHandledLater args $
+    if ncg && x86ish
+    then Left $ MO_Cmpxchg2 (wordWidth platform)
+    else panic "CasAddrOp2_Word"
 
   -- tagToEnum# is special: we need to pull the constructor
   -- out of the table, and perform an appropriate return.
