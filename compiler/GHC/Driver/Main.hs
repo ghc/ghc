@@ -1478,12 +1478,11 @@ markUnsafeInfer tcg_env whyUnsafe = do
     dflags <- getDynFlags
 
     let reason = WarningWithFlag Opt_WarnUnsafe
-    when (wopt Opt_WarnUnsafe dflags)
-         (logDiagnostics $ singleMessage $
-             mkPlainMsgEnvelope dflags (warnUnsafeOnLoc dflags) $
-             GhcDriverMessage $ DriverUnknownMessage $
-             mkPlainDiagnostic reason $
-             whyUnsafe' dflags)
+    logDiagnostics $ singleMessage $
+        mkPlainMsgEnvelope dflags (warnUnsafeOnLoc dflags) $
+        GhcDriverMessage $ DriverUnknownMessage $
+        mkPlainDiagnostic reason $
+        whyUnsafe' dflags
 
     liftIO $ writeIORef (tcg_safe_infer tcg_env) False
     liftIO $ writeIORef (tcg_safe_infer_reasons tcg_env) emptyMessages
