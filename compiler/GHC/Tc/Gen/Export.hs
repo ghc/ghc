@@ -283,8 +283,8 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
     exports_from_item (ExportAccum occs earlier_mods)
                       (L loc ie@(IEModuleContents _ lmod@(L _ mod)))
         | mod `elementOfUniqSet` earlier_mods    -- Duplicate export of M
-        = do { warnIfFlag Opt_WarnDuplicateExports True
-                          (dupModuleExport mod) ;
+        = do { addDiagnostic (WarningWithFlag Opt_WarnDuplicateExports)
+                             (dupModuleExport mod) ;
                return Nothing }
 
         | otherwise
