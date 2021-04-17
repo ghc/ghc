@@ -1165,7 +1165,7 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
             -- Warn when importing T(..) if T was exported abstractly
             emit_warning (DodgyImport n) = whenWOptM Opt_WarnDodgyImports $
               addDiagnostic (WarningWithFlag Opt_WarnDodgyImports) (dodgyImportWarn n)
-            emit_warning MissingImportList = whenWOptM Opt_WarnMissingImportList $
+            emit_warning MissingImportList =
               addDiagnostic (WarningWithFlag Opt_WarnMissingImportList) (missingImportListItem ieRdr)
             emit_warning (BadImportW ie) = whenWOptM Opt_WarnDodgyImports $
               addDiagnostic (WarningWithFlag Opt_WarnDodgyImports) (lookup_err_msg (BadImport ie))
