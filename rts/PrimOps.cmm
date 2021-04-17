@@ -264,6 +264,58 @@ stg_casIntArrayzh( gcptr arr, W_ ind, W_ old, W_ new )
 }
 
 
+stg_casInt8Arrayzh( gcptr arr, W_ ind, I8 old, I8 new )
+/* MutableByteArray# s -> Int# -> Int8# -> Int8# -> State# s -> (# State# s, Int8# #) */
+{
+    W_ p;
+    I8 h;
+
+    p = arr + SIZEOF_StgArrBytes + ind;
+    (h) = prim %cmpxchg8(p, old, new);
+
+    return(h);
+}
+
+
+stg_casInt16Arrayzh( gcptr arr, W_ ind, I16 old, I16 new )
+/* MutableByteArray# s -> Int# -> Int16# -> Int16# -> State# s -> (# State# s, Int16# #) */
+{
+    W_ p;
+    I16 h;
+
+    p = arr + SIZEOF_StgArrBytes + ind*2;
+    (h) = prim %cmpxchg16(p, old, new);
+
+    return(h);
+}
+
+
+stg_casInt32Arrayzh( gcptr arr, W_ ind, I32 old, I32 new )
+/* MutableByteArray# s -> Int# -> Int32# -> Int32# -> State# s -> (# State# s, Int32# #) */
+{
+    W_ p;
+    I32 h;
+
+    p = arr + SIZEOF_StgArrBytes + ind*4;
+    (h) = prim %cmpxchg32(p, old, new);
+
+    return(h);
+}
+
+
+stg_casInt64Arrayzh( gcptr arr, W_ ind, I64 old, I64 new )
+/* MutableByteArray# s -> Int# -> Int64# -> Int64# -> State# s -> (# State# s, Int64# #) */
+{
+    W_ p;
+    I64 h;
+
+    p = arr + SIZEOF_StgArrBytes + ind*8;
+    (h) = prim %cmpxchg64(p, old, new);
+
+    return(h);
+}
+
+
 stg_newArrayzh ( W_ n /* words */, gcptr init )
 {
     W_ words, size, p;
