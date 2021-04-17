@@ -595,8 +595,7 @@ tcRnModule' sum save_rn_syntax mod = do
                        mkPlainMsgEnvelope dflags (WarningWithFlag Opt_WarnSafe)
                                           (warnSafeOnLoc dflags) $
                        errSafe tcg_res')
-              False | safeHaskell dflags == Sf_Trustworthy &&
-                      wopt Opt_WarnTrustworthySafe dflags ->
+              False | safeHaskell dflags == Sf_Trustworthy ->
                       (logDiagnostics $ unitBag $
                        mkPlainMsgEnvelope dflags (WarningWithFlag Opt_WarnTrustworthySafe)
                                           (trustworthyOnLoc dflags) $
