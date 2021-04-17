@@ -40,7 +40,7 @@ module GHC.HsToCore.Monad (
         dsGetCompleteMatches,
 
         -- Warnings and errors
-        DsWarning, diagnosticDs, warnIfSetDs, errDs, errDsCoreExpr,
+        DsWarning, diagnosticDs, errDs, errDsCoreExpr,
         failWithDs, failDs, discardWarningsDs,
         askNoErrsDs,
 
@@ -455,7 +455,10 @@ putSrcSpanDsA :: SrcSpanAnn' ann -> DsM a -> DsM a
 putSrcSpanDsA loc = putSrcSpanDs (locA loc)
 
 -- | Emit a diagnostic for the current source location
--- NB: Warns whether or not -Wxyz is set
+-- If the diagnostic is not relevant given the particular `DynFlags`
+-- configuration, it will be suppressed.
+-- See Note [Discarding Messages] and Note [Suppressing Messages], both in
+-- GHC.Types.Error
 diagnosticDs :: DiagnosticReason -> SDoc -> DsM ()
 diagnosticDs reason warn
   = do { env <- getGblEnv
@@ -463,12 +466,6 @@ diagnosticDs reason warn
        ; dflags <- getDynFlags
        ; let msg = mkShortMsgEnvelope dflags reason loc (ds_unqual env) warn
        ; updMutVar (ds_msgs env) (\ msgs -> msg `addMessage` msgs) }
-
--- | Emit a warning only if the correct WarningWithoutFlag is set in the DynFlags
-warnIfSetDs :: WarningFlag -> SDoc -> DsM ()
-warnIfSetDs flag warn
-  = whenWOptM flag $
-    diagnosticDs (WarningWithFlag flag) warn
 
 errDs :: SDoc -> DsM ()
 errDs err
