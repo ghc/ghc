@@ -266,6 +266,13 @@ Both approaches have been evaluated, but we settled on the "SevIgnore one" for a
   turn a 'SevIgnore' into something else, for example to "unsuppress" diagnostics if a flag is
   set: with this approach, we have more leeway to accommodate new features.
 
+The above implies we may add warning-related diagnostics using the
+'mkMsgEnvelope' functions without first checking how the relevant 'WarningFlag'
+is set: if needed, the function will create a suppressed diagnostic. However, we
+might still want to check the relevant flag before adding a diagnostic, as an
+optimisation, when the diagnostic would be expensive to construct. In this case
+a check like `when (wopt Opt_WarnFoo dFlags) ...` is fine.
+
 -}
 
 
