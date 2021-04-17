@@ -10,7 +10,9 @@ import Foreign.Marshal.Alloc
 import Foreign.Ptr
 import Foreign.Storable
 import GHC.Exts
+import GHC.Int
 import GHC.IO
+import GHC.Word
 
 -- | Iterations per worker.
 iters :: Word
@@ -25,6 +27,10 @@ main = do
     fetchOrTest
     fetchXorTest
     casTest
+    cas8Test
+    cas16Test
+    cas32Test
+    cas64Test
     readWriteTest
     -- Addr#
     fetchAddSubAddrTest
@@ -33,6 +39,10 @@ main = do
     fetchOrAddrTest
     fetchXorAddrTest
     casAddrTest
+    casAddr8Test
+    casAddr16Test
+    casAddr32Test
+    casAddr64Test
     readWriteAddrTest
 
 loop :: Word -> IO () -> IO ()
@@ -202,6 +212,62 @@ casTest = do
         old' <- casIntArray mba ix old (old + n)
         when (old /= old') $ add mba ix n
 
+cas8Test :: IO ()
+cas8Test = do
+    tot <- race 0
+        (\ mba -> loop iters $ add mba 0 1)
+        (\ mba -> loop iters $ add mba 0 2)
+    assertEq (fromIntegral ((3 * fromIntegral iters) :: Word8)) tot "cas8Test"
+  where
+    -- Fetch-and-add implemented using CAS.
+    add :: MByteArray -> Int -> Int8 -> IO ()
+    add mba ix n = do
+        old <- readInt8Array mba ix
+        old' <- casInt8Array mba ix old (old + n)
+        when (old /= old') $ add mba ix n
+
+cas16Test :: IO ()
+cas16Test = do
+    tot <- race 0
+        (\ mba -> loop iters $ add mba 0 1)
+        (\ mba -> loop iters $ add mba 0 2)
+    assertEq (fromIntegral ((3 * fromIntegral iters) :: Word16)) tot "cas16Test"
+  where
+    -- Fetch-and-add implemented using CAS.
+    add :: MByteArray -> Int -> Int16 -> IO ()
+    add mba ix n = do
+        old <- readInt16Array mba ix
+        old' <- casInt16Array mba ix old (old + n)
+        when (old /= old') $ add mba ix n
+
+cas32Test :: IO ()
+cas32Test = do
+    tot <- race 0
+        (\ mba -> loop iters $ add mba 0 1)
+        (\ mba -> loop iters $ add mba 0 2)
+    assertEq (fromIntegral ((3 * fromIntegral iters) :: Word32)) tot "cas32Test"
+  where
+    -- Fetch-and-add implemented using CAS.
+    add :: MByteArray -> Int -> Int32 -> IO ()
+    add mba ix n = do
+        old <- readInt32Array mba ix
+        old' <- casInt32Array mba ix old (old + n)
+        when (old /= old') $ add mba ix n
+
+cas64Test :: IO ()
+cas64Test = do
+    tot <- race 0
+        (\ mba -> loop iters $ add mba 0 1)
+        (\ mba -> loop iters $ add mba 0 2)
+    assertEq (3 * fromIntegral iters) tot "cas64Test"
+  where
+    -- Fetch-and-add implemented using CAS.
+    add :: MByteArray -> Int -> Int64 -> IO ()
+    add mba ix n = do
+        old <- readInt64Array mba ix
+        old' <- casInt64Array mba ix old (old + n)
+        when (old /= old') $ add mba ix n
+
 -- | Test atomicCasWordAddr# by having two threads concurrently increment a
 -- counter, checking the sum at the end.
 casAddrTest :: IO ()
@@ -217,6 +283,69 @@ casAddrTest = do
       where
         go old = do
             old' <- atomicCasWordPtr ptr old (old + n)
+            when (old /= old') $ go old'
+
+casAddr8Test :: IO ()
+casAddr8Test = do
+    tot <- race8Addr 0
+        (\ addr -> loop iters $ add addr 1)
+        (\ addr -> loop iters $ add addr 2)
+    assertEq (fromIntegral (fromIntegral (3 * iters) :: Word8))
+             (fromIntegral tot) "casAddr8Test"
+  where
+    -- Fetch-and-add implemented using CAS.
+    add :: Ptr Word8 -> Word8 -> IO ()
+    add ptr n = peek ptr >>= go
+      where
+        go old = do
+            old' <- atomicCasWord8Ptr ptr old (old + n)
+            when (old /= old') $ go old'
+
+casAddr16Test :: IO ()
+casAddr16Test = do
+    tot <- race16Addr 0
+        (\ addr -> loop iters $ add addr 1)
+        (\ addr -> loop iters $ add addr 2)
+    assertEq (fromIntegral (fromIntegral (3 * iters) :: Word16))
+             (fromIntegral tot) "casAddr16Test"
+  where
+    -- Fetch-and-add implemented using CAS.
+    add :: Ptr Word16 -> Word16 -> IO ()
+    add ptr n = peek ptr >>= go
+      where
+        go old = do
+            old' <- atomicCasWord16Ptr ptr old (old + n)
+            when (old /= old') $ go old'
+
+casAddr32Test :: IO ()
+casAddr32Test = do
+    tot <- race32Addr 0
+        (\ addr -> loop iters $ add addr 1)
+        (\ addr -> loop iters $ add addr 2)
+    assertEq (fromIntegral (fromIntegral (3 * iters) :: Word32))
+             (fromIntegral tot) "casAddr32Test"
+  where
+    -- Fetch-and-add implemented using CAS.
+    add :: Ptr Word32 -> Word32 -> IO ()
+    add ptr n = peek ptr >>= go
+      where
+        go old = do
+            old' <- atomicCasWord32Ptr ptr old (old + n)
+            when (old /= old') $ go old'
+
+casAddr64Test :: IO ()
+casAddr64Test = do
+    tot <- race64Addr 0
+        (\ addr -> loop iters $ add addr 1)
+        (\ addr -> loop iters $ add addr 2)
+    assertEq (3 * iters) (fromIntegral tot) "casAddr64Test"
+  where
+    -- Fetch-and-add implemented using CAS.
+    add :: Ptr Word64 -> Word64 -> IO ()
+    add ptr n = peek ptr >>= go
+      where
+        go old = do
+            old' <- atomicCasWord64Ptr ptr old (old + n)
             when (old /= old') $ go old'
 
 
@@ -286,6 +415,62 @@ raceAddr n0 thread1 thread2 = do
     mapM_ takeMVar [done1, done2]
     peek ptr
 
+race8Addr :: Word8                -- ^ Initial value of array element
+         -> (Ptr Word8 -> IO ())  -- ^ Thread 1 action
+         -> (Ptr Word8 -> IO ())  -- ^ Thread 2 action
+         -> IO Word8              -- ^ Final value of array element
+race8Addr n0 thread1 thread2 = do
+    done1 <- newEmptyMVar
+    done2 <- newEmptyMVar
+    ptr <- castPtr <$> callocBytes (sizeOf (undefined :: Word8))
+    poke ptr n0
+    forkIO $ thread1 ptr >> putMVar done1 ()
+    forkIO $ thread2 ptr >> putMVar done2 ()
+    mapM_ takeMVar [done1, done2]
+    peek ptr
+
+race16Addr :: Word16                -- ^ Initial value of array element
+          -> (Ptr Word16 -> IO ())  -- ^ Thread 1 action
+          -> (Ptr Word16 -> IO ())  -- ^ Thread 2 action
+          -> IO Word16              -- ^ Final value of array element
+race16Addr n0 thread1 thread2 = do
+    done1 <- newEmptyMVar
+    done2 <- newEmptyMVar
+    ptr <- castPtr <$> callocBytes (sizeOf (undefined :: Word16))
+    poke ptr n0
+    forkIO $ thread1 ptr >> putMVar done1 ()
+    forkIO $ thread2 ptr >> putMVar done2 ()
+    mapM_ takeMVar [done1, done2]
+    peek ptr
+
+race32Addr :: Word32                -- ^ Initial value of array element
+          -> (Ptr Word32 -> IO ())  -- ^ Thread 1 action
+          -> (Ptr Word32 -> IO ())  -- ^ Thread 2 action
+          -> IO Word32              -- ^ Final value of array element
+race32Addr n0 thread1 thread2 = do
+    done1 <- newEmptyMVar
+    done2 <- newEmptyMVar
+    ptr <- castPtr <$> callocBytes (sizeOf (undefined :: Word32))
+    poke ptr n0
+    forkIO $ thread1 ptr >> putMVar done1 ()
+    forkIO $ thread2 ptr >> putMVar done2 ()
+    mapM_ takeMVar [done1, done2]
+    peek ptr
+
+race64Addr :: Word64                -- ^ Initial value of array element
+          -> (Ptr Word64 -> IO ())  -- ^ Thread 1 action
+          -> (Ptr Word64 -> IO ())  -- ^ Thread 2 action
+          -> IO Word64              -- ^ Final value of array element
+race64Addr n0 thread1 thread2 = do
+    done1 <- newEmptyMVar
+    done2 <- newEmptyMVar
+    ptr <- castPtr <$> callocBytes (sizeOf (undefined :: Word64))
+    poke ptr n0
+    forkIO $ thread1 ptr >> putMVar done1 ()
+    forkIO $ thread2 ptr >> putMVar done2 ()
+    mapM_ takeMVar [done1, done2]
+    peek ptr
+
 ------------------------------------------------------------------------
 -- Test helper
 
@@ -347,6 +532,26 @@ readIntArray (MBA mba#) (I# ix#) = IO $ \ s# ->
     case readIntArray# mba# ix# s# of
         (# s2#, n# #) -> (# s2#, I# n# #)
 
+readInt8Array :: MByteArray -> Int -> IO Int8
+readInt8Array (MBA mba#) (I# ix#) = IO $ \ s# ->
+    case readInt8Array# mba# ix# s# of
+        (# s2#, n# #) -> (# s2#, I8# n# #)
+
+readInt16Array :: MByteArray -> Int -> IO Int16
+readInt16Array (MBA mba#) (I# ix#) = IO $ \ s# ->
+    case readInt16Array# mba# ix# s# of
+        (# s2#, n# #) -> (# s2#, I16# n# #)
+
+readInt32Array :: MByteArray -> Int -> IO Int32
+readInt32Array (MBA mba#) (I# ix#) = IO $ \ s# ->
+    case readInt32Array# mba# ix# s# of
+        (# s2#, n# #) -> (# s2#, I32# n# #)
+
+readInt64Array :: MByteArray -> Int -> IO Int64
+readInt64Array (MBA mba#) (I# ix#) = IO $ \ s# ->
+    case readInt64Array# mba# ix# s# of
+        (# s2#, n# #) -> (# s2#, I64# n# #)
+
 atomicWriteIntArray :: MByteArray -> Int -> Int -> IO ()
 atomicWriteIntArray (MBA mba#) (I# ix#) (I# n#) = IO $ \ s# ->
     case atomicWriteIntArray# mba# ix# n# s# of
@@ -361,6 +566,26 @@ casIntArray :: MByteArray -> Int -> Int -> Int -> IO Int
 casIntArray (MBA mba#) (I# ix#) (I# old#) (I# new#) = IO $ \ s# ->
     case casIntArray# mba# ix# old# new# s# of
         (# s2#, old2# #) -> (# s2#, I# old2# #)
+
+casInt8Array :: MByteArray -> Int -> Int8 -> Int8 -> IO Int8
+casInt8Array (MBA mba#) (I# ix#) (I8# old#) (I8# new#) = IO $ \ s# ->
+    case casInt8Array# mba# ix# old# new# s# of
+        (# s2#, old2# #) -> (# s2#, I8# old2# #)
+
+casInt16Array :: MByteArray -> Int -> Int16 -> Int16 -> IO Int16
+casInt16Array (MBA mba#) (I# ix#) (I16# old#) (I16# new#) = IO $ \ s# ->
+    case casInt16Array# mba# ix# old# new# s# of
+        (# s2#, old2# #) -> (# s2#, I16# old2# #)
+
+casInt32Array :: MByteArray -> Int -> Int32 -> Int32 -> IO Int32
+casInt32Array (MBA mba#) (I# ix#) (I32# old#) (I32# new#) = IO $ \ s# ->
+    case casInt32Array# mba# ix# old# new# s# of
+        (# s2#, old2# #) -> (# s2#, I32# old2# #)
+
+casInt64Array :: MByteArray -> Int -> Int64 -> Int64 -> IO Int64
+casInt64Array (MBA mba#) (I# ix#) (I64# old#) (I64# new#) = IO $ \ s# ->
+    case casInt64Array# mba# ix# old# new# s# of
+        (# s2#, old2# #) -> (# s2#, I64# old2# #)
 
 ------------------------------------------------------------------------
 -- Wrappers around Addr#
@@ -411,3 +636,20 @@ atomicCasWordPtr :: Ptr Word -> Word -> Word -> IO Word
 atomicCasWordPtr (Ptr addr#) (W# old#) (W# new#) = IO $ \ s# ->
     case atomicCasWordAddr# addr# old# new# s# of
         (# s2#, old2# #) -> (# s2#, W# old2# #)
+
+atomicCasWord8Ptr :: Ptr Word8 -> Word8 -> Word8 -> IO Word8
+atomicCasWord8Ptr (Ptr addr#) (W8# old#) (W8# new#) = IO $ \ s# ->
+    case atomicCasWord8Addr# addr# old# new# s# of
+        (# s2#, old2# #) -> (# s2#, W8# old2# #)
+atomicCasWord16Ptr :: Ptr Word16 -> Word16 -> Word16 -> IO Word16
+atomicCasWord16Ptr (Ptr addr#) (W16# old#) (W16# new#) = IO $ \ s# ->
+    case atomicCasWord16Addr# addr# old# new# s# of
+        (# s2#, old2# #) -> (# s2#, W16# old2# #)
+atomicCasWord32Ptr :: Ptr Word32 -> Word32 -> Word32 -> IO Word32
+atomicCasWord32Ptr (Ptr addr#) (W32# old#) (W32# new#) = IO $ \ s# ->
+    case atomicCasWord32Addr# addr# old# new# s# of
+        (# s2#, old2# #) -> (# s2#, W32# old2# #)
+atomicCasWord64Ptr :: Ptr Word64 -> Word64 -> Word64 -> IO Word64
+atomicCasWord64Ptr (Ptr addr#) (W64# old#) (W64# new#) = IO $ \ s# ->
+    case atomicCasWord64Addr# addr# old# new# s# of
+        (# s2#, old2# #) -> (# s2#, W64# old2# #)

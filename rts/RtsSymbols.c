@@ -721,6 +721,10 @@
       SymI_HasProto(stg_newBCOzh)                                       \
       SymI_HasProto(stg_newByteArrayzh)                                 \
       SymI_HasProto(stg_casIntArrayzh)                                  \
+      SymI_HasProto(stg_casInt8Arrayzh)                                 \
+      SymI_HasProto(stg_casInt16Arrayzh)                                \
+      SymI_HasProto(stg_casInt32Arrayzh)                                \
+      SymI_HasProto(stg_casInt64Arrayzh)                                \
       SymI_HasProto(stg_newMVarzh)                                      \
       SymI_HasProto(stg_newMutVarzh)                                    \
       SymI_HasProto(stg_newTVarzh)                                      \
