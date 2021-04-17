@@ -1583,6 +1583,8 @@ warnUnusedImportDecls gbl_env hsc_src
                        (vcat [ text "Uses:" <+> ppr uses
                              , text "Import usage" <+> ppr usage])
 
+       -- These warnings are costly to construct, so only do so if we will end
+       -- up actually emitting them (i.e. if the relevant flag is actually set).
        ; whenWOptM Opt_WarnUnusedImports $
          mapM_ (warnUnusedImport Opt_WarnUnusedImports fld_env) usage
 
