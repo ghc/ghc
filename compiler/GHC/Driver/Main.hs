@@ -562,8 +562,7 @@ tcRnModule' sum save_rn_syntax mod = do
 
     let reason = WarningWithFlag Opt_WarnMissingSafeHaskellMode
     -- -Wmissing-safe-haskell-mode
-    when (not (safeHaskellModeEnabled dflags)
-          && wopt Opt_WarnMissingSafeHaskellMode dflags) $
+    unless (safeHaskellModeEnabled dflags) $
         logDiagnostics $ unitBag $
         mkPlainMsgEnvelope dflags reason (getLoc (hpm_module mod)) $
         warnMissingSafeHaskellMode
