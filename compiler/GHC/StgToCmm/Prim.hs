@@ -1072,6 +1072,14 @@ emitPrimOp dflags primop = case primop of
     doAtomicWriteByteArray mba ix (bWord platform) val
   CasByteArrayOp_Int -> \[mba, ix, old, new] -> opIntoRegs $ \[res] ->
     doCasByteArray res mba ix (bWord platform) old new
+  CasByteArrayOp_Int8 -> \[mba, ix, old, new] -> opIntoRegs $ \[res] ->
+    doCasByteArray res mba ix b8 old new
+  CasByteArrayOp_Int16 -> \[mba, ix, old, new] -> opIntoRegs $ \[res] ->
+    doCasByteArray res mba ix b16 old new
+  CasByteArrayOp_Int32 -> \[mba, ix, old, new] -> opIntoRegs $ \[res] ->
+    doCasByteArray res mba ix b32 old new
+  CasByteArrayOp_Int64 -> \[mba, ix, old, new] -> opIntoRegs $ \[res] ->
+    doCasByteArray res mba ix b64 old new
 
 -- The rest just translate straightforwardly
 
@@ -3049,7 +3057,7 @@ doCasByteArray
 doCasByteArray res mba idx idx_ty old new = do
     profile <- getProfile
     platform <- getPlatform
-    let width = (typeWidth idx_ty)
+    let width = typeWidth idx_ty
         addr = cmmIndexOffExpr platform (arrWordsHdrSize profile)
                width mba idx
     emitPrimCall
