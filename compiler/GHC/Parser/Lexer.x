@@ -45,6 +45,10 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE UnboxedSums #-}
+{-# LANGUAGE UnliftedNewtypes #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
@@ -53,7 +57,7 @@ module GHC.Parser.Lexer (
    Token(..), lexer, lexerDbg,
    ParserOpts(..), mkParserOpts,
    PState (..), initParserState, initPragState,
-   P(..), ParseResult(..),
+   P(..), ParseResult(POk, PFailed),
    allocateComments, allocatePriorComments, allocateFinalComments,
    MonadP(..),
    getRealSrcLoc, getPState,
@@ -2273,17 +2277,25 @@ data LayoutContext
   deriving Show
 
 -- | The result of running a parser.
-data ParseResult a
-  = POk      -- ^ The parser has consumed a (possibly empty) prefix
-             --   of the input and produced a result. Use 'getMessages'
-             --   to check for accumulated warnings and non-fatal errors.
-      PState -- ^ The resulting parsing state. Can be used to resume parsing.
-      a      -- ^ The resulting value.
-  | PFailed  -- ^ The parser has consumed a (possibly empty) prefix
-             --   of the input and failed.
-      PState -- ^ The parsing state right before failure, including the fatal
-             --   parse error. 'getMessages' and 'getErrorMessages' must return
-             --   a non-empty bag of errors.
+newtype ParseResult a = PR (# (# PState, a #) | PState #)
+
+-- | The parser has consumed a (possibly empty) prefix of the input and produced
+-- a result. Use 'getMessages' to check for accumulated warnings and non-fatal
+-- errors.
+--
+-- The carried parsing state can be used to resume parsing.
+pattern POk :: PState -> a -> ParseResult a
+pattern POk s a = PR (# (# s , a #) | #)
+
+-- | The parser has consumed a (possibly empty) prefix of the input and failed.
+--
+-- The carried parsing state can be used to resume parsing. It is the state
+-- right before failure, including the fatal parse error. 'getMessages' and
+-- 'getErrorMessages' must return a non-empty bag of errors.
+pattern PFailed :: PState -> ParseResult a
+pattern PFailed s = PR (# | s #)
+
+{-# COMPLETE POk, PFailed #-}
 
 -- | Test whether a 'WarningFlag' is set
 warnopt :: WarningFlag -> ParserOpts -> Bool
@@ -3024,7 +3036,7 @@ srcParseErr
 srcParseErr options buf len loc = PsError (PsErrParse token) suggests loc
   where
    token = lexemeToString (offsetBytes (-len) buf) len
-   pattern = decodePrevNChars 8 buf
+   pattern_ = decodePrevNChars 8 buf
    last100 = decodePrevNChars 100 buf
    doInLast100 = "do" `isInfixOf` last100
    mdoInLast100 = "mdo" `isInfixOf` last100
@@ -3036,7 +3048,7 @@ srcParseErr options buf len loc = PsError (PsErrParse token) suggests loc
    sug_rdo = sug (token == "<-" && mdoInLast100)           SuggestRecursiveDo
    sug_do  = sug (token == "<-" && not mdoInLast100)       SuggestDo
    sug_let = sug (token == "=" && doInLast100)             SuggestLetInDo         -- #15849
-   sug_pat = sug (not ps_enabled && pattern == "pattern ") SuggestPatternSynonyms -- #12429
+   sug_pat = sug (not ps_enabled && pattern_ == "pattern ") SuggestPatternSynonyms -- #12429
    suggests
          | null token = []
          | otherwise  = catMaybes [sug_th, sug_rdo, sug_do, sug_let, sug_pat]
