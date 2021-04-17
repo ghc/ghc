@@ -1167,7 +1167,7 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
               addDiagnostic (WarningWithFlag Opt_WarnDodgyImports) (dodgyImportWarn n)
             emit_warning MissingImportList =
               addDiagnostic (WarningWithFlag Opt_WarnMissingImportList) (missingImportListItem ieRdr)
-            emit_warning (BadImportW ie) = whenWOptM Opt_WarnDodgyImports $
+            emit_warning (BadImportW ie) =
               addDiagnostic (WarningWithFlag Opt_WarnDodgyImports) (lookup_err_msg (BadImport ie))
 
             run_lookup :: IELookupM a -> TcRn (Maybe a)
