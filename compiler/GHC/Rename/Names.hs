@@ -1163,7 +1163,7 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
              return [ (L loc ie, avail) | (ie,avail) <- stuff ]
         where
             -- Warn when importing T(..) if T was exported abstractly
-            emit_warning (DodgyImport n) = whenWOptM Opt_WarnDodgyImports $
+            emit_warning (DodgyImport n) =
               addDiagnostic (WarningWithFlag Opt_WarnDodgyImports) (dodgyImportWarn n)
             emit_warning MissingImportList =
               addDiagnostic (WarningWithFlag Opt_WarnMissingImportList) (missingImportListItem ieRdr)
