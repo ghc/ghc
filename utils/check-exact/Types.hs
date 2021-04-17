@@ -63,14 +63,10 @@ mkAnnKey ld =
 
 type Pos = (Int,Int)
 
-deltaRow, deltaColumn :: DeltaPos -> Int
-deltaRow (DP r _) = r
-deltaColumn (DP _ c) = c
-
 -- ---------------------------------------------------------------------
 
 annNone :: Annotation
-annNone = Ann (DP 0 0) [] [] [] Nothing Nothing
+annNone = Ann (SameLine 0) [] [] [] Nothing Nothing
 
 data Annotation = Ann
   {
