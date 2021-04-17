@@ -236,8 +236,7 @@ exports_from_avail Nothing rdr_env _imports _this_mod
    -- so that's how we handle it, except we also export the data family
    -- when a data instance is exported.
   = do {
-    ; warnIfFlag Opt_WarnMissingExportList
-        True
+    ; addDiagnostic (WarningWithFlag Opt_WarnMissingExportList)
         (missingModuleExportWarn $ moduleName _this_mod)
     ; let avails =
             map fix_faminst . gresToAvailInfo
