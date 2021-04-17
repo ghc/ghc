@@ -604,8 +604,7 @@ tcRnModule' sum save_rn_syntax mod = do
                        GhcDriverMessage $ DriverUnknownMessage $
                        mkPlainDiagnostic (WarningWithFlag Opt_WarnSafe) $
                        errSafe tcg_res')
-              False | safeHaskell dflags == Sf_Trustworthy &&
-                      wopt Opt_WarnTrustworthySafe dflags ->
+              False | safeHaskell dflags == Sf_Trustworthy ->
                       (logDiagnostics $ singleMessage $
                        mkPlainMsgEnvelope dflags (trustworthyOnLoc dflags) $
                        GhcDriverMessage $ DriverUnknownMessage $
