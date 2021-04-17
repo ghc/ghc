@@ -1927,6 +1927,46 @@ primop CasByteArrayOp_Int "casIntArray#" GenPrimOp
    with has_side_effects = True
         can_fail = True
 
+primop CasByteArrayOp_Int8 "casInt8Array#" GenPrimOp
+   MutableByteArray# s -> Int# -> Int8# -> Int8# -> State# s -> (# State# s, Int8# #)
+   {Given an array, an offset in bytes, the expected old value, and
+    the new value, perform an atomic compare and swap i.e. write the new
+    value if the current value matches the provided old value. Returns
+    the value of the element before the operation. Implies a full memory
+    barrier.}
+   with has_side_effects = True
+        can_fail = True
+
+primop CasByteArrayOp_Int16 "casInt16Array#" GenPrimOp
+   MutableByteArray# s -> Int# -> Int16# -> Int16# -> State# s -> (# State# s, Int16# #)
+   {Given an array, an offset in 16 bit units, the expected old value, and
+    the new value, perform an atomic compare and swap i.e. write the new
+    value if the current value matches the provided old value. Returns
+    the value of the element before the operation. Implies a full memory
+    barrier.}
+   with has_side_effects = True
+        can_fail = True
+
+primop CasByteArrayOp_Int32 "casInt32Array#" GenPrimOp
+   MutableByteArray# s -> Int# -> Int32# -> Int32# -> State# s -> (# State# s, Int32# #)
+   {Given an array, an offset in 32 bit units, the expected old value, and
+    the new value, perform an atomic compare and swap i.e. write the new
+    value if the current value matches the provided old value. Returns
+    the value of the element before the operation. Implies a full memory
+    barrier.}
+   with has_side_effects = True
+        can_fail = True
+
+primop CasByteArrayOp_Int64 "casInt64Array#" GenPrimOp
+   MutableByteArray# s -> Int# -> INT64 -> INT64 -> State# s -> (# State# s, INT64 #)
+   {Given an array, an offset in 64 bit units, the expected old value, and
+    the new value, perform an atomic compare and swap i.e. write the new
+    value if the current value matches the provided old value. Returns
+    the value of the element before the operation. Implies a full memory
+    barrier.}
+   with has_side_effects = True
+        can_fail = True
+
 primop FetchAddByteArrayOp_Int "fetchAddIntArray#" GenPrimOp
    MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
    {Given an array, and offset in machine words, and a value to add,
@@ -2378,6 +2418,62 @@ primop  CasAddrOp_Word "atomicCasWordAddr#" GenPrimOp
    { Compare and swap on a word-sized and aligned memory location.
 
      Use as: \s -> atomicCasWordAddr# location expected desired s
+
+     This version always returns the old value read. This follows the normal
+     protocol for CAS operations (and matches the underlying instruction on
+     most architectures).
+
+     Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail         = True
+
+primop  CasAddrOp_Word8 "atomicCasWord8Addr#" GenPrimOp
+   Addr# -> Word8# -> Word8# -> State# s -> (# State# s, Word8# #)
+   { Compare and swap on a 8 bit-sized and aligned memory location.
+
+     Use as: \s -> atomicCasWordAddr8# location expected desired s
+
+     This version always returns the old value read. This follows the normal
+     protocol for CAS operations (and matches the underlying instruction on
+     most architectures).
+
+     Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail         = True
+
+primop  CasAddrOp_Word16 "atomicCasWord16Addr#" GenPrimOp
+   Addr# -> Word16# -> Word16# -> State# s -> (# State# s, Word16# #)
+   { Compare and swap on a 16 bit-sized and aligned memory location.
+
+     Use as: \s -> atomicCasWordAddr16# location expected desired s
+
+     This version always returns the old value read. This follows the normal
+     protocol for CAS operations (and matches the underlying instruction on
+     most architectures).
+
+     Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail         = True
+
+primop  CasAddrOp_Word32 "atomicCasWord32Addr#" GenPrimOp
+   Addr# -> Word32# -> Word32# -> State# s -> (# State# s, Word32# #)
+   { Compare and swap on a 32 bit-sized and aligned memory location.
+
+     Use as: \s -> atomicCasWordAddr32# location expected desired s
+
+     This version always returns the old value read. This follows the normal
+     protocol for CAS operations (and matches the underlying instruction on
+     most architectures).
+
+     Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail         = True
+
+primop  CasAddrOp_Word64 "atomicCasWord64Addr#" GenPrimOp
+   Addr# -> WORD64 -> WORD64 -> State# s -> (# State# s, WORD64 #)
+   { Compare and swap on a 64 bit-sized and aligned memory location.
+
+     Use as: \s -> atomicCasWordAddr64# location expected desired s
 
      This version always returns the old value read. This follows the normal
      protocol for CAS operations (and matches the underlying instruction on
