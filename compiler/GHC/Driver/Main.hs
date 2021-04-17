@@ -1453,9 +1453,8 @@ markUnsafeInfer tcg_env whyUnsafe = do
     dflags <- getDynFlags
 
     let reason = WarningWithFlag Opt_WarnUnsafe
-    when (wopt Opt_WarnUnsafe dflags)
-         (logDiagnostics $ unitBag $
-             mkPlainMsgEnvelope dflags reason (warnUnsafeOnLoc dflags) (whyUnsafe' dflags))
+    logDiagnostics $ unitBag $
+        mkPlainMsgEnvelope dflags reason (warnUnsafeOnLoc dflags) (whyUnsafe' dflags)
 
     liftIO $ writeIORef (tcg_safeInfer tcg_env) (False, whyUnsafe)
     -- NOTE: Only wipe trust when not in an explicitly safe haskell mode. Other
