@@ -56,6 +56,7 @@ module GHC.Driver.Session (
         DynLibLoader(..),
         fFlags, fLangFlags, xFlags,
         wWarningFlags,
+        wWarningFlagMap,
         dynFlagDependencies,
         makeDynFlagsConsistent,
         positionIndependent,
@@ -269,6 +270,8 @@ import Control.Monad.Trans.Except
 import Data.Ord
 import Data.Char
 import Data.List (intercalate, sortBy)
+import Data.Map (Map)
+import qualified Data.Map as Map
 import qualified Data.Set as Set
 import System.FilePath
 import System.Directory
@@ -1259,7 +1262,6 @@ type FatalMessager = String -> IO ()
 
 defaultFatalMessager :: FatalMessager
 defaultFatalMessager = hPutStrLn stderr
-
 
 newtype FlushOut = FlushOut (IO ())
 
@@ -3066,11 +3068,12 @@ useInstead prefix flag turn_on
 nop :: TurnOnFlag -> DynP ()
 nop _ = return ()
 
--- | Find the 'FlagSpec' for a 'WarningFlag'.
 flagSpecOf :: WarningFlag -> Maybe (FlagSpec WarningFlag)
-flagSpecOf flag = listToMaybe $ filter check wWarningFlags
-  where
-    check fs = flagSpecFlag fs == flag
+flagSpecOf = flip Map.lookup wWarningFlagMap
+
+-- | Find the 'FlagSpec' for a 'WarningFlag'.
+wWarningFlagMap :: Map WarningFlag (FlagSpec WarningFlag)
+wWarningFlagMap = Map.fromListWith (\_ x -> x) $ map (flagSpecFlag &&& id) wWarningFlags
 
 -- | These @-W\<blah\>@ flags can all be reversed with @-Wno-\<blah\>@
 wWarningFlags :: [FlagSpec WarningFlag]
