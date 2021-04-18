@@ -333,6 +333,9 @@ forgetful -- that is, omits one or more type variables in its RHS.  If so,
 it expands the synonym and proceeds; if not, it simply returns the
 unexpanded synonym. See also Note [Rewriting synonyms].
 
+Where do we actually perform rewriting within a type? See Note [Rewritable] in
+GHC.Tc.Solver.Monad.
+
 Note [rewrite_args performance]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In programs with lots of type-level evaluation, rewrite_args becomes

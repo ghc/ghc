@@ -4,18 +4,6 @@
 [4 of 5] Compiling T6018Dfail       ( T6018Dfail.hs, T6018Dfail.o )
 [5 of 5] Compiling T6018fail        ( T6018fail.hs, T6018fail.o )
 
-T6018Afail.hs:9:15: error:
-    Type family equation right-hand sides overlap; this violates
-    the family's injectivity annotation:
-      G Char Bool Int = Int -- Defined at T6018Afail.hs:9:15
-      G Bool Int Char = Int -- Defined at T6018fail.hs:17:15
-
-T6018Cfail.hs:8:15: error:
-    Type family equation right-hand sides overlap; this violates
-    the family's injectivity annotation:
-      T6018Bfail.H Char Bool Int = Int -- Defined at T6018Cfail.hs:8:15
-      T6018Bfail.H Bool Int Char = Int -- Defined at T6018Dfail.hs:7:15
-
 T6018fail.hs:15:15: error:
     Type family equation right-hand sides overlap; this violates
     the family's injectivity annotation:
@@ -166,3 +154,15 @@ T6018fail.hs:136:1: error:
     but these LHS type and kind patterns are not bare variables: ‘*’,
                                                                  ‘Char’
       FC Char a = a -- Defined at T6018fail.hs:136:1
+
+module T6018Cfail: error:
+    Type family equation right-hand sides overlap; this violates
+    the family's injectivity annotation:
+      T6018Bfail.H Char Bool Int = Int -- Defined in module T6018Cfail
+      T6018Bfail.H Bool Int Char = Int -- Defined in module T6018Dfail
+
+module T6018Afail: error:
+    Type family equation right-hand sides overlap; this violates
+    the family's injectivity annotation:
+      G Char Bool Int = Int -- Defined in module T6018Afail
+      G Bool Int Char = Int -- Defined at T6018fail.hs:17:15

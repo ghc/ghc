@@ -161,7 +161,7 @@ data PprStyle
                 -- Does not assume tidied code: non-external names
                 -- are printed with uniques.
 
-  | PprCode LabelStyle -- ^ Print code; either C or assembler
+  | PprCode !LabelStyle -- ^ Print code; either C or assembler
 
 -- | Style of label pretty-printing.
 --
@@ -445,6 +445,7 @@ defaultSDocContext = SDC
   }
 
 withPprStyle :: PprStyle -> SDoc -> SDoc
+{-# INLINE CONLIKE withPprStyle #-}
 withPprStyle sty d = SDoc $ \ctxt -> runSDoc d ctxt{sdocStyle=sty}
 
 pprDeeper :: SDoc -> SDoc
@@ -487,15 +488,19 @@ pprSetDepth depth doc = SDoc $ \ctx ->
             runSDoc doc ctx
 
 getPprStyle :: (PprStyle -> SDoc) -> SDoc
+{-# INLINE CONLIKE getPprStyle #-}
 getPprStyle df = SDoc $ \ctx -> runSDoc (df (sdocStyle ctx)) ctx
 
 sdocWithContext :: (SDocContext -> SDoc) -> SDoc
+{-# INLINE CONLIKE sdocWithContext #-}
 sdocWithContext f = SDoc $ \ctx -> runSDoc (f ctx) ctx
 
 sdocOption :: (SDocContext -> a) -> (a -> SDoc) -> SDoc
+{-# INLINE CONLIKE sdocOption #-}
 sdocOption f g = sdocWithContext (g . f)
 
 updSDocContext :: (SDocContext -> SDocContext) -> SDoc -> SDoc
+{-# INLINE CONLIKE updSDocContext #-}
 updSDocContext upd doc
   = SDoc $ \ctx -> runSDoc doc (upd ctx)
 
@@ -537,14 +542,17 @@ userStyle _other       = False
 
 -- | Indicate if -dppr-debug mode is enabled
 getPprDebug :: (Bool -> SDoc) -> SDoc
+{-# INLINE CONLIKE getPprDebug #-}
 getPprDebug d = sdocWithContext $ \ctx -> d (sdocPprDebug ctx)
 
 -- | Says what to do with and without -dppr-debug
 ifPprDebug :: SDoc -> SDoc -> SDoc
+{-# INLINE CONLIKE ifPprDebug #-}
 ifPprDebug yes no = getPprDebug $ \dbg -> if dbg then yes else no
 
 -- | Says what to do with -dppr-debug; without, return empty
 whenPprDebug :: SDoc -> SDoc        -- Empty for non-debug style
+{-# INLINE CONLIKE whenPprDebug #-}
 whenPprDebug d = ifPprDebug d empty
 
 -- | The analog of 'Pretty.printDoc_' for 'SDoc', which tries to make sure the
@@ -571,6 +579,7 @@ bufLeftRenderSDoc ctx bufHandle doc =
   Pretty.bufLeftRender bufHandle (runSDoc doc ctx)
 
 pprCode :: LabelStyle -> SDoc -> SDoc
+{-# INLINE CONLIKE pprCode #-}
 pprCode cs d = withPprStyle (PprCode cs) d
 
 renderWithContext :: SDocContext -> SDoc -> String
@@ -608,21 +617,32 @@ float    :: Float      -> SDoc
 double   :: Double     -> SDoc
 rational :: Rational   -> SDoc
 
+{-# INLINE CONLIKE empty #-}
 empty       = docToSDoc $ Pretty.empty
+{-# INLINE CONLIKE char #-}
 char c      = docToSDoc $ Pretty.char c
 
+{-# INLINE CONLIKE text #-}   -- Inline so that the RULE Pretty.text will fire
 text s      = docToSDoc $ Pretty.text s
-{-# INLINE text #-}   -- Inline so that the RULE Pretty.text will fire
 
+{-# INLINE CONLIKE ftext #-}
 ftext s     = docToSDoc $ Pretty.ftext s
+{-# INLINE CONLIKE ptext #-}
 ptext s     = docToSDoc $ Pretty.ptext s
+{-# INLINE CONLIKE ztext #-}
 ztext s     = docToSDoc $ Pretty.ztext s
+{-# INLINE CONLIKE int #-}
 int n       = docToSDoc $ Pretty.int n
+{-# INLINE CONLIKE integer #-}
 integer n   = docToSDoc $ Pretty.integer n
+{-# INLINE CONLIKE float #-}
 float n     = docToSDoc $ Pretty.float n
+{-# INLINE CONLIKE double #-}
 double n    = docToSDoc $ Pretty.double n
+{-# INLINE CONLIKE rational #-}
 rational n  = docToSDoc $ Pretty.rational n
               -- See Note [Print Hexadecimal Literals] in GHC.Utils.Ppr
+{-# INLINE CONLIKE word #-}
 word n      = sdocOption sdocHexWordLiterals $ \case
                True  -> docToSDoc $ Pretty.hex n
                False -> docToSDoc $ Pretty.integer n
@@ -635,14 +655,21 @@ doublePrec p n = text (showFFloat (Just p) n "")
 parens, braces, brackets, quotes, quote,
         doubleQuotes, angleBrackets :: SDoc -> SDoc
 
+{-# INLINE CONLIKE parens #-}
 parens d        = SDoc $ Pretty.parens . runSDoc d
+{-# INLINE CONLIKE braces #-}
 braces d        = SDoc $ Pretty.braces . runSDoc d
+{-# INLINE CONLIKE brackets #-}
 brackets d      = SDoc $ Pretty.brackets . runSDoc d
+{-# INLINE CONLIKE quote #-}
 quote d         = SDoc $ Pretty.quote . runSDoc d
+{-# INLINE CONLIKE doubleQuotes #-}
 doubleQuotes d  = SDoc $ Pretty.doubleQuotes . runSDoc d
+{-# INLINE CONLIKE angleBrackets #-}
 angleBrackets d = char '<' <> d <> char '>'
 
 cparen :: Bool -> SDoc -> SDoc
+{-# INLINE CONLIKE cparen #-}
 cparen b d = SDoc $ Pretty.maybeParens b . runSDoc d
 
 -- 'quotes' encloses something in single quotes...
@@ -663,7 +690,7 @@ semi, comma, colon, equals, space, dcolon, underscore, dot, vbar :: SDoc
 arrow, lollipop, larrow, darrow, arrowt, larrowt, arrowtt, larrowtt, lambda :: SDoc
 lparen, rparen, lbrack, rbrack, lbrace, rbrace, blankLine :: SDoc
 
-blankLine  = docToSDoc $ Pretty.text ""
+blankLine  = docToSDoc Pretty.emptyText
 dcolon     = unicodeSyntax (char '∷') (docToSDoc $ Pretty.text "::")
 arrow      = unicodeSyntax (char '→') (docToSDoc $ Pretty.text "->")
 lollipop   = unicodeSyntax (char '⊸') (docToSDoc $ Pretty.text "%1 ->")
@@ -724,11 +751,16 @@ nest :: Int -> SDoc -> SDoc
 ($+$) :: SDoc -> SDoc -> SDoc
 -- ^ Join two 'SDoc' together vertically
 
+{-# INLINE CONLIKE nest #-}
 nest n d    = SDoc $ Pretty.nest n . runSDoc d
-(<>) d1 d2  = SDoc $ \sty -> (Pretty.<>)  (runSDoc d1 sty) (runSDoc d2 sty)
-(<+>) d1 d2 = SDoc $ \sty -> (Pretty.<+>) (runSDoc d1 sty) (runSDoc d2 sty)
-($$) d1 d2  = SDoc $ \sty -> (Pretty.$$)  (runSDoc d1 sty) (runSDoc d2 sty)
-($+$) d1 d2 = SDoc $ \sty -> (Pretty.$+$) (runSDoc d1 sty) (runSDoc d2 sty)
+{-# INLINE CONLIKE (<>) #-}
+(<>) d1 d2  = SDoc $ \ctx -> (Pretty.<>)  (runSDoc d1 ctx) (runSDoc d2 ctx)
+{-# INLINE CONLIKE (<+>) #-}
+(<+>) d1 d2 = SDoc $ \ctx -> (Pretty.<+>) (runSDoc d1 ctx) (runSDoc d2 ctx)
+{-# INLINE CONLIKE ($$) #-}
+($$) d1 d2  = SDoc $ \ctx -> (Pretty.$$)  (runSDoc d1 ctx) (runSDoc d2 ctx)
+{-# INLINE CONLIKE ($+$) #-}
+($+$) d1 d2 = SDoc $ \ctx -> (Pretty.$+$) (runSDoc d1 ctx) (runSDoc d2 ctx)
 
 hcat :: [SDoc] -> SDoc
 -- ^ Concatenate 'SDoc' horizontally
@@ -747,25 +779,37 @@ fcat :: [SDoc] -> SDoc
 -- ^ This behaves like 'fsep', but it uses '<>' for horizontal conposition rather than '<+>'
 
 
-hcat ds = SDoc $ \sty -> Pretty.hcat [runSDoc d sty | d <- ds]
-hsep ds = SDoc $ \sty -> Pretty.hsep [runSDoc d sty | d <- ds]
-vcat ds = SDoc $ \sty -> Pretty.vcat [runSDoc d sty | d <- ds]
-sep ds  = SDoc $ \sty -> Pretty.sep  [runSDoc d sty | d <- ds]
-cat ds  = SDoc $ \sty -> Pretty.cat  [runSDoc d sty | d <- ds]
-fsep ds = SDoc $ \sty -> Pretty.fsep [runSDoc d sty | d <- ds]
-fcat ds = SDoc $ \sty -> Pretty.fcat [runSDoc d sty | d <- ds]
+-- Inline all those wrappers to help ensure we create lists of Doc, not of SDoc
+-- later applied to the same SDocContext. It helps the worker/wrapper
+-- transformation extracting only the required fields from the SDocContext.
+{-# INLINE CONLIKE hcat #-}
+hcat ds = SDoc $ \ctx -> Pretty.hcat [runSDoc d ctx | d <- ds]
+{-# INLINE CONLIKE hsep #-}
+hsep ds = SDoc $ \ctx -> Pretty.hsep [runSDoc d ctx | d <- ds]
+{-# INLINE CONLIKE vcat #-}
+vcat ds = SDoc $ \ctx -> Pretty.vcat [runSDoc d ctx | d <- ds]
+{-# INLINE CONLIKE sep #-}
+sep ds  = SDoc $ \ctx -> Pretty.sep  [runSDoc d ctx | d <- ds]
+{-# INLINE CONLIKE cat #-}
+cat ds  = SDoc $ \ctx -> Pretty.cat  [runSDoc d ctx | d <- ds]
+{-# INLINE CONLIKE fsep #-}
+fsep ds = SDoc $ \ctx -> Pretty.fsep [runSDoc d ctx | d <- ds]
+{-# INLINE CONLIKE fcat #-}
+fcat ds = SDoc $ \ctx -> Pretty.fcat [runSDoc d ctx | d <- ds]
 
 hang :: SDoc  -- ^ The header
       -> Int  -- ^ Amount to indent the hung body
       -> SDoc -- ^ The hung body, indented and placed below the header
       -> SDoc
+{-# INLINE CONLIKE hang #-}
 hang d1 n d2   = SDoc $ \sty -> Pretty.hang (runSDoc d1 sty) n (runSDoc d2 sty)
 
 -- | This behaves like 'hang', but does not indent the second document
 -- when the header is empty.
 hangNotEmpty :: SDoc -> Int -> SDoc -> SDoc
+{-# INLINE CONLIKE hangNotEmpty #-}
 hangNotEmpty d1 n d2 =
-    SDoc $ \sty -> Pretty.hangNotEmpty (runSDoc d1 sty) n (runSDoc d2 sty)
+    SDoc $ \ctx -> Pretty.hangNotEmpty (runSDoc d1 ctx) n (runSDoc d2 ctx)
 
 punctuate :: SDoc   -- ^ The punctuation
           -> [SDoc] -- ^ The list that will have punctuation added between every adjacent pair of elements
@@ -777,17 +821,21 @@ punctuate p (d:ds) = go d ds
                      go d (e:es) = (d <> p) : go e es
 
 ppWhen, ppUnless :: Bool -> SDoc -> SDoc
+{-# INLINE CONLIKE ppWhen #-}
 ppWhen True  doc = doc
 ppWhen False _   = empty
 
+{-# INLINE CONLIKE ppUnless #-}
 ppUnless True  _   = empty
 ppUnless False doc = doc
 
+{-# INLINE CONLIKE ppWhenOption #-}
 ppWhenOption :: (SDocContext -> Bool) -> SDoc -> SDoc
 ppWhenOption f doc = sdocOption f $ \case
    True  -> doc
    False -> empty
 
+{-# INLINE CONLIKE ppUnlessOption #-}
 ppUnlessOption :: (SDocContext -> Bool) -> SDoc -> SDoc
 ppUnlessOption f doc = sdocOption f $ \case
    True  -> empty

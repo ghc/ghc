@@ -13,7 +13,6 @@ module GHC.Types.TyThing.Ppr (
         pprTyThingLoc,
         pprTyThingInContextLoc,
         pprTyThingHdr,
-        pprTypeForUser,
         pprFamInst
   ) where
 
@@ -25,12 +24,11 @@ import GHC.Driver.Ppr (warnPprTrace)
 
 import GHC.Types.TyThing ( TyThing(..), tyThingParent_maybe )
 import GHC.Types.Name
-import GHC.Types.Var.Env( emptyTidyEnv )
 
-import GHC.Core.Type    ( Type, ArgFlag(..), mkTyVarBinders, tidyOpenType )
+import GHC.Core.Type    ( ArgFlag(..), mkTyVarBinders )
 import GHC.Core.Coercion.Axiom ( coAxiomTyCon )
 import GHC.Core.FamInstEnv( FamInst(..), FamFlavor(..) )
-import GHC.Core.TyCo.Ppr ( pprUserForAll, pprTypeApp, pprSigmaType )
+import GHC.Core.TyCo.Ppr ( pprUserForAll, pprTypeApp )
 
 import GHC.Iface.Syntax ( ShowSub(..), ShowHowMuch(..), AltPpr(..)
   , showToHeader, pprIfaceDecl )
@@ -191,17 +189,6 @@ pprTyThing ss ty_thing
                pprModulePrefix sty mod occ <> ppr occ
              Nothing  -> WARN( True, ppr name ) Nothing
              -- Nothing is unexpected here; TyThings have External names
-
-pprTypeForUser :: Type -> SDoc
--- The type is tidied
-pprTypeForUser ty
-  = pprSigmaType tidy_ty
-  where
-    (_, tidy_ty)     = tidyOpenType emptyTidyEnv ty
-     -- Often the types/kinds we print in ghci are fully generalised
-     -- and have no free variables, but it turns out that we sometimes
-     -- print un-generalised kinds (eg when doing :k T), so it's
-     -- better to use tidyOpenType here
 
 showWithLoc :: SDoc -> SDoc -> SDoc
 showWithLoc loc doc

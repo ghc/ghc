@@ -840,6 +840,8 @@ any_rewritable :: Bool    -- Ignore casts and coercions
 -- This looks like it should use foldTyCo, but that function is
 -- role-agnostic, and this one must be role-aware. We could make
 -- foldTyCon role-aware, but that may slow down more common usages.
+--
+-- See Note [Rewritable] in GHC.Tc.Solver.Monad for a specification for this function.
 {-# INLINE any_rewritable #-} -- this allows specialization of predicates
 any_rewritable ignore_cos role tv_pred tc_pred should_expand
   = go role emptyVarSet
@@ -888,9 +890,13 @@ anyRewritableTyVar :: Bool     -- Ignore casts and coercions
                    -> EqRel    -- Ambient role
                    -> (EqRel -> TcTyVar -> Bool)  -- check tyvar
                    -> TcType -> Bool
+-- See Note [Rewritable] in GHC.Tc.Solver.Monad for a specification for this function.
 anyRewritableTyVar ignore_cos role pred
   = any_rewritable ignore_cos role pred
-      (\ _ _ _ -> False) -- don't check tyconapps
+      (\ _ _ _ -> False) -- no special check for tyconapps
+                         -- (this False is ORed with other results, so it
+                         --  really means "do nothing special"; the arguments
+                         --   are still inspected)
       (\ _ -> False)     -- don't expand synonyms
     -- NB: No need to expand synonyms, because we can find
     -- all free variables of a synonym by looking at its
@@ -901,12 +907,14 @@ anyRewritableTyFamApp :: EqRel   -- Ambient role
                           -- should return True only for type family applications
                       -> TcType -> Bool
   -- always ignores casts & coercions
+-- See Note [Rewritable] in GHC.Tc.Solver.Monad for a specification for this function.
 anyRewritableTyFamApp role check_tyconapp
   = any_rewritable True role (\ _ _ -> False) check_tyconapp (not . isFamFreeTyCon)
 
 -- This version is used by shouldSplitWD. It *does* look in casts
 -- and coercions, and it always expands type synonyms whose RHSs mention
 -- type families.
+-- See Note [Rewritable] in GHC.Tc.Solver.Monad for a specification for this function.
 anyRewritableCanEqLHS :: EqRel   -- Ambient role
                       -> (EqRel -> TcTyVar -> Bool)            -- check tyvar
                       -> (EqRel -> TyCon -> [TcType] -> Bool)  -- check type family
@@ -931,6 +939,7 @@ this case) is nominal, the work item can't actually rewrite the inert item.
 Moreover, if we were to kick out the inert item the exact same situation
 would re-occur and we end up with an infinite loop in which each kicks
 out the other (#14363).
+
 -}
 
 {- *********************************************************************

@@ -60,6 +60,7 @@ module Data.Bits (
 import GHC.Base
 import GHC.Bits
 import GHC.Enum
+import qualified GHC.List as List
 import GHC.Read
 import GHC.Show
 
@@ -116,6 +117,10 @@ instance (Bits a) => Semigroup (And a) where
 -- @since 4.16
 instance (FiniteBits a) => Monoid (And a) where
   mempty = And oneBits
+  -- By default, we would get a lazy right fold. This forces the use of a strict
+  -- left fold instead.
+  mconcat = List.foldl' (<>) mempty
+  {-# INLINE mconcat #-}
 
 -- | Monoid under bitwise inclusive OR.
 --
@@ -143,6 +148,10 @@ instance (Bits a) => Semigroup (Ior a) where
 -- | @since 4.16
 instance (Bits a) => Monoid (Ior a) where
   mempty = Ior zeroBits
+  -- By default, we would get a lazy right fold. This forces the use of a strict
+  -- left fold instead.
+  mconcat = List.foldl' (<>) mempty
+  {-# INLINE mconcat #-}
 
 -- | Monoid under bitwise XOR.
 --
@@ -170,6 +179,10 @@ instance (Bits a) => Semigroup (Xor a) where
 -- | @since 4.16
 instance (Bits a) => Monoid (Xor a) where
   mempty = Xor zeroBits
+  -- By default, we would get a lazy right fold. This forces the use of a strict
+  -- left fold instead.
+  mconcat = List.foldl' (<>) mempty
+  {-# INLINE mconcat #-}
 
 -- | Monoid under bitwise \'equality\'; defined as @1@ if the corresponding
 -- bits match, and @0@ otherwise.
@@ -206,3 +219,7 @@ instance (FiniteBits a) => Semigroup (Iff a) where
 -- @since 4.16
 instance (FiniteBits a) => Monoid (Iff a) where
   mempty = Iff oneBits
+  -- By default, we would get a lazy right fold. This forces the use of a strict
+  -- left fold instead.
+  mconcat = List.foldl' (<>) mempty
+  {-# INLINE mconcat #-}

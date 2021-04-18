@@ -34,9 +34,10 @@ import Data.Maybe (catMaybes, mapMaybe, fromMaybe)
 import Numeric (readHex)
 import System.Environment (getArgs)
 import System.Exit (ExitCode(ExitSuccess), exitFailure)
-import System.FilePath ((</>))
+import System.FilePath ((</>),(<.>))
 import System.IO (stderr, hPutStrLn)
 import System.Process (showCommandForUser, readProcess, rawSystem)
+import System.Directory (renameFile)
 
 main :: IO ()
 main = do opts <- parseArgs
@@ -63,12 +64,9 @@ main = do opts <- parseArgs
                      let haskellRs = [ what
                                      | (wh, what) <- rs
                                      , wh `elem` [Haskell, Both] ]
-                         cRs = [ what
-                               | (wh, what) <- rs
-                               , wh `elem` [C, Both] ]
                      case cm of
                          ComputeHaskell -> writeHaskellValue fn haskellRs
-                         ComputeHeader  -> writeHeader       fn cRs
+                         ComputeHeader  -> writeHeader       fn rs
 
 data Options = Options {
                    o_verbose :: Bool,
@@ -81,6 +79,16 @@ data Options = Options {
                    o_objdumpProg :: Maybe FilePath,
                    o_targetOS :: Maybe String
                }
+
+-- | Write a file atomically
+--
+-- This avoids other processes seeing the file while it is being written into.
+atomicWriteFile :: FilePath -> String -> IO ()
+atomicWriteFile fn s = do
+  let tmp = fn <.> "tmp"
+  writeFile tmp s
+  renameFile tmp fn
+
 
 parseArgs :: IO Options
 parseArgs = do args <- getArgs
@@ -673,7 +681,7 @@ getWanted verbose os tmpdir gccProgram gccFlags nmProgram mobjdumpProgram
     = do let cStuff = unlines (headers ++ concatMap (doWanted . snd) (wanteds os))
              cFile = tmpdir </> "tmp.c"
              oFile = tmpdir </> "tmp.o"
-         writeFile cFile cStuff
+         atomicWriteFile cFile cStuff
          execute verbose gccProgram (gccFlags ++ ["-c", cFile, "-o", oFile])
          xs <- case os of
                  "openbsd" -> readProcess objdumpProgam ["--syms", oFile] ""
@@ -858,27 +866,72 @@ getWanted verbose os tmpdir gccProgram gccFlags nmProgram mobjdumpProgram
               = return (w, FieldTypeGcptrMacro name)
 
 writeHaskellType :: FilePath -> [What Fst] -> IO ()
-writeHaskellType fn ws = writeFile fn xs
-    where xs = unlines [header, body, footer]
+writeHaskellType fn ws = atomicWriteFile fn xs
+    where xs = unlines [header, body, footer, parser]
           header = "module GHC.Platform.Constants where\n\n\
-                   \import Prelude\n\n\
+                   \import Prelude\n\
+                   \import Data.Char\n\n\
                    \data PlatformConstants = PlatformConstants {"
-          footer = "  } deriving (Show,Read,Eq)"
+          footer = "  } deriving (Show,Read,Eq)\n\n"
           body = intercalate ",\n" (concatMap doWhat ws)
 
-          doWhat (GetClosureSize name _) = ["      pc_" ++ name ++ " :: Int"]
-          doWhat (GetFieldType   name _) = ["      pc_" ++ name ++ " :: Int"]
-          doWhat (GetWord        name _) = ["      pc_" ++ name ++ " :: Int"]
-          doWhat (GetInt         name _) = ["      pc_" ++ name ++ " :: Int"]
-          doWhat (GetNatural     name _) = ["      pc_" ++ name ++ " :: Integer"]
-          doWhat (GetBool        name _) = ["      pc_" ++ name ++ " :: Bool"]
+          doWhat (GetClosureSize name _) = ["      pc_" ++ name ++ " :: {-# UNPACK #-} !Int"]
+          doWhat (GetFieldType   name _) = ["      pc_" ++ name ++ " :: {-# UNPACK #-} !Int"]
+          doWhat (GetWord        name _) = ["      pc_" ++ name ++ " :: {-# UNPACK #-} !Int"]
+          doWhat (GetInt         name _) = ["      pc_" ++ name ++ " :: {-# UNPACK #-} !Int"]
+          doWhat (GetNatural     name _) = ["      pc_" ++ name ++ " :: !Integer"]
+          doWhat (GetBool        name _) = ["      pc_" ++ name ++ " :: !Bool"]
           doWhat (StructFieldMacro {}) = []
           doWhat (ClosureFieldMacro {}) = []
           doWhat (ClosurePayloadMacro {}) = []
           doWhat (FieldTypeGcptrMacro {}) = []
 
+          vs = zip ws [(0::Int)..]
+          parser =
+            "parseConstantsHeader :: FilePath -> IO PlatformConstants\n\
+            \parseConstantsHeader fp = do\n\
+            \  s <- readFile fp\n\
+            \  let def = \"#define HS_CONSTANTS \\\"\"\n\
+            \      find [] xs = xs\n\
+            \      find _  [] = error $ \"Couldn't find \" ++ def ++ \" in \" ++ fp\n\
+            \      find (d:ds) (x:xs)\n\
+            \        | d == x    = find ds xs\n\
+            \        | otherwise = find def xs\n\n\
+            \      readVal' :: Bool -> Integer -> String -> [Integer]\n\
+            \      readVal' n     c (x:xs) = case x of\n\
+            \        '\"' -> [if n then negate c else c]\n\
+            \        '-' -> readVal' True c xs\n\
+            \        ',' -> (if n then negate c else c) : readVal' False 0 xs\n\
+            \        _   -> readVal' n (c*10 + fromIntegral (ord x - ord '0')) xs\n\
+            \      readVal' n     c []     = [if n then negate c else c]\n\n\
+            \      readVal = readVal' False 0\n\n\
+            \  return $! case readVal (find def s) of\n"
+            ++ "    [" ++ concatMap (nicetab . snd) vs
+            ++ "\n     ] -> PlatformConstants\n            { "
+            ++ intercalate "\n            , " (concatMap (uncurry doParse) vs)
+            ++ "\n            }\n"
+            ++ "    _ -> error \"Invalid platform constants\"\n"
+
+          nicetab 0 = "v0"
+          nicetab v
+            | v `mod` 16 == 0 = "\n     ,v"++show v
+            | otherwise       = ",v"++show v
+
+
+          doParse (GetClosureSize name _)   i = ["pc_" ++ name ++ " = fromIntegral v" ++ show i]
+          doParse (GetFieldType   name _)   i = ["pc_" ++ name ++ " = fromIntegral v" ++ show i]
+          doParse (GetWord        name _)   i = ["pc_" ++ name ++ " = fromIntegral v" ++ show i]
+          doParse (GetInt         name _)   i = ["pc_" ++ name ++ " = fromIntegral v" ++ show i]
+          doParse (GetNatural     name _)   i = ["pc_" ++ name ++ " = v" ++ show i]
+          doParse (GetBool        name _)   i = ["pc_" ++ name ++ " = 0 < v" ++ show i]
+          doParse (StructFieldMacro {})    _i = []
+          doParse (ClosureFieldMacro {})   _i = []
+          doParse (ClosurePayloadMacro {}) _i = []
+          doParse (FieldTypeGcptrMacro {}) _i = []
+
+
 writeHaskellValue :: FilePath -> [What Snd] -> IO ()
-writeHaskellValue fn rs = writeFile fn xs
+writeHaskellValue fn rs = atomicWriteFile fn xs
     where xs = unlines [header, body, footer]
           header = "PlatformConstants {"
           footer = "  }"
@@ -894,25 +947,41 @@ writeHaskellValue fn rs = writeFile fn xs
           doWhat (ClosurePayloadMacro {}) = []
           doWhat (FieldTypeGcptrMacro {}) = []
 
-writeHeader :: FilePath -> [What Snd] -> IO ()
-writeHeader fn rs = writeFile fn xs
-    where xs = unlines (headers ++ body)
-          headers = ["/* This file is created automatically.  Do not edit by hand.*/", ""]
-          body = map doWhat rs
-          doWhat (GetFieldType   name (Snd v)) = "#define " ++ name ++ " b" ++ show (v * 8)
-          doWhat (GetClosureSize name (Snd v)) = "#define " ++ name ++ " (SIZEOF_StgHeader+" ++ show v ++ ")"
-          doWhat (GetWord        name (Snd v)) = "#define " ++ name ++ " " ++ show v
-          doWhat (GetInt         name (Snd v)) = "#define " ++ name ++ " " ++ show v
-          doWhat (GetNatural     name (Snd v)) = "#define " ++ name ++ " " ++ show v
-          doWhat (GetBool        name (Snd v)) = "#define " ++ name ++ " " ++ show (fromEnum v)
-          doWhat (StructFieldMacro nameBase) =
-                     "#define " ++ nameBase ++ "(__ptr__) REP_" ++ nameBase ++ "[__ptr__+OFFSET_" ++ nameBase ++ "]"
-          doWhat (ClosureFieldMacro nameBase) =
-                     "#define " ++ nameBase ++ "(__ptr__) REP_" ++ nameBase ++ "[__ptr__+SIZEOF_StgHeader+OFFSET_" ++ nameBase ++ "]"
-          doWhat (ClosurePayloadMacro nameBase) =
-                     "#define " ++ nameBase ++ "(__ptr__,__ix__) W_[__ptr__+SIZEOF_StgHeader+OFFSET_" ++ nameBase ++ " + WDS(__ix__)]"
-          doWhat (FieldTypeGcptrMacro nameBase) =
-                     "#define REP_" ++ nameBase ++ " gcptr"
+writeHeader :: FilePath -> [(Where, What Snd)] -> IO ()
+writeHeader fn rs = atomicWriteFile fn xs
+    where xs = headers ++ hs ++ unlines body
+          headers = "/* This file is created automatically.  Do not edit by hand.*/\n\n"
+          haskellRs = fmap snd $ filter (\r -> fst r `elem` [Haskell,Both]) rs
+          cRs       = fmap snd $ filter (\r -> fst r `elem` [C,Both]) rs
+          hs = concat
+                  [ "#define HS_CONSTANTS \""
+                  , intercalate "," (mapMaybe doHs haskellRs)
+                  , "\"\n"
+                  ]
+          doHs x = case x of
+            GetFieldType   _name (Snd v) -> Just (show v)
+            GetClosureSize _name (Snd v) -> Just (show v)
+            GetWord        _name (Snd v) -> Just (show v)
+            GetInt         _name (Snd v) -> Just (show v)
+            GetNatural     _name (Snd v) -> Just (show v)
+            GetBool        _name (Snd v) -> Just (if v then "1" else "0")
+            StructFieldMacro {}          -> Nothing
+            ClosureFieldMacro {}         -> Nothing
+            ClosurePayloadMacro {}       -> Nothing
+            FieldTypeGcptrMacro {}       -> Nothing
+
+          body = map doC cRs
+          doC x = case x of
+            GetFieldType   name (Snd v)  -> "#define " ++ name ++ " b" ++ show (v * 8)
+            GetClosureSize name (Snd v)  -> "#define " ++ name ++ " (SIZEOF_StgHeader+" ++ show v ++ ")"
+            GetWord        name (Snd v)  -> "#define " ++ name ++ " " ++ show v
+            GetInt         name (Snd v)  -> "#define " ++ name ++ " " ++ show v
+            GetNatural     name (Snd v)  -> "#define " ++ name ++ " " ++ show v
+            GetBool        name (Snd v)  -> "#define " ++ name ++ " " ++ show (fromEnum v)
+            StructFieldMacro nameBase    -> "#define " ++ nameBase ++ "(__ptr__) REP_" ++ nameBase ++ "[__ptr__+OFFSET_" ++ nameBase ++ "]"
+            ClosureFieldMacro nameBase   -> "#define " ++ nameBase ++ "(__ptr__) REP_" ++ nameBase ++ "[__ptr__+SIZEOF_StgHeader+OFFSET_" ++ nameBase ++ "]"
+            ClosurePayloadMacro nameBase -> "#define " ++ nameBase ++ "(__ptr__,__ix__) W_[__ptr__+SIZEOF_StgHeader+OFFSET_" ++ nameBase ++ " + WDS(__ix__)]"
+            FieldTypeGcptrMacro nameBase -> "#define REP_" ++ nameBase ++ " gcptr"
 
 die :: String -> IO a
 die err = do hPutStrLn stderr err

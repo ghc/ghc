@@ -230,7 +230,7 @@ tcHsBootSigs binds sigs
     tc_boot_sig (TypeSig _ lnames hs_ty) = mapM f lnames
       where
         f (L _ name)
-          = do { sigma_ty <- tcHsSigWcType (FunSigCtxt name False) hs_ty
+          = do { sigma_ty <- tcHsSigWcType (FunSigCtxt name NoRRC) hs_ty
                ; return (mkVanillaGlobal name sigma_ty) }
         -- Notice that we make GlobalIds, not LocalIds
     tc_boot_sig s = pprPanic "tcHsBootSigs/tc_boot_sig" (ppr s)

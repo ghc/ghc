@@ -56,7 +56,7 @@ is both quick to build and consistent with our testsuite:
 $ ./validate --build-only
 ```
 
-You can use the `./inplace/bin/ghc-stage2` binary to play with the
+You can use the `_validatebuild/stage1/bin/ghc` binary to play with the
 newly built compiler.
 
 Now, hack on your copy and rebuild (with `make`) as necessary.

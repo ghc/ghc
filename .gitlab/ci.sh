@@ -565,11 +565,21 @@ if [ -n "$CROSS_TARGET" ]; then
   target_triple="$CROSS_TARGET"
 fi
 
+echo "Branch name $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME"
 # Ignore performance improvements in @marge-bot batches.
 # See #19562.
-if [ "${GITLAB_CI_BRANCH:-}" == "wip/marge_bot_batch_merge_job" ]; then
+if [ "${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-}" == "wip/marge_bot_batch_merge_job" ]; then
   if [ -z "${IGNORE_PERF_FAILURES:-}" ]; then
     IGNORE_PERF_FAILURES="decreases"
+    echo "Ignoring perf failures"
+  fi
+fi
+echo "CI_COMMIT_BRANCH: $CI_COMMIT_BRANCH"
+echo "CI_PROJECT_PATH: $CI_PROJECT_PATH"
+if [ "${CI_COMMIT_BRANCH:-}" == "master" ] &&  [ "${CI_PROJECT_PATH:-}" == "ghc/ghc" ]; then
+  if [ -z "${IGNORE_PERF_FAILURES:-}" ]; then
+    IGNORE_PERF_FAILURES="decreases"
+    echo "Ignoring perf failures"
   fi
 fi
 if [ -n "${IGNORE_PERF_FAILURES:-}" ]; then

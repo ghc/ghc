@@ -25,7 +25,8 @@ import GHC.Cmm.CLabel
 import GHC.Cmm
 import GHC.CmmToAsm.Config
 import GHC.Data.FastString
-import GHC.Utils.Outputable
+import GHC.Utils.Outputable as SDoc
+import qualified GHC.Utils.Ppr as Pretty
 import GHC.Utils.Panic
 import GHC.Platform
 
@@ -35,7 +36,6 @@ import Data.Array.ST
 import Control.Monad.ST
 
 import Data.Word
-import Data.Bits
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import GHC.Exts
@@ -95,28 +95,34 @@ pprASCII str
   -- the literal SDoc directly.
   -- See #14741
   -- and Note [Pretty print ASCII when AsmCodeGen]
-  = text $ BS.foldr (\w s -> do1 w ++ s) "" str
+  --
+  -- We work with a `Doc` instead of an `SDoc` because there is no need to carry
+  -- an `SDocContext` that we don't use. It leads to nicer (STG) code.
+  = docToSDoc (BS.foldr f Pretty.empty str)
     where
-       do1 :: Word8 -> String
-       do1 w | 0x09 == w = "\\t"
-             | 0x0A == w = "\\n"
-             | 0x22 == w = "\\\""
-             | 0x5C == w = "\\\\"
+       f :: Word8 -> Pretty.Doc -> Pretty.Doc
+       f w s = do1 w Pretty.<> s
+
+       do1 :: Word8 -> Pretty.Doc
+       do1 w | 0x09 == w = Pretty.text "\\t"
+             | 0x0A == w = Pretty.text "\\n"
+             | 0x22 == w = Pretty.text "\\\""
+             | 0x5C == w = Pretty.text "\\\\"
                -- ASCII printable characters range
-             | w >= 0x20 && w <= 0x7E = [chr' w]
-             | otherwise = '\\' : octal w
+             | w >= 0x20 && w <= 0x7E = Pretty.char (chr' w)
+             | otherwise = Pretty.sizedText 4 xs
+                where
+                 !xs = [ '\\', x0, x1, x2] -- octal
+                 !x0 = chr' (ord0 + (w `unsafeShiftR` 6) .&. 0x07)
+                 !x1 = chr' (ord0 + (w `unsafeShiftR` 3) .&. 0x07)
+                 !x2 = chr' (ord0 + w .&. 0x07)
+                 !ord0 = 0x30 -- = ord '0'
 
        -- we know that the Chars we create are in the ASCII range
        -- so we bypass the check in "chr"
        chr' :: Word8 -> Char
        chr' (W8# w#) = C# (chr# (word2Int# (word8ToWord# w#)))
 
-       octal :: Word8 -> String
-       octal w = [ chr' (ord0 + (w `unsafeShiftR` 6) .&. 0x07)
-                 , chr' (ord0 + (w `unsafeShiftR` 3) .&. 0x07)
-                 , chr' (ord0 + w .&. 0x07)
-                 ]
-       ord0 = 0x30 -- = ord '0'
 
 -- | Emit a ".string" directive
 pprString :: ByteString -> SDoc
@@ -192,37 +198,39 @@ pprSectionHeader config (Section t suffix) =
  case platformOS (ncgPlatform config) of
    OSAIX     -> pprXcoffSectionHeader t
    OSDarwin  -> pprDarwinSectionHeader t
-   OSMinGW32 -> pprGNUSectionHeader config (char '$') t suffix
-   _         -> pprGNUSectionHeader config (char '.') t suffix
+   _         -> pprGNUSectionHeader config t suffix
 
-pprGNUSectionHeader :: NCGConfig -> SDoc -> SectionType -> CLabel -> SDoc
-pprGNUSectionHeader config sep t suffix =
-  text ".section " <> ptext header <> subsection <> flags
+pprGNUSectionHeader :: NCGConfig -> SectionType -> CLabel -> SDoc
+pprGNUSectionHeader config t suffix =
+  hcat [text ".section ", header, subsection, flags]
   where
+    sep
+      | OSMinGW32 <- platformOS platform = char '$'
+      | otherwise                        = char '.'
     platform      = ncgPlatform config
     splitSections = ncgSplitSections config
     subsection
       | splitSections = sep <> pdoc platform suffix
       | otherwise     = empty
     header = case t of
-      Text -> sLit ".text"
-      Data -> sLit ".data"
+      Text -> text ".text"
+      Data -> text ".data"
       ReadOnlyData  | OSMinGW32 <- platformOS platform
-                                -> sLit ".rdata"
-                    | otherwise -> sLit ".rodata"
+                                -> text ".rdata"
+                    | otherwise -> text ".rodata"
       RelocatableReadOnlyData | OSMinGW32 <- platformOS platform
                                 -- Concept does not exist on Windows,
                                 -- So map these to R/O data.
-                                          -> sLit ".rdata$rel.ro"
-                              | otherwise -> sLit ".data.rel.ro"
-      UninitialisedData -> sLit ".bss"
+                                          -> text ".rdata$rel.ro"
+                              | otherwise -> text ".data.rel.ro"
+      UninitialisedData -> text ".bss"
       ReadOnlyData16 | OSMinGW32 <- platformOS platform
-                                 -> sLit ".rdata$cst16"
-                     | otherwise -> sLit ".rodata.cst16"
+                                 -> text ".rdata$cst16"
+                     | otherwise -> text ".rodata.cst16"
       CString
         | OSMinGW32 <- platformOS platform
-                    -> sLit ".rdata"
-        | otherwise -> sLit ".rodata.str"
+                    -> text ".rdata"
+        | otherwise -> text ".rodata.str"
       OtherSection _ ->
         panic "PprBase.pprGNUSectionHeader: unknown section type"
     flags = case t of

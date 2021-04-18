@@ -53,7 +53,7 @@ import GHC.Core.TyCon
    , tyConFamilySize )
 import GHC.Core.DataCon ( dataConTagZ, dataConTyCon, dataConWrapId, dataConWorkId )
 import GHC.Core.Utils  ( eqExpr, cheapEqExpr, exprIsHNF, exprType
-                       , stripTicksTop, stripTicksTopT, mkTicks )
+                       , stripTicksTop, stripTicksTopT, mkTicks, stripTicksE )
 import GHC.Core.Multiplicity
 import GHC.Core.FVs
 import GHC.Core.Type
@@ -76,7 +76,6 @@ import Control.Applicative ( Alternative(..) )
 
 import Control.Monad
 import Data.Functor (($>))
-import Data.Bits as Bits
 import qualified Data.ByteString as BS
 import Data.Ratio
 import Data.Word
@@ -129,9 +128,9 @@ primOpRules nm = \case
                                     , equalArgs $> Lit zeroI8 ]
    Int8NegOp   -> mkPrimOpRule nm 1 [ unaryLit negOp
                                     , semiInversePrimOp Int8NegOp ]
-   Int8SllOp   -> mkPrimOpRule nm 2 [ shiftRule LitNumInt8 (const Bits.shiftL)
+   Int8SllOp   -> mkPrimOpRule nm 2 [ shiftRule LitNumInt8 (const shiftL)
                                     , rightIdentity zeroI8 ]
-   Int8SraOp   -> mkPrimOpRule nm 2 [ shiftRule LitNumInt8 (const Bits.shiftR)
+   Int8SraOp   -> mkPrimOpRule nm 2 [ shiftRule LitNumInt8 (const shiftR)
                                     , rightIdentity zeroI8 ]
    Int8SrlOp   -> mkPrimOpRule nm 2 [ shiftRule LitNumInt8 $ const $ shiftRightLogical @Word8
                                     , rightIdentity zeroI8 ]
@@ -167,7 +166,7 @@ primOpRules nm = \case
                                     , equalArgs $> Lit zeroW8 ]
    Word8NotOp  -> mkPrimOpRule nm 1 [ unaryLit complementOp
                                     , semiInversePrimOp Word8NotOp ]
-   Word8SllOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumWord (const Bits.shiftL) ]
+   Word8SllOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumWord (const shiftL) ]
    Word8SrlOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumWord $ const $ shiftRightLogical @Word8 ]
 
 
@@ -196,9 +195,9 @@ primOpRules nm = \case
                                     , equalArgs $> Lit zeroI16 ]
    Int16NegOp  -> mkPrimOpRule nm 1 [ unaryLit negOp
                                     , semiInversePrimOp Int16NegOp ]
-   Int16SllOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumInt16 (const Bits.shiftL)
+   Int16SllOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumInt16 (const shiftL)
                                     , rightIdentity zeroI16 ]
-   Int16SraOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumInt16 (const Bits.shiftR)
+   Int16SraOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumInt16 (const shiftR)
                                     , rightIdentity zeroI16 ]
    Int16SrlOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumInt16 $ const $ shiftRightLogical @Word16
                                     , rightIdentity zeroI16 ]
@@ -234,7 +233,7 @@ primOpRules nm = \case
                                     , equalArgs $> Lit zeroW16 ]
    Word16NotOp -> mkPrimOpRule nm 1 [ unaryLit complementOp
                                     , semiInversePrimOp Word16NotOp ]
-   Word16SllOp -> mkPrimOpRule nm 2 [ shiftRule LitNumWord (const Bits.shiftL) ]
+   Word16SllOp -> mkPrimOpRule nm 2 [ shiftRule LitNumWord (const shiftL) ]
    Word16SrlOp -> mkPrimOpRule nm 2 [ shiftRule LitNumWord $ const $ shiftRightLogical @Word16 ]
 
 
@@ -263,9 +262,9 @@ primOpRules nm = \case
                                     , equalArgs $> Lit zeroI32 ]
    Int32NegOp  -> mkPrimOpRule nm 1 [ unaryLit negOp
                                     , semiInversePrimOp Int32NegOp ]
-   Int32SllOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumInt32 (const Bits.shiftL)
+   Int32SllOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumInt32 (const shiftL)
                                     , rightIdentity zeroI32 ]
-   Int32SraOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumInt32 (const Bits.shiftR)
+   Int32SraOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumInt32 (const shiftR)
                                     , rightIdentity zeroI32 ]
    Int32SrlOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumInt32 $ const $ shiftRightLogical @Word32
                                     , rightIdentity zeroI32 ]
@@ -301,7 +300,7 @@ primOpRules nm = \case
                                     , equalArgs $> Lit zeroW32 ]
    Word32NotOp -> mkPrimOpRule nm 1 [ unaryLit complementOp
                                     , semiInversePrimOp Word32NotOp ]
-   Word32SllOp -> mkPrimOpRule nm 2 [ shiftRule LitNumWord (const Bits.shiftL) ]
+   Word32SllOp -> mkPrimOpRule nm 2 [ shiftRule LitNumWord (const shiftL) ]
    Word32SrlOp -> mkPrimOpRule nm 2 [ shiftRule LitNumWord $ const $ shiftRightLogical @Word32 ]
 
 
@@ -346,9 +345,9 @@ primOpRules nm = \case
                                     , semiInversePrimOp IntNotOp ]
    IntNegOp    -> mkPrimOpRule nm 1 [ unaryLit negOp
                                     , semiInversePrimOp IntNegOp ]
-   IntSllOp    -> mkPrimOpRule nm 2 [ shiftRule LitNumInt (const Bits.shiftL)
+   IntSllOp    -> mkPrimOpRule nm 2 [ shiftRule LitNumInt (const shiftL)
                                     , rightIdentityPlatform zeroi ]
-   IntSraOp    -> mkPrimOpRule nm 2 [ shiftRule LitNumInt (const Bits.shiftR)
+   IntSraOp    -> mkPrimOpRule nm 2 [ shiftRule LitNumInt (const shiftR)
                                     , rightIdentityPlatform zeroi ]
    IntSrlOp    -> mkPrimOpRule nm 2 [ shiftRule LitNumInt shiftRightLogicalNative
                                     , rightIdentityPlatform zeroi ]
@@ -389,7 +388,7 @@ primOpRules nm = \case
                                     , equalArgs >> retLit zerow ]
    WordNotOp   -> mkPrimOpRule nm 1 [ unaryLit complementOp
                                     , semiInversePrimOp WordNotOp ]
-   WordSllOp   -> mkPrimOpRule nm 2 [ shiftRule LitNumWord (const Bits.shiftL) ]
+   WordSllOp   -> mkPrimOpRule nm 2 [ shiftRule LitNumWord (const shiftL) ]
    WordSrlOp   -> mkPrimOpRule nm 2 [ shiftRule LitNumWord shiftRightLogicalNative ]
 
    -- coercions
@@ -521,17 +520,82 @@ primOpRules nm = \case
                                              , semiInversePrimOp DoubleNegOp ]
    DoubleDecode_Int64Op -> mkPrimOpRule nm 1 [ unaryLit doubleDecodeOp ]
 
-   -- Relational operators
+   -- Relational operators, equality
+
+   Int8EqOp   -> mkRelOpRule nm (==) [ litEq True ]
+   Int8NeOp   -> mkRelOpRule nm (/=) [ litEq False ]
+
+   Int16EqOp  -> mkRelOpRule nm (==) [ litEq True ]
+   Int16NeOp  -> mkRelOpRule nm (/=) [ litEq False ]
+
+   Int32EqOp  -> mkRelOpRule nm (==) [ litEq True ]
+   Int32NeOp  -> mkRelOpRule nm (/=) [ litEq False ]
 
    IntEqOp    -> mkRelOpRule nm (==) [ litEq True ]
    IntNeOp    -> mkRelOpRule nm (/=) [ litEq False ]
+
+   Word8EqOp  -> mkRelOpRule nm (==) [ litEq True ]
+   Word8NeOp  -> mkRelOpRule nm (/=) [ litEq False ]
+
+   Word16EqOp -> mkRelOpRule nm (==) [ litEq True ]
+   Word16NeOp -> mkRelOpRule nm (/=) [ litEq False ]
+
+   Word32EqOp -> mkRelOpRule nm (==) [ litEq True ]
+   Word32NeOp -> mkRelOpRule nm (/=) [ litEq False ]
+
+   WordEqOp   -> mkRelOpRule nm (==) [ litEq True ]
+   WordNeOp   -> mkRelOpRule nm (/=) [ litEq False ]
+
    CharEqOp   -> mkRelOpRule nm (==) [ litEq True ]
    CharNeOp   -> mkRelOpRule nm (/=) [ litEq False ]
+
+   FloatEqOp  -> mkFloatingRelOpRule nm (==)
+   FloatNeOp  -> mkFloatingRelOpRule nm (/=)
+
+   DoubleEqOp -> mkFloatingRelOpRule nm (==)
+   DoubleNeOp -> mkFloatingRelOpRule nm (/=)
+
+   -- Relational operators, ordering
+
+   Int8GtOp   -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
+   Int8GeOp   -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
+   Int8LeOp   -> mkRelOpRule nm (<=) [ boundsCmp Le ]
+   Int8LtOp   -> mkRelOpRule nm (<)  [ boundsCmp Lt ]
+
+   Int16GtOp  -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
+   Int16GeOp  -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
+   Int16LeOp  -> mkRelOpRule nm (<=) [ boundsCmp Le ]
+   Int16LtOp  -> mkRelOpRule nm (<)  [ boundsCmp Lt ]
+
+   Int32GtOp  -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
+   Int32GeOp  -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
+   Int32LeOp  -> mkRelOpRule nm (<=) [ boundsCmp Le ]
+   Int32LtOp  -> mkRelOpRule nm (<)  [ boundsCmp Lt ]
 
    IntGtOp    -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
    IntGeOp    -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
    IntLeOp    -> mkRelOpRule nm (<=) [ boundsCmp Le ]
    IntLtOp    -> mkRelOpRule nm (<)  [ boundsCmp Lt ]
+
+   Word8GtOp  -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
+   Word8GeOp  -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
+   Word8LeOp  -> mkRelOpRule nm (<=) [ boundsCmp Le ]
+   Word8LtOp  -> mkRelOpRule nm (<)  [ boundsCmp Lt ]
+
+   Word16GtOp -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
+   Word16GeOp -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
+   Word16LeOp -> mkRelOpRule nm (<=) [ boundsCmp Le ]
+   Word16LtOp -> mkRelOpRule nm (<)  [ boundsCmp Lt ]
+
+   Word32GtOp -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
+   Word32GeOp -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
+   Word32LeOp -> mkRelOpRule nm (<=) [ boundsCmp Le ]
+   Word32LtOp -> mkRelOpRule nm (<)  [ boundsCmp Lt ]
+
+   WordGtOp   -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
+   WordGeOp   -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
+   WordLeOp   -> mkRelOpRule nm (<=) [ boundsCmp Le ]
+   WordLtOp   -> mkRelOpRule nm (<)  [ boundsCmp Lt ]
 
    CharGtOp   -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
    CharGeOp   -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
@@ -542,22 +606,13 @@ primOpRules nm = \case
    FloatGeOp  -> mkFloatingRelOpRule nm (>=)
    FloatLeOp  -> mkFloatingRelOpRule nm (<=)
    FloatLtOp  -> mkFloatingRelOpRule nm (<)
-   FloatEqOp  -> mkFloatingRelOpRule nm (==)
-   FloatNeOp  -> mkFloatingRelOpRule nm (/=)
 
    DoubleGtOp -> mkFloatingRelOpRule nm (>)
    DoubleGeOp -> mkFloatingRelOpRule nm (>=)
    DoubleLeOp -> mkFloatingRelOpRule nm (<=)
    DoubleLtOp -> mkFloatingRelOpRule nm (<)
-   DoubleEqOp -> mkFloatingRelOpRule nm (==)
-   DoubleNeOp -> mkFloatingRelOpRule nm (/=)
 
-   WordGtOp   -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
-   WordGeOp   -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
-   WordLeOp   -> mkRelOpRule nm (<=) [ boundsCmp Le ]
-   WordLtOp   -> mkRelOpRule nm (<)  [ boundsCmp Lt ]
-   WordEqOp   -> mkRelOpRule nm (==) [ litEq True ]
-   WordNeOp   -> mkRelOpRule nm (/=) [ litEq False ]
+   -- Misc
 
    AddrAddOp  -> mkPrimOpRule nm 2 [ rightIdentityPlatform zeroi ]
 
@@ -2188,7 +2243,7 @@ match_inline _ = Nothing
 -- See Note [magicDictId magic] in "GHC.Types.Id.Make"
 -- for a description of what is going on here.
 match_magicDict :: [Expr CoreBndr] -> Maybe (Expr CoreBndr)
-match_magicDict [Type _, Var wrap `App` Type a `App` Type _ `App` f, x, y ]
+match_magicDict [Type _, (stripTicksE (const True) -> (Var wrap `App` Type a `App` Type _ `App` f)), x, y ]
   | Just (_, fieldTy, _)  <- splitFunTy_maybe $ dropForAlls $ idType wrap
   , Just (_, dictTy, _)   <- splitFunTy_maybe fieldTy
   , Just dictTc           <- tyConAppTyCon_maybe dictTy

@@ -575,7 +575,7 @@ listUnitInfo state = Map.elems (unitInfoMap state)
 -- 'initUnits' can be called again subsequently after updating the
 -- 'packageFlags' field of the 'DynFlags', and it will update the
 -- 'unitState' in 'DynFlags'.
-initUnits :: Logger -> DynFlags -> Maybe [UnitDatabase UnitId] -> IO ([UnitDatabase UnitId], UnitState, HomeUnit)
+initUnits :: Logger -> DynFlags -> Maybe [UnitDatabase UnitId] -> IO ([UnitDatabase UnitId], UnitState, HomeUnit, Maybe PlatformConstants)
 initUnits logger dflags cached_dbs = do
 
   let forceUnitInfoMap (state, _) = unitInfoMap state `seq` ()
@@ -595,7 +595,24 @@ initUnits logger dflags cached_dbs = do
                              (homeUnitInstanceOf_ dflags)
                              (homeUnitInstantiations_ dflags)
 
-  return (dbs,unit_state,home_unit)
+  -- Try to find platform constants
+  --
+  -- See Note [Platform constants] in GHC.Platform
+  mconstants <- if homeUnitId_ dflags == rtsUnitId
+    then do
+      -- we're building the RTS! Lookup DerivedConstants.h in the include paths
+      lookupPlatformConstants (includePathsGlobal (includePaths dflags))
+    else
+      -- lookup the DerivedConstants.h header bundled with the RTS unit. We
+      -- don't fail if we can't find the RTS unit as it can be a valid (but
+      -- uncommon) case, e.g. building a C utility program (not depending on the
+      -- RTS) before building the RTS. In any case, we will fail later on if we
+      -- really need to use the platform constants but they have not been loaded.
+      case lookupUnitId unit_state rtsUnitId of
+        Nothing   -> return Nothing
+        Just info -> lookupPlatformConstants (fmap ST.unpack (unitIncludeDirs info))
+
+  return (dbs,unit_state,home_unit,mconstants)
 
 mkHomeUnit
     :: UnitState

@@ -418,19 +418,24 @@ addUnit :: GhcMonad m => UnitInfo -> m ()
 addUnit u = do
     hsc_env <- getSession
     logger <- getLogger
+    let dflags0 = hsc_dflags hsc_env
     let old_unit_env = hsc_unit_env hsc_env
     newdbs <- case ue_unit_dbs old_unit_env of
         Nothing  -> panic "addUnit: called too early"
         Just dbs ->
          let newdb = UnitDatabase
-               { unitDatabasePath  = "(in memory " ++ showSDoc (hsc_dflags hsc_env) (ppr (unitId u)) ++ ")"
+               { unitDatabasePath  = "(in memory " ++ showSDoc dflags0 (ppr (unitId u)) ++ ")"
                , unitDatabaseUnits = [u]
                }
          in return (dbs ++ [newdb]) -- added at the end because ordering matters
-    (dbs,unit_state,home_unit) <- liftIO $ initUnits logger (hsc_dflags hsc_env) (Just newdbs)
+    (dbs,unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags0 (Just newdbs)
+
+    -- update platform constants
+    dflags <- liftIO $ updatePlatformConstants dflags0 mconstants
+
     let unit_env = UnitEnv
-          { ue_platform  = targetPlatform (hsc_dflags hsc_env)
-          , ue_namever   = ghcNameVersion (hsc_dflags hsc_env)
+          { ue_platform  = targetPlatform dflags
+          , ue_namever   = ghcNameVersion dflags
           , ue_home_unit = Just home_unit
           , ue_hpt       = ue_hpt old_unit_env
           , ue_eps       = ue_eps old_unit_env
@@ -438,7 +443,8 @@ addUnit u = do
           , ue_unit_dbs  = Just dbs
           }
     setSession $ hsc_env
-        { hsc_unit_env = unit_env
+        { hsc_dflags   = dflags
+        , hsc_unit_env = unit_env
         }
 
 compileInclude :: Int -> (Int, Unit) -> BkpM ()

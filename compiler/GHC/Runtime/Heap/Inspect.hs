@@ -71,7 +71,7 @@ import Data.List ((\\))
 import GHC.Exts
 import qualified Data.Sequence as Seq
 import Data.Sequence (viewl, ViewL(..))
-import Foreign
+import Foreign hiding (shiftL, shiftR)
 import System.IO.Unsafe
 
 ---------------------------------------------

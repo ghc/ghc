@@ -77,7 +77,6 @@ data Settings = Settings
   , sTargetPlatform    :: Platform       -- Filled in by SysTools
   , sToolSettings      :: {-# UNPACK #-} !ToolSettings
   , sPlatformMisc      :: {-# UNPACK #-} !PlatformMisc
-  , sPlatformConstants :: PlatformConstants
 
   -- You shouldn't need to look things up in rawSettings directly.
   -- They should have their own fields instead.
