@@ -1208,14 +1208,14 @@ loadModule tcm = do
    mb_linkable <-
       case (ms_iface_date ms, ms_obj_date ms) of
           -- See Note [When source is considered modified]
-          (Just hi_date, Just obj_date) | obj_date >= hi_date -> do
-              prev_hash_matches <- liftIO $ doesIfaceHashMatch hsc_env ms
-              return $ if prev_hash_matches
-                  then Just $ mkObjectLinkable (ms_mod ms)
-                                               (ml_obj_file loc)
-                                               obj_date
-                                               (ms_hs_hash ms)
-                  else Nothing
+          (Just hi_date, Just obj_date) | obj_date >= hi_date -> liftIO $ do
+              prev_hash_matches <- doesIfaceHashMatch hsc_env ms
+              if prev_hash_matches
+                  then fmap Just $ findObjectLinkable
+                                          (ms_mod ms)
+                                          (ml_obj_file loc)
+                                          obj_date
+                  else return Nothing
           _ -> return Nothing
 
    let source_modified | isNothing mb_linkable = SourceModified

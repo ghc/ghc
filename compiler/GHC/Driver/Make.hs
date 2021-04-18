@@ -810,7 +810,7 @@ pruneHomePackageTable hpt summ (stable_obj, stable_bco)
           | otherwise      = hmi'{ hm_details = emptyModDetails }
           where
            modl = moduleName (mi_module (hm_iface hmi))
-           hmi' | Just l <- hm_linkable hmi, linkableHash l /= ms_hs_hash ms
+           hmi' | mi_src_hash (hm_iface hmi) /= ms_hs_hash ms
                 = hmi{ hm_linkable = Nothing }
                 | otherwise
                 = hmi
@@ -975,11 +975,12 @@ checkStability hsc_env hpt sccs all_home_mods =
           | otherwise = case lookupHpt hpt (ms_mod_name ms) of
                 Just hmi  | Just l <- hm_linkable hmi ->
                               not (isObjectLinkable l) &&
-                              -- We check the linkableHash here instead of the
-                              -- linkableTime because if we got here then the
-                              -- linkable doesn't represent a file on disk and
-                              -- the time is therefore mostly meaningless
-                              linkableHash l == ms_hs_hash ms
+                              -- We check the hash from the HomeModInfo here
+                              -- instead of the linkableTime, because if we got
+                              -- here then the linkable doesn't represent a
+                              -- file on disk and the time is therefore mostly
+                              -- meaningless
+                              mi_src_hash (hm_iface hmi) == ms_hs_hash ms
                 _other  -> False
 
 {- Parallel Upsweep
@@ -1778,9 +1779,8 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
 
           | is_stable_obj, isNothing old_hmi -> do
                 debug_trace 5 (text "compiling stable on-disk mod:" <+> ppr this_mod_name)
-                let linkable = mkObjectLinkable this_mod obj_fn
+                linkable <- findObjectLinkable this_mod obj_fn
                                 (expectJust "upsweep1" mb_obj_date)
-                                (ms_hs_hash summary)
                 compile_it (Just linkable) SourceUnmodifiedAndStable
                 -- object is stable, but we need to load the interface
                 -- off disk to make a HMI.
@@ -1798,7 +1798,7 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
             Just l <- hm_linkable hmi,
             not (isObjectLinkable l),
             (bcknd /= NoBackend) `implies` not is_fake_linkable,
-            linkableHash l == ms_hs_hash summary -> do
+            mi_src_hash (hm_iface hmi) == ms_hs_hash summary -> do
                 debug_trace 5 (text "compiling non-stable BCO mod:" <+> ppr this_mod_name)
                 compile_it (Just l) SourceUnmodified
                 -- we have an old BCO that is up to date with respect
@@ -1826,7 +1826,7 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
                                 compile_it (Just l) SourceUnmodified
                         _otherwise -> do
                                 debug_trace 5 (text "compiling mod with new on-disk obj2:" <+> ppr this_mod_name)
-                                let linkable = mkObjectLinkable this_mod obj_fn obj_date (ms_hs_hash summary)
+                                linkable <- findObjectLinkable this_mod obj_fn obj_date
                                 compile_it_discard_iface (Just linkable) SourceUnmodified
                     else compile_it Nothing SourceModified
 

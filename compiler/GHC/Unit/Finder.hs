@@ -27,7 +27,8 @@ module GHC.Unit.Finder (
     uncacheModule,
     mkStubPaths,
 
-    mkObjectLinkable,
+    findObjectLinkableMaybe,
+    findObjectLinkable,
 
   ) where
 
@@ -54,13 +55,13 @@ import qualified GHC.Data.ShortText as ST
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Fingerprint
 
 import GHC.Linker.Types
 
 import Data.IORef
 import System.Directory
 import System.FilePath
+import Control.Monad
 import Data.Time
 
 
@@ -587,14 +588,21 @@ mkStubPaths dflags mod location
         stub_basename <.> "h"
 
 -- -----------------------------------------------------------------------------
--- mkObjectLinkable isn't related to the other stuff in here,
+-- findLinkable isn't related to the other stuff in here,
 -- but there's no other obvious place for it
---
+
+findObjectLinkableMaybe :: Module -> ModLocation -> IO (Maybe Linkable)
+findObjectLinkableMaybe mod locn
+   = do let obj_fn = ml_obj_file locn
+        maybe_obj_time <- modificationTimeIfExists obj_fn
+        case maybe_obj_time of
+          Nothing -> return Nothing
+          Just obj_time -> liftM Just (findObjectLinkable mod obj_fn obj_time)
+
 -- Make an object linkable when we know the object file exists, and we know
--- its modification time and source file hash.
---
-mkObjectLinkable :: Module -> FilePath -> UTCTime -> Fingerprint -> Linkable
-mkObjectLinkable mod obj_fn obj_time src_hash = LM obj_time src_hash mod [DotO obj_fn]
+-- its modification time.
+findObjectLinkable :: Module -> FilePath -> UTCTime -> IO Linkable
+findObjectLinkable mod obj_fn obj_time = return (LM obj_time mod [DotO obj_fn])
   -- We used to look for _stub.o files here, but that was a bug (#706)
   -- Now GHC merges the stub.o into the main .o (#3687)
 

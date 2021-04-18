@@ -216,8 +216,6 @@ compileOne' m_tc_result mHscMessage
                addFilesToClean tmpfs TFL_GhcSession $
                    [ml_obj_file $ ms_location summary]
 
-   let mk_linkable time us = LM time (ms_hs_hash summary) this_mod us
-
    case (status, bcknd) of
         (HscUpToDate iface hmi_details, _) ->
             -- TODO recomp014 triggers this assert. What's going on?!
@@ -227,7 +225,7 @@ compileOne' m_tc_result mHscMessage
             unlinked_time <- getCurrentTime
             let mb_linkable = if isHsBootOrSig src_flavour
                                 then Nothing
-                                else Just (mk_linkable unlinked_time [])
+                                else Just (LM unlinked_time this_mod [])
             return $! HomeModInfo iface hmi_details mb_linkable
         (HscNotGeneratingCode _ _, _) -> panic "compileOne HscNotGeneratingCode"
         (_, NoBackend) -> panic "compileOne NoBackend"
@@ -238,7 +236,7 @@ compileOne' m_tc_result mHscMessage
             return $! HomeModInfo iface hmi_details Nothing
         (HscUpdateSig iface hmi_details, Interpreter) -> do
             unlinked_time <- getCurrentTime
-            let !linkable = mk_linkable unlinked_time []
+            let !linkable = LM unlinked_time this_mod []
             return $! HomeModInfo iface hmi_details (Just linkable)
         (HscUpdateSig iface hmi_details, _) -> do
             output_fn <- getOutputFilename logger tmpfs next_phase
@@ -259,7 +257,7 @@ compileOne' m_tc_result mHscMessage
                               (Just location)
                               []
             o_time <- getModificationUTCTime object_filename
-            let !linkable = mk_linkable o_time [DotO object_filename]
+            let !linkable = LM o_time this_mod [DotO object_filename]
             return $! HomeModInfo iface hmi_details (Just linkable)
         (HscRecomp { hscs_guts = cgguts,
                      hscs_mod_location = mod_location,
@@ -284,7 +282,7 @@ compileOne' m_tc_result mHscMessage
 
             let hs_unlinked = [BCOs comp_bc spt_entries]
             unlinked_time <- getCurrentTime
-            let !linkable = mk_linkable unlinked_time (hs_unlinked ++ stub_o)
+            let !linkable = LM unlinked_time this_mod (hs_unlinked ++ stub_o)
             return $! HomeModInfo final_iface hmi_details (Just linkable)
         (HscRecomp{}, _) -> do
             output_fn <- getOutputFilename logger tmpfs next_phase
@@ -301,7 +299,7 @@ compileOne' m_tc_result mHscMessage
                               []
                   -- The object filename comes from the ModLocation
             o_time <- getModificationUTCTime object_filename
-            let !linkable = mk_linkable o_time [DotO object_filename]
+            let !linkable = LM o_time this_mod [DotO object_filename]
             -- See Note [ModDetails and --make mode]
             details <- initModDetails hsc_env' summary iface
             return $! HomeModInfo iface details (Just linkable)
