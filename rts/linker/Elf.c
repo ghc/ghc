@@ -1542,11 +1542,20 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 #endif
             S = (Elf_Addr)oc->sections[secno].start
                 + stab[ELF_R_SYM(info)].st_value;
-         } else {
+         } else if (ELF_R_TYPE(info) != COMPAT_R_X86_64_TLSGD) {
             /* No, so look up the name in our global table. */
             symbol = strtab + sym.st_name;
             S_tmp = lookupDependentSymbol( symbol, oc );
             S = (Elf_Addr)S_tmp;
+         } else {
+            symbol = strtab + sym.st_name;
+#if defined(x86_64_HOST_ARCH) && defined(freebsd_HOST_OS)
+            S = lookupTlsgdSymbol(symbol, ELF_R_SYM(info), oc);
+#else
+            errorBelch("%s: unhandled ELF TLSGD relocation for symbol `%s'",
+                       oc->fileName, symbol);
+            S = 0;
+#endif
          }
          if (!S) {
            errorBelch("%s: unknown symbol `%s'", oc->fileName, symbol);
@@ -1759,6 +1768,19 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
           if (off != (Elf64_Sword)off) {
               barf(
                   "COMPAT_R_X86_64_GOTPCREL relocation out of range: "
+                  "%s = %" PRIx64 " in %s.",
+                  symbol, off, oc->fileName);
+          }
+          Elf64_Sword payload = off;
+          memcpy((void*)P, &payload, sizeof(payload));
+          break;
+      }
+      case COMPAT_R_X86_64_TLSGD:
+      {
+          StgInt64 off = S + A - P;
+          if (off != (Elf64_Sword)off) {
+              barf(
+                  "COMPAT_R_X86_64_TLSGD relocation out of range: "
                   "%s = %" PRIx64 " in %s.",
                   symbol, off, oc->fileName);
           }
