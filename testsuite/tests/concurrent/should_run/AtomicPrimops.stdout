@@ -4,6 +4,9 @@ fetchNandTest: OK
 fetchOrTest: OK
 fetchXorTest: OK
 casTest: OK
+cas8Test: OK
+cas16Test: OK
+cas32Test: OK
 readWriteTest: OK
 fetchAddSubAddrTest: OK
 fetchAndAddrTest: OK
