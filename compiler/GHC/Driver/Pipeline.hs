@@ -89,7 +89,6 @@ import GHC.Data.StringBuffer   ( hGetStringBuffer, hPutStringBuffer )
 import GHC.Data.Maybe          ( expectJust )
 
 import GHC.Iface.Make          ( mkFullIface )
-import GHC.Iface.UpdateIdInfos ( updateModDetailsIdInfos )
 import GHC.Iface.Load
 
 import GHC.Types.Basic       ( SuccessFlag(..) )
