@@ -848,11 +848,13 @@ instance Eq1 Complex where
 -- [(2 % 3 :+ 3 % 4,"")]
 --
 instance Read1 Complex where
-    liftReadPrec rp _  = parens $ prec 9 $ do
+    liftReadPrec rp _  = parens $ prec complexPrec $ do
         x <- step rp
         expectP (Symbol ":+")
         y <- step rp
         return (x :+ y)
+      where
+        complexPrec = 6
 
     liftReadListPrec = liftReadListPrecDefault
     liftReadList     = liftReadListDefault
@@ -863,8 +865,10 @@ instance Read1 Complex where
 -- "2 :+ 3"
 --
 instance Show1 Complex where
-    liftShowsPrec sp _ d (x :+ y) = showParen (d >= 10) $
-        sp 10 x . showString " :+ " . sp 10 y
+    liftShowsPrec sp _ d (x :+ y) = showParen (d > complexPrec) $
+        sp (complexPrec+1) x . showString " :+ " . sp (complexPrec+1) y
+      where
+        complexPrec = 6
 
 -- Building blocks
 
