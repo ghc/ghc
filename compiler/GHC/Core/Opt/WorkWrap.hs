@@ -494,6 +494,10 @@ tryWW   :: DynFlags
 tryWW dflags fam_envs is_rec fn_id rhs
   -- See Note [Worker-wrapper for NOINLINE functions]
 
+  | Opaque <- inlinePragmaSpec (inlinePragInfo fn_info)
+        -- Don't w/w OPAQUE things
+  = return [ (new_fn_id, rhs) ]
+
   | Just stable_unf <- certainlyWillInline uf_opts fn_info
   = return [ (fn_id `setIdUnfolding` stable_unf, rhs) ]
         -- See Note [Don't w/w INLINE things]
