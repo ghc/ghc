@@ -981,7 +981,7 @@ certainlyWillInline opts fn_info
 
   where
     loop_breaker = isStrongLoopBreaker (occInfo fn_info)
-    noinline     = inlinePragmaSpec (inlinePragInfo fn_info) == NoInline
+    noinline     = inlinePragmaSpec (inlinePragInfo fn_info) `elem` [NoInline, Opaque]
     fn_unf       = unfoldingInfo fn_info
 
         -- The UnfIfGoodArgs case seems important.  If we w/w small functions
