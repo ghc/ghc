@@ -1,0 +1,16 @@
+Read vs. Read1 (at precedence 6)
+[(1 :+ 1,"")]
+[(1 :+ 1,"")]
+
+Show vs. Show1 (at precedence 6)
+1 :+ 1
+1 :+ 1
+
+Read vs. Read1 (at precedence 7)
+[]
+[]
+
+Show vs. Show1 (at precedence 7)
+(1 :+ 1)
+(1 :+ 1)
+
