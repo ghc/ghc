@@ -253,7 +253,6 @@ compileOne' m_tc_result mHscMessage
                                Nothing,
                                Just (HscOut src_flavour
                                             mod_name
-                                            summary
                                             (HscUpdateSig iface hmi_details)))
                               (Just basename)
                               Persistent
@@ -269,7 +268,7 @@ compileOne' m_tc_result mHscMessage
                    }, Interpreter) -> do
             -- In interpreted mode the regular codeGen backend is not run so we
             -- generate a interface without codeGen info.
-            final_iface <- mkFullIface hsc_env' summary partial_iface Nothing
+            final_iface <- mkFullIface hsc_env' partial_iface Nothing
             -- Reconstruct the `ModDetails` from the just-constructed `ModIface`
             -- See Note [ModDetails and --make mode]
             hmi_details <- liftIO $ initModDetails hsc_env' summary final_iface
@@ -295,7 +294,7 @@ compileOne' m_tc_result mHscMessage
             (_, _, Just iface) <- runPipeline StopLn hsc_env'
                               (output_fn,
                                Nothing,
-                               Just (HscOut src_flavour mod_name summary status))
+                               Just (HscOut src_flavour mod_name status))
                               (Just basename)
                               Persistent
                               (Just location)
@@ -1343,10 +1342,10 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
         -- "driver" plugins may have modified the DynFlags so we update them
         setDynFlags (hsc_dflags plugin_hsc_env)
 
-        return (HscOut src_flavour mod_name mod_summary result,
+        return (HscOut src_flavour mod_name result,
                 panic "HscOut doesn't have an input filename")
 
-runPhase (HscOut src_flavour mod_name mod_summary result) _ = do
+runPhase (HscOut src_flavour mod_name result) _ = do
         dflags <- getDynFlags
         logger <- getLogger
         location <- getLocation src_flavour mod_name
@@ -1391,7 +1390,7 @@ runPhase (HscOut src_flavour mod_name mod_summary result) _ = do
                       hscGenHardCode hsc_env' cgguts mod_location output_fn
 
                     let dflags = hsc_dflags hsc_env'
-                    final_iface <- liftIO (mkFullIface hsc_env' mod_summary partial_iface (Just cg_infos))
+                    final_iface <- liftIO (mkFullIface hsc_env' partial_iface (Just cg_infos))
                     setIface final_iface
 
                     -- See Note [Writing interface files]

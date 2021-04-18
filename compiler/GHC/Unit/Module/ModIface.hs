@@ -101,8 +101,6 @@ data ModIfaceBackend = ModIfaceBackend
     -- ^ Hash of export list
   , mi_orphan_hash :: !Fingerprint
     -- ^ Hash for orphan rules, class and family instances combined
-  , mi_src_hash :: !Fingerprint
-    -- ^ Hash for the source file on the filesystem
     -- Cached environments for easy lookup. These are computed (lazily) from
     -- other fields and are not put into the interface file.
     -- Not really produced by the backend but there is no need to create them
@@ -243,13 +241,17 @@ data ModIface_ (phase :: ModIfacePhase)
                 -- ^ Either `()` or `ModIfaceBackend` for
                 -- a fully instantiated interface.
 
-        mi_ext_fields :: ExtensibleFields
+        mi_ext_fields :: ExtensibleFields,
                 -- ^ Additional optional fields, where the Map key represents
                 -- the field name, resulting in a (size, serialized data) pair.
                 -- Because the data is intended to be serialized through the
                 -- internal `Binary` class (increasing compatibility with types
                 -- using `Name` and `FastString`, such as HIE), this format is
                 -- chosen over `ByteString`s.
+                --
+
+        mi_src_hash :: !Fingerprint
+                -- ^ Hash of the .hs source, used for recompilation checking.
      }
 
 -- | Old-style accessor for whether or not the ModIface came from an hs-boot
@@ -306,6 +308,9 @@ instance Binary ModIface where
                  mi_module    = mod,
                  mi_sig_of    = sig_of,
                  mi_hsc_src   = hsc_src,
+                 mi_src_hash = _src_hash, -- Don't `put_` this in the instance
+                                          -- because we are going to write it
+                                          -- out separately in the actual file
                  mi_deps      = deps,
                  mi_usages    = usages,
                  mi_exports   = exports,
@@ -337,9 +342,7 @@ instance Binary ModIface where
                    mi_orphan = orphan,
                    mi_finsts = hasFamInsts,
                    mi_exp_hash = exp_hash,
-                   mi_orphan_hash = orphan_hash,
-                   mi_src_hash = _src_hash -- Like mi_ext_fields; this goes into
-                                           -- the iface header so we ignore it here
+                   mi_orphan_hash = orphan_hash
                  }}) = do
         put_ bh mod
         put_ bh sig_of
@@ -409,6 +412,8 @@ instance Binary ModIface where
                  mi_module      = mod,
                  mi_sig_of      = sig_of,
                  mi_hsc_src     = hsc_src,
+                 mi_src_hash = fingerprint0, -- placeholder because this is dealt
+                                             -- with specially when the file is read
                  mi_deps        = deps,
                  mi_usages      = usages,
                  mi_exports     = exports,
@@ -442,8 +447,6 @@ instance Binary ModIface where
                    mi_finsts = hasFamInsts,
                    mi_exp_hash = exp_hash,
                    mi_orphan_hash = orphan_hash,
-                   mi_src_hash = fingerprint0, -- placeholder because this is dealt
-                                               -- with specially when the file is read
                    mi_warn_fn = mkIfaceWarnCache warns,
                    mi_fix_fn = mkIfaceFixCache fixities,
                    mi_hash_fn = mkIfaceHashCache decls
@@ -457,6 +460,7 @@ emptyPartialModIface mod
   = ModIface { mi_module      = mod,
                mi_sig_of      = Nothing,
                mi_hsc_src     = HsSrcFile,
+               mi_src_hash    = fingerprint0,
                mi_deps        = noDependencies,
                mi_usages      = [],
                mi_exports     = [],
@@ -495,7 +499,6 @@ emptyFullModIface mod =
           mi_finsts = False,
           mi_exp_hash = fingerprint0,
           mi_orphan_hash = fingerprint0,
-          mi_src_hash = fingerprint0,
           mi_warn_fn = emptyIfaceWarnCache,
           mi_fix_fn = emptyIfaceFixCache,
           mi_hash_fn = emptyIfaceHashCache } }
@@ -518,11 +521,11 @@ emptyIfaceHashCache _occ = Nothing
 -- avoid major space leaks.
 instance (NFData (IfaceBackendExts (phase :: ModIfacePhase)), NFData (IfaceDeclExts (phase :: ModIfacePhase))) => NFData (ModIface_ phase) where
   rnf (ModIface f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12
-                f13 f14 f15 f16 f17 f18 f19 f20 f21 f22 f23 f24) =
+                f13 f14 f15 f16 f17 f18 f19 f20 f21 f22 f23 f24 f25) =
     rnf f1 `seq` rnf f2 `seq` f3 `seq` f4 `seq` f5 `seq` f6 `seq` rnf f7 `seq` f8 `seq`
     f9 `seq` rnf f10 `seq` rnf f11 `seq` f12 `seq` rnf f13 `seq` rnf f14 `seq` rnf f15 `seq`
     rnf f16 `seq` f17 `seq` rnf f18 `seq` rnf f19 `seq` f20 `seq` f21 `seq` f22 `seq` rnf f23
-    `seq` rnf f24
+    `seq` rnf f24 `seq` f25 `seq` ()
 
 -- | Records whether a module has orphans. An \"orphan\" is one of:
 --

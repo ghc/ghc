@@ -109,9 +109,10 @@ import Data.IORef
 
 mkPartialIface :: HscEnv
                -> ModDetails
+               -> ModSummary
                -> ModGuts
                -> PartialModIface
-mkPartialIface hsc_env mod_details
+mkPartialIface hsc_env mod_details mod_summary
   ModGuts{ mg_module       = this_mod
          , mg_hsc_src      = hsc_src
          , mg_usages       = usages
@@ -128,7 +129,7 @@ mkPartialIface hsc_env mod_details
          , mg_arg_docs     = arg_docs
          }
   = mkIface_ hsc_env this_mod hsc_src used_th deps rdr_env fix_env warns hpc_info self_trust
-             safe_mode usages doc_hdr decl_docs arg_docs mod_details
+             safe_mode usages doc_hdr decl_docs arg_docs mod_summary mod_details
 
 -- | Fully instantiate an interface. Adds fingerprints and potentially code
 -- generator produced information.
@@ -136,8 +137,8 @@ mkPartialIface hsc_env mod_details
 -- CgInfos is not available when not generating code (-fno-code), or when not
 -- generating interface pragmas (-fomit-interface-pragmas). See also
 -- Note [Conveying CAF-info and LFInfo between modules] in GHC.StgToCmm.Types.
-mkFullIface :: HscEnv -> ModSummary -> PartialModIface -> Maybe CgInfos -> IO ModIface
-mkFullIface hsc_env ms partial_iface mb_cg_infos = do
+mkFullIface :: HscEnv -> PartialModIface -> Maybe CgInfos -> IO ModIface
+mkFullIface hsc_env partial_iface mb_cg_infos = do
     let decls
           | gopt Opt_OmitInterfacePragmas (hsc_dflags hsc_env)
           = mi_decls partial_iface
@@ -146,7 +147,7 @@ mkFullIface hsc_env ms partial_iface mb_cg_infos = do
 
     full_iface <-
       {-# SCC "addFingerprints" #-}
-      addFingerprints hsc_env ms partial_iface{ mi_decls = decls }
+      addFingerprints hsc_env partial_iface{ mi_decls = decls }
 
     -- Debug printing
     let unit_state = hsc_units hsc_env
@@ -221,10 +222,10 @@ mkIfaceTc hsc_env safe_mode mod_details mod_summary
                    used_th deps rdr_env
                    fix_env warns hpc_info
                    (imp_trust_own_pkg imports) safe_mode usages
-                   doc_hdr' doc_map arg_map
+                   doc_hdr' doc_map arg_map mod_summary
                    mod_details
 
-          mkFullIface hsc_env mod_summary partial_iface Nothing
+          mkFullIface hsc_env partial_iface Nothing
 
 mkIface_ :: HscEnv -> Module -> HscSource
          -> Bool -> Dependencies -> GlobalRdrEnv
@@ -235,12 +236,13 @@ mkIface_ :: HscEnv -> Module -> HscSource
          -> Maybe HsDocString
          -> DeclDocMap
          -> ArgDocMap
+         -> ModSummary
          -> ModDetails
          -> PartialModIface
 mkIface_ hsc_env
          this_mod hsc_src used_th deps rdr_env fix_env src_warns
          hpc_info pkg_trust_req safe_mode usages
-         doc_hdr decl_docs arg_docs
+         doc_hdr decl_docs arg_docs mod_summary
          ModDetails{  md_insts     = insts,
                       md_fam_insts = fam_insts,
                       md_rules     = rules,
@@ -317,7 +319,9 @@ mkIface_ hsc_env
           mi_decl_docs   = decl_docs,
           mi_arg_docs    = arg_docs,
           mi_final_exts  = (),
-          mi_ext_fields  = emptyExtensibleFields }
+          mi_ext_fields  = emptyExtensibleFields,
+          mi_src_hash = ms_hs_hash mod_summary
+          }
   where
      cmp_rule     = lexicalCompareFS `on` ifRuleName
      -- Compare these lexicographically by OccName, *not* by unique,

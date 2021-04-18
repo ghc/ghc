@@ -923,7 +923,7 @@ finish summary tc_result mb_old_hash = do
                 {-# SCC "GHC.Driver.Main.mkPartialIface" #-}
                 -- This `force` saves 2M residency in test T10370
                 -- See Note [Avoiding space leaks in toIface*] for details.
-                force (mkPartialIface hsc_env details simplified_guts)
+                force (mkPartialIface hsc_env details summary simplified_guts)
 
           return HscRecomp { hscs_guts = cg_guts,
                              hscs_mod_location = ms_location summary,

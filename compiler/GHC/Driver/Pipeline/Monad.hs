@@ -27,7 +27,6 @@ import GHC.Utils.TmpFs (TempFileLifetime)
 import GHC.Types.SourceFile
 
 import GHC.Unit.Module
-import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.Status
 
@@ -51,7 +50,7 @@ instance MonadIO CompPipeline where
     liftIO m = P $ \_env state -> do a <- m; return (state, a)
 
 data PhasePlus = RealPhase Phase
-               | HscOut HscSource ModuleName ModSummary HscStatus
+               | HscOut HscSource ModuleName HscStatus
 
 instance Outputable PhasePlus where
     ppr (RealPhase p) = ppr p
