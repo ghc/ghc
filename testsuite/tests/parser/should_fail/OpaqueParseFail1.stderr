@@ -1,0 +1,2 @@
+OpaqueParseFail1.hs:4:11: error:
+    parse error on input ‘[’

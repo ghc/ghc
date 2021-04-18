@@ -50,7 +50,7 @@ import GHC.Core.DataCon
 import GHC.Types.Literal
 import GHC.Builtin.PrimOps
 import GHC.Types.Id.Info
-import GHC.Types.Basic  ( Arity, InlineSpec(..), inlinePragmaSpec )
+import GHC.Types.Basic  ( Arity, isNoInlinePragma, isOpaquePragma )
 import GHC.Core.Type
 import GHC.Builtin.Names
 import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
@@ -969,6 +969,7 @@ certainlyWillInline opts fn_info
       CoreUnfolding { uf_tmpl = expr, uf_guidance = guidance, uf_src = src }
         | loop_breaker -> Nothing       -- Won't inline, so try w/w
         | noinline     -> Nothing       -- See Note [Worker/wrapper for NOINLINE functions]
+        | opaque       -> Nothing       -- See Note [OPAQUE pragma]
         | otherwise
         -> case guidance of
              UnfNever   -> Nothing
@@ -990,7 +991,9 @@ certainlyWillInline opts fn_info
 
   where
     loop_breaker = isStrongLoopBreaker (occInfo fn_info)
-    noinline     = inlinePragmaSpec (inlinePragInfo fn_info) == NoInline
+    inl_prag     = inlinePragInfo fn_info
+    noinline     = isNoInlinePragma inl_prag
+    opaque       = isOpaquePragma inl_prag
     fn_unf       = unfoldingInfo fn_info
 
         -- The UnfIfGoodArgs case seems important.  If we w/w small functions
