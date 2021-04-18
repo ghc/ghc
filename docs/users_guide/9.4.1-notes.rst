@@ -1,0 +1,22 @@
+.. _release-9-4-1:
+
+Version 9.4.1
+==============
+
+``base`` library
+~~~~~~~~~~~~~~~~
+
+- ``GHC.Exts.magicDict`` now has the type: ::
+
+        magicDict :: forall {rr :: RuntimeRep} dt st (r :: TYPE rr). (dt => r) -> st -> r
+
+  ``magicDict`` can now be used without defining an intermediate data type. For
+  example, the ``withTypeable`` function from the ``Data.Typeable`` module can
+  now be defined as: ::
+
+        withTypeable :: forall k (a :: k) rep (r :: TYPE rep). ()
+                     => TypeRep a -> (Typeable a => r) -> r
+        withTypeable rep k = magicDict @(Typeable a) k rep
+
+  Note that the explicit type application is required, as the call to
+  ``magicDict`` would be ambiguous otherwise.
