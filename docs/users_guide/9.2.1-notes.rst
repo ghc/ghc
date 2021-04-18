@@ -169,6 +169,10 @@ Compiler
   also useful with this flag to give each usage of a data constructor its own
   unique info table so they can be distinguished in gdb and heap profiles.
 
+- A new pragma, :pragma:`OPAQUE`, that ensures that every call of a named function
+  annotated with an :pragma:`OPAQUE` pragma remains a call of that named function,
+  not some name-mangled variant.
+
 GHCi
 ~~~~
 

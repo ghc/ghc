@@ -1117,6 +1117,7 @@ rep_specialiseInst ty loc
 
 repInline :: InlineSpec -> MetaM (Core TH.Inline)
 repInline NoInline         = dataCon noInlineDataConName
+repInline Opaque           = dataCon opaqueDataConName
 repInline Inline           = dataCon inlineDataConName
 repInline Inlinable        = dataCon inlinableDataConName
 repInline NoUserInlinePrag = notHandled "NOUSERINLINE" empty
