@@ -562,6 +562,8 @@ prepareBinding env top_lvl old_bndr bndr rhs
   | Cast rhs1 co <- rhs
     -- Try for cast worker/wrapper
     -- See Note [Cast worker/wrappers]
+  , inlinePragmaSpec (idInlinePragma old_bndr) /= Opaque
+        -- Don't make a cast w/w for opaque bindings
   , not (isStableUnfolding (realIdUnfolding old_bndr))
         -- Don't make a cast w/w if the thing is going to be inlined anyway
   , not (exprIsTrivial rhs1)
