@@ -507,6 +507,9 @@ tryWW   :: WwOpts
                                         -- if two, then a worker and a
                                         -- wrapper.
 tryWW ww_opts is_rec fn_id rhs
+  -- Don't w/w OPAQUE things
+  | isOpaquePragma (inlinePragInfo fn_info)
+  = return [ (new_fn_id, rhs) ]
   -- Do this even if there is a NOINLINE pragma
   -- See Note [Worker/wrapper for NOINLINE functions]
 

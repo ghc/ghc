@@ -472,6 +472,9 @@ pragInlD :: Quote m => Name -> Inline -> RuleMatch -> Phases -> m Dec
 pragInlD name inline rm phases
   = pure $ PragmaD $ InlineP name inline rm phases
 
+pragOpaqueD :: Quote m => Name -> m Dec
+pragOpaqueD name = pure $ PragmaD $ OpaqueP name
+
 pragSpecD :: Quote m => Name -> m Type -> Phases -> m Dec
 pragSpecD n ty phases
   = do
