@@ -9,8 +9,8 @@
     { T17544_kw.hs:1:1 }
     (UnchangedAnchor))
    (AnnsModule
-    [(AddEpAnn AnnModule (AR { T17544_kw.hs:11:1-6 }))
-    ,(AddEpAnn AnnWhere (AR { T17544_kw.hs:13:13-17 }))]
+    [(AddEpAnn AnnModule (EpaSpan { T17544_kw.hs:11:1-6 }))
+    ,(AddEpAnn AnnWhere (EpaSpan { T17544_kw.hs:13:13-17 }))]
     (AnnList
      (Nothing)
      (Nothing)
@@ -50,8 +50,8 @@
        (Anchor
         { T17544_kw.hs:(15,1)-(16,20) }
         (UnchangedAnchor))
-       [(AddEpAnn AnnData (AR { T17544_kw.hs:15:1-4 }))
-       ,(AddEpAnn AnnWhere (AR { T17544_kw.hs:16:3-7 }))]
+       [(AddEpAnn AnnData (EpaSpan { T17544_kw.hs:15:1-4 }))
+       ,(AddEpAnn AnnWhere (EpaSpan { T17544_kw.hs:16:3-7 }))]
        (EpaComments
         []))
       (L
@@ -67,8 +67,8 @@
         (Anchor
          { T17544_kw.hs:(15,1)-(16,20) }
          (UnchangedAnchor))
-        [(AddEpAnn AnnData (AR { T17544_kw.hs:15:1-4 }))
-        ,(AddEpAnn AnnWhere (AR { T17544_kw.hs:16:3-7 }))]
+        [(AddEpAnn AnnData (EpaSpan { T17544_kw.hs:15:1-4 }))
+        ,(AddEpAnn AnnWhere (EpaSpan { T17544_kw.hs:16:3-7 }))]
         (EpaComments
          []))
        (DataType)
@@ -82,7 +82,7 @@
            (Anchor
             { T17544_kw.hs:16:9-20 }
             (UnchangedAnchor))
-           [(AddEpAnn AnnDcolon (AR { T17544_kw.hs:16:15-16 }))]
+           [(AddEpAnn AnnDcolon (EpaSpan { T17544_kw.hs:16:15-16 }))]
            (EpaComments
             []))
           [(L
@@ -133,8 +133,8 @@
        (Anchor
         { T17544_kw.hs:(18,1)-(19,26) }
         (UnchangedAnchor))
-       [(AddEpAnn AnnNewtype (AR { T17544_kw.hs:18:1-7 }))
-       ,(AddEpAnn AnnWhere (AR { T17544_kw.hs:19:3-7 }))]
+       [(AddEpAnn AnnNewtype (EpaSpan { T17544_kw.hs:18:1-7 }))
+       ,(AddEpAnn AnnWhere (EpaSpan { T17544_kw.hs:19:3-7 }))]
        (EpaComments
         []))
       (L
@@ -150,8 +150,8 @@
         (Anchor
          { T17544_kw.hs:(18,1)-(19,26) }
          (UnchangedAnchor))
-        [(AddEpAnn AnnNewtype (AR { T17544_kw.hs:18:1-7 }))
-        ,(AddEpAnn AnnWhere (AR { T17544_kw.hs:19:3-7 }))]
+        [(AddEpAnn AnnNewtype (EpaSpan { T17544_kw.hs:18:1-7 }))
+        ,(AddEpAnn AnnWhere (EpaSpan { T17544_kw.hs:19:3-7 }))]
         (EpaComments
          []))
        (NewType)
@@ -165,7 +165,7 @@
            (Anchor
             { T17544_kw.hs:19:9-26 }
             (UnchangedAnchor))
-           [(AddEpAnn AnnDcolon (AR { T17544_kw.hs:19:15-16 }))]
+           [(AddEpAnn AnnDcolon (EpaSpan { T17544_kw.hs:19:15-16 }))]
            (EpaComments
             []))
           [(L
@@ -188,7 +188,7 @@
                             (UnchangedAnchor))
                            (AnnListItem
                             [(AddRarrowAnn
-                              (AR { T17544_kw.hs:19:21-22 }))])
+                              (EpaSpan { T17544_kw.hs:19:21-22 }))])
                            (EpaComments
                             [])) { T17544_kw.hs:19:18-19 })
               (HsTupleTy
@@ -198,8 +198,8 @@
                  (UnchangedAnchor))
                 (AnnParen
                  (AnnParens)
-                 (AR { T17544_kw.hs:19:18 })
-                 (AR { T17544_kw.hs:19:19 }))
+                 (EpaSpan { T17544_kw.hs:19:18 })
+                 (EpaSpan { T17544_kw.hs:19:19 }))
                 (EpaComments
                  []))
                (HsBoxedOrConstraintTuple)
@@ -242,8 +242,8 @@
         (Anchor
          { T17544_kw.hs:(21,1)-(24,18) }
          (UnchangedAnchor))
-        [(AddEpAnn AnnClass (AR { T17544_kw.hs:21:1-5 }))
-        ,(AddEpAnn AnnWhere (AR { T17544_kw.hs:23:3-7 }))]
+        [(AddEpAnn AnnClass (EpaSpan { T17544_kw.hs:21:1-5 }))
+        ,(AddEpAnn AnnWhere (EpaSpan { T17544_kw.hs:23:3-7 }))]
         (EpaComments
          []))
        (NoAnnSortKey)
@@ -281,7 +281,7 @@
            { T17544_kw.hs:24:5-13 }
            (UnchangedAnchor))
           (AnnSig
-           (AddEpAnn AnnDcolon (AR { T17544_kw.hs:24:15-16 }))
+           (AddEpAnn AnnDcolon (EpaSpan { T17544_kw.hs:24:15-16 }))
            [])
           (EpaComments
            []))
