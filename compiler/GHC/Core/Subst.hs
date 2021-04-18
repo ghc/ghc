@@ -585,7 +585,7 @@ substCoVarBndr (Subst in_scope id_env tv_env cv_env) cv
         (TCvSubst in_scope' tv_env' cv_env', cv')
            -> (Subst in_scope' id_env tv_env' cv_env', cv')
 
--- | See 'Type.substTy'
+-- | See 'GHC.Core.Type.substTy'.
 substTy :: Subst -> Type -> Type
 substTy subst ty = Type.substTyUnchecked (getTCvSubst subst) ty
 
