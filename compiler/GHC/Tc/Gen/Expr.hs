@@ -1293,7 +1293,7 @@ disambiguateRecordBinds record_expr record_rho rbnds res_ty
     -- See Note [Deprecating ambiguous fields] in GHC.Tc.Gen.Head
     reportAmbiguousField :: TyCon -> TcM ()
     reportAmbiguousField parent_type =
-        setSrcSpan loc $ warnIfFlag Opt_WarnAmbiguousFields True $
+        setSrcSpan loc $ addDiagnostic (WarningWithFlag Opt_WarnAmbiguousFields) $
           vcat [ text "The record update" <+> ppr rupd
                    <+> text "with type" <+> ppr parent_type
                    <+> text "is ambiguous."
@@ -1410,8 +1410,8 @@ checkMissingFields con_like rbinds arg_tys
         addErrTc (missingStrictFields con_like [])
     else do
         when (notNull field_strs && null field_labels)
-             (diagnosticTc (WarningWithFlag Opt_WarnMissingFields) True
-                           (missingFields con_like []))
+             (addDiagnosticTc (WarningWithFlag Opt_WarnMissingFields)
+                              (missingFields con_like []))
 
   | otherwise = do              -- A record
     unless (null missing_s_fields) $ do
@@ -1420,14 +1420,13 @@ checkMissingFields con_like rbinds arg_tys
         -- we can't substitute it with (error "Missing field f")
         addErrTc (missingStrictFields con_like fs)
 
-    warn <- woptM Opt_WarnMissingFields
-    when (warn && notNull missing_ns_fields) $ do
+    unless (null missing_ns_fields) $ do
         fs <- zonk_fields missing_ns_fields
         -- It is not an error (though we may want) to omit a
         -- lazy field, because we can always use
         -- (error "Missing field f") instead.
-        diagnosticTc (WarningWithFlag Opt_WarnMissingFields) True
-                     (missingFields con_like fs)
+        addDiagnosticTc (WarningWithFlag Opt_WarnMissingFields)
+                        (missingFields con_like fs)
 
   where
     -- we zonk the fields to get better types in error messages (#18869)
