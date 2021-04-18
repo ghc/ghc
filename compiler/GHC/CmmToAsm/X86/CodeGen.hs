@@ -3411,7 +3411,7 @@ outOfLineCmmOp bid mop res args
               MO_AtomicRMW _ _ -> fsLit "atomicrmw"
               MO_AtomicRead _  -> fsLit "atomicread"
               MO_AtomicWrite _ -> fsLit "atomicwrite"
-              MO_Cmpxchg _     -> fsLit "cmpxchg"
+              MO_Cmpxchg _     -> should_be_inline
               MO_Xchg _        -> should_be_inline
 
               MO_UF_Conv _ -> unsupported
