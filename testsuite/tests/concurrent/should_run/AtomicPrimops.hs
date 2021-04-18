@@ -10,6 +10,7 @@ import Foreign.Marshal.Alloc
 import Foreign.Ptr
 import Foreign.Storable
 import GHC.Exts
+import GHC.Int
 import GHC.IO
 
 -- | Iterations per worker.
@@ -25,6 +26,9 @@ main = do
     fetchOrTest
     fetchXorTest
     casTest
+    cas8Test
+    cas16Test
+    cas32Test
     readWriteTest
     -- Addr#
     fetchAddSubAddrTest
@@ -202,6 +206,48 @@ casTest = do
         old' <- casIntArray mba ix old (old + n)
         when (old /= old') $ add mba ix n
 
+cas8Test :: IO ()
+cas8Test = do
+    tot <- race 0
+        (\ mba -> loop iters $ add mba 0 1)
+        (\ mba -> loop iters $ add mba 0 2)
+    assertEq ((3 * fromIntegral iters) `mod` 256) tot "cas8Test"
+  where
+    -- Fetch-and-add implemented using CAS.
+    add :: MByteArray -> Int -> Int8 -> IO ()
+    add mba ix n = do
+        old <- readInt8Array mba ix
+        old' <- casInt8Array mba ix old (old + n)
+        when (old /= old') $ add mba ix n
+
+cas16Test :: IO ()
+cas16Test = do
+    tot <- race 0
+        (\ mba -> loop iters $ add mba 0 1)
+        (\ mba -> loop iters $ add mba 0 2)
+    assertEq ((3 * fromIntegral iters) `mod` 65536) tot "cas16Test"
+  where
+    -- Fetch-and-add implemented using CAS.
+    add :: MByteArray -> Int -> Int16 -> IO ()
+    add mba ix n = do
+        old <- readInt16Array mba ix
+        old' <- casInt16Array mba ix old (old + n)
+        when (old /= old') $ add mba ix n
+
+cas32Test :: IO ()
+cas32Test = do
+    tot <- race 0
+        (\ mba -> loop iters $ add mba 0 1)
+        (\ mba -> loop iters $ add mba 0 2)
+    assertEq ((3 * fromIntegral iters) `mod` 2^32) tot "cas32Test"
+  where
+    -- Fetch-and-add implemented using CAS.
+    add :: MByteArray -> Int -> Int32 -> IO ()
+    add mba ix n = do
+        old <- readInt32Array mba ix
+        old' <- casInt32Array mba ix old (old + n)
+        when (old /= old') $ add mba ix n
+
 -- | Test atomicCasWordAddr# by having two threads concurrently increment a
 -- counter, checking the sum at the end.
 casAddrTest :: IO ()
@@ -347,6 +393,21 @@ readIntArray (MBA mba#) (I# ix#) = IO $ \ s# ->
     case readIntArray# mba# ix# s# of
         (# s2#, n# #) -> (# s2#, I# n# #)
 
+readInt8Array :: MByteArray -> Int -> IO Int8
+readInt8Array (MBA mba#) (I# ix#) = IO $ \ s# ->
+    case readInt8Array# mba# ix# s# of
+        (# s2#, n# #) -> (# s2#, I8# n# #)
+
+readInt16Array :: MByteArray -> Int -> IO Int16
+readInt16Array (MBA mba#) (I# ix#) = IO $ \ s# ->
+    case readInt16Array# mba# ix# s# of
+        (# s2#, n# #) -> (# s2#, I16# n# #)
+
+readInt32Array :: MByteArray -> Int -> IO Int32
+readInt32Array (MBA mba#) (I# ix#) = IO $ \ s# ->
+    case readInt32Array# mba# ix# s# of
+        (# s2#, n# #) -> (# s2#, I32# n# #)
+
 atomicWriteIntArray :: MByteArray -> Int -> Int -> IO ()
 atomicWriteIntArray (MBA mba#) (I# ix#) (I# n#) = IO $ \ s# ->
     case atomicWriteIntArray# mba# ix# n# s# of
@@ -361,6 +422,21 @@ casIntArray :: MByteArray -> Int -> Int -> Int -> IO Int
 casIntArray (MBA mba#) (I# ix#) (I# old#) (I# new#) = IO $ \ s# ->
     case casIntArray# mba# ix# old# new# s# of
         (# s2#, old2# #) -> (# s2#, I# old2# #)
+
+casInt8Array :: MByteArray -> Int -> Int8 -> Int8 -> IO Int8
+casInt8Array (MBA mba#) (I# ix#) (I8# old#) (I8# new#) = IO $ \ s# ->
+    case casInt8Array# mba# ix# old# new# s# of
+        (# s2#, old2# #) -> (# s2#, I8# old2# #)
+
+casInt16Array :: MByteArray -> Int -> Int16 -> Int16 -> IO Int16
+casInt16Array (MBA mba#) (I# ix#) (I16# old#) (I16# new#) = IO $ \ s# ->
+    case casInt16Array# mba# ix# old# new# s# of
+        (# s2#, old2# #) -> (# s2#, I16# old2# #)
+
+casInt32Array :: MByteArray -> Int -> Int32 -> Int32 -> IO Int32
+casInt32Array (MBA mba#) (I# ix#) (I32# old#) (I32# new#) = IO $ \ s# ->
+    case casInt32Array# mba# ix# old# new# s# of
+        (# s2#, old2# #) -> (# s2#, I32# old2# #)
 
 ------------------------------------------------------------------------
 -- Wrappers around Addr#
