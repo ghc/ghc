@@ -18,7 +18,7 @@ Language extensions can be controlled (i.e. allowed or not) in two ways:
    ``{-# LANGUAGE TemplateHaskell #-}`` (see :ref:`language-pragma`).
 
 .. extension:: GHC2021
-    :shortdesc: Use GHC’s set of default languages from 2021
+    :shortdesc: Use GHC’s set of default extensions from 2021
 
     GHC blesses a number of extensions, beyond Haskell 2010, to be suitable to
     turned on by default. These extensions are considered to be stable and

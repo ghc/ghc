@@ -84,7 +84,7 @@ Language
 
 * The :extension:`GHC2021` language is supported now. It builds on top of
   Haskell2010, adding several stable and conservative extensions, and removing
-  deprecated ones. It is now also the “default” langauge set that is active
+  deprecated ones. It is now also the “default” language set that is active
   when no other language set, such as :extension:`Haskell98` or
   :extension:`Haskell2010`,  is explicitly loaded (e.g via Cabal’s
   ``default-language``).
