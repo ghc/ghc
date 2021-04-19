@@ -15,6 +15,7 @@ import GHC.Core.SimpleOpt
 import GHC.Core.Coercion.Opt
 import GHC.Parser.Lexer
 import GHC.Runtime.Interpreter (BCOOpts(..))
+import GHC.Utils.Error (mkPlainMsgEnvelope)
 import GHCi.Message (EvalOpts(..))
 
 import GHC.Conc (getNumProcessors)
@@ -39,6 +40,7 @@ initParserOpts =
   mkParserOpts
     <$> warningFlags
     <*> extensionFlags
+    <*> mkPlainMsgEnvelope
     <*> safeImportsOn
     <*> gopt Opt_Haddock
     <*> gopt Opt_KeepRawTokenStream

@@ -11,7 +11,7 @@ werror.hs:7:13: error: [-Wname-shadowing (in -Wall), -Werror=name-shadowing]
 
 werror.hs:8:1: error: [-Wtabs (in -Wdefault), -Werror=tabs]
     Tab character found here.
-    Please use spaces instead.
+    Suggested fix: Please use spaces instead.
 
 werror.hs:10:1: error: [-Wmissing-signatures (in -Wall), -Werror=missing-signatures]
     Top-level binding with no type signature: f :: [a1] -> [a2]
