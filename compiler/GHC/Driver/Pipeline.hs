@@ -233,7 +233,7 @@ compileOne' m_tc_result mHscMessage
             (_, _, Just iface, mb_linkable) <- runPipeline StopLn hsc_env'
                               (output_fn,
                                Nothing,
-                               Just (HscOut src_flavour mod_name summary status))
+                               Just (HscBackend src_flavour mod_name summary status))
                               (Just basename)
                               Persistent
                               (Just location)
@@ -686,7 +686,7 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_input_buf, mb_phase)
              isHaskell (RealPhase (Cpp   _)) = True
              isHaskell (RealPhase (HsPp  _)) = True
              isHaskell (RealPhase (Hsc   _)) = True
-             isHaskell (HscOut {})           = True
+             isHaskell (HscBackend {})           = True
              isHaskell _                     = False
 
              isHaskellishFile = isHaskell start_phase
@@ -714,7 +714,7 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_input_buf, mb_phase)
                        throwGhcExceptionIO (UsageError
                                    ("cannot compile this file to desired target: "
                                       ++ input_fn))
-             HscOut {} -> return ()
+             HscBackend {} -> return ()
 
          -- Write input buffer to temp file if requested
          input_fn' <- case (start_phase, mb_input_buf) of
@@ -850,7 +850,7 @@ pipeLoop phase input_fn = do
                                   (text "Running phase" <+> ppr phase)
 
            case phase of
-               HscOut {} -> do
+               HscBackend {} -> do
                    -- Depending on the dynamic-too state, we first run the
                    -- backend to generate the non-dynamic objects and then
                    -- re-run it to generate the dynamic ones.
@@ -1295,10 +1295,10 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
         -- "driver" plugins may have modified the DynFlags so we update them
         setDynFlags (hsc_dflags plugin_hsc_env)
 
-        return (HscOut src_flavour mod_name mod_summary result,
-                panic "HscOut doesn't have an input filename")
+        return (HscBackend src_flavour mod_name mod_summary result,
+                panic "HscBackend doesn't have an input filename")
 
-runPhase (HscOut src_flavour mod_name mod_summary result) _ = do
+runPhase (HscBackend src_flavour mod_name mod_summary result) _ = do
         dflags <- getDynFlags
         logger <- getLogger
         location <- getLocation src_flavour mod_name
