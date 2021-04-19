@@ -5,11 +5,13 @@
 {-# LANGUAGE CPP, GADTs, ScopedTypeVariables, BangPatterns, TupleSections #-}
 
 module FamInstEnv (
+        -- * Family instances
         FamInst(..), FamFlavor(..), famInstAxiom, famInstTyCon, famInstRHS,
         famInstsRepTyCons, famInstRepTyCon_maybe, dataFamInstRepTyCon,
         pprFamInst, pprFamInsts,
         mkImportedFamInst,
 
+        -- * Family instance environment
         FamInstEnvs, FamInstEnv, emptyFamInstEnv, emptyFamInstEnvs,
         extendFamInstEnv, extendFamInstEnvList,
         famInstEnvElts, famInstEnvSize, familyInstances,
@@ -18,21 +20,22 @@ module FamInstEnv (
         mkCoAxBranch, mkBranchedCoAxiom, mkUnbranchedCoAxiom, mkSingleCoAxiom,
         mkNewTypeCoAxiom,
 
+        -- * Family instance lookup
         FamInstMatch(..),
         lookupFamInstEnv, lookupFamInstEnvConflicts, lookupFamInstEnvByTyCon,
 
         isDominatedBy, apartnessCheck,
 
-        -- Injectivity
+        -- * Injectivity
         InjectivityCheckResult(..),
         lookupFamInstEnvInjectivityConflicts, injectiveBranches,
 
-        -- Normalisation
+        -- * Normalisation
         topNormaliseType, topNormaliseType_maybe,
         normaliseType, normaliseTcApp, normaliseTcArgs,
         reduceTyFamApp_maybe,
 
-        -- Flattening
+        -- * Flattening
         flattenTys
     ) where
 
@@ -350,7 +353,7 @@ UniqFM and UniqDFM.
 See Note [Deterministic UniqFM].
 -}
 
-type FamInstEnv = UniqDFM FamilyInstEnv  -- Maps a family to its instances
+type FamInstEnv = UniqDFM FamilyInstEnv  -- ^ Maps a family to its instances
      -- See Note [FamInstEnv]
      -- See Note [FamInstEnv determinism]
 
@@ -764,6 +767,7 @@ lookupFamInstEnvByTyCon (pkg_ie, home_ie) fam_tc
                Nothing          -> []
                Just (FamIE fis) -> fis
 
+-- | Look-up an instance for a type family applied to some types.
 lookupFamInstEnv
     :: FamInstEnvs
     -> TyCon -> [Type]          -- What we are looking for
@@ -775,10 +779,11 @@ lookupFamInstEnv
    where
      match _ _ tpl_tys tys = tcMatchTys tpl_tys tys
 
+-- | Find instances in 'FamInstEnvs' which conflict with a new 'FamInst'.
 lookupFamInstEnvConflicts
     :: FamInstEnvs
-    -> FamInst          -- Putative new instance
-    -> [FamInstMatch]   -- Conflicting matches (don't look at the fim_tys field)
+    -> FamInst          -- ^ Putative new instance
+    -> [FamInstMatch]   -- ^ Conflicting matches (don't look at the fim_tys field)
 -- E.g. when we are about to add
 --    f : type instance F [a] = a->a
 -- we do (lookupFamInstConflicts f [b])
