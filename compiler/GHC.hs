@@ -330,7 +330,6 @@ import GHCi.RemoteTypes
 import qualified GHC.Parser as Parser
 import GHC.Parser.Lexer
 import GHC.Parser.Annotation
-import GHC.Parser.Errors.Ppr
 import GHC.Parser.Utils
 
 import GHC.Iface.Load        ( loadSysInterface )
@@ -1608,7 +1607,7 @@ getTokenStream mod = do
   let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
   case lexTokenStream (initParserOpts dflags) source startLoc of
     POk _ ts    -> return ts
-    PFailed pst -> throwErrors (foldPsMessages mkParserErr (getErrorMessages pst))
+    PFailed pst -> throwErrors (GhcPsMessage <$> getErrorMessages pst)
 
 -- | Give even more information on the source than 'getTokenStream'
 -- This function allows reconstructing the source completely with
@@ -1619,7 +1618,7 @@ getRichTokenStream mod = do
   let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
   case lexTokenStream (initParserOpts dflags) source startLoc of
     POk _ ts    -> return $ addSourceToTokens startLoc source ts
-    PFailed pst -> throwErrors (foldPsMessages mkParserErr (getErrorMessages pst))
+    PFailed pst -> throwErrors (GhcPsMessage <$> getErrorMessages pst)
 
 -- | Given a source location and a StringBuffer corresponding to this
 -- location, return a rich token stream with the source associated to the
@@ -1799,12 +1798,11 @@ parser str dflags filename =
 
      PFailed pst ->
          let (warns,errs) = getMessages pst in
-         (foldPsMessages (mkParserWarn dflags) warns
-         , Left (foldPsMessages mkParserErr errs))
+         (GhcPsMessage <$> warns, Left $ GhcPsMessage <$> errs)
 
      POk pst rdr_module ->
          let (warns,_) = getMessages pst in
-         (foldPsMessages (mkParserWarn dflags) warns, Right rdr_module)
+         (GhcPsMessage <$> warns, Right rdr_module)
 
 -- -----------------------------------------------------------------------------
 -- | Find the package environment (if one exists)
