@@ -63,6 +63,9 @@
 #include <string.h>
 
 #include <pthread.h>
+#if defined(HAVE_PTHREAD_NP_H)
+#include <pthread_np.h>
+#endif
 #include <unistd.h>
 #include <fcntl.h>
 
@@ -175,10 +178,20 @@ initTicker (Time interval, TickProc handle_tick)
     /*
      * We can't use the RTS's createOSThread here as we need to remain attached
      * to the thread we create so we can later join to it if requested
+     *
+     * On FreeBSD 12.2 pthread_set_name_np() is unconditionally declared in
+     * <pthread_np.h>, while pthread_setname_np() is conditionally declared in
+     * <pthread.h> when _POSIX_SOURCE is not defined, but we're including
+     * <PosixSource.h>, so must use pthread_set_name_np() instead.  See similar
+     * code in "rts/posix/OSThreads.c".
      */
     if (! pthread_create(&thread, NULL, itimer_thread_func, (void*)handle_tick)) {
-#if defined(HAVE_PTHREAD_SETNAME_NP)
+#if defined(HAVE_PTHREAD_SET_NAME_NP)
+        pthread_set_name_np(thread, "ghc_ticker");
+#elif defined(HAVE_PTHREAD_SETNAME_NP)
         pthread_setname_np(thread, "ghc_ticker");
+#elif defined(HAVE_PTHREAD_SETNAME_NP_DARWIN)
+        pthread_setname_np("ghc_ticker");
 #endif
     } else {
         barf("Itimer: Failed to spawn thread: %s", strerror(errno));

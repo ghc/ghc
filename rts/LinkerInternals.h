@@ -195,6 +195,7 @@ typedef struct {
     } jumpIsland;
 #elif defined(x86_64_HOST_ARCH)
     uint64_t    addr;
+    // See Note [TLSGD relocation] in elf_tlsgd.c
     uint8_t     jumpIsland[8];
 #elif defined(arm_HOST_ARCH)
     uint8_t     jumpIsland[16];
