@@ -2222,7 +2222,7 @@ warnUnnecessarySourceImports sccs = do
 
         warn :: DynFlags -> Located ModuleName -> WarnMsg
         warn dflags (L loc mod) =
-           mkPlainMsgEnvelope dflags WarningWithoutFlag loc
+           mkPlainMsgEnvelope dflags (WarningWithFlag Opt_WarnUnusedImports) loc
                 (text "{-# SOURCE #-} unnecessary in import of "
                  <+> quotes (ppr mod))
 
