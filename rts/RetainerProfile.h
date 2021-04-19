@@ -12,20 +12,15 @@
 #if defined(PROFILING)
 
 #include "RetainerSet.h"
-#include "TraverseHeap.h"
+#include "rts/TraverseHeap.h"
 
 #include "BeginPrivate.h"
 
 void initRetainerProfiling ( void );
 void endRetainerProfiling  ( void );
-void retainerProfile       ( void );
+void retainerProfile       ( traverseState *ts );
 
-bool isRetainerSetValid( const StgClosure *c );
 RetainerSet* retainerSetOf( const StgClosure *c );
-
-// Used by GC.c
-W_ retainerStackBlocks(void);
-extern traverseState g_retainerTraverseState;
 
 #include "EndPrivate.h"
 

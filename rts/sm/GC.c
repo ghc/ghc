@@ -37,14 +37,13 @@
 #include "Schedule.h"
 #include "Sanity.h"
 #include "BlockAlloc.h"
-#include "ProfHeap.h"
+#include "rts/ProfHeap.h"
 #include "Proftimer.h"
 #include "Weak.h"
 #include "Prelude.h"
 #include "RtsSignals.h"
 #include "STM.h"
 #include "Trace.h"
-#include "RetainerProfile.h"
 #include "LdvProfile.h"
 #include "RaiseAsync.h"
 #include "StableName.h"
@@ -62,7 +61,7 @@
    Global variables
    -------------------------------------------------------------------------- */
 
-/* STATIC OBJECT LIST.
+/* Note [STATIC OBJECT LIST]
  *
  * During GC:
  * We maintain a linked list of static objects that are still live.
@@ -96,7 +95,15 @@
  * We build up a static object list while collecting generations 0..N,
  * which is then appended to the static object list of generation N+1.
  *
- * See also: Note [STATIC_LINK fields] in Storage.h.
+ * See also:
+ *
+ * - Note [STATIC_LINK fields] in Storage.h,
+ *
+ * - evacuate_static_object in Evac.c where objects get chained onto the
+ *   static_objects list and
+ *
+ * - scavenge_static where they get moved from static_objects to
+ *   scavanged_static_objects.
  */
 
 /* Hot GC globals
@@ -914,14 +921,6 @@ GarbageCollect (uint32_t collect_gen,
       checkUnload();
   }
 
-#if defined(PROFILING)
-  // resetStaticObjectForProfiling() must be called before
-  // zeroing below.
-
-  // ToDo: fix the gct->scavenged_static_objects below
-  resetStaticObjectForProfiling(&g_retainerTraverseState, gct->scavenged_static_objects);
-#endif
-
   // Start any pending finalizers.  Must be after
   // updateStableTables() and stableUnlock() (see #4221).
   RELEASE_SM_LOCK;
@@ -978,11 +977,6 @@ GarbageCollect (uint32_t collect_gen,
       need_prealloc += RtsFlags.GcFlags.largeAllocLim;
       need_prealloc += countAllocdBlocks(exec_block);
       need_prealloc += arenaBlocks();
-#if defined(PROFILING)
-      if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_RETAINER) {
-          need_prealloc += retainerStackBlocks();
-      }
-#endif
 
       // Reset the counter if the major GC was caused by a heap overflow
       consec_idle_gcs = is_overflow_gc ? 0 : consec_idle_gcs + 1;
