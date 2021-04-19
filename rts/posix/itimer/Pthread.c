@@ -63,6 +63,9 @@
 #include <string.h>
 
 #include <pthread.h>
+#if defined(HAVE_PTHREAD_NP_H)
+#include <pthread_np.h>
+#endif
 #include <unistd.h>
 #include <fcntl.h>
 
