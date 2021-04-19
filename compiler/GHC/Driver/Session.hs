@@ -151,6 +151,7 @@ module GHC.Driver.Session (
         defaultFatalMessager,
         defaultFlushOut,
         defaultFlushErr,
+        setOutputFile, setDynOutputFile, setOutputHi,
 
         getOpts,                        -- DynFlags -> (DynFlags -> [a]) -> [a]
         getVerbFlags,

@@ -2408,7 +2408,11 @@ enableCodeGenWhen logger tmpfs condition should_modify staticLife dynLife bcknd 
         let ms' = ms
               { ms_location =
                   ms_location {ml_hi_file = hi_file, ml_obj_file = o_file}
-              , ms_hspp_opts = updOptLevel 0 $ dflags {backend = bcknd}
+              , ms_hspp_opts = updOptLevel 0 $
+                  setOutputFile (Just o_file) $
+                  setDynOutputFile (Just $ dynamicOutputFile dflags o_file) $
+                  setOutputHi (Just hi_file) $
+                  dflags {backend = bcknd}
               }
         pure (ExtendedModSummary ms' bkp_deps)
       | otherwise = return (ExtendedModSummary ms bkp_deps)
