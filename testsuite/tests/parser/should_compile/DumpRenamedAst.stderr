@@ -119,7 +119,7 @@
                          (UnchangedAnchor))
                         (AnnListItem
                          [(AddVbarAnn
-                           (AR { DumpRenamedAst.hs:10:19 }))])
+                           (EpaSpan { DumpRenamedAst.hs:10:19 }))])
                         (EpaComments
                          [])) { DumpRenamedAst.hs:10:14-17 })
            (ConDeclH98
@@ -293,9 +293,9 @@
               (Anchor
                { DumpRenamedAst.hs:12:20-30 }
                (UnchangedAnchor))
-              [(AddEpAnn AnnDcolon (AR { DumpRenamedAst.hs:12:24-25 }))
-              ,(AddEpAnn AnnOpenP (AR { DumpRenamedAst.hs:12:20 }))
-              ,(AddEpAnn AnnCloseP (AR { DumpRenamedAst.hs:12:30 }))]
+              [(AddEpAnn AnnDcolon (EpaSpan { DumpRenamedAst.hs:12:24-25 }))
+              ,(AddEpAnn AnnOpenP (EpaSpan { DumpRenamedAst.hs:12:20 }))
+              ,(AddEpAnn AnnCloseP (EpaSpan { DumpRenamedAst.hs:12:30 }))]
               (EpaComments
                []))
              (())
@@ -311,8 +311,8 @@
                  (UnchangedAnchor))
                 (AnnParen
                  (AnnParensSquare)
-                 (AR { DumpRenamedAst.hs:12:27 })
-                 (AR { DumpRenamedAst.hs:12:29 }))
+                 (EpaSpan { DumpRenamedAst.hs:12:27 })
+                 (EpaSpan { DumpRenamedAst.hs:12:29 }))
                 (EpaComments
                  []))
                (L
@@ -376,7 +376,7 @@
                { DumpRenamedAst.hs:16:20 }
                (UnchangedAnchor))
               (AddRarrowAnn
-               (AR { DumpRenamedAst.hs:16:22-23 }))
+               (EpaSpan { DumpRenamedAst.hs:16:22-23 }))
               (EpaComments
                []))
              (HsUnrestrictedArrow
@@ -397,7 +397,7 @@
                  { DumpRenamedAst.hs:16:25 }
                  (UnchangedAnchor))
                 (AddRarrowAnn
-                 (AR { DumpRenamedAst.hs:16:27-28 }))
+                 (EpaSpan { DumpRenamedAst.hs:16:27-28 }))
                 (EpaComments
                  []))
                (HsUnrestrictedArrow
@@ -453,7 +453,7 @@
                  (Anchor
                   { DumpRenamedAst.hs:19:23 }
                   (UnchangedAnchor))
-                 [(AddEpAnn AnnDcolon (AR { DumpRenamedAst.hs:19:25-26 }))]
+                 [(AddEpAnn AnnDcolon (EpaSpan { DumpRenamedAst.hs:19:25-26 }))]
                  (EpaComments
                   []))
                 (L
@@ -472,7 +472,7 @@
                     { DumpRenamedAst.hs:19:28 }
                     (UnchangedAnchor))
                    (AddRarrowAnn
-                    (AR { DumpRenamedAst.hs:19:30-31 }))
+                    (EpaSpan { DumpRenamedAst.hs:19:30-31 }))
                    (EpaComments
                     []))
                   (HsUnrestrictedArrow
@@ -508,7 +508,7 @@
                 { DumpRenamedAst.hs:19:42-52 }
                 (UnchangedAnchor))
                (AddRarrowAnn
-                (AR { DumpRenamedAst.hs:19:54-55 }))
+                (EpaSpan { DumpRenamedAst.hs:19:54-55 }))
                (EpaComments
                 []))
               (HsUnrestrictedArrow
@@ -525,7 +525,7 @@
                     { DumpRenamedAst.hs:19:43 }
                     (UnchangedAnchor))
                    (AddRarrowAnn
-                    (AR { DumpRenamedAst.hs:19:45-46 }))
+                    (EpaSpan { DumpRenamedAst.hs:19:45-46 }))
                    (EpaComments
                     []))
                   (HsUnrestrictedArrow
@@ -578,7 +578,7 @@
                                 (UnchangedAnchor))
                                (AnnListItem
                                 [(AddRarrowAnn
-                                  (AR { DumpRenamedAst.hs:20:36-37 }))])
+                                  (EpaSpan { DumpRenamedAst.hs:20:36-37 }))])
                                (EpaComments
                                 [])) { DumpRenamedAst.hs:20:10-34 })
                   (HsParTy
@@ -611,7 +611,7 @@
                          { DumpRenamedAst.hs:20:22-25 }
                          (UnchangedAnchor))
                         (AddRarrowAnn
-                         (AR { DumpRenamedAst.hs:20:27-28 }))
+                         (EpaSpan { DumpRenamedAst.hs:20:27-28 }))
                         (EpaComments
                          []))
                        (HsUnrestrictedArrow
@@ -733,9 +733,9 @@
              (Anchor
               { DumpRenamedAst.hs:22:10-17 }
               (UnchangedAnchor))
-             [(AddEpAnn AnnDcolon (AR { DumpRenamedAst.hs:22:13-14 }))
-             ,(AddEpAnn AnnOpenP (AR { DumpRenamedAst.hs:22:10 }))
-             ,(AddEpAnn AnnCloseP (AR { DumpRenamedAst.hs:22:17 }))]
+             [(AddEpAnn AnnDcolon (EpaSpan { DumpRenamedAst.hs:22:13-14 }))
+             ,(AddEpAnn AnnOpenP (EpaSpan { DumpRenamedAst.hs:22:10 }))
+             ,(AddEpAnn AnnCloseP (EpaSpan { DumpRenamedAst.hs:22:17 }))]
              (EpaComments
               []))
             (())
@@ -915,9 +915,9 @@
               (Anchor
                { DumpRenamedAst.hs:24:16-23 }
                (UnchangedAnchor))
-              [(AddEpAnn AnnDcolon (AR { DumpRenamedAst.hs:24:19-20 }))
-              ,(AddEpAnn AnnOpenP (AR { DumpRenamedAst.hs:24:16 }))
-              ,(AddEpAnn AnnCloseP (AR { DumpRenamedAst.hs:24:23 }))]
+              [(AddEpAnn AnnDcolon (EpaSpan { DumpRenamedAst.hs:24:19-20 }))
+              ,(AddEpAnn AnnOpenP (EpaSpan { DumpRenamedAst.hs:24:16 }))
+              ,(AddEpAnn AnnCloseP (EpaSpan { DumpRenamedAst.hs:24:23 }))]
               (EpaComments
                []))
              (())
@@ -939,9 +939,9 @@
               (Anchor
                { DumpRenamedAst.hs:24:25-40 }
                (UnchangedAnchor))
-              [(AddEpAnn AnnDcolon (AR { DumpRenamedAst.hs:24:28-29 }))
-              ,(AddEpAnn AnnOpenP (AR { DumpRenamedAst.hs:24:25 }))
-              ,(AddEpAnn AnnCloseP (AR { DumpRenamedAst.hs:24:40 }))]
+              [(AddEpAnn AnnDcolon (EpaSpan { DumpRenamedAst.hs:24:28-29 }))
+              ,(AddEpAnn AnnOpenP (EpaSpan { DumpRenamedAst.hs:24:25 }))
+              ,(AddEpAnn AnnCloseP (EpaSpan { DumpRenamedAst.hs:24:40 }))]
               (EpaComments
                []))
              (())
@@ -956,7 +956,7 @@
                  { DumpRenamedAst.hs:24:31 }
                  (UnchangedAnchor))
                 (AddRarrowAnn
-                 (AR { DumpRenamedAst.hs:24:33-34 }))
+                 (EpaSpan { DumpRenamedAst.hs:24:33-34 }))
                 (EpaComments
                  []))
                (HsUnrestrictedArrow
@@ -1122,8 +1122,8 @@
                  (UnchangedAnchor))
                 (AnnParen
                  (AnnParensSquare)
-                 (AR { DumpRenamedAst.hs:30:12 })
-                 (AR { DumpRenamedAst.hs:30:14 }))
+                 (EpaSpan { DumpRenamedAst.hs:30:12 })
+                 (EpaSpan { DumpRenamedAst.hs:30:14 }))
                 (EpaComments
                  []))
                (L
@@ -1144,7 +1144,7 @@
              (Anchor
               { DumpRenamedAst.hs:31:3-27 }
               (UnchangedAnchor))
-             [(AddEpAnn AnnType (AR { DumpRenamedAst.hs:31:3-6 }))]
+             [(AddEpAnn AnnType (EpaSpan { DumpRenamedAst.hs:31:3-6 }))]
              (EpaComments
               []))
             (FamEqn
@@ -1164,8 +1164,8 @@
                    (UnchangedAnchor))
                   (AnnParen
                    (AnnParensSquare)
-                   (AR { DumpRenamedAst.hs:31:10 })
-                   (AR { DumpRenamedAst.hs:31:12 }))
+                   (EpaSpan { DumpRenamedAst.hs:31:10 })
+                   (EpaSpan { DumpRenamedAst.hs:31:12 }))
                   (EpaComments
                    []))
                  (L
@@ -1283,9 +1283,9 @@
                      (AnnList
                       (Nothing)
                       (Just
-                       (AddEpAnn AnnOpenP (AR { DumpRenamedAst.hs:8:18 })))
+                       (AddEpAnn AnnOpenP (EpaSpan { DumpRenamedAst.hs:8:18 })))
                       (Just
-                       (AddEpAnn AnnCloseP (AR { DumpRenamedAst.hs:8:23 })))
+                       (AddEpAnn AnnCloseP (EpaSpan { DumpRenamedAst.hs:8:23 })))
                       []
                       [])
                      (EpaComments
@@ -1302,5 +1302,3 @@
               {Name: GHC.Types.Type})))))])))))]
   (Nothing)
   (Nothing)))
-
-
