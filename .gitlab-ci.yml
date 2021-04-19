@@ -1156,6 +1156,8 @@ release-x86_64-linux-fedora27-dwarf:
     # skipping perf tests for now since we build a quick-flavoured GHC,
     # which might result in some broken perf tests?
     HADRIAN_ARGS: "--docs=no-sphinx --skip-perf"
+    # --skip-perf is incompatible with IGNORE_PERF_FAILURES.
+    IGNORE_PERF_FAILURES: ""
 
   script:
     - bash .gitlab/ci.sh configure
