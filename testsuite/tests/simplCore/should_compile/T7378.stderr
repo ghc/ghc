@@ -1,0 +1,3 @@
+      case i of { I# ww1 ->
+      case <# ww1 0# of {
+  = / i -> case i of { I# ww1 -> I# (uncheckedIShiftRA# ww1 1#) }
