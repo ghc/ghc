@@ -55,6 +55,7 @@ module GHC.Driver.Main
     , hscDesugar
     , makeSimpleDetails
     , hscSimplify -- ToDo, shouldn't really export this
+    , hscDesugarAndSimplify
 
     -- * Safe Haskell
     , hscCheckSafe
@@ -709,7 +710,7 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
     case m_tc_result of
       Just tc_result
        | not always_do_basic_recompilation_check -> runHsc hsc_env $
-        finish mod_summary tc_result Nothing
+        hscDesugarAndSimplify mod_summary tc_result Nothing
       _ -> do
         (recomp_reqd, mb_checked_iface)
             <- {-# SCC "checkOldIface" #-}
@@ -737,7 +738,7 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
             FrontendTypecheck tc_result <- case hscFrontendHook (hsc_hooks hsc_env) of
               Nothing -> FrontendTypecheck . fst <$> hsc_typecheck False mod_summary Nothing
               Just h  -> h mod_summary
-            finish mod_summary tc_result mb_old_hash
+            hscDesugarAndSimplify mod_summary tc_result mb_old_hash
 
 -- Knot tying!  See Note [Knot-tying typecheckIface]
 -- See Note [ModDetails and --make mode]
@@ -809,11 +810,11 @@ See !5492 and #13586
 -- HscRecomp in turn will carry the information required to compute a interface
 -- when passed the result of the code generator. So all this can and is done at
 -- the call site of the backend code gen if it is run.
-finish :: ModSummary
+hscDesugarAndSimplify :: ModSummary
        -> TcGblEnv
        -> Maybe Fingerprint
        -> Hsc HscStatus
-finish summary tc_result mb_old_hash = do
+hscDesugarAndSimplify summary tc_result mb_old_hash = do
   hsc_env <- getHscEnv
   dflags <- getDynFlags
   logger <- getLogger
@@ -889,7 +890,7 @@ contents).
 
 Cases for which we generate simple interfaces:
 
-   * GHC.Driver.Main.finish: when a compilation does NOT require (re)compilation
+   * GHC.Driver.Main.hscDesugarAndSimplify: when a compilation does NOT require (re)compilation
    of the hard code
 
    * GHC.Driver.Pipeline.compileOne': when we run in One Shot mode and target
