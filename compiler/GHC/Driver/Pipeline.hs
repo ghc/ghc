@@ -136,7 +136,7 @@ preprocess hsc_env input_fn mb_input_buf mb_phase =
   MC.handle handler $
   fmap Right $ do
   MASSERT2(isJust mb_phase || isHaskellSrcFilename input_fn, text input_fn)
-  (dflags, fp, mb_iface) <- runPipeline anyHsc hsc_env (input_fn, mb_input_buf, fmap RealPhase mb_phase)
+  (dflags, fp, mb_iface, _) <- runPipeline anyHsc hsc_env (input_fn, mb_input_buf, fmap RealPhase mb_phase)
         Nothing
         -- We keep the processed file for the whole session to save on
         -- duplicated work in ghci.
@@ -213,47 +213,7 @@ compileOne' m_tc_result mHscMessage
                addFilesToClean tmpfs TFL_GhcSession $
                    [ml_obj_file $ ms_location summary]
 
-   case bcknd of
-     Interpreter -> case status of
-        HscUpToDate iface hmi_details ->
-            ASSERT( isJust mb_old_linkable || isNoLink (ghcLink dflags) )
-            return $! HomeModInfo iface hmi_details mb_old_linkable
-        HscUpdate iface hmi_details ->
-            return $! HomeModInfo iface hmi_details Nothing
-        HscRecomp { hscs_guts = cgguts,
-                     hscs_mod_location = mod_location,
-                     hscs_partial_iface = partial_iface,
-                     hscs_old_iface_hash = mb_old_iface_hash
-                   } -> do
-            -- In interpreted mode the regular codeGen backend is not run so we
-            -- generate a interface without codeGen info.
-            final_iface <- mkFullIface hsc_env' partial_iface Nothing
-            -- Reconstruct the `ModDetails` from the just-constructed `ModIface`
-            -- See Note [ModDetails and --make mode]
-            hmi_details <- liftIO $ initModDetails hsc_env' summary final_iface
-            liftIO $ hscMaybeWriteIface logger dflags True final_iface mb_old_iface_hash (ms_location summary)
-
-            (hasStub, comp_bc, spt_entries) <- hscInteractive hsc_env' cgguts mod_location
-
-            stub_o <- case hasStub of
-                      Nothing -> return []
-                      Just stub_c -> do
-                          stub_o <- compileStub hsc_env' stub_c
-                          return [DotO stub_o]
-
-            let hs_unlinked = [BCOs comp_bc spt_entries]
-                unlinked_time = ms_hs_date summary
-              -- Why do we use the timestamp of the source file here,
-              -- rather than the current time?  This works better in
-              -- the case where the local clock is out of sync
-              -- with the filesystem's clock.  It's just as accurate:
-              -- if the source is modified, then the linkable will
-              -- be out of date.
-            let !linkable = LM unlinked_time (ms_mod summary)
-                           (hs_unlinked ++ stub_o)
-            return $! HomeModInfo final_iface hmi_details (Just linkable)
-
-     _ -> case status of
+   case status of
         HscUpToDate iface hmi_details ->
             ASSERT( isJust mb_old_linkable || isNoLink (ghcLink dflags) )
             return $! HomeModInfo iface hmi_details mb_old_linkable
@@ -263,16 +223,18 @@ compileOne' m_tc_result mHscMessage
                             (Temporary TFL_CurrentModule)
                             basename dflags next_phase (Just location)
             -- We're in --make mode: finish the compilation pipeline.
-            (_, _, Just iface) <- runPipeline StopLn hsc_env'
+            (_, _, Just iface, mb_linkable) <- runPipeline StopLn hsc_env'
                               (output_fn,
                                Nothing,
-                               Just (HscOut src_flavour mod_name status))
+                               Just (HscOut src_flavour mod_name summary status))
                               (Just basename)
                               Persistent
                               (Just location)
                               []
-            mLinkable <- case src_flavour of
-              HsSrcFile -> do
+            -- TODO: figure out a way to set this in runPipeline for HsSrcFile
+            mLinkable <- case (mb_linkable, src_flavour) of
+              (Just l, _) -> return $ Just l
+              (_, HsSrcFile) -> do
                   -- The object filename comes from the ModLocation
                   o_time <- getModificationUTCTime object_filename
                   let !linkable = LM o_time this_mod [DotO object_filename]
@@ -377,7 +339,7 @@ compileForeign hsc_env lang stub_c = do
 #if __GLASGOW_HASKELL__ < 811
               RawObject  -> panic "compileForeign: should be unreachable"
 #endif
-        (_, stub_o, _) <- runPipeline StopLn hsc_env
+        (_, stub_o, _, _) <- runPipeline StopLn hsc_env
                        (stub_c, Nothing, Just (RealPhase phase))
                        Nothing (Temporary TFL_GhcSession)
                        Nothing{-no ModLocation-}
@@ -642,7 +604,7 @@ compileFile hsc_env stop_phase (src, mb_phase) = do
                 -- -o foo applies to the file we are compiling now
          | otherwise = Persistent
 
-   ( _, out_file, _) <- runPipeline stop_phase hsc_env
+   ( _, out_file, _, _) <- runPipeline stop_phase hsc_env
                             (src, Nothing, fmap RealPhase mb_phase)
                             Nothing
                             output
@@ -690,8 +652,8 @@ runPipeline
   -> PipelineOutput             -- ^ Output filename
   -> Maybe ModLocation          -- ^ A ModLocation, if this is a Haskell module
   -> [FilePath]                 -- ^ foreign objects
-  -> IO (DynFlags, FilePath, Maybe ModIface)
-                                -- ^ (final flags, output filename, interface)
+  -> IO (DynFlags, FilePath, Maybe ModIface, Maybe Linkable)
+                                -- ^ (final flags, output filename, interface, linkable)
 runPipeline stop_phase hsc_env0 (input_fn, mb_input_buf, mb_phase)
              mb_basename output maybe_loc foreign_os
 
@@ -820,15 +782,17 @@ runPipeline'
   -> FilePath                   -- ^ Input filename
   -> Maybe ModLocation          -- ^ A ModLocation, if this is a Haskell module
   -> [FilePath]                 -- ^ foreign objects, if we have one
-  -> IO (DynFlags, FilePath, Maybe ModIface)
-                                -- ^ (final flags, output filename, interface)
+  -> IO (DynFlags, FilePath, Maybe ModIface, Maybe Linkable)
+                                -- ^ (final flags, output filename, interface, linkable)
 runPipeline' start_phase hsc_env env input_fn
              maybe_loc foreign_os
   = do
   -- Execute the pipeline...
-  let state = PipeState{ hsc_env, maybe_loc, foreign_os = foreign_os, iface = Nothing }
+  let state = PipeState{ hsc_env, maybe_loc, foreign_os = foreign_os, iface = Nothing
+                       , maybe_linkable = Nothing }
   (pipe_state, fp) <- evalP (pipeLoop start_phase input_fn) env state
-  return (pipeStateDynFlags pipe_state, fp, pipeStateModIface pipe_state)
+  return (pipeStateDynFlags pipe_state, fp, pipeStateModIface pipe_state
+         , pipeStateLinkable pipe_state )
 
 -- ---------------------------------------------------------------------------
 -- outer pipeline loop
@@ -1315,10 +1279,10 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
         -- "driver" plugins may have modified the DynFlags so we update them
         setDynFlags (hsc_dflags plugin_hsc_env)
 
-        return (HscOut src_flavour mod_name result,
+        return (HscOut src_flavour mod_name mod_summary result,
                 panic "HscOut doesn't have an input filename")
 
-runPhase (HscOut src_flavour mod_name result) _ = do
+runPhase (HscOut src_flavour mod_name mod_summary result) _ = do
         dflags <- getDynFlags
         logger <- getLogger
         location <- getLocation src_flavour mod_name
@@ -1326,6 +1290,10 @@ runPhase (HscOut src_flavour mod_name result) _ = do
 
         let o_file = ml_obj_file location -- The real object file
             next_phase = hscPostBackendPhase src_flavour (backend dflags)
+            write_obj = case backend dflags of
+                            NoBackend    -> False
+                            Interpreter  -> False
+                            _            -> True
 
         case result of
             HscUpToDate iface _ ->
@@ -1337,7 +1305,7 @@ runPhase (HscOut src_flavour mod_name result) _ = do
                    return (RealPhase StopLn, o_file)
             HscUpdate iface _ ->
                 do
-                   case src_flavour of
+                   when write_obj $ case src_flavour of
                      HsigFile -> do
                        -- We need to create a REAL but empty .o file
                        -- because we are going to attempt to put it in a library
@@ -1358,7 +1326,38 @@ runPhase (HscOut src_flavour mod_name result) _ = do
                         hscs_partial_iface = partial_iface,
                         hscs_old_iface_hash = mb_old_iface_hash
                       }
-              -> do output_fn <- phaseOutputFilename next_phase
+              -> case backend dflags of
+                NoBackend -> panic "HscRecomp not relevant for NoBackend"
+                Interpreter -> do
+                    PipeState{hsc_env=hsc_env'} <- getPipeState
+                    -- In interpreted mode the regular codeGen backend is not run so we
+                    -- generate a interface without codeGen info.
+                    final_iface <- liftIO $ mkFullIface hsc_env' partial_iface Nothing
+                    liftIO $ hscMaybeWriteIface logger dflags True final_iface mb_old_iface_hash location
+
+                    (hasStub, comp_bc, spt_entries) <- liftIO $ hscInteractive hsc_env' cgguts mod_location
+
+                    stub_o <- liftIO $ case hasStub of
+                              Nothing -> return []
+                              Just stub_c -> do
+                                  stub_o <- compileStub hsc_env' stub_c
+                                  return [DotO stub_o]
+
+                    let hs_unlinked = [BCOs comp_bc spt_entries]
+                        unlinked_time = ms_hs_date mod_summary
+                      -- Why do we use the timestamp of the source file here,
+                      -- rather than the current time?  This works better in
+                      -- the case where the local clock is out of sync
+                      -- with the filesystem's clock.  It's just as accurate:
+                      -- if the source is modified, then the linkable will
+                      -- be out of date.
+                    let !linkable = LM unlinked_time (ms_mod mod_summary)
+                                   (hs_unlinked ++ stub_o)
+                    setIface final_iface
+                    setLinkable linkable
+                    return (RealPhase StopLn, o_file)
+                _ -> do
+                    output_fn <- phaseOutputFilename next_phase
 
                     PipeState{hsc_env=hsc_env'} <- getPipeState
 
