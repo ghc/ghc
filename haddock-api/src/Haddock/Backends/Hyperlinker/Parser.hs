@@ -238,6 +238,7 @@ classify tok =
     ITrequires             -> TkKeyword
 
     ITinline_prag       {} -> TkPragma
+    ITopaque_prag       {} -> TkPragma
     ITspec_prag         {} -> TkPragma
     ITspec_inline_prag  {} -> TkPragma
     ITsource_prag       {} -> TkPragma
@@ -379,6 +380,7 @@ inPragma True _ = True
 inPragma False tok =
   case tok of
     ITinline_prag       {} -> True
+    ITopaque_prag       {} -> True
     ITspec_prag         {} -> True
     ITspec_inline_prag  {} -> True
     ITsource_prag       {} -> True
