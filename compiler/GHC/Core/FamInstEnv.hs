@@ -9,11 +9,13 @@
 -- FamInstEnv: Type checked family instance declarations
 
 module GHC.Core.FamInstEnv (
+        -- * Family instances
         FamInst(..), FamFlavor(..), famInstAxiom, famInstTyCon, famInstRHS,
         famInstsRepTyCons, famInstRepTyCon_maybe, dataFamInstRepTyCon,
         pprFamInst, pprFamInsts,
         mkImportedFamInst,
 
+        -- * Family instance environment
         FamInstEnvs, FamInstEnv, emptyFamInstEnv, emptyFamInstEnvs,
         extendFamInstEnv, extendFamInstEnvList,
         famInstEnvElts, famInstEnvSize, familyInstances,
@@ -22,16 +24,17 @@ module GHC.Core.FamInstEnv (
         mkCoAxBranch, mkBranchedCoAxiom, mkUnbranchedCoAxiom, mkSingleCoAxiom,
         mkNewTypeCoAxiom,
 
+        -- * Family instance lookup
         FamInstMatch(..),
         lookupFamInstEnv, lookupFamInstEnvConflicts, lookupFamInstEnvByTyCon,
 
         isDominatedBy, apartnessCheck,
 
-        -- Injectivity
+        -- * Injectivity
         InjectivityCheckResult(..),
         lookupFamInstEnvInjectivityConflicts, injectiveBranches,
 
-        -- Normalisation
+        -- * Normalisation
         topNormaliseType, topNormaliseType_maybe,
         normaliseType, normaliseTcApp,
         topReduceTyFamApp_maybe, reduceTyFamApp_maybe
@@ -353,7 +356,7 @@ See Note [Deterministic UniqFM].
 -- Internally we sometimes index by Name instead of TyCon despite
 -- of what the type says. This is safe since
 -- getUnique (tyCon) == getUniqe (tcName tyCon)
-type FamInstEnv = UniqDFM TyCon FamilyInstEnv  -- Maps a family to its instances
+type FamInstEnv = UniqDFM TyCon FamilyInstEnv  -- ^ Maps a family to its instances
      -- See Note [FamInstEnv]
      -- See Note [FamInstEnv determinism]
 
@@ -366,11 +369,11 @@ newtype FamilyInstEnv
 instance Outputable FamilyInstEnv where
   ppr (FamIE fs) = text "FamIE" <+> vcat (map ppr fs)
 
--- | Index a FamInstEnv by the tyCons name.
+-- | Index a 'FamInstEnv' by the name of the family.
 toNameInstEnv :: FamInstEnv -> UniqDFM Name FamilyInstEnv
 toNameInstEnv = unsafeCastUDFMKey
 
--- | Create a FamInstEnv from Name indices.
+-- | Create a 'FamInstEnv' from 'Name' indices.
 fromNameInstEnv :: UniqDFM Name FamilyInstEnv -> FamInstEnv
 fromNameInstEnv = unsafeCastUDFMKey
 
@@ -778,6 +781,7 @@ lookupFamInstEnvByTyCon (pkg_ie, home_ie) fam_tc
                Nothing          -> []
                Just (FamIE fis) -> fis
 
+-- | Look-up an instance for a type family applied to some types.
 lookupFamInstEnv
     :: FamInstEnvs
     -> TyCon -> [Type]          -- What we are looking for
@@ -789,10 +793,11 @@ lookupFamInstEnv
    where
      match _ _ tpl_tys tys = tcMatchTys tpl_tys tys
 
+-- | Find instances in 'FamInstEnvs' which conflict with a new 'FamInst'.
 lookupFamInstEnvConflicts
     :: FamInstEnvs
-    -> FamInst          -- Putative new instance
-    -> [FamInstMatch]   -- Conflicting matches (don't look at the fim_tys field)
+    -> FamInst          -- ^ Putative new instance
+    -> [FamInstMatch]   -- ^ Conflicting matches (don't look at the fim_tys field)
 -- E.g. when we are about to add
 --    f : type instance F [a] = a->a
 -- we do (lookupFamInstConflicts f [b])
