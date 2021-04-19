@@ -10,7 +10,7 @@ import GHC.Driver.Errors.Types
 import GHC.Driver.Flags
 import GHC.Driver.Session
 import GHC.HsToCore.Errors.Ppr ()
-import GHC.Parser.Errors.Ppr (pprPsError)
+import GHC.Parser.Errors.Ppr ()
 import GHC.Tc.Errors.Ppr ()
 import GHC.Types.Error
 import GHC.Unit.Types
@@ -69,8 +69,8 @@ instance Diagnostic DriverMessage where
   diagnosticMessage = \case
     DriverUnknownMessage m
       -> diagnosticMessage m
-    DriverPsHeaderMessage desc hints
-      -> mkSimpleDecorated $ pprPsError desc hints
+    DriverPsHeaderMessage m
+      -> diagnosticMessage m
     DriverMissingHomeModules missing buildingCabalPackage
       -> let msg | buildingCabalPackage == YesBuildingCabalPackage
                  = hang
@@ -151,8 +151,8 @@ instance Diagnostic DriverMessage where
   diagnosticHints = \case
     DriverUnknownMessage m
       -> diagnosticHints m
-    DriverPsHeaderMessage _desc hints
-      -> hints
+    DriverPsHeaderMessage psMsg
+      -> diagnosticHints psMsg
     DriverMissingHomeModules{}
       -> noHints
     DriverUnusedPackages{}

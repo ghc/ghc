@@ -5,7 +5,6 @@ module GHC.Types.Hint where
 import GHC.Prelude
 
 import GHC.Utils.Outputable
-import GHC.Types.Name.Reader
 import GHC.LanguageExtensions
 import Data.Typeable
 import GHC.Unit.Module (ModuleName, Module)
@@ -47,12 +46,6 @@ data GhcHint
        Test cases: None (that explicitly test this particular hint is emitted).
     -}
   | SuggestLetInDo
-    -- FIXME(adn) This is not a hint but was migrated from the old \"PsHint\" type.
-    -- It will be removed in a further refactoring as part of #18516.
-  | SuggestInfixBindMaybeAtPat !RdrName
-    -- FIXME(adn) This is not a hint but was migrated from the old \"PsHint\" type.
-    -- It will be removed in a further refactoring as part of #18516.
-  | TypeApplicationsInPatternsOnlyDataCons
     {-| Suggests to add an \".hsig\" signature file to the Cabal manifest.
 
       Triggered by: 'GHC.Driver.Errors.Types.DriverUnexpectedSignature', if Cabal
@@ -75,6 +68,20 @@ data GhcHint
       Test case(s): driver/T12955
     -}
   | SuggestSignatureInstantiations !ModuleName [InstantiationSuggestion]
+  {-| Suggests to use spaces instead of tabs.
+
+      Triggered by: 'GHC.Parser.Errors.Types.PsWarnTab'.
+
+      Examples: None
+      Test Case(s): None
+  -}
+  | SuggestUseSpaces
+  {-| Suggests wrapping an expression in parentheses
+
+      Examples: None
+      Test Case(s): None
+  -}
+  | SuggestParentheses
 
 
 instance Outputable GhcHint where
@@ -88,15 +95,6 @@ instance Outputable GhcHint where
     SuggestLetInDo
       -> text "Perhaps you need a 'let' in a 'do' block?"
            $$ text "e.g. 'let x = 5' instead of 'x = 5'"
-    SuggestInfixBindMaybeAtPat fun
-      -> text "In a function binding for the"
-              <+> quotes (ppr fun)
-              <+> text "operator."
-           $$ if opIsAt fun
-                 then perhapsAsPat
-                 else empty
-    TypeApplicationsInPatternsOnlyDataCons
-      -> text "Type applications in patterns are only allowed on data constructors."
     SuggestAddSignatureCabalFile pi_mod_name
       -> text "Try adding" <+> quotes (ppr pi_mod_name)
            <+> text "to the"
@@ -111,10 +109,10 @@ instance Outputable GhcHint where
          in text "Try passing -instantiated-with=\"" <>
               suggested_instantiated_with <> text "\"" $$
                 text "replacing <" <> ppr pi_mod_name <> text "> as necessary."
-
-perhapsAsPat :: SDoc
-perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"
-
+    SuggestUseSpaces
+      -> text "Please use spaces instead."
+    SuggestParentheses
+      -> text "Use parentheses."
 
 -- | An 'InstantiationSuggestion' for a '.hsig' file. This is generated
 -- by GHC in case of a 'DriverUnexpectedSignature' and suggests a way

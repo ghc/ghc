@@ -26,7 +26,9 @@ import GHC.Types.Unique.FM
 import GHC.Data.StringBuffer
 import GHC.Data.FastString
 import GHC.Parser.CharClass
-import GHC.Parser.Errors
+import GHC.Parser.Errors.Types
+import GHC.Parser.Errors.Ppr ()
+import GHC.Utils.Error
 import GHC.Utils.Misc
 --import TRACE
 
@@ -326,7 +328,9 @@ lexToken = do
     AlexEOF -> do let span = mkPsSpan loc1 loc1
                   liftP (setLastToken span 0)
                   return (L span CmmT_EOF)
-    AlexError (loc2,_) -> liftP $ failLocMsgP (psRealLoc loc1) (psRealLoc loc2) (PsError PsErrCmmLexer [])
+    AlexError (loc2,_) ->
+      let msg srcLoc = mkPlainErrorMsgEnvelope srcLoc PsErrCmmLexer
+      in liftP $ failLocMsgP (psRealLoc loc1) (psRealLoc loc2) msg
     AlexSkip inp2 _ -> do
         setInput inp2
         lexToken
