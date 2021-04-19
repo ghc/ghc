@@ -2472,6 +2472,7 @@ mkInlinePragma src (inl, match_info) mb_act
             Nothing  -> -- No phase specified
                         case inl of
                           NoInline -> NeverActive
+                          Opaque   -> NeverActive
                           _other   -> AlwaysActive
 
 -----------------------------------------------------------------------------
