@@ -37,6 +37,7 @@ import Data.Maybe( mapMaybe )
 import Data.List ( partition, mapAccumL )
 import Data.List.NonEmpty ( NonEmpty(..) )
 import qualified Data.Foldable as Foldable
+import qualified Data.Semigroup ( (<>) )
 
 infixr 3 `consBag`
 infixl 3 `snocBag`
@@ -343,3 +344,9 @@ instance IsList (Bag a) where
   type Item (Bag a) = a
   fromList = listToBag
   toList   = bagToList
+
+instance Semigroup (Bag a) where
+  (<>) = unionBags
+
+instance Monoid (Bag a) where
+  mempty = emptyBag
