@@ -586,6 +586,39 @@ data CallishMachOp
   | MO_F32_Fabs
   | MO_F32_Sqrt
 
+  -- 64-bit int/word ops for when they exceed the native word size
+  | MO_64_S_Conv_ToNative
+  | MO_64_S_Conv_FromNative
+  | MO_64_U_Conv_ToNative
+  | MO_64_U_Conv_FromNative
+  | MO_64_Neg
+  | MO_64_Add
+  | MO_64_Sub
+  | MO_64_Mul
+  | MO_64_S_Quot
+  | MO_64_S_Rem
+  | MO_64_U_Quot
+  | MO_64_U_Rem
+
+  | MO_64_And
+  | MO_64_Or
+  | MO_64_Xor
+  | MO_64_Not
+  | MO_64_Shl
+  | MO_64_U_Shr
+  | MO_64_S_Shr
+
+  | MO_64_Eq
+  | MO_64_Ne
+  | MO_64_S_Ge
+  | MO_64_S_Gt
+  | MO_64_S_Le
+  | MO_64_S_Lt
+  | MO_64_U_Ge
+  | MO_64_U_Gt
+  | MO_64_U_Le
+  | MO_64_U_Lt
+
   | MO_UF_Conv Width
 
   | MO_S_Mul2    Width
