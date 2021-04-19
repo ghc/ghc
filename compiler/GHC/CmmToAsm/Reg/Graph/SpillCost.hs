@@ -12,6 +12,7 @@ module GHC.CmmToAsm.Reg.Graph.SpillCost (
 
         slurpSpillCostInfo,
         chooseSpill,
+        chooseSpill_chaitin,
 
         lifeMapFromSpillCostInfo
 ) where
@@ -180,6 +181,20 @@ chooseSpill info graph
    in   nodeId node
 
 
+chooseSpill_chaitin
+        :: SpillCostInfo
+        -> Graph VirtualReg RegClass RealReg
+        -> VirtualReg
+
+chooseSpill_chaitin info graph
+ = let  cost    = spillCost_chaitin info graph
+        node    = minimumBy (\n1 n2 -> compare (cost $ nodeId n1) (cost $ nodeId n2))
+                $ nonDetEltsUFM $ graphMap graph
+                -- See Note [Unique Determinism and code generation]
+
+   in   nodeId node
+
+
 -------------------------------------------------------------------------------
 -- | Chaitins spill cost function is:
 --
@@ -262,6 +277,28 @@ spillCost_length info _ reg
         | lifetime <= 1         = 1/0
         | otherwise             = 1 / fromIntegral lifetime
         where (_, _, _, lifetime)
+                = fromMaybe (reg, 0, 0, 0)
+                $ lookupUFM info reg
+
+
+spillCost_chaitin
+        :: SpillCostInfo
+        -> Graph VirtualReg RegClass RealReg
+        -> VirtualReg
+        -> Float
+
+spillCost_chaitin info graph reg
+        -- Spilling a live range that only lives for 1 instruction
+        -- isn't going to help us at all - and we definitely want to avoid
+        -- trying to re-spill previously inserted spill code.
+        | lifetime <= 1         = 1/0
+
+        -- Otherwise revert to chaitin's regular cost function.
+        | otherwise = spillCost / conflicts
+        where
+            !spillCost = fromIntegral (uses + defs) :: Float
+            conflicts = fromIntegral (nodeDegree classOfVirtualReg graph reg)
+            (_, defs, uses, lifetime)
                 = fromMaybe (reg, 0, 0, 0)
                 $ lookupUFM info reg
 
