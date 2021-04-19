@@ -716,9 +716,6 @@ hscIncrementalFrontend
               Just h  -> h mod_summary
             return $ Right (tc_result, mb_old_hash)
 
-        stable = case source_modified of
-                     SourceUnmodifiedAndStable -> True
-                     _                         -> False
 
     case m_tc_result of
          Just tc_result
@@ -735,25 +732,7 @@ hscIncrementalFrontend
             let mb_old_hash = fmap (mi_iface_hash . mi_final_exts) mb_checked_iface
 
             case mb_checked_iface of
-                Just iface | not (recompileRequired recomp_reqd) ->
-                    -- If the module used TH splices when it was last
-                    -- compiled, then the recompilation check is not
-                    -- accurate enough (#481) and we must ignore
-                    -- it.  However, if the module is stable (none of
-                    -- the modules it depends on, directly or
-                    -- indirectly, changed), then we *can* skip
-                    -- recompilation. This is why the SourceModified
-                    -- type contains SourceUnmodifiedAndStable, and
-                    -- it's pretty important: otherwise ghc --make
-                    -- would always recompile TH modules, even if
-                    -- nothing at all has changed. Stability is just
-                    -- the same check that make is doing for us in
-                    -- one-shot mode.
-                    if mi_used_th iface && not stable
-                      then
-                        compile mb_old_hash (RecompBecause "TH")
-                      else
-                        skip iface
+                Just iface | not (recompileRequired recomp_reqd) -> skip iface
                 _ -> compile mb_old_hash recomp_reqd
 
 --------------------------------------------------------------
