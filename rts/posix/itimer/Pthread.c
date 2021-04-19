@@ -36,6 +36,12 @@
  */
 
 #include "PosixSource.h"
+#if defined(freebsd_HOST_OS) || defined(dragonfly_HOST_OS)
+/* Inclusion of system headers usually requires __BSD_VISIBLE on FreeBSD and
+ * DragonflyBSD, because of some specific types, like u_char, u_int, etc. */
+#define __BSD_VISIBLE   1
+#endif
+
 #include "Rts.h"
 
 #include "Ticker.h"
@@ -63,6 +69,9 @@
 #include <string.h>
 
 #include <pthread.h>
+#if defined(HAVE_PTHREAD_NP_H)
+#include <pthread_np.h>
+#endif
 #include <unistd.h>
 #include <fcntl.h>
 
