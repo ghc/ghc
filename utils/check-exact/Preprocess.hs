@@ -213,7 +213,6 @@ getPreprocessedSrcDirectPrim cppOptions src_fn = do
   hsc_env <- GHC.getSession
   let dfs = GHC.hsc_dflags hsc_env
       new_env = hsc_env { GHC.hsc_dflags = injectCppOptions cppOptions dfs }
-  -- (dflags', hspp_fn) <-
   r <- GHC.liftIO $ GHC.preprocess new_env src_fn Nothing (Just (GHC.Cpp GHC.HsSrcFile))
   case r of
     Left err -> error $ showErrorMessages err
@@ -309,4 +308,3 @@ mergeBy cmp (allx@(x:xs)) (ally@(y:ys))
         -- Someone please put this code out of its misery.
     | (x `cmp` y) <= EQ = x : mergeBy cmp xs ally
     | otherwise = y : mergeBy cmp allx ys
-
