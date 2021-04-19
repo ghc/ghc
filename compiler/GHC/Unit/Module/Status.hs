@@ -5,7 +5,6 @@ where
 
 import GHC.Prelude
 
-import GHC.Unit
 import GHC.Unit.Module.ModGuts
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.ModDetails
@@ -22,8 +21,6 @@ data HscStatus
     | HscRecomp
         { hscs_guts           :: CgGuts
           -- ^ Information for the code generator.
-        , hscs_mod_location   :: !ModLocation
-          -- ^ Module info
         , hscs_partial_iface  :: !PartialModIface
           -- ^ Partial interface
         , hscs_old_iface_hash :: !(Maybe Fingerprint)

@@ -843,7 +843,6 @@ hscDesugarAndSimplify summary tc_result mb_old_hash = do
                 force (mkPartialIface hsc_env details simplified_guts)
 
           return HscRecomp { hscs_guts = cg_guts,
-                             hscs_mod_location = ms_location summary,
                              hscs_partial_iface = partial_iface,
                              hscs_old_iface_hash = mb_old_hash
                            }

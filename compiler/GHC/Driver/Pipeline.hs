@@ -1338,7 +1338,6 @@ runPhase (HscOut src_flavour mod_name mod_summary result) _ = do
                    setIface iface
                    return (RealPhase StopLn, o_file)
             HscRecomp { hscs_guts = cgguts,
-                        hscs_mod_location = mod_location,
                         hscs_partial_iface = partial_iface,
                         hscs_old_iface_hash = mb_old_iface_hash
                       }
@@ -1351,7 +1350,7 @@ runPhase (HscOut src_flavour mod_name mod_summary result) _ = do
                     final_iface <- liftIO $ mkFullIface hsc_env' partial_iface Nothing
                     liftIO $ hscMaybeWriteIface logger dflags True final_iface mb_old_iface_hash location
 
-                    (hasStub, comp_bc, spt_entries) <- liftIO $ hscInteractive hsc_env' cgguts mod_location
+                    (hasStub, comp_bc, spt_entries) <- liftIO $ hscInteractive hsc_env' cgguts location
 
                     stub_o <- liftIO $ case hasStub of
                               Nothing -> return []
@@ -1378,14 +1377,14 @@ runPhase (HscOut src_flavour mod_name mod_summary result) _ = do
                     PipeState{hsc_env=hsc_env'} <- getPipeState
 
                     (outputFilename, mStub, foreign_files, cg_infos) <- liftIO $
-                      hscGenHardCode hsc_env' cgguts mod_location output_fn
+                      hscGenHardCode hsc_env' cgguts location output_fn
 
                     let dflags = hsc_dflags hsc_env'
                     final_iface <- liftIO (mkFullIface hsc_env' partial_iface (Just cg_infos))
                     setIface final_iface
 
                     -- See Note [Writing interface files]
-                    liftIO $ hscMaybeWriteIface logger dflags False final_iface mb_old_iface_hash mod_location
+                    liftIO $ hscMaybeWriteIface logger dflags False final_iface mb_old_iface_hash location
 
                     stub_o <- liftIO (mapM (compileStub hsc_env') mStub)
                     foreign_os <- liftIO $
