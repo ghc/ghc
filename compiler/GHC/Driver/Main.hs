@@ -749,17 +749,12 @@ hscIncrementalFrontend
                     -- nothing at all has changed. Stability is just
                     -- the same check that make is doing for us in
                     -- one-shot mode.
-                    case m_tc_result of
-                    Nothing
-                     | mi_used_th iface && not stable ->
+                    if mi_used_th iface && not stable
+                      then
                         compile mb_old_hash (RecompBecause "TH")
-                    _ ->
+                      else
                         skip iface
-                _ ->
-                    case m_tc_result of
-                    Nothing -> compile mb_old_hash recomp_reqd
-                    Just tc_result ->
-                        return $ Right (FrontendTypecheck tc_result, mb_old_hash)
+                _ -> compile mb_old_hash recomp_reqd
 
 --------------------------------------------------------------
 -- Compilers
