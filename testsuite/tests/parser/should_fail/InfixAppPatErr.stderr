@@ -1,4 +1,4 @@
 
 InfixAppPatErr.hs:2:7: error:
     do-notation in pattern
-    Possibly caused by a missing 'do'?
+    Suggested fix: Possibly caused by a missing 'do'?
