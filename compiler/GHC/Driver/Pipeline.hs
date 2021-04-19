@@ -87,6 +87,7 @@ import GHC.Data.StringBuffer   ( hGetStringBuffer, hPutStringBuffer )
 import GHC.Data.Maybe          ( expectJust )
 
 import GHC.Iface.Make          ( mkFullIface )
+import GHC.Runtime.Loader      ( initializePlugins )
 
 import GHC.Types.Basic       ( SuccessFlag(..) )
 import GHC.Types.Target
@@ -197,11 +198,13 @@ compileOne' m_tc_result mHscMessage
    let tmpfs  = hsc_tmpfs hsc_env0
    debugTraceMsg logger dflags1 2 (text "compile: input file" <+> text input_fnpp)
 
+   plugin_hsc_env <- initializePlugins hsc_env
+
    -- Run the pipeline up to codeGen (so everything up to, but not including, STG)
-   (status, plugin_hsc_env) <- hscIncrementalCompile
+   status <- hscIncrementalCompile
                         always_do_basic_recompilation_check
                         m_tc_result mHscMessage
-                        hsc_env summary source_modified mb_old_iface (mod_index, nmods)
+                        plugin_hsc_env summary source_modified mb_old_iface (mod_index, nmods)
    -- Use an HscEnv updated with the plugin info
    let hsc_env' = plugin_hsc_env
 
@@ -1269,8 +1272,9 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
 
   -- run the compiler!
         let msg hsc_env _ what _ = oneShotMsg hsc_env what
-        (result, plugin_hsc_env) <-
-          liftIO $ hscIncrementalCompile True Nothing (Just msg) hsc_env'
+        plugin_hsc_env <- liftIO $ initializePlugins hsc_env'
+        result <-
+          liftIO $ hscIncrementalCompile True Nothing (Just msg) plugin_hsc_env
                             mod_summary source_unchanged Nothing (1,1)
 
         -- In the rest of the pipeline use the loaded plugins
