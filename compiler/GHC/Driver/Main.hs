@@ -680,61 +680,6 @@ This is the only thing that isn't caught by the type-system.
 
 type Messager = HscEnv -> (Int,Int) -> RecompileRequired -> ModuleGraphNode -> IO ()
 
--- | This function runs GHC's frontend with recompilation
--- avoidance. Specifically, it checks if recompilation is needed,
--- and if it is, it parses and typechecks the input module.
--- It does not write out the results of typechecking (See
--- compileOne and hscIncrementalCompile).
-hscIncrementalFrontend :: Bool -- always do basic recompilation check?
-                       -> Maybe TcGblEnv
-                       -> Maybe Messager
-                       -> ModSummary
-                       -> SourceModified
-                       -> Maybe ModIface  -- Old interface, if available
-                       -> (Int,Int)       -- (i,n) = module i of n (for msgs)
-                       -> Hsc (Either ModIface (FrontendResult, Maybe Fingerprint))
-
-hscIncrementalFrontend
-  always_do_basic_recompilation_check m_tc_result
-  mHscMessage mod_summary source_modified mb_old_iface mod_index
-    = do
-    hsc_env <- getHscEnv
-
-    let msg what = case mHscMessage of
-          -- We use extendModSummaryNoDeps because extra backpack deps are only needed for batch mode
-          Just hscMessage -> hscMessage hsc_env mod_index what (ModuleNode (extendModSummaryNoDeps mod_summary))
-          Nothing -> return ()
-
-        skip iface = do
-            liftIO $ msg UpToDate
-            return $ Left iface
-
-        compile mb_old_hash reason = do
-            liftIO $ msg reason
-            tc_result <- case hscFrontendHook (hsc_hooks hsc_env) of
-              Nothing -> FrontendTypecheck . fst <$> hsc_typecheck False mod_summary Nothing
-              Just h  -> h mod_summary
-            return $ Right (tc_result, mb_old_hash)
-
-
-    case m_tc_result of
-         Just tc_result
-          | not always_do_basic_recompilation_check ->
-             return $ Right (FrontendTypecheck tc_result, Nothing)
-         _ -> do
-            (recomp_reqd, mb_checked_iface)
-                <- {-# SCC "checkOldIface" #-}
-                   liftIO $ checkOldIface hsc_env mod_summary
-                                source_modified mb_old_iface
-            -- save the interface that comes back from checkOldIface.
-            -- In one-shot mode we don't have the old iface until this
-            -- point, when checkOldIface reads it from the disk.
-            let mb_old_hash = fmap (mi_iface_hash . mi_final_exts) mb_checked_iface
-
-            case mb_checked_iface of
-                Just iface | not (recompileRequired recomp_reqd) -> skip iface
-                _ -> compile mb_old_hash recomp_reqd
-
 --------------------------------------------------------------
 -- Compilers
 --------------------------------------------------------------
@@ -768,13 +713,45 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
                 | otherwise
                 = hsc_env''
 
+        msg what = case mHscMessage of
+          -- We use extendModSummaryNoDeps because extra backpack deps are only needed for batch mode
+          Just hscMessage -> hscMessage hsc_env mod_index what (ModuleNode (extendModSummaryNoDeps mod_summary))
+          Nothing -> return ()
+
+        skip iface = do
+            liftIO $ msg UpToDate
+            return $ Left iface
+
+        compile mb_old_hash reason = do
+            liftIO $ msg reason
+            tc_result <- case hscFrontendHook (hsc_hooks hsc_env) of
+              Nothing -> FrontendTypecheck . fst <$> hsc_typecheck False mod_summary Nothing
+              Just h  -> h mod_summary
+            return $ Right (tc_result, mb_old_hash)
+
     -- NB: enter Hsc monad here so that we don't bail out early with
     -- -Werror on typechecker warnings; we also want to run the desugarer
     -- to get those warnings too. (But we'll always exit at that point
     -- because the desugarer runs ioMsgMaybe.)
     runHsc hsc_env $ do
-    e <- hscIncrementalFrontend always_do_basic_recompilation_check m_tc_result mHscMessage
-            mod_summary source_modified mb_old_iface mod_index
+    e <- case m_tc_result of
+         Just tc_result
+          | not always_do_basic_recompilation_check ->
+             return $ Right (FrontendTypecheck tc_result, Nothing)
+         _ -> do
+            (recomp_reqd, mb_checked_iface)
+                <- {-# SCC "checkOldIface" #-}
+                   liftIO $ checkOldIface hsc_env mod_summary
+                                source_modified mb_old_iface
+            -- save the interface that comes back from checkOldIface.
+            -- In one-shot mode we don't have the old iface until this
+            -- point, when checkOldIface reads it from the disk.
+            let mb_old_hash = fmap (mi_iface_hash . mi_final_exts) mb_checked_iface
+
+            case mb_checked_iface of
+                Just iface | not (recompileRequired recomp_reqd) -> skip iface
+                _ -> compile mb_old_hash recomp_reqd
+
     case e of
         -- We didn't need to do any typechecking; the old interface
         -- file on disk was good enough.
