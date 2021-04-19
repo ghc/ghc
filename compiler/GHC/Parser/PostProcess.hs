@@ -144,6 +144,7 @@ import Data.Foldable
 import GHC.Driver.Flags ( WarningFlag(..) )
 import qualified Data.Semigroup as Semi
 import GHC.Utils.Panic
+import GHC.LanguageExtensions (Extension(RecursiveDo))
 
 import Control.Monad
 import Text.ParserCombinators.ReadP as ReadP
@@ -1096,7 +1097,7 @@ checkPat loc (L l e@(PatBuilderVar (L ln c))) tyargs args
       add_hint TypeApplicationsInPatternsOnlyDataCons $
       patFail (locA l) (ppr e <+> hsep [text "@" <> ppr t | t <- tyargs])
   | not (null args) && patIsRec c =
-      add_hint SuggestRecursiveDo $
+      add_hint (SuggestExtension RecursiveDo) $
       patFail (locA l) (ppr e)
 checkPat loc (L _ (PatBuilderAppType f _ t)) tyargs args =
   checkPat loc f (t : tyargs) args
