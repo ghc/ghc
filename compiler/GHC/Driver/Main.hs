@@ -2086,7 +2086,7 @@ hscImport hsc_env str = runInteractiveHsc hsc_env $ do
         [L _ i] -> return i
         _ -> liftIO $ throwOneError $
                  mkPlainErrorMsgEnvelope noSrcSpan $
-                 GhcPsMessage $ PsUnknownMessage $ mkPlainError $
+                 GhcPsMessage $ PsUnknownMessage mempty $ mkPlainError $
                      text "parse error in import declaration"
 
 -- | Typecheck an expression (but don't run it)
@@ -2117,7 +2117,7 @@ hscParseExpr expr = do
     Just (L _ (BodyStmt _ expr _ _)) -> return expr
     _ -> throwOneError $
            mkPlainErrorMsgEnvelope noSrcSpan $
-           GhcPsMessage $ PsUnknownMessage $ mkPlainError $
+           GhcPsMessage $ PsUnknownMessage mempty $ mkPlainError $
              text "not an expression:" <+> quotes (text expr)
 
 hscParseStmt :: String -> Hsc (Maybe (GhciLStmt GhcPs))

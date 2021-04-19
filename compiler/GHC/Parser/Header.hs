@@ -317,7 +317,7 @@ checkProcessArgsResult flags
       liftIO $ throwErrors $ foldl' (\acc m -> addMessage (mkMsg m) acc) emptyMessages flags
     where mkMsg (L loc flag)
               = mkPlainErrorMsgEnvelope loc $
-                GhcPsMessage $ PsUnknownMessage $ mkPlainError $
+                GhcPsMessage $ PsUnknownMessage mempty $ mkPlainError $
                   text "unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+>
                   text flag
 
@@ -361,5 +361,5 @@ optionsParseError str loc =
 
 throwErr :: SrcSpan -> SDoc -> a                -- #15053
 throwErr loc doc =
-  let msg = mkPlainErrorMsgEnvelope loc $ GhcPsMessage $ PsUnknownMessage $ mkPlainError doc
+  let msg = mkPlainErrorMsgEnvelope loc $ GhcPsMessage $ PsUnknownMessage mempty $ mkPlainError doc
   in throw $ mkSrcErr $ singleMessage msg

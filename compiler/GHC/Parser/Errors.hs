@@ -9,7 +9,7 @@ module GHC.Parser.Errors
    , LexErr(..)
    , CmmParserError(..)
    , LexErrKind(..)
-   , PsHint(..)
+   , T.PsHint(..)
    , StarIsType (..)
    )
 where
@@ -19,6 +19,7 @@ import GHC.Types.SrcLoc
 import GHC.Types.Name.Reader (RdrName)
 import GHC.Types.Name.Occurrence (OccName)
 import GHC.Parser.Types
+import qualified GHC.Parser.Errors.Types as T
 import Language.Haskell.Syntax.Extension
 import GHC.Hs.Extension
 import GHC.Hs.Expr
@@ -82,7 +83,7 @@ data TransLayoutReason
 
 data PsError = PsError
    { errDesc  :: !PsErrorDesc   -- ^ Error description
-   , errHints :: ![PsHint]      -- ^ Hints
+   , errHints :: ![T.PsHint]      -- ^ Hints
    , errLoc   :: !SrcSpan       -- ^ Error position
    }
 
@@ -392,17 +393,6 @@ data NumUnderscoreReason
    = NumUnderscore_Integral
    | NumUnderscore_Float
    deriving (Show,Eq,Ord)
-
-data PsHint
-   = SuggestTH
-   | SuggestRecursiveDo
-   | SuggestDo
-   | SuggestMissingDo
-   | SuggestLetInDo
-   | SuggestPatternSynonyms
-   | SuggestInfixBindMaybeAtPat !RdrName
-   | TypeApplicationsInPatternsOnlyDataCons -- ^ Type applications in patterns are only allowed on data constructors
-
 
 data LexErrKind
    = LexErrKind_EOF        -- ^ End of input
