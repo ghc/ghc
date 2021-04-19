@@ -54,7 +54,6 @@ import GHC.Prelude hiding (mod)
 import GHC.Hs
 
 import GHC.Types.SrcLoc
-import GHC.Driver.Flags ( WarningFlag(..) )
 import GHC.Utils.Panic
 import GHC.Data.Bag
 
@@ -71,7 +70,7 @@ import Data.Coerce
 import qualified Data.Monoid
 
 import GHC.Parser.Lexer
-import GHC.Parser.Errors
+import GHC.Parser.Errors.Types
 import GHC.Utils.Misc (mergeListsBy, filterOut, mapLastM, (<&&>))
 import qualified GHC.Data.Strict as Strict
 
@@ -193,9 +192,9 @@ addHaddockToModule lmod = do
 
 reportHdkWarning :: HdkWarn -> P ()
 reportHdkWarning (HdkWarnInvalidComment (L l _)) =
-  addWarning Opt_WarnInvalidHaddock $ PsWarnHaddockInvalidPos (mkSrcSpanPs l)
+  addPsMessage (mkSrcSpanPs l) PsWarnHaddockInvalidPos
 reportHdkWarning (HdkWarnExtraComment (L l _)) =
-  addWarning Opt_WarnInvalidHaddock $ PsWarnHaddockIgnoreMulti l
+  addPsMessage l PsWarnHaddockIgnoreMulti
 
 collectHdkWarnings :: HdkSt -> [HdkWarn]
 collectHdkWarnings HdkSt{ hdk_st_pending, hdk_st_warnings } =
