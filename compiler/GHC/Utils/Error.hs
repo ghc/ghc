@@ -26,6 +26,7 @@ module GHC.Utils.Error (
 
         -- ** Formatting
         pprMessageBag, pprMsgEnvelopeBagWithLoc,
+        pprMessages,
         pprLocMsgEnvelope,
         formatBulleted,
 
@@ -221,6 +222,9 @@ formatBulleted ctx (unDecorated -> docs)
     where
     msgs    = filter (not . Outputable.isEmpty ctx) docs
     starred = (bullet<+>)
+
+pprMessages :: Diagnostic e => Messages e -> SDoc
+pprMessages = vcat . pprMsgEnvelopeBagWithLoc . getMessages
 
 pprMsgEnvelopeBagWithLoc :: Diagnostic e => Bag (MsgEnvelope e) -> [SDoc]
 pprMsgEnvelopeBagWithLoc bag = [ pprLocMsgEnvelope item | item <- sortMsgBag Nothing bag ]
