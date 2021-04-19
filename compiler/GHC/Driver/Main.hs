@@ -188,7 +188,7 @@ import GHC.Types.SourceError
 import GHC.Types.SafeHaskell
 import GHC.Types.ForeignStubs
 import GHC.Types.Var.Env       ( emptyTidyEnv )
-import GHC.Types.Error
+import GHC.Types.Error hiding ( getMessages )
 import GHC.Types.Fixity.Env
 import GHC.Types.CostCentre
 import GHC.Types.IPE
