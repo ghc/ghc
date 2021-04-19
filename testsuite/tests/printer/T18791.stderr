@@ -1,6 +1,7 @@
 
 ==================== Parser AST ====================
 
+
 (L
  { T18791.hs:1:1 }
  (HsModule
@@ -9,8 +10,8 @@
     { T18791.hs:1:1 }
     (UnchangedAnchor))
    (AnnsModule
-    [(AddEpAnn AnnModule (AR { T18791.hs:2:1-6 }))
-    ,(AddEpAnn AnnWhere (AR { T18791.hs:2:15-19 }))]
+    [(AddEpAnn AnnModule (EpaSpan { T18791.hs:2:1-6 }))
+    ,(AddEpAnn AnnWhere (EpaSpan { T18791.hs:2:15-19 }))]
     (AnnList
      (Nothing)
      (Nothing)
@@ -50,8 +51,8 @@
        (Anchor
         { T18791.hs:(4,1)-(5,17) }
         (UnchangedAnchor))
-       [(AddEpAnn AnnData (AR { T18791.hs:4:1-4 }))
-       ,(AddEpAnn AnnWhere (AR { T18791.hs:4:8-12 }))]
+       [(AddEpAnn AnnData (EpaSpan { T18791.hs:4:1-4 }))
+       ,(AddEpAnn AnnWhere (EpaSpan { T18791.hs:4:8-12 }))]
        (EpaComments
         []))
       (L
@@ -67,8 +68,8 @@
         (Anchor
          { T18791.hs:(4,1)-(5,17) }
          (UnchangedAnchor))
-        [(AddEpAnn AnnData (AR { T18791.hs:4:1-4 }))
-        ,(AddEpAnn AnnWhere (AR { T18791.hs:4:8-12 }))]
+        [(AddEpAnn AnnData (EpaSpan { T18791.hs:4:1-4 }))
+        ,(AddEpAnn AnnWhere (EpaSpan { T18791.hs:4:8-12 }))]
         (EpaComments
          []))
        (DataType)
@@ -82,7 +83,7 @@
            (Anchor
             { T18791.hs:5:3-17 }
             (UnchangedAnchor))
-           [(AddEpAnn AnnDcolon (AR { T18791.hs:5:7-8 }))]
+           [(AddEpAnn AnnDcolon (EpaSpan { T18791.hs:5:7-8 }))]
            (EpaComments
             []))
           [(L
@@ -105,7 +106,7 @@
                             (UnchangedAnchor))
                            (AnnListItem
                             [(AddRarrowAnn
-                              (AR { T18791.hs:5:14-15 }))])
+                              (EpaSpan { T18791.hs:5:14-15 }))])
                            (EpaComments
                             [])) { T18791.hs:5:10-12 })
               (HsTyVar
