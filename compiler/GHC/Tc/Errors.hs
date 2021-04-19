@@ -66,6 +66,7 @@ import GHC.Data.List.SetOps ( equivClasses )
 import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Utils.FV ( fvVarList, unionFV )
+import qualified GHC.Data.Strict as Strict
 
 import Control.Monad    ( unless, when, foldM, forM_ )
 import Data.Foldable    ( toList )
@@ -1033,7 +1034,7 @@ mkErrorReport :: DiagnosticReason
 mkErrorReport rea ctxt tcl_env (Report important relevant_bindings valid_subs)
   = do { context <- mkErrInfo (cec_tidy ctxt) (tcl_ctxt tcl_env)
        ; mkDecoratedSDocAt rea
-                           (RealSrcSpan (tcl_loc tcl_env) Nothing)
+                           (RealSrcSpan (tcl_loc tcl_env) Strict.Nothing)
                            (vcat important)
                            context
                            (vcat $ relevant_bindings ++ valid_subs)
@@ -1045,7 +1046,7 @@ mkErrorReportNC :: DiagnosticReason
                 -> Report
                 -> TcM (MsgEnvelope DiagnosticMessage)
 mkErrorReportNC rea tcl_env (Report important relevant_bindings valid_subs)
-  = mkDecoratedSDocAt rea (RealSrcSpan (tcl_loc tcl_env) Nothing)
+  = mkDecoratedSDocAt rea (RealSrcSpan (tcl_loc tcl_env) Strict.Nothing)
                       (vcat important)
                       O.empty
                       (vcat $ relevant_bindings ++ valid_subs)

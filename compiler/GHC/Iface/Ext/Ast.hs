@@ -60,6 +60,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Data.Maybe
 import GHC.Data.FastString
+import qualified GHC.Data.Strict as Strict
 
 import GHC.Iface.Ext.Types
 import GHC.Iface.Ext.Utils
@@ -356,7 +357,7 @@ enrichHie ts (hsGrp, imports, exports, _) ev_bs insts tcs =
           top_ev_asts :: [HieAST Type] <- do
             let
               l :: SrcSpanAnnA
-              l = noAnnSrcSpan (RealSrcSpan (realSrcLocSpan $ mkRealSrcLoc file 1 1) Nothing)
+              l = noAnnSrcSpan (RealSrcSpan (realSrcLocSpan $ mkRealSrcLoc file 1 1) Strict.Nothing)
             toHie $ EvBindContext ModuleScope Nothing
                   $ L l (EvBinds ev_bs)
 

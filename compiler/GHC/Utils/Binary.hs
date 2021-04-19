@@ -83,6 +83,7 @@ import GHC.Types.Unique.FM
 import GHC.Data.FastMutInt
 import GHC.Utils.Fingerprint
 import GHC.Types.SrcLoc
+import qualified GHC.Data.Strict as Strict
 
 import Control.DeepSeq
 import Foreign hiding (shiftL, shiftR)
@@ -704,6 +705,15 @@ instance Binary a => Binary (Maybe a) where
                           case h of
                             0 -> return Nothing
                             _ -> do x <- get bh; return (Just x)
+
+instance Binary a => Binary (Strict.Maybe a) where
+    put_ bh Strict.Nothing = putByte bh 0
+    put_ bh (Strict.Just a) = do putByte bh 1; put_ bh a
+    get bh =
+      do h <- getWord8 bh
+         case h of
+           0 -> return Strict.Nothing
+           _ -> do x <- get bh; return (Strict.Just x)
 
 instance (Binary a, Binary b) => Binary (Either a b) where
     put_ bh (Left  a) = do putByte bh 0; put_ bh a
