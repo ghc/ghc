@@ -256,11 +256,12 @@ m32_alloc_page(void)
     m32_free_page_pool_size --;
     return page;
   } else {
-    struct m32_page_t *page = mmapForLinker(getPageSize(),MAP_ANONYMOUS,-1,0);
-    if (page > (struct m32_page_t *) 0xffffffff) {
+    const size_t map_sz = getPageSize();
+    uint8_t *page = mmapForLinker(map_sz,MAP_ANONYMOUS,-1,0);
+    if (page + map_sz > (uint8_t *) 0xffffffff) {
       barf("m32_alloc_page: failed to get allocation in lower 32-bits");
     }
-    return page;
+    return (struct m32_page_t *) page;
   }
 }
 
