@@ -12,7 +12,6 @@ module GHC.Driver.Errors.Types (
   -- * Utility functions
   , hoistTcRnMessage
   , hoistDsMessage
-  , foldPsMessages
   , checkBuildingCabalPackage
   ) where
 
@@ -25,7 +24,6 @@ import GHC.Driver.Session
 import GHC.Types.Error
 import GHC.Unit.Module
 
-import GHC.Parser.Errors       ( PsErrorDesc )
 import GHC.Parser.Errors.Types ( PsMessage )
 import GHC.Tc.Errors.Types     ( TcRnMessage )
 import GHC.HsToCore.Errors.Types ( DsMessage )
@@ -92,14 +90,6 @@ data GhcMessage where
 ghcUnknownMessage :: (Diagnostic a, Typeable a) => a -> GhcMessage
 ghcUnknownMessage = GhcUnknownMessage
 
--- | Given a collection of @e@ wrapped in a 'Foldable' structure, converts it
--- into 'Messages' via the supplied transformation function.
-foldPsMessages :: Foldable f
-               => (e -> MsgEnvelope PsMessage)
-               -> f e
-               -> Messages GhcMessage
-foldPsMessages f = foldMap (singleMessage . fmap GhcPsMessage . f)
-
 -- | Abstracts away the frequent pattern where we are calling 'ioMsgMaybe' on
 -- the result of 'IO (Messages TcRnMessage, a)'.
 hoistTcRnMessage :: Monad m => m (Messages TcRnMessage, a) -> m (Messages GhcMessage, a)
@@ -119,7 +109,7 @@ data DriverMessage where
   DriverUnknownMessage :: (Diagnostic a, Typeable a) => a -> DriverMessage
   -- | A parse error in parsing a Haskell file header during dependency
   -- analysis
-  DriverPsHeaderMessage :: !PsErrorDesc -> ![GhcHint] -> DriverMessage
+  DriverPsHeaderMessage :: !PsMessage -> DriverMessage
 
   {-| DriverMissingHomeModules is a warning (controlled with -Wmissing-home-modules) that
       arises when running GHC in --make mode when some modules needed for compilation
