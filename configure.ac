@@ -1218,7 +1218,7 @@ dnl Setting thread names
 dnl ~~~~~~~~~~~~~~~~~~~~
 dnl The portability situation here is complicated:
 dnl
-dnl * FreeBSD supports pthread_set_name_np in <pthread_np.h>
+dnl * FreeBSD supports pthread_setname_np in <pthread_np.h>
 dnl * glibc supports pthread_setname_np
 dnl * Darwin supports pthread_setname_np but does not take a
 dnl   pthread_t argument.
@@ -1270,7 +1270,7 @@ AC_LINK_IFELSE([
     [[
     #include <pthread_np.h>
     ]],
-    [[pthread_setname_np(pthread_self(), "name");]]
+    [[pthread_set_name_np(pthread_self(), "name");]]
   )],
   [
     AC_MSG_RESULT(yes)
