@@ -34,7 +34,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Logger
 import Control.Monad
 import Control.Monad.IO.Class
-import Control.Monad.Trans.State.Strict
+import GHC.Utils.Monad.State.Strict
 
 newtype StgM a = StgM { _unStgM :: StateT Char IO a }
   deriving (Functor, Applicative, Monad, MonadIO)

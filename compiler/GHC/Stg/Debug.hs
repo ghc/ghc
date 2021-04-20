@@ -19,7 +19,7 @@ import GHC.Driver.Session
 
 import Control.Monad (when)
 import Control.Monad.Trans.Reader
-import Control.Monad.Trans.State
+import GHC.Utils.Monad.State.Strict
 import Control.Monad.Trans.Class
 import GHC.Types.Unique.Map
 import GHC.Types.SrcLoc
