@@ -97,14 +97,14 @@ g [InlPrag=[2]] :: Bool -> Bool -> Int -> Int
          Tmpl= \ (w [Occ=Once1] :: Bool)
                  (w1 [Occ=Once1] :: Bool)
                  (w2 [Occ=Once1!] :: Int) ->
-                 case w2 of { GHC.Types.I# ww1 [Occ=Once1] ->
-                 case T13143.$wg w w1 ww1 of ww2 [Occ=Once1] { __DEFAULT ->
-                 GHC.Types.I# ww2
+                 case w2 of { GHC.Types.I# ww [Occ=Once1] ->
+                 case T13143.$wg w w1 ww of ww1 [Occ=Once1] { __DEFAULT ->
+                 GHC.Types.I# ww1
                  }
                  }}]
 g = \ (w :: Bool) (w1 :: Bool) (w2 :: Int) ->
-      case w2 of { GHC.Types.I# ww1 ->
-      case T13143.$wg w w1 ww1 of ww2 { __DEFAULT -> GHC.Types.I# ww2 }
+      case w2 of { GHC.Types.I# ww ->
+      case T13143.$wg w w1 ww of ww1 { __DEFAULT -> GHC.Types.I# ww1 }
       }
 
 

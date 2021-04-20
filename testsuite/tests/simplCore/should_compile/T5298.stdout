@@ -7,7 +7,7 @@ $wg
       }
 --
 g = \ w ->
-      case w of { I# ww1 -> case $wg ww1 of ww2 { __DEFAULT -> I# ww2 } }
+      case w of { I# ww -> case $wg ww of ww1 { __DEFAULT -> I# ww1 } }
 
 
 ------ Local rules for imported ids --------

@@ -181,7 +181,7 @@ Notice that we refrain from w/w'ing an INLINE function even if it is
 in a recursive group.  It might not be the loop breaker.  (We could
 test for loop-breaker-hood, but I'm not sure that ever matters.)
 
-Note [Worker-wrapper for INLINABLE functions]
+Note [Worker/wrapper for INLINABLE functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If we have
   {-# INLINABLE f #-}
@@ -226,7 +226,7 @@ in advance...the logic in mkWwBodies is complex. So I've left the
 super-simple test, with this Note to explain.
 
 
-Note [Worker-wrapper for NOINLINE functions]
+Note [Worker/wrapper for NOINLINE functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We used to disable worker/wrapper for NOINLINE things, but it turns out
 this can cause unnecessary reboxing of values. Consider
@@ -300,7 +300,7 @@ splitting a NOINLINE function.
 
 Note [Worker activation]
 ~~~~~~~~~~~~~~~~~~~~~~~~
-Follows on from Note [Worker-wrapper for INLINABLE functions]
+Follows on from Note [Worker/wrapper for INLINABLE functions]
 
 It is *vital* that if the worker gets an INLINABLE pragma (from the
 original function), then the worker has the same phase activation as
@@ -413,7 +413,7 @@ When should the wrapper inlining be active?
    Id
 
 2. It should be active at some point, despite (1) because of
-   Note [Worker-wrapper for NOINLINE functions]
+   Note [Worker/wrapper for NOINLINE functions]
 
 3. For ordinary functions with no pragmas we want to inline the
    wrapper as early as possible (#15056).  Suppose another module
@@ -469,7 +469,7 @@ Note [Wrapper NoUserInlinePrag]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We use NoUserInlinePrag on the wrapper, to say that there is no
 user-specified inline pragma. (The worker inherits that; see Note
-[Worker-wrapper for INLINABLE functions].)  The wrapper has no pragma
+[Worker/wrapper for INLINABLE functions].)  The wrapper has no pragma
 given by the user.
 
 (Historical note: we used to give the wrapper an INLINE pragma, but
@@ -492,7 +492,7 @@ tryWW   :: DynFlags
                                         -- if two, then a worker and a
                                         -- wrapper.
 tryWW dflags fam_envs is_rec fn_id rhs
-  -- See Note [Worker-wrapper for NOINLINE functions]
+  -- See Note [Worker/wrapper for NOINLINE functions]
 
   | Just stable_unf <- certainlyWillInline uf_opts fn_info
   = return [ (fn_id `setIdUnfolding` stable_unf, rhs) ]
@@ -611,7 +611,7 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
   | otherwise
   = WARN( not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr cpr) )
           -- The arity should match the signature
-    do { mb_stuff <- mkWwBodies dflags fam_envs rhs_fvs fn_id wrap_dmds use_cpr_info
+    do { mb_stuff <- mkWwBodies (initWwOpts dflags fam_envs) rhs_fvs fn_id wrap_dmds use_cpr_info
        ; case mb_stuff of
             Nothing -> return [(fn_id, rhs)]
 
@@ -658,7 +658,7 @@ mkWWBindPair dflags fn_id fn_info arity rhs work_uniq div cpr
                              , inl_sat    = Nothing
                              , inl_act    = work_act
                              , inl_rule   = FunLike }
-      -- inl_inline: copy from fn_id; see Note [Worker-wrapper for INLINABLE functions]
+      -- inl_inline: copy from fn_id; see Note [Worker/wrapper for INLINABLE functions]
       -- inl_act:    see Note [Worker activation]
       -- inl_rule:   it does not make sense for workers to be constructorlike.
 
@@ -677,7 +677,7 @@ mkWWBindPair dflags fn_id fn_info arity rhs work_uniq div cpr
                 `setInlinePragma` work_prag
 
                 `setIdUnfolding` mkWorkerUnfolding simpl_opts work_fn fn_unfolding
-                        -- See Note [Worker-wrapper for INLINABLE functions]
+                        -- See Note [Worker/wrapper for INLINABLE functions]
 
                 `setIdDmdSig` mkClosedDmdSig work_demands div
                         -- Even though we may not be at top level,
@@ -870,7 +870,8 @@ splitThunk :: DynFlags -> FamInstEnvs -> RecFlag -> Var -> Expr Var -> UniqSM [(
 splitThunk dflags fam_envs is_rec x rhs
   = ASSERT(not (isJoinId x))
     do { let x' = localiseId x -- See comment above
-       ; (useful,_, wrap_fn, work_fn) <- mkWWstr dflags fam_envs False [x']
+       ; (useful,_, wrap_fn, work_fn)
+           <- mkWWstr (initWwOpts dflags fam_envs) NotArgOfInlineableFun [x']
        ; let res = [ (x, Let (NonRec x' rhs) (wrap_fn (work_fn (Var x')))) ]
        ; if useful then ASSERT2( isNonRec is_rec, ppr x ) -- The thunk must be non-recursive
                    return res
