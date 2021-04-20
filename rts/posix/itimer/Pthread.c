@@ -171,6 +171,11 @@ initTicker (Time interval, TickProc handle_tick)
     itimer_interval = interval;
     stopped = false;
     exited = false;
+#if defined(HAVE_SIGNAL_H)
+    sigset_t mask, omask;
+    int sigret;
+#endif
+    int ret;
 
     initCondition(&start_cond);
     initMutex(&mutex);
@@ -184,8 +189,23 @@ initTicker (Time interval, TickProc handle_tick)
      * <pthread.h> when _POSIX_SOURCE is not defined, but we're including
      * <PosixSource.h>, so must use pthread_set_name_np() instead.  See similar
      * code in "rts/posix/OSThreads.c".
+     *
+     * Create the thread with all blockable signals blocked, leaving signal
+     * handling to the main and/or other threads.  This is especially useful in
+     * the non-threaded runtime, where applications might expect sigprocmask(2)
+     * to effectively block signals.
      */
-    if (! pthread_create(&thread, NULL, itimer_thread_func, (void*)handle_tick)) {
+#if defined(HAVE_SIGNAL_H)
+    sigfillset(&mask);
+    sigret = pthread_sigmask(SIG_SETMASK, &mask, &omask);
+#endif
+    ret = pthread_create(&thread, NULL, itimer_thread_func, (void*)handle_tick);
+#if defined(HAVE_SIGNAL_H)
+    if (sigret == 0)
+        pthread_sigmask(SIG_SETMASK, &omask, NULL);
+#endif
+
+    if (ret == 0) {
 #if defined(HAVE_PTHREAD_SET_NAME_NP)
         pthread_set_name_np(thread, "ghc_ticker");
 #elif defined(HAVE_PTHREAD_SETNAME_NP)
