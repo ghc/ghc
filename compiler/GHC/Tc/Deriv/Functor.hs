@@ -34,7 +34,7 @@ import GHC.Utils.Panic
 import GHC.Builtin.Names
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
-import GHC.Utils.Monad.State
+import GHC.Utils.Monad.State.Strict
 import GHC.Tc.Deriv.Generate
 import GHC.Tc.Utils.TcType
 import GHC.Core.TyCon

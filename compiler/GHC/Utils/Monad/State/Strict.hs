@@ -2,12 +2,25 @@
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE PatternSynonyms #-}
 
-module GHC.Utils.Monad.State where
+-- | A state monad which is strict in its state.
+module GHC.Utils.Monad.State.Strict
+  ( -- * The State monad
+    State(pattern State)
+  , evalState
+  , execState
+  , runState
+    -- * Operations
+  , get
+  , gets
+  , put
+  , modify
+  ) where
 
 import GHC.Prelude
 
 import GHC.Exts (oneShot)
 
+-- | A state monad which is strict in the state.
 newtype State s a = State' { runState' :: s -> (# a, s #) }
     deriving (Functor)
 
@@ -25,12 +38,12 @@ pattern State m <- State' m
 instance Applicative (State s) where
    pure x   = State $ \s -> (# x, s #)
    m <*> n  = State $ \s -> case runState' m s of
-                            (# f, s' #) -> case runState' n s' of
-                                           (# x, s'' #) -> (# f x, s'' #)
+                            (# f, !s' #) -> case runState' n s' of
+                                            (# x, s'' #) -> (# f x, s'' #)
 
 instance Monad (State s) where
     m >>= n  = State $ \s -> case runState' m s of
-                             (# r, s' #) -> runState' (n r) s'
+                             (# r, !s' #) -> runState' (n r) s'
 
 get :: State s s
 get = State $ \s -> (# s, s #)
