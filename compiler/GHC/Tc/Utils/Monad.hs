@@ -1040,7 +1040,7 @@ mkLongErrAt loc msg extra
          let msg' = pprWithUnitState unit_state msg in
          return $ mkErrorMsgEnvelope loc printer
                 $ TcRnUnknownMessage
-                $ mkDecoratedError [msg', extra] }
+                $ mkDecoratedError noHints [msg', extra] }
 
 mkTcRnMessage :: DiagnosticReason
               -> SrcSpan
@@ -1060,7 +1060,7 @@ mkTcRnMessage reason loc important context extra
          in
          return $ mkMsgEnvelope dflags loc printer
                 $ TcRnUnknownMessage
-                $ mkDecoratedDiagnostic reason errDocs }
+                $ mkDecoratedDiagnostic reason noHints errDocs }
 
 addLongErrAt :: SrcSpan -> SDoc -> SDoc -> TcRn ()
 addLongErrAt loc msg extra = mkLongErrAt loc msg extra >>= reportDiagnostic
@@ -1568,7 +1568,7 @@ add_diagnostic_at reason loc msg extra_info
          dflags  <- getDynFlags ;
          let { dia = mkMsgEnvelope dflags loc printer $
                      TcRnUnknownMessage $
-                     mkDecoratedDiagnostic reason [msg, extra_info] } ;
+                     mkDecoratedDiagnostic reason noHints [msg, extra_info] } ;
          reportDiagnostic dia }
 
 
