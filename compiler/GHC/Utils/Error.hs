@@ -40,6 +40,7 @@ module GHC.Utils.Error (
         mkPlainDiagnostic,
         mkDecoratedError,
         mkDecoratedDiagnostic,
+        noHints,
 
         -- * Utilities
         doIfSet, doIfSet_dyn,

@@ -78,7 +78,7 @@ failWithRn doc = do
     -- TODO: maybe associate this with a source location?
     let msg = mkPlainErrorMsgEnvelope noSrcSpan $
               TcRnUnknownMessage $
-              mkPlainError doc
+              mkPlainError noHints doc
     writeTcRef errs_var (msg `addMessage` errs)
     failM
 
