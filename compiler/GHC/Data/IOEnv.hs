@@ -36,6 +36,7 @@ import GHC.Prelude
 
 import GHC.Driver.Session
 import {-# SOURCE #-} GHC.Driver.Hooks
+import GHC.IO (catchException)
 import GHC.Utils.Exception
 import GHC.Unit.Module
 import GHC.Utils.Panic
@@ -183,7 +184,7 @@ safeTry act = do
     -- Fork, so that 'act' is safe from all asynchronous exceptions other than the ones we send it
     t <- forkIO $ try (restore act) >>= putMVar var
     restore (readMVar var)
-      `catch` \(e :: SomeException) -> do
+      `catchException` \(e :: SomeException) -> do
         -- Control reaches this point only if the parent thread was sent an async exception
         -- In that case, kill the 'act' thread and re-raise the exception
         killThread t
