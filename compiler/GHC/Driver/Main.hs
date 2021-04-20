@@ -714,8 +714,7 @@ hscRecompStatus
       Just iface | not (recompileRequired recomp_reqd) -> do
         -- We didn't need to do any typechecking; the old interface
         -- file on disk was good enough.
-        details <- initModDetails hsc_env mod_summary iface
-        return $ HscUpToDate iface details
+        return $ HscUpToDate iface
 
       _ -> return $ HscRecompNeeded mb_old_hash
 

@@ -15,7 +15,7 @@ import GHC.Utils.Fingerprint
 -- | Status of a module in incremental compilation
 data HscRecompStatus
     -- | Nothing to do because code already exists.
-    = HscUpToDate ModIface ModDetails
+    = HscUpToDate ModIface
     -- | Recompilation of module, or update of interface is required. Optionally
     -- pass the old interface hash to avoid updating the existing interface when
     -- it has not changed.
