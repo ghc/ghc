@@ -30,6 +30,7 @@ import GHC.Hs.Decls
 import GHC.Core.Coercion.Axiom (Role)
 import GHC.Data.FastString
 import GHC.Unit.Module.Name
+import GHC.LanguageExtensions
 
 -- | A warning that might arise during parsing.
 data PsWarning
@@ -395,12 +396,10 @@ data NumUnderscoreReason
 
 data PsHint
    = PsUnknownHint !DecoratedSDoc
-   | SuggestTH
-   | SuggestRecursiveDo
+   | SuggestExtension !Extension
    | SuggestDo
    | SuggestMissingDo
    | SuggestLetInDo
-   | SuggestPatternSynonyms
    | SuggestInfixBindMaybeAtPat !RdrName
    | TypeApplicationsInPatternsOnlyDataCons -- ^ Type applications in patterns are only allowed on data constructors
 

@@ -621,13 +621,11 @@ pp_unexpected_fun_app e a =
 pp_hint :: Hint PsMessage -> SDoc
 pp_hint (MkPsHint hint) = case hint of
    PsUnknownHint dec      -> ppr $ unDecorated dec
-   SuggestTH              -> text "Perhaps you intended to use TemplateHaskell"
+   SuggestExtension ext   -> text "Perhaps you intended to use" <+> ppr ext
    SuggestDo              -> text "Perhaps this statement should be within a 'do' block?"
    SuggestMissingDo       -> text "Possibly caused by a missing 'do'?"
-   SuggestRecursiveDo     -> text "Perhaps you intended to use RecursiveDo"
    SuggestLetInDo         -> text "Perhaps you need a 'let' in a 'do' block?"
                              $$ text "e.g. 'let x = 5' instead of 'x = 5'"
-   SuggestPatternSynonyms -> text "Perhaps you intended to use PatternSynonyms"
 
    SuggestInfixBindMaybeAtPat fun
       -> text "In a function binding for the"

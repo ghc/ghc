@@ -115,6 +115,7 @@ import GHC.Parser.CharClass
 import GHC.Parser.Annotation
 import GHC.Driver.Flags
 import GHC.Parser.Errors
+import GHC.LanguageExtensions ( Extension(TemplateHaskell, RecursiveDo, PatternSynonyms) )
 }
 
 -- -----------------------------------------------------------------------------
@@ -3032,11 +3033,11 @@ srcParseErr options buf len loc = PsError (PsErrParse token) suggests loc
    ps_enabled = PatternSynonymsBit `xtest` pExtsBitmap options
 
    sug c s = if c then Just s else Nothing
-   sug_th  = sug (not th_enabled && token == "$")          SuggestTH              -- #7396
-   sug_rdo = sug (token == "<-" && mdoInLast100)           SuggestRecursiveDo
+   sug_th  = sug (not th_enabled && token == "$")          (SuggestExtension TemplateHaskell) -- #7396
+   sug_rdo = sug (token == "<-" && mdoInLast100)           (SuggestExtension RecursiveDo)
    sug_do  = sug (token == "<-" && not mdoInLast100)       SuggestDo
    sug_let = sug (token == "=" && doInLast100)             SuggestLetInDo         -- #15849
-   sug_pat = sug (not ps_enabled && pattern == "pattern ") SuggestPatternSynonyms -- #12429
+   sug_pat = sug (not ps_enabled && pattern == "pattern ") (SuggestExtension PatternSynonyms) -- #12429
    suggests
          | null token = []
          | otherwise  = catMaybes [sug_th, sug_rdo, sug_do, sug_let, sug_pat]
