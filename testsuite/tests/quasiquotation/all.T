@@ -9,6 +9,7 @@ test('T14028',
      [req_interp, req_rts_linker,
       only_ways([config.ghc_th_way]),
       unless(config.have_ext_interp, skip),
+      when(opsys('freebsd'), fragile(19723)),
       when(opsys('linux') and arch('arm'), expect_broken_for(17558, ['dyn'])),
       when(opsys('linux') and arch('x86_64'), expect_broken_for(17300, ['dyn']))],
      makefile_test, ['T14028'])
