@@ -9,12 +9,12 @@ module GHC.Parser.Errors
    , LexErr(..)
    , CmmParserError(..)
    , LexErrKind(..)
-   , PsHint(..)
    , StarIsType (..)
    )
 where
 
 import GHC.Prelude
+import GHC.Types.Error
 import GHC.Types.SrcLoc
 import GHC.Types.Name.Reader (RdrName)
 import GHC.Types.Name.Occurrence (OccName)
@@ -27,7 +27,6 @@ import GHC.Hs.Type
 import GHC.Hs.Lit
 import GHC.Hs.Decls
 import GHC.Core.Coercion.Axiom (Role)
-import GHC.Utils.Outputable (SDoc)
 import GHC.Data.FastString
 import GHC.Unit.Module.Name
 
@@ -82,7 +81,7 @@ data TransLayoutReason
 
 data PsError = PsError
    { errDesc  :: !PsErrorDesc   -- ^ Error description
-   , errHints :: ![PsHint]      -- ^ Hints
+   , errHints :: ![GhcHint]     -- ^ Hints
    , errLoc   :: !SrcSpan       -- ^ Error position
    }
 
@@ -395,17 +394,6 @@ data NumUnderscoreReason
    = NumUnderscore_Integral
    | NumUnderscore_Float
    deriving (Show,Eq,Ord)
-
-data PsHint
-   = SuggestTH
-   | SuggestRecursiveDo
-   | SuggestDo
-   | SuggestMissingDo
-   | SuggestLetInDo
-   | SuggestPatternSynonyms
-   | SuggestInfixBindMaybeAtPat !RdrName
-   | TypeApplicationsInPatternsOnlyDataCons -- ^ Type applications in patterns are only allowed on data constructors
-
 
 data LexErrKind
    = LexErrKind_EOF        -- ^ End of input

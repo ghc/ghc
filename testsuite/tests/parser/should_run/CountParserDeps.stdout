@@ -1,4 +1,4 @@
-Found 262 GHC.Parser module dependencies
+Found 263 GHC.Parser module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.Types
@@ -173,6 +173,7 @@ GHC.Types.Fixity
 GHC.Types.Fixity.Env
 GHC.Types.ForeignCall
 GHC.Types.ForeignStubs
+GHC.Types.Hint
 GHC.Types.HpcInfo
 GHC.Types.IPE
 GHC.Types.Id

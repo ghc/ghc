@@ -31,6 +31,7 @@ instance Diagnostic TcRnMessage where
       -> mkDecorated [ text "The import item" <+> quotes (ppr ie) <+>
                        text "does not have an explicit import list"
                      ]
+
   diagnosticReason = \case
     TcRnUnknownMessage m
       -> diagnosticReason m
@@ -44,6 +45,20 @@ instance Diagnostic TcRnMessage where
       -> WarningWithFlag Opt_WarnDodgyExports
     TcRnMissingImportList{}
       -> WarningWithFlag Opt_WarnMissingImportList
+
+  diagnosticHints = \case
+    TcRnUnknownMessage m
+      -> diagnosticHints m
+    TcRnImplicitLift{}
+      -> noHints
+    TcRnUnusedPatternBinds{}
+      -> noHints
+    TcRnDodgyImports{}
+      -> noHints
+    TcRnDodgyExports{}
+      -> noHints
+    TcRnMissingImportList{}
+      -> noHints
 
 dodgy_msg :: (Outputable a, Outputable b) => SDoc -> a -> b -> SDoc
 dodgy_msg kind tc ie

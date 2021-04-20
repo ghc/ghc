@@ -69,6 +69,7 @@ import GHC.Types.Name.Reader
 import GHC.Types.Name.Occurrence ( varName, dataName, tcClsName, tvName, occNameFS, mkVarOcc, occNameString)
 import GHC.Types.SrcLoc
 import GHC.Types.Basic
+import GHC.Types.Error ( GhcHint(..) )
 import GHC.Types.Fixity
 import GHC.Types.ForeignCall
 import GHC.Types.SourceFile
