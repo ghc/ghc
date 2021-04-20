@@ -641,8 +641,6 @@ data DynFlags = DynFlags {
 
   interactivePrint      :: Maybe String,
 
-  nextWrapperNum        :: IORef (ModuleEnv Int),
-
   -- | Machine dependent flags (-m\<blah> stuff)
   sseVersion            :: Maybe SseVersion,
   bmiVersion            :: Maybe BmiVersion,
@@ -1050,7 +1048,6 @@ initDynFlags dflags = do
  refDynamicTooFailed <- newIORef (not platformCanGenerateDynamicToo)
  refRtldInfo <- newIORef Nothing
  refRtccInfo <- newIORef Nothing
- wrapperNum <- newIORef emptyModuleEnv
  canUseUnicode <- do let enc = localeEncoding
                          str = "‘’"
                      (withCString enc str $ \cstr ->
@@ -1068,7 +1065,6 @@ initDynFlags dflags = do
        (useColor dflags, colScheme dflags)
  return dflags{
         dynamicTooFailed = refDynamicTooFailed,
-        nextWrapperNum = wrapperNum,
         useUnicode    = useUnicode',
         useColor      = useColor',
         canUseColor   = stderrSupportsAnsiColors,
@@ -1231,7 +1227,6 @@ defaultDynFlags mySettings llvmConfig =
         profAuto = NoProfAuto,
         callerCcFilters = [],
         interactivePrint = Nothing,
-        nextWrapperNum = panic "defaultDynFlags: No nextWrapperNum",
         sseVersion = Nothing,
         bmiVersion = Nothing,
         avx = False,
