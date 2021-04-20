@@ -5,7 +5,8 @@
 -- | A lazy state monad.
 module GHC.Utils.Monad.State.Lazy
   ( -- * The State monda
-    State(pattern State)
+    State(State)
+  , state
   , evalState
   , execState
   , runState
@@ -44,6 +45,10 @@ instance Applicative (State s) where
 instance Monad (State s) where
     m >>= n  = State $ \s -> case runState' m s of
                              (# r, s' #) -> runState' (n r) s'
+
+state :: (s -> (a, s)) -> State s a
+state f = State $ \s -> case f s of
+                        (r, s') -> (# r, s' #)
 
 get :: State s s
 get = State $ \s -> (# s, s #)
