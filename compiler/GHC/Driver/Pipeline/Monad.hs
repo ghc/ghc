@@ -4,7 +4,7 @@
 -- Defined in separate module so that it can safely be imported from Hooks
 module GHC.Driver.Pipeline.Monad (
     CompPipeline(..), evalP
-  , PhasePlus(..)
+  , PhasePlus(..), HscBackendAction (..)
   , PipeEnv(..), PipeState(..), PipelineOutput(..)
   , getPipeEnv, getPipeState, getPipeSession
   , setDynFlags, setModLocation, setForeignOs, setIface
@@ -25,8 +25,6 @@ import GHC.Driver.Plugins
 import GHC.Linker.Types
 
 import GHC.Utils.TmpFs (TempFileLifetime)
-
-import GHC.Types.SourceFile
 
 import GHC.Unit.Module
 import GHC.Unit.Module.ModIface
@@ -53,7 +51,8 @@ instance MonadIO CompPipeline where
     liftIO m = P $ \_env state -> do a <- m; return (state, a)
 
 data PhasePlus = RealPhase Phase
-               | HscBackend HscSource ModuleName ModSummary HscStatus
+               -- | The backend phase takes care of -dynamic-too
+               | HscBackend ModSummary HscBackendAction
 
 instance Outputable PhasePlus where
     ppr (RealPhase p) = ppr p

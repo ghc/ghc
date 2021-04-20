@@ -40,8 +40,7 @@ module GHC.Driver.Main
 
     -- * Compiling complete source files
     , Messager, batchMsg
-    , HscStatus (..)
-    , hscIncrementalCompile
+    , HscBackendAction (..), HscRecompStatus (..)
     , initModDetails
     , hscMaybeWriteIface
     , hscCompileCmmFile
@@ -50,12 +49,14 @@ module GHC.Driver.Main
     , hscInteractive
 
     -- * Running passes separately
+    , hscRecompStatus
     , hscParse
     , hscTypecheckRename
     , hscDesugar
     , makeSimpleDetails
     , hscSimplify -- ToDo, shouldn't really export this
     , hscDesugarAndSimplify
+    , hsc_typecheck
 
     -- * Safe Haskell
     , hscCheckSafe
@@ -680,23 +681,14 @@ This is the only thing that isn't caught by the type-system.
 
 type Messager = HscEnv -> (Int,Int) -> RecompileRequired -> ModuleGraphNode -> IO ()
 
---------------------------------------------------------------
--- Compilers
---------------------------------------------------------------
-
--- | Used by both OneShot and batch mode. Runs the pipeline HsSyn and Core parts
--- of the pipeline.
--- We return a interface if we already had an old one around and recompilation
--- was not needed. Otherwise it will be created during later passes when we
--- run the compilation pipeline.
-hscIncrementalCompile :: Maybe Messager
-                      -> HscEnv
-                      -> ModSummary
-                      -> SourceModified
-                      -> Maybe ModIface
-                      -> (Int,Int)
-                      -> IO HscStatus
-hscIncrementalCompile
+hscRecompStatus :: Maybe Messager
+                -> HscEnv
+                -> ModSummary
+                -> SourceModified
+                -> Maybe ModIface
+                -> (Int,Int)
+                -> IO HscRecompStatus
+hscRecompStatus
     mHscMessage hsc_env mod_summary source_modified mb_old_iface mod_index
   = do
     let
@@ -723,15 +715,7 @@ hscIncrementalCompile
         details <- initModDetails hsc_env mod_summary iface
         return $ HscUpToDate iface details
 
-      -- NB: enter Hsc monad here so that we don't bail out early with
-      -- -Werror on typechecker warnings; we also want to run the desugarer
-      -- to get those warnings too. (But we'll always exit at that point
-      -- because the desugarer runs ioMsgMaybe.)
-      _ -> runHsc hsc_env $ do
-        FrontendTypecheck tc_result <- case hscFrontendHook (hsc_hooks hsc_env) of
-          Nothing -> FrontendTypecheck . fst <$> hsc_typecheck False mod_summary Nothing
-          Just h  -> h mod_summary
-        hscDesugarAndSimplify mod_summary tc_result mb_old_hash
+      _ -> return $ HscRecompNeeded mb_old_hash
 
 -- Knot tying!  See Note [Knot-tying typecheckIface]
 -- See Note [ModDetails and --make mode]
@@ -806,7 +790,7 @@ See !5492 and #13586
 hscDesugarAndSimplify :: ModSummary
        -> TcGblEnv
        -> Maybe Fingerprint
-       -> Hsc HscStatus
+       -> Hsc HscBackendAction
 hscDesugarAndSimplify summary tc_result mb_old_hash = do
   hsc_env <- getHscEnv
   dflags <- getDynFlags

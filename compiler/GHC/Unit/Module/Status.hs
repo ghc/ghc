@@ -1,5 +1,5 @@
 module GHC.Unit.Module.Status
-   ( HscStatus (..)
+   ( HscBackendAction(..), HscRecompStatus (..)
    )
 where
 
@@ -11,12 +11,19 @@ import GHC.Unit.Module.ModDetails
 
 import GHC.Utils.Fingerprint
 
--- | Status of a module compilation to machine code
-data HscStatus
+-- | Status of a module in incremental compilation
+data HscRecompStatus
     -- | Nothing to do because code already exists.
     = HscUpToDate ModIface ModDetails
-    -- | Update boot file result.
-    | HscUpdate ModIface ModDetails
+    -- | Recompilation, or update of interface required.
+    -- Optionally pass the old interface hash for to avoid updating the existing
+    -- interface when the interface has not changed.
+    | HscRecompNeeded (Maybe Fingerprint)
+
+-- | Action to perform in backend compilation (TODO: move this to a more appropriate place)
+data HscBackendAction
+    -- | Update the boot and signature file results.
+    = HscUpdate ModIface ModDetails
     -- | Recompile this module.
     | HscRecomp
         { hscs_guts           :: CgGuts
