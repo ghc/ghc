@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fno-warn-orphans #-} -- instance Diagnostic TcRnMessage
+{-# OPTIONS_GHC -fno-warn-orphans #-} -- instance {RenderableMessage, Diagnostic} TcRnMessage
 
 module GHC.Tc.Errors.Ppr where
 
@@ -8,3 +8,4 @@ import GHC.Types.Error
 instance Diagnostic TcRnMessage where
   diagnosticMessage (TcRnUnknownMessage m) = diagnosticMessage m
   diagnosticReason  (TcRnUnknownMessage m) = diagnosticReason m
+  diagnosticHints   (TcRnUnknownMessage m) = diagnosticHints m

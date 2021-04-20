@@ -1,3 +1,4 @@
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -30,6 +31,12 @@ module GHC.Types.Error
    , mkDecoratedDiagnostic
    , mkDecoratedError
 
+   -- * Hints and refactoring actions
+   , Hint (..)
+   , IsHint (..)
+   , Refactoring (..)
+   , noHints
+
     -- * Rendering Messages
 
    , SDoc
@@ -58,8 +65,10 @@ import GHC.Driver.Flags
 
 import GHC.Data.Bag
 import GHC.IO (catchException)
+import GHC.LanguageExtensions (Extension)
 import GHC.Utils.Outputable as Outputable
 import qualified GHC.Utils.Ppr.Colour as Col
+import GHC.Types.Name.Reader (RdrName)
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Data.FastString (unpackFS)
 import GHC.Data.StringBuffer (atLine, hGetStringBuffer, len, lexemeToString)
@@ -67,6 +76,7 @@ import GHC.Utils.Json
 
 import Data.Bifunctor
 import Data.Foldable    ( fold )
+import Data.Typeable (Typeable)
 
 {-
 Note [Messages]
@@ -189,6 +199,44 @@ constraint.
 
 -}
 
+-- | An /action/ which can be performed on an Haskell expression, typically
+-- to transform it according to an 'Hint'.
+data Refactoring
+  = MkRefactoring SrcSpan      -- ^ where the current code to be replaced lives
+                  Replacement  -- ^ replacement for that code
+
+data Replacement
+{-
+  -- = ReplaceExpr (HsExpr GhcPs)
+  -- | ReplaceType (HsType GhcPs)
+  -- | ReplaceMatch (Match GhcPs (HsExpr GhcPs))
+-}
+
+-- | A typeclass for /hints/, emitted by GHC together with diagnostics. A /hint/
+-- is a program transformation which suggests a possible way to deal with a particular
+-- warning or error.
+class Outputable a => IsHint a where
+  hintRefactoring :: a -> Maybe Refactoring
+
+-- | A type for hints emitted by GHC.
+data Hint where
+  -- | An \"unknown\" hint. This type constructor allows arbitrary
+  -- hints to be embedded. The typical use case would be GHC plugins
+  -- willing to emit hints alonside their custom diagnostics.
+  UnknownHint :: (IsHint a, Typeable a) => a -> Hint
+  -- | Suggests adding a particular language extension.
+  SuggestExtension :: !Extension -> Hint
+  -- | Suggests that a particular statement should be written within a \"do\"
+  -- block.
+  SuggestDo :: Hint
+  -- | Suggests that a missing \"do\" block.
+  SuggestMissingDo :: Hint
+  -- | Suggests that a \"let\" expression is needed in a \"do\" block.
+  SuggestLetInDo :: Hint
+  SuggestInfixBindMaybeAtPat :: !RdrName -> Hint
+  -- | Type applications in patterns are only allowed on data constructors
+  TypeApplicationsInPatternsOnlyDataCons :: Hint
+
 -- | A class identifying a diagnostic.
 -- Dictionary.com defines a diagnostic as:
 --
@@ -202,6 +250,16 @@ constraint.
 class Diagnostic a where
   diagnosticMessage :: a -> DecoratedSDoc
   diagnosticReason  :: a -> DiagnosticReason
+  diagnosticHints   :: a -> [Hint]
+
+-- | A generic 'Hint' message, to be used with 'DiagnosticMessage'.
+data DiagnosticHint = DiagnosticHint !SDoc !Refactoring
+
+instance Outputable DiagnosticHint where
+  ppr (DiagnosticHint msg _) = msg
+
+instance IsHint DiagnosticHint where
+  hintRefactoring = const Nothing
 
 -- | A generic 'Diagnostic' message, without any further classification or
 -- provenance: By looking at a 'DiagnosticMessage' we don't know neither
@@ -211,30 +269,36 @@ class Diagnostic a where
 data DiagnosticMessage = DiagnosticMessage
   { diagMessage :: !DecoratedSDoc
   , diagReason  :: !DiagnosticReason
+  , diagHints   :: [Hint]
   }
 
 instance Diagnostic DiagnosticMessage where
   diagnosticMessage = diagMessage
   diagnosticReason  = diagReason
+  diagnosticHints   = diagHints
+
+-- | Helper function to use when no hints can be provided.
+noHints :: IsHint a => [a]
+noHints = mempty
 
 -- | Create a 'DiagnosticMessage' with a 'DiagnosticReason'
 mkDiagnosticMessage :: DecoratedSDoc -> DiagnosticReason -> DiagnosticMessage
-mkDiagnosticMessage = DiagnosticMessage
+mkDiagnosticMessage msg rea = DiagnosticMessage msg rea []
 
 mkPlainDiagnostic :: DiagnosticReason -> SDoc -> DiagnosticMessage
-mkPlainDiagnostic rea doc = DiagnosticMessage (mkSimpleDecorated doc) rea
+mkPlainDiagnostic rea doc = DiagnosticMessage (mkSimpleDecorated doc) rea []
 
 -- | Create an error 'DiagnosticMessage' holding just a single 'SDoc'
 mkPlainError :: SDoc -> DiagnosticMessage
-mkPlainError doc = DiagnosticMessage (mkSimpleDecorated doc) ErrorWithoutFlag
+mkPlainError doc = DiagnosticMessage (mkSimpleDecorated doc) ErrorWithoutFlag []
 
 -- | Create a 'DiagnosticMessage' from a list of bulleted SDocs and a 'DiagnosticReason'
 mkDecoratedDiagnostic :: DiagnosticReason -> [SDoc] -> DiagnosticMessage
-mkDecoratedDiagnostic rea docs = DiagnosticMessage (mkDecorated docs) rea
+mkDecoratedDiagnostic rea docs = DiagnosticMessage (mkDecorated docs) rea []
 
 -- | Create an error 'DiagnosticMessage' from a list of bulleted SDocs
 mkDecoratedError :: [SDoc] -> DiagnosticMessage
-mkDecoratedError docs = DiagnosticMessage (mkDecorated docs) ErrorWithoutFlag
+mkDecoratedError docs = DiagnosticMessage (mkDecorated docs) ErrorWithoutFlag []
 
 -- | The reason /why/ a 'Diagnostic' was emitted in the first place.
 -- Diagnostic messages are born within GHC with a very precise reason, which
