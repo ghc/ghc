@@ -48,14 +48,13 @@ import GHC.Prelude
 import GHC.Driver.Flags
 
 import GHC.Data.Bag
+import GHC.IO (catchException)
 import GHC.Utils.Outputable as Outputable
 import qualified GHC.Utils.Ppr.Colour as Col
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Data.FastString (unpackFS)
 import GHC.Data.StringBuffer (atLine, hGetStringBuffer, len, lexemeToString)
 import GHC.Utils.Json
-
-import System.IO.Error  ( catchIOError )
 
 {-
 Note [Messages]
@@ -371,7 +370,7 @@ getCaretDiagnostic msg_class (RealSrcSpan span _) =
   where
     getSrcLine fn i =
       getLine i (unpackFS fn)
-        `catchIOError` \_ ->
+        `catchException` \(_ :: IOError) ->
           pure Nothing
 
     getLine i fn = do
