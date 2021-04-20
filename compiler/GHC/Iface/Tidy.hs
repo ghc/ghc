@@ -1254,7 +1254,7 @@ tidyTopIdInfo uf_opts rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold
     --    the function returns bottom
     -- In this case, show_unfold will be false (we don't expose unfoldings
     -- for bottoming functions), but we might still have a worker/wrapper
-    -- split (see Note [Worker-wrapper for bottoming functions] in
+    -- split (see Note [Worker/wrapper for bottoming functions] in
     -- GHC.Core.Opt.WorkWrap)
 
 
