@@ -59,6 +59,7 @@ module GHC.Runtime.Interpreter
 
 import GHC.Prelude
 
+import GHC.IO (catchException)
 import GHC.Driver.Ppr (showSDoc)
 import GHC.Driver.Env
 import GHC.Driver.Session
@@ -547,19 +548,19 @@ findSystemLibrary interp str = interpCmd interp (FindSystemLibrary str)
 iservCall :: Binary a => IServInstance -> Message a -> IO a
 iservCall iserv msg =
   remoteCall (iservPipe iserv) msg
-    `catch` \(e :: SomeException) -> handleIServFailure iserv e
+    `catchException` \(e :: SomeException) -> handleIServFailure iserv e
 
 -- | Read a value from the iserv process
 readIServ :: IServInstance -> Get a -> IO a
 readIServ iserv get =
   readPipe (iservPipe iserv) get
-    `catch` \(e :: SomeException) -> handleIServFailure iserv e
+    `catchException` \(e :: SomeException) -> handleIServFailure iserv e
 
 -- | Send a value to the iserv process
 writeIServ :: IServInstance -> Put -> IO ()
 writeIServ iserv put =
   writePipe (iservPipe iserv) put
-    `catch` \(e :: SomeException) -> handleIServFailure iserv e
+    `catchException` \(e :: SomeException) -> handleIServFailure iserv e
 
 handleIServFailure :: IServInstance -> SomeException -> IO a
 handleIServFailure iserv e = do
