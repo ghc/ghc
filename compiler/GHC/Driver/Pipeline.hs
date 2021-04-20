@@ -211,18 +211,28 @@ compileOne' m_tc_result mHscMessage
    let runBackend = compileOneBackend plugin_hsc_env summary
 
    -- Run the pipeline up to codeGen (so everything up to, but not including, STG)
-   status <- case m_tc_result of
+   case m_tc_result of
      Just tc_result
-       | not always_do_basic_recompilation_check -> runHsc plugin_hsc_env $
-         hscDesugarAndSimplify summary tc_result Nothing
-     _ -> hscIncrementalCompile mHscMessage plugin_hsc_env summary
+       | not always_do_basic_recompilation_check -> do
+         hscBackend <- runHsc plugin_hsc_env $
+           hscDesugarAndSimplify summary tc_result Nothing
+         runBackend hscBackend
+     _ -> do
+       status <- hscRecompStatus mHscMessage plugin_hsc_env summary
             source_modified mb_old_iface (mod_index, nmods)
 
-   case status of
-        HscUpToDate iface hmi_details ->
-            ASSERT( isJust mb_old_linkable || isNoLink (ghcLink dflags) )
-            return $! HomeModInfo iface hmi_details mb_old_linkable
-        _ -> runBackend status
+       case status of
+         HscUpToDate iface hmi_details ->
+           ASSERT( isJust mb_old_linkable || isNoLink (ghcLink dflags) )
+           return $! HomeModInfo iface hmi_details mb_old_linkable
+         HscRecompNeeded mb_old_hash -> do
+           hscBackend <- runHsc plugin_hsc_env $ do
+             FrontendTypecheck tc_result <- case hscFrontendHook (hsc_hooks plugin_hsc_env) of
+               Nothing -> FrontendTypecheck . fst <$> hsc_typecheck False summary Nothing
+               Just h  -> h summary
+             hscDesugarAndSimplify summary tc_result mb_old_hash
+
+           runBackend hscBackend
 
  where dflags0     = ms_hspp_opts summary
        location    = ms_location summary
@@ -292,9 +302,9 @@ compileOne' m_tc_result mHscMessage
 compileOneBackend
   :: HscEnv
   -> ModSummary
-  -> HscStatus
+  -> HscBackendAction
   -> IO HomeModInfo
-compileOneBackend hsc_env summary status = do
+compileOneBackend hsc_env summary hscBackend = do
   output_fn <- getOutputFilename logger tmpfs next_phase
                   (Temporary TFL_CurrentModule)
                   basename dflags next_phase (Just location)
@@ -302,7 +312,7 @@ compileOneBackend hsc_env summary status = do
   (_, _, Just iface, mb_linkable) <- runPipeline StopLn hsc_env
                     (output_fn,
                      Nothing,
-                     Just (HscBackend src_flavour mod_name summary status))
+                     Just (HscBackend summary hscBackend))
                     (Just basename)
                     Persistent
                     (Just location)
@@ -325,7 +335,6 @@ compileOneBackend hsc_env summary status = do
        this_mod    = ms_mod summary
        location    = ms_location summary
        input_fn    = expectJust "compile:hs" (ml_hs_file location)
-       mod_name    = moduleName this_mod
 
        logger = hsc_logger hsc_env
        tmpfs  = hsc_tmpfs hsc_env
@@ -701,7 +710,7 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_input_buf, mb_phase)
              isHaskell (RealPhase (Cpp   _)) = True
              isHaskell (RealPhase (HsPp  _)) = True
              isHaskell (RealPhase (Hsc   _)) = True
-             isHaskell (HscBackend {})           = True
+             isHaskell (HscBackend {})       = True
              isHaskell _                     = False
 
              isHaskellishFile = isHaskell start_phase
@@ -1300,20 +1309,38 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
         type_env_var <- liftIO $ newIORef emptyNameEnv
         let plugin_hsc_env = plugin_hsc_env' { hsc_type_env_var = Just (mod, type_env_var) }
 
-        result <-
-          liftIO $ hscIncrementalCompile (Just msg) plugin_hsc_env
-                            mod_summary source_unchanged Nothing (1,1)
+        status <- liftIO $ hscRecompStatus (Just msg) plugin_hsc_env mod_summary
+             source_unchanged Nothing (1, 1)
 
-        -- In the rest of the pipeline use the loaded plugins
-        setPlugins (hsc_plugins        plugin_hsc_env)
-                   (hsc_static_plugins plugin_hsc_env)
-        -- "driver" plugins may have modified the DynFlags so we update them
-        setDynFlags (hsc_dflags plugin_hsc_env)
+        logger <- getLogger
+        case status of
+            HscUpToDate iface _ ->
+                do liftIO $ touchObjectFile logger dflags o_file
+                   -- The .o file must have a later modification date
+                   -- than the source file (else we wouldn't get Nothing)
+                   -- but we touch it anyway, to keep 'make' happy (we think).
+                   setIface iface
+                   return (RealPhase StopLn, o_file)
+            HscRecompNeeded mb_old_hash -> do
+              hscBackend <- liftIO $ runHsc plugin_hsc_env $ do
+                FrontendTypecheck tc_result <- case hscFrontendHook (hsc_hooks plugin_hsc_env) of
+                  Nothing -> FrontendTypecheck . fst <$> hsc_typecheck False mod_summary Nothing
+                  Just h  -> h mod_summary
+                hscDesugarAndSimplify mod_summary tc_result mb_old_hash
 
-        return (HscBackend src_flavour mod_name mod_summary result,
-                panic "HscBackend doesn't have an input filename")
+              -- In the rest of the pipeline use the loaded plugins
+              setPlugins (hsc_plugins        plugin_hsc_env)
+                         (hsc_static_plugins plugin_hsc_env)
+              -- "driver" plugins may have modified the DynFlags so we update them
+              setDynFlags (hsc_dflags plugin_hsc_env)
 
-runPhase (HscBackend src_flavour mod_name mod_summary result) _ = do
+              return (HscBackend mod_summary hscBackend,
+                      panic "HscBackend doesn't have an input filename")
+
+runPhase (HscBackend mod_summary result) _ = do
+        let mod_name = moduleName (ms_mod mod_summary)
+            src_flavour = (ms_hsc_src mod_summary)
+
         dflags <- getDynFlags
         logger <- getLogger
         location <- getLocation src_flavour mod_name
@@ -1327,13 +1354,6 @@ runPhase (HscBackend src_flavour mod_name mod_summary result) _ = do
                             _            -> True
 
         case result of
-            HscUpToDate iface _ ->
-                do liftIO $ touchObjectFile logger dflags o_file
-                   -- The .o file must have a later modification date
-                   -- than the source file (else we wouldn't get Nothing)
-                   -- but we touch it anyway, to keep 'make' happy (we think).
-                   setIface iface
-                   return (RealPhase StopLn, o_file)
             HscUpdate iface _ ->
                 do
                    when write_obj $ case src_flavour of
