@@ -1210,7 +1210,11 @@ checkSafeImports tcg_env
             tcg_env' <- case (not infPassed) of
               True  ->
                 let castMsg m = TcRnUnknownMessage
-                              $ DiagnosticMessage (diagnosticMessage m) (diagnosticReason m)
+                              $ DiagnosticMessage (diagnosticMessage m)
+                                                  (diagnosticReason m)
+                                                  noHints -- suppress the hints, as they can be
+                                                          -- related to any phase of the compilation.
+
                 -- NOTE(adinapoli) This is /extremely/ unfortunate. We have
                 -- to cast everything to be a 'TcRnMessage'!
                 in markUnsafeInfer tcg_env (castMsg <$> infErrs)

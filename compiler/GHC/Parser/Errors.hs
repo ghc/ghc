@@ -15,6 +15,7 @@ module GHC.Parser.Errors
 where
 
 import GHC.Prelude
+import GHC.Types.Error
 import GHC.Types.SrcLoc
 import GHC.Types.Name.Reader (RdrName)
 import GHC.Types.Name.Occurrence (OccName)
@@ -27,9 +28,9 @@ import GHC.Hs.Type
 import GHC.Hs.Lit
 import GHC.Hs.Decls
 import GHC.Core.Coercion.Axiom (Role)
-import GHC.Utils.Outputable (SDoc)
 import GHC.Data.FastString
 import GHC.Unit.Module.Name
+import GHC.LanguageExtensions
 
 -- | A warning that might arise during parsing.
 data PsWarning
@@ -394,12 +395,11 @@ data NumUnderscoreReason
    deriving (Show,Eq,Ord)
 
 data PsHint
-   = SuggestTH
-   | SuggestRecursiveDo
+   = PsUnknownHint !DecoratedSDoc
+   | SuggestExtension !Extension
    | SuggestDo
    | SuggestMissingDo
    | SuggestLetInDo
-   | SuggestPatternSynonyms
    | SuggestInfixBindMaybeAtPat !RdrName
    | TypeApplicationsInPatternsOnlyDataCons -- ^ Type applications in patterns are only allowed on data constructors
 

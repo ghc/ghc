@@ -10,6 +10,7 @@ import GHC.Driver.Errors.Types
 import GHC.Data.Bag
 import GHC.Prelude
 import GHC.Parser.Errors ( PsError(..) )
+import GHC.Parser.Errors.Ppr
 import GHC.Types.SrcLoc
 import GHC.Types.SourceError
 import GHC.Types.Error
@@ -59,4 +60,4 @@ printOrThrowDiagnostics logger dflags msgs
 mkDriverPsHeaderMessage :: PsError -> MsgEnvelope DriverMessage
 mkDriverPsHeaderMessage ps_err
   = mkPlainErrorMsgEnvelope (errLoc ps_err) $
-    DriverPsHeaderMessage (errDesc ps_err) (errHints ps_err)
+    DriverPsHeaderMessage (errDesc ps_err) (MkPsHint <$> errHints ps_err)
