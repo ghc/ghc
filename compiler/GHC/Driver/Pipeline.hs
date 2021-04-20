@@ -220,9 +220,11 @@ compileOne' m_tc_result mHscMessage
             source_modified mb_old_iface (mod_index, nmods)
 
        case status of
-         HscUpToDate iface hmi_details ->
-           ASSERT( isJust mb_old_linkable || isNoLink (ghcLink dflags) )
-           return $! HomeModInfo iface hmi_details mb_old_linkable
+         HscUpToDate iface -> do
+           MASSERT( isJust mb_old_linkable || isNoLink (ghcLink dflags) )
+           -- See Note [ModDetails and --make mode]
+           details <- initModDetails plugin_hsc_env summary iface
+           return $! HomeModInfo iface details mb_old_linkable
          HscRecompNeeded mb_old_hash -> do
            (tc_result, warnings) <- hscTypecheckAndGetWarnings plugin_hsc_env summary
            runPostTc tc_result warnings mb_old_hash
@@ -1312,7 +1314,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
 
         logger <- getLogger
         case status of
-            HscUpToDate iface _ ->
+            HscUpToDate iface ->
                 do liftIO $ touchObjectFile logger dflags o_file
                    -- The .o file must have a later modification date
                    -- than the source file (else we wouldn't get Nothing)
