@@ -425,7 +425,7 @@ checkProcessArgsResult flags
       liftIO $ throwErrors $ foldMap (singleMessage . mkMsg) flags
     where mkMsg (L loc flag)
               = mkPlainErrorMsgEnvelope loc $
-                GhcDriverMessage $ DriverUnknownMessage $ mkPlainError $
+                GhcDriverMessage $ DriverUnknownMessage $ mkPlainError noHints $
                   text "unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+>
                   text flag
 
@@ -469,5 +469,5 @@ optionsParseError str loc =
 
 throwErr :: SrcSpan -> SDoc -> a                -- #15053
 throwErr loc doc =
-  let msg = mkPlainErrorMsgEnvelope loc $ GhcPsMessage $ PsUnknownMessage $ mkPlainError doc
+  let msg = mkPlainErrorMsgEnvelope loc $ GhcPsMessage $ PsUnknownMessage $ mkPlainError noHints doc
   in throw $ mkSrcErr $ singleMessage msg
